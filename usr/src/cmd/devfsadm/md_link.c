@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <sys/mkdev.h>
+#include <sdssc.h>
 
 #define	MD_LINK_RE_DEVICES	"^md/r?dsk/.+$"
 #define	MD_LINK_RE_SHARED	"^md/shared/[0-9]+/r?dsk/.+$"
@@ -99,6 +100,13 @@ md_create(di_minor_t minor, di_node_t node)
 	int key;
 	mdsetname_t	*sp = NULL;
 	md_error_t ep;
+
+	/*
+	 * Initialize sdssc entry points. Don't worry about the return
+	 * value here since the interface functions will get initialized
+	 * correctly regardless.
+	 */
+	(void) sdssc_bind_library();
 
 	(void) strcpy(mn, di_minor_name(minor));
 

@@ -219,7 +219,6 @@ meta_init_make_device(
 	md_error_t	*ep
 )
 {
-	di_devlink_handle_t	hdl;
 	md_mkdev_params_t	params;
 	mdkey_t			rval = 0;
 	char			*p;
@@ -247,18 +246,8 @@ meta_init_make_device(
 		return (-1);
 	}
 
-	/*
-	 * Wait until device appears in namespace. di_devlink_init() returns
-	 * once the /dev links have been created. If NULL is returned the
-	 * link operation failed and we haven't got a device to use.
-	 * NOTE: This will take a _long_ time for large numbers of metadevices.
-	 *	 Change to use the enhanced di_devlink_init() interface when
-	 *	 available.
-	 */
-	hdl = di_devlink_init("md", DI_MAKE_LINK);
-	if (hdl != NULL) {
-		(void) di_devlink_fini(&hdl);
-	} else {
+	/* Make sure the /dev link is created */
+	if (meta_update_devtree(MD_MKMIN((*spp)->setno, params.un)) != 0) {
 		/*
 		 * Delete name entry we just created
 		 */

@@ -38,6 +38,7 @@
 #include 	<meta.h>
 #include 	<syslog.h>
 #include	<sdssc.h>
+#include	<libdevinfo.h>
 #include	"meta_set_prv.h"
 
 /*
@@ -173,6 +174,57 @@ mda_getpath(char *devname)
 	(void) strncpy(pathname, devname, len);
 	pathname[len] = '\0';
 	return (pathname);
+}
+
+/*
+ * meta_update_devtree -- Update the /dev/md namespace for metadevices.
+ *
+ * Only update the specific link if a valid minor(not NODEV) is given.
+ * Otherwise, update the entire /dev/md .
+ */
+
+int
+meta_update_devtree(minor_t mnum)
+{
+	char	nodename[40];
+	di_devlink_handle_t	hdl;
+
+	/*
+	 * di_devlink_init() returns once the /dev links have been
+	 * updated(created or removed). If di_devlink_init returns
+	 * a NULL, the link operation failed.
+	 *
+	 * Use the enhanced di_devlink_init interface if the mnum
+	 * is available.
+	 */
+	if (mnum == NODEV) {
+		/*
+		 * NOTE: This will take a _long_ time for large numbers
+		 * of metadevices.
+		 */
+		hdl = di_devlink_init("md", DI_MAKE_LINK);
+	} else {
+		/* Call di_devlink_init twice, for block and raw devices */
+		(void) sprintf(nodename, "/pseudo/md@0:%lu,%lu,raw",
+		    MD_MIN2SET(mnum), MD_MIN2UNIT(mnum));
+		hdl = di_devlink_init(nodename, DI_MAKE_LINK);
+
+		if (hdl == NULL)
+			return (-1);
+		else
+			(void) di_devlink_fini(&hdl);
+
+		(void) sprintf(nodename, "/pseudo/md@0:%lu,%lu,blk",
+		    MD_MIN2SET(mnum), MD_MIN2UNIT(mnum));
+		hdl = di_devlink_init(nodename, DI_MAKE_LINK);
+	}
+
+	if (hdl != NULL) {
+		(void) di_devlink_fini(&hdl);
+		return (0);
+	}
+
+	return (-1);
 }
 
 /*

@@ -3737,6 +3737,10 @@ function	meta_upd_ctdnames
 version		SUNWprivate_1.1
 end
 
+function	meta_update_devtree
+version		SUNWprivate_1.1
+end
+
 function	pathname_reload
 version		SUNWprivate_1.1
 end

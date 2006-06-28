@@ -1957,6 +1957,7 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 		/* If the user requests a release, clean up everything */
 		md_clr_setstatus(setno, MD_SET_KEEPTAG);
 
+		/* Block incoming I/Os during release_set operation */
 		if (MD_MNSET_SETNO(setno)) {
 			/*
 			 * md_tas_block_setio will block the set if
@@ -1979,6 +1980,10 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 		}
 
 		err = release_set(cp, mode);
+
+		/* Unblock I/O state only if release_set failed */
+		if (err)
+			md_clearblock_setio(setno);
 
 		break;
 	}

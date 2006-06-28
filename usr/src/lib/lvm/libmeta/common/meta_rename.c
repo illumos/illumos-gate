@@ -231,7 +231,6 @@ meta_swap(
 	if (op == MDRNOP_RENAME && from_has_parent) {
 		(void) add_key_name(sp, to_np, NULL, ep);
 		if (from_is_fn)
-			(void) del_key_name(sp, from_np, ep);
 			(void) del_self_name(sp, from_np->key, ep);
 	}
 

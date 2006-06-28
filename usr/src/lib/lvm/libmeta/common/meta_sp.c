@@ -4600,6 +4600,13 @@ meta_sp_reset_common(
 		(void) mdstealerror(ep, &reset_params.mde);
 		goto out;
 	}
+
+	/*
+	 * Wait for the /dev to be cleaned up. Ignore the return
+	 * value since there's not much we can do.
+	 */
+	(void) meta_update_devtree(meta_getminor(np->dev));
+
 	rval = 0;	/* success */
 
 	if (options & MDCMD_PRINT) {

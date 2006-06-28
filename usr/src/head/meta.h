@@ -1804,6 +1804,7 @@ extern	int		meta_upd_ctdnames(mdsetname_t **sp, set_t setno,
 			    md_error_t *ep);
 extern  int		pathname_reload(mdsetname_t **sp, set_t setno,
 			    md_error_t *ep);
+extern	int		meta_update_devtree(minor_t mnum);
 
 /* meta_mn_comm.c */
 extern int		mdmn_send_message(set_t setno, md_mn_msgtype_t type,
