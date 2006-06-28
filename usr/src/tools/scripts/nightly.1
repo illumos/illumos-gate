@@ -2,9 +2,8 @@
 .\" " CDDL HEADER START
 .\" "
 .\" " The contents of this file are subject to the terms of the
-.\" " Common Development and Distribution License, Version 1.0 only
-.\" " (the "License").  You may not use this file except in compliance
-.\" " with the License.
+.\" " Common Development and Distribution License (the "License").
+.\" " You may not use this file except in compliance with the License.
 .\" "
 .\" " You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 .\" " or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,9 @@
 .\" "
 .\" " CDDL HEADER END
 .\" "
-.\" "Copyright 2005 Sun Microsystems, Inc.  All rights reserved."
+.\" "Copyright 2006 Sun Microsystems, Inc.  All rights reserved."
 .\" "Use is subject to license terms."
-.TH nightly 1 "1 January 2005"
+.TH nightly 1 "23 June 2006"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
@@ -209,9 +208,6 @@ Default group of options for building a release (-mp)
 .TP 10
 .B \-V VERS
 set the build version string to VERS, overriding VERSION
-.TP
-.B \-d
-use Distributed Make (default uses Parallel Make)
 .TP
 .B \-X
 do IA32 realmode builds (requires access to a
@@ -450,9 +446,9 @@ check, which appears in the nightly output as "Check lists of files."
 .LP
 .B CHECK_DMAKE
 .RS 5
-Nightly validates that, if dmake is in use, the version of dmake
-encountered is known to be safe to use.  Set this flag to 'n' to
-disable this test, allowing any version of dmake to be used.
+Nightly validates that the version of dmake encountered is known to be
+safe to use.  Set this flag to 'n' to disable this test, allowing any
+version of dmake to be used.
 .RE
 .LP
 .SH REALMODE ENVIRONMENT VARIABLES

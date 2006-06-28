@@ -32,9 +32,8 @@ package in $(PKGARCHIVE). Installing that package will populate the
 /opt/onbld directory, and create a root account for building called 'gk',
 which uses csh and has a home directory of /opt/onbld/gk. You can
 use this account to do full builds with 'nightly'. You don't have to,
-you just need to be root do a full build, but the 'gk' account has 
-the path setup properly, contains a .make.machines file for pmake,
-and the .login attempts to set up for dmake (if it ever works).
+but the 'gk' account has the path setup properly, has a .make.machines
+file for dmake, and has a .login that sets up for dmake.
 
 Layout of /opt/onbld
 --------------------
@@ -269,7 +268,7 @@ How to do a full build
    edit the file and tailor it to your workspace. Remember that this file
    is a shell script, so it can do more than set environment variables.
 
-2. Login as 'gk' (or root, but your PATH and .make.machines for pmake will
+2. Login as 'gk' (or root, but your PATH and .make.machines for dmake will
    not be right). Run 'nightly' and give it your environment file as an
    option. 'nightly' will first look for your environment file in
    /opt/onbld/env, and if it's not there then it will look for it as an

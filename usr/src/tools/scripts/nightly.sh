@@ -372,30 +372,10 @@ build() {
 
 	if [ "$W_FLAG" = "n" ]; then
 		echo "\n==== Build warnings ($LABEL) ====\n" >>$mail_msg_file
-		# should be none, but there are a few that are pmake
-		# related, and a couple of silly ones.
 		egrep -i warning: $SRC/${INSTALLOG}.out \
 			| egrep -v '^tic:' \
-			| egrep -v '^mcs:' \
-			| egrep -v '^LD_LIBRARY_PATH=' \
-			| egrep -v 'multiple use of -K option' \
-			| egrep -v 'option -I appears more than once' \
-			| egrep -v 'ar: creating' \
-			| egrep -v 'ar: writing' \
-			| egrep -v 'conflicts:' \
-			| egrep -v ':saved created' \
-			| egrep -v '^stty.*c:' \
-			| egrep -v '^mfgname.c:' \
-			| egrep -v '^uname-i.c:' \
-			| egrep -v '^volumes.c:' \
-			| egrep -v '^lint library construction:' \
-			| egrep -v 'tsort: INFORM:' \
-			| egrep -v 'stripalign:' \
-			| egrep -v 'chars, width' \
-			| egrep -v 'option -zdefs/nodefs appears more than' \
 			| egrep -v "symbol \`timezone' has differing types:" \
-			| egrep -v "parameter <PSTAMP> set to" \
-			| egrep -v "^Manifying" \
+		        | egrep -v "parameter <PSTAMP> set to" \ 
 			| egrep -v "Ignoring unknown host" \
 			| egrep -v "redefining segment flags attribute for" \
 			>> $mail_msg_file
@@ -418,8 +398,6 @@ build() {
 			| egrep -v '^tic:' \
 			| egrep -v '^mcs' \
 			| egrep -v '^LD_LIBRARY_PATH=' \
-			| egrep -v 'multiple use of -K option' \
-			| egrep -v 'option -I appears more than once' \
 			| egrep -v 'ar: creating' \
 			| egrep -v 'ar: writing' \
 			| egrep -v 'conflicts:' \
@@ -432,7 +410,6 @@ build() {
 			| egrep -v 'tsort: INFORM:' \
 			| egrep -v 'stripalign:' \
 			| egrep -v 'chars, width' \
-			| egrep -v 'option -zdefs/nodefs appears more than' \
 			| egrep -v "symbol \`timezone' has differing types:" \
 			| egrep -v 'PSTAMP' \
 			| egrep -v '|%WHOANDWHERE%|' \
@@ -610,10 +587,6 @@ dolint() {
 	if [ -f ${LINTNOISE}.out ]; then
 		mv ${LINTNOISE}.out ${LINTNOISE}.ref
 	fi
-        #grep : $LINTOUT |
-		#egrep -v '^(name|function|value|argument|real|user|sys)' |
-		#egrep -v 'warning: (name|function|value|possibly)' |
-		#egrep -v 'warning: argument used' |
         grep : $LINTOUT | \
 		egrep -v '^(real|user|sys)' |
 		egrep -v '(library construction)' | \
@@ -845,7 +818,6 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-V VERS set the build version string to VERS
 	-X	copy x86 IHV proto area
 	-a	create cpio archives
-	-d	use Distributed Make (default uses Parallel Make)
 	-f	find unreferenced files
 	-i	do an incremental build (no "make clobber")
 	-l	do "make lint" in $LINTDIRS (default: $SRC y)
@@ -875,7 +847,6 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 # default values for low-level FLAGS; G I R are group FLAGS
 A_FLAG=n
 a_FLAG=n
-d_FLAG=n
 C_FLAG=n
 F_FLAG=n
 f_FLAG=n
@@ -1062,7 +1033,7 @@ check_closed_tree
 
 #
 # Note: changes to the option letters here should also be applied to the
-#	bldenv script.
+#	bldenv script.  `d' is listed for backward compatibility.
 #
 OPTIND=1
 while getopts ABDFNMPTCGIRafinlmoptuUxdrtzWS:X FLAG $NIGHTLY_OPTIONS
@@ -1098,8 +1069,6 @@ do
 		p_FLAG=y
 		;;
 	  a )	a_FLAG=y
-		;;
-	  d )	d_FLAG=y
 		;;
 	  f )	f_FLAG=y
 		;;
@@ -1214,34 +1183,33 @@ POUND_SIGN="#"
 # the Makefile.master definitions.
 export o_FLAG POUND_SIGN
 
-if [ "$d_FLAG" = "y" ]; then
-	maketype="distributed"
-	MAKE=dmake
-	# get the dmake version string alone
-	DMAKE_VERSION=$( $MAKE -v )
-	DMAKE_VERSION=${DMAKE_VERSION#*: }
-	# focus in on just the dotted version number alone
-	DMAKE_MAJOR=$( echo $DMAKE_VERSION | \
-		sed -e 's/.*\<\([^.]*\.[^   ]*\).*$/\1/' )
-	# extract the second (or final) integer
-	DMAKE_MINOR=${DMAKE_MAJOR#*.}
-	DMAKE_MINOR=${DMAKE_MINOR%%.*}
-	# extract the first integer
-	DMAKE_MAJOR=${DMAKE_MAJOR%%.*}
-	CHECK_DMAKE=${CHECK_DMAKE:-y}
-	# x86 was built on the 12th, sparc on the 13th.
-	if [ "$CHECK_DMAKE" = "y" -a \
-	     "$DMAKE_VERSION" != "Sun Distributed Make 7.3 2003/03/12" -a \
-	     "$DMAKE_VERSION" != "Sun Distributed Make 7.3 2003/03/13" -a \( \
-	     "$DMAKE_MAJOR" -lt 7 -o \
-	     "$DMAKE_MAJOR" -eq 7 -a "$DMAKE_MINOR" -lt 4 \) ]; then
-		if [ -z "$DMAKE_VERSION" ]; then
-			echo "$MAKE is missing."
-			exit 1
-		fi
-		echo `whence $MAKE`" version is:"
-		echo "  ${DMAKE_VERSION}"
-		cat <<EOF
+maketype="distributed"
+MAKE=dmake
+# get the dmake version string alone
+DMAKE_VERSION=$( $MAKE -v )
+DMAKE_VERSION=${DMAKE_VERSION#*: }
+# focus in on just the dotted version number alone
+DMAKE_MAJOR=$( echo $DMAKE_VERSION | \
+	sed -e 's/.*\<\([^.]*\.[^   ]*\).*$/\1/' )
+# extract the second (or final) integer
+DMAKE_MINOR=${DMAKE_MAJOR#*.}
+DMAKE_MINOR=${DMAKE_MINOR%%.*}
+# extract the first integer
+DMAKE_MAJOR=${DMAKE_MAJOR%%.*}
+CHECK_DMAKE=${CHECK_DMAKE:-y}
+# x86 was built on the 12th, sparc on the 13th.
+if [ "$CHECK_DMAKE" = "y" -a \
+     "$DMAKE_VERSION" != "Sun Distributed Make 7.3 2003/03/12" -a \
+     "$DMAKE_VERSION" != "Sun Distributed Make 7.3 2003/03/13" -a \( \
+     "$DMAKE_MAJOR" -lt 7 -o \
+     "$DMAKE_MAJOR" -eq 7 -a "$DMAKE_MINOR" -lt 4 \) ]; then
+	if [ -z "$DMAKE_VERSION" ]; then
+		echo "$MAKE is missing."
+		exit 1
+	fi
+	echo `whence $MAKE`" version is:"
+	echo "  ${DMAKE_VERSION}"
+	cat <<EOF
 
 This version may not be safe for use.  Either set TEAMWARE to a better
 path or (if you really want to use this version of dmake anyway), add
@@ -1249,12 +1217,7 @@ the following to your environment to disable this check:
 
   CHECK_DMAKE=n
 EOF
-		exit 1
-	fi
-else
-	PATH="$TEAMWARE/ParallelMake/bin:$PATH"
-	maketype="parallel"
-	MAKE=make
+	exit 1
 fi
 export PATH
 export MAKE
@@ -1705,9 +1668,7 @@ echo "%M% version %I% 20%E%\n" | tee -a $mail_msg_file >> $LOGFILE
 
 # make
 whence $MAKE | tee -a $mail_msg_file >> $LOGFILE
-if [ "$d_FLAG" = "y" ]; then
-	$MAKE -v | tee -a $mail_msg_file >> $LOGFILE
-fi
+$MAKE -v | tee -a $mail_msg_file >> $LOGFILE
 echo "number of concurrent jobs = $DMAKE_MAX_JOBS" |
     tee -a $mail_msg_file >> $LOGFILE
 
@@ -1729,12 +1690,11 @@ fi
 	echo
 	# 
 	# Put statefile somewhere we know we can write to rather than trip
-	# over a read-only $srcroot.  Use /usr/ccs/bin/make here because 
-	# it supports -K and ParallelMake doesn't.
+	# over a read-only $srcroot.
 	# 
 	rm -f $TMPDIR/make-state
 	export SRC=$srcroot
-	if /usr/ccs/bin/make -K $TMPDIR/make-state -e $target 2>/dev/null; then
+	if $MAKE -K $TMPDIR/make-state -e $target 2>/dev/null; then
 		continue
 	fi
 	touch $TMPDIR/nocompiler

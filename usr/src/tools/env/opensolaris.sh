@@ -39,9 +39,8 @@
 #	sends mail on completion (-m and the MAILTO variable)
 #	checks for changes in ELF runpaths (-r)
 #	build and use this workspace's tools in $SRC/tools (-t)
-#	use dmake instead of pmake (-d)
 #
-NIGHTLY_OPTIONS="-FNnaCdDlmrt";		export NIGHTLY_OPTIONS
+NIGHTLY_OPTIONS="-FNnaCDlmrt";		export NIGHTLY_OPTIONS
 
 # This is a variable for the rest of the script - GATE doesn't matter to
 # nightly itself
