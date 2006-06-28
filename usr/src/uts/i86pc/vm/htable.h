@@ -97,11 +97,14 @@ typedef struct htable htable_t;
 /*
  * The htable hash table hashing function.  The 28 is so that high
  * order bits are include in the hash index to skew the wrap
- * around of addresses.
+ * around of addresses. Even though the hash buckets are stored per
+ * hat we include the value of hat pointer in the hash function so
+ * that the secondary hash for the htable mutex winds up begin different in
+ * every address space.
  */
 #define	HTABLE_HASH(hat, va, lvl)					\
-	((((va) >> LEVEL_SHIFT(1)) + ((va) >> 28) + (lvl)) &		\
-	((hat)->hat_num_hash - 1))
+	((((va) >> LEVEL_SHIFT(1)) + ((va) >> 28) + (lvl) +		\
+	((uintptr_t)(hat) >> 4)) & ((hat)->hat_num_hash - 1))
 
 /*
  * For 32 bit, access to page table entries is done via the page table's PFN and
