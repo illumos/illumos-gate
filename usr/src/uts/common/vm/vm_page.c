@@ -170,11 +170,11 @@ static kcondvar_t freemem_cv;
  */
 
 #if NCPU <= 4
-#define	PAD	1
+#define	PAD	2
 #define	PCF_FANOUT	4
 static	uint_t	pcf_mask = PCF_FANOUT - 1;
 #else
-#define	PAD	9
+#define	PAD	10
 #ifdef sun4v
 #define	PCF_FANOUT	32
 #else
@@ -184,9 +184,8 @@ static	uint_t	pcf_mask = PCF_FANOUT - 1;
 #endif
 
 struct pcf {
-	uint_t		pcf_touch;	/* just to help the cache */
-	uint_t		pcf_count;	/* page count */
 	kmutex_t	pcf_lock;	/* protects the structure */
+	uint_t		pcf_count;	/* page count */
 	uint_t		pcf_wait;	/* number of waiters */
 	uint_t		pcf_block; 	/* pcgs flag to page_free() */
 	uint_t		pcf_reserve; 	/* pages freed after pcf_block set */
@@ -1343,7 +1342,6 @@ pcf_acquire_all()
 
 	p = pcf;
 	for (i = 0; i < PCF_FANOUT; i++) {
-		p->pcf_touch = 1;
 		mutex_enter(&p->pcf_lock);
 		p++;
 	}
@@ -1500,7 +1498,6 @@ checkagain:
 	total = 0;
 	p = pcf;
 	for (i = 0; i < PCF_FANOUT; i++) {
-		p->pcf_touch = 1;
 		mutex_enter(&p->pcf_lock);
 		total += p->pcf_count;
 		if (total >= npages) {
@@ -2144,7 +2141,6 @@ page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	enough = 0;
 	pcf_index = PCF_INDEX();
 	p = &pcf[pcf_index];
-	p->pcf_touch = 1;
 	q = &pcf[PCF_FANOUT];
 	for (pcftotal = 0, i = 0; i < PCF_FANOUT; i++) {
 		if (p->pcf_count > npages) {
@@ -2171,7 +2167,6 @@ page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 		if (p >= q) {
 			p = pcf;
 		}
-		p->pcf_touch = 1;
 	}
 
 	if (!enough) {
@@ -2183,7 +2178,6 @@ page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 
 		/* try to collect pages from several pcf bins */
 		for (p = pcf, pcftotal = 0, i = 0; i < PCF_FANOUT; i++) {
-			p->pcf_touch = 1;
 			mutex_enter(&p->pcf_lock);
 			pcftotal += p->pcf_count;
 			if (pcftotal >= npages) {
@@ -2374,7 +2368,6 @@ page_create_va(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	pcf_index = PCF_INDEX();
 
 	p = &pcf[pcf_index];
-	p->pcf_touch = 1;
 	q = &pcf[PCF_FANOUT];
 	for (i = 0; i < PCF_FANOUT; i++) {
 		if (p->pcf_count > npages) {
@@ -2400,7 +2393,6 @@ page_create_va(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 		if (p >= q) {
 			p = pcf;
 		}
-		p->pcf_touch = 1;
 	}
 
 	if (!enough) {
@@ -2631,7 +2623,6 @@ fail:
 		if (overshoot) {
 			VM_STAT_ADD(page_create_overshoot);
 			p = &pcf[pcf_index];
-			p->pcf_touch = 1;
 			mutex_enter(&p->pcf_lock);
 			if (p->pcf_block) {
 				p->pcf_reserve += overshoot;
@@ -2775,7 +2766,6 @@ page_free(page_t *pp, int dontneed)
 	 */
 	pcf_index = PCF_INDEX();
 	p = &pcf[pcf_index];
-	p->pcf_touch = 1;
 
 	mutex_enter(&p->pcf_lock);
 	if (p->pcf_block) {
@@ -2828,7 +2818,6 @@ page_free_at_startup(page_t *pp)
 	 */
 	pcf_index = PCF_INDEX();
 	p = &pcf[pcf_index];
-	p->pcf_touch = 1;
 
 	ASSERT(p->pcf_block == 0);
 	ASSERT(p->pcf_wait == 0);
@@ -3006,7 +2995,6 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 
 	pcf_index = PCF_INDEX();
 	p = &pcf[pcf_index];
-	p->pcf_touch = 1;
 	mutex_enter(&p->pcf_lock);
 	if (p->pcf_count >= npgs) {
 		collected = npgs;
@@ -3025,7 +3013,6 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 		 */
 		p = pcf;
 		for (i = 0; i < PCF_FANOUT; i++) {
-			p->pcf_touch = 1;
 			mutex_enter(&p->pcf_lock);
 			if (p->pcf_count) {
 				if (p->pcf_count >= need) {
