@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,7 +112,8 @@
 #include <errno.h>
 #include <sys/stat.h>
 
-#define	JAN_01_1902		(long long)0x8017E880
+/* JAN_01_1902 cast to (int) - negative number of seconds from 1970 */
+#define	JAN_01_1902		(int)0x8017E880
 #define	LEN_TZDIR		(sizeof (TZDIR) - 1)
 #define	TIMEZONE		"/etc/default/init"
 #define	TZSTRING		"TZ="
