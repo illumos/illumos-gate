@@ -91,6 +91,8 @@ PCI_COMMON_OBJS	+= pci.o pci_util.o pci_dma.o pci_devctl.o \
 			pci_cb.o pci_ib.o pci_ecc.o pci_pbm.o pci_intr.o \
 			pci_space.o pci_counters.o pci_axq.o \
 			pci_fm.o pci_reloc.o pci_tools.o pci_asm.o
+RMCLOMV_OBJS	+= rmclomv.o
+WRSMD_OBJS	+= wrsmd.o
 
 PSYCHO_PCI_OBJS	+= $(PCI_COMMON_OBJS) pcipsy.o
 SCHIZO_PCI_OBJS	+= $(PCI_COMMON_OBJS) pcisch_asm.o pcisch.o pcix.o

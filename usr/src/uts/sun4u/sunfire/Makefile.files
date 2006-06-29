@@ -40,6 +40,8 @@ FHC_OBJS        += fhc.o fhc_bd.o jtag.o fhc_asm.o
 
 AC_OBJS         += ac.o ac_stat.o ac_add.o ac_del.o ac_test.o ac_asm.o
 
+CENTRAL_OBJS	+= central.o
+
 ENVIRON_OBJS	+= environ.o
 
 SYSCTRL_OBJS	+= sysctrl.o sysctrl_quiesce.o sysctrl_dr.o sysctrl_asm.o

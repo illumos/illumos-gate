@@ -1,0 +1,94 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+msgid  "cpu/mem   "
+msgid  "mem       "
+msgid  "dual-sbus "
+msgid  "sbus-upa  "
+msgid  "dual-pci  "
+msgid  "disk      "
+msgid  "soc+sbus  "
+msgid  "soc+upa   "
+msgid  "unknown   "
+msgid  "get-status"
+msgid  "list"
+msgid  "connect"
+msgid  "disconnect"
+msgid  "configure"
+msgid  "unconfigure"
+msgid  "quiesce-test"
+msgid  "insert-test"
+msgid  "remove-test"
+msgid  "set-condition-test"
+msgid  "enable-at-boot"
+msgid  "disable-at-boot"
+msgid  "prom open"
+msgid  "prom getprop"
+msgid  "prom setprop"
+msgid  "[-f][-o enable-at-boot]"
+msgid  "\t-x quiesce-test ap_id [ap_id...]"
+msgid  "\t-x insert-test  ap_id [ap_id...]"
+msgid  "\t-x remove-test  ap_id [ap_id...]"
+msgid  "\t-x set-condition-test=<condition>"
+msgid  "\t-o enable-at-boot"
+msgid  "\t-o disable-at-boot"
+msgid  "unknown"
+msgid  "ok"
+msgid  "failing"
+msgid  "failed"
+msgid  "unusable"
+msgid  "<%s>"
+msgid  "\n"
+msgid  "cfga_sid(%d,%d)=%d\n"
+msgid  "errno=%d"
+msgid  "%s\n"
+msgid  "<%d>"
+msgid  "%s"
+msgid  "/tmp/cfga_simdata"
+msgid  "sim_open"
+msgid  "sim_stat"
+msgid  "sim_size"
+msgid  "sim_read"
+msgid  "sim_open(%s)\n"
+msgid  "/dev/openprom"
+msgid  "sim_ioctl(%d)\n"
+msgid  "sim_seek"
+msgid  "sim_write"
+msgid  "disabled-board-list"
+msgid  "getprop(%s, %d)\n"
+msgid  "prom_set_prop(%s)\n"
+msgid  "%x"
+msgid  "slot"
+msgid  "ap_idx(%s)\n"
+msgid  "ap_idx: s=%s, n=%d\n"
+msgid  "ap_idx(%s)=%d\n"
+msgid  "cpu %d: "
+msgid  "%3d MHz "
+msgid  "%0.1fM "
+msgid  "single buffered ffb   "
+msgid  "double buffered ffb   "
+msgid  "no ffb installed   "
+msgid  "illegal ffb size   "
+msgid  "target: %2d "
+msgid  "no disk   "
+msgid  "disabled at boot   "
+msgid  "non-detachable   "
+msgid  "100 MHz capable   "

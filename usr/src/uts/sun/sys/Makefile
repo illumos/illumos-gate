@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,12 +56,10 @@ pr_impl_util.h		pr_planegroups.h \
 promif.h		promimpl.h \
 ramdac.h 		ser_async.h		ser_zscc.h \
 socalio.h		socalreg.h \
+socal_cq_defs.h		socalmap.h		socalvar.h \
 stp4020_reg.h		stp4020_var.h \
 ttymux.h		ttymuxuser.h \
 zsdev.h
-
-CLOSED_HDRS= \
-socal_cq_defs.h		socalmap.h		socalvar.h
 
 AUDIOHDRS= \
 audio_4231.h \

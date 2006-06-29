@@ -444,6 +444,10 @@ $(OBJS_DIR)/%.o: 		$(UTSBASE)/common/io/bge/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/cardbus/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/dld/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -563,6 +567,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/pcmcia/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppp/sppp/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/pcmcia/pem/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O) 
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppp/spppasyn/%.c
 	$(COMPILE.c) -o $@ $<
@@ -1157,6 +1165,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/sada/drv/audiots/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/bge/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/cardbus/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/dld/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -1416,6 +1427,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/pcmcia/nexus/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/pcmcia/pcs/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/pcmcia/pem/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/rpc/%.c

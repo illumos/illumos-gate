@@ -374,6 +374,8 @@ AUDIO810_OBJS += audio810.o
 
 AUDIOTS_OBJS +=	audiots.o
 
+CARDBUS_OBJS += cardbus.o cardbus_hp.o cardbus_cfg.o
+
 CONSKBD_OBJS += conskbd.o
 
 CONSMS_OBJS +=	consms.o
@@ -1036,6 +1038,10 @@ MIXER_OBJS +=	am_main.o am_ad.o am_ioctl.o
 C2AUDIT_OBJS +=	adr.o audit.o audit_event.o audit_io.o \
 		audit_path.o audit_start.o audit_syscalls.o audit_token.o \
 		audit_mem.o audit_zone.o
+
+PCIC_OBJS +=	pcic.o
+
+PEM_OBJS +=	pem.o
 
 RPCSEC_OBJS +=	secmod.o	sec_clnt.o	sec_svc.o	sec_gen.o \
 		auth_des.o	auth_kern.o	auth_loopb.o\

@@ -352,6 +352,7 @@ CHKHDRS=			\
 	pci_impl.h		\
 	pcmcia.h		\
 	pctypes.h		\
+	pem.h			\
 	pfmod.h			\
 	pm.h			\
 	policy.h		\
@@ -567,7 +568,8 @@ AUDIOHDRS=			\
 BSCHDRS=			\
 	lom_ebuscodes.h		\
 	lom_io.h		\
-	lom_priv.h
+	lom_priv.h		\
+	lombus.h
 
 MDESCHDRS=			\
 	mdesc.h			\
@@ -888,6 +890,8 @@ PCHDRS=			\
 	avintr.h	\
 	dma_engine.h	\
 	i8272A.h	\
+	pcic_reg.h	\
+	pcic_var.h	\
 	pic.h		\
 	pit.h		\
 	rtc.h

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -71,6 +71,8 @@ ERI_OBJS +=	eri.o
 SBUSMEM_OBJS +=	sbusmem.o
 
 SD_OBJS +=	sd.o sd_xbuf.o
+
+SOCAL_OBJS +=	socal.o socal_ucode.o
 
 CMLB_OBJS +=	cmlb.o
 

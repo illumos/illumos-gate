@@ -58,7 +58,7 @@ usr/src/uts/sun4u/daktari/Makefile
 usr/src/uts/sun4u/enchilada/Makefile
 usr/closed/uts/sun4u/ents/Makefile
 usr/src/uts/sun4u/littleneck/Makefile
-usr/closed/uts/sun4u/lw2plus/Makefile
+usr/src/uts/sun4u/lw2plus/Makefile
 usr/src/uts/sun4u/lw8/Makefile
 usr/src/uts/sun4u/mpxu/Makefile
 usr/src/uts/sun4u/serengeti/Makefile

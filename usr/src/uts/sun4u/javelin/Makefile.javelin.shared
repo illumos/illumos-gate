@@ -18,9 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# uts/sun4u/javelin/Makefile.javelin
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -74,5 +74,5 @@ include $(UTSTREE)/sun4u/Makefile.sun4u
 # Define modules (must come after Makefile.sun4u, for CLOSED_BUILD)
 #
 JAVELIN_KMODS	= platmod
+JAVELIN_KMODS	+= envctrltwo
 
-$(CLOSED_BUILD)CLOSED_JAVELIN_KMODS	= envctrltwo

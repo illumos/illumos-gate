@@ -267,6 +267,7 @@ DRV_KMODS	+= ib ibd
 DRV_KMODS	+= pci_pci px_pci pxb_bcm pcie
 DRV_KMODS	+= i8042 kb8042 mouse8042
 DRV_KMODS	+= fcode
+DRV_KMODS	+= socal
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= audioens
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= audioixp
@@ -276,7 +277,6 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= dad
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ifp
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= scsi_vhci
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= sgen
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= socal
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= uata
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= usbser_edge
 
@@ -292,15 +292,13 @@ DRV_KMODS	+= emul64
 # PCMCIA specific module(s)
 #
 DRV_KMODS	+= stp4020 pcs
-MISC_KMODS	+= busra dada pcmcia
+MISC_KMODS	+= busra cardbus dada pcmcia
 DRV_KMODS	+= pcata pcmem pcram
+DRV_KMODS	+= pcic
+DRV_KMODS	+= pem
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcelx
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcic
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcser
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pem
-
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= cardbus
 
 # Add lvm
 #

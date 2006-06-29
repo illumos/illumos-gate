@@ -26,10 +26,6 @@
 
 include $(SRC)/Makefile.master
 
-CLOSED_SUN4UMOD = $(CLOSED)/cmd/mdb/sun4u/modules
-
-SUBDIRS = unix wrsm lw8 serengeti
-
-$(CLOSED_BUILD)SUBDIRS += $(CLOSED_SUN4UMOD)/wrsmd
+SUBDIRS = unix wrsm lw8 serengeti wrsmd
 
 include ../../Makefile.subdirs

@@ -70,7 +70,6 @@ include $(UTSTREE)/sun4u/Makefile.sun4u
 #
 #	Define modules (must come after Makefile.sun4u for CLOSED_BUILD).
 #
-SUNFIRE_KMODS			= ac environ fhc simmstat sysctrl sram
+SUNFIRE_KMODS			= ac central environ fhc simmstat sysctrl sram
 $(CLOSED_BUILD)CLOSED_SUNFIRE_KMODS	= platmod
-$(CLOSED_BUILD)CLOSED_SUNFIRE_KMODS	+= central
 

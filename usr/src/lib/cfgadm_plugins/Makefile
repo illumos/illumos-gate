@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,15 +29,10 @@
 
 include $(SRC)/Makefile.master
 
-CLOSED_PLUGIN = $(CLOSED)/lib/cfgadm_plugins/
-
 COMMON_SUBDIRS= scsi pci usb ib
-sparc_SUBDIRS=	sbd
+sparc_SUBDIRS=	sbd ac sysctrl
 
 i386_SUBDIRS= sata
-
-$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED_PLUGIN)/ac
-$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED_PLUGIN)/sysctrl
 
 SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 

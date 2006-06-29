@@ -341,11 +341,10 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= scsi_vhci
 #
 DRV_KMODS	+= pcs
 DRV_KMODS	+= pcata pcmem pcram
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pem
+DRV_KMODS	+= pem
+MISC_KMODS	+= cardbus
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcelx
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcser
-
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= cardbus
 
 #
 #	I2O specific module(s)
