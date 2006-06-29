@@ -375,7 +375,7 @@ build() {
 		egrep -i warning: $SRC/${INSTALLOG}.out \
 			| egrep -v '^tic:' \
 			| egrep -v "symbol \`timezone' has differing types:" \
-		        | egrep -v "parameter <PSTAMP> set to" \ 
+		        | egrep -v "parameter <PSTAMP> set to" \
 			| egrep -v "Ignoring unknown host" \
 			| egrep -v "redefining segment flags attribute for" \
 			>> $mail_msg_file
