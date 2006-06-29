@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2688,14 +2687,13 @@ prgetusage(kthread_t *t, prhusage_t *pup)
 		default:		panic("prgetusage: unknown microstate");
 		}
 		tmp1 = curtime - ms->ms_state_start;
-		if (tmp1 <= 0) {
+		if (tmp1 < 0) {
 			curtime = gethrtime_unscaled();
-			tmp1 = 0;
 			i++;
 			continue;
 		}
 		scalehrtime(&tmp1);
-	} while (tmp1 <= 0 && i < MAX_ITERS_SPIN);
+	} while (tmp1 < 0 && i < MAX_ITERS_SPIN);
 
 	*mstimep += tmp1;
 
@@ -2848,14 +2846,13 @@ praddusage(kthread_t *t, prhusage_t *pup)
 		default:		panic("praddusage: unknown microstate");
 		}
 		tmp = curtime - ms->ms_state_start;
-		if (tmp <= 0) {
+		if (tmp < 0) {
 			curtime = gethrtime_unscaled();
-			tmp = 0;
 			i++;
 			continue;
 		}
 		scalehrtime(&tmp);
-	} while (tmp <= 0 && i < MAX_ITERS_SPIN);
+	} while (tmp < 0 && i < MAX_ITERS_SPIN);
 
 	*mstimep += tmp;
 
