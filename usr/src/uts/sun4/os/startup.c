@@ -92,6 +92,8 @@ extern void add_vx_handler(char *, int, void (*)(cell_t *));
 extern void mem_config_init(void);
 extern void memseg_remap_init(void);
 
+extern void mach_kpm_init(void);
+
 /*
  * External Data:
  */
@@ -158,7 +160,7 @@ caddr_t valloc_base;		/* beginning of kvalloc segment	*/
 caddr_t kmem64_base;		/* base of kernel mem segment in 64-bit space */
 caddr_t kmem64_end;		/* end of kernel mem segment in 64-bit space */
 
-uintptr_t shm_alignment = 0;	/* VAC address consistency modulus */
+uintptr_t shm_alignment;	/* VAC address consistency modulus */
 struct memlist *phys_install;	/* Total installed physical memory */
 struct memlist *phys_avail;	/* Available (unreserved) physical memory */
 struct memlist *virt_avail;	/* Available (unmapped?) virtual memory */
@@ -2054,6 +2056,8 @@ startup_vm(void)
 			panic("segkpm_create segkpm");
 
 		rw_exit(&kas.a_lock);
+
+		mach_kpm_init();
 	}
 
 	/*

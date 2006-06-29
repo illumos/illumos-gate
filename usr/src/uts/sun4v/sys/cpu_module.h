@@ -79,12 +79,10 @@ void	vtag_flushall_tl1(uint64_t dummy1, uint64_t dummy2);
 void	vtag_unmap_perm_tl1(uint64_t addr, uint64_t ctx);
 
 /*
- * virtual alias flushes (virtual address caches)
+ * Calculate, set optimal dtlb pagesize, for ISM and mpss, to support
+ * cpus with non-fully-associative dtlbs.
  */
-void	vac_flushpage(pfn_t pf, int color);
-void	vac_flushpage_tl1(uint64_t pf, uint64_t color);
-void	vac_flushcolor(int color, pfn_t pf);
-void	vac_flushcolor_tl1(uint64_t color, uint64_t dummy);
+extern uchar_t *ctx_pgsz_array;
 
 /*
  * flush instruction cache if needed

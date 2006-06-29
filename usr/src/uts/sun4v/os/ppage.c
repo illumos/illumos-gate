@@ -65,8 +65,6 @@
  * available virtual page from the set of the appropiate color.
  */
 
-#define	clsettoarray(color, set) ((color * nsets) + set)
-
 int pp_slots = 4;		/* small default, tuned by cpu module */
 
 /* tuned by cpu module, default is "safe" */
@@ -74,13 +72,12 @@ int pp_consistent_coloring = PPAGE_STORES_POLLUTE | PPAGE_LOADS_POLLUTE;
 
 static caddr_t	ppmap_vaddrs[PPMAPSIZE / MMU_PAGESIZE];
 static int	nsets;			/* number of sets */
-static int	ppmap_pages;		/* generate align mask */
 static int	ppmap_shift;		/* set selector */
 
 #ifdef PPDEBUG
 #define		MAXCOLORS	16	/* for debug only */
 static int	ppalloc_noslot = 0;	/* # of allocations from kernelmap */
-static int	align_hits[MAXCOLORS];
+static int	align_hits;
 static int	pp_allocs;		/* # of ppmapin requests */
 #endif /* PPDEBUG */
 
@@ -93,41 +90,31 @@ static struct ppmap_va {
 	caddr_t	ppmap_slots[MAXPP_SLOTS];
 } ppmap_va[NCPU];
 
+/* prevent compilation with VAC defined */
+#ifdef VAC
+#error "sun4v ppmapin and ppmapout do not support VAC"
+#endif
+
 void
 ppmapinit(void)
 {
-	int color, nset, setsize;
+	int nset;
 	caddr_t va;
 
 	ASSERT(pp_slots <= MAXPP_SLOTS);
 
 	va = (caddr_t)PPMAPBASE;
-	if (cache & CACHE_VAC) {
-		int a;
 
-		ppmap_pages = mmu_btop(shm_alignment);
-		nsets = PPMAPSIZE / shm_alignment;
-		setsize = shm_alignment;
-		ppmap_shift = MMU_PAGESHIFT;
-		a = ppmap_pages;
-		while (a >>= 1)
-			ppmap_shift++;
-	} else {
-		/*
-		 * If we do not have a virtual indexed cache we simply
-		 * have only one set containing all pages.
-		 */
-		ppmap_pages = 1;
-		nsets = mmu_btop(PPMAPSIZE);
-		setsize = MMU_PAGESIZE;
-		ppmap_shift = MMU_PAGESHIFT;
-	}
-	for (color = 0; color < ppmap_pages; color++) {
-		for (nset = 0; nset < nsets; nset++) {
-			ppmap_vaddrs[clsettoarray(color, nset)] =
-			    (caddr_t)((uintptr_t)va + (nset * setsize));
-		}
-		va += MMU_PAGESIZE;
+	/*
+	 * sun4v does not have a virtual indexed cache and simply
+	 * has only one set containing all pages.
+	 */
+	nsets = mmu_btop(PPMAPSIZE);
+	ppmap_shift = MMU_PAGESHIFT;
+
+	for (nset = 0; nset < nsets; nset++) {
+		ppmap_vaddrs[nset] =
+		    (caddr_t)((uintptr_t)va + (nset * MMU_PAGESIZE));
 	}
 }
 
@@ -152,56 +139,35 @@ ppmapinit(void)
  * the right color we can almost guarantee a cache conflict will not occur.
  */
 
+/*ARGSUSED2*/
 caddr_t
 ppmapin(page_t *pp, uint_t vprot, caddr_t hint)
 {
-	int color, nset, index, start;
+	int nset;
 	caddr_t va;
 
 #ifdef PPDEBUG
 	pp_allocs++;
 #endif /* PPDEBUG */
-	if (cache & CACHE_VAC) {
-		color = sfmmu_get_ppvcolor(pp);
-		if (color == -1) {
-			if ((intptr_t)hint != -1L) {
-				color = addr_to_vcolor(hint);
-			} else {
-				color = addr_to_vcolor(mmu_ptob(pp->p_pagenum));
-			}
-		}
 
-	} else {
-		/*
-		 * For physical caches, we can pick any address we want.
-		 */
-		color = 0;
-	}
-
-	start = color;
-	do {
-		for (nset = 0; nset < nsets; nset++) {
-			index = clsettoarray(color, nset);
-			va = ppmap_vaddrs[index];
-			if (va != NULL) {
+	/*
+	 * For sun4v caches are physical caches, we can pick any address
+	 * we want.
+	 */
+	for (nset = 0; nset < nsets; nset++) {
+		va = ppmap_vaddrs[nset];
+		if (va != NULL) {
 #ifdef PPDEBUG
-				align_hits[color]++;
+			align_hits++;
 #endif /* PPDEBUG */
-				if (casptr(&ppmap_vaddrs[index],
-				    va, NULL) == va) {
-					hat_memload(kas.a_hat, va, pp,
-						vprot | HAT_NOSYNC,
-						HAT_LOAD_LOCK);
-					return (va);
-				}
+			if (casptr(&ppmap_vaddrs[nset], va, NULL) == va) {
+				hat_memload(kas.a_hat, va, pp,
+					vprot | HAT_NOSYNC,
+					HAT_LOAD_LOCK);
+				return (va);
 			}
 		}
-		/*
-		 * first pick didn't succeed, try another
-		 */
-		if (++color == ppmap_pages)
-			color = 0;
-	} while (color != start);
+	}
 
 #ifdef PPDEBUG
 	ppalloc_noslot++;
@@ -221,7 +187,7 @@ ppmapin(page_t *pp, uint_t vprot, caddr_t hint)
 void
 ppmapout(caddr_t va)
 {
-	int color, nset, index;
+	int nset;
 
 	if (va >= kernelheap && va < ekernelheap) {
 		/*
@@ -235,16 +201,12 @@ ppmapout(caddr_t va)
 		/*
 		 * Space came from ppmap_vaddrs[], give it back.
 		 */
-		color = addr_to_vcolor(va);
-		ASSERT((cache & CACHE_VAC)? (color < ppmap_pages) : 1);
-
 		nset = ((uintptr_t)va >> ppmap_shift) & (nsets - 1);
-		index = clsettoarray(color, nset);
 		hat_unload(kas.a_hat, va, PAGESIZE,
 		    (HAT_UNLOAD_NOSYNC | HAT_UNLOAD_UNLOCK));
 
-		ASSERT(ppmap_vaddrs[index] == NULL);
-		ppmap_vaddrs[index] = va;
+		ASSERT(ppmap_vaddrs[nset] == NULL);
+		ppmap_vaddrs[nset] = va;
 	}
 }
 

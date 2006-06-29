@@ -1150,55 +1150,6 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	SET_SIZE(vtag_flushall_tl1)
 
 /*
- * vac_flushpage(pfnum, color)
- *	Flush 1 8k page of the D-$ with physical page = pfnum
- *	Algorithm:
- *		The spitfire dcache is a 16k direct mapped virtual indexed,
- *		physically tagged cache.  Given the pfnum we read all cache
- *		lines for the corresponding page in the cache (determined by
- *		the color).  Each cache line is compared with
- *		the tag created from the pfnum. If the tags match we flush
- *		the line.
- */
-	ENTRY(vac_flushpage)
-	/*
-	 * flush page from the d$
-	 *
-	 * %o0 = pfnum, %o1 = color
-	 */
-	! XXXQ
-	retl
-	  nop
-	SET_SIZE(vac_flushpage)
-
-	ENTRY_NP(vac_flushpage_tl1)
-	/*
-	 * x-trap to flush page from the d$
-	 *
-	 * %g1 = pfnum, %g2 = color
-	 */
-	! XXXQ
-	retry
-	SET_SIZE(vac_flushpage_tl1)
-
-	ENTRY(vac_flushcolor)
-	/*
-	 * %o0 = vcolor
-	 */
-	! XXXQ
-	retl
-	  nop
-	SET_SIZE(vac_flushcolor)
-
-	ENTRY(vac_flushcolor_tl1)
-	/*
-	 * %g1 = vcolor
-	 */
-	! XXXQ
-	retry
-	SET_SIZE(vac_flushcolor_tl1)
-
-/*
  * flush_instr_mem:
  *	Flush a portion of the I-$ starting at vaddr
  * 	%o0 vaddr

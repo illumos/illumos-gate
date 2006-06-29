@@ -119,7 +119,9 @@ typedef struct hat sfmmu_t;
 #define	PP_ISRO(pp)		((pp)->p_nrm & P_RO)
 #define	PP_ISNC(pp)		((pp)->p_nrm & (P_PNC|P_TNC))
 #define	PP_ISPNC(pp)		((pp)->p_nrm & P_PNC)
+#ifdef VAC
 #define	PP_ISTNC(pp)		((pp)->p_nrm & P_TNC)
+#endif
 #define	PP_ISKPMS(pp)		((pp)->p_nrm & P_KPMS)
 #define	PP_ISKPMC(pp)		((pp)->p_nrm & P_KPMC)
 
@@ -129,7 +131,9 @@ typedef struct hat sfmmu_t;
 #define	PP_SETRO(pp)		((pp)->p_nrm |= P_RO)
 #define	PP_SETREFRO(pp)		((pp)->p_nrm |= (P_REF|P_RO))
 #define	PP_SETPNC(pp)		((pp)->p_nrm |= P_PNC)
+#ifdef VAC
 #define	PP_SETTNC(pp)		((pp)->p_nrm |= P_TNC)
+#endif
 #define	PP_SETKPMS(pp)		((pp)->p_nrm |= P_KPMS)
 #define	PP_SETKPMC(pp)		((pp)->p_nrm |= P_KPMC)
 
@@ -138,7 +142,9 @@ typedef struct hat sfmmu_t;
 #define	PP_CLRREFMOD(pp)	((pp)->p_nrm &= ~(P_REF|P_MOD))
 #define	PP_CLRRO(pp)		((pp)->p_nrm &= ~P_RO)
 #define	PP_CLRPNC(pp)		((pp)->p_nrm &= ~P_PNC)
+#ifdef VAC
 #define	PP_CLRTNC(pp)		((pp)->p_nrm &= ~P_TNC)
+#endif
 #define	PP_CLRKPMS(pp)		((pp)->p_nrm &= ~P_KPMS)
 #define	PP_CLRKPMC(pp)		((pp)->p_nrm &= ~P_KPMC)
 
@@ -427,8 +433,11 @@ struct hat {
  * bits 2 through min(num of cache colors + 1,31) are
  * for cache colors that have already been flushed.
  */
-#define	CACHE_UNCACHE		1
+#ifdef VAC
 #define	CACHE_NUM_COLOR		(shm_alignment >> MMU_PAGESHIFT)
+#else
+#define	CACHE_NUM_COLOR		1
+#endif
 
 #define	CACHE_VCOLOR_MASK(vcolor)	(2 << (vcolor & (CACHE_NUM_COLOR - 1)))
 
@@ -1608,6 +1617,7 @@ label:
 
 #ifndef _ASM
 
+#ifdef VAC
 /*
  * Page coloring
  * The p_vcolor field of the page struct (1 byte) is used to store the
@@ -1630,6 +1640,9 @@ label:
 
 #define	addr_to_vcolor(addr) \
 	(((uint_t)(uintptr_t)(addr) >> MMU_PAGESHIFT) & vac_colors_mask)
+#else	/* VAC */
+#define	addr_to_vcolor(addr)	(0)
+#endif	/* VAC */
 
 /*
  * The field p_index in the psm page structure is for large pages support.

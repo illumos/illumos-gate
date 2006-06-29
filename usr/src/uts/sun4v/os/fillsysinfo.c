@@ -79,13 +79,23 @@ uint64_t	system_clock_freq;
 int		niobus = 0;
 uint_t		niommu_tsbs = 0;
 
+/* prevent compilation with VAC defined */
+#ifdef VAC
+#error "The sun4v architecture does not support VAC"
+#endif
+
+#define	S_VAC_SIZE	MMU_PAGESIZE
+#define	S_VAC_SHIFT	MMU_PAGESHIFT
+
+int		vac_size = S_VAC_SIZE;
+uint_t		vac_mask = MMU_PAGEMASK & (S_VAC_SIZE - 1);
+int		vac_shift = S_VAC_SHIFT;
+uintptr_t	shm_alignment = S_VAC_SIZE;
+
 void
 map_wellknown_devices()
 {
 }
-
-#define	S_VAC_SIZE	MMU_PAGESIZE
-#define	S_VAC_SHIFT	MMU_PAGESHIFT
 
 /*
  * For backward compatibility we need to verify that we can handle
@@ -309,8 +319,6 @@ cpu_setup_common(char **cpu_module_isa_set)
 {
 	extern int disable_delay_tlb_flush, delay_tlb_flush;
 	extern int mmu_exported_pagesize_mask;
-	extern int vac_size, vac_shift;
-	extern uint_t vac_mask;
 	int nocpus, i;
 	size_t ra_limit;
 	mde_cookie_t *cpulist;
@@ -350,12 +358,6 @@ cpu_setup_common(char **cpu_module_isa_set)
 		fill_cpu(mdp, cpulist[i]);
 
 	setup_exec_unit_mappings(mdp);
-
-	vac_size = S_VAC_SIZE;
-	vac_mask = MMU_PAGEMASK & (vac_size - 1);
-	vac_shift = S_VAC_SHIFT;
-	shm_alignment = vac_size;
-	vac = 0;
 
 	/*
 	 * If MD is broken then append the passed ISA set,
