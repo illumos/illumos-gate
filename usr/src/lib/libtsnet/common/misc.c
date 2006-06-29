@@ -115,7 +115,9 @@ static const char *rtsa_keywords[] = {
 	"doi",
 #define	SAK_CIPSO	3
 	"cipso",
-#define	SAK_INVAL	4
+#define	SAK_SL		4
+	"sl",
+#define	SAK_INVAL	5
 	NULL
 };
 
@@ -138,6 +140,15 @@ rtsa_to_str(const struct rtsa_s *rtsa, char *line, size_t len)
 			line[slen++] = ',';
 		switch (i & mask) {
 		case RTSA_MINSL:
+			if ((mask & RTSA_MAXSL) &&
+			    blequal(&rtsa->rtsa_slrange.lower_bound,
+			    &rtsa->rtsa_slrange.upper_bound)) {
+				slen += snprintf(line + slen, len - slen,
+				    "sl=%s",
+				    sl_to_str(&rtsa->rtsa_slrange.lower_bound));
+				mask ^= RTSA_MAXSL;
+				break;
+			}
 			slen += snprintf(line + slen, len - slen, "min_sl=%s",
 			    sl_to_str(&rtsa->rtsa_slrange.lower_bound));
 			break;
@@ -243,6 +254,22 @@ rtsa_keyword(const char *options, struct rtsa_s *sp, int *errp, char **errstrp)
 				return (B_FALSE);
 			}
 			mask |= RTSA_MAXSL;
+			break;
+
+		case SAK_SL:
+			if (mask & (RTSA_MAXSL|RTSA_MINSL)) {
+				*errstrp = (char *)options;
+				*errp = LTSNET_DUP_KEY;
+				return (B_FALSE);
+			}
+			if (stobsl(attrbuf, &min_sl, NO_CORRECTION,
+			    &err) != 1) {
+				*errstrp = (char *)valptr;
+				*errp = LTSNET_ILL_LABEL;
+				return (B_FALSE);
+			}
+			bcopy(&min_sl, &max_sl, sizeof (bslabel_t));
+			mask |= (RTSA_MINSL | RTSA_MAXSL);
 			break;
 
 		case SAK_DOI:

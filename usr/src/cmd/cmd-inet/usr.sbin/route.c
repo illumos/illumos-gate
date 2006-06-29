@@ -1376,23 +1376,27 @@ args_to_rtcmd(rtcmd_irep_t *rcip, char **argv, char *cmd_string)
 				syntax_arg_missing(keyword_str);
 				return (B_FALSE);
 			}
-			if ((rcip->ri_cmd == RTM_ADD ||
-			    rcip->ri_cmd == RTM_CHANGE) &&
-			    rcip->ri_rtsa_cnt++ < 1 && is_system_labeled()) {
+			if (is_system_labeled()) {
 				int err;
 
+				if (rcip->ri_rtsa_cnt >= 1) {
+					syntax_error(gettext("route: can't "
+					    "specify more than one security "
+					    "attribute\n"));
+					return (B_FALSE);
+				}
 				if (!rtsa_keyword(tok, &rcip->ri_rtsa, &err,
 				    NULL)) {
-					(void) fprintf(stderr, gettext("route: "
+					syntax_error(gettext("route: "
 					    "bad security attribute: %s\n"),
 					    tsol_strerror(err, errno));
 					return (B_FALSE);
 				}
-			}
-			if (rcip->ri_rtsa_cnt > 1) {
-				(void) fprintf(stderr,
-				    gettext("route: can't specify more "
-				    "than one security attribute\n"));
+				rcip->ri_rtsa_cnt++;
+			} else {
+				syntax_error(gettext("route: "
+				    "system is not labeled; cannot specify"
+				    "security attributes.\n"));
 				return (B_FALSE);
 			}
 			break;

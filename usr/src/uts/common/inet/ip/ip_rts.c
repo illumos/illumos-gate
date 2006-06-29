@@ -258,6 +258,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	ire_t		*sire = NULL;
 	int		error = 0;
 	int		match_flags = MATCH_IRE_DSTONLY;
+	int		match_flags_local = MATCH_IRE_TYPE | MATCH_IRE_GW;
 	int		found_addrs;
 	sa_family_t	af;
 	ipaddr_t	dst_addr;
@@ -277,6 +278,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	struct rtsa_s	*rtsap = NULL;
 	tsol_gcgrp_t	*gcgrp = NULL;
 	tsol_gc_t	*gc = NULL;
+	ts_label_t	*tsl = crgetlabel(ioc_cr);
 
 	ip1dbg(("ip_rts_request: mp is %x\n", DB_TYPE(mp)));
 
@@ -483,9 +485,11 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 
 	/*
 	 * We only process any passed-in route security attributes for
-	 * either RTM_ADD or RTM_CHANGE message; ignore otherwise.
+	 * either RTM_ADD or RTM_CHANGE message; We overload them
+	 * to do an RTM_GET as a different label; ignore otherwise.
 	 */
-	if (rtm->rtm_type == RTM_ADD || rtm->rtm_type == RTM_CHANGE) {
+	if (rtm->rtm_type == RTM_ADD || rtm->rtm_type == RTM_CHANGE ||
+	    rtm->rtm_type == RTM_GET) {
 		ASSERT(rtsecattr.rtsa_cnt <= TSOL_RTSA_REQUEST_MAX);
 		if (rtsecattr.rtsa_cnt > 0)
 			rtsap = &rtsecattr.rtsa_attr[0];
@@ -718,9 +722,27 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 
 		if (rtm->rtm_type == RTM_GET) {
 			match_flags |=
-			    (MATCH_IRE_DEFAULT | MATCH_IRE_RECURSIVE);
+			    (MATCH_IRE_DEFAULT | MATCH_IRE_RECURSIVE |
+			    MATCH_IRE_SECATTR);
+			match_flags_local |= MATCH_IRE_SECATTR;
 			if ((found_addrs & RTA_GATEWAY) != 0)
 				match_flags |= MATCH_IRE_GW;
+			if (rtsap != NULL) {
+				if (rtsa_validate(rtsap) != 0) {
+					error = EINVAL;
+					goto done;
+				}
+				if (crgetzoneid(ioc_cr) != GLOBAL_ZONEID &&
+				    (tsl->tsl_doi != rtsap->rtsa_doi ||
+				    !bldominates(&tsl->tsl_label,
+				    &rtsap->rtsa_slrange.lower_bound))) {
+					error = EPERM;
+					goto done;
+				}
+				tsl = labelalloc(
+				    &rtsap->rtsa_slrange.lower_bound,
+				    rtsap->rtsa_doi, KM_NOSLEEP);
+			}
 		}
 		if (rtm->rtm_type == RTM_CHANGE) {
 			if ((found_addrs & RTA_GATEWAY) &&
@@ -746,28 +768,29 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			if (net_mask == IP_HOST_MASK) {
 				ire = ire_ctable_lookup(dst_addr, gw_addr,
 				    IRE_LOCAL | IRE_LOOPBACK, NULL, ALL_ZONES,
-				    NULL, MATCH_IRE_TYPE | MATCH_IRE_GW);
+				    tsl, match_flags_local);
 			}
 			if (ire == NULL) {
 				ire = ire_ftable_lookup(dst_addr, net_mask,
 				    gw_addr, 0, ipif, &sire, ALL_ZONES, 0,
-				    NULL, match_flags);
+				    tsl, match_flags);
 			}
 			break;
 		case AF_INET6:
 			if (IN6_ARE_ADDR_EQUAL(&net_mask_v6, &ipv6_all_ones)) {
 				ire = ire_ctable_lookup_v6(&dst_addr_v6,
 				    &gw_addr_v6, IRE_LOCAL | IRE_LOOPBACK, NULL,
-				    ALL_ZONES, NULL,
-				    MATCH_IRE_TYPE | MATCH_IRE_GW);
+				    ALL_ZONES, tsl, match_flags_local);
 			}
 			if (ire == NULL) {
 				ire = ire_ftable_lookup_v6(&dst_addr_v6,
 				    &net_mask_v6, &gw_addr_v6, 0, ipif, &sire,
-				    ALL_ZONES, 0, NULL, match_flags);
+				    ALL_ZONES, 0, tsl, match_flags);
 			}
 			break;
 		}
+		if (tsl != NULL && tsl != crgetlabel(ioc_cr))
+			label_rele(tsl);
 
 		if (ire == NULL) {
 			error = ESRCH;
