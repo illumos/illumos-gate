@@ -493,11 +493,21 @@ initifs()
 		} else {
 			struct phyint_instance *pii;
 
-			pii = pi->pi_v4;
-			if (LINK_UP(pi) && !PROBE_CAPABLE(pii))
-				pii = pi->pi_v6;
-			if (LINK_UP(pi) && !PROBE_CAPABLE(pii))
+			/*
+			 * Skip interfaces which are not capable of probing,
+			 * and interfaces that have downed links (as we will
+			 * not get any response).
+			 */
+			if (LINK_DOWN(pi))
 				continue;
+
+			pii = pi->pi_v4;
+			if (!PROBE_CAPABLE(pii)) {
+				pii = pi->pi_v6;
+				if (!PROBE_CAPABLE(pii))
+					continue;
+			}
+
 			/*
 			 * It is possible that the phyint has started
 			 * receiving packets, after it has been marked
