@@ -2646,6 +2646,7 @@ dump_netgroup(ns_ldap_result_t *res)
 			(void) fprintf(stdout, " %s", value[attr_count]);
 			attr_count++;
 		}
+	attr_count = 0;
 	value = __ns_ldap_getAttr(res->entry, "memberNisNetgroup");
 	if (value != NULL)
 		while (value[attr_count] != NULL) {
