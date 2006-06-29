@@ -78,7 +78,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <net/route.h>
-#include <netdb.h>
 
 #include <stdio.h>
 #include <errno.h>
@@ -94,6 +93,9 @@
 #include <libzfs.h>
 #include <zone.h>
 #include <assert.h>
+#include <libcontract.h>
+#include <libcontract_priv.h>
+#include <uuid/uuid.h>
 
 #include <sys/mntio.h>
 #include <sys/mnttab.h>
@@ -3542,8 +3544,84 @@ error:
 	return (rval);
 }
 
+/*
+ * Enter the zone and write a /etc/zones/index file there.  This allows
+ * libzonecfg (and thus zoneadm) to report the UUID and potentially other zone
+ * details from inside the zone.
+ */
+static void
+write_index_file(zoneid_t zoneid)
+{
+	FILE *zef;
+	FILE *zet;
+	struct zoneent *zep;
+	pid_t child;
+	int tmpl_fd;
+	ctid_t ct;
+	int fd;
+	char uuidstr[UUID_PRINTABLE_STRING_LENGTH];
+
+	/* Locate the zone entry in the global zone's index file */
+	if ((zef = setzoneent()) == NULL)
+		return;
+	while ((zep = getzoneent_private(zef)) != NULL) {
+		if (strcmp(zep->zone_name, zone_name) == 0)
+			break;
+		free(zep);
+	}
+	endzoneent(zef);
+	if (zep == NULL)
+		return;
+
+	if ((tmpl_fd = init_template()) == -1) {
+		free(zep);
+		return;
+	}
+
+	if ((child = fork()) == -1) {
+		(void) ct_tmpl_clear(tmpl_fd);
+		(void) close(tmpl_fd);
+		free(zep);
+		return;
+	}
+
+	/* parent waits for child to finish */
+	if (child != 0) {
+		free(zep);
+		if (contract_latest(&ct) == -1)
+			ct = -1;
+		(void) ct_tmpl_clear(tmpl_fd);
+		(void) close(tmpl_fd);
+		(void) waitpid(child, NULL, 0);
+		(void) contract_abandon_id(ct);
+		return;
+	}
+
+	/* child enters zone and sets up index file */
+	(void) ct_tmpl_clear(tmpl_fd);
+	if (zone_enter(zoneid) != -1) {
+		(void) mkdir(ZONE_CONFIG_ROOT, ZONE_CONFIG_MODE);
+		(void) chown(ZONE_CONFIG_ROOT, ZONE_CONFIG_UID,
+		    ZONE_CONFIG_GID);
+		fd = open(ZONE_INDEX_FILE, O_WRONLY|O_CREAT|O_TRUNC,
+		    ZONE_INDEX_MODE);
+		if (fd != -1 && (zet = fdopen(fd, "w")) != NULL) {
+			(void) fchown(fd, ZONE_INDEX_UID, ZONE_INDEX_GID);
+			if (uuid_is_null(zep->zone_uuid))
+				uuidstr[0] = '\0';
+			else
+				uuid_unparse(zep->zone_uuid, uuidstr);
+			(void) fprintf(zet, "%s:%s:/:%s\n", zep->zone_name,
+			    zone_state_str(zep->zone_state),
+			    uuidstr);
+			(void) fclose(zet);
+		}
+	}
+	_exit(0);
+}
+
 int
-vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd)
+vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd, zoneid_t zoneid)
 {
 	if (!mount_cmd && validate_datasets(zlogp) != 0) {
 		lofs_discard_mnttab();
@@ -3560,6 +3638,9 @@ vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd)
 		lofs_discard_mnttab();
 		return (-1);
 	}
+
+	write_index_file(zoneid);
+
 	lofs_discard_mnttab();
 	return (0);
 }

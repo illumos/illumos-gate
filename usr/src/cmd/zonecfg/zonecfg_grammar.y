@@ -659,6 +659,19 @@ set_command: SET
 		$$->cmd_prop_name[0] = $2;
 		$$->cmd_property_ptr[0] = &property[0];
 	}
+	| SET TOKEN ZONEPATH EQUAL property_value
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_argc = 1;
+		$$->cmd_argv[0] = $2;
+		$$->cmd_argv[1] = NULL;
+		$$->cmd_handler = &set_func;
+		$$->cmd_prop_nv_pairs = 1;
+		$$->cmd_prop_name[0] = PT_ZONEPATH;
+		$$->cmd_property_ptr[0] = &property[0];
+	}
 
 verify_command: VERIFY
 	{

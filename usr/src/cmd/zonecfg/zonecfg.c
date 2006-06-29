@@ -68,7 +68,6 @@
 #include <locale.h>
 #include <libintl.h>
 #include <alloca.h>
-#include <regex.h>
 #include <signal.h>
 #include <libtecla.h>
 #include <libzfs.h>
@@ -2668,14 +2667,30 @@ void
 set_func(cmd_t *cmd)
 {
 	char *prop_id;
-	int err, res_type, prop_type;
+	int arg, err, res_type, prop_type;
 	property_value_ptr_t pp;
 	boolean_t autoboot;
+	boolean_t force_set = FALSE;
 
 	if (zone_is_read_only(CMD_SET))
 		return;
 
 	assert(cmd != NULL);
+
+	optind = opterr = 0;
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "F")) != EOF) {
+		switch (arg) {
+		case 'F':
+			force_set = TRUE;
+			break;
+		default:
+			if (optopt == '?')
+				longer_usage(CMD_SET);
+			else
+				short_usage(CMD_SET);
+			return;
+		}
+	}
 
 	prop_type = cmd->cmd_prop_name[0];
 	if (global_scope) {
@@ -2699,6 +2714,20 @@ set_func(cmd_t *cmd)
 		}
 	} else {
 		res_type = resource_scope;
+	}
+
+	if (force_set) {
+		if (res_type != RT_ZONEPATH) {
+			zerr(gettext("Only zonepath setting can be forced."));
+			saw_error = TRUE;
+			return;
+		}
+		if (!zonecfg_in_alt_root()) {
+			zerr(gettext("Zonepath is changeable only in an "
+			    "alternate root."));
+			saw_error = TRUE;
+			return;
+		}
 	}
 
 	pp = cmd->cmd_property_ptr[0];
@@ -2756,7 +2785,7 @@ set_func(cmd_t *cmd)
 		}
 		return;
 	case RT_ZONEPATH:
-		if (state_atleast(ZONE_STATE_INSTALLED)) {
+		if (!force_set && state_atleast(ZONE_STATE_INSTALLED)) {
 			zerr(gettext("Zone %s already installed; %s %s not "
 			    "allowed."), zone, cmd_to_str(CMD_SET),
 			    rt_to_str(RT_ZONEPATH));
@@ -4603,6 +4632,7 @@ int
 main(int argc, char *argv[])
 {
 	int err, arg;
+	struct stat st;
 
 	/* This must be before anything goes to stdout. */
 	setbuf(stdout, NULL);
@@ -4629,7 +4659,7 @@ main(int argc, char *argv[])
 		exit(Z_OK);
 	}
 
-	while ((arg = getopt(argc, argv, "?f:z:")) != EOF) {
+	while ((arg = getopt(argc, argv, "?f:R:z:")) != EOF) {
 		switch (arg) {
 		case '?':
 			if (optopt == '?')
@@ -4641,6 +4671,20 @@ main(int argc, char *argv[])
 		case 'f':
 			cmd_file_name = optarg;
 			cmd_file_mode = TRUE;
+			break;
+		case 'R':
+			if (*optarg != '/') {
+				zerr(gettext("root path must be absolute: %s"),
+				    optarg);
+				exit(Z_USAGE);
+			}
+			if (stat(optarg, &st) == -1 || !S_ISDIR(st.st_mode)) {
+				zerr(gettext(
+				    "root path must be a directory: %s"),
+				    optarg);
+				exit(Z_USAGE);
+			}
+			zonecfg_set_root(optarg);
 			break;
 		case 'z':
 			if (zonecfg_validate_zonename(optarg) != Z_OK) {

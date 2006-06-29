@@ -828,6 +828,17 @@ zonecfg_get_zonepath(zone_dochandle_t handle, char *path, size_t pathsize)
 int
 zonecfg_set_zonepath(zone_dochandle_t handle, char *zonepath)
 {
+	size_t len;
+
+	/*
+	 * The user deals in absolute paths in the running global zone, but the
+	 * internal configuration files deal with boot environment relative
+	 * paths.  Strip out the alternate root when specified.
+	 */
+	len = strlen(zonecfg_root);
+	if (strncmp(zonepath, zonecfg_root, len) != 0 || zonepath[len] != '/')
+		return (Z_BAD_PROPERTY);
+	zonepath += len;
 	return (setrootattr(handle, DTD_ATTR_ZONEPATH, zonepath));
 }
 
@@ -923,7 +934,8 @@ zonecfg_refresh_index_file(zone_dochandle_t handle)
 	if ((err = zonecfg_get_zonepath(handle, zonepath,
 	    sizeof (zonepath))) != Z_OK)
 		return (err);
-	(void) strlcpy(ze.zone_path, zonepath, sizeof (ze.zone_path));
+	(void) strlcpy(ze.zone_path, zonepath + strlen(zonecfg_root),
+	    sizeof (ze.zone_path));
 
 	if (is_renaming(handle)) {
 		opcode = PZE_MODIFY;
@@ -4012,22 +4024,24 @@ zone_state_str(zone_state_t state_num)
  * doesn't touch this buffer on failure.
  */
 int
-zonecfg_get_name_by_uuid(const uuid_t uuid, char *zonename, size_t namelen)
+zonecfg_get_name_by_uuid(const uuid_t uuidin, char *zonename, size_t namelen)
 {
 	FILE *fp;
 	struct zoneent *ze;
+	uchar_t *uuid;
 
 	/*
 	 * A small amount of subterfuge via casts is necessary here because
 	 * libuuid doesn't use const correctly, but we don't want to export
 	 * this brokenness to our clients.
 	 */
-	if (uuid_is_null(*(uuid_t *)&uuid))
+	uuid = (uchar_t *)uuidin;
+	if (uuid_is_null(uuid))
 		return (Z_NO_ZONE);
 	if ((fp = setzoneent()) == NULL)
 		return (Z_NO_ZONE);
 	while ((ze = getzoneent_private(fp)) != NULL) {
-		if (uuid_compare(*(uuid_t *)&uuid, ze->zone_uuid) == 0)
+		if (uuid_compare(uuid, ze->zone_uuid) == 0)
 			break;
 		free(ze);
 	}

@@ -43,7 +43,7 @@ SRCS = $(OBJS:.o=.c)
 POFILE=zoneadm_all.po
 POFILES= $(OBJS:%.o=%.po)
 
-LDLIBS += -lzonecfg -lsocket -lgen -lpool -lbsm -lzfs
+LDLIBS += -lzonecfg -lsocket -lgen -lpool -lbsm -lzfs -luuid
 
 .KEEP_STATE:
 

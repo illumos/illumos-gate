@@ -64,6 +64,7 @@
 #include <sys/mntent.h>
 #include <limits.h>
 #include <dirent.h>
+#include <uuid/uuid.h>
 
 #include <fcntl.h>
 #include <door.h>
@@ -86,6 +87,7 @@ typedef struct zone_entry {
 	char		*zstate_str;
 	zone_state_t	zstate_num;
 	char		zroot[MAXPATHLEN];
+	char		zuuid[UUID_PRINTABLE_STRING_LENGTH];
 } zone_entry_t;
 
 static zone_entry_t *zents;
@@ -124,6 +126,7 @@ struct cmd {
 #define	SHELP_MOVE	"move zonepath"
 #define	SHELP_DETACH	"detach [-n]"
 #define	SHELP_ATTACH	"attach [-F] [-n <path>]"
+#define	SHELP_MARK	"mark incomplete"
 
 static int help_func(int argc, char *argv[]);
 static int ready_func(int argc, char *argv[]);
@@ -140,6 +143,7 @@ static int clone_func(int argc, char *argv[]);
 static int move_func(int argc, char *argv[]);
 static int detach_func(int argc, char *argv[]);
 static int attach_func(int argc, char *argv[]);
+static int mark_func(int argc, char *argv[]);
 static int sanity_check(char *zone, int cmd_num, boolean_t running,
     boolean_t unsafe_when_running);
 static int cmd_match(char *cmd);
@@ -162,7 +166,8 @@ static struct cmd cmdtab[] = {
 	{ CMD_CLONE,		"clone",	SHELP_CLONE,	clone_func },
 	{ CMD_MOVE,		"move",		SHELP_MOVE,	move_func },
 	{ CMD_DETACH,		"detach",	SHELP_DETACH,	detach_func },
-	{ CMD_ATTACH,		"attach",	SHELP_ATTACH,	attach_func }
+	{ CMD_ATTACH,		"attach",	SHELP_ATTACH,	attach_func },
+	{ CMD_MARK,		"mark",		SHELP_MARK,	mark_func }
 };
 
 /* global variables */
@@ -171,6 +176,7 @@ static struct cmd cmdtab[] = {
 static char *execname;
 static char *locale;
 char *target_zone;
+static char *target_uuid;
 
 /* used in do_subproc() and signal handler */
 static volatile boolean_t child_killed;
@@ -209,16 +215,16 @@ long_help(int cmd_num)
 		    "running zones are listed, though this can be "
 		    "expanded to all\n\tinstalled zones with the -i "
 		    "option or all configured zones with the\n\t-c "
-		    "option.  When used with the general -z <zone> "
-		    "option, lists only the\n\tspecified zone, but "
-		    "lists it regardless of its state, and the -i "
-		    "and -c\n\toptions are disallowed.  The -v option "
-		    "can be used to display verbose\n\tinformation: "
-		    "zone name, id, current state, root directory and "
-		    "options.\n\tThe -p option can be used to request "
-		    "machine-parsable output.  The -v\n\tand -p "
-		    "options are mutually exclusive.  If neither -v "
-		    "nor -p is used,\n\tjust the zone name is listed."));
+		    "option.  When used with the general -z <zone> and/or -u "
+		    "<uuid-match>\n\toptions, lists only the specified "
+		    "matching zone, but lists it\n\tregardless of its state, "
+		    "and the -i and -c options are disallowed.  The\n\t-v "
+		    "option can be used to display verbose information: zone "
+		    "name, id,\n\tcurrent state, root directory and options.  "
+		    "The -p option can be used\n\tto request machine-parsable "
+		    "output.  The -v and -p options are mutually\n\texclusive."
+		    "  If neither -v nor -p is used, just the zone name is "
+		    "listed."));
 	case CMD_VERIFY:
 		return (gettext("Check to make sure the configuration "
 		    "can safely be instantiated\n\ton the machine: "
@@ -263,6 +269,12 @@ long_help(int cmd_num)
 		    "from the\n\tspecified path and the configuration is only "
 		    "validated.  The path can\n\tbe '-' to specify standard "
 		    "input."));
+	case CMD_MARK:
+		return (gettext("Set the state of the zone.  This can be used "
+		    "to force the zone\n\tstate to 'incomplete' "
+		    "administratively if some activity has rendered\n\tthe "
+		    "zone permanently unusable.  The only valid state that "
+		    "may be\n\tspecified is 'incomplete'."));
 	default:
 		return ("");
 	}
@@ -282,8 +294,9 @@ usage(boolean_t explicit)
 	FILE *fd = explicit ? stdout : stderr;
 
 	(void) fprintf(fd, "%s:\t%s help\n", gettext("usage"), execname);
-	(void) fprintf(fd, "\t%s [-z <zone>] list\n", execname);
-	(void) fprintf(fd, "\t%s -z <zone> <%s>\n", execname,
+	(void) fprintf(fd, "\t%s [-z <zone>] [-u <uuid-match>] list\n",
+	    execname);
+	(void) fprintf(fd, "\t%s {-z <zone>|-u <uuid-match>} <%s>\n", execname,
 	    gettext("subcommand"));
 	(void) fprintf(fd, "\n%s:\n\n", gettext("Subcommands"));
 	for (i = CMD_MIN; i <= CMD_MAX; i++) {
@@ -374,6 +387,8 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 		    "NAME", "STATUS", "PATH");
 	}
 	if (!verbose) {
+		char *cp, *clim;
+
 		if (!parsable) {
 			(void) printf("%s\n", zent->zname);
 			return;
@@ -382,8 +397,13 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 			(void) printf("-");
 		else
 			(void) printf("%lu", zent->zid);
-		(void) printf(":%s:%s:%s\n", zent->zname, zent->zstate_str,
-		    zent->zroot);
+		(void) printf(":%s:%s:", zent->zname, zent->zstate_str);
+		cp = zent->zroot;
+		while ((clim = strchr(cp, ':')) != NULL) {
+			(void) printf("%.*s\\:", clim - cp, cp);
+			cp = clim + 1;
+		}
+		(void) printf("%s:%s\n", cp, zent->zuuid);
 		return;
 	}
 	if (zent->zstate_str != NULL) {
@@ -401,12 +421,19 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 {
 	char root[MAXPATHLEN], *cp;
 	int err;
+	uuid_t uuid;
 
 	(void) strlcpy(zent->zname, zone_name, sizeof (zent->zname));
 	(void) strlcpy(zent->zroot, "???", sizeof (zent->zroot));
 	zent->zstate_str = "???";
 
 	zent->zid = zid;
+
+	if (zonecfg_get_uuid(zone_name, uuid) == Z_OK &&
+	    !uuid_is_null(uuid))
+		uuid_unparse(uuid, zent->zuuid);
+	else
+		zent->zuuid[0] = '\0';
 
 	/*
 	 * For labeled zones which query the zone path of lower-level
@@ -1374,21 +1401,38 @@ static void
 fake_up_local_zone(zoneid_t zid, zone_entry_t *zeptr)
 {
 	ssize_t result;
+	uuid_t uuid;
+	FILE *fp;
+
+	(void) memset(zeptr, 0, sizeof (*zeptr));
 
 	zeptr->zid = zid;
+
 	/*
 	 * Since we're looking up our own (non-global) zone name,
 	 * we can be assured that it will succeed.
 	 */
 	result = getzonenamebyid(zid, zeptr->zname, sizeof (zeptr->zname));
 	assert(result >= 0);
-	if (!is_system_labeled()) {
-		(void) strlcpy(zeptr->zroot, "/", sizeof (zeptr->zroot));
-	} else {
+	if (zonecfg_is_scratch(zeptr->zname) &&
+	    (fp = zonecfg_open_scratch("", B_FALSE)) != NULL) {
+		(void) zonecfg_reverse_scratch(fp, zeptr->zname, zeptr->zname,
+		    sizeof (zeptr->zname), NULL, 0);
+		zonecfg_close_scratch(fp);
+	}
+
+	if (is_system_labeled()) {
 		(void) zone_getattr(zid, ZONE_ATTR_ROOT, zeptr->zroot,
 		    sizeof (zeptr->zroot));
+	} else {
+		(void) strlcpy(zeptr->zroot, "/", sizeof (zeptr->zroot));
 	}
+
 	zeptr->zstate_str = "running";
+
+	if (zonecfg_get_uuid(zeptr->zname, uuid) == Z_OK &&
+	    !uuid_is_null(uuid))
+		uuid_unparse(uuid, zeptr->zuuid);
 }
 
 static int
@@ -1720,6 +1764,7 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 		case CMD_READY:
 		case CMD_BOOT:
 		case CMD_MOUNT:
+		case CMD_MARK:
 			if (state < ZONE_STATE_INSTALLED) {
 				zerror(gettext("must be %s before %s."),
 				    zone_state_str(ZONE_STATE_INSTALLED),
@@ -4364,6 +4409,32 @@ unmount_func(int argc, char *argv[])
 }
 
 static int
+mark_func(int argc, char *argv[])
+{
+	int err, lockfd;
+
+	if (argc != 1 || strcmp(argv[0], "incomplete") != 0)
+		return (Z_USAGE);
+	if (sanity_check(target_zone, CMD_MARK, B_FALSE, B_FALSE) != Z_OK)
+		return (Z_ERR);
+
+	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
+		zerror(gettext("another %s may have an operation in progress."),
+		    "zoneadm");
+		return (Z_ERR);
+	}
+
+	err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
+	if (err != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("could not set state"));
+	}
+	release_lock_file(lockfd);
+
+	return (err);
+}
+
+static int
 help_func(int argc, char *argv[])
 {
 	int arg, cmd_num;
@@ -4468,10 +4539,13 @@ main(int argc, char **argv)
 	if (init_zfs() != Z_OK)
 		exit(Z_ERR);
 
-	while ((arg = getopt(argc, argv, "?z:R:")) != EOF) {
+	while ((arg = getopt(argc, argv, "?u:z:R:")) != EOF) {
 		switch (arg) {
 		case '?':
 			return (usage(B_TRUE));
+		case 'u':
+			target_uuid = optarg;
+			break;
 		case 'z':
 			target_zone = optarg;
 			break;
@@ -4494,6 +4568,20 @@ main(int argc, char **argv)
 
 	if (optind >= argc)
 		return (usage(B_FALSE));
+
+	if (target_uuid != NULL && *target_uuid != '\0') {
+		uuid_t uuid;
+		static char newtarget[ZONENAME_MAX];
+
+		if (uuid_parse(target_uuid, uuid) == -1) {
+			zerror(gettext("illegal UUID value specified"));
+			exit(Z_ERR);
+		}
+		if (zonecfg_get_name_by_uuid(uuid, newtarget,
+		    sizeof (newtarget)) == Z_OK)
+			target_zone = newtarget;
+	}
+
 	if (target_zone != NULL && zone_get_id(target_zone, &zid) != 0) {
 		errno = Z_NO_ZONE;
 		zperror(target_zone, B_TRUE);

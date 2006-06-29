@@ -459,7 +459,7 @@ zone_ready(zlog_t *zlogp, boolean_t mount_cmd)
 			    zonecfg_strerror(err));
 		return (-1);
 	}
-	if (vplat_bringup(zlogp, mount_cmd) != 0) {
+	if (vplat_bringup(zlogp, mount_cmd, zone_id) != 0) {
 		bringup_failure_recovery = B_TRUE;
 		(void) vplat_teardown(NULL, mount_cmd);
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
@@ -471,8 +471,8 @@ zone_ready(zlog_t *zlogp, boolean_t mount_cmd)
 	return (0);
 }
 
-static int
-init_template()
+int
+init_template(void)
 {
 	int fd;
 	int err = 0;

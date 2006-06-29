@@ -110,6 +110,16 @@ extern "C" {
 #define	ZONE_CONFIG_ROOT	"/etc/zones"
 #define	ZONE_INDEX_FILE		ZONE_CONFIG_ROOT "/index"
 
+/* Owner, group, and mode (defined by packaging) for the config directory */
+#define	ZONE_CONFIG_UID		0		/* root */
+#define	ZONE_CONFIG_GID		3		/* sys */
+#define	ZONE_CONFIG_MODE	0755
+
+/* Owner, group, and mode (defined by packaging) for the index file */
+#define	ZONE_INDEX_UID		0		/* root */
+#define	ZONE_INDEX_GID		3		/* sys */
+#define	ZONE_INDEX_MODE		0644
+
 /* The maximum length of the VERSION string in the pkginfo(4) file. */
 #define	ZONE_PKG_VERSMAX	256
 

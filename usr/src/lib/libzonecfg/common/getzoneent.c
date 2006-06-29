@@ -308,6 +308,8 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 		(void) unlock_index_file(lock_fd);
 		return (Z_TEMP_FILE);
 	}
+	(void) fchmod(tmp_file_desc, ZONE_INDEX_MODE);
+	(void) fchown(tmp_file_desc, ZONE_INDEX_UID, ZONE_INDEX_GID);
 	if ((tmp_file = fdopen(tmp_file_desc, "w")) == NULL) {
 		(void) close(tmp_file_desc);
 		err = Z_MISC_FS;
@@ -454,7 +456,6 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 		goto error;
 	}
 	tmp_file = NULL;
-	(void) chmod(tmp_file_name, 0644);
 	if (rename(tmp_file_name, path) == -1) {
 		err = errno == EACCES ? Z_ACCES : Z_MISC_FS;
 		goto error;

@@ -99,7 +99,7 @@ extern void eventstream_write(zone_evt_t evt);
  * Virtual platform interfaces.
  */
 extern zoneid_t vplat_create(zlog_t *, boolean_t);
-extern int vplat_bringup(zlog_t *, boolean_t);
+extern int vplat_bringup(zlog_t *, boolean_t, zoneid_t);
 extern int vplat_teardown(zlog_t *, boolean_t);
 
 
@@ -111,6 +111,11 @@ extern void destroy_console_slave(void);
 extern void reset_slave_terminal(zlog_t *);
 extern int init_console(zlog_t *);
 extern void serve_console(zlog_t *);
+
+/*
+ * Contract handling.
+ */
+extern int init_template(void);
 
 #ifdef __cplusplus
 }
