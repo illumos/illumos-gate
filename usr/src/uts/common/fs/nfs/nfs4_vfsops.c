@@ -527,17 +527,18 @@ nfs4_copyin(char *data, int datalen, struct nfs_args *nargs)
 
 		nargs->syncaddr = kmem_alloc(sizeof (struct netbuf), KM_SLEEP);
 		bcopy(&syncaddr, nargs->syncaddr, sizeof (struct netbuf));
-	}
-	/* get server's netname */
-	if (copyinstr(STRUCT_FGETP(args, netname), netname,
-		sizeof (netname), &nlen)) {
-		error = EFAULT;
-		goto errout;
-	}
 
-	netname[nlen] = '\0';
-	nargs->netname = kmem_zalloc(nlen, KM_SLEEP);
-	(void) strcpy(nargs->netname, netname);
+		/* get server's netname */
+		if (copyinstr(STRUCT_FGETP(args, netname), netname,
+			sizeof (netname), &nlen)) {
+			error = EFAULT;
+			goto errout;
+		}
+
+		netname[nlen] = '\0';
+		nargs->netname = kmem_zalloc(nlen, KM_SLEEP);
+		(void) strcpy(nargs->netname, netname);
+	}
 
 	/*
 	 * Get the extention data which has the security data structure.
