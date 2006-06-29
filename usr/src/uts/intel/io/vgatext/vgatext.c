@@ -402,6 +402,7 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		if (reg_rnumber < 0) {
 			cmn_err(CE_WARN,
 				MYNAME ": can't find reg entry for registers");
+			error = DDI_FAILURE;
 			goto fail;
 		}
 		softc->fb_regno = vgatext_get_isa_reg_index(devi, 0,
@@ -409,6 +410,7 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		if (softc->fb_regno < 0) {
 			cmn_err(CE_WARN,
 				MYNAME ": can't find reg entry for memory");
+			error = DDI_FAILURE;
 			goto fail;
 		}
 	} else if (STREQ(parent_type, "pci") || STREQ(parent_type, "pciex")) {
@@ -419,6 +421,7 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		if (reg_rnumber < 0) {
 			cmn_err(CE_WARN,
 				MYNAME ": can't find reg entry for registers");
+			error = DDI_FAILURE;
 			goto fail;
 		}
 		softc->fb_regno = vgatext_get_pci_reg_index(devi,
@@ -428,6 +431,7 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		if (softc->fb_regno < 0) {
 			cmn_err(CE_WARN,
 				MYNAME ": can't find reg entry for memory");
+			error = DDI_FAILURE;
 			goto fail;
 		}
 		softc->agp_master = (agp_master_softc_t *)
@@ -435,6 +439,7 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	} else {
 		cmn_err(CE_WARN, MYNAME ": unknown parent type \"%s\".",
 			parent_type);
+		error = DDI_FAILURE;
 		goto fail;
 	}
 	ddi_prop_free(parent_type);
