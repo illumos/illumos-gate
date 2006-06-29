@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,7 +87,7 @@ static int	read_pam_conf(pam_handle_t *, char *);
 static int 	get_pam_conf_entry(struct pam_fh *, pam_handle_t *,
     pamtab_t **);
 static char	*read_next_token(char **);
-static char	*nextline(struct pam_fh *);
+static char	*nextline(struct pam_fh *, pam_handle_t *, int *);
 static int	verify_pam_conf(pamtab_t *, char *);
 
 /* functions to clean up and free memory */
@@ -2060,8 +2059,9 @@ read_pam_conf(pam_handle_t *pamh, char *config)
 	pamh->pam_conf_name[i] = strdup(config);
 	pam_trace(PAM_DEBUG_CONF, "read_pam_conf[%d:%s](%p) open(%s)",
 	    i, pam_trace_cname(pamh), (void *)pamh, config);
-	if (open_pam_conf(&pam_fh, pamh, config) == 0)
+	if (open_pam_conf(&pam_fh, pamh, config) == 0) {
 		return (PAM_SYSTEM_ERR);
+	}
 
 	while ((error =
 	    get_pam_conf_entry(pam_fh, pamh, &pamentp)) == PAM_SUCCESS &&
@@ -2189,9 +2189,10 @@ get_pam_conf_entry(struct pam_fh *pam_fh, pam_handle_t *pamh, pamtab_t **pam)
 	int		i;
 	char		*current_line = NULL;
 	int		error = PAM_SYSTEM_ERR;	/* preset to error */
+	int		err;
 
 	/* get the next line from pam.conf */
-	if ((cp = nextline(pam_fh)) == NULL) {
+	if ((cp = nextline(pam_fh, pamh, &err)) == NULL) {
 		/* no more lines in pam.conf ==> return */
 		error = PAM_SUCCESS;
 		*pam = NULL;
@@ -2364,6 +2365,7 @@ getpath:
 	(*pam)->module_argc = argc;
 
 	error = PAM_SUCCESS;	/* success */
+	(*pam)->pam_err = err;	/* was the line truncated */
 
 out:
 	if (current_line)
@@ -2425,13 +2427,14 @@ pam_conf_strnchr(char *sp, int c, intptr_t count)
  */
 
 static char *
-nextline(struct pam_fh *pam_fh)
+nextline(struct pam_fh *pam_fh, pam_handle_t *pamh, int *err)
 {
 	char	*ll;
 	int	find_a_line = 0;
 	char	*data = pam_fh->data;
 	char	*bufferp = pam_fh->bufferp;
 	char	*bufferendp = &data[pam_fh->bufsize];
+	size_t	input_len;
 
 	/*
 	 * Skip the blank line, comment line
@@ -2447,8 +2450,9 @@ nextline(struct pam_fh *pam_fh)
 			 * If we are at the end of the buffer, there is
 			 * no next line.
 			 */
-			if (++bufferp == bufferendp)
+			if (++bufferp == bufferendp) {
 				return (NULL);
+			}
 			/* else we check *bufferp again */
 		}
 
@@ -2457,33 +2461,55 @@ nextline(struct pam_fh *pam_fh)
 			if ((ll = pam_conf_strnchr(bufferp, '\n',
 				bufferendp - bufferp)) != NULL) {
 				bufferp = ll;
-			}
-			else
-			/* this comment line the last line. no next line */
+			} else {
+				/*
+				 * this comment line the last line.
+				 * no next line
+				 */
 				return (NULL);
+			}
 
 			/*
 			 * If we are at the end of the buffer, there is
 			 * no next line.
 			 */
-			if (bufferp == bufferendp)
+			if (bufferp == bufferendp) {
 				return (NULL);
+			}
 		}
 
-		if ((*bufferp != '\n') && (*bufferp != '#'))
+		if ((*bufferp != '\n') && (*bufferp != '#')) {
 			find_a_line = 1;
+		}
 	}
 
+	*err = PAM_SUCCESS;
 	/* now we find one line */
 	if ((ll = pam_conf_strnchr(bufferp, '\n', bufferendp - bufferp))
-		!= NULL) {
-		(void) strncpy(pam_fh->line, bufferp, ll - bufferp);
-		pam_fh->line[ll - bufferp] = '\0';
+	    != NULL) {
+		if ((input_len = ll - bufferp) >= sizeof (pam_fh->line)) {
+			__pam_log(LOG_AUTH | LOG_ERR,
+			    "nextline[%d:%s]: pam.conf line too long %.256s",
+			    pamh->include_depth, pam_trace_cname(pamh),
+			    bufferp);
+			input_len = sizeof (pam_fh->line) - 1;
+			*err = PAM_SERVICE_ERR;
+		}
+		(void) strncpy(pam_fh->line, bufferp, input_len);
+		pam_fh->line[input_len] = '\0';
 		pam_fh->bufferp = ll++;
 	} else {
 		ll = bufferendp;
-		(void) strncpy(pam_fh->line, bufferp, ll - bufferp);
-		pam_fh->line[ll - bufferp] = '\0';
+		if ((input_len = ll - bufferp) >= sizeof (pam_fh->line)) {
+			__pam_log(LOG_AUTH | LOG_ERR,
+			    "nextline[%d:%s]: pam.conf line too long %.256s",
+			    pamh->include_depth, pam_trace_cname(pamh),
+			    bufferp);
+			input_len = sizeof (pam_fh->line) - 1;
+			*err = PAM_SERVICE_ERR;
+		}
+		(void) strncpy(pam_fh->line, bufferp, input_len);
+		pam_fh->line[input_len] = '\0';
 		pam_fh->bufferp = ll;
 	}
 
@@ -2493,9 +2519,9 @@ nextline(struct pam_fh *pam_fh)
 /*
  * verify_pam_conf - verify that the pam_conf entry is filled in.
  *
- *	Error if there is no service.
- *	Error if there is a service and it matches the requested service
- *		but, the type, flag, or path is in error.
+ *	True = Error if there is no service.
+ *	True = Error if there is a service and it matches the requested service
+ *		but, the type, flag, line overflow, or path is in error.
  */
 
 static int
@@ -2505,6 +2531,7 @@ verify_pam_conf(pamtab_t *pam, char *service)
 	    ((strcasecmp(pam->pam_service, service) == 0) &&
 	    ((pam->pam_type == -1) ||
 	    (pam->pam_flag == 0) ||
+	    (pam->pam_err != PAM_SUCCESS) ||
 	    (pam->module_path == (char *)NULL))));
 }
 
