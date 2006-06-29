@@ -1926,7 +1926,7 @@ multi_result(ns_ldap_cookie_t *cookie)
 					&target_posp, &list_size, &errCode);
 			if (rc == LDAP_SUCCESS) {
 				cookie->index = target_posp + LISTPAGESIZE;
-				if (cookie->index >= list_size) {
+				if (cookie->index > list_size) {
 					finished = 1;
 				}
 			}
