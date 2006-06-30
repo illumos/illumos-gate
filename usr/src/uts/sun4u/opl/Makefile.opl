@@ -156,5 +156,19 @@ MACHINE_DEFS	+= -DITLB_32M_256M_SUPPORT
 #    in non-busy state before further xcalls can be issued.
 MACHINE_DEFS += -DOLYMPUS_C_REV_A_ERRATA_XCALL
 MACHINE_DEFS += -DOLYMPUS_C_REV_B_ERRATA_XCALL
+#
+# OLYMPUS C Spurious interrupts
+# - When an UE is detected in a interrupt packet, 
+#   Olympus-C takes an interrupt_vector_trap (TT=0x60) while
+#   ASI_INTR_RECIEVE.BUSY is set to zero to indicate the existence
+#   of the error. Software will see this as a spurious interrupt since
+#   the interrupt busy bit is set to zero. SW will still need to
+#   explicitly clear the interrupt busy bit to reset the HW state.
+#   Failure to do so will result in the processor continuously taking
+#   an interrupt vector trap when PSTATE.IE is reset to one.
+#   Note that UE in interrupt packet is reported to the SP and handled
+#   accordingly. For the domain, the system should panic as it is not
+#   recoverable.
+MACHINE_DEFS += -DCLEAR_INTR_BUSYBIT_ON_SPURIOUS
 
 .KEEP_STATE:
