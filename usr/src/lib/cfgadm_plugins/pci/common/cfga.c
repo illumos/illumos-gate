@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -626,7 +625,8 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 	DBG(1, ("cfga_change_state: os is %d\n", state.ap_ostate));
 	switch (state_change_cmd) {
 	case CFGA_CMD_CONNECT:
-		if ((rs == AP_RSTATE_CONNECTED) ||
+		if ((rs == AP_RSTATE_EMPTY) ||
+		    (rs == AP_RSTATE_CONNECTED) ||
 		    (os == AP_OSTATE_CONFIGURED)) {
 			cfga_err(errstring, ERR_AP_ERR, 0);
 			rv = CFGA_INVAL;
