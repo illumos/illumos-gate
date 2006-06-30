@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -26,34 +27,17 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PATH=/usr/bin:/usr/sbin:${PATH}
-export PATH
+. /lib/svc/share/smf_include.sh
 
-EXIT=0
+DRD=/usr/lib/ldoms/drd
+mach=`/sbin/uname -m`
 
-not_installed()
-{
-	driver=$1
+EXIT=$SMF_EXIT_ERR_CONFIG
 
-	grep "^${driver} " ${BASEDIR}/etc/name_to_major > /dev/null 2>&1
+if [ $mach = "sun4v" ]; then
+	$DRD && EXIT=$SMF_EXIT_OK
+else
+	echo "$SMF_FMRI is not supported on this platform."
+fi
 
-	if [ "$?" -eq 0 ]; then
-		return 1
-	else
-		return 0
-	fi
-}
-
-# 
-# Unload and remove drivers
-#
-not_installed cnex  || rem_drv -b "${BASEDIR}" cnex  || EXIT=1
-not_installed drctl || rem_drv -b "${BASEDIR}" drctl || EXIT=1
-not_installed vcc   || rem_drv -b "${BASEDIR}" vcc   || EXIT=1
-not_installed vdc   || rem_drv -b "${BASEDIR}" vdc   || EXIT=1
-not_installed vds   || rem_drv -b "${BASEDIR}" vds   || EXIT=1
-not_installed vldc  || rem_drv -b "${BASEDIR}" vldc  || EXIT=1
-not_installed vnet  || rem_drv -b "${BASEDIR}" vnet  || EXIT=1
-not_installed vsw   || rem_drv -b "${BASEDIR}" vsw   || EXIT=1
-
-exit ${EXIT}
+exit $EXIT

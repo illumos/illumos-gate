@@ -652,6 +652,7 @@ var/svc/profile/platform_SUNW,Ultra-Enterprise-10000.xml	i386
 var/svc/profile/platform_SUNW,UltraSPARC-IIi-Netract.xml	i386
 var/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-40.xml	i386
 var/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-60.xml	i386
+var/svc/profile/platform_sun4v.xml	i386
 #
 # Private libuutil files
 #

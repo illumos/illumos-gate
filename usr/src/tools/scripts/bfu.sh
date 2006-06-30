@@ -314,6 +314,7 @@ superfluous_local_zone_files="
 	lib/svc/method/sf880dr
 	lib/svc/method/svc-cvcd
 	lib/svc/method/svc-dcs
+	lib/svc/method/svc-drd
 	lib/svc/method/svc-dscp
 	lib/svc/method/svc-dumpadm
 	lib/svc/method/svc-intrd

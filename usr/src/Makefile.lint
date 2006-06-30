@@ -409,6 +409,7 @@ i386_SUBDIRS= \
 sparc_SUBDIRS= \
 	cmd/datadm \
 	cmd/dcs \
+	cmd/drd \
 	cmd/fruadm \
 	cmd/prtdscp \
 	cmd/prtfru \

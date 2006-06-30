@@ -25,6 +25,10 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+# This makefile drives the production of the drctl kernel module.
+#
+# sun4v implementation architecture dependent
+#
 
 #
 # Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -34,10 +38,11 @@ UTSBASE	= ../..
 #
 # Define the module and object file sets.
 #
-MODULE		= dr_cpu
-OBJECTS		= $(DR_CPU_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(DR_CPU_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
+MODULE		= drctl
+OBJECTS		= $(DRCTL_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(DRCTL_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/sun4v/io
 
 #
 # Include common rules.
@@ -49,7 +54,7 @@ include $(UTSBASE)/sun4v/Makefile.sun4v
 #
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
 # lint pass one enforcement
@@ -60,11 +65,6 @@ CFLAGS		+= -v
 # Turn on doubleword alignment for 64 bit registers
 #
 CFLAGS		+= -dalign
-
-#
-# Module Dependencies
-#
-LDFLAGS		+= -dy -Nmisc/ds -Ndrv/drctl
 
 #
 # Default build targets.

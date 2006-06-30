@@ -51,4 +51,5 @@
 d none usr 755 root sys
 d none usr/lib 755 root bin
 d none usr/lib/ldoms 755 root bin
+f none usr/lib/ldoms/drd 555 root bin
 f none usr/lib/ldoms/vntsd 555 root bin

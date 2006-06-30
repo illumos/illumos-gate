@@ -19,6 +19,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -128,6 +129,7 @@ check_add_drv()
 }
 
 check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-channel-devices"' cnex
+check_add_drv -b "${BASEDIR}" drctl
 check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-console-concentrator"' vcc
 check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-disk"' vdc
 check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-disk-server"' vds

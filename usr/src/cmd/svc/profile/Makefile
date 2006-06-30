@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -50,7 +51,8 @@ PROFILESRCS = \
 	platform_SUNW,Ultra-Enterprise-10000.xml \
 	platform_SUNW,UltraSPARC-IIi-Netract.xml \
 	platform_i86pc.xml \
-	platform_none.xml
+	platform_none.xml \
+	platform_sun4v.xml
 
 PROFILES = $(PROFILESRCS:%=$(ROOTPROFILE)/%)
 

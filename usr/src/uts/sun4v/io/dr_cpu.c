@@ -41,6 +41,7 @@
 #include <sys/mach_descrip.h>
 #include <sys/mdesc.h>
 #include <sys/ds.h>
+#include <sys/drctl.h>
 #include <sys/dr_util.h>
 #include <sys/dr_cpu.h>
 #include <sys/promif.h>
@@ -57,6 +58,8 @@ static struct modlinkage modlinkage = {
 	(void *)&modlmisc,
 	NULL
 };
+
+typedef int (*fn_t)(processorid_t, int *, boolean_t);
 
 /*
  * Global DS Handle
@@ -101,12 +104,11 @@ static ds_clnt_ops_t dr_cpu_ops = {
 static int dr_cpu_init(void);
 static int dr_cpu_fini(void);
 
-static int dr_cpu_list_configure(dr_cpu_hdr_t *, dr_cpu_hdr_t **, int *);
-static int dr_cpu_list_unconfigure(dr_cpu_hdr_t *, dr_cpu_hdr_t **, int *);
+static int dr_cpu_list_wrk(dr_cpu_hdr_t *, dr_cpu_hdr_t **, int *, fn_t);
 static int dr_cpu_list_status(dr_cpu_hdr_t *, dr_cpu_hdr_t **, int *);
 
 static int dr_cpu_unconfigure(processorid_t, int *status, boolean_t force);
-static int dr_cpu_configure(processorid_t, int *status);
+static int dr_cpu_configure(processorid_t, int *status, boolean_t force);
 static int dr_cpu_status(processorid_t, int *status);
 
 static int dr_cpu_probe(processorid_t newcpuid);
@@ -114,6 +116,7 @@ static int dr_cpu_deprobe(processorid_t cpuid);
 
 static dev_info_t *dr_cpu_find_node(processorid_t cpuid);
 static mde_cookie_t dr_cpu_find_node_md(processorid_t, md_t *, mde_cookie_t *);
+static void dr_cpu_check_cpus(uint32_t *cpuids, int ncpus, dr_cpu_stat_t *stat);
 
 
 int
@@ -250,13 +253,15 @@ dr_cpu_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 	 */
 	switch (req->msg_type) {
 	case DR_CPU_CONFIGURE:
-		if ((rv = dr_cpu_list_configure(req, &resp, &resp_len)) != 0)
+		rv = dr_cpu_list_wrk(req, &resp, &resp_len, dr_cpu_configure);
+		if (rv != 0)
 			DR_DBG_CPU("dr_cpu_list_configure failed (%d)\n", rv);
 		break;
 
 	case DR_CPU_UNCONFIGURE:
 	case DR_CPU_FORCE_UNCONFIG:
-		if ((rv = dr_cpu_list_unconfigure(req, &resp, &resp_len)) != 0)
+		rv = dr_cpu_list_wrk(req, &resp, &resp_len, dr_cpu_unconfigure);
+		if (rv != 0)
 			DR_DBG_CPU("dr_cpu_list_unconfigure failed (%d)\n", rv);
 		break;
 
@@ -292,48 +297,177 @@ done:
 }
 
 /*
- * Do not modify result buffer or length on error.
+ * Common routine to config or unconfig multiple cpus.  The unconfig
+ * case checks with the OS to see if the removal of cpus will be
+ * permitted, but can be overridden by the "force" version of the
+ * command.  Otherwise, the logic for both cases is identical.
+ *
+ * Note: Do not modify result buffer or length on error.
  */
 static int
-dr_cpu_list_configure(dr_cpu_hdr_t *req, dr_cpu_hdr_t **resp, int *resp_len)
+dr_cpu_list_wrk(dr_cpu_hdr_t *rq, dr_cpu_hdr_t **resp, int *resp_len, fn_t f)
 {
+	/* related to request message (based on cpu_hdr_t *rq function arg) */
+
+	uint32_t	*rq_cpus;	/* address of cpuid array in request */
+
+	/* the response message to our caller (passed back via **resp) */
+
+	dr_cpu_hdr_t	*rs;		/* address of allocated response msg */
+	size_t		rs_len;		/* length of response msg */
+	dr_cpu_stat_t	*rs_stat;	/* addr. of status array in response */
+	caddr_t		rs_str;		/* addr. of string area in response */
+	size_t		rs_stat_len;	/* length of status area in response */
+	size_t		rs_str_len;	/* length of string area in response */
+
+	/* the request message sent to drctl_config_[init|fini] */
+
+	drctl_rsrc_t	*dr_rq;		/* addr. of allocated msg for drctl */
+	size_t		dr_rq_len;	/* length of same */
+
+	/* the response message received from drctl_config_init */
+
+	drctl_rsrc_t	*dr_rs;		/* &response from drctl_config_init */
+	size_t		dr_rs_len = 0;	/* length of response from same */
+	caddr_t		dr_rs_str;	/* &(string area) in same */
+	drctl_cookie_t	dr_rs_ck;	/* the cookie from same */
+
+	/* common temp variables */
+
 	int		idx;
+	int		cmd;
 	int		result;
 	int		status;
-	int		rlen;
-	uint32_t	*cpuids;
-	dr_cpu_hdr_t	*rp;
-	dr_cpu_stat_t	*stat;
+	int		count;
+	int		rv;
+	int		flags;
+	int		force;
+	int		fail_status;
+	static const char me[] = "dr_cpu_list_wrk";
 
-	/* the incoming array of cpuids to configure */
-	cpuids = (uint32_t *)((caddr_t)req + sizeof (dr_cpu_hdr_t));
 
-	/* allocate a response message */
-	rlen = sizeof (dr_cpu_hdr_t);
-	rlen += req->num_records * sizeof (dr_cpu_stat_t);
-	rp = kmem_zalloc(rlen, KM_SLEEP);
+	ASSERT(rq != NULL && rq->num_records != 0);
 
-	/* fill in the known data */
-	rp->req_num = req->req_num;
-	rp->msg_type = DR_CPU_OK;
-	rp->num_records = req->num_records;
+	count = rq->num_records;
+	flags = 0;
+	force = B_FALSE;
 
-	/* stat array for the response */
-	stat = (dr_cpu_stat_t *)((caddr_t)rp + sizeof (dr_cpu_hdr_t));
-
-	/* configure each of the CPUs */
-	for (idx = 0; idx < req->num_records; idx++) {
-
-		result = dr_cpu_configure(cpuids[idx], &status);
-
-		/* save off results of the configure */
-		stat[idx].cpuid = cpuids[idx];
-		stat[idx].result = result;
-		stat[idx].status = status;
+	switch (rq->msg_type) {
+	case DR_CPU_CONFIGURE:
+		cmd = DRCTL_CPU_CONFIG_REQUEST;
+		fail_status = DR_CPU_STAT_UNCONFIGURED;
+		break;
+	case DR_CPU_FORCE_UNCONFIG:
+		flags = DRCTL_FLAG_FORCE;
+		force = B_TRUE;
+		_NOTE(FALLTHROUGH)
+	case DR_CPU_UNCONFIGURE:
+		cmd = DRCTL_CPU_UNCONFIG_REQUEST;
+		fail_status = DR_CPU_STAT_CONFIGURED;
+		break;
+	default:
+		/* Programming error if we reach this. */
+		ASSERT(0);
+		cmn_err(CE_NOTE, "%s: bad msg_type %d\n", me, rq->msg_type);
+		return (-1);
 	}
 
-	*resp = rp;
-	*resp_len = rlen;
+	/* the incoming array of cpuids to configure */
+	rq_cpus = (uint32_t *)((caddr_t)rq + sizeof (dr_cpu_hdr_t));
+
+	/* allocate drctl request msg based on incoming resource count */
+	dr_rq_len = sizeof (drctl_rsrc_t) * count;
+	dr_rq = kmem_zalloc(dr_rq_len, KM_SLEEP);
+
+	/* copy the cpuids for the drctl call from the incoming request msg */
+	for (idx = 0; idx < count; idx++)
+		dr_rq[idx].res_cpu_id = rq_cpus[idx];
+
+	rv = drctl_config_init(cmd,
+	    flags, dr_rq, count, &dr_rs, &dr_rs_len, &dr_rs_ck);
+
+	if (rv != 0) {
+		cmn_err(CE_CONT,
+		    "?%s: drctl_config_init returned: %d\n", me, rv);
+		kmem_free(dr_rq, dr_rq_len);
+		return (-1);
+	}
+
+	ASSERT(dr_rs != NULL && dr_rs_len != 0);
+
+	/*
+	 * Allocate a response buffer for our caller.  It consists of
+	 * the header plus the (per resource) status array and a string
+	 * area the size of which is equal to the size of the string
+	 * area in the drctl_config_init response.  The latter is
+	 * simply the size difference between the config_init request
+	 * and config_init response messages (and may be zero).
+	 */
+	rs_stat_len =  count * sizeof (dr_cpu_stat_t);
+	rs_str_len = dr_rs_len - dr_rq_len;
+	rs_len = sizeof (dr_cpu_hdr_t) + rs_stat_len + rs_str_len;
+	rs = kmem_zalloc(rs_len, KM_SLEEP);
+
+	/* fill in the known data */
+	rs->req_num = rq->req_num;
+	rs->msg_type = DR_CPU_OK;
+	rs->num_records = count;
+
+	/* stat array for the response */
+	rs_stat = (dr_cpu_stat_t *)((caddr_t)rs + sizeof (dr_cpu_hdr_t));
+
+	if (rq->msg_type == DR_CPU_FORCE_UNCONFIG)
+		dr_cpu_check_cpus(rq_cpus, count, rs_stat);
+
+	/* [un]configure each of the CPUs */
+	for (idx = 0; idx < count; idx++) {
+
+		if (dr_rs[idx].status != DRCTL_STATUS_ALLOW ||
+		    rs_stat[idx].result == DR_CPU_RES_BLOCKED) {
+			result = DR_CPU_RES_FAILURE;
+			status = fail_status;
+		} else {
+			result = (*f)(rq_cpus[idx], &status, force);
+		}
+
+		/* save off results of the configure */
+		rs_stat[idx].cpuid = rq_cpus[idx];
+		rs_stat[idx].result = result;
+		rs_stat[idx].status = status;
+
+		/*
+		 * Convert any string offset from being relative to
+		 * the start of the drctl response to being relative
+		 * to the start of the response sent to our caller.
+		 */
+		if (dr_rs[idx].offset != 0)
+			rs_stat[idx].string_off = (uint32_t)dr_rs[idx].offset -
+			    dr_rq_len + (rs_len - rs_str_len);
+
+		/* save result for _fini() reusing _init msg memory */
+		dr_rq[idx].status = (status == fail_status) ?
+		    DRCTL_STATUS_CONFIG_FAILURE : DRCTL_STATUS_CONFIG_SUCCESS;
+		DR_DBG_CPU("%s: cpuid %d status %d result %d off %d",
+		    me, rq_cpus[idx], dr_rq[idx].status,
+		    result, rs_stat[idx].string_off);
+	}
+
+	/* copy the strings (if any) from drctl resp. into resp. for caller */
+	dr_rs_str = (caddr_t)dr_rs + dr_rq_len;
+	rs_str = (caddr_t)rs + rs_len - rs_str_len;
+	bcopy(dr_rs_str, rs_str, rs_str_len);
+
+	rv = drctl_config_fini(&dr_rs_ck, dr_rq, count);
+	if (rv != 0)
+		cmn_err(CE_CONT,
+		    "?%s: drctl_config_fini returned: %d\n", me, rv);
+
+	kmem_free(dr_rs, dr_rs_len);
+
+	kmem_free(dr_rq, dr_rq_len);
+
+	*resp = rs;
+	*resp_len = rs_len;
 
 	dr_generate_event(DR_TYPE_CPU, SE_HINT_INSERT);
 
@@ -394,70 +528,6 @@ dr_cpu_check_cpus(uint32_t *cpuids, int ncpus, dr_cpu_stat_t *stat)
 	mutex_exit(&cpu_lock);
 }
 
-/*
- * Do not modify result buffer or length on error.
- */
-static int
-dr_cpu_list_unconfigure(dr_cpu_hdr_t *req, dr_cpu_hdr_t **resp, int *resp_len)
-{
-	int		idx;
-	int		result;
-	int		status;
-	int		rlen;
-	uint32_t	*cpuids;
-	dr_cpu_hdr_t	*rp;
-	dr_cpu_stat_t	*stat;
-	boolean_t	force;
-
-	/* the incoming array of cpuids to configure */
-	cpuids = (uint32_t *)((caddr_t)req + sizeof (dr_cpu_hdr_t));
-
-	/* check if this is a forced unconfigured */
-	force = (req->msg_type == DR_CPU_FORCE_UNCONFIG) ? B_TRUE : B_FALSE;
-
-	/* allocate a response message */
-	rlen = sizeof (dr_cpu_hdr_t);
-	rlen += req->num_records * sizeof (dr_cpu_stat_t);
-	rp = kmem_zalloc(rlen, KM_SLEEP);
-
-	/* fill in the known data */
-	rp->req_num = req->req_num;
-	rp->msg_type = DR_CPU_OK;
-	rp->num_records = req->num_records;
-
-	/* stat array for the response */
-	stat = (dr_cpu_stat_t *)((caddr_t)rp + sizeof (dr_cpu_hdr_t));
-
-	/*
-	 * If the operation is not a forced unconfigure,
-	 * perform secondary checks for things that would
-	 * prevent an operation.
-	 */
-	if (!force)
-		dr_cpu_check_cpus(cpuids, req->num_records, stat);
-
-	/* unconfigure each of the CPUs */
-	for (idx = 0; idx < req->num_records; idx++) {
-
-		/* skip this cpu if it is already marked as blocked */
-		if (stat[idx].result == DR_CPU_RES_BLOCKED)
-			continue;
-
-		result = dr_cpu_unconfigure(cpuids[idx], &status, force);
-
-		/* save off results of the unconfigure */
-		stat[idx].cpuid = cpuids[idx];
-		stat[idx].result = result;
-		stat[idx].status = status;
-	}
-
-	*resp = rp;
-	*resp_len = rlen;
-
-	dr_generate_event(DR_TYPE_CPU, SE_HINT_REMOVE);
-
-	return (0);
-}
 
 /*
  * Do not modify result buffer or length on error.
@@ -557,9 +627,11 @@ done:
 	return (0);
 }
 
+
 static int
-dr_cpu_configure(processorid_t cpuid, int *status)
+dr_cpu_configure(processorid_t cpuid, int *status, boolean_t force)
 {
+	 _NOTE(ARGUNUSED(force))
 	struct cpu	*cp;
 	int		rv = 0;
 

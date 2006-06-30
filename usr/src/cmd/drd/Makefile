@@ -25,13 +25,70 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+# Makefile definitions for sun4v DR Daemon (drd)
+#
 
-include ../Makefile.com
+PROG=		drd
+MANIFEST=	drd.xml
+SVCMETHOD=	svc-drd
+
+include ../Makefile.cmd
+include ../../Makefile.psm
+
+CLASS=		32
+
+PLATFORM=	sun4v
+
+SRCS=		drd.c		\
+		drd_log.c	\
+		drd_rcm.c
+
+HDRS=		drd.h
+
+OBJS=		$(SRCS:%.c=%.o)
+
+LINT_SRCS=	$(SRCS)
+LINT_FILES=	$(LINT_SRCS:%.c=%.ln)
+
+ROOTCMDDIR=		$(ROOTLIB)/ldoms
+ROOTMANIFESTDIR=	$(ROOTSVCPLATFORMSUN4V)
+$(ROOTMANIFEST)		:= FILEMODE= 444
+
+#
+# FLAGS:
+#
+CPPFLAGS= 	-I$(SRC)/uts/sun4v $(CPPFLAGS.master) -D_REENTRANT
+
+LINT_FLAGS=	-c -Nlevel=4 -Ncheck 
+
+XGETFLAGS +=	-a -s -x $(PROG).xcl
+
+
+#
+# LIBRARIES:
+#
+LDLIBS +=	-lkstat		\
+		-lnvpair	\
+		-lrcm
 
 .KEEP_STATE:
 
-all: $(FILES)
 
-install: all pkg
+all: $(PROG)
+
+$(PROG): $(OBJS) $(HDRS)
+	$(CC) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all .WAIT $(ROOTCMD) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+check:	$(CHKMANIFEST)
+
+lint:
+	$(LINT) $(LINT_FLAGS) $(CPPFLAGS) $(LINT_SRCS)
+
+clean:
+	$(RM) $(PROG) $(OBJS) $(LINT_FILES)
 
 include ../Makefile.targ
+include ../../Makefile.psm.targ

@@ -449,6 +449,7 @@ i386_SUBDIRS=		\
 sparc_SUBDIRS=		\
 	cvcd		\
 	dcs		\
+	drd		\
 	fruadm		\
 	oplhpd		\
 	prtdscp		\
@@ -750,6 +751,7 @@ MANIFEST_TOPDIRS=			\
 	cron				\
 	cvcd				\
 	dispadmin			\
+	drd				\
 	dumpadm				\
 	eeprom				\
 	fm				\

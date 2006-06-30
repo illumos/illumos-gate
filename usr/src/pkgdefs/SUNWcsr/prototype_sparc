@@ -60,3 +60,4 @@ f none var/svc/profile/platform_SUNW,Ultra-Enterprise-10000.xml 444 root sys
 f none var/svc/profile/platform_SUNW,UltraSPARC-IIi-Netract.xml 444 root sys
 l none var/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-40.xml=./platform_SUNW,UltraSPARC-IIi-Netract.xml
 l none var/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-60.xml=./platform_SUNW,UltraSPARC-IIi-Netract.xml
+f none var/svc/profile/platform_sun4v.xml 444 root sys
