@@ -78,6 +78,134 @@ bsdaddr_to_uri(char *bsdaddr)
 }
 
 #if defined(__sun) && defined(__SVR4)
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <sys/sockio.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
+static struct in6_addr **
+local_interfaces()
+{
+	struct in6_addr **result = NULL;
+	int s;
+	struct lifnum n;
+	struct lifconf c;
+	struct lifreq *r;
+	int count;
+
+	/* we need a socket to get the interfaces */
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+		return (0);
+
+	/* get the number of interfaces */
+	memset(&n, 0, sizeof (n));
+	n.lifn_family = AF_UNSPEC;
+	if (ioctl(s, SIOCGLIFNUM, (char *)&n) < 0) {
+		close(s);
+		return (0);	/* no interfaces */
+	}
+
+	/* get the interface(s) configuration */
+	memset(&c, 0, sizeof (c));
+	c.lifc_family = AF_UNSPEC;
+	c.lifc_buf = calloc(n.lifn_count, sizeof (struct lifreq));
+	c.lifc_len = (n.lifn_count * sizeof (struct lifreq));
+	if (ioctl(s, SIOCGLIFCONF, (char *)&c) < 0) {
+		free(c.lifc_buf);
+		close(s);
+		return (0);	/* can't get interface(s) configuration */
+	}
+	close(s);
+
+	r = c.lifc_req;
+	for (count = c.lifc_len / sizeof (struct lifreq);
+	     count > 0; count--, r++) {
+		struct in6_addr v6[1], *addr = NULL;
+
+		switch (r->lifr_addr.ss_family) {
+		case AF_INET: {
+			struct sockaddr_in *s =
+				(struct sockaddr_in *)&r->lifr_addr;
+			IN6_INADDR_TO_V4MAPPED(&s->sin_addr, v6);
+			addr = v6;
+			}
+			break;
+		case AF_INET6: {
+			struct sockaddr_in6 *s =
+				(struct sockaddr_in6 *)&r->lifr_addr;
+			addr = &s->sin6_addr;
+			}
+			break;
+		}
+
+		if (addr != NULL) {
+			struct in6_addr *a = malloc(sizeof (*a));
+
+			memcpy(a, addr, sizeof (*a));
+			list_append(&result, a);
+		}
+	}
+	free(c.lifc_buf);
+
+	return (result);
+}
+
+static int
+match_interfaces(char *host)
+{
+	struct in6_addr **lif = local_interfaces();
+	struct hostent *hp;
+	int rc = 0;
+	int errnum;
+
+	/* are there any local interfaces */
+	if (lif == NULL)
+		return (0);
+
+	/* cycle through the host db addresses */
+	hp = getipnodebyname(host, AF_INET6, AI_ALL|AI_V4MAPPED, &errnum);
+	if (hp != NULL) {
+		struct in6_addr **tmp = (struct in6_addr **)hp->h_addr_list;
+		int i;
+
+		for (i = 0; ((rc == 0) && (tmp[i] != NULL)); i++) {
+			int j;
+
+			for (j = 0; ((rc == 0) && (lif[j] != NULL)); j++)
+				if (memcmp(tmp[i], lif[j],
+						sizeof (struct in6_addr)) == 0)
+					rc = 1;
+		}
+	}
+	free(lif);
+
+	return (rc);
+}
+
+static int
+is_localhost(char *host)
+{
+	char hostname[BUFSIZ];
+
+	/* is it "localhost" */
+	if (strncasecmp(host, "localhost", 10) == 0)
+		return (1);
+
+	/* is it the {nodename} */
+	sysinfo(SI_HOSTNAME, hostname, sizeof (hostname));
+	if (strncasecmp(host, hostname, strlen(hostname)) == 0)
+		return (1);
+
+	/* does it match one of the host's configured interfaces */
+	if (match_interfaces(host) != 0)
+		return (1);
+
+	return (0);
+}
+
 /*
  * This is an awful HACK to force the dynamic PAPI library to use the
  * lpsched support when the destination apears to be a local lpsched
@@ -89,7 +217,6 @@ solaris_lpsched_shortcircuit_hack(papi_attribute_t ***list)
 	papi_attribute_t *attribute;
 	uri_t *uri = NULL;
 	char *printer = NULL;
-	char hostname[BUFSIZ];
 	char buf[128], buf2[128];
 
 	/* setting this in the calling env can be useful for debugging */
@@ -105,12 +232,6 @@ solaris_lpsched_shortcircuit_hack(papi_attribute_t ***list)
 	if (strcasecmp(uri->scheme, "lpsched") == 0)
 		return;
 
-	sysinfo(SI_HOSTNAME, hostname, sizeof (hostname));
-	if ((uri->host != NULL) &&
-	    (strncasecmp(uri->host, hostname, strlen(hostname)) != 0) &&
-	    (strncasecmp(uri->host, "localhost", 10) != 0))
-		return;
-
 	if ((printer = strrchr(uri->path, '/')) == NULL)
 		printer = uri->path;
 	else
@@ -122,7 +243,12 @@ solaris_lpsched_shortcircuit_hack(papi_attribute_t ***list)
 	if ((access(buf, F_OK) < 0) && (access(buf2, F_OK) < 0))
 		return;
 
-	snprintf(buf, sizeof (buf), "lpsched://localhost/printers/%s", printer);
+	/* is this the "local" host */
+	if ((uri->host != NULL) && (is_localhost(uri->host) == 0))
+		return;
+
+	snprintf(buf, sizeof (buf), "lpsched://%s/printers/%s",
+			(uri->host ? uri->host : "localhost"), printer);
 	papiAttributeListAddString(list, PAPI_ATTR_REPLACE,
 			"printer-uri-supported", buf);
 }
@@ -194,7 +320,7 @@ fill_printer_uri(papi_attribute_t ***list)
 	if ((list == NULL) || (*list == NULL))
 		return;
 
-	/* do we have a printer-uri-supported */
+	/* do we have a printer-uri */
 	attribute = papiAttributeListFind(*list, "printer-uri");
 	if (attribute != NULL) /* we have what we need, return */
 		return;
@@ -299,9 +425,6 @@ _cvt_nss_entry_to_printer(char *entry)
 	}
 
 	fill_printer_uri_supported(&list);
-#if defined(__sun) && defined(__SVR4)
-	solaris_lpsched_shortcircuit_hack(&list);
-#endif
 	cvt_all_to_member_names(&list); /* convert "all" to "member-names" */
 
 	return (list);
@@ -418,6 +541,9 @@ getprinterentry(char *ns)
 		buf[0] = '\0';
 
 	result = _cvt_nss_entry_to_printer(buf);
+#if defined(__sun) && defined(__SVR4)
+	solaris_lpsched_shortcircuit_hack(&result);
+#endif
 #ifdef NEED_BROKEN_PRINTER_URI_SEMANTIC
 	fill_printer_uri(&result);
 #endif /* NEED_BROKEN_PRINTER_URI_SEMANTIC */
@@ -481,7 +607,9 @@ getprinterbyname(char *name, char *ns)
 		result = _cvt_nss_entry_to_printer(buf);
 #endif
 	}
-
+#if defined(__sun) && defined(__SVR4)
+	solaris_lpsched_shortcircuit_hack(&result);
+#endif
 #ifdef DEBUG
 	printf("getprinterbyname(%s): %s = 0x%8.8x\n", (ns ? ns : "NULL"),
 		name, result);

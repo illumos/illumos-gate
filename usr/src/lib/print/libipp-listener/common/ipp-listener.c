@@ -380,10 +380,9 @@ print_service_connect(papi_service_t *svc, papi_attribute_t **request,
 				"requesting-user-name", &user);
 
 	/* get the printer or service name */
-	get_printer_id(operational, &printer_uri, NULL);
-	svc_name = destination_from_printer_uri(printer_uri);
 	(void) papiAttributeListGetString(request, NULL,
 				"default-service", &svc_name);
+	get_printer_id(operational, &svc_name, NULL);
 
 	status = papiServiceCreate(svc, svc_name, user, NULL, NULL,
 					PAPI_ENCRYPT_NEVER, NULL);

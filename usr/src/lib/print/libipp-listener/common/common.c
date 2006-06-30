@@ -102,10 +102,6 @@ get_printer_id(papi_attribute_t **attributes, char **printer, int *id)
 			*id = atoi(++job);
 		}
 	}
-
-	/* move to the last component of the name */
-	if (*printer != NULL)
-		*printer = strrchr(*printer, '/') + 1;
 }
 
 void
