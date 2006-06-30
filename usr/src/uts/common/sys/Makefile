@@ -46,6 +46,7 @@ i386_HDRS=			\
 	agpgart.h		\
 	asy.h			\
 	audio/audio810.h	\
+	audio/audiohd.h	\
 	bmc_intf.h		\
 	fd_debug.h		\
 	fdc.h			\

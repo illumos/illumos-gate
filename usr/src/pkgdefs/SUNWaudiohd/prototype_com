@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -35,18 +34,14 @@
 #!default <mode> <owner> <group>	# default used if not specified on entry
 #!<param>=<value>			# puts parameter in pkg environment
 
-#
-# Include ISA independent files (prototype_com)
-#
-!include prototype_com
-#
-# List files which are i386 specific here
+# packaging files
+i pkginfo
+i copyright
+i depend
+i postinstall
+i preremove
 #
 # source locations relative to the prototype file
 #
-# SUNWaudh
+# SUNWaudiohd
 #
-f none usr/include/sys/audio/audio810.h 644 root bin
-f none usr/include/sys/audio/audiohd.h 644 root bin
-f none usr/include/sys/audio/audioixp.h 644 root bin
-f none usr/include/sys/audio/audiovia823x.h 644 root bin

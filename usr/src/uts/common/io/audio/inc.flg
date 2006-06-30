@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -76,11 +76,13 @@ find_files "s.*"	\
 	usr/src/uts/sparc/audiots	\
 	usr/src/uts/sparc/audio810	\
 	usr/src/uts/sparc/audio1575	\
+	usr/src/uts/sparc/audiohd	\
 	usr/src/uts/sparc/audiosup	\
 	usr/src/uts/sparc/mixer		\
 	usr/src/uts/sparc/amsrc2	\
 	usr/src/uts/sparc/diaudio	\
 	usr/src/uts/i86pc/audio810	\
+	usr/src/uts/i86pc/audiohd	\
 	usr/src/uts/intel/audiosup	\
 	usr/src/uts/intel/mixer		\
 	usr/src/uts/intel/diaudio
