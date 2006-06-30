@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +57,7 @@
  * <nports>	::= <number>
  * <ports>	::= <port> <m-port>*
  * <m-port>	::= ',' <port>
- * <port>		::= <devname> '/' <port-num>
+ * <port>		::= <devname>
  * <devname>	::= <string>
  * <port-num>	::= <number>
  * <policy>	::= <pol-level> <m-pol>*
@@ -328,7 +327,6 @@ tryagain:
 
 			bcopy(port->lp_devname, attr.lg_ports[j].lp_devname,
 			    MAXNAMELEN + 1);
-			attr.lg_ports[j].lp_port = port->lp_port;
 			bcopy(port->lp_mac, attr.lg_ports[j].lp_mac,
 			    ETHERADDRL);
 			attr.lg_ports[j].lp_state = port->lp_state;
@@ -401,26 +399,22 @@ i_laadm_parse_db(char *line, laadm_grp_attr_db_t *attr)
 		goto failed;
 
 	for (i = 0; i < attr->lt_nports; i++) {
-		char *where, *ptoken;
+		char *where, *devname;
 
 		/* port */
 		if ((token = strtok_r(NULL, ", \t\n", &lasts)) == NULL)
 			goto failed;
 
-		/* device name */
-		if ((ptoken = strtok_r(token, "/", &where)) == NULL)
+		/*
+		 * device name: In a previous version of this file, a port
+		 * number could be specified using <devname>/<portnum>.
+		 * This syntax is unecessary and obsolete.
+		 */
+		if ((devname = strtok_r(token, "/", &where)) == NULL)
 			goto failed;
-		if (strlcpy(attr->lt_ports[i].lp_devname, ptoken,
+		if (strlcpy(attr->lt_ports[i].lp_devname, devname,
 		    MAXNAMELEN) >= MAXNAMELEN)
 			goto failed;
-
-		/* port number */
-		errno = 0;
-		value = (int)strtol(token + strlen(ptoken) + 1, &endp, 10);
-		if (errno != 0 || *endp != '\0')
-			goto failed;
-
-		attr->lt_ports[i].lp_port = value;
 	}
 
 	/* unicast MAC address */
@@ -530,7 +524,6 @@ i_laadm_add_rem_sys(laadm_grp_attr_db_t *attr, int cmd, laadm_diag_t *diag)
 		    attr->lt_ports[i].lp_devname,
 		    MAXNAMELEN) >= MAXNAMELEN)
 			goto failed;
-		ports[i].lp_port = attr->lt_ports[i].lp_port;
 	}
 
 	if ((fd = open(LAADM_DEV, O_RDWR)) < 0) {
@@ -625,7 +618,6 @@ i_laadm_create_sys(int fd, laadm_grp_attr_db_t *attr, laadm_diag_t *diag)
 			free(iocp);
 			return (-1);
 		}
-		ports[i].lp_port = attr->lt_ports[i].lp_port;
 	}
 
 	if (attr->lt_mac_fixed &&
@@ -1032,10 +1024,8 @@ i_laadm_add_db_fn(void *arg, laadm_grp_attr_db_t *grp)
 	/* are any of the ports to be added already members of the group? */
 	for (i = 0; i < grp->lt_nports; i++) {
 		for (j = 0; j < attr->lt_nports; j++) {
-			if ((strcmp(grp->lt_ports[i].lp_devname,
-			    attr->lt_ports[j].lp_devname) == 0) &&
-			    (grp->lt_ports[i].lp_port ==
-			    attr->lt_ports[j].lp_port)) {
+			if (strcmp(grp->lt_ports[i].lp_devname,
+			    attr->lt_ports[j].lp_devname) == 0) {
 				errno = EEXIST;
 				return (-1);
 			}
@@ -1112,9 +1102,7 @@ i_laadm_remove_db_fn(void *arg, laadm_grp_attr_db_t *grp)
 		match = B_FALSE;
 		for (j = 0; j < attr->lt_nports && !match; j++) {
 			match = (strcmp(grp->lt_ports[i].lp_devname,
-			    attr->lt_ports[j].lp_devname) == 0) &&
-			    (grp->lt_ports[i].lp_port ==
-			    attr->lt_ports[j].lp_port);
+			    attr->lt_ports[j].lp_devname) == 0);
 		}
 		if (match)
 			nremoved++;
@@ -1370,8 +1358,7 @@ i_laadm_fput_grp(FILE *fp, laadm_grp_attr_db_t *attr)
 	for (i = 0; i < attr->lt_nports; i++) {
 		if (i > 0)
 			FPRINTF_ERR(fprintf(fp, ","));
-		FPRINTF_ERR(fprintf(fp, "%s/%d", attr->lt_ports[i].lp_devname,
-		    attr->lt_ports[i].lp_port));
+		FPRINTF_ERR(fprintf(fp, "%s", attr->lt_ports[i].lp_devname));
 	}
 	FPRINTF_ERR(fprintf(fp, "\t"));
 

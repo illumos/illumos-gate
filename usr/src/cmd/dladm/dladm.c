@@ -44,7 +44,7 @@
 #include <liblaadm.h>
 #include <libmacadm.h>
 
-#define	AGGR_DEV	"aggr0"
+#define	AGGR_DRV	"aggr"
 #define	MAXPORT		256
 #define	DUMP_LACP_FORMAT	"    %-9s %-8s %-7s %-12s "	\
 	"%-5s %-4s %-4s %-9s %-7s\n"
@@ -110,11 +110,11 @@ static void	link_stats(const char *, uint32_t);
 static void	aggr_stats(uint16_t, uint32_t);
 static void	dev_stats(const char *dev, uint32_t);
 
-static void	get_mac_stats(const char *, uint_t, pktsum_t *);
+static void	get_mac_stats(const char *, pktsum_t *);
 static void	get_link_stats(const char *, pktsum_t *);
-static uint64_t	mac_ifspeed(const char *, uint_t);
-static char	*mac_link_state(const char *, uint_t);
-static char	*mac_link_duplex(const char *, uint_t);
+static uint64_t	mac_ifspeed(const char *);
+static char	*mac_link_state(const char *);
+static char	*mac_link_duplex(const char *);
 static void	stats_total(pktsum_t *, pktsum_t *, pktsum_t *);
 static void	stats_diff(pktsum_t *, pktsum_t *, pktsum_t *);
 
@@ -260,8 +260,6 @@ do_create_aggr(int argc, char *argv[])
 				    progname);
 				exit(1);
 			}
-
-			port[nport].lp_port = 0;
 
 			nport++;
 			break;
@@ -471,8 +469,6 @@ do_add_aggr(int argc, char *argv[])
 				    progname);
 				exit(1);
 			}
-			port[nport].lp_port = 0;
-
 			nport++;
 			break;
 		case 't':
@@ -561,8 +557,6 @@ do_remove_aggr(int argc, char *argv[])
 				    progname);
 				exit(1);
 			}
-			port[nport].lp_port = 0;
-
 			nport++;
 			break;
 		case 't':
@@ -834,15 +828,20 @@ print_link_parseable(const char *name, dladm_attr_t *dap, boolean_t legacy)
 	char		type[TYPE_WIDTH];
 
 	if (!legacy) {
+		char	drv[LIFNAMSIZ];
+		int	instance;
+
 		if (dap->da_vid != 0) {
 			(void) snprintf(type, TYPE_WIDTH, "vlan %u",
 			    dap->da_vid);
 		} else {
 			(void) snprintf(type, TYPE_WIDTH, "non-vlan");
 		}
-		if (strcmp(dap->da_dev, AGGR_DEV) == 0) {
+		if (dlpi_if_parse(dap->da_dev, drv, &instance) != 0)
+			return;
+		if (strncmp(drv, AGGR_DRV, sizeof (AGGR_DRV)) == 0) {
 			(void) printf("%s type=%s mtu=%d key=%u\n",
-			    name, type, dap->da_max_sdu, dap->da_port);
+			    name, type, dap->da_max_sdu, instance);
 		} else {
 			(void) printf("%s type=%s mtu=%d device=%s\n",
 			    name, type, dap->da_max_sdu, dap->da_dev);
@@ -859,16 +858,21 @@ print_link(const char *name, dladm_attr_t *dap, boolean_t legacy)
 	char		type[TYPE_WIDTH];
 
 	if (!legacy) {
+		char drv[LIFNAMSIZ];
+		int instance;
+
 		if (dap->da_vid != 0) {
 			(void) snprintf(type, TYPE_WIDTH, gettext("vlan %u"),
 			    dap->da_vid);
 		} else {
 			(void) snprintf(type, TYPE_WIDTH, gettext("non-vlan"));
 		}
-		if (strcmp(dap->da_dev, AGGR_DEV) == 0) {
+		if (dlpi_if_parse(dap->da_dev, drv, &instance) != 0)
+			return;
+		if (strncmp(drv, AGGR_DRV, sizeof (AGGR_DRV)) == 0) {
 			(void) printf(gettext("%-9s\ttype: %s\tmtu: %d"
 			    "\taggregation: key %u\n"), name, type,
-			    dap->da_max_sdu, dap->da_port);
+			    dap->da_max_sdu, instance);
 		} else {
 			(void) printf(gettext("%-9s\ttype: %s\tmtu: "
 			    "%d\tdevice: %s\n"), name, type, dap->da_max_sdu,
@@ -1058,25 +1062,24 @@ static void
 dump_port(laadm_port_attr_sys_t *port, boolean_t parseable)
 {
 	char *dev = port->lp_devname;
-	uint_t portnum = port->lp_port;
 	char buf[ETHERADDRL * 3];
 
 	if (!parseable) {
 		(void) printf("	   %-9s\t%s", dev, laadm_mac_addr_to_str(
 		    port->lp_mac, buf));
-		(void) printf("\t  %-5u Mbps", (int)(mac_ifspeed(dev, portnum) /
+		(void) printf("\t  %-5u Mbps", (int)(mac_ifspeed(dev) /
 		    1000000ull));
-		(void) printf("\t%s", mac_link_duplex(dev, portnum));
-		(void) printf("\t%s", mac_link_state(dev, portnum));
+		(void) printf("\t%s", mac_link_duplex(dev));
+		(void) printf("\t%s", mac_link_state(dev));
 		(void) printf("\t%s\n", port_state_to_str(port->lp_state));
 
 	} else {
 		(void) printf(" device=%s address=%s", dev,
 		    laadm_mac_addr_to_str(port->lp_mac, buf));
-		(void) printf(" speed=%u", (int)(mac_ifspeed(dev, portnum) /
+		(void) printf(" speed=%u", (int)(mac_ifspeed(dev) /
 		    1000000ull));
-		(void) printf(" duplex=%s", mac_link_duplex(dev, portnum));
-		(void) printf(" link=%s", mac_link_state(dev, portnum));
+		(void) printf(" duplex=%s", mac_link_duplex(dev));
+		(void) printf(" link=%s", mac_link_state(dev));
 		(void) printf(" port=%s", port_state_to_str(port->lp_state));
 	}
 }
@@ -1153,8 +1156,7 @@ show_key(void *arg, laadm_grp_attr_sys_t *grp)
 		/* sum the ports statistics */
 		bzero(&pktsumtot, sizeof (pktsumtot));
 		for (i = 0; i < grp->lg_nports; i++) {
-			get_mac_stats(grp->lg_ports[i].lp_devname,
-			    grp->lg_ports[i].lp_port, &port_stat);
+			get_mac_stats(grp->lg_ports[i].lp_devname, &port_stat);
 			stats_total(&pktsumtot, &port_stat,
 			    &state->gs_prevstats[i]);
 		}
@@ -1166,8 +1168,7 @@ show_key(void *arg, laadm_grp_attr_sys_t *grp)
 		(void) printf("%-12llu\n", pktsumtot.obytes);
 
 		for (i = 0; i < grp->lg_nports; i++) {
-			get_mac_stats(grp->lg_ports[i].lp_devname,
-			    grp->lg_ports[i].lp_port, &port_stat);
+			get_mac_stats(grp->lg_ports[i].lp_devname, &port_stat);
 			(void) printf("	   %s", grp->lg_ports[i].lp_devname);
 			dump_port_stat(i, state, &port_stat, &pktsumtot);
 		}
@@ -1228,16 +1229,16 @@ show_dev(void *arg, const char *dev)
 
 	if (!state->ms_parseable) {
 		(void) printf(gettext("\t\tlink: %s"),
-		    mac_link_state(dev, 0));
+		    mac_link_state(dev));
 		(void) printf(gettext("\tspeed: %-5u Mbps"),
-		    (unsigned int)(mac_ifspeed(dev, 0) / 1000000ull));
+		    (unsigned int)(mac_ifspeed(dev) / 1000000ull));
 		(void) printf(gettext("\tduplex: %s\n"),
-		    mac_link_duplex(dev, 0));
+		    mac_link_duplex(dev));
 	} else {
-		(void) printf(" link=%s", mac_link_state(dev, 0));
+		(void) printf(" link=%s", mac_link_state(dev));
 		(void) printf(" speed=%u",
-		    (unsigned int)(mac_ifspeed(dev, 0) / 1000000ull));
-		(void) printf(" duplex=%s\n", mac_link_duplex(dev, 0));
+		    (unsigned int)(mac_ifspeed(dev) / 1000000ull));
+		(void) printf(" duplex=%s\n", mac_link_duplex(dev));
 	}
 }
 
@@ -1256,7 +1257,7 @@ show_dev_stats(void *arg, const char *dev)
 		bzero(&state->ms_prevstats, sizeof (state->ms_prevstats));
 	}
 
-	get_mac_stats(dev, 0, &stats);
+	get_mac_stats(dev, &stats);
 	stats_diff(&diff_stats, &stats, &state->ms_prevstats);
 
 	(void) printf("%s", dev);
@@ -1737,14 +1738,12 @@ stats_diff(pktsum_t *s1, pktsum_t *s2, pktsum_t *s3)
 }
 
 /*
- * In the following routines, we do the first kstat_lookup()
- * assuming that the device is gldv3-based and that the kstat
- * name is of the format <driver_name><instance>/<port>. If the
- * lookup fails, we redo the kstat_lookup() using the kstat name
- * <driver_name><instance>. This second lookup is needed for
- * getting kstats from legacy devices. This can fail too if the
- * device is not attached or the device is legacy and doesn't
- * export the kstats we need.
+ * In the following routines, we do the first kstat_lookup() assuming that
+ * the device is gldv3-based and that the kstat name is the one passed in
+ * as the "name" argument. If the lookup fails, we redo the kstat_lookup()
+ * omitting the kstat name. This second lookup is needed for getting kstats
+ * from legacy devices. This can fail too if the device is not attached or
+ * the device is legacy and doesn't export the kstats we need.
  */
 static void
 get_stats(char *module, int instance, char *name, pktsum_t *stats)
@@ -1760,8 +1759,7 @@ get_stats(char *module, int instance, char *name, pktsum_t *stats)
 	}
 
 	if ((ksp = kstat_lookup(kcp, module, instance, name)) == NULL &&
-	    (module == NULL ||
-	    (ksp = kstat_lookup(kcp, NULL, -1, module)) == NULL)) {
+	    (ksp = kstat_lookup(kcp, module, instance, NULL)) == NULL) {
 		/*
 		 * The kstat query could fail if the underlying MAC
 		 * driver was already detached.
@@ -1801,49 +1799,53 @@ get_stats(char *module, int instance, char *name, pktsum_t *stats)
 	return;
 
 bail:
-	(void) fprintf(stderr,
-	    gettext("%s: kstat operation failed\n"),
-	    progname);
 	(void) kstat_close(kcp);
 }
 
 static void
-get_mac_stats(const char *dev, uint_t port, pktsum_t *stats)
+get_mac_stats(const char *dev, pktsum_t *stats)
 {
-	char			name[MAXNAMELEN];
+	char	module[LIFNAMSIZ];
+	int	instance;
 
+	if (dlpi_if_parse(dev, module, &instance) != 0)
+		return;
 	bzero(stats, sizeof (*stats));
-
-	(void) snprintf(name, MAXNAMELEN - 1, "%s/%u", dev, port);
-	get_stats((char *)dev, 0, name, stats);
+	get_stats(module, instance, "mac", stats);
 }
 
 static void
 get_link_stats(const char *link, pktsum_t *stats)
 {
+	char	module[LIFNAMSIZ];
+	int	instance;
+
+	if (dlpi_if_parse(link, module, &instance) != 0)
+		return;
 	bzero(stats, sizeof (*stats));
-	get_stats(NULL, -1, (char *)link, stats);
+	get_stats(module, instance, (char *)link, stats);
 }
 
-static uint64_t
-mac_ifspeed(const char *dev, uint_t port)
+static int
+get_single_mac_stat(const char *dev, const char *name, uint8_t type,
+    void *val)
 {
-	char		name[MAXNAMELEN];
+	char		module[LIFNAMSIZ];
+	int		instance;
 	kstat_ctl_t	*kcp;
 	kstat_t		*ksp;
-	uint64_t	ifspeed = 0;
 
 	if ((kcp = kstat_open()) == NULL) {
 		(void) fprintf(stderr,
 		    gettext("%s: kstat open operation failed\n"),
 		    progname);
-		return (0);
+		return (-1);
 	}
 
-	(void) snprintf(name, MAXNAMELEN - 1, "%s/%u", dev, port);
-	if ((ksp = kstat_lookup(kcp, (char *)dev, -1, name)) == NULL &&
-	    (ksp = kstat_lookup(kcp, NULL, -1, (char *)dev)) == NULL) {
-
+	if (dlpi_if_parse(dev, module, &instance) != 0)
+		return (-1);
+	if ((ksp = kstat_lookup(kcp, module, instance, "mac")) == NULL &&
+	    (ksp = kstat_lookup(kcp, module, instance, NULL)) == NULL) {
 		/*
 		 * The kstat query could fail if the underlying MAC
 		 * driver was already detached.
@@ -1858,55 +1860,35 @@ mac_ifspeed(const char *dev, uint_t port)
 		goto bail;
 	}
 
-	if (kstat_value(ksp, "ifspeed", KSTAT_DATA_UINT64, &ifspeed) < 0) {
-		(void) fprintf(stderr,
-		    gettext("%s: kstat value failed\n"),
-		    progname);
+	if (kstat_value(ksp, name, type, val) < 0)
 		goto bail;
-	}
+
+	(void) kstat_close(kcp);
+	return (0);
 
 bail:
 	(void) kstat_close(kcp);
+	return (-1);
+}
+
+static uint64_t
+mac_ifspeed(const char *dev)
+{
+	uint64_t ifspeed = 0;
+
+	(void) get_single_mac_stat(dev, "ifspeed", KSTAT_DATA_UINT64, &ifspeed);
 	return (ifspeed);
 }
 
 static char *
-mac_link_state(const char *dev, uint_t port)
+mac_link_state(const char *dev)
 {
-	char		name[MAXNAMELEN];
-	kstat_ctl_t	*kcp;
-	kstat_t		*ksp;
 	link_state_t	link_state;
 	char		*state_str = "unknown";
 
-	if ((kcp = kstat_open()) == NULL) {
-		(void) fprintf(stderr,
-		    gettext("%s: kstat open operation failed\n"),
-		    progname);
+	if (get_single_mac_stat(dev, "link_state", KSTAT_DATA_UINT32,
+	    &link_state) != 0) {
 		return (state_str);
-	}
-
-	(void) snprintf(name, MAXNAMELEN - 1, "%s/%u", dev, port);
-
-	if ((ksp = kstat_lookup(kcp, (char *)dev, -1, name)) == NULL &&
-	    (ksp = kstat_lookup(kcp, NULL, -1, (char *)dev)) == NULL) {
-		/*
-		 * The kstat query could fail if the underlying MAC
-		 * driver was already detached.
-		 */
-		goto bail;
-	}
-
-	if (kstat_read(kcp, ksp, NULL) == -1) {
-		(void) fprintf(stderr,
-		    gettext("%s: kstat read failed\n"),
-		    progname);
-		goto bail;
-	}
-
-	if (kstat_value(ksp, "link_state", KSTAT_DATA_UINT32,
-	    &link_state) < 0) {
-		goto bail;
 	}
 
 	switch (link_state) {
@@ -1920,50 +1902,21 @@ mac_link_state(const char *dev, uint_t port)
 		break;
 	}
 
-bail:
-	(void) kstat_close(kcp);
 	return (state_str);
 }
 
 
 static char *
-mac_link_duplex(const char *dev, uint_t port)
+mac_link_duplex(const char *dev)
 {
-	char		name[MAXNAMELEN];
-	kstat_ctl_t	*kcp;
-	kstat_t		*ksp;
 	link_duplex_t	link_duplex;
 	char		*duplex_str = "unknown";
 
-	if ((kcp = kstat_open()) == NULL) {
-		(void) fprintf(stderr,
-		    gettext("%s: kstat open operation failed\n"),
-		    progname);
+	if (get_single_mac_stat(dev, "link_duplex", KSTAT_DATA_UINT32,
+	    &link_duplex) != 0) {
 		return (duplex_str);
 	}
 
-	(void) snprintf(name, MAXNAMELEN - 1, "%s/%u", dev, port);
-
-	if ((ksp = kstat_lookup(kcp, (char *)dev, -1, name)) == NULL &&
-	    (ksp = kstat_lookup(kcp, NULL, -1, (char *)dev)) == NULL) {
-		/*
-		 * The kstat query could fail if the underlying MAC
-		 * driver was already detached.
-		 */
-		goto bail;
-	}
-
-	if (kstat_read(kcp, ksp, NULL) == -1) {
-		(void) fprintf(stderr,
-		    gettext("%s: kstat read failed\n"),
-		    progname);
-		goto bail;
-	}
-
-	if (kstat_value(ksp, "link_duplex", KSTAT_DATA_UINT32,
-	    &link_duplex) < 0) {
-		goto bail;
-	}
 	switch (link_duplex) {
 	case LINK_DUPLEX_FULL:
 		duplex_str = "full";
@@ -1975,7 +1928,5 @@ mac_link_duplex(const char *dev, uint_t port)
 		break;
 	}
 
-bail:
-	(void) kstat_close(kcp);
 	return (duplex_str);
 }

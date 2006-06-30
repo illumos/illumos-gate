@@ -117,6 +117,31 @@ static ether_addr_t bge_broadcast_addr = {
  */
 static uint32_t bge_net1_boot_support = 1;
 
+static int		bge_m_start(void *);
+static void		bge_m_stop(void *);
+static int		bge_m_promisc(void *, boolean_t);
+static int		bge_m_multicst(void *, boolean_t, const uint8_t *);
+static int		bge_m_unicst(void *, const uint8_t *);
+static void		bge_m_resources(void *);
+static void		bge_m_ioctl(void *, queue_t *, mblk_t *);
+static boolean_t	bge_m_getcapab(void *, mac_capab_t, void *);
+
+#define	BGE_M_CALLBACK_FLAGS	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB)
+
+static mac_callbacks_t bge_m_callbacks = {
+	BGE_M_CALLBACK_FLAGS,
+	bge_m_stat,
+	bge_m_start,
+	bge_m_stop,
+	bge_m_promisc,
+	bge_m_multicst,
+	bge_m_unicst,
+	bge_m_tx,
+	bge_m_resources,
+	bge_m_ioctl,
+	bge_m_getcapab
+};
+
 /*
  * ========== Transmit and receive ring reinitialisation ==========
  */
@@ -738,6 +763,29 @@ bge_m_promisc(void *arg, boolean_t on)
 	return (0);
 }
 
+/*ARGSUSED*/
+static boolean_t
+bge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
+{
+	switch (cap) {
+	case MAC_CAPAB_HCKSUM: {
+		uint32_t *txflags = cap_data;
+
+		*txflags = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM;
+		break;
+	}
+	case MAC_CAPAB_POLL:
+		/*
+		 * There's nothing for us to fill in, simply returning
+		 * B_TRUE stating that we support polling is sufficient.
+		 */
+		break;
+	default:
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
 /*
  * Loopback ioctl code
  */
@@ -1058,7 +1106,7 @@ bge_m_resources(void *arg)
 
 	for (ring = 0; ring < bgep->chipid.rx_rings; ring++) {
 		rrp = &bgep->recv[ring];
-		rrp->handle = mac_resource_add(bgep->macp,
+		rrp->handle = mac_resource_add(bgep->mh,
 		    (mac_resource_t *)&mrf);
 	}
 
@@ -1891,8 +1939,6 @@ bge_unattach(bge_t *bgep, uint_t asf_mode)
 bge_unattach(bge_t *bgep)
 #endif
 {
-	mac_t	*macp;
-
 	BGE_TRACE(("bge_unattach($%p)",
 		(void *)bgep));
 
@@ -1967,8 +2013,6 @@ bge_unattach(bge_t *bgep)
 	bge_fm_fini(bgep);
 
 	ddi_remove_minor_node(bgep->devinfo, NULL);
-	macp = bgep->macp;
-	kmem_free(macp, sizeof (*macp));
 	kmem_free(bgep, sizeof (*bgep));
 }
 
@@ -2045,8 +2089,6 @@ bge_resume(dev_info_t *devinfo)
 	return (DDI_SUCCESS);
 }
 
-static uint8_t ether_brdcst[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-
 /*
  * attach(9E) -- Attach a device to the system
  *
@@ -2056,14 +2098,13 @@ static int
 bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 {
 	bge_t *bgep;				/* Our private data	*/
-	mac_t *macp;
+	mac_register_t *macp;
 	chip_id_t *cidp;
 	cyc_handler_t cychand;
 	cyc_time_t cyctime;
 	caddr_t regs;
 	int instance;
 	int err;
-	mac_info_t *mip;
 	int intr_types;
 #ifdef BGE_IPMI_ASF
 	uint32_t mhcrValue;
@@ -2086,18 +2127,10 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		break;
 	}
 
-	/*
-	 * Allocate mac_t and BGE private structures, and
-	 * cross-link them so that given either one of these or
-	 * the devinfo the others can be derived.
-	 */
-	macp = kmem_zalloc(sizeof (*macp), KM_SLEEP);
 	bgep = kmem_zalloc(sizeof (*bgep), KM_SLEEP);
 	ddi_set_driver_private(devinfo, bgep);
 	bgep->bge_guard = BGE_GUARD;
 	bgep->devinfo = devinfo;
-	bgep->macp = macp;
-	macp->m_driver = bgep;
 
 	/*
 	 * Initialize more fields in BGE private data
@@ -2395,47 +2428,22 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ethaddr_copy(cidp->vendor_addr.addr, bgep->curr_addr.addr);
 	bgep->curr_addr.set = 1;
 
-	/*
-	 * Initialize pointers to device specific functions which
-	 * will be used by the generic layer.
-	 */
-	mip = &(macp->m_info);
-	mip->mi_media = DL_ETHER;
-	mip->mi_sdu_min = 0;
-	mip->mi_sdu_max = cidp->ethmax_size - sizeof (struct ether_header);
-	mip->mi_cksum = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM;
-	mip->mi_poll = DL_CAPAB_POLL;
-
-	mip->mi_addr_length = ETHERADDRL;
-	bcopy(ether_brdcst, mip->mi_brdcst_addr, ETHERADDRL);
-	bcopy(bgep->curr_addr.addr, mip->mi_unicst_addr, ETHERADDRL);
-
-	MAC_STAT_MIB(mip->mi_stat);
-	mip->mi_stat[MAC_STAT_UNKNOWNS] = B_FALSE;
-	MAC_STAT_ETHER(mip->mi_stat);
-	mip->mi_stat[MAC_STAT_SQE_ERRORS] = B_FALSE;
-	mip->mi_stat[MAC_STAT_MACRCV_ERRORS] = B_FALSE;
-	if (!(bgep->chipid.flags & CHIP_FLAG_SERDES))
-		MAC_STAT_MII(mip->mi_stat);
-
-	macp->m_stat = bge_m_stat;
-	macp->m_stop = bge_m_stop;
-	macp->m_start = bge_m_start;
-	macp->m_unicst = bge_m_unicst;
-	macp->m_multicst = bge_m_multicst;
-	macp->m_promisc = bge_m_promisc;
-	macp->m_tx = bge_m_tx;
-	macp->m_resources = bge_m_resources;
-	macp->m_ioctl = bge_m_ioctl;
-
+	if ((macp = mac_alloc(MAC_VERSION)) == NULL)
+		goto attach_fail;
+	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
+	macp->m_driver = bgep;
 	macp->m_dip = devinfo;
-	macp->m_ident = MAC_IDENT;
-
+	macp->m_src_addr = bgep->curr_addr.addr;
+	macp->m_callbacks = &bge_m_callbacks;
+	macp->m_min_sdu = 0;
+	macp->m_max_sdu = cidp->ethmax_size - sizeof (struct ether_header);
 	/*
 	 * Finally, we're ready to register ourselves with the MAC layer
 	 * interface; if this succeeds, we're all ready to start()
 	 */
-	if (mac_register(macp) != 0)
+	err = mac_register(macp, &bgep->mh);
+	mac_free(macp);
+	if (err != 0)
 		goto attach_fail;
 
 	cychand.cyh_func = bge_chip_cyclic;
@@ -2556,7 +2564,7 @@ bge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	 * in which case we just return failure without shutting
 	 * down chip operations.
 	 */
-	if (mac_unregister(bgep->macp) != 0)
+	if (mac_unregister(bgep->mh) != 0)
 		return (DDI_FAILURE);
 
 	/*

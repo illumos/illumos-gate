@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,15 +99,35 @@ static ddi_device_acc_attr_t rge_buf_accattr = {
 	DDI_DEFAULT_ACC
 };
 
-static ether_addr_t rge_broadcast_addr = {
-	0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-};
-
 /*
  * Property names
  */
 static char debug_propname[] = "rge-debug-flags";
 
+static int		rge_m_start(void *);
+static void		rge_m_stop(void *);
+static int		rge_m_promisc(void *, boolean_t);
+static int		rge_m_multicst(void *, boolean_t, const uint8_t *);
+static int		rge_m_unicst(void *, const uint8_t *);
+static void		rge_m_resources(void *);
+static void		rge_m_ioctl(void *, queue_t *, mblk_t *);
+static boolean_t	rge_m_getcapab(void *, mac_capab_t, void *);
+
+#define	RGE_M_CALLBACK_FLAGS	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB)
+
+static mac_callbacks_t rge_m_callbacks = {
+	RGE_M_CALLBACK_FLAGS,
+	rge_m_stat,
+	rge_m_start,
+	rge_m_stop,
+	rge_m_promisc,
+	rge_m_multicst,
+	rge_m_unicst,
+	rge_m_tx,
+	rge_m_resources,
+	rge_m_ioctl,
+	rge_m_getcapab
+};
 
 /*
  * Allocate an area of memory and a DMA handle for accessing it
@@ -1205,9 +1224,31 @@ rge_m_resources(void *arg)
 	mrf.mrf_arg = (void *)rgep;
 	mrf.mrf_normal_blank_time = RGE_RX_INT_TIME;
 	mrf.mrf_normal_pkt_count = RGE_RX_INT_PKTS;
-	rgep->handle = mac_resource_add(rgep->macp, (mac_resource_t *)&mrf);
+	rgep->handle = mac_resource_add(rgep->mh, (mac_resource_t *)&mrf);
 
 	mutex_exit(rgep->genlock);
+}
+
+/* ARGSUSED */
+static boolean_t
+rge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
+{
+	switch (cap) {
+	case MAC_CAPAB_HCKSUM: {
+		uint32_t *hcksum_txflags = cap_data;
+		*hcksum_txflags = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM;
+		break;
+	}
+	case MAC_CAPAB_POLL:
+		/*
+		 * There's nothing for us to fill in, simply returning
+		 * B_TRUE stating that we support polling is sufficient.
+		 */
+		break;
+	default:
+		return (B_FALSE);
+	}
+	return (B_TRUE);
 }
 
 /*
@@ -1220,8 +1261,6 @@ rge_m_resources(void *arg)
 static void
 rge_unattach(rge_t *rgep)
 {
-	mac_t *macp;
-
 	/*
 	 * Flag that no more activity may be initiated
 	 */
@@ -1276,8 +1315,6 @@ rge_unattach(rge_t *rgep)
 		pci_config_teardown(&rgep->cfg_handle);
 
 	ddi_remove_minor_node(rgep->devinfo, NULL);
-	macp = rgep->macp;
-	kmem_free(macp, sizeof (*macp));
 	kmem_free(rgep, sizeof (*rgep));
 }
 
@@ -1330,8 +1367,7 @@ static int
 rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 {
 	rge_t *rgep;			/* Our private data	*/
-	mac_t *macp;
-	mac_info_t *mip;
+	mac_register_t *macp;
 	chip_id_t *cidp;
 	cyc_handler_t cychand;
 	cyc_time_t cyctime;
@@ -1364,17 +1400,9 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		break;
 	}
 
-	/*
-	 * Allocate mac_t and RGE private structures, and
-	 * cross-link them so that given either one of these or
-	 * the devinfo the others can be derived.
-	 */
-	macp = kmem_zalloc(sizeof (*macp), KM_SLEEP);
 	rgep = kmem_zalloc(sizeof (*rgep), KM_SLEEP);
 	ddi_set_driver_private(devinfo, rgep);
 	rgep->devinfo = devinfo;
-	rgep->macp = macp;
-	macp->m_driver = rgep;
 
 	/*
 	 * Initialize more fields in RGE private data
@@ -1529,72 +1557,23 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	rge_init_kstats(rgep, instance);
 	rgep->progress |= PROGRESS_KSTATS;
 
-	/*
-	 * Initialize pointers to device specific functions which
-	 * will be used by the generic layer.
-	 */
-	mip = &(macp->m_info);
-	mip->mi_media = DL_ETHER;
-	mip->mi_sdu_min = 0;
-	mip->mi_sdu_max = rgep->param_default_mtu;
-	mip->mi_cksum = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM;
-	mip->mi_poll = DL_CAPAB_POLL;
-
-	mip->mi_addr_length = ETHERADDRL;
-	bcopy(rge_broadcast_addr, mip->mi_brdcst_addr, ETHERADDRL);
-	bcopy(rgep->netaddr, mip->mi_unicst_addr, ETHERADDRL);
-
-	/*
-	 * Register h/w supported statistics
-	 */
-	MAC_STAT_MIB(mip->mi_stat);
-	mip->mi_stat[MAC_STAT_MULTIXMT] = B_FALSE;
-	mip->mi_stat[MAC_STAT_BRDCSTXMT] = B_FALSE;
-	mip->mi_stat[MAC_STAT_UNKNOWNS] = B_FALSE;
-	mip->mi_stat[MAC_STAT_NOXMTBUF] = B_FALSE;
-
-	MAC_STAT_ETHER(mip->mi_stat);
-	mip->mi_stat[MAC_STAT_FCS_ERRORS] = B_FALSE;
-	mip->mi_stat[MAC_STAT_SQE_ERRORS] = B_FALSE;
-	mip->mi_stat[MAC_STAT_TX_LATE_COLLISIONS] = B_FALSE;
-	mip->mi_stat[MAC_STAT_EX_COLLISIONS] = B_FALSE;
-	mip->mi_stat[MAC_STAT_MACXMT_ERRORS] = B_FALSE;
-	mip->mi_stat[MAC_STAT_CARRIER_ERRORS] = B_FALSE;
-	mip->mi_stat[MAC_STAT_TOOLONG_ERRORS] = B_FALSE;
-	mip->mi_stat[MAC_STAT_MACRCV_ERRORS] = B_FALSE;
-
-	MAC_STAT_MII(mip->mi_stat);
-	mip->mi_stat[MAC_STAT_LP_CAP_1000FDX] = B_FALSE;
-	mip->mi_stat[MAC_STAT_LP_CAP_1000HDX] = B_FALSE;
-	mip->mi_stat[MAC_STAT_LP_CAP_100FDX] = B_FALSE;
-	mip->mi_stat[MAC_STAT_LP_CAP_100HDX] = B_FALSE;
-	mip->mi_stat[MAC_STAT_LP_CAP_10FDX] = B_FALSE;
-	mip->mi_stat[MAC_STAT_LP_CAP_10HDX] = B_FALSE;
-	mip->mi_stat[MAC_STAT_LP_CAP_ASMPAUSE] = B_FALSE;
-	mip->mi_stat[MAC_STAT_LP_CAP_PAUSE] = B_FALSE;
-	mip->mi_stat[MAC_STAT_LP_CAP_AUTONEG] = B_FALSE;
-	mip->mi_stat[MAC_STAT_LINK_ASMPAUSE] = B_FALSE;
-	mip->mi_stat[MAC_STAT_LINK_PAUSE] = B_FALSE;
-	mip->mi_stat[MAC_STAT_LINK_AUTONEG] = B_FALSE;
-
-	macp->m_stat = rge_m_stat;
-	macp->m_stop = rge_m_stop;
-	macp->m_start = rge_m_start;
-	macp->m_unicst = rge_m_unicst;
-	macp->m_multicst = rge_m_multicst;
-	macp->m_promisc = rge_m_promisc;
-	macp->m_tx = rge_m_tx;
-	macp->m_resources = rge_m_resources;
-	macp->m_ioctl = rge_m_ioctl;
-
+	if ((macp = mac_alloc(MAC_VERSION)) == NULL)
+		goto attach_fail;
+	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
+	macp->m_driver = rgep;
 	macp->m_dip = devinfo;
-	macp->m_ident = MAC_IDENT;
+	macp->m_src_addr = rgep->netaddr;
+	macp->m_callbacks = &rge_m_callbacks;
+	macp->m_min_sdu = 0;
+	macp->m_max_sdu = rgep->param_default_mtu;
 
 	/*
 	 * Finally, we're ready to register ourselves with the MAC layer
 	 * interface; if this succeeds, we're all ready to start()
 	 */
-	if (mac_register(macp) != 0)
+	err = mac_register(macp, &rgep->mh);
+	mac_free(macp);
+	if (err != 0)
 		goto attach_fail;
 
 	cychand.cyh_func = rge_chip_cyclic;
@@ -1666,7 +1645,7 @@ rge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	 * in which case we just return failure without shutting
 	 * down chip operations.
 	 */
-	if (mac_unregister(rgep->macp) != 0)
+	if (mac_unregister(rgep->mh) != 0)
 		return (DDI_FAILURE);
 
 	/*

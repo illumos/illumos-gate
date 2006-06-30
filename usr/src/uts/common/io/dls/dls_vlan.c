@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,7 +118,8 @@ dls_vlan_fini(void)
  */
 
 int
-dls_vlan_create(const char *name, const char *dev, uint_t port, uint16_t vid)
+dls_vlan_create(const char *vlanname, const char *macname, uint_t ddi_instance,
+    uint16_t vid)
 {
 	dls_link_t	*dlp;
 	dls_vlan_t	*dvp;
@@ -131,25 +131,25 @@ dls_vlan_create(const char *name, const char *dev, uint_t port, uint16_t vid)
 	 * characters in length and must terminate with a digit (before the
 	 * NUL, of course).
 	 */
-	len = strlen(name);
+	len = strlen(vlanname);
 	if (len == 0 || len >= IFNAMSIZ)
 		return (EINVAL);
 
-	if (!isdigit(name[len - 1]))
+	if (!isdigit(vlanname[len - 1]))
 		return (EINVAL);
 
 	/*
 	 * Get a reference to a dls_link_t representing the MAC. This call
 	 * will create one if necessary.
 	 */
-	if ((err = dls_link_hold(dev, port, &dlp)) != 0)
+	if ((err = dls_link_hold(macname, ddi_instance, &dlp)) != 0)
 		return (err);
 
 	/*
 	 * Allocate a new dls_vlan_t.
 	 */
 	dvp = kmem_cache_alloc(i_dls_vlan_cachep, KM_SLEEP);
-	(void) strlcpy(dvp->dv_name, name, IFNAMSIZ);
+	(void) strlcpy(dvp->dv_name, vlanname, sizeof (dvp->dv_name));
 	dvp->dv_id = vid;
 	dvp->dv_dlp = dlp;
 
@@ -242,8 +242,8 @@ again:
 	err = mod_hash_find(i_dls_vlan_hash, (mod_hash_key_t)name,
 	    (mod_hash_val_t *)&dvp);
 	if (err != 0) {
-		char		drv[MAXNAMELEN];
-		uint_t		index, port, len;
+		char		mac[MAXNAMELEN];
+		uint_t		index, ddi_inst, mac_ppa, len;
 		uint16_t	vid;
 
 		ASSERT(err == MH_ERR_NOTFOUND);
@@ -260,26 +260,25 @@ again:
 		 * value because it must have been derived from
 		 * ddi_major_to_name().
 		 */
-		if (ddi_parse(name, drv, &index) != DDI_SUCCESS ||
+		if (ddi_parse(name, mac, &index) != DDI_SUCCESS ||
 		    (vid = DLS_PPA2VID(index)) == VLAN_ID_NONE ||
 		    vid > VLAN_ID_MAX) {
 			err = EINVAL;
 			goto done;
 		}
 
-		if (strcmp(drv, "aggr") == 0) {
-			port = (uint_t)DLS_PPA2INST(index);
-			(void) strlcpy(drv, "aggr0", MAXNAMELEN);
-		} else {
-			port = 0;
-			len = strlen(drv);
-			ASSERT(len < MAXNAMELEN);
-			(void) snprintf(drv + len, MAXNAMELEN - len, "%d",
-			    DLS_PPA2INST(index));
-		}
+		mac_ppa = (uint_t)DLS_PPA2INST(index);
+		if (strcmp(mac, "aggr") == 0)
+			ddi_inst = 0;
+		else
+			ddi_inst = mac_ppa;
+
+		len = strlen(mac);
+		ASSERT(len < MAXNAMELEN);
+		(void) snprintf(mac + len, MAXNAMELEN - len, "%d", mac_ppa);
 		rw_exit(&i_dls_vlan_lock);
 
-		if ((err = dls_vlan_create(name, drv, port, vid)) != 0) {
+		if ((err = dls_vlan_create(name, mac, ddi_inst, vid)) != 0) {
 			rw_enter(&i_dls_vlan_lock, RW_WRITER);
 			goto done;
 		}
@@ -298,6 +297,22 @@ again:
 
 	if ((err = dls_mac_hold(dlp)) != 0)
 		goto done;
+
+	/*
+	 * Do not allow the creation of tagged VLAN interfaces on
+	 * non-Ethernet links.  Note that we cannot do this check in
+	 * dls_vlan_create() nor in this function prior to the call to
+	 * dls_mac_hold().  The reason is that before we do a
+	 * dls_mac_hold(), we may not have opened the mac, and therefore do
+	 * not know what kind of media the mac represents.  In other words,
+	 * dls_mac_hold() assigns the dl_mip of the dls_link_t we're
+	 * interested in.
+	 */
+	if (dvp->dv_id != VLAN_ID_NONE && dlp->dl_mip->mi_media != DL_ETHER) {
+		dls_mac_rele(dlp);
+		err = EINVAL;
+		goto done;
+	}
 
 	if ((err = mac_start(dlp->dl_mh)) != 0) {
 		dls_mac_rele(dlp);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +85,6 @@ i_dladm_info(int fd, const char *name, dladm_attr_t *dap)
 
 	(void) strlcpy(dap->da_dev, dia.dia_dev, MAXNAMELEN);
 	dap->da_max_sdu = dia.dia_max_sdu;
-	dap->da_port = dia.dia_port;
 	dap->da_vid = dia.dia_vid;
 
 	return (0);
@@ -214,13 +212,7 @@ dladm_walk_vlan(void (*fn)(void *, const char *), void *arg, const char *name)
 	if ((iocp = (dld_ioc_vlan_t *)calloc(1, bufsize)) == NULL)
 		return (-1);
 
-	if (strncmp(name, "aggr", 4) == 0) {
-		(void) strlcpy((char *)iocp->div_name, "aggr0", IFNAMSIZ);
-		iocp->div_port = atoi(strpbrk(name, "0123456789"));
-	} else {
-		(void) strlcpy((char *)iocp->div_name, name, IFNAMSIZ);
-		iocp->div_port = 0;
-	}
+	(void) strlcpy((char *)iocp->div_name, name, IFNAMSIZ);
 	if (i_dladm_ioctl(fd, DLDIOCVLAN, iocp, bufsize) == 0) {
 		dvip = (dld_vlan_info_t *)(iocp + 1);
 		for (i = 0; i < iocp->div_count; i++)

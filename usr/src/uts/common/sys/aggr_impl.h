@@ -30,6 +30,7 @@
 
 #include <sys/types.h>
 #include <sys/mac.h>
+#include <sys/mac_ether.h>
 #include <sys/aggr_lacp.h>
 
 #ifdef	__cplusplus
@@ -64,7 +65,6 @@ typedef struct aggr_port_s {
 			lp_promisc_on : 1,
 			lp_pad_bits : 28;
 	uint32_t	lp_closing;
-	uint_t		lp_port;
 	mac_handle_t	lp_mh;
 	const mac_info_t *lp_mip;
 	mac_notify_handle_t lp_mnh;
@@ -75,6 +75,7 @@ typedef struct aggr_port_s {
 	link_state_t	lp_link_state;
 	link_duplex_t	lp_link_duplex;
 	uint64_t	lp_stat[MAC_NSTAT];
+	uint64_t	lp_ether_stat[ETHER_NSTAT];
 	aggr_lacp_port_t lp_lacp;		/* LACP state */
 	lacp_stats_t	lp_lacp_stats;
 	const mac_txinfo_t *lp_txinfo;
@@ -107,10 +108,11 @@ typedef struct aggr_grp_s {
 			lg_addr_fixed : 1,	/* fixed MAC address? */
 			lg_started : 1,		/* group started? */
 			lg_promisc : 1,		/* in promiscuous mode? */
-			lg_pad_bits : 12;
+			lg_gldv3_polling : 1,
+			lg_pad_bits : 11;
 	aggr_port_t	*lg_ports;		/* list of configured ports */
 	aggr_port_t	*lg_mac_addr_port;
-	mac_t		lg_mac;
+	mac_handle_t	lg_mh;
 	uint_t		lg_rx_resources;
 	uint_t		lg_nattached_ports;
 	uint_t		lg_ntx_ports;
@@ -121,8 +123,10 @@ typedef struct aggr_grp_s {
 	link_state_t	lg_link_state;
 	link_duplex_t	lg_link_duplex;
 	uint64_t	lg_stat[MAC_NSTAT];
+	uint64_t	lg_ether_stat[ETHER_NSTAT];
 	aggr_lacp_mode_t lg_lacp_mode;		/* off, active, or passive */
 	Agg_t		aggr;			/* 802.3ad data */
+	uint32_t	lg_hcksum_txflags;
 } aggr_grp_t;
 
 #define	AGGR_LACP_LOCK(grp)	mutex_enter(&(grp)->aggr.gl_lock);
@@ -158,8 +162,8 @@ extern void aggr_ioctl(queue_t *, mblk_t *);
 
 typedef int (*aggr_grp_info_new_grp_fn_t)(void *, uint32_t, uchar_t *,
     boolean_t, uint32_t, uint32_t, aggr_lacp_mode_t, aggr_lacp_timer_t);
-typedef int (*aggr_grp_info_new_port_fn_t)(void *, char *, uint32_t,
-    uchar_t *, aggr_port_state_t, aggr_lacp_state_t *);
+typedef int (*aggr_grp_info_new_port_fn_t)(void *, char *, uchar_t *,
+    aggr_port_state_t, aggr_lacp_state_t *);
 
 extern void aggr_grp_init(void);
 extern void aggr_grp_fini(void);
@@ -185,7 +189,7 @@ extern uint_t aggr_grp_count(void);
 
 extern void aggr_port_init(void);
 extern void aggr_port_fini(void);
-extern int aggr_port_create(const char *, uint_t, aggr_port_t **);
+extern int aggr_port_create(const char *, aggr_port_t **);
 extern void aggr_port_delete(aggr_port_t *);
 extern void aggr_port_free(aggr_port_t *);
 extern int aggr_port_start(aggr_port_t *);
@@ -193,7 +197,7 @@ extern void aggr_port_stop(aggr_port_t *);
 extern int aggr_port_promisc(aggr_port_t *, boolean_t);
 extern int aggr_port_unicst(aggr_port_t *, uint8_t *);
 extern int aggr_port_multicst(void *, boolean_t, const uint8_t *);
-extern uint64_t aggr_port_stat(aggr_port_t *, enum mac_stat);
+extern uint64_t aggr_port_stat(aggr_port_t *, uint_t);
 extern boolean_t aggr_port_notify_link(aggr_grp_t *, aggr_port_t *, boolean_t);
 extern void aggr_port_init_callbacks(aggr_port_t *);
 

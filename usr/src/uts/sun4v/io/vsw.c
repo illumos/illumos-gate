@@ -56,6 +56,7 @@
 #include <sys/modctl.h>
 #include <sys/modhash.h>
 #include <sys/mac.h>
+#include <sys/mac_ether.h>
 #include <sys/taskq.h>
 #include <sys/note.h>
 #include <sys/mach_descrip.h>
@@ -86,15 +87,13 @@ static void vsw_rx_cb(void *, mac_resource_handle_t, mblk_t *);
 static mblk_t *vsw_tx_msg(vsw_t *, mblk_t *);
 static int vsw_mac_register(vsw_t *);
 static int vsw_mac_unregister(vsw_t *);
-static uint64_t vsw_m_stat(void *arg, enum mac_stat);
+static int vsw_m_stat(void *, uint_t, uint64_t *);
 static void vsw_m_stop(void *arg);
 static int vsw_m_start(void *arg);
 static int vsw_m_unicst(void *arg, const uint8_t *);
 static int vsw_m_multicst(void *arg, boolean_t, const uint8_t *);
 static int vsw_m_promisc(void *arg, boolean_t);
 static mblk_t *vsw_m_tx(void *arg, mblk_t *);
-static void vsw_m_resources(void *arg);
-static void vsw_m_ioctl(void *arg, queue_t *q, mblk_t *mp);
 
 /* MDEG routines */
 static	void vsw_mdeg_register(vsw_t *vswp);
@@ -213,6 +212,20 @@ int	vsw_wretries = 100;		/* # of write attempts */
  */
 void		(*vsw_switch_frame)(vsw_t *, mblk_t *, int, vsw_port_t *,
 			mac_resource_handle_t);
+
+static	mac_callbacks_t	vsw_m_callbacks = {
+	0,
+	vsw_m_stat,
+	vsw_m_start,
+	vsw_m_stop,
+	vsw_m_promisc,
+	vsw_m_multicst,
+	vsw_m_unicst,
+	vsw_m_tx,
+	NULL,
+	NULL,
+	NULL
+};
 
 static	struct	cb_ops	vsw_cb_ops = {
 	nulldev,			/* cb_open */
@@ -618,8 +631,6 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Do this in both layer 2 and layer 3 mode.
 	 */
 	vswp->if_state &= ~VSW_IF_UP;
-	vswp->if_macp = NULL;
-	vswp->if_mrh = NULL;
 	if (vswp->mdprops & VSW_MD_MACADDR) {
 		if (vsw_mac_register(vswp) != 0) {
 			cmn_err(CE_WARN, "Unable to register as provider "
@@ -1073,6 +1084,9 @@ vsw_setup_layer3(vsw_t *vswp)
 static int
 vsw_mac_attach(vsw_t *vswp)
 {
+	char	drv[LIFNAMSIZ];
+	uint_t	ddi_instance;
+
 	D1(vswp, "vsw_mac_attach: enter");
 
 	vswp->mh = NULL;
@@ -1081,7 +1095,11 @@ vsw_mac_attach(vsw_t *vswp)
 
 	ASSERT(vswp->mdprops & VSW_MD_PHYSNAME);
 
-	if ((mac_open(vswp->physname, 0, &vswp->mh)) != 0) {
+	if (ddi_parse(vswp->physname, drv, &ddi_instance) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "invalid device name: %s", vswp->physname);
+		goto mac_fail_exit;
+	}
+	if ((mac_open(vswp->physname, ddi_instance, &vswp->mh)) != 0) {
 		cmn_err(CE_WARN, "mac_open %s failed", vswp->physname);
 		goto mac_fail_exit;
 	}
@@ -1269,54 +1287,24 @@ vsw_tx_msg(vsw_t *vswp, mblk_t *mp)
 static int
 vsw_mac_register(vsw_t *vswp)
 {
-	mac_t		*macp = NULL;
-	mac_info_t	*mip = NULL;
-	int		rv = 0;
+	mac_register_t	*macp;
+	int		rv;
 
 	D1(vswp, "%s: enter", __func__);
 
-	macp = kmem_zalloc(sizeof (mac_t), KM_SLEEP);
-
-	/*
-	 * Setup the m_info fields.
-	 */
-	mip = &(macp->m_info);
-	mip->mi_media = DL_ETHER;
-	mip->mi_sdu_min = 0;
-	mip->mi_sdu_max = ETHERMTU;
-	mip->mi_cksum = 0;
-	mip->mi_poll = DL_CAPAB_POLL;
-
-	mip->mi_addr_length = ETHERADDRL;
-	bcopy(&etherbroadcastaddr, mip->mi_brdcst_addr, ETHERADDRL);
-
-	READ_ENTER(&vswp->if_lockrw);
-	bcopy(&vswp->if_addr, mip->mi_unicst_addr, ETHERADDRL);
-	RW_EXIT(&vswp->if_lockrw);
-
-	MAC_STAT_MIB(mip->mi_stat);
-	MAC_STAT_ETHER(mip->mi_stat);
-
-	/* entry points */
-	macp->m_stat = vsw_m_stat;
-	macp->m_stop = vsw_m_stop;
-	macp->m_start = vsw_m_start;
-	macp->m_unicst = vsw_m_unicst;
-	macp->m_multicst = vsw_m_multicst;
-	macp->m_promisc = vsw_m_promisc;
-	macp->m_tx = vsw_m_tx;
-	macp->m_resources = vsw_m_resources;
-	macp->m_ioctl = vsw_m_ioctl;
-
-	macp->m_port = 0;
-	macp->m_dip = vswp->dip;
-	macp->m_ident = MAC_IDENT;
+	if ((macp = mac_alloc(MAC_VERSION)) == NULL)
+		return (EINVAL);
+	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
 	macp->m_driver = vswp;
-
-	vswp->if_macp = macp;
-
-	/* register */
-	rv = mac_register(macp);
+	macp->m_dip = vswp->dip;
+	macp->m_src_addr = (uint8_t *)&vswp->if_addr;
+	macp->m_callbacks = &vsw_m_callbacks;
+	macp->m_min_sdu = 0;
+	macp->m_max_sdu = ETHERMTU;
+	rv = mac_register(macp, &vswp->if_mh);
+	mac_free(macp);
+	if (rv == 0)
+		vswp->if_state |= VSW_IF_REG;
 
 	D1(vswp, "%s: exit", __func__);
 
@@ -1332,8 +1320,8 @@ vsw_mac_unregister(vsw_t *vswp)
 
 	WRITE_ENTER(&vswp->if_lockrw);
 
-	if (vswp->if_macp != NULL) {
-		rv = mac_unregister(vswp->if_macp);
+	if (vswp->if_state & VSW_IF_REG) {
+		rv = mac_unregister(vswp->if_mh);
 		if (rv != 0) {
 			DWARN(vswp, "%s: unable to unregister from MAC "
 				"framework", __func__);
@@ -1343,11 +1331,8 @@ vsw_mac_unregister(vsw_t *vswp)
 			return (rv);
 		}
 
-		/* mark i/f as down and promisc off */
-		vswp->if_state &= ~VSW_IF_UP;
-
-		kmem_free(vswp->if_macp, sizeof (mac_t));
-		vswp->if_macp = NULL;
+		/* mark i/f as down and unregistered */
+		vswp->if_state &= ~(VSW_IF_UP | VSW_IF_REG);
 	}
 	RW_EXIT(&vswp->if_lockrw);
 
@@ -1356,25 +1341,19 @@ vsw_mac_unregister(vsw_t *vswp)
 	return (rv);
 }
 
-static uint64_t
-vsw_m_stat(void *arg, enum mac_stat stat)
+static int
+vsw_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	vsw_t			*vswp = (vsw_t *)arg;
-	const mac_info_t	*mip;
 
 	D1(vswp, "%s: enter", __func__);
 
-	if (vswp->mh != NULL)
-		mip = mac_info(vswp->mh);
-	else
-		return (0);
-
-	if (!mip->mi_stat[stat])
-		return (0);
+	if (vswp->mh == NULL)
+		return (EINVAL);
 
 	/* return stats from underlying device */
-	return (mac_stat_get(vswp->mh, stat));
-
+	*val = mac_stat_get(vswp->mh, stat);
+	return (0);
 }
 
 static void
@@ -1533,39 +1512,6 @@ vsw_m_tx(void *arg, mblk_t *mp)
 	D1(vswp, "%s: exit", __func__);
 
 	return (NULL);
-}
-
-static void
-vsw_m_resources(void *arg)
-{
-	vsw_t		*vswp = (vsw_t *)arg;
-	mac_rx_fifo_t	mrf;
-
-	D1(vswp, "%s: enter", __func__);
-
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = NULL;
-	mrf.mrf_arg = (void *)vswp;
-	mrf.mrf_normal_blank_time = 0;
-	mrf.mrf_normal_pkt_count = 0;
-
-	WRITE_ENTER(&vswp->if_lockrw);
-	vswp->if_mrh = mac_resource_add(vswp->if_macp, (mac_resource_t *)&mrf);
-	RW_EXIT(&vswp->if_lockrw);
-
-	D1(vswp, "%s: exit", __func__);
-}
-
-static void
-vsw_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
-{
-	vsw_t		*vswp = (vsw_t *)arg;
-
-	D1(vswp, "%s: enter", __func__);
-
-	miocnak(q, mp, 0, ENOTSUP);
-
-	D1(vswp, "%s: exit", __func__);
 }
 
 /*
@@ -4702,7 +4648,7 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			if (caller != VSW_LOCALDEV) {
 				if (vswp->if_state & VSW_IF_UP) {
 					RW_EXIT(&vswp->if_lockrw);
-					mac_rx(vswp->if_macp, mrh, mp);
+					mac_rx(vswp->if_mh, mrh, mp);
 				} else {
 					RW_EXIT(&vswp->if_lockrw);
 					/* Interface down, drop pkt */
@@ -4736,7 +4682,7 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 				RW_EXIT(&vswp->if_lockrw);
 				nmp = copymsg(mp);
 				if (nmp)
-					mac_rx(vswp->if_macp, mrh, nmp);
+					mac_rx(vswp->if_mh, mrh, nmp);
 			} else {
 				RW_EXIT(&vswp->if_lockrw);
 			}
@@ -4798,7 +4744,7 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 						RW_EXIT(&vswp->if_lockrw);
 						nmp = copymsg(mp);
 						if (nmp)
-							mac_rx(vswp->if_macp,
+							mac_rx(vswp->if_mh,
 								mrh, nmp);
 					} else {
 						RW_EXIT(&vswp->if_lockrw);
@@ -4819,7 +4765,7 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 					READ_ENTER(&vswp->if_lockrw);
 					if (VSW_U_P(vswp->if_state)) {
 						RW_EXIT(&vswp->if_lockrw);
-						mac_rx(vswp->if_macp, mrh, mp);
+						mac_rx(vswp->if_mh, mrh, mp);
 					} else {
 						RW_EXIT(&vswp->if_lockrw);
 						freemsg(mp);
@@ -4938,7 +4884,7 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 						RW_EXIT(&vswp->if_lockrw);
 						D2(vswp, "%s: sending up",
 							__func__);
-						mac_rx(vswp->if_macp, mrh, mp);
+						mac_rx(vswp->if_mh, mrh, mp);
 					} else {
 						RW_EXIT(&vswp->if_lockrw);
 						/* Interface down, drop pkt */
@@ -5001,7 +4947,7 @@ vsw_forward_all(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 			RW_EXIT(&vswp->if_lockrw);
 			nmp = copymsg(mp);
 			if (nmp)
-				mac_rx(vswp->if_macp, vswp->if_mrh, nmp);
+				mac_rx(vswp->if_mh, NULL, nmp);
 		} else {
 			RW_EXIT(&vswp->if_lockrw);
 		}
@@ -5119,8 +5065,7 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 				if (vswp->if_state & VSW_IF_UP) {
 					nmp = copymsg(mp);
 					if (nmp)
-						mac_rx(vswp->if_macp,
-							vswp->if_mrh, nmp);
+						mac_rx(vswp->if_mh, NULL, nmp);
 					check_if = B_FALSE;
 					D3(vswp, "%s: sending up stack"
 						" for addr 0x%llx", __func__,
@@ -5147,7 +5092,7 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 				" for addr 0x%llx", __func__, caller, key);
 			nmp = copymsg(mp);
 			if (nmp)
-				mac_rx(vswp->if_macp, vswp->if_mrh, nmp);
+				mac_rx(vswp->if_mh, NULL, nmp);
 		} else {
 			RW_EXIT(&vswp->if_lockrw);
 		}

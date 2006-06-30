@@ -176,8 +176,8 @@ dld_finish_pending_ops(dld_str_t *dsp)
 
 typedef struct dl_info_ack_wrapper {
 	dl_info_ack_t		dl_info;
-	uint8_t			dl_addr[MAXADDRLEN + sizeof (uint16_t)];
-	uint8_t			dl_brdcst_addr[MAXADDRLEN];
+	uint8_t			dl_addr[MAXMACADDRLEN + sizeof (uint16_t)];
+	uint8_t			dl_brdcst_addr[MAXMACADDRLEN];
 	dl_qos_cl_range1_t	dl_qos_range1;
 	dl_qos_cl_sel1_t	dl_qos_sel1;
 } dl_info_ack_wrapper_t;
@@ -290,14 +290,16 @@ proto_info_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	dlp->dl_max_sdu = minfop->mi_sdu_max;
 
 	addr_length = minfop->mi_addr_length;
-	ASSERT(addr_length != 0);
 
 	/*
 	 * Copy in the media broadcast address.
 	 */
-	dlp->dl_brdcst_addr_offset = (uintptr_t)brdcst_addr - (uintptr_t)dlp;
-	bcopy(minfop->mi_brdcst_addr, brdcst_addr, addr_length);
-	dlp->dl_brdcst_addr_length = addr_length;
+	if (minfop->mi_brdcst_addr != NULL) {
+		dlp->dl_brdcst_addr_offset =
+		    (uintptr_t)brdcst_addr - (uintptr_t)dlp;
+		bcopy(minfop->mi_brdcst_addr, brdcst_addr, addr_length);
+		dlp->dl_brdcst_addr_length = addr_length;
+	}
 
 	/*
 	 * We only support QoS information for VLAN interfaces.
@@ -347,7 +349,8 @@ proto_info_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		 * DLSAP address.
 		 */
 		dlp->dl_addr_offset = (uintptr_t)addr - (uintptr_t)dlp;
-		bcopy(dsp->ds_curr_addr, addr, addr_length);
+		if (addr_length > 0)
+			bcopy(dsp->ds_curr_addr, addr, addr_length);
 		*(uint16_t *)(addr + addr_length) = dsp->ds_sap;
 	}
 
@@ -492,7 +495,7 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 {
 	dl_bind_req_t	*dlp = (dl_bind_req_t *)udlp;
 	int		err = 0;
-	uint8_t		addr[MAXADDRLEN];
+	uint8_t		addr[MAXMACADDRLEN];
 	uint_t		addr_length;
 	t_uscalar_t	dl_err;
 	t_scalar_t	sap;
@@ -1199,8 +1202,6 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 			dl_capab_hcksum_t *hcksump;
 			dl_capab_hcksum_t hcksum;
 
-			ASSERT(dsp->ds_mip->mi_cksum != 0);
-
 			hcksump = (dl_capab_hcksum_t *)&sp[1];
 			/*
 			 * Copy for alignment.
@@ -1367,7 +1368,8 @@ proto_notify_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	    DL_NOTE_PHYS_ADDR |
 	    DL_NOTE_LINK_UP |
 	    DL_NOTE_LINK_DOWN |
-	    DL_NOTE_CAPAB_RENEG;
+	    DL_NOTE_CAPAB_RENEG |
+	    DL_NOTE_SPEED;
 
 	rw_enter(&dsp->ds_lock, RW_WRITER);
 
@@ -1381,9 +1383,6 @@ proto_notify_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		dl_err = DL_OUTSTATE;
 		goto failed;
 	}
-
-	if (dsp->ds_mip->mi_stat[MAC_STAT_IFSPEED])
-		note |= DL_NOTE_SPEED;
 
 	/*
 	 * Cache the notifications that are being enabled.
@@ -1426,7 +1425,7 @@ proto_unitdata_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	const uint8_t		*addr;
 	uint16_t		sap;
 	uint_t			addr_length;
-	mblk_t			*bp, *cont;
+	mblk_t			*bp, *payload;
 	uint32_t		start, stuff, end, value, flags;
 	t_uscalar_t		dl_err;
 
@@ -1463,8 +1462,8 @@ proto_unitdata_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	 * Check the length of the packet and the block types.
 	 */
 	size = 0;
-	cont = mp->b_cont;
-	for (bp = cont; bp != NULL; bp = bp->b_cont) {
+	payload = mp->b_cont;
+	for (bp = payload; bp != NULL; bp = bp->b_cont) {
 		if (DB_TYPE(bp) != M_DATA)
 			goto baddata;
 
@@ -1475,16 +1474,10 @@ proto_unitdata_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto baddata;
 
 	/*
-	 * sap <= ETHERMTU indicates that LLC is being used
-	 * and ethertype needs to be set to the payload length.
-	 */
-	if (sap <= ETHERMTU)
-		sap = (uint16_t)size;
-
-	/*
 	 * Build a packet header.
 	 */
-	if ((bp = dls_header(dsp->ds_dc, addr, sap, dsp->ds_pri)) == NULL) {
+	bp = dls_header(dsp->ds_dc, addr, sap, dsp->ds_pri, payload);
+	if (bp == NULL) {
 		dl_err = DL_BADADDR;
 		goto failed;
 	}
@@ -1497,16 +1490,15 @@ proto_unitdata_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	/*
 	 * Transfer the checksum offload information if it is present.
 	 */
-	hcksum_retrieve(cont, NULL, NULL, &start, &stuff, &end, &value,
+	hcksum_retrieve(payload, NULL, NULL, &start, &stuff, &end, &value,
 	    &flags);
-	(void) hcksum_assoc(bp, NULL, NULL, start, stuff, end, value, flags,
-	    0);
+	(void) hcksum_assoc(bp, NULL, NULL, start, stuff, end, value, flags, 0);
 
 	/*
 	 * Link the payload onto the new header.
 	 */
 	ASSERT(bp->b_cont == NULL);
-	bp->b_cont = cont;
+	bp->b_cont = payload;
 
 	str_mdata_fastpath_put(dsp, bp);
 	rw_exit(&dsp->ds_lock);
@@ -1706,7 +1698,7 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	dl_capab_hcksum_t	hcksum;
 	dl_capab_zerocopy_t	zcopy;
 	uint8_t			*ptr;
-	uint32_t		cksum;
+	boolean_t		cksum_cap;
 	boolean_t		poll_cap;
 	queue_t			*q = dsp->ds_wq;
 	mblk_t			*mp1;
@@ -1731,7 +1723,7 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	 * If advertising DL_CAPAB_POLL has not been explicitly disabled
 	 * then reserve space for that capability.
 	 */
-	poll_cap = ((dsp->ds_mip->mi_poll & DL_CAPAB_POLL) &&
+	poll_cap = (mac_capab_get(dsp->ds_mh, MAC_CAPAB_POLL, NULL) &&
 	    !(dld_opt & DLD_OPT_NO_POLL) && (dsp->ds_vid == VLAN_ID_NONE));
 	if (poll_cap) {
 		subsize += sizeof (dl_capability_sub_t) +
@@ -1742,7 +1734,8 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	 * If the MAC interface supports checksum offload then reserve
 	 * space for the DL_CAPAB_HCKSUM capability.
 	 */
-	if ((cksum = dsp->ds_mip->mi_cksum) != 0) {
+	if (cksum_cap = mac_capab_get(dsp->ds_mh, MAC_CAPAB_HCKSUM,
+	    &hcksum.hcksum_txflags)) {
 		subsize += sizeof (dl_capability_sub_t) +
 		    sizeof (dl_capab_hcksum_t);
 	}
@@ -1794,9 +1787,8 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 		 * Check if polling state has changed after we re-acquired
 		 * the lock above, so that we don't mis-advertise it.
 		 */
-		poll_cap = ((dsp->ds_mip->mi_poll & DL_CAPAB_POLL) &&
-		    !(dld_opt & DLD_OPT_NO_POLL) &&
-		    (dsp->ds_vid == VLAN_ID_NONE));
+		poll_cap = !(dld_opt & DLD_OPT_NO_POLL) &&
+		    (dsp->ds_vid == VLAN_ID_NONE);
 
 		if (!poll_cap) {
 			int poll_capab_size;
@@ -1859,17 +1851,14 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * TCP/IP checksum offload.
 	 */
-	if (cksum != 0) {
+	if (cksum_cap) {
 		dlsp = (dl_capability_sub_t *)ptr;
 
 		dlsp->dl_cap = DL_CAPAB_HCKSUM;
 		dlsp->dl_length = sizeof (dl_capab_hcksum_t);
 		ptr += sizeof (dl_capability_sub_t);
 
-		bzero(&hcksum, sizeof (dl_capab_hcksum_t));
 		hcksum.hcksum_version = HCKSUM_VERSION_1;
-		hcksum.hcksum_txflags = cksum;
-
 		dlcapabsetqid(&(hcksum.hcksum_mid), dsp->ds_rq);
 		bcopy(&hcksum, ptr, sizeof (dl_capab_hcksum_t));
 		ptr += sizeof (dl_capab_hcksum_t);

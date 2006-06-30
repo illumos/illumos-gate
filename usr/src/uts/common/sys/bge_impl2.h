@@ -73,6 +73,7 @@ extern "C" {
 #include <sys/fm/io/ddi.h>
 
 #include <sys/mac.h>
+#include <sys/mac_ether.h>
 
 #ifdef __amd64
 #include <sys/x86_archext.h>
@@ -742,7 +743,7 @@ typedef struct bge {
 	 * These fields are set by attach() and unchanged thereafter ...
 	 */
 	dev_info_t		*devinfo;	/* device instance	*/
-	mac_t			*macp;		/* MAC structure	*/
+	mac_handle_t		mh;		/* mac module handle	*/
 	ddi_acc_handle_t	cfg_handle;	/* DDI I/O handle	*/
 	ddi_acc_handle_t	io_handle;	/* DDI I/O handle	*/
 	void			*io_regs;	/* mapped registers	*/
@@ -1211,7 +1212,7 @@ void   bge_chip_msi_trig(bge_t *bgep);
 /* bge_kstats.c */
 void bge_init_kstats(bge_t *bgep, int instance);
 void bge_fini_kstats(bge_t *bgep);
-uint64_t bge_m_stat(void *arg, enum mac_stat stat);
+int bge_m_stat(void *arg, uint_t stat, uint64_t *val);
 
 /* bge_log.c */
 #if	BGE_DEBUGGING

@@ -429,3 +429,8 @@ $(CLOSED_BUILD)CLOSED_XMODS =		\
 #	'Dacf' Modules (/kernel/dacf):
 #
 DACF_KMODS	+= usb_ac_dacf
+
+#
+#	MAC-Type Plugin Modules (/kernel/mac)
+#
+MAC_KMODS	+= mac_ether

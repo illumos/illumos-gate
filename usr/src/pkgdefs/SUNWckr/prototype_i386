@@ -147,6 +147,7 @@ f none kernel/genunix 755 root sys
 f none kernel/ipp/ipgpc 755 root sys
 d none boot/acpi 755 root sys
 d none boot/acpi/tables 755 root sys
+f none kernel/mac/mac_ether 755 root sys
 f none kernel/misc/acpica 755 root sys
 f none kernel/misc/busra 755 root sys
 f none kernel/misc/cardbus 755 root sys
@@ -316,6 +317,8 @@ f none kernel/fs/amd64/tmpfs 755 root sys
 f none kernel/fs/amd64/ufs 755 root sys
 d none kernel/ipp/amd64 755 root sys
 f none kernel/ipp/amd64/ipgpc 755 root sys
+d none kernel/mac/amd64 755 root sys
+f none kernel/mac/amd64/mac_ether 755 root sys
 d none kernel/misc/amd64 755 root sys
 f none kernel/misc/amd64/acpica 755 root sys
 f none kernel/misc/amd64/busra 755 root sys

@@ -46,6 +46,7 @@
 #include <sys/atomic.h>
 #include <sys/stat.h>
 #include <sys/sdt.h>
+#include <sys/dlpi.h>
 
 #include <sys/aggr.h>
 #include <sys/aggr_impl.h>
@@ -99,7 +100,7 @@ aggr_port_resource_add(void *arg, mac_resource_t *mrp)
 	aggr_port_t *port = (aggr_port_t *)arg;
 	aggr_grp_t *grp = port->lp_grp;
 
-	return (mac_resource_add(&grp->lg_mac, mrp));
+	return (mac_resource_add(grp->lg_mh, mrp));
 }
 
 void
@@ -114,17 +115,29 @@ aggr_port_init_callbacks(aggr_port_t *port)
 }
 
 int
-aggr_port_create(const char *name, uint_t portnum, aggr_port_t **pp)
+aggr_port_create(const char *name, aggr_port_t **pp)
 {
 	int err;
 	mac_handle_t mh;
 	aggr_port_t *port;
 	uint_t i;
+	const mac_info_t *mip;
+	char driver[MAXNAMELEN];
+	uint_t ddi_instance;
 
 	*pp = NULL;
 
-	if ((err = mac_open(name, portnum, &mh)) != 0)
+	if (ddi_parse(name, driver, &ddi_instance) != DDI_SUCCESS)
+		return (EINVAL);
+
+	if ((err = mac_open(name, ddi_instance, &mh)) != 0)
 		return (err);
+
+	mip = mac_info(mh);
+	if (mip->mi_media != DL_ETHER) {
+		mac_close(mh);
+		return (EINVAL);
+	}
 
 	if (!mac_active_set(mh)) {
 		mac_close(mh);
@@ -136,8 +149,7 @@ aggr_port_create(const char *name, uint_t portnum, aggr_port_t **pp)
 	port->lp_refs = 1;
 	port->lp_next = NULL;
 	port->lp_mh = mh;
-	port->lp_mip = mac_info(mh);
-	port->lp_port = portnum;
+	port->lp_mip = mip;
 	(void) strlcpy(port->lp_devname, name, sizeof (port->lp_devname));
 	port->lp_closing = 0;
 
@@ -162,10 +174,12 @@ aggr_port_create(const char *name, uint_t portnum, aggr_port_t **pp)
 	 * the consistituent ports.
 	 */
 	for (i = 0; i < MAC_NSTAT; i++) {
-		/* avoid non-counter stats */
-		if (i == MAC_STAT_IFSPEED || i == MAC_STAT_LINK_DUPLEX)
-			continue;
-		port->lp_stat[i] = aggr_port_stat(port, i);
+		port->lp_stat[i] =
+		    aggr_port_stat(port, i + MAC_STAT_MIN);
+	}
+	for (i = 0; i < ETHER_NSTAT; i++) {
+		port->lp_ether_stat[i] =
+		    aggr_port_stat(port, i + MACTYPE_STAT_MIN);
 	}
 
 	/* LACP related state */
@@ -238,7 +252,7 @@ aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port, boolean_t dolock)
 	port->lp_link_state = link_state;
 
 	/* link duplex change? */
-	link_duplex = aggr_port_stat(port, MAC_STAT_LINK_DUPLEX);
+	link_duplex = aggr_port_stat(port, ETHER_STAT_LINK_DUPLEX);
 	if (port->lp_link_duplex != link_duplex) {
 		if (link_duplex == LINK_DUPLEX_FULL)
 			do_attach |= (port->lp_link_duplex != LINK_DUPLEX_FULL);
@@ -355,19 +369,19 @@ aggr_port_notify_cb(void *arg, mac_notify_type_t type)
 
 	switch (type) {
 	case MAC_NOTE_TX:
-		mac_tx_update(&grp->lg_mac);
+		mac_tx_update(grp->lg_mh);
 		break;
 	case MAC_NOTE_LINK:
 		if (aggr_port_notify_link(grp, port, B_TRUE))
-			mac_link_update(&grp->lg_mac, grp->lg_link_state);
+			mac_link_update(grp->lg_mh, grp->lg_link_state);
 		break;
 	case MAC_NOTE_UNICST:
 		aggr_port_notify_unicst(grp, port, &mac_addr_changed,
 		    &link_state_changed);
 		if (mac_addr_changed)
-			mac_unicst_update(&grp->lg_mac, grp->lg_addr);
+			mac_unicst_update(grp->lg_mh, grp->lg_addr);
 		if (link_state_changed)
-			mac_link_update(&grp->lg_mac, grp->lg_link_state);
+			mac_link_update(grp->lg_mh, grp->lg_link_state);
 		break;
 	case MAC_NOTE_PROMISC:
 		port->lp_txinfo = mac_tx_get(port->lp_mh);
@@ -461,10 +475,7 @@ aggr_port_multicst(void *arg, boolean_t add, const uint8_t *addrp)
 }
 
 uint64_t
-aggr_port_stat(aggr_port_t *port, enum mac_stat stat)
+aggr_port_stat(aggr_port_t *port, uint_t stat)
 {
-	if (!port->lp_mip->mi_stat[stat])
-		return (0);
-
 	return (mac_stat_get(port->lp_mh, stat));
 }

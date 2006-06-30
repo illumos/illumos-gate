@@ -2507,6 +2507,23 @@ create_datalink_conf()
 	rm -f /tmp/ifnames.$$
 }
 
+revert_aggregation_conf()
+{
+	aggrconf=$rootprefix/etc/aggregation.conf
+	nawk '
+		/^[ \t]*#/ || /^[ \t]*$/ {
+			print;
+			next;
+		}
+
+		{
+			OFS="\t";
+			gsub(/[^,]*/, "&/0", $4);
+			print;
+		}' $aggrconf > $aggrconf.bfutmp
+	mv -f $aggrconf.bfutmp $aggrconf
+}
+
 remove_initd_links()
 {
 	# If we're delivering a new version of an existing /etc/init.d script,
@@ -6019,6 +6036,19 @@ mondo_loop() {
 	rm -f $usr/lib/sparcv9/librac.so
 	rm -f $usr/lib/sparcv9/librac.so.1
 
+	#
+	# Remove /kernel/mac.  This directory was introduced by
+	# PSARC/2006/248, and along with this came a syntax change to the
+	# /etc/aggregation.conf file.  After archives have been extracted,
+	# we check for the existance of the /kernel/mac directory to see if
+	# we're doing a backward bfu and need to convert the syntax of the
+	# /etc/aggregation.conf file to its old format.
+	#
+	if [ -d $root/kernel/mac ]; then
+		from_new_aggrconf=1
+		rm -rf $root/kernel/mac;
+	fi
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then
@@ -6390,6 +6420,15 @@ mondo_loop() {
 		print "copying the corresponding file from the global zone.\n"
 	else
 		fixup_mpxio
+
+		#
+		# If we're bfuing backward across PSARC/2006/248, then
+		# revert the /etc/aggregation.conf to its old format.
+		#
+		if [ -f $rootprefix/etc/aggregation.conf -a \
+		    ! -d $rootprefix/kernel/mac -a $from_new_aggrconf ]; then
+			revert_aggregation_conf
+		fi
 	fi
 
 	cd $root

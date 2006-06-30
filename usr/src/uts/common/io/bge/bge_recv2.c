@@ -385,7 +385,7 @@ restart:
 		mutex_exit(rrp->rx_lock);
 
 		if (mp != NULL) {
-			mac_rx(bgep->macp, rrp->handle, mp);
+			mac_rx(bgep->mh, rrp->handle, mp);
 
 			/*
 			 * Restart from ring 0, if the driver is compiled

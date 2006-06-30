@@ -41,6 +41,7 @@
 #include <sys/mac_impl.h>
 #include <sys/dls.h>
 #include <sys/dld.h>
+#include <sys/modctl.h>
 
 #define	IMPL_HASHSZ	67	/* prime */
 
@@ -49,44 +50,15 @@ static mod_hash_t	*i_mac_impl_hash;
 krwlock_t		i_mac_impl_lock;
 uint_t			i_mac_impl_count;
 
+#define	MACTYPE_KMODDIR	"mac"
+#define	MACTYPE_HASHSZ	67
+static mod_hash_t	*i_mactype_hash;
+
 static void i_mac_notify_task(void *);
 
 /*
  * Private functions.
  */
-
-/*ARGSUSED*/
-static boolean_t
-i_mac_ether_unicst_verify(mac_impl_t *mip, const uint8_t *addr)
-{
-	/*
-	 * Check the address is not a group address.
-	 */
-	if (addr[0] & 0x01)
-		return (B_FALSE);
-
-	return (B_TRUE);
-}
-
-static boolean_t
-i_mac_ether_multicst_verify(mac_impl_t *mip, const uint8_t *addr)
-{
-	mac_t		*mp = mip->mi_mp;
-
-	/*
-	 * Check the address is a group address.
-	 */
-	if (!(addr[0] & 0x01))
-		return (B_FALSE);
-
-	/*
-	 * Check the address is not the media broadcast address.
-	 */
-	if (bcmp(addr, mp->m_info.mi_brdcst_addr, mip->mi_addr_length) == 0)
-		return (B_FALSE);
-
-	return (B_TRUE);
-}
 
 /*ARGSUSED*/
 static int
@@ -96,7 +68,7 @@ i_mac_constructor(void *buf, void *arg, int kmflag)
 
 	bzero(buf, sizeof (mac_impl_t));
 
-	mip->mi_link = LINK_STATE_UNKNOWN;
+	mip->mi_linkstate = LINK_STATE_UNKNOWN;
 
 	rw_init(&mip->mi_state_lock, NULL, RW_DRIVER, NULL);
 	rw_init(&mip->mi_data_lock, NULL, RW_DRIVER, NULL);
@@ -116,16 +88,16 @@ i_mac_destructor(void *buf, void *arg)
 {
 	mac_impl_t	*mip = buf;
 
-	ASSERT(mip->mi_mp == NULL);
 	ASSERT(mip->mi_ref == 0);
 	ASSERT(mip->mi_active == 0);
-	ASSERT(mip->mi_link == LINK_STATE_UNKNOWN);
+	ASSERT(mip->mi_linkstate == LINK_STATE_UNKNOWN);
 	ASSERT(mip->mi_devpromisc == 0);
 	ASSERT(mip->mi_promisc == 0);
 	ASSERT(mip->mi_mmap == NULL);
 	ASSERT(mip->mi_mnfp == NULL);
 	ASSERT(mip->mi_resource_add == NULL);
 	ASSERT(mip->mi_ksp == NULL);
+	ASSERT(mip->mi_kstat_count == 0);
 
 	rw_destroy(&mip->mi_state_lock);
 	rw_destroy(&mip->mi_data_lock);
@@ -136,138 +108,6 @@ i_mac_destructor(void *buf, void *arg)
 	mutex_destroy(&mip->mi_activelink_lock);
 	mutex_destroy(&mip->mi_notify_ref_lock);
 	cv_destroy(&mip->mi_notify_cv);
-}
-
-static int
-i_mac_create(mac_t *mp)
-{
-	dev_info_t	*dip;
-	mac_impl_t	*mip;
-	int		err = 0;
-
-	dip = mp->m_dip;
-	ASSERT(dip != NULL);
-	ASSERT(ddi_get_instance(dip) >= 0);
-
-	/*
-	 * Allocate a new mac_impl_t.
-	 */
-	mip = kmem_cache_alloc(i_mac_impl_cachep, KM_SLEEP);
-
-	/*
-	 * Construct a name.
-	 */
-	(void) snprintf(mip->mi_dev, MAXNAMELEN - 1, "%s%d",
-	    ddi_driver_name(dip), ddi_get_instance(dip));
-	mip->mi_port = mp->m_port;
-
-	MAC_NAME(mip->mi_name, mip->mi_dev, mip->mi_port);
-
-	/*
-	 * Set the mac_t/mac_impl_t cross-references.
-	 */
-	mip->mi_mp = mp;
-	mp->m_impl = (void *)mip;
-
-	/*
-	 * The mac is not ready for open yet.
-	 */
-	mip->mi_disabled = B_TRUE;
-
-	/*
-	 * Insert the hash table entry.
-	 */
-	rw_enter(&i_mac_impl_lock, RW_WRITER);
-	if (mod_hash_insert(i_mac_impl_hash,
-	    (mod_hash_key_t)mip->mi_name, (mod_hash_val_t)mip) != 0) {
-		kmem_cache_free(i_mac_impl_cachep, mip);
-		err = EEXIST;
-		goto done;
-	}
-	i_mac_impl_count++;
-
-	/*
-	 * Copy the fixed 'factory' MAC address from the immutable info.
-	 * This is taken to be the MAC address currently in use.
-	 */
-	mip->mi_addr_length = mp->m_info.mi_addr_length;
-	bcopy(mp->m_info.mi_unicst_addr, mip->mi_addr, mip->mi_addr_length);
-
-	/*
-	 * Set up the address verification functions.
-	 */
-	ASSERT(mp->m_info.mi_media == DL_ETHER);
-	mip->mi_unicst_verify = i_mac_ether_unicst_verify;
-	mip->mi_multicst_verify = i_mac_ether_multicst_verify;
-
-	/*
-	 * Set up the two possible transmit routines.
-	 */
-	mip->mi_txinfo.mt_fn = mp->m_tx;
-	mip->mi_txinfo.mt_arg = mp->m_driver;
-	mip->mi_txloopinfo.mt_fn = mac_txloop;
-	mip->mi_txloopinfo.mt_arg = mip;
-
-	/*
-	 * Initialize the kstats for this device.
-	 */
-	mac_stat_create(mip);
-
-done:
-	rw_exit(&i_mac_impl_lock);
-	return (err);
-}
-
-static void
-i_mac_destroy(mac_t *mp)
-{
-	mac_impl_t		*mip = mp->m_impl;
-	mac_multicst_addr_t	*p, *nextp;
-	mod_hash_val_t		val;
-
-	rw_enter(&i_mac_impl_lock, RW_WRITER);
-
-	ASSERT(mip->mi_ref == 0);
-	ASSERT(!mip->mi_activelink);
-
-	/*
-	 * Destroy the kstats.
-	 */
-	mac_stat_destroy(mip);
-
-	/*
-	 * Remove and destroy the hash table entry.
-	 */
-	(void) mod_hash_remove(i_mac_impl_hash,
-	    (mod_hash_key_t)mip->mi_name, &val);
-	ASSERT(mip == (mac_impl_t *)val);
-
-	ASSERT(i_mac_impl_count > 0);
-	i_mac_impl_count--;
-
-	/*
-	 * Free the list of multicast addresses.
-	 */
-	for (p = mip->mi_mmap; p != NULL; p = nextp) {
-		nextp = p->mma_nextp;
-		kmem_free(p, sizeof (mac_multicst_addr_t));
-	}
-	mip->mi_mmap = NULL;
-
-	/*
-	 * Clean up the mac_impl_t ready to go back into the cache.
-	 */
-	mp->m_impl = NULL;
-	mip->mi_mp = NULL;
-	mip->mi_link = LINK_STATE_UNKNOWN;
-	mip->mi_disabled = B_FALSE;
-
-	/*
-	 * Free the structure back to the cache.
-	 */
-	kmem_cache_free(i_mac_impl_cachep, mip);
-
-	rw_exit(&i_mac_impl_lock);
 }
 
 static void
@@ -338,11 +178,44 @@ i_mac_notify_task(void *notify_arg)
 		notify(arg, type);
 	}
 	rw_exit(&mip->mi_notify_lock);
-
 	mutex_enter(&mip->mi_notify_ref_lock);
 	if (--mip->mi_notify_ref == 0)
 		cv_signal(&mip->mi_notify_cv);
 	mutex_exit(&mip->mi_notify_ref_lock);
+}
+
+static mactype_t *
+i_mactype_getplugin(const char *plugin_name)
+{
+	mactype_t	*mtype = NULL;
+	boolean_t	tried_modload = B_FALSE;
+
+find_registered_mactype:
+	if (mod_hash_find(i_mactype_hash, (mod_hash_key_t)plugin_name,
+	    (mod_hash_val_t *)&mtype) == 0) {
+		/*
+		 * Because the reference count is initialized at 1 (see
+		 * mactype_register()), we don't need to bump up the
+		 * reference count if we're the first reference.
+		 */
+		if (!tried_modload)
+			mtype->mt_ref++;
+		return (mtype);
+	} else if (tried_modload) {
+		return (NULL);
+	}
+
+	/*
+	 * If the plugin has not yet been loaded, then attempt to load it
+	 * now.  If modload succeeds, the plugin should have registered
+	 * using mactype_register(), in which case we can go back and
+	 * attempt to find it again.
+	 */
+	if (modload(MACTYPE_KMODDIR, (char *)plugin_name) != -1) {
+		tried_modload = B_TRUE;
+		goto find_registered_mactype;
+	}
+	return (NULL);
 }
 
 /*
@@ -353,8 +226,8 @@ void
 mac_init(void)
 {
 	i_mac_impl_cachep = kmem_cache_create("mac_impl_cache",
-	    sizeof (mac_impl_t), 0, i_mac_constructor, i_mac_destructor, NULL,
-	    NULL, NULL, 0);
+	    sizeof (mac_impl_t), 0, i_mac_constructor, i_mac_destructor,
+	    NULL, NULL, NULL, 0);
 	ASSERT(i_mac_impl_cachep != NULL);
 
 	i_mac_impl_hash = mod_hash_create_extended("mac_impl_hash",
@@ -362,6 +235,11 @@ mac_init(void)
 	    mod_hash_bystr, NULL, mod_hash_strkey_cmp, KM_SLEEP);
 	rw_init(&i_mac_impl_lock, NULL, RW_DEFAULT, NULL);
 	i_mac_impl_count = 0;
+
+	i_mactype_hash = mod_hash_create_extended("mactype_hash",
+	    MACTYPE_HASHSZ,
+	    mod_hash_null_keydtor, mod_hash_null_valdtor,
+	    mod_hash_bystr, NULL, mod_hash_strkey_cmp, KM_SLEEP);
 }
 
 int
@@ -374,6 +252,8 @@ mac_fini(void)
 	rw_destroy(&i_mac_impl_lock);
 
 	kmem_cache_destroy(i_mac_impl_cachep);
+
+	mod_hash_destroy_hash(i_mactype_hash);
 	return (0);
 }
 
@@ -382,9 +262,8 @@ mac_fini(void)
  */
 
 int
-mac_open(const char *dev, uint_t port, mac_handle_t *mhp)
+mac_open(const char *macname, uint_t ddi_instance, mac_handle_t *mhp)
 {
-	char		name[MAXNAMELEN];
 	char		driver[MAXNAMELEN];
 	uint_t		instance;
 	major_t		major;
@@ -396,13 +275,13 @@ mac_open(const char *dev, uint_t port, mac_handle_t *mhp)
 	 * Check the device name length to make sure it won't overflow our
 	 * buffer.
 	 */
-	if (strlen(dev) >= MAXNAMELEN)
+	if (strlen(macname) >= MAXNAMELEN)
 		return (EINVAL);
 
 	/*
 	 * Split the device name into driver and instance components.
 	 */
-	if (ddi_parse(dev, driver, &instance) != DDI_SUCCESS)
+	if (ddi_parse(macname, driver, &instance) != DDI_SUCCESS)
 		return (EINVAL);
 
 	/*
@@ -419,20 +298,15 @@ mac_open(const char *dev, uint_t port, mac_handle_t *mhp)
 	 * call mac_open() because this would lead to a recursive attach
 	 * panic.
 	 */
-	if ((dip = ddi_hold_devi_by_instance(major, instance, 0)) == NULL)
+	if ((dip = ddi_hold_devi_by_instance(major, ddi_instance, 0)) == NULL)
 		return (EINVAL);
-
-	/*
-	 * Construct the name of the MAC interface.
-	 */
-	MAC_NAME(name, dev, port);
 
 	/*
 	 * Look up its entry in the global hash table.
 	 */
 again:
 	rw_enter(&i_mac_impl_lock, RW_WRITER);
-	err = mod_hash_find(i_mac_impl_hash, (mod_hash_key_t)name,
+	err = mod_hash_find(i_mac_impl_hash, (mod_hash_key_t)macname,
 	    (mod_hash_val_t *)&mip);
 	if (err != 0) {
 		err = ENOENT;
@@ -444,10 +318,6 @@ again:
 		goto again;
 	}
 
-	/*
-	 * We currently only support the DL_ETHER media type.
-	 */
-	ASSERT(mip->mi_mp->m_info.mi_media == DL_ETHER);
 	mip->mi_ref++;
 	rw_exit(&i_mac_impl_lock);
 
@@ -464,7 +334,7 @@ void
 mac_close(mac_handle_t mh)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
-	dev_info_t	*dip = mip->mi_mp->m_dip;
+	dev_info_t	*dip = mip->mi_dip;
 
 	rw_enter(&i_mac_impl_lock, RW_WRITER);
 
@@ -479,44 +349,63 @@ mac_close(mac_handle_t mh)
 const mac_info_t *
 mac_info(mac_handle_t mh)
 {
-	mac_impl_t	*mip = (mac_impl_t *)mh;
-	mac_t		*mp = mip->mi_mp;
-
-	/*
-	 * Return a pointer to the mac_info_t embedded in the mac_t.
-	 */
-	return (&(mp->m_info));
+	return (&((mac_impl_t *)mh)->mi_info);
 }
 
 dev_info_t *
 mac_devinfo_get(mac_handle_t mh)
 {
-	return (((mac_impl_t *)mh)->mi_mp->m_dip);
+	return (((mac_impl_t *)mh)->mi_dip);
 }
 
 uint64_t
-mac_stat_get(mac_handle_t mh, enum mac_stat stat)
+mac_stat_get(mac_handle_t mh, uint_t stat)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
-	mac_t		*mp = mip->mi_mp;
+	uint64_t	val;
+	int		ret;
 
-	ASSERT(mp->m_info.mi_stat[stat]);
-	ASSERT(mp->m_stat != NULL);
+	/*
+	 * The range of stat determines where it is maintained.  Stat
+	 * values from 0 up to (but not including) MAC_STAT_MIN are
+	 * mainteined by the mac module itself.  Everything else is
+	 * maintained by the driver.
+	 */
+	if (stat < MAC_STAT_MIN) {
+		/* These stats are maintained by the mac module itself. */
+		switch (stat) {
+		case MAC_STAT_LINK_STATE:
+			return (mip->mi_linkstate);
+		case MAC_STAT_LINK_UP:
+			return (mip->mi_linkstate == LINK_STATE_UP);
+		case MAC_STAT_PROMISC:
+			return (mip->mi_devpromisc != 0);
+		default:
+			ASSERT(B_FALSE);
+		}
+	}
 
 	/*
 	 * Call the driver to get the given statistic.
 	 */
-	return (mp->m_stat(mp->m_driver, stat));
+	ret = mip->mi_getstat(mip->mi_driver, stat, &val);
+	if (ret != 0) {
+		/*
+		 * The driver doesn't support this statistic.  Get the
+		 * statistic's default value.
+		 */
+		val = mac_stat_default(mip, stat);
+	}
+	return (val);
 }
 
 int
 mac_start(mac_handle_t mh)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
-	mac_t		*mp = mip->mi_mp;
 	int		err;
 
-	ASSERT(mp->m_start != NULL);
+	ASSERT(mip->mi_start != NULL);
 
 	rw_enter(&(mip->mi_state_lock), RW_WRITER);
 
@@ -534,7 +423,7 @@ mac_start(mac_handle_t mh)
 	/*
 	 * Start the device.
 	 */
-	if ((err = mp->m_start(mp->m_driver)) != 0)
+	if ((err = mip->mi_start(mip->mi_driver)) != 0)
 		--mip->mi_active;
 
 done:
@@ -546,9 +435,8 @@ void
 mac_stop(mac_handle_t mh)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
-	mac_t		*mp = mip->mi_mp;
 
-	ASSERT(mp->m_stop != NULL);
+	ASSERT(mip->mi_stop != NULL);
 
 	rw_enter(&(mip->mi_state_lock), RW_WRITER);
 
@@ -566,7 +454,7 @@ mac_stop(mac_handle_t mh)
 	/*
 	 * Stop the device.
 	 */
-	mp->m_stop(mp->m_driver);
+	mip->mi_stop(mip->mi_driver);
 
 done:
 	rw_exit(&(mip->mi_state_lock));
@@ -576,25 +464,27 @@ int
 mac_multicst_add(mac_handle_t mh, const uint8_t *addr)
 {
 	mac_impl_t		*mip = (mac_impl_t *)mh;
-	mac_t			*mp = mip->mi_mp;
 	mac_multicst_addr_t	**pp;
 	mac_multicst_addr_t	*p;
 	int			err;
 
-	ASSERT(mp->m_multicst != NULL);
+	ASSERT(mip->mi_multicst != NULL);
 
 	/*
 	 * Verify the address.
 	 */
-	if (!(mip->mi_multicst_verify(mip, addr)))
-		return (EINVAL);
+	if ((err = mip->mi_type->mt_ops.mtops_multicst_verify(addr,
+	    mip->mi_pdata)) != 0) {
+		return (err);
+	}
 
 	/*
 	 * Check whether the given address is already enabled.
 	 */
 	rw_enter(&(mip->mi_data_lock), RW_WRITER);
 	for (pp = &(mip->mi_mmap); (p = *pp) != NULL; pp = &(p->mma_nextp)) {
-		if (bcmp(p->mma_addr, addr, mip->mi_addr_length) == 0) {
+		if (bcmp(p->mma_addr, addr, mip->mi_type->mt_addr_length) ==
+		    0) {
 			/*
 			 * The address is already enabled so just bump the
 			 * reference count.
@@ -617,7 +507,7 @@ mac_multicst_add(mac_handle_t mh, const uint8_t *addr)
 	/*
 	 * Enable a new multicast address.
 	 */
-	if ((err = mp->m_multicst(mp->m_driver, B_TRUE, addr)) != 0) {
+	if ((err = mip->mi_multicst(mip->mi_driver, B_TRUE, addr)) != 0) {
 		kmem_free(p, sizeof (mac_multicst_addr_t));
 		goto done;
 	}
@@ -625,7 +515,7 @@ mac_multicst_add(mac_handle_t mh, const uint8_t *addr)
 	/*
 	 * Add the address to the list of enabled addresses.
 	 */
-	bcopy(addr, p->mma_addr, mip->mi_addr_length);
+	bcopy(addr, p->mma_addr, mip->mi_type->mt_addr_length);
 	p->mma_ref++;
 	*pp = p;
 
@@ -638,19 +528,19 @@ int
 mac_multicst_remove(mac_handle_t mh, const uint8_t *addr)
 {
 	mac_impl_t		*mip = (mac_impl_t *)mh;
-	mac_t			*mp = mip->mi_mp;
 	mac_multicst_addr_t	**pp;
 	mac_multicst_addr_t	*p;
 	int			err;
 
-	ASSERT(mp->m_multicst != NULL);
+	ASSERT(mip->mi_multicst != NULL);
 
 	/*
 	 * Find the entry in the list for the given address.
 	 */
 	rw_enter(&(mip->mi_data_lock), RW_WRITER);
 	for (pp = &(mip->mi_mmap); (p = *pp) != NULL; pp = &(p->mma_nextp)) {
-		if (bcmp(p->mma_addr, addr, mip->mi_addr_length) == 0) {
+		if (bcmp(p->mma_addr, addr, mip->mi_type->mt_addr_length) ==
+		    0) {
 			if (--p->mma_ref == 0)
 				break;
 
@@ -676,7 +566,7 @@ mac_multicst_remove(mac_handle_t mh, const uint8_t *addr)
 	/*
 	 * Disable the multicast address.
 	 */
-	if ((err = mp->m_multicst(mp->m_driver, B_FALSE, addr)) != 0) {
+	if ((err = mip->mi_multicst(mip->mi_driver, B_FALSE, addr)) != 0) {
 		p->mma_ref++;
 		goto done;
 	}
@@ -696,17 +586,18 @@ int
 mac_unicst_set(mac_handle_t mh, const uint8_t *addr)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
-	mac_t		*mp = mip->mi_mp;
 	int		err;
 	boolean_t	notify = B_FALSE;
 
-	ASSERT(mp->m_unicst != NULL);
+	ASSERT(mip->mi_unicst != NULL);
 
 	/*
 	 * Verify the address.
 	 */
-	if (!(mip->mi_unicst_verify(mip, addr)))
-		return (EINVAL);
+	if ((err = mip->mi_type->mt_ops.mtops_unicst_verify(addr,
+	    mip->mi_pdata)) != 0) {
+		return (err);
+	}
 
 	/*
 	 * Program the new unicast address.
@@ -718,18 +609,18 @@ mac_unicst_set(mac_handle_t mh, const uint8_t *addr)
 	 * This check is necessary otherwise it may call into mac_unicst_set
 	 * recursively.
 	 */
-	if (bcmp(addr, mip->mi_addr, mip->mi_addr_length) == 0) {
+	if (bcmp(addr, mip->mi_addr, mip->mi_type->mt_addr_length) == 0) {
 		err = 0;
 		goto done;
 	}
 
-	if ((err = mp->m_unicst(mp->m_driver, addr)) != 0)
+	if ((err = mip->mi_unicst(mip->mi_driver, addr)) != 0)
 		goto done;
 
 	/*
 	 * Save the address and flag that we need to send a notification.
 	 */
-	bcopy(addr, mip->mi_addr, mip->mi_addr_length);
+	bcopy(addr, mip->mi_addr, mip->mi_type->mt_addr_length);
 	notify = B_TRUE;
 
 done:
@@ -747,10 +638,23 @@ mac_unicst_get(mac_handle_t mh, uint8_t *addr)
 	mac_impl_t	*mip = (mac_impl_t *)mh;
 
 	/*
-	 * Copy out the current unicast address.
+	 * Copy out the current unicast source address.
 	 */
 	rw_enter(&(mip->mi_data_lock), RW_READER);
-	bcopy(mip->mi_addr, addr, mip->mi_addr_length);
+	bcopy(mip->mi_addr, addr, mip->mi_type->mt_addr_length);
+	rw_exit(&(mip->mi_data_lock));
+}
+
+void
+mac_dest_get(mac_handle_t mh, uint8_t *addr)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	/*
+	 * Copy out the current destination address.
+	 */
+	rw_enter(&(mip->mi_data_lock), RW_READER);
+	bcopy(mip->mi_dstaddr, addr, mip->mi_type->mt_addr_length);
 	rw_exit(&(mip->mi_data_lock));
 }
 
@@ -758,10 +662,9 @@ int
 mac_promisc_set(mac_handle_t mh, boolean_t on, mac_promisc_type_t ptype)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
-	mac_t		*mp = mip->mi_mp;
 	int		err = 0;
 
-	ASSERT(mp->m_promisc != NULL);
+	ASSERT(mip->mi_setpromisc != NULL);
 	ASSERT(ptype == MAC_DEVPROMISC || ptype == MAC_PROMISC);
 
 	/*
@@ -775,7 +678,8 @@ mac_promisc_set(mac_handle_t mh, boolean_t on, mac_promisc_type_t ptype)
 		 * Enable promiscuous mode on the device if not yet enabled.
 		 */
 		if (mip->mi_devpromisc++ == 0) {
-			if ((err = mp->m_promisc(mp->m_driver, B_TRUE)) != 0) {
+			err = mip->mi_setpromisc(mip->mi_driver, B_TRUE);
+			if (err != 0) {
 				mip->mi_devpromisc--;
 				goto done;
 			}
@@ -798,7 +702,8 @@ mac_promisc_set(mac_handle_t mh, boolean_t on, mac_promisc_type_t ptype)
 		 * enabling.
 		 */
 		if (--mip->mi_devpromisc == 0) {
-			if ((err = mp->m_promisc(mp->m_driver, B_FALSE)) != 0) {
+			err = mip->mi_setpromisc(mip->mi_driver, B_FALSE);
+			if (err != 0) {
 				mip->mi_devpromisc++;
 				goto done;
 			}
@@ -838,28 +743,28 @@ void
 mac_resources(mac_handle_t mh)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
-	mac_t		*mp = mip->mi_mp;
-
-	ASSERT(mp->m_resources != NULL);
 
 	/*
-	 * Call the driver to register its resources.
+	 * If the driver supports resource registration, call the driver to
+	 * ask it to register its resources.
 	 */
-	mp->m_resources(mp->m_driver);
+	if (mip->mi_callbacks->mc_callbacks & MC_RESOURCES)
+		mip->mi_resources(mip->mi_driver);
 }
 
 void
 mac_ioctl(mac_handle_t mh, queue_t *wq, mblk_t *bp)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
-	mac_t		*mp = mip->mi_mp;
-
-	ASSERT(mp->m_ioctl != NULL);
 
 	/*
-	 * Call the driver to handle the ioctl.
+	 * Call the driver to handle the ioctl.  The driver may not support
+	 * any ioctls, in which case we reply with a NAK on its behalf.
 	 */
-	mp->m_ioctl(mp->m_driver, wq, bp);
+	if (mip->mi_callbacks->mc_callbacks & MC_IOCTL)
+		mip->mi_ioctl(mip->mi_driver, wq, bp);
+	else
+		miocnak(wq, bp, 0, EINVAL);
 }
 
 const mac_txinfo_t *
@@ -886,7 +791,6 @@ mac_tx_get(mac_handle_t mh)
 		 * MAC_PROMISC prior to calling mac_txloop_remove().
 		 */
 		mtp = &mip->mi_txinfo;
-
 	}
 
 	rw_exit(&mip->mi_txloop_lock);
@@ -896,12 +800,7 @@ mac_tx_get(mac_handle_t mh)
 link_state_t
 mac_link_get(mac_handle_t mh)
 {
-	mac_impl_t	*mip = (mac_impl_t *)mh;
-
-	/*
-	 * Return the current link state.
-	 */
-	return (mip->mi_link);
+	return (((mac_impl_t *)mh)->mi_linkstate);
 }
 
 mac_notify_handle_t
@@ -1082,53 +981,217 @@ mac_resource_set(mac_handle_t mh, mac_resource_add_t add, void *arg)
  * Driver support functions.
  */
 
-int
-mac_register(mac_t *mp)
+mac_register_t *
+mac_alloc(uint_t mac_version)
 {
-	int	err, instance;
-	char	name[MAXNAMELEN], devname[MAXNAMELEN];
-	const char *drvname;
+	mac_register_t *mregp;
+
+	/*
+	 * Make sure there isn't a version mismatch between the driver and
+	 * the framework.  In the future, if multiple versions are
+	 * supported, this check could become more sophisticated.
+	 */
+	if (mac_version != MAC_VERSION)
+		return (NULL);
+
+	mregp = kmem_zalloc(sizeof (mac_register_t), KM_SLEEP);
+	mregp->m_version = mac_version;
+	return (mregp);
+}
+
+void
+mac_free(mac_register_t *mregp)
+{
+	kmem_free(mregp, sizeof (mac_register_t));
+}
+
+/*
+ * mac_register() is how drivers register new MACs with the GLDv3
+ * framework.  The mregp argument is allocated by drivers using the
+ * mac_alloc() function, and can be freed using mac_free() immediately upon
+ * return from mac_register().  Upon success (0 return value), the mhp
+ * opaque pointer becomes the driver's handle to its MAC interface, and is
+ * the argument to all other mac module entry points.
+ */
+/* ARGSUSED */
+int
+mac_register(mac_register_t *mregp, mac_handle_t *mhp)
+{
+	mac_impl_t	*mip;
+	mactype_t	*mtype;
+	int		err;
 	struct devnames *dnp;
-	minor_t	minor;
+	minor_t		minor;
+	mod_hash_val_t	val;
+	boolean_t	style1_created = B_FALSE, style2_created = B_FALSE;
 
-	drvname = ddi_driver_name(mp->m_dip);
-	instance = ddi_get_instance(mp->m_dip);
+	/* Find the required MAC-Type plugin. */
+	if ((mtype = i_mactype_getplugin(mregp->m_type_ident)) == NULL)
+		return (EINVAL);
 
-	if (strcmp(mp->m_ident, MAC_IDENT) != 0) {
-		cmn_err(CE_WARN, "%s%d/%d: possible mac interface mismatch",
-		    drvname, instance, mp->m_port);
+	/* Create a mac_impl_t to represent this MAC. */
+	mip = kmem_cache_alloc(i_mac_impl_cachep, KM_SLEEP);
+
+	/*
+	 * The mac is not ready for open yet.
+	 */
+	mip->mi_disabled = B_TRUE;
+
+	mip->mi_drvname = ddi_driver_name(mregp->m_dip);
+	/*
+	 * Some drivers such as aggr need to register multiple MACs.  Such
+	 * drivers must supply a non-zero "instance" argument so that each
+	 * MAC can be assigned a unique MAC name and can have unique
+	 * kstats.
+	 */
+	mip->mi_instance = ((mregp->m_instance == 0) ?
+	    ddi_get_instance(mregp->m_dip) : mregp->m_instance);
+
+	/* Construct the MAC name as <drvname><instance> */
+	(void) snprintf(mip->mi_name, sizeof (mip->mi_name), "%s%d",
+	    mip->mi_drvname, mip->mi_instance);
+
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	if (mod_hash_insert(i_mac_impl_hash,
+	    (mod_hash_key_t)mip->mi_name, (mod_hash_val_t)mip) != 0) {
+		kmem_cache_free(i_mac_impl_cachep, mip);
+		rw_exit(&i_mac_impl_lock);
+		return (EEXIST);
+	}
+	i_mac_impl_count++;
+
+	mip->mi_driver = mregp->m_driver;
+
+	mip->mi_type = mtype;
+
+	mip->mi_info.mi_media = mtype->mt_type;
+	mip->mi_info.mi_sdu_min = mregp->m_min_sdu;
+	if (mregp->m_max_sdu <= mregp->m_min_sdu) {
+		err = EINVAL;
+		goto fail;
+	}
+	mip->mi_info.mi_sdu_max = mregp->m_max_sdu;
+	mip->mi_info.mi_addr_length = mip->mi_type->mt_addr_length;
+	/*
+	 * If the media supports a broadcast address, cache a pointer to it
+	 * in the mac_info_t so that upper layers can use it.
+	 */
+	mip->mi_info.mi_brdcst_addr = mip->mi_type->mt_brdcst_addr;
+
+	/*
+	 * Copy the unicast source address into the mac_info_t, but only if
+	 * the MAC-Type defines a non-zero address length.  We need to
+	 * handle MAC-Types that have an address length of 0
+	 * (point-to-point protocol MACs for example).
+	 */
+	if (mip->mi_type->mt_addr_length > 0) {
+		if (mregp->m_src_addr == NULL) {
+			err = EINVAL;
+			goto fail;
+		}
+		mip->mi_info.mi_unicst_addr =
+		    kmem_alloc(mip->mi_type->mt_addr_length, KM_SLEEP);
+		bcopy(mregp->m_src_addr, mip->mi_info.mi_unicst_addr,
+		    mip->mi_type->mt_addr_length);
+
+		/*
+		 * Copy the fixed 'factory' MAC address from the immutable
+		 * info.  This is taken to be the MAC address currently in
+		 * use.
+		 */
+		bcopy(mip->mi_info.mi_unicst_addr, mip->mi_addr,
+		    mip->mi_type->mt_addr_length);
+		/* Copy the destination address if one is provided. */
+		if (mregp->m_dst_addr != NULL) {
+			bcopy(mregp->m_dst_addr, mip->mi_dstaddr,
+			    mip->mi_type->mt_addr_length);
+		}
+	} else if (mregp->m_src_addr != NULL) {
+		err = EINVAL;
+		goto fail;
 	}
 
 	/*
-	 * Create a new mac_impl_t to pair with the mac_t.
+	 * The format of the m_pdata is specific to the plugin.  It is
+	 * passed in as an argument to all of the plugin callbacks.  The
+	 * driver can update this information by calling
+	 * mac_pdata_update().
 	 */
-	if ((err = i_mac_create(mp)) != 0)
-		return (err);
-
-	err = EEXIST;
-	if (ddi_create_minor_node(mp->m_dip, (char *)drvname, S_IFCHR, 0,
-	    DDI_NT_NET, CLONE_DEV) != DDI_SUCCESS)
-		goto fail1;
-
-	(void) snprintf(devname, MAXNAMELEN, "%s%d", drvname, instance);
-
-	if (strcmp(drvname, "aggr") == 0) {
-		(void) snprintf(name, MAXNAMELEN, "aggr%u", mp->m_port);
-		minor = (minor_t)mp->m_port + 1;
-	} else {
-		(void) strlcpy(name, devname, MAXNAMELEN);
-		minor = (minor_t)instance + 1;
+	if (mregp->m_pdata != NULL) {
+		/*
+		 * Verify that the plugin supports MAC plugin data and that
+		 * the supplied data is valid.
+		 */
+		if (!(mip->mi_type->mt_ops.mtops_ops & MTOPS_PDATA_VERIFY)) {
+			err = EINVAL;
+			goto fail;
+		}
+		if (!mip->mi_type->mt_ops.mtops_pdata_verify(mregp->m_pdata,
+		    mregp->m_pdata_size)) {
+			err = EINVAL;
+			goto fail;
+		}
+		mip->mi_pdata = kmem_alloc(mregp->m_pdata_size, KM_SLEEP);
+		bcopy(mregp->m_pdata, mip->mi_pdata, mregp->m_pdata_size);
+		mip->mi_pdata_size = mregp->m_pdata_size;
 	}
 
-	if (ddi_create_minor_node(mp->m_dip, name, S_IFCHR, minor,
-	    DDI_NT_NET, 0) != DDI_SUCCESS)
-		goto fail2;
+	/*
+	 * Stash the driver callbacks into the mac_impl_t, but first sanity
+	 * check to make sure all mandatory callbacks are set.
+	 */
+	if (mregp->m_callbacks->mc_getstat == NULL ||
+	    mregp->m_callbacks->mc_start == NULL ||
+	    mregp->m_callbacks->mc_stop == NULL ||
+	    mregp->m_callbacks->mc_setpromisc == NULL ||
+	    mregp->m_callbacks->mc_multicst == NULL ||
+	    mregp->m_callbacks->mc_unicst == NULL ||
+	    mregp->m_callbacks->mc_tx == NULL) {
+		err = EINVAL;
+		goto fail;
+	}
+	mip->mi_callbacks = mregp->m_callbacks;
 
-	if ((err = dls_create(name, devname, mp->m_port)) != 0)
-		goto fail3;
+	mip->mi_dip = mregp->m_dip;
+
+	/*
+	 * Set up the two possible transmit routines.
+	 */
+	mip->mi_txinfo.mt_fn = mip->mi_tx;
+	mip->mi_txinfo.mt_arg = mip->mi_driver;
+	mip->mi_txloopinfo.mt_fn = mac_txloop;
+	mip->mi_txloopinfo.mt_arg = mip;
+
+	/*
+	 * Initialize the kstats for this device.
+	 */
+	mac_stat_create(mip);
+
+	err = EEXIST;
+	/* Create a style-2 DLPI device */
+	if (ddi_create_minor_node(mip->mi_dip, (char *)mip->mi_drvname,
+	    S_IFCHR, 0, DDI_NT_NET, CLONE_DEV) != DDI_SUCCESS)
+		goto fail;
+	style2_created = B_TRUE;
+
+	/* Create a style-1 DLPI device */
+	minor = (minor_t)mip->mi_instance + 1;
+	if (ddi_create_minor_node(mip->mi_dip, mip->mi_name, S_IFCHR, minor,
+	    DDI_NT_NET, 0) != DDI_SUCCESS)
+		goto fail;
+	style1_created = B_TRUE;
+
+	/*
+	 * Create a link for this MAC.  The link name will be the same as
+	 * the MAC name.
+	 */
+	err = dls_create(mip->mi_name, mip->mi_name,
+	    ddi_get_instance(mip->mi_dip));
+	if (err != 0)
+		goto fail;
 
 	/* set the gldv3 flag in dn_flags */
-	dnp = &devnamesp[ddi_driver_major(mp->m_dip)];
+	dnp = &devnamesp[ddi_driver_major(mip->mi_dip)];
 	LOCK_DEV_OPS(&dnp->dn_lock);
 	dnp->dn_flags |= DN_GLDV3_DRIVER;
 	UNLOCK_DEV_OPS(&dnp->dn_lock);
@@ -1136,37 +1199,59 @@ mac_register(mac_t *mp)
 	/*
 	 * Mark the MAC to be ready for open.
 	 */
-	rw_enter(&i_mac_impl_lock, RW_WRITER);
-	((mac_impl_t *)mp->m_impl)->mi_disabled = B_FALSE;
-	rw_exit(&i_mac_impl_lock);
+	mip->mi_disabled = B_FALSE;
 
-	cmn_err(CE_NOTE, "!%s%d/%d registered", drvname, instance, mp->m_port);
+	cmn_err(CE_NOTE, "!%s registered", mip->mi_name);
+	rw_exit(&i_mac_impl_lock);
+	*mhp = (mac_handle_t)mip;
 	return (0);
 
-fail3:
-	ddi_remove_minor_node(mp->m_dip, name);
-fail2:
-	ddi_remove_minor_node(mp->m_dip, (char *)drvname);
-fail1:
-	i_mac_destroy(mp);
+fail:
+	(void) mod_hash_remove(i_mac_impl_hash, (mod_hash_key_t)mip->mi_name,
+	    &val);
+	ASSERT(mip == (mac_impl_t *)val);
+	i_mac_impl_count--;
+
+	if (mip->mi_info.mi_unicst_addr != NULL) {
+		kmem_free(mip->mi_info.mi_unicst_addr,
+		    mip->mi_type->mt_addr_length);
+		mip->mi_info.mi_unicst_addr = NULL;
+	}
+	if (style1_created)
+		ddi_remove_minor_node(mip->mi_dip, mip->mi_name);
+	if (style2_created)
+		ddi_remove_minor_node(mip->mi_dip, (char *)mip->mi_drvname);
+
+	mac_stat_destroy(mip);
+
+	if (mip->mi_type != NULL) {
+		mip->mi_type->mt_ref--;
+		mip->mi_type = NULL;
+	}
+
+	if (mip->mi_pdata != NULL) {
+		kmem_free(mip->mi_pdata, mip->mi_pdata_size);
+		mip->mi_pdata = NULL;
+		mip->mi_pdata_size = 0;
+	}
+
+	kmem_cache_free(i_mac_impl_cachep, mip);
+	rw_exit(&i_mac_impl_lock);
 	return (err);
 }
 
 int
-mac_unregister(mac_t *mp)
+mac_unregister(mac_handle_t mh)
 {
-	int		err, instance;
-	char		name[MAXNAMELEN];
-	const char	*drvname;
-	mac_impl_t	*mip = mp->m_impl;
-
-	drvname = ddi_driver_name(mp->m_dip);
-	instance = ddi_get_instance(mp->m_dip);
+	int			err;
+	mac_impl_t		*mip = (mac_impl_t *)mh;
+	mod_hash_val_t		val;
+	mac_multicst_addr_t	*p, *nextp;
 
 	/*
 	 * See if there are any other references to this mac_t (e.g., VLAN's).
 	 * If not, set mi_disabled to prevent any new VLAN's from being
-	 * created before we can perform the i_mac_destroy() below.
+	 * created while we're destroying this mac.
 	 */
 	rw_enter(&i_mac_impl_lock, RW_WRITER);
 	if (mip->mi_ref > 0) {
@@ -1184,12 +1269,7 @@ mac_unregister(mac_t *mp)
 		cv_wait(&mip->mi_notify_cv, &mip->mi_notify_ref_lock);
 	mutex_exit(&mip->mi_notify_ref_lock);
 
-	if (strcmp(drvname, "aggr") == 0)
-		(void) snprintf(name, MAXNAMELEN, "aggr%u", mp->m_port);
-	else
-		(void) snprintf(name, MAXNAMELEN, "%s%d", drvname, instance);
-
-	if ((err = dls_destroy(name)) != 0) {
+	if ((err = dls_destroy(mip->mi_name)) != 0) {
 		rw_enter(&i_mac_impl_lock, RW_WRITER);
 		mip->mi_disabled = B_FALSE;
 		rw_exit(&i_mac_impl_lock);
@@ -1197,25 +1277,54 @@ mac_unregister(mac_t *mp)
 	}
 
 	/*
-	 * Destroy the mac_impl_t.
-	 */
-	i_mac_destroy(mp);
-
-	/*
 	 * Remove both style 1 and style 2 minor nodes
 	 */
-	ddi_remove_minor_node(mp->m_dip, (char *)drvname);
-	ddi_remove_minor_node(mp->m_dip, name);
+	ddi_remove_minor_node(mip->mi_dip, (char *)mip->mi_drvname);
+	ddi_remove_minor_node(mip->mi_dip, mip->mi_name);
 
-	cmn_err(CE_NOTE, "!%s%d/%d unregistered", drvname, instance,
-	    mp->m_port);
+	ASSERT(!mip->mi_activelink);
+
+	mac_stat_destroy(mip);
+
+	(void) mod_hash_remove(i_mac_impl_hash, (mod_hash_key_t)mip->mi_name,
+	    &val);
+	ASSERT(mip == (mac_impl_t *)val);
+
+	ASSERT(i_mac_impl_count > 0);
+	i_mac_impl_count--;
+
+	if (mip->mi_pdata != NULL)
+		kmem_free(mip->mi_pdata, mip->mi_pdata_size);
+	mip->mi_pdata = NULL;
+	mip->mi_pdata_size = 0;
+
+	/*
+	 * Free the list of multicast addresses.
+	 */
+	for (p = mip->mi_mmap; p != NULL; p = nextp) {
+		nextp = p->mma_nextp;
+		kmem_free(p, sizeof (mac_multicst_addr_t));
+	}
+	mip->mi_mmap = NULL;
+
+	mip->mi_linkstate = LINK_STATE_UNKNOWN;
+	kmem_free(mip->mi_info.mi_unicst_addr, mip->mi_type->mt_addr_length);
+	mip->mi_info.mi_unicst_addr = NULL;
+
+	mip->mi_type->mt_ref--;
+	mip->mi_type = NULL;
+
+	cmn_err(CE_NOTE, "!%s unregistered", mip->mi_name);
+
+	kmem_cache_free(i_mac_impl_cachep, mip);
+
 	return (0);
 }
 
 void
-mac_rx(mac_t *mp, mac_resource_handle_t mrh, mblk_t *bp)
+mac_rx(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *bp)
 {
-	mac_impl_t	*mip = mp->m_impl;
+	mac_impl_t	*mip = (mac_impl_t *)mh;
 	mac_rx_fn_t	*mrfp;
 
 	/*
@@ -1252,7 +1361,6 @@ mblk_t *
 mac_txloop(void *arg, mblk_t *bp)
 {
 	mac_impl_t	*mip = arg;
-	mac_t		*mp = mip->mi_mp;
 	mac_txloop_fn_t	*mtfp;
 	mblk_t		*loop_bp, *resid_bp, *next_bp;
 
@@ -1263,7 +1371,7 @@ mac_txloop(void *arg, mblk_t *bp)
 		if ((loop_bp = copymsg(bp)) == NULL)
 			goto noresources;
 
-		if ((resid_bp = mp->m_tx(mp->m_driver, bp)) != NULL) {
+		if ((resid_bp = mip->mi_tx(mip->mi_driver, bp)) != NULL) {
 			ASSERT(resid_bp == bp);
 			freemsg(loop_bp);
 			goto noresources;
@@ -1303,16 +1411,14 @@ noresources:
 }
 
 void
-mac_link_update(mac_t *mp, link_state_t link)
+mac_link_update(mac_handle_t mh, link_state_t link)
 {
-	mac_impl_t	*mip = mp->m_impl;
-
-	ASSERT(mip->mi_mp == mp);
+	mac_impl_t	*mip = (mac_impl_t *)mh;
 
 	/*
 	 * Save the link state.
 	 */
-	mip->mi_link = link;
+	mip->mi_linkstate = link;
 
 	/*
 	 * Send a MAC_NOTE_LINK notification.
@@ -1321,16 +1427,17 @@ mac_link_update(mac_t *mp, link_state_t link)
 }
 
 void
-mac_unicst_update(mac_t *mp, const uint8_t *addr)
+mac_unicst_update(mac_handle_t mh, const uint8_t *addr)
 {
-	mac_impl_t	*mip = mp->m_impl;
+	mac_impl_t	*mip = (mac_impl_t *)mh;
 
-	ASSERT(mip->mi_mp == mp);
+	if (mip->mi_type->mt_addr_length == 0)
+		return;
 
 	/*
 	 * Save the address.
 	 */
-	bcopy(addr, mip->mi_addr, mip->mi_addr_length);
+	bcopy(addr, mip->mi_addr, mip->mi_type->mt_addr_length);
 
 	/*
 	 * Send a MAC_NOTE_UNICST notification.
@@ -1339,35 +1446,27 @@ mac_unicst_update(mac_t *mp, const uint8_t *addr)
 }
 
 void
-mac_tx_update(mac_t *mp)
+mac_tx_update(mac_handle_t mh)
 {
-	mac_impl_t	*mip = mp->m_impl;
-
-	ASSERT(mip->mi_mp == mp);
-
 	/*
 	 * Send a MAC_NOTE_TX notification.
 	 */
-	i_mac_notify(mip, MAC_NOTE_TX);
+	i_mac_notify((mac_impl_t *)mh, MAC_NOTE_TX);
 }
 
 void
-mac_resource_update(mac_t *mp)
+mac_resource_update(mac_handle_t mh)
 {
-	mac_impl_t	*mip = mp->m_impl;
-
-	ASSERT(mip->mi_mp == mp);
-
 	/*
 	 * Send a MAC_NOTE_RESOURCE notification.
 	 */
-	i_mac_notify(mip, MAC_NOTE_RESOURCE);
+	i_mac_notify((mac_impl_t *)mh, MAC_NOTE_RESOURCE);
 }
 
 mac_resource_handle_t
-mac_resource_add(mac_t *mp, mac_resource_t *mrp)
+mac_resource_add(mac_handle_t mh, mac_resource_t *mrp)
 {
-	mac_impl_t		*mip = mp->m_impl;
+	mac_impl_t		*mip = (mac_impl_t *)mh;
 	mac_resource_handle_t	mrh;
 	mac_resource_add_t	add;
 	void			*arg;
@@ -1385,11 +1484,41 @@ mac_resource_add(mac_t *mp, mac_resource_t *mrp)
 	return (mrh);
 }
 
+int
+mac_pdata_update(mac_handle_t mh, void *mac_pdata, size_t dsize)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	/*
+	 * Verify that the plugin supports MAC plugin data and that the
+	 * supplied data is valid.
+	 */
+	if (!(mip->mi_type->mt_ops.mtops_ops & MTOPS_PDATA_VERIFY))
+		return (EINVAL);
+	if (!mip->mi_type->mt_ops.mtops_pdata_verify(mac_pdata, dsize))
+		return (EINVAL);
+
+	if (mip->mi_pdata != NULL)
+		kmem_free(mip->mi_pdata, mip->mi_pdata_size);
+
+	mip->mi_pdata = kmem_alloc(dsize, KM_SLEEP);
+	bcopy(mac_pdata, mip->mi_pdata, dsize);
+	mip->mi_pdata_size = dsize;
+
+	/*
+	 * Since the MAC plugin data is used to construct MAC headers that
+	 * were cached in fast-path headers, we need to flush fast-path
+	 * information for links associated with this mac.
+	 */
+	i_mac_notify(mip, MAC_NOTE_FASTPATH_FLUSH);
+	return (0);
+}
+
 void
-mac_multicst_refresh(mac_t *mp, mac_multicst_t refresh, void *arg,
+mac_multicst_refresh(mac_handle_t mh, mac_multicst_t refresh, void *arg,
     boolean_t add)
 {
-	mac_impl_t		*mip = mp->m_impl;
+	mac_impl_t		*mip = (mac_impl_t *)mh;
 	mac_multicst_addr_t	*p;
 
 	/*
@@ -1397,8 +1526,8 @@ mac_multicst_refresh(mac_t *mp, mac_multicst_t refresh, void *arg,
 	 * driver's m_multicst entry point.
 	 */
 	if (refresh == NULL) {
-		refresh = mp->m_multicst;
-		arg = mp->m_driver;
+		refresh = mip->mi_multicst;
+		arg = mip->mi_driver;
 	}
 	ASSERT(refresh != NULL);
 
@@ -1413,16 +1542,16 @@ mac_multicst_refresh(mac_t *mp, mac_multicst_t refresh, void *arg,
 }
 
 void
-mac_unicst_refresh(mac_t *mp, mac_unicst_t refresh, void *arg)
+mac_unicst_refresh(mac_handle_t mh, mac_unicst_t refresh, void *arg)
 {
-	mac_impl_t	*mip = mp->m_impl;
+	mac_impl_t	*mip = (mac_impl_t *)mh;
 	/*
 	 * If no specific refresh function was given then default to the
-	 * driver's m_unicst entry point.
+	 * driver's mi_unicst entry point.
 	 */
 	if (refresh == NULL) {
-		refresh = mp->m_unicst;
-		arg = mp->m_driver;
+		refresh = mip->mi_unicst;
+		arg = mip->mi_driver;
 	}
 	ASSERT(refresh != NULL);
 
@@ -1433,17 +1562,17 @@ mac_unicst_refresh(mac_t *mp, mac_unicst_t refresh, void *arg)
 }
 
 void
-mac_promisc_refresh(mac_t *mp, mac_promisc_t refresh, void *arg)
+mac_promisc_refresh(mac_handle_t mh, mac_setpromisc_t refresh, void *arg)
 {
-	mac_impl_t	*mip = mp->m_impl;
+	mac_impl_t	*mip = (mac_impl_t *)mh;
 
 	/*
 	 * If no specific refresh function was given then default to the
 	 * driver's m_promisc entry point.
 	 */
 	if (refresh == NULL) {
-		refresh = mp->m_promisc;
-		arg = mp->m_driver;
+		refresh = mip->mi_setpromisc;
+		arg = mip->mi_driver;
 	}
 	ASSERT(refresh != NULL);
 
@@ -1502,10 +1631,10 @@ i_mac_info_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 		return (MH_WALK_CONTINUE);
 
 	if (strcmp(statep->mi_name,
-	    ddi_driver_name(mip->mi_mp->m_dip)) != 0)
+	    ddi_driver_name(mip->mi_dip)) != 0)
 		return (MH_WALK_CONTINUE);
 
-	statep->mi_infop = &mip->mi_mp->m_info;
+	statep->mi_infop = &mip->mi_info;
 	return (MH_WALK_TERMINATE);
 }
 
@@ -1527,6 +1656,74 @@ mac_info_get(const char *name, mac_info_t *minfop)
 	return (B_TRUE);
 }
 
+boolean_t
+mac_capab_get(mac_handle_t mh, mac_capab_t cap, void *cap_data)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	if (mip->mi_callbacks->mc_callbacks & MC_GETCAPAB)
+		return (mip->mi_getcapab(mip->mi_driver, cap, cap_data));
+	else
+		return (B_FALSE);
+}
+
+boolean_t
+mac_sap_verify(mac_handle_t mh, uint32_t sap, uint32_t *bind_sap)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+	return (mip->mi_type->mt_ops.mtops_sap_verify(sap, bind_sap,
+	    mip->mi_pdata));
+}
+
+mblk_t *
+mac_header(mac_handle_t mh, const uint8_t *daddr, uint32_t sap, mblk_t *payload,
+    size_t extra_len)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+	return (mip->mi_type->mt_ops.mtops_header(mip->mi_addr, daddr, sap,
+	    mip->mi_pdata, payload, extra_len));
+}
+
+int
+mac_header_info(mac_handle_t mh, mblk_t *mp, mac_header_info_t *mhip)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+	return (mip->mi_type->mt_ops.mtops_header_info(mp, mip->mi_pdata,
+	    mhip));
+}
+
+mblk_t *
+mac_header_cook(mac_handle_t mh, mblk_t *mp)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+	if (mip->mi_type->mt_ops.mtops_ops & MTOPS_HEADER_COOK) {
+		if (DB_REF(mp) > 1) {
+			mblk_t *newmp = copymsg(mp);
+			freemsg(mp);
+			mp = newmp;
+		}
+		return (mip->mi_type->mt_ops.mtops_header_cook(mp,
+		    mip->mi_pdata));
+	}
+	return (mp);
+}
+
+mblk_t *
+mac_header_uncook(mac_handle_t mh, mblk_t *mp)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+	if (mip->mi_type->mt_ops.mtops_ops & MTOPS_HEADER_UNCOOK) {
+		if (DB_REF(mp) > 1) {
+			mblk_t *newmp = copymsg(mp);
+			freemsg(mp);
+			mp = newmp;
+		}
+		return (mip->mi_type->mt_ops.mtops_header_uncook(mp,
+		    mip->mi_pdata));
+	}
+	return (mp);
+}
+
 void
 mac_init_ops(struct dev_ops *ops, const char *name)
 {
@@ -1537,4 +1734,130 @@ void
 mac_fini_ops(struct dev_ops *ops)
 {
 	dld_fini_ops(ops);
+}
+
+/*
+ * MAC Type Plugin functions.
+ */
+
+mactype_register_t *
+mactype_alloc(uint_t mactype_version)
+{
+	mactype_register_t *mtrp;
+
+	/*
+	 * Make sure there isn't a version mismatch between the plugin and
+	 * the framework.  In the future, if multiple versions are
+	 * supported, this check could become more sophisticated.
+	 */
+	if (mactype_version != MACTYPE_VERSION)
+		return (NULL);
+
+	mtrp = kmem_zalloc(sizeof (mactype_register_t), KM_SLEEP);
+	mtrp->mtr_version = mactype_version;
+	return (mtrp);
+}
+
+void
+mactype_free(mactype_register_t *mtrp)
+{
+	kmem_free(mtrp, sizeof (mactype_register_t));
+}
+
+int
+mactype_register(mactype_register_t *mtrp)
+{
+	mactype_t	*mtp;
+	mactype_ops_t	*ops = mtrp->mtr_ops;
+
+	/* Do some sanity checking before we register this MAC type. */
+	if (mtrp->mtr_ident == NULL || ops == NULL || mtrp->mtr_addrlen == 0)
+		return (EINVAL);
+
+	/*
+	 * Verify that all mandatory callbacks are set in the ops
+	 * vector.
+	 */
+	if (ops->mtops_unicst_verify == NULL ||
+	    ops->mtops_multicst_verify == NULL ||
+	    ops->mtops_sap_verify == NULL ||
+	    ops->mtops_header == NULL ||
+	    ops->mtops_header_info == NULL) {
+		return (EINVAL);
+	}
+
+	mtp = kmem_zalloc(sizeof (*mtp), KM_SLEEP);
+	mtp->mt_ident = mtrp->mtr_ident;
+	mtp->mt_ops = *ops;
+	mtp->mt_type = mtrp->mtr_mactype;
+	mtp->mt_addr_length = mtrp->mtr_addrlen;
+	if (mtrp->mtr_brdcst_addr != NULL) {
+		mtp->mt_brdcst_addr = kmem_alloc(mtrp->mtr_addrlen, KM_SLEEP);
+		bcopy(mtrp->mtr_brdcst_addr, mtp->mt_brdcst_addr,
+		    mtrp->mtr_addrlen);
+	}
+
+	mtp->mt_stats = mtrp->mtr_stats;
+	mtp->mt_statcount = mtrp->mtr_statcount;
+
+	/*
+	 * A MAC-Type plugin only registers when i_mactype_getplugin() does
+	 * an explicit modload() as a result of a driver requesting to use
+	 * that plugin in mac_register().  We pre-emptively set the initial
+	 * reference count to 1 here to prevent the plugin module from
+	 * unloading before the driver's mac_register() completes.  If we
+	 * were to initialize the reference count to 0, then there would be
+	 * a window during which the module could unload before the
+	 * reference count could be bumped up to 1.
+	 */
+	mtp->mt_ref = 1;
+
+	if (mod_hash_insert(i_mactype_hash,
+	    (mod_hash_key_t)mtp->mt_ident, (mod_hash_val_t)mtp) != 0) {
+		kmem_free(mtp->mt_brdcst_addr, mtp->mt_addr_length);
+		kmem_free(mtp, sizeof (*mtp));
+		return (EEXIST);
+	}
+	return (0);
+}
+
+int
+mactype_unregister(const char *ident)
+{
+	mactype_t	*mtp;
+	mod_hash_val_t	val;
+	int 		err;
+
+	/*
+	 * Let's not allow MAC drivers to use this plugin while we're
+	 * trying to unregister it...
+	 */
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
+
+	if ((err = mod_hash_find(i_mactype_hash, (mod_hash_key_t)ident,
+	    (mod_hash_val_t *)&mtp)) != 0) {
+		/* A plugin is trying to unregister, but it never registered. */
+		rw_exit(&i_mac_impl_lock);
+		return (ENXIO);
+	}
+
+	if (mtp->mt_ref > 0) {
+		rw_exit(&i_mac_impl_lock);
+		return (EBUSY);
+	}
+
+	err = mod_hash_remove(i_mactype_hash, (mod_hash_key_t)ident, &val);
+	ASSERT(err == 0);
+	if (err != 0) {
+		/* This should never happen, thus the ASSERT() above. */
+		rw_exit(&i_mac_impl_lock);
+		return (EINVAL);
+	}
+	ASSERT(mtp == (mactype_t *)val);
+
+	kmem_free(mtp->mt_brdcst_addr, mtp->mt_addr_length);
+	kmem_free(mtp, sizeof (mactype_t));
+	rw_exit(&i_mac_impl_lock);
+
+	return (0);
 }

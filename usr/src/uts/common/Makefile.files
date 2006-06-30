@@ -513,6 +513,8 @@ GLD_OBJS +=     gld.o gldutil.o
 
 MAC_OBJS +=     mac.o mac_mod.o mac_stat.o
 
+MAC_ETHER_OBJS +=	mac_ether.o
+
 AGGR_OBJS +=	aggr_dev.o aggr_ctl.o aggr_grp.o aggr_port.o \
 		aggr_send.o aggr_recv.o aggr_lacp.o
 

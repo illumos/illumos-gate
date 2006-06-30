@@ -58,20 +58,19 @@
 #include <sys/aggr.h>
 #include <sys/aggr_impl.h>
 
-static void aggr_m_info(void *, mac_info_t *);
 static int aggr_m_start(void *);
 static void aggr_m_stop(void *);
 static int aggr_m_promisc(void *, boolean_t);
 static int aggr_m_multicst(void *, boolean_t, const uint8_t *);
 static int aggr_m_unicst(void *, const uint8_t *);
-static uint64_t aggr_m_stat(void *, enum mac_stat);
+static int aggr_m_stat(void *, uint_t, uint64_t *);
 static void aggr_m_resources(void *);
 static void aggr_m_ioctl(void *, queue_t *, mblk_t *);
+static boolean_t aggr_m_capab_get(void *, mac_capab_t, void *);
 
-static aggr_port_t *aggr_grp_port_lookup(aggr_grp_t *, const char *, uint32_t);
+static aggr_port_t *aggr_grp_port_lookup(aggr_grp_t *, const char *);
 static int aggr_grp_rem_port(aggr_grp_t *, aggr_port_t *, boolean_t *,
     boolean_t *);
-static void aggr_stats_op(enum mac_stat, uint64_t *, uint64_t *, boolean_t);
 static void aggr_grp_capab_set(aggr_grp_t *);
 static boolean_t aggr_grp_capab_check(aggr_grp_t *, aggr_port_t *);
 
@@ -84,7 +83,6 @@ static uint_t		aggr_grp_cnt;
 #define	GRP_HASH_KEY(key)	((mod_hash_key_t)(uintptr_t)key)
 
 static uchar_t aggr_zero_mac[] = {0, 0, 0, 0, 0, 0};
-static uchar_t aggr_brdcst_mac[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 /* used by grp_info_walker */
 typedef struct aggr_grp_info_state {
@@ -95,6 +93,22 @@ typedef struct aggr_grp_info_state {
 	void		*ls_fn_arg;
 	int		ls_rc;
 } aggr_grp_info_state_t;
+
+#define	AGGR_M_CALLBACK_FLAGS	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB)
+
+static mac_callbacks_t aggr_m_callbacks = {
+	AGGR_M_CALLBACK_FLAGS,
+	aggr_m_stat,
+	aggr_m_start,
+	aggr_m_stop,
+	aggr_m_promisc,
+	aggr_m_multicst,
+	aggr_m_unicst,
+	aggr_m_tx,
+	aggr_m_resources,
+	aggr_m_ioctl,
+	aggr_m_capab_get
+};
 
 /*ARGSUSED*/
 static int
@@ -393,8 +407,7 @@ aggr_grp_port_mac_changed(aggr_grp_t *grp, aggr_port_t *port,
  * Add a port to a link aggregation group.
  */
 static int
-aggr_grp_add_port(aggr_grp_t *grp, const char *name, uint_t portnum,
-    aggr_port_t **pp)
+aggr_grp_add_port(aggr_grp_t *grp, const char *name, aggr_port_t **pp)
 {
 	aggr_port_t *port, **cport;
 	int err;
@@ -403,7 +416,7 @@ aggr_grp_add_port(aggr_grp_t *grp, const char *name, uint_t portnum,
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 
 	/* create new port */
-	err = aggr_port_create(name, portnum, &port);
+	err = aggr_port_create(name, &port);
 	if (err != 0)
 		return (err);
 
@@ -467,9 +480,10 @@ aggr_grp_add_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 	/* add the specified ports to group */
 	for (i = 0; i < nports; i++) {
 		/* add port to group */
-		if ((rc = aggr_grp_add_port(grp, ports[i].lp_devname,
-		    ports[i].lp_port, &port)) != 0)
+		if ((rc = aggr_grp_add_port(grp, ports[i].lp_devname, &port)) !=
+		    0) {
 			goto bail;
+		}
 		ASSERT(port != NULL);
 		nadded++;
 
@@ -509,14 +523,13 @@ aggr_grp_add_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 	    aggr_grp_update_ports_mac(grp);
 
 	if (link_state_changed)
-		mac_link_update(&grp->lg_mac, grp->lg_link_state);
+		mac_link_update(grp->lg_mh, grp->lg_link_state);
 
 bail:
 	if (rc != 0) {
 		/* stop and remove ports that have been added */
 		for (i = 0; i < nadded && !grp->lg_closing; i++) {
-			port = aggr_grp_port_lookup(grp, ports[i].lp_devname,
-			    ports[i].lp_port);
+			port = aggr_grp_port_lookup(grp, ports[i].lp_devname);
 			ASSERT(port != NULL);
 			if (grp->lg_started) {
 				rw_enter(&port->lp_lock, RW_WRITER);
@@ -530,7 +543,7 @@ bail:
 	rw_exit(&grp->lg_lock);
 	AGGR_LACP_UNLOCK(grp);
 	if (rc == 0 && !grp->lg_closing)
-		mac_resource_update(&grp->lg_mac);
+		mac_resource_update(grp->lg_mh);
 	AGGR_GRP_REFRELE(grp);
 	return (rc);
 }
@@ -618,10 +631,10 @@ bail:
 		 * will be sent there.
 		 */
 		if ((grp_arg == NULL) && mac_addr_changed)
-			mac_unicst_update(&grp->lg_mac, grp->lg_addr);
+			mac_unicst_update(grp->lg_mh, grp->lg_addr);
 
 		if (link_state_changed)
-			mac_link_update(&grp->lg_mac, grp->lg_link_state);
+			mac_link_update(grp->lg_mh, grp->lg_link_state);
 
 	}
 
@@ -650,8 +663,7 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 {
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port;
-	mac_t *mac;
-	mac_info_t *mip;
+	mac_register_t *mac;
 	boolean_t link_state_changed;
 	int err;
 	int i;
@@ -693,8 +705,7 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 	grp->lg_ntx_ports = 0;
 
 	for (i = 0; i < nports; i++) {
-		err = aggr_grp_add_port(grp, ports[i].lp_devname,
-		    ports[i].lp_port, NULL);
+		err = aggr_grp_add_port(grp, ports[i].lp_devname, NULL);
 		if (err != 0)
 			goto bail;
 	}
@@ -727,43 +738,22 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 	/* update outbound load balancing policy */
 	aggr_send_update_policy(grp, policy);
 
-	/* register with the MAC module */
-	mac = &grp->lg_mac;
-	bzero(mac, sizeof (*mac));
-
-	mac->m_ident = MAC_IDENT;
-
-	mac->m_driver = grp;
-	mac->m_dip = aggr_dip;
-	mac->m_port = key;
-
-	mip = &(mac->m_info);
-	mip->mi_media = DL_ETHER;
-	mip->mi_sdu_min = 0;
-	mip->mi_sdu_max = ETHERMTU;
-
-	MAC_STAT_MIB(mip->mi_stat);
-	MAC_STAT_ETHER(mip->mi_stat);
-	mip->mi_stat[MAC_STAT_LINK_DUPLEX] = B_TRUE;
-
-	mip->mi_addr_length = ETHERADDRL;
-	bcopy(aggr_brdcst_mac, mip->mi_brdcst_addr, ETHERADDRL);
-	bcopy(grp->lg_addr, mip->mi_unicst_addr, ETHERADDRL);
-
-	mac->m_stat = aggr_m_stat;
-	mac->m_start = aggr_m_start;
-	mac->m_stop = aggr_m_stop;
-	mac->m_promisc = aggr_m_promisc;
-	mac->m_multicst = aggr_m_multicst;
-	mac->m_unicst = aggr_m_unicst;
-	mac->m_tx = aggr_m_tx;
-	mac->m_resources = aggr_m_resources;
-	mac->m_ioctl = aggr_m_ioctl;
-
 	/* set the initial group capabilities */
 	aggr_grp_capab_set(grp);
 
-	if ((err = mac_register(mac)) != 0)
+	if ((mac = mac_alloc(MAC_VERSION)) == NULL)
+		goto bail;
+	mac->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
+	mac->m_driver = grp;
+	mac->m_dip = aggr_dip;
+	mac->m_instance = key;
+	mac->m_src_addr = grp->lg_addr;
+	mac->m_callbacks = &aggr_m_callbacks;
+	mac->m_min_sdu = 0;
+	mac->m_max_sdu = ETHERMTU;
+	err = mac_register(mac, &grp->lg_mh);
+	mac_free(mac);
+	if (err != 0)
 		goto bail;
 
 	/* set LACP mode */
@@ -814,15 +804,14 @@ bail:
  * and port number.
  */
 static aggr_port_t *
-aggr_grp_port_lookup(aggr_grp_t *grp, const char *devname, uint32_t portnum)
+aggr_grp_port_lookup(aggr_grp_t *grp, const char *devname)
 {
 	aggr_port_t *port;
 
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock) || RW_READ_HELD(&grp->lg_lock));
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-		if ((strcmp(port->lp_devname, devname) == 0) &&
-		    (port->lp_port == portnum))
+		if (strcmp(port->lp_devname, devname) == 0)
 			break;
 	}
 
@@ -842,6 +831,7 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 	boolean_t link_state_changed = B_FALSE;
 	uint64_t val;
 	uint_t i;
+	uint_t stat;
 
 	ASSERT(AGGR_LACP_LOCK_HELD(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
@@ -880,20 +870,27 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 	link_state_changed = aggr_grp_detach_port(grp, port);
 
 	/*
-	 * Add the statistics of the ports while it was aggregated
-	 * to the group's residual statistics.
+	 * Add the counter statistics of the ports while it was aggregated
+	 * to the group's residual statistics.  This is done by obtaining
+	 * the current counter from the underlying MAC then subtracting the
+	 * value of the counter at the moment it was added to the
+	 * aggregation.
 	 */
 	for (i = 0; i < MAC_NSTAT && !grp->lg_closing; i++) {
-		/* avoid stats that are not counters */
-		if (i == MAC_STAT_IFSPEED || i == MAC_STAT_LINK_DUPLEX)
+		stat = i + MAC_STAT_MIN;
+		if (!MAC_STAT_ISACOUNTER(stat))
 			continue;
-
-		/* get current value */
-		val = aggr_port_stat(port, i);
-		/* subtract value at the point of aggregation */
+		val = aggr_port_stat(port, stat);
 		val -= port->lp_stat[i];
-		/* add to the residual stat */
 		grp->lg_stat[i] += val;
+	}
+	for (i = 0; i < ETHER_NSTAT && !grp->lg_closing; i++) {
+		stat = i + MACTYPE_STAT_MIN;
+		if (!ETHER_STAT_ISACOUNTER(stat))
+		    continue;
+		val = aggr_port_stat(port, stat);
+		val -= port->lp_ether_stat[i];
+		grp->lg_ether_stat[i] += val;
 	}
 
 	grp->lg_nports--;
@@ -953,8 +950,7 @@ aggr_grp_rem_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 
 	/* first verify that all the groups are valid */
 	for (i = 0; i < nports; i++) {
-		if (aggr_grp_port_lookup(grp, ports[i].lp_devname,
-		    ports[i].lp_port) == NULL) {
+		if (aggr_grp_port_lookup(grp, ports[i].lp_devname) == NULL) {
 			/* port not found */
 			rc = ENOENT;
 			goto bail;
@@ -964,8 +960,7 @@ aggr_grp_rem_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 	/* remove the specified ports from group */
 	for (i = 0; i < nports && !grp->lg_closing; i++) {
 		/* lookup port */
-		port = aggr_grp_port_lookup(grp, ports[i].lp_devname,
-		    ports[i].lp_port);
+		port = aggr_grp_port_lookup(grp, ports[i].lp_devname);
 		ASSERT(port != NULL);
 
 		/* stop port if group has already been started */
@@ -987,11 +982,11 @@ bail:
 	rw_exit(&grp->lg_lock);
 	AGGR_LACP_UNLOCK(grp);
 	if (mac_addr_update)
-		mac_unicst_update(&grp->lg_mac, grp->lg_addr);
+		mac_unicst_update(grp->lg_mh, grp->lg_addr);
 	if (link_state_update)
-		mac_link_update(&grp->lg_mac, grp->lg_link_state);
+		mac_link_update(grp->lg_mh, grp->lg_link_state);
 	if (rc == 0)
-		mac_resource_update(&grp->lg_mac);
+		mac_resource_update(grp->lg_mh);
 	AGGR_GRP_REFRELE(grp);
 
 	return (rc);
@@ -1022,7 +1017,7 @@ aggr_grp_delete(uint32_t key)
 	 * fail if a client hasn't closed the MAC port, we gracefully
 	 * fail the operation.
 	 */
-	if (mac_unregister(&grp->lg_mac)) {
+	if (mac_unregister(grp->lg_mh)) {
 		rw_exit(&grp->lg_lock);
 		AGGR_LACP_UNLOCK(grp);
 		rw_exit(&aggr_grp_lock);
@@ -1101,8 +1096,8 @@ aggr_grp_info_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 		rw_enter(&port->lp_lock, RW_READER);
 
 		state->ls_rc = state->ls_new_port_fn(state->ls_fn_arg,
-		    port->lp_devname, port->lp_port, port->lp_addr,
-		    port->lp_state, &port->lp_lacp.ActorOperPortState);
+		    port->lp_devname, port->lp_addr, port->lp_state,
+		    &port->lp_lacp.ActorOperPortState);
 
 		rw_exit(&port->lp_lock);
 
@@ -1161,43 +1156,73 @@ aggr_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 	miocnak(q, mp, 0, ENOTSUP);
 }
 
-static uint64_t
-aggr_m_stat(void *arg, enum mac_stat stat)
+static int
+aggr_grp_stat(aggr_grp_t *grp, uint_t stat, uint64_t *val)
 {
-	aggr_grp_t *grp = arg;
-	aggr_port_t *port;
-	uint64_t val;
+	aggr_port_t	*port;
+	uint_t		stat_index;
+
+	/* We only aggregate counter statistics. */
+	if (IS_MAC_STAT(stat) && !MAC_STAT_ISACOUNTER(stat) ||
+	    IS_MACTYPE_STAT(stat) && !ETHER_STAT_ISACOUNTER(stat)) {
+		return (ENOTSUP);
+	}
+
+	/*
+	 * Counter statistics for a group are computed by aggregating the
+	 * counters of the members MACs while they were aggregated, plus
+	 * the residual counter of the group itself, which is updated each
+	 * time a MAC is removed from the group.
+	 */
+	*val = 0;
+	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
+		/* actual port statistic */
+		*val += aggr_port_stat(port, stat);
+		/*
+		 * minus the port stat when it was added, plus any residual
+		 * ammount for the group.
+		 */
+		if (IS_MAC_STAT(stat)) {
+			stat_index = stat - MAC_STAT_MIN;
+			*val -= port->lp_stat[stat_index];
+			*val += grp->lg_stat[stat_index];
+		} else if (IS_MACTYPE_STAT(stat)) {
+			stat_index = stat - MACTYPE_STAT_MIN;
+			*val -= port->lp_ether_stat[stat_index];
+			*val += grp->lg_ether_stat[stat_index];
+		}
+	}
+	return (0);
+}
+
+static int
+aggr_m_stat(void *arg, uint_t stat, uint64_t *val)
+{
+	aggr_grp_t	*grp = arg;
+	int		rval = 0;
 
 	rw_enter(&grp->lg_lock, RW_READER);
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
-		val = grp->lg_ifspeed;
+		*val = grp->lg_ifspeed;
 		break;
-	case MAC_STAT_LINK_DUPLEX:
-		val = grp->lg_link_duplex;
+
+	case ETHER_STAT_LINK_DUPLEX:
+		*val = grp->lg_link_duplex;
 		break;
+
 	default:
 		/*
-		 * The remaining statistics are counters. They are computed
-		 * by aggregating the counters of the members MACs while they
-		 * were aggregated, plus the residual counter of the group
-		 * itself, which is updated each time a MAC is removed from
-		 * the group.
+		 * For all other statistics, we return the aggregated stat
+		 * from the underlying ports.  aggr_grp_stat() will set
+		 * rval appropriately if the statistic isn't a counter.
 		 */
-		val = 0;
-		for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-			/* actual port statistic */
-			val += aggr_port_stat(port, stat);
-			/* minus the port stat when it was added */
-			val -= port->lp_stat[stat];
-			/* plus any residual amount for the group */
-			val += grp->lg_stat[stat];
-		}
+		rval = aggr_grp_stat(grp, stat, val);
 	}
 
 	rw_exit(&grp->lg_lock);
-	return (val);
+	return (rval);
 }
 
 static int
@@ -1296,7 +1321,7 @@ aggr_m_promisc(void *arg, boolean_t on)
 	grp->lg_promisc = on;
 
 	if (link_state_changed)
-		mac_link_update(&grp->lg_mac, grp->lg_link_state);
+		mac_link_update(grp->lg_mh, grp->lg_link_state);
 
 bail:
 	rw_exit(&grp->lg_lock);
@@ -1304,6 +1329,34 @@ bail:
 	AGGR_GRP_REFRELE(grp);
 
 	return (0);
+}
+
+/*
+ * Initialize the capabilities that are advertised for the group
+ * according to the capabilities of the constituent ports.
+ */
+static boolean_t
+aggr_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
+{
+	aggr_grp_t *grp = arg;
+
+	switch (cap) {
+	case MAC_CAPAB_HCKSUM: {
+		uint32_t *hcksum_txflags = cap_data;
+		*hcksum_txflags = grp->lg_hcksum_txflags;
+		break;
+	}
+	case MAC_CAPAB_POLL:
+		/*
+		 * There's nothing for us to fill in, we simply return
+		 * B_TRUE or B_FALSE to represent the group's support
+		 * status for this capability.
+		 */
+		return (grp->lg_gldv3_polling);
+	default:
+		return (B_FALSE);
+	}
+	return (B_TRUE);
 }
 
 /*
@@ -1323,8 +1376,7 @@ aggr_grp_multicst_port(aggr_port_t *port, boolean_t add)
 	if (!port->lp_started)
 		return;
 
-	mac_multicst_refresh(&grp->lg_mac, aggr_port_multicst, port,
-	    add);
+	mac_multicst_refresh(grp->lg_mh, aggr_port_multicst, port, add);
 }
 
 static int
@@ -1369,36 +1421,49 @@ aggr_m_unicst(void *arg, const uint8_t *macaddr)
 static void
 aggr_grp_capab_set(aggr_grp_t *grp)
 {
-	uint32_t cksum = (uint32_t)-1;
-	uint32_t poll = DL_CAPAB_POLL;
 	aggr_port_t *port;
-	const mac_info_t *port_mi;
 
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
-
 	ASSERT(grp->lg_ports != NULL);
-	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-		port_mi = mac_info(port->lp_mh);
-		cksum &= port_mi->mi_cksum;
-		poll &= port_mi->mi_poll;
-	}
 
-	grp->lg_mac.m_info.mi_cksum = cksum;
-	grp->lg_mac.m_info.mi_poll = poll;
+	grp->lg_hcksum_txflags = (uint32_t)-1;
+	grp->lg_gldv3_polling = B_TRUE;
+
+	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
+		if (!mac_capab_get(port->lp_mh, MAC_CAPAB_HCKSUM,
+		    &grp->lg_hcksum_txflags)) {
+			grp->lg_hcksum_txflags = 0;
+		}
+
+		grp->lg_gldv3_polling &=
+		    mac_capab_get(port->lp_mh, MAC_CAPAB_POLL, NULL);
+	}
 }
 
+
 /*
- * Checks whether the capabilities of the ports being added are compatible
+ * Checks whether the capabilities of the port being added are compatible
  * with the current capabilities of the aggregation.
  */
 static boolean_t
 aggr_grp_capab_check(aggr_grp_t *grp, aggr_port_t *port)
 {
-	const mac_info_t *port_mi = mac_info(port->lp_mh);
-	uint32_t grp_cksum = grp->lg_mac.m_info.mi_cksum;
+	uint32_t	hcksum_txflags;
 
 	ASSERT(grp->lg_ports != NULL);
 
-	return (((grp_cksum & port_mi->mi_cksum) == grp_cksum) &&
-	    (grp->lg_mac.m_info.mi_poll == port_mi->mi_poll));
+	if (!mac_capab_get(port->lp_mh, MAC_CAPAB_HCKSUM, &hcksum_txflags)) {
+		if (grp->lg_hcksum_txflags != 0)
+			return (B_FALSE);
+	} else if ((hcksum_txflags & grp->lg_hcksum_txflags) !=
+	    grp->lg_hcksum_txflags) {
+		return (B_FALSE);
+	}
+
+	if (mac_capab_get(port->lp_mh, MAC_CAPAB_POLL, NULL) !=
+	    grp->lg_gldv3_polling) {
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
 }

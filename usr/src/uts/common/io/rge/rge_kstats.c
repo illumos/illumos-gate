@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,12 +196,11 @@ rge_fini_kstats(rge_t *rgep)
 		}
 }
 
-uint64_t
-rge_m_stat(void *arg, enum mac_stat stat)
+int
+rge_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	rge_t *rgep = arg;
 	rge_hw_stats_t *bstp;
-	uint64_t val = 0;
 
 	mutex_enter(rgep->genlock);
 	rge_hw_stats_dump(rgep);
@@ -211,167 +209,160 @@ rge_m_stat(void *arg, enum mac_stat stat)
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
-		val = rgep->param_link_speed * 1000000ull;
+		*val = rgep->param_link_speed * 1000000ull;
 		break;
 
 	case MAC_STAT_MULTIRCV:
-		val = RGE_BSWAP_32(bstp->multi_rcv);
+		*val = RGE_BSWAP_32(bstp->multi_rcv);
 		break;
 
 	case MAC_STAT_BRDCSTRCV:
-		val = RGE_BSWAP_64(bstp->brdcst_rcv);
+		*val = RGE_BSWAP_64(bstp->brdcst_rcv);
 		break;
 
 	case MAC_STAT_NORCVBUF:
-		val = RGE_BSWAP_16(bstp->in_discards);
+		*val = RGE_BSWAP_16(bstp->in_discards);
 		break;
 
 	case MAC_STAT_IERRORS:
-		val = RGE_BSWAP_32(bstp->rcv_err);
+		*val = RGE_BSWAP_32(bstp->rcv_err);
 		break;
 
 	case MAC_STAT_OERRORS:
-		val = RGE_BSWAP_64(bstp->xmt_err);
+		*val = RGE_BSWAP_64(bstp->xmt_err);
 		break;
 
 	case MAC_STAT_COLLISIONS:
-		val = RGE_BSWAP_32(bstp->xmt_1col + bstp->xmt_mcol);
+		*val = RGE_BSWAP_32(bstp->xmt_1col + bstp->xmt_mcol);
 		break;
 
 	case MAC_STAT_RBYTES:
-		val = rgep->stats.rbytes;
+		*val = rgep->stats.rbytes;
 		break;
 
 	case MAC_STAT_IPACKETS:
-		val = RGE_BSWAP_64(bstp->rcv_ok);
+		*val = RGE_BSWAP_64(bstp->rcv_ok);
 		break;
 
 	case MAC_STAT_OBYTES:
-		val = rgep->stats.obytes;
+		*val = rgep->stats.obytes;
 		break;
 
 	case MAC_STAT_OPACKETS:
-		val = RGE_BSWAP_64(bstp->xmt_ok);
+		*val = RGE_BSWAP_64(bstp->xmt_ok);
 		break;
 
-	case MAC_STAT_ALIGN_ERRORS:
-		val = RGE_BSWAP_16(bstp->frame_err);
+	case ETHER_STAT_ALIGN_ERRORS:
+		*val = RGE_BSWAP_16(bstp->frame_err);
 		break;
 
-	case MAC_STAT_FIRST_COLLISIONS:
-		val = RGE_BSWAP_32(bstp->xmt_1col);
+	case ETHER_STAT_FIRST_COLLISIONS:
+		*val = RGE_BSWAP_32(bstp->xmt_1col);
 		break;
 
-	case MAC_STAT_MULTI_COLLISIONS:
-		val = RGE_BSWAP_32(bstp->xmt_mcol);
+	case ETHER_STAT_MULTI_COLLISIONS:
+		*val = RGE_BSWAP_32(bstp->xmt_mcol);
 		break;
 
-	case MAC_STAT_DEFER_XMTS:
-		val = rgep->stats.defer;
+	case ETHER_STAT_DEFER_XMTS:
+		*val = rgep->stats.defer;
 		break;
 
-	case MAC_STAT_XCVR_ADDR:
-		val = rgep->phy_mii_addr;
+	case ETHER_STAT_XCVR_ADDR:
+		*val = rgep->phy_mii_addr;
 		break;
 
-	case MAC_STAT_XCVR_ID:
+	case ETHER_STAT_XCVR_ID:
 		mutex_enter(rgep->genlock);
-		val = rge_mii_get16(rgep, MII_PHYIDH);
-		val <<= 16;
-		val |= rge_mii_get16(rgep, MII_PHYIDL);
+		*val = rge_mii_get16(rgep, MII_PHYIDH);
+		*val <<= 16;
+		*val |= rge_mii_get16(rgep, MII_PHYIDL);
 		mutex_exit(rgep->genlock);
 		break;
 
-	case MAC_STAT_XCVR_INUSE:
-		val = XCVR_1000T;
+	case ETHER_STAT_XCVR_INUSE:
+		*val = XCVR_1000T;
 		break;
 
-	case MAC_STAT_CAP_1000FDX:
-		val = 1;
+	case ETHER_STAT_CAP_1000FDX:
+		*val = 1;
 		break;
 
-	case MAC_STAT_CAP_1000HDX:
-		val = 0;
+	case ETHER_STAT_CAP_1000HDX:
+		*val = 0;
 		break;
 
-	case MAC_STAT_CAP_100FDX:
-		val = 1;
+	case ETHER_STAT_CAP_100FDX:
+		*val = 1;
 		break;
 
-	case MAC_STAT_CAP_100HDX:
-		val = 1;
+	case ETHER_STAT_CAP_100HDX:
+		*val = 1;
 		break;
 
-	case MAC_STAT_CAP_10FDX:
-		val = 1;
+	case ETHER_STAT_CAP_10FDX:
+		*val = 1;
 		break;
 
-	case MAC_STAT_CAP_10HDX:
-		val = 1;
+	case ETHER_STAT_CAP_10HDX:
+		*val = 1;
 		break;
 
-	case MAC_STAT_CAP_ASMPAUSE:
-		val = 1;
+	case ETHER_STAT_CAP_ASMPAUSE:
+		*val = 1;
 		break;
 
-	case MAC_STAT_CAP_PAUSE:
-		val = 1;
+	case ETHER_STAT_CAP_PAUSE:
+		*val = 1;
 		break;
 
-	case MAC_STAT_CAP_AUTONEG:
-		val = 1;
+	case ETHER_STAT_CAP_AUTONEG:
+		*val = 1;
 		break;
 
-	case MAC_STAT_ADV_CAP_1000FDX:
-		val = rgep->param_adv_1000fdx;
+	case ETHER_STAT_ADV_CAP_1000FDX:
+		*val = rgep->param_adv_1000fdx;
 		break;
 
-	case MAC_STAT_ADV_CAP_1000HDX:
-		val = rgep->param_adv_1000hdx;
+	case ETHER_STAT_ADV_CAP_1000HDX:
+		*val = rgep->param_adv_1000hdx;
 		break;
 
-	case MAC_STAT_ADV_CAP_100FDX:
-		val = rgep->param_adv_100fdx;
+	case ETHER_STAT_ADV_CAP_100FDX:
+		*val = rgep->param_adv_100fdx;
 		break;
 
-	case MAC_STAT_ADV_CAP_100HDX:
-		val = rgep->param_adv_100hdx;
+	case ETHER_STAT_ADV_CAP_100HDX:
+		*val = rgep->param_adv_100hdx;
 		break;
 
-	case MAC_STAT_ADV_CAP_10FDX:
-		val = rgep->param_adv_10fdx;
+	case ETHER_STAT_ADV_CAP_10FDX:
+		*val = rgep->param_adv_10fdx;
 		break;
 
-	case MAC_STAT_ADV_CAP_10HDX:
-		val = rgep->param_adv_10hdx;
+	case ETHER_STAT_ADV_CAP_10HDX:
+		*val = rgep->param_adv_10hdx;
 		break;
 
-	case MAC_STAT_ADV_CAP_ASMPAUSE:
-		val = rgep->param_adv_asym_pause;
+	case ETHER_STAT_ADV_CAP_ASMPAUSE:
+		*val = rgep->param_adv_asym_pause;
 		break;
 
-	case MAC_STAT_ADV_CAP_PAUSE:
-		val = rgep->param_adv_pause;
+	case ETHER_STAT_ADV_CAP_PAUSE:
+		*val = rgep->param_adv_pause;
 		break;
 
-	case MAC_STAT_ADV_CAP_AUTONEG:
-		val = rgep->param_adv_autoneg;
+	case ETHER_STAT_ADV_CAP_AUTONEG:
+		*val = rgep->param_adv_autoneg;
 		break;
 
-	case MAC_STAT_LINK_DUPLEX:
-		val = rgep->param_link_duplex;
+	case ETHER_STAT_LINK_DUPLEX:
+		*val = rgep->param_link_duplex;
 		break;
 
-#ifdef	DEBUG
 	default:
-		/*
-		 * Shouldn't reach here...
-		 */
-		cmn_err(CE_PANIC,
-		    "rge_m_stat: unrecognized parameter value = %d",
-		    stat);
-#endif
+		return (ENOTSUP);
 	}
 
-	return (val);
+	return (0);
 }

@@ -81,7 +81,7 @@ xge_event(xge_queue_item_t *item)
 		if (lldev->is_initialized) {
 			if (__hal_channel_dtr_count(lldev->fifo_channel)
 			    >= XGELL_TX_LEVEL_HIGH) {
-				mac_tx_update(lldev->macp);
+				mac_tx_update(lldev->mh);
 				xge_debug_osdep(XGE_TRACE,
 				    "mac_tx_update happened!");
 			}

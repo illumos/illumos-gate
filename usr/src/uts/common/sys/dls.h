@@ -51,21 +51,7 @@ extern "C" {
 #define	DLS_INFO	"Data-Link Services v%I%"
 
 /*
- * Check the legality of a DLSAP value. The following values are allowed,
- * as specified by PSARC 2003/150:
- *
- * 0							802 semantics
- * ETHERTYPE_802_MIN (1536)..ETHERTYPE_MAX (65535)	ethertype semantics
- * 1..ETHERMTU (1500)					802 semantics, for
- *							DL_ETHER only.
- */
-#define	SAP_LEGAL(type, sap) \
-	(((sap) >= ETHERTYPE_802_MIN && (sap) < ETHERTYPE_MAX) || \
-	((sap) == 0) || \
-	((sap) <= ETHERMTU && (type) == DL_ETHER))
-
-/*
- * Macros for converting a ppa to an instance#, vlan ID, or minor.
+ * Macros for converting ppas to instance #s, Vlan ID, or minor.
  */
 #define	DLS_PPA2INST(ppa)	((int)((ppa) % 1000))
 #define	DLS_PPA2VID(ppa)	((uint16_t)((ppa) / 1000))
@@ -92,7 +78,7 @@ extern uint16_t		dls_vid(dls_channel_t);
 #define	DLS_SAP_LLC	0
 #define	DLS_SAP_PROMISC	(1 << 16)
 
-extern int	dls_bind(dls_channel_t, uint16_t);
+extern int	dls_bind(dls_channel_t, uint32_t);
 extern void	dls_unbind(dls_channel_t);
 
 #define	DLS_PROMISC_SAP		0x00000001
@@ -104,18 +90,9 @@ extern int	dls_promisc(dls_channel_t, uint32_t);
 extern int	dls_multicst_add(dls_channel_t, const uint8_t *);
 extern int	dls_multicst_remove(dls_channel_t, const uint8_t *);
 
-extern mblk_t	*dls_header(dls_channel_t, const uint8_t *, uint16_t, uint_t);
-
-typedef struct dls_header_info {
-	size_t		dhi_length;
-	const uint8_t	*dhi_daddr;
-	const uint8_t	*dhi_saddr;
-	uint16_t	dhi_ethertype;
-	uint16_t	dhi_vid;
-	boolean_t	dhi_isgroup;
-} dls_header_info_t;
-
-extern void	dls_header_info(dls_channel_t, mblk_t *, dls_header_info_t *);
+extern mblk_t	*dls_header(dls_channel_t, const uint8_t *, uint16_t, uint_t,
+    mblk_t *);
+extern int	dls_header_info(dls_channel_t, mblk_t *, mac_header_info_t *);
 
 typedef	void	(*dls_rx_t)(void *, mac_resource_handle_t, mblk_t *, size_t);
 

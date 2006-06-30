@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -359,7 +358,7 @@ drv_close(queue_t *rq)
 static void
 drv_ioc_attr(dld_ctl_str_t *ctls, mblk_t *mp)
 {
-	dld_ioc_attr_t *diap;
+	dld_ioc_attr_t	*diap;
 	dls_vlan_t	*dvp = NULL;
 	dls_link_t	*dlp = NULL;
 	int		err;
@@ -377,8 +376,7 @@ drv_ioc_attr(dld_ctl_str_t *ctls, mblk_t *mp)
 	}
 
 	dlp = dvp->dv_dlp;
-	(void) strlcpy(diap->dia_dev, dlp->dl_dev, MAXNAMELEN);
-	diap->dia_port = dlp->dl_port;
+	(void) strlcpy(diap->dia_dev, dlp->dl_name, sizeof (diap->dia_dev));
 	diap->dia_vid = dvp->dv_id;
 	diap->dia_max_sdu = dlp->dl_mip->mi_sdu_max;
 
@@ -424,8 +422,7 @@ drv_ioc_vlan_info(dls_vlan_t *dvp, void *arg)
 	 * passed buffer space is limited to 65536 bytes. So
 	 * copy only the vlans associated with the passed link.
 	 */
-	if (strcmp(dvp->dv_dlp->dl_dev, statep->divp->div_name) == 0 &&
-	    dvp->dv_dlp->dl_port == statep->divp->div_port &&
+	if (strcmp(dvp->dv_dlp->dl_name, statep->divp->div_name) == 0 &&
 	    dvp->dv_id != 0) {
 		if (statep->bytes_left < sizeof (dld_vlan_info_t))
 			return (ENOSPC);

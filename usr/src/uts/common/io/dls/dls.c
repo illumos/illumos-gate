@@ -106,164 +106,6 @@ i_dls_notify(void *arg, mac_notify_type_t type)
 	}
 }
 
-static mblk_t *
-i_dls_ether_header(dls_impl_t *dip, const uint8_t *daddr, uint16_t sap,
-    uint_t pri)
-{
-	struct ether_header		*ehp;
-	struct ether_vlan_header	*evhp;
-	const mac_info_t		*mip;
-	uint_t				addr_length;
-	uint16_t			vid;
-	mblk_t				*mp;
-
-	mip = dip->di_mip;
-	addr_length = mip->mi_addr_length;
-
-	/*
-	 * Check whether the DLSAP value is legal for ethernet.
-	 */
-	if (!SAP_LEGAL(mip->mi_media, sap))
-		return (NULL);
-
-	/*
-	 * If the interface is a VLAN interface then we need VLAN packet
-	 * headers.
-	 */
-	if ((vid = dip->di_dvp->dv_id) != VLAN_ID_NONE)
-		goto vlan;
-
-	/*
-	 * Allocate a normal ethernet packet header.
-	 */
-	if ((mp = allocb(sizeof (struct ether_header), BPRI_HI)) == NULL)
-		return (NULL);
-
-	/*
-	 * Copy in the given address as the destination, our current unicast
-	 * address as the source and the given sap as the type/length.
-	 */
-	ehp = (struct ether_header *)mp->b_rptr;
-	bcopy(daddr, &(ehp->ether_dhost), addr_length);
-	bcopy(dip->di_unicst_addr, &(ehp->ether_shost), addr_length);
-	ehp->ether_type = htons(sap);
-
-	mp->b_wptr += sizeof (struct ether_header);
-	return (mp);
-
-vlan:
-	/*
-	 * Allocate a VLAN ethernet packet header.
-	 */
-	if ((mp = allocb(sizeof (struct ether_vlan_header), BPRI_HI)) == NULL)
-		return (NULL);
-
-	/*
-	 * Copy in the given address as the destination, our current unicast
-	 * address as the source, the VLAN tpid and tci and the given sap as
-	 * the type/length.
-	 */
-	evhp = (struct ether_vlan_header *)mp->b_rptr;
-	bcopy(daddr, &(evhp->ether_dhost), addr_length);
-	bcopy(dip->di_unicst_addr, &(evhp->ether_shost), addr_length);
-	evhp->ether_tpid = htons(VLAN_TPID);
-	evhp->ether_tci = htons(VLAN_TCI(pri, ETHER_CFI, vid));
-	evhp->ether_type = htons(sap);
-
-	mp->b_wptr += sizeof (struct ether_vlan_header);
-	return (mp);
-}
-
-/*ARGSUSED*/
-static void
-i_dls_ether_header_info(dls_impl_t *dip, mblk_t *mp, dls_header_info_t *dhip)
-{
-	struct ether_header		*ehp;
-	struct ether_vlan_header	*evhp;
-	uint16_t			type_length;
-	uint16_t			tci;
-
-	ASSERT(MBLKL(mp) >= sizeof (struct ether_header));
-	ehp = (struct ether_header *)mp->b_rptr;
-
-	/*
-	 * Determine whether to parse a normal or VLAN ethernet header.
-	 */
-	if ((type_length = ntohs(ehp->ether_type)) == VLAN_TPID)
-		goto vlan;
-
-	/*
-	 * Specify the length of the header.
-	 */
-	dhip->dhi_length = sizeof (struct ether_header);
-
-	/*
-	 * Get the destination address.
-	 */
-	dhip->dhi_daddr = (const uint8_t *)&(ehp->ether_dhost);
-
-	/*
-	 * If the destination address was a group address then
-	 * dl_group_address field should be non-zero.
-	 */
-	dhip->dhi_isgroup = (dhip->dhi_daddr[0] & 0x01);
-
-	/*
-	 * Get the source address.
-	 */
-	dhip->dhi_saddr = (uint8_t *)&(ehp->ether_shost);
-
-	/*
-	 * Get the ethertype
-	 */
-	dhip->dhi_ethertype = type_length;
-
-	/*
-	 * The VLAN identifier must be VLAN_ID_NONE.
-	 */
-	dhip->dhi_vid = VLAN_ID_NONE;
-
-	return;
-
-vlan:
-	ASSERT(MBLKL(mp) >= sizeof (struct ether_vlan_header));
-	evhp = (struct ether_vlan_header *)mp->b_rptr;
-
-	/*
-	 * Specify the length of the header.
-	 */
-	dhip->dhi_length = sizeof (struct ether_vlan_header);
-
-	/*
-	 * Get the destination address.
-	 */
-	dhip->dhi_daddr = (const uint8_t *)&(evhp->ether_dhost);
-
-	/*
-	 * If the destination address was a group address then
-	 * dl_group_address field should be non-zero.
-	 */
-	dhip->dhi_isgroup = (dhip->dhi_daddr[0] & 0x01);
-
-	/*
-	 * Get the source address.
-	 */
-	dhip->dhi_saddr = (uint8_t *)&(evhp->ether_shost);
-
-	/*
-	 * Get the ethertype
-	 */
-	type_length = ntohs(evhp->ether_type);
-	dhip->dhi_ethertype = type_length;
-	ASSERT(dhip->dhi_ethertype != VLAN_TPID);
-
-	/*
-	 * Get the VLAN identifier.
-	 */
-	tci = ntohs(evhp->ether_tci);
-	dhip->dhi_vid = VLAN_ID(tci);
-}
-
 static void
 dls_stat_init()
 {
@@ -325,9 +167,9 @@ dls_fini(void)
  */
 
 int
-dls_create(const char *name, const char *dev, uint_t port)
+dls_create(const char *linkname, const char *macname, uint_t ddi_instance)
 {
-	return (dls_vlan_create(name, dev, port, 0));
+	return (dls_vlan_create(linkname, macname, ddi_instance, 0));
 }
 
 int
@@ -371,14 +213,6 @@ dls_open(const char *name, dls_channel_t *dcp)
 	 * Set the MAC transmit information.
 	 */
 	dip->di_txinfo = mac_tx_get(dip->di_mh);
-
-	/*
-	 * Set up packet header constructor and parser functions. (We currently
-	 * only support ethernet).
-	 */
-	ASSERT(dip->di_mip->mi_media == DL_ETHER);
-	dip->di_header = i_dls_ether_header;
-	dip->di_header_info = i_dls_ether_header_info;
 
 	/*
 	 * Add a notification function so that we get updates from the MAC.
@@ -427,10 +261,11 @@ dls_close(dls_channel_t dc)
 		rw_exit(&(dip->di_lock));
 		dls_link_remove(dlp, dip);
 		rw_enter(&(dip->di_lock), RW_WRITER);
-		dip->di_rx = NULL;
-		dip->di_rx_arg = NULL;
 		dip->di_bound = B_FALSE;
 	}
+
+	dip->di_rx = NULL;
+	dip->di_rx_arg = NULL;
 
 	/*
 	 * Walk the list of multicast addresses, disabling each at the MAC.
@@ -481,30 +316,29 @@ dls_close(dls_channel_t dc)
 mac_handle_t
 dls_mac(dls_channel_t dc)
 {
-	dls_impl_t	*dip = (dls_impl_t *)dc;
-
-	return (dip->di_mh);
+	return (((dls_impl_t *)dc)->di_mh);
 }
 
 uint16_t
 dls_vid(dls_channel_t dc)
 {
-	dls_impl_t	*dip = (dls_impl_t *)dc;
-
-	return (dip->di_dvp->dv_id);
+	return (((dls_impl_t *)dc)->di_dvp->dv_id);
 }
 
 int
-dls_bind(dls_channel_t dc, uint16_t sap)
+dls_bind(dls_channel_t dc, uint32_t sap)
 {
 	dls_impl_t	*dip = (dls_impl_t *)dc;
 	dls_link_t	*dlp;
+	uint32_t	dls_sap;
 
 	/*
 	 * Check to see the value is legal for the media type.
 	 */
-	if (!SAP_LEGAL(dip->di_mip->mi_media, sap))
+	if (!mac_sap_verify(dip->di_mh, sap, &dls_sap))
 		return (EINVAL);
+	if (dip->di_promisc & DLS_PROMISC_SAP)
+		dls_sap = DLS_SAP_PROMISC;
 
 	/*
 	 * Set up the dls_impl_t to mark it as able to receive packets.
@@ -523,9 +357,7 @@ dls_bind(dls_channel_t dc, uint16_t sap)
 	 *	 otherwise deadlock may ensue.
 	 */
 	dlp = dip->di_dvp->dv_dlp;
-	dls_link_add(dlp,
-	    (dip->di_promisc & DLS_PROMISC_SAP) ? DLS_SAP_PROMISC :
-	    (uint32_t)sap, dip);
+	dls_link_add(dlp, dls_sap, dip);
 
 	return (0);
 }
@@ -586,13 +418,16 @@ dls_promisc(dls_channel_t dc, uint32_t flags)
 	 */
 	if (!(flags & DLS_PROMISC_SAP) &&
 	    (dip->di_promisc & DLS_PROMISC_SAP)) {
+		uint32_t dls_sap;
+
 		dip->di_promisc &= ~DLS_PROMISC_SAP;
 		if (!dip->di_bound)
 			goto multi;
 
 		rw_exit(&(dip->di_lock));
 		dls_link_remove(dlp, dip);
-		dls_link_add(dlp, dip->di_sap, dip);
+		(void) mac_sap_verify(dip->di_mh, dip->di_sap, &dls_sap);
+		dls_link_add(dlp, dls_sap, dip);
 		rw_enter(&(dip->di_lock), RW_WRITER);
 	}
 
@@ -608,7 +443,7 @@ multi:
 	if (dlp->dl_npromisc == 0 &&
 	    (flags & (DLS_PROMISC_MULTI|DLS_PROMISC_PHYS))) {
 		ASSERT(dlp->dl_mth == NULL);
-		dlp->dl_mth = mac_txloop_add(dlp->dl_mh, dlp->dl_loopback, dlp);
+		dlp->dl_mth = mac_txloop_add(dlp->dl_mh, dlp->dl_txloop, dlp);
 	}
 
 	/*
@@ -766,19 +601,51 @@ done:
 }
 
 mblk_t *
-dls_header(dls_channel_t dc, const uint8_t *addr, uint16_t sap, uint_t pri)
+dls_header(dls_channel_t dc, const uint8_t *addr, uint16_t sap, uint_t pri,
+    mblk_t *payload)
 {
 	dls_impl_t	*dip = (dls_impl_t *)dc;
+	uint16_t	vid;
+	size_t		extra_len;
+	uint16_t	mac_sap;
+	mblk_t		*mp;
+	struct ether_vlan_header *evhp;
 
-	return (dip->di_header(dip, addr, sap, pri));
+	vid = dip->di_dvp->dv_id;
+	if (vid != VLAN_ID_NONE) {
+		/*
+		 * We know ahead of time that we'll need to fill in
+		 * additional VLAN information in the link-layer header.
+		 * We will tell the MAC layer to pre-allocate some space at
+		 * the end of the Ethernet header for us.
+		 */
+		ASSERT(dip->di_mip->mi_media == DL_ETHER);
+		extra_len = sizeof (struct ether_vlan_header) -
+		    sizeof (struct ether_header);
+		mac_sap = VLAN_TPID;
+	} else {
+		extra_len = 0;
+		mac_sap = sap;
+	}
+
+	mp = mac_header(dip->di_mh, addr, mac_sap, payload, extra_len);
+	if (vid == VLAN_ID_NONE || mp == NULL)
+		return (mp);
+
+	/* This is an Ethernet VLAN link.  Fill in the VLAN information */
+	ASSERT(MBLKL(mp) == sizeof (struct ether_header));
+	mp->b_wptr += extra_len;
+	evhp = (struct ether_vlan_header *)mp->b_rptr;
+	evhp->ether_tci = htons(VLAN_TCI(pri, ETHER_CFI, vid));
+	evhp->ether_type = htons(sap);
+	return (mp);
 }
 
-void
-dls_header_info(dls_channel_t dc, mblk_t *mp, dls_header_info_t *dhip)
+int
+dls_header_info(dls_channel_t dc, mblk_t *mp, mac_header_info_t *mhip)
 {
-	dls_impl_t	*dip = (dls_impl_t *)dc;
-
-	dip->di_header_info(dip, mp, dhip);
+	return (dls_link_header_info(((dls_impl_t *)dc)->di_dvp->dv_dlp,
+	    mp, mhip, NULL));
 }
 
 void
@@ -800,39 +667,12 @@ dls_tx(dls_channel_t dc, mblk_t *mp)
 	return (mtp->mt_fn(mtp->mt_arg, mp));
 }
 
-/*
- * Exported functions.
- */
-
-#define	ADDR_MATCH(_addr_a, _addr_b, _length, _match)			\
-	{								\
-		uint_t	i;						\
-									\
-		/*							\
-		 * Make sure the addresses are 16 bit aligned and that	\
-		 * the length is an even number of octets.		\
-		 */							\
-		ASSERT(IS_P2ALIGNED((_addr_a), sizeof (uint16_t)));	\
-		ASSERT(IS_P2ALIGNED((_addr_b), sizeof (uint16_t)));	\
-		ASSERT((_length & 1) == 0);				\
-									\
-		(_match) = B_TRUE;					\
-		for (i = 0; i < (_length) >> 1; i++) {			\
-			if (((uint16_t *)(_addr_a))[i] !=		\
-			    ((uint16_t *)(_addr_b))[i]) {		\
-				(_match) = B_FALSE;			\
-				break;					\
-			}						\
-		}							\
-	}
-
 boolean_t
-dls_accept(dls_impl_t *dip, const uint8_t *daddr, dls_rx_t *di_rx,
+dls_accept(dls_impl_t *dip, mac_header_info_t *mhip, dls_rx_t *di_rx,
     void **di_rx_arg)
 {
-	boolean_t		match;
 	dls_multicst_addr_t	*dmap;
-	uint_t			addr_length = dip->di_mip->mi_addr_length;
+	size_t			addr_length = dip->di_mip->mi_addr_length;
 
 	/*
 	 * We must not accept packets if the dls_impl_t is not marked as bound
@@ -848,43 +688,39 @@ dls_accept(dls_impl_t *dip, const uint8_t *daddr, dls_rx_t *di_rx,
 	if (dip->di_promisc & DLS_PROMISC_PHYS)
 		goto accept;
 
-	/*
-	 * Check to see if the destination address matches the dls_impl_t
-	 * unicast address.
-	 */
-	ADDR_MATCH(daddr, dip->di_unicst_addr, addr_length, match);
-	if (match)
-		goto accept;
-
-	/*
-	 * Check for a 'group' address. If it is not then refuse it since we
-	 * already know it does not match the unicast address.
-	 */
-	if (!(daddr[0] & 0x01))
-		goto refuse;
-
-	/*
-	 * If the address is broadcast then the dls_impl_t will always accept
-	 * it.
-	 */
-	ADDR_MATCH(daddr, dip->di_mip->mi_brdcst_addr, addr_length,
-	    match);
-	if (match)
-		goto accept;
-
-	/*
-	 * If a group address is not broadcast then it must be multicast so
-	 * check it against the list of addresses enabled for this dls_impl_t
-	 * or accept it unconditionally if the dls_impl_t is in 'all
-	 * multicast' mode.
-	 */
-	if (dip->di_promisc & DLS_PROMISC_MULTI)
-		goto accept;
-
-	for (dmap = dip->di_dmap; dmap != NULL; dmap = dmap->dma_nextp) {
-		ADDR_MATCH(daddr, dmap->dma_addr, addr_length, match);
-		if (match)
+	switch (mhip->mhi_dsttype) {
+	case MAC_ADDRTYPE_UNICAST:
+		/*
+		 * Check to see if the destination address matches the
+		 * dls_impl_t unicast address.
+		 */
+		if (memcmp(mhip->mhi_daddr, dip->di_unicst_addr, addr_length) ==
+		    0) {
 			goto accept;
+		}
+		break;
+	case MAC_ADDRTYPE_MULTICAST:
+		/*
+		 * Check the address against the list of addresses enabled
+		 * for this dls_impl_t or accept it unconditionally if the
+		 * dls_impl_t is in 'all multicast' mode.
+		 */
+		if (dip->di_promisc & DLS_PROMISC_MULTI)
+			goto accept;
+		for (dmap = dip->di_dmap; dmap != NULL;
+		    dmap = dmap->dma_nextp) {
+			if (memcmp(mhip->mhi_daddr, dmap->dma_addr,
+			    addr_length) == 0) {
+				goto accept;
+			}
+		}
+		break;
+	case MAC_ADDRTYPE_BROADCAST:
+		/*
+		 * If the address is broadcast then the dls_impl_t will
+		 * always accept it.
+		 */
+		goto accept;
 	}
 
 refuse:
@@ -902,10 +738,8 @@ accept:
 	return (B_TRUE);
 }
 
-/*ARGSUSED*/
 boolean_t
-dls_accept_loopback(dls_impl_t *dip, const uint8_t *daddr, dls_rx_t *di_rx,
-    void **di_rx_arg)
+dls_accept_loopback(dls_impl_t *dip, dls_rx_t *di_rx, void **di_rx_arg)
 {
 	/*
 	 * We must not accept packets if the dls_impl_t is not marked as bound

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,7 +108,6 @@ typedef union {
 /* one of the ports of a link aggregation group */
 typedef struct laioc_port {
 	char		lp_devname[MAXNAMELEN + 1];
-	uint_t		lp_port;
 } laioc_port_t;
 
 #define	LAIOC_CREATE		LAIOC(1)
@@ -168,7 +166,6 @@ typedef enum aggr_link_state {
 
 typedef struct laioc_info_port {
 	char		lp_devname[MAXNAMELEN + 1];
-	uint32_t	lp_port;
 	uchar_t		lp_mac[ETHERADDRL];
 	aggr_port_state_t lp_state;
 	aggr_lacp_state_t lp_lacp_state;

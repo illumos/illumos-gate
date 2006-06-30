@@ -63,6 +63,7 @@
 #include <sys/strsun.h>
 
 #include <sys/mac.h>
+#include <sys/mac_ether.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -251,15 +252,17 @@ typedef struct xgell_rx_buffer_pool_t {
 	spinlock_t		pool_lock;	/* buffer pool lock */
 } xgell_rx_buffer_pool_t;
 
+typedef struct xgelldev xgelldev_t;
+
 typedef struct xgell_ring_t {
 	xge_hal_channel_h	channelh;
-	mac_t			*macp;
+	xgelldev_t		*lldev;
 	mac_resource_handle_t	handle;		/* per ring cookie */
 } xgell_ring_t;
 
-typedef struct {
+struct xgelldev {
 	caddr_t			ndp;
-	mac_t			*macp;
+	mac_handle_t		mh;
 	int			instance;
 	dev_info_t		*dev_info;
 	xge_hal_device_h	devh;
@@ -274,7 +277,7 @@ typedef struct {
 	volatile int		in_reset;
 	timeout_id_t		timeout_id;
 	kmutex_t		genlock;
-} xgelldev_t;
+};
 
 typedef struct {
 	mblk_t			*mblk;

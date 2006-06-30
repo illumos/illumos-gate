@@ -366,8 +366,9 @@ typedef struct vsw_ctrl_task {
 /*
  * State of interface if switch plumbed as network device.
  */
-#define		VSW_IF_UP	0x1	/* Interface UP */
-#define		VSW_IF_PROMISC	0x2	/* Interface in promiscious mode */
+#define		VSW_IF_REG	0x1	/* interface was registered */
+#define		VSW_IF_UP	0x2	/* Interface UP */
+#define		VSW_IF_PROMISC	0x4	/* Interface in promiscious mode */
 
 #define		VSW_U_P(state)	\
 			(state == (VSW_IF_UP | VSW_IF_PROMISC))
@@ -420,8 +421,7 @@ typedef struct	vsw {
 	mdeg_handle_t		mdeg_hdl;
 
 	/* if configured as an ethernet interface */
-	mac_t			*if_macp;	/* MAC structure */
-	mac_resource_handle_t	if_mrh;
+	mac_handle_t		if_mh;		/* MAC handle */
 	struct ether_addr	if_addr;	/* interface address */
 	krwlock_t		if_lockrw;
 	uint8_t			if_state;	/* interface state */

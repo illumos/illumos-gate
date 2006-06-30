@@ -43,6 +43,7 @@
 #include <sys/strsun.h>
 #include <sys/note.h>
 #include <sys/mac.h>
+#include <sys/mac_ether.h>
 #include <sys/ldc.h>
 #include <sys/mach_descrip.h>
 #include <sys/mdeg.h>
@@ -61,18 +62,17 @@
  * Function prototypes.
  */
 /* vgen proxy entry points */
-int vgen_init(void *vnetp, dev_info_t *vnetdip, void *vnetmacp,
-	const uint8_t *macaddr, mac_t **vgenmacp);
+int vgen_init(void *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
+	mac_register_t **vgenmacp);
 void vgen_uninit(void *arg);
 static int vgen_start(void *arg);
 static void vgen_stop(void *arg);
 static mblk_t *vgen_tx(void *arg, mblk_t *mp);
-static void vgen_resources(void *arg);
 static int vgen_multicst(void *arg, boolean_t add,
 	const uint8_t *mca);
 static int vgen_promisc(void *arg, boolean_t on);
 static int vgen_unicst(void *arg, const uint8_t *mca);
-static uint64_t vgen_stat(void *arg, enum mac_stat stat);
+static int vgen_stat(void *arg, uint_t stat, uint64_t *val);
 static void vgen_ioctl(void *arg, queue_t *wq, mblk_t *mp);
 
 /* externs - functions provided by vnet to add/remove/modify entries in fdb */
@@ -81,6 +81,8 @@ void vnet_del_fdb(void *arg, uint8_t *macaddr);
 void vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg);
 void vnet_add_def_rte(void *arg, mac_tx_t m_tx, void *txarg);
 void vnet_del_def_rte(void *arg);
+void vnet_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp);
+void vnet_tx_update(void *arg);
 
 /* vgen internal functions */
 static void vgen_detach_ports(vgen_t *vgenp);
@@ -99,7 +101,7 @@ static int vgen_port_attach_mdeg(vgen_t *vgenp, int port_num, uint64_t *ldcids,
 static void vgen_port_detach_mdeg(vgen_port_t *portp);
 static int vgen_update_port(vgen_t *vgenp, md_t *curr_mdp,
 	mde_cookie_t curr_mdex, md_t *prev_mdp, mde_cookie_t prev_mdex);
-static uint64_t	vgen_port_stat(vgen_port_t *portp, enum mac_stat stat);
+static uint64_t	vgen_port_stat(vgen_port_t *portp, uint_t stat);
 
 static int vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id);
 static void vgen_ldc_detach(vgen_ldc_t *ldcp);
@@ -117,8 +119,7 @@ static int vgen_init_tbufs(vgen_ldc_t *ldcp);
 static void vgen_uninit_tbufs(vgen_ldc_t *ldcp);
 static void vgen_clobber_tbufs(vgen_ldc_t *ldcp);
 static void vgen_clobber_rxds(vgen_ldc_t *ldcp);
-static uint64_t	vgen_ldc_stat(vgen_ldc_t *ldcp, enum mac_stat stat);
-static void vgen_init_macp(vgen_t *vgenp, mac_t *macp);
+static uint64_t	vgen_ldc_stat(vgen_ldc_t *ldcp, uint_t stat);
 static uint_t vgen_ldc_cb(uint64_t event, caddr_t arg);
 static int vgen_portsend(vgen_port_t *portp, mblk_t *mp);
 static int vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp);
@@ -281,6 +282,20 @@ static mdeg_prop_spec_t vgen_prop_template[] = {
 
 static int vgen_mdeg_cb(void *cb_argp, mdeg_result_t *resp);
 
+static mac_callbacks_t vgen_m_callbacks = {
+	0,
+	vgen_stat,
+	vgen_start,
+	vgen_stop,
+	vgen_promisc,
+	vgen_multicst,
+	vgen_unicst,
+	vgen_tx,
+	NULL,
+	NULL,
+	NULL
+};
+
 /* externs */
 extern uint32_t vnet_ntxds;
 extern uint32_t vnet_reclaim_lowat;
@@ -362,18 +377,18 @@ vgen_ver_t dbg_vgen_versions[VGEN_NUM_VER] =
  * vgen_init() is called by an instance of vnet driver to initialize the
  * corresponding generic proxy transport layer. The arguments passed by vnet
  * are - an opaque pointer to the vnet instance, pointers to dev_info_t and
- * mac_t of the vnet device, mac address of the vnet device, and a pointer to
- * the mac_t of the generic transport is returned in the last argument.
+ * the mac address of the vnet device, and a pointer to mac_register_t of
+ * the generic transport is returned in the last argument.
  */
 int
-vgen_init(void *vnetp, dev_info_t *vnetdip, void *vnetmacp,
-	const uint8_t *macaddr, mac_t **vgenmacp)
+vgen_init(void *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
+    mac_register_t **vgenmacp)
 {
 	vgen_t *vgenp;
-	mac_t *macp;
+	mac_register_t *macp;
 	int instance;
 
-	if ((vnetp == NULL) || (vnetdip == NULL) ||(vnetmacp == NULL))
+	if ((vnetp == NULL) || (vnetdip == NULL))
 		return (DDI_FAILURE);
 
 	instance = ddi_get_instance(vnetdip);
@@ -384,8 +399,20 @@ vgen_init(void *vnetp, dev_info_t *vnetdip, void *vnetmacp,
 
 	vgenp->vnetp = vnetp;
 	vgenp->vnetdip = vnetdip;
-	vgenp->vnetmacp = vnetmacp;
 	bcopy(macaddr, &(vgenp->macaddr), ETHERADDRL);
+
+	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
+		KMEM_FREE(vgenp);
+		return (DDI_FAILURE);
+	}
+	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
+	macp->m_driver = vgenp;
+	macp->m_dip = vnetdip;
+	macp->m_src_addr = (uint8_t *)&(vgenp->macaddr);
+	macp->m_callbacks = &vgen_m_callbacks;
+	macp->m_min_sdu = 0;
+	macp->m_max_sdu = ETHERMTU;
+	vgenp->macp = macp;
 
 	/* allocate multicast table */
 	vgenp->mctab = kmem_zalloc(VGEN_INIT_MCTAB_SIZE *
@@ -400,15 +427,13 @@ vgen_init(void *vnetp, dev_info_t *vnetdip, void *vnetmacp,
 		mutex_destroy(&vgenp->lock);
 		kmem_free(vgenp->mctab, VGEN_INIT_MCTAB_SIZE *
 		    sizeof (struct ether_addr));
+		mac_free(vgenp->macp);
 		KMEM_FREE(vgenp);
 		return (DDI_FAILURE);
 	}
 
-	macp = &vgenp->vgenmac;
-	vgen_init_macp(vgenp, macp);
-
-	/* register mac_t of this vgen_t with vnet */
-	*vgenmacp = macp;
+	/* register macp of this vgen_t with vnet */
+	*vgenmacp = vgenp->macp;
 
 	DBG1((vnetp, "vgen_init: exit vnet_instance(%d)\n", instance));
 	return (DDI_SUCCESS);
@@ -444,6 +469,8 @@ vgen_uninit(void *arg)
 	/* free multicast table */
 	kmem_free(vgenp->mctab, vgenp->mcsize * sizeof (struct ether_addr));
 
+	mac_free(vgenp->macp);
+
 	mutex_exit(&vgenp->lock);
 
 	mutex_destroy(&vgenp->lock);
@@ -454,7 +481,7 @@ vgen_uninit(void *arg)
 }
 
 /* enable transmit/receive for the device */
-static int
+int
 vgen_start(void *arg)
 {
 	vgen_t		*vgenp = (vgen_t *)arg;
@@ -471,7 +498,7 @@ vgen_start(void *arg)
 }
 
 /* stop transmit/receive */
-static void
+void
 vgen_stop(void *arg)
 {
 	vgen_t		*vgenp = (vgen_t *)arg;
@@ -678,7 +705,7 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 	txdp->nbytes = size;
 	txdp->ncookies = tbufp->ncookies;
 	bcopy((tbufp->memcookie), (txdp->memcookie),
-		tbufp->ncookies * sizeof (ldc_mem_cookie_t));
+	    tbufp->ncookies * sizeof (ldc_mem_cookie_t));
 
 	/* send dring datamsg to the peer */
 	start = end = i;
@@ -721,28 +748,8 @@ vgen_tx_exit:
 	return (VGEN_TX_SUCCESS);
 }
 
-/* register resources */
-static void
-vgen_resources(void *arg)
-{
-	vgen_t *vgenp;
-	mac_rx_fifo_t mrf;
-
-	vgenp = (vgen_t *)arg;
-	DBG1((vgenp->vnetp, "vgen_resources: enter\n"));
-
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = NULL;
-	mrf.mrf_arg = NULL;
-	mrf.mrf_normal_blank_time = 0;
-	mrf.mrf_normal_pkt_count = 0;
-	vgenp->mrh = mac_resource_add(vgenp->vnetmacp, (mac_resource_t *)&mrf);
-
-	DBG1((vgenp->vnetp, "vgen_resources: exit\n"));
-}
-
 /* enable/disable a multicast address */
-static int
+int
 vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 {
 	vgen_t			*vgenp;
@@ -884,26 +891,25 @@ vgen_unicst(void *arg, const uint8_t *mca)
 }
 
 /* get device statistics */
-static uint64_t
-vgen_stat(void *arg, enum mac_stat stat)
+int
+vgen_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	vgen_t		*vgenp = (vgen_t *)arg;
 	vgen_port_t	*portp;
 	vgen_portlist_t	*plistp;
-	uint64_t val;
 
-	val = 0;
+	*val = 0;
 
 	plistp = &(vgenp->vgenports);
 	READ_ENTER(&plistp->rwlock);
 
 	for (portp = plistp->headp; portp != NULL; portp = portp->nextp) {
-			val += vgen_port_stat(portp, stat);
+		*val += vgen_port_stat(portp, stat);
 	}
 
 	RW_EXIT(&plistp->rwlock);
 
-	return (val);
+	return (0);
 }
 
 static void
@@ -1492,7 +1498,7 @@ vgen_update_port(vgen_t *vgenp, md_t *curr_mdp, mde_cookie_t curr_mdex,
 }
 
 static uint64_t
-vgen_port_stat(vgen_port_t *portp, enum mac_stat stat)
+vgen_port_stat(vgen_port_t *portp, uint_t stat)
 {
 	vgen_ldclist_t	*ldclp;
 	vgen_ldc_t *ldcp;
@@ -1983,13 +1989,13 @@ vgen_init_tbufs(vgen_ldc_t *ldcp)
 		tbufp->datap = datap;
 
 		if ((ncookies == 0) ||
-			(ncookies > (uint64_t)MAX_COOKIES)) {
+		    (ncookies > (uint64_t)MAX_COOKIES)) {
 			goto init_tbufs_failed;
 		}
 
 		for (ci = 1; ci < ncookies; ci++) {
 			rv = ldc_mem_nextcookie(tbufp->memhandle,
-				&(tbufp->memcookie[ci]));
+			    &(tbufp->memcookie[ci]));
 			if (rv != 0) {
 				goto init_tbufs_failed;
 			}
@@ -2156,7 +2162,7 @@ vgen_init_rxds(vgen_ldc_t *ldcp, uint32_t num_desc, uint32_t desc_size,
 
 /* get channel statistics */
 static uint64_t
-vgen_ldc_stat(vgen_ldc_t *ldcp, enum mac_stat stat)
+vgen_ldc_stat(vgen_ldc_t *ldcp, uint_t stat)
 {
 	vgen_stats_t *statsp;
 	uint64_t val;
@@ -2218,71 +2224,56 @@ vgen_ldc_stat(vgen_ldc_t *ldcp, enum mac_stat stat)
 
 	/* stats not relevant to ldc, return 0 */
 	case MAC_STAT_IFSPEED:
-	case MAC_STAT_ALIGN_ERRORS:
-	case MAC_STAT_FCS_ERRORS:
-	case MAC_STAT_FIRST_COLLISIONS:
-	case MAC_STAT_MULTI_COLLISIONS:
-	case MAC_STAT_DEFER_XMTS:
-	case MAC_STAT_TX_LATE_COLLISIONS:
-	case MAC_STAT_EX_COLLISIONS:
-	case MAC_STAT_MACXMT_ERRORS:
-	case MAC_STAT_CARRIER_ERRORS:
-	case MAC_STAT_TOOLONG_ERRORS:
-	case MAC_STAT_XCVR_ADDR:
-	case MAC_STAT_XCVR_ID:
-	case MAC_STAT_XCVR_INUSE:
-	case MAC_STAT_CAP_1000FDX:
-	case MAC_STAT_CAP_1000HDX:
-	case MAC_STAT_CAP_100FDX:
-	case MAC_STAT_CAP_100HDX:
-	case MAC_STAT_CAP_10FDX:
-	case MAC_STAT_CAP_10HDX:
-	case MAC_STAT_CAP_ASMPAUSE:
-	case MAC_STAT_CAP_PAUSE:
-	case MAC_STAT_CAP_AUTONEG:
-	case MAC_STAT_ADV_CAP_1000FDX:
-	case MAC_STAT_ADV_CAP_1000HDX:
-	case MAC_STAT_ADV_CAP_100FDX:
-	case MAC_STAT_ADV_CAP_100HDX:
-	case MAC_STAT_ADV_CAP_10FDX:
-	case MAC_STAT_ADV_CAP_10HDX:
-	case MAC_STAT_ADV_CAP_ASMPAUSE:
-	case MAC_STAT_ADV_CAP_PAUSE:
-	case MAC_STAT_ADV_CAP_AUTONEG:
-	case MAC_STAT_LP_CAP_1000FDX:
-	case MAC_STAT_LP_CAP_1000HDX:
-	case MAC_STAT_LP_CAP_100FDX:
-	case MAC_STAT_LP_CAP_100HDX:
-	case MAC_STAT_LP_CAP_10FDX:
-	case MAC_STAT_LP_CAP_10HDX:
-	case MAC_STAT_LP_CAP_ASMPAUSE:
-	case MAC_STAT_LP_CAP_PAUSE:
-	case MAC_STAT_LP_CAP_AUTONEG:
-	case MAC_STAT_LINK_ASMPAUSE:
-	case MAC_STAT_LINK_PAUSE:
-	case MAC_STAT_LINK_AUTONEG:
-	case MAC_STAT_LINK_DUPLEX:
+	case ETHER_STAT_ALIGN_ERRORS:
+	case ETHER_STAT_FCS_ERRORS:
+	case ETHER_STAT_FIRST_COLLISIONS:
+	case ETHER_STAT_MULTI_COLLISIONS:
+	case ETHER_STAT_DEFER_XMTS:
+	case ETHER_STAT_TX_LATE_COLLISIONS:
+	case ETHER_STAT_EX_COLLISIONS:
+	case ETHER_STAT_MACXMT_ERRORS:
+	case ETHER_STAT_CARRIER_ERRORS:
+	case ETHER_STAT_TOOLONG_ERRORS:
+	case ETHER_STAT_XCVR_ADDR:
+	case ETHER_STAT_XCVR_ID:
+	case ETHER_STAT_XCVR_INUSE:
+	case ETHER_STAT_CAP_1000FDX:
+	case ETHER_STAT_CAP_1000HDX:
+	case ETHER_STAT_CAP_100FDX:
+	case ETHER_STAT_CAP_100HDX:
+	case ETHER_STAT_CAP_10FDX:
+	case ETHER_STAT_CAP_10HDX:
+	case ETHER_STAT_CAP_ASMPAUSE:
+	case ETHER_STAT_CAP_PAUSE:
+	case ETHER_STAT_CAP_AUTONEG:
+	case ETHER_STAT_ADV_CAP_1000FDX:
+	case ETHER_STAT_ADV_CAP_1000HDX:
+	case ETHER_STAT_ADV_CAP_100FDX:
+	case ETHER_STAT_ADV_CAP_100HDX:
+	case ETHER_STAT_ADV_CAP_10FDX:
+	case ETHER_STAT_ADV_CAP_10HDX:
+	case ETHER_STAT_ADV_CAP_ASMPAUSE:
+	case ETHER_STAT_ADV_CAP_PAUSE:
+	case ETHER_STAT_ADV_CAP_AUTONEG:
+	case ETHER_STAT_LP_CAP_1000FDX:
+	case ETHER_STAT_LP_CAP_1000HDX:
+	case ETHER_STAT_LP_CAP_100FDX:
+	case ETHER_STAT_LP_CAP_100HDX:
+	case ETHER_STAT_LP_CAP_10FDX:
+	case ETHER_STAT_LP_CAP_10HDX:
+	case ETHER_STAT_LP_CAP_ASMPAUSE:
+	case ETHER_STAT_LP_CAP_PAUSE:
+	case ETHER_STAT_LP_CAP_AUTONEG:
+	case ETHER_STAT_LINK_ASMPAUSE:
+	case ETHER_STAT_LINK_PAUSE:
+	case ETHER_STAT_LINK_AUTONEG:
+	case ETHER_STAT_LINK_DUPLEX:
 	default:
 		val = 0;
 		break;
 
 	}
 	return (val);
-}
-
-static void
-vgen_init_macp(vgen_t *vgenp, mac_t *macp)
-{
-	macp->m_driver = (void *)vgenp;
-	macp->m_start = vgen_start;
-	macp->m_stop = vgen_stop;
-	macp->m_tx = vgen_tx;
-	macp->m_resources = vgen_resources;
-	macp->m_multicst = vgen_multicst;
-	macp->m_promisc = vgen_promisc;
-	macp->m_unicst = vgen_unicst;
-	macp->m_stat = vgen_stat;
-	macp->m_ioctl = vgen_ioctl;
 }
 
 /* Interrupt handler for the channel */
@@ -2480,7 +2471,7 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 		mp->b_next = mp->b_prev = NULL;
 		DBG2((vnetp, "vgen_ldc_cb: id(%lx) rx pkt len (%lx)\n",
 		    ldcp->ldc_id, MBLKL(mp)));
-		mac_rx((mac_t *)vgenp->vnetmacp, vgenp->mrh, mp);
+		vnet_rx(vgenp->vnetp, NULL, mp);
 	}
 	DBG1((vnetp, "vgen_ldc_cb exit: ldcid (%lx)\n", ldcp->ldc_id));
 
@@ -4396,7 +4387,7 @@ vgen_reclaim_dring(vgen_ldc_t *ldcp)
 	if (ldcp->need_resched) {
 		ldcp->need_resched = B_FALSE;
 #ifdef VGEN_USE_MAC_TX_UPDATE
-		mac_tx_update(vgenp->vnetmacp);
+		vnet_tx_update(vgenp->vnetp);
 #endif
 	}
 }
@@ -4484,7 +4475,7 @@ vgen_ldc_watchdog(void *arg)
 		if (ldcp->need_resched) {
 			ldcp->need_resched = B_FALSE;
 #ifdef VGEN_USE_MAC_TX_UPDATE
-			mac_tx_update(ldcp->vgenp->vnetmacp);
+			vnet_tx_update(ldcp->vgenp->vnetp);
 #endif
 		}
 	}

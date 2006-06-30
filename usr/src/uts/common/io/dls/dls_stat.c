@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,31 +39,25 @@
 #include <sys/dls.h>
 #include <sys/dls_impl.h>
 
-typedef struct i_dls_stat_info_s {
-	enum mac_stat	dsi_stat;
-	char		*dsi_name;
-	uint_t		dsi_type;
-} i_mac_stat_info_t;
-
-static i_mac_stat_info_t	i_dls_si[] = {
-	{ MAC_STAT_IFSPEED, "ifspeed", KSTAT_DATA_UINT64 },
-	{ MAC_STAT_MULTIRCV, "multircv", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_BRDCSTRCV, "brdcstrcv", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_MULTIXMT, "multixmt", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_BRDCSTXMT, "brdcstxmt", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_NORCVBUF, "norcvbuf", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_IERRORS, "ierrors", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_NOXMTBUF, "noxmtbuf", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_OERRORS, "oerrors", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_COLLISIONS, "collisions", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_RBYTES, "rbytes", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_IPACKETS, "ipackets", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_OBYTES, "obytes", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_OPACKETS, "opackets", KSTAT_DATA_UINT32 },
-	{ MAC_STAT_RBYTES, "rbytes64", KSTAT_DATA_UINT64 },
-	{ MAC_STAT_IPACKETS, "ipackets64", KSTAT_DATA_UINT64 },
-	{ MAC_STAT_OBYTES, "obytes64", KSTAT_DATA_UINT64 },
-	{ MAC_STAT_OPACKETS, "opackets64", KSTAT_DATA_UINT64 }
+static mac_stat_info_t	i_dls_si[] = {
+	{ MAC_STAT_IFSPEED, "ifspeed", KSTAT_DATA_UINT64, 0 },
+	{ MAC_STAT_MULTIRCV, "multircv", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_BRDCSTRCV, "brdcstrcv", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_MULTIXMT, "multixmt", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_BRDCSTXMT, "brdcstxmt", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_NORCVBUF, "norcvbuf", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_IERRORS, "ierrors", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_NOXMTBUF, "noxmtbuf", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_OERRORS, "oerrors", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_COLLISIONS, "collisions", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_RBYTES, "rbytes", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_IPACKETS, "ipackets", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_OBYTES, "obytes", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_OPACKETS, "opackets", KSTAT_DATA_UINT32, 0 },
+	{ MAC_STAT_RBYTES, "rbytes64", KSTAT_DATA_UINT64, 0 },
+	{ MAC_STAT_IPACKETS, "ipackets64", KSTAT_DATA_UINT64, 0 },
+	{ MAC_STAT_OBYTES, "obytes64", KSTAT_DATA_UINT64, 0 },
+	{ MAC_STAT_OPACKETS, "opackets64", KSTAT_DATA_UINT64, 0 }
 };
 
 #define	STAT_INFO_COUNT	(sizeof (i_dls_si) / sizeof (i_dls_si[0]))
@@ -91,12 +84,9 @@ i_dls_stat_update(kstat_t *ksp, int rw)
 
 	knp = (kstat_named_t *)ksp->ks_data;
 	for (i = 0; i < STAT_INFO_COUNT; i++) {
-		if (!(dlp->dl_mip->mi_stat[i_dls_si[i].dsi_stat]))
-			continue;
+		val = mac_stat_get(dlp->dl_mh, i_dls_si[i].msi_stat);
 
-		val = mac_stat_get(dlp->dl_mh, i_dls_si[i].dsi_stat);
-
-		switch (i_dls_si[i].dsi_type) {
+		switch (i_dls_si[i].msi_type) {
 		case KSTAT_DATA_UINT64:
 			knp->value.ui64 = val;
 			break;
@@ -129,23 +119,16 @@ dls_mac_stat_create(dls_vlan_t *dvp)
 	kstat_t			*ksp;
 	kstat_named_t		*knp;
 	uint_t			i;
-	uint_t			count;
 	int			err;
 
 	if (dls_mac_hold(dlp) != 0)
 		return;
 
-	count = 0;
-	for (i = 0; i < STAT_INFO_COUNT; i++) {
-		if (dlp->dl_mip->mi_stat[i_dls_si[i].dsi_stat])
-			count++;
-	}
-
 	err = ddi_parse(dvp->dv_name, module, &instance);
 	ASSERT(err == DDI_SUCCESS);
 
 	if ((ksp = kstat_create(module, instance, NULL, "net",
-	    KSTAT_TYPE_NAMED, count + 1, 0)) == NULL)
+	    KSTAT_TYPE_NAMED, STAT_INFO_COUNT + 1, 0)) == NULL)
 		goto done;
 
 	ksp->ks_update = i_dls_stat_update;
@@ -154,15 +137,10 @@ dls_mac_stat_create(dls_vlan_t *dvp)
 
 	knp = (kstat_named_t *)ksp->ks_data;
 	for (i = 0; i < STAT_INFO_COUNT; i++) {
-		if (!(dlp->dl_mip->mi_stat[i_dls_si[i].dsi_stat]))
-			continue;
-
-		kstat_named_init(knp, i_dls_si[i].dsi_name,
-		    i_dls_si[i].dsi_type);
+		kstat_named_init(knp, i_dls_si[i].msi_name,
+		    i_dls_si[i].msi_type);
 		knp++;
-		--count;
 	}
-	ASSERT(count == 0);
 
 	kstat_named_init(knp, "unknowns", KSTAT_DATA_UINT32);
 

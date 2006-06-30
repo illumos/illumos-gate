@@ -155,8 +155,8 @@ struct dld_str {
 	/*
 	 * Cached MAC unicast addresses.
 	 */
-	uint8_t			ds_fact_addr[MAXADDRLEN];
-	uint8_t			ds_curr_addr[MAXADDRLEN];
+	uint8_t			ds_fact_addr[MAXMACADDRLEN];
+	uint8_t			ds_curr_addr[MAXMACADDRLEN];
 
 	/*
 	 * Mode: unitdata, fast-path or raw.
@@ -249,7 +249,6 @@ extern uint32_t		dld_opt;
  */
 
 #define	IMPLY(p, c)	(!(p) || (c))
-#define	AGGR_DEV	"aggr0"
 
 #define	DLD_ENTER(dsp) {					\
 	mutex_enter(&dsp->ds_thr_lock);				\

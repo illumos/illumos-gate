@@ -41,6 +41,7 @@
 #include <sys/dlpi.h>
 #include <net/if.h>
 #include <sys/mac.h>
+#include <sys/mac_ether.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/strsun.h>
@@ -57,14 +58,12 @@ static int vnetattach(dev_info_t *, ddi_attach_cmd_t);
 static int vnetdetach(dev_info_t *, ddi_detach_cmd_t);
 
 /* MAC entrypoints  */
-static uint64_t vnet_m_stat(void *arg, enum mac_stat stat);
+static int vnet_m_stat(void *, uint_t, uint64_t *);
 static int vnet_m_start(void *);
 static void vnet_m_stop(void *);
 static int vnet_m_promisc(void *, boolean_t);
 static int vnet_m_multicst(void *, boolean_t, const uint8_t *);
 static int vnet_m_unicst(void *, const uint8_t *);
-static void vnet_m_resources(void *);
-static void vnet_m_ioctl(void *, queue_t *, mblk_t *);
 mblk_t *vnet_m_tx(void *, mblk_t *);
 
 /* vnet internal functions */
@@ -81,11 +80,27 @@ void vnet_del_fdb(void *arg, uint8_t *macaddr);
 void vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg);
 void vnet_add_def_rte(void *arg, mac_tx_t m_tx, void *txarg);
 void vnet_del_def_rte(void *arg);
+void vnet_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp);
+void vnet_tx_update(void *arg);
 
 /* externs */
-extern int vgen_init(void *vnetp, dev_info_t *vnetdip, void *vnetmacp,
-	const uint8_t *macaddr, mac_t **vgenmacp);
+extern int vgen_init(void *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
+	mac_register_t **vgenmacp);
 extern void vgen_uninit(void *arg);
+
+static mac_callbacks_t vnet_m_callbacks = {
+	0,
+	vnet_m_stat,
+	vnet_m_start,
+	vnet_m_stop,
+	vnet_m_promisc,
+	vnet_m_multicst,
+	vnet_m_unicst,
+	vnet_m_tx,
+	NULL,
+	NULL,
+	NULL
+};
 
 /*
  * Linked list of "vnet_t" structures - one per instance.
@@ -106,18 +121,6 @@ uint32_t vnet_nfdb_hash = VNET_NFDB_HASH;	/* size of fdb hash table */
  * Property names
  */
 static char macaddr_propname[] = "local-mac-address";
-
-static struct ether_addr etherbroadcastaddr = {
-	0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-};
-
-/*
- * MIB II broadcast/multicast packets
- */
-#define	IS_BROADCAST(ehp) \
-		(ether_cmp(&ehp->ether_dhost, &etherbroadcastaddr) == 0)
-#define	IS_MULTICAST(ehp) \
-		((ehp->ether_dhost.ether_addr_octet[0] & 01) == 1)
 
 /*
  * This is the string displayed by modinfo(1m).
@@ -288,17 +291,15 @@ _info(struct modinfo *modinfop)
 static int
 vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	mac_t		*macp;
 	vnet_t		*vnetp;
 	vp_tl_t		*vp_tlp;
 	int		instance;
 	int		status;
 	enum		{ AST_init = 0x0, AST_vnet_alloc = 0x1,
-			    AST_mac_alloc = 0x2, AST_read_macaddr = 0x4,
-			    AST_vgen_init = 0x8, AST_vptl_alloc = 0x10,
-			    AST_fdbh_alloc = 0x20 }
+			    AST_read_macaddr = 0x2, AST_vgen_init = 0x4,
+			    AST_vptl_alloc = 0x8, AST_fdbh_alloc = 0x10 }
 			attach_state;
-	mac_t		*vgenmacp = NULL;
+	mac_register_t	*vgenmacp = NULL;
 	uint32_t	nfdbh = 0;
 
 	attach_state = AST_init;
@@ -319,14 +320,9 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vnetp = kmem_zalloc(sizeof (vnet_t), KM_SLEEP);
 	attach_state |= AST_vnet_alloc;
 
-	macp = kmem_zalloc(sizeof (mac_t), KM_SLEEP);
-	attach_state |= AST_mac_alloc;
-
 	/* setup links to vnet_t from both devinfo and mac_t */
 	ddi_set_driver_private(dip, (caddr_t)vnetp);
-	macp->m_driver = vnetp;
 	vnetp->dip = dip;
-	vnetp->macp = macp;
 	vnetp->instance = instance;
 
 	/* read the mac address */
@@ -349,8 +345,8 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * will use hardware specific driver to communicate directly over the
 	 * physical device to reach remote hosts without going through vswitch.
 	 */
-	status = vgen_init(vnetp, vnetp->dip, vnetp->macp,
-	    (uint8_t *)vnetp->curr_macaddr, &vgenmacp);
+	status = vgen_init(vnetp, vnetp->dip, (uint8_t *)vnetp->curr_macaddr,
+	    &vgenmacp);
 	if (status != DDI_SUCCESS) {
 		DERR((vnetp, "vgen_init() failed\n"));
 		goto vnet_attach_fail;
@@ -406,9 +402,6 @@ vnet_attach_fail:
 	if (attach_state & AST_vgen_init) {
 		vgen_uninit(vgenmacp->m_driver);
 	}
-	if (attach_state & AST_mac_alloc) {
-		KMEM_FREE(macp);
-	}
 	if (attach_state & AST_vnet_alloc) {
 		KMEM_FREE(vnetp);
 	}
@@ -448,7 +441,7 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * particular if there are DLPI style-2 streams still open -
 	 * in which case we just return failure.
 	 */
-	if (mac_unregister(vnetp->macp) != 0)
+	if (mac_unregister(vnetp->mh) != 0)
 		goto vnet_detach_fail;
 
 	/* unlink from instance(vnet_t) list */
@@ -472,7 +465,6 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 	RW_EXIT(&vnetp->trwlock);
 
-	KMEM_FREE(vnetp->macp);
 	KMEM_FREE(vnetp);
 
 	return (DDI_SUCCESS);
@@ -487,7 +479,8 @@ vnet_m_start(void *arg)
 {
 	vnet_t		*vnetp = arg;
 	vp_tl_t		*vp_tlp;
-	mac_t		*vp_macp;
+	mac_register_t	*vp_macp;
+	mac_callbacks_t	*cbp;
 
 	DBG1((vnetp, "vnet_m_start: enter\n"));
 
@@ -504,7 +497,8 @@ vnet_m_start(void *arg)
 	WRITE_ENTER(&vnetp->trwlock);
 	for (vp_tlp = vnetp->tlp; vp_tlp != NULL; vp_tlp = vp_tlp->nextp) {
 		vp_macp = vp_tlp->macp;
-		vp_macp->m_start(vp_macp->m_driver);
+		cbp = vp_macp->m_callbacks;
+		cbp->mc_start(vp_macp->m_driver);
 	}
 	RW_EXIT(&vnetp->trwlock);
 
@@ -519,14 +513,16 @@ vnet_m_stop(void *arg)
 {
 	vnet_t		*vnetp = arg;
 	vp_tl_t		*vp_tlp;
-	mac_t		*vp_macp;
+	mac_register_t	*vp_macp;
+	mac_callbacks_t	*cbp;
 
 	DBG1((vnetp, "vnet_m_stop: enter\n"));
 
 	WRITE_ENTER(&vnetp->trwlock);
 	for (vp_tlp = vnetp->tlp; vp_tlp != NULL; vp_tlp = vp_tlp->nextp) {
 		vp_macp = vp_tlp->macp;
-		vp_macp->m_stop(vp_macp->m_driver);
+		cbp = vp_macp->m_callbacks;
+		cbp->mc_stop(vp_macp->m_driver);
 	}
 	RW_EXIT(&vnetp->trwlock);
 
@@ -558,7 +554,8 @@ vnet_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 
 	vnet_t *vnetp = arg;
 	vp_tl_t		*vp_tlp;
-	mac_t		*vp_macp;
+	mac_register_t	*vp_macp;
+	mac_callbacks_t	*cbp;
 	int rv = VNET_SUCCESS;
 
 	DBG1((vnetp, "vnet_m_multicst: enter\n"));
@@ -566,7 +563,8 @@ vnet_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	for (vp_tlp = vnetp->tlp; vp_tlp != NULL; vp_tlp = vp_tlp->nextp) {
 		if (strcmp(vnetp->vgen_name, vp_tlp->name) == 0) {
 			vp_macp = vp_tlp->macp;
-			rv = vp_macp->m_multicst(vp_macp->m_driver, add, mca);
+			cbp = vp_macp->m_callbacks;
+			rv = cbp->mc_multicst(vp_macp->m_driver, add, mca);
 			break;
 		}
 	}
@@ -673,123 +671,65 @@ vnet_m_tx(void *arg, mblk_t *mp)
 	return (mp);
 }
 
-/* register resources with mac layer */
-static void
-vnet_m_resources(void *arg)
-{
-	vnet_t *vnetp = arg;
-	vp_tl_t	*vp_tlp;
-	mac_t	*vp_macp;
-
-	DBG1((vnetp, "vnet_m_resources: enter\n"));
-
-	WRITE_ENTER(&vnetp->trwlock);
-	for (vp_tlp = vnetp->tlp; vp_tlp != NULL; vp_tlp = vp_tlp->nextp) {
-		vp_macp = vp_tlp->macp;
-		vp_macp->m_resources(vp_macp->m_driver);
-	}
-	RW_EXIT(&vnetp->trwlock);
-
-	DBG1((vnetp, "vnet_m_resources: exit\n"));
-}
-
-/*
- * vnet specific ioctls
- */
-static void
-vnet_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
-{
-	vnet_t *vnetp = (vnet_t *)arg;
-	struct iocblk *iocp;
-	int cmd;
-
-	DBG1((vnetp, "vnet_m_ioctl: enter\n"));
-
-	iocp = (struct iocblk *)mp->b_rptr;
-	iocp->ioc_error = 0;
-	cmd = iocp->ioc_cmd;
-	switch (cmd) {
-	default:
-		miocnak(wq, mp, 0, EINVAL);
-		break;
-	}
-	DBG1((vnetp, "vnet_m_ioctl: exit\n"));
-}
-
 /* get statistics from the device */
-uint64_t
-vnet_m_stat(void *arg, enum mac_stat stat)
+int
+vnet_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	vnet_t *vnetp = arg;
 	vp_tl_t	*vp_tlp;
-	mac_t	*vp_macp;
-	uint64_t val = 0;
+	mac_register_t	*vp_macp;
+	mac_callbacks_t	*cbp;
+	uint64_t val_total = 0;
 
 	DBG1((vnetp, "vnet_m_stat: enter\n"));
 
 	/*
-	 * get the specified statistic from each transport
-	 * and return the aggregate val
+	 * get the specified statistic from each transport and return the
+	 * aggregate val.  This obviously only works for counters.
 	 */
+	if ((IS_MAC_STAT(stat) && !MAC_STAT_ISACOUNTER(stat)) ||
+	    (IS_MACTYPE_STAT(stat) && !ETHER_STAT_ISACOUNTER(stat))) {
+		return (ENOTSUP);
+	}
 	READ_ENTER(&vnetp->trwlock);
 	for (vp_tlp = vnetp->tlp; vp_tlp != NULL; vp_tlp = vp_tlp->nextp) {
 		vp_macp = vp_tlp->macp;
-		val += vp_macp->m_stat(vp_macp->m_driver, stat);
+		cbp = vp_macp->m_callbacks;
+		if (cbp->mc_getstat(vp_macp->m_driver, stat, val) == 0)
+			val_total += *val;
 	}
 	RW_EXIT(&vnetp->trwlock);
 
+	*val = val_total;
+
 	DBG1((vnetp, "vnet_m_stat: exit\n"));
-	return (val);
+	return (0);
 }
 
 /* wrapper function for mac_register() */
 static int
 vnet_mac_register(vnet_t *vnetp)
 {
-	mac_info_t *mip;
-	mac_t *macp;
+	mac_register_t	*macp;
+	int		err;
 
-	macp = vnetp->macp;
-
-	mip = &(macp->m_info);
-	mip->mi_media = DL_ETHER;
-	mip->mi_sdu_min = 0;
-	mip->mi_sdu_max = ETHERMTU;
-	mip->mi_cksum = 0;
-	mip->mi_poll = 0; /* DL_CAPAB_POLL ? */
-	mip->mi_addr_length = ETHERADDRL;
-	bcopy(&etherbroadcastaddr, mip->mi_brdcst_addr, ETHERADDRL);
-	bcopy(vnetp->curr_macaddr, mip->mi_unicst_addr, ETHERADDRL);
-
-	MAC_STAT_MIB(mip->mi_stat);
-	mip->mi_stat[MAC_STAT_UNKNOWNS] = B_FALSE;
-	MAC_STAT_ETHER(mip->mi_stat);
-	mip->mi_stat[MAC_STAT_SQE_ERRORS] = B_FALSE;
-	mip->mi_stat[MAC_STAT_MACRCV_ERRORS] = B_FALSE;
-
-	macp->m_stat = vnet_m_stat;
-	macp->m_start = vnet_m_start;
-	macp->m_stop = vnet_m_stop;
-	macp->m_promisc = vnet_m_promisc;
-	macp->m_multicst = vnet_m_multicst;
-	macp->m_unicst = vnet_m_unicst;
-	macp->m_resources = vnet_m_resources;
-	macp->m_ioctl = vnet_m_ioctl;
-	macp->m_tx = vnet_m_tx;
-
+	if ((macp = mac_alloc(MAC_VERSION)) == NULL)
+		return (DDI_FAILURE);
+	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
+	macp->m_driver = vnetp;
 	macp->m_dip = vnetp->dip;
-	macp->m_ident = MAC_IDENT;
+	macp->m_src_addr = vnetp->curr_macaddr;
+	macp->m_callbacks = &vnet_m_callbacks;
+	macp->m_min_sdu = 0;
+	macp->m_max_sdu = ETHERMTU;
 
 	/*
 	 * Finally, we're ready to register ourselves with the MAC layer
 	 * interface; if this succeeds, we're all ready to start()
 	 */
-	if (mac_register(macp) != 0) {
-		KMEM_FREE(macp);
-		return (DDI_FAILURE);
-	}
-
-	return (DDI_SUCCESS);
+	err = mac_register(macp, &vnetp->mh);
+	mac_free(macp);
+	return (err == 0 ? DDI_SUCCESS : DDI_FAILURE);
 }
 
 /* add vp_tl to the list */
@@ -1043,4 +983,18 @@ vnet_del_def_rte(void *arg)
 	fdbhp->headp = NULL;
 
 	RW_EXIT(&fdbhp->rwlock);
+}
+
+void
+vnet_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
+{
+	vnet_t *vnetp = arg;
+	mac_rx(vnetp->mh, mrh, mp);
+}
+
+void
+vnet_tx_update(void *arg)
+{
+	vnet_t *vnetp = arg;
+	mac_tx_update(vnetp->mh);
 }

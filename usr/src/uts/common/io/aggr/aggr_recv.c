@@ -51,7 +51,7 @@ aggr_recv_lacp(aggr_port_t *port, mblk_t *mp)
 		mblk_t *nmp = copymsg(mp);
 
 		if (nmp != NULL)
-			mac_rx(&grp->lg_mac, NULL, nmp);
+			mac_rx(grp->lg_mh, NULL, nmp);
 	}
 
 	aggr_lacp_rx(port, mp);
@@ -68,7 +68,7 @@ aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 	aggr_grp_t *grp = port->lp_grp;
 
 	if (grp->lg_lacp_mode == AGGR_LACP_OFF) {
-		mac_rx(&grp->lg_mac, mrh, mp);
+		mac_rx(grp->lg_mh, mrh, mp);
 	} else {
 		mblk_t *cmp, *last, *head;
 		struct ether_header *ehp;
@@ -89,12 +89,10 @@ aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 				} else {
 					/* send up accumulated packets */
 					last->b_next = NULL;
-					if (port->lp_collector_enabled) {
-						mac_rx(&grp->lg_mac, mrh,
-						    head);
-					} else {
+					if (port->lp_collector_enabled)
+						mac_rx(grp->lg_mh, mrh, head);
+					else
 						freemsgchain(head);
-					}
 					head = cmp->b_next;
 					cmp->b_next = NULL;
 					freemsg(cmp);
@@ -124,12 +122,10 @@ aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 					ASSERT(last != NULL);
 					/* send up non-LACP packets */
 					last->b_next = NULL;
-					if (port->lp_collector_enabled) {
-						mac_rx(&grp->lg_mac, mrh,
-						    head);
-					} else {
+					if (port->lp_collector_enabled)
+						mac_rx(grp->lg_mh, mrh, head);
+					else
 						freemsgchain(head);
-					}
 					/* unlink and pass up LACP packets */
 					head = cmp->b_next;
 					cmp->b_next = NULL;
@@ -144,7 +140,7 @@ aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 		}
 		if (head != NULL) {
 			if (port->lp_collector_enabled)
-				mac_rx(&grp->lg_mac, mrh, head);
+				mac_rx(grp->lg_mh, mrh, head);
 			else
 				freemsgchain(head);
 		}

@@ -41,10 +41,8 @@
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 
-#define	XGELL_MAX_FRAME_SIZE(macp)	((macp->m_info.mi_sdu_max) + \
+#define	XGELL_MAX_FRAME_SIZE(hldev)	((hldev)->config.mtu +	\
     sizeof (struct ether_vlan_header))
-
-u8 xge_broadcast_addr[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 #define	HEADROOM		2	/* for DIX-only packets */
 
@@ -126,6 +124,32 @@ struct ddi_dma_attr hal_dma_attr_aligned = {
 struct ddi_dma_attr *p_hal_dma_attr = &hal_dma_attr;
 struct ddi_dma_attr *p_hal_dma_attr_aligned = &hal_dma_attr_aligned;
 
+static int		xgell_m_stat(void *, uint_t, uint64_t *);
+static int		xgell_m_start(void *);
+static void		xgell_m_stop(void *);
+static int		xgell_m_promisc(void *, boolean_t);
+static int		xgell_m_multicst(void *, boolean_t, const uint8_t *);
+static int		xgell_m_unicst(void *, const uint8_t *);
+static void		xgell_m_ioctl(void *, queue_t *, mblk_t *);
+static mblk_t 		*xgell_m_tx(void *, mblk_t *);
+static boolean_t	xgell_m_getcapab(void *, mac_capab_t, void *);
+
+#define	XGELL_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
+
+static mac_callbacks_t xgell_m_callbacks = {
+	XGELL_M_CALLBACK_FLAGS,
+	xgell_m_stat,
+	xgell_m_start,
+	xgell_m_stop,
+	xgell_m_promisc,
+	xgell_m_multicst,
+	xgell_m_unicst,
+	xgell_m_tx,
+	NULL,
+	xgell_m_ioctl,
+	xgell_m_getcapab
+};
+
 /*
  * xge_device_poll
  *
@@ -174,7 +198,7 @@ xgell_callback_link_up(void *userdata)
 {
 	xgelldev_t *lldev = (xgelldev_t *)userdata;
 
-	mac_link_update(lldev->macp, LINK_STATE_UP);
+	mac_link_update(lldev->mh, LINK_STATE_UP);
 	/* Link states should be reported to user whenever it changes */
 	cmn_err(CE_NOTE, "!%s%d: Link is up [10 Gbps Full Duplex]",
 	    XGELL_IFNAME, lldev->instance);
@@ -190,7 +214,7 @@ xgell_callback_link_down(void *userdata)
 {
 	xgelldev_t *lldev = (xgelldev_t *)userdata;
 
-	mac_link_update(lldev->macp, LINK_STATE_DOWN);
+	mac_link_update(lldev->mh, LINK_STATE_DOWN);
 	/* Link states should be reported to user whenever it changes */
 	cmn_err(CE_NOTE, "!%s%d: Link is down", XGELL_IFNAME,
 	    lldev->instance);
@@ -299,7 +323,7 @@ xgell_rx_buffer_alloc(xgelldev_t *lldev)
 	extern ddi_device_acc_attr_t *p_xge_dev_attr;
 	xgell_rx_buffer_t *rx_buffer;
 
-	hldev = (xge_hal_device_t *)lldev->devh;
+	hldev = lldev->devh;
 
 	if (ddi_dma_alloc_handle(hldev->pdev, p_hal_dma_attr, DDI_DMA_SLEEP,
 	    0, &dma_handle) != DDI_SUCCESS) {
@@ -427,16 +451,14 @@ xgell_rx_destroy_buffer_pool(xgelldev_t *lldev)
 static int
 xgell_rx_create_buffer_pool(xgelldev_t *lldev)
 {
-	mac_t *macp;
 	xge_hal_device_t *hldev;
 	xgell_rx_buffer_t *rx_buffer;
 	int i;
 
-	macp = lldev->macp;
-	hldev = macp->m_driver;
+	hldev = (xge_hal_device_t *)lldev->devh;
 
 	lldev->bf_pool.total = 0;
-	lldev->bf_pool.size = XGELL_MAX_FRAME_SIZE(lldev->macp);
+	lldev->bf_pool.size = XGELL_MAX_FRAME_SIZE(hldev);
 	lldev->bf_pool.head = NULL;
 	lldev->bf_pool.free = 0;
 	lldev->bf_pool.post = 0;
@@ -477,9 +499,7 @@ xgell_rx_dtr_replenish(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, int index,
     void *userdata, xge_hal_channel_reopen_e reopen)
 {
 	xgell_ring_t *ring = userdata;
-	mac_t *macp = ring->macp;
-	xge_hal_device_t *hldev = (xge_hal_device_t *)macp->m_driver;
-	xgelldev_t *lldev = xge_hal_device_private(hldev);
+	xgelldev_t *lldev = ring->lldev;
 	xgell_rx_buffer_t *rx_buffer;
 	xgell_rxd_priv_t *rxd_priv;
 
@@ -742,10 +762,8 @@ static xge_hal_status_e
 xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
     void *userdata)
 {
-	mac_t *macp = ((xgell_ring_t *)userdata)->macp;
+	xgelldev_t *lldev = ((xgell_ring_t *)userdata)->lldev;
 	xgell_rx_buffer_t *rx_buffer;
-	xge_hal_device_t *hldev = (xge_hal_device_t *)macp->m_driver;
-	xgelldev_t *lldev = xge_hal_device_private(hldev);
 	mblk_t *mp_head = NULL;
 	mblk_t *mp_end  = NULL;
 
@@ -845,7 +863,7 @@ xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 	    XGE_HAL_OK);
 
 	if (mp_head) {
-		mac_rx(macp, ((xgell_ring_t *)userdata)->handle, mp_head);
+		mac_rx(lldev->mh, ((xgell_ring_t *)userdata)->handle, mp_head);
 	}
 
 	/*
@@ -1048,7 +1066,7 @@ _begin:
 			continue;
 		}
 
-		ret = ddi_dma_alloc_handle(lldev->macp->m_dip, &tx_dma_attr,
+		ret = ddi_dma_alloc_handle(lldev->dev_info, &tx_dma_attr,
 		    DDI_DMA_DONTWAIT, 0, &dma_handle);
 		if (ret != DDI_SUCCESS) {
 			xge_debug_ll(XGE_ERR,
@@ -1335,7 +1353,7 @@ xgell_rx_open(xgelldev_t *lldev)
 		return (B_FALSE);
 	}
 
-	lldev->ring_main.macp = lldev->macp;
+	lldev->ring_main.lldev = lldev;
 	attr.userdata = &lldev->ring_main;
 
 	status = xge_hal_channel_open(lldev->devh, &attr,
@@ -1353,10 +1371,8 @@ static int
 xgell_initiate_start(xgelldev_t *lldev)
 {
 	xge_hal_status_e status;
-#ifdef XGELL_TX_NOMAP_COPY
 	xge_hal_device_t *hldev = lldev->devh;
-#endif
-	int maxpkt = lldev->macp->m_info.mi_sdu_max;
+	int maxpkt = hldev->config.mtu;
 
 	/* check initial mtu before enabling the device */
 	status = xge_hal_device_mtu_check(lldev->devh, maxpkt);
@@ -1399,7 +1415,7 @@ xgell_initiate_start(xgelldev_t *lldev)
 	}
 
 #ifdef XGELL_TX_NOMAP_COPY
-	hldev->config.fifo.alignment_size = XGELL_MAX_FRAME_SIZE(lldev->macp);
+	hldev->config.fifo.alignment_size = XGELL_MAX_FRAME_SIZE(hldev);
 #endif
 
 	if (!xgell_tx_open(lldev)) {
@@ -1702,108 +1718,107 @@ xgell_m_promisc(void *arg, boolean_t on)
 }
 
 /*
- * xgell_m_stats
+ * xgell_m_stat
  * @arg: pointer to device private strucutre(hldev)
- * @msp: pointer to mac_stats_t strucutre
  *
- * This function is called by MAC Layer to get  network statistics
+ * This function is called by MAC Layer to get network statistics
  * from the driver.
  */
-static uint64_t
-xgell_m_stat(void *arg, enum mac_stat stat)
+static int
+xgell_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	xge_hal_stats_hw_info_t *hw_info;
 	xge_hal_device_t *hldev = (xge_hal_device_t *)arg;
 	xgelldev_t *lldev = xge_hal_device_private(hldev);
-	uint64_t val;
 
 	xge_debug_ll(XGE_TRACE, "%s", "MAC_STATS_GET");
 
 	if (!mutex_tryenter(&lldev->genlock))
-		return (0);
+		return (EAGAIN);
 
 	if (!lldev->is_initialized) {
 		mutex_exit(&lldev->genlock);
-		return (0);
+		return (EAGAIN);
 	}
 
 	if (xge_hal_stats_hw(hldev, &hw_info) != XGE_HAL_OK) {
 		mutex_exit(&lldev->genlock);
-		return (0);
+		return (EAGAIN);
 	}
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
-		val = 10000000000ull; /* 10G */
-		break;
-
-	case MAC_STAT_LINK_DUPLEX:
-		val = LINK_DUPLEX_FULL;
+		*val = 10000000000ull; /* 10G */
 		break;
 
 	case MAC_STAT_MULTIRCV:
-		val = hw_info->rmac_vld_mcst_frms;
+		*val = hw_info->rmac_vld_mcst_frms;
 		break;
 
 	case MAC_STAT_BRDCSTRCV:
-		val = hw_info->rmac_vld_bcst_frms;
+		*val = hw_info->rmac_vld_bcst_frms;
 		break;
 
 	case MAC_STAT_MULTIXMT:
-		val = hw_info->tmac_mcst_frms;
+		*val = hw_info->tmac_mcst_frms;
 		break;
 
 	case MAC_STAT_BRDCSTXMT:
-		val = hw_info->tmac_bcst_frms;
+		*val = hw_info->tmac_bcst_frms;
 		break;
 
 	case MAC_STAT_RBYTES:
-		val = hw_info->rmac_ttl_octets;
+		*val = hw_info->rmac_ttl_octets;
 		break;
 
 	case MAC_STAT_NORCVBUF:
-		val = hw_info->rmac_drop_frms;
+		*val = hw_info->rmac_drop_frms;
 		break;
 
 	case MAC_STAT_IERRORS:
-		val = hw_info->rmac_discarded_frms;
+		*val = hw_info->rmac_discarded_frms;
 		break;
 
 	case MAC_STAT_OBYTES:
-		val = hw_info->tmac_ttl_octets;
+		*val = hw_info->tmac_ttl_octets;
 		break;
 
 	case MAC_STAT_NOXMTBUF:
-		val = hw_info->tmac_drop_frms;
+		*val = hw_info->tmac_drop_frms;
 		break;
 
 	case MAC_STAT_OERRORS:
-		val = hw_info->tmac_any_err_frms;
+		*val = hw_info->tmac_any_err_frms;
 		break;
 
 	case MAC_STAT_IPACKETS:
-		val = hw_info->rmac_vld_frms;
+		*val = hw_info->rmac_vld_frms;
 		break;
 
 	case MAC_STAT_OPACKETS:
-		val = hw_info->tmac_frms;
+		*val = hw_info->tmac_frms;
 		break;
 
-	case MAC_STAT_FCS_ERRORS:
-		val = hw_info->rmac_fcs_err_frms;
+	case ETHER_STAT_FCS_ERRORS:
+		*val = hw_info->rmac_fcs_err_frms;
 		break;
 
-	case MAC_STAT_TOOLONG_ERRORS:
-		val = hw_info->rmac_long_frms;
+	case ETHER_STAT_TOOLONG_ERRORS:
+		*val = hw_info->rmac_long_frms;
+		break;
+
+	case ETHER_STAT_LINK_DUPLEX:
+		*val = LINK_DUPLEX_FULL;
 		break;
 
 	default:
-		ASSERT(B_FALSE);
+		mutex_exit(&lldev->genlock);
+		return (ENOTSUP);
 	}
 
 	mutex_exit(&lldev->genlock);
 
-	return (val);
+	return (0);
 }
 
 /*
@@ -1825,7 +1840,6 @@ xgell_device_alloc(xge_hal_device_h devh,
 	lldev = kmem_zalloc(sizeof (xgelldev_t), KM_SLEEP);
 
 	/* allocate mac */
-	lldev->macp = kmem_zalloc(sizeof (mac_t), KM_SLEEP);
 	lldev->devh = hldev;
 	lldev->instance = instance;
 	lldev->dev_info = dev_info;
@@ -1845,8 +1859,6 @@ xgell_device_free(xgelldev_t *lldev)
 {
 	xge_debug_ll(XGE_TRACE, "freeing device %s%d",
 	    XGELL_IFNAME, lldev->instance);
-
-	kmem_free(lldev->macp, sizeof (*(lldev->macp)));
 
 	kmem_free(lldev, sizeof (xgelldev_t));
 }
@@ -1929,29 +1941,28 @@ xgell_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	}
 }
 
-static void
-xgell_m_blank(void *arg, time_t ticks, uint_t count)
+/* ARGSUSED */
+static boolean_t
+xgell_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
-}
-
-#define	XGE_RX_INTPT_TIME	128
-#define	XGE_RX_PKT_CNT		8
-
-static void
-xgell_m_resources(void *arg)
-{
-	xge_hal_device_t *hldev = (xge_hal_device_t *)arg;
-	xgelldev_t *lldev = xge_hal_device_private(hldev);
-	mac_rx_fifo_t mrf;
-
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = xgell_m_blank;
-	mrf.mrf_arg = (void *)hldev;
-	mrf.mrf_normal_blank_time = XGE_RX_INTPT_TIME;
-	mrf.mrf_normal_pkt_count = XGE_RX_PKT_CNT;
-
-	lldev->ring_main.handle = mac_resource_add(lldev->macp,
-	    (mac_resource_t *)&mrf);
+	switch (cap) {
+	case MAC_CAPAB_HCKSUM: {
+		uint32_t *hcksum_txflags = cap_data;
+		*hcksum_txflags = HCKSUM_INET_FULL_V4 | HCKSUM_INET_FULL_V6 |
+		    HCKSUM_IPHDRCKSUM;
+		break;
+	}
+	case MAC_CAPAB_POLL:
+		/*
+		 * Fallthrough to default, as we don't support GLDv3
+		 * polling.  When blanking is implemented, we will need to
+		 * change this to return B_TRUE in addition to registering
+		 * an mc_resources callback.
+		 */
+	default:
+		return (B_FALSE);
+	}
+	return (B_TRUE);
 }
 
 static int
@@ -2231,100 +2242,39 @@ xgell_devconfig_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
 int
 xgell_device_register(xgelldev_t *lldev, xgell_config_t *config)
 {
-	mac_t *macp = lldev->macp;
+	mac_register_t *macp;
 	xge_hal_device_t *hldev = (xge_hal_device_t *)lldev->devh;
-	mac_info_t *mip;
+	int err;
 
-	mip = &(macp->m_info);
-
-	mip->mi_media = DL_ETHER;
-	mip->mi_sdu_min = 0;
-	mip->mi_sdu_max = hldev->config.mtu;
-	mip->mi_cksum = HCKSUM_INET_FULL_V4 | HCKSUM_INET_FULL_V6 |
-	    HCKSUM_IPHDRCKSUM;
-
-	/*
-	 * When xgell_m_blank() has a valid implementation, this
-	 * should be changed to enable polling by add DL_CAPAB_POLL
-	 * to mp_poll.
-	 */
-	mip->mi_poll = 0;
-	mip->mi_addr_length = ETHERADDRL;
-	bcopy(xge_broadcast_addr, mip->mi_brdcst_addr, ETHERADDRL);
-	bcopy(&hldev->macaddr[0], mip->mi_unicst_addr, ETHERADDRL);
-
-	MAC_STAT_MIB(mip->mi_stat);
-	mip->mi_stat[MAC_STAT_UNKNOWNS] = B_FALSE;
-	mip->mi_stat[MAC_STAT_COLLISIONS] = B_FALSE;
-
-	mip->mi_stat[MAC_STAT_FCS_ERRORS] = B_TRUE;
-	mip->mi_stat[MAC_STAT_TOOLONG_ERRORS] = B_TRUE;
-
-	mip->mi_stat[MAC_STAT_LINK_DUPLEX] = B_TRUE;
-
-	macp->m_stat = xgell_m_stat;
-	macp->m_stop = xgell_m_stop;
-	macp->m_start = xgell_m_start;
-	macp->m_unicst = xgell_m_unicst;
-	macp->m_multicst = xgell_m_multicst;
-	macp->m_promisc = xgell_m_promisc;
-	macp->m_tx = xgell_m_tx;
-	macp->m_resources = xgell_m_resources;
-	macp->m_ioctl = xgell_m_ioctl;
-
-	macp->m_dip = hldev->pdev;
-	macp->m_driver = (caddr_t)hldev;
-	macp->m_ident = MAC_IDENT;
 
 	if (nd_load(&lldev->ndp, "pciconf", xgell_pciconf_get, NULL,
-	    (caddr_t)lldev) == B_FALSE) {
-		nd_free(&lldev->ndp);
-		xge_debug_ll(XGE_ERR, "%s", "unable to load ndd parameter");
-		return (DDI_FAILURE);
-	}
+	    (caddr_t)lldev) == B_FALSE)
+		goto xgell_ndd_fail;
 
 	if (nd_load(&lldev->ndp, "about", xgell_about_get, NULL,
-	    (caddr_t)lldev) == B_FALSE) {
-		nd_free(&lldev->ndp);
-		xge_debug_ll(XGE_ERR, "%s", "unable to load ndd parameter");
-		return (DDI_FAILURE);
-	}
+	    (caddr_t)lldev) == B_FALSE)
+		goto xgell_ndd_fail;
 
 	if (nd_load(&lldev->ndp, "stats", xgell_stats_get, NULL,
-	    (caddr_t)lldev) == B_FALSE) {
-		nd_free(&lldev->ndp);
-		xge_debug_ll(XGE_ERR, "%s", "unable to load ndd parameter");
-		return (DDI_FAILURE);
-	}
+	    (caddr_t)lldev) == B_FALSE)
+		goto xgell_ndd_fail;
 
 	if (nd_load(&lldev->ndp, "bar0", xgell_bar0_get, xgell_bar0_set,
-	    (caddr_t)lldev) == B_FALSE) {
-		nd_free(&lldev->ndp);
-		xge_debug_ll(XGE_ERR, "%s", "unable to load ndd parameter");
-		return (DDI_FAILURE);
-	}
+	    (caddr_t)lldev) == B_FALSE)
+		goto xgell_ndd_fail;
 
 	if (nd_load(&lldev->ndp, "debug_level", xgell_debug_level_get,
-		    xgell_debug_level_set, (caddr_t)lldev) == B_FALSE) {
-		nd_free(&lldev->ndp);
-		xge_debug_ll(XGE_ERR, "%s", "unable to load ndd parameter");
-		return (DDI_FAILURE);
-	}
+	    xgell_debug_level_set, (caddr_t)lldev) == B_FALSE)
+		goto xgell_ndd_fail;
 
 	if (nd_load(&lldev->ndp, "debug_module_mask",
 	    xgell_debug_module_mask_get, xgell_debug_module_mask_set,
-	    (caddr_t)lldev) == B_FALSE) {
-		nd_free(&lldev->ndp);
-		xge_debug_ll(XGE_ERR, "%s", "unable to load ndd parameter");
-		return (DDI_FAILURE);
-	}
+	    (caddr_t)lldev) == B_FALSE)
+		goto xgell_ndd_fail;
 
 	if (nd_load(&lldev->ndp, "devconfig", xgell_devconfig_get, NULL,
-	    (caddr_t)lldev) == B_FALSE) {
-		nd_free(&lldev->ndp);
-		xge_debug_ll(XGE_ERR, "%s", "unable to load ndd parameter");
-		return (DDI_FAILURE);
-	}
+	    (caddr_t)lldev) == B_FALSE)
+		goto xgell_ndd_fail;
 
 	bcopy(config, &lldev->config, sizeof (xgell_config_t));
 
@@ -2336,24 +2286,41 @@ xgell_device_register(xgelldev_t *lldev, xgell_config_t *config)
 
 	mutex_init(&lldev->genlock, NULL, MUTEX_DRIVER, hldev->irqh);
 
+	if ((macp = mac_alloc(MAC_VERSION)) == NULL)
+		goto xgell_register_fail;
+	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
+	macp->m_driver = hldev;
+	macp->m_dip = lldev->dev_info;
+	macp->m_src_addr = hldev->macaddr[0];
+	macp->m_callbacks = &xgell_m_callbacks;
+	macp->m_min_sdu = 0;
+	macp->m_max_sdu = hldev->config.mtu;
 	/*
 	 * Finally, we're ready to register ourselves with the Nemo
 	 * interface; if this succeeds, we're all ready to start()
 	 */
-	if (mac_register(macp) != 0) {
-		nd_free(&lldev->ndp);
-		mutex_destroy(&lldev->genlock);
-		/* Ignore return value, since RX not start */
-		(void) xgell_rx_destroy_buffer_pool(lldev);
-		xge_debug_ll(XGE_ERR, "%s",
-		    "unable to register networking device");
-		return (DDI_FAILURE);
-	}
+	err = mac_register(macp, &lldev->mh);
+	mac_free(macp);
+	if (err != 0)
+		goto xgell_register_fail;
 
 	xge_debug_ll(XGE_TRACE, "etherenet device %s%d registered",
 	    XGELL_IFNAME, lldev->instance);
 
 	return (DDI_SUCCESS);
+
+xgell_ndd_fail:
+	nd_free(&lldev->ndp);
+	xge_debug_ll(XGE_ERR, "%s", "unable to load ndd parameter");
+	return (DDI_FAILURE);
+
+xgell_register_fail:
+	nd_free(&lldev->ndp);
+	mutex_destroy(&lldev->genlock);
+	/* Ignore return value, since RX not start */
+	(void) xgell_rx_destroy_buffer_pool(lldev);
+	xge_debug_ll(XGE_ERR, "%s", "unable to register networking device");
+	return (DDI_FAILURE);
 }
 
 /*
@@ -2373,7 +2340,7 @@ xgell_device_unregister(xgelldev_t *lldev)
 		return (DDI_FAILURE);
 	}
 
-	if (mac_unregister(lldev->macp) != 0) {
+	if (mac_unregister(lldev->mh) != 0) {
 		xge_debug_ll(XGE_ERR, "unable to unregister device %s%d",
 		    XGELL_IFNAME, lldev->instance);
 		return (DDI_FAILURE);

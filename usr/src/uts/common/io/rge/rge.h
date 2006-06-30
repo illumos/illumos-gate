@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +63,7 @@ extern "C" {
 #include <sys/sunddi.h>
 
 #include <sys/mac.h>
+#include <sys/mac_ether.h>
 
 /*
  * Reconfiguring the network devices requires the net_config privilege
@@ -387,7 +387,7 @@ typedef struct rge_stats {
  */
 typedef struct rge {
 	dev_info_t		*devinfo;	/* device instance	*/
-	mac_t			*macp;		/* MAC structure	*/
+	mac_handle_t		mh;		/* mac module handle	*/
 	ddi_acc_handle_t	cfg_handle;	/* DDI I/O handle	*/
 	ddi_acc_handle_t	io_handle;	/* DDI I/O handle	*/
 	caddr_t			io_regs;	/* mapped registers	*/
@@ -735,7 +735,7 @@ void rge_phy_update(rge_t *rgep);
 /* rge_kstats.c */
 void rge_init_kstats(rge_t *rgep, int instance);
 void rge_fini_kstats(rge_t *rgep);
-uint64_t rge_m_stat(void *arg, enum mac_stat stat);
+int rge_m_stat(void *arg, uint_t stat, uint64_t *val);
 
 /* rge_log.c */
 #if	RGE_DEBUGGING

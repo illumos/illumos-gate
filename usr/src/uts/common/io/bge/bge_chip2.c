@@ -3274,7 +3274,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 */
 	if (bgep->chipid.flags & CHIP_FLAG_PARTIAL_CSUM)
 		bge_reg_set32(bgep, MODE_CONTROL_REG,
-			MODE_SEND_NO_PSEUDO_HDR_CSUM);
+		    MODE_SEND_NO_PSEUDO_HDR_CSUM);
 
 	/*
 	 * Step 29: configure Timer Prescaler.  The value is always the
@@ -4333,7 +4333,7 @@ bge_chip_factotum(caddr_t arg)
 	 * Note: can't do this while still holding the mutex.
 	 */
 	if (linkchg)
-		mac_link_update(bgep->macp, bgep->link_state);
+		mac_link_update(bgep->mh, bgep->link_state);
 
 	return (result);
 }

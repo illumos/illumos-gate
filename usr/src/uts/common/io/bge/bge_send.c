@@ -510,7 +510,7 @@ bge_reschedule(caddr_t arg)
 	BGE_TRACE(("bge_reschedule($%p)", (void *)bgep));
 
 	if (bgep->bge_mac_state == BGE_MAC_STARTED && bgep->resched_needed) {
-		mac_tx_update(bgep->macp);
+		mac_tx_update(bgep->mh);
 		bgep->resched_needed = B_FALSE;
 		bgep->resched_running = B_FALSE;
 	}

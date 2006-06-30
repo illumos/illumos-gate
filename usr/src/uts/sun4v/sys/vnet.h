@@ -52,7 +52,7 @@ extern "C" {
  */
 typedef struct vp_tl {
 	struct vp_tl		*nextp;			/* next in list */
-	mac_t			*macp;			/* transport ops */
+	mac_register_t		*macp;			/* transport ops */
 	char			name[LIFNAMSIZ];	/* device name */
 	major_t			major;			/* driver major # */
 	uint_t			instance;		/* dev instance */
@@ -101,7 +101,7 @@ typedef struct vnet {
 	int			instance;	/* instance # */
 	dev_info_t		*dip;		/* dev_info */
 	struct vnet		*nextp;		/* next in list */
-	mac_t 			*macp;		/* MAC - macinfo */
+	mac_handle_t 		mh;		/* handle to GLDv3 mac module */
 	uchar_t			vendor_addr[ETHERADDRL]; /* orig macadr */
 	uchar_t			curr_macaddr[ETHERADDRL]; /* current macadr */
 	vp_tl_t			*tlp;		/* list of vp_tl */

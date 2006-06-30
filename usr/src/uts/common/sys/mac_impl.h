@@ -29,17 +29,30 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mac.h>
+#include <net/if.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+/*
+ * Statistics of class MAC_INTERFACE_STAT, maintained internally by the mac
+ * module.
+ */
+enum mac_interface_stat {
+	MAC_STAT_LINK_STATE,
+	MAC_STAT_LINK_UP,
+	MAC_STAT_PROMISC,
+
+	MAC_INTERFACE_NSTAT		/* Must be the last entry */
+};
 
 typedef struct mac_multicst_addr_s	mac_multicst_addr_t;
 
 struct mac_multicst_addr_s {
 	mac_multicst_addr_t	*mma_nextp;
 	uint_t			mma_ref;
-	uint8_t			mma_addr[MAXADDRLEN];
+	uint8_t			mma_addr[MAXMACADDRLEN];
 };
 
 typedef struct mac_notify_fn_s		mac_notify_fn_t;
@@ -66,60 +79,72 @@ struct mac_txloop_fn_s {
 	void			*mtf_arg;
 };
 
-typedef boolean_t	(*mac_unicst_verify_t)(mac_impl_t *,
-    const uint8_t *);
-typedef boolean_t	(*mac_multicst_verify_t)(mac_impl_t *,
-    const uint8_t *);
+typedef struct mactype_s {
+	const char	*mt_ident;
+	uint32_t	mt_ref;
+	uint_t		mt_type;
+	size_t		mt_addr_length;
+	uint8_t		*mt_brdcst_addr;
+	mactype_ops_t	mt_ops;
+	mac_stat_info_t	*mt_stats;	/* array of mac_stat_info_t elements */
+	size_t		mt_statcount;	/* number of elements in mt_stats */
+} mactype_t;
 
-struct mac_impl_s {
-	mac_t			*mi_mp;
-	char			mi_dev[MAXNAMELEN];
-	uint_t			mi_port;
-	char			mi_name[MAXNAMELEN];
-
+/*
+ * Each registered MAC is associated with a mac_t structure.
+ */
+typedef struct mac_impl_s {
+	char			mi_name[LIFNAMSIZ];
+	const char		*mi_drvname;
+	uint_t			mi_instance;
+	void			*mi_driver;	/* Driver private data */
+	mac_info_t		mi_info;
+	mactype_t		*mi_type;
+	void			*mi_pdata;
+	size_t			mi_pdata_size;
+	mac_callbacks_t		*mi_callbacks;
+	dev_info_t		*mi_dip;
 	uint32_t		mi_ref;
 	boolean_t		mi_disabled;
-
 	krwlock_t		mi_state_lock;
 	uint_t			mi_active;
-
 	krwlock_t		mi_data_lock;
-	link_state_t		mi_link;
+	link_state_t		mi_linkstate;
 	uint_t			mi_promisc;
 	uint_t			mi_devpromisc;
-	uint8_t			mi_addr[MAXADDRLEN];
+	uint8_t			mi_addr[MAXMACADDRLEN];
+	uint8_t			mi_dstaddr[MAXMACADDRLEN];
 	mac_multicst_addr_t	*mi_mmap;
-
-	uint_t			mi_addr_length;
-
 	krwlock_t		mi_notify_lock;
 	mac_notify_fn_t		*mi_mnfp;
-
 	kmutex_t		mi_notify_ref_lock;
 	uint32_t		mi_notify_ref;
 	kcondvar_t		mi_notify_cv;
-
 	krwlock_t		mi_rx_lock;
 	mac_rx_fn_t		*mi_mrfp;
-
 	krwlock_t		mi_txloop_lock;
 	mac_txloop_fn_t		*mi_mtfp;
-
 	krwlock_t		mi_resource_lock;
 	mac_resource_add_t	mi_resource_add;
 	void			*mi_resource_add_arg;
-
 	kstat_t			*mi_ksp;
-
-	mac_unicst_verify_t	mi_unicst_verify;
-	mac_multicst_verify_t	mi_multicst_verify;
-
+	uint_t			mi_kstat_count;
 	kmutex_t		mi_activelink_lock;
 	boolean_t		mi_activelink;
-
 	mac_txinfo_t		mi_txinfo;
 	mac_txinfo_t		mi_txloopinfo;
-};
+} mac_impl_t;
+
+#define	mi_getstat	mi_callbacks->mc_getstat
+#define	mi_start	mi_callbacks->mc_start
+#define	mi_stop		mi_callbacks->mc_stop
+#define	mi_setpromisc	mi_callbacks->mc_setpromisc
+#define	mi_multicst	mi_callbacks->mc_multicst
+#define	mi_unicst	mi_callbacks->mc_unicst
+#define	mi_resources	mi_callbacks->mc_resources
+#define	mi_tx		mi_callbacks->mc_tx
+#define	mi_ioctl	mi_callbacks->mc_ioctl
+#define	mi_getcapab	mi_callbacks->mc_getcapab
 
 typedef struct mac_notify_task_arg {
 	mac_impl_t		*mnt_mip;
@@ -131,6 +156,7 @@ extern int	mac_fini(void);
 
 extern void	mac_stat_create(mac_impl_t *);
 extern void	mac_stat_destroy(mac_impl_t *);
+extern uint64_t	mac_stat_default(mac_impl_t *, uint_t);
 
 #ifdef	__cplusplus
 }

@@ -816,32 +816,25 @@ str_mdata_fastpath_put(dld_str_t *dsp, mblk_t *mp)
 void
 str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 {
-	struct ether_header	*ehp;
-	mblk_t			*bp;
+	mblk_t			*bp, *newmp;
 	size_t			size;
-	size_t			hdrlen;
+	mac_header_info_t	mhi;
+
+	/*
+	 * Certain MAC type plugins provide an illusion for raw DLPI
+	 * consumers.  They pretend that the MAC layer is something that
+	 * it's not for the benefit of observability tools.  For example, a
+	 * wifi plugin might pretend that it's Ethernet for such consumers.
+	 * Here, we call into the MAC layer so that this illusion can be
+	 * maintained.  The plugin will optionally transform the MAC header
+	 * here into something that can be passed down.  The header goes
+	 * from raw mode to "cooked" mode.
+	 */
+	if ((newmp = mac_header_cook(dsp->ds_mh, mp)) == NULL)
+		goto discard;
+	mp = newmp;
 
 	size = MBLKL(mp);
-	if (size < sizeof (struct ether_header))
-		goto discard;
-
-	hdrlen = sizeof (struct ether_header);
-
-	ehp = (struct ether_header *)mp->b_rptr;
-	if (ntohs(ehp->ether_type) == VLAN_TPID) {
-		struct ether_vlan_header	*evhp;
-
-		if (size < sizeof (struct ether_vlan_header))
-			goto discard;
-
-		/*
-		 * Replace vtag with our own
-		 */
-		evhp = (struct ether_vlan_header *)ehp;
-		evhp->ether_tci = htons(VLAN_TCI(dsp->ds_pri,
-		    ETHER_CFI, dsp->ds_vid));
-		hdrlen = sizeof (struct ether_vlan_header);
-	}
 
 	/*
 	 * Check the packet is not too big and that any remaining
@@ -855,8 +848,24 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 		size += MBLKL(bp);
 	}
 
-	if (size > dsp->ds_mip->mi_sdu_max + hdrlen)
+	if (dls_header_info(dsp->ds_dc, mp, &mhi) != 0)
 		goto discard;
+
+	if (size > dsp->ds_mip->mi_sdu_max + mhi.mhi_hdrsize)
+		goto discard;
+
+	if (dsp->ds_mip->mi_media == DL_ETHER && mhi.mhi_origsap == VLAN_TPID) {
+		struct ether_vlan_header	*evhp;
+
+		if (size < sizeof (struct ether_vlan_header))
+			goto discard;
+		/*
+		 * Replace vtag with our own
+		 */
+		evhp = (struct ether_vlan_header *)mp->b_rptr;
+		evhp->ether_tci = htons(VLAN_TCI(dsp->ds_pri,
+		    ETHER_CFI, dsp->ds_vid));
+	}
 
 	str_mdata_fastpath_put(dsp, mp);
 	return;
@@ -978,7 +987,7 @@ dld_str_rx_raw(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
     size_t header_length)
 {
 	dld_str_t		*dsp = (dld_str_t *)arg;
-	mblk_t			*next;
+	mblk_t			*next, *newmp;
 
 	ASSERT(mp != NULL);
 	do {
@@ -994,15 +1003,38 @@ dld_str_rx_raw(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		 */
 		ASSERT(mp->b_rptr >= DB_BASE(mp) + header_length);
 		mp->b_rptr -= header_length;
-		if (header_length == sizeof (struct ether_vlan_header)) {
-			/*
-			 * Strip off the vtag
-			 */
-			ovbcopy(mp->b_rptr, mp->b_rptr + VLAN_TAGSZ,
-			    2 * ETHERADDRL);
-			mp->b_rptr += VLAN_TAGSZ;
-		}
 
+		/*
+		 * Certain MAC type plugins provide an illusion for raw
+		 * DLPI consumers.  They pretend that the MAC layer is
+		 * something that it's not for the benefit of observability
+		 * tools.  For example, a wifi plugin might pretend that
+		 * it's Ethernet for such consumers.  Here, we call into
+		 * the MAC layer so that this illusion can be maintained.
+		 * The plugin will optionally transform the MAC header here
+		 * into something that can be passed up to raw consumers.
+		 * The header goes from "cooked" mode to raw mode.
+		 */
+		if ((newmp = mac_header_uncook(dsp->ds_mh, mp)) == NULL) {
+			freemsg(mp);
+			mp = next;
+			continue;
+		}
+		mp = newmp;
+
+		if (dsp->ds_mip->mi_media == DL_ETHER) {
+			struct ether_header *ehp =
+			    (struct ether_header *)mp->b_rptr;
+
+			if (ntohs(ehp->ether_type) == VLAN_TPID) {
+				/*
+				 * Strip off the vtag
+				 */
+				ovbcopy(mp->b_rptr, mp->b_rptr + VLAN_TAGSZ,
+				    2 * ETHERADDRL);
+				mp->b_rptr += VLAN_TAGSZ;
+			}
+		}
 		/*
 		 * Pass the packet on.
 		 */
@@ -1127,8 +1159,8 @@ dld_str_notify_ind(dld_str_t *dsp)
 
 typedef struct dl_unitdata_ind_wrapper {
 	dl_unitdata_ind_t	dl_unitdata;
-	uint8_t			dl_dest_addr[MAXADDRLEN + sizeof (uint16_t)];
-	uint8_t			dl_src_addr[MAXADDRLEN + sizeof (uint16_t)];
+	uint8_t			dl_dest_addr[MAXMACADDRLEN + sizeof (uint16_t)];
+	uint8_t			dl_src_addr[MAXMACADDRLEN + sizeof (uint16_t)];
 } dl_unitdata_ind_wrapper_t;
 
 /*
@@ -1140,7 +1172,7 @@ str_unitdata_ind(dld_str_t *dsp, mblk_t *mp)
 	mblk_t				*nmp;
 	dl_unitdata_ind_wrapper_t	*dlwp;
 	dl_unitdata_ind_t		*dlp;
-	dls_header_info_t		dhi;
+	mac_header_info_t		mhi;
 	uint_t				addr_length;
 	uint8_t				*daddr;
 	uint8_t				*saddr;
@@ -1148,7 +1180,8 @@ str_unitdata_ind(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * Get the packet header information.
 	 */
-	dls_header_info(dsp->ds_dc, mp, &dhi);
+	if (dls_header_info(dsp->ds_dc, mp, &mhi) != 0)
+		return (NULL);
 
 	/*
 	 * Allocate a message large enough to contain the wrapper structure
@@ -1171,7 +1204,7 @@ str_unitdata_ind(dld_str_t *dsp, mblk_t *mp)
 	addr_length = dsp->ds_mip->mi_addr_length;
 	daddr = dlwp->dl_dest_addr;
 	dlp->dl_dest_addr_offset = (uintptr_t)daddr - (uintptr_t)dlp;
-	bcopy(dhi.dhi_daddr, daddr, addr_length);
+	bcopy(mhi.mhi_daddr, daddr, addr_length);
 
 	/*
 	 * Set the destination DLSAP to our bound DLSAP value.
@@ -1180,23 +1213,29 @@ str_unitdata_ind(dld_str_t *dsp, mblk_t *mp)
 	dlp->dl_dest_addr_length = addr_length + sizeof (uint16_t);
 
 	/*
-	 * If the destination address was a group address then
+	 * If the destination address was multicast or broadcast then the
 	 * dl_group_address field should be non-zero.
 	 */
-	dlp->dl_group_address = dhi.dhi_isgroup;
+	dlp->dl_group_address = (mhi.mhi_dsttype == MAC_ADDRTYPE_MULTICAST) ||
+	    (mhi.mhi_dsttype == MAC_ADDRTYPE_BROADCAST);
 
 	/*
-	 * Copy in the source address.
+	 * Copy in the source address if one exists.  Some MAC types (DL_IB
+	 * for example) may not have access to source information.
 	 */
-	saddr = dlwp->dl_src_addr;
-	dlp->dl_src_addr_offset = (uintptr_t)saddr - (uintptr_t)dlp;
-	bcopy(dhi.dhi_saddr, saddr, addr_length);
+	if (mhi.mhi_saddr == NULL) {
+		dlp->dl_src_addr_offset = dlp->dl_src_addr_length = 0;
+	} else {
+		saddr = dlwp->dl_src_addr;
+		dlp->dl_src_addr_offset = (uintptr_t)saddr - (uintptr_t)dlp;
+		bcopy(mhi.mhi_saddr, saddr, addr_length);
 
-	/*
-	 * Set the source DLSAP to the packet ethertype.
-	 */
-	*(uint16_t *)(saddr + addr_length) = dhi.dhi_ethertype;
-	dlp->dl_src_addr_length = addr_length + sizeof (uint16_t);
+		/*
+		 * Set the source DLSAP to the packet ethertype.
+		 */
+		*(uint16_t *)(saddr + addr_length) = mhi.mhi_origsap;
+		dlp->dl_src_addr_length = addr_length + sizeof (uint16_t);
+	}
 
 	return (nmp);
 }
@@ -1384,6 +1423,30 @@ str_notify_capab_reneg(dld_str_t *dsp)
 }
 
 /*
+ * DL_NOTIFY_IND: DL_NOTE_FASTPATH_FLUSH
+ */
+static void
+str_notify_fastpath_flush(dld_str_t *dsp)
+{
+	mblk_t		*mp;
+	dl_notify_ind_t	*dlip;
+
+	if (!(dsp->ds_notifications & DL_NOTE_FASTPATH_FLUSH))
+		return;
+
+	if ((mp = mexchange(dsp->ds_wq, NULL, sizeof (dl_notify_ind_t),
+	    M_PROTO, 0)) == NULL)
+		return;
+
+	bzero(mp->b_rptr, sizeof (dl_notify_ind_t));
+	dlip = (dl_notify_ind_t *)mp->b_rptr;
+	dlip->dl_primitive = DL_NOTIFY_IND;
+	dlip->dl_notification = DL_NOTE_FASTPATH_FLUSH;
+
+	qreply(dsp->ds_wq, mp);
+}
+
+/*
  * MAC notification callback.
  */
 static void
@@ -1429,27 +1492,18 @@ str_notify(void *arg, mac_notify_type_t type)
 		 * updates the link state.
 		 */
 		switch (mac_link_get(dsp->ds_mh)) {
-		case LINK_STATE_UP:
+		case LINK_STATE_UP: {
+			uint64_t speed;
 			/*
 			 * The link is up so send the appropriate
 			 * DL_NOTIFY_IND.
 			 */
 			str_notify_link_up(dsp);
 
-			/*
-			 * If we can find the link speed then send a
-			 * DL_NOTIFY_IND for that too.
-			 */
-			if (dsp->ds_mip->mi_stat[MAC_STAT_IFSPEED]) {
-				uint64_t	val;
-
-				val = mac_stat_get(dsp->ds_mh,
-				    MAC_STAT_IFSPEED);
-				str_notify_speed(dsp,
-				    (uint32_t)(val / 1000ull));
-			}
+			speed = mac_stat_get(dsp->ds_mh, MAC_STAT_IFSPEED);
+			str_notify_speed(dsp, (uint32_t)(speed / 1000ull));
 			break;
-
+		}
 		case LINK_STATE_DOWN:
 			/*
 			 * The link is down so send the appropriate
@@ -1470,6 +1524,10 @@ str_notify(void *arg, mac_notify_type_t type)
 		 * Send the appropriate DL_NOTIFY_IND.
 		 */
 		str_notify_capab_reneg(dsp);
+		break;
+
+	case MAC_NOTE_FASTPATH_FLUSH:
+		str_notify_fastpath_flush(dsp);
 		break;
 
 	default:
@@ -1679,7 +1737,7 @@ ioc_fast(dld_str_t *dsp, mblk_t *mp)
 	sap = *(uint16_t *)(nmp->b_rptr + off + addr_length);
 	dc = dsp->ds_dc;
 
-	if ((hmp = dls_header(dc, addr, sap, dsp->ds_pri)) == NULL) {
+	if ((hmp = dls_header(dc, addr, sap, dsp->ds_pri, NULL)) == NULL) {
 		rw_exit(&dsp->ds_lock);
 		err = ENOMEM;
 		goto failed;

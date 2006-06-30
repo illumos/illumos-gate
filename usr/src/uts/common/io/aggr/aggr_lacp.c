@@ -90,7 +90,6 @@ static uint16_t lacp_system_priority = 0x1000;
 typedef struct lacp_sel_ports {
 	uint16_t sp_key;
 	char sp_devname[MAXNAMELEN + 1];
-	uint_t sp_port;
 	struct ether_addr sp_partner_system;
 	uint32_t sp_partner_key;
 	struct lacp_sel_ports *sp_next;
@@ -213,10 +212,10 @@ aggr_lacp_init_port(aggr_port_t *portp)
 	offset = ((portp->lp_devname[0] + portp->lp_devname[1]) << 8);
 	instance = inst_num(portp->lp_devname);
 	/* actor port # */
-	pl->ActorPortNumber = offset + instance + portp->lp_port;
-	AGGR_LACP_DBG(("aggr_lacp_init_port(%s/%d): "
+	pl->ActorPortNumber = offset + instance;
+	AGGR_LACP_DBG(("aggr_lacp_init_port(%s): "
 	    "ActorPortNumber = 0x%x\n", portp->lp_devname,
-	    portp->lp_port, pl->ActorPortNumber));
+	    pl->ActorPortNumber));
 
 	pl->ActorPortPriority = (uint16_t)lacp_port_priority;
 	pl->ActorPortAggrId = 0;	/* aggregator id - not used */
@@ -224,10 +223,9 @@ aggr_lacp_init_port(aggr_port_t *portp)
 
 	pl->ActorAdminPortKey = aggrp->lg_key;
 	pl->ActorOperPortKey = pl->ActorAdminPortKey;
-	AGGR_LACP_DBG(("aggr_lacp_init_port(%s/%d) "
+	AGGR_LACP_DBG(("aggr_lacp_init_port(%s) "
 	    "ActorAdminPortKey = 0x%x, ActorAdminPortKey = 0x%x\n",
-	    portp->lp_devname, portp->lp_port, pl->ActorAdminPortKey,
-	    pl->ActorOperPortKey));
+	    portp->lp_devname, pl->ActorAdminPortKey, pl->ActorOperPortKey));
 
 	/* Actor admin. port state */
 	pl->ActorAdminPortState.bit.activity = B_FALSE;
@@ -454,8 +452,8 @@ lacp_periodic_sm(aggr_port_t *portp)
 		stop_periodic_timer(portp);
 		pl->sm.periodic_state = LACP_NO_PERIODIC;
 		pl->NTT = B_FALSE;
-		AGGR_LACP_DBG(("lacp_periodic_sm(%s/%d):NO LACP "
-		    "%s--->%s\n", portp->lp_devname, portp->lp_port,
+		AGGR_LACP_DBG(("lacp_periodic_sm(%s):NO LACP "
+		    "%s--->%s\n", portp->lp_devname,
 		    lacp_periodic_str[oldstate],
 		    lacp_periodic_str[pl->sm.periodic_state]));
 		return;
@@ -470,9 +468,8 @@ lacp_periodic_sm(aggr_port_t *portp)
 		stop_periodic_timer(portp);
 		pl->sm.periodic_state = LACP_NO_PERIODIC;
 		pl->NTT = B_FALSE;
-		AGGR_LACP_DBG(("lacp_periodic_sm(%s/%d):STOP %s--->%s\n",
-		    portp->lp_devname, portp->lp_port,
-		    lacp_periodic_str[oldstate],
+		AGGR_LACP_DBG(("lacp_periodic_sm(%s):STOP %s--->%s\n",
+		    portp->lp_devname, lacp_periodic_str[oldstate],
 		    lacp_periodic_str[pl->sm.periodic_state]));
 		return;
 	}
@@ -672,9 +669,9 @@ lacp_mux_sm(aggr_port_t *portp)
 
 		if (pl->ActorOperPortState.bit.collecting ||
 		    pl->ActorOperPortState.bit.distributing) {
-			AGGR_LACP_DBG(("trunk link: (%s/%d): "
+			AGGR_LACP_DBG(("trunk link: (%s): "
 			    "Collector_Distributor Disabled.\n",
-			    portp->lp_devname, portp->lp_port));
+			    portp->lp_devname));
 		}
 
 		pl->ActorOperPortState.bit.collecting =
@@ -736,8 +733,8 @@ again:
 		return;
 	}
 
-	AGGR_LACP_DBG(("lacp_mux_sm(%s/%d):%s--->%s\n",
-	    portp->lp_devname, portp->lp_port, lacp_mux_str[oldstate],
+	AGGR_LACP_DBG(("lacp_mux_sm(%s):%s--->%s\n",
+	    portp->lp_devname, lacp_mux_str[oldstate],
 	    lacp_mux_str[pl->sm.mux_state]));
 
 	/* perform actions on entering a new state */
@@ -745,9 +742,9 @@ again:
 	case LACP_DETACHED:
 		if (pl->ActorOperPortState.bit.collecting ||
 		    pl->ActorOperPortState.bit.distributing) {
-			AGGR_LACP_DBG(("trunk link: (%s/%d): "
+			AGGR_LACP_DBG(("trunk link: (%s): "
 			    "Collector_Distributor Disabled.\n",
-			    portp->lp_devname, portp->lp_port));
+			    portp->lp_devname));
 		}
 
 		pl->ActorOperPortState.bit.sync =
@@ -767,9 +764,9 @@ again:
 	case LACP_ATTACHED:
 		if (pl->ActorOperPortState.bit.collecting ||
 		    pl->ActorOperPortState.bit.distributing) {
-			AGGR_LACP_DBG(("trunk link: (%s%d): "
+			AGGR_LACP_DBG(("trunk link: (%s): "
 			    "Collector_Distributor Disabled.\n",
-			    portp->lp_devname, portp->lp_port));
+			    portp->lp_devname));
 		}
 
 		pl->ActorOperPortState.bit.sync = B_TRUE;
@@ -793,9 +790,9 @@ again:
 	case LACP_COLLECTING_DISTRIBUTING:
 		if (!pl->ActorOperPortState.bit.collecting &&
 		    !pl->ActorOperPortState.bit.distributing) {
-			AGGR_LACP_DBG(("trunk link: (%s/%d): "
+			AGGR_LACP_DBG(("trunk link: (%s): "
 			    "Collector_Distributor Enabled.\n",
-			    portp->lp_devname, portp->lp_port));
+			    portp->lp_devname));
 		}
 		pl->ActorOperPortState.bit.distributing = B_TRUE;
 
@@ -826,8 +823,8 @@ receive_marker_pdu(aggr_port_t *portp, mblk_t *mp)
 
 	AGGR_LACP_LOCK(portp->lp_grp);
 
-	AGGR_LACP_DBG(("trunk link: (%s/%d): MARKER PDU received:\n",
-	    portp->lp_devname, portp->lp_port));
+	AGGR_LACP_DBG(("trunk link: (%s): MARKER PDU received:\n",
+	    portp->lp_devname));
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!portp->lp_lacp.sm.lacp_on)
@@ -837,50 +834,47 @@ receive_marker_pdu(aggr_port_t *portp, mblk_t *mp)
 		goto bail;
 
 	if (markerp->version != MARKER_VERSION) {
-		AGGR_LACP_DBG(("trunk link (%s/%d): Malformed MARKER PDU: "
+		AGGR_LACP_DBG(("trunk link (%s): Malformed MARKER PDU: "
 		    "version = %d does not match s/w version %d\n",
-		    portp->lp_devname, portp->lp_port,
-		    markerp->version, MARKER_VERSION));
+		    portp->lp_devname, markerp->version, MARKER_VERSION));
 		goto bail;
 	}
 
 	if (markerp->tlv_marker == MARKER_RESPONSE_TLV) {
 		/* We do not yet send out MARKER info PDUs */
-		AGGR_LACP_DBG(("trunk link (%s/%d): MARKER RESPONSE PDU: "
+		AGGR_LACP_DBG(("trunk link (%s): MARKER RESPONSE PDU: "
 		    " MARKER TLV = %d - We don't send out info type!\n",
-		    portp->lp_devname, portp->lp_port,
-		    markerp->tlv_marker));
+		    portp->lp_devname, markerp->tlv_marker));
 		goto bail;
 	}
 
 	if (markerp->tlv_marker != MARKER_INFO_TLV) {
-		AGGR_LACP_DBG(("trunk link (%s/%d): Malformed MARKER PDU: "
-		    " MARKER TLV = %d \n", portp->lp_devname, portp->lp_port,
+		AGGR_LACP_DBG(("trunk link (%s): Malformed MARKER PDU: "
+		    " MARKER TLV = %d \n", portp->lp_devname,
 		    markerp->tlv_marker));
 		goto bail;
 	}
 
 	if (markerp->marker_len != MARKER_INFO_RESPONSE_LENGTH) {
-		AGGR_LACP_DBG(("trunk link (%s/%d): Malformed MARKER PDU: "
-		    " MARKER length = %d \n", portp->lp_devname, portp->lp_port,
+		AGGR_LACP_DBG(("trunk link (%s): Malformed MARKER PDU: "
+		    " MARKER length = %d \n", portp->lp_devname,
 		    markerp->marker_len));
 		goto bail;
 	}
 
 	if (markerp->requestor_port != portp->lp_lacp.PartnerOperPortNum) {
-		AGGR_LACP_DBG(("trunk link (%s/%d): MARKER PDU: "
+		AGGR_LACP_DBG(("trunk link (%s): MARKER PDU: "
 		    " MARKER Port %d not equal to Partner port %d\n",
-		    portp->lp_devname, portp->lp_port,
-		    markerp->requestor_port,
+		    portp->lp_devname, markerp->requestor_port,
 		    portp->lp_lacp.PartnerOperPortNum));
 		goto bail;
 	}
 
 	if (ether_cmp(&markerp->system_id,
 	    &portp->lp_lacp.PartnerOperSystem) != 0) {
-		AGGR_LACP_DBG(("trunk link (%s/%d): MARKER PDU: "
+		AGGR_LACP_DBG(("trunk link (%s): MARKER PDU: "
 		    " MARKER MAC not equal to Partner MAC\n",
-		    portp->lp_devname, portp->lp_port));
+		    portp->lp_devname));
 		goto bail;
 	}
 
@@ -1066,12 +1060,12 @@ lacp_misconfig_check(aggr_port_t *portp)
 			    mac->ether_addr_octet[4], mac->ether_addr_octet[5]);
 
 			portp->lp_lacp.sm.selected = AGGR_UNSELECTED;
-			cmn_err(CE_NOTE, "aggr key %d port %s/%d: Port Partner "
+			cmn_err(CE_NOTE, "aggr key %d port %s: Port Partner "
 			    "MAC %s and key %d in use on aggregation "
-			    "key %d port %s/%d\n", grp->lg_key,
-			    portp->lp_devname, portp->lp_port,
-			    mac_str, portp->lp_lacp.PartnerOperKey,
-			    cport->sp_key, cport->sp_devname, cport->sp_port);
+			    "key %d port %s\n", grp->lg_key,
+			    portp->lp_devname, mac_str,
+			    portp->lp_lacp.PartnerOperKey, cport->sp_key,
+			    cport->sp_devname);
 			break;
 		}
 	}
@@ -1094,8 +1088,7 @@ lacp_sel_ports_del(aggr_port_t *portp)
 	for (cport = sel_ports; cport != NULL; prev = &cport->sp_next,
 	    cport = cport->sp_next) {
 		if (bcmp(portp->lp_devname, cport->sp_devname,
-		    MAXNAMELEN + 1) == 0 &&
-		    (portp->lp_port == cport->sp_port)) {
+		    MAXNAMELEN + 1) == 0) {
 			break;
 		}
 	}
@@ -1129,8 +1122,7 @@ lacp_sel_ports_add(aggr_port_t *portp)
 	for (cport = sel_ports; cport != NULL;
 	    last = &cport->sp_next, cport = cport->sp_next) {
 		if (bcmp(portp->lp_devname, cport->sp_devname,
-		    MAXNAMELEN + 1) == 0 && (portp->lp_port ==
-		    cport->sp_port)) {
+		    MAXNAMELEN + 1) == 0) {
 			ASSERT(cport->sp_partner_key ==
 			    portp->lp_lacp.PartnerOperKey);
 			ASSERT(ether_cmp(&cport->sp_partner_system,
@@ -1153,7 +1145,6 @@ lacp_sel_ports_add(aggr_port_t *portp)
 	    &new_port->sp_partner_system, sizeof (new_port->sp_partner_system));
 	new_port->sp_partner_key = portp->lp_lacp.PartnerOperKey;
 	bcopy(portp->lp_devname, new_port->sp_devname, MAXNAMELEN + 1);
-	new_port->sp_port = portp->lp_port;
 
 	*last = new_port;
 
@@ -1199,11 +1190,10 @@ lacp_selection_logic(aggr_port_t *portp)
 	if (pl->sm.begin || !pl->sm.lacp_enabled ||
 	    (portp->lp_state != AGGR_PORT_STATE_ATTACHED)) {
 
-		AGGR_LACP_DBG(("lacp_selection_logic:(%s/%d): "
+		AGGR_LACP_DBG(("lacp_selection_logic:(%s): "
 		    "selected %d-->%d (begin=%d, lacp_enabled = %d, "
-		    "lp_state=%d)\n", portp->lp_devname, portp->lp_port,
-		    pl->sm.selected, AGGR_UNSELECTED,
-		    pl->sm.begin, pl->sm.lacp_enabled,
+		    "lp_state=%d)\n", portp->lp_devname, pl->sm.selected,
+		    AGGR_UNSELECTED, pl->sm.begin, pl->sm.lacp_enabled,
 		    portp->lp_state));
 
 		lacp_port_unselect(portp);
@@ -1216,9 +1206,8 @@ lacp_selection_logic(aggr_port_t *portp)
 	 * If LACP is not enabled then selected is never set.
 	 */
 	if (!pl->sm.lacp_enabled) {
-		AGGR_LACP_DBG(("lacp_selection_logic:(%s/%d): "
-		    "selected %d-->%d\n", portp->lp_devname, portp->lp_port,
-		    pl->sm.selected, AGGR_UNSELECTED));
+		AGGR_LACP_DBG(("lacp_selection_logic:(%s): selected %d-->%d\n",
+		    portp->lp_devname, pl->sm.selected, AGGR_UNSELECTED));
 
 		lacp_port_unselect(portp);
 		lacp_mux_sm(portp);
@@ -1286,8 +1275,8 @@ lacp_selection_logic(aggr_port_t *portp)
 	 */
 	if (ether_cmp(&pl->PartnerOperSystem,
 	    (struct ether_addr *)&aggrp->lg_addr) == 0) {
-		cmn_err(CE_NOTE, "trunk link: (%s/%d): Loopback condition.\n",
-		    portp->lp_devname, portp->lp_port);
+		cmn_err(CE_NOTE, "trunk link: (%s): Loopback condition.\n",
+		    portp->lp_devname);
 
 		lacp_port_unselect(portp);
 		lacp_mux_sm(portp);
@@ -1342,11 +1331,11 @@ lacp_selection_logic(aggr_port_t *portp)
 		 */
 		lacp_port_unselect(portp);
 
-		cmn_err(CE_NOTE, "trunk link: (%s/%d): Port Partner MAC or"
+		cmn_err(CE_NOTE, "trunk link: (%s): Port Partner MAC or"
 		    " key (%d) incompatible with Aggregation Partner "
 		    "MAC or key (%d)\n",
-		    portp->lp_devname, portp->lp_port,
-		    pl->PartnerOperKey, aggrp->aggr.PartnerOperAggrKey);
+		    portp->lp_devname, pl->PartnerOperKey,
+		    aggrp->aggr.PartnerOperAggrKey);
 
 		lacp_mux_sm(portp);
 		return;
@@ -1354,8 +1343,8 @@ lacp_selection_logic(aggr_port_t *portp)
 
 	/* If we get to here, automatically set selected */
 	if (pl->sm.selected != AGGR_SELECTED) {
-		AGGR_LACP_DBG(("lacp_selection_logic:(%s/%d): "
-		    "selected %d-->%d\n", portp->lp_devname, portp->lp_port,
+		AGGR_LACP_DBG(("lacp_selection_logic:(%s): "
+		    "selected %d-->%d\n", portp->lp_devname,
 		    pl->sm.selected, AGGR_SELECTED));
 		if (!lacp_port_select(portp))
 			return;
@@ -1396,14 +1385,12 @@ lacp_selection_logic(aggr_port_t *portp)
 	}
 
 	if (aggrp->aggr.ready) {
-		AGGR_LACP_DBG(("lacp_selection_logic:(%s/%d): "
-		    "aggr.ready already set\n", portp->lp_devname,
-		    portp->lp_port));
+		AGGR_LACP_DBG(("lacp_selection_logic:(%s): "
+		    "aggr.ready already set\n", portp->lp_devname));
 		lacp_mux_sm(portp);
 	} else {
-		AGGR_LACP_DBG(("lacp_selection_logic:(%s/%d): Ready %d-->%d\n",
-		    portp->lp_devname, portp->lp_port, aggrp->aggr.ready,
-		    B_TRUE));
+		AGGR_LACP_DBG(("lacp_selection_logic:(%s): Ready %d-->%d\n",
+		    portp->lp_devname, aggrp->aggr.ready, B_TRUE));
 		aggrp->aggr.ready = B_TRUE;
 
 		for (tpp = aggrp->lg_ports; tpp; tpp = tpp->lp_next)
@@ -1426,8 +1413,8 @@ wait_while_timer_pop(void *data)
 
 	AGGR_LACP_LOCK(portp->lp_grp);
 
-	AGGR_LACP_DBG(("trunk link:(%s/%d): wait_while_timer pop \n",
-	    portp->lp_devname, portp->lp_port));
+	AGGR_LACP_DBG(("trunk link:(%s): wait_while_timer pop \n",
+	    portp->lp_devname));
 	portp->lp_lacp.wait_while_timer.id = 0;
 	portp->lp_lacp.sm.ready_n = B_TRUE;
 
@@ -1479,8 +1466,8 @@ aggr_lacp_port_attached(aggr_port_t *portp)
 	ASSERT(portp->lp_state == AGGR_PORT_STATE_ATTACHED);
 	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
 
-	AGGR_LACP_DBG(("aggr_lacp_port_attached: "
-	    "port %s/%d\n", portp->lp_devname, portp->lp_port));
+	AGGR_LACP_DBG(("aggr_lacp_port_attached: port %s\n",
+	    portp->lp_devname));
 
 	portp->lp_lacp.sm.port_enabled = B_TRUE;	/* link on */
 
@@ -1535,8 +1522,8 @@ aggr_lacp_port_detached(aggr_port_t *portp)
 	ASSERT(AGGR_LACP_LOCK_HELD(grp));
 	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
 
-	AGGR_LACP_DBG(("aggr_lacp_port_detached: port %s/%d\n",
-	    portp->lp_devname, portp->lp_port));
+	AGGR_LACP_DBG(("aggr_lacp_port_detached: port %s\n",
+	    portp->lp_devname));
 
 	portp->lp_lacp.sm.port_enabled = B_FALSE;
 
@@ -1580,8 +1567,7 @@ lacp_on(aggr_port_t *portp)
 	lacp_reset_port(portp);
 	portp->lp_lacp.sm.lacp_on = B_TRUE;
 
-	AGGR_LACP_DBG(("lacp_on:(%s/%d): \n", portp->lp_devname,
-	    portp->lp_port));
+	AGGR_LACP_DBG(("lacp_on:(%s): \n", portp->lp_devname));
 
 	lacp_receive_sm(portp, NULL);
 	lacp_mux_sm(portp);
@@ -1609,8 +1595,7 @@ lacp_off(aggr_port_t *portp)
 
 	portp->lp_lacp.sm.lacp_on = B_FALSE;
 
-	AGGR_LACP_DBG(("lacp_off:(%s/%d): \n", portp->lp_devname,
-	    portp->lp_port));
+	AGGR_LACP_DBG(("lacp_off:(%s): \n", portp->lp_devname));
 
 	/*
 	 * Disable Slow Protocol Timers. We must temporarely release
@@ -1659,9 +1644,9 @@ valid_lacp_pdu(aggr_port_t *portp, lacp_t *lacp)
 	    (lacp->partner_info.information_len != sizeof (link_info_t)) ||
 	    (lacp->collector_len != LACP_COLLECTOR_INFO_LEN) ||
 	    (lacp->terminator_len != LACP_TERMINATOR_INFO_LEN)) {
-		AGGR_LACP_DBG(("trunk link (%s/%d): Malformed LACPDU: "
+		AGGR_LACP_DBG(("trunk link (%s): Malformed LACPDU: "
 		    " Terminator Length = %d \n", portp->lp_devname,
-		    portp->lp_port, lacp->terminator_len));
+		    lacp->terminator_len));
 		return (B_FALSE);
 	}
 
@@ -1717,8 +1702,8 @@ current_while_timer_pop(void *data)
 
 	AGGR_LACP_LOCK(portp->lp_grp);
 
-	AGGR_LACP_DBG(("trunk link:(%s/%d): current_while_timer "
-	    "pop id=%p\n", portp->lp_devname, portp->lp_port,
+	AGGR_LACP_DBG(("trunk link:(%s): current_while_timer "
+	    "pop id=%p\n", portp->lp_devname,
 	    portp->lp_lacp.current_while_timer.id));
 
 	portp->lp_lacp.current_while_timer.id = 0;
@@ -1805,9 +1790,9 @@ record_PDU(aggr_port_t *portp, lacp_t *lacp)
 	}
 
 	if (save_sync != pl->PartnerOperPortState.bit.sync) {
-		AGGR_LACP_DBG(("record_PDU:(%s/%d): partner sync "
-		    "%d -->%d\n", portp->lp_devname, portp->lp_port,
-		    save_sync, pl->PartnerOperPortState.bit.sync));
+		AGGR_LACP_DBG(("record_PDU:(%s): partner sync "
+		    "%d -->%d\n", portp->lp_devname, save_sync,
+		    pl->PartnerOperPortState.bit.sync));
 		return (B_TRUE);
 	} else {
 		return (B_FALSE);
@@ -1837,9 +1822,9 @@ update_selected(aggr_port_t *portp, lacp_t *lacp)
 	    (pl->PartnerOperKey != ntohs(lacp->actor_info.key)) ||
 	    (pl->PartnerOperPortState.bit.aggregation !=
 	    lacp->actor_info.state.bit.aggregation)) {
-		AGGR_LACP_DBG(("update_selected:(%s/%d): "
-		    "selected  %d-->%d\n", portp->lp_devname, portp->lp_port,
-		    pl->sm.selected, AGGR_UNSELECTED));
+		AGGR_LACP_DBG(("update_selected:(%s): "
+		    "selected  %d-->%d\n", portp->lp_devname, pl->sm.selected,
+		    AGGR_UNSELECTED));
 
 		lacp_port_unselect(portp);
 		return (B_TRUE);
@@ -1869,8 +1854,8 @@ update_default_selected(aggr_port_t *portp)
 	    (pl->PartnerOperPortState.bit.aggregation !=
 	    pl->PartnerAdminPortState.bit.aggregation)) {
 
-		AGGR_LACP_DBG(("update_default_selected:(%s/%d): "
-		    "selected  %d-->%d\n", portp->lp_devname, portp->lp_port,
+		AGGR_LACP_DBG(("update_default_selected:(%s): "
+		    "selected  %d-->%d\n", portp->lp_devname,
 		    pl->sm.selected, AGGR_UNSELECTED));
 
 		lacp_port_unselect(portp);
@@ -1908,9 +1893,8 @@ update_NTT(aggr_port_t *portp, lacp_t *lacp)
 	    (pl->ActorOperPortState.bit.aggregation !=
 	    lacp->partner_info.state.bit.aggregation)) {
 
-		AGGR_LACP_DBG(("update_NTT:(%s/%d): NTT  %d-->%d\n",
-		    portp->lp_devname, portp->lp_port, pl->NTT,
-		    B_TRUE));
+		AGGR_LACP_DBG(("update_NTT:(%s): NTT  %d-->%d\n",
+		    portp->lp_devname, pl->NTT, B_TRUE));
 
 		pl->NTT = B_TRUE;
 	}
@@ -1967,9 +1951,8 @@ lacp_receive_sm(aggr_port_t *portp, lacp_t *lacp)
 
 	if (!((lacp && (oldstate == LACP_CURRENT) &&
 	    (pl->sm.receive_state == LACP_CURRENT)))) {
-		AGGR_LACP_DBG(("lacp_receive_sm(%s/%d):%s--->%s\n",
-		    portp->lp_devname, portp->lp_port,
-		    lacp_receive_str[oldstate],
+		AGGR_LACP_DBG(("lacp_receive_sm(%s):%s--->%s\n",
+		    portp->lp_devname, lacp_receive_str[oldstate],
 		    lacp_receive_str[pl->sm.receive_state]));
 	}
 
@@ -2057,8 +2040,8 @@ lacp_receive_sm(aggr_port_t *portp, lacp_t *lacp)
 		if (!lacp) /* no LACPDU so current_while_timer popped */
 			break;
 
-		AGGR_LACP_DBG(("lacp_receive_sm: (%s/%d): "
-		    "LACPDU received:\n", portp->lp_devname, portp->lp_port));
+		AGGR_LACP_DBG(("lacp_receive_sm: (%s): LACPDU received:\n",
+		    portp->lp_devname));
 
 		/*
 		 * Validate Actor_Information_Length,
@@ -2066,9 +2049,9 @@ lacp_receive_sm(aggr_port_t *portp, lacp_t *lacp)
 		 * and Terminator_Length fields.
 		 */
 		if (!valid_lacp_pdu(portp, lacp)) {
-			AGGR_LACP_DBG(("lacp_receive_sm (%s/%d): "
+			AGGR_LACP_DBG(("lacp_receive_sm (%s): "
 			    "Invalid LACPDU received\n",
-			    portp->lp_devname, portp->lp_port));
+			    portp->lp_devname));
 			break;
 		}
 
@@ -2125,9 +2108,8 @@ aggr_set_coll_dist_locked(aggr_port_t *portp, boolean_t enable)
 {
 	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
 
-	AGGR_LACP_DBG(("AGGR_SET_COLL_DIST_TYPE: (%s/%d) %s\n",
-	    portp->lp_devname, portp->lp_port,
-	    enable ? "ENABLED" : "DISABLED"));
+	AGGR_LACP_DBG(("AGGR_SET_COLL_DIST_TYPE: (%s) %s\n",
+	    portp->lp_devname, enable ? "ENABLED" : "DISABLED"));
 
 	if (!enable) {
 		/*
@@ -2169,8 +2151,8 @@ aggr_lacp_rx(aggr_port_t *portp, mblk_t *dmp)
 
 	switch (lacp->subtype) {
 	case LACP_SUBTYPE:
-		AGGR_LACP_DBG(("aggr_lacp_rx:(%s/%d): "
-		    "LACPDU received.\n", portp->lp_devname, portp->lp_port));
+		AGGR_LACP_DBG(("aggr_lacp_rx:(%s): LACPDU received.\n",
+		    portp->lp_devname));
 
 		AGGR_LACP_LOCK(portp->lp_grp);
 		if (!portp->lp_lacp.sm.lacp_on) {
@@ -2182,17 +2164,16 @@ aggr_lacp_rx(aggr_port_t *portp, mblk_t *dmp)
 		break;
 
 	case MARKER_SUBTYPE:
-		AGGR_LACP_DBG(("aggr_lacp_rx:(%s%d): "
-		    "Marker Packet received.\n",
-		    portp->lp_devname, portp->lp_port));
+		AGGR_LACP_DBG(("aggr_lacp_rx:(%s): Marker Packet received.\n",
+		    portp->lp_devname));
 
 		(void) receive_marker_pdu(portp, dmp);
 		break;
 
 	default:
-		AGGR_LACP_DBG(("aggr_lacp_rx: (%s%d): "
+		AGGR_LACP_DBG(("aggr_lacp_rx: (%s): "
 		    "Unknown Slow Protocol type %d\n",
-		    portp->lp_devname, portp->lp_port, lacp->subtype));
+		    portp->lp_devname, lacp->subtype));
 		break;
 	}
 

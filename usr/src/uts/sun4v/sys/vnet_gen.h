@@ -318,16 +318,14 @@ typedef struct vgen_portlist {
 typedef struct vgen {
 	void			*vnetp;		/* associated vnet instance */
 	dev_info_t		*vnetdip;	/* dip of vnet */
-	void			*vnetmacp;	/* mac_t of vnet */
 	uint8_t			macaddr[ETHERADDRL];	/* mac addr of vnet */
-	mac_resource_handle_t	mrh;		/* handle for mac_rx() */
 	kmutex_t		lock;		/* synchornize ops */
 	int			flags;		/* flags */
 	vgen_portlist_t		vgenports;	/* Port List */
 	mdeg_node_spec_t	*mdeg_parentp;
 	mdeg_handle_t		mdeg_hdl;
 	vgen_port_t		*vsw_portp;	/* port connected to vsw */
-	mac_t			vgenmac;	/* vgen mac ops */
+	mac_register_t		*macp;		/* vgen mac ops */
 	struct ether_addr	*mctab;		/* multicast addr table */
 	uint32_t		mcsize;		/* allocated size of mctab */
 	uint32_t		mccount;	/* # of valid addrs in mctab */
