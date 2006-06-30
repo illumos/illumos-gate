@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -626,7 +625,7 @@ pset_bind(psetid_t pset, idtype_t idtype, id_t id, psetid_t *opset)
 static int
 pset_getloadavg(psetid_t pset, int *buf, int nelem)
 {
-	int *loadbuf;
+	int loadbuf[LOADAVG_NSTATS];
 	int error = 0;
 
 	if (nelem < 0)
@@ -639,15 +638,11 @@ pset_getloadavg(psetid_t pset, int *buf, int nelem)
 	if (nelem > LOADAVG_NSTATS)
 		nelem = LOADAVG_NSTATS;
 
-	loadbuf = kmem_alloc(nelem * sizeof (int), KM_SLEEP);
-
 	mutex_enter(&cpu_lock);
 	error = cpupart_get_loadavg(pset, loadbuf, nelem);
 	mutex_exit(&cpu_lock);
 	if (!error && nelem && copyout(loadbuf, buf, nelem * sizeof (int)) != 0)
 		error = EFAULT;
-
-	kmem_free(loadbuf, nelem * sizeof (int));
 
 	if (error)
 		return (set_errno(error));
