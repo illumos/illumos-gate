@@ -411,7 +411,7 @@ sparc_SUBDIRS= \
 	cmd/datadm \
 	cmd/dcs \
 	cmd/drd \
-'ve	cmd/fruadm \
+	cmd/fruadm \
 	cmd/prtdscp \
 	cmd/prtfru \
 	cmd/sckmd \
