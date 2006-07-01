@@ -732,6 +732,7 @@ nfsmapid_cfg() {
 	rm -f ${tmpservices}
 }
 
+#
 # Define global variables
 #
 CALL_DEVID_DESTROY=""
@@ -5989,6 +5990,15 @@ mondo_loop() {
 	# Remove unneeded nfsmapid entries
 	#
 	nfsmapid_cfg
+
+	#
+	# Nuke the nfsauth headers. The cpio archive will lay the right
+	# one to match mountd(1m)'s comm method w/the kernel (via kRPC
+	# or Doors/XDR).
+	#
+	rm -f ${usr}/include/rpcsvc/nfsauth_prot.x
+	rm -f ${usr}/include/rpcsvc/nfsauth_prot.h
+	rm -f ${usr}/include/nfs/auth.h
 
 	#
 	# Move the original manifests aside; later we will restore
