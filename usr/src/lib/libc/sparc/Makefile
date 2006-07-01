@@ -780,7 +780,7 @@ PORTI18N_COND=			\
 AIOOBJS=			\
 	aio.o			\
 	aio_alloc.o		\
-	posix_aio.o		\
+	posix_aio.o
 
 RTOBJS=				\
 	clock_timer.o		\
