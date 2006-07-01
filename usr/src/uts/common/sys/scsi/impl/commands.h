@@ -340,8 +340,10 @@ union scsi_cdb {		/* scsi command description block */
 				(cdb)->g0_addr1  = ((addr) >> 8) & 0xFF; \
 				(cdb)->g0_addr0  = (addr) & 0xFF
 
-#define	GETG0ADDR(cdb)		(((cdb)->g0_addr2 & 0x1F) << 16) + \
-				((cdb)->g0_addr1 << 8) + ((cdb)->g0_addr0)
+#define	GETG0COUNT(cdb)		(cdb)->g0_count0
+
+#define	GETG0ADDR(cdb)		((((cdb)->g0_addr2 & 0x1F) << 16) + \
+				((cdb)->g0_addr1 << 8) + ((cdb)->g0_addr0))
 
 #define	GETG0TAG(cdb)		((cdb)->g0_addr2)
 
@@ -357,10 +359,12 @@ union scsi_cdb {		/* scsi command description block */
 				(cdb)->g1_addr1  = ((addr) >> 8) & 0xFF; \
 				(cdb)->g1_addr0  = (addr) & 0xFF
 
-#define	GETG1ADDR(cdb)		((cdb)->g1_addr3 << 24) + \
+#define	GETG1COUNT(cdb)		(((cdb)->g1_count1 << 8) + ((cdb)->g1_count0))
+
+#define	GETG1ADDR(cdb)		(((cdb)->g1_addr3 << 24) + \
 				((cdb)->g1_addr2 << 16) + \
 				((cdb)->g1_addr1 << 8)  + \
-				((cdb)->g1_addr0)
+				((cdb)->g1_addr0))
 
 #define	GETG1TAG(cdb)		(cdb)->g1_reladdr
 
@@ -384,6 +388,20 @@ union scsi_cdb {		/* scsi command description block */
 						((addr) >> 8) & 0xFF; \
 					(cdb)->g4_addtl_cdb_data0 = \
 						(addr) & 0xFF
+
+#define	GETG4COUNT(cdb)		(((cdb)->g4_count3 << 24) + \
+				((cdb)->g4_count2 << 16) + \
+				((cdb)->g4_count1 << 8) + \
+				((cdb)->g4_count0))
+
+#define	GETG4LONGADDR(cdb)	(((diskaddr_t)(cdb)->g4_addr3 << 56) + \
+			((diskaddr_t)(cdb)->g4_addr2 << 48) + \
+			((diskaddr_t)(cdb)->g4_addr1 << 40) + \
+			((diskaddr_t)(cdb)->g4_addr0 << 32) + \
+			((diskaddr_t)(cdb)->g4_addtl_cdb_data3 << 24) + \
+			((diskaddr_t)(cdb)->g4_addtl_cdb_data2 << 16) + \
+			((diskaddr_t)(cdb)->g4_addtl_cdb_data1 << 8) + \
+			((diskaddr_t)(cdb)->g4_addtl_cdb_data0))
 
 #define	FORMG4ADDR(cdb, addr)	(cdb)->g4_addr3 = (addr) >> 24; \
 				(cdb)->g4_addr2 = ((addr) >> 16) & 0xFF; \

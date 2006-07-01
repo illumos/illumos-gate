@@ -259,6 +259,9 @@ CHKHDRS=			\
 	ipc.h			\
 	ipc_impl.h		\
 	isa_defs.h		\
+	iscsi_authclient.h	\
+	iscsi_authclientglue.h	\
+	iscsi_protocol.h	\
 	jioctl.h		\
 	kbd.h			\
 	kbdreg.h		\

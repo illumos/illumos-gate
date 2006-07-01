@@ -83,6 +83,7 @@ ROOT.SYS= \
 	/etc/fs/nfs  \
 	/etc/fs/zfs \
 	/etc/ftpd  \
+	/etc/iscsi \
 	/etc/rpcsec	\
 	/etc/security	\
 	/etc/gss	\

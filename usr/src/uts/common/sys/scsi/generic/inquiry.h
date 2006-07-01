@@ -63,7 +63,7 @@ struct scsi_inquiry {
 
 	/* byte 3 */
 	uchar_t	inq_rdf		: 4,	/* response data format 	*/
-				: 1,	/* reserved 			*/
+		inq_hisup	: 1,	/* Hierarchial support		*/
 		inq_normaca	: 1,	/* setting NACA bit supported */
 		inq_trmiop	: 1,	/* TERMINATE I/O PROC msg 	*/
 		inq_aenc	: 1;	/* async event notification cap. */
@@ -72,8 +72,9 @@ struct scsi_inquiry {
 
 	uchar_t	inq_len;		/* additional length 		*/
 
-	uchar_t			: 8;	/* reserved 			*/
-
+	uchar_t			: 4,	/* reserved 			*/
+		inq_tpgs	: 1,	/* supports Target Port Group set */
+				: 3;
 	uchar_t	inq_addr16	: 1,	/* supports 16 bit wide SCSI addr */
 		inq_addr32	: 1,	/* supports 32 bit wide SCSI addr */
 		inq_ackqreqq	: 1,	/* data tranfer on Q cable */
@@ -140,14 +141,16 @@ struct scsi_inquiry {
 	uchar_t	inq_aenc	: 1,	/* async event notification cap. */
 		inq_trmiop	: 1,	/* supports TERMINATE I/O PROC msg */
 		inq_normaca	: 1,	/* setting NACA bit supported */
-				: 1,	/* reserved */
+		inq_hisup	: 1,	/* hierachial support */
 		inq_rdf		: 4;	/* response data format */
 
 	/* bytes 4-7 */
 
 	uchar_t	inq_len;		/* additional length */
 
-	uchar_t			: 8;	/* reserved */
+	uchar_t			: 3,	/* reserved */
+		inq_tpgs	: 1,	/* supports Target Port Group Set */
+				: 4;
 
 	uchar_t			: 2,	/* reserved 			*/
 		inq_port	: 1,	/* port receiving inquiry cmd */
@@ -291,6 +294,51 @@ struct scsi_inquiry {
 #define	RDF_LEVEL0		0x00
 #define	RDF_CCS			0x01
 #define	RDF_SCSI2		0x02
+
+/*
+ * SPC-3 revision 21c, section 7.6.4.1
+ * Table 289 -- Device Identification VPD page
+ */
+struct vpd_hdr {
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t	device_type	: 4,
+		periph_qual	: 4;
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t	periph_qual	: 4,
+		device_type	: 4;
+#else
+#error One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif
+	uchar_t	page_code,
+		page_len[2];
+};
+
+/*
+ * SPC-3 revision 21c, section 7.6.4.1
+ * Table 290 -- Identification descriptor
+ */
+struct vpd_desc {
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t	code_set	: 4,
+		proto_id	: 4;
+	uchar_t id_type		: 4,
+		association	: 2,
+				: 1,
+		piv		: 1;
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t	proto_id	: 4,
+		code_set	: 4;
+	uchar_t piv		: 1,
+				: 1,
+		association	: 2,
+		id_type		: 4;
+#else
+#error One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif
+	uchar_t	resrv1;
+	uchar_t	len;
+	/* ---- data follows ---- */
+};
 
 #ifdef	__cplusplus
 }

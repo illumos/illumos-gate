@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,19 +196,6 @@ static void emul64_yield_check();
 static emul64_rng_overlap_t bsd_tgt_overlap(emul64_tgt_t *, diskaddr_t, int);
 
 char *emul64_name = "emul64";
-
-
-/* XXX replace with FORMG0COUNT */
-#define	GETG0COUNT(cdb)		((cdb)->g0_count0)
-
-#define	GETG1COUNT(cdb)		((cdb)->g1_count1 << 8)  + \
-				((cdb)->g1_count0)
-
-#define	GETG4COUNT(cdb)	\
-			((uint64_t)(cdb)->g4_count3 << 24)  + \
-			((uint64_t)(cdb)->g4_count2 << 16)  + \
-			((uint64_t)(cdb)->g4_count1 << 8)  + \
-			((uint64_t)(cdb)->g4_count0)
 
 
 /*

@@ -802,3 +802,11 @@ usr/include/nss.h			i386
 #
 # bmc (IPMI) interfaces shared within ON.
 usr/include/sys/bmc_intf.h		i386
+#
+# These files are used by the iSCSI Target which is in this consolidation
+# and the iSCSI Initiator which is in the DMG consolidation. There's no
+# reason to ship these files.
+#
+usr/include/sys/iscsi_protocol.h	i386
+usr/include/sys/iscsi_authclient.h	i386
+usr/include/sys/iscsi_authclientglue.h	i386

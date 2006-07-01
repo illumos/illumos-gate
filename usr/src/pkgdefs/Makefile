@@ -207,6 +207,8 @@ COMMON_SUBDIRS= \
 	SUNWippcore \
 	SUNWipplr \
 	SUNWipplu \
+	SUNWiscsitgtr \
+	SUNWiscsitgtu \
 	SUNWixgb \
 	SUNWkrbr \
 	SUNWkrbu \

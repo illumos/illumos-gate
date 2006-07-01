@@ -199,6 +199,7 @@ COMMON_SUBDIRS=		\
 	ipf		\
 	isainfo		\
 	isalist		\
+	iscsi		\
 	java		\
 	join		\
 	kbd		\
@@ -555,6 +556,7 @@ MSGSUBDIRS=		\
 	hostname	\
 	id		\
 	isaexec		\
+	iscsi		\
 	join		\
 	krb5		\
 	kstat		\
