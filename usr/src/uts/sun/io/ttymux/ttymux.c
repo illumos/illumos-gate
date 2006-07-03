@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -798,22 +797,6 @@ sm_putqs(queue_t *q, mblk_t *mp, int (*qfn)())
 }
 
 /*
- * sm_reply - send an ioctl reply back up the queue.
- */
-static void
-sm_reply(queue_t *q, mblk_t *mp, uchar_t type, int error)
-{
-	struct iocblk *iocbp;
-
-	iocbp = (struct iocblk *)mp->b_rptr;
-
-	DB_TYPE(mp) = type;
-	iocbp->ioc_count = 0;
-	iocbp->ioc_error = error;
-	qreply(q, mp);
-}
-
-/*
  * Service a streams link and unlink requests.
  */
 static void
@@ -953,7 +936,10 @@ sm_link_req(queue_t *wq, mblk_t *mp)
 	default:
 		rval = EINVAL;
 	}
-	sm_reply(wq, mp, (rval) ? M_IOCNAK : M_IOCACK, rval);
+	if (rval != 0)
+		miocnak(wq, mp, 0, rval);
+	else
+		miocack(wq, mp, 0, 0);
 }
 
 static int
@@ -1223,17 +1209,25 @@ sm_default_uwioctl(queue_t *wq, mblk_t *mp, int (*qfn)())
 	case TIOCEXCL:
 	case TIOCNXCL:
 	case TIOCSTI:
+		/*
+		 * The three ioctl types we support do not require any
+		 * additional allocation and should not return a pending
+		 * ioctl state. For this reason it is safe for us to ignore
+		 * the return value from ttycommon_ioctl().
+		 * Additionally, we translate any error response from
+		 * ttycommon_ioctl() into EINVAL.
+		 */
 		(void) ttycommon_ioctl(uqi->sm_ttycommon, wq, mp, &err);
-		sm_reply(wq, mp, err ? M_IOCACK : M_IOCNAK, err);
+		if (err < 0)
+			miocnak(wq, mp, 0, EINVAL);
+		else
+			miocack(wq, mp, 0, 0);
 		return (0);
 	default:
 		break;
 	}
-	err = sm_update_ttyinfo(mp, uqi);
-	if (err) {
-		iobp->ioc_error = err;
-		mp->b_datap->db_type = M_IOCNAK;
-		qreply(wq, mp);
+	if ((err = sm_update_ttyinfo(mp, uqi)) != 0) {
+		miocnak(wq, mp, 0, err);
 		return (0);
 	}
 
