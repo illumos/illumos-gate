@@ -589,35 +589,6 @@ name2cp(struct node *np, struct config *croot)
 	return (cp);
 }
 
-int
-config_confprop(struct node *np, struct config *croot, struct evalue *valuep)
-{
-	struct node *nodep;
-	struct config *cp;
-	const char *s;
-
-	if (np->u.expr.left->u.func.s == L_fru)
-		nodep = eval_fru(np->u.expr.left->u.func.arglist);
-	else if (np->u.expr.left->u.func.s == L_asru)
-		nodep = eval_asru(np->u.expr.left->u.func.arglist);
-
-	cp = name2cp(nodep, croot);
-	if (cp == NULL)
-		return (1);
-
-	/* for now s will point to a quote [see addconfigprop()] */
-	ASSERT(np->u.expr.right->t == T_QUOTE);
-
-	s = config_getprop(cp, np->u.expr.right->u.quote.s);
-	if (s == NULL)
-		return (1);
-
-	valuep->t = STRING;
-	valuep->v = (uintptr_t)stable(s);
-
-	return (0);
-}
-
 #define	CONNECTED_SEPCHARS " ,"
 
 int

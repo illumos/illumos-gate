@@ -1856,7 +1856,8 @@ itree_set_arrow_traits(struct arrow *ap, struct node *fromev,
 	/* handle constraints on the from event in the prop statement */
 	epnames[0] = fromev->u.event.epname;
 	epnames[1] = toev->u.event.epname;
-	if (eval_potential(fromev->u.event.eexprlist, ex, epnames, &newc) == 0)
+	if (eval_potential(fromev->u.event.eexprlist, ex, epnames, &newc,
+	    Ninfo.croot) == 0)
 		return (0);		/* constraint disallows arrow */
 
 	/*
@@ -1876,7 +1877,8 @@ itree_set_arrow_traits(struct arrow *ap, struct node *fromev,
 	/* handle constraints on the to event in the prop statement */
 	epnames[0] = toev->u.event.epname;
 	epnames[1] = fromev->u.event.epname;
-	if (eval_potential(toev->u.event.eexprlist, ex, epnames, &newc) == 0) {
+	if (eval_potential(toev->u.event.eexprlist, ex, epnames, &newc,
+	    Ninfo.croot) == 0) {
 		if (newc != NULL)
 			tree_free(newc);
 		return (0);		/* constraint disallows arrow */

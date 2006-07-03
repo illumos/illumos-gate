@@ -95,7 +95,6 @@ static struct fme {
 	fmd_event_t *e0r;
 
 	id_t    timer;			/* for setting an fmd time-out */
-	id_t	htid;			/* for setting hesitation timer */
 
 	struct event *ecurrent;		/* ereport under consideration */
 	struct event *suspects;		/* current suspect list */
@@ -103,7 +102,6 @@ static struct fme {
 	int nsuspects;			/* count of suspects */
 	int nonfault;			/* zero if all suspects T_FAULT */
 	int posted_suspects;		/* true if we've posted a diagnosis */
-	int hesitated;			/* true if we hesitated */
 	int uniqobs;			/* number of unique events observed */
 	int peek;			/* just peeking, don't track suspects */
 	int overflow;			/* true if overflow FME */
@@ -606,6 +604,14 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 
 	Open_fme_count++;
 
+	/*
+	 * ignore solved or closed cases
+	 */
+	if (fmep->posted_suspects ||
+	    fmd_case_solved(fmep->hdl, fmep->fmcase) ||
+	    fmd_case_closed(fmep->hdl, fmep->fmcase))
+		return;
+
 	/* give the diagnosis algorithm a shot at the new FME state */
 	fme_eval(fmep, NULL);
 	return;
@@ -1058,6 +1064,14 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 			continue;
 		}
 
+		/*
+		 * ignore solved or closed cases
+		 */
+		if (fmep->posted_suspects ||
+		    fmd_case_solved(fmep->hdl, fmep->fmcase) ||
+		    fmd_case_closed(fmep->hdl, fmep->fmcase))
+			continue;
+
 		/* look up event in event tree for this FME */
 		if ((ep = itree_lookup(fmep->eventtree,
 		    eventstring, ipp)) == NULL)
@@ -1287,22 +1301,6 @@ indent(void)
 		return;
 	for (i = 0; i < current_indent; i++)
 		out(O_ALTFP|O_VERB|O_NONL, indent_s[i]);
-}
-
-static int
-suspects_changed(struct fme *fmep)
-{
-	struct event *suspects = fmep->suspects;
-	struct event *psuspects = fmep->psuspects;
-
-	while (suspects != NULL && psuspects != NULL) {
-		if (suspects != psuspects)
-			return (1);
-		suspects = suspects->suspects;
-		psuspects = psuspects->psuspects;
-	}
-
-	return (suspects != psuspects);
 }
 
 #define	SLNEW		1
@@ -1937,7 +1935,6 @@ istat_fini(void)
 static void
 publish_suspects(struct fme *fmep)
 {
-	struct event *ep;
 	struct rsl *srl = NULL;
 	struct rsl *erl;
 	struct rsl *rp;
@@ -1952,29 +1949,6 @@ publish_suspects(struct fme *fmep)
 	boolean_t allfaulty = B_TRUE;
 
 	stats_counter_bump(fmep->diags);
-
-	/*
-	 * The current fmd interfaces don't allow us to solve a case
-	 * that's already solved.  If we make a new case, what of the
-	 * ereports?  We don't appear to have an interface that allows
-	 * us to access the ereports attached to a case (if we wanted
-	 * to copy the original case's ereport attachments to the new
-	 * case) and it's also a bit unclear if there would be any
-	 * problems with having ereports attached to multiple cases
-	 * and/or attaching DIAGNOSED ereports to a case.  For now,
-	 * we'll just output a message.
-	 */
-	if (fmep->posted_suspects ||
-	    fmd_case_solved(fmep->hdl, fmep->fmcase)) {
-		out(O_ALTFP|O_NONL, "Revised diagnosis for case %s: ",
-		    fmd_case_uuid(fmep->hdl, fmep->fmcase));
-		for (ep = fmep->suspects; ep; ep = ep->suspects) {
-			out(O_ALTFP|O_NONL, " ");
-			itree_pevent_brief(O_ALTFP|O_NONL, ep);
-		}
-		out(O_ALTFP, NULL);
-		return;
-	}
 
 	/*
 	 * If we're auto-closing upsets, we don't want to include them
@@ -2037,15 +2011,15 @@ publish_suspects(struct fme *fmep)
 			if (node2uint(n, &fr) != 0) {
 				out(O_DEBUG|O_NONL, "event ");
 				ipath_print(O_DEBUG|O_NONL,
-				    ep->enode->u.event.ename->u.name.s,
-				    ep->ipp);
+				    rp->suspect->enode->u.event.ename->u.name.s,
+				    rp->suspect->ipp);
 				out(O_DEBUG, " has no FITrate (using 1)");
 				fr = 1;
 			} else if (fr == 0) {
 				out(O_DEBUG|O_NONL, "event ");
 				ipath_print(O_DEBUG|O_NONL,
-				    ep->enode->u.event.ename->u.name.s,
-				    ep->ipp);
+				    rp->suspect->enode->u.event.ename->u.name.s,
+				    rp->suspect->ipp);
 				out(O_DEBUG, " has zero FITrate (using 1)");
 				fr = 1;
 			}
@@ -2352,14 +2326,6 @@ fme_set_timer(struct fme *fmep, unsigned long long wull)
 
 	if (fmep->wull != 0) {
 		fmd_timer_remove(fmep->hdl, fmep->timer);
-		if (fmep->timer == fmep->htid) {
-			out(O_ALTFP,
-			    "[stopped hesitating FME%d, case %s]",
-			    fmep->id,
-			    fmd_case_uuid(fmep->hdl,
-			    fmep->fmcase));
-			fmep->htid = 0;
-		}
 	}
 
 	fmep->timer = fmd_timer_install(fmep->hdl, (void *)fmep,
@@ -2384,22 +2350,11 @@ fme_timer_fired(struct fme *fmep, id_t tid)
 		return;
 	}
 
-	out(O_ALTFP, "Timer fired %lx %lx", tid, fmep->htid);
-	if (tid != fmep->htid) {
-		/*
-		 * normal timer (not the hesitation timer)
-		 */
-		fmep->pull = fmep->wull;
-		fmep->wull = 0;
-		fmd_buf_write(fmep->hdl, fmep->fmcase,
-		    WOBUF_PULL, (void *)&fmep->pull, sizeof (fmep->pull));
-		/*
-		 * no point in heistating if we've already waited.
-		 */
-		fmep->hesitated = 1;
-	} else {
-		fmep->hesitated = 1;
-	}
+	out(O_ALTFP, "Timer fired %lx", tid);
+	fmep->pull = fmep->wull;
+	fmep->wull = 0;
+	fmd_buf_write(fmep->hdl, fmep->fmcase,
+	    WOBUF_PULL, (void *)&fmep->pull, sizeof (fmep->pull));
 	fme_eval(fmep, fmep->e0r);
 }
 
@@ -2478,107 +2433,49 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 	}
 	out(O_ALTFP|O_VERB, NULL);
 
-	if (fmep->posted_suspects) {
+	switch (fmep->state) {
+	case FME_CREDIBLE:
+		print_suspects(SLNEW, fmep);
+		(void) upsets_eval(fmep, ffep);
+
 		/*
-		 * this FME has already posted a diagnosis, so see if
-		 * the event changed the diagnosis and print a warning
-		 * if it did.
-		 *
+		 * we may have already posted suspects in upsets_eval() which
+		 * can recurse into fme_eval() again. If so then just return.
 		 */
-		if (suspects_changed(fmep)) {
-			print_suspects(SLCHANGED, fmep);
-			publish_suspects(fmep);
+		if (fmep->posted_suspects)
+			return;
+
+		publish_suspects(fmep);
+		fmep->posted_suspects = 1;
+		fmd_buf_write(fmep->hdl, fmep->fmcase,
+		    WOBUF_POSTD,
+		    (void *)&fmep->posted_suspects,
+		    sizeof (fmep->posted_suspects));
+
+		/*
+		 * Now the suspects have been posted, we can clear up
+		 * the instance tree as we won't be looking at it again.
+		 * Also cancel the timer as the case is now solved.
+		 */
+		if (fmep->wull != 0) {
+			fmd_timer_remove(fmep->hdl, fmep->timer);
+			fmep->wull = 0;
 		}
-	} else {
-		switch (fmep->state) {
-		case FME_CREDIBLE:
-			/*
-			 * if the suspect list contains any upsets, we
-			 * turn off the hesitation logic (by setting
-			 * the hesitate flag which normally indicates
-			 * we've already done the hesitate logic).
-			 * this is done because hesitating with upsets
-			 * causes us to explain away additional soft errors
-			 * while the upset FME stays open.
-			 */
-			if (fmep->hesitated == 0) {
-				struct event *s;
+		lut_walk(fmep->eventtree, (lut_cb)clear_arrows,
+		    (void *)fmep);
+		break;
 
-				for (s = fmep->suspects; s; s = s->suspects) {
-					if (s->t == N_UPSET) {
-						fmep->hesitated = 1;
-						break;
-					}
-				}
-			}
+	case FME_WAIT:
+		ASSERT(my_delay > fmep->ull);
+		(void) fme_set_timer(fmep, my_delay);
+		print_suspects(SLWAIT, fmep);
+		break;
 
-			if (Hesitate &&
-			    fmep->suspects != NULL &&
-			    fmep->suspects->suspects != NULL &&
-			    fmep->hesitated == 0) {
-				/*
-				 * about to publish multi-entry suspect list,
-				 * set the hesitation timer if not already set.
-				 */
-				if (fmep->htid == 0) {
-					out(O_ALTFP|O_NONL,
-					    "[hesitate FME%d, case %s ",
-					    fmep->id,
-					    fmd_case_uuid(fmep->hdl,
-					    fmep->fmcase));
-					ptree_timeval(O_ALTFP|O_NONL,
-					    (unsigned long long *)&Hesitate);
-					out(O_ALTFP, "]");
-					if (fme_set_timer(fmep, Hesitate))
-						fmep->htid = fmep->timer;
-				} else {
-					out(O_ALTFP,
-					    "[still hesitating FME%d, case %s]",
-					    fmep->id,
-					    fmd_case_uuid(fmep->hdl,
-					    fmep->fmcase));
-				}
-			} else {
-				print_suspects(SLNEW, fmep);
-				(void) upsets_eval(fmep, ffep);
-				publish_suspects(fmep);
-				fmep->posted_suspects = 1;
-				fmd_buf_write(fmep->hdl, fmep->fmcase,
-				    WOBUF_POSTD,
-				    (void *)&fmep->posted_suspects,
-				    sizeof (fmep->posted_suspects));
-			}
-			break;
-
-		case FME_WAIT:
-			/*
-			 * singleton suspect list implies
-			 * no point in waiting
-			 */
-			if (fmep->suspects &&
-			    fmep->suspects->suspects == NULL) {
-				print_suspects(SLNEW, fmep);
-				(void) upsets_eval(fmep, ffep);
-				publish_suspects(fmep);
-				fmep->posted_suspects = 1;
-				fmd_buf_write(fmep->hdl, fmep->fmcase,
-				    WOBUF_POSTD,
-				    (void *)&fmep->posted_suspects,
-				    sizeof (fmep->posted_suspects));
-				fmep->state = FME_CREDIBLE;
-			} else {
-				ASSERT(my_delay > fmep->ull);
-				(void) fme_set_timer(fmep, my_delay);
-				print_suspects(SLWAIT, fmep);
-			}
-			break;
-
-		case FME_DISPROVED:
-			print_suspects(SLDISPROVED, fmep);
-			Undiag_reason = UD_UNSOLVD;
-			fme_undiagnosable(fmep);
-			break;
-		}
+	case FME_DISPROVED:
+		print_suspects(SLDISPROVED, fmep);
+		Undiag_reason = UD_UNSOLVD;
+		fme_undiagnosable(fmep);
+		break;
 	}
 
 	if (fmep->posted_suspects == 1 && Autoclose != NULL) {
@@ -2778,9 +2675,22 @@ mark_arrows(struct fme *fmep, struct event *ep, int mark,
 				continue;
 			}
 			ep2->cached_state &= ~PARENT_WAIT;
-			result = requirements_test(fmep, ep2, at_latest_by +
-			    ap->arrowp->maxdelay,
-			    &my_delay);
+			/*
+			 * if we've reached an ereport and no propagation time
+			 * is specified, use the Hesitate value
+			 */
+			if (ep2->t == N_EREPORT && at_latest_by == 0ULL &&
+			    ap->arrowp->maxdelay == 0ULL) {
+				result = requirements_test(fmep, ep2, Hesitate,
+				    &my_delay);
+				out(O_ALTFP|O_VERB|O_NONL, "  default wait ");
+				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep2);
+				out(O_ALTFP|O_VERB, NULL);
+			} else {
+				result = requirements_test(fmep, ep2,
+				    at_latest_by + ap->arrowp->maxdelay,
+				    &my_delay);
+			}
 			if (result == FME_WAIT) {
 				retval = WAIT_EFFECT;
 				if (overall_delay > my_delay)
@@ -2848,8 +2758,12 @@ effects_test(struct fme *fmep, struct event *fault_event,
 	itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, fault_event);
 	out(O_ALTFP|O_VERB, NULL);
 
-	(void) mark_arrows(fmep, fault_event, CREDIBLE_EFFECT, at_latest_by,
-	    &my_delay, 0);
+	if (mark_arrows(fmep, fault_event, CREDIBLE_EFFECT, at_latest_by,
+	    &my_delay, 0) == WAIT_EFFECT) {
+		return_value = FME_WAIT;
+		if (overall_delay > my_delay)
+			overall_delay = my_delay;
+	}
 	for (error_event = fmep->observations;
 	    error_event; error_event = error_event->observations) {
 		indent();
@@ -2858,9 +2772,6 @@ effects_test(struct fme *fmep, struct event *fault_event,
 		if (!(error_event->cached_state & CREDIBLE_EFFECT)) {
 			if (error_event->cached_state &
 			    (PARENT_WAIT|WAIT_EFFECT)) {
-				return_value = FME_WAIT;
-				if (overall_delay > my_delay)
-					overall_delay = my_delay;
 				out(O_ALTFP|O_VERB, " NOT YET triggered");
 				continue;
 			}

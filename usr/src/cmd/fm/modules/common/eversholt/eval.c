@@ -149,6 +149,37 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		tree_free(rhs);
 
 		return (1);
+	} else if (funcname == L_confprop) {
+		struct config *cp;
+		struct node *lhs;
+		char *path;
+		const char *s;
+
+		if (np->u.expr.left->u.func.s == L_fru)
+			lhs = eval_fru(np->u.expr.left->u.func.arglist);
+		else if (np->u.expr.left->u.func.s == L_asru)
+			lhs = eval_asru(np->u.expr.left->u.func.arglist);
+		else
+			out(O_DIE, "confprop: unexpected lhs type: %s",
+			    ptree_nodetype2str(np->u.expr.left->t));
+
+		/* for now s will point to a quote [see addconfigprop()] */
+		ASSERT(np->u.expr.right->t == T_QUOTE);
+
+		/* eval_dup will expand wildcards, iterators, etc... */
+		lhs = eval_dup(lhs, ex, epnames);
+		path = ipath2str(NULL, ipath(lhs));
+		cp = config_lookup(croot, path, 0);
+		tree_free(lhs);
+		FREE((void *)path);
+		if (cp == NULL)
+			return (0);
+		s = config_getprop(cp, np->u.expr.right->u.quote.s);
+		if (s == NULL)
+			return (0);
+		valuep->v = (uintptr_t)stable(s);
+		valuep->t = STRING;
+		return (1);
 	}
 
 	if (try)
@@ -178,8 +209,6 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		return (! config_is_present(np, croot, valuep));
 	} else if (funcname == L_is_type) {
 		return (! config_is_type(np, croot, valuep));
-	} else if (funcname == L_confprop) {
-		return (! config_confprop(np, croot, valuep));
 	} else if (funcname == L_envprop) {
 		outfl(O_DIE, np->file, np->line,
 		    "eval_func: %s not yet supported", funcname);
@@ -645,12 +674,12 @@ eval_dup(struct node *np, struct lut *ex, struct node *epnames[])
  */
 int
 eval_potential(struct node *np, struct lut *ex, struct node *epnames[],
-	    struct node **newc)
+	    struct node **newc, struct config *croot)
 {
 	struct node *newnp;
 	struct evalue value;
 
-	if (eval_expr(np, ex, epnames, NULL, NULL, NULL, 1, &value) == 0) {
+	if (eval_expr(np, ex, epnames, NULL, croot, NULL, 1, &value) == 0) {
 		/*
 		 * couldn't eval expression because
 		 * it contains deferred items.  make
