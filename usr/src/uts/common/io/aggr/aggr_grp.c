@@ -981,12 +981,14 @@ aggr_grp_rem_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 bail:
 	rw_exit(&grp->lg_lock);
 	AGGR_LACP_UNLOCK(grp);
-	if (mac_addr_update)
-		mac_unicst_update(grp->lg_mh, grp->lg_addr);
-	if (link_state_update)
-		mac_link_update(grp->lg_mh, grp->lg_link_state);
-	if (rc == 0)
-		mac_resource_update(grp->lg_mh);
+	if (!grp->lg_closing) {
+		if (mac_addr_update)
+			mac_unicst_update(grp->lg_mh, grp->lg_addr);
+		if (link_state_update)
+			mac_link_update(grp->lg_mh, grp->lg_link_state);
+		if (rc == 0)
+			mac_resource_update(grp->lg_mh);
+	}
 	AGGR_GRP_REFRELE(grp);
 
 	return (rc);
@@ -1018,6 +1020,7 @@ aggr_grp_delete(uint32_t key)
 	 * fail the operation.
 	 */
 	if (mac_unregister(grp->lg_mh)) {
+		grp->lg_closing = B_FALSE;
 		rw_exit(&grp->lg_lock);
 		AGGR_LACP_UNLOCK(grp);
 		rw_exit(&aggr_grp_lock);
