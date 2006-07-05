@@ -1962,7 +1962,7 @@ ipcl_walk(pfv_t func, void *arg)
  * Search for a peer TCP/IPv4 loopback conn by doing a reverse lookup on
  * the {src, dst, lport, fport} quadruplet.  Returns with conn reference
  * held; caller must call CONN_DEC_REF.  Only checks for connected entries
- * (peer tcp in at least ESTABLISHED state).
+ * (peer tcp in ESTABLISHED state).
  */
 conn_t *
 ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *connp, ipha_t *ipha, tcph_t *tcph)
@@ -1993,7 +1993,7 @@ ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *connp, ipha_t *ipha, tcph_t *tcph)
 
 		if (IPCL_CONN_MATCH(tconnp, IPPROTO_TCP,
 		    ipha->ipha_dst, ipha->ipha_src, ports) &&
-		    tconnp->conn_tcp->tcp_state >= TCPS_ESTABLISHED &&
+		    tconnp->conn_tcp->tcp_state == TCPS_ESTABLISHED &&
 		    (!zone_chk || tconnp->conn_zoneid == connp->conn_zoneid)) {
 
 			ASSERT(tconnp != connp);
@@ -2010,7 +2010,7 @@ ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *connp, ipha_t *ipha, tcph_t *tcph)
  * Search for a peer TCP/IPv6 loopback conn by doing a reverse lookup on
  * the {src, dst, lport, fport} quadruplet.  Returns with conn reference
  * held; caller must call CONN_DEC_REF.  Only checks for connected entries
- * (peer tcp in at least ESTABLISHED state).
+ * (peer tcp in ESTABLISHED state).
  */
 conn_t *
 ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *connp, ip6_t *ip6h, tcph_t *tcph)
@@ -2045,7 +2045,7 @@ ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *connp, ip6_t *ip6h, tcph_t *tcph)
 		/* We skip tcp_bound_if check here as this is loopback tcp */
 		if (IPCL_CONN_MATCH_V6(tconnp, IPPROTO_TCP,
 		    ip6h->ip6_dst, ip6h->ip6_src, ports) &&
-		    tconnp->conn_tcp->tcp_state >= TCPS_ESTABLISHED &&
+		    tconnp->conn_tcp->tcp_state == TCPS_ESTABLISHED &&
 		    (!zone_chk || tconnp->conn_zoneid == connp->conn_zoneid)) {
 
 			ASSERT(tconnp != connp);

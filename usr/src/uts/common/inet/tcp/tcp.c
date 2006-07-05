@@ -3733,6 +3733,9 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 	tcp->tcp_cleandeathtag = tag;
 #endif
 
+	if (tcp->tcp_fused)
+		tcp_unfuse(tcp);
+
 	if (tcp->tcp_linger_tid != 0 &&
 	    TCP_TIMER_CANCEL(tcp, tcp->tcp_linger_tid) >= 0) {
 		tcp_stop_lingering(tcp);
