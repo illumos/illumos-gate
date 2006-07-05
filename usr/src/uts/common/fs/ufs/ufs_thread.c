@@ -744,6 +744,14 @@ ufs_idle_free(struct inode *ip)
 			CPU_STATS_ADDQ(CPU, sys, ufsinopage, 1);
 		}
 		ASSERT((vp->v_type == VCHR) || !vn_has_cached_data(vp));
+
+		/*
+		 * We had better not have a vnode reference count > 1
+		 * at this point, if we do then something is broken as
+		 * this inode/vnode acquired a reference underneath of us.
+		 */
+		ASSERT(vp->v_count == 1);
+
 		ufs_free_inode(ip);
 	}
 }

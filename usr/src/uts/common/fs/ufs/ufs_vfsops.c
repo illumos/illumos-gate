@@ -1528,6 +1528,23 @@ ufs_unmount(struct vfs *vfsp, int fflag, struct cred *cr)
 			inext = ip->i_forw;
 			if (ip->i_ufsvfs != ufsvfsp)
 				continue;
+
+			/*
+			 * We've found the inode in the cache and as we
+			 * hold the hash mutex the inode can not
+			 * disappear from underneath us.
+			 * We also know it must have at least a vnode
+			 * reference count of 1.
+			 * We perform an additional VN_HOLD so the VN_RELE
+			 * in case we take the inode off the idle queue
+			 * can not be the last one.
+			 * It is safe to grab the writer contents lock here
+			 * to prevent a race with ufs_iinactive() putting
+			 * inodes into the idle queue while we operate on
+			 * this inode.
+			 */
+			rw_enter(&ip->i_contents, RW_WRITER);
+
 			vp = ITOV(ip);
 			VN_HOLD(vp)
 			remque(ip);
@@ -1549,6 +1566,9 @@ ufs_unmount(struct vfs *vfsp, int fflag, struct cred *cr)
 			else
 				vp->v_vfsp = NULL;
 			vp->v_type = VBAD;
+
+			rw_exit(&ip->i_contents);
+
 			VN_RELE(vp);
 		}
 		mutex_exit(&ih_lock[i]);
