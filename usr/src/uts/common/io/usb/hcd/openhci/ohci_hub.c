@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +74,12 @@ static void	ohci_handle_clrchng_port_over_current(
 static void	ohci_handle_get_port_status(
 				ohci_state_t		*ohcip,
 				uint16_t		port);
+static int	ohci_handle_set_clear_hub_feature(
+				ohci_state_t		*ohcip,
+				uchar_t 		bRequest,
+				uint16_t		wValue);
+static void	ohci_handle_clrchng_hub_over_current(
+				ohci_state_t		*ohcip);
 static void	ohci_handle_get_hub_descriptor(
 				ohci_state_t		*ohcip);
 static void	ohci_handle_get_hub_status(
@@ -586,6 +591,10 @@ ohci_handle_root_hub_request(
 			break;
 		}
 		break;
+	case HUB_HANDLE_HUB_FEATURE_TYPE:
+		error = ohci_handle_set_clear_hub_feature(ohcip,
+		    bRequest, wValue);
+		break;
 	default:
 		USB_DPRINTF_L2(PRINT_MASK_ROOT_HUB, ohcip->ohci_log_hdl,
 		    "ohci_handle_root_hub_request: "
@@ -1073,6 +1082,77 @@ ohci_handle_get_port_status(
 
 
 /*
+ * ohci_handle_set_clear_hub_feature:
+ *
+ * OHCI only implements clearing C_HUB_OVER_CURRENT feature now.
+ * Other hub requests of this bmRequestType are either not
+ * supported by hardware or never used.
+ */
+static int
+ohci_handle_set_clear_hub_feature(
+	ohci_state_t		*ohcip,
+	uchar_t 		bRequest,
+	uint16_t		wValue)
+{
+	int			error = USB_SUCCESS;
+
+	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ohcip->ohci_log_hdl,
+	    "ohci_handle_set_clear_hub_feature: 0x%x 0x%x",
+	    bRequest, wValue);
+
+	switch (bRequest) {
+	case USB_REQ_CLEAR_FEATURE:
+		if (wValue == CFS_C_HUB_OVER_CURRENT) {
+			ohci_handle_clrchng_hub_over_current(ohcip);
+		} else {
+			USB_DPRINTF_L2(PRINT_MASK_ROOT_HUB, ohcip->ohci_log_hdl,
+			    "ohci_handle_set_clear_hub_feature: "
+			    "Unsupported request 0x%x 0x%x", bRequest, wValue);
+
+			error = USB_FAILURE;
+		}
+		break;
+
+	case USB_REQ_SET_FEATURE:
+	default:
+		USB_DPRINTF_L2(PRINT_MASK_ROOT_HUB, ohcip->ohci_log_hdl,
+		    "ohci_handle_set_clear_hub_feature: "
+		    "Unsupported request 0x%x 0x%x", bRequest, wValue);
+
+		error = USB_FAILURE;
+		break;
+	}
+
+	return (error);
+}
+
+
+/*
+ * ohci_handle_clrchng_hub_over_current:
+ *
+ * Clear over current indicator change bit on the root hub.
+ */
+static void
+ohci_handle_clrchng_hub_over_current(
+	ohci_state_t		*ohcip)
+{
+	uint_t			hub_status;
+
+	mutex_enter(&ohcip->ohci_int_mutex);
+
+	hub_status = Get_OpReg(hcr_rh_status);
+
+	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ohcip->ohci_log_hdl,
+	    "ohci_handle_clrchng_hub_over_current: "
+	    "status = 0x%x", hub_status);
+
+	Set_OpReg(hcr_rh_status, HCR_RH_STATUS_OCIC);
+
+	mutex_exit(&ohcip->ohci_int_mutex);
+}
+
+
+/*
  * ohci_handle_get_hub_descriptor:
  */
 static void
@@ -1520,14 +1600,16 @@ ohci_handle_root_hub_status_change(void *arg)
 	new_root_hub_status = Get_OpReg(hcr_rh_status);
 
 	/* See if the root hub status has changed */
-	if ((new_root_hub_status & HCR_RH_STATUS_MASK) !=
-	    ohcip->ohci_root_hub.rh_status) {
+	if (new_root_hub_status & HCR_RH_CHNG_MASK) {
 
 		USB_DPRINTF_L3(PRINT_MASK_ROOT_HUB, ohcip->ohci_log_hdl,
 		    "ohci_handle_root_hub_status_change: "
 		    "Root hub status has changed!");
 
 		all_ports_status = 1;
+
+		/* Update root hub status */
+		ohcip->ohci_root_hub.rh_status = new_root_hub_status;
 	}
 
 	/* Check each port */

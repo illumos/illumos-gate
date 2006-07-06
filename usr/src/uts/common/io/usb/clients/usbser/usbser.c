@@ -159,6 +159,12 @@ static usb_console_info_t console_input, console_output;
 static uchar_t *console_input_buf;
 static uchar_t *console_input_start, *console_input_end;
 
+_NOTE(SCHEME_PROTECTS_DATA("unshared", usbser_console_abort))
+_NOTE(SCHEME_PROTECTS_DATA("unshared", console_input))
+_NOTE(SCHEME_PROTECTS_DATA("unshared", console_output))
+_NOTE(SCHEME_PROTECTS_DATA("unshared", console_input_start))
+_NOTE(SCHEME_PROTECTS_DATA("unshared", console_input_end))
+
 static void usbser_putchar(cons_polledio_arg_t, uchar_t);
 static int usbser_getchar(cons_polledio_arg_t);
 static boolean_t usbser_ischar(cons_polledio_arg_t);

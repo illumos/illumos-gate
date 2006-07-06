@@ -34,6 +34,11 @@ one usba_device
 
 ### specify the root functions
 
+root	usb_console_output_init
+root	usb_console_output_fini
+root	usb_console_output_enter
+root	usb_console_output_exit
+root	usb_console_write
 root	usb_console_input_enter
 root	usb_console_input_exit
 root	usb_console_read
@@ -189,3 +194,8 @@ add usba_hcdi_ops::usba_hcdi_console_input_init targets \
                                                 ehci_hcdi_polled_input_init
 add usba_hcdi_ops::usba_hcdi_console_input_fini targets \
                                                 ehci_hcdi_polled_input_fini
+
+add usba_hcdi_ops::usba_hcdi_console_input_init targets \
+						uhci_hcdi_polled_input_init
+add usba_hcdi_ops::usba_hcdi_console_input_fini targets \
+						uhci_hcdi_polled_input_fini

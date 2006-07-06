@@ -398,6 +398,10 @@ uhci_hcdi_polled_write(usb_console_info_impl_t *info, uchar_t *buf,
 	uhci_pipe_private_t	*pp;
 	usba_pipe_handle_data_t	*ph;
 
+#ifndef lint
+	_NOTE(NO_COMPETING_THREADS_NOW);
+#endif
+
 	uhci_polledp = (uhci_polled_t *)info->uci_private;
 	uhcip = uhci_polledp->uhci_polled_uhcip;
 	ph = uhci_polledp->uhci_polled_ph;
@@ -460,6 +464,10 @@ uhci_hcdi_polled_write(usb_console_info_impl_t *info, uchar_t *buf,
 		SetFL32(uhcip, uhcip->uhci_frame_lst_tablep[i],
 		    HC_END_OF_LIST);
 	}
+
+#ifndef lint
+	_NOTE(COMPETING_THREADS_NOW);
+#endif
 
 	return (USB_SUCCESS);
 }

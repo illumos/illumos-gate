@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -3597,6 +3596,39 @@ hubd_hotplug_thread(void *arg)
 					}
 				}
 			}
+
+			/*
+			 * Check if the port is over-current
+			 */
+			if (change & PORT_CHANGE_OCIC) {
+				USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG,
+				    hubd->h_log_handle,
+				    "Port%d in over current condition, "
+				    "please check the attached device to "
+				    "clear the condition. The system will "
+				    "try to recover the port, but if not "
+				    "successful, you need to re-connect "
+				    "the hub or reboot the system to bring "
+				    "the port back to work", port);
+
+				if (!(status & PORT_STATUS_PPS)) {
+					/*
+					 * Try to enable port power, but
+					 * possibly fail. Ignore failure
+					 */
+					(void) hubd_enable_port_power(hubd,
+					    port);
+
+					/*
+					 * Delay some time to avoid
+					 * over-current event to happen
+					 * too frequently in some cases
+					 */
+					mutex_exit(HUBD_MUTEX(hubd));
+					delay(drv_usectohz(500000));
+					mutex_enter(HUBD_MUTEX(hubd));
+				}
+			}
 		}
 	}
 
@@ -4000,8 +4032,10 @@ hubd_get_hub_status(hubd_t *hubd)
 	size_t		cfg_length;
 	uchar_t		*usb_cfg;
 	uint8_t		MaxPower;
+	usb_hub_descr_t	*hub_descr;
+	usb_port_t	port;
 
-	USB_DPRINTF_L4(DPRINT_MASK_PORT, hubd->h_log_handle,
+	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 	    "hubd_get_hub_status:");
 
 	ASSERT(mutex_owned(HUBD_MUTEX(hubd)));
@@ -4024,7 +4058,7 @@ hubd_get_hub_status(hubd_t *hubd)
 
 	if (rval != USB_CFG_DESCR_SIZE) {
 
-		USB_DPRINTF_L2(DPRINT_MASK_PORT, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "get hub configuration descriptor failed.");
 
 		mutex_enter(HUBD_MUTEX(hubd));
@@ -4051,7 +4085,7 @@ hubd_get_hub_status(hubd_t *hubd)
 				 * not draw any power from USB bus.
 				 * It can't work well on this condition.
 				 */
-				USB_DPRINTF_L1(DPRINT_MASK_PORT,
+				USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG,
 				    hubd->h_log_handle,
 				    "local power has been lost, "
 				    "please disconnect hub");
@@ -4060,7 +4094,7 @@ hubd_get_hub_status(hubd_t *hubd)
 				/*
 				 * Bus-powered only or self/bus-powered hub.
 				 */
-				USB_DPRINTF_L1(DPRINT_MASK_PORT,
+				USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG,
 				    hubd->h_log_handle,
 				    "local power has been lost,"
 				    "the hub could draw %d"
@@ -4070,19 +4104,19 @@ hubd_get_hub_status(hubd_t *hubd)
 
 		}
 
-		USB_DPRINTF_L3(DPRINT_MASK_PORT, hubd->h_log_handle,
+		USB_DPRINTF_L3(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "clearing feature C_HUB_LOCAL_POWER ");
 
 		if ((rval = usb_pipe_sync_ctrl_xfer(hubd->h_dip,
 		    hubd->h_default_pipe,
-		    USB_DEV_REQ_TYPE_CLASS,
+		    HUB_HANDLE_HUB_FEATURE_TYPE,
 		    USB_REQ_CLEAR_FEATURE,
 		    CFS_C_HUB_LOCAL_POWER,
 		    0,
 		    0,
 		    NULL, 0,
 		    &completion_reason, &cb_flags, 0)) != USB_SUCCESS) {
-			USB_DPRINTF_L2(DPRINT_MASK_PORT,
+			USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG,
 			    hubd->h_log_handle,
 			    "clear feature C_HUB_LOCAL_POWER "
 			    "failed (%d 0x%x %d)",
@@ -4094,33 +4128,96 @@ hubd_get_hub_status(hubd_t *hubd)
 	if (change & C_HUB_OVER_CURRENT) {
 
 		if (status & HUB_OVER_CURRENT) {
-			/*
-			 * the user must offline this hub in order to recover.
-			 * the port power is automatically disabled, so we
-			 * won't see disconnects.
-			 */
-			USB_DPRINTF_L0(DPRINT_MASK_PORT, hubd->h_log_handle,
-			    "global over current condition, "
-			    "please disconnect hub");
+
+			if (usba_is_root_hub(hubd->h_dip)) {
+				/*
+				 * The root hub should be automatically
+				 * recovered when over-current condition is
+				 * cleared. But there might be exception and
+				 * need user interaction to recover.
+				 */
+				USB_DPRINTF_L0(DPRINT_MASK_HOTPLUG,
+				    hubd->h_log_handle,
+				    "Root hub over current condition, "
+				    "please check your system to clear the "
+				    "condition as soon as possible. And you "
+				    "may need to reboot the system to bring "
+				    "the root hub back to work if it cannot "
+				    "recover automatically");
+			} else {
+				/*
+				 * The driver would try to recover port power
+				 * on over current condition. When the recovery
+				 * fails, the user may still need to offline
+				 * this hub in order to recover.
+				 * The port power is automatically disabled,
+				 * so we won't see disconnects.
+				 */
+				USB_DPRINTF_L0(DPRINT_MASK_HOTPLUG,
+				    hubd->h_log_handle,
+				    "Hub global over current condition, "
+				    "please disconnect the devices connected "
+				    "to the hub to clear the condition. And "
+				    "you may need to re-connect the hub if "
+				    "the ports do not work");
+			}
 		}
 
-		USB_DPRINTF_L3(DPRINT_MASK_PORT, hubd->h_log_handle,
+		USB_DPRINTF_L3(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "clearing feature C_HUB_OVER_CURRENT");
 
 		if ((rval = usb_pipe_sync_ctrl_xfer(hubd->h_dip,
 		    hubd->h_default_pipe,
-		    USB_DEV_REQ_TYPE_CLASS,
+		    HUB_HANDLE_HUB_FEATURE_TYPE,
 		    USB_REQ_CLEAR_FEATURE,
 		    CFS_C_HUB_OVER_CURRENT,
 		    0,
 		    0,
 		    NULL, 0,
 		    &completion_reason, &cb_flags, 0)) != USB_SUCCESS) {
-			USB_DPRINTF_L2(DPRINT_MASK_PORT,
+			USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG,
 			    hubd->h_log_handle,
 			    "clear feature C_HUB_OVER_CURRENT "
 			    "failed (%d 0x%x %d)",
 			    rval, completion_reason, cb_flags);
+		}
+
+		/*
+		 * Try to recover all port power if they are turned off.
+		 * Don't do this for root hub, but rely on the root hub
+		 * to recover itself.
+		 */
+		if (!usba_is_root_hub(hubd->h_dip)) {
+
+			mutex_enter(HUBD_MUTEX(hubd));
+
+			/*
+			 * Only check the power status of the 1st port
+			 * since all port power status should be the same.
+			 */
+			(void) hubd_determine_port_status(hubd, 1, &status,
+			    &change, 0);
+
+			if (status & PORT_STATUS_PPS) {
+
+				return (USB_SUCCESS);
+			}
+
+			hub_descr = &hubd->h_hub_descr;
+
+			for (port = 1; port <= hub_descr->bNbrPorts;
+			    port++) {
+
+				(void) hubd_enable_port_power(hubd, port);
+			}
+
+			mutex_exit(HUBD_MUTEX(hubd));
+
+			/*
+			 * Delay some time to avoid over-current event
+			 * to happen too frequently in some cases
+			 */
+			delay(drv_usectohz(500000));
 		}
 	}
 

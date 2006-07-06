@@ -236,6 +236,7 @@ typedef volatile struct ohci_regs {
 #define	HCR_RH_STATUS_OCIC	0x00020000	/* Over current indicator */
 #define	HCR_RH_STATUS_CRWE	0x80000000	/* Clear remote wakeup enable */
 #define	HCR_RH_STATUS_MASK	0x10038003	/* Status mask */
+#define	HCR_RH_CHNG_MASK	0x00030000	/* Mask for change bits */
 
 /* hcr_rh_portstatus bits */
 #define	HCR_PORT_CCS		0x00000001	/* Current connect status */
