@@ -1978,6 +1978,7 @@ pcic_setup_adapter(pcicdev_t *pcic)
 			    pcic->cfgaddr + PCIC_DIAG_REG, cfg);
 			break;
 		    case PCIC_TI_PCI1520:
+		    case PCIC_TI_PCI1510:
 		    case PCIC_TI_VENDOR:
 			if (pcic->pc_intr_mode == PCIC_INTR_MODE_ISA) {
 				cfg = ddi_get8(pcic->cfg_handle,
@@ -2401,6 +2402,7 @@ pcic_intr(caddr_t arg1, caddr_t arg2)
 		case PCIC_TI_PCI1250:
 		case PCIC_TI_PCI1225:
 		case PCIC_TI_PCI1221:
+		case PCIC_TI_PCI1510:
 		case PCIC_TI_PCI1520:
 		case PCIC_TI_PCI1410:
 		case PCIC_TI_VENDOR:
@@ -5664,6 +5666,7 @@ pcic_handle_cd_change(pcicdev_t *pcic, pcic_socket_t *sockp, uint8_t status)
 	irq = pcic_getb(pcic, sockp->pcs_socket, PCIC_MANAGEMENT_INT);
 	irq |= PCIC_CD_DETECT;
 	pcic_putb(pcic, sockp->pcs_socket, PCIC_MANAGEMENT_INT, irq);
+	pcic_putcb(pcic, CB_STATUS_MASK, CB_SE_CCDMASK);
 
 	pcic_err(pcic->dip, 7, "Leaving pcic_handle_cd_change\n");
 }
