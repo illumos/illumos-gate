@@ -1783,7 +1783,29 @@ ENTRY(gateA20)
 	jnz	3f
 	ret
 
-3:	/* use keyboard controller */
+3:	/*
+	 * try to switch gateA20 using PORT92, the "Fast A20 and Init"
+	 * register
+	 */
+	mov	$0x92, %dx
+	inb	%dx, %al
+	/* skip the port92 code if it's unimplemented (read returns 0xff) */
+	cmpb	$0xff, %al
+	jz	6f
+
+	/* set or clear bit1, the ALT_A20_GATE bit */
+	movb	4(%esp), %ah
+	testb	%ah, %ah
+	jz	4f
+	orb	$2, %al
+	jmp	5f
+4:	and	$0xfd, %al
+
+	/* clear the INIT_NOW bit; don't accidently reset the machine */
+5:	and	$0xfe, %al
+	outb	%al, %dx
+
+6:	/* use keyboard controller */
 	pushl	%eax
 
 	call    gloop1
@@ -1793,9 +1815,12 @@ ENTRY(gateA20)
 
 gloopint1:
 	inb	$K_STATUS
+	cmpb    $0xff, %al
+	jz      gloopint1_done
 	andb	$K_IBUF_FUL, %al
 	jnz	gloopint1
 
+gloopint1_done:
 	movb	$KB_OUTPUT_MASK, %al
 	cmpb	$0, 0x8(%esp)
 	jz	gdoit
@@ -1816,6 +1841,8 @@ gdoit:
 
 gloop1:
 	inb	$K_STATUS
+	cmpb	$0xff, %al
+	jz	gloop2ret
 	andb	$K_IBUF_FUL, %al
 	jnz	gloop1
 
@@ -2122,6 +2149,10 @@ ENTRY(ascii_key_map)
 
 ENTRY(console_getkey)
 	push	%ebp
+
+wait_for_key:
+	call	EXT_C(console_checkkey)
+	incl	wait_for_key
 
 	call	EXT_C(prot_to_real)
 	.code16
