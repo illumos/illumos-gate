@@ -2630,7 +2630,7 @@ bge_chip_sync(bge_t *bgep)
 	boolean_t promisc;
 	uint64_t macaddr;
 	uint32_t fill;
-	int i;
+	int i, j;
 	int retval = DDI_SUCCESS;
 
 	BGE_TRACE(("bge_chip_sync($%p)",
@@ -2693,18 +2693,20 @@ bge_chip_sync(bge_t *bgep)
 	if (!bgep->asf_enabled || !asf_keeplive) {
 #endif
 		/*
-		 * Transform the MAC address from host to chip format, then
+		 * Transform the MAC address(es) from host to chip format, then
 		 * reprogram the transmit random backoff seed and the unicast
 		 * MAC address(es) ...
 		 */
-		for (i = 0, fill = 0, macaddr = 0ull; i < ETHERADDRL; ++i) {
-			macaddr <<= 8;
-			macaddr |= bgep->curr_addr.addr[i];
-			fill += bgep->curr_addr.addr[i];
+		for (j = 0; j < MAC_ADDRESS_REGS_MAX; j++) {
+			for (i = 0, fill = 0, macaddr = 0ull;
+			    i < ETHERADDRL; ++i) {
+				macaddr <<= 8;
+				macaddr |= bgep->curr_addr[j].addr[i];
+				fill += bgep->curr_addr[j].addr[i];
+			}
+			bge_reg_put32(bgep, MAC_TX_RANDOM_BACKOFF_REG, fill);
+			bge_reg_put64(bgep, MAC_ADDRESS_REG(j), macaddr);
 		}
-		bge_reg_put32(bgep, MAC_TX_RANDOM_BACKOFF_REG, fill);
-		for (i = 0; i < MAC_ADDRESS_REGS_MAX; ++i)
-			bge_reg_put64(bgep, MAC_ADDRESS_REG(i), macaddr);
 
 		BGE_DEBUG(("bge_chip_sync($%p) setting MAC address %012llx",
 			(void *)bgep, macaddr));
@@ -3180,7 +3182,7 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 				bgep->chipid.vendor_addr.addr[i] = (uchar_t)mac;
 				mac >>= 8;
 			}
-			bgep->chipid.vendor_addr.set = 1;
+			bgep->chipid.vendor_addr.set = B_TRUE;
 		}
 	}
 

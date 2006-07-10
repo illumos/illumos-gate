@@ -125,6 +125,12 @@ static int		bge_m_unicst(void *, const uint8_t *);
 static void		bge_m_resources(void *);
 static void		bge_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t	bge_m_getcapab(void *, mac_capab_t, void *);
+static int		bge_unicst_set(void *, const uint8_t *,
+    mac_addr_slot_t);
+static int		bge_m_unicst_add(void *, mac_multi_addr_t *);
+static int		bge_m_unicst_remove(void *, mac_addr_slot_t);
+static int		bge_m_unicst_modify(void *, mac_multi_addr_t *);
+static int		bge_m_unicst_get(void *, mac_multi_addr_t *);
 
 #define	BGE_M_CALLBACK_FLAGS	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB)
 
@@ -512,16 +518,28 @@ bge_m_start(void *arg)
 }
 
 /*
- *	bge_m_unicst_set() -- set the physical network address
+ *	bge_m_unicst() -- set the physical network address
  */
 static int
 bge_m_unicst(void *arg, const uint8_t *macaddr)
+{
+	/*
+	 * Request to set address in
+	 * address slot 0, i.e., default address
+	 */
+	return (bge_unicst_set(arg, macaddr, 0));
+}
+
+/*
+ *	bge_unicst_set() -- set the physical network address
+ */
+static int
+bge_unicst_set(void *arg, const uint8_t *macaddr, mac_addr_slot_t slot)
 {
 	bge_t *bgep = arg;		/* private device info	*/
 
 	BGE_TRACE(("bge_m_unicst_set($%p, %s)", arg,
 		ether_sprintf((void *)macaddr)));
-
 	/*
 	 * Remember the new current address in the driver state
 	 * Sync the chip's idea of the address too ...
@@ -533,7 +551,7 @@ bge_m_unicst(void *arg, const uint8_t *macaddr)
 		mutex_exit(bgep->genlock);
 		return (EIO);
 	}
-	ethaddr_copy(macaddr, bgep->curr_addr.addr);
+	ethaddr_copy(macaddr, bgep->curr_addr[slot].addr);
 #ifdef BGE_IPMI_ASF
 	if (bge_chip_sync(bgep, B_FALSE) == DDI_FAILURE) {
 #else
@@ -597,6 +615,158 @@ bge_m_unicst(void *arg, const uint8_t *macaddr)
 		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
 		mutex_exit(bgep->genlock);
 		return (EIO);
+	}
+	mutex_exit(bgep->genlock);
+
+	return (0);
+}
+
+/*
+ * The following four routines are used as callbacks for multiple MAC
+ * address support:
+ *    -  bge_m_unicst_add(void *, mac_multi_addr_t *);
+ *    -  bge_m_unicst_remove(void *, mac_addr_slot_t);
+ *    -  bge_m_unicst_modify(void *, mac_multi_addr_t *);
+ *    -  bge_m_unicst_get(void *, mac_multi_addr_t *);
+ */
+
+/*
+ * bge_m_unicst_add() - will find an unused address slot, set the
+ * address value to the one specified, reserve that slot and enable
+ * the NIC to start filtering on the new MAC address.
+ * address slot. Returns 0 on success.
+ */
+static int
+bge_m_unicst_add(void *arg, mac_multi_addr_t *maddr)
+{
+	bge_t *bgep = arg;		/* private device info	*/
+	mac_addr_slot_t slot;
+	int i, err;
+
+	if (mac_unicst_verify(bgep->mh,
+	    maddr->mma_addr, maddr->mma_addrlen) == B_FALSE)
+		return (EINVAL);
+
+	mutex_enter(bgep->genlock);
+	if (bgep->unicst_addr_avail == 0) {
+		/* no slots available */
+		mutex_exit(bgep->genlock);
+		return (ENOSPC);
+	}
+
+	/*
+	 * Primary/default address is in slot 0. The next three
+	 * addresses are the multiple MAC addresses. So multiple
+	 * MAC address 0 is in slot 1, 1 in slot 2, and so on.
+	 * When we return a slot number to the user, it is
+	 * actually slot number plus one to bge.
+	 */
+	for (i = 0; i < bgep->unicst_addr_total; i++) {
+		if (bgep->curr_addr[i + 1].set == B_FALSE) {
+			bgep->curr_addr[i + 1].set = B_TRUE;
+			slot = i;
+			break;
+		}
+	}
+
+	bgep->unicst_addr_avail--;
+	mutex_exit(bgep->genlock);
+	maddr->mma_slot = slot;
+
+	if ((err = bge_unicst_set(bgep, maddr->mma_addr, slot)) != 0) {
+		mutex_enter(bgep->genlock);
+		bgep->curr_addr[slot + 1].set = B_FALSE;
+		bgep->unicst_addr_avail++;
+		mutex_exit(bgep->genlock);
+	}
+	return (err);
+}
+
+/*
+ * bge_m_unicst_remove() - removes a MAC address that was added by a
+ * call to bge_m_unicst_add(). The slot number that was returned in
+ * add() is passed in the call to remove the address.
+ * Returns 0 on success.
+ */
+static int
+bge_m_unicst_remove(void *arg, mac_addr_slot_t slot)
+{
+	bge_t *bgep = arg;		/* private device info	*/
+
+	ASSERT(slot < bgep->unicst_addr_total);
+	mutex_enter(bgep->genlock);
+	if (bgep->curr_addr[slot + 1].set == B_TRUE) {
+		bgep->curr_addr[slot + 1].set = B_FALSE;
+		bgep->unicst_addr_avail++;
+		mutex_exit(bgep->genlock);
+		/*
+		 * Copy the default address to the passed slot
+		 */
+		return (bge_unicst_set(bgep,
+		    bgep->curr_addr[0].addr, slot + 1));
+	}
+	mutex_exit(bgep->genlock);
+	return (EINVAL);
+}
+
+/*
+ * bge_m_unicst_modify() - modifies the value of an address that
+ * has been added by bge_m_unicst_add(). The new address, address
+ * length and the slot number that was returned in the call to add
+ * should be passed to bge_m_unicst_modify(). mma_flags should be
+ * set to 0. Returns 0 on success.
+ */
+static int
+bge_m_unicst_modify(void *arg, mac_multi_addr_t *maddr)
+{
+	bge_t *bgep = arg;		/* private device info	*/
+	mac_addr_slot_t slot;
+
+	if (mac_unicst_verify(bgep->mh,
+	    maddr->mma_addr, maddr->mma_addrlen) == B_FALSE)
+		return (EINVAL);
+
+	slot = maddr->mma_slot;
+
+	mutex_enter(bgep->genlock);
+	if (slot < bgep->unicst_addr_total &&
+	    bgep->curr_addr[slot].set == B_TRUE) {
+		mutex_exit(bgep->genlock);
+		return (bge_unicst_set(bgep, maddr->mma_addr, slot));
+	}
+	mutex_exit(bgep->genlock);
+
+	return (EINVAL);
+}
+
+/*
+ * bge_m_unicst_get() - will get the MAC address and all other
+ * information related to the address slot passed in mac_multi_addr_t.
+ * mma_flags should be set to 0 in the call.
+ * On return, mma_flags can take the following values:
+ * 1) MMAC_SLOT_UNUSED
+ * 2) MMAC_SLOT_USED | MMAC_VENDOR_ADDR
+ * 3) MMAC_SLOT_UNUSED | MMAC_VENDOR_ADDR
+ * 4) MMAC_SLOT_USED
+ */
+static int
+bge_m_unicst_get(void *arg, mac_multi_addr_t *maddr)
+{
+	bge_t *bgep = arg;		/* private device info	*/
+	mac_addr_slot_t slot;
+
+	slot = maddr->mma_slot;
+
+	if (slot < 0 || slot >= bgep->unicst_addr_total)
+		return (EINVAL);
+
+	mutex_enter(bgep->genlock);
+	if (bgep->curr_addr[slot + 1].set == B_TRUE) {
+		ethaddr_copy(bgep->curr_addr[slot + 1].addr,
+		    maddr->mma_addr);
+		maddr->mma_flags = MMAC_SLOT_USED;
+	} else {
+		maddr->mma_flags = MMAC_SLOT_UNUSED;
 	}
 	mutex_exit(bgep->genlock);
 
@@ -767,6 +937,8 @@ bge_m_promisc(void *arg, boolean_t on)
 static boolean_t
 bge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
+	bge_t *bgep = arg;
+
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM: {
 		uint32_t *txflags = cap_data;
@@ -774,12 +946,32 @@ bge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		*txflags = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM;
 		break;
 	}
+
 	case MAC_CAPAB_POLL:
 		/*
 		 * There's nothing for us to fill in, simply returning
 		 * B_TRUE stating that we support polling is sufficient.
 		 */
 		break;
+
+	case MAC_CAPAB_MULTIADDRESS: {
+		multiaddress_capab_t	*mmacp = cap_data;
+
+		mutex_enter(bgep->genlock);
+		mmacp->maddr_naddr = bgep->unicst_addr_total;
+		mmacp->maddr_naddrfree = bgep->unicst_addr_avail;
+		/* No multiple factory addresses, set mma_flag to 0 */
+		mmacp->maddr_flag = 0;
+		mmacp->maddr_handle = bgep;
+		mmacp->maddr_add = bge_m_unicst_add;
+		mmacp->maddr_remove = bge_m_unicst_remove;
+		mmacp->maddr_modify = bge_m_unicst_modify;
+		mmacp->maddr_get = bge_m_unicst_get;
+		mmacp->maddr_reserve = NULL;
+		mutex_exit(bgep->genlock);
+		break;
+	}
+
 	default:
 		return (B_FALSE);
 	}
@@ -1760,7 +1952,7 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 		if (nelts == ETHERADDRL) {
 			while (nelts--)
 				cidp->vendor_addr.addr[nelts] = ints[nelts];
-			cidp->vendor_addr.set = 1;
+			cidp->vendor_addr.set = B_TRUE;
 		}
 		ddi_prop_free(ints);
 	}
@@ -1771,7 +1963,7 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 		if (nelts == ETHERADDRL) {
 			while (nelts--)
 				cidp->vendor_addr.addr[nelts] = bytes[nelts];
-			cidp->vendor_addr.set = 1;
+			cidp->vendor_addr.set = B_TRUE;
 		}
 		ddi_prop_free(bytes);
 	}
@@ -1800,10 +1992,10 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 	 * 'local-mac-address? = false', use "the system address" instead
 	 * (but only if it's non-null i.e. has been set from the IDPROM).
 	 */
-	if (cidp->vendor_addr.set == 0 || strcmp(propbuf, "false") == 0)
+	if (cidp->vendor_addr.set == B_FALSE || strcmp(propbuf, "false") == 0)
 		if (localetheraddr(NULL, &sysaddr) != 0) {
 			ethaddr_copy(&sysaddr, cidp->vendor_addr.addr);
-			cidp->vendor_addr.set = 1;
+			cidp->vendor_addr.set = B_TRUE;
 		}
 
 	BGE_DEBUG(("bge_find_mac_address: +system %s (%sset)",
@@ -1822,7 +2014,7 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 		if (nelts == ETHERADDRL) {
 			while (nelts--)
 				cidp->vendor_addr.addr[nelts] = bytes[nelts];
-			cidp->vendor_addr.set = 1;
+			cidp->vendor_addr.set = B_TRUE;
 		}
 		ddi_prop_free(bytes);
 	}
@@ -2425,15 +2617,18 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Determine whether to override the chip's own MAC address
 	 */
 	bge_find_mac_address(bgep, cidp);
-	ethaddr_copy(cidp->vendor_addr.addr, bgep->curr_addr.addr);
-	bgep->curr_addr.set = 1;
+	ethaddr_copy(cidp->vendor_addr.addr, bgep->curr_addr[0].addr);
+	bgep->curr_addr[0].set = B_TRUE;
+
+	bgep->unicst_addr_avail = MAC_ADDRESS_REGS_MAX - 1;
+	bgep->unicst_addr_total = MAC_ADDRESS_REGS_MAX - 1;
 
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL)
 		goto attach_fail;
 	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
 	macp->m_driver = bgep;
 	macp->m_dip = devinfo;
-	macp->m_src_addr = bgep->curr_addr.addr;
+	macp->m_src_addr = bgep->curr_addr[0].addr;
 	macp->m_callbacks = &bge_m_callbacks;
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = cidp->ethmax_size - sizeof (struct ether_header);

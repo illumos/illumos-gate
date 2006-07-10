@@ -582,6 +582,27 @@ done:
 	return (err);
 }
 
+/*
+ * mac_unicst_verify: Verifies the passed address. It fails
+ * if the passed address is a group address or has incorrect length.
+ */
+boolean_t
+mac_unicst_verify(mac_handle_t mh, const uint8_t *addr, uint_t len)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	/*
+	 * Verify the address.
+	 */
+	if ((len != mip->mi_type->mt_addr_length) ||
+	    (mip->mi_type->mt_ops.mtops_unicst_verify(addr,
+	    mip->mi_pdata)) != 0) {
+		return (B_FALSE);
+	} else {
+		return (B_TRUE);
+	}
+}
+
 int
 mac_unicst_set(mac_handle_t mh, const uint8_t *addr)
 {

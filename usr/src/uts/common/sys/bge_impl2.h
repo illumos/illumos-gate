@@ -511,7 +511,7 @@ typedef struct send_ring {
 typedef struct {
 	ether_addr_t		addr;		/* in canonical form	*/
 	uint8_t			spare;
-	uint8_t			set;		/* nonzero => valid	*/
+	boolean_t		set;		/* B_TRUE => valid	*/
 } bge_mac_addr_t;
 
 /*
@@ -849,12 +849,15 @@ typedef struct bge {
 	kmutex_t		softintrlock[1];
 
 	/*
-	 * Current Ethernet address and multicast hash (bitmap) and
+	 * Current Ethernet addresses and multicast hash (bitmap) and
 	 * refcount tables, protected by <genlock>
 	 */
-	bge_mac_addr_t		curr_addr;
+	bge_mac_addr_t		curr_addr[MAC_ADDRESS_REGS_MAX];
 	uint32_t		mcast_hash[BGE_HASH_TABLE_SIZE/32];
 	uint8_t			mcast_refs[BGE_HASH_TABLE_SIZE];
+	uint32_t		unicst_addr_total; /* total unicst addresses */
+	uint32_t		unicst_addr_avail;
+					/* unused unicst addr slots */
 
 	/*
 	 * Link state data (protected by genlock)

@@ -170,9 +170,47 @@ typedef struct mac_info_s {
  */
 typedef enum {
 	MAC_CAPAB_HCKSUM	= 0x01,	/* data is a uint32_t for the txflags */
-	MAC_CAPAB_POLL		= 0x02	/* boolean only, no data */
+	MAC_CAPAB_POLL		= 0x02,	/* boolean only, no data */
+	MAC_CAPAB_MULTIADDRESS	= 0x03	/* data is multiaddress_capab_t */
 	/* add new capabilities here */
 } mac_capab_t;
+
+typedef int mac_addr_slot_t;
+
+/* mma_flags values */
+#define	MMAC_SLOT_USED		0x1   /* address slot used */
+#define	MMAC_SLOT_UNUSED	0x2   /* free address slot */
+#define	MMAC_VENDOR_ADDR	0x4   /* address returned is vendor supplied */
+
+typedef struct mac_multi_address_s {
+	mac_addr_slot_t	mma_slot;	/* slot for add/remove/get/set */
+	uint_t		mma_addrlen;
+	uint8_t		mma_addr[MAXMACADDRLEN];
+	uint_t		mma_flags;
+} mac_multi_addr_t;
+
+typedef int	(*maddr_reserve_t)(void *, mac_multi_addr_t *);
+typedef int	(*maddr_add_t)(void *, mac_multi_addr_t *);
+typedef int	(*maddr_remove_t)(void *, mac_addr_slot_t);
+typedef int	(*maddr_modify_t)(void *, mac_multi_addr_t *);
+typedef int	(*maddr_get_t)(void *, mac_multi_addr_t *);
+
+/* maddr_flag values */
+#define	MADDR_VENDOR_ADDR	0x01	/* addr returned is vendor supplied */
+
+/* multiple mac address: add/remove/set/get mac address */
+typedef struct multiaddress_capab_s {
+	int		maddr_naddr;	/* total addresses */
+	int		maddr_naddrfree;	/* free address slots */
+	uint_t		maddr_flag;	/* MADDR_VENDOR_ADDR bit can be set */
+	/* driver entry points */
+	void		*maddr_handle;	/* cookie to be used for the calls */
+	maddr_reserve_t	maddr_reserve;	/* reserve a factory address */
+	maddr_add_t	maddr_add;	/* add a new unicst address */
+	maddr_remove_t	maddr_remove;	/* remove an added address */
+	maddr_modify_t	maddr_modify;	/* modify an added address */
+	maddr_get_t	maddr_get;	/* get address from specified slot */
+} multiaddress_capab_t;
 
 /*
  * MAC driver entry point types.
@@ -422,6 +460,8 @@ extern boolean_t		mac_promisc_get(mac_handle_t,
 extern int 			mac_multicst_add(mac_handle_t, const uint8_t *);
 extern int 			mac_multicst_remove(mac_handle_t,
     const uint8_t *);
+extern boolean_t		mac_unicst_verify(mac_handle_t,
+    const uint8_t *, uint_t);
 extern int			mac_unicst_set(mac_handle_t, const uint8_t *);
 extern void			mac_unicst_get(mac_handle_t, uint8_t *);
 extern void			mac_dest_get(mac_handle_t, uint8_t *);
