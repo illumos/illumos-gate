@@ -724,7 +724,7 @@ scf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			scf_next_cmd_check(statep);
 			/* SUSPEND wait state */
 			wk_time = drv_usectohz(SCF_MIL2MICRO(scf_timer_value_get
-				(SCF_TIMERCD_CMDEND)) + ddi_get_lbolt());
+				(SCF_TIMERCD_CMDEND))) + ddi_get_lbolt();
 			scf_comtbl.suspend_wait = 1;
 			while (scf_comtbl.suspend_wait != 0) {
 				cv_ret = cv_timedwait_sig
@@ -743,6 +743,15 @@ scf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 					break;
 				}
 			}
+			/* Check SCF command exec */
+			if (scf_comtbl.scf_cmd_exec_flag) {
+				/* Set command wait status */
+				scf_cmdwait_status_set();
+				scf_comtbl.scf_cmd_exec_flag = 0;
+			}
+
+			/* All timer stop */
+			scf_timer_all_stop();
 		}
 
 		scf_del_queue(statep);

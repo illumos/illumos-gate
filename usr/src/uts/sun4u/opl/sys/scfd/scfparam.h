@@ -48,7 +48,7 @@ extern uint_t	scf_halt_proc_mode;	/* SCFHALT after processing mode */
 extern uint_t	scf_last_detach_mode;	/* Last detach mode */
 
 /*
- * SRAM trace date size
+ * SRAM trace data size
  */
 extern uint_t	scf_sram_trace_data_size;	/* Get SRAM trace data size */
 extern uint_t	scf_trace_rxdata_size;	/* Rx data trace size */
