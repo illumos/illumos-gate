@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,6 +146,7 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	char	*user;
 	char	*passwd;
 	char	*rep_passwd;
+	char	*crypt_passwd;
 	char	*repository_name;
 	struct pam_repository *auth_rep;
 	pwu_repository_t *pwu_rep;
@@ -310,7 +310,21 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	}
 
 	/* Now check the entered password */
-	if (strcmp(crypt(passwd, rep_passwd), rep_passwd) == 0)
+	if ((crypt_passwd = crypt(passwd, rep_passwd)) == NULL) {
+		switch (errno) {
+		case ENOMEM:
+			result = PAM_BUF_ERR;
+			break;
+		case ELIBACC:
+			result = PAM_OPEN_ERR;
+			break;
+		default:
+			result = PAM_SYSTEM_ERR;
+		}
+		goto out;
+	}
+
+	if (strcmp(crypt_passwd, rep_passwd) == 0)
 		result = PAM_SUCCESS;
 	else
 		result = PAM_AUTH_ERR;
