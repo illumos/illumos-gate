@@ -275,14 +275,22 @@ exit_daemon_cmd(vntsd_client_t *clientp, int rv)
 	return (rv);
 }
 
-/* vntsd_process_daemon_cmd() - special commands */
+/*
+ * vntsd_process_daemon_cmd() - special commands
+ * "<RET>~"  vntsd daemon commands
+ * "<RET>~~" enter '~' character
+ */
 int
 vntsd_process_daemon_cmd(vntsd_client_t *clientp, char c)
 {
 	esctable_t *p;
 	int	    rv;
+	char	    prev_char;
 
-	if (c != VNTSD_DAEMON_CMD) {
+	prev_char = clientp->prev_char;
+	clientp->prev_char = c;
+
+	if (c != VNTSD_DAEMON_CMD || (prev_char != 0 && prev_char != CR)) {
 		/* not a daemon command */
 		return (VNTSD_SUCCESS);
 	}
@@ -302,6 +310,18 @@ vntsd_process_daemon_cmd(vntsd_client_t *clientp, char c)
 	/* read in command */
 	if ((rv = vntsd_read_char(clientp, &c)) != VNTSD_SUCCESS) {
 		return (exit_daemon_cmd(clientp, rv));
+	}
+
+	clientp->prev_char = c;
+	if (c == VNTSD_DAEMON_CMD) {
+		/*
+		 * received another '~'
+		 * a user types '~~' to get '~'
+		 */
+		(void) mutex_lock(&clientp->lock);
+		clientp->status &= ~VNTSD_CLIENT_DISABLE_DAEMON_CMD;
+		(void) mutex_unlock(&clientp->lock);
+		return (VNTSD_SUCCESS);
 	}
 
 	for (p = etable; p->e_char; p++) {

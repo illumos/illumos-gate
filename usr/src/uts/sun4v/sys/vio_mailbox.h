@@ -120,6 +120,13 @@ extern "C" {
 #define	VIO_PAYLOAD_ELEMS	(VIO_PAYLOAD_SZ / LDC_ELEM_SIZE) /* num words */
 
 /*
+ * Peer dring processing state. Either actively processing dring
+ * or stopped.
+ */
+#define	VIO_DP_ACTIVE		1
+#define	VIO_DP_STOPPED		2
+
+/*
  * VIO device message tag.
  *
  * These 64 bits are used as a common header for all VIO message types.
@@ -168,7 +175,6 @@ typedef struct vio_ver_msg {
 	uint16_t		resv2;
 	uint64_t		resv3[VIO_PAYLOAD_ELEMS - 1];
 } vio_ver_msg_t;
-
 
 /*
  * VIO Descriptor Ring Register message.
@@ -260,10 +266,15 @@ typedef struct vio_dring_msg {
 	uint32_t		start_idx;	/* Indx of first updated elem */
 	int32_t			end_idx;	/* Indx of last updated elem */
 
+	uint8_t			dring_process_state;	/* Processing state */
+
 	/*
 	 * Padding.
 	 */
-	uint64_t	resv[VIO_PAYLOAD_ELEMS - 3];
+	uint8_t			resv1;
+	uint16_t		resv2;
+	uint32_t		resv3;
+	uint64_t		resv4[VIO_PAYLOAD_ELEMS - 4];
 } vio_dring_msg_t;
 
 /*

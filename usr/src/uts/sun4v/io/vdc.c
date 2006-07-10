@@ -69,6 +69,7 @@
 #include <sys/mdeg.h>
 #include <sys/note.h>
 #include <sys/open.h>
+#include <sys/sdt.h>
 #include <sys/stat.h>
 #include <sys/sunddi.h>
 #include <sys/types.h>
@@ -152,7 +153,6 @@ static int	vdc_populate_descriptor(vdc_t *vdc, caddr_t addr,
 static int	vdc_wait_for_descriptor_update(vdc_t *vdc, uint_t idx,
 			vio_dring_msg_t dmsg);
 static int	vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx);
-static int	vdc_get_response(vdc_t *vdc, int start, int end);
 static int	vdc_populate_mem_hdl(vdc_t *vdc, uint_t idx,
 			caddr_t addr, size_t nbytes, int operation);
 static boolean_t vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg, int
@@ -162,19 +162,26 @@ static boolean_t vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg, int
 static int	vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode);
 static int	vdc_create_fake_geometry(vdc_t *vdc);
 static int	vdc_setup_disk_layout(vdc_t *vdc);
-static int	vdc_null_copy_func(void *from, void *to, int mode, int dir);
-static int	vdc_get_vtoc_convert(void *from, void *to, int mode, int dir);
-static int	vdc_set_vtoc_convert(void *from, void *to, int mode, int dir);
-static int	vdc_get_geom_convert(void *from, void *to, int mode, int dir);
-static int	vdc_set_geom_convert(void *from, void *to, int mode, int dir);
-static int	vdc_uscsicmd_convert(void *from, void *to, int mode, int dir);
+static int	vdc_null_copy_func(vdc_t *vdc, void *from, void *to,
+		    int mode, int dir);
+static int	vdc_get_vtoc_convert(vdc_t *vdc, void *from, void *to,
+		    int mode, int dir);
+static int	vdc_set_vtoc_convert(vdc_t *vdc, void *from, void *to,
+		    int mode, int dir);
+static int	vdc_get_geom_convert(vdc_t *vdc, void *from, void *to,
+		    int mode, int dir);
+static int	vdc_set_geom_convert(vdc_t *vdc, void *from, void *to,
+		    int mode, int dir);
+static int	vdc_uscsicmd_convert(vdc_t *vdc, void *from, void *to,
+		    int mode, int dir);
 
 /*
  * Module variables
  */
 uint64_t	vdc_hz_timeout;
 uint64_t	vdc_usec_timeout = VDC_USEC_TIMEOUT_MIN;
-uint64_t	vdc_dump_usec_timeout = VDC_USEC_TIMEOUT_MIN / 300;
+uint64_t	vdc_usec_timeout_dump = VDC_USEC_TIMEOUT_MIN / 300;
+uint64_t	vdc_usec_timeout_dring = 10 * MILLISEC;
 static int	vdc_retries = VDC_RETRIES;
 static int	vdc_dump_retries = VDC_RETRIES * 10;
 
@@ -932,18 +939,38 @@ vdc_print(dev_t dev, char *str)
 static int
 vdc_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 {
-	int			rv = 0;
-	size_t			nbytes = (nblk * DEV_BSIZE);
-	int			instance = SDUNIT(getminor(dev));
-	vdc_t			*vdc;
+	buf_t	*buf;	/* BWRITE requests need to be in a buf_t structure */
+	int	rv;
+	size_t	nbytes = nblk * DEV_BSIZE;
+	int	instance = SDUNIT(getminor(dev));
+	vdc_t	*vdc = NULL;
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
 		vdc_msg("%s (%d):  Could not get state.", __func__, instance);
 		return (ENXIO);
 	}
 
-	rv = vdc_populate_descriptor(vdc, addr, nbytes, VD_OP_BWRITE,
-					blkno, SDPART(getminor(dev)));
+	buf = kmem_alloc(sizeof (buf_t), KM_SLEEP);
+	bioinit(buf);
+	buf->b_un.b_addr = addr;
+	buf->b_bcount = nbytes;
+	buf->b_flags = B_BUSY | B_WRITE;
+	buf->b_dev = dev;
+	rv = vdc_populate_descriptor(vdc, (caddr_t)buf, nbytes,
+			VD_OP_BWRITE, blkno, SDPART(getminor(dev)));
+
+	/*
+	 * If the OS instance is panicking, the call above will ensure that
+	 * the descriptor is done before returning. This should always be
+	 * case when coming through this function but we check just in case
+	 * and wait if necessary for the vDisk server to ACK and trigger
+	 * the biodone.
+	 */
+	if (!ddi_in_panic())
+		rv = biowait(buf);
+
+	biofini(buf);
+	kmem_free(buf, sizeof (buf_t));
 
 	PR1("%s: status=%d\n", __func__, rv);
 
@@ -983,22 +1010,32 @@ vdc_strategy(struct buf *buf)
 		return (0);
 	}
 
+	DTRACE_IO2(vstart, buf_t *, buf, vdc_t *, vdc);
+
 	ASSERT(buf->b_bcount <= (vdc->max_xfer_sz * vdc->block_size));
 
 	if (!vdc_is_able_to_tx_data(vdc, O_NONBLOCK)) {
-		vdc_msg("%s: Not ready to transmit data", __func__);
+		PR0("%s: Not ready to transmit data\n", __func__);
 		bioerror(buf, ENXIO);
 		biodone(buf);
 		return (0);
 	}
 	bp_mapin(buf);
 
-	rv = vdc_populate_descriptor(vdc, buf->b_un.b_addr, buf->b_bcount, op,
+	rv = vdc_populate_descriptor(vdc, (caddr_t)buf, buf->b_bcount, op,
 			buf->b_lblkno, SDPART(getminor(buf->b_edev)));
 
-	PR1("%s: status=%d", __func__, rv);
-	bioerror(buf, rv);
-	biodone(buf);
+	/*
+	 * If the request was successfully sent, the strategy call returns and
+	 * the ACK handler calls the bioxxx functions when the vDisk server is
+	 * done.
+	 */
+	if (rv) {
+		PR0("[%d] Failed to read/write (err=%d)\n", instance, rv);
+		bioerror(buf, rv);
+		biodone(buf);
+	}
+
 	return (0);
 }
 
@@ -1900,6 +1937,8 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
  *
  * Description:
  *	This function gets the index of the next Descriptor Ring entry available
+ *	If the ring is full, it will back off and wait for the next entry to be
+ *	freed (the ACK handler will signal).
  *
  * Return Value:
  *	0 <= rv < VD_DRING_LEN		Next available slot
@@ -1910,9 +1949,9 @@ vdc_get_next_dring_entry_idx(vdc_t *vdc, uint_t num_slots_needed)
 {
 	_NOTE(ARGUNUSED(num_slots_needed))
 
-	vd_dring_entry_t	*dep = NULL;	/* Dring Entry Pointer */
+	vd_dring_entry_t	*dep = NULL;	/* DRing Entry Pointer */
+	vdc_local_desc_t	*ldep = NULL;	/* Local DRing Entry Pointer */
 	int			idx = -1;
-	int			start_idx = 0;
 
 	ASSERT(vdc != NULL);
 	ASSERT(vdc->dring_len == VD_DRING_LEN);
@@ -1920,67 +1959,31 @@ vdc_get_next_dring_entry_idx(vdc_t *vdc, uint_t num_slots_needed)
 	ASSERT(vdc->dring_curr_idx < VD_DRING_LEN);
 	ASSERT(mutex_owned(&vdc->dring_lock));
 
-	/* Start at the last entry used */
-	idx = start_idx = vdc->dring_curr_idx;
+	/* pick the next descriptor after the last one used */
+	idx = (vdc->dring_curr_idx + 1) % VD_DRING_LEN;
+	ldep = &vdc->local_dring[idx];
+	ASSERT(ldep != NULL);
+	dep = ldep->dep;
+	ASSERT(dep != NULL);
 
-	/*
-	 * Loop through Descriptor Ring checking for a free entry until we reach
-	 * the entry we started at. We should never come close to filling the
-	 * Ring at any stage, instead this is just to prevent an entry which
-	 * gets into an inconsistent state (e.g. due to a request timing out)
-	 * from blocking progress.
-	 */
-	do {
-		/* Get the next entry after the last known index tried */
-		idx = (idx + 1) % VD_DRING_LEN;
-
-		dep = VDC_GET_DRING_ENTRY_PTR(vdc, idx);
-		ASSERT(dep != NULL);
-
+	mutex_enter(&ldep->lock);
+	if (dep->hdr.dstate == VIO_DESC_FREE) {
+		vdc->dring_curr_idx = idx;
+	} else {
+		DTRACE_PROBE(full);
+		(void) cv_timedwait(&ldep->cv, &ldep->lock,
+					VD_GET_TIMEOUT_HZ(1));
 		if (dep->hdr.dstate == VIO_DESC_FREE) {
-			ASSERT(idx >= 0);
-			ASSERT(idx < VD_DRING_LEN);
 			vdc->dring_curr_idx = idx;
-			return (idx);
-
-		} else if (dep->hdr.dstate == VIO_DESC_READY) {
-			PR0("%s: Entry %d waiting to be accepted\n",
-					__func__, idx);
-			continue;
-
-		} else if (dep->hdr.dstate == VIO_DESC_ACCEPTED) {
-			PR0("%s: Entry %d waiting to be processed\n",
-					__func__, idx);
-			continue;
-
-		} else if (dep->hdr.dstate == VIO_DESC_DONE) {
-			PR0("%s: Entry %d done but not marked free\n",
-					__func__, idx);
-
-			/*
-			 * If we are currently panicking, interrupts are
-			 * disabled and we will not be getting ACKs from the
-			 * vDisk server so we mark the descriptor ring entries
-			 * as FREE here instead of in the ACK handler.
-			 */
-			if (panicstr) {
-				(void) vdc_depopulate_descriptor(vdc, idx);
-				dep->hdr.dstate = VIO_DESC_FREE;
-				vdc->local_dring[idx].flags = VIO_DESC_FREE;
-			}
-			continue;
-
 		} else {
-			vdc_msg("Public Descriptor Ring entry corrupted");
-			mutex_enter(&vdc->lock);
-			vdc_reset_connection(vdc, B_FALSE);
-			mutex_exit(&vdc->lock);
-			return (-1);
+			PR0("[%d] Entry %d unavailable still in state %d\n",
+					vdc->instance, idx, dep->hdr.dstate);
+			idx = -1; /* indicate that the ring is full */
 		}
+	}
+	mutex_exit(&ldep->lock);
 
-	} while (idx != start_idx);
-
-	return (-1);
+	return (idx);
 }
 
 /*
@@ -1994,7 +1997,11 @@ vdc_get_next_dring_entry_idx(vdc_t *vdc, uint_t num_slots_needed)
  *
  * Arguments:
  *	vdc	- the soft state pointer
- *	addr	- start address of memory region.
+ *	addr	- address of structure to be written. In the case of block
+ *		  reads and writes this structure will be a buf_t and the
+ *		  address of the data to be written will be in the b_un.b_addr
+ *		  field. Otherwise the value of addr will be the address
+ *		  to be written.
  *	nbytes	- number of bytes to read/write
  *	operation - operation we want vds to perform (VD_OP_XXX)
  *	arg	- parameter to be sent to server (depends on VD_OP_XXX type)
@@ -2031,8 +2038,8 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	idx = vdc_get_next_dring_entry_idx(vdc, 1);
 	if (idx == -1) {
 		mutex_exit(&vdc->dring_lock);
-		vdc_msg("%s[%d]: no descriptor ring entry avail, seq=%d\n",
-				__func__, vdc->instance, vdc->seq_num);
+		PR0("[%d] no descriptor ring entry avail, last seq=%d\n",
+				vdc->instance, vdc->seq_num - 1);
 
 		/*
 		 * Since strategy should not block we don't wait for the DRing
@@ -2047,17 +2054,23 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	ASSERT(dep != NULL);
 
 	/*
-	 * Wait for anybody still using the DRing entry to finish.
-	 * (e.g. still waiting for vds to respond to a request)
+	 * We now get the lock for this descriptor before dropping the overall
+	 * DRing lock. This prevents a race condition where another vdc thread
+	 * could grab the descriptor we selected.
 	 */
+	ASSERT(!MUTEX_HELD(&local_dep->lock));
 	mutex_enter(&local_dep->lock);
+	mutex_exit(&vdc->dring_lock);
 
 	switch (operation) {
 	case VD_OP_BREAD:
 	case VD_OP_BWRITE:
+		local_dep->buf = (struct buf *)addr;
+		local_dep->addr = local_dep->buf->b_un.b_addr;
 		PR1("buf=%p, block=%lx, nbytes=%lx\n", addr, arg, nbytes);
 		dep->payload.addr = (diskaddr_t)arg;
-		rv = vdc_populate_mem_hdl(vdc, idx, addr, nbytes, operation);
+		rv = vdc_populate_mem_hdl(vdc, idx, local_dep->addr,
+						nbytes, operation);
 		break;
 
 	case VD_OP_GET_VTOC:
@@ -2065,6 +2078,7 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	case VD_OP_GET_DISKGEOM:
 	case VD_OP_SET_DISKGEOM:
 	case VD_OP_SCSICMD:
+		local_dep->addr = addr;
 		if (nbytes > 0) {
 			rv = vdc_populate_mem_hdl(vdc, idx, addr, nbytes,
 							operation);
@@ -2085,7 +2099,6 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 
 	if (rv != 0) {
 		mutex_exit(&local_dep->lock);
-		mutex_exit(&vdc->dring_lock);
 		return (rv);
 	}
 
@@ -2101,30 +2114,34 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	dep->hdr.ack = 1;		/* request an ACK for every message */
 
 	local_dep->flags = VIO_DESC_READY;
-	local_dep->addr = addr;
 
 	/*
 	 * Send a msg with the DRing details to vds
 	 */
+	mutex_enter(&vdc->lock);
 	VIO_INIT_DRING_DATA_TAG(dmsg);
 	VDC_INIT_DRING_DATA_MSG_IDS(dmsg, vdc);
 	dmsg.dring_ident = vdc->dring_ident;
 	dmsg.start_idx = idx;
 	dmsg.end_idx = idx;
 
+	DTRACE_IO2(send, vio_dring_msg_t *, &dmsg, vdc_t *, vdc);
+
 	PR1("ident=0x%llx, st=%d, end=%d, seq=%d req=%d dep=%p\n",
 			vdc->dring_ident, dmsg.start_idx, dmsg.end_idx,
 			dmsg.seq_num, dep->payload.req_id, dep);
 
-	mutex_enter(&vdc->lock);
 	rv = vdc_send(vdc, (caddr_t)&dmsg, &msglen);
-	mutex_exit(&vdc->lock);
 	PR1("%s[%d]: ldc_write() rv=%d\n", __func__, vdc->instance, rv);
 	if (rv != 0) {
+		mutex_exit(&vdc->lock);
 		mutex_exit(&local_dep->lock);
-		mutex_exit(&vdc->dring_lock);
 		vdc_msg("%s: ldc_write(%d)\n", __func__, rv);
-		return (EAGAIN);
+
+		/* Clear the DRing entry */
+		rv = vdc_depopulate_descriptor(vdc, idx);
+
+		return (rv ? rv : EAGAIN);
 	}
 
 	/*
@@ -2132,14 +2149,7 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	 * number to be used by the next message
 	 */
 	vdc->seq_num++;
-
-	/*
-	 * XXX - potential performance enhancement (Investigate at a later date)
-	 *
-	 * for calls from strategy(9E), instead of waiting for a response from
-	 * vds, we could return at this stage and let the ACK handling code
-	 * trigger the biodone(9F)
-	 */
+	mutex_exit(&vdc->lock);
 
 	/*
 	 * When a guest is panicking, the completion of requests needs to be
@@ -2170,7 +2180,7 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 				}
 
 				PR1("Waiting for next packet @ %d\n", idx);
-				delay(drv_usectohz(vdc_dump_usec_timeout));
+				drv_usecwait(vdc_usec_timeout_dump);
 				continue;
 			}
 
@@ -2238,14 +2248,24 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 		}
 
 		mutex_exit(&local_dep->lock);
-		mutex_exit(&vdc->dring_lock);
 
 		return (rv);
 	}
 
 	/*
-	 * Now watch the DRing entries we modified to get the response
-	 * from vds.
+	 * In the case of calls from strategy and dump (in the non-panic case),
+	 * instead of waiting for a response from the vDisk server return now.
+	 * They will be processed asynchronously and the vdc ACK handling code
+	 * will trigger the biodone(9F)
+	 */
+	if ((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) {
+		mutex_exit(&local_dep->lock);
+		return (rv);
+	}
+
+	/*
+	 * In the case of synchronous calls we watch the DRing entries we
+	 * modified and await the response from vds.
 	 */
 	rv = vdc_wait_for_descriptor_update(vdc, idx, dmsg);
 	if (rv == ETIMEDOUT) {
@@ -2257,7 +2277,6 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	PR1("%s[%d] Status=%d\n", __func__, vdc->instance, rv);
 
 	mutex_exit(&local_dep->lock);
-	mutex_exit(&vdc->dring_lock);
 
 	return (rv);
 }
@@ -2287,7 +2306,6 @@ vdc_wait_for_descriptor_update(vdc_t *vdc, uint_t idx, vio_dring_msg_t dmsg)
 	int	rv = 0;
 
 	ASSERT(vdc != NULL);
-	ASSERT(mutex_owned(&vdc->dring_lock));
 	ASSERT(idx < VD_DRING_LEN);
 	local_dep = &vdc->local_dring[idx];
 	ASSERT(local_dep != NULL);
@@ -2329,12 +2347,12 @@ vdc_wait_for_descriptor_update(vdc_t *vdc, uint_t idx, vio_dring_msg_t dmsg)
 			 * and have never made it to the other side (vds).
 			 * (We reuse the original message but update seq ID)
 			 */
+			mutex_enter(&vdc->lock);
 			VDC_INIT_DRING_DATA_MSG_IDS(dmsg, vdc);
 			retries = 0;
-			mutex_enter(&vdc->lock);
 			status = vdc_send(vdc, (caddr_t)&dmsg, &msglen);
-			mutex_exit(&vdc->lock);
 			if (status != 0) {
+				mutex_exit(&vdc->lock);
 				vdc_msg("%s: Error (%d) while resending after "
 					"timeout\n", __func__, status);
 				status = ETIMEDOUT;
@@ -2345,60 +2363,13 @@ vdc_wait_for_descriptor_update(vdc_t *vdc, uint_t idx, vio_dring_msg_t dmsg)
 			 * the sequence number to be used by the next message.
 			 */
 			vdc->seq_num++;
+			mutex_exit(&vdc->lock);
 		}
 	}
 
 	return (status);
 }
 
-static int
-vdc_get_response(vdc_t *vdc, int start, int end)
-{
-	vdc_local_desc_t	*ldep = NULL;	/* Local Dring Entry Pointer */
-	vd_dring_entry_t	*dep = NULL;	/* Dring Entry Pointer */
-	int			status = ENXIO;
-	int			idx = -1;
-
-	ASSERT(vdc != NULL);
-	ASSERT(start >= 0);
-	ASSERT(start <= VD_DRING_LEN);
-	ASSERT(start >= -1);
-	ASSERT(start <= VD_DRING_LEN);
-
-	idx = start;
-	ldep = &vdc->local_dring[idx];
-	ASSERT(ldep != NULL);
-	dep = ldep->dep;
-	ASSERT(dep != NULL);
-
-	PR0("%s[%d] DRING entry=%d status=%d\n", __func__, vdc->instance,
-			idx, VIO_GET_DESC_STATE(dep->hdr.dstate));
-	while (VIO_GET_DESC_STATE(dep->hdr.dstate) == VIO_DESC_DONE) {
-		if ((end != -1) && (idx > end))
-			return (0);
-
-		switch (ldep->operation) {
-		case VD_OP_BREAD:
-		case VD_OP_BWRITE:
-			/* call bioxxx */
-			break;
-		default:
-			/* signal waiter */
-			break;
-		}
-
-		/* Clear the DRing entry */
-		status = vdc_depopulate_descriptor(vdc, idx);
-		PR0("%s[%d] Status=%d\n", __func__, vdc->instance, status);
-
-		/* loop accounting to get next DRing entry */
-		idx++;
-		ldep = &vdc->local_dring[idx];
-		dep = ldep->dep;
-	}
-
-	return (status);
-}
 
 /*
  * Function:
@@ -2452,7 +2423,7 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 
 		bcopy(ldep->align_addr, ldep->addr, dep->payload.nbytes);
 		kmem_free(ldep->align_addr,
-				sizeof (caddr_t) * dep->payload.nbytes);
+			sizeof (caddr_t) * P2ROUNDUP(dep->payload.nbytes, 8));
 		ldep->align_addr = NULL;
 	}
 
@@ -2536,17 +2507,20 @@ vdc_populate_mem_hdl(vdc_t *vdc, uint_t idx, caddr_t addr, size_t nbytes,
 	 */
 	vaddr = addr;
 	if (((uint64_t)addr & 0x7) != 0) {
+		ASSERT(ldep->align_addr == NULL);
 		ldep->align_addr =
-			kmem_zalloc(sizeof (caddr_t) * nbytes, KM_SLEEP);
+			kmem_zalloc(sizeof (caddr_t) * P2ROUNDUP(nbytes, 8),
+					KM_SLEEP);
 		PR0("%s[%d] Misaligned address %lx reallocating "
-		    "(buf=%lx entry=%d)\n",
-		    __func__, vdc->instance, addr, ldep->align_addr, idx);
+		    "(buf=%lx nb=%d op=%d entry=%d)\n",
+		    __func__, vdc->instance, addr, ldep->align_addr, nbytes,
+		    operation, idx);
 		bcopy(addr, ldep->align_addr, nbytes);
 		vaddr = ldep->align_addr;
 	}
 
 	rv = ldc_mem_bind_handle(mhdl, vaddr, P2ROUNDUP(nbytes, 8),
-		vdc->dring_mem_info.mtype, perm, &dep->payload.cookie[0],
+		LDC_SHADOW_MAP, perm, &dep->payload.cookie[0],
 		&dep->payload.ncookies);
 	PR1("%s[%d] bound mem handle; ncookies=%d\n",
 			__func__, vdc->instance, dep->payload.ncookies);
@@ -2556,7 +2530,7 @@ vdc_populate_mem_hdl(vdc_t *vdc, uint_t idx, caddr_t addr, size_t nbytes,
 		    __func__, vdc->instance, mhdl, addr, idx, rv);
 		if (ldep->align_addr) {
 			kmem_free(ldep->align_addr,
-					sizeof (caddr_t) * dep->payload.nbytes);
+				sizeof (caddr_t) * P2ROUNDUP(nbytes, 8));
 			ldep->align_addr = NULL;
 		}
 		return (EAGAIN);
@@ -2986,7 +2960,7 @@ static int
 vdc_process_data_msg(vdc_t *vdc, vio_msg_t msg)
 {
 	int			status = 0;
-	vdc_local_desc_t	*local_dep = NULL;
+	vdc_local_desc_t	*ldep = NULL;
 	vio_dring_msg_t		*dring_msg = NULL;
 	uint_t			num_msgs;
 	uint_t			start;
@@ -3010,6 +2984,8 @@ vdc_process_data_msg(vdc_t *vdc, vio_msg_t msg)
 		return (EPROTO);
 	}
 
+	DTRACE_IO2(recv, vio_dring_msg_t, dring_msg, vdc_t *, vdc);
+
 	/*
 	 * calculate the number of messages that vds ACK'ed
 	 *
@@ -3031,12 +3007,32 @@ vdc_process_data_msg(vdc_t *vdc, vio_msg_t msg)
 	 * Wake the thread waiting for each DRing entry ACK'ed
 	 */
 	for (i = 0; i < num_msgs; i++) {
+		int operation;
 		int idx = (start + i) % VD_DRING_LEN;
 
-		local_dep = &vdc->local_dring[idx];
-		mutex_enter(&local_dep->lock);
-		cv_signal(&local_dep->cv);
-		mutex_exit(&local_dep->lock);
+		ldep = &vdc->local_dring[idx];
+		mutex_enter(&ldep->lock);
+		operation = ldep->dep->payload.operation;
+		if ((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) {
+			/*
+			 * The vDisk server responds when it accepts a
+			 * descriptor so we continue looping and process
+			 * it when it sends the message that it is done.
+			 */
+			if (ldep->dep->hdr.dstate != VIO_DESC_DONE) {
+				mutex_exit(&ldep->lock);
+				continue;
+			}
+			bioerror(ldep->buf, ldep->dep->payload.status);
+			biodone(ldep->buf);
+
+			DTRACE_IO2(vdone, buf_t *, ldep->buf, vdc_t *, vdc);
+
+			/* Clear the DRing entry */
+			status = vdc_depopulate_descriptor(vdc, idx);
+		}
+		cv_signal(&ldep->cv);
+		mutex_exit(&ldep->lock);
 	}
 
 	if (msg.tag.vio_subtype == VIO_SUBTYPE_NACK) {
@@ -3348,6 +3344,7 @@ vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg, int num_msgs)
 {
 	ASSERT(vdc != NULL);
 	ASSERT(dring_msg != NULL);
+	ASSERT(mutex_owned(&vdc->lock));
 
 	/*
 	 * Check to see if the messages were responded to in the correct
@@ -3357,7 +3354,7 @@ vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg, int num_msgs)
 	 *	  if so something is seriously wrong so we reset the connection
 	 *	- a seq_num greater than what we expected is returned.
 	 */
-	if (dring_msg->seq_num != (vdc->seq_num_reply + num_msgs)) {
+	if (dring_msg->seq_num < vdc->seq_num_reply) {
 		vdc_msg("%s[%d]: Bogus seq_num %d, expected %d\n",
 			__func__, vdc->instance, dring_msg->seq_num,
 			vdc->seq_num_reply + num_msgs);
@@ -3529,7 +3526,8 @@ typedef struct vdc_dk_ioctl {
 	size_t		nbytes;		/* size of structure to be copied */
 
 	/* function to convert between vDisk and Solaris structure formats */
-	int	(*convert)(void *vd_buf, void *ioctl_arg, int mode, int dir);
+	int	(*convert)(vdc_t *vdc, void *vd_buf, void *ioctl_arg,
+	    int mode, int dir);
 } vdc_dk_ioctl_t;
 
 /*
@@ -3546,15 +3544,13 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 		vdc_get_vtoc_convert},
 	{VD_OP_SET_VTOC,	DKIOCSVTOC,		sizeof (vd_vtoc_t),
 		vdc_set_vtoc_convert},
-	{VD_OP_SET_DISKGEOM,	DKIOCSGEOM,		sizeof (vd_geom_t),
-		vdc_get_geom_convert},
 	{VD_OP_GET_DISKGEOM,	DKIOCGGEOM,		sizeof (vd_geom_t),
 		vdc_get_geom_convert},
 	{VD_OP_GET_DISKGEOM,	DKIOCG_PHYGEOM,		sizeof (vd_geom_t),
 		vdc_get_geom_convert},
-	{VD_OP_GET_DISKGEOM, DKIOCG_VIRTGEOM,		sizeof (vd_geom_t),
+	{VD_OP_GET_DISKGEOM, 	DKIOCG_VIRTGEOM,	sizeof (vd_geom_t),
 		vdc_get_geom_convert},
-	{VD_OP_SET_DISKGEOM, DKIOCSGEOM,		sizeof (vd_geom_t),
+	{VD_OP_SET_DISKGEOM,	DKIOCSGEOM,		sizeof (vd_geom_t),
 		vdc_set_geom_convert},
 
 	/*
@@ -3600,6 +3596,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	size_t		alloc_len = 0;		/* #bytes to allocate mem for */
 	caddr_t		mem_p = NULL;
 	size_t		nioctls = (sizeof (dk_ioctl)) / (sizeof (dk_ioctl[0]));
+	struct vtoc	vtoc_saved;
 
 	PR0("%s: Processing ioctl(%x) for dev %x : model %x\n",
 		__func__, cmd, dev, ddi_model_convert_from(mode & FMODELS));
@@ -3740,13 +3737,21 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	ASSERT(alloc_len != 0);	/* sanity check */
 	mem_p = kmem_zalloc(alloc_len, KM_SLEEP);
 
+	if (cmd == DKIOCSVTOC) {
+		/*
+		 * Save a copy of the current VTOC so that we can roll back
+		 * if the setting of the new VTOC fails.
+		 */
+		bcopy(vdc->vtoc, &vtoc_saved, sizeof (struct vtoc));
+	}
+
 	/*
 	 * Call the conversion function for this ioctl whhich if necessary
 	 * converts from the Solaris format to the format ARC'ed
 	 * as part of the vDisk protocol (FWARC 2006/195)
 	 */
 	ASSERT(dk_ioctl[idx].convert != NULL);
-	rv = (dk_ioctl[idx].convert)(arg, mem_p, mode, VD_COPYIN);
+	rv = (dk_ioctl[idx].convert)(vdc, arg, mem_p, mode, VD_COPYIN);
 	if (rv != 0) {
 		PR0("%s[%d]: convert returned %d for ioctl 0x%x\n",
 				__func__, instance, rv, cmd);
@@ -3770,20 +3775,24 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 			__func__, instance, rv, cmd);
 		if (mem_p != NULL)
 			kmem_free(mem_p, alloc_len);
+
+		if (cmd == DKIOCSVTOC) {
+			/* update of the VTOC has failed, roll back */
+			bcopy(&vtoc_saved, vdc->vtoc, sizeof (struct vtoc));
+		}
+
 		return (rv);
 	}
 
-	/*
-	 * If the VTOC has been changed, then vdc needs to update the copy
-	 * it saved in the soft state structure and try and update the device
-	 * node properties. Failing to set the properties should not cause
-	 * an error to be return the caller though.
-	 */
 	if (cmd == DKIOCSVTOC) {
-		bcopy(mem_p, vdc->vtoc, sizeof (struct vtoc));
+		/*
+		 * The VTOC has been changed, try and update the device
+		 * node properties. Failing to set the properties should
+		 * not cause an error to be return the caller though.
+		 */
 		if (vdc_create_device_nodes_props(vdc)) {
 			cmn_err(CE_NOTE, "![%d] Failed to update device nodes"
-				" properties", instance);
+			    " properties", vdc->instance);
 		}
 	}
 
@@ -3793,7 +3802,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	 * protocol (FWARC 2006/195) back to a format understood by
 	 * the rest of Solaris.
 	 */
-	rv = (dk_ioctl[idx].convert)(mem_p, arg, mode, VD_COPYOUT);
+	rv = (dk_ioctl[idx].convert)(vdc, mem_p, arg, mode, VD_COPYOUT);
 	if (rv != 0) {
 		PR0("%s[%d]: convert returned %d for ioctl 0x%x\n",
 				__func__, instance, rv, cmd);
@@ -3816,8 +3825,9 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
  *	do not need to convert the data being passed in/out to userland
  */
 static int
-vdc_null_copy_func(void *from, void *to, int mode, int dir)
+vdc_null_copy_func(vdc_t *vdc, void *from, void *to, int mode, int dir)
 {
+	_NOTE(ARGUNUSED(vdc))
 	_NOTE(ARGUNUSED(from))
 	_NOTE(ARGUNUSED(to))
 	_NOTE(ARGUNUSED(mode))
@@ -3831,9 +3841,16 @@ vdc_null_copy_func(void *from, void *to, int mode, int dir)
  *	vdc_get_vtoc_convert()
  *
  * Description:
- *	This routine fakes up the disk info needed for some DKIO ioctls.
+ *	This routine performs the necessary convertions from the DKIOCGVTOC
+ *	Solaris structure to the format defined in FWARC 2006/195.
+ *
+ *	In the struct vtoc definition, the timestamp field is marked as not
+ *	supported so it is not part of vDisk protocol (FWARC 2006/195).
+ *	However SVM uses that field to check it can write into the VTOC,
+ *	so we fake up the info of that field.
  *
  * Arguments:
+ *	vdc	- the vDisk client
  *	from	- the buffer containing the data to be copied from
  *	to	- the buffer to be copied to
  *	mode	- flags passed to ioctl() call
@@ -3842,11 +3859,12 @@ vdc_null_copy_func(void *from, void *to, int mode, int dir)
  * Return Code:
  *	0	- Success
  *	ENXIO	- incorrect buffer passed in.
- *	EFAULT	- ddi_copyxxx routine encountered an error.
+ *	EFAULT	- ddi_copyout routine encountered an error.
  */
 static int
-vdc_get_vtoc_convert(void *from, void *to, int mode, int dir)
+vdc_get_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 {
+	int		i;
 	void		*tmp_mem = NULL;
 	void		*tmp_memp;
 	struct vtoc	vt;
@@ -3868,6 +3886,12 @@ vdc_get_vtoc_convert(void *from, void *to, int mode, int dir)
 	tmp_mem = kmem_alloc(copy_len, KM_SLEEP);
 
 	VD_VTOC2VTOC((vd_vtoc_t *)from, &vt);
+
+	/* fake the VTOC timestamp field */
+	for (i = 0; i < V_NUMPAR; i++) {
+		vt.timestamp[i] = vdc->vtoc->timestamp[i];
+	}
+
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
 		vtoctovtoc32(vt, vt32);
 		tmp_memp = &vt32;
@@ -3887,8 +3911,11 @@ vdc_get_vtoc_convert(void *from, void *to, int mode, int dir)
  *	vdc_set_vtoc_convert()
  *
  * Description:
+ *	This routine performs the necessary convertions from the DKIOCSVTOC
+ *	Solaris structure to the format defined in FWARC 2006/195.
  *
  * Arguments:
+ *	vdc	- the vDisk client
  *	from	- Buffer with data
  *	to	- Buffer where data is to be copied to
  *	mode	- flags passed to ioctl
@@ -3900,7 +3927,7 @@ vdc_get_vtoc_convert(void *from, void *to, int mode, int dir)
  *	EFAULT	- ddi_copyin of data failed
  */
 static int
-vdc_set_vtoc_convert(void *from, void *to, int mode, int dir)
+vdc_set_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 {
 	void		*tmp_mem = NULL;
 	struct vtoc	vt;
@@ -3934,6 +3961,12 @@ vdc_set_vtoc_convert(void *from, void *to, int mode, int dir)
 		vtp = tmp_mem;
 	}
 
+	/*
+	 * The VTOC is being changed, then vdc needs to update the copy
+	 * it saved in the soft state structure.
+	 */
+	bcopy(vtp, vdc->vtoc, sizeof (struct vtoc));
+
 	VTOC2VD_VTOC(vtp, &vtvd);
 	bcopy(&vtvd, to, sizeof (vd_vtoc_t));
 	kmem_free(tmp_mem, copy_len);
@@ -3946,8 +3979,12 @@ vdc_set_vtoc_convert(void *from, void *to, int mode, int dir)
  *	vdc_get_geom_convert()
  *
  * Description:
+ *	This routine performs the necessary convertions from the DKIOCGGEOM,
+ *	DKIOCG_PHYSGEOM and DKIOG_VIRTGEOM Solaris structures to the format
+ *	defined in FWARC 2006/195
  *
  * Arguments:
+ *	vdc	- the vDisk client
  *	from	- Buffer with data
  *	to	- Buffer where data is to be copied to
  *	mode	- flags passed to ioctl
@@ -3956,11 +3993,13 @@ vdc_set_vtoc_convert(void *from, void *to, int mode, int dir)
  * Return Code:
  *	0	- Success
  *	ENXIO	- Invalid buffer passed in
- *	EFAULT	- ddi_copyin of data failed
+ *	EFAULT	- ddi_copyout of data failed
  */
 static int
-vdc_get_geom_convert(void *from, void *to, int mode, int dir)
+vdc_get_geom_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 {
+	_NOTE(ARGUNUSED(vdc))
+
 	struct dk_geom	geom;
 	int	copy_len = sizeof (struct dk_geom);
 	int	rv = 0;
@@ -3984,10 +4023,11 @@ vdc_get_geom_convert(void *from, void *to, int mode, int dir)
  *	vdc_set_geom_convert()
  *
  * Description:
- *	This routine performs the necessary convertions from the DKIOCSVTOC
- *	Solaris structure to the format defined in FWARC 2006/195
+ *	This routine performs the necessary convertions from the DKIOCSGEOM
+ *	Solaris structure to the format defined in FWARC 2006/195.
  *
  * Arguments:
+ *	vdc	- the vDisk client
  *	from	- Buffer with data
  *	to	- Buffer where data is to be copied to
  *	mode	- flags passed to ioctl
@@ -3999,8 +4039,10 @@ vdc_get_geom_convert(void *from, void *to, int mode, int dir)
  *	EFAULT	- ddi_copyin of data failed
  */
 static int
-vdc_set_geom_convert(void *from, void *to, int mode, int dir)
+vdc_set_geom_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 {
+	_NOTE(ARGUNUSED(vdc))
+
 	vd_geom_t	vdgeom;
 	void		*tmp_mem = NULL;
 	int		copy_len = sizeof (struct dk_geom);
@@ -4104,6 +4146,7 @@ vdc_create_fake_geometry(vdc_t *vdc)
 static int
 vdc_setup_disk_layout(vdc_t *vdc)
 {
+	buf_t	*buf;	/* BREAD requests need to be in a buf_t structure */
 	dev_t	dev;
 	int	slice = 0;
 	int	rv;
@@ -4129,14 +4172,9 @@ vdc_setup_disk_layout(vdc_t *vdc)
 	}
 
 	/*
-	 * Read disk label from start of disk
-	 */
-	vdc->label = kmem_zalloc(DK_LABEL_SIZE, KM_SLEEP);
-
-	/*
 	 * find the slice that represents the entire "disk" and use that to
 	 * read the disk label. The convention in Solaris is that slice 2
-	 * represents the whole disk so we check that it is otherwise we
+	 * represents the whole disk so we check that it is, otherwise we
 	 * default to slice 0
 	 */
 	if ((vdc->vdisk_type == VD_DISK_TYPE_DISK) &&
@@ -4145,8 +4183,22 @@ vdc_setup_disk_layout(vdc_t *vdc)
 	} else {
 		slice = 0;
 	}
-	rv = vdc_populate_descriptor(vdc, (caddr_t)vdc->label, DK_LABEL_SIZE,
+
+	/*
+	 * Read disk label from start of disk
+	 */
+	vdc->label = kmem_zalloc(DK_LABEL_SIZE, KM_SLEEP);
+	buf = kmem_alloc(sizeof (buf_t), KM_SLEEP);
+	bioinit(buf);
+	buf->b_un.b_addr = (caddr_t)vdc->label;
+	buf->b_bcount = DK_LABEL_SIZE;
+	buf->b_flags = B_BUSY | B_READ;
+	buf->b_dev = dev;
+	rv = vdc_populate_descriptor(vdc, (caddr_t)buf, DK_LABEL_SIZE,
 			VD_OP_BREAD, 0, slice);
+	rv = biowait(buf);
+	biofini(buf);
+	kmem_free(buf, sizeof (buf_t));
 
 	return (rv);
 }

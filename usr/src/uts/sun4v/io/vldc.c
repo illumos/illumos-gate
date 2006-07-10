@@ -408,6 +408,7 @@ i_vldc_mdeg_register(vldc_t *vldcp)
 
 	bcopy(nameprop, name, namesz);
 	VLDC_SET_MDEG_PROP_NAME(pspecp, name);
+	ddi_prop_free(nameprop);
 
 	/* copy in the instance property */
 	VLDC_SET_MDEG_PROP_INST(pspecp, inst);
@@ -728,6 +729,9 @@ i_vldc_close_port(vldc_t *vldcp, uint_t portno)
 	kmem_free(vport->send_buf, vport->mtu);
 	kmem_free(vport->recv_buf, vport->mtu);
 
+	if (strcmp(vport->minorp->sname, VLDC_HVCTL_SVCNAME) == 0)
+		kmem_free(vport->cookie_buf, vldc_max_cookie);
+
 	vport->status = VLDC_PORT_CLOSED;
 
 	return (rv);
@@ -910,6 +914,9 @@ vldc_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	vport->recv_buf = kmem_alloc(vport->mtu, KM_SLEEP);
 	vport->send_buf = kmem_alloc(vport->mtu, KM_SLEEP);
 
+	if (strcmp(vport->minorp->sname, VLDC_HVCTL_SVCNAME) == 0)
+		vport->cookie_buf = kmem_alloc(vldc_max_cookie, KM_SLEEP);
+
 	vport->is_stream = B_FALSE;	/* assume not a stream */
 	vport->hanged_up = B_FALSE;
 
@@ -1057,50 +1064,57 @@ i_vldc_ioctl_read_cookie(vldc_port_t *vport, int vldc_instance, void *arg,
     int mode)
 {
 	vldc_data_t copy_info;
-	caddr_t buf;
-	uint64_t len;
+	uint64_t len, balance, copy_size;
+	caddr_t src_addr, dst_addr;
 	int rv;
 
 	if (ddi_copyin(arg, &copy_info, sizeof (copy_info), mode) == -1) {
 		return (EFAULT);
 	}
 
-	len = copy_info.length;
-	if (len > vldc_max_cookie) {
-		return (EINVAL);
-	}
+	len = balance = copy_info.length;
+	src_addr = (caddr_t)copy_info.src_addr;
+	dst_addr = (caddr_t)copy_info.dst_addr;
+	while (balance > 0) {
 
-	/* allocate a temporary buffer */
-	buf = kmem_alloc(len, KM_SLEEP);
+		/* get the max amount to the copied */
+		copy_size = MIN(balance, vldc_max_cookie);
 
-	mutex_enter(&vport->minorp->lock);
+		mutex_enter(&vport->minorp->lock);
 
-	D2("i_vldc_ioctl_read_cookie: vldc@%d:%d reading from 0x%lx "
-	    "size 0x%lx to 0x%lx\n", vldc_instance, vport->number,
-	    copy_info.dst_addr, copy_info.length, copy_info.src_addr);
+		D2("i_vldc_ioctl_read_cookie: vldc@%d:%d reading from 0x%p "
+		    "size 0x%lx to 0x%p\n", vldc_instance, vport->number,
+		    dst_addr, copy_size, src_addr);
 
-	/* read from the HV into the temporary buffer */
-	rv = ldc_mem_rdwr_pa(vport->ldc_handle, buf, &len,
-	    (caddr_t)copy_info.dst_addr, LDC_COPY_IN);
-	if (rv != 0) {
-		DWARN("i_vldc_ioctl_read_cookie: vldc@%d:%d cannot read "
-		    "address 0x%lx, rv=%d\n", vldc_instance, vport->number,
-		    copy_info.dst_addr, rv);
+		/* read from the HV into the temporary buffer */
+		rv = ldc_mem_rdwr_pa(vport->ldc_handle, vport->cookie_buf,
+		    &copy_size, dst_addr, LDC_COPY_IN);
+		if (rv != 0) {
+			DWARN("i_vldc_ioctl_read_cookie: vldc@%d:%d cannot "
+			    "read address 0x%p, rv=%d\n",
+			    vldc_instance, vport->number, dst_addr, rv);
+			mutex_exit(&vport->minorp->lock);
+			return (EFAULT);
+		}
+
+		D2("i_vldc_ioctl_read_cookie: vldc@%d:%d read succeeded\n",
+		    vldc_instance, vport->number);
+
 		mutex_exit(&vport->minorp->lock);
-		kmem_free(buf, copy_info.length);
-		return (EFAULT);
-	}
 
-	D2("i_vldc_ioctl_read_cookie: vldc@%d:%d read succeeded\n",
-	    vldc_instance, vport->number);
+		/*
+		 * copy data from temporary buffer out to the
+		 * caller and free buffer
+		 */
+		rv = ddi_copyout(vport->cookie_buf, src_addr, copy_size, mode);
+		if (rv != 0) {
+			return (EFAULT);
+		}
 
-	mutex_exit(&vport->minorp->lock);
-
-	/* copy data from temporary buffer out to the caller and free buffer */
-	rv = ddi_copyout(buf, (caddr_t)copy_info.src_addr, len, mode);
-	kmem_free(buf, copy_info.length);
-	if (rv != 0) {
-		return (EFAULT);
+		/* adjust len, source and dest */
+		balance -= copy_size;
+		src_addr += copy_size;
+		dst_addr += copy_size;
 	}
 
 	/* set the structure to reflect outcome */
@@ -1118,54 +1132,58 @@ i_vldc_ioctl_write_cookie(vldc_port_t *vport, int vldc_instance, void *arg,
     int mode)
 {
 	vldc_data_t copy_info;
-	caddr_t buf;
-	uint64_t len;
+	uint64_t len, balance, copy_size;
+	caddr_t src_addr, dst_addr;
 	int rv;
 
-	if (ddi_copyin((caddr_t)arg, &copy_info,
-	    sizeof (copy_info), mode) != 0) {
+	if (ddi_copyin(arg, &copy_info, sizeof (copy_info), mode) != 0) {
 		return (EFAULT);
-	}
-
-	len = copy_info.length;
-	if (len > vldc_max_cookie) {
-		return (EINVAL);
 	}
 
 	D2("i_vldc_ioctl_write_cookie: vldc@%d:%d writing 0x%lx size 0x%lx "
 	    "to 0x%lx\n", vldc_instance, vport->number, copy_info.src_addr,
 	    copy_info.length, copy_info.dst_addr);
 
-	/* allocate a temporary buffer */
-	buf = kmem_alloc(len, KM_SLEEP);
+	len = balance = copy_info.length;
+	src_addr = (caddr_t)copy_info.src_addr;
+	dst_addr = (caddr_t)copy_info.dst_addr;
+	while (balance > 0) {
 
-	/* copy into the temporary buffer the data to be written to the HV */
-	if (ddi_copyin((caddr_t)copy_info.src_addr, buf,
-	    copy_info.length, mode) != 0) {
-		kmem_free(buf, copy_info.length);
-		return (EFAULT);
-	}
+		/* get the max amount to the copied */
+		copy_size = MIN(balance, vldc_max_cookie);
 
-	mutex_enter(&vport->minorp->lock);
+		/*
+		 * copy into the temporary buffer the data
+		 * to be written to the HV
+		 */
+		if (ddi_copyin((caddr_t)src_addr, vport->cookie_buf,
+		    copy_size, mode) != 0) {
+			return (EFAULT);
+		}
 
-	/* write the data from the temporary buffer to the HV */
-	rv = ldc_mem_rdwr_pa(vport->ldc_handle, buf, &len,
-	    (caddr_t)copy_info.dst_addr, LDC_COPY_OUT);
-	if (rv != 0) {
-		DWARN("i_vldc_ioctl_write_cookie: vldc@%d:%d failed to write at"
-		    " address 0x%lx\n, rv=%d", vldc_instance, vport->number,
-		    copy_info.dst_addr, rv);
+		mutex_enter(&vport->minorp->lock);
+
+		/* write the data from the temporary buffer to the HV */
+		rv = ldc_mem_rdwr_pa(vport->ldc_handle, vport->cookie_buf,
+		    &copy_size, dst_addr, LDC_COPY_OUT);
+		if (rv != 0) {
+			DWARN("i_vldc_ioctl_write_cookie: vldc@%d:%d "
+			    "failed to write at address 0x%p\n, rv=%d",
+			    vldc_instance, vport->number, dst_addr, rv);
+			mutex_exit(&vport->minorp->lock);
+			return (EFAULT);
+		}
+
+		D2("i_vldc_ioctl_write_cookie: vldc@%d:%d write succeeded\n",
+		    vldc_instance, vport->number);
+
 		mutex_exit(&vport->minorp->lock);
-		kmem_free(buf, copy_info.length);
-		return (EFAULT);
+
+		/* adjust len, source and dest */
+		balance -= copy_size;
+		src_addr += copy_size;
+		dst_addr += copy_size;
 	}
-
-	D2("i_vldc_ioctl_write_cookie: vldc@%d:%d write succeeded\n",
-	    vldc_instance, vport->number);
-
-	mutex_exit(&vport->minorp->lock);
-
-	kmem_free(buf, copy_info.length);
 
 	/* set the structure to reflect outcome */
 	copy_info.length = len;
@@ -1315,13 +1333,19 @@ vldc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		break;
 
 	case VLDC_IOCTL_READ_COOKIE:
-
+		if (strcmp(vport->minorp->sname, VLDC_HVCTL_SVCNAME)) {
+			rv = EINVAL;
+			break;
+		}
 		rv = i_vldc_ioctl_read_cookie(vport, instance,
 		    (void *)arg, mode);
 		break;
 
 	case VLDC_IOCTL_WRITE_COOKIE:
-
+		if (strcmp(vport->minorp->sname, VLDC_HVCTL_SVCNAME)) {
+			rv = EINVAL;
+			break;
+		}
 		rv = i_vldc_ioctl_write_cookie(vport, instance,
 		    (void *)arg, mode);
 		break;

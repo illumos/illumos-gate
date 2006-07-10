@@ -765,9 +765,11 @@ cnex_rem_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
 		if (rv) {
 			DWARN("cnex_rem_intr: ino=0x%llx, cannot get state\n",
 			    iinfo->ino);
+			mutex_exit(&cldcp->lock);
+			return (ENXIO);
 		}
 
-		if (rv || ((gethrtime() - start) > cnex_pending_tmout))
+		if ((gethrtime() - start) > cnex_pending_tmout)
 			break;
 
 	} while (!panicstr && istate == HV_INTR_DELIVERED_STATE);
@@ -776,9 +778,8 @@ cnex_rem_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
 	if (istate != HV_INTR_IDLE_STATE) {
 		DWARN("cnex_rem_intr: cannot remove intr busy ino=%x\n",
 		    iinfo->ino);
-		/* clear interrupt state */
-		(void) hvldc_intr_setstate(cnex_ssp->cfghdl, iinfo->ino,
-		    HV_INTR_IDLE_STATE);
+		mutex_exit(&cldcp->lock);
+		return (EAGAIN);
 	}
 
 	/* remove interrupt */
@@ -850,6 +851,8 @@ cnex_clr_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
 	    HV_INTR_IDLE_STATE);
 	if (rv) {
 		DWARN("cnex_intr_wrapper: cannot clear interrupt state\n");
+		mutex_exit(&cldcp->lock);
+		return (ENXIO);
 	}
 
 	mutex_exit(&cldcp->lock);

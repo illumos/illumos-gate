@@ -50,6 +50,12 @@
 #include "vntsd.h"
 #include "chars.h"
 
+/* handle for writing all clients  */
+typedef	struct write_buf {
+	uint_t	sz;	    /* data size */
+	char	*buf;
+} write_buf_t;
+
 /*
  * check the state of write thread. exit if no more client connects to the
  * console.
@@ -81,19 +87,15 @@ write_chk_status(vntsd_cons_t *consp, int status)
  * skip_terminal_null()
  * scan terminal null character sequence (0x5e 0x40)
  * return number of characters in the buf after skipping terminal null
- * sequence.
+ * sequence. buf size must be at least sz+1.
  */
 static int
-skip_terminal_null(char *buf, int buf_sz, int sz)
+skip_terminal_null(char *buf, int sz)
 {
 	int	    i, j;
 	static int  term_null_seq = 0;
 
 	assert(sz >= 0);
-
-	if (buf_sz < sz+1) {
-		return (-1);
-	}
 
 	if (term_null_seq) {
 		/* skip 0x5e previously */
@@ -180,14 +182,18 @@ read_vcc(vntsd_cons_t *consp, char *buf, ssize_t *sz)
 	return (VNTSD_STATUS_VCC_IO_ERR);
 }
 
-static int s_sz;
-/* write to a client */
+/*
+ * write to a client
+ * this function is passed as a parameter to vntsd_que_find.
+ * for each client that connected to the console, vntsd_que_find
+ * applies this function.
+ */
 static boolean_t
-write_all_clients(vntsd_client_t *clientp, char *buf)
+write_one_client(vntsd_client_t *clientp, write_buf_t *write_buf)
 {
 	int rv;
 
-	rv = vntsd_write_client(clientp, buf, s_sz);
+	rv = vntsd_write_client(clientp, write_buf->buf, write_buf->sz);
 	if (rv != VNTSD_SUCCESS) {
 		(void) mutex_lock(&clientp->lock);
 		clientp->status |= VNTSD_CLIENT_IO_ERR;
@@ -206,6 +212,7 @@ vntsd_write_thread(vntsd_cons_t *consp)
 	char		buf[VNTSD_MAX_BUF_SIZE+1];
 	int		sz;
 	int		rv;
+	write_buf_t	write_buf;
 
 	D1(stderr, "t@%d vntsd_write@%d\n", thr_self(), consp->vcc_fd);
 
@@ -225,12 +232,13 @@ vntsd_write_thread(vntsd_cons_t *consp)
 		}
 
 		/* has data */
-		if ((s_sz = skip_terminal_null(buf, sz+1, sz)) == 0) {
+		if ((sz = skip_terminal_null(buf, sz)) == 0) {
 			/* terminal null sequence */
 			continue;
 		}
 
-		assert(s_sz > 0);
+		write_buf.sz = sz;
+		write_buf.buf = buf;
 
 		/*
 		 * output data to all clients connected
@@ -239,7 +247,7 @@ vntsd_write_thread(vntsd_cons_t *consp)
 
 		(void) mutex_lock(&consp->lock);
 		(void) vntsd_que_find(consp->clientpq,
-		    (compare_func_t)write_all_clients, buf);
+		    (compare_func_t)write_one_client, &write_buf);
 		(void) mutex_unlock(&consp->lock);
 
 		write_chk_status(consp, VNTSD_SUCCESS);

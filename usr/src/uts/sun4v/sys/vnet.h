@@ -44,6 +44,7 @@ extern "C" {
 #define	VNET_LDCWD_INTERVAL	1000		/* watchdog freq in msec */
 #define	VNET_LDCWD_TXTIMEOUT	1000		/* tx timeout in msec */
 #define	VNET_LDC_QLEN		1024		/* ldc qlen */
+#define	VNET_NRBUFS		512		/* number of receive bufs */
 
 /*
  * vnet proxy transport layer information. There is one instance of this for

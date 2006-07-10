@@ -427,6 +427,7 @@ struct ldc_chan {
 
 	boolean_t	intr_pending;	/* TRUE if interrupts are pending */
 
+	kmutex_t	tx_lock;	/* Transmit lock */
 	uint64_t	tx_q_entries;	/* Num entries in transmit queue */
 	uint64_t	tx_q_va;	/* Virtual addr of transmit queue */
 	uint64_t	tx_q_ra;	/* Real addr of transmit queue */
@@ -451,7 +452,6 @@ struct ldc_chan {
 
 	uint8_t		pkt_payload;	/* Size of packet payload */
 
-	uint32_t	first_fragment;	/* Seqid of first msg fragment */
 	uint32_t	last_msg_snt;	/* Seqid of last packet sent */
 	uint32_t	last_ack_rcd;	/* Seqid of last ACK recd */
 	uint32_t	last_msg_rcd;	/* Seqid of last packet received */

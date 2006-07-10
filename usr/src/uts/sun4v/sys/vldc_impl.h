@@ -52,6 +52,8 @@ extern "C" {
 #define	VLDC_MINOR_MASK		(VLDC_MAX_PORTS - 1)
 #define	VLDC_INST_SHIFT		11
 
+#define	VLDC_HVCTL_SVCNAME	"hvctl"
+
 /* get port number from minor number */
 #define	VLDCPORT(vldcp, minor)	\
 		((vldcp)->minor_tbl[(minor) & VLDC_MINOR_MASK].portno)
@@ -95,6 +97,7 @@ typedef struct vldc_port {
 	uint32_t	mtu;			/* port mtu */
 	caddr_t		send_buf;		/* send buffer */
 	caddr_t		recv_buf;		/* receive buffer */
+	caddr_t		cookie_buf;		/* rd/wr cookie buffer */
 
 	uint64_t	ldc_id;			/* Channel number */
 	ldc_handle_t	ldc_handle;		/* Channel handle */

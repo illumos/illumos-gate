@@ -50,9 +50,8 @@
 
 
 /* Virtual disk server initialization flags */
-#define	VDS_LOCKING		0x01
-#define	VDS_LDI			0x02
-#define	VDS_MDEG		0x04
+#define	VDS_LDI			0x01
+#define	VDS_MDEG		0x02
 
 /* Virtual disk server tunable parameters */
 #define	VDS_LDC_RETRIES		3
@@ -71,11 +70,10 @@
 
 /* Virtual disk initialization flags */
 #define	VD_LOCKING		0x01
-#define	VD_TASKQ		0x02
-#define	VD_LDC			0x04
-#define	VD_DRING		0x08
-#define	VD_SID			0x10
-#define	VD_SEQ_NUM		0x20
+#define	VD_LDC			0x02
+#define	VD_DRING		0x04
+#define	VD_SID			0x08
+#define	VD_SEQ_NUM		0x10
 
 /* Flags for opening/closing backing devices via LDI */
 #define	VD_OPEN_FLAGS		(FEXCL | FREAD | FWRITE)
@@ -135,20 +133,48 @@
 #endif	/* DEBUG */
 
 
+/*
+ * Soft state structure for a vds instance
+ */
 typedef struct vds {
 	uint_t		initialized;	/* driver inst initialization flags */
 	dev_info_t	*dip;		/* driver inst devinfo pointer */
-	kmutex_t	lock;		/* lock for this structure */
 	ldi_ident_t	ldi_ident;	/* driver's identifier for LDI */
 	mod_hash_t	*vd_table;	/* table of virtual disks served */
 	mdeg_handle_t	mdeg;		/* handle for MDEG operations  */
 } vds_t;
 
+/*
+ * Types of descriptor-processing tasks
+ */
+typedef enum vd_task_type {
+	VD_NONFINAL_RANGE_TASK,	/* task for intermediate descriptor in range */
+	VD_FINAL_RANGE_TASK,	/* task for last in a range of descriptors */
+} vd_task_type_t;
+
+/*
+ * Structure describing the task for processing a descriptor
+ */
+typedef struct vd_task {
+	struct vd		*vd;		/* vd instance task is for */
+	vd_task_type_t		type;		/* type of descriptor task */
+	int			index;		/* dring elem index for task */
+	vio_msg_t		*msg;		/* VIO message task is for */
+	size_t			msglen;		/* length of message content */
+	size_t			msgsize;	/* size of message buffer */
+	vd_dring_payload_t	*request;	/* request task will perform */
+	struct buf		buf;		/* buf(9s) for I/O request */
+
+} vd_task_t;
+
+/*
+ * Soft state structure for a virtual disk instance
+ */
 typedef struct vd {
 	uint_t			initialized;	/* vdisk initialization flags */
-	kmutex_t		lock;		/* lock for this structure */
 	vds_t			*vds;		/* server for this vdisk */
-	ddi_taskq_t		*taskq;		/* taskq for this vdisk */
+	ddi_taskq_t		*startq;	/* queue for I/O start tasks */
+	ddi_taskq_t		*completionq;	/* queue for completion tasks */
 	ldi_handle_t		ldi_handle[V_NUMPAR];	/* LDI slice handles */
 	dev_t			dev[V_NUMPAR];	/* dev numbers for slices */
 	uint_t			nslices;	/* number for slices */
@@ -160,7 +186,6 @@ typedef struct vd {
 	ldc_status_t		ldc_state;	/* LDC connection state */
 	ldc_handle_t		ldc_handle;	/* handle for LDC comm */
 	size_t			max_msglen;	/* largest LDC message len */
-	boolean_t		enabled;	/* whether vdisk is enabled */
 	vd_state_t		state;		/* client handshake state */
 	uint8_t			xfer_mode;	/* transfer mode with client */
 	uint32_t		sid;		/* client's session ID */
@@ -170,11 +195,19 @@ typedef struct vd {
 	uint32_t		descriptor_size;	/* num bytes in desc */
 	uint32_t		dring_len;	/* number of dring elements */
 	caddr_t			dring;		/* address of dring */
+	vd_task_t		inband_task;	/* task for inband descriptor */
+	vd_task_t		*dring_task;	/* tasks dring elements */
+
+	kmutex_t		lock;		/* protects variables below */
+	boolean_t		enabled;	/* is vdisk enabled? */
+	boolean_t		reset_state;	/* reset connection state? */
+	boolean_t		reset_ldc;	/* reset LDC channel? */
 } vd_t;
 
 typedef struct vds_operation {
 	uint8_t	operation;
-	int	(*function)(vd_t *vd, vd_dring_payload_t *request);
+	int	(*start)(vd_task_t *task);
+	void	(*complete)(void *arg);
 } vds_operation_t;
 
 typedef struct vd_ioctl {
@@ -217,86 +250,245 @@ static int	vd_msglevel;
 
 
 static int
-vd_bread(vd_t *vd, vd_dring_payload_t *request)
+vd_start_bio(vd_task_t *task)
 {
-	int		status;
-	struct buf	buf;
+	int			status = 0;
+	vd_t			*vd		= task->vd;
+	vd_dring_payload_t	*request	= task->request;
+	struct buf		*buf		= &task->buf;
 
-	PR1("Read %lu bytes at block %lu", request->nbytes, request->addr);
+
+	ASSERT(vd != NULL);
+	ASSERT(request != NULL);
+	ASSERT(request->slice < vd->nslices);
+	ASSERT((request->operation == VD_OP_BREAD) ||
+	    (request->operation == VD_OP_BWRITE));
+
 	if (request->nbytes == 0)
 		return (EINVAL);	/* no service for trivial requests */
-	ASSERT(mutex_owned(&vd->lock));
-	ASSERT(request->slice < vd->nslices);
 
-	bioinit(&buf);
-	buf.b_flags	= B_BUSY | B_READ;
-	buf.b_bcount	= request->nbytes;
-	buf.b_un.b_addr = kmem_alloc(buf.b_bcount, KM_SLEEP);
-	buf.b_lblkno	= request->addr;
-	buf.b_edev	= vd->dev[request->slice];
+	PR1("%s %lu bytes at block %lu",
+	    (request->operation == VD_OP_BREAD) ? "Read" : "Write",
+	    request->nbytes, request->addr);
 
-	if ((status = ldi_strategy(vd->ldi_handle[request->slice], &buf)) == 0)
-		status = biowait(&buf);
-	biofini(&buf);
+	bioinit(buf);
+	buf->b_flags		= B_BUSY;
+	buf->b_bcount		= request->nbytes;
+	buf->b_un.b_addr	= kmem_alloc(buf->b_bcount, KM_SLEEP);
+	buf->b_lblkno		= request->addr;
+	buf->b_edev		= vd->dev[request->slice];
+
+	if (request->operation == VD_OP_BREAD) {
+		buf->b_flags |= B_READ;
+	} else {
+		buf->b_flags |= B_WRITE;
+		/* Get data to write from client */
+		if ((status = ldc_mem_copy(vd->ldc_handle, buf->b_un.b_addr, 0,
+			    &request->nbytes, request->cookie,
+			    request->ncookies, LDC_COPY_IN)) != 0) {
+			PRN("ldc_mem_copy() returned errno %d "
+			    "copying from client", status);
+		}
+	}
+
+	/* Start the block I/O */
 	if ((status == 0) &&
-	    ((status = ldc_mem_copy(vd->ldc_handle, buf.b_un.b_addr, 0,
+	    ((status = ldi_strategy(vd->ldi_handle[request->slice], buf)) == 0))
+		return (EINPROGRESS);	/* will complete on completionq */
+
+	/* Clean up after error */
+	kmem_free(buf->b_un.b_addr, buf->b_bcount);
+	biofini(buf);
+	return (status);
+}
+
+static int
+send_msg(ldc_handle_t ldc_handle, void *msg, size_t msglen)
+{
+	int	retry, status;
+	size_t	nbytes;
+
+
+	for (retry = 0, status = EWOULDBLOCK;
+	    retry < vds_ldc_retries && status == EWOULDBLOCK;
+	    retry++) {
+		PR1("ldc_write() attempt %d", (retry + 1));
+		nbytes = msglen;
+		status = ldc_write(ldc_handle, msg, &nbytes);
+	}
+
+	if (status != 0) {
+		PRN("ldc_write() returned errno %d", status);
+		return (status);
+	} else if (nbytes != msglen) {
+		PRN("ldc_write() performed only partial write");
+		return (EIO);
+	}
+
+	PR1("SENT %lu bytes", msglen);
+	return (0);
+}
+
+static void
+vd_need_reset(vd_t *vd, boolean_t reset_ldc)
+{
+	mutex_enter(&vd->lock);
+	vd->reset_state	= B_TRUE;
+	vd->reset_ldc	= reset_ldc;
+	mutex_exit(&vd->lock);
+}
+
+/*
+ * Reset the state of the connection with a client, if needed; reset the LDC
+ * transport as well, if needed.  This function should only be called from the
+ * "startq", as it waits for tasks on the "completionq" and will deadlock if
+ * called from that queue.
+ */
+static void
+vd_reset_if_needed(vd_t *vd)
+{
+	int		status = 0;
+
+
+	mutex_enter(&vd->lock);
+	if (!vd->reset_state) {
+		ASSERT(!vd->reset_ldc);
+		mutex_exit(&vd->lock);
+		return;
+	}
+	mutex_exit(&vd->lock);
+
+
+	PR0("Resetting connection state with %s", VD_CLIENT(vd));
+
+	/*
+	 * Let any asynchronous I/O complete before possibly pulling the rug
+	 * out from under it; defer checking vd->reset_ldc, as one of the
+	 * asynchronous tasks might set it
+	 */
+	ddi_taskq_wait(vd->completionq);
+
+
+	if ((vd->initialized & VD_DRING) &&
+	    ((status = ldc_mem_dring_unmap(vd->dring_handle)) != 0))
+		PRN("ldc_mem_dring_unmap() returned errno %d", status);
+
+	if (vd->dring_task != NULL) {
+		ASSERT(vd->dring_len != 0);
+		kmem_free(vd->dring_task,
+		    (sizeof (*vd->dring_task)) * vd->dring_len);
+		vd->dring_task = NULL;
+	}
+
+
+	mutex_enter(&vd->lock);
+	if (vd->reset_ldc && ((status = ldc_reset(vd->ldc_handle)) != 0))
+		PRN("ldc_reset() returned errno %d", status);
+
+	vd->initialized	&= ~(VD_SID | VD_SEQ_NUM | VD_DRING);
+	vd->state	= VD_STATE_INIT;
+	vd->max_msglen	= sizeof (vio_msg_t);	/* baseline vio message size */
+
+	vd->reset_state	= B_FALSE;
+	vd->reset_ldc	= B_FALSE;
+	mutex_exit(&vd->lock);
+}
+
+static int
+vd_mark_elem_done(vd_t *vd, int idx, int elem_status)
+{
+	boolean_t		accepted;
+	int			status;
+	vd_dring_entry_t	*elem = VD_DRING_ELEM(idx);
+
+
+	/* Acquire the element */
+	if ((status = ldc_mem_dring_acquire(vd->dring_handle, idx, idx)) != 0) {
+		PRN("ldc_mem_dring_acquire() returned errno %d", status);
+		return (status);
+	}
+
+	/* Set the element's status and mark it done */
+	accepted = (elem->hdr.dstate == VIO_DESC_ACCEPTED);
+	if (accepted) {
+		elem->payload.status	= elem_status;
+		elem->hdr.dstate	= VIO_DESC_DONE;
+	} else {
+		/* Perhaps client timed out waiting for I/O... */
+		PRN("element %u no longer \"accepted\"", idx);
+		VD_DUMP_DRING_ELEM(elem);
+	}
+	/* Release the element */
+	if ((status = ldc_mem_dring_release(vd->dring_handle, idx, idx)) != 0) {
+		PRN("ldc_mem_dring_release() returned errno %d", status);
+		return (status);
+	}
+
+	return (accepted ? 0 : EINVAL);
+}
+
+static void
+vd_complete_bio(void *arg)
+{
+	int			status		= 0;
+	vd_task_t		*task		= (vd_task_t *)arg;
+	vd_t			*vd		= task->vd;
+	vd_dring_payload_t	*request	= task->request;
+	struct buf		*buf		= &task->buf;
+
+
+	ASSERT(vd != NULL);
+	ASSERT(request != NULL);
+	ASSERT(task->msg != NULL);
+	ASSERT(task->msglen >= sizeof (*task->msg));
+	ASSERT(task->msgsize >= task->msglen);
+
+	/* Wait for the I/O to complete */
+	request->status = biowait(buf);
+
+	/* If data was read, copy it to the client */
+	if ((request->status == 0) && (request->operation == VD_OP_BREAD) &&
+	    ((status = ldc_mem_copy(vd->ldc_handle, buf->b_un.b_addr, 0,
 		    &request->nbytes, request->cookie, request->ncookies,
 		    LDC_COPY_OUT)) != 0)) {
 		PRN("ldc_mem_copy() returned errno %d copying to client",
 		    status);
 	}
-	kmem_free(buf.b_un.b_addr, buf.b_bcount);	/* nbytes can change */
-	return (status);
-}
 
-static int
-vd_do_bwrite(vd_t *vd, uint_t slice, diskaddr_t block, size_t nbytes,
-    ldc_mem_cookie_t *cookie, uint64_t ncookies, caddr_t data)
-{
-	int		status;
-	struct buf	buf;
+	/* Release I/O buffer */
+	kmem_free(buf->b_un.b_addr, buf->b_bcount);
+	biofini(buf);
 
-	ASSERT(mutex_owned(&vd->lock));
-	ASSERT(slice < vd->nslices);
-	ASSERT(nbytes != 0);
-	ASSERT(data != NULL);
+	/* Update the dring element for a dring client */
+	if ((status == 0) && (vd->xfer_mode == VIO_DRING_MODE))
+		status = vd_mark_elem_done(vd, task->index, request->status);
 
-	/* Get data from client */
-	if ((status = ldc_mem_copy(vd->ldc_handle, data, 0, &nbytes,
-		    cookie, ncookies, LDC_COPY_IN)) != 0) {
-		PRN("ldc_mem_copy() returned errno %d copying from client",
-		    status);
-		return (status);
-	}
+	/*
+	 * If a transport error occurred, arrange to "nack" the message when
+	 * the final task in the descriptor element range completes
+	 */
+	if (status != 0)
+		task->msg->tag.vio_subtype = VIO_SUBTYPE_NACK;
 
-	bioinit(&buf);
-	buf.b_flags	= B_BUSY | B_WRITE;
-	buf.b_bcount	= nbytes;
-	buf.b_un.b_addr	= data;
-	buf.b_lblkno	= block;
-	buf.b_edev	= vd->dev[slice];
+	/*
+	 * Only the final task for a range of elements will respond to and
+	 * free the message
+	 */
+	if (task->type == VD_NONFINAL_RANGE_TASK)
+		return;
 
-	if ((status = ldi_strategy(vd->ldi_handle[slice], &buf)) == 0)
-		status = biowait(&buf);
-	biofini(&buf);
-	return (status);
-}
+	/*
+	 * Send the "ack" or "nack" back to the client; if sending the message
+	 * via LDC fails, arrange to reset both the connection state and LDC
+	 * itself
+	 */
+	PR1("Sending %s",
+	    (task->msg->tag.vio_subtype == VIO_SUBTYPE_ACK) ? "ACK" : "NACK");
+	if (send_msg(vd->ldc_handle, task->msg, task->msglen) != 0)
+		vd_need_reset(vd, B_TRUE);
 
-static int
-vd_bwrite(vd_t *vd, vd_dring_payload_t *request)
-{
-	int	status;
-	caddr_t	data;
-
-
-	PR1("Write %ld bytes at block %lu", request->nbytes, request->addr);
-	if (request->nbytes == 0)
-		return (EINVAL);	/* no service for trivial requests */
-	data = kmem_alloc(request->nbytes, KM_SLEEP);
-	status = vd_do_bwrite(vd, request->slice, request->addr,
-	    request->nbytes, request->cookie, request->ncookies, data);
-	kmem_free(data, request->nbytes);
-	return (status);
+	/* Free the message now that it has been used for the reply */
+	kmem_free(task->msg, task->msgsize);
 }
 
 static void
@@ -347,7 +539,6 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 	size_t	nbytes = request->nbytes;	/* modifiable copy */
 
 
-	ASSERT(mutex_owned(&vd->lock));
 	ASSERT(request->slice < vd->nslices);
 	PR0("Performing %s", ioctl->operation_name);
 
@@ -379,8 +570,8 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 			    (void *)ioctl->arg)) != 0)
 			return (status);
 	} else if ((status = ldi_ioctl(vd->ldi_handle[request->slice],
-		    ioctl->cmd, (intptr_t)ioctl->arg, FKIOCTL, kcred,
-		    &rval)) != 0) {
+		    ioctl->cmd, (intptr_t)ioctl->arg, (vd_open_flags | FKIOCTL),
+		    kcred, &rval)) != 0) {
 		PR0("ldi_ioctl(%s) = errno %d", ioctl->cmd_name, status);
 		return (status);
 	}
@@ -453,7 +644,7 @@ vd_open_new_slices(vd_t *vd)
 
 	/* Get the (new) VTOC for updated slice sizes */
 	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC, (intptr_t)&vtoc,
-		    FKIOCTL, kcred, &rval)) != 0) {
+		    (vd_open_flags | FKIOCTL), kcred, &rval)) != 0) {
 		PRN("ldi_ioctl(DKIOCGVTOC) returned errno %d", status);
 		return;
 	}
@@ -483,13 +674,15 @@ vd_open_new_slices(vd_t *vd)
 
 #define	RNDSIZE(expr) P2ROUNDUP(sizeof (expr), sizeof (uint64_t))
 static int
-vd_ioctl(vd_t *vd, vd_dring_payload_t *request)
+vd_ioctl(vd_task_t *task)
 {
-	int		i, status;
-	void		*buf = NULL;
-	struct dk_geom	dk_geom = {0};
-	struct vtoc	vtoc = {0};
-	vd_ioctl_t	ioctl[] = {
+	int			i, status;
+	void			*buf = NULL;
+	struct dk_geom		dk_geom = {0};
+	struct vtoc		vtoc = {0};
+	vd_t			*vd		= task->vd;
+	vd_dring_payload_t	*request	= task->request;
+	vd_ioctl_t		ioctl[] = {
 		/* Command (no-copy) operations */
 		{VD_OP_FLUSH, STRINGIZE(VD_OP_FLUSH), 0,
 		    DKIOCFLUSHWRITECACHE, STRINGIZE(DKIOCFLUSHWRITECACHE),
@@ -522,7 +715,8 @@ vd_ioctl(vd_t *vd, vd_dring_payload_t *request)
 	size_t		nioctls = (sizeof (ioctl))/(sizeof (ioctl[0]));
 
 
-	ASSERT(mutex_owned(&vd->lock));
+	ASSERT(vd != NULL);
+	ASSERT(request != NULL);
 	ASSERT(request->slice < vd->nslices);
 
 	/*
@@ -554,6 +748,7 @@ vd_ioctl(vd_t *vd, vd_dring_payload_t *request)
 	if ((request->operation == VD_OP_SET_VTOC) &&
 	    (vd->vdisk_type == VD_DISK_TYPE_DISK))
 		vd_open_new_slices(vd);
+	PR0("Returning %d", status);
 	return (status);
 }
 
@@ -562,31 +757,33 @@ vd_ioctl(vd_t *vd, vd_dring_payload_t *request)
  * been defined
  */
 static const vds_operation_t	vds_operation[] = {
-	{VD_OP_BREAD,		vd_bread},
-	{VD_OP_BWRITE,		vd_bwrite},
-	{VD_OP_FLUSH,		vd_ioctl},
-	{VD_OP_GET_WCE,		vd_ioctl},
-	{VD_OP_SET_WCE,		vd_ioctl},
-	{VD_OP_GET_VTOC,	vd_ioctl},
-	{VD_OP_SET_VTOC,	vd_ioctl},
-	{VD_OP_GET_DISKGEOM,	vd_ioctl},
-	{VD_OP_SET_DISKGEOM,	vd_ioctl}
+	{VD_OP_BREAD,		vd_start_bio,	vd_complete_bio},
+	{VD_OP_BWRITE,		vd_start_bio,	vd_complete_bio},
+	{VD_OP_FLUSH,		vd_ioctl,	NULL},
+	{VD_OP_GET_WCE,		vd_ioctl,	NULL},
+	{VD_OP_SET_WCE,		vd_ioctl,	NULL},
+	{VD_OP_GET_VTOC,	vd_ioctl,	NULL},
+	{VD_OP_SET_VTOC,	vd_ioctl,	NULL},
+	{VD_OP_GET_DISKGEOM,	vd_ioctl,	NULL},
+	{VD_OP_SET_DISKGEOM,	vd_ioctl,	NULL}
 };
 
 static const size_t	vds_noperations =
 	(sizeof (vds_operation))/(sizeof (vds_operation[0]));
 
 /*
- * Process a request using a defined operation
+ * Process a task specifying a client I/O request
  */
 static int
-vd_process_request(vd_t *vd, vd_dring_payload_t *request)
+vd_process_task(vd_task_t *task)
 {
-	int	i;
+	int			i, status;
+	vd_t			*vd		= task->vd;
+	vd_dring_payload_t	*request	= task->request;
 
 
-	PR1("Entered");
-	ASSERT(mutex_owned(&vd->lock));
+	ASSERT(vd != NULL);
+	ASSERT(request != NULL);
 
 	/* Range-check slice */
 	if (request->slice >= vd->nslices) {
@@ -595,41 +792,37 @@ vd_process_request(vd_t *vd, vd_dring_payload_t *request)
 		return (EINVAL);
 	}
 
-	/* Perform the requested operation */
+	/* Find the requested operation */
 	for (i = 0; i < vds_noperations; i++)
 		if (request->operation == vds_operation[i].operation)
-			return (vds_operation[i].function(vd, request));
-
-	/* No matching operation found */
-	PRN("Unsupported operation %u", request->operation);
-	return (ENOTSUP);
-}
-
-static int
-send_msg(ldc_handle_t ldc_handle, void *msg, size_t msglen)
-{
-	int	retry, status;
-	size_t	nbytes;
-
-
-	for (retry = 0, status = EWOULDBLOCK;
-	    retry < vds_ldc_retries && status == EWOULDBLOCK;
-	    retry++) {
-		PR1("ldc_write() attempt %d", (retry + 1));
-		nbytes = msglen;
-		status = ldc_write(ldc_handle, msg, &nbytes);
+			break;
+	if (i == vds_noperations) {
+		PRN("Unsupported operation %u", request->operation);
+		return (ENOTSUP);
 	}
 
-	if (status != 0) {
-		PRN("ldc_write() returned errno %d", status);
-		return (status);
-	} else if (nbytes != msglen) {
-		PRN("ldc_write() performed only partial write");
-		return (EIO);
+	/* Start the operation */
+	if ((status = vds_operation[i].start(task)) != EINPROGRESS) {
+		request->status = status;	/* op succeeded or failed */
+		return (0);			/* but request completed */
 	}
 
-	PR1("SENT %lu bytes", msglen);
-	return (0);
+	ASSERT(vds_operation[i].complete != NULL);	/* debug case */
+	if (vds_operation[i].complete == NULL) {	/* non-debug case */
+		PRN("Unexpected return of EINPROGRESS "
+		    "with no I/O completion handler");
+		request->status = EIO;	/* operation failed */
+		return (0);		/* but request completed */
+	}
+
+	/* Queue a task to complete the operation */
+	status = ddi_taskq_dispatch(vd->completionq, vds_operation[i].complete,
+	    task, DDI_SLEEP);
+	/* ddi_taskq_dispatch(9f) guarantees success with DDI_SLEEP */
+	ASSERT(status == DDI_SUCCESS);
+
+	PR1("Operation in progress");
+	return (EINPROGRESS);	/* completion handler will finish request */
 }
 
 /*
@@ -782,13 +975,12 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	vd_attr_msg_t	*attr_msg = (vd_attr_msg_t *)msg;
 
 
-	PR0("Entered");
-	ASSERT(mutex_owned(&vd->lock));
 	ASSERT(msglen >= sizeof (msg->tag));
 
 	if (!vd_msgtype(&msg->tag, VIO_TYPE_CTRL, VIO_SUBTYPE_INFO,
 		VIO_ATTR_INFO)) {
-		return (ENOMSG);	/* not an attribute message */
+		PR0("Message is not an attribute message");
+		return (ENOMSG);
 	}
 
 	if (msglen != sizeof (*attr_msg)) {
@@ -835,6 +1027,14 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		 * their cookies
 		 */
 		vd->max_msglen = MAX(vd->max_msglen, max_inband_msglen);
+
+		/*
+		 * Initialize the data structure for processing in-band I/O
+		 * request descriptors
+		 */
+		vd->inband_task.vd	= vd;
+		vd->inband_task.index	= 0;
+		vd->inband_task.type	= VD_FINAL_RANGE_TASK;	/* range == 1 */
 	}
 
 	attr_msg->vdisk_size = vd->vdisk_size;
@@ -853,13 +1053,12 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	vio_dring_reg_msg_t	*reg_msg = (vio_dring_reg_msg_t *)msg;
 
 
-	PR0("Entered");
-	ASSERT(mutex_owned(&vd->lock));
 	ASSERT(msglen >= sizeof (msg->tag));
 
 	if (!vd_msgtype(&msg->tag, VIO_TYPE_CTRL, VIO_SUBTYPE_INFO,
 		VIO_DRING_REG)) {
-		return (ENOMSG);	/* not a register-dring message */
+		PR0("Message is not a register-dring message");
+		return (ENOMSG);
 	}
 
 	if (msglen < sizeof (*reg_msg)) {
@@ -878,6 +1077,12 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 
 	if (vd->initialized & VD_DRING) {
 		PRN("A dring was previously registered; only support one");
+		return (EBADMSG);
+	}
+
+	if (reg_msg->num_descriptors > INT32_MAX) {
+		PRN("reg_msg->num_descriptors = %u; must be <= %u (%s)",
+		    reg_msg->ncookies, INT32_MAX, STRINGIZE(INT32_MAX));
 		return (EBADMSG);
 	}
 
@@ -928,7 +1133,7 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	}
 
 
-	/* Valid message and dring mapped */
+	/* Initialize for valid message and mapped dring */
 	PR1("descriptor size = %u, dring length = %u",
 	    vd->descriptor_size, vd->dring_len);
 	vd->initialized |= VD_DRING;
@@ -937,6 +1142,19 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	vd->descriptor_size = reg_msg->descriptor_size;
 	vd->dring_len = reg_msg->num_descriptors;
 	reg_msg->dring_ident = vd->dring_ident;
+
+	/*
+	 * Allocate and initialize a "shadow" array of data structures for
+	 * tasks to process I/O requests in dring elements
+	 */
+	vd->dring_task =
+	    kmem_zalloc((sizeof (*vd->dring_task)) * vd->dring_len, KM_SLEEP);
+	for (int i = 0; i < vd->dring_len; i++) {
+		vd->dring_task[i].vd		= vd;
+		vd->dring_task[i].index		= i;
+		vd->dring_task[i].request	= &VD_DRING_ELEM(i)->payload;
+	}
+
 	return (0);
 }
 
@@ -946,13 +1164,12 @@ vd_process_dring_unreg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	vio_dring_unreg_msg_t	*unreg_msg = (vio_dring_unreg_msg_t *)msg;
 
 
-	PR0("Entered");
-	ASSERT(mutex_owned(&vd->lock));
 	ASSERT(msglen >= sizeof (msg->tag));
 
 	if (!vd_msgtype(&msg->tag, VIO_TYPE_CTRL, VIO_SUBTYPE_INFO,
 		VIO_DRING_UNREG)) {
-		return (ENOMSG);	/* not an unregister-dring message */
+		PR0("Message is not an unregister-dring message");
+		return (ENOMSG);
 	}
 
 	if (msglen != sizeof (*unreg_msg)) {
@@ -973,11 +1190,12 @@ vd_process_dring_unreg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 static int
 process_rdx_msg(vio_msg_t *msg, size_t msglen)
 {
-	PR0("Entered");
 	ASSERT(msglen >= sizeof (msg->tag));
 
-	if (!vd_msgtype(&msg->tag, VIO_TYPE_CTRL, VIO_SUBTYPE_INFO, VIO_RDX))
-		return (ENOMSG);	/* not an RDX message */
+	if (!vd_msgtype(&msg->tag, VIO_TYPE_CTRL, VIO_SUBTYPE_INFO, VIO_RDX)) {
+		PR0("Message is not an RDX message");
+		return (ENOMSG);
+	}
 
 	if (msglen != sizeof (vio_rdx_msg_t)) {
 		PRN("Expected %lu-byte RDX message; received %lu bytes",
@@ -985,36 +1203,17 @@ process_rdx_msg(vio_msg_t *msg, size_t msglen)
 		return (EBADMSG);
 	}
 
+	PR0("Valid RDX message");
 	return (0);
-}
-
-static void
-vd_reset_connection(vd_t *vd, boolean_t reset_ldc)
-{
-	int	status = 0;
-
-
-	ASSERT(mutex_owned(&vd->lock));
-	PR0("Resetting connection with %s", VD_CLIENT(vd));
-	if ((vd->initialized & VD_DRING) &&
-	    ((status = ldc_mem_dring_unmap(vd->dring_handle)) != 0))
-		PRN("ldc_mem_dring_unmap() returned errno %d", status);
-	if ((reset_ldc == B_TRUE) &&
-	    ((status = ldc_reset(vd->ldc_handle)) != 0))
-		PRN("ldc_reset() returned errno %d", status);
-	vd->initialized &= ~(VD_SID | VD_SEQ_NUM | VD_DRING);
-	vd->state = VD_STATE_INIT;
-	vd->max_msglen = sizeof (vio_msg_t);	/* baseline vio message size */
 }
 
 static int
 vd_check_seq_num(vd_t *vd, uint64_t seq_num)
 {
-	ASSERT(mutex_owned(&vd->lock));
 	if ((vd->initialized & VD_SEQ_NUM) && (seq_num != vd->seq_num + 1)) {
 		PRN("Received seq_num %lu; expected %lu",
 		    seq_num, (vd->seq_num + 1));
-		vd_reset_connection(vd, B_FALSE);
+		vd_need_reset(vd, B_FALSE);
 		return (1);
 	}
 
@@ -1040,19 +1239,19 @@ expected_inband_size(vd_dring_inband_msg_t *msg)
  * operating on them within a descriptor ring
  */
 static int
-vd_process_desc_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
+vd_process_desc_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 {
 	size_t			expected;
 	vd_dring_inband_msg_t	*desc_msg = (vd_dring_inband_msg_t *)msg;
 
 
-	PR1("Entered");
-	ASSERT(mutex_owned(&vd->lock));
 	ASSERT(msglen >= sizeof (msg->tag));
 
 	if (!vd_msgtype(&msg->tag, VIO_TYPE_DATA, VIO_SUBTYPE_INFO,
-		VIO_DESC_DATA))
-		return (ENOMSG);	/* not an in-band-descriptor message */
+		VIO_DESC_DATA)) {
+		PR1("Message is not an in-band-descriptor message");
+		return (ENOMSG);
+	}
 
 	if (msglen < sizeof (*desc_msg)) {
 		PRN("Expected at least %lu-byte descriptor message; "
@@ -1066,129 +1265,124 @@ vd_process_desc_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		return (EBADMSG);
 	}
 
-	if (vd_check_seq_num(vd, desc_msg->hdr.seq_num) != 0) {
+	if (vd_check_seq_num(vd, desc_msg->hdr.seq_num) != 0)
 		return (EBADMSG);
-	}
 
-	/* Valid message; process the request */
-	desc_msg->payload.status = vd_process_request(vd, &desc_msg->payload);
-	return (0);
-}
-
-static boolean_t
-vd_accept_dring_elems(vd_t *vd, uint32_t start, uint32_t ndesc)
-{
-	uint32_t	i, n;
-
-
-	/* Check descriptor states */
-	for (n = ndesc, i = start; n > 0; n--, i = (i + 1) % vd->dring_len) {
-		if (VD_DRING_ELEM(i)->hdr.dstate != VIO_DESC_READY) {
-			PRN("descriptor %u not ready", i);
-			VD_DUMP_DRING_ELEM(VD_DRING_ELEM(i));
-			return (B_FALSE);
-		}
-	}
-
-	/* Descriptors are valid; accept them */
-	for (n = ndesc, i = start; n > 0; n--, i = (i + 1) % vd->dring_len)
-		VD_DRING_ELEM(i)->hdr.dstate = VIO_DESC_ACCEPTED;
-
-	return (B_TRUE);
+	/*
+	 * Valid message:  Set up the in-band descriptor task and process the
+	 * request.  Arrange to acknowledge the client's message, unless an
+	 * error processing the descriptor task results in setting
+	 * VIO_SUBTYPE_NACK
+	 */
+	PR1("Valid in-band-descriptor message");
+	msg->tag.vio_subtype = VIO_SUBTYPE_ACK;
+	vd->inband_task.msg	= msg;
+	vd->inband_task.msglen	= msglen;
+	vd->inband_task.msgsize	= msgsize;
+	vd->inband_task.request	= &desc_msg->payload;
+	return (vd_process_task(&vd->inband_task));
 }
 
 static int
-vd_process_dring(vd_t *vd, uint32_t start, uint32_t end)
+vd_process_element(vd_t *vd, vd_task_type_t type, uint32_t idx,
+    vio_msg_t *msg, size_t msglen, size_t msgsize)
 {
-	int		status;
-	boolean_t	accepted;
-	uint32_t	i, io_status, n, ndesc;
+	int			status;
+	boolean_t		ready;
+	vd_dring_entry_t	*elem = VD_DRING_ELEM(idx);
 
 
-	ASSERT(mutex_owned(&vd->lock));
-	PR1("start = %u, end = %u", start, end);
-
-	/* Validate descriptor range */
-	if ((start >= vd->dring_len) || (end >= vd->dring_len)) {
-		PRN("\"start\" = %u, \"end\" = %u; both must be less than %u",
-		    start, end, vd->dring_len);
-		return (EINVAL);
-	}
-
-	/* Acquire updated dring elements */
-	if ((status = ldc_mem_dring_acquire(vd->dring_handle,
-		    start, end)) != 0) {
+	/* Accept the updated dring element */
+	if ((status = ldc_mem_dring_acquire(vd->dring_handle, idx, idx)) != 0) {
 		PRN("ldc_mem_dring_acquire() returned errno %d", status);
 		return (status);
 	}
-	/* Accept updated dring elements */
-	ndesc = ((end < start) ? end + vd->dring_len : end) - start + 1;
-	PR1("ndesc = %u", ndesc);
-	accepted = vd_accept_dring_elems(vd, start, ndesc);
-	/* Release dring elements */
-	if ((status = ldc_mem_dring_release(vd->dring_handle,
-		    start, end)) != 0) {
+	ready = (elem->hdr.dstate == VIO_DESC_READY);
+	if (ready) {
+		elem->hdr.dstate = VIO_DESC_ACCEPTED;
+	} else {
+		PRN("descriptor %u not ready", idx);
+		VD_DUMP_DRING_ELEM(elem);
+	}
+	if ((status = ldc_mem_dring_release(vd->dring_handle, idx, idx)) != 0) {
 		PRN("ldc_mem_dring_release() returned errno %d", status);
 		return (status);
 	}
-	/* If a descriptor was in the wrong state, return an error */
-	if (!accepted)
-		return (EINVAL);
+	if (!ready)
+		return (EBUSY);
 
 
-	/* Process accepted dring elements */
-	for (n = ndesc, i = start; n > 0; n--, i = (i + 1) % vd->dring_len) {
-		vd_dring_entry_t	*elem = VD_DRING_ELEM(i);
+	/* Initialize a task and process the accepted element */
+	PR1("Processing dring element %u", idx);
+	vd->dring_task[idx].type	= type;
+	vd->dring_task[idx].msg		= msg;
+	vd->dring_task[idx].msglen	= msglen;
+	vd->dring_task[idx].msgsize	= msgsize;
+	if ((status = vd_process_task(&vd->dring_task[idx])) != EINPROGRESS)
+		status = vd_mark_elem_done(vd, idx, elem->payload.status);
 
-		/* Process descriptor outside acquire/release bracket */
-		PR1("Processing dring element %u", i);
-		io_status = vd_process_request(vd, &elem->payload);
-
-		/* Re-acquire client's dring element */
-		if ((status = ldc_mem_dring_acquire(vd->dring_handle,
-			    i, i)) != 0) {
-			PRN("ldc_mem_dring_acquire() returned errno %d",
-			    status);
-			return (status);
-		}
-		/* Update processed element */
-		if (elem->hdr.dstate == VIO_DESC_ACCEPTED) {
-			elem->payload.status	= io_status;
-			elem->hdr.dstate	= VIO_DESC_DONE;
-		} else {
-			/* Perhaps client timed out waiting for I/O... */
-			accepted = B_FALSE;
-			PRN("element %u no longer \"accepted\"", i);
-			VD_DUMP_DRING_ELEM(elem);
-		}
-		/* Release updated processed element */
-		if ((status = ldc_mem_dring_release(vd->dring_handle,
-			    i, i)) != 0) {
-			PRN("ldc_mem_dring_release() returned errno %d",
-			    status);
-			return (status);
-		}
-		/* If the descriptor was in the wrong state, return an error */
-		if (!accepted)
-			return (EINVAL);
-	}
-
-	return (0);
+	return (status);
 }
 
 static int
-vd_process_dring_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
+vd_process_element_range(vd_t *vd, int start, int end,
+    vio_msg_t *msg, size_t msglen, size_t msgsize)
+{
+	int		i, n, nelem, status = 0;
+	boolean_t	inprogress = B_FALSE;
+	vd_task_type_t	type;
+
+
+	ASSERT(start >= 0);
+	ASSERT(end >= 0);
+
+	/*
+	 * Arrange to acknowledge the client's message, unless an error
+	 * processing one of the dring elements results in setting
+	 * VIO_SUBTYPE_NACK
+	 */
+	msg->tag.vio_subtype = VIO_SUBTYPE_ACK;
+
+	/*
+	 * Process the dring elements in the range
+	 */
+	nelem = ((end < start) ? end + vd->dring_len : end) - start + 1;
+	for (i = start, n = nelem; n > 0; i = (i + 1) % vd->dring_len, n--) {
+		((vio_dring_msg_t *)msg)->end_idx = i;
+		type = (n == 1) ? VD_FINAL_RANGE_TASK : VD_NONFINAL_RANGE_TASK;
+		status = vd_process_element(vd, type, i, msg, msglen, msgsize);
+		if (status == EINPROGRESS)
+			inprogress = B_TRUE;
+		else if (status != 0)
+			break;
+	}
+
+	/*
+	 * If some, but not all, operations of a multi-element range are in
+	 * progress, wait for other operations to complete before returning
+	 * (which will result in "ack" or "nack" of the message).  Note that
+	 * all outstanding operations will need to complete, not just the ones
+	 * corresponding to the current range of dring elements; howevever, as
+	 * this situation is an error case, performance is less critical.
+	 */
+	if ((nelem > 1) && (status != EINPROGRESS) && inprogress)
+		ddi_taskq_wait(vd->completionq);
+
+	return (status);
+}
+
+static int
+vd_process_dring_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 {
 	vio_dring_msg_t	*dring_msg = (vio_dring_msg_t *)msg;
 
 
-	PR1("Entered");
-	ASSERT(mutex_owned(&vd->lock));
 	ASSERT(msglen >= sizeof (msg->tag));
 
 	if (!vd_msgtype(&msg->tag, VIO_TYPE_DATA, VIO_SUBTYPE_INFO,
 		VIO_DRING_DATA)) {
-		return (ENOMSG);	/* not a dring-data message */
+		PR1("Message is not a dring-data message");
+		return (ENOMSG);
 	}
 
 	if (msglen != sizeof (*dring_msg)) {
@@ -1197,9 +1391,8 @@ vd_process_dring_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		return (EBADMSG);
 	}
 
-	if (vd_check_seq_num(vd, dring_msg->seq_num) != 0) {
+	if (vd_check_seq_num(vd, dring_msg->seq_num) != 0)
 		return (EBADMSG);
-	}
 
 	if (dring_msg->dring_ident != vd->dring_ident) {
 		PRN("Expected dring ident %lu; received ident %lu",
@@ -1207,10 +1400,24 @@ vd_process_dring_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		return (EBADMSG);
 	}
 
+	if (dring_msg->start_idx >= vd->dring_len) {
+		PRN("\"start_idx\" = %u; must be less than %u",
+		    dring_msg->start_idx, vd->dring_len);
+		return (EBADMSG);
+	}
 
-	/* Valid message; process dring */
-	dring_msg->tag.vio_subtype = VIO_SUBTYPE_ACK;
-	return (vd_process_dring(vd, dring_msg->start_idx, dring_msg->end_idx));
+	if ((dring_msg->end_idx < 0) ||
+	    (dring_msg->end_idx >= vd->dring_len)) {
+		PRN("\"end_idx\" = %u; must be >= 0 and less than %u",
+		    dring_msg->end_idx, vd->dring_len);
+		return (EBADMSG);
+	}
+
+	/* Valid message; process range of updated dring elements */
+	PR1("Processing descriptor range, start = %u, end = %u",
+	    dring_msg->start_idx, dring_msg->end_idx);
+	return (vd_process_element_range(vd, dring_msg->start_idx,
+		dring_msg->end_idx, msg, msglen, msgsize));
 }
 
 static int
@@ -1241,14 +1448,13 @@ recv_msg(ldc_handle_t ldc_handle, void *msg, size_t *nbytes)
 }
 
 static int
-vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
+vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 {
 	int		status;
 
 
 	PR1("Processing (%x/%x/%x) message", msg->tag.vio_msgtype,
 	    msg->tag.vio_subtype, msg->tag.vio_subtype_env);
-	ASSERT(mutex_owned(&vd->lock));
 
 	/*
 	 * Validate session ID up front, since it applies to all messages
@@ -1338,7 +1544,7 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	case VD_STATE_DATA:
 		switch (vd->xfer_mode) {
 		case VIO_DESC_MODE:	/* expect in-band-descriptor message */
-			return (vd_process_desc_msg(vd, msg, msglen));
+			return (vd_process_desc_msg(vd, msg, msglen, msgsize));
 
 		case VIO_DRING_MODE:	/* expect dring-data or unreg-dring */
 			/*
@@ -1346,7 +1552,7 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 			 * them first
 			 */
 			if ((status = vd_process_dring_msg(vd, msg,
-				    msglen)) != ENOMSG)
+				    msglen, msgsize)) != ENOMSG)
 				return (status);
 
 			/*
@@ -1371,14 +1577,12 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	}
 }
 
-static void
-vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
+static int
+vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 {
 	int		status;
 	boolean_t	reset_ldc = B_FALSE;
 
-
-	ASSERT(mutex_owned(&vd->lock));
 
 	/*
 	 * Check that the message is at least big enough for a "tag", so that
@@ -1387,19 +1591,22 @@ vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	if (msglen < sizeof (vio_msg_tag_t)) {
 		PRN("Received short (%lu-byte) message", msglen);
 		/* Can't "nack" short message, so drop the big hammer */
-		vd_reset_connection(vd, B_TRUE);
-		return;
+		vd_need_reset(vd, B_TRUE);
+		return (EBADMSG);
 	}
 
 	/*
 	 * Process the message
 	 */
-	switch (status = vd_do_process_msg(vd, msg, msglen)) {
+	switch (status = vd_do_process_msg(vd, msg, msglen, msgsize)) {
 	case 0:
 		/* "ack" valid, successfully-processed messages */
 		msg->tag.vio_subtype = VIO_SUBTYPE_ACK;
 		break;
 
+	case EINPROGRESS:
+		/* The completion handler will "ack" or "nack" the message */
+		return (EINPROGRESS);
 	case ENOMSG:
 		PRN("Received unexpected message");
 		_NOTE(FALLTHROUGH);
@@ -1417,15 +1624,29 @@ vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		break;
 	}
 
-	/* "ack" or "nack" the message */
+	/* Send the "ack" or "nack" to the client */
 	PR1("Sending %s",
 	    (msg->tag.vio_subtype == VIO_SUBTYPE_ACK) ? "ACK" : "NACK");
 	if (send_msg(vd->ldc_handle, msg, msglen) != 0)
 		reset_ldc = B_TRUE;
 
-	/* Reset the connection for nack'ed or failed messages */
+	/* Arrange to reset the connection for nack'ed or failed messages */
 	if ((status != 0) || reset_ldc)
-		vd_reset_connection(vd, reset_ldc);
+		vd_need_reset(vd, reset_ldc);
+
+	return (status);
+}
+
+static boolean_t
+vd_enabled(vd_t *vd)
+{
+	boolean_t	enabled;
+
+
+	mutex_enter(&vd->lock);
+	enabled = vd->enabled;
+	mutex_exit(&vd->lock);
+	return (enabled);
 }
 
 static void
@@ -1435,71 +1656,67 @@ vd_recv_msg(void *arg)
 	int	status = 0;
 
 
-	PR2("Entered");
 	ASSERT(vd != NULL);
-	mutex_enter(&vd->lock);
-	/*
-	 * Receive and process any messages in the LDC queue; max_msglen is
-	 * reset each time through the loop, as vd->max_msglen can increase
-	 * during connection handshake
-	 */
-	for (size_t max_msglen = vd->max_msglen;
-	    vd->enabled && status == 0;
-	    max_msglen = vd->max_msglen) {
-		size_t		msglen = max_msglen;
-		vio_msg_t	*vio_msg = kmem_alloc(max_msglen, KM_SLEEP);
+	PR2("New task to receive incoming message(s)");
+	while (vd_enabled(vd) && status == 0) {
+		size_t		msglen, msgsize;
+		vio_msg_t	*vio_msg;
 
-		if ((status = recv_msg(vd->ldc_handle, vio_msg, &msglen)) == 0)
-			vd_process_msg(vd, vio_msg, msglen);
-		else if (status != ENOMSG)
-			vd_reset_connection(vd, B_TRUE);
-		kmem_free(vio_msg, max_msglen);
+
+		/*
+		 * Receive and process a message
+		 */
+		vd_reset_if_needed(vd);	/* can change vd->max_msglen */
+		msgsize = vd->max_msglen;	/* stable copy for alloc/free */
+		msglen	= msgsize;	/* actual length after recv_msg() */
+		vio_msg = kmem_alloc(msgsize, KM_SLEEP);
+		if ((status = recv_msg(vd->ldc_handle, vio_msg, &msglen)) ==
+		    0) {
+			if (vd_process_msg(vd, vio_msg, msglen, msgsize) ==
+			    EINPROGRESS)
+				continue;	/* handler will free msg */
+		} else if (status != ENOMSG) {
+			/* Probably an LDC failure; arrange to reset it */
+			vd_need_reset(vd, B_TRUE);
+		}
+		kmem_free(vio_msg, msgsize);
 	}
-	mutex_exit(&vd->lock);
-	PR2("Returning");
-}
-
-static uint_t
-vd_do_handle_ldc_events(vd_t *vd, uint64_t event)
-{
-	ASSERT(mutex_owned(&vd->lock));
-
-	if (!vd->enabled)
-		return (LDC_SUCCESS);
-
-	if (event & LDC_EVT_RESET) {
-		PR0("Channel was reset");
-		return (LDC_SUCCESS);
-	}
-
-	if (event & LDC_EVT_UP) {
-		/* Reset the connection state when channel comes (back) up */
-		vd_reset_connection(vd, B_FALSE);
-	}
-
-	if (event & LDC_EVT_READ) {
-		PR1("New data available");
-		/* Queue a task to receive the new data */
-		if (ddi_taskq_dispatch(vd->taskq, vd_recv_msg, vd, DDI_SLEEP) !=
-		    DDI_SUCCESS)
-			PRN("Unable to dispatch vd_recv_msg()");
-	}
-
-	return (LDC_SUCCESS);
+	PR2("Task finished");
 }
 
 static uint_t
 vd_handle_ldc_events(uint64_t event, caddr_t arg)
 {
-	uint_t	status;
 	vd_t	*vd = (vd_t *)(void *)arg;
 
 
 	ASSERT(vd != NULL);
-	mutex_enter(&vd->lock);
-	status = vd_do_handle_ldc_events(vd, event);
-	mutex_exit(&vd->lock);
-	return (status);
+
+	if (!vd_enabled(vd))
+		return (LDC_SUCCESS);
+
+	if (event & LDC_EVT_RESET) {
+		PR0("LDC channel was reset");
+		return (LDC_SUCCESS);
+	}
+
+	if (event & LDC_EVT_UP) {
+		PR0("LDC channel came up:  Resetting client connection state");
+		vd_need_reset(vd, B_FALSE);
+	}
+
+	if (event & LDC_EVT_READ) {
+		int	status;
+
+		PR1("New data available");
+		/* Queue a task to receive the new data */
+		status = ddi_taskq_dispatch(vd->startq, vd_recv_msg, vd,
+		    DDI_SLEEP);
+		/* ddi_taskq_dispatch(9f) guarantees success with DDI_SLEEP */
+		ASSERT(status == DDI_SUCCESS);
+	}
+
+	return (LDC_SUCCESS);
 }
 
 static uint_t
@@ -1519,15 +1736,15 @@ vds_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	vds_t	*vds;
 
 
-	PR0("Entered");
 	switch (cmd) {
 	case DDI_DETACH:
 		/* the real work happens below */
 		break;
 	case DDI_SUSPEND:
-		/* nothing to do for this non-device */
+		PR0("No action required for DDI_SUSPEND");
 		return (DDI_SUCCESS);
 	default:
+		PRN("Unrecognized \"cmd\"");
 		return (DDI_FAILURE);
 	}
 
@@ -1552,8 +1769,6 @@ vds_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (vds->initialized & VDS_LDI)
 		(void) ldi_ident_release(vds->ldi_ident);
 	mod_hash_destroy_hash(vds->vd_table);
-	if (vds->initialized & VDS_LOCKING)
-		mutex_destroy(&vds->lock);
 	ddi_soft_state_free(vds_state, instance);
 	return (DDI_SUCCESS);
 }
@@ -1584,7 +1799,7 @@ vd_setup_full_disk(vd_t *vd)
 
 	/* Get the VTOC for slice sizes */
 	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC, (intptr_t)&vtoc,
-		    FKIOCTL, kcred, &rval)) != 0) {
+		    (vd_open_flags | FKIOCTL), kcred, &rval)) != 0) {
 		PRN("ldi_ioctl(DKIOCGVTOC) returned errno %d", status);
 		return (status);
 	}
@@ -1701,7 +1916,8 @@ vd_setup_vd(char *block_device, vd_t *vd)
 
 	/* Get dk_cinfo to determine slice of backing block device */
 	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCINFO,
-		    (intptr_t)&dk_cinfo, FKIOCTL, kcred, &rval)) != 0) {
+		    (intptr_t)&dk_cinfo, (vd_open_flags | FKIOCTL), kcred,
+		    &rval)) != 0) {
 		PRN("ldi_ioctl(DKIOCINFO) returned errno %d for %s",
 		    status, block_device);
 		return (status);
@@ -1726,7 +1942,8 @@ vd_setup_vd(char *block_device, vd_t *vd)
 
 	/* Initialize dk_geom structure for single-slice block device */
 	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGGEOM,
-		    (intptr_t)&vd->dk_geom, FKIOCTL, kcred, &rval)) != 0) {
+		    (intptr_t)&vd->dk_geom, (vd_open_flags | FKIOCTL), kcred,
+		    &rval)) != 0) {
 		PRN("ldi_ioctl(DKIOCGEOM) returned errno %d for %s",
 		    status, block_device);
 		return (status);
@@ -1747,7 +1964,8 @@ vd_setup_vd(char *block_device, vd_t *vd)
 
 	/* Initialize vtoc structure for single-slice block device */
 	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC,
-		    (intptr_t)&vd->vtoc, FKIOCTL, kcred, &rval)) != 0) {
+		    (intptr_t)&vd->vtoc, (vd_open_flags | FKIOCTL), kcred,
+		    &rval)) != 0) {
 		PRN("ldi_ioctl(DKIOCGVTOC) returned errno %d for %s",
 		    status, block_device);
 		return (status);
@@ -1811,16 +2029,22 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *block_device, uint64_t ldc_id,
 	vd->initialized |= VD_LOCKING;
 
 
-	/* Create the task queue for the vdisk */
-	(void) snprintf(tq_name, sizeof (tq_name), "vd%lu", id);
+	/* Create start and completion task queues for the vdisk */
+	(void) snprintf(tq_name, sizeof (tq_name), "vd_startq%lu", id);
 	PR1("tq_name = %s", tq_name);
-	if ((vd->taskq = ddi_taskq_create(vds->dip, tq_name, 1,
+	if ((vd->startq = ddi_taskq_create(vds->dip, tq_name, 1,
 		    TASKQ_DEFAULTPRI, 0)) == NULL) {
 		PRN("Could not create task queue");
 		return (EIO);
 	}
-	vd->initialized |= VD_TASKQ;
-	vd->enabled = 1;	/* before callback can dispatch to taskq */
+	(void) snprintf(tq_name, sizeof (tq_name), "vd_completionq%lu", id);
+	PR1("tq_name = %s", tq_name);
+	if ((vd->completionq = ddi_taskq_create(vds->dip, tq_name, 1,
+		    TASKQ_DEFAULTPRI, 0)) == NULL) {
+		PRN("Could not create task queue");
+		return (EIO);
+	}
+	vd->enabled = 1;	/* before callback can dispatch to startq */
 
 
 	/* Bring up LDC */
@@ -1864,9 +2088,10 @@ vds_destroy_vd(void *arg)
 	vd_t	*vd = (vd_t *)arg;
 
 
-	PR0("Entered");
 	if (vd == NULL)
 		return;
+
+	PR0("Destroying vdisk state");
 
 	/* Disable queuing requests for the vdisk */
 	if (vd->initialized & VD_LOCKING) {
@@ -1875,9 +2100,19 @@ vds_destroy_vd(void *arg)
 		mutex_exit(&vd->lock);
 	}
 
-	/* Drain and destroy the task queue (*before* shutting down LDC) */
-	if (vd->initialized & VD_TASKQ)
-		ddi_taskq_destroy(vd->taskq);	/* waits for queued tasks */
+	/* Drain and destroy start queue (*before* destroying completionq) */
+	if (vd->startq != NULL)
+		ddi_taskq_destroy(vd->startq);	/* waits for queued tasks */
+
+	/* Drain and destroy completion queue (*before* shutting down LDC) */
+	if (vd->completionq != NULL)
+		ddi_taskq_destroy(vd->completionq);	/* waits for tasks */
+
+	if (vd->dring_task != NULL) {
+		ASSERT(vd->dring_len != 0);
+		kmem_free(vd->dring_task,
+		    (sizeof (*vd->dring_task)) * vd->dring_len);
+	}
 
 	/* Shut down LDC */
 	if (vd->initialized & VD_LDC) {
@@ -2171,9 +2406,6 @@ vds_do_attach(dev_info_t *dip)
 							sizeof (void *));
 	ASSERT(vds->vd_table != NULL);
 
-	mutex_init(&vds->lock, NULL, MUTEX_DRIVER, NULL);
-	vds->initialized |= VDS_LOCKING;
-
 	if ((status = ldi_ident_from_dip(dip, &vds->ldi_ident)) != 0) {
 		PRN("ldi_ident_from_dip() returned errno %d", status);
 		return (DDI_FAILURE);
@@ -2205,14 +2437,14 @@ vds_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int	status;
 
-	PR0("Entered");
 	switch (cmd) {
 	case DDI_ATTACH:
+		PR0("Attaching");
 		if ((status = vds_do_attach(dip)) != DDI_SUCCESS)
 			(void) vds_detach(dip, DDI_DETACH);
 		return (status);
 	case DDI_RESUME:
-		/* nothing to do for this non-device */
+		PR0("No action required for DDI_RESUME");
 		return (DDI_SUCCESS);
 	default:
 		return (DDI_FAILURE);
@@ -2251,6 +2483,7 @@ _init(void)
 {
 	int		i, status;
 
+
 	if ((status = ddi_soft_state_init(&vds_state, sizeof (vds_t), 1)) != 0)
 		return (status);
 	if ((status = mod_install(&modlinkage)) != 0) {
@@ -2275,6 +2508,7 @@ int
 _fini(void)
 {
 	int	status;
+
 
 	if ((status = mod_remove(&modlinkage)) != 0)
 		return (status);

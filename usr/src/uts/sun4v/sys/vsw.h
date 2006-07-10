@@ -82,6 +82,7 @@ extern "C" {
 #include <sys/vio_mailbox.h>
 #include <sys/vnet_common.h>
 #include <sys/ethernet.h>
+#include <sys/vio_util.h>
 
 /*
  * Default message type.
@@ -209,9 +210,21 @@ typedef struct ver_sup {
 #define	VSW_MAX_COOKIES		((ETHERMTU >> MMU_PAGESHIFT) + 2)
 
 /*
+ * Size and number of mblks to be created in free pool.
+ */
+#define	VSW_MBLK_SIZE	2048
+#define	VSW_NUM_MBLKS	1024
+
+/*
  * Private descriptor
  */
 typedef struct vsw_private_desc {
+	/*
+	 * Below lock must be held when accessing the state of
+	 * a descriptor on either the private or public sections
+	 * of the ring.
+	 */
+	kmutex_t		dstate_lock;
 	uint64_t		dstate;
 	vnet_public_desc_t	*descp;
 	ldc_mem_handle_t	memhandle;
@@ -237,6 +250,10 @@ typedef struct dring_info {
 	ldc_dring_handle_t	handle;
 	uint64_t		ident;	/* identifier sent to peer */
 	uint64_t		end_idx;	/* last idx processed */
+	int64_t			last_ack_recv;
+
+	kmutex_t		restart_lock;
+	boolean_t		restart_reqd;	/* send restart msg */
 
 	/*
 	 * base address of private and public portions of the
@@ -258,6 +275,7 @@ typedef struct lane {
 	uint64_t	lstate;		/* Lane state */
 	uint32_t	ver_major:16,	/* Version major number */
 			ver_minor:16;	/* Version minor number */
+	kmutex_t	seq_lock;
 	uint64_t	seq_num;	/* Sequence number */
 	uint64_t	mtu;		/* ETHERMTU */
 	uint64_t	addr;		/* Unique physical address */
@@ -295,6 +313,7 @@ typedef struct vsw_ldc {
 	lane_t			lane_in;	/* Inbound lane */
 	lane_t			lane_out;	/* Outbound lane */
 	uint8_t			dev_class;	/* Peer device class */
+	vio_mblk_pool_t		*rxh;		/* Receive pool handle */
 } vsw_ldc_t;
 
 /* list of ldcs per port */
@@ -406,6 +425,8 @@ typedef struct	vsw {
 
 	mod_hash_t		*mfdb;		/* multicast FDB */
 	krwlock_t		mfdbrw;		/* rwlock for mFDB */
+
+	vio_mblk_pool_t		*rxh;		/* Receive pool handle */
 
 	/* mac layer */
 	mac_handle_t		mh;

@@ -79,7 +79,7 @@ extern "C" {
 #define	VD_MAX_COOKIES		((VD_MAX_BLOCK_SIZE / PAGESIZE) + 1)
 #define	VD_USEC_TIMEOUT		20000
 #define	VD_LDC_IDS_PROP		"ldc-ids"
-#define	VD_LDC_QLEN		32
+#define	VD_LDC_QLEN		VD_DRING_LEN
 
 /*
  * Flags used by ioctl routines to indicate if a copyin/copyout is needed

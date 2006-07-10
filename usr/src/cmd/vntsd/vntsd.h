@@ -248,6 +248,8 @@ typedef struct vntsd_client {
 
 	struct vntsd_cons    *cons; /* back link to console configuration */
 
+	char	    prev_char;	    /* previous char read by this client */
+
 } vntsd_client_t;
 
 /* console structure */

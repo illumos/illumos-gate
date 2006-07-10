@@ -86,7 +86,7 @@ void vnet_tx_update(void *arg);
 /* externs */
 extern int vgen_init(void *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
 	mac_register_t **vgenmacp);
-extern void vgen_uninit(void *arg);
+extern int vgen_uninit(void *arg);
 
 static mac_callbacks_t vnet_m_callbacks = {
 	0,
@@ -116,6 +116,7 @@ uint32_t vnet_ldcwd_interval = VNET_LDCWD_INTERVAL; /* watchdog freq in msec */
 uint32_t vnet_ldcwd_txtimeout = VNET_LDCWD_TXTIMEOUT;  /* tx timeout in msec */
 uint32_t vnet_ldc_qlen = VNET_LDC_QLEN;		/* ldc qlen */
 uint32_t vnet_nfdb_hash = VNET_NFDB_HASH;	/* size of fdb hash table */
+uint32_t vnet_nrbufs = VNET_NRBUFS;	/* number of receive buffers */
 
 /*
  * Property names
@@ -296,8 +297,9 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int		instance;
 	int		status;
 	enum		{ AST_init = 0x0, AST_vnet_alloc = 0x1,
-			    AST_read_macaddr = 0x2, AST_vgen_init = 0x4,
-			    AST_vptl_alloc = 0x8, AST_fdbh_alloc = 0x10 }
+			    AST_mac_alloc = 0x2, AST_read_macaddr = 0x4,
+			    AST_vgen_init = 0x8, AST_vptl_alloc = 0x10,
+			    AST_fdbh_alloc = 0x20 }
 			attach_state;
 	mac_register_t	*vgenmacp = NULL;
 	uint32_t	nfdbh = 0;
@@ -400,7 +402,7 @@ vnet_attach_fail:
 		RW_EXIT(&vnetp->trwlock);
 	}
 	if (attach_state & AST_vgen_init) {
-		vgen_uninit(vgenmacp->m_driver);
+		(void) vgen_uninit(vgenmacp->m_driver);
 	}
 	if (attach_state & AST_vnet_alloc) {
 		KMEM_FREE(vnetp);
@@ -418,6 +420,7 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	vnet_t		**vnetpp;
 	vp_tl_t		*vp_tlp;
 	int		instance;
+	int		rv;
 
 	instance = ddi_get_instance(dip);
 	DBG1((NULL, "vnetdetach: instance(%d) enter\n", instance));
@@ -436,6 +439,21 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		goto vnet_detach_fail;
 	}
 
+	/* uninit and free vnet proxy transports */
+	WRITE_ENTER(&vnetp->trwlock);
+	while ((vp_tlp = vnetp->tlp) != NULL) {
+		if (strcmp(vnetp->vgen_name, vp_tlp->name) == 0) {
+			/* uninitialize generic transport */
+			rv = vgen_uninit(vp_tlp->macp->m_driver);
+			if (rv != DDI_SUCCESS) {
+				RW_EXIT(&vnetp->trwlock);
+				goto vnet_detach_fail;
+			}
+		}
+		vnet_del_vptl(vnetp, vp_tlp);
+	}
+	RW_EXIT(&vnetp->trwlock);
+
 	/*
 	 * Unregister from the MAC subsystem.  This can fail, in
 	 * particular if there are DLPI style-2 streams still open -
@@ -453,17 +471,6 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		}
 	}
 	RW_EXIT(&vnet_rw);
-
-	/* uninit and free vnet proxy transports */
-	WRITE_ENTER(&vnetp->trwlock);
-	while ((vp_tlp = vnetp->tlp) != NULL) {
-		if (strcmp(vnetp->vgen_name, vp_tlp->name) == 0) {
-			/* uninitialize generic transport */
-			vgen_uninit(vp_tlp->macp->m_driver);
-		}
-		vnet_del_vptl(vnetp, vp_tlp);
-	}
-	RW_EXIT(&vnetp->trwlock);
 
 	KMEM_FREE(vnetp);
 

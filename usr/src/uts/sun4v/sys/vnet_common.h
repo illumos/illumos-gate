@@ -43,10 +43,12 @@ extern "C" {
  */
 
 /* max # of cookies per frame size */
-#define	MAX_COOKIES	 ((ETHERMAX >> MMU_PAGESHIFT) + 2)
+#define	MAX_COOKIES	 ((ETHERMAX >> MMU_PAGESHIFT) + 2ULL)
 
 /* initial send sequence number */
 #define	VNET_ISS		0x1
+
+#define	VNET_IPALIGN		6	/* padding for IP header alignment */
 
 /* vnet descriptor */
 typedef struct vnet_public_desc {

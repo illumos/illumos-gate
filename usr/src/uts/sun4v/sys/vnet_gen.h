@@ -69,7 +69,7 @@ extern "C" {
 #define	LDC_TO_VNET(ldcp)  ((ldcp)->portp->vgenp->vnetp)
 #define	LDC_TO_VGEN(ldcp)  ((ldcp)->portp->vgenp)
 
-#define	VGEN_TX_DBLK_SZ		2048	/* tx data buffer size */
+#define	VGEN_DBLK_SZ		2048	/* data buffer size */
 #define	VGEN_LDC_UP_DELAY	100	/* usec delay between ldc_up retries */
 
 /* get the address of next tbuf */
@@ -107,7 +107,6 @@ typedef struct vgen_priv_desc {
 	ldc_mem_handle_t	memhandle;	/* mem handle for data */
 	caddr_t			datap;		/* prealloc'd tx data buffer */
 	uint64_t		datalen;	/* total actual datalen */
-	uint64_t		seqnum;		/* sequence number of pkt */
 	uint64_t		ncookies;	/* num ldc_mem_cookies */
 	ldc_mem_cookie_t	memcookie[MAX_COOKIES];	/* data cookies */
 } vgen_private_desc_t;
@@ -147,13 +146,10 @@ typedef struct vgen_ver {
 typedef struct vgen_stats {
 
 	/* Link Input/Output stats */
-	uint64_t	ipackets;
-	uint64_t	ierrors;
-	uint64_t	opackets;
-	uint64_t	oerrors;
-#if 0
-	uint64_t	collisions;
-#endif
+	uint64_t	ipackets;	/* # rx packets */
+	uint64_t	ierrors;	/* # rx error */
+	uint64_t	opackets;	/* # tx packets */
+	uint64_t	oerrors;	/* # tx error */
 
 	/* MIB II variables */
 	uint64_t	rbytes;		/* # bytes received */
@@ -166,17 +162,18 @@ typedef struct vgen_stats {
 	uint32_t	noxmtbuf;	/* # xmit packets discarded */
 
 	/* Tx Statistics */
-	uint32_t	tx_no_desc;
-	uint32_t	tx_allocb_fail;
+	uint32_t	tx_no_desc;	/* # out of transmit descriptors */
 
 	/* Rx Statistics */
-	uint32_t	rx_no_desc;
-	uint32_t	rx_allocb_fail;
-	uint32_t	rx_lost_pkts;
+	uint32_t	rx_allocb_fail;	/* # rx buf allocb() failures */
+	uint32_t	rx_vio_allocb_fail; /* # vio_allocb() failures */
+	uint32_t	rx_lost_pkts;	/* # rx lost packets */
 
 	/* Callback statistics */
-	uint32_t	callbacks;
-	uint32_t	dring_data_acks;
+	uint32_t	callbacks;		/* # callbacks */
+	uint32_t	dring_data_acks;	/* # dring data acks recvd  */
+	uint32_t	dring_stopped_acks;	/* # dring stopped acks recvd */
+	uint32_t	dring_data_msgs;	/* # dring data msgs sent */
 
 } vgen_stats_t;
 
@@ -190,9 +187,7 @@ typedef struct vgen_kstats {
 	kstat_named_t	opackets;
 	kstat_named_t	opackets64;
 	kstat_named_t	oerrors;
-#if 0
-	kstat_named_t	collisions;
-#endif
+
 	/*
 	 * required by kstat for MIB II objects(RFC 1213)
 	 */
@@ -208,17 +203,18 @@ typedef struct vgen_kstats {
 	kstat_named_t	noxmtbuf; 	/* MIB - ifOutDiscards */
 
 	/* Tx Statistics */
-	kstat_named_t	tx_no_desc;
-	kstat_named_t	tx_allocb_fail;
+	kstat_named_t	tx_no_desc;	/* # out of transmit descriptors */
 
 	/* Rx Statistics */
-	kstat_named_t	rx_no_desc;
-	kstat_named_t	rx_allocb_fail;
-	kstat_named_t	rx_lost_pkts;
+	kstat_named_t	rx_allocb_fail;	/* # rx buf allocb failures */
+	kstat_named_t	rx_vio_allocb_fail; /* # vio_allocb() failures */
+	kstat_named_t	rx_lost_pkts;	/* # rx lost packets */
 
 	/* Callback statistics */
-	kstat_named_t	callbacks;
-	kstat_named_t	dring_data_acks;
+	kstat_named_t	callbacks;		/* # callbacks */
+	kstat_named_t	dring_data_acks;	/* # dring data acks recvd  */
+	kstat_named_t	dring_stopped_acks;	/* # dring stopped acks recvd */
+	kstat_named_t	dring_data_msgs;	/* # dring data msgs sent */
 
 } vgen_kstats_t;
 
@@ -277,6 +273,8 @@ typedef struct vgen_ldc {
 	uint32_t		next_rxi;	/* next expected recv index */
 	uint32_t		num_rxds;	/* number of rx descriptors */
 	caddr_t			tx_datap;	/* prealloc'd tx data area */
+	vio_mblk_pool_t		*rmp;		/* rx mblk pool */
+	uint32_t		num_rbufs;	/* number of rx bufs */
 
 	/* misc */
 	uint32_t		flags;		/* flags */
@@ -284,6 +282,7 @@ typedef struct vgen_ldc {
 	boolean_t		need_ldc_reset; /* ldc_reset needed */
 	boolean_t		need_mcast_sync; /* sync mcast table with vsw */
 	uint32_t		hretries;	/* handshake retry count */
+	boolean_t		resched_peer;	/* send tx msg to peer */
 
 	/* channel statistics */
 	vgen_stats_t		*statsp;	/* channel statistics */
@@ -329,6 +328,7 @@ typedef struct vgen {
 	struct ether_addr	*mctab;		/* multicast addr table */
 	uint32_t		mcsize;		/* allocated size of mctab */
 	uint32_t		mccount;	/* # of valid addrs in mctab */
+	vio_mblk_pool_t		*rmp;		/* rx mblk pools to be freed */
 } vgen_t;
 
 #ifdef __cplusplus

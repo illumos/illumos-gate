@@ -212,7 +212,7 @@ cpu_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 		}
 		break;
 	case FMA_CPU_REQ_OFFLINE:
-		rv = p_online_internal(msg->cpu_id, P_OFFLINE,
+		rv = p_online_internal(msg->cpu_id, P_FAULTED,
 		    &cpu_status);
 		if (rv == EINVAL) {
 			FI_DBG(CE_CONT, "Failed p_online call failed."

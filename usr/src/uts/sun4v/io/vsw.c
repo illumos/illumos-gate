@@ -68,6 +68,8 @@
 #include <sys/vio_mailbox.h>
 #include <sys/vnet_mailbox.h>
 #include <sys/vnet_common.h>
+#include <sys/vio_util.h>
+#include <sys/sdt.h>
 
 /*
  * Function prototypes.
@@ -183,7 +185,6 @@ static void vsw_create_privring(vsw_ldc_t *);
 static int vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp);
 static int vsw_dring_find_free_desc(dring_info_t *, vsw_private_desc_t **,
     int *);
-static void vsw_dring_priv2pub(vsw_private_desc_t *);
 static dring_info_t *vsw_ident2dring(lane_t *, uint64_t);
 
 static void vsw_set_lane_attr(vsw_t *, lane_t *);
@@ -194,9 +195,9 @@ static int vsw_check_dring_info(vio_dring_reg_msg_t *);
 
 /* Misc support routines */
 static	caddr_t vsw_print_ethaddr(uint8_t *addr, char *ebuf);
-
 static void vsw_free_lane_resources(vsw_ldc_t *, uint64_t);
 static int vsw_free_ring(dring_info_t *);
+
 
 /* Debugging routines */
 static void dump_flags(uint64_t);
@@ -206,6 +207,13 @@ static void display_ring(dring_info_t *);
 
 int	vsw_num_handshakes = 3;		/* # of handshake attempts */
 int	vsw_wretries = 100;		/* # of write attempts */
+int	vsw_chain_len = 150;		/* max # of mblks in msg chain */
+int	vsw_desc_delay = 0;		/* delay in us */
+int	vsw_read_attempts = 5;		/* # of reads of descriptor */
+
+uint32_t	vsw_mblk_size = VSW_MBLK_SIZE;
+uint32_t	vsw_num_mblks = VSW_NUM_MBLKS;
+
 
 /*
  * mode specific frame switching function
@@ -638,6 +646,13 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 	}
 
+	/* prevent auto-detaching */
+	if (ddi_prop_update_int(DDI_DEV_T_NONE, vswp->dip,
+				DDI_NO_AUTODETACH, 1) != DDI_SUCCESS) {
+		cmn_err(CE_NOTE, "Unable to set \"%s\" property for "
+			"instance %u", DDI_NO_AUTODETACH, instance);
+	}
+
 	/*
 	 * Now we have everything setup, register for MD change
 	 * events.
@@ -681,8 +696,9 @@ vsw_attach_fail:
 static int
 vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	vsw_t	**vswpp, *vswp;
-	int 	instance;
+	vio_mblk_pool_t		*poolp, *npoolp;
+	vsw_t			**vswpp, *vswp;
+	int 			instance;
 
 	instance = ddi_get_instance(dip);
 	vswp = ddi_get_soft_state(vsw_state, instance);
@@ -707,8 +723,8 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			cmn_err(CE_WARN, "Unable to detach from MAC layer");
 			return (DDI_FAILURE);
 		}
+		rw_destroy(&vswp->if_lockrw);
 	}
-	rw_destroy(&vswp->if_lockrw);
 
 	vsw_mdeg_unregister(vswp);
 
@@ -720,6 +736,19 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (vsw_detach_ports(vswp) != 0) {
 		cmn_err(CE_WARN, "Unable to detach ports");
 		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Destroy any free pools that may still exist.
+	 */
+	poolp = vswp->rxh;
+	while (poolp != NULL) {
+		npoolp = vswp->rxh = poolp->nextp;
+		if (vio_destroy_mblks(poolp) != 0) {
+			vswp->rxh = poolp;
+			return (DDI_FAILURE);
+		}
+		poolp = npoolp;
 	}
 
 	/*
@@ -926,7 +955,6 @@ vsw_get_md_properties(vsw_t *vswp)
 		D2(vswp, "%s: using first device specified (%s)",
 			__func__, vswp->physname);
 	}
-
 
 #ifdef DEBUG
 	/*
@@ -1335,6 +1363,8 @@ vsw_mac_unregister(vsw_t *vswp)
 		vswp->if_state &= ~(VSW_IF_UP | VSW_IF_REG);
 	}
 	RW_EXIT(&vswp->if_lockrw);
+
+	vswp->mdprops &= ~VSW_MD_MACADDR;
 
 	D1(vswp, "%s: exit", __func__);
 
@@ -2021,6 +2051,7 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 	ldc_attr_t 	attr;
 	ldc_status_t	istatus;
 	int 		status = DDI_FAILURE;
+	int		rv;
 
 	D1(vswp, "%s: enter", __func__);
 
@@ -2030,6 +2061,15 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 		return (1);
 	}
 	ldcp->ldc_id = ldc_id;
+
+	/* allocate pool of receive mblks */
+	rv = vio_create_mblks(vsw_num_mblks, vsw_mblk_size, &(ldcp->rxh));
+	if (rv) {
+		DWARN(vswp, "%s: unable to create free mblk pool for"
+			" channel %ld (rv %d)", __func__, ldc_id, rv);
+		kmem_free(ldcp, sizeof (vsw_ldc_t));
+		return (1);
+	}
 
 	mutex_init(&ldcp->ldc_txlock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&ldcp->ldc_cblock, NULL, MUTEX_DRIVER, NULL);
@@ -2045,6 +2085,8 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 	ldcp->hss_id = 1;	/* Initial handshake session id */
 
 	/* only set for outbound lane, inbound set by peer */
+	mutex_init(&ldcp->lane_in.seq_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&ldcp->lane_out.seq_lock, NULL, MUTEX_DRIVER, NULL);
 	vsw_set_lane_attr(vswp, &ldcp->lane_out);
 
 	attr.devclass = LDC_DEV_NT_SVC;
@@ -2055,27 +2097,15 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 	if (status != 0) {
 		DERR(vswp, "%s(%lld): ldc_init failed, rv (%d)",
 		    __func__, ldc_id, status);
-		mutex_destroy(&ldcp->ldc_txlock);
-		mutex_destroy(&ldcp->ldc_cblock);
-		cv_destroy(&ldcp->drain_cv);
-		mutex_destroy(&ldcp->drain_cv_lock);
-		mutex_destroy(&ldcp->hss_lock);
-		kmem_free(ldcp, sizeof (vsw_ldc_t));
-		return (1);
+		goto ldc_attach_fail;
 	}
 
 	status = ldc_reg_callback(ldcp->ldc_handle, vsw_ldc_cb, (caddr_t)ldcp);
 	if (status != 0) {
 		DERR(vswp, "%s(%lld): ldc_reg_callback failed, rv (%d)",
 		    __func__, ldc_id, status);
-		mutex_destroy(&ldcp->ldc_txlock);
-		mutex_destroy(&ldcp->ldc_cblock);
-		cv_destroy(&ldcp->drain_cv);
-		mutex_destroy(&ldcp->drain_cv_lock);
-		mutex_destroy(&ldcp->hss_lock);
 		(void) ldc_fini(ldcp->ldc_handle);
-		kmem_free(ldcp, sizeof (vsw_ldc_t));
-		return (1);
+		goto ldc_attach_fail;
 	}
 
 
@@ -2097,6 +2127,40 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 
 	D1(vswp, "%s: exit", __func__);
 	return (0);
+
+ldc_attach_fail:
+	mutex_destroy(&ldcp->ldc_txlock);
+	mutex_destroy(&ldcp->ldc_cblock);
+
+	cv_destroy(&ldcp->drain_cv);
+
+	if (ldcp->rxh != NULL) {
+		if (vio_destroy_mblks(ldcp->rxh) != 0) {
+			/*
+			 * Something odd has happened, as the destroy
+			 * will only fail if some mblks have been allocated
+			 * from the pool already (which shouldn't happen)
+			 * and have not been returned.
+			 *
+			 * Add the pool pointer to a list maintained in
+			 * the device instance. Another attempt will be made
+			 * to free the pool when the device itself detaches.
+			 */
+			cmn_err(CE_WARN, "Creation of ldc channel %ld failed"
+				" and cannot destroy associated mblk pool",
+				ldc_id);
+			ldcp->rxh->nextp =  vswp->rxh;
+			vswp->rxh = ldcp->rxh;
+		}
+	}
+	mutex_destroy(&ldcp->drain_cv_lock);
+	mutex_destroy(&ldcp->hss_lock);
+
+	mutex_destroy(&ldcp->lane_in.seq_lock);
+	mutex_destroy(&ldcp->lane_out.seq_lock);
+	kmem_free(ldcp, sizeof (vsw_ldc_t));
+
+	return (1);
 }
 
 /*
@@ -2150,11 +2214,28 @@ vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
 	ldcp->ldc_status = LDC_INIT;
 	ldcp->ldc_handle = NULL;
 	ldcp->ldc_vswp = NULL;
+
+	if (ldcp->rxh != NULL) {
+		if (vio_destroy_mblks(ldcp->rxh)) {
+			/*
+			 * Mostly likely some mblks are still in use and
+			 * have not been returned to the pool. Add the pool
+			 * to the list maintained in the device instance.
+			 * Another attempt will be made to destroy the pool
+			 * when the device detaches.
+			 */
+			ldcp->rxh->nextp =  vswp->rxh;
+			vswp->rxh = ldcp->rxh;
+		}
+	}
+
 	mutex_destroy(&ldcp->ldc_txlock);
 	mutex_destroy(&ldcp->ldc_cblock);
 	cv_destroy(&ldcp->drain_cv);
 	mutex_destroy(&ldcp->drain_cv_lock);
 	mutex_destroy(&ldcp->hss_lock);
+	mutex_destroy(&ldcp->lane_in.seq_lock);
+	mutex_destroy(&ldcp->lane_out.seq_lock);
 
 	/* unlink it from the list */
 	prev_ldcp = ldcp->ldc_next;
@@ -4072,11 +4153,14 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 	size_t			off = 0;
 	uint64_t		ncookies = 0;
 	uint64_t		chain = 0;
-	uint64_t		j, len, num;
-	uint32_t		start, end, datalen;
-	int			i, last_sync, rv;
+	uint64_t		j, len;
+	uint32_t		pos, start, datalen;
+	uint32_t		range_start, range_end;
+	int32_t			end, num, cnt = 0;
+	int			i, rv;
 	boolean_t		ack_needed = B_FALSE;
-	boolean_t		sync_needed = B_TRUE;
+	boolean_t		prev_desc_ack = B_FALSE;
+	int			read_attempts = 0;
 
 	D1(vswp, "%s(%lld): enter", __func__, ldcp->ldc_id);
 
@@ -4107,43 +4191,94 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 			return;
 		}
 
-		start = end = 0;
-		start = dring_pkt->start_idx;
+		start = pos = dring_pkt->start_idx;
 		end = dring_pkt->end_idx;
+		len = dp->num_descriptors;
 
-		D3(vswp, "%s(%lld): start index %ld : end %ld\n",
+		range_start = range_end = pos;
+
+		D2(vswp, "%s(%lld): start index %ld : end %ld\n",
 			__func__, ldcp->ldc_id, start, end);
 
-		/* basic sanity check */
-		len = dp->num_descriptors;
-		if (end > len) {
-			DERR(vswp, "%s(%lld): endpoint %lld outside ring"
-				" length %lld", __func__, ldcp->ldc_id,
-				end, len);
+		if (end == -1) {
+			num = -1;
+		} else if (num >= 0) {
+			num = end >= pos ?
+				end - pos + 1: (len - pos + 1) + end;
 
+			/* basic sanity check */
+			if (end > len) {
+				DERR(vswp, "%s(%lld): endpoint %lld outside "
+					"ring length %lld", __func__,
+					ldcp->ldc_id, end, len);
+
+				SND_DRING_NACK(ldcp, dring_pkt);
+				return;
+			}
+		} else {
+			DERR(vswp, "%s(%lld): invalid endpoint %lld",
+				__func__, ldcp->ldc_id, end);
 			SND_DRING_NACK(ldcp, dring_pkt);
 			return;
 		}
 
-		/* sync data */
-		if ((rv = ldc_mem_dring_acquire(dp->handle,
-						start, end)) != 0) {
-			DERR(vswp, "%s(%lld): unable to acquire dring : err %d",
-				__func__, ldcp->ldc_id, rv);
-			return;
-		}
+		while (cnt != num) {
+vsw_recheck_desc:
+			if ((rv = ldc_mem_dring_acquire(dp->handle,
+							pos, pos)) != 0) {
+				DERR(vswp, "%s(%lld): unable to acquire "
+					"descriptor at pos %d: err %d",
+					__func__, pos, ldcp->ldc_id, rv);
+				SND_DRING_NACK(ldcp, dring_pkt);
+				return;
+			}
 
-		pub_addr = (vnet_public_desc_t *)dp->pub_addr;
+			pub_addr = (vnet_public_desc_t *)dp->pub_addr + pos;
 
-		j = num = 0;
+			/*
+			 * When given a bounded range of descriptors
+			 * to process, its an error to hit a descriptor
+			 * which is not ready. In the non-bounded case
+			 * (end_idx == -1) this simply indicates we have
+			 * reached the end of the current active range.
+			 */
+			if (pub_addr->hdr.dstate != VIO_DESC_READY) {
+				/* unbound - no error */
+				if (end == -1) {
+					if (read_attempts == vsw_read_attempts)
+						break;
 
-		/* calculate # descriptors taking into a/c wrap around */
-		num = end >= start ? end - start + 1: (len - start + 1) + end;
+					delay(drv_usectohz(vsw_desc_delay));
+					read_attempts++;
+					goto vsw_recheck_desc;
+				}
 
-		last_sync = start;
+				/* bounded - error - so NACK back */
+				DERR(vswp, "%s(%lld): descriptor not READY "
+					"(%d)", __func__, ldcp->ldc_id,
+					pub_addr->hdr.dstate);
+				SND_DRING_NACK(ldcp, dring_pkt);
+				return;
+			}
 
-		for (i = start; j < num; i = (i + 1) % len, j++) {
-			pub_addr = (vnet_public_desc_t *)dp->pub_addr + i;
+			DTRACE_PROBE1(read_attempts, int, read_attempts);
+
+			range_end = pos;
+
+			/*
+			 * If we ACK'd the previous descriptor then now
+			 * record the new range start position for later
+			 * ACK's.
+			 */
+			if (prev_desc_ack) {
+				range_start = pos;
+
+				D2(vswp, "%s(%lld): updating range start "
+					"to be %d", __func__, ldcp->ldc_id,
+					range_start);
+
+				prev_desc_ack = B_FALSE;
+			}
 
 			/*
 			 * Data is padded to align on 8 byte boundary,
@@ -4161,48 +4296,35 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 
 			D2(vswp, "%s(%lld): processing desc %lld at pos"
 				" 0x%llx : dstate 0x%lx : datalen 0x%lx",
-				__func__, ldcp->ldc_id, i, pub_addr,
+				__func__, ldcp->ldc_id, pos, pub_addr,
 				pub_addr->hdr.dstate, datalen);
-
-			/*
-			 * XXXX : Is it a fatal error to be told to
-			 * process a packet when the READY bit is not
-			 * set ?
-			 */
-			if (pub_addr->hdr.dstate != VIO_DESC_READY) {
-				DERR(vswp, "%s(%d): descriptor %lld at pos "
-				" 0x%llx not READY (0x%lx)", __func__,
-				ldcp->ldc_id, i, pub_addr,
-				pub_addr->hdr.dstate);
-
-				SND_DRING_NACK(ldcp, dring_pkt);
-				(void) ldc_mem_dring_release(dp->handle,
-					start, end);
-				return;
-			}
 
 			/*
 			 * Mark that we are starting to process descriptor.
 			 */
 			pub_addr->hdr.dstate = VIO_DESC_ACCEPTED;
 
+			mp = vio_allocb(ldcp->rxh);
+			if (mp == NULL) {
+				/*
+				 * No free receive buffers available, so
+				 * fallback onto allocb(9F). Make sure that
+				 * we get a data buffer which is a multiple
+				 * of 8 as this is required by ldc_mem_copy.
+				 */
+				DTRACE_PROBE(allocb);
+				mp = allocb(datalen + VNET_IPALIGN + 8,
+								BPRI_MED);
+			}
+
 			/*
-			 * allocb(9F) returns an aligned data block. We
-			 * need to ensure that we ask ldc for an aligned
-			 * number of bytes also.
+			 * Ensure that we ask ldc for an aligned
+			 * number of bytes.
 			 */
-			nbytes = datalen;
+			nbytes = datalen + VNET_IPALIGN;
 			if (nbytes & 0x7) {
 				off = 8 - (nbytes & 0x7);
 				nbytes += off;
-			}
-			mp = allocb(datalen, BPRI_MED);
-			if (mp == NULL) {
-				DERR(vswp, "%s(%lld): allocb failed",
-					__func__, ldcp->ldc_id);
-				(void) ldc_mem_dring_release(dp->handle,
-					start, end);
-				return;
 			}
 
 			ncookies = pub_addr->ncookies;
@@ -4213,17 +4335,23 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 
 			if (rv != 0) {
 				DERR(vswp, "%s(%d): unable to copy in "
-					"data from %d cookies", __func__,
-					ldcp->ldc_id, ncookies);
+					"data from %d cookies in desc %d"
+					" (rv %d)", __func__, ldcp->ldc_id,
+					ncookies, pos, rv);
 				freemsg(mp);
+
+				pub_addr->hdr.dstate = VIO_DESC_DONE;
 				(void) ldc_mem_dring_release(dp->handle,
-					start, end);
-				return;
+								pos, pos);
+				break;
 			} else {
 				D2(vswp, "%s(%d): copied in %ld bytes"
 					" using %d cookies", __func__,
 					ldcp->ldc_id, nbytes, ncookies);
 			}
+
+			/* adjust the read pointer to skip over the padding */
+			mp->b_rptr += VNET_IPALIGN;
 
 			/* point to the actual end of data */
 			mp->b_wptr = mp->b_rptr + datalen;
@@ -4246,50 +4374,89 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 			/* mark we are finished with this descriptor */
 			pub_addr->hdr.dstate = VIO_DESC_DONE;
 
+			(void) ldc_mem_dring_release(dp->handle, pos, pos);
+
 			/*
-			 * Send an ACK back to peer if requested, and sync
-			 * the rings up to this point so the remote side sees
-			 * the descriptor flag in a consistent state.
+			 * Send an ACK back to peer if requested.
 			 */
 			if (ack_needed) {
-				if ((rv = ldc_mem_dring_release(
-					dp->handle, last_sync, i)) != 0) {
-					DERR(vswp, "%s(%lld): unable to sync"
-						" from %d to %d", __func__,
-						ldcp->ldc_id, last_sync, i);
-				}
-
 				ack_needed = B_FALSE;
 
-				if (i == end)
-					sync_needed = B_FALSE;
-				else
-					sync_needed = B_TRUE;
+				dring_pkt->start_idx = range_start;
+				dring_pkt->end_idx = range_end;
 
-				last_sync = (i + 1) % len;
+				DERR(vswp, "%s(%lld): processed %d %d, ACK"
+					" requested", __func__, ldcp->ldc_id,
+					dring_pkt->start_idx,
+					dring_pkt->end_idx);
 
+				dring_pkt->dring_process_state = VIO_DP_ACTIVE;
 				dring_pkt->tag.vio_subtype = VIO_SUBTYPE_ACK;
 				dring_pkt->tag.vio_sid = ldcp->local_session;
 				vsw_send_msg(ldcp, (void *)dring_pkt,
 					sizeof (vio_dring_msg_t));
-			}
-		}
 
-		if (sync_needed) {
-			if ((rv = ldc_mem_dring_release(dp->handle,
-					last_sync, end)) != 0) {
-				DERR(vswp, "%s(%lld): unable to sync"
-					" from %d to %d", __func__,
-					ldcp->ldc_id, last_sync, end);
+				prev_desc_ack = B_TRUE;
+				range_start = pos;
+			}
+
+			/* next descriptor */
+			pos = (pos + 1) % len;
+			cnt++;
+
+			/*
+			 * Break out of loop here and stop processing to
+			 * allow some other network device (or disk) to
+			 * get access to the cpu.
+			 */
+			/* send the chain of packets to be switched */
+			if (chain > vsw_chain_len) {
+				D3(vswp, "%s(%lld): switching chain of %d "
+					"msgs", __func__, ldcp->ldc_id, chain);
+				vsw_switch_frame(vswp, bp, VSW_VNETPORT,
+							ldcp->ldc_port, NULL);
+				bp = NULL;
+				break;
 			}
 		}
 
 		/* send the chain of packets to be switched */
-		D3(vswp, "%s(%lld): switching chain of %d msgs", __func__,
-			ldcp->ldc_id, chain);
-		vsw_switch_frame(vswp, bp, VSW_VNETPORT,
-					ldcp->ldc_port, NULL);
+		if (bp != NULL) {
+			D3(vswp, "%s(%lld): switching chain of %d msgs",
+					__func__, ldcp->ldc_id, chain);
+			vsw_switch_frame(vswp, bp, VSW_VNETPORT,
+							ldcp->ldc_port, NULL);
+		}
 
+		DTRACE_PROBE1(msg_cnt, int, cnt);
+
+		/*
+		 * We are now finished so ACK back with the state
+		 * set to STOPPING so our peer knows we are finished
+		 */
+		dring_pkt->tag.vio_subtype = VIO_SUBTYPE_ACK;
+		dring_pkt->tag.vio_sid = ldcp->local_session;
+
+		dring_pkt->dring_process_state = VIO_DP_STOPPED;
+
+		DTRACE_PROBE(stop_process_sent);
+
+		/*
+		 * We have not processed any more descriptors beyond
+		 * the last one we ACK'd.
+		 */
+		if (prev_desc_ack)
+			range_start = range_end;
+
+		dring_pkt->start_idx = range_start;
+		dring_pkt->end_idx = range_end;
+
+		D2(vswp, "%s(%lld) processed : %d : %d, now stopping",
+			__func__, ldcp->ldc_id, dring_pkt->start_idx,
+			dring_pkt->end_idx);
+
+		vsw_send_msg(ldcp, (void *)dring_pkt,
+					sizeof (vio_dring_msg_t));
 		break;
 
 	case VIO_SUBTYPE_ACK:
@@ -4312,7 +4479,6 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 		end = dring_pkt->end_idx;
 		len = dp->num_descriptors;
 
-
 		j = num = 0;
 		/* calculate # descriptors taking into a/c wrap around */
 		num = end >= start ? end - start + 1: (len - start + 1) + end;
@@ -4320,31 +4486,112 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 		D2(vswp, "%s(%lld): start index %ld : end %ld : num %ld\n",
 			__func__, ldcp->ldc_id, start, end, num);
 
+		mutex_enter(&dp->dlock);
+		dp->last_ack_recv = end;
+		mutex_exit(&dp->dlock);
+
 		for (i = start; j < num; i = (i + 1) % len, j++) {
 			pub_addr = (vnet_public_desc_t *)dp->pub_addr + i;
 			priv_addr = (vsw_private_desc_t *)dp->priv_addr + i;
 
-			if (pub_addr->hdr.dstate != VIO_DESC_DONE) {
-				DERR(vswp, "%s: descriptor %lld at pos "
-					" 0x%llx not DONE (0x%lx)\n", __func__,
-					i, pub_addr, pub_addr->hdr.dstate);
-				return;
-			} else {
+			/*
+			 * If the last descriptor in a range has the ACK
+			 * bit set then we will get two messages from our
+			 * peer relating to it. The normal ACK msg and then
+			 * a subsequent STOP msg. The first message will have
+			 * resulted in the descriptor being reclaimed and
+			 * its state set to FREE so when we encounter a non
+			 * DONE descriptor we need to check to see if its
+			 * because we have just reclaimed it.
+			 */
+			mutex_enter(&priv_addr->dstate_lock);
+			if (pub_addr->hdr.dstate == VIO_DESC_DONE) {
 				/* clear all the fields */
 				bzero(priv_addr->datap, priv_addr->datalen);
 				priv_addr->datalen = 0;
 
 				pub_addr->hdr.dstate = VIO_DESC_FREE;
 				pub_addr->hdr.ack = 0;
+
 				priv_addr->dstate = VIO_DESC_FREE;
+				mutex_exit(&priv_addr->dstate_lock);
 
 				D3(vswp, "clearing descp %d : pub state "
 					"0x%llx : priv state 0x%llx", i,
 					pub_addr->hdr.dstate,
 					priv_addr->dstate);
+
+			} else {
+				mutex_exit(&priv_addr->dstate_lock);
+
+				if (dring_pkt->dring_process_state !=
+							VIO_DP_STOPPED) {
+					DERR(vswp, "%s: descriptor %lld at pos "
+						" 0x%llx not DONE (0x%lx)\n",
+						__func__, i, pub_addr,
+						pub_addr->hdr.dstate);
+					return;
+				}
 			}
 		}
 
+		/*
+		 * If our peer is stopping processing descriptors then
+		 * we check to make sure it has processed all the descriptors
+		 * we have updated. If not then we send it a new message
+		 * to prompt it to restart.
+		 */
+		if (dring_pkt->dring_process_state == VIO_DP_STOPPED) {
+			DTRACE_PROBE(stop_process_recv);
+			D2(vswp, "%s(%lld): got stopping msg : %d : %d",
+				__func__, ldcp->ldc_id, dring_pkt->start_idx,
+				dring_pkt->end_idx);
+
+			/*
+			 * Check next descriptor in public section of ring.
+			 * If its marked as READY then we need to prompt our
+			 * peer to start processing the ring again.
+			 */
+			i = (end + 1) % len;
+			pub_addr = (vnet_public_desc_t *)dp->pub_addr + i;
+			priv_addr = (vsw_private_desc_t *)dp->priv_addr + i;
+
+			/*
+			 * Hold the restart lock across all of this to
+			 * make sure that its not possible for us to
+			 * decide that a msg needs to be sent in the future
+			 * but the sending code having already checked is
+			 * about to exit.
+			 */
+			mutex_enter(&dp->restart_lock);
+			mutex_enter(&priv_addr->dstate_lock);
+			if (pub_addr->hdr.dstate == VIO_DESC_READY) {
+
+				mutex_exit(&priv_addr->dstate_lock);
+
+				dring_pkt->tag.vio_subtype = VIO_SUBTYPE_INFO;
+				dring_pkt->tag.vio_sid = ldcp->local_session;
+
+				mutex_enter(&ldcp->lane_out.seq_lock);
+				dring_pkt->seq_num = ldcp->lane_out.seq_num++;
+				mutex_exit(&ldcp->lane_out.seq_lock);
+
+				dring_pkt->start_idx = (end + 1) % len;
+				dring_pkt->end_idx = -1;
+
+				D2(vswp, "%s(%lld) : sending restart msg:"
+					" %d : %d", __func__, ldcp->ldc_id,
+					dring_pkt->start_idx,
+					dring_pkt->end_idx);
+
+				vsw_send_msg(ldcp, (void *)dring_pkt,
+						sizeof (vio_dring_msg_t));
+			} else {
+				mutex_exit(&priv_addr->dstate_lock);
+				dp->restart_reqd = B_TRUE;
+			}
+			mutex_exit(&dp->restart_lock);
+		}
 		break;
 
 	case VIO_SUBTYPE_NACK:
@@ -4510,7 +4757,9 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		 * check that the descriptor we are being ACK'ed for is in
 		 * fact READY, i.e. it is one we have shared with our peer.
 		 */
+		mutex_enter(&priv_addr->dstate_lock);
 		if (priv_addr->dstate != VIO_DESC_READY) {
+			mutex_exit(&priv_addr->dstate_lock);
 			cmn_err(CE_WARN, "%s: (%ld) desc at index %ld not "
 				"READY (0x%lx)", __func__, ldcp->ldc_id, idx,
 				priv_addr->dstate);
@@ -4527,6 +4776,7 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 			bzero(priv_addr->datap, priv_addr->datalen);
 			priv_addr->datalen = 0;
 			priv_addr->dstate = VIO_DESC_FREE;
+			mutex_exit(&priv_addr->dstate_lock);
 		}
 		break;
 
@@ -4561,9 +4811,11 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		priv_addr += idx;
 
 		/* release resources associated with sent msg */
+		mutex_enter(&priv_addr->dstate_lock);
 		bzero(priv_addr->datap, priv_addr->datalen);
 		priv_addr->datalen = 0;
 		priv_addr->dstate = VIO_DESC_FREE;
+		mutex_exit(&priv_addr->dstate_lock);
 
 		break;
 
@@ -5153,6 +5405,7 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	vio_dring_msg_t		dring_pkt;
 	dring_info_t		*dp = NULL;
 	vsw_private_desc_t	*priv_desc = NULL;
+	vnet_public_desc_t	*pub = NULL;
 	vsw_t			*vswp = ldcp->ldc_vswp;
 	mblk_t			*bp;
 	size_t			n, size;
@@ -5183,14 +5436,12 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 		return (LDC_TX_FAILURE);
 	}
 
-	mutex_enter(&dp->dlock);
-
 	size = msgsize(mp);
 	if (size > (size_t)ETHERMAX) {
 		DERR(vswp, "%s(%lld) invalid size (%ld)\n", __func__,
 		    ldcp->ldc_id, size);
-		status = LDC_TX_FAILURE;
-		goto vsw_dringsend_free_exit;
+		freemsg(mp);
+		return (LDC_TX_FAILURE);
 	}
 
 	/*
@@ -5201,7 +5452,7 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	 * peers. This may change in the future.
 	 */
 	if (vsw_dring_find_free_desc(dp, &priv_desc, &idx) != 0) {
-		DERR(vswp, "%s(%lld): no descriptor available for ring "
+		D2(vswp, "%s(%lld): no descriptor available for ring "
 			"at 0x%llx", __func__, ldcp->ldc_id, dp);
 
 		/* nothing more we can do */
@@ -5215,6 +5466,7 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 
 	/* copy data into the descriptor */
 	bufp = priv_desc->datap;
+	bufp += VNET_IPALIGN;
 	for (bp = mp, n = 0; bp != NULL; bp = bp->b_cont) {
 		n = MBLKL(bp);
 		bcopy(bp->b_rptr, bufp, n);
@@ -5222,48 +5474,69 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	}
 
 	priv_desc->datalen = (size < (size_t)ETHERMIN) ? ETHERMIN : size;
-	priv_desc->dstate = VIO_DESC_READY;
+
+	pub = priv_desc->descp;
+	pub->nbytes = priv_desc->datalen;
+
+	mutex_enter(&priv_desc->dstate_lock);
+	pub->hdr.dstate = VIO_DESC_READY;
+	mutex_exit(&priv_desc->dstate_lock);
 
 	/*
-	 * Copy relevant sections of private descriptor
-	 * to public section
+	 * Determine whether or not we need to send a message to our
+	 * peer prompting them to read our newly updated descriptor(s).
 	 */
-	vsw_dring_priv2pub(priv_desc);
+	mutex_enter(&dp->restart_lock);
+	if (dp->restart_reqd) {
+		dp->restart_reqd = B_FALSE;
+		mutex_exit(&dp->restart_lock);
 
-	/*
-	 * Send a vio_dring_msg to peer to prompt them to read
-	 * the updated descriptor ring.
-	 */
-	dring_pkt.tag.vio_msgtype = VIO_TYPE_DATA;
-	dring_pkt.tag.vio_subtype = VIO_SUBTYPE_INFO;
-	dring_pkt.tag.vio_subtype_env = VIO_DRING_DATA;
-	dring_pkt.tag.vio_sid = ldcp->local_session;
+		/*
+		 * Send a vio_dring_msg to peer to prompt them to read
+		 * the updated descriptor ring.
+		 */
+		dring_pkt.tag.vio_msgtype = VIO_TYPE_DATA;
+		dring_pkt.tag.vio_subtype = VIO_SUBTYPE_INFO;
+		dring_pkt.tag.vio_subtype_env = VIO_DRING_DATA;
+		dring_pkt.tag.vio_sid = ldcp->local_session;
 
-	/* Note - for now using first ring */
-	dring_pkt.dring_ident = dp->ident;
+		/* Note - for now using first ring */
+		dring_pkt.dring_ident = dp->ident;
 
-	/*
-	 * Access to the seq_num is implicitly protected by the
-	 * fact that we have only one dring associated with the
-	 * lane currently and we hold the associated dring lock.
-	 */
-	dring_pkt.seq_num = ldcp->lane_out.seq_num++;
+		mutex_enter(&ldcp->lane_out.seq_lock);
+		dring_pkt.seq_num = ldcp->lane_out.seq_num++;
+		mutex_exit(&ldcp->lane_out.seq_lock);
 
-	/* Note - only updating single descrip at time at the moment */
-	dring_pkt.start_idx = idx;
-	dring_pkt.end_idx = idx;
+		/*
+		 * If last_ack_recv is -1 then we know we've not
+		 * received any ack's yet, so this must be the first
+		 * msg sent, so set the start to the begining of the ring.
+		 */
+		mutex_enter(&dp->dlock);
+		if (dp->last_ack_recv == -1) {
+			dring_pkt.start_idx = 0;
+		} else {
+			dring_pkt.start_idx = (dp->last_ack_recv + 1) %
+						dp->num_descriptors;
+		}
+		dring_pkt.end_idx = -1;
+		mutex_exit(&dp->dlock);
 
-	D3(vswp, "%s(%lld): dring 0x%llx : ident 0x%llx\n", __func__,
-		ldcp->ldc_id, dp, dring_pkt.dring_ident);
-	D3(vswp, "%s(%lld): start %lld : end %lld : seq %lld\n", __func__,
-		ldcp->ldc_id, dring_pkt.start_idx, dring_pkt.end_idx,
-		dring_pkt.seq_num);
+		D3(vswp, "%s(%lld): dring 0x%llx : ident 0x%llx\n", __func__,
+			ldcp->ldc_id, dp, dring_pkt.dring_ident);
+		D3(vswp, "%s(%lld): start %lld : end %lld : seq %lld\n",
+			__func__, ldcp->ldc_id, dring_pkt.start_idx,
+			dring_pkt.end_idx, dring_pkt.seq_num);
 
-	vsw_send_msg(ldcp, (void *)&dring_pkt, sizeof (vio_dring_msg_t));
+		vsw_send_msg(ldcp, (void *)&dring_pkt,
+						sizeof (vio_dring_msg_t));
+	} else {
+		mutex_exit(&dp->restart_lock);
+		D2(vswp, "%s(%lld): updating descp %d", __func__,
+			ldcp->ldc_id, idx);
+	}
 
 vsw_dringsend_free_exit:
-
-	mutex_exit(&dp->dlock);
 
 	/* free the message block */
 	freemsg(mp);
@@ -5316,14 +5589,12 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 		return (LDC_TX_FAILURE);
 	}
 
-	mutex_enter(&dp->dlock);
-
 	size = msgsize(mp);
 	if (size > (size_t)ETHERMAX) {
 		DERR(vswp, "%s(%lld) invalid size (%ld)\n", __func__,
 		    ldcp->ldc_id, size);
-		status = LDC_TX_FAILURE;
-		goto vsw_descrsend_free_exit;
+		freemsg(mp);
+		return (LDC_TX_FAILURE);
 	}
 
 	/*
@@ -5355,7 +5626,6 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	}
 
 	priv_desc->datalen = (size < (size_t)ETHERMIN) ? ETHERMIN : size;
-	priv_desc->dstate = VIO_DESC_READY;
 
 	/* create and send the in-band descp msg */
 	ibnd_msg.hdr.tag.vio_msgtype = VIO_TYPE_DATA;
@@ -5363,12 +5633,9 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	ibnd_msg.hdr.tag.vio_subtype_env = VIO_DESC_DATA;
 	ibnd_msg.hdr.tag.vio_sid = ldcp->local_session;
 
-	/*
-	 * Access to the seq_num is implicitly protected by the
-	 * fact that we have only one dring associated with the
-	 * lane currently and we hold the associated dring lock.
-	 */
+	mutex_enter(&ldcp->lane_out.seq_lock);
 	ibnd_msg.hdr.seq_num = ldcp->lane_out.seq_num++;
+	mutex_exit(&ldcp->lane_out.seq_lock);
 
 	/*
 	 * Copy the mem cookies describing the data from the
@@ -5387,8 +5654,6 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	vsw_send_msg(ldcp, (void *)&ibnd_msg, sizeof (vio_ibnd_desc_t));
 
 vsw_descrsend_free_exit:
-
-	mutex_exit(&dp->dlock);
 
 	/* free the allocated message blocks */
 	freemsg(mp);
@@ -6140,6 +6405,7 @@ vsw_create_dring(vsw_ldc_t *ldcp)
 
 	/* haven't used any descriptors yet */
 	dp->end_idx = 0;
+	dp->last_ack_recv = -1;
 
 	/* bind dring to the channel */
 	if ((ldc_mem_dring_bind(ldcp->ldc_handle, dp->handle,
@@ -6149,6 +6415,9 @@ vsw_create_dring(vsw_ldc_t *ldcp)
 			"%lld", ldcp->ldc_id);
 		goto dring_fail_exit;
 	}
+
+	mutex_init(&dp->restart_lock, NULL, MUTEX_DRIVER, NULL);
+	dp->restart_reqd = B_TRUE;
 
 	/*
 	 * Only ever create rings for outgoing lane. Link it onto
@@ -6225,6 +6494,9 @@ vsw_create_privring(vsw_ldc_t *ldcp)
 	/* haven't used any descriptors yet */
 	dp->end_idx = 0;
 
+	mutex_init(&dp->restart_lock, NULL, MUTEX_DRIVER, NULL);
+	dp->restart_reqd = B_TRUE;
+
 	/*
 	 * Only ever create rings for outgoing lane. Link it onto
 	 * end of list.
@@ -6257,11 +6529,13 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 	uint64_t		offset = 0;
 	uint32_t		ncookies = 0;
 	static char		*name = "vsw_setup_ring";
-	int			i, j, rv;
+	int			i, j, nc, rv;
 
-	/* note - public section may be null */
 	priv_addr = dp->priv_addr;
 	pub_addr = dp->pub_addr;
+
+	/* public section may be null but private should never be */
+	ASSERT(priv_addr != NULL);
 
 	/*
 	 * Allocate the region of memory which will be used to hold
@@ -6281,6 +6555,8 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 	 * descriptor fields.
 	 */
 	for (i = 0; i < VSW_RING_NUM_EL; i++) {
+		mutex_init(&priv_addr->dstate_lock, NULL, MUTEX_DRIVER, NULL);
+
 		if ((ldc_mem_alloc_handle(ldcp->ldc_handle,
 			&priv_addr->memhandle)) != 0) {
 			DERR(vswp, "%s: alloc mem handle failed", name);
@@ -6335,6 +6611,14 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 			/* link pub and private sides */
 			priv_addr->descp = pub_addr;
 
+			pub_addr->ncookies = priv_addr->ncookies;
+
+			for (nc = 0; nc < pub_addr->ncookies; nc++) {
+				bcopy(&priv_addr->memcookie[nc],
+					&pub_addr->memcookie[nc],
+					sizeof (ldc_mem_cookie_t));
+			}
+
 			pub_addr->hdr.dstate = VIO_DESC_FREE;
 			pub_addr++;
 		}
@@ -6352,9 +6636,11 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 setup_ring_cleanup:
 	priv_addr = dp->priv_addr;
 
-	for (i = 0; i < VSW_RING_NUM_EL; i++) {
+	for (j = 0; j < i; j++) {
 		(void) ldc_mem_unbind_handle(priv_addr->memhandle);
 		(void) ldc_mem_free_handle(priv_addr->memhandle);
+
+		mutex_destroy(&priv_addr->dstate_lock);
 
 		priv_addr++;
 	}
@@ -6368,7 +6654,8 @@ setup_ring_cleanup:
  * starting at the location of the last free descriptor found
  * previously.
  *
- * Returns 0 if free descriptor is available, 1 otherwise.
+ * Returns 0 if free descriptor is available, and updates state
+ * of private descriptor to VIO_DESC_READY,  otherwise returns 1.
  *
  * FUTURE: might need to return contiguous range of descriptors
  * as dring info msg assumes all will be contiguous.
@@ -6377,71 +6664,39 @@ static int
 vsw_dring_find_free_desc(dring_info_t *dringp,
 		vsw_private_desc_t **priv_p, int *idx)
 {
-	vsw_private_desc_t	*addr;
-	uint64_t		i;
-	uint64_t		j = 0;
-	uint64_t		start = dringp->end_idx;
+	vsw_private_desc_t	*addr = NULL;
 	int			num = VSW_RING_NUM_EL;
 	int			ret = 1;
 
 	D1(NULL, "%s enter\n", __func__);
 
-	addr = dringp->priv_addr;
+	ASSERT(dringp->priv_addr != NULL);
 
 	D2(NULL, "%s: searching ring, dringp 0x%llx : start pos %lld",
-			__func__, dringp, start);
+			__func__, dringp, dringp->end_idx);
 
-	for (i = start; j < num; i = (i + 1) % num, j++) {
-		addr = (vsw_private_desc_t *)dringp->priv_addr + i;
-		D2(NULL, "%s: descriptor %lld : dstate 0x%llx\n",
-			__func__, i, addr->dstate);
-		if (addr->dstate == VIO_DESC_FREE) {
-			D2(NULL, "%s: descriptor %lld is available",
-								__func__, i);
-			*priv_p = addr;
-			*idx = i;
-			dringp->end_idx = (i + 1) % num;
-			ret = 0;
-			break;
-		}
+	addr = (vsw_private_desc_t *)dringp->priv_addr + dringp->end_idx;
+
+	mutex_enter(&addr->dstate_lock);
+	if (addr->dstate == VIO_DESC_FREE) {
+		addr->dstate = VIO_DESC_READY;
+		*priv_p = addr;
+		*idx = dringp->end_idx;
+		dringp->end_idx = (dringp->end_idx + 1) % num;
+		ret = 0;
+
 	}
+	mutex_exit(&addr->dstate_lock);
 
 	/* ring full */
 	if (ret == 1) {
-		D2(NULL, "%s: no desp free: started at %d", __func__, start);
+		D2(NULL, "%s: no desp free: started at %d", __func__,
+			dringp->end_idx);
 	}
 
 	D1(NULL, "%s: exit\n", __func__);
 
 	return (ret);
-}
-
-/*
- * Copy relevant fields from the private descriptor into the
- * associated public side.
- */
-static void
-vsw_dring_priv2pub(vsw_private_desc_t *priv)
-{
-	vnet_public_desc_t	*pub;
-	int			i;
-
-	D1(NULL, "vsw_dring_priv2pub enter\n");
-
-	pub = priv->descp;
-
-	pub->ncookies = priv->ncookies;
-	pub->nbytes = priv->datalen;
-
-	for (i = 0; i < pub->ncookies; i++) {
-		bcopy(&priv->memcookie[i], &pub->memcookie[i],
-			sizeof (ldc_mem_cookie_t));
-	}
-
-	pub->hdr.ack = 1;
-	pub->hdr.dstate = VIO_DESC_READY;
-
-	D1(NULL, "vsw_dring_priv2pub exit");
 }
 
 /*
@@ -6487,7 +6742,10 @@ vsw_set_lane_attr(vsw_t *vswp, lane_t *lp)
 	lp->addr_type = ADDR_TYPE_MAC;
 	lp->xfer_mode = VIO_DRING_MODE;
 	lp->ack_freq = 0;	/* for shared mode */
+
+	mutex_enter(&lp->seq_lock);
 	lp->seq_num = VNET_ISS;
+	mutex_exit(&lp->seq_lock);
 }
 
 /*
@@ -6650,7 +6908,9 @@ vsw_free_lane_resources(vsw_ldc_t *ldcp, uint64_t dir)
 	}
 
 	lp->lstate = VSW_LANE_INACTIV;
+	mutex_enter(&lp->seq_lock);
 	lp->seq_num = VNET_ISS;
+	mutex_exit(&lp->seq_lock);
 	if (lp->dringp) {
 		if (dir == INBOUND) {
 			dp = lp->dringp;
@@ -6725,6 +6985,7 @@ vsw_free_ring(dring_info_t *dp)
 					}
 					paddr->memhandle = NULL;
 				}
+				mutex_destroy(&paddr->dstate_lock);
 			}
 			kmem_free(dp->priv_addr, (sizeof (vsw_private_desc_t)
 					* VSW_RING_NUM_EL));
@@ -6744,6 +7005,7 @@ vsw_free_ring(dring_info_t *dp)
 
 		mutex_exit(&dp->dlock);
 		mutex_destroy(&dp->dlock);
+		mutex_destroy(&dp->restart_lock);
 		kmem_free(dp, sizeof (dring_info_t));
 
 		dp = dpp;
