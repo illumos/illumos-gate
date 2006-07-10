@@ -911,7 +911,7 @@ installctx(
 /*
  * Remove thread context ops from the current thread.
  * (Or allow the agent thread to remove thread context ops from another
- * thread in the same process)
+ * thread in the same, stopped, process)
  */
 int
 removectx(
@@ -927,18 +927,8 @@ removectx(
 	struct ctxop *ctx, *prev_ctx;
 
 	ASSERT(t == curthread || ttoproc(t)->p_stat == SIDL ||
-	    ttoproc(t)->p_agenttp == curthread);
+	    ttoproc(t)->p_agenttp == curthread || t->t_state == TS_STOPPED);
 
-	/*
-	 * There's a potential race for t_ctx between the agent thread
-	 * and the target thread when lwps are exiting (for example,
-	 * when the process is reacting to having been killed).  At
-	 * other times, the target thread will be TS_STOPPED whilst the
-	 * agent thread is inside this function.  However, from the
-	 * perspective of the cost of locking, it seems cheaper to take
-	 * a thread-specific lock everytime we come through here.
-	 */
-	mutex_enter(&t->t_ctx_lock);
 	prev_ctx = NULL;
 	for (ctx = t->t_ctx; ctx != NULL; ctx = ctx->next) {
 		if (ctx->save_op == save && ctx->restore_op == restore &&
@@ -949,7 +939,6 @@ removectx(
 				prev_ctx->next = ctx->next;
 			else
 				t->t_ctx = ctx->next;
-			mutex_exit(&t->t_ctx_lock);
 			if (ctx->free_op != NULL)
 				(ctx->free_op)(ctx->arg, 0);
 			kmem_free(ctx, sizeof (struct ctxop));
@@ -957,8 +946,6 @@ removectx(
 		}
 		prev_ctx = ctx;
 	}
-	mutex_exit(&t->t_ctx_lock);
-
 	return (0);
 }
 
