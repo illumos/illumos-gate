@@ -54,7 +54,7 @@ static void	apic_clear_mask(apic_irq_t *);
 static void	apic_set_mask(apic_irq_t *);
 static uchar_t	apic_find_multi_vectors(int, int);
 int		apic_navail_vector(dev_info_t *, int);
-int		apic_alloc_vectors(dev_info_t *, int, int, int, int);
+int		apic_alloc_vectors(dev_info_t *, int, int, int, int, int);
 void		apic_free_vectors(dev_info_t *, int, int, int, int);
 int		apic_intr_ops(dev_info_t *, ddi_intr_handle_impl_t *,
 		    psm_intr_op_t, int *);
@@ -190,7 +190,7 @@ apic_navail_vector(dev_info_t *dip, int pri)
 		count = 0;
 		while ((apic_vector_to_irq[i] == APIC_RESV_IRQ) &&
 			(i < highest)) {
-			if ((i == T_FASTTRAP) || (i == APIC_SPUR_INTR))
+			if (APIC_CHECK_RESERVE_VECTORS(i))
 				break;
 			count++;
 			i++;
@@ -201,10 +201,16 @@ apic_navail_vector(dev_info_t *dip, int pri)
 	return (navail);
 }
 
+/*
+ * Finds "count" contiguous MSI vectors starting at the proper alignment
+ * at "pri".
+ * Caller needs to make sure that count has to be power of 2 and should not
+ * be < 1.
+ */
 static uchar_t
 apic_find_multi_vectors(int pri, int count)
 {
-	int	lowest, highest, i, navail, start;
+	int	lowest, highest, i, navail, start, msibits;
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_find_mult: pri: %x, count: %x\n",
 	    pri, count));
@@ -213,13 +219,27 @@ apic_find_multi_vectors(int pri, int count)
 	lowest = apic_ipltopri[pri - 1] + APIC_VECTOR_PER_IPL;
 	navail = 0;
 
+	/*
+	 * msibits is the no. of lower order message data bits for the
+	 * allocated MSI vectors and is used to calculate the aligned
+	 * starting vector
+	 */
+	msibits = count - 1;
+
 	/* It has to be contiguous */
 	for (i = lowest; i < highest; i++) {
 		navail = 0;
+
+		/*
+		 * starting vector has to be aligned accordingly for
+		 * multiple MSIs
+		 */
+		if (msibits)
+			i = (i + msibits) & ~msibits;
 		start = i;
 		while ((apic_vector_to_irq[i] == APIC_RESV_IRQ) &&
 			(i < highest)) {
-			if ((i == T_FASTTRAP) || (i == APIC_SPUR_INTR))
+			if (APIC_CHECK_RESERVE_VECTORS(i))
 				break;
 			navail++;
 			if (navail >= count)
@@ -229,7 +249,6 @@ apic_find_multi_vectors(int pri, int count)
 	}
 	return (0);
 }
-
 
 /*
  * It finds the apic_irq_t associates with the dip, ispec and type.
@@ -369,23 +388,27 @@ apic_set_mask(apic_irq_t *irqp)
  * This function allocate "count" vector(s) for the given "dip/pri/type"
  */
 int
-apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type)
+apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
+    int behavior)
 {
 	int	rcount, i;
 	uchar_t	start, irqno, cpu;
-	short	idx;
 	major_t	major;
 	apic_irq_t	*irqptr;
 
-	/* for MSI/X only */
-	if (!DDI_INTR_IS_MSI_OR_MSIX(type))
+	/* only supports MSI at the moment, will add MSI-X support later */
+	if (type != DDI_INTR_TYPE_MSI)
 		return (0);
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: dip=0x%p type=%d "
-	    "inum=0x%x  pri=0x%x count=0x%x\n",
-	    (void *)dip, type, inum, pri, count));
+	    "inum=0x%x  pri=0x%x count=0x%x behavior=%d\n",
+	    (void *)dip, type, inum, pri, count, behavior));
 
 	if (count > 1) {
+		if (behavior == DDI_INTR_ALLOC_STRICT &&
+		    (apic_multi_msi_enable == 0 || count > apic_multi_msi_max))
+			return (0);
+
 		if (apic_multi_msi_enable == 0)
 			count = 1;
 		else if (count > apic_multi_msi_max)
@@ -394,11 +417,19 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type)
 
 	if ((rcount = apic_navail_vector(dip, pri)) > count)
 		rcount = count;
+	else if (rcount == 0 || (rcount < count &&
+	    behavior == DDI_INTR_ALLOC_STRICT))
+		return (0);
+
+	/* if not ISP2, then round it down */
+	if (!ISP2(rcount))
+		rcount = 1 << (highbit(rcount) - 1);
 
 	mutex_enter(&airq_mutex);
 
-	for (start = 0; rcount > 0; rcount--) {
-		if ((start = apic_find_multi_vectors(pri, rcount)) != 0)
+	for (start = 0; rcount > 0; rcount >>= 1) {
+		if ((start = apic_find_multi_vectors(pri, rcount)) != 0 ||
+		    behavior == DDI_INTR_ALLOC_STRICT)
 			break;
 	}
 
@@ -408,7 +439,6 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type)
 		return (0);
 	}
 
-	idx = (short)((type == DDI_INTR_TYPE_MSI) ? MSI_INDEX : MSIX_INDEX);
 	major = (dip != NULL) ? ddi_name_to_major(ddi_get_name(dip)) : 0;
 	for (i = 0; i < rcount; i++) {
 		if ((irqno = apic_allocate_irq(apic_first_avail_irq)) ==
@@ -435,7 +465,7 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type)
 		irqptr->airq_vector = start + i;
 		irqptr->airq_origirq = (uchar_t)(inum + i);
 		irqptr->airq_share_id = 0;
-		irqptr->airq_mps_intr_index = idx;
+		irqptr->airq_mps_intr_index = MSI_INDEX;
 		irqptr->airq_dip = dip;
 		irqptr->airq_major = major;
 		if (i == 0) /* they all bound to the same cpu */
@@ -834,7 +864,8 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 		break;
 	case PSM_INTR_OP_ALLOC_VECTORS:
 		*result = apic_alloc_vectors(dip, hdlp->ih_inum,
-		    hdlp->ih_scratch1, hdlp->ih_pri, hdlp->ih_type);
+		    hdlp->ih_scratch1, hdlp->ih_pri, hdlp->ih_type,
+		    (int)(uintptr_t)hdlp->ih_scratch2);
 		break;
 	case PSM_INTR_OP_FREE_VECTORS:
 		apic_free_vectors(dip, hdlp->ih_inum, hdlp->ih_scratch1,
@@ -890,14 +921,12 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 
 		/* Now allocate the vectors */
 		count_vec = apic_alloc_vectors(dip, hdlp->ih_inum,
-		    hdlp->ih_scratch1, new_priority, hdlp->ih_type);
+		    hdlp->ih_scratch1, new_priority, hdlp->ih_type,
+		    DDI_INTR_ALLOC_STRICT);
 
-		/* Did we get fewer vectors? */
-		if (count_vec != hdlp->ih_scratch1) {
-			apic_free_vectors(dip, hdlp->ih_inum, count_vec,
-			    new_priority, hdlp->ih_type);
+		/* Did we get the new vectors? */
+		if (!count_vec)
 			return (PSM_FAILURE);
-		}
 
 		/* Finally, free the previously allocated vectors */
 		apic_free_vectors(dip, hdlp->ih_inum, count_vec,
