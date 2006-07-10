@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,7 +94,6 @@ prldap_install_routines( LDAP *ld, int shared )
 }
 
 
-#ifndef _SOLARIS_SDK	/* Not used, left in to stay in sync with iplanet */
 /*
  * Function: prldap_set_session_option().
  * 
@@ -177,7 +176,6 @@ int LDAP_CALL prldap_get_session_option( LDAP *ld, void *sessionarg,
 
     return( rc );
 }
-#endif	/* !_SOLARIS_SDK */
 
 
 /*

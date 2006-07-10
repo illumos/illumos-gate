@@ -41,6 +41,7 @@
 #include "ns_sldap.h"
 #include "ns_internal.h"
 #include "ns_cache_door.h"
+#include "ldappr.h"
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <procfs.h>
@@ -1247,6 +1248,18 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 #ifdef DEBUG
 		(void) fprintf(stderr, "+++TLS transport\n");
 #endif /* DEBUG */
+
+		if (prldap_set_session_option(NULL, NULL,
+		    PRLDAP_OPT_IO_MAX_TIMEOUT,
+		    timeoutMilliSec) != LDAP_SUCCESS) {
+			(void) snprintf(errstr, sizeof (errstr),
+				gettext("openConnection: failed to initialize "
+				"TLS security"));
+			MKERROR(LOG_WARNING, *errorp, LDAP_CONNECT_ERROR,
+				strdup(errstr), NULL);
+			return (NS_LDAP_INTERNAL);
+		}
+
 		hostcertpath = auth->hostcertpath;
 		if (hostcertpath == NULL) {
 			alloc_hcp = __s_get_hostcertpath();
