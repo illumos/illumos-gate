@@ -2780,7 +2780,8 @@ spa_sync(spa_t *spa, uint64_t txg)
 	 * don't generate work on an otherwise idle system.
 	 */
 	if (!txg_list_empty(&dp->dp_dirty_datasets, txg) ||
-	    !txg_list_empty(&dp->dp_dirty_dirs, txg))
+	    !txg_list_empty(&dp->dp_dirty_dirs, txg) ||
+	    !txg_list_empty(&dp->dp_sync_tasks, txg))
 		spa_sync_deferred_frees(spa, txg);
 
 	/*
