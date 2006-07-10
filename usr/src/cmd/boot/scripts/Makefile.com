@@ -25,27 +25,46 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 # 
 
-i386_SUBDIRS=           \
-	i386
+.SUFFIXES: .ksh
 
-sparc_SUBDIRS=		\
-	sparc
+MANIFEST= boot-archive-update.xml
+SVCMETHOD= boot-archive-update
 
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-check:=		TARGET= check
+PROG= create_ramdisk create_diskmap
+METHODPROG= boot-archive-update
+SBINPROG= root_archive
+
+SBINLINKS= $(SBINPROG)
+
+include ../Makefile.com
+
+ROOTSBINPROG=	$(SBINPROG:%=$(ROOTUSRSBIN)/%)
+
+ROOTMANIFESTDIR= $(ROOTSVCSYSTEM)
+$(ROOTMANIFEST) := FILEMODE= 444
+
+ROOTBOOTSOLARISBINLINKS= $(SBINLINKS:%=$(ROOTBOOTSOLARISBIN)/%)
 
 .KEEP_STATE:
 
-SUBDIRS = $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
+all: $(PROG) $(METHODPROG) $(SBINPROG)
 
-all clean clobber check: $(SUBDIRS)
+$(ROOTBOOTSOLARISBINLINKS):
+	-$(RM) $@; $(SYMLINK) ../../../usr/sbin/$(@F) $@
 
-install: $(SUBDIRS)
+check:	$(CHKMANIFEST)
 
-FRC:
+clean:
+	$(RM) $(PROG) $(METHODPROG) $(SBINPROG)
 
-$(SUBDIRS): FRC
-	$(MAKE) -f Makefile.$@ $(TARGET)
+ _msg:
+
+lint:
+
+# Default rule for building ksh scripts.
+.ksh:
+	$(RM) $@
+	$(CAT) $< > $@
+	$(CHMOD) +x $@
+
+include ../Makefile.targ

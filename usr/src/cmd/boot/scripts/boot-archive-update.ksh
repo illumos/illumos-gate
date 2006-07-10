@@ -28,51 +28,27 @@
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/fs_include.sh
 
-ERRORFILE=/etc/svc/volatile/boot_archive_error
-FILELIST=/etc/svc/volatile/boot_archive_filelist
 UPDATEFILE=/etc/svc/volatile/boot_archive_needs_update
-
-#
-# no boot-archive on sparc...yet
-#
-if [  `uname -p` = "sparc" ]; then
-	exit $SMF_EXIT_OK
-fi
 
 smf_is_globalzone || exit $SMF_EXIT_OK
 
+# no boot-archive on sparc...yet
 #
-# Make sure we return failure only once. If user choose to ignore
-# error, we return success to permit boot to continue. The boot
-# archive will be updated on the subsequent shutdown.
-#
-if [ -f "${ERRORFILE}" ]; then
-	rm ${ERRORFILE}
-	exit $SMF_EXIT_OK
+if [ `uname -p` = "sparc" ]; then
+        exit $SMF_EXIT_OK
 fi
 
-#
-# Now check the archive.
-#
-/sbin/bootadm update-archive -vnC 2> /dev/null
-if [ $? = 0 ]; then
-	exit $SMF_EXIT_OK
+# get rid of transient reboot entry in GRUB menu
+if [ -f /stubboot/boot/grub/menu.lst ]; then
+	/sbin/bootadm -m update_temp -R /stubboot
+else
+	/sbin/bootadm -m update_temp
 fi
 
-touch $ERRORFILE
-touch $UPDATEFILE
+if [ -f $UPDATEFILE ] || [ -f /reconfigure ]; then
+	/usr/sbin/rtc -c > /dev/null 2>&1
+	/sbin/bootadm update-archive
+	rm -f $UPDATEFILE
+fi
 
-cecho ""
-cecho "WARNING: The following files in / differ from the boot archive:"
-cecho ""
-
-/sbin/bootadm update-archive -vn | grep -v "cannot find" > /dev/msglog
-
-cecho ""
-cecho "The recommended action is to reboot and select the \"Solaris failsafe\""
-cecho "option from the boot menu. Then follow the prompts to update the"
-cecho "boot archive. To continue booting at your own risk, you may clear the"
-cecho "service by running: \"svcadm clear system/boot-archive\""
-cecho ""
-
-exit $SMF_EXIT_ERR_FATAL
+exit $SMF_EXIT_OK

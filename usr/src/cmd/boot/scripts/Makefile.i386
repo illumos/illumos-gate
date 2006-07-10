@@ -25,27 +25,9 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 # 
 
-i386_SUBDIRS=           \
-	i386
-
-sparc_SUBDIRS=		\
-	sparc
-
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-check:=		TARGET= check
+include Makefile.com
 
 .KEEP_STATE:
 
-SUBDIRS = $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
-
-all clean clobber check: $(SUBDIRS)
-
-install: $(SUBDIRS)
-
-FRC:
-
-$(SUBDIRS): FRC
-	$(MAKE) -f Makefile.$@ $(TARGET)
+install: all $(ROOTBOOTSOLARISBINPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD) \
+	$(ROOTSBINPROG) .WAIT $(ROOTBOOTSOLARISBINLINKS)

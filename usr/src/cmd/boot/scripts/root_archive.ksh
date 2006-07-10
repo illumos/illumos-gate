@@ -55,6 +55,22 @@ usage()
 	printf "       root_archive unpackmedia <solaris_image> <root>\n"
 }
 
+cleanup()
+{
+	if [ -d $MNT ] ; then
+		umount $MNT 2> /dev/null
+		rmdir $MNT
+	fi
+
+	if [ -f $TMR ] ; then
+		rm $TMR
+	fi
+	
+	if [ $LOFIDEV ] ; then
+		lofiadm -d $LOFIDEV
+	fi
+}
+
 archive_X()
 {
 	MEDIA="$1"
@@ -73,8 +89,8 @@ archive_X()
 	# create the graphics and non-graphics X archive
 	#
 	cd "$MINIROOT/usr"
-	find openwin dt -print | cpio -ocmPuB 2> /dev/null | bzip2 > \
-	    "$CPIO_DIR/X.cpio.bz2"
+	find openwin dt X11 -print 2> /dev/null |\
+	    cpio -ocmPuB 2> /dev/null | bzip2 > "$CPIO_DIR/X.cpio.bz2"
 
 	find openwin/bin/mkfontdir \
 	     openwin/lib/installalias \
@@ -83,9 +99,10 @@ archive_X()
 	         -print | cpio -ocmPuB 2> /dev/null | bzip2 > \
 	         "$CPIO_DIR/X_small.cpio.bz2"
 
-	rm -rf dt openwin
+	rm -rf dt openwin X11
 	ln -s ../tmp/root/usr/dt
 	ln -s ../tmp/root/usr/openwin
+	ln -s ../tmp/root/usr/X11
 	cd ../..
 }
 
@@ -115,7 +132,9 @@ packmedia()
 
 	# clear out 64 bit support to conserve memory
 	#
-	find "$MINIROOT" -name amd64 -type directory | xargs rm -rf
+	if [ STRIP_AMD64 != false ] ; then
+		find "$MINIROOT" -name amd64 -type directory | xargs rm -rf
+	fi
 
 	cp "$MINIROOT/platform/i86pc/multiboot" "$MEDIA/boot"
 
@@ -150,7 +169,7 @@ unarchive_X()
 	# unpack X
 	#
 	cd "$UNPACKED_ROOT/usr"
-	rm -rf dt openwin
+	rm -rf dt openwin X11
 	bzcat "$CPIO_DIR/X.cpio.bz2" | cpio -icdmu 2> /dev/null
 }
 
@@ -189,10 +208,9 @@ unpack()
 		exit 1
 	fi
 
-	TMR=/tmp/mr$$
 	gzcat "$MR" > $TMR
 
-	lofidev=`/usr/sbin/lofiadm -a $TMR`
+	LOFIDEV=`/usr/sbin/lofiadm -a $TMR`
 	if [ $? != 0 ] ; then
 		echo lofi plumb failed
 		exit 2
@@ -200,20 +218,20 @@ unpack()
 
 	mkdir -p $MNT
 
-	FSTYP=`fstyp $lofidev`
+	FSTYP=`fstyp $LOFIDEV`
 
 	if [ "$FSTYP" = ufs ] ; then
-		/usr/sbin/mount -o ro,nologging $lofidev $MNT
+		/usr/sbin/mount -o ro,nologging $LOFIDEV $MNT
 		do_unpack
 	elif [ "$FSTYP" = hsfs ] ; then
-		/usr/sbin/mount -F hsfs -o ro $lofidev $MNT
+		/usr/sbin/mount -F hsfs -o ro $LOFIDEV $MNT
 		do_unpack
 	else
 		printf "invalid root archive\n"
 	fi
 
 	rmdir $MNT
-	lofiadm -d $TMR
+	lofiadm -d $TMR ; LOFIDEV=""
 	rm $TMR
 }
 
@@ -225,38 +243,54 @@ pack()
 	fi
 
 	size=`du -sk "$UNPACKED_ROOT" | ( read size name; echo $size )`
-	size=`expr $size + \( $size \* 10 \) / 100`
-	rm -f "$MR"
-	/usr/sbin/mkfile ${size}k "$MR"
+	size=`expr "$EXTRA_SPACE" \* 1024 + $size + \( $size \* 10 \) / 100`
 
-	lofidev=`/usr/sbin/lofiadm -a "$MR"`
+	/usr/sbin/mkfile ${size}k "$TMR"
+
+	LOFIDEV=`/usr/sbin/lofiadm -a "$TMR"`
 	if [ $? != 0 ] ; then
 		echo lofi plumb failed
 		exit 2
 	fi
 
-	rlofidev=`echo $lofidev | sed s/lofi/rlofi/`
-	newfs $rlofidev < /dev/null 2> /dev/null 
+	RLOFIDEV=`echo $LOFIDEV | sed s/lofi/rlofi/`
+	newfs $RLOFIDEV < /dev/null 2> /dev/null 
 	mkdir -p $MNT
-	mount -o nologging $lofidev $MNT 
+	mount -o nologging $LOFIDEV $MNT 
 	rmdir $MNT/lost+found
 	cd "$UNPACKED_ROOT"
 	find . -print | cpio -pdum $MNT 2> /dev/null
 	lockfs -f $MNT
 	umount $MNT
 	rmdir $MNT
-	lofiadm -d "$MR"
+	lofiadm -d $LOFIDEV
+	LOFIDEV=""
 
 	cd "$BASE"
 
-	rm -f "$MR.gz"
-	gzip -f "$MR"
-	mv "$MR.gz" "$MR"
+	rm -f "$TMR.gz"
+	gzip -f "$TMR"
+	mv "$TMR.gz" "$MR"
 	chmod a+r "$MR"
 }
 
 # main
 #
+
+EXTRA_SPACE=0
+
+while getopts s:6 opt ; do
+	case $opt in
+	s)	EXTRA_SPACE="$OPTARG"
+		;;
+	6)	STRIP_AMD64=false
+		;;
+	*)	usage
+		exit 1
+		;;
+	esac
+done
+shift `expr $OPTIND - 1`
 
 if [ $# != 3 ] ; then
 	usage
@@ -266,6 +300,8 @@ fi
 UNPACKED_ROOT="$3"
 BASE="`pwd`"
 MNT=/tmp/mnt$$
+TMR=/tmp/mr$$
+LOFIDEV=
 MR="$2"
 
 if [ "`dirname $MR`" = . ] ; then
@@ -274,6 +310,8 @@ fi
 if [ "`dirname $UNPACKED_ROOT`" = . ] ; then
 	UNPACKED_ROOT="$BASE/$UNPACKED_ROOT"
 fi
+
+trap cleanup EXIT
 
 case $1 in
 	packmedia)

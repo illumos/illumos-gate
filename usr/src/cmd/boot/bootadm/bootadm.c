@@ -52,6 +52,7 @@
 #include <strings.h>
 #include <sys/systeminfo.h>
 #include <sys/dktp/fdisk.h>
+#include <sys/param.h>
 
 #include <pwd.h>
 #include <grp.h>
@@ -317,6 +318,15 @@ static struct {
 	nvlist_t *old_nvlp;
 	int need_update;
 } walk_arg;
+
+
+static struct safefile {
+	char *name;
+	struct safefile *next;
+};
+
+struct safefile *safefiles = NULL;
+#define	NEED_UPDATE_FILE "/etc/svc/volatile/boot_archive_needs_update"
 
 static void
 usage(void)
@@ -1362,6 +1372,9 @@ cmpstat(
 	uint64_t filestat[2];
 	int error;
 
+	struct safefile *safefilep;
+	FILE *fp;
+
 	/*
 	 * We only want regular files
 	 */
@@ -1389,11 +1402,45 @@ cmpstat(
 		return (0);
 
 	/*
-	 * If we are invoked as part of system/filesyste/boot-archive
-	 * SMF service, ignore amd64 modules unless we are booted amd64.
+	 * If we are invoked as part of system/filesyste/boot-archive, then
+	 * there are a number of things we should not worry about
 	 */
-	if (bam_smf_check && !is_amd64() && strstr(file, "/amd64/") != 0)
-		return (0);
+	if (bam_smf_check) {
+		/* ignore amd64 modules unless we are booted amd64. */
+		if (!is_amd64() && strstr(file, "/amd64/") != 0)
+			return (0);
+
+		/* read in list of safe files */
+		if (safefiles == NULL)
+			if (fp = fopen("/boot/solaris/filelist.safe", "r")) {
+				safefiles = s_calloc(1,
+				    sizeof (struct safefile));
+				safefilep = safefiles;
+				safefilep->name = s_calloc(1, MAXPATHLEN +
+				    MAXNAMELEN);
+				safefilep->next = NULL;
+				while (s_fgets(safefilep->name, MAXPATHLEN +
+				    MAXNAMELEN, fp) != NULL) {
+					safefilep->next = s_calloc(1,
+					    sizeof (struct safefile));
+					safefilep = safefilep->next;
+					safefilep->name = s_calloc(1,
+					    MAXPATHLEN + MAXNAMELEN);
+					safefilep->next = NULL;
+				}
+				(void) fclose(fp);
+			}
+
+		safefilep = safefiles;
+		while (safefilep->next != NULL)
+			if (strcmp(file, safefilep->name) != 0) {
+				fp = fopen(NEED_UPDATE_FILE, "w");
+				if (fclose(fp) != 0)
+					bam_error(CLOSE_FAIL, NEED_UPDATE_FILE,
+						strerror(errno));
+				return (0);
+			}
+	}
 
 	/*
 	 * We need an update if file doesn't exist in old archive

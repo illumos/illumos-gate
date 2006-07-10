@@ -778,6 +778,7 @@ MANIFEST_TOPDIRS=			\
 	zoneadmd
 
 MANIFEST_SUBDIRS=			\
+	boot/scripts			\
 	cmd-crypto/scripts		\
 	cmd-inet/usr.lib/in.chargend	\
 	cmd-inet/usr.lib/in.daytimed	\

@@ -14,7 +14,6 @@ etc/cluster/nodeid
 kernel
 platform/i86pc/biosint
 platform/i86pc/kernel
-boot/solaris.xpm
 boot/solaris/bootenv.rc
 boot/solaris/devicedb/master
 boot/acpi/tables

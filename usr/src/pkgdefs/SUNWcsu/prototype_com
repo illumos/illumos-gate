@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -817,6 +817,7 @@ s none usr/sbin/repquota=../lib/fs/ufs/repquota
 l none usr/sbin/roleadd=../../usr/sbin/useradd
 l none usr/sbin/roledel=../../usr/sbin/userdel
 l none usr/sbin/rolemod=../../usr/sbin/usermod
+f none usr/sbin/root_archive 555 root sys
 s none usr/sbin/route=../../sbin/route
 s none usr/sbin/routeadm=../../sbin/routeadm
 f none usr/sbin/rpcbind 555 root bin

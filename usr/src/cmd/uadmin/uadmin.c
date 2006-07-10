@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +36,8 @@
 #include <signal.h>
 #include <sys/uadmin.h>
 #include <bsm/libbsm.h>
+
+#define	SMF_RST "/etc/svc/volatile/resetting"
 
 static const char *Usage = "Usage: %s cmd fcn [mdep]\n";
 
@@ -79,13 +80,14 @@ main(int argc, char *argv[])
 			    argv[0]);
 
 		if (cmd == A_SHUTDOWN || cmd == A_REBOOT)
-			(void) creat("/etc/svc/volatile/resetting", 0777);
+			(void) creat(SMF_RST, 0777);
 	}
 
 	if (uadmin(cmd, fcn, mdep) < 0) {
 		perror("uadmin");
 
-		/* GLXXX unlink resetting file? */
+		(void) unlink(SMF_RST);
+
 		return (1);
 	}
 
