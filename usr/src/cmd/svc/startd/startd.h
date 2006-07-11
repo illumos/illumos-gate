@@ -274,6 +274,12 @@ typedef enum {
 	METHOD_RESTART_OTHER
 } method_restart_t;
 
+typedef enum {
+	PROPAGATE_START,
+	PROPAGATE_STOP,
+	PROPAGATE_SAT
+} propagate_event_t;
+
 /*
  * Graph representation.
  */
@@ -587,7 +593,7 @@ void vertex_subgraph_dependencies_shutdown(scf_handle_t *h,
     graph_vertex_t *v, int was_running);
 void graph_transition_sulogin(restarter_instance_state_t,
     restarter_instance_state_t);
-void graph_transition_propagate(graph_vertex_t *, restarter_event_type_t,
+void graph_transition_propagate(graph_vertex_t *, propagate_event_t,
     restarter_error_t);
 
 /* libscf.c - common */
@@ -717,7 +723,7 @@ void special_online_hooks_get(const char *, instance_hook_t *,
 
 /* transition.c */
 int gt_transition(scf_handle_t *, graph_vertex_t *, restarter_error_t,
-    restarter_instance_state_t, restarter_instance_state_t);
+    restarter_instance_state_t);
 
 /* utmpx.c */
 void utmpx_init(void);

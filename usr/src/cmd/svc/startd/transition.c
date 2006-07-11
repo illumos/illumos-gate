@@ -96,7 +96,7 @@ gt_enter_uninit(scf_handle_t *h, graph_vertex_t *v,
 		log_framework(LOG_DEBUG, "Propagating stop of %s.\n",
 		    v->gv_name);
 
-		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_STOP, rerr);
+		graph_transition_propagate(v, PROPAGATE_STOP, rerr);
 	}
 
 	graph_transition_sulogin(RESTARTER_STATE_UNINIT, old_state);
@@ -109,16 +109,22 @@ gt_enter_maint(scf_handle_t *h, graph_vertex_t *v,
 {
 	vertex_subgraph_dependencies_shutdown(h, v, gt_running(old_state));
 
+	/*
+	 * If the service was running, propagate a stop event.  If the
+	 * service was not running the maintenance transition may satisfy
+	 * optional dependencies and should be propagated to determine
+	 * whether new dependents are satisfiable.
+	 */
 	if (gt_running(old_state)) {
-		log_framework(LOG_DEBUG, "Propagating stop of %s.\n",
-		    v->gv_name);
+		log_framework(LOG_DEBUG, "Propagating maintenance (stop) of "
+		    "%s.\n", v->gv_name);
 
-		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_STOP, rerr);
-	} else if (v->gv_state == RESTARTER_STATE_MAINT) {
+		graph_transition_propagate(v, PROPAGATE_STOP, rerr);
+	} else {
 		log_framework(LOG_DEBUG, "Propagating maintenance of %s.\n",
 		    v->gv_name);
 
-		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_START, rerr);
+		graph_transition_propagate(v, PROPAGATE_SAT, rerr);
 	}
 
 	graph_transition_sulogin(RESTARTER_STATE_MAINT, old_state);
@@ -147,7 +153,7 @@ gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
 		log_framework(LOG_DEBUG, "Propagating stop of %s.\n",
 		    v->gv_name);
 
-		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_STOP, rerr);
+		graph_transition_propagate(v, PROPAGATE_STOP, rerr);
 	}
 
 	graph_transition_sulogin(RESTARTER_STATE_OFFLINE, old_state);
@@ -172,21 +178,22 @@ gt_enter_disabled(scf_handle_t *h, graph_vertex_t *v,
 	}
 
 	/*
-	 * If the service was running, propagate this as a stop.
-	 * Otherwise, we treat other transitions as a start propagate,
-	 * since they can satisfy optional_all dependencies.
+	 * If the service was running, propagate this as a stop.  If the
+	 * service was not running the disabled transition may satisfy
+	 * optional dependencies and should be propagated to determine
+	 * whether new dependents are satisfiable.
 	 */
 	if (gt_running(old_state)) {
 		log_framework(LOG_DEBUG, "Propagating stop of %s.\n",
 		    v->gv_name);
 
-		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_STOP, rerr);
+		graph_transition_propagate(v, PROPAGATE_STOP, rerr);
 
-	} else if (v->gv_state == RESTARTER_STATE_DISABLED) {
+	} else {
 		log_framework(LOG_DEBUG, "Propagating disable of %s.\n",
 		    v->gv_name);
 
-		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_START, rerr);
+		graph_transition_propagate(v, PROPAGATE_SAT, rerr);
 	}
 
 	graph_transition_sulogin(RESTARTER_STATE_DISABLED, old_state);
@@ -239,15 +246,14 @@ gt_internal_online_or_degraded(scf_handle_t *h, graph_vertex_t *v,
 		log_framework(LOG_DEBUG, "Propagating start of %s.\n",
 		    v->gv_name);
 
-		graph_transition_propagate(v,
-		    RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON, rerr);
+		graph_transition_propagate(v, PROPAGATE_START, rerr);
 	} else if (rerr == RERR_REFRESH) {
 		/* For refresh we'll get a message sans state change */
 
 		log_framework(LOG_DEBUG, "Propagating refresh of %s.\n",
 		    v->gv_name);
 
-		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_STOP, rerr);
+		graph_transition_propagate(v, PROPAGATE_STOP, rerr);
 	}
 
 	return (0);
@@ -286,10 +292,13 @@ gt_enter_degraded(scf_handle_t *h, graph_vertex_t *v,
  * state machine.  It can return:
  *    0              success
  *    ECONNABORTED   repository connection aborted
+ *
+ * v->gv_state should be set to the state we're transitioning to before
+ * calling this function.
  */
 int
 gt_transition(scf_handle_t *h, graph_vertex_t *v, restarter_error_t rerr,
-    restarter_instance_state_t old_state, restarter_instance_state_t new_state)
+    restarter_instance_state_t old_state)
 {
 	int err = 0;
 
@@ -302,7 +311,7 @@ gt_transition(scf_handle_t *h, graph_vertex_t *v, restarter_error_t rerr,
 	/*
 	 * Now call the appropriate gt_enter function for the new state.
 	 */
-	switch (new_state) {
+	switch (v->gv_state) {
 	case RESTARTER_STATE_UNINIT:
 		err = gt_enter_uninit(h, v, old_state, rerr);
 		break;
@@ -328,10 +337,10 @@ gt_transition(scf_handle_t *h, graph_vertex_t *v, restarter_error_t rerr,
 		break;
 
 	default:
-		/* Shouldn't have been passed an invalid state. */
+		/* Shouldn't be in an invalid state. */
 #ifndef NDEBUG
 		uu_warn("%s:%d: Uncaught case %d.\n", __FILE__, __LINE__,
-		    new_state);
+		    v->gv_state);
 #endif
 		abort();
 	}

@@ -1590,7 +1590,7 @@ graph_start_if_satisfied(graph_vertex_t *v)
  * instance transitions between offline -> online, or from !running ->
  * maintenance, as well as when an instance is removed from the graph.
  *
- * We have to walk the all dependents, since optional_all dependencies several
+ * We have to walk all the dependents, since optional_all dependencies several
  * levels up could become (un)satisfied, instead of unsatisfiable.  For example,
  *
  *	+-----+  optional_all  +-----+  require_all  +-----+
@@ -4006,7 +4006,7 @@ dgraph_set_instance_state(scf_handle_t *h, const char *inst_name,
 	old_state = v->gv_state;
 	v->gv_state = state;
 
-	err = gt_transition(h, v, serr, old_state, state);
+	err = gt_transition(h, v, serr, old_state);
 
 	MUTEX_UNLOCK(&dgraph_lock);
 	return (err);
@@ -4068,31 +4068,34 @@ graph_transition_sulogin(restarter_instance_state_t state,
 }
 
 /*
- * Propagate a start, stop or maintenance event.  Use the
- * RESTARTER_EVENT_TYPE_START, RESTARTER_EVENT_TYPE_STOP, and
- * RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON respectively to represent those
- * events.
+ * Propagate a start, stop event, or a satisfiability event.
  *
- * For maintenance, we need to propagate_satbility() as well to
- * take care of walking further down the graph than just the direct
- * dependents.
+ * PROPAGATE_START and PROPAGATE_STOP simply propagate the transition event
+ * to direct dependents.  PROPAGATE_SAT propagates a start then walks the
+ * full dependent graph to check for newly satisfied nodes.  This is
+ * necessary for cases when non-direct dependents may be effected but direct
+ * dependents may not (e.g. for optional_all evaluations, see the
+ * propagate_satbility() comments).
+ *
+ * PROPAGATE_SAT should be used whenever a non-running service moves into
+ * a state which can satisfy optional dependencies, like disabled or
+ * maintenance.
  */
 void
-graph_transition_propagate(graph_vertex_t *v, restarter_event_type_t propagate,
+graph_transition_propagate(graph_vertex_t *v, propagate_event_t type,
     restarter_error_t rerr)
 {
-	if (propagate == RESTARTER_EVENT_TYPE_STOP) {
+	if (type == PROPAGATE_STOP) {
 		graph_walk_dependents(v, propagate_stop, (void *)rerr);
-	} else if (propagate == RESTARTER_EVENT_TYPE_START ||
-	    propagate == RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON) {
+	} else if (type == PROPAGATE_START || type == PROPAGATE_SAT) {
 		graph_walk_dependents(v, propagate_start, NULL);
 
-		if (propagate == RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON)
+		if (type == PROPAGATE_SAT)
 			propagate_satbility(v);
 	} else {
 #ifndef NDEBUG
-		uu_warn("%s:%d: Unexpected propagate value %d.\n",  __FILE__,
-		    __LINE__, propagate);
+		uu_warn("%s:%d: Unexpected type value %d.\n",  __FILE__,
+		    __LINE__, type);
 #endif
 		abort();
 	}
