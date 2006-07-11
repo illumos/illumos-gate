@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # SUNWses postinstall script
@@ -34,6 +33,8 @@ export PATH
 EXIT=0
 
 ADDDRV=/usr/sbin/add_drv
+REMDRV=/usr/sbin/rem_drv
+DRVALS=${BASEDIR}/etc/driver_aliases
 
 DEVLINKTB="$BASEDIR/etc/devlink.tab"
 
@@ -63,12 +64,57 @@ rem_devlink()
 	rm -f $TMP.devlink
 }
 
-dev_aliases='"scsiclass,0d" "scsiclass,00.vSUN.pUniversal_Xport"'
+# Returns 1 if an item is already on the list
+on_the_list()
+{
+	NEEDLE="$1"
+	HAYSTACK="$2"
+
+	for item in $HAYSTACK
+	do
+		if [ $item = $NEEDLE ]
+		then
+			return 1
+		fi
+	done
+	return 0
+}
+
+merged_aliases=""
+dev_aliases='"scsiclass,0d" "scsiclass,00.vSUN.pUniversal_Xport" "scsiclass,00.vSTK.pUniversal_Xport"'
+
+current_aliases=`grep \^ses ${DRVALS} | sed -e 's/^ses //g'`
 
 rem_devlink 'type=ddi_pseudo;name=ses' 'es/ses\\N0'
 
-${ADDDRV} -b ${BASEDIR} -n -m '* 0666 bin bin' -i "${dev_aliases}" ses
+if [ -n "$current_aliases" ]
+then
+	$REMDRV -b $BASEDIR ses
+
+	for current in $current_aliases
+	do
+		on_the_list $current "$merged_aliases"
+		if [ $? -eq 0 ]
+		then
+			merged_aliases=`echo $merged_aliases $current`
+		fi
+	done
+
+	for alias in $dev_aliases
+	do
+		on_the_list $alias "$merged_aliases"
+		if [ $? -eq 0 ]
+		then
+			merged_aliases=`echo $merged_aliases $alias`
+		fi
+	done
+else
+	merged_aliases=$dev_aliases
+fi
+
+${ADDDRV} -b ${BASEDIR} -n -m '* 0666 bin bin' -i "${merged_aliases}" ses
 touch ${BASEDIR}/reconfigure
+
 rm -f $TMP.devlink
 
 exit ${EXIT}
