@@ -68,6 +68,7 @@ typedef struct etm_xport_sock_hdl {
 	exs_conn_t h_client;		/* Sending connection handle */
 	exs_conn_t h_server;		/* Receiving connection handle */
 	pthread_t h_tid;		/* Thread ID of server thread */
+	int h_destroy;			/* Destroy the server thread? */
 	char *h_endpt_id;		/* Endpoint id from ETM common */
 	int h_dom;			/* Domain ID from platform (libdscp) */
 	fmd_hdl_t *h_hdl;		/* fmd handle */

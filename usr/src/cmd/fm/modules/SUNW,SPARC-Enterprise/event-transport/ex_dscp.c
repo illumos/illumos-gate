@@ -76,6 +76,7 @@ exs_hdl_alloc(fmd_hdl_t *hdl, char *endpoint_id,
 	hp->h_client.c_sd = EXS_SD_FREE;
 	hp->h_server.c_sd = EXS_SD_FREE;
 	hp->h_tid = EXS_TID_FREE;
+	hp->h_destroy = 0;
 	hp->h_hdl = hdl;
 	hp->h_cb_func = cb_func;
 	hp->h_cb_func_arg = cb_func_arg;
@@ -169,7 +170,7 @@ exs_prep_client(exs_hdl_t *hp)
  * Prepare to accept a connection.
  * Return 0 for success, nonzero for failure.
  */
-static int
+int
 exs_prep_accept(exs_hdl_t *hp)
 {
 
@@ -299,13 +300,6 @@ exs_server(void *arg)
 	struct pollfd pfd[2];
 	nfds_t nfds;
 
-	if (exs_prep_accept(hp)) {
-		fmd_hdl_debug(hp->h_hdl, "xport - exiting server thread for %s",
-		    hp->h_endpt_id);
-		hp->h_tid = EXS_TID_FREE;
-		return; /* thread dies */
-	}
-
 	while (!hp->h_quit) {
 		pfd[0].events = POLLIN;
 		pfd[0].revents = 0;
@@ -322,6 +316,7 @@ exs_server(void *arg)
 		if (pfd[0].revents & (POLLHUP | POLLERR)) {
 			fmd_hdl_debug(hp->h_hdl, "xport - poll hangup/err for "
 			    "%s accept socket", hp->h_endpt_id);
+			hp->h_destroy++;
 			break;
 		}
 
@@ -352,8 +347,6 @@ exs_server(void *arg)
 
 	if (hp->h_server.c_sd != EXS_SD_FREE)
 		(void) close(hp->h_server.c_sd);
-
-	hp->h_tid = EXS_TID_FREE;
 }
 
 /*
@@ -396,8 +389,9 @@ etm_xport_init(fmd_hdl_t *hdl, char *endpoint_id,
 	hp->h_next = Exh_head;
 	Exh_head = hp;
 
-	/* A server thread is created for every endpoint */
-	hp->h_tid = fmd_thr_create(hdl, exs_server, hp);
+	if (exs_prep_accept(hp) == 0)
+		/* A server thread is created for every endpoint */
+		hp->h_tid = fmd_thr_create(hdl, exs_server, hp);
 
 	(void) pthread_mutex_unlock(&List_lock);
 
@@ -460,8 +454,16 @@ etm_xport_open(fmd_hdl_t *hdl, etm_xport_hdl_t tlhdl)
 	int flags;
 	exs_hdl_t *hp = (exs_hdl_t *)tlhdl;
 
-	if (hp->h_tid == EXS_TID_FREE)
-		hp->h_tid = fmd_thr_create(hdl, exs_server, hp);
+	if (hp->h_destroy) {
+		fmd_thr_destroy(hp->h_hdl, hp->h_tid);
+		hp->h_tid = EXS_TID_FREE;
+		hp->h_destroy = 0;
+	}
+
+	if (hp->h_tid == EXS_TID_FREE) {
+		if (exs_prep_accept(hp) == 0)
+			hp->h_tid = fmd_thr_create(hdl, exs_server, hp);
+	}
 
 	if (hp->h_client.c_sd == EXS_SD_FREE) {
 		if (exs_prep_client(hp) != 0)

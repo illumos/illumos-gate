@@ -1102,16 +1102,16 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 
 	if (mp->epm_qstat == Q_UNINITIALIZED) {
 		mp->epm_txbusy--;
-		(void) pthread_mutex_unlock(&mp->epm_lock);
 		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
+		(void) pthread_mutex_unlock(&mp->epm_lock);
 		return (FMD_SEND_FAILED);
 	}
 
 	if (mp->epm_cstat == C_CLOSED) {
 		etm_suspend_reconnect(hdl, mp);
 		mp->epm_txbusy--;
-		(void) pthread_mutex_unlock(&mp->epm_lock);
 		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
+		(void) pthread_mutex_unlock(&mp->epm_lock);
 		return (FMD_SEND_RETRY);
 	}
 
@@ -1124,8 +1124,8 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 		fmd_xprt_suspend(hdl, xprthdl);
 		mp->epm_qstat = Q_SUSPENDED;
 		mp->epm_txbusy--;
-		(void) pthread_mutex_unlock(&mp->epm_lock);
 		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
+		(void) pthread_mutex_unlock(&mp->epm_lock);
 		fmd_hdl_debug(hdl, "queue suspended for %s", mp->epm_ep_str);
 		return (FMD_SEND_RETRY);
 	}
@@ -1135,8 +1135,8 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 		    == NULL) {
 			etm_suspend_reconnect(hdl, mp);
 			mp->epm_txbusy--;
-			(void) pthread_mutex_unlock(&mp->epm_lock);
 			(void) pthread_cond_broadcast(&mp->epm_tx_cv);
+			(void) pthread_mutex_unlock(&mp->epm_lock);
 			return (FMD_SEND_RETRY);
 		} else {
 			mp->epm_cstat = C_OPEN;
@@ -1149,8 +1149,8 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 	msgnvl = fmd_xprt_translate(hdl, xprthdl, ep);
 	if (msgnvl == NULL) {
 		mp->epm_txbusy--;
-		(void) pthread_mutex_unlock(&mp->epm_lock);
 		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
+		(void) pthread_mutex_unlock(&mp->epm_lock);
 		fmd_hdl_error(hdl, "Failed to translate event %p\n",
 		    (void *) ep);
 		return (FMD_SEND_FAILED);
@@ -1172,8 +1172,8 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 	if (rv = nvlist_pack(msgnvl, &nvbuf, &nvsize, NV_ENCODE_XDR, 0)) {
 		(void) pthread_mutex_lock(&mp->epm_lock);
 		mp->epm_txbusy--;
-		(void) pthread_mutex_unlock(&mp->epm_lock);
 		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
+		(void) pthread_mutex_unlock(&mp->epm_lock);
 		fmd_hdl_error(hdl, "Failed to pack event : %s\n", strerror(rv));
 		FREE_BUF(hdl, buf, buflen);
 		return (FMD_SEND_FAILED);
@@ -1188,8 +1188,8 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 		(void) pthread_mutex_lock(&mp->epm_lock);
 		etm_suspend_reconnect(hdl, mp);
 		mp->epm_txbusy--;
-		(void) pthread_mutex_unlock(&mp->epm_lock);
 		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
+		(void) pthread_mutex_unlock(&mp->epm_lock);
 		FREE_BUF(hdl, buf, buflen);
 		INCRSTAT(Etm_stats.error_write.fmds_value.ui64);
 		return (FMD_SEND_RETRY);
@@ -1207,8 +1207,8 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 		(void) pthread_mutex_lock(&mp->epm_lock);
 		etm_suspend_reconnect(hdl, mp);
 		mp->epm_txbusy--;
-		(void) pthread_mutex_unlock(&mp->epm_lock);
 		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
+		(void) pthread_mutex_unlock(&mp->epm_lock);
 		FREE_BUF(hdl, buf, buflen);
 		INCRSTAT(Etm_stats.error_read.fmds_value.ui64);
 		return (FMD_SEND_RETRY);
@@ -1268,9 +1268,9 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 		}
 
 		mp->epm_txbusy--;
-		(void) pthread_mutex_unlock(&mp->epm_lock);
 
 		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
+		(void) pthread_mutex_unlock(&mp->epm_lock);
 
 		INCRSTAT(Etm_stats.error_read_badhdr.fmds_value.ui64);
 
@@ -1279,9 +1279,8 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 
 	(void) pthread_mutex_lock(&mp->epm_lock);
 	mp->epm_txbusy--;
-	(void) pthread_mutex_unlock(&mp->epm_lock);
-
 	(void) pthread_cond_broadcast(&mp->epm_tx_cv);
+	(void) pthread_mutex_unlock(&mp->epm_lock);
 
 	return (FMD_SEND_SUCCESS);
 }
