@@ -344,7 +344,7 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 			(void) strlcpy(_fmd_csn, s2.smbi_serial, MAXNAMELEN);
 		}
 		smbios_close(shp);
-	} else if ((rooth = di_init("/", DINFOCPYALL)) != DI_NODE_NIL &&
+	} else if ((rooth = di_init("/", DINFOPROP)) != DI_NODE_NIL &&
 	    (promh = di_prom_init()) != DI_PROM_HANDLE_NIL) {
 		if (di_prom_prop_lookup_bytes(promh, rooth, "chassis-sn",
 		    (unsigned char **)&bufp) != -1) {

@@ -116,8 +116,7 @@ opl_cpulist_free(fmd_hdl_t *hdl, cmd_list_t *cpu_list)
 	fmd_hdl_debug(hdl,
 	    "Enter opl_cpulist_free for cpulist %llx\n", cpu_list);
 
-	for (opl_cpu = cmd_list_next(cpu_list); opl_cpu != NULL;
-	    opl_cpu = cmd_list_next(opl_cpu)) {
+	while ((opl_cpu = cmd_list_next(cpu_list)) != NULL) {
 		cmd_list_delete(cpu_list, opl_cpu);
 		fmd_hdl_free(hdl, opl_cpu, sizeof (opl_cpu_t));
 	}
