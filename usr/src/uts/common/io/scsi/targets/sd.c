@@ -759,8 +759,11 @@ static const int sd_disk_table_size =
 #define	SD_INTERCONNECT_FABRIC		1
 #define	SD_INTERCONNECT_FIBRE		2
 #define	SD_INTERCONNECT_SSA		3
+#define	SD_INTERCONNECT_SATA		4
 #define	SD_IS_PARALLEL_SCSI(un)		\
 	((un)->un_interconnect_type == SD_INTERCONNECT_PARALLEL)
+#define	SD_IS_SERIAL(un)		\
+	((un)->un_interconnect_type == SD_INTERCONNECT_SATA)
 
 /*
  * Definitions used by device id registration routines
@@ -7914,6 +7917,12 @@ sd_unit_attach(dev_info_t *devi)
 		SD_INFO(SD_LOG_ATTACH_DETACH, un,
 		    "sd_unit_attach: un:0x%p SD_INTERCONNECT_PARALLEL\n", un);
 		break;
+	case INTERCONNECT_SATA:
+		un->un_f_is_fibre = FALSE;
+		un->un_interconnect_type = SD_INTERCONNECT_SATA;
+		SD_INFO(SD_LOG_ATTACH_DETACH, un,
+		    "sd_unit_attach: un:0x%p SD_INTERCONNECT_SATA\n", un);
+		break;
 	case INTERCONNECT_FIBRE:
 		un->un_interconnect_type = SD_INTERCONNECT_FIBRE;
 		SD_INFO(SD_LOG_ATTACH_DETACH, un,
@@ -8251,7 +8260,7 @@ sd_unit_attach(dev_info_t *devi)
 	 * on entry to this routine, it's no longer absolutely necessary for
 	 * this to be before the call to sd_spin_up_unit.
 	 */
-	if (SD_IS_PARALLEL_SCSI(un)) {
+	if (SD_IS_PARALLEL_SCSI(un) || SD_IS_SERIAL(un)) {
 		/*
 		 * If SCSI-2 tagged queueing is supported by the target
 		 * and by the host adapter then we will enable it.
@@ -8288,6 +8297,18 @@ sd_unit_attach(dev_info_t *devi)
 			    "sd_unit_attach: un:0x%p no tag queueing\n", un);
 		}
 
+		/*
+		 * Enable large transfers for SATA/SAS drives
+		 */
+		if (SD_IS_SERIAL(un)) {
+			un->un_max_xfer_size =
+			    ddi_getprop(DDI_DEV_T_ANY, devi, 0,
+			    sd_max_xfer_size, SD_MAX_XFER_SIZE);
+			SD_INFO(SD_LOG_ATTACH_DETACH, un,
+			    "sd_unit_attach: un:0x%p max transfer "
+			    "size=0x%x\n", un, un->un_max_xfer_size);
+
+		}
 
 		/* Setup or tear down default wide operations for disks */
 
@@ -8298,7 +8319,8 @@ sd_unit_attach(dev_info_t *devi)
 		 * code may need to be updated when the ssd module is
 		 * obsoleted and removed from the system. (4299588)
 		 */
-		if ((devp->sd_inq->inq_rdf == RDF_SCSI2) &&
+		if (SD_IS_PARALLEL_SCSI(un) &&
+		    (devp->sd_inq->inq_rdf == RDF_SCSI2) &&
 		    (devp->sd_inq->inq_wbus16 || devp->sd_inq->inq_wbus32)) {
 			if (scsi_ifsetcap(SD_ADDRESS(un), "wide-xfer",
 			    1, 1) == 1) {
