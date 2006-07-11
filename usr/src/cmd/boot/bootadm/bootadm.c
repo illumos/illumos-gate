@@ -320,7 +320,7 @@ static struct {
 } walk_arg;
 
 
-static struct safefile {
+struct safefile {
 	char *name;
 	struct safefile *next;
 };

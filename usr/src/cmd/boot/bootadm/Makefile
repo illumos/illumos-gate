@@ -31,6 +31,9 @@ i386_DATA= filelist.ramdisk filelist.safe
 
 SBINLINKS= $(PROG)
 
+OBJS = bootadm.o
+SRCS = $(OBJS:.o=.c)
+
 include ../Makefile.com
 
 ROOTBOOTSOLARISDATA= $($(MACH)_DATA:%=$(ROOTBOOTSOLARIS)/%)
@@ -50,6 +53,10 @@ CFLAGS +=	$(XSTRCONST)
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 
 all: $(PROG)
+
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
 $(ROOTUSRSBINLINKS):
 	-$(RM) $@; $(SYMLINK) ../../sbin/$(@F) $@

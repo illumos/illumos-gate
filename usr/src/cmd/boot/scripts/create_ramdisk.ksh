@@ -170,11 +170,11 @@ function create_isofs
 #
 # get filelist
 #
-files="$ALT_ROOT/boot/solaris/filelist.ramdisk"
+filelist=`cat "$ALT_ROOT/boot/solaris/filelist.ramdisk"`
 if [ -f "$ALT_ROOT/etc/boot/solaris/filelist.ramdisk" ]; then
-	files="$files \"$ALT_ROOT/etc/boot/solaris/filelist.ramdisk\""
+	filelistI=`cat "$ALT_ROOT/etc/boot/solaris/filelist.ramdisk"`
 fi
-filelist=`cat "$files" | sort -u`
+filelist=`echo $filelist $filelistI | sort -u`
 
 #
 # decide if cpu is amd64 capable
