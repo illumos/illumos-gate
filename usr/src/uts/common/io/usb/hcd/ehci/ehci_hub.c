@@ -1000,7 +1000,7 @@ ehci_handle_port_reset(
 
 		mutex_exit(&ehcip->ehci_int_mutex);
 
-		/* Wait 10ms for reset to complete */
+		/* Wait 20ms for reset to complete */
 		delay(drv_usectohz(EHCI_PORT_RESET_TIMEWAIT));
 
 		mutex_enter(&ehcip->ehci_int_mutex);
