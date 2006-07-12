@@ -3319,6 +3319,54 @@ pci_post_init_child(pci_t *pci_p, dev_info_t *child)
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE,
 			    child, "pcix-update-cmd-reg", value);
 		}
+
+		if (PCI_CHIP_ID(pci_p) >= XMITS_VER_30) {
+			uint64_t *pbm_pcix_diag_reg =
+			    (uint64_t *)(pci_p->pci_address[0] +
+			    XMITS_PCI_X_DIAG_REG_OFFSET);
+			uint64_t bugcntl = (*pbm_pcix_diag_reg >>
+			    XMITS_PCI_X_DIAG_BUGCNTL_SHIFT) &
+			    XMITS_PCI_X_DIAG_BUGCNTL_MASK;
+			uint64_t tunable = (*pbm_p->pbm_ctrl_reg &
+			    XMITS_PCI_CTRL_X_MODE ?
+			    xmits_pcix_diag_bugcntl_pcix :
+			    xmits_pcix_diag_bugcntl_pci)
+			    & XMITS_PCI_X_DIAG_BUGCNTL_MASK;
+
+			DEBUG4(DBG_INIT_CLD, pci_p->pci_dip, "%s: XMITS "
+			    "pcix diag bugcntl=0x%lx, tunable=0x%lx, mode=%s\n",
+			    ddi_driver_name(child), bugcntl, tunable,
+			    ((*pbm_p->pbm_ctrl_reg & XMITS_PCI_CTRL_X_MODE)?
+			    "PCI-X":"PCI"));
+
+			DEBUG2(DBG_INIT_CLD, pci_p->pci_dip, "%s: XMITS "
+			    "pcix diag reg=0x%lx (CUR)\n",
+			    ddi_driver_name(child), *pbm_pcix_diag_reg);
+
+			/*
+			 * Due to a XMITS 3.x hw bug, we need to
+			 * read PBM's xmits pci ctrl status register to
+			 * determine mode (PCI or PCI-X) and then update
+			 * PBM's pcix diag register with new BUG_FIX_CNTL
+			 * bits (47:32) _if_ different from tunable's mode
+			 * based value. This update is performed only once
+			 * during the PBM's first child init.
+			 *
+			 * Per instructions from xmits hw engineering,
+			 * non-BUG_FIX_CNTL bits should not be preserved
+			 * when updating the pcix diag register. Such bits
+			 * should be written as 0s.
+			 */
+
+			if (bugcntl != tunable) {
+				*pbm_pcix_diag_reg = tunable <<
+				    XMITS_PCI_X_DIAG_BUGCNTL_SHIFT;
+
+				DEBUG2(DBG_INIT_CLD, pci_p->pci_dip, "%s: XMITS"
+				    " pcix diag reg=0x%lx (NEW)\n",
+				    ddi_driver_name(child), *pbm_pcix_diag_reg);
+			}
+		}
 	}
 }
 

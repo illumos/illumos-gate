@@ -386,6 +386,8 @@ extern "C" {
 #define	XMITS_PCI_X_DIAG_SRCQ_ONE		(0x1ull << 9)
 #define	XMITS_PCI_X_DIAG_CRCQ_FLUSH		(0x1ull << 8)
 #define	XMITS_PCI_X_DIAG_SRCQ_FLUSH_SHIFT	0
+#define	XMITS_PCI_X_DIAG_BUGCNTL_MASK		0xFFFF  /* bits 47:32 */
+#define	XMITS_PCI_X_DIAG_BUGCNTL_SHIFT		32
 
 #define	XMITS_PCI_X_DIAG_SRCQ_MASK		0xff
 

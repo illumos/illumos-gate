@@ -300,3 +300,10 @@ uint_t xmits_max_read_bytes = 0;
  * Bits 15:0 increase the maximum PIO retries allowed by XMITS.
  */
 uint_t xmits_upper_retry_counter = 0x3E8;
+
+/*
+ * default values for xmits pcix diag BUG_FIX_CNTL bits 47:32
+ * depending on mode: pcix or pci.
+ */
+uint_t xmits_pcix_diag_bugcntl_pcix = 0xA0;
+uint_t xmits_pcix_diag_bugcntl_pci =  0xFF;
