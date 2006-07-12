@@ -515,10 +515,11 @@ Elf_reloc_entry_2(Lm_list *lml, int caller, const char *prestr, Word type,
 	if (caller == ELF_DBG_RTLD) {
 		if (type == SHT_RELA)
 			dbg_print(lml, MSG_INTL(MSG_REL_RTA_ENTRY), prestr,
-			    typestr, EC_OFF(off), EC_SXWORD(add), symname);
+			    typestr, EC_OFF(off), EC_SXWORD(add), symname,
+			    poststr);
 		else
 			dbg_print(lml, MSG_INTL(MSG_REL_RTN_ENTRY), prestr,
-			    typestr, EC_OFF(off), symname);
+			    typestr, EC_OFF(off), symname, poststr);
 		return;
 	}
 	if (caller == ELF_DBG_LD) {

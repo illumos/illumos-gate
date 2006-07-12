@@ -258,6 +258,14 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 	DBG_CALL(Dbg_file_delete(lmp));
 
 	/*
+	 * If this is a temporary link-map, put in place to facilitate the
+	 * link-edit or a relocatable object, then the link-map contains no
+	 * information that needs to be cleaned up.
+	 */
+	if (FLAGS(lmp) & FLG_RT_OBJECT)
+		return;
+
+	/*
 	 * Unmap the object.
 	 */
 	LM_UNMAP_SO(lmp)(lmp);

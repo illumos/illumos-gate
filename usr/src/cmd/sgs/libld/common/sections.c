@@ -649,12 +649,12 @@ make_dynamic(Ofl_desc *ofl)
 	 * Reserve entries for any _init() and _fini() section addresses.
 	 */
 	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_INIT_U),
-	    SYM_NOHASH, 0, ofl)) != NULL) && sdp->sd_ref == REF_REL_NEED) {
+	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED)) {
 		sdp->sd_flags |= FLG_SY_UPREQD;
 		cnt++;
 	}
 	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_FINI_U),
-	    SYM_NOHASH, 0, ofl)) != NULL) && sdp->sd_ref == REF_REL_NEED) {
+	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED)) {
 		sdp->sd_flags |= FLG_SY_UPREQD;
 		cnt++;
 	}
@@ -1479,8 +1479,6 @@ make_shstrtab(Ofl_desc *ofl)
 		return (S_ERROR);
 
 	size = st_getstrtab_sz(ofl->ofl_shdrsttab);
-	assert(size > 0);
-
 	assert(size > 0);
 
 	data->d_size = size;
@@ -2367,4 +2365,124 @@ ld_make_sections(Ofl_desc *ofl)
 	}
 
 	return (1);
+}
+
+/*
+ * Build an additional data section - used to back OBJT symbol definitions
+ * added with a mapfile.
+ */
+Is_desc *
+ld_make_data(Ofl_desc *ofl, size_t size)
+{
+	Shdr		*shdr;
+	Elf_Data	*data;
+	Is_desc		*isec;
+
+	/*
+	 * Allocate and initialize the Elf_Data structure.
+	 */
+	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+		return ((Is_desc *)S_ERROR);
+	data->d_type = ELF_T_BYTE;
+	data->d_size = size;
+	data->d_align = M_WORD_ALIGN;
+	data->d_version = ofl->ofl_dehdr->e_version;
+
+	/*
+	 * Allocate and initialize the Shdr structure.
+	 */
+	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
+		return ((Is_desc *)S_ERROR);
+	shdr->sh_type = SHT_PROGBITS;
+	shdr->sh_flags = SHF_ALLOC | SHF_WRITE;
+	shdr->sh_size = (Xword)size;
+	shdr->sh_addralign = M_WORD_ALIGN;
+
+	/*
+	 * Allocate and initialize the Is_desc structure.
+	 */
+	if ((isec = libld_calloc(1, sizeof (Is_desc))) == (Is_desc *)0)
+		return ((Is_desc *)S_ERROR);
+	isec->is_name = MSG_ORIG(MSG_SCN_DATA);
+	isec->is_shdr = shdr;
+	isec->is_indata = data;
+
+	if (ld_place_section(ofl, isec, M_ID_DATA, 0) == (Os_desc *)S_ERROR)
+		return ((Is_desc *)S_ERROR);
+
+	return (isec);
+}
+
+static const uchar_t ret_template[] = {
+#if	defined(i386)
+/* 0x00 */	0xc3				/* ret */
+#elif	defined(__amd64)
+/* 0x00 */	0x55,				/* pushq  %rbp */
+/* 0x01 */	0x48, 0x8b, 0xec,		/* movq   %rsp,%rbp */
+/* 0x04 */	0x48, 0x8b, 0xe5,		/* movq   %rbp,%rsp */
+/* 0x07 */	0x5d,				/* popq   %rbp */
+/* 0x08 */	0xc3				/* ret */
+#elif	defined(sparc) || defined(__sparcv9)
+/* 0x00 */	0x81, 0xc3, 0xe0, 0x08,		/* retl */
+/* 0x04 */	0x01, 0x00, 0x00, 0x00		/* nop */
+#else
+#error	unsupported architecture!
+#endif
+};
+
+/*
+ * Build an additional text section - used to back FUNC symbol definitions
+ * added with a mapfile.
+ */
+Is_desc *
+ld_make_text(Ofl_desc *ofl, size_t size)
+{
+	Shdr		*shdr;
+	Elf_Data	*data;
+	Is_desc		*isec;
+
+	/*
+	 * Insure the size is sufficient to contain the minimum return
+	 * instruction.
+	 */
+	if (size < sizeof (ret_template))
+		size = sizeof (ret_template);
+
+	/*
+	 * Allocate and initialize the Elf_Data structure.  Fill the buffer
+	 * with the appropriate return instruction.
+	 */
+	if (((data = libld_calloc(sizeof (Elf_Data), 1)) == 0) ||
+	    ((data->d_buf = libld_calloc(size, 1)) == 0))
+		return ((Is_desc *)S_ERROR);
+	data->d_type = ELF_T_BYTE;
+	data->d_size = size;
+	data->d_align = M_WORD_ALIGN;
+	data->d_version = ofl->ofl_dehdr->e_version;
+
+	(void) memcpy(data->d_buf, ret_template, sizeof (ret_template));
+
+	/*
+	 * Allocate and initialize the Shdr structure.
+	 */
+	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
+		return ((Is_desc *)S_ERROR);
+	shdr->sh_type = SHT_PROGBITS;
+	shdr->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
+	shdr->sh_size = (Xword)size;
+	shdr->sh_addralign = M_WORD_ALIGN;
+
+	/*
+	 * Allocate and initialize the Is_desc structure.
+	 */
+	if ((isec = libld_calloc(1, sizeof (Is_desc))) == (Is_desc *)0)
+		return ((Is_desc *)S_ERROR);
+	isec->is_name = MSG_ORIG(MSG_SCN_TEXT);
+	isec->is_shdr = shdr;
+	isec->is_indata = data;
+
+	if (ld_place_section(ofl, isec, M_ID_TEXT, 0) == (Os_desc *)S_ERROR)
+		return ((Is_desc *)S_ERROR);
+
+	return (isec);
 }

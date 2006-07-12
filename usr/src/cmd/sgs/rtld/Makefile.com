@@ -97,7 +97,7 @@ LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) \
 		$(LDLIB) $(LD_LIB) 
 
 DYNFLAGS +=	-i -e _rt_boot $(VERSREF) -Bsymbolic -zlazyload -znodlopen \
-		-zdtrace=dtrace_data $(MAPOPTS) '-R$$ORIGIN'
+		-z interpose -zdtrace=dtrace_data $(MAPOPTS) '-R$$ORIGIN'
 
 BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 

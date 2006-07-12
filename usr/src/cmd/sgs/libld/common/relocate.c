@@ -1369,6 +1369,18 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 		return (1);
 
 	/*
+	 * If the input section exists, but the section has not been associated
+	 * to an output section, then this is a little suspicious.
+	 */
+	if (sdp->sd_isc && (sdp->sd_isc->is_osdesc == 0) &&
+	    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION)) {
+		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_RELINVSEC),
+		    M_REL_CONTYPSTR(rtype, 0), ifl->ifl_name, isp->is_name,
+		    sdp->sd_isc->is_name);
+		return (1);
+	}
+
+	/*
 	 * If the symbol for this relocation is invalid (which should have
 	 * generated a message during symbol processing), or the relocation
 	 * record's symbol reference is in any other way invalid, then it's

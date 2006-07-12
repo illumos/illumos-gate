@@ -1063,7 +1063,7 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 		} else {
 			Os_desc	*osp = sdp->sd_isc->is_osdesc;
 
-			if ((osp->os_flags & FLG_OS_OUTREL) == 0) {
+			if (osp && ((osp->os_flags & FLG_OS_OUTREL) == 0)) {
 				ofl->ofl_dynshdrcnt++;
 				osp->os_flags |= FLG_OS_OUTREL;
 			}

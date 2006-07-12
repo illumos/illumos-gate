@@ -66,7 +66,6 @@ ld_main(int argc, char **argv)
 {
 	char		*sgs_support;	/* SGS_SUPPORT environment string */
 	Half		etype;
-	uint_t		stflags;
 	int		suplib = 0;
 	Ofl_desc	*ofl;
 
@@ -108,22 +107,6 @@ ld_main(int argc, char **argv)
 	 */
 	if (ofl->ofl_flags1 & FLG_OF1_DONE)
 		return (0);
-
-	/*
-	 * Initialize string tables, by default we compress the
-	 * stringtables.
-	 */
-	if (ofl->ofl_flags1 & FLG_OF1_NCSTTAB)
-		stflags = 0;
-	else
-		stflags = FLG_STNEW_COMPRESS;
-
-	if ((ofl->ofl_shdrsttab = st_new(stflags)) == 0)
-		return (1);
-	if ((ofl->ofl_strtab = st_new(stflags)) == 0)
-		return (1);
-	if ((ofl->ofl_dynstrtab = st_new(stflags)) == 0)
-		return (1);
 
 	/*
 	 * Determine whether any support libraries been loaded (either through

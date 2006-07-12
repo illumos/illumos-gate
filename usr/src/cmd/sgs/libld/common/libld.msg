@@ -214,7 +214,7 @@
 # message files remain consistent).
 
 @ MSG_REL_NOFIT		"relocation error: %s: file %s: symbol %s: \
-			 value 0x%llx does not fit\n"
+			 value 0x%llx does not fit"
 @ MSG_REL_NONALIGN	"relocation error: %s: file %s: symbol %s: \
 			 offset 0x%llx is non-aligned"
 @ MSG_REL_NULL		"relocation error: file %s: section %s: \
@@ -247,41 +247,40 @@
 			 invalid relocation type: 0x%x"
 @ MSG_REL_EMPTYSEC	"relocation error: %s: file %s: symbol %s: \
 			 attempted against empty section %s"
-@ MSG_REL_EXTERNSYM	"relocation error: %s: file %s: symbol %s:\n\
-			 \texternal symbolic relocation against \
-			 non-allocatable section %s;\n\
-			 \tcannot be processed at runtime: relocation ignored"
+@ MSG_REL_EXTERNSYM	"relocation error: %s: file %s: symbol %s: \
+			 external symbolic relocation against non-allocatable \
+			 section %s; cannot be processed at runtime: \
+			 relocation ignored"
 @ MSG_REL_UNEXPREL	"relocation error: %s: file %s: symbol %s: \
 			 unexpected relocation; generic processing performed"
 @ MSG_REL_UNEXPSYM	"relocation error: %s: file %s: symbol %s: \
 			 unexpected symbol referenced from file %s"
 @ MSG_REL_SYMDISC	"relocation error: file: %s section: %s symbol: %s: \
-			 relocation against a discarded symbol,\n\
-			 \tsymbol is part of discarded section: %s"
+			 symbol has been discarded with discarded section: %s"
+@ MSG_REL_NOSYMBOL	"relocation error: %s: file %s: section: %s: \
+			 offset: 0x%llx: relocation requires reference symbol"
 @ MSG_REL_DISPREL1	"relocation error: %s: file %s: symbol %s: \
-			 displacement relocation applied to \
-			 the symbol %s at 0x%llx: \
-			 the symbol %s is a copy relocated symbol"
+			 displacement relocation applied to the symbol \
+			 %s at 0x%llx: symbol %s is a copy relocated symbol"
+
 @ MSG_REL_DISPREL2	"relocation warning: %s: file %s: symbol %s: \
 			 may contain displacement relocation"
 @ MSG_REL_DISPREL3	"relocation warning: %s: file %s: symbol %s: \
-			 displacement relocation applied to \
-			 the symbol %s: at 0x%llx: \
-			 displacement relocation will not be visible \
-			 in output image"
+			 displacement relocation applied to the symbol \
+			 %s: at 0x%llx: displacement relocation will not be \
+			 visible in output image"
 @ MSG_REL_DISPREL4	"relocation warning: %s: file %s: symbol %s: \
-			 displacement relocation to be applied to \
-			 the symbol %s: at 0x%llx: \
-			 displacement relocation will be visible \
-			 in output image"
-@ MSG_REL_NOSYMBOL	"relocation error: %s: file %s: section: %s: \
-			 offset: 0x%llx: relocation requires reference symbol"
+			 displacement relocation to be applied to the symbol \
+			 %s: at 0x%llx: displacement relocation will be \
+			 visible in output image"
 @ MSG_REL_COPY		"relocation warning: %s: file %s: symbol %s: \
-			 relocation bound to a symbol with \
-			 STV_PROTECTED visibility"
-
-@ MSG_REL_TLSIE		"relocation: %s: file %s: symbol %s: relocation \
-			 has restricted use when building a shared object"
+			 relocation bound to a symbol with STV_PROTECTED \
+			 visibility"
+@ MSG_RELINVSEC		"relocation warning: %s: file %s: section: %s: \
+			 against suspicious section %s; relocation ignored"
+@ MSG_REL_TLSIE		"relocation warning: %s: file %s: symbol %s: \
+			 relocation has restricted use when building a shared \
+			 object"
 
 #
 # TRANSLATION_NOTE
@@ -339,8 +338,8 @@
 @ MSG_FIL_EXCLUDE	"file %s: section %s contains both SHF_EXCLUDE and \
 			 SHF_ALLOC flags: SHF_EXCLUDE ignored"
 @ MSG_FIL_INTERRUPT	"file %s: creation interrupted: %s"
-@ MSG_FIL_INVRELOC1	"file %s: section %s: relocations can not be\n\
-			 \tapplied against section `%s'"
+@ MSG_FIL_INVRELOC1	"file %s: section %s: relocations can not be applied \
+			 against section `%s'"
 @ MSG_FIL_INVSHINFO	"file %s: section %s: has invalid sh_info: %lld"
 @ MSG_FIL_INVSHLINK	"file %s: section %s: has invalid sh_link: %lld"
 @ MSG_FIL_INVSHENTSIZE	"file %s: section %s: has invalid sh_entsize: %lld"
@@ -482,9 +481,13 @@
 @ MSG_SYM_UND_NOTA	"%-35s %s  (symbol belongs to unavailable version %s \
 			 (%s))"
 @ MSG_SYM_UND_BNDLOCAL	"%-35s %s  (symbol scope specifies local binding)"
-@ MSG_SYM_ENTRY		"entry point symbol `%s' is undefined"
-@ MSG_SYM_DTRACE	"PT_SUNWDTRACE symbol `%s' is undefined"
 
+@ MSG_SYM_ENTRY		"entry point"
+@ MSG_SYM_UNDEF		"%s symbol `%s' is undefined"
+@ MSG_SYM_EXTERN	"%s symbol `%s' is undefined  (symbol belongs to \
+			 dependency %s)"
+@ MSG_SYM_NOCRT		"symbol `%s' not found, but %s section exists - \
+			 possible link-edit without using the compiler driver"
 
 # Output file update messages
 
@@ -593,6 +596,7 @@
 # Section strings
 
 @ MSG_SCN_BSS		".bss"
+@ MSG_SCN_DATA		".data"
 @ MSG_SCN_COMMENT	".comment"
 @ MSG_SCN_DEBUG		".debug"
 @ MSG_SCN_DYNAMIC	".dynamic"
@@ -632,6 +636,11 @@
 @ MSG_SCN_SYMTAB	".symtab"
 @ MSG_SCN_SYMTAB_SHNDX	".symtab_shndx"
 @ MSG_SCN_TBSS		".tbss"
+@ MSG_SCN_TEXT		".text"
+
+@ MSG_SYM_FINIARRAY	"finiarray"
+@ MSG_SYM_INITARRAY	"initarray"
+@ MSG_SYM_PREINITARRAY	"preinitarray"
 
 #
 # GNU section names
@@ -1111,3 +1120,5 @@
 @ MSG_MAP_OVERRIDE	"override"
 
 @ MSG_FMT_INDEX		"[%lld]"
+
+@ MSG_STR_DTRACE	"PT_SUNWDTRACE"

@@ -1288,26 +1288,16 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 
 
 /*
- * Process a symbol definition list
- * 	version name {
- *		local:
- *		hidden:
- *		    symbol { =	(FUNC | OBJECT)
- *				(PARENT | EXTERN)
- *				($ABS | $COMMON) A V
- *			   };
- *			*;
- *		global:
- *		default:
- *		symbolic:
- *		protected:
- *		    symbol { =	(FUNC | OBJECT)
- *				(PARENT | EXTERN)
- *				(DIRECT | NODIRECT)
- *				([FILTER | AUXILIARY] name)
- *				($ABS | $COMMON) A V
- *			   };
- *	} [references];
+ * Process a symbol definition.  Historically, this originated from processing
+ * a version definition.  However, this has evolved into a generic means of
+ * defining symbol references and definitions (see Defining Additional Symbols
+ * in the Linker and Libraries guide for the complete syntax).
+ *
+ * [ name ] {
+ *	scope:
+ *		 symbol [ = [ type ] [ value ] [ size ] [ attribute ] ];
+ * } [ dependency ];
+ *
  */
 #define	SYMNO		50		/* Symbol block allocation amount */
 #define	FLG_SCOPE_LOCL	0		/* local scope flag */
@@ -1405,7 +1395,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 		char		*_name, *filtee = 0;
 		Word		sym_flags = 0;
 		Half		sym_flags1 = 0;
-		uint_t		filter = 0, dftflag;
+		uint_t		filter = 0, novalue = 1, dftflag;
 
 		if ((tok != TK_STRING) && (tok != TK_COLON)) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -1498,6 +1488,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				 * Determine any Value or Size attributes.
 				 */
 				lowercase(Start_tok);
+
 				if (Start_tok[0] == 'v' ||
 				    Start_tok[0] == 's') {
 					char		*end_tok;
@@ -1535,6 +1526,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					    }
 					    /* LINTED */
 					    value = (Addr)number;
+					    novalue = 0;
 					    break;
 					case 's':
 					    if (size) {
@@ -1739,6 +1731,42 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				 */
 				if (shndx != SHN_UNDEF)
 					sdp->sd_flags |= FLG_SY_MAPUSED;
+			}
+
+			/*
+			 * A symbol declaration that defines a size but no
+			 * value is processed as a request to create an
+			 * associated backing section.  The intent behind this
+			 * functionality is to provide OBJT definitions within
+			 * filters that are not ABS.  ABS symbols don't allow
+			 * copy-relocations to be established to filter OBJT
+			 * definitions.
+			 */
+			if ((shndx == SHN_ABS) && size && novalue &&
+			    (sdp->sd_isc == 0)) {
+				Is_desc	*isp;
+
+				if (type == STT_OBJECT) {
+					if ((isp = ld_make_data(ofl,
+					    size)) == (Is_desc *)S_ERROR)
+						return (S_ERROR);
+				} else {
+					if ((isp = ld_make_text(ofl,
+					    size)) == (Is_desc *)S_ERROR)
+						return (S_ERROR);
+				}
+
+				/*
+				 * Now that backing storage has been created,
+				 * associate the symbol descriptor.  Remove the
+				 * symbols special section tag so that it will
+				 * be assigned the correct section index as part
+				 * of update symbol processing.
+				 */
+				sdp->sd_flags &= ~FLG_SY_SPECSEC;
+				sym_flags &= ~FLG_SY_SPECSEC;
+				sdp->sd_isc = isp;
+				isp->is_file = ifl;
 			}
 
 			/*

@@ -507,6 +507,13 @@ check_flags(Ofl_desc * ofl, int argc)
 		return (S_ERROR);
 
 	/*
+	 * Initialize string tables.  Symbol definitions within mapfiles can
+	 * result in the creation of input sections.
+	 */
+	if (ld_init_strings(ofl) == S_ERROR)
+		return (S_ERROR);
+
+	/*
 	 * Process any mapfiles after establishing the entrance criteria as
 	 * the user may be redefining or adding sections/segments.
 	 */
@@ -1598,4 +1605,22 @@ ld_process_files(Ofl_desc *ofl, int argc, char **argv)
 		ld_ent_check(ofl);
 
 	return (1);
+}
+
+uintptr_t
+ld_init_strings(Ofl_desc *ofl)
+{
+	uint_t	stflags;
+
+	if (ofl->ofl_flags1 & FLG_OF1_NCSTTAB)
+		stflags = 0;
+	else
+		stflags = FLG_STNEW_COMPRESS;
+
+	if (((ofl->ofl_shdrsttab = st_new(stflags)) == 0) ||
+	    ((ofl->ofl_strtab = st_new(stflags)) == 0) ||
+	    ((ofl->ofl_dynstrtab = st_new(stflags)) == 0))
+		return (S_ERROR);
+
+	return (0);
 }

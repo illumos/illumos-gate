@@ -1107,3 +1107,9 @@ Bugid   Risk Synopsis
 6431835 data corruption on x64 in 64-bit mode while LD_PROFILE is in effect
 6423051 static TLS support within the link-editors needs a major face lift (D)
 6432984 ld(1) output file removal - change default behavior (PSARC 2006/353) (D)
+6388946 attempting to dlopen a .o file mislabeled as .so fails
+6446740 allow mapfile symbol definitions to create backing storage (D)
+4986360 linker crash on exec of .so (as opposed to a.out) -- error preferred
+	instead
+6229145 ld: initarray/finiarray processing occurs after got size is determined
+6324924 the linker should warn if there's a .init section but not _init

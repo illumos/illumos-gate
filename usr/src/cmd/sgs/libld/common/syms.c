@@ -511,11 +511,11 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
  * If this is a global symbol, and it hasn't explicitly been defined as being
  * directly bound to, indicate that it can't be directly bound to.
  * Historically, most special symbols only have meaning to the object in which
- * they exist, however, they've always been global.  To insure compatibility
- * with any unexpected use presently in effect, insure these symbols don't get
+ * they exist, however, they've always been global.  To ensure compatibility
+ * with any unexpected use presently in effect, ensure these symbols don't get
  * directly bound to.  Note, that establishing this state here isn't sufficient
  * to create a syminfo table, only if a syminfo table is being created by some
- * other symbol directives will the nodirect binding be recorded.  This insures
+ * other symbol directives will the nodirect binding be recorded.  This ensures
  * we don't create syminfo sections for all objects we create, as this might add
  * unnecessary bloat to users who haven't explicitly requested extra symbol
  * information.
@@ -565,7 +565,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 			usdp->sd_flags1 |= flags1;
 
 			/*
-			 * If the reference originated from a mapfile insure
+			 * If the reference originated from a mapfile ensure
 			 * we mark the symbol as used.
 			 */
 			if (usdp->sd_flags & FLG_SY_MAPREF)
@@ -641,7 +641,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		sdp->sd_flags1 |= flags1;
 
 		/*
-		 * If the reference originated from a mapfile insure
+		 * If the reference originated from a mapfile ensure
 		 * we mark the symbol as used.
 		 */
 		if (sdp->sd_flags & FLG_SY_MAPREF)
@@ -879,6 +879,55 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 }
 
 /*
+ * Make sure a symbol definition is local to the object being built.
+ */
+static int
+ensure_sym_local(Ofl_desc *ofl, Sym_desc *sdp, const char *str)
+{
+	if (sdp->sd_sym->st_shndx == SHN_UNDEF) {
+		if (str) {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_SYM_UNDEF), str,
+			    demangle((char *)sdp->sd_name));
+		}
+		return (1);
+	}
+	if (sdp->sd_ref != REF_REL_NEED) {
+		if (str) {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_SYM_EXTERN), str,
+			    demangle((char *)sdp->sd_name),
+			    sdp->sd_file->ifl_name);
+		}
+		return (1);
+	}
+
+	sdp->sd_flags |= FLG_SY_UPREQD;
+	if (sdp->sd_isc) {
+		sdp->sd_isc->is_flags |= FLG_IS_SECTREF;
+		sdp->sd_isc->is_file->ifl_flags |= FLG_IF_FILEREF;
+	}
+	return (0);
+}
+
+/*
+ * Make sure all the symbol definitions required for initarray, finiarray, or
+ * preinitarray's are local to the object being built.
+ */
+static int
+ensure_array_local(Ofl_desc *ofl, List *list, const char *str)
+{
+	Listnode	*lnp;
+	Sym_desc	*sdp;
+	int		ret = 0;
+
+	for (LIST_TRAVERSE(list, lnp, sdp))
+		ret += ensure_sym_local(ofl, sdp, str);
+
+	return (ret);
+}
+
+/*
  * After all symbol table input processing has been finished, and all relocation
  * counting has been carried out (ie. no more symbols will be read, generated,
  * or modified), validate and count the relevant entries:
@@ -908,6 +957,7 @@ ld_sym_validate(Ofl_desc *ofl)
 #if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
 	Xword		lbssalign = 0, lbsssize = 0;
 #endif
+	int		ret;
 
 	/*
 	 * If a symbol is undefined and this link-edit calls for no undefined
@@ -1366,59 +1416,57 @@ ld_sym_validate(Ofl_desc *ofl)
 	 * Determine what entry point symbol we need, and if found save its
 	 * symbol descriptor so that we can update the ELF header entry with the
 	 * symbols value later (see update_oehdr).  Make sure the symbol is
-	 * tagged to insure its update in case -s is in effect.  Use any -e
+	 * tagged to ensure its update in case -s is in effect.  Use any -e
 	 * option first, or the default entry points `_start' and `main'.
 	 */
+	ret = 0;
 	if (ofl->ofl_entry) {
-		if (((sdp = ld_sym_find(ofl->ofl_entry, SYM_NOHASH, 0, ofl)) ==
-		    NULL) || (sdp->sd_ref != REF_REL_NEED)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_SYM_ENTRY),
-			    demangle((char *)ofl->ofl_entry));
-			return (S_ERROR);
-		}
-		ofl->ofl_entry = (void *)sdp;
-		sdp->sd_flags |= FLG_SY_UPREQD;
-		if (sdp->sd_isc) {
-			sdp->sd_isc->is_flags |= FLG_IS_SECTREF;
-			sdp->sd_isc->is_file->ifl_flags |= FLG_IF_FILEREF;
+		if (((sdp = ld_sym_find(ofl->ofl_entry, SYM_NOHASH, 0,
+		    ofl)) != NULL) && (ensure_sym_local(ofl,
+		    sdp, MSG_INTL(MSG_SYM_ENTRY)) == 0)) {
+			ofl->ofl_entry = (void *)sdp;
+		} else {
+			ret++;
 		}
 	} else if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_START),
-	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED)) {
+	    SYM_NOHASH, 0, ofl)) != NULL) && (ensure_sym_local(ofl,
+	    sdp, 0) == 0)) {
 		ofl->ofl_entry = (void *)sdp;
-		sdp->sd_flags |= FLG_SY_UPREQD;
-		if (sdp->sd_isc) {
-			sdp->sd_isc->is_flags |= FLG_IS_SECTREF;
-			sdp->sd_isc->is_file->ifl_flags |= FLG_IF_FILEREF;
-		}
+
 	} else if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_MAIN),
-	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED)) {
+	    SYM_NOHASH, 0, ofl)) != NULL) && (ensure_sym_local(ofl,
+	    sdp, 0) == 0)) {
 		ofl->ofl_entry = (void *)sdp;
-		sdp->sd_flags |= FLG_SY_UPREQD;
-		if (sdp->sd_isc) {
-			sdp->sd_isc->is_flags |= FLG_IS_SECTREF;
-			sdp->sd_isc->is_file->ifl_flags |= FLG_IF_FILEREF;
-		}
 	}
 
 	/*
-	 * If ld -zdtrace=<sym> was given, then validate that the
-	 * symbol is defined within the current object being built.
+	 * If ld -zdtrace=<sym> was given, then validate that the symbol is
+	 * defined within the current object being built.
 	 */
 	if ((sdp = ofl->ofl_dtracesym) != 0) {
-		if ((sdp->sd_ref != REF_REL_NEED) ||
-		    (sdp->sd_sym->st_shndx == SHN_UNDEF)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_SYM_DTRACE),
-			    demangle((char *)sdp->sd_name));
-			return (S_ERROR);
-		}
-		sdp->sd_flags |= FLG_SY_UPREQD;
-		if (sdp->sd_isc) {
-			sdp->sd_isc->is_flags |= FLG_IS_SECTREF;
-			sdp->sd_isc->is_file->ifl_flags |= FLG_IF_FILEREF;
-		}
+		ret += ensure_sym_local(ofl, sdp, MSG_ORIG(MSG_STR_DTRACE));
 	}
+
+	/*
+	 * If any initarray, finiarray or preinitarray functions have been
+	 * requested, make sure they are defined within the current object
+	 * being built.
+	 */
+	if (ofl->ofl_initarray.head) {
+		ret += ensure_array_local(ofl, &ofl->ofl_initarray,
+		    MSG_ORIG(MSG_SYM_INITARRAY));
+	}
+	if (ofl->ofl_finiarray.head) {
+		ret += ensure_array_local(ofl, &ofl->ofl_finiarray,
+		    MSG_ORIG(MSG_SYM_FINIARRAY));
+	}
+	if (ofl->ofl_preiarray.head) {
+		ret += ensure_array_local(ofl, &ofl->ofl_preiarray,
+		    MSG_ORIG(MSG_SYM_PREINITARRAY));
+	}
+
+	if (ret)
+		return (S_ERROR);
 
 	/*
 	 * If we're required to record any needed dependencies versioning

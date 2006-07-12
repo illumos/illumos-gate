@@ -37,7 +37,7 @@
 # definitions see:
 #	Policy for Shared Library Version Names and Interface Definitions
 
-SUNWprivate_4.1 {
+SUNWprivate_4.2 {
 	global:
 		dbg_print;
 
@@ -48,6 +48,8 @@ SUNWprivate_4.1 {
 		ld64_create_outfile;
 		ld32_ent_setup;
 		ld64_ent_setup;
+		ld32_init_strings;
+		ld64_init_strings;
 		ld32_make_sections;
 		ld64_make_sections;
 		ld32_ofl_cleanup;
@@ -62,8 +64,6 @@ SUNWprivate_4.1 {
 		ld64_sym_validate;
 		ld32_update_outfile;
 		ld64_update_outfile;
-
-		st_new;
 	local:
 		*;
 };

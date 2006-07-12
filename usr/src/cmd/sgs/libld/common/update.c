@@ -64,7 +64,7 @@ update_osym(Ofl_desc *ofl)
 	Sym_desc	*sdp;
 	Sym_avlnode	*sav;
 	Sg_desc		*sgp, *tsgp = 0, *dsgp = 0, *esgp = 0;
-	Os_desc		*osp;
+	Os_desc		*osp, *iosp = 0, *fosp = 0;
 	Ifl_desc	*ifl;
 	Word		bssndx, etext_ndx, edata_ndx = 0, end_ndx, start_ndx;
 	Word		end_abs = 0, etext_abs = 0, edata_abs;
@@ -283,6 +283,17 @@ update_osym(Ofl_desc *ofl)
 				start_ndx = elf_ndxscn(osp->os_scn);
 				start_set++;
 			}
+
+			/*
+			 * While we're here, determine whether a .init or .fini
+			 * section exist.
+			 */
+			if ((iosp == 0) && (strcmp(osp->os_name,
+			    MSG_ORIG(MSG_SCN_INIT)) == 0))
+				iosp = osp;
+			if ((fosp == 0) && (strcmp(osp->os_name,
+			    MSG_ORIG(MSG_SCN_FINI)) == 0))
+				fosp = osp;
 		}
 	}
 
@@ -624,25 +635,40 @@ update_osym(Ofl_desc *ofl)
 	/*
 	 * Two special symbols are `_init' and `_fini'.  If these are supplied
 	 * by crti.o then they are used to represent the total concatenation of
-	 * the `.init' and `.fini' sections.  In this case determine the size of
-	 * these sections and updated the symbols value accordingly.
+	 * the `.init' and `.fini' sections.
+	 *
+	 * First, determine whether any .init or .fini sections exist.  If these
+	 * sections exist when a dynamic object is being built, but no `_init'
+	 * or `_fini' symbols are found, then the user is probably building this
+	 * object directly from ld(1) rather than using a compiler driver that
+	 * provides the symbols via crt's.
+	 *
+	 * If the .init or .fini section exist, and their associated symbols,
+	 * determine the size of the sections and updated the symbols value
+	 * accordingly.
 	 */
 	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_INIT_U), SYM_NOHASH, 0,
 	    ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED) && sdp->sd_isc &&
-	    (strcmp(sdp->sd_isc->is_name, MSG_ORIG(MSG_SCN_INIT)) == 0)) {
-
+	    (sdp->sd_isc->is_osdesc == iosp)) {
 		if (ld_sym_copy(sdp) == S_ERROR)
 			return ((Addr)S_ERROR);
 		sdp->sd_sym->st_size =
 			sdp->sd_isc->is_osdesc->os_shdr->sh_size;
+	} else if (iosp && !(flags & FLG_OF_RELOBJ)) {
+		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_SYM_NOCRT),
+		    MSG_ORIG(MSG_SYM_INIT_U), MSG_ORIG(MSG_SCN_INIT));
 	}
+
 	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_FINI_U), SYM_NOHASH, 0,
 	    ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED) && sdp->sd_isc &&
-	    (strcmp(sdp->sd_isc->is_name, MSG_ORIG(MSG_SCN_FINI)) == 0)) {
+	    (sdp->sd_isc->is_osdesc == fosp)) {
 		if (ld_sym_copy(sdp) == S_ERROR)
 			return ((Addr)S_ERROR);
 		sdp->sd_sym->st_size =
 			sdp->sd_isc->is_osdesc->os_shdr->sh_size;
+	} else if (fosp && !(flags & FLG_OF_RELOBJ)) {
+		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_SYM_NOCRT),
+		    MSG_ORIG(MSG_SYM_FINI_U), MSG_ORIG(MSG_SCN_FINI));
 	}
 
 	/*
@@ -748,18 +774,16 @@ update_osym(Ofl_desc *ofl)
 		}
 
 		/*
-		 * Note - we expand the COMMON symbols here
-		 * because we *must* assign addresses to them
-		 * in the same order that we calculated space
-		 * in sym_validate().  If we don't then
-		 * differing alignment requirements can
-		 * throw us all out of whack.
+		 * Note - expand the COMMON symbols here because an address
+		 * must be assigned to them in the same order that space was
+		 * calculated in sym_validate().  If this ordering isn't
+		 * followed differing alignment requirements can throw us all
+		 * out of whack.
 		 *
-		 * The expanded .bss global symbol is handled
-		 * here as well.
+		 * The expanded .bss global symbol is handled here as well.
 		 *
-		 * The actual adding entries into the symbol
-		 * table still occurs below in hashbucket order.
+		 * The actual adding entries into the symbol table still occurs
+		 * below in hashbucket order.
 		 */
 		symptr = sdp->sd_sym;
 		restore = 0;
@@ -768,15 +792,12 @@ update_osym(Ofl_desc *ofl)
 		    (sdp->sd_shndx = symptr->st_shndx) == SHN_COMMON)) {
 
 			/*
-			 * If this this is an expanded symbol,
-			 * 	it goes to sunwdata1.
+			 * An expanded symbol goes to .sunwdata1.
 			 *
-			 * If this is a partial initialized
-			 * global symbol and the output is a
-			 * shared object, it goes to sunwbss.
+			 * A partial initialized global symbol within a shared
+			 * object goes to .sunwbss.
 			 *
-			 * If allocating common assign it an
-			 * address in the .bss section.
+			 * Assign COMMON allocations to .bss.
 			 *
 			 * Otherwise leave it as is.
 			 */
@@ -803,6 +824,7 @@ update_osym(Ofl_desc *ofl)
 					symptr->st_size;
 				sdp->sd_isc = ofl->ofl_issunwbss;
 				sdp->sd_flags |= FLG_SY_COMMEXP;
+
 			} else if (ELF_ST_TYPE(symptr->st_info) != STT_TLS &&
 			    (local || !(flags & FLG_OF_RELOBJ))) {
 				restore = 1;
@@ -813,6 +835,7 @@ update_osym(Ofl_desc *ofl)
 				bssaddr = symptr->st_value + symptr->st_size;
 				sdp->sd_isc = ofl->ofl_isbss;
 				sdp->sd_flags |= FLG_SY_COMMEXP;
+
 			} else if (ELF_ST_TYPE(symptr->st_info) == STT_TLS &&
 			    (local || !(flags & FLG_OF_RELOBJ))) {
 				restore = 1;
@@ -845,12 +868,11 @@ update_osym(Ofl_desc *ofl)
 		}
 
 		if (restore != 0) {
-			unsigned char type, bind;
+			unsigned char	type, bind;
+
 			/*
-			 * Make sure this COMMON
-			 * symbol is returned to the
-			 * same binding as was defined
-			 * in the original relocatable
+			 * Make sure this COMMON symbol is returned to the same
+			 * binding as was defined in the original relocatable
 			 * object reference.
 			 */
 			type = ELF_ST_TYPE(symptr->st_info);
@@ -899,6 +921,7 @@ update_osym(Ofl_desc *ofl)
 #else
 #error Unknown architecture!
 #endif
+
 		if (DBG_ENABLED) {
 			for (LIST_TRAVERSE(&sdp->sd_GOTndxs, lnp2, gnp)) {
 				gottable->gt_sym = sdp;
@@ -1122,7 +1145,7 @@ update_osym(Ofl_desc *ofl)
 		 * depending on the type of the symbol.  Process the .symtab
 		 * first, followed by the .dynsym, thus the `sym' value will
 		 * remain as the .dynsym value when the .dynsym is present.
-		 * This insures that any versioning symbols st_name value will
+		 * This ensures that any versioning symbols st_name value will
 		 * be appropriate for the string table used to by version
 		 * entries.
 		 */
@@ -3059,13 +3082,13 @@ ld_update_outfile(Ofl_desc *ofl)
 		}
 
 		/*
-		 * Save the address of the first executable section for default
-		 * use as the execution entry point.  This may get overridden in
-		 * update_oehdr().
+		 * Ensure the ELF entry point defaults to zero.  Typically, this
+		 * value is overridden in update_oehdr() to one of the standard
+		 * entry points.  Historically, this default was set to the
+		 * address of first executable section, but this has since been
+		 * found to be more confusing than it is helpful.
 		 */
-		if (!(flags & FLG_OF_RELOBJ) && !(ehdr->e_entry) &&
-		    (phdr->p_flags & PF_X))
-			ehdr->e_entry = vaddr;
+		ehdr->e_entry = 0;
 
 		DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 

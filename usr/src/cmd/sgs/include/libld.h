@@ -1005,6 +1005,7 @@ typedef struct ar_desc {
 #define	ld_create_outfile	ld64_create_outfile
 #define	ld_ent_setup		ld64_ent_setup
 #define	ld_ofl_cleanup		ld64_ofl_cleanup
+#define	ld_init_strings		ld64_init_strings
 #define	ld_make_sections	ld64_make_sections
 #define	ld_main			ld64_main
 #define	ld_process_open		ld64_process_open
@@ -1019,6 +1020,7 @@ typedef struct ar_desc {
 #define	ld_create_outfile	ld32_create_outfile
 #define	ld_ent_setup		ld32_ent_setup
 #define	ld_ofl_cleanup		ld32_ofl_cleanup
+#define	ld_init_strings		ld32_init_strings
 #define	ld_make_sections	ld32_make_sections
 #define	ld_main			ld32_main
 #define	ld_process_open		ld32_process_open
@@ -1036,6 +1038,7 @@ extern int		ld64_main(int, char **);
 extern uintptr_t	ld_create_outfile(Ofl_desc *);
 extern uintptr_t	ld_ent_setup(Ofl_desc *, Xword);
 extern void		ld_ofl_cleanup(Ofl_desc *);
+extern uintptr_t	ld_init_strings(Ofl_desc *);
 extern uintptr_t	ld_make_sections(Ofl_desc *);
 extern Ifl_desc		*ld_process_open(const char *, size_t, int, Ofl_desc *,
 			    Half, Rej_desc *);

@@ -98,11 +98,9 @@ elf_obj_init(Lm_list *lml, Aliste lmco, const char *name)
 	olmp->rt_priv = (void *)ofl;
 
 	/*
-	 * Initialize string tables
+	 * Initialize string tables.
 	 */
-	if (((ofl->ofl_shdrsttab = st_new(0)) == 0) ||
-	    ((ofl->ofl_strtab = st_new(0)) == 0) ||
-	    ((ofl->ofl_dynstrtab = st_new(0)) == 0))
+	if (ld_init_strings(ofl) == S_ERROR)
 		return (0);
 
 	/*

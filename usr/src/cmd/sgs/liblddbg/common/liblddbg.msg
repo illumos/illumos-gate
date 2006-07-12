@@ -355,7 +355,7 @@
 
 @ MSG_EDATA_TITLE_64	"                    addr type                \
 			 size           offset al file"
-@ MSG_EDATA_ENTRY_64	"  %3s %#18llx %-5s %#18llx %#8llx %2lld %s%s"
+@ MSG_EDATA_ENTRY_64	"  %3s %#18llx %-5s %#18llx %#16llx %2lld %s%s"
 
 @ MSG_EDATA_IGNSCN	"  (section ignored)"
 
@@ -918,8 +918,8 @@
 @ MSG_REL_RTN_TITLE_32	"         type                       offset      \
 			 value  symbol"
 @ MSG_REL_RTV_TITLE_32	"                                                value"
-@ MSG_REL_RTA_ENTRY_32	" %5s %-24s %#10llx %#10llx  %s"
-@ MSG_REL_RTN_ENTRY_32	" %5s %-24s %#10llx             %s"
+@ MSG_REL_RTA_ENTRY_32	" %5s %-24s %#10llx %#10llx  %s  %s"
+@ MSG_REL_RTN_ENTRY_32	" %5s %-24s %#10llx             %s  %s"
 @ MSG_REL_RT_APLVAL_32	" apply                          %#10llx %#10llx"
 @ MSG_REL_RT_APLREG_32	" apply                          %10.10s %#10llx"
 
@@ -983,8 +983,8 @@
 @ MSG_REL_RTN_TITLE_64	"         type                               \
 			 offset              value  symbol"
 @ MSG_REL_RTV_TITLE_64	"                                                                value"
-@ MSG_REL_RTA_ENTRY_64	" %5s %-24s %#18llx %#18llx  %s"
-@ MSG_REL_RTN_ENTRY_64	" %5s %-24s %#18llx                    %s"
+@ MSG_REL_RTA_ENTRY_64	" %5s %-24s %#18llx %#18llx  %s  %s"
+@ MSG_REL_RTN_ENTRY_64	" %5s %-24s %#18llx                    %s  %s"
 @ MSG_REL_RT_APLVAL_64	" apply                          %#18llx %#18llx"
 @ MSG_REL_RT_APLREG_64	" apply                          %18.18s %#18llx"
 
