@@ -1388,8 +1388,23 @@ udp_bind(queue_t *q, mblk_t *mp)
 			 * Check ipversion to allow IPv4 and IPv6 sockets to
 			 * have disjoint port number spaces.
 			 */
-			if (udp->udp_ipversion != udp1->udp_ipversion)
-				continue;
+			if (udp->udp_ipversion != udp1->udp_ipversion) {
+
+				/*
+				 * On the first time through the loop, if the
+				 * the user intentionally specified a
+				 * particular port number, then ignore any
+				 * bindings of the other protocol that may
+				 * conflict. This allows the user to bind IPv6
+				 * alone and get both v4 and v6, or bind both
+				 * both and get each seperately. On subsequent
+				 * times through the loop, we're checking a
+				 * port that we chose (not the user) and thus
+				 * we do not allow casual duplicate bindings.
+				 */
+				if (count == 0 && requested_port != 0)
+					continue;
+			}
 
 			/*
 			 * No difference depending on SO_REUSEADDR.
