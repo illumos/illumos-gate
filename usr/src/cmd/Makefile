@@ -162,8 +162,8 @@ COMMON_SUBDIRS=		\
 	fmtmsg		\
 	fold		\
 	format		\
-	fstyp		\
 	fs.d		\
+	fstyp		\
 	fuser		\
 	gcore		\
 	gencat		\
@@ -853,6 +853,11 @@ svccfg_check:
 _msg: $(MSGSUBDIRS) $($(MACH)_MSGSUBDIRS) .WAIT _dc
 
 _dc: $(DCSUBDIRS)
+
+#
+# Dependencies
+#
+fs.d: fstyp
 
 $(FIRST_SUBDIRS) $(BWOSDIRS) $(SUBDIRS) $(BSMSUBDIRS) $(MANIFEST_SUBDIRS): FRC
 	@if [ -f $@/Makefile  ]; then \
