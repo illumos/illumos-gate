@@ -224,6 +224,14 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		goto out;
 
 	/*
+	 * Prevent executing an ELF file that has no entry point.
+	 */
+	if (ehdrp->e_entry == 0) {
+		uprintf("%s: Bad entry point\n", exec_file);
+		goto bad;
+	}
+
+	/*
 	 * Put data model that we're exec-ing to into the args passed to
 	 * exec_args(), so it will know what it is copying to on new stack.
 	 * Now that we know whether we are exec-ing a 32-bit or 64-bit

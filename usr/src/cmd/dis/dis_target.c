@@ -730,9 +730,9 @@ dis_tgt_function_iter(dis_tgt_t *tgt, function_iter_f func, void *data)
 
 		/* ignore non-functions */
 		if ((GELF_ST_TYPE(sym->se_sym.st_info) != STT_FUNC) ||
-		    sym->se_name == NULL ||
-		    sym->se_sym.st_size == 0 ||
-		    sym->se_shndx == -1)
+		    (sym->se_name == NULL) ||
+		    (sym->se_sym.st_size == 0) ||
+		    (sym->se_shndx >= SHN_LORESERVE))
 			continue;
 
 		/* get the ELF data associated with this function */
