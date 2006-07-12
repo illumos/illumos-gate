@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -494,7 +493,7 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		 * of a path - but that wouldn't work in the kernel case.
 		 */
 		while ((kcfdfd = open(_PATH_KCFD_DOOR, O_RDONLY)) == -1) {
-			if (errno != EINTR)
+			if (!(errno == EINTR || errno == EAGAIN))
 				break;
 		}
 		if (kcfdfd == -1) {
@@ -525,7 +524,7 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		darg.rsize = sizeof (kcf_door_arg_t);
 
 		while ((r = door_call(kcfdfd, &darg)) != 0) {
-			if (errno != EINTR)
+			if (!(errno == EINTR || errno == EAGAIN))
 				break;
 		}
 
