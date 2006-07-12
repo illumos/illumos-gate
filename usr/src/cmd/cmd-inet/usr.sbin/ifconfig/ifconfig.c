@@ -21,18 +21,11 @@
 #include <inet/ip.h>
 
 #define	LOOPBACK_IF	"lo0"
-
 #define	NONE_STR	"none"
-
-#ifndef	ARP_MOD_NAME
 #define	ARP_MOD_NAME	"arp"
-#endif
-
-#define	ADDRBITS_V4	32	/* number of bits in IPv4 address */
-#define	ADDRBITS_V6	128	/* number of bits in IPv6 address */
-
-#define	AF_FUNC_STATUS		1	/* af_status func reports status */
-#define	AF_FUNC_CONFIGINFO	2	/* af_status func reports configinfo */
+#define	TUN_NAME	"tun"
+#define	ATUN_NAME	"atun"
+#define	TUN6TO4_NAME	"6to4tun"
 
 typedef struct if_flags {
 	uint64_t iff_value;
@@ -81,15 +74,12 @@ static if_flags_t	if_flags_tbl[] = {
 };
 
 static struct	lifreq lifr;
-/* current interface name a praticular function is accessing */
+/* current interface name a particular function is accessing */
 static char	name[LIFNAMSIZ];
 /* foreach interface saved name */
 static char	origname[LIFNAMSIZ];
 static char savedname[LIFNAMSIZ];	/* For addif */
 static int	setaddr;
-static char partname[LIFNAMSIZ];
-
-uid_t	euid;
 
 /*
  * Make sure the algorithm variables hold more than the sizeof an algorithm
@@ -121,7 +111,6 @@ int	debug = 0;
 int	all = 0;	/* setifdhcp() needs to know this */
 int	verbose = 0;
 int	v4compat = 0;	/* Compatible printing format */
-boolean_t	partial = _B_FALSE;
 
 /*
  * Function prototypes for command functions.
@@ -164,12 +153,6 @@ static int	set_tun_hop_limit(char *arg, int64_t param);
 static int	setzone(char *arg, int64_t param);
 static int	setallzones(char *arg, int64_t param);
 static int	setifsrc(char *arg, int64_t param);
-
-#ifdef DEBUG
-static int	setnd(char *arg, int64_t param);
-static int	delnd(char *arg, int64_t param);
-static int	getnd(char *arg, int64_t param);
-#endif /* DEBUG */
 
 /*
  * Address family specific function prototypes.
@@ -292,18 +275,9 @@ struct	cmd {
 	{ "-failed",	-IFF_FAILED,	setifflags,	1,	AF_ANY },
 	{ "group",	NEXTARG,	setifgroupname,	1,	AF_ANY },
 	{ "configinfo",	0,		configinfo,	1,	AF_ANY },
-	{ "encaplimit",	NEXTARG,	set_tun_encap_limit,	0,
-	    AF_ANY },
-	{ "-encaplimit", 0,		clr_tun_encap_limit,	0,
-	    AF_ANY },
-	{ "thoplimit",	NEXTARG,	set_tun_hop_limit,	0,
-	    AF_ANY },
-#ifdef DEBUG
-	{ "getnd",	NEXTARG,	getnd,		0,	AF_INET6 },
-	{ "setnd",	NEXTARG,	setnd,		0,	AF_INET6 },
-	{ "delnd",	NEXTARG,	delnd,		0,	AF_INET6 },
-#endif
-/* XXX for testing SIOCT* ioctls. Remove */
+	{ "encaplimit",	NEXTARG,	set_tun_encap_limit,	0, AF_ANY },
+	{ "-encaplimit", 0,		clr_tun_encap_limit,	0, AF_ANY },
+	{ "thoplimit",	NEXTARG,	set_tun_hop_limit,	0, AF_ANY },
 	{ "set",	NEXTARG,	setifaddr,	0,	AF_ANY },
 	{ "destination", NEXTARG,	setifdstaddr,	0,	AF_ANY },
 	{ "zone",	NEXTARG,	setzone,	0,	AF_ANY },
@@ -383,7 +357,6 @@ main(int argc, char *argv[])
 	(void) strncpy(name, *argv, sizeof (name));
 	name[sizeof (name) - 1] = '\0';
 	(void) strncpy(origname, name, sizeof (origname));	/* For addif */
-	euid = geteuid();
 	default_ip_str = NULL;
 	v4compat = get_compat_flag(&default_ip_str);
 	if (v4compat == DEFAULT_PROT_BAD_VALUE) {
@@ -688,14 +661,6 @@ foreachinterface(void (*func)(), int argc, char *argv[], int af,
 		(void) strncpy(name, lifrp->lifr_name, sizeof (name));
 		(void) strncpy(origname, name, sizeof (origname));
 
-		if (partial) {
-			if (debug)
-				(void) fprintf(stderr,
-				    "checking partial %s against %s\n",
-				    partname, name);
-			if (strncmp(name, partname, strlen(partname)))
-				continue;
-		}
 		(*func)(argc, argv, save_af, lifrp);
 		/* the func could have overwritten origname, so restore */
 		(void) strncpy(name, origname, sizeof (name));
@@ -1008,7 +973,7 @@ setifaddr(char *addr, int64_t param)
 	default:
 		if (afp->af_af == AF_INET6) {
 			sin6 = (struct sockaddr_in6 *)&netmask;
-			if (!in_prefixlentomask(prefixlen, ADDRBITS_V6,
+			if (!in_prefixlentomask(prefixlen, IPV6_ABITS,
 			    (uchar_t *)&sin6->sin6_addr)) {
 				(void) fprintf(stderr, "ifconfig: "
 				    "Bad prefix length: %d\n",
@@ -1017,7 +982,7 @@ setifaddr(char *addr, int64_t param)
 			}
 		} else {
 			sin = (struct sockaddr_in *)&netmask;
-			if (!in_prefixlentomask(prefixlen, ADDRBITS_V4,
+			if (!in_prefixlentomask(prefixlen, IP_ABITS,
 			    (uchar_t *)&sin->sin_addr)) {
 				(void) fprintf(stderr, "ifconfig: "
 				    "Bad prefix length: %d\n",
@@ -1404,7 +1369,7 @@ setifprefixlen(char *addr, int64_t param)
 	int af = afp->af_af;
 
 	prefixlen = in_getprefixlen(addr, _B_TRUE,
-	    (af == AF_INET) ? ADDRBITS_V4 : ADDRBITS_V6);
+	    (af == AF_INET) ? IP_ABITS : IPV6_ABITS);
 	if (prefixlen < 0) {
 		(void) fprintf(stderr,
 		    "ifconfig: Bad prefix length in %s\n", addr);
@@ -1416,7 +1381,7 @@ setifprefixlen(char *addr, int64_t param)
 		struct sockaddr_in6 *sin6;
 
 		sin6 = (struct sockaddr_in6 *)&lifr.lifr_addr;
-		if (!in_prefixlentomask(prefixlen, ADDRBITS_V6,
+		if (!in_prefixlentomask(prefixlen, IPV6_ABITS,
 		    (uchar_t *)&sin6->sin6_addr)) {
 			(void) fprintf(stderr, "ifconfig: "
 			    "Bad prefix length: %d\n",
@@ -1427,7 +1392,7 @@ setifprefixlen(char *addr, int64_t param)
 		struct sockaddr_in *sin;
 
 		sin = (struct sockaddr_in *)&lifr.lifr_addr;
-		if (!in_prefixlentomask(prefixlen, ADDRBITS_V4,
+		if (!in_prefixlentomask(prefixlen, IP_ABITS,
 		    (uchar_t *)&sin->sin_addr)) {
 			(void) fprintf(stderr, "ifconfig: "
 			    "Bad prefix length: %d\n",
@@ -1695,13 +1660,6 @@ print_ifether(char *ifname)
 	icfg_handle_t	handle;
 	int		fd;
 
-	/*
-	 * Loopback interfaces and tunnels can't have MAC addresses,
-	 * so filter them out first.
-	 */
-	if (strcmp(ifname, LOOPBACK_IF) == 0)
-		return;
-
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
 
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -1894,7 +1852,7 @@ addif(char *str, int64_t param)
 		if (afp->af_af == AF_INET6) {
 			struct sockaddr_in6 *sin6;
 			sin6 = (struct sockaddr_in6 *)&mask;
-			if (!in_prefixlentomask(prefixlen, ADDRBITS_V6,
+			if (!in_prefixlentomask(prefixlen, IPV6_ABITS,
 			    (uchar_t *)&sin6->sin6_addr)) {
 				(void) fprintf(stderr, "ifconfig: "
 				    "Bad prefix length: %d\n",
@@ -1905,7 +1863,7 @@ addif(char *str, int64_t param)
 			struct sockaddr_in *sin;
 
 			sin = (struct sockaddr_in *)&mask;
-			if (!in_prefixlentomask(prefixlen, ADDRBITS_V4,
+			if (!in_prefixlentomask(prefixlen, IP_ABITS,
 			    (uchar_t *)&sin->sin_addr)) {
 				(void) fprintf(stderr, "ifconfig: "
 				    "Bad prefix length: %d\n",
@@ -2468,22 +2426,6 @@ ip_plink(int muxfd, int ipfd_lowstr, int arpfd_lowstr, int orig_arpid)
 	return (0);
 }
 
-
-/*
- * The names of other core TCP/IP stack modules which cannot be removed.
- */
-#ifndef	TUN_NAME
-#define	TUN_NAME	"tun"
-#endif
-
-#ifndef	ATUN_NAME
-#define	ATUN_NAME	"atun"
-#endif
-
-#ifndef	TUN6TO4_NAME
-#define	TUN6TO4_NAME	"6to4tun"
-#endif
-
 /*
  * The real function to perform module insertion/removal.
  *
@@ -2587,84 +2529,6 @@ modop(char *arg, char op)
 	free(arg_str);
 	return (ip_plink(muxfd, ipfd_lowstr, arpfd_lowstr, orig_arpid));
 }
-
-#ifdef DEBUG
-
-/* ARGSUSED */
-static int
-getnd(char *addr, int64_t param)
-{
-	struct sockaddr_in6 v6addr;
-	char *str = NULL;
-
-	in6_getaddr(addr, &v6addr, NULL);
-	(void) memcpy(&lifr.lifr_nd.lnr_addr, &v6addr, sizeof (v6addr));
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-	if (ioctl(s, SIOCLIFGETND, (caddr_t)&lifr) < 0)  {
-		Perror0_exit("SIOCLIFGETND");
-	}
-	str = _link_ntoa((const unsigned char *)lifr.lifr_nd.lnr_hdw_addr,
-	    str, lifr.lifr_nd.lnr_hdw_len, IFT_OTHER);
-	if (str != NULL) {
-		(void) printf("address %s", str);
-		free(str);
-	}
-	(void) printf(" state %d/%d/%d flags %x\n",
-		lifr.lifr_nd.lnr_state_create,
-		lifr.lifr_nd.lnr_state_same_lla,
-		lifr.lifr_nd.lnr_state_diff_lla,
-		lifr.lifr_nd.lnr_flags);
-	return (0);
-}
-
-/* ARGSUSED */
-static int
-delnd(char *addr, int64_t param)
-{
-	struct sockaddr_in6 v6addr;
-
-	in6_getaddr(addr, &v6addr, NULL);
-	(void) memcpy(&lifr.lifr_nd.lnr_addr, &v6addr, sizeof (v6addr));
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-
-	lifr.lifr_nd.lnr_state_create = ND_UNCHANGED;
-	lifr.lifr_nd.lnr_state_same_lla = ND_UNCHANGED;
-	lifr.lifr_nd.lnr_state_diff_lla = ND_UNCHANGED;
-	lifr.lifr_nd.lnr_flags = 0;
-	if (ioctl(s, SIOCLIFDELND, (caddr_t)&lifr) < 0)  {
-		Perror0_exit("SIOCLIFDELND");
-	}
-	return (0);
-}
-
-/* ARGSUSED */
-static int
-setnd(char *addr, int64_t param)
-{
-	struct sockaddr_in6 v6addr;
-
-	/*
-	 * XXX parse phyaddr? Need syntax to fit in one argv.
-	 * XXX <proto addr>/<phyaddr> ??
-	 */
-	in6_getaddr(addr, &v6addr, NULL);
-	(void) memcpy(&lifr.lifr_nd.lnr_addr, &v6addr, sizeof (v6addr));
-	(void) memset(lifr.lifr_nd.lnr_hdw_addr, 0x55,
-	    sizeof (lifr.lifr_nd.lnr_hdw_addr));
-	lifr.lifr_nd.lnr_hdw_len = 6;
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-
-	lifr.lifr_nd.lnr_state_create = ND_STALE;
-	lifr.lifr_nd.lnr_state_same_lla = ND_UNCHANGED;
-	lifr.lifr_nd.lnr_state_diff_lla = ND_STALE;
-	lifr.lifr_nd.lnr_flags = 0;
-
-	if (ioctl(s, SIOCLIFSETND, (caddr_t)&lifr) < 0)  {
-		Perror0_exit("SIOCLIFSETND");
-	}
-	return (0);
-}
-#endif /* DEBUG */
 
 /*
  * Set tunnel source address
@@ -4284,7 +4148,7 @@ in_getaddr(char *s, struct sockaddr *saddr, int *plenp)
 	if (plenp != NULL) {
 		char *cp;
 
-		*plenp = in_getprefixlen(str, _B_TRUE, ADDRBITS_V4);
+		*plenp = in_getprefixlen(str, _B_TRUE, IP_ABITS);
 		if (*plenp == BAD_ADDR)
 			return;
 		cp = strchr(str, '/');
@@ -4351,7 +4215,7 @@ in6_getaddr(char *s, struct sockaddr *saddr, int *plenp)
 	if (plenp != NULL) {
 		char *cp;
 
-		*plenp = in_getprefixlen(str, _B_TRUE, ADDRBITS_V6);
+		*plenp = in_getprefixlen(str, _B_TRUE, IPV6_ABITS);
 		if (*plenp == BAD_ADDR)
 			return;
 		cp = strchr(str, '/');
