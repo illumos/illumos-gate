@@ -81,15 +81,17 @@ extern "C" {
 /*
  * Flags that alter standard formatting for conversion routines.
  */
-#define	CONV_FMT_DECIMAL	0x1	/* conv_invalid_val() should print */
+#define	CONV_FMT_DECIMAL	0x01	/* conv_invalid_val() should print */
 					/*    integer print as decimal */
 					/*    (default is hex) */
-#define	CONV_FMT_SPACE		0x2	/* conv_invalid_val() should append */
+#define	CONV_FMT_SPACE		0x02	/* conv_invalid_val() should append */
 					/*    a space after the number.  */
-#define	CONV_FMT_ALTDUMP	0x4	/* Output strings using the versions */
+#define	CONV_FMT_ALTDUMP	0x04	/* Output strings using the versions */
 					/*    used by the dump program. */
-#define	CONV_FMT_ALTFILE	0x8	/* Output strings in the form used */
+#define	CONV_FMT_ALTFILE	0x08	/* Output strings in the form used */
 					/*    by the file(1) command */
+#define	CONV_FMT_ALTCRLE	0x10	/* Output strings in the form used */
+					/*    by the crle(1) command */
 
 /*
  * Mask of CONV_FMT bits that reflect a desire to use alternate strings.
@@ -104,6 +106,46 @@ typedef struct {
 	Xword		v_val;		/* expansion value */
 	const char	*v_msg;		/* associated message string */
 } Val_desc;
+
+/*
+ * conv_expn_field() is willing to supply default strings for the
+ * prefix, separator, and suffix arguments, if they are passed as NULL.
+ * The caller needs to know how much room to allow for these items.
+ * These values supply those sizes.
+ */
+#define	CONV_EXPN_FIELD_DEF_PREFIX_SIZE	2	/* Default is "[ " */
+#define	CONV_EXPN_FIELD_DEF_SEP_SIZE	1	/* Default is " " */
+#define	CONV_EXPN_FIELD_DEF_SUFFIX_SIZE	2	/* Default is " ]" */
+
+
+/*
+ * conv_expn_field() requires a large number of inputs, many of which
+ * can be NULL to accept default behavior. An argument of the following
+ * type is used to supply them.
+ */
+typedef struct {
+	char *buf;		/* Buffer to receive generated string */
+	size_t bufsize;		/* sizeof(buf) */
+	const Val_desc *vdp;	/* Array of value descriptors, giving the */
+				/*	possible bit values, and their */
+				/*	corresponding strings. Note that the */
+				/*	final element must contain only NULL */
+				/*	values. This terminates the list. */
+	const char **lead_str;	/* NULL, or array of pointers to strings to */
+				/*	be output at the head of the list. */
+				/*	Last entry must be NULL. */
+	Xword oflags;		/* Bits for which output strings are desired */
+	Xword rflags;		/* Bits for which a numeric value should be */
+				/*	output if vdp does not provide str. */
+				/*	Must be a proper subset of oflags */
+	const char *prefix;	/* NULL, or string to prefix output with */
+				/*	If NULL, "[ " is used. */
+	const char *sep;	/* NULL, or string to separate output items */
+				/*	with. If NULL, " " is used. */
+	const char *suffix;	/* NULL, or string to suffix output with */
+				/*	If NULL, " ]" is used. */
+} CONV_EXPN_FIELD_ARG;
+
 
 /*
  * Define all generic interfaces.
@@ -211,18 +253,17 @@ extern	const char	*conv_cap_val(Xword, Xword, Half);
 extern	const char	*conv_cap_val_hw1(Xword, Half);
 extern	const char	*conv_cap_val_sf1(Xword, Half);
 extern	const char	*conv_dyn_flag1(Xword);
-extern	const char	*conv_dyn_flag(Xword);
-extern	const char	*conv_dyn_posflag1(Xword);
+extern	const char	*conv_dyn_flag(Xword, int);
+extern	const char	*conv_dyn_posflag1(Xword, int);
 extern	const char	*conv_dyn_tag(Xword, Half, int);
-extern	const char	*conv_dyn_feature1(Xword);
+extern	const char	*conv_dyn_feature1(Xword, int);
 extern	const char	*conv_ehdr_class(uchar_t, int);
 extern	const char	*conv_ehdr_data(uchar_t, int);
 extern	const char	*conv_ehdr_flags(Half, Word);
 extern	const char	*conv_ehdr_mach(Half, int);
 extern	const char	*conv_ehdr_type(Half, int);
 extern	const char	*conv_ehdr_vers(Word, int);
-extern	int		conv_expn_field(char *, size_t, const Val_desc *,
-			    Xword, Xword, const char *, int);
+extern	int		conv_expn_field(CONV_EXPN_FIELD_ARG *);
 extern	const char	*conv_invalid_val(char *, size_t, Xword, int);
 extern	const char	*conv_phdr_flags(Word);
 extern	const char	*conv_phdr_type(Half, Word);

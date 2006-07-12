@@ -29,6 +29,7 @@
 
 find_files "s.*" \
 	usr/src/cmd/sgs/crle \
+	usr/src/cmd/sgs/dump \
 	usr/src/cmd/sgs/include \
 	usr/src/cmd/sgs/lari \
 	usr/src/cmd/sgs/ld \
@@ -46,6 +47,7 @@ find_files "s.*" \
 	usr/src/cmd/sgs/librtld \
 	usr/src/cmd/sgs/librtld_db \
 	usr/src/cmd/sgs/link_audit \
+	usr/src/cmd/sgs/nm \
 	usr/src/cmd/sgs/mcs \
 	usr/src/cmd/sgs/messages \
 	usr/src/cmd/sgs/moe \

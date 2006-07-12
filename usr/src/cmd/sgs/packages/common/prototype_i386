@@ -38,6 +38,7 @@
 !include prototype_com
 
 d none $SGSDIR/lib/amd64=lib/amd64 755 root bin
+s none $SGSDIR/lib/64=amd64
 f none $SGSDIR/lib/amd64/ld.so.1=lib/amd64/ld.so.1 755 root bin
 f none $SGSDIR/lib/amd64/libdl.so.1=lib/amd64/libdl.so.1 755 root bin
 s none $SGSDIR/lib/amd64/libdl.so=libdl.so.1
@@ -53,8 +54,10 @@ f none $SGSDIR/usr/bin/amd64/crle=usr/bin/amd64/crle 555 root bin
 f none $SGSDIR/usr/bin/amd64/moe=usr/bin/amd64/moe 555 root bin
 f none $SGSDIR/usr/bin/amd64/pvs=usr/bin/amd64/pvs 555 root bin
 d none $SGSDIR/usr/ccs/bin/amd64 755 root bin
+f none $SGSDIR/usr/ccs/bin/amd64/dump=usr/ccs/bin/amd64/dump 0555 root bin
 f none $SGSDIR/usr/ccs/bin/amd64/elfdump=usr/ccs/bin/amd64/elfdump 0555 root bin
 f none $SGSDIR/usr/ccs/bin/amd64/ld=usr/ccs/bin/amd64/ld 755 root bin
+f none $SGSDIR/usr/ccs/bin/amd64/nm=usr/ccs/bin/amd64/nm 0555 root bin
 f none $SGSDIR/usr/ccs/bin/amd64/mcs=usr/ccs/bin/amd64/mcs 0555 root bin
 l none $SGSDIR/usr/ccs/bin/amd64/strip=../../../../usr/ccs/bin/amd64/mcs
 d none $SGSDIR/usr/lib/link_audit/amd64 755 root bin

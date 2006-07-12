@@ -34,28 +34,29 @@
 #include	"msg.h"
 #include	"_debug.h"
 
-#define	FLAGSZ	MSG_TLS_FLAG_START_SIZE + \
-		MSG_TLS_FLAG_STATIC_SIZE + \
-		CONV_INV_STRSIZE + MSG_TLS_FLAG_END_SIZE
+#define	FLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_TLS_FLAG_STATIC_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 static void
 Dbg_tls_modent(Lm_list *lml, TLS_modinfo * tmodent)
 {
+	static char	flagstr[FLAGSZ];
 	static Val_desc	vda[] = {
 		{ TM_FLG_STATICTLS,	MSG_ORIG(MSG_TLS_FLAG_STATIC) },
 		{ 0,			0 }
 	};
-	char	flagstr[FLAGSZ];
+	static CONV_EXPN_FIELD_ARG conv_arg = { flagstr,
+		sizeof (flagstr), vda };
+
 	ulong_t	flags;
 
 	if ((flags = tmodent->tm_flags) != 0) {
-		(void) strlcpy(flagstr, MSG_ORIG(MSG_TLS_FLAG_START), FLAGSZ);
-
-		if (conv_expn_field(flagstr, FLAGSZ, vda, flags, flags,
-		    MSG_ORIG(MSG_TLS_FLAG_SEP), 0))
-			(void) strcat(flagstr, MSG_ORIG(MSG_TLS_FLAG_END));
-	} else
+		conv_arg.oflags = conv_arg.rflags = flags;
+		(void) conv_expn_field(&conv_arg);
+	} else {
 		flagstr[0] = '\0';
+	}
 
 	dbg_print(lml, MSG_INTL(MSG_TLS_MODENT1),
 	    EC_XWORD((uintptr_t)tmodent->tm_tlsblock),

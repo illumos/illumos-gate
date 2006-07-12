@@ -121,15 +121,14 @@ static void usage();
 static void each_file(char *);
 static void process(Elf *, char *);
 static Elf_Scn * get_scnfd(Elf *, int, int);
-static void get_symtab(Elf *, GElf_Ehdr *, char *);
+static void get_symtab(Elf *, char *);
 static SYM * readsyms(Elf_Data *, GElf_Sxword, Elf *, unsigned int,
 			unsigned int);
 static int compare(SYM *, SYM *);
 static char *lookup(int, int);
 static int  is_bss_section(unsigned int, Elf *, unsigned int);
 static void print_ar_files(int, Elf *, char *);
-static void print_symtab(Elf *, GElf_Ehdr *, unsigned int,
-				Elf_Scn *, GElf_Shdr *, char *);
+static void print_symtab(Elf *, unsigned int, Elf_Scn *, GElf_Shdr *, char *);
 static void parsename(char *);
 static void parse_fn_and_print(const char *, char *);
 static char d_buf[512];
@@ -464,7 +463,7 @@ process(Elf *elf_file, char *filename)
 	}
 
 	set_A_header(filename);
-	get_symtab(elf_file, &ehdr, filename);
+	get_symtab(elf_file, filename);
 }
 
 /*
@@ -499,7 +498,7 @@ get_scnfd(Elf * e_file, int shstrtab, int SCN_TYPE)
  * ELF file, a pointer to the ELF header, and the filename.
  */
 static void
-get_symtab(Elf *elf_file, GElf_Ehdr *ehdr, char *filename)
+get_symtab(Elf *elf_file, char *filename)
 {
 	Elf_Scn	*scn, *scnfd;
 	Elf_Data *data;
@@ -548,7 +547,7 @@ get_symtab(Elf *elf_file, GElf_Ehdr *ehdr, char *filename)
 		}
 
 		if (shdr.sh_type == symtabtype)	{
-			print_symtab(elf_file, ehdr, shstrndx, scn,
+			print_symtab(elf_file, shstrndx, scn,
 				&shdr, filename);
 		}
 	} /* end while */
@@ -631,7 +630,7 @@ print_ar_files(int fd, Elf * elf_file, char *filename)
  * is requested.
  */
 static void
-print_symtab(Elf *elf_file, GElf_Ehdr *ehdr, unsigned int shstrndx,
+print_symtab(Elf *elf_file, unsigned int shstrndx,
 	Elf_Scn *p_sd, GElf_Shdr *shdr, char *filename)
 {
 
@@ -640,25 +639,32 @@ print_symtab(Elf *elf_file, GElf_Ehdr *ehdr, unsigned int shstrndx,
 	SYM	*s;
 	GElf_Sxword	count = 0;
 	static void print_header(int);
+	int ndigits;
 #ifndef XPG4
 	static void print_with_uflag(SYM *, char *);
 #endif
-	static void print_with_pflag(Elf *, GElf_Ehdr *, unsigned int,
-			SYM *, char *);
-	static void print_with_Pflag(Elf *, GElf_Ehdr *, unsigned int,
-			SYM *);
-	static void print_with_otherflags(Elf *, GElf_Ehdr *, unsigned int,
-			SYM *, char *);
+	static void print_with_pflag(int, Elf *, unsigned int, SYM *, char *);
+	static void print_with_Pflag(int, Elf *, unsigned int, SYM *);
+	static void print_with_otherflags(int, Elf *, unsigned int,
+		SYM *, char *);
+
+	/*
+	 * Determine # of digits to use for each numeric value.
+	 */
+	if (x_flag) {		/* Hex */
+		ndigits = 8;
+	} else if (o_flag) {	/* Octal */
+		ndigits = 11;
+	} else {		/* Decimal */
+		ndigits = 10;
+	}
+	if (gelf_getclass(elf_file) == ELFCLASS64)
+		ndigits *= 2;
 
 	/*
 	 * print header
 	 */
-#ifndef XPG4
-	if (!u_flag)
-		print_header(gelf_getclass(elf_file));
-#else
-	print_header(gelf_getclass(elf_file));
-#endif
+	print_header(ndigits);
 
 	/*
 	 * get symbol table data
@@ -675,7 +681,6 @@ print_symtab(Elf *elf_file, GElf_Ehdr *ehdr, unsigned int shstrndx,
 	 * translate symbol table data
 	 */
 	sym_data = readsyms(sd, count, elf_file, shdr->sh_link,
-		/* LINTED */
 		(unsigned int)elf_ndxscn(p_sd));
 	if (sym_data == NULL) {
 		(void) fprintf(stderr, gettext(
@@ -698,13 +703,14 @@ print_symtab(Elf *elf_file, GElf_Ehdr *ehdr, unsigned int shstrndx,
 #else
 		if (p_flag)
 #endif
-			print_with_pflag(elf_file, ehdr, shstrndx, sym_data,
-				filename);
-		else if (P_flag)
-			print_with_Pflag(elf_file, ehdr, shstrndx, sym_data);
-		else
-			print_with_otherflags(elf_file, ehdr, shstrndx,
+			print_with_pflag(ndigits, elf_file, shstrndx,
 				sym_data, filename);
+		else if (P_flag)
+			print_with_Pflag(ndigits, elf_file, shstrndx,
+				sym_data);
+		else
+			print_with_otherflags(ndigits, elf_file,
+				shstrndx, sym_data, filename);
 		sym_data++;
 		count--;
 	}
@@ -857,12 +863,12 @@ set_A_header(char *fname)
 	if (A_flag == 0)
 		return;
 
-	if (archive_name == (char *)0)
-		(void) sprintf(A_header, "%s: ", fname);
-	else
-		(void) sprintf(A_header, "%s[%s]: ",
-			archive_name,
-			fname);
+	if (archive_name == (char *)0) {
+		(void) snprintf(A_header, sizeof (A_header), "%s: ", fname);
+	} else {
+		(void) snprintf(A_header, sizeof (A_header), "%s[%s]: ",
+			archive_name, fname);
+	}
 }
 
 /*
@@ -870,72 +876,46 @@ set_A_header(char *fname)
  *	The following functions are called from
  *	print_symtab().
  */
+
+/*
+ * Print header line if needed.
+ *
+ * entry:
+ *	ndigits - # of digits to be used to format an integer
+ *		value, not counting any '0x' (hex) or '0' (octal) prefix.
+ */
 static void
-print_header(int class)
+print_header(int ndigits)
 {
-	int adj = 0;
+	const char *fmt;
+	const char *section_title;
+	int pad;
 
-	if (class == ELFCLASS64)
-		adj = 11;
-
-	/*
-	 * Print header line if needed.
-	 */
-	if (h_flag == 0 && p_flag == 0 && P_flag == 0) {
+	if (
+#ifndef XPG4
+	    !u_flag &&
+#endif
+	    !h_flag && !p_flag && !P_flag) {
 		(void) printf("\n");
+		if (!s_flag) {
+			fmt = "%-9s%-*s%-*s%-6s%-6s%-6s%-8s%s\n\n";
+			section_title = "Shndx";
+		} else {
+			fmt = "%-9s%-*s%-*s%-6s%-6s%-6s%-15s%s\n\n";
+			section_title = "Shname";
+		}
 		if (A_flag != 0)
 			(void) printf("%s", A_header);
 		if (o_flag) {
-			if (!s_flag) {
-				(void) printf(
-				    "%-9s%-*s%-*s%-6s%-6s%-6s%-8s%s\n\n",
-				    "[Index]", 13 + adj, " Value",
-				    13 + adj, " Size", "Type", "Bind",
-				    "Other", "Shndx", "Name");
-			}
-			else
-			{
-				(void) printf(
-				    "%-9s%-*s%-*s%-6s%-6s%-6s%-15s%s\n\n",
-				    "[Index]", 13 + adj, " Value",
-				    13 + adj, " Size", "Type", "Bind",
-				    "Other", "Shname", "Name");
-			}
+			pad = 2;	/* Allow for leading '|0' */
 		} else if (x_flag) {
-			if (!s_flag) {
-				(void) printf(
-				    "%-9s%-*s%-*s%-6s%-6s%-6s%-8s%s\n\n",
-				    "[Index]", 11 + adj, " Value",
-				    11 + adj, " Size", "Type", "Bind",
-				    "Other", "Shndx", "Name");
-			}
-			else
-			{
-				(void) printf(
-				    "%-9s%-*s%-*s%-6s%-6s%-6s%-15s%s\n\n",
-				    "[Index]", 11 + adj, " Value",
-				    11 + adj, " Size", "Type", "Bind",
-				    "Other", "Shname", "Name");
-			}
+			pad = 3;	/* Allow for leading '|0x' */
+		} else {
+			pad = 1;	/* Allow for leading '|' */
 		}
-		else
-		{
-			if (!s_flag) {
-				(void) printf(
-				    "%-9s%-*s%-*s%-6s%-6s%-6s%-8s%s\n\n",
-				    "[Index]", 11 + adj, " Value",
-				    9 + adj, " Size", "Type", "Bind",
-				    "Other", "Shndx", "Name");
-			}
-			else
-			{
-				(void) printf(
-				    "%-9s%-*s%-*s%-6s%-6s%-6s%-15s%s\n\n",
-				    "[Index]", 11 + adj, " Value",
-				    9 + adj, " Size", "Type", "Bind",
-				    "Other", "Shname", "Name");
-			}
-		}
+		(void) printf(fmt, "[Index]", pad + ndigits, " Value",
+			pad + ndigits, " Size", "Type", "Bind",
+			"Other", section_title, "Name");
 	}
 }
 
@@ -1055,18 +1035,15 @@ print_with_uflag(
  */
 static void
 print_with_pflag(
+	int ndigits,
 	Elf *elf_file,
-	GElf_Ehdr *ehdr,
 	unsigned int shstrndx,
 	SYM *sym_data,
 	char *filename
 )
 {
 	char *sym_key	= NULL;
-	int adj		= 0;
-
-	if ((int)ehdr->e_ident[EI_CLASS] == ELFCLASS64)
-		adj = 11;
+	const char *fmt;
 
 	if (is_sym_print(sym_data) != 1)
 		return;
@@ -1081,15 +1058,14 @@ print_with_pflag(
 	 *	(hex/octal/decimal)
 	 */
 	if (x_flag) {
-		(void) printf("0x%.*llx ", 8 + adj,
-			EC_ADDR(sym_data->value));
+		fmt = "0x%.*llx ";
 	} else if (o_flag) {
-		(void) printf("0%.*llo ", 11 + adj,
-			EC_ADDR(sym_data->value));
+		fmt = "0%.*llo ";
 	} else {
-		(void) printf("%.*llu ", 10 + adj,
-			EC_ADDR(sym_data->value));
+		fmt = "%.*llu ";
 	}
+	(void) printf(fmt, ndigits, EC_ADDR(sym_data->value));
+
 
 	/*
 	 * Symbol Type.
@@ -1165,8 +1141,8 @@ print_with_pflag(
  */
 static void
 print_with_Pflag(
+	int ndigits,
 	Elf *elf_file,
-	GElf_Ehdr *ehdr,
 	unsigned int shstrndx,
 	SYM *sym_data
 )
@@ -1175,10 +1151,7 @@ print_with_Pflag(
 #define	SYM_LEN 10
 	char sym_name[SYM_LEN+1];
 	size_t len;
-	int adj = 0;
-
-	if ((int)ehdr->e_ident[EI_CLASS] == ELFCLASS64)
-		adj = 11;
+	const char *fmt;
 
 	if (is_sym_print(sym_data) != 1)
 		return;
@@ -1251,19 +1224,14 @@ print_with_Pflag(
 	 *	(hex/octal/decimal)
 	 */
 	if (d_flag) {
-		(void) printf("%*llu %*llu ",
-			10 + adj, EC_ADDR(sym_data->value),
-			10 + adj, EC_XWORD(sym_data->size));
+		fmt = "%*llu %*llu \n";
 	} else if (o_flag) {
-		(void) printf("%*llo %*llo ",
-			11 + adj, EC_ADDR(sym_data->value),
-			11 + adj, EC_XWORD(sym_data->size));
+		fmt = "%*llo %*llo \n";
 	} else {	/* Hex and it is the default */
-		(void) printf("%*llx %*llx ",
-			8 + adj, EC_ADDR(sym_data->value),
-			8 + adj, EC_XWORD(sym_data->size));
+		fmt = "%*llx %*llx \n";
 	}
-	(void) putchar('\n');
+	(void) printf(fmt, ndigits, EC_ADDR(sym_data->value),
+		ndigits, EC_XWORD(sym_data->size));
 }
 
 /*
@@ -1271,35 +1239,28 @@ print_with_Pflag(
  */
 static void
 print_with_otherflags(
+	int ndigits,
 	Elf *elf_file,
-	GElf_Ehdr *ehdr,
 	unsigned int shstrndx,
 	SYM *sym_data,
 	char *filename
 )
 {
-	int adj = 0;
-
-	if ((int)ehdr->e_ident[EI_CLASS] == ELFCLASS64)
-		adj = 11;
+	const char *fmt;
 
 	if (is_sym_print(sym_data) != 1)
 		return;
 	(void) printf("%s", A_header);
 	(void) printf("[%d]\t|", sym_data->indx);
 	if (o_flag) {
-		(void) printf("0%.*llo|0%.*llo|",
-			11 + adj, EC_ADDR(sym_data->value),
-			11 + adj, EC_XWORD(sym_data->size));
+		fmt = "0%.*llo|0%.*llo|";
 	} else if (x_flag) {
-		(void) printf("0x%.*llx|0x%.*llx|",
-			8 + adj, EC_ADDR(sym_data->value),
-			8 + adj, EC_XWORD(sym_data->size));
+		fmt = "0x%.*llx|0x%.*llx|";
 	} else {
-		(void) printf("%*llu|%*lld|",
-			10 + adj, EC_ADDR(sym_data->value),
-			8 + adj, EC_XWORD(sym_data->size));
+		fmt = "%*llu|%*lld|";
 	}
+	(void) printf(fmt, ndigits, EC_ADDR(sym_data->value),
+		ndigits, EC_XWORD(sym_data->size));
 
 	switch (sym_data->type) {
 	case STT_NOTYPE:(void) printf("%-5s", "NOTY"); break;
@@ -1439,7 +1400,8 @@ FormatName(char *OldName, char *NewName)
 	size_t length = strlen(s)+strlen(NewName)+strlen(OldName)-3;
 	char *hold = OldName;
 	OldName = malloc(length);
-	(void) sprintf(OldName, s, NewName, hold);
+	/*LINTED*/
+	(void) snprintf(OldName, length, s, NewName, hold);
 	return (OldName);
 }
 

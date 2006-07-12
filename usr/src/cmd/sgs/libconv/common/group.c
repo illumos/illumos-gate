@@ -30,15 +30,15 @@
 #include	"_conv.h"
 #include	"group_msg.h"
 
-#define	FLAGSZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_GPH_ZERO_SIZE + \
-		MSG_GPH_LDSO_SIZE + \
-		MSG_GPH_FIRST_SIZE + \
-		MSG_GPH_PARENT_SIZE + \
-		MSG_GPH_FILTEE_SIZE + \
-		MSG_GPH_INITIAL_SIZE + \
-		MSG_GPH_STICKY_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+#define	FLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_GPH_ZERO_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_GPH_LDSO_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_GPH_FIRST_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_GPH_PARENT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_GPH_FILTEE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_GPH_INITIAL_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_GPH_STICKY_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 /*
  * String conversion routine for Grp_hdl flags.
@@ -57,13 +57,13 @@ conv_grphdl_flags(uint_t flags)
 		{ GPH_STICKY,		MSG_ORIG(MSG_GPH_STICKY) },
 		{ 0,			0 }
 	};
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_NULL));
 
-	(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
-	if (conv_expn_field(string, FLAGSZ, vda, flags, flags, 0, 0))
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAGSZ);
+	conv_arg.oflags = conv_arg.rflags = flags;
+	(void) conv_expn_field(&conv_arg);
 
 	return ((const char *)string);
 }

@@ -120,21 +120,21 @@ conv_sec_type(Half mach, Word sec, int fmt_flags)
 	return (conv_invalid_val(string, CONV_INV_STRSIZE, sec, fmt_flags));
 }
 
-#define	FLAGSZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_SHF_WRITE_SIZE + \
-		MSG_SHF_ALLOC_SIZE + \
-		MSG_SHF_EXECINSTR_SIZE + \
-		MSG_SHF_MERGE_SIZE + \
-		MSG_SHF_STRINGS_SIZE + \
-		MSG_SHF_INFO_LINK_SIZE + \
-		MSG_SHF_LINK_ORDER_SIZE + \
-		MSG_SHF_OS_NONCONFORMING_SIZE + \
-		MSG_SHF_GROUP_SIZE + \
-		MSG_SHF_TLS_SIZE + \
-		MSG_SHF_EXCLUDE_SIZE + \
-		MSG_SHF_ORDERED_SIZE + \
-		MSG_SHF_AMD64_LARGE_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+#define	FLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_SHF_WRITE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_SHF_ALLOC_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_SHF_EXECINSTR_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_SHF_MERGE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_SHF_STRINGS_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_SHF_INFO_LINK_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_SHF_LINK_ORDER_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_SHF_OS_NONCONFORMING_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_SHF_GROUP_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_SHF_TLS_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_SHF_EXCLUDE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_SHF_ORDERED_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_SHF_AMD64_LARGE_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 const char *
 conv_sec_flags(Xword flags)
@@ -156,13 +156,13 @@ conv_sec_flags(Xword flags)
 		{ SHF_AMD64_LARGE,	MSG_ORIG(MSG_SHF_AMD64_LARGE) },
 		{ 0,			0 }
 	};
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FLAGSZ);
-	if (conv_expn_field(string, FLAGSZ, vda, flags, flags, 0, 0))
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAGSZ);
+	conv_arg.oflags = conv_arg.rflags = flags;
+	(void) conv_expn_field(&conv_arg);
 
 	return ((const char *)string);
 }

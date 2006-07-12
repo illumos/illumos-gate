@@ -68,81 +68,150 @@ conv_invalid_val(char *string, size_t size, Xword value, int fmt_flags)
 
 
 /*
+ * cef_cp() is used by conv_expn_field() to fill in the output buffer.
+ * A CONV_EXPN_FIELD_STATE variable is used to maintain the buffer state
+ * as the operation progresses.
+ *
+ * entry:
+ *	arg - As passed to conv_expn_field().
+ *	state - Variable used to maintain buffer state between calls.
+ *	list_item - TRUE(1) if this is a list item, and FALSE(0)
+ *		if it is something else.
+ *	str - String to be added to the buffer.
+ *
+ * exit:
+ *	On Success:
+ *		buffer contains the output string, including a list
+ *		separator if appropriate. state has been updated.
+ *		TRUE(1) is returned.
+ *	On Failure:
+ *		Buffer contains the numeric representation for the flags,
+ *		and FALSE(0) is returned.
+ */
+typedef struct {
+	char *cur;		/* Current output position in buf */
+	size_t room;		/* # of bytes left in buf */
+	int list_cnt;		/* # of list items output into buf  */
+	const char *sep_str;	/* String used as list separator */
+	int sep_str_len;	/* strlen(sep_str) */
+} CONV_EXPN_FIELD_STATE;
+
+static int
+cef_cp(CONV_EXPN_FIELD_ARG *arg, CONV_EXPN_FIELD_STATE *state,
+	int list_item, const char *str)
+{
+	int n;
+
+	if (list_item) {	/* This is a list item */
+		/*
+		 * If list is non-empty, and the buffer has room,
+		 * then insert the separator.
+		 */
+		if (state->list_cnt != 0) {
+			if (state->sep_str_len < state->room) {
+				(void) memcpy(state->cur, state->sep_str,
+					state->sep_str_len);
+				state->cur += state->sep_str_len;
+				state->room -= state->sep_str_len;
+			} else {
+				/* Ensure code below will catch lack of room */
+				state->room = 0;
+			}
+		}
+		state->list_cnt++;
+	}
+
+	n = strlen(str);
+	if (n < state->room) {
+		(void) memcpy(state->cur, str, n);
+		state->cur += n;
+		state->room -= n;
+		return (TRUE);
+	}
+
+	/* Buffer too small. Fill in the numeric value and report failure */
+	(void) conv_invalid_val(arg->buf, arg->bufsize, arg->oflags, 0);
+	return (FALSE);
+}
+
+
+
+/*
  * Provide a focal point for expanding bit-fields values into
  * their corresponding strings.
  *
  * entry:
- *	string - Buffer into which the resulting string is generated.
- *	size - Size of string buffer (i.e. sizeof(string))
- *	vdp - Array of value descriptors, giving the possible bit
- *		values, and their corresponding strings. Note that the
- *		final element must contain only NULL values. This
- *		terminates the list.
- *	oflags - Bits for which output strings are desired.
- *	rflags - Bits for which a numeric value should be printed
- *		if vdp does not provide a corresponding string. This
- *		must be a proper subset of oflags.
- *	separator - If non-NULL, a separator string to be inserted
- *		between each string value copied into the output.
- *	element - TRUE if first element output should be preceeded
- *		by a separator, and FALSE otherwise.
+ *	arg - Specifies the operation to be carried out. See the
+ *		definition of CONV_EXPN_FIELD_ARG in conv.h for details.
  *
  * exit:
- *	string contains the formatted result. True (1) is returned if there
- *	was no error, and False (0) if the buffer was too small.
+ *	arg->buf contains the formatted result. True (1) is returned if there
+ *	was no error, and False (0) if the buffer was too small. In the failure
+ *	case, arg->buf contains a numeric representation of the value.
  */
 int
-conv_expn_field(char *string, size_t size, const Val_desc *vdp,
-    Xword oflags, Xword rflags, const char *separator, int element)
+conv_expn_field(CONV_EXPN_FIELD_ARG *arg)
 {
-	const Val_desc	*vde;
+	const Val_desc *vde;
+	CONV_EXPN_FIELD_STATE state;
+	Xword rflags = arg->rflags;
+	const char **lead_str;
+
+
+	/* Initialize buffer state */
+	state.cur = arg->buf;
+	state.room = arg->bufsize;
+	state.list_cnt = 0;
+	state.sep_str = arg->sep ? arg->sep : MSG_ORIG(MSG_GBL_SEP);
+	state.sep_str_len = strlen(state.sep_str);
+
+	/* Prefix string */
+	if (!cef_cp(arg, &state, FALSE,
+	    (arg->prefix ? arg->prefix : MSG_ORIG(MSG_GBL_OSQBRKT))))
+		return (FALSE);
+
+	/* Any strings in the lead_str array go at the head of the list */
+	lead_str = arg->lead_str;
+	if (lead_str) {
+		while (*lead_str) {
+			if (!cef_cp(arg, &state, TRUE, *lead_str++))
+				return (FALSE);
+		}
+	}
 
 	/*
 	 * Traverse the callers Val_desc array and determine if the value
-	 * corresponds to any array item.
+	 * corresponds to any array item and add those that are to the list.
 	 */
-	for (vde = vdp; vde->v_msg; vde++) {
-		if (oflags & vde->v_val) {
-			/*
-			 * If a separator is required, and elements have already
-			 * been added to the users output buffer, add the
-			 * separator to the buffer first.
-			 */
-			if (separator && element++) {
-				if (strlcat(string, separator, size) >= size) {
-					(void) conv_invalid_val(string, size,
-					    oflags, 0);
-					return (0);
-				}
-			}
+	for (vde = arg->vdp; vde->v_msg; vde++) {
+		if (arg->oflags & vde->v_val) {
+			if (!cef_cp(arg, &state, TRUE, vde->v_msg))
+				return (FALSE);
 
-			/*
-			 * Add the items strings to the users output buffer.
-			 */
-			if (strlcat(string, vde->v_msg, size) >= size) {
-				(void) conv_invalid_val(string, size,
-				    oflags, 0);
-				return (0);
-			}
-
-			/*
-			 * Indicate this item has been collected.
-			 */
+			/* Indicate this item has been collected */
 			rflags &= ~(vde->v_val);
 		}
 	}
 
 	/*
-	 * If any flags remain, then they are unidentified.  Add the number
+	 * If any flags remain, then they are unidentified.  Add the numeric
 	 * representation of these flags to the users output buffer.
 	 */
 	if (rflags) {
-		size_t  off = strlen(string);
-		size_t  rem = size - off;
+		char ibuf[CONV_INV_STRSIZE];
 
-		(void) conv_invalid_val(&string[off], rem, rflags,
-		    CONV_FMT_SPACE);
+		(void) conv_invalid_val(ibuf, sizeof (ibuf), rflags, 0);
+		if (!cef_cp(arg, &state, TRUE, ibuf))
+			return (FALSE);
 	}
 
-	return (1);
+	/* Suffix string */
+	if (!cef_cp(arg, &state, FALSE,
+	    (arg->suffix ? arg->suffix : MSG_ORIG(MSG_GBL_CSQBRKT))))
+		return (FALSE);
+
+	/* Terminate the buffer */
+	*state.cur = '\0';
+
+	return (TRUE);
 }

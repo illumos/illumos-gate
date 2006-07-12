@@ -1418,13 +1418,13 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 				name = string(_cache, ndx, strsec,
 				    file, dyn->d_un.d_ptr);
 			else if (dyn->d_tag == DT_FLAGS)
-				name = conv_dyn_flag(dyn->d_un.d_val);
+				name = conv_dyn_flag(dyn->d_un.d_val, 0);
 			else if (dyn->d_tag == DT_FLAGS_1)
 				name = conv_dyn_flag1(dyn->d_un.d_val);
 			else if (dyn->d_tag == DT_POSFLAG_1)
-				name = conv_dyn_posflag1(dyn->d_un.d_val);
+				name = conv_dyn_posflag1(dyn->d_un.d_val, 0);
 			else if (dyn->d_tag == DT_FEATURE_1)
-				name = conv_dyn_feature1(dyn->d_un.d_val);
+				name = conv_dyn_feature1(dyn->d_un.d_val, 0);
 			else if (dyn->d_tag == DT_DEPRECATED_SPARC_REGISTER)
 				name = MSG_INTL(MSG_STR_DEPRECATED);
 			else

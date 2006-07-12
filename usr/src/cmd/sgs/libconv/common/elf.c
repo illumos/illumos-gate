@@ -195,12 +195,12 @@ conv_ehdr_vers(Word version, int fmt_flags)
 		ARRAY_NELTS(versions), versions, versions_alt, versions_alt));
 }
 
-#define	EFLAGSZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_EF_SPARCV9_TSO_SIZE + \
-		MSG_EF_SPARC_SUN_US1_SIZE + \
-		MSG_EF_SPARC_HAL_R1_SIZE + \
-		MSG_EF_SPARC_SUN_US3_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+#define	EFLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_EF_SPARCV9_TSO_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE +  \
+		MSG_EF_SPARC_SUN_US1_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE +  \
+		MSG_EF_SPARC_HAL_R1_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE +  \
+		MSG_EF_SPARC_SUN_US3_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE +  \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 /*
  * Make a string representation of the e_flags field.
@@ -220,7 +220,11 @@ conv_ehdr_flags(Half mach, Word flags)
 		MSG_EF_SPARCV9_TSO,	MSG_EF_SPARCV9_PSO,
 		MSG_EF_SPARCV9_RMO
 	};
-	Word		_flags = flags;
+	static const char *leading_str_arr[2];
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda,
+		leading_str_arr };
+
+	const char **lstr = leading_str_arr;
 
 	/*
 	 * Non-SPARC architectures presently provide no known flags.
@@ -231,20 +235,15 @@ conv_ehdr_flags(Half mach, Word flags)
 		 * Valid vendor extension bits for SPARCV9.  These must be
 		 * updated along with elf_SPARC.h.
 		 */
-		(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
 
+		conv_arg.oflags = conv_arg.rflags = flags;
 		if ((mach == EM_SPARCV9) && (flags <= EF_SPARCV9_RMO)) {
-		    if (strlcat(string,
-			MSG_ORIG(mm_flags[flags & EF_SPARCV9_MM]),
-			EFLAGSZ) >= EFLAGSZ)
-			    return (conv_invalid_val(string, EFLAGSZ,
-				flags, 0));
-		    _flags &= ~EF_SPARCV9_MM;
+			*lstr++ = MSG_ORIG(mm_flags[flags & EF_SPARCV9_MM]);
+			conv_arg.rflags &= ~EF_SPARCV9_MM;
 		}
+		*lstr = NULL;
 
-		if (conv_expn_field(string, EFLAGSZ, vda, flags, _flags, 0, 0))
-			(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT),
-			    EFLAGSZ);
+		(void) conv_expn_field(&conv_arg);
 
 		return (string);
 	}

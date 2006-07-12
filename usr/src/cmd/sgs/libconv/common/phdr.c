@@ -58,17 +58,17 @@ conv_phdr_type(Half mach, Word type)
 		return (conv_invalid_val(string, CONV_INV_STRSIZE, type, 0));
 }
 
-#define	PHDRSZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_PF_X_SIZE + \
-		MSG_PF_W_SIZE + \
-		MSG_PF_R_SIZE + \
-		MSG_PF_SUNW_FAILURE_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+#define	PHDRSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_PF_X_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_PF_W_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_PF_R_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_PF_SUNW_FAILURE_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 const char *
 conv_phdr_flags(Word flags)
 {
-	static char	string[PHDRSZ];
+	static char string[PHDRSZ];
 	static Val_desc vda[] = {
 		{ PF_X,			MSG_ORIG(MSG_PF_X) },
 		{ PF_W,			MSG_ORIG(MSG_PF_W) },
@@ -76,13 +76,13 @@ conv_phdr_flags(Word flags)
 		{ PF_SUNW_FAILURE,	MSG_ORIG(MSG_PF_SUNW_FAILURE) },
 		{ 0,			0 }
 	};
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), PHDRSZ);
-	if (conv_expn_field(string, PHDRSZ, vda, flags, flags, 0, 0))
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), PHDRSZ);
+	conv_arg.oflags = conv_arg.rflags = flags;
+	(void) conv_expn_field(&conv_arg);
 
 	return ((const char *)string);
 }

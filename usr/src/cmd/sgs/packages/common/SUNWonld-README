@@ -45,7 +45,7 @@ SUNWonld - link-editors development package.
 
   Comments and Questions:
 
-    Contact Rod Evans, Mike Walker and/or Seizo Sakurai.
+    Contact Rod Evans, Ali Bahrami, and/or Seizo Sakurai.
 
   Warnings:
 
@@ -1113,3 +1113,4 @@ Bugid   Risk Synopsis
 	instead
 6229145 ld: initarray/finiarray processing occurs after got size is determined
 6324924 the linker should warn if there's a .init section but not _init
+6421380 elfdump inserts extra whitespace in bitmap value display

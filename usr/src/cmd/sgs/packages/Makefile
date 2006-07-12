@@ -75,10 +75,12 @@ PKGDIRS=	../libcrle \
 		../libld \
 		../elfdump \
 		../crle \
+		../dump \
 		../lari \
 		../ld \
 		../ldd \
 		../ldprof \
+		../nm \
 		../mcs \
 		../moe \
 		../pvs

@@ -35,13 +35,13 @@
 #include	"_conv.h"
 #include	"dynamic_msg.h"
 
-#define	POSSZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_DFP_LAZYLOAD_SIZE + \
-		MSG_DFP_GROUPPERM_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+#define	POSSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_DFP_LAZYLOAD_ALT_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DFP_GROUPPERM_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 const char *
-conv_dyn_posflag1(Xword flags)
+conv_dyn_posflag1(Xword flags, int fmt_flags)
 {
 	static char	string[POSSZ];
 	static Val_desc vda[] = {
@@ -49,27 +49,38 @@ conv_dyn_posflag1(Xword flags)
 		{ DF_P1_GROUPPERM,	MSG_ORIG(MSG_DFP_GROUPPERM) },
 		{ 0,			0 }
 	};
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static Val_desc vda_alt[] = {
+		{ DF_P1_LAZYLOAD,	MSG_ORIG(MSG_DFP_LAZYLOAD_ALT) },
+		{ DF_P1_GROUPPERM,	MSG_ORIG(MSG_DFP_GROUPPERM) },
+		{ 0,			0 }
+	};
+	static CONV_EXPN_FIELD_ARG conv_arg_alt = { string, sizeof (string),
+		vda_alt, NULL, 0, 0, MSG_ORIG(MSG_STR_EMPTY), NULL,
+		MSG_ORIG(MSG_STR_EMPTY) };
+
+	CONV_EXPN_FIELD_ARG *arg;
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), POSSZ);
-	if (conv_expn_field(string, POSSZ, vda, flags, flags, 0, 0))
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), POSSZ);
+	arg = (fmt_flags & CONV_FMT_ALTDUMP) ? &conv_arg_alt : &conv_arg;
+	arg->oflags = arg->rflags = flags;
+	(void) conv_expn_field(arg);
 
 	return ((const char *)string);
 }
 
-#define	FLAGSZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_DF_ORIGIN_SIZE + \
-		MSG_DF_SYMBOLIC_SIZE + \
-		MSG_DF_TEXTREL_SIZE + \
-		MSG_DF_BIND_NOW_SIZE + \
-		MSG_DF_STATIC_TLS_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+#define	FLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_DF_ORIGIN_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF_SYMBOLIC_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF_TEXTREL_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF_BIND_NOW_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF_STATIC_TLS_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 const char *
-conv_dyn_flag(Xword flags)
+conv_dyn_flag(Xword flags, int fmt_flags)
 {
 	static char	string[FLAGSZ];
 	static Val_desc vda[] = {
@@ -80,48 +91,53 @@ conv_dyn_flag(Xword flags)
 		{ DF_STATIC_TLS,	MSG_ORIG(MSG_DF_STATIC_TLS) },
 		{ 0,			0 }
 	};
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FLAGSZ);
-	if (conv_expn_field(string, FLAGSZ, vda, flags, flags, 0, 0))
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAGSZ);
+	conv_arg.oflags = conv_arg.rflags = flags;
+	if (fmt_flags & CONV_FMT_ALTDUMP) {
+		conv_arg.prefix = conv_arg.suffix = MSG_ORIG(MSG_STR_EMPTY);
+	} else {
+		conv_arg.prefix = conv_arg.suffix = NULL;
+	}
+	(void) conv_expn_field(&conv_arg);
 
 	return ((const char *)string);
 }
 
-#define	FLAG1SZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_DF1_NOW_SIZE + \
-		MSG_DF1_GLOBAL_SIZE + \
-		MSG_DF1_GROUP_SIZE + \
-		MSG_DF1_NODELETE_SIZE + \
-		MSG_DF1_LOADFLTR_SIZE + \
-		MSG_DF1_INITFIRST_SIZE + \
-		MSG_DF1_NOOPEN_SIZE + \
-		MSG_DF1_ORIGIN_SIZE + \
-		MSG_DF1_DIRECT_SIZE + \
-		MSG_DF1_TRANS_SIZE + \
-		MSG_DF1_INTERPOSE_SIZE + \
-		MSG_DF1_NODEFLIB_SIZE + \
-		MSG_DF1_NODUMP_SIZE + \
-		MSG_DF1_CONFALT_SIZE + \
-		MSG_DF1_ENDFILTEE_SIZE + \
-		MSG_DF1_DISPRELPND_SIZE + \
-		MSG_DF1_DISPRELDNE_SIZE + \
-		MSG_DF1_NODIRECT_SIZE + \
-		MSG_DF1_IGNMULDEF_SIZE + \
-		MSG_DF1_NOKSYMS_SIZE + \
-		MSG_DF1_NORELOC_SIZE + \
-		MSG_DF1_NOHDR_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+#define	FLAG1SZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_DF1_NOW_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_GLOBAL_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_GROUP_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_NODELETE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_LOADFLTR_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_INITFIRST_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_NOOPEN_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_ORIGIN_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_DIRECT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_TRANS_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_INTERPOSE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_NODEFLIB_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_NODUMP_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_CONFALT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_ENDFILTEE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_DISPRELPND_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_DISPRELDNE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_NODIRECT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_IGNMULDEF_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_NOKSYMS_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_NORELOC_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_NOHDR_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 const char *
 conv_dyn_flag1(Xword flags)
 {
 	static char	string[FLAG1SZ];
 	static Val_desc vda[] = {
-		{ DF_1_NOW,		MSG_ORIG(MSG_DF_ORIGIN) },
+		{ DF_1_NOW,		MSG_ORIG(MSG_DF1_NOW) },
 		{ DF_1_GLOBAL,		MSG_ORIG(MSG_DF1_GLOBAL) },
 		{ DF_1_GROUP,		MSG_ORIG(MSG_DF1_GROUP) },
 		{ DF_1_NODELETE,	MSG_ORIG(MSG_DF1_NODELETE) },
@@ -145,24 +161,24 @@ conv_dyn_flag1(Xword flags)
 		{ DF_1_NOHDR,		MSG_ORIG(MSG_DF1_NOHDR) },
 		{ 0,			0 }
 	};
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FLAG1SZ);
-	if (conv_expn_field(string, FLAG1SZ, vda, flags, flags, 0, 0))
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAG1SZ);
+	conv_arg.oflags = conv_arg.rflags = flags;
+	(void) conv_expn_field(&conv_arg);
 
 	return ((const char *)string);
 }
 
-#define	FEATSZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_DTF_PARINIT_SIZE + \
-		MSG_DTF_CONFEXP_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+#define	FEATSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_DTF_PARINIT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DTF_CONFEXP_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 const char *
-conv_dyn_feature1(Xword flags)
+conv_dyn_feature1(Xword flags, int fmt_flags)
 {
 	static char	string[FEATSZ];
 	static Val_desc vda[] = {
@@ -170,13 +186,18 @@ conv_dyn_feature1(Xword flags)
 		{ DTF_1_CONFEXP,	MSG_ORIG(MSG_DTF_CONFEXP) },
 		{ 0,			0 }
 	};
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FEATSZ);
-	if (conv_expn_field(string, FEATSZ, vda, flags, flags, 0, 0))
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FEATSZ);
+	conv_arg.oflags = conv_arg.rflags = flags;
+	if (fmt_flags & CONV_FMT_ALTDUMP) {
+		conv_arg.prefix = conv_arg.suffix = MSG_ORIG(MSG_STR_EMPTY);
+	} else {
+		conv_arg.prefix = conv_arg.suffix = NULL;
+	}
+	(void) conv_expn_field(&conv_arg);
 
 	return ((const char *)string);
 }
@@ -320,11 +341,11 @@ conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 	}
 }
 
-#define	BINDTSZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_BND_NEEDED_SIZE + \
-		MSG_BND_REFER_SIZE + \
-		MSG_BND_FILTER_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+#define	BINDTSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_BND_NEEDED_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_BND_REFER_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_BND_FILTER_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 const char *
 conv_bnd_type(uint_t flags)
@@ -336,13 +357,13 @@ conv_bnd_type(uint_t flags)
 		{ BND_FILTER,		MSG_ORIG(MSG_BND_FILTER) },
 		{ 0,			0 }
 	};
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_STR_EMPTY));
 
-	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), BINDTSZ);
-	if (conv_expn_field(string, BINDTSZ, vda, flags, flags, 0, 0))
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), BINDTSZ);
+	conv_arg.oflags = conv_arg.rflags = flags;
+	(void) conv_expn_field(&conv_arg);
 
 	return ((const char *)string);
 }
@@ -353,10 +374,10 @@ conv_bnd_type(uint_t flags)
  *	LML_FLG_OBJDELETED, or
  *	LML_FLG_ATEXIT.
  */
-#define	BINDOSZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_BND_ADDED_SIZE + \
-		MSG_BND_REEVAL_SIZE + \
-		MSG_GBL_CSQBRKT_SIZE
+#define	BINDOSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_BND_ADDED_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_BND_REEVAL_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 const char *
 conv_bnd_obj(uint_t flags)
@@ -369,6 +390,7 @@ conv_bnd_obj(uint_t flags)
 		{ LML_FLG_ATEXIT,	MSG_ORIG(MSG_BND_ATEXIT) },
 		{ 0,			0 }
 	};
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
 
 	if ((flags & (LML_FLG_OBJADDED | LML_FLG_OBJREEVAL |
 	    LML_FLG_OBJDELETED | LML_FLG_ATEXIT)) == 0)
@@ -376,11 +398,11 @@ conv_bnd_obj(uint_t flags)
 
 	/*
 	 * Note, we're not worried about unknown flags for this family, only
-	 * the selected flags are of interest.
+	 * the selected flags are of interest, so we leave conv_arg.rflags
+	 * set to 0.
 	 */
-	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), BINDOSZ);
-	if (conv_expn_field(string, BINDOSZ, vda, flags, 0, 0, 0))
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), BINDOSZ);
+	conv_arg.oflags = flags;
+	(void) conv_expn_field(&conv_arg);
 
 	return ((const char *)string);
 }

@@ -369,6 +369,7 @@ print_rela(Elf *elf_file, SCNTAB *p_scns, Elf_Data *rdata, Elf_Data *sym_data,
 					(void) sprintf(tmpstr, "%%-%ds",
 						/* LINTED */
 						(int)len);
+					/*LINTED: E_SEC_PRINTF_VAR_FMT*/
 					(void) printf(tmpstr, sym_name);
 				} else
 					(void) printf("%-22s", sym_name);
@@ -665,6 +666,7 @@ print_shdr(Elf *elf_file, SCNTAB *s, int num_scns, int index)
 			EC_WORD(p->p_shdr.sh_type),
 			EC_XWORD(p->p_shdr.sh_flags));
 		} else {
+			/*LINTED: E_SEC_PRINTF_VAR_FMT*/
 			(void) printf(conv_sec_type(p_ehdr.e_machine,
 				p->p_shdr.sh_type, DUMP_CONVFMT));
 			(void) printf("    ");
@@ -1059,57 +1061,6 @@ dump_symbol_table(Elf *elf_file, SCNTAB *p_symtab, char *filename)
 
 
 /*
- * The items in a dynamic section are displayed using a small set
- * of standard output styles. To reduce code size and promote
- * consistency, the following family of functions, all named
- * with the prefix "pdynitem_", are used by dump_dynamic().
- *
- * entry:
- *	name - Name of element
- *	p_dyn - Pointer to struct describing element
- *	elf_file, link - Used to look up a string from the string table
- *		in the ELF file.
- *	bitdesc - Pointer to NULL terminated array of PDYNITEM_BITDESC
- *		structs describing the allowed bit values.
- */
-#define	pdyn_Fmtptr		"%#llx"
-
-/*
- * Arrays of this type are used for the values argument to
- * pdynitem_bitmask(). It maps a bit value to a human readable
- * name string. The final element of such an array must always
- * be NULL.
- */
-typedef struct {
-	int bit;		/* Bit Value */
-	const char *name;	/* Name corresponding to bit */
-} PDYNITEM_BITDESC;
-
-void
-pdynitem_bitmask(GElf_Dyn *p_dyn, PDYNITEM_BITDESC *bitdesc)
-{
-	char buf[512];
-
-	if (v_flag) {
-		buf[0] = '\0';
-		for (; bitdesc->bit; bitdesc++) {
-			if (p_dyn->d_un.d_val &	bitdesc->bit)
-				(void) strlcat(buf, bitdesc->name,
-					sizeof (buf));
-		}
-		if (buf[0]) {
-			(void) printf("%s", buf);
-			return;
-		}
-	}
-
-	/* We don't have a string, or one is not requested. Show address */
-	(void) printf(pdyn_Fmtptr, EC_ADDR(p_dyn->d_un.d_ptr));
-
-}
-
-
-/*
  * Print dynamic linking information.  Input is an ELF
  * file descriptor, the SCNTAB structure, the number of
  * sections, and the filename.
@@ -1117,64 +1068,7 @@ pdynitem_bitmask(GElf_Dyn *p_dyn, PDYNITEM_BITDESC *bitdesc)
 static void
 dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 {
-	/*
-	 * Map dynamic bit fields to readable strings. These tables
-	 * must be kept in sync with the definitions in <link.h>.
-	 *
-	 * The string displayed is always the same as the name used
-	 * for the constant, with the prefix removed. The BITDESC macro
-	 * generate both PDYNITEM_BITDESC fields from the base name.
-	 */
-#define	BITDESC(prefix, item) { prefix ## item, #item " " }
-
-	static PDYNITEM_BITDESC dyn_dt_flags[] = {	/* DT_FLAGS */
-		BITDESC(DF_, ORIGIN),
-		BITDESC(DF_, SYMBOLIC),
-		BITDESC(DF_, TEXTREL),
-		BITDESC(DF_, BIND_NOW),
-		BITDESC(DF_, STATIC_TLS),
-		{ 0 }
-	};
-
-	static PDYNITEM_BITDESC dyn_dt_flags_1[] = {	/* DT_FLAGS_1 */
-		BITDESC(DF_1_, NOW),
-		BITDESC(DF_1_, GLOBAL),
-		BITDESC(DF_1_, GROUP),
-		BITDESC(DF_1_, NODELETE),
-		BITDESC(DF_1_, LOADFLTR),
-		BITDESC(DF_1_, INITFIRST),
-		BITDESC(DF_1_, NOOPEN),
-		BITDESC(DF_1_, ORIGIN),
-		BITDESC(DF_1_, DIRECT),
-		BITDESC(DF_1_, TRANS),
-		BITDESC(DF_1_, INTERPOSE),
-		BITDESC(DF_1_, NODEFLIB),
-		BITDESC(DF_1_, NODUMP),
-		BITDESC(DF_1_, CONFALT),
-		BITDESC(DF_1_, ENDFILTEE),
-		BITDESC(DF_1_, DISPRELDNE),
-		BITDESC(DF_1_, DISPRELPND),
-		BITDESC(DF_1_, NODIRECT),
-		BITDESC(DF_1_, IGNMULDEF),
-		BITDESC(DF_1_, NOKSYMS),
-		BITDESC(DF_1_, NOHDR),
-		BITDESC(DF_1_, NORELOC),
-		{ 0 }
-	};
-
-	static PDYNITEM_BITDESC dyn_dt_feature_1[] = {	/* DT_FEATURE_1 */
-		BITDESC(DTF_1_, PARINIT),
-		BITDESC(DTF_1_, CONFEXP),
-		{ 0 }
-	};
-
-	static PDYNITEM_BITDESC dyn_dt_posflag_1[] = {	/* DT_POSFLAG_1 */
-		BITDESC(DF_P1_, LAZYLOAD),
-		BITDESC(DF_P1_, GROUPPERM),
-		{ 0 }
-	};
-
-#undef	BITDESC
+#define	pdyn_Fmtptr	"%#llx"
 
 	Elf_Data	*dyn_data;
 	GElf_Dyn	p_dyn;
@@ -1184,7 +1078,9 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 	int		lib_scns = num_scns;
 	SCNTAB		*l_scns = p_scns;
 	int		header_num = 0;
-	char 		*str;
+	const char	*str;
+
+	(void) gelf_getehdr(elf_file, &p_ehdr);
 
 	if (!p_flag)
 		(void) printf("\n  **** DYNAMIC SECTION INFORMATION ****\n");
@@ -1314,16 +1210,39 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			 * Items that are bitmasks
 			 */
 			case DT_FLAGS:
-				pdynitem_bitmask(&p_dyn, dyn_dt_flags);
-				break;
 			case DT_FEATURE_1:
-				pdynitem_bitmask(&p_dyn, dyn_dt_feature_1);
-				break;
 			case DT_POSFLAG_1:
-				pdynitem_bitmask(&p_dyn, dyn_dt_posflag_1);
-				break;
 			case DT_FLAGS_1:
-				pdynitem_bitmask(&p_dyn, dyn_dt_flags_1);
+				str = NULL;
+				if (v_flag) {
+					switch (p_dyn.d_tag) {
+					case DT_FLAGS:
+						str = conv_dyn_flag(
+							p_dyn.d_un.d_val,
+							DUMP_CONVFMT);
+					break;
+					case DT_FEATURE_1:
+						str = conv_dyn_feature1(
+							p_dyn.d_un.d_val,
+							DUMP_CONVFMT);
+						break;
+					case DT_POSFLAG_1:
+						str = conv_dyn_posflag1(
+							p_dyn.d_un.d_val,
+							DUMP_CONVFMT);
+						break;
+					case DT_FLAGS_1:
+						str = conv_dyn_flag1(
+							p_dyn.d_un.d_val);
+						break;
+					}
+				}
+				if (str) {	/* Show as string */
+					(void) printf("%s", str);
+				} else {	/* Numeric form */
+					(void) printf(pdyn_Fmtptr,
+						EC_ADDR(p_dyn.d_un.d_ptr));
+				}
 				break;
 
 			/*
@@ -1348,7 +1267,6 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 	/*
 	 * Check for existence of static shared library information.
 	 */
-	(void) gelf_getehdr(elf_file, &p_ehdr);
 	while (header_num < p_ehdr.e_phnum) {
 		(void) gelf_getphdr(elf_file, header_num, &p_phdr);
 		if (p_phdr.p_type == PT_SHLIB) {
@@ -1361,6 +1279,7 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 		}
 		header_num++;
 	}
+#undef	pdyn_Fmtptr
 }
 
 /*
@@ -1478,11 +1397,7 @@ dump_elf_header(Elf *elf_file, char *filename, GElf_Ehdr * elf_head_p)
 		(void) printf("[0]\t%u\t%llu\t", EC_WORD(shdr0.sh_type),
 			EC_XWORD(shdr0.sh_flags));
 
-		/*
-		 * LINTED - field and EC_XWORD cause -#*llu complaints that
-		 * even this comment can't shutup.
-		 */
-		(void) printf("%-#*llx %-#*llx%-#*llu%s%-#*u\n",
+		(void) printf("%-#*llx %-#*llx%-*llu%s%-*u\n",
 			field, EC_ADDR(shdr0.sh_addr),
 			field, EC_OFF(shdr0.sh_offset),
 			field, EC_XWORD(shdr0.sh_size),

@@ -46,7 +46,7 @@ conv_cap_1(Xword val, char *str, size_t len, Half mach,
 	len -= _len;
 	str += _len;
 
-	if ((*fptr)(val, str, len, CAP_FMT_DBLSPACE, mach) != 0)
+	if ((*fptr)(val, str, len, CAP_FMT_SNGSPACE, mach) != 0)
 		return (0);
 
 	_len = strlen(str);

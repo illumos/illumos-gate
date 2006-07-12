@@ -38,6 +38,7 @@
 !include prototype_com
 
 d none $SGSDIR/lib/sparcv9=lib/sparcv9 755 root bin
+s none $SGSDIR/lib/64=sparcv9
 f none $SGSDIR/lib/sparcv9/ld.so.1=lib/sparcv9/ld.so.1 755 root bin
 f none $SGSDIR/lib/sparcv9/libdl.so.1=lib/sparcv9/libdl.so.1 755 root bin
 s none $SGSDIR/lib/sparcv9/libdl.so=libdl.so.1
@@ -53,8 +54,10 @@ f none $SGSDIR/usr/bin/sparcv9/crle=usr/bin/sparcv9/crle 555 root bin
 f none $SGSDIR/usr/bin/sparcv9/moe=usr/bin/sparcv9/moe 555 root bin
 f none $SGSDIR/usr/bin/sparcv9/pvs=usr/bin/sparcv9/pvs 555 root bin
 d none $SGSDIR/usr/ccs/bin/sparcv9 755 root bin
+f none $SGSDIR/usr/ccs/bin/sparcv9/dump=usr/ccs/bin/sparcv9/dump 0555 root bin
 f none $SGSDIR/usr/ccs/bin/sparcv9/elfdump=usr/ccs/bin/sparcv9/elfdump 0555 root bin
 f none $SGSDIR/usr/ccs/bin/sparcv9/ld=usr/ccs/bin/sparcv9/ld 755 root bin
+f none $SGSDIR/usr/ccs/bin/sparcv9/nm=usr/ccs/bin/sparcv9/nm 0555 root bin
 f none $SGSDIR/usr/ccs/bin/sparcv9/mcs=usr/ccs/bin/sparcv9/mcs 0555 root bin
 l none $SGSDIR/usr/ccs/bin/sparcv9/strip=../../../../usr/ccs/bin/sparcv9/mcs
 f none $SGSDIR/usr/lib/ld.so=usr/lib/ld.so 755 root bin

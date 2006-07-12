@@ -29,17 +29,17 @@
 #include	"_conv.h"
 #include	"dl_msg.h"
 
-#define	MODESZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_RTLD_LAZY_SIZE + \
-		MSG_RTLD_GLOBAL_SIZE + \
-		MSG_RTLD_NOLOAD_SIZE + \
-		MSG_RTLD_PARENT_SIZE + \
-		MSG_RTLD_GROUP_SIZE + \
-		MSG_RTLD_WORLD_SIZE + \
-		MSG_RTLD_NODELETE_SIZE + \
-		MSG_RTLD_FIRST_SIZE + \
-		MSG_RTLD_CONFGEN_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+#define	MODESZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_RTLD_LAZY_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_RTLD_GLOBAL_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_RTLD_NOLOAD_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_RTLD_PARENT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_RTLD_GROUP_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_RTLD_WORLD_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_RTLD_NODELETE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_RTLD_FIRST_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_RTLD_CONFGEN_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 
 /*
@@ -59,33 +59,42 @@ conv_dl_mode(int mode, int fabricate)
 		{ RTLD_CONFGEN,		MSG_ORIG(MSG_RTLD_CONFGEN) },
 		{ 0,			0 }
 	};
-	int		_mode = mode;
+	static const char *leading_str_arr[3];
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda,
+		leading_str_arr };
 
-	(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
+	const char **lstr = leading_str_arr;
+
+	conv_arg.oflags = conv_arg.rflags = mode;
+
 
 	if (mode & RTLD_NOW) {
-	    if (strlcat(string, MSG_ORIG(MSG_RTLD_NOW), MODESZ) >= MODESZ)
-		return (conv_invalid_val(string, MODESZ, mode, 0));
+		*lstr++ = MSG_ORIG(MSG_RTLD_NOW);
 	} else if (fabricate) {
-	    if (strlcat(string, MSG_ORIG(MSG_RTLD_LAZY), MODESZ) >= MODESZ)
-		return (conv_invalid_val(string, MODESZ, mode, 0));
+		*lstr++ = MSG_ORIG(MSG_RTLD_LAZY);
 	}
 	if (mode & RTLD_GLOBAL) {
-	    if (strlcat(string, MSG_ORIG(MSG_RTLD_GLOBAL), MODESZ) >= MODESZ)
-		return (conv_invalid_val(string, MODESZ, mode, 0));
+		*lstr++ = MSG_ORIG(MSG_RTLD_GLOBAL);
 	} else if (fabricate) {
-	    if (strlcat(string, MSG_ORIG(MSG_RTLD_LOCAL), MODESZ) >= MODESZ)
-		return (conv_invalid_val(string, MODESZ, mode, 0));
+		*lstr++ = MSG_ORIG(MSG_RTLD_LOCAL);
 	}
-	_mode &= ~(RTLD_LAZY | RTLD_NOW | RTLD_GLOBAL);
+	*lstr = NULL;
+	conv_arg.oflags = mode;
+	conv_arg.rflags = mode & ~(RTLD_LAZY | RTLD_NOW | RTLD_GLOBAL);
 
-	if (conv_expn_field(string, MODESZ, vda, mode, _mode, 0, 0))
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), MODESZ);
+	(void) conv_expn_field(&conv_arg);
 
 	return ((const char *)string);
 }
 
-#define	FLAGSZ	MSG_GBL_OSQBRKT_SIZE + \
+/*
+ * Note: We can use two different sets of prefix/separator/suffix
+ * strings in conv_dl_flag(), depending on the value of the separator
+ * argument. To size the buffer, I use the default prefix and suffix
+ * sizes, and the alternate separator size, because they are larger.
+ */
+
+#define	FLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
 		MSG_RTLD_REL_RELATIVE_SIZE +	MSG_GBL_SEP_SIZE + \
 		MSG_RTLD_REL_EXEC_SIZE +	MSG_GBL_SEP_SIZE + \
 		MSG_RTLD_REL_DEPENDS_SIZE +	MSG_GBL_SEP_SIZE + \
@@ -96,7 +105,7 @@ conv_dl_mode(int mode, int fabricate)
 		MSG_RTLD_STRIP_SIZE +		MSG_GBL_SEP_SIZE + \
 		MSG_RTLD_NOHEAP_SIZE +		MSG_GBL_SEP_SIZE + \
 		MSG_RTLD_CONFSET_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 /*
  * String conversion routine for dldump() flags.
@@ -104,7 +113,7 @@ conv_dl_mode(int mode, int fabricate)
  * we build a "|" separated string.
  */
 const char *
-conv_dl_flag(int flags, int separator)
+conv_dl_flag(int flags, int fmt_flags)
 {
 	static	char	string[FLAGSZ];
 	static Val_desc vda[] = {
@@ -120,30 +129,32 @@ conv_dl_flag(int flags, int separator)
 		{ RTLD_CONFSET,		MSG_ORIG(MSG_RTLD_CONFSET) },
 		{ 0,			0 }
 	};
-	int		_flags = flags, element = 0;
+	static const char *leading_str_arr[2];
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda,
+		leading_str_arr };
+
+	const char **lstr = leading_str_arr;
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	if (separator)
-		(void) strlcpy(string, MSG_ORIG(MSG_GBL_QUOTE), FLAGSZ);
-	else
-		(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FLAGSZ);
+
+	if (fmt_flags & CONV_FMT_ALTCRLE) {
+		conv_arg.prefix = conv_arg.suffix = MSG_ORIG(MSG_GBL_QUOTE);
+		conv_arg.sep = MSG_ORIG(MSG_GBL_SEP);
+	} else {		/* Use default delimiters */
+		conv_arg.prefix = conv_arg.suffix =
+			conv_arg.sep = NULL;
+	}
 
 	if ((flags & RTLD_REL_ALL) == RTLD_REL_ALL) {
-	    if (strlcat(string, MSG_ORIG(MSG_RTLD_REL_ALL), FLAGSZ) >= FLAGSZ)
-		return (conv_invalid_val(string, FLAGSZ, flags, 0));
-	    element++;
-	    flags = _flags &= ~RTLD_REL_ALL;
+		*lstr++ = MSG_ORIG(MSG_RTLD_REL_ALL);
+	    flags &= ~RTLD_REL_ALL;
 	}
+	*lstr = NULL;
+	conv_arg.oflags = conv_arg.rflags = flags;
 
-	if (conv_expn_field(string, FLAGSZ, vda, flags, _flags,
-	    (separator ? MSG_ORIG(MSG_GBL_SEP) : 0), element)) {
-		if (separator)
-		    (void) strlcat(string, MSG_ORIG(MSG_GBL_QUOTE), FLAGSZ);
-		else
-		    (void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAGSZ);
-	}
+	(void) conv_expn_field(&conv_arg);
 
 	return ((const char *)string);
 }

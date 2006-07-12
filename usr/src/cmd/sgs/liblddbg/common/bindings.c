@@ -85,6 +85,7 @@ Dbg_bind_global(Rt_map *flmp, Addr fabs, Off foff, Xword pltndx,
     Pltbindtype pbtype, Rt_map *tlmp, Addr tabs, Off toff,
     const char *sym, uint_t binfo)
 {
+	static char binfostr[BINFOSZ];
 	static Val_desc vda[] = {
 		{ DBG_BINFO_DIRECT,	MSG_ORIG(MSG_BINFO_DIRECT) },
 		{ DBG_BINFO_INTERPOSE,	MSG_ORIG(MSG_BINFO_INTERPOSE) },
@@ -93,7 +94,10 @@ Dbg_bind_global(Rt_map *flmp, Addr fabs, Off foff, Xword pltndx,
 		{ DBG_BINFO_PLTADDR,	MSG_ORIG(MSG_BINFO_PLTADDR) },
 		{ 0,			0 }
 	};
-	char		binfostr[BINFOSZ];
+	static CONV_EXPN_FIELD_ARG conv_arg = { binfostr, sizeof (binfostr),
+		vda, NULL, 0, 0, MSG_ORIG(MSG_BINFO_START),
+		MSG_ORIG(MSG_BINFO_SEP), MSG_ORIG(MSG_BINFO_END) };
+
 	const char	*ffile = NAME(flmp);
 	const char	*tfile = NAME(tlmp);
 	Lm_list		*lml = LIST(flmp);
@@ -114,13 +118,11 @@ Dbg_bind_global(Rt_map *flmp, Addr fabs, Off foff, Xword pltndx,
 	binfo &= ~DBG_BINFO_FOUND;
 	binfo &= DBG_BINFO_MSK;
 	if (binfo) {
-		(void) strlcpy(binfostr, MSG_ORIG(MSG_BINFO_START), BINFOSZ);
-
-		if (conv_expn_field(binfostr, BINFOSZ, vda, binfo, binfo,
-		    MSG_ORIG(MSG_BINFO_SEP), 0))
-			(void) strcat(binfostr, MSG_ORIG(MSG_BINFO_END));
-	} else
+		conv_arg.oflags = conv_arg.rflags = binfo;
+		(void) conv_expn_field(&conv_arg);
+	} else {
 		binfostr[0] = '\0';
+	}
 
 	if (pltndx != (Xword)-1) {
 		const char	*pltstring;

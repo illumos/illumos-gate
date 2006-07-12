@@ -380,7 +380,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		if (head->ch_dlflags &&
 		    (head->ch_dlflags != RTLD_REL_RELATIVE)) {
 			(void) snprintf(_cmd, PATH_MAX, MSG_ORIG(MSG_CMD_FLAGS),
-			    conv_dl_flag(head->ch_dlflags, 1));
+			    conv_dl_flag(head->ch_dlflags, CONV_FMT_ALTCRLE));
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 			if (list_append(&cmdline, cmd) == 0)
 				return (INSCFG_RET_FAIL);

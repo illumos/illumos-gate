@@ -59,8 +59,10 @@ LINTLDIRS=	../libld \
 		../sgsdemangler \
 		../elfdump \
 		../crle \
+		../dump \
 		../ld \
 		../ldd \
+		../nm \
 		../mcs \
 		../moe \
 		../pvs

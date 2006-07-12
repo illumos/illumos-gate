@@ -35,3 +35,8 @@
 @ MSG_GBL_FMT_HEX_64	"0x%llx"
 @ MSG_GBL_FMT_HEXS_32	" 0x%lx "
 @ MSG_GBL_FMT_HEXS_64	" 0x%llx "
+
+
+@ MSG_GBL_OSQBRKT	"[ "
+@ MSG_GBL_CSQBRKT	" ]"
+@ MSG_GBL_SEP		" "

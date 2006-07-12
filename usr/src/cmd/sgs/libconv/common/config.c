@@ -32,17 +32,17 @@
 #include	"_conv.h"
 #include	"config_msg.h"
 
-#define	FEATSZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_CONF_EDLIBPATH_SIZE + \
-		MSG_CONF_ESLIBPATH_SIZE + \
-		MSG_CONF_ADLIBPATH_SIZE + \
-		MSG_CONF_ASLIBPATH_SIZE + \
-		MSG_CONF_DIRCFG_SIZE + \
-		MSG_CONF_OBJALT_SIZE + \
-		MSG_CONF_MEMRESV_SIZE + \
-		MSG_CONF_ENVS_SIZE + \
-		MSG_CONF_FLTR_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+#define	FEATSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_CONF_EDLIBPATH_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_ESLIBPATH_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_ADLIBPATH_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_ASLIBPATH_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_DIRCFG_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_OBJALT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_MEMRESV_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_ENVS_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_FLTR_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 /*
  * String conversion routine for configuration file information.
@@ -63,31 +63,30 @@ conv_config_feat(int features)
 		{ CONF_FLTR,		MSG_ORIG(MSG_CONF_FLTR) },
 		{ 0,			0 }
 	};
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
 
-	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FEATSZ);
-	if (conv_expn_field(string, FEATSZ, vda, features,
-	    features, 0, 0))
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FEATSZ);
+	conv_arg.oflags = conv_arg.rflags = features;
+	(void) conv_expn_field(&conv_arg);
 
 	return ((const char *)string);
 }
 
-#define	FLAGSZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_CONF_DIRENT_SIZE + \
-		MSG_CONF_ALLENTS_SIZE + \
-		MSG_CONF_NOEXIST_SIZE + \
-		MSG_CONF_EXEC_SIZE + \
-		MSG_CONF_ALTER_SIZE + \
-		MSG_CONF_OPTIONAL_SIZE + \
-		MSG_CONF_DUMP_SIZE + \
-		MSG_CONF_REALPATH_SIZE + \
-		MSG_CONF_NOALTER_SIZE + \
-		MSG_CONF_GROUP_SIZE + \
-		MSG_CONF_APP_SIZE + \
-		MSG_CONF_CMDLINE_SIZE + \
-		MSG_CONF_FILTER_SIZE + \
-		MSG_CONF_FILTEE_SIZE + \
-		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+#define	FLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_CONF_DIRENT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_ALLENTS_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_NOEXIST_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_EXEC_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_ALTER_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_OPTIONAL_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_DUMP_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_REALPATH_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_NOALTER_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_GROUP_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_APP_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_CMDLINE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_FILTER_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_CONF_FILTEE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 /*
  * String conversion routine for object flags.
@@ -112,27 +111,29 @@ conv_config_obj(ushort_t flags)
 		{ RTC_OBJ_FILTEE,	MSG_ORIG(MSG_CONF_FILTEE) },
 		{ 0,			0 }
 	};
-	ushort_t	_flags = flags;
+	static const char *leading_str_arr[2];
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda,
+		leading_str_arr };
+
+	const char **lstr = leading_str_arr;
 
 	if ((flags == 0) || (flags == RTC_OBJ_OPTINAL))
 		return (MSG_ORIG(MSG_GBL_NULL));
 
-	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FLAGSZ);
+	conv_arg.rflags = flags;
 
 	/*
 	 * Print an alternative-optional object simply as optional.
 	 */
 	if ((flags & (RTC_OBJ_ALTER | RTC_OBJ_OPTINAL)) ==
 	    (RTC_OBJ_ALTER | RTC_OBJ_OPTINAL)) {
-		if (strlcat(string, MSG_ORIG(MSG_CONF_OPTIONAL),
-		    FLAGSZ) >= FLAGSZ)
-			return (conv_invalid_val(string, FLAGSZ, flags, 0));
-		flags = _flags &= ~(RTC_OBJ_ALTER | RTC_OBJ_OPTINAL);
+		*lstr++ = MSG_ORIG(MSG_CONF_OPTIONAL);
+		conv_arg.rflags &= ~(RTC_OBJ_ALTER | RTC_OBJ_OPTINAL);
 	}
-	flags = _flags &= ~RTC_OBJ_OPTINAL;
+	*lstr = NULL;
+	conv_arg.oflags = conv_arg.rflags &= ~RTC_OBJ_OPTINAL;
 
-	if (conv_expn_field(string, FLAGSZ, vda, flags, _flags, 0, 0))
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAGSZ);
+	(void) conv_expn_field(&conv_arg);
 
 	return ((const char *)string);
 }
