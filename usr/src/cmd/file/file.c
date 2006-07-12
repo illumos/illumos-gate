@@ -981,67 +981,120 @@ print_elf_type(Elf *elf, GElf_Ehdr *ehdr, int format)
 static void
 print_elf_machine(int machine)
 {
-	switch (machine) {
-	case EM_NONE:
-		(void) printf(" %s", gettext("unknown machine"));
-		break;
-	case EM_M32:
-		(void) printf(" %s", gettext("WE32100"));
-		break;
-	case EM_SPARC:
-		(void) printf(" %s", gettext("SPARC"));
-		break;
-	case EM_386:
-		(void) printf(" %s", gettext("80386"));
-		break;
-	case EM_68K:
-		(void) printf(" %s", gettext("M68000"));
-		break;
-	case EM_88K:
-		(void) printf(" %s", gettext("M88000"));
-		break;
-	case EM_486:
-		(void) printf(" %s", gettext("80486"));
-		break;
-	case EM_860:
-		(void) printf(" %s", gettext("i860"));
-		break;
-	case EM_MIPS:
-		(void) printf(" %s", gettext("MIPS RS3000 Big-Endian"));
-		break;
-	case EM_MIPS_RS3_LE:
-		(void) printf(" %s", gettext("MIPS RS3000 Little-Endian"));
-		break;
-	case EM_RS6000:
-		(void) printf(" %s", gettext("MIPS RS6000"));
-		break;
-	case EM_PA_RISC:
-		(void) printf(" %s", gettext("PA-RISC"));
-		break;
-	case EM_nCUBE:
-		(void) printf(" %s", gettext("nCUBE"));
-		break;
-	case EM_VPP500:
-		(void) printf(" %s", gettext("VPP500"));
-		break;
-	case EM_SPARC32PLUS:
-		(void) printf(" %s", gettext("SPARC32PLUS"));
-		break;
-	case EM_PPC:
-		(void) printf(" %s", gettext("PowerPC"));
-		break;
-	case EM_SPARCV9:
-		(void) printf(" %s", gettext("SPARCV9"));
-		break;
-	case EM_IA_64:
-		(void) printf(" %s", gettext("IA64"));
-		break;
-	case EM_AMD64:
-		(void) printf(" %s", gettext("AMD64"));
-		break;
-	default:
-		break;
-	}
+	/*
+	 * This table must be kept in sync with the EM_ constants
+	 * in /usr/include/sys/elf.h.
+	 */
+	static const char *mach_str[EM_NUM] = {
+		"unknown machine",		/* 0 - EM_NONE */
+		"WE32100",			/* 1 - EM_M32 */
+		"SPARC",			/* 2 - EM_SPARC */
+		"80386",			/* 3 - EM_386 */
+		"M68000",			/* 4 - EM_68K */
+		"M88000",			/* 5 - EM_88K */
+		"80486",			/* 6 - EM_486 */
+		"i860",				/* 7 - EM_860 */
+		"MIPS RS3000 Big-Endian",	/* 8 - EM_MIPS */
+		"S/370",			/* 9 - EM_S370 */
+		"MIPS RS3000 Little-Endian",	/* 10 - EM_MIPS_RS3_LE */
+		"MIPS RS6000",			/* 11 - EM_RS6000 */
+		NULL,				/* 12 - EM_UNKNOWN12 */
+		NULL,				/* 13 - EM_UNKNOWN13 */
+		NULL,				/* 14 - EM_UNKNOWN14 */
+		"PA-RISC",			/* 15 - EM_PA_RISC */
+		"nCUBE",			/* 16 - EM_nCUBE */
+		"VPP500",			/* 17 - EM_VPP500 */
+		"SPARC32PLUS",			/* 18 - EM_SPARC32PLUS */
+		"i960",				/* 19 - EM_960 */
+		"PowerPC",			/* 20 - EM_PPC */
+		"PowerPC64",			/* 21 - EM_PPC64 */
+		NULL,				/* 22 - EM_UNKNOWN22 */
+		NULL,				/* 23 - EM_UNKNOWN23 */
+		NULL,				/* 24 - EM_UNKNOWN24 */
+		NULL,				/* 25 - EM_UNKNOWN25 */
+		NULL,				/* 26 - EM_UNKNOWN26 */
+		NULL,				/* 27 - EM_UNKNOWN27 */
+		NULL,				/* 28 - EM_UNKNOWN28 */
+		NULL,				/* 29 - EM_UNKNOWN29 */
+		NULL,				/* 30 - EM_UNKNOWN30 */
+		NULL,				/* 31 - EM_UNKNOWN31 */
+		NULL,				/* 32 - EM_UNKNOWN32 */
+		NULL,				/* 33 - EM_UNKNOWN33 */
+		NULL,				/* 34 - EM_UNKNOWN34 */
+		NULL,				/* 35 - EM_UNKNOWN35 */
+		"V800",				/* 36 - EM_V800 */
+		"FR20",				/* 37 - EM_FR20 */
+		"RH32",				/* 38 - EM_RH32 */
+		"RCE",				/* 39 - EM_RCE */
+		"ARM",				/* 40 - EM_ARM */
+		"Alpha",			/* 41 - EM_ALPHA */
+		"S/390",			/* 42 - EM_SH */
+		"SPARCV9",			/* 43 - EM_SPARCV9 */
+		"Tricore",			/* 44 - EM_TRICORE */
+		"ARC",				/* 45 - EM_ARC */
+		"H8/300",			/* 46 - EM_H8_300 */
+		"H8/300H",			/* 47 - EM_H8_300H */
+		"H8S",				/* 48 - EM_H8S */
+		"H8/500",			/* 49 - EM_H8_500 */
+		"IA64",				/* 50 - EM_IA_64 */
+		"MIPS-X",			/* 51 - EM_MIPS_X */
+		"Coldfire",			/* 52 - EM_COLDFIRE */
+		"M68HC12",			/* 53 - EM_68HC12 */
+		"MMA",				/* 54 - EM_MMA */
+		"PCP",				/* 55 - EM_PCP */
+		"nCPU",				/* 56 - EM_NCPU */
+		"NDR1",				/* 57 - EM_NDR1 */
+		"Starcore",			/* 58 - EM_STARCORE */
+		"ME16",				/* 59 - EM_ME16 */
+		"ST100",			/* 60 - EM_ST100 */
+		"TINYJ",			/* 61 - EM_TINYJ */
+		"AMD64",			/* 62 - EM_AMD64 */
+		"PDSP",				/* 63 - EM_PDSP */
+		NULL,				/* 64 - EM_UNKNOWN64 */
+		NULL,				/* 65 - EM_UNKNOWN65 */
+		"FX66",				/* 66 - EM_FX66 */
+		"ST9 PLUS",			/* 67 - EM_ST9PLUS */
+		"ST7",				/* 68 - EM_ST7 */
+		"68HC16",			/* 69 - EM_68HC16 */
+		"68HC11",			/* 70 - EM_68HC11 */
+		"68H08",			/* 71 - EM_68HC08 */
+		"68HC05",			/* 72 - EM_68HC05 */
+		"SVX",				/* 73 - EM_SVX */
+		"ST19",				/* 74 - EM_ST19 */
+		"VAX",				/* 75 - EM_VAX */
+		"CRIS",				/* 76 - EM_CRIS */
+		"Javelin",			/* 77 - EM_JAVELIN */
+		"Firepath",			/* 78 - EM_FIREPATH */
+		"ZSP",				/* 79 - EM_ZSP */
+		"MMIX",				/* 80 - EM_MMIX */
+		"HUANY",			/* 81 - EM_HUANY */
+		"Prism",			/* 82 - EM_PRISM */
+		"AVR",				/* 83 - EM_AVR */
+		"FR30",				/* 84 - EM_FR30 */
+		"D10V",				/* 85 - EM_D10V */
+		"D30V",				/* 86 - EM_D30V */
+		"V850",				/* 87 - EM_V850 */
+		"M32R",				/* 88 - EM_M32R */
+		"MN10300",			/* 89 - EM_MN10300 */
+		"MN10200",			/* 90 - EM_MN10200 */
+		"picoJava",			/* 91 - EM_PJ */
+		"OpenRISC",			/* 92 - EM_OPENRISC */
+		"Tangent-A5",			/* 93 - EM_ARC_A5 */
+		"Xtensa"			/* 94 - EM_XTENSA */
+	};
+	/* If new machine is added, refuse to compile until we're updated */
+#if EM_NUM != 95
+#error "Number of known ELF machine constants has changed"
+#endif
+
+	const char *str;
+
+	if ((machine < EM_NONE) || (machine >= EM_NUM))
+		machine = EM_NONE;
+
+	str = mach_str[machine];
+	if (str)
+		(void) printf(" %s", str);
 }
 
 static void
@@ -1049,10 +1102,10 @@ print_elf_datatype(int datatype)
 {
 	switch (datatype) {
 	case ELFDATA2LSB:
-		(void) printf(" %s", gettext("LSB"));
+		(void) printf(" LSB");
 		break;
 	case ELFDATA2MSB:
-		(void) printf(" %s", gettext("MSB"));
+		(void) printf(" MSB");
 		break;
 	default:
 		break;
