@@ -333,12 +333,17 @@ zfs_refresh_properties(vfs_t *vfsp)
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
 
+	/*
+	 * Remount operations default to "rw" unless "ro" is explicitly
+	 * specified.
+	 */
 	if (vfs_optionisset(vfsp, MNTOPT_RO, NULL)) {
 		readonly_changed_cb(zfsvfs, B_TRUE);
-	} else if (vfs_optionisset(vfsp, MNTOPT_RW, NULL)) {
-		if (dmu_objset_is_snapshot(zfsvfs->z_os))
-			return (EROFS);
-		readonly_changed_cb(zfsvfs, B_FALSE);
+	} else {
+		if (!dmu_objset_is_snapshot(zfsvfs->z_os))
+			readonly_changed_cb(zfsvfs, B_FALSE);
+		else if (vfs_optionisset(vfsp, MNTOPT_RW, NULL))
+			    return (EROFS);
 	}
 
 	if (vfs_optionisset(vfsp, MNTOPT_NOSUID, NULL)) {
