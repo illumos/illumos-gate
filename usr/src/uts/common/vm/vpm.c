@@ -732,7 +732,7 @@ vpm_pagecreate(
 	int i;
 	ASSERT(nseg >= MINVMAPS && nseg < MAXVMAPS);
 
-	for (i = 0; len > 0; len -= MIN(len, PAGESIZE), i++) {
+	for (i = 0; len > 0; len -= PAGESIZE, i++) {
 		struct vpmap *vpm;
 
 
@@ -832,12 +832,15 @@ vpm_map_pages(
 	if (vp->v_type == VBLK)
 		vp = common_specvp(vp);
 
+	/*
+	 * round up len to a multiple of PAGESIZE.
+	 */
+	len = ((off + len - baseoff + PAGESIZE - 1) & (uintptr_t)PAGEMASK);
 
 	if (!fetchpage)
 		return (vpm_pagecreate(vp, baseoff, len, vml, nseg, newpage));
 
-	for (i = 0; len > 0; len -= MIN(len, PAGESIZE), i++,
-						pplist[i] = NULL) {
+	for (i = 0; len > 0; len -= PAGESIZE, i++, pplist[i] = NULL) {
 
 		pp = page_lookup(vp, baseoff, SE_SHARED);
 
@@ -863,7 +866,7 @@ vpm_map_pages(
 			base = segkpm_create_va(baseoff);
 
 			error = VOP_GETPAGE(vp, baseoff, len, &prot, &pplist[i],
-			roundup(len, PAGESIZE), segkmap, base, rw, CRED());
+			len, segkmap, base, rw, CRED());
 			if (error) {
 				VPM_DEBUG(vpmd_getpagefailed);
 				pplist[i] = NULL;

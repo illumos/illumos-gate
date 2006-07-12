@@ -1188,9 +1188,9 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 				/*
 				 * Flush pages.
 				 */
-				(void) vpm_sync_pages(vp, off, n, flags);
+				error = vpm_sync_pages(vp, off, n, flags);
 			} else {
-				(void) segmap_release(segkmap, base, flags);
+				error = segmap_release(segkmap, base, flags);
 			}
 			/*
 			 * If the operation failed and is synchronous,
