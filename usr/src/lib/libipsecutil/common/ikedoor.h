@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,12 @@ extern "C" {
 #include <net/pfkeyv2.h>
 #include <door.h>
 
+/*
+ * This version number is intended to stop the calling process from
+ * getting confused if a structure is changed and a mismatch occurs.
+ * This should be incremented each time a structure is changed.
+ */
+#define	DOORVER 1
 #define	DOORNM	"/var/run/ike_door"
 
 
@@ -70,6 +75,8 @@ typedef enum {
 	IKE_SVC_WRITE_PS,
 
 	IKE_SVC_DBG_RBDUMP,
+
+	IKE_SVC_GET_DEFS,
 
 	IKE_SVC_ERROR
 } ike_svccmd_t;
@@ -147,6 +154,24 @@ typedef struct {
 	char		st_pkcs11_libname[PATH_MAX];
 } ike_stats_t;
 
+/* structure used to pass default values used by in.iked back to ikeadm */
+typedef struct {
+	uint32_t	rule_p1_lifetime_secs;
+	uint32_t	rule_p1_minlife;
+	uint32_t	rule_p1_nonce_len;
+	uint32_t	rule_p2_lifetime_secs;
+	uint32_t	rule_p2_softlife_secs;
+	uint32_t	rule_p2_lifetime_kb;
+	uint32_t	rule_p2_softlife_kb;
+	uint32_t	rule_p2_minlife;
+	uint32_t	rule_p2_def_minlife;
+	uint32_t	rule_p2_nonce_len;
+	uint32_t	rule_p2_pfs;
+	uint32_t	rule_p2_minsoft;
+	uint32_t	rule_max_certs;
+	uint32_t	rule_ike_port;
+	uint32_t	rule_natt_port;
+} ike_defaults_t;
 
 /* data formatting structures for P1 SA dumps */
 typedef struct {
@@ -302,7 +327,10 @@ typedef struct {
 	uint32_t	rule_p1_nonce_len;
 	uint32_t	rule_p2_nonce_len;
 	uint32_t	rule_p2_pfs;
-	uint32_t	rule_p2_lifetime;
+	uint32_t	rule_p2_lifetime_secs;
+	uint32_t	rule_p2_softlife_secs;
+	uint32_t	rule_p2_lifetime_kb;
+	uint32_t	rule_p2_softlife_kb;
 	uint16_t	rule_xform_cnt;
 	uint16_t	rule_xform_off;
 	uint16_t	rule_locip_cnt;
@@ -449,6 +477,20 @@ typedef struct {
 	uint32_t	stat_len;
 } ike_statreq_t;
 
+/*
+ * IKE_SVC_GET_DEFS
+ * Used to request default values from in.iked.
+ *
+ * Upon request, cmd is set, and stat_len does not matter.
+ *
+ * Upon successful return, stat_len contains the total size of the
+ * returned buffer, this contains a pair of ike_defaults_t's.
+ */
+typedef struct {
+	ike_svccmd_t	cmd;
+	uint32_t	stat_len;
+	uint32_t	version;
+} ike_defreq_t;
 
 /*
  * IKE_SVC_DUMP_{P1S|RULES|PS}
@@ -646,6 +688,7 @@ typedef union {
 	ike_rw_t	svc_rw;
 	ike_flush_t	svc_flush;
 	ike_err_t	svc_err;
+	ike_defreq_t	svc_defaults;
 } ike_service_t;
 
 #ifdef	__cplusplus

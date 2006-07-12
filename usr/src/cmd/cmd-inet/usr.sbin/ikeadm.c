@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,7 +97,8 @@ static void
 print_help()
 {
 	(void) printf(gettext("Valid commands and objects:\n"));
-	(void) printf("\tget   debug|priv|stats|p1|rule|preshared [%s]\n",
+	(void) printf(
+	    "\tget   debug|priv|stats|p1|rule|preshared|defaults [%s]\n",
 	    gettext("identifier"));
 	(void) printf("\tset   priv %s\n", gettext("level"));
 	(void) printf("\tset   debug %s [%s]\n",
@@ -375,6 +375,7 @@ parsecmd(char *cmdstr, char *objstr)
 				{"p1",		IKE_SVC_GET_P1},
 				{"rule",	IKE_SVC_GET_RULE},
 				{"preshared",	IKE_SVC_GET_PS},
+				{"defaults",	IKE_SVC_GET_DEFS},
 				{NULL,		IKE_SVC_ERROR},
 			}
 		},
@@ -1833,12 +1834,18 @@ print_rule(ike_rule_t *rp)
 	(void) printf(gettext("GLOBL: local_idtype="));
 	(void) dump_sadb_idtype(rp->rule_local_idtype, stdout, NULL);
 	(void) printf(gettext(", ike_mode=%s\n"), xchgstr(rp->rule_ike_mode));
-	(void) printf(gettext("GLOBL: p1_nonce_len=%u, p2_nonce_len=%u\n"),
-	    rp->rule_p1_nonce_len, rp->rule_p2_nonce_len);
-	(void) printf(
-	    gettext("GLOBL: p2_pfs=%s (group %u), p2_lifetime=%u seconds\n"),
+	(void) printf(gettext(
+	    "GLOBL: p1_nonce_len=%u, p2_nonce_len=%u, p2_pfs=%s (group %u)\n"),
+	    rp->rule_p1_nonce_len, rp->rule_p2_nonce_len,
 	    (rp->rule_p2_pfs) ? gettext("true") : gettext("false"),
-	    rp->rule_p2_pfs, rp->rule_p2_lifetime);
+	    rp->rule_p2_pfs);
+	(void) printf(
+	    gettext("GLOBL: p2_lifetime=%u seconds, p2_softlife=%u seconds\n"),
+	    rp->rule_p2_lifetime_secs, rp->rule_p2_softlife_secs);
+	(void) printf(
+	    gettext("GLOBL: p2_lifetime_kb=%u seconds,"
+	    " p2_softlife_kb=%u seconds\n"),
+	    rp->rule_p2_lifetime_kb, rp->rule_p2_softlife_kb);
 
 	if (rp->rule_locip_cnt > 0) {
 		(void) printf(gettext("LOCIP: IP address range(s):\n"));
@@ -1924,6 +1931,93 @@ print_stats(ike_stats_t *sp, int len)
 	if (*(sp->st_pkcs11_libname) != '\0')
 		(void) printf(gettext("PKCS#11 library linked in from %s\n"),
 		    sp->st_pkcs11_libname);
+}
+
+static void
+print_defaults(char *label, char *description, char *unit, boolean_t kbytes,
+    uint_t current, uint_t def)
+{
+	(void) printf("%-18s%-10s%14u%s%-10s%-26s\n", label,
+	    (current != def) ? gettext("config") : gettext("default"),
+	    (current != def) ? current : def, (kbytes) ? "K " : "  ",
+	    unit, description);
+}
+
+/*
+ * Print out defaults used by in.iked, the argument is a buffer containing
+ * two ike_defaults_t's, the first contains the hard coded defaults, the second
+ * contains the actual values used. If these differ, then the defaults have been
+ * changed via a config file entry. Note that "-" indicates this default
+ * is not tunable.
+ */
+static void
+do_print_defaults(ike_defaults_t *dp)
+{
+	ike_defaults_t *ddp;
+	ddp = (ike_defaults_t *)(dp + 1);
+
+	(void) printf(gettext("\nGlobal defaults. Some values can be"
+	    " over-ridden on a per rule basis.\n\n"));
+
+	(void) printf("%-18s%-10s%-16s%-10s%-26s\n\n",
+	    gettext("Token:"), gettext("Source:"), gettext("Value:"),
+	    gettext("Unit:"), gettext("Description:"));
+
+	print_defaults("p1_lifetime_secs", gettext("phase 1 lifetime"),
+	    gettext("seconds"), B_FALSE, ddp->rule_p1_lifetime_secs,
+	    dp->rule_p1_lifetime_secs);
+
+	print_defaults("-", gettext("minimum phase 1 lifetime"),
+	    gettext("seconds"), B_FALSE, ddp->rule_p1_minlife,
+	    dp->rule_p1_minlife);
+
+	print_defaults("p1_nonce_len", gettext("phase 1 nonce length"),
+	    gettext("bytes"), B_FALSE, ddp->rule_p1_nonce_len,
+	    dp->rule_p1_nonce_len);
+
+	print_defaults("p2_lifetime_secs", gettext("phase 2 lifetime"),
+	    gettext("seconds"), B_FALSE, ddp->rule_p2_lifetime_secs,
+	    dp->rule_p2_lifetime_secs);
+
+	print_defaults("p2_softlife_secs", gettext("phase 2 soft lifetime"),
+	    gettext("seconds"), B_FALSE, ddp->rule_p2_softlife_secs,
+	    dp->rule_p2_softlife_secs);
+
+	print_defaults("p2_lifetime_kb", gettext("phase 2 lifetime"),
+	    gettext("bytes"), B_TRUE, ddp->rule_p2_lifetime_kb,
+	    dp->rule_p2_lifetime_kb);
+
+	print_defaults("p2_softlife_kb", gettext("phase 2 soft lifetime"),
+	    gettext("bytes"), B_TRUE, ddp->rule_p2_softlife_kb,
+	    dp->rule_p2_softlife_kb);
+
+	print_defaults("-", gettext("minimum phase 2 lifetime"),
+	    gettext("seconds"), B_FALSE, ddp->rule_p2_minlife,
+	    dp->rule_p2_minlife);
+
+	print_defaults("p2_nonce_len", gettext("phase 2 nonce length"),
+	    gettext("bytes"), B_FALSE, ddp->rule_p2_nonce_len,
+	    dp->rule_p2_nonce_len);
+
+	print_defaults("-", gettext("default phase 2 lifetime"),
+	    gettext("seconds"), B_FALSE, ddp->rule_p2_def_minlife,
+	    dp->rule_p2_def_minlife);
+
+	print_defaults("-", gettext("minimum phase 2 soft delta"),
+	    gettext("seconds"), B_FALSE, ddp->rule_p2_minsoft,
+	    dp->rule_p2_minsoft);
+
+	print_defaults("p2_pfs", gettext("phase 2 PFS"),
+	    " ", B_FALSE, ddp->rule_p2_pfs, dp->rule_p2_pfs);
+
+	print_defaults("max_certs", gettext("max certificates"),
+	    " ", B_FALSE, ddp->rule_max_certs, dp->rule_max_certs);
+
+	print_defaults("-", gettext("IKE port number"),
+	    " ", B_FALSE, ddp->rule_ike_port, dp->rule_ike_port);
+
+	print_defaults("-", gettext("NAT-T port number"),
+	    " ", B_FALSE, ddp->rule_natt_port, dp->rule_natt_port);
 }
 
 static void
@@ -2128,6 +2222,36 @@ do_getstats(int cmd)
 	sreqp = &rtn->svc_stats;
 	sp = (ike_stats_t *)(sreqp + 1);
 	print_stats(sp, sreqp->stat_len);
+}
+
+static void
+do_getdefs(int cmd)
+{
+	ike_service_t	*rtn;
+	ike_defreq_t	dreq, *dreqp;
+	ike_defaults_t	*dp;
+
+	dreq.cmd = cmd;
+
+	rtn = ikedoor_call((char *)&dreq, sizeof (ike_defreq_t), NULL, 0);
+	if ((rtn == NULL) || (rtn->svc_err.cmd == IKE_SVC_ERROR)) {
+		ikeadm_err_exit(&rtn->svc_err,
+		    gettext("error getting defaults"));
+	}
+
+	dreqp = &rtn->svc_defaults;
+	dp = (ike_defaults_t *)(dreqp + 1);
+
+	/*
+	 * Before printing each line, make sure the structure we were
+	 * given is big enough to include the fields needed.
+	 * Silently bail out of there is a version mismatch.
+	 */
+	if (dreqp->stat_len < ((2 * sizeof (ike_defaults_t))
+	    + sizeof (ike_defreq_t)) || dreqp->version != DOORVER) {
+		return;
+	}
+	do_print_defaults(dp);
 }
 
 static void
@@ -2742,6 +2866,9 @@ parseit(int argc, char **argv)
 	argv += cmd_obj_args;
 
 	switch (cmd) {
+	case IKE_SVC_GET_DEFS:
+		do_getdefs(cmd);
+		break;
 	case IKE_SVC_GET_DBG:
 	case IKE_SVC_GET_PRIV:
 		do_getvar(cmd);
