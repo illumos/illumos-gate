@@ -1185,6 +1185,7 @@ top:
 			    zfsvfs->z_assign == TXG_NOWAIT) {
 				/* NB: we already did dmu_tx_wait() */
 				zfs_dirent_unlock(dl);
+				VN_RELE(ZTOV(zp));
 				goto top;
 			}
 		}
