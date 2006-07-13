@@ -668,7 +668,7 @@ static void	icmp_inbound(queue_t *, mblk_t *, boolean_t, ill_t *, int,
     uint32_t, boolean_t, boolean_t, ill_t *, zoneid_t);
 static ipaddr_t	icmp_get_nexthop_addr(ipha_t *, ill_t *, zoneid_t, mblk_t *mp);
 static boolean_t icmp_inbound_too_big(icmph_t *, ipha_t *, ill_t *, zoneid_t,
-		    mblk_t *mp);
+		    mblk_t *, int);
 static void	icmp_inbound_error_fanout(queue_t *, ill_t *, mblk_t *,
 		    icmph_t *, ipha_t *, int, int, boolean_t, boolean_t,
 		    ill_t *, zoneid_t);
@@ -1984,10 +1984,16 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 		case ICMP_DEST_UNREACHABLE:
 			if (icmph->icmph_code == ICMP_FRAGMENTATION_NEEDED) {
 				if (!icmp_inbound_too_big(icmph, ipha, ill,
-				    zoneid, mp)) {
+				    zoneid, mp, iph_hdr_length)) {
 					freemsg(first_mp);
 					return;
 				}
+				/*
+				 * icmp_inbound_too_big() may alter mp.
+				 * Resynch ipha and icmph accordingly.
+				 */
+				icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
+				ipha = (ipha_t *)&icmph[1];
 			}
 			/* FALLTHRU */
 		default :
@@ -2265,7 +2271,7 @@ static int icmp_frag_size_table[] =
  */
 static boolean_t
 icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
-    zoneid_t zoneid, mblk_t *mp)
+    zoneid_t zoneid, mblk_t *mp, int iph_hdr_length)
 {
 	ire_t	*ire, *first_ire;
 	int	mtu;
@@ -2293,7 +2299,7 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
 			ip1dbg(("icmp_inbound_too_big: insufficient hdr\n"));
 			return (B_FALSE);
 		}
-		icmph = (icmph_t *)&mp->b_rptr[hdr_length];
+		icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
 		ipha = (ipha_t *)&icmph[1];
 	}
 	nexthop_addr = icmp_get_nexthop_addr(ipha, ill, zoneid, mp);
