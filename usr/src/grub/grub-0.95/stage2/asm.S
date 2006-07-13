@@ -2152,7 +2152,8 @@ ENTRY(console_getkey)
 
 wait_for_key:
 	call	EXT_C(console_checkkey)
-	incl	wait_for_key
+	incl	%eax
+	jz	wait_for_key
 
 	call	EXT_C(prot_to_real)
 	.code16
