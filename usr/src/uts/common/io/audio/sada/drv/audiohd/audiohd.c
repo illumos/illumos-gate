@@ -31,11 +31,10 @@
  * 2006 line of new workstations and PCs, which are MCP55-based
  * with Realtek ALC88x codec. Due to short time constraints on the
  * production of this software kernel module, we used a minimalistic
- * approach to only provide audio play functionality for just the
- * nVidia HD audio controller and the Realtek ALC880, ALC883 and
- * ALC885  codecs.  Certainly, the driver may work and attach to
- * Intel High-Definition audio devices which have same the Realtek
- * Codec.
+ * approach to provide audio functionality for just the nVidia HD
+ * audio controller and the Realtek ALC880, ALC883 and ALC885
+ * codecs.  Certainly, the driver may work and attach to Intel
+ * High-Definition audio devices which have same the Realtek Codec.
  *
  * HD audio supports multiple streams, each of which can act as an
  * independent device. However, we just support two streams: the
@@ -124,16 +123,19 @@ static int audiohd_alc880_set_gain(audiohd_state_t *, int, int, int);
 static int audiohd_alc880_set_port(audiohd_state_t *, int, int);
 static int audiohd_alc880_mute_outputs(audiohd_state_t *, boolean_t);
 static int audiohd_alc880_set_monitor_gain(audiohd_state_t *, int);
+static void audiohd_alc880_max_gain(audiohd_state_t *, uint_t *,
+    uint_t *, uint_t *);
 
 /* ops for ALC880 */
 static struct audiohd_codec_ops audiohd_alc880_ops = {
-	audiohd_alc880_enable_play,	/* ac_enable_play */
-	audiohd_alc880_enable_record,	/* ac_enable_record */
-	audiohd_alc880_set_pcm_fmt,	/* ac_set_pcm_fmt */
-	audiohd_alc880_set_gain,	/* ac_set_out_gain */
-	audiohd_alc880_set_port,	/* ac_set_port */
-	audiohd_alc880_mute_outputs,	/* ac_mute_outputs */
-	audiohd_alc880_set_monitor_gain	/* ac_set_monitor_gain */
+	audiohd_alc880_enable_play,		/* ac_enable_play */
+	audiohd_alc880_enable_record,		/* ac_enable_record */
+	audiohd_alc880_set_pcm_fmt,		/* ac_set_pcm_fmt */
+	audiohd_alc880_set_gain,		/* ac_set_out_gain */
+	audiohd_alc880_set_port,		/* ac_set_port */
+	audiohd_alc880_mute_outputs,		/* ac_mute_outputs */
+	audiohd_alc880_set_monitor_gain,	/* ac_set_monitor_gain */
+	audiohd_alc880_max_gain		/* ac_get_max_gain */
 };
 
 /* anchor for soft state structures */
@@ -257,7 +259,7 @@ static struct dev_ops audiohd_dev_ops = {
 /* Linkage structure for loadable drivers */
 static struct modldrv audiohd_modldrv = {
 	&mod_driverops,		/* drv_modops */
-	AUDIOHD_MOD_NAME"%I%",		/* drv_linkinfo */
+	AUDIOHD_MOD_NAME"%I%",	/* drv_linkinfo */
 	&audiohd_dev_ops,		/* drv_dev_ops */
 };
 
@@ -458,6 +460,9 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "!audiohd_attach() counldn't create codec");
 		goto err_attach_exit6;
 	}
+
+	AUDIOHD_CODEC_MAX_GAIN(statep, &statep->hda_pgain_max,
+	    &statep->hda_rgain_max, &statep->hda_mgain_max);
 
 	/*
 	 * This is a workaround. ALC880 doesn't support 8k sample rate,
@@ -1208,6 +1213,7 @@ audiohd_init_state(audiohd_state_t *statep, dev_info_t *dip)
 	mutex_init(&statep->hda_mutex, NULL,
 	    MUTEX_DRIVER, statep->hda_intr_cookie);
 
+	statep->hda_outputs_muted = B_FALSE;
 	statep->hda_rirb_rp = 0;
 
 	return (AUDIO_SUCCESS);
@@ -1401,7 +1407,7 @@ audiohd_alloc_dma_mem(audiohd_state_t *statep, audiohd_dma_t *pdma,
 
 	if (ddi_dma_mem_alloc(pdma->ad_dmahdl, memsize, &hda_dev_accattr,
 	    dma_flags & (DDI_DMA_CONSISTENT | DDI_DMA_STREAMING),
-	    DDI_DMA_SLEEP, NULL, (caddr_t *)&pdma->ad_vaddr,
+		DDI_DMA_SLEEP, NULL, (caddr_t *)&pdma->ad_vaddr,
 	    &pdma->ad_real_sz, &pdma->ad_acchdl) != DDI_SUCCESS) {
 		audio_sup_log(ahandle, CE_WARN,
 		    "!map_regs() ddi_dma_mem_alloc failed");
@@ -1426,7 +1432,7 @@ audiohd_alloc_dma_mem(audiohd_state_t *statep, audiohd_dma_t *pdma,
 		    "!map_regs() addr_bind_handle failed, cookies > 1");
 		goto error_alloc_dma_exit3;
 	}
-	pdma->ad_paddr = (uintptr_t)(cookie.dmac_address);
+	pdma->ad_paddr = (uintptr_t)(cookie.dmac_laddress);
 	pdma->ad_req_sz = memsize;
 
 	return (AUDIO_SUCCESS);
@@ -1529,7 +1535,7 @@ audiohd_init_controller(audiohd_state_t *statep)
 	/* allocate DMA for CORB */
 	retval = audiohd_alloc_dma_mem(statep, &statep->hda_dma_corb,
 	    AUDIOHD_CDBIO_CORB_LEN, &dma_attr,
-	    DDI_DMA_WRITE | DDI_DMA_CONSISTENT);
+	    DDI_DMA_WRITE | DDI_DMA_STREAMING);
 	if (retval != AUDIO_SUCCESS) {
 		audio_sup_log(statep->hda_ahandle, CE_WARN,
 		    "!init_controller() failed to alloc DMA for CORB");
@@ -1539,7 +1545,7 @@ audiohd_init_controller(audiohd_state_t *statep)
 	/* allocate DMA for RIRB */
 	retval = audiohd_alloc_dma_mem(statep, &statep->hda_dma_rirb,
 	    AUDIOHD_CDBIO_RIRB_LEN, &dma_attr,
-	    DDI_DMA_READ | DDI_DMA_CONSISTENT);
+	    DDI_DMA_READ | DDI_DMA_STREAMING);
 	if (retval != AUDIO_SUCCESS) {
 		audio_sup_log(statep->hda_ahandle, CE_WARN,
 		    "!init_controller() failed to alloc DMA for RIRB");
@@ -2042,10 +2048,13 @@ audiohd_set_gain(audiohd_state_t *statep, int dir, int gain, int channel)
 	}
 
 	/*
-	 * SADA uses 255 as the max volume, but HD spec us 0x3f
-	 * adjust vlaue of gain
+	 * SADA uses 255 as the max volume, but HD spec uses at most 7bits
+	 * to represent volum. Here, adjust vlaue of gain
 	 */
-	gain = gain * AUDIOHDC_GAIN_MAX / AUDIO_MAX_GAIN;
+	if (dir == AUDIO_PLAY)
+		gain = gain * statep->hda_pgain_max / AUDIO_MAX_GAIN;
+	else
+		gain = gain * statep->hda_rgain_max / AUDIO_MAX_GAIN;
 
 	rc = AUDIOHD_CODEC_SET_GAIN(statep, dir, gain, channel);
 	return (rc);
@@ -2097,7 +2106,11 @@ audiohd_set_monitor_gain(audiohd_state_t *statep, int gain)
 	} else if (gain < AUDIO_MIN_GAIN) {
 		gain = AUDIO_MIN_GAIN;
 	}
-	gain = gain * AUDIOHDC_GAIN_MAX / AUDIO_MAX_GAIN;
+	gain = gain * statep->hda_mgain_max / AUDIO_MAX_GAIN;
+
+	/*
+	 * Allow to set monitor gain even if no input is selected
+	 */
 	statep->hda_monitor_gain = gain;
 
 	if (statep->hda_in_ports == AUDIO_NONE)
@@ -2318,13 +2331,8 @@ audiohd_alc880_enable_play(audiohd_state_t *statep)
 	if (lTmp == AUDIOHD_CODEC_FAILURE)
 		return (AUDIO_FAILURE);
 
-	output_val = AUDIOHDC_AMP_SET_OUTPUT;
-	output_val |= AUDIOHDC_AMP_SET_LEFT | AUDIOHDC_AMP_SET_RIGHT;
-	output_val |= AUDIOHDC_GAIN_MAX;
-
-	input_val = AUDIOHDC_AMP_SET_INPUT;
-	input_val |= AUDIOHDC_AMP_SET_LEFT | AUDIOHDC_AMP_SET_RIGHT;
-	input_val |= AUDIOHDC_GAIN_MAX;
+	output_val = AUDIOHDC_AMP_SET_LR_OUTPUT | AUDIOHDC_GAIN_MAX;
+	input_val = AUDIOHDC_AMP_SET_LR_INPUT | AUDIOHDC_GAIN_MAX;
 
 	/* output amp of DAC */
 	lTmp = audioha_codec_4bit_verb_get(statep, caddr, AUDIOHDC_NID(0x02),
@@ -2350,10 +2358,12 @@ audiohd_alc880_enable_play(audiohd_state_t *statep)
 	    AUDIOHDC_AMP_SET_RIGHT | statep->hda_play_rgain);
 
 	/* Unmute pin */
-	lTmp = audioha_codec_4bit_verb_get(statep, caddr, AUDIOHDC_NID(0x14),
-	    AUDIOHDC_VERB_SET_AMP_MUTE, output_val);
-	if (lTmp == AUDIOHD_CODEC_FAILURE)
-		return (AUDIO_FAILURE);
+	if (!statep->hda_outputs_muted) {
+		lTmp = audioha_codec_4bit_verb_get(statep, caddr,
+		    AUDIOHDC_NID(0x14), AUDIOHDC_VERB_SET_AMP_MUTE, output_val);
+		if (lTmp == AUDIOHD_CODEC_FAILURE)
+			return (AUDIO_FAILURE);
+	}
 
 	/* enable output for pin node 0x14 */
 	lTmp = audioha_codec_verb_get(statep, caddr, AUDIOHDC_NID(0x14),
@@ -2387,18 +2397,34 @@ audiohd_alc880_enable_record(audiohd_state_t *statep)
 		return (AUDIO_FAILURE);
 
 	/* input amp of ADC node 0x9 */
-	val = AUDIOHDC_AMP_SET_INPUT;
-	val |= AUDIOHDC_AMP_SET_LEFT | AUDIOHDC_AMP_SET_RIGHT;
+	val = AUDIOHDC_AMP_SET_LR_INPUT | AUDIOHDC_GAIN_MAX;
 	lTmp = audioha_codec_4bit_verb_get(statep, caddr, AUDIOHDC_NID(0x09),
-	    AUDIOHDC_VERB_SET_AMP_MUTE, val | AUDIOHDC_GAIN_MAX);
+	    AUDIOHDC_VERB_SET_AMP_MUTE, val);
 	if (lTmp == AUDIOHD_CODEC_FAILURE)
 		return (AUDIO_FAILURE);
+
+	/* MIC1 */
+	(void) audioha_codec_verb_get(statep, caddr, AUDIOHDC_NID(0x18),
+	    AUDIOHDC_VERB_SET_PIN_CTRL, AUDIOHDC_PIN_CONTROL_IN_ENABLE | 4);
+
+	/* MIC 2 */
+	(void) audioha_codec_verb_get(statep, caddr, AUDIOHDC_NID(0x19),
+	    AUDIOHDC_VERB_SET_PIN_CTRL, AUDIOHDC_PIN_CONTROL_IN_ENABLE | 4);
+
+	/* line-in1 */
+	(void) audioha_codec_verb_get(statep, caddr, AUDIOHDC_NID(0x1a),
+	    AUDIOHDC_VERB_SET_PIN_CTRL, AUDIOHDC_PIN_CONTROL_IN_ENABLE | 4);
+
+	/* cd-in */
+	(void) audioha_codec_verb_get(statep, caddr, AUDIOHDC_NID(0x1c),
+	    AUDIOHDC_VERB_SET_PIN_CTRL, AUDIOHDC_PIN_CONTROL_IN_ENABLE | 4);
 
 	/*
 	 * enable gain for monitor path, from node 0x0B to node 0x0C,
 	 * In the input list of 0x0c, 0x0b node has index 1
 	 */
-	val |= (1 << AUDIOHDC_AMP_SET_INDEX_OFFSET) | statep->hda_monitor_gain;
+	val = AUDIOHDC_AMP_SET_LR_INPUT | AUDIOHDC_GAIN_MAX;
+	val |= (1 << AUDIOHDC_AMP_SET_INDEX_OFFSET);
 	lTmp = audioha_codec_4bit_verb_get(statep, caddr, AUDIOHDC_NID(0x0C),
 	    AUDIOHDC_VERB_SET_AMP_MUTE, val);
 	if (lTmp == AUDIOHD_CODEC_FAILURE) {
@@ -2487,7 +2513,6 @@ static int
 audiohd_alc880_set_port(audiohd_state_t *statep, int dir, int port)
 {
 	uint_t	val;
-	uint_t	nid_pin;
 	uint_t	tmp_port = 0;
 	uint_t	caddr = statep->hda_codec->hc_addr;
 
@@ -2497,8 +2522,7 @@ audiohd_alc880_set_port(audiohd_state_t *statep, int dir, int port)
 			port = statep->hda_out_ports;
 		}
 
-		val = AUDIOHDC_AMP_SET_OUTPUT;
-		val |= AUDIOHDC_AMP_SET_LEFT | AUDIOHDC_AMP_SET_RIGHT;
+		val = AUDIOHDC_AMP_SET_LR_OUTPUT;
 		if (port & AUDIO_HEADPHONE) {
 			tmp_port |= AUDIO_HEADPHONE;
 		} else { /* mute */
@@ -2526,8 +2550,7 @@ audiohd_alc880_set_port(audiohd_state_t *statep, int dir, int port)
 	switch (port) {
 	case AUDIO_NONE:
 		/* mute ADC node 0x09 */
-		val = AUDIOHDC_AMP_SET_INPUT | AUDIOHDC_AMP_SET_MUTE;
-		val |= AUDIOHDC_AMP_SET_LEFT | AUDIOHDC_AMP_SET_RIGHT;
+		val = AUDIOHDC_AMP_SET_LR_INPUT | AUDIOHDC_AMP_SET_MUTE;
 		(void) audioha_codec_4bit_verb_get(statep, caddr,
 		    AUDIOHDC_NID(0x9), AUDIOHDC_VERB_SET_AMP_MUTE, val);
 		statep->hda_in_ports = port;
@@ -2535,15 +2558,12 @@ audiohd_alc880_set_port(audiohd_state_t *statep, int dir, int port)
 
 	case AUDIO_MICROPHONE:
 		tmp_port = 0;	/* MIC1 */
-		nid_pin = 0x18;
 		break;
 	case AUDIO_LINE_IN:
 		tmp_port = 2;	/* Line-in1 */
-		nid_pin = 0x1a;
 		break;
 	case AUDIO_CD:
 		tmp_port = 4;	/* CD in */
-		nid_pin = 0x1c;
 		break;
 	default:
 		return (AUDIO_FAILURE);
@@ -2584,28 +2604,68 @@ audiohd_alc880_set_port(audiohd_state_t *statep, int dir, int port)
 		 * used.
 		 */
 
-		/* mute old input port */
-		val = AUDIOHDC_AMP_SET_INPUT;
-		val |= AUDIOHDC_AMP_SET_LEFT | AUDIOHDC_AMP_SET_RIGHT;
-		val |= (statep->hda_in_ports << AUDIOHDC_AMP_SET_INDEX_OFFSET);
+		if (statep->hda_in_ports != AUDIO_NONE) {
+			uint_t		old_index;
 
-		(void) audioha_codec_4bit_verb_get(statep, caddr,
-		    AUDIOHDC_NID(0x22), AUDIOHDC_VERB_SET_AMP_MUTE,
-		    (val | AUDIOHDC_AMP_SET_MUTE));
+			switch (statep->hda_in_ports) {
+			case AUDIO_MICROPHONE:
+				old_index = 0;	/* MIC1 */
+				break;
+			case AUDIO_LINE_IN:
+				old_index = 2;	/* Line-in1 */
+				break;
+			case AUDIO_CD:
+				old_index = 4;	/* CD in */
+				break;
+			default:	/* impossible to reach here */
+				return (AUDIO_FAILURE);
+			}
+
+			/* mute old input port */
+			val = AUDIOHDC_AMP_SET_LR_INPUT | AUDIOHDC_AMP_SET_MUTE;
+			val |= (old_index << AUDIOHDC_AMP_SET_INDEX_OFFSET);
+			(void) audioha_codec_4bit_verb_get(statep, caddr,
+			    AUDIOHDC_NID(0x22), AUDIOHDC_VERB_SET_AMP_MUTE,
+			    val);
+
+			if (statep->hda_in_ports == AUDIO_MICROPHONE) {
+				/* mute MIC2 as well */
+				old_index = 1;
+				val = AUDIOHDC_AMP_SET_LR_INPUT;
+				val |= AUDIOHDC_AMP_SET_MUTE;
+				val |=
+				    old_index << AUDIOHDC_AMP_SET_INDEX_OFFSET;
+				(void) audioha_codec_4bit_verb_get(statep,
+				    caddr, AUDIOHDC_NID(0x22),
+					AUDIOHDC_VERB_SET_AMP_MUTE, val);
+			}
+		}
 
 		/* unmute new input port */
+		val = AUDIOHDC_AMP_SET_LR_INPUT;
+		val |= tmp_port << AUDIOHDC_AMP_SET_INDEX_OFFSET;
 		(void) audioha_codec_4bit_verb_get(statep, caddr,
-		    AUDIOHDC_NID(0x22), AUDIOHDC_VERB_SET_AMP_MUTE,
-		    val | (tmp_port << AUDIOHDC_AMP_SET_INDEX_OFFSET));
+		    AUDIOHDC_NID(0x22), AUDIOHDC_VERB_SET_AMP_MUTE, val);
+
+		if (port == AUDIO_MICROPHONE) {
+			/*
+			 * SADA only exports control for one MIC, so if MIC
+			 * is selected, we unmute MIC2 as well
+			 */
+			tmp_port = 1;
+			val = AUDIOHDC_AMP_SET_LR_INPUT;
+			val |= tmp_port << AUDIOHDC_AMP_SET_INDEX_OFFSET;
+			(void) audioha_codec_4bit_verb_get(statep, caddr,
+			    AUDIOHDC_NID(0x22), AUDIOHDC_VERB_SET_AMP_MUTE,
+			    val);
+		}
+
 		break;
 
 	default:
 		/* impossible to reach here */
 		break;
 	}
-
-	(void) audioha_codec_verb_get(statep, caddr, nid_pin,
-	    AUDIOHDC_VERB_SET_PIN_CTRL, AUDIOHDC_PIN_CONTROL_IN_ENABLE | 4);
 
 	statep->hda_in_ports = port;
 
@@ -2622,17 +2682,17 @@ audiohd_alc880_mute_outputs(audiohd_state_t *statep, boolean_t mute)
 	uint_t	val;
 	uint_t	caddr = statep->hda_codec->hc_addr;
 
+	if (statep->hda_outputs_muted == mute)
+		return (AUDIO_SUCCESS);
+
+	statep->hda_outputs_muted = mute;
+	val = AUDIOHDC_AMP_SET_LR_OUTPUT;
 	if (mute) {
-		val = AUDIOHDC_AMP_SET_OUTPUT;
-		val |= AUDIOHDC_AMP_SET_LEFT | AUDIOHDC_AMP_SET_RIGHT;
 		val |= AUDIOHDC_AMP_SET_MUTE;
-	} else {
-		val = AUDIOHDC_AMP_SET_OUTPUT;
-		val |= AUDIOHDC_AMP_SET_LEFT | AUDIOHDC_AMP_SET_RIGHT;
 	}
 
 	(void) audioha_codec_4bit_verb_get(statep, caddr,
-		AUDIOHDC_NID(0x14), AUDIOHDC_VERB_SET_AMP_MUTE, val);
+	    AUDIOHDC_NID(0x14), AUDIOHDC_VERB_SET_AMP_MUTE, val);
 
 	return (AUDIO_SUCCESS);
 
@@ -2640,6 +2700,9 @@ audiohd_alc880_mute_outputs(audiohd_state_t *statep, boolean_t mute)
 
 /*
  * audiohd_alc880_set_monitor_gain()
+ *
+ * Description:
+ *	Set the gain for input-to-ouput path
  */
 static int
 audiohd_alc880_set_monitor_gain(audiohd_state_t *statep, int gain)
@@ -2660,14 +2723,46 @@ audiohd_alc880_set_monitor_gain(audiohd_state_t *statep, int gain)
 		break;
 	}
 
-	val = AUDIOHDC_AMP_SET_INPUT;
-	val |= AUDIOHDC_AMP_SET_LEFT | AUDIOHDC_AMP_SET_RIGHT;
+	val = AUDIOHDC_AMP_SET_LR_INPUT | gain;
 	val |= (index << AUDIOHDC_AMP_SET_INDEX_OFFSET);
-	val |= gain;
-
 	(void) audioha_codec_4bit_verb_get(statep, caddr,
 	    AUDIOHDC_NID(0xB), AUDIOHDC_VERB_SET_AMP_MUTE, val);
 
+	/* set MIC1 and MIC2 if MIC is requested */
+	if (statep->hda_in_ports == AUDIO_MICROPHONE) {
+		index = 1;
+		val = AUDIOHDC_AMP_SET_LR_INPUT | gain;
+		val |= (index << AUDIOHDC_AMP_SET_INDEX_OFFSET);
+		(void) audioha_codec_4bit_verb_get(statep, caddr,
+		    AUDIOHDC_NID(0xB), AUDIOHDC_VERB_SET_AMP_MUTE, val);
+	}
 	return (AUDIO_SUCCESS);
 
 }	/* audiohd_alc880_set_monitor_gain() */
+
+/*
+ * audiohd_alc880_max_gain()
+ *
+ * Description:
+ *	Get max gains for packplay and recording
+ */
+static void
+audiohd_alc880_max_gain(audiohd_state_t *statep, uint_t *pgain, uint_t
+	*rgain, uint_t *mgain)
+{
+	uint_t	caddr = statep->hda_codec->hc_addr;
+	uint_t	lTmp;
+
+	lTmp = audioha_codec_verb_get(statep, caddr, AUDIOHDC_NID(0xC),
+	    AUDIOHDC_VERB_GET_PARAM, AUDIOHDC_PAR_AMP_OUT_CAP);
+	*pgain = (lTmp & AUDIOHDC_AMP_CAP_STEP_NUMS) >> 8;
+
+	lTmp = audioha_codec_verb_get(statep, caddr, AUDIOHDC_NID(0x9),
+	    AUDIOHDC_VERB_GET_PARAM, AUDIOHDC_PAR_AMP_IN_CAP);
+	*rgain = (lTmp & AUDIOHDC_AMP_CAP_STEP_NUMS) >> 8;
+
+	lTmp = audioha_codec_verb_get(statep, caddr, AUDIOHDC_NID(0xb),
+	    AUDIOHDC_VERB_GET_PARAM, AUDIOHDC_PAR_AMP_IN_CAP);
+	*mgain = (lTmp & AUDIOHDC_AMP_CAP_STEP_NUMS) >> 8;
+
+}	/* audiohd_alc880_max_gain() */

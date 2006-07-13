@@ -271,9 +271,10 @@ extern "C" {
 #define	AUDIOHDC_AMP_SET_INPUT			0x4000
 #define	AUDIOHDC_AMP_SET_LEFT			0x2000
 #define	AUDIOHDC_AMP_SET_RIGHT			0x1000
-#define	AUDIOHDC_AMP_SET_INDEX_OFFSET		8
 #define	AUDIOHDC_AMP_SET_MUTE			0x0080
-#define	AUDIOHDC_AMP_SET_GAIN_MASK		0x007f
+#define	AUDIOHDC_AMP_SET_LR_INPUT		0x7000
+#define	AUDIOHDC_AMP_SET_LR_OUTPUT		0xb000
+#define	AUDIOHDC_AMP_SET_INDEX_OFFSET		8
 #define	AUDIOHDC_AMP_SET_GAIN_MASK		0x007f
 #define	AUDIOHDC_GAIN_MAX			0x7f
 #define	AUDIOHDC_GAIN_BITS			7
@@ -285,6 +286,15 @@ extern "C" {
 #define	AUDIOHDC_PIN_CONTROL_HP_ENABLE		0x80
 #define	AUDIOHDC_PIN_CONTROL_OUT_ENABLE		0x40
 #define	AUDIOHDC_PIN_CONTROL_IN_ENABLE		0x20
+
+/*
+ * Bits for Amplifier capabilities
+ */
+#define	AUDIOHDC_AMP_CAP_MUTE_CAP		0x80000000
+#define	AUDIOHDC_AMP_CAP_STEP_SIZE		0x007f0000
+#define	AUDIOHDC_AMP_CAP_STEP_NUMS		0x00007f00
+#define	AUDIOHDC_AMP_CAP_0DB_OFFSET		0x0000007f
+
 
 #define	AUDIOHD_CODEC_FAILURE	(uint32_t)(-1)
 
@@ -372,24 +382,29 @@ typedef struct {
 	int		hda_csample_rate;
 	int		hda_cchannels;
 	int		hda_cprecision;
-	int		hda_monitor_gain;
 	int		hda_pint_freq;	/* play intr frequence */
 	int		hda_rint_freq;	/* record intr frequence */
 	int		hda_pbuf_size;	/* play buffer size */
 	int		hda_rbuf_size;	/* record buffer size */
 
-	uint_t		hda_play_stag;	/* tag of playback stream */
+	boolean_t	hda_outputs_muted;
+
+	uint_t		hda_monitor_gain;
+	uint_t		hda_mgain_max;
+	uint_t		hda_play_stag;		/* tag of playback stream */
 	uint_t		hda_record_stag;	/* tag of record stream */
 	uint_t		hda_play_regbase;	/* regbase for play stream */
 	uint_t		hda_record_regbase;	/* regbase for record stream */
-	uint_t		hda_play_lgain;	/* left gain for playback */
-	uint_t		hda_play_rgain;	/* right gain for playback */
+	uint_t		hda_play_lgain;		/* left gain for playback */
+	uint_t		hda_play_rgain;		/* right gain for playback */
+	uint_t		hda_pgain_max;		/* max gain for playback */
 	uint_t		hda_record_lgain;	/* left gain for recording */
 	uint_t		hda_record_rgain;	/* right gain for recording */
+	uint_t		hda_rgain_max;		/* max gain for record */
 	uint_t		hda_play_format;
 	uint_t		hda_record_format;
-	uint_t		hda_out_ports;	/* active outputs */
-	uint_t		hda_in_ports;	/* active inputs */
+	uint_t		hda_out_ports;		/* active outputs */
+	uint_t		hda_in_ports;		/* active inputs */
 
 	audiohd_hda_codec_t	*hda_codec;
 } audiohd_state_t;
@@ -402,6 +417,8 @@ struct audiohd_codec_ops {
 	int (*ac_set_port)(audiohd_state_t *, int, int);
 	int (*ac_mute_outputs)(audiohd_state_t *, boolean_t);
 	int (*ac_set_monitor_gain)(audiohd_state_t *, int);
+	void (*ac_get_max_gain)
+		(audiohd_state_t *, uint_t *, uint_t *, uint_t *);
 };
 
 #define	AUDIOHD_CODEC_ENABLE_PLAY(x) \
@@ -424,6 +441,9 @@ struct audiohd_codec_ops {
 
 #define	AUDIOHD_CODEC_SET_MON_GAIN(x, y) \
 	x->hda_codec->hc_ops->ac_set_monitor_gain(x, y)
+
+#define	AUDIOHD_CODEC_MAX_GAIN(x, y, z, w) \
+	x->hda_codec->hc_ops->ac_get_max_gain(x, y, z, w)
 
 
 /*
