@@ -4696,13 +4696,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 			cpid = DB_CPID(mp);
 			UDP_STAT(udp_in_recvucred);
 		}
-		/*
-		 * If IP_RECVTTL is set allocate the appropriate sized buffer
-		 */
-		if (udp->udp_recvttl) {
-			udi_size += sizeof (struct T_opthdr) + sizeof (uint8_t);
-			UDP_STAT(udp_in_recvttl);
-		}
+
 		/*
 		 * If SO_TIMESTAMP is set allocate the appropriate sized
 		 * buffer. Since gethrestime() expects a pointer aligned
@@ -4713,6 +4707,14 @@ udp_input(conn_t *connp, mblk_t *mp)
 			udi_size += sizeof (struct T_opthdr) +
 			    sizeof (timestruc_t) + _POINTER_ALIGNMENT;
 			UDP_STAT(udp_in_timestamp);
+		}
+
+		/*
+		 * If IP_RECVTTL is set allocate the appropriate sized buffer
+		 */
+		if (udp->udp_recvttl) {
+			udi_size += sizeof (struct T_opthdr) + sizeof (uint8_t);
+			UDP_STAT(udp_in_recvttl);
 		}
 		ASSERT(IPH_HDR_LENGTH((ipha_t *)rptr) == IP_SIMPLE_HDR_LENGTH);
 
@@ -4771,7 +4773,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				dstopt += sizeof (struct T_opthdr);
 				dstptr = (ipaddr_t *)dstopt;
 				*dstptr = ((ipha_t *)rptr)->ipha_dst;
-				dstopt += sizeof (ipaddr_t);
+				dstopt = (char *)toh + toh->len;
 				udi_size -= toh->len;
 			}
 
@@ -4791,7 +4793,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				dstptr = (struct sockaddr_dl *)dstopt;
 				bcopy(&pinfo->in_pkt_slla, dstptr,
 				    sizeof (struct sockaddr_dl));
-				dstopt += sizeof (struct sockaddr_dl);
+				dstopt = (char *)toh + toh->len;
 				udi_size -= toh->len;
 			}
 
@@ -4810,7 +4812,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				dstopt += sizeof (struct T_opthdr);
 				dstptr = (uint_t *)dstopt;
 				*dstptr = pinfo->in_pkt_ifindex;
-				dstopt += sizeof (uint_t);
+				dstopt = (char *)toh + toh->len;
 				udi_size -= toh->len;
 			}
 
@@ -4823,26 +4825,10 @@ udp_input(conn_t *connp, mblk_t *mp)
 				toh->len = sizeof (struct T_opthdr) + ucredsize;
 				toh->status = 0;
 				(void) cred2ucred(cr, cpid, &toh[1], rcr);
-				dstopt += toh->len;
+				dstopt = (char *)toh + toh->len;
 				udi_size -= toh->len;
 			}
 
-			if (udp->udp_recvttl) {
-				struct	T_opthdr *toh;
-				uint8_t	*dstptr;
-
-				toh = (struct T_opthdr *)dstopt;
-				toh->level = IPPROTO_IP;
-				toh->name = IP_RECVTTL;
-				toh->len = sizeof (struct T_opthdr) +
-				    sizeof (uint8_t);
-				toh->status = 0;
-				dstopt += sizeof (struct T_opthdr);
-				dstptr = (uint8_t *)dstopt;
-				*dstptr = ((ipha_t *)rptr)->ipha_ttl;
-				dstopt += sizeof (uint8_t);
-				udi_size -= toh->len;
-			}
 			if (udp->udp_timestamp) {
 				struct	T_opthdr *toh;
 
@@ -4857,7 +4843,32 @@ udp_input(conn_t *connp, mblk_t *mp)
 				dstopt = (char *)P2ROUNDUP((intptr_t)dstopt,
 				    sizeof (intptr_t));
 				gethrestime((timestruc_t *)dstopt);
-				dstopt += sizeof (timestruc_t);
+				dstopt = (char *)toh + toh->len;
+				udi_size -= toh->len;
+			}
+
+			/*
+			 * CAUTION:
+			 * Due to aligment issues
+			 * Processing of IP_RECVTTL option
+			 * should always be the last. Adding
+			 * any option processing after this will
+			 * cause alignment panic.
+			 */
+			if (udp->udp_recvttl) {
+				struct	T_opthdr *toh;
+				uint8_t	*dstptr;
+
+				toh = (struct T_opthdr *)dstopt;
+				toh->level = IPPROTO_IP;
+				toh->name = IP_RECVTTL;
+				toh->len = sizeof (struct T_opthdr) +
+				    sizeof (uint8_t);
+				toh->status = 0;
+				dstopt += sizeof (struct T_opthdr);
+				dstptr = (uint8_t *)dstopt;
+				*dstptr = ((ipha_t *)rptr)->ipha_ttl;
+				dstopt = (char *)toh + toh->len;
 				udi_size -= toh->len;
 			}
 
