@@ -136,10 +136,17 @@ all_zones_files="
 	etc/saf/_sactab
 	etc/saf/_sysconfig
 	etc/saf/zsmon/_pmtab
-	etc/security/*_attr
-	etc/security/audit_*
+	etc/security/audit_class
+	etc/security/audit_control
+	etc/security/audit_event
+	etc/security/audit_startup
+	etc/security/audit_user
+	etc/security/audit_warn
+	etc/security/auth_attr
 	etc/security/crypt.conf
+	etc/security/exec_attr
 	etc/security/policy.conf
+	etc/security/prof_attr
 	etc/sfw/openssl/openssl.cnf
 	etc/shadow
 	etc/skel/.profile
@@ -421,9 +428,6 @@ realmode_files="
 	boot/solaris/bootenv.rc
 	boot/solaris/devicedb/master
 "
-
-local_zone_info_file=/tmp/local_zone_info.$$
-rm -f $local_zone_info_file
 
 fail() {
 	print "$*" >& 2
@@ -1932,8 +1936,6 @@ karch=`uname -m`
 plat=`uname -i`
 
 cpiodir=$1
-
-local_zone_info_file=/tmp/local_zone_info.$$
 
 if [ "$cpiodir" = again ]; then
 	cpiodir=`nawk '/^bfu.ed from / { print $3; exit }' /etc/motd`
@@ -3784,6 +3786,9 @@ then
 		# the zone configuration to become unreadable (e.g., via a
 		# DTD flag day).
 		#
+		local_zone_info_file=$root/.bfu_local_zone_info
+		rm -f $local_zone_info_file
+
 		zoneadm list -pi | nawk -F: '{
 			if ($3 == "installed") {
 				printf "%s %s\n", $2, $4
@@ -6511,7 +6516,12 @@ if [ -s $local_zone_info_file ]; then
 		print "\nNow for zone $zone..."
 		mondo_loop $zonepath/root $zone
 	done
-	rm -f $local_zone_info_file
+
+	#
+	# Normally we would clean up $local_zone_info_file but instead
+	# we leave it behind for ACR to locate and use inside the BFU
+	# alternate reality environment.
+	#
 fi
 
 print "Turning off delayed i/o and syncing filesystems ..."

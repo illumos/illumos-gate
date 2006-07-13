@@ -2,9 +2,8 @@
 .\" " CDDL HEADER START
 .\" "
 .\" " The contents of this file are subject to the terms of the
-.\" " Common Development and Distribution License, Version 1.0 only
-.\" " (the "License").  You may not use this file except in compliance
-.\" " with the License.
+.\" " Common Development and Distribution License (the "License").
+.\" " You may not use this file except in compliance with the License.
 .\" "
 .\" " You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 .\" " or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,9 @@
 .\" "
 .\" " CDDL HEADER END
 .\" "
-.\" " Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+.\" " Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 .\" " Use is subject to license terms.
-.TH acr 1 "27 January 2005"
+.TH acr 1 "%H%"
 .SH NAME
 .I acr
 \- Automatically attempt BFU conflict resolution.
@@ -56,6 +55,9 @@ Upgrade Boot Environment, or any other BFU'ed solaris install.
 .LP
 If given the name of an archive directory as its second argument, it
 searches for the conflict resolution archive in that directory.
+.LP 
+When operating on /, acr also resolves conflicts for all installed
+zones.
 .SH LIMITATIONS
 While this script is usually much more reliable than manual conflict
 resolution, bugs in the packaging scripts it uses may still result in
