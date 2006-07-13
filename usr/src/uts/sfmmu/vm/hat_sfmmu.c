@@ -6365,9 +6365,11 @@ retry_xhat:
 
 	pml = sfmmu_mlist_enter(pp);
 
+#ifdef VAC
 	if (pp->p_kpmref)
 		sfmmu_kpm_pageunload(pp);
 	ASSERT(!PP_ISMAPPED_KPM(pp));
+#endif
 
 	index = PP_MAPINDEX(pp);
 	cons = TTE8K;
@@ -7305,8 +7307,10 @@ hat_page_getshare(page_t *pp)
 	pml = sfmmu_mlist_enter(spp);
 	cnt = spp->p_share;
 
+#ifdef VAC
 	if (kpm_enable)
 		cnt += spp->p_kpmref;
+#endif
 
 	/*
 	 * If we have any large mappings, we count the number of

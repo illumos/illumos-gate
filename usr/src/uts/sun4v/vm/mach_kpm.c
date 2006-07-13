@@ -38,9 +38,6 @@
 #include <vm/seg_kpm.h>
 #include <vm/mach_kpm.h>
 
-/* kpm prototypes */
-void	sfmmu_kpm_pageunload(page_t *);
-
 /*
  * Kernel Physical Mapping (kpm) facility
  */
@@ -258,13 +255,8 @@ sfmmu_kpm_vatopfn(caddr_t vaddr)
 	SFMMU_KPM_VTOP(vaddr, paddr);
 	pfn = (pfn_t)btop(paddr);
 	pp = page_numtopp_nolock(pfn);
-	if (pp && pp->p_kpmref)
+	if (pp)
 		return (pfn);
 	else
 		return ((pfn_t)PFN_INVALID);
 }
-
-/*ARGSUSED*/
-void
-sfmmu_kpm_pageunload(page_t *pp)
-{}
