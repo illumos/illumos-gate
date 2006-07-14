@@ -988,7 +988,8 @@ do_gcc(cw_ictx_t *ctx)
 				 */
 				break;
 			}
-			if (strcmp(arg, "-W0,-noglobal") == 0) {
+			if (strcmp(arg, "-W0,-noglobal") == 0 ||
+			    strcmp(arg, "-W0,-xglobalstatic") == 0) {
 				/*
 				 * gcc doesn't prefix local symbols
 				 * in debug mode, so this is not needed.
