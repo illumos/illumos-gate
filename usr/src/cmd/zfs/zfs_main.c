@@ -2246,8 +2246,8 @@ share_or_mount(int type, int argc, char **argv)
 		qsort(fslist, count, sizeof (void *), mountpoint_compare);
 
 		for (i = 0; i < count; i++) {
-			if ((ret = share_mount_callback(fslist[i], &cb)) != 0)
-				break;
+			if (share_mount_callback(fslist[i], &cb) != 0)
+				ret = 1;
 		}
 
 		for (i = 0; i < count; i++)
