@@ -2195,7 +2195,7 @@ static int
 share_or_mount(int type, int argc, char **argv)
 {
 	int do_all = 0;
-	int c, ret;
+	int c, ret = 0;
 	share_mount_cbdata_t cb = { 0 };
 
 	cb.cb_type = type;
@@ -2278,7 +2278,6 @@ share_or_mount(int type, int argc, char **argv)
 			    entry.mnt_mountp);
 		}
 
-		ret = 0;
 	} else {
 		zfs_handle_t *zhp;
 
