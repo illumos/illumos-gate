@@ -33,8 +33,8 @@
 # The default is the old behavior of CLONE_WS
 #
 # -i on the command line, means fast options, so when it's on the
-# command line (only), lint, check, GPROF and TRACE builds are skipped
-# no matter what the setting of their individual flags are in NIGHTLY_OPTIONS.
+# command line (only), lint and check builds are skipped no matter what 
+# the setting of their individual flags are in NIGHTLY_OPTIONS.
 #
 # LINTDIRS can be set in the env file, format is a list of:
 #
@@ -773,6 +773,11 @@ check_closed_tree() {
 	fi
 }
 
+obsolete_build() {
+    	echo "WARNING: Obsolete $1 build requested; request will be ignored"
+}
+
+
 MACH=`uname -p`
 
 if [ "$OPTHOME" = "" ]; then
@@ -787,7 +792,7 @@ fi
 USAGE='Usage: nightly [-in] [-V VERS ] [ -S E|D|H ] <env_file>
 
 Where:
-	-i	Fast incremental options (no clobber, lint, check, gprof, trace)
+	-i	Fast incremental options (no clobber, lint, check)
 	-n      Do not do a bringover
 	-V VERS set the build version string to VERS
 	-S	Build a variant of the source product
@@ -811,9 +816,7 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-I	integration engineer default group of options (-ampu)
 	-M	do not run pmodes (safe file permission checker)
 	-N	do not run protocmp
-	-P	do a build with GPROF on
 	-R	default group of options for building a release (-mp)
-	-T	do a build with TRACE on
 	-U	update proto area in the parent
 	-V VERS set the build version string to VERS
 	-X	copy x86 IHV proto area
@@ -1035,6 +1038,7 @@ check_closed_tree
 # Note: changes to the option letters here should also be applied to the
 #	bldenv script.  `d' is listed for backward compatibility.
 #
+NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
 OPTIND=1
 while getopts ABDFNMPTCGIRafinlmoptuUxdrtzWS:X FLAG $NIGHTLY_OPTIONS
 do
@@ -1047,10 +1051,10 @@ do
 		;;
 	  D )	D_FLAG=y
 		;;
-	  P )	P_FLAG=y
-		;;
+	  P )	P_FLAG=y 
+		;; # obsolete
 	  T )	T_FLAG=y
-		;;
+		;; # obsolete
 	  C )	C_FLAG=y
 		;;
 	  M )	M_FLAG=y
@@ -1304,8 +1308,8 @@ rm -rf ${TMPDIR}
 mkdir -p $TMPDIR || exit 1
 
 #
-# Keep elfsign's use of pkcs11_softtoken from looking in the user home 
-# directory, which doesn't always work.   Needed until all build machines 
+# Keep elfsign's use of pkcs11_softtoken from looking in the user home
+# directory, which doesn't always work.   Needed until all build machines
 # have the fix for 6271754
 #
 SOFTTOKEN_DIR=$TMPDIR
@@ -1417,7 +1421,7 @@ logshuffle() {
 	    		state=Failed
 			;;
 	esac
-	
+
 	cat $build_time_file $mail_msg_file > ${LLOG}/mail_msg
 	if [ "$m_FLAG" = "y" ]; then
 	    	cat $build_time_file $mail_msg_file |
@@ -1558,6 +1562,14 @@ env >> $LOGFILE
 
 echo "\n==== Nightly argument issues ====\n" | tee -a $mail_msg_file >> $LOGFILE
 
+if [ "$P_FLAG" = "y" ]; then
+	obsolete_build GPROF | tee -a $mail_msg_file >> $LOGFILE
+fi
+
+if [ "$T_FLAG" = "y" ]; then
+	obsolete_build TRACE | tee -a $mail_msg_file >> $LOGFILE
+fi
+
 if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
 	if [ "$i_FLAG" = "y" -o "$i_CMD_LINE_FLAG" = "y" ]; then
 		echo "WARNING: the -S flags do not support incremental" \
@@ -1619,11 +1631,6 @@ if [ "$f_FLAG" = "y" ]; then
 		    tee -a $mail_msg_file >> $LOGFILE
 		f_FLAG=n
 	fi
-fi
-
-if [ "$T_FLAG" = "y" -a -d $SRC/uts/common/dtrace ]; then
-	echo "WARNING: TRACE build requested but workspace contains DTrace;" \
-	    "-T will have no effect\n" | tee -a $mail_msg_file >> $LOGFILE
 fi
 
 if [ "$t_FLAG" = "n" ]; then
@@ -1688,10 +1695,10 @@ fi
 ( cd $srcroot
   for target in cc-version cc64-version java-version; do
 	echo
-	# 
+	#
 	# Put statefile somewhere we know we can write to rather than trip
 	# over a read-only $srcroot.
-	# 
+	#
 	rm -f $TMPDIR/make-state
 	export SRC=$srcroot
 	if $MAKE -K $TMPDIR/make-state -e $target 2>/dev/null; then
@@ -1699,13 +1706,13 @@ fi
 	fi
 	touch $TMPDIR/nocompiler
   done
-  echo 
+  echo
 ) | tee -a $mail_msg_file >> $LOGFILE
 
-if [ -f $TMPDIR/nocompiler ]; then 
+if [ -f $TMPDIR/nocompiler ]; then
 	rm -f $TMPDIR/nocompiler
 	build_ok=n
-	echo "Aborting due to missing compiler." | 
+	echo "Aborting due to missing compiler." |
 		tee -a $mail_msg_file >> $LOGFILE
 	exit 1
 fi
@@ -1802,14 +1809,19 @@ if [ "$n_FLAG" = "n" ]; then
 	    -w $CODEMGR_WS $BRINGOVER_FILES < /dev/null 2>&1 ||
 		touch $TMPDIR/bringover_failed
 
-         staffer bringovercheck $CODEMGR_WS	      
+         staffer bringovercheck $CODEMGR_WS >$TMPDIR/bringovercheck.out 2>&1
+
+	 if [ -s $TMPDIR/bringovercheck.out ]; then
+		echo "\n==== POST-BRINGOVER CLEANUP NOISE ====\n"
+		cat $TMPDIR/bringovercheck.out
+	 fi
 
 	) | tee -a  $mail_msg_file >> $LOGFILE
 
-	if [ -f $TMPDIR/bringover_failed ]; then 
+	if [ -f $TMPDIR/bringover_failed ]; then
 		rm -f $TMPDIR/bringover_failed
 		build_ok=n
-		echo "trouble with bringover, quitting at `date`." | 
+		echo "trouble with bringover, quitting at `date`." |
 			tee -a $mail_msg_file >> $LOGFILE
 		exit 1
 	fi
@@ -2121,44 +2133,6 @@ if [ "$r_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	    diff $SRC/runtime.ref - >> $mail_msg_file
 fi
 
-# For now, don't make archives or packages for GPROF/TRACE builds
-a_FLAG=n
-p_FLAG=n
-
-# GPROF build begins
-
-if [ "$i_CMD_LINE_FLAG" = "n" -a "$P_FLAG" = "y" ]; then
-
-	export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
-	export RELEASE_BUILD ; RELEASE_BUILD=
-	export EXTRA_OPTIONS ; EXTRA_OPTIONS="-DGPROF"
-	export EXTRA_CFLAGS ; EXTRA_CFLAGS="-xpg"
-
-	build GPROF -prof
-
-else
-	echo "\n==== No GPROF build ====\n" >> $LOGFILE
-fi
-
-# GPROF build ends
-
-# TRACE build begins
-
-if [ "$i_CMD_LINE_FLAG" = "n" -a "$T_FLAG" = "y" ]; then
-
-	export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
-	export RELEASE_BUILD ; RELEASE_BUILD=
-	export EXTRA_OPTIONS ; EXTRA_OPTIONS="-DTRACE"
-	unset EXTRA_CFLAGS
-
-	build TRACE -trace
-
-else
-	echo "\n==== No TRACE build ====\n" >> $LOGFILE
-fi
-
-# TRACE build ends
-
 # DEBUG lint of kernel begins
 
 if [ "$i_CMD_LINE_FLAG" = "n" -a "$l_FLAG" = "y" ]; then
@@ -2294,7 +2268,7 @@ fi
 
 #
 # All done save for the sweeping up.
-# (whichever exit we hit here will trigger the "cleanup" trap which 
+# (whichever exit we hit here will trigger the "cleanup" trap which
 # optionally sends mail on completion).
 #
 if [ "$build_ok" = "y" ]; then

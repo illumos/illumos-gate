@@ -65,8 +65,6 @@ copy updated proto area to parent
 .TP
 list shared lib interface and compare with previous list
 .TP
-perform builds with profiling and tracing support
-.TP
 perform a "make lint" of the kernel and report errors
 .TP
 perform a "make check" to report hdrchk/cstyle errors
@@ -116,19 +114,11 @@ Do _not_ do a non-DEBUG build (use with -D to get just a DEBUG build)
 .B \-M
 Do not run pmodes (safe file permission checker)
 .TP
-.B \-P
-Do a build with GPROF on (not built by default)
-.TP
-.B \-T
-Do a build with TRACE on (not built by default).  Note: the TRACE option should
-not be used with Solaris 10 or later following the integration of DTrace as it
-is no longer applicable to the Solaris kernel source base.
-.TP
 .B \-i
-Do an incremental build, suppressing the "make clobber"
-that by default removes all existing binaries and derived files.
-From the command line, -i also suppresses profiled and trace
-builds, the lint pass and the cstyle/hdrchk pass
+Do an incremental build, suppressing the "make clobber" that by
+default removes all existing binaries and derived files.  From the
+command line, -i also suppresses the lint pass and the cstyle/hdrchk
+pass
 .TP
 .B \-n
 Suppress the bringover so that the build will start immediately with
