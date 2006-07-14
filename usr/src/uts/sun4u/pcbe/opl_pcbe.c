@@ -90,16 +90,40 @@ struct nametable {
 	const char	*name;
 };
 
+/*
+ * Performance Control Register (PCR)
+ *
+ * +----------+-----+-----+------+----+
+ * |      0   | OVF |  0  | OVR0 | 0  |
+ * +----------+-----+-----+------+----+
+ * 63     48  47:32  31:27   26    25
+ *
+ * +----+----+--- -+----+-----+---+-----+-----+----+----+----+
+ * | NC |  0 | SC  | 0  | SU  | 0 | SL  |ULRO | UT | ST |PRIV|
+ * +----+----+-----+----+-----+---+-----+-----+----+----+----+
+ * 24:22  21  20:18  17  16:11 10  9:4     3    2    1    0
+ *
+ *
+ * Performance Instrumentation Counter (PIC)
+ * Four PICs are implemented in SPARC64 VI,
+ * each PIC is accessed using PCR.SC as a select field.
+ *
+ * +------------------------+--------------------------+
+ * |         PICU	    |		PICL	       |
+ * +------------------------+--------------------------+
+ *  63			 32  31			      0
+ */
+
 #define	PIC_MASK (((uint64_t)1 << 32) - 1)
 
-#define	SPARC64_VI_PCR_PRIVPIC	UINT64_C(1)
+#define	SPARC64_VI_PCR_PRIVPIC  UINT64_C(0)
 
-#define	CPC_SPARC64_VI_PCR_USR_SHIFT	2
 #define	CPC_SPARC64_VI_PCR_SYS_SHIFT	1
+#define	CPC_SPARC64_VI_PCR_USR_SHIFT	2
 
 #define	CPC_SPARC64_VI_PCR_PICL_SHIFT	4
 #define	CPC_SPARC64_VI_PCR_PICU_SHIFT	11
-#define	CPC_SPARC64_VI_PCR_PIC_MASK	UINT64_C(0x3f)
+#define	CPC_SPARC64_VI_PCR_PIC_MASK	UINT64_C(0x3F)
 
 #define	CPC_SPARC64_VI_NPIC		8
 
@@ -252,7 +276,7 @@ static const char *opl_impl_name;
 static const char *opl_cpuref;
 static char *pic_events[CPC_SPARC64_VI_NPIC];
 
-static const char *sp_6_ref = "See the \"SPARC64 VI User's Manual\"  "
+static const char *sp_6_ref = "See the \"SPARC64 VI extensions\" "
 			"for descriptions of these events.";
 
 static int
@@ -362,15 +386,23 @@ opl_pcbe_event_coverage(char *event)
 }
 
 /*
- * XXX: Need to check if overflow bits can be cleared here.
+ * Check if counter overflow and clear it.
  */
 static uint64_t
 opl_pcbe_overflow_bitmap(void)
 {
-	uint64_t	pcr;
+	uint64_t	pcr, overflow;
 
 	pcr = ultra_getpcr();
-	return ((pcr & SPARC64_VI_PCR_OVF) >> CPC_SPARC64_VI_PCR_OVF_SHIFT);
+	DTRACE_PROBE1(sparc64__getpcr, uint64_t, pcr);
+
+	overflow = (pcr & SPARC64_VI_PCR_OVF) >>
+		CPC_SPARC64_VI_PCR_OVF_SHIFT;
+
+	if (overflow)
+		ultra_setpcr(pcr & ~SPARC64_VI_PCR_OVF);
+
+	return (overflow);
 }
 
 /*ARGSUSED*/
@@ -452,7 +484,7 @@ opl_pcbe_program(void *token)
 
 		dummypic[i] = nullpic[i];
 		dummypic[i].opl_flags = firstconfig->opl_flags;
-		pic[i] = &nullpic[i];
+		pic[i] = &dummypic[i];
 	}
 
 	/*
@@ -479,22 +511,27 @@ opl_pcbe_program(void *token)
 	 * and use that as the baseline for future samples.
 	 */
 
-	/* Set pcr */
+	/* Get PCR */
 	pcr = ultra_getpcr();
 	pcr |= (SPARC64_VI_PCR_ULRO | SPARC64_VI_PCR_OVRO);
+
 	if (pic[0]->opl_flags & CPC_COUNT_USER)
 		pcr |= SPARC64_VI_PCR_USR;
 	if (pic[0]->opl_flags & CPC_COUNT_SYSTEM)
 		pcr |= SPARC64_VI_PCR_SYS;
 
 	/* Set counter values */
+
 	for (i = 0; i < SPARC64_VI_NUM_PIC_PAIRS; i++) {
 		SPARC64_VI_PCR_SEL_PIC(pcr, i);
 		SPARC64_VI_PCR_SEL_EVENT(pcr, pic[i*2]->opl_bits,
 		    pic[i*2 + 1]->opl_bits);
 
 		ultra_setpcr(pcr);
+		DTRACE_PROBE1(sparc64__setpcr, uint64_t, pcr);
+
 		curpic = ultra_getpic();
+		DTRACE_PROBE1(sparc64__newpic, uint64_t, curpic);
 		pic[i*2]->opl_pic = (uint32_t)(curpic & PIC_MASK);
 		pic[i*2 + 1]->opl_pic = (uint32_t)(curpic >> 32);
 	}
@@ -560,7 +597,9 @@ opl_pcbe_sample(void *token)
 		    pic[i*2 + 1]->opl_bits);
 
 		ultra_setpcr(pcr);
+
 		curpic = ultra_getpic();
+		DTRACE_PROBE1(sparc64__getpic, unit64_t, curpic);
 
 		diff = (int64_t)((uint32_t)(curpic & PIC_MASK) -
 		    pic[i*2]->opl_pic);
@@ -589,7 +628,7 @@ opl_pcbe_free(void *config)
 
 static struct modlpcbe modlpcbe = {
 	&mod_pcbeops,
-	"SPARC64 VI Performance Counters v%I%",
+	"SPARC64 VI Performance Counters v1.2",
 	&opl_pcbe_ops
 };
 
