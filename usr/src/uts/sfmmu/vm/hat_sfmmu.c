@@ -910,8 +910,7 @@ hat_init_pagesizes()
 	/*
 	 * Initialize mmu-specific large page sizes.
 	 */
-	if ((mmu_page_sizes == max_mmu_page_sizes) &&
-	    (&mmu_large_pages_disabled)) {
+	if (&mmu_large_pages_disabled) {
 		disable_large_pages |= mmu_large_pages_disabled(HAT_LOAD);
 		disable_ism_large_pages |=
 		    mmu_large_pages_disabled(HAT_LOAD_SHARE);

@@ -60,12 +60,14 @@ static int panther_only = 0;
 static int pan_disable_ism_large_pages = ((1 << TTE64K) |
 	(1 << TTE512K) | (1 << TTE256M));
 static int pan_disable_large_pages = (1 << TTE256M);
-static int pan_disable_auto_large_pages = (1 << TTE4M) | (1 << TTE256M);
+static int pan_disable_auto_large_pages =  ((1 << TTE64K) |
+	(1 << TTE512K) | (1 << TTE4M) | (1 << TTE256M));
 
 static int chjag_disable_ism_large_pages = ((1 << TTE64K) |
 	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 static int chjag_disable_large_pages = ((1 << TTE32M) | (1 << TTE256M));
-static int chjag_disable_auto_large_pages = ((1 << TTE32M) | (1 << TTE256M));
+static int chjag_disable_auto_large_pages = ((1 << TTE64K) |
+	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 
 /*
  * The function returns the USIII-IV mmu-specific values for the
@@ -161,21 +163,24 @@ mmu_init_large_pages(size_t ism_pagesize)
 		pan_disable_ism_large_pages = ((1 << TTE64K) |
 			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 		pan_disable_large_pages = (1 << TTE256M);
-		pan_disable_auto_large_pages = (1 << TTE32M) | (1 << TTE256M);
+		pan_disable_auto_large_pages = ((1 << TTE64K) |
+			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 		auto_lpg_maxszc = TTE4M;
 		break;
 	case MMU_PAGESIZE32M:
 		pan_disable_ism_large_pages = ((1 << TTE64K) |
 			(1 << TTE512K) | (1 << TTE256M));
 		pan_disable_large_pages = (1 << TTE256M);
-		pan_disable_auto_large_pages = (1 << TTE4M) | (1 << TTE256M);
+		pan_disable_auto_large_pages = ((1 << TTE64K) |
+			(1 << TTE512K) | (1 << TTE4M) | (1 << TTE256M));
 		auto_lpg_maxszc = TTE32M;
 		break;
 	case MMU_PAGESIZE256M:
 		pan_disable_ism_large_pages = ((1 << TTE64K) |
 			(1 << TTE512K) | (1 << TTE32M));
 		pan_disable_large_pages = (1 << TTE32M);
-		pan_disable_auto_large_pages = (1 << TTE4M) | (1 << TTE32M);
+		pan_disable_auto_large_pages = ((1 << TTE64K) |
+			(1 << TTE512K) | (1 << TTE4M) | (1 << TTE32M));
 		auto_lpg_maxszc = TTE256M;
 		break;
 	default:
@@ -238,7 +243,7 @@ mmu_preferred_pgsz(struct hat *hat, caddr_t addr, size_t len)
 	uint_t pgsz0, pgsz1;
 	uint_t szc, maxszc = mmu_page_sizes - 1;
 	size_t pgsz;
-	extern int disable_large_pages;
+	extern int disable_auto_large_pages;
 
 	pgsz0 = (uint_t)sfmmup->sfmmu_pgsz[0];
 	pgsz1 = (uint_t)sfmmup->sfmmu_pgsz[1];
@@ -263,7 +268,7 @@ mmu_preferred_pgsz(struct hat *hat, caddr_t addr, size_t len)
 		}
 	} else { /* Otherwise pick best fit if neither TLB is reprogrammed. */
 		for (szc = maxszc; szc > TTE8K; szc--) {
-			if (disable_large_pages & (1 << szc))
+			if (disable_auto_large_pages & (1 << szc))
 				continue;
 
 			pgsz = hw_page_array[szc].hp_size;
