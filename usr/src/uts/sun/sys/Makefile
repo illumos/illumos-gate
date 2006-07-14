@@ -67,14 +67,13 @@ audio1575.h
 
 SCSIADHDRS= \
 espcmd.h	espreg.h	espvar.h	fascmd.h	fasdma.h \
-fasreg.h	fasvar.h	ifpio.h
+fasreg.h	fasvar.h	ifpio.h		sfvar.h
 
 CLOSED_SCSIAD = $(CLOSED)/uts/sun/sys/scsi/adapters
 
 CLOSED_SCSIADHDRS= \
 ifpcmd.h	ifpmail.h	ifpreg.h	ifpvar.h \
-ispcmd.h	ispmail.h	ispreg.h	ispvar.h \
-sfvar.h
+ispcmd.h	ispmail.h	ispreg.h	ispvar.h
 
 SCSITARGHDRS= \
 

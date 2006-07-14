@@ -72,6 +72,8 @@ SBUSMEM_OBJS +=	sbusmem.o
 
 SD_OBJS +=	sd.o sd_xbuf.o
 
+SF_OBJS +=	sf.o
+
 SOCAL_OBJS +=	socal.o socal_ucode.o
 
 CMLB_OBJS +=	cmlb.o
