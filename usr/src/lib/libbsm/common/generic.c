@@ -416,8 +416,9 @@ aug_audit(void)
 
 	(void) au_write(ad, au_to_subject_ex(aug_auid, aug_euid, aug_egid,
 		aug_uid, aug_gid, aug_pid, aug_asid, &aug_tid));
+	if (is_system_labeled())
+		(void) au_write(ad, au_to_mylabel());
 	if (aug_policy & AUDIT_GROUP) {
-
 		int ng;
 		gid_t grplst[NGROUPS_MAX];
 
@@ -426,9 +427,6 @@ aug_audit(void)
 			(void) au_write(ad, au_to_newgroups(ng, grplst));
 		}
 	}
-	if (is_system_labeled())
-		(void) au_write(ad, au_to_mylabel());
-
 	if (aug_text != NULL) {
 		(void) au_write(ad, au_to_text(aug_text));
 	}
@@ -446,10 +444,10 @@ aug_audit(void)
 	}
 #ifdef _LP64
 	(void) au_write(ad, au_to_return64((aug_sorf == 0) ? 0 : -1,
-						(int64_t)aug_sorf));
+	    (int64_t)aug_sorf));
 #else
 	(void) au_write(ad, au_to_return32((aug_sorf == 0) ? 0 : -1,
-						(int32_t)aug_sorf));
+	    (int32_t)aug_sorf));
 #endif
 	if (au_close(ad, 1, aug_event) < 0) {
 		(void) au_close(ad, 0, 0);

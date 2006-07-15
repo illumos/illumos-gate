@@ -250,7 +250,7 @@ end
 
 function	au_to_label
 include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	token_t *au_to_label(bslabel_t *label)
+declaration	token_t *au_to_label(m_label_t *label)
 version		SUNWprivate_1.1
 end		
 

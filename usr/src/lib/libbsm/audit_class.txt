@@ -61,29 +61,10 @@
 0x00100000:ps:process start/stop
 0x00200000:pm:process modify
 0x00300000:pc:process (meta-class)
-#
-# The following four masks define X server related audit classes which
-# are applicable to Trusted Extensions.  X server audit events are mapped
-# to these classes per the following criteria:
-#
-# xp :	Protocols audited for use of privilege (successful or otherwise).
-#	E.g., ChangeWindowAttributes is audited when issued by a client to
-#	change attributes of another client's window.  This class also includes
-#	any administrative protocols (e.g. SetAccessControl).
-# xc :	Server objects creation/destruction; e.g., CreateWindow.
-# xs :	Protocols that do not return X error messages to clients on failure for
-#	lack for security attributes.  E.g., GetImage does not return BadWindow 
-#	error if it cannot read from a window for lack of privilege. It just
-#	does not read from that window.
-#	These events should be selected for audit on success only. Selecting
-#	them for failure will cause a lot of noise in the audit trail.
-# xx : All above X classes.
-#
 0x00400000:xp:X - privileged/administrative operations
 0x00800000:xc:X - object create/destroy
 0x01000000:xs:X - operations that always silently fail, if bad
 0x01c00000:xx:X - all X events (meta-class)
-#
 0x20000000:io:ioctl
 0x40000000:ex:exec
 0x80000000:ot:other

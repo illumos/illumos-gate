@@ -41,9 +41,9 @@
 #include <netinet/in.h>
 #include <netinet/in_pcb.h>
 #include <string.h>
+#include <ucred.h>
 #include <zone.h>
 #include <sys/tsol/label.h>
-#include <sys/tsol/label_macro.h>
 
 #define	NGROUPS		16	/* XXX - temporary */
 
@@ -1246,22 +1246,26 @@ au_to_xselect(char *pstring, char *type, short dlen, char *data)
 /*
  * au_to_label
  * return s:
- *	pointer to token chain containing a sensitivity label token.
+ *	pointer to a label token.
  */
 token_t *
-au_to_label(bslabel_t *label)
+au_to_label(m_label_t *label)
 {
 	token_t *token;			/* local token */
 	adr_t adr;			/* adr memory stream header */
 	char data_header = AUT_LABEL;	/* header for this token */
-	short bs = sizeof (bslabel_t);
+	size_t llen = blabel_size();
 
-	token = get_token(sizeof (char) + bs);
-	if (token == NULL)
+	token = get_token(sizeof (char) + llen);
+	if (token == NULL) {
 		return (NULL);
+	} else if (label == NULL) {
+		free(token);
+		return (NULL);
+	}
 	adr_start(&adr, token->tt_data);
 	adr_char(&adr, &data_header, 1);
-	adr_char(&adr, (char *)label, bs);
+	adr_char(&adr, (char *)label, llen);
 
 	return (token);
 }
@@ -1269,22 +1273,21 @@ au_to_label(bslabel_t *label)
 /*
  * au_to_mylabel
  * return s:
- *	pointer to a slabel token.
+ *	pointer to a label token.
  */
 token_t *
 au_to_mylabel(void)
 {
-	bslabel_t	slabel;
-	zoneid_t	zid = getzoneid();
+	ucred_t		*uc;
+	token_t		*token;
 
-	if (zid == GLOBAL_ZONEID) {
-		bsllow(&slabel);
-	} else {
-		if (zone_getattr(zid, ZONE_ATTR_SLBL, &slabel,
-		    sizeof (bslabel_t)) < 0)
-			return (NULL);
+	if ((uc = ucred_get(P_MYID)) == NULL) {
+		return (NULL);
 	}
-	return (au_to_label(&slabel));
+
+	token = au_to_label(ucred_getlabel(uc));
+	ucred_free(uc);
+	return (token);
 }
 
 /*
