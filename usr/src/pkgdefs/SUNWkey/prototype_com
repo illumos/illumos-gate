@@ -145,6 +145,7 @@ f none usr/share/lib/keytables/type_6/latvia 444 root bin
 f none usr/share/lib/keytables/type_6/lithuania 444 root bin
 f none usr/share/lib/keytables/type_6/macedonia 444 root bin
 f none usr/share/lib/keytables/type_6/russia 444 root bin
+f none usr/share/lib/keytables/type_6/latinamerica 444 root bin
 
 l none usr/share/lib/keytables/type_6/layout_00=../../../../../usr/share/lib/keytables/type_6/us
 l none usr/share/lib/keytables/type_6/layout_02=../../../../../usr/share/lib/keytables/type_6/belgium
@@ -187,3 +188,4 @@ l none usr/share/lib/keytables/type_6/layout_109=../../../../../usr/share/lib/ke
 l none usr/share/lib/keytables/type_6/layout_10b=../../../../../usr/share/lib/keytables/type_6/macedonia
 l none usr/share/lib/keytables/type_6/layout_17=../../../../../usr/share/lib/keytables/type_6/russia
 l none usr/share/lib/keytables/type_6/layout_15=../../../../../usr/share/lib/keytables/type_6/poland
+l none usr/share/lib/keytables/type_6/layout_11=../../../../../usr/share/lib/keytables/type_6/latinamerica

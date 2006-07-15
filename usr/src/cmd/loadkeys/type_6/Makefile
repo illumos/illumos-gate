@@ -34,7 +34,8 @@ KEYTABLES = \
         swiss_french swiss_german taiwan uk \
         slovakia slovenia serbiaandmontenegro \
         iceland croatia bulgaria belarus maltaus \
-        maltauk albania turkeyq turkeyf latvia lithuania macedonia russia 
+        maltauk albania turkeyq turkeyf latvia lithuania macedonia russia \
+	latinamerica
 
 KEYTABLESCONFIG = kbd_layouts
 
@@ -54,7 +55,7 @@ LAYOUTS= \
 	layout_10a layout_10b layout_1a layout_1b layout_1c layout_1e \
 	layout_20 layout_21 layout_100 layout_18 layout_101 layout_102 \
 	layout_103 layout_104 layout_105 layout_106 layout_107 layout_108 \
-	layout_10f layout_1f layout_23 layout_15 layout_05
+	layout_10f layout_1f layout_23 layout_15 layout_05 layout_11
 
 ROOTLINKS= $(LAYOUTS:%=$(ROOTKEYDIR)/%)
 
@@ -120,6 +121,9 @@ $(ROOTKEYDIR)/layout_0f: $(ROOTKEYDIR)/japan
 
 $(ROOTKEYDIR)/layout_10: $(ROOTKEYDIR)/korea
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/korea $@
+
+$(ROOTKEYDIR)/layout_11: $(ROOTKEYDIR)/latinamerica
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/latinamerica $@
 
 $(ROOTKEYDIR)/layout_12: $(ROOTKEYDIR)/netherlands
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/netherlands $@
