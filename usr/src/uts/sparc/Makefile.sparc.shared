@@ -219,7 +219,7 @@ ALL_DEFS	 = $(MACHINE_DEFS) $(DEBUG_DEFS) $(OPTION_DEFS)
 #	Common Drivers (usually pseudo drivers) (/kernel/drv):
 #
 DRV_KMODS	+= aggr arp bl bofi clone cn conskbd consms cpuid
-DRV_KMODS	+= crypto cryptoadm dca devinfo dump
+DRV_KMODS	+= crypto cryptoadm devinfo dump
 DRV_KMODS	+= dtrace fasttrap fbt lockstat profile sdt systrace
 DRV_KMODS	+= fssnap icmp icmp6 ip ip6 ipsecah
 DRV_KMODS	+= ipsecesp iwscn keysock kmdb kstat ksyms llc1
@@ -235,6 +235,12 @@ DRV_KMODS	+= ipf pfil
 DRV_KMODS	+= rpcib
 DRV_KMODS	+= vni
 DRV_KMODS	+= xge
+
+#
+# Don't build some of these for OpenSolaris, since they will be
+# replaced by binaries that are signed by Sun Release Engineering.
+#
+$(CLOSED_BUILD)DRV_KMODS	+= dca
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= glm
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= isp

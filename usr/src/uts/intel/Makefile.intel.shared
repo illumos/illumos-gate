@@ -226,7 +226,6 @@ DRV_KMODS	+= consms
 DRV_KMODS	+= cpuid
 DRV_KMODS	+= crypto
 DRV_KMODS	+= cryptoadm
-DRV_KMODS	+= dca
 DRV_KMODS	+= devinfo
 DRV_KMODS	+= dld
 DRV_KMODS	+= dump
@@ -295,6 +294,12 @@ DRV_KMODS	+= wc
 DRV_KMODS	+= winlock
 DRV_KMODS	+= xge
 DRV_KMODS	+= zcons
+
+#
+# Don't build some of these for OpenSolaris, since they will be
+# replaced by binaries that are signed by Sun Release Engineering.
+#
+$(CLOSED_BUILD)DRV_KMODS	+= dca
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= chxge
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= glm
