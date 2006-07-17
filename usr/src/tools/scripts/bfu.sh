@@ -5997,13 +5997,17 @@ mondo_loop() {
 	nfsmapid_cfg
 
 	#
-	# Nuke the nfsauth headers. The cpio archive will lay the right
-	# one to match mountd(1m)'s comm method w/the kernel (via kRPC
-	# or Doors/XDR).
+	# Nuke the nfsauth headers when we're working with the 'global'
+	# or a fully populated local zone. The cpio archive will lay the
+	# right one to match mountd(1m)'s comm method w/the kernel (via
+	# kRPC or Doors/XDR).
 	#
-	rm -f ${usr}/include/rpcsvc/nfsauth_prot.x
-	rm -f ${usr}/include/rpcsvc/nfsauth_prot.h
-	rm -f ${usr}/include/nfs/auth.h
+	dir_is_inherited usr 2>/dev/null;
+	if [ $? = 1 -o $zone = global ]; then
+		rm -f ${rootprefix}/usr/include/rpcsvc/nfsauth_prot.x
+		rm -f ${rootprefix}/usr/include/rpcsvc/nfsauth_prot.h
+		rm -f ${rootprefix}/usr/include/nfs/auth.h
+	fi
 
 	#
 	# Move the original manifests aside; later we will restore
