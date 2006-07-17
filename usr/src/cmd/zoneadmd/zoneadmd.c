@@ -1257,6 +1257,8 @@ main(int argc, char *argv[])
 	zlog_t errlog;
 	zlog_t *zlogp;
 
+	int ctfd;
+
 	progname = get_execbasename(argv[0]);
 
 	/*
@@ -1411,12 +1413,25 @@ main(int argc, char *argv[])
 	(void) sigaddset(&block_cld, SIGCHLD);
 	(void) sigprocmask(SIG_BLOCK, &block_cld, NULL);
 
+	if ((ctfd = init_template()) == -1) {
+		zerror(zlogp, B_TRUE, "failed to create contract");
+		return (1);
+	}
+
 	/*
 	 * Do not let another thread localize a message while we are forking.
 	 */
 	(void) mutex_lock(&msglock);
 	pid = fork();
 	(void) mutex_unlock(&msglock);
+
+	/*
+	 * In all cases (parent, child, and in the event of an error) we
+	 * don't want to cause creation of contracts on subsequent fork()s.
+	 */
+	(void) ct_tmpl_clear(ctfd);
+	(void) close(ctfd);
+
 	if (pid == -1) {
 		zerror(zlogp, B_TRUE, "could not fork");
 		return (1);
