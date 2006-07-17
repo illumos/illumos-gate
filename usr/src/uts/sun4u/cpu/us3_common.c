@@ -143,6 +143,9 @@ static void cpu_log_fast_ecc_error(caddr_t tpc, int priv, int tl, uint64_t ceen,
     uint64_t nceen, ch_cpu_logout_t *clop);
 static int cpu_ce_delayed_ec_logout(uint64_t);
 static int cpu_matching_ecache_line(uint64_t, void *, int, int *);
+static int cpu_error_is_ecache_data(int, uint64_t);
+static void cpu_fmri_cpu_set(nvlist_t *, int);
+static int cpu_error_to_resource_type(struct async_flt *aflt);
 
 #ifdef	CHEETAHPLUS_ERRATUM_25
 static int mondo_recover_proc(uint16_t, int);
@@ -303,6 +306,14 @@ NA, MTC0, MTC1, M2, MTC2, M2, M2, MT0, MTC3, M2, M2,  MT1, M2, MT2, M2, M2
 #define	BSYND_TBL_SIZE	16
 
 #endif /* !(JALAPENO || SERRANO) */
+
+/*
+ * Types returned from cpu_error_to_resource_type()
+ */
+#define	ERRTYPE_UNKNOWN		0
+#define	ERRTYPE_CPU		1
+#define	ERRTYPE_MEMORY		2
+#define	ERRTYPE_ECACHE_DATA	3
 
 /*
  * CE initial classification and subsequent action lookup table
@@ -2489,6 +2500,26 @@ cpu_page_retire(ch_async_flt_t *ch_flt)
 }
 
 /*
+ * Return true if the error specified in the AFSR indicates
+ * an E$ data error (L2$ for Cheetah/Cheetah+/Jaguar, L3$
+ * for Panther, none for Jalapeno/Serrano).
+ */
+/* ARGSUSED */
+static int
+cpu_error_is_ecache_data(int cpuid, uint64_t t_afsr)
+{
+#if defined(JALAPENO) || defined(SERRANO)
+	return (0);
+#elif defined(CHEETAH_PLUS)
+	if (IS_PANTHER(cpunodes[cpuid].implementation))
+		return ((t_afsr & C_AFSR_EXT_L3_DATA_ERRS) != 0);
+	return ((t_afsr & C_AFSR_EC_DATA_ERRS) != 0);
+#else	/* CHEETAH_PLUS */
+	return ((t_afsr & C_AFSR_EC_DATA_ERRS) != 0);
+#endif
+}
+
+/*
  * The cpu_log_err() function is called by cpu_async_log_err() to perform the
  * generic event post-processing for correctable and uncorrectable memory,
  * E$, and MTag errors.  Historically this entry point was used to log bits of
@@ -2504,19 +2535,10 @@ cpu_log_err(struct async_flt *aflt)
 	int synd_status, synd_code, afar_status;
 	ch_async_flt_t *ch_flt = (ch_async_flt_t *)aflt;
 
-	/*
-	 * Need to turn on ECC_ECACHE for plat_get_mem_unum().
-	 * For Panther, L2$ is not external, so we don't want to
-	 * generate an E$ unum for those errors.
-	 */
-	if (IS_PANTHER(cpunodes[aflt->flt_inst].implementation)) {
-		if (ch_flt->flt_bit & C_AFSR_EXT_L3_ERRS)
-			aflt->flt_status |= ECC_ECACHE;
-	} else {
-		if (ch_flt->flt_bit & C_AFSR_ECACHE)
-			aflt->flt_status |= ECC_ECACHE;
-	}
-
+	if (cpu_error_is_ecache_data(aflt->flt_inst, ch_flt->flt_bit))
+		aflt->flt_status |= ECC_ECACHE;
+	else
+		aflt->flt_status &= ~ECC_ECACHE;
 	/*
 	 * Determine syndrome status.
 	 */
@@ -3290,7 +3312,7 @@ cpu_async_panic_callb(void)
 	get_cpu_error_state(&cpu_error_regs);
 
 	afsr_errs = (cpu_error_regs.afsr & C_AFSR_ALL_ERRS) |
-	    (cpu_error_regs.afsr_ext & C_AFSR_EXT_L3_ERRS);
+	    (cpu_error_regs.afsr_ext & C_AFSR_EXT_ALL_ERRS);
 
 	if (afsr_errs) {
 
@@ -3433,14 +3455,16 @@ cpu_get_mem_unum_aflt(int synd_status, struct async_flt *aflt,
 	 */
 	return (cpu_get_mem_unum(synd_status, aflt->flt_synd,
 	    (aflt->flt_class == BUS_FAULT) ?
-	    (uint64_t)-1 : ((ch_async_flt_t *)(aflt))->afsr_errs,
+	    (uint64_t)-1 : ((ch_async_flt_t *)aflt)->flt_bit,
 	    aflt->flt_addr, aflt->flt_bus_id, aflt->flt_in_memory,
 	    aflt->flt_status, buf, buflen, lenp));
 }
 
 /*
  * This routine is a more generic interface to cpu_get_mem_unum()
- * that may be used by other modules (e.g. mm).
+ * that may be used by other modules (e.g. the 'mm' driver, through
+ * the 'MEM_NAME' ioctl, which is used by fmd to resolve unum's
+ * for Jalapeno/Serrano FRC/RCE or FRU/RUE paired events).
  */
 int
 cpu_get_mem_name(uint64_t synd, uint64_t *afsr, uint64_t afar,
@@ -3449,6 +3473,7 @@ cpu_get_mem_name(uint64_t synd, uint64_t *afsr, uint64_t afar,
 	int synd_status, flt_in_memory, ret;
 	ushort_t flt_status = 0;
 	char unum[UNUM_NAMLEN];
+	uint64_t t_afsr_errs;
 
 	/*
 	 * Check for an invalid address.
@@ -3465,19 +3490,25 @@ cpu_get_mem_name(uint64_t synd, uint64_t *afsr, uint64_t afar,
 	    pf_is_memory(afar >> MMU_PAGESHIFT);
 
 	/*
-	 * Need to turn on ECC_ECACHE for plat_get_mem_unum().
-	 * For Panther, L2$ is not external, so we don't want to
-	 * generate an E$ unum for those errors.
+	 * Get aggregate AFSR for call to cpu_error_is_ecache_data.
 	 */
-	if (IS_PANTHER(cpunodes[CPU->cpu_id].implementation)) {
-		if (*(afsr + 1) & C_AFSR_EXT_L3_ERRS)
-			flt_status |= ECC_ECACHE;
-	} else {
-		if (*afsr & C_AFSR_ECACHE)
-			flt_status |= ECC_ECACHE;
+	if (*afsr == (uint64_t)-1)
+		t_afsr_errs = C_AFSR_CE;
+	else {
+		t_afsr_errs = (*afsr & C_AFSR_ALL_ERRS);
+#if defined(CHEETAH_PLUS)
+		if (IS_PANTHER(cpunodes[CPU->cpu_id].implementation))
+			t_afsr_errs |= (*(afsr + 1) & C_AFSR_EXT_ALL_ERRS);
+#endif	/* CHEETAH_PLUS */
 	}
 
-	ret = cpu_get_mem_unum(synd_status, (ushort_t)synd, *afsr, afar,
+	/*
+	 * Turn on ECC_ECACHE if error type is E$ Data.
+	 */
+	if (cpu_error_is_ecache_data(CPU->cpu_id, t_afsr_errs))
+		flt_status |= ECC_ECACHE;
+
+	ret = cpu_get_mem_unum(synd_status, (ushort_t)synd, t_afsr_errs, afar,
 	    CPU->cpu_id, flt_in_memory, flt_status, unum, UNUM_NAMLEN, lenp);
 	if (ret != 0)
 		return (ret);
@@ -4355,6 +4386,67 @@ cpu_payload_add_ecache(struct async_flt *aflt, nvlist_t *nvl)
 }
 
 /*
+ * Initialize cpu scheme for specified cpu.
+ */
+static void
+cpu_fmri_cpu_set(nvlist_t *cpu_fmri, int cpuid)
+{
+	char sbuf[21]; /* sizeof (UINT64_MAX) + '\0' */
+	uint8_t mask;
+
+	mask = cpunodes[cpuid].version;
+	(void) snprintf(sbuf, sizeof (sbuf), "%llX",
+	    (u_longlong_t)cpunodes[cpuid].device_id);
+	(void) fm_fmri_cpu_set(cpu_fmri, FM_CPU_SCHEME_VERSION, NULL,
+	    cpuid, &mask, (const char *)sbuf);
+}
+
+/*
+ * Returns ereport resource type.
+ */
+static int
+cpu_error_to_resource_type(struct async_flt *aflt)
+{
+	ch_async_flt_t *ch_flt = (ch_async_flt_t *)aflt;
+
+	switch (ch_flt->flt_type) {
+
+	case CPU_CE_ECACHE:
+	case CPU_UE_ECACHE:
+	case CPU_UE_ECACHE_RETIRE:
+	case CPU_ORPH:
+		/*
+		 * If AFSR error bit indicates L2$ Data for Cheetah,
+		 * Cheetah+ or Jaguar, or L3$ Data for Panther, return
+		 * E$ Data type, otherwise, return CPU type.
+		 */
+		if (cpu_error_is_ecache_data(aflt->flt_inst,
+		    ch_flt->flt_bit))
+			return (ERRTYPE_ECACHE_DATA);
+		return (ERRTYPE_CPU);
+
+	case CPU_CE:
+	case CPU_UE:
+	case CPU_EMC:
+	case CPU_DUE:
+	case CPU_RCE:
+	case CPU_RUE:
+	case CPU_FRC:
+	case CPU_FRU:
+		return (ERRTYPE_MEMORY);
+
+	case CPU_IC_PARITY:
+	case CPU_DC_PARITY:
+	case CPU_FPUERR:
+	case CPU_PC_PARITY:
+	case CPU_ITLB_PARITY:
+	case CPU_DTLB_PARITY:
+		return (ERRTYPE_CPU);
+	}
+	return (ERRTYPE_UNKNOWN);
+}
+
+/*
  * Encode the data saved in the ch_async_flt_t struct into
  * the FM ereport payload.
  */
@@ -4474,16 +4566,32 @@ cpu_payload_add_aflt(struct async_flt *aflt, nvlist_t *payload,
 	 * Create the FMRI that goes into the payload
 	 * and contains the unum info if necessary.
 	 */
-	if ((aflt->flt_payload & FM_EREPORT_PAYLOAD_FLAG_RESOURCE) &&
-	    (*afar_status == AFLT_STAT_VALID)) {
+	if (aflt->flt_payload & FM_EREPORT_PAYLOAD_FLAG_RESOURCE) {
 		char unum[UNUM_NAMLEN] = "";
 		char sid[DIMM_SERIAL_ID_LEN] = "";
-		int len;
+		int len, ret, rtype;
+		uint64_t offset = (uint64_t)-1;
 
-		if (cpu_get_mem_unum_aflt(*synd_status, aflt, unum,
-		    UNUM_NAMLEN, &len) == 0) {
-			uint64_t offset = (uint64_t)-1;
-			int ret;
+		rtype = cpu_error_to_resource_type(aflt);
+		switch (rtype) {
+
+		case ERRTYPE_MEMORY:
+		case ERRTYPE_ECACHE_DATA:
+
+			/*
+			 * Memory errors, do unum lookup
+			 */
+			if (*afar_status == AFLT_STAT_INVALID)
+				break;
+
+			if (rtype == ERRTYPE_ECACHE_DATA)
+				aflt->flt_status |= ECC_ECACHE;
+			else
+				aflt->flt_status &= ~ECC_ECACHE;
+
+			if (cpu_get_mem_unum_aflt(*synd_status, aflt, unum,
+			    UNUM_NAMLEN, &len) != 0)
+				break;
 
 			ret = cpu_get_mem_sid(unum, sid, DIMM_SERIAL_ID_LEN,
 			    &len);
@@ -4498,6 +4606,17 @@ cpu_payload_add_aflt(struct async_flt *aflt, nvlist_t *payload,
 			fm_payload_set(payload,
 			    FM_EREPORT_PAYLOAD_NAME_RESOURCE,
 			    DATA_TYPE_NVLIST, resource, NULL);
+			break;
+
+		case ERRTYPE_CPU:
+			/*
+			 * On-board processor array error, add cpu resource.
+			 */
+			cpu_fmri_cpu_set(resource, aflt->flt_inst);
+			fm_payload_set(payload,
+			    FM_EREPORT_PAYLOAD_NAME_RESOURCE,
+			    DATA_TYPE_NVLIST, resource, NULL);
+			break;
 		}
 	}
 }
@@ -4534,7 +4653,7 @@ cpu_flt_in_memory(ch_async_flt_t *ch_flt, uint64_t t_afsr_bit)
 {
 	struct async_flt *aflt = (struct async_flt *)ch_flt;
 
-	return ((aflt->flt_stat & C_AFSR_MEMORY) &&
+	return ((t_afsr_bit & C_AFSR_MEMORY) &&
 	    afsr_to_afar_status(ch_flt->afsr_errs, t_afsr_bit) ==
 	    AFLT_STAT_VALID &&
 	    pf_is_memory(aflt->flt_addr >> MMU_PAGESHIFT));
@@ -6386,14 +6505,13 @@ void
 cpu_ereport_post(struct async_flt *aflt)
 {
 	char *cpu_type, buf[FM_MAX_CLASS];
-	char sbuf[21]; /* sizeof (UINT64_MAX) + '\0' */
 	nv_alloc_t *nva = NULL;
 	nvlist_t *ereport, *detector, *resource;
 	errorq_elem_t *eqep;
 	ch_async_flt_t *ch_flt = (ch_async_flt_t *)aflt;
 	char unum[UNUM_NAMLEN];
 	int len = 0;
-	uint8_t msg_type, mask;
+	uint8_t msg_type;
 	plat_ecc_ch_async_flt_t	plat_ecc_ch_flt;
 
 	if (aflt->flt_panic || panicstr) {
@@ -6434,11 +6552,8 @@ cpu_ereport_post(struct async_flt *aflt)
 		cpu_type = FM_EREPORT_CPU_UNSUPPORTED;
 		break;
 	}
-	mask = cpunodes[aflt->flt_inst].version;
-	(void) snprintf(sbuf, sizeof (sbuf), "%llX",
-	    (u_longlong_t)cpunodes[aflt->flt_inst].device_id);
-	(void) fm_fmri_cpu_set(detector, FM_CPU_SCHEME_VERSION, NULL,
-	    aflt->flt_inst, &mask, (const char *)sbuf);
+
+	cpu_fmri_cpu_set(detector, aflt->flt_inst);
 
 	/*
 	 * Encode all the common data into the ereport.

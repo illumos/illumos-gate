@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,19 +128,6 @@ extern "C" {
 			C_AFSR_JEIC | C_AFSR_JEIT | C_AFSR_JEIS)
 #endif /* SERRANO */
 
-#if defined(SERRANO)
-/* SERRANO AFSR bits due to an Ecache error */
-#define	C_AFSR_ECACHE	(C_AFSR_UCU | C_AFSR_UCC | C_AFSR_EDU | C_AFSR_EDC | \
-			C_AFSR_WDU | C_AFSR_WDC | C_AFSR_CPU | C_AFSR_CPC | \
-			C_AFSR_ETU  | C_AFSR_ETS | C_AFSR_ETI | C_AFSR_ETC)
-
-#else /* SERRANO */
-/* JP AFSR bits due to an Ecache error */
-#define	C_AFSR_ECACHE	(C_AFSR_UCU | C_AFSR_UCC | C_AFSR_EDU | C_AFSR_EDC | \
-			C_AFSR_WDU | C_AFSR_WDC | C_AFSR_CPU | C_AFSR_CPC | \
-			C_AFSR_ETP)
-#endif /* SERRANO */
-
 /* JP AFSR bits due to a Memory error */
 #define	C_AFSR_MEMORY	(C_AFSR_UE | C_AFSR_CE | C_AFSR_FRC | C_AFSR_FRU |\
 			C_AFSR_RCE | C_AFSR_RUE)
@@ -195,10 +181,10 @@ extern "C" {
 			C_AFSR_L3_UCC | C_AFSR_L3_UCU | C_AFSR_L3_CPU | \
 			C_AFSR_L3_WDU)
 
-/* Ch+ AFSR bits due to an Ecache error */
-#define	C_AFSR_ECACHE	(C_AFSR_UCU | C_AFSR_UCC | C_AFSR_EDU | C_AFSR_EDC | \
-			C_AFSR_WDU | C_AFSR_WDC | C_AFSR_CPU | C_AFSR_CPC | \
-			C_AFSR_TUE | C_AFSR_TSCE | C_AFSR_THCE | C_AFSR_TUE_SH)
+/* Ch+ AFSR bits due to an Ecache data error */
+#define	C_AFSR_EC_DATA_ERRS	(C_AFSR_UCU | C_AFSR_UCC | C_AFSR_EDU | \
+			C_AFSR_EDC | C_AFSR_WDU | C_AFSR_WDC | C_AFSR_CPU | \
+			C_AFSR_CPC)
 
 /* Ch+ AFSR bits due to a Memory error */
 #define	C_AFSR_MEMORY	(C_AFSR_UE | C_AFSR_CE | C_AFSR_EMU | C_AFSR_EMC | \
@@ -248,8 +234,9 @@ extern "C" {
 			C_AFSR_CPU | C_AFSR_UCC | C_AFSR_BERR | C_AFSR_TO)
 
 /* AFSR bits due to an Ecache error */
-#define	C_AFSR_ECACHE	(C_AFSR_UCU | C_AFSR_UCC | C_AFSR_EDU | C_AFSR_EDC | \
-			C_AFSR_WDU | C_AFSR_WDC | C_AFSR_CPU | C_AFSR_CPC)
+#define	C_AFSR_EC_DATA_ERRS	(C_AFSR_UCU | C_AFSR_UCC | C_AFSR_EDU | \
+			C_AFSR_EDC | C_AFSR_WDU | C_AFSR_WDC | C_AFSR_CPU | \
+			C_AFSR_CPC)
 
 /* AFSR bits due to a Memory error */
 #define	C_AFSR_MEMORY	(C_AFSR_UE | C_AFSR_CE | C_AFSR_EMU | C_AFSR_EMC)
@@ -306,11 +293,10 @@ extern "C" {
 			C_AFSR_EXT_FECC_ERRS | C_AFSR_EXT_CECC_ERRS | \
 			C_AFSR_EXT_ASYNC_ERRS | C_AFSR_L3_MECC)
 
-/* Panther AFSR_EXT bits due to L3 cache errors */
-#define	C_AFSR_EXT_L3_ERRS	(C_AFSR_L3_WDU | C_AFSR_L3_WDC | \
+/* Panther AFSR_EXT bits due to L3 cache data errors */
+#define	C_AFSR_EXT_L3_DATA_ERRS	(C_AFSR_L3_WDU | C_AFSR_L3_WDC | \
 			C_AFSR_L3_CPU | C_AFSR_L3_CPC | C_AFSR_L3_UCU | \
-			C_AFSR_L3_UCC | C_AFSR_L3_EDU | C_AFSR_L3_EDC | \
-			C_AFSR_L3_TUE | C_AFSR_L3_TUE_SH | C_AFSR_L3_THCE)
+			C_AFSR_L3_UCC | C_AFSR_L3_EDU | C_AFSR_L3_EDC)
 
 /* Panther AFSR_EXT bits with a valid ESYND field */
 #define	C_AFSR_EXT_ESYND_ERRS	(C_AFSR_L3_UCU | C_AFSR_L3_UCC | \

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,7 +205,8 @@ extern "C" {
 					    FM_EREPORT_PAYLOAD_FLAGS_TRAP | \
 					    FM_EREPORT_PAYLOAD_FLAG_PRIV | \
 					    FM_EREPORT_PAYLOAD_FLAG_ME | \
-					    FM_EREPORT_PAYLOAD_FLAGS_L1L2)
+					    FM_EREPORT_PAYLOAD_FLAGS_L1L2 | \
+					    FM_EREPORT_PAYLOAD_FLAG_RESOURCE)
 #define	FM_EREPORT_PAYLOAD_L2_TAG_ECC	(FM_EREPORT_PAYLOAD_FLAG_AFSRS | \
 					    FM_EREPORT_PAYLOAD_FLAGS_AFAR | \
 					    FM_EREPORT_PAYLOAD_FLAG_PC | \
@@ -214,6 +214,7 @@ extern "C" {
 					    FM_EREPORT_PAYLOAD_FLAG_PRIV | \
 					    FM_EREPORT_PAYLOAD_FLAG_ME | \
 					    FM_EREPORT_PAYLOAD_FLAGS_L1L2 | \
+					    FM_EREPORT_PAYLOAD_FLAG_RESOURCE | \
 					    FM_EREPORT_PAYLOAD_FLAGS_L3)
 #define	FM_EREPORT_PAYLOAD_L3_TAG_ECC	(FM_EREPORT_PAYLOAD_FLAG_AFSRS | \
 					    FM_EREPORT_PAYLOAD_FLAGS_AFAR | \
@@ -222,6 +223,7 @@ extern "C" {
 					    FM_EREPORT_PAYLOAD_FLAG_PRIV | \
 					    FM_EREPORT_PAYLOAD_FLAG_ME | \
 					    FM_EREPORT_PAYLOAD_FLAGS_L1L2 | \
+					    FM_EREPORT_PAYLOAD_FLAG_RESOURCE | \
 					    FM_EREPORT_PAYLOAD_FLAGS_L3)
 #define	FM_EREPORT_PAYLOAD_L2_DATA	(FM_EREPORT_PAYLOAD_FLAG_AFSRS | \
 					    FM_EREPORT_PAYLOAD_FLAGS_AFAR | \
@@ -258,26 +260,32 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_ICACHE_PE	(FM_EREPORT_PAYLOAD_FLAG_PC | \
 					    FM_EREPORT_PAYLOAD_FLAGS_TRAP | \
 					    FM_EREPORT_PAYLOAD_FLAG_PRIV | \
-					    FM_EREPORT_PAYLOAD_FLAGS_L1I)
+					    FM_EREPORT_PAYLOAD_FLAGS_L1I| \
+					    FM_EREPORT_PAYLOAD_FLAG_RESOURCE)
 #define	FM_EREPORT_PAYLOAD_DCACHE_PE	(FM_EREPORT_PAYLOAD_FLAG_PC | \
 					    FM_EREPORT_PAYLOAD_FLAGS_TRAP | \
 					    FM_EREPORT_PAYLOAD_FLAG_PRIV | \
-					    FM_EREPORT_PAYLOAD_FLAGS_L1D)
+					    FM_EREPORT_PAYLOAD_FLAGS_L1D| \
+					    FM_EREPORT_PAYLOAD_FLAG_RESOURCE)
 #define	FM_EREPORT_PAYLOAD_PCACHE_PE	(FM_EREPORT_PAYLOAD_FLAG_PC | \
 					    FM_EREPORT_PAYLOAD_FLAGS_TRAP | \
 					    FM_EREPORT_PAYLOAD_FLAG_PRIV | \
-					    FM_EREPORT_PAYLOAD_FLAGS_L1P)
+					    FM_EREPORT_PAYLOAD_FLAGS_L1P| \
+					    FM_EREPORT_PAYLOAD_FLAG_RESOURCE)
 #define	FM_EREPORT_PAYLOAD_ITLB_PE	(FM_EREPORT_PAYLOAD_FLAG_PC | \
 					    FM_EREPORT_PAYLOAD_FLAGS_TRAP | \
 					    FM_EREPORT_PAYLOAD_FLAG_PRIV | \
-					    FM_EREPORT_PAYLOAD_FLAGS_ITLB)
+					    FM_EREPORT_PAYLOAD_FLAGS_ITLB| \
+					    FM_EREPORT_PAYLOAD_FLAG_RESOURCE)
 #define	FM_EREPORT_PAYLOAD_DTLB_PE	(FM_EREPORT_PAYLOAD_FLAG_PC | \
 					    FM_EREPORT_PAYLOAD_FLAGS_TRAP | \
 					    FM_EREPORT_PAYLOAD_FLAG_PRIV | \
 					    FM_EREPORT_PAYLOAD_FLAGS_DTLB | \
-					    FM_EREPORT_PAYLOAD_FLAG_FAULT_VA)
+					    FM_EREPORT_PAYLOAD_FLAG_FAULT_VA| \
+					    FM_EREPORT_PAYLOAD_FLAG_RESOURCE)
 #define	FM_EREPORT_PAYLOAD_FPU_HWCOPY	(FM_EREPORT_PAYLOAD_FLAG_COPYFUNCTION |\
 					    FM_EREPORT_PAYLOAD_FLAG_INSTRBLOCK|\
+					    FM_EREPORT_PAYLOAD_FLAG_RESOURCE | \
 					    FM_EREPORT_PAYLOAD_FLAG_HOWDETECTED)
 /*
  * FM_EREPORT_PAYLOAD_UNKNOWN
