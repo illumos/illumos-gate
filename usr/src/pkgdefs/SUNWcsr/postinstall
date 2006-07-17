@@ -136,7 +136,8 @@ if [ "$UPDATE" != yes ]; then
 	# customize, if appropriate.
 	#
 	ln -s ns_files.xml $BASEDIR/var/svc/profile/name_service.xml
-elif [ ! -r $BASEDIR/var/svc/profile/name_service.xml ]; then
+elif [ ! -r $BASEDIR/var/svc/profile/name_service.xml ] || \
+	[ ! -L $BASEDIR/var/svc/profile/name_service.xml ]; then
 	#
 	# Associate name service profile, if none present.
 	#
@@ -155,6 +156,11 @@ elif [ ! -r $BASEDIR/var/svc/profile/name_service.xml ]; then
 		ns_profile=ns_nis.xml
 	else
 		ns_profile=ns_files.xml
+	fi
+
+	# Remove stale copy of name_service.xml, if it is not a symlink.
+	if [ ! -L $BASEDIR/var/svc/profile/name_service.xml ]; then
+		/usr/bin/rm -f $BASEDIR/var/svc/profile/name_service.xml
 	fi
 
 	ln -s $ns_profile $BASEDIR/var/svc/profile/name_service.xml
