@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -777,6 +777,7 @@ static int pk11_RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 	PK11_SESSION *sp = NULL;
 	int ret = 0;
 	char tmp_buf[20];
+	unsigned long ulsiglen;
 
 	/* Encode the digest */
 	/* Special case: SSL signature, just check the length */
@@ -859,9 +860,10 @@ static int pk11_RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 			goto err;
 			}
 
-		*siglen = j;
+		ulsiglen = j;
 		rv = pFuncList->C_Sign(sp->session, s, i, sigret, 
-			(CK_ULONG_PTR)siglen);
+			(CK_ULONG_PTR) &ulsiglen);
+		*siglen = ulsiglen;
 
 		if (rv != CKR_OK)
 			{
@@ -1360,7 +1362,7 @@ pk11_dsa_do_sign(const unsigned char *dgst, int dlen, DSA *dsa)
 	 * each is 20 bytes long
 	 */
 	unsigned char sigret[DSA_SIGNATURE_LEN];
-	unsigned int siglen = DSA_SIGNATURE_LEN;
+	unsigned long siglen = DSA_SIGNATURE_LEN;
 	unsigned int siglen2 = DSA_SIGNATURE_LEN / 2;
 
 	PK11_SESSION *sp = NULL;
