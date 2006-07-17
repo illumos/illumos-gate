@@ -25,7 +25,7 @@
  *
  */
 
-/* $Id: job.c 155 2006-04-26 02:34:54Z ktou $ */
+/* $Id: job.c 179 2006-07-17 18:24:07Z njacobs $ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -143,7 +143,6 @@ papiJobStreamOpen(papi_service_t handle, char *name,
 
 		if ((s->fd = mkstemp(dfname)) >= 0)
 			s->dfname = strdup(dfname);
-		s->job->attributes = attributes;
 	}
 	s->metadata = metadata;
 

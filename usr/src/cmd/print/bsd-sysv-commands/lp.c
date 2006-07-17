@@ -25,7 +25,7 @@
  *
  */
 
-/* $Id: lp.c 169 2006-05-20 05:58:14Z njacobs $ */
+/* $Id: lp.c 179 2006-07-17 18:24:07Z njacobs $ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -303,12 +303,12 @@ main(int ac, char *av[])
 
 	if (((silent == 0) || (dump != 0)) &&
 	    ((list = papiJobGetAttributeList(job)) != NULL)) {
-		char *dest = "unknown";
 		int32_t id = 0;
 
-		papiAttributeListGetString(list, NULL, "printer-name", &dest);
+		papiAttributeListGetString(list, NULL,
+					"printer-name", &printer);
 		papiAttributeListGetInteger(list, NULL, "job-id", &id);
-		printf(gettext("request id is %s-%d "), dest, id);
+		printf(gettext("request id is %s-%d "), printer, id);
 		if (ac != optind)
 			printf("(%d file(s))\n", ac - optind);
 		else
