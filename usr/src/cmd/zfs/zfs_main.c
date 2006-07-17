@@ -177,6 +177,8 @@ get_usage(zfs_help_t idx)
 	case HELP_LIST:
 		return (gettext("\tlist [-rH] [-o property[,property]...] "
 		    "[-t type[,type]...]\n"
+		    "\t    [-s property [-s property]...]"
+		    " [-S property [-S property]...]\n"
 		    "\t    [filesystem|volume|snapshot] ...\n"));
 	case HELP_MOUNT:
 		return (gettext("\tmount\n"
@@ -1051,8 +1053,9 @@ zfs_do_get(int argc, char **argv)
 	}
 
 	/* run for each object */
-	return (zfs_for_each(argc, argv, recurse, ZFS_TYPE_ANY,
+	return (zfs_for_each(argc, argv, recurse, ZFS_TYPE_ANY, NULL,
 	    get_callback, &cb));
+
 }
 
 /*
@@ -1135,17 +1138,21 @@ zfs_do_inherit(int argc, char **argv)
 	}
 
 	return (zfs_for_each(argc - 1, argv + 1, recurse,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, NULL,
 	    inherit_callback, (void *)prop));
 }
 
 /*
- * list [-rH] [-o property[,property]...] [-t type[,type]...] <dataset> ...
+ * list [-rH] [-o property[,property]...] [-t type[,type]...]
+ *      [-s property [-s property]...] [-S property [-S property]...]
+ *      <dataset> ...
  *
  * 	-r	Recurse over all children
  * 	-H	Scripted mode; elide headers and separate colums by tabs
  * 	-o	Control which fields to display.
  * 	-t	Control which object types to display.
+ *	-s	Specify sort columns, descending order.
+ *	-S	Specify sort columns, ascending order.
  *
  * When given no arguments, lists all filesystems in the system.
  * Otherwise, list the specified datasets, optionally recursing down them if
@@ -1254,9 +1261,12 @@ zfs_do_list(int argc, char **argv)
 	char *type_subopts[] = { "filesystem", "volume", "snapshot", NULL };
 	char *badopt;
 	int alloffset;
+	zfs_sort_column_t *sortcol = NULL;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":o:rt:H")) != -1) {
+	while ((c = getopt(argc, argv, ":o:rt:Hs:S:")) != -1) {
+		zfs_prop_t	prop;
+
 		switch (c) {
 		case 'o':
 			fields = optarg;
@@ -1266,6 +1276,24 @@ zfs_do_list(int argc, char **argv)
 			break;
 		case 'H':
 			scripted = B_TRUE;
+			break;
+		case 's':
+			if ((prop = zfs_name_to_prop(optarg)) ==
+			    ZFS_PROP_INVAL) {
+				(void) fprintf(stderr,
+				    gettext("invalid property '%s'\n"), optarg);
+				usage(B_FALSE);
+			}
+			zfs_add_sort_column(&sortcol, prop, B_FALSE);
+			break;
+		case 'S':
+			if ((prop = zfs_name_to_prop(optarg)) ==
+			    ZFS_PROP_INVAL) {
+				(void) fprintf(stderr,
+				    gettext("invalid property '%s'\n"), optarg);
+				usage(B_FALSE);
+			}
+			zfs_add_sort_column(&sortcol, prop, B_TRUE);
 			break;
 		case 't':
 			types = 0;
@@ -1334,7 +1362,10 @@ zfs_do_list(int argc, char **argv)
 	cb.cb_scripted = scripted;
 	cb.cb_first = B_TRUE;
 
-	ret = zfs_for_each(argc, argv, recurse, types, list_callback, &cb);
+	ret = zfs_for_each(argc, argv, recurse, types, sortcol,
+	    list_callback, &cb);
+
+	zfs_free_sort_columns(sortcol);
 
 	if (ret == 0 && cb.cb_first)
 		(void) printf(gettext("no datasets available\n"));
@@ -1777,7 +1808,7 @@ zfs_do_set(int argc, char **argv)
 		return (1);
 
 	return (zfs_for_each(argc - 2, argv + 2, B_FALSE,
-	    ZFS_TYPE_ANY, set_callback, &cb));
+	    ZFS_TYPE_ANY, NULL, set_callback, &cb));
 }
 
 /*
