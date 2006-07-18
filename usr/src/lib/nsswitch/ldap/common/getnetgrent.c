@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,89 +29,24 @@
 #include "ldap_common.h"
 
 /* netgroup attributes filters */
-#define	_N_NAME			"cn"
 #define	_N_TRIPLE		"nisnetgrouptriple"
 #define	_N_MEMBER		"membernisnetgroup"
 
 #define	PRINT_VAL(a)		(((a).argc == 0) || ((a).argv == NULL) || \
 				    ((a).argv[0] == NULL)) ? "*" : (a).argv[0]
-#define	ISWILD(a)		((a) == NULL)
-#define	GET_ARGV(a)		(((a).argc == 0) || ((a).argv == NULL) || \
-				    ((a).argv[0] == NULL)) ? NULL : (a).argv[0]
 #define	ISNULL(a)		(a == NULL ? "<NULL>" : a)
-#define	MAX_NETGR_NAME_LEN	256
 #define	MAX_DOMAIN_LEN		1024
 #define	MAX_TRIPLE_LEN		(MAXHOSTNAMELEN + LOGNAME_MAX + \
 					MAX_DOMAIN_LEN + 5)
 
-#define	_F_GETNETGR_TRIPLE		\
-	"(&(objectClass=nisNetGroup)"	\
-		"(|(nisnetgrouptriple=(%s,%s,*))(nisnetgrouptriple=(%s,,*))" \
-		"(nisnetgrouptriple=(,%s,*))(nisnetgrouptriple=(,,*))))"
-#define	_F_GETNETGR_TRIPLE_SSD		\
-	"(&(%%s)(|(nisnetgrouptriple=(%s,%s,*))(nisnetgrouptriple=(%s,,*))" \
-		"(nisnetgrouptriple=(,%s,*))(nisnetgrouptriple=(,,*))))"
-#define	_F_GETNETGR_TRIPLE_MACHINE	\
-	"(&(objectClass=nisNetGroup)"	\
-		"(|(nisnetgrouptriple=(%s,*,*))(nisnetgrouptriple=(,*,*))))"
-#define	_F_GETNETGR_TRIPLE_MACHINE_SSD	\
-	"(&(%%s)(|(nisnetgrouptriple=(%s,*,*))(nisnetgrouptriple=(,*,*))))"
-#define	_F_GETNETGRENT		\
-	"(&(objectClass=nisNetGroup)(nisnetgrouptriple=(%s,%s,%s)))"
-#define	_F_GETNETGRENT_SSD	\
-	"(&(%%s)(nisnetgrouptriple=(%s,%s,%s)))"
-
-/*
- * Although the filter should include the test for (*,,*), this leads to
- * an unindexed search. To support this, a plugin should be the directory
- * server.
- */
-#define	_F_GETNETGR_TRIPLE_USER		\
-	"(&(objectClass=nisNetGroup)(nisnetgrouptriple=(*,%s,*)))"
-#define	_F_GETNETGR_TRIPLE_USER_SSD	\
-	"(&(%%s)(nisnetgrouptriple=(*,%s,*)))"
-
-#define	_F_GETMEMBERGRENT	\
-	"(&(objectClass=nisNetGroup)(membernisnetgroup=%s))"
-#define	_F_GETMEMBERGRENT_SSD	\
-	"(&(%%s)(membernisnetgroup=%s))"
-
-#define	_F_ISMEMBERGRENT	\
-	"(&(objectClass=nisNetGroup)(cn=%s)(membernisnetgroup=%s))"
-#define	_F_ISMEMBERGRENT_SSD	\
-	"(&(%%s)(cn=%s)(membernisnetgroup=%s))"
-
-#define	MAX_INNETGR_FILTER_LEN (2 * MAXHOSTNAMELEN + 2 * LOGNAME_MAX + 140)
-#define	MAX_GETMEM_FILTER_LEN (MAX_NETGR_NAME_LEN + 50)
-#define	MAX_ISMEM_FILTER_LEN (2 * MAX_NETGR_NAME_LEN + 56)
-
-#define	_F_GETMEMBER		\
-	"(&(objectClass=nisNetGroup)(membernisnetgroup=%s))"
-#define	_F_GETMEMBER_SSD	"(&(%%s)(membernisnetgroup=%s))"
 #define	_F_SETMEMBER		"(&(objectClass=nisNetGroup)(cn=%s))"
 #define	_F_SETMEMBER_SSD	"(&(%%s)(cn=%s))"
 
 #define	N_HASH		257
+#define	COMMA		','
 
 static const char *netgrent_attrs[] = {
 	_N_TRIPLE,
-	_N_MEMBER,
-	(char *)NULL
-};
-
-static const char *netgr_name_attrs[] = {
-	_N_NAME,
-	(char *)NULL
-};
-
-static const char *netgr_leaf_attrs[] = {
-	_N_NAME,
-	_N_TRIPLE,
-	(char *)NULL
-};
-
-static const char *netgr_node_attrs[] = {
-	_N_NAME,
 	_N_MEMBER,
 	(char *)NULL
 };
@@ -158,27 +92,6 @@ get_hash(const char *s)
 		sum += ((unsigned char *)s)[i];
 
 	return ((sum + i) % N_HASH);
-}
-
-static netgroup_name_t *
-in_netgroup_table(const char *name, netgroup_table_t *tab)
-{
-	hash_t		h;
-	netgroup_name_t *ret;
-
-	if (tab == NULL || name == NULL || *name == '\0')
-		return (NULL);
-
-	h = get_hash(name);
-	ret = tab->hash_list[h];
-
-	while (ret != NULL) {
-		if (strcmp(name, ret->name) == 0)
-			break;
-		ret = ret->next_hash;
-	}
-
-	return (ret);
 }
 
 /*
@@ -381,8 +294,9 @@ split_triple(char *triple, char **hostname, char **username, char **domain)
 }
 
 /*
- * check the domain part of the triples.
- *	-1 = fails to match, 0 = match
+ * Test membership in triple
+ *	return 0 = no match
+ *	return 1 = match
  */
 
 static int
@@ -398,15 +312,26 @@ match_triple_entry(struct nss_innetgr_args *ia, const ns_ldap_entry_t *entry)
 	char	triple[MAX_TRIPLE_LEN];
 	char	*tuser, *thost, *tdomain;
 	int	i;
+	char	*current, *limit;
+	int	pulen, phlen;
+	char	*pusers0, *phost0;
 
 	nhost = ia->arg[NSS_NETGR_MACHINE].argc;
 	phost = (char **)ia->arg[NSS_NETGR_MACHINE].argv;
-	if (phost == NULL || *phost == NULL)
+	if (phost == NULL || *phost == NULL) {
 		nhost = 0;
+	} else {
+		phost0 = phost[0];
+		phlen = strlen(phost0);
+	}
 	nusers = ia->arg[NSS_NETGR_USER].argc;
 	pusers = (char **)ia->arg[NSS_NETGR_USER].argv;
-	if (pusers == NULL || *pusers == NULL)
+	if (pusers == NULL || *pusers == NULL) {
 		nusers = 0;
+	} else {
+		pusers0 = pusers[0];
+		pulen = strlen(pusers0);
+	}
 	ndomains = ia->arg[NSS_NETGR_DOMAIN].argc;
 	pdomains = (char **)ia->arg[NSS_NETGR_DOMAIN].argv;
 	if (pdomains == NULL || *pdomains == NULL)
@@ -416,33 +341,121 @@ match_triple_entry(struct nss_innetgr_args *ia, const ns_ldap_entry_t *entry)
 	if (attr == NULL || *attr == NULL)
 		return (0);
 
-	for (; *attr; attr++) {
-	    if (strlcpy(triple, *attr, sizeof (triple)) >= sizeof (triple))
-		continue;
-	    if (split_triple(triple, &thost, &tuser, &tdomain) != 0)
-		continue;
-	    if (thost != NULL && *thost != '\0' && nhost != 0) {
-		for (i = 0; i < nhost; i++)
-		    if (strcasecmp(thost, phost[i]) == 0)
-			break;
-		if (i == nhost)
-		    continue;
-	    }
-	    if (tuser != NULL && *tuser != '\0' && nusers != 0) {
-		for (i = 0; i < nusers; i++)
-		    if (strcmp(tuser, pusers[i]) == 0)
-			break;
-		if (i == nusers)
-		    continue;
-	    }
-	    if (tdomain != NULL && *tdomain != '\0' && ndomains != 0) {
-		for (i = 0; i < ndomains; i++)
-		    if (domcmp(tdomain, pdomains[i]) == 0)
-			break;
-		if (i == ndomains)
-		    continue;
-	    }
-	    return (1);
+	/* Special cases for speedup */
+	if (nusers == 1 && nhost == 0 && ndomains == 0) {
+		/* Special case for finding a single user in a netgroup */
+		for (; *attr; attr++) {
+			/* jump to first comma and check next character */
+			current = *attr;
+			if ((current = strchr(current, COMMA)) == NULL)
+				continue;
+			current++;
+
+			/* skip whitespaces */
+			while (isspace(*current))
+				current++;
+
+			/* if user part is null, then treat as wildcard */
+			if (*current == COMMA)
+				return (1);
+
+			/* compare first character */
+			if (*pusers0 != *current)
+				continue;
+
+			/* limit username to COMMA */
+			if ((limit = strchr(current, COMMA)) == NULL)
+				continue;
+			*limit = '\0';
+
+			/* remove blanks before COMMA */
+			if ((limit = strpbrk(current, " \t")) != NULL)
+				*limit = '\0';
+
+			/* compare size of username */
+			if (pulen != strlen(current)) {
+				continue;
+			}
+
+			/* do actual compare */
+			if (strncmp(pusers0, current, pulen) == 0) {
+				return (1);
+			} else {
+				continue;
+			}
+		}
+	} else if (nusers == 0 && nhost == 1 && ndomains == 0) {
+		/* Special case for finding a single host in a netgroup */
+		for (; *attr; attr++) {
+
+			/* jump to first character and check */
+			current = *attr;
+			current++;
+
+			/* skip whitespaces */
+			while (isspace(*current))
+				current++;
+
+			/* if host part is null, then treat as wildcard */
+			if (*current == COMMA)
+				return (1);
+
+			/* compare first character */
+			if (tolower(*phost0) != tolower(*current))
+				continue;
+
+			/* limit hostname to COMMA */
+			if ((limit = strchr(current, COMMA)) == NULL)
+				continue;
+			*limit = '\0';
+
+			/* remove blanks before COMMA */
+			if ((limit = strpbrk(current, " \t")) != NULL)
+				*limit = '\0';
+
+			/* compare size of hostname */
+			if (phlen != strlen(current)) {
+				continue;
+			}
+
+			/* do actual compare */
+			if (strncasecmp(phost0, current, phlen) == 0) {
+				return (1);
+			} else {
+				continue;
+			}
+		}
+	} else {
+		for (; *attr; attr++) {
+			if (strlcpy(triple, *attr,
+					sizeof (triple)) >= sizeof (triple))
+				continue;
+			if (split_triple(triple, &thost, &tuser, &tdomain) != 0)
+				continue;
+			if (thost != NULL && *thost != '\0' && nhost != 0) {
+				for (i = 0; i < nhost; i++)
+					if (strcasecmp(thost, phost[i]) == 0)
+						break;
+				if (i == nhost)
+				    continue;
+			}
+			if (tuser != NULL && *tuser != '\0' && nusers != 0) {
+				for (i = 0; i < nusers; i++)
+					if (strcmp(tuser, pusers[i]) == 0)
+						break;
+				if (i == nusers)
+					continue;
+			}
+			if (tdomain != NULL && *tdomain != '\0' &&
+					ndomains != 0) {
+				for (i = 0; i < ndomains; i++)
+					if (domcmp(tdomain, pdomains[i]) == 0)
+						break;
+				if (i == ndomains)
+					continue;
+			}
+			return (1);
+		}
 	}
 
 	return (0);
@@ -566,155 +579,6 @@ top_down_search(struct nss_innetgr_args *ia, char *netgrname)
 	return (status);
 }
 
-static int
-innetgr_SSD_filter(const ns_ldap_search_desc_t *desc, char **realfilter,
-		const void *userdata)
-{
-	const innetgr_cookie_t	*cookie = (innetgr_cookie_t *)userdata;
-
-	return (_merge_SSD_filter(desc, realfilter, cookie->ssd_filter));
-}
-
-static int process_innetgr_node(const ns_ldap_entry_t *entry,
-	const void *userdata);
-
-/* return 1 when done, 0 otherwise */
-static int
-check_parent(const char *gr_name, innetgr_cookie_t *cookie)
-{
-	ns_ldap_result_t	*result = NULL;
-	ns_ldap_error_t		*error = NULL;
-	char			searchfilter[MAX_GETMEM_FILTER_LEN];
-	char			name[MAX_GETMEM_FILTER_LEN];
-	char			ssd_filter[MAX_GETMEM_FILTER_LEN];
-	const char		*ssd_filter_sav = cookie->ssd_filter;
-	int			ret;
-
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getnetgrent.c: check_parent:%s]\n", gr_name);
-#endif /* DEBUG */
-
-	if (_ldap_filter_name(name, gr_name, sizeof (name)) != 0)
-		return (0);
-	ret = snprintf(searchfilter, sizeof (searchfilter),
-		    _F_GETMEMBERGRENT, name);
-	if (ret >= sizeof (searchfilter) || ret < 0)
-		return (0);
-
-	ret = snprintf(ssd_filter, sizeof (ssd_filter),
-		    _F_GETMEMBERGRENT_SSD, name);
-	if (ret >= sizeof (ssd_filter) || ret < 0)
-		return (0);
-
-	cookie->ssd_filter = ssd_filter;
-	cookie->membername = gr_name;
-
-	(void) __ns_ldap_list(_NETGROUP, searchfilter, innetgr_SSD_filter,
-		netgr_node_attrs, NULL, 0, &result, &error,
-		process_innetgr_node, cookie);
-
-	cookie->ssd_filter = ssd_filter_sav;
-
-	(void) __ns_ldap_freeResult(&result);
-	(void) __ns_ldap_freeError(&error);
-
-	return (cookie->ia->status == NSS_NETGR_NO ? 0 : 1);
-}
-
-/* Use the server's matching rule if not a case exact match */
-
-static int
-server_match(innetgr_cookie_t *cookie)
-{
-	ns_ldap_result_t	*result = NULL;
-	ns_ldap_error_t		*error = NULL;
-	char			searchfilter[MAX_ISMEM_FILTER_LEN];
-	char			netgrname[MAX_ISMEM_FILTER_LEN];
-	char			membername[MAX_ISMEM_FILTER_LEN];
-	char			ssd_filter[MAX_ISMEM_FILTER_LEN];
-	const char		*ssd_filter_sav = cookie->ssd_filter;
-	int			rc;
-	int			ret;
-
-	if (_ldap_filter_name(netgrname, cookie->netgrname,
-		    sizeof (netgrname)) != 0)
-		return (0);
-	if (_ldap_filter_name(membername, cookie->membername,
-		    sizeof (membername)) != 0)
-		return (0);
-	ret = snprintf(searchfilter, sizeof (searchfilter), _F_ISMEMBERGRENT,
-		    netgrname, membername);
-	if (ret >= sizeof (searchfilter) || ret < 0)
-		return (0);
-
-	ret = snprintf(ssd_filter, sizeof (ssd_filter), _F_ISMEMBERGRENT_SSD,
-		    netgrname, membername);
-	if (ret >= sizeof (ssd_filter) || ret < 0)
-		return (0);
-
-	cookie->ssd_filter = ssd_filter;
-
-	rc = __ns_ldap_list(_NETGROUP, searchfilter, innetgr_SSD_filter,
-		netgr_name_attrs, NULL, 0, &result, &error,
-		NULL, &cookie);
-
-	(void) __ns_ldap_freeResult(&result);
-	(void) __ns_ldap_freeError(&error);
-
-	cookie->ssd_filter = ssd_filter_sav;
-	return (rc == NS_LDAP_SUCCESS);
-}
-
-static int
-process_innetgr_node(const ns_ldap_entry_t *entry, const void *userdata)
-{
-	innetgr_cookie_t *cookie = (innetgr_cookie_t *)userdata;
-	char **a, **attr;
-
-	attr = __ns_ldap_getAttr(entry, _N_NAME);
-	if (attr == NULL)
-	    return (NS_LDAP_CB_NEXT);
-
-	for (a = attr; *a; a++) {
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getnetgrent.c: process_innetgr_node:%s]\n",
-		*a);
-#endif /* DEBUG */
-
-	    if (strcasecmp(*a, cookie->netgrname) == 0) {
-		if (strcmp(*a, cookie->netgrname) == 0 ||
-			server_match(cookie)) {
-		    cookie->ia->status = NSS_NETGR_FOUND;
-		    return (NS_LDAP_CB_DONE);
-		}
-	    }
-	}
-	for (a = attr; *a; a++) {
-	    /* check if we have already visited this node */
-	    if (in_netgroup_table(*a, &cookie->tab) != NULL)
-		continue;
-	    if (add_netgroup_name(*a, &cookie->tab) != 0) {
-		cookie->ia->status = NSS_NETGR_NOMEM;
-		return (NS_LDAP_CB_DONE);
-	    }
-	    if (check_parent(*a, cookie) == 1)
-		return (NS_LDAP_CB_DONE);
-	}
-	return (NS_LDAP_CB_NEXT);
-}
-
-static int
-process_innetgr_leaf(const ns_ldap_entry_t *entry, const void *userdata)
-{
-	innetgr_cookie_t *cookie = (innetgr_cookie_t *)userdata;
-
-	/* Check to see if this entry matches the triple */
-	if (match_triple_entry(cookie->ia, entry) != 1)
-		return (NS_LDAP_CB_NEXT);
-
-	return (process_innetgr_node(entry, userdata));
-}
-
 /*
  * __netgr_in checks only checks the netgroup specified in ngroup
  */
@@ -722,17 +586,7 @@ static nss_status_t
 __netgr_in(void *a, char *netgrname)
 {
 	struct nss_innetgr_args	*ia = (struct nss_innetgr_args *)a;
-	char			searchfilter[MAX_INNETGR_FILTER_LEN];
-	char			ssd_filter[MAX_INNETGR_FILTER_LEN];
-	char			mach[MAX_INNETGR_FILTER_LEN];
-	char			user[MAX_INNETGR_FILTER_LEN];
-	ns_ldap_result_t	*result = NULL;
-	ns_ldap_error_t		*error = NULL;
-	int			rc;
 	nss_status_t		status = NSS_NOTFOUND;
-	innetgr_cookie_t	cookie = {NULL, NULL, NULL};
-	int			user_wild, mach_wild;
-	int			ret;
 
 #ifdef DEBUG
 	(void) fprintf(stdout, "\n[getnetgrent.c: netgr_in]\n");
@@ -755,71 +609,7 @@ __netgr_in(void *a, char *netgrname)
 	if (netgrname == NULL)
 		return (status);
 
-	mach_wild = (ia->arg[NSS_NETGR_MACHINE].argc == 0) ||
-	    (ia->arg[NSS_NETGR_MACHINE].argv == NULL) ||
-	    (ia->arg[NSS_NETGR_MACHINE].argv[0] == NULL);
-
-	user_wild = (ia->arg[NSS_NETGR_USER].argc == 0) ||
-	    (ia->arg[NSS_NETGR_USER].argv == NULL) ||
-	    (ia->arg[NSS_NETGR_USER].argv[0] == NULL);
-
-	if (!mach_wild && _ldap_filter_name(mach,
-	    ia->arg[NSS_NETGR_MACHINE].argv[0], sizeof (mach)) != 0)
-		return ((nss_status_t)NSS_NOTFOUND);
-
-	if (!user_wild && _ldap_filter_name(user,
-	    ia->arg[NSS_NETGR_USER].argv[0], sizeof (user)) != 0)
-		return ((nss_status_t)NSS_NOTFOUND);
-
-	if (!mach_wild && !user_wild) {
-	    ret = snprintf(searchfilter, sizeof (searchfilter),
-			_F_GETNETGR_TRIPLE, mach, user, mach, user);
-	    if (ret >= sizeof (searchfilter) || ret < 0)
-		return ((nss_status_t)NSS_NOTFOUND);
-
-	    ret = snprintf(ssd_filter, sizeof (ssd_filter),
-			_F_GETNETGR_TRIPLE_SSD, mach, user, mach, user);
-	    if (ret >= sizeof (ssd_filter) || ret < 0)
-		return ((nss_status_t)NSS_NOTFOUND);
-	} else if (!mach_wild && user_wild) {
-	    ret = snprintf(searchfilter, sizeof (searchfilter),
-			_F_GETNETGR_TRIPLE_MACHINE, mach);
-	    if (ret >= sizeof (searchfilter) || ret < 0)
-		return ((nss_status_t)NSS_NOTFOUND);
-
-	    ret = snprintf(ssd_filter, sizeof (ssd_filter),
-			_F_GETNETGR_TRIPLE_MACHINE_SSD, mach);
-	    if (ret >= sizeof (ssd_filter) || ret < 0)
-		return ((nss_status_t)NSS_NOTFOUND);
-	} else if (mach_wild && !user_wild) {
-	    ret = snprintf(searchfilter, sizeof (searchfilter),
-			_F_GETNETGR_TRIPLE_USER, user);
-	    if (ret >= sizeof (searchfilter) || ret < 0)
-		return ((nss_status_t)NSS_NOTFOUND);
-
-	    ret = snprintf(ssd_filter, sizeof (ssd_filter),
-			_F_GETNETGR_TRIPLE_USER_SSD, user);
-	    if (ret >= sizeof (ssd_filter) || ret < 0)
-		return ((nss_status_t)NSS_NOTFOUND);
-	} else {
-	    return (top_down_search(ia, netgrname));
-	}
-
-	cookie.ia = ia;
-	cookie.ssd_filter = ssd_filter;
-	cookie.netgrname = netgrname;
-	(void) memset(&cookie.tab, 0, sizeof (cookie.tab));
-
-	rc = __ns_ldap_list(_NETGROUP, searchfilter, innetgr_SSD_filter,
-		netgr_leaf_attrs, NULL, 0, &result, &error,
-		process_innetgr_leaf, &cookie);
-	status = switch_err(rc, error);
-
-	(void) __ns_ldap_freeResult(&result);
-	(void) __ns_ldap_freeError(&error);
-	free_netgroup_table(&cookie.tab);
-
-	return (status);
+	return (top_down_search(ia, netgrname));
 }
 
 /*ARGSUSED0*/
