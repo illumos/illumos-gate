@@ -142,9 +142,6 @@ get_info_by_policy(int policy)
 		/* non-RT scheduling class */
 		pcpri_t		pcpri;
 
-		/* need RT class info before we can translate priorities */
-		if (get_info_by_policy(SCHED_FIFO) < 0)
-			return (-1);
 		/*
 		 * get class's global priority's min, max, and
 		 * translate them into RT priority level (index) via rt_dptbl.
@@ -170,6 +167,10 @@ map_gp_to_rtpri(pri_t gpri)
 {
 	rtdpent_t	*rtdp;
 	pri_t		pri;
+
+	/* need RT class info before we can translate priorities */
+	if (rt_dptbl == NULL && get_info_by_policy(SCHED_FIFO) < 0)
+		return (-1);
 
 	if (gpri <= rt_dptbl[rt_class.pcc_primin].rt_globpri) {
 		pri = gpri - rt_dptbl[rt_class.pcc_primin].rt_globpri + \
