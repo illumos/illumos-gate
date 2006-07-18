@@ -973,6 +973,7 @@ rfs4_ss_clid_write_one(rfs4_client_t *cp, char *dss_path, char *leaf)
 {
 	int ioflag;
 	int file_vers = NFS4_SS_VERSION;
+	size_t dirlen;
 	struct uio uio;
 	struct iovec iov[4];
 	char *dir;
@@ -981,11 +982,14 @@ rfs4_ss_clid_write_one(rfs4_client_t *cp, char *dss_path, char *leaf)
 	nfs_client_id4 *cl_id4 = &(cp->nfs_client);
 
 	/* allow 2 extra bytes for '/' & NUL */
-	dir = kmem_alloc(strlen(dss_path) + strlen(NFS4_DSS_STATE_LEAF) + 2,
-	    KM_SLEEP);
+	dirlen = strlen(dss_path) + strlen(NFS4_DSS_STATE_LEAF) + 2;
+	dir = kmem_alloc(dirlen, KM_SLEEP);
 	(void) sprintf(dir, "%s/%s", dss_path, NFS4_DSS_STATE_LEAF);
 
-	if ((ss_pn = rfs4_ss_pnalloc(dir, leaf)) == NULL)
+	ss_pn = rfs4_ss_pnalloc(dir, leaf);
+	/* rfs4_ss_pnalloc takes its own copy */
+	kmem_free(dir, dirlen);
+	if (ss_pn == NULL)
 		return;
 
 	if (vn_open(ss_pn->pn, UIO_SYSSPACE, FCREAT|FWRITE, 0600, &vp,

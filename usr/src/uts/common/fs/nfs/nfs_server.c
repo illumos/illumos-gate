@@ -104,9 +104,6 @@ static struct modlinkage modlinkage = {
 
 char _depends_on[] = "misc/klmmod";
 
-/* for testing RG failover code path on non-Cluster system */
-int hanfsv4_force = 0;
-
 int
 _init(void)
 {
@@ -523,8 +520,7 @@ rfs4_server_start(int nfs4_srv_delegation)
 				 * that a Resource Group failover has
 				 * occurred.
 				 */
-				if (cluster_bootflags & CLUSTER_BOOTED ||
-				    hanfsv4_force)
+				if (cluster_bootflags & CLUSTER_BOOTED)
 					hanfsv4_failover();
 			} else {
 				/* cold start */
@@ -2871,6 +2867,13 @@ hanfsv4_failover(void)
 	rfs4_dss_path_t *dss_path;
 
 	/*
+	 * Note: currently, rfs4_dss_pathlist cannot be NULL, since
+	 * it will always include an entry for NFS4_DSS_VAR_DIR. If we
+	 * make the latter dynamically specified too, the following will
+	 * need to be adjusted.
+	 */
+
+	/*
 	 * First, look for removed paths: RGs that have been failed-over
 	 * away from this node.
 	 * Walk the "currently-serving" rfs4_dss_pathlist and, for each
@@ -2893,21 +2896,17 @@ hanfsv4_failover(void)
 
 		for (i = 0; i < rfs4_dss_numnewpaths; i++) {
 			int cmpret;
-			size_t ncmp;
 			char *newpath = rfs4_dss_newpaths[i];
-
-			ncmp = MAX(strlen(path), strlen(newpath));
-			cmpret = strncmp(path, newpath, ncmp);
 
 			/*
 			 * Since nfsd has sorted rfs4_dss_newpaths for us,
-			 * once the return from strncmp is negative we know
+			 * once the return from strcmp is negative we know
 			 * we've passed the point where "path" should be,
 			 * and can stop searching: "path" has been removed.
 			 */
+			cmpret = strcmp(path, newpath);
 			if (cmpret < 0)
 				break;
-
 			if (cmpret == 0) {
 				found = 1;
 				break;
@@ -2930,6 +2929,8 @@ hanfsv4_failover(void)
 
 			/* remove from "currently-serving" list, and destroy */
 			remque(dss_path);
+			/* allow for NUL */
+			kmem_free(dss_path->path, strlen(dss_path->path) + 1);
 			kmem_free(dss_path, sizeof (rfs4_dss_path_t));
 
 			dss_path = path_next;
