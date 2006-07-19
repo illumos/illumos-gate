@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,7 +94,7 @@ fillconflist(int lineno, const char *entry, char **args,
 	cp->cf_opts = opts;
 	cp->cf_com = com;
 	cp->cf_flags = flags;
-	if (entry) {
+	if (entry != NULL) {
 		Conflut = lut_add(Conflut, entry, cp);
 		fn_list_adds(Confentries, entry);
 	}
@@ -151,7 +150,7 @@ nexttok(char **ptrptr)
 			return (ptr);
 		}
 
-	if (quote)
+	if (quote != NULL)
 		err(EF_FILE|EF_JMP, "Unbalanced %c quote", *quote);
 		/*NOTREACHED*/
 
@@ -351,7 +350,7 @@ conf_lookup(const char *lhs)
 {
 	struct confinfo *cp = lut_lookup(Conflut, lhs);
 
-	if (cp) {
+	if (cp != NULL) {
 		err_fileline(Confname, cp->cf_lineno);
 		return (cp->cf_args);
 	} else
@@ -366,7 +365,7 @@ conf_opts(const char *lhs)
 {
 	struct confinfo *cp = lut_lookup(Conflut, lhs);
 
-	if (cp) {
+	if (cp != NULL) {
 		if (cp->cf_opts)
 			return (cp->cf_opts);	/* already parsed */
 		err_fileline(Confname, cp->cf_lineno);
@@ -387,7 +386,7 @@ conf_replace(const char *lhs, struct opts *newopts)
 	if (Conffd == -1)
 		return;
 
-	if (cp) {
+	if (cp != NULL) {
 		cp->cf_opts = newopts;
 		cp->cf_args = NULL;
 		if (newopts == NULL)
@@ -408,7 +407,7 @@ conf_set(const char *entry, char *o, const char *optarg)
 	if (Conffd == -1)
 		return;
 
-	if (cp) {
+	if (cp != NULL) {
 		if (cp->cf_opts == NULL)
 			cp->cf_opts = opts_parse(cp->cf_args, OPTF_CONF);
 		cp->cf_flags &= ~CONFF_DELETED;
@@ -468,6 +467,7 @@ conf_print(FILE *stream)
 /*
  * test main for conf module, usage: a.out conffile
  */
+int
 main(int argc, char *argv[])
 {
 	err_init(argv[0]);
@@ -484,6 +484,8 @@ main(int argc, char *argv[])
 	conf_close(opts_parse(NULL, 0));
 
 	err_done(0);
+	/* NOTREACHED */
+	return (0);
 }
 
 #endif	/* TESTMODULE */

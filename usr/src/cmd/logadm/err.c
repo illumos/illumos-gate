@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * logadm/err.c -- some basic error routines
  *
@@ -109,7 +108,7 @@ err(int flags, const char *fmt, ...)
 
 	/* print a copy to stderr */
 	if (!as_is) {
-		if (Myname) {
+		if (Myname != NULL) {
 			(void) fprintf(stderr, "%s: ", Myname);
 			if (Errorfile)
 				(void) fprintf(Errorfile, "%s: ", Myname);
@@ -127,7 +126,7 @@ err(int flags, const char *fmt, ...)
 	(void) vfprintf(stderr, intlfmt, ap);
 	if (Errorfile)
 		(void) vfprintf(Errorfile, intlfmt, ap);
-	if (errno_msg) {
+	if (errno_msg != NULL) {
 		(void) fprintf(stderr, ": %s", errno_msg);
 		if (Errorfile)
 			(void) fprintf(Errorfile, ": %s", errno_msg);
@@ -220,8 +219,9 @@ err_mailto(const char *recipient)
 	FILE *pfp;
 	char line[MAXLINE];
 
-	if (lastrecipient) {
-		if (recipient && strcmp(recipient, lastrecipient) == 0)
+	if (lastrecipient != NULL) {
+		if (recipient != NULL &&
+		    strcmp(recipient, lastrecipient) == 0)
 			return;		/* keep going, same recipient */
 
 		/* stop saving output for lastrecipient and send message */
@@ -241,7 +241,7 @@ err_mailto(const char *recipient)
 		Errorfile = NULL;
 	}
 
-	if (recipient) {
+	if (recipient != NULL) {
 		/* start saving error output for this recipient */
 		if ((Errorfile = tmpfile()) == NULL)
 			err(EF_SYS, "tmpfile");
@@ -289,12 +289,18 @@ err_realloc(void *ptr, int nbytes, const char *fname, int line)
 char *
 err_strdup(const char *ptr, const char *fname, int line)
 {
-	char *retval = strdup(ptr);
+	char *retval = NULL;
 
-	if (retval == NULL)
-		err(0, "%s:%d: out of memory", fname, line);
+	if (ptr != NULL) {
+		retval = strdup(ptr);
+		if (retval == NULL)
+			err(0, "%s:%d: out of memory", fname, line);
+	} else
+		err(0, "%s:%d: could not strdup", fname, line);
+
 
 	return (retval);
+
 }
 
 /*

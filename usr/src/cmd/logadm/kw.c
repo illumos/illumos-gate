@@ -393,6 +393,7 @@ time_t Now;
 /*
  * test main for kw module, usage: a.out fname [template...]
  */
+int
 main(int argc, char *argv[])
 {
 	int i;
@@ -424,6 +425,8 @@ main(int argc, char *argv[])
 	}
 
 	err_done(0);
+	/* NOTREACHED */
+	return (0);
 }
 
 #endif	/* TESTMODULE */

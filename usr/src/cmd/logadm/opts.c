@@ -431,20 +431,22 @@ opts_printword(const char *word, FILE *stream)
 {
 	char *q = "";
 
-	if (strchr(word, ' ') || strchr(word, '\t') ||
-	    strchr(word, '$') || strchr(word, '[') ||
-	    strchr(word, '?') || strchr(word, '{') ||
-	    strchr(word, '`') || strchr(word, ';')) {
-		if (strchr(word, '\''))
-			q = "\"";
-		else if (strchr(word, '"'))
-			err(EF_FILE|EF_JMP, "Can't protect quotes in <%s>",
-			    word);
-		else
-			q = "'";
-		(void) fprintf(stream, "%s%s%s", q, word, q);
-	} else
-		(void) fprintf(stream, "%s", word);
+	if (word != NULL) {
+		if (strchr(word, ' ') || strchr(word, '\t') ||
+		    strchr(word, '$') || strchr(word, '[') ||
+		    strchr(word, '?') || strchr(word, '{') ||
+		    strchr(word, '`') || strchr(word, ';')) {
+			if (strchr(word, '\''))
+				q = "\"";
+			else if (strchr(word, '"'))
+				err(EF_FILE|EF_JMP,
+				    "Can't protect quotes in <%s>", word);
+			else
+				q = "'";
+			(void) fprintf(stream, "%s%s%s", q, word, q);
+		} else
+			(void) fprintf(stream, "%s", word);
+	}
 }
 
 /*
@@ -484,6 +486,7 @@ static struct optinfo Opttable[] = {
 /*
  * test main for opts module, usage: a.out options...
  */
+int
 main(int argc, char *argv[])
 {
 	struct opts *opts;
@@ -505,6 +508,8 @@ main(int argc, char *argv[])
 	printf("\n");
 
 	err_done(0);
+	/* NOTREACHED */
+	return (0);
 }
 
 #endif	/* TESTMODULE */

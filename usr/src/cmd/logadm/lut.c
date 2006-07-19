@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * logadm/lut.c -- simple lookup table module
  *
@@ -70,7 +69,7 @@ struct lut {
 struct lut *
 lut_add(struct lut *root, const char *lhs, void *rhs)
 {
-	int diff;
+	int diff = 0;
 
 	if (root == NULL) {
 		/* not in tree, create new node */
@@ -78,7 +77,7 @@ lut_add(struct lut *root, const char *lhs, void *rhs)
 		root->lut_lhs = STRDUP(lhs);
 		root->lut_rhs = rhs;
 		root->lut_left = root->lut_right = NULL;
-	} else if ((diff = strcmp(root->lut_lhs, lhs)) == 0) {
+	} else if (lhs != NULL && (diff = strcmp(root->lut_lhs, lhs)) == 0) {
 		/* already in tree, replace node */
 		root->lut_rhs = rhs;
 	} else if (diff > 0)
@@ -121,7 +120,7 @@ lut_lookup(struct lut *root, const char *lhs)
 {
 	int diff;
 
-	if (root == NULL)
+	if (root == NULL || lhs == NULL)
 		return (NULL);
 	else if ((diff = strcmp(root->lut_lhs, lhs)) == 0)
 		return (root->lut_rhs);
@@ -155,7 +154,7 @@ lut_walk(struct lut *root,
 void
 lut_free(struct lut *root, void (*callback)(void *rhs))
 {
-	if (root) {
+	if (root != NULL) {
 		lut_free(root->lut_left, callback);
 		lut_free(root->lut_right, callback);
 		FREE(root->lut_lhs);
@@ -180,6 +179,7 @@ printer(const char *lhs, void *rhs, void *arg)
 /*
  * test main for lut module, usage: a.out [lhs[=rhs]...]
  */
+int
 main(int argc, char *argv[])
 {
 	struct lut *r = NULL;
@@ -209,6 +209,8 @@ main(int argc, char *argv[])
 	lut_free(dupr, NULL);
 
 	err_done(0);
+	/* NOTREACHED */
+	return (0);
 }
 
 #endif	/* TESTMODULE */

@@ -190,6 +190,7 @@ main(int argc, char *argv[])
 	struct fn_list *lognames;	/* list of lognames we're processing */
 	struct fn *fnp;
 	char *val;
+	char *buf;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -370,16 +371,17 @@ main(int argc, char *argv[])
 	/* foreach logname... */
 	fn_list_rewind(lognames);
 	while ((fnp = fn_list_next(lognames)) != NULL) {
-		if (lut_lookup(Donenames, fn_s(fnp)) != NULL) {
+		buf = fn_s(fnp);
+		if (buf != NULL && lut_lookup(Donenames, buf) != NULL) {
 			if (Debug)
 				(void) fprintf(stderr,
 				    "main: logname already done: <%s>\n",
-				    fn_s(fnp));
+				    buf);
 			continue;
 		}
-		if (SETJMP)
+		if (buf != NULL && SETJMP)
 			err(EF_FILE, "bailing out on logname \"%s\" "
-			    "due to errors", fn_s(fnp));
+			    "due to errors", buf);
 		else
 			dologname(fnp, clopts);
 	}
@@ -416,8 +418,10 @@ static void
 commajoin(const char *lhs, void *rhs, void *arg)
 {
 	struct fn *fnp = (struct fn *)arg;
+	char *buf;
 
-	if (*fn_s(fnp))
+	buf = fn_s(fnp);
+	if (buf != NULL && *buf)
 		fn_putc(fnp, ',');
 	fn_puts(fnp, lhs);
 }
@@ -479,7 +483,9 @@ dologname(struct fn *fnp, struct opts *clopts)
 		(void) out("# processing logname: %s\n", logname);
 
 	if (Debug) {
-		(void) fprintf(stderr, "dologname: logname <%s>\n", logname);
+		if (logname != NULL)
+			(void) fprintf(stderr, "dologname: logname <%s>\n",
+			    logname);
 		(void) fprintf(stderr, "conffile opts:");
 		opts_print(cfopts, stderr, NULL);
 		(void) fprintf(stderr, "\n");
@@ -557,10 +563,13 @@ dologname(struct fn *fnp, struct opts *clopts)
 	 */
 	logfiles = opts_cmdargs(cfopts);
 	if (Debug) {
+		char *buf;
 		(void) fprintf(stderr, "dologname: logfiles from cfopts:\n");
 		fn_list_rewind(logfiles);
 		while ((nextfnp = fn_list_next(logfiles)) != NULL)
-			(void) fprintf(stderr, "    <%s>\n", fn_s(nextfnp));
+			buf = fn_s(nextfnp);
+			if (buf != NULL)
+				(void) fprintf(stderr, "    <%s>\n", buf);
 	}
 	if (fn_list_empty(logfiles))
 		globbedfiles = glob_glob(fnp);
@@ -597,7 +606,7 @@ rotatelog(struct fn *fnp, struct opts *opts)
 	const char *group;
 	const char *mode;
 
-	if (Debug)
+	if (Debug && fname != NULL)
 		(void) fprintf(stderr, "rotatelog: fname <%s>\n", fname);
 
 	if (opts_count(opts, "p") && opts_optarg_int(opts, "p") == OPTP_NEVER)
@@ -777,7 +786,7 @@ rotatelog(struct fn *fnp, struct opts *opts)
 	/* record the rotation date */
 	(void) strftime(nowstr, sizeof (nowstr),
 	    "%a %b %e %T %Y", gmtime(&Now));
-	if (opts_count(opts, "v"))
+	if (opts_count(opts, "v") && fname != NULL)
 		(void) out("#     recording rotation date %s for %s\n",
 		    nowstr, fname);
 	conf_set(fname, "P", STRDUP(nowstr));
@@ -795,16 +804,22 @@ rotateto(struct fn *fnp, struct opts *opts, int n, struct fn *recentlog,
 	struct fn *dirname;
 	int hasn;
 	struct stat stbuf;
+	char *buf1;
+	char *buf2;
 
 	/* expand template to figure out new filename */
 	hasn = kw_expand(template, newfile, n, isgz);
 
-	if (Debug)
-		(void) fprintf(stderr, "rotateto: %s -> %s (%d)\n", fn_s(fnp),
-		    fn_s(newfile), n);
+	buf1 = fn_s(fnp);
+	buf2 = fn_s(newfile);
 
+	if (Debug)
+		if (buf1 != NULL && buf2 != NULL) {
+			(void) fprintf(stderr, "rotateto: %s -> %s (%d)\n",
+			    buf1, buf2, n);
+		}
 	/* if filename is there already, rotate "up" */
-	if (hasn && lstat(fn_s(newfile), &stbuf) != -1)
+	if (hasn && lstat(buf2, &stbuf) != -1)
 		rotateto(newfile, opts, n + 1, recentlog, isgz);
 	else if (hasn && opts_count(opts, "z")) {
 		struct fn *gzfnp = fn_dup(newfile);
@@ -892,7 +907,7 @@ expirefiles(struct fn *fnp, struct opts *opts)
 	off_t count;
 	off_t size;
 
-	if (Debug)
+	if (Debug && fname != NULL)
 		(void) fprintf(stderr, "expirefiles: fname <%s>\n", fname);
 
 	/* return if no potential expire conditions */
@@ -921,11 +936,18 @@ expirefiles(struct fn *fnp, struct opts *opts)
 	files = glob_reglob(pattern);
 
 	if (Debug) {
-		(void) fprintf(stderr, "expirefiles: pattern <%s>\n",
-		    fn_s(pattern));
+		char *buf;
+
+		buf = fn_s(pattern);
+		if (buf != NULL) {
+			(void) fprintf(stderr, "expirefiles: pattern <%s>\n",
+			    buf);
+		}
 		fn_list_rewind(files);
 		while ((nextfnp = fn_list_next(files)) != NULL)
-			(void) fprintf(stderr, "    <%s>\n", fn_s(nextfnp));
+			buf = fn_s(nextfnp);
+			if (buf != NULL)
+				(void) fprintf(stderr, "    <%s>\n", buf);
 	}
 
 	/* see if count causes expiration */

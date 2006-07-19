@@ -86,7 +86,7 @@ fn_new(const char *s)
 	fnp->fn_next = NULL;
 
 	/* if passed-in string contains at least 1 non-null character... */
-	if (s && *s) {
+	if (s != NULL && *s) {
 		int len = strlen(s);
 		int buflen = roundup(len + 1, FN_INC);
 
@@ -128,14 +128,19 @@ fn_dup(struct fn *fnp)
 struct fn *
 fn_dirname(struct fn *fnp)
 {
-	char *ptr;
+	char *ptr = NULL;
 	struct fn *ret;
+	char *buf;
 
-	if ((ptr = strrchr(fn_s(fnp), '/')) == NULL)
+	buf = fn_s(fnp);
+
+	if (buf != NULL)
+		ptr = strrchr(buf, '/');
+	if (ptr == NULL || buf == NULL)
 		return (fn_new("."));
 	else {
 		*ptr = '\0';
-		ret = fn_new(fn_s(fnp));
+		ret = fn_new(buf);
 		*ptr = '/';
 		return (ret);
 	}
@@ -250,7 +255,7 @@ void
 fn_puts(struct fn *fnp, const char *s)
 {
 	/* non-optimal, but simple! */
-	while (s && *s)
+	while (s != NULL && *s)
 		fn_putc(fnp, *s++);
 }
 
@@ -458,7 +463,7 @@ fn_list_appendrange(struct fn_list *fnlp, const char *s, const char *limit)
 	const char *ptr;
 
 	/* for each fn in the list... */
-	while (fnp) {
+	while (fnp != NULL) {
 		if (fnp == fnlp->fnl_last)
 			nextfnp = NULL;
 		else

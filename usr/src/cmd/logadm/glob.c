@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * logadm/glob.c -- globbing routines
  *
@@ -98,7 +97,7 @@ glob_debrace(struct fn *fnp)
 	fn_list_adds(ret, "");
 
 	/* while braces remain... */
-	while ((left = strchr(sp, '{')) != NULL)
+	while (sp != NULL && (left = strchr(sp, '{')) != NULL)
 		if ((right = strchr(left, '}')) == NULL) {
 			err(EF_FILE|EF_JMP, "Missing }");
 			fn_list_free(ret);
@@ -141,7 +140,7 @@ glob_magic(struct fn *fnp)
 {
 	char *s = fn_s(fnp);
 
-	for (; *s; s++)
+	for (; s != NULL && *s; s++)
 		if (*s == '*' ||
 		    *s == '?' ||
 		    *s == '[')
@@ -227,6 +226,7 @@ glob_reglob(struct fn *fnp)
 	int skipdotfiles;
 	char *re;
 	char ret0[MAXPATHLEN];
+
 
 	/* start with the initial directory in the list */
 	if (*sp == '/') {
@@ -381,6 +381,7 @@ glob_to_reglob(struct fn *fnp)
  * test main for glob module, usage: a.out [-r] [pattern...]
  *	-r means the patterns are reglobs instead of globs
  */
+int
 main(int argc, char *argv[])
 {
 	int i;
@@ -414,7 +415,7 @@ main(int argc, char *argv[])
 		while ((fnp = fn_list_next(fnlp)) != NULL)
 			printf("    <%s>\n", fn_s(fnp));
 
-		printf("total size: %d\n", fn_list_totalsize(fnlp));
+		printf("total size: %lld\n", fn_list_totalsize(fnlp));
 
 		while ((fnp = fn_list_popoldest(fnlp)) != NULL) {
 			printf("    oldest <%s>\n", fn_s(fnp));
@@ -426,6 +427,8 @@ main(int argc, char *argv[])
 	fn_free(argfnp);
 
 	err_done(0);
+	/* NOTREACHED */
+	return (0);
 }
 
 #endif	/* TESTMODULE */
