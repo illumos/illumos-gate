@@ -737,6 +737,9 @@ auto_send_unmount_request(
 		sizeof (umntres),
 		hard);
 
+	if (!error)
+		error = xdrres.status;
+
 	AUTOFS_DPRINT((5, "\tauto_send_unmount_request: error=%d\n", error));
 
 	return (error);
