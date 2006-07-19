@@ -9617,6 +9617,26 @@ sd_set_errstats(struct sd_lun *un)
 	    un->un_sd->sd_inq->inq_revision, 4);
 
 	/*
+	 * All the errstats are persistent across detach/attach,
+	 * so reset all the errstats here in case of the hot
+	 * replacement of disk drives, except for not changed
+	 * Sun qualified drives.
+	 */
+	if ((bcmp(&SD_INQUIRY(un)->inq_pid[9], "SUN", 3) != 0) ||
+	    (bcmp(&SD_INQUIRY(un)->inq_serial, stp->sd_serial.value.c,
+	    sizeof (SD_INQUIRY(un)->inq_serial)) != 0)) {
+		stp->sd_softerrs.value.ui32 = 0;
+		stp->sd_harderrs.value.ui32 = 0;
+		stp->sd_transerrs.value.ui32 = 0;
+		stp->sd_rq_media_err.value.ui32 = 0;
+		stp->sd_rq_ntrdy_err.value.ui32 = 0;
+		stp->sd_rq_nodev_err.value.ui32 = 0;
+		stp->sd_rq_recov_err.value.ui32 = 0;
+		stp->sd_rq_illrq_err.value.ui32 = 0;
+		stp->sd_rq_pfa_err.value.ui32 = 0;
+	}
+
+	/*
 	 * Set the "Serial No" kstat for Sun qualified drives (indicated by
 	 * "SUN" in bytes 25-27 of the inquiry data (bytes 9-11 of the pid)
 	 * (4376302))
