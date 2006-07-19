@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -43,7 +42,7 @@ uint32_t	zfetch_max_streams = 8;
 /* min time before stream reclaim */
 uint32_t	zfetch_min_sec_reap = 2;
 /* max number of blocks to fetch at a time */
-uint32_t	zfetch_block_cap = 32;
+uint32_t	zfetch_block_cap = 256;
 /* number of bytes in a array_read at which we stop prefetching (1Mb) */
 uint64_t	zfetch_array_rd_sz = 1024 * 1024;
 
@@ -52,19 +51,23 @@ static int		dmu_zfetch_colinear(zfetch_t *, zstream_t *);
 static void		dmu_zfetch_dofetch(zfetch_t *, zstream_t *);
 static uint64_t		dmu_zfetch_fetch(dnode_t *, uint64_t, uint64_t);
 static uint64_t		dmu_zfetch_fetchsz(dnode_t *, uint64_t, uint64_t);
-static int		dmu_zfetch_find(zfetch_t *, zstream_t *);
+static int		dmu_zfetch_find(zfetch_t *, zstream_t *, int);
 static int		dmu_zfetch_stream_insert(zfetch_t *, zstream_t *);
 static zstream_t	*dmu_zfetch_stream_reclaim(zfetch_t *);
 static void		dmu_zfetch_stream_remove(zfetch_t *, zstream_t *);
 static void		dmu_zfetch_stream_update(zfetch_t *, zstream_t *);
 static int		dmu_zfetch_streams_equal(zstream_t *, zstream_t *);
 
-
 /*
  * Given a zfetch structure and a zstream structure, determine whether the
- * blocks to be read are part of a co-linear to a pair of existing prefetch
+ * blocks to be read are part of a co-linear pair of existing prefetch
  * streams.  If a set is found, coalesce the streams, removing one, and
  * configure the prefetch so it looks for a strided access pattern.
+ *
+ * In other words: if we find two sequential access streams that are
+ * the same length and distance N appart, and this read is N from the
+ * last stream, then we are probably in a strided access pattern.  So
+ * combine the two sequential streams into a single strided stream.
  *
  * If no co-linear streams are found, return NULL.
  */
@@ -249,9 +252,9 @@ dmu_zfetch_fetchsz(dnode_t *dn, uint64_t blkid, uint64_t nblks)
 	}
 
 	/* compute fetch size */
-	if (blkid + nblks > dn->dn_maxblkid) {
-		fetchsz = dn->dn_maxblkid - blkid;
-		ASSERT(blkid + fetchsz <= dn->dn_maxblkid);
+	if (blkid + nblks + 1 > dn->dn_maxblkid) {
+		fetchsz = (dn->dn_maxblkid - blkid) + 1;
+		ASSERT(blkid + fetchsz - 1 <= dn->dn_maxblkid);
 	} else {
 		fetchsz = nblks;
 	}
@@ -266,10 +269,11 @@ dmu_zfetch_fetchsz(dnode_t *dn, uint64_t blkid, uint64_t nblks)
  * located and returns true, otherwise it returns false
  */
 static int
-dmu_zfetch_find(zfetch_t *zf, zstream_t *zh)
+dmu_zfetch_find(zfetch_t *zf, zstream_t *zh, int prefetched)
 {
 	zstream_t	*zs;
 	int64_t		diff;
+	int		reset = !prefetched;
 	int		rc = 0;
 
 	if (zh == NULL)
@@ -287,20 +291,33 @@ top:
 	for (zs = list_head(&zf->zf_stream); zs;
 	    zs = list_next(&zf->zf_stream, zs)) {
 
-
+		/*
+		 * XXX - should this be an assert?
+		 */
 		if (zs->zst_len == 0) {
 			/* bogus stream */
 			continue;
 		}
 
-		if (zh->zst_offset - zs->zst_offset < zs->zst_len) {
+		/*
+		 * We hit this case when we are in a strided prefetch stream:
+		 * we will read "len" blocks before "striding".
+		 */
+		if (zh->zst_offset >= zs->zst_offset &&
+		    zh->zst_offset < zs->zst_offset + zs->zst_len) {
 			/* already fetched */
-			rw_exit(&zf->zf_rwlock);
-			return (1);
+			rc = 1;
+			goto out;
 		}
 
+		/*
+		 * This is the forward sequential read case: we increment
+		 * len by one each time we hit here, so we will enter this
+		 * case on every read.
+		 */
 		if (zh->zst_offset == zs->zst_offset + zs->zst_len) {
-			/* forward sequential access */
+
+			reset = !prefetched && zs->zst_len > 1;
 
 			mutex_enter(&zs->zst_lock);
 
@@ -308,7 +325,6 @@ top:
 				mutex_exit(&zs->zst_lock);
 				goto top;
 			}
-
 			zs->zst_len += zh->zst_len;
 			diff = zs->zst_len - zfetch_block_cap;
 			if (diff > 0) {
@@ -320,8 +336,13 @@ top:
 
 			break;
 
+		/*
+		 * Same as above, but reading backwards through the file.
+		 */
 		} else if (zh->zst_offset == zs->zst_offset - zh->zst_len) {
 			/* backwards sequential access */
+
+			reset = !prefetched && zs->zst_len > 1;
 
 			mutex_enter(&zs->zst_lock);
 
@@ -388,11 +409,33 @@ top:
 	}
 
 	if (zs) {
-		rc = 1;
-		dmu_zfetch_dofetch(zf, zs);
-		mutex_exit(&zs->zst_lock);
-	}
+		if (reset) {
+			zstream_t *remove = zs;
 
+			rc = 0;
+			mutex_exit(&zs->zst_lock);
+			rw_exit(&zf->zf_rwlock);
+			rw_enter(&zf->zf_rwlock, RW_WRITER);
+			/*
+			 * Relocate the stream, in case someone removes
+			 * it while we were acquiring the WRITER lock.
+			 */
+			for (zs = list_head(&zf->zf_stream); zs;
+			    zs = list_next(&zf->zf_stream, zs)) {
+				if (zs == remove) {
+					dmu_zfetch_stream_remove(zf, zs);
+					mutex_destroy(&zs->zst_lock);
+					kmem_free(zs, sizeof (zstream_t));
+					break;
+				}
+			}
+		} else {
+			rc = 1;
+			dmu_zfetch_dofetch(zf, zs);
+			mutex_exit(&zs->zst_lock);
+		}
+	}
+out:
 	rw_exit(&zf->zf_rwlock);
 	return (rc);
 }
@@ -527,7 +570,7 @@ dmu_zfetch_streams_equal(zstream_t *zs1, zstream_t *zs2)
  * routines to create, delete, find, or operate upon prefetch streams.
  */
 void
-dmu_zfetch(zfetch_t *zf, uint64_t offset, uint64_t size)
+dmu_zfetch(zfetch_t *zf, uint64_t offset, uint64_t size, int prefetched)
 {
 	zstream_t	zst;
 	zstream_t	*newstream;
@@ -550,7 +593,7 @@ dmu_zfetch(zfetch_t *zf, uint64_t offset, uint64_t size)
 	zst.zst_len = (P2ROUNDUP(offset + size, blksz) -
 	    P2ALIGN(offset, blksz)) >> blkshft;
 
-	fetched = dmu_zfetch_find(zf, &zst);
+	fetched = dmu_zfetch_find(zf, &zst, prefetched);
 	if (!fetched) {
 		fetched = dmu_zfetch_colinear(zf, &zst);
 	}

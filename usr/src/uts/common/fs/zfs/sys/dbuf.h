@@ -47,11 +47,12 @@ extern "C" {
  * define flags for dbuf_read
  */
 
-#define	DB_RF_MUST_SUCCEED	0
+#define	DB_RF_MUST_SUCCEED	(1 << 0)
 #define	DB_RF_CANFAIL		(1 << 1)
 #define	DB_RF_HAVESTRUCT	(1 << 2)
 #define	DB_RF_NOPREFETCH	(1 << 3)
 #define	DB_RF_NEVERWAIT		(1 << 4)
+#define	DB_RF_CACHED		(1 << 5)
 
 /*
  * The state transition diagram for dbufs looks like:

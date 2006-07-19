@@ -60,6 +60,7 @@ struct arc_buf {
 #define	ARC_WAIT	(1 << 1)	/* perform I/O synchronously */
 #define	ARC_NOWAIT	(1 << 2)	/* perform I/O asynchronously */
 #define	ARC_PREFETCH	(1 << 3)	/* I/O is a prefetch */
+#define	ARC_CACHED	(1 << 4)	/* I/O was already in cache */
 
 arc_buf_t *arc_buf_alloc(spa_t *spa, int size, void *tag);
 void arc_buf_add_ref(arc_buf_t *buf, void *tag);
@@ -74,7 +75,7 @@ int arc_referenced(arc_buf_t *buf);
 
 int arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_byteswap_func_t *swap,
     arc_done_func_t *done, void *private, int priority, int flags,
-    uint32_t arc_flags, zbookmark_t *zb);
+    uint32_t *arc_flags, zbookmark_t *zb);
 int arc_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
     uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
     arc_done_func_t *done, void *private, int priority, int flags,

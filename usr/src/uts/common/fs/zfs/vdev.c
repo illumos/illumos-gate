@@ -1760,7 +1760,7 @@ static vdev_knob_t vdev_knob[] = {
 		"minimum pending I/Os to the disk",
 		1,
 		10000,
-		2,
+		4,
 		offsetof(struct vdev, vdev_queue.vq_min_pending)
 	},
 	{
@@ -1792,7 +1792,7 @@ static vdev_knob_t vdev_knob[] = {
 		"deadline = pri + (lbolt >> time_shift)",
 		0,
 		63,
-		8,
+		6,
 		offsetof(struct vdev, vdev_queue.vq_time_shift)
 	},
 	{

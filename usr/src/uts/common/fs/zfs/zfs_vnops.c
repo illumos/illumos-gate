@@ -446,7 +446,7 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		n = MIN(zfs_read_chunk_size,
 		    zp->z_phys->zp_size - uio->uio_loffset);
 		n = MIN(n, cnt);
-		error = dmu_buf_hold_array(zfsvfs->z_os, zp->z_id,
+		error = dmu_buf_hold_array_by_bonus(zp->z_dbuf,
 		    uio->uio_loffset, n, TRUE, FTAG, &numbufs, &dbpp);
 		if (error)
 			goto out;

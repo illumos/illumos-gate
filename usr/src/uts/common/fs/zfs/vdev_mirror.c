@@ -51,6 +51,8 @@ typedef struct mirror_map {
 	mirror_child_t	mm_child[1];
 } mirror_map_t;
 
+int vdev_mirror_shift = 21;
+
 static mirror_map_t *
 vdev_mirror_map_alloc(zio_t *zio)
 {
@@ -96,7 +98,8 @@ vdev_mirror_map_alloc(zio_t *zio)
 		mm->mm_children = c;
 		mm->mm_replacing = (vd->vdev_ops == &vdev_replacing_ops ||
 		    vd->vdev_ops == &vdev_spare_ops);
-		mm->mm_preferred = mm->mm_replacing ? 0 : spa_get_random(c);
+		mm->mm_preferred = mm->mm_replacing ? 0 :
+		    (zio->io_offset >> vdev_mirror_shift) % c;
 		mm->mm_root = B_FALSE;
 
 		for (c = 0; c < mm->mm_children; c++) {

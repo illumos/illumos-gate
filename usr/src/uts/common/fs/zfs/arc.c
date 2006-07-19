@@ -139,6 +139,12 @@ typedef enum arc_reclaim_strategy {
 /* number of seconds before growing cache again */
 static int		arc_grow_retry = 60;
 
+/*
+ * minimum lifespan of a prefetched block in seconds
+ * (this is converted to ticks during the arc initialization)
+ */
+static int		arc_min_prefetch_lifespan = 1;
+
 static kmutex_t arc_reclaim_lock;
 static int arc_dead;
 
@@ -264,6 +270,7 @@ static void arc_access_and_exit(arc_buf_hdr_t *buf, kmutex_t *hash_lock);
 #define	ARC_IO_ERROR		(1 << 11)	/* I/O failed for buf */
 #define	ARC_FREED_IN_READ	(1 << 12)	/* buf freed while in read */
 #define	ARC_BUF_AVAILABLE	(1 << 13)	/* block not in active use */
+#define	ARC_INDIRECT		(1 << 14)	/* this is an indirect block */
 
 #define	HDR_IN_HASH_TABLE(hdr)	((hdr)->b_flags & ARC_IN_HASH_TABLE)
 #define	HDR_IO_IN_PROGRESS(hdr)	((hdr)->b_flags & ARC_IO_IN_PROGRESS)
@@ -535,7 +542,6 @@ add_reference(arc_buf_hdr_t *ab, kmutex_t *hash_lock, void *tag)
 
 		ASSERT(!MUTEX_HELD(&ab->b_state->mtx));
 		mutex_enter(&ab->b_state->mtx);
-		ASSERT(refcount_count(&ab->b_refcnt) > 0);
 		ASSERT(list_link_active(&ab->b_arc_node));
 		list_remove(&ab->b_state->list, ab);
 		if (GHOST_STATE(ab->b_state)) {
@@ -547,6 +553,9 @@ add_reference(arc_buf_hdr_t *ab, kmutex_t *hash_lock, void *tag)
 		ASSERT3U(ab->b_state->lsize, >=, delta);
 		atomic_add_64(&ab->b_state->lsize, -delta);
 		mutex_exit(&ab->b_state->mtx);
+		/* remove the prefetch flag is we get a reference */
+		if (ab->b_flags & ARC_PREFETCH)
+			ab->b_flags &= ~ARC_PREFETCH;
 	}
 }
 
@@ -605,9 +614,12 @@ arc_change_state(arc_state_t *new_state, arc_buf_hdr_t *ab, kmutex_t *hash_lock)
 			ASSERT(list_link_active(&ab->b_arc_node));
 			list_remove(&old_state->list, ab);
 
-			/* ghost elements have a ghost size */
-			if (GHOST_STATE(old_state)) {
-				ASSERT(ab->b_datacnt == 0);
+			/*
+			 * If prefetching out of the ghost cache,
+			 * we will have a non-null datacnt.
+			 */
+			if (GHOST_STATE(old_state) && ab->b_datacnt == 0) {
+				/* ghost elements have a ghost size */
 				ASSERT(ab->b_buf == NULL);
 				from_delta = ab->b_size;
 			}
@@ -643,14 +655,6 @@ arc_change_state(arc_state_t *new_state, arc_buf_hdr_t *ab, kmutex_t *hash_lock)
 	ASSERT(!BUF_EMPTY(ab));
 	if (new_state == arc.anon && old_state != arc.anon) {
 		buf_hash_remove(ab);
-	}
-
-	/*
-	 * If this buffer isn't being transferred to the MRU-top
-	 * state, it's safe to clear its prefetch flag
-	 */
-	if ((new_state != arc.mru) && (new_state != arc.mru_ghost)) {
-		ab->b_flags &= ~ARC_PREFETCH;
 	}
 
 	/* adjust state sizes */
@@ -918,8 +922,14 @@ arc_evict(arc_state_t *state, int64_t bytes)
 
 	for (ab = list_tail(&state->list); ab; ab = ab_prev) {
 		ab_prev = list_prev(&state->list, ab);
+		/* prefetch buffers have a minimum lifespan */
+		if (ab->b_flags & (ARC_PREFETCH|ARC_INDIRECT) &&
+		    lbolt - ab->b_arc_access < arc_min_prefetch_lifespan) {
+			skipped++;
+			continue;
+		}
 		hash_lock = HDR_LOCK(ab);
-		if (mutex_tryenter(hash_lock)) {
+		if (!HDR_IO_IN_PROGRESS(ab) && mutex_tryenter(hash_lock)) {
 			ASSERT3U(refcount_count(&ab->b_refcnt), ==, 0);
 			ASSERT(ab->b_datacnt > 0);
 			while (ab->b_buf) {
@@ -991,6 +1001,7 @@ top:
 		ab_prev = list_prev(&state->list, ab);
 		hash_lock = HDR_LOCK(ab);
 		if (mutex_tryenter(hash_lock)) {
+			ASSERT(!HDR_IO_IN_PROGRESS(ab));
 			ASSERT(ab->b_buf == NULL);
 			arc_change_state(arc.anon, ab, hash_lock);
 			mutex_exit(hash_lock);
@@ -1102,12 +1113,13 @@ arc_flush(void)
 	ASSERT(arc_eviction_list == NULL);
 }
 
+int arc_kmem_reclaim_shift = 5;		/* log2(fraction of arc to reclaim) */
+
 void
 arc_kmem_reclaim(void)
 {
 	uint64_t to_free;
 
-	/* Remove 12.5% */
 	/*
 	 * We need arc_reclaim_lock because we don't want multiple
 	 * threads trying to reclaim concurrently.
@@ -1127,16 +1139,16 @@ arc_kmem_reclaim(void)
 	mutex_enter(&arc_reclaim_lock);
 
 #ifdef _KERNEL
-	to_free = MAX(arc.c >> 3, ptob(needfree));
+	to_free = MAX(arc.c >> arc_kmem_reclaim_shift, ptob(needfree));
 #else
-	to_free = arc.c >> 3;
+	to_free = arc.c >> arc_kmem_reclaim_shift;
 #endif
 	if (arc.c > to_free)
 		atomic_add_64(&arc.c, -to_free);
 	else
 		arc.c = arc.c_min;
 
-	atomic_add_64(&arc.p, -(arc.p >> 3));
+	atomic_add_64(&arc.p, -(arc.p >> arc_kmem_reclaim_shift));
 	if (arc.c > arc.size)
 		arc.c = arc.size;
 	if (arc.c < arc.c_min)
@@ -1468,14 +1480,25 @@ arc_access_and_exit(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 
 	} else if (buf->b_state == arc.mru) {
 		/*
-		 * If this buffer is in the MRU-top state and has the prefetch
-		 * flag, the first read was actually part of a prefetch.  In
-		 * this situation, we simply want to clear the flag and return.
-		 * A subsequent access should bump this into the MFU state.
+		 * If this buffer is here because of a prefetch, then either:
+		 * - clear the flag if this is a "referencing" read
+		 *   (any subsequent access will bump this into the MFU state).
+		 * or
+		 * - move the buffer to the head of the list if this is
+		 *   another prefetch (to make it less likely to be evicted).
 		 */
 		if ((buf->b_flags & ARC_PREFETCH) != 0) {
-			buf->b_flags &= ~ARC_PREFETCH;
-			atomic_add_64(&arc.mru->hits, 1);
+			if (refcount_count(&buf->b_refcnt) == 0) {
+				ASSERT(list_link_active(&buf->b_arc_node));
+				mutex_enter(&arc.mru->mtx);
+				list_remove(&arc.mru->list, buf);
+				list_insert_head(&arc.mru->list, buf);
+				mutex_exit(&arc.mru->mtx);
+			} else {
+				buf->b_flags &= ~ARC_PREFETCH;
+				atomic_add_64(&arc.mru->hits, 1);
+			}
+			buf->b_arc_access = lbolt;
 			mutex_exit(hash_lock);
 			return;
 		}
@@ -1506,7 +1529,8 @@ arc_access_and_exit(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 
 		if (buf->b_flags & ARC_PREFETCH) {
 			new_state = arc.mru;
-			buf->b_flags &= ~ARC_PREFETCH;
+			if (refcount_count(&buf->b_refcnt) > 0)
+				buf->b_flags &= ~ARC_PREFETCH;
 			DTRACE_PROBE1(new_state__mru, arc_buf_hdr_t *, buf);
 		} else {
 			new_state = arc.mfu;
@@ -1526,26 +1550,45 @@ arc_access_and_exit(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 		 * This buffer has been accessed more than once and is
 		 * still in the cache.  Keep it in the MFU state.
 		 *
-		 * NOTE: the add_reference() that occurred when we did
-		 * the arc_read() should have kicked this off the list,
-		 * so even if it was a prefetch, it will be put back at
-		 * the head of the list when we remove_reference().
+		 * NOTE: an add_reference() that occurred when we did
+		 * the arc_read() will have kicked this off the list.
+		 * If it was a prefetch, we will explicitly move it to
+		 * the head of the list now.
 		 */
+		if ((buf->b_flags & ARC_PREFETCH) != 0) {
+			ASSERT(refcount_count(&buf->b_refcnt) == 0);
+			ASSERT(list_link_active(&buf->b_arc_node));
+			mutex_enter(&arc.mfu->mtx);
+			list_remove(&arc.mfu->list, buf);
+			list_insert_head(&arc.mfu->list, buf);
+			mutex_exit(&arc.mfu->mtx);
+		}
 		atomic_add_64(&arc.mfu->hits, 1);
+		buf->b_arc_access = lbolt;
 	} else if (buf->b_state == arc.mfu_ghost) {
+		arc_state_t	*new_state = arc.mfu;
 		/*
 		 * This buffer has been accessed more than once but has
 		 * been evicted from the cache.  Move it back to the
 		 * MFU state.
 		 */
 
+		if (buf->b_flags & ARC_PREFETCH) {
+			/*
+			 * This is a prefetch access...
+			 * move this block back to the MRU state.
+			 */
+			ASSERT3U(refcount_count(&buf->b_refcnt), ==, 0);
+			new_state = arc.mru;
+		}
+
 		arc_adapt(blksz, arc.mfu_ghost);
 		if (arc_evict_needed())
-			evict_state = arc.mfu;
+			evict_state = new_state;
 
 		buf->b_arc_access = lbolt;
 		DTRACE_PROBE1(new_state__mfu, arc_buf_hdr_t *, buf);
-		arc_change_state(arc.mfu, buf, hash_lock);
+		arc_change_state(new_state, buf, hash_lock);
 
 		atomic_add_64(&arc.mfu_ghost->hits, 1);
 	} else {
@@ -1628,19 +1671,6 @@ arc_read_done(zio_t *zio)
 			}
 			acb->acb_buf = abuf;
 			abuf = NULL;
-		} else {
-			/*
-			 * The caller did not provide a callback function.
-			 * In this case, we should just remove the reference.
-			 */
-			if (HDR_FREED_IN_READ(hdr)) {
-				ASSERT3P(hdr->b_state, ==, arc.anon);
-				(void) refcount_remove(&hdr->b_refcnt,
-				    acb->acb_private);
-			} else {
-				(void) remove_reference(hdr, hash_lock,
-				    acb->acb_private);
-			}
 		}
 	}
 	hdr->b_acb = NULL;
@@ -1658,15 +1688,15 @@ arc_read_done(zio_t *zio)
 		if (HDR_IN_HASH_TABLE(hdr))
 			buf_hash_remove(hdr);
 		freeable = refcount_is_zero(&hdr->b_refcnt);
-		/* translate checksum errors into IO errors */
+		/* convert checksum errors into IO errors */
 		if (zio->io_error == ECKSUM)
 			zio->io_error = EIO;
 	}
 
 	/*
-	 * Broadcast before we drop the hash_lock.  This is less efficient,
-	 * but avoids the possibility that the hdr (and hence the cv) might
-	 * be freed before we get to the cv_broadcast().
+	 * Broadcast before we drop the hash_lock to avoid the possibility
+	 * that the hdr (and hence the cv) might be freed before we get to
+	 * the cv_broadcast().
 	 */
 	cv_broadcast(&hdr->b_cv);
 
@@ -1731,7 +1761,7 @@ arc_read_done(zio_t *zio)
 int
 arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_byteswap_func_t *swap,
     arc_done_func_t *done, void *private, int priority, int flags,
-    uint32_t arc_flags, zbookmark_t *zb)
+    uint32_t *arc_flags, zbookmark_t *zb)
 {
 	arc_buf_hdr_t *hdr;
 	arc_buf_t *buf;
@@ -1742,8 +1772,18 @@ top:
 	hdr = buf_hash_find(spa, BP_IDENTITY(bp), bp->blk_birth, &hash_lock);
 	if (hdr && hdr->b_datacnt > 0) {
 
+		*arc_flags |= ARC_CACHED;
+
 		if (HDR_IO_IN_PROGRESS(hdr)) {
-			if ((arc_flags & ARC_NOWAIT) && done) {
+
+			if (*arc_flags & ARC_WAIT) {
+				cv_wait(&hdr->b_cv, hash_lock);
+				mutex_exit(hash_lock);
+				goto top;
+			}
+			ASSERT(*arc_flags & ARC_NOWAIT);
+
+			if (done) {
 				arc_callback_t	*acb = NULL;
 
 				acb = kmem_zalloc(sizeof (arc_callback_t),
@@ -1761,10 +1801,6 @@ top:
 				add_reference(hdr, hash_lock, private);
 				mutex_exit(hash_lock);
 				return (0);
-			} else if (arc_flags & ARC_WAIT) {
-				cv_wait(&hdr->b_cv, hash_lock);
-				mutex_exit(hash_lock);
-				goto top;
 			}
 			mutex_exit(hash_lock);
 			return (0);
@@ -1796,6 +1832,9 @@ top:
 				hdr->b_flags &= ~ARC_BUF_AVAILABLE;
 			}
 			add_reference(hdr, hash_lock, private);
+		} else if (*arc_flags & ARC_PREFETCH &&
+		    refcount_count(&hdr->b_refcnt) == 0) {
+			hdr->b_flags |= ARC_PREFETCH;
 		}
 		DTRACE_PROBE1(arc__hit, arc_buf_hdr_t *, hdr);
 		arc_access_and_exit(hdr, hash_lock);
@@ -1825,15 +1864,26 @@ top:
 				(void) arc_buf_remove_ref(buf, private);
 				goto top; /* restart the IO request */
 			}
-
+			/* if this is a prefetch, we don't have a reference */
+			if (*arc_flags & ARC_PREFETCH) {
+				(void) remove_reference(hdr, hash_lock,
+				    private);
+				hdr->b_flags |= ARC_PREFETCH;
+			}
+			if (BP_GET_LEVEL(bp) > 0)
+				hdr->b_flags |= ARC_INDIRECT;
 		} else {
 			/* this block is in the ghost cache */
 			ASSERT(GHOST_STATE(hdr->b_state));
 			ASSERT(!HDR_IO_IN_PROGRESS(hdr));
-			add_reference(hdr, hash_lock, private);
-			ASSERT3U(refcount_count(&hdr->b_refcnt), ==, 1);
-
+			ASSERT3U(refcount_count(&hdr->b_refcnt), ==, 0);
 			ASSERT(hdr->b_buf == NULL);
+
+			/* if this is a prefetch, we don't have a reference */
+			if (*arc_flags & ARC_PREFETCH)
+				hdr->b_flags |= ARC_PREFETCH;
+			else
+				add_reference(hdr, hash_lock, private);
 			buf = kmem_cache_alloc(buf_cache, KM_SLEEP);
 			buf->b_hdr = hdr;
 			buf->b_efunc = NULL;
@@ -1844,6 +1894,7 @@ top:
 			atomic_add_64(&arc.size, hdr->b_size);
 			ASSERT(hdr->b_datacnt == 0);
 			hdr->b_datacnt = 1;
+
 		}
 
 		acb = kmem_zalloc(sizeof (arc_callback_t), KM_SLEEP);
@@ -1853,13 +1904,6 @@ top:
 
 		ASSERT(hdr->b_acb == NULL);
 		hdr->b_acb = acb;
-
-		/*
-		 * If this DVA is part of a prefetch, mark the buf
-		 * header with the prefetch flag
-		 */
-		if (arc_flags & ARC_PREFETCH)
-			hdr->b_flags |= ARC_PREFETCH;
 		hdr->b_flags |= ARC_IO_IN_PROGRESS;
 
 		/*
@@ -1883,10 +1927,10 @@ top:
 		rzio = zio_read(pio, spa, bp, buf->b_data, size,
 		    arc_read_done, buf, priority, flags, zb);
 
-		if (arc_flags & ARC_WAIT)
+		if (*arc_flags & ARC_WAIT)
 			return (zio_wait(rzio));
 
-		ASSERT(arc_flags & ARC_NOWAIT);
+		ASSERT(*arc_flags & ARC_NOWAIT);
 		zio_nowait(rzio);
 	}
 	return (0);
@@ -2260,22 +2304,33 @@ arc_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 		    ab->b_cksum0 == bp->blk_cksum.zc_word[0]);
 		if (ab->b_state != arc.anon)
 			arc_change_state(arc.anon, ab, hash_lock);
-		if (refcount_is_zero(&ab->b_refcnt)) {
+		if (HDR_IO_IN_PROGRESS(ab)) {
+			/*
+			 * This should only happen when we prefetch.
+			 */
+			ASSERT(ab->b_flags & ARC_PREFETCH);
+			ASSERT3U(ab->b_datacnt, ==, 1);
+			ab->b_flags |= ARC_FREED_IN_READ;
+			if (HDR_IN_HASH_TABLE(ab))
+				buf_hash_remove(ab);
+			ab->b_arc_access = 0;
+			bzero(&ab->b_dva, sizeof (dva_t));
+			ab->b_birth = 0;
+			ab->b_cksum0 = 0;
+			ab->b_buf->b_efunc = NULL;
+			ab->b_buf->b_private = NULL;
+			mutex_exit(hash_lock);
+		} else if (refcount_is_zero(&ab->b_refcnt)) {
 			mutex_exit(hash_lock);
 			arc_hdr_destroy(ab);
 			atomic_add_64(&arc.deleted, 1);
 		} else {
 			/*
-			 * We could have an outstanding read on this
-			 * block, so multiple active references are
-			 * possible.  But we should only have a single
-			 * data buffer associated at this point.
+			 * We still have an active reference on this
+			 * buffer.  This can happen, e.g., from
+			 * dbuf_unoverride().
 			 */
-			ASSERT3U(ab->b_datacnt, ==, 1);
-			if (HDR_IO_IN_PROGRESS(ab))
-				ab->b_flags |= ARC_FREED_IN_READ;
-			if (HDR_IN_HASH_TABLE(ab))
-				buf_hash_remove(ab);
+			ASSERT(!HDR_IN_HASH_TABLE(ab));
 			ab->b_arc_access = 0;
 			bzero(&ab->b_dva, sizeof (dva_t));
 			ab->b_birth = 0;
@@ -2350,6 +2405,9 @@ arc_init(void)
 	mutex_init(&arc_reclaim_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&arc_reclaim_thr_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&arc_reclaim_thr_cv, NULL, CV_DEFAULT, NULL);
+
+	/* Convert seconds to clock ticks */
+	arc_min_prefetch_lifespan *= hz;
 
 	/* Start out with 1/8 of all memory */
 	arc.c = physmem * PAGESIZE / 8;

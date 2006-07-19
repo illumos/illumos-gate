@@ -152,6 +152,7 @@ zil_read_log_block(zilog_t *zilog, const blkptr_t *bp, arc_buf_t **abufpp)
 {
 	blkptr_t blk = *bp;
 	zbookmark_t zb;
+	uint32_t aflags = ARC_WAIT;
 	int error;
 
 	zb.zb_objset = bp->blk_cksum.zc_word[ZIL_ZC_OBJSET];
@@ -163,7 +164,7 @@ zil_read_log_block(zilog_t *zilog, const blkptr_t *bp, arc_buf_t **abufpp)
 
 	error = arc_read(NULL, zilog->zl_spa, &blk, byteswap_uint64_array,
 	    arc_getbuf_func, abufpp, ZIO_PRIORITY_SYNC_READ, ZIO_FLAG_CANFAIL |
-	    ZIO_FLAG_SPECULATIVE | ZIO_FLAG_SCRUB, ARC_WAIT, &zb);
+	    ZIO_FLAG_SPECULATIVE | ZIO_FLAG_SCRUB, &aflags, &zb);
 
 	if (error == 0) {
 		char *data = (*abufpp)->b_data;

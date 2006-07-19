@@ -34,6 +34,8 @@
 #include <sys/vdev_impl.h>
 #include <sys/zio.h>
 
+uint64_t metaslab_aliquot = 512ULL << 10;
+
 /*
  * ==========================================================================
  * Metaslab classes
@@ -146,7 +148,7 @@ metaslab_group_create(metaslab_class_t *mc, vdev_t *vd)
 	mutex_init(&mg->mg_lock, NULL, MUTEX_DEFAULT, NULL);
 	avl_create(&mg->mg_metaslab_tree, metaslab_compare,
 	    sizeof (metaslab_t), offsetof(struct metaslab, ms_group_node));
-	mg->mg_aliquot = 2ULL << 20;		/* XXX -- tweak me */
+	mg->mg_aliquot = metaslab_aliquot * MAX(1, vd->vdev_children);
 	mg->mg_vd = vd;
 	metaslab_class_add(mc, mg);
 

@@ -142,6 +142,7 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		osi->os_rootbp = *bp;
 	osi->os_phys = zio_buf_alloc(sizeof (objset_phys_t));
 	if (!BP_IS_HOLE(&osi->os_rootbp)) {
+		uint32_t aflags = ARC_WAIT;
 		zbookmark_t zb;
 		zb.zb_objset = ds ? ds->ds_object : 0;
 		zb.zb_object = 0;
@@ -152,7 +153,7 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		err = arc_read(NULL, spa, &osi->os_rootbp,
 		    dmu_ot[DMU_OT_OBJSET].ot_byteswap,
 		    arc_bcopy_func, osi->os_phys,
-		    ZIO_PRIORITY_SYNC_READ, ZIO_FLAG_CANFAIL, ARC_WAIT, &zb);
+		    ZIO_PRIORITY_SYNC_READ, ZIO_FLAG_CANFAIL, &aflags, &zb);
 		if (err) {
 			zio_buf_free(osi->os_phys, sizeof (objset_phys_t));
 			kmem_free(osi, sizeof (objset_impl_t));

@@ -322,6 +322,8 @@ uint64_t dmu_buf_refcount(dmu_buf_t *db);
  */
 int dmu_buf_hold_array(objset_t *os, uint64_t object, uint64_t offset,
     uint64_t length, int read, void *tag, int *numbufsp, dmu_buf_t ***dbpp);
+int dmu_buf_hold_array_by_bonus(dmu_buf_t *db, uint64_t offset,
+    uint64_t length, int read, void *tag, int *numbufsp, dmu_buf_t ***dbpp);
 void dmu_buf_rele_array(dmu_buf_t **, int numbufs, void *tag);
 
 /*

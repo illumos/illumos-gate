@@ -147,11 +147,16 @@ dmu_bonus_hold(objset_t *os, uint64_t object, void *tag, dmu_buf_t **dbp)
 	return (0);
 }
 
-int
-dmu_buf_hold_array(objset_t *os, uint64_t object, uint64_t offset,
+/*
+ * Note: longer-term, we should modify all of the dmu_buf_*() interfaces
+ * to take a held dnode rather than <os, object> -- the lookup is wasteful,
+ * and can induce severe lock contention when writing to several files
+ * whose dnodes are in the same block.
+ */
+static int
+dmu_buf_hold_array_by_dnode(dnode_t *dn, uint64_t offset,
     uint64_t length, int read, void *tag, int *numbufsp, dmu_buf_t ***dbpp)
 {
-	dnode_t *dn;
 	dmu_buf_t **dbp;
 	uint64_t blkid, nblks, i;
 	uint32_t flags;
@@ -160,20 +165,9 @@ dmu_buf_hold_array(objset_t *os, uint64_t object, uint64_t offset,
 
 	ASSERT(length <= DMU_MAX_ACCESS);
 
-	if (length == 0) {
-		if (numbufsp)
-			*numbufsp = 0;
-		*dbpp = NULL;
-		return (0);
-	}
-
 	flags = DB_RF_CANFAIL | DB_RF_NEVERWAIT;
 	if (length > zfetch_array_rd_sz)
 		flags |= DB_RF_NOPREFETCH;
-
-	err = dnode_hold(os->os, object, FTAG, &dn);
-	if (err)
-		return (err);
 
 	rw_enter(&dn->dn_struct_rwlock, RW_READER);
 	if (dn->dn_datablkshift) {
@@ -193,12 +187,11 @@ dmu_buf_hold_array(objset_t *os, uint64_t object, uint64_t offset,
 		if (db == NULL) {
 			rw_exit(&dn->dn_struct_rwlock);
 			dmu_buf_rele_array(dbp, nblks, tag);
-			dnode_rele(dn, FTAG);
 			zio_nowait(zio);
 			return (EIO);
 		}
 		/* initiate async i/o */
-		if (read && db->db_state == DB_UNCACHED) {
+		if (read) {
 			rw_exit(&dn->dn_struct_rwlock);
 			(void) dbuf_read(db, zio, flags);
 			rw_enter(&dn->dn_struct_rwlock, RW_READER);
@@ -206,7 +199,6 @@ dmu_buf_hold_array(objset_t *os, uint64_t object, uint64_t offset,
 		dbp[i] = &db->db;
 	}
 	rw_exit(&dn->dn_struct_rwlock);
-	dnode_rele(dn, FTAG);
 
 	/* wait for async i/o */
 	err = zio_wait(zio);
@@ -236,6 +228,38 @@ dmu_buf_hold_array(objset_t *os, uint64_t object, uint64_t offset,
 	*numbufsp = nblks;
 	*dbpp = dbp;
 	return (0);
+}
+
+int
+dmu_buf_hold_array(objset_t *os, uint64_t object, uint64_t offset,
+    uint64_t length, int read, void *tag, int *numbufsp, dmu_buf_t ***dbpp)
+{
+	dnode_t *dn;
+	int err;
+
+	err = dnode_hold(os->os, object, FTAG, &dn);
+	if (err)
+		return (err);
+
+	err = dmu_buf_hold_array_by_dnode(dn, offset, length, read, tag,
+	    numbufsp, dbpp);
+
+	dnode_rele(dn, FTAG);
+
+	return (err);
+}
+
+int
+dmu_buf_hold_array_by_bonus(dmu_buf_t *db, uint64_t offset,
+    uint64_t length, int read, void *tag, int *numbufsp, dmu_buf_t ***dbpp)
+{
+	dnode_t *dn = ((dmu_buf_impl_t *)db)->db_dnode;
+	int err;
+
+	err = dmu_buf_hold_array_by_dnode(dn, offset, length, read, tag,
+	    numbufsp, dbpp);
+
+	return (err);
 }
 
 void
@@ -383,6 +407,9 @@ dmu_write(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 	dmu_buf_t **dbp;
 	int numbufs, i;
 
+	if (size == 0)
+		return;
+
 	VERIFY(0 == dmu_buf_hold_array(os, object, offset, size,
 	    FALSE, FTAG, &numbufs, &dbp));
 
@@ -423,6 +450,9 @@ dmu_write_uio(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 	dmu_buf_t **dbp;
 	int numbufs, i;
 	int err = 0;
+
+	if (size == 0)
+		return (0);
 
 	err = dmu_buf_hold_array(os, object, offset, size,
 	    FALSE, FTAG, &numbufs, &dbp);
@@ -620,6 +650,7 @@ backup_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 	    type != DMU_OT_DNODE && type != DMU_OT_OBJSET) {
 		int blksz = BP_GET_LSIZE(bp);
 		if (data == NULL) {
+			uint32_t aflags = ARC_WAIT;
 			arc_buf_t *abuf;
 			zbookmark_t zb;
 
@@ -630,7 +661,7 @@ backup_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 			(void) arc_read(NULL, spa, bp,
 			    dmu_ot[type].ot_byteswap, arc_getbuf_func, &abuf,
 			    ZIO_PRIORITY_ASYNC_READ, ZIO_FLAG_MUSTSUCCEED,
-			    ARC_WAIT, &zb);
+			    &aflags, &zb);
 
 			if (abuf) {
 				err = dump_data(ba, type, object, blkid * blksz,
@@ -1511,6 +1542,16 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 			 * this zio to the parent zio passed in.
 			 */
 			cv_wait(&db->db_changed, &db->db_mtx);
+			if (!db->db_data_pending &&
+			    db->db_blkptr && BP_IS_HOLE(db->db_blkptr)) {
+				/*
+				 * IO was compressed away
+				 */
+				*bp = *db->db_blkptr; /* structure assignment */
+				mutex_exit(&db->db_mtx);
+				txg_resume(dp);
+				return (0);
+			}
 			ASSERT(db->db_data_pending ||
 			    (db->db_blkptr && db->db_blkptr->blk_birth == txg));
 		}
