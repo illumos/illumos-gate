@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,12 +73,14 @@ id("%Z%%M% %I%     %E% SMI")
 VERSION 1.1
 VERBOSE 1
 
-/* create a /platform node for the seeprom */
+/*
+ * create /platform seeprom node properties
+ */
 name:/platform/i2c@1f,530000/power-supply-fru-prom@0,6c
-	PROP binding-name string r 0 "i2c-at24c64"
+	PROP binding-name string r 0 "i2c-at34c02"
 	PROP driver-name string r 0 "seeprom"
 	PROP devfs-path string r 0 "/i2c@1f,530000/power-supply-fru-prom"
-	PROP compatible string r 0 "i2c-at24c64"
+	PROP compatible string r 0 "i2c-at34c02"
 	PROP device_type string r 0 "fru-prom"
 	PROP UnitAddress string r 0 "0,6c"
 

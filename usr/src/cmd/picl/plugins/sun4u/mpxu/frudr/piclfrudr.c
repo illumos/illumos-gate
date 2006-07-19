@@ -172,6 +172,7 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	PSU2_NAME "PSU2"
 #define	PSU3_NAME "PSU3"
 #define	PS_DEVICE_NAME "power-supply-fru-prom"
+#define	PSU_COMPATIBLE	"i2c-at24c64"
 
 /*
  * Seattle/Boston PSU defines
@@ -184,6 +185,7 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	SEATTLE_PS1_ADDR	0x6e
 #define	SEATTLE_PS0_UNITADDR	"0,6c"
 #define	SEATTLE_PS1_UNITADDR	"0,6e"
+#define	SEATTLE_PSU_COMPATIBLE	"i2c-at34c02"
 #define	BOSTON_PSU_I2C_BUS_DEV	"/devices/i2c@1f,520000:devctl"
 #define	BOSTON_PSU_DEV	\
 	"/devices/i2c@1f,520000/power-supply-fru-prom@0,%x"
@@ -196,6 +198,7 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	BOSTON_PS1_UNITADDR	"0,32"
 #define	BOSTON_PS2_UNITADDR	"0,52"
 #define	BOSTON_PS3_UNITADDR	"0,72"
+#define	BOSTON_PSU_COMPATIBLE	"i2c-at34c02"
 
 /*
  * disk defines
@@ -2664,6 +2667,7 @@ create_i2c_node(char *ap_id)
 	devctl_hdl_t	bus_hdl;
 	devctl_hdl_t	dev_hdl;
 	char		dev_path[MAXPATHLEN];
+	char		*compatible;
 
 	/* create seeprom node */
 	nd_reg[0] = 0;
@@ -2673,12 +2677,15 @@ create_i2c_node(char *ap_id)
 	case PLAT_SEATTLE1U:
 	case PLAT_SEATTLE2U:
 		bus_hdl = devctl_bus_acquire(SEATTLE_PSU_I2C_BUS_DEV, 0);
+		compatible = SEATTLE_PSU_COMPATIBLE;
 		break;
 	case PLAT_BOSTON:
 		bus_hdl = devctl_bus_acquire(BOSTON_PSU_I2C_BUS_DEV, 0);
+		compatible = BOSTON_PSU_COMPATIBLE;
 		break;
 	default:
 		bus_hdl = devctl_bus_acquire(PSU_I2C_BUS_DEV, 0);
+		compatible = PSU_COMPATIBLE;
 		break;
 	}
 
@@ -2687,7 +2694,7 @@ create_i2c_node(char *ap_id)
 
 	/* device definition properties */
 	ddef_hdl = devctl_ddef_alloc(PS_DEVICE_NAME, 0);
-	(void) devctl_ddef_string(ddef_hdl, "compatible", "i2c-at24c64");
+	(void) devctl_ddef_string(ddef_hdl, "compatible", compatible);
 	(void) devctl_ddef_string(ddef_hdl, "device_type", "seeprom");
 	(void) devctl_ddef_int_array(ddef_hdl, "reg", 2, nd_reg);
 
