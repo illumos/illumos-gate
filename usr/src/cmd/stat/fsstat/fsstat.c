@@ -674,7 +674,7 @@ set_mntpt(entity_t *ep)
 		ulong_t		m_fsid;	/* From statvfs(), set only as needed */
 	} *mnt_list = NULL;	/* Linked list of mount-points */
 	struct mnt *mntp;
-	struct statvfs statvfsbuf;
+	struct statvfs64 statvfsbuf;
 	char *original_name = ep->e_name;
 	char path[PATH_MAX];
 
@@ -721,7 +721,7 @@ set_mntpt(entity_t *ep)
 	for (mntp = mnt_list; mntp; mntp = mntp->m_next) {
 		if (strncmp(path, mntp->m_mntpt, strlen(mntp->m_mntpt)) == 0) {
 			if (mntp->m_fsid == 0) {
-				if (statvfs(mntp->m_mntpt, &statvfsbuf)) {
+				if (statvfs64(mntp->m_mntpt, &statvfsbuf)) {
 					/* Can't statvfs so no match */
 					continue;
 				} else {
@@ -762,7 +762,7 @@ void
 set_ksnames(entity_t *entities, int nentities, char **fstypes, int nfstypes)
 {
 	int		i, j;
-	struct statvfs statvfsbuf;
+	struct statvfs64 statvfsbuf;
 
 	for (i = 0; i < nentities; i++) {
 		entity_t	*ep = &entities[i];
@@ -798,7 +798,7 @@ set_ksnames(entity_t *entities, int nentities, char **fstypes, int nfstypes)
 		}
 
 		/* If we didn't find it, see if it's a path */
-		if (ep->e_name == NULL || statvfs(ep->e_name, &statvfsbuf)) {
+		if (ep->e_name == NULL || statvfs64(ep->e_name, &statvfsbuf)) {
 			/* Error - Make sure the entry is nulled out */
 			ep->e_ksname[0] = 0;
 			continue;

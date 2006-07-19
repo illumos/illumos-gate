@@ -32,7 +32,7 @@ SRCS =$(OBJS:%.o=%.c)
 include $(SRC)/cmd/Makefile.cmd
 
 LDLIBS += -lkstat
-CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR} -g
+CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
 FILEMODE= 0555
 GROUP= bin
 
