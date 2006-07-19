@@ -5,7 +5,7 @@
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ipfcomp.c,v 1.19 2003/04/09 19:04:33 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: ipfcomp.c,v 1.24.2.2 2004/04/28 10:34:44 darrenr Exp $";
 #endif
 
 #include "ipf.h"
@@ -95,7 +95,9 @@ frentry_t *fr;
 		fprintf(fp, "#include <sys/types.h>\n");
 		fprintf(fp, "#include <sys/time.h>\n");
 		fprintf(fp, "#include <sys/socket.h>\n");
-		fprintf(fp, "#include <sys/systm.h>\n");
+		fprintf(fp, "#if !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__sgi)\n");
+		fprintf(fp, "# include <sys/systm.h>\n");
+		fprintf(fp, "#endif\n");
 		fprintf(fp, "#include <sys/errno.h>\n");
 		fprintf(fp, "#include <sys/param.h>\n");
 		fprintf(fp,
@@ -113,9 +115,14 @@ frentry_t *fr;
 		fprintf(fp, "#include <netinet/in_systm.h>\n");
 		fprintf(fp, "#include <netinet/ip.h>\n");
 		fprintf(fp, "#include <netinet/tcp.h>\n");
-		fprintf(fp, "#include \"ip_compat.h\"\n");
-		fprintf(fp, "#include \"ip_fil.h\"\n\n");
-		fprintf(fp, "#include \"ip_rules.h\"\n\n");
+		fprintf(fp, "#include \"netinet/ip_compat.h\"\n");
+		fprintf(fp, "#include \"netinet/ip_fil.h\"\n\n");
+		fprintf(fp, "#include \"netinet/ip_rules.h\"\n\n");
+		fprintf(fp, "#ifndef _KERNEL\n");
+		fprintf(fp, "# include <string.h>\n");
+		fprintf(fp, "#endif /* _KERNEL */\n");
+		fprintf(fp, "\n");
+		fprintf(fp, "#ifdef IPFILTER_COMPILED\n");
 	}
 
 	addrule(fp, fr);
@@ -152,18 +159,9 @@ frentry_t *fr;
 	int i;
 
 	f = (frentry_t *)malloc(sizeof(*f));
-	if (f == NULL) {
-		fprintf(stderr, "out of memory\n");
-		exit(1);
-	}
-
 	bcopy((char *)fr, (char *)f, sizeof(*fr));
 	if (fr->fr_ipf) {
 		f->fr_ipf = (fripf_t *)malloc(sizeof(*f->fr_ipf));
-		if (f->fr_ipf == NULL) {
-			fprintf(stderr, "out of memory\n");
-			exit(1);
-		}
 		bcopy((char *)fr->fr_ipf, (char *)f->fr_ipf,
 		      sizeof(*fr->fr_ipf));
 	}
@@ -176,10 +174,6 @@ frentry_t *fr;
 
 	if (g == NULL) {
 		g = (frgroup_t *)calloc(1, sizeof(*g));
-		if (g == NULL) {
-			fprintf(stderr, "out of memory\n");
-			exit(1);
-		}
 		g->fg_next = groups;
 		groups = g;
 		g->fg_head = f;
@@ -220,10 +214,6 @@ static u_long ipf%s_rule_data_%s_%u[] = {\n",
 				break;
 		if (g == NULL) {
 			g = (frgroup_t *)calloc(1, sizeof(*g));
-			if (g == NULL) {
-				fprintf(stderr, "out of memory\n");
-				exit(1);
-			}
 			g->fg_next = groups;
 			groups = g;
 			g->fg_head = f;
@@ -332,7 +322,9 @@ frentry_t *fr;
 			}
 		}
 		emittail();
+		fprintf(cfile, "#endif /* IPFILTER_COMPILED */\n");
 	}
+
 }
 
 
@@ -723,7 +715,7 @@ u_int incount, outcount;
 
 	/*
 	 * print out C code that implements a filter rule.
-	 */ 
+	 */
 	for (; i < FRC_MAX; i++) {
 		switch(m[i].c)
 		{
@@ -941,10 +933,6 @@ u_int incount, outcount;
 	}
 	if (n == NULL)
 		n = (mc_t *)malloc(sizeof(*n) * FRC_MAX);
-		if (n == NULL) {
-			fprintf(stderr, "out of memory\n");
-			exit(1);
-		}
 	bcopy((char *)m, (char *)n, sizeof(*n) * FRC_MAX);
 	sin = in;
 }
@@ -958,10 +946,6 @@ int dir;
 
 	if (m == NULL)
 		m = (mc_t *)calloc(1, sizeof(*m) * FRC_MAX);
-		if (m == NULL) {
-			fprintf(stderr, "out of memory\n");
-			exit(1);
-		}
 
 	for (g = groups; g != NULL; g = g->fg_next) {
 		if ((dir == 0) && ((g->fg_flags & FR_INQUE) != 0))
@@ -1309,6 +1293,9 @@ int ipfrule_add_%s_%s()\n", instr, group);
 	fp->fr_flags = FR_%sQUE|FR_NOMATCH;\n\
 	fp->fr_data = (void *)ipf_rules_%s_%s[0];\n",
 		(in != 0) ? "IN" : "OUT", instr, group);
+	fprintf(fp, "\
+	fp->fr_dsize = sizeof(ipf_rules_%s_%s[0]);\n",
+		instr, group);
 
 	fprintf(fp, "\
 	fp->fr_v = 4;\n\

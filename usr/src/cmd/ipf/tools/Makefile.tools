@@ -48,7 +48,7 @@ ipftest		:=	LDLIBS += -lsocket -lnsl -lmd
 ipfstat		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf
 ipmon		:=	LDLIBS += -lsocket -lnsl
 ipnat		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf
-ippool		:=	LDLIBS += -lnsl -lkvm
+ippool		:=	LDLIBS += -lsocket -lnsl -lkvm
 
 CLEANFILES	+= $(OBJS)
 
@@ -90,7 +90,7 @@ ipf:	$(IPF_OBJS) $(LIBIPF)
 	$(LINK.c) -o ipf $(IPF_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-ipf_y.o: ../ipf_y.c $(COMMONIPF)/ip_fil.h $(COMMONIPF)/ipf.h \
+ipf_y.o: ../ipf_y.c $(COMMONIPF)/netinet/ip_fil.h $(COMMONIPF)/ipf.h \
 	../ipf_y.c ../ipf_l.h
 
 ../ipf_y.c ../ipf_y.h: ../ipf_y.y
@@ -100,11 +100,11 @@ ipf_y.o: ../ipf_y.c $(COMMONIPF)/ip_fil.h $(COMMONIPF)/ipf.h \
 	sed -e 's/yy/ipf_yy/g' -e 's/y.tab.h/ipf_y.h/' \
 	   ipf.tab.h > ../ipf_y.h
 
-ipf_l.o: ../ipf_l.c $(COMMONIPF)/ip_fil.h $(COMMONIPF)/ipf.h  \
+ipf_l.o: ../ipf_l.c $(COMMONIPF)/netinet/ip_fil.h $(COMMONIPF)/ipf.h  \
 	 ../ipf_y.h ../ipf_l.h
 	$(COMPILE.c) ../ipf_l.c -o $@
 
-../ipf_l.c: ../lexer.c $(COMMONIPF)/ipf.h $(COMMONIPF)/ip_fil.h
+../ipf_l.c: ../lexer.c $(COMMONIPF)/ipf.h $(COMMONIPF)/netinet/ip_fil.h
 	sed -e 's/yy/ipf_yy/g' -e 's/y.tab.h/ipf_y.h/' \
 	       -e 's/lexer.h/ipf_l.h/' ../lexer.c > $@
 
@@ -149,7 +149,7 @@ ipnat:	$(IPNAT_OBJS) $(LIBIPF)
 	$(LINK.c) -o ipnat $(IPNAT_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-ipnat_y.o: ../ipnat_y.c $(COMMONIPF)/ip_nat.h \
+ipnat_y.o: ../ipnat_y.c $(COMMONIPF)/netinet/ip_nat.h \
 	../ipnat_y.h ../ipnat_l.h
 
 ../ipnat_y.c ../ipnat_y.h: ../ipnat_y.y
@@ -161,10 +161,10 @@ ipnat_y.o: ../ipnat_y.c $(COMMONIPF)/ip_nat.h \
 	sed -e 's/yy/ipnat_yy/g' -e 's/y.tab.h/ipnat_y.h/' \
 	   ipnat.tab.h > ../ipnat_y.h
 
-ipnat_l.o: ../ipnat_l.c $(COMMONIPF)/ip_nat.h ../ipnat_l.h
+ipnat_l.o: ../ipnat_l.c $(COMMONIPF)/netinet/ip_nat.h ../ipnat_l.h
 	$(COMPILE.c) ../ipnat_l.c -o $@
 
-../ipnat_l.c: ../lexer.c $(COMMONIPF)/ip_nat.h
+../ipnat_l.c: ../lexer.c $(COMMONIPF)/netinet/ip_nat.h
 	sed -e 's/yy/ipnat_yy/g' -e 's/y.tab.h/ipnat_y.h/' \
 	       -e 's/lexer.h/ipnat_l.h/' ../lexer.c > $@
 
@@ -175,7 +175,7 @@ ippool:	$(IPPOOL_OBJS) $(LIBIPF)
 	$(LINK.c) -o ippool $(IPPOOL_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-ippool_y.o: ../ippool_y.c $(COMMONIPF)/ip_pool.h \
+ippool_y.o: ../ippool_y.c $(COMMONIPF)/netinet/ip_pool.h \
 	../ippool_y.h ../ippool_l.h
 
 ../ippool_y.c ../ippool_y.h: ../ippool_y.y
@@ -187,10 +187,10 @@ ippool_y.o: ../ippool_y.c $(COMMONIPF)/ip_pool.h \
 	sed -e 's/yy/ippool_yy/g' -e 's/y.tab.h/ippool_y.h/' \
 	   ippool.tab.h > ../ippool_y.h
 
-ippool_l.o: ../ippool_l.c $(COMMONIPF)/ip_pool.h ../ippool_l.h
+ippool_l.o: ../ippool_l.c $(COMMONIPF)/netinet/ip_pool.h ../ippool_l.h
 	$(COMPILE.c) ../ippool_l.c -o $@
 
-../ippool_l.c: ../lexer.c $(COMMONIPF)/ip_pool.h
+../ippool_l.c: ../lexer.c $(COMMONIPF)/netinet/ip_pool.h
 	sed -e 's/yy/ippool_yy/g' -e 's/y.tab.h/ippool_y.h/' \
 	       -e 's/lexer.h/ippool_l.h/' ../lexer.c > $@
 
@@ -206,7 +206,7 @@ clean:
 
 lint: 	lint_SRCS
 
-%.o:	$(SRC)/common/ipf/%.c
+%.o:	$(SRC)/uts/common/inet/ipf/%.c
 	$(COMPILE.c) $<
 
 %.o:	../%.c

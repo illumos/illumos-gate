@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -14,16 +14,20 @@
 #define	PRINTF	(void)printf
 #define	FPRINTF	(void)fprintf
 
-ip_pool_t *printpool(pp, copyfunc, opts)
+ip_pool_t *printpool(pp, copyfunc, name, opts)
 ip_pool_t *pp;
 copyfunc_t copyfunc;
+char *name;
 int opts;
 {
-	ip_pool_node_t *ipnp, *ipnpn;
+	ip_pool_node_t *ipnp, *ipnpn, ipn;
 	ip_pool_t ipp;
 
 	if ((*copyfunc)(pp, &ipp, sizeof(ipp)))
 		return NULL;
+
+	if ((name != NULL) && strncmp(name, ipp.ipo_name, FR_GROUPLEN))
+		return ipp.ipo_next;
 
 	if ((opts & OPT_DEBUG) == 0) {
 		if ((ipp.ipo_flags & IPOOL_ANON) != 0)
@@ -82,17 +86,22 @@ int opts;
 	ipp.ipo_list = NULL;
 	while (ipnpn != NULL) {
 		ipnp = (ip_pool_node_t *)malloc(sizeof(*ipnp));
-		(*copyfunc)(ipnpn, ipnp, sizeof(*ipnp));
+		(*copyfunc)(ipnpn, ipnp, sizeof(ipn));
 		ipnpn = ipnp->ipn_next;
 		ipnp->ipn_next = ipp.ipo_list;
 		ipp.ipo_list = ipnp;
 	}
 
-	for (ipnp = ipp.ipo_list; ipnp != NULL; ) {
-		ipnp = printpoolnode(ipnp, opts);
+	if (ipp.ipo_list == NULL) {
+		putchar(';');
+	} else {
+		for (ipnp = ipp.ipo_list; ipnp != NULL; ) {
+			ipnp = printpoolnode(ipnp, opts);
 
-		if ((opts & OPT_DEBUG) == 0)
-			putchar(';');
+			if ((opts & OPT_DEBUG) == 0) {
+				putchar(';');
+			}
+		}
 	}
 
 	if ((opts & OPT_DEBUG) == 0)

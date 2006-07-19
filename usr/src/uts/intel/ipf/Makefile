@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,6 +42,8 @@ MINOR=	    echo $(RELEASE) | cut -d. -f2
 CPPFLAGS += -DIPFILTER_LKM -DIPFILTER_LOG -DIPFILTER_LOOKUP -DUSE_INET6
 CPPFLAGS += -DSUNDDI -DSOLARIS2=$(MINOR:sh) -DIRE_ILL_CN
 LDFLAGS += -dy -Ndrv/ip -Ndrv/pfil -Nmisc/md5
+
+INC_PATH += -I$(UTSBASE)/common/inet/ipf
 
 #
 #	Default build targets.

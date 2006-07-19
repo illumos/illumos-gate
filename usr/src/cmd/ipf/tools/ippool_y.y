@@ -4,7 +4,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,15 +36,9 @@
 #include <unistd.h>
 
 #include "ipf.h"
-#if SOLARIS2 >= 10
-#include "ip_lookup.h"
-#include "ip_pool.h"
-#include "ip_htable.h"
-#else
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
-#endif
 #include "ippool_l.h"
 #include "kmem.h"
 
@@ -164,25 +158,23 @@ role:
 	;
 
 ipftree:
-	IPT_TYPE '=' IPT_TREE number '{' { yyexpectaddr = 1; }
-	addrlist '}'
+	IPT_TYPE '=' IPT_TREE number start addrlist end
 					{ strncpy(iplo.ipo_name, $4,
 						  sizeof(iplo.ipo_name));
-					  $$ = $7;
+					  $$ = $6;
 					}
 	;
 
 ipfhash:
-	IPT_TYPE '=' IPT_HASH number hashopts '{' { yyexpectaddr = 1; }
-	hashlist '}'
+	IPT_TYPE '=' IPT_HASH number hashopts start hashlist end
 					{ strncpy(ipht.iph_name, $4,
 						  sizeof(ipht.iph_name));
-					  $$ = $8;
+					  $$ = $7;
 					}
 	;
 
 ipfgroup:
-	setgroup hashopts '{' grouplist '}'
+	setgroup hashopts start grouplist end
 					{ iphtent_t *e;
 					  for (e = $4; e != NULL;
 					       e = e->ipe_next)
@@ -192,10 +184,10 @@ ipfgroup:
 								FR_GROUPLEN);
 					  $$ = $4;
 					}
-	| hashopts '{' setgrouplist '}'		{ $$ = $3; }
+	| hashopts start setgrouplist end		{ $$ = $3; }
 	;
 
-number:	IPT_NUM '=' YY_NUMBER			{ sprintf(poolname, "%u", $3);
+number:	IPT_NUM '=' YY_NUMBER			{ snprintf(poolname, FR_GROUPLEN, "%u", $3);
 						  $$ = poolname;
 						}
 	| IPT_NAME '=' YY_STR			{ $$ = $3; }
@@ -208,7 +200,7 @@ setgroup:
 					  $$ = strdup(tmp);
 					}
 	| IPT_GROUP '=' YY_NUMBER	{ char tmp[FR_GROUPLEN+1];
-					  sprintf(tmp, "%u", $3);
+					  snprintf(tmp, FR_GROUPLEN, "%u", $3);
 					  $$ = strdup(tmp);
 					}
 	;
@@ -220,14 +212,15 @@ hashopts:
 	;
 
 addrlist:
-	next				{ $$ = NULL; }
+	';'				{ $$ = NULL; }
 	| range next addrlist		{ $1->ipn_next = $3; $$ = $1; }
 	| range next			{ $$ = $1; }
-	| range				{ $$ = $1; }
+	| range
 	;
 
 grouplist:
-	groupentry next grouplist	{ $$ = $1; $1->ipe_next = $3; }
+	';'				{ $$ = NULL; }
+	| groupentry next grouplist	{ $$ = $1; $1->ipe_next = $3; }
 	| addrmask next grouplist	{ $$ = calloc(1, sizeof(iphtent_t));
 					  if ($$ == NULL)
 						yyerror("sorry, out of memory");
@@ -242,7 +235,8 @@ grouplist:
 						(char *)&($$->ipe_mask),
 						sizeof($$->ipe_mask));
 					  set_ipv6_addr = 0;
-	  				  $$->ipe_next = $3; }
+					  $$->ipe_next = $3;
+					}
 	| groupentry next		{ $$ = $1; }
 	| addrmask next			{ $$ = calloc(1, sizeof(iphtent_t));
 					  if ($$ == NULL)
@@ -262,34 +256,38 @@ grouplist:
 	;
 
 setgrouplist:
-	groupentry next			{ $$ = $1; }
+	';'				{ $$ = NULL; }
+	| groupentry next		{ $$ = $1; }
 	| groupentry next setgrouplist	{ $1->ipe_next = $3; $$ = $1; }
 	;
 
 groupentry:
-	addrmask ',' setgroup	{ $$ = calloc(1, sizeof(iphtent_t));
-				  if ($$ == NULL)
-					yyerror("sorry, out of memory");
-				  if  (set_ipv6_addr)
-				  	$$->ipe_family = AF_INET6;
-				  else
-					$$->ipe_family = AF_INET;
-				  bcopy((char *)&($1[0]),
-					(char *)&($$->ipe_addr),
-					sizeof($$->ipe_addr));
-				  bcopy((char *)&($1[1]),
-					(char *)&($$->ipe_mask),
-					sizeof($$->ipe_mask));
-  				  set_ipv6_addr = 0;
-	 			  strncpy($$->ipe_group, $3,  FR_GROUPLEN);
-				  free($3); }
-
+	addrmask ',' setgroup		{ $$ = calloc(1, sizeof(iphtent_t));
+					  if ($$ == NULL)
+						yyerror("sorry, out of memory");
+					  if  (set_ipv6_addr)
+					  	$$->ipe_family = AF_INET6;
+					  else
+						$$->ipe_family = AF_INET;
+					  bcopy((char *)&($1[0]),
+						(char *)&($$->ipe_addr),
+						sizeof($$->ipe_addr));
+					  bcopy((char *)&($1[1]),
+						(char *)&($$->ipe_mask),
+						sizeof($$->ipe_mask));
+					  set_ipv6_addr = 0;
+					  strncpy($$->ipe_group, $3,
+						  FR_GROUPLEN);
+					  free($3);
+					}
 	;
 
 range:	addrmask	{ $$ = calloc(1, sizeof(*$$));
 			  if ($$ == NULL)
 				yyerror("sorry, out of memory");
 			  $$->ipn_info = 0;
+			  $$->ipn_addr.adf_len = sizeof($$->ipn_addr);
+			  $$->ipn_mask.adf_len = sizeof($$->ipn_mask);
 			  if (set_ipv6_addr) {
 				  $$->ipn_addr.adf_family = AF_INET6;
 				  $$->ipn_addr.adf_addr = $1[0];
@@ -306,6 +304,8 @@ range:	addrmask	{ $$ = calloc(1, sizeof(*$$));
 			  if ($$ == NULL)
 				yyerror("sorry, out of memory");
 			  $$->ipn_info = 1;
+			  $$->ipn_addr.adf_len = sizeof($$->ipn_addr);
+			  $$->ipn_mask.adf_len = sizeof($$->ipn_mask);
 			  if (set_ipv6_addr) {
 				  $$->ipn_addr.adf_family = AF_INET6;
 				  $$->ipn_addr.adf_addr = $2[0];
@@ -319,12 +319,13 @@ range:	addrmask	{ $$ = calloc(1, sizeof(*$$));
 			}
 
 hashlist:
-	hashentry next			{ $$ = $1; }
+	';'				{ $$ = NULL; }
+	| hashentry next		{ $$ = $1; }
 	| hashentry next hashlist	{ $1->ipe_next = $3; $$ = $1; }
 	;
 
 hashentry:
-	addrmask 			{ $$ = calloc(1, sizeof(iphtent_t));
+	addrmask			{ $$ = calloc(1, sizeof(iphtent_t));
 					  if ($$ == NULL)
 						yyerror("sorry, out of memory");
 					  if  (set_ipv6_addr)
@@ -337,32 +338,47 @@ hashentry:
 					  bcopy((char *)&($1[1]),
 						(char *)&($$->ipe_mask),
 						sizeof($$->ipe_mask));
-					  set_ipv6_addr = 0;
 					}
 	;
 
 addrmask:
-	ipaddr '/' mask		{ $$[0] = $1; $$[1] = $3; }
-	| ipaddr		{ $$[0] = $1;
+	ipaddr '/' mask		{ $$[0] = $1; $$[1] = $3;
+				  yyexpectaddr = 0;
+				}
+	| ipaddr		{ $$[0] = $1; 
+				  yyexpectaddr = 0;
 				  if (set_ipv6_addr) 
 				  	fill6bits(128, (u_32_t *)$$[1].in6.s6_addr);
 				  else
-				  	$$[1].in4.s_addr = 0xffffffff; }
+				  	$$[1].in4.s_addr = 0xffffffff;
+				}
 	;
 
 ipaddr:	ipv4			{ $$ = $1; }
 	| YY_NUMBER		{ $$.in4.s_addr = htonl($1); }
-	| YY_IPV6 		{ set_ipv6_addr = 1;
+	| YY_IPV6		{ set_ipv6_addr = 1;
 				  bcopy(&$1, &$$, sizeof($$));
 				  yyexpectaddr = 0; }
+	| YY_STR		{ if (gethost($1, &($$.in4.s_addr)) == -1)
+					yyerror("Unknown hostname");
+				}
 	;
 
 mask:	YY_NUMBER		{ if (set_ipv6_addr)
-    					ntomask(6, $1, (u_32_t *)$$.in6.s6_addr);
+					ntomask(6, $1, (u_32_t *)$$.in6.s6_addr);
 				  else
-				  	ntomask(4, $1, (u_32_t *)&$$.in4.s_addr);
-				}
+				  	ntomask(4, $1, (u_32_t *)&$$.in4.s_addr); }
 	| ipv4			{ $$ = $1; }
+	;
+
+start:	'{'			{ yyexpectaddr = 1; }
+	;
+
+end:	'}'			{ yyexpectaddr = 0; }
+	;
+
+next:	','			{ yyexpectaddr = 1; }
+	| ';'			{ yyexpectaddr = 1; }
 	;
 
 size:	IPT_SIZE '=' YY_NUMBER	{ ipht.iph_size = $3; }
@@ -380,12 +396,6 @@ ipv4:	YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER
 		  $$.in4.s_addr = htonl($$.in4.s_addr);
 		}
 	;
-
-next:	';'			{ yyexpectaddr = 1; }
-	| ','			{ yyexpectaddr = 1; }
-	;
-
-
 %%
 static	wordtab_t	yywords[] = {
 	{ "auth",	IPT_AUTH },

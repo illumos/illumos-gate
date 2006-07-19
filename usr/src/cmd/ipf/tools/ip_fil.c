@@ -3,26 +3,21 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(lint)
-static const char rcsid[] = "@(#)$Id: ip_fil.c,v 2.121 2003/06/28 17:01:55 darrenr Exp $";
+static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed";
+static const char rcsid[] = "@(#)$Id: ip_fil.c,v 2.133.2.9 2005/01/08 14:22:18 darrenr Exp $";
 #endif
 
 #ifndef	SOLARIS
 #define	SOLARIS	(defined(sun) && (defined(__svr4__) || defined(__SVR4)))
 #endif
 
-#if defined(KERNEL) || defined(_KERNEL)
-# undef KERNEL
-# undef _KERNEL
-# define        KERNEL	1
-# define        _KERNEL	1
-#endif
 #include <sys/param.h>
 #if defined(__FreeBSD__) && !defined(__FreeBSD_version)
 # if defined(IPFILTER_LKM)
@@ -36,30 +31,20 @@ static const char rcsid[] = "@(#)$Id: ip_fil.c,v 2.121 2003/06/28 17:01:55 darre
 # endif
 #endif
 #include <sys/errno.h>
-#include <sys/types.h>
-
-#ifdef _KERNEL
-#  include <sys/systm.h>
-#  include <sys/fcntl.h>
-#else
-#  define _KERNEL
-#  ifdef __OpenBSD__
-struct file;
-#  endif
-
-#  include <sys/uio.h>
-#  undef _KERNEL
+#if defined(__hpux) && (HPUXREV >= 1111) && !defined(_KERNEL)
+# include <sys/kern_svcs.h>
 #endif
-
+#include <sys/types.h>
+#define _KERNEL
+#define KERNEL
+#ifdef __OpenBSD__
+struct file;
+#endif
+#include <sys/uio.h>
+#undef _KERNEL
+#undef KERNEL
 #include <sys/file.h>
 #include <sys/ioctl.h>
-
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <fcntl.h>
-
 #ifdef __sgi
 # include <sys/ptimers.h>
 #endif
@@ -73,7 +58,9 @@ struct file;
 #else
 # include <sys/filio.h>
 #endif
-#include <sys/protosw.h>
+#ifndef linux
+# include <sys/protosw.h>
+#endif
 #include <sys/socket.h>
 
 #include <stdio.h>
@@ -81,6 +68,7 @@ struct file;
 #include <stdlib.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
 
 #ifdef __hpux
 # define _NET_ROUTE_INCLUDED
@@ -98,18 +86,27 @@ struct file;
 #include <sys/hashing.h>
 # endif
 #endif
+#if defined(__FreeBSD__)
+# include "radix_ipf.h"
+#endif
 #include <net/route.h>
 #include <netinet/in.h>
 #if !(defined(__sgi) && !defined(IFF_DRVRLOCK)) /* IRIX < 6 */ && \
-    !defined(__hpux)
+    !defined(__hpux) && !defined(linux)
 # include <netinet/in_var.h>
 #endif
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#include <netinet/ip_var.h>
+#if !defined(linux)
+# include <netinet/ip_var.h>
+#endif
 #include <netinet/tcp.h>
 #if defined(__osf__)
 # include <netinet/tcp_timer.h>
+#endif
+#if defined(__osf__) || defined(__hpux) || defined(__sgi)
+# include "radix_ipf_local.h"
+# define _RADIX_H_
 #endif
 #include <netinet/udp.h>
 #include <netinet/tcpip.h>
@@ -119,15 +116,6 @@ struct file;
 #ifdef __hpux
 # undef _NET_ROUTE_INCLUDED
 #endif
-#if SOLARIS2 >= 10
-#include "ip_compat.h"
-#include "ip_fil.h"
-#include "ip_nat.h"
-#include "ip_frag.h"
-#include "ip_state.h"
-#include "ip_proxy.h"
-#include "ip_auth.h"
-#else
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
 #include "netinet/ip_nat.h"
@@ -135,18 +123,13 @@ struct file;
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_auth.h"
-#endif
 #ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
 #endif
 #ifdef	IPFILTER_SCAN
 #include "netinet/ip_scan.h"
 #endif
-#if SOLARIS2 >= 10
-#include "ip_pool.h"
-#else
 #include "netinet/ip_pool.h"
-#endif
 #ifdef IPFILTER_COMPILED
 # include "netinet/ip_rules.h"
 #endif
@@ -156,8 +139,8 @@ struct file;
 #ifdef __hpux
 struct rtentry;
 #endif
+#include "md5.h"
 
-#include <sys/md5.h>
 
 #if !defined(__osf__)
 extern	struct	protosw	inetsw[];
@@ -168,8 +151,9 @@ static	struct	ifnet **ifneta = NULL;
 static	int	nifs = 0;
 
 static	int	frzerostats __P((caddr_t));
+static	void	fr_setifpaddr __P((struct ifnet *, char *));
 void	init_ifp __P((void));
-#if defined(__sgi) && (IRIX < 605)
+#if defined(__sgi) && (IRIX < 60500)
 static int 	no_output __P((struct ifnet *, struct mbuf *,
 			       struct sockaddr *));
 static int	write_output __P((struct ifnet *, struct mbuf *,
@@ -220,18 +204,12 @@ caddr_t	data;
 }
 
 
-
 /*
  * Filter ioctl interface.
  */
 int iplioctl(dev, cmd, data, mode)
 int dev;
-#if defined(__NetBSD__) || defined(__OpenBSD__) || \
-	(_BSDI_VERSION >= 199701) || (__FreeBSD_version >= 300000)
-u_long cmd;
-#else
-int cmd;
-#endif
+ioctlcmd_t cmd;
 caddr_t data;
 int mode;
 {
@@ -260,7 +238,8 @@ int mode;
 	}
 	if (unit == IPL_LOGAUTH) {
 		if (fr_running > 0) {
-			if ((cmd == SIOCADAFR) || (cmd == SIOCRMAFR)) {
+			if ((cmd == (ioctlcmd_t)SIOCADAFR) ||
+			    (cmd == (ioctlcmd_t)SIOCRMAFR)) {
 				if (!(mode & FWRITE)) {
 					error = EPERM;
 				} else {
@@ -324,6 +303,15 @@ int mode;
 			else
 				error = ipldetach();
 		}
+		break;
+	case SIOCIPFSET :
+		if (!(mode & FWRITE)) {
+			error = EPERM;
+			break;
+		}
+	case SIOCIPFGETNEXT :
+	case SIOCIPFGET :
+		error = fr_ipftune(cmd, (void *)data);
 		break;
 	case SIOCSETFF :
 		if (!(mode & FWRITE))
@@ -422,7 +410,7 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			frsync();
+			frsync(NULL);
 		}
 		break;
 	default :
@@ -471,7 +459,7 @@ void *ifp;
 }
 
 
-void fr_resolvdest(fdp, v)
+void fr_resolvedest(fdp, v)
 frdest_t *fdp;
 int v;
 {
@@ -485,7 +473,7 @@ int v;
 }
 
 
-#if defined(__sgi) && (IRIX < 605)
+#if defined(__sgi) && (IRIX < 60500)
 static int no_output(ifp, m, s)
 #else
 # if TRU64 >= 1885
@@ -504,7 +492,7 @@ struct sockaddr *s;
 }
 
 
-#if defined(__sgi) && (IRIX < 605)
+#if defined(__sgi) && (IRIX < 60500)
 static int write_output(ifp, m, s)
 #else
 # if TRU64 >= 1885
@@ -528,7 +516,8 @@ struct sockaddr *s;
 	ip = MTOD(mb, ip_t *);
 
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-	(defined(OpenBSD) && (OpenBSD >= 199603))
+    (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	sprintf(fname, "/tmp/%s", ifp->if_xname);
 #else
 	sprintf(fname, "/tmp/%s%d", ifp->if_name, ifp->if_unit);
@@ -544,20 +533,75 @@ struct sockaddr *s;
 }
 
 
+static void fr_setifpaddr(ifp, addr)
+struct ifnet *ifp;
+char *addr;
+{
+#ifdef __sgi
+	struct in_ifaddr *ifa;
+#else
+	struct ifaddr *ifa;
+#endif
+
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+	if (ifp->if_addrlist.tqh_first != NULL)
+#else
+# ifdef __sgi
+	if (ifp->in_ifaddr != NULL)
+# else
+	if (ifp->if_addrlist != NULL)
+# endif
+#endif
+		return;
+
+	ifa = (struct ifaddr *)malloc(sizeof(*ifa));
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+	ifp->if_addrlist.tqh_first = ifa;
+#else
+# ifdef __sgi
+	ifp->in_ifaddr = ifa;
+# else
+	ifp->if_addrlist = ifa;
+# endif
+#endif
+
+	if (ifa != NULL) {
+		struct sockaddr_in *sin;
+
+#ifdef __sgi
+		sin = (struct sockaddr_in *)&ifa->ia_addr;
+#else
+		sin = (struct sockaddr_in *)&ifa->ifa_addr;
+#endif
+		sin->sin_addr.s_addr = inet_addr(addr);
+		if (sin->sin_addr.s_addr == 0)
+			abort();
+	}
+}
+
 struct ifnet *get_unit(name, v)
 char *name;
 int v;
 {
-	struct ifnet *ifp, **ifa, **old_ifneta;
+	struct ifnet *ifp, **ifpp, **old_ifneta;
+	char *addr;
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-	(defined(OpenBSD) && (OpenBSD >= 199603))
+    (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 
 	if (name == NULL)
 		name = "anon0";
 
-	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
-		if (!strcmp(name, ifp->if_xname))
+	addr = strchr(name, '=');
+	if (addr != NULL)
+		*addr++ = '\0';
+
+	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
+		if (!strcmp(name, ifp->if_xname)) {
+			if (addr != NULL)
+				fr_setifpaddr(ifp, addr);
 			return ifp;
+		}
 	}
 #else
 	char *s, ifname[LIFNAMSIZ+1];
@@ -565,10 +609,17 @@ int v;
 	if (name == NULL)
 		name = "anon0";
 
-	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
+	addr = strchr(name, '=');
+	if (addr != NULL)
+		*addr++ = '\0';
+
+	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
 		COPYIFNAME(ifp, ifname);
-		if (!strcmp(name, ifname))
+		if (!strcmp(name, ifname)) {
+			if (addr != NULL)
+				fr_setifpaddr(ifp, addr);
 			return ifp;
+		}
 	}
 #endif
 
@@ -587,7 +638,7 @@ int v;
 		old_ifneta = ifneta;
 		nifs++;
 		ifneta = (struct ifnet **)realloc(ifneta,
-						  (nifs + 1) * sizeof(*ifa));
+						  (nifs + 1) * sizeof(ifp));
 		if (!ifneta) {
 			free(old_ifneta);
 			nifs = 0;
@@ -603,12 +654,13 @@ int v;
 	ifp = ifneta[nifs - 1];
 
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-	(defined(OpenBSD) && (OpenBSD >= 199603))
-	strncpy(ifp->if_xname, name, sizeof(ifp->if_xname));
+    (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
+	(void) strncpy(ifp->if_xname, name, sizeof(ifp->if_xname));
 #else
-	for (s = name; *s && !isdigit(*s); s++)
+	for (s = name; *s && !ISDIGIT(*s); s++)
 		;
-	if (*s && isdigit(*s)) {
+	if (*s && ISDIGIT(*s)) {
 		ifp->if_unit = atoi(s);
 		ifp->if_name = (char *)malloc(s - name + 1);
 		if (ifp->if_name == NULL) {
@@ -619,7 +671,7 @@ int v;
 			perror("malloc");
 			exit(1);
 		}
-		strncpy(ifp->if_name, name, s - name);
+		(void) strncpy(ifp->if_name, name, s - name);
 		ifp->if_name[s - name] = '\0';
 	} else {
 		ifp->if_name = strdup(name);
@@ -627,6 +679,11 @@ int v;
 	}
 #endif
 	ifp->if_output = no_output;
+
+	if (addr != NULL) {
+		fr_setifpaddr(ifp, addr);
+	}
+
 	return ifp;
 }
 
@@ -636,7 +693,8 @@ struct ifnet *ifp;
 {
 	static char ifname[LIFNAMSIZ];
 
-#if defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__OpenBSD__) || defined(__NetBSD__) || defined(linux) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	sprintf(ifname, "%s", ifp->if_xname);
 #else
 	sprintf(ifname, "%s%d", ifp->if_name, ifp->if_unit);
@@ -648,13 +706,14 @@ struct ifnet *ifp;
 
 void init_ifp()
 {
-	struct ifnet *ifp, **ifa;
+	struct ifnet *ifp, **ifpp;
 	char fname[32];
 	int fd;
 
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-	(defined(OpenBSD) && (OpenBSD >= 199603))
-	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
+    (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
+	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
 		ifp->if_output = write_output;
 		sprintf(fname, "/tmp/%s", ifp->if_xname);
 		fd = open(fname, O_WRONLY|O_CREAT|O_EXCL|O_TRUNC, 0600);
@@ -665,7 +724,7 @@ void init_ifp()
 	}
 #else
 
-	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
+	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
 		ifp->if_output = write_output;
 		sprintf(fname, "/tmp/%s%d", ifp->if_name, ifp->if_unit);
 		fd = open(fname, O_WRONLY|O_CREAT|O_EXCL|O_TRUNC, 0600);
@@ -692,7 +751,7 @@ frdest_t *fdp;
 	ip->ip_len = htons((u_short)ip->ip_len);
 	ip->ip_off = htons((u_short)(ip->ip_off | IP_MF));
 	ip->ip_sum = 0;
-#if defined(__sgi) && (IRIX < 605)
+#if defined(__sgi) && (IRIX < 60500)
 	(*ifp->if_output)(ifp, (void *)ip, NULL);
 # if TRU64 >= 1885
 	(*ifp->if_output)(ifp, (void *)m, NULL, 0, 0);
@@ -717,12 +776,13 @@ int type;
 fr_info_t *fin;
 int dst;
 {
-	verbose("- TCP RST sent\n");
+	verbose("- ICMP unreachable sent\n");
 	return 0;
 }
 
 
-void frsync()
+void frsync(ifp)
+void *ifp;
 {
 	return;
 }
@@ -860,3 +920,74 @@ fr_info_t *fin;
 		fin->fin_flx |= FI_BAD;
 }
 #endif
+
+
+/*
+ * See above for description, except that all addressing is in user space.
+ */
+int copyoutptr(src, dst, size)
+void *src, *dst;
+size_t size;
+{
+	caddr_t ca;
+
+	bcopy(dst, (char *)&ca, sizeof(ca));
+	bcopy(src, ca, size);
+	return 0;
+}
+
+
+/*
+ * See above for description, except that all addressing is in user space.
+ */
+int copyinptr(src, dst, size)
+void *src, *dst;
+size_t size;
+{
+	caddr_t ca;
+
+	bcopy(src, (char *)&ca, sizeof(ca));
+	bcopy(ca, dst, size);
+	return 0;
+}
+
+
+/*
+ * return the first IP Address associated with an interface
+ */
+int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
+int v, atype;
+void *ifptr;
+struct in_addr *inp, *inpmask;
+{
+	struct ifnet *ifp = ifptr;
+#ifdef __sgi
+	struct in_ifaddr *ifa;
+#else
+	struct ifaddr *ifa;
+#endif
+
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+	ifa = ifp->if_addrlist.tqh_first;
+#else
+# ifdef __sgi
+	ifa = (struct in_ifaddr *)ifp->in_ifaddr;
+# else
+	ifa = ifp->if_addrlist;
+# endif
+#endif
+	if (ifa != NULL) {
+		struct sockaddr_in *sin, mask;
+
+		mask.sin_addr.s_addr = 0xffffffff;
+
+#ifdef __sgi
+		sin = (struct sockaddr_in *)&ifa->ia_addr;
+#else
+		sin = (struct sockaddr_in *)&ifa->ifa_addr;
+#endif
+
+		return fr_ifpfillv4addr(atype, sin, &mask, inp, inpmask);
+	}
+	return 0;
+}

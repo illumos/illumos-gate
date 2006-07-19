@@ -4,7 +4,7 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  *
- * $Id: portnum.c,v 1.6 2001/06/09 17:09:24 darrenr Exp $
+ * $Id: portnum.c,v 1.6.4.1 2004/12/09 19:41:22 darrenr Exp $
  */
 
 #include <ctype.h>
@@ -25,7 +25,7 @@ int     linenum;
 	u_short	p1 = 0;
 	int i;
 
-	if (isdigit(*name)) {
+	if (ISDIGIT(*name)) {
 		if (ratoi(name, &i, 0, USHRT_MAX)) {
 			*port = (u_short)i;
 			return 1;

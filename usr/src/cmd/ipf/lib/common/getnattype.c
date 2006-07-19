@@ -9,7 +9,7 @@
 #include "kmem.h"
 
 #if !defined(lint)
-static const char rcsid[] = "@(#)$Id: getnattype.c,v 1.2 2002/01/28 06:50:46 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: getnattype.c,v 1.3 2004/01/17 17:26:07 darrenr Exp $";
 #endif
 
 
@@ -23,9 +23,10 @@ ipnat_t *ipnat;
 	ipnat_t ipnatbuff;
 	char *which;
 
-	if (!ipnat || (ipnat && kmemcpy((char *)&ipnatbuff, (long)ipnat,
-					sizeof(ipnatbuff))))
+	if (!ipnat)
 		return "???";
+	if (kmemcpy((char *)&ipnatbuff, (long)ipnat, sizeof(ipnatbuff)))
+		return "!!!";
 
 	switch (ipnatbuff.in_redir)
 	{

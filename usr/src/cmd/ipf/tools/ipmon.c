@@ -29,6 +29,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <time.h>
 #if !defined(__SVR4) && !defined(__svr4__)
 # if (__FreeBSD_version >= 300000)
 #  include <sys/dirent.h>
@@ -49,7 +50,7 @@
 #include <netinet/in_systm.h>
 #include <net/if.h>
 #include <netinet/ip.h>
-#if !defined(__hpux)
+#if !defined(__hpux) && !defined(linux)
 # include <netinet/tcp_fsm.h>
 #endif
 #include <netdb.h>
@@ -60,8 +61,10 @@
 #endif
 #include <resolv.h>
 
-#include <sys/protosw.h>
-#include <netinet/ip_var.h>
+#if !defined(linux)
+# include <sys/protosw.h>
+# include <netinet/ip_var.h>
+#endif
 
 #include <netinet/tcp.h>
 #include <netinet/ip_icmp.h>
@@ -69,26 +72,17 @@
 #include <ctype.h>
 #include <syslog.h>
 
-#include <netinet/tcpip.h>
-
-#if SOLARIS2 >= 10
-#include "ip_compat.h"
-#include "ip_fil.h"
-#include "ip_nat.h"
-#include "ip_state.h"
-#include "ip_proxy.h"
-#else
 #include "netinet/ip_compat.h"
+#include <netinet/tcpip.h>
 #include "netinet/ip_fil.h"
 #include "netinet/ip_nat.h"
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
-#endif
 #include "ipmon.h"
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipmon.c	1.21 6/5/96 (C)1993-2000 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ipmon.c,v 1.22 2003/06/14 02:56:57 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: ipmon.c,v 1.33.2.10 2005/06/18 02:41:35 darrenr Exp $";
 #endif
 
 
@@ -146,10 +140,8 @@ static	char	*pidfile = "/etc/ipmon.pid";
 
 static	char	line[2048];
 static	int	opts = 0;
-static	FILE	*newlog = NULL;
 static	char	*logfile = NULL;
 static	FILE	*binarylog = NULL;
-static	FILE	*newbinarylog = NULL;
 static	char	*binarylogfile = NULL;
 static	int	donehup = 0;
 static	void	usage __P((char *));
@@ -401,17 +393,7 @@ size_t tablesz;
 static void handlehup(sig)
 int sig;
 {
-	FILE	*fp;
-
 	signal(SIGHUP, handlehup);
-	if (logfile && (fp = fopen(logfile, "a")))
-		newlog = fp;
-	if (binarylogfile && (fp = fopen(binarylogfile, "a")))
-		newbinarylog = fp;
-	init_tabs();
-	if (conf_file)
-		if (load_config(conf_file) == -1)
-			exit(1);
 	donehup = 1;
 }
 
@@ -442,6 +424,14 @@ static void init_tabs()
 			    p->p_name != NULL && protocols[p->p_proto] == NULL)
 				protocols[p->p_proto] = strdup(p->p_name);
 		endprotoent();
+#if defined(_AIX51)
+		if (protocols[0])
+			free(protocols[0]);
+		if (protocols[252])
+			free(protocols[252]);
+		protocols[0] = "ip";
+		protocols[252] = NULL;
+#endif
 	}
 
 	if (udp_ports != NULL) {
@@ -678,7 +668,7 @@ int	len;
 			sprintf((char *)t, "        ");
 			t += 8;
 			for (k = 16; k; k--, s++)
-				*t++ = (isprint(*s) ? *s : '.');
+				*t++ = (ISPRINT(*s) ? *s : '.');
 			s--;
 		}
 			
@@ -696,7 +686,7 @@ int	len;
 		t += 7;
 		s -= j & 0xf;
 		for (k = j & 0xf; k; k--, s++)
-			*t++ = (isprint(*s) ? *s : '.');
+			*t++ = (ISPRINT(*s) ? *s : '.');
 		*t++ = '\n';
 		*t = '\0';
 	}
@@ -787,7 +777,7 @@ int	blen;
 				(long long)nl->nl_bytes[0],
 				(long long)nl->nl_bytes[1]);
 #else
-		(void) sprintf(t, " Pkts %ld Bytes %ld",
+		(void) sprintf(t, " Pkts %ld/%ld Bytes %ld/%ld",
 				nl->nl_pkts[0], nl->nl_pkts[1],
 				nl->nl_bytes[0], nl->nl_bytes[1]);
 #endif
@@ -876,6 +866,13 @@ int	blen;
 		(void) sprintf(t, "%s PR icmpv6 %d",
 			hostname(res, sl->isl_v, (u_32_t *)&sl->isl_dst),
 			sl->isl_itype);
+	} else {
+		(void) sprintf(t, "%s -> ",
+			hostname(res, sl->isl_v, (u_32_t *)&sl->isl_src));
+		t += strlen(t);
+		(void) sprintf(t, "%s PR %s",
+			hostname(res, sl->isl_v, (u_32_t *)&sl->isl_dst),
+			proto);
 	}
 	t += strlen(t);
 	if (sl->isl_tag != FR_NOLOGTAG) {
@@ -885,7 +882,14 @@ int	blen;
 	if (sl->isl_type != ISL_NEW) {
 		sprintf(t,
 #ifdef	USE_QUAD_T
+#ifdef	PRId64
+			" Forward: Pkts in %" PRId64 " Bytes in %" PRId64
+			" Pkts out %" PRId64 " Bytes out %" PRId64
+			" Backward: Pkts in %" PRId64 " Bytes in %" PRId64
+			" Pkts out %" PRId64 " Bytes out %" PRId64,
+#else
 			" Forward: Pkts in %qd Bytes in %qd Pkts out %qd Bytes out %qd Backward: Pkts in %qd Bytes in %qd Pkts out %qd Bytes out %qd",
+#endif /* PRId64 */
 #else
 			" Forward: Pkts in %ld Bytes in %ld Pkts out %ld Bytes out %ld Backward: Pkts in %ld Bytes in %ld Pkts out %ld Bytes out %ld",
 #endif
@@ -944,25 +948,16 @@ int	logtype, blen;
 		}
 
 		if (logtype == IPL_LOGIPF) {
-			if (ipl->ipl_magic != IPL_MAGIC) {
-				/* invalid data or out of sync */
-				break;
-			}
-			print_ipflog(log, buf, psize);
+			if (ipl->ipl_magic == IPL_MAGIC)
+				print_ipflog(log, buf, psize);
 
 		} else if (logtype == IPL_LOGNAT) {
-			if (ipl->ipl_magic != IPL_MAGIC) {
-				/* invalid data or out of sync */
-				break;
-			}
-			print_natlog(log, buf, psize);
+			if (ipl->ipl_magic == IPL_MAGIC_NAT)
+				print_natlog(log, buf, psize);
 
 		} else if (logtype == IPL_LOGSTATE) {
-			if (ipl->ipl_magic != IPL_MAGIC) {
-				/* invalid data or out of sync */
-				break;
-			}
-			print_statelog(log, buf, psize);
+			if (ipl->ipl_magic == IPL_MAGIC_STATE)
+				print_statelog(log, buf, psize);
 		}
 
 		blen -= psize;
@@ -984,9 +979,9 @@ int	blen;
 	struct	icmp	*icmp;
 	struct	tm	*tm;
 	char	*t, *proto;
-	int	i, v, lvl, res, len, off, plen, ipoff;
-	u_32_t	*s, *d, cmdflags;
+	int	i, v, lvl, res, len, off, plen, ipoff, defaction;
 	ip_t	*ipc, *ip;
+	u_32_t	*s, *d;
 	u_short	hl, p;
 	ipflog_t *ipf;
 	iplog_t	*ipl;
@@ -1020,6 +1015,7 @@ int	blen;
 	}
 #if (defined(MENTAT) || \
 	(defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199603)) || \
+	(defined(__FreeBSD__) && (__FreeBSD_version >= 501113)) || \
 	(defined(OpenBSD) && (OpenBSD >= 199603))) || defined(linux)
 	{
 	char	ifname[sizeof(ipf->fl_ifname) + 1];
@@ -1028,8 +1024,8 @@ int	blen;
 	ifname[sizeof(ipf->fl_ifname)] = '\0';
 	(void) sprintf(t, "%s", ifname);
 	t += strlen(t);
-# if defined(MENTAT)
-	if (isalpha(*(t - 1))) {
+# if defined(MENTAT) || defined(linux)
+	if (ISALPHA(*(t - 1))) {
 		sprintf(t, "%d", ipf->fl_unit);
 		t += strlen(t);
 	}
@@ -1044,7 +1040,12 @@ int	blen;
 	(void) sprintf(t, "%*.*s%u", len, len, ipf->fl_ifname, ipf->fl_unit);
 	t += strlen(t);
 #endif
+#if defined(__sgi) || defined(_AIX51) || defined(__powerpc__) || \
+    defined(__arm__)
+	if ((ipf->fl_group[0] == 255) && (ipf->fl_group[1] == '\0'))
+#else
 	if ((ipf->fl_group[0] == -1) && (ipf->fl_group[1] == '\0'))
+#endif
 		strcat(t, " @-1:");
 	else if (ipf->fl_group[0] == '\0')
 		(void) strcpy(t, " @0:");
@@ -1064,7 +1065,6 @@ int	blen;
 		lvl = LOG_ERR;
 	}
 
-	cmdflags = ipf->fl_flags & FR_CMDMASK;
 	if (FR_ISPASS(ipf->fl_flags)) {
 		if (ipf->fl_flags & FR_LOGP)
 			*t++ = 'p';
@@ -1099,7 +1099,7 @@ int	blen;
 		p = (u_short)ip6->ip6_nxt;
 		s = (u_32_t *)&ip6->ip6_src;
 		d = (u_32_t *)&ip6->ip6_dst;
-		plen = ntohs(ip6->ip6_plen);
+		plen = hl + ntohs(ip6->ip6_plen);
 #else
 		sprintf(t, "ipv6");
 		goto printipflog;
@@ -1218,11 +1218,13 @@ int	blen;
 					IP_HL(ipc) << 2, i);
 				t += strlen(t);
 				if (ipoff & IP_OFFMASK) {
-					(void) sprintf(t, " frag %s%s%hu@%hu",
-						ipoff & IP_MF ? "+" : "",
-						ipoff & IP_DF ? "-" : "",
+					(void) sprintf(t,
+						"(frag %d:%hu@%hu%s%s)",
+						ntohs(ipc->ip_id),
 						i - (IP_HL(ipc) << 2),
-						(ipoff & IP_OFFMASK) << 3);
+						(ipoff & IP_OFFMASK) << 3,
+						ipoff & IP_MF ? "+" : "",
+						ipoff & IP_DF ? "-" : "");
 				}
 			}
 
@@ -1234,13 +1236,15 @@ int	blen;
 			hostname(res, v, d), proto, hl, plen);
 		t += strlen(t);
 		if (off & IP_OFFMASK)
-			(void) sprintf(t, " frag %s%s%hu@%hu",
+			(void) sprintf(t, " (frag %d:%hu@%hu%s%s)",
+				ntohs(ip->ip_id),
+				plen - hl, (off & IP_OFFMASK) << 3,
 				ipoff & IP_MF ? "+" : "",
-				ipoff & IP_DF ? "-" : "",
-				plen - hl, (off & IP_OFFMASK) << 3);
+				ipoff & IP_DF ? "-" : "");
 	}
 	t += strlen(t);
 
+printipflog:
 	if (ipf->fl_flags & FR_KEEPSTATE) {
 		(void) strcpy(t, " K-S");
 		t += strlen(t);
@@ -1256,25 +1260,73 @@ int	blen;
 	else if (ipf->fl_dir == 1)
 		strcpy(t, " OUT");
 	t += strlen(t);
-	if (ipf->fl_tag) {
-		sprintf(t, " tag %d", ipf->fl_tag);
+	if (ipf->fl_logtag != 0) {
+		sprintf(t, " log-tag %d", ipf->fl_logtag);
 		t += strlen(t);
 	}
-printipflog:
+	if (ipf->fl_nattag.ipt_num[0] != 0) {
+		strcpy(t, " nat-tag ");
+		t += strlen(t);
+		strncpy(t, ipf->fl_nattag.ipt_tag, sizeof(ipf->fl_nattag));
+		t += strlen(t);
+	}
+	if ((ipf->fl_lflags & FI_LOWTTL) != 0) {
+			strcpy(t, " low-ttl");
+			t += 8;
+	}
+	if ((ipf->fl_lflags & FI_OOW) != 0) {
+			strcpy(t, " OOW");
+			t += 4;
+	}
+	if ((ipf->fl_lflags & FI_BAD) != 0) {
+			strcpy(t, " bad");
+			t += 4;
+	}
+	if ((ipf->fl_lflags & FI_NATED) != 0) {
+			strcpy(t, " NAT");
+			t += 4;
+	}
+	if ((ipf->fl_lflags & FI_BADNAT) != 0) {
+			strcpy(t, " bad-NAT");
+			t += 8;
+	}
+	if ((ipf->fl_lflags & FI_BADSRC) != 0) {
+			strcpy(t, " bad-src");
+			t += 8;
+	}
+	if ((ipf->fl_lflags & FI_MULTICAST) != 0) {
+			strcpy(t, " multicast");
+			t += 10;
+	}
+	if ((ipf->fl_lflags & FI_BROADCAST) != 0) {
+			strcpy(t, " broadcast");
+			t += 10;
+	}
+	if ((ipf->fl_lflags & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST)) ==
+	    FI_MBCAST) {
+			strcpy(t, " mbcast");
+			t += 7;
+	}
 	*t++ = '\n';
 	*t++ = '\0';
-	if (opts & OPT_SYSLOG)
-		syslog(lvl, "%s", line);
-	else
-		(void) fprintf(log, "%s", line);
-	if (opts & OPT_HEXHDR)
-		dumphex(log, opts, buf, sizeof(iplog_t) + sizeof(*ipf));
-	if (opts & OPT_HEXBODY)
-		dumphex(log, opts, (char *)ip, ipf->fl_plen + ipf->fl_hlen);
-	else if ((opts & OPT_LOGBODY) && (ipf->fl_flags & FR_LOGBODY))
-		dumphex(log, opts, (char *)ip + ipf->fl_hlen, ipf->fl_plen);
-	if (conf_file)
-		check_action(buf, opts, line);
+	defaction = 0;
+	if (conf_file != NULL)
+		defaction = check_action(buf, line, opts, lvl);
+	if (defaction == 0) {
+		if (opts & OPT_SYSLOG)
+			syslog(lvl, "%s", line);
+		else
+			(void) fprintf(log, "%s", line);
+		if (opts & OPT_HEXHDR)
+			dumphex(log, opts, buf,
+				sizeof(iplog_t) + sizeof(*ipf));
+		if (opts & OPT_HEXBODY)
+			dumphex(log, opts, (char *)ip,
+				ipf->fl_plen + ipf->fl_hlen);
+		else if ((opts & OPT_LOGBODY) && (ipf->fl_flags & FR_LOGBODY))
+			dumphex(log, opts, (char *)ip + ipf->fl_hlen,
+				ipf->fl_plen);
+	}
 }
 
 
@@ -1378,6 +1430,7 @@ char *argv[];
 {
 	struct	stat	sb;
 	FILE	*log = stdout;
+	FILE	*fp;
 	int	fd[3], doread, n, i;
 	int	tr, nr, regular[3], c;
 	int	fdt[3], devices = 0, make_daemon = 0;
@@ -1581,17 +1634,18 @@ char *argv[];
 
 			tr = read_log(fd[i], &n, buf, sizeof(buf));
 			if (donehup) {
-				donehup = 0;
-				if (newlog) {
+				if (logfile && (fp = fopen(logfile, "a"))) {
 					fclose(log);
-					log = newlog;
-					newlog = NULL;
+					log = fp;
 				}
-				if (newbinarylog) {
+				if (binarylogfile && (fp = fopen(binarylogfile, "a"))) {
 					fclose(binarylog);
-					binarylog = newbinarylog;
-					newbinarylog = NULL;
+					binarylog = fp;
 				}
+				init_tabs();
+				if (conf_file != NULL)
+					load_config(conf_file);
+				donehup = 0;
 			}
 
 			switch (tr)

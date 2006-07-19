@@ -3,20 +3,14 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: remove_poolnode.c,v 1.1 2003/04/13 06:40:14 darrenr Exp $
+ * $Id: remove_poolnode.c,v 1.3 2003/11/22 10:14:36 darrenr Exp $
  */
 
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include "ipf.h"
-
-#if SOLARIS2 >= 10
-#include "ip_lookup.h"
-#include "ip_htable.h"
-#else
 #include "netinet/ip_lookup.h"
-#include "netinet/ip_htable.h"
-#endif
+#include "netinet/ip_pool.h"
 
 static int poolfd = -1;
 

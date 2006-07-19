@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: ipft_td.c,v 1.11 2003/06/03 16:01:01 darrenr Exp $
+ * $Id: ipft_td.c,v 1.15 2004/01/08 13:34:31 darrenr Exp $
  */
 
 /*
@@ -32,16 +32,15 @@ tcpdump -nqte
 #include "ipf.h"
 #include "ipt.h"
 
-#undef	ICMP_MAXTYPE
-#include <netinet/ip_icmp.h>
+#ifndef linux
 #include <netinet/ip_var.h>
-#include <netinet/udp.h>
+#endif
 #include <netinet/tcpip.h>
 
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipft_td.c	1.8 2/4/96 (C)1995 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ipft_td.c,v 1.11 2003/06/03 16:01:01 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: ipft_td.c,v 1.15 2004/01/08 13:34:31 darrenr Exp $";
 #endif
 
 static	int	tcpd_open __P((char *));
@@ -97,7 +96,6 @@ int	cnt, *dir;
 {
 	struct	tcpiphdr pkt;
 	ip_t	*ip = (ip_t *)&pkt;
-	struct	protoent *p;
 	char	src[32], dst[32], misc[256], time[32], link1[32], link2[32];
 	char	lbuf[160], *s;
 	int	n, slen, extra = 0;

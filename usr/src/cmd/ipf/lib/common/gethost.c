@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 1993-2005  by Darren Reed.
+ * See the IPFILTER.LICENCE file for details on licencing.
+ */ 
+
 #include "ipf.h"
 
 int gethost(name, hostp)
@@ -5,7 +10,13 @@ char *name;
 u_32_t *hostp;
 {
 	struct hostent *h;
+	struct netent *n;
 	u_32_t addr;
+
+	if (!strcmp(name, "test.host.dots")) {
+		*hostp = htonl(0xfedcba98);
+		return 0;
+	}
 
 	if (!strcmp(name, "<thishost>"))
 		name = thishost;
@@ -17,6 +28,12 @@ u_32_t *hostp;
 			*hostp = addr;
 			return 0;
 		}
+	}
+
+	n = getnetbyname(name);
+	if (n != NULL) {
+		*hostp = (u_32_t)htonl(n->n_net & 0xffffffff);
+		return 0;
 	}
 	return -1;
 }

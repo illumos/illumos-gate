@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: icmpcode.c,v 1.6 2001/06/09 17:09:24 darrenr Exp $
+ * $Id: icmpcode.c,v 1.7.2.1 2004/12/09 19:41:20 darrenr Exp $
  */
 
 #include <ctype.h>
@@ -18,7 +18,7 @@
 char	*icmpcodes[MAX_ICMPCODE + 1] = {
 	"net-unr", "host-unr", "proto-unr", "port-unr", "needfrag", "srcfail",
 	"net-unk", "host-unk", "isolate", "net-prohib", "host-prohib",
-	"net-tos", "host-tos", "filter-prohib", "host-preced", "preced-cutoff", 
+	"net-tos", "host-tos", "filter-prohib", "host-preced", "preced-cutoff",
 	NULL };
 
 /*
@@ -32,7 +32,7 @@ char *str;
 
 	if ((s = strrchr(str, ')')))
 		*s = '\0';
-	if (isdigit(*str)) {
+	if (ISDIGIT(*str)) {
 		if (!ratoi(str, &i, 0, 255))
 			return -1;
 		else

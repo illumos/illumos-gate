@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -21,20 +21,13 @@
 #include "ipf.h"
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#if SOLARIS2 >= 10
-#include "ipl.h"
-#else
 #include "netinet/ipl.h"
-#endif
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipf.c	1.23 6/5/96 (C) 1993-2000 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ipf.c,v 1.24 2003/07/01 16:30:47 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: ipf.c,v 1.35.2.3 2004/12/15 18:27:17 darrenr Exp $";
 #endif
 
-#if	SOLARIS
-static	void	blockunknown __P((void));
-#endif
 #if !defined(__SVR4) && defined(__GNUC__)
 extern	char	*index __P((const char *, int));
 #endif
@@ -44,7 +37,7 @@ extern	int	optind;
 extern	frentry_t *frtop;
 
 
-void	frsync __P((void));
+void	ipf_frsync __P((void));
 void	zerostats __P((void));
 int	main __P((int, char *[]));
 
@@ -62,8 +55,6 @@ static	void	usage __P((void));
 static	int	showversion __P((void));
 static	int	get_flags __P((void));
 static	void	ipf_interceptadd __P((int, ioctlfunc_t, void *));
-static	void	dotuning __P((char *));
-static	void	printtunable __P((ipftune_t *));
 
 static	int	fd = -1;
 static	ioctlfunc_t	iocfunctions[IPL_LOGSIZE] = { ioctl, ioctl, ioctl,
@@ -73,13 +64,9 @@ static	ioctlfunc_t	iocfunctions[IPL_LOGSIZE] = { ioctl, ioctl, ioctl,
 
 static void usage()
 {
-	fprintf(stderr, "usage: ipf [-"
-#ifdef USE_INET6
-		"6"
-#endif
-		"AdDEInoPrsUvVyzZ] %s %s %s %s\n",
-		"[-l block|pass|nomatch|state|nat]", "[-T optionlist]",
-		"[-F i|o|a|s|S|u]", "[-f filename]");
+	fprintf(stderr, "usage: ipf [-6AdDEInoPrRsvVyzZ] %s %s %s\n",
+		"[-l block|pass|nomatch|state|nat]", "[-cc] [-F i|o|a|s|S|u]",
+		"[-f filename] [-T <tuneopts>]");
 	exit(1);
 }
 
@@ -93,7 +80,7 @@ char *argv[];
 	if (argc < 2)
 		usage();
 
-	while ((c = getopt(argc, argv, "6ACdDEf:F:Il:noPrsT:UvVyzZ")) != -1) {
+	while ((c = getopt(argc, argv, "6Ac:dDEf:F:Il:noPrRsT:vVyzZ")) != -1) {
 		switch (c)
 		{
 		case '?' :
@@ -107,11 +94,10 @@ char *argv[];
 		case 'A' :
 			opts &= ~OPT_INACTIVE;
 			break;
-#ifdef USE_OPTIONC
-		case 'C' :
-			outputc = 1;
+		case 'c' :
+			if (strcmp(optarg, "c") == 0)
+				outputc = 1;
 			break;
-#endif
 		case 'E' :
 			set_state((u_int)1);
 			break;
@@ -141,6 +127,9 @@ char *argv[];
 		case 'P' :
 			ipfname = IPAUTH_NAME;
 			break;
+		case 'R' :
+			opts ^= OPT_NORESOLVE;
+			break;
 		case 'r' :
 			opts ^= OPT_REMOVE;
 			break;
@@ -148,13 +137,9 @@ char *argv[];
 			swapactive();
 			break;
 		case 'T' :
-			dotuning(optarg);
+			if (opendevice(ipfname, 1) >= 0)
+				ipf_dotuning(fd, optarg, ioctl);
 			break;
-#if SOLARIS
-		case 'U' :
-			blockunknown();
-			break;
-#endif
 		case 'v' :
 			opts += OPT_VERBOSE;
 			break;
@@ -163,7 +148,7 @@ char *argv[];
 				exit(1);
 			break;
 		case 'y' :
-			frsync();
+			ipf_frsync();
 			break;
 		case 'z' :
 			opts ^= OPT_ZERORULEST;
@@ -275,7 +260,7 @@ void *ptr;
 static void packetlogon(opt)
 char	*opt;
 {
-	int	flag, xfd, logopt;
+	int	flag, xfd, logopt, change = 0;
 
 	flag = get_flags();
 	if (flag != 0) {
@@ -289,24 +274,35 @@ char	*opt;
 		flag |= FF_LOGPASS;
 		if (opts & OPT_VERBOSE)
 			printf("set log flag: pass\n");
+		change = 1;
 	}
 	if (strstr(opt, "nomatch")) {
 		flag |= FF_LOGNOMATCH;
 		if (opts & OPT_VERBOSE)
 			printf("set log flag: nomatch\n");
+		change = 1;
 	}
 	if (strstr(opt, "block") || index(opt, 'd')) {
 		flag |= FF_LOGBLOCK;
 		if (opts & OPT_VERBOSE)
 			printf("set log flag: block\n");
+		change = 1;
+	}
+	if (strstr(opt, "none")) {
+		if (opts & OPT_VERBOSE)
+			printf("disable all log flags\n");
+		change = 1;
 	}
 
-	if (opendevice(ipfname, 1) != -2 && (ioctl(fd, SIOCSETFF, &flag) != 0))
-		perror("ioctl(SIOCSETFF)");
+	if (change == 1) {
+		if (opendevice(ipfname, 1) != -2 &&
+		    (ioctl(fd, SIOCSETFF, &flag) != 0))
+			perror("ioctl(SIOCSETFF)");
+	}
 
 	if ((opts & (OPT_DONOTHING|OPT_VERBOSE)) == OPT_VERBOSE) {
 		flag = get_flags();
-		printf("log flag is now %#x\n", flag);
+		printf("log flags are now %#x\n", flag);
 	}
 
 	if (strstr(opt, "state")) {
@@ -360,19 +356,22 @@ char	*arg;
 		rem = fl;
 
 		closedevice();
+		if (opendevice(IPSTATE_NAME, 1) == -2)
+			exit(1);
 
-		if (opendevice(IPSTATE_NAME, 1) != -2) {
+		if (!(opts & OPT_DONOTHING)) {
 			if (use_inet6) {
-#ifdef USE_INET6
-				if (ioctl(fd, SIOCIPFL6, &fl) == -1)
-					perror("SIOCIPFL6");
-#endif
+				if (ioctl(fd, SIOCIPFL6, &fl) == -1) {
+					perror("ioctl(SIOCIPFL6)");
+					exit(1);
+				}
 			} else {
-				if (ioctl(fd, SIOCIPFFL, &fl) == -1)
-					perror("SIOCIPFFL");
+				if (ioctl(fd, SIOCIPFFL, &fl) == -1) {
+					perror("ioctl(SIOCIPFFL)");
+					exit(1);
+				}
 			}
 		}
-
 		if ((opts & (OPT_DONOTHING|OPT_VERBOSE)) == OPT_VERBOSE) {
 			printf("remove flags %s (%d)\n", arg, rem);
 			printf("removed %d filter rules\n", fl);
@@ -408,15 +407,20 @@ char	*arg;
 		fl |= FR_INACTIVE;
 	rem = fl;
 
-	if (opendevice(ipfname, 1) != -2) {
+	if (opendevice(ipfname, 1) == -2)
+		exit(1);
+
+	if (!(opts & OPT_DONOTHING)) {
 		if (use_inet6) {
-#ifdef USE_INET6
-			if (ioctl(fd, SIOCIPFL6, &fl) == -1)
-				perror("SIOCIPFL6");
-#endif
+			if (ioctl(fd, SIOCIPFL6, &fl) == -1) {
+				perror("ioctl(SIOCIPFL6)");
+				exit(1);
+			}
 		} else {
-			if (ioctl(fd, SIOCIPFFL, &fl) == -1)
-				perror("SIOCIPFFL");
+			if (ioctl(fd, SIOCIPFFL, &fl) == -1) {
+				perror("ioctl(SIOCIPFFL)");
+				exit(1);
+			}
 		}
 	}
 
@@ -440,7 +444,7 @@ static void swapactive()
 }
 
 
-void frsync()
+void ipf_frsync()
 {
 	int frsyn = 0;
 
@@ -491,33 +495,6 @@ friostat_t	*fp;
 			fp->f_st[0].fr_pkl, fp->f_st[0].fr_skip,
 			fp->f_st[1].fr_pkl, fp->f_st[1].fr_skip);
 }
-
-
-#if SOLARIS
-static void blockunknown()
-{
-	u_32_t	flag;
-
-	if (opendevice(ipfname, 1) == -1)
-		return;
-
-	flag = get_flags();
-	if ((opts & (OPT_DONOTHING|OPT_VERBOSE)) == OPT_VERBOSE)
-		printf("log flag is currently %#x\n", flag);
-
-	flag ^= FF_BLOCKNONIP;
-
-	if (opendevice(ipfname, 1) != -2 && ioctl(fd, SIOCSETFF, &flag))
-		perror("ioctl(SIOCSETFF)");
-
-	if ((opts & (OPT_DONOTHING|OPT_VERBOSE)) == OPT_VERBOSE) {
-		if (ioctl(fd, SIOCGETFF, &flag))
-			perror("ioctl(SIOCGETFF)");
-
-		printf("log flag is now %#x\n", flag);
-	}
-}
-#endif
 
 
 static int showversion()
@@ -583,82 +560,7 @@ static int showversion()
 		s = "nomatch -> block";
 	printf("%s all, Logging: %savailable\n", s, fio.f_logging ? "" : "un");
 	printf("Active list: %d\n", fio.f_active);
+	printf("Feature mask: %#x\n", fio.f_features);
 
 	return 0;
-}
-
-
-static void dotuning(tuneargs)
-char *tuneargs;
-{
-	ipfobj_t obj;
-	ipftune_t tu;
-	char *s, *t;
-
-	if (opendevice(ipfname, 1) < 0)
-		return;
-
-	bzero((char *)&tu, sizeof(tu));
-	obj.ipfo_rev = IPFILTER_VERSION;
-	obj.ipfo_size = sizeof(tu);;
-	obj.ipfo_ptr = (void *)&tu;
-	obj.ipfo_type = IPFOBJ_TUNEABLE;
-
-	for (s = strtok(tuneargs, ","); s != NULL; s = strtok(NULL, ",")) {
-		if (!strcmp(s, "list")) {
-			while (1) {
-				if (ioctl(fd, SIOCIPFGETNEXT, &obj) == -1) {
-					perror("ioctl(SIOCIPFGETNEXT)");
-					break;
-				}
-				if (tu.ipft_cookie == NULL)
-					break;
-
-				tu.ipft_name[sizeof(tu.ipft_name) - 1] = '\0';
-				printtunable(&tu);
-			}
-		} else if ((t = strchr(s, '=')) != NULL) {
-			*t++ = '\0';
-			strncpy(tu.ipft_name, s, sizeof(tu.ipft_name));
-			if (sscanf(t, "%lu", &tu.ipft_vlong) == 1) {
-				if (ioctl(fd, SIOCIPFSET, &obj) == -1) {
-					perror("ioctl(SIOCIPFSET)");
-					return;
-				}
-			} else {
-				fprintf(stderr, "invalid value '%s'\n", s);
-				return;
-			}
-		} else {
-			strncpy(tu.ipft_name, s, sizeof(tu.ipft_name));
-			if (ioctl(fd, SIOCIPFGET, &obj) == -1) {
-				perror("ioctl(SIOCIPFGET)");
-				return;
-			}
-			if (tu.ipft_cookie == NULL)
-				return;
-
-			tu.ipft_name[sizeof(tu.ipft_name) - 1] = '\0';
-			printtunable(&tu);
-		}
-	}
-}
-
-
-static void printtunable(tup)
-ipftune_t *tup;
-{
-	printf("%s\tmin %#lx\tmax %#lx\tcurrent ",
-		tup->ipft_name, tup->ipft_min, tup->ipft_max);
-	if (tup->ipft_sz == sizeof(u_long))
-		printf("%lu\n", tup->ipft_vlong);
-	else if (tup->ipft_sz == sizeof(u_int))
-		printf("%u\n", tup->ipft_vint);
-	else if (tup->ipft_sz == sizeof(u_short))
-		printf("%hu\n", tup->ipft_vshort);
-	else if (tup->ipft_sz == sizeof(u_char))
-		printf("%u\n", (u_int)tup->ipft_vchar);
-	else {
-		printf("sz = %d\n", tup->ipft_sz);
-	}
 }

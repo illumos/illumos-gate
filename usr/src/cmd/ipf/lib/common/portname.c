@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: portname.c,v 1.6 2002/01/28 06:50:47 darrenr Exp $
+ * $Id: portname.c,v 1.7 2003/08/14 14:27:43 darrenr Exp $
  */
 #include "ipf.h"
 
@@ -15,21 +15,23 @@ int	pr, port;
 	struct	protoent	*p = NULL;
 	struct	servent	*sv = NULL, *sv1 = NULL;
 
-	if (pr == -1) {
-		if ((sv = getservbyport(htons(port), "tcp"))) {
-			strncpy(buf, sv->s_name, sizeof(buf)-1);
-			buf[sizeof(buf)-1] = '\0';
-			sv1 = getservbyport(htons(port), "udp");
-			sv = strncasecmp(buf, sv->s_name, strlen(buf)) ?
-			     NULL : sv1;
-		}
-		if (sv)
-			return buf;
-	} else if ((pr != -2) && (p = getprotobynumber(pr))) {
-		if ((sv = getservbyport(htons(port), p->p_name))) {
-			strncpy(buf, sv->s_name, sizeof(buf)-1);
-			buf[sizeof(buf)-1] = '\0';
-			return buf;
+	if ((opts & OPT_NORESOLVE) == 0) {
+		if (pr == -1) {
+			if ((sv = getservbyport(htons(port), "tcp"))) {
+				strncpy(buf, sv->s_name, sizeof(buf)-1);
+				buf[sizeof(buf)-1] = '\0';
+				sv1 = getservbyport(htons(port), "udp");
+				sv = strncasecmp(buf, sv->s_name, strlen(buf)) ?
+				     NULL : sv1;
+			}
+			if (sv)
+				return buf;
+		} else if ((pr != -2) && (p = getprotobynumber(pr))) {
+			if ((sv = getservbyport(htons(port), p->p_name))) {
+				strncpy(buf, sv->s_name, sizeof(buf)-1);
+				buf[sizeof(buf)-1] = '\0';
+				return buf;
+			}
 		}
 	}
 

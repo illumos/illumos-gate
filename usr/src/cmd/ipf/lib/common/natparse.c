@@ -5,7 +5,7 @@
  */
 #if !defined(lint)
 static const char sccsid[] ="@(#)ipnat.c	1.9 6/5/96 (C) 1993 Darren Reed";
-static const char rcsid[] = "@(#)$Id: natparse.c,v 1.6 2002/11/09 14:08:04 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: natparse.c,v 1.8.2.1 2004/12/09 19:41:21 darrenr Exp $";
 #endif
 
 #include <sys/ioctl.h>
@@ -55,7 +55,7 @@ int linenum;
 		*s = '\0';
 	if ((s = strchr(line, '#')))
 		*s = '\0';
-	while (*line && isspace(*line))
+	while (*line && ISSPACE(*line))
 		line++;
 	if (!*line)
 		return NULL;
@@ -223,7 +223,7 @@ int linenum;
 			return NULL;
 		}
 
-		if (isdigit(**cpp) && (s = strchr(*cpp, '-')))
+		if (ISDIGIT(**cpp) && (s = strchr(*cpp, '-')))
 			*s++ = '\0';
 		else
 			s = NULL;
@@ -357,7 +357,7 @@ int linenum;
 			return NULL;
 		ipn.in_pnext = htons(ipn.in_pnext);
 		cpp++;
-	} 
+	}
 	if (dnetm && *dnetm == '/')
 		*dnetm++ = '\0';
 
@@ -559,7 +559,7 @@ int linenum;
 		}
 		*t++ = '\0';
 		
-		if (!icmpidnum(*cpp, &ipn.in_pmin, linenum) || 
+		if (!icmpidnum(*cpp, &ipn.in_pmin, linenum) ||
 		    !icmpidnum(t, &ipn.in_pmax, linenum))
 			return NULL;
 	} else if (!strcasecmp(*cpp, "portmap")) {

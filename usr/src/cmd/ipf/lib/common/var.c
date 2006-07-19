@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 1993-2005  by Darren Reed.
+ * See the IPFILTER.LICENCE file for details on licencing.
+ */ 
+
 #include <ctype.h>
 
 #include "ipf.h"
@@ -44,9 +49,9 @@ int line;
 			fprintf(stderr, "%d: { without }\n", line);
 			return NULL;
 		}
-	} else if (isalpha(*s)) {
+	} else if (ISALPHA(*s)) {
 		for (t = s + 1; *t != '\0'; t++)
-			if (!isalpha(*t) && !isdigit(*t))
+			if (!ISALPHA(*t) && !ISDIGIT(*t) && (*t != '_'))
 				break;
 	} else {
 		fprintf(stderr, "%d: variables cannot start with '%c'\n",
@@ -95,6 +100,9 @@ int line;
 				break;
 			default :
 				c = *s;
+				if (c == '\0')
+					return newstring;
+
 				value = get_variable(s, &p3, line);
 				if (value == NULL)
 					return NULL;
@@ -119,7 +127,7 @@ int line;
 				if (p3 != NULL)
 					strcat(p1, p3);
 
-				s = p1 + len - strlen(p3);
+				s = p1 + len - strlen(p3) - 1;
 				if (newstring != oldstring)
 					free(newstring);
 				newstring = p1;

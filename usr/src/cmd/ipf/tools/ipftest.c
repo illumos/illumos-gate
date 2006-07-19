@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -16,7 +16,7 @@
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipt.c	1.19 6/3/96 (C) 1993-2000 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ipftest.c,v 1.35 2003/07/01 01:03:04 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: ipftest.c,v 1.44.2.4 2005/07/16 06:05:28 darrenr Exp $";
 #endif
 
 extern	char	*optarg;
@@ -29,7 +29,7 @@ extern	int	fr_running;
 
 ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
-ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ip_poolrw;
+ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ip_poolrw, ipf_frcache;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 int	opts = OPT_DONOTHING;
 int	use_inet6 = 0;
@@ -47,7 +47,7 @@ void	fixv4sums __P((mb_t *, ip_t *));
 
 #if defined(__NetBSD__) || defined(__OpenBSD__) || SOLARIS || \
 	(_BSDI_VERSION >= 199701) || (__FreeBSD_version >= 300000) || \
-	defined(__osf__)
+	defined(__osf__) || defined(linux)
 int ipftestioctl __P((int, ioctlcmd_t, ...));
 int ipnattestioctl __P((int, ioctlcmd_t, ...));
 int ipstatetestioctl __P((int, ioctlcmd_t, ...));
@@ -101,19 +101,15 @@ char *argv[];
 	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock");
 	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
 	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
+	RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
 
 	initparse();
-	fr_loginit();
-	fr_authinit();
-	fr_fraginit();
-	fr_stateinit();
-	fr_natinit();
-	appr_init();
-	ip_lookup_init();
+	if (fr_initialise() == -1)
+		abort();
 	fr_running = 1;
 
-	while ((c = getopt(argc, argv, "6bdDF:i:I:l:N:P:or:vxX")) != -1)
+	while ((c = getopt(argc, argv, "6bdDF:i:I:l:N:P:or:RT:vxX")) != -1)
 		switch (c)
 		{
 		case '6' :
@@ -165,6 +161,9 @@ char *argv[];
 				return -1;
 			loaded = 1;
 			break;
+		case 'R' :
+			opts |= OPT_NORESOLVE;
+			break;
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			break;
@@ -179,6 +178,9 @@ char *argv[];
 			if (ippool_parsefile(-1, optarg, ipooltestioctl) == -1)
 				return -1;
 			loaded = 1;
+			break;
+		case 'T' :
+			ipf_dotuning(-1, optarg, ipftestioctl);
 			break;
 		case 'x' :
 			opts |= OPT_HEX;
@@ -272,7 +274,7 @@ char *argv[];
 		} else if ((opts & (OPT_BRIEF|OPT_NAT)) == (OPT_NAT|OPT_BRIEF))
 			printpacket(ip);
 		if (dir && (ifp != NULL) && IP_V(ip) && (m != NULL))
-#if  defined(__sgi) && (IRIX < 605)
+#if  defined(__sgi) && (IRIX < 60500)
 			(*ifp->if_output)(ifp, (void *)m, NULL);
 #else
 # if TRU64 >= 1885
@@ -303,19 +305,7 @@ char *argv[];
 		dumpgroups();
 	}
 
-	for (i = IPL_LOGMAX; i >= 0; i--)
-		(void) ipflog_clear(i);
-
-	fr_fragunload();
-	fr_authunload();
-	fr_stateunload();
-	fr_natunload();
-	appr_unload();
-
-	i = frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	i += frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE);
-
-	ip_lookup_unload();
+	fr_deinitialise();
 
 	return 0;
 }
@@ -323,7 +313,7 @@ char *argv[];
 
 #if defined(__NetBSD__) || defined(__OpenBSD__) || SOLARIS || \
 	(_BSDI_VERSION >= 199701) || (__FreeBSD_version >= 300000) || \
-	defined(__osf__)
+	defined(__osf__) || defined(linux)
 int ipftestioctl(int dev, ioctlcmd_t cmd, ...)
 {
 	caddr_t data;
@@ -338,7 +328,11 @@ int ipftestioctl(int dev, ioctlcmd_t cmd, ...)
 	if (opts & OPT_DEBUG)
 		fprintf(stderr, "iplioctl(IPF,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -356,7 +350,11 @@ int ipnattestioctl(int dev, ioctlcmd_t cmd, ...)
 	if (opts & OPT_DEBUG)
 		fprintf(stderr, "iplioctl(NAT,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -374,7 +372,11 @@ int ipstatetestioctl(int dev, ioctlcmd_t cmd, ...)
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "iplioctl(STATE,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -392,7 +394,11 @@ int ipauthtestioctl(int dev, ioctlcmd_t cmd, ...)
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "iplioctl(AUTH,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -410,7 +416,11 @@ int ipscantestioctl(int dev, ioctlcmd_t cmd, ...)
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "iplioctl(SCAN,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -428,7 +438,11 @@ int ipsynctestioctl(int dev, ioctlcmd_t cmd, ...)
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "iplioctl(SYNC,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -446,7 +460,11 @@ int ipooltestioctl(int dev, ioctlcmd_t cmd, ...)
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "iplioctl(POOL,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 #else
 int ipftestioctl(dev, cmd, data)
@@ -459,7 +477,11 @@ void *data;
 	i = iplioctl(IPL_LOGIPF, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "iplioctl(IPF,%#x,%p) = %d\n", cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -473,7 +495,11 @@ void *data;
 	i = iplioctl(IPL_LOGNAT, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "iplioctl(NAT,%#x,%p) = %d\n", cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -487,7 +513,11 @@ void *data;
 	i = iplioctl(IPL_LOGSTATE, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "iplioctl(STATE,%#x,%p) = %d\n", cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -501,7 +531,11 @@ void *data;
 	i = iplioctl(IPL_LOGAUTH, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "iplioctl(AUTH,%#x,%p) = %d\n", cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -515,7 +549,11 @@ void *data;
 	i = iplioctl(IPL_LOGSYNC, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "iplioctl(SYNC,%#x,%p) = %d\n", cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -529,7 +567,11 @@ void *data;
 	i = iplioctl(IPL_LOGSCAN, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "iplioctl(SCAN,%#x,%p) = %d\n", cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -543,7 +585,11 @@ void *data;
 	i = iplioctl(IPL_LOGLOOKUP, cmd, data, FWRITE|FREAD);
 	if (opts & OPT_DEBUG)
 		fprintf(stderr, "iplioctl(POOL,%#x,%p) = %d\n", cmd, data, i);
-	return i;
+	if (i != 0) {
+		errno = i;
+		return -1;
+	}
+	return 0;
 }
 #endif
 
@@ -585,8 +631,11 @@ void dumpnat()
 	for (ipn = nat_list; ipn != NULL; ipn = ipn->in_next)
 		printnat(ipn, opts & (OPT_DEBUG|OPT_VERBOSE));
 	printf("\nList of active sessions:\n");
-	for (nat = nat_instances; nat; nat = nat->nat_next)
+	for (nat = nat_instances; nat; nat = nat->nat_next) {
 		printactivenat(nat, opts);
+		if (nat->nat_aps)
+			printaps(nat->nat_aps, opts);
+	}
 }
 
 
@@ -599,7 +648,8 @@ void dumpstate()
 
 	printf("List of active state sessions:\n");
 	for (ips = ips_list; ips != NULL; )
-		ips = printstate(ips, opts & (OPT_DEBUG|OPT_VERBOSE));
+		ips = printstate(ips, opts & (OPT_DEBUG|OPT_VERBOSE),
+				 fr_ticks);
 }
 
 
@@ -612,12 +662,12 @@ void dumplookups()
 	printf("List of configured pools\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
 		for (ipl = ip_pool_list[i]; ipl != NULL; ipl = ipl->ipo_next)
-			printpool(ipl, bcopywrap, opts);
+			printpool(ipl, bcopywrap, NULL, opts);
 
 	printf("List of configured hash tables\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
 		for (iph = ipf_htables[i]; iph != NULL; iph = iph->iph_next)
-			printhash(iph, bcopywrap, opts);
+			printhash(iph, bcopywrap, NULL, opts);
 }
 
 
@@ -666,7 +716,7 @@ char *filename;
 	struct iovec iov;
 	struct uio uio;
 	size_t resid;
-	int fd;
+	int fd, i;
 
 	fd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644);
 	if (fd == -1) {
@@ -674,26 +724,27 @@ char *filename;
 		return;
 	}
 
-	while (1) {
-		bzero((char *)&iov, sizeof(iov));
-		iov.iov_base = buffer;
-		iov.iov_len = sizeof(buffer);
+	for (i = 0; i <= IPL_LOGMAX; i++)
+		while (1) {
+			bzero((char *)&iov, sizeof(iov));
+			iov.iov_base = buffer;
+			iov.iov_len = sizeof(buffer);
 
-		bzero((char *)&uio, sizeof(uio));
-		uio.uio_iov = &iov;
-		uio.uio_iovcnt = 1;
-		uio.uio_resid = iov.iov_len;
-		resid = uio.uio_resid;
+			bzero((char *)&uio, sizeof(uio));
+			uio.uio_iov = &iov;
+			uio.uio_iovcnt = 1;
+			uio.uio_resid = iov.iov_len;
+			resid = uio.uio_resid;
 
-		if (ipflog_read(0, &uio) == 0) {
-			/*
-			 * If nothing was read then break out.
-			 */
-			if (uio.uio_resid == resid)
+			if (ipflog_read(i, &uio) == 0) {
+				/*
+				 * If nothing was read then break out.
+				 */
+				if (uio.uio_resid == resid)
+					break;
+				write(fd, buffer, resid - uio.uio_resid);
+			} else
 				break;
-			write(fd, buffer, resid - uio.uio_resid);
-		} else
-			break;
 	}
 
 	close(fd);

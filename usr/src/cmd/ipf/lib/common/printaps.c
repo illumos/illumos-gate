@@ -11,7 +11,7 @@
 
 
 #if !defined(lint)
-static const char rcsid[] = "@(#)$Id";
+static const char rcsid[] = "@(#)$Id: printaps.c,v 1.4 2004/01/08 13:34:32 darrenr Exp $";
 #endif
 
 

@@ -5,7 +5,7 @@
  *
  * $Id: print_toif.c,v 1.8 2002/01/28 06:50:47 darrenr Exp $
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,7 @@ frdest_t *fdp;
 		char ipv6addr[INET6_ADDRSTRLEN];
 
 		inet_ntop(AF_INET6, &fdp->fd_ip6, ipv6addr,
-			  sizeof(ipv6addr));
+			  sizeof(fdp->fd_ip6));
 		printf(":%s", ipv6addr);
 	} else
 #endif

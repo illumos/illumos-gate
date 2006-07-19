@@ -5,7 +5,7 @@
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipft_hx.c	1.1 3/9/96 (C) 1996 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ipft_hx.c,v 1.11 2003/02/16 02:32:35 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: ipft_hx.c,v 1.11.4.1 2004/12/09 19:41:20 darrenr Exp $";
 #endif
 
 #include <ctype.h>
@@ -111,7 +111,7 @@ int	cnt, *dir;
 				if (t < (char *)ip)
 					putchar('\t');
 				while (t < (char *)ip) {
-					if (isprint(*t) && isascii(*t))
+					if (ISPRINT(*t) && ISASCII(*t))
 						putchar(*t);
 					else
 						putchar('.');
@@ -133,7 +133,7 @@ register char	*src, *dst;
 	char	c;
 
 	while ((c = *src++)) {
-		if (isspace(c)) {
+		if (ISSPACE(c)) {
 			if (state) {
 				dst++;
 				state = 0;
@@ -141,7 +141,7 @@ register char	*src, *dst;
 			continue;
 		} else if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
 			   (c >= 'A' && c <= 'F')) {
-			c = isdigit(c) ? (c - '0') : (toupper(c) - 55);
+			c = ISDIGIT(c) ? (c - '0') : (TOUPPER(c) - 55);
 			if (state == 0) {
 				*dst = (c << 4);
 				state++;

@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: hostnum.c,v 1.8 2002/01/28 06:50:46 darrenr Exp $
+ * $Id: hostnum.c,v 1.10.2.1 2004/12/09 19:41:20 darrenr Exp $
  */
 
 #include <ctype.h>
@@ -21,13 +21,12 @@ char	*host;
 int     linenum;
 char	*ifname;
 {
-	struct	hostent	*hp;
-	struct	netent	*np;
 	struct	in_addr	ip;
 
 	if (!strcasecmp("any", host) ||
 	    (ifname && *ifname && !strcasecmp(ifname, host)))
 		return 0;
+
 #ifdef	USE_INET6
 	if (use_inet6) {
 		if (inet_pton(AF_INET6, host, ipa) == 1)
@@ -36,7 +35,7 @@ char	*ifname;
 			return -1;
 	}
 #endif
-	if (isdigit(*host) && inet_aton(host, &ip)) {
+	if (ISDIGIT(*host) && inet_aton(host, &ip)) {
 		*ipa = ip.s_addr;
 		return 0;
 	}
@@ -44,15 +43,5 @@ char	*ifname;
 	if (!strcasecmp("<thishost>", host))
 		host = thishost;
 
-	if (!(hp = gethostbyname(host))) {
-		if (!(np = getnetbyname(host))) {
-			fprintf(stderr, "%d: can't resolve hostname: %s\n",
-				linenum, host);
-			return -1;
-		}
-		*ipa = htonl(np->n_net);
-		return 0;
-	}
-	*ipa = *(u_32_t *)hp->h_addr;
-	return 0;
+	return gethost(host, ipa);
 }

@@ -3,9 +3,9 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: load_hashnode.c,v 1.2 2003/04/26 04:55:11 darrenr Exp $
+ * $Id: load_hashnode.c,v 1.2.4.1 2004/03/06 14:33:28 darrenr Exp $
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -14,14 +14,8 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include "ipf.h"
-
-#if SOLARIS2 >= 10
-#include "ip_lookup.h"
-#include "ip_htable.h"
-#else
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_htable.h"
-#endif
 
 static int hashfd = -1;
 
@@ -34,6 +28,7 @@ ioctlfunc_t iocfunc;
 {
 	iplookupop_t op;
 	iphtent_t ipe;
+	int err;
 
 	if ((hashfd == -1) && ((opts & OPT_DONOTHING) == 0))
 		hashfd = open(IPLOOKUP_NAME, O_RDWR);
@@ -56,9 +51,14 @@ ioctlfunc_t iocfunc;
 	bcopy((char *)&node->ipe_group, (char *)&ipe.ipe_group,
 	      sizeof(ipe.ipe_group));
 
-	if ((*iocfunc)(hashfd, SIOCLOOKUPADDNODE, &op))
+	if ((opts & OPT_REMOVE) == 0)
+		err = (*iocfunc)(hashfd, SIOCLOOKUPADDNODE, &op);
+	else
+		err = (*iocfunc)(hashfd, SIOCLOOKUPDELNODE, &op);
+
+	if (err != 0)
 		if (!(opts & OPT_DONOTHING)) {
-			perror("load_hash:SIOCLOOKUPADDNODE");
+			perror("load_hash:SIOCLOOKUP*NODE");
 			return -1;
 		}
 	return 0;

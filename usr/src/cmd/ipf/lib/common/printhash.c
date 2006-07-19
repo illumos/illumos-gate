@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
  
@@ -14,18 +14,23 @@
 #define	PRINTF	(void)printf
 #define	FPRINTF	(void)fprintf
 
-iphtable_t *printhash(hp, copyfunc, opts)
+
+iphtable_t *printhash(hp, copyfunc, name, opts)
 iphtable_t *hp;
 copyfunc_t copyfunc;
+char *name;
 int opts;
 {
 	iphtent_t *ipep, **table;
 	iphtable_t iph;
+	int i, printed;
 	size_t sz;
-	int i;
 
 	if ((*copyfunc)((char *)hp, (char *)&iph, sizeof(iph)))
 		return NULL;
+
+	if ((name != NULL) && strncmp(name, iph.iph_name, FR_GROUPLEN))
+		return iph.iph_next;
 
 	if ((opts & OPT_DEBUG) == 0) {
 		if ((iph.iph_type & IPHASH_ANON) == IPHASH_ANON)
@@ -124,11 +129,14 @@ int opts;
 	if ((*copyfunc)((char *)iph.iph_table, (char *)table, sz))
 		return NULL;
 
-	for (i = 0; i < iph.iph_size; i++) {
+	for (i = 0, printed = 0; i < iph.iph_size; i++) {
 		for (ipep = table[i]; ipep != NULL; ) {
 			ipep = printhashnode(&iph, ipep, copyfunc, opts);
+			printed++;
 		}
 	}
+	if (printed == 0)
+		putchar(';');
 
 	free(table);
 

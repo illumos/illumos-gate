@@ -5,7 +5,7 @@
  *
  * Added redirect stuff and a variety of bug fixes. (mcn@EnGarde.com)
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,9 +49,13 @@
 #include <arpa/inet.h>
 #include <resolv.h>
 #include <ctype.h>
-#include <nlist.h>
+#if defined(linux)
+# include <linux/a.out.h>
+#else
+# include <nlist.h>
+#endif
 #include "ipf.h"
-#include "ipl.h"
+#include "netinet/ipl.h"
 #include "kmem.h"
 
 #ifdef	__hpux
@@ -67,7 +71,7 @@ extern	char	*sys_errlist[];
 
 #if !defined(lint)
 static const char sccsid[] ="@(#)ipnat.c	1.9 6/5/96 (C) 1993 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ipnat.c,v 1.20 2003/07/01 16:30:27 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: ipnat.c,v 1.24.2.2 2005/05/10 21:19:30 darrenr Exp $";
 #endif
 
 
@@ -90,7 +94,7 @@ int	opts;
 void usage(name)
 char *name;
 {
-	fprintf(stderr, "Usage: %s [-CdFhlnrsv] [-f filename]\n", name);
+	fprintf(stderr, "Usage: %s [-CFhlnrRsv] [-f filename]\n", name);
 	exit(1);
 }
 
@@ -112,7 +116,7 @@ char *argv[];
 	kernel = NULL;
 	mode = O_RDWR;
 
-	while ((c = getopt(argc, argv, "CdFf:hlM:N:nrsv")) != -1)
+	while ((c = getopt(argc, argv, "CdFf:hlM:N:nrRsv")) != -1)
 		switch (c)
 		{
 		case 'C' :
@@ -143,6 +147,9 @@ char *argv[];
 		case 'n' :
 			opts |= OPT_DONOTHING;
 			mode = O_RDONLY;
+			break;
+		case 'R' :
+			opts |= OPT_NORESOLVE;
 			break;
 		case 'r' :
 			opts |= OPT_REMOVE;
@@ -313,7 +320,7 @@ int opts;
 				break;
 			}
 			if (opts & OPT_HITS)
-				printf("%d ", ipn.in_hits);
+				printf("%lu ", ipn.in_hits);
 			printnat(&ipn, opts & (OPT_DEBUG|OPT_VERBOSE));
 			nsp->ns_list = ipn.in_next;
 		}
@@ -324,6 +331,8 @@ int opts;
 			if (kmemcpy((char *)&nat, (long)np, sizeof(nat)))
 				break;
 			printactivenat(&nat, opts);
+			if (nat.nat_aps)
+				printaps(nat.nat_aps, opts);
 		}
 
 		if (opts & OPT_VERBOSE)

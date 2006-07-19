@@ -4,47 +4,36 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ipf.h"
-#include <netinet/ip_icmp.h>
 #include <sys/ioctl.h>
 #include <syslog.h>
 #ifdef IPFILTER_BPF
-# include <net/bpf.h>
-# include <pcap-int.h>
+# include "pcap-bpf.h"
+# define _NET_BPF_H_
 # include <pcap.h>
 #endif
-#if SOLARIS2 >= 10
-#include "ip_pool.h"
-#include "ip_htable.h"
-#include "ipl.h"
-#else
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
 #include "netinet/ipl.h"
-#endif
 #include "ipf_l.h"
 
 #define	YYDEBUG	1
 #define	DOALL(x)	for (fr = frc; fr != NULL; fr = fr->fr_next) { x }
 #define	DOREM(x)	for (; fr != NULL; fr = fr->fr_next) { x }
-#if SOLARIS2 >= 10
-#define VNI	"vni"
-#define VNISTRLEN 3
-#endif
 
-#define OPTION_LOG		0x1
-#define OPTION_QUICK		0x2
-#define OPTION_DUP		0x4
-#define OPTION_PROUTE		0x8
-#define OPTION_ON		0x10
-#define OPTION_REPLYTO		0x20
-#define OPTION_FROUTE		0x40
+#define OPTION_LOG              0x1
+#define OPTION_QUICK            0x2
+#define OPTION_DUP              0x4
+#define OPTION_PROUTE           0x8
+#define OPTION_ON               0x10
+#define OPTION_REPLYTO          0x20
+#define OPTION_FROUTE           0x40
 
 extern	void	yyerror __P((char *));
 extern	int	yyparse __P((void));
@@ -56,7 +45,7 @@ extern	int	yylineNum;
 static	void	newrule __P((void));
 static	void	setipftype __P((void));
 static	u_32_t	lookuphost __P((char *));
-static	void	dobpf __P((char *));
+static	void	dobpf __P((int, char *));
 static	void	resetaddr __P((void));
 static	struct	alist_s	*newalist __P((struct alist_s *));
 static	u_int	makehash __P((struct alist_s *));
@@ -77,14 +66,20 @@ static	int		nrules = 0;
 static	int		newlist = 0;
 static	int		added = 0;
 static	int		ipffd = -1;
+static  int             ruleopts = 0;
 static	int		*yycont = 0;
-static	int		ruleopts = 0;
 static	ioctlfunc_t	ipfioctl[IPL_LOGSIZE];
 static	addfunc_t	ipfaddfunc = NULL;
-static	wordtab_t	addrwords[4];
-static	wordtab_t	maskwords[5];
-static	wordtab_t	*savewords;
-static	int		set_ipv6_addr = 0;
+static	struct	wordtab ipfwords[95];
+static	struct	wordtab	addrwords[4];
+static	struct	wordtab	maskwords[5];
+static	struct	wordtab icmpcodewords[17];
+static	struct	wordtab icmptypewords[16];
+static	struct	wordtab ipv4optwords[25];
+static	struct	wordtab ipv4secwords[9];
+static	struct	wordtab ipv6optwords[8];
+static	struct	wordtab logwords[33];
+static  int             set_ipv6_addr = 0;
 
 %}
 %union	{
@@ -94,6 +89,7 @@ static	int		set_ipv6_addr = 0;
 	frentry_t	fr;
 	frtuc_t	*frt;
 	struct	alist_s	*alist;
+	u_short	port;
 	struct	{
 		u_short	p1;
 		u_short	p2;
@@ -106,10 +102,11 @@ static	int		set_ipv6_addr = 0;
 	union	i6addr	ip6;
 };
 
-%type	<num>	portnum facility priority icmpcode seclevel secname icmptype
+%type	<port>	portnum
+%type	<num>	facility priority icmpcode seclevel secname icmptype
 %type	<num>	opt compare range opttype flagset optlist ipv6hdrlist ipv6hdr
-%type	<num>	portc porteq 
-%type	<ipa>	hostname ipv4 ipv4mask
+%type	<num>	portc porteq
+%type	<ipa>	hostname ipv4 ipv4mask ipv4_16 ipv4_24
 %type	<ip6>	ipv6mask
 %type	<ipp>	addr ipaddr
 %type	<str>	servicename name interfacename
@@ -127,13 +124,13 @@ static	int		set_ipv6_addr = 0;
 %token	IPFY_RETICMP IPFY_RETRST IPFY_RETICMPASDST
 %token	IPFY_IN IPFY_OUT
 %token	IPFY_QUICK IPFY_ON IPFY_OUTVIA IPFY_INVIA
-%token	IPFY_DUPTO IPFY_TO IPFY_FROUTE IPFY_REPLY_TO
+%token	IPFY_DUPTO IPFY_TO IPFY_FROUTE IPFY_REPLY_TO IPFY_ROUTETO
 %token	IPFY_TOS IPFY_TTL IPFY_PROTO
 %token	IPFY_HEAD IPFY_GROUP
-%token	IPFY_AUTH IPFY_PREAUTH IPFY_DIVERT
+%token	IPFY_AUTH IPFY_PREAUTH
 %token	IPFY_LOG IPFY_BODY IPFY_FIRST IPFY_LEVEL IPFY_ORBLOCK
-%token	IPFY_LOGTAG IPFY_TAG IPFY_SKIP
-%token	IPFY_FROM IPFY_ALL IPFY_ANY IPFY_BPF IPFY_POOL IPFY_HASH
+%token	IPFY_LOGTAG IPFY_MATCHTAG IPFY_SETTAG IPFY_SKIP
+%token	IPFY_FROM IPFY_ALL IPFY_ANY IPFY_BPFV4 IPFY_BPFV6 IPFY_POOL IPFY_HASH
 %token	IPFY_PPS
 %token	IPFY_ESP IPFY_AH
 %token	IPFY_WITH IPFY_AND IPFY_NOT IPFY_NO IPFY_OPT
@@ -146,6 +143,7 @@ static	int		set_ipv6_addr = 0;
 %token	IPFY_IPOPTS IPFY_SHORT IPFY_NAT IPFY_BADSRC IPFY_LOWTTL IPFY_FRAG
 %token	IPFY_MBCAST IPFY_BAD IPFY_BADNAT IPFY_OOW IPFY_NEWISN IPFY_NOICMPERR
 %token	IPFY_KEEP IPFY_STATE IPFY_FRAGS IPFY_LIMIT IPFY_STRICT IPFY_AGE
+%token	IPFY_SYNC IPFY_FRAGBODY
 %token	IPFY_IPOPT_NOP IPFY_IPOPT_RR IPFY_IPOPT_ZSU IPFY_IPOPT_MTUP
 %token	IPFY_IPOPT_MTUR IPFY_IPOPT_ENCODE IPFY_IPOPT_TS IPFY_IPOPT_TR
 %token	IPFY_IPOPT_SEC IPFY_IPOPT_LSRR IPFY_IPOPT_ESEC IPFY_IPOPT_CIPSO
@@ -212,16 +210,19 @@ assigning:
 	'='				{ yyvarnext = 1; }
 	;
 
-rule:	inrule
-	| outrule
+rule:	inrule eol
+	| outrule eol
+	;
+
+eol:	| ';'
 	;
 
 inrule:
-	rulehead markin { ruleopts = 0; } inopts rulemain ruletail
+	rulehead markin { ruleopts = 0; } inopts rulemain ruletail intag ruletail2
 	;
 
 outrule:
-	rulehead markout { ruleopts = 0; } outopts rulemain ruletail
+	rulehead markout { ruleopts = 0; } outopts rulemain ruletail outtag ruletail2
 	;
 
 rulehead:
@@ -246,15 +247,26 @@ ipfrule:
 	;
 
 bpfrule:
-	IPFY_BPF '{' YY_STR '}' 	{ dobpf($3); free($3); }
+	IPFY_BPFV4 '{' YY_STR '}' 	{ dobpf(4, $3); free($3); }
+	| IPFY_BPFV6 '{' YY_STR '}' 	{ dobpf(6, $3); free($3); }
 	;
 
 ruletail:
-	keep head group tag pps age new
+	with keep head group
+	;
+
+ruletail2:
+	pps age new
+	;
+
+intag:	settagin matchtagin
+	;
+
+outtag:	settagout matchtagout
 	;
 
 insert:
-	'@' YY_NUMBER			{ fr->fr_hits = (U_QUAD_T)$2; }
+	'@' YY_NUMBER			{ fr->fr_hits = (U_QUAD_T)$2 + 1; }
 	;
 
 collection:
@@ -263,8 +275,6 @@ collection:
 
 action:	block
 	| IPFY_PASS			{ fr->fr_flags |= FR_PASS; }
-	| IPFY_DIVERT YY_NUMBER		{ fr->fr_flags |= FR_DIVERT;
-					  fr->fr_arg = $2; }
 	| log
 	| IPFY_COUNT			{ fr->fr_flags |= FR_ACCOUNT; }
 	| auth
@@ -429,7 +439,7 @@ lmore:	lanother			{ if (newlist == 1) {
 					  }
 					  fr = addrule();
 					  if (yycont != NULL)
-					  	*yycont = 1;
+						*yycont = 1;
 					}
 	;
 
@@ -454,7 +464,7 @@ protox:	IPFY_PROTO			{ setipftype();
 					  yysetdict(NULL); }
 	;
 
-ip:	srcdst flags with icmp
+ip:	srcdst flags icmp
 	;
 
 group:	| IPFY_GROUP YY_STR		{ DOALL(strncpy(fr->fr_group, $2, \
@@ -473,21 +483,50 @@ head:	| IPFY_HEAD YY_STR		{ DOALL(strncpy(fr->fr_grhead, $2, \
 							$2);) }
 	;
 
-tag:	| IPFY_TAG YY_NUMBER		{ DOALL(fr->fr_logtag = $2;) }
-	| IPFY_TAG '(' taglist ')'
-
-taglist:
-	tagspec
-	| taglist ',' tagspec
+settagin:
+	| IPFY_SETTAG '(' taginlist ')'
 	;
 
-tagspec:
-	IPFY_NAT '=' YY_STR		{ DOALL(strncpy(fr->fr_nattag.ipt_tag,\
-						$3, 16););
+taginlist:
+	taginspec
+	| taginlist ',' taginspec
+	;
+
+taginspec:
+	logtag
+	|nattag
+	;
+
+nattag:	IPFY_NAT '=' YY_STR		{ DOALL(strncpy(fr->fr_nattag.ipt_tag,\
+						$3, IPFTAG_LEN););
 					  free($3); }
 	| IPFY_NAT '=' YY_NUMBER	{ DOALL(sprintf(fr->fr_nattag.ipt_tag,\
-						"%15d", $3);) }
-	| IPFY_LOG '=' YY_NUMBER	{ DOALL(fr->fr_logtag = $3;) }
+						"%d", $3 & 0xffffffff);) }
+	;
+
+logtag:	IPFY_LOG '=' YY_NUMBER		{ DOALL(fr->fr_logtag = $3;) }
+	;
+
+settagout:
+	| IPFY_SETTAG '(' tagoutlist ')'
+	;
+
+tagoutlist:
+	tagoutspec
+	| tagoutlist ',' tagoutspec
+	;
+
+tagoutspec:
+	logtag
+	| nattag
+	;
+
+matchtagin:
+	| IPFY_MATCHTAG '(' tagoutlist ')'
+	;
+
+matchtagout:
+	| IPFY_MATCHTAG '(' taginlist ')'
 	;
 
 pps:	| IPFY_PPS YY_NUMBER		{ DOALL(fr->fr_pps = $2;) }
@@ -517,114 +556,26 @@ on:	IPFY_ON onname
 	;
 
 onname:	interfacename
-		{
-#if SOLARIS2 >=10
-		char *cp;
-#endif
-		strncpy(fr->fr_ifnames[0], $1, sizeof(fr->fr_ifnames[0]));
-#if SOLARIS2 >= 10
-		if (strncmp(VNI, $1, VNISTRLEN) == 0) {
-			cp = $1 + VNISTRLEN;
-			cp += strspn(cp, "0123456789");
-			if (*cp == '\0' || *cp == ':') {
-				fprintf(stderr, "%d: Warning- %s specified. vni"
-				    " is a virtual interface, use a physical"
-				    " interface instead. See vni(7D)\n", 
-				    yylineNum, $1);
-			}
-		}
-#endif
+		{ strncpy(fr->fr_ifnames[0], $1, sizeof(fr->fr_ifnames[0]));
 		  free($1);
 		}
-	| interfacename ',' name
-		{ 
-#if SOLARIS2 >= 10
-		char *cp;
-#endif
-		strncpy(fr->fr_ifnames[0], $1, sizeof(fr->fr_ifnames[0]));
-#if SOLARIS2 >= 10
-		if (strncmp(VNI, $1, VNISTRLEN) == 0) {
-			cp = $1 + VNISTRLEN;
-			cp += strspn(cp, "0123456789");
-			if (*cp == '\0' || *cp == ':') {
-				fprintf(stderr, "%d: Warning- %s specified. vni"
-				    " is a virtual interface, use a physical"
-				    " interface instead. See vni(7D)\n", 
-				    yylineNum, $1);
-			}
-		}
-#endif
+	| interfacename ',' interfacename
+		{ strncpy(fr->fr_ifnames[0], $1, sizeof(fr->fr_ifnames[0]));
 		  free($1);
 		  strncpy(fr->fr_ifnames[1], $3, sizeof(fr->fr_ifnames[1]));
-#if SOLARIS2 >= 10
-		if (strncmp(VNI, $3, VNISTRLEN) == 0) {
-			cp = $3 + VNISTRLEN;
-			cp += strspn(cp, "0123456789");
-			if (*cp == '\0' || *cp == ':') {
-				fprintf(stderr, "%d: Warning- %s specified. vni"
-				    " is a virtual interface, use a physical"
-				    " interface instead. See vni(7D)\n", 
-				    yylineNum, $3);
-			}
-		}
-#endif
 		  free($3);
 		}
 	;
 
 vianame:
-	interfacename
-		{
-#if SOLARIS2 >= 10
-		char *cp;
-#endif
-		strncpy(fr->fr_ifnames[2], $1, sizeof(fr->fr_ifnames[2]));
-#if SOLARIS2 >= 10
-		if (strncmp(VNI, $1, VNISTRLEN) == 0) {
-			cp = $1 + VNISTRLEN;
-			cp += strspn(cp, "0123456789");
-			if (*cp == '\0' || *cp == ':') {
-				fprintf(stderr, "%d: Warning- %s specified. vni"
-				    " is a virtual interface, use a physical"
-				    " interface instead. See vni(7D)\n", 
-				    yylineNum, $1);
-			}
-		}
-#endif
+	name
+		{ strncpy(fr->fr_ifnames[2], $1, sizeof(fr->fr_ifnames[2]));
 		  free($1);
 		}
-	| interfacename ',' name
-		{ 
-#if SOLARIS2 >= 10
-		char *cp;
-#endif
-		strncpy(fr->fr_ifnames[2], $1, sizeof(fr->fr_ifnames[2]));
-#if SOLARIS2 >= 10
-		if (strncmp(VNI, $1, VNISTRLEN) == 0) {
-			cp = $1 + VNISTRLEN;
-			cp += strspn(cp, "0123456789");
-			if (*cp == '\0' || *cp == ':') {
-				fprintf(stderr, "%d: Warning- %s specified. vni"
-				    " is a virtual interface, use a physical"
-				    " interface instead. See vni(7D)\n", 
-				    yylineNum, $1);
-			}
-		}
-#endif
+	| name ',' name
+		{ strncpy(fr->fr_ifnames[2], $1, sizeof(fr->fr_ifnames[2]));
 		  free($1);
 		  strncpy(fr->fr_ifnames[3], $3, sizeof(fr->fr_ifnames[3]));
-#if SOLARIS2 >= 10
-		if (strncmp(VNI, $3, VNISTRLEN) == 0) {
-			cp = $3 + VNISTRLEN;
-			cp += strspn(cp, "0123456789");
-			if (*cp == '\0' || *cp == ':') {
-				fprintf(stderr, "%d: Warning- %s specified. vni"
-				    " is a virtual interface, use a physical"
-				    " interface instead. See vni(7D)\n", 
-				    yylineNum, $3);
-			}
-		}
-#endif
 		  free($3);
 		}
 	;
@@ -633,25 +584,48 @@ dup:	IPFY_DUPTO name
 	{ strncpy(fr->fr_dif.fd_ifname, $2, sizeof(fr->fr_dif.fd_ifname));
 	  free($2);
 	}
-	| IPFY_DUPTO name ':' hostname
+	| IPFY_DUPTO name duptoseparator hostname
 	{ strncpy(fr->fr_dif.fd_ifname, $2, sizeof(fr->fr_dif.fd_ifname));
 	  fr->fr_dif.fd_ip = $4;
+	  yyexpectaddr = 0;
 	  free($2);
 	}
+	| IPFY_DUPTO name duptoseparator YY_IPV6
+	{ strncpy(fr->fr_dif.fd_ifname, $2, sizeof(fr->fr_dif.fd_ifname));
+	  bcopy(&$4, &fr->fr_dif.fd_ip6, sizeof(fr->fr_dif.fd_ip6));
+	  yyexpectaddr = 0;
+	  free($2);
+	}
+	;
+
+duptoseparator:
+	':'	{ yyexpectaddr = 1; yycont = &yyexpectaddr; resetaddr(); }
 	;
 
 froute:	IPFY_FROUTE			{ fr->fr_flags |= FR_FASTROUTE; }
 	;
 
-proute:	IPFY_TO name
+proute:	routeto name
 	{ strncpy(fr->fr_tif.fd_ifname, $2, sizeof(fr->fr_tif.fd_ifname));
 	  free($2);
 	}
-	| IPFY_TO name ':' hostname
+	| routeto name duptoseparator hostname
 	{ strncpy(fr->fr_tif.fd_ifname, $2, sizeof(fr->fr_tif.fd_ifname));
 	  fr->fr_tif.fd_ip = $4;
+	  yyexpectaddr = 0;
 	  free($2);
 	}
+	| routeto name duptoseparator YY_IPV6
+	{ strncpy(fr->fr_tif.fd_ifname, $2, sizeof(fr->fr_tif.fd_ifname));
+	  bcopy(&$4, &fr->fr_tif.fd_ip6, sizeof(fr->fr_tif.fd_ip6));
+	  yyexpectaddr = 0;
+	  free($2);
+	}
+	;
+
+routeto:
+	IPFY_TO
+	| IPFY_ROUTETO
 	;
 
 replyto:
@@ -659,7 +633,7 @@ replyto:
 	{ strncpy(fr->fr_rif.fd_ifname, $2, sizeof(fr->fr_rif.fd_ifname));
 	  free($2);
 	}
-	| IPFY_REPLY_TO name ':' hostname
+	| IPFY_REPLY_TO name duptoseparator hostname
 	{ strncpy(fr->fr_rif.fd_ifname, $2, sizeof(fr->fr_rif.fd_ifname));
 	  fr->fr_rif.fd_ip = $4;
 	  free($2);
@@ -686,7 +660,7 @@ starticmpcode:
 	'('				{ yysetdict(icmpcodewords); }
 	;
 
-srcdst:	IPFY_ALL
+srcdst:	| IPFY_ALL
 	| fromto
 	;
 
@@ -699,7 +673,7 @@ protocol:
 				  } else {
 					int p = getproto($1);
 					if (p == -1)
-						fprintf(stderr, "protocol unknown: %s, line %d\n", $1, yylineNum);
+						yyerror("protocol unknown");
 					DOREM(fr->fr_proto = p; \
 						fr->fr_mproto = 0xff;)
 				  }
@@ -730,6 +704,8 @@ from:	IPFY_FROM			{ setipftype();
 					  if (fr == NULL)
 						fr = frc;
 					  yyexpectaddr = 1;
+					  if (yydebug)
+						printf("set yyexpectaddr\n");
 					  yycont = &yyexpectaddr;
 					  yysetdict(addrwords);
 					  resetaddr(); }
@@ -738,6 +714,8 @@ from:	IPFY_FROM			{ setipftype();
 to:	IPFY_TO				{ if (fr == NULL)
 						fr = frc;
 					  yyexpectaddr = 1;
+					  if (yydebug)
+						printf("set yyexpectaddr\n");
 					  yycont = &yyexpectaddr;
 					  yysetdict(addrwords);
 					  resetaddr(); }
@@ -751,22 +729,30 @@ andwith:
 	| IPFY_AND			{ nowith = 0; setipftype(); }
 	;
 
-flags:	| IPFY_FLAGS flagset	
+flags:	| startflags flagset	
 		{ DOALL(fr->fr_tcpf = $2; fr->fr_tcpfm = FR_TCPFMAX;) }
-	| IPFY_FLAGS flagset '/' flagset
+	| startflags flagset '/' flagset
 		{ DOALL(fr->fr_tcpf = $2; fr->fr_tcpfm = $4;) }
-	| IPFY_FLAGS '/' flagset
+	| startflags '/' flagset
 		{ DOALL(fr->fr_tcpf = 0; fr->fr_tcpfm = $3;) }
-	| IPFY_FLAGS YY_NUMBER
+	| startflags YY_NUMBER
 		{ DOALL(fr->fr_tcpf = $2; fr->fr_tcpfm = FR_TCPFMAX;) }
-	| IPFY_FLAGS '/' YY_NUMBER
+	| startflags '/' YY_NUMBER
 		{ DOALL(fr->fr_tcpf = 0; fr->fr_tcpfm = $3;) }
-	| IPFY_FLAGS YY_NUMBER '/' YY_NUMBER
+	| startflags YY_NUMBER '/' YY_NUMBER
 		{ DOALL(fr->fr_tcpf = $2; fr->fr_tcpfm = $4;) }
-	| IPFY_FLAGS flagset '/' YY_NUMBER
+	| startflags flagset '/' YY_NUMBER
 		{ DOALL(fr->fr_tcpf = $2; fr->fr_tcpfm = $4;) }
-	| IPFY_FLAGS YY_NUMBER '/' flagset
+	| startflags YY_NUMBER '/' flagset
 		{ DOALL(fr->fr_tcpf = $2; fr->fr_tcpfm = $4;) }
+	;
+
+startflags:
+	IPFY_FLAGS	{ if (frc->fr_type != FR_T_IPF)
+				yyerror("flags with non-ipf type rule");
+			  if (frc->fr_proto != IPPROTO_TCP)
+				yyerror("flags with non-TCP rule");
+			}
 	;
 
 flagset:
@@ -775,10 +761,10 @@ flagset:
 	;
 
 srcobject:
-	srcaddr srcport
+	{ yyresetdict(); } fromport
+	| srcaddr srcport
 	| '!' srcaddr srcport
 		{ DOALL(fr->fr_flags |= FR_NOTSRCIP;) }
-	| fromport
 	;
 
 srcaddr:
@@ -840,7 +826,7 @@ srcportlist:
 	;
 
 dstobject:
-	toport
+	{ yyresetdict(); } toport
 	| dstaddr dstport
 	| '!' dstaddr dstport
 			{ DOALL(fr->fr_flags |= FR_NOTDSTIP;) }
@@ -960,7 +946,11 @@ maskspace:
 ipv4mask:
 	ipv4				{ $$ = $1; }
 	| YY_HEX			{ $$.s_addr = htonl($1); }
-	| YY_NUMBER			{ ntomask(4, $1, (u_32_t *)&$$); }
+	| YY_NUMBER			{ if (($1 >= 0) && ($1 <= 32)) {
+						ntomask(4, $1, (u_32_t *)&$$);
+					  } else
+						yyerror("invalid mask");
+					}
 	| IPFY_BROADCAST		{ if (ifpflag == FRI_DYNAMIC) {
 						$$.s_addr = 0;
 						ifpflag = FRI_BROADCAST;
@@ -988,7 +978,11 @@ ipv4mask:
 	;
 
 ipv6mask:
-	YY_NUMBER			{ ntomask(6, $1, $$.i6); }
+	YY_NUMBER			{ if (($1 >= 0) && ($1 <= 128)) {
+						ntomask(6, $1, $$.i6);
+					  } else
+						yyerror("invalid mask");
+					}
 	| IPFY_BROADCAST		{ if (ifpflag == FRI_DYNAMIC) {
 						bzero(&$$, sizeof($$));
 						ifpflag = FRI_BROADCAST;
@@ -1174,6 +1168,7 @@ age:	| IPFY_AGE YY_NUMBER		{ DOALL(fr->fr_age[0] = $2; \
 keep:	| IPFY_KEEP keepstate
 	| IPFY_KEEP keepfrag
 	| IPFY_KEEP keepstate IPFY_KEEP keepfrag
+	| IPFY_KEEP keepfrag IPFY_KEEP keepstate
 	;
 
 keepstate:
@@ -1182,6 +1177,7 @@ keepstate:
 
 keepfrag:
 	IPFY_FRAGS fragoptlist		{ DOALL(fr->fr_flags |= FR_KEEPFRAG;) }
+	| IPFY_FRAG fragoptlist		{ DOALL(fr->fr_flags |= FR_KEEPFRAG;) }
 	;
 
 fragoptlist:
@@ -1219,34 +1215,46 @@ stateopt:
 						fr->fr_flags |= FR_NEWISN;)
 				}
 	| IPFY_NOICMPERR	{ DOALL(fr->fr_flags |= FR_NOICMPERR;) }
+
+	| IPFY_SYNC		{ DOALL(fr->fr_flags |= FR_STATESYNC;) }
 	;
 
 portnum:
-	servicename			{ $$ = ntohs(getport(frc, $1));
-					  if ($$ == -1)
-						fprintf(stderr, "service unknown: %s, line %d\n", $1, yylineNum);
+	servicename			{ if (getport(frc, $1, &($$)) == -1)
+						yyerror("service unknown");
+					  else
+						$$ = ntohs($$);
 					  free($1);
 					}
-	| YY_NUMBER			{ $$ = $1; }
+	| YY_NUMBER			{ if ($1 > 65535)	/* Unsigned */
+						yyerror("invalid port number");
+					  else
+						$$ = $1;
+					}
 	;
 
 withlist:
 	withopt
 	| withlist withopt
+	| withlist ',' withopt
 	;
 
 withopt:
 	opttype		{ DOALL(fr->fr_flx |= $1; fr->fr_mflx |= $1;) }
 	| notwith opttype
-			{ DOALL(fr->fr_mflx |= $2;) }
-	| IPFY_OPT ipopts
-	| notwith IPFY_OPT ipopts
-	| startv6hdrs ipv6hdrs
+					{ DOALL(fr->fr_mflx |= $2;) }
+	| ipopt ipopts			{ yyresetdict(); }
+	| notwith ipopt ipopts		{ yyresetdict(); }
+	| startv6hdrs ipv6hdrs		{ yyresetdict(); }
+	;
+
+ipopt:	IPFY_OPT			{ yysetdict(ipv4optwords); }
 	;
 
 startv6hdrs:
 	IPF6_V6HDRS	{ if (use_inet6 == 0)
 				yyerror("only available with IPv6");
+			  yysetdict(ipv6optwords);
 			}
 	;
 
@@ -1264,6 +1272,8 @@ opttype:
 	| IPFY_BADSRC			{ $$ = FI_BADSRC; }
 	| IPFY_LOWTTL			{ $$ = FI_LOWTTL; }
 	| IPFY_FRAG			{ $$ = FI_FRAG; }
+	| IPFY_FRAGBODY			{ $$ = FI_FRAGBODY; }
+	| IPFY_FRAGS			{ $$ = FI_FRAG; }
 	| IPFY_MBCAST			{ $$ = FI_MBCAST; }
 	| IPFY_MULTICAST		{ $$ = FI_MULTICAST; }
 	| IPFY_BROADCAST		{ $$ = FI_BROADCAST; }
@@ -1374,12 +1384,17 @@ opt:
 	| IPFY_IPOPT_NSAPA		{ $$ = getoptbyvalue(IPOPT_NSAPA); }
 	| IPFY_IPOPT_RTRALRT		{ $$ = getoptbyvalue(IPOPT_RTRALRT); }
 	| IPFY_IPOPT_UMP		{ $$ = getoptbyvalue(IPOPT_UMP); }
-	| IPFY_SECCLASS secname
+	| setsecclass secname
 			{ DOALL(fr->fr_mip.fi_secmsk |= $2;
 				if (!nowith)
 					fr->fr_ip.fi_secmsk |= $2;)
 			  $$ = 0;
+			  yyresetdict();
 			}
+	;
+
+setsecclass:
+	IPFY_SECCLASS	{ yysetdict(ipv4secwords); }
 	;
 
 ipv6hdr:
@@ -1439,8 +1454,7 @@ priority:
 	;
 
 compare:
-	'='				{ $$ = FR_EQUAL; }
-	| YY_CMP_EQ			{ $$ = FR_EQUAL; }
+	YY_CMP_EQ			{ $$ = FR_EQUAL; }
 	| YY_CMP_NE			{ $$ = FR_NEQUAL; }
 	| YY_CMP_LT			{ $$ = FR_LESST; }
 	| YY_CMP_LE			{ $$ = FR_LESSTE; }
@@ -1460,32 +1474,51 @@ servicename:
 interfacename:	YY_STR			{ $$ = $1; }
 	| YY_STR ':' YY_NUMBER
 		{ $$ = $1;
-#if SOLARIS2 >= 10
-		if (strncmp(VNI, $1, VNISTRLEN) != 0)
-#endif
 		  fprintf(stderr, "%d: Logical interface %s:%d unsupported, "
-			"use the physical interface %s instead.\n",
-			yylineNum, $1, $3, $1);
+			  "use the physical interface %s instead.\n",
+			  yylineNum, $1, $3, $1);
 		}
 	;
 
 name:	YY_STR				{ $$ = $1; }
 	;
 
-ipv4:	YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER
-		{ if ($1 > 255 || $3 > 255 || $5 > 255 || $7 > 255) {
+ipv4_16:
+	YY_NUMBER '.' YY_NUMBER
+		{ if ($1 > 255 || $3 > 255) {
 			yyerror("Invalid octet string for IP address");
 			return 0;
 		  }
-		  $$.s_addr = ($1 << 24) | ($3 << 16) | ($5 << 8) | $7;
+		  $$.s_addr = ($1 << 24) | ($3 << 16);
 		  $$.s_addr = htonl($$.s_addr);
 		}
 	;
+
+ipv4_24:
+	ipv4_16 '.' YY_NUMBER
+		{ if ($3 > 255) {
+			yyerror("Invalid octet string for IP address");
+			return 0;
+		  }
+		  $$.s_addr |= htonl($3 << 8);
+		}
+	;
+
+ipv4:	ipv4_24 '.' YY_NUMBER
+		{ if ($3 > 255) {
+			yyerror("Invalid octet string for IP address");
+			return 0;
+		  }
+		  $$.s_addr |= htonl($3);
+		}
+	| ipv4_24
+	| ipv4_16
+	;
+
 %%
 
 
-static	struct	wordtab ipfwords[] = {
-	{ "addext",			IPFY_IPOPT_ADDEXT },
+static	struct	wordtab ipfwords[95] = {
 	{ "age",			IPFY_AGE },
 	{ "ah",				IPFY_AH },
 	{ "all",			IPFY_ALL },
@@ -1497,58 +1530,43 @@ static	struct	wordtab ipfwords[] = {
 	{ "bcast",			IPFY_BROADCAST },
 	{ "block",			IPFY_BLOCK },
 	{ "body",			IPFY_BODY },
-	{ "bpf",			IPFY_BPF },
+	{ "bpf-v4",			IPFY_BPFV4 },
+#ifdef USE_INET6
+	{ "bpf-v6",			IPFY_BPFV6 },
+#endif
 	{ "call",			IPFY_CALL },
-	{ "cipso",			IPFY_IPOPT_CIPSO },
 	{ "code",			IPFY_ICMPCODE },
-	{ "confid",			IPFY_SEC_CONF },
 	{ "count",			IPFY_COUNT },
-	{ "divert",			IPFY_DIVERT },
-	{ "dps",			IPFY_IPOPT_DPS },
-	{ "dstopts",			IPFY_IPV6OPT_DSTOPTS },
 	{ "dup-to",			IPFY_DUPTO },
-	{ "e-sec",			IPFY_IPOPT_ESEC },
-	{ "eip",			IPFY_IPOPT_EIP },
-	{ "encode",			IPFY_IPOPT_ENCODE },
 	{ "eq",				YY_CMP_EQ },
 	{ "esp",			IPFY_ESP },
 	{ "fastroute",			IPFY_FROUTE },
 	{ "first",			IPFY_FIRST },
-	{ "finn",			IPFY_IPOPT_FINN },
-	{ "frag",			IPFY_FRAG },
 	{ "flags",			IPFY_FLAGS },
+	{ "frag",			IPFY_FRAG },
+	{ "frag-body",			IPFY_FRAGBODY },
 	{ "frags",			IPFY_FRAGS },
 	{ "from",			IPFY_FROM },
 	{ "ge",				YY_CMP_GE },
 	{ "group",			IPFY_GROUP },
 	{ "gt",				YY_CMP_GT },
 	{ "head",			IPFY_HEAD },
-	{ "hopopts",			IPFY_IPV6OPT_HOPOPTS },
-	{ "host-preced",		IPFY_ICMPC_HSTPRE },
-	{ "host-prohib",		IPFY_ICMPC_HSTPRO },
-	{ "host-tos",			IPFY_ICMPC_HSTTOS },
-	{ "host-unk",			IPFY_ICMPC_HSTUNK },
-	{ "host-unr",			IPFY_ICMPC_HSTUNR },
 	{ "icmp",			IPFY_ICMP },
 	{ "icmp-type",			IPFY_ICMPTYPE },
-	{ "imitd",			IPFY_IPOPT_IMITD },
 	{ "in",				IPFY_IN },
 	{ "in-via",			IPFY_INVIA },
 	{ "ipopt",			IPFY_IPOPTS },
 	{ "ipopts",			IPFY_IPOPTS },
-	{ "ipv6",			IPFY_IPV6OPT_IPV6 },
 	{ "keep",			IPFY_KEEP },
 	{ "le",				YY_CMP_LE },
 	{ "level",			IPFY_LEVEL },
 	{ "limit",			IPFY_LIMIT },
 	{ "log",			IPFY_LOG },
 	{ "lowttl",			IPFY_LOWTTL },
-	{ "lsrr",			IPFY_IPOPT_LSRR },
 	{ "lt",				YY_CMP_LT },
 	{ "mask",			IPFY_MASK },
+	{ "match-tag",			IPFY_MATCHTAG },
 	{ "mbcast",			IPFY_MBCAST },
-	{ "mtup",			IPFY_IPOPT_MTUP },
-	{ "mtur",			IPFY_IPOPT_MTUR },
 	{ "multicast",			IPFY_MULTICAST },
 	{ "nat",			IPFY_NAT },
 	{ "ne",				YY_CMP_NE },
@@ -1556,11 +1574,8 @@ static	struct	wordtab ipfwords[] = {
 	{ "newisn",			IPFY_NEWISN },
 	{ "no",				IPFY_NO },
 	{ "no-icmp-err",		IPFY_NOICMPERR },
-	{ "none",			IPFY_IPV6OPT_NONE },
-	{ "nop",			IPFY_IPOPT_NOP },
 	{ "now",			IPFY_NOW },
 	{ "not",			IPFY_NOT },
-	{ "nsapa",			IPFY_IPOPT_NSAPA },
 	{ "oow",			IPFY_OOW },
 	{ "on",				IPFY_ON },
 	{ "opt",			IPFY_OPT },
@@ -1574,42 +1589,26 @@ static	struct	wordtab ipfwords[] = {
 	{ "proto",			IPFY_PROTO },
 	{ "quick",			IPFY_QUICK },
 	{ "reply-to",			IPFY_REPLY_TO },
-	{ "reserv-1",			IPFY_SEC_RSV1 },
-	{ "reserv-2",			IPFY_SEC_RSV2 },
-	{ "reserv-3",			IPFY_SEC_RSV3 },
-	{ "reserv-4",			IPFY_SEC_RSV4 },
 	{ "return-icmp",		IPFY_RETICMP },
 	{ "return-icmp-as-dest",	IPFY_RETICMPASDST },
 	{ "return-rst",			IPFY_RETRST },
-	{ "routing",			IPFY_IPV6OPT_ROUTING },
-	{ "rr",				IPFY_IPOPT_RR },
-	{ "rtralrt",			IPFY_IPOPT_RTRALRT },
-	{ "satid",			IPFY_IPOPT_SATID },
-	{ "sdb",			IPFY_IPOPT_SDB },
-	{ "sec",			IPFY_IPOPT_SEC },
+	{ "route-to",			IPFY_ROUTETO },
 	{ "sec-class",			IPFY_SECCLASS },
-	{ "secret",			IPFY_SEC_SEC },
+	{ "set-tag",			IPFY_SETTAG },
 	{ "skip",			IPFY_SKIP },
 	{ "short",			IPFY_SHORT },
-	{ "ssrr",			IPFY_IPOPT_SSRR },
 	{ "state",			IPFY_STATE },
+	{ "state-age",			IPFY_AGE },
 	{ "strict",			IPFY_STRICT },
-	{ "tag",			IPFY_TAG },
+	{ "sync",			IPFY_SYNC },
 	{ "tcp",			IPFY_TCP },
 	{ "tcp-udp",			IPFY_TCPUDP },
 	{ "tos",			IPFY_TOS },
-	{ "topsecret",			IPFY_SEC_TS },
 	{ "to",				IPFY_TO },
-	{ "tr",				IPFY_IPOPT_TR },
-	{ "ts",				IPFY_IPOPT_TS },
 	{ "ttl",			IPFY_TTL },
 	{ "udp",			IPFY_UDP },
-	{ "ump",			IPFY_IPOPT_UMP },
-	{ "unclass",			IPFY_SEC_UNC },
 	{ "v6hdrs",			IPF6_V6HDRS },
-	{ "visa",			IPFY_IPOPT_VISA },
 	{ "with",			IPFY_WITH },
-	{ "zsu",			IPFY_IPOPT_ZSU },
 	{ NULL,				0 }
 };
 
@@ -1667,7 +1666,58 @@ static	struct	wordtab icmpcodewords[17] = {
 	{ NULL,				0 },
 };
 
-static	struct	wordtab logwords[] = {
+static	struct	wordtab ipv4optwords[25] = {
+	{ "addext",			IPFY_IPOPT_ADDEXT },
+	{ "cipso",			IPFY_IPOPT_CIPSO },
+	{ "dps",			IPFY_IPOPT_DPS },
+	{ "e-sec",			IPFY_IPOPT_ESEC },
+	{ "eip",			IPFY_IPOPT_EIP },
+	{ "encode",			IPFY_IPOPT_ENCODE },
+	{ "finn",			IPFY_IPOPT_FINN },
+	{ "imitd",			IPFY_IPOPT_IMITD },
+	{ "lsrr",			IPFY_IPOPT_LSRR },
+	{ "mtup",			IPFY_IPOPT_MTUP },
+	{ "mtur",			IPFY_IPOPT_MTUR },
+	{ "nop",			IPFY_IPOPT_NOP },
+	{ "nsapa",			IPFY_IPOPT_NSAPA },
+	{ "rr",				IPFY_IPOPT_RR },
+	{ "rtralrt",			IPFY_IPOPT_RTRALRT },
+	{ "satid",			IPFY_IPOPT_SATID },
+	{ "sdb",			IPFY_IPOPT_SDB },
+	{ "sec",			IPFY_IPOPT_SEC },
+	{ "ssrr",			IPFY_IPOPT_SSRR },
+	{ "tr",				IPFY_IPOPT_TR },
+	{ "ts",				IPFY_IPOPT_TS },
+	{ "ump",			IPFY_IPOPT_UMP },
+	{ "visa",			IPFY_IPOPT_VISA },
+	{ "zsu",			IPFY_IPOPT_ZSU },
+	{ NULL,				0 },
+};
+
+static	struct	wordtab ipv4secwords[9] = {
+	{ "confid",			IPFY_SEC_CONF },
+	{ "reserv-1",			IPFY_SEC_RSV1 },
+	{ "reserv-2",			IPFY_SEC_RSV2 },
+	{ "reserv-3",			IPFY_SEC_RSV3 },
+	{ "reserv-4",			IPFY_SEC_RSV4 },
+	{ "secret",			IPFY_SEC_SEC },
+	{ "topsecret",			IPFY_SEC_TS },
+	{ "unclass",			IPFY_SEC_UNC },
+	{ NULL,				0 },
+};
+
+static	struct	wordtab ipv6optwords[8] = {
+	{ "dstopts",			IPFY_IPV6OPT_DSTOPTS },
+	{ "esp",			IPFY_ESP },
+	{ "frag",			IPFY_FRAG },
+	{ "hopopts",			IPFY_IPV6OPT_HOPOPTS },
+	{ "ipv6",			IPFY_IPV6OPT_IPV6 },
+	{ "none",			IPFY_IPV6OPT_NONE },
+	{ "routing",			IPFY_IPV6OPT_ROUTING },
+	{ NULL,				0 },
+};
+
+static	struct	wordtab logwords[33] = {
 	{ "kern",			IPFY_FAC_KERN },
 	{ "user",			IPFY_FAC_USER },
 	{ "mail",			IPFY_FAC_MAIL },
@@ -1892,46 +1942,74 @@ char *name;
 	}
 
 	if (gethost(name, &addr) == -1) {
+		fprintf(stderr, "unknown name \"%s\"\n", name);
 		return 0;
 	}
 	return addr;
 }
 
 
-static void dobpf(phrase)
+static void dobpf(v, phrase)
+int v;
 char *phrase;
 {
 #ifdef IPFILTER_BPF
 	struct bpf_program bpf;
 	struct pcap *p;
+#endif
+	fakebpf_t *fb;
 	u_32_t l;
 	char *s;
 	int i;
 
 	for (fr = frc; fr != NULL; fr = fr->fr_next) {
 		if (fr->fr_type != FR_T_NONE) {
-			fprintf(stderr, "cannoy mix IPF and BPF matching\n");
+			fprintf(stderr, "cannot mix IPF and BPF matching\n");
 			return;
 		}
-		fr->fr_type = FR_T_IPF;
+		fr->fr_v = v;
+		fr->fr_type = FR_T_BPFOPC;
 
 		if (!strncmp(phrase, "\"0x", 2)) {
 			phrase++;
-			fr->fr_data = malloc(4);
-			if (fr->fr_data == NULL)
+			fb = malloc(sizeof(fakebpf_t));
+			if (fb == NULL)
 				yyerror("sorry, out of memory");
 
-			for (i = 0, s = strtok(phrase, " \r\n\t"; s != NULL;
+			for (i = 0, s = strtok(phrase, " \r\n\t"); s != NULL;
 			     s = strtok(NULL, " \r\n\t"), i++) {
-				fr->fr_data = realloc(fr->fr_data, (i + 1) * 4);
-				if (fr->fr_data == NULL)
+				fb = realloc(fb, (i / 4 + 1) * sizeof(*fb));
+				if (fb == NULL)
 					yyerror("sorry, out of memory");
 				l = (u_32_t)strtol(s, NULL, 0);
-				((u_32_t *)fr->fr_data)[i] = l;
+				switch (i & 3)
+				{
+				case 0 :
+					fb[i / 4].fb_c = l & 0xffff;
+					break;
+				case 1 :
+					fb[i / 4].fb_t = l & 0xff;
+					break;
+				case 2 :
+					fb[i / 4].fb_f = l & 0xff;
+					break;
+				case 3 :
+					fb[i / 4].fb_k = l;
+					break;
+				}
 			}
+			if ((i & 3) != 0) {
+				fprintf(stderr,
+					"Odd number of bytes in BPF code\n");
+				exit(1);
+			}
+			i--;
+			fr->fr_dsize = (i / 4 + 1) * sizeof(*fb);
+			fr->fr_data = fb;
 			return;
 		}
 
+#ifdef IPFILTER_BPF
 		bzero((char *)&bpf, sizeof(bpf));
 		p = pcap_open_dead(DLT_RAW, 1);
 		if (!p) {
@@ -1939,29 +2017,32 @@ char *phrase;
 			return;
 		}
 
-		if (pcap_compile(p, &bpf, phrase, 1, 0xffffffff) {
+		if (pcap_compile(p, &bpf, phrase, 1, 0xffffffff)) {
 			pcap_perror(p, "ipf");
 			pcap_close(p);
-			fprintf(stderr, "pcap parsing failed\n");
+			fprintf(stderr, "pcap parsing failed (%s)\n", phrase);
 			return;
 		}
 		pcap_close(p);
 
 		fr->fr_dsize = bpf.bf_len * sizeof(struct bpf_insn);
-		fr->fr_data = malloc(bpf.bf_len);
+		fr->fr_data = malloc(fr->fr_dsize);
 		if (fr->fr_data == NULL)
 			yyerror("sorry, out of memory");
-		bcopy((char *)bpf.bf_insns, fr->fr_data, bpf.bf_len);
+		bcopy((char *)bpf.bf_insns, fr->fr_data, fr->fr_dsize);
 		if (!bpf_validate(fr->fr_data, bpf.bf_len)) {
 			fprintf(stderr, "BPF validation failed\n");
 			return;
 		}
+#endif
 	}
 
+#ifdef IPFILTER_BPF
 	if (opts & OPT_DEBUG)
 		bpf_dump(&bpf, 0);
 #else
-	fprintf(stderr, "BPF expressions for matching not supported\n");
+	fprintf(stderr, "BPF filter expressions not supported\n");
+	exit(1);
 #endif
 }
 
@@ -2087,7 +2168,7 @@ int fd;
 ioctlfunc_t ioctlfunc;
 void *ptr;
 {
-	u_int add, del;
+	ioctlcmd_t add, del;
 	frentry_t *fr;
 	ipfobj_t obj;
 
@@ -2148,7 +2229,7 @@ void *ptr;
 		}
 	} else if ((opts & OPT_REMOVE) != 0) {
 		if ((*ioctlfunc)(fd, del, (void *)&obj) == -1) {
-			if ((opts & OPT_DONOTHING) == 0) {
+			if ((opts & OPT_DONOTHING) != 0) {
 				fprintf(stderr, "%d:", yylineNum);
 				perror("ioctl(delete rule)");
 			}
@@ -2157,23 +2238,22 @@ void *ptr;
 		if ((*ioctlfunc)(fd, add, (void *)&obj) == -1) {
 			if (!(opts & OPT_DONOTHING)) {
 				fprintf(stderr, "%d:", yylineNum);
-				fprintf(stderr,"ioctl(add/insert rule) failed: rule exists\n");
+				perror("ioctl(add/insert rule)");
 			}
 		}
 	}
 }
 
-
 static void setsyslog()
 {
-	savewords = yysettab(logwords);
+	yysetdict(logwords);
 	yybreakondot = 1;
 }
 
 
 static void unsetsyslog()
 {
-	yysettab(savewords);
+	yyresetdict();
 	yybreakondot = 0;
 }
 
@@ -2182,7 +2262,6 @@ static void fillgroup(fr)
 frentry_t *fr;
 {
 	frentry_t *f;
-	int i;
 
 	for (f = frold; f != NULL; f = f->fr_next)
 		if (strncmp(f->fr_grhead, fr->fr_group, FR_GROUPLEN) == 0)
@@ -2192,7 +2271,9 @@ frentry_t *fr;
 
 	/*
 	 * Only copy down matching fields if the rules are of the same type
-	 * and are of ipf type.
+	 * and are of ipf type.   The only fields that are copied are those
+	 * that impact the rule parsing itself, eg. need for knowing what the
+	 * protocol should be for rules with port comparisons in them.
 	 */
 	if (f->fr_type != fr->fr_type || f->fr_type != FR_T_IPF)
 		return;
@@ -2205,36 +2286,7 @@ frentry_t *fr;
 	if (fr->fr_proto == 0 && f->fr_proto != 0)
 		fr->fr_proto = f->fr_proto;
 
-	if (fr->fr_proto == IPPROTO_TCP) {
-		if (fr->fr_tcpfm == 0 && f->fr_tcpfm != 0)
-			fr->fr_tcpfm = f->fr_tcpfm;
-		if (fr->fr_tcpf == 0 && f->fr_tcpf != 0)
-			fr->fr_tcpf = f->fr_tcpf;
-	}
-
-	if (fr->fr_proto == IPPROTO_ICMP) {
-		if (fr->fr_icmpm == 0 && f->fr_icmpm != 0)
-			fr->fr_icmpm = f->fr_icmpm;
-		if (fr->fr_icmp == 0 && f->fr_icmp != 0)
-			fr->fr_icmp = f->fr_icmp;
-	}
-
-	if (fr->fr_optbits == 0 && f->fr_optbits != 0)
-		fr->fr_optbits = f->fr_optbits;
-	if (fr->fr_optmask == 0 && f->fr_optmask != 0)
-		fr->fr_optmask = f->fr_optmask;
-	if (fr->fr_secbits == 0 && f->fr_secbits != 0)
-		fr->fr_secbits = f->fr_secbits;
-	if (fr->fr_secmask == 0 && f->fr_secmask != 0)
-		fr->fr_secmask = f->fr_secmask;
-	if (fr->fr_authbits == 0 && f->fr_authbits != 0)
-		fr->fr_authbits = f->fr_authbits;
-	if (fr->fr_authmask == 0 && f->fr_authmask != 0)
-		fr->fr_authmask = f->fr_authmask;
-
-	for (i = 0; i < 3; i++) {
-		if (*f->fr_ifnames[i] != '\0' && *fr->fr_ifnames[i] == '\0')
-			strncpy(fr->fr_ifnames[i], f->fr_ifnames[i],
-				sizeof(f->fr_ifnames[i]));
-	}
+	if ((fr->fr_mproto == 0) && ((fr->fr_flx & FI_TCPUDP) == 0) &&
+	    ((f->fr_flx & FI_TCPUDP) != 0))
+		fr->fr_flx |= FI_TCPUDP;
 }

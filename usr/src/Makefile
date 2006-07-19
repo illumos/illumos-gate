@@ -180,7 +180,7 @@ cmdheaders: FRC
 	@cd cmd/mdb; pwd; $(MAKE) install_h
 
 commonheaders: FRC
-	@cd common/ipf; pwd; $(MAKE) install_h
+	@cd uts/common/inet/ipf/netinet; pwd; $(MAKE) install_h
 
 # each xmod target depends on a corresponding MACH-specific pseudotarget
 # before doing common xmod work

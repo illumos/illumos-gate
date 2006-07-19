@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: ipft_pc.c,v 1.9 2003/02/16 02:32:36 darrenr Exp $
+ * $Id: ipft_pc.c,v 1.10 2004/02/07 18:17:40 darrenr Exp $
  */
 #include "ipf.h"
 #include "pcap-ipf.h"
@@ -11,7 +11,7 @@
 #include "ipt.h"
 
 #if !defined(lint)
-static const char rcsid[] = "@(#)$Id: ipft_pc.c,v 1.9 2003/02/16 02:32:36 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: ipft_pc.c,v 1.10 2004/02/07 18:17:40 darrenr Exp $";
 #endif
 
 struct	llc	{
@@ -75,7 +75,7 @@ static	int	pcap_readip __P((char *, int, char **, int *));
 static	void	swap_hdr __P((pcaphdr_t *));
 static	int	pcap_read_rec __P((struct pcap_pkthdr *));
 
-static	int	pfd = -1, s_type = -1, swapped = 0;
+static	int	pfd = -1, swapped = 0;
 static	struct llc	*llcp = NULL;
 
 struct	ipread	pcap = { pcap_open, pcap_close, pcap_readip, 0 };
@@ -139,7 +139,6 @@ char	*fname;
 	}
 
 	pfd = fd;
-	s_type = ph.pc_type;
 	printf("opened pcap file %s:\n", fname);
 	printf("\tid: %08x version: %d.%d type: %d snap %d\n",
 		ph.pc_id, ph.pc_v_maj, ph.pc_v_min, ph.pc_type, ph.pc_slen);

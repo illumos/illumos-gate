@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: ipft_ef.c,v 1.11 2003/06/02 12:22:49 darrenr Exp $
+ * $Id: ipft_ef.c,v 1.14 2004/01/08 13:34:31 darrenr Exp $
  */
 
 /*
@@ -23,16 +23,15 @@ etherfind -n -t
 #include "ipf.h"
 #include "ipt.h"
 
-#undef	ICMP_MAXTYPE
-#include <netinet/ip_icmp.h>
+#ifndef linux
 #include <netinet/ip_var.h>
-#include <netinet/udp.h>
+#endif
 #include <netinet/tcpip.h>
 
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipft_ef.c	1.6 2/4/96 (C)1995 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ipft_ef.c,v 1.11 2003/06/02 12:22:49 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: ipft_ef.c,v 1.14 2004/01/08 13:34:31 darrenr Exp $";
 #endif
 
 static	int	etherf_open __P((char *));

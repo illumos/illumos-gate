@@ -3,11 +3,11 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: ipft_tx.c,v 1.11 2003/02/16 02:32:01 darrenr Exp $
+ * $Id: ipft_tx.c,v 1.15.2.3 2005/06/18 02:41:34 darrenr Exp $
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipft_tx.c	1.7 6/5/96 (C) 1993 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ipft_tx.c,v 1.11 2003/02/16 02:32:01 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: ipft_tx.c,v 1.15.2.3 2005/06/18 02:41:34 darrenr Exp $";
 #endif
 
 #include <ctype.h>
@@ -15,10 +15,9 @@ static const char rcsid[] = "@(#)$Id: ipft_tx.c,v 1.11 2003/02/16 02:32:01 darre
 #include "ipf.h"
 #include "ipt.h"
 
-#undef	ICMP_MAXTYPE
-#include <netinet/ip_icmp.h>
+#ifndef linux
 #include <netinet/ip_var.h>
-#include <netinet/udp.h>
+#endif
 #include <netinet/tcpip.h>
 
 
@@ -30,8 +29,8 @@ static	int	text_open __P((char *)), text_close __P((void));
 static	int	text_readip __P((char *, int, char **, int *));
 static	int	parseline __P((char *, ip_t *, char **, int *));
 
-static	char	_tcp_flagset[] = "FSRPAUEC";
-static	u_char	_tcp_flags[] = { TH_FIN, TH_SYN, TH_RST, TH_PUSH,
+static	char	myflagset[] = "FSRPAUEC";
+static	u_char	myflags[] = { TH_FIN, TH_SYN, TH_RST, TH_PUSH,
 				TH_ACK, TH_URG, TH_ECN, TH_CWR };
 
 struct	ipread	iptext = { text_open, text_close, text_readip, R_DO_CKSUM };
@@ -50,24 +49,20 @@ static	u_32_t	tx_hostnum(host, resolved)
 char	*host;
 int	*resolved;
 {
-	struct	hostent	*hp;
-	struct	netent	*np;
+	u_32_t	ipa;
 
 	*resolved = 0;
-	if (!strcasecmp("any",host))
+	if (!strcasecmp("any", host))
 		return 0L;
-	if (isdigit(*host))
+	if (ISDIGIT(*host))
 		return inet_addr(host);
 
-	if (!(hp = gethostbyname(host))) {
-		if (!(np = getnetbyname(host))) {
-			*resolved = -1;
-			fprintf(stderr, "can't resolve hostname: %s\n", host);
-			return 0;
-		}
-		return htonl(np->n_net);
+	if (gethost(host, &ipa) == -1) {
+		*resolved = -1;
+		fprintf(stderr, "can't resolve hostname: %s\n", host);
+		return 0;
 	}
-	return *(u_32_t *)hp->h_addr;
+	return ipa;
 }
 
 
@@ -81,7 +76,7 @@ char	*name;
 	struct	servent	*sp, *sp2;
 	u_short	p1 = 0;
 
-	if (isdigit(*name))
+	if (ISDIGIT(*name))
 		return (u_short)atoi(name);
 	if (!tx_proto)
 		tx_proto = "tcp/udp";
@@ -205,11 +200,11 @@ int	*out;
 		return 1;
 
 	c = **cpp;
-	if (!isalpha(c) || (tolower(c) != 'o' && tolower(c) != 'i')) {
+	if (!ISALPHA(c) || (TOLOWER(c) != 'o' && TOLOWER(c) != 'i')) {
 		fprintf(stderr, "bad direction \"%s\"\n", *cpp);
 		return 1;
 	}
-	*out = (tolower(c) == 'o') ? 1 : 0;
+	*out = (TOLOWER(c) == 'o') ? 1 : 0;
 	cpp++;
 	if (!*cpp)
 		return 1;
@@ -241,7 +236,7 @@ int	*out;
 			tx_proto = "icmp";
 		}
 		cpp++;
-	} else if (isdigit(**cpp) && !index(*cpp, '.')) {
+	} else if (ISDIGIT(**cpp) && !index(*cpp, '.')) {
 		ip->ip_p = atoi(*cpp);
 		cpp++;
 	} else
@@ -259,6 +254,10 @@ int	*out;
 		}
 		*last++ = '\0';
 		tcp->th_sport = htons(tx_portnum(last));
+		if (ip->ip_p == IPPROTO_TCP) {
+			tcp->th_win = htons(4096);
+			TCP_OFF_A(tcp, sizeof(*tcp) >> 2);
+		}
 	}
 	ip->ip_src.s_addr = tx_hostnum(*cpp, &r);
 	cpp++;
@@ -279,19 +278,18 @@ int	*out;
 	ip->ip_dst.s_addr = tx_hostnum(*cpp, &r);
 	cpp++;
 	if (*cpp && ip->ip_p == IPPROTO_TCP) {
-		extern	char	_tcp_flagset[];
-		extern	u_char	_tcp_flags[];
 		char	*s, *t;
 
+		tcp->th_flags = 0;
 		for (s = *cpp; *s; s++)
-			if ((t  = strchr(_tcp_flagset, *s)))
-				tcp->th_flags |= _tcp_flags[t - _tcp_flagset];
+			if ((t  = strchr(myflagset, *s)))
+				tcp->th_flags |= myflags[t - myflagset];
 		if (tcp->th_flags)
 			cpp++;
 		if (tcp->th_flags == 0)
 			abort();
-		tcp->th_win = htons(4096);
-		TCP_OFF_A(tcp, sizeof(*tcp) >> 2);
+		if (tcp->th_flags & TH_URG)
+			tcp->th_urp = htons(1);
 	} else if (*cpp && ip->ip_p == IPPROTO_ICMP) {
 		extern	char	*tx_icmptypes[];
 		char	**s, *t;

@@ -3,19 +3,14 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: load_pool.c,v 1.12 2003/04/26 04:55:11 darrenr Exp $
+ * $Id: load_pool.c,v 1.14.2.2 2005/02/01 02:44:06 darrenr Exp $
  */
 
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include "ipf.h"
-#if SOLARIS2 >= 10
-#include "ip_lookup.h"
-#include "ip_pool.h"
-#else
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_pool.h"
-#endif
 
 static int poolfd = -1;
 
@@ -44,20 +39,29 @@ ioctlfunc_t iocfunc;
 	if (*plp->ipo_name == '\0')
 		op.iplo_arg |= IPOOL_ANON;
 
-	if ((*iocfunc)(poolfd, SIOCLOOKUPADDTABLE, &op))
-		if ((opts & OPT_DONOTHING) == 0) {
-			perror("load_pool:SIOCLOOKUPADDTABLE");
-			return -1;
-		}
+	if ((opts & OPT_REMOVE) == 0) {
+		if ((*iocfunc)(poolfd, SIOCLOOKUPADDTABLE, &op))
+			if ((opts & OPT_DONOTHING) == 0) {
+				perror("load_pool:SIOCLOOKUPADDTABLE");
+				return -1;
+			}
+	}
 
 	if ((opts & OPT_VERBOSE) != 0) {
 		pool.ipo_list = plp->ipo_list;
-		printpool(&pool, bcopywrap, opts);
+		printpool(&pool, bcopywrap, pool.ipo_name, opts);
 		pool.ipo_list = NULL;
 	}
 
 	for (a = plp->ipo_list; a != NULL; a = a->ipn_next)
 		load_poolnode(plp->ipo_unit, plp->ipo_name, a, iocfunc);
 
+	if ((opts & OPT_REMOVE) != 0) {
+		if ((*iocfunc)(poolfd, SIOCLOOKUPDELTABLE, &op))
+			if ((opts & OPT_DONOTHING) == 0) {
+				perror("load_pool:SIOCLOOKUPDELTABLE");
+				return -1;
+			}
+	}
 	return 0;
 }

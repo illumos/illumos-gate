@@ -9,14 +9,8 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include "ipf.h"
-
-#if SOLARIS2 >= 10
-#include "ip_lookup.h"
-#include "ip_htable.h"
-#else
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_htable.h"
-#endif
 
 static int hashfd = -1;
 

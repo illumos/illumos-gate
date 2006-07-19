@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -17,19 +17,21 @@ OBJECTS=	addicmp.o addipopt.o bcopywrap.o \
 		getline.o getnattype.o getport.o getportproto.o \
 		getproto.o getsumd.o hostmask.o hostname.o \
 		hostnum.o icmpcode.o inet_addr.o initparse.o \
-		ionames.o ipoptsec.o ipft_ef.o ipft_hx.o \
-		ipft_pc.o ipft_sn.o ipft_td.o ipft_tx.o kmem.o \
-		kmemcpywrap.o kvatoname.o load_hash.o load_pool.o \
- 		load_hashnode.o load_poolnode.o loglevel.o \
-		mutex_emul.o nametokva.o natparse.o ntomask.o \
-		optname.o optprint.o optprintv6.o optvalue.o \
+		ionames.o v6ionames.o ipoptsec.o ipf_dotuning.o \
+		ipft_ef.o ipft_hx.o ipft_pc.o ipft_sn.o ipft_td.o \
+		ipft_tx.o kmem.o kmemcpywrap.o kvatoname.o \
+		load_hash.o load_pool.o load_hashnode.o \
+		load_poolnode.o loglevel.o mutex_emul.o nametokva.o \
+		natparse.o ntomask.o optname.o optprint.o \
+		optprintv6.o optvalue.o \
 		portname.o portnum.o ports.o print_toif.o \
-		printaps.o printbuf.o printhash.o printhashnode.o \
-		printip.o printpool.o printpoolnode.o printfr.o \
+		printactivenat.o printaps.o printbuf.o printhash.o \
+		printhashnode.o printip.o printpool.o \
+		printpoolnode.o printfr.o printfraginfo.o \
 		printhostmap.o printifname.o printhostmask.o \
-		printlog.o printmask.o printnat.o printportcmp.o \
-		printpacket.o printpacket6.o printsbuf.o \
-		printstate.o ratoi.o \
+		printlog.o printmask.o printnat.o printpacket.o \
+		printpacket6.o printportcmp.o printproto.o \
+		printsbuf.o printstate.o printtunable.o ratoi.o \
 		remove_pool.o remove_poolnode.o remove_hash.o \
 		remove_hashnode.o resetlexer.o rwlock_emul.o \
 		tcpflags.o to_interface.o var.o verbose.o \

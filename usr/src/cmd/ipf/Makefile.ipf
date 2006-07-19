@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -11,8 +11,8 @@
 LIBIPF=		../../lib/$(MACH)/libipf.a
 LIBIPF64=		../../lib/$(MACH64)/libipf.a
 
-COMMONIPF=	$(SRC)/common/ipf
-KERNELIPF=	$(SRC)/uts/common/inet/ipf
+COMMONIPF=	$(SRC)/uts/common/inet/ipf
+KERNELIPF=	$(SRC)/uts/common/inet/pfil
 
 MINOR=		echo $(RELEASE) | cut -d. -f2
 CPPFLAGS	+= -I$(COMMONIPF) -I$(KERNELIPF) -DSUNDDI -DUSE_INET6 \

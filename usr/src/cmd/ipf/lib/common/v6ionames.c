@@ -3,10 +3,8 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: v6ionames.c,v 1.1 2003/04/26 04:55:58 darrenr Exp $
+ * $Id: v6ionames.c,v 1.1.4.1 2005/01/02 13:08:49 darrenr Exp $
  */
-
-
 #include "ipf.h"
 
 

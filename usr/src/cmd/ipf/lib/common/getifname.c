@@ -1,6 +1,16 @@
+/*
+ * Copyright (C) 2003 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include "ipf.h"
 #include "qif.h"
-
 #include "kmem.h"
 
 /*
@@ -10,24 +20,34 @@
 char *getifname(ptr)
 struct ifnet *ptr;
 {
-#if SOLARIS
+#if SOLARIS || defined(__hpux)
+# if SOLARIS
+#  include <sys/mutex.h>
+#  include <sys/condvar.h>
+# endif
+# ifdef __hpux
+#  include "compat.h"
+# endif
 	char *ifname;
-	s_ill_t ill;
+	qif_t qif;
 
 	if ((void *)ptr == (void *)-1)
 		return "!";
 	if (ptr == NULL)
 		return "-";
 
-	if (kmemcpy((char *)&ill, (u_long)ptr, sizeof(ill)) == -1)
+	if (kmemcpy((char *)&qif, (u_long)ptr, sizeof(qif)) == -1)
 		return "X";
-	ifname = malloc(sizeof(ill.ill_name) + 1);
-	strncpy(ifname, ill.ill_name, sizeof(ill.ill_name));
-	ifname[sizeof(ill.ill_name)] = '\0';
+	ifname = strdup(qif.qf_name);
+	if ((ifname != NULL) && (*ifname == '\0')) {
+		free(ifname);
+		return "!";
+	}
 	return ifname;
 #else
 # if defined(NetBSD) && (NetBSD >= 199905) && (NetBSD < 1991011) || \
-    defined(__OpenBSD__)
+    defined(__OpenBSD__) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 #else
 	char buf[32];
 	int len;
@@ -42,7 +62,8 @@ struct ifnet *ptr;
 	if (kmemcpy((char *)&netif, (u_long)ptr, sizeof(netif)) == -1)
 		return "X";
 # if defined(NetBSD) && (NetBSD >= 199905) && (NetBSD < 1991011) || \
-    defined(__OpenBSD__)
+    defined(__OpenBSD__) || defined(linux) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	return strdup(netif.if_xname);
 # else
 	if (kstrncpy(buf, (u_long)netif.if_name, sizeof(buf)) == -1)

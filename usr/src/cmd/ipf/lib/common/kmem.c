@@ -9,7 +9,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -23,7 +23,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/file.h>
-#if !defined(__sgi) && !defined(__hpux) && !defined(__osf__)
+#if !defined(__sgi) && !defined(__hpux) && !defined(__osf__) && !defined(linux) && !defined(_AIX51)
 #include <kvm.h>
 #endif
 #include <fcntl.h>
@@ -37,6 +37,9 @@
 #if __FreeBSD_version >= 300000
 # include <net/if_var.h>
 #endif
+#if defined(linux) || defined(__osf__) || defined(__sgi) || defined(__hpux)
+# include <stdlib.h>
+#endif
 
 #include "kmem.h"
 
@@ -46,12 +49,13 @@
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)kmem.c	1.4 1/12/96 (C) 1992 Darren Reed";
-static const char rcsid[] = "@(#)$Id: kmem.c,v 1.11 2003/06/02 12:22:29 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: kmem.c,v 1.16.2.2 2005/06/12 07:18:41 darrenr Exp $";
 #endif
 
 
 
-#if !defined(__sgi) && !defined(__hpux) && !defined(__osf__)
+#if !defined(__sgi) && !defined(__hpux) && !defined(__osf__) && \
+    !defined(linux) && !defined(_AIX51)
 /*
  * For all platforms where there is a libkvm and a kvm_t, we use that...
  */
@@ -62,17 +66,21 @@ static	kvm_t	*kvm_f = NULL;
  *...and for the others (HP-UX, IRIX, Tru64), we have to provide our own.
  */
 
-typedef	int	kvm_t;
+typedef	int *	kvm_t;
 
-static	kvm_t	kvm_f = -1;
+static	kvm_t	kvm_f = NULL;
 static	char	*kvm_errstr = NULL;
+
+kvm_t kvm_open __P((char *, char *, char *, int, char *));
+int kvm_read __P((kvm_t, u_long, char *, size_t));
 
 kvm_t kvm_open(kernel, core, swap, mode, errstr)
 char *kernel, *core, *swap;
 int mode;
 char *errstr;
 {
-	kvm_t fd;
+	kvm_t k;
+	int fd;
 
 	kvm_errstr = errstr;
 
@@ -80,7 +88,15 @@ char *errstr;
 		core = "/dev/kmem";
 
 	fd = open(core, mode);
-	return fd;
+	if (fd == -1)
+		return NULL;
+	k = malloc(sizeof(*k));
+	if (k == NULL) {
+		close(fd);
+		return NULL;
+	}
+	*k = fd;
+	return k;
 }
 
 int kvm_read(kvm, pos, buffer, size)
@@ -89,10 +105,10 @@ u_long pos;
 char *buffer;
 size_t size;
 {
-	int r, left;
+	int r = 0, left;
 	char *bufp;
 
-	if (lseek(kvm, pos, 0) == -1) {
+	if (lseek(*kvm, pos, 0) == -1) {
 		if (kvm_errstr != NULL) {
 			fprintf(stderr, "%s", kvm_errstr);
 			perror("lseek");
@@ -101,19 +117,19 @@ size_t size;
 	}
 
 	for (bufp = buffer, left = size; left > 0; bufp += r, left -= r) {
-		r = read(kvm, bufp, 1);
+		r = read(*kvm, bufp, left);
 #ifdef	__osf__
 		/*
 		 * Tru64 returns "0" for successful operation, not the number
 		 * of bytes read.
 		 */
-		return r;
-#else
+		if (r == 0)
+			r = left;
+#endif
 		if (r <= 0)
 			return -1;
-#endif
 	}
-	return 0;
+	return r;
 }
 #endif /* !defined(__sgi) && !defined(__hpux) && !defined(__osf__) */
 
@@ -126,7 +142,7 @@ char	*kern, *core;
 		perror("openkmem:open");
 		return -1;
 	    }
-	return 0;
+	return kvm_f != NULL;
 }
 
 int	kmemcpy(buf, pos, n)
@@ -179,7 +195,7 @@ register int	n;
 		if (r <= 0)
 		    {
 			fprintf(stderr, "pos=0x%lx ", (u_long)pos);
-			perror("kstrncpy:read");
+			perror("kmemcpy:read");
 			return -1;
 		    }
 		else

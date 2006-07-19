@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 1993-2005  by Darren Reed.
+ * See the IPFILTER.LICENCE file for details on licencing.
+ */ 
+
 #ifdef	IPFILTER_SCAN
 
 #include <ctype.h>
@@ -12,7 +17,7 @@ char *buf;
 	int i;
 
 	for (s = (u_char *)buf, i = ISC_TLEN; i; i--, s++) {
-		if (isprint(*s))
+		if (ISPRINT(*s))
 			putchar(*s);
 		else
 			printf("\\%o", *s);

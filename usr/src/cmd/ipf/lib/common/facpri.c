@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: facpri.c,v 1.5 2001/06/09 17:09:24 darrenr Exp $
+ * $Id: facpri.c,v 1.6 2003/12/01 01:59:43 darrenr Exp $
  */
 
 #include <stdio.h>
@@ -20,7 +20,7 @@
 #include "facpri.h"
 
 #if !defined(lint)
-static const char rcsid[] = "@(#)$Id: facpri.c,v 1.5 2001/06/09 17:09:24 darrenr Exp $";
+static const char rcsid[] = "@(#)$Id: facpri.c,v 1.6 2003/12/01 01:59:43 darrenr Exp $";
 #endif
 
 
@@ -35,7 +35,7 @@ table_t	facs[] = {
 	{ "auth", LOG_AUTH },	{ "syslog", LOG_SYSLOG },
 	{ "lpr", LOG_LPR },	{ "news", LOG_NEWS },
 	{ "uucp", LOG_UUCP },
-#if LOG_CRON == LOG_CRON2 
+#if LOG_CRON == LOG_CRON2
 	{ "cron2", LOG_CRON1 },
 #else
 	{ "cron", LOG_CRON1 },

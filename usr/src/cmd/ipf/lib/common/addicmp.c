@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: addicmp.c,v 1.8 2002/01/28 06:50:45 darrenr Exp $
+ * $Id: addicmp.c,v 1.10.2.1 2004/12/09 19:41:16 darrenr Exp $
  */
 
 #include <ctype.h>
@@ -34,7 +34,7 @@ int     linenum;
 		return -1;
 	if (!fp->fr_proto)	/* to catch lusers */
 		fp->fr_proto = IPPROTO_ICMP;
-	if (isdigit(***cp)) {
+	if (ISDIGIT(***cp)) {
 		if (!ratoi(**cp, &i, 0, 255)) {
 			fprintf(stderr,
 				"%d: Invalid icmp-type (%s) specified\n",
@@ -68,9 +68,9 @@ int     linenum;
 	if (**cp && strcasecmp("code", **cp))
 		return 0;
 	(*cp)++;
-	if (isdigit(***cp)) {
+	if (ISDIGIT(***cp)) {
 		if (!ratoi(**cp, &i, 0, 255)) {
-			fprintf(stderr, 
+			fprintf(stderr,
 				"%d: Invalid icmp code (%s) specified\n",
 				linenum, **cp);
 			return -1;
@@ -78,7 +78,7 @@ int     linenum;
 	} else {
 		i = icmpcode(**cp);
 		if (i == -1) {
-			fprintf(stderr, 
+			fprintf(stderr,
 				"%d: Unknown icmp code (%s) specified\n",
 				linenum, **cp);
 			return -1;
