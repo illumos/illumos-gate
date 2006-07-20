@@ -682,6 +682,14 @@ sbdp_resume(sbdp_sr_handle_t *srh)
 
 		ASSERT(MUTEX_HELD(&cpu_lock));
 
+		/*
+		 * Prevent false alarm in tod_validate() due to tod
+		 * value change between suspend and resume
+		 */
+		mutex_enter(&tod_lock);
+		tod_fault_reset();
+		mutex_exit(&tod_lock);
+
 		sbdp_enable_intr(); 	/* enable intr & clock */
 
 		/*
@@ -695,7 +703,6 @@ sbdp_resume(sbdp_sr_handle_t *srh)
 		 * If we suspended hw watchdog at suspend,
 		 * re-enable it now.
 		 */
-
 		if (SR_CHECK_FLAG(srh, SR_FLAG_WATCHDOG)) {
 			mutex_enter(&tod_lock);
 			tod_ops.tod_set_watchdog_timer(

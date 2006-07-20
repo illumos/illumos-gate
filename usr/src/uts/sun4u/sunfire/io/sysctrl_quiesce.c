@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -564,6 +564,14 @@ sysctrl_resume(sysc_cfga_pkt_t *pkt)
 #ifndef	Bug_4154263
 		DEBUGP(errp("release cpus..."));
 #endif
+		/*
+		 * Prevent false alarm in tod_validate() due to tod
+		 * value change between suspend and resume
+		 */
+		mutex_enter(&tod_lock);
+		tod_fault_reset();
+		mutex_exit(&tod_lock);
+
 		sysctrl_release_cpus();
 		DEBUGP(errp("cpus resumed...\n"));
 

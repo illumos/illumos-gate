@@ -544,7 +544,7 @@ panic_hres_tick(void)
 	brz,pt	adj, 3f;		/* no adjustments, it's easy */	\
 	add	hrestnsec, nslt, hrestnsec; /* hrest.tv_nsec += nslt */	\
 	brlz,pn	adj, 2f;		/* if hrestime_adj negative */	\
-	srl	nslt, ADJ_SHIFT, nslt;	/* delay: nslt >>= 4 */		\
+	srlx	nslt, ADJ_SHIFT, nslt;	/* delay: nslt >>= 4 */		\
 	subcc	adj, nslt, %g0;		/* hrestime_adj - nslt/16 */	\
 	movg	%xcc, nslt, adj;	/* adj by min(adj, nslt/16) */	\
 	ba	3f;			/* go convert to sec/nsec */	\
@@ -558,6 +558,7 @@ panic_hres_tick(void)
 	nop;				/* delay: do nothing :( */	\
 	add	hrestsec, 1, hrestsec;	/* hrest.tv_sec++; */		\
 	sub	hrestnsec, nano, hrestnsec; /* hrest.tv_nsec -= NANOSEC; */ \
+	ba,a	3b;			/* check >= billion again */	\
 4:
 
 	ENTRY_NP(gethrestime)

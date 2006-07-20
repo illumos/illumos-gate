@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -728,6 +727,14 @@ dr_resume(dr_sr_handle_t *srh)
 
 		ASSERT(MUTEX_HELD(&cpu_lock));
 
+		/*
+		 * Prevent false alarm in tod_validate() due to tod
+		 * value change between suspend and resume
+		 */
+		mutex_enter(&tod_lock);
+		tod_fault_reset();
+		mutex_exit(&tod_lock);
+
 		dr_enable_intr(); 	/* enable intr & clock */
 
 		start_cpus();
@@ -747,7 +754,6 @@ dr_resume(dr_sr_handle_t *srh)
 		 * If we suspended hw watchdog at suspend,
 		 * re-enable it now.
 		 */
-
 		if (srh->sr_flags & (SR_FLAG_WATCHDOG)) {
 			mutex_enter(&tod_lock);
 			tod_ops.tod_set_watchdog_timer(
