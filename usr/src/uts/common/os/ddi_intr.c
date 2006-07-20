@@ -187,7 +187,8 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	    (void *)dip, type, inum, count, behavior));
 
 	/* Validate parameters */
-	if (dip == NULL || h_array == NULL || count < 1) {
+	if (dip == NULL || h_array == NULL || count < 1 ||
+	    !DDI_INTR_BEHAVIOR_FLAG_VALID(behavior)) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: Invalid args\n"));
 		return (DDI_EINVAL);
 	}

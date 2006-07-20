@@ -124,6 +124,9 @@ typedef struct ddi_intr_handle_impl {
 #define	DDI_INTR_SUP_TYPES	DDI_INTR_TYPE_FIXED|DDI_INTR_TYPE_MSI|\
 				DDI_INTR_TYPE_MSIX
 
+#define	DDI_INTR_BEHAVIOR_FLAG_VALID(f) \
+	    (((f) == DDI_INTR_ALLOC_NORMAL) || ((f) == DDI_INTR_ALLOC_STRICT))
+
 /* values for ih_flags */
 #define	DDI_INTR_MSIX_DUP	0x01	/* MSI-X vector which has been dupped */
 
