@@ -171,7 +171,6 @@ main(int argc, char *argv[])
 			break;
 		}
 	}
-
 	/*
 	 * Check for sufficient arguments
 	 * or a usage error.
@@ -192,49 +191,54 @@ main(int argc, char *argv[])
 	 */
 	if ((grpp = strchr(argv[0], ':')) != NULL) {
 		*grpp++ = 0;
-
-		if (isnumber(grpp)) {
-			errno = 0;
-			gid = (gid_t)strtol(grpp, NULL, 10);
-			if (errno != 0) {
-				if (errno == ERANGE) {
-					(void) fprintf(stderr, gettext(
-						"chown: group id too large\n"));
-					exit(2);
-				} else {
-					(void) fprintf(stderr, gettext(
-						"chown: invalid group id\n"));
-					exit(2);
-				}
-			}
-		} else if ((grp = getgrnam(grpp)) == NULL) {
-			(void) fprintf(stderr, gettext(
-				"chown: unknown group id %s\n"), grpp);
-			exit(2);
-		} else
+		if ((grp = getgrnam(grpp)) != NULL) {
 			gid = grp->gr_gid;
-	}
-
-	if (isnumber(argv[0])) {
-		errno = 0;
-		uid = (uid_t)strtol(argv[0], NULL, 10);
-		if (errno != 0) {
-			if (errno == ERANGE) {
-				(void) fprintf(stderr, gettext(
-					"chown: user id too large\n"));
-				exit(2);
+		} else {
+			if (isnumber(grpp)) {
+				errno = 0;
+				gid = (gid_t)strtol(grpp, NULL, 10);
+				if (errno != 0) {
+					if (errno == ERANGE) {
+						(void) fprintf(stderr, gettext(
+						"chown: group id too large\n"));
+							exit(2);
+					} else {
+						(void) fprintf(stderr, gettext(
+						"chown: invalid group id\n"));
+						exit(2);
+					}
+				}
 			} else {
 				(void) fprintf(stderr, gettext(
-					"chown: invalid user id\n"));
+					"chown: unknown group id %s\n"), grpp);
 				exit(2);
 			}
 		}
-	} else if ((pwd = getpwnam(argv[0])) == NULL) {
-		(void) fprintf(stderr, gettext(
-			"chown: unknown user id %s\n"), argv[0]);
-		exit(2);
-	} else
+	}
+
+	if ((pwd = getpwnam(argv[0])) != NULL) {
 		uid = pwd->pw_uid;
+	} else {
+		if (isnumber(argv[0])) {
+			errno = 0;
+			uid = (uid_t)strtol(argv[0], NULL, 10);
+			if (errno != 0) {
+				if (errno == ERANGE) {
+					(void) fprintf(stderr, gettext(
+					"chown: user id too large\n"));
+					exit(2);
+				} else {
+					(void) fprintf(stderr, gettext(
+					"chown: invalid user id\n"));
+					exit(2);
+				}
+			}
+		} else {
+			(void) fprintf(stderr, gettext(
+			"chown: unknown user id %s\n"), argv[0]);
+			exit(2);
+		}
+	}
 
 	for (c = 1; c < argc; c++) {
 		tree = NULL;
