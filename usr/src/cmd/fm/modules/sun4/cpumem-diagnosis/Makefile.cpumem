@@ -48,7 +48,7 @@ SRCS = \
 
 include ../../Makefile.plugin
 
-CMD_VERSION = "1.5"
+CMD_VERSION = "1.6"
 
 INCDIRS += \
 	. \

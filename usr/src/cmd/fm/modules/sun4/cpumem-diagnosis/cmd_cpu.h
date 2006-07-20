@@ -96,7 +96,8 @@ typedef enum cmd_cpu_type {
 	CPU_ULTRASPARC_IVplus,
 	CPU_ULTRASPARC_IIIiplus,
 	CPU_ULTRASPARC_T1,
-	CPU_SPARC64_VI
+	CPU_SPARC64_VI,
+	CPU_ULTRASPARC_T2
 } cmd_cpu_type_t;
 
 typedef struct cmd_cpu_cases {
@@ -307,7 +308,8 @@ extern void cmd_xxu_resolve(fmd_hdl_t *, cmd_xr_t *, fmd_event_t *);
 
 #define	CMD_CPU_VERSION_1	CPU_MKVERSION(1)	/* -1 */
 #define	CMD_CPU_VERSION_2	CPU_MKVERSION(2)	/* -2 */
-#define	CMD_CPU_VERSION		CMD_CPU_VERSION_2
+#define	CMD_CPU_VERSION_3	CPU_MKVERSION(3)	/* -3 */
+#define	CMD_CPU_VERSION		CMD_CPU_VERSION_3
 
 #define	CMD_CPU_VERSIONED(cpu)	((int)(cpu)->cpu_version < 0)
 
@@ -344,13 +346,26 @@ typedef struct cmd_cpu_1 {
 	cmd_list_t cpu1_xxu_retries;	/* List of pending xxU retries */
 } cmd_cpu_1_t;
 
-/* Portion of the bank structure which must be persisted */
+typedef struct cmd_cpu_2 {
+	cmd_header_t cpu2_header;	/* Nodetype must be CMD_NT_CPU */
+	uint_t cpu2_version;		/* struct version - must follow hdr */
+	uint32_t cpu2_cpuid;		/* Logical ID for this CPU */
+	cmd_cpu_type_t cpu2_type;	/* CPU model */
+	uint8_t cpu2_faulting;		/* Set if fault has been issued */
+	cmd_fmri_t cpu2_asru;		/* ASRU for this CPU */
+	cmd_fmri_t cpu2_fru;		/* FRU for this CPU */
+	cmd_cpu_uec_t cpu2_uec;		/* UE cache */
+	cmd_cpu_uec_t cpu2_olduec;	/* To-be-flushed UE cache */
+} cmd_cpu_2_t;
+
+/* Portion of the cpu structure which must be persisted */
 typedef struct cmd_cpu_pers {
 	cmd_header_t cpup_header;	/* Nodetype must be CMD_NT_CPU */
 	uint_t cpup_version;		/* struct version - must follow hdr */
 	uint32_t cpup_cpuid;		/* Logical ID for this CPU */
 	cmd_cpu_type_t cpup_type;	/* CPU model */
 	uint8_t cpup_faulting;		/* Set if fault has been issued */
+	uint8_t cpup_level;		/* cpu group level - 0 == thread */
 	cmd_fmri_t cpup_asru;		/* ASRU for this CPU */
 	cmd_fmri_t cpup_fru;		/* FRU for this CPU */
 	cmd_cpu_uec_t cpup_uec;		/* UE cache */
@@ -369,10 +384,10 @@ struct cmd_cpu {
 
 #define	CMD_CPU_MAXSIZE \
 	MAX(MAX(sizeof (cmd_cpu_0_t), sizeof (cmd_cpu_1_t)), \
-	    sizeof (cmd_cpu_pers_t))
+	    MAX(sizeof (cmd_cpu_2_t), sizeof (cmd_cpu_pers_t)))
 #define	CMD_CPU_MINSIZE \
 	MIN(MIN(sizeof (cmd_cpu_0_t), sizeof (cmd_cpu_1_t)), \
-	    sizeof (cmd_cpu_pers_t))
+	    MIN(sizeof (cmd_cpu_2_t), sizeof (cmd_cpu_pers_t)))
 
 #define	cpu_header		cpu_pers.cpup_header
 #define	cpu_nodetype		cpu_pers.cpup_header.hdr_nodetype
@@ -381,6 +396,7 @@ struct cmd_cpu {
 #define	cpu_cpuid		cpu_pers.cpup_cpuid
 #define	cpu_type		cpu_pers.cpup_type
 #define	cpu_faulting		cpu_pers.cpup_faulting
+#define	cpu_level		cpu_pers.cpup_level
 #define	cpu_asru		cpu_pers.cpup_asru
 #define	cpu_fru			cpu_pers.cpup_fru
 #define	cpu_uec			cpu_pers.cpup_uec
@@ -600,13 +616,14 @@ extern cmd_evdisp_t cmd_l2ctl(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
  * FMRI in the passed ereport.
  */
 extern cmd_cpu_t *cmd_cpu_lookup_from_detector(fmd_hdl_t *, nvlist_t *,
-    const char *);
+    const char *, uint8_t);
 
 extern char *cpu_getfrustr(fmd_hdl_t *, uint32_t);
-extern cmd_cpu_t *cmd_cpu_lookup(fmd_hdl_t *, nvlist_t *, const char *);
+extern cmd_cpu_t *cmd_cpu_lookup(fmd_hdl_t *, nvlist_t *, const char *,
+    uint8_t);
 
-extern nvlist_t *cmd_cpu_create_fault(fmd_hdl_t *, cmd_cpu_t *, const char *,
-    nvlist_t *, uint_t);
+extern void cmd_cpu_create_faultlist(fmd_hdl_t *, fmd_case_t *, cmd_cpu_t *,
+    const char *, nvlist_t *, uint_t);
 
 extern void cmd_cpu_destroy(fmd_hdl_t *, cmd_cpu_t *);
 extern void *cmd_cpu_restore(fmd_hdl_t *, fmd_case_t *, cmd_case_ptr_t *);
@@ -616,6 +633,12 @@ extern void cmd_cpu_gc(fmd_hdl_t *);
 extern void cmd_cpu_fini(fmd_hdl_t *hdl);
 extern char *cmd_cpu_serdnm_create(fmd_hdl_t *, cmd_cpu_t *, const char *);
 extern nvlist_t *cmd_cpu_fmri_create(uint32_t, uint8_t);
+
+extern uint32_t cmd_cpu2core(uint32_t, cmd_cpu_type_t, uint8_t);
+
+#define	CMD_CPU_LEVEL_THREAD		0
+#define	CMD_CPU_LEVEL_CORE		1
+#define	CMD_CPU_LEVEL_CHIP		2
 
 typedef enum {
     CMD_CPU_FAM_UNSUPPORTED,

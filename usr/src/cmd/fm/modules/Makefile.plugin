@@ -57,12 +57,13 @@ LINTFLAGS += -mu
 LINTFILES = $(SRCS:%.c=%.ln)
 
 APIMAP = ../../../fmd/common/fmd_api.map
+FMRIMAP = ../../../fmd/common/fmd_fmri.map
 
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
 CFLAGS += -G $(XREGSFLAG) 
 
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
-LDFLAGS += $(ZTEXT) $(ZCOMBRELOC) $(ZDEFS) $(ZIGNORE) -M$(APIMAP)
+LDFLAGS += $(ZTEXT) $(ZCOMBRELOC) $(ZDEFS) $(ZIGNORE) -M$(APIMAP) -M$(FMRIMAP)
 LDLIBS += -lnvpair -lc
 
 all: $(PROG)

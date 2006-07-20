@@ -221,7 +221,9 @@ cmd_rxefrx_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	int isce = CMD_ERRCL_MATCH(clcode, CMD_ERRCL_RCE | CMD_ERRCL_FRC);
 	int rc;
 	int minorvers = 1;
+	uint8_t level = clcode & CMD_ERRCL_LEVEL_EXTRACT;
 
+	clcode &= CMD_ERRCL_LEVEL_MASK;
 	rferr = fmd_hdl_zalloc(hdl, sizeof (cmd_iorxefrx_t), FMD_SLEEP);
 
 	if (nvlist_lookup_pairs(nvl, 0,
@@ -243,7 +245,8 @@ cmd_rxefrx_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 
 	rferr->rf_type = cmd_mem_name2type(typenm, minorvers);
 
-	if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class)) == NULL) {
+	if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class,
+	    level)) == NULL) {
 		fmd_hdl_free(hdl, rferr, sizeof (cmd_iorxefrx_t));
 		return (CMD_EVD_UNUSED);
 	}

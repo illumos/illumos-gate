@@ -46,7 +46,9 @@
 /*
  * We follow the same algorithm for handling all L1$, TLB, and L2/L3 cache
  * tag events so we can have one common routine into which each handler
- * calls.
+ * calls.  The two tests of (strcmp(serdnm, "") != 0) are used to eliminate
+ * the need for a separate macro for UEs which override SERD engine
+ * counting CEs leading to same fault.
  */
 /*ARGSUSED9*/
 static cmd_evdisp_t
@@ -55,7 +57,6 @@ cmd_cpuerr_common(fmd_hdl_t *hdl, fmd_event_t *ep, cmd_cpu_t *cpu,
     const char *serdn, const char *serdt, const char *fltnm,
     cmd_errcl_t clcode)
 {
-	nvlist_t *flt;
 	const char *uuid;
 
 	if (cc->cc_cp != NULL && fmd_case_solved(hdl, cc->cc_cp))
@@ -64,21 +65,33 @@ cmd_cpuerr_common(fmd_hdl_t *hdl, fmd_event_t *ep, cmd_cpu_t *cpu,
 	if (cc->cc_cp == NULL) {
 		cc->cc_cp = cmd_case_create(hdl, &cpu->cpu_header, pstype,
 		    &uuid);
-		cc->cc_serdnm = cmd_cpu_serdnm_create(hdl, cpu, serdnm);
-
-		fmd_serd_create(hdl, cc->cc_serdnm,
-		    fmd_prop_get_int32(hdl, serdn),
-		    fmd_prop_get_int64(hdl, serdt));
+		if (strcmp(serdnm, "") != 0) {
+			cc->cc_serdnm = cmd_cpu_serdnm_create(hdl, cpu,
+			    serdnm);
+			fmd_serd_create(hdl, cc->cc_serdnm,
+			    fmd_prop_get_int32(hdl, serdn),
+			    fmd_prop_get_int64(hdl, serdt));
+		}
 	}
 
-	fmd_hdl_debug(hdl, "adding event to %s\n", cc->cc_serdnm);
-	if (fmd_serd_record(hdl, cc->cc_serdnm, ep) == FMD_B_FALSE)
-		return (CMD_EVD_OK); /* serd engine hasn't fired yet */
+	if (strcmp(serdnm, "") != 0) {
+		fmd_hdl_debug(hdl, "adding event to %s\n", cc->cc_serdnm);
+		if (fmd_serd_record(hdl, cc->cc_serdnm, ep) == FMD_B_FALSE)
+			return (CMD_EVD_OK); /* serd engine hasn't fired yet */
 
-	fmd_case_add_serd(hdl, cc->cc_cp, cc->cc_serdnm);
+		fmd_case_add_serd(hdl, cc->cc_cp, cc->cc_serdnm);
+	} else {
+		fmd_hdl_debug(hdl,
+		    "destroying existing %s state for class %x\n",
+		    cc->cc_serdnm, clcode);
+		fmd_serd_destroy(hdl, cc->cc_serdnm);
+		fmd_hdl_strfree(hdl, cc->cc_serdnm);
+		cc->cc_serdnm = NULL;
+		fmd_case_reset(hdl, cc->cc_cp);
+		fmd_case_add_ereport(hdl, cc->cc_cp, ep);
+	}
 
-	flt = cmd_cpu_create_fault(hdl, cpu, fltnm, NULL, 100);
-	fmd_case_add_suspect(hdl, cc->cc_cp, flt);
+	cmd_cpu_create_faultlist(hdl, cc->cc_cp, cpu, fltnm, NULL, 100);
 
 	fmd_case_solve(hdl, cc->cc_cp);
 
@@ -90,10 +103,12 @@ cmd_evdisp_t								\
 cmd_##name(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,		\
     const char *class, cmd_errcl_t clcode)				\
 {									\
+	uint8_t level = clcode & CMD_ERRCL_LEVEL_EXTRACT;		\
 	cmd_cpu_t *cpu;							\
 									\
-	if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class)) ==	\
-	    NULL || cpu->cpu_faulting)					\
+	clcode &= CMD_ERRCL_LEVEL_MASK;					\
+	if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class,	\
+	    level)) == NULL || cpu->cpu_faulting)			\
 		return (CMD_EVD_UNUSED);				\
 									\
 	return (cmd_cpuerr_common(hdl, ep, cpu, &cpu->cpu_##casenm,	\
@@ -111,58 +126,11 @@ CMD_CPU_SIMPLEHANDLER(irc, ireg, CMD_PTR_CPU_IREG, "ireg", "ireg")
 CMD_CPU_SIMPLEHANDLER(frc, freg, CMD_PTR_CPU_FREG, "freg", "freg")
 CMD_CPU_SIMPLEHANDLER(mau, mau, CMD_PTR_CPU_MAU, "mau", "mau")
 
-/*
- * The following macro handles UE errors for CPUs.
- * The UE may or may not share a fault with one or more
- * CEs, but this doesn't matter.  We look for existence of a
- * SERD engine, blow it away if it exists, and close the case
- * as solved.
- */
+CMD_CPU_SIMPLEHANDLER(fpu, fpu, CMD_PTR_CPU_FPU, "", "fpu")
+CMD_CPU_SIMPLEHANDLER(l2ctl, l2ctl, CMD_PTR_CPU_L2CTL, "", "l2ctl")
+CMD_CPU_SIMPLEHANDLER(iru, ireg, CMD_PTR_CPU_IREG, "", "ireg")
+CMD_CPU_SIMPLEHANDLER(fru, freg, CMD_PTR_CPU_FREG, "", "freg")
 
-#define	CMD_CPU_UEHANDLER(name, casenm, ptr, fltname)			\
-cmd_evdisp_t								\
-cmd_##name(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,		\
-    const char *class, cmd_errcl_t clcode)				\
-{									\
-	const char *uuid;						\
-	cmd_cpu_t *cpu;							\
-	nvlist_t *flt;							\
-	cmd_case_t *cc;							\
-									\
-	if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class)) ==	\
-	    NULL || cpu->cpu_faulting)					\
-		return (CMD_EVD_UNUSED);				\
-									\
-	cc = &cpu->cpu_##casenm;					\
-	if (cc->cc_cp != NULL && fmd_case_solved(hdl, cc->cc_cp))	\
-		return (CMD_EVD_REDUND);				\
-									\
-	if (cc->cc_cp == NULL) {					\
-		cc->cc_cp = cmd_case_create(hdl, &cpu->cpu_header,	\
-		    ptr, &uuid);					\
-	}								\
-									\
-	if (cc->cc_serdnm != NULL) {					\
-		fmd_hdl_debug(hdl,					\
-		    "destroying existing %s state for class %x\n",	\
-		    cc->cc_serdnm, clcode);				\
-		fmd_serd_destroy(hdl, cc->cc_serdnm);			\
-		fmd_hdl_strfree(hdl, cc->cc_serdnm);			\
-		cc->cc_serdnm = NULL;					\
-		fmd_case_reset(hdl, cc->cc_cp);				\
-	}								\
-									\
-	fmd_case_add_ereport(hdl, cc->cc_cp, ep);			\
-	flt = cmd_cpu_create_fault(hdl, cpu, fltname, NULL, 100);	\
-	fmd_case_add_suspect(hdl, cc->cc_cp, flt);			\
-	fmd_case_solve(hdl, cc->cc_cp);					\
-	return (CMD_EVD_OK);						\
-}
-
-CMD_CPU_UEHANDLER(fpu, fpu, CMD_PTR_CPU_FPU, "fpu")
-CMD_CPU_UEHANDLER(l2ctl, l2ctl, CMD_PTR_CPU_L2CTL, "l2ctl")
-CMD_CPU_UEHANDLER(iru, ireg, CMD_PTR_CPU_IREG, "ireg")
-CMD_CPU_UEHANDLER(fru, freg, CMD_PTR_CPU_FREG, "freg")
 
 #ifdef sun4u
 /*
@@ -197,12 +165,13 @@ cmd_##name(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,		\
 		    FM_EREPORT_PAYLOAD_NAME_RESOURCE, &rsrc) != 0)	\
 			return (CMD_EVD_BAD);				\
 									\
-		if ((cpu = cmd_cpu_lookup(hdl, rsrc,			\
-		    CPU_EREPORT_STRING)) == NULL || cpu->cpu_faulting)	\
+		if ((cpu = cmd_cpu_lookup(hdl, rsrc, CPU_EREPORT_STRING,\
+		    CMD_CPU_LEVEL_THREAD)) == NULL ||			\
+		    cpu->cpu_faulting)					\
 			return (CMD_EVD_UNUSED);			\
 	} else {							\
-		if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl,	\
-		    class)) == NULL || cpu->cpu_faulting)		\
+		if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class,\
+		    CMD_CPU_LEVEL_THREAD)) == NULL || cpu->cpu_faulting)\
 			return (CMD_EVD_UNUSED);			\
 									\
 		(void) nvlist_lookup_nvlist(nvl,			\
@@ -273,7 +242,6 @@ cmd_xxu_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 	cmd_case_t *cc = isl3 ? &cpu->cpu_l3data : &cpu->cpu_l2data;
 	const char *uuid;
 	nvlist_t *rsrc = NULL;
-	nvlist_t *flt;
 
 	if (cpu->cpu_faulting) {
 		CMD_STAT_BUMP(xxu_retr_flt);
@@ -328,8 +296,8 @@ cmd_xxu_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 	}
 
 	fmd_case_add_ereport(hdl, cc->cc_cp, ep);
-	flt = cmd_cpu_create_fault(hdl, cpu, ed->ed_fltnm, rsrc, 100);
-	fmd_case_add_suspect(hdl, cc->cc_cp, flt);
+
+	cmd_cpu_create_faultlist(hdl, cc->cc_cp, cpu, ed->ed_fltnm, rsrc, 100);
 	fmd_case_solve(hdl, cc->cc_cp);
 }
 
@@ -342,7 +310,6 @@ cmd_xxc_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 	cmd_case_t *cc = isl3 ? &cpu->cpu_l3data : &cpu->cpu_l2data;
 	const char *uuid;
 	nvlist_t *rsrc = NULL;
-	nvlist_t *flt;
 
 	if (cpu->cpu_faulting || (cc->cc_cp != NULL &&
 	    fmd_case_solved(hdl, cc->cc_cp)))
@@ -370,8 +337,7 @@ cmd_xxc_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 	}
 
 	fmd_case_add_serd(hdl, cc->cc_cp, cc->cc_serdnm);
-	flt = cmd_cpu_create_fault(hdl, cpu, ed->ed_fltnm, rsrc, 100);
-	fmd_case_add_suspect(hdl, cc->cc_cp, flt);
+	cmd_cpu_create_faultlist(hdl, cc->cc_cp, cpu, ed->ed_fltnm, rsrc, 100);
 	fmd_case_solve(hdl, cc->cc_cp);
 }
 
@@ -448,9 +414,12 @@ cmd_xxcu_initial(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	cmd_cpu_t *cpu;
 	cmd_xr_t *xr;
 	uint64_t ena;
+	uint8_t level = clcode & CMD_ERRCL_LEVEL_EXTRACT;
 
-	if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class)) == NULL ||
-	    cpu->cpu_faulting)
+	clcode &= CMD_ERRCL_LEVEL_MASK; /* keep level bits out of train masks */
+
+	if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class,
+	    level)) == NULL || cpu->cpu_faulting)
 		return (CMD_EVD_UNUSED);
 
 	cc = CMD_ERRCL_ISL2XXCU(clcode) ? &cpu->cpu_l2data : &cpu->cpu_l3data;

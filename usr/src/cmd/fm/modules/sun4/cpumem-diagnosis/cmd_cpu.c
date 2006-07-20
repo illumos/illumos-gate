@@ -70,7 +70,8 @@ static const char *const cpu_names[] = {
 	"ultraSPARC-IVplus",
 	"ultraSPARC-IIIiplus",
 	"ultraSPARC-T1",
-	"SPARC64-VI"
+	"SPARC64-VI",
+	"ultraSPARC-T2"
 };
 
 /*
@@ -83,7 +84,9 @@ static const faminfo_t fam_info_tbl[] = {
 	{ CMD_CPU_FAM_SPARC64,		B_FALSE }
 };
 
-static cmd_cpu_t *cpu_lookup_by_cpuid(uint32_t);
+static cmd_cpu_t *cpu_lookup_by_cpuid(uint32_t, uint8_t);
+static cmd_cpu_t *cpu_create(fmd_hdl_t *, nvlist_t *, uint32_t,
+    uint8_t, cmd_cpu_type_t);
 static void cpu_buf_write(fmd_hdl_t *, cmd_cpu_t *);
 
 static const char *
@@ -109,6 +112,116 @@ cpu_nname2type(fmd_hdl_t *hdl, const char *name, size_t n)
 	fmd_hdl_abort(hdl, "illegal CPU name %*.*s\n", n, n, name);
 	/*NOTREACHED*/
 	return (0);
+}
+
+const char *fmd_fmri_get_platform();
+#define	is_starcat	(strcmp(fmd_fmri_get_platform(), \
+"SUNW,Sun-Fire-15000") == 0)
+#define	is_serengeti	(strcmp(fmd_fmri_get_platform(), \
+"SUNW,Sun-Fire") == 0)
+
+static void
+core2cpus(uint32_t core, cmd_cpu_type_t type, uint8_t level,
+    uint32_t *cpuinit, uint32_t *cpufinal, uint32_t *cpustep)
+{
+	switch (type) {
+#ifdef sun4u
+
+#define	US4P_SCAT_CPUS_PER_CORE		2
+#define	US4P_SCAT_CPU_CORE_STEP		4
+#define	US4P_SGTI_CPUS_PER_CORE		2
+#define	US4P_SGTI_CPU_CORE_STEP		512
+#define	US4P_DAKC_CPUS_PER_CORE		2
+#define	US4P_DAKC_CPU_CORE_STEP		16
+
+	case CPU_ULTRASPARC_IVplus:
+		switch (level) {
+		case CMD_CPU_LEVEL_CORE:
+			if (is_starcat)
+				*cpustep = US4P_SCAT_CPU_CORE_STEP;
+			else if (is_serengeti)
+				*cpustep = US4P_SGTI_CPU_CORE_STEP;
+			else
+				*cpustep = US4P_DAKC_CPU_CORE_STEP;
+			*cpuinit = core;
+			*cpufinal = *cpuinit + *cpustep;
+			return;
+		default:
+			*cpuinit = *cpufinal = core;
+			*cpustep = 1;
+			return;
+		}
+#else /* i.e. sun4v */
+
+#define	UST1_CPUS_PER_CORE		4
+#define	UST1_CPU_CORE_STEP		1
+#define	UST1_CPUS_PER_CHIP		32
+#define	UST1_CPU_CHIP_STEP		1
+
+	case CPU_ULTRASPARC_T1:
+		switch (level) {
+		case CMD_CPU_LEVEL_CORE:
+			*cpuinit = core * UST1_CPUS_PER_CORE;
+			*cpufinal = *cpuinit + UST1_CPUS_PER_CORE - 1;
+			*cpustep = UST1_CPU_CORE_STEP;
+			return;
+		case CMD_CPU_LEVEL_CHIP:
+			*cpuinit = core * UST1_CPUS_PER_CHIP;
+			*cpufinal = *cpuinit + UST1_CPUS_PER_CHIP - 1;
+			*cpustep = UST1_CPU_CHIP_STEP;
+			return;
+		default:
+			*cpuinit = *cpufinal = core;
+			*cpustep = 1;
+			return;
+		}
+	/* core2cpus CPU_ULTRASPARC_T2 */
+#endif /* sun4u */
+	default:
+		*cpuinit = *cpufinal = core;
+		*cpustep = 1;
+		return;
+	}
+}
+
+uint32_t
+cmd_cpu2core(uint32_t cpuid, cmd_cpu_type_t type, uint8_t level) {
+
+	switch (type) {
+#ifdef sun4u
+
+#define	US4P_SCAT_CORE_SYSBD_STEP	32
+
+	case CPU_ULTRASPARC_IVplus:
+		switch (level) {
+		case CMD_CPU_LEVEL_CORE:
+			if (is_starcat)
+				return ((cpuid /
+				    US4P_SCAT_CORE_SYSBD_STEP) *
+				    US4P_SCAT_CORE_SYSBD_STEP +
+				    (cpuid % US4P_SCAT_CPU_CORE_STEP));
+			else if (is_serengeti)
+				return (cpuid % US4P_SGTI_CPU_CORE_STEP);
+			else
+				return (cpuid % US4P_DAKC_CPU_CORE_STEP);
+		default:
+			return (cpuid);
+		}
+#else /* i.e. sun4v */
+	case CPU_ULTRASPARC_T1:
+		switch (level) {
+		case CMD_CPU_LEVEL_CORE:
+			return (cpuid/UST1_CPUS_PER_CORE);
+		case CMD_CPU_LEVEL_CHIP:
+			return (cpuid/UST1_CPUS_PER_CHIP);
+		default:
+			return (cpuid);
+		}
+	/* cmd_cpu2core CPU_ULTRASPARC_T2 */
+#endif /* sun4u */
+	default:
+		return (cpuid);
+	}
 }
 
 #ifdef sun4u
@@ -627,19 +740,44 @@ cmd_trw_restore(fmd_hdl_t *hdl)
 char *
 cmd_cpu_serdnm_create(fmd_hdl_t *hdl, cmd_cpu_t *cpu, const char *serdbase)
 {
-	const char *fmt = "cpu_%d_%s_serd";
-	size_t sz = snprintf(NULL, 0, fmt, cpu->cpu_cpuid, serdbase) + 1;
-	char *nm = fmd_hdl_alloc(hdl, sz, FMD_SLEEP);
-	(void) snprintf(nm, sz, fmt, cpu->cpu_cpuid, serdbase);
+	char *nm;
+	const char *fmt;
+	size_t sz;
+	if (cpu->cpu_level == CMD_CPU_LEVEL_THREAD) {
+		fmt = "cpu_%d_%s_serd";
+		sz = snprintf(NULL, 0, fmt, cpu->cpu_cpuid, serdbase) + 1;
+		nm = fmd_hdl_alloc(hdl, sz, FMD_SLEEP);
+		(void) snprintf(nm, sz, fmt, cpu->cpu_cpuid, serdbase);
+	} else {
+		fmt = "cpu_%d_%d_%s_serd";
+		sz = snprintf(NULL, 0, fmt, cpu->cpu_cpuid, cpu->cpu_level,
+		    serdbase) + 1;
+		nm = fmd_hdl_alloc(hdl, sz, FMD_SLEEP);
+		(void) snprintf(nm, sz, fmt, cpu->cpu_cpuid, cpu->cpu_level,
+		    serdbase);
+	}
 
 	return (nm);
 }
 
-nvlist_t *
-cmd_cpu_create_fault(fmd_hdl_t *hdl, cmd_cpu_t *cpu, const char *type,
-    nvlist_t *rsrc, uint_t cert)
+/*
+ * cmd_cpu_create_faultlist is a combination of the former cmd_cpu_create_fault
+ * and fmd_case_add_suspect.  If a 'cpu' structure represents a set of threads
+ * (level > CMD_CPU_LEVEL_THREAD), then we must add multiple faults to
+ * this case, under loop control.  Use call to cmd_cpu_create_faultlist to
+ * replace the sequence
+ *
+ *	flt = cmd_cpu_create_fault(...);
+ *	fmd_case_add_suspect(hdl, cc->cp, flt);
+ */
+
+void
+cmd_cpu_create_faultlist(fmd_hdl_t *hdl, fmd_case_t *casep, cmd_cpu_t *cpu,
+    const char *type, nvlist_t *rsrc, uint_t cert)
 {
 	char fltnm[64];
+	uint32_t cpuinit, cpufinal, cpustep, i;
+	nvlist_t *flt;
 
 	(void) snprintf(fltnm, sizeof (fltnm), "fault.cpu.%s.%s",
 	    cpu_type2name(hdl, cpu->cpu_type), type);
@@ -647,8 +785,40 @@ cmd_cpu_create_fault(fmd_hdl_t *hdl, cmd_cpu_t *cpu, const char *type,
 	cpu->cpu_faulting = FMD_B_TRUE;
 	cpu_buf_write(hdl, cpu);
 
-	return (fmd_nvl_create_fault(hdl, fltnm, cert, cpu->cpu_asru_nvl,
-	    cpu->cpu_fru_nvl, rsrc));
+	if (cpu->cpu_level > CMD_CPU_LEVEL_THREAD) {
+		core2cpus(cpu->cpu_cpuid, cpu->cpu_type, cpu->cpu_level,
+		    &cpuinit, &cpufinal, &cpustep);
+		for (i = cpuinit; i <= cpufinal; i += cpustep) {
+			cmd_cpu_t *cpui = cpu_lookup_by_cpuid(i,
+			    CMD_CPU_LEVEL_THREAD);
+			if (cpui == NULL) {
+				nvlist_t *asru;
+				if (nvlist_dup(cpu->cpu_asru_nvl,
+				    &asru, 0) != 0) {
+					fmd_hdl_abort(hdl, "unable to alloc"
+					    "ASRU for thread in core\n");
+				}
+				(void) nvlist_remove_all(asru,
+				    FM_FMRI_CPU_ID);
+				if (nvlist_add_uint32(asru,
+				    FM_FMRI_CPU_ID, i) != 0) {
+					fmd_hdl_abort(hdl,
+					    "unable to create thread struct\n");
+				}
+				cpui = cpu_create(hdl, asru, i,
+				    CMD_CPU_LEVEL_THREAD, cpu->cpu_type);
+			}
+			cpui->cpu_faulting = FMD_B_TRUE;
+			cpu_buf_write(hdl, cpui);
+			flt = fmd_nvl_create_fault(hdl, fltnm, cert,
+			    cpui->cpu_asru_nvl, cpu->cpu_fru_nvl, rsrc);
+			fmd_case_add_suspect(hdl, casep, flt);
+		}
+	} else {
+		flt = fmd_nvl_create_fault(hdl, fltnm, cert,
+		    cpu->cpu_asru_nvl, cpu->cpu_fru_nvl, rsrc);
+		fmd_case_add_suspect(hdl, casep, flt);
+	}
 }
 
 static void
@@ -692,13 +862,14 @@ cmd_cpu_destroy(fmd_hdl_t *hdl, cmd_cpu_t *cpu)
 }
 
 static cmd_cpu_t *
-cpu_lookup_by_cpuid(uint32_t cpuid)
+cpu_lookup_by_cpuid(uint32_t cpuid, uint8_t level)
 {
 	cmd_cpu_t *cpu;
 
 	for (cpu = cmd_list_next(&cmd.cmd_cpus); cpu != NULL;
 	    cpu = cmd_list_next(cpu)) {
-		if (cpu->cpu_cpuid == cpuid)
+		if ((cpu->cpu_cpuid == cpuid) &&
+		    (cpu->cpu_level == level))
 			return (cpu);
 	}
 
@@ -786,8 +957,9 @@ cpu_getfru(fmd_hdl_t *hdl, uint32_t cpuid)
 	nvlist_t *nvlp;
 
 	if ((frustr = cpu_getfrustr(hdl, cpuid)) == NULL) {
-		fmd_hdl_abort(hdl, "failed to retrieve FRU string for CPU %d",
+		fmd_hdl_error(hdl, "failed to retrieve FRU string for CPU %d",
 		    cpuid);
+		return (NULL);
 	}
 	nvlp = cpu_mkfru(frustr);
 	fmd_hdl_strfree(hdl, frustr);
@@ -798,10 +970,10 @@ static void
 cpu_buf_write(fmd_hdl_t *hdl, cmd_cpu_t *cpu)
 {
 	if (fmd_buf_size(hdl, NULL, cpu->cpu_bufname) !=
-	    sizeof (cmd_cpu_pers_t))
-		fmd_buf_destroy(hdl, NULL, cpu->cpu_bufname);
+		    sizeof (cmd_cpu_pers_t))
+			fmd_buf_destroy(hdl, NULL, cpu->cpu_bufname);
 
-	fmd_buf_write(hdl, NULL, cpu->cpu_bufname, &cpu->cpu_pers,
+		fmd_buf_write(hdl, NULL, cpu->cpu_bufname, &cpu->cpu_pers,
 	    sizeof (cmd_cpu_pers_t));
 }
 
@@ -841,7 +1013,8 @@ cpu_buf_create(fmd_hdl_t *hdl, cmd_cpu_t *cpu)
 }
 
 static cmd_cpu_t *
-cpu_create(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t cpuid, cmd_cpu_type_t type)
+cpu_create(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t cpuid, uint8_t level,
+    cmd_cpu_type_t type)
 {
 	cmd_cpu_t *cpu;
 	nvlist_t *fru;
@@ -857,11 +1030,17 @@ cpu_create(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t cpuid, cmd_cpu_type_t type)
 	cpu = fmd_hdl_zalloc(hdl, sizeof (cmd_cpu_t), FMD_SLEEP);
 	cpu->cpu_nodetype = CMD_NT_CPU;
 	cpu->cpu_cpuid = cpuid;
+	cpu->cpu_level = level;
 	cpu->cpu_type = type;
 	cpu->cpu_version = CMD_CPU_VERSION;
 
-	cmd_bufname(cpu->cpu_bufname, sizeof (cpu->cpu_bufname),
-	    "cpu_%d", cpu->cpu_cpuid);
+	if (cpu->cpu_level > CMD_CPU_LEVEL_THREAD) {
+		cmd_bufname(cpu->cpu_bufname, sizeof (cpu->cpu_bufname),
+		    "cpu_%d", cpu->cpu_cpuid);
+	} else {
+		cmd_bufname(cpu->cpu_bufname, sizeof (cpu->cpu_bufname),
+		    "cpu_%d_%d", cpu->cpu_cpuid, cpu->cpu_level);
+	}
 
 #ifdef sun4u
 	cpu_uec_create(hdl, cpu, &cpu->cpu_uec, "cpu_uec_%d", cpu->cpu_cpuid);
@@ -914,6 +1093,48 @@ cpu_create(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t cpuid, cmd_cpu_type_t type)
 	return (cpu);
 }
 
+/*
+ * As its name implies, 'cpu_all_threads_invalid' determines if all cpu
+ * threads (level 0) contained within the cpu structure are invalid.
+ * This is done by checking all the (level 0) threads which may be
+ * contained within this chip, core, or thread; if all are invalid, return
+ * FMD_B_TRUE; if any are valid, return FMD_B_FALSE.
+ */
+
+int
+cpu_all_threads_invalid(fmd_hdl_t *hdl, cmd_cpu_t *cpu)
+{
+	nvlist_t *asru;
+	uint32_t cpuinit, cpufinal, cpustep, i;
+
+	core2cpus(cpu->cpu_cpuid, cpu->cpu_type, cpu->cpu_level,
+	    &cpuinit, &cpufinal, &cpustep);
+
+	if (cpuinit == cpufinal) {
+		if (fmd_nvl_fmri_present(hdl, cpu->cpu_asru_nvl) &&
+		    !fmd_nvl_fmri_unusable(hdl, cpu->cpu_asru_nvl))
+			return (FMD_B_FALSE);
+		else return (FMD_B_TRUE);
+	} else {
+
+		if (nvlist_dup(cpu->cpu_asru_nvl, &asru, 0) != 0)
+			fmd_hdl_abort(hdl, "cannot copy asru\n");
+		for (i = cpuinit; i <= cpufinal; i += cpustep) {
+			(void) nvlist_remove_all(asru, FM_FMRI_CPU_ID);
+			if (nvlist_add_uint32(asru, FM_FMRI_CPU_ID, i) != 0) {
+				fmd_hdl_abort(hdl, "cpu_all_threads_invalid: ",
+				    "cannot add thread %d to asru\n", i);
+			}
+			if (fmd_nvl_fmri_present(hdl, asru) &&
+			    !fmd_nvl_fmri_unusable(hdl, asru)) {
+				nvlist_free(asru);
+				return (FMD_B_FALSE);
+			}
+		}
+	}
+	nvlist_free(asru);
+	return (FMD_B_TRUE);
+}
 
 /*
  * Locate the state structure for this CPU, creating a new one if one doesn't
@@ -924,12 +1145,14 @@ cpu_create(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t cpuid, cmd_cpu_type_t type)
  * serial IDs from the three entities.
  */
 cmd_cpu_t *
-cmd_cpu_lookup(fmd_hdl_t *hdl, nvlist_t *asru, const char *class)
+cmd_cpu_lookup(fmd_hdl_t *hdl, nvlist_t *asru, const char *class,
+    uint8_t level)
 {
 	cmd_cpu_t *cpu;
 	uint8_t vers;
-	const char *scheme;
+	const char *scheme, *cpuname;
 	uint32_t cpuid;
+	cmd_cpu_type_t ct;
 
 	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {
 		CMD_STAT_BUMP(bad_cpu_asru);
@@ -947,10 +1170,19 @@ cmd_cpu_lookup(fmd_hdl_t *hdl, nvlist_t *asru, const char *class)
 		return (NULL);
 	}
 
-	cpu = cpu_lookup_by_cpuid(cpuid);
+	/*
+	 * 'cpuid' at this point refers to a thread, because it
+	 * was extracted from a detector FMRI
+	 */
 
-	if (cpu != NULL && (!fmd_nvl_fmri_present(hdl, cpu->cpu_asru_nvl) ||
-	    fmd_nvl_fmri_unusable(hdl, cpu->cpu_asru_nvl))) {
+	cpuname = class + sizeof ("ereport.cpu");
+	ct = cpu_nname2type(hdl, cpuname,
+	    (size_t)(strchr(cpuname, '.') - cpuname));
+
+	cpu = cpu_lookup_by_cpuid(cmd_cpu2core(cpuid, ct, level), level);
+
+	if (cpu != NULL &&
+	    cpu_all_threads_invalid(hdl, cpu) == FMD_B_TRUE) {
 		fmd_hdl_debug(hdl, "cpu_lookup: discarding old state\n");
 		cmd_cpu_destroy(hdl, cpu);
 		cpu = NULL;
@@ -967,27 +1199,26 @@ cmd_cpu_lookup(fmd_hdl_t *hdl, nvlist_t *asru, const char *class)
 	}
 
 	if (cpu == NULL) {
-		const char *cpuname = class + sizeof ("ereport.cpu");
-
-		cpu = cpu_create(hdl, asru, cpuid, cpu_nname2type(hdl, cpuname,
-		    (size_t)(strchr(cpuname, '.') - cpuname)));
+		cpu = cpu_create(hdl, asru,
+		    cmd_cpu2core(cpuid, ct, level), level, ct);
 	}
 
 	return (cpu);
 }
 
 cmd_cpu_t *
-cmd_cpu_lookup_from_detector(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
+cmd_cpu_lookup_from_detector(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class,
+    uint8_t level)
 {
 	nvlist_t *det;
 
 	(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &det);
 
-	return (cmd_cpu_lookup(hdl, det, class));
+	return (cmd_cpu_lookup(hdl, det, class, level));
 }
 
 static cmd_cpu_t *
-cpu_v0tov2(fmd_hdl_t *hdl, cmd_cpu_0_t *old, size_t oldsz)
+cpu_v0tov3(fmd_hdl_t *hdl, cmd_cpu_0_t *old, size_t oldsz)
 {
 	cmd_cpu_t *new;
 
@@ -1002,6 +1233,7 @@ cpu_v0tov2(fmd_hdl_t *hdl, cmd_cpu_0_t *old, size_t oldsz)
 	new->cpu_cpuid = old->cpu0_cpuid;
 	new->cpu_type = old->cpu0_type;
 	new->cpu_faulting = old->cpu0_faulting;
+	new->cpu_level = CMD_CPU_LEVEL_THREAD;
 	new->cpu_asru = old->cpu0_asru;
 	new->cpu_fru = old->cpu0_fru;
 	new->cpu_uec = old->cpu0_uec;
@@ -1012,7 +1244,7 @@ cpu_v0tov2(fmd_hdl_t *hdl, cmd_cpu_0_t *old, size_t oldsz)
 }
 
 static cmd_cpu_t *
-cpu_v1tov2(fmd_hdl_t *hdl, cmd_cpu_1_t *old, size_t oldsz)
+cpu_v1tov3(fmd_hdl_t *hdl, cmd_cpu_1_t *old, size_t oldsz)
 {
 	cmd_cpu_t *new;
 
@@ -1027,6 +1259,7 @@ cpu_v1tov2(fmd_hdl_t *hdl, cmd_cpu_1_t *old, size_t oldsz)
 	new->cpu_cpuid = old->cpu1_cpuid;
 	new->cpu_type = old->cpu1_type;
 	new->cpu_faulting = old->cpu1_faulting;
+	new->cpu_level = CMD_CPU_LEVEL_THREAD;
 	new->cpu_asru = old->cpu1_asru;
 	new->cpu_fru = old->cpu1_fru;
 	new->cpu_uec = old->cpu1_uec;
@@ -1037,13 +1270,39 @@ cpu_v1tov2(fmd_hdl_t *hdl, cmd_cpu_1_t *old, size_t oldsz)
 }
 
 static cmd_cpu_t *
-cpu_wrapv2(fmd_hdl_t *hdl, cmd_cpu_pers_t *pers, size_t psz)
+cpu_v2tov3(fmd_hdl_t *hdl, cmd_cpu_2_t *old, size_t oldsz)
+{
+	cmd_cpu_t *new;
+
+	if (oldsz != sizeof (cmd_cpu_2_t)) {
+		fmd_hdl_abort(hdl, "size of state doesn't match size of "
+		    "version 2 state (%u bytes).\n", sizeof (cmd_cpu_2_t));
+	}
+
+	new = fmd_hdl_zalloc(hdl, sizeof (cmd_cpu_t), FMD_SLEEP);
+
+	new->cpu_header = old->cpu2_header;
+	new->cpu_cpuid = old->cpu2_cpuid;
+	new->cpu_type = old->cpu2_type;
+	new->cpu_faulting = old->cpu2_faulting;
+	new->cpu_asru = old->cpu2_asru;
+	new->cpu_fru = old->cpu2_fru;
+	new->cpu_uec = old->cpu2_uec;
+	new->cpu_olduec = old->cpu2_olduec;
+	new->cpu_version = CMD_CPU_VERSION;
+	new->cpu_level = CMD_CPU_LEVEL_THREAD;
+	fmd_hdl_free(hdl, old, oldsz);
+	return (new);
+}
+
+static cmd_cpu_t *
+cpu_wrapv3(fmd_hdl_t *hdl, cmd_cpu_pers_t *pers, size_t psz)
 {
 	cmd_cpu_t *cpu;
 
 	if (psz != sizeof (cmd_cpu_pers_t)) {
 		fmd_hdl_abort(hdl, "size of state doesn't match size of "
-		    "version 0 state (%u bytes).\n", sizeof (cmd_cpu_pers_t));
+		    "version 3 state (%u bytes).\n", sizeof (cmd_cpu_pers_t));
 	}
 
 	cpu = fmd_hdl_zalloc(hdl, sizeof (cmd_cpu_t), FMD_SLEEP);
@@ -1099,12 +1358,17 @@ cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 		if (CMD_CPU_VERSIONED(cpu)) {
 			switch (cpu->cpu_version) {
 			case CMD_CPU_VERSION_1:
-				cpu = cpu_v1tov2(hdl, (cmd_cpu_1_t *)cpu,
+				cpu = cpu_v1tov3(hdl, (cmd_cpu_1_t *)cpu,
 				    cpusz);
 				migrated = 1;
 				break;
 			case CMD_CPU_VERSION_2:
-				cpu = cpu_wrapv2(hdl, (cmd_cpu_pers_t *)cpu,
+				cpu = cpu_v2tov3(hdl, (cmd_cpu_2_t *)cpu,
+				    cpusz);
+				migrated = 1;
+				break;
+			case CMD_CPU_VERSION_3:
+				cpu = cpu_wrapv3(hdl, (cmd_cpu_pers_t *)cpu,
 				    cpusz);
 				break;
 			default:
@@ -1114,7 +1378,7 @@ cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 				break;
 			}
 		} else {
-			cpu = cpu_v0tov2(hdl, (cmd_cpu_0_t *)cpu, cpusz);
+			cpu = cpu_v0tov3(hdl, (cmd_cpu_0_t *)cpu, cpusz);
 			migrated = 1;
 		}
 
@@ -1207,8 +1471,7 @@ cmd_cpu_validate(fmd_hdl_t *hdl)
 
 	for (cpu = cmd_list_next(&cmd.cmd_cpus); cpu != NULL;
 	    cpu = cmd_list_next(cpu)) {
-		if (!fmd_nvl_fmri_present(hdl, cpu->cpu_asru_nvl) ||
-		    fmd_nvl_fmri_unusable(hdl, cpu->cpu_asru_nvl))
+		if (cpu_all_threads_invalid(hdl, cpu) == FMD_B_TRUE)
 			cpu->cpu_flags |= CMD_CPU_F_DELETING;
 	}
 
@@ -1281,8 +1544,7 @@ cpu_gc_keep_one(fmd_hdl_t *hdl, cmd_cpu_t *cpu)
 {
 	int i;
 
-	if (!fmd_nvl_fmri_present(hdl, cpu->cpu_asru_nvl) ||
-	    fmd_nvl_fmri_unusable(hdl, cpu->cpu_asru_nvl)) {
+	if (cpu_all_threads_invalid(hdl, cpu) == FMD_B_TRUE) {
 		fmd_hdl_debug(hdl, "GC of CPU %d: no longer working\n",
 		    cpu->cpu_cpuid);
 		return (0);

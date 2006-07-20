@@ -131,7 +131,7 @@ cmd_opl_ue_cpu(fmd_hdl_t *hdl, fmd_event_t *ep,
 {
 	const char *uuid;
 	cmd_cpu_t *main_cpu, *sib_cpu;
-	nvlist_t *flt, *fmri;
+	nvlist_t *fmri;
 	cmd_list_t *cpu_list;
 	opl_cpu_t *opl_cpu;
 	uint32_t main_cpuid, nsusp = 1;
@@ -169,7 +169,7 @@ cmd_opl_ue_cpu(fmd_hdl_t *hdl, fmd_event_t *ep,
 			}
 
 			sib_cpu = cmd_cpu_lookup(hdl, fmri,
-			    CPU_EREPORT_STRING);
+			    CPU_EREPORT_STRING, CMD_CPU_LEVEL_THREAD);
 			if (sib_cpu == NULL || sib_cpu->cpu_faulting) {
 				if (fmri != NULL)
 					nvlist_free(fmri);
@@ -221,10 +221,9 @@ cmd_opl_ue_cpu(fmd_hdl_t *hdl, fmd_event_t *ep,
 				    opl_cpu->oc_cpuid);
 				continue;
 			}
-			flt = cmd_cpu_create_fault(hdl,
+			cmd_cpu_create_faultlist(hdl, cc->cc_cp,
 			    opl_cpu->oc_cmd_cpu, fltname, cpu_rsrc, cert);
 			nvlist_free(cpu_rsrc);
-			fmd_case_add_suspect(hdl, cc->cc_cp, flt);
 		}
 	}
 	fmd_case_solve(hdl, cc->cc_cp);

@@ -325,7 +325,8 @@ cmd_ue_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	cmd_bank_t *bank;
 	cmd_cpu_t *cpu;
 
-	cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class);
+	cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class,
+	    CMD_CPU_LEVEL_THREAD);
 
 	if (cpu == NULL) {
 		fmd_hdl_debug(hdl, "cmd_ue_common: cpu not found\n");
