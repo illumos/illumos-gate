@@ -68,6 +68,7 @@
 #include <sys/modhash.h>
 #include <sys/disp.h>
 #include <sys/autoconf.h>
+#include <sys/sysmacros.h>
 
 #ifdef	DEBUG
 #include <sys/debug.h>
@@ -8158,7 +8159,7 @@ mdi_realloc(void *old_ptr, size_t old_size, size_t new_size)
 
 	new_ptr = kmem_zalloc(new_size, KM_SLEEP);
 	if (old_ptr) {
-		bcopy(old_ptr, new_ptr, old_size);
+		bcopy(old_ptr, new_ptr, MIN(old_size, new_size));
 		kmem_free(old_ptr, old_size);
 	}
 	return (new_ptr);
@@ -8764,4 +8765,39 @@ error:
 alloc_failed:
 	MDI_DEBUG(1, (CE_WARN, dip,
 	    "!i_mdi_log_sysevent: Unable to send sysevent"));
+}
+
+char **
+mdi_get_phci_driver_list(char *vhci_class, int	*ndrivers)
+{
+	char	**driver_list, **ret_driver_list = NULL;
+	int	*root_support_list;
+	int	cur_elements, max_elements;
+
+	get_phci_driver_list(vhci_class, &driver_list, &root_support_list,
+	    &cur_elements, &max_elements);
+
+
+	if (driver_list) {
+		kmem_free(root_support_list, sizeof (int) * max_elements);
+		ret_driver_list = mdi_realloc(driver_list, sizeof (char *)
+		    * max_elements, sizeof (char *) * cur_elements);
+	}
+	*ndrivers = cur_elements;
+
+	return (ret_driver_list);
+
+}
+
+void
+mdi_free_phci_driver_list(char **driver_list, int ndrivers)
+{
+	char	**p;
+	int	i;
+
+	if (driver_list) {
+		for (i = 0, p = driver_list; i < ndrivers; i++, p++)
+			kmem_free(*p, strlen(*p) + 1);
+		kmem_free(driver_list, sizeof (char *) * ndrivers);
+	}
 }

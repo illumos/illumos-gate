@@ -278,6 +278,12 @@ void mdi_vhci_walk_phcis(dev_info_t *, int (*f)(dev_info_t *, void *),
 void mdi_vhci_walk_clients(dev_info_t *, int (*f)(dev_info_t *, void *),
     void *arg);
 
+/*
+ * MDI PHCI driver list helper functions
+ */
+char **mdi_get_phci_driver_list(char *vhci_class, int	*ndrivers);
+void mdi_free_phci_driver_list(char **driver_list, int ndrivers);
+
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus

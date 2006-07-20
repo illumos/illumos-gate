@@ -170,7 +170,7 @@ static void		ibnex_config_pseudo_all(dev_info_t *);
 static int		ibnex_ioc_bus_config_one(dev_info_t **, uint_t,
 			    ddi_bus_config_op_t, void *, dev_info_t **, int *);
 static int		ibnex_is_merge_node(dev_info_t *);
-static int		ibnex_hw_in_dev_tree(char *);
+static void		ibnex_hw_in_dev_tree(char *);
 
 /*
  * The bus_ops structure defines the capabilities of HCA nexus driver.
@@ -373,11 +373,18 @@ int
 _init(void)
 {
 	int	error;
+	char	**hca_driver_list;
+	int	i, ndrivers;
 
 	if (ibnex_hw_status == IBNEX_DEVTREE_NOT_CHECKED) {
-		ibnex_hw_status = (ibnex_hw_in_dev_tree("tavor")
-		    == DDI_SUCCESS) ? IBNEX_HW_IN_DEVTREE :
-		    IBNEX_HW_NOT_IN_DEVTREE;
+		ibnex_hw_status = IBNEX_HW_NOT_IN_DEVTREE;
+		hca_driver_list = mdi_get_phci_driver_list("ib", &ndrivers);
+		for (i = 0; i < ndrivers; i++) {
+			ibnex_hw_in_dev_tree(hca_driver_list[i]);
+			if (ibnex_hw_status == IBNEX_HW_IN_DEVTREE)
+				break;
+		}
+		mdi_free_phci_driver_list(hca_driver_list, ndrivers);
 	}
 
 	/*
@@ -4152,23 +4159,20 @@ ibnex_is_merge_node(dev_info_t *child)
  * Checks if the dn_head for the driver has already
  * initialized by the prom tree.
  */
-int
+void
 ibnex_hw_in_dev_tree(char *driver_name)
 {
-	struct devnames *dnp;
-	int ret = DDI_FAILURE;
 	major_t	major;
 
+	IBTF_DPRINTF_L4("ibnex", "\thw_in_dev_tree(%s)", driver_name);
+
 	if (devnamesp == NULL)
-		return (ret);
+		return;
 
 	major = ddi_name_to_major(driver_name);
 	if (major == -1)
-		return (ret);
+		return;
 
-	dnp = &devnamesp[major];
-	if (dnp->dn_head)
-		ret = DDI_SUCCESS;
-
-	return (ret);
+	if (devnamesp[major].dn_head != (dev_info_t *)NULL)
+		ibnex_hw_status = IBNEX_HW_IN_DEVTREE;
 }
