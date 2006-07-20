@@ -1387,6 +1387,7 @@ logshuffle() {
 	    	LLOG=$LLOG.$$
 	fi
 	mkdir $LLOG
+	export LLOG
 
 	if [ "$build_ok" = "y" ]; then
 		mv $ATLOG/proto_list_${MACH} $LLOG
@@ -1421,6 +1422,11 @@ logshuffle() {
 	    		state=Failed
 			;;
 	esac
+
+	if [ -x "$POST_NIGHTLY" ]; then
+		echo "\n==== Running POST_NIGHTLY command: $POST_NIGHTLY ====" >> $mail_msg_file
+		$POST_NIGHTLY $state >> $mail_msg_file 2>&1
+	fi
 
 	cat $build_time_file $mail_msg_file > ${LLOG}/mail_msg
 	if [ "$m_FLAG" = "y" ]; then

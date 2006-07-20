@@ -214,3 +214,9 @@ UT_NO_USAGE_TRACKING="1"; export UT_NO_USAGE_TRACKING
 # If not set the default is "usr", but it can be used for bringing
 # over deleted_files or other nifty directories.
 #BRINGOVER_FILES="usr deleted_files"
+
+# POST_NIGHTLY can be any command to be run at the end of nightly.
+# As its first and only argument, the command will be provided the return
+# status of nightly - one of "Completed", "Interrupted", or "Failed"
+# The log file will be available at $LOGFILE
+#POST_NIGHTLY=
