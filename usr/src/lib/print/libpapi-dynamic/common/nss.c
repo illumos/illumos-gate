@@ -25,7 +25,7 @@
  *
  */
 
-/* $Id: nss.c 166 2006-05-20 05:48:55Z njacobs $ */
+/* Id: nss.c 180 2006-07-20 17:33:02Z njacobs $ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -51,7 +51,7 @@
 
 
 static char *
-bsdaddr_to_uri(char *bsdaddr)
+bsdaddr_to_uri(papi_attribute_t **list, char *bsdaddr)
 {
 	char *result = NULL;
 
@@ -62,10 +62,13 @@ bsdaddr_to_uri(char *bsdaddr)
 		tmp = strdup(bsdaddr);
 
 		bsd[0] = strtok_r(tmp, ":,", &iter);
-		bsd[1] = strtok_r(NULL, ":,", &iter);
+		if ((bsd[1] = strtok_r(NULL, ":,", &iter)) == NULL)
+			papiAttributeListGetString(list, NULL,
+					"printer-name", &bsd[1]);
 		bsd[2] = strtok_r(NULL, ":,", &iter);
 
-		snprintf(buf, sizeof (buf), "lpd://%s/%s%s%s", bsd[0], bsd[1],
+		snprintf(buf, sizeof (buf), "lpd://%s/printers/%s%s%s", bsd[0],
+			(bsd[1] != NULL) ? bsd[1] : "",
 			(bsd[2] != NULL) ? "#" : "",
 			(bsd[2] != NULL) ? bsd[2] : "");
 
@@ -276,7 +279,7 @@ fill_printer_uri_supported(papi_attribute_t ***list)
 	/* do we have a printers.conf(4) "bsdaddr" to convert */
 	papiAttributeListGetString(*list, NULL, "bsdaddr", &string);
 	if (string != NULL) { /* parse it, convert it, add it */
-		char *uri = bsdaddr_to_uri(string);
+		char *uri = bsdaddr_to_uri(*list, string);
 
 		if (uri != NULL) {
 			papiAttributeListAddString(list, PAPI_ATTR_APPEND,
@@ -574,7 +577,7 @@ getprinterbyname(char *name, char *ns)
 		papiAttributeListAddString(&result, PAPI_ATTR_APPEND,
 				"printer-uri-supported", name);
 	} else if (strchr(name, ':') != NULL) {	/* shortcut for POSIX form */
-		char *uri = bsdaddr_to_uri(name);
+		char *uri = bsdaddr_to_uri(result, name);
 
 		papiAttributeListAddString(&result, PAPI_ATTR_APPEND,
 				"printer-name", name);
