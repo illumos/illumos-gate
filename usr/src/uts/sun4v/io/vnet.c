@@ -114,7 +114,7 @@ uint32_t vnet_reclaim_lowat = VNET_RECLAIM_LOWAT;  /* tx recl low watermark */
 uint32_t vnet_reclaim_hiwat = VNET_RECLAIM_HIWAT;  /* tx recl high watermark */
 uint32_t vnet_ldcwd_interval = VNET_LDCWD_INTERVAL; /* watchdog freq in msec */
 uint32_t vnet_ldcwd_txtimeout = VNET_LDCWD_TXTIMEOUT;  /* tx timeout in msec */
-uint32_t vnet_ldc_qlen = VNET_LDC_QLEN;		/* ldc qlen */
+uint32_t vnet_ldc_mtu = VNET_LDC_MTU;		/* ldc mtu */
 uint32_t vnet_nfdb_hash = VNET_NFDB_HASH;	/* size of fdb hash table */
 uint32_t vnet_nrbufs = VNET_NRBUFS;	/* number of receive buffers */
 

@@ -305,7 +305,7 @@ extern uint32_t vnet_reclaim_lowat;
 extern uint32_t vnet_reclaim_hiwat;
 extern uint32_t vnet_ldcwd_interval;
 extern uint32_t vnet_ldcwd_txtimeout;
-extern uint32_t vnet_ldc_qlen;
+extern uint32_t vnet_ldc_mtu;
 extern uint32_t vnet_nrbufs;
 extern int _vnet_dbglevel;
 extern void _vnetdebug_printf(void *vnetp, const char *fmt, ...);
@@ -1540,7 +1540,7 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 	attr.devclass = LDC_DEV_NT;
 	attr.instance = ddi_get_instance(vgenp->vnetdip);
 	attr.mode = LDC_MODE_UNRELIABLE;
-	attr.qlen = vnet_ldc_qlen;
+	attr.mtu = vnet_ldc_mtu;
 	status = ldc_init(ldc_id, &attr, &ldcp->ldc_handle);
 	if (status != 0) {
 		DWARN((vgenp->vnetp, "ldc_init failed, id (%lx) rv (%d)\n",
@@ -2957,7 +2957,7 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 		    "vgen_reset_hphase: id (%lx), Doing Channel Reset...\n",
 		    ldcp->ldc_id));
 		ldcp->need_ldc_reset = B_FALSE;
-		(void) ldc_reset(ldcp->ldc_handle);
+		(void) ldc_down(ldcp->ldc_handle);
 		(void) ldc_status(ldcp->ldc_handle, &istatus);
 		DBG2((vnetp,
 		    "vgen_reset_hphase: id (%lx), RESET Done,ldc_status(%x)\n",

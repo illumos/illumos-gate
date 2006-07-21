@@ -196,7 +196,6 @@ extern "C" {
 /* size of vcc message data */
 #define	    VCC_MTU_SZ		    56
 
-
 /* Default values */
 #define	    VCC_HDR_SZ		    8	    /* header size */
 #define	    VCC_BUF_SZ		    (VCC_HDR_SZ + VCC_MTU_SZ)
@@ -205,8 +204,6 @@ extern "C" {
 #define	    VCC_INST_SHIFT	    11
 #define	    VCC_INVALID_CHANNEL	    -1
 #define	    VCC_NO_PID_BLOCKING	    -1
-
-#define	    VCC_QUEUE_LEN	    0x80    /* ldc queue size */
 
 #define	    VCC_MINOR_NAME_PREFIX   "ldom-" /* device name prefix */
 

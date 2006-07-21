@@ -38,14 +38,15 @@ extern "C" {
 #include <sys/sunddi.h>
 #include <sys/ioctl.h>
 
-/* Memory map table size */
-#define	MTBL_MAX_SIZE		65536	/* 64K */
+/* Memory map table entries */
+#define	LDC_MTBL_ENTRIES	8192	/* 8 K */
 
 /* Define LDC Queue info */
 #define	LDC_PACKET_SHIFT	6
-#define	LDC_QUEUE_ENTRIES	128
+#define	LDC_QUEUE_ENTRIES	512
+#define	LDC_MTU_MSGS		4
 #define	LDC_QUEUE_SIZE		(LDC_QUEUE_ENTRIES << LDC_PACKET_SHIFT)
-#define	LDC_STREAM_MTU		(LDC_QUEUE_SIZE >> 1)
+#define	LDC_DEFAULT_MTU		(LDC_QUEUE_SIZE / LDC_MTU_MSGS)
 
 /*
  * LDC Reliable mode - initial packet seqid

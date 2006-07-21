@@ -556,7 +556,7 @@ i_vldc_add_port(vldc_t *vldcp, md_t *mdp, mde_cookie_t node)
 	}
 
 	/* set the default MTU */
-	vport->mtu = VLDC_DEFAULT_MTU;
+	vport->mtu = (vport->is_stream) ? VLDC_STREAM_MTU : VLDC_DEFAULT_MTU;
 
 	/* get the service being exported by this port */
 	if (md_get_prop_str(mdp, node, "vldc-svc-name", &sname)) {
@@ -1004,7 +1004,7 @@ vldc_set_ldc_mode(vldc_port_t *vport, vldc_t *vldcp, int channel_mode)
 	/* initialize the channel */
 	attr.devclass = LDC_DEV_SERIAL;
 	attr.instance = ddi_get_instance(vldcp->dip);
-	attr.qlen = VLDC_QUEUE_LEN;
+	attr.mtu = vport->mtu;
 	attr.mode = vport->ldc_mode;
 
 	if ((rv = ldc_init(vport->ldc_id, &attr,
@@ -1533,7 +1533,7 @@ vldc_chpoll(dev_t dev, short events, int anyyet,  short *reventsp,
 	vldc_port_t *vport;
 	vldc_minor_t *vminor;
 	ldc_status_t ldc_state;
-	boolean_t isempty;
+	boolean_t haspkts;
 	int rv;
 
 	minor = getminor(dev);
@@ -1578,8 +1578,8 @@ vldc_chpoll(dev_t dev, short events, int anyyet,  short *reventsp,
 		 * there is data ready to read.
 		 */
 		if (events & POLLIN) {
-			if ((ldc_chkq(vport->ldc_handle, &isempty) == 0) &&
-			    (isempty == B_FALSE)) {
+			if ((ldc_chkq(vport->ldc_handle, &haspkts) == 0) &&
+			    haspkts) {
 				*reventsp |= POLLIN;
 			}
 		}

@@ -84,6 +84,17 @@ extern "C" {
 #define	VDC_ID_PROP			"id"
 
 /*
+ * Definition of actions to be carried out when processing the sequence ID
+ * of a message received from the vDisk server. The function verifying the
+ * sequence number checks the 'seq_num_xxx' fields in the soft state and
+ * returns whether the message should be processed (VDC_SEQ_NUM_TODO) or
+ * whether it was it was previously processed (VDC_SEQ_NUM_SKIP).
+ */
+#define	VDC_SEQ_NUM_INVALID		-1	/* Error */
+#define	VDC_SEQ_NUM_SKIP		0	/* Request already processed */
+#define	VDC_SEQ_NUM_TODO		1	/* Request needs processing */
+
+/*
  * Scheme to store the instance number and the slice number in the minor number.
  * (Uses the same format and definitions as the sd(7D) driver)
  */
@@ -92,29 +103,40 @@ extern "C" {
 /*
  * variables controlling how long to wait before timing out and how many
  * retries to attempt before giving up when communicating with vds.
+ *
+ * These values need to be sufficiently large so that a guest can survive
+ * the reboot of the service domain.
  */
-#define	VDC_RETRIES	3
+#define	VDC_RETRIES	10
 
 #define	VDC_USEC_TIMEOUT_MIN	(30 * MICROSEC)		/* 30 sec */
 
-#define	VD_GET_TIMEOUT_HZ(mul)	\
-	(ddi_get_lbolt() + (vdc_hz_timeout * MAX(1, mul)))
+/*
+ * This macro returns the number of Hz that the vdc driver should wait before
+ * a timeout is triggered. The 'timeout' parameter specifiecs the wait
+ * time in Hz. The 'mul' parameter allows for a multiplier to be
+ * specified allowing for a backoff to be implemented (e.g. using the
+ * retry number as a multiplier) where the wait time will get longer if
+ * there is no response on the previous retry.
+ */
+#define	VD_GET_TIMEOUT_HZ(timeout, mul)	\
+	(ddi_get_lbolt() + ((timeout) * MAX(1, (mul))))
 
 /*
  * Macros to manipulate Descriptor Ring variables in the soft state
  * structure.
  */
-#define	VDC_GET_NEXT_REQ_ID(vdc)	((vdc->req_id)++)
+#define	VDC_GET_NEXT_REQ_ID(vdc)	((vdc)->req_id++)
 
 #define	VDC_GET_DRING_ENTRY_PTR(vdc, idx)	\
-		(vd_dring_entry_t *)(vdc->dring_mem_info.vaddr +	\
-			(idx * vdc->dring_entry_size))
+		(vd_dring_entry_t *)((vdc)->dring_mem_info.vaddr +	\
+			(idx * (vdc)->dring_entry_size))
 
 #define	VDC_MARK_DRING_ENTRY_FREE(vdc, idx)			\
 	{ \
 		vd_dring_entry_t *dep = NULL;				\
 		ASSERT(vdc != NULL);					\
-		ASSERT((idx >= 0) && (idx < VD_DRING_LEN));		\
+		ASSERT((idx >= 0) && (idx < vdc->dring_len));		\
 		ASSERT(vdc->dring_mem_info.vaddr != NULL);		\
 		dep = (vd_dring_entry_t *)(vdc->dring_mem_info.vaddr +	\
 			(idx * vdc->dring_entry_size));			\
@@ -165,19 +187,21 @@ typedef struct vdc {
 	kmutex_t	lock;		/* protects next 2 sections of vars */
 	kcondvar_t	cv;		/* signal when upper layers can send */
 
-	dev_info_t	*dip;		/* device info pointer */
-	int		instance;	/* driver instance number */
 	int		initialized;	/* keeps track of what's init'ed */
 	int		hshake_cnt;	/* number of failed handshakes */
 	int		open;		/* count of outstanding opens */
 	int		dkio_flush_pending;	/* # outstanding DKIO flushes */
 
-	vio_ver_t	ver;		/* version number agreed with server */
 	uint64_t	session_id;	/* common ID sent with all messages */
 	uint64_t	seq_num;	/* most recent sequence num generated */
 	uint64_t	seq_num_reply;	/* Last seq num ACK/NACK'ed by vds */
 	uint64_t	req_id;		/* Most recent Request ID generated */
+	uint64_t	req_id_proc;	/* Last request ID processed by vdc */
 	vd_state_t	state;		/* Current handshake state */
+
+	dev_info_t	*dip;		/* device info pointer */
+	int		instance;	/* driver instance number */
+	vio_ver_t	ver;		/* version number agreed with server */
 	vd_disk_type_t	vdisk_type;	/* type of device/disk being imported */
 	uint64_t	vdisk_size;	/* device size in bytes */
 	uint64_t	max_xfer_sz;	/* maximum block size of a descriptor */
@@ -206,9 +230,12 @@ typedef struct vdc {
 	kmutex_t		dring_lock;
 	ldc_mem_info_t		dring_mem_info;
 	uint_t			dring_curr_idx;
+	uint_t			dring_proc_idx;
 	uint32_t		dring_len;
+	uint32_t		dring_max_cookies;
 	uint32_t		dring_cookie_count;
 	uint32_t		dring_entry_size;
+	boolean_t		dring_notify_server;
 	ldc_mem_cookie_t	*dring_cookie;
 	uint64_t		dring_ident;
 
@@ -226,25 +253,20 @@ typedef struct vdc {
 #ifdef DEBUG
 extern int	vdc_msglevel;
 
-#define	PR0 if (vdc_msglevel > 0)	\
-		vdc_msg
-
-#define	PR1 if (vdc_msglevel > 1)	\
-		vdc_msg
-
-#define	PR2 if (vdc_msglevel > 2)	\
-		vdc_msg
+#define	DMSG(err_level, format, ...)					\
+	do {								\
+		if (vdc_msglevel > err_level)				\
+			cmn_err(CE_CONT, "?%s"format, __func__, __VA_ARGS__);\
+		_NOTE(CONSTANTCONDITION)				\
+	} while (0);
 
 #define	VDC_DUMP_DRING_MSG(dmsgp)					\
-		vdc_msg("sq:%d start:%d end:%d ident:%x\n",		\
+		DMSG(0, "sq:%lu start:%d end:%d ident:%lu\n",		\
 			dmsgp->seq_num, dmsgp->start_idx,		\
 			dmsgp->end_idx, dmsgp->dring_ident);
 
 #else	/* !DEBUG */
-#define	PR0(...)
-#define	PR1(...)
-#define	PR2(...)
-
+#define	DMSG(err_level, ...)
 #define	VDC_DUMP_DRING_MSG(dmsgp)
 
 #endif	/* !DEBUG */

@@ -205,7 +205,7 @@ typedef uint64_t ds_portset_t;
 /*
  * LDC Information
  */
-#define	DS_QUEUE_LEN	128		/* LDC queue size */
+#define	DS_STREAM_MTU		4096
 
 /*
  * Machine Description Constants

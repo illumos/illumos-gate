@@ -153,17 +153,28 @@ static struct drctl_unit *drctlp = &drctl_state;
 int
 _init(void)
 {
+	int rv;
+
 	drctlp->drc_inst = -1;
 	mutex_init(&drctlp->drc_lock, NULL, MUTEX_DRIVER, NULL);
-	return (mod_install(&modlinkage));
+
+	if ((rv = mod_install(&modlinkage)) != 0)
+		mutex_destroy(&drctlp->drc_lock);
+
+	return (rv);
 }
 
 
 int
 _fini(void)
 {
+	int rv;
+
+	if ((rv = mod_remove(&modlinkage)) != 0)
+		return (rv);
+
 	mutex_destroy(&drctlp->drc_lock);
-	return (mod_remove(&modlinkage));
+	return (0);
 }
 
 

@@ -41,13 +41,13 @@ extern "C" {
 
 /* default values */
 #define	VLDC_DEFAULT_MTU	0x800	/* default mtu size */
+#define	VLDC_STREAM_MTU		0x1000	/* 4K */
 
 /* VLDC limits */
 #define	VLDC_MAX_COOKIE		0x40000	/* max. size of xfer to/from HV */
 #define	VLDC_MAX_MTU		0x40000	/* 256K */
 #define	VLDC_MAX_PORTS		0x800
 #define	VLDC_MAX_MINORS		VLDC_MAX_PORTS
-#define	VLDC_QUEUE_LEN		0x80
 
 #define	VLDC_MINOR_MASK		(VLDC_MAX_PORTS - 1)
 #define	VLDC_INST_SHIFT		11

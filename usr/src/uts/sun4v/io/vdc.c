@@ -57,6 +57,7 @@
  *	code waiting on the IO.
  */
 
+#include <sys/atomic.h>
 #include <sys/conf.h>
 #include <sys/disp.h>
 #include <sys/ddi.h>
@@ -155,8 +156,7 @@ static int	vdc_wait_for_descriptor_update(vdc_t *vdc, uint_t idx,
 static int	vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx);
 static int	vdc_populate_mem_hdl(vdc_t *vdc, uint_t idx,
 			caddr_t addr, size_t nbytes, int operation);
-static boolean_t vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg, int
-			num_msgs);
+static int	vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg);
 
 /* dkio */
 static int	vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode);
@@ -178,12 +178,26 @@ static int	vdc_uscsicmd_convert(vdc_t *vdc, void *from, void *to,
 /*
  * Module variables
  */
-uint64_t	vdc_hz_timeout;
-uint64_t	vdc_usec_timeout = VDC_USEC_TIMEOUT_MIN;
-uint64_t	vdc_usec_timeout_dump = VDC_USEC_TIMEOUT_MIN / 300;
-uint64_t	vdc_usec_timeout_dring = 10 * MILLISEC;
-static int	vdc_retries = VDC_RETRIES;
-static int	vdc_dump_retries = VDC_RETRIES * 10;
+
+/*
+ * Tunable variables to control how long vdc waits before timing out on
+ * various operations
+ */
+static int	vdc_retries = 10;
+
+/* calculated from 'vdc_usec_timeout' during attach */
+static uint64_t	vdc_hz_timeout;				/* units: Hz */
+static uint64_t	vdc_usec_timeout = 30 * MICROSEC;	/* 30s units: ns */
+
+static uint64_t	vdc_hz_timeout_ldc;			/* units: Hz */
+static uint64_t	vdc_usec_timeout_ldc = 10 * MILLISEC;	/* 0.01s units: ns */
+
+/* values for dumping - need to run in a tighter loop */
+static uint64_t	vdc_usec_timeout_dump = 100 * MILLISEC;	/* 0.1s units: ns */
+static int	vdc_dump_retries = 100;
+
+/* Count of the number of vdc instances attached */
+static volatile uint32_t	vdc_instance_count = 0;
 
 /* Soft state pointer */
 static void	*vdc_state;
@@ -197,16 +211,6 @@ int	vdc_msglevel = 0;
  * The first array entry is the latest and preferred version.
  */
 static const vio_ver_t	vdc_version[] = {{1, 0}};
-
-static void
-vdc_msg(const char *format, ...)
-{
-	va_list	args;
-
-	va_start(args, format);
-	vcmn_err(CE_CONT, format, args);
-	va_end(args);
-}
 
 static struct cb_ops vdc_cb_ops = {
 	vdc_open,	/* cb_open */
@@ -336,27 +340,25 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	ASSERT(cmd == DDI_DETACH);
 	instance = ddi_get_instance(dip);
-	PR1("%s[%d] Entered\n", __func__, instance);
+	DMSG(1, "[%d] Entered\n", instance);
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
-		vdc_msg("%s[%d]:  Could not get state structure.",
-		    __func__, instance);
+		cmn_err(CE_NOTE, "[%d] Couldn't get state structure", instance);
 		return (DDI_FAILURE);
 	}
 
 	if (vdc->open) {
-		PR0("%s[%d]: Cannot detach: device is open",
-				__func__, instance);
+		DMSG(0, "[%d] Cannot detach: device is open", instance);
 		return (DDI_FAILURE);
 	}
 
-	PR0("%s[%d] proceeding...\n", __func__, instance);
+	DMSG(0, "[%d] proceeding...\n", instance);
 
 	/*
 	 * try and disable callbacks to prevent another handshake
 	 */
 	rv = ldc_set_cb_mode(vdc->ldc_handle, LDC_CB_DISABLE);
-	PR0("%s[%d] callback disabled (rv=%d)\n", __func__, instance, rv);
+	DMSG(0, "[%d] callback disabled (rv=%d)\n", instance, rv);
 
 	/*
 	 * Prevent any more attempts to start a handshake with the vdisk
@@ -374,10 +376,10 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		cv_signal(&vdc->msg_proc_cv);
 
 		while (vdc->msg_proc_thr_state != VDC_THR_DONE) {
-			PR0("%s[%d]: Waiting for thread to exit\n",
-				__func__, instance);
+			DMSG(0, "[%d] Waiting for thread to exit\n", instance);
 			rv = cv_timedwait(&vdc->msg_proc_cv,
-				&vdc->msg_proc_lock, VD_GET_TIMEOUT_HZ(1));
+				&vdc->msg_proc_lock,
+				VD_GET_TIMEOUT_HZ(vdc_hz_timeout, 1));
 			if ((rv == -1) && (retries++ > vdc_retries))
 				break;
 		}
@@ -424,7 +426,7 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (vdc->initialized & VDC_SOFT_STATE)
 		ddi_soft_state_free(vdc_state, instance);
 
-	PR0("%s[%d] End %p\n", __func__, instance, vdc);
+	DMSG(0, "[%d] End %p\n", instance, (void *)vdc);
 
 	return (DDI_SUCCESS);
 }
@@ -442,14 +444,13 @@ vdc_do_attach(dev_info_t *dip)
 
 	instance = ddi_get_instance(dip);
 	if (ddi_soft_state_zalloc(vdc_state, instance) != DDI_SUCCESS) {
-		vdc_msg("%s:(%d): Couldn't alloc state structure",
-		    __func__, instance);
+		cmn_err(CE_NOTE, "[%d] Couldn't alloc state structure",
+		    instance);
 		return (DDI_FAILURE);
 	}
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
-		vdc_msg("%s:(%d): Could not get state structure.",
-		    __func__, instance);
+		cmn_err(CE_NOTE, "[%d] Couldn't get state structure", instance);
 		return (DDI_FAILURE);
 	}
 
@@ -460,6 +461,7 @@ vdc_do_attach(dev_info_t *dip)
 	vdc->initialized = VDC_SOFT_STATE;
 
 	vdc_hz_timeout = drv_usectohz(vdc_usec_timeout);
+	vdc_hz_timeout_ldc = drv_usectohz(vdc_usec_timeout_ldc);
 
 	vdc->dip	= dip;
 	vdc->instance	= instance;
@@ -503,33 +505,43 @@ vdc_do_attach(dev_info_t *dip)
 	/* Bring up connection with vds via LDC */
 	status = vdc_start_ldc_connection(vdc);
 	if (status != 0) {
-		vdc_msg("%s[%d]  Could not start LDC", __func__, instance);
+		cmn_err(CE_NOTE, "[%d] Could not start LDC", instance);
 		return (DDI_FAILURE);
 	}
 
 	/*
 	 * We need to wait until the handshake has completed before leaving
-	 * the attach(). This is to allow the device node(s) to be created
-	 * and the first usage of the filesystem to succeed.
+	 * the attach(). If this is the first vdc device attached (i.e. the root
+	 * filesystem) we will wait much longer in the hope that we can finally
+	 * communicate with the vDisk server (the service domain may be
+	 * rebooting, etc.). This wait is necessary so that the device node(s)
+	 * are created before the attach(9E) return (otherwise the open(9E) will
+	 * fail and and the root file system will not boot).
 	 */
+	atomic_inc_32(&vdc_instance_count);
 	mutex_enter(&vdc->attach_lock);
-	while ((vdc->ldc_state != LDC_UP) ||
-		(vdc->state != VD_STATE_DATA)) {
+	while ((vdc->ldc_state != LDC_UP) || (vdc->state != VD_STATE_DATA)) {
 
-		PR0("%s[%d] handshake in progress [VD %d (LDC %d)]\n",
-			__func__, instance, vdc->state, vdc->ldc_state);
+		DMSG(0, "[%d] handshake in progress [VD %d (LDC %d)]\n",
+			instance, vdc->state, vdc->ldc_state);
 
 		status = cv_timedwait(&vdc->attach_cv, &vdc->attach_lock,
-				VD_GET_TIMEOUT_HZ(1));
+				VD_GET_TIMEOUT_HZ(vdc_hz_timeout, retries));
 		if (status == -1) {
-			if (retries >= vdc_retries) {
-				PR0("%s[%d] Give up handshake wait.\n",
-						__func__, instance);
+			/*
+			 * If this is not the first instance attached or we
+			 * have exceeeded the max number of retries we give
+			 * up waiting and do not delay the attach any longer
+			 */
+			if ((vdc_instance_count != 1) ||
+			    (retries >= vdc_retries)) {
+				DMSG(0, "[%d] Giving up wait for handshake\n",
+						instance);
 				mutex_exit(&vdc->attach_lock);
 				return (DDI_FAILURE);
 			} else {
-				PR0("%s[%d] Retry #%d for handshake.\n",
-						__func__, instance, retries);
+				DMSG(0, "[%d] Retry #%d for handshake.\n",
+						instance, retries);
 				vdc_init_handshake_negotiation(vdc);
 				retries++;
 			}
@@ -567,7 +579,7 @@ vdc_do_attach(dev_info_t *dip)
 
 	ddi_report_dev(dip);
 
-	PR0("%s[%d] Attach completed\n", __func__, instance);
+	DMSG(0, "[%d] Attach completed\n", instance);
 	return (status);
 }
 
@@ -604,7 +616,8 @@ vdc_do_ldc_init(vdc_t *vdc)
 	vdc->initialized |= VDC_LDC;
 
 	if ((status = vdc_get_ldc_id(dip, &ldc_id)) != 0) {
-		vdc_msg("%s:  Failed to get <ldc_id> property\n", __func__);
+		cmn_err(CE_NOTE, "[%d] Failed to get LDC channel ID property",
+				vdc->instance);
 		return (EIO);
 	}
 	vdc->ldc_id = ldc_id;
@@ -612,7 +625,7 @@ vdc_do_ldc_init(vdc_t *vdc)
 	ldc_attr.devclass = LDC_DEV_BLK;
 	ldc_attr.instance = vdc->instance;
 	ldc_attr.mode = LDC_MODE_UNRELIABLE;	/* unreliable transport */
-	ldc_attr.qlen = VD_LDC_QLEN;
+	ldc_attr.mtu = VD_LDC_MTU;
 
 	if ((vdc->initialized & VDC_LDC_INIT) == 0) {
 		status = ldc_init(ldc_id, &ldc_attr, &vdc->ldc_handle);
@@ -625,7 +638,8 @@ vdc_do_ldc_init(vdc_t *vdc)
 	}
 	status = ldc_status(vdc->ldc_handle, &ldc_state);
 	if (status != 0) {
-		vdc_msg("Cannot discover LDC status [err=%d].", status);
+		cmn_err(CE_NOTE, "[%d] Cannot discover LDC status [err=%d]",
+				vdc->instance, status);
 		return (status);
 	}
 	vdc->ldc_state = ldc_state;
@@ -634,7 +648,8 @@ vdc_do_ldc_init(vdc_t *vdc)
 		status = ldc_reg_callback(vdc->ldc_handle, vdc_handle_cb,
 		    (caddr_t)vdc);
 		if (status != 0) {
-			vdc_msg("%s: ldc_reg_callback()=%d", __func__, status);
+			cmn_err(CE_NOTE, "[%d] LDC callback reg. failed (%d)",
+					vdc->instance, status);
 			return (status);
 		}
 		vdc->initialized |= VDC_LDC_CB;
@@ -669,14 +684,14 @@ vdc_start_ldc_connection(vdc_t *vdc)
 	mutex_enter(&vdc->lock);
 
 	if (vdc->ldc_state == LDC_UP) {
-		PR0("%s:  LDC is already UP ..\n", __func__);
+		DMSG(0, "[%d] LDC is already UP ..\n", vdc->instance);
 		mutex_exit(&vdc->lock);
 		return (0);
 	}
 
 	status = vdc_do_ldc_up(vdc);
 
-	PR0("%s[%d] Finished bringing up LDC\n", __func__, vdc->instance);
+	DMSG(0, "[%d] Finished bringing up LDC\n", vdc->instance);
 
 	mutex_exit(&vdc->lock);
 
@@ -737,8 +752,8 @@ vdc_create_device_nodes(vdc_t *vdc)
 		(void) snprintf(name, sizeof (name), "%c", 'a' + i);
 		if (ddi_create_minor_node(dip, name, S_IFBLK,
 		    VD_MAKE_DEV(instance, i), DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
-			vdc_msg("%s[%d]: Couldn't add block node %s.",
-				__func__, instance, name);
+			cmn_err(CE_NOTE, "[%d] Couldn't add block node '%s'",
+				instance, name);
 			return (EIO);
 		}
 
@@ -749,8 +764,8 @@ vdc_create_device_nodes(vdc_t *vdc)
 			'a' + i, ",raw");
 		if (ddi_create_minor_node(dip, name, S_IFCHR,
 		    VD_MAKE_DEV(instance, i), DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
-			vdc_msg("%s[%d]:  Could not add raw node %s.",
-				__func__, instance, name);
+			cmn_err(CE_NOTE, "[%d] Couldn't add raw node '%s'",
+				instance, name);
 			return (EIO);
 		}
 	}
@@ -815,21 +830,21 @@ vdc_create_device_nodes_props(vdc_t *vdc)
 			VD_MAKE_DEV(instance, i));
 
 		size = vdc->vtoc->v_part[i].p_size * vdc->vtoc->v_sectorsz;
-		PR0("%s[%d] sz %ld (%ld Mb)  p_size %lx\n",
-				__func__, instance, size, size / (1024 * 1024),
+		DMSG(0, "[%d] sz %ld (%ld Mb)  p_size %lx\n",
+				instance, size, size / (1024 * 1024),
 				vdc->vtoc->v_part[i].p_size);
 
 		rv = ddi_prop_update_int64(dev, dip, VDC_SIZE_PROP_NAME, size);
 		if (rv != DDI_PROP_SUCCESS) {
-			vdc_msg("%s:(%d): Couldn't add \"%s\" [%d]\n",
-				__func__, instance, VDC_SIZE_PROP_NAME, size);
+			cmn_err(CE_NOTE, "[%d] Couldn't add '%s' prop of [%ld]",
+				instance, VDC_SIZE_PROP_NAME, size);
 			return (EIO);
 		}
 
 		rv = ddi_prop_update_int64(dev, dip, VDC_NBLOCKS_PROP_NAME,
 			lbtodb(size));
 		if (rv != DDI_PROP_SUCCESS) {
-			vdc_msg("%s:(%d): Couldn't add \"%s\" [%d]\n", __func__,
+			cmn_err(CE_NOTE, "[%d] Couldn't add '%s' prop [%llu]",
 				instance, VDC_NBLOCKS_PROP_NAME, lbtodb(size));
 			return (EIO);
 		}
@@ -849,14 +864,14 @@ vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 	ASSERT(dev != NULL);
 	instance = SDUNIT(getminor(*dev));
 
-	PR0("%s[%d] minor = %d flag = %x, otyp = %x\n", __func__, instance,
-			getminor(*dev), flag, otyp);
+	DMSG(0, "[%d] minor = %d flag = %x, otyp = %x\n",
+			instance, getminor(*dev), flag, otyp);
 
 	if ((otyp != OTYP_CHR) && (otyp != OTYP_BLK))
 		return (EINVAL);
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
-		vdc_msg("%s[%d] Could not get state.", __func__, instance);
+		cmn_err(CE_NOTE, "[%d] Couldn't get state structure", instance);
 		return (ENXIO);
 	}
 
@@ -864,7 +879,8 @@ vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 	 * Check to see if we can communicate with vds
 	 */
 	if (!vdc_is_able_to_tx_data(vdc, flag)) {
-		PR0("%s[%d] Not ready to transmit data\n", __func__, instance);
+		DMSG(0, "[%d] Not ready to transmit data (flag=%x)\n",
+				instance, flag);
 		return (ENOLINK);
 	}
 
@@ -885,13 +901,13 @@ vdc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 
 	instance = SDUNIT(getminor(dev));
 
-	PR0("%s[%d] flag = %x, otyp = %x\n", __func__, instance, flag, otyp);
+	DMSG(0, "[%d] flag = %x, otyp = %x\n", instance, flag, otyp);
 
 	if ((otyp != OTYP_CHR) && (otyp != OTYP_BLK))
 		return (EINVAL);
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
-		vdc_msg("%s[%d] Could not get state.", __func__, instance);
+		cmn_err(CE_NOTE, "[%d] Couldn't get state structure", instance);
 		return (ENXIO);
 	}
 
@@ -899,13 +915,14 @@ vdc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 	 * Check to see if we can communicate with vds
 	 */
 	if (!vdc_is_able_to_tx_data(vdc, 0)) {
-		PR0("%s[%d] Not ready to transmit data\n", __func__, instance);
+		DMSG(0, "[%d] Not ready to transmit data (flag=%x)\n",
+				instance, flag);
 		return (ETIMEDOUT);
 	}
 
 	if (vdc->dkio_flush_pending) {
-		PR0("%s[%d]: Cannot detach: %d outstanding DKIO flushes",
-			__func__, instance, vdc->dkio_flush_pending);
+		DMSG(0, "[%d] Cannot detach: %d outstanding DKIO flushes\n",
+			instance, vdc->dkio_flush_pending);
 		return (EBUSY);
 	}
 
@@ -946,7 +963,7 @@ vdc_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	vdc_t	*vdc = NULL;
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
-		vdc_msg("%s (%d):  Could not get state.", __func__, instance);
+		cmn_err(CE_NOTE, "[%d] Couldn't get state structure", instance);
 		return (ENXIO);
 	}
 
@@ -972,7 +989,7 @@ vdc_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	biofini(buf);
 	kmem_free(buf, sizeof (buf_t));
 
-	PR1("%s: status=%d\n", __func__, rv);
+	DMSG(1, "[%d] status=%d\n", instance, rv);
 
 	return (rv);
 }
@@ -999,12 +1016,12 @@ vdc_strategy(struct buf *buf)
 	int		instance = SDUNIT(getminor(buf->b_edev));
 	int	op = (buf->b_flags & B_READ) ? VD_OP_BREAD : VD_OP_BWRITE;
 
-	PR1("%s: %s %ld bytes at block %ld : b_addr=0x%p",
-	    __func__, (buf->b_flags & B_READ) ? "Read" : "Write",
-	    buf->b_bcount, buf->b_lblkno, buf->b_un.b_addr);
+	DMSG(2, "[%d] %s %ld bytes at block %llx : b_addr=0x%p",
+	    instance, (buf->b_flags & B_READ) ? "Read" : "Write",
+	    buf->b_bcount, buf->b_lblkno, (void *)buf->b_un.b_addr);
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
-		vdc_msg("%s[%d]:  Could not get state.", __func__, instance);
+		cmn_err(CE_NOTE, "[%d] Couldn't get state structure", instance);
 		bioerror(buf, ENXIO);
 		biodone(buf);
 		return (0);
@@ -1012,10 +1029,8 @@ vdc_strategy(struct buf *buf)
 
 	DTRACE_IO2(vstart, buf_t *, buf, vdc_t *, vdc);
 
-	ASSERT(buf->b_bcount <= (vdc->max_xfer_sz * vdc->block_size));
-
 	if (!vdc_is_able_to_tx_data(vdc, O_NONBLOCK)) {
-		PR0("%s: Not ready to transmit data\n", __func__);
+		DMSG(0, "[%d] Not ready to transmit data\n", instance);
 		bioerror(buf, ENXIO);
 		biodone(buf);
 		return (0);
@@ -1031,7 +1046,7 @@ vdc_strategy(struct buf *buf)
 	 * done.
 	 */
 	if (rv) {
-		PR0("[%d] Failed to read/write (err=%d)\n", instance, rv);
+		DMSG(0, "[%d] Failed to read/write (err=%d)\n", instance, rv);
 		bioerror(buf, rv);
 		biodone(buf);
 	}
@@ -1045,7 +1060,7 @@ vdc_read(dev_t dev, struct uio *uio, cred_t *cred)
 {
 	_NOTE(ARGUNUSED(cred))
 
-	PR1("vdc_read():  Entered");
+	DMSG(1, "[%d] Entered", SDUNIT(getminor(dev)));
 	return (physio(vdc_strategy, NULL, dev, B_READ, minphys, uio));
 }
 
@@ -1054,7 +1069,7 @@ vdc_write(dev_t dev, struct uio *uio, cred_t *cred)
 {
 	_NOTE(ARGUNUSED(cred))
 
-	PR1("vdc_write():  Entered");
+	DMSG(1, "[%d] Entered", SDUNIT(getminor(dev)));
 	return (physio(vdc_strategy, NULL, dev, B_WRITE, minphys, uio));
 }
 
@@ -1063,7 +1078,7 @@ vdc_aread(dev_t dev, struct aio_req *aio, cred_t *cred)
 {
 	_NOTE(ARGUNUSED(cred))
 
-	PR1("vdc_aread():  Entered");
+	DMSG(1, "[%d] Entered", SDUNIT(getminor(dev)));
 	return (aphysio(vdc_strategy, anocancel, dev, B_READ, minphys, aio));
 }
 
@@ -1072,7 +1087,7 @@ vdc_awrite(dev_t dev, struct aio_req *aio, cred_t *cred)
 {
 	_NOTE(ARGUNUSED(cred))
 
-	PR1("vdc_awrite():  Entered");
+	DMSG(1, "[%d] Entered", SDUNIT(getminor(dev)));
 	return (aphysio(vdc_strategy, anocancel, dev, B_WRITE, minphys, aio));
 }
 
@@ -1103,12 +1118,12 @@ vdc_init_handshake_negotiation(void *arg)
 
 	ASSERT(vdc != NULL);
 
-	PR0("[%d] Initializing vdc<->vds handshake\n", vdc->instance);
+	DMSG(0, "[%d] Initializing vdc<->vds handshake\n", vdc->instance);
 
 	/* get LDC state */
 	status = ldc_status(vdc->ldc_handle, &ldc_state);
 	if (status != 0) {
-		cmn_err(CE_NOTE, "[%d] Couldn't get LDC status: err=%d",
+		cmn_err(CE_NOTE, "[%d] Couldn't get LDC status (err=%d)",
 				vdc->instance, status);
 		return;
 	}
@@ -1119,7 +1134,7 @@ vdc_init_handshake_negotiation(void *arg)
 	 * triggered due to the UP event.
 	 */
 	if (ldc_state != LDC_UP) {
-		PR0("[%d] Triggering an LDC_UP and returning\n", vdc->instance);
+		DMSG(0, "[%d] Triggering LDC_UP & returning\n", vdc->instance);
 		(void) vdc_do_ldc_up(vdc);
 		return;
 	}
@@ -1130,8 +1145,8 @@ vdc_init_handshake_negotiation(void *arg)
 	 * has not been reset or detach() has stopped further handshakes.
 	 */
 	if (vdc->initialized & (VDC_HANDSHAKE | VDC_HANDSHAKE_STOP)) {
-		PR0("%s[%d] Negotiation not triggered. [init=%x]\n",
-			__func__, vdc->instance, vdc->initialized);
+		DMSG(0, "[%d] Negotiation not triggered. [init=%x]\n",
+			vdc->instance, vdc->initialized);
 		mutex_exit(&vdc->lock);
 		return;
 	}
@@ -1165,8 +1180,8 @@ vdc_init_handshake_negotiation(void *arg)
 		 * nothing to do - we have already completed the negotiation
 		 * and we can transmit data when ready.
 		 */
-		PR0("%s[%d] Negotiation triggered after handshake completed",
-			__func__, vdc->instance);
+		DMSG(0, "[%d] Negotiation triggered after handshake completed",
+			vdc->instance);
 	}
 
 	mutex_exit(&vdc->lock);
@@ -1191,16 +1206,17 @@ vdc_init_ver_negotiation(vdc_t *vdc, vio_ver_t ver)
 	size_t		msglen = sizeof (pkt);
 	int		status = -1;
 
-	PR0("%s: Entered.\n", __func__);
-
 	ASSERT(vdc != NULL);
 	ASSERT(mutex_owned(&vdc->lock));
+
+	DMSG(0, "[%d] Entered.\n", vdc->instance);
 
 	/*
 	 * set the Session ID to a unique value
 	 * (the lower 32 bits of the clock tick)
 	 */
 	vdc->session_id = ((uint32_t)gettick() & 0xffffffff);
+	DMSG(0, "[%d] Set SID to 0x%lx\n", vdc->instance, vdc->session_id);
 
 	pkt.tag.vio_msgtype = VIO_TYPE_CTRL;
 	pkt.tag.vio_subtype = VIO_SUBTYPE_INFO;
@@ -1211,11 +1227,12 @@ vdc_init_ver_negotiation(vdc_t *vdc, vio_ver_t ver)
 	pkt.ver_minor = ver.minor;
 
 	status = vdc_send(vdc, (caddr_t)&pkt, &msglen);
-	PR0("%s: vdc_send(status = %d)\n", __func__, status);
+	DMSG(0, "[%d] Ver info sent (status = %d)\n", vdc->instance, status);
 
 	if ((status != 0) || (msglen != sizeof (vio_ver_msg_t))) {
-		PR0("%s[%d] vdc_send failed: id(%lx) rv(%d) size(%d)\n",
-				__func__, vdc->instance, vdc->ldc_handle,
+		cmn_err(CE_NOTE, "[%d] Failed to send Ver negotiation info: "
+				"id(%lx) rv(%d) size(%ld)",
+				vdc->instance, vdc->ldc_handle,
 				status, msglen);
 		if (msglen != sizeof (vio_ver_msg_t))
 			status = ENOMSG;
@@ -1246,7 +1263,7 @@ vdc_init_attr_negotiation(vdc_t *vdc)
 	ASSERT(vdc != NULL);
 	ASSERT(mutex_owned(&vdc->lock));
 
-	PR0("%s[%d] entered\n", __func__, vdc->instance);
+	DMSG(0, "[%d] entered\n", vdc->instance);
 
 	/* fill in tag */
 	pkt.tag.vio_msgtype = VIO_TYPE_CTRL;
@@ -1262,12 +1279,13 @@ vdc_init_attr_negotiation(vdc_t *vdc)
 	pkt.vdisk_size = 0;	/* server will set to valid size */
 
 	status = vdc_send(vdc, (caddr_t)&pkt, &msglen);
-	PR0("%s: vdc_send(status = %d)\n", __func__, status);
+	DMSG(0, "[%d] Attr info sent (status = %d)\n", vdc->instance, status);
 
 	if ((status != 0) || (msglen != sizeof (vio_ver_msg_t))) {
-		PR0("%s[%d] ldc_write failed: id(%lx) rv(%d) size (%d)\n",
-			__func__, vdc->instance, vdc->ldc_handle,
-			status, msglen);
+		cmn_err(CE_NOTE, "[%d] Failed to send Attr negotiation info: "
+				"id(%lx) rv(%d) size(%ld)",
+				vdc->instance, vdc->ldc_handle,
+				status, msglen);
 		if (msglen != sizeof (vio_ver_msg_t))
 			status = ENOMSG;
 	}
@@ -1302,11 +1320,11 @@ vdc_init_dring_negotiate(vdc_t *vdc)
 		cmn_err(CE_CONT, "[%d] Failed to init DRing (status = %d)\n",
 				vdc->instance, status);
 		vdc_destroy_descriptor_ring(vdc);
-		vdc_reset_connection(vdc, B_FALSE);
+		vdc_reset_connection(vdc, B_TRUE);
 		return (status);
 	}
-	PR0("%s[%d] Init of descriptor ring completed (status = %d)\n",
-			__func__, vdc->instance, status);
+	DMSG(0, "[%d] Init of descriptor ring completed (status = %d)\n",
+			vdc->instance, status);
 
 	/* fill in tag */
 	pkt.tag.vio_msgtype = VIO_TYPE_CTRL;
@@ -1315,17 +1333,17 @@ vdc_init_dring_negotiate(vdc_t *vdc)
 	pkt.tag.vio_sid = vdc->session_id;
 	/* fill in payload */
 	pkt.dring_ident = 0;
-	pkt.num_descriptors = VD_DRING_LEN;
-	pkt.descriptor_size = VD_DRING_ENTRY_SZ;
+	pkt.num_descriptors = vdc->dring_len;
+	pkt.descriptor_size = vdc->dring_entry_size;
 	pkt.options = (VIO_TX_DRING | VIO_RX_DRING);
 	pkt.ncookies = vdc->dring_cookie_count;
 	pkt.cookie[0] = vdc->dring_cookie[0];	/* for now just one cookie */
 
 	status = vdc_send(vdc, (caddr_t)&pkt, &msglen);
 	if (status != 0) {
-		PR0("%s[%d] Failed to register DRing (status = %d)\n",
-				__func__, vdc->instance, status);
-		vdc_reset_connection(vdc, B_FALSE);
+		cmn_err(CE_NOTE, "[%d] Failed to register DRing (err = %d)",
+				vdc->instance, status);
+		vdc_reset_connection(vdc, B_TRUE);
 	}
 
 	return (status);
@@ -1376,6 +1394,8 @@ vdc_send(vdc_t *vdc, caddr_t pkt, size_t *msglen)
 	do {
 		size = *msglen;
 		status = ldc_write(vdc->ldc_handle, pkt, &size);
+		if (status == EWOULDBLOCK)
+			delay(vdc_hz_timeout_ldc);
 	} while (status == EWOULDBLOCK && retries++ < vdc_retries);
 
 	/* if LDC had serious issues --- reset vdc state */
@@ -1447,7 +1467,7 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 	}
 	obp_inst = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 			OBP_REG, -1);
-	PR1("%s[%d]: OBP inst=%d\n", __func__, instance, obp_inst);
+	DMSG(1, "[%d] OBP inst=%d\n", instance, obp_inst);
 
 	/*
 	 * We now walk the MD nodes and if an instance of a vdc node matches
@@ -1484,7 +1504,7 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 		goto done;
 	}
 
-	PR1("%s[%d] num_vdevs=%d\n", __func__, instance, num_vdevs);
+	DMSG(1, "[%d] num_vdevs=%d\n", instance, num_vdevs);
 	for (idx = 0; idx < num_vdevs; idx++) {
 		status = md_get_prop_str(mdp, listp[idx], "name", &node_name);
 		if ((status != 0) || (node_name == NULL)) {
@@ -1493,12 +1513,11 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 			continue;
 		}
 
-		PR1("%s[%d] Found node %s\n", __func__, instance, node_name);
+		DMSG(1, "[%d] Found node '%s'\n", instance, node_name);
 		if (strcmp(VDC_MD_DISK_NAME, node_name) == 0) {
 			status = md_get_prop_val(mdp, listp[idx],
 					VDC_MD_CFG_HDL, &md_inst);
-			PR1("%s[%d] vdc inst# in MD=%d\n",
-					__func__, instance, md_inst);
+			DMSG(1, "[%d] vdc inst in MD=%lx\n", instance, md_inst);
 			if ((status == 0) && (md_inst == obp_inst)) {
 				found_inst = B_TRUE;
 				break;
@@ -1512,7 +1531,7 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 		status = ENOENT;
 		goto done;
 	}
-	PR0("%s[%d] MD inst=%d\n", __func__, instance, md_inst);
+	DMSG(0, "[%d] MD inst=%lx\n", instance, md_inst);
 
 	/* get the channels for this node */
 	num_chans = md_scan_dag(mdp, listp[idx],
@@ -1527,8 +1546,8 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 		goto done;
 
 	} else if (num_chans != 1) {
-		PR0("%s[%d] Expected 1 '%s' node for '%s' port, found %d\n",
-			__func__, instance, VDC_MD_CHAN_NAME, VDC_MD_VDEV_NAME,
+		DMSG(0, "[%d] Expected 1 '%s' node for '%s' port, found %d\n",
+			instance, VDC_MD_CHAN_NAME, VDC_MD_VDEV_NAME,
 			num_chans);
 	}
 
@@ -1542,7 +1561,7 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 		status = ENOENT;
 	}
 
-	PR0("%s[%d] LDC id is 0x%lx\n", __func__, instance, *ldc_id);
+	DMSG(0, "[%d] LDC id is 0x%lx\n", instance, *ldc_id);
 
 done:
 	if (chanp)
@@ -1560,13 +1579,13 @@ vdc_do_ldc_up(vdc_t *vdc)
 {
 	int	status;
 
-	PR0("[%d] Bringing up channel %x\n", vdc->instance, vdc->ldc_id);
+	DMSG(0, "[%d] Bringing up channel %lx\n", vdc->instance, vdc->ldc_id);
 
 	if ((status = ldc_up(vdc->ldc_handle)) != 0) {
 		switch (status) {
 		case ECONNREFUSED:	/* listener not ready at other end */
-			PR0("%s: ldc_up(%d,...) return %d\n",
-					__func__, vdc->ldc_id, status);
+			DMSG(0, "[%d] ldc_up(%lx,...) return %d\n",
+					vdc->instance, vdc->ldc_id, status);
 			status = 0;
 			break;
 		default:
@@ -1617,8 +1636,8 @@ vdc_is_able_to_tx_data(vdc_t *vdc, int flag)
 		return (B_TRUE);
 
 	if ((flag & O_NONBLOCK) || (flag & O_NDELAY)) {
-		PR0("%s[%d] Not ready to tx - state %d LDC state %d\n",
-			__func__, vdc->instance, state, ldc_state);
+		DMSG(0, "[%d] Not ready to tx - state %d LDC state %d\n",
+			vdc->instance, state, ldc_state);
 		return (B_FALSE);
 	}
 
@@ -1629,11 +1648,11 @@ vdc_is_able_to_tx_data(vdc_t *vdc, int flag)
 	 */
 	mutex_enter(&vdc->lock);
 	while ((vdc->ldc_state != LDC_UP) || (vdc->state != VD_STATE_DATA)) {
-		PR0("%s: Waiting for connection at state %d (LDC state %d)\n",
-			__func__, vdc->state, vdc->ldc_state);
+		DMSG(0, "[%d] Waiting for connection. (state %d : LDC %d)\n",
+			vdc->instance, vdc->state, vdc->ldc_state);
 
 		rv = cv_timedwait(&vdc->cv, &vdc->lock,
-			VD_GET_TIMEOUT_HZ(retries));
+			VD_GET_TIMEOUT_HZ(vdc_hz_timeout, retries));
 
 		/*
 		 * An rv of -1 indicates that we timed out without the LDC
@@ -1646,13 +1665,13 @@ vdc_is_able_to_tx_data(vdc_t *vdc, int flag)
 		 */
 		if (rv == -1) {
 			if (retries >= vdc_retries) {
-				PR0("%s[%d] handshake wait timed out.\n",
-						__func__, vdc->instance);
+				DMSG(0, "[%d] handshake wait timed out\n",
+						vdc->instance);
 				mutex_exit(&vdc->lock);
 				return (B_FALSE);
 			} else {
-				PR1("%s[%d] Retry #%d for handshake timedout\n",
-					__func__, vdc->instance, retries);
+				DMSG(1, "[%d] Handshake retry #%d timed out\n",
+					vdc->instance, retries);
 				retries++;
 			}
 		}
@@ -1687,18 +1706,18 @@ vdc_terminate_ldc(vdc_t *vdc)
 	ASSERT(vdc != NULL);
 	ASSERT(mutex_owned(&vdc->lock));
 
-	PR0("%s[%d] initialized=%x\n", __func__, instance, vdc->initialized);
+	DMSG(0, "[%d] initialized=%x\n", instance, vdc->initialized);
 
 	if (vdc->initialized & VDC_LDC_OPEN) {
-		PR0("%s[%d]: ldc_close()\n", __func__, instance);
+		DMSG(0, "[%d] ldc_close()\n", instance);
 		(void) ldc_close(vdc->ldc_handle);
 	}
 	if (vdc->initialized & VDC_LDC_CB) {
-		PR0("%s[%d]: ldc_unreg_callback()\n", __func__, instance);
+		DMSG(0, "[%d] ldc_unreg_callback()\n", instance);
 		(void) ldc_unreg_callback(vdc->ldc_handle);
 	}
 	if (vdc->initialized & VDC_LDC) {
-		PR0("%s[%d]: ldc_fini()\n", __func__, instance);
+		DMSG(0, "[%d] ldc_fini()\n", instance);
 		(void) ldc_fini(vdc->ldc_handle);
 		vdc->ldc_handle = NULL;
 	}
@@ -1727,18 +1746,18 @@ vdc_reset_connection(vdc_t *vdc, boolean_t reset_ldc)
 	ASSERT(vdc != NULL);
 	ASSERT(mutex_owned(&vdc->lock));
 
-	PR0("%s[%d] Entered\n", __func__, vdc->instance);
+	cmn_err(CE_CONT, "?[%d] Resetting connection to vDisk server\n",
+			vdc->instance);
 
 	vdc->state = VD_STATE_INIT;
 
 	if (reset_ldc) {
-		status = ldc_reset(vdc->ldc_handle);
-		PR0("%s[%d]  ldc_reset() = %d\n",
-				__func__, vdc->instance, status);
+		status = ldc_down(vdc->ldc_handle);
+		DMSG(0, "[%d]  ldc_down() = %d\n", vdc->instance, status);
 	}
 
 	vdc->initialized &= ~VDC_HANDSHAKE;
-	PR0("%s[%d] init=%x\n", __func__, vdc->instance, vdc->initialized);
+	DMSG(0, "[%d] initialized=%x\n", vdc->instance, vdc->initialized);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1766,28 +1785,49 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 	int	status = 0;
 	int	i;
 
-	PR0("%s[%d] initialized=%x\n",
-			__func__, vdc->instance, vdc->initialized);
+	DMSG(0, "[%d] initialized=%x\n", vdc->instance, vdc->initialized);
 
 	ASSERT(vdc != NULL);
 	ASSERT(mutex_owned(&vdc->lock));
 	ASSERT(vdc->ldc_handle != NULL);
 
+	/* ensure we have enough room to store max sized block */
+	ASSERT(maxphys <= VD_MAX_BLOCK_SIZE);
+
 	if ((vdc->initialized & VDC_DRING_INIT) == 0) {
-		PR0("%s[%d] ldc_mem_dring_create\n", __func__, vdc->instance);
-		status = ldc_mem_dring_create(VD_DRING_LEN, VD_DRING_ENTRY_SZ,
-				&vdc->ldc_dring_hdl);
+		DMSG(0, "[%d] ldc_mem_dring_create\n", vdc->instance);
+		/*
+		 * Calculate the maximum block size we can transmit using one
+		 * Descriptor Ring entry from the attributes returned by the
+		 * vDisk server. This is subject to a minimum of 'maxphys'
+		 * as we do not have the capability to split requests over
+		 * multiple DRing entries.
+		 */
+		if ((vdc->max_xfer_sz * vdc->block_size) < maxphys) {
+			DMSG(0, "[%d] using minimum DRing size\n",
+					vdc->instance);
+			vdc->dring_max_cookies = maxphys / PAGESIZE;
+		} else {
+			vdc->dring_max_cookies =
+				(vdc->max_xfer_sz * vdc->block_size) / PAGESIZE;
+		}
+		vdc->dring_entry_size = (sizeof (vd_dring_entry_t) +
+				(sizeof (ldc_mem_cookie_t) *
+					(vdc->dring_max_cookies - 1)));
+		vdc->dring_len = VD_DRING_LEN;
+
+		status = ldc_mem_dring_create(vdc->dring_len,
+				vdc->dring_entry_size, &vdc->ldc_dring_hdl);
 		if ((vdc->ldc_dring_hdl == NULL) || (status != 0)) {
-			PR0("%s: Failed to create a descriptor ring", __func__);
+			cmn_err(CE_NOTE, "[%d] Descriptor ring creation failed",
+					vdc->instance);
 			return (status);
 		}
-		vdc->dring_entry_size = VD_DRING_ENTRY_SZ;
-		vdc->dring_len = VD_DRING_LEN;
 		vdc->initialized |= VDC_DRING_INIT;
 	}
 
 	if ((vdc->initialized & VDC_DRING_BOUND) == 0) {
-		PR0("%s[%d] ldc_mem_dring_bind\n", __func__, vdc->instance);
+		DMSG(0, "[%d] ldc_mem_dring_bind\n", vdc->instance);
 		vdc->dring_cookie =
 			kmem_zalloc(sizeof (ldc_mem_cookie_t), KM_SLEEP);
 
@@ -1796,9 +1836,9 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 				&vdc->dring_cookie[0],
 				&vdc->dring_cookie_count);
 		if (status != 0) {
-			PR0("%s: Failed to bind descriptor ring (%p) "
-				"to channel (%p)\n",
-				__func__, vdc->ldc_dring_hdl, vdc->ldc_handle);
+			cmn_err(CE_NOTE, "[%d] Failed to bind descriptor ring "
+				"(%lx) to channel (%lx)\n", vdc->instance,
+				vdc->ldc_dring_hdl, vdc->ldc_handle);
 			return (status);
 		}
 		ASSERT(vdc->dring_cookie_count == 1);
@@ -1807,17 +1847,17 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 
 	status = ldc_mem_dring_info(vdc->ldc_dring_hdl, &vdc->dring_mem_info);
 	if (status != 0) {
-		PR0("%s: Failed to get info for descriptor ring (%p)\n",
-			__func__, vdc->ldc_dring_hdl);
+		DMSG(0, "[%d] Failed to get info for descriptor ring (%lx)\n",
+			vdc->instance, vdc->ldc_dring_hdl);
 		return (status);
 	}
 
 	if ((vdc->initialized & VDC_DRING_LOCAL) == 0) {
-		PR0("%s[%d] local dring\n", __func__, vdc->instance);
+		DMSG(0, "[%d] local dring\n", vdc->instance);
 
 		/* Allocate the local copy of this dring */
 		vdc->local_dring =
-			kmem_zalloc(VD_DRING_LEN * sizeof (vdc_local_desc_t),
+			kmem_zalloc(vdc->dring_len * sizeof (vdc_local_desc_t),
 						KM_SLEEP);
 		vdc->initialized |= VDC_DRING_LOCAL;
 	}
@@ -1829,7 +1869,7 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 	 * at the start.
 	 */
 	vdc->initialized |= VDC_DRING_ENTRY;
-	for (i = 0; i < VD_DRING_LEN; i++) {
+	for (i = 0; i < vdc->dring_len; i++) {
 		dep = VDC_GET_DRING_ENTRY_PTR(vdc, i);
 		dep->hdr.dstate = VIO_DESC_FREE;
 
@@ -1853,7 +1893,9 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 	 * we set it to the last DRing entry so that it wraps around to zero
 	 * for the 1st entry to be used.
 	 */
-	vdc->dring_curr_idx = VD_DRING_LEN - 1;
+	vdc->dring_curr_idx = vdc->dring_len - 1;
+
+	vdc->dring_notify_server = B_TRUE;
 
 	return (status);
 }
@@ -1882,11 +1924,11 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
 	ASSERT(mutex_owned(&vdc->lock));
 	ASSERT(vdc->state == VD_STATE_INIT);
 
-	PR0("%s: Entered\n", __func__);
+	DMSG(0, "[%d] Entered\n", vdc->instance);
 
 	if (vdc->initialized & VDC_DRING_ENTRY) {
-		PR0("[%d] Removing Local DRing entries\n", vdc->instance);
-		for (i = 0; i < VD_DRING_LEN; i++) {
+		DMSG(0, "[%d] Removing Local DRing entries\n", vdc->instance);
+		for (i = 0; i < vdc->dring_len; i++) {
 			ldep = &vdc->local_dring[i];
 			mhdl = ldep->desc_mhdl;
 
@@ -1901,33 +1943,33 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
 	}
 
 	if (vdc->initialized & VDC_DRING_LOCAL) {
-		PR0("[%d] Freeing Local DRing\n", vdc->instance);
+		DMSG(0, "[%d] Freeing Local DRing\n", vdc->instance);
 		kmem_free(vdc->local_dring,
-				VD_DRING_LEN * sizeof (vdc_local_desc_t));
+				vdc->dring_len * sizeof (vdc_local_desc_t));
 		vdc->initialized &= ~VDC_DRING_LOCAL;
 	}
 
 	if (vdc->initialized & VDC_DRING_BOUND) {
-		PR0("[%d] Unbinding DRing\n", vdc->instance);
+		DMSG(0, "[%d] Unbinding DRing\n", vdc->instance);
 		status = ldc_mem_dring_unbind(vdc->ldc_dring_hdl);
 		if (status == 0) {
 			vdc->initialized &= ~VDC_DRING_BOUND;
 		} else {
-			vdc_msg("%s: Failed to unbind Descriptor Ring (%lx)\n",
-				vdc->ldc_dring_hdl);
+			cmn_err(CE_NOTE, "[%d] Error %d unbinding DRing %lx",
+				vdc->instance, status, vdc->ldc_dring_hdl);
 		}
 	}
 
 	if (vdc->initialized & VDC_DRING_INIT) {
-		PR0("[%d] Destroying DRing\n", vdc->instance);
+		DMSG(0, "[%d] Destroying DRing\n", vdc->instance);
 		status = ldc_mem_dring_destroy(vdc->ldc_dring_hdl);
 		if (status == 0) {
 			vdc->ldc_dring_hdl = NULL;
 			bzero(&vdc->dring_mem_info, sizeof (ldc_mem_info_t));
 			vdc->initialized &= ~VDC_DRING_INIT;
 		} else {
-			vdc_msg("%s: Failed to destroy Descriptor Ring (%lx)\n",
-					vdc->ldc_dring_hdl);
+			cmn_err(CE_NOTE, "[%d] Error %d destroying DRing (%lx)",
+				vdc->instance, status, vdc->ldc_dring_hdl);
 		}
 	}
 }
@@ -1941,7 +1983,7 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
  *	freed (the ACK handler will signal).
  *
  * Return Value:
- *	0 <= rv < VD_DRING_LEN		Next available slot
+ *	0 <= rv < vdc->dring_len		Next available slot
  *	-1 				DRing is full
  */
 static int
@@ -1954,13 +1996,13 @@ vdc_get_next_dring_entry_idx(vdc_t *vdc, uint_t num_slots_needed)
 	int			idx = -1;
 
 	ASSERT(vdc != NULL);
-	ASSERT(vdc->dring_len == VD_DRING_LEN);
+	ASSERT(vdc->dring_len == vdc->dring_len);
 	ASSERT(vdc->dring_curr_idx >= 0);
-	ASSERT(vdc->dring_curr_idx < VD_DRING_LEN);
+	ASSERT(vdc->dring_curr_idx < vdc->dring_len);
 	ASSERT(mutex_owned(&vdc->dring_lock));
 
 	/* pick the next descriptor after the last one used */
-	idx = (vdc->dring_curr_idx + 1) % VD_DRING_LEN;
+	idx = (vdc->dring_curr_idx + 1) % vdc->dring_len;
 	ldep = &vdc->local_dring[idx];
 	ASSERT(ldep != NULL);
 	dep = ldep->dep;
@@ -1972,11 +2014,11 @@ vdc_get_next_dring_entry_idx(vdc_t *vdc, uint_t num_slots_needed)
 	} else {
 		DTRACE_PROBE(full);
 		(void) cv_timedwait(&ldep->cv, &ldep->lock,
-					VD_GET_TIMEOUT_HZ(1));
+					VD_GET_TIMEOUT_HZ(vdc_hz_timeout, 1));
 		if (dep->hdr.dstate == VIO_DESC_FREE) {
 			vdc->dring_curr_idx = idx;
 		} else {
-			PR0("[%d] Entry %d unavailable still in state %d\n",
+			DMSG(0, "[%d] Entry %d unavailable still in state %d\n",
 					vdc->instance, idx, dep->hdr.dstate);
 			idx = -1; /* indicate that the ring is full */
 		}
@@ -2038,7 +2080,7 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	idx = vdc_get_next_dring_entry_idx(vdc, 1);
 	if (idx == -1) {
 		mutex_exit(&vdc->dring_lock);
-		PR0("[%d] no descriptor ring entry avail, last seq=%d\n",
+		DMSG(0, "[%d] no descriptor ring entry avail, last seq=%ld\n",
 				vdc->instance, vdc->seq_num - 1);
 
 		/*
@@ -2048,7 +2090,7 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 		return (EAGAIN);
 	}
 
-	ASSERT(idx < VD_DRING_LEN);
+	ASSERT(idx < vdc->dring_len);
 	local_dep = &vdc->local_dring[idx];
 	dep = local_dep->dep;
 	ASSERT(dep != NULL);
@@ -2058,7 +2100,7 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	 * DRing lock. This prevents a race condition where another vdc thread
 	 * could grab the descriptor we selected.
 	 */
-	ASSERT(!MUTEX_HELD(&local_dep->lock));
+	ASSERT(MUTEX_NOT_HELD(&local_dep->lock));
 	mutex_enter(&local_dep->lock);
 	mutex_exit(&vdc->dring_lock);
 
@@ -2067,7 +2109,8 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	case VD_OP_BWRITE:
 		local_dep->buf = (struct buf *)addr;
 		local_dep->addr = local_dep->buf->b_un.b_addr;
-		PR1("buf=%p, block=%lx, nbytes=%lx\n", addr, arg, nbytes);
+		DMSG(2, "[%d] buf=%p, block=%lx, nbytes=%lu\n",
+				vdc->instance, (void *)addr, arg, nbytes);
 		dep->payload.addr = (diskaddr_t)arg;
 		rv = vdc_populate_mem_hdl(vdc, idx, local_dep->addr,
 						nbytes, operation);
@@ -2092,7 +2135,7 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 		break;
 
 	default:
-		cmn_err(CE_NOTE, "[%d] Unsupported vDisk operation [%d]\n",
+		cmn_err(CE_CONT, "?[%d] Unsupported vDisk operation [%d]\n",
 				vdc->instance, operation);
 		rv = EINVAL;
 	}
@@ -2108,7 +2151,7 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	dep->payload.req_id = VDC_GET_NEXT_REQ_ID(vdc);
 	dep->payload.operation = operation;
 	dep->payload.nbytes = nbytes;
-	dep->payload.status = EINPROGRESS;	/* vds will set valid value */
+	dep->payload.status = -1;	/* vds will set valid value */
 	dep->payload.slice = slice;
 	dep->hdr.dstate = VIO_DESC_READY;
 	dep->hdr.ack = 1;		/* request an ACK for every message */
@@ -2127,19 +2170,22 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 
 	DTRACE_IO2(send, vio_dring_msg_t *, &dmsg, vdc_t *, vdc);
 
-	PR1("ident=0x%llx, st=%d, end=%d, seq=%d req=%d dep=%p\n",
-			vdc->dring_ident, dmsg.start_idx, dmsg.end_idx,
-			dmsg.seq_num, dep->payload.req_id, dep);
+	DMSG(2, "[%d] ident=0x%lx, st=%u, end=%u, seq=%ld req=%ld dep=%p\n",
+			vdc->instance, vdc->dring_ident,
+			dmsg.start_idx, dmsg.end_idx,
+			dmsg.seq_num, dep->payload.req_id, (void *)dep);
 
 	rv = vdc_send(vdc, (caddr_t)&dmsg, &msglen);
-	PR1("%s[%d]: ldc_write() rv=%d\n", __func__, vdc->instance, rv);
+	DMSG(1, "[%d] send via LDC: rv=%d\n", vdc->instance, rv);
 	if (rv != 0) {
-		mutex_exit(&vdc->lock);
-		mutex_exit(&local_dep->lock);
-		vdc_msg("%s: ldc_write(%d)\n", __func__, rv);
+		cmn_err(CE_NOTE, "[%d] err (%d) sending DRing data msg via LDC",
+				vdc->instance, rv);
 
 		/* Clear the DRing entry */
 		rv = vdc_depopulate_descriptor(vdc, idx);
+
+		mutex_exit(&vdc->lock);
+		mutex_exit(&local_dep->lock);
 
 		return (rv ? rv : EAGAIN);
 	}
@@ -2173,13 +2219,13 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 			 */
 			if ((rv == 0) && (msglen == 0)) {
 				if (retries++ > vdc_dump_retries) {
-					PR0("[%d] Giving up waiting, idx %d\n",
+					DMSG(0, "[%d] Stopping wait, idx %d\n",
 							vdc->instance, idx);
 					rv = EAGAIN;
 					break;
 				}
 
-				PR1("Waiting for next packet @ %d\n", idx);
+				DMSG(1, "Waiting for next packet @ %d\n", idx);
 				drv_usecwait(vdc_usec_timeout_dump);
 				continue;
 			}
@@ -2190,7 +2236,7 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 			 */
 			if ((dmsg.tag.vio_msgtype != VIO_TYPE_DATA) ||
 			    (dmsg.tag.vio_subtype_env != VIO_DRING_DATA)) {
-				PR0("discarding pkt: type=%d sub=%d env=%d\n",
+				DMSG(0, "discard pkt: type=%d sub=%d env=%d\n",
 					dmsg.tag.vio_msgtype,
 					dmsg.tag.vio_subtype,
 					dmsg.tag.vio_subtype_env);
@@ -2213,19 +2259,19 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 			}
 
 			start = dmsg.start_idx;
-			if (start >= VD_DRING_LEN) {
-				PR0("[%d] Bogus ack data : start %d\n",
+			if (start >= vdc->dring_len) {
+				DMSG(0, "[%d] Bogus ack data : start %d\n",
 					vdc->instance, start);
 				continue;
 			}
 
 			dep = VDC_GET_DRING_ENTRY_PTR(vdc, start);
 
-			PR1("[%d] Dumping start=%d idx=%d state=%d\n",
+			DMSG(1, "[%d] Dumping start=%d idx=%d state=%d\n",
 				vdc->instance, start, idx, dep->hdr.dstate);
 
 			if (dep->hdr.dstate != VIO_DESC_DONE) {
-				PR0("[%d] Entry @ %d - state !DONE %d\n",
+				DMSG(0, "[%d] Entry @ %d - state !DONE %d\n",
 					vdc->instance, start, dep->hdr.dstate);
 				continue;
 			}
@@ -2238,7 +2284,7 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 			 * error with the correct request.
 			 */
 			if (idx > start) {
-				PR0("[%d] Looping: start %d, idx %d\n",
+				DMSG(0, "[%d] Looping: start %d, idx %d\n",
 						vdc->instance, idx, start);
 				continue;
 			}
@@ -2274,7 +2320,7 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	}
 
 	rv = vdc_depopulate_descriptor(vdc, idx);
-	PR1("%s[%d] Status=%d\n", __func__, vdc->instance, rv);
+	DMSG(0, "[%d] Exiting: status=%d\n", vdc->instance, rv);
 
 	mutex_exit(&local_dep->lock);
 
@@ -2306,38 +2352,38 @@ vdc_wait_for_descriptor_update(vdc_t *vdc, uint_t idx, vio_dring_msg_t dmsg)
 	int	rv = 0;
 
 	ASSERT(vdc != NULL);
-	ASSERT(idx < VD_DRING_LEN);
+	ASSERT(idx < vdc->dring_len);
 	local_dep = &vdc->local_dring[idx];
 	ASSERT(local_dep != NULL);
+	ASSERT(MUTEX_HELD(&local_dep->lock));
 	dep = local_dep->dep;
 	ASSERT(dep != NULL);
 
 	while (dep->hdr.dstate != VIO_DESC_DONE) {
 		rv = cv_timedwait(&local_dep->cv, &local_dep->lock,
-			VD_GET_TIMEOUT_HZ(retries));
+			VD_GET_TIMEOUT_HZ(vdc_hz_timeout, retries));
 		if (rv == -1) {
 			/*
 			 * If they persist in ignoring us we'll storm off in a
 			 * huff and return ETIMEDOUT to the upper layers.
 			 */
 			if (retries >= vdc_retries) {
-				PR0("%s: Finished waiting on entry %d\n",
-					__func__, idx);
+				DMSG(0, "[%d] Finished waiting on entry %d\n",
+					vdc->instance, idx);
 				status = ETIMEDOUT;
 				break;
 			} else {
 				retries++;
-				PR0("%s[%d]: Timeout #%d on entry %d "
-				    "[seq %d][req %d]\n", __func__,
-				    vdc->instance,
+				DMSG(0, "[%d] Timeout #%d on entry %d "
+				    "[seq %lu][req %lu]\n", vdc->instance,
 				    retries, idx, dmsg.seq_num,
 				    dep->payload.req_id);
 			}
 
 			if (dep->hdr.dstate & VIO_DESC_ACCEPTED) {
-				PR0("%s[%d]: vds has accessed entry %d [seq %d]"
-				    "[req %d] but not ack'ed it yet\n",
-				    __func__, vdc->instance, idx, dmsg.seq_num,
+				DMSG(0, "[%d] entry %d ACCEPTED [seq %lu]"
+				    "[req %lu] but not ACK'ed by vds yet\n",
+				    vdc->instance, idx, dmsg.seq_num,
 				    dep->payload.req_id);
 				continue;
 			}
@@ -2353,8 +2399,9 @@ vdc_wait_for_descriptor_update(vdc_t *vdc, uint_t idx, vio_dring_msg_t dmsg)
 			status = vdc_send(vdc, (caddr_t)&dmsg, &msglen);
 			if (status != 0) {
 				mutex_exit(&vdc->lock);
-				vdc_msg("%s: Error (%d) while resending after "
-					"timeout\n", __func__, status);
+				cmn_err(CE_NOTE, "[%d] Error (%d) while sending"
+						" after timeout",
+						vdc->instance, status);
 				status = ETIMEDOUT;
 				break;
 			}
@@ -2394,17 +2441,19 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 	int		rv = 0;
 
 	ASSERT(vdc != NULL);
-	ASSERT(idx < VD_DRING_LEN);
+	ASSERT(idx < vdc->dring_len);
 	ldep = &vdc->local_dring[idx];
 	ASSERT(ldep != NULL);
+	ASSERT(MUTEX_HELD(&ldep->lock));
 	dep = ldep->dep;
 	ASSERT(dep != NULL);
+	ASSERT((dep->hdr.dstate == VIO_DESC_DONE) ||
+			(dep->payload.status == ECANCELED));
 
+	VDC_MARK_DRING_ENTRY_FREE(vdc, idx);
+	VIO_SET_DESC_STATE(ldep->flags, VIO_DESC_FREE);
 	status = dep->payload.status;
 	operation = dep->payload.operation;
-	VDC_MARK_DRING_ENTRY_FREE(vdc, idx);
-	ldep = &vdc->local_dring[idx];
-	VIO_SET_DESC_STATE(ldep->flags, VIO_DESC_FREE);
 
 	/* the DKIO W$ operations never bind handles so we can return now */
 	if ((operation == VD_OP_FLUSH) ||
@@ -2429,7 +2478,7 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 
 	rv = ldc_mem_unbind_handle(ldep->desc_mhdl);
 	if (rv != 0) {
-		cmn_err(CE_NOTE, "[%d] unbind mem hdl 0x%lx @ idx %d failed:%d",
+		cmn_err(CE_CONT, "?[%d] unbind mhdl 0x%lx @ idx %d failed (%d)",
 				vdc->instance, ldep->desc_mhdl, idx, rv);
 		/*
 		 * The error returned by the vDisk server is more informative
@@ -2472,7 +2521,7 @@ vdc_populate_mem_hdl(vdc_t *vdc, uint_t idx, caddr_t addr, size_t nbytes,
 	int			i;
 
 	ASSERT(vdc != NULL);
-	ASSERT(idx < VD_DRING_LEN);
+	ASSERT(idx < vdc->dring_len);
 
 	dep = VDC_GET_DRING_ENTRY_PTR(vdc, idx);
 	ldep = &vdc->local_dring[idx];
@@ -2511,10 +2560,10 @@ vdc_populate_mem_hdl(vdc_t *vdc, uint_t idx, caddr_t addr, size_t nbytes,
 		ldep->align_addr =
 			kmem_zalloc(sizeof (caddr_t) * P2ROUNDUP(nbytes, 8),
 					KM_SLEEP);
-		PR0("%s[%d] Misaligned address %lx reallocating "
-		    "(buf=%lx nb=%d op=%d entry=%d)\n",
-		    __func__, vdc->instance, addr, ldep->align_addr, nbytes,
-		    operation, idx);
+		DMSG(0, "[%d] Misaligned address %p reallocating "
+		    "(buf=%p nb=%ld op=%d entry=%d)\n",
+		    vdc->instance, (void *)addr, (void *)ldep->align_addr,
+		    nbytes, operation, idx);
 		bcopy(addr, ldep->align_addr, nbytes);
 		vaddr = ldep->align_addr;
 	}
@@ -2522,12 +2571,12 @@ vdc_populate_mem_hdl(vdc_t *vdc, uint_t idx, caddr_t addr, size_t nbytes,
 	rv = ldc_mem_bind_handle(mhdl, vaddr, P2ROUNDUP(nbytes, 8),
 		LDC_SHADOW_MAP, perm, &dep->payload.cookie[0],
 		&dep->payload.ncookies);
-	PR1("%s[%d] bound mem handle; ncookies=%d\n",
-			__func__, vdc->instance, dep->payload.ncookies);
+	DMSG(2, "[%d] bound mem handle; ncookies=%d\n",
+			vdc->instance, dep->payload.ncookies);
 	if (rv != 0) {
-		vdc_msg("%s[%d] failed to ldc_mem_bind_handle "
-		    "(mhdl=%lx, buf=%lx entry=%d err=%d)\n",
-		    __func__, vdc->instance, mhdl, addr, idx, rv);
+		cmn_err(CE_CONT, "?[%d] Failed to bind LDC memory handle "
+		    "(mhdl=%p, buf=%p entry=%u err=%d)\n",
+		    vdc->instance, (void *)mhdl, (void *)addr, idx, rv);
 		if (ldep->align_addr) {
 			kmem_free(ldep->align_addr,
 				sizeof (caddr_t) * P2ROUNDUP(nbytes, 8));
@@ -2543,8 +2592,9 @@ vdc_populate_mem_hdl(vdc_t *vdc, uint_t idx, caddr_t addr, size_t nbytes,
 		rv = ldc_mem_nextcookie(mhdl, &dep->payload.cookie[i]);
 		if (rv != 0) {
 			(void) ldc_mem_unbind_handle(mhdl);
-			vdc_msg("%s: failed to get next cookie(mhdl=%lx "
-				"cnum=%d), err=%d", __func__, mhdl, i, rv);
+			cmn_err(CE_CONT, "?[%d] Failed to get next cookie "
+					"(mhdl=%lx cnum=%d), err=%d",
+					vdc->instance, mhdl, i, rv);
 			if (ldep->align_addr) {
 				kmem_free(ldep->align_addr,
 					sizeof (caddr_t) * dep->payload.nbytes);
@@ -2584,8 +2634,7 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 
 	ASSERT(vdc != NULL);
 
-	PR1("%s[%d] event=%x seqID=%d\n",
-			__func__, vdc->instance, event, vdc->seq_num);
+	DMSG(1, "[%d] evt=%lx seqID=%ld\n", vdc->instance, event, vdc->seq_num);
 
 	/*
 	 * Depending on the type of event that triggered this callback,
@@ -2596,7 +2645,7 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 	 * check for the event types is deliberate.
 	 */
 	if (event & LDC_EVT_UP) {
-		PR0("%s[%d] Received LDC_EVT_UP\n", __func__, vdc->instance);
+		DMSG(0, "[%d] Received LDC_EVT_UP\n", vdc->instance);
 
 		/* get LDC state */
 		rv = ldc_status(vdc->ldc_handle, &ldc_state);
@@ -2642,7 +2691,7 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 	}
 
 	if (event & LDC_EVT_RESET) {
-		PR0("%s[%d] Recvd LDC RESET event\n", __func__, vdc->instance);
+		DMSG(0, "[%d] Received LDC RESET event\n", vdc->instance);
 
 		/* get LDC state */
 		rv = ldc_status(vdc->ldc_handle, &ldc_state);
@@ -2653,14 +2702,14 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 		}
 		mutex_enter(&vdc->lock);
 		vdc->ldc_state = ldc_state;
-		vdc_reset_connection(vdc, B_FALSE);
+		vdc_reset_connection(vdc, B_TRUE);
 		mutex_exit(&vdc->lock);
 
 		vdc_init_handshake_negotiation(vdc);
 	}
 
 	if (event & LDC_EVT_DOWN) {
-		PR0("%s[%d] Recvd LDC DOWN event\n", __func__, vdc->instance);
+		DMSG(0, "[%d] Received LDC DOWN event\n", vdc->instance);
 
 		/* get LDC state */
 		rv = ldc_status(vdc->ldc_handle, &ldc_state);
@@ -2705,46 +2754,46 @@ static void
 vdc_process_msg_thread(vdc_t *vdc)
 {
 	int		status = 0;
-	boolean_t	q_is_empty = B_TRUE;
+	boolean_t	q_has_pkts = B_FALSE;
 
 	ASSERT(vdc != NULL);
 
 	mutex_enter(&vdc->msg_proc_lock);
-	PR0("%s[%d]: Starting\n", __func__, vdc->instance);
+	DMSG(0, "[%d] Starting\n", vdc->instance);
 
 	vdc->msg_proc_thr_state = VDC_THR_RUNNING;
 
 	while (vdc->msg_proc_thr_state == VDC_THR_RUNNING) {
 
-		PR1("%s[%d] Waiting\n", __func__, vdc->instance);
+		DMSG(2, "[%d] Waiting\n", vdc->instance);
 		while (!vdc->msg_pending)
 			cv_wait(&vdc->msg_proc_cv, &vdc->msg_proc_lock);
 
-		PR1("%s[%d] Message Received\n", __func__, vdc->instance);
+		DMSG(2, "[%d] Message Received\n", vdc->instance);
 
 		/* check if there is data */
-		status = ldc_chkq(vdc->ldc_handle, &q_is_empty);
+		status = ldc_chkq(vdc->ldc_handle, &q_has_pkts);
 		if ((status != 0) &&
 		    (vdc->msg_proc_thr_state == VDC_THR_RUNNING)) {
 			cmn_err(CE_NOTE, "[%d] Unable to communicate with vDisk"
 					" server. Cannot check LDC queue: %d",
 					vdc->instance, status);
 			mutex_enter(&vdc->lock);
-			vdc_reset_connection(vdc, B_FALSE);
+			vdc_reset_connection(vdc, B_TRUE);
 			mutex_exit(&vdc->lock);
 			vdc->msg_proc_thr_state = VDC_THR_STOP;
 			continue;
 		}
 
-		if (!q_is_empty) {
-			PR1("%s: new pkt(s) available\n", __func__);
+		if (q_has_pkts) {
+			DMSG(2, "[%d] new pkt(s) available\n", vdc->instance);
 			vdc_process_msg(vdc);
 		}
 
 		vdc->msg_pending = B_FALSE;
 	}
 
-	PR0("Message processing thread stopped\n");
+	DMSG(0, "[%d] Message processing thread stopped\n", vdc->instance);
 	vdc->msg_pending = B_FALSE;
 	vdc->msg_proc_thr_state = VDC_THR_DONE;
 	cv_signal(&vdc->msg_proc_cv);
@@ -2783,7 +2832,7 @@ vdc_process_msg(void *arg)
 
 	mutex_enter(&vdc->lock);
 
-	PR1("%s\n", __func__);
+	DMSG(1, "[%d]\n", vdc->instance);
 
 	for (;;) {
 
@@ -2791,7 +2840,8 @@ vdc_process_msg(void *arg)
 		status = ldc_read(vdc->ldc_handle, (caddr_t)&vio_msg, &nbytes);
 
 		if (status) {
-			vdc_msg("%s: ldc_read() failed = %d", __func__, status);
+			cmn_err(CE_CONT, "?[%d] Error %d reading LDC msg\n",
+					vdc->instance, status);
 
 			/* if status is ECONNRESET --- reset vdc state */
 			if (status == EIO || status == ECONNRESET) {
@@ -2803,20 +2853,19 @@ vdc_process_msg(void *arg)
 		}
 
 		if ((nbytes > 0) && (nbytes < sizeof (vio_msg_tag_t))) {
-			cmn_err(CE_CONT, "![%d] Expect %lu bytes; recv'd %lu\n",
+			cmn_err(CE_CONT, "?[%d] Expect %lu bytes; recv'd %lu\n",
 				vdc->instance, sizeof (vio_msg_tag_t), nbytes);
 			mutex_exit(&vdc->lock);
 			return;
 		}
 
 		if (nbytes == 0) {
-			PR2("%s[%d]: ldc_read() done..\n",
-					__func__, vdc->instance);
+			DMSG(3, "[%d] ldc_read() done..\n", vdc->instance);
 			mutex_exit(&vdc->lock);
 			return;
 		}
 
-		PR1("%s[%d] (%x/%x/%x)\n", __func__, vdc->instance,
+		DMSG(2, "[%d] (%x/%x/%x)\n", vdc->instance,
 		    vio_msg.tag.vio_msgtype,
 		    vio_msg.tag.vio_subtype,
 		    vio_msg.tag.vio_subtype_env);
@@ -2829,10 +2878,13 @@ vdc_process_msg(void *arg)
 		 */
 		if ((vio_msg.tag.vio_sid != vdc->session_id) &&
 		    (vio_msg.tag.vio_subtype_env != VIO_VER_INFO)) {
-			cmn_err(CE_NOTE, "[%d] Invalid SID 0x%x, expect 0x%lx",
+			cmn_err(CE_NOTE, "[%d] Invalid SID: received 0x%x, "
+					"expected 0x%lx [seq num %lx @ %d]",
 				vdc->instance, vio_msg.tag.vio_sid,
-				vdc->session_id);
-			vdc_reset_connection(vdc, B_FALSE);
+				vdc->session_id,
+				((vio_dring_msg_t *)&vio_msg)->seq_num,
+				((vio_dring_msg_t *)&vio_msg)->start_idx);
+			vdc_reset_connection(vdc, B_TRUE);
 			mutex_exit(&vdc->lock);
 			return;
 		}
@@ -2848,15 +2900,22 @@ vdc_process_msg(void *arg)
 			status = vdc_process_err_msg(vdc, vio_msg);
 			break;
 		default:
-			PR1("%s", __func__);
+			cmn_err(CE_NOTE, "[%d] Unknown VIO message type",
+					vdc->instance);
 			status = EINVAL;
 			break;
 		}
 
 		if (status != 0) {
-			PR0("%s[%d] Error (%d) occcurred processing msg\n",
-					__func__, vdc->instance, status);
-			vdc_reset_connection(vdc, B_FALSE);
+			DMSG(0, "[%d] Error (%d) occurred processing req %lu\n",
+					vdc->instance, status,
+					vdc->req_id_proc);
+			vdc_reset_connection(vdc, B_TRUE);
+
+			/* we need to drop the lock to trigger the handshake */
+			mutex_exit(&vdc->lock);
+			vdc_init_handshake_negotiation(vdc);
+			mutex_enter(&vdc->lock);
 		}
 	}
 	_NOTE(NOTREACHED)
@@ -2912,7 +2971,7 @@ vdc_process_ctrl_msg(vdc_t *vdc, vio_msg_t msg)
 			break;
 		}
 
-		PR0("%s: Received RDX - handshake successful\n", __func__);
+		DMSG(0, "[%d] Received RDX: handshake done\n", vdc->instance);
 
 		vdc->hshake_cnt = 0;	/* reset failed handshake count */
 		status = 0;
@@ -2962,10 +3021,11 @@ vdc_process_data_msg(vdc_t *vdc, vio_msg_t msg)
 	int			status = 0;
 	vdc_local_desc_t	*ldep = NULL;
 	vio_dring_msg_t		*dring_msg = NULL;
-	uint_t			num_msgs;
 	uint_t			start;
-	uint_t			end;
-	uint_t			i;
+	int			end;
+	uint_t			count = 0;
+	uint_t			operation;
+	uint_t			idx;
 
 	ASSERT(msg.tag.vio_msgtype == VIO_TYPE_DATA);
 	ASSERT(vdc != NULL);
@@ -2976,53 +3036,47 @@ vdc_process_data_msg(vdc_t *vdc, vio_msg_t msg)
 	/*
 	 * Check to see if the message has bogus data
 	 */
-	start = dring_msg->start_idx;
+	idx = start = dring_msg->start_idx;
 	end = dring_msg->end_idx;
-	if ((start >= VD_DRING_LEN) || (end >= VD_DRING_LEN)) {
-		vdc_msg("%s: Bogus ACK data : start %d, end %d\n",
-			__func__, start, end);
-		return (EPROTO);
+	if ((start >= vdc->dring_len) ||
+	    (end >= vdc->dring_len) || (end < -1)) {
+		cmn_err(CE_CONT, "?[%d] Bogus ACK data : start %d, end %d\n",
+			vdc->instance, start, end);
+		return (EINVAL);
 	}
 
 	DTRACE_IO2(recv, vio_dring_msg_t, dring_msg, vdc_t *, vdc);
 
 	/*
-	 * calculate the number of messages that vds ACK'ed
-	 *
-	 * Assumes, (like the rest of vdc) that there is a 1:1 mapping
-	 * between requests and Dring entries.
-	 */
-	num_msgs = (end >= start) ?
-			(end - start + 1) :
-			(VD_DRING_LEN - start + end + 1);
-
-	/*
 	 * Verify that the sequence number is what vdc expects.
 	 */
-	if (!vdc_verify_seq_num(vdc, dring_msg, num_msgs)) {
+	switch (vdc_verify_seq_num(vdc, dring_msg)) {
+	case VDC_SEQ_NUM_TODO:
+		break;	/* keep processing this message */
+	case VDC_SEQ_NUM_SKIP:
+		return (0);
+	case VDC_SEQ_NUM_INVALID:
 		return (ENXIO);
 	}
 
-	/*
-	 * Wake the thread waiting for each DRing entry ACK'ed
-	 */
-	for (i = 0; i < num_msgs; i++) {
-		int operation;
-		int idx = (start + i) % VD_DRING_LEN;
+	if (msg.tag.vio_subtype == VIO_SUBTYPE_NACK) {
+		DMSG(0, "[%d] DATA NACK\n", vdc->instance);
+		VDC_DUMP_DRING_MSG(dring_msg);
+		return (EIO);
 
-		ldep = &vdc->local_dring[idx];
+	} else if (msg.tag.vio_subtype == VIO_SUBTYPE_INFO) {
+		return (EPROTO);
+	}
+
+	ldep = &vdc->local_dring[start];
+	if (ldep->dep->hdr.dstate == VIO_DESC_DONE) {
 		mutex_enter(&ldep->lock);
 		operation = ldep->dep->payload.operation;
+		vdc->req_id_proc = ldep->dep->payload.req_id;
+		vdc->dring_proc_idx = idx;
+		ASSERT(ldep->dep->hdr.dstate == VIO_DESC_DONE);
+
 		if ((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) {
-			/*
-			 * The vDisk server responds when it accepts a
-			 * descriptor so we continue looping and process
-			 * it when it sends the message that it is done.
-			 */
-			if (ldep->dep->hdr.dstate != VIO_DESC_DONE) {
-				mutex_exit(&ldep->lock);
-				continue;
-			}
 			bioerror(ldep->buf, ldep->dep->payload.status);
 			biodone(ldep->buf);
 
@@ -3035,18 +3089,8 @@ vdc_process_data_msg(vdc_t *vdc, vio_msg_t msg)
 		mutex_exit(&ldep->lock);
 	}
 
-	if (msg.tag.vio_subtype == VIO_SUBTYPE_NACK) {
-		PR0("%s: DATA NACK\n", __func__);
-		VDC_DUMP_DRING_MSG(dring_msg);
-		vdc_reset_connection(vdc, B_FALSE);
-
-		/* we need to drop the lock to trigger the handshake */
-		mutex_exit(&vdc->lock);
-		vdc_init_handshake_negotiation(vdc);
-		mutex_enter(&vdc->lock);
-	} else if (msg.tag.vio_subtype == VIO_SUBTYPE_INFO) {
-		status = EPROTO;
-	}
+	/* probe gives the count of how many entries were processed */
+	DTRACE_IO2(processed, int, count, vdc_t *, vdc);
 
 	return (status);
 }
@@ -3133,7 +3177,7 @@ vdc_handle_ver_msg(vdc_t *vdc, vio_ver_msg_t *ver_msg)
 			ver_msg->dev_class = VDEV_DISK;
 
 			status = vdc_send(vdc, (caddr_t)ver_msg, &len);
-			PR0("[%d] Resend VER info (LDC status = %d)\n",
+			DMSG(0, "[%d] Resend VER info (LDC status = %d)\n",
 					vdc->instance, status);
 			if (len != sizeof (*ver_msg))
 				status = EBADMSG;
@@ -3193,26 +3237,34 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 		vdc->vdisk_size = attr_msg->vdisk_size;
 		vdc->vdisk_type = attr_msg->vdisk_type;
 
-		if ((attr_msg->max_xfer_sz != vdc->max_xfer_sz) ||
-		    (attr_msg->vdisk_block_size != vdc->block_size)) {
-			/*
-			 * Future support: step down to the block size
-			 * and max transfer size suggested by the
-			 * server. (If this value is less than 128K
-			 * then multiple Dring entries per request
-			 * would need to be implemented)
-			 */
-			cmn_err(CE_NOTE, "[%d] Couldn't process block "
-				"attributes from vds", vdc->instance);
-			status = EINVAL;
-			break;
+		DMSG(0, "[%d] max_xfer_sz: sent %lx acked %lx\n",
+			vdc->instance, vdc->max_xfer_sz, attr_msg->max_xfer_sz);
+		DMSG(0, "[%d] vdisk_block_size: sent %lx acked %x\n",
+			vdc->instance, vdc->block_size,
+			attr_msg->vdisk_block_size);
+
+		/*
+		 * We don't know at compile time what the vDisk server will
+		 * think are good values but we apply an large (arbitrary)
+		 * upper bound to prevent memory exhaustion in vdc if it was
+		 * allocating a DRing based of huge values sent by the server.
+		 * We probably will never exceed this except if the message
+		 * was garbage.
+		 */
+		if ((attr_msg->max_xfer_sz * attr_msg->vdisk_block_size) <=
+				(PAGESIZE * DEV_BSIZE)) {
+			vdc->max_xfer_sz = attr_msg->max_xfer_sz;
+			vdc->block_size = attr_msg->vdisk_block_size;
+		} else {
+			cmn_err(CE_NOTE, "[%d] vds block transfer size too big;"
+				" using max supported by vdc", vdc->instance);
 		}
 
 		if ((attr_msg->xfer_mode != VIO_DRING_MODE) ||
 		    (attr_msg->vdisk_size > INT64_MAX) ||
 		    (attr_msg->vdisk_type > VD_DISK_TYPE_DISK)) {
-			vdc_msg("%s[%d] Couldn't process attrs "
-			    "from vds", __func__, vdc->instance);
+			cmn_err(CE_NOTE, "[%d] Invalid attributes from vds",
+					vdc->instance);
 			status = EINVAL;
 			break;
 		}
@@ -3276,8 +3328,8 @@ vdc_handle_dring_reg_msg(vdc_t *vdc, vio_dring_reg_msg_t *dring_msg)
 	case VIO_SUBTYPE_ACK:
 		/* save the received dring_ident */
 		vdc->dring_ident = dring_msg->dring_ident;
-		PR0("%s[%d] Received dring ident=0x%lx\n",
-			__func__, vdc->instance, vdc->dring_ident);
+		DMSG(0, "[%d] Received dring ident=0x%lx\n",
+			vdc->instance, vdc->dring_ident);
 
 		/*
 		 * Send an RDX message to vds to indicate we are ready
@@ -3303,7 +3355,7 @@ vdc_handle_dring_reg_msg(vdc_t *vdc, vio_dring_reg_msg_t *dring_msg)
 		 * stop negotiating.
 		 */
 		cmn_err(CE_CONT, "server could not register DRing\n");
-		vdc_reset_connection(vdc, B_FALSE);
+		vdc_reset_connection(vdc, B_TRUE);
 		vdc_destroy_descriptor_ring(vdc);
 		status = EPROTO;
 		break;
@@ -3327,20 +3379,26 @@ vdc_handle_dring_reg_msg(vdc_t *vdc, vio_dring_reg_msg_t *dring_msg)
  *	vdc_verify_seq_num()
  *
  * Description:
- *	This functions verifies that the sequence number sent back by vds with
- *	the latest message correctly follows the last request processed.
+ *	This functions verifies that the sequence number sent back by the vDisk
+ *	server with the latest message is what is expected (i.e. it is greater
+ *	than the last seq num sent by the vDisk server and less than or equal
+ *	to the last seq num generated by vdc).
+ *
+ *	It then checks the request ID to see if any requests need processing
+ *	in the DRing.
  *
  * Arguments:
  *	vdc		- soft state pointer for this instance of the driver.
  *	dring_msg	- pointer to the LDC message sent by vds
- *	num_msgs	- the number of requests being acknowledged
  *
  * Return Code:
- *	B_TRUE	- Success.
- *	B_FALSE	- The seq numbers are so out of sync, vdc cannot deal with them
+ *	VDC_SEQ_NUM_TODO	- Message needs to be processed
+ *	VDC_SEQ_NUM_SKIP	- Message has already been processed
+ *	VDC_SEQ_NUM_INVALID	- The seq numbers are so out of sync,
+ *				  vdc cannot deal with them
  */
-static boolean_t
-vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg, int num_msgs)
+static int
+vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg)
 {
 	ASSERT(vdc != NULL);
 	ASSERT(dring_msg != NULL);
@@ -3348,29 +3406,23 @@ vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg, int num_msgs)
 
 	/*
 	 * Check to see if the messages were responded to in the correct
-	 * order by vds. There are 3 possible scenarios:
-	 *	- the seq_num we expected is returned (everything is OK)
-	 *	- a seq_num earlier than the last one acknowledged is returned,
-	 *	  if so something is seriously wrong so we reset the connection
-	 *	- a seq_num greater than what we expected is returned.
+	 * order by vds.
 	 */
-	if (dring_msg->seq_num < vdc->seq_num_reply) {
-		vdc_msg("%s[%d]: Bogus seq_num %d, expected %d\n",
-			__func__, vdc->instance, dring_msg->seq_num,
-			vdc->seq_num_reply + num_msgs);
-		if (dring_msg->seq_num < (vdc->seq_num_reply + num_msgs)) {
-			return (B_FALSE);
-		} else {
-			/*
-			 * vds has responded with a seq_num greater than what we
-			 * expected
-			 */
-			return (B_FALSE);
-		}
+	if ((dring_msg->seq_num <= vdc->seq_num_reply) ||
+	    (dring_msg->seq_num > vdc->seq_num)) {
+		cmn_err(CE_CONT, "?[%d] Bogus sequence_number %lu: "
+			"%lu > expected <= %lu (last proc req %lu sent %lu)\n",
+				vdc->instance, dring_msg->seq_num,
+				vdc->seq_num_reply, vdc->seq_num,
+				vdc->req_id_proc, vdc->req_id);
+		return (VDC_SEQ_NUM_INVALID);
 	}
-	vdc->seq_num_reply += num_msgs;
+	vdc->seq_num_reply = dring_msg->seq_num;
 
-	return (B_TRUE);
+	if (vdc->req_id_proc < vdc->req_id)
+		return (VDC_SEQ_NUM_TODO);
+	else
+		return (VDC_SEQ_NUM_SKIP);
 }
 
 
@@ -3409,7 +3461,7 @@ vdc_is_supported_version(vio_ver_msg_t *ver_msg)
 		 */
 		if (ver_msg->ver_major == vdc_version[i].major) {
 			if (ver_msg->ver_minor > vdc_version[i].minor) {
-				PR0("Adjusting minor version from %u to %u",
+				DMSG(0, "Adjusting minor version from %u to %u",
 				    ver_msg->ver_minor, vdc_version[i].minor);
 				ver_msg->ver_minor = vdc_version[i].minor;
 			}
@@ -3426,7 +3478,7 @@ vdc_is_supported_version(vio_ver_msg_t *ver_msg)
 		if (ver_msg->ver_major > vdc_version[i].major) {
 			ver_msg->ver_major = vdc_version[i].major;
 			ver_msg->ver_minor = vdc_version[i].minor;
-			PR0("Suggesting major/minor (0x%x/0x%x)\n",
+			DMSG(0, "Suggesting major/minor (0x%x/0x%x)\n",
 				ver_msg->ver_major, ver_msg->ver_minor);
 
 			return (B_FALSE);
@@ -3481,7 +3533,7 @@ vdc_dkio_flush_cb(void *arg)
 	int			rv;
 
 	if (dk_arg == NULL) {
-		vdc_msg("%s[?] DKIOCFLUSHWRITECACHE arg is NULL\n", __func__);
+		cmn_err(CE_CONT, "?[Unk] DKIOCFLUSHWRITECACHE arg is NULL\n");
 		return;
 	}
 	dkc = &dk_arg->dkc;
@@ -3491,8 +3543,8 @@ vdc_dkio_flush_cb(void *arg)
 	rv = vdc_populate_descriptor(vdc, NULL, 0, VD_OP_FLUSH,
 		dk_arg->mode, SDPART(getminor(dk_arg->dev)));
 	if (rv != 0) {
-		PR0("%s[%d] DKIOCFLUSHWRITECACHE failed %d : model %x\n",
-			__func__, vdc->instance, rv,
+		DMSG(0, "[%d] DKIOCFLUSHWRITECACHE failed %d : model %x\n",
+			vdc->instance, rv,
 			ddi_model_convert_from(dk_arg->mode & FMODELS));
 	}
 
@@ -3598,8 +3650,8 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	size_t		nioctls = (sizeof (dk_ioctl)) / (sizeof (dk_ioctl[0]));
 	struct vtoc	vtoc_saved;
 
-	PR0("%s: Processing ioctl(%x) for dev %x : model %x\n",
-		__func__, cmd, dev, ddi_model_convert_from(mode & FMODELS));
+	DMSG(0, "[%d] Processing ioctl(%x) for dev %lx : model %x\n",
+		instance, cmd, dev, ddi_model_convert_from(mode & FMODELS));
 
 	vdc = ddi_get_soft_state(vdc_state, instance);
 	if (vdc == NULL) {
@@ -3612,7 +3664,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	 * Check to see if we can communicate with the vDisk server
 	 */
 	if (!vdc_is_able_to_tx_data(vdc, O_NONBLOCK)) {
-		PR0("%s[%d] Not ready to transmit data\n", __func__, instance);
+		DMSG(0, "[%d] Not ready to transmit data\n", instance);
 		return (ENOLINK);
 	}
 
@@ -3628,8 +3680,8 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	}
 
 	if (idx >= nioctls) {
-		PR0("%s[%d] Unsupported ioctl(%x)\n",
-				__func__, vdc->instance, cmd);
+		cmn_err(CE_CONT, "?[%d] Unsupported ioctl (0x%x)\n",
+				vdc->instance, cmd);
 		return (ENOTSUP);
 	}
 
@@ -3680,7 +3732,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 			struct dk_callback *dkc = (struct dk_callback *)arg;
 			vdc_dk_arg_t	*dkarg = NULL;
 
-			PR1("[%d] Flush W$: mode %x\n", instance, mode);
+			DMSG(1, "[%d] Flush W$: mode %x\n", instance, mode);
 
 			/*
 			 * If the backing device is not a 'real' disk then the
@@ -3731,8 +3783,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 
 	/* LDC requires that the memory being mapped is 8-byte aligned */
 	alloc_len = P2ROUNDUP(len, sizeof (uint64_t));
-	PR1("%s[%d]: struct size %d alloc %d\n",
-			__func__, instance, len, alloc_len);
+	DMSG(1, "[%d] struct size %ld alloc %ld\n", instance, len, alloc_len);
 
 	ASSERT(alloc_len != 0);	/* sanity check */
 	mem_p = kmem_zalloc(alloc_len, KM_SLEEP);
@@ -3753,8 +3804,8 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	ASSERT(dk_ioctl[idx].convert != NULL);
 	rv = (dk_ioctl[idx].convert)(vdc, arg, mem_p, mode, VD_COPYIN);
 	if (rv != 0) {
-		PR0("%s[%d]: convert returned %d for ioctl 0x%x\n",
-				__func__, instance, rv, cmd);
+		DMSG(0, "[%d] convert func returned %d for ioctl 0x%x\n",
+				instance, rv, cmd);
 		if (mem_p != NULL)
 			kmem_free(mem_p, alloc_len);
 		return (rv);
@@ -3771,8 +3822,8 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 		 * be returning a value such as ENOTTY to indicate
 		 * that the ioctl is not applicable.
 		 */
-		PR0("%s[%d]: vds returned %d for ioctl 0x%x\n",
-			__func__, instance, rv, cmd);
+		DMSG(0, "[%d] vds returned %d for ioctl 0x%x\n",
+			instance, rv, cmd);
 		if (mem_p != NULL)
 			kmem_free(mem_p, alloc_len);
 
@@ -3804,8 +3855,8 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	 */
 	rv = (dk_ioctl[idx].convert)(vdc, mem_p, arg, mode, VD_COPYOUT);
 	if (rv != 0) {
-		PR0("%s[%d]: convert returned %d for ioctl 0x%x\n",
-				__func__, instance, rv, cmd);
+		DMSG(0, "[%d] convert func returned %d for ioctl 0x%x\n",
+				instance, rv, cmd);
 		if (mem_p != NULL)
 			kmem_free(mem_p, alloc_len);
 		return (rv);

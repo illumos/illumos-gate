@@ -410,7 +410,7 @@ i_vcc_ldc_init(vcc_t *vccp, vcc_port_t *vport)
 	/* initialize the channel */
 	attr.devclass = LDC_DEV_SERIAL;
 	attr.instance = ddi_get_instance(vccp->dip);
-	attr.qlen = VCC_QUEUE_LEN;
+	attr.mtu = VCC_MTU_SZ;
 	attr.mode = LDC_MODE_RAW;
 
 	if ((rv = ldc_init(vport->ldc_id, &attr, &(vport->ldc_handle))) != 0) {
@@ -584,7 +584,7 @@ vcc_ldc_cb(uint64_t event, caddr_t arg)
 {
 
 	vcc_port_t  *vport = (vcc_port_t *)arg;
-	boolean_t   isempty;
+	boolean_t   hasdata;
 
 	/*
 	 * do not need to hold lock because if ldc calls back, the
@@ -605,8 +605,8 @@ vcc_ldc_cb(uint64_t event, caddr_t arg)
 	if (event & LDC_EVT_READ) {
 
 		/* channel has data for read */
-		(void) ldc_chkq(vport->ldc_handle, &isempty);
-		if (isempty) {
+		(void) ldc_chkq(vport->ldc_handle, &hasdata);
+		if (!hasdata) {
 			/* data already read */
 			return (LDC_SUCCESS);
 		}

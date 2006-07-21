@@ -105,18 +105,11 @@ typedef struct ldc_cnex {
 } ldc_cnex_t;
 
 /* LDC attribute structure */
-
-/*
- * FIXME: Attribute passed in should be an MTU size
- * Allocate the queue internally to ldc module to accomodate
- * based on MTU size. For streaming mode, size can be zero.
- */
-
 typedef struct ldc_attr {
 	ldc_dev_t	devclass;	/* device class */
 	uint64_t	instance;	/* device class instance */
 	ldc_mode_t	mode;		/* channel mode */
-	uint64_t	qlen;		/* channel queue elements */
+	uint64_t	mtu;		/* channel mtu */
 } ldc_attr_t;
 
 /* LDC memory cookie */
@@ -170,12 +163,12 @@ int ldc_fini(ldc_handle_t handle);
 int ldc_open(ldc_handle_t handle);
 int ldc_close(ldc_handle_t handle);
 int ldc_up(ldc_handle_t handle);
-int ldc_reset(ldc_handle_t handle);
+int ldc_down(ldc_handle_t handle);
 int ldc_reg_callback(ldc_handle_t handle,
     uint_t(*callback)(uint64_t event, caddr_t arg), caddr_t arg);
 int ldc_unreg_callback(ldc_handle_t handle);
 int ldc_set_cb_mode(ldc_handle_t handle, ldc_cb_mode_t imode);
-int ldc_chkq(ldc_handle_t handle, boolean_t *isempty);
+int ldc_chkq(ldc_handle_t handle, boolean_t *hasdata);
 int ldc_read(ldc_handle_t handle, caddr_t buf, size_t *size);
 int ldc_write(ldc_handle_t handle, caddr_t buf, size_t *size);
 int ldc_status(ldc_handle_t handle, ldc_status_t *status);

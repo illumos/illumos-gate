@@ -170,11 +170,6 @@ typedef struct ver_sup {
 #define	VSW_MAX_CHAN_READ	50
 
 /*
- * LDC queue length
- */
-#define	VSW_LDC_QLEN		1024
-
-/*
  * Currently only support one ldc per port.
  */
 #define	VSW_PORT_MAX_LDCS	1	/* max # of ldcs per port */
@@ -208,6 +203,11 @@ typedef struct ver_sup {
 #define	VSW_PUB_SIZE	sizeof (vnet_public_desc_t)
 
 #define	VSW_MAX_COOKIES		((ETHERMTU >> MMU_PAGESHIFT) + 2)
+
+/*
+ * LDC pkt tranfer MTU
+ */
+#define	VSW_LDC_MTU	sizeof (def_msg_t)
 
 /*
  * Size and number of mblks to be created in free pool.
@@ -334,6 +334,10 @@ typedef struct mcst_addr {
 #define	VSW_PORT_DETACHING	0x2	/* In process of being detached */
 #define	VSW_PORT_DETACHABLE	0x4	/* Safe to detach */
 
+#define	VSW_ADDR_UNSET		0x0	/* Addr not set */
+#define	VSW_ADDR_HW		0x1	/* Addr programmed in HW */
+#define	VSW_ADDR_PROMISC	0x2	/* Card in promisc to see addr */
+
 /* port information associated with a vsw */
 typedef struct vsw_port {
 	int			p_instance;	/* port instance */
@@ -354,6 +358,9 @@ typedef struct vsw_port {
 
 	kmutex_t		mca_lock;	/* multicast lock */
 	mcst_addr_t		*mcap;		/* list of multicast addrs */
+
+	mac_addr_slot_t		addr_slot;	/* Unicast address slot */
+	int			addr_set;	/* Addr set where */
 
 	/*
 	 * mac address of the port & connected device
@@ -402,11 +409,12 @@ typedef struct vsw_ctrl_task {
 #define		NUM_SMODES	3	/* number of switching modes */
 
 /*
- * Bits indicating which properties we've read from MD.
+ * Bits indicating which properties we've read from MD or physical device.
  */
 #define		VSW_MD_PHYSNAME	0x1
 #define		VSW_MD_MACADDR	0x2
-#define		VSW_MD_SMODE	0x4
+#define		VSW_DEV_MACADDR	0x4
+#define		VSW_MD_SMODE	0x8
 
 /*
  * vsw instance state information.
@@ -418,6 +426,7 @@ typedef struct	vsw {
 	char			physname[LIFNAMSIZ];	/* phys-dev */
 	uint8_t			smode[NUM_SMODES];	/* switching mode */
 	int			smode_idx;	/* curr pos in smode array */
+	int			smode_num;	/* # of modes specified */
 	uint8_t			mdprops;	/* bitmask of props found */
 	vsw_port_list_t		plist;		/* associated ports */
 	ddi_taskq_t		*taskq_p;	/* VIO ctrl msg taskq */
@@ -431,11 +440,11 @@ typedef struct	vsw {
 	/* mac layer */
 	mac_handle_t		mh;
 	mac_rx_handle_t		mrh;
-	mac_notify_handle_t	mnh;
+	multiaddress_capab_t	maddr;		/* Multiple uni addr capable */
 	const mac_txinfo_t	*txinfo;	/* MAC tx routine */
 
-	/* Initial promisc setting of interface */
-	boolean_t		init_promisc;
+	boolean_t		recfg_reqd;	/* Reconfig of addrs needed */
+	int			promisc_cnt;
 
 	/* Machine Description updates  */
 	mdeg_node_spec_t	*inst_spec;

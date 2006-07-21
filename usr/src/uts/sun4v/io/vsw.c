@@ -78,13 +78,19 @@ static	int vsw_attach(dev_info_t *, ddi_attach_cmd_t);
 static	int vsw_detach(dev_info_t *, ddi_detach_cmd_t);
 static	int vsw_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static	void vsw_get_md_properties(vsw_t *vswp);
+static	int vsw_get_physaddr(vsw_t *);
 static	int vsw_setup_layer2(vsw_t *);
 static	int vsw_setup_layer3(vsw_t *);
 
 /* MAC layer routines */
 static	int vsw_mac_attach(vsw_t *vswp);
 static	void vsw_mac_detach(vsw_t *vswp);
-static void vsw_notify_cb(void *, mac_notify_type_t);
+static	int vsw_get_hw_maddr(vsw_t *);
+static	int vsw_set_hw(vsw_t *, vsw_port_t *);
+static	int vsw_set_hw_promisc(vsw_t *, vsw_port_t *);
+static	int vsw_unset_hw(vsw_t *, vsw_port_t *);
+static	int vsw_unset_hw_promisc(vsw_t *, vsw_port_t *);
+static	int vsw_reconfig_hw(vsw_t *);
 static void vsw_rx_cb(void *, mac_resource_handle_t, mblk_t *);
 static mblk_t *vsw_tx_msg(vsw_t *, mblk_t *);
 static int vsw_mac_register(vsw_t *);
@@ -486,7 +492,7 @@ static int
 vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	vsw_t		*vswp;
-	int		smode, instance, i;
+	int		instance, i;
 	char		hashname[MAXNAMELEN];
 	char		qname[TASKQ_NAMELEN];
 	int		rv = 1;
@@ -528,15 +534,6 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rw_init(&vswp->if_lockrw, NULL, RW_DRIVER, NULL);
 
 	progress |= PROG_if_lock;
-
-	/*
-	 * User specifies (via MD) an array of switching modes in
-	 * decreasing order of preference. Default mode is always
-	 * layer 2 (mac switching), so init array with that value.
-	 */
-	vswp->smode_idx = 0;
-	for (i = 0; i < NUM_SMODES; i++)
-		vswp->smode[i] = VSW_LAYER2;
 
 	/*
 	 * Get the various properties such as physical device name
@@ -599,13 +596,10 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	progress |= PROG_taskq;
 
 	/* select best switching mode */
-	for (i = 0; i < NUM_SMODES; i++) {
-		smode = vswp->smode[i];
-		switch (smode) {
+	for (i = 0; i < vswp->smode_num; i++) {
+		vswp->smode_idx = i;
+		switch (vswp->smode[i]) {
 		case VSW_LAYER2:
-			rv = vsw_setup_layer2(vswp);
-			break;
-
 		case VSW_LAYER2_PROMISC:
 			rv = vsw_setup_layer2(vswp);
 			break;
@@ -616,13 +610,12 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		default:
 			DERR(vswp, "unknown switch mode");
+			rv = 1;
 			break;
 		}
 
-		if (rv == 0) {
-			vswp->smode_idx = i;
+		if (rv == 0)
 			break;
-		}
 	}
 
 	if (rv == 1) {
@@ -639,7 +632,7 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Do this in both layer 2 and layer 3 mode.
 	 */
 	vswp->if_state &= ~VSW_IF_UP;
-	if (vswp->mdprops & VSW_MD_MACADDR) {
+	if (vswp->mdprops & (VSW_MD_MACADDR | VSW_DEV_MACADDR)) {
 		if (vsw_mac_register(vswp) != 0) {
 			cmn_err(CE_WARN, "Unable to register as provider "
 				" with MAC layer, continuing with attach");
@@ -718,7 +711,7 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	D2(vswp, "detaching instance %d", instance);
 
-	if (vswp->mdprops & VSW_MD_MACADDR) {
+	if (vswp->mdprops & (VSW_MD_MACADDR | VSW_DEV_MACADDR)) {
 		if (vsw_mac_unregister(vswp) != 0) {
 			cmn_err(CE_WARN, "Unable to detach from MAC layer");
 			return (DDI_FAILURE);
@@ -728,14 +721,27 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	vsw_mdeg_unregister(vswp);
 
-	if ((vswp->smode[vswp->smode_idx] == VSW_LAYER2) ||
-		(vswp->smode[vswp->smode_idx] == VSW_LAYER2_PROMISC)) {
-		vsw_mac_detach(vswp);
+	/* remove mac layer callback */
+	if ((vswp->mh != NULL) && (vswp->mrh != NULL)) {
+		mac_rx_remove(vswp->mh, vswp->mrh);
+		vswp->mrh = NULL;
 	}
 
 	if (vsw_detach_ports(vswp) != 0) {
 		cmn_err(CE_WARN, "Unable to detach ports");
 		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Now that the ports have been deleted, stop and close
+	 * the physical device.
+	 */
+	if (vswp->mh != NULL) {
+		mac_stop(vswp->mh);
+		mac_close(vswp->mh);
+
+		vswp->mh = NULL;
+		vswp->txinfo = NULL;
 	}
 
 	/*
@@ -983,11 +989,19 @@ vsw_get_md_properties(vsw_t *vswp)
 	}
 #endif
 
-	/* local mac address */
+	/* mac address for vswitch device itself */
 	if (md_get_prop_val(mdp, listp[idx],
 			macaddr_propname, &macaddr) != 0) {
-		cmn_err(CE_WARN, "%s: unable to get local MAC address",
-								__func__);
+		cmn_err(CE_WARN, "!Unable to get MAC address from MD");
+
+		/*
+		 * Fallback to using the mac address of the physical
+		 * device.
+		 */
+		if (vsw_get_physaddr(vswp) == 0) {
+			cmn_err(CE_NOTE, "!Using MAC address from physical "
+				"device (%s)", vswp->physname);
+		}
 	} else {
 		READ_ENTER(&vswp->if_lockrw);
 		for (i = ETHERADDRL - 1; i >= 0; i--) {
@@ -1004,47 +1018,47 @@ vsw_get_md_properties(vsw_t *vswp)
 	 * first item in list.
 	 */
 	len = 0;
+	vswp->smode_num = 0;
 	if (md_get_prop_data(mdp, listp[idx], smode_propname,
 				(uint8_t **)(&smode), &len) != 0) {
 		/*
-		 * Unable to get switch-mode property, so just use
-		 * default values which vswp->smode[] array has already
-		 * been pre-populated with, namely layer2.
+		 * Unable to get switch-mode property from MD, nothing
+		 * more we can do.
 		 */
-		cmn_err(CE_WARN, "%s: unable to get switch mode property, "
-			"defaulting to layer 2 mode", __func__);
-	} else {
-		i = 0;
-		curr_mode = smode;
-		/*
-		 * Modes of operation:
-		 * 'switched'	 - layer 2 switching, underlying HW in
-		 *			non-promiscuous mode.
-		 * 'promiscuous' - layer 2 switching, underlying HW in
-		 *			promiscuous mode.
-		 * 'routed'	 - layer 3 (i.e. IP) routing, underlying HW
-		 *			in non-promiscuous mode.
-		 */
-		while ((curr_mode < (smode + len)) && (i < NUM_SMODES)) {
-			D2(vswp, "%s: curr_mode = [%s]", __func__, curr_mode);
-			if (strcmp(curr_mode, "switched") == 0)
-				vswp->smode[i] = VSW_LAYER2;
-			else if (strcmp(curr_mode, "promiscuous") == 0)
-				vswp->smode[i] = VSW_LAYER2_PROMISC;
-			else if (strcmp(curr_mode, "routed") == 0)
-				vswp->smode[i] = VSW_LAYER3;
-			else {
-				DERR(vswp, "%s: unknown mode %s",
-					__func__, curr_mode);
-				/* default to layer 2 */
-				vswp->smode[i] = VSW_LAYER2;
-			}
-			curr_mode += strlen(curr_mode) + 1;
-			i++;
-		}
-
-		vswp->mdprops |= VSW_MD_SMODE;
+		cmn_err(CE_WARN, "!unable to get switch mode property");
+		goto md_prop_exit;
 	}
+
+	curr_mode = smode;
+	/*
+	 * Modes of operation:
+	 * 'switched'	 - layer 2 switching, underlying HW in
+	 *			programmed mode.
+	 * 'promiscuous' - layer 2 switching, underlying HW in
+	 *			promiscuous mode.
+	 * 'routed'	 - layer 3 (i.e. IP) routing, underlying HW
+	 *			in non-promiscuous mode.
+	 */
+	while ((curr_mode < (smode + len)) && (vswp->smode_num < NUM_SMODES)) {
+		D2(vswp, "%s: curr_mode = [%s]", __func__, curr_mode);
+		if (strcmp(curr_mode, "switched") == 0) {
+			vswp->smode[vswp->smode_num++] = VSW_LAYER2;
+		} else if (strcmp(curr_mode, "promiscuous") == 0) {
+			vswp->smode[vswp->smode_num++] = VSW_LAYER2_PROMISC;
+		} else if (strcmp(curr_mode, "routed") == 0) {
+			vswp->smode[vswp->smode_num++] = VSW_LAYER3;
+		} else {
+			cmn_err(CE_WARN, "Unknown switch mode %s, setting to"
+				" default switched mode", curr_mode);
+			vswp->smode[vswp->smode_num++] = VSW_LAYER2;
+		}
+		curr_mode += strlen(curr_mode) + 1;
+	}
+
+	D2(vswp, "%d switching modes specified", vswp->smode_num);
+
+	if (vswp->smode_num > 0)
+		vswp->mdprops |= VSW_MD_SMODE;
 
 md_prop_exit:
 	(void) md_fini_handle(mdp);
@@ -1054,11 +1068,85 @@ md_prop_exit:
 	D1(vswp, "%s: exit", __func__);
 }
 
+/*
+ * Get the mac address of the physical device.
+ *
+ * Returns 0 on success, 1 on failure.
+ */
+static int
+vsw_get_physaddr(vsw_t *vswp)
+{
+	mac_handle_t	mh;
+	char		drv[LIFNAMSIZ];
+	uint_t		ddi_instance;
+
+	D1(vswp, "%s: enter", __func__);
+
+	if (ddi_parse(vswp->physname, drv, &ddi_instance) != DDI_SUCCESS)
+		return (1);
+
+	if (mac_open(vswp->physname, ddi_instance, &mh) != 0) {
+		cmn_err(CE_WARN, "!mac_open %s failed", vswp->physname);
+		return (1);
+	}
+
+	READ_ENTER(&vswp->if_lockrw);
+	mac_unicst_get(mh, vswp->if_addr.ether_addr_octet);
+	RW_EXIT(&vswp->if_lockrw);
+
+	mac_close(mh);
+
+	vswp->mdprops |= VSW_DEV_MACADDR;
+
+	D1(vswp, "%s: exit", __func__);
+
+	return (0);
+}
+
+/*
+ * Check to see if the card supports the setting of multiple unicst
+ * addresses.
+ *
+ * Returns 0 if card supports the programming of multiple unicast addresses
+ * and there are free address slots available, otherwise returns 1.
+ */
+static int
+vsw_get_hw_maddr(vsw_t *vswp)
+{
+	D1(vswp, "%s: enter", __func__);
+
+	if (vswp->mh == NULL) {
+		return (1);
+	}
+
+	if (!mac_capab_get(vswp->mh, MAC_CAPAB_MULTIADDRESS, &vswp->maddr)) {
+		DWARN(vswp, "Unable to get capabilities of"
+			" underlying device (%s)", vswp->physname);
+		return (1);
+	}
+
+	if (vswp->maddr.maddr_naddrfree == 0) {
+		cmn_err(CE_WARN, "!device %s has no free unicast address slots",
+			vswp->physname);
+		return (1);
+	}
+
+	D2(vswp, "%s: %d addrs : %d free", __func__,
+		vswp->maddr.maddr_naddr, vswp->maddr.maddr_naddrfree);
+
+	D1(vswp, "%s: exit", __func__);
+
+	return (0);
+}
+
+/*
+ * Setup for layer 2 switching.
+ *
+ * Returns 0 on success, 1 on failure.
+ */
 static int
 vsw_setup_layer2(vsw_t *vswp)
 {
-	int		rv = 0;
-
 	D1(vswp, "%s: enter", __func__);
 
 	vsw_switch_frame = vsw_switch_l2_frame;
@@ -1074,19 +1162,35 @@ vsw_setup_layer2(vsw_t *vswp)
 			 * so return 1 so that can fall back to next
 			 * prefered switching method.
 			 */
-			cmn_err(CE_WARN, "!unable to join as MAC layer "
-				"client, continuing with attach");
-			rv = 1;
+			cmn_err(CE_WARN, "!Unable to join as MAC layer "
+				"client");
+			return (1);
 		}
+
+		if (vswp->smode[vswp->smode_idx] == VSW_LAYER2) {
+			/*
+			 * Verify that underlying device can support multiple
+			 * unicast mac addresses, and has free capacity.
+			 */
+			if (vsw_get_hw_maddr(vswp) != 0) {
+				cmn_err(CE_WARN, "!unable to setup switching");
+				vsw_mac_detach(vswp);
+				return (1);
+			}
+		}
+
 	} else {
-		/* No physical device name found in MD */
-		DERR(vswp, "%s: no physical device name specified", __func__);
-		rv = 1;
+		/*
+		 * No physical device name found in MD which is
+		 * required for layer 2.
+		 */
+		cmn_err(CE_WARN, "!no physical device name specified");
+		return (1);
 	}
 
 	D1(vswp, "%s: exit", __func__);
 
-	return (rv);
+	return (0);
 }
 
 static int
@@ -1119,7 +1223,6 @@ vsw_mac_attach(vsw_t *vswp)
 
 	vswp->mh = NULL;
 	vswp->mrh = NULL;
-	vswp->mnh = NULL;
 
 	ASSERT(vswp->mdprops & VSW_MD_PHYSNAME);
 
@@ -1134,9 +1237,6 @@ vsw_mac_attach(vsw_t *vswp)
 
 	D2(vswp, "vsw_mac_attach: using device %s", vswp->physname);
 
-	/* register for changes in the interface */
-	vswp->mnh = mac_notify_add(vswp->mh, vsw_notify_cb, (void *)vswp);
-
 	/* register our rx callback function */
 	vswp->mrh = mac_rx_add(vswp->mh, vsw_rx_cb, (void *)vswp);
 
@@ -1149,44 +1249,18 @@ vsw_mac_attach(vsw_t *vswp)
 		goto mac_fail_exit;
 	}
 
-	/* get and store original promisc setting */
-	vswp->init_promisc = mac_promisc_get(vswp->mh, MAC_DEVPROMISC);
-
-	/*
-	 * FUTURE: When we have the ability to set multiple unicast
-	 * mac address then we won't have to set the device into
-	 * promisc mode, but for the moment its the only way we.
-	 * can see pkts that logical domains we are serving are
-	 * interested in.
-	 */
-	if ((vswp->smode[vswp->smode_idx] == VSW_LAYER2_PROMISC) &&
-					(vswp->init_promisc == B_FALSE)) {
-		DERR(vswp, "vsw_mac_attach: enabling promisc mode..");
-
-		if (mac_promisc_set(vswp->mh, B_TRUE, MAC_DEVPROMISC) != 0) {
-			DERR(vswp, "vsw_mac_attach: unable to set device"
-				" into promiscuous mode");
-			goto mac_fail_exit;
-		}
-	}
-
 	D1(vswp, "vsw_mac_attach: exit");
 	return (0);
 
 mac_fail_exit:
 	if (vswp->mh != NULL) {
-		mac_promisc_set(vswp->mh, vswp->init_promisc, MAC_DEVPROMISC);
 		if (vswp->mrh != NULL)
 			mac_rx_remove(vswp->mh, vswp->mrh);
-
-		if (vswp->mnh != NULL)
-			mac_notify_remove(vswp->mh, vswp->mnh);
 
 		mac_close(vswp->mh);
 	}
 
 	vswp->mrh = NULL;
-	vswp->mnh = NULL;
 	vswp->mh = NULL;
 	vswp->txinfo = NULL;
 
@@ -1200,19 +1274,14 @@ vsw_mac_detach(vsw_t *vswp)
 	D1(vswp, "vsw_mac_detach: enter");
 
 	if (vswp->mh != NULL) {
-		/* restore promisc to original setting */
-		mac_promisc_set(vswp->mh, vswp->init_promisc, MAC_DEVPROMISC);
 		if (vswp->mrh != NULL)
 			mac_rx_remove(vswp->mh, vswp->mrh);
 
-		if (vswp->mnh != NULL)
-			mac_notify_remove(vswp->mh, vswp->mnh);
-
+		mac_stop(vswp->mh);
 		mac_close(vswp->mh);
 	}
 
 	vswp->mrh = NULL;
-	vswp->mnh = NULL;
 	vswp->mh = NULL;
 	vswp->txinfo = NULL;
 
@@ -1220,32 +1289,345 @@ vsw_mac_detach(vsw_t *vswp)
 }
 
 /*
- * Get notified of changes to the interface.
+ * Depending on the mode specified, the capabilites and capacity
+ * of the underlying device setup the physical device.
  *
- * For the moment we brute force the interface back
- * into promisc mode if it is unset (e.g. by snoop).
- * When we have the ability to set multiple mac addresses,
- * we will need to see if this is necessary.
+ * If in layer 3 mode, then do nothing.
+ *
+ * If in layer 2 programmed mode attempt to program the unicast address
+ * associated with the port into the physical device. If this is not
+ * possible due to resource exhaustion or simply because the device does
+ * not support multiple unicast addresses then if required fallback onto
+ * putting the card into promisc mode.
+ *
+ * If in promisc mode then simply set the card into promisc mode.
+ *
+ * Returns 0 success, 1 on failure.
  */
-static void
-vsw_notify_cb(void *arg, mac_notify_type_t type)
+static int
+vsw_set_hw(vsw_t *vswp, vsw_port_t *port)
 {
-	vsw_t		*vswp = (vsw_t *)arg;
+	mac_multi_addr_t	mac_addr;
+	void			*mah;
+	int			err;
 
-	switch (type) {
-	case MAC_NOTE_PROMISC:
-		vswp->txinfo = mac_tx_get(vswp->mh);
-		if (mac_promisc_get(vswp->mh, MAC_DEVPROMISC) == B_TRUE) {
-			D2(vswp, "%s: still in PROMISC mode", __func__);
-		} else {
-			D2(vswp, "%s: now in NON-PROMISC mode", __func__);
-			D2(vswp, "...re-enabling");
-			mac_promisc_set(vswp->mh, B_TRUE, MAC_DEVPROMISC);
-		}
-		break;
-	default:
-		break;
+	D1(vswp, "%s: enter", __func__);
+
+	if (vswp->smode[vswp->smode_idx] == VSW_LAYER3)
+		return (0);
+
+	if (vswp->smode[vswp->smode_idx] == VSW_LAYER2_PROMISC) {
+		return (vsw_set_hw_promisc(vswp, port));
 	}
+
+	if (vswp->maddr.maddr_handle == NULL)
+		return (1);
+
+	mah = vswp->maddr.maddr_handle;
+
+	/*
+	 * Attempt to program the unicast address into the HW.
+	 */
+	mac_addr.mma_addrlen = ETHERADDRL;
+	ether_copy(&port->p_macaddr, &mac_addr.mma_addr);
+
+	err = vswp->maddr.maddr_add(mah, &mac_addr);
+	if (err != 0) {
+		cmn_err(CE_WARN, "!failed to program addr "
+			"%x:%x:%x:%x:%x:%x for port %d into device %s "
+			": err %d", port->p_macaddr.ether_addr_octet[0],
+			port->p_macaddr.ether_addr_octet[1],
+			port->p_macaddr.ether_addr_octet[2],
+			port->p_macaddr.ether_addr_octet[3],
+			port->p_macaddr.ether_addr_octet[4],
+			port->p_macaddr.ether_addr_octet[5],
+			port->p_instance, vswp->physname, err);
+
+		/*
+		 * Mark that attempt should be made to re-config sometime
+		 * in future if a port is deleted.
+		 */
+		vswp->recfg_reqd = B_TRUE;
+
+		/*
+		 * Only 1 mode specified, nothing more to do.
+		 */
+		if (vswp->smode_num == 1)
+			return (err);
+
+		/*
+		 * If promiscuous was next mode specified try to
+		 * set the card into that mode.
+		 */
+		if ((vswp->smode_idx <= (vswp->smode_num - 2)) &&
+			(vswp->smode[vswp->smode_idx + 1]
+					== VSW_LAYER2_PROMISC)) {
+			vswp->smode_idx += 1;
+			return (vsw_set_hw_promisc(vswp, port));
+		}
+		return (err);
+	}
+
+	port->addr_slot = mac_addr.mma_slot;
+	port->addr_set = VSW_ADDR_HW;
+
+	D2(vswp, "programmed addr %x:%x:%x:%x:%x:%x for port %d "
+		"into slot %d of device %s",
+		port->p_macaddr.ether_addr_octet[0],
+		port->p_macaddr.ether_addr_octet[1],
+		port->p_macaddr.ether_addr_octet[2],
+		port->p_macaddr.ether_addr_octet[3],
+		port->p_macaddr.ether_addr_octet[4],
+		port->p_macaddr.ether_addr_octet[5],
+		port->p_instance, port->addr_slot, vswp->physname);
+
+	D1(vswp, "%s: exit", __func__);
+
+	return (0);
+}
+
+/*
+ * If in layer 3 mode do nothing.
+ *
+ * If in layer 2 switched mode remove the address from the physical
+ * device.
+ *
+ * If in layer 2 promiscuous mode disable promisc mode.
+ *
+ * Returns 0 on success.
+ */
+static int
+vsw_unset_hw(vsw_t *vswp, vsw_port_t *port)
+{
+	int		err;
+	void		*mah;
+
+	D1(vswp, "%s: enter", __func__);
+
+	if (vswp->smode[vswp->smode_idx] == VSW_LAYER3)
+		return (0);
+
+	if (port->addr_set == VSW_ADDR_PROMISC) {
+		return (vsw_unset_hw_promisc(vswp, port));
+	}
+
+	if (port->addr_set == VSW_ADDR_HW) {
+		if (vswp->mh == NULL)
+			return (1);
+
+		if (vswp->maddr.maddr_handle == NULL)
+			return (1);
+
+		mah = vswp->maddr.maddr_handle;
+
+		err = vswp->maddr.maddr_remove(mah, port->addr_slot);
+		if (err != 0) {
+			cmn_err(CE_WARN, "!Unable to remove addr "
+				"%x:%x:%x:%x:%x:%x for port %d from device %s"
+				" : (err %d)",
+				port->p_macaddr.ether_addr_octet[0],
+				port->p_macaddr.ether_addr_octet[1],
+				port->p_macaddr.ether_addr_octet[2],
+				port->p_macaddr.ether_addr_octet[3],
+				port->p_macaddr.ether_addr_octet[4],
+				port->p_macaddr.ether_addr_octet[5],
+				port->p_instance, vswp->physname, err);
+			return (err);
+		}
+
+		port->addr_set = VSW_ADDR_UNSET;
+
+		D2(vswp, "removed addr %x:%x:%x:%x:%x:%x for "
+			"port %d from device %s",
+			port->p_macaddr.ether_addr_octet[0],
+			port->p_macaddr.ether_addr_octet[1],
+			port->p_macaddr.ether_addr_octet[2],
+			port->p_macaddr.ether_addr_octet[3],
+			port->p_macaddr.ether_addr_octet[4],
+			port->p_macaddr.ether_addr_octet[5],
+			port->p_instance, vswp->physname);
+	}
+
+	D1(vswp, "%s: exit", __func__);
+	return (0);
+}
+
+/*
+ * Set network card into promisc mode.
+ *
+ * Returns 0 on success, 1 on failure.
+ */
+static int
+vsw_set_hw_promisc(vsw_t *vswp, vsw_port_t *port)
+{
+	D1(vswp, "%s: enter", __func__);
+
+	if (vswp->mh == NULL)
+		return (1);
+
+	if (vswp->promisc_cnt++ == 0) {
+		if (mac_promisc_set(vswp->mh, B_TRUE, MAC_DEVPROMISC) != 0) {
+			vswp->promisc_cnt--;
+			return (1);
+		}
+		cmn_err(CE_NOTE, "!switching device %s into promiscuous mode",
+				vswp->physname);
+	}
+	port->addr_set = VSW_ADDR_PROMISC;
+
+	D1(vswp, "%s: exit", __func__);
+
+	return (0);
+}
+
+/*
+ * Turn off promiscuous mode on network card.
+ *
+ * Returns 0 on success, 1 on failure.
+ */
+static int
+vsw_unset_hw_promisc(vsw_t *vswp, vsw_port_t *port)
+{
+	vsw_port_list_t 	*plist = &vswp->plist;
+
+	D1(vswp, "%s: enter", __func__);
+
+	if (vswp->mh == NULL)
+		return (1);
+
+	ASSERT(port->addr_set == VSW_ADDR_PROMISC);
+
+	if (--vswp->promisc_cnt == 0) {
+		if (mac_promisc_set(vswp->mh, B_FALSE, MAC_DEVPROMISC) != 0) {
+			vswp->promisc_cnt++;
+			return (1);
+		}
+
+		/*
+		 * We are exiting promisc mode either because we were
+		 * only in promisc mode because we had failed over from
+		 * switched mode due to HW resource issues, or the user
+		 * wanted the card in promisc mode for all the ports and
+		 * the last port is now being deleted. Tweak the message
+		 * accordingly.
+		 */
+		if (plist->num_ports != 0) {
+			cmn_err(CE_NOTE, "!switching device %s back to "
+				"programmed mode", vswp->physname);
+		} else {
+			cmn_err(CE_NOTE, "!switching device %s out of "
+				"promiscuous mode", vswp->physname);
+		}
+	}
+	port->addr_set = VSW_ADDR_UNSET;
+
+	D1(vswp, "%s: exit", __func__);
+	return (0);
+}
+
+/*
+ * Determine whether or not we are operating in our prefered
+ * mode and if not whether the physical resources now allow us
+ * to operate in it.
+ *
+ * Should only be invoked after port which is being deleted has been
+ * removed from the port list.
+ */
+static int
+vsw_reconfig_hw(vsw_t *vswp)
+{
+	vsw_port_list_t 	*plist = &vswp->plist;
+	mac_multi_addr_t	mac_addr;
+	vsw_port_t		*tp;
+	void			*mah;
+	int			rv = 0;
+	int			s_idx;
+
+	D1(vswp, "%s: enter", __func__);
+
+	if (vswp->maddr.maddr_handle == NULL)
+		return (1);
+
+	/*
+	 * Check if there are now sufficient HW resources to
+	 * attempt a re-config.
+	 */
+	if (plist->num_ports > vswp->maddr.maddr_naddrfree)
+		return (1);
+
+	/*
+	 * If we are in layer 2 (i.e. switched) or would like to be
+	 * in layer 2 then check if any ports need to be programmed
+	 * into the HW.
+	 *
+	 * This can happen in two cases - switched was specified as
+	 * the prefered mode of operation but we exhausted the HW
+	 * resources and so failed over to the next specifed mode,
+	 * or switched was the only mode specified so after HW
+	 * resources were exhausted there was nothing more we
+	 * could do.
+	 */
+	if (vswp->smode_idx > 0)
+		s_idx = vswp->smode_idx - 1;
+	else
+		s_idx = vswp->smode_idx;
+
+	if (vswp->smode[s_idx] == VSW_LAYER2) {
+		mah = vswp->maddr.maddr_handle;
+
+		D2(vswp, "%s: attempting reconfig..", __func__);
+
+		/*
+		 * Scan the port list for any port whose address has not
+		 * be programmed in HW - there should be a max of one.
+		 */
+		for (tp = plist->head; tp != NULL; tp = tp->p_next) {
+			if (tp->addr_set != VSW_ADDR_HW) {
+				mac_addr.mma_addrlen = ETHERADDRL;
+				ether_copy(&tp->p_macaddr, &mac_addr.mma_addr);
+
+				rv = vswp->maddr.maddr_add(mah, &mac_addr);
+				if (rv != 0) {
+					DWARN(vswp, "Error setting addr in "
+						"HW for port %d err %d",
+						tp->p_instance, rv);
+					goto reconfig_err_exit;
+				}
+				tp->addr_slot = mac_addr.mma_slot;
+
+				D2(vswp, "re-programmed port %d "
+					"addr %x:%x:%x:%x:%x:%x into slot %d"
+					" of device %s", tp->p_instance,
+					tp->p_macaddr.ether_addr_octet[0],
+					tp->p_macaddr.ether_addr_octet[1],
+					tp->p_macaddr.ether_addr_octet[2],
+					tp->p_macaddr.ether_addr_octet[3],
+					tp->p_macaddr.ether_addr_octet[4],
+					tp->p_macaddr.ether_addr_octet[5],
+					tp->addr_slot, vswp->physname);
+
+				/*
+				 * If up to now we had to put the card into
+				 * promisc mode to see this address, we
+				 * can now safely disable promisc mode.
+				 */
+				if (tp->addr_set == VSW_ADDR_PROMISC)
+					(void) vsw_unset_hw_promisc(vswp, tp);
+
+				tp->addr_set = VSW_ADDR_HW;
+			}
+		}
+
+		/* no further re-config needed */
+		vswp->recfg_reqd = B_FALSE;
+
+		vswp->smode_idx = s_idx;
+
+		return (0);
+	}
+
+reconfig_err_exit:
+	return (rv);
 }
 
 /*
@@ -1364,7 +1746,7 @@ vsw_mac_unregister(vsw_t *vswp)
 	}
 	RW_EXIT(&vswp->if_lockrw);
 
-	vswp->mdprops &= ~VSW_MD_MACADDR;
+	vswp->mdprops &= ~(VSW_MD_MACADDR | VSW_DEV_MACADDR);
 
 	D1(vswp, "%s: exit", __func__);
 
@@ -1440,7 +1822,7 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	vsw_t		*vswp = (vsw_t *)arg;
 	mcst_addr_t	*mcst_p = NULL;
 	uint64_t	addr = 0x0;
-	int		i;
+	int		i, ret = 0;
 
 	D1(vswp, "%s: enter", __func__);
 
@@ -1477,33 +1859,37 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 			/*
 			 * Call into the underlying driver to program the
 			 * address into HW.
-			 *
-			 * Note:
-			 * Can safely ignore the return value as the card
-			 * will for the moment always be in promisc mode.
-			 * When we can program multiple MAC addresses into the
-			 * HW then we will need to care about the return
-			 * value here.
 			 */
-			if (vswp->mh != NULL)
-				(void) mac_multicst_add(vswp->mh, mca);
+			if (vswp->mh != NULL) {
+				ret = mac_multicst_add(vswp->mh, mca);
+				if (ret != 0) {
+					cmn_err(CE_WARN, "!unable to add "
+						"multicast address");
+					goto vsw_remove_addr;
+				}
+			}
+		} else {
+			cmn_err(CE_WARN, "!unable to add multicast address");
 		}
-	} else {
-		D2(vswp, "%s: removing multicast", __func__);
+		return (ret);
+	}
+
+vsw_remove_addr:
+
+	D2(vswp, "%s: removing multicast", __func__);
+	/*
+	 * Remove the address from the hash table..
+	 */
+	if (vsw_del_mcst(vswp, VSW_LOCALDEV, addr, NULL) == 0) {
+
 		/*
-		 * Remove the address from the hash table..
+		 * ..and then from the list maintained in the
+		 * vsw_t structure.
 		 */
-		if (vsw_del_mcst(vswp, VSW_LOCALDEV, addr, NULL) == 0) {
+		vsw_del_addr(VSW_LOCALDEV, vswp, addr);
 
-			/*
-			 * ..and then from the list maintained in the
-			 * vsw_t structure.
-			 */
-			vsw_del_addr(VSW_LOCALDEV, vswp, addr);
-
-			if (vswp->mh != NULL)
-				(void) mac_multicst_remove(vswp->mh, mca);
-		}
+		if (vswp->mh != NULL)
+			(void) mac_multicst_remove(vswp->mh, mca);
 	}
 
 	D1(vswp, "%s: exit", __func__);
@@ -1814,6 +2200,7 @@ struct ether_addr *macaddr)
 	port->p_instance = p_instance;
 	port->p_ldclist.num_ldcs = 0;
 	port->p_ldclist.head = NULL;
+	port->addr_set = VSW_ADDR_UNSET;
 
 	rw_init(&port->p_ldclist.lockrw, NULL, RW_DRIVER, NULL);
 
@@ -1861,6 +2248,8 @@ struct ether_addr *macaddr)
 	/* create the fdb entry for this port/mac address */
 	(void) vsw_add_fdb(vswp, port);
 
+	(void) vsw_set_hw(vswp, port);
+
 	/* link it into the list of ports for this vsw instance */
 	prev_port = (vsw_port_t **)(&plist->head);
 	port->p_next = *prev_port;
@@ -1902,6 +2291,9 @@ vsw_port_detach(vsw_t *vswp, int p_instance)
 		return (1);
 	}
 
+	/* Remove address if was programmed into HW. */
+	(void) vsw_unset_hw(vswp, port);
+
 	/* Remove the fdb entry for this port/mac address */
 	(void) vsw_del_fdb(vswp, port);
 
@@ -1909,9 +2301,16 @@ vsw_port_detach(vsw_t *vswp, int p_instance)
 	vsw_del_mcst_port(port);
 
 	/*
-	 * No longer need to hold lock on port list now that we
-	 * have unlinked the target port from the list.
+	 * No longer need to hold writer lock on port list now
+	 * that we have unlinked the target port from the list.
 	 */
+	RW_EXIT(&plist->lockrw);
+
+	READ_ENTER(&plist->lockrw);
+
+	if (vswp->recfg_reqd)
+		(void) vsw_reconfig_hw(vswp);
+
 	RW_EXIT(&plist->lockrw);
 
 	if (vsw_port_delete(port)) {
@@ -1945,6 +2344,9 @@ vsw_detach_ports(vsw_t *vswp)
 			RW_EXIT(&plist->lockrw);
 			return (1);
 		}
+
+		/* Remove address if was programmed into HW. */
+		(void) vsw_unset_hw(vswp, port);
 
 		/* Remove the fdb entry for this port/mac address */
 		(void) vsw_del_fdb(vswp, port);
@@ -2092,7 +2494,7 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 	attr.devclass = LDC_DEV_NT_SVC;
 	attr.instance = ddi_get_instance(vswp->dip);
 	attr.mode = LDC_MODE_UNRELIABLE;
-	attr.qlen = VSW_LDC_QLEN;
+	attr.mtu = VSW_LDC_MTU;
 	status = ldc_init(ldc_id, &attr, &ldcp->ldc_handle);
 	if (status != 0) {
 		DERR(vswp, "%s(%lld): ldc_init failed, rv (%d)",
@@ -5941,11 +6343,14 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 	mcst_addr_t		*mcst_p = NULL;
 	vsw_t			*vswp = port->p_vswp;
 	uint64_t		addr = 0x0;
-	int			i;
+	int			i, ret;
 
 	D1(vswp, "%s: enter", __func__);
 
 	D2(vswp, "%s: %d addresses", __func__, mcst_pkt->count);
+
+	if (vswp->mh == NULL)
+		return (1);
 
 	for (i = 0; i < mcst_pkt->count; i++) {
 		/*
@@ -5988,18 +6393,17 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				 * has already been programmed then the MAC
 				 * just increments a ref counter (which is
 				 * used when the address is being deleted)
-				 *
-				 * Note:
-				 * For the moment we dont care if this
-				 * succeeds because the card must be in
-				 * promics mode. When we have the ability
-				 * to program multiple unicst address into
-				 * the card then we will need to check this
-				 * return value.
 				 */
-				if (vswp->mh != NULL)
-					(void) mac_multicst_add(vswp->mh,
+				ret = mac_multicst_add(vswp->mh,
 						(uchar_t *)&mcst_pkt->mca[i]);
+				if (ret) {
+					cmn_err(CE_WARN, "!unable to add "
+						"multicast address");
+					(void) vsw_del_mcst(vswp, VSW_VNETPORT,
+						addr, port);
+					vsw_del_addr(VSW_VNETPORT, port, addr);
+					return (ret);
+				}
 
 			} else {
 				DERR(vswp, "%s: error adding multicast "
@@ -6028,8 +6432,7 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				 * if other ports are interested in this
 				 * address.
 				 */
-				if (vswp->mh != NULL)
-					(void) mac_multicst_remove(vswp->mh,
+				(void) mac_multicst_remove(vswp->mh,
 						(uchar_t *)&mcst_pkt->mca[i]);
 
 			} else {

@@ -79,7 +79,7 @@ extern "C" {
 #define	VD_MAX_COOKIES		((VD_MAX_BLOCK_SIZE / PAGESIZE) + 1)
 #define	VD_USEC_TIMEOUT		20000
 #define	VD_LDC_IDS_PROP		"ldc-ids"
-#define	VD_LDC_QLEN		VD_DRING_LEN
+#define	VD_LDC_MTU		256
 
 /*
  * Flags used by ioctl routines to indicate if a copyin/copyout is needed
@@ -141,8 +141,6 @@ typedef struct vd_dring_entry {
 
 /*
  * vDisk control operation structures
- *
- * XXX FIXME - future support - add structures for VD_OP_XXXX
  */
 
 /*

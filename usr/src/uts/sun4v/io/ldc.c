@@ -27,7 +27,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * sun4v LDC Transport Layer
+ * sun4v LDC Link Layer
  */
 #include <sys/types.h>
 #include <sys/file.h>
@@ -138,8 +138,33 @@ static hsvc_info_t intr_hsvc = {
 	HSVC_REV_1, NULL, HSVC_GROUP_INTR, 1, 0, "ldc"
 };
 
+
 /*
- * LDC retry count and delay
+ * The no. of MTU size messages that can be stored in
+ * the LDC Tx queue. The number of Tx queue entries is
+ * then computed as (mtu * mtu_msgs)/sizeof(queue_entry)
+ */
+uint64_t ldc_mtu_msgs = LDC_MTU_MSGS;
+
+/*
+ * The minimum queue length. This is the size of the smallest
+ * LDC queue. If the computed value is less than this default,
+ * the queue length is rounded up to 'ldc_queue_entries'.
+ */
+uint64_t ldc_queue_entries = LDC_QUEUE_ENTRIES;
+
+/*
+ * Pages exported for remote access over each channel is
+ * maintained in a table registered with the Hypervisor.
+ * The default number of entries in the table is set to
+ * 'ldc_mtbl_entries'.
+ */
+uint64_t ldc_maptable_entries = LDC_MTBL_ENTRIES;
+
+/*
+ * LDC retry count and delay - when the HV returns EWOULDBLOCK
+ * the operation is retried 'ldc_max_retries' times with a
+ * wait of 'ldc_delay' usecs between each retry.
  */
 int ldc_max_retries = LDC_MAX_RETRIES;
 clock_t ldc_delay = LDC_DELAY;
@@ -365,7 +390,7 @@ _fini(void)
 /* -------------------------------------------------------------------------- */
 
 /*
- * LDC Transport Internal Functions
+ * LDC Link Layer Internal Functions
  */
 
 /*
@@ -721,7 +746,7 @@ i_ldc_send_pkt(ldc_chan_t *ldcp, uint8_t pkttype, uint8_t subtype,
 
 /*
  * Checks if packet was received in right order
- * in the case of a reliable transport.
+ * in the case of a reliable link.
  * Returns 0 if in order, else EIO
  */
 static int
@@ -1933,6 +1958,7 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 	ldc_chan_t 	*ldcp;
 	int		rv, exit_val;
 	uint64_t	ra_base, nentries;
+	uint64_t	qlen;
 
 	exit_val = EINVAL;	/* guarantee an error if exit on failure */
 
@@ -2004,16 +2030,12 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 	ldcp->mode = attr->mode;
 	ldcp->devclass = attr->devclass;
 	ldcp->devinst = attr->instance;
-
-	ldcp->rx_q_entries =
-		(attr->qlen > 0) ? attr->qlen : LDC_QUEUE_ENTRIES;
-	ldcp->tx_q_entries = ldcp->rx_q_entries;
+	ldcp->mtu = (attr->mtu > 0) ? attr->mtu : LDC_DEFAULT_MTU;
 
 	D1(ldcp->id,
 	    "ldc_init: (0x%llx) channel attributes, class=0x%x, "
-	    "instance=0x%llx,mode=%d, qlen=%d\n",
-	    ldcp->id, ldcp->devclass, ldcp->devinst,
-	    ldcp->mode, ldcp->rx_q_entries);
+	    "instance=0x%llx, mode=%d, mtu=%d\n",
+	    ldcp->id, ldcp->devclass, ldcp->devinst, ldcp->mode, ldcp->mtu);
 
 	ldcp->next_vidx = 0;
 	ldcp->tstate = 0;
@@ -2033,26 +2055,22 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 		ldcp->pkt_payload = LDC_PAYLOAD_SIZE_RAW;
 		ldcp->read_p = i_ldc_read_raw;
 		ldcp->write_p = i_ldc_write_raw;
-		ldcp->mtu = 0;
 		break;
 	case LDC_MODE_UNRELIABLE:
 		ldcp->pkt_payload = LDC_PAYLOAD_SIZE_UNRELIABLE;
 		ldcp->read_p = i_ldc_read_packet;
 		ldcp->write_p = i_ldc_write_packet;
-		ldcp->mtu = 0;
 		break;
 	case LDC_MODE_RELIABLE:
 		ldcp->pkt_payload = LDC_PAYLOAD_SIZE_RELIABLE;
 		ldcp->read_p = i_ldc_read_packet;
 		ldcp->write_p = i_ldc_write_packet;
-		ldcp->mtu = 0;
 		break;
 	case LDC_MODE_STREAM:
 		ldcp->pkt_payload = LDC_PAYLOAD_SIZE_RELIABLE;
 
 		ldcp->stream_remains = 0;
 		ldcp->stream_offset = 0;
-		ldcp->mtu = LDC_STREAM_MTU;
 		ldcp->stream_bufferp = kmem_alloc(ldcp->mtu, KM_SLEEP);
 		ldcp->read_p = i_ldc_read_stream;
 		ldcp->write_p = i_ldc_write_stream;
@@ -2061,6 +2079,18 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 		exit_val = EINVAL;
 		goto cleanup_on_exit;
 	}
+
+	/*
+	 * qlen is (mtu * ldc_mtu_msgs) / pkt_payload. If this
+	 * value is smaller than default length of ldc_queue_entries,
+	 * qlen is set to ldc_queue_entries..
+	 */
+	qlen = (ldcp->mtu * ldc_mtu_msgs) / ldcp->pkt_payload;
+	ldcp->rx_q_entries =
+		(qlen < ldc_queue_entries) ? ldc_queue_entries : qlen;
+	ldcp->tx_q_entries = ldcp->rx_q_entries;
+
+	D1(ldcp->id, "ldc_init: queue length = 0x%llx\n", qlen);
 
 	/* Create a transmit queue */
 	ldcp->tx_q_va = (uint64_t)
@@ -2734,15 +2764,15 @@ ldc_up(ldc_handle_t handle)
 
 
 /*
- * Reset a channel by re-registering the Rx queues
+ * Bring a channel down by resetting its state and queues
  */
 int
-ldc_reset(ldc_handle_t handle)
+ldc_down(ldc_handle_t handle)
 {
 	ldc_chan_t 	*ldcp;
 
 	if (handle == NULL) {
-		DWARN(DBG_ALL_LDCS, "ldc_reset: invalid channel handle\n");
+		DWARN(DBG_ALL_LDCS, "ldc_down: invalid channel handle\n");
 		return (EINVAL);
 	}
 	ldcp = (ldc_chan_t *)handle;
@@ -2833,10 +2863,10 @@ ldc_set_cb_mode(ldc_handle_t handle, ldc_cb_mode_t cmode)
 
 /*
  * Check to see if there are packets on the incoming queue
- * Will return isempty = B_FALSE if there are  packets
+ * Will return hasdata = B_FALSE if there are no packets
  */
 int
-ldc_chkq(ldc_handle_t handle, boolean_t *isempty)
+ldc_chkq(ldc_handle_t handle, boolean_t *hasdata)
 {
 	int 		rv;
 	uint64_t 	rx_head, rx_tail;
@@ -2848,7 +2878,7 @@ ldc_chkq(ldc_handle_t handle, boolean_t *isempty)
 	}
 	ldcp = (ldc_chan_t *)handle;
 
-	*isempty = B_TRUE;
+	*hasdata = B_FALSE;
 
 	mutex_enter(&ldcp->lock);
 
@@ -2880,7 +2910,7 @@ ldc_chkq(ldc_handle_t handle, boolean_t *isempty)
 
 	if (rx_head != rx_tail) {
 		D1(ldcp->id, "ldc_chkq: (0x%llx) queue has pkt(s)\n", ldcp->id);
-		*isempty = B_FALSE;
+		*hasdata = B_TRUE;
 	}
 
 	mutex_exit(&ldcp->lock);
@@ -3150,8 +3180,8 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 
 		/*
 		 * Process any messages of type CTRL messages
-		 * Future implementations should try to pass these to
-		 * LDC transport by resetting the intr state.
+		 * Future implementations should try to pass these
+		 * to LDC link by resetting the intr state.
 		 *
 		 * NOTE: not done as a switch() as type can be both ctrl+data
 		 */
@@ -3390,7 +3420,7 @@ i_ldc_read_stream(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
  * Write specified amount of bytes to the channel
  * in multiple pkts of pkt_payload size. Each
  * packet is tagged with an unique packet ID in
- * the case of a reliable transport.
+ * the case of a reliable link.
  *
  * On return, size contains the number of bytes written.
  */
@@ -3577,7 +3607,7 @@ i_ldc_write_raw(ldc_chan_t *ldcp, caddr_t buf, size_t *sizep)
  * Write specified amount of bytes to the channel
  * in multiple pkts of pkt_payload size. Each
  * packet is tagged with an unique packet ID in
- * the case of a reliable transport.
+ * the case of a reliable link.
  *
  * On return, size contains the number of bytes written.
  * This function needs to ensure that the write size is < MTU size
@@ -3639,7 +3669,7 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 		(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
 
 	/*
-	 * Transport mode determines whether we use HV Tx head or the
+	 * Link mode determines whether we use HV Tx head or the
 	 * private protocol head (corresponding to last ACKd pkt) for
 	 * determining how much we can write
 	 */
@@ -3767,7 +3797,7 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
  * Write specified amount of bytes to the channel
  * in multiple pkts of pkt_payload size. Each
  * packet is tagged with an unique packet ID in
- * the case of a reliable transport.
+ * the case of a reliable link.
  *
  * On return, size contains the number of bytes written.
  * This function needs to ensure that the write size is < MTU size
@@ -3900,9 +3930,8 @@ ldc_mem_alloc_handle(ldc_handle_t handle, ldc_mem_handle_t *mhandle)
 
 		/* Allocate and initialize the map table structure */
 		mtbl = kmem_zalloc(sizeof (ldc_mtbl_t), KM_SLEEP);
-		mtbl->size = MTBL_MAX_SIZE;
-		mtbl->num_entries = mtbl->num_avail =
-			(MTBL_MAX_SIZE/sizeof (ldc_mte_slot_t));
+		mtbl->num_entries = mtbl->num_avail = ldc_maptable_entries;
+		mtbl->size = ldc_maptable_entries * sizeof (ldc_mte_slot_t);
 		mtbl->next_entry = NULL;
 
 		/* Allocate the table itself */

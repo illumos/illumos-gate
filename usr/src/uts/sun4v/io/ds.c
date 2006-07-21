@@ -546,7 +546,7 @@ ds_ldc_init(ds_port_t *port)
 	ldc_attr.devclass = LDC_DEV_GENERIC;
 	ldc_attr.instance = 0;
 	ldc_attr.mode = LDC_MODE_STREAM;
-	ldc_attr.qlen = DS_QUEUE_LEN;
+	ldc_attr.mtu = DS_STREAM_MTU;
 
 	if ((rv = ldc_init(port->ldc.id, &ldc_attr, &port->ldc.hdl)) != 0) {
 		cmn_err(CE_WARN, "ds@%lx: ldc_init: ldc_init error (%d)",
@@ -714,7 +714,7 @@ ds_handle_recv(void *arg)
 	char		*hbuf;
 	size_t		len;
 	size_t		read_size;
-	boolean_t	isempty;
+	boolean_t	hasdata;
 	ds_hdr_t	hdr;
 	uint8_t		*msg;
 	char		*currp;
@@ -727,7 +727,7 @@ ds_handle_recv(void *arg)
 	ldc_hdl = port->ldc.hdl;
 
 	mutex_enter(&port->lock);
-	while ((ldc_chkq(ldc_hdl, &isempty) == 0) && (!isempty)) {
+	while ((ldc_chkq(ldc_hdl, &hasdata) == 0) && hasdata) {
 
 
 		DS_DBG("ds@%lx: reading next message\n", port->id);

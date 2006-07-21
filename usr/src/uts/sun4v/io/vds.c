@@ -177,9 +177,10 @@ typedef struct vd {
 	ddi_taskq_t		*completionq;	/* queue for completion tasks */
 	ldi_handle_t		ldi_handle[V_NUMPAR];	/* LDI slice handles */
 	dev_t			dev[V_NUMPAR];	/* dev numbers for slices */
-	uint_t			nslices;	/* number for slices */
+	uint_t			nslices;	/* number of slices */
 	size_t			vdisk_size;	/* number of blocks in vdisk */
 	vd_disk_type_t		vdisk_type;	/* slice or entire disk */
+	ushort_t		max_xfer_sz;	/* max xfer size in DEV_BSIZE */
 	boolean_t		pseudo;		/* underlying pseudo dev */
 	struct dk_geom		dk_geom;	/* synthetic for slice type */
 	struct vtoc		vtoc;		/* synthetic for slice type */
@@ -382,8 +383,8 @@ vd_reset_if_needed(vd_t *vd)
 
 
 	mutex_enter(&vd->lock);
-	if (vd->reset_ldc && ((status = ldc_reset(vd->ldc_handle)) != 0))
-		PRN("ldc_reset() returned errno %d", status);
+	if (vd->reset_ldc && ((status = ldc_down(vd->ldc_handle)) != 0))
+		PRN("ldc_down() returned errno %d", status);
 
 	vd->initialized	&= ~(VD_SID | VD_SEQ_NUM | VD_DRING);
 	vd->state	= VD_STATE_INIT;
@@ -1036,6 +1037,10 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		vd->inband_task.index	= 0;
 		vd->inband_task.type	= VD_FINAL_RANGE_TASK;	/* range == 1 */
 	}
+
+	/* Return the device's block size and max transfer size to the client */
+	attr_msg->vdisk_block_size	= DEV_BSIZE;
+	attr_msg->max_xfer_sz		= vd->max_xfer_sz;
 
 	attr_msg->vdisk_size = vd->vdisk_size;
 	attr_msg->vdisk_type = vd->vdisk_type;
@@ -1867,43 +1872,67 @@ vd_setup_full_disk(vd_t *vd)
 }
 
 static int
-vd_setup_vd(char *block_device, vd_t *vd)
+vd_setup_vd(char *device_path, vd_t *vd)
 {
-	int		otyp, rval, status;
+	int		rval, status;
 	dev_info_t	*dip;
 	struct dk_cinfo	dk_cinfo;
 
 
-	if ((status = ldi_open_by_name(block_device, vd_open_flags, kcred,
+	if ((status = ldi_open_by_name(device_path, vd_open_flags, kcred,
 		    &vd->ldi_handle[0], vd->vds->ldi_ident)) != 0) {
-		PRN("ldi_open_by_name(%s) = errno %d", block_device, status);
+		PRN("ldi_open_by_name(%s) = errno %d", device_path, status);
 		return (status);
 	}
 
-	/* Get block device's device number, otyp, and size */
+	/* Get device number and size of backing device */
 	if ((status = ldi_get_dev(vd->ldi_handle[0], &vd->dev[0])) != 0) {
 		PRN("ldi_get_dev() returned errno %d for %s",
-		    status, block_device);
+		    status, device_path);
 		return (status);
-	}
-	if ((status = ldi_get_otyp(vd->ldi_handle[0], &otyp)) != 0) {
-		PRN("ldi_get_otyp() returned errno %d for %s",
-		    status, block_device);
-		return (status);
-	}
-	if (otyp != OTYP_BLK) {
-		PRN("Cannot serve non-block device %s", block_device);
-		return (ENOTBLK);
 	}
 	if (ldi_get_size(vd->ldi_handle[0], &vd->vdisk_size) != DDI_SUCCESS) {
-		PRN("ldi_get_size() failed for %s", block_device);
+		PRN("ldi_get_size() failed for %s", device_path);
 		return (EIO);
 	}
+	vd->vdisk_size = lbtodb(vd->vdisk_size);	/* convert to blocks */
 
-	/* Determine if backing block device is a pseudo device */
+	/* Verify backing device supports dk_cinfo, dk_geom, and vtoc */
+	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCINFO,
+		    (intptr_t)&dk_cinfo, (vd_open_flags | FKIOCTL), kcred,
+		    &rval)) != 0) {
+		PRN("ldi_ioctl(DKIOCINFO) returned errno %d for %s",
+		    status, device_path);
+		return (status);
+	}
+	if (dk_cinfo.dki_partition >= V_NUMPAR) {
+		PRN("slice %u >= maximum slice %u for %s",
+		    dk_cinfo.dki_partition, V_NUMPAR, device_path);
+		return (EIO);
+	}
+	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGGEOM,
+		    (intptr_t)&vd->dk_geom, (vd_open_flags | FKIOCTL), kcred,
+		    &rval)) != 0) {
+		PRN("ldi_ioctl(DKIOCGEOM) returned errno %d for %s",
+		    status, device_path);
+		return (status);
+	}
+	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC,
+		    (intptr_t)&vd->vtoc, (vd_open_flags | FKIOCTL), kcred,
+		    &rval)) != 0) {
+		PRN("ldi_ioctl(DKIOCGVTOC) returned errno %d for %s",
+		    status, device_path);
+		return (status);
+	}
+
+	/* Store the device's max transfer size for return to the client */
+	vd->max_xfer_sz = dk_cinfo.dki_maxtransfer;
+
+
+	/* Determine if backing device is a pseudo device */
 	if ((dip = ddi_hold_devi_by_instance(getmajor(vd->dev[0]),
 		    dev_to_instance(vd->dev[0]), 0))  == NULL) {
-		PRN("%s is no longer accessible", block_device);
+		PRN("%s is no longer accessible", device_path);
 		return (EIO);
 	}
 	vd->pseudo = is_pseudo_device(dip);
@@ -1914,62 +1943,33 @@ vd_setup_vd(char *block_device, vd_t *vd)
 		return (0);	/* ...and we're done */
 	}
 
-	/* Get dk_cinfo to determine slice of backing block device */
-	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCINFO,
-		    (intptr_t)&dk_cinfo, (vd_open_flags | FKIOCTL), kcred,
-		    &rval)) != 0) {
-		PRN("ldi_ioctl(DKIOCINFO) returned errno %d for %s",
-		    status, block_device);
-		return (status);
-	}
-
-	if (dk_cinfo.dki_partition >= V_NUMPAR) {
-		PRN("slice %u >= maximum slice %u for %s",
-		    dk_cinfo.dki_partition, V_NUMPAR, block_device);
-		return (EIO);
-	}
-
 
 	/* If slice is entire-disk slice, initialize for full disk */
 	if (dk_cinfo.dki_partition == VD_ENTIRE_DISK_SLICE)
 		return (vd_setup_full_disk(vd));
 
 
-	/* Otherwise, we have a non-entire slice of a block device */
+	/* Otherwise, we have a non-entire slice of a device */
 	vd->vdisk_type	= VD_DISK_TYPE_SLICE;
 	vd->nslices	= 1;
 
 
-	/* Initialize dk_geom structure for single-slice block device */
-	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGGEOM,
-		    (intptr_t)&vd->dk_geom, (vd_open_flags | FKIOCTL), kcred,
-		    &rval)) != 0) {
-		PRN("ldi_ioctl(DKIOCGEOM) returned errno %d for %s",
-		    status, block_device);
-		return (status);
-	}
+	/* Initialize dk_geom structure for single-slice device */
 	if (vd->dk_geom.dkg_nsect == 0) {
-		PRN("%s geometry claims 0 sectors per track", block_device);
+		PRN("%s geometry claims 0 sectors per track", device_path);
 		return (EIO);
 	}
 	if (vd->dk_geom.dkg_nhead == 0) {
-		PRN("%s geometry claims 0 heads", block_device);
+		PRN("%s geometry claims 0 heads", device_path);
 		return (EIO);
 	}
 	vd->dk_geom.dkg_ncyl =
-	    lbtodb(vd->vdisk_size)/vd->dk_geom.dkg_nsect/vd->dk_geom.dkg_nhead;
+	    vd->vdisk_size/vd->dk_geom.dkg_nsect/vd->dk_geom.dkg_nhead;
 	vd->dk_geom.dkg_acyl = 0;
 	vd->dk_geom.dkg_pcyl = vd->dk_geom.dkg_ncyl + vd->dk_geom.dkg_acyl;
 
 
-	/* Initialize vtoc structure for single-slice block device */
-	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC,
-		    (intptr_t)&vd->vtoc, (vd_open_flags | FKIOCTL), kcred,
-		    &rval)) != 0) {
-		PRN("ldi_ioctl(DKIOCGVTOC) returned errno %d for %s",
-		    status, block_device);
-		return (status);
-	}
+	/* Initialize vtoc structure for single-slice device */
 	bcopy(VD_VOLUME_NAME, vd->vtoc.v_volume,
 	    MIN(sizeof (VD_VOLUME_NAME), sizeof (vd->vtoc.v_volume)));
 	bzero(vd->vtoc.v_part, sizeof (vd->vtoc.v_part));
@@ -1977,7 +1977,7 @@ vd_setup_vd(char *block_device, vd_t *vd)
 	vd->vtoc.v_part[0].p_tag = V_UNASSIGNED;
 	vd->vtoc.v_part[0].p_flag = 0;
 	vd->vtoc.v_part[0].p_start = 0;
-	vd->vtoc.v_part[0].p_size = lbtodb(vd->vdisk_size);
+	vd->vtoc.v_part[0].p_size = vd->vdisk_size;
 	bcopy(VD_ASCIILABEL, vd->vtoc.v_asciilabel,
 	    MIN(sizeof (VD_ASCIILABEL), sizeof (vd->vtoc.v_asciilabel)));
 
@@ -1986,7 +1986,7 @@ vd_setup_vd(char *block_device, vd_t *vd)
 }
 
 static int
-vds_do_init_vd(vds_t *vds, uint64_t id, char *block_device, uint64_t ldc_id,
+vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t ldc_id,
     vd_t **vdp)
 {
 	char			tq_name[TASKQ_NAMELEN];
@@ -1997,9 +1997,9 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *block_device, uint64_t ldc_id,
 
 
 	ASSERT(vds != NULL);
-	ASSERT(block_device != NULL);
+	ASSERT(device_path != NULL);
 	ASSERT(vdp != NULL);
-	PR0("Adding vdisk for %s", block_device);
+	PR0("Adding vdisk for %s", device_path);
 
 	if ((vd = kmem_zalloc(sizeof (*vd), KM_NOSLEEP)) == NULL) {
 		PRN("No memory for virtual disk");
@@ -2010,7 +2010,7 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *block_device, uint64_t ldc_id,
 
 
 	/* Open vdisk and initialize parameters */
-	if ((status = vd_setup_vd(block_device, vd)) != 0)
+	if ((status = vd_setup_vd(device_path, vd)) != 0)
 		return (status);
 	ASSERT(vd->nslices > 0 && vd->nslices <= V_NUMPAR);
 	PR0("vdisk_type = %s, pseudo = %s, nslices = %u",
@@ -2051,7 +2051,7 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *block_device, uint64_t ldc_id,
 	ldc_attr.devclass	= LDC_DEV_BLK_SVC;
 	ldc_attr.instance	= ddi_get_instance(vds->dip);
 	ldc_attr.mode		= LDC_MODE_UNRELIABLE;
-	ldc_attr.qlen		= VD_LDC_QLEN;
+	ldc_attr.mtu		= VD_LDC_MTU;
 	if ((status = ldc_init(ldc_id, &ldc_attr, &vd->ldc_handle)) != 0) {
 		PRN("ldc_init(%lu) = errno %d", ldc_id, status);
 		return (status);
@@ -2141,7 +2141,7 @@ vds_destroy_vd(void *arg)
 }
 
 static int
-vds_init_vd(vds_t *vds, uint64_t id, char *block_device, uint64_t ldc_id)
+vds_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t ldc_id)
 {
 	int	status;
 	vd_t	*vd = NULL;
@@ -2151,7 +2151,7 @@ vds_init_vd(vds_t *vds, uint64_t id, char *block_device, uint64_t ldc_id)
 	(void) vd;
 #endif	/* lint */
 
-	if ((status = vds_do_init_vd(vds, id, block_device, ldc_id, &vd)) != 0)
+	if ((status = vds_do_init_vd(vds, id, device_path, ldc_id, &vd)) != 0)
 		vds_destroy_vd(vd);
 
 	return (status);
@@ -2209,7 +2209,7 @@ vds_get_ldc_id(md_t *md, mde_cookie_t vd_node, uint64_t *ldc_id)
 static void
 vds_add_vd(vds_t *vds, md_t *md, mde_cookie_t vd_node)
 {
-	char		*block_device = NULL;
+	char		*device_path = NULL;
 	uint64_t	id = 0, ldc_id = 0;
 
 
@@ -2219,7 +2219,7 @@ vds_add_vd(vds_t *vds, md_t *md, mde_cookie_t vd_node)
 	}
 	PR0("Adding vdisk ID %lu", id);
 	if (md_get_prop_str(md, vd_node, VD_BLOCK_DEVICE_PROP,
-		&block_device) != 0) {
+		&device_path) != 0) {
 		PRN("Error getting vdisk \"%s\"", VD_BLOCK_DEVICE_PROP);
 		return;
 	}
@@ -2229,7 +2229,7 @@ vds_add_vd(vds_t *vds, md_t *md, mde_cookie_t vd_node)
 		return;
 	}
 
-	if (vds_init_vd(vds, id, block_device, ldc_id) != 0) {
+	if (vds_init_vd(vds, id, device_path, ldc_id) != 0) {
 		PRN("Failed to add vdisk ID %lu", id);
 		return;
 	}
