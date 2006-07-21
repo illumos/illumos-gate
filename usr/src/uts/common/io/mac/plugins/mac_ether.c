@@ -26,7 +26,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * DL_ETHER MAC Type plugin for the Nemo mac module
+ * Ethernet MAC plugin for the Nemo mac module
  */
 
 #include <sys/types.h>
@@ -100,7 +100,7 @@ static mac_stat_info_t ether_stats[] = {
 
 static struct modlmisc mac_ether_modlmisc = {
 	&mod_miscops,
-	"DL_ETHER MAC Type plugin"
+	"Ethernet MAC plugin %I%"
 };
 
 static struct modlinkage mac_ether_modlinkage = {

@@ -36,15 +36,12 @@ extern "C" {
 #endif
 
 /*
- * Statistics of class MAC_INTERFACE_STAT, maintained internally by the mac
- * module.
+ * Statistics maintained internally by the mac module.
  */
-enum mac_interface_stat {
+enum mac_mod_stat {
 	MAC_STAT_LINK_STATE,
 	MAC_STAT_LINK_UP,
-	MAC_STAT_PROMISC,
-
-	MAC_INTERFACE_NSTAT		/* Must be the last entry */
+	MAC_STAT_PROMISC
 };
 
 typedef struct mac_multicst_addr_s	mac_multicst_addr_t;

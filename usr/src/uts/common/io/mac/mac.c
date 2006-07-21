@@ -1034,7 +1034,6 @@ mac_free(mac_register_t *mregp)
  * opaque pointer becomes the driver's handle to its MAC interface, and is
  * the argument to all other mac module entry points.
  */
-/* ARGSUSED */
 int
 mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 {

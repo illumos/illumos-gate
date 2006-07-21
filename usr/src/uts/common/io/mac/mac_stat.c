@@ -39,8 +39,6 @@
 #define	MAC_KSTAT_NAME	"mac"
 #define	MAC_KSTAT_CLASS	"net"
 
-typedef	int (*ks_update_fnp)(struct kstat *, int);
-
 static mac_stat_info_t	i_mac_si[] = {
 	{ MAC_STAT_IFSPEED,	"ifspeed",	KSTAT_DATA_UINT64,	0 },
 	{ MAC_STAT_MULTIRCV,	"multircv",	KSTAT_DATA_UINT32,	0 },
