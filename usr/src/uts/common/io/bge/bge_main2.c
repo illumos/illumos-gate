@@ -641,7 +641,7 @@ bge_m_unicst_add(void *arg, mac_multi_addr_t *maddr)
 {
 	bge_t *bgep = arg;		/* private device info	*/
 	mac_addr_slot_t slot;
-	int i, err;
+	int err;
 
 	if (mac_unicst_verify(bgep->mh,
 	    maddr->mma_addr, maddr->mma_addrlen) == B_FALSE)
@@ -658,24 +658,23 @@ bge_m_unicst_add(void *arg, mac_multi_addr_t *maddr)
 	 * Primary/default address is in slot 0. The next three
 	 * addresses are the multiple MAC addresses. So multiple
 	 * MAC address 0 is in slot 1, 1 in slot 2, and so on.
-	 * When we return a slot number to the user, it is
-	 * actually slot number plus one to bge.
+	 * So the first multiple MAC address resides in slot 1.
 	 */
-	for (i = 0; i < bgep->unicst_addr_total; i++) {
-		if (bgep->curr_addr[i + 1].set == B_FALSE) {
-			bgep->curr_addr[i + 1].set = B_TRUE;
-			slot = i;
+	for (slot = 1; slot < bgep->unicst_addr_total; slot++) {
+		if (bgep->curr_addr[slot].set == B_FALSE) {
+			bgep->curr_addr[slot].set = B_TRUE;
 			break;
 		}
 	}
 
+	ASSERT(slot < bgep->unicst_addr_total);
 	bgep->unicst_addr_avail--;
 	mutex_exit(bgep->genlock);
 	maddr->mma_slot = slot;
 
 	if ((err = bge_unicst_set(bgep, maddr->mma_addr, slot)) != 0) {
 		mutex_enter(bgep->genlock);
-		bgep->curr_addr[slot + 1].set = B_FALSE;
+		bgep->curr_addr[slot].set = B_FALSE;
 		bgep->unicst_addr_avail++;
 		mutex_exit(bgep->genlock);
 	}
@@ -693,17 +692,18 @@ bge_m_unicst_remove(void *arg, mac_addr_slot_t slot)
 {
 	bge_t *bgep = arg;		/* private device info	*/
 
-	ASSERT(slot < bgep->unicst_addr_total);
+	if (slot <= 0 || slot >= bgep->unicst_addr_total)
+		return (EINVAL);
+
 	mutex_enter(bgep->genlock);
-	if (bgep->curr_addr[slot + 1].set == B_TRUE) {
-		bgep->curr_addr[slot + 1].set = B_FALSE;
+	if (bgep->curr_addr[slot].set == B_TRUE) {
+		bgep->curr_addr[slot].set = B_FALSE;
 		bgep->unicst_addr_avail++;
 		mutex_exit(bgep->genlock);
 		/*
 		 * Copy the default address to the passed slot
 		 */
-		return (bge_unicst_set(bgep,
-		    bgep->curr_addr[0].addr, slot + 1));
+		return (bge_unicst_set(bgep, bgep->curr_addr[0].addr, slot));
 	}
 	mutex_exit(bgep->genlock);
 	return (EINVAL);
@@ -728,9 +728,11 @@ bge_m_unicst_modify(void *arg, mac_multi_addr_t *maddr)
 
 	slot = maddr->mma_slot;
 
+	if (slot <= 0 || slot >= bgep->unicst_addr_total)
+		return (EINVAL);
+
 	mutex_enter(bgep->genlock);
-	if (slot < bgep->unicst_addr_total &&
-	    bgep->curr_addr[slot].set == B_TRUE) {
+	if (bgep->curr_addr[slot].set == B_TRUE) {
 		mutex_exit(bgep->genlock);
 		return (bge_unicst_set(bgep, maddr->mma_addr, slot));
 	}
@@ -757,12 +759,12 @@ bge_m_unicst_get(void *arg, mac_multi_addr_t *maddr)
 
 	slot = maddr->mma_slot;
 
-	if (slot < 0 || slot >= bgep->unicst_addr_total)
+	if (slot <= 0 || slot >= bgep->unicst_addr_total)
 		return (EINVAL);
 
 	mutex_enter(bgep->genlock);
-	if (bgep->curr_addr[slot + 1].set == B_TRUE) {
-		ethaddr_copy(bgep->curr_addr[slot + 1].addr,
+	if (bgep->curr_addr[slot].set == B_TRUE) {
+		ethaddr_copy(bgep->curr_addr[slot].addr,
 		    maddr->mma_addr);
 		maddr->mma_flags = MMAC_SLOT_USED;
 	} else {
@@ -958,7 +960,13 @@ bge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		multiaddress_capab_t	*mmacp = cap_data;
 
 		mutex_enter(bgep->genlock);
-		mmacp->maddr_naddr = bgep->unicst_addr_total;
+		/*
+		 * The number of MAC addresses made available by
+		 * this capability is one less than the total as
+		 * the primary address in slot 0 is counted in
+		 * the total.
+		 */
+		mmacp->maddr_naddr = bgep->unicst_addr_total - 1;
 		mmacp->maddr_naddrfree = bgep->unicst_addr_avail;
 		/* No multiple factory addresses, set mma_flag to 0 */
 		mmacp->maddr_flag = 0;
@@ -2620,8 +2628,13 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ethaddr_copy(cidp->vendor_addr.addr, bgep->curr_addr[0].addr);
 	bgep->curr_addr[0].set = B_TRUE;
 
+	bgep->unicst_addr_total = MAC_ADDRESS_REGS_MAX;
+	/*
+	 * Address available is one less than MAX
+	 * as primary address is not advertised
+	 * as a multiple MAC address.
+	 */
 	bgep->unicst_addr_avail = MAC_ADDRESS_REGS_MAX - 1;
-	bgep->unicst_addr_total = MAC_ADDRESS_REGS_MAX - 1;
 
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL)
 		goto attach_fail;

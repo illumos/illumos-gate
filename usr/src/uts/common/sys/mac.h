@@ -171,7 +171,7 @@ typedef struct mac_info_s {
 typedef enum {
 	MAC_CAPAB_HCKSUM	= 0x01,	/* data is a uint32_t for the txflags */
 	MAC_CAPAB_POLL		= 0x02,	/* boolean only, no data */
-	MAC_CAPAB_MULTIADDRESS	= 0x03	/* data is multiaddress_capab_t */
+	MAC_CAPAB_MULTIADDRESS	= 0x04	/* data is multiaddress_capab_t */
 	/* add new capabilities here */
 } mac_capab_t;
 
