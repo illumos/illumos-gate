@@ -1,3 +1,5 @@
+/* Portions Copyright 2006 Stephen P. Potter */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
