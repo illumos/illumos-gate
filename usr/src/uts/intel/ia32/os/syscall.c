@@ -214,18 +214,22 @@ syscall_entry(kthread_t *t, long *argp)
 
 	if ((t->t_pre_sys | syscalltrace) != 0) {
 		error = pre_syscall();
+
 		/*
-		 * Reset lwp_ap so that the args will be refetched if
-		 * the lwp stopped for /proc purposes in pre_syscall().
+		 * pre_syscall() has taken care so that lwp_ap is current;
+		 * it either points to syscall-entry-saved amd64 regs,
+		 * or it points to lwp_arg[], which has been re-copied from
+		 * the ia32 ustack, but either way, it's a current copy after
+		 * /proc has possibly mucked with the syscall args.
 		 */
-		lwp->lwp_argsaved = 0;
-		lwp->lwp_ap = argp;
+
 		if (error)
 			return (&sysent_err);	/* use dummy handler */
 	}
 
 	/*
-	 * Fetch the system call arguments.
+	 * Fetch the system call arguments to the kernel stack copy used
+	 * for syscall handling.
 	 * Note: for loadable system calls the number of arguments required
 	 * may not be known at this point, and will be zero if the system call
 	 * was never loaded.  Once the system call has been loaded, the number
@@ -336,12 +340,23 @@ pre_syscall()
 			if (PTOU(p)->u_systrap &&
 			    prismember(&PTOU(p)->u_entrymask, code)) {
 				stop(PR_SYSENTRY, code);
-#if defined(_LP64)
+
 				/*
-				 * Must refetch args since they were
-				 * possibly modified by /proc.
-				 * Indicate that a valid copy is in registers.
+				 * /proc may have modified syscall args,
+				 * either in regs for amd64 or on ustack
+				 * for ia32.  Either way, arrange to
+				 * copy them again, both for the syscall
+				 * handler and for other consumers in
+				 * post_syscall (like audit).  Here, we
+				 * only do amd64, and just set lwp_ap
+				 * back to the kernel-entry stack copy;
+				 * the syscall ml code redoes
+				 * move-from-regs to set up for the
+				 * syscall handler after we return.  For
+				 * ia32, save_syscall_args() below makes
+				 * an lwp_ap-accessible copy.
 				 */
+#if defined(_LP64)
 				if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE) {
 					lwp->lwp_argsaved = 0;
 					lwp->lwp_ap =
@@ -353,6 +368,16 @@ pre_syscall()
 		}
 		repost = 1;
 	}
+
+	/*
+	 * ia32 kernel, or ia32 proc on amd64 kernel: keep args in
+	 * lwp_arg for post-syscall processing, regardless of whether
+	 * they might have been changed in /proc above.
+	 */
+#if defined(_LP64)
+	if (lwp_getdatamodel(lwp) != DATAMODEL_NATIVE)
+#endif
+		(void) save_syscall_args();
 
 	if (lwp->lwp_sysabort) {
 		/*
