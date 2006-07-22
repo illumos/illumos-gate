@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2043,8 +2042,7 @@ bioclone(struct buf *bp, off_t off, size_t len, dev_t dev, daddr_t blkno,
 	B_ABRWRITE)
 
 	/*
-	 * the cloned buffer does not inherit the B_REMAPPED flag. A separate
-	 * bp_mapin(9F) has to be done to get a kernel mapping.
+	 * The cloned buffer does not inherit the B_REMAPPED flag.
 	 */
 	bufp->b_flags = (bp->b_flags & BUF_CLONE_FLAGS)  | B_BUSY;
 	bufp->b_bcount = len;
@@ -2062,6 +2060,8 @@ bioclone(struct buf *bp, off_t off, size_t len, dev_t dev, daddr_t blkno,
 		bufp->b_shadow = bp->b_shadow +
 			btop(((uintptr_t)bp->b_un.b_addr & PAGEOFFSET) + off);
 		bufp->b_un.b_addr = (caddr_t)((uintptr_t)bp->b_un.b_addr + off);
+		if (bp->b_flags & B_REMAPPED)
+			bufp->b_proc = NULL;
 	} else {
 		if (bp->b_flags & B_PAGEIO) {
 			struct page *pp;
