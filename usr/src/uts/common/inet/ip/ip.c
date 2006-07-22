@@ -8084,14 +8084,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			}
 
 			/*
-			 * TSol note: Please see the corresponding note
-			 * of the IRE_IF_NORESOLVER case
-			 */
-			ga.ga_af = AF_INET;
-			IN6_IPADDR_TO_V4MAPPED(dst, &ga.ga_addr);
-			gcgrp = gcgrp_lookup(&ga, B_FALSE);
-
-			/*
 			 * We obtain a partial IRE_CACHE which we will pass
 			 * along with the resolver query.  When the response
 			 * comes back it will be there ready for us to add.
@@ -8118,19 +8110,12 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			    0,				/* flags if any */
 			    &(save_ire->ire_uinfo),
 			    NULL,
-			    gcgrp);
+			    NULL);
 
 			if (ire == NULL) {
 				ire_refrele(save_ire);
-				if (gcgrp != NULL) {
-					GCGRP_REFRELE(gcgrp);
-					gcgrp = NULL;
-				}
 				break;
 			}
-
-			/* reference now held by IRE */
-			gcgrp = NULL;
 
 			if ((sire != NULL) &&
 			    (sire->ire_flags & RTF_MULTIRT)) {

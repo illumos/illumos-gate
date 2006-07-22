@@ -1852,6 +1852,12 @@ ire_init_common(ire_t *ire, uint_t *max_fragp, mblk_t *fp_mp,
 	 * has held a reference to it and will release it when this routine
 	 * returns a failure, otherwise we own the reference.  We do this
 	 * prior to initializing the rest IRE fields.
+	 *
+	 * Don't allocate ire_gw_secattr for the resolver case to prevent
+	 * memory leak (in case of external resolution failure). We'll
+	 * allocate it after a successful external resolution, in ire_add().
+	 * Note that ire->ire_mp != NULL here means this ire is headed
+	 * to an external resolver.
 	 */
 	if (is_system_labeled()) {
 		if ((type & (IRE_LOCAL | IRE_LOOPBACK | IRE_BROADCAST |
@@ -1861,8 +1867,8 @@ ire_init_common(ire_t *ire, uint_t *max_fragp, mblk_t *fp_mp,
 				GC_REFRELE(gc);
 			if (gcgrp != NULL)
 				GCGRP_REFRELE(gcgrp);
-		} else if (tsol_ire_init_gwattr(ire, ipversion,
-		    gc, gcgrp) != 0) {
+		} else if ((ire->ire_mp == NULL) &&
+		    tsol_ire_init_gwattr(ire, ipversion, gc, gcgrp) != 0) {
 			/* free any caller-allocated mblks upon failure */
 			if (fp_mp != NULL)
 				freeb(fp_mp);
@@ -3104,11 +3110,15 @@ ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func)
 	ill_walk_context_t ctx;
 	ire_t	*ire = *irep;
 	int	error;
+	boolean_t ire_is_mblk = B_FALSE;
+	tsol_gcgrp_t *gcgrp = NULL;
+	tsol_gcgrp_addr_t ga;
 
 	ASSERT(ire->ire_type != IRE_MIPRTUN);
 
 	/* get ready for the day when original ire is not created as mblk */
 	if (ire->ire_mp != NULL) {
+		ire_is_mblk = B_TRUE;
 		/* Copy the ire to a kmem_alloc'ed area */
 		ire1 = kmem_cache_alloc(ire_cache, KM_NOSLEEP);
 		if (ire1 == NULL) {
@@ -3222,6 +3232,40 @@ ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func)
 			*irep = NULL;
 			return (EINVAL);
 		}
+
+		/*
+		 * Since we didn't attach label security attributes to the
+		 * ire for the resolver case, we need to add it now. (only
+		 * for v4 resolver and v6 xresolv case).
+		 */
+		if (is_system_labeled() && ire_is_mblk) {
+			if (ire->ire_ipversion == IPV4_VERSION) {
+				ga.ga_af = AF_INET;
+				IN6_IPADDR_TO_V4MAPPED(ire->ire_gateway_addr !=
+				    INADDR_ANY ? ire->ire_gateway_addr :
+				    ire->ire_addr, &ga.ga_addr);
+			} else {
+				ga.ga_af = AF_INET6;
+				ga.ga_addr = IN6_IS_ADDR_UNSPECIFIED(
+				    &ire->ire_gateway_addr_v6) ?
+				    ire->ire_addr_v6 :
+				    ire->ire_gateway_addr_v6;
+			}
+			gcgrp = gcgrp_lookup(&ga, B_FALSE);
+			error = tsol_ire_init_gwattr(ire, ire->ire_ipversion,
+			    NULL, gcgrp);
+			if (error != 0) {
+				if (gcgrp != NULL) {
+					GCGRP_REFRELE(gcgrp);
+					gcgrp = NULL;
+				}
+				ipif_refrele(ipif);
+				ire->ire_ipif = NULL;
+				ire_delete(ire);
+				*irep = NULL;
+				return (error);
+			}
+		}
 	}
 
 	/*
@@ -3242,8 +3286,7 @@ ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func)
 }
 
 /*
- * Add a fully initialized IRE to an appropriate
- * table based on ire_type.
+ * Add an initialized IRE to an appropriate table based on ire_type.
  *
  * The forward table contains IRE_PREFIX/IRE_HOST/IRE_HOST_REDIRECT
  * IRE_IF_RESOLVER/IRE_IF_NORESOLVER and IRE_DEFAULT.

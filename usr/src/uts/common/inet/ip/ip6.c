@@ -5190,13 +5190,6 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				dst = v6gw;
 				v6gw = ipv6_all_zeros;
 			}
-			/*
-			 * TSol note: Please see the note above the
-			 * IRE_IF_NORESOLVER case.
-			 */
-			ga.ga_af = AF_INET6;
-			ga.ga_addr = dst;
-			gcgrp = gcgrp_lookup(&ga, B_FALSE);
 			if (dst_ill->ill_flags & ILLF_XRESOLV) {
 				/*
 				 * Ask the external resolver to do its thing.
@@ -5233,21 +5226,14 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 					0,		/* flags if any */
 					&(save_ire->ire_uinfo),
 					NULL,
-					gcgrp);
+					NULL);
 
 				ire_refrele(save_ire);
 				if (ire == NULL) {
-					if (gcgrp != NULL) {
-						GCGRP_REFRELE(gcgrp);
-						gcgrp = NULL;
-					}
 					ip1dbg(("ip_newroute_v6:"
 					    "ire is NULL\n"));
 					break;
 				}
-
-				/* reference now held by IRE */
-				gcgrp = NULL;
 
 				if ((sire != NULL) &&
 				    (sire->ire_flags & RTF_MULTIRT)) {
@@ -5403,7 +5389,14 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			}
 			/*
 			 * Non-external resolver case.
+			 *
+			 * TSol note: Please see the note above the
+			 * IRE_IF_NORESOLVER case.
 			 */
+			ga.ga_af = AF_INET6;
+			ga.ga_addr = dst;
+			gcgrp = gcgrp_lookup(&ga, B_FALSE);
+
 			ire = ire_create_v6(
 				&dst,			/* dest address */
 				&ipv6_all_ones,		/* mask */

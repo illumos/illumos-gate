@@ -6221,6 +6221,8 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	uint32_t ip_len;
 	udpha_t	*udpha;
 	udpattrs_t	attrs;
+	uchar_t	ip_snd_opt[IP_MAX_OPT_LENGTH];
+	uint32_t	ip_snd_opt_len = 0;
 
 	*error = 0;
 
@@ -6251,11 +6253,20 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	/* mp1 points to the M_DATA mblk carrying the packet */
 	ASSERT(mp1 != NULL && DB_TYPE(mp1) == M_DATA);
 
-	/* Check if our saved options are valid; update if not */
+	/*
+	 * Check if our saved options are valid; update if not
+	 * TSOL Note: Since we are not in WRITER mode, UDP packets
+	 * to different destination may require different labels.
+	 * We use conn_lock to ensure that lastdst, ip_snd_options,
+	 * and ip_snd_options_len are consistent for the current
+	 * destination and are updated atomically.
+	 */
+	mutex_enter(&connp->conn_lock);
 	if (is_system_labeled()) {
 		/* Using UDP MLP requires SCM_UCRED from user */
 		if (connp->conn_mlp_type != mlptSingle &&
 		    !attrs.udpattr_credset) {
+			mutex_exit(&connp->conn_lock);
 			DTRACE_PROBE4(
 			    tx__ip__log__info__output__udp,
 			    char *, "MLP mp(1) lacks SCM_UCRED attr(2) on q(3)",
@@ -6265,13 +6276,19 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 		}
 		if ((!IN6_IS_ADDR_V4MAPPED(&udp->udp_v6lastdst) ||
 		    V4_PART_OF_V6(udp->udp_v6lastdst) != v4dst) &&
-		    (*error = udp_update_label(q, mp, v4dst)) != 0)
+		    (*error = udp_update_label(q, mp, v4dst)) != 0) {
+			mutex_exit(&connp->conn_lock);
 			goto done;
+		}
 	}
+	if (udp->udp_ip_snd_options_len > 0) {
+		ip_snd_opt_len = udp->udp_ip_snd_options_len;
+		bcopy(udp->udp_ip_snd_options, ip_snd_opt, ip_snd_opt_len);
+	}
+	mutex_exit(&connp->conn_lock);
 
 	/* Add an IP header */
-	ip_hdr_length = IP_SIMPLE_HDR_LENGTH + UDPH_SIZE +
-	    udp->udp_ip_snd_options_len;
+	ip_hdr_length = IP_SIMPLE_HDR_LENGTH + UDPH_SIZE + ip_snd_opt_len;
 	ipha = (ipha_t *)&mp1->b_rptr[-ip_hdr_length];
 	if (DB_REF(mp1) != 1 || (uchar_t *)ipha < DB_BASE(mp1) ||
 	    !OK_32PTR(ipha)) {
@@ -6370,8 +6387,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	if (ip_hdr_length > IP_SIMPLE_HDR_LENGTH) {
 		uint32_t	cksum;
 
-		bcopy(udp->udp_ip_snd_options, &ipha[1],
-		    udp->udp_ip_snd_options_len);
+		bcopy(ip_snd_opt, &ipha[1], ip_snd_opt_len);
 		/*
 		 * Massage source route putting first source route in ipha_dst.
 		 * Ignore the destination in T_unitdata_req.
@@ -7059,6 +7075,9 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error)
 	in6_addr_t	ip6_dst;
 	udpattrs_t	attrs;
 	boolean_t	opt_present;
+	ip6_hbh_t	*hopoptsptr = NULL;
+	uint_t		hopoptslen = 0;
+	boolean_t	is_ancillary = B_FALSE;
 
 	*error = 0;
 
@@ -7119,7 +7138,14 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error)
 	 * If we're not going to the same destination as last time, then
 	 * recompute the label required.  This is done in a separate routine to
 	 * avoid blowing up our stack here.
+	 *
+	 * TSOL Note: Since we are not in WRITER mode, UDP packets
+	 * to different destination may require different labels.
+	 * We use conn_lock to ensure that lastdst, sticky ipp_hopopts,
+	 * and sticky ipp_hopoptslen are consistent for the current
+	 * destination and are updated atomically.
 	 */
+	mutex_enter(&connp->conn_lock);
 	if (is_system_labeled()) {
 		/* Using UDP MLP requires SCM_UCRED from user */
 		if (connp->conn_mlp_type != mlptSingle &&
@@ -7129,18 +7155,22 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error)
 			    char *, "MLP mp(1) lacks SCM_UCRED attr(2) on q(3)",
 			    mblk_t *, mp1, udpattrs_t *, &attrs, queue_t *, q);
 			*error = ECONNREFUSED;
+			mutex_exit(&connp->conn_lock);
 			goto done;
 		}
 		if ((opt_present ||
 		    !IN6_ARE_ADDR_EQUAL(&udp->udp_v6lastdst, &ip6_dst)) &&
-		    (*error = udp_update_label_v6(q, mp, &ip6_dst)) != 0)
+		    (*error = udp_update_label_v6(q, mp, &ip6_dst)) != 0) {
+			mutex_exit(&connp->conn_lock);
 			goto done;
+		}
 	}
 
 	/*
 	 * If there's a security label here, then we ignore any options the
 	 * user may try to set.  We keep the peer's label as a hidden sticky
-	 * option.
+	 * option. We make a private copy of this label before releasing the
+	 * lock so that label is kept consistent with the destination addr.
 	 */
 	if (udp->udp_label_len_v6 > 0) {
 		ignore &= ~IPPF_HOPOPTS;
@@ -7149,6 +7179,7 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error)
 
 	if ((udp->udp_sticky_ipp.ipp_fields == 0) && (ipp->ipp_fields == 0)) {
 		/* No sticky options nor ancillary data. */
+		mutex_exit(&connp->conn_lock);
 		goto no_options;
 	}
 
@@ -7165,9 +7196,21 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error)
 		} else if (udp->udp_sticky_ipp.ipp_fields & IPPF_HOPOPTS) {
 			option_exists |= IPPF_HOPOPTS;
 			is_sticky |= IPPF_HOPOPTS;
-			udp_ip_hdr_len += udp->udp_sticky_ipp.ipp_hopoptslen;
+			ASSERT(udp->udp_sticky_ipp.ipp_hopoptslen != 0);
+			hopoptsptr = kmem_alloc(
+			    udp->udp_sticky_ipp.ipp_hopoptslen, KM_NOSLEEP);
+			if (hopoptsptr == NULL) {
+				*error = ENOMEM;
+				mutex_exit(&connp->conn_lock);
+				goto done;
+			}
+			hopoptslen = udp->udp_sticky_ipp.ipp_hopoptslen;
+			bcopy(udp->udp_sticky_ipp.ipp_hopopts, hopoptsptr,
+			    hopoptslen);
+			udp_ip_hdr_len += hopoptslen;
 		}
 	}
+	mutex_exit(&connp->conn_lock);
 
 	if (!(ignore & IPPF_RTHDR)) {
 		if (ipp->ipp_fields & IPPF_RTHDR) {
@@ -7400,12 +7443,23 @@ no_options:
 		/* Hop-by-hop options */
 		ip6_hbh_t *hbh = (ip6_hbh_t *)cp;
 		tipp = ANCIL_OR_STICKY_PTR(IPPF_HOPOPTS);
+		if (hopoptslen == 0) {
+			hopoptsptr = tipp->ipp_hopopts;
+			hopoptslen = tipp->ipp_hopoptslen;
+			is_ancillary = B_TRUE;
+		}
 
 		*nxthdr_ptr = IPPROTO_HOPOPTS;
 		nxthdr_ptr = &hbh->ip6h_nxt;
 
-		bcopy(tipp->ipp_hopopts, cp, tipp->ipp_hopoptslen);
-		cp += tipp->ipp_hopoptslen;
+		bcopy(hopoptsptr, cp, hopoptslen);
+		cp += hopoptslen;
+
+		if (hopoptsptr != NULL && !is_ancillary) {
+			kmem_free(hopoptsptr, hopoptslen);
+			hopoptsptr = NULL;
+			hopoptslen = 0;
+		}
 	}
 	/*
 	 * En-route destination options
@@ -7576,6 +7630,10 @@ no_options:
 	ip_output_v6(connp, mp1, q, IP_WPUT);
 
 done:
+	if (hopoptsptr != NULL && !is_ancillary) {
+		kmem_free(hopoptsptr, hopoptslen);
+		hopoptsptr = NULL;
+	}
 	if (*error != 0) {
 		ASSERT(mp != NULL);
 		BUMP_MIB(&udp_mib, udpOutErrors);
