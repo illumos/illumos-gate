@@ -2139,31 +2139,19 @@ promote_snap_cb(zfs_handle_t *zhp, void *data)
 {
 	promote_data_t *pd = data;
 	zfs_handle_t *szhp;
-	int err;
 	char snapname[MAXPATHLEN];
-	char *cp;
 
 	/* We don't care about snapshots after the pivot point */
 	if (zfs_prop_get_int(zhp, ZFS_PROP_CREATETXG) > pd->cb_pivot_txg)
 		return (0);
 
-	/*
-	 * Unmount it.  We actually need to open it to provoke it to be
-	 * mounted first, because if it is not mounted, umount2 will
-	 * mount it!
-	 */
-	(void) strcpy(snapname, pd->cb_mountpoint);
-	(void) strcat(snapname, "/.zfs/snapshot/");
-	cp = strchr(zhp->zfs_name, '@');
-	(void) strcat(snapname, cp+1);
-	err = open(snapname, O_RDONLY);
-	if (err != -1)
-		(void) close(err);
-	(void) umount2(snapname, MS_FORCE);
+	/* Remove the device link if it's a zvol. */
+	if (zhp->zfs_volblocksize != 0)
+		(void) zvol_remove_link(zhp->zfs_hdl, zhp->zfs_name);
 
 	/* Check for conflicting names */
 	(void) strcpy(snapname, pd->cb_target);
-	(void) strcat(snapname, cp);
+	(void) strcat(snapname, strchr(zhp->zfs_name, '@'));
 	szhp = make_dataset_handle(zhp->zfs_hdl, snapname);
 	if (szhp != NULL) {
 		zfs_close(szhp);
@@ -2173,6 +2161,22 @@ promote_snap_cb(zfs_handle_t *zhp, void *data)
 		    zhp->zfs_name, snapname);
 		return (zfs_error(zhp->zfs_hdl, EZFS_EXISTS, pd->cb_errbuf));
 	}
+	return (0);
+}
+
+static int
+promote_snap_done_cb(zfs_handle_t *zhp, void *data)
+{
+	promote_data_t *pd = data;
+
+	/* We don't care about snapshots after the pivot point */
+	if (zfs_prop_get_int(zhp, ZFS_PROP_CREATETXG) > pd->cb_pivot_txg)
+		return (0);
+
+	/* Create the device link if it's a zvol. */
+	if (zhp->zfs_volblocksize != 0)
+		(void) zvol_create_link(zhp->zfs_hdl, zhp->zfs_name);
+
 	return (0);
 }
 
@@ -2223,16 +2227,24 @@ zfs_promote(zfs_handle_t *zhp)
 	(void) zfs_prop_get(pzhp, ZFS_PROP_MOUNTPOINT, pd.cb_mountpoint,
 	    sizeof (pd.cb_mountpoint), NULL, NULL, 0, FALSE);
 	ret = zfs_iter_snapshots(pzhp, promote_snap_cb, &pd);
-	if (ret != 0)
+	if (ret != 0) {
+		zfs_close(pzhp);
 		return (-1);
+	}
 
 	/* issue the ioctl */
+	(void) strlcpy(zc.zc_prop_value, zhp->zfs_dmustats.dds_clone_of,
+	    sizeof (zc.zc_prop_value));
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 	ret = ioctl(hdl->libzfs_fd, ZFS_IOC_PROMOTE, &zc);
 
 	if (ret != 0) {
-		switch (errno) {
+		int save_errno = errno;
 
+		(void) zfs_iter_snapshots(pzhp, promote_snap_done_cb, &pd);
+		zfs_close(pzhp);
+
+		switch (save_errno) {
 		case EEXIST:
 			/*
 			 * There is a conflicting snapshot name.  We
@@ -2245,10 +2257,13 @@ zfs_promote(zfs_handle_t *zhp)
 			return (zfs_error(hdl, EZFS_EXISTS, errbuf));
 
 		default:
-			return (zfs_standard_error(hdl, errno, errbuf));
+			return (zfs_standard_error(hdl, save_errno, errbuf));
 		}
+	} else {
+		(void) zfs_iter_snapshots(zhp, promote_snap_done_cb, &pd);
 	}
 
+	zfs_close(pzhp);
 	return (ret);
 }
 

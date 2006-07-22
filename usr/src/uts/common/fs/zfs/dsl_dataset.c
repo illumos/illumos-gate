@@ -653,7 +653,7 @@ dsl_snapshots_destroy(char *fsname, char *snapname)
 	da.failed = fsname;
 
 	err = dmu_objset_find(fsname,
-	    dsl_snapshot_destroy_one, &da, 0);
+	    dsl_snapshot_destroy_one, &da, DS_FIND_CHILDREN);
 
 	if (err == 0)
 		err = dsl_sync_task_group_wait(da.dstg);
@@ -1706,7 +1706,12 @@ dsl_dataset_promote_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	VERIFY(0 == dsl_dataset_open_obj(dp,
 	    dd->dd_phys->dd_clone_parent_obj,
 	    NULL, DS_MODE_EXCLUSIVE, FTAG, &pivot_ds));
-	pdd = pivot_ds->ds_dir;
+	/*
+	 * We need to explicitly open pdd, since pivot_ds's pdd will be
+	 * changing.
+	 */
+	VERIFY(0 == dsl_dir_open_obj(dp, pivot_ds->ds_dir->dd_object,
+	    NULL, FTAG, &pdd));
 
 	/* move snapshots to this dir */
 	name = kmem_alloc(MAXPATHLEN, KM_SLEEP);
@@ -1768,6 +1773,7 @@ dsl_dataset_promote_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	dsl_dir_diduse_space(dd, pa->used, pa->comp, pa->uncomp, tx);
 	pivot_ds->ds_phys->ds_unique_bytes = pa->unique;
 
+	dsl_dir_close(pdd, FTAG);
 	dsl_dataset_close(pivot_ds, DS_MODE_EXCLUSIVE, FTAG);
 	kmem_free(name, MAXPATHLEN);
 }

@@ -1192,7 +1192,8 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	 * create lying around from a previous run.  If so, destroy it
 	 * and all of its snapshots.
 	 */
-	(void) dmu_objset_find(name, ztest_destroy_cb, NULL, DS_FIND_SNAPSHOTS);
+	(void) dmu_objset_find(name, ztest_destroy_cb, NULL,
+	    DS_FIND_CHILDREN | DS_FIND_SNAPSHOTS);
 
 	/*
 	 * Verify that the destroyed dataset is no longer in the namespace.
@@ -3154,7 +3155,7 @@ ztest_run(char *pool)
 		if (zopt_verbose >= 3)
 			(void) printf("Destroying %s to free up space\n", name);
 		(void) dmu_objset_find(name, ztest_destroy_cb, NULL,
-		    DS_FIND_SNAPSHOTS);
+		    DS_FIND_SNAPSHOTS | DS_FIND_CHILDREN);
 		(void) rw_unlock(&ztest_shared->zs_name_lock);
 	}
 

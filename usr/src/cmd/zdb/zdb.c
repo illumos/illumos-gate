@@ -1719,7 +1719,7 @@ dump_zpool(spa_t *spa)
 			dump_metaslabs(spa);
 		}
 		(void) dmu_objset_find(spa->spa_name, dump_one_dir, NULL,
-		    DS_FIND_SNAPSHOTS);
+		    DS_FIND_SNAPSHOTS | DS_FIND_CHILDREN);
 	}
 
 	if (dump_opt['b'] || dump_opt['c'])

@@ -1282,6 +1282,9 @@ dbuf_findbp(dnode_t *dn, int level, uint64_t blkid, int fail_sparse,
 {
 	int nlevels, epbs;
 
+	*parentp = NULL;
+	*bpp = NULL;
+
 	ASSERT(blkid != DB_BONUS_BLKID);
 
 	if (dn->dn_phys->dn_nlevels == 0)
@@ -1296,8 +1299,6 @@ dbuf_findbp(dnode_t *dn, int level, uint64_t blkid, int fail_sparse,
 	if (level >= nlevels ||
 	    (blkid > (dn->dn_phys->dn_maxblkid >> (level * epbs)))) {
 		/* the buffer has no parent yet */
-		*parentp = NULL;
-		*bpp = NULL;
 		return (ENOENT);
 	} else if (level < nlevels-1) {
 		/* this block is referenced from an indirect block */
@@ -1478,6 +1479,7 @@ dbuf_prefetch(dnode_t *dn, uint64_t blkid)
 			return;
 		}
 		mutex_exit(&db->db_mtx);
+		db = NULL;
 	}
 
 	if (dbuf_findbp(dn, 0, blkid, TRUE, &db, &bp) == 0) {

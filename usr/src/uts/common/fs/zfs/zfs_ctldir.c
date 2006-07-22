@@ -454,7 +454,6 @@ zfsctl_rename_snap(zfsctl_snapdir_t *sdp, zfs_snapentry_t *sep, const char *nm)
 	vfs_t *vfsp;
 	refstr_t *pathref;
 	char newpath[MAXNAMELEN];
-	const char *oldpath;
 	char *tail;
 
 	ASSERT(MUTEX_HELD(&sdp->sd_lock));
@@ -481,19 +480,19 @@ zfsctl_rename_snap(zfsctl_snapdir_t *sdp, zfs_snapentry_t *sep, const char *nm)
 	 *	- update the tail of the resource path
 	 */
 	pathref = vfs_getmntpoint(vfsp);
-	oldpath = refstr_value(pathref);
-	VERIFY((tail = strrchr(oldpath, '/')) != NULL);
-	ASSERT((tail - oldpath) + strlen(nm) + 2 < MAXNAMELEN);
-	(void) strncpy(newpath, oldpath, tail - oldpath + 1);
+	(void) strncpy(newpath, refstr_value(pathref), sizeof (newpath));
+	VERIFY((tail = strrchr(newpath, '/')) != NULL);
+	*(tail+1) = '\0';
+	ASSERT3U(strlen(newpath) + strlen(nm), <, sizeof (newpath));
 	(void) strcat(newpath, nm);
 	refstr_rele(pathref);
 	vfs_setmntpoint(vfsp, newpath);
 
 	pathref = vfs_getresource(vfsp);
-	oldpath = refstr_value(pathref);
-	VERIFY((tail = strrchr(oldpath, '@')) != NULL);
-	ASSERT((tail - oldpath) + strlen(nm) + 2 < MAXNAMELEN);
-	(void) strncpy(newpath, oldpath, tail - oldpath + 1);
+	(void) strncpy(newpath, refstr_value(pathref), sizeof (newpath));
+	VERIFY((tail = strrchr(newpath, '@')) != NULL);
+	*(tail+1) = '\0';
+	ASSERT3U(strlen(newpath) + strlen(nm), <, sizeof (newpath));
 	(void) strcat(newpath, nm);
 	refstr_rele(pathref);
 	vfs_setresource(vfsp, newpath);

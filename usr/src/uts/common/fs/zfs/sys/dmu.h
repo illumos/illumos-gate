@@ -135,7 +135,8 @@ void zfs_znode_byteswap(void *buf, size_t size);
 #define	DS_MODE_INCONSISTENT	0x10
 #define	DS_MODE_IS_INCONSISTENT(x)	((x) & DS_MODE_INCONSISTENT)
 
-#define	DS_FIND_SNAPSHOTS	0x01
+#define	DS_FIND_SNAPSHOTS	(1<<0)
+#define	DS_FIND_CHILDREN	(1<<1)
 
 /*
  * The maximum number of bytes that can be accessed as part of one

@@ -625,10 +625,12 @@ dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive)
 	sn.dstg = dsl_sync_task_group_create(spa_get_dsl(spa));
 	sn.snapname = snapname;
 
-	if (recursive)
-		err = dmu_objset_find(fsname, dmu_objset_snapshot_one, &sn, 0);
-	else
+	if (recursive) {
+		err = dmu_objset_find(fsname,
+		    dmu_objset_snapshot_one, &sn, DS_FIND_CHILDREN);
+	} else {
 		err = dmu_objset_snapshot_one(fsname, &sn);
+	}
 
 	if (err)
 		goto out;
@@ -892,31 +894,33 @@ dmu_objset_find(char *name, int func(char *, void *), void *arg, int flags)
 	/*
 	 * Iterate over all children.
 	 */
-	for (zap_cursor_init(&zc, dd->dd_pool->dp_meta_objset,
-	    dd->dd_phys->dd_child_dir_zapobj);
-	    zap_cursor_retrieve(&zc, &attr) == 0;
-	    (void) zap_cursor_advance(&zc)) {
-		ASSERT(attr.za_integer_length == sizeof (uint64_t));
-		ASSERT(attr.za_num_integers == 1);
+	if (flags & DS_FIND_CHILDREN) {
+		for (zap_cursor_init(&zc, dd->dd_pool->dp_meta_objset,
+		    dd->dd_phys->dd_child_dir_zapobj);
+		    zap_cursor_retrieve(&zc, &attr) == 0;
+		    (void) zap_cursor_advance(&zc)) {
+			ASSERT(attr.za_integer_length == sizeof (uint64_t));
+			ASSERT(attr.za_num_integers == 1);
 
-		/*
-		 * No separating '/' because parent's name ends in /.
-		 */
-		child = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-		/* XXX could probably just use name here */
-		dsl_dir_name(dd, child);
-		(void) strcat(child, "/");
-		(void) strcat(child, attr.za_name);
-		err = dmu_objset_find(child, func, arg, flags);
-		kmem_free(child, MAXPATHLEN);
-		if (err)
-			break;
-	}
-	zap_cursor_fini(&zc);
+			/*
+			 * No separating '/' because parent's name ends in /.
+			 */
+			child = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+			/* XXX could probably just use name here */
+			dsl_dir_name(dd, child);
+			(void) strcat(child, "/");
+			(void) strcat(child, attr.za_name);
+			err = dmu_objset_find(child, func, arg, flags);
+			kmem_free(child, MAXPATHLEN);
+			if (err)
+				break;
+		}
+		zap_cursor_fini(&zc);
 
-	if (err) {
-		dsl_dir_close(dd, FTAG);
-		return (err);
+		if (err) {
+			dsl_dir_close(dd, FTAG);
+			return (err);
+		}
 	}
 
 	/*

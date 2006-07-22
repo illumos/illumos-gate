@@ -964,7 +964,7 @@ zfs_unmount_snap(char *name, void *arg)
 {
 	char *snapname = arg;
 	char *cp;
-	vfs_t *vfsp;
+	vfs_t *vfsp = NULL;
 
 	/*
 	 * Snapshots (which are under .zfs control) must be unmounted
@@ -977,7 +977,7 @@ zfs_unmount_snap(char *name, void *arg)
 		vfsp = zfs_get_vfs(name);
 		cp = strchr(name, '@');
 		*cp = '\0';
-	} else {
+	} else if (strchr(name, '@')) {
 		vfsp = zfs_get_vfs(name);
 	}
 
@@ -1007,7 +1007,7 @@ zfs_ioc_destroy_snaps(zfs_cmd_t *zc)
 	if (snapshot_namecheck(zc->zc_prop_value, NULL, NULL) != 0)
 		return (EINVAL);
 	err = dmu_objset_find(zc->zc_name,
-	    zfs_unmount_snap, zc->zc_prop_value, 0);
+	    zfs_unmount_snap, zc->zc_prop_value, DS_FIND_CHILDREN);
 	if (err)
 		return (err);
 	return (dmu_snapshots_destroy(zc->zc_name, zc->zc_prop_value));
@@ -1210,6 +1210,17 @@ zfs_ioc_bookmark_name(zfs_cmd_t *zc)
 static int
 zfs_ioc_promote(zfs_cmd_t *zc)
 {
+	char *cp;
+
+	/*
+	 * We don't need to unmount *all* the origin fs's snapshots, but
+	 * it's easier.
+	 */
+	cp = strchr(zc->zc_prop_value, '@');
+	if (cp)
+		*cp = '\0';
+	(void) dmu_objset_find(zc->zc_prop_value,
+	    zfs_unmount_snap, NULL, DS_FIND_SNAPSHOTS);
 	return (dsl_dataset_promote(zc->zc_name));
 }
 
