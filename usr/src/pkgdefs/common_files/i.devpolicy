@@ -40,9 +40,6 @@ do
 	cp $dest $dest.$$
 	sed < $dest.$$ > $dest \
 	    -e '/md:admin/s/read_priv_set=sys_config/			/' \
-	    -e '/^[sm]d[: 	]/d'					   \
-	    -e '/^ssd[: 	]/d'					   \
-	    -e '/^fssnap:\*	/d'					   \
 	    -e '/^icmp[ 	]*read_priv_set=net_rawaccess[ 	]*write_priv_set=net_rawaccess$/d' \
 	    -e '/^icmp6[ 	]*read_priv_set=net_rawaccess[ 	]*write_priv_set=net_rawaccess$/d'
 
