@@ -761,7 +761,15 @@ scsi_hba_bus_ctl(
 		dev_info_t		*ndip;
 
 		hba = ddi_get_driver_private(dip);
-		ASSERT(hba != NULL);
+
+		/*
+		 * For a driver like fp with multiple upper-layer-protocols
+		 * it is possible for scsi_hba_init in _init to plumb SCSA
+		 * and have the load of fcp (which does scsi_hba_attach_setup)
+		 * to fail.  In this case we may get here with a NULL hba.
+		 */
+		if (hba == NULL)
+			return (DDI_FAILURE);
 
 		sd = kmem_zalloc(sizeof (struct scsi_device), KM_SLEEP);
 
