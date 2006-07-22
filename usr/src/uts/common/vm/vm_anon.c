@@ -1024,6 +1024,15 @@ anon_decref_pages(
 	ASSERT(szc != 0);
 	ASSERT(IS_P2ALIGNED(pgcnt, pgcnt));
 	ASSERT(IS_P2ALIGNED(an_idx, pgcnt));
+	ASSERT(an_idx < ahp->size);
+
+	if (ahp->size - an_idx < pgcnt) {
+		/*
+		 * In case of shared mappings total anon map size may not be
+		 * the largest page size aligned.
+		 */
+		pgcnt = ahp->size - an_idx;
+	}
 
 	VM_STAT_ADD(anonvmstats.decrefpages[0]);
 
@@ -1474,6 +1483,7 @@ anon_free_pages(
 	npages = btopr(size);
 	ASSERT(IS_P2ALIGNED(npages, pgcnt));
 	ASSERT(IS_P2ALIGNED(an_idx, pgcnt));
+	ASSERT(an_idx < ahp->size);
 
 	VM_STAT_ADD(anonvmstats.freepages[0]);
 
@@ -1621,7 +1631,7 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, int flags)
 		}
 
 		pgcnt = page_get_pagecnt(pp->p_szc);
-		if (!IS_P2ALIGNED(index, pgcnt)) {
+		if (!IS_P2ALIGNED(index, pgcnt) || npages < pgcnt) {
 			if (!page_try_demote_pages(pp)) {
 				mutex_exit(ahm);
 				page_unlock(pp);
@@ -1802,6 +1812,7 @@ anon_map_getpages(
 	int		prealloc = 1;
 	int		err, slotcreate;
 	uint_t		vpprot;
+	int		upsize = (szc < seg->s_szc);
 
 #if !defined(__i386) && !defined(__amd64)
 	ASSERT(seg->s_szc != 0);
@@ -1824,9 +1835,10 @@ anon_map_getpages(
 			ppa[0] = pl[0];
 			if (brkcow == 0 || (*protp & PROT_WRITE)) {
 				VM_STAT_ADD(anonvmstats.getpages[2]);
-				if (ppa[0]->p_szc != 0) {
+				if (ppa[0]->p_szc != 0 && upsize) {
 					VM_STAT_ADD(anonvmstats.getpages[3]);
-					*ppa_szc = ppa[0]->p_szc;
+					*ppa_szc = MIN(ppa[0]->p_szc,
+					    seg->s_szc);
 					page_unlock(ppa[0]);
 					return (-2);
 				}
@@ -1859,11 +1871,11 @@ anon_map_getpages(
 		uint_t pszc;
 		swap_xlate(ap, &vp, &off);
 		if (page_exists_forreal(vp, (u_offset_t)off, &pszc)) {
-			if (pszc > szc) {
-				*ppa_szc = pszc;
+			if (pszc > szc && upsize) {
+				*ppa_szc = MIN(pszc, seg->s_szc);
 				return (-2);
 			}
-			if (pszc == szc) {
+			if (pszc >= szc) {
 				prealloc = 0;
 			}
 		}
@@ -1980,10 +1992,11 @@ top:
 		 * Similar to the anon_zero case.
 		 */
 		err = swap_getconpage(vp, (u_offset_t)off, PAGESIZE,
-		    NULL, pl, PAGESIZE, conpp, &nreloc, seg, vaddr,
+		    NULL, pl, PAGESIZE, conpp, ppa_szc, &nreloc, seg, vaddr,
 		    slotcreate == 1 ? S_CREATE : rw, cred);
 
 		if (err) {
+			ASSERT(err != -2 || upsize);
 			VM_STAT_ADD(anonvmstats.getpages[12]);
 			ASSERT(slotcreate == 0);
 			goto io_err;
@@ -1991,12 +2004,14 @@ top:
 
 		pp = pl[0];
 
-		if (pp->p_szc != szc) {
+		if (pp->p_szc < szc || (pp->p_szc > szc && upsize)) {
 			VM_STAT_ADD(anonvmstats.getpages[13]);
 			ASSERT(slotcreate == 0);
 			ASSERT(prealloc == 0);
 			ASSERT(pg_idx == 0);
 			if (pp->p_szc > szc) {
+				ASSERT(upsize);
+				*ppa_szc = MIN(pp->p_szc, seg->s_szc);
 				page_unlock(pp);
 				VM_STAT_ADD(anonvmstats.getpages[14]);
 				return (-2);
@@ -2063,8 +2078,11 @@ top:
 
 		if (pg_idx > 0 &&
 		    ((page_pptonum(pp) != page_pptonum(ppa[pg_idx - 1]) + 1) ||
-		    (pp->p_szc != ppa[pg_idx - 1]->p_szc)))
+		    (pp->p_szc != ppa[pg_idx - 1]->p_szc))) {
 			panic("anon_map_getpages: unexpected page");
+		} else if (pg_idx == 0 && (page_pptonum(pp) & (pgcnt - 1))) {
+			panic("anon_map_getpages: unaligned page");
+		}
 
 		if (prealloc == 0) {
 			ppa[pg_idx] = pp;
@@ -2122,7 +2140,7 @@ io_err:
 	 * unlocked.
 	 */
 
-	ASSERT(err != -2 || pg_idx == 0);
+	ASSERT(err != -2 || ((pg_idx == 0) && upsize));
 
 	VM_STAT_COND_ADD(err > 0, anonvmstats.getpages[22]);
 	VM_STAT_COND_ADD(err == -1, anonvmstats.getpages[23]);
@@ -2490,7 +2508,8 @@ anon_map_privatepages(
 		}
 
 		err = swap_getconpage(vp, (u_offset_t)off, PAGESIZE, NULL, pl,
-			PAGESIZE, conpp, &nreloc, seg, vaddr, S_CREATE, cred);
+			PAGESIZE, conpp, NULL, &nreloc, seg, vaddr,
+			S_CREATE, cred);
 
 		/*
 		 * Impossible to fail this is S_CREATE.
@@ -2788,8 +2807,8 @@ anon_map_createpages(
 			conpp = pp;
 
 			err = swap_getconpage(ap_vp, ap_off, PAGESIZE,
-			    (uint_t *)NULL, anon_pl, PAGESIZE, conpp, &nreloc,
-			    seg, addr, S_CREATE, cred);
+			    (uint_t *)NULL, anon_pl, PAGESIZE, conpp, NULL,
+			    &nreloc, seg, addr, S_CREATE, cred);
 
 			if (err) {
 				ANON_LOCK_EXIT(&amp->a_rwlock);
@@ -2822,6 +2841,124 @@ anon_map_createpages(
 	return (0);
 }
 
+static int
+anon_try_demote_pages(
+	struct anon_hdr *ahp,
+	ulong_t sidx,
+	uint_t szc,
+	page_t **ppa,
+	int private)
+{
+	struct anon	*ap;
+	pgcnt_t		pgcnt = page_get_pagecnt(szc);
+	page_t		*pp;
+	pgcnt_t		i;
+	kmutex_t	*ahmpages = NULL;
+	int		root = 0;
+	pgcnt_t		npgs;
+	pgcnt_t		curnpgs = 0;
+	size_t		ppasize = 0;
+
+	ASSERT(szc != 0);
+	ASSERT(IS_P2ALIGNED(pgcnt, pgcnt));
+	ASSERT(IS_P2ALIGNED(sidx, pgcnt));
+	ASSERT(sidx < ahp->size);
+
+	if (ppa == NULL) {
+		ppasize = pgcnt * sizeof (page_t *);
+		ppa = kmem_alloc(ppasize, KM_SLEEP);
+	}
+
+	ap = anon_get_ptr(ahp, sidx);
+	if (ap != NULL && private) {
+		VM_STAT_ADD(anonvmstats.demotepages[1]);
+		ahmpages = &anonpages_hash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+		mutex_enter(ahmpages);
+	}
+
+	if (ap != NULL && ap->an_refcnt > 1) {
+		if (ahmpages != NULL) {
+			VM_STAT_ADD(anonvmstats.demotepages[2]);
+			mutex_exit(ahmpages);
+		}
+		if (ppasize != 0) {
+			kmem_free(ppa, ppasize);
+		}
+		return (0);
+	}
+	if (ahmpages != NULL) {
+		mutex_exit(ahmpages);
+	}
+	if (ahp->size - sidx < pgcnt) {
+		ASSERT(private == 0);
+		pgcnt = ahp->size - sidx;
+	}
+	for (i = 0; i < pgcnt; i++, sidx++) {
+		ap = anon_get_ptr(ahp, sidx);
+		if (ap != NULL) {
+			if (ap->an_refcnt != 1) {
+				panic("anon_try_demote_pages: an_refcnt != 1");
+			}
+			pp = ppa[i] = page_lookup(ap->an_vp, ap->an_off,
+				SE_EXCL);
+			if (pp != NULL) {
+				(void) hat_pageunload(pp,
+					HAT_FORCE_PGUNLOAD);
+			}
+		} else {
+			ppa[i] = NULL;
+		}
+	}
+	for (i = 0; i < pgcnt; i++) {
+		if ((pp = ppa[i]) != NULL && pp->p_szc != 0) {
+			ASSERT(pp->p_szc <= szc);
+			if (!root) {
+				VM_STAT_ADD(anonvmstats.demotepages[3]);
+				if (curnpgs != 0)
+					panic("anon_try_demote_pages: "
+						"bad large page");
+
+				root = 1;
+				curnpgs = npgs =
+					page_get_pagecnt(pp->p_szc);
+
+				ASSERT(npgs <= pgcnt);
+				ASSERT(IS_P2ALIGNED(npgs, npgs));
+				ASSERT(!(page_pptonum(pp) &
+					(npgs - 1)));
+			} else {
+				ASSERT(i > 0);
+				ASSERT(page_pptonum(pp) - 1 ==
+					page_pptonum(ppa[i - 1]));
+				if ((page_pptonum(pp) & (npgs - 1)) ==
+					npgs - 1)
+					root = 0;
+			}
+			ASSERT(PAGE_EXCL(pp));
+			pp->p_szc = 0;
+			ASSERT(curnpgs > 0);
+			curnpgs--;
+		}
+	}
+	if (root != 0 || curnpgs != 0)
+		panic("anon_try_demote_pages: bad large page");
+
+	for (i = 0; i < pgcnt; i++) {
+		if ((pp = ppa[i]) != NULL) {
+			ASSERT(!hat_page_is_mapped(pp));
+			ASSERT(pp->p_szc == 0);
+			page_unlock(pp);
+		}
+	}
+	if (ppasize != 0) {
+		kmem_free(ppa, ppasize);
+	}
+	return (1);
+}
+
+/*
+ * anon_map_demotepages() can only be called by MAP_PRIVATE segments.
+ */
 int
 anon_map_demotepages(
 	struct anon_map *amp,
@@ -2842,7 +2979,6 @@ anon_map_demotepages(
 	pgcnt_t		i, pg_idx;
 	ulong_t		an_idx;
 	caddr_t		vaddr;
-	kmutex_t	*ahmpages = NULL;
 	int 		err;
 	int		retry = 0;
 	uint_t		vpprot;
@@ -2851,87 +2987,15 @@ anon_map_demotepages(
 	ASSERT(IS_P2ALIGNED(pgcnt, pgcnt));
 	ASSERT(IS_P2ALIGNED(start_idx, pgcnt));
 	ASSERT(ppa != NULL);
+	ASSERT(szc != 0);
+	ASSERT(szc == amp->a_szc);
 
 	VM_STAT_ADD(anonvmstats.demotepages[0]);
 
-	ap = anon_get_ptr(amp->ahp, start_idx);
-	if (ap != NULL) {
-		VM_STAT_ADD(anonvmstats.demotepages[1]);
-		ahmpages = &anonpages_hash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
-		mutex_enter(ahmpages);
-	}
 top:
-	if (ap == NULL || ap->an_refcnt <= 1) {
-		int root = 0;
-		pgcnt_t npgs, curnpgs = 0;
-
-		VM_STAT_ADD(anonvmstats.demotepages[2]);
-
-		ASSERT(retry == 0 || ap != NULL);
-
-		if (ahmpages != NULL)
-			mutex_exit(ahmpages);
-		an_idx = start_idx;
-		for (i = 0; i < pgcnt; i++, an_idx++) {
-			ap = anon_get_ptr(amp->ahp, an_idx);
-			if (ap != NULL) {
-				ASSERT(ap->an_refcnt == 1);
-				pp = ppa[i] = page_lookup(ap->an_vp, ap->an_off,
-				    SE_EXCL);
-				if (pp != NULL) {
-					(void) hat_pageunload(pp,
-					    HAT_FORCE_PGUNLOAD);
-				}
-			} else {
-				ppa[i] = NULL;
-			}
-		}
-		for (i = 0; i < pgcnt; i++) {
-			if ((pp = ppa[i]) != NULL && pp->p_szc != 0) {
-				ASSERT(pp->p_szc <= szc);
-				if (!root) {
-					VM_STAT_ADD(anonvmstats.demotepages[3]);
-					if (curnpgs != 0)
-						panic("anon_map_demotepages: "
-						    "bad large page");
-
-					root = 1;
-					curnpgs = npgs =
-					    page_get_pagecnt(pp->p_szc);
-
-					ASSERT(npgs <= pgcnt);
-					ASSERT(IS_P2ALIGNED(npgs, npgs));
-					ASSERT(!(page_pptonum(pp) &
-					    (npgs - 1)));
-				} else {
-					ASSERT(i > 0);
-					ASSERT(page_pptonum(pp) - 1 ==
-					    page_pptonum(ppa[i - 1]));
-					if ((page_pptonum(pp) & (npgs - 1)) ==
-					    npgs - 1)
-						root = 0;
-				}
-				ASSERT(PAGE_EXCL(pp));
-				pp->p_szc = 0;
-				curnpgs--;
-			}
-		}
-		if (root != 0 || curnpgs != 0)
-			panic("anon_map_demotepages: bad large page");
-
-		for (i = 0; i < pgcnt; i++) {
-			if ((pp = ppa[i]) != NULL) {
-				ASSERT(!hat_page_is_mapped(pp));
-				ASSERT(pp->p_szc == 0);
-				page_unlock(pp);
-			}
-		}
-		kmem_free(ppa, ppasize);
+	if (anon_try_demote_pages(amp->ahp, start_idx, szc, ppa, 1)) {
 		return (0);
 	}
-	ASSERT(ahmpages != NULL);
-	mutex_exit(ahmpages);
-	ahmpages = NULL;
 
 	VM_STAT_ADD(anonvmstats.demotepages[4]);
 
@@ -2985,6 +3049,75 @@ top:
 	kmem_free(ppa, ppasize);
 
 	return (0);
+}
+
+/*
+ * Free pages of shared anon map. It's assumed that anon maps don't share anon
+ * structures with private anon maps. Therefore all anon structures should
+ * have at most one reference at this point. This means underlying pages can
+ * be exclusively locked and demoted or freed.  If not freeing the entire
+ * large pages demote the ends of the region we free to be able to free
+ * subpages. Page roots correspend to aligned index positions in anon map.
+ */
+void
+anon_shmap_free_pages(struct anon_map *amp, ulong_t sidx, size_t len)
+{
+	ulong_t eidx = sidx + btopr(len);
+	pgcnt_t pages = page_get_pagecnt(amp->a_szc);
+	struct anon_hdr *ahp = amp->ahp;
+	ulong_t tidx;
+	size_t size;
+	ulong_t sidx_aligned;
+	ulong_t eidx_aligned;
+
+	ASSERT(RW_WRITE_HELD(&amp->a_rwlock));
+	ASSERT(amp->refcnt <= 1);
+	ASSERT(amp->a_szc > 0);
+	ASSERT(eidx <= ahp->size);
+	ASSERT(!anon_share(ahp, sidx, btopr(len)));
+
+	if (len == 0) {	/* XXX */
+		return;
+	}
+
+	sidx_aligned = P2ALIGN(sidx, pages);
+	if (sidx_aligned != sidx ||
+	    (eidx < sidx_aligned + pages && eidx < ahp->size)) {
+		if (!anon_try_demote_pages(ahp, sidx_aligned,
+		    amp->a_szc, NULL, 0)) {
+			panic("anon_shmap_free_pages: demote failed");
+		}
+		size = (eidx <= sidx_aligned + pages) ? (eidx - sidx) :
+		    P2NPHASE(sidx, pages);
+		size <<= PAGESHIFT;
+		anon_free(ahp, sidx, size);
+		sidx = sidx_aligned + pages;
+		if (eidx <= sidx) {
+			return;
+		}
+	}
+	eidx_aligned = P2ALIGN(eidx, pages);
+	if (sidx < eidx_aligned) {
+		anon_free_pages(ahp, sidx,
+		    (eidx_aligned - sidx) << PAGESHIFT,
+		    amp->a_szc);
+		sidx = eidx_aligned;
+	}
+	ASSERT(sidx == eidx_aligned);
+	if (eidx == eidx_aligned) {
+		return;
+	}
+	tidx = eidx;
+	if (eidx != ahp->size && anon_get_next_ptr(ahp, &tidx) != NULL &&
+	    tidx - sidx < pages) {
+		if (!anon_try_demote_pages(ahp, sidx, amp->a_szc, NULL, 0)) {
+			panic("anon_shmap_free_pages: demote failed");
+		}
+		size = (eidx - sidx) << PAGESHIFT;
+		anon_free(ahp, sidx, size);
+	} else {
+		anon_free_pages(ahp, sidx, pages << PAGESHIFT, amp->a_szc);
+	}
 }
 
 /*

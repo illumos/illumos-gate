@@ -657,6 +657,10 @@ extern size_t initdata_pgsz64k_minsize;
  */
 pgcnt_t execseg_lpg_min_physmem = 131072;		/* 1GB */
 
+extern int disable_shm_large_pages;
+pgcnt_t shm_lpg_min_physmem = 131072;			/* 1GB */
+extern size_t max_shm_lpsize;
+
 
 /* assumes TTE8K...TTE4M == szc */
 
@@ -765,6 +769,48 @@ map_execseg_pgszcvec(int text, caddr_t addr, size_t len)
 	}
 
 	return (ret);
+}
+
+uint_t
+map_shm_pgszcvec(caddr_t addr, size_t size, uintptr_t off)
+{
+	caddr_t eaddr = addr + size;
+	uint_t szcvec = 0;
+	int i;
+	caddr_t raddr;
+	caddr_t readdr;
+	size_t pgsz;
+
+	if (physmem < shm_lpg_min_physmem || mmu_page_sizes <= 1 ||
+	    max_shm_lpsize <= MMU_PAGESIZE) {
+		return (0);
+	}
+
+	for (i = mmu_page_sizes - 1; i > 0; i--) {
+		if (disable_shm_large_pages & (1 << i)) {
+			continue;
+		}
+		pgsz = page_get_pagesize(i);
+		if (pgsz > max_shm_lpsize) {
+			continue;
+		}
+		raddr = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
+		readdr = (caddr_t)P2ALIGN((uintptr_t)eaddr, pgsz);
+		if (raddr < addr || raddr >= readdr) {
+			continue;
+		}
+		if (P2PHASE((uintptr_t)addr ^ off, pgsz)) {
+			continue;
+		}
+		szcvec |= (1 << i);
+		/*
+		 * And or in the remaining enabled page sizes.
+		 */
+		szcvec |= P2PHASE(~disable_shm_large_pages, (1 << i));
+		szcvec &= ~1; /* no need to return 8K pagesize */
+		break;
+	}
+	return (szcvec);
 }
 
 #define	PNUM_SIZE(size_code)						\

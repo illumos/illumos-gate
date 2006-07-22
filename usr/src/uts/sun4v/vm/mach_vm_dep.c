@@ -130,6 +130,8 @@ size_t text_pgsz64k_minsize = MMU_PAGESIZE64K;
 size_t text_pgsz4m_minsize = MMU_PAGESIZE4M;
 size_t initdata_pgsz64k_minsize = MMU_PAGESIZE64K;
 
+size_t max_shm_lpsize = MMU_PAGESIZE4M;
+
 /*
  * map_addr_proc() is the routine called when the system is to
  * choose an address for the user.  We will pick an address

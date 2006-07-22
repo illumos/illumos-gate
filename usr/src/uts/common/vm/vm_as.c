@@ -1463,11 +1463,9 @@ top:
 }
 
 static int
-as_map_vnsegs(struct as *as, caddr_t addr, size_t size,
+as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
     int (*crfp)(), struct segvn_crargs *vn_a, int *segcreated)
 {
-	int text = vn_a->flags & MAP_TEXT;
-	uint_t szcvec = map_execseg_pgszcvec(text, addr, size);
 	uint_t szc;
 	uint_t nszc;
 	int error;
@@ -1475,8 +1473,110 @@ as_map_vnsegs(struct as *as, caddr_t addr, size_t size,
 	caddr_t eaddr;
 	size_t segsize;
 	struct seg *seg;
-	uint_t save_szcvec;
 	size_t pgsz;
+	int do_off = (vn_a->vp != NULL || vn_a->amp != NULL);
+	uint_t save_szcvec;
+
+	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(IS_P2ALIGNED(addr, PAGESIZE));
+	ASSERT(IS_P2ALIGNED(size, PAGESIZE));
+	ASSERT(vn_a->vp == NULL || vn_a->amp == NULL);
+	if (!do_off) {
+		vn_a->offset = 0;
+	}
+
+	if (szcvec <= 1) {
+		seg = seg_alloc(as, addr, size);
+		if (seg == NULL) {
+			return (ENOMEM);
+		}
+		vn_a->szc = 0;
+		error = (*crfp)(seg, vn_a);
+		if (error != 0) {
+			seg_free(seg);
+		}
+		return (error);
+	}
+
+	eaddr = addr + size;
+	save_szcvec = szcvec;
+	szcvec >>= 1;
+	szc = 0;
+	nszc = 0;
+	while (szcvec) {
+		if ((szcvec & 0x1) == 0) {
+			nszc++;
+			szcvec >>= 1;
+			continue;
+		}
+		nszc++;
+		pgsz = page_get_pagesize(nszc);
+		a = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
+		if (a != addr) {
+			ASSERT(a < eaddr);
+			segsize = a - addr;
+			seg = seg_alloc(as, addr, segsize);
+			if (seg == NULL) {
+				return (ENOMEM);
+			}
+			vn_a->szc = szc;
+			error = (*crfp)(seg, vn_a);
+			if (error != 0) {
+				seg_free(seg);
+				return (error);
+			}
+			*segcreated = 1;
+			if (do_off) {
+				vn_a->offset += segsize;
+			}
+			addr = a;
+		}
+		szc = nszc;
+		szcvec >>= 1;
+	}
+
+	ASSERT(addr < eaddr);
+	szcvec = save_szcvec | 1; /* add 8K pages */
+	while (szcvec) {
+		a = (caddr_t)P2ALIGN((uintptr_t)eaddr, pgsz);
+		ASSERT(a >= addr);
+		if (a != addr) {
+			segsize = a - addr;
+			seg = seg_alloc(as, addr, segsize);
+			if (seg == NULL) {
+				return (ENOMEM);
+			}
+			vn_a->szc = szc;
+			error = (*crfp)(seg, vn_a);
+			if (error != 0) {
+				seg_free(seg);
+				return (error);
+			}
+			*segcreated = 1;
+			if (do_off) {
+				vn_a->offset += segsize;
+			}
+			addr = a;
+		}
+		szcvec &= ~(1 << szc);
+		if (szcvec) {
+			szc = highbit(szcvec) - 1;
+			pgsz = page_get_pagesize(szc);
+		}
+	}
+	ASSERT(addr == eaddr);
+
+	return (0);
+}
+
+static int
+as_map_vnsegs(struct as *as, caddr_t addr, size_t size,
+    int (*crfp)(), struct segvn_crargs *vn_a, int *segcreated)
+{
+	int text = vn_a->flags & MAP_TEXT;
+	uint_t szcvec = map_execseg_pgszcvec(text, addr, size);
+	int error;
+	struct seg *seg;
 	struct vattr va;
 	u_offset_t eoff;
 	size_t save_size = 0;
@@ -1523,76 +1623,35 @@ again:
 		}
 	}
 
-	eaddr = addr + size;
-	save_szcvec = szcvec;
-	szcvec >>= 1;
-	szc = 0;
-	nszc = 0;
-	while (szcvec) {
-		if ((szcvec & 0x1) == 0) {
-			nszc++;
-			szcvec >>= 1;
-			continue;
-		}
-		nszc++;
-		pgsz = page_get_pagesize(nszc);
-		a = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
-		if (a != addr) {
-			ASSERT(a < eaddr);
-			segsize = a - addr;
-			seg = seg_alloc(as, addr, segsize);
-			if (seg == NULL) {
-				return (ENOMEM);
-			}
-			vn_a->szc = szc;
-			error = (*crfp)(seg, vn_a);
-			if (error != 0) {
-				seg_free(seg);
-				return (error);
-			}
-			*segcreated = 1;
-			vn_a->offset += segsize;
-			addr = a;
-		}
-		szc = nszc;
-		szcvec >>= 1;
+	error = as_map_segvn_segs(as, addr, size, szcvec, crfp, vn_a,
+	    segcreated);
+	if (error != 0) {
+		return (error);
 	}
-
-	ASSERT(addr < eaddr);
-	szcvec = save_szcvec | 1; /* add 8K pages */
-	while (szcvec) {
-		a = (caddr_t)P2ALIGN((uintptr_t)eaddr, pgsz);
-		ASSERT(a >= addr);
-		if (a != addr) {
-			segsize = a - addr;
-			seg = seg_alloc(as, addr, segsize);
-			if (seg == NULL) {
-				return (ENOMEM);
-			}
-			vn_a->szc = szc;
-			error = (*crfp)(seg, vn_a);
-			if (error != 0) {
-				seg_free(seg);
-				return (error);
-			}
-			*segcreated = 1;
-			vn_a->offset += segsize;
-			addr = a;
-		}
-		szcvec &= ~(1 << szc);
-		if (szcvec) {
-			szc = highbit(szcvec) - 1;
-			pgsz = page_get_pagesize(szc);
-		}
-	}
-	ASSERT(addr == eaddr);
-
 	if (save_size) {
+		addr += size;
 		size = save_size - size;
+		szcvec = 0;
 		goto again;
 	}
-
 	return (0);
+}
+
+static int
+as_map_sham(struct as *as, caddr_t addr, size_t size,
+    int (*crfp)(), struct segvn_crargs *vn_a, int *segcreated)
+{
+	uint_t szcvec = map_shm_pgszcvec(addr, size,
+	    vn_a->amp == NULL ? (uintptr_t)addr :
+		(uintptr_t)P2ROUNDUP(vn_a->offset, PAGESIZE));
+
+	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(IS_P2ALIGNED(addr, PAGESIZE));
+	ASSERT(IS_P2ALIGNED(size, PAGESIZE));
+	ASSERT(vn_a->vp == NULL);
+
+	return (as_map_segvn_segs(as, addr, size, szcvec,
+	    crfp, vn_a, segcreated));
 }
 
 int
@@ -1636,10 +1695,15 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 		return (ENOMEM);
 	}
 
-	if (AS_MAP_VNSEGS_USELPGS(crfp, argsp)) {
+	if (AS_MAP_VNSEGS_USELPGS(crfp, argsp) || AS_MAP_SHAMP(crfp, argsp)) {
 		int unmap = 0;
-		error = as_map_vnsegs(as, raddr, rsize, crfp,
-		    (struct segvn_crargs *)argsp, &unmap);
+		if (AS_MAP_SHAMP(crfp, argsp)) {
+			error = as_map_sham(as, raddr, rsize, crfp,
+			    (struct segvn_crargs *)argsp, &unmap);
+		} else {
+			error = as_map_vnsegs(as, raddr, rsize, crfp,
+			    (struct segvn_crargs *)argsp, &unmap);
+		}
 		if (error != 0) {
 			AS_LOCK_EXIT(as, &as->a_lock);
 			if (unmap) {

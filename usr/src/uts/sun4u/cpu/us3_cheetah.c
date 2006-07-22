@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,6 +123,7 @@ cpu_fiximp(pnode_t dnode)
 	};
 
 	extern int exec_lpg_disable, use_brk_lpg, use_stk_lpg, use_zmap_lpg;
+	extern size_t max_shm_lpsize;
 
 
 	for (i = 0; i < sizeof (prop) / sizeof (prop[0]); i++)
@@ -148,6 +148,7 @@ cpu_fiximp(pnode_t dnode)
 	use_brk_lpg = 0;
 	use_stk_lpg = 0;
 	use_zmap_lpg = 0;
+	max_shm_lpsize = MMU_PAGESIZE;
 }
 
 void

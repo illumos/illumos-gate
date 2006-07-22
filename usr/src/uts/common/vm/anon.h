@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -282,7 +281,7 @@ struct anon_map {
 	struct	anon_hdr *ahp; 	/* anon array header pointer, containing */
 				/* anon pointer array(s) */
 	size_t	swresv;		/* swap space reserved for this anon_map */
-	uint_t	refcnt;		/* reference count on this structure */
+	ulong_t	refcnt;		/* reference count on this structure */
 	ushort_t a_szc;		/* max szc among shared processes */
 	void	*locality;	/* lgroup locality info */
 };
@@ -362,7 +361,7 @@ extern void	anon_disclaim(struct anon_map *, ulong_t, size_t, int);
 extern int	anon_getpage(struct anon **, uint_t *, struct page **,
 		    size_t, struct seg *, caddr_t, enum seg_rw, struct cred *);
 extern int	swap_getconpage(struct vnode *, u_offset_t, size_t,
-		    uint_t *, page_t *[], size_t, page_t *,
+		    uint_t *, page_t *[], size_t, page_t *, uint_t *,
 		    spgcnt_t *, struct seg *, caddr_t,
 		    enum seg_rw, struct cred *);
 extern int	anon_map_getpages(struct anon_map *, ulong_t,
@@ -384,6 +383,7 @@ extern int	anon_map_createpages(struct anon_map *, ulong_t,
 extern int	anon_map_demotepages(struct anon_map *, ulong_t,
 		    struct seg *, caddr_t, uint_t,
 		    struct vpage [], struct cred *);
+extern void	anon_shmap_free_pages(struct anon_map *, ulong_t, size_t);
 extern int	anon_resvmem(size_t, uint_t);
 extern void	anon_unresv(size_t);
 extern struct	anon_map *anonmap_alloc(size_t, size_t);

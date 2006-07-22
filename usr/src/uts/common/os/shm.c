@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -761,6 +760,10 @@ shmdt(caddr_t addr)
 		mutex_exit(&pp->p_lock);
 		return (EINVAL);
 	}
+	if (sap->sa_addr != addr) {
+		mutex_exit(&pp->p_lock);
+		return (EINVAL);
+	}
 	avl_remove(pp->p_segacct, sap);
 	mutex_exit(&pp->p_lock);
 
@@ -942,13 +945,21 @@ shm_sacompar(const void *x, const void *y)
 	segacct_t *sa1 = (segacct_t *)x;
 	segacct_t *sa2 = (segacct_t *)y;
 
-	if (sa1->sa_addr < sa2->sa_addr)
+	if (sa1->sa_addr < sa2->sa_addr) {
 		return (-1);
-	if (sa1->sa_addr > sa2->sa_addr)
+	} else if (sa2->sa_len != 0) {
+		if (sa1->sa_addr >= sa2->sa_addr + sa2->sa_len) {
+			return (1);
+		} else if (sa1->sa_len != 0) {
+			return (1);
+		} else {
+			return (0);
+		}
+	} else if (sa1->sa_addr > sa2->sa_addr) {
 		return (1);
-	if ((sa1->sa_len == 0) || (sa2->sa_len == 0))
+	} else {
 		return (0);
-	return (1);
+	}
 }
 
 /*
@@ -1240,7 +1251,13 @@ shm_rm_amp(struct anon_map *amp, uint_t lckflag)
 	 * Free up the anon_map.
 	 */
 	lgrp_shm_policy_fini(amp, NULL);
-	anon_free(amp->ahp, 0, amp->size);
+	if (amp->a_szc != 0) {
+		ANON_LOCK_ENTER(&amp->a_rwlock, RW_WRITER);
+		anon_shmap_free_pages(amp, 0, amp->size);
+		ANON_LOCK_EXIT(&amp->a_rwlock);
+	} else {
+		anon_free(amp->ahp, 0, amp->size);
+	}
 	anon_unresv(amp->swresv);
 	anonmap_free(amp);
 }

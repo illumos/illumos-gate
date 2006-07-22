@@ -146,6 +146,7 @@ int	sfmmu_allow_nc_trans = 0;
 int	disable_ism_large_pages = (1 << TTE512K);
 int	disable_large_pages = 0;
 int	disable_auto_large_pages = 0;
+int	disable_shm_large_pages = 0;
 
 /*
  * Private sfmmu data structures for hat management
@@ -918,6 +919,7 @@ hat_init_pagesizes()
 		    mmu_large_pages_disabled(HAT_LOAD_AUTOLPG);
 	}
 
+	disable_shm_large_pages = disable_auto_large_pages;
 }
 
 /*

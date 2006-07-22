@@ -172,6 +172,7 @@ map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int *remap)
  * to be used for mapping application and libraries text segments.
  */
 int	use_text_largepages = 0;
+int	use_shm_largepages = 0;
 
 /*
  * Return a bit vector of large page size codes that
@@ -192,6 +193,29 @@ map_execseg_pgszcvec(int text, caddr_t addr, size_t len)
 	pgsz = LEVEL_SIZE(1);
 	a = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
 	if (a < addr || a >= addr + len) {
+		return (0);
+	}
+	len -= (a - addr);
+	if (len < pgsz) {
+		return (0);
+	}
+	return (1 << 1);
+}
+
+uint_t
+map_shm_pgszcvec(caddr_t addr, size_t len, uintptr_t off)
+{
+	size_t	pgsz;
+	caddr_t a;
+
+	if (!use_shm_largepages || mmu.max_page_level == 0) {
+		return (0);
+	}
+
+	pgsz = LEVEL_SIZE(1);
+	a = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
+	if (a < addr || a >= addr + len ||
+	    P2PHASE((uintptr_t)addr ^ off, pgsz)) {
 		return (0);
 	}
 	len -= (a - addr);

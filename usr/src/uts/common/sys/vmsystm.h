@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,6 +121,7 @@ extern	int useracc(void *, size_t, int);
 extern	size_t map_pgsz(int maptype, struct proc *p, caddr_t addr,
 		size_t len, int *remap);
 extern	uint_t map_execseg_pgszcvec(int, caddr_t, size_t);
+extern	uint_t map_shm_pgszcvec(caddr_t, size_t, uintptr_t);
 extern	void map_addr(caddr_t *addrp, size_t len, offset_t off, int vacalign,
     uint_t flags);
 extern	int map_addr_vacalign_check(caddr_t, u_offset_t);

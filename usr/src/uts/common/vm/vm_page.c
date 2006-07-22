@@ -200,9 +200,6 @@ kmutex_t	pcgs_cagelock;		/* serializes NOSLEEP cage allocs */
 kmutex_t	pcgs_wait_lock;		/* used for delay in pcgs */
 static kcondvar_t	pcgs_cv;	/* cv for delay in pcgs */
 
-#define	PAGE_LOCK_MAXIMUM \
-	((1 << (sizeof (((page_t *)0)->p_lckcnt) * NBBY)) - 1)
-
 #ifdef VM_STATS
 
 /*
@@ -551,6 +548,10 @@ add_physmem(
 		 * and do any other arch specific initialization
 		 */
 		add_physmem_cb(pp, pnum);
+
+		pp->p_lckcnt = 0;
+		pp->p_cowcnt = 0;
+		pp->p_slckcnt = 0;
 
 		/*
 		 * Initialize the page lock as unlocked, since nobody
@@ -2711,9 +2712,11 @@ page_free(page_t *pp, int dontneed)
 	 * The page_struct_lock need not be acquired to examine these
 	 * fields since the page has an "exclusive" lock.
 	 */
-	if (hat_page_is_mapped(pp) || pp->p_lckcnt != 0 || pp->p_cowcnt != 0) {
-		panic("page_free pp=%p, pfn=%lx, lckcnt=%d, cowcnt=%d",
-		    pp, page_pptonum(pp), pp->p_lckcnt, pp->p_cowcnt);
+	if (hat_page_is_mapped(pp) || pp->p_lckcnt != 0 || pp->p_cowcnt != 0 ||
+	    pp->p_slckcnt != 0) {
+		panic("page_free pp=%p, pfn=%lx, lckcnt=%d, cowcnt=%d "
+		    "slckcnt = %d", pp, page_pptonum(pp), pp->p_lckcnt,
+		    pp->p_cowcnt, pp->p_slckcnt);
 		/*NOTREACHED*/
 	}
 
@@ -2853,7 +2856,7 @@ page_free_pages(page_t *pp)
 			/*NOTREACHED*/
 		}
 		if (hat_page_is_mapped(tpp) || tpp->p_lckcnt != 0 ||
-		    tpp->p_cowcnt != 0) {
+		    tpp->p_cowcnt != 0 || tpp->p_slckcnt != 0) {
 			panic("page_free_pages %p", (void *)tpp);
 			/*NOTREACHED*/
 		}
@@ -3142,6 +3145,7 @@ page_destroy(page_t *pp, int dontfree)
 {
 	ASSERT((PAGE_EXCL(pp) &&
 	    !page_iolock_assert(pp)) || panicstr);
+	ASSERT(pp->p_slckcnt == 0 || panicstr);
 
 	if (pp->p_szc != 0) {
 		if (pp->p_vnode == NULL || IS_SWAPFSVP(pp->p_vnode) ||
@@ -3210,6 +3214,7 @@ page_destroy_pages(page_t *pp)
 	for (i = 0, tpp = pp; i < pgcnt; i++, tpp++) {
 		ASSERT((PAGE_EXCL(tpp) &&
 		    !page_iolock_assert(tpp)) || panicstr);
+		ASSERT(tpp->p_slckcnt == 0 || panicstr);
 		(void) hat_pageunload(tpp, HAT_FORCE_PGUNLOAD);
 		page_hashout(tpp, NULL);
 		ASSERT(tpp->p_offset == (u_offset_t)-1);
@@ -4921,6 +4926,8 @@ do_page_relocate(
 
 	for (i = 0; i < npgs; i++) {
 		ASSERT(PAGE_EXCL(targ));
+		ASSERT(targ->p_slckcnt == 0);
+		ASSERT(repl->p_slckcnt == 0);
 
 		(void) hat_pageunload(targ, HAT_FORCE_PGUNLOAD);
 
@@ -5269,6 +5276,7 @@ page_try_demote_pages(page_t *pp)
 
 	for (tpp = rootpp, i = 0; i < npgs; i++, tpp++) {
 		ASSERT(PAGE_EXCL(tpp));
+		ASSERT(tpp->p_slckcnt == 0);
 		(void) hat_pageunload(tpp, HAT_FORCE_PGUNLOAD);
 		tpp->p_szc = 0;
 	}

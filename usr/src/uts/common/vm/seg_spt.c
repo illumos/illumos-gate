@@ -376,6 +376,11 @@ segspt_create(struct seg *seg, caddr_t argsp)
 	struct vnode	*vp;
 	page_t		**ppa;
 	uint_t		hat_flags;
+	size_t		pgsz;
+	pgcnt_t		pgcnt;
+	caddr_t		a;
+	pgcnt_t		pidx;
+	size_t		sz;
 
 	/*
 	 * We are holding the a_lock on the underlying dummy as,
@@ -419,7 +424,9 @@ segspt_create(struct seg *seg, caddr_t argsp)
 	seg->s_szc = sptcargs->szc;
 
 	ANON_LOCK_ENTER(&amp->a_rwlock, RW_WRITER);
-	amp->a_szc = seg->s_szc;
+	if (seg->s_szc > amp->a_szc) {
+		amp->a_szc = seg->s_szc;
+	}
 	ANON_LOCK_EXIT(&amp->a_rwlock);
 
 	/*
@@ -506,8 +513,20 @@ segspt_create(struct seg *seg, caddr_t argsp)
 	if (!hat_supported(HAT_DYNAMIC_ISM_UNMAP, NULL))
 		hat_flags |= HAT_LOAD_LOCK;
 
-	hat_memload_array(seg->s_as->a_hat, addr, ptob(npages),
-	    ppa, sptd->spt_prot, hat_flags);
+	/*
+	 * Load translations one lare page at a time
+	 * to make sure we don't create mappings bigger than
+	 * segment's size code in case underlying pages
+	 * are shared with segvn's segment that uses bigger
+	 * size code than we do.
+	 */
+	pgsz = page_get_pagesize(seg->s_szc);
+	pgcnt = page_get_pagecnt(seg->s_szc);
+	for (a = addr, pidx = 0; pidx < npages; a += pgsz, pidx += pgcnt) {
+		sz = MIN(pgsz, ptob(npages - pidx));
+		hat_memload_array(seg->s_as->a_hat, a, sz,
+		    &ppa[pidx], sptd->spt_prot, hat_flags);
+	}
 
 	/*
 	 * On platforms that do not support HAT_DYNAMIC_ISM_UNMAP,
@@ -1701,13 +1720,17 @@ segspt_dismfault(struct hat *hat, struct seg *seg, caddr_t addr,
 	struct  as		*curspt = shmd->shm_sptas;
 	struct  spt_data 	*sptd = sptseg->s_data;
 	pgcnt_t npages;
-	size_t  share_sz, size;
+	size_t  size;
 	caddr_t segspt_addr, shm_addr;
 	page_t  **ppa;
 	int	i;
 	ulong_t an_idx = 0;
 	int	err = 0;
 	int	dyn_ism_unmap = hat_supported(HAT_DYNAMIC_ISM_UNMAP, (void *)0);
+	size_t	pgsz;
+	pgcnt_t	pgcnt;
+	caddr_t	a;
+	pgcnt_t	pidx;
 
 #ifdef lint
 	hat = hat;
@@ -1740,9 +1763,10 @@ segspt_dismfault(struct hat *hat, struct seg *seg, caddr_t addr,
 	 * layer by calling hat_memload_array() with differing page sizes
 	 * over a given virtual range.
 	 */
-	share_sz = page_get_pagesize(sptseg->s_szc);
-	shm_addr = (caddr_t)P2ALIGN((uintptr_t)(addr), share_sz);
-	size = P2ROUNDUP((uintptr_t)(((addr + len) - shm_addr)), share_sz);
+	pgsz = page_get_pagesize(sptseg->s_szc);
+	pgcnt = page_get_pagecnt(sptseg->s_szc);
+	shm_addr = (caddr_t)P2ALIGN((uintptr_t)(addr), pgsz);
+	size = P2ROUNDUP((uintptr_t)(((addr + len) - shm_addr)), pgsz);
 	npages = btopr(size);
 
 	/*
@@ -1792,15 +1816,19 @@ segspt_dismfault(struct hat *hat, struct seg *seg, caddr_t addr,
 			goto dism_err;
 		}
 		AS_LOCK_ENTER(sptseg->s_as, &sptseg->s_as->a_lock, RW_READER);
+		a = segspt_addr;
+		pidx = 0;
 		if (type == F_SOFTLOCK) {
 
 			/*
 			 * Load up the translation keeping it
 			 * locked and don't unlock the page.
 			 */
-			hat_memload_array(sptseg->s_as->a_hat, segspt_addr,
-			    size, ppa, sptd->spt_prot,
-			    HAT_LOAD_LOCK | HAT_LOAD_SHARE);
+			for (; pidx < npages; a += pgsz, pidx += pgcnt) {
+				hat_memload_array(sptseg->s_as->a_hat,
+				    a, pgsz, &ppa[pidx], sptd->spt_prot,
+				    HAT_LOAD_LOCK | HAT_LOAD_SHARE);
+			}
 		} else {
 			if (hat == seg->s_as->a_hat) {
 
@@ -1812,9 +1840,13 @@ segspt_dismfault(struct hat *hat, struct seg *seg, caddr_t addr,
 					    npages);
 
 				/* CPU HAT */
-				hat_memload_array(sptseg->s_as->a_hat,
-				    segspt_addr, size, ppa, sptd->spt_prot,
-				    HAT_LOAD_SHARE);
+				for (; pidx < npages;
+				    a += pgsz, pidx += pgcnt) {
+					hat_memload_array(sptseg->s_as->a_hat,
+					    a, pgsz, &ppa[pidx],
+					    sptd->spt_prot,
+					    HAT_LOAD_SHARE);
+				}
 			} else {
 				/* XHAT. Pass real address */
 				hat_memload_array(hat, shm_addr,
@@ -1896,7 +1928,7 @@ segspt_shmfault(struct hat *hat, struct seg *seg, caddr_t addr,
 	struct as		*curspt = shmd->shm_sptas;
 	struct spt_data 	*sptd   = sptseg->s_data;
 	pgcnt_t npages;
-	size_t share_size, size;
+	size_t size;
 	caddr_t sptseg_addr, shm_addr;
 	page_t *pp, **ppa;
 	int	i;
@@ -1906,6 +1938,11 @@ segspt_shmfault(struct hat *hat, struct seg *seg, caddr_t addr,
 	struct anon_map *amp;		/* XXX - for locknest */
 	struct anon *ap = NULL;
 	anon_sync_obj_t cookie;
+	size_t		pgsz;
+	pgcnt_t		pgcnt;
+	caddr_t		a;
+	pgcnt_t		pidx;
+	size_t		sz;
 
 #ifdef lint
 	hat = hat;
@@ -1943,9 +1980,10 @@ segspt_shmfault(struct hat *hat, struct seg *seg, caddr_t addr,
 	 * layer by calling hat_memload_array() with differing page sizes
 	 * over a given virtual range.
 	 */
-	share_size = page_get_pagesize(sptseg->s_szc);
-	shm_addr = (caddr_t)P2ALIGN((uintptr_t)(addr), share_size);
-	size = P2ROUNDUP((uintptr_t)(((addr + len) - shm_addr)), share_size);
+	pgsz = page_get_pagesize(sptseg->s_szc);
+	pgcnt = page_get_pagecnt(sptseg->s_szc);
+	shm_addr = (caddr_t)P2ALIGN((uintptr_t)(addr), pgsz);
+	size = P2ROUNDUP((uintptr_t)(((addr + len) - shm_addr)), pgsz);
 	npages = btopr(size);
 
 	/*
@@ -2045,14 +2083,19 @@ segspt_shmfault(struct hat *hat, struct seg *seg, caddr_t addr,
 		 * underlying HAT layer.
 		 */
 		AS_LOCK_ENTER(sptseg->s_as, &sptseg->s_as->a_lock, RW_READER);
+		a = sptseg_addr;
+		pidx = 0;
 		if (type == F_SOFTLOCK) {
 			/*
 			 * Load up the translation keeping it
 			 * locked and don't unlock the page.
 			 */
-			hat_memload_array(sptseg->s_as->a_hat, sptseg_addr,
-			    ptob(npages), ppa, sptd->spt_prot,
-			    HAT_LOAD_LOCK | HAT_LOAD_SHARE);
+			for (; pidx < npages; a += pgsz, pidx += pgcnt) {
+				sz = MIN(pgsz, ptob(npages - pidx));
+				hat_memload_array(sptseg->s_as->a_hat, a,
+				    sz, &ppa[pidx], sptd->spt_prot,
+				    HAT_LOAD_LOCK | HAT_LOAD_SHARE);
+			}
 		} else {
 			if (hat == seg->s_as->a_hat) {
 
@@ -2064,9 +2107,13 @@ segspt_shmfault(struct hat *hat, struct seg *seg, caddr_t addr,
 					    npages);
 
 				/* CPU HAT */
-				hat_memload_array(sptseg->s_as->a_hat,
-				    sptseg_addr, ptob(npages), ppa,
-				    sptd->spt_prot, HAT_LOAD_SHARE);
+				for (; pidx < npages;
+				    a += pgsz, pidx += pgcnt) {
+					sz = MIN(pgsz, ptob(npages - pidx));
+					hat_memload_array(sptseg->s_as->a_hat,
+					    a, sz, &ppa[pidx],
+					    sptd->spt_prot, HAT_LOAD_SHARE);
+				}
 			} else {
 				/* XHAT. Pass real address */
 				hat_memload_array(hat, shm_addr,

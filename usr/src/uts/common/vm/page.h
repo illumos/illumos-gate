@@ -497,7 +497,7 @@ typedef struct page {
 #if defined(_LP64)
 	uint_t		p_sharepad;	/* pad for growing p_share */
 #endif
-	uint_t		p_msresv_1;	/* reserved for future use */
+	uint_t		p_slckcnt;	/* number of softlocks */
 #if defined(__sparc)
 	uint_t		p_kpmref;	/* number of kpm mapping sharers */
 	struct kpme	*p_kpmelist;	/* kpm specific mapping info */
@@ -516,6 +516,10 @@ typedef struct page {
 typedef	page_t	devpage_t;
 #define	devpage	page
 
+#define	PAGE_LOCK_MAXIMUM \
+	((1 << (sizeof (((page_t *)0)->p_lckcnt) * NBBY)) - 1)
+
+#define	PAGE_SLOCK_MAXIMUM UINT_MAX
 
 /*
  * Page hash table is a power-of-two in size, externally chained

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,8 +67,9 @@ static int	swap_getapage(struct vnode *vp, u_offset_t off, size_t len,
     struct seg *seg, caddr_t addr, enum seg_rw rw, struct cred *cr);
 
 int	swap_getconpage(struct vnode *vp, u_offset_t off, size_t len,
-    uint_t *protp, page_t **plarr, size_t plsz, page_t *conpp, spgcnt_t *nreloc,
-    struct seg *seg, caddr_t addr, enum seg_rw rw, struct cred *cr);
+    uint_t *protp, page_t **plarr, size_t plsz, page_t *conpp,
+    uint_t *pszc, spgcnt_t *nreloc, struct seg *seg, caddr_t addr,
+    enum seg_rw rw, struct cred *cr);
 
 static int 	swap_putapage(struct vnode *vp, page_t *pp, u_offset_t *off,
     size_t *lenp, int flags, struct cred *cr);
@@ -316,6 +316,7 @@ swap_getconpage(
 	page_t *pl[],
 	size_t plsz,
 	page_t	*conpp,
+	uint_t	*pszc,
 	spgcnt_t *nreloc,
 	struct seg *seg,
 	caddr_t addr,
@@ -362,18 +363,22 @@ swap_getconpage(
 	 */
 	if (pp != conpp) {
 		ASSERT(rw != S_CREATE);
+		ASSERT(pszc != NULL);
 		ASSERT(PAGE_SHARED(pp));
 		if (pp->p_szc < conpp->p_szc) {
+			*pszc = pp->p_szc;
 			page_unlock(pp);
 			err = -1;
-		} else if (pp->p_szc > conpp->p_szc) {
+		} else if (pp->p_szc > conpp->p_szc &&
+		    seg->s_szc > conpp->p_szc) {
+			*pszc = MIN(pp->p_szc, seg->s_szc);
 			page_unlock(pp);
 			err = -2;
 		} else {
 			pl[0] = pp;
 			pl[1] = NULL;
 			if (page_pptonum(pp) &
-			    (page_get_pagecnt(pp->p_szc) - 1))
+			    (page_get_pagecnt(conpp->p_szc) - 1))
 			    cmn_err(CE_PANIC, "swap_getconpage: no root");
 		}
 		return (err);
