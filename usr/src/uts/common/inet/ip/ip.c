@@ -10090,6 +10090,9 @@ ip_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 	case IPPROTO_IP:
 		switch (name) {
 		case IP_NEXTHOP:
+			if (secpolicy_net_config(cr, B_FALSE) != 0)
+				return (EPERM);
+			/* FALLTHRU */
 		case IP_MULTICAST_IF:
 		case IP_DONTFAILOVER_IF: {
 			ipaddr_t addr = *i1;
