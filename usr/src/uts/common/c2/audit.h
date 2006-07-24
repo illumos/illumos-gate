@@ -275,14 +275,8 @@ typedef au_id_t auid_t;
 #define	AUDIT_PUBLIC	0x0800	/* audit even "public" files */
 #define	AUDIT_ZONENAME	0x1000	/* emit zonename token */
 #define	AUDIT_PERZONE	0x2000	/* auditd and audit queue for each zone */
-
-/*
- * These next (WINDATA*) are used by TSOL. Although per-zone audit is not
- * used with TSOL, these policies still make sense to be categorized as
- * "local".
- */
-#define	AUDIT_WINDATA_DOWN	0x00010000	/* include downgraded data */
-#define	AUDIT_WINDATA_UP	0x00020000	/* include upgraded data */
+#define	AUDIT_WINDATA_DOWN	0x4000	/* include paste downgraded data */
+#define	AUDIT_WINDATA_UP	0x8000	/* include paste upgraded data */
 
 /*
  * If AUDIT_GLOBAL changes, corresponding changes are required in

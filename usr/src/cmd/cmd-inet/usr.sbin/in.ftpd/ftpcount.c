@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,10 +32,6 @@
  
 ****************************************************************************/
 #include "config.h"
-
-#ifdef TSOL
-#include <tsol/priv.h>
-#endif
 
 #include <stdio.h>
 #include <errno.h>
@@ -217,11 +213,6 @@ static void lock_fd(int fd)
 #else
     arg.l_type = F_RDLCK;
     arg.l_whence = arg.l_start = arg.l_len = 0;
-#ifdef TSOL
-    if (set_effective_priv(PRIV_ON, 1, PRIV_FILE_LOCK) != 0) {
-	syslog(LOG_ERR, "Cannot add PRIV_FILE_LOCK to eff. priv. set");
-    }
-#endif
     while (-1 == fcntl(fd, F_SETLK, &arg)) {
 #ifndef NO_PID_SLEEP_MSGS
 	syslog(LOG_ERR, "sleeping: fcntl lock of pid file failed: %m");
@@ -230,11 +221,6 @@ static void lock_fd(int fd)
 	sleep(1);
     }
 #ifndef HAVE_FLOCK
-#ifdef TSOL
-    if (set_effective_priv(PRIV_OFF, 1, PRIV_FILE_LOCK) != 0) {
-	syslog(LOG_ERR, "Cannot remove PRIV_FILE_LOCK from eff. priv. set");
-    }
-#endif
 #endif /* HAVE_FLOCK */
 }
 
@@ -255,17 +241,7 @@ static void unlock_fd(int fd)
 #else
     arg.l_type = F_UNLCK;
     arg.l_whence = arg.l_start = arg.l_len = 0;
-#ifdef TSOL
-    if (set_effective_priv(PRIV_ON, 1, PRIV_FILE_LOCK) != 0) {
-	syslog(LOG_ERR, "Cannot add PRIV_FILE_LOCK to eff. priv. set");
-    }
-#endif
     fcntl(fd, F_SETLK, &arg);
-#ifdef TSOL
-    if (set_effective_priv(PRIV_OFF, 1, PRIV_FILE_LOCK) != 0) {
-	syslog(LOG_ERR, "Cannot remove PRIV_FILE_LOCK from eff. priv. set");
-    }
-#endif
 #endif /* HAVE_FLOCK */
 }
 
@@ -510,15 +486,6 @@ int main(int argc, char **argv)
 #else
     char hostaddress[32];
 #endif
-#endif
-
-#ifdef TSOL
-/* Before anything, clear the effective privilege set */
-
-    if (set_effective_priv(PRIV_SET, 0) != 0) {
-	syslog(LOG_ERR, "ftp[count|who] cannot clear effective privileges!");
-	exit(1);
-    }
 #endif
 
     if ((progname = strrchr(argv[0], '/')))

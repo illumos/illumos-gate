@@ -55,11 +55,7 @@ extern "C" {
  *                                 SunOS 5.7
  */
 
-#ifdef	TSOL
-#define	TOKEN_VERSION   4
-#else	/* !TSOL */
 #define	TOKEN_VERSION   2
-#endif	/* TSOL */
 
 /*
  * Audit record token type codes
@@ -114,9 +110,9 @@ extern "C" {
 #define	AUT_IPC_PERM		((char)0x32)
 #define	AUT_LABEL		((char)0x33)
 #define	AUT_GROUPS		((char)0x34)
-#define	AUT_ILABEL		((char)0x35)
-#define	AUT_SLABEL		((char)0x36)
-#define	AUT_CLEAR		((char)0x37)
+/*
+ * 0x35, 0x36, 0x37 unused
+ */
 #define	AUT_PRIV		((char)0x38)
 #define	AUT_UPRIV		((char)0x39)
 #define	AUT_LIAISON		((char)0x3A)
@@ -737,7 +733,7 @@ extern token_t *au_to_process_ex(au_id_t, uid_t, gid_t, uid_t, gid_t,
 extern token_t *au_to_return32(char, uint32_t);
 extern token_t *au_to_return64(char, uint64_t);
 extern token_t *au_to_seq(int);
-extern token_t *au_to_label(bslabel_t *);
+extern token_t *au_to_label(m_label_t *);
 extern token_t *au_to_socket(struct oldsocket *);
 extern token_t *au_to_socket_ex(short, short,
 				struct sockaddr *, struct sockaddr *);

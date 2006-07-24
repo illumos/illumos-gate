@@ -63,7 +63,6 @@
 #include <sys/devpolicy.h>
 #include <sys/crypto/ioctladmin.h>
 #include <inet/kssl/kssl.h>
-#include <sys/tsol/label.h>
 
 static void add_return_token(caddr_t *, unsigned int scid, int err, int rval);
 
@@ -916,17 +915,10 @@ audit_core_finish(int code)
 		ASSERT(ainfo != NULL);
 
 		/*
-		 * Add a subject token (no locks since our private copy of
+		 * Add subject information (no locks since our private copy of
 		 * credential
 		 */
-		AUDIT_SETSUBJ(&(u_ad), cr, ainfo);
-
-		/* Add an optional group token */
-		AUDIT_SETGROUP(&(u_ad), cr, kctx);
-
-		/* Add slabel token */
-		if (is_system_labeled())
-			au_write(&(u_ad), au_to_label(CR_SL(cr)));
+		AUDIT_SETSUBJ(&(u_ad), cr, ainfo, kctx);
 
 		/* Add a return token (should use f argument) */
 		add_return_token((caddr_t *)&(u_ad), tad->tad_scid, 0, 0);
@@ -1135,15 +1127,8 @@ audit_closef(struct file *fp)
 		audit_sec_attributes((caddr_t *)&(ad), vp);
 	}
 
-	/* Add a subject token */
-	AUDIT_SETSUBJ((caddr_t *)&(ad), cr, ainfo);
-
-	/* add an optional group token */
-	AUDIT_SETGROUP((caddr_t *)&(ad), cr, kctx);
-
-	/* add slabel token */
-	if (is_system_labeled())
-		au_write((caddr_t *)&(ad), au_to_label(CR_SL(cr)));
+	/* Add subject information */
+	AUDIT_SETSUBJ((caddr_t *)&(ad), cr, ainfo, kctx);
 
 	/* add a return token */
 	add_return_token((caddr_t *)&(ad), tad->tad_scid, 0, 0);
@@ -1333,14 +1318,8 @@ audit_reboot(void)
 		if (ainfo == NULL)
 			return;
 
-		AUDIT_SETSUBJ(&(u_ad), cr, ainfo);
-
-		/* add an optional group token */
-		AUDIT_SETGROUP(&(u_ad), cr, kctx);
-
-		/* add slabel token */
-		if (is_system_labeled())
-			au_uwrite(au_to_label(CR_SL(cr)));
+		/* Add subject information */
+		AUDIT_SETSUBJ(&(u_ad), cr, ainfo, kctx);
 
 		/* add a return token */
 		add_return_token((caddr_t *)&(u_ad), tad->tad_scid, 0, 0);
@@ -2169,15 +2148,8 @@ audit_cryptoadm(int cmd, char *module_name, crypto_mech_name_t *mech_names,
 	if (audit_success(kctx, tad, error) != AU_OK)
 		return;
 
-	/* Add a subject token */
-	AUDIT_SETSUBJ((caddr_t *)&(ad), cr, ainfo);
-
-	/* add an optional group token */
-	AUDIT_SETGROUP((caddr_t *)&(ad), cr, kctx);
-
-	/* add slabel token */
-	if (is_system_labeled())
-		au_write((caddr_t *)&ad, au_to_label(CR_SL(cr)));
+	/* Add subject information */
+	AUDIT_SETSUBJ((caddr_t *)&(ad), cr, ainfo, kctx);
 
 	switch (cmd) {
 	case CRYPTO_LOAD_DEV_DISABLED:
@@ -2322,15 +2294,8 @@ audit_kssl(int cmd, void *params, int error)
 	if (audit_success(kctx, tad, error) != AU_OK)
 		return;
 
-	/* Add a subject token */
-	AUDIT_SETSUBJ((caddr_t *)&ad, cr, ainfo);
-
-	/* add an optional group token */
-	AUDIT_SETGROUP((caddr_t *)&ad, cr, kctx);
-
-	/* Add slabel token */
-	if (is_system_labeled())
-		au_write(&(u_ad), au_to_label(CR_SL(cr)));
+	/* Add subject information */
+	AUDIT_SETSUBJ((caddr_t *)&ad, cr, ainfo, kctx);
 
 	switch (cmd) {
 	case KSSL_ADD_ENTRY: {

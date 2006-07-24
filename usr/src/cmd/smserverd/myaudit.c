@@ -210,6 +210,8 @@ audit_audit(door_data_t *door_dp)
 		door_dp->audit_egid,
 		door_dp->audit_uid, door_dp->audit_gid, door_dp->audit_pid,
 		door_dp->audit_asid, &door_dp->audit_tid));
+	if (is_system_labeled())
+		(void) au_write(ad, au_to_mylabel());
 	if (door_dp->audit_policy & AUDIT_GROUP) {
 
 		int ng;
@@ -220,10 +222,6 @@ audit_audit(door_data_t *door_dp)
 			(void) au_write(ad, au_to_newgroups(ng, grplst));
 		}
 	}
-
-	if (is_system_labeled())
-		(void) au_write(ad, au_to_mylabel());
-
 	if (strlen(door_dp->audit_text) != 0) {
 		(void) au_write(ad, au_to_text(door_dp->audit_text));
 	}

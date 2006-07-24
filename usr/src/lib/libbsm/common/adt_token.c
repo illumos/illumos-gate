@@ -504,10 +504,9 @@ adt_to_process(datadef *def, void *p_data, int required,
 }
 
 /*
- * generate a subject token and, depending on audit policy, a
- * group token.  For TSOL, this is probably the right place
- * to generate a label token.  Alternatively, a TSOL token could
- * be defined in adt.xml with 'opt="none".
+ * Generate subject information.
+ * If labels are present, generate the subject label token.
+ * If the group audit policy is set, generate the subject group token.
  *
  * The required flag does not apply here.
  *
@@ -533,6 +532,8 @@ adt_to_subject(datadef *def, void *p_data, int required,
 		sp->as_euid, sp->as_egid, sp->as_ruid, sp->as_rgid,
 		getpid(), sp->as_info.ai_asid,
 		&(sp->as_info.ai_termid)));
+	if (is_system_labeled())
+		(void) au_write(event->ae_event_handle, au_to_mylabel());
 	/*
 	 * If AUDIT_GROUP is set, a groups token must be output.
 	 * In a session model, the groups list is undefined, so output an
@@ -554,9 +555,6 @@ adt_to_subject(datadef *def, void *p_data, int required,
 			    au_to_newgroups(0, grouplist));
 		}
 	}
-
-	if (is_system_labeled())
-		(void) au_write(event->ae_event_handle, au_to_mylabel());
 }
 
 /*

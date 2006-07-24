@@ -79,14 +79,12 @@ tokens.
 			arbitrary		|
 			argument		|
 			attribute		|
-			clearance		|
 			cmd			|
 			exit			|
 			exec_args		|
 			exec_env		|
 			fmri			|
 			group			|
-			information_label	|
 			ip			|
 			ip_address		|
 			IPC			|
@@ -140,7 +138,7 @@ Audit records will have this general layout of tokens after the
 first token (which is the record token):
 	(tokens),subject,group,(tokens),return,sequence,host
 
-(all tokens after the record token are optional; host is TSOL only.)
+(all tokens after the record token are optional; the host token is unused.)
 
 -->
 <!ELEMENT record (
@@ -270,9 +268,6 @@ first token (which is the record token):
 		count		CDATA #REQUIRED
 >
 
-<!-- clearance token -->
-<!ELEMENT clearance		(#PCDATA)>
-
 <!-- privilege token -->
 <!ELEMENT privilege		(#PCDATA)>
 <!ATTLIST privilege
@@ -287,9 +282,6 @@ first token (which is the record token):
 
 <!-- sensitivity_label token -->
 <!ELEMENT sensitivity_label	(#PCDATA)>
-
-<!-- information_label token -->
-<!ELEMENT information_label	(#PCDATA)>
 
 <!-- use_of_authorization token -->
 <!ELEMENT use_of_authorization	(#PCDATA)>

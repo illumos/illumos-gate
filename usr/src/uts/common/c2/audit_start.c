@@ -43,7 +43,6 @@
 #include <sys/debug.h>
 #include <sys/cred_impl.h>
 #include <sys/zone.h>
-#include <sys/tsol/label.h>
 #include <c2/audit.h>
 #include <c2/audit_kernel.h>
 #include <c2/audit_kevents.h>
@@ -422,15 +421,8 @@ audit_finish(
 
 			ASSERT(ainfo != NULL);
 
-			/* Add a subject token */
-			AUDIT_SETSUBJ(&(u_ad), cr, ainfo);
-
-			/* Add an optional group token */
-			AUDIT_SETGROUP(&(u_ad), cr, kctx);
-
-			/* Add token for process SL */
-			if (is_system_labeled())
-				au_write(&(u_ad), au_to_label(CR_SL(cr)));
+			/* Add subject information */
+			AUDIT_SETSUBJ(&(u_ad), cr, ainfo, kctx);
 
 			if (tad->tad_evmod & PAD_SPRIVUSE)
 				au_write(&(u_ad),

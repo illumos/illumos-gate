@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
  *
  * JNI wrapper for adt interface within libbsm
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -330,34 +329,3 @@ Java_com_sun_audit_AuditSession_bsmAuditOn(JNIEnv *env, jobject cls) {
 
 	return (1);
 }
-
-#ifdef TSOL
-/*
- * Class:     com_sun_audit_AuditSession
- * Method:    setSL
- * Signature: ([BLjava/lang/String;)V
- */
-
-/* ARGSUSED */
-JNIEXPORT void JNICALL
-Java_com_sun_audit_AuditSession_setSL(JNIEnv *env, jobject cls,
-    jbyteArray jstate, jstring jlabel) {
-
-	adt_session_data_t	*state;
-	const char		*label;
-
-	if (j2c_pointer(env, jstate, (caddr_t *)&state))
-		return;	/* j2c_pointer threw exception */
-
-	if (state == NULL)
-		return;	/* invalid session */
-
-	label = (*env)->GetStringUTFChars(env, jlabel, NULL);
-
-	if (adt_put_slabel(state, (char *)label))
-		local_throw(env, "java/lang/Exception", errno_to_i18n(errno));
-
-	(*env)->ReleaseStringUTFChars(env, jlabel, label);
-}
-
-#endif	/* TSOL */

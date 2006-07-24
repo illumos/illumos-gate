@@ -125,6 +125,8 @@ audit_allocate_record(status)
 		return (0);
 
 	(void) au_write(ad, au_to_me());	/* add subject token */
+	if (is_system_labeled())
+		(void) au_write(ad, au_to_mylabel());
 
 	if (policy & AUDIT_GROUP) {	/* add optional group token */
 		(void) memset(grplst, 0, sizeof (grplst));
@@ -136,8 +138,6 @@ audit_allocate_record(status)
 		}
 		(void) au_write(ad, au_to_newgroups(ng, grplst));
 	}
-	if (is_system_labeled())
-		(void) au_write(ad, au_to_mylabel());
 
 	if (status)
 		(void) au_write(ad, au_to_exit(status, -1));
