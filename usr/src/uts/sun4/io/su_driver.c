@@ -1319,27 +1319,42 @@ asy_program(struct asycom *asy, int mode)
 		    ~CIBAUD & ~CIBAUDEXT;
 		if (mode == ASY_INIT) {
 			async->async_ttycommon.t_cflag |= B9600;
+			async->async_ttycommon.t_cflag |= B9600 << IBSHIFT;
 			baudrate = B9600;
 		} else {
 			async->async_ttycommon.t_cflag |=
 			    (asy->asy_ocflags & (CBAUD | CBAUDEXT |
 			    CIBAUD | CIBAUDEXT));
+			error = EINVAL;
+			goto end;
 		}
-		error = EINVAL;
-		goto end;
 	}
 
-	/* set the baud rate */
-	if (async->async_ttycommon.t_cflag & (CIBAUD|CIBAUDEXT)) {
-		async->async_ttycommon.t_cflag &= ~(CIBAUD);
-		if (baudrate > CBAUD) {
-			async->async_ttycommon.t_cflag |= CIBAUDEXT;
+	/*
+	 * If CIBAUD and CIBAUDEXT are zero then we should set them to
+	 * the equivelant output baud bits.  Else, if CIBAUD and CIBAUDEXT
+	 * don't match CBAUD and CBAUDEXT respectively then we should
+	 * notify the requestor that we do not support split speeds.
+	 */
+	if ((async->async_ttycommon.t_cflag  & (CIBAUD|CIBAUDEXT)) == 0) {
+		async->async_ttycommon.t_cflag |=
+		    (async->async_ttycommon.t_cflag & CBAUD) << IBSHIFT;
+		if (async->async_ttycommon.t_cflag & CBAUDEXT)
+		    async->async_ttycommon.t_cflag |= CIBAUDEXT;
+	} else {
+		if ((((async->async_ttycommon.t_cflag & CBAUD) << IBSHIFT) !=
+		    (async->async_ttycommon.t_cflag & CIBAUD)) ||
+		    !(((async->async_ttycommon.t_cflag & (CBAUDEXT |
+		    CIBAUDEXT)) == (CBAUDEXT | CIBAUDEXT)) ||
+		    ((async->async_ttycommon.t_cflag & (CBAUDEXT |
+		    CIBAUDEXT)) == 0))) {
+			async->async_ttycommon.t_cflag &= ~CBAUD & ~CBAUDEXT &
+			    ~CIBAUD & ~CIBAUDEXT;
 			async->async_ttycommon.t_cflag |=
-				(((baudrate - CBAUD -1)<< IBSHIFT) & CIBAUD);
-		} else {
-			async->async_ttycommon.t_cflag &= ~CIBAUDEXT;
-			async->async_ttycommon.t_cflag |=
-				((baudrate << IBSHIFT) & CIBAUD);
+			    (asy->asy_ocflags & (CBAUD | CBAUDEXT |
+			    CIBAUD | CIBAUDEXT));
+			error = EINVAL;
+			goto end;
 		}
 	}
 
