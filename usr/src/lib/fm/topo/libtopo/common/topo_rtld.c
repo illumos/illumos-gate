@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in comodliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -90,8 +89,6 @@ rtld_init(topo_mod_t *mod)
 		topo_free(rp, sizeof (topo_rtld_t));
 		return (topo_mod_seterrno(mod, ETOPO_RTLD_INIT));
 	}
-
-	(void) pthread_mutex_unlock(&mod->tm_lock);
 
 	/*
 	 * Call _topo_init() in the module.
