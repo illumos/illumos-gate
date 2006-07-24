@@ -152,8 +152,8 @@
 /* PCISHPC controller command complete delay in microseconds. */
 #define	SHPC_COMMAND_WAIT_TIME	10000
 
-/* reset delay is 2^25 clock cycles as per PCI spec @33MHz. */
-static int pcishpc_reset_delay = 0x1000000;
+/* reset delay to 1 sec. */
+static int pcishpc_reset_delay = 1000000;
 
 /* PCISHPC controller softstate structure */
 typedef struct pcishpc_ctrl {
@@ -267,7 +267,7 @@ static int pcishpc_debug_enabled = 0;
 extern struct mod_ops mod_miscops;
 static struct modlmisc modlmisc = {
 	&mod_miscops,
-	"PCI SHPC hotplug module v1.12",
+	"PCI SHPC hotplug module v%I%",
 };
 
 /* Module linkage information for the kernel */
@@ -945,8 +945,12 @@ pcishpc_register_slot(pcishpc_ctrl_t *ctrl_p, int slot)
 		&pcishpc_p->slot_info, &pcishpc_p->slot_handle,
 			pcishpc_p->slot_ops, (caddr_t)pcishpc_p, 0) != 0) {
 
-		pcishpc_debug("pcishpc_register_slot() faled to Register "
+		pcishpc_debug("pcishpc_register_slot() failed to Register "
 			"slot");
+
+		hpc_free_slot_ops(pcishpc_p->slot_ops);
+		pcishpc_p->slot_ops = NULL;
+
 		return (DDI_FAILURE);
 	}
 
@@ -1061,6 +1065,9 @@ pcishpc_uninit(dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
+	(void) pcishpc_disable_irqs(ctrl_p);
+	ctrl_p->interrupt_installed = B_FALSE;
+
 	(void) pcishpc_destroy_controller(dip);
 
 	mutex_exit(&pcishpc_control_mutex);
@@ -1078,18 +1085,14 @@ pcishpc_uninit(dev_info_t *dip)
 static int
 pcishpc_destroy_slots(pcishpc_ctrl_t *ctrl_p)
 {
-	pcishpc_t *pcishpc_p, *prev_pcishpc_p;
+	pcishpc_t *pcishpc_p;
 	pcishpc_t **pcishpc_pp;
 
 	pcishpc_debug("pcishpc_destroy_slots() called(ctrl_p=%p)", ctrl_p);
 
 	pcishpc_pp = &pcishpc_head;
-	prev_pcishpc_p = NULL;
 
 	while ((pcishpc_p = *pcishpc_pp) != NULL) {
-
-		pcishpc_pp = &(pcishpc_p->nextp);
-
 		if (pcishpc_p->ctrl == ctrl_p) {
 			if (pcishpc_p->attn_btn_threadp != NULL) {
 				mutex_enter(&ctrl_p->shpc_mutex);
@@ -1106,16 +1109,23 @@ pcishpc_destroy_slots(pcishpc_ctrl_t *ctrl_p)
 				mutex_exit(&ctrl_p->shpc_mutex);
 			}
 
-			if (prev_pcishpc_p == NULL)
-				pcishpc_head = pcishpc_p->nextp;
-			else
-				prev_pcishpc_p->nextp = pcishpc_p->nextp;
+			*pcishpc_pp = pcishpc_p->nextp;
 
 			pcishpc_debug("pcishpc_destroy_slots() (shpc_p=%p) "
 			    "destroyed", pcishpc_p);
+			if (pcishpc_p->slot_ops)
+				if (hpc_slot_unregister(
+				    &pcishpc_p->slot_handle) != 0) {
+					pcishpc_debug("pcishpc_destroy_slots() "
+					    "failed to unregister slot");
+					return (DDI_FAILURE);
+				} else {
+					hpc_free_slot_ops(pcishpc_p->slot_ops);
+					pcishpc_p->slot_ops = NULL;
+				}
 			kmem_free(pcishpc_p, sizeof (pcishpc_t));
 		} else
-			prev_pcishpc_p = pcishpc_p;
+			pcishpc_pp = &(pcishpc_p->nextp);
 	}
 
 	return (DDI_SUCCESS);
@@ -1237,7 +1247,7 @@ pcishpc_set_power_state(pcishpc_t *pcishpc_p, hpc_slot_state_t state)
 	pcishpc_get_slot_state(pcishpc_p);
 
 	/* delay after powerON to let the device initialize itself */
-	drv_usecwait(pcishpc_reset_delay);
+	delay(drv_usectohz(pcishpc_reset_delay));
 
 	return (DDI_SUCCESS);
 }
@@ -2295,7 +2305,6 @@ pcishpc_set_slot_name(pcishpc_ctrl_t *ctrl_p, int slot)
 	int pci_id_cnt, pci_id_bit;
 	int slots_before, found;
 	int invalid_slotnum = 0;
-	uint32_t config;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, ctrl_p->shpc_dip,
 		DDI_PROP_DONTPASS, "physical-slot#", &slotnum, &count) ==
@@ -2303,12 +2312,14 @@ pcishpc_set_slot_name(pcishpc_ctrl_t *ctrl_p, int slot)
 		p->phy_slot_num = slotnum[0];
 		ddi_prop_free(slotnum);
 	} else {
-		config = pcishpc_read_reg(ctrl_p, SHPC_SLOT_CONFIGURATION_REG);
-		p->phy_slot_num = SHPC_SLOT_CONFIG_PHY_SLOT_NUM(config);
+		if (ctrl_p->deviceIncreases)
+			p->phy_slot_num = ctrl_p->physStart + slot;
+		else
+			p->phy_slot_num = ctrl_p->physStart - slot;
 	}
 
 	if (!p->phy_slot_num) { /* platform may not have initialized it */
-		cmn_err(CE_WARN, "%s#%d: Invalid slot number! ",
+		pcishpc_debug("%s#%d: Invalid slot number! ",
 				ddi_driver_name(ctrl_p->shpc_dip),
 				ddi_get_instance(ctrl_p->shpc_dip));
 		p->phy_slot_num = pci_config_get8(ctrl_p->shpc_config_hdl,
@@ -2389,8 +2400,8 @@ pcishpc_set_slot_name(pcishpc_ctrl_t *ctrl_p, int slot)
 	}
 
 	if (invalid_slotnum)
-	    (void) sprintf(p->slot_info.pci_slot_name, "pci%ddev%d",
-		p->phy_slot_num, p->deviceNum);
+	    (void) sprintf(p->slot_info.pci_slot_name, "pci%d",
+		p->deviceNum);
 	else
 	    (void) sprintf(p->slot_info.pci_slot_name, "pci%d",
 		p->phy_slot_num);
