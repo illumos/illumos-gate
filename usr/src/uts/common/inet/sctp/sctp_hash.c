@@ -456,7 +456,7 @@ ip_fanout_sctp(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 	}
 	if ((connp = sctp_fanout(src, dst, ports, ipif_seqid, zoneid, mp)) ==
 	    NULL) {
-		ip_fanout_sctp_raw(mp, recv_ill, ipha, isv4,
+		ip_fanout_sctp_raw(first_mp, recv_ill, ipha, isv4,
 		    ports, mctl_present, flags, ip_policy,
 		    ipif_seqid, zoneid);
 		return;

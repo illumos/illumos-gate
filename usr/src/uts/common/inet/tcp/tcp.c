@@ -3500,6 +3500,9 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 		mutex_enter(&tbf->tf_lock);
 		for (ltcp = tbf->tf_tcp; ltcp != NULL;
 		    ltcp = ltcp->tcp_bind_hash) {
+			boolean_t not_socket;
+			boolean_t exclbind;
+
 			if (lport != ltcp->tcp_lport)
 				continue;
 
@@ -3533,7 +3536,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * spec		spec		yes if A
 			 *
 			 * For labeled systems, SO_MAC_EXEMPT behaves the same
-			 * as UDP_EXCLBIND, except that zoneid is ignored.
+			 * as TCP_EXCLBIND, except that zoneid is ignored.
 			 *
 			 * Note:
 			 *
@@ -3558,12 +3561,18 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * TCPS_LISTEN and both endpoints have SO_REUSEADDR
 			 * set, let the bind succeed.
 			 *
-			 * But because of (1), we cannot do that now.  If
-			 * in future, we can change this going back semantics,
-			 * we can add the above check.
+			 * Because of (1), we cannot do that for TLI
+			 * endpoints.  But we can do that for socket endpoints.
+			 * If in future, we can change this going back
+			 * semantics, we can use the above check for TLI also.
 			 */
-			if (ltcp->tcp_exclbind || tcp->tcp_exclbind ||
-			    lconnp->conn_mac_exempt || connp->conn_mac_exempt) {
+			not_socket = !(TCP_IS_SOCKET(ltcp) &&
+			    TCP_IS_SOCKET(tcp));
+			exclbind = ltcp->tcp_exclbind || tcp->tcp_exclbind;
+
+			if (lconnp->conn_mac_exempt || connp->conn_mac_exempt ||
+			    (exclbind && (not_socket ||
+			    ltcp->tcp_state <= TCPS_ESTABLISHED))) {
 				if (V6_OR_V4_INADDR_ANY(
 				    ltcp->tcp_bound_source_v6) ||
 				    V6_OR_V4_INADDR_ANY(*laddr) ||
@@ -9599,6 +9608,9 @@ tcp_opt_get(queue_t *q, int level, int	name, uchar_t *ptr)
 		case SO_MAC_EXEMPT:
 			*i1 = connp->conn_mac_exempt;
 			break;
+		case SO_EXCLBIND:
+			*i1 = tcp->tcp_exclbind ? SO_EXCLBIND : 0;
+			break;
 		default:
 			return (-1);
 		}
@@ -10097,6 +10109,10 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				connp->conn_mac_exempt = onoff;
 				mutex_exit(&connp->conn_lock);
 			}
+			break;
+		case SO_EXCLBIND:
+			if (!checkonly)
+				tcp->tcp_exclbind = onoff;
 			break;
 		default:
 			*outlenp = 0;
@@ -14332,6 +14348,12 @@ est:
 		case TCPS_CLOSING:
 			if (tcp->tcp_fin_acked) {
 				tcp->tcp_state = TCPS_TIME_WAIT;
+				/*
+				 * Unconditionally clear the exclusive binding
+				 * bit so this TIME-WAIT connection won't
+				 * interfere with new ones.
+				 */
+				tcp->tcp_exclbind = 0;
 				if (!TCP_IS_DETACHED(tcp)) {
 					TCP_TIMER_RESTART(tcp,
 					    tcp_time_wait_interval);
@@ -14381,6 +14403,12 @@ est:
 				/* FALLTHRU */
 			case TCPS_FIN_WAIT_2:
 				tcp->tcp_state = TCPS_TIME_WAIT;
+				/*
+				 * Unconditionally clear the exclusive binding
+				 * bit so this TIME-WAIT connection won't
+				 * interfere with new ones.
+				 */
+				tcp->tcp_exclbind = 0;
 				if (!TCP_IS_DETACHED(tcp)) {
 					TCP_TIMER_RESTART(tcp,
 					    tcp_time_wait_interval);

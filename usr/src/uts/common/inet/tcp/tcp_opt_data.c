@@ -80,6 +80,8 @@ opdes_t	tcp_opt_arr[] = {
 	0 },
 { SO_ALLZONES, SOL_SOCKET, OA_R, OA_RW, OP_CONFIG, OP_PASSNEXT, sizeof (int),
 	0 },
+{ SO_EXCLBIND, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
+
 { TCP_NODELAY,	IPPROTO_TCP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0
 	},
 { TCP_MAXSEG,	IPPROTO_TCP, OA_R, OA_R, OP_NP, OP_PASSNEXT, sizeof (uint_t),

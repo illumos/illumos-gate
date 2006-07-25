@@ -340,7 +340,7 @@ svc_tli_create_common(const int ofd, const struct netconfig *nconf,
 		}
 
 		/*
-		 * {TCP,UDP}_EXCLBIND has the following properties
+		 * SO_EXCLBIND has the following properties
 		 *    - an fd bound to port P via IPv4 will prevent an IPv6
 		 *    bind to port P (and vice versa)
 		 *    - an fd bound to a wildcard IP address for port P will
@@ -355,10 +355,8 @@ svc_tli_create_common(const int ofd, const struct netconfig *nconf,
 		    (tcp || (strcmp(nconf->nc_proto, NC_UDP) == 0)) &&
 		    rpc_control(__RPC_SVC_EXCLBIND_GET, &exclbind)) {
 			if (exclbind) {
-				if (__rpc_tli_set_options(fd,
-					tcp ? IPPROTO_TCP : IPPROTO_UDP,
-					tcp ? TCP_EXCLBIND : UDP_EXCLBIND,
-							1) < 0) {
+				if (__rpc_tli_set_options(fd, SOL_SOCKET,
+				    SO_EXCLBIND, 1) < 0) {
 					syslog(LOG_ERR,
 			    "svc_tli_create: can't set EXCLBIND [netid='%s']",
 					    nconf->nc_netid);

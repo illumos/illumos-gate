@@ -494,6 +494,7 @@ __rpc_tli_set_options(int fd, int optlevel, int optname, int optval)
 	case SO_RECVUCRED:
 	case SO_ANON_MLP:
 	case SO_MAC_EXEMPT:
+	case SO_EXCLBIND:
 	case TCP_EXCLBIND:
 	case UDP_EXCLBIND:
 		/* LINTED */

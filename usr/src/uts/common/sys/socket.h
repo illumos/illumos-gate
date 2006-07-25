@@ -154,6 +154,7 @@ typedef	void		*_RESTRICT_KYWD Psocklen_t;
 #define	SCM_TIMESTAMP	SO_TIMESTAMP	/* socket control message timestamp */
 
 #define	SO_ALLZONES	0x1014		/* bind in all zones */
+#define	SO_EXCLBIND	0x1015		/* exclusive binding */
 
 #ifdef	_KERNEL
 #define	SO_SRCADDR	0x2001		/* Internal: AF_UNIX source address */

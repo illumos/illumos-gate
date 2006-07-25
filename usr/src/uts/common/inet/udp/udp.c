@@ -3129,6 +3129,9 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 		case SO_ALLZONES:
 			*i1 = connp->conn_allzones;
 			break;	/* goto sizeof (int) option return */
+		case SO_EXCLBIND:
+			*i1 = udp->udp_exclbind ? SO_EXCLBIND : 0;
+			break;
 		default:
 			return (-1);
 		}
@@ -3555,6 +3558,10 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 			}
 			break;
 		}
+		case SO_EXCLBIND:
+			if (!checkonly)
+				udp->udp_exclbind = onoff;
+			break;
 		default:
 			*outlenp = 0;
 			return (EINVAL);

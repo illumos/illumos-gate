@@ -444,10 +444,10 @@ _rresvport_addr(int *alport, struct sockaddr_storage *addr)
 		return (-1);
 
 	/*
-	 * Set TCP_EXCLBIND to get a "unique" port, which is not bound
+	 * Set SO_EXCLBIND to get a "unique" port, which is not bound
 	 * to any other sockets.
 	 */
-	if (setsockopt(s, IPPROTO_TCP, TCP_EXCLBIND, &on, sizeof (on)) < 0) {
+	if (setsockopt(s, SOL_SOCKET, SO_EXCLBIND, &on, sizeof (on)) < 0) {
 		(void) close(s);
 		return (-1);
 	}
@@ -460,8 +460,8 @@ _rresvport_addr(int *alport, struct sockaddr_storage *addr)
 			sin6->sin6_port = htons((ushort_t)*alport);
 		}
 		if (bind(s, (struct sockaddr *)addr, len) >= 0) {
-			/* To be safe, need to turn off TCP_EXCLBIND. */
-			(void) setsockopt(s, IPPROTO_TCP, TCP_EXCLBIND, &off,
+			/* To be safe, need to turn off SO_EXCLBIND. */
+			(void) setsockopt(s, SOL_SOCKET, SO_EXCLBIND, &off,
 			    sizeof (off));
 			return (s);
 		}
@@ -510,7 +510,7 @@ _rresvport_addr(int *alport, struct sockaddr_storage *addr)
 		 */
 		(void) setsockopt(s, IPPROTO_TCP, TCP_ANONPRIVBIND, &off,
 		    sizeof (off));
-		(void) setsockopt(s, IPPROTO_TCP, TCP_EXCLBIND, &off,
+		(void) setsockopt(s, SOL_SOCKET, SO_EXCLBIND, &off,
 		    sizeof (off));
 		return (s);
 	}

@@ -1759,6 +1759,7 @@ sol_optname(private_t *pri, long val)
 		case SO_TYPE:		return ("SO_TYPE");
 		case SO_PROTOTYPE:	return ("SO_PROTOTYPE");
 		case SO_ALLZONES:	return ("SO_ALLZONES");
+		case SO_EXCLBIND:	return ("SO_EXCLBIND");
 
 		default:		(void) snprintf(pri->code_buf, CBSIZE,
 						    "0x%lx", val);
