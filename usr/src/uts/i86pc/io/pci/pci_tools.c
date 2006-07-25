@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +43,7 @@
 #include <io/pci/pci_var.h>
 #include <sys/promif.h>
 #include <sys/x86_archext.h>
+#include <sys/cpuvar.h>
 
 #define	PCIEX_BDF_OFFSET_DELTA	4
 #define	PCIEX_REG_FUNC_SHIFT	(PCI_REG_FUNC_SHIFT + PCIEX_BDF_OFFSET_DELTA)
@@ -874,7 +874,9 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 			 * memory-mapped access
 			 * Lastly, check for PCI devices and do I/O access
 			 */
-			if (prg.bus_no == 0 && prg.dev_no == 0x18) {
+			if ((prg.bus_no == 0) &&
+			    (prg.dev_no >= 0x18) &&
+			    (prg.dev_no < (0x18 + ncpus))) {
 				if (cpuid_getvendor(CPU) == X86_VENDOR_AMD)
 					rval = pcitool_cfg_access(dip, &prg,
 					    write_flag);
