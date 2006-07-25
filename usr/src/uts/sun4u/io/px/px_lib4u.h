@@ -71,6 +71,15 @@ typedef struct px_cb_list {
 	struct px_cb_list	*next;
 } px_cb_list_t;
 
+/* IO chip type */
+typedef enum {
+	PX_CHIP_UNIDENTIFIED = 0,
+	PX_CHIP_FIRE = 1,
+	PX_CHIP_OBERON = 2
+} px_chip_type_t;
+
+#define	PX_CHIP_TYPE(pxu_p)	((pxu_p)->chip_type)
+
 typedef struct px_cb {
 	px_cb_list_t	*pxl;		/* linked list px */
 	kmutex_t	cb_mutex;	/* lock for CB */
@@ -81,7 +90,7 @@ typedef struct px_cb {
 } px_cb_t;
 
 typedef struct pxu {
-	uint32_t	chip_id;
+	px_chip_type_t	chip_type;
 	uint8_t		portid;
 	uint16_t	tsb_cookie;
 	uint32_t	tsb_size;
@@ -262,30 +271,14 @@ typedef	struct eq_rec {
 #define	PX_BDF_TO_CFGADDR(bdf, offset) (((bdf) << PX_PA_BDF_SHIFT) + (offset))
 
 /*
- * The sequence of the chip_type appearance is significant.
- * There are code depending on it: PX_CHIP_TYPE(pxu_p) < PX_CHIP_FIRE.
- */
-typedef enum {
-	PX_CHIP_UNIDENTIFIED = 0,
-	PX_CHIP_FIRE = 1,
-	PX_CHIP_OBERON = 2
-} px_chip_id_t;
-
-/*
- * [msb]                                [lsb]
- * 0x00 <chip_type> <version#> <module-revision#>
- */
-#define	PX_CHIP_ID(t, v, m)	(((t) << 16) | ((v) << 8) | (m))
-#define	PX_CHIP_TYPE(pxu_p)	(((pxu_p)->chip_id) >> 16)
-#define	PX_CHIP_REV(pxu_p)	 (((pxu_p)->chip_id) & 0xFF)
-#define	PX_CHIP_VER(pxu_p)	 ((((pxu_p)->chip_id) >> 8) & 0xFF)
-
-/*
  * Fire hardware specific version definitions.
+ * All Fire versions > 2.0 will be numerically greater than FIRE_MOD_REV_20
  */
-#define	FIRE_VER_10	PX_CHIP_ID(PX_CHIP_FIRE, 0x01, 0x00)
-#define	FIRE_VER_20	PX_CHIP_ID(PX_CHIP_FIRE, 0x03, 0x00)
-#define	OBERON_VER_10	PX_CHIP_ID(PX_CHIP_OBERON, 0x00, 0x00)
+#define	FIRE_MOD_REV_20	0x03
+
+/*
+ * Oberon specific definitions.
+ */
 #define	OBERON_RANGE_PROP_MASK	0x7fff
 
 /*

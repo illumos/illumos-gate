@@ -64,7 +64,7 @@ uint64_t px_paddr_mask;
 static int px_goto_l23ready(px_t *px_p);
 static int px_goto_l0(px_t *px_p);
 static int px_pre_pwron_check(px_t *px_p);
-static uint32_t px_identity_chip(px_t *px_p);
+static uint32_t px_identity_init(px_t *px_p);
 static boolean_t px_cpr_callb(void *arg, int code);
 static uint_t px_cb_intr(caddr_t arg);
 
@@ -157,38 +157,26 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	px_t		*px_p = DIP_TO_STATE(dip);
 	caddr_t		xbc_csr_base, csr_base;
 	px_dvma_range_prop_t	px_dvma_range;
-	uint32_t	chip_id;
+	px_chip_type_t	chip_type = px_identity_init(px_p);
 	pxu_t		*pxu_p;
 
-	DBG(DBG_ATTACH, dip, "px_lib_dev_init: dip 0x%p\n", dip);
+	DBG(DBG_ATTACH, dip, "px_lib_dev_init: dip 0x%p", dip);
 
-	if ((chip_id = px_identity_chip(px_p)) == PX_CHIP_UNIDENTIFIED)
-		return (DDI_FAILURE);
-
-	switch (chip_id) {
-	case FIRE_VER_10:
-		cmn_err(CE_WARN, "FIRE Hardware Version 1.0 is not supported");
-		return (DDI_FAILURE);
-	case FIRE_VER_20:
-		DBG(DBG_ATTACH, dip, "FIRE Hardware Version 2.0\n");
-		px_paddr_mask = MMU_FIRE_PADDR_MASK;
-		break;
-	case OBERON_VER_10:
-		DBG(DBG_ATTACH, dip, "Oberon Hardware Version 1.0\n");
-		px_paddr_mask = MMU_OBERON_PADDR_MASK;
-		break;
-	default:
-		cmn_err(CE_WARN, "%s%d: PX Hardware Version Unknown\n",
-		    ddi_driver_name(dip), ddi_get_instance(dip));
+	if (chip_type == PX_CHIP_UNIDENTIFIED) {
+		cmn_err(CE_WARN, "%s%d: Unrecognized Hardware Version\n",
+		    NAMEINST(dip));
 		return (DDI_FAILURE);
 	}
+
+	px_paddr_mask = (chip_type == PX_CHIP_FIRE) ? MMU_FIRE_PADDR_MASK :
+	    MMU_OBERON_PADDR_MASK;
 
 	/*
 	 * Allocate platform specific structure and link it to
 	 * the px state structure.
 	 */
 	pxu_p = kmem_zalloc(sizeof (pxu_t), KM_SLEEP);
-	pxu_p->chip_id = chip_id;
+	pxu_p->chip_type = chip_type;
 	pxu_p->portid  = ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "portid", -1);
 
@@ -1982,7 +1970,7 @@ l0_done:
  * the identity defaults to PX_CHIP_UNIDENTIFIED.
  */
 static uint32_t
-px_identity_chip(px_t *px_p)
+px_identity_init(px_t *px_p)
 {
 	dev_info_t	*dip = px_p->px_dip;
 	char		*name = ddi_binding_name(dip);
@@ -1992,22 +1980,22 @@ px_identity_chip(px_t *px_p)
 	    "module-revision#", 0);
 
 	/* Check for Fire driver binding name */
-	if ((strcmp(name, "pci108e,80f0") == 0) ||
-	    (strcmp(name, "pciex108e,80f0") == 0)) {
-		DBG(DBG_ATTACH, dip, "px_identity_chip: %s%d: "
-		    "name %s module-revision %d\n", ddi_driver_name(dip),
-		    ddi_get_instance(dip), name, revision);
+	if (strcmp(name, "pciex108e,80f0") == 0) {
+		DBG(DBG_ATTACH, dip, "px_identity_init: %s%d: "
+		    "(FIRE), module-revision %d\n", NAMEINST(dip),
+		    revision);
 
-		return (PX_CHIP_ID(PX_CHIP_FIRE, revision, 0x00));
+		return ((revision >= FIRE_MOD_REV_20) ?
+		    PX_CHIP_FIRE : PX_CHIP_UNIDENTIFIED);
 	}
 
 	/* Check for Oberon driver binding name */
 	if (strcmp(name, "pciex108e,80f8") == 0) {
-		DBG(DBG_ATTACH, dip, "px_identity_chip: %s%d: "
-		    "name %s module-revision %d\n", ddi_driver_name(dip),
-		    ddi_get_instance(dip), name, revision);
+		DBG(DBG_ATTACH, dip, "px_identity_init: %s%d: "
+		    "(OBERON), module-revision %d\n", NAMEINST(dip),
+		    revision);
 
-		return (PX_CHIP_ID(PX_CHIP_OBERON, revision, 0x00));
+		return (PX_CHIP_OBERON);
 	}
 
 	DBG(DBG_ATTACH, dip, "%s%d: Unknown PCI Express Host bridge %s %x\n",
