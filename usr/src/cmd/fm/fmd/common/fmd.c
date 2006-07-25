@@ -514,11 +514,15 @@ fmd_destroy(fmd_t *dp)
 	 * hold the dispq lock as a writer while doing so since it uses d_self.
 	 */
 	if (dp->d_self != NULL) {
+		fmd_module_t *self;
+
 		(void) pthread_rwlock_wrlock(&dp->d_disp->dq_lock);
-		fmd_module_unload(dp->d_self);
-		fmd_module_rele(dp->d_self);
+		self = dp->d_self;
 		dp->d_self = NULL;
 		(void) pthread_rwlock_unlock(&dp->d_disp->dq_lock);
+
+		fmd_module_unload(self);
+		fmd_module_rele(self);
 	}
 
 	/*
