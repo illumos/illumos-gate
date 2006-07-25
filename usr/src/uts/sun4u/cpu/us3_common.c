@@ -115,6 +115,8 @@ static int cpu_async_log_err(void *flt, errorq_elem_t *eqep);
 static void cpu_log_diag_info(ch_async_flt_t *ch_flt);
 static void cpu_queue_one_event(ch_async_flt_t *ch_flt, char *reason,
     ecc_type_to_info_t *eccp, ch_diag_data_t *cdp);
+static int cpu_flt_in_memory_one_event(ch_async_flt_t *ch_flt,
+    uint64_t t_afsr_bit);
 static int clear_ecc(struct async_flt *ecc);
 #if defined(CPU_IMP_ECACHE_ASSOC)
 static int cpu_ecache_line_valid(ch_async_flt_t *ch_flt);
@@ -131,6 +133,7 @@ static int afsr_to_esynd_status(uint64_t afsr, uint64_t afsr_bit);
 static int afsr_to_msynd_status(uint64_t afsr, uint64_t afsr_bit);
 static int afsr_to_synd_status(uint_t cpuid, uint64_t afsr, uint64_t afsr_bit);
 static int synd_to_synd_code(int synd_status, ushort_t synd, uint64_t afsr_bit);
+static int cpu_get_mem_unum_synd(int synd_code, struct async_flt *, char *buf);
 static void cpu_uninit_ecache_scrub_dr(struct cpu *cp);
 static void cpu_scrubphys(struct async_flt *aflt);
 static void cpu_payload_add_aflt(struct async_flt *, nvlist_t *, nvlist_t *,
@@ -2531,7 +2534,6 @@ void
 cpu_log_err(struct async_flt *aflt)
 {
 	char unum[UNUM_NAMLEN];
-	int len = 0;
 	int synd_status, synd_code, afar_status;
 	ch_async_flt_t *ch_flt = (ch_async_flt_t *)aflt;
 
@@ -2554,18 +2556,17 @@ cpu_log_err(struct async_flt *aflt)
 	else
 		afar_status = AFLT_STAT_INVALID;
 
+	synd_code = synd_to_synd_code(synd_status,
+	    aflt->flt_synd, ch_flt->flt_bit);
+
 	/*
 	 * If afar status is not invalid do a unum lookup.
 	 */
 	if (afar_status != AFLT_STAT_INVALID) {
-		(void) cpu_get_mem_unum_aflt(synd_status, aflt, unum,
-			UNUM_NAMLEN, &len);
+		(void) cpu_get_mem_unum_synd(synd_code, aflt, unum);
 	} else {
 		unum[0] = '\0';
 	}
-
-	synd_code = synd_to_synd_code(synd_status,
-	    aflt->flt_synd, ch_flt->flt_bit);
 
 	/*
 	 * Do not send the fruid message (plat_ecc_error_data_t)
@@ -3458,6 +3459,34 @@ cpu_get_mem_unum_aflt(int synd_status, struct async_flt *aflt,
 	    (uint64_t)-1 : ((ch_async_flt_t *)aflt)->flt_bit,
 	    aflt->flt_addr, aflt->flt_bus_id, aflt->flt_in_memory,
 	    aflt->flt_status, buf, buflen, lenp));
+}
+
+/*
+ * Return unum string given synd_code and async_flt into
+ * the buf with size UNUM_NAMLEN
+ */
+static int
+cpu_get_mem_unum_synd(int synd_code, struct async_flt *aflt, char *buf)
+{
+	int ret, len;
+
+	/*
+	 * Syndrome code must be either a single-bit error code
+	 * (0...143) or -1 for unum lookup.
+	 */
+	if (synd_code < 0 || synd_code >= M2)
+		synd_code = -1;
+	if (&plat_get_mem_unum) {
+		if ((ret = plat_get_mem_unum(synd_code, aflt->flt_addr,
+		    aflt->flt_bus_id, aflt->flt_in_memory,
+		    aflt->flt_status, buf, UNUM_NAMLEN, &len)) != 0) {
+			buf[0] = '\0';
+		}
+		return (ret);
+	}
+
+	buf[0] = '\0';
+	return (ENOTSUP);
 }
 
 /*
@@ -4569,7 +4598,7 @@ cpu_payload_add_aflt(struct async_flt *aflt, nvlist_t *payload,
 	if (aflt->flt_payload & FM_EREPORT_PAYLOAD_FLAG_RESOURCE) {
 		char unum[UNUM_NAMLEN] = "";
 		char sid[DIMM_SERIAL_ID_LEN] = "";
-		int len, ret, rtype;
+		int len, ret, rtype, synd_code;
 		uint64_t offset = (uint64_t)-1;
 
 		rtype = cpu_error_to_resource_type(aflt);
@@ -4589,8 +4618,10 @@ cpu_payload_add_aflt(struct async_flt *aflt, nvlist_t *payload,
 			else
 				aflt->flt_status &= ~ECC_ECACHE;
 
-			if (cpu_get_mem_unum_aflt(*synd_status, aflt, unum,
-			    UNUM_NAMLEN, &len) != 0)
+			synd_code = synd_to_synd_code(*synd_status,
+			    aflt->flt_synd, ch_flt->flt_bit);
+
+			if (cpu_get_mem_unum_synd(synd_code, aflt, unum) != 0)
 				break;
 
 			ret = cpu_get_mem_sid(unum, sid, DIMM_SERIAL_ID_LEN,
@@ -4657,6 +4688,57 @@ cpu_flt_in_memory(ch_async_flt_t *ch_flt, uint64_t t_afsr_bit)
 	    afsr_to_afar_status(ch_flt->afsr_errs, t_afsr_bit) ==
 	    AFLT_STAT_VALID &&
 	    pf_is_memory(aflt->flt_addr >> MMU_PAGESHIFT));
+}
+
+/*
+ * Returns whether fault address is valid based on the error bit for the
+ * one event being queued and whether the address is "in memory".
+ */
+static int
+cpu_flt_in_memory_one_event(ch_async_flt_t *ch_flt, uint64_t t_afsr_bit)
+{
+	struct async_flt *aflt = (struct async_flt *)ch_flt;
+	int afar_status;
+	uint64_t afsr_errs, afsr_ow, *ow_bits;
+
+	if (!(t_afsr_bit & C_AFSR_MEMORY) ||
+	    !pf_is_memory(aflt->flt_addr >> MMU_PAGESHIFT))
+		return (0);
+
+	afsr_errs = ch_flt->afsr_errs;
+	afar_status = afsr_to_afar_status(afsr_errs, t_afsr_bit);
+
+	switch (afar_status) {
+	case AFLT_STAT_VALID:
+		return (1);
+
+	case AFLT_STAT_AMBIGUOUS:
+		/*
+		 * Status is ambiguous since another error bit (or bits)
+		 * of equal priority to the specified bit on in the afsr,
+		 * so check those bits. Return 1 only if the bits on in the
+		 * same class as the t_afsr_bit are also C_AFSR_MEMORY bits.
+		 * Otherwise not all the equal priority bits are for memory
+		 * errors, so return 0.
+		 */
+		ow_bits = afar_overwrite;
+		while ((afsr_ow = *ow_bits++) != 0) {
+			/*
+			 * Get other bits that are on in t_afsr_bit's priority
+			 * class to check for Memory Error bits only.
+			 */
+			if (afsr_ow & t_afsr_bit) {
+				if ((afsr_errs & afsr_ow) & ~C_AFSR_MEMORY)
+					return (0);
+				else
+					return (1);
+			}
+		}
+		/*FALLTHRU*/
+
+	default:
+		return (0);
+	}
 }
 
 static void
@@ -4787,7 +4869,8 @@ cpu_queue_one_event(ch_async_flt_t *ch_flt, char *reason,
 		ch_flt->flt_diag_data = *cdp;
 	else
 		ch_flt->flt_diag_data.chd_afar = LOGOUT_INVALID;
-	aflt->flt_in_memory = cpu_flt_in_memory(ch_flt, ch_flt->flt_bit);
+	aflt->flt_in_memory =
+	    cpu_flt_in_memory_one_event(ch_flt, ch_flt->flt_bit);
 
 	if (ch_flt->flt_bit & C_AFSR_MSYND_ERRS)
 		aflt->flt_synd = GET_M_SYND(aflt->flt_stat);
@@ -5168,19 +5251,25 @@ afsr_to_synd_status(uint_t cpuid, uint64_t afsr, uint64_t afsr_bit)
 #ifdef lint
 	cpuid = cpuid;
 #endif
-	if (afsr_bit & C_AFSR_MSYND_ERRS) {
-		return (afsr_to_msynd_status(afsr, afsr_bit));
-	} else if (afsr_bit & (C_AFSR_ESYND_ERRS | C_AFSR_EXT_ESYND_ERRS)) {
 #if defined(CHEETAH_PLUS)
-		/*
-		 * The E_SYND overwrite policy is slightly different
-		 * for Panther CPUs.
-		 */
+	/*
+	 * The M_SYND overwrite policy is combined with the E_SYND overwrite
+	 * policy for Cheetah+ and separate for Panther CPUs.
+	 */
+	if (afsr_bit & C_AFSR_MSYND_ERRS) {
+		if (IS_PANTHER(cpunodes[cpuid].implementation))
+			return (afsr_to_msynd_status(afsr, afsr_bit));
+		else
+			return (afsr_to_esynd_status(afsr, afsr_bit));
+	} else if (afsr_bit & (C_AFSR_ESYND_ERRS | C_AFSR_EXT_ESYND_ERRS)) {
 		if (IS_PANTHER(cpunodes[cpuid].implementation))
 			return (afsr_to_pn_esynd_status(afsr, afsr_bit));
 		else
 			return (afsr_to_esynd_status(afsr, afsr_bit));
 #else /* CHEETAH_PLUS */
+	if (afsr_bit & C_AFSR_MSYND_ERRS) {
+		return (afsr_to_msynd_status(afsr, afsr_bit));
+	} else if (afsr_bit & (C_AFSR_ESYND_ERRS | C_AFSR_EXT_ESYND_ERRS)) {
 		return (afsr_to_esynd_status(afsr, afsr_bit));
 #endif /* CHEETAH_PLUS */
 	} else {
@@ -6510,7 +6599,7 @@ cpu_ereport_post(struct async_flt *aflt)
 	errorq_elem_t *eqep;
 	ch_async_flt_t *ch_flt = (ch_async_flt_t *)aflt;
 	char unum[UNUM_NAMLEN];
-	int len = 0;
+	int synd_code;
 	uint8_t msg_type;
 	plat_ecc_ch_async_flt_t	plat_ecc_ch_flt;
 
@@ -6595,9 +6684,11 @@ cpu_ereport_post(struct async_flt *aflt)
 			 */
 			if (plat_ecc_ch_flt.ecaf_afar_status !=
 			    AFLT_STAT_INVALID) {
-				(void) cpu_get_mem_unum_aflt(
-				    plat_ecc_ch_flt.ecaf_synd_status, aflt,
-				    unum, UNUM_NAMLEN, &len);
+				synd_code = synd_to_synd_code(
+				    plat_ecc_ch_flt.ecaf_synd_status,
+				    aflt->flt_synd, ch_flt->flt_bit);
+				(void) cpu_get_mem_unum_synd(synd_code,
+				    aflt, unum);
 			} else {
 				unum[0] = '\0';
 			}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -675,23 +674,25 @@ uint64_t afar_overwrite[] = {
 };
 
 /*
- * See Cheetah+ Delta PRM 10.9.
- *   Class 2:  UE, DUE, IVU, EDU, WDU, UCU, CPU
- *   Class 1:  CE, IVC, EDC, WDC, UCC, CPC
+ * For Cheetah+, the E_SYND and M_SYND overwrite priorities are combined.
+ * See Cheetah+ Delta PRM 10.9 and Cheetah+ PRM 11.6.2
+ *   Class 2:  UE, DUE, IVU, EDU, EMU, WDU, UCU, CPU
+ *   Class 1:  CE, IVC, EDC, EMC, WDC, UCC, CPC
  */
 uint64_t esynd_overwrite[] = {
 	/* class 2: */
-	C_AFSR_UE | C_AFSR_DUE | C_AFSR_IVU | C_AFSR_EDU | C_AFSR_WDU |
-	    C_AFSR_UCU | C_AFSR_CPU,
+	C_AFSR_UE | C_AFSR_DUE | C_AFSR_IVU | C_AFSR_EDU | C_AFSR_EMU |
+	    C_AFSR_WDU | C_AFSR_UCU | C_AFSR_CPU,
 	/* class 1: */
-	C_AFSR_CE | C_AFSR_IVC | C_AFSR_EDC | C_AFSR_WDC | C_AFSR_UCC |
-	    C_AFSR_CPC,
+	C_AFSR_CE | C_AFSR_IVC | C_AFSR_EDC | C_AFSR_EMC | C_AFSR_WDC |
+	    C_AFSR_UCC | C_AFSR_CPC,
 	0
 };
 
 /*
  * In panther, the E_SYND overwrite policy changed a little bit
  * by adding one more level.
+ * See Panther PRM P.6.2
  *   class 3:
  *      AFSR     -- UCU, UCC
  *      AFSR_EXT -- L3_UCU, L3_UCC
@@ -725,9 +726,9 @@ afsr_to_pn_esynd_status(uint64_t afsr, uint64_t afsr_bit)
 
 /*
  * Prioritized list of Error bits for MSYND overwrite.
- * See Cheetah PRM P.6.3
- *   Class 2:  EMU
- *   Class 1:  EMC
+ * See Panther PRM P.6.2 (For Cheetah+, see esynd_overwrite classes)
+ *   Class 2:  EMU, IMU
+ *   Class 1:  EMC, IMC
  *
  * Panther adds IMU and IMC.
  */
