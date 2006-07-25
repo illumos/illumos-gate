@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -670,7 +669,6 @@ keycheck(uint8_t *key, uint8_t *corrected_key)
 	 * Fix parity.
 	 */
 	fix_des_parity(&key_so_far);
-	key_so_far ^= 0x0101010101010101ULL;
 
 	/* Do weak key check itself. */
 	for (i = 0; i < (sizeof (des_weak_keys) / sizeof (uint64_t)); i++)
@@ -750,6 +748,7 @@ des3_keycheck(uint8_t *key, uint8_t *corrected_key)
 	if (corrected_key != NULL) {
 		bcopy(currentkey, corrected_key, DES3_KEYSIZE);
 	}
+
 /* EXPORT DELETE END */
 	return (B_TRUE);
 }
@@ -765,6 +764,49 @@ des_keycheck(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 		return (B_FALSE);
 	}
 }
+
+void
+des_parity_fix(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
+{
+	uint64_t aligned_key[DES3_KEYSIZE / sizeof (uint64_t)];
+	uint8_t *paritied_key;
+	uint64_t key_so_far;
+	int i = 0, offset = 0;
+
+	if (strength == DES)
+		bcopy(key, aligned_key, DES_KEYSIZE);
+	else
+		bcopy(key, aligned_key, DES3_KEYSIZE);
+
+	paritied_key = (uint8_t *)aligned_key;
+	while (strength > i) {
+		offset = 8 * i;
+		key_so_far = (((uint64_t)paritied_key[offset + 0] << 56) |
+		    ((uint64_t)paritied_key[offset + 1] << 48) |
+		    ((uint64_t)paritied_key[offset + 2] << 40) |
+		    ((uint64_t)paritied_key[offset + 3] << 32) |
+		    ((uint64_t)paritied_key[offset + 4] << 24) |
+		    ((uint64_t)paritied_key[offset + 5] << 16) |
+		    ((uint64_t)paritied_key[offset + 6] << 8) |
+		    (uint64_t)paritied_key[offset + 7]);
+
+		fix_des_parity(&key_so_far);
+
+		paritied_key[offset + 0] = key_so_far >> 56;
+		paritied_key[offset + 1] = key_so_far >> 48;
+		paritied_key[offset + 2] = key_so_far >> 40;
+		paritied_key[offset + 3] = key_so_far >> 32;
+		paritied_key[offset + 4] = key_so_far >> 24;
+		paritied_key[offset + 5] = key_so_far >> 16;
+		paritied_key[offset + 6] = key_so_far >> 8;
+		paritied_key[offset + 7] = (uint8_t)key_so_far;
+
+		i++;
+	}
+
+	bcopy(paritied_key, corrected_key, DES_KEYSIZE * strength);
+}
+
 
 /*
  * Initialize key schedule for DES, DES2, and DES3
@@ -915,5 +957,6 @@ fix_des_parity(uint64_t *keyp)
 	k ^= k >> 2;
 	k ^= k >> 4;
 	*keyp ^= (k & 0x0101010101010101ULL);
+	*keyp ^= 0x0101010101010101ULL;
 /* EXPORT DELETE END */
 }
