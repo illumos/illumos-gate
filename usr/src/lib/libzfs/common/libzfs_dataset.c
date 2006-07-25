@@ -2947,6 +2947,15 @@ zfs_rename(zfs_handle_t *zhp, const char *target)
 			    "datasets must be within same pool"));
 			return (zfs_error(hdl, EZFS_CROSSTARGET, errbuf));
 		}
+
+		/* new name cannot be a child of the current dataset name */
+		if (strncmp(parent, zhp->zfs_name,
+			    strlen(zhp->zfs_name)) == 0) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "New dataset name cannot be a descendent of "
+			    "current dataset name"));
+			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
+		}
 	}
 
 	(void) snprintf(errbuf, sizeof (errbuf),
