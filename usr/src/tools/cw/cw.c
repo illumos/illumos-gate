@@ -1010,6 +1010,14 @@ do_gcc(cw_ictx_t *ctx)
 				    "-fno-eliminate-unused-debug-types");
 				break;
 			}
+			if (strcmp(arg, "-W2,-xwrap_int") == 0) {
+				/*
+				 * Use the legacy behaviour (pre-SS11)
+				 * for integer wrapping.
+				 * gcc does not need this.
+				 */
+				break;
+			}
 			if (strcmp(arg, "-W2,-Rcond_elim") == 0) {
 				/*
 				 * Elimination and expansion of conditionals;
@@ -1035,6 +1043,13 @@ do_gcc(cw_ictx_t *ctx)
 				/*
 				 * Prevents insertion of register symbols.
 				 * gcc doesn't do this, so ignore it.
+				 */
+				break;
+			}
+			if (strcmp(arg, "-Wc,-Qassembler-ounrefsym=0") == 0) {
+				/*
+				 * Prevents optimizing away of static variables.
+				 * gcc does not do this, so it's not needed.
 				 */
 				break;
 			}
@@ -1621,10 +1636,10 @@ main(int argc, char **argv)
 	if ((dir = getenv("SPRO_VROOT")) != NULL) {
 		(void) snprintf(cc_buf, MAXPATHLEN, "%s/bin", dir);
 	} else if ((dir = getenv("SPRO_ROOT")) != NULL) {
-		(void) snprintf(cc_buf, MAXPATHLEN, "%s/SOS10/bin", dir);
+		(void) snprintf(cc_buf, MAXPATHLEN, "%s/SS11/bin", dir);
 	} else if ((dir = getenv("BUILD_TOOLS")) != NULL) {
 		(void) snprintf(cc_buf, MAXPATHLEN,
-		    "%s/SUNWspro/SOS10/bin", dir);
+		    "%s/SUNWspro/SS11/bin", dir);
 	}
 	if (dir != NULL) {
 		dirs[CIDX(CW_C_CC, 0)] = (const char *)cc_buf;

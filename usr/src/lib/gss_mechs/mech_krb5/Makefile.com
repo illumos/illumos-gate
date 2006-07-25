@@ -199,8 +199,6 @@ include $(REL_PATH)/../../Makefile.lib
 # Must come after Makefile.lib so CPPFLAGS doesn't get overwritten
 include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 
-sparcv9_C_PICFLAGS =  -K PIC
-
 K5LIBLINK=$(LIBRARY:%.a=lib%.so)
 
 # override default text domain
