@@ -323,8 +323,6 @@ extern void		router_update_k(struct router *dr);
 extern uint_t		router_timer(struct router *dr, uint_t elapsed);
 
 
-extern void	logperror_pi(struct phyint *pi, char *str);
-extern void	logperror_pr(struct prefix *pr, char *str);
 extern void	check_to_advertise(struct phyint *pi, enum adv_events event);
 extern void	check_to_solicit(struct phyint *pi,
 		    enum solicit_events event);

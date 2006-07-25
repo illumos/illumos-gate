@@ -1965,7 +1965,7 @@ fprintdate(FILE *file)
 
 /* PRINTFLIKE1 */
 void
-logmsg(int level, char *fmt, ...)
+logmsg(int level, const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
@@ -1980,7 +1980,7 @@ logmsg(int level, char *fmt, ...)
 }
 
 void
-logperror(char *str)
+logperror(const char *str)
 {
 	if (logging) {
 		syslog(LOG_ERR, "%s: %m\n", str);
@@ -1991,7 +1991,7 @@ logperror(char *str)
 }
 
 void
-logperror_pi(struct phyint *pi, char *str)
+logperror_pi(const struct phyint *pi, const char *str)
 {
 	if (logging) {
 		syslog(LOG_ERR, "%s (interface %s): %m\n",
@@ -2004,7 +2004,7 @@ logperror_pi(struct phyint *pi, char *str)
 }
 
 void
-logperror_pr(struct prefix *pr, char *str)
+logperror_pr(const struct prefix *pr, const char *str)
 {
 	if (logging) {
 		syslog(LOG_ERR, "%s (prefix %s if %s): %m\n",

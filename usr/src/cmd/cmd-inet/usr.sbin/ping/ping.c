@@ -1471,13 +1471,6 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 			    progname, strerror(errno));
 			exit(EXIT_FAILURE);
 		}
-		if (setsockopt(recv_sock, IPPROTO_IPV6, IPV6_RECVRTHDRDSTOPTS,
-		    (char *)&on, sizeof (on)) == -1) {
-			Fprintf(stderr,
-			    "%s: setsockopt IPV6_RECVRTHDRDSTOPTS %s\n",
-			    progname, strerror(errno));
-			exit(EXIT_FAILURE);
-		}
 	}
 
 	*send_sockp = send_sock;

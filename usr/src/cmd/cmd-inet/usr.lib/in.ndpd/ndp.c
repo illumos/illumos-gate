@@ -65,7 +65,7 @@ static void	verify_prefix_opt(struct phyint *pi, uchar_t *opt,
 static void	verify_mtu_opt(struct phyint *pi, uchar_t *opt,
 		    char *frombuf);
 
-static void	update_ra_flag(struct phyint *pi,
+static void	update_ra_flag(const struct phyint *pi,
 		    const struct sockaddr_in6 *from, int isrouter);
 
 static uint_t	ra_flags;	/* Global to detect when to trigger DHCP */
@@ -445,7 +445,7 @@ incoming_ra(struct phyint *pi, struct nd_router_advert *ra, int len,
 		opt = (struct nd_opt_hdr *)((char *)opt + optlen);
 		len -= optlen;
 	}
-	if (!slla_opt_present)
+	if (!loopback && !slla_opt_present)
 		update_ra_flag(pi, from, NDF_ISROUTER_ON);
 	/* Stop sending solicitations */
 	check_to_solicit(pi, SOLICIT_DONE);
@@ -1364,7 +1364,8 @@ verify_opt_len(struct nd_opt_hdr *opt, int optlen,
  * Update IsRouter Flag for Host turning into a router or vice-versa.
  */
 static void
-update_ra_flag(struct phyint *pi, const struct sockaddr_in6 *from, int isrouter)
+update_ra_flag(const struct phyint *pi, const struct sockaddr_in6 *from,
+    int isrouter)
 {
 	struct lifreq lifr;
 	char abuf[INET6_ADDRSTRLEN];
@@ -1386,7 +1387,14 @@ update_ra_flag(struct phyint *pi, const struct sockaddr_in6 *from, int isrouter)
 	(void) strlcpy(lifr.lifr_name, pi->pi_name, sizeof (lifr.lifr_name));
 
 	if (ioctl(pi->pi_sock, SIOCLIFGETND, (char *)&lifr) < 0) {
-		logperror_pi(pi, "update_ra_flag: SIOCLIFGETND");
+		if (errno == ESRCH) {
+			if (debug & D_IFSCAN) {
+				logmsg(LOG_DEBUG,
+"update_ra_flag: SIOCLIFGETND: nce doesn't exist, not setting IFF_ROUTER");
+			}
+		} else {
+			logperror_pi(pi, "update_ra_flag: SIOCLIFGETND");
+		}
 	} else {
 		/*
 		 * The lif_nd_req structure has three state values to be used

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +62,8 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <net/route.h>
+
+#include "tables.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -130,8 +131,10 @@ extern struct	sockaddr_dl	*rta_ifp;
 #define	MAXARGSPERLINE	128
 
 void		timer_schedule(uint_t delay);
-extern void	logmsg(int level, char *fmt, ...);
-extern void	logperror(char *str);
+extern void	logmsg(int level, const char *fmt, ...);
+extern void	logperror(const char *str);
+extern void	logperror_pi(const struct phyint *pi, const char *str);
+extern void	logperror_pr(const struct prefix *pr, const char *str);
 extern int	parse_config(char *config_file, boolean_t file_required);
 
 extern int	poll_add(int fd);
