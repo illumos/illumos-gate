@@ -55,11 +55,17 @@
 		<service_fmri value='svc:/system/filesystem/local' />
 	</dependency>
 
+	<!--
+	  Since updating the boot-archive can take a while on slow machines or
+	  when there are many glommed kernels to wad up, a longer timeout is
+	  needed. However if it doesn't finish eventually something up, and
+	  an error message to trigger further investigation is appropriate.
+	-->
 	<exec_method
 		type='method'
 		name='start'
 		exec='/lib/svc/method/boot-archive-update'
-		timeout_seconds='60' />
+		timeout_seconds='3600' />
 
 	<exec_method
 		type='method'
