@@ -20,7 +20,7 @@
  */
 
 /*
- *  Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -44,7 +44,7 @@
 #include <sys/sunndi.h>
 #include <sys/time.h>
 #include <sys/callb.h>
-#include "pciehpc_ck804.h"
+#include "pciehpc_nvidia.h"
 
 static int ck804_slot_connect(caddr_t, hpc_slot_t, void *, uint_t);
 static int ck804_slot_disconnect(caddr_t, hpc_slot_t, void *, uint_t);

@@ -35,10 +35,10 @@
 #include <sys/sunndi.h>
 #include <sys/pcie.h>
 #include <sys/pci_cfgspace.h>
-#include <io/pciex/pcie_ck804_boot.h>
+#include <io/pciex/pcie_nvidia.h>
 
 /*
- * PCI Configuration (ck804, PCIe) related library functions
+ * PCI Configuration (Nvidia chipsets, PCIe) related library functions
  */
 static boolean_t	look_for_any_pciex_device(uchar_t);
 
@@ -233,12 +233,14 @@ create_pcie_root_bus(uchar_t bus, dev_info_t *dip)
 
 
 /*
- * Only for Nvidia's CrushK 8-04 chipsets:
- *	To enable hotplug; we need to map in two I/O BARs
+ * add_nvidia_isa_bridge_props():
+ *	To enable native hotplug; we need to map in two I/O BARs
  *	from ISA bridge's config space
+ *
+ * NOTE: For now, this function is only used for Nvidia's CrushK 8-04 chipsets.
  */
 void
-add_ck804_isa_bridge_props(dev_info_t *dip, uchar_t bus, uchar_t dev,
+add_nvidia_isa_bridge_props(dev_info_t *dip, uchar_t bus, uchar_t dev,
     uchar_t func)
 {
 	uint_t devloc, base;

@@ -38,7 +38,7 @@
 #include <sys/pci_cfgspace_impl.h>
 #include <sys/psw.h>
 #include "../../../../common/pci/pci_strings.h"
-#include <io/pciex/pcie_ck804_boot.h>
+#include <io/pciex/pcie_nvidia.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
 
@@ -901,7 +901,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	/* check for ck8-04 based PCI ISA bridge only */
 	if (NVIDIA_IS_LPC_BRIDGE(vendorid, deviceid) && (dev == 1) &&
 	    (func == 0))
-		add_ck804_isa_bridge_props(dip, bus, dev, func);
+		add_nvidia_isa_bridge_props(dip, bus, dev, func);
 
 	if (pciex && is_pci_bridge)
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip, "model",

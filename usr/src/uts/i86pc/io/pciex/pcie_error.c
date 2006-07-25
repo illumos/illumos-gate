@@ -43,7 +43,7 @@
 #include <sys/pcie_impl.h>
 #include <sys/promif.h>
 #include <io/pciex/pcie_error.h>
-#include <io/pciex/pcie_ck804_boot.h>
+#include <io/pciex/pcie_nvidia.h>
 
 extern uint32_t pcie_expected_ue_mask;
 
@@ -145,9 +145,9 @@ static void	pcie_check_io_mem_range(ddi_acc_handle_t, boolean_t *,
 		    boolean_t *);
 static uint16_t pcie_error_find_cap_reg(ddi_acc_handle_t, uint8_t);
 static uint16_t	pcie_error_find_ext_aer_capid(ddi_acc_handle_t);
-static void	pcie_ck804_error_init(dev_info_t *, ddi_acc_handle_t,
+static void	pcie_nvidia_error_init(dev_info_t *, ddi_acc_handle_t,
 		    uint16_t, uint16_t);
-static void	pcie_ck804_error_fini(ddi_acc_handle_t, uint16_t, uint16_t);
+static void	pcie_nvidia_error_fini(ddi_acc_handle_t, uint16_t, uint16_t);
 
 /*
  * PCI-Express error initialization.
@@ -253,14 +253,12 @@ pcie_error_init(dev_info_t *cdip)
 		goto cleanup;
 
 	/*
-	 * Only enable these set of errors for CK8-04/IO-4 devices, and disable
-	 * UR reporting for non CK8-04 child devices.
+	 * Only enable these set of errors for Nvidia chipset, and disable
+	 * UR reporting for non their child devices.
 	 */
-	if ((pci_config_get16(cfg_hdl, PCI_CONF_VENID) ==
-	    NVIDIA_CK804_VENDOR_ID) &&
-	    (pci_config_get16(cfg_hdl, PCI_CONF_DEVID) ==
-	    NVIDIA_CK804_DEVICE_ID))
-		pcie_ck804_error_init(cdip, cfg_hdl, cap_ptr, aer_ptr);
+	if ((pci_config_get16(cfg_hdl, PCI_CONF_VENID) == NVIDIA_VENDOR_ID) &&
+	    NVIDIA_PCIE_RC_DEV_ID(pci_config_get16(cfg_hdl, PCI_CONF_DEVID)))
+		pcie_nvidia_error_init(cdip, cfg_hdl, cap_ptr, aer_ptr);
 	else if (dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT)
 		pcie_expected_ue_mask |= PCIE_AER_UCE_UR;
 
@@ -369,18 +367,18 @@ pcie_check_io_mem_range(ddi_acc_handle_t cfg_hdl, boolean_t *empty_io_range,
 }
 
 static void
-pcie_ck804_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,
+pcie_nvidia_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,
     uint16_t cap_ptr, uint16_t aer_ptr)
 {
 	uint16_t	rc_ctl;
 
 	/* Program SERR_FORWARD bit in NV_XVR_INTR_BCR */
-	rc_ctl = pci_config_get16(cfg_hdl, NVIDIA_CK804_INTR_BCR_OFF + 0x2);
-	pci_config_put16(cfg_hdl, NVIDIA_CK804_INTR_BCR_OFF + 0x2,
-	    rc_ctl | NVIDIA_CK804_INTR_BCR_SERR_ENABLE);
+	rc_ctl = pci_config_get16(cfg_hdl, NVIDIA_INTR_BCR_OFF + 0x2);
+	pci_config_put16(cfg_hdl, NVIDIA_INTR_BCR_OFF + 0x2,
+	    rc_ctl | NVIDIA_INTR_BCR_SERR_FORWARD_BIT);
 	PCIE_ERROR_DBG("%s: PCIe NV_XVR_INTR_BCR=0x%x->0x%x\n",
 	    ddi_driver_name(child), rc_ctl,
-	    pci_config_get16(cfg_hdl, NVIDIA_CK804_INTR_BCR_OFF + 0x2));
+	    pci_config_get16(cfg_hdl, NVIDIA_INTR_BCR_OFF + 0x2));
 
 	rc_ctl = pci_config_get16(cfg_hdl, cap_ptr + PCIE_ROOTCTL);
 	pci_config_put16(cfg_hdl, cap_ptr + PCIE_ROOTCTL,
@@ -472,11 +470,9 @@ pcie_error_fini(dev_info_t *cdip)
 	/*
 	 * Only disable these set of errors for CK8-04/IO-4 devices
 	 */
-	if ((pci_config_get16(cfg_hdl, PCI_CONF_VENID) ==
-	    NVIDIA_CK804_VENDOR_ID) &&
-	    (pci_config_get16(cfg_hdl, PCI_CONF_DEVID) ==
-	    NVIDIA_CK804_DEVICE_ID))
-		pcie_ck804_error_fini(cfg_hdl, cap_ptr, aer_ptr);
+	if ((pci_config_get16(cfg_hdl, PCI_CONF_VENID) == NVIDIA_VENDOR_ID) &&
+	    NVIDIA_PCIE_RC_DEV_ID(pci_config_get16(cfg_hdl, PCI_CONF_DEVID)))
+		pcie_nvidia_error_fini(cfg_hdl, cap_ptr, aer_ptr);
 
 	if (aer_ptr == PCIE_EXT_CAP_NEXT_PTR_NULL)
 		goto error_fini_exit;
@@ -507,7 +503,7 @@ error_fini_exit:
 
 
 static void
-pcie_ck804_error_fini(ddi_acc_handle_t cfg_hdl, uint16_t cap_ptr,
+pcie_nvidia_error_fini(ddi_acc_handle_t cfg_hdl, uint16_t cap_ptr,
     uint16_t aer_ptr)
 {
 	uint16_t	rc_ctl;

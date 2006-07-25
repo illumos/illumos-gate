@@ -49,7 +49,7 @@
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/hotplug/pci/pciehpc.h>
 #include <io/pciex/pcie_error.h>
-#include <io/pciex/pcie_ck804_boot.h>
+#include <io/pciex/pcie_nvidia.h>
 
 #ifdef DEBUG
 static int pepb_debug = 0;
@@ -250,7 +250,7 @@ static int	pepb_pcie_port_type(dev_info_t *dip,
 static uint_t	pepb_intx_intr(caddr_t arg, caddr_t arg2);
 static uint_t	pepb_pwr_msi_intr(caddr_t arg, caddr_t arg2);
 static uint_t	pepb_err_msi_intr(caddr_t arg, caddr_t arg2);
-static int	pepb_is_ck804_root_port(dev_info_t *);
+static int	pepb_is_nvidia_root_port(dev_info_t *);
 static int	pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type);
 static void	pepb_intr_fini(pepb_devstate_t *pepb_p);
 
@@ -381,7 +381,7 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    ddi_driver_name(devi), ddi_get_instance(devi), intr_types));
 
 	if (pepb_enable_msi && (intr_types & DDI_INTR_TYPE_MSI) &&
-	    pepb_is_ck804_root_port(devi) == DDI_SUCCESS) {
+	    pepb_is_nvidia_root_port(devi) == DDI_SUCCESS) {
 		if (pepb_intr_init(pepb, DDI_INTR_TYPE_MSI) == DDI_SUCCESS)
 			goto next_step;
 		else
@@ -923,7 +923,7 @@ pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type)
 	isr_tab = kmem_alloc(isr_tab_size, KM_SLEEP);
 	if (pepb_enable_msi && pepb_p->intr_count == 2 &&
 	    intr_type == DDI_INTR_TYPE_MSI &&
-	    pepb_is_ck804_root_port(dip) == DDI_SUCCESS) {
+	    pepb_is_nvidia_root_port(dip) == DDI_SUCCESS) {
 		isr_tab[0] = pepb_pwr_msi_intr;
 		isr_tab[1] = pepb_err_msi_intr;
 	} else
@@ -1050,12 +1050,12 @@ pepb_intx_intr(caddr_t arg, caddr_t arg2)
 }
 
 /*
- * pepb_is_ck804_root_port()
+ * pepb_is_nvidia_root_port()
  *
- * This helper function checks if the device is a Nvidia ck8-04 or not
+ * This helper function checks if the device is a Nvidia RC or not
  */
 static int
-pepb_is_ck804_root_port(dev_info_t *dip)
+pepb_is_nvidia_root_port(dev_info_t *dip)
 {
 	int ret = DDI_FAILURE;
 	ddi_acc_handle_t handle;
@@ -1063,10 +1063,8 @@ pepb_is_ck804_root_port(dev_info_t *dip)
 	if (pci_config_setup(dip, &handle) != DDI_SUCCESS)
 		return (ret);
 
-	if (pci_config_get16(handle, PCI_CONF_VENID) ==
-	    NVIDIA_CK804_VENDOR_ID &&
-	    pci_config_get16(handle, PCI_CONF_DEVID) ==
-	    NVIDIA_CK804_DEVICE_ID)
+	if ((pci_config_get16(handle, PCI_CONF_VENID) == NVIDIA_VENDOR_ID) &&
+	    NVIDIA_PCIE_RC_DEV_ID(pci_config_get16(handle, PCI_CONF_DEVID)))
 		ret = DDI_SUCCESS;
 
 	pci_config_teardown(&handle);

@@ -36,7 +36,7 @@
 #include <sys/acpi/acpi.h>
 #include <sys/acpi/acpi_pci.h>
 #include <sys/acpica.h>
-#include <io/pciex/pcie_ck804_boot.h>
+#include <io/pciex/pcie_nvidia.h>
 
 /*
  * Prototype declaration
@@ -103,20 +103,15 @@ npe_query_acpi_mcfg(dev_info_t *dip)
 void
 npe_ck804_fix_aer_ptr(dev_info_t *child)
 {
-	ushort_t		vid, did, cya1;
+	ushort_t		cya1;
 	ddi_acc_handle_t	config_handle;
 
 	if (pci_config_setup(child, &config_handle) != DDI_SUCCESS)
 		return;
 
-	vid = pci_config_get16(config_handle, PCI_CONF_VENID);
-	if (vid != NVIDIA_CK804_VENDOR_ID) {
-		pci_config_teardown(&config_handle);
-		return;
-	}
-
-	did = pci_config_get16(config_handle, PCI_CONF_DEVID);
-	if (did != NVIDIA_CK804_DEVICE_ID) {
+	if ((pci_config_get16(config_handle, PCI_CONF_VENID) !=
+	    NVIDIA_VENDOR_ID) && (pci_config_get16(config_handle,
+	    PCI_CONF_DEVID) != NVIDIA_CK804_DEVICE_ID)) {
 		pci_config_teardown(&config_handle);
 		return;
 	}

@@ -149,7 +149,7 @@ MCAMD_OBJS	+= \
 PCI_E_NEXUS_OBJS += npe.o npe_misc.o 
 PCI_E_NEXUS_OBJS += pci_common.o pci_kstats.o pci_tools.o pcie_error.o
 PCI_E_PCINEXUS_OBJS += pcie_pci.o pcie_error.o
-PCIEHPCNEXUS_OBJS += pciehpc_x86.o pciehpc_acpi.o pciehpc_ck804.o
+PCIEHPCNEXUS_OBJS += pciehpc_x86.o pciehpc_acpi.o pciehpc_nvidia.o
 
 #
 #	platform specific modules
@@ -158,7 +158,7 @@ UPPC_OBJS += uppc.o psm_common.o
 PCI_AUTOCONFIG_OBJS += \
 	pci_autoconfig.o \
 	pci_boot.o	\
-	pcie_ck804_boot.o	\
+	pcie_nvidia.o	\
 	pci_memlist.o	\
 	pci_resource.o
 
