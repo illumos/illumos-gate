@@ -101,13 +101,11 @@ ddi_intr_get_nintrs(dev_info_t *dip, int type, int *nintrsp)
 	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_nintrs: dip %p, type: %d\n",
 	    (void *)dip, type));
 
-	if ((dip == NULL) || (type & ~(DDI_INTR_SUP_TYPES))) {
+	if ((dip == NULL) || !DDI_INTR_TYPE_FLAG_VALID(type) ||
+	    !(i_ddi_intr_get_supported_types(dip) & type)) {
 		*nintrsp = 0;
-		return (DDI_EINVAL);
-	}
-
-	if (!(i_ddi_intr_get_supported_types(dip) & type)) {
-		*nintrsp = 0;
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_nintrs: Invalid "
+		    "input args\n"));
 		return (DDI_EINVAL);
 	}
 
@@ -146,13 +144,11 @@ ddi_intr_get_navail(dev_info_t *dip, int type, int *navailp)
 	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_navail: dip %p, type: %d\n",
 	    (void *)dip, type));
 
-	if ((dip == NULL) || (type & ~(DDI_INTR_SUP_TYPES))) {
+	if ((dip == NULL) || !DDI_INTR_TYPE_FLAG_VALID(type) ||
+	    !(i_ddi_intr_get_supported_types(dip) & type)) {
 		*navailp = 0;
-		return (DDI_EINVAL);
-	}
-
-	if (!(i_ddi_intr_get_supported_types(dip) & type)) {
-		*navailp = 0;
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_navail: Invalid "
+		    "input args\n"));
 		return (DDI_EINVAL);
 	}
 
@@ -187,16 +183,27 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	    (void *)dip, type, inum, count, behavior));
 
 	/* Validate parameters */
-	if (dip == NULL || h_array == NULL || count < 1 ||
+	if (dip == NULL || h_array == NULL || count < 1 || inum < 0 ||
 	    !DDI_INTR_BEHAVIOR_FLAG_VALID(behavior)) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: Invalid args\n"));
 		return (DDI_EINVAL);
 	}
 
 	/* Validate interrupt type */
-	if (!(i_ddi_intr_get_supported_types(dip) & type)) {
+	if (!DDI_INTR_TYPE_FLAG_VALID(type) ||
+	    !(i_ddi_intr_get_supported_types(dip) & type)) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: type %x not "
 		    "supported\n", type));
+		return (DDI_EINVAL);
+	}
+
+	/*
+	 * Check if the 'inum' was previously allocated or not? Fail, if so.
+	 */
+	if ((type == DDI_INTR_TYPE_FIXED) &&
+	    (i_ddi_get_intr_handle(dip, inum) != NULL)) {
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: inum %d is already "
+		    "in use, can not allocate again!!\n", inum));
 		return (DDI_EINVAL);
 	}
 
@@ -651,8 +658,11 @@ ddi_intr_dup_handler(ddi_intr_handle_t org, int dup_inum,
 	    (void *)hdlp));
 
 	/* Do some input argument checking ("dup" handle is not allocated) */
-	if ((hdlp == NULL) || (*dup != NULL))
+	if ((hdlp == NULL) || (*dup != NULL) || (dup_inum < 0)) {
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_dup_handler: Invalid "
+		    "input args\n"));
 		return (DDI_EINVAL);
+	}
 
 	rw_enter(&hdlp->ih_rwlock, RW_READER);
 
