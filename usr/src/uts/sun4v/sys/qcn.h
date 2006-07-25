@@ -66,7 +66,6 @@ extern "C" {
 typedef struct qcn {
 	/* mutexes */
 	kmutex_t qcn_hi_lock;		/* protects qcn_t (soft state)	*/
-	kmutex_t qcn_softlock;	/* protects input handler	*/
 	kmutex_t qcn_lock;	/* protects output queue	*/
 
 	/* stream queues */
@@ -85,7 +84,10 @@ typedef struct qcn {
 	uint_t	qcn_polling;
 	uchar_t	qcn_rget;
 	uchar_t	qcn_rput;
-	int	qcn_soft_pend;
+
+	/* the following is protected by atomic operations */
+	volatile unsigned int	qcn_soft_pend;
+
 	ddi_softint_handle_t qcn_softint_hdl;
 	uchar_t	*qcn_ring;
 	ushort_t	qcn_hangup;
@@ -94,7 +96,6 @@ typedef struct qcn {
 	int	qcn_intr_cnt;	/* # of intrs count returned */
 	size_t	qcn_intr_size;	/* Size of intr array */
 	uint_t	qcn_intr_pri;	/* Interrupt priority   */
-	ddi_iblock_cookie_t qcn_soft_pri;
 	uint_t	qcn_rbuf_overflow;
 	/*
 	 * support for console read/write support
@@ -105,6 +106,11 @@ typedef struct qcn {
 	uint64_t	cons_write_buf_ra;
 	uint64_t	cons_read_buf_ra;
 } qcn_t;
+
+/* Constants for qcn_soft_pend */
+#define	QCN_SP_IDL	0	/* qcn_soft_pend is idle - do trigger */
+#define	QCN_SP_DO	1	/* soft interrupt needs to be processed */
+#define	QCN_SP_IP	2	/* in process, if interrupt, set DO, no trig */
 
 /* Constants used by promif routines */
 #define	QCN_CLNT_STR	"CON_CLNT"

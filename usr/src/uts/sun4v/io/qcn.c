@@ -406,13 +406,9 @@ qcn_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			qcn_remove_intrs();
 			return (DDI_FAILURE);
 		}
-	qcn_state->qcn_soft_pri =
-	    (ddi_iblock_cookie_t)(uint64_t)soft_prip;
 
 	mutex_init(&qcn_state->qcn_hi_lock, NULL, MUTEX_DRIVER,
 	    (void *)(uintptr_t)(qcn_state->qcn_intr_pri));
-	mutex_init(&qcn_state->qcn_softlock, NULL, MUTEX_DRIVER,
-	    (void *)(qcn_state->qcn_soft_pri));
 	}
 
 	mutex_init(&qcn_state->qcn_lock, NULL, MUTEX_DRIVER, NULL);
@@ -929,20 +925,13 @@ static void
 qcn_trigger_softint(void)
 {
 	/*
-	 * get lock for software ints and see if we need to trigger a soft
-	 * interrupt (no pending sofware ints).
-	 */
-	mutex_enter(&qcn_state->qcn_softlock);
-	/*
 	 * if we are not currently servicing a software interrupt
 	 * (qcn_soft_pend == 0), trigger the service routine to run.
 	 */
-	if (!qcn_state->qcn_soft_pend++) {
-		mutex_exit(&qcn_state->qcn_softlock);
+	if (atomic_swap_uint(&qcn_state->qcn_soft_pend, QCN_SP_DO) ==
+				QCN_SP_IDL) {
 		(void) ddi_intr_trigger_softint(
 			    qcn_state->qcn_softint_hdl, NULL);
-	} else {
-		mutex_exit(&qcn_state->qcn_softlock);
 	}
 }
 
@@ -954,18 +943,8 @@ qcn_soft_intr(caddr_t arg1, caddr_t arg2)
 	int	cc;
 	int	overflow_check;
 
-	/*
-	 * grab the lock for the soft int pending.  It is grabbed here so
-	 * that the decrement at the end of the do loop is under lock
-	 * protection.
-	 */
-	mutex_enter(&qcn_state->qcn_softlock);
 	do {
-		/*
-		 * release the soft int lock so that the interrupt routine
-		 * will not be held up.
-		 */
-		mutex_exit(&qcn_state->qcn_softlock);
+		(void) atomic_swap_uint(&qcn_state->qcn_soft_pend, QCN_SP_IP);
 		mutex_enter(&qcn_state->qcn_hi_lock);
 		if ((cc = RING_CNT(qcn_state)) <= 0) {
 			mutex_exit(&qcn_state->qcn_hi_lock);
@@ -1014,9 +993,12 @@ out:
 				mutex_exit(&qcn_state->qcn_lock);
 			}
 		}
-		mutex_enter(&qcn_state->qcn_softlock);
-	} while (qcn_state->qcn_soft_pend-- > 1);
-	mutex_exit(&qcn_state->qcn_softlock);
+		/*
+		 * now loop if another interrupt came in (qcn_trigger_softint
+		 * called) while we were processing the loop
+		 */
+	} while (atomic_swap_uint(&qcn_state->qcn_soft_pend, QCN_SP_IDL) ==
+								QCN_SP_DO);
 	return (DDI_INTR_CLAIMED);
 }
 
