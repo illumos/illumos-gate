@@ -81,7 +81,7 @@ typedef struct etm_xport_sock_hdl {
 
 #define	EXS_SERVER_PORT 24		/* Port number for server */
 #define	EXS_SERVER_ADDR in6addr_any	/* Address for server */
-#define	EXS_CLIENT_PORT 0		/* Port number for client */
+#define	EXS_CLIENT_PORT 12		/* Port number for client */
 #define	EXS_NUM_SOCKS 5			/* Length of socket queue */
 #define	EXS_SD_FREE -1			/* Socket descr value when unset */
 #define	EXS_TID_FREE 0			/* Thread ID value when unset */

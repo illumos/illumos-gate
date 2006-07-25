@@ -125,7 +125,7 @@ exs_get_id(fmd_hdl_t *hdl, char *endpoint_id, int *dom_id)
 static int
 exs_prep_client(exs_hdl_t *hp)
 {
-	int rv;
+	int rv, optval = 1;
 
 	/* Find the DSCP address for the remote endpoint */
 	if ((rv = dscpAddr(hp->h_dom, DSCP_ADDR_REMOTE,
@@ -142,6 +142,15 @@ exs_prep_client(exs_hdl_t *hp)
 		return (2);
 	}
 
+	if (setsockopt(hp->h_client.c_sd, SOL_SOCKET, SO_REUSEADDR,
+	    &optval, sizeof (optval))) {
+		fmd_hdl_error(hp->h_hdl, "xport - set REUSEADDR failed on "
+		    "client socket for %s", hp->h_endpt_id);
+		(void) close(hp->h_client.c_sd);
+		hp->h_client.c_sd = EXS_SD_FREE;
+		return (3);
+	}
+
 	/* Bind the socket to the local IP address of the DSCP link */
 	if ((rv = dscpBind(hp->h_dom, hp->h_client.c_sd,
 	    EXS_CLIENT_PORT)) != DSCP_OK) {
@@ -149,7 +158,7 @@ exs_prep_client(exs_hdl_t *hp)
 		    "failed for %s : rv = %d\n", hp->h_endpt_id, rv);
 		(void) close(hp->h_client.c_sd);
 		hp->h_client.c_sd = EXS_SD_FREE;
-		return (3);
+		return (4);
 	}
 
 	hp->h_client.c_saddr.sin_port = htons(EXS_SERVER_PORT);
@@ -160,7 +169,7 @@ exs_prep_client(exs_hdl_t *hp)
 		    "failed for %s : rv = %d\n", hp->h_endpt_id, rv);
 		(void) close(hp->h_client.c_sd);
 		hp->h_client.c_sd = EXS_SD_FREE;
-		return (4);
+		return (5);
 	}
 
 	return (0);
