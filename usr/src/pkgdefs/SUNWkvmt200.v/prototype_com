@@ -84,3 +84,11 @@ s none usr/platform/SUNW,Sun-Fire-T1000=SUNW,Sun-Fire-T200
 # add pelton link
 #
 s none usr/platform/SUNW,Netra-T2000=SUNW,Sun-Fire-T200
+#
+# add erie fujitsu link
+#
+s none usr/platform/SUNW,SPARC-Enterprise-T1000=SUNW,Sun-Fire-T200
+#
+# add ontario fujitsu link
+#
+s none usr/platform/SUNW,SPARC-Enterprise-T2000=SUNW,Sun-Fire-T200

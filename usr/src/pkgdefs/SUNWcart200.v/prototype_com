@@ -57,3 +57,5 @@ s none platform/SUNW,Sun-Fire-T200/lib=../sun4v/lib
 s none platform/SUNW,Sun-Fire-T1000=sun4v
 s none platform/SUNW,Netra-T2000=SUNW,Sun-Fire-T200
 s none platform/SUNW,Netra-CP3060/lib=../sun4v/lib
+s none platform/SUNW,SPARC-Enterprise-T2000=SUNW,Sun-Fire-T200
+s none platform/SUNW,SPARC-Enterprise-T1000=sun4v

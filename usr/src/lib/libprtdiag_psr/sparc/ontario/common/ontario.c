@@ -317,9 +317,11 @@ sun4v_display_pci(picl_nodehdl_t plafh)
 	 * Call functions based on appropriate platform
 	 */
 	if ((strncmp(platbuf, ONTARIO_PLATFORM,
-	    strlen(ONTARIO_PLATFORM))) == 0) {
+		strlen(ONTARIO_PLATFORM)) == 0) ||
+	    (strncmp(platbuf, ONTARIO_PLATFORM2,
+		strlen(ONTARIO_PLATFORM2)) == 0)) {
 		(void) picl_walk_tree_by_class(plafh, "pciex",
-		    "pciex", ontario_pci_callback);
+			"pciex", ontario_pci_callback);
 	} else if ((strncmp(platbuf, PELTON_PLATFORM,
 		strlen(PELTON_PLATFORM))) == 0) {
 		(void) picl_walk_tree_by_class(plafh, "pciex",

@@ -103,8 +103,10 @@ map_wellknown_devices()
  */
 #define	ONTARIO_PLATNAME1	"SUNW,Sun-Fire-T200"
 #define	ONTARIO_PLATNAME2	"SUNW,Sun-Fire-T2000"
+#define	ONTARIO_PLATNAME3	"SUNW,SPARC-Enterprise-T2000"
 #define	ERIE_PLATNAME1		"SUNW,Sun-Fire-T100"
 #define	ERIE_PLATNAME2		"SUNW,Sun-Fire-T1000"
+#define	ERIE_PLATNAME3		"SUNW,SPARC-Enterprise-T1000"
 
 void
 fill_cpu(md_t *mdp, mde_cookie_t cpuc)
@@ -778,10 +780,12 @@ init_md_broken(md_t *mdp)
 	 */
 
 	if (md_get_prop_val(mdp, platlist[0], "domaining-enabled", &val) != 0 &&
-	    ((strcmp(vbuf, ONTARIO_PLATNAME1) == 0) ||
-	    (strcmp(vbuf, ONTARIO_PLATNAME2) == 0) ||
-	    (strcmp(vbuf, ERIE_PLATNAME1) == 0) ||
-	    (strcmp(vbuf, ERIE_PLATNAME2) == 0)))
+	((strcmp(vbuf, ONTARIO_PLATNAME1) == 0) ||
+	(strcmp(vbuf, ONTARIO_PLATNAME2) == 0) ||
+	(strcmp(vbuf, ONTARIO_PLATNAME3) == 0) ||
+	(strcmp(vbuf, ERIE_PLATNAME1) == 0) ||
+	(strcmp(vbuf, ERIE_PLATNAME2) == 0) ||
+	(strcmp(vbuf, ERIE_PLATNAME3) == 0)))
 		broken_md_flag = 1;
 
 	md_free_scan_dag(mdp, &platlist);

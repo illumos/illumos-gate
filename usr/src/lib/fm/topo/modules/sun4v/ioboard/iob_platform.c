@@ -43,6 +43,7 @@
 #define	LABEL	"IOBD"
 #define	IOBDFRU	"hc:///component="LABEL
 #define	ERIE	"SUNW,Sun-Fire-T1000"
+#define	ERIE2	"SUNW,SPARC-Enterprise-T1000"
 #define	HB_MAX	1
 
 /*ARGSUSED*/
@@ -133,7 +134,8 @@ platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax,
 	 * compatibility, we continue to allow the
 	 * ioboard to be a peer to the motherboard SUNW,SunFireT200 systems.
 	 */
-	if (strcmp(plat, ERIE) == 0) {
+	if ((strcmp(plat, ERIE) == 0) ||
+	    (strcmp(plat, ERIE2) == 0)) {
 		if (strcmp(topo_node_name(parent), "motherboard") != 0) {
 			topo_mod_strfree(mod, plat);
 			return (0);
