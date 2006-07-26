@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -25,10 +24,10 @@
 # files to make sure the files and their parent directory paths all have
 # proper permissions.  And check the master alias file(s) too.
 #
-# See http://www.sendmail.org/sun-specific/migration.html#Security for details.
+# See http://www.sendmail.org/vendor/sun/migration.html#Security for details.
 #
-# Copyright (c) 1998-2000 by Sun Microsystems, Inc.
-# All Rights Reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # %W% (Sun) %G%
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -104,14 +103,14 @@ done
 # user.  O/w, do it for all arguments.
 
 if [ $# -eq 0 ] ; then
-	arg=`who am i | awk '{print $1}'`
+	arg=`id | nawk -F'(' '{n = split($2,id,")"); print id[1]}'`
 elif [ $1 = "ALL" ] ; then
 	arg=""
 else
 	arg="$*"
 fi
 
-for i in `getent passwd $arg | nawk '{FS=":";print $6}'`
+for i in `getent passwd $arg | nawk -F: '{print $6}'`
 do
 	if [ -f $i/.forward ] ; then
 		break_down $i/.forward
