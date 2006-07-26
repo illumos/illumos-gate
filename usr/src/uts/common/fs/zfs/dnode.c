@@ -735,7 +735,6 @@ dnode_set_blksz(dnode_t *dn, uint64_t size, int ibs, dmu_tx_t *tx)
 {
 	dmu_buf_impl_t *db, *db_next;
 	int have_db0 = FALSE;
-	int err = ENOTSUP;
 
 	if (size == 0)
 		size = SPA_MINBLOCKSIZE;
@@ -744,18 +743,17 @@ dnode_set_blksz(dnode_t *dn, uint64_t size, int ibs, dmu_tx_t *tx)
 	else
 		size = P2ROUNDUP(size, SPA_MINBLOCKSIZE);
 
-	if (ibs == 0)
-		ibs = dn->dn_indblkshift;
+	if (ibs == dn->dn_indblkshift)
+		ibs = 0;
 
-	if (size >> SPA_MINBLOCKSHIFT == dn->dn_datablkszsec &&
-	    ibs == dn->dn_indblkshift)
+	if (size >> SPA_MINBLOCKSHIFT == dn->dn_datablkszsec && ibs == 0)
 		return (0);
 
 	rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
 
 	/* Check for any allocated blocks beyond the first */
 	if (dn->dn_phys->dn_maxblkid != 0)
-		goto end;
+		goto fail;
 
 	mutex_enter(&dn->dn_dbufs_mtx);
 	for (db = list_head(&dn->dn_dbufs); db; db = db_next) {
@@ -765,10 +763,13 @@ dnode_set_blksz(dnode_t *dn, uint64_t size, int ibs, dmu_tx_t *tx)
 			have_db0 = TRUE;
 		} else if (db->db_blkid != DB_BONUS_BLKID) {
 			mutex_exit(&dn->dn_dbufs_mtx);
-			goto end;
+			goto fail;
 		}
 	}
 	mutex_exit(&dn->dn_dbufs_mtx);
+
+	if (ibs && dn->dn_nlevels != 1)
+		goto fail;
 
 	db = NULL;
 	if (!BP_IS_HOLE(&dn->dn_phys->dn_blkptr[0]) || have_db0) {
@@ -778,18 +779,22 @@ dnode_set_blksz(dnode_t *dn, uint64_t size, int ibs, dmu_tx_t *tx)
 	}
 
 	dnode_setdblksz(dn, size);
-	dn->dn_indblkshift = ibs;
 	dnode_setdirty(dn, tx);
 	dn->dn_next_blksz[tx->tx_txg&TXG_MASK] = size;
-	dn->dn_next_indblkshift[tx->tx_txg&TXG_MASK] = ibs;
+	if (ibs) {
+		dn->dn_indblkshift = ibs;
+		dn->dn_next_indblkshift[tx->tx_txg&TXG_MASK] = ibs;
+	}
 
 	if (db)
 		dbuf_rele(db, FTAG);
 
-	err = 0;
-end:
 	rw_exit(&dn->dn_struct_rwlock);
-	return (err);
+	return (0);
+
+fail:
+	rw_exit(&dn->dn_struct_rwlock);
+	return (ENOTSUP);
 }
 
 uint64_t
@@ -909,18 +914,15 @@ void
 dnode_free_range(dnode_t *dn, uint64_t off, uint64_t len, dmu_tx_t *tx)
 {
 	dmu_buf_impl_t *db;
-	uint64_t start, objsize, blkid, nblks;
-	int blkshift, blksz, tail, head, epbs;
+	uint64_t blkoff, blkid, nblks;
+	int blksz, head;
 	int trunc = FALSE;
 
 	rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
 	blksz = dn->dn_datablksz;
-	blkshift = dn->dn_datablkshift;
-	epbs = dn->dn_indblkshift - SPA_BLKPTRSHIFT;
 
 	/* If the range is past the end of the file, this is a no-op */
-	objsize = blksz * (dn->dn_maxblkid+1);
-	if (off >= objsize)
+	if (off >= blksz * (dn->dn_maxblkid+1))
 		goto out;
 	if (len == -1ULL) {
 		len = UINT64_MAX - off;
@@ -930,22 +932,24 @@ dnode_free_range(dnode_t *dn, uint64_t off, uint64_t len, dmu_tx_t *tx)
 	/*
 	 * First, block align the region to free:
 	 */
-	if (dn->dn_maxblkid == 0) {
-		if (off == 0) {
+	if (ISP2(blksz)) {
+		head = P2NPHASE(off, blksz);
+		blkoff = P2PHASE(off, blksz);
+	} else {
+		ASSERT(dn->dn_maxblkid == 0);
+		if (off == 0 && len >= blksz) {
+			/* Freeing the whole block; don't do any head. */
 			head = 0;
 		} else {
+			/* Freeing part of the block. */
 			head = blksz - off;
 			ASSERT3U(head, >, 0);
 		}
-		start = off;
-	} else {
-		ASSERT(ISP2(blksz));
-		head = P2NPHASE(off, blksz);
-		start = P2PHASE(off, blksz);
+		blkoff = off;
 	}
 	/* zero out any partial block data at the start of the range */
 	if (head) {
-		ASSERT3U(start + head, ==, blksz);
+		ASSERT3U(blkoff + head, ==, blksz);
 		if (len < head)
 			head = len;
 		if (dbuf_hold_impl(dn, 0, dbuf_whichblock(dn, off), TRUE,
@@ -959,76 +963,96 @@ dnode_free_range(dnode_t *dn, uint64_t off, uint64_t len, dmu_tx_t *tx)
 				dbuf_will_dirty(db, tx);
 				rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
 				data = db->db.db_data;
-				bzero(data + start, head);
+				bzero(data + blkoff, head);
 			}
 			dbuf_rele(db, FTAG);
 		}
 		off += head;
 		len -= head;
 	}
-	/* If the range was less than one block, we are done */
-	if (len == 0)
+
+	/* If the range was less than one block, we're done */
+	if (len == 0 || off >= blksz * (dn->dn_maxblkid+1))
 		goto out;
 
-	/* If the remaining range is past the end of the file, we are done */
-	if (off > dn->dn_maxblkid << blkshift)
-		goto out;
+	if (!ISP2(blksz)) {
+		/*
+		 * They are freeing the whole block of a
+		 * non-power-of-two blocksize file.  Skip all the messy
+		 * math.
+		 */
+		ASSERT3U(off, ==, 0);
+		ASSERT3U(len, >=, blksz);
+		blkid = 0;
+		nblks = 1;
+	} else {
+		int tail;
+		int epbs = dn->dn_indblkshift - SPA_BLKPTRSHIFT;
+		int blkshift = dn->dn_datablkshift;
 
-	if (off + len == UINT64_MAX)
-		tail = 0;
-	else
-		tail = P2PHASE(len, blksz);
+		/* If the remaining range is past end of file, we're done */
+		if (off > dn->dn_maxblkid << blkshift)
+			goto out;
 
-	ASSERT3U(P2PHASE(off, blksz), ==, 0);
-	/* zero out any partial block data at the end of the range */
-	if (tail) {
-		if (len < tail)
-			tail = len;
-		if (dbuf_hold_impl(dn, 0, dbuf_whichblock(dn, off+len),
-		    TRUE, FTAG, &db) == 0) {
-			/* don't dirty if it isn't on disk and isn't dirty */
-			if (db->db_dirtied ||
-			    (db->db_blkptr && !BP_IS_HOLE(db->db_blkptr))) {
-				rw_exit(&dn->dn_struct_rwlock);
-				dbuf_will_dirty(db, tx);
-				rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
-				bzero(db->db.db_data, tail);
+		if (off + len == UINT64_MAX)
+			tail = 0;
+		else
+			tail = P2PHASE(len, blksz);
+
+		ASSERT3U(P2PHASE(off, blksz), ==, 0);
+		/* zero out any partial block data at the end of the range */
+		if (tail) {
+			if (len < tail)
+				tail = len;
+			if (dbuf_hold_impl(dn, 0, dbuf_whichblock(dn, off+len),
+			    TRUE, FTAG, &db) == 0) {
+				/* don't dirty if not on disk and not dirty */
+				if (db->db_dirtied ||
+				    (db->db_blkptr &&
+				    !BP_IS_HOLE(db->db_blkptr))) {
+					rw_exit(&dn->dn_struct_rwlock);
+					dbuf_will_dirty(db, tx);
+					rw_enter(&dn->dn_struct_rwlock,
+					    RW_WRITER);
+					bzero(db->db.db_data, tail);
+				}
+				dbuf_rele(db, FTAG);
 			}
+			len -= tail;
+		}
+		/* If the range did not include a full block, we are done */
+		if (len == 0)
+			goto out;
+
+		/* dirty the left indirects */
+		if (dn->dn_nlevels > 1 && off != 0) {
+			db = dbuf_hold_level(dn, 1,
+			    (off - head) >> (blkshift + epbs), FTAG);
+			dbuf_will_dirty(db, tx);
 			dbuf_rele(db, FTAG);
 		}
-		len -= tail;
+
+		/* dirty the right indirects */
+		if (dn->dn_nlevels > 1 && !trunc) {
+			db = dbuf_hold_level(dn, 1,
+			    (off + len + tail - 1) >> (blkshift + epbs), FTAG);
+			dbuf_will_dirty(db, tx);
+			dbuf_rele(db, FTAG);
+		}
+
+		/*
+		 * Finally, add this range to the dnode range list, we
+		 * will finish up this free operation in the syncing phase.
+		 */
+		ASSERT(IS_P2ALIGNED(off, 1<<blkshift));
+		ASSERT(off + len == UINT64_MAX ||
+		    IS_P2ALIGNED(len, 1<<blkshift));
+		blkid = off >> blkshift;
+		nblks = len >> blkshift;
+
+		if (trunc)
+			dn->dn_maxblkid = (blkid ? blkid - 1 : 0);
 	}
-	/* If the range did not include a full block, we are done */
-	if (len == 0)
-		goto out;
-
-	/* dirty the left indirects */
-	if (dn->dn_nlevels > 1 && off != 0) {
-		db = dbuf_hold_level(dn, 1,
-		    (off - head) >> (blkshift + epbs), FTAG);
-		dbuf_will_dirty(db, tx);
-		dbuf_rele(db, FTAG);
-	}
-
-	/* dirty the right indirects */
-	if (dn->dn_nlevels > 1 && !trunc) {
-		db = dbuf_hold_level(dn, 1,
-		    (off + len + tail - 1) >> (blkshift + epbs), FTAG);
-		dbuf_will_dirty(db, tx);
-		dbuf_rele(db, FTAG);
-	}
-
-	/*
-	 * Finally, add this range to the dnode range list, we
-	 * will finish up this free operation in the syncing phase.
-	 */
-	ASSERT(IS_P2ALIGNED(off, 1<<blkshift));
-	ASSERT(off + len == UINT64_MAX || IS_P2ALIGNED(len, 1<<blkshift));
-	blkid = off >> blkshift;
-	nblks = len >> blkshift;
-
-	if (trunc)
-		dn->dn_maxblkid = (blkid ? blkid - 1 : 0);
 
 	mutex_enter(&dn->dn_mtx);
 	dnode_clear_range(dn, blkid, nblks, tx);
