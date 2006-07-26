@@ -128,7 +128,11 @@ extern "C" {
 #define	DFL	86		/* print door_create() flags */
 #define	DPM	87		/* print DOOR_PARAM_XX flags */
 #define	TND	88		/* print trusted network data base opcode */
-#define	HID	89		/* hidden argument, don't print */
+#define	RSC	89		/* print rctlsys subcode */
+#define	RGF	90		/* print rctlsys_get flags */
+#define	RSF	91		/* print rctlsys_set flags */
+#define	RCF	92		/* print rctlsys_ctl flags */
+#define	HID	93		/* hidden argument, don't print */
 				/* make sure HID is always the last member */
 
 /*

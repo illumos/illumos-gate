@@ -300,7 +300,7 @@ const struct systable systable[] = {
 {"acctctl",	3, DEC, NOV, HEX, HEX, UNS},			/*  71 */
 {"exacctsys",	6, DEC, NOV, DEC, IDT, DEC, HEX, DEC, HEX},	/*  72 */
 {"getpagesizes", 2, DEC, NOV, HEX, DEC},			/*  73 */
-{"rctlsys",	6, DEC, NOV, DEC, STG, HEX, HEX, DEC, DEC},	/*  74 */
+{"rctlsys",	6, DEC, NOV, RSC, STG, HEX, HEX, DEC, DEC},	/*  74 */
 {"issetugid",	0, DEC, NOV},					/*  75 */
 {"fsat",	6, DEC, NOV, HEX, HEX, HEX, HEX, HEX, HEX},	/*  76 */
 {"lwp_park",	3, DEC, NOV, DEC, HEX, DEC},			/*  77 */
@@ -575,6 +575,14 @@ const	struct systable utstable[] = {
 {"utssys",	4, DEC, NOV, STG, FUI, UTS, HEX}		/* 3 */
 };
 #define	NUTSCODE	(sizeof (utstable) / sizeof (struct systable))
+
+const	struct systable rctltable[] = {
+{"getrctl",	6, DEC, NOV, HID, STG, HEX, HEX, HID, RGF},	/* 0 */
+{"setrctl",	6, DEC, NOV, HID, STG, HEX, HEX, HID, RSF},	/* 1 */
+{"rctlsys_lst",	6, DEC, NOV, HID, HID, HEX, HID, HEX, HID},	/* 2 */
+{"rctlsys_ctl",	6, DEC, NOV, HID, STG, HEX, HID, HID, RCF},	/* 3 */
+};
+#define	NRCTLCODE	(sizeof (rctltable) / sizeof (struct systable))
 
 const	struct systable sgptable[] = {
 {"sigpendsys",	2, DEC, NOV, DEC, HEX},				/* err */
@@ -946,6 +954,10 @@ const	struct sysalias sysalias[] = {
 	{ "tnmlp",		SYS_labelsys	},
 	{ "getlabel",		SYS_labelsys	},
 	{ "fgetlabel",		SYS_labelsys	},
+	{ "getrctl",		SYS_rctlsys	},
+	{ "setrctl",		SYS_rctlsys	},
+	{ "rctlsys_lst",	SYS_rctlsys	},
+	{ "rctlsys_ctl",	SYS_rctlsys	},
 	{  NULL,	0	}	/* end-of-list */
 };
 
@@ -1082,6 +1094,10 @@ subsys(int syscall, int subcode)
 		case SYS_labelsys:	/* label family */
 			if ((unsigned)subcode < NLABELCODE)
 				stp = &labeltable[subcode];
+			break;
+		case SYS_rctlsys:	/* rctl family */
+			if ((unsigned)subcode < NRCTLCODE)
+				stp = &rctltable[subcode];
 			break;
 		}
 	}
@@ -1233,6 +1249,7 @@ getsubcode(private_t *pri)
 		case SYS_ucredsys:	/* ucredsys */
 		case SYS_zone:		/* zone */
 		case SYS_labelsys:	/* labelsys */
+		case SYS_rctlsys:	/* rctlsys */
 			subcode = arg0;
 			break;
 		case SYS_fcntl:		/* fcntl() */
@@ -1293,7 +1310,8 @@ maxsyscalls()
 	    + NUCREDSYSCODE - 1
 	    + NPORTCODE - 1
 	    + NZONECODE - 1
-	    + NLABELCODE - 1);
+	    + NLABELCODE - 1
+	    + NRCTLCODE - 1);
 }
 
 /*
@@ -1365,6 +1383,8 @@ nsubcodes(int syscall)
 		return (NZONECODE);
 	case SYS_labelsys:
 		return (NLABELCODE);
+	case SYS_rctlsys:
+		return (NRCTLCODE);
 	default:
 		return (1);
 	}

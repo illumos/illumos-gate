@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2152,8 +2151,13 @@ static int
 rctl_global_action(rctl_t *r, rctl_set_t *rset, struct proc *p, rctl_val_t *v)
 {
 	rctl_dict_entry_t *rde = r->rc_dict_entry;
-	const char *pr, *en;
+	const char *pr, *en, *idstr;
 	id_t id;
+	enum {
+		SUFFIX_NONE,	/* id consumed directly */
+		SUFFIX_NUMERIC,	/* id consumed in suffix */
+		SUFFIX_STRING	/* idstr consumed in suffix */
+	} suffix = SUFFIX_NONE;
 	int ret = 0;
 
 	v->rcv_firing_time = gethrtime();
@@ -2177,30 +2181,56 @@ rctl_global_action(rctl_t *r, rctl_set_t *rset, struct proc *p, rctl_val_t *v)
 	case RCENTITY_PROCESS:
 		en = "process";
 		id = p->p_pid;
+		suffix = SUFFIX_NONE;
 		break;
 	case RCENTITY_TASK:
 		en = "task";
 		id = p->p_task->tk_tkid;
+		suffix = SUFFIX_NUMERIC;
 		break;
 	case RCENTITY_PROJECT:
 		en = "project";
 		id = p->p_task->tk_proj->kpj_id;
+		suffix = SUFFIX_NUMERIC;
 		break;
 	case RCENTITY_ZONE:
 		en = "zone";
-		id = p->p_zone->zone_id;
+		idstr = p->p_zone->zone_name;
+		suffix = SUFFIX_STRING;
 		break;
 	default:
-		en = "unknown entity associated with pid";
+		en = "unknown entity associated with process";
 		id = p->p_pid;
+		suffix = SUFFIX_NONE;
 		break;
 	}
 
 	if (rde->rcd_flagaction & RCTL_GLOBAL_SYSLOG) {
-		(void) strlog(0, 0, 0,
-		    rde->rcd_strlog_flags | log_global.lz_active,
-		    "%s rctl %s (value %llu) exceeded by %s %d", pr,
-		    rde->rcd_name, v->rcv_value, en, id);
+		switch (suffix) {
+		default:
+		case SUFFIX_NONE:
+			(void) strlog(0, 0, 0,
+			    rde->rcd_strlog_flags | log_global.lz_active,
+			    "%s rctl %s (value %llu) exceeded by %s %d.",
+			    pr, rde->rcd_name, v->rcv_value, en, id);
+			break;
+		case SUFFIX_NUMERIC:
+			(void) strlog(0, 0, 0,
+			    rde->rcd_strlog_flags | log_global.lz_active,
+			    "%s rctl %s (value %llu) exceeded by process %d"
+			    " in %s %d.",
+			    pr, rde->rcd_name, v->rcv_value, p->p_pid,
+			    en, id);
+			break;
+		case SUFFIX_STRING:
+			(void) strlog(0, 0, 0,
+			    rde->rcd_strlog_flags | log_global.lz_active,
+			    "%s rctl %s (value %llu) exceeded by process %d"
+			    " in %s %s.",
+			    pr, rde->rcd_name, v->rcv_value, p->p_pid,
+			    en, idstr);
+			break;
+		}
 	}
 
 	if (rde->rcd_flagaction & RCTL_GLOBAL_DENY_ALWAYS)

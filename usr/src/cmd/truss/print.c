@@ -77,6 +77,8 @@
 #include <sys/lgrp_user.h>
 #include <sys/door.h>
 #include <sys/tsol/tndb.h>
+#include <sys/rctl.h>
+#include <sys/rctl_impl.h>
 #include "ramdata.h"
 #include "print.h"
 #include "proto.h"
@@ -2439,6 +2441,97 @@ prt_dpm(private_t *pri, int raw, long val)
 }
 
 /*
+ * Print rctlsys subcodes
+ */
+void
+prt_rsc(private_t *pri, int raw, long val)	/* print utssys code */
+{
+	const char *s = raw? NULL : rctlsyscode(val);
+
+	if (s == NULL)
+		prt_dec(pri, 0, val);
+	else
+		outstring(pri, s);
+}
+
+/*
+ * Print getrctl flags
+ */
+void
+prt_rgf(private_t *pri, int raw, long val)
+{
+	long action = val & (~RCTLSYS_ACTION_MASK);
+
+	if (raw)
+		prt_hex(pri, 0, val);
+	else if (action == RCTL_FIRST)
+		outstring(pri, "RCTL_FIRST");
+	else if (action == RCTL_NEXT)
+		outstring(pri, "RCTL_NEXT");
+	else if (action == RCTL_USAGE)
+		outstring(pri, "RCTL_USAGE");
+	else
+		prt_hex(pri, 0, val);
+}
+
+/*
+ * Print setrctl flags
+ */
+void
+prt_rsf(private_t *pri, int raw, long val)
+{
+	long action = val & (~RCTLSYS_ACTION_MASK);
+	long pval = val & RCTL_LOCAL_ACTION_MASK;
+	char *s = pri->code_buf;
+
+	if (raw) {
+		prt_hex(pri, 0, val);
+		return;
+	} else if (action == RCTL_INSERT)
+		(void) strcpy(s, "RCTL_INSERT");
+	else if (action == RCTL_DELETE)
+		(void) strcpy(s, "RCTL_DELETE");
+	else if (action == RCTL_REPLACE)
+		(void) strcpy(s, "RCTL_REPLACE");
+	else {
+		prt_hex(pri, 0, val);
+		return;
+	}
+
+	if (pval & RCTL_USE_RECIPIENT_PID) {
+		pval ^= RCTL_USE_RECIPIENT_PID;
+		(void) strlcat(s, "|RCTL_USE_RECIPIENT_PID",
+		    sizeof (pri->code_buf));
+	}
+
+	if ((pval & RCTLSYS_ACTION_MASK) != 0)
+		prt_hex(pri, 0, val);
+	else if (*s != '\0')
+		outstring(pri, s);
+	else
+		prt_hex(pri, 0, val);
+}
+
+/*
+ * Print rctlctl flags
+ */
+void
+prt_rcf(private_t *pri, int raw, long val)
+{
+	long action = val & (~RCTLSYS_ACTION_MASK);
+
+	if (raw)
+		prt_hex(pri, 0, val);
+	else if (action == RCTLCTL_GET)
+		outstring(pri, "RCTLCTL_GET");
+	else if (action == RCTLCTL_SET)
+		outstring(pri, "RCTLCTL_SET");
+	else
+		prt_hex(pri, 0, val);
+}
+
+
+/*
  * Array of pointers to print functions, one for each format.
  */
 void (* const Print[])() = {
@@ -2531,5 +2624,9 @@ void (* const Print[])() = {
 	prt_dfl,	/* DFL -- print door_create() flags */
 	prt_dpm,	/* DPM -- print DOOR_PARAM_XX flags */
 	prt_tnd,	/* TND -- print trusted network data base opcode */
+	prt_rsc,	/* RSC -- print rctlsys() subcodes */
+	prt_rgf,	/* RGF -- print getrctl() flags */
+	prt_rsf,	/* RSF -- print setrctl() flags */
+	prt_rcf,	/* RCF -- print rctlsys_ctl() flags */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

@@ -91,6 +91,8 @@
 #include <sys/priv_impl.h>
 #include <sys/priv.h>
 #include <tsol/label.h>
+#include <sys/nvpair.h>
+#include <libnvpair.h>
 
 #include "ramdata.h"
 #include "systable.h"
@@ -4394,6 +4396,41 @@ show_getrusage32(long offset)
 }
 #endif
 
+/*
+ * Utility function to print a packed nvlist by unpacking
+ * and calling the libnvpair pretty printer.  Frees all
+ * allocated memory internally.
+ */
+static void
+show_packed_nvlist(private_t *pri, uintptr_t offset, size_t size)
+{
+	nvlist_t *nvl = NULL;
+	size_t readsize;
+	char *buf;
+
+	if ((offset == 0) || (size == 0)) {
+		return;
+	}
+
+	buf = my_malloc(size, "nvlist decode buffer");
+	readsize = Pread(Proc, buf, size, offset);
+	if (readsize != size) {
+		(void) printf("%s\t<?>", pri->pname);
+	} else {
+		int result;
+
+		result = nvlist_unpack(buf, size, &nvl, 0);
+		if (result == 0) {
+			nvlist_print(stdout, nvl);
+			nvlist_free(nvl);
+		} else {
+			(void) printf("%s\tunpack of nvlist"
+			    " failed: %d\n", pri->pname, result);
+		}
+	}
+	free(buf);
+}
+
 static void
 show_zone_create_args(private_t *pri, long offset)
 {
@@ -4435,6 +4472,9 @@ show_zone_create_args(private_t *pri, long offset)
 		    (void *)args.rctlbuf);
 		(void) printf("%s\t     rctlbufsz: %lu\n", pri->pname,
 		    (ulong_t)args.rctlbufsz);
+
+		show_packed_nvlist(pri, (uintptr_t)args.rctlbuf,
+		    args.rctlbufsz);
 
 		(void) printf("%s\t           zfs: %s\n", pri->pname, zone_zfs);
 
@@ -4518,6 +4558,9 @@ show_zone_create_args32(private_t *pri, long offset)
 		(void) printf("%s\t     rctlbufsz: %lu\n", pri->pname,
 		    (ulong_t)args.rctlbufsz);
 
+		show_packed_nvlist(pri, (uintptr_t)args.rctlbuf,
+		    args.rctlbufsz);
+
 		(void) printf("%s\t           zfs: %s\n", pri->pname, zone_zfs);
 
 		(void) printf("%s\textended_error: 0x%x\n", pri->pname,
@@ -4573,6 +4616,97 @@ show_zones(private_t *pri)
 	}
 }
 
+static void
+show_rctlblk(private_t *pri, long _rctlblk)
+{
+	rctlblk_t *blk;
+	int size = rctlblk_size();
+	size_t readsize;
+	const char *s;
+
+	blk = my_malloc(size, "rctlblk decode buffer");
+	readsize = Pread(Proc, blk, size, _rctlblk);
+	if (readsize != size) {
+		(void) printf("%s\t\t<?>", pri->pname);
+	} else {
+		(void) printf("%s\t\t     Privilege: 0x%x\n",
+		    pri->pname,
+		    rctlblk_get_privilege(blk));
+		(void) printf("%s\t\t         Value: %lld\n",
+		    pri->pname,
+		    rctlblk_get_value(blk));
+		(void) printf("%s\t\tEnforced Value: %lld\n",
+		    pri->pname,
+		    rctlblk_get_enforced_value(blk));
+
+		{
+			int sig, act;
+			act = rctlblk_get_local_action(blk, &sig);
+
+			s = rctl_local_action(pri, act);
+			if (s == NULL) {
+				(void) printf("%s\t\t  Local action: 0x%x\n",
+				    pri->pname, act);
+			} else {
+				(void) printf("%s\t\t  Local action: %s\n",
+				    pri->pname, s);
+			}
+
+			if (act & RCTL_LOCAL_SIGNAL) {
+				(void) printf("%s\t\t                "
+				    "For signal %s\n",
+				    pri->pname, signame(pri, sig));
+			}
+		}
+
+		s = rctl_local_flags(pri, rctlblk_get_local_flags(blk));
+		if (s == NULL) {
+			(void) printf("%s\t\t   Local flags: 0x%x\n",
+			    pri->pname, rctlblk_get_local_flags(blk));
+		} else {
+			(void) printf("%s\t\t   Local flags: %s\n",
+			    pri->pname, s);
+		}
+
+#ifdef _LP64
+		(void) printf("%s\t\t Recipient PID: %d\n",
+		    pri->pname,
+		    rctlblk_get_recipient_pid(blk));
+#else
+		(void) printf("%s\t\t Recipient PID: %ld\n",
+		    pri->pname,
+		    rctlblk_get_recipient_pid(blk));
+#endif
+		(void) printf("%s\t\t   Firing Time: %lld\n",
+		    pri->pname,
+		    rctlblk_get_firing_time(blk));
+	}
+	free(blk);
+}
+
+static void
+show_rctls(private_t *pri)
+{
+	switch (pri->sys_args[0]) {
+	case 0:	/* getrctl */
+	case 1: /* setrctl */
+		/*
+		 * If these offsets look a little odd, remember that they're
+		 * into the _raw_ system call
+		 */
+		(void) printf("%s\tOld rctlblk: 0x%lx\n", pri->pname,
+		    pri->sys_args[2]);
+		if (pri->sys_args[2] != NULL) {
+			show_rctlblk(pri, pri->sys_args[2]);
+		}
+		(void) printf("%s\tNew rctlblk: 0x%lx\n", pri->pname,
+		    pri->sys_args[3]);
+		if (pri->sys_args[3] != NULL) {
+			show_rctlblk(pri, pri->sys_args[3]);
+		}
+		break;
+	}
+}
 
 /* expound verbosely upon syscall arguments */
 /*ARGSUSED*/
@@ -5053,6 +5187,10 @@ expound(private_t *pri, long r0, int raw)
 
 	case SYS_zone:
 		show_zones(pri);
+		break;
+
+	case SYS_rctlsys:
+		show_rctls(pri);
 		break;
 	}
 }

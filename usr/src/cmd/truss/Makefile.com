@@ -39,8 +39,8 @@ include ../../Makefile.cmd
 CFLAGS		+= $(CCVERBOSE)
 CFLAGS64	+= $(CCVERBOSE)
 
-LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -ltsol
+LAZYLIBS = $(ZLAZYLOAD) -ltsol -lnvpair $(ZNOLAZYLOAD)
+lint := LAZYLIBS = -ltsol -lnvpair
 LDLIBS	+= -lproc -lrtld_db -lc_db -lnsl -lsocket $(LAZYLIBS)
 
 CPPFLAGS += -D_REENTRANT -D_LARGEFILE64_SOURCE=1

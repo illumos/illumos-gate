@@ -1146,6 +1146,77 @@ utscode(int code)
 }
 
 const char *
+rctlsyscode(int code)
+{
+	const char *str = NULL;
+	switch (code) {
+	case 0:		str = "GETRCTL";	break;
+	case 1:		str = "SETRCTL";	break;
+	case 2:		str = "RCTLSYS_LST";	break;
+	case 3:		str = "RCTLSYS_CTL";	break;
+	default:	str = "UNKNOWN";	break;
+	}
+	return (str);
+}
+
+const char *
+rctl_local_action(private_t *pri, uint_t val)
+{
+	uint_t action = val & (~RCTL_LOCAL_ACTION_MASK);
+
+	char *s = pri->code_buf;
+
+	*s = '\0';
+
+	if (action & RCTL_LOCAL_NOACTION) {
+		action ^= RCTL_LOCAL_NOACTION;
+		(void) strlcat(s, "|RCTL_LOCAL_NOACTION",
+		    sizeof (pri->code_buf));
+	}
+	if (action & RCTL_LOCAL_SIGNAL) {
+		action ^= RCTL_LOCAL_SIGNAL;
+		(void) strlcat(s, "|RCTL_LOCAL_SIGNAL",
+		    sizeof (pri->code_buf));
+	}
+	if (action & RCTL_LOCAL_DENY) {
+		action ^= RCTL_LOCAL_DENY;
+		(void) strlcat(s, "|RCTL_LOCAL_DENY",
+		    sizeof (pri->code_buf));
+	}
+
+	if ((action & (~RCTL_LOCAL_ACTION_MASK)) != 0)
+		return (NULL);
+	else if (*s != '\0')
+		return (s+1);
+	else
+		return (NULL);
+}
+
+
+const char *
+rctl_local_flags(private_t *pri, uint_t val)
+{
+	uint_t pval = val & RCTL_LOCAL_ACTION_MASK;
+	char *s = pri->code_buf;
+
+	*s = '\0';
+
+	if (pval & RCTL_LOCAL_MAXIMAL) {
+		pval ^= RCTL_LOCAL_MAXIMAL;
+		(void) strlcat(s, "|RCTL_LOCAL_MAXIMAL",
+		    sizeof (pri->code_buf));
+	}
+
+	if ((pval & RCTL_LOCAL_ACTION_MASK) != 0)
+		return (NULL);
+	else if (*s != '\0')
+		return (s+1);
+	else
+		return (NULL);
+}
+
+
+const char *
 sconfname(int code)
 {
 	const char *str = NULL;
