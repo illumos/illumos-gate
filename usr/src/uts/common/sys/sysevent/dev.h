@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +100,39 @@ extern "C" {
  *	Attribute Value	- value of the devinfo_node_property
  *
  *
+ * Event schema for EC_DEV_ADD/ESC_PRINTER
+ *
+ *	Event Class 	- EC_DEV_ADD
+ *	Event Sub-Class - ESC_PRINTER
+ *
+ *	Attribute Name	- EV_VERSION
+ *	Attribute Type	- DATA_TYPE_INT32
+ *	Attribute Value	- event version number
+ *
+ *	Attribute Name	- DEV_NAME
+ *	Attribute Type	- DATA_TYPE_STRING
+ *	Attribute Value	- /dev/printers name associated with the device
+ *			  if exists.
+ *			  /dev name associated with the device if it exists
+ *
+ *	Attribute Name	- DEV_PHYS_PATH
+ *	Attribute Type	- DATA_TYPE_STRING
+ *	Attribute Value	- physical path of the device without the "/devices"
+ *			  prefix.
+ *
+ *	Attribute Name	- DEV_DRIVER_NAME
+ *	Attribute Type	- DATA_TYPE_STRING
+ *	Attribute Value	- driver name
+ *
+ *	Attribute Name	- DEV_INSTANCE
+ *	Attribute Type	- DATA_TYPE_INT32
+ *	Attribute Value	- driver instance number
+ *
+ *	Attribute Name	- DEV_PROP_PREFIX<devinfo_node_property>
+ *	Attribute Type	- data type of the devinfo_node_property
+ *	Attribute Value	- value of the devinfo_node_property
+ *
+ *
  * Event schema for EC_DEV_REMOVE/ESC_DISK
  *
  *	Event Class 	- EC_DEV_REMOVE
@@ -143,6 +175,35 @@ extern "C" {
  *	Attribute Value	- /dev name associated with the device if exists.
  *			  /dev name associated with the driver for DLPI
  *			  Style-2 only drivers.
+ *
+ *	Attribute Name	- DEV_PHYS_PATH
+ *	Attribute Type	- DATA_TYPE_STRING
+ *	Attribute Value	- physical path of the device without the "/devices"
+ *			  prefix.
+ *
+ *	Attribute Name	- DEV_DRIVER_NAME
+ *	Attribute Type	- DATA_TYPE_STRING
+ *	Attribute Value	- driver name
+ *
+ *	Attribute Name	- DEV_INSTANCE
+ *	Attribute Type	- DATA_TYPE_INT32
+ *	Attribute Value	- driver instance number
+ *
+ *
+ * Event schema for EC_DEV_REMOVE/ESC_PRINTER
+ *
+ *	Event Class 	- EC_DEV_REMOVE
+ *	Event Sub-Class - ESC_PRINTER
+ *
+ *	Attribute Name	- EV_VERSION
+ *	Attribute Type	- DATA_TYPE_INT32
+ *	Attribute Value	- event version number
+ *
+ *	Attribute Name	- DEV_NAME
+ *	Attribute Type	- DATA_TYPE_STRING
+ *	Attribute Value	- /dev/printers name associated with the device
+ *			  if exists.
+ *			  /dev name associated with the device if it exists
  *
  *	Attribute Name	- DEV_PHYS_PATH
  *	Attribute Type	- DATA_TYPE_STRING

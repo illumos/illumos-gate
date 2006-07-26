@@ -8257,6 +8257,41 @@ lookup_network_dev_name(char *node_path, char *driver_name)
 	return (dev_name);
 }
 
+static char *
+lookup_printer_dev_name(char *node_path)
+{
+	struct devlink_cb_arg cb_arg;
+	char *dev_name = NULL;
+	int i;
+
+#define	DEV_PRINTERS	"/dev/printers/"
+
+	cb_arg.count = 0;
+	cb_arg.rv = 0;
+	(void) di_devlink_cache_walk(devlink_cache, NULL, node_path,
+	    DI_PRIMARY_LINK, &cb_arg, devlink_cb);
+
+	if (cb_arg.rv == -1 || cb_arg.count == 0)
+		return (NULL);
+
+	/* first try lookup based on /dev/printers name */
+	for (i = 0; i < cb_arg.count; i++) {
+		if (strncmp(cb_arg.dev_names[i], DEV_PRINTERS,
+		    sizeof (DEV_PRINTERS) - 1) == 0) {
+			dev_name = s_strdup(cb_arg.dev_names[i]);
+			break;
+		}
+	}
+
+	/* fallback to the first name */
+	if ((dev_name == NULL) && (cb_arg.count > 0))
+		dev_name = s_strdup(cb_arg.dev_names[0]);
+
+	free_dev_names(&cb_arg);
+
+	return (dev_name);
+}
+
 /*
  * Build an nvlist containing all attributes for devfs events.
  * Returns nvlist pointer on success, NULL on failure.
@@ -8300,6 +8335,11 @@ build_event_attributes(char *class, char *subclass, char *node_path,
 	} else if (strcmp(subclass, ESC_NETWORK) == 0) {
 		if ((dev_name = lookup_network_dev_name(node_path, driver_name))
 		    == NULL) {
+			dev_name_lookup_err = 1;
+			goto out;
+		}
+	} else if (strcmp(subclass, ESC_PRINTER) == 0) {
+		if ((dev_name = lookup_printer_dev_name(node_path)) == NULL) {
 			dev_name_lookup_err = 1;
 			goto out;
 		}

@@ -5698,6 +5698,13 @@ derive_devi_class(dev_info_t *dip, char *node_type, int flag)
 		    node_type[sizeof (DDI_NT_NET) - 1] == ':')) {
 
 			rv = i_ddi_set_devi_class(dip, ESC_NETWORK, flag);
+
+		} else if (strncmp(node_type, DDI_NT_PRINTER,
+		    sizeof (DDI_NT_PRINTER) - 1) == 0 &&
+		    (node_type[sizeof (DDI_NT_PRINTER) - 1] == '\0' ||
+		    node_type[sizeof (DDI_NT_PRINTER) - 1] == ':')) {
+
+			rv = i_ddi_set_devi_class(dip, ESC_PRINTER, flag);
 		}
 	}
 
