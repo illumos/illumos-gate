@@ -1603,6 +1603,48 @@ const struct st_drivetype st_drivetypes[] =
   },
 
   /*
+   * [1] The DLT-S4 has three densites at this time,
+   *     0x49 for SuperDLT tape I, 0x4a for SuperDLT tape II,
+   *     0x4b for SuperDLT tape III.
+   *     This drive is configured with ST_KNOWS_MEDIA.
+   *     That means that it will look at the mediatype from the mode sense
+   *     to select the density code. The compression will be selected based
+   *     on the minor node the user opened.
+   * [2] S4 reports a medium type that is used to select the density.
+   */
+  {                           /* Structure member Description                 */
+                              /* ---------------- -----------                 */
+    "Quantum DLT-S4",         /* .name            Display ("pretty") name     */
+    14,                       /* .length          Length of next item...      */
+    "QUANTUM DLT-S4",         /* .vid             Vendor-product ID string    */
+    ST_TYPE_DLT,              /* .type            Numeric type (cf. mtio.h)   */
+    0,                        /* .bsize           Block size (0 = variable)   */
+                              /* .options         Drive option flags:         */
+    ST_VARIABLE         |     /*   000001           Supports variable length  */
+    ST_BSF              |     /*   000008           Supports SPACE block fwd  */
+    ST_BSR              |     /*   000010           Supports SPACE block rev  */
+    ST_KNOWS_EOD        |     /*   000200           Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*   000400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*   008000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP    |     /*   010000           [Note 1]                  */
+    ST_KNOWS_MEDIA,           /*   800000         Media detrmines density     */
+                              /*    -----                                     */
+                              /*   818619                                     */
+    -1,                       /* .max_rretries    Not used any more.          */
+    -1,                       /* .max_wretries    Not used any more.          */
+    {0x49, 0x4a, 0x4b, 0x4b}, /* .densities       Density codes [Note 1]      */
+    MT_DENSITY4,              /* .default_density (.densities[x])             */
+    {0x86, 0x87, 0x91, 0x91}, /* .mediatype       Media type  [Note 2]        */
+    0,                        /* .non_motion_time                             */
+    MINUTES(60),              /* .io_time                                     */
+    MINUTES(4),               /* .rewind_time                                 */
+    MINUTES(360),             /* .space_time                                  */
+    MINUTES(16),              /* .load_time                                   */
+    MINUTES(16),              /* .unload_time                                 */
+    MINUTES(360)              /* .erase_time                                  */
+  },
+
+  /*
    * Seagate Hornet NS20 Travan
    *
    *     NOTES
