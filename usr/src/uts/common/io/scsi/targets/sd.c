@@ -9901,6 +9901,13 @@ sd_cache_control(struct sd_lun *un, int rcd_flag, int wce_flag)
 	}
 
 	mode_caching_page = (struct mode_caching *)(header + hdrlen + bd_len);
+	if (mode_caching_page->mode_page.code != MODEPAGE_CACHING) {
+		SD_ERROR(SD_LOG_COMMON, un, "sd_cache_control: Mode Sense"
+		    " caching page code mismatch %d\n",
+		    mode_caching_page->mode_page.code);
+		kmem_free(header, buflen);
+		return (EIO);
+	}
 
 	/* Check the relevant bits on successful mode sense. */
 	if ((mode_caching_page->rcd && rcd_flag == SD_CACHE_ENABLE) ||
@@ -10073,6 +10080,13 @@ sd_get_write_cache_enabled(struct sd_lun *un, int *is_enabled)
 	}
 
 	mode_caching_page = (struct mode_caching *)(header + hdrlen + bd_len);
+	if (mode_caching_page->mode_page.code != MODEPAGE_CACHING) {
+		SD_ERROR(SD_LOG_COMMON, un, "sd_cache_control: Mode Sense"
+		    " caching page code mismatch %d\n",
+		    mode_caching_page->mode_page.code);
+		kmem_free(header, buflen);
+		return (EIO);
+	}
 	*is_enabled = mode_caching_page->wce;
 
 	kmem_free(header, buflen);
