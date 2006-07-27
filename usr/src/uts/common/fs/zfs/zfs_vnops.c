@@ -876,12 +876,11 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 			error = ENOENT;
 			goto out;
 		}
-		VERIFY(0 == dmu_buf_hold(os, lr->lr_foid, off, FTAG, &db));
-		bcopy((char *)db->db_data + off - db->db_offset, buf, dlen);
-		dmu_buf_rele(db, FTAG);
+		VERIFY(0 == dmu_read(os, lr->lr_foid, off, dlen, buf));
 	} else { /* indirect write */
 		uint64_t boff; /* block starting offset */
 
+		ASSERT3U(dlen, <=, zp->z_blksz);
 		/*
 		 * Have to lock the whole block to ensure when it's
 		 * written out and it's checksum is being calculated
