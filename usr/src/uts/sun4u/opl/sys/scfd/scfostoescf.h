@@ -47,7 +47,7 @@ extern int scf_get_dimminfo(uint32_t boardnum, void *buf, uint32_t *bufsz);
 #define	SUB_OS_SEND_PRE_FMEMA		0x10
 #define	SUB_OS_SEND_CANCEL_FMEMA	0x15
 #define	SUB_OS_SEND_COMPLETE_FMEMA	0x43
-#define	SUB_OS_RECEIVE_DIMM_INFO	0x44
+#define	SUB_OS_RECEIVE_DIMM_INFO	0x45
 
 #ifdef	__cplusplus
 }

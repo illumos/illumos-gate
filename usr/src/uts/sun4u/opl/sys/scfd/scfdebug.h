@@ -131,6 +131,7 @@ typedef struct scf_scfioctest_tbl {
 #define	TEST_FMEM_START			0x00001211
 #define	TEST_FMEM_END			0x00001212
 #define	TEST_FMEM_CANCEL		0x00001213
+#define	TEST_GET_DIMMINFO		0x00001214
 
 /*
  * External vwlue

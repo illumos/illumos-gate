@@ -2427,7 +2427,7 @@ scf_ioc_dr(intptr_t arg, int mode, int *rval_p, int u_mode)
 
 	case SUB_SB_SENSE_ALL:
 		scf_cmd.rbuf = &scfdr_p->rbuf[0];
-		scf_cmd.rcount = sizeof (scfdr_p->sbuf);
+		scf_cmd.rcount = sizeof (scfdr_p->rbuf);
 		scf_cmd.flag = SCF_USE_SLBUF;
 		break;
 

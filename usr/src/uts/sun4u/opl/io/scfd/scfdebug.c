@@ -158,6 +158,7 @@ extern int	scf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 extern int	scf_fmem_start(int s_bd, int t_bd);
 extern int	scf_fmem_end(void);
 extern int	scf_fmem_cancel(void);
+extern int	scf_get_dimminfo(uint32_t boardnum, void *buf, uint32_t *bufsz);
 
 int
 scf_debug_cmdthrough(intptr_t arg, int mode)
@@ -1086,12 +1087,18 @@ scf_debug_test(intptr_t arg, int mode)
 			break;
 
 		case 0x00010000:
+		case 0x00010098:
 			if (statep != NULL) {
 				mutex_exit(&scf_comtbl.all_mutex);
 				func_ret = scf_detach(statep->dip, DDI_SUSPEND);
 				func_ret =
 					scf_detach(scf_comtbl.scf_pseudo_p->dip,
 					DDI_SUSPEND);
+				if (test_p->info[0] == 0x00010098) {
+					scf_panic_callb(1);
+					mutex_enter(&scf_comtbl.all_mutex);
+					break;
+				}
 
 				drv_usecwait(5000000);
 
@@ -1304,6 +1311,50 @@ scf_debug_test(intptr_t arg, int mode)
 		mutex_exit(&scf_comtbl.all_mutex);
 		func_ret = scf_fmem_cancel();
 		mutex_enter(&scf_comtbl.all_mutex);
+
+		break;
+
+	case TEST_GET_DIMMINFO:
+		SCFDBGMSG(SCF_DBGFLAG_DBG, "TEST_GET_DIMMINFO");
+
+		/*
+		 * IN:
+		 *	info[0] : boardnum
+		 *	info[1] : bufsz
+		 * OUT:
+		 *	info[1] : bufsz
+		 */
+		length = (uint32_t)test_p->info[1];
+
+		/*
+		 * scf_get_dimminfo(uint32_t boardnum, void *buf,
+		 * uint32_t *bufsz);
+		 */
+
+		if (length != 0) {
+			kmem_size = length;
+			data_addr = (caddr_t)kmem_zalloc(kmem_size, KM_SLEEP);
+		}
+
+		mutex_exit(&scf_comtbl.all_mutex);
+		func_ret = scf_get_dimminfo(test_p->info[0], data_addr,
+			&length);
+		mutex_enter(&scf_comtbl.all_mutex);
+
+		if (scf_debug_nofirm_sys == SCF_DBF_NOFIRM_SYS_ON) {
+			length = kmem_size;
+			msc_dptr = data_addr;
+			for (ii = 0; ii < length; ii++, msc_dptr++) {
+				*msc_dptr = ii;
+			}
+		}
+		if (length != 0)
+			bcopy((void *)data_addr, (void *)&test_p->rdata[0],
+				length);
+
+		if (data_addr != NULL) kmem_free(data_addr, kmem_size);
+
+		test_p->info[1] = (uint_t)length;
 
 		break;
 

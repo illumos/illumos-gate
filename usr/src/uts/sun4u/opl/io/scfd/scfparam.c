@@ -73,7 +73,7 @@ uint_t	scf_tesum_rcnt = 1;		/* Tx sum retry counter */
 uint_t	scf_resum_rcnt = 1;		/* Rx sum retry counter */
 uint_t	scf_cmd_to_rcnt = 1;		/* Command to retry counter */
 uint_t	scf_devbusy_wait_rcnt = 6;	/* Command device busy retry counter */
-uint_t	scf_online_wait_rcnt = 6;	/* SCF online retry counter */
+uint_t	scf_online_wait_rcnt = 30;	/* SCF online retry counter */
 uint_t	scf_path_change_max = 4;	/* SCF path change retry counter */
 
 /*

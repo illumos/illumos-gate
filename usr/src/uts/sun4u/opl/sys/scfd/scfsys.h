@@ -48,7 +48,7 @@ extern "C" {
 #define	FLAG_ON			(1)
 #define	FLAG_OFF		(0)
 
-#define	SCF_DRIVER_VERSION	"SCF driver 1.8"
+#define	SCF_DRIVER_VERSION	"SCF driver 1.9"
 #define	SCF_DRIVER_NAME		"scfd"
 #define	SCF_DEVICE_NAME		"scfc"
 

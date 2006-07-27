@@ -2351,7 +2351,7 @@ scf_online_wait_tout(void)
 		statep->online_to_rcnt++;
 
 		/* Check re-try out */
-		if (statep->online_to_rcnt <= scf_online_wait_rcnt) {
+		if (statep->online_to_rcnt < scf_online_wait_rcnt) {
 			/* SCF online timer start */
 			scf_timer_start(SCF_TIMERCD_ONLINE);
 			goto END_online_wait_tout;
@@ -2463,7 +2463,7 @@ scf_cmdbusy_tout(void)
 		statep->devbusy_to_rcnt++;
 
 		/* Check re-try out */
-		if (statep->devbusy_to_rcnt <= scf_devbusy_wait_rcnt) {
+		if (statep->devbusy_to_rcnt < scf_devbusy_wait_rcnt) {
 			/* SCF online timer start */
 			scf_timer_start(SCF_TIMERCD_CMDBUSY);
 			goto END_cmdbusy_tout;
@@ -2902,6 +2902,7 @@ scf_panic_callb(int code)
 	int			report_counter = 0;
 	int			ii = 0;
 	int			new_report = 0;
+	int			ost;
 
 	SCFDBGMSG1(SCF_DBGFLAG_FOCK, SCF_FUNC_NAME ": start code = %d",
 		code);
@@ -3031,9 +3032,20 @@ scf_panic_callb(int code)
 			if (statep == NULL) {
 				statep = scf_comtbl.scf_wait_p;
 				if (statep == NULL) {
-					/* Not use SCF path */
-					SCF_PANIC_TRACE(__LINE__);
-					goto END_scf_panic_callb;
+					statep = scf_comtbl.scf_suspend_p;
+					if (statep) {
+						ost = statep->old_path_status;
+						if ((ost != PATH_STAT_ACTIVE) &&
+							(ost !=
+							PATH_STAT_STANDBY)) {
+							statep = NULL;
+						}
+					}
+					if (statep == NULL) {
+						/* Not use SCF path */
+						SCF_PANIC_TRACE(__LINE__);
+						goto END_scf_panic_callb;
+					}
 				}
 				path_flag = 1;
 			}
@@ -3047,8 +3059,18 @@ scf_panic_callb(int code)
 		if (statep == NULL) {
 			statep = scf_comtbl.scf_wait_p;
 			if (statep == NULL) {
-				SCF_PANIC_TRACE(__LINE__);
-				goto END_scf_panic_callb;
+				statep = scf_comtbl.scf_suspend_p;
+				if (statep) {
+					ost = statep->old_path_status;
+					if ((ost != PATH_STAT_ACTIVE) &&
+						(ost != PATH_STAT_STANDBY)) {
+						statep = NULL;
+					}
+				}
+				if (statep == NULL) {
+					SCF_PANIC_TRACE(__LINE__);
+					goto END_scf_panic_callb;
+				}
 			}
 			/* wait */
 			drv_usecwait(SCF_MIL2MICRO((scf_cmdend_wait_time_panic *
