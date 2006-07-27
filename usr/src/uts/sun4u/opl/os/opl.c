@@ -974,10 +974,7 @@ plat_cpuid_to_mmu_ctx_info(processorid_t cpuid, mmu_ctx_info_t *info)
 
 	impl = cpunodes[cpuid].implementation;
 	if (IS_OLYMPUS_C(impl)) {
-		/*
-		 * Olympus-C processor supports 2 strands per core.
-		 */
-		info->mmu_idx = cpuid >> 1;
+		info->mmu_idx = MMU_ID(cpuid);
 		info->mmu_nctxs = 8192;
 	} else {
 		cmn_err(CE_PANIC, "Unknown processor %d", impl);

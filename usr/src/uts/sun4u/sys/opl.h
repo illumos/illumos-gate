@@ -66,6 +66,10 @@ extern "C" {
 #define	CORE_ID(x)	(((uint_t)(x)/OPL_MAX_STRANDID_PER_CORE) & \
 	(OPL_MAX_COREID_PER_CMP - 1))
 #define	STRAND_ID(x)	((uint_t)(x) & (OPL_MAX_STRANDID_PER_CORE - 1))
+#define	MMU_ID(x) \
+	((opl_get_physical_board(LSB_ID(x)) * OPL_MAX_COREID_PER_BOARD) + \
+	(CHIP_ID(x) * OPL_MAX_COREID_PER_CMP) + \
+	CORE_ID(x))
 
 /*
  * Max. boards supported in a domain per model.
