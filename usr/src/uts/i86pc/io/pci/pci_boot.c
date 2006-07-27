@@ -1161,10 +1161,6 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	subclass = pci_getb(bus, dev, func, PCI_CONF_SUBCLASS);
 	progclass = pci_getb(bus, dev, func, PCI_CONF_PROGCLASS);
 	header = pci_getb(bus, dev, func, PCI_CONF_HEADER) & PCI_HEADER_TYPE_M;
-	/* Fetch PCI command, disable I/O and memory */
-	cmd_reg = pci_getw(bus, dev, func, PCI_CONF_COMM);
-	pci_putw(bus, dev, func, PCI_CONF_COMM,
-	    cmd_reg & ~(PCI_COMM_IO | PCI_COMM_MAE));
 
 	switch (header) {
 	case PCI_HEADER_ZERO:
@@ -1183,11 +1179,17 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 
 	/*
 	 * Create the register property by saving the current
-	 * value of the base register.  Disable memory/io, then
-	 * write 0xffffffff to the base register.  Read the
-	 * value back to determine the required size of the
-	 * address space.  Restore the base register
-	 * contents.
+	 * value of the base register. Write 0xffffffff to the
+	 * base register.  Read the value back to determine the
+	 * required size of the address space.  Restore the base
+	 * register contents.
+	 *
+	 * Do not disable I/O and memory access; this isn't necessary
+	 * since no driver is yet attached to this device, and disabling
+	 * I/O and memory access has the side-effect of disabling PCI-PCI
+	 * bridge mappings, which makes the bridge transparent to secondary-
+	 * bus activity (see sections 4.1-4.3 of the PCI-PCI Bridge
+	 * Spec V1.2).
 	 */
 	end = PCI_CONF_BASE0 + max_basereg * sizeof (uint_t);
 	for (j = 0, offset = PCI_CONF_BASE0; offset < end;
@@ -1437,10 +1439,10 @@ done:
 	if (config_op == CONFIG_NEW && enable) {
 		cmn_err(CE_NOTE,
 		    "!enable PCI device [%d/%d/%d]", bus, dev, func);
+		cmd_reg = pci_getw(bus, dev, func, PCI_CONF_COMM);
 		cmd_reg |= (enable | PCI_COMM_ME);
+		pci_putw(bus, dev, func, PCI_CONF_COMM, cmd_reg);
 	}
-	/* restore device enables */
-	pci_putw(bus, dev, func, PCI_CONF_COMM, cmd_reg);
 	return (reprogram);
 }
 
