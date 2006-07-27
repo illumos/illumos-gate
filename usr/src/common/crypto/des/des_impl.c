@@ -768,6 +768,7 @@ des_keycheck(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 void
 des_parity_fix(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 {
+/* EXPORT DELETE START */
 	uint64_t aligned_key[DES3_KEYSIZE / sizeof (uint64_t)];
 	uint8_t *paritied_key;
 	uint64_t key_so_far;
@@ -805,6 +806,7 @@ des_parity_fix(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 	}
 
 	bcopy(paritied_key, corrected_key, DES_KEYSIZE * strength);
+/* EXPORT DELETE END */
 }
 
 
