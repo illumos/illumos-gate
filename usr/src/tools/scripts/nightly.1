@@ -441,6 +441,16 @@ safe to use.  Set this flag to 'n' to disable this test, allowing any
 version of dmake to be used.
 .RE
 .LP
+.B POST_NIGHTLY
+.RS 5
+The command specified here will be executed at the end of nightly.  The
+return status of nightly - one of "Completed", "Interrupted", or "Failed" -
+will be available in the environment variable NIGHTLY_STATUS.  Any other
+environment variables exported in the environment file or by nightly are
+available, although these are not stable, and should be checked before use.
+The command output will be appended to the mail message and log file.
+.RE
+.LP
 .SH REALMODE ENVIRONMENT VARIABLES
 .LP
 The following environment variables referenced by
