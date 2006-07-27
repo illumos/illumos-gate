@@ -804,10 +804,10 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 				goto out;
 		}
 
-		if (nfload(rp, NULL))
-			goto out;
 		bzero(&siginfo, sizeof (siginfo));
 		if (type == T_SYS_RTT_ALIGN + T_USER) {
+			if (nfload(rp, NULL))
+				goto out;
 			/*
 			 * Can't do unaligned stack access
 			 */
@@ -817,17 +817,25 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 			fault = FLTACCESS;
 			break;
 		}
+
+		/*
+		 * Try to fix alignment before non-faulting load test.
+		 */
 		if (p->p_fixalignment) {
 			if (do_unaligned(rp, &badaddr) == SIMU_SUCCESS) {
 				rp->r_pc = rp->r_npc;
 				rp->r_npc += 4;
 				goto out;
 			}
+			if (nfload(rp, NULL))
+				goto out;
 			siginfo.si_signo = SIGSEGV;
 			siginfo.si_code = SEGV_MAPERR;
 			siginfo.si_addr = badaddr;
 			fault = FLTBOUNDS;
 		} else {
+			if (nfload(rp, NULL))
+				goto out;
 			siginfo.si_signo = SIGBUS;
 			siginfo.si_code = BUS_ADRALN;
 			if (rp->r_pc & 3) {	/* offending address, if pc */
