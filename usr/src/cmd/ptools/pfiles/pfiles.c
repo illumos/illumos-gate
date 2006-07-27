@@ -546,6 +546,7 @@ show_sockopts(struct ps_prochandle *Pr, int fd)
 	    { SO_OOBINLINE,	"SO_OOBINLINE,"	},
 	    { SO_DGRAM_ERRIND,	"SO_DGRAM_ERRIND,"},
 	    { SO_ALLZONES,	"SO_ALLZONES,"	},
+	    { SO_EXCLBIND,	"SO_EXCLBIND," },
 	};
 	struct linger l;
 
