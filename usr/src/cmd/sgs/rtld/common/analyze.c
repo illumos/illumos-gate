@@ -437,17 +437,6 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp)
 		 * Relocate the link-map control list.
 		 */
 		lret = _relocate_lmc(lml, nlmp, &relocated);
-
-		/*
-		 * At this point we've completed the addition of a new group of
-		 * objects, either the initial objects that start the process
-		 * (called from setup()), a group added through lazy loading or
-		 * filters, or from a dlopen() request.  Indicate to the
-		 * debuggers that new objects have been added.
-		 */
-		if (relocated && lret &&
-		    ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
-			rd_event(lml, RD_DLACTIVITY, RT_ADD);
 	}
 
 	/*

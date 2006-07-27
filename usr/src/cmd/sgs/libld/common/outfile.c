@@ -259,6 +259,68 @@ pad_outfile(Ofl_desc *ofl)
 }
 
 /*
+ * Create an output section.  The first instance of an input section triggers
+ * the creation of a new output section.
+ */
+static uintptr_t
+create_outsec(Ofl_desc *ofl, Sg_desc *sgp, Os_desc *osp, Word ptype, int shidx,
+    Boolean fixalign)
+{
+	Elf_Scn	*scn;
+	Shdr	*shdr;
+
+	/*
+	 * Get a section descriptor for the section.
+	 */
+	if ((scn = elf_newscn(ofl->ofl_welf)) == NULL) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_NEWSCN),
+		    ofl->ofl_name);
+		return (S_ERROR);
+	}
+	osp->os_scn = scn;
+
+	/*
+	 * Get a new section header table entry and copy the pertinent
+	 * information from the in-core descriptor.
+	 */
+	if ((shdr = elf_getshdr(scn)) == NULL) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
+		    ofl->ofl_name);
+		return (S_ERROR);
+	}
+	*shdr = *(osp->os_shdr);
+	osp->os_shdr = shdr;
+
+	/*
+	 * If this is the first section within a loadable segment, and the
+	 * alignment needs to be updated, record this section.
+	 */
+	if ((fixalign == TRUE) && (ptype == PT_LOAD) && (shidx == 1))
+		sgp->sg_fscn = scn;
+
+	/*
+	 * Remove any SHF_ORDERED or SHF_LINK_ORDER flags.  If we are not
+	 * building a relocatable object, remove any SHF_GROUP flag.
+	 */
+	osp->os_shdr->sh_flags &= ~ALL_SHF_ORDER;
+	if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)
+		osp->os_shdr->sh_flags &= ~SHF_GROUP;
+
+	/*
+	 * If this is a TLS section, save it so that the PT_TLS program header
+	 * information can be established after the output image has been
+	 * initially created.  At this point, all TLS input sections are ordered
+	 * as they will appear in the output image.
+	 */
+	if ((ofl->ofl_flags & FLG_OF_TLSPHDR) &&
+	    (osp->os_shdr->sh_flags & SHF_TLS) &&
+	    (list_appendc(&ofl->ofl_ostlsseg, osp) == 0))
+		return (S_ERROR);
+
+	return (0);
+}
+
+/*
  * Create the elf structures that allow the input data to be associated with the
  * new image:
  *
@@ -283,9 +345,7 @@ ld_create_outfile(Ofl_desc *ofl)
 	Sg_desc		*sgp;
 	Os_desc		**ospp;
 	Is_desc		*isp;
-	Elf_Scn		*scn;
 	Elf_Data	*tlsdata = 0;
-	Shdr		*shdr;
 	Aliste		off;
 	Word		flags = ofl->ofl_flags;
 	size_t		ndx = 0, fndx = 0;
@@ -420,62 +480,6 @@ ld_create_outfile(Ofl_desc *ofl)
 			Listnode	*lnp2;
 			Os_desc		*osp = *ospp;
 
-			shidx++;
-
-			/*
-			 * Get a section descriptor for the section.
-			 */
-			if ((scn = elf_newscn(ofl->ofl_welf)) == NULL) {
-				eprintf(ofl->ofl_lml, ERR_ELF,
-				    MSG_INTL(MSG_ELF_NEWSCN), ofl->ofl_name);
-				return (S_ERROR);
-			}
-			osp->os_scn = scn;
-
-			/*
-			 * Get a new section header table entry and copy the
-			 * pertinent information from the in-core descriptor.
-			 * As we had originally allocated the section header
-			 * (refer place_section()) we might as well free it up.
-			 */
-			if ((shdr = elf_getshdr(scn)) == NULL) {
-				eprintf(ofl->ofl_lml, ERR_ELF,
-				    MSG_INTL(MSG_ELF_GETSHDR), ofl->ofl_name);
-				return (S_ERROR);
-			}
-			*shdr = *(osp->os_shdr);
-
-			if ((fixalign == TRUE) && (ptype == PT_LOAD) &&
-			    (shidx == 1))
-				sgp->sg_fscn = scn;
-
-			osp->os_shdr = shdr;
-
-			/*
-			 * Knock off the SHF_ORDERED & SHF_LINK_ORDER flags.
-			 */
-			osp->os_shdr->sh_flags &= ~ALL_SHF_ORDER;
-
-			/*
-			 * If we are not building a RELOBJ - we strip
-			 * off the SHF_GROUP flag (if present).
-			 */
-			if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)
-				osp->os_shdr->sh_flags &= ~SHF_GROUP;
-
-			/*
-			 * If this is a TLS section, save it so that the PT_TLS
-			 * program header information can be established after
-			 * the output image has been initialy created.  At this
-			 * point, all TLS input sections are ordered as they
-			 * will appear in the output image.
-			 */
-			if ((ofl->ofl_flags & FLG_OF_TLSPHDR) &&
-			    (osp->os_shdr->sh_flags & SHF_TLS)) {
-				if (list_appendc(&ofl->ofl_ostlsseg, osp) == 0)
-					return (S_ERROR);
-			}
-
 			dataidx = 0;
 			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp2, isp)) {
 				Elf_Data *	data;
@@ -504,8 +508,6 @@ ld_create_outfile(Ofl_desc *ofl)
 					    DBG_CALL(Dbg_unused_sec(lml, isp));
 				}
 
-				dataidx++;
-
 				/*
 				 * If this section provides no data, and isn't
 				 * referenced, then it can be discarded as well.
@@ -527,25 +529,38 @@ ld_create_outfile(Ofl_desc *ofl)
 				}
 
 				/*
-				 * Create new output data buffers for each of
-				 * the input data buffers, thus linking the new
+				 * The first input section triggers the creation
+				 * of the associated output section.
+				 */
+				if (osp->os_scn == NULL) {
+					shidx++;
+
+					if (create_outsec(ofl, sgp, osp, ptype,
+					    shidx, fixalign) == S_ERROR)
+						return (S_ERROR);
+				}
+
+				dataidx++;
+
+				/*
+				 * Create a new output data buffer for each
+				 * input data buffer, thus linking the new
 				 * buffers to the new elf output structures.
 				 * Simply make the new data buffers point to
 				 * the old data.
 				 */
-				if ((data = elf_newdata(scn)) == NULL) {
+				if ((data = elf_newdata(osp->os_scn)) == NULL) {
 					eprintf(ofl->ofl_lml, ERR_ELF,
 					    MSG_INTL(MSG_ELF_NEWDATA),
 					    ofl->ofl_name);
 					return (S_ERROR);
 				}
 				*data = *(isp->is_indata);
+				isp->is_indata = data;
 
 				if ((fixalign == TRUE) && (ptype == PT_LOAD) &&
-				    (shidx == 1) && (dataidx == 1)) {
+				    (shidx == 1) && (dataidx == 1))
 					data->d_align = sgp->sg_addralign;
-				}
-				isp->is_indata = data;
 
 				/*
 				 * Save the first TLS data buffer, as this is
@@ -581,8 +596,9 @@ ld_create_outfile(Ofl_desc *ofl)
 					while (sz >> 32) {
 						data->d_size = SIZE_MAX;
 						sz -= (Xword)SIZE_MAX;
-						if ((data =
-						    elf_newdata(scn)) == NULL)
+
+						data = elf_newdata(osp->os_scn);
+						if (data == NULL)
 							return (S_ERROR);
 					}
 					data->d_size = (size_t)sz;
@@ -703,6 +719,15 @@ ld_create_outfile(Ofl_desc *ofl)
 
 		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
 			Os_desc	*osp = *ospp;
+
+			/*
+			 * Make sure that an output section was originally
+			 * created.  Input sections that had been marked as
+			 * discarded may have made an output section
+			 * unnecessary.
+			 */
+			if (osp->os_scn == NULL)
+				continue;
 
 			if ((osp->os_scn = elf_getscn(ofl->ofl_elf, ++ndx)) ==
 			    NULL) {

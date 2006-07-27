@@ -173,7 +173,7 @@ remove_pnode(Pnode * pnp)
 /*
  * Remove a link-map list descriptor.  This is called to finalize the removal
  * of an entire link-map list, after all link-maps have been removed, or none
- * got added.  As load_one() can process a list of potential candidates objects,
+ * got added.  As load_one() can process a list of potential candidate objects,
  * the link-map descriptor must be maintained as each object is processed.  Only
  * after all objects have been processed can a failure condition finally tear
  * down the link-map list descriptor.
@@ -182,6 +182,15 @@ void
 remove_lml(Lm_list *lml)
 {
 	if (lml && (lml->lm_head == 0)) {
+		/*
+		 * As a whole link-map list is being removed, the debuggers
+		 * would have been alerted of this deletion (or an addition
+		 * in the case we're here to clean up from a failure).  Set
+		 * the main link-map list so that a consistent registration
+		 * can be signaled to the debuggers when we leave ld.so.1.
+		 */
+		lml_main.lm_flags |= LML_FLG_DBNOTIF;
+
 		if (lml->lm_lmidstr)
 			free(lml->lm_lmidstr);
 		if (lml->lm_alp)

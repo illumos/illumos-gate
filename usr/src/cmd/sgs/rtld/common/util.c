@@ -128,8 +128,6 @@ rtld_db_postinit(Lm_list *lml)
  *  ii	the first time we move a secondary link-map control list to the primary
  *	link-map control list (effectively, this is like adding a group of
  *	objects to the primary link-map control list).
- *  iii	the first time we relocate a series of objects on the primary link-map
- *	control list.
  *
  * Set an RD_CONSISTENT event when it is required (LML_FLG_DBNOTIF is set) and
  *
@@ -1098,11 +1096,15 @@ lm_append(Lm_list *lml, Aliste lmco, Rt_map *lmp)
 	(lml->lm_obj)++;
 
 	/*
-	 * Alert the debuggers that we are about to mess with the main link-map
-	 * control list.
+	 * If we're about to add a new object to the main link-map control list,
+	 * alert the debuggers that we are about to mess with this list.
+	 * Additions of individual objects to the main link-map control list
+	 * occur during initial setup as the applications immediate dependencies
+	 * are loaded.  Individual objects are also loaded on the main link-map
+	 * control list of new alternative link-map control lists.
 	 */
 	if ((lmco == ALO_DATA) && ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
-		rd_event(lml, RD_DLACTIVITY, RT_DELETE);
+		rd_event(lml, RD_DLACTIVITY, RT_ADD);
 
 	/* LINTED */
 	lmc = (Lm_cntl *)((char *)lml->lm_lists + lmco);
@@ -1221,8 +1223,8 @@ lm_delete(Lm_list *lml, Rt_map *lmp)
 		return;
 
 	/*
-	 * Alert the debuggers that we are about to mess with the main link-map
-	 * control list.
+	 * If we're about to delete an object from the main link-map control
+	 * list, alert the debuggers that we are about to mess with this list.
 	 */
 	if ((CNTL(lmp) == ALO_DATA) && ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
 		rd_event(lml, RD_DLACTIVITY, RT_DELETE);
@@ -1266,14 +1268,16 @@ lm_move(Lm_list *lml, Aliste nlmco, Aliste plmco, Lm_cntl *nlmc, Lm_cntl *plmc)
 {
 	Rt_map	*lmp;
 
-	DBG_CALL(Dbg_file_cntl(lml, nlmco, plmco));
-
 	/*
-	 * Alert the debuggers that we are about to mess with the main link-map
-	 * control list.
+	 * If we're about to add a new family of objects to the main link-map
+	 * control list, alert the debuggers that we are about to mess with this
+	 * list.  Additions of object families to the main link-map control
+	 * list occur during lazy loading, filtering and dlopen().
 	 */
 	if ((plmco == ALO_DATA) && ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
 		rd_event(lml, RD_DLACTIVITY, RT_ADD);
+
+	DBG_CALL(Dbg_file_cntl(lml, nlmco, plmco));
 
 	/*
 	 * Indicate each new link-map has been moved to the previous link-map
@@ -3234,13 +3238,19 @@ fmap_setup()
  * released, and any locks dropped.
  */
 void
-leave(Lm_list * lml)
+leave(Lm_list *lml)
 {
+	Lm_list	*elml = lml;
+
 	/*
-	 * Alert the debuggers that the link-maps are consistent.
+	 * Alert the debuggers that the link-maps are consistent.  Note, in the
+	 * case of tearing down a whole link-map list, lml will be null.  In
+	 * this case use the main link-map list to test for a notification.
 	 */
-	if (lml)
-		rd_event(lml, RD_DLACTIVITY, RT_CONSISTENT);
+	if (elml == 0)
+		elml = &lml_main;
+	if (elml->lm_flags & LML_FLG_DBNOTIF)
+		rd_event(elml, RD_DLACTIVITY, RT_CONSISTENT);
 
 	if (dz_fd != FD_UNAVAIL) {
 		(void) close(dz_fd);

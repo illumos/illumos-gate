@@ -1114,3 +1114,6 @@ Bugid   Risk Synopsis
 6229145 ld: initarray/finiarray processing occurs after got size is determined
 6324924 the linker should warn if there's a .init section but not _init
 6421380 elfdump inserts extra whitespace in bitmap value display
+6449485 ld(1) creates misaligned TLS in binary compiled with -xpg
+6424550 Write to unallocated (wua) errors when libraries are built with
+	-z lazyload

@@ -966,8 +966,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		 * handshake allows the debugger to initialize, and consequently
 		 * allows the user to set break points in .init code.
 		 */
-		rd_event(&lml_rtld, RD_DLACTIVITY, RT_CONSISTENT);
 		rd_event(&lml_main, RD_DLACTIVITY, RT_CONSISTENT);
+		rd_event(&lml_rtld, RD_DLACTIVITY, RT_CONSISTENT);
 
 		if (rtld_flags & RT_FL_DEBUGGER) {
 			r_debug.rtd_rdebug.r_flags |= RD_FL_ODBG;
