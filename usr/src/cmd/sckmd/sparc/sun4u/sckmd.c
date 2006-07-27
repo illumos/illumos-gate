@@ -439,8 +439,14 @@ get_pfkey_reply(uint32_t req_seq, uint8_t req_type, int *err)
 		return (-1);
 	}
 
-	/* check for errors in SADB message */
-	if (msg->sadb_msg_errno != 0) {
+	/*
+	 * Check for errors in SADB message, but ignore the
+	 * ESRCH error for DELETE operation. This can happen if the SP
+	 * sends a DELETE request first before sending the ADD
+	 * request, just to make sure the keys are installed without a failure.
+	 */
+	if ((msg->sadb_msg_errno != 0) && !((msg->sadb_msg_errno == ESRCH) &&
+	    (msg->sadb_msg_type == SADB_DELETE))) {
 
 		char	   unknown_type_str[16];
 		int	   unknown_type = 0;
