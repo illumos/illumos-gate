@@ -73,7 +73,7 @@ CLEANLINTFILES	+= $(LINT64_FILES)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
-CPPFLAGS        +=      -DCARDBUS
+CPPFLAGS        +=      -DCARDBUS -DHOTPLUG
 
 #	dependency
 LDFLAGS	+=	-dy -Nmisc/busra -Nmisc/pcmcia -Nmisc/cardbus

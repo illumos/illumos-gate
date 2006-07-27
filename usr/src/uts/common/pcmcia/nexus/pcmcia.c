@@ -922,6 +922,8 @@ pcmcia_rnum_to_mapped(dev_info_t *dip, int rnumber)
 	ppd = (struct pcmcia_parent_private *)ddi_get_parent_data(dip);
 	if (ppd->ppd_nreg < rnumber)
 		return (NULL);
+	if (ppd->ppd_assigned == NULL)
+		return (NULL);
 	if (ppd->ppd_assigned[rnumber].phys_len == 0)
 		return (NULL);
 	else

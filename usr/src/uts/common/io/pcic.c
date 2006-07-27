@@ -84,6 +84,7 @@
 #include <sys/pci/pci_nexus.h>
 #endif
 
+#include <sys/hotplug/hpcsvc.h>
 #include <sys/syshw.h>
 #include "cardbus/cardbus.h"
 
@@ -2322,6 +2323,13 @@ pcic_intr(caddr_t arg1, caddr_t arg2)
 
 				pcic_putcb(pcic, CB_STATUS_MASK, 0x0);
 
+				/*
+				 * Put the socket in debouncing state so that
+				 * the leaf driver won't receive interrupts.
+				 * Crucial for handling surprise-removal.
+				 */
+				sockp->pcs_flags |= PCS_DEBOUNCING;
+
 				if (!sockp->pcs_cd_softint_flg) {
 					sockp->pcs_cd_softint_flg = 1;
 					(void) ddi_intr_trigger_softint(
@@ -2390,47 +2398,9 @@ pcic_intr(caddr_t arg1, caddr_t arg2)
 	    pcic->pc_intr_mode, pcic->pc_type, io_ints);
 #endif
 
-	switch (pcic->pc_intr_mode) {
-	case PCIC_INTR_MODE_PCI_1:
-		value = ~0;
-		/* fix value if adapter can tell us about I/O intrs */
-		switch (pcic->pc_type) {
-
-		case PCIC_TI_PCI1031:
-		case PCIC_TI_PCI1130:
-		case PCIC_TI_PCI1131:
-		case PCIC_TI_PCI1250:
-		case PCIC_TI_PCI1225:
-		case PCIC_TI_PCI1221:
-		case PCIC_TI_PCI1510:
-		case PCIC_TI_PCI1520:
-		case PCIC_TI_PCI1410:
-		case PCIC_TI_VENDOR:
-			i = ddi_get8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_CRDCTL_REG);
-			if (i & PCIC_CRDCTL_IFG)
-				value = 1;
-			else
-				value = 0;
-			i |= PCIC_CRDCTL_IFG;
-			/* clear the condition */
-			ddi_put8(pcic->cfg_handle,
-					pcic->cfgaddr + PCIC_CRDCTL_REG, i);
-			break;
-		case PCIC_TOSHIBA_TOPIC100:
-		case PCIC_TOSHIBA_TOPIC95:
-		case PCIC_TOSHIBA_VENDOR:
-		case PCIC_RICOH_VENDOR:
-		case PCIC_O2MICRO_VENDOR:
-		default:
-			value = 1;
-			break;
-		}
-		if (value && pcic_do_io_intr(pcic, value) == DDI_INTR_CLAIMED)
+	if (io_ints) {
+		if (pcic_do_io_intr(pcic, io_ints) == DDI_INTR_CLAIMED)
 			ret = DDI_INTR_CLAIMED;
-		break;
-	default:
-		break;
 	}
 
 	mutex_exit(&pcic->intr_lock);
@@ -2489,8 +2459,9 @@ pcic_do_io_intr(pcicdev_t *pcic, uint32_t sockets)
 		    pcic->irq_current->arg1,
 		    pcic->irq_current->arg2);
 #endif
-		if (sockp->pcs_flags & PCS_CARD_PRESENT &&
-		    sockets & (1 << cur)) {
+		if ((sockp->pcs_flags & PCS_CARD_PRESENT) &&
+		    !(sockp->pcs_flags & PCS_DEBOUNCING) &&
+		    (sockets & (1 << cur))) {
 
 			if ((*pcic->irq_current->intr)(pcic->irq_current->arg1,
 			    pcic->irq_current->arg2) == DDI_INTR_CLAIMED)
@@ -5667,6 +5638,9 @@ pcic_handle_cd_change(pcicdev_t *pcic, pcic_socket_t *sockp, uint8_t status)
 	irq |= PCIC_CD_DETECT;
 	pcic_putb(pcic, sockp->pcs_socket, PCIC_MANAGEMENT_INT, irq);
 	pcic_putcb(pcic, CB_STATUS_MASK, CB_SE_CCDMASK);
+
+	/* Out from debouncing state */
+	sockp->pcs_flags &= ~PCS_DEBOUNCING;
 
 	pcic_err(pcic->dip, 7, "Leaving pcic_handle_cd_change\n");
 }

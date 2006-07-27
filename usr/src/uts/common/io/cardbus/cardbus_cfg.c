@@ -1204,7 +1204,7 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 	ndi_devi_exit(dip, count);
 
 	if (phdl->error != PCICFG_SUCCESS) {
-		cardbus_err(dip, 1, "Failure summing resources\n");
+		cmn_err(CE_WARN, "Failure summing resources\n");
 		return (phdl->error);
 	}
 
@@ -1250,7 +1250,8 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 
 		if (ndi_ra_alloc(dip, mem_request, &mem_answer, &alen,
 		    NDI_RA_TYPE_MEM, NDI_RA_PASS) != NDI_SUCCESS) {
-			cardbus_err(dip, 1, "Failed to allocate memory\n");
+			cmn_err(CE_WARN, "Failed to allocate memory for %s\n",
+				ddi_driver_name(dip));
 			return (PCICFG_FAILURE);
 		}
 
@@ -1261,15 +1262,21 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 	io_request->ra_len += cardbus_min_spare_io;
 	if (io_request->ra_len) {
 
+#if defined(__x86) || defined(__amd64)
+		io_request->ra_boundbase = 0x1000;
+		io_request->ra_boundlen = 0xefff;
+#else
 		io_request->ra_boundbase = 0;
 		io_request->ra_boundlen = PCICFG_4GIG_LIMIT;
+#endif
 		io_request->ra_flags |= NDI_RA_ALLOC_BOUNDED;
 		io_request->ra_len = PCICFG_ROUND_UP(io_request->ra_len,
 				phdl->io_gran);
 
 		if (ndi_ra_alloc(dip, io_request, &io_answer,
 		    &alen, NDI_RA_TYPE_IO, NDI_RA_PASS) != NDI_SUCCESS) {
-			cardbus_err(dip, 1, "Failed to allocate I/O space\n");
+			cmn_err(CE_WARN, "Failed to allocate I/O space "
+				"for %s\n", ddi_driver_name(dip));
 			if (mem_request->ra_len) {
 				(void) ndi_ra_free(dip, mem_answer,
 					alen, NDI_RA_TYPE_MEM, NDI_RA_PASS);
@@ -2409,7 +2416,7 @@ cardbus_probe_bridge(cbus_t *cbp, dev_info_t *attpt, uint_t bus,
 	if (ndi_ra_alloc(cbp->cb_dip, &req,
 	    &next_bus, &blen, NDI_RA_TYPE_PCI_BUSNUM,
 	    NDI_RA_PASS) != NDI_SUCCESS) {
-		cardbus_err(cbp->cb_dip, 1, "Failed to get a bus number\n");
+		cmn_err(CE_WARN, "Failed to get a bus number\n");
 		goto failed;
 	}
 
@@ -2623,7 +2630,7 @@ cardbus_probe_children(cbus_t *cbp, dev_info_t *parent, uint_t bus,
 				    &next_bus, &blen,
 				    NDI_RA_TYPE_PCI_BUSNUM,
 				    NDI_RA_PASS) != NDI_SUCCESS) {
-					cardbus_err(new_child, 1,
+					cmn_err(CE_WARN,
 					    "Failed to get a bus number\n");
 					goto failedchild;
 				}
@@ -4226,79 +4233,6 @@ cardbus_get_class_name(uint32_t classcode)
 	return (NULL);
 }
 #endif /* _DONT_USE_1275_GENERIC_NAMES */
-
-/*
- * Work out a pil for a device based on the PCI class code.
- * Mostly taken from iline_to_pil() in sun4u/io/pci/pcic_intr.c.
- */
-#ifdef sparc
-int
-cardbus_get_class_pil(dev_info_t *rdip)
-{
-	uint32_t classcode;
-	struct cardbus_name_entry *ptr;
-	int	pil = 1;
-
-	classcode = ddi_prop_get_int(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-	    "class-code", -1);
-	if (classcode != -1) {
-		classcode = ((uint_t)classcode & 0xffff00) >> 8;
-	} else {
-		cardbus_err(rdip, 1,
-		    "%s%d has no class-code property\n",
-		    ddi_driver_name(rdip), ddi_get_instance(rdip));
-		return (pil);
-	}
-
-	for (ptr = &cardbus_class_lookup[0]; ptr->name != NULL; ptr++) {
-		if (ptr->class_code == classcode) {
-			if (ptr->pil <= 0x9)
-				return (ptr->pil);
-			else {
-				cardbus_err(rdip, 1,
-				    "%s%d has high pil 0xb => 0x9\n",
-				    ddi_driver_name(rdip),
-				    ddi_get_instance(rdip));
-				return (0x9);
-			}
-		}
-	}
-
-	/*
-	 * Not in our table - make a decision using the base-class-code.
-	 */
-	classcode = classcode >> 16; /* Base classcode */
-	switch (classcode) {
-	default:
-	case PCI_CLASS_NONE:
-		pil = 1;
-		break;
-
-	case PCI_CLASS_MASS:
-	case PCI_CLASS_SERIALBUS:
-		pil = 0x4;
-		break;
-
-	case PCI_CLASS_NET:
-		pil = 0x6;
-		break;
-
-	case PCI_CLASS_DISPLAY:
-		pil = 0x9;
-		break;
-
-	case PCI_CLASS_MM:
-	case PCI_CLASS_MEM:
-	case PCI_CLASS_BRIDGE:
-		cardbus_err(rdip, 1,
-		    "%s%d has high pil 0xb => 0x9\n",
-		    ddi_driver_name(rdip), ddi_get_instance(rdip));
-		pil = 0x9;
-		break;
-	}
-	return (pil);
-}
-#endif
 
 static void
 cardbus_force_boolprop(dev_info_t *dip, char *pname)

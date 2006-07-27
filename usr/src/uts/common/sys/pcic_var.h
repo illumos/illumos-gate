@@ -144,6 +144,7 @@ struct pcic_socket {
 #define	PCS_CARD_IS16BIT	0x2000	/* So we can tell if it's OK */
 #define	PCS_CARD_REMOVED	0x4000	/* Removed but still work to do */
 #define	PCS_CARD_CBREM		0x8000	/* Cardbus specific work to do */
+#define	PCS_DEBOUNCING		0x10000  /* Socket in debouncing state */
 
 #define	PCIC_MAX_SOCKETS 4	/* 2 per chip up to 2 chips per IO addr */
 

@@ -56,9 +56,6 @@ extern int cardbus_configure(cbus_t *cbp);
 extern int cardbus_unconfigure(cbus_t *cbp);
 extern int cardbus_teardown_device(dev_info_t *);
 extern int cardbus_primary_busno(dev_info_t *dip);
-#ifdef sparc
-extern int cardbus_get_class_pil(dev_info_t *rdip);
-#endif
 
 #ifdef DEBUG
 extern void cardbus_dump_children(dev_info_t *dip, int level);

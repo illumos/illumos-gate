@@ -78,7 +78,7 @@ static int cardbus_command_default = PCI_COMM_SERR_ENABLE |
 
 static int cardbus_next_instance = 0;
 static int cardbus_count = 0;
-static int number_of_cardbus_cards = 0;
+int number_of_cardbus_cards = 0;
 
 static int cardbus_bus_map(dev_info_t *dip, dev_info_t *rdip,
 		ddi_map_req_t *mp, off_t offset, off_t len, caddr_t *vaddrp);
@@ -674,7 +674,6 @@ cardbus_unload_cardbus(dev_info_t *dip)
 	int	rval;
 #endif
 	cbus_t *cbp;
-	struct dev_info *devi = DEVI(dip);
 
 	cardbus_err(dip, 6, "cardbus_unload_cardbus\n");
 
@@ -692,6 +691,8 @@ cardbus_unload_cardbus(dev_info_t *dip)
 
 	(void) hpc_slot_event_notify(cbp->slot_handle,
 	    HPC_EVENT_SLOT_POWER_OFF, 0);
+	(void) hpc_slot_event_notify(cbp->slot_handle,
+	    HPC_EVENT_SLOT_UNCONFIGURE, 0);
 	(void) hpc_slot_event_notify(cbp->slot_handle,
 	    HPC_EVENT_SLOT_REMOVAL, 0);
 
@@ -730,9 +731,6 @@ cardbus_unload_cardbus(dev_info_t *dip)
 			    dip, cookie, NULL);
 		}
 	}
-
-	devi->devi_ops->devo_bus_ops = cbp->orig_bopsp;
-	--number_of_cardbus_cards;
 
 	cardbus_revert_properties(dip);
 }
@@ -2554,8 +2552,6 @@ cardbus_post_event(dev_info_t *dip, dev_info_t *rdip,
 	return (DDI_FAILURE);
 }
 
-#ifdef sparc
-
 static int cardbus_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		ddi_intr_handle_impl_t *hdlp);
 static int cardbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
@@ -2565,7 +2561,13 @@ static int cardbus_enable_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 static int cardbus_disable_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		ddi_intr_handle_impl_t *hdlp);
 
-/*ARGSUSED*/
+static int
+cardbus_get_pil(dev_info_t *dip)
+{
+	return ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "interrupt-priorities", 6);
+}
+
 static int
 cardbus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	ddi_intr_handle_impl_t *hdlp, void *result)
@@ -2587,7 +2589,7 @@ cardbus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		break;
 	case DDI_INTROP_GETPRI:
 		*(int *)result = hdlp->ih_pri ?
-		    hdlp->ih_pri : cardbus_get_class_pil(rdip);
+		    hdlp->ih_pri : cardbus_get_pil(dip);
 		break;
 	case DDI_INTROP_SETPRI:
 		break;
@@ -2606,11 +2608,14 @@ cardbus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		break;
 	case DDI_INTROP_NINTRS:
 	case DDI_INTROP_NAVAIL:
+#ifdef sparc
 		*(int *)result = i_ddi_get_nintrs(rdip);
+#else
+		*(int *)result = 1;
+#endif
 		break;
 	case DDI_INTROP_SUPPORTED_TYPES:
-		*(int *)result = i_ddi_get_nintrs(rdip) ?
-		    DDI_INTR_TYPE_FIXED : 0;
+		*(int *)result = DDI_INTR_TYPE_FIXED;
 		break;
 	default:
 		ret = DDI_ENOTSUP;
@@ -2644,11 +2649,11 @@ cardbus_enable_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	}
 
 	sih.socket = socket;
-	sih.handler_id = (uint64_t)rdip;
+	sih.handler_id = (unsigned)(long)rdip;
 	sih.handler = (f_tt *)hdlp->ih_cb_func;
 	sih.arg1 = hdlp->ih_cb_arg1;
 	sih.arg2 = hdlp->ih_cb_arg2;
-	sih.irq = cardbus_get_class_pil(rdip);
+	sih.irq = cardbus_get_pil(dip);
 
 	if ((*anp->an_if->pcif_set_interrupt)(dip, &sih) != SUCCESS)
 		return (DDI_FAILURE);
@@ -2680,7 +2685,7 @@ cardbus_disable_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	}
 
 	cih.socket = socket;
-	cih.handler_id = (uint64_t)rdip;
+	cih.handler_id = (unsigned)(long)rdip;
 	cih.handler = (f_tt *)hdlp->ih_cb_func;
 
 	if ((*anp->an_if->pcif_clr_interrupt)(dip, &cih) != SUCCESS)
@@ -2688,19 +2693,6 @@ cardbus_disable_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 
 	return (DDI_SUCCESS);
 }
-
-#elif defined(__x86) || defined(__amd64)
-static int
-cardbus_intr_ops(dev_info_t *dip, dev_info_t *rdip,
-		ddi_intr_op_t op, ddi_intr_handle_impl_t *hdlp,
-		void *result)
-{
-	_NOTE(ARGUNUSED(dip));
-	return i_ddi_intr_ops(ddi_get_parent(rdip), ddi_get_parent(rdip),
-			op, (void *)hdlp, result);
-}
-
-#endif /* ifdef sparc */
 
 #if defined(CARDBUS_DEBUG)
 static int	cardbus_do_pprintf = 0;

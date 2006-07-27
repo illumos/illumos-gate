@@ -79,6 +79,7 @@ typedef struct hpc_occupant_info {
 #define	AP_IS_CB_MINOR(x)	(((x)>>8) == (3))
 
 extern int cardbus_debug;
+extern int number_of_cardbus_cards;
 
 static int cardbus_autocfg_enabled = 1;	/* auto config is enabled by default */
 
@@ -270,6 +271,8 @@ cardbus_event_handler(caddr_t slot_arg, uint_t event_mask)
 		if (cardbus_unconfigure_ap(cbp) != HPC_SUCCESS)
 			rv = HPC_ERR_FAILED;
 
+		DEVI(cbp->cb_dip)->devi_ops->devo_bus_ops = cbp->orig_bopsp;
+		--number_of_cardbus_cards;
 		break;
 
 	case HPC_EVENT_SLOT_REMOVAL:
@@ -1612,6 +1615,10 @@ cardbus_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			 * Get card information structure, hpc_card_info_t.
 			 */
 
+			if (cbp->card_present == B_FALSE) {
+				rv = ENXIO;
+				break;
+			}
 			/* verify that the card is configured */
 			if (cbp->ostate != AP_OSTATE_CONFIGURED) {
 				/* either the card is not present or */
