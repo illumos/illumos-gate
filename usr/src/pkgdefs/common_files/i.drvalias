@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,6 +54,13 @@ obsolete_sparc()
 	    -e '/^pci "pci108e,8000"[ 	]*$/d' \
 	    -e '/^pci "pci108e,a000"[ 	]*$/d' \
 	    -e '/^pci "pciclass,060000"[ 	]*$/d' \
+	    -e '/^px "pci108e,80f0"[ 	]*$/d' \
+	    -e '/^px_pci "pci1033,124"[ 	]*$/d' \
+	    -e '/^px_pci "pci1033,125"[ 	]*$/d' \
+	    -e '/^px_pci "pci8086,340"[ 	]*$/d' \
+	    -e '/^px_pci "pci8086,341"[ 	]*$/d' \
+	    -e '/^px_pci "pci10b5,8532"[ 	]*$/d' \
+	    -e '/^px_pci "pci10b5,8516"[ 	]*$/d' \
 	    -e '/^sx SUNW,sx[ 	]*$/d' \
 	    -e '/^sx "SUNW,sx"[ 	]*$/d' \
 	    -e '/^xbox SUNW,xbox[ 	]*$/d' \
@@ -85,6 +92,9 @@ obsolete_i386() {
 	    -e '/^mlx[ 	]*"pci1069,11"[ 	]*$/d' \
 	    -e '/^p9000[ 	]*"pci100e,9001"[ 	]*$/d' \
 	    -e '/^p9100[ 	]*"pci100e,9100"[ 	]*$/d' \
+	    -e '/^pcie_pci[ 	]*"pciex1011,1"[ 	]*$/d' \
+	    -e '/^pcie_pci[ 	]*"pciex1011,21"[ 	]*$/d' \
+	    -e '/^pcie_pci[ 	]*"pciex1014,22"[ 	]*$/d' \
 	    -e '/^spwr[ 	]*"pci10b8,0005"[ 	]*$/d' \
 	    -e '/^chs[ 	]*"pci1014,2e"[ 	]*$/d' \
 	    -e '/^cpqncr[ 	]*"pcie11,7004"[ 	]*$/d' \
