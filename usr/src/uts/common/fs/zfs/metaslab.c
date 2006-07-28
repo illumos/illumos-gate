@@ -187,6 +187,11 @@ metaslab_group_remove(metaslab_group_t *mg, metaslab_t *msp)
 static void
 metaslab_group_sort(metaslab_group_t *mg, metaslab_t *msp, uint64_t weight)
 {
+	/*
+	 * Although in principle the weight can be any value, in
+	 * practice we do not use values in the range [1, 510].
+	 */
+	ASSERT(weight >= SPA_MINBLOCKSIZE-1 || weight == 0);
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
 
 	mutex_enter(&mg->mg_lock);
@@ -434,6 +439,12 @@ metaslab_activate(metaslab_t *msp, uint64_t activation_weight)
 static void
 metaslab_passivate(metaslab_t *msp, uint64_t size)
 {
+	/*
+	 * If size < SPA_MINBLOCKSIZE, then we will not allocate from
+	 * this metaslab again.  In that case, it had better be empty,
+	 * or we would be leaving space on the table.
+	 */
+	ASSERT(size >= SPA_MINBLOCKSIZE || msp->ms_map.sm_space == 0);
 	metaslab_group_sort(msp->ms_group, msp, MIN(msp->ms_weight, size));
 	ASSERT((msp->ms_weight & METASLAB_ACTIVE_MASK) == 0);
 }
@@ -658,8 +669,7 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t size, uint64_t txg,
 		if ((msp->ms_weight & METASLAB_WEIGHT_SECONDARY) &&
 		    activation_weight == METASLAB_WEIGHT_PRIMARY) {
 			metaslab_passivate(msp,
-			    (msp->ms_weight & ~METASLAB_ACTIVE_MASK) /
-			    METASLAB_SMO_BONUS_MULTIPLIER);
+			    msp->ms_weight & ~METASLAB_ACTIVE_MASK);
 			mutex_exit(&msp->ms_lock);
 			continue;
 		}

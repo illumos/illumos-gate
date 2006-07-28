@@ -202,12 +202,6 @@ freelist_walk_step(mdb_walk_state_t *wsp)
 	return (WALK_NEXT);
 }
 
-/* ARGSUSED */
-static void
-freelist_walk_fini(mdb_walk_state_t *wsp)
-{
-}
-
 
 static int
 dataset_name(uintptr_t addr, char *buf)
@@ -626,7 +620,7 @@ dbufs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (mdb_pwalk("dmu_buf_impl_t", dbufs_cb, &data, 0) != 0) {
+	if (mdb_walk("dmu_buf_impl_t", dbufs_cb, &data) != 0) {
 		mdb_warn("can't walk dbufs");
 		return (DCMD_ERR);
 	}
@@ -1061,6 +1055,100 @@ vdev_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (do_print_vdev(addr, flags, 0, print_queue, stats, recursive));
 }
 
+typedef struct metaslab_walk_data {
+	uint64_t mw_numvdevs;
+	uintptr_t *mw_vdevs;
+	int mw_curvdev;
+	uint64_t mw_nummss;
+	uintptr_t *mw_mss;
+	int mw_curms;
+} metaslab_walk_data_t;
+
+static int
+metaslab_walk_step(mdb_walk_state_t *wsp)
+{
+	metaslab_walk_data_t *mw = wsp->walk_data;
+	metaslab_t ms;
+	uintptr_t msp;
+
+	if (mw->mw_curvdev >= mw->mw_numvdevs)
+		return (WALK_DONE);
+
+	if (mw->mw_mss == NULL) {
+		uintptr_t mssp;
+		uintptr_t vdevp;
+
+		ASSERT(mw->mw_curms == 0);
+		ASSERT(mw->mw_nummss == 0);
+
+		vdevp = mw->mw_vdevs[mw->mw_curvdev];
+		if (GETMEMB(vdevp, struct vdev, vdev_ms, mssp) ||
+		    GETMEMB(vdevp, struct vdev, vdev_ms_count, mw->mw_nummss)) {
+			return (WALK_ERR);
+		}
+
+		mw->mw_mss = mdb_alloc(mw->mw_nummss * sizeof (void*),
+		    UM_SLEEP | UM_GC);
+		if (mdb_vread(mw->mw_mss, mw->mw_nummss * sizeof (void*),
+		    mssp) == -1) {
+			mdb_warn("failed to read vdev_ms at %p", mssp);
+			return (WALK_ERR);
+		}
+	}
+
+	if (mw->mw_curms >= mw->mw_nummss) {
+		mw->mw_mss = NULL;
+		mw->mw_curms = 0;
+		mw->mw_nummss = 0;
+		mw->mw_curvdev++;
+		return (WALK_NEXT);
+	}
+
+	msp = mw->mw_mss[mw->mw_curms];
+	if (mdb_vread(&ms, sizeof (metaslab_t), msp) == -1) {
+		mdb_warn("failed to read metaslab_t at %p", msp);
+		return (WALK_ERR);
+	}
+
+	mw->mw_curms++;
+
+	return (wsp->walk_callback(msp, &ms, wsp->walk_cbdata));
+}
+
+/* ARGSUSED */
+static int
+metaslab_walk_init(mdb_walk_state_t *wsp)
+{
+	metaslab_walk_data_t *mw;
+	uintptr_t root_vdevp;
+	uintptr_t childp;
+
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("must supply address of spa_t\n");
+		return (WALK_ERR);
+	}
+
+	mw = mdb_zalloc(sizeof (metaslab_walk_data_t), UM_SLEEP | UM_GC);
+
+	if (GETMEMB(wsp->walk_addr, struct spa, spa_root_vdev, root_vdevp) ||
+	    GETMEMB(root_vdevp, struct vdev, vdev_children, mw->mw_numvdevs) ||
+	    GETMEMB(root_vdevp, struct vdev, vdev_child, childp)) {
+		return (DCMD_ERR);
+	}
+
+	mw->mw_vdevs = mdb_alloc(mw->mw_numvdevs * sizeof (void *),
+	    UM_SLEEP | UM_GC);
+	if (mdb_vread(mw->mw_vdevs, mw->mw_numvdevs * sizeof (void *),
+	    childp) == -1) {
+		mdb_warn("failed to read root vdev children at %p", childp);
+		return (DCMD_ERR);
+	}
+
+	wsp->walk_data = mw;
+
+	return (WALK_NEXT);
+}
+
 typedef struct mdb_spa {
 	uintptr_t spa_dsl_pool;
 	uintptr_t spa_root_vdev;
@@ -1090,7 +1178,46 @@ typedef struct mdb_metaslab {
 	space_map_t ms_freemap[TXG_SIZE];
 	space_map_t ms_map;
 	space_map_obj_t ms_smo;
+	space_map_obj_t ms_smo_syncing;
 } mdb_metaslab_t;
+
+typedef struct space_data {
+	uint64_t ms_allocmap[TXG_SIZE];
+	uint64_t ms_freemap[TXG_SIZE];
+	uint64_t ms_map;
+	uint64_t avail;
+	uint64_t nowavail;
+} space_data_t;
+
+/* ARGSUSED */
+static int
+space_cb(uintptr_t addr, const void *unknown, void *arg)
+{
+	space_data_t *sd = arg;
+	mdb_metaslab_t ms;
+
+	if (GETMEMB(addr, struct metaslab, ms_allocmap, ms.ms_allocmap) ||
+	    GETMEMB(addr, struct metaslab, ms_freemap, ms.ms_freemap) ||
+	    GETMEMB(addr, struct metaslab, ms_map, ms.ms_map) ||
+	    GETMEMB(addr, struct metaslab, ms_smo, ms.ms_smo) ||
+	    GETMEMB(addr, struct metaslab, ms_smo_syncing, ms.ms_smo_syncing)) {
+		return (WALK_ERR);
+	}
+
+	sd->ms_allocmap[0] += ms.ms_allocmap[0].sm_space;
+	sd->ms_allocmap[1] += ms.ms_allocmap[1].sm_space;
+	sd->ms_allocmap[2] += ms.ms_allocmap[2].sm_space;
+	sd->ms_allocmap[3] += ms.ms_allocmap[3].sm_space;
+	sd->ms_freemap[0] += ms.ms_freemap[0].sm_space;
+	sd->ms_freemap[1] += ms.ms_freemap[1].sm_space;
+	sd->ms_freemap[2] += ms.ms_freemap[2].sm_space;
+	sd->ms_freemap[3] += ms.ms_freemap[3].sm_space;
+	sd->ms_map += ms.ms_map.sm_space;
+	sd->avail += ms.ms_map.sm_size - ms.ms_smo.smo_alloc;
+	sd->nowavail += ms.ms_map.sm_size - ms.ms_smo_syncing.smo_alloc;
+
+	return (WALK_NEXT);
+}
 
 /*
  * ::spa_space [-b]
@@ -1109,13 +1236,7 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_dsl_dir_phys_t dsp;
 	uint64_t children;
 	uintptr_t childaddr;
-	uintptr_t *child;
-	uint64_t ms_allocmap[TXG_SIZE] = {0, 0, 0, 0};
-	uint64_t ms_freemap[TXG_SIZE] = {0, 0, 0, 0};
-	uint64_t ms_map = 0;
-	uint64_t avail = 0;
-	int i, j;
-	int havecompressed = TRUE;
+	space_data_t sd;
 	int shift = 20;
 	char *suffix = "M";
 	int bits = FALSE;
@@ -1143,20 +1264,11 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    GETMEMB(dp_root_dir, struct dsl_dir,
 	    dd_space_towrite, dd.dd_space_towrite) ||
 	    GETMEMB(dd.dd_phys, struct dsl_dir_phys,
-	    dd_used_bytes, dsp.dd_used_bytes)) {
-		return (DCMD_ERR);
-	}
-
-	if (GETMEMB(dd.dd_phys, struct dsl_dir_phys,
+	    dd_used_bytes, dsp.dd_used_bytes) ||
+	    GETMEMB(dd.dd_phys, struct dsl_dir_phys,
 	    dd_compressed_bytes, dsp.dd_compressed_bytes) ||
 	    GETMEMB(dd.dd_phys, struct dsl_dir_phys,
 	    dd_uncompressed_bytes, dsp.dd_uncompressed_bytes)) {
-		havecompressed = FALSE;
-	}
-
-	child = mdb_alloc(children * sizeof (void *), UM_SLEEP | UM_GC);
-	if (mdb_vread(child, children * sizeof (void *), childaddr) == -1) {
-		mdb_warn("failed to read root vdev children at %p", childaddr);
 		return (DCMD_ERR);
 	}
 
@@ -1170,90 +1282,31 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("dd_phys.dd_used_bytes = %llu%s\n",
 	    dsp.dd_used_bytes >> shift, suffix);
-	if (havecompressed) {
-		mdb_printf("dd_phys.dd_compressed_bytes = %llu%s\n",
-		    dsp.dd_compressed_bytes >> shift, suffix);
-		mdb_printf("dd_phys.dd_uncompressed_bytes = %llu%s\n",
-		    dsp.dd_uncompressed_bytes >> shift, suffix);
-	}
+	mdb_printf("dd_phys.dd_compressed_bytes = %llu%s\n",
+	    dsp.dd_compressed_bytes >> shift, suffix);
+	mdb_printf("dd_phys.dd_uncompressed_bytes = %llu%s\n",
+	    dsp.dd_uncompressed_bytes >> shift, suffix);
 
-	for (i = 0; i < children; i++) {
-		mdb_vdev_t vd;
-		uintptr_t *vdev_ms;
-
-		if (GETMEMB(child[i], struct vdev,
-		    vdev_parent, vd.vdev_parent) ||
-		    GETMEMB(child[i], struct vdev,
-		    vdev_stat, vd.vdev_stat) ||
-		    GETMEMB(child[i], struct vdev, vdev_ms, vd.vdev_ms) ||
-		    GETMEMB(child[i], struct vdev,
-		    vdev_ms_count, vd.vdev_ms_count)) {
-			return (DCMD_ERR);
-		}
-
-		/*
-		 * If this is the root vdev, its stats are the pool-wide stats.
-		 */
-		if (vd.vdev_parent == NULL) {
-			mdb_printf("pool_alloc = %llu%s\n",
-			    vd.vdev_stat.vs_alloc >> shift, suffix);
-			mdb_printf("pool_space = %llu%s\n",
-			    vd.vdev_stat.vs_space >> shift, suffix);
-		}
-
-		/*
-		 * If this is not a top-level vdev, it doesn't have space.
-		 */
-		if (vd.vdev_parent != spa.spa_root_vdev)
-			continue;
-
-		vdev_ms = mdb_alloc(vd.vdev_ms_count * sizeof (void*),
-		    UM_SLEEP | UM_GC);
-		if (mdb_vread(vdev_ms, vd.vdev_ms_count * sizeof (void*),
-		    (uintptr_t)vd.vdev_ms) == -1) {
-			mdb_warn("failed to read vdev_ms at %p", vd.vdev_ms);
-			return (DCMD_ERR);
-		}
-
-		for (j = 0; j < vd.vdev_ms_count; j++) {
-			mdb_metaslab_t ms;
-
-			if (GETMEMB(vdev_ms[j], struct metaslab,
-			    ms_allocmap, ms.ms_allocmap) ||
-			    GETMEMB(vdev_ms[j], struct metaslab,
-			    ms_freemap, ms.ms_freemap) ||
-			    GETMEMB(vdev_ms[j], struct metaslab,
-			    ms_map, ms.ms_map) ||
-			    GETMEMB(vdev_ms[j], struct metaslab,
-			    ms_smo, ms.ms_smo)) {
-				return (DCMD_ERR);
-			}
-
-			ms_allocmap[0] += ms.ms_allocmap[0].sm_space;
-			ms_allocmap[1] += ms.ms_allocmap[1].sm_space;
-			ms_allocmap[2] += ms.ms_allocmap[2].sm_space;
-			ms_allocmap[3] += ms.ms_allocmap[3].sm_space;
-			ms_freemap[0] += ms.ms_freemap[0].sm_space;
-			ms_freemap[1] += ms.ms_freemap[1].sm_space;
-			ms_freemap[2] += ms.ms_freemap[2].sm_space;
-			ms_freemap[3] += ms.ms_freemap[3].sm_space;
-			ms_map += ms.ms_map.sm_space;
-			avail += ms.ms_map.sm_size - ms.ms_smo.smo_alloc;
-		}
+	bzero(&sd, sizeof (sd));
+	if (mdb_pwalk("metaslab", space_cb, &sd, addr) != 0) {
+		mdb_warn("can't walk metaslabs");
+		return (DCMD_ERR);
 	}
 
 	mdb_printf("ms_allocmap = %llu%s %llu%s %llu%s %llu%s\n",
-	    ms_allocmap[0] >> shift, suffix,
-	    ms_allocmap[1] >> shift, suffix,
-	    ms_allocmap[2] >> shift, suffix,
-	    ms_allocmap[3] >> shift, suffix);
+	    sd.ms_allocmap[0] >> shift, suffix,
+	    sd.ms_allocmap[1] >> shift, suffix,
+	    sd.ms_allocmap[2] >> shift, suffix,
+	    sd.ms_allocmap[3] >> shift, suffix);
 	mdb_printf("ms_freemap = %llu%s %llu%s %llu%s %llu%s\n",
-	    ms_freemap[0] >> shift, suffix,
-	    ms_freemap[1] >> shift, suffix,
-	    ms_freemap[2] >> shift, suffix,
-	    ms_freemap[3] >> shift, suffix);
-	mdb_printf("ms_map = %llu%s\n", ms_map >> shift, suffix);
-	mdb_printf("avail = %llu%s\n", avail >> shift, suffix);
+	    sd.ms_freemap[0] >> shift, suffix,
+	    sd.ms_freemap[1] >> shift, suffix,
+	    sd.ms_freemap[2] >> shift, suffix,
+	    sd.ms_freemap[3] >> shift, suffix);
+	mdb_printf("ms_map = %llu%s\n", sd.ms_map >> shift, suffix);
+	mdb_printf("last synced avail = %llu%s\n", sd.avail >> shift, suffix);
+	mdb_printf("current syncing avail = %llu%s\n",
+	    sd.nowavail >> shift, suffix);
 
 	return (DCMD_OK);
 }
@@ -1426,12 +1479,6 @@ txg_list_walk_step(mdb_walk_state_t *wsp)
 	return (status);
 }
 
-/* ARGSUSED */
-static void
-txg_list_walk_fini(mdb_walk_state_t *wsp)
-{
-}
-
 /*
  * ::walk spa
  *
@@ -1514,19 +1561,21 @@ static const mdb_walker_t walkers[] = {
 		list_walk_init, list_walk_step, list_walk_fini },
 #endif
 	{ "zms_freelist", "walk ZFS metaslab freelist",
-		freelist_walk_init, freelist_walk_step, freelist_walk_fini },
+		freelist_walk_init, freelist_walk_step, NULL },
 	{ "txg_list", "given any txg_list_t *, walk all entries in all txgs",
-		txg_list_walk_init, txg_list_walk_step, txg_list_walk_fini },
+		txg_list_walk_init, txg_list_walk_step, NULL },
 	{ "txg_list0", "given any txg_list_t *, walk all entries in txg 0",
-		txg_list0_walk_init, txg_list_walk_step, txg_list_walk_fini },
+		txg_list0_walk_init, txg_list_walk_step, NULL },
 	{ "txg_list1", "given any txg_list_t *, walk all entries in txg 1",
-		txg_list1_walk_init, txg_list_walk_step, txg_list_walk_fini },
+		txg_list1_walk_init, txg_list_walk_step, NULL },
 	{ "txg_list2", "given any txg_list_t *, walk all entries in txg 2",
-		txg_list2_walk_init, txg_list_walk_step, txg_list_walk_fini },
+		txg_list2_walk_init, txg_list_walk_step, NULL },
 	{ "txg_list3", "given any txg_list_t *, walk all entries in txg 3",
-		txg_list3_walk_init, txg_list_walk_step, txg_list_walk_fini },
+		txg_list3_walk_init, txg_list_walk_step, NULL },
 	{ "spa", "walk all spa_t entries in the namespace",
 		spa_walk_init, spa_walk_step, NULL },
+	{ "metaslab", "given a spa_t *, walk all metaslab_t structures",
+		metaslab_walk_init, metaslab_walk_step, NULL },
 	{ NULL }
 };
 
