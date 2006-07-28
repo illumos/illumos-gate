@@ -65,10 +65,7 @@ static int
 process(const char *fn, const struct stat *sp, int ftw_type,
     struct FTW *ftws)
 {
-	char *name;
 	char *suffix_match;
-
-	uchar_t hash[MHASH_SIZE];
 
 	if (ftw_type != FTW_F)
 		return (0);
@@ -77,10 +74,7 @@ process(const char *fn, const struct stat *sp, int ftw_type,
 	if (suffix_match == NULL || strcmp(suffix_match, ".xml") != 0)
 		return (0);
 
-	name = mhash_filename_to_propname(fn);
-
-	if (mhash_retrieve_entry(hndl, name, hash) == -1 ||
-	    mhash_test_file(hndl, fn, 0, &name, hash) == 0)
+	if (mhash_test_file(hndl, fn, 0, NULL, NULL) == MHASH_NEWFILE)
 		(void) printf("%s\n", fn);
 
 	return (0);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -442,20 +442,39 @@ md5_hash_file(const char *file, off64_t sz, uchar_t *hash)
  *   continues.  For profile application, the operation continues only if the
  *   hash value for the file is absent.
  *
- *   Return non-zero if we should skip the file because it is unchanged or
- *   nonexistent.
+ *   We keep two hashes: one which can be quickly test: the metadata hash,
+ *   and one which is more expensive to test: the file contents hash.
+ *
+ *   If either hash matches, the file does not need to be re-read.
+ *   If only one of the hashes matches, a side effect of this function
+ *   is to store the newly computed hash.
+ *   If neither hash matches, the hash computed for the new file is returned
+ *   and not stored.
+ *
+ *   Return values:
+ *	MHASH_NEWFILE	- the file no longer matches the hash or no hash existed
+ *			  ONLY in this case we return the new file's hash.
+ *	MHASH_FAILURE	- an internal error occurred, or the file was not found.
+ *	MHASH_RECONCILED- based on the metadata/file hash, the file does
+ *			  not need to be re-read; if necessary,
+ *			  the hash was upgraded or reconciled.
+ *
+ * NOTE: no hash is returned UNLESS MHASH_NEWFILE is returned.
  */
 int
 mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
-    char **pnamep, uchar_t *hash)
+    char **pnamep, uchar_t *hashbuf)
 {
 	boolean_t do_hash;
 	struct stat64 st;
 	char *cp;
 	char *data;
 	uchar_t stored_hash[MHASH_SIZE];
+	uchar_t hash[MHASH_SIZE];
 	char *pname;
 	int ret;
+	int hashash;
+	int metahashok = 0;
 
 	/*
 	 * In the case where we are doing automated imports, we reduce the UID,
@@ -493,21 +512,45 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 	cp = getenv("SVCCFG_CHECKHASH");
 	do_hash = (cp != NULL && *cp != '\0');
 	if (!do_hash) {
-		*pnamep = NULL;
-		return (0);
+		if (pnamep != NULL)
+			*pnamep = NULL;
+		return (MHASH_NEWFILE);
+	}
+
+	pname = mhash_filename_to_propname(file);
+	if (pname == NULL)
+		return (MHASH_FAILURE);
+
+	hashash = mhash_retrieve_entry(hndl, pname, stored_hash) == 0;
+
+	/* Never reread a profile. */
+	if (hashash && is_profile) {
+		uu_free(pname);
+		return (MHASH_RECONCILED);
+	}
+
+	/*
+	 * No hash and not interested in one, then don't bother computing it.
+	 * We also skip returning the property name in that case.
+	 */
+	if (!hashash && hashbuf == NULL) {
+		uu_free(pname);
+		return (MHASH_NEWFILE);
 	}
 
 	do
 		ret = stat64(file, &st);
 	while (ret < 0 && errno == EINTR);
 	if (ret < 0) {
-		return (-1);
+		uu_free(pname);
+		return (MHASH_FAILURE);
 	}
 
 	data = uu_msprintf(MHASH_FORMAT_V2, st.st_uid, st.st_gid,
 	    st.st_size, st.st_mtime);
 	if (data == NULL) {
-		return (-1);
+		uu_free(pname);
+		return (MHASH_FAILURE);
 	}
 
 	(void) memset(hash, 0, MHASH_SIZE);
@@ -515,71 +558,62 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 
 	uu_free(data);
 
-	pname = mhash_filename_to_propname(file);
-	if (pname == NULL)
-		return (-1);
+	/*
+	 * Verify the meta data hash.
+	 */
+	if (hashash && memcmp(hash, stored_hash, MD5_DIGEST_LENGTH) == 0) {
+		int i;
 
-	if (mhash_retrieve_entry(hndl, pname, stored_hash) == 0) {
-		uchar_t hash_v1[MHASH_SIZE];
-
-		if (is_profile) {
-			uu_free(pname);
-			return (1);
-		}
-
+		metahashok = 1;
 		/*
-		 * Manifest import.
+		 * The metadata hash matches; now we see if there was a
+		 * content hash; if not, we will continue on and compute and
+		 * store the updated hash.
+		 * If there was no content hash, mhash_retrieve_entry()
+		 * will have zero filled it.
 		 */
-		if (memcmp(hash, stored_hash, MD5_DIGEST_LENGTH) == 0) {
-			int i;
+		for (i = 0; i < MD5_DIGEST_LENGTH; i++) {
+			if (stored_hash[MD5_DIGEST_LENGTH+i] != 0) {
+				uu_free(pname);
+				return (MHASH_RECONCILED);
+			}
+		}
+	}
+
+	/*
+	 * Compute the file hash as we can no longer avoid having to know it.
+	 * Note: from this point on "hash" contains the full, current, hash.
+	 */
+	if (md5_hash_file(file, st.st_size, &hash[MHASH_SIZE_OLD]) != 0) {
+		uu_free(pname);
+		return (MHASH_FAILURE);
+	}
+	if (hashash) {
+		uchar_t hash_v1[MHASH_SIZE_OLD];
+
+		if (metahashok ||
+		    memcmp(&hash[MHASH_SIZE_OLD], &stored_hash[MHASH_SIZE_OLD],
+		    MD5_DIGEST_LENGTH) == 0) {
 
 			/*
-			 * If there's no recorded file hash, record it.
+			 * Reconcile entry: we get here when either the
+			 * meta data hash matches or the content hash matches;
+			 * we then update the database with the complete
+			 * new hash so we can be a bit quicker next time.
 			 */
-			for (i = 0; i < MD5_DIGEST_LENGTH; i++) {
-				if (stored_hash[MD5_DIGEST_LENGTH+i] != 0)
-					break;
-			}
-			if (i == MD5_DIGEST_LENGTH) {
-				if (md5_hash_file(file, st.st_size,
-				    &hash[MHASH_SIZE_OLD]) == 0) {
-				    (void) mhash_store_entry(hndl, pname, hash,
-					NULL);
-				}
-			} else {
-				/* Always return hash with MD5 content hash */
-				(void) memcpy(hash, stored_hash, MHASH_SIZE);
-			}
-			uu_free(pname);
-			return (1);
-		}
-
-		/*
-		 * The remainder of our hash is all 0; if the returned hash
-		 * is not, it's a V2 hash + file checksum; so we're going
-		 * to hash the file and then compare the checksum again.
-		 */
-		if (memcmp(&hash[MHASH_SIZE_OLD], &stored_hash[MHASH_SIZE_OLD],
-			MD5_DIGEST_LENGTH) != 0 &&
-		    md5_hash_file(file, st.st_size,
-			&hash[MHASH_SIZE_OLD]) == 0 &&
-		    memcmp(&hash[MHASH_SIZE_OLD], &stored_hash[MHASH_SIZE_OLD],
-			MD5_DIGEST_LENGTH) == 0) {
-
-			/* Be kind and update the entry */
 			(void) mhash_store_entry(hndl, pname, hash, NULL);
 			uu_free(pname);
-			return (1);
+			return (MHASH_RECONCILED);
 		}
 
 		/*
-		 * No match on V2 hash; compare V1 hash.
+		 * No match on V2 hash or file content; compare V1 hash.
 		 */
 		data = uu_msprintf(MHASH_FORMAT_V1, st.st_ino, st.st_uid,
 		    st.st_size, st.st_mtime);
 		if (data == NULL) {
 			uu_free(pname);
-			return (-1);
+			return (MHASH_FAILURE);
 		}
 
 		md5_calc(hash_v1, (uchar_t *)data, strlen(data));
@@ -587,12 +621,23 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 		uu_free(data);
 
 		if (memcmp(hash_v1, stored_hash, MD5_DIGEST_LENGTH) == 0) {
+			/*
+			 * Update the new entry so we don't have to go through
+			 * all this trouble next time.
+			 */
+			(void) mhash_store_entry(hndl, pname, hash, NULL);
 			uu_free(pname);
-			return (1);
+			return (MHASH_RECONCILED);
 		}
 	}
 
-	*pnamep = pname;
+	if (pnamep != NULL)
+		*pnamep = pname;
+	else
+		uu_free(pname);
 
-	return (0);
+	if (hashbuf != NULL)
+		(void) memcpy(hashbuf, hash, MHASH_SIZE);
+
+	return (MHASH_NEWFILE);
 }

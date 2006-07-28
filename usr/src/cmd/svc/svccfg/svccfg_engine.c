@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -563,7 +563,8 @@ engine_import(uu_list_t *args)
 
 	lscf_prep_hndl();
 
-	if ((ret = mhash_test_file(g_hndl, file, 0, &pname, hash)) != 0)
+	ret = mhash_test_file(g_hndl, file, 0, &pname, hash);
+	if (ret != MHASH_NEWFILE)
 		return (ret);
 
 	/* Load */
@@ -616,7 +617,8 @@ engine_apply(const char *file)
 
 	lscf_prep_hndl();
 
-	if ((ret = mhash_test_file(g_hndl, file, 1, &pname, hash)) != 0)
+	ret = mhash_test_file(g_hndl, file, 1, &pname, hash);
+	if (ret != MHASH_NEWFILE)
 		return (ret);
 
 	b = internal_bundle_new();

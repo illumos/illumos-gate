@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,13 +183,13 @@ hash(char *arg)
 	ready_scf_objects();
 
 	switch (ret = mhash_test_file(hndl, arg, 0, &pname, hash)) {
-	case 1:
+	case MHASH_RECONCILED:
 		/* Equivalent hash already stored. */
 		return (0);
-	case 0:
+	case MHASH_NEWFILE:
 		/* Hash differs. */
 		break;
-	case -1:
+	case MHASH_FAILURE:
 		uu_die(gettext("mhash_test_file() failed"));
 	default:
 		uu_die(gettext("unknown return value (%d) from "

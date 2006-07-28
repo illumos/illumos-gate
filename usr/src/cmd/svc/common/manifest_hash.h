@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,10 @@ extern "C" {
 
 #define	MHASH_FORMAT_V1	"%llx%lx%llx%lx"
 #define	MHASH_FORMAT_V2	"%lx%lx%llx%lx"
+
+#define	MHASH_NEWFILE		(0)
+#define	MHASH_RECONCILED	(1)
+#define	MHASH_FAILURE		(-1)
 
 char *mhash_filename_to_propname(const char *);
 int mhash_retrieve_entry(scf_handle_t *, const char *, uchar_t *);
