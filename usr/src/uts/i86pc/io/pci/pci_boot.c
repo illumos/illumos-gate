@@ -1474,8 +1474,21 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 
 	/* setup bus number hierarchy */
 	pci_bus_res[secbus].sub_bus = subbus;
+	/*
+	 * Keep track of the largest subordinate bus number (this is essential
+	 * for peer busses because there is no other way of determining its
+	 * subordinate bus number).
+	 */
 	if (subbus > pci_bus_res[bus].sub_bus)
 		pci_bus_res[bus].sub_bus = subbus;
+	/*
+	 * Loop through subordinate busses, initializing their parent bus
+	 * field to this bridge's parent.  The subordinate busses' parent
+	 * fields may very well be further refined later, as child bridges
+	 * are enumerated.  (The value is to note that the subordinate busses
+	 * are not peer busses by changing their par_bus fields to anything
+	 * other than -1.)
+	 */
 	for (i = secbus + 1; i <= subbus; i++)
 		pci_bus_res[i].par_bus = bus;
 
@@ -1618,13 +1631,29 @@ add_bus_slot_names_prop(int bus)
 
 	len = pci_slot_names_prop(bus, slotprop, sizeof (slotprop));
 	if (len > 0) {
-		if (pci_bus_res[bus].dip == NULL)
+		/*
+		 * Only create a peer bus node if this bus may be a peer bus.
+		 * It may be a peer bus if the dip is NULL and if par_bus is
+		 * -1 (par_bus is -1 if this bus was not found to be
+		 * subordinate to any PCI-PCI bridge).
+		 * If it's not a peer bus, then the ACPI BBN-handling code
+		 * will remove it later.
+		 */
+		if (pci_bus_res[bus].par_bus == (uchar_t)-1 &&
+		    pci_bus_res[bus].dip == NULL) {
+
 			create_root_bus_dip(bus);
-		ASSERT(pci_bus_res[bus].dip);
-		ASSERT((len % sizeof (int)) == 0);
-		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
-		    pci_bus_res[bus].dip, "slot-names",
-		    (int *)slotprop, len / sizeof (int));
+		}
+		if (pci_bus_res[bus].dip != NULL) {
+			ASSERT((len % sizeof (int)) == 0);
+			(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
+			    pci_bus_res[bus].dip, "slot-names",
+			    (int *)slotprop, len / sizeof (int));
+		} else {
+			cmn_err(CE_NOTE, "!BIOS BUG: Invalid bus number in PCI "
+			    "IRQ routing table; Not adding slot-names "
+			    "property for incorrect bus %d", bus);
+		}
 	}
 }
 
