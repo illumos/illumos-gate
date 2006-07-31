@@ -964,7 +964,7 @@ httrace_walk_init(mdb_walk_state_t *wsp)
 	httrace_walk_data_t *tw;
 	httrace_cpu_data_t *tc;
 	struct htrap_trace_record *buf;
-	htrap_trace_hdr_t hdr;
+	htrap_trace_hdr_t *hdr;
 
 	if (wsp->walk_addr != NULL) {
 		mdb_warn("httrace only supports global walks\n");
@@ -994,8 +994,7 @@ httrace_walk_init(mdb_walk_state_t *wsp)
 
 		htraptrace_buf_inuse = 1;
 		tc = &(tw->tw_cpus[i]);
-		tc->tc_bufsiz = ctl->d.hlimit -
-			sizeof (struct htrap_trace_record);
+		tc->tc_bufsiz = ctl->d.hlimit;
 		tc->tc_buf = buf = mdb_alloc(tc->tc_bufsiz, UM_SLEEP);
 		tc->tc_base = (uintptr_t)ctl->d.hvaddr_base;
 
@@ -1005,12 +1004,11 @@ httrace_walk_init(mdb_walk_state_t *wsp)
 			mdb_free(buf, tc->tc_bufsiz);
 			tc->tc_buf = NULL;
 		} else {
-			mdb_vread(&hdr, sizeof (htrap_trace_hdr_t),
-				(uintptr_t)ctl->d.hvaddr_base);
+			hdr = (htrap_trace_hdr_t *)buf;
 			tc->tc_rec = (struct htrap_trace_record *)
-				((uintptr_t)buf + (uintptr_t)hdr.last_offset);
+				((uintptr_t)buf + (uintptr_t)hdr->last_offset);
 			tc->tc_stop = (struct htrap_trace_record *)
-				((uintptr_t)buf + (uintptr_t)hdr.offset);
+				((uintptr_t)buf + (uintptr_t)hdr->offset);
 		}
 	}
 	if (!htraptrace_buf_inuse) {
@@ -1045,7 +1043,7 @@ httrace_walk_step(mdb_walk_state_t *wsp)
 		if (tc->tc_rec->tt_tick == 0)
 			mdb_warn("Warning: tt_tick == 0\n");
 
-		if (tc->tc_rec->tt_tick > oldest_tick) {
+		if (tc->tc_rec->tt_tick >= oldest_tick) {
 			oldest_tick = tc->tc_rec->tt_tick;
 			oldest = i;
 		}
