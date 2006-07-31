@@ -67,7 +67,7 @@ static long aio_list_max = 0;
 int
 aio_read(aiocb_t *aiocbp)
 {
-	if (aiocbp == NULL || aiocbp->aio_reqprio < 0) {
+	if (aiocbp == NULL || aiocbp->aio_reqprio != 0) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -85,7 +85,7 @@ aio_read(aiocb_t *aiocbp)
 int
 aio_write(aiocb_t *aiocbp)
 {
-	if (aiocbp == NULL || aiocbp->aio_reqprio < 0) {
+	if (aiocbp == NULL || aiocbp->aio_reqprio != 0) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -243,7 +243,7 @@ lio_listio(int mode, aiocb_t *_RESTRICT_KYWD const *_RESTRICT_KYWD list,
 			}
 			if (aiocbp->aio_resultp.aio_errno == EBADFD)
 				SET_KAIO_NOT_SUPPORTED(aiocbp->aio_fildes);
-			if (aiocbp->aio_reqprio < 0) {
+			if (aiocbp->aio_reqprio != 0) {
 				aiocbp->aio_resultp.aio_errno = EINVAL;
 				aiocbp->aio_resultp.aio_return = -1;
 				EIOflg = 1;
@@ -767,7 +767,7 @@ aio_fsync(int op, aiocb_t *aiocbp)
 
 	if (aiocbp == NULL)
 		return (0);
-	if (aiocbp->aio_reqprio < 0 || (op != O_DSYNC && op != O_SYNC)) {
+	if (op != O_DSYNC && op != O_SYNC) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -1273,7 +1273,7 @@ _aio_check_timeout(const timespec_t *utimo, timespec_t *end, int *timedwait)
 int
 aio_read64(aiocb64_t *aiocbp)
 {
-	if (aiocbp == NULL || aiocbp->aio_reqprio < 0) {
+	if (aiocbp == NULL || aiocbp->aio_reqprio != 0) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -1291,7 +1291,7 @@ aio_read64(aiocb64_t *aiocbp)
 int
 aio_write64(aiocb64_t *aiocbp)
 {
-	if (aiocbp == NULL || aiocbp->aio_reqprio < 0) {
+	if (aiocbp == NULL || aiocbp->aio_reqprio != 0) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -1429,7 +1429,7 @@ lio_listio64(int mode, aiocb64_t *_RESTRICT_KYWD const *_RESTRICT_KYWD list,
 			}
 			if (aiocbp->aio_resultp.aio_errno == EBADFD)
 				SET_KAIO_NOT_SUPPORTED(aiocbp->aio_fildes);
-			if (aiocbp->aio_reqprio < 0) {
+			if (aiocbp->aio_reqprio != 0) {
 				aiocbp->aio_resultp.aio_errno = EINVAL;
 				aiocbp->aio_resultp.aio_return = -1;
 				EIOflg = 1;
@@ -1627,7 +1627,7 @@ aio_fsync64(int op, aiocb64_t *aiocbp)
 
 	if (aiocbp == NULL)
 		return (0);
-	if (aiocbp->aio_reqprio < 0 || (op != O_DSYNC && op != O_SYNC)) {
+	if (op != O_DSYNC && op != O_SYNC) {
 		errno = EINVAL;
 		return (-1);
 	}
