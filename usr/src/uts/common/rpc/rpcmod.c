@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -1015,10 +1014,11 @@ typedef struct mir_s {
 		 */
 		mir_svc_no_more_msgs : 1,
 		mir_listen_stream : 1,	/* listen end point */
-		mir_setup_complete : 1,	/* server has initialized everything */
+		mir_unused : 1,	/* no longer used */
 		mir_timer_call : 1,
 		mir_junk_fill_thru_bit_31 : 21;
 
+	int	mir_setup_complete;	/* server has initialized everything */
 	timeout_id_t mir_timer_id;	/* Timer for idle checks */
 	clock_t	mir_idle_timeout;	/* Allowed idle time before shutdown */
 		/*
@@ -2431,9 +2431,13 @@ mir_svc_start(queue_t *wq)
 {
 	mir_t   *mir = (mir_t *)wq->q_ptr;
 
-	mutex_enter(&mir->mir_mutex);
+	/*
+	 * no longer need to take the mir_mutex because the
+	 * mir_setup_complete field has been moved out of
+	 * the binary field protected by the mir_mutex.
+	 */
+
 	mir->mir_setup_complete = 1;
-	mutex_exit(&mir->mir_mutex);
 	qenable(RD(wq));
 }
 
