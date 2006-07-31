@@ -77,6 +77,7 @@ struct prop_changelist {
 	boolean_t		cl_alldependents;
 	int			cl_flags;
 	boolean_t		cl_haszonedchild;
+	boolean_t		cl_sorted;
 };
 
 /*
@@ -384,15 +385,20 @@ change_one(zfs_handle_t *zhp, void *data)
 
 		uu_list_node_init(cn, &cn->cn_listnode, clp->cl_pool);
 
-		if (clp->cl_alldependents) {
-			verify(uu_list_insert_after(clp->cl_list,
-				uu_list_last(clp->cl_list), cn) == 0);
-			return (0);
+		if (clp->cl_sorted) {
+			uu_list_index_t idx;
+
+			(void) uu_list_find(clp->cl_list, cn, NULL,
+			    &idx);
+			uu_list_insert(clp->cl_list, cn, idx);
 		} else {
+			ASSERT(!clp->cl_alldependents);
 			verify(uu_list_insert_before(clp->cl_list,
 				uu_list_first(clp->cl_list), cn) == 0);
-			return (zfs_iter_children(zhp, change_one, data));
 		}
+
+		if (!clp->cl_alldependents)
+			return (zfs_iter_children(zhp, change_one, data));
 	} else {
 		zfs_close(zhp);
 	}
@@ -400,6 +406,40 @@ change_one(zfs_handle_t *zhp, void *data)
 	return (0);
 }
 
+/*ARGSUSED*/
+static int
+compare_mountpoints(const void *a, const void *b, void *unused)
+{
+	const prop_changenode_t *ca = a;
+	const prop_changenode_t *cb = b;
+
+	char mounta[MAXPATHLEN];
+	char mountb[MAXPATHLEN];
+
+	boolean_t hasmounta, hasmountb;
+
+	/*
+	 * When unsharing or unmounting filesystems, we need to do it in
+	 * mountpoint order.  This allows the user to have a mountpoint
+	 * hierarchy that is different from the dataset hierarchy, and still
+	 * allow it to be changed.  However, if either dataset doesn't have a
+	 * mountpoint (because it is a volume or a snapshot), we place it at the
+	 * end of the list, because it doesn't affect our change at all.
+	 */
+	hasmounta = (zfs_prop_get(ca->cn_handle, ZFS_PROP_MOUNTPOINT, mounta,
+	    sizeof (mounta), NULL, NULL, 0, B_FALSE) == 0);
+	hasmountb = (zfs_prop_get(cb->cn_handle, ZFS_PROP_MOUNTPOINT, mountb,
+	    sizeof (mountb), NULL, NULL, 0, B_FALSE) == 0);
+
+	if (!hasmounta && hasmountb)
+		return (-1);
+	else if (hasmounta && !hasmountb)
+		return (1);
+	else if (!hasmounta && !hasmountb)
+		return (0);
+	else
+		return (strcmp(mountb, mounta));
+}
 
 /*
  * Given a ZFS handle and a property, construct a complete list of datasets that
@@ -416,14 +456,26 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	prop_changenode_t *cn;
 	zfs_handle_t *temp;
 	char property[ZFS_MAXPROPLEN];
+	uu_compare_fn_t *compare = NULL;
 
 	if ((clp = zfs_alloc(zhp->zfs_hdl, sizeof (prop_changelist_t))) == NULL)
 		return (NULL);
 
+	/*
+	 * For mountpoint-related tasks, we want to sort everything by
+	 * mountpoint, so that we mount and unmount them in the appropriate
+	 * order, regardless of their position in the hierarchy.
+	 */
+	if (prop == ZFS_PROP_NAME || prop == ZFS_PROP_ZONED ||
+	    prop == ZFS_PROP_MOUNTPOINT || prop == ZFS_PROP_SHARENFS) {
+		compare = compare_mountpoints;
+		clp->cl_sorted = B_TRUE;
+	}
+
 	clp->cl_pool = uu_list_pool_create("changelist_pool",
 	    sizeof (prop_changenode_t),
 	    offsetof(prop_changenode_t, cn_listnode),
-	    NULL, 0);
+	    compare, 0);
 	if (clp->cl_pool == NULL) {
 		assert(uu_error() == UU_ERROR_NO_MEMORY);
 		(void) zfs_error(zhp->zfs_hdl, EZFS_NOMEM, "internal error");
@@ -431,7 +483,8 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 		return (NULL);
 	}
 
-	clp->cl_list = uu_list_create(clp->cl_pool, NULL, 0);
+	clp->cl_list = uu_list_create(clp->cl_pool, NULL,
+	    clp->cl_sorted ? UU_LIST_SORTED : 0);
 	clp->cl_flags = flags;
 
 	if (clp->cl_list == NULL) {
@@ -465,7 +518,7 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 		return (clp);
 
 	if (clp->cl_alldependents) {
-		if (zfs_iter_dependents(zhp, change_one, clp) != 0) {
+		if (zfs_iter_dependents(zhp, B_TRUE, change_one, clp) != 0) {
 			changelist_free(clp);
 			return (NULL);
 		}
@@ -501,8 +554,14 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	cn->cn_zoned = zfs_prop_get_int(zhp, ZFS_PROP_ZONED);
 
 	uu_list_node_init(cn, &cn->cn_listnode, clp->cl_pool);
-	verify(uu_list_insert_after(clp->cl_list,
-	    uu_list_last(clp->cl_list), cn) == 0);
+	if (clp->cl_sorted) {
+		uu_list_index_t idx;
+		(void) uu_list_find(clp->cl_list, cn, NULL, &idx);
+		uu_list_insert(clp->cl_list, cn, idx);
+	} else {
+		verify(uu_list_insert_after(clp->cl_list,
+		    uu_list_last(clp->cl_list), cn) == 0);
+	}
 
 	/*
 	 * If the property was previously 'legacy' or 'none', record this fact,

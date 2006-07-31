@@ -366,6 +366,11 @@ zfs_refresh_properties(vfs_t *vfsp)
 	else if (vfs_optionisset(vfsp, MNTOPT_EXEC, NULL))
 		exec_changed_cb(zfsvfs, B_TRUE);
 
+	if (vfs_optionisset(vfsp, MNTOPT_ATIME, NULL))
+		atime_changed_cb(zfsvfs, B_TRUE);
+	else if (vfs_optionisset(vfsp, MNTOPT_NOATIME, NULL))
+		atime_changed_cb(zfsvfs, B_FALSE);
+
 	return (0);
 }
 

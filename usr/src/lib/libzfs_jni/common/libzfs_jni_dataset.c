@@ -754,7 +754,7 @@ zjni_get_Datasets_dependents(JNIEnv *env, jobjectArray paths)
 			zfs_handle_t *zhp = zfs_open(g_zfs, path, ZFS_TYPE_ANY);
 			if (zhp != NULL) {
 				/* Add all dependents of this Dataset to list */
-				(void) zfs_iter_dependents(zhp,
+				(void) zfs_iter_dependents(zhp, B_FALSE,
 				    zjni_create_add_Dataset, &data);
 
 				/* Add this Dataset to list (and close zhp) */

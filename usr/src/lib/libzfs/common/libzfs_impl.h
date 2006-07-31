@@ -63,6 +63,7 @@ struct zfs_handle {
 	nvlist_t *zfs_props;
 	uint64_t zfs_volsize;
 	uint64_t zfs_volblocksize;
+	boolean_t zfs_mntcheck;
 	char *zfs_mntopts;
 	char zfs_root[MAXPATHLEN];
 };
@@ -87,7 +88,8 @@ int no_memory(libzfs_handle_t *);
 int zfs_standard_error(libzfs_handle_t *, int, const char *, ...);
 int zpool_standard_error(libzfs_handle_t *, int, const char *, ...);
 
-char **get_dependents(libzfs_handle_t *, const char *, size_t *);
+int get_dependents(libzfs_handle_t *, boolean_t, const char *, char ***,
+    size_t *);
 
 typedef struct prop_changelist prop_changelist_t;
 

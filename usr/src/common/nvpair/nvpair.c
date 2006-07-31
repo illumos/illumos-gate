@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -608,15 +607,18 @@ int
 nvlist_xdup(nvlist_t *nvl, nvlist_t **nvlp, nv_alloc_t *nva)
 {
 	int err;
+	nvlist_t *ret;
 
 	if (nvl == NULL || nvlp == NULL)
 		return (EINVAL);
 
-	if ((err = nvlist_xalloc(nvlp, nvl->nvl_nvflag, nva)) != 0)
+	if ((err = nvlist_xalloc(&ret, nvl->nvl_nvflag, nva)) != 0)
 		return (err);
 
-	if ((err = nvlist_copy_pairs(nvl, *nvlp)) != 0)
-		nvlist_free(*nvlp);
+	if ((err = nvlist_copy_pairs(nvl, ret)) != 0)
+		nvlist_free(ret);
+	else
+		*nvlp = ret;
 
 	return (err);
 }

@@ -60,6 +60,10 @@
  * datasets.  We do a topological ordering of our graph starting at our target
  * dataset, and then walk the results in reverse.
  *
+ * It's possible for the graph to have cycles if, for example, the user renames
+ * a clone to be the parent of its origin snapshot.  The user can request to
+ * generate an error in this case, or ignore the cycle and continue.
+ *
  * When removing datasets, we want to destroy the snapshots in chronological
  * order (because this is the most efficient method).  In order to accomplish
  * this, we store the creation transaction group with each vertex and keep each
@@ -68,6 +72,7 @@
  */
 
 #include <assert.h>
+#include <libintl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -95,6 +100,12 @@ typedef struct zfs_vertex {
 	int			zv_edgecount;
 	int			zv_edgealloc;
 } zfs_vertex_t;
+
+enum {
+	VISIT_SEEN = 1,
+	VISIT_SORT_PRE,
+	VISIT_SORT_POST
+};
 
 /*
  * Edge structure.  Simply maintains a pointer to the destination vertex.  There
@@ -346,7 +357,7 @@ zfs_graph_add(libzfs_handle_t *hdl, zfs_graph_t *zgp, const char *source,
 
 	if ((svp = zfs_graph_lookup(hdl, zgp, source, 0)) == NULL)
 		return (-1);
-	svp->zv_visited = 1;
+	svp->zv_visited = VISIT_SEEN;
 	if (dest != NULL) {
 		dvp = zfs_graph_lookup(hdl, zgp, dest, txg);
 		if (dvp == NULL)
@@ -361,10 +372,9 @@ zfs_graph_add(libzfs_handle_t *hdl, zfs_graph_t *zgp, const char *source,
 /*
  * Iterate over all children of the given dataset, adding any vertices as
  * necessary.  Returns 0 if no cloned snapshots were seen, -1 if there was an
- * error, or 1 otherwise.  This is
- * a simple recursive algorithm - the ZFS namespace typically is very flat.  We
- * manually invoke the necessary ioctl() calls to avoid the overhead and
- * additional semantics of zfs_open().
+ * error, or 1 otherwise.  This is a simple recursive algorithm - the ZFS
+ * namespace typically is very flat.  We manually invoke the necessary ioctl()
+ * calls to avoid the overhead and additional semantics of zfs_open().
  */
 static int
 iterate_children(libzfs_handle_t *hdl, zfs_graph_t *zgp, const char *dataset)
@@ -379,8 +389,21 @@ iterate_children(libzfs_handle_t *hdl, zfs_graph_t *zgp, const char *dataset)
 	zvp = zfs_graph_lookup(hdl, zgp, dataset, 0);
 	if (zvp == NULL)
 		return (-1);
-	if (zvp->zv_visited)
+	if (zvp->zv_visited == VISIT_SEEN)
 		return (0);
+
+	/*
+	 * We check the clone parent here instead of within the loop, so that if
+	 * the root dataset has been promoted from a clone, we find its parent
+	 * appropriately.
+	 */
+	(void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
+	if (ioctl(hdl->libzfs_fd, ZFS_IOC_OBJSET_STATS, &zc) == 0 &&
+	    zc.zc_objset_stats.dds_clone_of[0] != '\0') {
+		if (zfs_graph_add(hdl, zgp, zc.zc_objset_stats.dds_clone_of,
+		    zc.zc_name, zc.zc_objset_stats.dds_creation_txg) != 0)
+			return (-1);
+	}
 
 	for ((void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
 	    ioctl(hdl->libzfs_fd, ZFS_IOC_DATASET_LIST_NEXT, &zc) == 0;
@@ -405,14 +428,6 @@ iterate_children(libzfs_handle_t *hdl, zfs_graph_t *zgp, const char *dataset)
 		 */
 		if (zfs_graph_add(hdl, zgp, dataset, zc.zc_name,
 		    zc.zc_objset_stats.dds_creation_txg) != 0)
-			return (-1);
-
-		/*
-		 * If this dataset has a clone parent, add an appropriate edge.
-		 */
-		if (zc.zc_objset_stats.dds_clone_of[0] != '\0' &&
-		    zfs_graph_add(hdl, zgp, zc.zc_objset_stats.dds_clone_of,
-		    zc.zc_name, zc.zc_objset_stats.dds_creation_txg) != 0)
 			return (-1);
 
 		/*
@@ -462,7 +477,7 @@ iterate_children(libzfs_handle_t *hdl, zfs_graph_t *zgp, const char *dataset)
 			ret = 1;
 	}
 
-	zvp->zv_visited = 1;
+	zvp->zv_visited = VISIT_SEEN;
 
 	return (ret);
 }
@@ -532,22 +547,43 @@ construct_graph(libzfs_handle_t *hdl, const char *dataset)
  * hijack the 'zv_visited' marker to avoid visiting the same vertex twice.
  */
 static int
-topo_sort(libzfs_handle_t *hdl, char **result, size_t *idx, zfs_vertex_t *zgv)
+topo_sort(libzfs_handle_t *hdl, boolean_t allowrecursion, char **result,
+    size_t *idx, zfs_vertex_t *zgv)
 {
 	int i;
 
-	/* avoid doing a search if we don't have to */
-	if (zgv->zv_visited == 2)
+	if (zgv->zv_visited == VISIT_SORT_PRE && !allowrecursion) {
+		/*
+		 * If we've already seen this vertex as part of our depth-first
+		 * search, then we have a cyclic dependency, and we must return
+		 * an error.
+		 */
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "recursive dependency at '%s'"),
+		    zgv->zv_dataset);
+		return (zfs_error(hdl, EZFS_RECURSIVE,
+		    dgettext(TEXT_DOMAIN,
+		    "cannot determine dependent datasets")));
+	} else if (zgv->zv_visited >= VISIT_SORT_PRE) {
+		/*
+		 * If we've already processed this as part of the topological
+		 * sort, then don't bother doing so again.
+		 */
 		return (0);
+	}
 
+	zgv->zv_visited = VISIT_SORT_PRE;
+
+	/* avoid doing a search if we don't have to */
 	zfs_vertex_sort_edges(zgv);
 	for (i = 0; i < zgv->zv_edgecount; i++) {
-		if (topo_sort(hdl, result, idx, zgv->zv_edges[i]->ze_dest) != 0)
+		if (topo_sort(hdl, allowrecursion, result, idx,
+		    zgv->zv_edges[i]->ze_dest) != 0)
 			return (-1);
 	}
 
 	/* we may have visited this in the course of the above */
-	if (zgv->zv_visited == 2)
+	if (zgv->zv_visited == VISIT_SORT_POST)
 		return (0);
 
 	if ((result[*idx] = zfs_alloc(hdl,
@@ -556,7 +592,7 @@ topo_sort(libzfs_handle_t *hdl, char **result, size_t *idx, zfs_vertex_t *zgv)
 
 	(void) strcpy(result[*idx], zgv->zv_dataset);
 	*idx += 1;
-	zgv->zv_visited = 2;
+	zgv->zv_visited = VISIT_SORT_POST;
 	return (0);
 }
 
@@ -564,34 +600,39 @@ topo_sort(libzfs_handle_t *hdl, char **result, size_t *idx, zfs_vertex_t *zgv)
  * The only public interface for this file.  Do the dirty work of constructing a
  * child list for the given object.  Construct the graph, do the toplogical
  * sort, and then return the array of strings to the caller.
+ *
+ * The 'allowrecursion' parameter controls behavior when cycles are found.  If
+ * it is set, the the cycle is ignored and the results returned as if the cycle
+ * did not exist.  If it is not set, then the routine will generate an error if
+ * a cycle is found.
  */
-char **
-get_dependents(libzfs_handle_t *hdl, const char *dataset, size_t *count)
+int
+get_dependents(libzfs_handle_t *hdl, boolean_t allowrecursion,
+    const char *dataset, char ***result, size_t *count)
 {
-	char **result;
 	zfs_graph_t *zgp;
 	zfs_vertex_t *zvp;
 
 	if ((zgp = construct_graph(hdl, dataset)) == NULL)
-		return (NULL);
+		return (-1);
 
-	if ((result = zfs_alloc(hdl,
+	if ((*result = zfs_alloc(hdl,
 	    zgp->zg_nvertex * sizeof (char *))) == NULL) {
 		zfs_graph_destroy(zgp);
-		return (NULL);
+		return (-1);
 	}
 
 	if ((zvp = zfs_graph_lookup(hdl, zgp, dataset, 0)) == NULL) {
-		free(result);
+		free(*result);
 		zfs_graph_destroy(zgp);
-		return (NULL);
+		return (-1);
 	}
 
 	*count = 0;
-	if (topo_sort(hdl, result, count, zvp) != 0) {
-		free(result);
+	if (topo_sort(hdl, allowrecursion, *result, count, zvp) != 0) {
+		free(*result);
 		zfs_graph_destroy(zgp);
-		return (NULL);
+		return (-1);
 	}
 
 	/*
@@ -599,10 +640,10 @@ get_dependents(libzfs_handle_t *hdl, const char *dataset, size_t *count)
 	 * strictly a dependent.
 	 */
 	assert(*count > 0);
-	free(result[*count - 1]);
+	free((*result)[*count - 1]);
 	(*count)--;
 
 	zfs_graph_destroy(zgp);
 
-	return (result);
+	return (0);
 }

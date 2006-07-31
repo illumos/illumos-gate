@@ -173,12 +173,17 @@ propname_match(const char *p, int prop, size_t len)
 	int c;
 #endif
 
+#ifndef _KERNEL
+	if (colname == NULL)
+		return (0);
+#endif
+
 	if (len == strlen(propname) &&
 	    strncmp(p, propname, len) == 0)
 		return (1);
 
 #ifndef _KERNEL
-	if (colname == NULL || len != strlen(colname))
+	if (len != strlen(colname))
 		return (0);
 
 	for (c = 0; c < len; c++)

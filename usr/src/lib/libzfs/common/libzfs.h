@@ -89,6 +89,7 @@ enum {
 	EZFS_INTR,		/* signal received */
 	EZFS_ISSPARE,		/* device is a hot spare */
 	EZFS_INVALCONFIG,	/* invalid vdev configuration */
+	EZFS_RECURSIVE,		/* recursive dependency */
 	EZFS_UNKNOWN		/* unknown error */
 };
 
@@ -274,7 +275,7 @@ int zfs_get_proplist(char *fields, zfs_prop_t *proplist, int max, int *count,
 typedef int (*zfs_iter_f)(zfs_handle_t *, void *);
 extern int zfs_iter_root(libzfs_handle_t *, zfs_iter_f, void *);
 extern int zfs_iter_children(zfs_handle_t *, zfs_iter_f, void *);
-extern int zfs_iter_dependents(zfs_handle_t *, zfs_iter_f, void *);
+extern int zfs_iter_dependents(zfs_handle_t *, boolean_t, zfs_iter_f, void *);
 extern int zfs_iter_filesystems(zfs_handle_t *, zfs_iter_f, void *);
 extern int zfs_iter_snapshots(zfs_handle_t *, zfs_iter_f, void *);
 
@@ -353,6 +354,12 @@ extern int zpool_read_label(int, nvlist_t **);
  */
 extern int zpool_create_zvol_links(zpool_handle_t *);
 extern int zpool_remove_zvol_links(zpool_handle_t *);
+
+/*
+ * Mount and unmount datasets within a pool
+ */
+extern int zpool_mount_datasets(zpool_handle_t *, const char *);
+extern int zpool_unmount_datasets(zpool_handle_t *, boolean_t);
 
 #ifdef	__cplusplus
 }

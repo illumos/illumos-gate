@@ -211,11 +211,14 @@ namespace_reload(libzfs_handle_t *hdl)
 		if ((cn->cn_name = zfs_strdup(hdl,
 		    nvpair_name(elem))) == NULL) {
 			free(cn);
+			nvlist_free(config);
 			return (-1);
 		}
 
 		verify(nvpair_value_nvlist(elem, &child) == 0);
 		if (nvlist_dup(child, &cn->cn_config, 0) != 0) {
+			free(cn->cn_name);
+			free(cn);
 			nvlist_free(config);
 			return (no_memory(hdl));
 		}

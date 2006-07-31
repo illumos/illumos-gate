@@ -753,7 +753,7 @@ destroy_zfs(char *zonepath)
 	/*
 	 * We can't destroy the file system if it has dependents.
 	 */
-	if (zfs_iter_dependents(zhp, has_dependent, NULL) != 0 ||
+	if (zfs_iter_dependents(zhp, B_TRUE, has_dependent, NULL) != 0 ||
 	    zfs_unmount(zhp, NULL, 0) != 0) {
 		zfs_close(zhp);
 		return (Z_ERR);
@@ -789,8 +789,8 @@ destroy_zfs(char *zonepath)
 		 */
 		if ((ohp = zfs_open(g_zfs, origin,
 		    ZFS_TYPE_SNAPSHOT)) != NULL) {
-			if (zfs_iter_dependents(ohp, has_dependent, NULL)
-			    == 0 && zfs_unmount(ohp, NULL, 0) == 0)
+			if (zfs_iter_dependents(ohp, B_TRUE, has_dependent,
+			    NULL) == 0 && zfs_unmount(ohp, NULL, 0) == 0)
 				(void) zfs_destroy(ohp);
 			zfs_close(ohp);
 		}

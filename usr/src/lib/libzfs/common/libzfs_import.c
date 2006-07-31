@@ -788,6 +788,13 @@ zpool_find_import(libzfs_handle_t *hdl, int argc, char **argv)
 			if (S_ISDIR(statbuf.st_mode))
 				continue;
 
+			/*
+			 * Ignore special (non-character or non-block) files.
+			 */
+			if (!S_ISREG(statbuf.st_mode) &&
+			    !S_ISBLK(statbuf.st_mode))
+				continue;
+
 			if ((fd = open64(path, O_RDONLY)) < 0)
 				continue;
 

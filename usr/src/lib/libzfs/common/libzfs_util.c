@@ -146,6 +146,8 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		    "spare"));
 	case EZFS_INVALCONFIG:
 		return (dgettext(TEXT_DOMAIN, "invalid vdev configuration"));
+	case EZFS_RECURSIVE:
+		return (dgettext(TEXT_DOMAIN, "recursive dataset dependency"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:

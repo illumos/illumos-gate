@@ -609,7 +609,11 @@ destroy_snap_clones(zfs_handle_t *zhp, void *arg)
 		/*
 		 * Destroy any clones of this snapshot
 		 */
-		(void) zfs_iter_dependents(szhp, destroy_callback, cbp);
+		if (zfs_iter_dependents(szhp, B_FALSE, destroy_callback,
+		    cbp) != 0) {
+			zfs_close(szhp);
+			return (-1);
+		}
 		zfs_close(szhp);
 	}
 
@@ -673,7 +677,10 @@ zfs_do_destroy(int argc, char **argv)
 
 		if (cb.cb_doclones) {
 			cb.cb_snapname = cp;
-			(void) destroy_snap_clones(zhp, &cb);
+			if (destroy_snap_clones(zhp, &cb) != 0) {
+				zfs_close(zhp);
+				return (1);
+			}
 		}
 
 		ret = zfs_destroy_snaps(zhp, cp);
@@ -713,22 +720,28 @@ zfs_do_destroy(int argc, char **argv)
 	 * Check for any dependents and/or clones.
 	 */
 	cb.cb_first = B_TRUE;
-	if (!cb.cb_doclones)
-		(void) zfs_iter_dependents(zhp, destroy_check_dependent, &cb);
+	if (!cb.cb_doclones &&
+	    zfs_iter_dependents(zhp, B_TRUE, destroy_check_dependent,
+	    &cb) != 0) {
+		zfs_close(zhp);
+		return (1);
+	}
 
-	if (cb.cb_error) {
+
+	if (cb.cb_error ||
+	    zfs_iter_dependents(zhp, B_FALSE, destroy_callback, &cb) != 0) {
 		zfs_close(zhp);
 		return (1);
 	}
 
 	/*
-	 * Do the real thing.
+	 * Do the real thing.  The callback will close the handle regardless of
+	 * whether it succeeds or not.
 	 */
-	if (zfs_iter_dependents(zhp, destroy_callback, &cb) == 0 &&
-	    destroy_callback(zhp, &cb) == 0)
-		return (0);
+	if (destroy_callback(zhp, &cb) != 0)
+		return (1);
 
-	return (1);
+	return (0);
 }
 
 /*
@@ -1514,8 +1527,11 @@ rollback_check(zfs_handle_t *zhp, void *data)
 
 			if (cbp->cb_recurse) {
 				cbp->cb_dependent = B_TRUE;
-				(void) zfs_iter_dependents(zhp, rollback_check,
-				    cbp);
+				if (zfs_iter_dependents(zhp, B_TRUE,
+				    rollback_check, cbp) != 0) {
+					zfs_close(zhp);
+					return (-1);
+				}
 				cbp->cb_dependent = B_FALSE;
 			} else {
 				(void) fprintf(stderr, "%s\n",
@@ -1606,7 +1622,8 @@ zfs_do_rollback(int argc, char **argv)
 	cb.cb_create = zfs_prop_get_int(snap, ZFS_PROP_CREATETXG);
 	cb.cb_first = B_TRUE;
 	cb.cb_error = 0;
-	(void) zfs_iter_children(zhp, rollback_check, &cb);
+	if ((ret = zfs_iter_children(zhp, rollback_check, &cb)) != 0)
+		goto out;
 
 	if ((ret = cb.cb_error) != 0)
 		goto out;

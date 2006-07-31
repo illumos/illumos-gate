@@ -62,12 +62,6 @@ void pool_list_free(zpool_list_t *);
 int pool_list_count(zpool_list_t *);
 void pool_list_remove(zpool_list_t *, zpool_handle_t *);
 
-/*
- * Dataset functions
- */
-int unmount_datasets(zpool_handle_t *, int);
-int mount_share_datasets(zpool_handle_t *, const char *);
-
 libzfs_handle_t *g_zfs;
 
 #ifdef	__cplusplus

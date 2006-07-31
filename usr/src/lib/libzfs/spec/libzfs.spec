@@ -352,6 +352,10 @@ function zpool_iter
 version SUNWprivate_1.1
 end
 
+function zpool_mount_datasets
+version SUNWprivate_1.1
+end
+
 function zpool_open
 version SUNWprivate_1.1
 end
@@ -369,6 +373,10 @@ version SUNWprivate_1.1
 end
 
 function zpool_remove_zvol_links
+version SUNWprivate_1.1
+end
+
+function zpool_unmount_datasets
 version SUNWprivate_1.1
 end
 
