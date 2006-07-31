@@ -116,13 +116,17 @@ int dsl_dir_set_reservation(const char *ddname, uint64_t reservation);
 int dsl_dir_rename(dsl_dir_t *dd, const char *newname);
 int dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd, uint64_t space);
 
+/* internal reserved dir name */
+#define	MOS_DIR_NAME "$MOS"
+
 #ifdef ZFS_DEBUG
 #define	dprintf_dd(dd, fmt, ...) do { \
 	if (zfs_flags & ZFS_DEBUG_DPRINTF) { \
-	char *__ds_name = kmem_alloc(MAXNAMELEN, KM_SLEEP); \
+	char *__ds_name = kmem_alloc(MAXNAMELEN + strlen(MOS_DIR_NAME) + 1, \
+	    KM_SLEEP); \
 	dsl_dir_name(dd, __ds_name); \
 	dprintf("dd=%s " fmt, __ds_name, __VA_ARGS__); \
-	kmem_free(__ds_name, MAXNAMELEN); \
+	kmem_free(__ds_name, MAXNAMELEN + strlen(MOS_DIR_NAME) + 1); \
 	} \
 _NOTE(CONSTCOND) } while (0)
 #else

@@ -36,9 +36,6 @@
 #include <sys/zfs_context.h>
 #include <sys/fs/zfs.h>
 
-/* internal reserved dir name */
-#define	MOS_DIR_NAME "$MOS"
-
 static int
 dsl_pool_open_mos_dir(dsl_pool_t *dp, dsl_dir_t **ddp)
 {

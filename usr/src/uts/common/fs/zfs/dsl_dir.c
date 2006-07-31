@@ -182,7 +182,7 @@ dsl_dir_close(dsl_dir_t *dd, void *tag)
 	dmu_buf_rele(dd->dd_dbuf, tag);
 }
 
-/* buf must be long enough (MAXNAMELEN should do) */
+/* buf must be long enough (MAXNAMELEN + strlen(MOS_DIR_NAME) + 1 should do) */
 void
 dsl_dir_name(dsl_dir_t *dd, char *buf)
 {

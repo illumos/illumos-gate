@@ -114,7 +114,7 @@ typedef struct zinject_record {
 #define	ZINJECT_UNLOAD_SPA	0x4
 
 typedef struct zfs_cmd {
-	char		zc_name[MAXNAMELEN];
+	char		zc_name[MAXPATHLEN];
 	char		zc_prop_name[MAXNAMELEN];
 	char		zc_prop_value[MAXPATHLEN];
 	char		zc_root[MAXPATHLEN];
