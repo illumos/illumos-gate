@@ -2514,7 +2514,7 @@ revert_aggregation_conf()
 {
 	aggrconf=$rootprefix/etc/aggregation.conf
 	nawk '
-		/^[ \t]*#/ || /^[ \t]*$/ {
+		/^[ \t]*#/ || /^[ \t]*$/ || $4 ~ "/0" {
 			print;
 			next;
 		}
@@ -6065,7 +6065,9 @@ mondo_loop() {
 	#
 	if [ -d $root/kernel/mac ]; then
 		from_new_aggrconf=1
-		rm -rf $root/kernel/mac;
+		rm -rf $root/kernel/mac
+	else
+		from_new_aggrconf=0
 	fi
 
 	# End of pre-archive extraction hacks.
@@ -6445,7 +6447,8 @@ mondo_loop() {
 		# revert the /etc/aggregation.conf to its old format.
 		#
 		if [ -f $rootprefix/etc/aggregation.conf -a \
-		    ! -d $rootprefix/kernel/mac -a $from_new_aggrconf ]; then
+		    ! -d $rootprefix/kernel/mac -a \
+		    $from_new_aggrconf = 1 ]; then
 			revert_aggregation_conf
 		fi
 	fi
