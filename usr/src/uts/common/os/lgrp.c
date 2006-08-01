@@ -3599,6 +3599,11 @@ lgrp_shm_policy_get(struct anon_map *amp, ulong_t anon_index, vnode_t *vp,
 }
 
 /*
+ * Default memory allocation policy for kernel segmap pages
+ */
+lgrp_mem_policy_t	lgrp_segmap_default_policy = LGRP_MEM_POLICY_RANDOM;
+
+/*
  * Return lgroup to use for allocating memory
  * given the segment and address
  *
@@ -3621,6 +3626,7 @@ lgrp_mem_choose(struct seg *seg, caddr_t vaddr, size_t pgsz)
 	lgrp_mem_policy_info_t	*policy_info;
 	ushort_t		random;
 	int			stat = 0;
+	extern struct seg	*segkmap;
 
 	/*
 	 * Just return null if the lgrp framework hasn't finished
@@ -3635,6 +3641,8 @@ lgrp_mem_choose(struct seg *seg, caddr_t vaddr, size_t pgsz)
 	policy = lgrp_mem_default_policy;
 	if (seg != NULL) {
 		if (seg->s_as == &kas) {
+			if (seg == segkmap)
+				policy = lgrp_segmap_default_policy;
 			if (policy == LGRP_MEM_POLICY_RANDOM_PROC ||
 			    policy == LGRP_MEM_POLICY_RANDOM_PSET)
 				policy = LGRP_MEM_POLICY_RANDOM;
