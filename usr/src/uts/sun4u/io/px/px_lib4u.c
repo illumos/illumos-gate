@@ -2478,3 +2478,19 @@ px_lib_hotplug_uninit(dev_info_t *dip)
 		rem_ivintr(sysino, NULL);
 	}
 }
+
+boolean_t
+px_lib_is_in_drain_state(px_t *px_p)
+{
+	pxu_t 	*pxu_p = (pxu_t *)px_p->px_plat_p;
+	caddr_t csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
+	uint64_t drain_status;
+
+	if (PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON) {
+		drain_status = CSR_BR(csr_base, DRAIN_CONTROL_STATUS, DRAIN);
+	} else {
+		drain_status = CSR_BR(csr_base, TLU_STATUS, DRAIN);
+	}
+
+	return (drain_status);
+}

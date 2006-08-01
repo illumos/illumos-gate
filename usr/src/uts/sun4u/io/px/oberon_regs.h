@@ -193,6 +193,9 @@ extern "C" {
 #define	HOTPLUG_CONTROL_CLKEN					1
 #define	HOTPLUG_CONTROL_N_PERST					0
 
+#define	DRAIN_CONTROL_STATUS					0x51100
+#define	DRAIN_CONTROL_STATUS_DRAIN				0
+
 #define	PX_PCIEHP_PIL (LOCK_LEVEL - 1)
 #ifdef	__cplusplus
 }

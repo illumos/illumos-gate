@@ -207,6 +207,8 @@ extern void px_cpr_rem_callb(px_t *);
 extern int px_lib_hotplug_init(dev_info_t *dip, void *regops);
 extern void px_lib_hotplug_uninit(dev_info_t *dip);
 
+extern boolean_t px_lib_is_in_drain_state(px_t *px_p);
+
 #ifdef	__cplusplus
 }
 #endif

@@ -281,7 +281,9 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	mutex_enter(&px_p->px_fm_mutex);
 
 	err = px_err_handle(px_p, derr, PX_TRAP_CALL, B_TRUE);
-	ret = ndi_fm_handler_dispatch(px_p->px_dip, NULL, derr);
+
+	if (!px_lib_is_in_drain_state(px_p))
+		ret = ndi_fm_handler_dispatch(px_p->px_dip, NULL, derr);
 
 	mutex_exit(&px_p->px_fm_mutex);
 

@@ -693,6 +693,7 @@ px_err_cb_intr(caddr_t arg)
 	return (DDI_INTR_CLAIMED);
 }
 
+
 /*
  * px_err_dmc_pec_intr:
  * Interrupt handler for the DMC/PEC block.
@@ -725,7 +726,9 @@ px_err_dmc_pec_intr(caddr_t arg)
 	err |= px_err_handle(px_p, &derr, PX_INTR_CALL, B_TRUE);
 
 	/* Check all child devices for errors */
-	ret = ndi_fm_handler_dispatch(rpdip, NULL, &derr);
+	if (!px_lib_is_in_drain_state(px_p)) {
+		ret = ndi_fm_handler_dispatch(rpdip, NULL, &derr);
+	}
 
 	/* Set the interrupt state to idle */
 	(void) px_lib_intr_setstate(rpdip, px_fault_p->px_fh_sysino,

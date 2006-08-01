@@ -1910,3 +1910,10 @@ void
 px_cpr_rem_callb(px_t *px_p)
 {
 }
+
+/*ARGSUSED*/
+boolean_t
+px_lib_is_in_drain_state(px_t *px_p)
+{
+	return (B_FALSE);
+}
