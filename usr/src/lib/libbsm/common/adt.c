@@ -288,9 +288,9 @@ adt_cpy_tid(au_tid_addr_t *dest, const au_tid64_addr_t *src)
  * a continued session; its values obviate the need for a subsequent
  * call to adt_set_user().
  *
- * The flag ADT_USE_PROC_DATA is used to decide how to set the initial
- * state of the session.  If 0, the session is "no audit" until a call
- * to adt_set_user; if 1, the session is built from the process audit
+ * The flag is used to decide how to set the initial state of the session.
+ * If 0, the session is "no audit" until a call to adt_set_user; if
+ * ADT_USE_PROC_DATA, the session is built from the process audit
  * characteristics obtained from the kernel.  If imported_state is
  * not NULL, the resulting audit mask is an OR of the current process
  * audit mask and that passed in.
@@ -304,8 +304,7 @@ adt_cpy_tid(au_tid_addr_t *dest, const au_tid64_addr_t *src)
 
 int
 adt_start_session(adt_session_data_t **new_session,
-    const adt_export_data_t *imported_state,
-    adt_session_flags_t flags)
+    const adt_export_data_t *imported_state, adt_session_flags_t flags)
 {
 	adt_internal_state_t	*state;
 	adt_session_flags_t	flgmask = ADT_FLAGS_ALL;
@@ -335,6 +334,8 @@ adt_start_session(adt_session_data_t **new_session,
 	if (imported_state != NULL) {
 		if (adt_import(state, imported_state) != 0)
 			goto return_err_free;
+	} else if (flags & ADT_USE_PROC_DATA) {
+		state->as_session_model = ADT_PROCESS_MODEL;
 	}
 	state->as_flags = flags;
 	DPRINTF(("(%d) Starting session id = %08X\n",
@@ -369,6 +370,7 @@ return_err:
  * These are "volatile" (more changable than "evolving") and will
  * probably change in the S10 period.
  */
+
 void
 adt_get_asid(const adt_session_data_t *session_data, au_asid_t *asid)
 {
@@ -384,8 +386,7 @@ adt_get_asid(const adt_session_data_t *session_data, au_asid_t *asid)
 }
 
 void
-adt_set_asid(const adt_session_data_t *session_data,
-    const au_asid_t session_id)
+adt_set_asid(const adt_session_data_t *session_data, const au_asid_t session_id)
 {
 
 	if (session_data != NULL) {
@@ -408,6 +409,7 @@ adt_set_asid(const adt_session_data_t *session_data,
  * very good reason for setting your own audit id.  The process
  * audit characteristics are not changed by put, use adt_set_proc().
  */
+
 void
 adt_get_auid(const adt_session_data_t *session_data, au_id_t *auid)
 {
@@ -447,6 +449,7 @@ adt_set_auid(const adt_session_data_t *session_data, const au_id_t audit_id)
  * The process  audit characteristics are not changed by put, use
  * adt_set_proc().
  */
+
 void
 adt_get_termid(const adt_session_data_t *session_data, au_tid_addr_t *termid)
 {
@@ -490,6 +493,7 @@ adt_set_termid(const adt_session_data_t *session_data,
  * The process  audit characteristics are not changed by put, use
  * adt_set_proc().
  */
+
 void
 adt_get_mask(const adt_session_data_t *session_data, au_mask_t *mask)
 {
@@ -523,6 +527,7 @@ adt_set_mask(const adt_session_data_t *session_data, const au_mask_t *mask)
 /*
  * helpers for adt_load_termid
  */
+
 static void
 adt_do_ipv6_address(struct sockaddr_in6 *peer, struct sockaddr_in6 *sock,
     au_tid_addr_t *termid)
@@ -665,6 +670,7 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
  * as grounds for denying a login.  Otherwise the caller would
  * need to be aware of the audit state.
  */
+
 int
 adt_load_hostname(const char *hostname, adt_termid_t **termid)
 {
@@ -718,6 +724,7 @@ return_err:
  * as grounds for denying a login.  Otherwise the caller would
  * need to be aware of the audit state.
  */
+
 int
 adt_load_ttyname(const char *ttyname, adt_termid_t **termid)
 {
@@ -872,6 +879,7 @@ return_rc:
  * from_export_format()
  * read from a network order buffer into struct adt_session_data
  */
+
 static size_t
 adt_from_export_format(adt_internal_state_t *internal,
     const adt_export_data_t *external)
@@ -995,9 +1003,10 @@ adt_to_export_format(adt_export_data_t *external,
  * value is always the 64 bit version.  What is stored depends
  * on how libbsm is compiled.
  */
+
 size_t
-adt_import_proc(pid_t pid, uid_t euid, gid_t egid, uid_t ruid,
-    gid_t rgid, adt_export_data_t **external)
+adt_import_proc(pid_t pid, uid_t euid, gid_t egid, uid_t ruid, gid_t rgid,
+    adt_export_data_t **external)
 {
 	size_t			length = 0;
 	adt_internal_state_t	*state;
@@ -1084,6 +1093,7 @@ return_length:
 /*
  * adt_import() -- convert from network order to machine-specific order
  */
+
 static int
 adt_import(adt_internal_state_t *internal, const adt_export_data_t *external)
 {
@@ -1140,9 +1150,10 @@ adt_import(adt_internal_state_t *internal, const adt_export_data_t *external)
  * is sufficient memory, a buffer will be returned even in the
  * audit off case.
  */
+
 size_t
 adt_export_session_data(const adt_session_data_t *internal,
-			adt_export_data_t **external)
+    adt_export_data_t **external)
 {
 	adt_internal_state_t	*dummy;
 	size_t			length = 0;
@@ -1206,6 +1217,7 @@ adt_setto_unaudited(adt_internal_state_t *state)
  * By default, an audit session is based on the process; the default
  * is overriden by adt_set_user()
  */
+
 static int
 adt_init(adt_internal_state_t *state, int use_proc_data)
 {
@@ -1221,7 +1233,7 @@ adt_init(adt_internal_state_t *state, int use_proc_data)
 		if (state->as_audit_enabled) {
 			const au_tid64_addr_t	*tid;
 			const au_mask_t		*mask;
-			ucred_t			*ucred = ucred_get(getpid());
+			ucred_t			*ucred = ucred_get(P_MYID);
 
 			/*
 			 * Even if the ucred is NULL, the underlying
@@ -1342,6 +1354,7 @@ adt_newuser(adt_internal_state_t *state, uid_t ruid, au_tid_addr_t *termid)
 
 	return (0);
 }
+
 static int
 adt_changeuser(adt_internal_state_t *state, uid_t ruid)
 {
@@ -1365,16 +1378,17 @@ adt_changeuser(adt_internal_state_t *state, uid_t ruid)
 		ruid));
 	return (0);
 }
+
 /*
  * adt_set_user -- see also adt_set_from_ucred()
  *
  * ADT_NO_ATTRIB is a valid uid/gid meaning "not known" or
- * "unattributed."
+ * "unattributed."  If ruid, change the model to session.
  *
  * ADT_NO_CHANGE is a valid uid/gid meaning "do not change this value"
  * only valid with ADT_UPDATE.
  *
- * ADT_NO_AUDIT is the external equivalent to AU_NOAUDITIT -- there
+ * ADT_NO_AUDIT is the external equivalent to AU_NOAUDITID -- there
  * isn't a good reason to call adt_set_user() with it unless you don't
  * have a good value yet and intend to replace it later; auid will be
  * AU_NOAUDITID.
@@ -1386,13 +1400,10 @@ adt_changeuser(adt_internal_state_t *state, uid_t ruid)
  * See the note preceding adt_set_proc() about the use of ADT_HAVE_TID
  * and ADT_HAVE_ALL.
  */
+
 int
-adt_set_user(const adt_session_data_t *session_data,
-    uid_t euid,
-    gid_t egid,
-    uid_t ruid,
-    gid_t rgid,
-    const adt_termid_t *termid,
+adt_set_user(const adt_session_data_t *session_data, uid_t euid, gid_t egid,
+    uid_t ruid, gid_t rgid, const adt_termid_t *termid,
     enum adt_user_context user_context)
 {
 	adt_internal_state_t	*state;
@@ -1444,8 +1455,6 @@ adt_set_user(const adt_session_data_t *session_data,
 		state->as_have_user_data = ADT_HAVE_TID |
 		    ADT_HAVE_AUID | ADT_HAVE_ASID | ADT_HAVE_MASK;
 		return (0);
-		break;
-
 	default:
 		errno = EINVAL;
 		return (-1);
@@ -1467,8 +1476,13 @@ adt_set_user(const adt_session_data_t *session_data,
 			state->as_egid = egid;
 	}
 
+	if (ruid == ADT_NO_ATTRIB) {
+		state->as_session_model = ADT_SESSION_MODEL;
+	}
+
 	return (0);
 }
+
 /*
  * adt_set_from_ucred()
  *
@@ -1485,9 +1499,10 @@ adt_set_user(const adt_session_data_t *session_data,
  * so that adt_export_session_data() will have useful stuff to
  * work with.
  */
+
 int
-adt_set_from_ucred(const adt_session_data_t *session_data,
-    const ucred_t *uc, enum adt_user_context user_context)
+adt_set_from_ucred(const adt_session_data_t *session_data, const ucred_t *uc,
+    enum adt_user_context user_context)
 {
 	adt_internal_state_t	*state;
 	int			rc = -1;
@@ -1754,8 +1769,7 @@ adt_generate_event(const adt_event_data_t *p_extdata,
  */
 
 int
-adt_put_event(const adt_event_data_t *event, int status,
-    int return_val)
+adt_put_event(const adt_event_data_t *event, int status, int return_val)
 {
 	struct adt_event_state	*event_state;
 	struct translation	*xlate;

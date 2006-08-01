@@ -1800,6 +1800,12 @@ authenticated:
 			(void (*)(void *))audit_failed_login_cleanup,
 			(void *)authctxt);
 
+		/* Initialize the group list, audit sometimes needs it. */
+		if (initgroups(authctxt->pw->pw_name,
+		    authctxt->pw->pw_gid) < 0) {
+			perror("initgroups");
+			exit (1);
+		}
 		audit_sshd_login(&ah, authctxt->pw->pw_uid,
 			authctxt->pw->pw_gid);
 
@@ -1900,6 +1906,11 @@ authenticated:
 		(void (*)(void *))audit_failed_login_cleanup,
 		(void *)authctxt);
 
+	/* Initialize the group list, audit sometimes needs it. */
+	if (initgroups(authctxt->pw->pw_name, authctxt->pw->pw_gid) < 0) {
+		perror("initgroups");
+		exit (1);
+	}
 	audit_sshd_login(&ah, authctxt->pw->pw_uid,
 		authctxt->pw->pw_gid);
 

@@ -532,27 +532,25 @@ adt_to_subject(datadef *def, void *p_data, int required,
 		sp->as_euid, sp->as_egid, sp->as_ruid, sp->as_rgid,
 		getpid(), sp->as_info.ai_asid,
 		&(sp->as_info.ai_termid)));
-	if (is_system_labeled())
-		(void) au_write(event->ae_event_handle, au_to_mylabel());
 	/*
-	 * If AUDIT_GROUP is set, a groups token must be output.
-	 * In a session model, the groups list is undefined, so output an
-	 * empty list.  In a process model, ship it!
+	 * Add optional tokens if in the process model.
+	 * In a session model, the groups list is undefined and label
+	 * is wrong, so don't do anything.
 	 */
-	if (sp->as_kernel_audit_policy & AUDIT_GROUP) {
-		int group_count;
-		gid_t grouplist[NGROUPS_MAX];
+	if (sp->as_session_model == ADT_PROCESS_MODEL) {
+		if (is_system_labeled())
+			(void) au_write(event->ae_event_handle,
+			    au_to_mylabel());
 
-		(void) memset(grouplist, 0, sizeof (grouplist));
-		if (sp->as_session_model == ADT_PROCESS_MODEL) {
+		if (sp->as_kernel_audit_policy & AUDIT_GROUP) {
+			int group_count;
+			gid_t grouplist[NGROUPS_MAX];
+
 			if ((group_count = getgroups(NGROUPS_UMAX,
-			    grouplist))) {
+			    grouplist)) > 0) {
 				(void) au_write(event->ae_event_handle,
 				    au_to_newgroups(group_count, grouplist));
 			}
-		} else { /* consider deleting this null output */
-			(void) au_write(event->ae_event_handle,
-			    au_to_newgroups(0, grouplist));
 		}
 	}
 }
