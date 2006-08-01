@@ -43,6 +43,7 @@ i pkginfo
 i copyright
 i postinstall
 i preinstall
+i depend
 i i.etcsystem
 i i.kcfconfbase
 i i.manifest
