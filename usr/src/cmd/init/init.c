@@ -225,7 +225,6 @@ static int cmask;
  * Flags to indicate properties of various states.
  */
 #define	LSEL_RUNLEVEL	0x0001	/* runlevels you can transition to */
-#define	LSEL_NOAUDIT	0x0002	/* levels with auditing disabled */
 
 typedef struct lvl {
 	int	lvl_state;
@@ -237,15 +236,15 @@ typedef struct lvl {
 static lvl_t lvls[] = {
 	{ LVLQ,		0,	'Q', 0					},
 	{ LVLQ,		0,	'q', 0					},
-	{ LVL0,		MASK0,	'0', LSEL_RUNLEVEL | LSEL_NOAUDIT	},
-	{ LVL1, 	MASK1,	'1', LSEL_RUNLEVEL | LSEL_NOAUDIT	},
+	{ LVL0,		MASK0,	'0', LSEL_RUNLEVEL			},
+	{ LVL1, 	MASK1,	'1', LSEL_RUNLEVEL			},
 	{ LVL2, 	MASK2,	'2', LSEL_RUNLEVEL			},
 	{ LVL3, 	MASK3,	'3', LSEL_RUNLEVEL			},
 	{ LVL4, 	MASK4,	'4', LSEL_RUNLEVEL			},
-	{ LVL5, 	MASK5,	'5', LSEL_RUNLEVEL | LSEL_NOAUDIT	},
-	{ LVL6, 	MASK6, 	'6', LSEL_RUNLEVEL | LSEL_NOAUDIT	},
-	{ SINGLE_USER, 	MASKSU, 'S', LSEL_RUNLEVEL | LSEL_NOAUDIT	},
-	{ SINGLE_USER, 	MASKSU, 's', LSEL_RUNLEVEL | LSEL_NOAUDIT	},
+	{ LVL5, 	MASK5,	'5', LSEL_RUNLEVEL			},
+	{ LVL6, 	MASK6, 	'6', LSEL_RUNLEVEL			},
+	{ SINGLE_USER, 	MASKSU, 'S', LSEL_RUNLEVEL			},
+	{ SINGLE_USER, 	MASKSU, 's', LSEL_RUNLEVEL			},
 	{ LVLa,		MASKa,	'a', 0					},
 	{ LVLb,		MASKb,	'b', 0					},
 	{ LVLc,		MASKc,	'c', 0					}
@@ -3479,7 +3478,6 @@ userinit(int argc, char **argv)
 	char	*ln;
 	int	init_signal;
 	struct stat	sconbuf, conbuf;
-	int turnoff = 0;
 	const char *usage_msg = "Usage: init [0123456SsQqabc]\n";
 
 	/*
@@ -3497,8 +3495,6 @@ userinit(int argc, char **argv)
 		    argv[1]);
 		exit(1);
 	}
-
-	turnoff = LSEL_NOAUDIT & state_to_flags(init_signal);
 
 	if (init_signal == SINGLE_USER) {
 		/*
@@ -3555,17 +3551,7 @@ userinit(int argc, char **argv)
 
 	update_boot_archive(init_signal);
 
-	if (audit_put_record(ADT_SUCCESS, ADT_SUCCESS, argv[1]) &&
-	    turnoff) {
-		/* turn off audit daemon and try to flush audit queue */
-
-		if (system("/usr/sbin/audit -t")) {
-			(void) fprintf(stderr, "%s: can't turn off auditd\n",
-				argv[0]);
-		} else {
-			(void) sleep(5);
-		}
-	}
+	(void) audit_put_record(ADT_SUCCESS, ADT_SUCCESS, argv[1]);
 
 	/*
 	 * Signal init; init will take care of telling svc.startd.

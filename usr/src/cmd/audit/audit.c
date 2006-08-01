@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,7 +60,7 @@ static void	display_smf_error();
 
 static boolean_t is_audit_control_ok(char *);	/* file validation  */
 static boolean_t is_valid_zone(boolean_t);	/* operation ok in this zone? */
-static void	start_auditd();			/* start audit daemon */
+static int	start_auditd();			/* start audit daemon */
 
 /*
  * audit() - This program serves as a general administrator's interface to
@@ -129,21 +128,24 @@ main(int argc, char *argv[])
 		else if (!is_audit_control_ok(NULL))
 			exit(7);
 
-		start_auditd();
-		break;
+		return (start_auditd());
 	case 't':
 		if (!is_valid_zone(0))	/* 0 == no error message display */
-			exit(0);
-		/* use  bmsunconv to permanently disable, -t for temporary */
-		if (smf_disable_instance(instance_name, SMF_TEMPORARY) != 0)
+			exit(10);
+		/* use bmsunconv to permanently disable, -t for temporary */
+		if (smf_disable_instance(instance_name, SMF_TEMPORARY) != 0) {
 			display_smf_error();
+			exit(11);
+		}
 		break;
 	case 'T':
-		if (!is_valid_zone(0))	/* 0 == no error message display */
-			exit(0);
-
-		(void) smf_disable_instance(instance_name, SMF_TEMPORARY);
 		silent = 1;
+		if (!is_valid_zone(0))	/* 0 == no error message display */
+			exit(10);
+
+		if (smf_disable_instance(instance_name, SMF_TEMPORARY) != 0) {
+			exit(11);
+		}
 		break;
 	case 'v':
 		if (is_audit_control_ok(first_option)) {
@@ -158,20 +160,15 @@ main(int argc, char *argv[])
 		exit(6);
 	}
 
-	if (get_auditd_pid(&pid) != 0) {
-		if (silent) {
-			exit(0);
-		} else {
-			(void) fprintf(stderr, "%s: %s\n", progname, gettext(
-			"can't get process id of auditd from audit_data(4)"));
+	if (sig != 0) {
+		if (get_auditd_pid(&pid) != 0) {
+			(void) fprintf(stderr, "%s: %s\n", progname,
+			    gettext("can't get process id of auditd from "
+			    "audit_data(4)"));
 			exit(4);
 		}
-	}
 
-	if ((sig != 0) && (kill(pid, sig) != 0)) {
-		if (silent) {
-			exit(0);
-		} else {
+		if (kill(pid, sig) != 0) {
 			perror(progname);
 			(void) fprintf(stderr,
 			    gettext("%s: cannot signal auditd\n"), progname);
@@ -345,7 +342,7 @@ is_valid_zone(boolean_t show_err)
  * First check to see if c2audit is loaded via the auditon()
  * system call, then check SMF state.
  */
-static void
+static int
 start_auditd()
 {
 	int	audit_state;
@@ -353,20 +350,27 @@ start_auditd()
 
 	if (auditon(A_GETCOND, (caddr_t)&audit_state,
 	    sizeof (audit_state)) != 0)
-		return;
+		return (12);
 
 	if ((state = smf_get_state(instance_name)) == NULL) {
 		display_smf_error();
-		return;
+		return (13);
 	}
 	if (strcmp(SCF_STATE_STRING_ONLINE, state) != 0) {
-		if (smf_enable_instance(instance_name, 0) != 0)
+		if (smf_enable_instance(instance_name, 0) != 0) {
 			display_smf_error();
+			free(state);
+			return (14);
+		}
 	} else {
-		if (smf_refresh_instance(instance_name) != 0)
+		if (smf_refresh_instance(instance_name) != 0) {
 			display_smf_error();
+			free(state);
+			return (15);
+		}
 	}
 	free(state);
+	return (0);
 }
 
 static void
@@ -381,7 +385,7 @@ display_smf_error()
 		    instance_name);
 		break;
 	default:
-		(void) fprintf(stderr, "SMF error %d\n", rc);
+		(void) fprintf(stderr, "SMF error: %s\n", scf_strerror(rc));
 		break;
 	}
 }
