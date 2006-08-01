@@ -2994,6 +2994,7 @@ anon_map_demotepages(
 
 top:
 	if (anon_try_demote_pages(amp->ahp, start_idx, szc, ppa, 1)) {
+		kmem_free(ppa, ppasize);
 		return (0);
 	}
 
