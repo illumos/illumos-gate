@@ -279,7 +279,7 @@ process_nonresumable_error(struct regs *rp, uint64_t flags,
 			    AFLT_PROT_COPY) {
 				aflt->flt_panic |= aft_panic;
 			} else if (!trampolined &&
-			    (errh_flt.errh_er.attr & ERRH_ATTR_MEM)) {
+			    (aflt->flt_class != BUS_FAULT)) {
 				aflt->flt_panic = 1;
 			}
 
