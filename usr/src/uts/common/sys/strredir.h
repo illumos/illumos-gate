@@ -63,7 +63,7 @@ extern "C" {
 /* name of the module used to detect closes on redirected streams */
 #define	STRREDIR_MOD	"redirmod"
 
-extern void srpop(vnode_t *);
+extern void srpop(vnode_t *, boolean_t);
 
 #endif	/* _KERNEL */
 

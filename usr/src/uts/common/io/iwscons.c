@@ -130,13 +130,29 @@ str_vp(vnode_t *vp)
 }
 
 /*
+ * Interrupt any operations that may be outstanding against this vnode.
+ * optionally, wait for them to complete.
+ */
+static void
+srinterrupt(iwscn_list_t *lp, boolean_t wait)
+{
+	ASSERT(MUTEX_HELD(&iwscn_list_lock));
+
+	while (lp->wl_ref_cnt != 0) {
+		strsetrerror(lp->wl_vp, EINTR, 0, NULL);
+		strsetwerror(lp->wl_vp, EINTR, 0, NULL);
+		if (!wait)
+			break;
+		cv_wait(&iwscn_list_cv, &iwscn_list_lock);
+	}
+}
+
+/*
  * Remove vp from the redirection list rooted at iwscn_list, should it
- * be there.  If iwscn_list is non-NULL, deallocate the entry.  If
- * the entry doesn't exist upon completion, return NULL; otherwise
- * return a pointer to it.
+ * be there. Return a pointer to the removed entry.
  */
 static iwscn_list_t *
-srrm(vnode_t *vp, boolean_t free_entry)
+srrm(vnode_t *vp)
 {
 	iwscn_list_t	*lp, **lpp;
 
@@ -151,46 +167,11 @@ srrm(vnode_t *vp, boolean_t free_entry)
 		if (lp->wl_vp == vp)
 			break;
 	}
-	if (lp == NULL)
-		return (NULL);
+	if (lp != NULL)
+		/* Found it, remove this entry from the redirection list */
+		*lpp = lp->wl_next;
 
-	/* Found it, remove this entry from the redirection list */
-	*lpp = lp->wl_next;
-
-	if (free_entry == B_FALSE)
-		return (lp);
-
-	/*
-	 * This entry is no longer on the global redirection list so now
-	 * we have to wait for all operations currently in progress to
-	 * finish before we can actually delete this entry.  We don't
-	 * have to worry about a new operation on this vnode starting up
-	 * because we've removed it from the redirection list.
-	 */
-	while (lp->wl_ref_cnt != 0) {
-		/*
-		 * Interrupt any operations that may be outstanding
-		 * against this vnode and wait for them to complete.
-		 */
-		strsetrerror(lp->wl_vp, EINTR, 0, NULL);
-		strsetwerror(lp->wl_vp, EINTR, 0, NULL);
-		cv_wait(&iwscn_list_cv, &iwscn_list_lock);
-	}
-
-	if (lp->wl_is_console == B_TRUE) {
-		/*
-		 * Special case.  If this is the underlying console device
-		 * then we opened it so we need to close it.
-		 */
-		(void) VOP_CLOSE(lp->wl_vp, 0, 1, (offset_t)0, kcred);
-	} else {
-		/* Release our hold on this vnode */
-		VN_RELE(lp->wl_vp);
-	}
-
-	/* Free the entry */
-	kmem_free(lp, sizeof (*lp));
-	return (NULL);
+	return (lp);
 }
 
 /*
@@ -209,43 +190,65 @@ srpush(vnode_t *vp, boolean_t is_console)
 	ASSERT(vp);
 
 	/* Check if it's already on the redirection list */
-	if ((lp = srrm(vp, B_FALSE)) == NULL) {
+	if ((lp = srrm(vp)) == NULL) {
 		lp = kmem_zalloc(sizeof (*lp), KM_SLEEP);
 		lp->wl_vp = vp;
-
-		if (is_console == B_TRUE) {
-			lp->wl_is_console = B_TRUE;
-		} else {
-			/*
-			 * Hold the vnode.  Note that this hold will not
-			 * prevent the device stream associated with the
-			 * vnode from being closed.  (We protect against
-			 * that by pushing our streams redirection module
-			 * onto the stream to intercept close requests.)
-			 */
-			VN_HOLD(lp->wl_vp);
-			lp->wl_is_console = B_FALSE;
-		}
+		lp->wl_is_console = is_console;
 	}
-
 	/*
 	 * Note that if this vnode was already somewhere on the redirection
 	 * list then we removed it above and are now bumping it up to the
-	 * from of the redirection list.
+	 * front of the redirection list.
 	 */
 	lp->wl_next = iwscn_list;
 	iwscn_list = lp;
 }
 
 /*
- * srpop() - Remove redirection because the target stream is being closed.
- * Called from wcmclose().
+ * This vnode is no longer a valid redirection target. Terminate any current
+ * operations. If closing, wait for them to complete, then free the entry.
+ * If called because a hangup has occurred, just deprecate the entry to ensure
+ * it won't become the target again.
  */
 void
-srpop(vnode_t *vp)
+srpop(vnode_t *vp, boolean_t close)
 {
+	iwscn_list_t	*tlp;		/* This target's entry */
+	iwscn_list_t	*lp, **lpp;
+
 	mutex_enter(&iwscn_list_lock);
-	(void) srrm(vp, B_TRUE);
+
+	/*
+	 * Ensure no further operations are directed at the target
+	 * by removing it from the redirection list.
+	 */
+	if ((tlp = srrm(vp)) == NULL) {
+		/* vnode wasn't in the list */
+		mutex_exit(&iwscn_list_lock);
+		return;
+	}
+	/*
+	 * Terminate any current operations.
+	 * If we're closing, wait until they complete.
+	 */
+	srinterrupt(tlp, close);
+
+	if (close) {
+		/* We're finished with this target */
+		kmem_free(tlp, sizeof (*tlp));
+	} else {
+		/*
+		 * Deprecate the entry. There's no need for a flag to indicate
+		 * this state, it just needs to be moved to the back of the list
+		 * behind the underlying console device. Since the underlying
+		 * device anchors the list and is never removed, this entry can
+		 * never return to the front again to become the target.
+		 */
+		for (lpp = &iwscn_list; (lp = *lpp) != NULL; )
+			lpp = &lp->wl_next;
+		tlp->wl_next = NULL;
+		*lpp = tlp;
+	}
 	mutex_exit(&iwscn_list_lock);
 }
 
@@ -566,18 +569,29 @@ iwscnopen(dev_t *devp, int flag, int state, cred_t *cred)
 static int
 iwscnclose(dev_t dev, int flag, int state, cred_t *cred)
 {
+	iwscn_list_t	*lp;
+
 	ASSERT(getminor(dev) == 0);
 
 	if (state != OTYP_CHR)
 		return (ENXIO);
 
 	mutex_enter(&iwscn_list_lock);
+	/*
+	 * Remove each entry from the redirection list, terminate any
+	 * current operations, wait for them to finish, then free the entry.
+	 */
+	while (iwscn_list != NULL) {
+		lp = srrm(iwscn_list->wl_vp);
+		ASSERT(lp != NULL);
+		srinterrupt(lp, B_TRUE);
 
-	/* Remove all outstanding redirections */
-	while (iwscn_list != NULL)
-		(void) srrm(iwscn_list->wl_vp, B_TRUE);
-	iwscn_list = NULL;
+		if (lp->wl_is_console == B_TRUE)
+			/* Close the underlying console device. */
+			(void) VOP_CLOSE(lp->wl_vp, 0, 1, (offset_t)0, kcred);
 
+		kmem_free(lp, sizeof (*lp));
+	}
 	mutex_exit(&iwscn_list_lock);
 	return (0);
 }

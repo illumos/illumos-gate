@@ -44,6 +44,7 @@
 #include <sys/debug.h>
 #include <sys/strredir.h>
 #include <sys/strsubr.h>
+#include <sys/strsun.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -54,7 +55,7 @@
  */
 static int	wcmopen(queue_t	*, dev_t *, int, int, cred_t *);
 static int	wcmclose(queue_t *, int, cred_t *);
-static int	wcmput(queue_t *, mblk_t *);
+static int	wcmrput(queue_t *, mblk_t *);
 
 static struct module_info	wcminfo = {
 	STRREDIR_MODID,
@@ -66,7 +67,7 @@ static struct module_info	wcminfo = {
 };
 
 static struct qinit	wcmrinit = {
-	(int (*)())putnext,	/* put */
+	wcmrput,		/* put */
 	NULL,			/* service */
 	wcmopen,		/* open */
 	wcmclose,		/* close */
@@ -141,6 +142,20 @@ static int
 wcmclose(queue_t *q, int flag, cred_t *cred)
 {
 	qprocsoff(q);
-	srpop(q->q_stream->sd_vnode);
+	srpop(q->q_stream->sd_vnode, B_TRUE);
+	return (0);
+}
+
+/*
+ * Upstream messages are passed unchanged.
+ * If a hangup occurs the target is no longer usable, so deprecate it.
+ */
+static int
+wcmrput(queue_t *q, mblk_t *mp)
+{
+	if (DB_TYPE(mp) == M_HANGUP)
+		/* Don't block waiting for outstanding operations to complete */
+		srpop(q->q_stream->sd_vnode, B_FALSE);
+	putnext(q, mp);
 	return (0);
 }
