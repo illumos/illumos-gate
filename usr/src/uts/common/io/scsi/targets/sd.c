@@ -5304,12 +5304,14 @@ sd_use_efi(struct sd_lun *un, int path_flag)
 	efi_gpe_t	*partitions;
 	uchar_t		*buf;
 	uint_t		lbasize;
-	uint64_t	cap;
+	uint64_t	cap = 0;
 	uint_t		nparts;
 	diskaddr_t	gpe_lba;
+	struct uuid	uuid_type_reserved = EFI_RESERVED;
 
 	ASSERT(mutex_owned(SD_MUTEX(un)));
 	lbasize = un->un_tgt_blocksize;
+	un->un_reserved = -1;
 
 	mutex_exit(SD_MUTEX(un));
 
@@ -5383,6 +5385,10 @@ sd_use_efi(struct sd_lun *un, int path_flag)
 		    "primary label corrupt; using backup\n");
 	}
 
+	if (cap == 0)
+		rval = sd_send_scsi_READ_CAPACITY(un, &cap, &lbasize,
+		    path_flag);
+
 	nparts = ((efi_gpt_t *)buf)->efi_gpt_NumberOfPartitionEntries;
 	gpe_lba = ((efi_gpt_t *)buf)->efi_gpt_PartitionEntryLBA;
 
@@ -5411,6 +5417,12 @@ sd_use_efi(struct sd_lun *un, int path_flag)
 			    partitions->efi_gpe_StartingLBA + 1;
 			un->un_offset[i] =
 			    partitions->efi_gpe_StartingLBA;
+		}
+		if (un->un_reserved == -1) {
+			if (bcmp(&partitions->efi_gpe_PartitionTypeGUID,
+			    &uuid_type_reserved, sizeof (struct uuid)) == 0) {
+				un->un_reserved = i;
+			}
 		}
 		if (i == WD_NODE) {
 			/*
@@ -6171,8 +6183,8 @@ sd_register_devid(struct sd_lun *un, dev_info_t *devi, int reservation_flag)
 		 */
 		if (sd_get_devid(un) == EINVAL) {
 			(void) sd_create_devid(un);
-			un->un_f_opt_fab_devid = TRUE;
 		}
+		un->un_f_opt_fab_devid = TRUE;
 
 		/* Register the devid if it exists */
 		if (un->un_devid != NULL) {
@@ -6198,7 +6210,19 @@ sd_get_devid_block(struct sd_lun *un)
 {
 	daddr_t			spc, blk, head, cyl;
 
-	if (un->un_blockcount <= DK_MAX_BLOCKS) {
+	if ((un->un_f_geometry_is_valid == FALSE) ||
+	    (un->un_solaris_size < DK_LABEL_LOC))
+		return (-1);
+
+	if (un->un_vtoc.v_sanity != VTOC_SANE) {
+		/* EFI labeled */
+		if (un->un_reserved != -1) {
+			blk = un->un_map[un->un_reserved].dkl_cylno;
+		} else {
+			return (-1);
+		}
+	} else {
+		/* SMI labeled */
 		/* this geometry doesn't allow us to write a devid */
 		if (un->un_g.dkg_acyl < 2) {
 			return (-1);
@@ -6213,12 +6237,6 @@ sd_get_devid_block(struct sd_lun *un)
 		head = un->un_g.dkg_nhead - 1;
 		blk  = (cyl * (spc - un->un_g.dkg_apc)) +
 		    (head * un->un_g.dkg_nsect) + 1;
-	} else {
-		if (un->un_reserved != -1) {
-			blk = un->un_map[un->un_reserved].dkl_cylno + 1;
-		} else {
-			return (-1);
-		}
 	}
 	return (blk);
 }
@@ -23466,6 +23484,9 @@ sd_clear_efi(struct sd_lun *un)
 
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 
+	mutex_enter(SD_MUTEX(un));
+	un->un_reserved = -1;
+	mutex_exit(SD_MUTEX(un));
 	gpt = kmem_alloc(sizeof (efi_gpt_t), KM_SLEEP);
 
 	if (sd_send_scsi_READ(un, gpt, DEV_BSIZE, 1, SD_PATH_DIRECT) != 0) {
@@ -23784,6 +23805,7 @@ sd_dkio_set_efi(dev_t dev, caddr_t arg, int flag)
 	dk_efi_t	user_efi;
 	int		rval = 0;
 	void		*buffer;
+	int		valid_efi;
 
 	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL)
 		return (ENXIO);
@@ -23828,7 +23850,45 @@ sd_dkio_set_efi(dev_t dev, caddr_t arg, int flag)
 		    user_efi.dki_lba, SD_PATH_DIRECT);
 		if (rval == 0) {
 			mutex_enter(SD_MUTEX(un));
-			un->un_f_geometry_is_valid = FALSE;
+
+			/*
+			 * Set the un_reserved for valid efi label.
+			 * Function clear_efi in fdisk and efi_write in
+			 * libefi both change efi label on disk in 3 steps
+			 * 1. Change primary gpt and gpe
+			 * 2. Change backup gpe
+			 * 3. Change backup gpt, which is one block
+			 * We only reread the efi label after the 3rd step,
+			 * or there will be warning "primary label corrupt".
+			 */
+			if (user_efi.dki_length == un->un_tgt_blocksize) {
+				un->un_f_geometry_is_valid = FALSE;
+				valid_efi = sd_use_efi(un, SD_PATH_DIRECT);
+				if ((valid_efi == 0) &&
+				    un->un_f_devid_supported &&
+				    (un->un_f_opt_fab_devid == TRUE)) {
+					if (un->un_devid == NULL) {
+						sd_register_devid(un,
+						    SD_DEVINFO(un),
+						    SD_TARGET_IS_UNRESERVED);
+					} else {
+						/*
+						 * The device id for this disk
+						 * has been fabricated. The
+						 * device id must be preserved
+						 * by writing it back out to
+						 * disk.
+						 */
+						if (sd_write_deviceid(un)
+						    != 0) {
+							ddi_devid_free(
+							    un->un_devid);
+							un->un_devid = NULL;
+						}
+					}
+				}
+			}
+
 			mutex_exit(SD_MUTEX(un));
 		}
 	}
@@ -23963,31 +24023,6 @@ sd_dkio_set_mboot(dev_t dev, caddr_t arg, int flag)
 			mutex_exit(SD_MUTEX(un));
 			kmem_free(mboot, (size_t)(sizeof (struct mboot)));
 			return (rval);
-		}
-	}
-
-	/*
-	 * If the mboot write fails, write the devid anyway, what can it hurt?
-	 * Also preserve the device id by writing to the disk acyl for the case
-	 * where a devid has been fabricated.
-	 */
-	if (un->un_f_devid_supported && un->un_f_opt_fab_devid) {
-		if (un->un_devid == NULL) {
-			sd_register_devid(un, SD_DEVINFO(un),
-			    SD_TARGET_IS_UNRESERVED);
-		} else {
-			/*
-			 * The device id for this disk has been
-			 * fabricated. Fabricated device id's are
-			 * managed by storing them in the last 2
-			 * available sectors on the drive. The device
-			 * id must be preserved by writing it back out
-			 * to this location.
-			 */
-			if (sd_write_deviceid(un) != 0) {
-				ddi_devid_free(un->un_devid);
-				un->un_devid = NULL;
-			}
 		}
 	}
 

@@ -825,13 +825,6 @@ efi_write(int fd, struct dk_gpt *vtoc)
 	}
 	/* write the PMBR */
 	(void) write_pmbr(fd, vtoc);
-	if (ioctl(fd, MHIOCREREGISTERDEVID) == -1) {
-		if (efi_debug) {
-		    (void) fprintf(stderr,
-			    "MHIOCREREGISTERDEVID failed %d\n",
-			    errno);
-		}
-	}
 	free(dk_ioc.dki_data);
 	return (0);
 }
