@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,21 +18,19 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * du -- summarize disk usage
- *	/bin/du [-a][-d][-h|-k][-H|-L][-r][-o|-s] [file ...]
- *	/usr/xpg4/bin/du [-a][-h|-k][-H|-L][-r][-s][-x] [file ...]
+ *	du [-dorx] [-a|-s] [-h|-k|-m] [-H|-L] [file...]
  */
 
 #include <sys/types.h>
@@ -54,6 +51,7 @@ static int		aflg = 0;
 static int		rflg = 0;
 static int		sflg = 0;
 static int		kflg = 0;
+static int		mflg = 0;
 static int		oflg = 0;
 static int		dflg = 0;
 static int		hflg = 0;
@@ -72,11 +70,24 @@ static size_t		name_len = PATH_MAX + 1;    /* # of chars for name */
 typedef char		numbuf_t[NUMBER_WIDTH];
 
 /*
+ * Output formats.  Solaris uses a tab as separator, XPG4 a space.
+ */
+#ifdef XPG4
+#define	FORMAT1	"%s %s\n"
+#define	FORMAT2	"%lld %s\n"
+#else
+#define	FORMAT1	"%s\t%s\n"
+#define	FORMAT2	"%lld\t%s\n"
+#endif
+
+/*
  * convert DEV_BSIZE blocks to K blocks
  */
 #define	DEV_BSIZE	512
 #define	DEV_KSHIFT	1
+#define	DEV_MSHIFT	11
 #define	kb(n)		(((u_longlong_t)(n)) >> DEV_KSHIFT)
+#define	mb(n)		(((u_longlong_t)(n)) >> DEV_MSHIFT)
 
 long	wait();
 static u_longlong_t 	descend(char *curname, int curfd, int *retcode,
@@ -106,11 +117,7 @@ main(int argc, char **argv)
 	rflg++;		/* "-r" is not an option but ON always */
 #endif
 
-#ifdef XPG4
-	while ((c = getopt(argc, argv, "ahHkLrsx")) != EOF)
-#else
-	while ((c = getopt(argc, argv, "adhHkLors")) != EOF)
-#endif
+	while ((c = getopt(argc, argv, "adhHkLmorsx")) != EOF)
 		switch (c) {
 
 		case 'a':
@@ -119,6 +126,8 @@ main(int argc, char **argv)
 
 		case 'h':
 			hflg++;
+			kflg = 0;
+			mflg = 0;
 			continue;
 
 		case 'r':
@@ -131,6 +140,14 @@ main(int argc, char **argv)
 
 		case 'k':
 			kflg++;
+			hflg = 0;
+			mflg = 0;
+			continue;
+
+		case 'm':
+			mflg++;
+			hflg = 0;
+			kflg = 0;
 			continue;
 
 		case 'o':
@@ -158,19 +175,11 @@ main(int argc, char **argv)
 			Hflg = 0;
 			cmdarg = 0;
 			continue;
-#ifdef XPG4
 		case '?':
 			(void) fprintf(stderr, gettext(
-			    "usage: du [-a] [-h|-k] [-r] [-s] [-x] [-H|-L]"
-			    " [file ...]\n"));
+			    "usage: du [-dorx] [-a|-s] [-h|-k|-m] [-H|-L] "
+			    "[file...]\n"));
 			exit(2);
-#else
-		case '?':
-			(void) fprintf(stderr, gettext(
-			    "usage: du [-a] [-d] [-h|-k] [-r] [-o|-s] [-H|-L]"
-			    " [file ...]\n"));
-			exit(2);
-#endif
 		}
 	if (optind == argc) {
 		argv = &dot;
@@ -248,7 +257,7 @@ main(int argc, char **argv)
 			} else
 				np = base;
 			blocks = descend(*np ? np : ".", 0, &retcode,
-				(dev_t)0);
+			    (dev_t)0);
 			if (sflg)
 				printsize(blocks, base);
 			if (optind < argc - 1)
@@ -441,7 +450,7 @@ descend(char *curname, int curfd, int *retcode, dev_t device)
 	}
 	while (dp = readdir(dirp)) {
 		if ((strcmp(dp->d_name, ".") == 0) ||
-			(strcmp(dp->d_name, "..") == 0))
+		    (strcmp(dp->d_name, "..") == 0))
 			continue;
 		/*
 		 * we're about to append "/" + dp->d_name
@@ -583,27 +592,15 @@ printsize(blkcnt_t blocks, char *path)
 	if (hflg) {
 		numbuf_t numbuf;
 		unsigned long long scale = 1024L;
-#ifdef XPG4
-		(void) printf("%s %s\n",
+		(void) printf(FORMAT1,
 		    number_to_scaled_string(numbuf, blocks, DEV_BSIZE, scale),
 		    path);
-#else
-		(void) printf("%s\t%s\n",
-		    number_to_scaled_string(numbuf, blocks, DEV_BSIZE, scale),
-		    path);
-#endif
 	} else if (kflg) {
-#ifdef XPG4
-		(void) printf("%lld %s\n", (long long)kb(blocks), path);
-#else
-		(void) printf("%lld\t%s\n", (long long)kb(blocks), path);
-#endif
+		(void) printf(FORMAT2, (long long)kb(blocks), path);
+	} else if (mflg) {
+		(void) printf(FORMAT2, (long long)mb(blocks), path);
 	} else {
-#ifdef XPG4
-		(void) printf("%lld %s\n", (long long)blocks, path);
-#else
-		(void) printf("%lld\t%s\n", (long long)blocks, path);
-#endif
+		(void) printf(FORMAT2, (long long)blocks, path);
 	}
 }
 
