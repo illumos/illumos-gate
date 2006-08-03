@@ -160,8 +160,7 @@ event fault.io.pciex.device-invreq@pciexbus/pciexdev/pciexfn,
 	FITrate=PCIEX_DEV_INV_FIT, FRU=pciexbus/pciexdev,
 	ASRU=pciexbus/pciexdev/pciexfn;
 
-event fault.io.pciex.device-invreq@pciexrc,
-	FITrate=PCIEX_RC_INV_FIT, FRU=pciexrc, ASRU=pciexrc;
+event upset.io.pciex.device-invreq@pciexrc;
 
 event fault.io.pciex.device-noresp@pciexbus/pciexdev/pciexfn,
 	FITrate=PCIEX_DEV_NR_FIT, FRU=pciexbus/pciexdev,
@@ -368,7 +367,7 @@ event error.io.pciex.fatlink@pciexrc/pciexbus/pciexdev/pciexfn;
 prop fault.io.pciex.device-noresp@pciexrc (1)->
     error.io.pciex.nr-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>;
 
-prop fault.io.pciex.device-invreq@pciexrc (1)->
+prop upset.io.pciex.device-invreq@pciexrc (1)->
     error.io.pciex.badreq-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>;
 
 prop fault.io.pciex.device-interr@pciexrc (1)->

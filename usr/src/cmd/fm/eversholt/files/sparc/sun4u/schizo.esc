@@ -47,6 +47,7 @@ event fault.io.schizo@hostbridge,
 event error.io.sch.saf.dstat@hostbridge;
 event error.io.sch.saf.to@hostbridge;
 event error.io.sch.saf.bus@hostbridge;
+event error.io.sch.ecc.thresh@hostbridge;
 event error.io.pci.device-ta@hostbridge/pcibus/pcidev/pcifn;
 
 event ereport.io.sch.saf.to@hostbridge{within(5s)};
@@ -96,10 +97,14 @@ prop fault.io.schizo@hostbridge (0)->
     ereport.io.sch.saf.ape@hostbridge,
     ereport.io.sch.ecc.pue@hostbridge,
     ereport.io.sch.ecc.s-pue@hostbridge,
-    ereport.io.sch.ecc.thresh@hostbridge,
+    error.io.sch.ecc.thresh@hostbridge,
     error.io.sch.saf.to@hostbridge,
     error.io.sch.saf.bus@hostbridge,
     error.io.sch.saf.dstat@hostbridge;
+
+prop error.io.sch.ecc.thresh@hostbridge (2)->
+    ereport.io.sch.ecc.thresh@hostbridge,
+    ereport.io.sch.ecc.pce@hostbridge;
 
 prop error.io.sch.saf.to@hostbridge (2)->
     ereport.io.sch.saf.to@hostbridge,
@@ -134,12 +139,12 @@ fru cpu;
 
 event fault.io.datapath@cpu, FITrate=CPU_FIT, FRU=cpu;
 
+event error.io.cpu.ecc.thresh@cpu;
 event ereport.io.sch.saf.ssm-dis@hostbridge{within(5s)};
 event ereport.io.sch.saf.cpu0-par@hostbridge{within(5s)};
 event ereport.io.sch.saf.cpu0-bidi@hostbridge{within(5s)};
 event ereport.io.sch.saf.cpu1-par@hostbridge{within(5s)};
 event ereport.io.sch.saf.cpu1-bidi@hostbridge{within(5s)};
-event ereport.io.cpu.ecc.thresh@cpu;
 
 /*
  * A faulty xcal CPU[0] may cause:
@@ -181,29 +186,20 @@ prop fault.io.datapath@cpu (0)->
 
 prop fault.io.datapath@cpu[cpuid] (0)->
     ereport.io.sch.ecc.pue@hostbridge
-    {((payloadprop("ecc-afsr") >> AGENT_ID_SHIFT) & AGENT_ID_MASK) == cpuid},
-    ereport.io.cpu.ecc.thresh@cpu[cpuid];
+    {((payloadprop("ecc-afsr") >> AGENT_ID_SHIFT) & AGENT_ID_MASK) == cpuid};
 
-engine serd.io.cpu.ecc@cpu,
-    N=3, T=1day, method=persistent,
-    trip=ereport.io.cpu.ecc.thresh@cpu;
+prop fault.io.datapath@cpu (0)->
+    error.io.cpu.ecc.thresh@cpu;
 
-event upset.io.datapath@cpu,
-    engine=serd.io.cpu.ecc@cpu;
+prop error.io.cpu.ecc.thresh@cpu (1)->
+    ereport.io.sch.ecc.thresh@hostbridge<>;
 
-/*
- * An upset CPU may cause:
- *
- *  - pce:	PIO correctable error.
- */
-prop upset.io.datapath@cpu[cpuid] (0)->
-    ereport.io.sch.ecc.pce@hostbridge
+prop error.io.cpu.ecc.thresh@cpu[cpuid] (1)->
+    ereport.io.sch.ecc.pce@hostbridge<>
     {((payloadprop("ecc-afsr") >> AGENT_ID_SHIFT) & AGENT_ID_MASK) == cpuid};
 
 event fault.io.hbus@hostbridge,
     FITrate=HBUS_FIT, FRU=hostbridge, ASRU=hostbridge;
-
-event ereport.io.hbus.ecc.thresh@hostbridge;
 
 /*
  * A faulty host bus may cause:
@@ -225,22 +221,7 @@ prop fault.io.hbus@hostbridge (0)->
     ereport.io.sch.saf.cpu1-bidi@hostbridge,
     ereport.io.sch.ecc.pue@hostbridge,
     ereport.io.sch.ecc.s-pue@hostbridge,
-    ereport.io.hbus.ecc.thresh@hostbridge;
-
-engine serd.io.hbus.ecc@hostbridge,
-    N=3, T=1day, method=persistent,
-    trip=ereport.io.hbus.ecc.thresh@hostbridge;
-
-event upset.io.hbus@hostbridge,
-    engine=serd.io.hbus.ecc@hostbridge;
-
-/*
- * An upset host bus may cause:
- *
- *  - pce:	PIO correctable error.
- */
-prop upset.io.hbus@hostbridge (0)->
-    ereport.io.sch.ecc.pce@hostbridge;
+    error.io.sch.ecc.thresh@hostbridge;
 
 /*
  * A bad request from a downstream device/driver may cause

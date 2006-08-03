@@ -73,12 +73,12 @@ pci_fm_err_t pci_bdg_err_tbl[] = {
 };
 
 static pci_fm_err_t pciex_ce_err_tbl[] = {
-	PCIEX_RE,	PCIE_AER_CE_RECEIVER_ERR,	NULL,	DDI_FM_NONFATAL,
-	PCIEX_RNR,	PCIE_AER_CE_REPLAY_ROLLOVER,	NULL,	DDI_FM_NONFATAL,
-	PCIEX_RTO,	PCIE_AER_CE_REPLAY_TO,		NULL,	DDI_FM_NONFATAL,
-	PCIEX_BDP,	PCIE_AER_CE_BAD_DLLP,		NULL,	DDI_FM_NONFATAL,
-	PCIEX_BTP,	PCIE_AER_CE_BAD_TLP,		NULL,	DDI_FM_NONFATAL,
-	PCIEX_ANFE,	PCIE_AER_CE_AD_NFE,		NULL,	DDI_FM_NONFATAL,
+	PCIEX_RE,	PCIE_AER_CE_RECEIVER_ERR,	NULL,	DDI_FM_OK,
+	PCIEX_RNR,	PCIE_AER_CE_REPLAY_ROLLOVER,	NULL,	DDI_FM_OK,
+	PCIEX_RTO,	PCIE_AER_CE_REPLAY_TO,		NULL,	DDI_FM_OK,
+	PCIEX_BDP,	PCIE_AER_CE_BAD_DLLP,		NULL,	DDI_FM_OK,
+	PCIEX_BTP,	PCIE_AER_CE_BAD_TLP,		NULL,	DDI_FM_OK,
+	PCIEX_ANFE,	PCIE_AER_CE_AD_NFE,		NULL,	DDI_FM_OK,
 	NULL, NULL, NULL, NULL,
 };
 
@@ -89,11 +89,11 @@ static pci_fm_err_t pciex_ue_err_tbl[] = {
 	PCIEX_ROF,	PCIE_AER_UCE_RO,		NULL,	DDI_FM_FATAL,
 	PCIEX_FCP,	PCIE_AER_UCE_FCP,		NULL,	DDI_FM_FATAL,
 	PCIEX_MFP,	PCIE_AER_UCE_MTLP,		NULL,	DDI_FM_FATAL,
-	PCIEX_CTO,	PCIE_AER_UCE_TO,		NULL,	DDI_FM_NONFATAL,
-	PCIEX_UC,	PCIE_AER_UCE_UC,		NULL,	DDI_FM_NONFATAL,
+	PCIEX_CTO,	PCIE_AER_UCE_TO,		NULL,	DDI_FM_UNKNOWN,
+	PCIEX_UC,	PCIE_AER_UCE_UC,		NULL,	DDI_FM_OK,
 	PCIEX_ECRC,	PCIE_AER_UCE_ECRC,		NULL,	DDI_FM_UNKNOWN,
 	PCIEX_CA,	PCIE_AER_UCE_CA,		NULL,	DDI_FM_UNKNOWN,
-	PCIEX_UR,	PCIE_AER_UCE_UR,		NULL,	DDI_FM_NONFATAL,
+	PCIEX_UR,	PCIE_AER_UCE_UR,		NULL,	DDI_FM_UNKNOWN,
 	PCIEX_POIS,	PCIE_AER_UCE_PTLP,		NULL,	DDI_FM_UNKNOWN,
 	NULL, NULL, NULL, NULL,
 };
@@ -125,8 +125,8 @@ static pci_fm_err_t pcix_err_tbl[] = {
 static pci_fm_err_t pcix_sec_err_tbl[] = {
 	PCIX_SPL_DIS,		PCI_PCIX_BSS_SPL_DSCD,	NULL,	DDI_FM_UNKNOWN,
 	PCIX_UNEX_SPL,		PCI_PCIX_BSS_UNEX_SPL,	NULL,	DDI_FM_UNKNOWN,
-	PCIX_BSS_SPL_OR,	PCI_PCIX_BSS_SPL_OR,	NULL,	DDI_FM_NONFATAL,
-	PCIX_BSS_SPL_DLY,	PCI_PCIX_BSS_SPL_DLY,	NULL,	DDI_FM_NONFATAL,
+	PCIX_BSS_SPL_OR,	PCI_PCIX_BSS_SPL_OR,	NULL,	DDI_FM_OK,
+	PCIX_BSS_SPL_DLY,	PCI_PCIX_BSS_SPL_DLY,	NULL,	DDI_FM_OK,
 	NULL, NULL, NULL, NULL,
 };
 
@@ -134,7 +134,7 @@ static pci_fm_err_t pciex_nadv_err_tbl[] = {
 	PCIEX_UR,	PCIE_DEVSTS_UR_DETECTED,	NULL,	DDI_FM_UNKNOWN,
 	PCIEX_FAT,	PCIE_DEVSTS_FE_DETECTED,	NULL,	DDI_FM_FATAL,
 	PCIEX_NONFAT,	PCIE_DEVSTS_NFE_DETECTED,	NULL,	DDI_FM_UNKNOWN,
-	PCIEX_CORR,	PCIE_DEVSTS_CE_DETECTED,	NULL,	DDI_FM_NONFATAL,
+	PCIEX_CORR,	PCIE_DEVSTS_CE_DETECTED,	NULL,	DDI_FM_OK,
 	NULL, NULL, NULL, NULL,
 };
 
@@ -1266,10 +1266,7 @@ pcie_check_addr(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *eprt_p)
 		{
 			pcie_cfg_t *cfg_tlp = (pcie_cfg_t *)ue_hdr;
 
-			pcie_adv_regs->pcie_adv_bdf =
-			    (uint16_t)cfg_tlp->bus << 8 |
-			    (uint16_t)cfg_tlp->dev << 3 | cfg_tlp->func;
-
+			pcie_adv_regs->pcie_adv_bdf = cfg_tlp->rid;
 			derr->fme_status = DDI_FM_UNKNOWN;
 			break;
 		}
@@ -1360,10 +1357,8 @@ cmd_switch:
 		break;
 	    case PCI_PCIX_CMD_CFRD:
 	    case PCI_PCIX_CMD_CFWR:
-		/*
-		 * If we want to store the bdf of the device being addressed we
-		 * will need to do some surgery
-		 */
+		pcie_adv_regs->pcie_adv_bdf = pcie_pci_sue_attr->rid;
+
 		derr->fme_status = DDI_FM_UNKNOWN;
 		break;
 	    case PCI_PCIX_CMD_DADR:
@@ -1474,21 +1469,7 @@ pci_bdg_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 				    pci_bdg_regs->pci_bdg_sec_stat, PCI_BCNTRL,
 				    DATA_TYPE_UINT16,
 				    pci_bdg_regs->pci_bdg_ctrl, NULL);
-				/*
-				 * Increment severity based on flag if bridge
-				 * is PCI or PCI-X, if PCI Express and this is a
-				 * master abort then treat as nonfatal.
-				 * XXFM May need to check if all other errors
-				 * are related to MA?
-				 */
-				if (!(erpt_p->pe_dflags & PCIEX_DEV)) {
-					PCI_FM_SEV_INC(
-					    pci_bdg_err_tbl[i].flags);
-				} else if (pci_bdg_err_tbl[i].reg_bit ==
-				    PCI_STAT_R_MAST_AB) {
-					nonfatal++;
-				}
-
+				PCI_FM_SEV_INC(pci_bdg_err_tbl[i].flags);
 				if (derr->fme_bus_specific &&
 				    pci_bdg_err_tbl[i].terr_class)
 					pci_target_enqueue(derr->fme_ena,
@@ -1497,6 +1478,29 @@ pci_bdg_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 					    (uintptr_t)derr->fme_bus_specific);
 			}
 		}
+#if !defined(__sparc)
+		/*
+		 * For x86, many drivers and even user-level code currently get
+		 * away with accessing bad addresses, getting a UR and getting
+		 * -1 returned. Unfortunately, we have no control over this, so
+		 * we will have to treat all URs as nonfatal. Moreover, if the
+		 * leaf driver is non-hardened, then we don't actually see the
+		 * UR directly. All we see is a secondary bus master abort at
+		 * the root complex - so it's this condition that we actually
+		 * need to treat as nonfatal (providing no other unrelated nfe
+		 * conditions have also been seen by the root complex).
+		 */
+		if ((erpt_p->pe_dflags & PCIEX_RC_DEV) &&
+		    (pci_bdg_regs->pci_bdg_sec_stat & PCI_STAT_R_MAST_AB) &&
+		    !(pci_bdg_regs->pci_bdg_sec_stat & PCI_STAT_S_PERROR)) {
+			pcie_error_regs_t *pcie_regs =
+			    (pcie_error_regs_t *)erpt_p->pe_regs;
+			if ((pcie_regs->pcie_vflags & PCIE_ERR_STATUS_VALID) &&
+			    !(pcie_regs->pcie_err_status &
+			    PCIE_DEVSTS_NFE_DETECTED))
+				nonfatal++;
+		}
+#endif
 	}
 
 done:
@@ -1615,7 +1619,7 @@ pcix_ecc_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p,
 				break;
 			    case PCI_PCIX_ECC_PHASE_FADDR:
 			    case PCI_PCIX_ECC_PHASE_SADDR:
-				PCI_FM_SEV_INC(ecc_corr ?  DDI_FM_NONFATAL :
+				PCI_FM_SEV_INC(ecc_corr ?  DDI_FM_OK :
 				    DDI_FM_FATAL);
 				(void) snprintf(buf, FM_MAX_CLASS,
 				    "%s.%s%s", PCIX_ERROR_SUBCLASS,
@@ -1625,7 +1629,7 @@ pcix_ecc_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p,
 				break;
 			    case PCI_PCIX_ECC_PHASE_ATTR:
 				PCI_FM_SEV_INC(ecc_corr ?
-				    DDI_FM_NONFATAL : DDI_FM_FATAL);
+				    DDI_FM_OK : DDI_FM_FATAL);
 				(void) snprintf(buf, FM_MAX_CLASS,
 				    "%s.%s%s", PCIX_ERROR_SUBCLASS,
 				    i ? PCIX_SEC_ERROR_SUBCLASS : "",
@@ -1635,7 +1639,7 @@ pcix_ecc_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p,
 			    case PCI_PCIX_ECC_PHASE_DATA32:
 			    case PCI_PCIX_ECC_PHASE_DATA64:
 				if (ecc_corr)
-					ret = DDI_FM_NONFATAL;
+					ret = DDI_FM_OK;
 				else
 					ret = pcix_check_addr(dip, derr,
 					    pcix_ecc_regs);
@@ -1707,7 +1711,7 @@ pcix_ecc_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p,
 					    PCIX_ECC_ATTR, DATA_TYPE_UINT32,
 					    pcix_ecc_regs->pcix_ecc_attr, NULL);
 				PCI_FM_SEV_INC(sec_ue ? DDI_FM_FATAL :
-				    DDI_FM_NONFATAL);
+				    DDI_FM_OK);
 			}
 		}
 	}
@@ -1849,8 +1853,6 @@ pcie_rc_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p,
 		 */
 		if (ue && fe)
 			fatal++;
-		else if (ce && !ue)
-			nonfatal++;
 
 		if (fe && first_ue_fatal) {
 			(void) snprintf(buf, FM_MAX_CLASS,
@@ -1950,14 +1952,13 @@ pcie_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 			} else {
 				pcie_check_addr(dip, derr, erpt_p);
 				/*
-				 * fatal/nonfatal errors are fatal/nonfatal
+				 * fatal/ok errors are fatal/ok
 				 * regardless of if we find a handle
 				 */
 				if (pciex_ue_err_tbl[i].flags == DDI_FM_FATAL)
 					derr->fme_status = DDI_FM_FATAL;
-				else if (pciex_ue_err_tbl[i].flags ==
-				    DDI_FM_NONFATAL)
-					derr->fme_status = DDI_FM_NONFATAL;
+				else if (pciex_ue_err_tbl[i].flags == DDI_FM_OK)
+					derr->fme_status = DDI_FM_OK;
 				pcie_ereport_post(dip, derr, erpt_p, buf,
 				    PCIEX_TYPE_UE);
 				PCI_FM_SEV_INC(derr->fme_status);
@@ -1979,8 +1980,6 @@ pcie_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 			    pciex_ce_err_tbl[i].err_class);
 			pcie_ereport_post(dip, derr, erpt_p, buf,
 			    PCIEX_TYPE_CE);
-			if (!fatal && !unknown)
-				PCI_FM_SEV_INC(pciex_ce_err_tbl[i].flags);
 		}
 	}
 
@@ -2099,8 +2098,17 @@ pci_error_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p)
 			    PCI_CONFIG_COMMAND, DATA_TYPE_UINT16,
 			    erpt_p->pe_pci_regs->pci_cfg_comm, NULL);
 
-			if (!(erpt_p->pe_dflags & PCIEX_DEV))
+			/*
+			 * The meaning of SERR is different for PCIEX (just
+			 * implies a message has been sent) so we don't want to
+			 * treat that one as fatal.
+			 */
+			if ((erpt_p->pe_dflags & PCIEX_DEV) &&
+			    pci_err_tbl[i].reg_bit == PCI_STAT_S_SYSERR) {
+				unknown++;
+			} else {
 				PCI_FM_SEV_INC(pci_err_tbl[i].flags);
+			}
 		}
 		if (erpt_p->pe_dflags & PCIEX_DEV) {
 			int ret = pcie_error_report(dip, derr, erpt_p);
@@ -2145,10 +2153,8 @@ pci_ereport_post(dev_info_t *dip, ddi_fm_error_t *derr, uint16_t *xx_status)
 		derr->fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
 
 	erpt_p = (pci_erpt_t *)fmhdl->fh_bus_specific;
-	if (erpt_p == NULL) {
-		i_ddi_drv_ereport_post(dip, DVR_EFMCAP, NULL, DDI_NOSLEEP);
+	if (erpt_p == NULL)
 		return;
-	}
 
 	pci_regs_gather(dip, erpt_p);
 	pci_error_report(dip, derr, erpt_p);

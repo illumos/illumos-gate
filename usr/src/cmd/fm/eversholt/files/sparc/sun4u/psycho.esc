@@ -44,6 +44,7 @@ asru hostbridge;
 event fault.io.psycho@hostbridge,
     FITrate=HB_FIT, FRU=hostbridge, ASRU=hostbridge;
 
+event error.io.psy.ecc.thresh@hostbridge;
 event ereport.io.psy.ecc.pue@hostbridge{within(5s)};
 event ereport.io.psy.ecc.s-pue@hostbridge{within(5s)};
 event ereport.io.psy.ecc.thresh@hostbridge;
@@ -58,7 +59,7 @@ event ereport.io.psy.ecc.thresh@hostbridge;
 prop fault.io.psycho@hostbridge (0)->
     ereport.io.psy.ecc.pue@hostbridge,
     ereport.io.psy.ecc.s-pue@hostbridge,
-    ereport.io.psy.ecc.thresh@hostbridge;
+    error.io.psy.ecc.thresh@hostbridge;
 
 engine serd.io.psycho.ecc@hostbridge,
     N=3, T=1day, method=persistent,
@@ -69,6 +70,10 @@ event upset.io.psycho@hostbridge,
 
 event ereport.io.psy.ecc.pce@hostbridge{within(5s)};
 event ereport.io.psy.ecc.s-pce@hostbridge{within(5s)};
+
+prop error.io.psy.ecc.thresh@hostbridge (2)->
+    ereport.io.psy.ecc.thresh@hostbridge,
+    ereport.io.psy.ecc.pce@hostbridge;
 
 /*
  * An upset Psycho may cause:
@@ -81,8 +86,6 @@ prop upset.io.psycho@hostbridge (0)->
 event fault.io.hbus@hostbridge,
     FITrate=HBUS_FIT, FRU=hostbridge, ASRU=hostbridge;
 
-event ereport.io.hbus.ecc.thresh@hostbridge;
-
 /*
  * A faulty host bus may cause:
  *
@@ -93,29 +96,14 @@ event ereport.io.hbus.ecc.thresh@hostbridge;
 prop fault.io.hbus@hostbridge (0)->
     ereport.io.psy.ecc.pue@hostbridge,
     ereport.io.psy.ecc.s-pue@hostbridge,
-    ereport.io.hbus.ecc.thresh@hostbridge;
-
-engine serd.io.hbus.ecc@hostbridge,
-    N=3, T=1day, method=persistent,
-    trip=ereport.io.hbus.ecc.thresh@hostbridge;
-
-event upset.io.hbus@hostbridge,
-    engine=serd.io.hbus.ecc@hostbridge;
-
-/*
- * An upset host bus may cause:
- *
- *  - pce:	a PIO correctable error.
- */
-prop upset.io.hbus@hostbridge (0)->
-    ereport.io.psy.ecc.pce@hostbridge;
+    error.io.psy.ecc.thresh@hostbridge;
 
 fru cpu;
 
 event fault.io.datapath@cpu,
     FITrate=CPU_FIT, FRU=cpu;
 
-event ereport.io.cpu.ecc.thresh@cpu;
+event error.io.cpu.ecc.thresh@cpu;
 
 /*
  * A faulty CPU may cause:
@@ -127,24 +115,16 @@ event ereport.io.cpu.ecc.thresh@cpu;
  */
 prop fault.io.datapath@cpu[cpuid] (0)->
     ereport.io.psy.ecc.pue@hostbridge
-    {((payloadprop("ecc-afsr") >> AGENT_ID_SHIFT) & AGENT_ID_MASK) == cpuid},
-    ereport.io.cpu.ecc.thresh@cpu[cpuid];
+    {((payloadprop("ecc-afsr") >> AGENT_ID_SHIFT) & AGENT_ID_MASK) == cpuid};
 
-engine serd.io.cpu.ecc@cpu,
-    N=3, T=1day, method=persistent,
-    trip=ereport.io.cpu.ecc.thresh@cpu;
+prop fault.io.datapath@cpu (0)->
+    error.io.cpu.ecc.thresh@cpu;
 
-event upset.io.datapath@cpu,
-    engine=serd.io.cpu.ecc@cpu;
+prop error.io.cpu.ecc.thresh@cpu (1)->
+    ereport.io.psy.ecc.thresh@hostbridge<>;
 
-/*
- * An upset CPU may cause:
- *
- *  - pce:	a PIO correctable error, when the captured Agentid matches
- *		the cpuid.
- */
-prop upset.io.datapath@cpu[cpuid] (0)->
-    ereport.io.psy.ecc.pce@hostbridge
+prop error.io.cpu.ecc.thresh@cpu[cpuid] (1)->
+    ereport.io.psy.ecc.pce@hostbridge<>
     {((payloadprop("ecc-afsr") >> AGENT_ID_SHIFT) & AGENT_ID_MASK) == cpuid};
 
 asru pcibus/pcidev/pcifn;

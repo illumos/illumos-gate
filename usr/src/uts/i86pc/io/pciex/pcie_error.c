@@ -182,11 +182,23 @@ pcie_error_init(dev_info_t *cdip)
 	PCIE_ERROR_DBG("%s: header_type=%x\n",
 	    ddi_driver_name(cdip), header_type);
 
+	/* Look for PCIe capability */
+	cap_ptr = pcie_error_find_cap_reg(cfg_hdl, PCI_CAP_ID_PCI_E);
+	if (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {	/* PCIe found */
+		aer_ptr = pcie_error_find_ext_aer_capid(cfg_hdl);
+		if (aer_ptr != PCI_CAP_NEXT_PTR_NULL)
+			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
+			    "pcie-aer-pointer", aer_ptr);
+		dev_type = pci_config_get16(cfg_hdl, cap_ptr +
+		    PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
+	}
+
 	/* Setup the device's command register */
 	status_reg = pci_config_get16(cfg_hdl, PCI_CONF_STAT);
 	pci_config_put16(cfg_hdl, PCI_CONF_STAT, status_reg);
 	command_reg = pci_config_get16(cfg_hdl, PCI_CONF_COMM);
-	if (pcie_serr_disable_flag) {
+	if (pcie_serr_disable_flag && cap_ptr != PCI_CAP_NEXT_PTR_NULL &&
+	    dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT) {
 		pcie_command_default &= ~PCI_COMM_SERR_ENABLE;
 		/* shouldn't happen; just in case */
 		if (command_reg & PCI_COMM_SERR_ENABLE)
@@ -223,24 +235,15 @@ pcie_error_init(dev_info_t *cdip)
 		if (pcie_command_default & PCI_COMM_PARITY_DETECT)
 			bcr |= PCI_BCNF_BCNTRL_PARITY_ENABLE;
 		if (pcie_command_default & PCI_COMM_SERR_ENABLE) {
-			if (pcie_serr_disable_flag)
+			if (pcie_serr_disable_flag &&
+			    cap_ptr != PCI_CAP_NEXT_PTR_NULL &&
+			    dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT)
 				bcr &= ~PCI_BCNF_BCNTRL_SERR_ENABLE;
 			else
 				bcr |= PCI_BCNF_BCNTRL_SERR_ENABLE;
 		}
 		bcr |= PCI_BCNF_BCNTRL_MAST_AB_MODE;
 		pci_config_put8(cfg_hdl, PCI_BCNF_BCNTRL, bcr);
-	}
-
-	/* Look for PCIe capability */
-	cap_ptr = pcie_error_find_cap_reg(cfg_hdl, PCI_CAP_ID_PCI_E);
-	if (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {	/* PCIe found */
-		aer_ptr = pcie_error_find_ext_aer_capid(cfg_hdl);
-		if (aer_ptr != PCI_CAP_NEXT_PTR_NULL)
-			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
-			    "pcie-aer-pointer", aer_ptr);
-		dev_type = pci_config_get16(cfg_hdl, cap_ptr +
-		    PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 	}
 
 	/*
