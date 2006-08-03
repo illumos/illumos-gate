@@ -696,11 +696,12 @@ Usage:  $ME command [-D] [args]
         $ME comments    display check-in comments for active files
         $ME bugs [-u]   display all bugids in check-in comments
         $ME arcs [-u]   display all ARC cases in check-in comments
-        $ME pbcom [-v] [-u]  display summarized comments suitable for putback
+        $ME pbcom [-v] [-u] [-N]  display summarized comments suitable for putback
                         Default is to display only bugs and arc cases. Will
                         display warnings about non-bug comments to stderr.
                         -v: display all comments verbatim including non-bug/arc 
                         -u: prevent sorting, order determined by active list
+                        -N: don't check bug synopsis against bug database
 
 ======================== File Manipulation Commands ======================
         $ME edit [-s] [file ...]        
@@ -864,13 +865,14 @@ Usage:  $ME command [-D] [args]
                         wx/tmp/nametable.orig to Codemgr_wsdata/nametable.
 
 ======================== Teamware Commands ======================
-        $ME putback [-v][-f][Teamware putback flags, see below][file ...]
+        $ME putback [-v][-f][-N][Teamware putback flags, see below][file ...]
                         Use Teamware putback command to putback either
                         file(s) specified or *all* active and renamed
                         files if no file(s) specified.  Will use pbcom
                         output as the putback comments. 
                         -f: force non-interactive mode (will not prompt)
                         -v: pass comments verbatim to putback(see pbcom)
+                        -N: don't check bug synopsis against bug database
                         Accepts -n, -p pws, -q putback flags ('man putback' 
                         for more info).
         $ME pb          alias for putback.
@@ -1224,6 +1226,57 @@ wx_show_comment() {
 	fi
 }
 
+bugdb_lookup_monaco() {
+	typeset buglist=$1
+	typeset monaco=/net/monaco.sfbay/export/bin/monaco 
+
+	if [[ ! -x $monaco ]]; then
+		return 1
+	fi
+
+	$monaco -text <<-EOF
+	set What =
+	substr(cr.cr_number, 1, 7), synopsis
+
+	set Which =
+	cr.cr_number in ($buglist)
+
+	set FinalClauses =
+	order by cr.cr_number
+
+	do query/CR
+	EOF
+}
+
+bugdb_compare() {
+	nawk -v bugdb=$1 -v active=$2 -f - <<-"EOF"
+	BEGIN {
+		file = bugdb
+		while (getline < file) {
+			synbugdb[$1] = substr($0, length($1) + 1)
+		}
+		
+		file = active
+		while (getline < file) {
+			synactive = substr($0, length($1) + 1)
+			# If the synopsis doesn't match the bug database
+			# and the synopsis isn't what's in the database
+			# with " (something)" appended, spew a warning.
+			if (!($1 in synbugdb)) {
+				print "Bug " $1 " is not in the database"
+			} else if (synbugdb[$1] != synactive &&
+				!(index(synactive, synbugdb[$1]) == 1 &&
+				  substr(synactive, length(synbugdb[$1])) ~ \
+					/ \([^)]*\)$/)) {
+				print "Synopsis of " $1 " is wrong:"
+				print "  should be:" synbugdb[$1]
+				print "         is:" synactive
+			}
+		}
+	}
+	EOF
+}
+
 #
 # Summarize all comments listing, in order:
 #	 - free-form comments
@@ -1237,6 +1290,7 @@ wx_show_comment() {
 # -p will do pbcom checking and exit if it finds problems unless -v is given
 # -u will prevent sorting of the ARC case comments and bug comments
 # -v will output all comments verbatim (no sorting)
+# -N will prevent bug lookup, which may take a while.
 #
 # Note, be careful when modifying this function as sometimes the output
 # should go to stdout, as in the case of being called via pbchk and
@@ -1245,16 +1299,17 @@ wx_show_comment() {
 #
 
 wx_summary() {
-	typeset i comment arc bug bugnospc \
+	typeset i comment arc bug bugnospc bugid buglist synopsis \
 		show_arcs=true \
 		show_bugs=true \
 		show_others=true \
 		verbatim=false \
 		pbchk=false \
 		pbcom=false \
-		cmd=sort 
+		cmd=sort \
+		nolookup=false
 
-	while getopts :abnopuv i; do
+	while getopts :abnopuvN i; do
 		  case $i in
 		  a)	show_arcs=false;;
 		  b)	show_bugs=false;;
@@ -1263,6 +1318,7 @@ wx_summary() {
 		  p)	pbcom=true;;
 		  v)	verbatim=true;;
 		  u)	cmd=cat;;
+		  N)	nolookup=true;;
 		  *)	fail "Invalid flag -$OPTARG. See 'wx help' for more"\
 		  		"info.";;
 		  esac
@@ -1346,6 +1402,59 @@ wx_summary() {
 				return 1
 			fi
 		fi
+
+		# Compare bug synopsis in active comments with the bug database.
+		# If we've been passed -N, then we just never set buglist, thus
+		# skipping the lookup.
+		if ! $nolookup; then
+			grep "^$bug" $wxtmp/comments | sort > $wxtmp/buglist.active
+			cat $wxtmp/buglist.active | while read bugid synopsis; do
+				buglist=$buglist,$bugid
+			done
+			buglist=${buglist#,}
+		else
+			if $pbchk; then
+				print "Not performing bug synopsis check (be careful)"
+			else
+				print -u2 "Not performing bug synopsis check (be careful)"
+			fi
+		fi
+		if [[ -n $buglist ]]; then
+			bugdb_lookup_monaco $buglist > $wxtmp/buglist.bugdb
+			if [[ -s $wxtmp/buglist.bugdb && $? -eq 0 ]]; then
+				bugdb_compare $wxtmp/buglist.bugdb \
+					$wxtmp/buglist.active > $wxtmp/error
+				if [[ -s $wxtmp/error ]]; then
+					if $pbchk; then
+						cat $wxtmp/error
+					else
+						cat $wxtmp/error >&2
+					fi
+					if $pbcom && ! $verbatim; then
+						# Don't want to output anything
+						# to stdout for a pbcom if there
+						# is an error.
+						return 1
+					fi
+				fi
+			else
+				if $pbchk; then
+					print "Could not perform bug synopsis check"
+				else
+					print -u2 "Could not perform bug synopsis check"
+					if $pbcom; then
+						print -u2 "Use -N to skip bug synopsis check (be careful)"
+					fi
+				fi
+				if $pbcom && ! $verbatim; then
+					# Don't want to output anything
+					# to stdout for a pbcom if there
+					# is an error.
+					return 1
+				fi
+			fi
+		fi
+
 		if egrep "^$bugnospc" $wxtmp/comments >$wxtmp/error; then
 			# must have single space following bug ID
 			if $pbchk; then
@@ -4077,6 +4186,7 @@ rtichk() {
 	typeset gate=${parent##*/} usewebrti='false'
 	typeset webrticli=$(whence webrticli 2>/dev/null)
 	typeset -i i j rc=0 warnhdr=0
+	typeset nolookup opt
 
 	if [[ -f $wxdir/rtichk.NOT ]]; then
 		print "\nSkipping RTI check:"
@@ -4084,6 +4194,13 @@ rtichk() {
 	else
 		print "\nDoing RTI check:"
 	fi
+
+	while getopts :N opt; do
+		case $opt in
+			N) nolookup='-N' ;;
+			*) fail "Invalid flag -$OPTARG." ;;
+		esac
+	done
 
 	# Is the parent a patch gate?
 	if [[ $parent == *-patch* ]]; then
@@ -4124,7 +4241,7 @@ RTI status using old style checking...
 
 	# Use wx_summary to output bug ID's in active list comments,
 	# redirecting warnings about non-bug ID's to file for later use.
-	set -A bugs $(wx_summary -ao 2>$wxtmp/bugwarnings|cut -f1 -d' ')
+	set -A bugs $(wx_summary -ao $nolookup 2>$wxtmp/bugwarnings|cut -f1 -d' ')
 
 	((i = 0)) # init bugs array index
 	for bug in ${bugs[@]}; do
@@ -4303,6 +4420,7 @@ wx_putback() {
 	# verbatim is for -v verbatim flag which doesn't get passed to
 	# putback.
 	typeset i verbatim pbargs[] pbfiles narg=false force=false
+	typeset nolookup=false
 
 	if $FILES_PASSED; then
 		# use the user specified files
@@ -4312,7 +4430,7 @@ wx_putback() {
 		pbfiles=$(wx_active -p)
 	fi
 
-	while getopts :fnp:qv i; do
+	while getopts :fnp:qvN i; do
 		case $i in
 			# Force the putback (no user interaction)
 			f)	force=true;;
@@ -4330,6 +4448,8 @@ wx_putback() {
 				# -v doesn't get passed to putback.
 			v)	verbatim='-v';;
 
+			N)	nolookup='-N';;
+
 		  	*)	fail "Invalid flag -$OPTARG. See 'wx help'"\
 					"for more info.";;
 		esac
@@ -4339,7 +4459,7 @@ wx_putback() {
 		# real putback
 
 		# get pb comments, will be used later.
-		if ! wx_summary -p $verbatim >$wxtmp/pb_comments; then
+		if ! wx_summary -p $verbatim $nolookup >$wxtmp/pb_comments; then
 			# Fail if comments have problems.
 			fail "\nError, improper comments found. Use -v"\
 				"to bypass this check."
@@ -4371,7 +4491,7 @@ ARC case associated with your putback.
 			print "========== End of putback comments ======="
 
 			# Output warning if RTI isn't approved.
-			rtichk
+			rtichk $nolookup
 			print "========== End of RTI check output ======="
 
 			cat <<-EOF
@@ -4395,7 +4515,7 @@ $pbfiles
 		$PUTBACK "${pbargs[@]}" $pbfiles
 	else
 		# feed active list comments into real putback
-		wx_summary $verbatim |$PUTBACK "${pbargs[@]}" $pbfiles
+		wx_summary $verbatim $nolookup |$PUTBACK "${pbargs[@]}" $pbfiles
 	fi
 	return
 }

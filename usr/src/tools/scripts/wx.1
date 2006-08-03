@@ -94,8 +94,9 @@ Defaults to the compression of the previous backup.
 alias for backup command
 
 .TP
-.B bugs [-u]
-display all bugids in check-in comments
+.B bugs [-u] [-N]
+Display all bugids in check-in comments.  See \fBpbcom\fR below for a
+description of the flags.
 
 .TP
 .B cddlchk [cddlchk options]
@@ -127,7 +128,11 @@ comments shouldn't be included in the output.
 
 .TP
 .B comchk
-Warns if comments break ON rules.
+Warns if the comments' formats break ON rules.  In addition, this will
+warn if the bug id doesn't match the given synopsis.  Note that this
+performs a network connection to a server on the SWAN, so this may hang
+depending on the availability of the server.  Completely detached operation
+should fail smoothly (with a warning).
 
 .TP
 .B comments
@@ -412,15 +417,17 @@ Will run checks on all active files if no file args.
 Will skip checks for files listed in wx/pbchk.NOT.
 
 .TP
-.B pbcom [-v] [-u]
+.B pbcom [-v] [-u] [-N]
 display summarized comments suitable for putback
 Default is to display only bugs and arc cases.  Will
 display warnings about non-bug comments to stderr.
 
 -v: display all comments verbatim including non-bug/arc 
 
--u: prevent sorting, order determined by active list
+-u: prevent sorting, order determined by active list.
 Hint, putback will accept comments on stdin.
+
+-N: prevent a network lookup to cross-check bugids with their synopses
 
 .TP
 .B pblist 
@@ -443,11 +450,14 @@ show SCCS delta history for all active files
 -y: only show latest delta entry
 
 .TP
-.B putback [-v][other putback flags, see below]
+.B putback [-v] [-N] [other putback flags, see below]
 putback active and renamed files.  Will use pbcom
 output as the putback comments.
 
--v: pass comments verbatim to putback(see pbcom)
+-v: pass comments verbatim to putback (see pbcom)
+
+-N: don't cross-check bugids with their synopses (see pbcom)
+
 Accepts -n, -p, -q putback flags ('man putback' for
 more info).
 
