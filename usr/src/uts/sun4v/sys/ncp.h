@@ -250,6 +250,9 @@ struct ncp_stat {
 		kstat_named_t	ns_qfull;
 		kstat_named_t	ns_qbusy;
 		kstat_named_t	ns_qupdate_failure;
+		kstat_named_t	ns_nintr;
+		kstat_named_t	ns_nintr_err;
+		kstat_named_t	ns_nintr_jobs;
 	}			ns_mau[NCP_MAX_NMAUS];
 };
 
@@ -328,6 +331,9 @@ typedef struct {
 		uint64_t	qks_qfull;
 		uint64_t	qks_qbusy;
 		uint64_t	qks_qfail;
+		uint64_t	qks_nintr;
+		uint64_t	qks_nintr_err;
+		uint64_t	qks_nintr_jobs;
 	} nmq_ks;
 } ncp_mau_queue_t;
 
@@ -387,6 +393,7 @@ typedef struct {
 } ncp_mau2cpu_map_t;
 
 struct ncp {
+	uint_t				n_hvapi_major_version;
 	uint_t				n_hvapi_minor_version;
 	kmutex_t			n_lock;
 	kmem_cache_t			*n_ds_cache;

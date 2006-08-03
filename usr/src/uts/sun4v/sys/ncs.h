@@ -33,17 +33,11 @@ extern "C" {
 #endif
 
 /*
- * NCS HV API version definitions.
- */
-#define	NCS_MAJOR_VER		1
-#define	NCS_MINOR_VER		1
-
-/*
  * NCS HV API v1.0
  */
 #define	HV_NCS_REQUEST		0x110
 /*
- * NCS HV API v1.1
+ * NCS HV API v2.0
  */
 #define	HV_NCS_QCONF			0x111
 #define	HV_NCS_QINFO			0x112
@@ -51,6 +45,7 @@ extern "C" {
 #define	HV_NCS_GETTAIL			0x114
 #define	HV_NCS_SETTAIL			0x115
 #define	HV_NCS_QHANDLE_TO_DEVINO	0x116
+#define	HV_NCS_SETHEAD_MARKER		0x117
 
 #ifndef _ASM
 /* Forward typedefs */
@@ -74,7 +69,7 @@ union ma_ctl {
 		uint64_t	length:6;
 	} bits;
 };
-#endif /* _ASM */
+#endif /* !_ASM */
 
 /* Values for ma_ctl operation field */
 #define	MA_OP_LOAD		0x0
@@ -193,7 +188,8 @@ typedef struct ncs_hvdesc {
 	uint64_t	nhd_state;	/* ND_STATE_... */
 	uint64_t	nhd_type;	/* ND_TYPE_... */
 	ma_regs_t	nhd_regs;
-	uint64_t	_padding[2];
+	uint64_t	nhd_errstatus;
+	uint64_t	_padding;
 } ncs_hvdesc_t;
 
 #define	NCS_HVDESC_SHIFT	6	/* log2(NCS_HVDESC_SIZE) */
@@ -202,15 +198,15 @@ typedef struct ncs_hvdesc {
 
 extern uint64_t hv_ncs_request(int, uint64_t, size_t);
 
-#endif	/* _ASM */
+#endif	/* !_ASM */
 
 /*
- * NCS HV API v1.1 definitions (FWARC/2006/174)
+ * NCS HV API v2.0 definitions (FWARC/2006/174, FWARC/2006/425)
  *
- * Some of the structures above (v1.0) are inherited for v1.1
+ * Some of the structures above (v1.0) are inherited for v2.0
  */
 /*
- * In v1.1, the nhd_type field has the following values
+ * In v2.0, the nhd_type field has the following values
  * when non-zero (unassigned).  The nhd_type field indicates
  * whether the descriptor is the beginning of a crypto job,
  * the continuation, or the end/last descriptor in a job.
@@ -219,6 +215,13 @@ extern uint64_t hv_ncs_request(int, uint64_t, size_t);
 #define	ND_TYPE_START		0x01
 #define	ND_TYPE_CONT		0x02
 #define	ND_TYPE_END		0x80
+
+/*
+ * nhd_errstatus
+ */
+#define	ND_ERR_OK		0x00
+#define	ND_ERR_INVOP		0x01	/* invalid op */
+#define	ND_ERR_HWE		0x02	/* hardware err */
 
 /*
  * Types of queues supported by NCS
@@ -244,8 +247,9 @@ extern uint64_t	hv_ncs_gethead(uint64_t, uint64_t *);
 extern uint64_t	hv_ncs_gettail(uint64_t, uint64_t *);
 extern uint64_t	hv_ncs_settail(uint64_t, uint64_t);
 extern uint64_t	hv_ncs_qhandle_to_devino(uint64_t, uint64_t *);
+extern uint64_t	hv_ncs_sethead_marker(uint64_t, uint64_t);
 extern uint64_t	hv_ncs_intr_clrstate(uint64_t);
-#endif /* _ASM */
+#endif /* !_ASM */
 
 #ifdef	__cplusplus
 }
