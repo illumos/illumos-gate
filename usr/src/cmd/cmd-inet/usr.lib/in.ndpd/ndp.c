@@ -348,7 +348,8 @@ incoming_ra(struct phyint *pi, struct nd_router_advert *ra, int len,
 		logperror_pi(pi, "incoming_ra: SIOCGLIFLNKINFO");
 		return;
 	}
-	if (ra->nd_ra_curhoplimit != pi->pi_CurHopLimit) {
+	if (ra->nd_ra_curhoplimit != CURHOP_UNSPECIFIED &&
+	    ra->nd_ra_curhoplimit != pi->pi_CurHopLimit) {
 		pi->pi_CurHopLimit = ra->nd_ra_curhoplimit;
 
 		lifr.lifr_ifinfo.lir_maxhops = pi->pi_CurHopLimit;
