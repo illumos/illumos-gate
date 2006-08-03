@@ -370,6 +370,7 @@ extern	int	cpuset_isnull(cpuset_t *);
 extern	int	cpuset_cmp(cpuset_t *, cpuset_t *);
 extern	void	cpuset_only(cpuset_t *, uint_t);
 extern	uint_t	cpuset_find(cpuset_t *);
+extern	void	cpuset_bounds(cpuset_t *, uint_t *, uint_t *);
 
 #define	CPUSET_ALL(set)			cpuset_all(&(set))
 #define	CPUSET_ALL_BUT(set, cpu)	cpuset_all_but(&(set), cpu)
@@ -387,6 +388,14 @@ extern	uint_t	cpuset_find(cpuset_t *);
  */
 #define	CPUSET_FIND(set, cpu)		{		\
 	cpu = cpuset_find(&(set));			\
+}
+
+/*
+ * Determine the smallest and largest CPU id in the set. Returns
+ * CPUSET_NOTINSET in smallest and largest when set is empty.
+ */
+#define	CPUSET_BOUNDS(set, smallest, largest)	{		\
+	cpuset_bounds(&(set), &(smallest), &(largest));		\
 }
 
 /*
@@ -446,6 +455,11 @@ typedef	ulong_t	cpuset_t;	/* a set of CPUs */
 
 #define	CPUSET_FIND(set, cpu)		{		\
 	cpu = (uint_t)(lowbit(set) - 1);				\
+}
+
+#define	CPUSET_BOUNDS(set, smallest, largest)	{	\
+	smallest = (uint_t)(lowbit(set) - 1);		\
+	largest = (uint_t)(highbit(set) - 1);		\
 }
 
 #define	CPUSET_ATOMIC_DEL(set, cpu)	atomic_and_long(&(set), ~CPUSET(cpu))

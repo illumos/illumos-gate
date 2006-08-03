@@ -699,25 +699,38 @@ void
 send_mondo_set(cpuset_t set)
 {
 	uint64_t starttick, endtick, tick, lasttick;
+	uint_t largestid, smallestid;
+	int i, j;
+	int ncpuids = 0;
 	int shipped = 0;
 	int retries = 0;
 	struct machcpu	*mcpup = &(CPU->cpu_m);
 
 	ASSERT(!CPUSET_ISNULL(set));
+	CPUSET_BOUNDS(set, smallestid, largestid);
+	if (smallestid == CPUSET_NOTINSET) {
+		return;
+	}
+
 	starttick = lasttick = gettick();
 	endtick = starttick + xc_tick_limit;
 
-	do {
-		int ncpuids = 0;
-		int i, stat;
-
-		/* assemble CPU list for HV argument */
-		for (i = 0; i < NCPU; i++) {
+	/*
+	 * Assemble CPU list for HV argument. We already know
+	 * smallestid and largestid are members of set.
+	 */
+	mcpup->cpu_list[ncpuids++] = (uint16_t)smallestid;
+	if (largestid != smallestid) {
+		for (i = smallestid+1; i <= largestid-1; i++) {
 			if (CPU_IN_SET(set, i)) {
-				mcpup->cpu_list[ncpuids] = (uint16_t)i;
-				ncpuids++;
+				mcpup->cpu_list[ncpuids++] = (uint16_t)i;
 			}
 		}
+		mcpup->cpu_list[ncpuids++] = (uint16_t)largestid;
+	}
+
+	do {
+		int stat;
 
 		stat = shipit(ncpuids, mcpup->cpu_list_ra);
 		if (stat == H_EOK) {
@@ -729,60 +742,64 @@ send_mondo_set(cpuset_t set)
 		 * Either not all CPU mondos were sent, or an
 		 * error occurred. CPUs that were sent mondos
 		 * have their CPU IDs overwritten in cpu_list.
-		 * Reset the cpuset so that its only members
-		 * are those CPU IDs that still need to be sent.
+		 * Reset cpu_list so that it only holds those
+		 * CPU IDs that still need to be sent.
 		 */
-		CPUSET_ZERO(set);
-		for (i = 0; i < ncpuids; i++) {
+		for (i = 0, j = 0; i < ncpuids; i++) {
 			if (mcpup->cpu_list[i] == HV_SEND_MONDO_ENTRYDONE) {
 				shipped++;
 			} else {
-				CPUSET_ADD(set, mcpup->cpu_list[i]);
+				mcpup->cpu_list[j++] = mcpup->cpu_list[i];
 			}
 		}
+		ncpuids = j;
 
 		/*
 		 * Now handle possible errors returned
 		 * from hypervisor.
 		 */
 		if (stat == H_ECPUERROR) {
-			cpuset_t error_set;
+			int errorcpus;
+
+			if (!panic_quiesce)
+				cmn_err(CE_CONT, "send_mondo_set: cpuid(s) ");
 
 			/*
-			 * One or more of the CPUs passed to HV is
-			 * in the error state. Remove those CPUs from
-			 * set and record them in error_set.
+			 * Remove any CPUs in the error state from
+			 * cpu_list. At this point cpu_list only
+			 * contains the CPU IDs for mondos not
+			 * succesfully sent.
 			 */
-			CPUSET_ZERO(error_set);
-			for (i = 0; i < NCPU; i++) {
-				if (CPU_IN_SET(set, i)) {
-					uint64_t state = CPU_STATE_INVALID;
-					(void) hv_cpu_state(i, &state);
-					if (state == CPU_STATE_ERROR) {
-						CPUSET_ADD(error_set, i);
-						CPUSET_DEL(set, i);
-					}
+			for (i = 0, errorcpus = 0; i < ncpuids; i++) {
+				uint64_t state = CPU_STATE_INVALID;
+				uint16_t id = mcpup->cpu_list[i];
+
+				(void) hv_cpu_state(id, &state);
+				if (state == CPU_STATE_ERROR) {
+					if (!panic_quiesce)
+						cmn_err(CE_CONT, "0x%x ", id);
+					errorcpus++;
+				} else if (errorcpus > 0) {
+					mcpup->cpu_list[i - errorcpus] =
+					    mcpup->cpu_list[i];
 				}
 			}
+			ncpuids -= errorcpus;
 
 			if (!panic_quiesce) {
-				if (CPUSET_ISNULL(error_set)) {
+				if (errorcpus == 0) {
+					cmn_err(CE_CONT, "<none> have been "
+					    "marked in error\n");
 					cmn_err(CE_PANIC, "send_mondo_set: "
 					    "hypervisor returned "
 					    "H_ECPUERROR but no CPU in "
 					    "cpu_list in error state");
+				} else {
+					cmn_err(CE_CONT, "have been marked in "
+					    "error\n");
+					cmn_err(CE_PANIC, "send_mondo_set: "
+					    "CPU(s) in error state");
 				}
-
-				cmn_err(CE_CONT, "send_mondo_set: cpuid(s) ");
-				for (i = 0; i < NCPU; i++) {
-					if (CPU_IN_SET(error_set, i)) {
-						cmn_err(CE_CONT, "0x%x ", i);
-					}
-				}
-				cmn_err(CE_CONT, "have been marked in "
-				    "error\n");
-				cmn_err(CE_PANIC, "send_mondo_set: CPU(s) "
-				    "in error state");
 			}
 		} else if (stat != H_EWOULDBLOCK) {
 			if (panic_quiesce)
@@ -793,10 +810,8 @@ send_mondo_set(cpuset_t set)
 			cmn_err(CE_CONT, "send_mondo_set: unexpected "
 			    "hypervisor error 0x%x while sending a "
 			    "mondo to cpuid(s):", stat);
-			for (i = 0; i < NCPU; i++) {
-				if (CPU_IN_SET(set, i)) {
-					cmn_err(CE_CONT, " 0x%x", i);
-				}
+			for (i = 0; i < ncpuids; i++) {
+				cmn_err(CE_CONT, " 0x%x", mcpup->cpu_list[i]);
 			}
 			cmn_err(CE_CONT, "\n");
 			cmn_err(CE_PANIC, "send_mondo_set: unexpected "
@@ -817,9 +832,8 @@ send_mondo_set(cpuset_t set)
 				return;
 			cmn_err(CE_CONT, "send mondo timeout "
 			    "[retries: 0x%x]  cpuids: ", retries);
-			for (i = 0; i < NCPU; i++)
-				if (CPU_IN_SET(set, i))
-					cmn_err(CE_CONT, " 0x%x", i);
+			for (i = 0; i < ncpuids; i++)
+				cmn_err(CE_CONT, " 0x%x", mcpup->cpu_list[i]);
 			cmn_err(CE_CONT, "\n");
 			cmn_err(CE_PANIC, "send_mondo_set: timeout");
 		}
@@ -827,7 +841,7 @@ send_mondo_set(cpuset_t set)
 		while (gettick() < (tick + sys_clock_mhz))
 			;
 		retries++;
-	} while (!CPUSET_ISNULL(set));
+	} while (ncpuids > 0);
 
 	CPU_STATS_ADDQ(CPU, sys, xcalls, shipped);
 
@@ -1067,11 +1081,16 @@ xt_sync(cpuset_t cpuset)
 		uint64_t volatile xword[NCPU / 8];
 	} cpu_sync;
 	uint64_t starttick, endtick, tick, lasttick;
+	uint_t largestid, smallestid;
 	int i;
 
 	kpreempt_disable();
 	CPUSET_DEL(cpuset, CPU->cpu_id);
 	CPUSET_AND(cpuset, cpu_ready_set);
+
+	CPUSET_BOUNDS(cpuset, smallestid, largestid);
+	if (smallestid == CPUSET_NOTINSET)
+		goto out;
 
 	/*
 	 * Sun4v uses a queue for receiving mondos. Successful
@@ -1084,9 +1103,13 @@ xt_sync(cpuset_t cpuset)
 	 * and wait until other cpus reset it to 0.
 	 */
 	bzero((void *)&cpu_sync, NCPU);
-	for (i = 0; i < NCPU; i++)
-		if (CPU_IN_SET(cpuset, i))
-			cpu_sync.byte[i] = 1;
+	cpu_sync.byte[smallestid] = 1;
+	if (largestid != smallestid) {
+		for (i = (smallestid + 1); i <= (largestid - 1); i++)
+			if (CPU_IN_SET(cpuset, i))
+				cpu_sync.byte[i] = 1;
+		cpu_sync.byte[largestid] = 1;
+	}
 
 	xt_some(cpuset, (xcfunc_t *)xt_sync_tl1,
 	    (uint64_t)cpu_sync.byte, 0);
@@ -1094,7 +1117,7 @@ xt_sync(cpuset_t cpuset)
 	starttick = lasttick = gettick();
 	endtick = starttick + xc_tick_limit;
 
-	for (i = 0; i < (NCPU / 8); i ++) {
+	for (i = (smallestid / 8); i <= (largestid / 8); i++) {
 		while (cpu_sync.xword[i] != 0) {
 			tick = gettick();
 			/*

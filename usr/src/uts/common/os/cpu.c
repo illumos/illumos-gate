@@ -2603,6 +2603,51 @@ cpuset_find(cpuset_t *s)
 	return (cpu);
 }
 
+void
+cpuset_bounds(cpuset_t *s, uint_t *smallestid, uint_t *largestid)
+{
+	int	i, j;
+	uint_t	bit;
+
+	/*
+	 * First, find the smallest cpu id in the set.
+	 */
+	for (i = 0; i < CPUSET_WORDS; i++) {
+		if (s->cpub[i] != 0) {
+			bit = (uint_t)(lowbit(s->cpub[i]) - 1);
+			ASSERT(bit != (uint_t)-1);
+			*smallestid = bit + (i * BT_NBIPUL);
+
+			/*
+			 * Now find the largest cpu id in
+			 * the set and return immediately.
+			 * Done in an inner loop to avoid
+			 * having to break out of the first
+			 * loop.
+			 */
+			for (j = CPUSET_WORDS - 1; j >= i; j--) {
+				if (s->cpub[j] != 0) {
+					bit = (uint_t)(highbit(s->cpub[j]) - 1);
+					ASSERT(bit != (uint_t)-1);
+					*largestid = bit + (j * BT_NBIPUL);
+					ASSERT(*largestid >= *smallestid);
+					return;
+				}
+			}
+
+			/*
+			 * If this code is reached, a
+			 * smallestid was found, but not a
+			 * largestid. The cpuset must have
+			 * been changed during the course
+			 * of this function call.
+			 */
+			ASSERT(0);
+		}
+	}
+	*smallestid = *largestid = CPUSET_NOTINSET;
+}
+
 #endif	/* CPUSET_WORDS */
 
 /*
