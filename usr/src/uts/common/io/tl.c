@@ -375,7 +375,6 @@
  */
 #define	NEXTSTATE(EV, ST)	ti_statetbl[EV][ST]
 
-#define	TL_MAXQLEN	128	/* Max conn indications allowed. */
 #define	BADSEQNUM	(-1)	/* initial seq number used by T_DISCON_IND */
 #define	TL_BUFWAIT	(10000)	/* usecs to wait for allocb buffer timeout */
 #define	TL_TIDUSZ (64*1024)	/* tidu size when "strmsgz" is unlimited (0) */
@@ -560,6 +559,12 @@ typedef struct tl_icon {
 
 typedef struct so_ux_addr soux_addr_t;
 #define	TL_SOUX_ADDRLEN sizeof (soux_addr_t)
+
+/*
+ * Maximum number of unaccepted connection indications allowed per listener.
+ */
+#define	TL_MAXQLEN	4096
+int tl_maxqlen = TL_MAXQLEN;
 
 /*
  *	transport endpoint structure
@@ -2391,8 +2396,8 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 	/* negotiate max conn req pending */
 	if (IS_COTS(tep)) {
 		qlen = bind->CONIND_number;
-		if (qlen > TL_MAXQLEN)
-			qlen = TL_MAXQLEN;
+		if (qlen > tl_maxqlen)
+			qlen = tl_maxqlen;
 	}
 
 	/*
