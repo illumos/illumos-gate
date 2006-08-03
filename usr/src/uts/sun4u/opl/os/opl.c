@@ -669,8 +669,6 @@ plat_lgrp_config(lgrp_config_flag_t evt, uintptr_t arg)
  * NOTE: The numbers below are supposed to be load latencies for uncached
  * memory divided by 10.
  *
- * XXX latency values for Columbus, not Columbus2. Should be fixed later when
- *	we know the actual numbers for Columbus2.
  */
 int
 plat_lgrp_latency(lgrp_handle_t from, lgrp_handle_t to)
@@ -682,9 +680,9 @@ plat_lgrp_latency(lgrp_handle_t from, lgrp_handle_t to)
 	 */
 	if (lgrp_optimizations() && (from != to ||
 	    from == LGRP_DEFAULT_HANDLE || to == LGRP_DEFAULT_HANDLE))
-		return (27);
+		return (42);
 	else
-		return (25);
+		return (35);
 }
 
 /*
