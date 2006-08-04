@@ -358,7 +358,7 @@ extern int zpool_remove_zvol_links(zpool_handle_t *);
 /*
  * Mount and unmount datasets within a pool
  */
-extern int zpool_mount_datasets(zpool_handle_t *, const char *);
+extern int zpool_mount_datasets(zpool_handle_t *, const char *, int);
 extern int zpool_unmount_datasets(zpool_handle_t *, boolean_t);
 
 #ifdef	__cplusplus

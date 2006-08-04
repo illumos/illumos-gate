@@ -594,7 +594,7 @@ dataset_compare(const void *a, const void *b)
 }
 
 int
-zpool_mount_datasets(zpool_handle_t *zhp, const char *mntopts)
+zpool_mount_datasets(zpool_handle_t *zhp, const char *mntopts, int flags)
 {
 	mount_cbdata_t cb = { 0 };
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
@@ -627,7 +627,7 @@ zpool_mount_datasets(zpool_handle_t *zhp, const char *mntopts)
 	 */
 	ret = 0;
 	for (i = 0; i < cb.cb_used; i++) {
-		if (zfs_mount(cb.cb_datasets[i], mntopts, 0) != 0 ||
+		if (zfs_mount(cb.cb_datasets[i], mntopts, flags) != 0 ||
 		    zfs_share(cb.cb_datasets[i]) != 0)
 			ret = -1;
 	}

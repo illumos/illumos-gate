@@ -151,10 +151,9 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:
-		abort();
+		assert(hdl->libzfs_error == 0);
+		return (dgettext(TEXT_DOMAIN, "no error"));
 	}
-
-	/* NOTREACHED */
 }
 
 /*PRINTFLIKE2*/
@@ -437,7 +436,7 @@ libzfs_init(void)
 		return (NULL);
 	}
 
-	if ((hdl->libzfs_fd = open(ZFS_DEV, O_RDWR)) == NULL) {
+	if ((hdl->libzfs_fd = open(ZFS_DEV, O_RDWR)) < 0) {
 		free(hdl);
 		return (NULL);
 	}

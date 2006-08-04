@@ -1100,7 +1100,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 
 	verify((zhp = zpool_open(g_zfs, name)) != NULL);
 
-	if (zpool_mount_datasets(zhp, mntopts) != 0) {
+	if (zpool_mount_datasets(zhp, mntopts, 0) != 0) {
 		zpool_close(zhp);
 		return (1);
 	}
