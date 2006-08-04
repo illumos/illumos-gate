@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -59,10 +59,10 @@ OTHERINFOS	+= $(INCDIR2)/fru_HDD4_data.info
 OTHERINFOS	+= $(INCDIR2)/fru_HDD5_data.info
 OTHERINFOS	+= $(INCDIR2)/fru_HDD6_data.info
 OTHERINFOS	+= $(INCDIR2)/fru_HDD7_data.info
-OTHERINFOS	+= $(INCDIR2)/fru_PSU0_data.info
-OTHERINFOS	+= $(INCDIR2)/fru_PSU1_data.info
-OTHERINFOS	+= $(INCDIR2)/fru_PSU2_data.info
-OTHERINFOS	+= $(INCDIR2)/fru_PSU3_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_PS0_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_PS1_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_PS2_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_PS3_data.info
 OTHERINFOS	+= $(INCDIR2)/fru_SC_data.info
 
 ROOTLINTDIR =   $(ROOTLIBDIR)
@@ -83,7 +83,7 @@ install:	$(ROOTLIBDIR) $(ROOTCONF)
 
 $(CONFS): $(MAININFO) $(OTHERINFOS)
 	@$(RM) -f $@
-	@echo "# Copyright 2005 Sun Microsystems, Inc.  All rights reserved." \
+	@echo "# Copyright 2006 Sun Microsystems, Inc.  All rights reserved." \
 	> $@
 	@echo "# Use is subject to license terms." >> $@
 	@echo "# This is a generated file. #ident lines identify sources" >> $@

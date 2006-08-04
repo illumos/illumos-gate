@@ -26,7 +26,7 @@
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
  * This configuration file is parsed by PICL plugin envmon in response
- * to a PICL_FRU_ADDED event for PSU0
+ * to a PICL_FRU_ADDED event for PS0
  *
  * supported prop types: void, int, uint, float, string
  * supported prop access_modes: r, w, rw
@@ -81,4 +81,4 @@ name:/platform/i2c@1f,520000/power-supply-fru-prom@0,24
 	PROP UnitAddress string r 0 "0,24"
 
 /* and then add /frutree node and cross-references */
-#include "fru_PSU0_data.info"
+#include "fru_PS0_data.info"

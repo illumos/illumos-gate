@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,7 +41,7 @@ ROOTLIBDIR	= $(ROOT_PLAT_PLUGINDIR)
 ROOTLIBDIR	:= OWNER = root
 ROOTLIBDIR	:= GROUP = sys
 
-CONFS		= fru_PSU0.conf fru_PSU1.conf fru_PSU2.conf fru_PSU3.conf
+CONFS		= fru_PS0.conf fru_PS1.conf fru_PS2.conf fru_PS3.conf
 CONFS		+= fru_HDD0.conf fru_HDD1.conf fru_HDD2.conf
 CONFS		+= fru_HDD3.conf fru_HDD4.conf fru_HDD5.conf
 CONFS		+= fru_HDD6.conf fru_HDD7.conf
@@ -51,7 +51,7 @@ CONFS		+= fru_usb-a-3.conf fru_usb-a-4.conf
 ROOTCONF=	$(CONFS:%=$(ROOTLIBDIR)/%)
 $(ROOTCONF)	:= FILEMODE = 0644
 MAININFO=	$(CONFS:%.conf=%.info)
-OTHERINFOS	= fru_PSU0_data.info fru_PSU1_data.info fru_PSU2_data.info fru_PSU3_data.info
+OTHERINFOS	= fru_PS0_data.info fru_PS1_data.info fru_PS2_data.info fru_PS3_data.info
 OTHERINFOS	+= fru_HDD0_data.info fru_HDD1_data.info
 OTHERINFOS	+= fru_HDD2_data.info fru_HDD3_data.info
 OTHERINFOS	+= fru_HDD3_data.info fru_HDD4_data.info
@@ -79,7 +79,7 @@ install:	$(ROOTLIBDIR) $(ROOTCONF) $(FRUDR_LINK)
 
 $(CONFS): $(MAININFO) $(OTHERINFOS)
 	@$(RM) -f $@
-	@echo "# Copyright 2005 Sun Microsystems, Inc.  All rights reserved." \
+	@echo "# Copyright 2006 Sun Microsystems, Inc.  All rights reserved." \
 	> $@
 	@echo "# Use is subject to license terms." >> $@
 	@echo "# This is a generated file. #ident lines identify sources" >> $@

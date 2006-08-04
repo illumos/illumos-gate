@@ -26,7 +26,7 @@
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
  * This configuration file is parsed by PICL frudr plugin in response
- * to a PICL_FRU_ADDED event for PSU3
+ * to a PICL_FRU_ADDED event for PS3
  *
  * supported prop types: void, int, uint, float, string
  * supported prop access_modes: r, w, rw

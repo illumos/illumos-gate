@@ -94,10 +94,10 @@ id("%Z%%M%	%I%	%E% SMI")
 /*
  * fru/location parents and device tables for the power supplies
  */
-#include "fru_PSU0_data.info"
-#include "fru_PSU1_data.info"
-#include "fru_PSU2_data.info"
-#include "fru_PSU3_data.info"
+#include "fru_PS0_data.info"
+#include "fru_PS1_data.info"
+#include "fru_PS2_data.info"
+#include "fru_PS3_data.info"
 
 /*
  * usb ports

@@ -26,7 +26,7 @@
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
  * This configuration file is parsed by PICL plugin envmon in response
- * to a PICL_FRU_ADDED event for PSU0
+ * to a PICL_FRU_ADDED event for PS2
  *
  * supported prop types: void, int, uint, float, string
  * supported prop access_modes: r, w, rw
@@ -72,13 +72,13 @@ VERSION 1.1
 VERBOSE 1
 
 /* create a /platform node for the seeprom */
-name:/platform/i2c@1f,520000/power-supply-fru-prom@0,32
+name:/platform/i2c@1f,520000/power-supply-fru-prom@0,52
 	PROP binding-name string r 0 "i2c-at34c02"
 	PROP driver-name string r 0 "seeprom"
 	PROP devfs-path string r 0 "/i2c@1f,520000/power-supply-fru-prom"
 	PROP compatible string r 0 "i2c-at34c02"
 	PROP device_type string r 0 "fru-prom"
-	PROP UnitAddress string r 0 "0,32"
+	PROP UnitAddress string r 0 "0,52"
 
 /* and then add /frutree node and cross-references */
-#include "fru_PSU1_data.info"
+#include "fru_PS2_data.info"

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -348,10 +348,10 @@ f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/picl_asr.conf 644 root s
 f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/piclfrutree.conf 644 root sys
 f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/piclenvmon.conf 644 root sys
 f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_SC.conf 644 root sys
-f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PSU0.conf 644 root sys
-f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PSU1.conf 644 root sys
-f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PSU2.conf 644 root sys
-f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PSU3.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PS0.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PS1.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PS2.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PS3.conf 644 root sys
 f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD0.conf 644 root sys
 f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD1.conf 644 root sys
 f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD2.conf 644 root sys
