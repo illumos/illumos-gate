@@ -1081,6 +1081,7 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					*fileoff += cnt;
 					*count += cnt;
 					if (error != 0) {
+						kmem_free(buf, size);
 						VOP_RWUNLOCK(readvp, readflg,
 									NULL);
 						releasef(sfv->sfv_fd);
