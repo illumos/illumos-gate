@@ -1632,12 +1632,14 @@ uhci_insert_intr_td(
 		return (USB_SUCCESS);
 	}
 
-	/* DATA OUT */
-	ASSERT(req->intr_data != NULL);
+	if (req->intr_len) {
+		/* DATA OUT */
+		ASSERT(req->intr_data != NULL);
 
-	/* Copy the data into the message */
-	ddi_rep_put8(tw->tw_accesshandle, req->intr_data->b_rptr,
-		(uint8_t *)tw->tw_buf, req->intr_len, DDI_DEV_AUTOINCR);
+		/* Copy the data into the message */
+		ddi_rep_put8(tw->tw_accesshandle, req->intr_data->b_rptr,
+			(uint8_t *)tw->tw_buf, req->intr_len, DDI_DEV_AUTOINCR);
+	}
 
 	/* set tw->tw_claim flag, so that nobody else works on this tw. */
 	tw->tw_claim = UHCI_INTR_HDLR_CLAIMED;
@@ -1768,6 +1770,12 @@ uhci_create_transfer_wrapper(
 		return (NULL);
 	}
 
+	/* zero-length packet doesn't need to allocate dma memory */
+	if (length == 0) {
+
+		goto dmadone;
+	}
+
 	/* allow sg lists for transfer wrapper dma memory */
 	bcopy(&uhcip->uhci_dma_attr, &dma_attr, sizeof (ddi_dma_attr_t));
 	dma_attr.dma_attr_sgllen = UHCI_DMA_ATTR_SGLLEN;
@@ -1821,6 +1829,7 @@ uhci_create_transfer_wrapper(
 	tw->tw_cookie_idx = 0;
 	tw->tw_dma_offs = 0;
 
+dmadone:
 	/*
 	 * Only allow one wrapper to be added at a time. Insert the
 	 * new transaction wrapper into the list for this pipe.
@@ -1969,7 +1978,8 @@ uhci_fill_in_td(
 	}
 
 	SetTD_c_err(uhcip, current_dummy, UHCI_MAX_ERR_COUNT);
-	SetTD_mlen(uhcip, current_dummy, (length == 0) ? 0x7ff: (length - 1));
+	SetTD_mlen(uhcip, current_dummy,
+			(length == 0) ? ZERO_LENGTH : (length - 1));
 	SetTD_dtogg(uhcip, current_dummy, pp->pp_data_toggle);
 
 	/* Adjust the data toggle bit */
@@ -2816,11 +2826,15 @@ uhci_insert_bulk_td(
 
 	/* If the DATA OUT, copy the data into transfer buffer. */
 	if (tw->tw_direction == PID_OUT) {
-		ASSERT(req->bulk_data != NULL);
+		if (req->bulk_len) {
+			ASSERT(req->bulk_data != NULL);
 
-		/* Copy the data into the message */
-		ddi_rep_put8(tw->tw_accesshandle, req->bulk_data->b_rptr,
-		    (uint8_t *)tw->tw_buf, req->bulk_len, DDI_DEV_AUTOINCR);
+			/* Copy the data into the message */
+			ddi_rep_put8(tw->tw_accesshandle,
+				req->bulk_data->b_rptr,
+				(uint8_t *)tw->tw_buf,
+				req->bulk_len, DDI_DEV_AUTOINCR);
+		}
 	}
 
 	/* Get the max packet size.  */
@@ -2838,7 +2852,7 @@ uhci_insert_bulk_td(
 	} else {
 		num_bulk_tds = (tw->tw_bytes_pending / mps);
 
-		if (tw->tw_bytes_pending % mps) {
+		if (tw->tw_bytes_pending % mps || tw->tw_bytes_pending == 0) {
 			num_bulk_tds++;
 			length = (tw->tw_bytes_pending % mps);
 		}
@@ -2979,7 +2993,8 @@ uhci_fill_in_bulk_isoc_td(uhci_state_t *uhcip, uhci_td_t *current_td,
 	SetTD_c_err(uhcip, current_td, UHCI_MAX_ERR_COUNT);
 	SetTD_status(uhcip, current_td, UHCI_TD_ACTIVE);
 	SetTD_ioc(uhcip, current_td, INTERRUPT_ON_COMPLETION);
-	SetTD_mlen(uhcip, current_td, (length - 1));
+	SetTD_mlen(uhcip, current_td,
+			(length == 0) ? ZERO_LENGTH : (length - 1));
 	SetTD_dtogg(uhcip, current_td, pp->pp_data_toggle);
 	SetTD_devaddr(uhcip, current_td, ph->p_usba_device->usb_addr);
 	SetTD_endpt(uhcip, current_td, ph->p_ep.bEndpointAddress &

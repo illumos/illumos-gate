@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -249,18 +248,14 @@ _usba_check_req(usba_pipe_handle_data_t *ph_data, usb_opaque_t req,
 		}
 		break;
 	case USB_EP_ATTR_BULK:
-		if ((data == NULL) || (bulk_req->bulk_len == 0)) {
+		if ((bulk_req->bulk_len) && (data == NULL)) {
 
 			return (USB_INVALID_REQUEST);
 		}
 		break;
 	case USB_EP_ATTR_INTR:
-		if (intr_req->intr_len == 0) {
-
-			return (USB_INVALID_REQUEST);
-		}
 		if (direction == USB_EP_DIR_OUT) {
-			if (data == NULL) {
+			if (intr_req->intr_len && data == NULL) {
 
 				return (USB_INVALID_REQUEST);
 			}
@@ -292,7 +287,7 @@ _usba_check_req(usba_pipe_handle_data_t *ph_data, usb_opaque_t req,
 			}
 		}
 
-		if (data == NULL) {
+		if (data == NULL || isoc_req->isoc_pkts_length) {
 
 			return (USB_INVALID_REQUEST);
 		}

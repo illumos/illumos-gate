@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -542,7 +541,7 @@ keyspan_bulkout_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	    "keyspan_bulkout_cb: len=%d cr=%d cb_flags=%x",
 	    data_len, req->bulk_completion_reason, req->bulk_cb_flags);
 
-	if (req->bulk_completion_reason && (data_len > 0)) {
+	if (req->bulk_completion_reason && data) {
 
 		/*
 		 * Data wasn't transfered successfully.
@@ -559,13 +558,27 @@ keyspan_bulkout_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	/* if more data available, kick off another transmit */
 	mutex_enter(&kp->kp_mutex);
 	if (kp->kp_tx_mp == NULL) {
+		/*
+		 * Attach a zero packet if data length is muliple of 64,
+		 * due to the specification of keyspan_usa19hs.
+		 */
+		if ((kp->kp_ksp->ks_dev_spec.id_product ==
+			KEYSPAN_USA19HS_PID) && (data_len == 64)) {
+			kp->kp_tx_mp = allocb(0, BPRI_LO);
+			if (kp->kp_tx_mp) {
+				keyspan_tx_start(kp, NULL);
+				mutex_exit(&kp->kp_mutex);
 
-			/* no more data, notify waiters */
-			cv_broadcast(&kp->kp_tx_cv);
-			mutex_exit(&kp->kp_mutex);
+				return;
+			}
+		}
 
-			/* tx callback for this port */
-			kp->kp_cb.cb_tx(kp->kp_cb.cb_arg);
+		/* no more data, notify waiters */
+		cv_broadcast(&kp->kp_tx_cv);
+		mutex_exit(&kp->kp_mutex);
+
+		/* tx callback for this port */
+		kp->kp_cb.cb_tx(kp->kp_cb.cb_arg);
 	} else {
 		keyspan_tx_start(kp, NULL);
 		mutex_exit(&kp->kp_mutex);

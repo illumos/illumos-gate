@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1250,12 +1249,6 @@ keyspan_tx(ds_hdl_t hdl, uint_t port_num, mblk_t *mp)
 
 		return (USB_SUCCESS);
 	}
-	if (MBLKL(mp) <= 0) {
-		USB_DPRINTF_L3(DPRINT_CTLOP, kp->kp_lh, "keyspan_tx: len<=0");
-		freemsg(mp);
-
-		return (USB_SUCCESS);
-	}
 
 	kp = &ksp->ks_ports[port_num];
 
@@ -2115,15 +2108,10 @@ keyspan_tx_start(keyspan_port_t *kp, int *xferd)
 
 		return;
 	}
-	ASSERT(MBLKL(kp->kp_tx_mp) > 0);
 
 	len = min(msgdsize(kp->kp_tx_mp), kp->kp_write_len);
 	USB_DPRINTF_L4(DPRINT_OUT_PIPE, kp->kp_lh, "keyspan_tx_start:"
 	    "len = %d, tx_mp_len = %d", len, (int)msgdsize(kp->kp_tx_mp));
-	if (len == 0) {
-
-		return;
-	}
 
 	mutex_exit(&kp->kp_mutex);
 
@@ -2182,9 +2170,6 @@ keyspan_tx_start(keyspan_port_t *kp, int *xferd)
 	if (data_len <= 0) {
 		USB_DPRINTF_L3(DPRINT_OUT_PIPE, kp->kp_lh, "keyspan_tx_start:"
 		    "keyspan_tx_copy_data copied zero bytes");
-		freeb(data);
-
-		return;
 	}
 	mutex_exit(&kp->kp_mutex);
 	rval = keyspan_send_data(&kp->kp_dataout_pipe, &data, kp);
@@ -2218,6 +2203,14 @@ keyspan_tx_copy_data(keyspan_port_t *kp, mblk_t *data, int len)
 	int		data_len = 0;
 
 	ASSERT(mutex_owned(&kp->kp_mutex));
+
+	if (msgdsize(kp->kp_tx_mp) == 0) {
+		data->b_wptr = data->b_rptr;
+		freeb(kp->kp_tx_mp);
+		kp->kp_tx_mp = NULL;
+
+		return (data_len);
+	}
 
 	while ((data_len < len) && kp->kp_tx_mp) {
 		mp = kp->kp_tx_mp;

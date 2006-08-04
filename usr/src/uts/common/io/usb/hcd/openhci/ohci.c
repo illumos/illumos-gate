@@ -423,6 +423,9 @@ static void	ohci_sendup_td_message(
 				ohci_trans_wrapper_t	*tw,
 				ohci_td_t		*td,
 				usb_cr_t		error);
+static int	ohci_check_done_head(
+				ohci_state_t *ohcip,
+				ohci_td_t		*done_head);
 
 /* Miscillaneous functions */
 static void	ohci_cpr_cleanup(
@@ -4892,7 +4895,8 @@ ohci_allocate_bulk_resources(
 
 	/* Get the required bulk packet size */
 	td_count = bulk_reqp->bulk_len / OHCI_MAX_TD_XFER_SIZE;
-	if (bulk_reqp->bulk_len % OHCI_MAX_TD_XFER_SIZE) {
+	if (bulk_reqp->bulk_len % OHCI_MAX_TD_XFER_SIZE ||
+		bulk_reqp->bulk_len == 0) {
 		td_count++;
 	}
 
@@ -4935,7 +4939,8 @@ ohci_insert_bulk_req(
 	/* Get the required bulk packet size */
 	bulk_pkt_size = min(bulk_reqp->bulk_len, OHCI_MAX_TD_XFER_SIZE);
 
-	residue = tw->tw_length % bulk_pkt_size;
+	if (bulk_pkt_size)
+		residue = tw->tw_length % bulk_pkt_size;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 	    "ohci_insert_bulk_req: bulk_pkt_size = %d", bulk_pkt_size);
@@ -4957,7 +4962,7 @@ ohci_insert_bulk_req(
 	tw->tw_direction =
 	    (pipe_dir == USB_EP_DIR_OUT) ? HC_TD_OUT : HC_TD_IN;
 
-	if (tw->tw_direction == HC_TD_OUT) {
+	if (tw->tw_direction == HC_TD_OUT && bulk_reqp->bulk_len) {
 
 		ASSERT(bulk_reqp->bulk_data != NULL);
 
@@ -5361,12 +5366,14 @@ ohci_allocate_intr_resources(
 		}
 		tw->tw_direction = HC_TD_IN;
 	} else {
-		ASSERT(intr_reqp->intr_data != NULL);
+		if (tw_length) {
+			ASSERT(intr_reqp->intr_data != NULL);
 
-		/* Copy the data into the message */
-		ddi_rep_put8(tw->tw_accesshandle,
-		    intr_reqp->intr_data->b_rptr, (uint8_t *)tw->tw_buf,
-		    intr_reqp->intr_len, DDI_DEV_AUTOINCR);
+			/* Copy the data into the message */
+			ddi_rep_put8(tw->tw_accesshandle,
+			    intr_reqp->intr_data->b_rptr, (uint8_t *)tw->tw_buf,
+			    intr_reqp->intr_len, DDI_DEV_AUTOINCR);
+		}
 
 		tw->tw_curr_xfer_reqp = (usb_opaque_t)intr_reqp;
 		tw->tw_direction = HC_TD_OUT;
@@ -6785,6 +6792,12 @@ ohci_create_transfer_wrapper(
 		return (NULL);
 	}
 
+	/* zero-length packet doesn't need to allocate dma memory */
+	if (length == 0) {
+
+		goto dmadone;
+	}
+
 	/* allow sg lists for transfer wrapper dma memory */
 	bcopy(&ohcip->ohci_dma_attr, &dma_attr, sizeof (ddi_dma_attr_t));
 	dma_attr.dma_attr_sgllen = OHCI_DMA_ATTR_TW_SGLLEN;
@@ -6844,6 +6857,7 @@ ohci_create_transfer_wrapper(
 	tw->tw_cookie_idx = 0;
 	tw->tw_dma_offs = 0;
 
+dmadone:
 	/*
 	 * Only allow one wrapper to be added at a time. Insert the
 	 * new transaction wrapper into the list for this pipe.
@@ -7639,8 +7653,7 @@ ohci_intr(caddr_t arg1, caddr_t arg2)
 		/* Read and Save the HCCA DoneHead value */
 		done_head = ohci_intr_sts->ohci_curr_done_lst =
 		    (ohci_td_t *)(uintptr_t)
-		    (Get_HCCA(ohcip->ohci_hccap->HccaDoneHead) &
-		    HCCA_DONE_HEAD_MASK);
+		    (Get_HCCA(ohcip->ohci_hccap->HccaDoneHead));
 
 		USB_DPRINTF_L3(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 		    "ohci_intr: Done head! 0x%p", (void *)done_head);
@@ -7650,19 +7663,18 @@ ohci_intr(caddr_t arg1, caddr_t arg2)
 	ohci_do_intrs_stats(ohcip, intr);
 
 	/*
-	 * Look at the HccaDoneHead & if it is non-zero, then a done
-	 * list update interrupt is indicated.
+	 * Look at the HccaDoneHead, if it is a non-zero valid address and its
+	 * LSb is zero, a done list update interrupt is indicated. Otherwise,
+	 * this intr bit is cleared.
 	 */
-	if (done_head) {
+	if (ohci_check_done_head(ohcip, done_head) == USB_SUCCESS) {
 
-		/*
-		 * Check for the  WriteDoneHead interrupt bit in the
-		 * interrupt condition and set the WriteDoneHead bit
-		 * in the interrupt events if it is not set.
-		 */
-		if (!(intr & HCR_INTR_WDH)) {
-			intr |= HCR_INTR_WDH;
-		}
+		/* Set the WriteDoneHead bit in the interrupt events */
+		intr = HCR_INTR_WDH;
+	} else {
+
+		/* Clear the WriteDoneHead bit */
+		intr &= ~HCR_INTR_WDH;
 	}
 
 	/*
@@ -7741,8 +7753,7 @@ ohci_intr(caddr_t arg1, caddr_t arg2)
 		 * interrupt bit in the interrupt  status register.
 		 */
 		if (done_head == (ohci_td_t *)(uintptr_t)
-		    (Get_HCCA(ohcip->ohci_hccap->HccaDoneHead) &
-		    HCCA_DONE_HEAD_MASK)) {
+		    (Get_HCCA(ohcip->ohci_hccap->HccaDoneHead))) {
 
 			/* Reset the done head to NULL */
 			Set_HCCA(ohcip->ohci_hccap->HccaDoneHead, NULL);
@@ -7814,6 +7825,27 @@ ohci_intr(caddr_t arg1, caddr_t arg2)
 	return (DDI_INTR_CLAIMED);
 }
 
+/*
+ * Check whether done_head is a valid td point address.
+ * non-zero, 16-byte aligned, LSb is 0, fall in ohci_td_pool
+ */
+static int
+ohci_check_done_head(ohci_state_t *ohcip, ohci_td_t *done_head)
+{
+	uintptr_t lower, upper, headp;
+	lower = ohcip->ohci_td_pool_cookie.dmac_address;
+	upper = lower + ohcip->ohci_td_pool_cookie.dmac_size;
+	headp = (uintptr_t)done_head;
+
+	if (headp && !(headp & ~HCCA_DONE_HEAD_MASK) &&
+		(headp >= lower) && (headp < upper)) {
+
+		return (USB_SUCCESS);
+	} else {
+
+		return (USB_FAILURE);
+	}
+}
 
 /*
  * ohci_handle_missed_intr:
@@ -9650,9 +9682,9 @@ ohci_do_soft_reset(ohci_state_t	*ohcip)
 
 	/* Process any pending HCCA DoneHead */
 	done_head = (ohci_td_t *)(uintptr_t)
-	    (Get_HCCA(ohcip->ohci_hccap->HccaDoneHead) & HCCA_DONE_HEAD_MASK);
+	    (Get_HCCA(ohcip->ohci_hccap->HccaDoneHead));
 
-	if (done_head) {
+	if (ohci_check_done_head(ohcip, done_head) == USB_SUCCESS) {
 		/* Reset the done head to NULL */
 		Set_HCCA(ohcip->ohci_hccap->HccaDoneHead, NULL);
 
@@ -9660,9 +9692,10 @@ ohci_do_soft_reset(ohci_state_t	*ohcip)
 	}
 
 	/* Process any pending hcr_done_head value */
-	if (Get_OpReg(hcr_done_head)) {
-		ohci_traverse_done_list(ohcip,
-		    (ohci_td_t *)(uintptr_t)Get_OpReg(hcr_done_head));
+	done_head = (ohci_td_t *)(uintptr_t)Get_OpReg(hcr_done_head);
+	if (ohci_check_done_head(ohcip, done_head) == USB_SUCCESS) {
+
+		ohci_traverse_done_list(ohcip, done_head);
 	}
 
 	/* Do soft reset of ohci host controller */

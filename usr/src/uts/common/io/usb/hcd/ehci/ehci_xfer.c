@@ -1672,7 +1672,8 @@ ehci_allocate_bulk_resources(
 
 	/* Get the required bulk packet size */
 	qtd_count = bulk_reqp->bulk_len / EHCI_MAX_QTD_XFER_SIZE;
-	if (bulk_reqp->bulk_len % EHCI_MAX_QTD_XFER_SIZE) {
+	if (bulk_reqp->bulk_len % EHCI_MAX_QTD_XFER_SIZE ||
+		bulk_reqp->bulk_len == 0) {
 		qtd_count += 1;
 	}
 
@@ -1715,7 +1716,9 @@ ehci_insert_bulk_req(
 	/* Get the required bulk packet size */
 	bulk_pkt_size = min(bulk_reqp->bulk_len, EHCI_MAX_QTD_XFER_SIZE);
 
-	residue = tw->tw_length % bulk_pkt_size;
+	if (bulk_pkt_size) {
+		residue = tw->tw_length % bulk_pkt_size;
+	}
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_insert_bulk_req: bulk_pkt_size = %d", bulk_pkt_size);
@@ -1739,13 +1742,15 @@ ehci_insert_bulk_req(
 
 	if (tw->tw_direction == EHCI_QTD_CTRL_OUT_PID) {
 
-		ASSERT(bulk_reqp->bulk_data != NULL);
+		if (bulk_reqp->bulk_len) {
+			ASSERT(bulk_reqp->bulk_data != NULL);
 
-		bcopy(bulk_reqp->bulk_data->b_rptr, tw->tw_buf,
-			bulk_reqp->bulk_len);
+			bcopy(bulk_reqp->bulk_data->b_rptr, tw->tw_buf,
+				bulk_reqp->bulk_len);
 
-		Sync_IO_Buffer_for_device(tw->tw_dmahandle,
-			bulk_reqp->bulk_len);
+			Sync_IO_Buffer_for_device(tw->tw_dmahandle,
+				bulk_reqp->bulk_len);
+		}
 	}
 
 	ctrl = tw->tw_direction;
@@ -2126,14 +2131,16 @@ ehci_allocate_intr_resources(
 		}
 		tw->tw_direction = EHCI_QTD_CTRL_IN_PID;
 	} else {
-		ASSERT(intr_reqp->intr_data != NULL);
+		if (tw_length) {
+			ASSERT(intr_reqp->intr_data != NULL);
 
-		/* Copy the data into the buffer */
-		bcopy(intr_reqp->intr_data->b_rptr, tw->tw_buf,
-		    intr_reqp->intr_len);
+			/* Copy the data into the buffer */
+			bcopy(intr_reqp->intr_data->b_rptr, tw->tw_buf,
+			    intr_reqp->intr_len);
 
-		Sync_IO_Buffer_for_device(tw->tw_dmahandle,
-		    intr_reqp->intr_len);
+			Sync_IO_Buffer_for_device(tw->tw_dmahandle,
+			    intr_reqp->intr_len);
+		}
 
 		tw->tw_curr_xfer_reqp = (usb_opaque_t)intr_reqp;
 		tw->tw_direction = EHCI_QTD_CTRL_OUT_PID;
@@ -3010,6 +3017,12 @@ ehci_create_transfer_wrapper(
 		return (NULL);
 	}
 
+	/* zero-length packet doesn't need to allocate dma memory */
+	if (length == 0) {
+
+		goto dmadone;
+	}
+
 	/* allow sg lists for transfer wrapper dma memory */
 	bcopy(&ehcip->ehci_dma_attr, &dma_attr, sizeof (ddi_dma_attr_t));
 	dma_attr.dma_attr_sgllen = EHCI_DMA_ATTR_TW_SGLLEN;
@@ -3069,6 +3082,7 @@ ehci_create_transfer_wrapper(
 	tw->tw_cookie_idx = 0;
 	tw->tw_dma_offs = 0;
 
+dmadone:
 	/*
 	 * Only allow one wrapper to be added at a time. Insert the
 	 * new transaction wrapper into the list for this pipe.
@@ -3514,11 +3528,13 @@ ehci_free_tw(
 	/* Free 32bit ID */
 	EHCI_FREE_ID((uint32_t)tw->tw_id);
 
-	rval = ddi_dma_unbind_handle(tw->tw_dmahandle);
-	ASSERT(rval == DDI_SUCCESS);
+	if (tw->tw_dmahandle != NULL) {
+		rval = ddi_dma_unbind_handle(tw->tw_dmahandle);
+		ASSERT(rval == DDI_SUCCESS);
 
-	ddi_dma_mem_free(&tw->tw_accesshandle);
-	ddi_dma_free_handle(&tw->tw_dmahandle);
+		ddi_dma_mem_free(&tw->tw_accesshandle);
+		ddi_dma_free_handle(&tw->tw_dmahandle);
+	}
 
 	/* Free transfer wrapper */
 	kmem_free(tw, sizeof (ehci_trans_wrapper_t));
