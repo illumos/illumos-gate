@@ -71,6 +71,8 @@ extern "C" {
 #define	OPL_PX_HB(a)	(((a) >> 1) & 0x07)	/* Extract hb from ba */
 #define	OPL_PX_RC(a)	((a) & 0x01)		/* Extract rc from ba */
 #define	OPL_SLOT_NAMES	"slot-names"		/* Slot name property */
+#define	OPL_PX_DEVTYPE	"pciex"			/* Oberon is PCI-Ex devtype */
+#define	OPL_PX_BDF	"0x08"			/* BDF is always 0/1/0 */
 
 /* Macros for manipulating mc-opl driver bus address. */
 #define	OPL_MC_DRV	"mc-opl"		/* Driver name */
@@ -85,10 +87,8 @@ typedef struct {
 } ioboard_contents_t;
 
 /* Shared device tree root node */
-di_node_t opl_devtree;
-di_prom_handle_t opl_promtree;
 int opl_hb_enum(topo_mod_t *mp, const ioboard_contents_t *iob,
-    tnode_t *parent, int brd);
+    tnode_t *parent, int brd, di_prom_handle_t opl_promtree);
 
 #ifdef __cplusplus
 }

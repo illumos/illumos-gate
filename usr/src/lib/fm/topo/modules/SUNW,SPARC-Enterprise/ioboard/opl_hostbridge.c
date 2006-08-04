@@ -34,10 +34,31 @@
 #include "opl_topo.h"
 
 /*
+ * The following #define's are also in did_props.h, but I can't include that
+ * header file here. They should probably be moved to a centrally-located
+ * header file somewhere, since they may also be needed by diagnosis engines
+ * or agents.
+ */
+#define	TOPO_PGROUP_IO		"io"
+#define	TOPO_PROP_DEVTYPE	"DEVTYPE"
+#define	TOPO_PROP_DRIVER	"DRIVER"
+#define	TOPO_PROP_DEV		"DEV"
+
+#define	TOPO_PGROUP_PCI		"pci"
+#define	TOPO_PROP_EXCAP		"EXCAP"
+#define	TOPO_PROP_BDF		"BDF"
+#define	TOPO_PROP_VENDID	"VENDOR-ID"
+#define	TOPO_PROP_DEVID		"DEVICE-ID"
+#define	TOPO_PROP_CLASS		"CLASS-CODE"
+
+#define	PCIEX_ROOT		"pciexrc"
+
+
+/*
  * Check the root complex device node for a slot-names property.
  */
 const char *
-opl_get_slot_name(di_node_t n)
+opl_get_slot_name(di_node_t n, di_prom_handle_t opl_promtree)
 {
 	di_prom_prop_t pp = DI_PROM_PROP_NIL;
 	uchar_t *buf;
@@ -86,7 +107,7 @@ opl_node_create(topo_mod_t *mp, tnode_t *parent, const char *name, int inst,
 	/* Create FMRI */
 	if ((fmri = topo_fmri_create(thp, FM_FMRI_SCHEME_HC, name, inst,
 	    args, &err)) == NULL) {
-		topo_mod_dprintf(mp, "create of tnode for %s failed: %s",
+		topo_mod_dprintf(mp, "create of tnode for %s failed: %s\n",
 		    name, topo_strerror(topo_mod_errno(mp)));
 		(void) topo_mod_seterrno(mp, err);
 		nvlist_free(args);
@@ -98,11 +119,12 @@ opl_node_create(topo_mod_t *mp, tnode_t *parent, const char *name, int inst,
 	node = topo_node_bind(mp, parent, name, inst, fmri, priv);
 	if (node == NULL) {
 		nvlist_free(fmri);
-		topo_mod_dprintf(mp, "unable to bind root complex",
+		topo_mod_dprintf(mp, "unable to bind root complex: %s\n",
 		    topo_strerror(topo_mod_errno(mp)));
 		return (NULL); /* mod_errno already set */
 	}
 	nvlist_free(fmri);
+
 	return (node);
 }
 
@@ -111,14 +133,15 @@ opl_node_create(topo_mod_t *mp, tnode_t *parent, const char *name, int inst,
  */
 static tnode_t *
 opl_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode, int inst,
-	void *priv)
+    di_prom_handle_t opl_promtree)
 {
 	int err;
 	tnode_t *rcn;
 	topo_hdl_t *thp = topo_mod_handle(mp);
 	const char *slot_name;
+	char *dnpath;
 
-	rcn = opl_node_create(mp, parent, PCIEXRC, inst, priv);
+	rcn = opl_node_create(mp, parent, PCIEXRC, inst, (void *)dnode);
 	if (rcn == NULL) {
 		return (NULL);
 	}
@@ -127,7 +150,7 @@ opl_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode, int inst,
 	 * If this root complex connects to a slot, it will have a
 	 * slot-names property.
 	 */
-	slot_name = opl_get_slot_name(dnode);
+	slot_name = opl_get_slot_name(dnode, opl_promtree);
 	if (slot_name) {
 		char fru_str[64];
 		nvlist_t *fru_fmri;
@@ -145,6 +168,100 @@ opl_rc_node_create(topo_mod_t *mp, tnode_t *parent, di_node_t dnode, int inst,
 		(void) topo_node_fru_set(rcn, NULL, 0, &err);
 		(void) topo_node_label_set(rcn, NULL, &err);
 	}
+
+	/*
+	 * Set ASRU to be the dev-scheme ASRU
+	 */
+	if ((dnpath = di_devfs_path(dnode)) != NULL) {
+		nvlist_t *in;
+		nvlist_t *fmri;
+		if (topo_mod_nvalloc(mp, &in, NV_UNIQUE_NAME) != 0) {
+			topo_mod_dprintf(mp, "topo_mod_nvalloc failed\n");
+			di_devfs_path_free(dnpath);
+			topo_mod_seterrno(mp, EMOD_FMRI_NVL);
+			return (NULL);
+		}
+		if (nvlist_add_string(in, FM_FMRI_DEV_PATH,
+		    dnpath) != 0) {
+			topo_mod_dprintf(mp, "nvlist_add_string failed\n");
+			nvlist_free(in);
+			di_devfs_path_free(dnpath);
+			topo_mod_seterrno(mp, EMOD_NOMEM);
+			return (NULL);
+		}
+		fmri = topo_fmri_create(thp, FM_FMRI_SCHEME_DEV,
+		    FM_FMRI_SCHEME_DEV, 0, in, &err);
+		nvlist_free(in);
+		if (fmri == NULL) {
+			topo_mod_dprintf(mp,
+			    "dev:///%s fmri creation failed.\n",
+			    dnpath);
+			topo_mod_seterrno(mp, err);
+			di_devfs_path_free(dnpath);
+			return (NULL);
+		}
+		if (topo_node_asru_set(rcn, fmri, 0, &err) < 0) {
+			topo_mod_dprintf(mp, "topo_node_asru_set failed\n");
+			topo_mod_seterrno(mp, err);
+			nvlist_free(fmri);
+			di_devfs_path_free(dnpath);
+			return (NULL);
+		}
+		nvlist_free(fmri);
+	} else {
+		topo_mod_dprintf(mp, "NULL di_devfs_path.\n");
+	}
+
+	/*
+	 * Set pciexrc properties for root complex nodes
+	 */
+
+	/* Add the io and pci property groups */
+	if (topo_pgroup_create(rcn, TOPO_PGROUP_IO,
+	    TOPO_STABILITY_PRIVATE, &err) < 0) {
+		topo_mod_dprintf(mp, "topo_pgroup_create failed\n");
+		di_devfs_path_free(dnpath);
+		topo_mod_seterrno(mp, err);
+		return (NULL);
+	}
+	if (topo_pgroup_create(rcn, TOPO_PGROUP_PCI,
+	    TOPO_STABILITY_PRIVATE, &err) < 0) {
+		topo_mod_dprintf(mp, "topo_pgroup_create failed\n");
+		di_devfs_path_free(dnpath);
+		topo_mod_seterrno(mp, err);
+		return (NULL);
+	}
+	/* Add the devfs path property */
+	if (dnpath) {
+		if (topo_prop_set_string(rcn, TOPO_PGROUP_IO, TOPO_PROP_DEV,
+		    TOPO_PROP_SET_ONCE, dnpath, &err) != 0) {
+			topo_mod_dprintf(mp, "Failed to set DEV property\n");
+			di_devfs_path_free(dnpath);
+			topo_mod_seterrno(mp, err);
+		}
+		di_devfs_path_free(dnpath);
+	}
+	/* Oberon device type is always "pciex" */
+	if (topo_prop_set_string(rcn, TOPO_PGROUP_IO, TOPO_PROP_DEVTYPE,
+	    TOPO_PROP_SET_ONCE, OPL_PX_DEVTYPE, &err) != 0) {
+		topo_mod_dprintf(mp, "Failed to set DEVTYPE property\n");
+	}
+	/* Oberon driver is always "px" */
+	if (topo_prop_set_string(rcn, TOPO_PGROUP_IO, TOPO_PROP_DRIVER,
+	    TOPO_PROP_SET_ONCE, OPL_PX_DRV, &err) != 0) {
+		topo_mod_dprintf(mp, "Failed to set DRIVER property\n");
+	}
+	/* This is a PCIEX Root Complex */
+	if (topo_prop_set_string(rcn, TOPO_PGROUP_PCI, TOPO_PROP_EXCAP,
+	    TOPO_PROP_SET_ONCE, PCIEX_ROOT, &err) != 0) {
+		topo_mod_dprintf(mp, "Failed to set EXCAP property\n");
+	}
+	/* BDF of Oberon root complex is constant */
+	if (topo_prop_set_string(rcn, TOPO_PGROUP_PCI,
+	    TOPO_PROP_BDF, TOPO_PROP_SET_ONCE, OPL_PX_BDF, &err) != 0) {
+		topo_mod_dprintf(mp, "Failed to set EXCAP property\n");
+	}
+
 	/* Make room for children */
 	topo_node_range_create(mp, rcn, PCIEX_BUS, 0, OPL_BUS_MAX);
 	return (rcn);
@@ -180,7 +297,7 @@ opl_hb_node_create(topo_mod_t *mp, tnode_t *parent, int inst)
  */
 int
 opl_hb_enum(topo_mod_t *mp, const ioboard_contents_t *iob, tnode_t *ion,
-    int brd)
+    int brd, di_prom_handle_t opl_promtree)
 {
 	int hb;
 	int rc;
@@ -192,7 +309,7 @@ opl_hb_enum(topo_mod_t *mp, const ioboard_contents_t *iob, tnode_t *ion,
 	/* Load the pcibus module. We'll need it later. */
 	pcimod = topo_mod_load(mp, PCI_MOD_PATH);
 	if (pcimod == NULL) {
-		topo_mod_dprintf(mp, "can't load pcibus module",
+		topo_mod_dprintf(mp, "can't load pcibus module: %s\n",
 		    topo_strerror(topo_mod_errno(mp)));
 		return (-1);
 	}
@@ -221,7 +338,7 @@ opl_hb_enum(topo_mod_t *mp, const ioboard_contents_t *iob, tnode_t *ion,
 				hbnode = opl_hb_node_create(mp, ion, hb);
 				if (hbnode == NULL) {
 					topo_mod_dprintf(mp,
-					    "unable to create hbnode: %s",
+					    "unable to create hbnode: %s\n",
 					    topo_strerror(topo_mod_errno(mp)));
 					topo_mod_unload(pcimod);
 					return (-1);
@@ -230,10 +347,11 @@ opl_hb_enum(topo_mod_t *mp, const ioboard_contents_t *iob, tnode_t *ion,
 			}
 
 			/* Create the root complex node */
-			rcnode = opl_rc_node_create(mp, hbnode, p, rc, p);
+			rcnode = opl_rc_node_create(mp, hbnode, p, rc,
+			    opl_promtree);
 			if (rcnode == NULL) {
 				topo_mod_dprintf(mp,
-				    "unable to create rcnode: %s",
+				    "unable to create rcnode: %s\n",
 				    topo_strerror(topo_mod_errno(mp)));
 				topo_mod_unload(pcimod);
 				return (-1);
@@ -243,7 +361,7 @@ opl_hb_enum(topo_mod_t *mp, const ioboard_contents_t *iob, tnode_t *ion,
 			if (topo_mod_enumerate(pcimod, rcnode,
 			    PCI_BUS, PCIEX_BUS, 0, 255) != 0) {
 				topo_mod_dprintf(mp,
-				    "error enumerating pcibus",
+				    "error enumerating pcibus: %s\n",
 				    topo_strerror(topo_mod_errno(mp)));
 				topo_mod_unload(pcimod);
 				return (-1);
