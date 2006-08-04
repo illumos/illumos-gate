@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1285,28 +1284,7 @@ qdetach(queue_t *qp, int clmode, int flag, cred_t *crp, boolean_t is_remove)
 		((qp->q_syncq->sq_head == NULL) &&
 		(wqp->q_syncq->sq_head == NULL)));
 
-	/*
-	 * Flush the queues before q_next is set to NULL. This is needed
-	 * in order to backenable any downstream queue before we go away.
-	 * Note: we are already removed from the stream so that the
-	 * backenabling will not cause any messages to be delivered to our
-	 * put procedures.
-	 */
-	flushq(qp, FLUSHALL);
-	flushq(wqp, FLUSHALL);
-
-	/*
-	 * wait for any pending service processing to complete
-	 */
-	wait_svc(qp);
-
-	/* Tidy up - removeq only does a half-remove from stream */
-	qp->q_next = wqp->q_next = NULL;
-	ASSERT(!(qp->q_flag & QENAB));
-	ASSERT(!(wqp->q_flag & QENAB));
-
 	/* release any fmodsw_impl_t structure held on behalf of the queue */
-
 	ASSERT(qp->q_fp != NULL || qp->q_flag & QISDRV);
 	if (qp->q_fp != NULL)
 		fmodsw_rele(qp->q_fp);
@@ -3374,9 +3352,32 @@ freeq(queue_t *qp)
 
 	ASSERT(qp->q_flag & QREADR);
 
+	/*
+	 * If a previously dispatched taskq job is scheduled to run
+	 * sync_service() or a service routine is scheduled for the
+	 * queues about to be freed, wait here until all service is
+	 * done on the queue and all associated queues and syncqs.
+	 */
+	wait_svc(qp);
+
 	(void) flush_syncq(qp->q_syncq, qp);
 	(void) flush_syncq(wqp->q_syncq, wqp);
 	ASSERT(qp->q_syncqmsgs == 0 && wqp->q_syncqmsgs == 0);
+
+	/*
+	 * Flush the queues before q_next is set to NULL This is needed
+	 * in order to backenable any downstream queue before we go away.
+	 * Note: we are already removed from the stream so that the
+	 * backenabling will not cause any messages to be delivered to our
+	 * put procedures.
+	 */
+	flushq(qp, FLUSHALL);
+	flushq(wqp, FLUSHALL);
+
+	/* Tidy up - removeq only does a half-remove from stream */
+	qp->q_next = wqp->q_next = NULL;
+	ASSERT(!(qp->q_flag & QENAB));
+	ASSERT(!(wqp->q_flag & QENAB));
 
 	outer = qp->q_syncq->sq_outer;
 	if (outer != NULL) {
