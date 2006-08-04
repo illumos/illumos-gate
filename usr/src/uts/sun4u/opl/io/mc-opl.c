@@ -175,14 +175,14 @@ static char *mc_dc_dimm_unum_table[OPL_MAX_DIMMS] = {
 	/* --------CMUnn----------- */
 	/* --CS0-----|--CS1------ */
 	/* -H-|--L-- | -H- | -L-- */
-	"03A", "02A", "03B", "02B", /* MAC 0 bank 0 */
-	"13A", "12A", "13B", "12B", /* MAC 0 bank 1 */
-	"23A", "22A", "23B", "22B", /* MAC 1 bank 2 */
-	"33A", "32A", "33B", "32B", /* MAC 1 bank 3 */
-	"01A", "00A", "01B", "00B", /* MAC 2 bank 4 */
-	"11A", "10A", "11B", "10B", /* MAC 2 bank 5 */
-	"21A", "20A", "21B", "20B", /* MAC 3 bank 6 */
-	"31A", "30A", "31B", "30B"  /* MAC 3 bank 7 */
+	"03A", "02A", "03B", "02B", /* Bank 0 (MAC 0 bank 0) */
+	"13A", "12A", "13B", "12B", /* Bank 1 (MAC 0 bank 1) */
+	"23A", "22A", "23B", "22B", /* Bank 2 (MAC 1 bank 0) */
+	"33A", "32A", "33B", "32B", /* Bank 3 (MAC 1 bank 1) */
+	"01A", "00A", "01B", "00B", /* Bank 4 (MAC 2 bank 0) */
+	"11A", "10A", "11B", "10B", /* Bank 5 (MAC 2 bank 1) */
+	"21A", "20A", "21B", "20B", /* Bank 6 (MAC 3 bank 0) */
+	"31A", "30A", "31B", "30B"  /* Bank 7 (MAC 3 bank 1) */
 };
 
 /*
@@ -195,25 +195,25 @@ static char *mc_ff_dimm_unum_table[2 * OPL_MAX_DIMMS] = {
 	/* --------CMU0---------- */
 	/* --CS0-----|--CS1------ */
 	/* -H-|--L-- | -H- | -L-- */
-	"03A", "02A", "03B", "02B", /* MAC 0 bank 0 */
-	"01A", "00A", "01B", "00B", /* MAC 0 bank 1 */
-	"13A", "12A", "13B", "12B", /* MAC 1 bank 2 */
-	"11A", "10A", "11B", "10B", /* MAC 1 bank 3 */
-	"23A", "20A", "23B", "20B", /* MAC 2 bank 4 */
-	"21A", "20A", "21B", "20B", /* MAC 2 bank 5 */
-	"33A", "32A", "33B", "32B", /* MAC 3 bank 6 */
-	"31A", "30A", "31B", "30B", /* MAC 3 bank 7 */
+	"03A", "02A", "03B", "02B", /* Bank 0 (MAC 0 bank 0) */
+	"01A", "00A", "01B", "00B", /* Bank 1 (MAC 0 bank 1) */
+	"13A", "12A", "13B", "12B", /* Bank 2 (MAC 1 bank 0) */
+	"11A", "10A", "11B", "10B", /* Bank 3 (MAC 1 bank 1) */
+	"23A", "22A", "23B", "22B", /* Bank 4 (MAC 2 bank 0) */
+	"21A", "20A", "21B", "20B", /* Bank 5 (MAC 2 bank 1) */
+	"33A", "32A", "33B", "32B", /* Bank 6 (MAC 3 bank 0) */
+	"31A", "30A", "31B", "30B", /* Bank 7 (MAC 3 bank 1) */
 	/* --------CMU1---------- */
 	/* --CS0-----|--CS1------ */
 	/* -H-|--L-- | -H- | -L-- */
-	"43A", "42A", "43B", "42B", /* MAC 0 bank 0 */
-	"41A", "40A", "41B", "40B", /* MAC 0 bank 1 */
-	"53A", "52A", "53B", "50B", /* MAC 1 bank 2 */
-	"51A", "50A", "51B", "50B", /* MAC 1 bank 3 */
-	"63A", "62A", "63B", "62B", /* MAC 2 bank 4 */
-	"61A", "60A", "61B", "60B", /* MAC 2 bank 5 */
-	"73A", "72A", "73B", "72B", /* MAC 3 bank 6 */
-	"71A", "70A", "71B", "70B"  /* MAC 3 bank 7 */
+	"43A", "42A", "43B", "42B", /* Bank 0 (MAC 0 bank 0) */
+	"41A", "40A", "41B", "40B", /* Bank 1 (MAC 0 bank 1) */
+	"53A", "52A", "53B", "52B", /* Bank 2 (MAC 1 bank 0) */
+	"51A", "50A", "51B", "50B", /* Bank 3 (MAC 1 bank 1) */
+	"63A", "62A", "63B", "62B", /* Bank 4 (MAC 2 bank 0) */
+	"61A", "60A", "61B", "60B", /* Bank 5 (MAC 2 bank 1) */
+	"73A", "72A", "73B", "72B", /* Bank 6 (MAC 3 bank 0) */
+	"71A", "70A", "71B", "70B"  /* Bank 7 (MAC 3 bank 1) */
 };
 
 #define	BD_BK_SLOT_TO_INDEX(bd, bk, s)			\
@@ -3221,7 +3221,7 @@ mc_get_mem_offset(uint64_t paddr, uint64_t *offp)
 	mc_opl_t	*mcp;
 
 	mutex_enter(&mcmutex);
-	for (i = 0; i < OPL_MAX_BOARDS; i++) {
+	for (i = 0; ((i < OPL_MAX_BOARDS) && (ret != 0)); i++) {
 		if ((mcp = mc_instances[i]) == NULL)
 			continue;
 		mutex_enter(&mcp->mc_lock);
