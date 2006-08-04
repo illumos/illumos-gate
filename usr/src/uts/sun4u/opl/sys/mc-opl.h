@@ -356,7 +356,8 @@ extern int mc_inject_error(int error_type, uint64_t pa, uint32_t flags);
 #define	MC_INJECT_MIRROR_MODE		0x10
 #define	MC_INJECT_MIRROR(x)		(x & MC_INJECT_MIRROR_MODE)
 
-#define	MC_INJECT_FLAG_NO_TRAP	0x1
+#define	MC_INJECT_FLAG_PREFETCH	0x1
+#define	MC_INJECT_FLAG_NO_TRAP	MC_INJECT_FLAG_PREFETCH
 #define	MC_INJECT_FLAG_RESTART	0x2
 #define	MC_INJECT_FLAG_POLL	0x4
 #define	MC_INJECT_FLAG_RESET	0x8

@@ -48,12 +48,16 @@
 #include <sys/memlist.h>
 #include <sys/param.h>
 #include <sys/disp.h>
-#include <sys/ontrap.h>
 #include <vm/page.h>
 #include <sys/mc-opl.h>
 #include <sys/opl.h>
 #include <sys/opl_dimm.h>
 #include <sys/scfd/scfostoescf.h>
+#include <sys/cpu_module.h>
+#include <vm/seg_kmem.h>
+#include <sys/vmem.h>
+#include <vm/hat_sfmmu.h>
+#include <sys/vmsystm.h>
 
 /*
  * Function prototypes
@@ -223,8 +227,6 @@ static char *mc_ff_dimm_unum_table[2 * OPL_MAX_DIMMS] = {
 
 #define	MC_MAX_SPEEDS 7
 
-/* make this a structure */
-
 typedef struct {
 	uint32_t mc_speeds;
 	uint32_t mc_period;
@@ -243,8 +245,6 @@ static mc_scan_speed_t	mc_scan_speeds[MC_MAX_SPEEDS] = {
 };
 
 static uint32_t	mc_max_speed = (0x6 << 26);
-
-/* we have to measure these delays */
 
 int mc_isolation_bsize = MC_ISOLATION_BSIZE;
 int mc_patrol_interval_sec = MC_PATROL_INTERVAL_SEC;
@@ -1049,8 +1049,6 @@ static void
 mc_err_drain(mc_aflt_t *mc_aflt)
 {
 	int rv;
-	page_t *pp;
-	uint64_t errors;
 	uint64_t pa = (uint64_t)(-1);
 	int i;
 
@@ -1071,31 +1069,22 @@ mc_err_drain(mc_aflt_t *mc_aflt)
 	}
 
 	if (mc_aflt->mflt_stat[0]->mf_type != FLT_TYPE_PERMANENT_CE) {
-		MC_LOG("mc_err_drain:pa = %lx\n", pa);
-		pp = page_numtopp_nolock(pa >> PAGESHIFT);
+		uint64_t errors = 0;
 
-		if (pp) {
-			/*
-			 * Don't keep retiring and make ereports
-			 * on bad pages in PTRL case
-			 */
-			MC_LOG("mc_err_drain:pp = %p\n", pp);
-			if (mc_aflt->mflt_is_ptrl) {
-				errors = 0;
-				if (page_retire_check(pa, &errors) == 0) {
-					MC_LOG("Page retired\n");
-					return;
-				}
-				if (errors & mc_aflt->mflt_pr) {
-					MC_LOG("errors %lx, mflt_pr %x\n",
-						errors, mc_aflt->mflt_pr);
-					return;
-				}
-			}
-			MC_LOG("offline page %p error %x\n", pp,
-				mc_aflt->mflt_pr);
-			(void) page_retire(pa, mc_aflt->mflt_pr);
+		MC_LOG("mc_err_drain:pa = %lx\n", pa);
+
+		if (page_retire_check(pa, &errors) == 0) {
+			MC_LOG("Page retired\n");
+			return;
 		}
+		if ((errors & mc_aflt->mflt_pr) == mc_aflt->mflt_pr) {
+			MC_LOG("errors %lx, mflt_pr %x\n",
+				errors, mc_aflt->mflt_pr);
+			return;
+		}
+		MC_LOG("offline page at pa %lx error %x\n", pa,
+			mc_aflt->mflt_pr);
+		(void) page_retire(pa, mc_aflt->mflt_pr);
 	}
 
 	for (i = 0; i < mc_aflt->mflt_nflts; i++) {
@@ -1121,7 +1110,6 @@ mc_err_drain(mc_aflt_t *mc_aflt)
 static int
 restart_patrol(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr_info)
 {
-	page_t *pp;
 	uint64_t pa;
 	int rv;
 	int loop_count = 0;
@@ -1173,26 +1161,19 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr_info)
 			MC_LOG("Invalid PA\n");
 			pa = roundup(new_pa + 1, mc_isolation_bsize);
 		} else {
-			pp = page_numtopp_nolock(new_pa >> PAGESHIFT);
-			if (pp != NULL) {
-				uint64_t errors = 0;
-				if (page_retire_check(new_pa, &errors) &&
-					(errors == 0)) {
-					MC_LOG("Page has no error\n");
-					pa = new_pa;
-					goto done;
-				}
-				/*
-				 * skip bad pages
-				 * and let the following loop to take care
-				 */
-				pa = roundup(new_pa + 1, PAGESIZE);
-				MC_LOG("Skipping bad page to %lx\n", pa);
-			} else {
-				MC_LOG("Page has no page structure\n");
+			uint64_t errors = 0;
+			if (page_retire_check(new_pa, &errors) &&
+				(errors == 0)) {
+				MC_LOG("Page has no error\n");
 				pa = new_pa;
 				goto done;
 			}
+			/*
+			 * skip bad pages
+			 * and let the following loop to take care
+			 */
+			pa = roundup(new_pa + 1, PAGESIZE);
+			MC_LOG("Skipping bad page to %lx\n", pa);
 		}
 	}
 
@@ -1206,21 +1187,15 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr_info)
 			MC_LOG("pa is not valid. round up to 64 MB\n");
 			pa = roundup(pa + 1, 64 * 1024 * 1024);
 		} else {
-			pp = page_numtopp_nolock(pa >> PAGESHIFT);
-			if (pp != NULL) {
-				uint64_t errors = 0;
-				if (page_retire_check(pa, &errors) &&
-					(errors == 0)) {
-					MC_LOG("Page has no error\n");
-					break;
-				}
-				/* skip bad pages */
-				pa = roundup(pa + 1, PAGESIZE);
-				MC_LOG("Skipping bad page to %lx\n", pa);
-			} else {
-				MC_LOG("Page has no page structure\n");
+			uint64_t errors = 0;
+			if (page_retire_check(pa, &errors) &&
+				(errors == 0)) {
+				MC_LOG("Page has no error\n");
 				break;
 			}
+			/* skip bad pages */
+			pa = roundup(pa + 1, PAGESIZE);
+			MC_LOG("Skipping bad page to %lx\n", pa);
 		}
 		if (pa >= (mcp->mc_start_address + mcp->mc_size)) {
 			MC_LOG("Wrap around\n");
@@ -1899,6 +1874,7 @@ mc_check_errors_func(mc_opl_t *mcp)
 	int i, error_count = 0;
 	uint32_t stat, cntl;
 	int running;
+	int wrapped;
 
 	/*
 	 * scan errors.
@@ -1911,49 +1887,106 @@ mc_check_errors_func(mc_opl_t *mcp)
 			stat = ldphysio(MAC_PTRL_STAT(mcp, i));
 			cntl = ldphysio(MAC_PTRL_CNTL(mcp, i));
 			running = cntl & MAC_CNTL_PTRL_START;
+			wrapped = cntl & MAC_CNTL_PTRL_ADD_MAX;
 
-			if (cntl & MAC_CNTL_PTRL_ADD_MAX) {
+			if (mc_debug_show_all || stat) {
+				MC_LOG("/LSB%d/B%d stat %x cntl %x\n",
+					mcp->mc_board_num, i,
+					stat, cntl);
+			}
+
+			/*
+			 * Update stats and reset flag if the HW patrol
+			 * wrapped around in its scan.
+			 */
+			if (wrapped) {
 				mcp->mc_period[i]++;
 				MC_LOG("mc period %ld on "
 				    "/LSB%d/B%d\n", mcp->mc_period[i],
 				    mcp->mc_board_num, i);
 				MAC_CLEAR_MAX(mcp, i);
+			}
+
+			if (running) {
+				/*
+				 * Mac patrol HW is still running.
+				 * Normally when an error is detected,
+				 * the HW patrol will stop so that we
+				 * can collect error data for reporting.
+				 * Certain errors (MI errors) detected may not
+				 * cause the HW patrol to stop which is a
+				 * problem since we cannot read error data while
+				 * the HW patrol is running. SW is not allowed
+				 * to stop the HW patrol while it is running
+				 * as it may cause HW inconsistency. This is
+				 * described in a HW errata.
+				 * In situations where we detected errors
+				 * that may not cause the HW patrol to stop.
+				 * We speed up the HW patrol scanning in
+				 * the hope that it will find the 'real' PTRL
+				 * errors associated with the previous errors
+				 * causing the HW to finally stop so that we
+				 * can do the reporting.
+				 */
+				/*
+				 * Check to see if we did speed up
+				 * the HW patrol due to previous errors
+				 * detected that did not cause the patrol
+				 * to stop. We only do it if HW patrol scan
+				 * wrapped (counted as completing a 'period').
+				 */
 				if (mcp->mc_speedup_period[i] > 0) {
-				/* If patrol is stoppped, we fall through */
-					if (--mcp->mc_speedup_period[i] == 0 &&
-						running) {
-					    MAC_CMD(mcp, i, 0);
-					}
-				}
-			}
-			if (mc_debug_show_all) {
-				MC_LOG("/LSB%d/B%d stat %x cntl %x\n",
-					mcp->mc_board_num, i,
-					stat, cntl);
-			}
-			if (stat & (MAC_STAT_PTRL_ERRS|MAC_STAT_MI_ERRS)) {
-				if (running) {
-				    MC_LOG("patrol running /LSB%d/B%d\n",
-						mcp->mc_board_num, i);
-				}
-				if (running) {
-					/* speed up the scanning */
+				    if (wrapped &&
+					(--mcp->mc_speedup_period[i] == 0)) {
+					/*
+					 * We did try to speed up.
+					 * The speed up period has expired
+					 * and the HW patrol is still running.
+					 * The errors must be intermittent.
+					 * We have no choice but to ignore
+					 * them, reset the scan speed to normal
+					 * and clear the MI error bits.
+					 */
+					MC_LOG("Clearing MI errors\n");
+					MAC_CLEAR_ERRS(mcp, i,
+					    MAC_CNTL_MI_ERRS);
+				    }
+				} else if (stat & MAC_STAT_MI_ERRS) {
+					/*
+					 * MI errors detected but we cannot
+					 * report them since the HW patrol
+					 * is still running.
+					 * We will attempt to speed up the
+					 * scanning and hopefully the HW
+					 * can detect PRTL errors at the same
+					 * location that cause the HW patrol
+					 * to stop.
+					 */
 					mcp->mc_speedup_period[i] = 2;
 					MAC_CMD(mcp, i, 0);
-				} else {
-				    mcp->mc_speedup_period[i] = 0;
-				    maddr_info.mi_valid = 0;
-				    maddr_info.mi_advance = 1;
-				    if (IS_MIRROR(mcp, i))
-					mc_error_handler_mir(mcp, i,
-						&maddr_info);
-				    else
-					mc_error_handler(mcp, i, &maddr_info);
-
-				    error_count++;
-				    restart_patrol(mcp, i, &maddr_info);
 				}
+			} else if (stat & (MAC_STAT_PTRL_ERRS |
+			    MAC_STAT_MI_ERRS)) {
+				/*
+				 * HW Patrol has stopped and we found errors.
+				 * Proceed to collect and report error info.
+				 */
+				mcp->mc_speedup_period[i] = 0;
+				maddr_info.mi_valid = 0;
+				maddr_info.mi_advance = 1;
+				if (IS_MIRROR(mcp, i))
+				    mc_error_handler_mir(mcp, i, &maddr_info);
+				else
+				    mc_error_handler(mcp, i, &maddr_info);
+
+				error_count++;
+				restart_patrol(mcp, i, &maddr_info);
 			} else {
+				/*
+				 * HW patrol scan has apparently stopped
+				 * but no errors detected/flagged.
+				 * Restart the HW patrol just to be sure.
+				 */
 				restart_patrol(mcp, i, NULL);
 			}
 		}
@@ -2676,6 +2709,24 @@ delete_mcp(mc_opl_t *mcp)
 
 /* Error injection interface */
 
+static void
+mc_lock_va(uint64_t pa, caddr_t new_va)
+{
+	tte_t tte;
+
+	vtag_flushpage(new_va, KCONTEXT);
+	sfmmu_memtte(&tte, pa >> PAGESHIFT,
+		PROC_DATA|HAT_NOSYNC, TTE8K);
+	tte.tte_intlo |= TTE_LCK_INT;
+	sfmmu_dtlb_ld_kva(new_va, &tte);
+}
+
+static void
+mc_unlock_va(caddr_t va)
+{
+	vtag_flushpage(va, (uint64_t)ksfmmup);
+}
+
 /* ARGSUSED */
 int
 mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
@@ -2688,7 +2739,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 	uint32_t data, stat;
 	int both_sides = 0;
 	uint64_t pa0;
-	on_trap_data_t otd;
+	int extra_injection_needed = 0;
 	extern void cpu_flush_ecache(void);
 
 	MC_LOG("HW mc_inject_error(%x, %lx, %x)\n", error_type, pa, flags);
@@ -2732,7 +2783,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 
 	dimm_addr = pa_to_dimm(mcp, pa0);
 
-	MC_LOG("injecting error to /LSB%d/B%d/D%x\n",
+	MC_LOG("injecting error to /LSB%d/B%d/%x\n",
 		mcp->mc_board_num, bank, dimm_addr);
 
 
@@ -2755,8 +2806,10 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 	}
 
 	switch (error_type) {
-	case MC_INJECT_UE:
 	case MC_INJECT_SUE:
+		extra_injection_needed = 1;
+		/*FALLTHROUGH*/
+	case MC_INJECT_UE:
 	case MC_INJECT_MUE:
 		if (flags & MC_INJECT_FLAG_PATH) {
 			cntl = MAC_EG_ADD_FIX
@@ -2779,6 +2832,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 				|MAC_EG_FORCE_DERR16
 				|MAC_EG_DERR_ONCE;
 		}
+		extra_injection_needed = 1;
 		flags |= MC_INJECT_FLAG_ST;
 		break;
 	case MC_INJECT_PERMANENT_CE:
@@ -2839,20 +2893,69 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 
 
 	if (flags & MC_INJECT_FLAG_LD) {
-		if (flags & MC_INJECT_FLAG_NO_TRAP) {
-			if (on_trap(&otd, OT_DATA_EC)) {
-				no_trap();
-				MC_LOG("Trap occurred\n");
+		if (flags & MC_INJECT_FLAG_PREFETCH) {
+			/*
+			 * Use strong prefetch operation to
+			 * inject MI errors.
+			 */
+			page_t *pp;
+			extern void mc_prefetch(caddr_t);
+
+			MC_LOG("prefetch\n");
+
+			pp = page_numtopp_nolock(pa >> PAGESHIFT);
+			if (pp != NULL) {
+				caddr_t	va, va1;
+
+				va = ppmapin(pp, PROT_READ|PROT_WRITE,
+					(caddr_t)-1);
+				kpreempt_disable();
+				mc_lock_va((uint64_t)pa, va);
+				va1 = va + (pa & (PAGESIZE - 1));
+				mc_prefetch(va1);
+				mc_unlock_va(va);
+				kpreempt_enable();
+				ppmapout(va);
+
+				/*
+				 * For MI errors, we need one extra
+				 * injection for HW patrol to stop.
+				 */
+				extra_injection_needed = 1;
 			} else {
-				MC_LOG("On-trap Reading from %lx\n", pa);
-				data = ldphys(pa);
-				no_trap();
-				MC_LOG("data = %x\n", data);
+				cmn_err(CE_WARN, "Cannot find page structure"
+					" for PA %lx\n", pa);
 			}
 		} else {
 			MC_LOG("Reading from %lx\n", pa);
 			data = ldphys(pa);
 			MC_LOG("data = %x\n", data);
+		}
+
+		if (extra_injection_needed) {
+			/*
+			 * These are the injection cases where the
+			 * requested injected errors will not cause the HW
+			 * patrol to stop. For these cases, we need to inject
+			 * an extra 'real' PTRL error to force the
+			 * HW patrol to stop so that we can report the
+			 * errors injected. Note that we cannot read
+			 * and report error status while the HW patrol
+			 * is running.
+			 */
+			ST_MAC_REG(MAC_EG_CNTL(mcp, bank),
+				cntl & MAC_EG_SETUP_MASK);
+			ST_MAC_REG(MAC_EG_CNTL(mcp, bank), cntl);
+
+			if (both_sides) {
+			    ST_MAC_REG(MAC_EG_CNTL(mcp, bank^1), cntl &
+				MAC_EG_SETUP_MASK);
+			    ST_MAC_REG(MAC_EG_CNTL(mcp, bank^1), cntl);
+			}
+			data = 0xf0e0d0c0;
+			MC_LOG("Writing %x to %lx\n", data, pa);
+			stphys(pa, data);
+			cpu_flush_ecache();
 		}
 	}
 
@@ -2873,44 +2976,47 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 		stat = LD_MAC_REG(MAC_PTRL_STAT(mcp, bank));
 		cntl = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank));
 		running = cntl & MAC_CNTL_PTRL_START;
-		if (stat & (MAC_STAT_PTRL_ERRS|MAC_STAT_MI_ERRS)) {
-			if (running) {
-				/* speed up the scanning */
-				mcp->mc_speedup_period[bank] = 2;
-				MAC_CMD(mcp, bank, 0);
-			} else {
-				mcp->mc_speedup_period[bank] = 0;
-				maddr.mi_valid = 0;
-				maddr.mi_advance = 1;
-				if (IS_MIRROR(mcp, bank))
-					mc_error_handler_mir(mcp, bank,
-						&maddr);
-				else
-					mc_error_handler(mcp, bank, &maddr);
 
-				restart_patrol(mcp, bank, &maddr);
-			}
-		} else
+		if (!running &&
+		    (stat & (MAC_STAT_PTRL_ERRS|MAC_STAT_MI_ERRS))) {
+			/*
+			 * HW patrol stopped and we have errors to
+			 * report. Do it.
+			 */
+			mcp->mc_speedup_period[bank] = 0;
+			maddr.mi_valid = 0;
+			maddr.mi_advance = 1;
+			if (IS_MIRROR(mcp, bank))
+				mc_error_handler_mir(mcp, bank, &maddr);
+			else
+				mc_error_handler(mcp, bank, &maddr);
+
+			restart_patrol(mcp, bank, &maddr);
+		} else {
+			/*
+			 * We are expecting to report injected
+			 * errors but the HW patrol is still running.
+			 * Speed up the scanning
+			 */
+			mcp->mc_speedup_period[bank] = 2;
+			MAC_CMD(mcp, bank, 0);
 			restart_patrol(mcp, bank, NULL);
+		}
 	}
 
 	mutex_exit(&mcp->mc_lock);
 	return (0);
 }
+
 void
 mc_stphysio(uint64_t pa, uint32_t data)
 {
-#ifndef lint
-	uint32_t dummy;
-#endif
-
 	MC_LOG("0x%x -> pa(%lx)\n", data, pa);
 	stphysio(pa, data);
 
 	/* force the above write to be processed by mac patrol */
-#ifndef lint
-	dummy = ldphysio(pa);
-#endif
+	data = ldphysio(pa);
+	MC_LOG("pa(%lx) = 0x%x\n", pa, data);
 }
 
 uint32_t

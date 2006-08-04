@@ -44,7 +44,7 @@ SCFD_OBJS = scfconf.o scfdscp.o scfiomp.o scfostoescf.o \
 DRMACH_OBJS 	= drmach.o drmach_asm.o dr_util.o drmach_err.o
 DRMACH_DEPS	+= drmach_asm.o
 OPLMSU_OBJS	= oplmsu.o oplmsu_cmn_func.o oplmsu_ioctl_lrp.o oplmsu_ioctl_uwp.o
-MC_OPL_OBJS	= mc-opl.o
+MC_OPL_OBJS	= mc-opl.o mc-opl_asm.o
 
 #
 # Miscellaneous
