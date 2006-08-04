@@ -94,12 +94,15 @@ extern "C" {
 	((af) == AF_INET ? (pi)->pi_v4 : (pi)->pi_v6)
 
 /*
- * A phyint instance is probe *enabled* if it has been configured with a probe
- * address (i.e., an IFF_NOFAILOVER address).  It is probe *capable* if it is
- * also able to send probes (i.e., has one or more targets available).
+ * A phyint instance is probe *enabled* if it has been configured with a
+ * unique probe address (i.e., an IFF_NOFAILOVER address).  It is probe
+ * *capable* if it is also able to send probes (i.e., has one or more
+ * targets available).
  */
 #define	PROBE_ENABLED(pii) \
-	(((pii) != NULL) && ((pii)->pii_probe_logint != NULL))
+	(((pii) != NULL) && ((pii)->pii_probe_sock != -1) &&	\
+	((pii)->pii_probe_logint != NULL) &&			\
+	(((pii)->pii_probe_logint->li_dupaddr == 0)))
 
 #define	PROBE_CAPABLE(pii) \
 	(PROBE_ENABLED(pii) && ((pii)->pii_ntargets != 0))
@@ -445,8 +448,8 @@ extern void in_data(struct phyint_instance *pii);
 extern void in6_data(struct phyint_instance *pii);
 
 extern int try_failover(struct phyint *pi, int failover_type);
-extern int try_failback(struct phyint *pi, boolean_t check_only);
-extern int do_failback(struct phyint *pi, boolean_t check_only);
+extern int try_failback(struct phyint *pi);
+extern int do_failback(struct phyint *pi);
 extern boolean_t change_lif_flags(struct phyint *pi, uint64_t flags,
     boolean_t setfl);
 

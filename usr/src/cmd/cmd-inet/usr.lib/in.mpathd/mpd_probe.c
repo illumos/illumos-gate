@@ -1414,7 +1414,7 @@ phyint_check_for_repair(struct phyint *pi)
 		if (pi->pi_flags & IFF_STANDBY) {
 			(void) change_lif_flags(pi, IFF_FAILED, _B_FALSE);
 		} else {
-			if (try_failback(pi, _B_FALSE) != IPMP_FAILURE) {
+			if (try_failback(pi) != IPMP_FAILURE) {
 				(void) change_lif_flags(pi,
 				    IFF_FAILED, _B_FALSE);
 				/* Per state diagram */
@@ -1559,10 +1559,9 @@ phyint_inst_timer(struct phyint_instance *pii)
 	}
 
 	/*
-	 * If this phyint is not yet initialized for probes,
-	 * don't proceed further
+	 * If probing is not enabled on this phyint instance, don't proceed.
 	 */
-	if (pii->pii_probe_sock == -1)
+	if (!PROBE_ENABLED(pii))
 		return (TIMER_INFINITY);
 
 	/*
@@ -2620,7 +2619,7 @@ failover(struct phyint *from, struct phyint *to)
  * failback_enabled flag.
  */
 int
-do_failback(struct phyint *pi, boolean_t check_only)
+do_failback(struct phyint *pi)
 {
 	struct  phyint *from;
 	boolean_t done;
@@ -2669,18 +2668,12 @@ do_failback(struct phyint *pi, boolean_t check_only)
 			continue;
 		}
 
-		if (!check_only) {
-			pi->pi_empty = 0;	/* Per state diagram */
-			attempted_failback = _B_TRUE;
-			if (failback(from, pi) != 0) {
-				done = _B_FALSE;
-				break;
-			}
+		pi->pi_empty = 0;	/* Per state diagram */
+		attempted_failback = _B_TRUE;
+		if (failback(from, pi) != 0) {
+			done = _B_FALSE;
+			break;
 		}
-	}
-
-	if (check_only) {
-		return (partial ? IPMP_EFBPARTIAL : IPMP_SUCCESS);
 	}
 
 	/*
@@ -2711,7 +2704,7 @@ do_failback(struct phyint *pi, boolean_t check_only)
  * failback_enabled flag for phyints in named groups.
  */
 int
-try_failback(struct phyint *pi, boolean_t check_only)
+try_failback(struct phyint *pi)
 {
 	if (debug & D_FAILOVER)
 		logdebug("try_failback(%s)\n", pi->pi_name);
@@ -2719,7 +2712,7 @@ try_failback(struct phyint *pi, boolean_t check_only)
 	if (pi->pi_group != phyint_anongroup && !failback_enabled)
 		return (IPMP_EFBDISABLED);
 
-	return (do_failback(pi, check_only));
+	return (do_failback(pi));
 }
 
 /*

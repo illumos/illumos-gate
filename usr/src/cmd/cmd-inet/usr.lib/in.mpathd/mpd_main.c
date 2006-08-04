@@ -68,7 +68,8 @@ static void	init_router_targets();
 static void	cleanup(void);
 static int	setup_listener(int af);
 static void	check_config(void);
-static void	check_addr_unique(int af, char *name);
+static void	check_addr_unique(struct phyint_instance *,
+    struct sockaddr_storage *);
 static void	init_host_targets(void);
 static void	dup_host_targets(struct phyint_instance *desired_pii);
 static void	loopback_cmd(int sock, int family);
@@ -262,7 +263,7 @@ restore_phyint(struct phyint *pi)
 	 * Move all addresses owned by 'pi' back to pi, from each
 	 * of the other members of the group
 	 */
-	(void) try_failback(pi, _B_FALSE);
+	(void) try_failback(pi);
 }
 
 /*
@@ -425,8 +426,9 @@ initifs()
 		if (exists) {
 			/* The phyint is fine. So process the logint */
 			logint_init_from_k(pii, lifr->lifr_name);
+			check_addr_unique(pii, &lifr->lifr_addr);
 		}
-		check_addr_unique(af, lifr->lifr_name);
+
 	}
 
 	free(buf);
@@ -443,10 +445,10 @@ initifs()
 		li = pii->pii_probe_logint;
 		if ((li != NULL) && !li->li_dupaddr &&
 		    li->li_dupaddrmsg_printed) {
-			logerr("Test address %s is unique; enabling probe-"
-			    "based failure detection\n",
+			logerr("Test address %s is unique in group; enabling "
+			    "probe-based failure detection on %s\n",
 			    pr_addr(pii->pii_af, li->li_addr, abuf,
-				sizeof (abuf)));
+				sizeof (abuf)), pii->pii_phyint->pi_name);
 			li->li_dupaddrmsg_printed = 0;
 		}
 	}
@@ -520,8 +522,7 @@ initifs()
 			    (failure_state(pii) == PHYINT_FAILURE)) {
 				(void) try_failover(pi, FAILOVER_NORMAL);
 			} else if (pi->pi_state == PI_RUNNING && !pi->pi_full) {
-				if (try_failback(pi, _B_FALSE) !=
-				    IPMP_FAILURE) {
+				if (try_failback(pi) != IPMP_FAILURE) {
 					(void) change_lif_flags(pi, IFF_FAILED,
 					    _B_FALSE);
 					/* Per state diagram */
@@ -533,57 +534,45 @@ initifs()
 }
 
 /*
- * Check that test/probe addresses are always unique. link-locals and
- * ptp unnumbered may not be unique, and bind to such an (IFF_NOFAILOVER)
- * address can produce unexpected results. Log an error and alert the user.
+ * Check that a given test address is unique across all of the interfaces in a
+ * group.  (e.g., IPv6 link-locals may not be inherently unique, and binding
+ * to such an (IFF_NOFAILOVER) address can produce unexpected results.)
+ * Log an error and alert the user.
  */
 static void
-check_addr_unique(int af, char *name)
+check_addr_unique(struct phyint_instance *ourpii, struct sockaddr_storage *ss)
 {
-	struct lifreq	lifr;
-	struct phyint	*pi;
-	struct in6_addr	addr;
+	struct phyint		*pi;
+	struct phyint_group	*pg;
+	struct in6_addr		addr;
 	struct phyint_instance	*pii;
 	struct sockaddr_in	*sin;
-	struct sockaddr_in6	*sin6;
-	int ifsock;
-	char abuf[INET6_ADDRSTRLEN];
+	char			abuf[INET6_ADDRSTRLEN];
 
-	/* Get the socket for doing ioctls */
-	ifsock = (af == AF_INET) ? ifsock_v4 : ifsock_v6;
-
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-	lifr.lifr_name[sizeof (lifr.lifr_name) - 1] = '\0';
-	/*
-	 * Get the address corresponding to 'name'. We cannot
-	 * do a logint lookup in our tables, because, not all logints
-	 * in the system are tracked by mpathd. (eg. things not in a group)
-	 */
-	if (ioctl(ifsock, SIOCGLIFADDR, (char *)&lifr) < 0) {
-		if (errno == ENXIO) {
-			/* Interface has vanished */
-			return;
-		} else {
-			logperror("ioctl (get addr)");
-			return;
-		}
-	}
-
-	if (af == AF_INET) {
-		sin = (struct sockaddr_in *)&lifr.lifr_addr;
+	if (ss->ss_family == AF_INET) {
+		sin = (struct sockaddr_in *)ss;
 		IN6_INADDR_TO_V4MAPPED(&sin->sin_addr, &addr);
 	} else {
-		sin6 = (struct sockaddr_in6 *)&lifr.lifr_addr;
-		addr = sin6->sin6_addr;
+		assert(ss->ss_family == AF_INET6);
+		addr = ((struct sockaddr_in6 *)ss)->sin6_addr;
 	}
 
 	/*
-	 * Does the address 'addr' match any known test address ? If so
-	 * it is a duplicate, unless we are looking at the same logint
+	 * For anonymous groups, every interface is assumed to be on its own
+	 * link, so there is no chance of overlapping addresses.
 	 */
-	for (pi = phyints; pi != NULL; pi = pi->pi_next) {
-		pii = PHYINT_INSTANCE(pi, af);
-		if (pii == NULL || pii->pii_probe_logint == NULL)
+	pg = ourpii->pii_phyint->pi_group;
+	if (pg == phyint_anongroup)
+		return;
+
+	/*
+	 * Walk the list of phyint instances in the group and check for test
+	 * addresses matching ours.  Of course, we skip ourself.
+	 */
+	for (pi = pg->pg_phyint; pi != NULL; pi = pi->pi_pgnext) {
+		pii = PHYINT_INSTANCE(pi, ss->ss_family);
+		if (pii == NULL || pii == ourpii ||
+		    pii->pii_probe_logint == NULL)
 			continue;
 
 		if (!IN6_ARE_ADDR_EQUAL(&addr,
@@ -591,27 +580,18 @@ check_addr_unique(int af, char *name)
 			continue;
 		}
 
-		if (strncmp(pii->pii_probe_logint->li_name, name,
-		    sizeof (pii->pii_probe_logint->li_name)) == 0) {
-			continue;
-		}
-
 		/*
 		 * This test address is not unique. Set the dupaddr bit
+		 * and log an error message if not already logged.
 		 */
 		pii->pii_probe_logint->li_dupaddr = 1;
-
-		/*
-		 * Log an error message if not already logged
-		 */
-		if (pii->pii_probe_logint->li_dupaddrmsg_printed)
-			continue;
-
-		logerr("Test address %s is not unique; disabling "
-		    "probe-based failure detection\n",
-		    pr_addr(af, addr, abuf, sizeof (abuf)));
-
-		pii->pii_probe_logint->li_dupaddrmsg_printed = 1;
+		if (!pii->pii_probe_logint->li_dupaddrmsg_printed) {
+			logerr("Test address %s is not unique in group; "
+			    "disabling probe-based failure detection on %s\n",
+			    pr_addr(ss->ss_family, addr, abuf, sizeof (abuf)),
+			    pii->pii_phyint->pi_name);
+			pii->pii_probe_logint->li_dupaddrmsg_printed = 1;
+		}
 	}
 }
 
@@ -727,6 +707,14 @@ select_test_ifs(void)
 		 * the best available test address
 		 */
 		for (li = pii->pii_logint; li != NULL; li = li->li_next) {
+			/*
+			 * Skip 0.0.0.0 addresses, as those are never
+			 * actually usable.
+			 */
+			if (pii->pii_af == AF_INET &&
+			    IN6_IS_ADDR_V4MAPPED_ANY(&li->li_addr))
+				continue;
+
 			/*
 			 * Skip any IPv6 logints that are not link-local,
 			 * since we should always have a link-local address
@@ -844,7 +832,7 @@ select_test_ifs(void)
 		/*
 		 * Start the probe timer for this instance.
 		 */
-		if (!pii->pii_basetime_inited && pii->pii_probe_sock != -1) {
+		if (!pii->pii_basetime_inited && PROBE_ENABLED(pii)) {
 			start_timer(pii);
 			pii->pii_basetime_inited = 1;
 		}
@@ -1465,7 +1453,7 @@ process_rtm_ifinfo(if_msghdr_t *ifm, int type)
 		} else {
 			if (pi->pi_state == PI_RUNNING && !pi->pi_full) {
 				pi->pi_empty = 0;
-				(void) try_failback(pi, _B_FALSE);
+				(void) try_failback(pi);
 			}
 		}
 	}
@@ -2385,7 +2373,7 @@ main(int argc, char *argv[])
 				break;
 			}
 			if (pollfds[i].fd == rtsock_v4 ||
-				pollfds[i].fd == rtsock_v6) {
+			    pollfds[i].fd == rtsock_v6) {
 				process_rtsock(rtsock_v4, rtsock_v6);
 				break;
 			}
@@ -2726,51 +2714,43 @@ process_cmd(int newfd, union mi_commands *mpi)
 		miu = &mpi->mi_ucmd;
 		/*
 		 * Undo the offline command. As usual lookup the interface.
-		 * Send an error if it does not exist.
+		 * Send an error if it does not exist or is not offline.
 		 */
 		pi = phyint_lookup(miu->miu_ifname);
-		if (pi == NULL)
+		if (pi == NULL || pi->pi_state != PI_OFFLINE)
 			return (send_result(newfd, IPMP_FAILURE, EINVAL));
 
 		/*
-		 * Inverse of the offline operation. Do a failback, and then
-		 * clear the IFF_OFFLINE flag.
+		 * Reset the state of the interface based on the current link
+		 * state; if this phyint subsequently acquires a test address,
+		 * the state will be updated later as a result of the probes.
 		 */
-		error = do_failback(pi, _B_TRUE);
-		if (error == IPMP_EFBPARTIAL)
-			return (send_result(newfd, IPMP_EFBPARTIAL, 0));
-		error = do_failback(pi, _B_FALSE);
+		if (LINK_UP(pi))
+			phyint_chstate(pi, PI_RUNNING);
+		else
+			phyint_chstate(pi, PI_FAILED);
 
-		switch (error) {
-		case IPMP_SUCCESS:
-			if (!change_lif_flags(pi, IFF_OFFLINE, _B_FALSE)) {
-				logdebug("undo error %X\n", global_errno);
-				error = IPMP_FAILURE;
-				break;
-			}
-			/* FALLTHROUGH */
-
-		case IPMP_EFBPARTIAL:
+		if (pi->pi_state == PI_RUNNING) {
 			/*
-			 * Reset the state of the interface based on the
-			 * current link state; if this phyint subsequently
-			 * acquires a test address, the state will be changed
-			 * again later as a result of the probes.
+			 * Note that the success of MI_UNDO_OFFLINE is not
+			 * contingent on actually failing back; in the odd
+			 * case where we cannot do it here, we will try again
+			 * in initifs() since pi->pi_full will still be zero.
 			 */
-			if (LINK_UP(pi))
-				phyint_chstate(pi, PI_RUNNING);
-			else
-				phyint_chstate(pi, PI_FAILED);
-			break;
-
-		case IPMP_FAILURE:
-			break;
-
-		default:
-			logdebug("do_failback: unexpected return value\n");
-			break;
+			if (do_failback(pi) != IPMP_SUCCESS) {
+				logdebug("process_cmd: cannot failback from "
+				    "%s during MI_UNDO_OFFLINE\n", pi->pi_name);
+			}
 		}
-		return (send_result(newfd, error, global_errno));
+
+		/*
+		 * Clear the IFF_OFFLINE flag.  We have to do this last
+		 * because do_failback() relies on it being set to decide
+		 * when to display messages.
+		 */
+		(void) change_lif_flags(pi, IFF_OFFLINE, _B_FALSE);
+
+		return (send_result(newfd, IPMP_SUCCESS, 0));
 
 	case MI_SETOINDEX:
 		mis = &mpi->mi_scmd;
