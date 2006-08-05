@@ -2405,6 +2405,16 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 
 	eager->tcp_rq->q_ptr = econnp;
 	eager->tcp_wq->q_ptr = econnp;
+
+	/*
+	 * In the TLI/XTI loopback case, we are inside the listener's squeue,
+	 * which might be a different squeue from our peer TCP instance.
+	 * For TCP Fusion, the peer expects that whenever tcp_detached is
+	 * clear, our TCP queues point to the acceptor's queues.  Thus, use
+	 * membar_producer() to ensure that the assignments of tcp_rq/tcp_wq
+	 * above reach global visibility prior to the clearing of tcp_detached.
+	 */
+	membar_producer();
 	eager->tcp_detached = B_FALSE;
 
 	ASSERT(eager->tcp_ack_tid == 0);

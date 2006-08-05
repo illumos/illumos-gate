@@ -458,7 +458,6 @@ boolean_t
 tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 {
 	tcp_t *peer_tcp = tcp->tcp_loopback_peer;
-	queue_t *peer_rq;
 	uint_t max_unread;
 	boolean_t flow_stopped;
 	boolean_t urgent = (DB_TYPE(mp) != M_DATA);
@@ -469,7 +468,6 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_PROTO ||
 	    DB_TYPE(mp) == M_PCPROTO);
 
-	peer_rq = peer_tcp->tcp_rq;
 	max_unread = peer_tcp->tcp_fuse_rcv_unread_hiwater;
 
 	/* If this connection requires IP, unfuse and use regular path */
@@ -599,7 +597,17 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		 */
 		if (urgent || (!flow_stopped && !peer_tcp->tcp_direct_sockfs)) {
 			ASSERT(peer_tcp->tcp_rcv_list != NULL);
-			(void) tcp_fuse_rcv_drain(peer_rq, peer_tcp, NULL);
+			/*
+			 * For TLI-based streams, a thread in tcp_accept_swap()
+			 * can race with us.  That thread will ensure that the
+			 * correct peer_tcp->tcp_rq is globally visible before
+			 * peer_tcp->tcp_detached is visible as clear, but we
+			 * must also ensure that the load of tcp_rq cannot be
+			 * reordered to be before the tcp_detached check.
+			 */
+			membar_consumer();
+			(void) tcp_fuse_rcv_drain(peer_tcp->tcp_rq, peer_tcp,
+			    NULL);
 			/*
 			 * If synchronous streams was stopped above due
 			 * to the presence of urgent data, re-enable it.
