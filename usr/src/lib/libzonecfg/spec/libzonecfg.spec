@@ -290,9 +290,27 @@ end
 
 function	zonecfg_match_dev
 include		<libzonecfg.h>
-declaration	int zonecfg_match_dev(zone_dochandle_t, char *, struct zone_devtab *)
+declaration	int zonecfg_match_dev(zone_dochandle_t, const char *, struct zone_devtab *)
 version		SUNWprivate_1.1
 end		
+
+function	zonecfg_should_deldev
+include		<libzonecfg.h>
+declaration	int zonecfg_should_deldev(zone_dochandle_t, const char *, boolean_t *)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_clear_deldevs
+include		<libzonecfg.h>
+declaration	int zonecfg_clear_deldevs(zone_dochandle_t handle)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_has_deldevs
+include		<libzonecfg.h>
+declaration	int zonecfg_has_deldevs(zone_dochandle_t handle)
+version		SUNWprivate_1.1
+end
 
 function        zonecfg_add_attr
 include         <libzonecfg.h>

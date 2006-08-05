@@ -51,6 +51,22 @@
 
 <!ATTLIST device	match		CDATA #REQUIRED>
 
+<!--
+	The deleted-device element denotes a used-to-be device element.
+	We keep track of device elements which the user has deleted or
+	modified, and make an attempt to cleanse /dev of associated entries
+	at next zone boot.
+
+	The 'devnames' project will ultimately obsolete the need for this
+	functionality, but this element MUST remain in perpetuity, since
+	it is possible that zones crossing from pre-devnames to post-devnames
+	bits could carry a deleted-device element, and would therefore fail
+	XML validation if this were removed
+-->
+<!ELEMENT deleted-device	EMPTY>
+
+<!ATTLIST deleted-device	match		CDATA #REQUIRED>
+
 <!ELEMENT rctl-value	EMPTY>
 
 <!ATTLIST rctl-value	priv		CDATA #REQUIRED
@@ -95,7 +111,7 @@
 			mode		CDATA #REQUIRED
 			acl		CDATA #REQUIRED>
 
-<!ELEMENT zone		(filesystem | inherited-pkg-dir | network | device | rctl | attr | dataset | package | patch | dev-perm)*>
+<!ELEMENT zone		(filesystem | inherited-pkg-dir | network | device | deleted-device | rctl | attr | dataset | package | patch | dev-perm)*>
 
 <!ATTLIST zone		name		CDATA #REQUIRED
 			zonepath	CDATA #REQUIRED

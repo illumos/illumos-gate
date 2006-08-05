@@ -70,6 +70,7 @@
 #define	DTD_ELEM_ATTR		(const xmlChar *) "attr"
 #define	DTD_ELEM_COMMENT	(const xmlChar *) "comment"
 #define	DTD_ELEM_DEVICE		(const xmlChar *) "device"
+#define	DTD_ELEM_DELETEDDEVICE	(const xmlChar *) "deleted-device"
 #define	DTD_ELEM_FS		(const xmlChar *) "filesystem"
 #define	DTD_ELEM_FSOPTION	(const xmlChar *) "fsoption"
 #define	DTD_ELEM_IPD		(const xmlChar *) "inherited-pkg-dir"
@@ -2141,8 +2142,9 @@ zonecfg_add_dev(zone_dochandle_t handle, struct zone_devtab *tabptr)
 static int
 zonecfg_delete_dev_core(zone_dochandle_t handle, struct zone_devtab *tabptr)
 {
-	xmlNodePtr cur = handle->zone_dh_cur;
+	xmlNodePtr newnode, cur = handle->zone_dh_cur;
 	int match_match;
+	int err;
 
 	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
 		if (xmlStrcmp(cur->name, DTD_ELEM_DEVICE))
@@ -2152,6 +2154,19 @@ zonecfg_delete_dev_core(zone_dochandle_t handle, struct zone_devtab *tabptr)
 		    tabptr->zone_dev_match);
 
 		if (match_match) {
+			/*
+			 * Since we're succesfully deleting (or modifying)
+			 * a device entry, we need to do device node cleanup
+			 * on the next zone bootup, so we leave behind a
+			 * historical record for zoneadmd to consume.
+			 */
+			newnode = xmlNewTextChild(handle->zone_dh_top, NULL,
+			    DTD_ELEM_DELETEDDEVICE, NULL);
+
+			if ((err = newprop(newnode, DTD_ATTR_MATCH,
+			    tabptr->zone_dev_match)) != Z_OK)
+				return (err);
+
 			xmlUnlinkNode(cur);
 			xmlFreeNode(cur);
 			return (Z_OK);
@@ -2175,6 +2190,43 @@ zonecfg_delete_dev(zone_dochandle_t handle, struct zone_devtab *tabptr)
 		return (err);
 
 	return (Z_OK);
+}
+
+int
+zonecfg_clear_deldevs(zone_dochandle_t handle)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_DELETEDDEVICE) != 0)
+			continue;
+
+		xmlUnlinkNode(cur);
+		xmlFreeNode(cur);
+	}
+	return (Z_OK);
+}
+
+int
+zonecfg_has_deldevs(zone_dochandle_t handle)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_DELETEDDEVICE) == 0)
+			return (Z_OK);
+	}
+	return (Z_NO_ENTRY);
 }
 
 int
@@ -2447,7 +2499,7 @@ out:
  * zone devices.  Then it scans the user-supplied device entries.
  */
 int
-zonecfg_match_dev(zone_dochandle_t handle, char *devpath,
+zonecfg_match_dev(zone_dochandle_t handle, const char *devpath,
     struct zone_devtab *out_match)
 {
 	int err;
@@ -2522,6 +2574,90 @@ zonecfg_match_dev(zone_dochandle_t handle, char *devpath,
 
 	(void) strlcpy(out_match->zone_dev_match, match,
 	    sizeof (out_match->zone_dev_match));
+	return (Z_OK);
+}
+
+/*
+ * This routine answers the question: do we think <devpath> should be
+ * deleted during this zone's bootup?
+ *
+ * The criteria are:
+ * 	- Is there a matching rule for devpath?  If yes, then NO.
+ * 	- Is this a CHR or BLK device node?  If no, then NO.
+ *      - Is there a deleted device entry which matches devpath?  Then, YES
+ *      - Else NO
+ */
+int
+zonecfg_should_deldev(zone_dochandle_t handle, const char *devpath,
+    boolean_t *del)
+{
+	int err;
+	char match[MAXPATHLEN];
+	xmlNodePtr cur;
+	struct stat st;
+	char fullpath[MAXPATHLEN];
+	char zonepath[MAXPATHLEN];
+
+	if (handle == NULL || devpath == NULL || del == NULL)
+		return (Z_INVAL);
+
+	*del = B_FALSE;
+
+	/*
+	 * If a matching rule exists for this device, then leave it alone.
+	 */
+	if (zonecfg_match_dev(handle, devpath, NULL) == Z_OK)
+		return (Z_OK);
+
+	/*
+	 * lstat it.  If it's a regular file, a directory, a link or
+	 * something else miscellaneous, we'll be cautious and not
+	 * touch it.
+	 */
+	if ((err = zonecfg_get_zonepath(handle, zonepath,
+	    sizeof (zonepath))) != Z_OK)
+		return (err);
+
+	(void) snprintf(fullpath, sizeof (fullpath), "%s/dev/%s", zonepath,
+	    devpath);
+	if (lstat(fullpath, &st) == -1 ||
+	    (!S_ISBLK(st.st_mode) && !S_ISCHR(st.st_mode)))
+		return (Z_OK);
+
+	if ((err = operation_prep(handle)) != Z_OK) {
+		handle->zone_dh_cur = NULL;
+		return (err);
+	}
+
+	cur = handle->zone_dh_cur;
+	cur = cur->xmlChildrenNode;
+	if (cur == NULL)
+		return (Z_NO_ENTRY);
+	handle->zone_dh_cur = cur;
+
+	for (; cur != NULL; cur = cur->next) {
+		char *m;
+		if (xmlStrcmp(cur->name, DTD_ELEM_DELETEDDEVICE) != 0)
+			continue;
+		if ((err = fetchprop(cur, DTD_ATTR_MATCH, match,
+		    sizeof (match))) != Z_OK) {
+			handle->zone_dh_cur = handle->zone_dh_top;
+			return (err);
+		}
+		m = match;
+		/*
+		 * fnmatch gives us simple but powerful shell-style matching;
+		 * but first, we need to strip out /dev/ from the matching rule.
+		 */
+		if (strncmp(m, "/dev/", 5) == 0)
+			m += 5;
+
+		if (fnmatch(m, devpath, FNM_PATHNAME) == 0) {
+			*del = B_TRUE;
+			break;
+		}
+	}
+
 	return (Z_OK);
 }
 

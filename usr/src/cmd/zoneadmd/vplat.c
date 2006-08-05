@@ -3620,11 +3620,91 @@ write_index_file(zoneid_t zoneid)
 	_exit(0);
 }
 
+/*ARGSUSED1*/
+static int
+devcleanup_cb(const char *path, uid_t u, gid_t g, mode_t m, const char *a,
+    void *data)
+{
+	zone_dochandle_t h = (zone_dochandle_t)data;
+	boolean_t del;
+	char fullpath[MAXPATHLEN];
+	char zonepath[MAXPATHLEN];
+
+	if (zonecfg_should_deldev(h, path, &del) == Z_OK) {
+		if (del) {
+			if (zonecfg_get_zonepath(h, zonepath,
+			    sizeof (zonepath)) != Z_OK)
+				return (Z_OK);
+			(void) snprintf(fullpath, sizeof (fullpath),
+			    "%s/dev/%s", zonepath, path);
+			(void) unlink(fullpath);
+		}
+	}
+	return (Z_OK);
+}
+
+/*
+ * If needed, initiate a walk of the zone's /dev tree, looking for device
+ * entries which need to be cleaned up: this is a wrapper around functionality
+ * in libzonecfg which keeps track of newly-defunct device entries.
+ */
+static int
+devcleanup(zlog_t *zlogp)
+{
+	zone_dochandle_t handle;
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zerror(zlogp, B_TRUE, "getting zone configuration handle");
+		return (-1);
+	}
+
+	/*
+	 * Note that this is a rare case when we consult the *real* zone
+	 * config handle, not a snapshot-- that's because we want to
+	 * drop the deleted-device markers out of the config once we've
+	 * purged them from the FS.
+	 */
+	if (zonecfg_get_handle(zone_name, handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration");
+		zonecfg_fini_handle(handle);
+		return (-1);
+	}
+
+	/*
+	 * Quickly check whether there is any work to do prior to scanning
+	 * all of /dev.
+	 */
+	if (zonecfg_has_deldevs(handle) != Z_OK) {
+		zonecfg_fini_handle(handle);
+		return (0);
+	}
+
+	if (zonecfg_devwalk(handle, devcleanup_cb, (void *)handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "failed to walk devices");
+		zonecfg_fini_handle(handle);
+		return (-1);
+	}
+
+	/*
+	 * We don't need to process the deleted devices more than the one time.
+	 */
+	(void) zonecfg_clear_deldevs(handle);
+	(void) zonecfg_save(handle);
+	zonecfg_fini_handle(handle);
+	return (0);
+}
+
 int
 vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd, zoneid_t zoneid)
 {
+
 	if (!mount_cmd && validate_datasets(zlogp) != 0) {
 		lofs_discard_mnttab();
+		return (-1);
+	}
+
+	if (devcleanup(zlogp) != 0) {
+		zerror(zlogp, B_TRUE, "device cleanup failed");
 		return (-1);
 	}
 
