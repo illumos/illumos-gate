@@ -2339,6 +2339,13 @@ segvn_faultpage(
 				ANON_SLEEP);
 
 			ASSERT(pp->p_szc == 0);
+
+			/*
+			 * Handle pages that have been marked for migration
+			 */
+			if (lgrp_optimizations())
+				page_migrate(seg, addr, &pp, 1);
+
 			if (type == F_SOFTLOCK) {
 				if (!segvn_pp_lock_anonpages(pp, first)) {
 					page_unlock(pp);
@@ -2395,12 +2402,6 @@ segvn_faultpage(
 					VPP_SETPPLOCK(vpage);
 			}
 
-
-			/*
-			 * Handle pages that have been marked for migration
-			 */
-			if (lgrp_optimizations())
-				page_migrate(seg, addr, &pp, 1);
 			hat_memload(hat, addr, pp, prot, hat_flag);
 
 			if (!(hat_flag & HAT_LOAD_LOCK))
@@ -2481,6 +2482,13 @@ segvn_faultpage(
 	 * and return.
 	 */
 	if (cow == 0) {
+
+		/*
+		 * Handle pages that have been marked for migration
+		 */
+		if (lgrp_optimizations())
+			page_migrate(seg, addr, &opp, 1);
+
 		if (type == F_SOFTLOCK && svd->vp == NULL) {
 
 			ASSERT(opp->p_szc == 0 ||
@@ -2504,12 +2512,6 @@ segvn_faultpage(
 			else if (rw != S_OTHER && !hat_ismod(opp))
 				prot &= ~PROT_WRITE;
 		}
-
-		/*
-		 * Handle pages that have been marked for migration
-		 */
-		if (lgrp_optimizations())
-			page_migrate(seg, addr, &opp, 1);
 
 		hat_memload(hat, addr, opp, prot & vpprot, hat_flag);
 
@@ -2615,6 +2617,12 @@ segvn_faultpage(
 
 	(void) anon_set_ptr(amp->ahp, anon_index, ap, ANON_SLEEP);
 
+	/*
+	 * Handle pages that have been marked for migration
+	 */
+	if (lgrp_optimizations())
+		page_migrate(seg, addr, &pp, 1);
+
 	ASSERT(pp->p_szc == 0);
 	if (type == F_SOFTLOCK && svd->vp == NULL) {
 		if (!segvn_pp_lock_anonpages(pp, first)) {
@@ -2637,12 +2645,6 @@ segvn_faultpage(
 			prot &= ~PROT_WRITE;
 	}
 
-
-	/*
-	 * Handle pages that have been marked for migration
-	 */
-	if (lgrp_optimizations())
-		page_migrate(seg, addr, &pp, 1);
 	hat_memload(hat, addr, pp, prot, hat_flag);
 
 	if (!(hat_flag & HAT_LOAD_LOCK))
@@ -4313,6 +4315,12 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			ASSERT(segtype == MAP_PRIVATE ||
 			    ppa[0]->p_szc >= szc);
 
+			/*
+			 * Handle pages that have been marked for migration
+			 */
+			if (lgrp_optimizations())
+				page_migrate(seg, a, ppa, pages);
+
 			if (type == F_SOFTLOCK && svd->vp == NULL) {
 				/*
 				 * All pages in ppa array belong to the same
@@ -4332,12 +4340,6 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				segvn_pages_locked += pages;
 				mutex_exit(&freemem_lock);
 			}
-
-			/*
-			 * Handle pages that have been marked for migration
-			 */
-			if (lgrp_optimizations())
-				page_migrate(seg, a, ppa, pages);
 
 			if (segtype == MAP_SHARED) {
 				vpprot |= PROT_WRITE;
