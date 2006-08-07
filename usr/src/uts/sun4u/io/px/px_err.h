@@ -49,8 +49,13 @@ typedef enum {
 	PX_ERR_LPU_GIGABLZ
 } px_err_id_t;
 
-void px_err_reg_enable(px_t *px_p, px_err_id_t id);
-void px_err_reg_disable(px_t *px_p, px_err_id_t id);
+#define	PX_ERR_ENABLE	B_TRUE
+#define	PX_ERR_DISABLE	B_FALSE
+
+void px_err_reg_enable(px_err_id_t reg_id, caddr_t csr_base);
+void px_err_reg_disable(px_err_id_t reg_id, caddr_t csr_base);
+void px_err_reg_setup_pcie(uint8_t chip_mask, caddr_t csr_base,
+    boolean_t enable);
 
 #define	PX_ERR_EN_ALL			-1ull
 #define	PX_ERR_MASK_NONE		0ull

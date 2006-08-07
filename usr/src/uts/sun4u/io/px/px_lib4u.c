@@ -154,11 +154,13 @@ px_lib_unmap_regs(pxu_t *pxu_p)
 int
 px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 {
-	px_t		*px_p = DIP_TO_STATE(dip);
-	caddr_t		xbc_csr_base, csr_base;
+
+	caddr_t			xbc_csr_base, csr_base;
 	px_dvma_range_prop_t	px_dvma_range;
-	px_chip_type_t	chip_type = px_identity_init(px_p);
-	pxu_t		*pxu_p;
+	pxu_t			*pxu_p;
+	uint8_t			chip_mask;
+	px_t			*px_p = DIP_TO_STATE(dip);
+	px_chip_type_t		chip_type = px_identity_init(px_p);
 
 	DBG(DBG_ATTACH, dip, "px_lib_dev_init: dip 0x%p", dip);
 
@@ -168,6 +170,7 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 		return (DDI_FAILURE);
 	}
 
+	chip_mask = BITMASK(chip_type);
 	px_paddr_mask = (chip_type == PX_CHIP_FIRE) ? MMU_FIRE_PADDR_MASK :
 	    MMU_OBERON_PADDR_MASK;
 
@@ -223,13 +226,6 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	 */
 	switch (PX_CHIP_TYPE(pxu_p)) {
 	case PX_CHIP_OBERON:
-		px_err_reg_enable(px_p, PX_ERR_UBC);
-		px_err_reg_enable(px_p, PX_ERR_MMU);
-		px_err_reg_enable(px_p, PX_ERR_IMU);
-		px_err_reg_enable(px_p, PX_ERR_TLU_UE);
-		px_err_reg_enable(px_p, PX_ERR_TLU_CE);
-		px_err_reg_enable(px_p, PX_ERR_TLU_OE);
-
 		/*
 		 * Oberon hotplug uses SPARE3 field in ILU Error Log Enable
 		 * register to indicate the status of leaf reset,
@@ -242,26 +238,15 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 		else
 			px_ilu_log_mask &= ~(1ull <<
 			    ILU_ERROR_LOG_ENABLE_SPARE3);
-		px_err_reg_enable(px_p, PX_ERR_ILU);
 
+		px_err_reg_setup_pcie(chip_mask, csr_base, PX_ERR_ENABLE);
 		px_fabric_die_rc_ue |= PCIE_AER_UCE_UC;
 		break;
 
 	case PX_CHIP_FIRE:
-		px_err_reg_enable(px_p, PX_ERR_JBC);
-		px_err_reg_enable(px_p, PX_ERR_MMU);
-		px_err_reg_enable(px_p, PX_ERR_IMU);
-		px_err_reg_enable(px_p, PX_ERR_TLU_UE);
-		px_err_reg_enable(px_p, PX_ERR_TLU_CE);
-		px_err_reg_enable(px_p, PX_ERR_TLU_OE);
-		px_err_reg_enable(px_p, PX_ERR_ILU);
-		px_err_reg_enable(px_p, PX_ERR_LPU_LINK);
-		px_err_reg_enable(px_p, PX_ERR_LPU_PHY);
-		px_err_reg_enable(px_p, PX_ERR_LPU_RX);
-		px_err_reg_enable(px_p, PX_ERR_LPU_TX);
-		px_err_reg_enable(px_p, PX_ERR_LPU_LTSSM);
-		px_err_reg_enable(px_p, PX_ERR_LPU_GIGABLZ);
+		px_err_reg_setup_pcie(chip_mask, csr_base, PX_ERR_ENABLE);
 		break;
+
 	default:
 		cmn_err(CE_WARN, "%s%d: PX primary bus Unknown\n",
 		    ddi_driver_name(dip), ddi_get_instance(dip));
@@ -279,8 +264,10 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 int
 px_lib_dev_fini(dev_info_t *dip)
 {
-	px_t	*px_p = DIP_TO_STATE(dip);
-	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+	caddr_t			csr_base;
+	uint8_t			chip_mask;
+	px_t			*px_p = DIP_TO_STATE(dip);
+	pxu_t			*pxu_p = (pxu_t *)px_p->px_plat_p;
 
 	DBG(DBG_DETACH, dip, "px_lib_dev_fini: dip 0x%p\n", dip);
 
@@ -289,29 +276,12 @@ px_lib_dev_fini(dev_info_t *dip)
 	 */
 	switch (PX_CHIP_TYPE(pxu_p)) {
 	case PX_CHIP_OBERON:
-		px_err_reg_disable(px_p, PX_ERR_UBC);
-		px_err_reg_disable(px_p, PX_ERR_MMU);
-		px_err_reg_disable(px_p, PX_ERR_IMU);
-		px_err_reg_disable(px_p, PX_ERR_TLU_UE);
-		px_err_reg_disable(px_p, PX_ERR_TLU_CE);
-		px_err_reg_disable(px_p, PX_ERR_TLU_OE);
-		px_err_reg_disable(px_p, PX_ERR_ILU);
-		break;
 	case PX_CHIP_FIRE:
-		px_err_reg_disable(px_p, PX_ERR_JBC);
-		px_err_reg_disable(px_p, PX_ERR_MMU);
-		px_err_reg_disable(px_p, PX_ERR_IMU);
-		px_err_reg_disable(px_p, PX_ERR_TLU_UE);
-		px_err_reg_disable(px_p, PX_ERR_TLU_CE);
-		px_err_reg_disable(px_p, PX_ERR_TLU_OE);
-		px_err_reg_disable(px_p, PX_ERR_ILU);
-		px_err_reg_disable(px_p, PX_ERR_LPU_LINK);
-		px_err_reg_disable(px_p, PX_ERR_LPU_PHY);
-		px_err_reg_disable(px_p, PX_ERR_LPU_RX);
-		px_err_reg_disable(px_p, PX_ERR_LPU_TX);
-		px_err_reg_disable(px_p, PX_ERR_LPU_LTSSM);
-		px_err_reg_disable(px_p, PX_ERR_LPU_GIGABLZ);
+		chip_mask = BITMASK(PX_CHIP_TYPE(pxu_p));
+		csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
+		px_err_reg_setup_pcie(chip_mask, csr_base, PX_ERR_DISABLE);
 		break;
+
 	default:
 		cmn_err(CE_WARN, "%s%d: PX primary bus Unknown\n",
 		    ddi_driver_name(dip), ddi_get_instance(dip));
@@ -2050,6 +2020,12 @@ px_cb_add_intr(px_fault_t *fault_p)
 		cb_p->px_cb_func = px_cb_intr;
 		pxu_p->px_cb_p = cb_p;
 		px_set_cb(fault_p->px_fh_dip, (uint64_t)cb_p);
+
+		/* px_lib_dev_init allows only FIRE and OBERON */
+		px_err_reg_enable(
+		    (pxu_p->chip_type == PX_CHIP_FIRE) ?
+			PX_ERR_JBC : PX_ERR_UBC,
+		    pxu_p->px_address[PX_REG_XBC]);
 	} else
 		pxu_p->px_cb_p = cb_p;
 
@@ -2155,6 +2131,11 @@ px_cb_rem_intr(px_fault_t *fault_p)
 		return;
 	}
 	mutex_exit(&cb_p->cb_mutex);
+
+	/* px_lib_dev_init allows only FIRE and OBERON */
+	px_err_reg_disable(
+	    (pxu_p->chip_type == PX_CHIP_FIRE) ? PX_ERR_JBC : PX_ERR_UBC,
+	    pxu_p->px_address[PX_REG_XBC]);
 
 	mutex_destroy(&cb_p->cb_mutex);
 	px_set_cb(fault_p->px_fh_dip, 0ull);

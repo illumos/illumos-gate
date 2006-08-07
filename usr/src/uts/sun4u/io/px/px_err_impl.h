@@ -51,7 +51,7 @@ typedef struct px_err_bit_desc {
 /*
  * Reg Error handling tables:
  *
- * enabled		enable this register error handler
+ * chip_mask		mask of chip types supporting this error register
  *
  * *intr_mask_p		bitmask for enabled interrupts
  * *log_mask_p		bitmask for logged  interrupts
@@ -59,6 +59,8 @@ typedef struct px_err_bit_desc {
  *
  * *err_bit_tbl		error bit table
  * err_bit_keys		number of entries in the error bit table.
+ *
+ * reg_bank		register bank base
  *
  * last_reg		last captured register
  * log_addr		interrupt log    register offset
@@ -69,12 +71,13 @@ typedef struct px_err_bit_desc {
  * *msg			error messages table
  */
 typedef struct px_err_reg_desc {
-	boolean_t		enabled;
+	uint8_t			chip_mask;
 	uint64_t		*intr_mask_p;
 	uint64_t		*log_mask_p;
 	uint64_t		*count_mask_p;
 	px_err_bit_desc_t	*err_bit_tbl;
 	uint_t			err_bit_keys;
+	uint_t			reg_bank;
 	uint64_t		last_reg;
 	uint32_t		log_addr;
 	uint32_t		enable_addr;
@@ -82,11 +85,6 @@ typedef struct px_err_reg_desc {
 	uint32_t		clear_addr;
 	char			*msg;
 } px_err_reg_desc_t;
-
-/*
- * Macro to test for the JBC or UBC error id.
- */
-#define	PX_ERR_XBC(id)	(((id) == PX_ERR_JBC)||((id) == PX_ERR_UBC))
 
 /*
  * Macro to create the error handling forward declaration

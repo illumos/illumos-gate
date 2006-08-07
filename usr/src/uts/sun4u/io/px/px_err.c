@@ -553,22 +553,22 @@ px_err_bit_desc_t px_err_lpug_tbl[] = {
 
 
 /* Mask and Tables */
-#define	MnT6(pre) \
-	B_FALSE, \
+#define	MnT6X(pre) \
 	&px_ ## pre ## _intr_mask, \
 	&px_ ## pre ## _log_mask, \
 	&px_ ## pre ## _count_mask, \
 	px_err_ ## pre ## _tbl, \
 	px_err_ ## pre ## _keys, \
+	PX_REG_XBC, \
 	0
 
-#define	MnT6_ob(pre) \
-	B_FALSE, \
+#define	MnT6(pre) \
 	&px_ ## pre ## _intr_mask, \
 	&px_ ## pre ## _log_mask, \
 	&px_ ## pre ## _count_mask, \
-	px_err_ ## pre ## _ob_tbl, \
-	px_err_ ## pre ## _ob_keys, \
+	px_err_ ## pre ## _tbl, \
+	px_err_ ## pre ## _keys, \
+	PX_REG_CSR, \
 	0
 
 /* LPU Registers Addresses */
@@ -599,28 +599,35 @@ px_err_bit_desc_t px_err_lpug_tbl[] = {
 	pre ## _INTERRUPT_STATUS, \
 	pre ## _ERROR_STATUS_CLEAR
 
+/* Bits in chip_mask, set according to type. */
+#define	CHP_O	BITMASK(PX_CHIP_OBERON)
+#define	CHP_F	BITMASK(PX_CHIP_FIRE)
+#define	CHP_FO	(CHP_F | CHP_O)
+
 /*
  * Register error handling tables.
  * The ID Field (first field) is identified by an enum px_err_id_t.
  * It is located in px_err.h
  */
+static const
 px_err_reg_desc_t px_err_reg_tbl[] = {
-	{ MnT6(jbc),	R4(JBC),		  "JBC Error"},
-	{ MnT6(ubc),	R4(UBC),		  "UBC Error"},
-	{ MnT6(mmu),	R4(MMU),		  "MMU Error"},
-	{ MnT6(imu),	R4(IMU),		  "IMU Error"},
-	{ MnT6(tlu_ue),	TR4(UNCORRECTABLE_ERROR), "TLU UE"},
-	{ MnT6(tlu_ce), TR4(CORRECTABLE_ERROR),	  "TLU CE"},
-	{ MnT6(tlu_oe), TR4(OTHER_EVENT),	  "TLU OE"},
-	{ MnT6(ilu),	R4(ILU),		  "ILU Error"},
-	{ MnT6(lpul),	LR4(LINK_LAYER),	  "LPU Link Layer"},
-	{ MnT6(lpup),	LR4_FIXME(PHY),		  "LPU Phy Layer"},
-	{ MnT6(lpur),	LR4(RECEIVE_PHY),	  "LPU RX Phy Layer"},
-	{ MnT6(lpux),	LR4(TRANSMIT_PHY),	  "LPU TX Phy Layer"},
-	{ MnT6(lpus),	LR4(LTSSM),		  "LPU LTSSM"},
-	{ MnT6(lpug),	LR4(GIGABLAZE_GLUE),	  "LPU GigaBlaze Glue"},
+	{ CHP_F,  MnT6X(jbc),	R4(JBC),		  "JBC Error"},
+	{ CHP_O,  MnT6X(ubc),	R4(UBC),		  "UBC Error"},
+	{ CHP_FO, MnT6(mmu),	R4(MMU),		  "MMU Error"},
+	{ CHP_FO, MnT6(imu),	R4(IMU),		  "IMU Error"},
+	{ CHP_FO, MnT6(tlu_ue),	TR4(UNCORRECTABLE_ERROR), "TLU UE"},
+	{ CHP_FO, MnT6(tlu_ce),	TR4(CORRECTABLE_ERROR),	  "TLU CE"},
+	{ CHP_FO, MnT6(tlu_oe),	TR4(OTHER_EVENT),	  "TLU OE"},
+	{ CHP_FO, MnT6(ilu),	R4(ILU),		  "ILU Error"},
+	{ CHP_F,  MnT6(lpul),	LR4(LINK_LAYER),	  "LPU Link Layer"},
+	{ CHP_F,  MnT6(lpup),	LR4_FIXME(PHY),		  "LPU Phy Layer"},
+	{ CHP_F,  MnT6(lpur),	LR4(RECEIVE_PHY),	  "LPU RX Phy Layer"},
+	{ CHP_F,  MnT6(lpux),	LR4(TRANSMIT_PHY),	  "LPU TX Phy Layer"},
+	{ CHP_F,  MnT6(lpus),	LR4(LTSSM),		  "LPU LTSSM"},
+	{ CHP_F,  MnT6(lpug),	LR4(GIGABLAZE_GLUE),	  "LPU GigaBlaze Glue"},
 };
-#define	PX_ERR_REG_KEYS (sizeof (px_err_reg_tbl)) / (sizeof (px_err_reg_tbl[0]))
+
+#define	PX_ERR_REG_KEYS	(sizeof (px_err_reg_tbl)) / (sizeof (px_err_reg_tbl[0]))
 
 typedef struct px_err_ss {
 	uint64_t err_status[PX_ERR_REG_KEYS];
@@ -747,30 +754,23 @@ px_err_dmc_pec_intr(caddr_t arg)
 }
 
 /*
- * Error register are being handled by px_hlib xxx_init functions.
- * They are also called again by px_err_add_intr for mondo62 and 63
- * from px_cb_attach and px_attach
+ * Proper csr_base is responsibility of the caller. (Called from px_lib_dev_init
+ * via px_err_reg_setup_all for pcie error registers;  called from
+ * px_cb_add_intr for jbc/ubc from px_cb_attach.)
+ *
+ * Note: reg_id is passed in instead of reg_desc since this function is called
+ * from px_lib4u.c, which doesn't know about the structure of the table.
  */
 void
-px_err_reg_enable(px_t *px_p, px_err_id_t id)
+px_err_reg_enable(px_err_id_t reg_id, caddr_t csr_base)
 {
-	px_err_reg_desc_t	*reg_desc = &px_err_reg_tbl[id];
-	uint64_t 		intr_mask = *reg_desc->intr_mask_p;
-	uint64_t 		log_mask = *reg_desc->log_mask_p;
-	caddr_t			csr_base;
-	pxu_t			*pxu_p = (pxu_t *)px_p->px_plat_p;
-
-	/* Get the correct CSR BASE */
-	if (PX_ERR_XBC(id))
-		csr_base = (caddr_t)pxu_p->px_address[PX_REG_XBC];
-	else
-		csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
-
-	reg_desc->enabled = B_TRUE;
+	const px_err_reg_desc_t	*reg_desc_p = &px_err_reg_tbl[reg_id];
+	uint64_t 		intr_mask = *reg_desc_p->intr_mask_p;
+	uint64_t 		log_mask = *reg_desc_p->log_mask_p;
 
 	/* Enable logs if it exists */
-	if (reg_desc->log_addr != NULL)
-		CSR_XS(csr_base, reg_desc->log_addr, log_mask);
+	if (reg_desc_p->log_addr != NULL)
+		CSR_XS(csr_base, reg_desc_p->log_addr, log_mask);
 
 	/*
 	 * For readability you in code you set 1 to enable an interrupt.
@@ -781,61 +781,52 @@ px_err_reg_enable(px_t *px_p, px_err_id_t id)
 	 * Clear All Errors
 	 * Enable Errors
 	 */
-	CSR_XS(csr_base, reg_desc->enable_addr, 0);
-	CSR_XS(csr_base, reg_desc->clear_addr, -1);
-	CSR_XS(csr_base, reg_desc->enable_addr, intr_mask);
-	DBG(DBG_ATTACH, NULL, "%s Mask: 0x%llx\n",
-	    reg_desc->msg, CSR_XR(csr_base, reg_desc->enable_addr));
-	DBG(DBG_ATTACH, NULL, "%s Status: 0x%llx\n",
-	    reg_desc->msg, CSR_XR(csr_base, reg_desc->status_addr));
-	DBG(DBG_ATTACH, NULL, "%s Clear: 0x%llx\n",
-	    reg_desc->msg, CSR_XR(csr_base, reg_desc->clear_addr));
-	if (reg_desc->log_addr != NULL) {
-		DBG(DBG_ATTACH, NULL, "%s Log: 0x%llx\n",
-		    reg_desc->msg, CSR_XR(csr_base, reg_desc->log_addr));
+	CSR_XS(csr_base, reg_desc_p->enable_addr, 0);
+	CSR_XS(csr_base, reg_desc_p->clear_addr, -1);
+	CSR_XS(csr_base, reg_desc_p->enable_addr, intr_mask);
+	DBG(DBG_ATTACH, NULL, "%s Mask: 0x%llx\n", reg_desc_p->msg,
+	    CSR_XR(csr_base, reg_desc_p->enable_addr));
+	DBG(DBG_ATTACH, NULL, "%s Status: 0x%llx\n", reg_desc_p->msg,
+	    CSR_XR(csr_base, reg_desc_p->status_addr));
+	DBG(DBG_ATTACH, NULL, "%s Clear: 0x%llx\n", reg_desc_p->msg,
+	    CSR_XR(csr_base, reg_desc_p->clear_addr));
+	if (reg_desc_p->log_addr != NULL) {
+		DBG(DBG_ATTACH, NULL, "%s Log: 0x%llx\n", reg_desc_p->msg,
+		    CSR_XR(csr_base, reg_desc_p->log_addr));
 	}
 }
 
 void
-px_err_reg_disable(px_t *px_p, px_err_id_t id)
+px_err_reg_disable(px_err_id_t reg_id, caddr_t csr_base)
 {
-	px_err_reg_desc_t	*reg_desc = &px_err_reg_tbl[id];
-	caddr_t			csr_base;
-	pxu_t			*pxu_p = (pxu_t *)px_p->px_plat_p;
+	const px_err_reg_desc_t	*reg_desc_p = &px_err_reg_tbl[reg_id];
+	uint64_t		val = (reg_id >= PX_ERR_LPU_LINK) ? -1 : 0;
 
-	/* Get the correct CSR BASE */
-	if (PX_ERR_XBC(id))
-		csr_base = (caddr_t)(uintptr_t)pxu_p->px_address[PX_REG_XBC];
-	else
-		csr_base = (caddr_t)(uintptr_t)pxu_p->px_address[PX_REG_CSR];
+	if (reg_desc_p->log_addr != NULL)
+		CSR_XS(csr_base, reg_desc_p->log_addr, val);
+	CSR_XS(csr_base, reg_desc_p->enable_addr, val);
+}
 
-	reg_desc->enabled = B_FALSE;
+/*
+ * Set up pcie error registers.
+ */
+void
+px_err_reg_setup_pcie(uint8_t chip_mask, caddr_t csr_base, boolean_t enable)
+{
+	px_err_id_t		reg_id;
+	const px_err_reg_desc_t	*reg_desc_p;
+	void (*px_err_reg_func)(px_err_id_t, caddr_t);
 
-	switch (id) {
-	case PX_ERR_JBC:
-	case PX_ERR_UBC:
-	case PX_ERR_MMU:
-	case PX_ERR_IMU:
-	case PX_ERR_TLU_UE:
-	case PX_ERR_TLU_CE:
-	case PX_ERR_TLU_OE:
-	case PX_ERR_ILU:
-		if (reg_desc->log_addr != NULL) {
-			CSR_XS(csr_base, reg_desc->log_addr, 0);
-		}
-		CSR_XS(csr_base, reg_desc->enable_addr, 0);
-		break;
-	case PX_ERR_LPU_LINK:
-	case PX_ERR_LPU_PHY:
-	case PX_ERR_LPU_RX:
-	case PX_ERR_LPU_TX:
-	case PX_ERR_LPU_LTSSM:
-	case PX_ERR_LPU_GIGABLZ:
-		if (reg_desc->log_addr != NULL) {
-			CSR_XS(csr_base, reg_desc->log_addr, -1);
-		}
-		CSR_XS(csr_base, reg_desc->enable_addr, -1);
-		break;
+	/*
+	 * JBC or XBC are enabled during adding of common block interrupts,
+	 * not done here.
+	 */
+	px_err_reg_func = (enable ? px_err_reg_enable : px_err_reg_disable);
+	for (reg_id = 0; reg_id < PX_ERR_REG_KEYS; reg_id++) {
+		reg_desc_p = &px_err_reg_tbl[reg_id];
+		if ((reg_desc_p->chip_mask & chip_mask) &&
+		    (reg_desc_p->reg_bank == PX_REG_CSR))
+			px_err_reg_func(reg_id, csr_base);
 	}
 }
 
@@ -858,7 +849,7 @@ int
 px_err_handle(px_t *px_p, ddi_fm_error_t *derr, int caller,
     boolean_t chk_cb)
 {
-	px_err_ss_t		ss;
+	px_err_ss_t		ss = {0};
 	int			err = PX_OK;
 
 	ASSERT(MUTEX_HELD(&px_p->px_fm_mutex));
@@ -901,48 +892,23 @@ px_err_handle(px_t *px_p, ddi_fm_error_t *derr, int caller,
  * @param chk_cb	boolean on whether to store jbc/ubc register.
  */
 static void
-px_err_snapshot(px_t *px_p, px_err_ss_t *ss, boolean_t chk_cb)
+px_err_snapshot(px_t *px_p, px_err_ss_t *ss_p, boolean_t chk_cb)
 {
 	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
 	caddr_t	xbc_csr_base = (caddr_t)pxu_p->px_address[PX_REG_XBC];
 	caddr_t	pec_csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
-	px_err_reg_desc_t *reg_desc;
-	int reg_id;
+	uint8_t chip_mask = 1 << PX_CHIP_TYPE(pxu_p);
+	const px_err_reg_desc_t *reg_desc_p = px_err_reg_tbl;
+	px_err_id_t reg_id;
 
-	switch (PX_CHIP_TYPE(pxu_p)) {
-	case PX_CHIP_OBERON:
-		reg_id = PX_ERR_UBC;
-		break;
-	case PX_CHIP_FIRE:
-		reg_id = PX_ERR_JBC;
-		break;
-	default:
-		DBG(DBG_ERR_INTR, NULL, "px_err_snapshot - "
-		    "unknown chip type: 0x%x\n", PX_CHIP_TYPE(pxu_p));
-		reg_id = 0;
-		break;
-	}
-
-	/* snapshot CB interrupt status */
-	if (chk_cb == B_TRUE) {
-		reg_desc = &px_err_reg_tbl[reg_id];
-		/* Only look at enabled groups. */
-		if (reg_desc->enabled == B_TRUE)	{
-			ss->err_status[reg_id] = CSR_XR(xbc_csr_base,
-			    reg_desc->status_addr);
-		}
-	} else {
-		ss->err_status[reg_id] = 0;
-	}
-
-	/* snapshot DMC/PEC interrupt status */
-	for (reg_id = 2; reg_id < PX_ERR_REG_KEYS; reg_id += 1) {
-		reg_desc = &px_err_reg_tbl[reg_id];
-		/* Only look at enabled groups. */
-		if (reg_desc->enabled == B_TRUE)	{
-			ss->err_status[reg_id] = CSR_XR(pec_csr_base,
-			    reg_desc->status_addr);
-		}
+	for (reg_id = 0; reg_id < PX_ERR_REG_KEYS; reg_id++, reg_desc_p++) {
+		if (!(reg_desc_p->chip_mask & chip_mask))
+			continue;
+		ss_p->err_status[reg_id] =
+		    (reg_desc_p->reg_bank == PX_REG_CSR) ?
+		    CSR_XR(pec_csr_base, reg_desc_p->status_addr) :
+		    (chk_cb ?
+			CSR_XR(xbc_csr_base, reg_desc_p->status_addr) : 0);
 	}
 }
 
@@ -956,15 +922,15 @@ px_err_snapshot(px_t *px_p, px_err_ss_t *ss, boolean_t chk_cb)
  *
  * @param px_p		leaf in which to take the snap shot.
  * @param derr		fm err in which the ereport is to be based on
- * @param ss		pre-allocated memory to store the snap shot.
+ * @param ss_p		pre-allocated memory to store the snap shot.
  */
 static int
-px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss)
+px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss_p)
 {
 	dev_info_t		*rpdip = px_p->px_dip;
 	pxu_t			*pxu_p = (pxu_t *)px_p->px_plat_p;
 	caddr_t			csr_base;
-	px_err_reg_desc_t	*err_reg_tbl;
+	const px_err_reg_desc_t	*err_reg_tbl;
 	px_err_bit_desc_t	*err_bit_tbl;
 	px_err_bit_desc_t	*err_bit_desc;
 
@@ -974,39 +940,36 @@ px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss)
 
 	int			(*err_handler)();
 	int			(*erpt_handler)();
-	int			reg_id, key;
+	px_err_id_t		reg_id, key;
 	int			err = PX_OK;
 	int			biterr;
 
 	ASSERT(MUTEX_HELD(&px_p->px_fm_mutex));
 
 	/* send erport/handle/clear JBC errors */
-	for (reg_id = 0; reg_id < PX_ERR_REG_KEYS; reg_id += 1) {
+	for (reg_id = 0; reg_id < PX_ERR_REG_KEYS; reg_id++) {
 		/* Get the correct register description table */
 		err_reg_tbl = &px_err_reg_tbl[reg_id];
 
 		/* Only look at enabled groups. */
-		if (err_reg_tbl->enabled != B_TRUE)
+		if (!(BIT_TST(err_reg_tbl->chip_mask, PX_CHIP_TYPE(pxu_p))))
 			continue;
 
 		/* Get the correct CSR BASE */
-		if (PX_ERR_XBC(reg_id))
-			csr_base = (caddr_t)pxu_p->px_address[PX_REG_XBC];
-		else
-			csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
+		csr_base = (caddr_t)pxu_p->px_address[err_reg_tbl->reg_bank];
 
 		/* Get pointers to masks and register addresses */
 		log_mask = err_reg_tbl->log_mask_p;
 		count_mask = err_reg_tbl->count_mask_p;
 		status_addr = err_reg_tbl->status_addr;
 		clear_addr = err_reg_tbl->clear_addr;
-		ss_reg = ss->err_status[reg_id];
+		ss_reg = ss_p->err_status[reg_id];
 
 		/* Get the register BIT description table */
 		err_bit_tbl = err_reg_tbl->err_bit_tbl;
 
 		/* For each known bit in the register send erpt and handle */
-		for (key = 0; key < err_reg_tbl->err_bit_keys; key += 1) {
+		for (key = 0; key < err_reg_tbl->err_bit_keys; key++) {
 			/* Get the bit description table for this register */
 			err_bit_desc = &err_bit_tbl[key];
 
@@ -1063,7 +1026,8 @@ px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss)
  *
  * @param px_p		leaf in which to take the snap shot.
  * @param derr		fm err in which the ereport is to be based on
- * @param ss		pre-allocated memory to store the snap shot.
+ * @param err		fire register error status
+ * @param caller	PX_TRAP_CALL | PX_INTR_CALL | PX_LIB_CALL
  */
 static int
 px_err_check_severity(px_t *px_p, ddi_fm_error_t *derr, int err, int caller)
