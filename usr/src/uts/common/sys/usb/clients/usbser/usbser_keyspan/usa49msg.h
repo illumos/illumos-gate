@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,40 +36,9 @@ typedef struct keyspan_usa49_port_status_msg keyspan_usa49_port_status_msg_t;
  * usa49msg.h
  *
  * Copyright (C) 1998-2000 InnoSys Incorporated.  All Rights Reserved
- * This file is available under a BSD-style copyright
  *
  * Keyspan USB Async Message Formats for the USA49W
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
- *
- * 1. Redistributions of source code must retain this licence text
- * without modification, this list of conditions, and the following
- * disclaimer.	The following copyright notice must appear immediately at
- * the beginning of all source files:
- *
- * Copyright (C) 1998-2000 InnoSys Incorporated.  All Rights Reserved
- *
- * This file is available under a BSD-style copyright
- *
- * 2. The name of InnoSys Incorporated may not be used to endorse or promote
- * products derived from this software without specific prior written
- * permission.
- *
- * THIS SOFTWARE IS PROVIDED BY INNOSYS CORP. ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
- * NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- * 4th revision: USA49W version
  *
  * Buffer formats for RX/TX data messages are not defined by
  * a structure, but are described here:
@@ -129,18 +97,6 @@ typedef struct keyspan_usa49_port_status_msg keyspan_usa49_port_status_msg_t;
  *	with a status message, but no further status will be sent
  *	until a control messages with enablePort is sent
  *
- * revision history:
- *
- * 1999feb10	add reportHskiaChanges to allow us to ignore them
- * 1999feb10	add txAckThreshold for fast+loose throughput enhancement
- * 1999mar30	beef up support for RX error reporting
- * 1999apr14	add resetDataToggle to control message
- * 2000jan04	merge with usa17msg.h
- * 2000mar08	clone from usa26msg.h -> usa49msg.h
- * 2000mar09	change to support 4 ports
- * 2000may03	change external clocking to match USA-49W hardware
- * 2000jun01	add extended BSD-style copyright text
- * 2001jul05	change message format to improve OVERRUN case
  */
 
 /*
