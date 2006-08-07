@@ -264,9 +264,6 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (px_get_props(px_p, dip) == DDI_FAILURE)
 			goto err_bad_px_prop;
 
-		if ((px_fm_attach(px_p)) != DDI_SUCCESS)
-			goto err_bad_fm;
-
 		if (px_lib_dev_init(dip, &dev_hdl) != DDI_SUCCESS)
 			goto err_bad_dev_init;
 
@@ -302,14 +299,17 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			goto err_bad_pec;
 
 		if ((px_dma_attach(px_p)) != DDI_SUCCESS)
-			goto err_bad_pec; /* nothing to uninitialize on DMA */
+			goto err_bad_dma; /* nothing to uninitialize on DMA */
 
 		/*
 		 * All of the error handlers have been registered
 		 * by now so it's time to activate the interrupt.
 		 */
 		if ((ret = px_err_add_intr(&px_p->px_fault)) != DDI_SUCCESS)
-			goto err_bad_pec_add_intr;
+			goto err_bad_dma;
+
+		if ((px_fm_attach(px_p)) != DDI_SUCCESS)
+			goto err_bad_fm;
 
 		(void) px_init_hotplug(px_p);
 
@@ -353,8 +353,10 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 err_bad_pcitool_node:
 		ddi_remove_minor_node(dip, "devctl");
 err_bad_devctl_node:
+		px_fm_detach(px_p);
+err_bad_fm:
 		px_err_rem_intr(&px_p->px_fault);
-err_bad_pec_add_intr:
+err_bad_dma:
 		px_pec_detach(px_p);
 err_bad_pec:
 		px_msi_detach(px_p);
@@ -369,8 +371,6 @@ err_bad_cb:
 err_bad_ib:
 		(void) px_lib_dev_fini(dip);
 err_bad_dev_init:
-		px_fm_detach(px_p);
-err_bad_fm:
 		px_free_props(px_p);
 err_bad_px_prop:
 		mutex_destroy(&px_p->px_mutex);
@@ -456,6 +456,7 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		pxtool_uninit(dip);
 
 		ddi_remove_minor_node(dip, "devctl");
+		px_fm_detach(px_p);
 		px_err_rem_intr(&px_p->px_fault);
 		px_pec_detach(px_p);
 		px_pwr_teardown(dip);
@@ -466,7 +467,6 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		px_cb_detach(px_p);
 		px_ib_detach(px_p);
 		(void) px_lib_dev_fini(dip);
-		px_fm_detach(px_p);
 
 		/*
 		 * Free the px soft state structure and the rest of the
