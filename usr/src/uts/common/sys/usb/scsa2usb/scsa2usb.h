@@ -101,6 +101,43 @@ extern "C" {
 #define	MS_OTI_DEVICE_6828	0x6828	/* PID for 6828 flash disk */
 
 /*
+ * The AMI virtual floppy device is not a real USB storage device, but
+ * emulated by the SP firmware shipped together with important Sun x86
+ * products such as Galaxy and Thumper platforms. The device causes
+ * very long delay in boot process of these platforms which is a big
+ * performance issue. Improvement in firmware may solve the issue, but
+ * before the firmware is fixed, it needs to be taken care of by software
+ * to avoid the huge impact on user experience.
+ *
+ * The long boot delay is caused by timeouts and retries of READ CAPACITY
+ * command issued to the device. The device is a USB ufi subclass device
+ * using CBI protocol. When READ CAPACITY command is issued, the device
+ * returns STALL on the bulk endpoint during the data stage, however, it
+ * doesn't return status on the intr pipe during status stage, so the intr
+ * pipe can only fail with timeout.
+ *
+ * Reducing timeout value to 1 second can help a little bit, but the delay
+ * is still noticeable, because the target driver would make many retries
+ * for this command. It is not desirable to mess with the target driver
+ * for a broken USB device. So adding the device to the scsa2usb blacklist
+ * is the best choice we have.
+ *
+ * It is found that the READ CAPACITY failure only happens when there is
+ * no media in the floppy drive. When there is a media, the device works
+ * just fine. So READ CAPACITY command cannot be arbitrarily disabled.
+ * Media status needs to be checked before issuing the command by sending
+ * an additional TEST UNIT READY command. If TEST UNIT READY command
+ * return STATUS_GOOD, it means the media is ready and then READ CAPACITY
+ * can be issued.
+ *
+ * SCSA2USB_ATTRS_NO_MEDIA_CHECK is added below for this purpose. It is
+ * overrided in scsa2usb.c for the AMI virtual floppy device to take care
+ * of the special need.
+ */
+#define	MS_AMI_VID		0x46b	/* VendorId of AMI */
+#define	MS_AMI_VIRTUAL_FLOPPY	0xff40	/* PID for AMI virtual floppy */
+
+/*
  * List the attributes that need special case in the driver
  * SCSA2USB_ATTRS_GET_LUN: Bulk Only Transport Get_Max_Lun class specific
  *		command is not implemented by these devices
@@ -120,6 +157,8 @@ extern "C" {
  * SCSA2USB_ATTRS_USE_CSW_RESIDUE: Some devices report false residue in
  *		the CSW of bulk-only transfer status stage though data
  *		was successfully transfered, so need to ignore residue.
+ * SCSA2USB_ATTRS_NO_MEDIA_CHECK: AMI Virtual Floppy devices need to
+ *		check if media is ready before issuing READ CAPACITY.
  *
  * NOTE: If a device simply STALLs the GET_MAX_LUN BO class-specific command
  * and recovers then it will not be added to the scsa2usb_blacklist[] table
@@ -138,6 +177,7 @@ extern "C" {
 #define	SCSA2USB_ATTRS_MODE_SENSE	0x200	/* SCMD_MODE_SENSE */
 #define	SCSA2USB_ATTRS_INQUIRY		0x400	/* SCMD_INQUIRY */
 #define	SCSA2USB_ATTRS_USE_CSW_RESIDUE	0x800	/* for residue checking */
+#define	SCSA2USB_ATTRS_NO_MEDIA_CHECK	0x1000	/* for media checking */
 #define	SCSA2USB_ATTRS_REDUCED_CMD	\
 	(SCSA2USB_ATTRS_DOORLOCK|SCSA2USB_ATTRS_MODE_SENSE| \
 	SCSA2USB_ATTRS_START_STOP|SCSA2USB_ATTRS_INQUIRY| \
@@ -412,6 +452,8 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", usb_bulk_req_t))
 #define	ADDR2SCSA2USB(ap)	(TRAN2SCSA2USB(ADDR2TRAN(ap)))
 
 #define	PKT_PRIV_LEN		16
+
+#define	PKT_DEFAULT_TIMEOUT	5
 
 /*
  * auto request sense

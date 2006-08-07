@@ -79,6 +79,7 @@ static int	scsa2usb_fake_inquiry(scsa2usb_state_t *,
 					scsa2usb_cmd_t *, uint_t);
 static void	scsa2usb_do_inquiry(scsa2usb_state_t *,
 						uint_t, uint_t);
+static int	scsa2usb_do_tur(scsa2usb_state_t *, struct scsi_address *);
 
 /* override property handling */
 static void	scsa2usb_override(scsa2usb_state_t *);
@@ -342,6 +343,10 @@ static struct blacklist {
 	/* OTi6828 Flash Disk */
 	{MS_OTI_VID, MS_OTI_DEVICE_6828, 0,
 	    SCSA2USB_ATTRS_USE_CSW_RESIDUE},
+
+	/* AMI Virtual Floppy */
+	{MS_AMI_VID, MS_AMI_VIRTUAL_FLOPPY, 0,
+	    SCSA2USB_ATTRS_NO_MEDIA_CHECK},
 };
 
 
@@ -2431,7 +2436,7 @@ scsa2usb_scsi_init_pkt(struct scsi_address *ap,
 		/* nothing to do */
 	}
 
-	if (bp) {
+	if (bp && (bp->b_bcount != 0)) {
 		if ((bp_mapin_common(bp, (callback == SLEEP_FUNC) ?
 		    VM_SLEEP : VM_NOSLEEP)) == NULL) {
 			if (pkt != in_pkt) {
@@ -3293,6 +3298,77 @@ scsa2usb_handle_scsi_cmd_sub_class(scsa2usb_state_t *scsa2usbp,
 
 
 /*
+ * scsa2usb_do_tur is performed before READ CAPACITY command is issued.
+ * It returns media status, 0 for media ready, -1 for media not ready
+ * or other errors.
+ */
+static int
+scsa2usb_do_tur(scsa2usb_state_t *scsa2usbp, struct scsi_address *ap)
+{
+	struct scsi_pkt		*pkt;
+	scsa2usb_cmd_t		*turcmd;
+	int			rval = -1;
+
+	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
+	    "scsa2usb_do_tur:");
+
+	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
+
+	mutex_exit(&scsa2usbp->scsa2usb_mutex);
+	if ((pkt = scsi_init_pkt(ap, NULL, NULL, CDB_GROUP0, 1,
+	    PKT_PRIV_LEN, PKT_CONSISTENT, SLEEP_FUNC, NULL)) == NULL) {
+		mutex_enter(&scsa2usbp->scsa2usb_mutex);
+		USB_DPRINTF_L2(DPRINT_MASK_SCSA,
+		    scsa2usbp->scsa2usb_log_handle,
+		    "scsa2usb_do_tur: init pkt failed");
+
+		return (rval);
+	}
+
+	RQ_MAKECOM_G0(pkt, FLAG_HEAD | FLAG_NODISCON,
+	    (char)SCMD_TEST_UNIT_READY, 0, 0);
+
+	pkt->pkt_comp = NULL;
+	pkt->pkt_time = PKT_DEFAULT_TIMEOUT;
+	turcmd = PKT2CMD(pkt);
+
+	mutex_enter(&scsa2usbp->scsa2usb_mutex);
+	scsa2usb_prepare_pkt(scsa2usbp, turcmd->cmd_pkt);
+
+	if (scsa2usb_cmd_transport(scsa2usbp, turcmd) != TRAN_ACCEPT) {
+		USB_DPRINTF_L2(DPRINT_MASK_SCSA,
+		    scsa2usbp->scsa2usb_log_handle,
+		    "scsa2usb_do_tur: cmd transport failed, "
+		    "pkt_reason=0x%x", turcmd->cmd_pkt->pkt_reason);
+	} else if (*(turcmd->cmd_pkt->pkt_scbp) != STATUS_GOOD) {
+		/*
+		 * Theoretically, the sense data should be retrieved and
+		 * sense key be checked when check condition happens. If
+		 * the sense key is UNIT ATTENTION, TEST UNIT READY cmd
+		 * needs to be sent again to clear the UNIT ATTENTION and
+		 * another TUR to be sent to get the real media status.
+		 * But the AMI virtual floppy device simply cannot recover
+		 * from UNIT ATTENTION by re-sending a TUR cmd, so it
+		 * doesn't make any difference whether to check sense key
+		 * or not. Just ignore sense key checking here and assume
+		 * the device is NOT READY.
+		 */
+		USB_DPRINTF_L2(DPRINT_MASK_SCSA,
+		    scsa2usbp->scsa2usb_log_handle,
+		    "scsa2usb_do_tur: media not ready");
+	} else {
+		rval = 0;
+	}
+
+	mutex_exit(&scsa2usbp->scsa2usb_mutex);
+	scsi_destroy_pkt(pkt);
+	mutex_enter(&scsa2usbp->scsa2usb_mutex);
+
+	return (rval);
+}
+
+
+/*
  * scsa2usb_check_ufi_blacklist_attrs:
  *	validate "scsa2usb_blacklist_attrs" (see scsa2usb.h)
  *	if blacklisted attrs match accept the request
@@ -3340,6 +3416,33 @@ scsa2usb_check_ufi_blacklist_attrs(scsa2usb_state_t *scsa2usbp, uchar_t opcode,
 		 */
 		if (!(scsa2usbp->scsa2usb_attrs & SCSA2USB_ATTRS_START_STOP)) {
 			rval = SCSA2USB_JUST_ACCEPT;
+		}
+		break;
+	case SCMD_READ_CAPACITY:
+		/*
+		 * Some devices don't support READ CAPACITY command
+		 * when media is not ready. Need to check media status
+		 * before issuing the cmd to such device.
+		 */
+		if (!(scsa2usbp->scsa2usb_attrs &
+		    SCSA2USB_ATTRS_NO_MEDIA_CHECK)) {
+			struct scsi_pkt *pkt = cmd->cmd_pkt;
+
+			ASSERT(scsa2usbp->scsa2usb_cur_pkt == pkt);
+			scsa2usbp->scsa2usb_cur_pkt = NULL;
+
+			if (scsa2usb_do_tur(scsa2usbp,
+			    &pkt->pkt_address) != 0) {
+				/* media not ready, force cmd invalid */
+				if (cmd->cmd_bp) {
+					cmd->cmd_pkt->pkt_resid =
+					    cmd->cmd_bp->b_bcount;
+				}
+				scsa2usb_force_invalid_request(scsa2usbp, cmd);
+				rval = SCSA2USB_JUST_ACCEPT;
+			}
+
+			scsa2usbp->scsa2usb_cur_pkt = pkt;
 		}
 		break;
 	default:
