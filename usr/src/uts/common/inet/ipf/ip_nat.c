@@ -1355,7 +1355,7 @@ int getlock;
 	if (nat->nat_dir == NAT_OUTBOUND) {
 		fin.fin_data[0] = ntohs(nat->nat_oport);
 		fin.fin_data[1] = ntohs(nat->nat_outport);
-		fin.fin_ifp = nat->nat_ifps[1];
+		fin.fin_ifp = nat->nat_ifps[0];
 		if (getlock) {
 			READ_ENTER(&ipf_nat);
 		}
@@ -1371,12 +1371,12 @@ int getlock;
 	} else if (nat->nat_dir == NAT_INBOUND) {
 		fin.fin_data[0] = ntohs(nat->nat_inport);
 		fin.fin_data[1] = ntohs(nat->nat_oport);
-		fin.fin_ifp = nat->nat_ifps[0];
+		fin.fin_ifp = nat->nat_ifps[1];
 		if (getlock) {
 			READ_ENTER(&ipf_nat);
 		}
 		n = nat_outlookup(&fin, nat->nat_flags, fin.fin_p,
-			nat->nat_outip, nat->nat_oip);
+			nat->nat_inip, nat->nat_oip);
 		if (getlock) {
 			RWLOCK_EXIT(&ipf_nat);
 		}
@@ -2357,7 +2357,12 @@ int direction;
 
 	np = ni->nai_np;
 
-	COPYIFNAME(fin->fin_ifp, nat->nat_ifnames[0]);
+	if (np->in_ifps[0] != NULL) {
+		(void) COPYIFNAME(np->in_ifps[0], nat->nat_ifnames[0]);
+	}
+	if (np->in_ifps[1] != NULL) {
+		(void) COPYIFNAME(np->in_ifps[1], nat->nat_ifnames[1]);
+	}
 #ifdef	IPFILTER_SYNC
 	if ((nat->nat_flags & SI_CLONE) == 0)
 		nat->nat_sync = ipfsync_new(SMC_NAT, fin, nat);
@@ -2365,7 +2370,8 @@ int direction;
 
 	nat->nat_me = natsave;
 	nat->nat_dir = direction;
-	nat->nat_ifps[0] = fin->fin_ifp;
+	nat->nat_ifps[0] = np->in_ifps[0];
+	nat->nat_ifps[1] = np->in_ifps[1];
 	nat->nat_ptr = np;
 	nat->nat_p = fin->fin_p;
 	nat->nat_mssclamp = np->in_mssclamp;
@@ -3052,17 +3058,13 @@ struct in_addr src , mapdst;
 	hv = NAT_HASH_FN(src.s_addr, hv + sport, ipf_nattable_sz);
 	nat = nat_table[1][hv];
 	for (; nat; nat = nat->nat_hnext[1]) {
-		nflags = nat->nat_flags;
+		if (nat->nat_ifps[0] != NULL) {
+			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
+				continue;
+		} else if (ifp != NULL)
+			nat->nat_ifps[0] = ifp;
 
-		if (ifp != NULL) {
-			if (nat->nat_dir == NAT_REDIRECT) {
-				if (ifp != nat->nat_ifps[0])
-					continue;
-			} else {
-				if (ifp != nat->nat_ifps[1])
-					continue;
-			}
-		}
+		nflags = nat->nat_flags;
 
 		if (nat->nat_oip.s_addr == src.s_addr &&
 		    nat->nat_outip.s_addr == dst &&
@@ -3127,15 +3129,11 @@ find_in_wild_ports:
 
 	nat = nat_table[1][hv];
 	for (; nat; nat = nat->nat_hnext[1]) {
-		if (ifp != NULL) {
-			if (nat->nat_dir == NAT_REDIRECT) {
-				if (ifp != nat->nat_ifps[0])
-					continue;
-			} else {
-				if (ifp != nat->nat_ifps[1])
-					continue;
-			}
-		}
+		if (nat->nat_ifps[0] != NULL) {
+			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
+				continue;
+		} else if (ifp != NULL)
+			nat->nat_ifps[0] = ifp;
 
 		if (nat->nat_p != fin->fin_p)
 			continue;
@@ -3271,8 +3269,16 @@ struct in_addr src , dst;
 	int nflags;
 	void *ifp;
 	u_int hv;
+	frentry_t *fr;
 
-	ifp = fin->fin_ifp;
+	fr = fin->fin_fr;
+
+	if ((fr != NULL) && !(fr->fr_flags & FR_DUP) &&
+		fr->fr_tif.fd_ifp && fr->fr_tif.fd_ifp != (void *)-1)
+		ifp = fr->fr_tif.fd_ifp;
+	else
+		ifp = fin->fin_ifp;
+
 	srcip = src.s_addr;
 	sflags = flags & IPN_TCPUDPICMP;
 	sport = 0;
@@ -3302,18 +3308,14 @@ struct in_addr src , dst;
 	hv = NAT_HASH_FN(dst.s_addr, hv + dport, ipf_nattable_sz);
 	nat = nat_table[0][hv];
 	for (; nat; nat = nat->nat_hnext[0]) {
+		if (nat->nat_ifps[1] != NULL) {
+			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
+				continue;
+		} else if (ifp != NULL)
+			nat->nat_ifps[1] = ifp;
+
 		nflags = nat->nat_flags;
-
-		if (ifp != NULL) {
-			if (nat->nat_dir == NAT_REDIRECT) {
-				if (ifp != nat->nat_ifps[1])
-					continue;
-			} else {
-				if (ifp != nat->nat_ifps[0])
-					continue;
-			}
-		}
-
+ 
 		if (nat->nat_inip.s_addr == srcip &&
 		    nat->nat_oip.s_addr == dst.s_addr &&
 		    (((p == 0) && (sflags == (nflags & NAT_TCPUDPICMP)))
@@ -3367,15 +3369,11 @@ find_out_wild_ports:
 
 	nat = nat_table[0][hv];
 	for (; nat; nat = nat->nat_hnext[0]) {
-		if (ifp != NULL) {
-			if (nat->nat_dir == NAT_REDIRECT) {
-				if (ifp != nat->nat_ifps[1])
-					continue;
-			} else {
-				if (ifp != nat->nat_ifps[0])
-					continue;
-			}
-		}
+		if (nat->nat_ifps[1] != NULL) {
+			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
+			continue;
+		} else if (ifp != NULL)
+			nat->nat_ifps[1] = ifp;
 
 		if (nat->nat_p != fin->fin_p)
 			continue;
@@ -3685,7 +3683,7 @@ maskloop:
 		hv = NAT_HASH_FN(iph, 0, ipf_natrules_sz);
 		for (np = nat_rules[hv]; np; np = np->in_mnext)
 		{
-			if ((np->in_ifps[0] && (np->in_ifps[0] != ifp)))
+			if ((np->in_ifps[1] && (np->in_ifps[1] != ifp)))
 				continue;
 			if (np->in_v != fin->fin_v)
 				continue;
