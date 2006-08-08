@@ -263,7 +263,6 @@ create_target(xml_node_t *x)
 		    target_basedir, name);
 		unlink(path);
 		xml_remove_child(targets_config, n, MatchBoth);
-		xml_tree_free(n);
 	} else
 		xml_remove_child(c, l, MatchBoth);
 

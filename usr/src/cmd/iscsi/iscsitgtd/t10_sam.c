@@ -1918,9 +1918,9 @@ load_params(t10_lu_common_t *lu, char *basedir)
 			lu->l_state = lu_offline;
 		else if (strcmp(str, TGT_STATUS_ERRORED) == 0)
 			lu->l_state = lu_errored;
+		free(str);
 	} else
 		lu->l_state = lu_online;
-	free(str);
 
 	/*
 	 * If offline, we need to check to see if there's an initialization

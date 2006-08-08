@@ -676,9 +676,9 @@ make_login_response(iscsi_conn_t *c, iscsi_login_hdr_t *lhp)
 	(void) pthread_mutex_lock(&c->c_mutex);
 	r->statsn		= htonl(c->c_statsn++);
 	(void) pthread_mutex_unlock(&c->c_mutex);
-	/* ---- cmdsn is not advanced during login ---- */
 	(void) pthread_mutex_lock(&c->c_sess->s_mutex);
-	r->expcmdsn		= htonl(c->c_sess->s_seencmdsn + 1);
+	/* ---- cmdsn is not advanced during login ---- */
+	r->expcmdsn		= htonl(c->c_sess->s_seencmdsn);
 	r->maxcmdsn		= htonl(c->c_sess->s_seencmdsn + 1);
 	(void) pthread_mutex_unlock(&c->c_sess->s_mutex);
 

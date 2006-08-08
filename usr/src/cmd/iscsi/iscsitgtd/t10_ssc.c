@@ -138,10 +138,6 @@ ssc_init_per(t10_lu_impl_t *itl)
 		itl->l_cmd	= spc_cmd_offline;
 	itl->l_data		= ssc_data;
 	itl->l_cmd_table	= ssc_table;
-
-	itl->l_status		= KEY_UNIT_ATTENTION;
-	itl->l_asc		= SPC_ASC_PWR_ON;
-	itl->l_ascq		= SPC_ASCQ_PWR_ON;
 }
 
 /*

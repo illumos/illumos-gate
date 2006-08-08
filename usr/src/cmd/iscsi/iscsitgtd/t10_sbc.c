@@ -164,13 +164,6 @@ sbc_init_per(t10_lu_impl_t *itl)
 	itl->l_data	= sbc_data;
 	itl->l_cmd_table = lba_table;
 
-	/*
-	 * The first time an I_T nexus connects to a LU it is supposed
-	 * to receive an unit attention upon the first command sent.
-	 */
-	itl->l_status	= KEY_UNIT_ATTENTION;
-	itl->l_asc	= 0x29;
-	itl->l_ascq	= 0x01;
 }
 
 void
