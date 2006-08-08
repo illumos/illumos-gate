@@ -78,16 +78,20 @@ function cleanup
 
 function getsize
 {
-	# Estimate image size, add %10 overhead for ufs stuff
-	total_size=0
-	for file in $filelist
-	do
-		if [ -e "$ALT_ROOT/$file" ] ; then
-			du -sk "$ALT_ROOT/$file" | read size name
-			(( total_size += size ))
-		fi
-	done
-	(( total_size += total_size * 10 / 100 ))
+	# Estimate image size and add %10 overhead for ufs stuff.
+	# Note, we can't use du here in case we're on a filesystem, e.g. zfs,
+	# in which the disk usage is less than the sum of the file sizes.
+	# The nawk code 
+	#
+	#	{t += ($7 % 1024) ? (int($7 / 1024) + 1) * 1024 : $7}
+	#
+	# below rounds up the size of a file/directory, in bytes, to the
+	# next multiple of 1024.  This mimics the behavior of ufs especially
+	# with directories.  This results in a total size that's slightly
+	# bigger than if du was called on a ufs directory.
+	total_size=$(find $filelist -ls 2>/dev/null | nawk '
+	    {t += ($7 % 1024) ? (int($7 / 1024) + 1) * 1024 : $7}
+	    END {print int(t * 1.10 / 1024)}')
 }
 
 function create_ufs
@@ -222,7 +226,8 @@ fi
 # sanity check the archive before moving it into place
 # the file type check also establishes that the file exists at all
 #
-ARCHIVE_SIZE=`du -k "$ALT_ROOT/$BOOT_ARCHIVE-new" | cut -f 1`
+ARCHIVE_SIZE=$(/bin/ls -l "$ALT_ROOT/$BOOT_ARCHIVE-new" |
+	nawk '{print int($5 / 1024)}')
 file "$ALT_ROOT/$BOOT_ARCHIVE-new" | grep gzip > /dev/null
 
 if [ $? = 1 ] && [ -x /usr/bin/gzip ] || [ $ARCHIVE_SIZE -lt 5000 ]; then

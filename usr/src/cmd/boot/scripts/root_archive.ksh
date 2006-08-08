@@ -242,8 +242,20 @@ pack()
 		exit 1
 	fi
 
-	size=`du -sk "$UNPACKED_ROOT" | ( read size name; echo $size )`
-	size=`expr "$EXTRA_SPACE" \* 1024 + $size + \( $size \* 10 \) / 100`
+	# Estimate image size and add %10 overhead for ufs stuff.
+	# Note, we can't use du here in case $UNPACKED_ROOT is on a filesystem,
+	# e.g. zfs, in which the disk usage is less than the sum of the file
+	# sizes.  The nawk code 
+	#
+	#	{t += ($7 % 1024) ? (int($7 / 1024) + 1) * 1024 : $7}
+	#
+	# below rounds up the size of a file/directory, in bytes, to the
+	# next multiple of 1024.  This mimics the behavior of ufs especially
+	# with directories.  This results in a total size that's slightly
+	# bigger than if du was called on a ufs directory.
+	size=$(find "$UNPACKED_ROOT" -ls | nawk '
+	    {t += ($7 % 1024) ? (int($7 / 1024) + 1) * 1024 : $7}
+	    END {print int(t * 1.10 / 1024)}')
 
 	/usr/sbin/mkfile ${size}k "$TMR"
 
