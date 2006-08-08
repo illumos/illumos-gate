@@ -799,12 +799,24 @@ workaround_errata(struct cpu *cpu)
 		 */
 		if ((opteron_erratum_131 == 0) && ((lgrp_plat_node_cnt *
 		    cpuid_get_ncpu_per_chip(cpu)) >= 4)) {
+			uint64_t nbcfg;
+			uint64_t wabits;
+
 			/*
-			 * Workaround is to print a warning to upgrade
-			 * the BIOS
+			 * Print a warning if neither of the workarounds
+			 * for Erratum 131 is present.
 			 */
-			if (!(rdmsr(MSR_AMD_NB_CFG) & AMD_NB_CFG_SRQ_HEARTBEAT))
+
+			wabits = AMD_NB_CFG_SRQ_HEARTBEAT |
+			    AMD_NB_CFG_SRQ_SPR;
+
+			nbcfg = rdmsr(MSR_AMD_NB_CFG);
+			if ((nbcfg & wabits) == 0) {
 				opteron_erratum_131++;
+			} else {
+				/* cannot have both workarounds set */
+				ASSERT((nbcfg & wabits) != wabits);
+			}
 		}
 	}
 #endif

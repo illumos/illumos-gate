@@ -2012,7 +2012,7 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 121:
 		return (B(eax) || SH_C0(eax) || CG(eax) || D0(eax) || EX(eax));
 	case 122:
-		return (SH_C0(eax) || CG(eax) || D0(eax) || EX(eax));
+		return (1);
 	case 123:
 		return (JH_E1(eax) || BH_E4(eax) || JH_E6(eax));
 	case 131:

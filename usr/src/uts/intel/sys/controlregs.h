@@ -154,6 +154,7 @@ extern "C" {
 #define	MSR_BU_CFG	0xc0011023
 
 #define	AMD_NB_CFG_SRQ_HEARTBEAT	(UINT64_C(1) << 20)
+#define	AMD_NB_CFG_SRQ_SPR		(UINT64_C(1) << 32)
 
 /* AMD */
 #define	MSR_AMD_PATCHLEVEL	0x8b
