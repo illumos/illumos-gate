@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -837,8 +836,12 @@ login_conv(int num_msg, struct pam_message **msg,
 		switch (m->msg_style) {
 
 		case PAM_PROMPT_ECHO_OFF:
+			errno = 0;
 			temp = getpassphrase(m->msg);
 			if (temp != NULL) {
+				if (errno == EINTR)
+					return (PAM_CONV_ERR);
+
 				r->resp = strdup(temp);
 				if (r->resp == NULL) {
 					/* free responses */
