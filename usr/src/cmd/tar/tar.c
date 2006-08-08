@@ -4324,19 +4324,24 @@ readtape(char *buffer)
 			    "tar: tape read error\n"));
 			done(3);
 		/*
-		 * i == 0 means EOF reached and !rflag means that when
-		 * tar command uses 'r' as a function letter, we are trying
-		 * to update or replace an empty tar file which will fail.
-		 * So this fix is not for 'r' function letter.
+		 * i == 0 and !rflag means that EOF is reached and we are
+		 * trying to update or replace an empty tar file, so exit
+		 * with an error.
+		 *
+		 * If i == 0 and !first and NotTape, it means the pointer
+		 * has gone past the EOF. It could happen if two processes
+		 * try to update the same tar file simultaneously. So exit
+		 * with an error.
 		 */
-		} else if (i == 0 && !rflag) {
-				if (first) {
-					(void) fprintf(stderr, gettext(
-					    "tar: blocksize = %d\n"), i);
-					done(Errflg);
-				}
-				else
-					mterr("read", 0, 2);
+
+		} else if (i == 0) {
+			if (first && !rflag) {
+				(void) fprintf(stderr, gettext(
+				    "tar: blocksize = %d\n"), i);
+				done(Errflg);
+			} else if (!first && (!rflag || NotTape)) {
+				mterr("read", 0, 2);
+			}
 		} else if ((!first || Bflag) && i != TBLOCK*j) {
 			/*
 			 * Short read - try to get the remaining bytes.
