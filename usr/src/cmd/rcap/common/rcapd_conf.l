@@ -3,9 +3,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,11 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma	ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -259,4 +258,90 @@ rcfg_init(rcfg_t *rcfg)
 	rcfg->rcfg_rss_sample_interval = 5;
 	rcfg->rcfg_memory_cap_enforcement_pressure = 0;
 	(void) strcpy(rcfg->rcfg_stat_file, STAT_FILE_DEFAULT);
+}
+
+/*
+ * Create the configuration file given the rcfg_t structure. If a rcfg_t
+ * structure is NULL, create the configuration file with default parameters.
+ */
+void
+create_config_file(rcfg_t *conf)
+{
+	char *fname = RCAPD_DEFAULT_CONF_FILE;
+	char *template;
+	FILE *fp;
+	mode_t	mode = S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH;
+	int fd, olderrno, create_default = 0;
+
+	if (conf == NULL) {
+		create_default = 1;
+		if ((conf = malloc(sizeof (*conf))) == NULL)
+			die(gettext("memory allocation failure"));
+
+		/* Initialize config file with default parameters */
+		rcfg_init(conf);
+		conf->rcfg_mode_name = "project";
+	}
+
+	if ((template = malloc(strlen(fname) +
+	    strlen(CFG_TEMPLATE_SUFFIX) + 1)) == NULL)
+		die(gettext("memory allocation failure"));
+
+	(void) strcpy(template, fname);
+	(void) strcat(template, CFG_TEMPLATE_SUFFIX);
+
+	if ((fd = mkstemp(template)) < 0)
+		die(gettext("failed to create a temporary file %s"),
+		    template);
+
+	if ((fp = fdopen(fd, "w")) == NULL) {
+		olderrno = errno;
+		(void) close(fd);
+		if (unlink(template) < 0)
+			warn(gettext("could not unlink temp file %s"),
+			    template);
+		errno = olderrno;
+		die(gettext("Failed to open output file %s"), template);
+	}
+
+	(void) fputs("#\n# rcap.conf\n#\n"
+	    "# Configuration parameters for resource capping daemon.\n"
+	    "# Do NOT edit by hand -- use rcapadm(1m) instead.\n"
+	    "#\n", fp);
+	(void) fprintf(fp, "RCAPD_MEMORY_CAP_ENFORCEMENT_PRESSURE  "
+	    "= %d\n", conf->rcfg_memory_cap_enforcement_pressure);
+	(void) fprintf(fp, "RCAPD_RECONFIGURATION_INTERVAL         "
+	    "= %d\n", conf->rcfg_reconfiguration_interval);
+	(void) fprintf(fp, "RCAPD_PROC_WALK_INTERVAL               "
+	    "= %d\n", conf->rcfg_proc_walk_interval);
+	(void) fprintf(fp, "RCAPD_REPORT_INTERVAL                  "
+	    "= %d\n", conf->rcfg_report_interval);
+	(void) fprintf(fp, "RCAPD_RSS_SAMPLE_INTERVAL              "
+	    "= %d\n", conf->rcfg_rss_sample_interval);
+
+	if (fchmod(fd, mode) != 0) {
+		olderrno = errno;
+		(void) fclose(fp);
+		if (unlink(template) < 0)
+			warn(gettext("could not unlink temp file %s"),
+			    template);
+		errno = olderrno;
+		die(gettext("failed to fchmod %s to %o"), template, mode);
+	}
+
+	if (rename(template, fname) != 0) {
+		olderrno = errno;
+		(void) fclose(fp);
+		if (unlink(template) < 0)
+			warn(gettext("could not unlink temp file %s"),
+			    template);
+		errno = olderrno;
+		die(gettext("could not rename temporary file to %s"), fname);
+	}
+
+	(void) fclose(fp);
+	free(template);
+
+	if (create_default == 1)
+		free(conf);
 }

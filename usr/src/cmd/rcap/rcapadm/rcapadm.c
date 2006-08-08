@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +45,6 @@
 #include "rcapd_conf.h"
 #include "rcapd_stat.h"
 
-#define	CFG_TEMPLATE_SUFFIX	".XXXXXX"	/* suffix of mkstemp() arg */
 #define	RCAP_FMRI		"system/rcap:default"
 
 static void
@@ -140,10 +138,9 @@ out:
 int
 main(int argc, char *argv[])
 {
-	char *subopts, *optval, *template;
+	char *subopts, *optval;
 	int modified = 0;
-	FILE *fp;
-	int fd, olderrno, opt;
+	int opt;
 
 	(void) setprogname("rcapadm");
 	(void) setlocale(LC_ALL, "");
@@ -221,10 +218,6 @@ main(int argc, char *argv[])
 		}
 		rcfg_init(&conf);
 		conf.rcfg_mode_name = "project";
-		conf.rcfg_reconfiguration_interval = 60;
-		conf.rcfg_proc_walk_interval = 15;
-		conf.rcfg_report_interval = 5;
-		conf.rcfg_rss_sample_interval = 5;
 	} else {
 		/*
 		 * The configuration file has been read.  Warn that any lnode
@@ -251,55 +244,11 @@ main(int argc, char *argv[])
 		if (sample_interval >= 0)
 			conf.rcfg_rss_sample_interval = sample_interval;
 
-		if ((template = malloc(strlen(fname) +
-		    strlen(CFG_TEMPLATE_SUFFIX) + 1)) == NULL)
-			die(gettext("memory allocation failure"));
-		(void) strcpy(template, fname);
-		(void) strcpy(template + strlen(template), CFG_TEMPLATE_SUFFIX);
-		if ((fd = mkstemp(template)) < 0)
-			die("%s", template);
-		if ((fp = fdopen(fd, "w")) == NULL) {
-			olderrno = errno;
-			(void) close(fd);
-			(void) unlink(template);
-			errno = olderrno;
-			die("%s", template);
-			return (E_ERROR);
-		}
-		(void) fputs("#\n# rcap.conf\n#\n"
-		    "# Configuration parameters for resource capping daemon.\n"
-		    "# Do NOT edit by hand -- use rcapadm(1m) instead.\n"
-		    "#\n", fp);
-		(void) fprintf(fp, "RCAPD_MEMORY_CAP_ENFORCEMENT_PRESSURE  "
-		    "= %d\n", conf.rcfg_memory_cap_enforcement_pressure);
-		(void) fprintf(fp, "RCAPD_RECONFIGURATION_INTERVAL         "
-		    "= %d\n", conf.rcfg_reconfiguration_interval);
-		(void) fprintf(fp, "RCAPD_PROC_WALK_INTERVAL               "
-		    "= %d\n", conf.rcfg_proc_walk_interval);
-		(void) fprintf(fp, "RCAPD_REPORT_INTERVAL                  "
-		    "= %d\n", conf.rcfg_report_interval);
-		(void) fprintf(fp, "RCAPD_RSS_SAMPLE_INTERVAL              "
-		    "= %d\n", conf.rcfg_rss_sample_interval);
-		if (fchmod(fd, 0644) != 0) {
-			olderrno = errno;
-			(void) close(fd);
-			(void) fclose(fp);
-			(void) unlink(template);
-			errno = olderrno;
-			die("%s", template);
-		}
-		if (rename(template, fname) != 0) {
-			olderrno = errno;
-			(void) close(fd);
-			(void) fclose(fp);
-			(void) unlink(template);
-			errno = olderrno;
-			die(gettext("cannot rename temporary file to %s"),
-			    fname);
-		}
-		(void) fclose(fp);
-		(void) close(fd);
-		free(template);
+		/*
+		 * Create config file with the new parameter(s). The
+		 * create_config_file will exit if it fails.
+		 */
+		create_config_file(&conf);
 
 		if (enable > 0 && smf_enable_instance(RCAP_FMRI,
 		    no_starting_stopping > 0 ? SMF_AT_NEXT_BOOT : 0) != 0)

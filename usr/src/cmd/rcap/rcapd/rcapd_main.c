@@ -1096,9 +1096,23 @@ main(int argc, char *argv[])
 	 * Read the configuration file.
 	 */
 	if (rcfg_read(RCAPD_DEFAULT_CONF_FILE, -1, &rcfg, verify_statistics)
-	    != 0)
-		die(gettext("invalid configuration: %s"),
-		    RCAPD_DEFAULT_CONF_FILE);
+	    != 0) {
+		/*
+		 * A configuration file may not exist if rcapd is started
+		 * by enabling the smf rcap service, so attempt to create
+		 * a default file.
+		 */
+		create_config_file(NULL);
+
+		/*
+		 * A real failure if still can't read the
+		 * configuration file
+		 */
+		if (rcfg_read(RCAPD_DEFAULT_CONF_FILE, -1, &rcfg,
+		    verify_statistics) != 0)
+			die(gettext("resource caps not configured %s"),
+			    RCAPD_DEFAULT_CONF_FILE);
+	}
 	finish_configuration();
 	should_reconfigure = 0;
 
