@@ -602,6 +602,8 @@ SCSI_OBJS +=	scsi_capabilities.o	scsi_control.o	scsi_watch.o \
 		scsi_hba.o	scsi_transport.o	scsi_confsubr.o \
 		scsi_reset_notify.o
 
+SGEN_OBJS +=	sgen.o
+
 SATA_OBJS +=	sata.o
 
 USBA_OBJS +=	hcdi.o	usba.o	usbai.o hubdi.o parser.o genconsole.o \

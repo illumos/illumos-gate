@@ -272,6 +272,7 @@ DRV_KMODS	+= sad
 DRV_KMODS	+= sctp
 DRV_KMODS	+= sctp6
 DRV_KMODS	+= sd
+DRV_KMODS	+= sgen
 DRV_KMODS	+= si3124
 DRV_KMODS	+= spdsock
 DRV_KMODS	+= smbios
@@ -306,7 +307,6 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= glm
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= llc2
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= mpt
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= marvell88sx 
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= sgen
 
 #
 # Common code drivers

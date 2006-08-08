@@ -768,6 +768,7 @@ SCSIIMPLHDRS=		\
 SCSITARGETSHDRS=	\
 	ses.h		\
 	sesio.h		\
+	sgendef.h	\
 	stdef.h		\
 	sddef.h
 
