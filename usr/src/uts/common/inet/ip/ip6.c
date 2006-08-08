@@ -4768,9 +4768,14 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 					NULL, NULL, NULL, NULL);
 			}
 			if (src_ipif == NULL && ip6_asp_can_lookup()) {
+				uint_t restrict_ill = RESTRICT_TO_NONE;
+
+				if (ip6i_present && ((ip6i_t *)ip6h)->ip6i_flags
+				    & IP6I_ATTACH_IF)
+					restrict_ill = RESTRICT_TO_ILL;
 				ip6_asp_table_held = B_TRUE;
 				src_ipif = ipif_select_source_v6(dst_ill,
-				    v6dstp, RESTRICT_TO_NONE,
+				    v6dstp, restrict_ill,
 				    IPV6_PREFER_SRC_DEFAULT, zoneid);
 				if (src_ipif != NULL)
 					ire_marks |= IRE_MARK_USESRC_CHECK;

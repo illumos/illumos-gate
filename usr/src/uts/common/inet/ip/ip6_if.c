@@ -2076,7 +2076,8 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 		 * will be available on the new ill.
 		 * But link local addresses don't move.
 		 */
-		if (ill->ill_phyint->phyint_flags &
+		if (dstinfo.dst_restrict_ill != RESTRICT_TO_ILL &&
+		    ill->ill_phyint->phyint_flags &
 		    (PHYI_OFFLINE | PHYI_FAILED))
 			goto next_ill;
 

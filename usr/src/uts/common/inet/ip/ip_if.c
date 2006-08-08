@@ -17216,10 +17216,10 @@ no_err:
 	}
 
 	if (err == 0) {
-		if (ill_to_v4 != NULL)
+		if (ill_from_v4 != NULL && ill_to_v4 != NULL)
 			ilm_send_multicast_reqs(ill_from_v4, ill_to_v4);
 
-		if (ill_to_v6 != NULL)
+		if (ill_from_v6 != NULL && ill_to_v6 != NULL)
 			ilm_send_multicast_reqs(ill_from_v6, ill_to_v6);
 	}
 done:
