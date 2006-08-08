@@ -562,14 +562,10 @@ more:
 		size_t n;
 		char name[FSTYPSZ];
 
-
-		if (uap->flags & MS_SYSSPACE) {
+		if (uap->flags & MS_SYSSPACE)
 			error = copystr(uap->fstype, name, FSTYPSZ, &n);
-		} else {
-			nfs_free_args(args, fhandle);
-			kmem_free(args, sizeof (*args));
+		else
 			error = copyinstr(uap->fstype, name, FSTYPSZ, &n);
-		}
 
 		if (error) {
 			if (error == ENAMETOOLONG)
@@ -607,6 +603,11 @@ more:
 		}
 		error = pathconf_get((struct mntinfo *)vfsp->vfs_data, args);
 
+		if (!(uap->flags & MS_SYSSPACE)) {
+			nfs_free_args(args, fhandle);
+			kmem_free(args, sizeof (*args));
+		}
+
 		return (error);
 	}
 
@@ -614,7 +615,7 @@ more:
 	if (!(uap->flags & MS_OVERLAY) &&
 	    (mvp->v_count != 1 || (mvp->v_flag & VROOT))) {
 		mutex_exit(&mvp->v_lock);
-		if (!(uap->flags) & MS_SYSSPACE) {
+		if (!(uap->flags & MS_SYSSPACE)) {
 			nfs_free_args(args, fhandle);
 			kmem_free(args, sizeof (*args));
 		}
@@ -1021,7 +1022,7 @@ errout:
 		}
 	}
 
-	if (!(uap->flags & MS_SYSSPACE) && args) {
+	if (!(uap->flags & MS_SYSSPACE)) {
 		nfs_free_args(args, fhandle);
 		kmem_free(args, sizeof (*args));
 	}

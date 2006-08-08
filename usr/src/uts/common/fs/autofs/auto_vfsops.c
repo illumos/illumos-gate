@@ -102,11 +102,11 @@ static struct modlfs modlfs = {
 
 static struct modlinkage modlinkage = {
 	MODREV_1,
+	&modlfs,
 	&modlsys,
 #ifdef	_SYSCALL32_IMPL
 	&modlsys32,
 #endif
-	&modlfs,
 	NULL
 };
 
