@@ -39,6 +39,10 @@ use Getopt::Long qw(:config no_ignore_case bundling auto_version);
 use Sun::Solaris::Utils qw(textdomain gettext);
 use Sun::Solaris::Kstat;
 
+# Set message locale
+setlocale(LC_ALL, "");
+textdomain(TEXT_DOMAIN);
+
 ######################################################################
 # Configuration variables
 ######################################################################
@@ -202,7 +206,8 @@ sub id_translate
 #
 # Consolidate consequtive CPU ids as start-end
 # Input: list of CPUs
-# Output: string with cpu values with CPU ranges collapsed as x-y
+# Output: string with space-sepated cpu values with CPU ranges
+#   collapsed as x-y
 #
 sub collapse
 {
@@ -210,21 +215,33 @@ sub collapse
 	my @args = uniqsort(@_);
 	my $start = shift(@args);
 	my $result = '';
-	my $end = $start;
+	my $end = $start;	# Initial range consists of the first element
 	foreach my $el (@args) {
 		if ($el == ($end + 1)) {
+			#
+			# Got consecutive ID, so extend end of range without
+			# printing anything since the range may extend further
+			#
 			$end = $el;
 		} else {
-			if ($end > $start + 1) {
+			#
+			# Next ID is not consecutive, so print IDs gotten so
+			# far.
+			#
+			if ($end > $start + 1) {	# range
 				$result = "$result $start-$end";
-			} elsif ($end > $start) {
-				$result = "$result $start, $end";
-			} else {
+			} elsif ($end > $start) {	# different values
+				$result = "$result $start $end";
+			} else {	# same value
 				$result = "$result $start";
 			}
+
+			# Try finding consecutive range starting from this ID
 			$start = $end = $el;
 		}
 	}
+
+	# Print last ID(s)
 	if ($end > $start + 1) {
 		$result = "$result $start-$end";
 	} elsif ($end > $start) {
@@ -390,10 +407,6 @@ sub print_component_tree
 ############################
 # Main part of the program
 ############################
-
-# Set message locale
-setlocale(LC_ALL, "");
-textdomain(TEXT_DOMAIN);
 
 #
 # Option processing
