@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -32,9 +31,6 @@
  */
 
 #pragma D depends_on module procfs
-
-inline int errno = curthread->t_lwp ? curthread->t_lwp->lwp_errno : 0;
-#pragma D binding "1.0" errno
 
 /*
  * The following miscellaneous constants are used by the proc(4) translators
@@ -354,18 +350,3 @@ inline string root = curthread->t_procp->p_user.u_rdir == NULL ? "/" :
     stringof(curthread->t_procp->p_user.u_rdir->v_path);
 #pragma D attributes Stable/Stable/Common root
 #pragma D binding "1.0" root
-
-/*
- * ppid, uid and gid are used frequently enough to merit their own inlines...
- */
-inline uid_t ppid = curpsinfo->pr_ppid;
-#pragma D attributes Stable/Stable/Common ppid
-#pragma D binding "1.0" ppid
-
-inline uid_t uid = curpsinfo->pr_uid;
-#pragma D attributes Stable/Stable/Common uid
-#pragma D binding "1.0" uid
-
-inline gid_t gid = curpsinfo->pr_gid;
-#pragma D attributes Stable/Stable/Common gid
-#pragma D binding "1.0" gid

@@ -2484,6 +2484,18 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		 */
 		return ((uint64_t)curthread->t_procp->p_pidp->pid_id);
 
+	case DIF_VAR_PPID:
+		if (!dtrace_priv_proc(state))
+			return (0);
+
+		/*
+		 * See comment in DIF_VAR_PID.
+		 */
+		if (DTRACE_ANCHORED(mstate->dtms_probe) && CPU_ON_INTR(CPU))
+			return (pid0.pid_id);
+
+		return ((uint64_t)curthread->t_procp->p_ppid);
+
 	case DIF_VAR_TID:
 		/*
 		 * See comment in DIF_VAR_PID.
@@ -2531,6 +2543,46 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		return ((uint64_t)(uintptr_t)
 		    curthread->t_procp->p_zone->zone_name);
 
+	case DIF_VAR_UID:
+		if (!dtrace_priv_proc(state))
+			return (0);
+
+		/*
+		 * See comment in DIF_VAR_PID.
+		 */
+		if (DTRACE_ANCHORED(mstate->dtms_probe) && CPU_ON_INTR(CPU))
+			return ((uint64_t)p0.p_cred->cr_uid);
+
+		return ((uint64_t)curthread->t_cred->cr_uid);
+
+	case DIF_VAR_GID:
+		if (!dtrace_priv_proc(state))
+			return (0);
+
+		/*
+		 * See comment in DIF_VAR_PID.
+		 */
+		if (DTRACE_ANCHORED(mstate->dtms_probe) && CPU_ON_INTR(CPU))
+			return ((uint64_t)p0.p_cred->cr_gid);
+
+		return ((uint64_t)curthread->t_cred->cr_gid);
+
+	case DIF_VAR_ERRNO: {
+		klwp_t *lwp;
+		if (!dtrace_priv_proc(state))
+			return (0);
+
+		/*
+		 * See comment in DIF_VAR_PID.
+		 */
+		if (DTRACE_ANCHORED(mstate->dtms_probe) && CPU_ON_INTR(CPU))
+			return (0);
+
+		if ((lwp = curthread->t_lwp) == NULL)
+			return (0);
+
+		return ((uint64_t)lwp->lwp_errno);
+	}
 	default:
 		DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
 		return (0);
@@ -7384,7 +7436,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
  * 1. Make calls to subroutines other than copyin(), copyinstr() or
  *    miscellaneous string routines
  * 2. Access DTrace variables other than the args[] array, and the
- *    curthread, pid, tid and execname variables.
+ *    curthread, pid, ppid, tid, execname, zonename, uid and gid variables.
  * 3. Have thread-local variables.
  * 4. Have dynamic variables.
  */
@@ -7474,8 +7526,9 @@ dtrace_difo_validate_helper(dtrace_difo_t *dp)
 				break;
 
 			if (v == DIF_VAR_CURTHREAD || v == DIF_VAR_PID ||
-			    v == DIF_VAR_TID || v == DIF_VAR_EXECNAME ||
-			    v == DIF_VAR_ZONENAME)
+			    v == DIF_VAR_PPID || v == DIF_VAR_TID ||
+			    v == DIF_VAR_EXECNAME || v == DIF_VAR_ZONENAME ||
+			    v == DIF_VAR_UID || v == DIF_VAR_GID)
 				break;
 
 			err += efunc(pc, "illegal variable %u\n", v);

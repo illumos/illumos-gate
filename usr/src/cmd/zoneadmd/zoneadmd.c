@@ -97,6 +97,7 @@
 #include <libcontract_priv.h>
 #include <sys/contract/process.h>
 #include <sys/ctfs.h>
+#include <sys/objfs.h>
 
 #include <libzonecfg.h>
 #include "zoneadmd.h"
@@ -560,6 +561,9 @@ zone_mount_early(zlog_t *zlogp, zoneid_t zoneid)
 		return (-1);
 
 	if (mount_early_fs(zlogp, zoneid, "ctfs", CTFS_ROOT, "ctfs") != 0)
+		return (-1);
+
+	if (mount_early_fs(zlogp, zoneid, "objfs", OBJFS_ROOT, "objfs") != 0)
 		return (-1);
 
 	if (mount_early_fs(zlogp, zoneid, "swap", "/etc/svc/volatile",

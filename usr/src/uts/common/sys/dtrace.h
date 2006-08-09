@@ -233,6 +233,10 @@ typedef enum dtrace_probespec {
 #define	DIF_VAR_WALLTIMESTAMP	0x011a	/* wall-clock timestamp */
 #define	DIF_VAR_USTACKDEPTH	0x011b	/* user-land stack depth */
 #define	DIF_VAR_UCALLER		0x011c	/* user-level caller */
+#define	DIF_VAR_PPID		0x011d	/* parent process ID */
+#define	DIF_VAR_UID		0x011e	/* process user ID */
+#define	DIF_VAR_GID		0x011f	/* process group ID */
+#define	DIF_VAR_ERRNO		0x0120	/* thread errno */
 
 #define	DIF_SUBR_RAND			0
 #define	DIF_SUBR_MUTEX_OWNED		1
@@ -1221,7 +1225,11 @@ typedef struct dtrace_providerdesc {
  *    curthread     <= Current kthread_t pointer
  *    tid           <= Current thread identifier
  *    pid           <= Current process identifier
+ *    ppid          <= Parent process identifier
+ *    uid           <= Current user ID
+ *    gid           <= Current group ID
  *    execname      <= Current executable name
+ *    zonename      <= Current zone name
  *
  * Helper actions may not manipulate or allocate dynamic variables, but they
  * may have clause-local and statically-allocated global variables.  The
