@@ -233,6 +233,9 @@ copy_cd(void)
 	(void) check_device(src, CHECK_TYPE_NOT_CDROM | CHECK_NO_MEDIA |
 	    CHECK_DEVICE_NOT_READY | EXIT_IF_CHECK_FAILED);
 
+	/* What type of media are we working with? */
+	get_media_type(src->d_fd);
+
 	toc = (uchar_t *)my_zalloc(4);
 	if (!read_toc(src->d_fd, 0, 0, 4, toc)) {
 		err_msg(gettext("Cannot read table of contents\n"));
@@ -347,10 +350,12 @@ copy_cd(void)
 	 * We've finished copying the CD. If source and destination are the same
 	 * or they where not specified then eject the disk and wait for a new
 	 * disk to be inserted.
+	 *
+	 * Since, DVD+RWs are not blanked just reformated, allow the insertion
+	 * of a DVD+RW to be the only condition necessary to complete copying.
 	 */
 
-	while ((target == NULL) ||
-	    check_device(target, CHECK_NO_MEDIA|CHECK_MEDIA_IS_NOT_BLANK)) {
+	do {
 		if (target != NULL) {
 			(void) eject_media(target);
 		}
@@ -366,7 +371,12 @@ copy_cd(void)
 		(void) getchar();
 		(void) sleep(4);
 		(void) setup_target(SCAN_WRITERS);
-	}
+		if (target)
+			get_media_type(target->d_fd);
+	} while ((target == NULL) ||
+	    ((device_type == DVD_PLUS_W)? check_device(target, CHECK_NO_MEDIA):
+		check_device(target, CHECK_NO_MEDIA|CHECK_MEDIA_IS_NOT_BLANK)));
+
 	(void) printf("\n");
 	(void) setreuid(ruid, 0);
 
