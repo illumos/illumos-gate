@@ -1424,6 +1424,7 @@ aggr_m_unicst(void *arg, const uint8_t *macaddr)
 static void
 aggr_grp_capab_set(aggr_grp_t *grp)
 {
+	uint32_t cksum;
 	aggr_port_t *port;
 
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
@@ -1433,10 +1434,9 @@ aggr_grp_capab_set(aggr_grp_t *grp)
 	grp->lg_gldv3_polling = B_TRUE;
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-		if (!mac_capab_get(port->lp_mh, MAC_CAPAB_HCKSUM,
-		    &grp->lg_hcksum_txflags)) {
-			grp->lg_hcksum_txflags = 0;
-		}
+		if (!mac_capab_get(port->lp_mh, MAC_CAPAB_HCKSUM, &cksum))
+			cksum = 0;
+		grp->lg_hcksum_txflags &= cksum;
 
 		grp->lg_gldv3_polling &=
 		    mac_capab_get(port->lp_mh, MAC_CAPAB_POLL, NULL);
