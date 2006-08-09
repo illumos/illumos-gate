@@ -89,7 +89,7 @@ function getsize
 	# next multiple of 1024.  This mimics the behavior of ufs especially
 	# with directories.  This results in a total size that's slightly
 	# bigger than if du was called on a ufs directory.
-	total_size=$(find $filelist -ls 2>/dev/null | nawk '
+	total_size=$(cd "/$ALT_ROOT"; find $filelist -ls 2>/dev/null | nawk '
 	    {t += ($7 % 1024) ? (int($7 / 1024) + 1) * 1024 : $7}
 	    END {print int(t * 1.10 / 1024)}')
 }
