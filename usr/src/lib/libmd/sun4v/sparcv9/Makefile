@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 CLASS		= 64
 PLATFORM	= sun4v
@@ -35,9 +36,7 @@ include $(SRC)/lib/Makefile.lib.64
 # set of algortithm optimisations and thus different source and object files.
 OBJECTS		= md5.o
 
-SPECMAPFILE=
-MAPFILE=	mapfile
-DYNFLAGS +=	-M$(MAPFILE)
+MAPFILES =	mapfile
 
 ASDEFS +=	-D__sparcv9
 ASFLAGS	+=	-xarch=v9a $(AS_PICFLAGS)
@@ -46,8 +45,6 @@ ASFLAGS	+=	-xarch=v9a $(AS_PICFLAGS)
 # and .fini sections being added).
  
 BUILD.SO=	$(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(LDLIBS)
-
-$(DYNLIB):	$(MAPFILE)
 
 .KEEP_STATE:
 

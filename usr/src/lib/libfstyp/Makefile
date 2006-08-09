@@ -41,15 +41,13 @@ lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all install clean clobber: spec .WAIT $(SUBDIRS)
-
-lint: $(SUBDIRS)
+all install clean clobber lint: $(SUBDIRS)
 
 install_h: $(ROOTHDRS)
 
 check: $(CHECKHDRS)
 
-spec $(SUBDIRS): FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

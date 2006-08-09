@@ -24,8 +24,11 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
+#
 # Platform specific Makefile for libc_psr.
 #
+
 PLATFORM	= sun4u-opl
 COMPAT_PLAT	= sun4u-us3
 CLASS		= 64
@@ -34,12 +37,7 @@ OBJECTS		= memcpy.o memset.o memcmp.o
 
 include ../Makefile.com
 
-MAPDIR=		../../spec/$(PLATFORM)/$(MACH64)
-MAPFILE=	$(MAPDIR)/mapfile-$(MACH64)
-MAPFILES=	$(MAPFILE) $(MAPFILE-FLTR)
-MAPOPTS=	$(MAPFILES:%=-M %)
-DYNFLAGS +=	$(MAPOPTS)
-CLOBBERFILES +=	$(MAPFILE)
+MAPFILES =	../../sun4u/mapfile-vers $(MAPFILE-FLTR)
 
 ASDEFS +=	-D__sparcv9
 ASFLAGS	+=	-xarch=v9b
@@ -50,11 +48,6 @@ include $(SRC)/Makefile.master.64
 # and .fini sections being added).
 
 BUILD.SO=	$(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(LDLIBS)
-
-$(DYNLIB):	$(MAPFILES)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) `basename $@`
 
 .KEEP_STATE:
 

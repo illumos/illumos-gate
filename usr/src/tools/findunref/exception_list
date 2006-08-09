@@ -130,8 +130,8 @@
 ./src/lib/gss_mechs/mech_dh/dh1024/mapfile-vers
 ./src/lib/gss_mechs/mech_dh/dh192/mapfile-vers
 ./src/lib/gss_mechs/mech_dh/dh640/mapfile-vers
-./src/lib/gss_mechs/mech_krb5/spec/krb5_clean.spec
-./src/lib/gss_mechs/mech_spnego/spec/clean.spec
+./src/lib/gss_mechs/mech_krb5/mapfile-vers-clean
+./src/lib/gss_mechs/mech_spnego/mapfile-vers-clean
 ./src/lib/pkcs11/pkcs11_softtoken/common/Makefile
 ./src/uts/common/Makefile
 ./src/uts/common/crypto/io/Makefile

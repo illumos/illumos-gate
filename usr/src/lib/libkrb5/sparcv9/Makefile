@@ -24,9 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libkrb5/sparcv9/Makefile
-
-MAPDIR= ../common
 
 include ../Makefile.com
 

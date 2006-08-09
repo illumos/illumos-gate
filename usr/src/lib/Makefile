@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 include ../Makefile.master
 
@@ -53,8 +54,6 @@ include ../Makefile.master
 #
 SUBDIRS= \
 	common			.WAIT	\
-	abi/apptrace		.WAIT	\
-	../cmd/abi/spectrans	.WAIT	\
 	../cmd/sgs/libconv		\
 	../cmd/sgs/libdl	.WAIT
 
@@ -63,7 +62,6 @@ $(CLOSED_BUILD)SUBDIRS += \
 
 SUBDIRS += \
 	libc			.WAIT	\
-	libmapmalloc		.WAIT	\
 	../cmd/sgs/libelf	.WAIT	\
 	libmd				\
 	libmd5				\
@@ -115,6 +113,7 @@ SUBDIRS += \
 	liblm		\
 	libmacadm	\
 	libmalloc	\
+	libmapmalloc	\
 	libmtmalloc	\
 	libnls		\
 	libsmbios	\
@@ -147,6 +146,7 @@ SUBDIRS += \
 	pam_modules	\
 	crypt_modules	\
 	libadt_jni	\
+	abi		\
 	auditd_plugins	\
 	libvolmgt	\
 	libdevice	\
@@ -492,14 +492,14 @@ libsec:		libavl
 # in certain situations (e.g., exportable source builds,
 # OpenSolaris).
 #
-$(SUBDIRS) abi: FRC
+$(SUBDIRS): FRC
 	@if [ -f $@/Makefile  ]; then \
 		cd $@; pwd; $(MAKE) $(TARGET); \
 	else \
 		true; \
 	fi
 
-$(SUBDIRS:%=%-nodepend) abi-nodepend:
+$(SUBDIRS:%=%-nodepend):
 	@if [ -f $(@:%-nodepend=%)/Makefile  ]; then \
 		cd $(@:%-nodepend=%); pwd; $(MAKE) $(TARGET); \
 	else \

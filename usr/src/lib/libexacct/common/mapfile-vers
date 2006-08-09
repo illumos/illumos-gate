@@ -1,0 +1,74 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_1.3 {
+    global:
+	ea_clear;
+	ea_fdopen;
+} SUNW_1.2;
+
+SUNW_1.2 {
+    global:
+	ea_alloc;
+	ea_attach_to_group;
+	ea_attach_to_object;
+	ea_copy_object;
+	ea_copy_object_tree;
+	ea_free;
+	ea_free_item;
+	ea_get_object_tree;
+	ea_strdup;
+	ea_strfree;
+} SUNW_1.1;
+
+SUNW_1.1 {
+    global:
+	ea_close;
+	ea_error;
+	ea_free_object;
+	ea_get_creator;
+	ea_get_hostname;
+	ea_get_object;
+	ea_match_object_catalog;
+	ea_next_object;
+	ea_open;
+	ea_pack_object;
+	ea_previous_object;
+	ea_set_group;
+	ea_set_item;
+	ea_unpack_object;
+	ea_write_object;
+};
+
+SUNWprivate {
+    global:
+	exacct_order16;
+	exacct_order32;
+	exacct_order64;
+    local:
+	*;
+};

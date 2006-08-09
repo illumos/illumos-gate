@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -42,8 +41,6 @@ pics/%64.o:	../common/%.c
 		$(COMPILE.c) -D_ELF64 -o $@ $<
 		$(POST_PROCESS_O)
 
-$(DYNLIB):	$(MAPFILES)
-
 $(LIBLINKS):
 		-$(RM) $@; $(SYMLINK) $(DYNLIB) $@
 
@@ -61,7 +58,7 @@ lint:		$(LINTLIB32) $(LINTOUT32) $(LINTLIB64) $(LINTOUT64) \
 native:		$(SGSPROTO)/$(DYNLIB)
 
 $(SGSPROTO)/$(DYNLIB): \
-		pics .WAIT $$(PICS) $(MAPFILES)
+		pics .WAIT $$(PICS)
 		$(BUILD.SO)
 		$(POST_PROCESS_SO)
 		-@$(RM) $(SGSPROTO)/$(LIBLINKS)

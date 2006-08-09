@@ -24,8 +24,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libc/amd64/Makefile
-#
+
 LIBCBASE=.
 
 LIBRARY= libc.a
@@ -912,8 +911,7 @@ ALTPICS= $(TRACEOBJS:%=pics/%)
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR64)/libc_i18n.a
 $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS)
 
-MAPDIR=		../spec/amd64
-MAPFILE=	$(MAPDIR)/mapfile
+MAPFILES =	../port/mapfile-vers mapfile-vers
 
 CPPFLAGS=	-D_REENTRANT -D$(MACH64) -D__$(MACH64) \
 		-I. -I$(LIBCBASE)/inc -I../inc $(CPPFLAGS.master) -I/usr/include
@@ -922,8 +920,7 @@ ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) \
 
 # Inform the run-time linker about libc specialized initialization
 RTLDINFO =	-z rtldinfo=tls_rtldinfo
-
-DYNFLAGS +=	-M $(MAPFILE) $(RTLDINFO)
+DYNFLAGS +=	$(RTLDINFO)
 
 BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 
@@ -947,7 +944,7 @@ CLEANFILES=			\
 	pics/crtn.o		\
 	$(ALTPICS)
 
-CLOBBERFILES +=	$(MAPFILE) $(LIB_PIC)
+CLOBBERFILES +=	$(LIB_PIC)
 
 # list of C source for lint
 SRCS=							\
@@ -982,11 +979,6 @@ SRCS=							\
 # $(DYNLIB) $(LIB_PIC) := DYNOBJS = _rtbootld.o
 $(DYNLIB) := CRTI = crti.o
 $(DYNLIB) := CRTN = crtn.o
-
-$(DYNLIB):	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
 
 # Files which need the threads .il inline template
 TIL=				\

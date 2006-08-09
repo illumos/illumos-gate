@@ -1,0 +1,230 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_1.1 {
+    global:
+	scf_entry_add_value;
+	scf_entry_create;
+	scf_entry_destroy;
+	scf_entry_destroy_children;
+	scf_entry_handle;
+	scf_entry_reset;
+	scf_error;
+	scf_handle_bind;
+	scf_handle_create;
+	scf_handle_decode_fmri;
+	scf_handle_decorate;
+	scf_handle_destroy;
+	scf_handle_get_scope;
+	scf_handle_unbind;
+	scf_instance_add_pg;
+	scf_instance_create;
+	scf_instance_delete;
+	scf_instance_destroy;
+	scf_instance_get_name;
+	scf_instance_get_parent;
+	scf_instance_get_pg;
+	scf_instance_get_pg_composed;
+	scf_instance_get_snapshot;
+	scf_instance_handle;
+	scf_instance_to_fmri;
+	scf_iter_create;
+	scf_iter_destroy;
+	scf_iter_handle;
+	scf_iter_handle_scopes;
+	scf_iter_instance_pgs;
+	scf_iter_instance_pgs_composed;
+	scf_iter_instance_pgs_typed;
+	scf_iter_instance_pgs_typed_composed;
+	scf_iter_instance_snapshots;
+	scf_iter_next_instance;
+	scf_iter_next_pg;
+	scf_iter_next_property;
+	scf_iter_next_scope;
+	scf_iter_next_service;
+	scf_iter_next_snapshot;
+	scf_iter_next_value;
+	scf_iter_pg_properties;
+	scf_iter_property_values;
+	scf_iter_reset;
+	scf_iter_scope_services;
+	scf_iter_service_instances;
+	scf_iter_service_pgs;
+	scf_iter_service_pgs_typed;
+	scf_iter_snaplevel_pgs;
+	scf_iter_snaplevel_pgs_typed;
+	scf_limit;
+	scf_myname;
+	scf_pg_create;
+	scf_pg_delete;
+	scf_pg_destroy;
+	scf_pg_get_flags;
+	scf_pg_get_name;
+	scf_pg_get_parent_instance;
+	scf_pg_get_parent_service;
+	scf_pg_get_parent_snaplevel;
+	scf_pg_get_property;
+	scf_pg_get_type;
+	scf_pg_get_underlying_pg;
+	scf_pg_handle;
+	scf_pg_to_fmri;
+	scf_pg_update;
+	scf_property_create;
+	scf_property_destroy;
+	scf_property_get_name;
+	scf_property_get_value;
+	scf_property_handle;
+	scf_property_is_type;
+	scf_property_to_fmri;
+	scf_property_type;
+	scf_scope_add_service;
+	scf_scope_create;
+	scf_scope_destroy;
+	scf_scope_get_name;
+	scf_scope_get_parent;
+	scf_scope_get_service;
+	scf_scope_handle;
+	scf_scope_to_fmri;
+	scf_service_add_instance;
+	scf_service_add_pg;
+	scf_service_create;
+	scf_service_delete;
+	scf_service_destroy;
+	scf_service_get_instance;
+	scf_service_get_name;
+	scf_service_get_parent;
+	scf_service_get_pg;
+	scf_service_handle;
+	scf_service_to_fmri;
+	scf_simple_app_props_free;
+	scf_simple_app_props_get;
+	scf_simple_app_props_next;
+	scf_simple_app_props_search;
+	scf_simple_prop_free;
+	scf_simple_prop_get;
+	scf_simple_prop_name;
+	scf_simple_prop_next_astring;
+	scf_simple_prop_next_boolean;
+	scf_simple_prop_next_count;
+	scf_simple_prop_next_integer;
+	scf_simple_prop_next_opaque;
+	scf_simple_prop_next_reset;
+	scf_simple_prop_next_time;
+	scf_simple_prop_next_ustring;
+	scf_simple_prop_numvalues;
+	scf_simple_prop_pgname;
+	scf_simple_prop_type;
+	scf_simple_walk_instances;
+	scf_snaplevel_create;
+	scf_snaplevel_destroy;
+	scf_snaplevel_get_instance_name;
+	scf_snaplevel_get_next_snaplevel;
+	scf_snaplevel_get_parent;
+	scf_snaplevel_get_pg;
+	scf_snaplevel_get_scope_name;
+	scf_snaplevel_get_service_name;
+	scf_snaplevel_handle;
+	scf_snapshot_create;
+	scf_snapshot_destroy;
+	scf_snapshot_get_base_snaplevel;
+	scf_snapshot_get_name;
+	scf_snapshot_get_parent;
+	scf_snapshot_handle;
+	scf_snapshot_update;
+	scf_strerror;
+	scf_transaction_commit;
+	scf_transaction_create;
+	scf_transaction_destroy;
+	scf_transaction_destroy_children;
+	scf_transaction_handle;
+	scf_transaction_property_change;
+	scf_transaction_property_change_type;
+	scf_transaction_property_delete;
+	scf_transaction_property_new;
+	scf_transaction_reset;
+	scf_transaction_reset_all;
+	scf_transaction_start;
+	scf_type_base_type;
+	scf_value_base_type;
+	scf_value_create;
+	scf_value_destroy;
+	scf_value_get_as_string;
+	scf_value_get_as_string_typed;
+	scf_value_get_astring;
+	scf_value_get_boolean;
+	scf_value_get_count;
+	scf_value_get_integer;
+	scf_value_get_opaque;
+	scf_value_get_time;
+	scf_value_get_ustring;
+	scf_value_handle;
+	scf_value_is_type;
+	scf_value_reset;
+	scf_value_set_astring;
+	scf_value_set_boolean;
+	scf_value_set_count;
+	scf_value_set_from_string;
+	scf_value_set_integer;
+	scf_value_set_opaque;
+	scf_value_set_time;
+	scf_value_set_ustring;
+	scf_value_type;
+	smf_degrade_instance;
+	smf_disable_instance;
+	smf_enable_instance;
+	smf_get_state;
+	smf_maintain_instance;
+	smf_refresh_instance;
+	smf_restart_instance;
+	smf_restore_instance;
+};
+
+SUNWprivate_1.1 {
+    global:
+	scf_canonify_fmri;
+	scf_cmp_pattern;
+	_scf_handle_decorations;
+	_scf_notify_add_pgname;
+	_scf_notify_add_pgtype;
+	_scf_notify_wait;
+	scf_parse_file_fmri;
+	scf_parse_fmri;
+	scf_parse_svc_fmri;
+	_scf_pg_wait;
+	_scf_request_backup;
+	_scf_snapshot_attach;
+	_scf_snapshot_delete;
+	_scf_snapshot_take_attach;
+	_scf_snapshot_take_new;
+	_scf_snapshot_take_new_named;
+	scf_string_to_type;
+	scf_type_to_string;
+	scf_walk_fmri;
+	_smf_refresh_instance_i;
+    local:
+	*;
+};

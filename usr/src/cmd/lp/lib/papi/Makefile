@@ -24,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/lp/lib/papi/Makefile
-#
 
 LIBRARY =	psm-lpsched.a
 VERS=.1
@@ -56,10 +54,9 @@ LDLIBS	+=	-L$(SRC)/cmd/lp/lib/forms -llpfrm
 LDLIBS	+=	-L$(SRC)/cmd/lp/lib/access -llpacc
 LDLIBS	+=	-L$(SRC)/cmd/lp/lib/lp -llp
 
-MAPFILES=	mapfile
-MAPOPTS=	$(MAPFILES:%=-M%)
-DYNFLAGS +=	$(BDIRECT) $(MAPOPTS)
+MAPFILES =	mapfile
 
+DYNFLAGS +=	$(BDIRECT)
 
 LIBS = $(DYNLIB)
 SRCS= $(OBJECTS:%.o=%.c)

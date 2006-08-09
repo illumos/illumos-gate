@@ -24,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libmd5/Makefile.com
-#
 
 LIBRARY= libmd5.a
 VERS= .1
@@ -33,16 +31,14 @@ VERS= .1
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
-MAPFILES=       $(SRCDIR)/mapfile-vers $(MAPFILE-FLTR)
-MAPOPTS=        $(MAPFILES:%=-M %)
-
-DYNFLAGS +=     -F libmd.so.1 $(MAPOPTS)
+DYNFLAGS +=     -F libmd.so.1
 
 LIBS =          $(DYNLIB) $(LINTLIB)
 
 SRCDIR =        ../common
 $(LINTLIB) :=   SRCS = $(SRCDIR)/llib-lmd5
 
+MAPFILES +=	$(MAPFILE-FLTR)
 
 # Redefine shared object build rule to use $(LD) directly (this avoids .init
 # and .fini sections being added).  Also, since there are no OBJECTS, turn
@@ -55,6 +51,6 @@ CTFMERGE_LIB=   :
 
 all: $(LIBS)
 
-include ../../Makefile.targ
+lint:
 
-$(DYNLIB):      $(MAPFILES)
+include ../../Makefile.targ

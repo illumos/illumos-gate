@@ -32,8 +32,6 @@ OBJECTS =	libfstyp.o
 include ../../Makefile.lib
 
 SRCDIR =	../common
-MAPDIR =	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc

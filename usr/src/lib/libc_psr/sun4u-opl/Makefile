@@ -24,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libc_psr/sun4u-opl/Makefile
-#
 
 include $(SRC)/lib/Makefile.lib
 include $(SRC)/Makefile.psm
@@ -72,14 +70,11 @@ $(LIBC_PSR64_LINKS): $(LIBC_PSR64_DIRS)
 lint:
 	@ $(ECHO) "Nothing to lint here: skipping"
 
-lib32: spec .WAIT $(SUBDIRS)
+lib32: $(SUBDIRS)
 
 lib64: $(SUBDIRS64)
 
 $(SUBDIRS) $(SUBDIRS64): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
-
-spec: FRC
-	@cd ../spec/$(PLATFORM); pwd; $(MAKE) $(TARGET)
 
 FRC:

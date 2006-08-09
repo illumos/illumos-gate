@@ -44,8 +44,6 @@ $(LINTLIB):= 	SRCS=../common/llib-lsldap
 LDLIBS +=	-lnsl -lldap -lc
 
 SRCDIR =	../common
-MAPDIR =	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
 
 CFLAGS +=	$(CCVERBOSE)
 LOCFLAGS +=	-D_REENTRANT -DSUNW_OPTIONS -DTHREAD_SUNOS5_LWP

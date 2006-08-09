@@ -1,10 +1,28 @@
 #
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libresolv2/Makefile.com
 #
 
 LIBRARY= libresolv.a
@@ -87,10 +105,7 @@ include ../../Makefile.lib
 # install this library in the root filesystem
 include ../../Makefile.rootfs
 
-MAPFILE=	$(MAPDIR)/mapfile
-MAPFILES=	$(MAPFILE) ../common/mapfile-vers
-MAPOPTS=	$(MAPFILES:%=-M%)
-
+SRCDIR =	../common
 SRCS=		$(BSDOBJS:%.o=../common/bsd/%.c) \
 		$(DSTOBJS:%.o=../common/dst/%.c) \
 		$(INETOBJS:%.o=../common/inet/%.c) \
@@ -125,7 +140,7 @@ LOCFLAGS +=	-D_SYS_STREAM_H -D_REENTRANT -DSVR4 -DSUNW_OPTIONS \
 		$(SOLCOMPAT) -I../include -I../../common/inc
 
 CPPFLAGS +=	$(LOCFLAGS) 
-DYNFLAGS +=	$(MAPOPTS) $(ZNODELETE)
+DYNFLAGS +=	$(ZNODELETE)
 LDLIBS +=	-lsocket -lnsl -lc
 
 .KEEP_STATE:
@@ -133,11 +148,6 @@ LDLIBS +=	-lsocket -lnsl -lc
 all:	$(LIBS)
 
 lint:	lintcheck
-
-$(DYNLIB):	$(MAPFILES)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
 
 # include library targets
 include ../../Makefile.targ

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libcurses/screen/Makefile
-#
+
 LIBRARY=	libcurses.a
 VERS=	.1
 
@@ -136,10 +134,7 @@ include ../../Makefile.lib
 # install this library in the root filesystem
 include ../../Makefile.rootfs
 
-MAPFILE=	$(MAPDIR)/mapfile
-MAPOPTS=	$(MAPFILE:%=-M %)
-
-SRCS=		$(OBJECTS:%.o=../screen/%.c)
+SRCDIR =	../screen
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
@@ -159,7 +154,7 @@ ROOTLINKS64=	$(ROOTLIBDIR64)/$(LIBLINKS)
 CLEANFILES +=	$(LINTOUT) $(LINTLIB)
 
 CFLAGS	+=	$(CCVERBOSE)
-DYNFLAGS +=	$(MAPOPTS)
+
 LDLIBS += -lc
 
 CPPFLAGS += -I../screen -I../../common/inc
@@ -179,12 +174,6 @@ all: $(LIBS)
 
 lint: lintcheck
 
-$(DYNLIB): 	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
-
-
 # install rule for 32-bit libcurses.a
 $(ROOTLIBDIR)/%.a: %.a
 	$(INS.file)
@@ -203,15 +192,6 @@ $(ROOTLINKS) := INS.liblink= \
 		$(SYMLINK) libcurses.so$(VERS) libtermcap.so$(VERS); \
 		$(SYMLINK) libtermlib.so$(VERS) libtermlib.so; \
 		$(SYMLINK) libtermcap.so$(VERS) libtermcap.so;
-
-#
-# Include library targets
-#
-include ../../Makefile.targ
-
-pics/%.o: ../screen/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
 
 # install rule for lint library target
 $(ROOTLINTDIR)/%: ../screen/%
@@ -234,3 +214,8 @@ $(ROOTLINTDIR64)/%: ../screen/%
 		$(RM) llib-ltermcap.ln llib-ltermlib.ln ; \
 		$(SYMLINK) ./llib-lcurses.ln llib-ltermcap.ln; \
 		$(SYMLINK) ./llib-lcurses.ln llib-ltermlib.ln;
+
+#
+# Include library targets
+#
+include ../../Makefile.targ

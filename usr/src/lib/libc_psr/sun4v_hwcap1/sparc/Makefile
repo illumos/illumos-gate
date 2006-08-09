@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,16 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
+#
 # Platform specific Makefile for libc_psr.
 #
+
 PLATFORM	= sun4v
 ALT_PLAT	= sun4v_hwcap1
 CLASS		= 32
@@ -35,24 +37,14 @@ OBJECTS		= memcpy.o memset.o
 
 include ../Makefile.com
 
-MAPDIR=		../../spec/$(ALT_PLAT)/$(MACH)
-MAPFILE=	$(MAPDIR)/mapfile-$(MACH)
+MAPFILES =	../../sun4v/mapfile-vers ../mapfile $(MAPFILE-FLTR)
 
-MAPFILES=	$(MAPFILE) $(MAPFILE-FLTR) $(HWCAP_MAPFILE)
-MAPOPTS=	$(MAPFILES:%=-M %)
-DYNFLAGS +=	$(MAPOPTS)
-CLOBBERFILES +=	$(MAPFILE)
 ASFLAGS	+=	-xarch=v8plus
 
 # Redefine shared object build rule to use $(LD) directly (this avoids .init
 # and .fini sections being added).
 
 BUILD.SO=	$(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(LDLIBS)
-
-$(DYNLIB):	$(MAPFILES)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) `basename $@`
 
 .KEEP_STATE:
 

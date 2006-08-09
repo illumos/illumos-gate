@@ -19,10 +19,10 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 FSTYP_VERS=1
@@ -31,6 +31,9 @@ LIBPROG=	fstyp.so.${FSTYP_VERS}
 
 include ../../../../lib/Makefile.lib
 include ../../Makefile.fstype
+
+# There should be a mapfile here
+MAPFILES =
 
 CFLAGS +=	$(C_PICFLAGS)
 DYNLIB=		$(LIBPROG)

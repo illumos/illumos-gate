@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,33 +19,29 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# Copyright (c) 1999-2000 by Sun Microsystems, Inc.
-# All rights reserved.
-#
-# cmd/picl/plugins/lib/picld_pluginutil/Makefile
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include	$(SRC)/lib/Makefile.lib
 
-SUBDIRS = spec .WAIT $(MACH)
+SUBDIRS = $(MACH)
 
 # conditional assignments
-all :=      	TARGET= all
-install :=      TARGET= install
-clean :=        TARGET= clean
-clobber :=      TARGET= clobber
-lint :=         TARGET= lint
-_msg :=         TARGET= _msg
+all :=		TARGET= all
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+install :=	TARGET= install
+lint :=		TARGET= lint
+_msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all clean clobber install lint _msg: $(SUBDIRS)
 
-_msg:	$(MACH)
-
-$(MACH) spec: FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

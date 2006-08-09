@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -40,9 +39,7 @@ OBJECTS=	$(BLTOBJ)  $(MACHOBJS)  $(COMOBJS)
 include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
 
-MAPFILES =	../common/mapfile-vers
-MAPOPTS =	$(MAPFILES:%=-M%)
-
+SRCDIR =	../common
 CPPFLAGS +=	-I../../rtld/common -I$(SRCBASE)/lib/libc/inc \
 		-I$(SRCBASE)/uts/common/krtld -I$(SRC)/common/sgsrtcid
 DYNFLAGS +=	$(VERSREF) $(ZLAZYLOAD) '-R$$ORIGIN'
@@ -55,7 +52,7 @@ LINTFLAGS64 +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 # '=' is used with extra variables.
 #
 XXXFLAGS=
-$(DYNLIB) :=	XXXFLAGS= $(USE_PROTO) $(MAPOPTS)
+$(DYNLIB) :=	XXXFLAGS= $(USE_PROTO)
 DYNFLAGS +=	$(XXXFLAGS)
 
 

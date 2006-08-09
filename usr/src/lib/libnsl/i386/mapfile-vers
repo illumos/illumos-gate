@@ -1,0 +1,184 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_1.1 {
+    global:
+	_new_svc_fdset;
+} SUNW_0.7;
+
+SUNW_0.7 {
+    global:
+	gethostbyaddr;
+	gethostbyname;
+	inet_addr;
+	inet_netof;
+	inet_ntoa;
+	_null_auth;
+	rpc_broadcast_exp;
+	__rpc_createerr;
+	svc_exit;
+	svc_fdset;
+} SYSVABI_1.3;
+
+SYSVABI_1.3 {
+    global:
+	authdes_getucred;
+	authdes_seccreate;
+	authnone_create;
+	authsys_create;
+	authsys_create_default;
+	clnt_create;
+	clnt_dg_create;
+	clnt_pcreateerror;
+	clnt_perrno;
+	clnt_perror;
+	clnt_raw_create;
+	clnt_spcreateerror;
+	clnt_sperrno;
+	clnt_sperror;
+	clnt_tli_create;
+	clnt_tp_create;
+	clnt_vc_create;
+	endnetconfig;
+	endnetpath;
+	freenetconfigent;
+	getnetconfig;
+	getnetconfigent;
+	getnetname;
+	getnetpath;
+	getpublickey;
+	getsecretkey;
+	host2netname;
+	key_decryptsession;
+	key_encryptsession;
+	key_gendes;
+	key_setsecret;
+	nc_perror;
+	_nderror;
+	netdir_free;
+	netdir_getbyaddr;
+	netdir_getbyname;
+	netdir_options;
+	netname2host;
+	netname2user;
+	rpcb_getaddr;
+	rpcb_getmaps;
+	rpcb_gettime;
+	rpcb_rmtcall;
+	rpc_broadcast;
+	rpcb_set;
+	rpcb_unset;
+	rpc_call;
+	rpc_createerr;
+	rpc_reg;
+	setnetconfig;
+	setnetpath;
+	svc_create;
+	svc_dg_create;
+	svcerr_auth;
+	svcerr_decode;
+	svcerr_noproc;
+	svcerr_noprog;
+	svcerr_progvers;
+	svcerr_systemerr;
+	svcerr_weakauth;
+	svc_fd_create;
+	svc_getreqset;
+	svc_raw_create;
+	svc_reg;
+	svc_run;
+	svc_sendreply;
+	svc_tli_create;
+	svc_tp_create;
+	svc_unreg;
+	svc_vc_create;
+	t_accept;
+	taddr2uaddr;
+	t_alloc;
+	t_bind;
+	t_close;
+	t_connect;
+	t_errno;
+	t_error;
+	t_free;
+	t_getinfo;
+	t_getstate;
+	t_listen;
+	t_look;
+	t_open;
+	t_optmgmt;
+	t_rcv;
+	t_rcvconnect;
+	t_rcvdis;
+	t_rcvrel;
+	t_rcvudata;
+	t_rcvuderr;
+	t_snd;
+	t_snddis;
+	t_sndrel;
+	t_sndudata;
+	t_sync;
+	t_unbind;
+	uaddr2taddr;
+	user2netname;
+	xdr_accepted_reply;
+	xdr_array;
+	xdr_authsys_parms;
+	xdr_bool;
+	xdr_bytes;
+	xdr_callhdr;
+	xdr_callmsg;
+	xdr_char;
+	xdr_double;
+	xdr_enum;
+	xdr_float;
+	xdr_free;
+	xdr_int;
+	xdr_long;
+	xdrmem_create;
+	xdr_opaque;
+	xdr_opaque_auth;
+	xdr_pointer;
+	xdrrec_create;
+	xdrrec_eof;
+	xdrrec_skiprecord;
+	xdr_reference;
+	xdr_rejected_reply;
+	xdr_replymsg;
+	xdr_short;
+	xdrstdio_create;
+	xdr_string;
+	xdr_u_char;
+	xdr_u_long;
+	xdr_union;
+	xdr_u_short;
+	xdr_vector;
+	xdr_void;
+	xdr_wrapstring;
+	xprt_register;
+	xprt_unregister;
+};

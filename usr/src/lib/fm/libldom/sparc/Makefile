@@ -22,9 +22,9 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-MAPDIR = ../spec/sparc
 MACH_LDLIBS = -L$(ROOT)/usr/lib/fm
 
 include ../Makefile.com
@@ -33,7 +33,6 @@ DYNFLAGS += -R/usr/lib/fm
 
 FMHDRS = ldom.h
 HDRDIR = .
-SRCDIR = .
 
 ROOTFMHDRDIR = $(ROOT)/usr/platform/sun4v/include/sys/fm
 

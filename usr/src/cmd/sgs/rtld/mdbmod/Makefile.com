@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -40,7 +39,7 @@ include		$(SRC)/cmd/sgs/Makefile.com
 
 SGSMSGALL=	rtld.msg
 
-MAPFILE=	../common/mapfile
+MAPFILES =	../common/mapfile
 SRCS=		$(OBJECTS:%.o=../common/%.c)
 
 BLTDEFS=	msg.h
@@ -73,7 +72,7 @@ CPPFLAGS +=	-I. -I../common -I../../common -I../../../include \
 		-I$(SRC)/common/sgsrtcid \
 		-I$(SRC)/uts/$(ARCH)/sys
 
-DYNFLAGS +=	$(VERSREF) -M $(MAPFILE)
+DYNFLAGS +=	$(VERSREF)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 
 ROOTMDBLIB=	$(ROOT)/usr/lib/mdb/proc

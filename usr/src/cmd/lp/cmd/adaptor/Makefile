@@ -17,8 +17,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-
-
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -34,6 +32,9 @@ OBJECTS =	show_queue.o cancel_job.o submit_job.o misc.o
 
 include		../../../../lib/Makefile.lib
 include         ../../Makefile.lp
+
+# There should be a mapfile here
+MAPFILES =
 
 ROOTLIBDIR=	$(ROOT)/usr/lib/print/bsd-adaptor
 

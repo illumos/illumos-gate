@@ -24,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libmd/Makefile.com
-#
 
 # $LIBRARY is set in lower makefiles so we can have platform and
 # processor optimised versions of this library via libmd_psr and libmd_hwcapN
@@ -54,8 +52,6 @@ LDLIBS +=	-lc
 
 SRCDIR =	../common
 COMDIR =	$(SRC)/common/crypto
-MAPDIR =	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
 
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(C_BIGPICFLAGS)

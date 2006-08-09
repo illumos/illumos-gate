@@ -34,22 +34,21 @@ ROOTLIBDIR =	$(ROOT)/usr/lib/print
 include ../../../Makefile.lib
 include ../../../Makefile.rootfs
 
+SRCDIR =	../common
+
 ROOTLIBDIR=	$(ROOT)/usr/lib/print
 ROOTLIBDIR64=	$(ROOT)/usr/lib/print/$(MACH)
 
 LIBS =			$(DYNLIB)
 
-SRCS = $(OBJECTS:%.o = $(SRCDIR)/%.c)
-
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-SRCDIR =	../common
-MAPFILE =	$(SRCDIR)/mapfile
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../libpapi-common/common
-DYNFLAGS +=	-M $(MAPFILE)
+
+MAPFILES =	$(SRCDIR)/mapfile
+
 LDLIBS +=	-lsocket -lnsl -lc
 
 .KEEP_STATE:

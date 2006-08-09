@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1997-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +27,9 @@
 
 include $(SRC)/lib/Makefile.lib
 
-SUBDIRS =	$(MACH) $(BUILD64) $(MACH64)
+SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
+
 POFILE =	libcfgadm.po
 MSGFILES =	*/*.[ch]
 XGETFLAGS =	-a -x libcfgadm.xcl
@@ -41,13 +42,11 @@ lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all clean clobber install: spec .WAIT $(SUBDIRS)
-
-lint: $(SUBDIRS)
+all clean clobber install lint: $(SUBDIRS)
 
 check install_h:
 
-$(MACH) $(MACH64) spec:	FRC
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 _msg:	$(MSGDOMAINPOFILE)

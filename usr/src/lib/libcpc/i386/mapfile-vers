@@ -1,0 +1,61 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_1.2 {
+    global:
+} SUNW_1.1;
+
+SUNW_1.1 {
+    global:
+	cpc_access;
+	cpc_bind_event;
+	cpc_count_sys_events;
+	cpc_count_usr_events;
+	cpc_event_accum;
+	cpc_event_diff;
+	cpc_eventtostr;
+	cpc_getcciname;
+	cpc_getcpuref;
+	cpc_getcpuver;
+	cpc_getnpic;
+	cpc_getusage;
+	cpc_pctx_bind_event;
+	cpc_pctx_invalidate;
+	cpc_pctx_rele;
+	cpc_pctx_take_sample;
+	cpc_rele;
+	cpc_seterrfn;
+	cpc_shared_bind_event;
+	cpc_shared_close;
+	cpc_shared_open;
+	cpc_shared_rele;
+	cpc_shared_take_sample;
+	cpc_strtoevent;
+	cpc_take_sample;
+	cpc_version;
+	cpc_walk_names;
+};

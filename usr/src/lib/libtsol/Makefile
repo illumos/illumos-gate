@@ -22,11 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-#ident	"%Z%%M%	%I%	%E% SMI"
-
-#
-# lib/libtsol/Makefile
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.lib
@@ -51,9 +47,7 @@ lint :=		TARGET = lint
 # Override so that label.h gets installed where expected.
 ROOTHDRDIR=	$(ROOT)/usr/include/tsol
 
-all clean clobber install: spec .WAIT $(SUBDIRS)
-
-lint:	$(SUBDIRS)
+all clean clobber install lint: $(SUBDIRS)
 
 install_h: $(ROOTHDRS)
 
@@ -64,7 +58,7 @@ $(POFILE):	$(MSGFILES)
 
 _msg:		$(MSGDOMAINPOFILE)
 
-$(SUBDIRS) spec:	FRC
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

@@ -24,7 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/extendedFILE/Makefile.com
 
 LIBRARY = extendedFILE.a
 VERS = .1
@@ -34,17 +33,14 @@ OBJECTS = extendedFILE.o
 # include library definitions
 include ../../Makefile.lib
 
-MAPFILE = ../common/mapfile-vers
-
-SRCS = $(OBJECTS:%.o=../common/%.c)
+SRCDIR =	../common
 
 LIBS = $(DYNLIB)
 LDLIBS += -lc
 CFLAGS += $(CCVERBOSE)
-CPPFLAGS += -D_REENTRANT -I../common
-DYNFLAGS += -M$(MAPFILE) $(ZINTERPOSE)
+CPPFLAGS += -D_REENTRANT -I../common -I../../common/inc
 
-CPPFLAGS += -I../../common/inc
+DYNFLAGS +=	$(ZINTERPOSE)
 
 .KEEP_STATE:
 

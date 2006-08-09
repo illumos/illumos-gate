@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -65,8 +64,6 @@ $(VAR_POUND_2)lint :=		LIBTHREADFLAG=-lthread
 
 delete:
 		$(RM) $(DYNLIB)
-
-$(DYNLIB):	$$(MAPFILES)
 
 $(LIBLINKS):
 		$(RM) $(LIBLINKS)
@@ -136,7 +133,7 @@ wlocks/%.ll:	../common/%.c
 native:		$(SGSPROTO)/$(DYNLIB)
 
 $(SGSPROTO)/$(DYNLIB): \
-		pics .WAIT $$(PICS) $(MAPFILES)
+		pics .WAIT $$(PICS)
 		$(BUILD.SO)
 		$(POST_PROCESS_SO)
 		-@$(RM) $(SGSPROTO)/$(LIBLINKS)

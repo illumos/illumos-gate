@@ -18,19 +18,17 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libbsm/Makefile
-#
 
 include ../Makefile.lib
 
-SUBDIRS=	spec .WAIT $(MACH) $(BUILD64) $(MACH64)
+SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 XGETFLAGS_ADT += -a
 
@@ -209,7 +207,7 @@ adt_xlate.po: $(COMMONDIR)/adt_xlate.c
 	$(SED) "/^domain/d" < messages.po > adt_xlate.po
 	$(RM) messages.po
 
-spec $(MACH) $(MACH64) :	FRC
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

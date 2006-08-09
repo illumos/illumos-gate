@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -26,7 +25,6 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-MAPDIR = ../spec/sparcv9
 MACH_LDLIBS = -L$(ROOT)/usr/lib/fm/$(MACH64)
 
 include ../Makefile.com

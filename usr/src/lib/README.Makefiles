@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,15 @@
 #
 # CDDL HEADER END
 #
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
 Writing Library Makefiles in ON
 ===============================
-
- Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
-
-ident	"%Z%%M%	%I%	%E% SMI"
 
 Introduction
 ------------
@@ -57,7 +58,7 @@ Your library should consist of a hierarchical collection of Makefiles:
 	lib/<library>/<isa>/Makefile
 
 	  These are your library's ISA-specific Makefiles, one per ISA
-	  (usually sparc and i386, and sometimes sparcv9 and ia64).  These
+	  (usually sparc and i386, and often sparcv9 and amd64).  These
 	  Makefiles should include your common Makefile and then provide any
 	  needed ISA-specific rules and definitions, perhaps overriding those
 	  provided in your common Makefile.
@@ -74,7 +75,7 @@ Makefiles before introducing your own custom build macros or rules.
 	lib/Makefile.lib.64
 
 	  This contains macros for building 64-bit objects, and should be
-	  included in Makfiles for 64-bit native ISAs.
+	  included in Makefiles for 64-bit native ISAs.
 
 	lib/Makefile.rootfs
 
@@ -98,20 +99,20 @@ ISA-independent targets usually consist of:
 
 	install_h
 
-	  Install all library header files into the proto area.  Can be
-	  omitted if your library has no header files.
+	  Install all library header files into the proto area.
+	  Can be omitted if your library has no header files.
 
 	check
 
-	  Check all library header files for hdrchk compliance.  Can be
-	  omitted if your library has no header files.
+	  Check all library header files for hdrchk compliance.
+	  Can be omitted if your library has no header files.
 
 	_msg
 
-	  Build and install a message catalog.  Can be omitted if your
-	  library has no message catalog.
+	  Build and install a message catalog.
+	  Can be omitted if your library has no message catalog.
 
-Of course, other targets are (such as `cstyle') are fine as well, as long as
+Of course, other targets (such as `cstyle') are fine as well, as long as
 they are ISA-independent.
 
 The ROOTHDRS and CHECKHDRS targets are provided in lib/Makefile.lib to make
@@ -164,7 +165,7 @@ above example.  If you need to skip the C preprocessor, just use the native
 (.[ch]) suffix.
 
 The only time you shouldn't use BUILDPO.msgfiles as the preferred means of
-extracting messages in when you're extracting them from shell scripts; in
+extracting messages is when you're extracting them from shell scripts; in
 that case, you can use the BUILDPO.pofiles macro as explained below.
 
 To build a message catalog from other message catalogs, or from source files
@@ -227,7 +228,7 @@ ISA-specific Makefiles.  You can do this by:
 
 	2. Providing a common "descend into SUBDIRS" rule:
 
-		spec $(SUBDIRS): FRC
+		$(SUBDIRS): FRC
 			@cd $@; pwd; $(MAKE) $(TARGET)
 
 		FRC:
@@ -245,56 +246,41 @@ ISA-specific Makefiles.  You can do this by:
 
 	4. Having the aforementioned targets depend on SUBDIRS:
 
-		all clean clobber install: spec .WAIT $(SUBDIRS)
+		all clean clobber install lint: $(SUBDIRS)
 
-		lint: $(SUBDIRS)
-
-	   A few notes are in order here:
-
-		* The `all' target must be listed first; the others might as
-		  well be listed alphabetically.
-
-		* The `lint' target is listed separately because there is
-		  nothing to lint in the spec subdirectory.
-
-		* The .WAIT between spec and $(SUBDIRS) is suboptimal but
-		  currently required to make sure that two different make
-		  invocations don't simultaneously build the mapfiles.  It
-		  will likely be replaced with a more sophisticated
-		  mechanism in the future.
+	   The `all' target must be listed first so that make uses it as the
+	   default target; the others might as well be listed alphabetically.
 
 As an example of how all of this goes together, here's libinetutil's
-top-level library Makefile (copyright omitted):
+top-level library Makefile (license notice and copyright omitted):
 
-		include ../Makefile.lib
+	include ../Makefile.lib
 
-		HDRS =		libinetutil.h
-		HDRDIR =	common
-		SUBDIRS =	$(MACH)
-		$(BUILD64)SUBDIRS += $(MACH64)
+	HDRS =		libinetutil.h
+	HDRDIR =	common
+	SUBDIRS =	$(MACH)
+	$(BUILD64)SUBDIRS += $(MACH64)
 
-		all :=		TARGET = all
-		clean :=	TARGET = clean
-		clobber :=	TARGET = clobber
-		install :=	TARGET = install
-		lint :=		TARGET = lint
+	all :=		TARGET = all
+	clean :=	TARGET = clean
+	clobber :=	TARGET = clobber
+	install :=	TARGET = install
+	lint :=		TARGET = lint
 
-		.KEEP_STATE:
+	.KEEP_STATE:
 
-		all clean clobber install: spec .WAIT $(SUBDIRS)
+	all clean clobber install lint: $(SUBDIRS)
 
-		lint:		$(SUBDIRS)
+	install_h:	$(ROOTHDRS)
 
-		install_h:	$(ROOTHDRS)
+	check:		$(CHECKHDRS)
 
-		check:		$(CHECKHDRS)
+	$(SUBDIRS): FRC
+		@cd $@; pwd; $(MAKE) $(TARGET)
 
-		$(SUBDIRS) spec: FRC
-			@cd $@; pwd; $(MAKE) $(TARGET)
+	FRC:
 
-		FRC:
-
-		include ../Makefile.targ
+	include ../Makefile.targ
 
 The Common Makefile
 -------------------
@@ -303,7 +289,9 @@ In concept, your common Makefile should contain all of the rules and
 definitions that are the same on all ISAs.  However, for reasons of
 maintainability and cleanliness, you're encouraged to place even
 ISA-dependent rules and definitions, as long you express them in an
-ISA-independent way (e.g., by using $(MACH), $(TRANSMACH), and their kin).
+ISA-independent way (e.g., by using $(MACH), $(TARGETMACH), and their kin).
+(TARGETMACH is the same as MACH for 32-bit targets, and the same as MACH64
+for 64-bit targets).
 
 The common Makefile can be conceptually split up into four sections:
 
@@ -425,37 +413,17 @@ The third section typically consists of the following macros:
 	  should be put in DYNFLAGS (if they apply only to shared object
 	  construction) or LDFLAGS (if they apply in general).
 
-	MAPDIR
+	MAPFILES (if necessary)
 
-	  Set to the directory in which your library mapfile is built.  If
-	  your library builds its mapfile from specfiles, set this to
-	  `../spec/$(TRANSMACH)' (TRANSMACH is the same as MACH for
-	  32-bit targets, and the same as MACH64 for 64-bit targets).
+	  Set to the list of mapfiles used to link each ISA-specific version
+	  of your library.  This defaults to `$(SRCDIR)/mapfile-vers' in
+	  Makefile.lib, so you only need to change this if you have additional
+	  mapfiles or your mapfile doesn't follow the standard naming
+	  convention.  If you have supplemental ISA-dependent mapfiles that
+	  reside in the respective <isa> directories, you can augment
+	  MAPFILES like this:
 
-	MAPFILE (required if your mapfile is under source control)
-
-	  Set to the path to your library mapfile.  If your library builds
-	  its mapfile from specfiles, this need not be set.  If you set this,
-	  you must also set DYNFLAGS to include `-M $(MAPFILE)' and set
-	  DYNLIB to depend on MAPFILE.
-
-	SPECMAPFILE (required if your mapfile is generated from specfiles)
-
-	  Set to the path to your generated mapfile (usually
-	  `$(MAPDIR)/mapfile').  If your library mapfile is under source
-	  control, you need not set this. Setting this triggers a number of
-	  features in higher-level Makefiles:
-
-		* Your shared library will automatically be linked with
-		  `-M $(SPECMAPFILE)'.
-
-		* A `make clobber' will remove $(SPECMAPFILE).
-
-		* Changes to $(SPECMAPFILE) will cause your shared library
-		  to be rebuilt.
-
-		* An attempt to build $(SPECMAPFILE) will automatically
-		  cause a `make mapfile' to be done in MAPDIR.
+		MAPFILES += mapfile-vers
 
 	CPPFLAGS (if necessary)
 
@@ -539,38 +507,41 @@ Once again, here's libinetutil's common Makefile, which shows how many of
 these directives go together.  Note that Makefile.rootfs is included to
 cause libinetutil.so.1 to be installed in /lib rather than /usr/lib:
 
-		LIBRARY =	libinetutil.a
-		VERS =		.1
-		OBJECTS =	octet.o inetutil4.o ifspec.o
+	LIBRARY =	libinetutil.a
+	VERS =		.1
+	OBJECTS =	octet.o inetutil4.o ifspec.o ifaddrlist.o eh.o tq.o
 
-		include ../../Makefile.lib
-		include ../../Makefile.rootfs
+	include ../../Makefile.lib
+	include ../../Makefile.rootfs
 
-		LIBS =		$(DYNLIB) $(LINTLIB)
-		SRCS =		$(COMDIR)/octet.c $(SRCDIR)/inetutil4.c \
-				$(SRCDIR)/ifspec.c
-		$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
-		LDLIBS +=	-lsocket -lc
+	LIBS =		$(DYNLIB) $(LINTLIB)
 
-		SRCDIR =	../common
-		COMDIR =	$(SRC)/common/net/dhcp
-		MAPDIR =	../spec/$(TRANSMACH)
-		SPECMAPFILE =	$(MAPDIR)/mapfile
+	SRCDIR =	../common
+	COMDIR =	$(SRC)/common/net/dhcp
+	SRCS =		$(COMDIR)/octet.c $(SRCDIR)/inetutil4.c \
+			$(SRCDIR)/ifspec.c $(SRCDIR)/eh.c $(SRCDIR)/tq.c \
+			$(SRCDIR)/ifaddrlist.c
 
-		CFLAGS +=	$(CCVERBOSE)
-		CPPFLAGS +=	-I$(SRCDIR)
+	$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
+	LDLIBS +=	-lsocket -lc
 
-		.KEEP_STATE:
+	CFLAGS +=	$(CCVERBOSE)
+	CPPFLAGS +=	-I$(SRCDIR)
 
-		all: $(LIBS)
+	.KEEP_STATE:
 
-		lint: lintcheck
+	all: $(LIBS)
 
-		pics/%.o: $(COMDIR)/%.c
-			$(COMPILE.c) -o $@ $<
-			$(POST_PROCESS_O)
+	lint: lintcheck
 
-		include ../../Makefile.targ
+	pics/%.o: $(COMDIR)/%.c
+		$(COMPILE.c) -o $@ $<
+		$(POST_PROCESS_O)
+
+	include ../../Makefile.targ
+
+The mapfile for libinetutil is named `mapfile-vers' and resides in $(SRCDIR),
+so the MAPFILES definition is omitted, defaulting to $(SRCDIR)/mapfile-vers.
 
 Note that for libinetutil, not all of the object files come from SRCDIR.  To
 support this, an alternate source file directory named COMDIR is defined, and
@@ -608,9 +579,16 @@ Makefiles for libinetutil:
 
 		install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
 
+	amd64/Makefile:
+
+		include ../Makefile.com
+		include ../../Makefile.lib.64
+
+		install: all $(ROOTLIBS64) $(ROOTLINKS64)
+
 Observe that there is no .KEEP_STATE directive in these Makefiles, since all
 of these Makefiles include libinetutil/Makefile.com, and it already has a
-.KEEP_STATE directive.  Also, note that the 64-bit Makefile also includes
+.KEEP_STATE directive.  Also, note that the 64-bit Makefiles also include
 Makefile.lib.64, which overrides some of the definitions contained in the
 higher level Makefiles included by the common Makefile so that 64-bit
 compiles work correctly.
@@ -618,7 +596,7 @@ compiles work correctly.
 CTF Data in Libraries
 ---------------------
 
-By default, all position-indepedent objects are built with CTF data using
+By default, all position-independent objects are built with CTF data using
 ctfconvert, which is then merged together using ctfmerge when the shared
 object is built.  All C-source objects processed via ctfmerge need to be
 processed via ctfconvert or the build will fail.  Objects built from non-C

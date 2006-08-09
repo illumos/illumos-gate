@@ -19,10 +19,11 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 LIBRARY=	ldprof.a
 VERS=		.1
@@ -39,7 +40,7 @@ ROOTLIBDIR=	$(ROOT)/usr/lib/link_audit
 
 SGSPROTO=	../../proto/$(MACH)
 
-MAPFILE=	mapfile-vers
+MAPFILES =	mapfile-vers
 
 # Building SUNWonld results in a call to the `package' target.  Requirements
 # needed to run this application on older releases are established:
@@ -48,7 +49,7 @@ MAPFILE=	mapfile-vers
 DLLIB =		$(VAR_DL_LIB)
 package	:=	DLLIB = $(VAR_PKG_DL_LIB)
 
-DYNFLAGS +=	-M$(MAPFILE) $(USE_PROTO)
+DYNFLAGS +=	$(USE_PROTO)
 CPPFLAGS=	-I. -I../common -I../../include \
 		-I../../rtld/common \
 		-I../../include/$(MACH) \

@@ -1,0 +1,178 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_1.6 {
+    global:
+	getipv4sourcefilter;
+	getsourcefilter;
+	setipv4sourcefilter;
+	setsourcefilter;
+} SUNW_1.5;
+
+SUNW_1.5 {
+    global:
+	inet6_opt_append;
+	inet6_opt_find;
+	inet6_opt_finish;
+	inet6_opt_get_val;
+	inet6_opt_init;
+	inet6_opt_next;
+	inet6_opt_set_val;
+	inet6_rth_add;
+	inet6_rth_getaddr;
+	inet6_rth_init;
+	inet6_rth_reverse;
+	inet6_rth_segments;
+	inet6_rth_space;
+	sockatmark;
+	__xnet_getaddrinfo;
+} SUNW_1.4;
+
+SUNW_1.4 {
+    global:
+	freeaddrinfo;
+	gai_strerror;
+	getaddrinfo;
+	getnameinfo;
+	if_freenameindex;
+	if_indextoname;
+	if_nameindex;
+	if_nametoindex;
+	in6addr_any;
+	in6addr_loopback;
+	rcmd_af;
+	rexec_af;
+	rresvport_af;
+} SUNW_1.3;
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.2 or SUNW_1.3 symbols, but they are now kept as placeholders.
+# Don't add any symbols to these versions.
+
+SUNW_1.3 {
+    global:
+	SUNW_1.3;
+} SUNW_1.2;
+
+SUNW_1.2 {
+    global:
+	SUNW_1.2;
+} SUNW_1.1;
+
+SUNW_1.1 {
+    global:
+	__xnet_bind;
+	__xnet_connect;
+	__xnet_getsockopt;
+	__xnet_listen;
+	__xnet_recvmsg;
+	__xnet_sendmsg;
+	__xnet_sendto;
+	__xnet_socket;
+	__xnet_socketpair;
+} SUNW_0.7;
+
+SUNW_0.7 {
+    global:
+	endnetent;
+	endprotoent;
+	endservent;
+	ether_aton;
+	ether_hostton;
+	ether_line;
+	ether_ntoa;
+	ether_ntohost;
+	getnetbyaddr;
+	getnetbyaddr_r;
+	getnetbyname;
+	getnetbyname_r;
+	getnetent;
+	getnetent_r;
+	getprotobyname_r;
+	getprotobynumber_r;
+	getprotoent_r;
+	getservbyname_r;
+	getservbyport_r;
+	getservent;
+	getservent_r;
+	htonl;
+	htons;
+	ntohl;
+	ntohs;
+	rcmd;
+	rexec;
+	rresvport;
+	ruserok;
+	setnetent;
+	setprotoent;
+	setservent;
+	socketpair;
+};
+
+# There really should be only one SUNWprivate version.
+# Don't add any more.  Add new private symbols to SUNWprivate_1.3
+
+SUNWprivate_1.3 {
+    global:
+	_link_aton;
+	_link_ntoa;
+} SUNWprivate_1.2;
+
+SUNWprivate_1.2 {
+    global:
+	getnetmaskbyaddr;
+	getnetmaskbynet;
+} SUNWprivate_1.1;
+
+SUNWprivate_1.1 {
+    global:
+	_accept;
+	_bind;
+	bindresvport;
+	bootparams_getbyname;
+	_connect;
+	_getpeername;
+	_getsockname;
+	_getsockopt;
+	_listen;
+	_recv;
+	_recvfrom;
+	_recvmsg;
+	rresvport_addr;
+	_ruserpass;
+	_send;
+	_sendmsg;
+	_sendto;
+	_setsockopt;
+	_shutdown;
+	_socket;
+	_socket_bsd;
+	_socketpair;
+	_socketpair_bsd;
+    local:
+	*;
+};

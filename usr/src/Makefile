@@ -202,7 +202,7 @@ check:	$(CHKHDRSUBDIRS) $(CHKMFSTSUBDIRS)
 # don't contain actual source code.
 #
 $(CLOSED_BUILD)XRDIRS += ../closed
-XRPRUNE = spec pkgdefs prototypes xmod
+XRPRUNE = pkgdefs prototypes xmod
 XRINCDIRS = uts/common head ucbhead
 $(CLOSED_BUILD)XRINCDIRS = uts/common ../closed/uts/common head ucbhead
 

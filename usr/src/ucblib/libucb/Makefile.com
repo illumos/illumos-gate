@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# ucblib/libucb/Makefile.com
-# common part for i386/amd64/sparc/sparcv9
 #
 
 LIBRARY=	libucb.a
@@ -85,8 +81,7 @@ include $(SRC)/lib/Makefile.lib
 ROOTLIBDIR=	$(ROOT)/usr/ucblib
 ROOTLIBDIR64=	$(ROOT)/usr/ucblib/$(MACH64)
 
-MAPFILE=	$(MAPDIR)/mapfile
-MAPOPTS=	$(MAPFILE:%=-M%)
+MAPFILES =	../port/mapfile-vers mapfile-vers
 
 SRCS=		$(PORTGENOBJS:%.o=../port/gen/%.c) \
 		$(PORTSTDIOOBJS:%.o=../port/stdio/%.c) \
@@ -110,7 +105,6 @@ $(LINTLIB):= SRCS=../port/llib-lucb
 
 CFLAGS	+=	$(CCVERBOSE)
 CFLAGS64 +=	$(CCVERBOSE)
-DYNFLAGS +=	$(MAPOPTS)
 LDLIBS +=	-lelf -lc
 
 CPPFLAGS = -D$(MACH) -I$(ROOT)/usr/ucbinclude -I../inc \
@@ -130,27 +124,22 @@ all: $(LIBS)
 
 lint: lintcheck
 
-$(DYNLIB): 	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
-
-objs/%.o pics/%.o: ../port/gen/%.c
+pics/%.o: ../port/gen/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-objs/%.o pics/%.o: ../port/stdio/%.c
+pics/%.o: ../port/stdio/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-objs/%.o pics/%.o: ../port/sys/%.c
+pics/%.o: ../port/sys/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
 # shared (sparc/sparcv9/i386/amd64) platform-specific rule
-objs/%.o pics/%.o: sys/%.c
+pics/%.o: sys/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-objs/%.o pics/%.o: ../$(MACH)/sys/%.s
+pics/%.o: ../$(MACH)/sys/%.s
 	$(BUILD.s)
 	$(POST_PROCESS_O)
 

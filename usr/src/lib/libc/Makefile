@@ -2,7 +2,7 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, (the "License").
+# Common Development and Distribution License (the "License").
 # You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -100,7 +99,7 @@ $(ROOTVARIANTDIR)/$(VAR2_DYNLIB)	:= FILEMODE= 755
 
 .KEEP_STATE:
 
-all:	check_i18n .WAIT spec .WAIT lib32 $(BUILD64) .WAIT lib64 .WAIT etc
+all:	check_i18n .WAIT lib32 $(BUILD64) .WAIT lib64 .WAIT etc
 
 check_i18n:
 	@if [ ! -f $(ROOTFS_LIBDIR)/libc_i18n.a -o \
@@ -140,7 +139,6 @@ $($(MACH)_ETC): FRC
 
 install:	all			\
 		etc			\
-		spec			\
 		inslib32		\
 		$(BUILD64) inslib64
 
@@ -199,10 +197,10 @@ lint	:=	TARGET= lint
 
 .PARALLEL:	$(SUBDIRS)
 
-spec $(SUBDIRS): FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; VERSION='$(VERSION)' $(MAKE) $(TARGET)
 
-clean clobber: spec .WAIT $(SUBDIRS)
+clean clobber: $(SUBDIRS)
 	$(RM) -r $(MACH)/i18n_pics
 	$(BUILD64)$(RM) -r $(MACH64)/i18n_pics
 
@@ -215,8 +213,6 @@ catalog:
 
 $(MSGDOMAIN):
 	$(INS.dir)
-
-ARCHITECTURES = $(MACH) $(BUILD64) $(MACH64)
 
 cscope.out tags: FRC
 	$(XREF) -x $@

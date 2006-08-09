@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -25,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/librsm/Makefile.com
-#
 
 LIBRARY= librsm.a
 VERS= .2
@@ -38,8 +35,7 @@ OBJECTS = rsmlib.o rsmgen.o rsmloopback.o
 # include library definitions, do not change order of include and DYNLIB
 include ../../Makefile.lib
 
-MAPFILE = 	$(MAPDIR)/mapfile
-SRCS =		$(OBJECTS:%.o=../common/%.c)
+SRCDIR =	../common
 
 LIBS = $(DYNLIB)
 
@@ -54,8 +50,6 @@ $(NOT_RELEASE_BUILD)COPTFLAG64 =
 
 CPPFLAGS = -I../inc -I../../common/inc $(CPPFLAGS.master) -D_REENTRANT $(DEBUG)
 
-DYNFLAGS += -M$(MAPFILE)
-
 LDLIBS += -lc
 
 .KEEP_STATE:
@@ -63,11 +57,6 @@ LDLIBS += -lc
 all:  $(LIBS) fnamecheck
 
 lint: lintcheck
-
-$(DYNLIB): 	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
 
 # include library targets
 include ../../Makefile.targ

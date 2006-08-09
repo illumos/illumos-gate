@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -51,9 +50,9 @@ lint := TARGET = lint
 
 .KEEP_STATE:
 
-all lint clean clobber: spec .WAIT $(SUBDIRS)
+all lint clean clobber: $(SUBDIRS)
 
-install: install_h install_mibs spec .WAIT $(SUBDIRS)
+install: install_h install_mibs .WAIT $(SUBDIRS)
 
 install_h: $(ROOTFMHDRS)
 
@@ -61,7 +60,7 @@ install_mibs: $(ROOTSMAMIBDIR) $(ROOTMIBS)
 
 check: $(CHECKHDRS)
 
-spec $(SUBDIRS): FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 $(ROOTSMAMIBDIR):

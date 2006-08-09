@@ -1,15 +1,311 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Special mapfile to establish h_errno as a filter on libnsl.  As a filtered
-# symbol, this isn't visible to apptrace, and thus doesn't have to be defined
-# from the specfiles.  To ensure the symbol remains in .bss, with the correct
-# size, its filtering capabilities are assigned here rather than via a specfile.
 
-SUNW_2.1 {
-	global:
-		h_errno = FILTER libnsl.so.1;
+SUNW_2.3 {		# SunOS 5.11 (Solaris 11)
+    global:
+	inet_aton = FUNCTION FILTER libnsl.so.1;
+} SUNW_2.2;
+
+SUNW_2.2 {		# SunOS 5.9 (Solaris 9)
+    global:
+	fp_resstat;
+	herror;
+	res_hostalias;
+	res_nclose;
+	res_ninit;
+	res_nmkquery;
+	res_nquery;
+	res_nquerydomain;
+	res_nsearch;
+	res_nsend;
+	res_nsendsigned;
+} SUNW_2.1;
+
+SUNW_2.1 {		# SunOS 5.6 (Solaris 2.6)
+    global:
+	dn_comp;
+	dn_expand;
+	__dn_skipname;
+	__fp_query;
+	_getlong;
+	_getshort;
+	h_errno = FILTER libnsl.so.1;
+	__hostalias;
+	hstrerror;
+	__p_cdname;
+	__p_class;
+	__p_query;
+	__p_time;
+	__p_type;
+	__putlong;
+	_res;
+	res_init;
+	res_mkquery;
+	res_query;
+	res_querydomain;
+	res_search;
+	res_send;
+	res_update;
+};
+
+# There really should be only one SUNWprivate version.
+# Don't add any more.  Add new private symbols to SUNWprivate_2.2
+
+SUNWprivate_2.2 {
+    global:
+	isc_gethexstring;
+	isc_puthexstring;
+	__log_close_debug_channels;
+	__memactive;
+	p_sockun;
+	res_gethostbyname2;
+	res_getservers;
+	res_nametoclass;
+	res_nametotype;
+	res_nopt;
+	res_setservers;
+} SUNWprivate_2.1;
+
+SUNWprivate_2.1 {
+    global:
+	__areweinnamed;
+	__assertion_failed;
+	assertion_type_to_text;
+	b64_ntop;
+	__b64_ntop;
+	b64_pton;
+	__b64_pton;
+	__ctl_client;
+	__ctl_command;
+	__ctl_endclient;
+	__ctl_endserver;
+	__ctl_getcsctx;
+	__ctl_response;
+	__ctl_sendhelp;
+	__ctl_server;
+	__ctl_setcsctx;
+	daemon;
+	dn_count_labels;
+	__dn_count_labels;
+	dn_skipname;
+	dst_buffer_to_key;
+	dst_check_algorithm;
+	dst_dnskey_to_key;
+	dst_free_key;
+	dst_generate_key;
+	dst_init;
+	dst_key_to_buffer;
+	dst_random;
+	dst_read_key;
+	dst_s_calculate_bits;
+	dst_s_conv_bignum_b64_to_u8;
+	dst_s_conv_bignum_u8_to_b64;
+	dst_s_dns_key_id;
+	dst_s_get_int16;
+	dst_s_id_calc;
+	dst_sign_data;
+	dst_s_put_int16;
+	dst_s_verify_str;
+	dst_t_func;
+	dst_verify_data;
+	dst_write_key;
+	__evAddTime;
+	__evCancelConn;
+	__evCancelRW;
+	__evClearTimer;
+	__evConnect;
+	__evConsIovec;
+	__evConsTime;
+	__evCreate;
+	__evDeselectFD;
+	__evDestroy;
+	__evDispatch;
+	__evDo;
+	__evGetNext;
+	__evHighestFD;
+	__evListen;
+	__evNowTime;
+	__evRead;
+	__evResetTimer;
+	__evSelectFD;
+	__evSetDebug;
+	__evSetTimer;
+	__evTimeVal;
+	__evUnwait;
+	__evWaitFor;
+	fp_nquery;
+	__fp_nquery;
+	fp_query;
+	__fp_resstat;
+	h_errlist;
+	__h_errno;
+	__h_errno_set;
+	hostalias;
+	inet_net_ntop;
+	inet_net_pton;
+	inet_nsap_addr;
+	inet_nsap_ntoa;
+	irs_destroy;
+	__ISC_res_freeupdrec;
+	__ISC_res_mkupdate;
+	__ISC_res_mkupdrec;
+	__ISC_res_nmkupdate;
+	__ISC_res_nupdate;
+	__ISC_res_update;
+	key_file_fmt_str;
+	loc_aton;
+	__loc_aton;
+	loc_ntoa;
+	__loc_ntoa;
+	__log_add_channel;
+	__log_category_is_active;
+	__log_check;
+	__log_close_stream;
+	__log_free_channel;
+	__log_free_context;
+	__log_get_channel_type;
+	__log_get_stream;
+	__log_inc_references;
+	__log_new_context;
+	__log_new_file_channel;
+	__log_new_null_channel;
+	__log_new_syslog_channel;
+	__log_open_stream;
+	__log_option;
+	__log_set_file_owner;
+	__log_vwrite;
+	__log_write;
+	__memget;
+	__memget_record;
+	__memput;
+	__memput_record;
+	__memstats;
+	__net_data_init;
+	net_data_minimize;
+	__ns_datetosecs;
+	__ns_find_tsig;
+	_ns_flagdata;
+	__ns_format_ttl;
+	__ns_get16;
+	__ns_get32;
+	__ns_initparse;
+	__ns_makecanon;
+	__ns_msg_getflag;
+	__ns_name_ntol;
+	__ns_name_ntop;
+	__ns_name_pton;
+	__ns_name_rollback;
+	__ns_name_unpack;
+	__ns_parserr;
+	__ns_parse_ttl;
+	__ns_put16;
+	__ns_samedomain;
+	__ns_samename;
+	__ns_sign;
+	__ns_sign2;
+	__ns_sign_tcp;
+	__ns_sign_tcp2;
+	__ns_sign_tcp_init;
+	__ns_skiprr;
+	__ns_sprintrr;
+	__ns_sprintrrf;
+	__ns_verify;
+	__ns_verify_tcp;
+	__ns_verify_tcp_init;
+	p_cdname;
+	__p_cert_syms;
+	p_class;
+	__p_class_syms;
+	p_fqnname;
+	__p_key_syms;
+	p_query;
+	p_rcode;
+	p_secstodate;
+	__p_secstodate;
+	p_section;
+	__p_section;
+	p_time;
+	p_type;
+	__p_type_syms;
+	putlong;
+	putshort;
+	__putshort;
+	res_close;
+	__res_disable_mt;
+	res_dnok;
+	__res_dnok;
+	__res_enable_mt;
+	res_endhostent;
+	res_findzonecut;
+	res_freehostent;
+	res_freeupdrec;
+	__res_get_h_errno;
+	res_gethostbyaddr;
+	res_gethostbyname;
+	res_gethostent;
+	res_getipnodebyaddr;
+	res_getipnodebyname;
+	__res_get_res;
+	res_hnok;
+	__res_hnok;
+	res_isourserver;
+	res_mailok;
+	__res_mailok;
+	res_mkupdate;
+	res_mkupdrec;
+	res_nameinquery;
+	__res_nameinquery;
+	res_nisourserver;
+	_res_opcodes;
+	__res_override_retry;
+	res_ownok;
+	__res_ownok;
+	res_pquery;
+	res_queriesmatch;
+	__res_queriesmatch;
+	res_randomid;
+	__res_randomid;
+	res_sendsigned;
+	res_sethostent;
+	__res_set_no_hosts_fallback;
+	__res_state;
+	__res_unset_no_hosts_fallback;
+	set_assertion_failure_callback;
+	sym_ntop;
+	__sym_ntop;
+	sym_ntos;
+	__sym_ntos;
+	sym_ston;
+	__sym_ston;
+	tree_add;
+	tree_init;
+	tree_mung;
+	tree_srch;
+	tree_trav;
+    local:
+	*;
 };

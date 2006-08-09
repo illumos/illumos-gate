@@ -24,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# usr/src/lib/openssl/Makefile.com
-#
 
 LIBRARY = libcrypto.a
 
@@ -235,10 +233,9 @@ CFLAGS +=	-K PIC
 CFLAGS64 +=	-K PIC
 LDLIBS +=	-lc -lsocket -lnsl
 
-MAPFILES =	../common/mapfile
-MAPOPTS =	$(MAPFILES:%=-M %)
+DYNFLAGS +=	$(OPENSSL_FILTER_FLAG) $(OPENSSL_DYNFLAGS)
 
-DYNFLAGS +=	$(OPENSSL_FILTER_FLAG) $(OPENSSL_DYNFLAGS) $(MAPOPTS)
+MAPFILES =	../common/mapfile
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 SRCDIR =	$(OPENSSL_SRC)/crypto
@@ -247,7 +244,8 @@ $(LINTLIB) := 	SRCS = $(SRCDIR)/$(LINTSRC)
 
 # We do not want to give the CFLAGS and build date information
 # so we define the magic NO_WINDOWS_BRAINDEATH to suppress this
-pics/cversion.o := CPPFLAGS += -DNO_WINDOWS_BRAINDEATH
+pics/cversion.o :=	CPPFLAGS += -DNO_WINDOWS_BRAINDEATH
+lint :=			CPPFLAGS += -DNO_WINDOWS_BRAINDEATH
 
 .KEEP_STATE:
 

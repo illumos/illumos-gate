@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 SYSOBJS= signal.o
-
-MAPDIR=	../spec/amd64
 
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
@@ -37,7 +34,7 @@ DYNFLAGS += $(DYNFLAGS64)
 BUILD.SO= $(CC) $(CFLAGS) -o $@ -G $(DYNFLAGS) $(PICS) -L $(ROOT)/usr/lib/$(MACH64) $(LDLIBS)
 
 # amd64-specific rule
-objs/%.o pics/%.o: ../$(MACH)/sys/%.c
+pics/%.o: ../$(MACH)/sys/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 

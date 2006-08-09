@@ -24,8 +24,11 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
+#
 # Platform specific Makefile for libc_psr.
 #
+
 PLATFORM	= sun4u-opl
 COMPAT_PLAT	= sun4u-us3
 CLASS		= 32
@@ -34,23 +37,14 @@ OBJECTS		= memcpy.o memset.o memcmp.o
 
 include ../Makefile.com
 
-MAPDIR=		../../spec/$(PLATFORM)/$(MACH)
-MAPFILE=	$(MAPDIR)/mapfile-$(MACH)
-MAPFILES=	$(MAPFILE) $(MAPFILE-FLTR)
-MAPOPTS=	$(MAPFILES:%=-M %)
-DYNFLAGS +=	$(MAPOPTS)
-CLOBBERFILES +=	$(MAPFILE)
+MAPFILES =	../../sun4u/mapfile-vers $(MAPFILE-FLTR)
+
 ASFLAGS	+=	-xarch=v8plusb
 
 # Redefine shared object build rule to use $(LD) directly (this avoids .init
 # and .fini sections being added).
 
 BUILD.SO=	$(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(LDLIBS)
-
-$(DYNLIB):	$(MAPFILES)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) `basename $@`
 
 .KEEP_STATE:
 

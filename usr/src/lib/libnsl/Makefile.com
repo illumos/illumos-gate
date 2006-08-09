@@ -17,8 +17,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-
-
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -26,6 +24,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
 LIBRARY= libnsl.a
 VERS=	.1
 
@@ -177,9 +176,8 @@ include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
-MAPDIR=		../spec/$(TRANSMACH)
-SPECMAPFILE=	$(MAPDIR)/mapfile
-MAPOPTS=	$(MAPFILES:%=-M%)
+SRCDIR=		../common
+MAPFILES +=	mapfile-vers
 
 # Override the position-independent code generation flags.
 #
@@ -205,21 +203,17 @@ CCFLAGS64 += $(NOEXCEPTIONS)
 CPPFLAGS +=	-I$(SRC)/lib/common/inc -I$(SRC)/lib/libnsl/include -D_REENTRANT
 CPPFLAGS +=	-I$(SRC)/lib/libnsl/dial
 
-CFLAGS +=	-v
+CFLAGS +=	$(CCVERBOSE)
 
 LAZYLIBS = $(ZLAZYLOAD) -lmp -lmd -lscf $(ZNOLAZYLOAD)
 lint := LAZYLIBS = -lmd
 LDLIBS +=	$(LAZYLIBS) -lc
-DYNFLAGS +=	$(MAPOPTS)
 
-SRCDIR=		../common
 $(LINTLIB):=	SRCS=$(SRCDIR)/$(LINTSRC)
 LINTFLAGS +=	-m -DPORTMAP
 LINTFLAGS64 +=	-m -DPORTMAP
 
 .KEEP_STATE:
-
-$(DYNLIB):	$(MAPFILES)
 
 all: $(LIBS) fnamecheck
 

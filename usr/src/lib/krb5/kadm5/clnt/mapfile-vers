@@ -1,0 +1,148 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNWprivate_1.1 {
+    global:
+	chpass_principal_1;
+	chpw_error_message;
+	chrand_principal_1;
+	create_policy_1;
+	create_principal_1;
+	delete_policy_1;
+	delete_principal_1;
+	display_status;
+	get_policy_1;
+	get_pols_1;
+	get_principal_1;
+	get_princs_1;
+	get_privs_1;
+	init_1;
+	kadm5_chpass_principal;
+	kadm5_chpass_principal_3;
+	kadm5_chpass_principal_util;
+	kadm5_chpass_principal_v2;
+	kadm5_create_policy;
+	kadm5_create_principal;
+	kadm5_create_principal_3;
+	kadm5_decrypt_key;
+	kadm5_delete_policy;
+	kadm5_delete_principal;
+	kadm5_destroy;
+	kadm5_flush;
+	kadm5_free_config_params;
+	kadm5_free_name_list;
+	kadm5_free_policy_ent;
+	kadm5_free_principal_ent;
+	kadm5_get_adm_host_srv_name;
+	kadm5_get_config_params;
+	kadm5_get_cpw_host_srv_name;
+	kadm5_get_kiprop_host_srv_name;
+	_kadm5_get_kpasswd_protocol;
+	kadm5_get_master;
+	kadm5_get_policies;
+	kadm5_get_policy;
+	kadm5_get_principal;
+	kadm5_get_principals;
+	kadm5_get_privs;
+	kadm5_init;
+	kadm5_init_iprop;
+	kadm5_init_with_creds;
+	kadm5_init_with_password;
+	kadm5_init_with_skey;
+	kadm5_modify_policy;
+	kadm5_modify_principal;
+	kadm5_randkey_principal;
+	kadm5_randkey_principal_3;
+	kadm5_randkey_principal_old;
+	kadm5_rename_principal;
+	kadm5_setkey_principal_3;
+	krb5_aprof_finish;
+	krb5_aprof_get_deltat;
+	krb5_aprof_get_int32;
+	krb5_aprof_get_string;
+	krb5_aprof_getvals;
+	krb5_aprof_init;
+	krb5_flags_to_string;
+	krb5_free_key_data_contents;
+	krb5_free_realm_params;
+	krb5_input_flag_to_string;
+	krb5_keysalt_is_present;
+	krb5_keysalt_iterate;
+	krb5_klog_close;
+	krb5_klog_init;
+	krb5_klog_syslog;
+	krb5_log_error_table;
+	krb5_mk_chpw_req;
+	krb5_rd_chpw_rep;
+	krb5_read_realm_params;
+	krb5_string_to_flags;
+	krb5_string_to_keysalts;
+	modify_policy_1;
+	modify_principal_1;
+	rename_principal_1;
+	xdr_chpass_arg;
+	xdr_chrand_arg;
+	xdr_chrand_ret;
+	xdr_cpol_arg;
+	xdr_cprinc_arg;
+	xdr_dpol_arg;
+	xdr_dprinc_arg;
+	xdr_generic_ret;
+	xdr_getprivs_ret;
+	xdr_gpol_arg;
+	xdr_gpol_ret;
+	xdr_gpols_arg;
+	xdr_gpols_ret;
+	xdr_gprinc_arg;
+	xdr_gprinc_ret;
+	xdr_gprincs_arg;
+	xdr_gprincs_ret;
+	xdr_kadm5_policy_ent_rec;
+	xdr_kadm5_principal_ent_rec;
+	xdr_kadm5_principal_ent_rec_v1;
+	xdr_kadm5_ret_t;
+	xdr_krb5_deltat;
+	xdr_krb5_enctype;
+	xdr_krb5_flags;
+	xdr_krb5_int16;
+	xdr_krb5_keyblock;
+	xdr_krb5_key_data_nocontents;
+	xdr_krb5_kvno;
+	xdr_krb5_octet;
+	xdr_krb5_principal;
+	xdr_krb5_timestamp;
+	xdr_krb5_tl_data;
+	xdr_krb5_ui_4;
+	xdr_mpol_arg;
+	xdr_mprinc_arg;
+	xdr_nullstring;
+	xdr_nulltype;
+	xdr_rprinc_arg;
+	xdr_ui_4;
+    local:
+	*;
+};

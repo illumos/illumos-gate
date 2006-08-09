@@ -24,8 +24,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libc/sparcv9/Makefile
-#
+
 LIBCBASE=.
 
 LIBRARY= libc.a
@@ -920,8 +919,7 @@ ALTPICS= $(TRACEOBJS:%=pics/%)
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR64)/libc_i18n.a
 $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS)
 
-MAPDIR=		../spec/sparcv9
-MAPFILE=	$(MAPDIR)/mapfile
+MAPFILES =	../port/mapfile-vers mapfile-vers
 
 sparcv9_C_PICFLAGS= -K PIC
 CFLAGS64 +=	$(EXTN_CFLAGS)
@@ -932,8 +930,8 @@ ASFLAGS=	-K PIC -P -D__STDC__ -D_ASM -D__sparcv9 $(CPPFLAGS) \
 
 # Inform the run-time linker about libc specialized initialization
 RTLDINFO =	-z rtldinfo=tls_rtldinfo
+DYNFLAGS +=	$(RTLDINFO)
 
-DYNFLAGS +=	-M $(MAPFILE) $(RTLDINFO)
 DYNFLAGS +=	$(EXTN_DYNFLAGS)
 
 BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
@@ -957,7 +955,7 @@ CLEANFILES=			\
 	pics/crtn.o		\
 	$(ALTPICS)
 
-CLOBBERFILES +=	$(MAPFILE) $(LIB_PIC)
+CLOBBERFILES +=	$(LIB_PIC)
 
 # list of C source for lint
 SRCS=							\
@@ -993,11 +991,6 @@ SRCS=							\
 # $(DYNLIB) $(LIB_PIC) := DYNOBJS = _rtbootld.o
 $(DYNLIB) := CRTI = crti.o
 $(DYNLIB) := CRTN = crtn.o
-
-$(DYNLIB):	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
 
 # Files which need the threads .il inline template
 TIL=				\

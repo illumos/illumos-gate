@@ -34,18 +34,17 @@ include ../../../Makefile.rootfs
 
 ROOTLIBDIR=	$(ROOT)/usr/lib
 
-LIBS =			$(DYNLIB)
+SRCDIR =	../common
 
-SRCS = $(OBJECTS:%.o = $(SRCDIR)/%.c)
+LIBS =			$(DYNLIB)
 
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-SRCDIR =	../common
-MAPFILE =	$(SRCDIR)/mapfile
-
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
-DYNFLAGS +=	-M $(MAPFILE)
+
+MAPFILES =	$(SRCDIR)/mapfile
+
 LDLIBS +=	-lc
 
 .KEEP_STATE:

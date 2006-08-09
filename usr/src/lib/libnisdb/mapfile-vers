@@ -1,0 +1,184 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_2.1 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SUNW_2.1 {
+    global:
+	SUNW_2.1;
+};
+
+SUNWprivate_2.1 {
+    global:
+	abort_transaction;
+	addUpdate;
+	assertExclusive;
+	beginTransaction;
+	bp2buf;
+	cons;
+	createQuery;
+	db_abort_merge_dict;
+	db_add_entry;
+	__db_add_entry_nolog;
+	__db_add_entry_nosync;
+	__db_allowLDAP;
+	db_begin_merge_dict;
+	db_checkpoint;
+	__db_commit;
+	__db_configure;
+	db_copy_file;
+	dbCreateFromLDAP;
+	db_create_table;
+	__db_defer;
+	db_destroy_table;
+	__db_disallowLDAP;
+	db_end_merge_dict;
+	db_extract_dict_entries;
+	db_first_entry;
+	db_in_dict_file;
+	db_initialize;
+	db_list_entries;
+	__db_list_entries;
+	db_massage_dict;
+	db_next_entry;
+	db_perror;
+	db_remove_entry;
+	__db_remove_entry_nosync;
+	db_reset_next_entry;
+	__db_rollback;
+	db_standby;
+	db_sync_log;
+	db_table_exists;
+	db_unload_table;
+	deleteLDAPobj;
+	delete_map;
+	dump_dit_to_maps;
+	dump_maps_to_dit;
+	endTransaction;
+	free_entry;
+	freeEntryObjArray;
+	freeObjAttr;
+	freeQuery;
+	freeRuleValue;
+	fullObjName;
+	get_list_max;
+	get_map_name;
+	getObjMapping;
+	get_root_object;
+	hash;
+	init_lock_map;
+	init_lock_system;
+	init_yptol_flag;
+	internalTableName;
+	internal_table_name;
+	justTesting;
+	ldapConfig;
+	ldapDBTableMapping;
+	ldapMappingList;
+	loadAllLDAP;
+	lock_core;
+	lock_map;
+	lockTransLog;
+	logmsg;
+	__make_legal;
+	mapFromLDAP;
+	mapToLDAP;
+	mflag;
+	__nisdb_get_tsd;
+	__nisdb_lock_report;
+	__nisdb_rlock;
+	__nisdb_rulock;
+	__nisdb_wlock;
+	__nisdb_wlock_trylock;
+	__nisdb_wulock;
+	__nis_find_item_mt;
+	__nis_init_hash_table;
+	__nis_insert_item_mt;
+	__nis_insert_name_mt;
+	nis_isserving;
+	__nis_item_access;
+	__nis_lock_db_table;
+	__nis_lock_hash_table;
+	__nis_pop_item_mt;
+	__nis_release_item;
+	__nis_remove_item_mt;
+	__nis_retry_sleep;
+	__nis_scan_table_mt;
+	nis_server_control;
+	__nis_ulock_db_table;
+	__nis_ulock_hash_table;
+	nogecos;
+	nopw;
+	noshell;
+	numMisaligned;
+	objFromLDAP;
+	objToLDAP;
+	p2buf;
+	parseConfig;
+	printbuf;
+	printObjAttr;
+	printQuery;
+	printTableMapping;
+	relative_name;
+	remove_root_object;
+	rename_map;
+	sc2buf;
+	setColumnsDuringConfig;
+	sfree;
+	shim_changepasswd;
+	shim_dbm_close;
+	shim_dbm_delete;
+	shim_dbm_do_nextkey;
+	shim_dbm_fetch;
+	shim_dbm_fetch_noupdate;
+	shim_dbm_firstkey;
+	shim_dbm_nextkey;
+	shim_dbm_open;
+	shim_dbm_store;
+	shim_exit;
+	single;
+	socket;
+	tbl_prototype;
+	unlock_core;
+	unlock_map;
+	unlockTransLog;
+	update_root_object;
+	validloginshell;
+	validstr;
+	verbose;
+	xdr_nis_fetus_object;
+	xdr_nis_name_abbrev;
+	ypcheck_domain_yptol;
+	ypcheck_map_existence_yptol;
+	ypmkfilename;
+	yptol_mode;
+	yptol_newlock;
+    local:
+	*;
+};

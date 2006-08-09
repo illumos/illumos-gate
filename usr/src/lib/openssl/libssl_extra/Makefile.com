@@ -24,7 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# usr/src/lib/openssl/libssl_extra/Makefile.com
 
 LIBRARY = libssl_extra.a
 
@@ -32,11 +31,13 @@ OBJECTS = ssl_algs.o ssl_ciph.o ssl_lib.o
 
 include ../../Makefile.com
 
+# There should be a mapfile here
+MAPFILES =
+
 CPPFLAGS +=	-DCRYPTO_UNLIMITED
 LDLIBS +=	$(ROOT)/$(SFWLIBDIR)/libcrypto_extra.so$(VERS)
 LDLIBS +=	$(OPENSSL_LDFLAGS) -lcrypto -lssl -lc
 DYNFLAGS +=	$(OPENSSL_DYNFLAGS)
-
 
 LIBS =		$(DYNLIB)
 SRCDIR =	$(OPENSSL_SRC)/ssl
@@ -46,5 +47,7 @@ $(LINTLIB) := 	SRCS = $(SRCDIR)/$(LINTSRC)
 .KEEP_STATE:
 
 all:		$(LIBS)
+
+lint:		lintcheck
 
 include $(SRC)/lib/Makefile.targ

@@ -17,8 +17,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-
-
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -26,13 +24,13 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libnsl/Makefile
-#
+
 PROTOCOL_DIR= $(ROOTHDRDIR)/rpcsvc
 PROTOCOL_SRCDIR= $(SRC)/head/rpcsvc
 PROTOCOL_UTS_SRCDIR= $(SRC)/uts/common/rpc
 
-SUBDIRS = spec .WAIT $(MACH) $(BUILD64) .WAIT $(MACH64)
+SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 # objects are listed by source directory
 
@@ -98,7 +96,7 @@ all:		$(PROTOCOL_DIR) $(DERIVED_FILES) .WAIT $(SUBDIRS)
 headers:	$(PROTOCOL_DIR) .WAIT $(PROTOCOL_FILES) $(PROTOCOL_FILES_UTS) \
 		$(DERIVED_FILES)
 
-install:	all $(SUBDIRS)
+install:	all .WAIT $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 
@@ -241,7 +239,7 @@ generic.po:
 $(MSGDOMAIN):
 	$(INS.dir)
 
-spec $(MACH) $(MACH64) $(SPEC) $(SPEC64):      FRC
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

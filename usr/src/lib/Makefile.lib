@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -25,6 +24,8 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
+#
 # Definitions common to libraries.
 #
 # include global definitions; SRC should be defined in the shell.
@@ -43,6 +44,27 @@ NX_MAP_sparc=
 
 NX_MAP=		$(NX_MAP_$(MACH))
 
+#
+# By default, we define the source directory for libraries to be
+# one level up from the ISA-specific directory, where the code is
+# actually built.  Many libraries define a 'common' directory to
+# contain the source.  These libraries must redefine SRCDIR as:
+#	SRCDIR = ../common
+# Other variations are possible (../port, ../src, etc).
+#
+SRCDIR =	..
+
+#
+# We define MAPFILES here for the benefit of most libraries,
+# those that follow the convention of having source files and other
+# common files in the $(SRCDIR) directory.  Libraries that do not
+# follow this convention must define MAPFILES for themselves.
+# Libraries that do follow this convention but that need supplemental
+# ISA-specific mapfiles can augment MAPFILES like this:
+#	MAPFILES += mapfile-vers
+#
+MAPFILES =	$(SRCDIR)/mapfile-vers
+
 C_SYNONYMS_H=	$(SRC)/lib/common/inc/c_synonyms.h
 
 #
@@ -53,7 +75,7 @@ C_SYNONYMS_H=	$(SRC)/lib/common/inc/c_synonyms.h
 # name that will almost surely not exist on the build machine.
 #
 HDRDIR=		/__nonexistent_directory__
-SRCDIR=		.
+
 #
 # We don't build archive (*.a) libraries by default anymore.
 # If a component of the build needs to build an archive library
@@ -147,7 +169,7 @@ SONAME=		$(DYNLIB)
 
 HSONAME=	-h$(SONAME)
 DYNFLAGS=	$(HSONAME) $(ZTEXT) $(ZDEFS) $(ZCOMBRELOC) \
-		$(SPECMAPFILE:%=-M%) $(PGA_MAPFILE:%=-M%) $(NX_MAP:%=-M%)
+		$(MAPFILES:%=-M%) $(PGA_MAPFILE:%=-M%) $(NX_MAP:%=-M%)
 
 LDLIBS=		$(LDLIBS.lib)
 
@@ -221,7 +243,7 @@ HSONAMECCC=	-h $(SONAMECCC)
 # Keep in sync with the standard DYNFLAGS
 #
 $(DYNLIBCCC):=	DYNFLAGS = $(HSONAMECCC) $(ZTEXT) $(ZDEFS) $(ZCOMBRELOC) \
-		$(SPECMAPFILE:%=-M%) $(PGA_MAPFILE:%=-M%) $(NX_MAP:%=-M%) \
+		$(MAPFILES:%=-M%) $(PGA_MAPFILE:%=-M%) $(NX_MAP:%=-M%) \
 		$(NORUNPATH)
 
 
@@ -252,15 +274,12 @@ LINTCHECKFLAGS = -m -erroff=E_NAME_DEF_NOT_USED2
 LINTCHECKFLAGS += -erroff=E_NAME_DECL_NOT_USED_DEF2 
 
 #
-# Spec/ABI stuff
+# Target Architecture
 #
-# Spectranslator Target Architecture
-TRANSMACH=	$(MACH)
-SPECMAPFILES=	$(SPECMAPFILE:%/$(MACH64)/mapfile=%/$(MACH)/mapfile)
-$(BUILD64)SPECMAPFILES += $(SPECMAPFILE:%/$(MACH)/mapfile=%/$(MACH64)/mapfile)
+TARGETMACH=	$(MACH)
 
 #
 # Allow people to define their own clobber rules.  Normal makefiles
 # shouldn't override this - they should override $(CLOBBERFILES) instead.
 #
-CLOBBERTARGFILES= $(LIBS) $(DYNLIB) $(SPECMAPFILE) $(CLOBBERFILES)
+CLOBBERTARGFILES= $(LIBS) $(DYNLIB) $(CLOBBERFILES)

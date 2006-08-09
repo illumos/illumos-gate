@@ -24,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libkrb5/Makefile.com
-#
 
 # include library definitions
 include $(SRC)/lib/Makefile.lib
@@ -69,3 +67,5 @@ clobber: clean
 
 clean:
 	-$(RM) $(LIBS)
+
+lint:

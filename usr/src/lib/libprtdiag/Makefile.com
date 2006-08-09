@@ -48,6 +48,9 @@ CFLAGS		+= $(CCVERBOSE)
 LDLIBS		+= -lc -lkstat
 DYNFLAGS	+= -Wl,-f/usr/platform/\$$PLATFORM/lib/$(DYNLIBPSR)
 
+# There should be a mapfile here
+MAPFILES =
+
 SRCDIR		= ../../common
 $(LINTLIB)	:= SRCS = $(SRCDIR)/$(LINTSRC)
 USR_PSMLINT=	$(LINTSRC:%=$(USR_PSM_LIB_DIR)/%)

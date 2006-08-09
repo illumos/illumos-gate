@@ -1,0 +1,103 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_2.1 {
+    global:
+	bldominates;
+	blequal;
+	blstrictdom;
+	fgetlabel;
+	getlabel;
+	getplabel;
+	getuserrange;
+	getzoneidbylabel;
+	getzonelabelbyid;
+	getzonelabelbyname;
+	getzonerootbyid;
+	getzonerootbylabel;
+	getzonerootbyname;
+	label_to_str;
+	m_label_alloc;
+	m_label_dup;
+	m_label_free;
+	setflabel;
+	str_to_label;
+};
+
+SUNWprivate_1.1 {
+    global:
+	bclearcvt;
+	bclearcvtfull;
+	bclearhigh;
+	bclearlow;
+	bcleartoh;
+	bcleartoh_r;
+	bcleartos;
+	bclearundef;
+	bclearvalid;
+	bisinvalid;
+	blabel_alloc;
+	blabel_free;
+	blabel_size;
+	blinrange;
+	blinset;
+	blmaximum;
+	blminimum;
+	bltocolor;
+	bltocolor_r;
+	bltype;
+	bslcvt;
+	bslcvtfull;
+	bslhigh;
+	bsllow;
+	bsltoh;
+	bsltoh_r;
+	bsltos;
+	bslundef;
+	bslvalid;
+	getlabelbypath;
+	getpathbylabel;
+	h_alloc;
+	h_free;
+	htobclear;
+	htobsl;
+	labelfields;
+	labelinfo;
+	labelvers;
+	sbcleartos;
+	sbsltos;
+	setbltype;
+	set_effective_priv;
+	set_inheritable_priv;
+	set_permitted_priv;
+	stobclear;
+	stobsl;
+	userdefs;
+	zonecopy;
+    local:
+	*;
+};

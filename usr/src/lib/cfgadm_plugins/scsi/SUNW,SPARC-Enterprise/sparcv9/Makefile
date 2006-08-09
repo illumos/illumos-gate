@@ -18,17 +18,13 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/cfgadm_plugins/scsi/SUNW,SPARC-Enterprise/sparcv9/Makefile
-#
 
-MAPDIR=	../../spec/sparcv9
 include ../Makefile.com
 include ../../../../Makefile.lib.64
 CFLAGS64 += -I../../common -I$(SRC)/uts/sun4u/opl

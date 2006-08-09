@@ -22,12 +22,9 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libdscp/sparc/Makefile
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-MAPDIR= ../spec/sparc
 include	../Makefile.com
 
 all: $(LIBS)

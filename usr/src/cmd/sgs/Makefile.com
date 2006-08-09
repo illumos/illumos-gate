@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -116,7 +115,7 @@ CHKMSGFLAGS =	$(SGSMSGTARG:%=-m %) $(SGSMSGCHK:%=-m %)
 # Native targets should use the minimum of ld(1) flags to allow building on
 # previous releases.  We use mapfiles to scope, but don't bother versioning.
 
-native :=	DYNFLAGS = $(MAPOPTS) -R$(SGSPROTO) -L$(SGSPROTO) $(ZNOVERSION)
+native :=	DYNFLAGS = -R$(SGSPROTO) -L$(SGSPROTO) $(ZNOVERSION)
 
 USE_PROTO =	-Yl,$(SGSPROTO)
 

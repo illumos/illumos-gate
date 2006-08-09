@@ -1,0 +1,146 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_1.2 {
+    global:
+	nv_alloc_fini;
+	nv_alloc_init;
+	nv_alloc_nosleep;
+	nv_alloc_reset;
+	nv_fixed_ops;
+	nvlist_add_boolean_array;
+	nvlist_add_boolean_value;
+	nvlist_add_int8;
+	nvlist_add_int8_array;
+	nvlist_add_nvpair;
+	nvlist_add_uint8;
+	nvlist_add_uint8_array;
+	nvlist_lookup_boolean_array;
+	nvlist_lookup_boolean_value;
+	nvlist_lookup_int8;
+	nvlist_lookup_int8_array;
+	nvlist_lookup_nv_alloc;
+	nvlist_lookup_pairs;
+	nvlist_lookup_uint8;
+	nvlist_lookup_uint8_array;
+	nvlist_merge;
+	nvlist_remove;
+	nvlist_remove_all;
+	nvlist_xalloc;
+	nvlist_xdup;
+	nvlist_xpack;
+	nvlist_xunpack;
+	nvpair_value_boolean_array;
+	nvpair_value_boolean_value;
+	nvpair_value_int8;
+	nvpair_value_int8_array;
+	nvpair_value_uint8;
+	nvpair_value_uint8_array;
+} SUNW_1.1.1;
+
+SUNW_1.1.1 {
+    global:
+	nvlist_add_nvlist;
+	nvlist_add_nvlist_array;
+	nvlist_lookup_nvlist;
+	nvlist_lookup_nvlist_array;
+	nvpair_value_nvlist;
+	nvpair_value_nvlist_array;
+} SUNW_1.1;
+
+SUNW_1.1 {
+    global:
+	nvlist_add_boolean;
+	nvlist_add_byte;
+	nvlist_add_byte_array;
+	nvlist_add_int16;
+	nvlist_add_int16_array;
+	nvlist_add_int32;
+	nvlist_add_int32_array;
+	nvlist_add_int64;
+	nvlist_add_int64_array;
+	nvlist_add_string;
+	nvlist_add_string_array;
+	nvlist_add_uint16;
+	nvlist_add_uint16_array;
+	nvlist_add_uint32;
+	nvlist_add_uint32_array;
+	nvlist_add_uint64;
+	nvlist_add_uint64_array;
+	nvlist_alloc;
+	nvlist_dup;
+	nvlist_free;
+	nvlist_lookup_boolean;
+	nvlist_lookup_byte;
+	nvlist_lookup_byte_array;
+	nvlist_lookup_int16;
+	nvlist_lookup_int16_array;
+	nvlist_lookup_int32;
+	nvlist_lookup_int32_array;
+	nvlist_lookup_int64;
+	nvlist_lookup_int64_array;
+	nvlist_lookup_string;
+	nvlist_lookup_string_array;
+	nvlist_lookup_uint16;
+	nvlist_lookup_uint16_array;
+	nvlist_lookup_uint32;
+	nvlist_lookup_uint32_array;
+	nvlist_lookup_uint64;
+	nvlist_lookup_uint64_array;
+	nvlist_next_nvpair;
+	nvlist_pack;
+	nvlist_size;
+	nvlist_unpack;
+	nvpair_name;
+	nvpair_type;
+	nvpair_value_byte;
+	nvpair_value_byte_array;
+	nvpair_value_int16;
+	nvpair_value_int16_array;
+	nvpair_value_int32;
+	nvpair_value_int32_array;
+	nvpair_value_int64;
+	nvpair_value_int64_array;
+	nvpair_value_string;
+	nvpair_value_string_array;
+	nvpair_value_uint16;
+	nvpair_value_uint16_array;
+	nvpair_value_uint32;
+	nvpair_value_uint32_array;
+	nvpair_value_uint64;
+	nvpair_value_uint64_array;
+};
+
+SUNWprivate_1.1 {
+    global:
+	nvlist_add_hrtime;
+	nvlist_lookup_hrtime;
+	nvlist_print;
+	nvpair_value_hrtime;
+    local:
+	*;
+};

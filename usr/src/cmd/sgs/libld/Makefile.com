@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -63,9 +62,7 @@ OBJECTS =	$(BLTOBJ) $(G_MACHOBJS32) $(G_MACHOBJS64) \
 include 	$(SRC)/lib/Makefile.lib
 include 	$(SRC)/cmd/sgs/Makefile.com
 
-MAPFILES=	../common/mapfile-vers
-MAPOPTS=	$(MAPFILES:%=-M%)
-
+SRCDIR =	../common
 ELFCAP=		$(SRC)/common/elfcap
 
 # Building SUNWonld results in a call to the `package' target.  Requirements
@@ -85,10 +82,9 @@ LINTFLAGS +=	-u -D_REENTRANT
 LINTFLAGS64 +=	-u -D_REENTRANT
 
 DYNFLAGS +=	$(BDIRECT) $(VERSREF) \
-		$(ZLAZYLOAD) $(MAPOPTS) $(USE_PROTO) '-R$$ORIGIN'
+		$(ZLAZYLOAD) $(USE_PROTO) '-R$$ORIGIN'
 
 $(VAR_POUND_3)DEFS=
-$(VAR_POUND_3)native:=	MAPOPTS	=
 native:=	DYNFLAGS	+= $(CONVLIBDIR)
 
 BLTDEFS =	msg.h

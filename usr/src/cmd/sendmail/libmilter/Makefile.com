@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -39,6 +38,9 @@ include		$(SRC)/lib/Makefile.lib
 
 REMDIR=		$(SENDMAIL)/libsm
 SRCDIR=		$(SENDMAIL)/libmilter
+
+# There should be a mapfile here
+MAPFILES =
 
 SRCS=		$(LOCOBJS:%.o=$(SRCDIR)/%.c) $(REMOBJS:%.o=$(REMDIR)/%.c)
 

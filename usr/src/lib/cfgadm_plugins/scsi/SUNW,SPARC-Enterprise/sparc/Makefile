@@ -18,17 +18,13 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/cfgadm_plugins/scsi/SUNW,SPARC-Enterprise/sparc/Makefile
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-MAPDIR=	../../spec/sparc
 include ../Makefile.com
 CFLAGS += -I../../common -I$(SRC)/uts/sun4u/opl
 

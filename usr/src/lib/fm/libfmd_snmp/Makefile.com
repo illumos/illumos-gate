@@ -18,14 +18,12 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-
 
 LIBRARY = libfmd_snmp.a
 VERS = .1
@@ -46,8 +44,7 @@ include ../../Makefile.lib
 SRCS = $(LIBSRCS:%.c=../common/%.c)
 LIBS = $(DYNLIB) $(LINTLIB)
 
-SRCDIR = ../common
-SPECMAPFILE = $(MAPDIR)/mapfile
+SRCDIR =	../common
 
 CPPFLAGS += -I../common -I. -I/usr/sfw/include
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG

@@ -32,21 +32,20 @@ OBJECTS = ipp.o ipp_types.o read.o strings.o write.o
 include ../../../Makefile.lib
 include ../../../Makefile.rootfs
 
+SRCDIR =	../common
+
 ROOTLIBDIR=	$(ROOT)/usr/lib
 
 LIBS =			$(DYNLIB)
 
-SRCS = $(OBJECTS:%.o = $(SRCDIR)/%.c)
-
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-SRCDIR =	../common
-MAPFILE =	$(SRCDIR)/mapfile
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../libpapi-common/common
-DYNFLAGS +=	-M $(MAPFILE)
+
+MAPFILES =	$(SRCDIR)/mapfile
+
 LDLIBS +=	-lpapi-common -lc
 
 .KEEP_STATE:

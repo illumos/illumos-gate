@@ -34,6 +34,8 @@ OBJECTS = job.o library.o lpd-cancel.o lpd-job.o lpd-query.o printer.o \
 include ../../../Makefile.lib
 include ../../../Makefile.rootfs
 
+SRCDIR =	../common
+
 ROOTLIBDIR=	$(ROOT)/usr/lib/print
 ROOTLIBDIR64=	$(ROOT)/usr/lib/print/$(MACH)
 
@@ -43,17 +45,16 @@ $(EXTRALINKS):	$(ROOTLINKS)
 
 LIBS =			$(DYNLIB)
 
-SRCS = $(OBJECTS:%.o = $(SRCDIR)/%.c)
-
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-SRCDIR =	../common
-MAPFILE =	$(SRCDIR)/mapfile
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../libpapi-common/common
-DYNFLAGS +=	$(BDIRECT) -M $(MAPFILE)
+
+DYNFLAGS +=	$(BDIRECT)
+
+MAPFILES =	$(SRCDIR)/mapfile
+
 LDLIBS +=	-lc
 
 .KEEP_STATE:

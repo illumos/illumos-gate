@@ -1,0 +1,281 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# Due to mistakes made early in the history of this library, there are no
+# SUNW_1.1 through SUNW_1.4 symbols, but they are now kept as placeholders.
+# Don't add any symbols to these versions.
+
+SUNW_1.4 {
+    global:
+	SUNW_1.4;
+} SUNW_1.3;
+
+SUNW_1.3 {
+    global:
+	SUNW_1.3;
+} SUNW_1.2;
+
+SUNW_1.2 {
+    global:
+	SUNW_1.2;
+} SUNW_1.1;
+
+SUNW_1.1 {
+    global:
+	SUNW_1.1;
+};
+
+SUNWprivate_1.1 {
+    global:
+	Lalt_stack;
+	Lclearfault;
+	Lclearsig;
+	Lctlfd;
+	Ldstop;
+	Lfree;
+	Lgetareg;
+	Lgrab;
+	Lgrab_error;
+	_libproc_debug;
+	Lmain_stack;
+	Lprochandle;
+	Lpsinfo;
+	Lputareg;
+	Lsetrun;
+	Lstack;
+	Lstate;
+	Lstatus;
+	Lstop;
+	Lsync;
+	Lwait;
+	Lxecbkpt;
+	Lxecwapt;
+	Paddr_to_ctf;
+	Paddr_to_loadobj;
+	Paddr_to_map;
+	Paddr_to_text_map;
+	Pasfd;
+	Pclearfault;
+	Pclearsig;
+	Pcontent;
+	Pcreate;
+	Pcreate_agent;
+	Pcreate_callback;
+	Pcreate_error;
+	Pcred;
+	Pctlfd;
+	Pdelbkpt;
+	Pdelwapt;
+	Pdestroy_agent;
+	Pdstop;
+	Penv_iter;
+	Perror_printf;
+	Pexecname;
+	Pfault;
+	Pfgcore;
+	Pfgrab_core;
+	Pfree;
+	Pgcore;
+	Pgetareg;
+	Pgetauxval;
+	Pgetauxvec;
+	Pgetenv;
+	Pgrab;
+	Pgrab_core;
+	Pgrab_error;
+	Pgrab_file;
+	Pisprocdir;
+	Pissyscall_prev;
+	Plmid;
+	Plmid_to_loadobj;
+	Plmid_to_map;
+	Plookup_by_addr;
+	Plookup_by_name;
+	Plwp_alt_stack;
+	Plwp_getfpregs;
+	Plwp_getpsinfo;
+	Plwp_getregs;
+	Plwp_iter;
+	Plwp_iter_all;
+	Plwp_main_stack;
+	Plwp_setfpregs;
+	Plwp_setregs;
+	Plwp_stack;
+	Pmapping_iter;
+	Pname_to_ctf;
+	Pname_to_loadobj;
+	Pname_to_map;
+	Pobject_iter;
+	Pobjname;
+	Pplatform;
+	Ppltdest;
+	Ppriv;
+	Pprivinfo;
+	Ppsinfo;
+	Pputareg;
+	pr_access;
+	pr_close;
+	pr_creat;
+	Prd_agent;
+	pr_door_info;
+	Pread;
+	Pread_string;
+	Prelease;
+	Preopen;
+	Preset_maps;
+	pr_exit;
+	pr_fcntl;
+	pr_fstat;
+	pr_fstat64;
+	pr_fstatvfs;
+	pr_getitimer;
+	pr_getpeername;
+	pr_getprojid;
+	pr_getrctl;
+	pr_getrlimit;
+	pr_getrlimit64;
+	pr_getsockname;
+	pr_getsockopt;
+	pr_gettaskid;
+	pr_getzoneid;
+	pr_ioctl;
+	pr_link;
+	pr_llseek;
+	pr_lseek;
+	pr_lstat;
+	pr_lstat64;
+	pr_lwp_exit;
+	pr_memcntl;
+	pr_meminfo;
+	pr_mmap;
+	pr_munmap;
+	proc_arg_grab;
+	proc_arg_psinfo;
+	proc_arg_xgrab;
+	proc_arg_xpsinfo;
+	proc_content2str;
+	proc_finistdio;
+	proc_fltname;
+	proc_fltset2str;
+	proc_flushstdio;
+	proc_get_auxv;
+	proc_get_cred;
+	proc_get_priv;
+	proc_get_psinfo;
+	proc_get_status;
+	proc_initstdio;
+	proc_lwp_in_set;
+	proc_lwp_range_valid;
+	proc_signame;
+	proc_sigset2str;
+	proc_str2content;
+	proc_str2flt;
+	proc_str2fltset;
+	proc_str2sig;
+	proc_str2sigset;
+	proc_str2sys;
+	proc_str2sysset;
+	proc_sysname;
+	proc_sysset2str;
+	proc_unctrl_psinfo;
+	proc_walk;
+	pr_open;
+	pr_processor_bind;
+	pr_pset_bind;
+	pr_rename;
+	pr_setitimer;
+	pr_setrctl;
+	pr_setrlimit;
+	pr_setrlimit64;
+	pr_settaskid;
+	pr_sigaction;
+	pr_stat;
+	pr_stat64;
+	pr_statvfs;
+	pr_unlink;
+	pr_waitid;
+	pr_zmap;
+	Psetbkpt;
+	Psetcred;
+	Psetfault;
+	Psetflags;
+	Psetpriv;
+	Psetrun;
+	Psetsignal;
+	Psetsysentry;
+	Psetsysexit;
+	Psetwapt;
+	Psetzoneid;
+	Psignal;
+	ps_lcontinue;
+	ps_lgetfpregs;
+	ps_lgetregs;
+	ps_lsetfpregs;
+	ps_lsetregs;
+	ps_lstop;
+	ps_pauxv;
+	ps_pcontinue;
+	ps_pdmodel;
+	ps_pdread;
+	ps_pdwrite;
+	ps_pglobal_lookup;
+	ps_pglobal_sym;
+	ps_plog;
+	ps_pread;
+	ps_pstop;
+	ps_ptread;
+	ps_ptwrite;
+	ps_pwrite;
+	Pstack_iter;
+	Pstate;
+	Pstatus;
+	Pstop;
+	Pstopstatus;
+	Psymbol_iter;
+	Psymbol_iter_by_addr;
+	Psymbol_iter_by_lmid;
+	Psymbol_iter_by_name;
+	Psync;
+	Psyscall;
+	Psysentry;
+	Psysexit;
+	Puname;
+	Punsetflags;
+	Pupdate_maps;
+	Pupdate_syms;
+	Pwait;
+	Pwrite;
+	Pxcreate;
+	Pxecbkpt;
+	Pxecwapt;
+	Pxlookup_by_addr;
+	Pxlookup_by_name;
+	Pxsymbol_iter;
+	Pzonename;
+    local:
+	*;
+};

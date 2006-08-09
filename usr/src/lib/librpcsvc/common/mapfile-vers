@@ -1,0 +1,136 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.1 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SUNW_1.1 {
+    global:
+	SUNW_1.1;
+} SUNW_0.7;
+
+SUNW_0.7 {
+    global:
+	havedisk;
+	rnusers;
+	rstat;
+	rusers;
+	rwall;
+	xdr_statstime;
+	xdr_statsvar;
+	xdr_utmpidlearr;
+};
+
+SUNWprivate_1.1 {
+    global:
+	__clnt_bindresvport;
+	xdr_bp_address;
+	xdr_bp_fileid_t;
+	xdr_bp_getfile_arg;
+	xdr_bp_getfile_res;
+	xdr_bp_machine_name_t;
+	xdr_bp_path_t;
+	xdr_bp_whoami_arg;
+	xdr_bp_whoami_res;
+	xdr_dirpath;
+	xdr_exportnode;
+	xdr_exports;
+	xdr_fhandle;
+	xdr_fhandle3;
+	xdr_fhstatus;
+	xdr_fsh4_access;
+	xdr_fsh4_mode;
+	xdr_fsh_access;
+	xdr_fsh_mode;
+	xdr_groupnode;
+	xdr_groups;
+	xdr_int32;
+	xdr_int64;
+	xdr_ip_addr_t;
+	xdr_mon;
+	xdr_mon_id;
+	xdr_mountbody;
+	xdr_mountlist;
+	xdr_mountres3;
+	xdr_mountres3_ok;
+	xdr_mountstat3;
+	xdr_my_id;
+	xdr_name;
+	xdr_nlm4_cancargs;
+	xdr_nlm4_holder;
+	xdr_nlm4_lock;
+	xdr_nlm4_lockargs;
+	xdr_nlm4_notify;
+	xdr_nlm4_res;
+	xdr_nlm4_share;
+	xdr_nlm4_shareargs;
+	xdr_nlm4_shareres;
+	xdr_nlm4_stat;
+	xdr_nlm4_stats;
+	xdr_nlm4_testargs;
+	xdr_nlm4_testres;
+	xdr_nlm4_testrply;
+	xdr_nlm4_unlockargs;
+	xdr_nlm_cancargs;
+	xdr_nlm_holder;
+	xdr_nlm_lock;
+	xdr_nlm_lockargs;
+	xdr_nlm_notify;
+	xdr_nlm_res;
+	xdr_nlm_share;
+	xdr_nlm_shareargs;
+	xdr_nlm_shareres;
+	xdr_nlm_stat;
+	xdr_nlm_stats;
+	xdr_nlm_testargs;
+	xdr_nlm_testres;
+	xdr_nlm_testrply;
+	xdr_nlm_unlockargs;
+	xdr_ppathcnf;
+	xdr_reg1args;
+	xdr_reg1res;
+	xdr_res;
+	xdr_rstat_timeval;
+	xdr_rusers_utmp;
+	xdr_sm_name;
+	xdr_sm_stat;
+	xdr_sm_stat_res;
+	xdr_sprayarr;
+	xdr_spraycumul;
+	xdr_spraytimeval;
+	xdr_stat_chge;
+	xdr_status;
+	xdr_timeval;
+	xdr_uint32;
+	xdr_uint64;
+	xdr_unreg1args;
+	xdr_unreg1res;
+	xdr_utmp_array;
+    local:
+	*;
+};

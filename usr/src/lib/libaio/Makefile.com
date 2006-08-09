@@ -31,10 +31,9 @@ VERS = .1
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
-MAPFILES=	mapfile-vers $(MAPFILE-FLTR)
-MAPOPTS=	$(MAPFILES:%=-M %)
+MAPFILES =	mapfile-vers $(MAPFILE-FLTR)
 
-DYNFLAGS +=	-F libc.so.1 $(MAPOPTS)
+DYNFLAGS +=	-F libc.so.1
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
@@ -56,5 +55,3 @@ include ../../Makefile.targ
 all:	$(LIBS)
 
 lint:
-
-$(DYNLIB):	$(MAPFILES)

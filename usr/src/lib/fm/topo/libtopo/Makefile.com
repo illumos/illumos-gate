@@ -18,12 +18,12 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 LIBRARY = libtopo.a
 VERS = .1
@@ -66,8 +66,7 @@ include ../../../Makefile.lib
 SRCS = $(BUILTINSRCS:%.c=../common/%.c) $(LIBSRCS:%.c=../common/%.c)
 LIBS = $(DYNLIB) $(LINTLIB)
 
-SRCDIR = ../common
-SPECMAPFILE = $(MAPDIR)/mapfile
+SRCDIR =	../common
 
 CLEANFILES += ../common/topo_error.c
 

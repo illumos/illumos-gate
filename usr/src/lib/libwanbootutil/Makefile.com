@@ -60,9 +60,6 @@ SRCS =		$(LOC_SRCS) $(CRYPTO_SRCS)
 SRCDIR =	$(LOC_DIR)
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-MAPDIR =	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
-
 # Library includes sources created via rpcgen. And rpcgen unfortunately
 # created unused function variables.
 LINTFLAGS +=	-erroff=E_FUNC_VAR_UNUSED

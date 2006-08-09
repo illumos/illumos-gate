@@ -22,14 +22,12 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libdscp/Makefile
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.lib
 
-SUBDIRS=	spec .WAIT sparc svc
+SUBDIRS=	sparc svc
 
 all	:= TARGET= all
 install	:= TARGET= install
@@ -56,7 +54,7 @@ install_h: $(ROOTHDRS)
 
 check: $(CHECKHDRS)
 
-spec sparc svc: FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

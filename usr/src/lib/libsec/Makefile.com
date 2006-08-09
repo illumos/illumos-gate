@@ -24,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libsec/Makefile.com
-#
 
 LIBRARY= libsec.a
 VERS= .1
@@ -42,6 +40,8 @@ LINTSRCS = $(OBJS_COMMON)
 # include library definitions
 include ../../Makefile.lib
 
+SRCDIR=		../common
+
 LIBS =		$(DYNLIB) $(LINTLIB)
 
 CFLAGS +=	$(CCVERBOSE)
@@ -55,10 +55,6 @@ SRCS=		$(OBJS_COMMON:%.o=$(SRCDIR)/%.c) \
 		 $(OBJS_SHARED:%.o=$(SRC)/common/acl/%.c)
 
 $(LINTLIB):= SRCS=	$(SRCDIR)/$(LINTSRC)
-
-SRCDIR=		../common
-MAPDIR=		../spec/$(TRANSMACH)
-SPECMAPFILE=	$(MAPDIR)/mapfile
 
 .KEEP_STATE:
 

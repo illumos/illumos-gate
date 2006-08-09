@@ -22,11 +22,11 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 ASFLAGS += -D_ASM -K PIC -P
 
-MAPDIR = ../spec/sparc
 include ../Makefile.com
 
 install yydebug: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT) \

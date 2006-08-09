@@ -48,7 +48,6 @@ LIBS =			$(DYNLIB)
 
 SRCS = $(OBJECTS:%.o = %.c)
 
-MMAPFILE =	mapfile
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I../libipp-listener/common
@@ -56,7 +55,9 @@ CPPFLAGS +=	-I../libipp-core/common
 CPPFLAGS +=	-I/usr/apache/include
 CPPFLAGS +=	-DEAPI
 ZDEFS =		$(ZNODEFS)
-DYNFLAGS +=	-M$(MMAPFILE)
+
+MAPFILES =	mapfile
+
 LDLIBS +=	-lipp-listener -lipp-core -lpapi -lc
 
 #	SMF manifest

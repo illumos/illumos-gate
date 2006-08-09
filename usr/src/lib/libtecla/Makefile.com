@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,6 +33,7 @@ OBJECTS=	getline.o keytab.o freelist.o strngmem.o hash.o history.o \
 
 include ../../Makefile.lib
 
+SRCDIR =	../common
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc
 $(DYNLIB) :=	LDLIBS += -lcurses
@@ -45,10 +45,6 @@ CPPFLAGS +=	-I$(SRCDIR) -DSTDC_HEADERS=1 -DHAVE_SYS_TYPES_H=1 \
 	-DHAVE_SYSV_PTY=1 -D__EXTENSIONS__=1 -D_POSIX_C_SOURCE=199506L \
 	-DPREFER_REENTRANT
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
-
-SRCDIR =	../common
-MAPDIR =	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
 
 .KEEP_STATE:
 

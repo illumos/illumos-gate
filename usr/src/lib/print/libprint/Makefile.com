@@ -34,21 +34,18 @@ OBJECTS = \
 include ../../../Makefile.lib
 include ../../../Makefile.rootfs
 
+SRCDIR =	../common
+
 ROOTLIBDIR=	$(ROOT)/usr/lib
 
 LIBS =			$(DYNLIB)
 
-SRCS = $(OBJECTS:%.o = $(SRCDIR)/%.c)
-
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-SRCDIR =	../common
-MAPFILE =	$(SRCDIR)/mapfile-vers
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../head -D_REENTRANT
-DYNFLAGS +=	-M $(MAPFILE)
+
 LDLIBS +=	-lnsl -lsocket -lc -lldap
 
 

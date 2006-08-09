@@ -24,7 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libkrb5/Makefile
 
 include		$(SRC)/lib/Makefile.lib
 
@@ -53,7 +52,7 @@ LIBRARY= 	libkrb5.a
 
 .KEEP_STATE:
 
-all clean clobber install: $(SUBDIRS)
+all clean clobber install lint: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -63,7 +62,7 @@ pics/%.o:	$(SRCBASE)/uts/$(PLAT)/krtld/%.c
 		$(COMPILE.c) -o $@ $<  $(WARNFLAGS)
 		$(POST_PROCESS_O)
 
-$(RTLD):	pics $(PICS) $(CRTS) $(MAPFILES)
+$(RTLD):	pics $(PICS) $(CRTS)
 		$(SGSPROTO)/ld -o $@ -dy -G $(DYNFLAGS) $(CRTI) $(PICS) \
 		    $(LDLIBS) $(CRTN)
 		$(POST_PROCESS_SO)

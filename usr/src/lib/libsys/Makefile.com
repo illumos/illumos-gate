@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libsys/Makefile.com
 #
 
 LIBRARY=	libsys.a
@@ -36,13 +33,13 @@ OBJECTS=	$(COMOBJ)  $(MACHOBJ)
 
 include 	../../../lib/Makefile.lib
 
-MAPFILES=	mapfile-vers $(MAPFILE-FLTR)
-MAPOPTS=	$(MAPFILES:%=-M%)
+MAPFILES =	mapfile-vers $(MAPFILE-FLTR)
 
 # Define libsys to be a filter on libc.  The ABI requires the runtime linker as
 # the soname.
 
-DYNFLAGS +=	-F/usr/lib/libc.so.1 $(MAPOPTS)
+DYNFLAGS +=	-F/usr/lib/libc.so.1
+
 SONAME=		/usr/lib/ld.so.1
 
 # Redefine shared object build rule to use $(LD) directly (this avoids .init
@@ -55,4 +52,4 @@ pics/%.o :=	ASFLAGS += $(AS_PICFLAGS)
 COMSRC=		$(COMOBJ:%.o=%.c)
 MACHSRC=	$(MACHOBJ:%.o=%.s)
 
-CLOBBERFILES +=	$(DYNLIB)  $(LIBLINKS)  $(COMSRC)  $(MACHSRC) $(MAPFILE)
+CLOBBERFILES +=	$(DYNLIB)  $(LIBLINKS)  $(COMSRC)  $(MACHSRC)

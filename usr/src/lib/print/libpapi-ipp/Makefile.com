@@ -1,5 +1,4 @@
 #
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -34,6 +33,8 @@ ROOTLIBDIR =	$(ROOT)/usr/lib/print
 include ../../../Makefile.lib
 include ../../../Makefile.rootfs
 
+SRCDIR =	../common
+
 ROOTLIBDIR=	$(ROOT)/usr/lib/print
 ROOTLIBDIR64=	$(ROOT)/usr/lib/print/$(MACH)
 
@@ -43,19 +44,18 @@ $(EXTRALINKS):	$(ROOTLINKS)
 
 LIBS =			$(DYNLIB)
 
-SRCS = $(OBJECTS:%.o = $(SRCDIR)/%.c)
-
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-SRCDIR =	../common
-MAPFILE =	$(SRCDIR)/mapfile
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../libpapi-common/common
 CPPFLAGS +=	-I../../libipp-core/common
 CPPFLAGS +=	-I../../libhttp-core/common
-DYNFLAGS +=	$(BDIRECT) -M $(MAPFILE)
+
+DYNFLAGS +=	$(BDIRECT)
+
+MAPFILES =	$(SRCDIR)/mapfile
+
 LDLIBS +=	-L$(ROOTLIBDIR) -R/usr/lib/print -lhttp-core -lmd5
 LDLIBS +=	-lipp-core -lc
 

@@ -22,7 +22,8 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 include ../../Makefile.lib
 include ../Makefile.lib
@@ -42,17 +43,13 @@ lint := TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber: spec .WAIT $(SUBDIRS)
+all clean clobber install_h lint: $(SUBDIRS)
 
-install: install_h spec .WAIT $(SUBDIRS)
-
-lint: $(SUBDIRS)
-
-install_h: $(SUBDIRS)
+install: install_h .WAIT $(SUBDIRS)
 
 check: $(CHECKHDRS)
 
-spec $(SUBDIRS): FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

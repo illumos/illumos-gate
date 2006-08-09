@@ -1,4 +1,4 @@
-
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -18,14 +18,11 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libc/sparc/Makefile
 #
 
 LIBCBASE=.
@@ -974,8 +971,7 @@ ALTPICS= $(TRACEOBJS:%=pics/%)
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR)/libc_i18n.a
 $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS)
 
-MAPDIR=		../spec/sparc
-MAPFILE=	$(MAPDIR)/mapfile
+MAPFILES =	../port/mapfile-vers mapfile-vers
 
 CFLAGS +=	$(EXTN_CFLAGS)
 CPPFLAGS=	-D_REENTRANT -Dsparc $(EXTN_CPPFLAGS) \
@@ -984,8 +980,9 @@ ASFLAGS=	-K pic -P -D__STDC__ -D_ASM $(CPPFLAGS) $(sparc_AS_XARCH)
 
 # Inform the run-time linker about libc specialized initialization
 RTLDINFO =	-z rtldinfo=tls_rtldinfo
+DYNFLAGS +=	$(RTLDINFO)
 
-DYNFLAGS +=	-e __rtboot -M $(MAPFILE) $(RTLDINFO)
+DYNFLAGS +=	-e __rtboot
 DYNFLAGS +=	$(EXTN_DYNFLAGS)
 
 BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
@@ -1012,7 +1009,7 @@ CLEANFILES=			\
 	pics/crtn.o		\
 	$(ALTPICS)
 
-CLOBBERFILES +=	$(MAPFILE) $(LIB_PIC)
+CLOBBERFILES +=	$(LIB_PIC)
 
 # list of C source for lint
 SRCS=							\
@@ -1049,11 +1046,6 @@ SRCS=							\
 $(DYNLIB) $(LIB_PIC) := DYNOBJS = _rtbootld.o
 $(DYNLIB) := CRTI = crti.o
 $(DYNLIB) := CRTN = crtn.o
-
-$(DYNLIB):	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
 
 # Files which need the threads .il inline template
 TIL=				\

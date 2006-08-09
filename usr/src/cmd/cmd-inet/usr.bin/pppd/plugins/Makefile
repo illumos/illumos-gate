@@ -1,12 +1,29 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/cmd-inet/usr.bin/pppd/plugins/Makefile
-#
-
 
 MINCONN =	minconn.so
 PASSPROMPT = 	passprompt.so
@@ -31,9 +48,9 @@ $(PPPOE):=	PICS = pics/pppoe.o
 # Establish external references through mapfiles and dependencies to allow
 # use of -zdefs.
 HSONAME=
-$(MINCONN):=	MAPFILE = mapfile-minconn
-$(PASSPROMPT):=	MAPFILE = mapfile-passprompt
-$(PPPOE):=	MAPFILE = mapfile-pppoe
+$(MINCONN):=	MAPFILES = mapfile-minconn
+$(PASSPROMPT):=	MAPFILES = mapfile-passprompt
+$(PPPOE):=	MAPFILES = mapfile-pppoe
 
 # A bug in pmake causes redundancy when '+=' is conditionally assigned, so
 # '=' is used with extra variables.
@@ -44,7 +61,6 @@ LDLIBS +=	$(XXXLDLIBS)
 CPPFLAGS +=	-I.. -I$(SRC)/uts/common
 # XX64 -- this should not be needed -- fix me
 DYNFLAGS +=	-_gcc=-nostdlib
-DYNFLAGS +=	-M$(MAPFILE)
 
 CLOBBERFILES +=	$(LIBRARIES)
 
@@ -75,15 +91,15 @@ $(ROOTSRCFILES):=	GROUP = bin
 
 all:	$(LIBRARIES)
 
-$(MINCONN): pics .WAIT $$(MAPFILE) $$(PICS)
+$(MINCONN): pics .WAIT $$(PICS)
 	$(BUILD.SO)
 	$(POST_PROCESS_SO)
 
-$(PASSPROMPT): pics .WAIT $$(MAPFILE) $$(PICS)
+$(PASSPROMPT): pics .WAIT $$(PICS)
 	$(BUILD.SO)
 	$(POST_PROCESS_SO)
 
-$(PPPOE): pics .WAIT $$(MAPFILE) $$(PICS)
+$(PPPOE): pics .WAIT $$(PICS)
 	$(BUILD.SO)
 	$(POST_PROCESS_SO)
 

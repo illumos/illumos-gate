@@ -23,9 +23,6 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-
-#
-# lib/libldap5/Makefile.com
 #
 
 LIBRARY= libldap.a
@@ -104,7 +101,6 @@ ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
 
 
 CLEANFILES += 	$(LINTOUT) $(LINTLIB)
-CLOBBERFILES +=	$(MAPFILE)
 
 # Local Libldap definitions
 LOCFLAGS +=	 $(XSTRCONST) -D_REENTRANT
@@ -114,9 +110,6 @@ LOCFLAGS +=	 $(XSTRCONST) -D_REENTRANT
 sparcv9_C_PICFLAGS =	$(sparcv9_C_BIGPICFLAGS)
 #i386_C_PICFLAGS =	$(i386_C_BIGPICFLAGS)
 #amd64_C_PICFLAGS =	$(amd64_C_BIGPICFLAGS)
-
-MAPDIR = 	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
 
 CFLAGS +=	$(CCVERBOSE) $(LOCFLAGS)
 CFLAGS64 +=	$(LOCFLAGS)

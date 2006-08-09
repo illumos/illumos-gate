@@ -22,7 +22,8 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 LIBRARY = libldom.a
 VERS = .1
@@ -37,8 +38,6 @@ SRCS = $(LIBSRCS:%.c=../sparc/%.c)
 SRCDIR = ../sparc
 
 LIBS = $(DYNLIB) $(LINTLIB)
-
-SPECMAPFILE = $(MAPDIR)/mapfile
 
 CPPFLAGS += -I. -I$(SRC)/uts/sun4v
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)

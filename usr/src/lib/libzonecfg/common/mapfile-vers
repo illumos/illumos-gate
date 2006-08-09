@@ -1,0 +1,178 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNWprivate_1.1 {
+    global:
+	endzoneent;
+	getzoneent;
+	getzoneent_private;
+	putzoneent;
+	setzoneent;
+	zonecfg_access;
+	zonecfg_add_attr;
+	zonecfg_add_dev;
+	zonecfg_add_ds;
+	zonecfg_add_filesystem;
+	zonecfg_add_fs_option;
+	zonecfg_add_ipd;
+	zonecfg_add_nwif;
+	zonecfg_add_rctl;
+	zonecfg_add_rctl_value;
+	zonecfg_add_scratch;
+	zonecfg_attach_manifest;
+	zonecfg_check_handle;
+	zonecfg_clear_deldevs;
+	zonecfg_close_scratch;
+	zonecfg_construct_rctlblk;
+	zonecfg_create_snapshot;
+	zonecfg_default_privset;
+	zonecfg_delete_attr;
+	zonecfg_delete_dev;
+	zonecfg_delete_ds;
+	zonecfg_delete_filesystem;
+	zonecfg_delete_ipd;
+	zonecfg_delete_nwif;
+	zonecfg_delete_rctl;
+	zonecfg_delete_scratch;
+	zonecfg_destroy;
+	zonecfg_destroy_snapshot;
+	zonecfg_detached;
+	zonecfg_detach_save;
+	zonecfg_devperms_apply;
+	zonecfg_devwalk;
+	zonecfg_endattrent;
+	zonecfg_enddevent;
+	zonecfg_enddevperment;
+	zonecfg_enddsent;
+	zonecfg_endfsent;
+	zonecfg_endipdent;
+	zonecfg_endnwifent;
+	zonecfg_endpatchent;
+	zonecfg_endpkgent;
+	zonecfg_endrctlent;
+	zonecfg_find_mounts;
+	zonecfg_find_scratch;
+	zonecfg_fini_handle;
+	zonecfg_free_fs_option_list;
+	zonecfg_free_rctl_value_list;
+	zonecfg_get_attach_handle;
+	zonecfg_get_attr_boolean;
+	zonecfg_getattrent;
+	zonecfg_get_attr_int;
+	zonecfg_get_attr_string;
+	zonecfg_get_attr_uint;
+	zonecfg_get_autoboot;
+	zonecfg_get_bootargs;
+	zonecfg_get_detach_info;
+	zonecfg_getdevent;
+	zonecfg_getdevperment;
+	zonecfg_getdsent;
+	zonecfg_getfsent;
+	zonecfg_get_handle;
+	zonecfg_getipdent;
+	zonecfg_get_limitpriv;
+	zonecfg_get_name;
+	zonecfg_get_name_by_uuid;
+	zonecfg_getnwifent;
+	zonecfg_getpatchent;
+	zonecfg_getpkgent;
+	zonecfg_get_pool;
+	zonecfg_get_privset;
+	zonecfg_getrctlent;
+	zonecfg_get_root;
+	zonecfg_get_scratch;
+	zonecfg_get_snapshot_handle;
+	zonecfg_get_template_handle;
+	zonecfg_get_uuid;
+	zonecfg_get_zonepath;
+	zonecfg_has_deldevs;
+	zonecfg_in_alt_root;
+	zonecfg_init_handle;
+	zonecfg_is_rctl;
+	zonecfg_is_scratch;
+	zonecfg_lock_scratch;
+	zonecfg_lookup_attr;
+	zonecfg_lookup_dev;
+	zonecfg_lookup_ds;
+	zonecfg_lookup_filesystem;
+	zonecfg_lookup_ipd;
+	zonecfg_lookup_nwif;
+	zonecfg_lookup_rctl;
+	zonecfg_match_dev;
+	zonecfg_modify_attr;
+	zonecfg_modify_dev;
+	zonecfg_modify_ds;
+	zonecfg_modify_filesystem;
+	zonecfg_modify_ipd;
+	zonecfg_modify_nwif;
+	zonecfg_modify_rctl;
+	zonecfg_notify_bind;
+	zonecfg_notify_critical_abort;
+	zonecfg_notify_critical_enter;
+	zonecfg_notify_critical_exit;
+	zonecfg_notify_unbind;
+	zonecfg_open_scratch;
+	zonecfg_remove_fs_option;
+	zonecfg_remove_rctl_value;
+	zonecfg_reverse_scratch;
+	zonecfg_rm_detached;
+	zonecfg_same_net_address;
+	zonecfg_save;
+	zonecfg_setattrent;
+	zonecfg_set_autoboot;
+	zonecfg_set_bootargs;
+	zonecfg_setdevent;
+	zonecfg_setdevperment;
+	zonecfg_setdsent;
+	zonecfg_setfsent;
+	zonecfg_setipdent;
+	zonecfg_set_limitpriv;
+	zonecfg_set_name;
+	zonecfg_setnwifent;
+	zonecfg_setpatchent;
+	zonecfg_setpkgent;
+	zonecfg_set_pool;
+	zonecfg_setrctlent;
+	zonecfg_set_root;
+	zonecfg_set_zonepath;
+	zonecfg_should_deldev;
+	zonecfg_strerror;
+	zonecfg_validate_zonename;
+	zonecfg_valid_fs_type;
+	zonecfg_valid_net_address;
+	zonecfg_valid_rctl;
+	zonecfg_valid_rctlblk;
+	zonecfg_valid_rctlname;
+	zone_get_id;
+	zone_get_rootpath;
+	zone_get_state;
+	zone_get_zonepath;
+	zone_set_state;
+	zone_state_str;
+    local:
+	*;
+};

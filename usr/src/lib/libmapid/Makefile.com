@@ -19,8 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.
-# All rights reserved.  Use is subject to license terms.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -50,9 +50,6 @@ SRCDIR	=	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 LDLIBS	+=	-lresolv -lcmd -lc
-
-MAPDIR	=	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
 
 CFLAGS	+=	$(CCVERBOSE)
 CPPFLAGS+=	-I$(SRCDIR) -D_REENTRANT

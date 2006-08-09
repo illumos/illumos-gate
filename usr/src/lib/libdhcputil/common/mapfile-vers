@@ -1,0 +1,61 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# There really should be only one SUNWprivate version.
+# Don't add any more.  Add new private symbols to SUNWprivate_1.2
+
+SUNWprivate_1.2 {
+    global:
+	dhcp_options_scan;
+} SUNWprivate_1.1;
+
+SUNWprivate_1.1 {
+    global:
+	dhcpmsg;
+	dhcpmsg_fini;
+	dhcpmsg_init;
+	dsym_close_parser;
+	dsym_free_classes;
+	dsym_free_fields;
+	dsym_get_cat_id;
+	dsym_get_code_ranges;
+	dsym_get_type_id;
+	dsym_init_parser;
+	dsym_parse_field;
+	dsym_parser;
+	inittab_decode;
+	inittab_decode_e;
+	inittab_encode;
+	inittab_encode_e;
+	inittab_getbycode;
+	inittab_getbyname;
+	inittab_load;
+	inittab_type_to_size;
+	inittab_verify;
+    local:
+	*;
+};

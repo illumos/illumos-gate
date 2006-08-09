@@ -24,7 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# usr/src/lib/openssl/libcrypto_extra/Makefile.com
 
 LIBRARY = libcrypto_extra.a
 
@@ -48,6 +47,9 @@ BF_ENC =	bf/bf_enc.o
 
 include ../../Makefile.com
 
+# There should be a mapfile here
+MAPFILES =
+
 CFLAGS +=	-K PIC -DCRYPTO_UNLIMITED
 CFLAGS64 +=	-K PIC -DCRYPTO_UNLIMITED
 ZDEFS =		-znodefs
@@ -56,13 +58,14 @@ SONAME =        $(LIBRARY:.a=.so)$(VERS)
 
 LIBS =		$(DYNLIB)
 SRCDIR =	$(OPENSSL_SRC)/crypto
-SRCS =		$(OBJECTS:%.o=$(SRCDIR)/%.c)
 
 $(LINTLIB) := 	SRCS = $(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 
 all:		subdirs $(LIBS)
+
+lint:		lintcheck
 
 subdirs:	FRC
 	@mkdir -p \

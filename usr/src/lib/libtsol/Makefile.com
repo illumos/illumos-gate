@@ -22,11 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-#ident	"%Z%%M%	%I%	%E% SMI"
-
-#
-# lib/libtsol/Makefile.com
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libtsol.a
@@ -44,15 +40,13 @@ include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-lsecdb -lc
+
+SRCDIR =	../common
+$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 NONCOMMON =	$(OBJECTS:blabel.o=)
 lint:=		SRCS = $(NONCOMMON:%.o=$(SRCDIR)/%.c) $(COMMONDIR)/blabel.c
-
-SRCDIR =	../common
-MAPDIR =	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
 
 COMMONDIR=	$(SRC)/common/tsol
 

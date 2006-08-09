@@ -19,12 +19,10 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libc_psr/Makefile
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.lib
@@ -39,9 +37,9 @@ lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all install clean clobber lint lib32 lib64 : spec .WAIT $(SUBDIRS)
+all install clean clobber lint: $(SUBDIRS)
 
-spec $(SUBDIRS): FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

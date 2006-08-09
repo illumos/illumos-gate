@@ -27,7 +27,6 @@
 
 ASFLAGS += $(AS_PICFLAGS) -P -D_ASM
 
-MAPDIR = ../spec/amd64
 MACHOBJS = dis_tables.o
 
 include ../Makefile.com

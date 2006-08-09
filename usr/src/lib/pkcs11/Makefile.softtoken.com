@@ -24,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/pkcs11/Makefile.softtoken.com
-#
 
 LCL_OBJECTS = \
 	softGeneral.o 		\
@@ -148,9 +146,6 @@ SRCS =	\
 
 LIBS    =       $(DYNLIB)
 LDLIBS  +=      -lc -lmd -lcryptoutil
-
-MAPDIR  = ../spec/$(TRANSMACH)
-SPECMAPFILE = $(MAPDIR)/mapfile
 
 CFLAGS 	+=      $(CCVERBOSE)
 CPPFLAGS += -I$(AESDIR) -I$(BLOWFISHDIR) -I$(ARCFOURDIR) -I$(DESDIR) \

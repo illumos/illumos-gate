@@ -18,16 +18,15 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Makefile for Removable Media Mounter.
+
 #
-# cmd/volmgt/rmm/Makefile
+# Makefile for Removable Media Mounter.
 #
 
 PROG=	rmmount
@@ -36,6 +35,9 @@ PROG=	rmmount
 include ../../../lib/Makefile.lib
 include ../../Makefile.cmd
 include ../Makefile.volmgt
+
+# There should be a mapfile here
+MAPFILES =
 
 SED=	sed
 

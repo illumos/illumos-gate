@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libnisdb/Makefile
 #
 
 LIBRARY= libnisdb.a
@@ -93,9 +90,7 @@ CLEANFILES += $(DERIVED_FILES)
 # include library definitions
 include ../Makefile.lib
 
-MAPDIR=		./spec/$(MACH)
-MAPFILE=	$(MAPDIR)/mapfile
-CLOBBERFILES +=	$(MAPFILE)
+MAPFILES =	mapfile-vers
 
 SRCS= db_dictionary_c_xdr.c db_dictlog_c_xdr.c db_dictxdr.c \
 db_entry_c_xdr.c db_index_c_xdr.c db_index_entry_c_xdr.c db_item_c_xdr.c \
@@ -145,8 +140,6 @@ CPPFLAGS +=	-D_REENTRANT
 # Extra includes, from yp, for yptol files.
 CPPFLAGS += -I$(SRC)/cmd/ypcmd
 
-DYNFLAGS +=	-M$(MAPFILE)
-
 LIBS = $(DYNLIB)
 ZDEFS=
 LDLIBS += -lnsl -lldap -lcmd -lc
@@ -159,16 +152,11 @@ lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all:	spec .WAIT $(DERIVED_FILES) $(LIBS)
+all:	$(DERIVED_FILES) $(LIBS)
 
 install: all $(ROOTLIBS) $(ROOTLINKS)
 
 lint: $(DERIVED_FILES) .WAIT lintcheck
-
-$(DYNLIB):	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
 
 pics/%.o: %.c
 	$(COMPILE.c) -o $@ $<
@@ -206,13 +194,5 @@ $(DB_TABLE)_xdr.c:	$(DB_TABLE).x
 	$(RPCGEN) -DUSINGC -c $(DB_TABLE).x |\
 	$(SED) -e 's/^xdr_db_free_entry(/__OBSOLETED_xdr_db_free_entry(/' > $@
 
-clean clobber: spec
-
-spec:	FRC
-	@cd $@;pwd; $(MAKE) $(TARGET)
-
-
 # include library targets
 include ../Makefile.targ
-
-FRC:

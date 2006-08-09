@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -95,11 +94,11 @@ $(WHOLIB):=	SONAME = $(WHOLIB)
 $(SYMBINDREP):=	SONAME = $(SYMBINDREP)
 $(BINDLIB):=	SONAME = $(BINDLIB)
 
-$(TRUSSLIB):=	MAPFILE = mapfile-vers-truss
-$(PERFLIB):=	MAPFILE = mapfile-vers-perfcnt
-$(WHOLIB):=	MAPFILE = mapfile-vers-who
-$(SYMBINDREP):=	MAPFILE = mapfile-vers-symbindrep
-$(BINDLIB):=	MAPFILE = mapfile-vers-bindings
+$(TRUSSLIB):=	MAPFILES = mapfile-vers-truss
+$(PERFLIB):=	MAPFILES = mapfile-vers-perfcnt
+$(WHOLIB):=	MAPFILES = mapfile-vers-who
+$(SYMBINDREP):=	MAPFILES = mapfile-vers-symbindrep
+$(BINDLIB):=	MAPFILES = mapfile-vers-bindings
 
 $(ROOTCCSLIB) :=	OWNER =		root
 $(ROOTCCSLIB) :=	GROUP =		bin
@@ -107,7 +106,7 @@ $(ROOTCCSLIB) :=	DIRMODE =	755
 
 CPPFLAGS +=	-D_REENTRANT
 LDFLAGS +=	$(USE_PROTO)
-DYNFLAGS +=	$(VERSREF) -M$(MAPFILE)
+DYNFLAGS +=	$(VERSREF)
 
 LINTFLAGS +=	-uaxs $(LDLIBS)
 LINTFLAGS64 +=	-uaxs $(LDLIBS)

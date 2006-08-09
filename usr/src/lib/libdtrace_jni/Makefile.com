@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -45,7 +44,6 @@ include ../../Makefile.lib
 SRCS = $(LIBSRCS:%.c=../common/%.c)
 
 SRCDIR = ../common
-SPECMAPFILE = $(MAPDIR)/mapfile
 
 CPPFLAGS += -I../common -I.
 CPPFLAGS += -I$(JAVA_ROOT)/include -I$(JAVA_ROOT)/include/solaris

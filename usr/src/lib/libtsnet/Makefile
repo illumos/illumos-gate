@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.lib
@@ -43,11 +43,7 @@ MSGFILES =	common/misc.i
 
 .KEEP_STATE:
 
-all install: spec .WAIT $(SUBDIRS)
-
-clean clobber: spec $(SUBDIRS)
-
-lint: $(SUBDIRS)
+all clean clobber install lint: $(SUBDIRS)
 
 install_h: $(ROOTHDRS)
 
@@ -58,7 +54,7 @@ _msg: $(MSGDOMAINPOFILE)
 $(POFILE): $(MSGFILES)
 	$(BUILDPO.msgfiles)
 
-spec $(SUBDIRS): FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

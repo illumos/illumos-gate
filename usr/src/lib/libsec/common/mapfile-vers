@@ -1,0 +1,79 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_1.2 {
+    global:
+	acl_check;
+	acl_free;
+	acl_fromtext;
+	acl_get;
+	acl_set;
+	acl_strip;
+	acl_totext;
+	acl_trivial;
+	facl_get;
+	facl_set;
+} SUNW_1.1;
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.1 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SUNW_1.1 {
+    global:
+	SUNW_1.1;
+} SUNW_0.9;
+
+SUNW_0.9 {
+    global:
+	aclcheck;
+	aclfrommode;
+	aclfromtext;
+	aclsort;
+	acltomode;
+	acltotext;
+};
+
+SUNWprivate_1.1 {
+    global:
+	acl_addentries;
+	acl_alloc;
+	acl_cnt;
+	acl_data;
+	acl_dup;
+	acl_error;
+	acl_flags;
+	acl_modifyentries;
+	acl_parse;
+	acl_printacl;
+	acl_removeentries;
+	acl_strerror;
+	acl_to_aclp;
+	acl_type;
+    local:
+	*;
+};

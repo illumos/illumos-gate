@@ -1,0 +1,185 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_1.3 {
+    global:
+	di_devfs_minor_path;
+	di_driver_major;
+	di_link_next_by_lnode;
+	di_link_next_by_node;
+	di_link_private_get;
+	di_link_private_set;
+	di_link_spectype;
+	di_link_to_lnode;
+	di_lnode_devinfo;
+	di_lnode_devt;
+	di_lnode_name;
+	di_lnode_next;
+	di_lnode_private_get;
+	di_lnode_private_set;
+	di_minor_private_get;
+	di_minor_private_set;
+	di_node_private_get;
+	di_node_private_set;
+	di_walk_link;
+	di_walk_lnode;
+} SUNW_1.2;
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.2 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SUNW_1.2 {
+    global:
+	SUNW_1.2;
+} SUNW_1.1;
+
+SUNW_1.1 {
+    global:
+	di_binding_name;
+	di_bus_addr;
+	di_child_node;
+	di_compatible_names;
+	di_devfs_path;
+	di_devfs_path_free;
+	di_devid;
+	di_driver_name;
+	di_driver_ops;
+	di_drv_first_node;
+	di_drv_next_node;
+	di_fini;
+	di_init;
+	di_instance;
+	di_minor_devt;
+	di_minor_name;
+	di_minor_next;
+	di_minor_nodetype;
+	di_minor_spectype;
+	di_minor_type;
+	di_nodeid;
+	di_node_name;
+	di_parent_node;
+	di_prom_fini;
+	di_prom_init;
+	di_prom_prop_data;
+	di_prom_prop_lookup_bytes;
+	di_prom_prop_lookup_ints;
+	di_prom_prop_lookup_strings;
+	di_prom_prop_name;
+	di_prom_prop_next;
+	di_prop_bytes;
+	di_prop_devt;
+	di_prop_int64;
+	di_prop_ints;
+	di_prop_lookup_bytes;
+	di_prop_lookup_int64;
+	di_prop_lookup_ints;
+	di_prop_lookup_strings;
+	di_prop_name;
+	di_prop_next;
+	di_prop_strings;
+	di_prop_type;
+	di_sibling_node;
+	di_state;
+	di_walk_minor;
+	di_walk_node;
+};
+
+SUNWprivate_1.1 {
+    global:
+	devfs_add_minor_perm;
+	devfs_bootdev_free_list;
+	devfs_bootdev_get_list;
+	devfs_bootdev_modifiable;
+	devfs_bootdev_set_list;
+	devfs_dev_to_prom_name;
+	devfs_free_all_prom_names;
+	devfs_free_minor_perm;
+	devfs_get_all_prom_names;
+	devfs_get_prom_names;
+	devfs_install2target;
+	devfs_load_minor_perm;
+	devfs_path_to_drv;
+	devfs_read_minor_perm;
+	devfs_resolve_aliases;
+	devfs_rm_minor_perm;
+	devfs_target2install;
+	di_devlink_add_link;
+	di_devlink_cache_walk;
+	di_devlink_close;
+	di_devlink_content;
+	di_devlink_dup;
+	di_devlink_fini;
+	di_devlink_free;
+	di_devlink_init;
+	di_devlink_init_root;
+	di_devlink_open;
+	di_devlink_path;
+	di_devlink_rm_link;
+	di_devlink_type;
+	di_devlink_update;
+	di_devlink_walk;
+	di_devperm_login;
+	di_devperm_logout;
+	di_driver_private_data;
+	di_init_driver;
+	di_init_impl;
+	di_lookup_node;
+	di_minor_devinfo;
+	di_node_state;
+	di_parent_private_data;
+	di_path_addr;
+	di_path_client_node;
+	di_path_next;
+	di_path_next_client;
+	di_path_next_phci;
+	di_path_phci_node;
+	di_path_prop_bytes;
+	di_path_prop_int64s;
+	di_path_prop_ints;
+	di_path_prop_len;
+	di_path_prop_lookup_bytes;
+	di_path_prop_lookup_int64s;
+	di_path_prop_lookup_ints;
+	di_path_prop_lookup_strings;
+	di_path_prop_name;
+	di_path_prop_next;
+	di_path_prop_strings;
+	di_path_prop_type;
+	di_path_state;
+	di_phci_first_node;
+	di_phci_next_node;
+	di_prop_drv_next;
+	di_prop_global_next;
+	di_prop_hw_next;
+	di_prop_rawdata;
+	di_prop_sys_next;
+	di_vhci_first_node;
+	di_vhci_next_node;
+    local:
+	*;
+};

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -24,8 +23,6 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libresolv/Makefile
 #
 
 LIBRARY= libresolv.a
@@ -49,14 +46,7 @@ include ../Makefile.lib
 # install this library in the root filesystem
 include ../Makefile.rootfs
 
-SUBDIRS=	spec
-
-MAPDIR=		./spec/$(MACH)
-MAPFILE=	$(MAPDIR)/mapfile
-MAPFILES=	$(MAPFILE) mapfile-vers
-MAPOPTS=	$(MAPFILES:%=-M%)
-
-CLOBBERFILES +=	$(MAPFILE)
+SRCDIR =	.
 
 C99MODE=	$(C99_DISABLE)
 
@@ -66,40 +56,18 @@ C99MODE=	$(C99_DISABLE)
 # so we must put -I. ahead of the default include directories:
 CPPFLAGS = -I. -I../common/inc $(CPPFLAGS.master) -DDEBUG -DSYSV -D_REENTRANT
 LDLIBS += -lsocket -lnsl -lc
-DYNFLAGS +=	$(MAPOPTS)
 
 ROOTDYNLIBS=	$(DYNLIB:%=$(ROOTLIBDIR)/%)
-
-all :=		TARGET= all
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-delete :=	TARGET= delete
-install :=	TARGET= install
-lint :=		TARGET= lint
-catalog :=	TARGET= catalog
-package :=	TARGET= package
 
 .KEEP_STATE:
 
 LIBS = $(DYNLIB)
 
-all: $(SUBDIRS) $(LIBS)
+all: $(LIBS)
 
-install: all $(ROOTDYNLIBS) $(SUBDIRS)
+install: all $(ROOTDYNLIBS)
 
 lint: lintcheck
 
-clean clobber: $(SUBDIRS)
-
-spec: FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-$(DYNLIB): $(MAPFILES)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
-
 # include library targets
 include ../Makefile.targ
-
-FRC:

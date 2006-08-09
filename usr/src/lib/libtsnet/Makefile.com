@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY	=	libtsnet.a
@@ -40,15 +40,13 @@ include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
+
+SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 LAZYLIBS =	$(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
 LDLIBS +=	-lsocket -lnsl -lc -lsecdb $(LAZYLIBS)
 lint :=		LAZYLIBS = -ltsol
-
-SRCDIR =	../common
-MAPDIR =	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
 
 LIBTSOLINC =	$(SRC)/lib/libtsol/common
 

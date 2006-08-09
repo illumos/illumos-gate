@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -35,8 +34,7 @@ include		../../Makefile.lib
 # install this library in the root filesystem
 include		../../Makefile.rootfs
 
-MAPFILES=	../common/mapfile-vers $(MAPFILE-FLTR)
-MAPOPTS=	$(MAPFILES:%=-M%)
+MAPFILES +=	$(MAPFILE-FLTR)
 
 SRCDIR=		../common
 LIBS=		$(DYNLIB) $(LINTLIB)
@@ -44,7 +42,7 @@ LIBS=		$(DYNLIB) $(LINTLIB)
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
-DYNFLAGS +=     $(ZLOADFLTR) $(MAPOPTS)
+DYNFLAGS +=     $(ZLOADFLTR)
 
 # Redefine shared object build rule to use $(LD) directly (this avoids .init
 # and .fini sections being added).
@@ -58,5 +56,3 @@ all:		$(LIBS) fnamecheck
 lint:		lintcheck
 
 include		../../Makefile.targ
-
-$(DYNLIB):	$(MAPFILES)

@@ -1,0 +1,117 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNWprivate {
+    global:
+	topo_close;
+	topo_debug_set;
+	topo_fmri_asru;
+	topo_fmri_compare;
+	topo_fmri_contains;
+	topo_fmri_create;
+	topo_fmri_expand;
+	topo_fmri_fru;
+	topo_fmri_invoke;
+	topo_fmri_nvl2str;
+	topo_fmri_present;
+	topo_fmri_str2nvl;
+	topo_fmri_unusable;
+	topo_hdl_alloc;
+	topo_hdl_errmsg;
+	topo_hdl_errno;
+	topo_hdl_free;
+	topo_hdl_nvalloc;
+	topo_hdl_nvdup;
+	topo_hdl_strdup;
+	topo_hdl_strfree;
+	topo_hdl_zalloc;
+	topo_method_invoke;
+	topo_method_register;
+	topo_method_unregister;
+	topo_method_unregister_all;
+	topo_mod_alloc;
+	topo_mod_clrdebug;
+	topo_mod_dprintf;
+	topo_mod_enumerate;
+	topo_mod_errmsg;
+	topo_mod_errno;
+	topo_mod_free;
+	topo_mod_handle;
+	topo_mod_load;
+	topo_mod_nvalloc;
+	topo_mod_nvdup;
+	topo_mod_private;
+	topo_mod_register;
+	topo_mod_rootdir;
+	topo_mod_setdebug;
+	topo_mod_seterrno;
+	topo_mod_strdup;
+	topo_mod_strfree;
+	topo_mod_unload;
+	topo_mod_unregister;
+	topo_mod_zalloc;
+	topo_node_asru;
+	topo_node_asru_set;
+	topo_node_bind;
+	topo_node_fru;
+	topo_node_fru_set;
+	topo_node_instance;
+	topo_node_label;
+	topo_node_label_set;
+	topo_node_name;
+	topo_node_private;
+	topo_node_range_create;
+	topo_node_range_destroy;
+	topo_node_resource;
+	topo_node_unbind;
+	topo_open;
+	topo_pgroup_create;
+	topo_pgroup_destroy;
+	topo_prop_get_all;
+	topo_prop_get_fmri;
+	topo_prop_get_int32;
+	topo_prop_get_int64;
+	topo_prop_get_string;
+	topo_prop_get_uint32;
+	topo_prop_get_uint64;
+	topo_prop_inherit;
+	topo_prop_set_fmri;
+	topo_prop_set_int32;
+	topo_prop_set_int64;
+	topo_prop_set_string;
+	topo_prop_set_uint32;
+	topo_prop_set_uint64;
+	topo_prop_stability;
+	topo_snap_hold;
+	topo_snap_release;
+	topo_strerror;
+	topo_walk_fini;
+	topo_walk_init;
+	topo_walk_step;
+    local:
+	*;
+};

@@ -18,12 +18,12 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 LIBRARY = libfmd_adm.a
 VERS = .1
@@ -38,8 +38,7 @@ SRCS = $(LIBSRCS:%.c=../common/%.c)
 LIBS = $(DYNLIB) $(LINTLIB)
 CLEANFILES += fmd_rpc.c fmd_xdr.c fmd_rpc_adm.h fmd_rpc_adm.x
 
-SRCDIR = ../common
-SPECMAPFILE = $(MAPDIR)/mapfile
+SRCDIR =	../common
 
 CPPFLAGS += -I../common -I.
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)

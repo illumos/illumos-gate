@@ -24,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libc/Makefile.com
-#
 
 LIB_PIC= libc_pic.a
 VERS=	.1
@@ -953,8 +951,7 @@ ALTPICS= $(TRACEOBJS:%=pics/%)
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR)/libc_i18n.a
 $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS) $(LDLIBS)
 
-MAPDIR=		../spec/i386
-MAPFILE=	$(MAPDIR)/mapfile
+MAPFILES =	../port/mapfile-vers ../i386/mapfile-vers 
 
 #
 # EXTN_CPPFLAGS and EXTN_CFLAGS set in enclosing Makefile
@@ -966,10 +963,9 @@ ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) $(i386_AS_XARCH)
 
 # Inform the run-time linker about libc specialized initialization
 RTLDINFO =	-z rtldinfo=tls_rtldinfo
+DYNFLAGS +=	$(RTLDINFO)
 
-DYNFLAGS =	$(HSONAME) $(ZTEXT) $(ZDEFS) $(ZCOMBRELOC)
-DYNFLAGS +=	$(SPECMAPFILE:%=-M %) $(PGA_MAPFILE:%=-M %) $(NX_MAP:%=-M%) \
-		-e __rtboot -M $(MAPFILE) $(RTLDINFO)
+DYNFLAGS +=	-e __rtboot
 DYNFLAGS +=	$(EXTN_DYNFLAGS)
 
 BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
@@ -996,7 +992,7 @@ CLEANFILES=			\
 	pics/crtn.o		\
 	$(ALTPICS)
 
-CLOBBERFILES +=	$(MAPFILE) $(LIB_PIC)
+CLOBBERFILES +=	$(LIB_PIC)
 
 # list of C source for lint
 SRCS=							\
@@ -1032,11 +1028,6 @@ SRCS=							\
 $(DYNLIB) $(LIB_PIC) := DYNOBJS = _rtbootld.o
 $(DYNLIB) := CRTI = crti.o
 $(DYNLIB) := CRTN = crtn.o
-
-$(DYNLIB):	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
 
 # Files which need the threads .il inline template
 TIL=				\

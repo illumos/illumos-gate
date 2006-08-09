@@ -24,9 +24,9 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Makefile for volume management daemon
+
 #
-# cmd/volmgt/vold/Makefile
+# Makefile for volume management daemon
 #
 
 PROG=	vold
@@ -34,6 +34,9 @@ PROG=	vold
 include ../../../lib/Makefile.lib
 include ../../Makefile.cmd
 include ../Makefile.volmgt
+
+# There should be a mapfile here
+MAPFILES =
 
 SED=	sed
 

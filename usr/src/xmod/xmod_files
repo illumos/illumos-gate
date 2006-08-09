@@ -80,7 +80,7 @@ lib/libresolv2/dnssafe
 ../closed/lib/gss_mechs/mech_dh/dh640/mapfile-vers-export
 ../closed/lib/gss_mechs/mech_dummy/Makefile.export
 ../closed/lib/gss_mechs/mech_krb5/Makefile.export
-../closed/lib/gss_mechs/mech_krb5/spec/krb5_export.spec
+../closed/lib/gss_mechs/mech_krb5/mapfile-vers-export
 ../closed/lib/gss_mechs/mech_spnego/Makefile.export
-../closed/lib/gss_mechs/mech_spnego/spec/export.spec
+../closed/lib/gss_mechs/mech_spnego/mapfile-vers-export
 ../closed/lib/libgss/Makefile.export

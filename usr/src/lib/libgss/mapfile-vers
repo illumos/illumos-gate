@@ -1,0 +1,121 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_1.2 {
+    global:
+	gss_accept_sec_context;
+	gss_acquire_cred;
+	gss_acquire_cred_with_password;
+	gss_add_cred;
+	gss_add_cred_with_password;
+	gss_add_oid_set_member;
+	gss_canonicalize_name;
+	GSS_C_NT_ANONYMOUS;
+	GSS_C_NT_EXPORT_NAME;
+	GSS_C_NT_HOSTBASED_SERVICE;
+	GSS_C_NT_MACHINE_UID_NAME;
+	GSS_C_NT_STRING_UID_NAME;
+	GSS_C_NT_USER_NAME;
+	gss_compare_name;
+	gss_context_time;
+	gss_create_empty_oid_set;
+	gss_delete_sec_context;
+	gss_display_name;
+	gss_display_status;
+	gss_duplicate_name;
+	gss_export_name;
+	gss_export_sec_context;
+	gss_get_mic;
+	gss_import_name;
+	gss_import_sec_context;
+	gss_indicate_mechs;
+	gss_init_sec_context;
+	gss_inquire_context;
+	gss_inquire_cred;
+	gss_inquire_cred_by_mech;
+	gss_inquire_mechs_for_name;
+	gss_inquire_names_for_mech;
+	gss_process_context_token;
+	gss_release_buffer;
+	gss_release_cred;
+	gss_release_name;
+	gss_release_oid;
+	gss_release_oid_set;
+	gss_seal;
+	gss_sign;
+	gss_store_cred;
+	gss_test_oid_set_member;
+	gss_unseal;
+	gss_unwrap;
+	gss_verify;
+	gss_verify_mic;
+	gss_wrap;
+	gss_wrap_size_limit;
+} SUNW_1.1;
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.1 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SUNW_1.1 {
+    global:
+	SUNW_1.1;
+};
+
+SUNWprivate_1.1 {
+    global:
+	der_length_size;
+	generic_gss_copy_oid;
+	generic_gss_release_oid;
+	get_der_length;
+	gss_copy_oid_set;
+	gsscred_expname_to_unix_cred;
+	gsscred_expname_to_unix_cred_ext;
+	gsscred_name_to_unix_cred;
+	gsscred_name_to_unix_cred_ext;
+	gsscred_set_options;
+	gss_get_group_info;
+	__gss_get_kmodName;
+	__gss_get_mechanisms;
+	__gss_get_mech_info;
+	__gss_get_mech_type;
+	__gss_get_modOptions;
+	__gss_mech_qops;
+	__gss_mech_to_oid;
+	gss_nt_exported_name;
+	gss_nt_service_name;
+	gss_nt_service_name_v2;
+	__gss_num_to_qop;
+	__gss_oid_to_mech;
+	gss_oid_to_str;
+	__gss_qop_to_num;
+	gss_str_to_oid;
+	__gss_userok;
+	put_der_length;
+    local:
+	*;
+};

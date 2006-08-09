@@ -1,0 +1,94 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# There really should be only one SUNWprivate version.
+# Don't add any more.  Add new private symbols to SUNWprivate_1.1
+
+SUNWprivate_1.1 {
+    global:
+	__ns_ldap_getAcctMgmt;
+	__s_api_get_canonical_name;
+} SUNWprivate_1.0;
+
+SUNWprivate_1.0 {
+    global:
+	__getldapaliasbyname;
+	__ns_ldap_addAttr;
+	__ns_ldap_addEntry;
+	__ns_ldap_addTypedEntry;
+	__ns_ldap_auth;
+	__ns_ldap_cache_ping;
+	__ns_ldap_default_config;
+	__ns_ldap_delAttr;
+	__ns_ldap_delEntry;
+	__ns_ldap_dn2domain;
+	__ns_ldap_download;
+	__ns_ldap_DumpConfiguration;
+	__ns_ldap_DumpLdif;
+	__ns_ldap_endEntry;
+	__ns_ldap_err2str;
+	__ns_ldap_firstEntry;
+	__ns_ldap_freeAttributeMaps;
+	__ns_ldap_freeCred;
+	__ns_ldap_freeError;
+	__ns_ldap_freeObjectClassMaps;
+	__ns_ldap_freeParam;
+	__ns_ldap_freeResult;
+	__ns_ldap_freeSearchDescriptors;
+	__ns_ldap_getAttr;
+	__ns_ldap_getAttributeMaps;
+	__ns_ldap_getMappedAttributes;
+	__ns_ldap_getMappedObjectClass;
+	__ns_ldap_getObjectClassMaps;
+	__ns_ldap_getOrigAttribute;
+	__ns_ldap_getOrigObjectClass;
+	__ns_ldap_getParam;
+	__ns_ldap_getParamType;
+	__ns_ldap_getSearchDescriptors;
+	__ns_ldap_getServiceAuthMethods;
+	__ns_ldap_host2dn;
+	__ns_ldap_list;
+	__ns_ldap_LoadConfiguration;
+	__ns_ldap_LoadDoorInfo;
+	__ns_ldap_make_config;
+	__ns_ldap_nextEntry;
+	__ns_ldap_print_config;
+	__ns_ldap_repAttr;
+	__ns_ldap_setParam;
+	__ns_ldap_setParamValue;
+	__ns_ldap_setServer;
+	__ns_ldap_trydoorcall;
+	__ns_ldap_uid2dn;
+	__s_api_crosscheck;
+	__s_api_destroy_config;
+	__s_api_free2dArray;
+	__s_api_getServers;
+	__s_api_init_config;
+	__s_api_prepend_automountmapname_to_dn;
+    local:
+	*;
+};

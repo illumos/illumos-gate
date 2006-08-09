@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -45,13 +44,13 @@ NOCTFOBJS=	$(ASOBJS)
 include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
 
+SRCDIR =	../common
 PLAT =		$(VAR_PLAT_$(BASEPLAT))
 
 # Dtrace needs an executable data segment.
 NX_MAP=
 
-MAPFILES =	../common/mapfile-vers $(MAPFILE-ORDER) $(MAPFILE-PLAT)
-MAPOPTS =	$(MAPFILES:%=-M%)
+MAPFILES +=	$(MAPFILE-ORDER) $(MAPFILE-PLAT)
 
 # For the libc/libthread unified world:
 # This library needs to be placed in /lib to allow
@@ -97,7 +96,7 @@ LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) \
 		$(LDLIB) $(LD_LIB) 
 
 DYNFLAGS +=	-i -e _rt_boot $(VERSREF) -Bsymbolic -zlazyload -znodlopen \
-		-z interpose -zdtrace=dtrace_data $(MAPOPTS) '-R$$ORIGIN'
+		-z interpose -zdtrace=dtrace_data '-R$$ORIGIN'
 
 BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 

@@ -22,11 +22,11 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 ASFLAGS += $(AS_PICFLAGS) -P -D_ASM
 
-MAPDIR = ../spec/i386
 MACHOBJS = dis_tables.o
 DLIBSRCS = regs.d
 

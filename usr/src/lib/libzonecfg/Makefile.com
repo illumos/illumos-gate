@@ -35,12 +35,10 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc -lsocket -lnsl -luuid -lnvpair -lsysevent -lsec
 # DYNLIB libraries do not have lint libs and are not linted
 $(DYNLIB) :=	LDLIBS += -lxml2
-CPPFLAGS +=	-I/usr/include/libxml2 -I$(SRCDIR) -D_REENTRANT
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 SRCDIR =	../common
-MAPDIR =	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
+CPPFLAGS +=	-I/usr/include/libxml2 -I$(SRCDIR) -D_REENTRANT
+$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 

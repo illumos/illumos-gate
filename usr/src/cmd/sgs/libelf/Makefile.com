@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -64,12 +63,11 @@ $(OBJS) :=	XFFLAG=
 
 WARLOCKFILES=	$(OBJECTS:%.o=wlocks/%.ll)
 
-MAPFILES=	../common/mapfile-common
-MAPOPTS=	$(MAPFILES:%=-M%)
+MAPFILES =	../common/mapfile-common
 
 CLOBBERFILES +=
 
-DYNFLAGS +=	$(VERSREF) $(MAPOPTS)
+DYNFLAGS +=	$(VERSREF)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(VAR_LIBELF_LDLIBS) -lc
 
 LINTFLAGS +=	-u -erroff=E_BAD_PTR_CAST_ALIGN

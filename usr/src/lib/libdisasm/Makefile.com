@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 #
 # The build process for libdisasm is sightly different from that used by other
@@ -44,7 +45,6 @@ TYPES=		library
 CURTYPE=	library
 
 COMDIR=		$(SRC)/lib/libdisasm/common
-SPECDIR=	$(SRC)/lib/libdisasm/spec
 
 #
 # Architecture-dependent files common to both versions of libdisasm
@@ -86,8 +86,7 @@ LIBS_standalone	= $(STANDLIBRARY)
 LIBS_library = $(DYNLIB) $(LINTLIB)
 LIBS = $(LIBS_$(CURTYPE))
 
-MAPDIR=		$(SPECDIR)/$(TRANSMACH)
-SPECMAPFILE=	$(MAPDIR)/mapfile
+MAPFILES =	$(COMDIR)/mapfile-vers
 
 LDLIBS +=	-lc
 

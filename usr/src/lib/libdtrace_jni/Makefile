@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -39,9 +38,7 @@ lint := TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber: java spec .WAIT $(SUBDIRS)
-
-install: java spec .WAIT $(SUBDIRS)
+all clean clobber install: java .WAIT $(SUBDIRS)
 
 lint: $(SUBDIRS)
 
@@ -49,7 +46,7 @@ install_h:
 
 check: $(CHECKHDRS)
 
-java spec $(SUBDIRS): FRC
+java $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 doc:

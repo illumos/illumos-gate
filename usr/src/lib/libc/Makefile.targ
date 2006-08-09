@@ -264,7 +264,7 @@ pics/%.o: $(LIBCBASE)/$(CRTSRCS)/%.s
 	$(POST_PROCESS_O)
 
 # $(SRC)/common rules
-pics/%.o: $(SRC)/common/atomic/$(TRANSMACH)/%.s
+pics/%.o: $(SRC)/common/atomic/$(TARGETMACH)/%.s
 	$(BUILD.s)
 	$(POST_PROCESS_O)
 

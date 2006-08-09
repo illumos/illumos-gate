@@ -1,0 +1,119 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNWprivate_1.1 {
+    global:
+	_smb_debug;
+	smbios_bboard_flag_desc;
+	smbios_bboard_flag_name;
+	smbios_bboard_type_desc;
+	smbios_bios_flag_desc;
+	smbios_bios_flag_name;
+	smbios_bios_xb1_desc;
+	smbios_bios_xb1_name;
+	smbios_bios_xb2_desc;
+	smbios_bios_xb2_name;
+	smbios_boot_desc;
+	smbios_buf;
+	smbios_buflen;
+	smbios_bufopen;
+	smbios_cache_assoc_desc;
+	smbios_cache_ctype_desc;
+	smbios_cache_ctype_name;
+	smbios_cache_ecc_desc;
+	smbios_cache_flag_desc;
+	smbios_cache_flag_name;
+	smbios_cache_loc_desc;
+	smbios_cache_logical_desc;
+	smbios_cache_mode_desc;
+	smbios_chassis_state_desc;
+	smbios_chassis_type_desc;
+	smbios_checksum;
+	smbios_close;
+	smbios_errmsg;
+	smbios_errno;
+	smbios_evlog_flag_desc;
+	smbios_evlog_flag_name;
+	smbios_evlog_format_desc;
+	smbios_evlog_method_desc;
+	smbios_fdopen;
+	smbios_hwsec_desc;
+	smbios_info_bboard;
+	smbios_info_bios;
+	smbios_info_boot;
+	smbios_info_cache;
+	smbios_info_chassis;
+	smbios_info_common;
+	smbios_info_eventlog;
+	smbios_info_hwsec;
+	smbios_info_ipmi;
+	smbios_info_lang;
+	smbios_info_memarray;
+	smbios_info_memarrmap;
+	smbios_info_memdevice;
+	smbios_info_memdevmap;
+	smbios_info_obdevs;
+	smbios_info_port;
+	smbios_info_processor;
+	smbios_info_slot;
+	smbios_info_smbios;
+	smbios_info_strtab;
+	smbios_info_system;
+	smbios_ipmi_flag_desc;
+	smbios_ipmi_flag_name;
+	smbios_ipmi_type_desc;
+	smbios_iter;
+	smbios_lookup_id;
+	smbios_memarray_ecc_desc;
+	smbios_memarray_loc_desc;
+	smbios_memarray_use_desc;
+	smbios_memdevice_flag_desc;
+	smbios_memdevice_flag_name;
+	smbios_memdevice_form_desc;
+	smbios_memdevice_type_desc;
+	smbios_open;
+	smbios_port_conn_desc;
+	smbios_port_type_desc;
+	smbios_processor_family_desc;
+	smbios_processor_status_desc;
+	smbios_processor_type_desc;
+	smbios_processor_upgrade_desc;
+	smbios_slot_ch1_desc;
+	smbios_slot_ch1_name;
+	smbios_slot_ch2_desc;
+	smbios_slot_ch2_name;
+	smbios_slot_length_desc;
+	smbios_slot_type_desc;
+	smbios_slot_usage_desc;
+	smbios_slot_width_desc;
+	smbios_system_wakeup_desc;
+	smbios_type_desc;
+	smbios_type_name;
+	smbios_write;
+    local:
+	*;
+};

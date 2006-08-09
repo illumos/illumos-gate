@@ -24,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libbsm/Makefile.com
-#
 
 LIBRARY =	libbsm.a
 VERS = 		.1
@@ -81,9 +79,7 @@ include ../../Makefile.lib
 # install this library in the root filesystem
 include ../../Makefile.rootfs
 
-MAPFILE=	$(MAPDIR)/mapfile
-
-SRCS=		$(OBJECTS:%.o=../common/%.c)
+SRCDIR =	../common
 
 LIBS =	 	$(DYNLIB) $(LINTLIB)
 
@@ -93,10 +89,8 @@ ROOTLINTDIR=	$(ROOTLIBDIR)
 ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
 
 CLEANFILES +=	$(LINTOUT) $(LINTLIB)
-CLOBBERFILES +=	$(MAPFILE)
 
 CFLAGS	+=	$(CCVERBOSE)
-DYNFLAGS +=	-M$(MAPFILE)
 
 LAZYLIBS =	$(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
 LDLIBS +=	-lsocket -lnsl -lmd -lc -lsecdb $(LAZYLIBS)
@@ -117,11 +111,6 @@ TEXT_DOMAIN= SUNW_OST_OSLIB
 all: $(LIBS)
 
 lint: lintcheck
-
-$(DYNLIB) $(DYNLIB64): 	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); pwd; $(MAKE) mapfile
 
 # Include library targets
 #

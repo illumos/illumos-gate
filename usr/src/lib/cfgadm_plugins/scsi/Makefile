@@ -18,19 +18,18 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved. 
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/cfgadm_plugins/scsi/Makefile
 
 include		../../Makefile.lib
 
 sparc_SUBDIRS=	SUNW,SPARC-Enterprise
-SUBDIRS=	spec .WAIT $(MACH) $(BUILD64) $(MACH64) $($(MACH)_SUBDIRS)
+SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64) $($(MACH)_SUBDIRS)
 
 all :=		TARGET= all
 clean :=	TARGET= clean
@@ -54,7 +53,7 @@ CP=	cp
 
 all clean clobber delete install lint package: $(SUBDIRS)
 
-$(MACH) $(MACH64) spec $($(MACH)_SUBDIRS):	FRC
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 _msg:	$(MSGDOMAIN) $(POFILE)

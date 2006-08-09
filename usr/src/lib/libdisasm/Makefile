@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-
+#
 
 include ../Makefile.lib
 
@@ -42,17 +42,13 @@ lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-$(INTEL_BLD)SPECDIR= spec
-
-all clean clobber install: $(SPECDIR) .WAIT $(SUBDIRS)
-
-lint: $(SUBDIRS)
+all clean clobber install lint: $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 
 check:		$(CHECKHDRS)
 
-$(SUBDIRS) spec: FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

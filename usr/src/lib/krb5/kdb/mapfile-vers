@@ -1,0 +1,95 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.1 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SUNW_1.1 {
+    global:
+	SUNW_1.1;
+};
+
+SUNWprivate_1.1 {
+    global:
+	destroy_file_suffix;
+	krb5_db_close_database;
+	krb5_db_create;
+	krb5_db_delete_principal;
+	krb5_db_destroy;
+	krb5_dbe_apw;
+	krb5_dbe_ark;
+	krb5_dbe_cpw;
+	krb5_dbe_create_key_data;
+	krb5_dbe_crk;
+	krb5_dbe_find_enctype;
+	krb5_dbe_free_contents;
+	krb5_dbekd_decrypt_key_data;
+	krb5_dbekd_encrypt_key_data;
+	krb5_dbe_lookup_last_pwd_change;
+	krb5_dbe_lookup_mod_princ_data;
+	krb5_dbe_lookup_tl_data;
+	krb5_dbe_search_enctype;
+	krb5_dbe_update_last_pwd_change;
+	krb5_dbe_update_mod_princ_data;
+	krb5_dbe_update_tl_data;
+	krb5_db_fetch_mkey;
+	krb5_db_fini;
+	krb5_db_free_principal;
+	krb5_db_get_age;
+	krb5_db_get_principal;
+	krb5_db_init;
+	krb5_db_iterate;
+	krb5_db_lock;
+	krb5_db_open_database;
+	krb5_db_put_principal;
+	krb5_db_rename;
+	krb5_db_set_lockmode;
+	krb5_db_set_mkey;
+	krb5_db_set_name;
+	krb5_db_setup_mkey_name;
+	krb5_db_store_mkey;
+	krb5_db_unlock;
+	krb5_db_verify_master_key;
+	krb5_decode_princ_contents;
+	krb5_encode_princ_contents;
+	krb5_free_princ_contents;
+	krb5_ktkdb_close;
+	krb5_ktkdb_get_entry;
+	krb5_kt_kdb_ops;
+	krb5_ktkdb_resolve;
+	krb5_mkey_pwd_prompt1;
+	krb5_mkey_pwd_prompt2;
+	krb5_ser_db_context_init;
+	ulog_free_entries;
+	ulog_get_entries;
+	ulog_map;
+	ulog_replay;
+	ulog_set_role;
+    local:
+	*;
+};

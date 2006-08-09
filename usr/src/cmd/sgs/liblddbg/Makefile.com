@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -56,14 +55,13 @@ OBJECTS =	$(BLTOBJ) $(COMOBJS) $(COMOBJS32) $(COMOBJS64) $(TOOLOBJ)
 include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
 
-MAPFILES +=	../common/mapfile-vers
-MAPOPTS =	$(MAPFILES:%=-M%)
+SRCDIR =	../common
 
 LINTFLAGS +=	-u -D_REENTRANT
 LINTFLAGS64 +=	-u -D_REENTRANT
 
 CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc $(VAR_LIBLDDBG_CPPFLAGS)
-DYNFLAGS +=	$(VERSREF) $(MAPOPTS) $(ZLAZYLOAD) '-R$$ORIGIN'
+DYNFLAGS +=	$(VERSREF) $(ZLAZYLOAD) '-R$$ORIGIN'
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 
 # A bug in pmake causes redundancy when '+=' is conditionally assigned, so
@@ -74,7 +72,6 @@ XXXFLAGS=
 $(DYNLIB) :=	XXXFLAGS= $(USE_PROTO)
 DYNFLAGS +=     $(XXXFLAGS)
 
-native :=	MAPOPTS=
 native :=	DYNFLAGS	+= $(CONVLIBDIR)
 
 BLTDEFS =	msg.h

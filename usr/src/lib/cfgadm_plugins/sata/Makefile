@@ -18,18 +18,17 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/cfgadm_plugins/sata/Makefile
 
 include		../../Makefile.lib
 
-SUBDIRS=	spec .WAIT $(MACH) $(BUILD64) $(MACH64)
+SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET= all
 clean :=	TARGET= clean
@@ -53,7 +52,7 @@ CP=	cp
 
 all clean clobber delete install lint package: $(SUBDIRS)
 
-$(MACH) $(MACH64) spec: FRC
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 _msg:	$(MSGDOMAIN) $(POFILE)

@@ -1,0 +1,59 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNWprivate_1.1 {
+    global:
+	debugDisplaySS;
+	ss_abort_subsystem;
+	ss_add_info_dir;
+	ss_add_request_table;
+	ss_create_invocation;
+	ss_delete_info_dir;
+	ss_delete_invocation;
+	ss_delete_request_table;
+	ss_error;
+	ss_execute_command;
+	ss_execute_line;
+	ss_get_prompt;
+	ss_help;
+	ss_listen;
+	ss_list_requests;
+	ss_name;
+	ss_pager_create;
+	ss_page_stdin;
+	ss_parse;
+	ss_perror;
+	ss_quit;
+	ss_self_identify;
+	ss_set_prompt;
+	ss_std_requests;
+	ss_subsystem_name;
+	ss_subsystem_version;
+	ss_unimplemented;
+    local:
+	*;
+};

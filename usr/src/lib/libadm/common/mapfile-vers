@@ -1,0 +1,147 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.1 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SUNW_1.1 {
+    global:
+	SUNW_1.1;
+} SUNW_0.7;
+
+SUNW_0.7 {
+    global:
+	pkgdir;
+	read_vtoc;
+	write_vtoc;
+};
+
+SUNWprivate_1.1 {
+    global:
+	_adddevtabrec;
+	_adddgrptabrec;
+	allocmenu;
+	ckdate;
+	ckdate_err;
+	ckdate_hlp;
+	ckdate_val;
+	ckgid;
+	ckgid_dsp;
+	ckgid_err;
+	ckgid_hlp;
+	ckgid_val;
+	ckindent;
+	ckint;
+	ckint_err;
+	ckint_hlp;
+	ckint_val;
+	ckitem;
+	ckitem_err;
+	ckitem_hlp;
+	ckkeywd;
+	ckpath;
+	ckpath_err;
+	ckpath_hlp;
+	ckpath_stx;
+	ckpath_val;
+	ckquit;
+	ckrange;
+	ckrange_err;
+	ckrange_hlp;
+	ckrange_val;
+	ckstr;
+	ckstr_err;
+	ckstr_hlp;
+	ckstr_val;
+	cktime;
+	cktime_err;
+	cktime_hlp;
+	cktime_val;
+	ckuid;
+	ckuid_dsp;
+	ckuid_err;
+	ckuid_hlp;
+	ckuid_val;
+	ckwidth;
+	ckyorn;
+	ckyorn_err;
+	ckyorn_hlp;
+	ckyorn_val;
+	devattr;
+	devfree;
+	devreserv;
+	_devtabpath;
+	_dgrptabpath;
+	_enddevtab;
+	fpkginfo;
+	fpkginst;
+	fpkgparam;
+	get_ABI_namelngth;
+	getdev;
+	getdgrp;
+	getfullblkname;
+	getfullrawname;
+	getinput;
+	get_install_root;
+	get_PKGADM;
+	get_PKGLOC;
+	get_PKGOLD;
+	getvol;
+	_getvol;
+	listdev;
+	listdgrp;
+	_moddevtabrec;
+	_opendevtab;
+	_opendgrptab;
+	pkgfile;
+	pkginfo;
+	pkginfofind;
+	pkgnmchk;
+	pkgparam;
+	printmenu;
+	puterror;
+	puthelp;
+	putprmpt;
+	puttext;
+	reservdev;
+	_rmdevtabattrs;
+	_rmdevtabrec;
+	_rmdgrpmems;
+	_rmdgrptabrec;
+	_rsvtabpath;
+	set_ABI_namelngth;
+	set_install_root;
+	setinvis;
+	setitem;
+	set_PKGADM;
+	set_PKGLOC;
+	set_PKGpaths;
+	_validalias;
+    local:
+	*;
+};

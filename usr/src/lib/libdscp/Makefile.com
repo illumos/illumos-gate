@@ -22,9 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libdscp/Makefile.com
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libdscp.a
@@ -38,10 +36,6 @@ include	../../Makefile.rootfs
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc -lsocket -lnsl
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-SRCDIR =	..
-MAPDIR =	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
 
 CPPFLAGS +=	-I..
 CFLAGS +=	$(CCVERBOSE)

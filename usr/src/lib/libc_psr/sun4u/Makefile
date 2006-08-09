@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libc_psr/sun4u/Makefile
 #
 
 include ../../Makefile.lib
@@ -48,14 +45,11 @@ all install clean clobber : lib32 \
 lint:
 	@ $(ECHO) "Nothing to lint here: skipping"
 
-lib32: spec .WAIT $(SUBDIRS)
+lib32: $(SUBDIRS)
 
 lib64: $(SUBDIRS64)
 
 $(SUBDIRS) $(SUBDIRS64): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
-
-spec: FRC
-	@cd ../spec/$(PLATFORM); pwd; $(MAKE) $(TARGET)
 
 FRC:

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -25,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libmail/Makefile.com
-#
 
 LIBRARY= libmail.a
 VERS= .1
@@ -36,11 +33,11 @@ OBJECTS= 	abspath.o  casncmp.o   copystream.o delempty.o \
 		s_string.o  setup_exec.o strmove.o  skipspace.o \
 		substr.o   systemvp.o  trimnl.o     xgetenv.o
 
-# include library definitions
 include ../../Makefile.lib
 
-MAPFILE=	$(MAPDIR)/mapfile
-SRCS=		$(OBJECTS:%.o=../common/%.c)
+SRCDIR =	../common
+
+MAPFILES +=	$(MAPFILE32)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
@@ -50,7 +47,6 @@ LINTSRC=	$(LINTLIB:%.ln=%)
 
 CPPFLAGS =	-I../inc -I../../common/inc $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
-DYNFLAGS +=	-M $(MAPFILE)
 LDLIBS +=	-lc
 
 .KEEP_STATE:
@@ -59,12 +55,6 @@ all: $(LIBS) fnamecheck
 
 lint: lintcheck
 
-$(DYNLIB) $(DYNLIB64):	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
-
-# include library targets
 include ../../Makefile.targ
 
 pics/%.o: ../common/%.c

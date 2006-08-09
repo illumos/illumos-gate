@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -37,10 +36,10 @@ OBJECTS =	$(BLTOBJ) $(COMOBJS) $(COMOBJS64) $(PLTOBJS)
 include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
 
-MAPFILE=	../common/mapfile-vers
+SRCDIR =	../common
 
 CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc
-DYNFLAGS +=	-M$(MAPFILE) $(VERSREF)
+DYNFLAGS +=	$(VERSREF)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 
 LINTFLAGS +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2

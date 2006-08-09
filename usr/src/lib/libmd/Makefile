@@ -19,12 +19,10 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libmd/Makefile
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.lib
@@ -45,19 +43,15 @@ lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-.PARALLEL: $(MACH) $(MACH64) $(PLATFORMS)
+.PARALLEL: $(SUBDIRS)
 
-all install: spec .WAIT $(SUBDIRS)
-
-clean clobber: $(SUBDIRS)
-
-lint:		$(SUBDIRS)
+all clean clobber install lint: $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 
 check:		$(CHECKHDRS)
 
-spec $(MACH) $(MACH64) $(PLATFORMS): FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 FRC:
 

@@ -1,0 +1,138 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+#
+# The instances of "tecla_l.5" below (note "l" vs "1") are by design;
+# quoting the author:
+#
+# Unfortunately the tecla_l.5 version string is by now embedded in any
+# executable that linked with libtecla versions 1.5 ..., so I can't fix
+# the typo without preventing those programs from linking against 1.6.
+# Thus I now have to derive tecla_1.6 from tecla_l.5, in the map file.
+#
+
+tecla_1.6 {
+    global:
+	gl_append_history;
+	gl_automatic_history;
+	gl_query_char;
+	gl_read_char;
+} tecla_l.5;
+
+tecla_l.5 {
+    global:
+	cpl_recall_matches;
+	gl_abandon_line;
+	gl_bind_keyseq;
+	gl_catch_blocked;
+	gl_display_text;
+	gl_erase_terminal;
+	gl_error_message;
+	gl_handle_signal;
+	gl_inactivity_timeout;
+	gl_io_mode;
+	gl_list_signals;
+	gl_normal_io;
+	gl_pending_io;
+	gl_raw_io;
+	gl_register_action;
+	gl_return_status;
+	gl_tty_signals;
+} tecla_1.4;
+
+tecla_1.4 {
+    global:
+	gl_clear_history;
+	gl_configure_getline;
+	gl_echo_mode;
+	gl_group_history;
+	gl_ignore_signal;
+	gl_last_signal;
+	gl_limit_history;
+	gl_load_history;
+	gl_lookup_history;
+	gl_prompt_style;
+	gl_range_of_history;
+	gl_replace_prompt;
+	gl_resize_history;
+	gl_save_history;
+	gl_set_term_size;
+	gl_show_history;
+	gl_size_of_history;
+	gl_state_of_history;
+	gl_terminal_size;
+	gl_toggle_history;
+	gl_trap_signal;
+	gl_watch_fd;
+	libtecla_version;
+} tecla_1.3;
+
+tecla_1.3 {
+    global:
+	ef_list_expansions;
+} tecla_1.2;
+
+tecla_1.2 {
+    global:
+	cfc_file_start;
+	cfc_literal_escapes;
+	cfc_set_check_fn;
+	cpl_add_completion;
+	cpl_check_exe;
+	cpl_complete_word;
+	cpl_file_completions;
+	cpl_init_FileArgs;
+	cpl_last_error;
+	cpl_list_completions;
+	cpl_record_error;
+	del_CplFileConf;
+	del_ExpandFile;
+	del_GetLine;
+	del_PathCache;
+	del_PcaPathConf;
+	del_WordCompletion;
+	ef_expand_file;
+	ef_last_error;
+	gl_change_terminal;
+	gl_completion_action;
+	gl_customize_completion;
+	gl_get_line;
+	new_CplFileConf;
+	new_ExpandFile;
+	new_GetLine;
+	new_PathCache;
+	new_PcaPathConf;
+	new_WordCompletion;
+	pca_last_error;
+	pca_lookup_file;
+	pca_scan_path;
+	pca_set_check_fn;
+	ppc_file_start;
+	ppc_literal_escapes;
+    local:
+	*;
+};

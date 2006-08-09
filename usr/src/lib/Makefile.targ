@@ -18,12 +18,13 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
+
 #
 # included to define local library targets
 #
@@ -85,7 +86,7 @@ $(LIBRARY): objs .WAIT $$(OBJS)
 	$(BUILD.AR)
 	$(POST_PROCESS_A)
 
-$(DYNLIB): $$(SPECMAPFILE)
+$(DYNLIB): $$(MAPFILES)
 
 $(DYNLIB): pics .WAIT $$(PICS) $$(ALTPICS)
 	$(BUILD.SO)
@@ -103,9 +104,6 @@ $(LINTLIB): $$(SRCS)
 
 lintcheck: $$(SRCS)
 	$(LINT.c) $(LINTCHECKFLAGS) $(SRCS) $(LDLIBS)
-
-$(SPECMAPFILES):
-	cd $(MAPDIR); pwd; $(MAKE) $(@F)
 
 clobber: clean
 	-$(RM) $(CLOBBERTARGFILES)

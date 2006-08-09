@@ -28,6 +28,7 @@
 include		$(SRC)/cmd/Makefile.cmd
 
 SUBDIRS-common= libconv		\
+		.WAIT		\
 		libdl		\
 		libelf		\
 		liblddbg	\
@@ -173,7 +174,7 @@ FRC:
 # Cross-reference customization: ignore the directories named by XRPRUNE,
 # and tweak the file globs slightly.
 #
-XRPRUNE=	rtld.4.x spec packages abi
+XRPRUNE=	rtld.4.x packages abi
 XRADD=		*.msg mapfile* llib-[a-z]*
 XRDEL=		Makefile* kobj_*
 

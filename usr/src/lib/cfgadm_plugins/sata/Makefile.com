@@ -18,14 +18,11 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/cfgadm_plugins/sata/Makefile.com
 #
 
 LIBRARY= sata.a
@@ -36,13 +33,9 @@ OBJECTS= cfga_sata.o cfga_rcm.o
 # include library definitions
 include ../../../Makefile.lib
 
+SRCDIR =	../common
 ROOTLIBDIR=	$(ROOT)/usr/lib/cfgadm
 ROOTLIBDIR64=	$(ROOTLIBDIR)/$(MACH64)
-
-MAPFILE=	$(MAPDIR)/mapfile
-CLOBBERFILES +=	$(MAPFILE)
-
-SRCS=		$(OBJECTS:%.o=../common/%.c)
 
 LIBS=	$(DYNLIB)
 
@@ -52,7 +45,6 @@ LINTFLAGS64 +=	-DDEBUG
 CFLAGS +=	$(CCVERBOSE)
 CFLAGS64 +=	$(CCVERBOSE)
 
-DYNFLAGS +=	-M $(MAPFILE)
 LDLIBS +=	-lc -ldevice -ldevinfo -lrcm -lnvpair
 
 .KEEP_STATE:
@@ -60,11 +52,6 @@ LDLIBS +=	-lc -ldevice -ldevinfo -lrcm -lnvpair
 all:	$(LIBS)
 
 lint:	lintcheck
-
-$(DYNLIB):	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
 
 # Install rules
 

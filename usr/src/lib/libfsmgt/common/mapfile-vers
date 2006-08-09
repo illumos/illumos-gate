@@ -1,0 +1,90 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNWprivate_1.1 {
+    global:
+	cmd_execute_command;
+	cmd_execute_command_and_retrieve_string;
+	cmd_retrieve_string;
+	fileutil_add_string_to_array;
+	fileutil_free_string_array;
+	fileutil_get_cmd_from_string;
+	fileutil_get_first_column_data;
+	fileutil_getfs;
+	fileutil_getline;
+	fs_add_DFStab_ent;
+	fs_add_mount_default;
+	fs_check_for_duplicate_DFStab_paths;
+	fs_create_array_from_accesslist;
+	fs_del_All_DFStab_ents_with_Path;
+	fs_del_DFStab_ent;
+	fs_del_mount_default_ent;
+	fs_edit_DFStab_ent;
+	fs_edit_mount_defaults;
+	fs_free_DFStab_ents;
+	fs_free_mntdefaults_list;
+	fs_free_mount_list;
+	fs_free_share_list;
+	fs_get_availablesize;
+	fs_get_avail_for_nonsuperuser_size;
+	fs_get_blocksize;
+	fs_get_DFStab_ent_Desc;
+	fs_get_DFStab_ent_Fstype;
+	fs_get_DFStab_ent_Next;
+	fs_get_DFStab_ent_Options;
+	fs_get_DFStab_ent_Path;
+	fs_get_DFStab_ent_Res;
+	fs_get_DFStab_ents;
+	fs_get_Dfstab_share_cmd;
+	fs_get_filtered_mount_defaults;
+	fs_get_filtered_mount_list;
+	fs_get_fragsize;
+	fs_get_maxfilenamelen;
+	fs_get_mount_defaults;
+	fs_get_mount_list;
+	fs_get_mounts_by_mntopt;
+	fs_get_share_list;
+	fs_get_totalsize;
+	fs_get_usedsize;
+	fs_is_readonly;
+	fs_parse_optlist_for_option;
+	fs_parse_opts_for_sec_modes;
+	fs_print_dfstab_entries;
+	fs_set_DFStab_ent;
+	netcfg_free_networkid_list;
+	netcfg_get_networkid_list;
+	nfs_free_mntinfo_list;
+	nfs_get_filtered_mount_list;
+	nfs_get_mount_list;
+	nfs_get_mounts_by_mntopt;
+	nfssec_free_secmode_list;
+	nfssec_get_default_secmode;
+	nfssec_get_nfs_secmode_list;
+	sys_get_hostname;
+    local:
+	*;
+};

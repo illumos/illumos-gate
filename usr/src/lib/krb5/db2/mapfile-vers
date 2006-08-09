@@ -1,0 +1,70 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# Due to mistakes made early in the history of this library, there are
+# no SUNW_1.1 symbols, but the version is now kept as a placeholder.
+# Don't add any symbols to this version.
+
+SUNW_1.1 {
+    global:
+	SUNW_1.1;
+};
+
+SUNWprivate_1.1 {
+    global:
+	debugDisplayDB;
+	kdb2_dbm_clearerr;
+	kdb2_dbm_close;
+	kdb2_dbm_delete;
+	kdb2_dbm_dirfno;
+	kdb2_dbm_error;
+	kdb2_dbm_fetch;
+	kdb2_dbm_firstkey;
+	kdb2_dbminit;
+	kdb2_dbm_nextkey;
+	kdb2_dbm_open;
+	kdb2_dbm_store;
+	kdb2_dbopen;
+	kdb2_delete;
+	kdb2_fetch;
+	kdb2_firstkey;
+	kdb2_hcreate;
+	kdb2_hdestroy;
+	kdb2_hsearch;
+	kdb2_nextkey;
+	kdb2_store;
+	mpool_close;
+	mpool_delete;
+	mpool_filter;
+	mpool_get;
+	mpool_new;
+	mpool_open;
+	mpool_put;
+	mpool_sync;
+    local:
+	*;
+};

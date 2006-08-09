@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,8 +36,6 @@ LDLIBS +=	-lnvpair -lresolv -lnsl -lc
 
 ROOTLIBDIR =	$(ROOT)/usr/lib/inet/dhcp/nsu
 SRCDIR =	../common
-MAPFILES =	../common/mapfile
-MAPOPTS =	$(MAPFILES:%=-M %)
 
 #
 # Since lint is not smart enough to grok `do { } while (0)' in macros,
@@ -46,7 +43,8 @@ MAPOPTS =	$(MAPFILES:%=-M %)
 #
 LINTFLAGS +=	-erroff=E_CONSTANT_CONDITION
 CPPFLAGS += 	-D_REENTRANT -I../../libresolv2/include
-DYNFLAGS +=	$(MAPOPTS)
+
+MAPFILES =	../common/mapfile
 
 .KEEP_STATE:
 

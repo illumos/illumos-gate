@@ -18,14 +18,11 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/cfgadm_plugins/scsi/SUNW,SPARC-Enterprise/Makefile.com
 #
 
 LIBRARY= scsi.a
@@ -47,8 +44,7 @@ include $(SRC)/lib/Makefile.lib
 ROOTLIBDIR=	$(ROOT)/usr/platform/SUNW,SPARC-Enterprise/lib/cfgadm
 ROOTLIBDIR64=	$(ROOTLIBDIR)/$(MACH64)
 
-MAPFILE=	$(MAPDIR)/mapfile
-CLOBBERFILES +=	$(MAPFILE)
+SRCDIR =	../../common
 
 SRCS=	$(GEN_OBJECTS:%.o=../../common/%.c) $(OPL_OBJECTS:%.o=../common/%.c)
 
@@ -56,7 +52,6 @@ LIBS=	$(DYNLIB)
 
 CFLAGS +=	$(CCVERBOSE)
 
-DYNFLAGS +=	-M $(MAPFILE)
 LDLIBS +=	-lc -ldevice -ldevinfo -lrcm
 
 .KEEP_STATE:
@@ -64,11 +59,6 @@ LDLIBS +=	-lc -ldevice -ldevinfo -lrcm
 all:	$(LIBS)
 
 lint:   lintcheck
-
-$(DYNLIB):	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
 
 # Install rules
 

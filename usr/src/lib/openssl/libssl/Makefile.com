@@ -24,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# usr/src/lib/openssl/ssl/Makefile.com
-#
 
 LIBRARY = libssl.a
 
@@ -55,6 +53,9 @@ OBJECTS = bio_ssl.o							\
 	$($(MACH)_OBJECTS)
 
 include ../../Makefile.com
+
+# There should be a mapfile here
+MAPFILES =
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 SRCDIR =	../../../../common/openssl/ssl
