@@ -36,8 +36,13 @@ extern "C" {
  * Resumable and Non-resumable queues
  */
 #define	CPU_RQ_ENTRIES		64
-#define	CPU_NRQ_ENTRIES		64
+#define	MAX_CPU_RQ_ENTRIES	128
+
+#define	CPU_NRQ_ENTRIES		4
+#define	MAX_CPU_NRQ_ENTRIES	4
+
 #define	Q_ENTRY_SIZE		64
+
 #define	CPU_RQ_SIZE		(CPU_RQ_ENTRIES * Q_ENTRY_SIZE)
 #define	CPU_NRQ_SIZE		(CPU_NRQ_ENTRIES * Q_ENTRY_SIZE)
 

@@ -185,7 +185,9 @@ int ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *len,
 int ldc_mem_rdwr_pa(ldc_handle_t handle, caddr_t vaddr, size_t *size,
     caddr_t paddr, uint8_t  direction);
 int ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie,
-    uint32_t ccount, uint8_t mtype, caddr_t *vaddr, caddr_t *raddr);
+    uint32_t ccount, uint8_t mtype, uint8_t perm, caddr_t *vaddr,
+    caddr_t *raddr);
+int ldc_mem_unmap(ldc_mem_handle_t mhandle);
 int ldc_mem_acquire(ldc_mem_handle_t mhandle, uint64_t offset, uint64_t size);
 int ldc_mem_release(ldc_mem_handle_t mhandle, uint64_t offset, uint64_t size);
 

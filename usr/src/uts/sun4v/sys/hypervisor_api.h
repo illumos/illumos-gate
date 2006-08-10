@@ -401,7 +401,8 @@ extern uint64_t hv_ldc_copy(uint64_t channel, uint64_t request,
 extern uint64_t hv_ldc_mapin(uint64_t channel, uint64_t cookie,
     uint64_t *raddr, uint64_t *perm);
 extern uint64_t hv_ldc_unmap(uint64_t raddr);
-extern uint64_t hv_ldc_revoke(uint64_t raddr);
+extern uint64_t hv_ldc_revoke(uint64_t channel, uint64_t cookie,
+    uint64_t revoke_cookie);
 extern uint64_t hv_api_get_version(uint64_t api_group, uint64_t *majorp,
     uint64_t *minorp);
 extern uint64_t hv_api_set_version(uint64_t api_group, uint64_t major,

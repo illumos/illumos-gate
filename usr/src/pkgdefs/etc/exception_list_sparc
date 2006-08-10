@@ -822,6 +822,7 @@ lib/sparcv9/libc_i18n.a				sparc
 #
 usr/platform/SUNW,Sun-Fire-T200/lib/llib-lpcp.ln	sparc
 usr/platform/SUNW,Netra-CP3060/lib/llib-lpcp.ln		sparc
+usr/platform/sun4v/lib/llib-lpcp.ln			sparc
 #
 # ZFS internal tools and lint libraries
 #

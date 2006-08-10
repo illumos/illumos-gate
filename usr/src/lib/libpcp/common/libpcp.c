@@ -53,6 +53,8 @@
 
 #include "libpcp.h"
 #include "pcp_common.h"
+#include "pcp_utils.h"
+
 
 /*
  * Following libpcp interfaces are exposed to user applications.
@@ -165,14 +167,7 @@ static struct sigaction old_act;
 /*
  * Variables to support vldc based streaming transport
  */
-typedef enum {
-	GLVC_NON_STREAM,
-	VLDC_STREAMING
-} xport_t;
-
-static int xport_type = GLVC_NON_STREAM;
-#define	CHANNEL_DEV	"channel-devices"
-
+static pcp_xport_t xport_type = GLVC_NON_STREAM;
 #define	VLDC_MTU_SIZE	(2048)
 
 static void
@@ -194,25 +189,38 @@ pcp_init(char *channel_name)
 {
 	sigset_t oldset;
 	int channel_fd;
+	char *dev_path;
+	vldc_opt_op_t op;
 
 	if (channel_name == NULL)
 		return (PCPL_INVALID_ARGS);
 
 	/*
+	 * Given the argument, try to locate a device in the device tree
+	 */
+	dev_path = platsvc_name_to_path(channel_name, &xport_type);
+
+	/*
+	 * Path exists ?
+	 */
+	if (NULL == dev_path)
+		return (PCPL_INVALID_ARGS);
+
+	/*
 	 * Open virtual channel name.
 	 */
-	if ((channel_fd = open(channel_name, O_RDWR|O_EXCL)) < 0) {
+	if ((channel_fd = open(dev_path, O_RDWR|O_EXCL)) < 0) {
+		free(dev_path);
 		return (PCPL_GLVC_ERROR);
 	}
 
-	/*
-	 * Check if the channel-name points to a vldc node
-	 * or a glvc node
-	 */
-	if (strstr(channel_name, CHANNEL_DEV) != NULL) {
-		vldc_opt_op_t op;
+	free(dev_path);
 
-		xport_type  = VLDC_STREAMING;
+	/*
+	 * Handle transport-specific processing
+	 */
+	switch (xport_type) {
+	case VLDC_STREAMING:
 		mtu_size = VLDC_MTU_SIZE;
 
 		op.op_sel = VLDC_OP_SET;
@@ -222,17 +230,19 @@ pcp_init(char *channel_name)
 			(void) close(channel_fd);
 			return (PCPL_GLVC_ERROR);
 		}
-	} else {
-		xport_type  = GLVC_NON_STREAM;
+		break;
+	case GLVC_NON_STREAM:
+	default:
 		/*
 		 * Get the Channel MTU size
 		 */
 
 		if (pcp_get_prop(channel_fd, GLVC_XPORT_OPT_MTU_SZ,
-				&mtu_size) != 0) {
+		    &mtu_size) != 0) {
 			(void) close(channel_fd);
 			return (PCPL_GLVC_ERROR);
 		}
+		break;
 	}
 
 	/*

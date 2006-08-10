@@ -122,10 +122,7 @@ check_add_drv()
 				echo $minorentry >> $BASEDIR/etc/minor_perm
 			fi
 		fi
-
 	fi
-
-
 }
 
 check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-channel-devices"' cnex
@@ -136,3 +133,35 @@ check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-disk-server"' vds
 check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-channel"' vldc
 check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-network"' vnet
 check_add_drv -b "${BASEDIR}" -i '"SUNW,sun4v-network-switch"' vsw
+
+
+TMPFILE=$BASEDIR/tmp/drd.tmp
+
+#
+# The temporary file will be created by the preinstall script
+# if the drd service is being installed for the first time by
+# means of an upgrade. If the temporary file does not exist,
+# it is not necessary to take any action for drd.
+#
+if [ ! -f $TMPFILE ]; then
+	exit 0
+fi
+
+rm -f $TMPFILE
+
+#
+# Update the upgrade script to enable the drd service on the
+# system if it is a sun4v machine.
+#
+cat >> $BASEDIR/var/svc/profile/upgrade << \_ENABLE_DRD
+
+#
+# Enable drd if running on a sun4v platform
+#
+if [ `/sbin/uname -m` = "sun4v" ]; then
+	/usr/sbin/svcadm enable svc:/platform/sun4v/drd:default
+fi
+
+_ENABLE_DRD
+
+exit 0

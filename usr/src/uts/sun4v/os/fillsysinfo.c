@@ -51,6 +51,7 @@
 #include <sys/error.h>
 #include <sys/mmu.h>
 #include <sys/bitmap.h>
+#include <sys/intreg.h>
 
 int ncpunode;
 struct cpu_node cpunodes[NCPU];
@@ -66,7 +67,7 @@ static uint64_t get_mmu_ctx_bits(md_t *, mde_cookie_t);
 static uint64_t get_cpu_pagesizes(md_t *, mde_cookie_t);
 static char *construct_isalist(md_t *, mde_cookie_t, char **);
 static void set_at_flags(char *, int, char **);
-static void init_md_broken(md_t *);
+static void init_md_broken(md_t *, mde_cookie_t *);
 static int get_l2_cache_info(md_t *, mde_cookie_t, uint64_t *, uint64_t *,
     uint64_t *);
 static id_t get_exec_unit_mapping(md_t *, mde_cookie_t, mde_cookie_t *);
@@ -97,17 +98,6 @@ map_wellknown_devices()
 {
 }
 
-/*
- * For backward compatibility we need to verify that we can handle
- * running on platforms which shipped with missing MD properties.
- */
-#define	ONTARIO_PLATNAME1	"SUNW,Sun-Fire-T200"
-#define	ONTARIO_PLATNAME2	"SUNW,Sun-Fire-T2000"
-#define	ONTARIO_PLATNAME3	"SUNW,SPARC-Enterprise-T2000"
-#define	ERIE_PLATNAME1		"SUNW,Sun-Fire-T100"
-#define	ERIE_PLATNAME2		"SUNW,Sun-Fire-T1000"
-#define	ERIE_PLATNAME3		"SUNW,SPARC-Enterprise-T1000"
-
 void
 fill_cpu(md_t *mdp, mde_cookie_t cpuc)
 {
@@ -118,34 +108,16 @@ fill_cpu(md_t *mdp, mde_cookie_t cpuc)
 	char *namebufp;
 	int namelen;
 	uint64_t associativity = 0, linesize = 0, size = 0;
-	int status;
 
 	if (md_get_prop_val(mdp, cpuc, "id", &cpuid)) {
 		return;
 	}
 
+	/* All out-of-range cpus will be stopped later. */
 	if (cpuid >= NCPU) {
 		cmn_err(CE_CONT, "fill_cpu: out of range cpuid %ld - "
-		    "cpu excluded from configuration", cpuid);
+		    "cpu excluded from configuration\n", cpuid);
 
-		mutex_enter(&cpu_lock);
-
-		/*
-		 * Since the CPU cannot be used, make sure it
-		 * is in a safe place. If the firmware does not
-		 * support CPU stop, this is known to be true.
-		 * If it fails to stop for any other reason, the
-		 * system is in an inconsistent state and cannot
-		 * be allowed to continue.
-		 */
-		status = stopcpu_bycpuid(cpuid);
-
-		if ((status != 0) && (status != ENOTSUP)) {
-			cmn_err(CE_PANIC, "failed to stop cpu %lu (%d)",
-			    cpuid, status);
-		}
-
-		mutex_exit(&cpu_lock);
 		return;
 	}
 
@@ -253,7 +225,7 @@ setup_exec_unit_mappings(md_t *mdp)
 	 */
 	num = md_alloc_scan_dag(mdp, md_root_node(mdp), "cpus", "fwd", &node);
 	if (num < 1)
-		cmn_err(CE_PANIC, "No cpus node in machine desccription");
+		cmn_err(CE_PANIC, "No cpus node in machine description");
 	if (num > 1)
 		cmn_err(CE_PANIC, "More than 1 cpus node in machine"
 		    " description");
@@ -329,14 +301,14 @@ cpu_setup_common(char **cpu_module_isa_set)
 	if ((mdp = md_get_handle()) == NULL)
 		cmn_err(CE_PANIC, "Unable to initialize machine description");
 
-	init_md_broken(mdp);
-
 	nocpus = md_alloc_scan_dag(mdp,
 	    md_root_node(mdp), "cpu", "fwd", &cpulist);
 	if (nocpus < 1) {
 		cmn_err(CE_PANIC, "cpu_common_setup: cpulist allocation "
 		    "failed or incorrect number of CPUs in MD");
 	}
+
+	init_md_broken(mdp, cpulist);
 
 	if (use_page_coloring) {
 		do_pg_coloring = 1;
@@ -628,12 +600,22 @@ get_ra_limit(md_t *mdp)
 /*
  * This routine sets the globals for CPU and DEV mondo queue entries and
  * resumable and non-resumable error queue entries.
+ *
+ * First, look up the number of bits available to pass an entry number.
+ * This can vary by platform and may result in allocating an unreasonably
+ * (or impossibly) large amount of memory for the corresponding table,
+ * so we clamp it by 'max_entries'.  If the prop is missing, use
+ * 'default_entries'.
  */
 static uint64_t
 get_single_q_size(md_t *mdp, mde_cookie_t cpu_node_cookie,
-    char *qnamep, uint64_t default_entries)
+    char *qnamep, uint64_t default_entries, uint64_t max_entries)
 {
 	uint64_t entries;
+
+	if (default_entries > max_entries)
+		cmn_err(CE_CONT, "!get_single_q_size: dflt %ld > "
+		    "max %ld for %s\n", default_entries, max_entries, qnamep);
 
 	if (md_get_prop_val(mdp, cpu_node_cookie, qnamep, &entries)) {
 		if (!broken_md_flag)
@@ -643,24 +625,50 @@ get_single_q_size(md_t *mdp, mde_cookie_t cpu_node_cookie,
 	} else {
 		entries = 1 << entries;
 	}
+
+	entries = MIN(entries, max_entries);
+
 	return (entries);
 }
 
+/* Scaling constant used to compute size of cpu mondo queue */
+#define	CPU_MONDO_Q_MULTIPLIER	8
 
 static void
 get_q_sizes(md_t *mdp, mde_cookie_t cpu_node_cookie)
 {
+	uint64_t max_qsize;
+	mde_cookie_t *platlist;
+	uint64_t ncpus = NCPU;
+	int nrnode;
+
+	/*
+	 * Compute the maximum number of entries for the cpu mondo queue.
+	 * Use the appropriate property in the platform node, if it is
+	 * available.  Else, base it on NCPU.
+	 */
+	nrnode = md_alloc_scan_dag(mdp,
+	    md_root_node(mdp), "platform", "fwd", &platlist);
+
+	ASSERT(nrnode == 1);
+
+	if (md_get_prop_val(mdp, platlist[0], "max-vcpus", &ncpus) == -1)
+		cmn_err(CE_CONT, "!no 'max-vcpus' prop in platform node\n");
+	max_qsize = ncpus * CPU_MONDO_Q_MULTIPLIER;
+
+	md_free_scan_dag(mdp, &platlist);
+
 	cpu_q_entries = get_single_q_size(mdp, cpu_node_cookie,
-	    "q-cpu-mondo-#bits", DEFAULT_CPU_Q_ENTRIES);
+	    "q-cpu-mondo-#bits", DEFAULT_CPU_Q_ENTRIES, max_qsize);
 
 	dev_q_entries = get_single_q_size(mdp, cpu_node_cookie,
-	    "q-dev-mondo-#bits", DEFAULT_DEV_Q_ENTRIES);
+	    "q-dev-mondo-#bits", DEFAULT_DEV_Q_ENTRIES, SOFTIVNUM);
 
 	cpu_rq_entries = get_single_q_size(mdp, cpu_node_cookie,
-	    "q-resumable-#bits", CPU_RQ_ENTRIES);
+	    "q-resumable-#bits", CPU_RQ_ENTRIES, MAX_CPU_RQ_ENTRIES);
 
 	cpu_nrq_entries = get_single_q_size(mdp, cpu_node_cookie,
-		"q-nonresumable-#bits", CPU_NRQ_ENTRIES);
+	    "q-nonresumable-#bits", CPU_NRQ_ENTRIES, MAX_CPU_NRQ_ENTRIES);
 }
 
 
@@ -749,43 +757,40 @@ get_l2_cache_info(md_t *mdp, mde_cookie_t cpu_node_cookie,
 	return ((max_level > 0) ? 1 : 0);
 }
 
+
 /*
- * The broken_md_flag is set to 1, if the MD doesn't have
- * the domaining-enabled property in the platform node and the platforms
- * are Ontario and Erie. This flag is used to workaround some of the
- * incorrect MD properties.
+ * Set the broken_md_flag to 1 if the MD doesn't have
+ * the domaining-enabled property in the platform node and the
+ * platform uses the UltraSPARC-T1 cpu. This flag is used to
+ * workaround some of the incorrect MD properties.
  */
 static void
-init_md_broken(md_t *mdp)
+init_md_broken(md_t *mdp, mde_cookie_t *cpulist)
 {
 	int nrnode;
 	mde_cookie_t *platlist, rootnode;
-	char *vbuf;
 	uint64_t val = 0;
+	char *namebuf;
+	int namelen;
 
 	rootnode = md_root_node(mdp);
 	ASSERT(rootnode != MDE_INVAL_ELEM_COOKIE);
+	ASSERT(cpulist);
 
-	nrnode = md_alloc_scan_dag(mdp, md_root_node(mdp), "platform", "fwd",
+	nrnode = md_alloc_scan_dag(mdp, rootnode, "platform", "fwd",
 	    &platlist);
 
 	ASSERT(nrnode == 1);
 
-	if (md_get_prop_str(mdp, platlist[0], "name", &vbuf) != 0)
-		panic("platform name not found in machine description");
+	if (md_get_prop_data(mdp, cpulist[0],
+	    "compatible", (uint8_t **)&namebuf, &namelen)) {
+		cmn_err(CE_PANIC, "init_md_broken: "
+		    "Cannot read 'compatible' property of 'cpu' node");
+	}
 
-	/*
-	 * If domaining-enable prop doesn't exist and the platform name is
-	 * Ontario or Erie the md is broken.
-	 */
-
-	if (md_get_prop_val(mdp, platlist[0], "domaining-enabled", &val) != 0 &&
-	((strcmp(vbuf, ONTARIO_PLATNAME1) == 0) ||
-	(strcmp(vbuf, ONTARIO_PLATNAME2) == 0) ||
-	(strcmp(vbuf, ONTARIO_PLATNAME3) == 0) ||
-	(strcmp(vbuf, ERIE_PLATNAME1) == 0) ||
-	(strcmp(vbuf, ERIE_PLATNAME2) == 0) ||
-	(strcmp(vbuf, ERIE_PLATNAME3) == 0)))
+	if (md_get_prop_val(mdp, platlist[0],
+		"domaining-enabled", &val) == -1 &&
+	    strcmp(namebuf, "SUNW,UltraSPARC-T1") == 0)
 		broken_md_flag = 1;
 
 	md_free_scan_dag(mdp, &platlist);

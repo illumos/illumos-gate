@@ -121,12 +121,16 @@ static int	vdc_send(vdc_t *vdc, caddr_t pkt, size_t *msglen);
 static int	vdc_do_ldc_init(vdc_t *vdc);
 static int	vdc_start_ldc_connection(vdc_t *vdc);
 static int	vdc_create_device_nodes(vdc_t *vdc);
+static int	vdc_create_device_nodes_efi(vdc_t *vdc);
+static int	vdc_create_device_nodes_vtoc(vdc_t *vdc);
 static int	vdc_create_device_nodes_props(vdc_t *vdc);
 static int	vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id);
 static int	vdc_do_ldc_up(vdc_t *vdc);
 static void	vdc_terminate_ldc(vdc_t *vdc);
 static int	vdc_init_descriptor_ring(vdc_t *vdc);
 static void	vdc_destroy_descriptor_ring(vdc_t *vdc);
+static int	vdc_setup_devid(vdc_t *vdc);
+static void	vdc_store_efi(vdc_t *vdc, struct dk_gpt *efi);
 
 /* handshake with vds */
 static void		vdc_init_handshake_negotiation(void *arg);
@@ -164,6 +168,10 @@ static int	vdc_create_fake_geometry(vdc_t *vdc);
 static int	vdc_setup_disk_layout(vdc_t *vdc);
 static int	vdc_null_copy_func(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
+static int	vdc_get_wce_convert(vdc_t *vdc, void *from, void *to,
+		    int mode, int dir);
+static int	vdc_set_wce_convert(vdc_t *vdc, void *from, void *to,
+		    int mode, int dir);
 static int	vdc_get_vtoc_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
 static int	vdc_set_vtoc_convert(vdc_t *vdc, void *from, void *to,
@@ -173,6 +181,10 @@ static int	vdc_get_geom_convert(vdc_t *vdc, void *from, void *to,
 static int	vdc_set_geom_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
 static int	vdc_uscsicmd_convert(vdc_t *vdc, void *from, void *to,
+		    int mode, int dir);
+static int	vdc_get_efi_convert(vdc_t *vdc, void *from, void *to,
+		    int mode, int dir);
+static int	vdc_set_efi_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
 
 /*
@@ -274,6 +286,7 @@ _init(void)
 		return (status);
 	if ((status = mod_install(&modlinkage)) != 0)
 		ddi_soft_state_fini(&vdc_state);
+	vdc_efi_init(vd_process_ioctl);
 	return (status);
 }
 
@@ -290,6 +303,7 @@ _fini(void)
 
 	if ((status = mod_remove(&modlinkage)) != 0)
 		return (status);
+	vdc_efi_fini();
 	ddi_soft_state_fini(&vdc_state);
 	return (0);
 }
@@ -423,6 +437,11 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (vdc->label)
 		kmem_free(vdc->label, DK_LABEL_SIZE);
 
+	if (vdc->devid) {
+		ddi_devid_unregister(dip);
+		ddi_devid_free(vdc->devid);
+	}
+
 	if (vdc->initialized & VDC_SOFT_STATE)
 		ddi_soft_state_free(vdc_state, instance);
 
@@ -467,6 +486,7 @@ vdc_do_attach(dev_info_t *dip)
 	vdc->instance	= instance;
 	vdc->open	= 0;
 	vdc->vdisk_type	= VD_DISK_TYPE_UNK;
+	vdc->vdisk_label = VD_DISK_LABEL_UNK;
 	vdc->state	= VD_STATE_INIT;
 	vdc->ldc_state	= 0;
 	vdc->session_id = 0;
@@ -575,6 +595,13 @@ vdc_do_attach(dev_info_t *dip)
 		cmn_err(CE_NOTE, "[%d] Failed to create device nodes"
 				" properties (%d)", instance, status);
 		return (status);
+	}
+
+	/*
+	 * Setup devid
+	 */
+	if (vdc_setup_devid(vdc)) {
+		DMSG(0, "[%d] No device id available\n", instance);
 	}
 
 	ddi_report_dev(dip);
@@ -698,6 +725,61 @@ vdc_start_ldc_connection(vdc_t *vdc)
 	return (status);
 }
 
+static int
+vdc_create_device_nodes_efi(vdc_t *vdc)
+{
+	ddi_remove_minor_node(vdc->dip, "h");
+	ddi_remove_minor_node(vdc->dip, "h,raw");
+
+	if (ddi_create_minor_node(vdc->dip, "wd", S_IFBLK,
+		VD_MAKE_DEV(vdc->instance, VD_EFI_WD_SLICE),
+		DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
+		cmn_err(CE_NOTE, "[%d] Couldn't add block node 'wd'",
+		    vdc->instance);
+		return (EIO);
+	}
+
+	/* if any device node is created we set this flag */
+	vdc->initialized |= VDC_MINOR;
+
+	if (ddi_create_minor_node(vdc->dip, "wd,raw", S_IFCHR,
+		VD_MAKE_DEV(vdc->instance, VD_EFI_WD_SLICE),
+		DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
+		cmn_err(CE_NOTE, "[%d] Couldn't add block node 'wd,raw'",
+		    vdc->instance);
+		return (EIO);
+	}
+
+	return (0);
+}
+
+static int
+vdc_create_device_nodes_vtoc(vdc_t *vdc)
+{
+	ddi_remove_minor_node(vdc->dip, "wd");
+	ddi_remove_minor_node(vdc->dip, "wd,raw");
+
+	if (ddi_create_minor_node(vdc->dip, "h", S_IFBLK,
+		VD_MAKE_DEV(vdc->instance, VD_EFI_WD_SLICE),
+		DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
+		cmn_err(CE_NOTE, "[%d] Couldn't add block node 'h'",
+		    vdc->instance);
+		return (EIO);
+	}
+
+	/* if any device node is created we set this flag */
+	vdc->initialized |= VDC_MINOR;
+
+	if (ddi_create_minor_node(vdc->dip, "h,raw", S_IFCHR,
+		VD_MAKE_DEV(vdc->instance, VD_EFI_WD_SLICE),
+		DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
+		cmn_err(CE_NOTE, "[%d] Couldn't add block node 'h,raw'",
+		    vdc->instance);
+		return (EIO);
+	}
+
+	return (0);
+}
 
 /*
  * Function:
@@ -724,10 +806,9 @@ vdc_start_ldc_connection(vdc_t *vdc)
 static int
 vdc_create_device_nodes(vdc_t *vdc)
 {
-	/* uses NNNN which is OK as long as # of disks <= 10000 */
-	char		name[sizeof ("disk@NNNN:s,raw")];
+	char		name[sizeof ("s,raw")];
 	dev_info_t	*dip = NULL;
-	int		instance;
+	int		instance, status;
 	int		num_slices = 1;
 	int		i;
 
@@ -748,7 +829,24 @@ vdc_create_device_nodes(vdc_t *vdc)
 		return (EINVAL);
 	}
 
+	/*
+	 * Minor nodes are different for EFI disks: EFI disks do not have
+	 * a minor node 'g' for the minor number corresponding to slice
+	 * VD_EFI_WD_SLICE (slice 7) instead they have a minor node 'wd'
+	 * representing the whole disk.
+	 */
 	for (i = 0; i < num_slices; i++) {
+
+		if (i == VD_EFI_WD_SLICE) {
+			if (vdc->vdisk_label == VD_DISK_LABEL_EFI)
+				status = vdc_create_device_nodes_efi(vdc);
+			else
+				status = vdc_create_device_nodes_vtoc(vdc);
+			if (status != 0)
+				return (status);
+			continue;
+		}
+
 		(void) snprintf(name, sizeof (name), "%c", 'a' + i);
 		if (ddi_create_minor_node(dip, name, S_IFBLK,
 		    VD_MAKE_DEV(instance, i), DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
@@ -1832,7 +1930,7 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 			kmem_zalloc(sizeof (ldc_mem_cookie_t), KM_SLEEP);
 
 		status = ldc_mem_dring_bind(vdc->ldc_handle, vdc->ldc_dring_hdl,
-				LDC_SHADOW_MAP, LDC_MEM_RW,
+				LDC_SHADOW_MAP|LDC_DIRECT_MAP, LDC_MEM_RW,
 				&vdc->dring_cookie[0],
 				&vdc->dring_cookie_count);
 		if (status != 0) {
@@ -2116,11 +2214,16 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 						nbytes, operation);
 		break;
 
+	case VD_OP_GET_WCE:
+	case VD_OP_SET_WCE:
 	case VD_OP_GET_VTOC:
 	case VD_OP_SET_VTOC:
 	case VD_OP_GET_DISKGEOM:
 	case VD_OP_SET_DISKGEOM:
 	case VD_OP_SCSICMD:
+	case VD_OP_GET_DEVID:
+	case VD_OP_GET_EFI:
+	case VD_OP_SET_EFI:
 		local_dep->addr = addr;
 		if (nbytes > 0) {
 			rv = vdc_populate_mem_hdl(vdc, idx, addr, nbytes,
@@ -2129,8 +2232,6 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 		break;
 
 	case VD_OP_FLUSH:
-	case VD_OP_GET_WCE:
-	case VD_OP_SET_WCE:
 		rv = 0;		/* nothing to bind */
 		break;
 
@@ -2178,7 +2279,7 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	rv = vdc_send(vdc, (caddr_t)&dmsg, &msglen);
 	DMSG(1, "[%d] send via LDC: rv=%d\n", vdc->instance, rv);
 	if (rv != 0) {
-		cmn_err(CE_NOTE, "[%d] err (%d) sending DRing data msg via LDC",
+		DMSG(0, "[%d] err (%d) sending DRing data msg via LDC",
 				vdc->instance, rv);
 
 		/* Clear the DRing entry */
@@ -2455,10 +2556,8 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 	status = dep->payload.status;
 	operation = dep->payload.operation;
 
-	/* the DKIO W$ operations never bind handles so we can return now */
-	if ((operation == VD_OP_FLUSH) ||
-	    (operation == VD_OP_GET_WCE) ||
-	    (operation == VD_OP_SET_WCE))
+	/* the DKIO FLUSH operation never bind handles so we can return now */
+	if (operation == VD_OP_FLUSH)
 		return (status);
 
 	/*
@@ -2516,7 +2615,8 @@ vdc_populate_mem_hdl(vdc_t *vdc, uint_t idx, caddr_t addr, size_t nbytes,
 	vdc_local_desc_t	*ldep = NULL;
 	ldc_mem_handle_t	mhdl;
 	caddr_t			vaddr;
-	int			perm = LDC_MEM_RW;
+	uint8_t			perm = LDC_MEM_RW;
+	uint8_t			maptype;
 	int			rv = 0;
 	int			i;
 
@@ -2536,11 +2636,16 @@ vdc_populate_mem_hdl(vdc_t *vdc, uint_t idx, caddr_t addr, size_t nbytes,
 		perm = LDC_MEM_R;
 		break;
 
+	case VD_OP_GET_WCE:
+	case VD_OP_SET_WCE:
 	case VD_OP_GET_VTOC:
 	case VD_OP_SET_VTOC:
 	case VD_OP_GET_DISKGEOM:
 	case VD_OP_SET_DISKGEOM:
 	case VD_OP_SCSICMD:
+	case VD_OP_GET_DEVID:
+	case VD_OP_GET_EFI:
+	case VD_OP_SET_EFI:
 		perm = LDC_MEM_RW;
 		break;
 
@@ -2568,8 +2673,9 @@ vdc_populate_mem_hdl(vdc_t *vdc, uint_t idx, caddr_t addr, size_t nbytes,
 		vaddr = ldep->align_addr;
 	}
 
+	maptype = LDC_IO_MAP|LDC_SHADOW_MAP|LDC_DIRECT_MAP;
 	rv = ldc_mem_bind_handle(mhdl, vaddr, P2ROUNDUP(nbytes, 8),
-		LDC_SHADOW_MAP, perm, &dep->payload.cookie[0],
+		maptype, perm, &dep->payload.cookie[0],
 		&dep->payload.ncookies);
 	DMSG(2, "[%d] bound mem handle; ncookies=%d\n",
 			vdc->instance, dep->payload.ncookies);
@@ -3078,12 +3184,16 @@ vdc_process_data_msg(vdc_t *vdc, vio_msg_t msg)
 
 		if ((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) {
 			bioerror(ldep->buf, ldep->dep->payload.status);
-			biodone(ldep->buf);
-
-			DTRACE_IO2(vdone, buf_t *, ldep->buf, vdc_t *, vdc);
 
 			/* Clear the DRing entry */
 			status = vdc_depopulate_descriptor(vdc, idx);
+
+			/*
+			 * biodone() should be called after clearing the DRing
+			 * entry because biodone() will release the IO buffer.
+			 */
+			biodone(ldep->buf);
+			DTRACE_IO2(vdone, buf_t *, ldep->buf, vdc_t *, vdc);
 		}
 		cv_signal(&ldep->cv);
 		mutex_exit(&ldep->lock);
@@ -3589,9 +3699,9 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 	{VD_OP_FLUSH,		DKIOCFLUSHWRITECACHE,	sizeof (int),
 		vdc_null_copy_func},
 	{VD_OP_GET_WCE,		DKIOCGETWCE,		sizeof (int),
-		vdc_null_copy_func},
+		vdc_get_wce_convert},
 	{VD_OP_SET_WCE,		DKIOCSETWCE,		sizeof (int),
-		vdc_null_copy_func},
+		vdc_set_wce_convert},
 	{VD_OP_GET_VTOC,	DKIOCGVTOC,		sizeof (vd_vtoc_t),
 		vdc_get_vtoc_convert},
 	{VD_OP_SET_VTOC,	DKIOCSVTOC,		sizeof (vd_vtoc_t),
@@ -3604,6 +3714,10 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 		vdc_get_geom_convert},
 	{VD_OP_SET_DISKGEOM,	DKIOCSGEOM,		sizeof (vd_geom_t),
 		vdc_set_geom_convert},
+	{VD_OP_GET_EFI,		DKIOCGETEFI,		0,
+		vdc_get_efi_convert},
+	{VD_OP_SET_EFI,		DKIOCSETEFI,		0,
+		vdc_set_efi_convert},
 
 	/*
 	 * These particular ioctls are not sent to the server - vdc fakes up
@@ -3685,7 +3799,18 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 		return (ENOTSUP);
 	}
 
-	len = dk_ioctl[idx].nbytes;
+	if (cmd == DKIOCGETEFI || cmd == DKIOCSETEFI) {
+		/* size is not fixed for EFI ioctls, it depends on ioctl arg */
+		dk_efi_t	dk_efi;
+
+		rv = ddi_copyin(arg, &dk_efi, sizeof (dk_efi_t), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		len = sizeof (vd_efi_t) - 1 + dk_efi.dki_length;
+	} else {
+		len = dk_ioctl[idx].nbytes;
+	}
 
 	/*
 	 * Deal with the ioctls which the server does not provide. vdc can
@@ -3837,11 +3962,43 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 
 	if (cmd == DKIOCSVTOC) {
 		/*
-		 * The VTOC has been changed, try and update the device
+		 * The VTOC has been changed. We need to update the device
+		 * nodes to handle the case where an EFI label has been
+		 * changed to a VTOC label. We also try and update the device
 		 * node properties. Failing to set the properties should
 		 * not cause an error to be return the caller though.
 		 */
+		vdc->vdisk_label = VD_DISK_LABEL_VTOC;
+		(void) vdc_create_device_nodes_vtoc(vdc);
+
 		if (vdc_create_device_nodes_props(vdc)) {
+			cmn_err(CE_NOTE, "![%d] Failed to update device nodes"
+			    " properties", vdc->instance);
+		}
+
+	} else if (cmd == DKIOCSETEFI) {
+		/*
+		 * The EFI has been changed. We need to update the device
+		 * nodes to handle the case where a VTOC label has been
+		 * changed to an EFI label. We also try and update the device
+		 * node properties. Failing to set the properties should
+		 * not cause an error to be return the caller though.
+		 */
+		struct dk_gpt *efi;
+		size_t efi_len;
+
+		vdc->vdisk_label = VD_DISK_LABEL_EFI;
+		(void) vdc_create_device_nodes_efi(vdc);
+
+		rv = vdc_efi_alloc_and_read(dev, &efi, &efi_len);
+
+		if (rv == 0) {
+			vdc_store_efi(vdc, efi);
+			rv = vdc_create_device_nodes_props(vdc);
+			vd_efi_free(efi, efi_len);
+		}
+
+		if (rv) {
 			cmn_err(CE_NOTE, "![%d] Failed to update device nodes"
 			    " properties", vdc->instance);
 		}
@@ -3883,6 +4040,36 @@ vdc_null_copy_func(vdc_t *vdc, void *from, void *to, int mode, int dir)
 	_NOTE(ARGUNUSED(to))
 	_NOTE(ARGUNUSED(mode))
 	_NOTE(ARGUNUSED(dir))
+
+	return (0);
+}
+
+static int
+vdc_get_wce_convert(vdc_t *vdc, void *from, void *to,
+    int mode, int dir)
+{
+	_NOTE(ARGUNUSED(vdc))
+
+	if (dir == VD_COPYIN)
+		return (0);		/* nothing to do */
+
+	if (ddi_copyout(from, to, sizeof (int), mode) != 0)
+		return (EFAULT);
+
+	return (0);
+}
+
+static int
+vdc_set_wce_convert(vdc_t *vdc, void *from, void *to,
+    int mode, int dir)
+{
+	_NOTE(ARGUNUSED(vdc))
+
+	if (dir == VD_COPYOUT)
+		return (0);		/* nothing to do */
+
+	if (ddi_copyin(from, to, sizeof (int), mode) != 0)
+		return (EFAULT);
 
 	return (0);
 }
@@ -4119,6 +4306,85 @@ vdc_set_geom_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 	return (0);
 }
 
+static int
+vdc_get_efi_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
+{
+	_NOTE(ARGUNUSED(vdc))
+
+	vd_efi_t	*vd_efi;
+	dk_efi_t	dk_efi;
+	int		rv = 0;
+	void		*uaddr;
+
+	if ((from == NULL) || (to == NULL))
+		return (ENXIO);
+
+	if (dir == VD_COPYIN) {
+
+		vd_efi = (vd_efi_t *)to;
+
+		rv = ddi_copyin(from, &dk_efi, sizeof (dk_efi_t), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		vd_efi->lba = dk_efi.dki_lba;
+		vd_efi->length = dk_efi.dki_length;
+		bzero(vd_efi->data, vd_efi->length);
+
+	} else {
+
+		rv = ddi_copyin(to, &dk_efi, sizeof (dk_efi_t), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		uaddr = dk_efi.dki_data;
+
+		dk_efi.dki_data = kmem_alloc(dk_efi.dki_length, KM_SLEEP);
+
+		VD_EFI2DK_EFI((vd_efi_t *)from, &dk_efi);
+
+		rv = ddi_copyout(dk_efi.dki_data, uaddr, dk_efi.dki_length,
+		    mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		kmem_free(dk_efi.dki_data, dk_efi.dki_length);
+	}
+
+	return (0);
+}
+
+static int
+vdc_set_efi_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
+{
+	_NOTE(ARGUNUSED(vdc))
+
+	dk_efi_t	dk_efi;
+	void		*uaddr;
+
+	if (dir == VD_COPYOUT)
+		return (0);	/* nothing to do */
+
+	if ((from == NULL) || (to == NULL))
+		return (ENXIO);
+
+	if (ddi_copyin(from, &dk_efi, sizeof (dk_efi_t), mode) != 0)
+		return (EFAULT);
+
+	uaddr = dk_efi.dki_data;
+
+	dk_efi.dki_data = kmem_alloc(dk_efi.dki_length, KM_SLEEP);
+
+	if (ddi_copyin(uaddr, dk_efi.dki_data, dk_efi.dki_length, mode) != 0)
+		return (EFAULT);
+
+	DK_EFI2VD_EFI(&dk_efi, (vd_efi_t *)to);
+
+	kmem_free(dk_efi.dki_data, dk_efi.dki_length);
+
+	return (0);
+}
+
 /*
  * Function:
  *	vdc_create_fake_geometry()
@@ -4173,7 +4439,7 @@ vdc_create_fake_geometry(vdc_t *vdc)
 	if (vdc->minfo == NULL)
 		vdc->minfo = kmem_zalloc(sizeof (struct dk_minfo), KM_SLEEP);
 	vdc->minfo->dki_media_type = DK_FIXED_DISK;
-	vdc->minfo->dki_capacity = 1;
+	vdc->minfo->dki_capacity = vdc->vdisk_size;
 	vdc->minfo->dki_lbsize = DEV_BSIZE;
 
 	return (rv);
@@ -4216,11 +4482,37 @@ vdc_setup_disk_layout(vdc_t *vdc)
 	dev = makedevice(ddi_driver_major(vdc->dip),
 				VD_MAKE_DEV(vdc->instance, 0));
 	rv = vd_process_ioctl(dev, DKIOCGVTOC, (caddr_t)vdc->vtoc, FKIOCTL);
-	if (rv) {
+
+	if (rv && rv != ENOTSUP) {
 		cmn_err(CE_NOTE, "[%d] Failed to get VTOC (err=%d)",
 				vdc->instance, rv);
 		return (rv);
 	}
+
+	if (rv == ENOTSUP) {
+		/*
+		 * If the device does not support VTOC then we try
+		 * to read an EFI label.
+		 */
+		struct dk_gpt *efi;
+		size_t efi_len;
+
+		rv = vdc_efi_alloc_and_read(dev, &efi, &efi_len);
+
+		if (rv) {
+			cmn_err(CE_NOTE, "[%d] Failed to get EFI (err=%d)",
+			    vdc->instance, rv);
+			return (rv);
+		}
+
+		vdc->vdisk_label = VD_DISK_LABEL_EFI;
+		vdc_store_efi(vdc, efi);
+		vd_efi_free(efi, efi_len);
+
+		return (0);
+	}
+
+	vdc->vdisk_label = VD_DISK_LABEL_VTOC;
 
 	/*
 	 * find the slice that represents the entire "disk" and use that to
@@ -4252,4 +4544,121 @@ vdc_setup_disk_layout(vdc_t *vdc)
 	kmem_free(buf, sizeof (buf_t));
 
 	return (rv);
+}
+
+/*
+ * Function:
+ *	vdc_setup_devid()
+ *
+ * Description:
+ *	This routine discovers the devid of a vDisk. It requests the devid of
+ *	the underlying device from the vDisk server, builds an encapsulated
+ *	devid based on the retrieved devid and registers that new devid to
+ *	the vDisk.
+ *
+ * Arguments:
+ *	vdc	- soft state pointer for this instance of the device driver.
+ *
+ * Return Code:
+ *	0	- A devid was succesfully registered for the vDisk
+ */
+static int
+vdc_setup_devid(vdc_t *vdc)
+{
+	int rv;
+	vd_devid_t *vd_devid;
+	size_t bufsize, bufid_len;
+
+	/*
+	 * At first sight, we don't know the size of the devid that the
+	 * server will return but this size will be encoded into the
+	 * reply. So we do a first request using a default size then we
+	 * check if this size was large enough. If not then we do a second
+	 * request with the correct size returned by the server. Note that
+	 * ldc requires size to be 8-byte aligned.
+	 */
+	bufsize = P2ROUNDUP(VD_DEVID_SIZE(VD_DEVID_DEFAULT_LEN),
+	    sizeof (uint64_t));
+	vd_devid = kmem_zalloc(bufsize, KM_SLEEP);
+	bufid_len = bufsize - sizeof (vd_efi_t) - 1;
+
+	rv = vdc_populate_descriptor(vdc, (caddr_t)vd_devid, bufsize,
+	    VD_OP_GET_DEVID, 0, 0);
+	if (rv) {
+		kmem_free(vd_devid, bufsize);
+		return (rv);
+	}
+
+	if (vd_devid->length > bufid_len) {
+		/*
+		 * The returned devid is larger than the buffer used. Try again
+		 * with a buffer with the right size.
+		 */
+		kmem_free(vd_devid, bufsize);
+		bufsize = P2ROUNDUP(VD_DEVID_SIZE(vd_devid->length),
+		    sizeof (uint64_t));
+		vd_devid = kmem_zalloc(bufsize, KM_SLEEP);
+		bufid_len = bufsize - sizeof (vd_efi_t) - 1;
+
+		rv = vdc_populate_descriptor(vdc, (caddr_t)vd_devid, bufsize,
+		    VD_OP_GET_DEVID, 0, 0);
+		if (rv) {
+			kmem_free(vd_devid, bufsize);
+			return (rv);
+		}
+	}
+
+	/*
+	 * The virtual disk should have the same device id as the one associated
+	 * with the physical disk it is mapped on, otherwise sharing a disk
+	 * between a LDom and a non-LDom may not work (for example for a shared
+	 * SVM disk set).
+	 *
+	 * The DDI framework does not allow creating a device id with any
+	 * type so we first create a device id of type DEVID_ENCAP and then
+	 * we restore the orignal type of the physical device.
+	 */
+
+	/* build an encapsulated devid based on the returned devid */
+	if (ddi_devid_init(vdc->dip, DEVID_ENCAP, vd_devid->length,
+		vd_devid->id, &vdc->devid) != DDI_SUCCESS) {
+		DMSG(1, "[%d] Fail to created devid\n", vdc->instance);
+		kmem_free(vd_devid, bufsize);
+		return (1);
+	}
+
+	DEVID_FORMTYPE((impl_devid_t *)vdc->devid, vd_devid->type);
+
+	ASSERT(ddi_devid_valid(vdc->devid) == DDI_SUCCESS);
+
+	kmem_free(vd_devid, bufsize);
+
+	if (ddi_devid_register(vdc->dip, vdc->devid) != DDI_SUCCESS) {
+		DMSG(1, "[%d] Fail to register devid\n", vdc->instance);
+		return (1);
+	}
+
+	return (0);
+}
+
+static void
+vdc_store_efi(vdc_t *vdc, struct dk_gpt *efi)
+{
+	struct vtoc *vtoc = vdc->vtoc;
+
+	vd_efi_to_vtoc(efi, vtoc);
+	if (vdc->vdisk_type == VD_DISK_TYPE_SLICE) {
+		/*
+		 * vd_efi_to_vtoc() will store information about the EFI Sun
+		 * reserved partition (representing the entire disk) into
+		 * partition 7. However single-slice device will only have
+		 * that single partition and the vdc driver expects to find
+		 * information about that partition in slice 0. So we need
+		 * to copy information from slice 7 to slice 0.
+		 */
+		vtoc->v_part[0].p_tag = vtoc->v_part[VD_EFI_WD_SLICE].p_tag;
+		vtoc->v_part[0].p_flag = vtoc->v_part[VD_EFI_WD_SLICE].p_flag;
+		vtoc->v_part[0].p_start = vtoc->v_part[VD_EFI_WD_SLICE].p_start;
+		vtoc->v_part[0].p_size =  vtoc->v_part[VD_EFI_WD_SLICE].p_size;
+	}
 }

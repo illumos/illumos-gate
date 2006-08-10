@@ -58,7 +58,7 @@ dr_is_disabled(dr_type_t type)
 	 * the firmware does not support it, the system must
 	 * remain static and DR must be disabled.
 	 */
-	if (!domaining_enabled) {
+	if (!(domaining_capabilities & DOMAINING_ENABLED)) {
 		cmn_err(CE_NOTE, "!Kernel CIF handler is not enabled, DR "
 		    "is not available\n");
 		return (B_TRUE);

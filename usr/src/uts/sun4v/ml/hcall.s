@@ -1002,7 +1002,8 @@ hv_cnread(uint64_t buf_ra, uint64_t count, int64_t *retcount)
 
 
 	/*
-	 * hv_ldc_revoke(uint64_t raddr)
+	 * hv_ldc_revoke(uint64_t channel, uint64_t cookie,
+	 *		 uint64_t revoke_cookie
 	 */
 	ENTRY(hv_ldc_revoke)
 	mov     LDC_REVOKE, %o5

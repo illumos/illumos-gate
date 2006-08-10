@@ -68,6 +68,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+CPPFLAGS += -D_SUN4V_VDS
 
 #
 # module dependencies

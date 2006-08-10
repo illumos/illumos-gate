@@ -254,7 +254,8 @@ kctl_auxv_init_isadep(kmdb_auxv_t *kav, void *romp)
 void
 kctl_auxv_set_promif(kmdb_auxv_t *kav)
 {
-	kav->kav_domaining = domaining_enabled;
+	kav->kav_domaining =
+	    (domaining_capabilities & DOMAINING_ENABLED) ? 1 : 0;
 	kav->kav_promif_root = promif_stree_getroot();
 	kav->kav_promif_in = prom_stdin_ihandle();
 	kav->kav_promif_out = prom_stdout_ihandle();

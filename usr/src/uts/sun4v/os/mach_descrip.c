@@ -62,7 +62,7 @@
 #include <sys/mach_descrip.h>
 #include <sys/prom_plat.h>
 #include <sys/promif.h>
-
+#include <sys/ldoms.h>
 
 static void *mach_descrip_strt_meta_alloc(size_t size);
 static void mach_descrip_strt_meta_free(void *buf, size_t size);
@@ -72,7 +72,7 @@ static void *mach_descrip_buf_alloc(size_t size, size_t align);
 static void *mach_descrip_meta_alloc(size_t size);
 static uint64_t mach_descrip_find_md_gen(caddr_t ptr);
 static void init_md_params(void);
-static void init_domaining_enabled(md_t *mdp, mde_cookie_t *listp);
+static void init_domaining_capabilities(md_t *mdp, mde_cookie_t *listp);
 
 /*
  * Global ptr of the current generation Machine Description
@@ -115,16 +115,16 @@ static const char alloc_fail_msg[] =
 	"MD: cannot allocate MD buffer of size %ld bytes\n";
 
 /*
- * Global flag that indicates whether domaining features are
- * available. The value is set at boot time based on the value
- * of the 'domaining-enabled' property in the MD and the global
- * override flag below. Updates to this variable after boot are
- * not supported.
+ * Global flags that indicate what domaining features are
+ * available, if any. The value is set at boot time based on
+ * the value of the 'domaining-enabled' property in the MD
+ * and the global override flag below. Updates to this
+ * variable after boot are not supported.
  */
-uint_t domaining_enabled;
+uint_t domaining_capabilities;
 
 /*
- * Global override for the 'domaining_enabled' flag. If this
+ * Global override for the 'domaining_capailities' flags. If this
  * flag is set in /etc/system, domaining features are disabled,
  * ignoring the value of the 'domaining-enabled' property in
  * the MD.
@@ -671,28 +671,18 @@ init_md_params(void)
 	 * the only parameter of interest is whether or not
 	 * domaining features are supported.
 	 */
-	init_domaining_enabled(mdp, listp);
+	init_domaining_capabilities(mdp, listp);
 
 	(*curr_mach_descrip_memops->meta_freep)(listp, listsz);
 	(void) md_fini_handle(mdp);
 }
 
 static void
-init_domaining_enabled(md_t *mdp, mde_cookie_t *listp)
+init_domaining_capabilities(md_t *mdp, mde_cookie_t *listp)
 {
 	mde_cookie_t	rootnode;
 	int		num_nodes;
 	uint64_t	val = 0;
-
-	/*
-	 * If domaining has been manually disabled, always
-	 * honor that and ignore the value in the MD.
-	 */
-	if (force_domaining_disabled) {
-		domaining_enabled = 0;
-		MDP(("domaining manually disabled\n"));
-		return;
-	}
 
 	rootnode = md_root_node(mdp);
 	ASSERT(rootnode != MDE_INVAL_ELEM_COOKIE);
@@ -711,13 +701,21 @@ init_domaining_enabled(md_t *mdp, mde_cookie_t *listp)
 		 */
 		MDP(("'domaining-enabled' property not present\n"));
 
-		domaining_enabled = 0;
+		domaining_capabilities = 0;
 		return;
 	}
 
-	domaining_enabled = val;
+	domaining_capabilities = DOMAINING_SUPPORTED;
 
-	MDP(("domaining_enabled = 0x%x\n", domaining_enabled));
+	if (val == 1) {
+		if (force_domaining_disabled) {
+			MDP(("domaining manually disabled\n"));
+		} else {
+			domaining_capabilities |= DOMAINING_ENABLED;
+		}
+	}
+
+	MDP(("domaining_capabilities= 0x%x\n", domaining_capabilities));
 }
 
 /*

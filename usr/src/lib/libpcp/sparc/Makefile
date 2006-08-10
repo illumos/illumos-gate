@@ -30,13 +30,14 @@ UTSBASE= ../../../uts
 
 PLATINCS += -I$(USR_PLAT_DIR)/sun4v/include -I$(UTSBASE)/sun4v
 
-PLATFORM_OBJECTS= libpcp.o
+PLATFORM_OBJECTS= libpcp.o pcp_utils.o
 
 #
 # platform library directory (/usr/platform/SUNW,Sun-Fire-T200/lib)
 #
-PLATFORM=SUNW,Sun-Fire-T200
-LINKED_PLATFORMS = SUNW,Netra-CP3060
+PLATFORM=sun4v
+LINKED_PLATFORMS = SUNW,Sun-Fire-T200 \
+		SUNW,Netra-CP3060
 
 include ../Makefile.com
 

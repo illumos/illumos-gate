@@ -4604,7 +4604,7 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 
 		if (end == -1) {
 			num = -1;
-		} else if (num >= 0) {
+		} else if (end >= 0) {
 			num = end >= pos ?
 				end - pos + 1: (len - pos + 1) + end;
 
@@ -5053,9 +5053,10 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 	size_t			nbytes = 0;
 	size_t			off = 0;
 	uint64_t		idx = 0;
-	uint32_t		datalen = 0;
+	uint32_t		num = 1, len, datalen = 0;
 	uint64_t		ncookies = 0;
-	int			rv;
+	int			i, rv;
+	int			j = 0;
 
 	D1(vswp, "%s(%lld): enter", __func__, ldcp->ldc_id);
 
@@ -5148,38 +5149,55 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 			return;
 		}
 
-		priv_addr = (vsw_private_desc_t *)dp->priv_addr;
-
-		/* move to correct location in ring */
-		priv_addr += idx;
+		len = dp->num_descriptors;
+		/*
+		 * If the descriptor we are being ACK'ed for is not the
+		 * one we expected, then pkts were lost somwhere, either
+		 * when we tried to send a msg, or a previous ACK msg from
+		 * our peer. In either case we now reclaim the descriptors
+		 * in the range from the last ACK we received up to the
+		 * current ACK.
+		 */
+		if (idx != dp->last_ack_recv) {
+			DWARN(vswp, "%s: dropped pkts detected, (%ld, %ld)",
+				__func__, dp->last_ack_recv, idx);
+			num = idx >= dp->last_ack_recv ?
+				idx - dp->last_ack_recv + 1:
+				(len - dp->last_ack_recv + 1) + idx;
+		}
 
 		/*
 		 * When we sent the in-band message to our peer we
 		 * marked the copy in our private ring as READY. We now
 		 * check that the descriptor we are being ACK'ed for is in
 		 * fact READY, i.e. it is one we have shared with our peer.
+		 *
+		 * If its not we flag an error, but still reset the descr
+		 * back to FREE.
 		 */
-		mutex_enter(&priv_addr->dstate_lock);
-		if (priv_addr->dstate != VIO_DESC_READY) {
-			mutex_exit(&priv_addr->dstate_lock);
-			cmn_err(CE_WARN, "%s: (%ld) desc at index %ld not "
-				"READY (0x%lx)", __func__, ldcp->ldc_id, idx,
-				priv_addr->dstate);
-			cmn_err(CE_CONT, "%s: bound %d: ncookies %ld\n",
-				__func__, priv_addr->bound,
-				priv_addr->ncookies);
-			cmn_err(CE_CONT, "datalen %ld\n", priv_addr->datalen);
-			return;
-		} else {
+		for (i = dp->last_ack_recv; j < num; i = (i + 1) % len, j++) {
+			priv_addr = (vsw_private_desc_t *)dp->priv_addr + i;
+			mutex_enter(&priv_addr->dstate_lock);
+			if (priv_addr->dstate != VIO_DESC_READY) {
+				DERR(vswp, "%s: (%ld) desc at index %ld not "
+					"READY (0x%lx)", __func__,
+					ldcp->ldc_id, idx, priv_addr->dstate);
+				DERR(vswp, "%s: bound %d: ncookies %ld : "
+					"datalen %ld", __func__,
+					priv_addr->bound, priv_addr->ncookies,
+					priv_addr->datalen);
+			}
 			D2(vswp, "%s: (%lld) freeing descp at %lld", __func__,
 				ldcp->ldc_id, idx);
-
 			/* release resources associated with sent msg */
 			bzero(priv_addr->datap, priv_addr->datalen);
 			priv_addr->datalen = 0;
 			priv_addr->dstate = VIO_DESC_FREE;
 			mutex_exit(&priv_addr->dstate_lock);
 		}
+		/* update to next expected value */
+		dp->last_ack_recv = (idx + 1) % dp->num_descriptors;
+
 		break;
 
 	case VIO_SUBTYPE_NACK:
@@ -6884,6 +6902,8 @@ vsw_create_privring(vsw_ldc_t *ldcp)
 
 	dp->priv_addr = kmem_zalloc((sizeof (vsw_private_desc_t) *
 					VSW_RING_NUM_EL), KM_SLEEP);
+
+	dp->num_descriptors = VSW_RING_NUM_EL;
 
 	if (vsw_setup_ring(ldcp, dp)) {
 		DERR(vswp, "%s: setup of ring failed", __func__);

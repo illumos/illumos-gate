@@ -35,6 +35,8 @@
 #include <sys/kobj.h>
 #include <sys/reboot.h>
 #include <sys/hypervisor_api.h>
+#include <sys/mdesc.h>
+#include <sys/mach_descrip.h>
 
 #ifndef _KMDB
 static processorid_t cif_cpu;
@@ -186,6 +188,63 @@ promif_in_cif(void)
 	return ((cif_cpu == mycpuid) ? 1 : 0);
 }
 
+/*
+ * Check that all cpus in the MD are within range (< NCPU).  Attempt
+ * to stop any that aren't.
+ */
+static void
+cif_check_cpus(void)
+{
+	md_t		*mdp;
+	mde_cookie_t	rootnode;
+	size_t		listsz;
+	int		i;
+	mde_cookie_t	*listp = NULL;
+	int		num_nodes;
+	uint64_t	cpuid;
+	int		status;
+
+	mdp = md_get_handle();
+	ASSERT(mdp);
+
+	rootnode = md_root_node(mdp);
+	ASSERT(rootnode != MDE_INVAL_ELEM_COOKIE);
+
+	num_nodes = md_node_count(mdp);
+	ASSERT(num_nodes > 0);
+
+	listsz = num_nodes * sizeof (mde_cookie_t);
+	listp = kmem_zalloc(listsz, KM_SLEEP);
+
+	num_nodes = md_scan_dag(mdp, rootnode, md_find_name(mdp, "cpu"),
+	    md_find_name(mdp, "fwd"), listp);
+
+	if (num_nodes <= 0)
+		goto done;
+
+	for (i = 0; i < num_nodes; i++) {
+		if (md_get_prop_val(mdp, listp[i], "id", &cpuid)) {
+			cmn_err(CE_WARN, "cif_check_cpus: "
+			    "CPU instance %d has no 'id' property", i);
+			continue;
+		}
+
+		mutex_enter(&cpu_lock);
+
+		if (cpuid >= NCPU) {
+			status = stopcpu_bycpuid(cpuid);
+			if (status != 0 && status != ENOTSUP)
+				cmn_err(CE_PANIC, "failed to stop cpu %lu (%d)",
+				    cpuid, status);
+		}
+
+		mutex_exit(&cpu_lock);
+	}
+
+done:
+	kmem_free(listp, listsz);
+}
+
 void
 cif_init(void)
 {
@@ -197,7 +256,7 @@ cif_init(void)
 	 * Check if domaining is enabled. If not, do not
 	 * initialize the kernel CIF handler.
 	 */
-	if (!domaining_enabled)
+	if (!(domaining_capabilities & DOMAINING_ENABLED))
 		return;
 
 	/*
@@ -239,6 +298,8 @@ cif_init(void)
 		ASSERT(kmdb_cb != NULL);
 		(*kmdb_cb)();
 	}
+
+	cif_check_cpus();
 }
 
 static void
@@ -259,7 +320,7 @@ cache_prom_data(void)
 void
 cpu_mp_init(void)
 {
-	if (!domaining_enabled)
+	if (!(domaining_capabilities & DOMAINING_ENABLED))
 		return;
 
 	cif_cpu_mp_ready = 1;

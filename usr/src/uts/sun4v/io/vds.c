@@ -33,6 +33,7 @@
 
 #include <sys/types.h>
 #include <sys/conf.h>
+#include <sys/crc32.h>
 #include <sys/ddi.h>
 #include <sys/dkio.h>
 #include <sys/file.h>
@@ -164,7 +165,7 @@ typedef struct vd_task {
 	size_t			msgsize;	/* size of message buffer */
 	vd_dring_payload_t	*request;	/* request task will perform */
 	struct buf		buf;		/* buf(9s) for I/O request */
-
+	ldc_mem_handle_t	mhdl;		/* task memory handle */
 } vd_task_t;
 
 /*
@@ -180,8 +181,10 @@ typedef struct vd {
 	uint_t			nslices;	/* number of slices */
 	size_t			vdisk_size;	/* number of blocks in vdisk */
 	vd_disk_type_t		vdisk_type;	/* slice or entire disk */
+	vd_disk_label_t		vdisk_label;	/* EFI or VTOC label */
 	ushort_t		max_xfer_sz;	/* max xfer size in DEV_BSIZE */
 	boolean_t		pseudo;		/* underlying pseudo dev */
+	struct dk_efi		dk_efi;		/* synthetic for slice type */
 	struct dk_geom		dk_geom;	/* synthetic for slice type */
 	struct vtoc		vtoc;		/* synthetic for slice type */
 	ldc_status_t		ldc_state;	/* LDC connection state */
@@ -253,10 +256,11 @@ static int	vd_msglevel;
 static int
 vd_start_bio(vd_task_t *task)
 {
-	int			status = 0;
+	int			rv, status = 0;
 	vd_t			*vd		= task->vd;
 	vd_dring_payload_t	*request	= task->request;
 	struct buf		*buf		= &task->buf;
+	uint8_t			mtype;
 
 
 	ASSERT(vd != NULL);
@@ -275,30 +279,45 @@ vd_start_bio(vd_task_t *task)
 	bioinit(buf);
 	buf->b_flags		= B_BUSY;
 	buf->b_bcount		= request->nbytes;
-	buf->b_un.b_addr	= kmem_alloc(buf->b_bcount, KM_SLEEP);
 	buf->b_lblkno		= request->addr;
 	buf->b_edev		= vd->dev[request->slice];
 
-	if (request->operation == VD_OP_BREAD) {
-		buf->b_flags |= B_READ;
-	} else {
-		buf->b_flags |= B_WRITE;
-		/* Get data to write from client */
-		if ((status = ldc_mem_copy(vd->ldc_handle, buf->b_un.b_addr, 0,
-			    &request->nbytes, request->cookie,
-			    request->ncookies, LDC_COPY_IN)) != 0) {
-			PRN("ldc_mem_copy() returned errno %d "
-			    "copying from client", status);
-		}
+	mtype = (&vd->inband_task == task) ? LDC_SHADOW_MAP : LDC_DIRECT_MAP;
+
+	/* Map memory exported by client */
+	status = ldc_mem_map(task->mhdl, request->cookie, request->ncookies,
+	    mtype, (request->operation == VD_OP_BREAD) ? LDC_MEM_W : LDC_MEM_R,
+	    &(buf->b_un.b_addr), NULL);
+	if (status != 0) {
+		PRN("ldc_mem_map() returned err %d ", status);
+		biofini(buf);
+		return (status);
 	}
 
+	status = ldc_mem_acquire(task->mhdl, 0, buf->b_bcount);
+	if (status != 0) {
+		(void) ldc_mem_unmap(task->mhdl);
+		PRN("ldc_mem_map() returned err %d ", status);
+		biofini(buf);
+		return (status);
+	}
+
+	buf->b_flags |= (request->operation == VD_OP_BREAD) ? B_READ : B_WRITE;
+
 	/* Start the block I/O */
-	if ((status == 0) &&
-	    ((status = ldi_strategy(vd->ldi_handle[request->slice], buf)) == 0))
+	if ((status = ldi_strategy(vd->ldi_handle[request->slice], buf)) == 0)
 		return (EINPROGRESS);	/* will complete on completionq */
 
 	/* Clean up after error */
-	kmem_free(buf->b_un.b_addr, buf->b_bcount);
+	rv = ldc_mem_release(task->mhdl, 0, buf->b_bcount);
+	if (rv) {
+		PRN("ldc_mem_release() returned err %d ", status);
+	}
+	rv = ldc_mem_unmap(task->mhdl);
+	if (rv) {
+		PRN("ldc_mem_unmap() returned err %d ", status);
+	}
+
 	biofini(buf);
 	return (status);
 }
@@ -369,13 +388,15 @@ vd_reset_if_needed(vd_t *vd)
 	 */
 	ddi_taskq_wait(vd->completionq);
 
-
 	if ((vd->initialized & VD_DRING) &&
 	    ((status = ldc_mem_dring_unmap(vd->dring_handle)) != 0))
 		PRN("ldc_mem_dring_unmap() returned errno %d", status);
 
 	if (vd->dring_task != NULL) {
 		ASSERT(vd->dring_len != 0);
+		/* Free all dring_task memory handles */
+		for (int i = 0; i < vd->dring_len; i++)
+			(void) ldc_mem_free_handle(vd->dring_task[i].mhdl);
 		kmem_free(vd->dring_task,
 		    (sizeof (*vd->dring_task)) * vd->dring_len);
 		vd->dring_task = NULL;
@@ -447,17 +468,20 @@ vd_complete_bio(void *arg)
 	/* Wait for the I/O to complete */
 	request->status = biowait(buf);
 
-	/* If data was read, copy it to the client */
-	if ((request->status == 0) && (request->operation == VD_OP_BREAD) &&
-	    ((status = ldc_mem_copy(vd->ldc_handle, buf->b_un.b_addr, 0,
-		    &request->nbytes, request->cookie, request->ncookies,
-		    LDC_COPY_OUT)) != 0)) {
-		PRN("ldc_mem_copy() returned errno %d copying to client",
+	/* Release the buffer */
+	status = ldc_mem_release(task->mhdl, 0, buf->b_bcount);
+	if (status) {
+		PRN("ldc_mem_release() returned errno %d copying to client",
 		    status);
 	}
 
-	/* Release I/O buffer */
-	kmem_free(buf->b_un.b_addr, buf->b_bcount);
+	/* Unmap the memory */
+	status = ldc_mem_unmap(task->mhdl);
+	if (status) {
+		PRN("ldc_mem_unmap() returned errno %d copying to client",
+		    status);
+	}
+
 	biofini(buf);
 
 	/* Update the dring element for a dring client */
@@ -516,18 +540,119 @@ vtoc2vd_vtoc(void *ioctl_arg, void *vd_buf)
 	VTOC2VD_VTOC((struct vtoc *)ioctl_arg, (vd_vtoc_t *)vd_buf);
 }
 
+static void
+vd_get_efi_in(void *vd_buf, void *ioctl_arg)
+{
+	vd_efi_t *vd_efi = (vd_efi_t *)vd_buf;
+	dk_efi_t *dk_efi = (dk_efi_t *)ioctl_arg;
+
+	dk_efi->dki_lba = vd_efi->lba;
+	dk_efi->dki_length = vd_efi->length;
+	dk_efi->dki_data = kmem_zalloc(vd_efi->length, KM_SLEEP);
+}
+
+static void
+vd_get_efi_out(void *ioctl_arg, void *vd_buf)
+{
+	int len;
+	vd_efi_t *vd_efi = (vd_efi_t *)vd_buf;
+	dk_efi_t *dk_efi = (dk_efi_t *)ioctl_arg;
+
+	len = vd_efi->length;
+	DK_EFI2VD_EFI(dk_efi, vd_efi);
+	kmem_free(dk_efi->dki_data, len);
+}
+
+static void
+vd_set_efi_in(void *vd_buf, void *ioctl_arg)
+{
+	vd_efi_t *vd_efi = (vd_efi_t *)vd_buf;
+	dk_efi_t *dk_efi = (dk_efi_t *)ioctl_arg;
+
+	dk_efi->dki_data = kmem_alloc(vd_efi->length, KM_SLEEP);
+	VD_EFI2DK_EFI(vd_efi, dk_efi);
+}
+
+static void
+vd_set_efi_out(void *ioctl_arg, void *vd_buf)
+{
+	vd_efi_t *vd_efi = (vd_efi_t *)vd_buf;
+	dk_efi_t *dk_efi = (dk_efi_t *)ioctl_arg;
+
+	kmem_free(dk_efi->dki_data, vd_efi->length);
+}
+
+static int
+vd_read_vtoc(ldi_handle_t handle, struct vtoc *vtoc, vd_disk_label_t *label)
+{
+	int status, rval;
+	struct dk_gpt *efi;
+	size_t efi_len;
+
+	*label = VD_DISK_LABEL_UNK;
+
+	status = ldi_ioctl(handle, DKIOCGVTOC, (intptr_t)vtoc,
+	    (vd_open_flags | FKIOCTL), kcred, &rval);
+
+	if (status == 0) {
+		*label = VD_DISK_LABEL_VTOC;
+		return (0);
+	} else if (status != ENOTSUP) {
+		PRN("ldi_ioctl(DKIOCGVTOC) returned error %d", status);
+		return (status);
+	}
+
+	status = vds_efi_alloc_and_read(handle, &efi, &efi_len);
+
+	if (status) {
+		PRN("vds_efi_alloc_and_read returned error %d", status);
+		return (status);
+	}
+
+	*label = VD_DISK_LABEL_EFI;
+	vd_efi_to_vtoc(efi, vtoc);
+	vd_efi_free(efi, efi_len);
+
+	return (0);
+}
+
 static int
 vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 {
-	switch (cmd) {
-	case DKIOCGGEOM:
-		ASSERT(ioctl_arg != NULL);
-		bcopy(&vd->dk_geom, ioctl_arg, sizeof (vd->dk_geom));
-		return (0);
-	case DKIOCGVTOC:
-		ASSERT(ioctl_arg != NULL);
-		bcopy(&vd->vtoc, ioctl_arg, sizeof (vd->vtoc));
-		return (0);
+	dk_efi_t *dk_ioc;
+
+	switch (vd->vdisk_label) {
+
+	case VD_DISK_LABEL_VTOC:
+
+		switch (cmd) {
+		case DKIOCGGEOM:
+			ASSERT(ioctl_arg != NULL);
+			bcopy(&vd->dk_geom, ioctl_arg, sizeof (vd->dk_geom));
+			return (0);
+		case DKIOCGVTOC:
+			ASSERT(ioctl_arg != NULL);
+			bcopy(&vd->vtoc, ioctl_arg, sizeof (vd->vtoc));
+			return (0);
+		default:
+			return (ENOTSUP);
+		}
+
+	case VD_DISK_LABEL_EFI:
+
+		switch (cmd) {
+		case DKIOCGETEFI:
+			ASSERT(ioctl_arg != NULL);
+			dk_ioc = (dk_efi_t *)ioctl_arg;
+			if (dk_ioc->dki_length < vd->dk_efi.dki_length)
+				return (EINVAL);
+			bcopy(vd->dk_efi.dki_data, dk_ioc->dki_data,
+			    vd->dk_efi.dki_length);
+			return (0);
+		default:
+			return (ENOTSUP);
+		}
+
 	default:
 		return (ENOTSUP);
 	}
@@ -639,14 +764,13 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 static void
 vd_open_new_slices(vd_t *vd)
 {
-	int		rval, status;
+	int		status;
 	struct vtoc	vtoc;
 
-
-	/* Get the (new) VTOC for updated slice sizes */
-	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC, (intptr_t)&vtoc,
-		    (vd_open_flags | FKIOCTL), kcred, &rval)) != 0) {
-		PRN("ldi_ioctl(DKIOCGVTOC) returned errno %d", status);
+	/* Get the (new) partitions for updated slice sizes */
+	if ((status = vd_read_vtoc(vd->ldi_handle[0], &vtoc,
+	    &vd->vdisk_label)) != 0) {
+		PRN("vd_read_vtoc returned error %d", status);
 		return;
 	}
 
@@ -681,6 +805,7 @@ vd_ioctl(vd_task_t *task)
 	void			*buf = NULL;
 	struct dk_geom		dk_geom = {0};
 	struct vtoc		vtoc = {0};
+	struct dk_efi		dk_efi = {0};
 	vd_t			*vd		= task->vd;
 	vd_dring_payload_t	*request	= task->request;
 	vd_ioctl_t		ioctl[] = {
@@ -692,7 +817,7 @@ vd_ioctl(vd_task_t *task)
 		/* "Get" (copy-out) operations */
 		{VD_OP_GET_WCE, STRINGIZE(VD_OP_GET_WCE), RNDSIZE(int),
 		    DKIOCGETWCE, STRINGIZE(DKIOCGETWCE),
-		    NULL, NULL, VD_IDENTITY},
+		    NULL, VD_IDENTITY, VD_IDENTITY},
 		{VD_OP_GET_DISKGEOM, STRINGIZE(VD_OP_GET_DISKGEOM),
 		    RNDSIZE(vd_geom_t),
 		    DKIOCGGEOM, STRINGIZE(DKIOCGGEOM),
@@ -700,11 +825,14 @@ vd_ioctl(vd_task_t *task)
 		{VD_OP_GET_VTOC, STRINGIZE(VD_OP_GET_VTOC), RNDSIZE(vd_vtoc_t),
 		    DKIOCGVTOC, STRINGIZE(DKIOCGVTOC),
 		    &vtoc, NULL, vtoc2vd_vtoc},
+		{VD_OP_GET_EFI, STRINGIZE(VD_OP_GET_EFI), RNDSIZE(vd_efi_t),
+		    DKIOCGETEFI, STRINGIZE(DKIOCGETEFI),
+		    &dk_efi, vd_get_efi_in, vd_get_efi_out},
 
 		/* "Set" (copy-in) operations */
 		{VD_OP_SET_WCE, STRINGIZE(VD_OP_SET_WCE), RNDSIZE(int),
 		    DKIOCSETWCE, STRINGIZE(DKIOCSETWCE),
-		    NULL, VD_IDENTITY, NULL},
+		    NULL, VD_IDENTITY, VD_IDENTITY},
 		{VD_OP_SET_DISKGEOM, STRINGIZE(VD_OP_SET_DISKGEOM),
 		    RNDSIZE(vd_geom_t),
 		    DKIOCSGEOM, STRINGIZE(DKIOCSGEOM),
@@ -712,6 +840,9 @@ vd_ioctl(vd_task_t *task)
 		{VD_OP_SET_VTOC, STRINGIZE(VD_OP_SET_VTOC), RNDSIZE(vd_vtoc_t),
 		    DKIOCSVTOC, STRINGIZE(DKIOCSVTOC),
 		    &vtoc, vd_vtoc2vtoc, NULL},
+		{VD_OP_SET_EFI, STRINGIZE(VD_OP_SET_EFI), RNDSIZE(vd_efi_t),
+		    DKIOCSETEFI, STRINGIZE(DKIOCSETEFI),
+		    &dk_efi, vd_set_efi_in, vd_set_efi_out},
 	};
 	size_t		nioctls = (sizeof (ioctl))/(sizeof (ioctl[0]));
 
@@ -728,6 +859,16 @@ vd_ioctl(vd_task_t *task)
 		if (request->operation == ioctl[i].operation) {
 			/* LDC memory operations require 8-byte multiples */
 			ASSERT(ioctl[i].nbytes % sizeof (uint64_t) == 0);
+
+			if (request->operation == VD_OP_GET_EFI ||
+			    request->operation == VD_OP_SET_EFI) {
+				if (request->nbytes >= ioctl[i].nbytes)
+					break;
+				PRN("%s:  Expected at least nbytes = %lu, "
+				    "got %lu", ioctl[i].operation_name,
+				    ioctl[i].nbytes, request->nbytes);
+				return (EINVAL);
+			}
 
 			if (request->nbytes != ioctl[i].nbytes) {
 				PRN("%s:  Expected nbytes = %lu, got %lu",
@@ -746,10 +887,55 @@ vd_ioctl(vd_task_t *task)
 	status = vd_do_ioctl(vd, request, buf, &ioctl[i]);
 	if (request->nbytes)
 		kmem_free(buf, request->nbytes);
-	if ((request->operation == VD_OP_SET_VTOC) &&
-	    (vd->vdisk_type == VD_DISK_TYPE_DISK))
+	if (vd->vdisk_type == VD_DISK_TYPE_DISK &&
+	    (request->operation == VD_OP_SET_VTOC ||
+	    request->operation == VD_OP_SET_EFI))
 		vd_open_new_slices(vd);
 	PR0("Returning %d", status);
+	return (status);
+}
+
+static int
+vd_get_devid(vd_task_t *task)
+{
+	vd_t *vd = task->vd;
+	vd_dring_payload_t *request = task->request;
+	vd_devid_t *vd_devid;
+	impl_devid_t *devid;
+	int status, bufid_len, devid_len, len;
+
+	PR1("Get Device ID");
+
+	if (ddi_lyr_get_devid(vd->dev[request->slice],
+	    (ddi_devid_t *)&devid) != DDI_SUCCESS) {
+		/* the most common failure is that no devid is available */
+		return (ENOENT);
+	}
+
+	bufid_len = request->nbytes - sizeof (vd_devid_t) + 1;
+	devid_len = DEVID_GETLEN(devid);
+
+	vd_devid = kmem_zalloc(request->nbytes, KM_SLEEP);
+	vd_devid->length = devid_len;
+	vd_devid->type = DEVID_GETTYPE(devid);
+
+	len = (devid_len > bufid_len)? bufid_len : devid_len;
+
+	bcopy(devid->did_id, vd_devid->id, len);
+
+	/* LDC memory operations require 8-byte multiples */
+	ASSERT(request->nbytes % sizeof (uint64_t) == 0);
+
+	if ((status = ldc_mem_copy(vd->ldc_handle, (caddr_t)vd_devid, 0,
+	    &request->nbytes, request->cookie, request->ncookies,
+	    LDC_COPY_OUT)) != 0) {
+		PRN("ldc_mem_copy() returned errno %d copying to client",
+		    status);
+	}
+
+	kmem_free(vd_devid, request->nbytes);
+	ddi_devid_free((ddi_devid_t)devid);
+
 	return (status);
 }
 
@@ -766,7 +952,10 @@ static const vds_operation_t	vds_operation[] = {
 	{VD_OP_GET_VTOC,	vd_ioctl,	NULL},
 	{VD_OP_SET_VTOC,	vd_ioctl,	NULL},
 	{VD_OP_GET_DISKGEOM,	vd_ioctl,	NULL},
-	{VD_OP_SET_DISKGEOM,	vd_ioctl,	NULL}
+	{VD_OP_SET_DISKGEOM,	vd_ioctl,	NULL},
+	{VD_OP_GET_EFI,		vd_ioctl,	NULL},
+	{VD_OP_SET_EFI,		vd_ioctl,	NULL},
+	{VD_OP_GET_DEVID,	vd_get_devid,	NULL},
 };
 
 static const size_t	vds_noperations =
@@ -1111,7 +1300,7 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 
 	status = ldc_mem_dring_map(vd->ldc_handle, reg_msg->cookie,
 	    reg_msg->ncookies, reg_msg->num_descriptors,
-	    reg_msg->descriptor_size, LDC_SHADOW_MAP, &vd->dring_handle);
+	    reg_msg->descriptor_size, LDC_DIRECT_MAP, &vd->dring_handle);
 	if (status != 0) {
 		PRN("ldc_mem_dring_map() returned errno %d", status);
 		return (status);
@@ -1158,6 +1347,13 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		vd->dring_task[i].vd		= vd;
 		vd->dring_task[i].index		= i;
 		vd->dring_task[i].request	= &VD_DRING_ELEM(i)->payload;
+
+		status = ldc_mem_alloc_handle(vd->ldc_handle,
+		    &(vd->dring_task[i].mhdl));
+		if (status) {
+			PRN("ldc_mem_alloc_handle() returned err %d ", status);
+			return (ENXIO);
+		}
 	}
 
 	return (0);
@@ -1799,15 +1995,22 @@ vd_setup_full_disk(vd_t *vd)
 	int		rval, status;
 	major_t		major = getmajor(vd->dev[0]);
 	minor_t		minor = getminor(vd->dev[0]) - VD_ENTIRE_DISK_SLICE;
-	struct vtoc	vtoc;
+	struct dk_minfo	dk_minfo;
 
-
-	/* Get the VTOC for slice sizes */
-	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC, (intptr_t)&vtoc,
-		    (vd_open_flags | FKIOCTL), kcred, &rval)) != 0) {
-		PRN("ldi_ioctl(DKIOCGVTOC) returned errno %d", status);
+	/*
+	 * At this point, vdisk_size is set to the size of partition 2 but
+	 * this does not represent the size of the disk because partition 2
+	 * may not cover the entire disk and its size does not include reserved
+	 * blocks. So we update vdisk_size to be the size of the entire disk.
+	 */
+	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGMEDIAINFO,
+	    (intptr_t)&dk_minfo, (vd_open_flags | FKIOCTL),
+	    kcred, &rval)) != 0) {
+		PRN("ldi_ioctl(DKIOCGMEDIAINFO) returned errno %d",
+		    status);
 		return (status);
 	}
+	vd->vdisk_size = dk_minfo.dki_capacity;
 
 	/* Set full-disk parameters */
 	vd->vdisk_type	= VD_DISK_TYPE_DISK;
@@ -1840,7 +2043,7 @@ vd_setup_full_disk(vd_t *vd)
 		 * devices for (currently) zero-length slices, so skip
 		 * them for now
 		 */
-		if (vtoc.v_part[slice].p_size == 0) {
+		if (vd->vtoc.v_part[slice].p_size == 0) {
 			PR0("Skipping zero-length slice %u", slice);
 			continue;
 		}
@@ -1872,18 +2075,66 @@ vd_setup_full_disk(vd_t *vd)
 }
 
 static int
+vd_setup_partition_efi(vd_t *vd)
+{
+	efi_gpt_t *gpt;
+	efi_gpe_t *gpe;
+	struct uuid uuid = EFI_RESERVED;
+	uint32_t crc;
+	int length;
+
+	length = sizeof (efi_gpt_t) + sizeof (efi_gpe_t);
+
+	gpt = kmem_zalloc(length, KM_SLEEP);
+	gpe = (efi_gpe_t *)(gpt + 1);
+
+	gpt->efi_gpt_Signature = LE_64(EFI_SIGNATURE);
+	gpt->efi_gpt_Revision = LE_32(EFI_VERSION_CURRENT);
+	gpt->efi_gpt_HeaderSize = LE_32(sizeof (efi_gpt_t));
+	gpt->efi_gpt_FirstUsableLBA = LE_64(0ULL);
+	gpt->efi_gpt_LastUsableLBA = LE_64(vd->vdisk_size - 1);
+	gpt->efi_gpt_NumberOfPartitionEntries = LE_32(1);
+	gpt->efi_gpt_SizeOfPartitionEntry = LE_32(sizeof (efi_gpe_t));
+
+	UUID_LE_CONVERT(gpe->efi_gpe_PartitionTypeGUID, uuid);
+	gpe->efi_gpe_StartingLBA = gpt->efi_gpt_FirstUsableLBA;
+	gpe->efi_gpe_EndingLBA = gpt->efi_gpt_LastUsableLBA;
+
+	CRC32(crc, gpe, sizeof (efi_gpe_t), -1U, crc32_table);
+	gpt->efi_gpt_PartitionEntryArrayCRC32 = LE_32(~crc);
+
+	CRC32(crc, gpt, sizeof (efi_gpt_t), -1U, crc32_table);
+	gpt->efi_gpt_HeaderCRC32 = LE_32(~crc);
+
+	vd->dk_efi.dki_lba = 0;
+	vd->dk_efi.dki_length = length;
+	vd->dk_efi.dki_data = gpt;
+
+	return (0);
+}
+
+static int
 vd_setup_vd(char *device_path, vd_t *vd)
 {
 	int		rval, status;
 	dev_info_t	*dip;
 	struct dk_cinfo	dk_cinfo;
 
-
-	if ((status = ldi_open_by_name(device_path, vd_open_flags, kcred,
-		    &vd->ldi_handle[0], vd->vds->ldi_ident)) != 0) {
+	/*
+	 * We need to open with FNDELAY so that opening an empty partition
+	 * does not fail.
+	 */
+	if ((status = ldi_open_by_name(device_path, vd_open_flags | FNDELAY,
+	    kcred, &vd->ldi_handle[0], vd->vds->ldi_ident)) != 0) {
 		PRN("ldi_open_by_name(%s) = errno %d", device_path, status);
 		return (status);
 	}
+
+	/*
+	 * nslices must be updated now so that vds_destroy_vd() will close
+	 * the slice we have just opened in case of an error.
+	 */
+	vd->nslices = 1;
 
 	/* Get device number and size of backing device */
 	if ((status = ldi_get_dev(vd->ldi_handle[0], &vd->dev[0])) != 0) {
@@ -1910,19 +2161,22 @@ vd_setup_vd(char *device_path, vd_t *vd)
 		    dk_cinfo.dki_partition, V_NUMPAR, device_path);
 		return (EIO);
 	}
-	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGGEOM,
-		    (intptr_t)&vd->dk_geom, (vd_open_flags | FKIOCTL), kcred,
-		    &rval)) != 0) {
-		PRN("ldi_ioctl(DKIOCGEOM) returned errno %d for %s",
+
+	status = vd_read_vtoc(vd->ldi_handle[0], &vd->vtoc, &vd->vdisk_label);
+
+	if (status != 0) {
+		PRN("vd_read_vtoc returned errno %d for %s",
 		    status, device_path);
 		return (status);
 	}
-	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC,
-		    (intptr_t)&vd->vtoc, (vd_open_flags | FKIOCTL), kcred,
-		    &rval)) != 0) {
-		PRN("ldi_ioctl(DKIOCGVTOC) returned errno %d for %s",
-		    status, device_path);
-		return (status);
+
+	if (vd->vdisk_label == VD_DISK_LABEL_VTOC &&
+	    (status = ldi_ioctl(vd->ldi_handle[0], DKIOCGGEOM,
+	    (intptr_t)&vd->dk_geom, (vd_open_flags | FKIOCTL),
+	    kcred, &rval)) != 0) {
+		    PRN("ldi_ioctl(DKIOCGEOM) returned errno %d for %s",
+			status, device_path);
+		    return (status);
 	}
 
 	/* Store the device's max transfer size for return to the client */
@@ -1953,6 +2207,10 @@ vd_setup_vd(char *device_path, vd_t *vd)
 	vd->vdisk_type	= VD_DISK_TYPE_SLICE;
 	vd->nslices	= 1;
 
+	if (vd->vdisk_label == VD_DISK_LABEL_EFI) {
+		status = vd_setup_partition_efi(vd);
+		return (status);
+	}
 
 	/* Initialize dk_geom structure for single-slice device */
 	if (vd->dk_geom.dkg_nsect == 0) {
@@ -2069,6 +2327,12 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t ldc_id,
 		return (status);
 	}
 
+	/* Allocate the inband task memory handle */
+	status = ldc_mem_alloc_handle(vd->ldc_handle, &(vd->inband_task.mhdl));
+	if (status) {
+		PRN("ldc_mem_alloc_handle() returned err %d ", status);
+		return (ENXIO);
+	}
 
 	/* Add the successfully-initialized vdisk to the server's table */
 	if (mod_hash_insert(vds->vd_table, (mod_hash_key_t)id, vd) != 0) {
@@ -2093,6 +2357,9 @@ vds_destroy_vd(void *arg)
 
 	PR0("Destroying vdisk state");
 
+	if (vd->dk_efi.dki_data != NULL)
+		kmem_free(vd->dk_efi.dki_data, vd->dk_efi.dki_length);
+
 	/* Disable queuing requests for the vdisk */
 	if (vd->initialized & VD_LOCKING) {
 		mutex_enter(&vd->lock);
@@ -2110,9 +2377,15 @@ vds_destroy_vd(void *arg)
 
 	if (vd->dring_task != NULL) {
 		ASSERT(vd->dring_len != 0);
+		/* Free all dring_task memory handles */
+		for (int i = 0; i < vd->dring_len; i++)
+			(void) ldc_mem_free_handle(vd->dring_task[i].mhdl);
 		kmem_free(vd->dring_task,
 		    (sizeof (*vd->dring_task)) * vd->dring_len);
 	}
+
+	/* Free the inband task memory handle */
+	(void) ldc_mem_free_handle(vd->inband_task.mhdl);
 
 	/* Shut down LDC */
 	if (vd->initialized & VD_LDC) {
@@ -2128,7 +2401,7 @@ vds_destroy_vd(void *arg)
 		if (vd->ldi_handle[slice] != NULL) {
 			PR0("Closing slice %u", slice);
 			(void) ldi_close(vd->ldi_handle[slice],
-			    vd_open_flags, kcred);
+			    vd_open_flags | FNDELAY, kcred);
 		}
 	}
 

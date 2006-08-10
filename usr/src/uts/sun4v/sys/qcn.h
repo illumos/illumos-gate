@@ -105,6 +105,11 @@ typedef struct qcn {
 	char		*cons_write_buffer;
 	uint64_t	cons_write_buf_ra;
 	uint64_t	cons_read_buf_ra;
+	/*
+	 * qcn tx blocked used to indicate HV
+	 * returned EWOULDBLOCK on transmit.
+	 */
+	boolean_t	qcn_tx_blocked;
 } qcn_t;
 
 /* Constants for qcn_soft_pend */

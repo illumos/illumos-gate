@@ -18,14 +18,13 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_LDOMS_H
-#define	_LDOMS_H
+#ifndef	_PCP_UTILS_H
+#define	_PCP_UTILS_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -33,34 +32,30 @@
 extern "C" {
 #endif
 
-#include <sys/param.h>	/* for MAXHOSTNAMELEN */
+/*
+ * Enum to differentiate supported transport types
+ */
+typedef enum {
+	GLVC_NON_STREAM,
+	VLDC_STREAMING
+} pcp_xport_t;
 
 /*
- * Global LDoms definitions.
+ * This file contains some auxiliary routines to enable libpcp to
+ * automatically find the device pathname of a given SP service
+ * (e.g. SUNW,sun4v-fma). In addition, glvc pathnames are
+ * converted to a service name and then a device path to maintain
+ * backward compatibility for applications still using full glvc
+ * device paths. The routines are defined in a separate source
+ * file, so any program can separately link with the .o file
+ * directly instead of using libpcp.
  */
 
-/* Maximum number of logical domains supported */
-#define	LDOMS_MAX_DOMAINS	32
-
-/* maximum number of characters in the logical domain name */
-#define	LDOMS_MAX_NAME_LEN	MAXHOSTNAMELEN
-
-/*
- * Global flags that indicate what domaining features are
- * available, if any. The value is set at boot time based on
- * the value of the 'domaining-enabled' property in the MD
- * and the global override flag 'force_domaining_disabled'.
- * Updates to this variable after boot are not supported.
- */
-extern uint_t domaining_capabilities;
-
-/* values for domaining_capabilities word (above) */
-#define	DOMAINING_SUPPORTED	0x1
-#define	DOMAINING_ENABLED	0x2
-
+char *platsvc_extract_svc_name(char *devname);
+char *platsvc_name_to_path(char *, pcp_xport_t *);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _LDOMS_H */
+#endif /* _PCP_UTILS_H */

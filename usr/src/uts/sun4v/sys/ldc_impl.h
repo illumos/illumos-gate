@@ -426,7 +426,8 @@ struct ldc_chan {
 	boolean_t	cb_inprogress;	/* Channel callback in progress */
 	boolean_t	cb_enabled;	/* Channel callbacks are enabled */
 
-	boolean_t	intr_pending;	/* TRUE if interrupts are pending */
+	boolean_t	tx_intr_pending; /* TRUE if Tx interrupts are pending */
+	boolean_t	rx_intr_pending; /* TRUE if Rx interrupts are pending */
 
 	kmutex_t	tx_lock;	/* Transmit lock */
 	uint64_t	tx_q_entries;	/* Num entries in transmit queue */
@@ -480,6 +481,9 @@ typedef struct ldc_soft_state {
 	uint64_t	channels_open;	/* Number of open channels */
 	ldc_chan_t 	*chan_list;	/* List of LDC endpoints */
 	ldc_dring_t	*dring_list;	/* Descriptor rings (for export) */
+
+	kmem_cache_t	*memhdl_cache;	/* Memory handle cache */
+	kmem_cache_t	*memseg_cache;	/* Memory segment cache */
 } ldc_soft_state_t;
 
 #ifdef __cplusplus

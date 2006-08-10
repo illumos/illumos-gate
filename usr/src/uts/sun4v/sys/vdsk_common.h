@@ -38,6 +38,7 @@ extern "C" {
  * common to both the server (vds) and the client (vdc)
  */
 
+#include <sys/efi_partition.h>
 #include <sys/machparam.h>
 #include <sys/vtoc.h>
 
@@ -100,8 +101,17 @@ extern "C" {
 #define	VD_OP_GET_DISKGEOM	0x08	/* Get disk geometry */
 #define	VD_OP_SET_DISKGEOM	0x09	/* Set disk geometry */
 #define	VD_OP_SCSICMD		0x0a	/* SCSI control command */
+#define	VD_OP_GET_DEVID		0x0b	/* Get device id */
+#define	VD_OP_GET_EFI 		0x0c	/* Get EFI */
+#define	VD_OP_SET_EFI 		0x0d	/* Set EFI */
 #define	VD_OP_MASK		0xFF	/* mask of all possible operations */
-#define	VD_OP_COUNT		10	/* Number of operations */
+#define	VD_OP_COUNT		13	/* Number of operations */
+
+/*
+ * EFI disks do not have a slice 7. Actually that slice is used to represent
+ * the whole disk.
+ */
+#define	VD_EFI_WD_SLICE	7
 
 /*
  * Definitions of the various ways vds can export disk support to vdc.
@@ -111,6 +121,15 @@ typedef enum vd_disk_type {
 	VD_DISK_TYPE_SLICE,		/* slice in block device */
 	VD_DISK_TYPE_DISK		/* entire disk (slice 2) */
 } vd_disk_type_t;
+
+/*
+ * Definitions of the various disk label that vDisk supports.
+ */
+typedef enum vd_disk_label {
+	VD_DISK_LABEL_UNK = 0,		/* Unknown disk label */
+	VD_DISK_LABEL_VTOC,		/* VTOC disk label */
+	VD_DISK_LABEL_EFI		/* EFI disk label */
+} vd_disk_label_t;
 
 /*
  * vDisk Descriptor payload
@@ -185,6 +204,29 @@ typedef struct vd_vtoc {
 	vd_partition_t	partition[V_NUMPAR];	/* partition headers */
 } vd_vtoc_t;
 
+
+/*
+ * vDisk EFI definition (VD_OP_GET_EFI and VD_OP_SET_EFI)
+ */
+typedef struct vd_efi {
+	uint64_t	lba;		/* lba of the request */
+	uint64_t	length;		/* length of data */
+	char		data[1];	/* data of the request */
+} vd_efi_t;
+
+
+/*
+ * vDisk DEVID definition (VD_OP_GET_DEVID)
+ */
+#define	VD_DEVID_SIZE(l)	(sizeof (vd_devid_t) - 1 + l)
+#define	VD_DEVID_DEFAULT_LEN	128
+
+typedef struct vd_devid {
+	uint16_t	reserved;	/* padding */
+	uint16_t	type;		/* type of device id */
+	uint32_t	length;		/* length the device id */
+	char		id[1];		/* device id */
+} vd_devid_t;
 
 /*
  * Copy the contents of a vd_geom_t to the contents of a dk_geom struct
@@ -270,6 +312,54 @@ typedef struct vd_vtoc {
 	}								\
 }
 
+/*
+ * Copy the contents of a vd_efi_t to the contents of a dk_efi_t.
+ * Note that (dk_efi)->dki_data and (vd_efi)->data should be correctly
+ * initialized prior to using this macro.
+ */
+#define	VD_EFI2DK_EFI(vd_efi, dk_efi)					\
+{									\
+	(dk_efi)->dki_lba	= (vd_efi)->lba;			\
+	(dk_efi)->dki_length	= (vd_efi)->length;			\
+	bcopy((vd_efi)->data, (dk_efi)->dki_data, (dk_efi)->dki_length); \
+}
+
+/*
+ * Copy the contents of dk_efi_t to the contents of vd_efi_t.
+ * Note that (dk_efi)->dki_data and (vd_efi)->data should be correctly
+ * initialized prior to using this macro.
+ */
+#define	DK_EFI2VD_EFI(dk_efi, vd_efi)					\
+{									\
+	(vd_efi)->lba		= (dk_efi)->dki_lba;			\
+	(vd_efi)->length	= (dk_efi)->dki_length;			\
+	bcopy((dk_efi)->dki_data, (vd_efi)->data, (vd_efi)->length);	\
+}
+
+/*
+ * Hooks for EFI support
+ */
+
+/*
+ * The EFI alloc_and_read() function will use some ioctls to get EFI data
+ * but the device reference we will use is different depending if the command
+ * is issued from the vDisk server side (vds) or from the vDisk client side
+ * (vdc). From the server side (vds), we will have a layered device reference
+ * (ldi_handle_t) while on the client side (vdc) we will have a regular device
+ * reference (dev_t).
+ */
+#ifdef _SUN4V_VDS
+int vds_efi_alloc_and_read(ldi_handle_t dev, struct dk_gpt **vtoc,
+    size_t *vtoc_len);
+#else
+void vdc_efi_init(int (*func)(dev_t, int, caddr_t, int));
+void vdc_efi_fini(void);
+int vdc_efi_alloc_and_read(dev_t dev, struct dk_gpt **vtoc,
+    size_t *vtoc_len);
+#endif
+
+void vd_efi_free(struct dk_gpt *ptr, size_t length);
+void vd_efi_to_vtoc(struct dk_gpt *efi, struct vtoc *vtoc);
 
 #ifdef	__cplusplus
 }

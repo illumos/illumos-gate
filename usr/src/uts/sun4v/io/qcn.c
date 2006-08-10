@@ -82,19 +82,28 @@ static uchar_t qcn_stopped = B_FALSE;
 static int qcn_timeout_period = 20;	/* time out in seconds */
 size_t qcn_input_dropped;	/* dropped input character counter */
 
+static cyc_time_t qcn_poll_time;
+static uint64_t	qcn_poll_interval = 5;  /* milli sec */
+static void qcn_tx_block_handler(void *unused);
+static cyc_handler_t qcn_tx_block_cychandler = {
+	qcn_tx_block_handler,
+	NULL,
+	CY_LOW_LEVEL
+};
+static cyclic_id_t qcn_tx_block_cycid = CYCLIC_NONE;
+
 #ifdef QCN_POLLING
 static void qcn_poll_handler(void *unused);
-static cyc_time_t qcn_poll_time;
 static cyc_handler_t qcn_poll_cychandler = {
 	qcn_poll_handler,
 	NULL,
 	CY_LOW_LEVEL		/* XXX need softint to make this high */
 };
 static cyclic_id_t qcn_poll_cycid = CYCLIC_NONE;
-static uint64_t	qcn_poll_interval = 5;  /* milli sec */
 static uint64_t sb_interval = 0;
 uint_t qcn_force_polling = 0;
 #endif
+
 
 #define	QCN_MI_IDNUM		0xABCE
 #define	QCN_MI_HIWAT		8192
@@ -407,8 +416,18 @@ qcn_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 		}
 
-	mutex_init(&qcn_state->qcn_hi_lock, NULL, MUTEX_DRIVER,
-	    (void *)(uintptr_t)(qcn_state->qcn_intr_pri));
+		qcn_poll_time.cyt_when = 0ull;
+		qcn_poll_time.cyt_interval =
+		    qcn_poll_interval * 1000ull * 1000ull;
+		mutex_enter(&cpu_lock);
+		qcn_tx_block_cycid = cyclic_add(&qcn_tx_block_cychandler,
+		    &qcn_poll_time);
+		mutex_exit(&cpu_lock);
+
+		qcn_state->qcn_tx_blocked = B_FALSE;
+
+		mutex_init(&qcn_state->qcn_hi_lock, NULL, MUTEX_DRIVER,
+		    (void *)(uintptr_t)(qcn_state->qcn_intr_pri));
 	}
 
 	mutex_init(&qcn_state->qcn_lock, NULL, MUTEX_DRIVER, NULL);
@@ -450,9 +469,15 @@ qcn_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 #endif
 
-	if (!qcn_state->qcn_polling)
+	if (!qcn_state->qcn_polling) {
 		qcn_remove_intrs();
 
+		mutex_enter(&cpu_lock);
+		if (qcn_tx_block_cycid != CYCLIC_NONE)
+			cyclic_remove(qcn_tx_block_cycid);
+		qcn_tx_block_cycid = CYCLIC_NONE;
+		mutex_exit(&cpu_lock);
+	}
 	return (DDI_SUCCESS);
 }
 
@@ -859,6 +884,7 @@ qcn_transmit_write(queue_t *q, mblk_t *mp)
 				 * hypervisor cannot process the request -
 				 * channel busy.  Try again later.
 				 */
+				qcn_state->qcn_tx_blocked = B_TRUE;
 				return (EAGAIN);
 
 			case H_EIO :
@@ -887,8 +913,10 @@ qcn_transmit_putchr(queue_t *q, mblk_t *mp)
 		len = bp->b_wptr - bp->b_rptr;
 		buf = (caddr_t)bp->b_rptr;
 		for (i = 0; i < len; i++) {
-			if (hv_cnputchar(buf[i]) == H_EWOULDBLOCK)
-			break;
+			if (hv_cnputchar(buf[i]) == H_EWOULDBLOCK) {
+				qcn_state->qcn_tx_blocked = B_TRUE;
+				break;
+			}
 		}
 		if (i != len) {
 			bp->b_rptr += i;
@@ -977,21 +1005,13 @@ qcn_soft_intr(caddr_t arg1, caddr_t arg2)
 			putnext(qcn_state->qcn_readq, mp);
 		}
 out:
-		/*
-		 * If there are pending transmits because hypervisor
-		 * returned EWOULDBLOCK poke start now.
-		 */
-
-		if (qcn_state->qcn_writeq != NULL) {
-			if (qcn_state->qcn_hangup) {
-				(void) putctl(qcn_state->qcn_readq, M_HANGUP);
+		if (qcn_state->qcn_hangup) {
+			(void) putctl(qcn_state->qcn_readq, M_HANGUP);
+			if (qcn_state->qcn_writeq != NULL) {
 				flushq(qcn_state->qcn_writeq, FLUSHDATA);
-				qcn_state->qcn_hangup = 0;
-			} else {
-				mutex_enter(&qcn_state->qcn_lock);
-				qcn_start();
-				mutex_exit(&qcn_state->qcn_lock);
+				qcn_state->qcn_tx_blocked = B_FALSE;
 			}
+			qcn_state->qcn_hangup = 0;
 		}
 		/*
 		 * now loop if another interrupt came in (qcn_trigger_softint
@@ -1191,6 +1211,21 @@ out:
 }
 #endif
 
+/*ARGSUSED*/
+static void
+qcn_tx_block_handler(void *unused)
+{
+	mutex_enter(&qcn_state->qcn_lock);
+	/*
+	 * If the hypervisor returned EWOULDBLOCK on the transmit,
+	 * re-transmit now.
+	 */
+	if (qcn_state->qcn_tx_blocked && qcn_state->qcn_writeq != NULL) {
+		qcn_state->qcn_tx_blocked = B_FALSE;
+		qcn_start();
+	}
+	mutex_exit(&qcn_state->qcn_lock);
+}
 /*
  * Check for abort character sequence, copied from zs_async.c
  */

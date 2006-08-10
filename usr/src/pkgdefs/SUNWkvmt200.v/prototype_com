@@ -66,10 +66,11 @@ f none usr/platform/SUNW,Netra-CP3060/lib/libprtdiag_psr.so.1 644 root bin
 #
 # create libpcp library
 #
-s none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so=./libpcp.so.1
-s none usr/platform/SUNW,Netra-CP3060/lib/libpcp.so=../../SUNW,Sun-Fire-T200/lib/libpcp.so
-f none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so.1 755 root bin
-s none usr/platform/SUNW,Netra-CP3060/lib/libpcp.so.1=../../SUNW,Sun-Fire-T200/lib/libpcp.so.1
+s none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so=../../sun4v/lib/libpcp.so
+s none usr/platform/SUNW,Netra-CP3060/lib/libpcp.so=../../sun4v/lib/libpcp.so
+
+s none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
+s none usr/platform/SUNW,Netra-CP3060/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 
 #
 # platform-dependent boot object

@@ -52,6 +52,14 @@
 #include <sys/cpu.h>
 #include <sys/intreg.h>
 #include <sys/machcpuvar.h>
+#include <sys/mmu.h>
+#include <sys/pte.h>
+#include <vm/hat.h>
+#include <vm/as.h>
+#include <vm/hat_sfmmu.h>
+#include <sys/vm_machparam.h>
+#include <vm/seg_kmem.h>
+#include <vm/seg_kpm.h>
 #include <sys/note.h>
 #include <sys/ivintr.h>
 #include <sys/hypervisor_api.h>
@@ -138,6 +146,13 @@ static hsvc_info_t intr_hsvc = {
 	HSVC_REV_1, NULL, HSVC_GROUP_INTR, 1, 0, "ldc"
 };
 
+/*
+ * LDC framework supports mapping remote domain's memory
+ * either directly or via shadow memory pages. Default
+ * support is currently implemented via shadow copy.
+ * Direct map can be enabled by setting 'ldc_shmem_enabled'
+ */
+int ldc_shmem_enabled = 0;
 
 /*
  * The no. of MTU size messages that can be stored in
@@ -312,6 +327,25 @@ _init(void)
 
 	mutex_enter(&ldcssp->lock);
 
+	/* Create a cache for memory handles */
+	ldcssp->memhdl_cache = kmem_cache_create("ldc_memhdl_cache",
+	    sizeof (ldc_mhdl_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+	if (ldcssp->memhdl_cache == NULL) {
+		DWARN(DBG_ALL_LDCS, "_init: ldc_memhdl cache create failed\n");
+		mutex_exit(&ldcssp->lock);
+		return (-1);
+	}
+
+	/* Create cache for memory segment structures */
+	ldcssp->memseg_cache = kmem_cache_create("ldc_memseg_cache",
+	    sizeof (ldc_memseg_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+	if (ldcssp->memseg_cache == NULL) {
+		DWARN(DBG_ALL_LDCS, "_init: ldc_memseg cache create failed\n");
+		mutex_exit(&ldcssp->lock);
+		return (-1);
+	}
+
+
 	ldcssp->channel_count = 0;
 	ldcssp->channels_open = 0;
 	ldcssp->chan_list = NULL;
@@ -373,6 +407,10 @@ _fini(void)
 		(void) ldc_mem_dring_destroy((ldc_dring_handle_t)dringp);
 	}
 	ldcssp->dring_list = NULL;
+
+	/* Destroy kmem caches */
+	kmem_cache_destroy(ldcssp->memhdl_cache);
+	kmem_cache_destroy(ldcssp->memseg_cache);
 
 	/*
 	 * We have successfully "removed" the driver.
@@ -548,6 +586,7 @@ i_ldc_reset(ldc_chan_t *ldcp)
 	i_ldc_reset_state(ldcp);
 }
 
+
 /*
  * Clear pending interrupts
  */
@@ -557,9 +596,27 @@ i_ldc_clear_intr(ldc_chan_t *ldcp, cnex_intrtype_t itype)
 	ldc_cnex_t *cinfo = &ldcssp->cinfo;
 
 	ASSERT(MUTEX_HELD(&ldcp->lock));
-	if (cinfo->dip && ldcp->intr_pending) {
-		ldcp->intr_pending = B_FALSE;
+
+	if (cinfo->dip) {
+		/* check Tx interrupt */
+		if (itype == CNEX_TX_INTR) {
+			if (ldcp->tx_intr_pending)
+				ldcp->tx_intr_pending = B_FALSE;
+			else
+				return;
+		}
+		/* check Rx interrupt */
+		if (itype == CNEX_RX_INTR) {
+			if (ldcp->rx_intr_pending)
+				ldcp->rx_intr_pending = B_FALSE;
+			else
+				return;
+		}
+
 		(void) cinfo->clr_intr(cinfo->dip, ldcp->id, itype);
+		D2(ldcp->id,
+		    "i_ldc_clear_intr: (0x%llx) cleared 0x%x intr\n",
+		    ldcp->id, itype);
 	}
 }
 
@@ -1622,12 +1679,16 @@ i_ldc_tx_hdlr(caddr_t arg1, caddr_t arg2)
 	/* Obtain Tx lock */
 	mutex_enter(&ldcp->tx_lock);
 
+	/* mark interrupt as pending */
+	ldcp->tx_intr_pending = B_TRUE;
+
 	rv = hv_ldc_tx_get_state(ldcp->id, &ldcp->tx_head, &ldcp->tx_tail,
 	    &ldcp->link_state);
 	if (rv) {
 		cmn_err(CE_WARN,
 		    "i_ldc_tx_hdlr: (0x%lx) cannot read queue ptrs rv=0x%d\n",
 		    ldcp->id, rv);
+		i_ldc_clear_intr(ldcp, CNEX_TX_INTR);
 		mutex_exit(&ldcp->tx_lock);
 		mutex_exit(&ldcp->lock);
 		return (DDI_INTR_CLAIMED);
@@ -1724,7 +1785,7 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 	mutex_enter(&ldcp->lock);
 
 	/* mark interrupt as pending */
-	ldcp->intr_pending = B_TRUE;
+	ldcp->rx_intr_pending = B_TRUE;
 
 	/*
 	 * Read packet(s) from the queue
@@ -2908,8 +2969,11 @@ ldc_chkq(ldc_handle_t handle, boolean_t *hasdata)
 		return (ECONNRESET);
 	}
 
-	if (rx_head != rx_tail) {
-		D1(ldcp->id, "ldc_chkq: (0x%llx) queue has pkt(s)\n", ldcp->id);
+	if ((rx_head != rx_tail) ||
+	    (ldcp->mode == LDC_MODE_STREAM && ldcp->stream_remains > 0)) {
+		D1(ldcp->id,
+		    "ldc_chkq: (0x%llx) queue has pkt(s) or buffered data\n",
+		    ldcp->id);
 		*hasdata = B_TRUE;
 	}
 
@@ -3900,7 +3964,6 @@ ldc_mem_alloc_handle(ldc_handle_t handle, ldc_mem_handle_t *mhandle)
 {
 	ldc_chan_t 	*ldcp;
 	ldc_mhdl_t	*mhdl;
-	int 		rv;
 
 	if (handle == NULL) {
 		DWARN(DBG_ALL_LDCS,
@@ -3920,67 +3983,16 @@ ldc_mem_alloc_handle(ldc_handle_t handle, ldc_mem_handle_t *mhandle)
 		return (EINVAL);
 	}
 
-	/*
-	 * If this channel is allocating a mem handle for the
-	 * first time allocate it a memory map table and initialize it
-	 */
-	if (ldcp->mtbl == NULL) {
-
-		ldc_mtbl_t *mtbl;
-
-		/* Allocate and initialize the map table structure */
-		mtbl = kmem_zalloc(sizeof (ldc_mtbl_t), KM_SLEEP);
-		mtbl->num_entries = mtbl->num_avail = ldc_maptable_entries;
-		mtbl->size = ldc_maptable_entries * sizeof (ldc_mte_slot_t);
-		mtbl->next_entry = NULL;
-
-		/* Allocate the table itself */
-		mtbl->table = (ldc_mte_slot_t *)
-			contig_mem_alloc_align(mtbl->size, MMU_PAGESIZE);
-		if (mtbl->table == NULL) {
-			cmn_err(CE_WARN,
-			    "ldc_mem_alloc_handle: (0x%lx) error allocating "
-			    "table memory", ldcp->id);
-			kmem_free(mtbl, sizeof (ldc_mtbl_t));
-			mutex_exit(&ldcp->lock);
-			return (ENOMEM);
-		}
-
-		/* zero out the memory */
-		bzero(mtbl->table, mtbl->size);
-
-		/* initialize the lock */
-		mutex_init(&mtbl->lock, NULL, MUTEX_DRIVER, NULL);
-
-		/* register table for this channel */
-		rv = hv_ldc_set_map_table(ldcp->id,
-		    va_to_pa(mtbl->table), mtbl->num_entries);
-		if (rv != 0) {
-			cmn_err(CE_WARN,
-			    "ldc_mem_alloc_handle: (0x%lx) err %d mapping tbl",
-			    ldcp->id, rv);
-			contig_mem_free(mtbl->table, mtbl->size);
-			mutex_destroy(&mtbl->lock);
-			kmem_free(mtbl, sizeof (ldc_mtbl_t));
-			mutex_exit(&ldcp->lock);
-			return (EIO);
-		}
-
-		ldcp->mtbl = mtbl;
-
-		D1(ldcp->id,
-		    "ldc_mem_alloc_handle: (0x%llx) alloc'd map table 0x%llx\n",
-		    ldcp->id, ldcp->mtbl->table);
-	}
-
 	/* allocate handle for channel */
-	mhdl = kmem_zalloc(sizeof (ldc_mhdl_t), KM_SLEEP);
+	mhdl = kmem_cache_alloc(ldcssp->memhdl_cache, KM_SLEEP);
 
 	/* initialize the lock */
 	mutex_init(&mhdl->lock, NULL, MUTEX_DRIVER, NULL);
 
-	mhdl->status = LDC_UNBOUND;
+	mhdl->myshadow = B_FALSE;
+	mhdl->memseg = NULL;
 	mhdl->ldcp = ldcp;
+	mhdl->status = LDC_UNBOUND;
 
 	/* insert memory handle (@ head) into list */
 	if (ldcp->mhdl_list == NULL) {
@@ -4040,7 +4052,8 @@ ldc_mem_free_handle(ldc_mem_handle_t mhandle)
 	if (phdl == mhdl) {
 		ldcp->mhdl_list = mhdl->next;
 		mutex_destroy(&mhdl->lock);
-		kmem_free(mhdl, sizeof (ldc_mhdl_t));
+		kmem_cache_free(ldcssp->memhdl_cache, mhdl);
+
 		D1(ldcp->id,
 		    "ldc_mem_free_handle: (0x%llx) freed handle 0x%llx\n",
 		    ldcp->id, mhdl);
@@ -4050,7 +4063,7 @@ ldc_mem_free_handle(ldc_mem_handle_t mhandle)
 			if (phdl->next == mhdl) {
 				phdl->next = mhdl->next;
 				mutex_destroy(&mhdl->lock);
-				kmem_free(mhdl, sizeof (ldc_mhdl_t));
+				kmem_cache_free(ldcssp->memhdl_cache, mhdl);
 				D1(ldcp->id,
 				    "ldc_mem_free_handle: (0x%llx) freed "
 				    "handle 0x%llx\n", ldcp->id, mhdl);
@@ -4100,7 +4113,7 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 	uint64_t	pg_shift, pg_size, pg_size_code, pg_mask;
 	pgcnt_t		npages;
 	caddr_t		v_align, addr;
-	int 		i;
+	int 		i, rv;
 
 	if (mhandle == NULL) {
 		DWARN(DBG_ALL_LDCS,
@@ -4109,7 +4122,6 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 	}
 	mhdl = (ldc_mhdl_t *)mhandle;
 	ldcp = mhdl->ldcp;
-	mtbl = ldcp->mtbl;
 
 	/* clear count */
 	*ccount = 0;
@@ -4130,6 +4142,62 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 		    "ldc_mem_bind_handle: addr/size is not 8-byte aligned\n");
 		mutex_exit(&mhdl->lock);
 		return (EINVAL);
+	}
+
+	/*
+	 * If this channel is binding a memory handle for the
+	 * first time allocate it a memory map table and initialize it
+	 */
+	if ((mtbl = ldcp->mtbl) == NULL) {
+
+		mutex_enter(&ldcp->lock);
+
+		/* Allocate and initialize the map table structure */
+		mtbl = kmem_zalloc(sizeof (ldc_mtbl_t), KM_SLEEP);
+		mtbl->num_entries = mtbl->num_avail = ldc_maptable_entries;
+		mtbl->size = ldc_maptable_entries * sizeof (ldc_mte_slot_t);
+		mtbl->next_entry = NULL;
+
+		/* Allocate the table itself */
+		mtbl->table = (ldc_mte_slot_t *)
+			contig_mem_alloc_align(mtbl->size, MMU_PAGESIZE);
+		if (mtbl->table == NULL) {
+			cmn_err(CE_WARN,
+			    "ldc_mem_bind_handle: (0x%lx) error allocating "
+			    "table memory", ldcp->id);
+			kmem_free(mtbl, sizeof (ldc_mtbl_t));
+			mutex_exit(&ldcp->lock);
+			mutex_exit(&mhdl->lock);
+			return (ENOMEM);
+		}
+
+		/* zero out the memory */
+		bzero(mtbl->table, mtbl->size);
+
+		/* initialize the lock */
+		mutex_init(&mtbl->lock, NULL, MUTEX_DRIVER, NULL);
+
+		/* register table for this channel */
+		rv = hv_ldc_set_map_table(ldcp->id,
+		    va_to_pa(mtbl->table), mtbl->num_entries);
+		if (rv != 0) {
+			cmn_err(CE_WARN,
+			    "ldc_mem_bind_handle: (0x%lx) err %d mapping tbl",
+			    ldcp->id, rv);
+			contig_mem_free(mtbl->table, mtbl->size);
+			mutex_destroy(&mtbl->lock);
+			kmem_free(mtbl, sizeof (ldc_mtbl_t));
+			mutex_exit(&ldcp->lock);
+			mutex_exit(&mhdl->lock);
+			return (EIO);
+		}
+
+		ldcp->mtbl = mtbl;
+		mutex_exit(&ldcp->lock);
+
+		D1(ldcp->id,
+		    "ldc_mem_bind_handle: (0x%llx) alloc'd map table 0x%llx\n",
+		    ldcp->id, ldcp->mtbl->table);
 	}
 
 	/* FUTURE: get the page size, pgsz code, and shift */
@@ -4166,7 +4234,8 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 	}
 
 	/* Allocate a memseg structure */
-	memseg = mhdl->memseg = kmem_zalloc(sizeof (ldc_memseg_t), KM_SLEEP);
+	memseg = mhdl->memseg =
+		kmem_cache_alloc(ldcssp->memseg_cache, KM_SLEEP);
 
 	/* Allocate memory to store all pages and cookies */
 	memseg->pages = kmem_zalloc((sizeof (ldc_page_t) * npages), KM_SLEEP);
@@ -4177,6 +4246,13 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 	    ldcp->id, npages);
 
 	addr = v_align;
+
+	/*
+	 * Check if direct shared memory map is enabled, if not change
+	 * the mapping type to include SHADOW_MAP.
+	 */
+	if (ldc_shmem_enabled == 0)
+		mtype = LDC_SHADOW_MAP;
 
 	/*
 	 * Table slots are used in a round-robin manner. The algorithm permits
@@ -4412,7 +4488,9 @@ ldc_mem_unbind_handle(ldc_mem_handle_t mhandle)
 	ldc_chan_t 	*ldcp;
 	ldc_mtbl_t	*mtbl;
 	ldc_memseg_t	*memseg;
-	int		i;
+	uint64_t	cookie_addr;
+	uint64_t	pg_shift, pg_size_code;
+	int		i, rv;
 
 	if (mhandle == NULL) {
 		DWARN(DBG_ALL_LDCS,
@@ -4442,9 +4520,25 @@ ldc_mem_unbind_handle(ldc_mem_handle_t mhandle)
 	/* undo the pages exported */
 	for (i = 0; i < memseg->npages; i++) {
 
-		/* FUTURE: check for mapped pages */
+		/* check for mapped pages, revocation cookie != 0 */
 		if (memseg->pages[i].mte->cookie) {
-			_NOTE(EMPTY)
+
+			pg_size_code = page_szc(memseg->pages[i].size);
+			pg_shift = page_get_shift(memseg->pages[i].size);
+			cookie_addr = IDX2COOKIE(memseg->pages[i].index,
+			    pg_size_code, pg_shift);
+
+			D1(ldcp->id, "ldc_mem_unbind_handle: (0x%llx) revoke "
+			    "cookie 0x%llx, rcookie 0x%llx\n", ldcp->id,
+			    cookie_addr, memseg->pages[i].mte->cookie);
+			rv = hv_ldc_revoke(ldcp->id, cookie_addr,
+			    memseg->pages[i].mte->cookie);
+			if (rv) {
+				DWARN(ldcp->id,
+				    "ldc_mem_unbind_handle: (0x%llx) cannot "
+				    "revoke mapping, cookie %llx\n", ldcp->id,
+				    cookie_addr);
+			}
 		}
 
 		/* clear the entry from the table */
@@ -4457,7 +4551,7 @@ ldc_mem_unbind_handle(ldc_mem_handle_t mhandle)
 	kmem_free(memseg->pages, (sizeof (ldc_page_t) * memseg->npages));
 	kmem_free(memseg->cookies,
 	    (sizeof (ldc_mem_cookie_t) * memseg->npages));
-	kmem_free(memseg, sizeof (ldc_memseg_t));
+	kmem_cache_free(ldcssp->memseg_cache, memseg);
 
 	/* uninitialize the memory handle */
 	mhdl->memseg = NULL;
@@ -4642,11 +4736,11 @@ ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *size,
 			cmn_err(CE_WARN,
 			    "ldc_mem_copy: (0x%lx) err %d during copy\n",
 			    ldcp->id, rv);
-			DWARN(DBG_ALL_LDCS,
-			    "ldc_mem_copy: (0x%llx) dir=0x%x, caddr=0x%llx, "
-			    "loc_ra=0x%llx, exp_poff=0x%llx, loc_poff=0x%llx,"
-			    " exp_psz=0x%llx, loc_psz=0x%llx, copy_sz=0x%llx,"
-			    " copied_len=0x%llx, total_bal=0x%llx\n",
+			DWARN(ldcp->id,
+			    "ldc_mem_copy: (0x%lx) dir=0x%x, caddr=0x%lx, "
+			    "loc_ra=0x%lx, exp_poff=0x%lx, loc_poff=0x%lx,"
+			    " exp_psz=0x%lx, loc_psz=0x%lx, copy_sz=0x%lx,"
+			    " copied_len=0x%lx, total_bal=0x%lx\n",
 			    ldcp->id, direction, export_caddr, local_ra,
 			    export_poff, local_poff, export_psize, local_psize,
 			    copy_size, copied_len, total_bal);
@@ -4872,15 +4966,18 @@ ldc_mem_rdwr_pa(ldc_handle_t handle, caddr_t vaddr, size_t *size,
  */
 int
 ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
-    uint8_t mtype, caddr_t *vaddr, caddr_t *raddr)
+    uint8_t mtype, uint8_t perm, caddr_t *vaddr, caddr_t *raddr)
 {
-	int		i, idx;
+	int		i, j, idx, rv, retries;
 	ldc_chan_t 	*ldcp;
 	ldc_mhdl_t	*mhdl;
 	ldc_memseg_t	*memseg;
-	caddr_t		shadow_base = NULL, tmpaddr;
-	uint64_t	pg_size, pg_shift, pg_size_code;
-	uint64_t	exp_size = 0, npages;
+	caddr_t		tmpaddr;
+	uint64_t	map_perm = perm;
+	uint64_t	pg_size, pg_shift, pg_size_code, pg_mask;
+	uint64_t	exp_size = 0, base_off, map_size, npages;
+	uint64_t	cookie_addr, cookie_off, cookie_size;
+	tte_t		ldc_tte;
 
 	if (mhandle == NULL) {
 		DWARN(DBG_ALL_LDCS, "ldc_mem_map: invalid memory handle\n");
@@ -4918,23 +5015,6 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 		return (EINVAL);
 	}
 
-	if (mtype == LDC_SHADOW_MAP && vaddr == NULL) {
-		DWARN(ldcp->id,
-		    "ldc_mem_map: invalid vaddr arg0x%llx\n", vaddr);
-		mutex_exit(&ldcp->lock);
-		mutex_exit(&mhdl->lock);
-		return (EINVAL);
-	}
-
-	if (mtype == LDC_SHADOW_MAP &&
-	    (vaddr) && ((uintptr_t)(*vaddr) & MMU_PAGEOFFSET)) {
-		DWARN(ldcp->id,
-		    "ldc_mem_map: vaddr not page aligned, 0x%llx\n", *vaddr);
-		mutex_exit(&ldcp->lock);
-		mutex_exit(&mhdl->lock);
-		return (EINVAL);
-	}
-
 	D1(ldcp->id, "ldc_mem_map: (0x%llx) cookie = 0x%llx,0x%llx\n",
 	    ldcp->id, cookie->addr, cookie->size);
 
@@ -4942,93 +5022,210 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 	pg_size = MMU_PAGESIZE;
 	pg_size_code = page_szc(pg_size);
 	pg_shift = page_get_shift(pg_size_code);
+	pg_mask = ~(pg_size - 1);
 
 	/* calculate the number of pages in the exported cookie */
-	for (idx = 0; idx < ccount; idx++) {
-		if (cookie[idx].addr & MMU_PAGEOFFSET ||
-			cookie[idx].size & MMU_PAGEOFFSET) {
-			DWARN(ldcp->id,
-			    "ldc_mem_map: cookie addr/size not page aligned, "
-			    "0x%llx\n", cookie[idx].addr);
-			mutex_exit(&ldcp->lock);
-			mutex_exit(&mhdl->lock);
-			return (EINVAL);
-		}
+	base_off = cookie[0].addr & (pg_size - 1);
+	for (idx = 0; idx < ccount; idx++)
 		exp_size += cookie[idx].size;
-	}
-	npages = (exp_size >> pg_shift);
+	map_size = P2ROUNDUP((exp_size + base_off), pg_size);
+	npages = (map_size >> pg_shift);
 
 	/* Allocate memseg structure */
-	memseg = mhdl->memseg =	kmem_zalloc(sizeof (ldc_memseg_t), KM_SLEEP);
+	memseg = mhdl->memseg =
+		kmem_cache_alloc(ldcssp->memseg_cache, KM_SLEEP);
 
 	/* Allocate memory to store all pages and cookies */
 	memseg->pages =	kmem_zalloc((sizeof (ldc_page_t) * npages), KM_SLEEP);
 	memseg->cookies =
 		kmem_zalloc((sizeof (ldc_mem_cookie_t) * ccount), KM_SLEEP);
 
-	D2(ldcp->id, "ldc_mem_map: (0x%llx) processing 0x%llx pages\n",
-	    ldcp->id, npages);
+	D2(ldcp->id, "ldc_mem_map: (0x%llx) exp_size=0x%llx, map_size=0x%llx,"
+	    "pages=0x%llx\n", ldcp->id, exp_size, map_size, npages);
 
-	/* Check to see if the client is requesting direct or shadow map */
+	/*
+	 * Check if direct map over shared memory is enabled, if not change
+	 * the mapping type to SHADOW_MAP.
+	 */
+	if (ldc_shmem_enabled == 0)
+		mtype = LDC_SHADOW_MAP;
+
+	/*
+	 * Check to see if the client is requesting direct or shadow map
+	 * If direct map is requested, try to map remote memory first,
+	 * and if that fails, revert to shadow map
+	 */
+	if (mtype == LDC_DIRECT_MAP) {
+
+		/* Allocate kernel virtual space for mapping */
+		memseg->vaddr = vmem_xalloc(heap_arena, map_size,
+		    pg_size, 0, 0, NULL, NULL, VM_NOSLEEP);
+		if (memseg->vaddr == NULL) {
+			cmn_err(CE_WARN,
+			    "ldc_mem_map: (0x%lx) memory map failed\n",
+			    ldcp->id);
+			kmem_free(memseg->cookies,
+			    (sizeof (ldc_mem_cookie_t) * ccount));
+			kmem_free(memseg->pages,
+			    (sizeof (ldc_page_t) * npages));
+			kmem_cache_free(ldcssp->memseg_cache, memseg);
+
+			mutex_exit(&ldcp->lock);
+			mutex_exit(&mhdl->lock);
+			return (ENOMEM);
+		}
+
+		/* Unload previous mapping */
+		hat_unload(kas.a_hat, memseg->vaddr, map_size,
+		    HAT_UNLOAD_NOSYNC | HAT_UNLOAD_UNLOCK);
+
+		/* for each cookie passed in - map into address space */
+		idx = 0;
+		cookie_size = 0;
+		tmpaddr = memseg->vaddr;
+
+		for (i = 0; i < npages; i++) {
+
+			if (cookie_size == 0) {
+				ASSERT(idx < ccount);
+				cookie_addr = cookie[idx].addr & pg_mask;
+				cookie_off = cookie[idx].addr & (pg_size - 1);
+				cookie_size =
+				    P2ROUNDUP((cookie_off + cookie[idx].size),
+					pg_size);
+				idx++;
+			}
+
+			D1(ldcp->id, "ldc_mem_map: (0x%llx) mapping "
+			    "cookie 0x%llx, bal=0x%llx\n", ldcp->id,
+			    cookie_addr, cookie_size);
+
+			/* map the cookie into address space */
+			for (retries = 0; retries < ldc_max_retries;
+			    retries++) {
+
+				rv = hv_ldc_mapin(ldcp->id, cookie_addr,
+				    &memseg->pages[i].raddr, &map_perm);
+
+				if (rv != H_EWOULDBLOCK && rv != H_ETOOMANY)
+					break;
+
+				drv_usecwait(ldc_delay);
+			}
+
+			if (rv || memseg->pages[i].raddr == 0) {
+				DWARN(ldcp->id,
+				    "ldc_mem_map: (0x%llx) hv mapin err %d\n",
+				    ldcp->id, rv);
+
+				/* remove previous mapins */
+				hat_unload(kas.a_hat, memseg->vaddr, map_size,
+				    HAT_UNLOAD_NOSYNC | HAT_UNLOAD_UNLOCK);
+				for (j = 0; j < i; j++) {
+					rv = hv_ldc_unmap(
+							memseg->pages[j].raddr);
+					if (rv) {
+						DWARN(ldcp->id,
+						    "ldc_mem_map: (0x%llx) "
+						    "cannot unmap ra=0x%llx\n",
+					    ldcp->id,
+						    memseg->pages[j].raddr);
+					}
+				}
+
+				/* free kernel virtual space */
+				vmem_free(heap_arena, (void *)memseg->vaddr,
+				    memseg->size);
+
+				/* direct map failed - revert to shadow map */
+				mtype = LDC_SHADOW_MAP;
+				break;
+
+			} else {
+
+				D1(ldcp->id,
+				    "ldc_mem_map: (0x%llx) vtop map 0x%llx -> "
+				    "0x%llx, cookie=0x%llx, perm=0x%llx\n",
+				    ldcp->id, tmpaddr, memseg->pages[i].raddr,
+				    cookie_addr, perm);
+
+				/*
+				 * NOTE: Calling hat_devload directly, causes it
+				 * to look for page_t using the pfn. Since this
+				 * addr is greater than the memlist, it treates
+				 * it as non-memory
+				 */
+				sfmmu_memtte(&ldc_tte,
+				    (pfn_t)(memseg->pages[i].raddr >> pg_shift),
+				    PROT_READ | PROT_WRITE | HAT_NOSYNC, TTE8K);
+
+				D1(ldcp->id,
+				    "ldc_mem_map: (0x%llx) ra 0x%llx -> "
+				    "tte 0x%llx\n", ldcp->id,
+				    memseg->pages[i].raddr, ldc_tte);
+
+				sfmmu_tteload(kas.a_hat, &ldc_tte, tmpaddr,
+				    NULL, HAT_LOAD_LOCK);
+
+				cookie_size -= pg_size;
+				cookie_addr += pg_size;
+				tmpaddr += pg_size;
+			}
+		}
+	}
+
 	if (mtype == LDC_SHADOW_MAP) {
 		if (*vaddr == NULL) {
-			shadow_base =
+			memseg->vaddr =
 				contig_mem_alloc_align(exp_size, PAGESIZE);
-			if (shadow_base == NULL) {
+			if (memseg->vaddr == NULL) {
 				cmn_err(CE_WARN, "ldc_mem_map: shadow memory "
 				    "allocation failed\n");
 				kmem_free(memseg->cookies,
 				    (sizeof (ldc_mem_cookie_t) * ccount));
 				kmem_free(memseg->pages,
 				    (sizeof (ldc_page_t) * npages));
-				kmem_free(memseg, sizeof (ldc_memseg_t));
+				kmem_cache_free(ldcssp->memseg_cache, memseg);
 				mutex_exit(&ldcp->lock);
 				mutex_exit(&mhdl->lock);
 				return (ENOMEM);
 			}
 
-			bzero(shadow_base, exp_size);
+			bzero(memseg->vaddr, exp_size);
 			mhdl->myshadow = B_TRUE;
 
 			D1(ldcp->id, "ldc_mem_map: (0x%llx) allocated "
-			    "shadow page va=0x%llx\n", ldcp->id, shadow_base);
+			    "shadow page va=0x%llx\n", ldcp->id, memseg->vaddr);
 		} else {
 			/*
-			 * Use client supplied memory for shadow_base
+			 * Use client supplied memory for memseg->vaddr
 			 * WARNING: assuming that client mem is >= exp_size
 			 */
-			shadow_base = *vaddr;
+			memseg->vaddr = *vaddr;
 		}
-	} else if (mtype == LDC_DIRECT_MAP) {
-		/* FUTURE: Do a direct map by calling into HV */
-		_NOTE(EMPTY)
+
+		/* Save all page and cookie information */
+		for (i = 0, tmpaddr = memseg->vaddr; i < npages; i++) {
+			memseg->pages[i].raddr = va_to_pa(tmpaddr);
+			memseg->pages[i].size = pg_size;
+			tmpaddr += pg_size;
+		}
+
 	}
 
-	/* Save all page and cookie information */
-	for (i = 0, tmpaddr = shadow_base; i < npages; i++) {
-		memseg->pages[i].raddr = va_to_pa(tmpaddr);
-		memseg->pages[i].size = pg_size;
-		memseg->pages[i].index = 0;
-		memseg->pages[i].offset = 0;
-		memseg->pages[i].mte = NULL;
-		tmpaddr += pg_size;
-	}
-	for (i = 0; i < ccount; i++) {
-		memseg->cookies[i].addr = cookie[i].addr;
-		memseg->cookies[i].size = cookie[i].size;
-	}
+	/* save all cookies */
+	bcopy(cookie, memseg->cookies, ccount * sizeof (ldc_mem_cookie_t));
 
 	/* update memseg_t */
-	memseg->vaddr = shadow_base;
 	memseg->raddr = memseg->pages[0].raddr;
-	memseg->size = exp_size;
+	memseg->size = (mtype == LDC_SHADOW_MAP) ? exp_size : map_size;
 	memseg->npages = npages;
 	memseg->ncookies = ccount;
 	memseg->next_cookie = 0;
 
 	/* memory handle = mapped */
 	mhdl->mtype = mtype;
-	mhdl->perm = 0;
+	mhdl->perm = perm;
 	mhdl->status = LDC_MAPPED;
 
 	D1(ldcp->id, "ldc_mem_map: (0x%llx) mapped 0x%llx, ra=0x%llx, "
@@ -5036,10 +5233,12 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 	    ldcp->id, mhdl, memseg->raddr, memseg->vaddr,
 	    memseg->npages, memseg->ncookies);
 
+	if (mtype == LDC_SHADOW_MAP)
+		base_off = 0;
 	if (raddr)
-		*raddr = (caddr_t)memseg->raddr;
+		*raddr = (caddr_t)(memseg->raddr | base_off);
 	if (vaddr)
-		*vaddr = memseg->vaddr;
+		*vaddr = (caddr_t)((uintptr_t)memseg->vaddr | base_off);
 
 	mutex_exit(&ldcp->lock);
 	mutex_exit(&mhdl->lock);
@@ -5052,6 +5251,7 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 int
 ldc_mem_unmap(ldc_mem_handle_t mhandle)
 {
+	int		i, rv;
 	ldc_mhdl_t	*mhdl = (ldc_mhdl_t *)mhandle;
 	ldc_chan_t 	*ldcp;
 	ldc_memseg_t	*memseg;
@@ -5074,13 +5274,29 @@ ldc_mem_unmap(ldc_mem_handle_t mhandle)
 	/* if we allocated shadow memory - free it */
 	if (mhdl->mtype == LDC_SHADOW_MAP && mhdl->myshadow) {
 		contig_mem_free(memseg->vaddr, memseg->size);
+	} else if (mhdl->mtype == LDC_DIRECT_MAP) {
+
+		/* unmap in the case of DIRECT_MAP */
+		hat_unload(kas.a_hat, memseg->vaddr, memseg->size,
+		    HAT_UNLOAD_UNLOCK);
+
+		for (i = 0; i < memseg->npages; i++) {
+			rv = hv_ldc_unmap(memseg->pages[i].raddr);
+			if (rv) {
+				cmn_err(CE_WARN,
+				    "ldc_mem_map: (0x%lx) hv unmap err %d\n",
+				    ldcp->id, rv);
+			}
+		}
+
+		vmem_free(heap_arena, (void *)memseg->vaddr, memseg->size);
 	}
 
 	/* free the allocated memseg and page structures */
 	kmem_free(memseg->pages, (sizeof (ldc_page_t) * memseg->npages));
 	kmem_free(memseg->cookies,
 	    (sizeof (ldc_mem_cookie_t) * memseg->ncookies));
-	kmem_free(memseg, sizeof (ldc_memseg_t));
+	kmem_cache_free(ldcssp->memseg_cache, memseg);
 
 	/* uninitialize the memory handle */
 	mhdl->memseg = NULL;
@@ -5125,6 +5341,19 @@ i_ldc_mem_acquire_release(ldc_mem_handle_t mhandle, uint8_t direction,
 		    "i_ldc_mem_acquire_release: not mapped memory\n");
 		mutex_exit(&mhdl->lock);
 		return (EINVAL);
+	}
+
+	/* do nothing for direct map */
+	if (mhdl->mtype == LDC_DIRECT_MAP) {
+		mutex_exit(&mhdl->lock);
+		return (0);
+	}
+
+	/* do nothing if COPY_IN+MEM_W and COPY_OUT+MEM_R */
+	if ((direction == LDC_COPY_IN && (mhdl->perm & LDC_MEM_R) == 0) ||
+	    (direction == LDC_COPY_OUT && (mhdl->perm & LDC_MEM_W) == 0)) {
+		mutex_exit(&mhdl->lock);
+		return (0);
 	}
 
 	if (offset >= mhdl->memseg->size ||
@@ -5665,7 +5894,7 @@ ldc_mem_dring_map(ldc_handle_t handle, ldc_mem_cookie_t *cookie,
 	dringp->base = NULL;
 
 	/* map the dring into local memory */
-	err = ldc_mem_map(mhandle, cookie, ccount, mtype,
+	err = ldc_mem_map(mhandle, cookie, ccount, mtype, LDC_MEM_RW,
 	    &(dringp->base), NULL);
 	if (err || dringp->base == NULL) {
 		cmn_err(CE_WARN,

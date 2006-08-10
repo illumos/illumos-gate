@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -26,30 +27,24 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-#
-# This required package information file contains a list of package contents.
-# The 'pkgmk' command uses this file to identify the contents of a package
-# and their location on the development machine when building the package.
-# Can be created via a text editor or through use of the 'pkgproto' command.
-#
-
-#!search <pathname pathname ...>	# where to find pkg objects
-#!include <filename>			# include another 'prototype' file
-#!default <mode> <owner> <group>	# default used if not specified on entry
-#!<param>=<value>			# puts parameter in pkg environment
-
-# packaging files
-i pkginfo
-i copyright
-i depend
-i preinstall
-i postinstall
-i preremove
-i i.manifest
-i r.manifest
+TMPFILE=$BASEDIR/tmp/drd.tmp
+rm -f $TMPFILE
 
 #
-# source locations relative to the prototype file
+# If drd is being installed on the system for the first time as
+# part of an upgrade, svcadm must be invoked to enable the new
+# service. A clean install does not require this step as the
+# appropriate platform profile will control whether or not the
+# drd service is enabled.
 #
-# SUNWldomr.v
-#
+if [ "$UPDATE" = yes ]; then
+	#
+	# If drd is already installed, no action is taken since
+	# the admin may have intentionally disabled the service.
+	# Otherwise, a temporary file is used to signal that the
+	# postinstall script should enable the service.
+	#
+	if [ ! -f $BASEDIR/var/svc/manifest/platform/sun4v/drd.xml ]; then
+		/usr/bin/touch $TMPFILE
+	fi
+fi

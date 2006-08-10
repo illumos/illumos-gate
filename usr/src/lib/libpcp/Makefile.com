@@ -49,7 +49,7 @@ LINKED_LLIBLPCP_DIR 	= \
 
 LIBS = $(DYNLIB) $(LINTLIB)
 CFLAGS +=	$(CCVERBOSE)
-LDLIBS +=	-lc -lumem
+LDLIBS +=	-lc -lumem -ldevinfo
 PLATLIBS =	$(USR_PLAT_DIR)/$(PLATFORM)/lib
 INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libpcp.so.1 $@ $(CHOWNLINK) $(CHGRPLINK)
 INS.slink7=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libpcp.so $@ $(CHOWNLINK) $(CHGRPLINK)

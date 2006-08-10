@@ -203,13 +203,15 @@ typedef struct vdc {
 	int		instance;	/* driver instance number */
 	vio_ver_t	ver;		/* version number agreed with server */
 	vd_disk_type_t	vdisk_type;	/* type of device/disk being imported */
-	uint64_t	vdisk_size;	/* device size in bytes */
+	vd_disk_label_t vdisk_label; 	/* label type of device/disk imported */
+	uint64_t	vdisk_size;	/* device size in blocks */
 	uint64_t	max_xfer_sz;	/* maximum block size of a descriptor */
 	uint64_t	block_size;	/* device block size used */
 	struct dk_label	*label;		/* structure to store disk label */
 	struct dk_cinfo	*cinfo;		/* structure to store DKIOCINFO data */
 	struct dk_minfo	*minfo;		/* structure for DKIOCGMEDIAINFO data */
 	struct vtoc	*vtoc;		/* structure to store VTOC data */
+	ddi_devid_t	devid;		/* device id */
 
 	/*
 	 * The mutex 'msg_proc_lock' protects the following group of fields.
