@@ -7653,7 +7653,8 @@ ohci_intr(caddr_t arg1, caddr_t arg2)
 		/* Read and Save the HCCA DoneHead value */
 		done_head = ohci_intr_sts->ohci_curr_done_lst =
 		    (ohci_td_t *)(uintptr_t)
-		    (Get_HCCA(ohcip->ohci_hccap->HccaDoneHead));
+		    (Get_HCCA(ohcip->ohci_hccap->HccaDoneHead) &
+		    HCCA_DONE_HEAD_MASK);
 
 		USB_DPRINTF_L3(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 		    "ohci_intr: Done head! 0x%p", (void *)done_head);
@@ -7663,14 +7664,14 @@ ohci_intr(caddr_t arg1, caddr_t arg2)
 	ohci_do_intrs_stats(ohcip, intr);
 
 	/*
-	 * Look at the HccaDoneHead, if it is a non-zero valid address and its
-	 * LSb is zero, a done list update interrupt is indicated. Otherwise,
-	 * this intr bit is cleared.
+	 * Look at the HccaDoneHead, if it is a non-zero valid address,
+	 * a done list update interrupt is indicated. Otherwise, this
+	 * intr bit is cleared.
 	 */
 	if (ohci_check_done_head(ohcip, done_head) == USB_SUCCESS) {
 
 		/* Set the WriteDoneHead bit in the interrupt events */
-		intr = HCR_INTR_WDH;
+		intr |= HCR_INTR_WDH;
 	} else {
 
 		/* Clear the WriteDoneHead bit */
@@ -7753,7 +7754,8 @@ ohci_intr(caddr_t arg1, caddr_t arg2)
 		 * interrupt bit in the interrupt  status register.
 		 */
 		if (done_head == (ohci_td_t *)(uintptr_t)
-		    (Get_HCCA(ohcip->ohci_hccap->HccaDoneHead))) {
+		    (Get_HCCA(ohcip->ohci_hccap->HccaDoneHead) &
+		    HCCA_DONE_HEAD_MASK)) {
 
 			/* Reset the done head to NULL */
 			Set_HCCA(ohcip->ohci_hccap->HccaDoneHead, NULL);
@@ -7827,7 +7829,7 @@ ohci_intr(caddr_t arg1, caddr_t arg2)
 
 /*
  * Check whether done_head is a valid td point address.
- * non-zero, 16-byte aligned, LSb is 0, fall in ohci_td_pool
+ * It should be non-zero, 16-byte aligned, and fall in ohci_td_pool.
  */
 static int
 ohci_check_done_head(ohci_state_t *ohcip, ohci_td_t *done_head)
@@ -9682,7 +9684,7 @@ ohci_do_soft_reset(ohci_state_t	*ohcip)
 
 	/* Process any pending HCCA DoneHead */
 	done_head = (ohci_td_t *)(uintptr_t)
-	    (Get_HCCA(ohcip->ohci_hccap->HccaDoneHead));
+	    (Get_HCCA(ohcip->ohci_hccap->HccaDoneHead) & HCCA_DONE_HEAD_MASK);
 
 	if (ohci_check_done_head(ohcip, done_head) == USB_SUCCESS) {
 		/* Reset the done head to NULL */
@@ -9692,7 +9694,8 @@ ohci_do_soft_reset(ohci_state_t	*ohcip)
 	}
 
 	/* Process any pending hcr_done_head value */
-	done_head = (ohci_td_t *)(uintptr_t)Get_OpReg(hcr_done_head);
+	done_head = (ohci_td_t *)(uintptr_t)
+		(Get_OpReg(hcr_done_head) & HCCA_DONE_HEAD_MASK);
 	if (ohci_check_done_head(ohcip, done_head) == USB_SUCCESS) {
 
 		ohci_traverse_done_list(ohcip, done_head);
