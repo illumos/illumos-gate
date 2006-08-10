@@ -966,8 +966,10 @@ dsl_dataset_rollback_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	ds->ds_phys->ds_flags = ds->ds_prev->ds_phys->ds_flags;
 	ds->ds_phys->ds_unique_bytes = 0;
 
-	dmu_buf_will_dirty(ds->ds_prev->ds_dbuf, tx);
-	ds->ds_prev->ds_phys->ds_unique_bytes = 0;
+	if (ds->ds_prev->ds_phys->ds_next_snap_obj == ds->ds_object) {
+		dmu_buf_will_dirty(ds->ds_prev->ds_dbuf, tx);
+		ds->ds_prev->ds_phys->ds_unique_bytes = 0;
+	}
 }
 
 /* ARGSUSED */

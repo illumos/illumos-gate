@@ -149,7 +149,7 @@ dsl_sync_task_group_sync(dsl_sync_task_group_t *dstg, dmu_tx_t *tx)
 	    dstg->dstg_space, dstg->dstg_space * 3, 0, &tr_cookie, tx);
 	/* don't bother trying again */
 	if (dstg->dstg_err == ERESTART)
-		dstg->dstg_err = ENOSPC;
+		dstg->dstg_err = EAGAIN;
 	if (dstg->dstg_err)
 		return;
 
