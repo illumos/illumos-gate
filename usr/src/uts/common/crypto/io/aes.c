@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,12 +70,12 @@ typedef enum aes_mech_type {
 /*
  * The following definitions are to keep EXPORT_SRC happy.
  */
-#ifndef AES_MIN_KEY_LEN
-#define	AES_MIN_KEY_LEN		0
+#ifndef AES_MIN_KEY_BYTES
+#define	AES_MIN_KEY_BYTES		0
 #endif
 
-#ifndef AES_MAX_KEY_LEN
-#define	AES_MAX_KEY_LEN		0
+#ifndef AES_MAX_KEY_BYTES
+#define	AES_MAX_KEY_BYTES		0
 #endif
 
 /*
@@ -87,17 +86,17 @@ static crypto_mech_info_t aes_mech_info_tab[] = {
 	{SUN_CKM_AES_ECB, AES_ECB_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT | CRYPTO_FG_DECRYPT_ATOMIC,
-	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
+	    AES_MIN_KEY_BYTES, AES_MAX_KEY_BYTES, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
 	/* AES_CBC */
 	{SUN_CKM_AES_CBC, AES_CBC_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT | CRYPTO_FG_DECRYPT_ATOMIC,
-	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
+	    AES_MIN_KEY_BYTES, AES_MAX_KEY_BYTES, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
 	/* AES_CTR */
 	{SUN_CKM_AES_CTR, AES_CTR_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT | CRYPTO_FG_DECRYPT_ATOMIC,
-	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES}
+	    AES_MIN_KEY_BYTES, AES_MAX_KEY_BYTES, CRYPTO_KEYSIZE_UNIT_IN_BYTES}
 };
 
 /* operations are in-place if the output buffer is NULL */
