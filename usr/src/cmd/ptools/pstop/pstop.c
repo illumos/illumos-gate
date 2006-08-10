@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1994-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,10 +36,11 @@
 #include <libproc.h>
 
 static	int	stop(char *);
-static	int	perr(char *);
+static	int	lwpstop(int *, const lwpstatus_t *, const lwpsinfo_t *);
 
 static	char	*command;
-static	char	*procname;
+static	const char *lwps;
+static	struct	ps_prochandle *P;
 
 int
 main(int argc, char **argv)
@@ -53,9 +53,9 @@ main(int argc, char **argv)
 		command = argv[0];
 
 	if (argc <= 1) {
-		(void) fprintf(stderr, "usage:\t%s pid ...\n", command);
+		(void) fprintf(stderr, "usage:\t%s pid[/lwps] ...\n", command);
 		(void) fprintf(stderr,
-			"  (stop processes with /proc request)\n");
+		    "  (stop processes or lwps with /proc request)\n");
 		return (2);
 	}
 
@@ -68,38 +68,71 @@ main(int argc, char **argv)
 static int
 stop(char *arg)
 {
-	char ctlfile[100];
-	long ctl[1];
-	int ctlfd, gcode;
-	pid_t pid;
+	int gcode;
+	int rc = 0;
 
-	procname = arg;		/* for perr() */
-	if ((pid = proc_arg_psinfo(arg, PR_ARG_PIDS, NULL, &gcode)) == -1) {
+	if ((P = proc_arg_xgrab(arg, NULL, PR_ARG_PIDS, PGRAB_RETAIN |
+	    PGRAB_NOSTOP | PGRAB_FORCE, &gcode, &lwps)) == NULL) {
 		(void) fprintf(stderr, "%s: cannot control %s: %s\n",
-			command, arg, Pgrab_error(gcode));
+		    command, arg, Pgrab_error(gcode));
 		return (1);
+	} else if (lwps != NULL) {
+		/*
+		 * The user has provided an lwp specification.  Let's consider
+		 * the lwp specification as a mask.  We iterate over all lwps in
+		 * the process and stop every lwp, which matches the mask.  If
+		 * there is no lwp matching the mask or an error occured during
+		 * the iteration, set the return code to 1 as indication of an
+		 * error.
+		 */
+		int lwpcount = 0;
+
+		(void) Plwp_iter_all(P, (proc_lwp_all_f *)lwpstop, &lwpcount);
+		if (lwpcount == 0) {
+			(void) fprintf(stderr, "%s: cannot control %s:"
+			    " no matching LWPs found\n", command, arg);
+			rc = 1;
+		} else if (lwpcount == -1)
+			rc = 1;
+	} else {
+		(void) Pdstop(P);	/* Stop the process. */
 	}
 
-	(void) sprintf(ctlfile, "/proc/%d/ctl", (int)pid);
-	errno = 0;
-	if ((ctlfd = open(ctlfile, O_WRONLY)) >= 0) {
-		ctl[0] = PCDSTOP;
-		(void) write(ctlfd, ctl, sizeof (long));
-		(void) close(ctlfd);
-	}
-
-	return (perr(NULL));
+	/*
+	 * Prelease could change the tracing flags, use Pfree and unset
+	 * run-on-last-close flag to prevent the process being set running
+	 * after detaching from it.
+	 */
+	(void) Punsetflags(P, PR_RLC);
+	Pfree(P);
+	return (rc);
 }
 
+/* ARGSUSED */
 static int
-perr(char *s)
+lwpstop(int *lwpcount, const lwpstatus_t *status, const lwpsinfo_t *info)
 {
-	if (errno == 0)
-		return (0);
-	if (s)
-		(void) fprintf(stderr, "%s: ", procname);
-	else
-		s = procname;
-	perror(s);
-	return (1);
+	struct ps_lwphandle *L;
+	int gcode;
+
+	if (proc_lwp_in_set(lwps, info->pr_lwpid)) {
+		/*
+		 * There is a race between the callback from the iterator and
+		 * grabbing of the lwp.  If the lwp has already exited, Lgrab
+		 * will return the error code G_NOPROC.  It's not a real error,
+		 * only if there is no lwp matching the specification.
+		 */
+		if ((L = Lgrab(P, info->pr_lwpid, &gcode)) != NULL) {
+			(void) Ldstop(L);
+			Lfree(L);
+			if (*lwpcount >= 0)
+				(*lwpcount)++;
+		} else if (gcode != G_NOPROC) {
+			(void) fprintf(stderr, "%s: cannot control %d/%d: %s\n",
+			    command, (int)Pstatus(P)->pr_pid,
+			    (int)info->pr_lwpid, Lgrab_error(gcode));
+			*lwpcount = -1;
+		}
+	}
+	return (0);
 }

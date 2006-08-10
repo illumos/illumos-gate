@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,13 +36,16 @@
 #include <libproc.h>
 
 static	int	start(char *);
+static	int	lwpstart(int *, const lwpstatus_t *, const lwpsinfo_t *);
 
 static	char	*command;
+static	const char *lwps;
+static	struct	ps_prochandle *P;
 
 int
 main(int argc, char **argv)
 {
-	int rc = 0;
+	int	rc = 0;
 
 	if ((command = strrchr(argv[0], '/')) != NULL)
 		command++;
@@ -51,8 +53,9 @@ main(int argc, char **argv)
 		command = argv[0];
 
 	if (argc <= 1) {
-		(void) fprintf(stderr, "usage:\t%s pid ...\n", command);
-		(void) fprintf(stderr, "  (set stopped processes running)\n");
+		(void) fprintf(stderr, "usage:\t%s pid[/lwps] ...\n", command);
+		(void) fprintf(stderr, "  (set stopped processes or lwps "
+		    "running)\n");
 		return (2);
 	}
 
@@ -65,13 +68,13 @@ main(int argc, char **argv)
 static int
 start(char *arg)
 {
-	struct ps_prochandle *P;
 	int gcode;
+	int rc = 0;
 
-	if ((P = proc_arg_grab(arg, PR_ARG_PIDS,
-	    PGRAB_FORCE | PGRAB_RETAIN | PGRAB_NOSTOP, &gcode)) == NULL) {
+	if ((P = proc_arg_xgrab(arg, NULL, PR_ARG_PIDS, PGRAB_FORCE |
+	    PGRAB_RETAIN | PGRAB_NOSTOP, &gcode, &lwps)) == NULL) {
 		(void) fprintf(stderr, "%s: cannot control %s: %s\n",
-			command, arg, Pgrab_error(gcode));
+		    command, arg, Pgrab_error(gcode));
 		return (1);
 	}
 
@@ -100,12 +103,65 @@ start(char *arg)
 		Pdestroy_agent(P);
 	}
 
+	if (lwps != NULL) {
+		/*
+		 * The user provided an lwp specification. Let's consider the
+		 * lwp specification as a mask.  We iterate over all lwps in the
+		 * process and set running every lwp, which matches the mask.
+		 * If there is no lwp matching the mask or an error occured
+		 * during the iteration, set the return code to 1 as indication
+		 * of an error.  We need to unset run-on-last-close flag,
+		 * otherwise *all* lwps could be set running after detaching
+		 * from the process and not only lwps, which were selected.
+		 */
+		int lwpcount = 0;
+
+		(void) Punsetflags(P, PR_RLC);
+		(void) Plwp_iter_all(P, (proc_lwp_all_f *)lwpstart, &lwpcount);
+
+		if (lwpcount == 0) {
+			(void) fprintf(stderr, "%s: cannot control %s:"
+			    " no matching LWPs found\n", command, arg);
+			rc = 1;
+		} else if (lwpcount == -1)
+			rc = 1;
+	} else {
+		(void) Psetrun(P, 0, 0);	/* Set the process running. */
+	}
+
 	/*
 	 * Prelease could change the tracing flags or leave the victim hung
-	 * so we set the process running and free the handle by hand.
+	 * so we free the handle by hand.
 	 */
-	(void) Psetrun(P, 0, 0);
 	Pfree(P);
+	return (rc);
+}
 
+/* ARGSUSED */
+static int
+lwpstart(int *lwpcount, const lwpstatus_t *status, const lwpsinfo_t *info)
+{
+	struct ps_lwphandle *L;
+	int gcode;
+
+	if (proc_lwp_in_set(lwps, info->pr_lwpid)) {
+		/*
+		 * There is a race between the callback from the iterator and
+		 * grabbing of the lwp.  If the lwp has already exited, Lgrab
+		 * will return the error code G_NOPROC.  It's not a real error,
+		 * only if there is no lwp matching the specification.
+		 */
+		if ((L = Lgrab(P, info->pr_lwpid, &gcode)) != NULL) {
+			(void) Lsetrun(L, 0, 0);
+			Lfree(L);
+			if (*lwpcount >= 0)
+				(*lwpcount)++;
+		} else if (gcode != G_NOPROC) {
+			(void) fprintf(stderr, "%s: cannot control %d/%d: %s\n",
+			    command, (int)Pstatus(P)->pr_pid,
+			    (int)info->pr_lwpid, Lgrab_error(gcode));
+			*lwpcount = -1;
+		}
+	}
 	return (0);
 }
