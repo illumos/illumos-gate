@@ -33,10 +33,13 @@ DEVMAPS=/etc/security/device_maps
 TEXTDOMAIN="SUNW_OST_OSCMD"
 export TEXTDOMAIN
 
+# Perform required permission checks, depending on value of LOCAL_ROOT
+# (whether we are converting the active OS or just alternative boot
+# environments).
 permission()
 {
 ZONE=`/sbin/zonename`
-if [ ! "$ZONE" = "global" ]
+if [ ! "$ZONE" = "global" -a "$LOCAL_ROOT" = "true" ]
 then
 	form=`gettext "%s: ERROR: you must be in the global zone to run this script."`
 	printf "${form}\n" $PROG
@@ -96,7 +99,7 @@ done
 bsmconvert()
 {
 
-# If there is not startup file to be read by /etc/rc2.d/S99audit,
+# If there is no startup file to be read by /lib/svc/method/svc-auditd,
 # then gripe about it.
 
 form=`gettext "%s: INFO: checking startup file."`
@@ -111,7 +114,6 @@ then
 fi
 
 # Disable volume manager from running on reboot.
-touch ${ROOT}/var/svc/profile/upgrade
 cat >> ${ROOT}/var/svc/profile/upgrade <<SVC_UPGRADE
 svcadm disable svc:/system/filesystem/volfs:default
 SVC_UPGRADE
@@ -148,8 +150,12 @@ form=`gettext "%s: INFO: initializing device allocation."`
 printf "${form}\n" $PROG
 if [ -x /usr/bin/plabel ]
 then
-	# Trusted Extensions is installed.
-	/usr/sbin/devfsadm -e
+	# Trusted Extensions is installed. This is not currently done
+	# for alternate boot environments.
+	if [ -z "$ROOT" -o "$ROOT" = "/" ]
+	then
+		/usr/sbin/devfsadm -e
+	fi
 else
 	if [ ! -f ${ROOT}/${DEVALLOC} ]
 	then
@@ -161,35 +167,52 @@ else
 	fi
 fi
 
-
-# enable auditd.  Since we're running as single user, auditd won't
-# actually start until reboot.
-
+# enable auditd at next boot.
+cat >> ${ROOT}/var/svc/profile/upgrade <<SVC_UPGRADE
 /usr/sbin/svcadm enable system/auditd
+SVC_UPGRADE
 }
 
 # main loop
 
-permission
-sanity_check
+sanity_check $@
 if [ $# -eq 0 ]
 then
+	# converting local root, perform all permission checks
+	LOCAL_ROOT=true
+	permission
+
 	ROOT=
 	bsmconvert
+
 	echo
 	gettext "The Basic Security Module is ready.\n"
 	gettext "If there were any errors, please fix them now.\n"
 	gettext "Configure BSM by editing files located in /etc/security.\n"
 	gettext "Reboot this system now to come up with BSM enabled.\n"
 else
+	# determine if local root is being converted ("/" passed on
+	# command line), if so, full permission check required
+	LOCAL_ROOT=false
 	for ROOT in $@
 	do
-		conv_host=`basename $ROOT`
-		form=`gettext "%s: INFO: converting host %s ..."`
-		printf "${form}\n" $PROG $conv_host
+		if [ "$ROOT" = "/" ]
+		then
+			LOCAL_ROOT=true
+		fi
+	done
+
+	# perform required permission checks (depending on value of
+	# LOCAL_ROOT)
+	permission
+
+	for ROOT in $@
+	do
+		form=`gettext "%s: INFO: converting boot environment %s ..."`
+		printf "${form}\n" $PROG $ROOT
 		bsmconvert $ROOT
-		form=`gettext "%s: INFO: done with host %s"`
-		printf "${form}\n" $PROG $conv_host
+		form=`gettext "%s: INFO: done with boot environment %s"`
+		printf "${form}\n" $PROG $ROOT
 	done
 	echo
 	gettext "The Basic Security Module is ready.\n"

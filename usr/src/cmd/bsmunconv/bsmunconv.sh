@@ -31,11 +31,14 @@ PROG=bsmunconv
 TEXTDOMAIN="SUNW_OST_OSCMD"
 export TEXTDOMAIN
 
+# Perform required permission checks, depending on value of LOCAL_ROOT
+# (whether we are converting the active OS or just alternative boot
+# environments).
 permission()
 {
 cd /usr/lib
 ZONE=`/sbin/zonename`
-if [ ! "$ZONE" = "global" ]
+if [ ! "$ZONE" = "global" -a "$LOCAL_ROOT" = "true" ]
 then
 	form=`gettext "%s: ERROR: you must be in the global zone to run this script."`
 	printf "${form}\n" $PROG
@@ -52,7 +55,7 @@ fi
 
 set -- `/usr/bin/who -r`
 RUNLEVEL="$3"
-if [ "$RUNLEVEL" -ne "S" ]
+if [ "$RUNLEVEL" -ne "S" -a "$LOCAL_ROOT" = "true" ]
 then
 	form=`gettext "%s: ERROR: this script should be run at run level S."`
 	printf "${form}\n" $PROG
@@ -83,12 +86,17 @@ fi
 
 bsmunconvert()
 {
+# Turn off device allocation. This is not currently done for alternate
+# boot environments.
+if [ -z "$ROOT" -o "$ROOT" = "/" ]
+then
+	/usr/sbin/devfsadm -d
+fi
 
-# turn off device allocation
-/usr/sbin/devfsadm -d
-
-# disable auditd service
+# disable auditd service on next boot
+cat >> ${ROOT}/var/svc/profile/upgrade <<SVC_UPGRADE
 /usr/sbin/svcadm disable system/auditd 
+SVC_UPGRADE
 
 # restore volume manager startup on next boot using the
 # previous state saved by bsmconv.sh
@@ -99,7 +107,6 @@ if [ -f ${ROOT}/etc/security/spool/vold.state ]; then
 		state="disable"
 	fi
 fi
-touch  ${ROOT}/var/svc/profile/upgrade
 cat >> ${ROOT}/var/svc/profile/upgrade <<SVC_UPGRADE
 svcadm ${state} svc:/system/filesystem/volfs:default
 SVC_UPGRADE
@@ -119,38 +126,63 @@ else
 	printf "${form}\n" $PROG
 fi
 
-# Even though cron should not be running at run-level 1, it may have
-# been started by hand.
+# If we are currently converting the active host (${ROOT}="/") we will
+# need to ensure that cron is not running. cron should not be running
+# at run-level S, but it may have been started by hand.
 
-/usr/bin/pgrep -u root -f /usr/sbin/cron > /dev/null
-if [ $? -eq 0 ]; then
-	form=`gettext "%s: INFO: stopping the cron daemon."`
-	printf "${form}\n" $PROG
+if [ -z "$ROOT" -o "$ROOT" = "/" ]
+then
+	/usr/bin/pgrep -u root -f /usr/sbin/cron > /dev/null
+	if [ $? -eq 0 ]; then
+		form=`gettext "%s: INFO: stopping the cron daemon."`
+		printf "${form}\n" $PROG
 
-	/usr/sbin/svcadm disable -t system/cron
+		/usr/sbin/svcadm disable -t system/cron
+	fi
 fi
 
-rm -f /var/spool/cron/atjobs/*.au
-rm -f /var/spool/cron/crontabs/*.au
+rm -f ${ROOT}/var/spool/cron/atjobs/*.au
+rm -f ${ROOT}/var/spool/cron/crontabs/*.au
 
 }
 
 # main
 
-permission
-
 if [ $# -eq 0 ]
 then
+
+	# converting local root, perform all permission checks
+	LOCAL_ROOT=true
+	permission
+
+	# begin conversion
 	ROOT=
 	bsmunconvert
 	echo
 	gettext "The Basic Security Module has been disabled.\n"
 	gettext "Reboot this system now to come up without BSM.\n"
 else
+
+	# determine if local root is being converted ("/" passed on
+	# command line), if so, full permission check required
+	LOCAL_ROOT=false
+	for ROOT in $@
+	do
+		if [ "$ROOT" = "/" ]
+		then
+			LOCAL_ROOT=true
+		fi
+	done
+
+	# perform required permission checks (depending on value of
+	# LOCAL_ROOT)
+	permission
+
 	for ROOT in $@
 	do
 		bsmunconvert $ROOT
 	done
+
 	echo
 	gettext "The Basic Security Module has been disabled.\n"
 	gettext "Reboot each system that was disabled to come up without BSM.\n"

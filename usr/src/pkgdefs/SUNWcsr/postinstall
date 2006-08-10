@@ -195,13 +195,22 @@ fi
 /usr/sbin/removef -f $PKGINST >/dev/null 2>&1
 
 # Solaris audit's internal "enable/disable" state is maintained by
-# c2audit; if c2audit accepts the auditconfig query, then auditing
-# is enabled and SMF should enable auditd.
-#
+# c2audit; if c2audit accepts the auditconfig query, then auditing is
+# enabled. If that is the case, then SMF should always enable auditd
+# in the global zone and also in a non-global zone if perzone auditing
+# is in use.
+
 cat >> $BASEDIR/var/svc/profile/upgrade <<\_ENABLE_AUDIT
 /usr/sbin/auditconfig -getcond 2> /dev/null
 if [ $? -eq 0 ]; then
-	/usr/sbin/svcadm enable system/auditd
+	if [ `/sbin/zonename` = global ]; then
+		/usr/sbin/svcadm enable system/auditd
+	else
+		echo `/usr/sbin/auditconfig -getpolicy` | grep perzone > /dev/null
+		if [ $? -eq 0 ]; then
+			/usr/sbin/svcadm enable system/auditd
+		fi
+	fi
 fi
 _ENABLE_AUDIT
 

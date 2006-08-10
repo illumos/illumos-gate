@@ -49,8 +49,11 @@ if smf_is_nonglobalzone; then
 	echo `$AUDITCONFIG -getpolicy` | grep perzone > /dev/null
 
 	if [ $? -eq 1 ]; then
-		echo "$0:  auditd is not configured to run in a local zone"
-		exit $SMF_EXIT_ERR_CONFIG;
+		echo "$0:  auditd is not configured to run in a local"
+		echo "   zone, perzone policy not set (see auditconfig(1M))"
+		/usr/sbin/svcadm disable svc:/system/auditd:default 
+		sleep 5 &
+		exit $SMF_EXIT_OK;
 	fi		
 fi
 
