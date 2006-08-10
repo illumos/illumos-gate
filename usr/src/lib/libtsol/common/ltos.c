@@ -276,7 +276,6 @@ label_to_str(const m_label_t *l, char **s, const m_label_str_t t, uint_t f)
 	datasize = CALL_SIZE(pr_call_t, 0);
 	prcall.label = *l;
 	prcall.flags = f;
-	prret.buf[string_start] = '\0';	/* ensure valid buffer end */
 	if (__call_labeld(&callp, &bufsize, &datasize) == SUCCESS) {
 		if (callp->reterr != 0) {
 			errno = EINVAL;
