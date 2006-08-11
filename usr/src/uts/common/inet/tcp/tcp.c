@@ -92,6 +92,7 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
 
 #include <inet/ipclassifier.h>
 #include <inet/ip_ire.h>
+#include <inet/ip_ftable.h>
 #include <inet/ip_if.h>
 #include <inet/ipp_common.h>
 #include <sys/squeue.h>
@@ -18316,10 +18317,15 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		 */
 	}
 
+	/*
+	 * The following if case identifies whether or not
+	 * we are forced to take the slowpath.
+	 */
 	if (ire->ire_flags & RTF_MULTIRT ||
 	    ire->ire_stq == NULL ||
 	    ire->ire_max_frag < ntohs(ipha->ipha_length) ||
-	    (ire_fp_mp = ire->ire_fp_mp) == NULL ||
+	    (ire->ire_nce != NULL &&
+	    (ire_fp_mp = ire->ire_nce->nce_fp_mp) == NULL) ||
 	    (ire_fp_mp_len = MBLKL(ire_fp_mp)) > MBLKHEAD(mp)) {
 		if (tcp->tcp_snd_zcopy_aware)
 			mp = tcp_zcopy_disable(tcp, mp);
@@ -19226,6 +19232,18 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	if (ill->ill_capabilities & ILL_CAPAB_ZEROCOPY)
 		zc_cap = ill->ill_zerocopy_capab;
 
+	/*
+	 * Check if we can take tcp fast-path. Note that "incomplete"
+	 * ire's (where the link-layer for next hop is not resolved
+	 * or where the fast-path header in nce_fp_mp is not available
+	 * yet) are sent down the legacy (slow) path.
+	 * NOTE: We should fix ip_xmit_v4 to handle M_MULTIDATA
+	 */
+	if (ire->ire_nce && ire->ire_nce->nce_state != ND_REACHABLE) {
+		/* IRE will be released prior to returning */
+		goto legacy_send_no_md;
+	}
+
 	/* go to legacy path if interface doesn't support zerocopy */
 	if (tcp->tcp_snd_zcopy_aware && do_tcpzcopy != 2 &&
 	    (zc_cap == NULL || zc_cap->ill_zerocopy_flags == 0)) {
@@ -19411,7 +19429,6 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			    (mmd = mmd_alloc(md_hbuf, &md_mp,
 			    KM_NOSLEEP)) == NULL) || (tcp_mdt_add_attrs(mmd,
 			    /* fastpath mblk */
-			    (af == AF_INET) ? ire->ire_dlureq_mp :
 			    ire->ire_nce->nce_res_mp,
 			    /* hardware checksum enabled */
 			    (hwcksum_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)),

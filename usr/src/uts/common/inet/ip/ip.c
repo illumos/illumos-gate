@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -84,6 +83,7 @@
 #include <inet/ip_multi.h>
 #include <inet/ip_if.h>
 #include <inet/ip_ire.h>
+#include <inet/ip_ftable.h>
 #include <inet/ip_rts.h>
 #include <inet/optcom.h>
 #include <inet/ip_ndp.h>
@@ -134,6 +134,7 @@ squeue_func_t ip_input_proc;
  */
 #define	IP_STAT(x)		(ip_statistics.x.value.ui64++)
 #define	IP_STAT_UPDATE(x, n)	(ip_statistics.x.value.ui64 += (n))
+#define	SET_BPREV_FLAG(x)	((mblk_t *)(uintptr_t)(x))
 
 typedef struct ip_stat {
 	kstat_named_t	ipsec_fanout_proto;
@@ -467,6 +468,35 @@ uint32_t (*cl_inet_ipident)(uint8_t protocol, sa_family_t addr_family,
  * gcgrp_rwlock -> ire_lock
  * gcgrp_rwlock -> gcdb_lock
  *
+ *
+ * Routing/forwarding table locking notes:
+ *
+ * Lock acquisition order: Radix tree lock, irb_lock.
+ * Requirements:
+ * i.  Walker must not hold any locks during the walker callback.
+ * ii  Walker must not see a truncated tree during the walk because of any node
+ *     deletion.
+ * iii Existing code assumes ire_bucket is valid if it is non-null and is used
+ *     in many places in the code to walk the irb list. Thus even if all the
+ *     ires in a bucket have been deleted, we still can't free the radix node
+ *     until the ires have actually been inactive'd (freed).
+ *
+ * Tree traversal - Need to hold the global tree lock in read mode.
+ * Before dropping the global tree lock, need to either increment the ire_refcnt
+ * to ensure that the radix node can't be deleted.
+ *
+ * Tree add - Need to hold the global tree lock in write mode to add a
+ * radix node. To prevent the node from being deleted, increment the
+ * irb_refcnt, after the node is added to the tree. The ire itself is
+ * added later while holding the irb_lock, but not the tree lock.
+ *
+ * Tree delete - Need to hold the global tree lock and irb_lock in write mode.
+ * All associated ires must be inactive (i.e. freed), and irb_refcnt
+ * must be zero.
+ *
+ * Walker - Increment irb_refcnt before calling the walker callback. Hold the
+ * global tree lock (read mode) for traversal.
+ *
  * IPSEC notes :
  *
  * IP interacts with the IPSEC code (AH/ESP) by tagging a M_CTL message
@@ -654,10 +684,6 @@ uint_t ip_max_frag_dups = 10;
 
 #define	ILL_MAX_NAMELEN			LIFNAMSIZ
 
-/* Leave room for ip_newroute to tack on the src and target addresses */
-#define	OK_RESOLVER_MP(mp)						\
-	((mp) && ((mp)->b_wptr - (mp)->b_rptr) >= (2 * IP_ADDR_LEN))
-
 static int	conn_set_held_ipif(conn_t *, ipif_t **, ipif_t *);
 
 static mblk_t	*ip_wput_attach_llhdr(mblk_t *, ire_t *, ip_proc_t, uint32_t);
@@ -699,7 +725,6 @@ ipaddr_t	ip_net_mask(ipaddr_t);
 void		ip_newroute(queue_t *, mblk_t *, ipaddr_t, ill_t *, conn_t *);
 static void	ip_newroute_ipif(queue_t *, mblk_t *, ipif_t *, ipaddr_t,
 		    conn_t *, uint32_t);
-static int	ip_hdr_complete(ipha_t *, zoneid_t);
 char		*ip_nv_lookup(nv_t *, int);
 static boolean_t	ip_check_for_ipsec_opt(queue_t *, mblk_t *);
 static int	ip_param_get(queue_t *, mblk_t *, caddr_t, cred_t *);
@@ -789,21 +814,18 @@ static int	icmp_kstat_update(kstat_t *kp, int rw);
 
 static int	ip_conn_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 
-static boolean_t	ip_no_forward(ipha_t *, ill_t *);
-static boolean_t	ip_loopback_src_or_dst(ipha_t *, ill_t *);
-
 static mblk_t	*ip_tcp_input(mblk_t *, ipha_t *, ill_t *, boolean_t,
     ire_t *, mblk_t *, uint_t, queue_t *, ill_rx_ring_t *);
 
 void	ip_input(ill_t *, ill_rx_ring_t *, mblk_t *, size_t);
 
+static void	ip_rput_process_forward(queue_t *, mblk_t *, ire_t *,
+    ipha_t *, ill_t *, boolean_t);
+
 timeout_id_t ip_ire_expire_id;	/* IRE expiration timer. */
 static clock_t ip_ire_arp_time_elapsed; /* Time since IRE cache last flushed */
 static clock_t ip_ire_rd_time_elapsed;	/* ... redirect IREs last flushed */
 static clock_t ip_ire_pmtu_time_elapsed; /* Time since path mtu increase */
-
-uint_t	ip_ire_default_count;	/* Number of IPv4 IRE_DEFAULT entries. */
-uint_t	ip_ire_default_index;	/* Walking index used to mod in */
 
 ipaddr_t	ip_g_all_ones = IP_HOST_MASK;
 clock_t icmp_pkt_err_last = 0;	/* Time since last icmp_pkt_err */
@@ -1456,6 +1478,7 @@ static  uint_t conn_drain_list_cnt;	/* Total count of conn_drain_list */
 static  int    conn_drain_list_index;	/* Next drain_list to be used */
 int	conn_drain_nthreads;		/* Number of drainers reqd. */
 					/* Settable in /etc/system */
+uint_t	ip_redirect_cnt;		/* Num of redirect routes in ftable */
 
 /* Defined in ip_ire.c */
 extern uint32_t ip_ire_max_bucket_cnt, ip6_ire_max_bucket_cnt;
@@ -3255,8 +3278,10 @@ icmp_redirect(mblk_t *mp)
 		ire_refrele(save_ire);
 		return;
 	}
-	error = ire_add(&ire, NULL, NULL, NULL);
+	error = ire_add(&ire, NULL, NULL, NULL, B_FALSE);
 	ire_refrele(save_ire);
+	atomic_inc_32(&ip_redirect_cnt);
+
 	if (error == 0) {
 		ire_refrele(ire);		/* Held in ire_add_v4 */
 		/* tell routing sockets that we received a redirect */
@@ -3884,6 +3909,13 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 		 * as it would remove all IRE_CACHE entries for onlink
 		 * destinations. All onlink destinations have
 		 * ire_gateway_addr == 0.
+		 *
+		 *
+		 * The ip_ire_clookup_and_delete() call deletes
+		 * the nce and all relevant ire cache entries that
+		 * are associated with that nce.
+		 * The ire_walk_v4->ire_delete_cache_gw() call
+		 * will delete the appropriate redirect ires.
 		 */
 		if ((ip_ire_clookup_and_delete(src, NULL) ||
 		    (ire = ire_ftable_lookup(src, 0, 0, 0, NULL, NULL, NULL,
@@ -6672,7 +6704,7 @@ notfound:
  * is possible to generate ICMP
  * errors.
  */
-static int
+int
 ip_hdr_complete(ipha_t *ipha, zoneid_t zoneid)
 {
 	ire_t *ire;
@@ -6834,6 +6866,7 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 	uint32_t 	max_frag;
 	mblk_t		*first_mp;
 	uint32_t	ill_index;
+	ipxmit_state_t	pktxmit_state;
 
 	ASSERT(ire != NULL);
 	ASSERT(ire->ire_ipif->ipif_net_type == IRE_IF_NORESOLVER);
@@ -6935,19 +6968,16 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 
 	ASSERT(ire->ire_ipif != NULL);
 
-	mp = ip_wput_attach_llhdr(mp, ire, IPP_FWD_OUT, ill_index);
-	if (mp == NULL) {
-		BUMP_MIB(&ip_mib, ipInDiscards);
-		return;
+	/* Now send the packet to the tunnel interface */
+	mp->b_prev = SET_BPREV_FLAG(IPP_FWD_OUT);
+	q = ire->ire_stq;
+	pktxmit_state = ip_xmit_v4(mp, ire, NULL, B_FALSE);
+	if ((pktxmit_state == SEND_FAILED) ||
+	    (pktxmit_state == LLHDR_RESLV_FAILED)) {
+		ip2dbg(("ip_mrtun_forward: failed to send packet to ill %p\n",
+		    q->q_ptr));
 	}
 
-	/* Now send the packet to the tunnel interface */
-	q = ire->ire_stq;
-	UPDATE_IB_PKT_COUNT(ire);
-	ire->ire_last_used_time = lbolt;
-	BUMP_MIB(&ip_mib, ipForwDatagrams);
-	putnext(q, mp);
-	ip2dbg(("ip_mrtun_forward: sent packet to ill %p\n", q->q_ptr));
 	return;
 
 drop_pkt:;
@@ -7033,7 +7063,7 @@ ip_net_mask(ipaddr_t addr)
  * Select an ill for the packet by considering load spreading across
  * a different ill in the group if dst_ill is part of some group.
  */
-static ill_t *
+ill_t *
 ip_newroute_get_dst_ill(ill_t *dst_ill)
 {
 	ill_t *ill;
@@ -7127,7 +7157,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 	ire_t	*sire = NULL;
 	mblk_t	*first_mp;
 	ire_t	*save_ire;
-	mblk_t	*dlureq_mp;
 	ill_t	*attach_ill = NULL;	/* Bind to IPIF_NOFAILOVER address */
 	ushort_t ire_marks = 0;
 	boolean_t mctl_present;
@@ -7174,10 +7203,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 		return;
 	}
 
-	if (ip_loopback_src_or_dst(ipha, NULL)) {
-		goto icmp_err_ret;
-	}
-
 	if (mctl_present && io->ipsec_out_attach_if) {
 		/* ip_grab_attach_ill returns a held ill */
 		attach_ill = ip_grab_attach_ill(NULL, first_mp,
@@ -7222,6 +7247,33 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 	 * to look for other routes to the destination in the forward table.
 	 * This is actually used only for multirouting, where a list
 	 * of routes has to be processed in sequence.
+	 *
+	 * In the process of coming up with the most specific information,
+	 * ire_ftable_lookup may end up with an incomplete IRE_CACHE entry
+	 * for the gateway (i.e., one for which the ire_nce->nce_state is
+	 * not yet ND_REACHABLE, and is in the middle of arp resolution).
+	 * Two caveats when handling incomplete ire's in ip_newroute:
+	 * - we should be careful when accessing its ire_nce (specifically
+	 *   the nce_res_mp) ast it might change underneath our feet, and,
+	 * - not all legacy code path callers are prepared to handle
+	 *   incomplete ire's, so we should not create/add incomplete
+	 *   ire_cache entries here. (See discussion about temporary solution
+	 *   further below).
+	 *
+	 * In order to minimize packet dropping, and to preserve existing
+	 * behavior, we treat this case as if there were no IRE_CACHE for the
+	 * gateway, and instead use the IF_RESOLVER ire to send out
+	 * another request to ARP (this is achieved by passing the
+	 * MATCH_IRE_COMPLETE flag to ire_ftable_lookup). When the
+	 * arp response comes back in ip_wput_nondata, we will create
+	 * a per-dst ire_cache that has an ND_COMPLETE ire.
+	 *
+	 * Note that this is a temporary solution; the correct solution is
+	 * to create an incomplete  per-dst ire_cache entry, and send the
+	 * packet out when the gw's nce is resolved. In order to achieve this,
+	 * all packet processing must have been completed prior to calling
+	 * ire_add_then_send. Some legacy code paths (e.g. cgtp) would need
+	 * to be modified to accomodate this solution.
 	 */
 	if (in_ill != NULL) {
 		ire = ire_srcif_table_lookup(dst, IRE_IF_RESOLVER, NULL,
@@ -7255,7 +7307,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 		    NULL, &sire, zoneid, 0, MBLK_GETLABEL(mp),
 		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
 		    MATCH_IRE_RJ_BHOLE | MATCH_IRE_PARENT |
-		    MATCH_IRE_SECATTR);
+		    MATCH_IRE_SECATTR | MATCH_IRE_COMPLETE);
 	} else {
 		/*
 		 * attach_ill is set only for communicating with
@@ -7384,20 +7436,21 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 		 * route is added in the source interface's routing table.
 		 * If the outgoing interface of this route is of type
 		 * IRE_IF_RESOLVER, then upon creation of the ire,
-		 * ire_dlureq_mp is set to NULL. Later, when this route is
-		 * first used for forwarding packet, ip_newroute() is called
+		 * ire_nce->nce_res_mp is set to NULL.
+		 * Later, when this route is first used for forwarding
+		 * a packet, ip_newroute() is called
 		 * to resolve the hardware address of the outgoing ipif.
 		 * We do not come here for IRE_IF_NORESOLVER entries in the
 		 * source interface based table. We only come here if the
 		 * outgoing interface is a resolver interface and we don't
-		 * have the ire_dlureq_mp information yet.
+		 * have the ire_nce->nce_res_mp information yet.
 		 * If in_ill is not null that means it is called from
 		 * ip_rput.
 		 */
 
 		ASSERT(ire->ire_in_ill == NULL ||
 		    (ire->ire_type == IRE_IF_RESOLVER &&
-		    ire->ire_dlureq_mp == NULL));
+		    ire->ire_nce != NULL && ire->ire_nce->nce_res_mp == NULL));
 
 		/*
 		 * Verify that the returned IRE does not have either
@@ -7697,6 +7750,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			ire_t	*ipif_ire;
 			mblk_t	*ire_fp_mp;
 
+			ASSERT(save_ire->ire_nce->nce_state == ND_REACHABLE);
 			if (gw == 0)
 				gw = ire->ire_gateway_addr;
 			/*
@@ -7727,23 +7781,23 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 				goto icmp_err_ret;
 			}
 			/*
-			 * XXX We are using the same dlureq_mp
+			 * XXX We are using the same res_mp
 			 * (DL_UNITDATA_REQ) though the save_ire is not
 			 * pointing at the same ill.
 			 * This is incorrect. We need to send it up to the
-			 * resolver to get the right dlureq_mp. For ethernets
+			 * resolver to get the right res_mp. For ethernets
 			 * this may be okay (ill_type == DL_ETHER).
 			 */
-			dlureq_mp = save_ire->ire_dlureq_mp;
+			res_mp = save_ire->ire_nce->nce_res_mp;
 			ire_fp_mp = NULL;
 			/*
-			 * save_ire's ire_fp_mp can't change since it is
+			 * save_ire's nce_fp_mp can't change since it is
 			 * not an IRE_MIPRTUN or IRE_BROADCAST
 			 * LOCK_IRE_FP_MP does not do any useful work in
 			 * the case of IRE_CACHE. So we don't use it below.
 			 */
 			if (save_ire->ire_stq == dst_ill->ill_wq)
-				ire_fp_mp = save_ire->ire_fp_mp;
+				ire_fp_mp = save_ire->ire_nce->nce_fp_mp;
 
 			/*
 			 * Check cached gateway IRE for any security
@@ -7768,7 +7822,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,			/* IRE type */
-			    save_ire->ire_dlureq_mp,
+			    res_mp,
 			    src_ipif,
 			    in_ill,			/* incoming ill */
 			    (sire != NULL) ?
@@ -7879,7 +7933,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			/*
 			 * We have what we need to build an IRE_CACHE.
 			 *
-			 * Create a new dlureq_mp with the IP gateway address
+			 * Create a new res_mp with the IP gateway address
 			 * in destination address in the DLPI hdr if the
 			 * physical length is exactly 4 bytes.
 			 */
@@ -7891,17 +7945,17 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 				else
 					addr = (uchar_t *)&dst;
 
-				dlureq_mp = ill_dlur_gen(addr,
+				res_mp = ill_dlur_gen(addr,
 				    dst_ill->ill_phys_addr_length,
 				    dst_ill->ill_sap,
 				    dst_ill->ill_sap_length);
-			} else {
-				dlureq_mp = ire->ire_dlureq_mp;
-			}
 
-			if (dlureq_mp == NULL) {
-				ip1dbg(("ip_newroute: dlureq_mp NULL\n"));
-				break;
+				if (res_mp == NULL) {
+					ip1dbg(("ip_newroute: res_mp NULL\n"));
+					break;
+				}
+			} else {
+				res_mp = NULL;
 			}
 
 			/*
@@ -7932,7 +7986,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    dlureq_mp,
+			    res_mp,
 			    src_ipif,
 			    in_ill,			/* Incoming ill */
 			    save_ire->ire_mask,		/* Parent mask */
@@ -7946,7 +8000,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			    gcgrp);
 
 			if (dst_ill->ill_phys_addr_length == IP_ADDR_LEN)
-				freeb(dlureq_mp);
+				freeb(res_mp);
 
 			if (ire == NULL) {
 				if (gcgrp != NULL) {
@@ -8090,6 +8144,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			 * The ire_max_frag is atomically set under the
 			 * irebucket lock in ire_add_v[46].
 			 */
+
 			ire = ire_create_mp(
 			    (uchar_t *)&dst,		/* dest address */
 			    (uchar_t *)&ip_g_all_ones,	/* mask */
@@ -8101,7 +8156,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    res_mp,
+			    NULL,
 			    src_ipif,			/* Interface ipif */
 			    in_ill,			/* Incoming ILL */
 			    save_ire->ire_mask,		/* Parent mask */
@@ -8149,9 +8204,8 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			ire->ire_mp->b_cont = first_mp;
 			/* Have saved_mp handy, for cleanup if canput fails */
 			saved_mp = mp;
-			mp = ire->ire_dlureq_mp;
+			mp = copyb(res_mp);
 			ASSERT(mp != NULL);
-			ire->ire_dlureq_mp = NULL;
 			linkb(mp, ire->ire_mp);
 
 
@@ -8179,7 +8233,8 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			    areq->areq_target_addr_offset);
 			*addrp = dst;
 			/* Up to the resolver. */
-			if (canputnext(dst_ill->ill_rq)) {
+			if (canputnext(dst_ill->ill_rq) &&
+			    !(dst_ill->ill_arp_closing)) {
 				putnext(dst_ill->ill_rq, mp);
 				ire = NULL;
 				if (copy_mp != NULL) {
@@ -8227,10 +8282,17 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 				return;
 			} else {
 				/* Prepare for cleanup */
-				ire->ire_dlureq_mp = mp;
+				DTRACE_PROBE1(ip__newroute__drop, mblk_t *,
+				    mp);
 				mp->b_cont = NULL;
-				ire_delete(ire);
-				mp = saved_mp;
+				freeb(mp); /* areq */
+				/*
+				 * this is an ire that is not added to the
+				 * cache. ire_freemblk will handle the release
+				 * of any resources associated with the ire.
+				 */
+				ire_delete(ire); /* ire_mp */
+				mp = saved_mp; /* pkt */
 				ire = NULL;
 				if (copy_mp != NULL) {
 					MULTIRT_DEBUG_UNTAG(copy_mp);
@@ -8633,27 +8695,27 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 		switch (ipif->ipif_net_type) {
 		case IRE_IF_NORESOLVER: {
 			/* We have what we need to build an IRE_CACHE. */
-			mblk_t	*dlureq_mp;
+			mblk_t	*res_mp;
 
 			/*
-			 * Create a new dlureq_mp with the
+			 * Create a new res_mp with the
 			 * IP gateway address as destination address in the
 			 * DLPI hdr if the physical length is exactly 4 bytes.
 			 */
 			if (dst_ill->ill_phys_addr_length == IP_ADDR_LEN) {
-				dlureq_mp = ill_dlur_gen((uchar_t *)&dst,
+				res_mp = ill_dlur_gen((uchar_t *)&dst,
 				    dst_ill->ill_phys_addr_length,
 				    dst_ill->ill_sap,
 				    dst_ill->ill_sap_length);
 			} else {
 				/* use the value set in ip_ll_subnet_defaults */
-				dlureq_mp = ill_dlur_gen(NULL,
+				res_mp = ill_dlur_gen(NULL,
 				    dst_ill->ill_phys_addr_length,
 				    dst_ill->ill_sap,
 				    dst_ill->ill_sap_length);
 			}
 
-			if (dlureq_mp == NULL)
+			if (res_mp == NULL)
 				break;
 			/*
 			 * The new ire inherits the IRE_OFFSUBNET flags
@@ -8670,7 +8732,7 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    dlureq_mp,
+			    res_mp,
 			    src_ipif,
 			    NULL,
 			    (save_ire != NULL ? save_ire->ire_mask : 0),
@@ -8685,7 +8747,7 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			    NULL,
 			    NULL);
 
-			freeb(dlureq_mp);
+			freeb(res_mp);
 
 			if (ire == NULL) {
 				if (save_ire != NULL)
@@ -8698,7 +8760,14 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			/*
 			 * If IRE_MARK_NOADD is set then we need to convert
 			 * the max_fragp to a useable value now. This is
-			 * normally done in ire_add_v[46].
+			 * normally done in ire_add_v[46]. We also need to
+			 * associate the ire with an nce (normally would be
+			 * done in ip_wput_nondata()).
+			 *
+			 * Note that IRE_MARK_NOADD packets created here
+			 * do not have a non-null ire_mp pointer. The null
+			 * value of ire_bucket indicates that they were
+			 * never added.
 			 */
 			if (ire->ire_marks & IRE_MARK_NOADD) {
 				uint_t  max_frag;
@@ -8706,6 +8775,19 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 				max_frag = *ire->ire_max_fragp;
 				ire->ire_max_fragp = NULL;
 				ire->ire_max_frag = max_frag;
+
+				if ((ire->ire_nce = ndp_lookup_v4(
+				    ire_to_ill(ire),
+				    (ire->ire_gateway_addr != INADDR_ANY ?
+				    &ire->ire_gateway_addr : &ire->ire_addr),
+				    B_FALSE)) == NULL) {
+					if (save_ire != NULL)
+						ire_refrele(save_ire);
+					break;
+				}
+				ASSERT(ire->ire_nce->nce_state ==
+				    ND_REACHABLE);
+				NCE_REFHOLD_TO_REFHOLD_NOTR(ire->ire_nce);
 			}
 
 			/* Prevent save_ire from getting deleted */
@@ -8813,7 +8895,7 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    res_mp,
+			    NULL,	/* let ire_nce_init figure res_mp out */
 			    src_ipif,
 			    NULL,
 			    (save_ire != NULL ? save_ire->ire_mask : 0),
@@ -8860,9 +8942,8 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			ire->ire_mp->b_cont = first_mp;
 			/* Have saved_mp handy, for cleanup if canput fails */
 			saved_mp = mp;
-			mp = ire->ire_dlureq_mp;
+			mp = copyb(res_mp);
 			ASSERT(mp != NULL);
-			ire->ire_dlureq_mp = NULL;
 			linkb(mp, ire->ire_mp);
 
 			/*
@@ -8878,19 +8959,20 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			    areq->areq_target_addr_offset);
 			*addrp = dst;
 			/* Up to the resolver. */
-			if (canputnext(dst_ill->ill_rq)) {
+			if (canputnext(dst_ill->ill_rq) &&
+			    !(dst_ill->ill_arp_closing)) {
 				putnext(dst_ill->ill_rq, mp);
 				/*
 				 * The response will come back in ip_wput
 				 * with db_type IRE_DB_TYPE.
 				 */
 			} else {
-				ire->ire_dlureq_mp = mp;
 				mp->b_cont = NULL;
-				ire_delete(ire);
+				freeb(mp); /* areq */
+				ire_delete(ire); /* ire_mp */
 				saved_mp->b_next = NULL;
 				saved_mp->b_prev = NULL;
-				freemsg(first_mp);
+				freemsg(first_mp); /* pkt */
 				ip2dbg(("ip_newroute_ipif: dropped\n"));
 			}
 
@@ -9023,7 +9105,6 @@ ip_modopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	uint32_t cpu_cnt;
 	uint32_t min_cnt;
 	pgcnt_t mem_avail;
-	extern uint32_t ip_cache_table_size, ip6_cache_table_size;
 	ill_t	*ill;
 	int	err;
 
@@ -12883,12 +12964,14 @@ done:
  * in the case of packets coming from mobile ip forward tunnel.
  * It must be null otherwise.
  */
-static void
+static ire_t *
 ip_rput_noire(queue_t *q, ill_t *in_ill, mblk_t *mp, int ll_multicast,
     ipaddr_t dst)
 {
 	ipha_t	*ipha;
 	ill_t	*ill;
+	ire_t	*ire;
+	boolean_t	check_multirt = B_FALSE;
 
 	ipha = (ipha_t *)mp->b_rptr;
 	ill = (ill_t *)q->q_ptr;
@@ -12904,33 +12987,65 @@ ip_rput_noire(queue_t *q, ill_t *in_ill, mblk_t *mp, int ll_multicast,
 	 */
 	if (ll_multicast) {
 		freemsg(mp);
-		return;
+		return (NULL);
 	}
 	if (!(ill->ill_flags & ILLF_ROUTER) && !ip_source_routed(ipha)) {
 		BUMP_MIB(&ip_mib, ipForwProhibits);
 		freemsg(mp);
-		return;
+		return (NULL);
 	}
 
-	/* Check for Martian addresses */
-	if ((in_ill == NULL) && (ip_no_forward(ipha, ill))) {
-		freemsg(mp);
-		return;
-	}
-
-	/* Mark this packet as having originated externally */
+	/*
+	 * Mark this packet as having originated externally.
+	 *
+	 * For non-forwarding code path, ire_send later double
+	 * checks this interface to see if it is still exists
+	 * post-ARP resolution.
+	 *
+	 * Also, IPQOS uses this to differentiate between
+	 * IPP_FWD_OUT and IPP_LOCAL_OUT for post-ARP
+	 * QOS packet processing in ip_wput_attach_llhdr().
+	 * The QoS module can mark the b_band for a fastpath message
+	 * or the dl_priority field in a unitdata_req header for
+	 * CoS marking. This info can only be found in
+	 * ip_wput_attach_llhdr().
+	 */
 	mp->b_prev = (mblk_t *)(uintptr_t)ill->ill_phyint->phyint_ifindex;
-
 	/*
 	 * Clear the indication that this may have a hardware checksum
 	 * as we are not using it
 	 */
 	DB_CKSUMFLAGS(mp) = 0;
 
-	/*
-	 * Now hand the packet to ip_newroute.
-	 */
-	ip_newroute(q, mp, dst, in_ill, NULL);
+	if (in_ill != NULL) {
+		/*
+		 * Now hand the packet to ip_newroute.
+		 */
+		ip_newroute(q, mp, dst, in_ill, NULL);
+		return (NULL);
+	}
+	ire = ire_forward(dst, &check_multirt, NULL, NULL,
+	    MBLK_GETLABEL(mp));
+
+	if (ire == NULL && check_multirt) {
+		/* Let ip_newroute handle CGTP  */
+		ip_newroute(q, mp, dst, in_ill, NULL);
+		return (NULL);
+	}
+
+	if (ire != NULL)
+		return (ire);
+
+	mp->b_prev = mp->b_next = 0;
+	/* send icmp unreachable */
+	q = WR(q);
+	if (ip_source_routed(ipha))
+		icmp_unreachable(q, mp, ICMP_SOURCE_ROUTE_FAILED);
+	else
+		icmp_unreachable(q, mp, ICMP_HOST_UNREACHABLE);
+
+	return (NULL);
+
 }
 
 /*
@@ -13036,7 +13151,6 @@ ip_rput_notforus(queue_t **qp, mblk_t *mp, ire_t *ire, ill_t *ill)
 			/* Drop packet */
 			BUMP_MIB(&ip_mib, ipForwProhibits);
 			freemsg(mp);
-			ire_refrele(ire);
 			return (B_TRUE);
 		}
 
@@ -13052,20 +13166,164 @@ ip_rput_notforus(queue_t **qp, mblk_t *mp, ire_t *ire, ill_t *ill)
 	return (B_FALSE);
 }
 
+#define	SEND_PKT(ire, mp)			\
+{						\
+	UPDATE_IB_PKT_COUNT(ire);		\
+	(ire)->ire_last_used_time = lbolt;	\
+	BUMP_MIB(&ip_mib, ipForwDatagrams);	\
+	putnext((ire)->ire_stq, mp);		\
+}
+
+ire_t *
+ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
+{
+	ipha_t	*ipha;
+	ipaddr_t ip_dst, ip_src;
+	ire_t	*src_ire;
+	ill_t	*stq_ill;
+	uint_t	hlen;
+	uint32_t sum;
+	queue_t	*dev_q;
+	boolean_t check_multirt = B_FALSE;
+
+
+	ipha = (ipha_t *)mp->b_rptr;
+
+	/*
+	 * Martian Address Filtering [RFC 1812, Section 5.3.7]
+	 * The loopback address check for both src and dst has already
+	 * been checked in ip_input
+	 */
+	ip_dst = ntohl(dst);
+	ip_src = ntohl(ipha->ipha_src);
+
+	if (ip_dst == INADDR_ANY || IN_BADCLASS(ip_dst) ||
+	    IN_CLASSD(ip_src)) {
+		BUMP_MIB(&ip_mib, ipForwProhibits);
+		goto drop;
+	}
+	src_ire = ire_ctable_lookup(ipha->ipha_src, 0, IRE_BROADCAST, NULL,
+	    ALL_ZONES, NULL, MATCH_IRE_TYPE);
+
+	if (src_ire != NULL) {
+		BUMP_MIB(&ip_mib, ipForwProhibits);
+		goto drop;
+	}
+
+	/* No ire cache of nexthop. So first create one  */
+	if (ire == NULL) {
+		ire = ire_forward(dst, &check_multirt, NULL, NULL, NULL);
+		/*
+		 * We only come to ip_fast_forward if ip_cgtp_filter is
+		 * is not set. So upon return from ire_forward
+		 * check_multirt should remain as false.
+		 */
+		ASSERT(!check_multirt);
+		if (ire == NULL) {
+			BUMP_MIB(&ip_mib, ipInDiscards);
+			mp->b_prev = mp->b_next = 0;
+			/* send icmp unreachable */
+			if (ip_source_routed(ipha)) {
+				icmp_unreachable(ill->ill_wq, mp,
+				    ICMP_SOURCE_ROUTE_FAILED);
+			} else {
+				icmp_unreachable(ill->ill_wq, mp,
+				    ICMP_HOST_UNREACHABLE);
+			}
+			return (ire);
+		}
+	}
+
+	/*
+	 * Forwarding fastpath exception case:
+	 * If either of the follwoing case is true, we take
+	 * the slowpath
+	 *	o forwarding is not enabled
+	 *	o IPMP is enabled
+	 *	o corresponding ire is in incomplete state
+	 *	o packet needs fragmentation
+	 *
+	 * The codeflow from here on is thus:
+	 *	ip_rput_process_forward->ip_rput_forward->ip_xmit_v4
+	 */
+	stq_ill = (ill_t *)ire->ire_stq->q_ptr;
+	if (!(stq_ill->ill_flags & ILLF_ROUTER) ||
+	    !(ill->ill_flags & ILLF_ROUTER) || SAME_IPMP_GROUP(ill, stq_ill) ||
+	    (ire->ire_nce == NULL) ||
+	    (ire->ire_nce->nce_state != ND_REACHABLE) ||
+	    (ntohs(ipha->ipha_length) > ire->ire_max_frag) ||
+	    ipha->ipha_ttl <= 1) {
+		ip_rput_process_forward(ill->ill_rq, mp, ire,
+		    ipha, ill, B_FALSE);
+		return (ire);
+	}
+
+	mp->b_datap->db_struioun.cksum.flags = 0;
+	/* Adjust the checksum to reflect the ttl decrement. */
+	sum = (int)ipha->ipha_hdr_checksum + IP_HDR_CSUM_TTL_ADJUST;
+	ipha->ipha_hdr_checksum = (uint16_t)(sum + (sum >> 16));
+	ipha->ipha_ttl--;
+
+	dev_q = ire->ire_stq->q_next;
+	if ((dev_q->q_next != NULL ||
+	    dev_q->q_first != NULL) && !canput(dev_q)) {
+		goto indiscard;
+	}
+
+	hlen = ire->ire_nce->nce_fp_mp != NULL ?
+	    MBLKL(ire->ire_nce->nce_fp_mp) : 0;
+
+	if (hlen != 0 || ire->ire_nce->nce_res_mp != NULL) {
+		mp = ip_wput_attach_llhdr(mp, ire, 0, 0);
+		if (mp != NULL) {
+			SEND_PKT(ire, mp);
+			return (ire);
+		}
+	}
+
+indiscard:
+	BUMP_MIB(&ip_mib, ipInDiscards);
+drop:
+	if (mp != NULL)
+		freemsg(mp);
+	if (src_ire != NULL)
+		ire_refrele(src_ire);
+	return (ire);
+
+}
+
+/*
+ * This function is called in the forwarding slowpath, when
+ * either the ire lacks the link-layer address, or the packet needs
+ * further processing(eg. fragmentation), before transmission.
+ */
 static void
 ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
-    ill_t *ill, int ll_multicast)
+    ill_t *ill, boolean_t ll_multicast)
 {
 	ill_group_t	*ill_group;
 	ill_group_t	*ire_group;
-	queue_t	*dev_q;
+	queue_t		*dev_q;
+	ire_t		*src_ire;
 
 	ASSERT(ire->ire_stq != NULL);
+
+	mp->b_prev = NULL; /* ip_rput_noire sets incoming interface here */
+	mp->b_next = NULL; /* ip_rput_noire sets dst here */
+
 	if (ll_multicast != 0)
 		goto drop_pkt;
 
-	if (ip_no_forward(ipha, ill))
-		goto drop_pkt;
+	src_ire = ire_ctable_lookup(ipha->ipha_src, 0, IRE_BROADCAST, NULL,
+	    ALL_ZONES, NULL, MATCH_IRE_TYPE);
+	if (src_ire != NULL || ntohl(ipha->ipha_dst) == INADDR_ANY ||
+	    IN_BADCLASS(ntohl(ipha->ipha_dst))) {
+		if (src_ire != NULL)
+			ire_refrele(src_ire);
+		BUMP_MIB(&ip_mib, ipForwProhibits);
+		ip2dbg(("ip_rput_process_forward: Received packet with"
+		    " bad src/dst address on %s\n", ill->ill_name));
+	}
 
 	ill_group = ill->ill_group;
 	ire_group = ((ill_t *)(ire->ire_rfq)->q_ptr)->ill_group;
@@ -13096,7 +13354,6 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 			DB_CKSUMFLAGS(mp) = 0;
 			icmp_unreachable(q, mp,
 			    ICMP_SOURCE_ROUTE_FAILED);
-			ire_refrele(ire);
 			return;
 		}
 		goto drop_pkt;
@@ -13157,30 +13414,25 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 	if ((dev_q->q_next || dev_q->q_first) && !canput(dev_q)) {
 		BUMP_MIB(&ip_mib, ipInDiscards);
 		freemsg(mp);
-		ire_refrele(ire);
 		return;
 	}
 
 	ip_rput_forward(ire, ipha, mp, ill);
-	IRE_REFRELE(ire);
 	return;
 
 drop_pkt:
-	ire_refrele(ire);
 	ip2dbg(("ip_rput_forward: drop pkt\n"));
 	freemsg(mp);
 }
 
-static boolean_t
-ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t **irep, ipha_t *ipha,
+ire_t *
+ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t *ire, ipha_t *ipha,
     ill_t *ill, ipaddr_t dst, int cgtp_flt_pkt, int ll_multicast)
 {
 	queue_t		*q;
-	ire_t		*ire;
 	uint16_t	hcksumflags;
 
 	q = *qp;
-	ire = *irep;
 
 	/*
 	 * Clear the indication that this may have hardware
@@ -13197,7 +13449,7 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t **irep, ipha_t *ipha,
 		ire_refrele(ire);
 		freemsg(mp);
 		BUMP_MIB(&ip_mib, ipInDiscards);
-		return (B_TRUE);
+		return (NULL);
 	}
 	/*
 	 * For multicast we have set dst to be INADDR_BROADCAST
@@ -13223,7 +13475,7 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t **irep, ipha_t *ipha,
 			ire_refrele(ire);
 			freemsg(mp);
 			BUMP_MIB(&ip_mib, ipInDiscards);
-			return (B_TRUE);
+			return (NULL);
 		}
 		new_ire = ire_ctable_lookup(dst, 0, 0,
 		    ipif, ALL_ZONES, NULL, MATCH_IRE_ILL);
@@ -13235,7 +13487,7 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t **irep, ipha_t *ipha,
 				ire_refrele(new_ire);
 				freemsg(mp);
 				BUMP_MIB(&ip_mib, ipInDiscards);
-				return (B_TRUE);
+				return (NULL);
 			}
 			/*
 			 * In the special case of multirouted broadcast
@@ -13265,7 +13517,7 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t **irep, ipha_t *ipha,
 				ire_refrele(ire);
 				freemsg(mp);
 				BUMP_MIB(&ip_mib, ipInDiscards);
-				return (B_TRUE);
+				return (NULL);
 			}
 		} else {
 			/*
@@ -13343,24 +13595,24 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t **irep, ipha_t *ipha,
 				ip2dbg(("ip_rput_broadcast:drop pkt\n"));
 				freemsg(mp);
 				ire_refrele(ire);
-				return (B_TRUE);
+				return (NULL);
 			}
 			ipha->ipha_ttl = ip_broadcast_ttl + 1;
 			ipha->ipha_hdr_checksum = 0;
 			ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
 			ip_rput_process_forward(q, mp, ire, ipha,
 			    ill, ll_multicast);
-			return (B_TRUE);
+			ire_refrele(ire);
+			return (NULL);
 		}
 		ip1dbg(("ip_rput: NO directed broadcast to 0x%x\n",
 		    ntohl(ire->ire_addr)));
 	}
 
-	*irep = ire;
 
 	/* Restore any hardware checksum flags */
 	DB_CKSUMFLAGS(mp) = hcksumflags;
-	return (B_FALSE);
+	return (ire);
 }
 
 /* ARGSUSED */
@@ -13496,9 +13748,6 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 		}
 		for (from_mp = mp, to_mp = mp1; from_mp != NULL;
 		    from_mp = from_mp->b_cont, to_mp = to_mp->b_cont) {
-			/* Copy b_next - used in M_BREAK messages */
-			to_mp->b_next = from_mp->b_next;
-			from_mp->b_next = NULL;
 			/* Copy b_prev - used by ip_mroute_decap */
 			to_mp->b_prev = from_mp->b_prev;
 			from_mp->b_prev = NULL;
@@ -13532,24 +13781,6 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 		*first_mpp = mp1;
 		freeb(mp);
 		*mpp = mp1;
-		return (B_FALSE);
-	case M_BREAK:
-		/*
-		 * A packet arrives as M_BREAK following a cycle through
-		 * ip_rput, ip_newroute, ... and finally ire_add_then_send.
-		 * This is an IP datagram sans lower level header.
-		 * M_BREAK are also used to pass back in multicast packets
-		 * that are encapsulated with a source route.
-		 */
-		/* Ditch the M_BREAK mblk */
-		mp1 = mp->b_cont;
-		ASSERT(first_mp == mp);
-		*first_mpp = mp1;
-		freeb(mp);
-		mp = mp1;
-		mp->b_next = NULL;
-		*mpp = mp;
-		*ll_multicast = 0;
 		return (B_FALSE);
 	case M_IOCACK:
 		ip1dbg(("got iocack "));
@@ -13675,7 +13906,8 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 void
 ip_rput(queue_t *q, mblk_t *mp)
 {
-	ill_t		*ill;
+	ill_t	*ill;
+	mblk_t	 *dmp = NULL;
 
 	TRACE_1(TR_FAC_IP, TR_IP_RPUT_START, "ip_rput_start: q %p", q);
 
@@ -13746,7 +13978,6 @@ ip_rput(queue_t *q, mblk_t *mp)
 		}
 		mp1 = copymsg(mp);
 		if (mp1 == NULL) {
-			/* Clear b_next - used in M_BREAK messages */
 			mp->b_next = NULL;
 			/* clear b_prev - used by ip_mroute_decap */
 			mp->b_prev = NULL;
@@ -13762,14 +13993,28 @@ ip_rput(queue_t *q, mblk_t *mp)
 			 */
 			mp1->b_rptr += sizeof (struct ether_header);
 		}
-		/* Copy b_next - used in M_BREAK messages */
-		mp1->b_next = mp->b_next;
-		mp->b_next = NULL;
 		/* Copy b_prev - used by ip_mroute_decap */
 		mp1->b_prev = mp->b_prev;
 		mp->b_prev = NULL;
 		freemsg(mp);
 		mp = mp1;
+	}
+	if (DB_TYPE(mp) == M_DATA) {
+		dmp = mp;
+	} else if (DB_TYPE(mp) == M_PROTO &&
+	    *(t_uscalar_t *)mp->b_rptr == DL_UNITDATA_IND) {
+		dmp = mp->b_cont;
+	}
+	if (dmp != NULL) {
+		/*
+		 * IP header ptr not aligned?
+		 * OR IP header not complete in first mblk
+		 */
+		if (!OK_32PTR(dmp->b_rptr) ||
+		    (dmp->b_wptr - dmp->b_rptr) < IP_SIMPLE_HDR_LENGTH) {
+			if (!ip_check_and_align_header(q, dmp))
+				return;
+		}
 	}
 
 	TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
@@ -13787,12 +14032,13 @@ ip_rput(queue_t *q, mblk_t *mp)
  * The ill will always be valid if this function is called directly from
  * the driver.
  */
-/*ARGSUSED*/
+/* ARGSUSED */
 void
 ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 {
-	ipaddr_t		dst;
-	ire_t			*ire;
+	ipaddr_t		dst = NULL;
+	ipaddr_t		prev_dst;
+	ire_t			*ire = NULL;
 	ipha_t			*ipha;
 	uint_t			pkt_len;
 	ssize_t			len;
@@ -13819,7 +14065,15 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 		mp_chain = mp_chain->b_next;
 		mp->b_next = NULL;
 		ll_multicast = 0;
-		ire = NULL;
+
+		/*
+		 * We do ire caching from one iteration to
+		 * another. In the event the packet chain contains
+		 * all packets from the same dst, this caching saves
+		 * an ire_cache_lookup for each of the succeeding
+		 * packets in a packet chain.
+		 */
+		prev_dst = dst;
 
 		/*
 		 * ip_input fast path
@@ -13832,25 +14086,15 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 				continue;
 		}
 
+		/* Make sure its an M_DATA and that its aligned */
 		ASSERT(mp->b_datap->db_type == M_DATA);
-		ASSERT(mp->b_datap->db_ref == 1);
-
+		ASSERT(mp->b_datap->db_ref == 1 && OK_32PTR(mp->b_rptr));
 
 		ipha = (ipha_t *)mp->b_rptr;
 		len = mp->b_wptr - rptr;
 
 		BUMP_MIB(&ip_mib, ipInReceives);
 
-		/*
-		 * IP header ptr not aligned?
-		 * OR IP header not complete in first mblk
-		 */
-		if (!OK_32PTR(rptr) || len < IP_SIMPLE_HDR_LENGTH) {
-			if (!ip_check_and_align_header(q, mp))
-				continue;
-			ipha = (ipha_t *)mp->b_rptr;
-			len = mp->b_wptr - rptr;
-		}
 
 		/* multiple mblk or too short */
 		pkt_len = ntohs(ipha->ipha_length);
@@ -13880,14 +14124,21 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 			}
 		}
 
-		if (ip_loopback_src_or_dst(ipha, ill)) {
-			ip2dbg(("ip_input: drop pkt\n"));
+		/* Obtain the dst of the current packet */
+		dst = ipha->ipha_dst;
+
+		if (IP_LOOPBACK_ADDR(dst) ||
+		    IP_LOOPBACK_ADDR(ipha->ipha_src)) {
+			BUMP_MIB(&ip_mib, ipInAddrErrors);
+			cmn_err(CE_CONT, "dst %X src %X\n",
+			    dst, ipha->ipha_src);
 			freemsg(mp);
 			continue;
 		}
 
 		/*
-		 * Attach any necessary label information to this packet.
+		 * Attach any necessary label information to
+		 * this packet
 		 */
 		if (is_system_labeled() &&
 		    !tsol_get_pkt_label(mp, IPV4_VERSION)) {
@@ -13896,18 +14147,65 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 			continue;
 		}
 
+		/*
+		 * Reuse the cached ire only if the ipha_dst of the previous
+		 * packet is the same as the current packet AND it is not
+		 * INADDR_ANY.
+		 */
+		if (!(dst == prev_dst && dst != INADDR_ANY) &&
+		    (ire != NULL)) {
+			ire_refrele(ire);
+			ire = NULL;
+		}
 		opt_len = ipha->ipha_version_and_hdr_length -
 		    IP_SIMPLE_HDR_VERSION;
-		/* IP version bad or there are IP options */
-		if (opt_len) {
+
+		/*
+		 * Check to see if we can take the fastpath.
+		 * That is possible if the following conditions are met
+		 *	o Tsol disabled
+		 *	o CGTP disabled
+		 *	o ipp_action_count is 0
+		 *	o Mobile IP not running
+		 *	o no options in the packet
+		 *	o not a RSVP packet
+		 * 	o not a multicast packet
+		 */
+		if (!is_system_labeled() &&
+		    !ip_cgtp_filter && ipp_action_count == 0 &&
+		    ill->ill_mrtun_refcnt == 0 && ill->ill_srcif_refcnt == 0 &&
+		    opt_len == 0 && ipha->ipha_protocol != IPPROTO_RSVP &&
+		    !ll_multicast && !CLASSD(dst)) {
+			if (ire == NULL)
+				ire = ire_cache_lookup(dst, ALL_ZONES, NULL);
+
+			/* incoming packet is for forwarding */
+			if (ire == NULL || (ire->ire_type & IRE_CACHE)) {
+				ire = ip_fast_forward(ire, dst, ill, mp);
+				continue;
+			}
+			/* incoming packet is for local consumption */
+			if (ire->ire_type & IRE_LOCAL)
+				goto local;
+		}
+
+		/*
+		 * Disable ire caching for anything more complex
+		 * than the simple fast path case we checked for above.
+		 */
+		if (ire != NULL) {
+			ire_refrele(ire);
+			ire = NULL;
+		}
+
+		/* Full-blown slow path */
+		if (opt_len != 0) {
 			if (len != 0)
 				IP_STAT(ip_multimblk4);
 			else
 				IP_STAT(ip_ipoptions);
 			if (!ip_rput_multimblk_ipoptions(q, mp, &ipha, &dst))
 				continue;
-		} else {
-			dst = ipha->ipha_dst;
 		}
 
 		/*
@@ -13964,12 +14262,13 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 		if (ill->ill_srcif_refcnt > 0) {
 			ire = ire_srcif_table_lookup(dst, IRE_INTERFACE,
 			    NULL, ill, MATCH_IRE_TYPE);
-			if (ire != NULL && ire->ire_dlureq_mp == NULL &&
-			    ire->ire_ipif->ipif_net_type ==
-			    IRE_IF_RESOLVER) {
+			if (ire != NULL && ire->ire_nce->nce_res_mp == NULL &&
+			    ire->ire_ipif->ipif_net_type == IRE_IF_RESOLVER) {
+
 				/* We need to resolve the link layer info */
 				ire_refrele(ire);
-				ip_rput_noire(q, (ill_t *)q->q_ptr, mp,
+				ire = NULL;
+				(void) ip_rput_noire(q, (ill_t *)q->q_ptr, mp,
 				    ll_multicast, dst);
 				continue;
 			}
@@ -14019,8 +14318,11 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 						ip_mrtun_forward(ire, ill, mp);
 					}
 					ire_refrele(ire);
-					if (tmp_ire != NULL)
+					ire = NULL;
+					if (tmp_ire != NULL) {
 						ire_refrele(tmp_ire);
+						tmp_ire = NULL;
+					}
 					TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
 					    "ip_input_end: q %p (%S)",
 					    q, "uninit");
@@ -14056,8 +14358,9 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 			 * packets i.e. if they will go out over the
 			 * same interface as they came in on.
 			 */
-			ip_rput_noire(q, NULL, mp, ll_multicast, dst);
-			continue;
+			ire = ip_rput_noire(q, NULL, mp, ll_multicast, dst);
+			if (ire == NULL)
+				continue;
 		}
 
 		/*
@@ -14071,24 +14374,27 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 			 * unless the packet is broadcast for real, since
 			 * that routine is a no-op for multicast.
 			 */
-			if ((ipha->ipha_protocol != IPPROTO_UDP ||
-			    !CLASSD(ipha->ipha_dst)) &&
-			    ip_rput_process_broadcast(&q, mp, &ire, ipha, ill,
-			    dst, cgtp_flt_pkt, ll_multicast)) {
-				continue;
+			if (ipha->ipha_protocol != IPPROTO_UDP ||
+			    !CLASSD(ipha->ipha_dst)) {
+				ire = ip_rput_process_broadcast(&q, mp,
+				    ire, ipha, ill, dst, cgtp_flt_pkt,
+				    ll_multicast);
+				if (ire == NULL)
+					continue;
 			}
 		} else if (ire->ire_stq != NULL) {
 			/* fowarding? */
 			ip_rput_process_forward(q, mp, ire, ipha, ill,
 			    ll_multicast);
+			/* ip_rput_process_forward consumed the packet */
 			continue;
 		}
 
+local:
 		/* packet not for us */
 		if (ire->ire_rfq != q) {
-			if (ip_rput_notforus(&q, mp, ire, ill)) {
+			if (ip_rput_notforus(&q, mp, ire, ill))
 				continue;
-			}
 		}
 
 		switch (ipha->ipha_protocol) {
@@ -14123,24 +14429,26 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 					cnt = 1;
 				}
 			}
-			IRE_REFRELE(ire);
 			continue;
 		case IPPROTO_UDP:
 			ASSERT(first_mp == mp);
 			ip_udp_input(q, mp, ipha, ire, ill);
-			IRE_REFRELE(ire);
 			continue;
 		case IPPROTO_SCTP:
 			ASSERT(first_mp == mp);
 			ip_sctp_input(mp, ipha, ill, B_FALSE, ire, mp, 0,
 			    q, dst);
+			/* ire has been released by ip_sctp_input */
+			ire = NULL;
 			continue;
 		default:
 			ip_proto_input(q, first_mp, ipha, ire, ill);
-			IRE_REFRELE(ire);
 			continue;
 		}
 	}
+
+	if (ire != NULL)
+		ire_refrele(ire);
 
 	if (head != NULL)
 		squeue_enter_chain(curr_sqp, head, tail, cnt, SQTAG_IP_INPUT);
@@ -14783,9 +15091,9 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * IRE_MIPRTUN and IRE_BROADCAST it is difficult to
 			 * recreate the ire's without going through a complex
 			 * ipif up/down dance. So we don't delete the ire
-			 * itself, but just the ire_fp_mp for these 2 ire's
+			 * itself, but just the nce_fp_mp for these 2 ire's
 			 * In the case of the other ire's we delete the ire's
-			 * themselves. Access to ire_fp_mp is completely
+			 * themselves. Access to nce_fp_mp is completely
 			 * protected by ire_lock for IRE_MIPRTUN and
 			 * IRE_BROADCAST. Deleting the ire is preferable in the
 			 * other cases for performance.
@@ -15406,6 +15714,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 			return;
 		}
 	}
+
 	pkt_len = ntohs(ipha->ipha_length);
 
 	/* Adjust the checksum to reflect the ttl decrement. */
@@ -15437,6 +15746,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 	 */
 	if (ire->ire_ipif->ipif_ill->ill_ipif_up_count == 0) {
 		BUMP_MIB(&ip_mib, ipInDiscards);
+		ip2dbg(("ip_rput_forward:interface is down\n"));
 		goto drop_pkt;
 	}
 
@@ -15492,20 +15802,13 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 			}
 		}
 		ip_wput_frag(ire, mp, IB_PKT, max_frag, 0);
+		ip2dbg(("ip_rput_forward:sent to ip_wput_frag\n"));
 		return;
 	}
-
-	mp = ip_wput_attach_llhdr(mp, ire, IPP_FWD_OUT, ill_index);
-	if (mp == NULL) {
-		BUMP_MIB(&ip_mib, ipInDiscards);
-		return;
-	}
-
-	q = ire->ire_stq;
-	UPDATE_IB_PKT_COUNT(ire);
-	ire->ire_last_used_time = lbolt;
-	BUMP_MIB(&ip_mib, ipForwDatagrams);
-	putnext(q, mp);
+	mp->b_prev = (mblk_t *)IPP_FWD_OUT;
+	ip1dbg(("ip_rput_forward: Calling ip_xmit_v4\n"));
+	(void) ip_xmit_v4(mp, ire, NULL, B_FALSE);
+	/* ip_xmit_v4 always consumes the packet */
 	return;
 
 drop_pkt:;
@@ -17940,7 +18243,11 @@ ip_snmp_get2_v4(ire_t *ire, iproutedata_t *ird)
 	re->ipRouteInfo.re_max_frag	= ire->ire_max_frag;
 	re->ipRouteInfo.re_frag_flag	= ire->ire_frag_flag;
 	re->ipRouteInfo.re_rtt		= ire->ire_uinfo.iulp_rtt;
-	llmp = ire->ire_dlureq_mp;
+	if (ire->ire_nce &&
+	    ire->ire_nce->nce_state == ND_REACHABLE)
+		llmp = ire->ire_nce->nce_res_mp;
+	else
+		llmp = NULL;
 	re->ipRouteInfo.re_ref		= ire->ire_refcnt;
 	re->ipRouteInfo.re_src_addr	= ire->ire_src_addr;
 	re->ipRouteInfo.re_ire_type	= ire->ire_type;
@@ -18189,7 +18496,8 @@ ip_snmp_get2_v6_media(nce_t *nce, iproutedata_t *ird)
 	dl_unitdata_req_t		*dl;
 
 	ill = nce->nce_ill;
-	ASSERT(ill->ill_isv6);
+	if (ill->ill_isv6 == B_FALSE) /* skip arpce entry */
+		return (0);
 
 	/*
 	 * Neighbor cache entry attached to IRE with on-link
@@ -18385,10 +18693,20 @@ ip_trash_timer_expire(void *args)
 		ip_ire_pmtu_time_elapsed = 0;
 		IP_STAT(ip_ire_pmtu_timer_expired);
 	}
-	if (flush_flag != 0) {
-		/* Walk all IPv4 IRE's and update them */
-		ire_walk_v4(ire_expire, (char *)(uintptr_t)flush_flag,
-		    ALL_ZONES);
+
+	/*
+	 * Optimize for the case when there are no redirects in the
+	 * ftable, that is, no need to walk the ftable in that case.
+	 */
+	if (flush_flag & (FLUSH_MTU_TIME|FLUSH_ARP_TIME)) {
+		ire_walk_ill_tables(MATCH_IRE_TYPE, IRE_CACHETABLE, ire_expire,
+		    (char *)(uintptr_t)flush_flag, IP_MASK_TABLE_SIZE, 0, NULL,
+		    ip_cache_table_size, ip_cache_table, NULL, ALL_ZONES);
+	}
+	if ((flush_flag & FLUSH_REDIRECT_TIME) && ip_redirect_cnt > 0) {
+		ire_walk_ill_tables(MATCH_IRE_TYPE, IRE_FORWARDTABLE,
+		    ire_expire, (char *)(uintptr_t)flush_flag,
+		    IP_MASK_TABLE_SIZE, 0, NULL, 0, NULL, NULL, ALL_ZONES);
 	}
 	if (flush_flag & FLUSH_MTU_TIME) {
 		/*
@@ -20467,7 +20785,6 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller)
 {
 	ipha_t		*ipha;
 #define	rptr	((uchar_t *)ipha)
-	mblk_t		*mp1;
 	queue_t		*stq;
 #define	Q_TO_INDEX(stq)	(((ill_t *)stq->q_ptr)->ill_phyint->phyint_ifindex)
 	uint32_t	v_hlen_tos_len;
@@ -20498,6 +20815,7 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller)
 	boolean_t	multirt_send = B_FALSE;
 	int		err;
 	zoneid_t	zoneid;
+	ipxmit_state_t	pktxmit_state;
 
 	TRACE_1(TR_FAC_IP, TR_IP_WPUT_IRE_START,
 	    "ip_wput_ire_start: q %p", q);
@@ -21012,11 +21330,13 @@ another:;
 				multirt_send = B_FALSE;
 			}
 		}
-		mp = ip_wput_attach_llhdr(mp, ire, IPP_LOCAL_OUT, ill_index);
-		if (mp == NULL) {
-			BUMP_MIB(&ip_mib, ipOutDiscards);
-			ip2dbg(("ip_wput_ire: fastpath wput pkt dropped "\
-			    "during IPPF processing\n"));
+		mp->b_prev = SET_BPREV_FLAG(IPP_LOCAL_OUT);
+		DTRACE_PROBE2(ip__xmit__1, mblk_t *, mp, ire_t *, ire);
+		pktxmit_state = ip_xmit_v4(mp, ire, NULL, B_TRUE);
+		if ((pktxmit_state == SEND_FAILED) ||
+		    (pktxmit_state == LLHDR_RESLV_FAILED)) {
+			ip2dbg(("ip_wput_ire: ip_xmit_v4 failed"
+			    "- packet dropped\n"));
 			ire_refrele(ire);
 			if (next_mp != NULL) {
 				freemsg(next_mp);
@@ -21026,13 +21346,10 @@ another:;
 				ill_refrele(conn_outgoing_ill);
 			return;
 		}
-		UPDATE_OB_PKT_COUNT(ire);
-		ire->ire_last_used_time = lbolt;
 
 		TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
 		    "ip_wput_ire_end: q %p (%S)",
 		    q, "last copy out");
-		putnext(stq, mp);
 		IRE_REFRELE(ire);
 
 		if (multirt_send) {
@@ -21589,10 +21906,14 @@ broadcast:
 				}
 
 				ASSERT(ipsec_len == 0);
-				mp1 = ip_wput_attach_llhdr(mp, ire,
-				    IPP_LOCAL_OUT, ill_index);
-				if (mp1 == NULL) {
-					BUMP_MIB(&ip_mib, ipOutDiscards);
+				mp->b_prev =
+				    SET_BPREV_FLAG(IPP_LOCAL_OUT);
+				DTRACE_PROBE2(ip__xmit__2,
+				    mblk_t *, mp, ire_t *, ire);
+				pktxmit_state = ip_xmit_v4(mp, ire,
+				    NULL, B_TRUE);
+				if ((pktxmit_state == SEND_FAILED) ||
+				    (pktxmit_state == LLHDR_RESLV_FAILED)) {
 					if (next_mp) {
 						freemsg(next_mp);
 						ire_refrele(ire1);
@@ -21605,8 +21926,6 @@ broadcast:
 						ill_refrele(conn_outgoing_ill);
 					return;
 				}
-				UPDATE_OB_PKT_COUNT(ire);
-				ire->ire_last_used_time = lbolt;
 
 				if (multirt_send) {
 					/*
@@ -21614,7 +21933,6 @@ broadcast:
 					 * need to re-enter the sending loop
 					 * using the next ire.
 					 */
-					putnext(stq, mp1);
 					ire_refrele(ire);
 					ire = ire1;
 					stq = ire->ire_stq;
@@ -21636,14 +21954,12 @@ broadcast:
 				TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
 				    "ip_wput_ire_end: q %p (%S)",
 				    q, "last copy out(1)");
-				putnext(stq, mp1);
 				ire_refrele(ire);
 				if (conn_outgoing_ill != NULL)
 					ill_refrele(conn_outgoing_ill);
 				return;
 			}
 			/* More copies going out below. */
-			putnext(stq, mp1);
 		} else {
 			int offset;
 		    fragmentit:
@@ -21701,7 +22017,14 @@ broadcast:
 					    ire, ill_index);
 				}
 			} else {
-				/* Initiate IPPF processing */
+				/*
+				 * Initiate IPPF processing. For
+				 * fragmentable packets we finish
+				 * all QOS packet processing before
+				 * calling:
+				 * ip_wput_ire_fragmentit->ip_wput_frag
+				 */
+
 				if (IPP_ENABLED(IPP_LOCAL_OUT)) {
 					ip_process(IPP_LOCAL_OUT, &mp,
 					    ill_index);
@@ -22103,7 +22426,7 @@ ip_wput_frag_mdt(ire_t *ire, mblk_t *mp, ip_pkt_t pkt_type, int len,
 	if ((hdr_mp = allocb(i1, BPRI_HI)) == NULL ||
 	    ((hdr_mp->b_wptr += i1),
 	    (mmd = mmd_alloc(hdr_mp, &md_mp, KM_NOSLEEP)) == NULL) ||
-	    !ip_md_addr_attr(mmd, NULL, ire->ire_dlureq_mp)) {
+	    !ip_md_addr_attr(mmd, NULL, ire->ire_nce->nce_res_mp)) {
 		freemsg(mp);
 		if (md_mp == NULL) {
 			freemsg(hdr_mp);
@@ -22322,6 +22645,30 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	boolean_t	multirt_send = B_FALSE;
 	ire_t		*first_ire = NULL;
 	irb_t		*irb = NULL;
+
+	/*
+	 * IPSEC does not allow hw accelerated packets to be fragmented
+	 * This check is made in ip_wput_ipsec_out prior to coming here
+	 * via ip_wput_ire_fragmentit.
+	 *
+	 * If at this point we have an ire whose ARP request has not
+	 * been sent out, we call ip_xmit_v4->ire_arpresolve to trigger
+	 * sending of ARP query and change ire's state to ND_INCOMPLETE.
+	 * This packet and all fragmentable packets for this ire will
+	 * continue to get dropped while ire_nce->nce_state remains in
+	 * ND_INCOMPLETE. Post-ARP resolution, after ire's nce_state changes to
+	 * ND_REACHABLE, all subsquent large packets for this ire will
+	 * get fragemented and sent out by this function.
+	 */
+	if (ire->ire_nce && ire->ire_nce->nce_state != ND_REACHABLE) {
+		/* If nce_state is ND_INITIAL, trigger ARP query */
+		(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE);
+		ip1dbg(("ip_wput_frag: mac address for ire is unresolved"
+		    " -  dropping packet\n"));
+		BUMP_MIB(&ip_mib, ipFragFails);
+		freemsg(mp);
+		return;
+	}
 
 	TRACE_0(TR_FAC_IP, TR_IP_WPUT_FRAG_START,
 	    "ip_wput_frag_start:");
@@ -22579,12 +22926,12 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 
 		ll_hdr_len = 0;
 		LOCK_IRE_FP_MP(ire);
-		ll_hdr_mp = ire->ire_fp_mp;
+		ll_hdr_mp = ire->ire_nce->nce_fp_mp;
 		if (ll_hdr_mp != NULL) {
 			ASSERT(ll_hdr_mp->b_datap->db_type == M_DATA);
 			ll_hdr_len = ll_hdr_mp->b_wptr - ll_hdr_mp->b_rptr;
 		} else {
-			ll_hdr_mp = ire->ire_dlureq_mp;
+			ll_hdr_mp = ire->ire_nce->nce_res_mp;
 		}
 
 		/* If there is a transmit header, get a copy for this frag. */
@@ -22595,6 +22942,8 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		if (!ll_hdr_mp) {
 			/* No xmit header. */
 			xmit_mp = mp;
+
+		/* We have a link-layer header that can fit in our mblk. */
 		} else if (mp->b_datap->db_ref == 1 &&
 		    ll_hdr_len != 0 &&
 		    ll_hdr_len <= mp->b_rptr - mp->b_datap->db_base) {
@@ -22602,6 +22951,8 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 			mp->b_rptr -= ll_hdr_len;
 			bcopy(ll_hdr_mp->b_rptr, mp->b_rptr, ll_hdr_len);
 			xmit_mp = mp;
+
+		/* Corner case if copyb has failed */
 		} else if (!(xmit_mp = copyb(ll_hdr_mp))) {
 			UNLOCK_IRE_FP_MP(ire);
 			BUMP_MIB(&ip_mib, ipOutDiscards);
@@ -22625,11 +22976,21 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 			if (first_ire != NULL)
 				ire_refrele(first_ire);
 			return;
+
+		/*
+		 * Case of res_mp OR the fastpath mp can't fit
+		 * in the mblk
+		 */
 		} else {
 			xmit_mp->b_cont = mp;
 			if (DB_CRED(mp) != NULL)
 				mblk_setcred(xmit_mp, DB_CRED(mp));
-			/* Get priority marking, if any. */
+			/*
+			 * Get priority marking, if any.
+			 * We propagate the CoS marking from the
+			 * original packet that went to QoS processing
+			 * in ip_wput_ire to the newly carved mp.
+			 */
 			if (DB_TYPE(xmit_mp) == M_DATA)
 				xmit_mp->b_band = mp->b_band;
 		}
@@ -22858,16 +23219,21 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 			/* Update transmit header */
 			ll_hdr_len = 0;
 			LOCK_IRE_FP_MP(ire);
-			ll_hdr_mp = ire->ire_fp_mp;
+			ll_hdr_mp = ire->ire_nce->nce_fp_mp;
 			if (ll_hdr_mp != NULL) {
 				ASSERT(ll_hdr_mp->b_datap->db_type == M_DATA);
 				ll_hdr_len = MBLKL(ll_hdr_mp);
 			} else {
-				ll_hdr_mp = ire->ire_dlureq_mp;
+				ll_hdr_mp = ire->ire_nce->nce_res_mp;
 			}
 
 			if (!ll_hdr_mp) {
 				xmit_mp = mp;
+
+			/*
+			 * We have link-layer header that can fit in
+			 * our mblk.
+			 */
 			} else if (mp->b_datap->db_ref == 1 &&
 			    ll_hdr_len != 0 &&
 			    ll_hdr_len <= mp->b_rptr - mp->b_datap->db_base) {
@@ -22876,6 +23242,11 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 				bcopy(ll_hdr_mp->b_rptr, mp->b_rptr,
 				    ll_hdr_len);
 				xmit_mp = mp;
+
+			/*
+			 * Case of res_mp OR the fastpath mp can't fit
+			 * in the mblk
+			 */
 			} else if ((xmit_mp = copyb(ll_hdr_mp)) != NULL) {
 				xmit_mp->b_cont = mp;
 				if (DB_CRED(mp) != NULL)
@@ -22883,6 +23254,8 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 				/* Get priority marking, if any. */
 				if (DB_TYPE(xmit_mp) == M_DATA)
 					xmit_mp->b_band = mp->b_band;
+
+			/* Corner case if copyb failed */
 			} else {
 				/*
 				 * Exit both the replication and
@@ -23119,7 +23492,7 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 			 * to avoid sending duplicates needed when two
 			 * applications in the same zone join the same group on
 			 * different logical interfaces: we ignore the ilm if
-			 * its zoneid is the same as the last matching one.
+			 * it's zoneid is the same as the last matching one.
 			 * In addition, the sending of the packet for
 			 * ire_zoneid is delayed until all of the other ilms
 			 * have been exhausted.
@@ -23495,9 +23868,9 @@ ip_wput_multicast(queue_t *q, mblk_t *mp, ipif_t *ipif)
  * NOTE : This function does not ire_refrele the ire argument passed in.
  *
  * Copy the link layer header and do IPQoS if needed. Frees the mblk on
- * failure. The ire_fp_mp can vanish any time in the case of IRE_MIPRTUN
+ * failure. The nce_fp_mp can vanish any time in the case of IRE_MIPRTUN
  * and IRE_BROADCAST due to DL_NOTE_FASTPATH_FLUSH. Hence we have to hold
- * the ire_lock to access the ire_fp_mp in this case.
+ * the ire_lock to access the nce_fp_mp in this case.
  * IPQoS assumes that the first M_DATA contains the IP header. So, if we are
  * prepending a fastpath message IPQoS processing must precede it, we also set
  * the b_band of the fastpath message to that of the  mblk returned by IPQoS
@@ -23520,7 +23893,7 @@ ip_wput_attach_llhdr(mblk_t *mp, ire_t *ire, ip_proc_t proc, uint32_t ill_index)
 	ipha = (ipha_t *)mp->b_rptr;
 	hlen = 0;
 	LOCK_IRE_FP_MP(ire);
-	if ((mp1 = ire->ire_fp_mp) != NULL) {
+	if ((mp1 = ire->ire_nce->nce_fp_mp) != NULL) {
 		ASSERT(DB_TYPE(mp1) == M_DATA);
 		/* Initiate IPPF processing */
 		if ((proc != 0) && IPP_ENABLED(proc)) {
@@ -23531,7 +23904,7 @@ ip_wput_attach_llhdr(mblk_t *mp, ire_t *ire, ip_proc_t proc, uint32_t ill_index)
 
 			ipha = (ipha_t *)mp->b_rptr;
 			LOCK_IRE_FP_MP(ire);
-			if ((mp1 = ire->ire_fp_mp) == NULL) {
+			if ((mp1 = ire->ire_nce->nce_fp_mp) == NULL) {
 				qos_done = B_TRUE;
 				goto no_fp_mp;
 			}
@@ -23545,13 +23918,11 @@ ip_wput_attach_llhdr(mblk_t *mp, ire_t *ire, ip_proc_t proc, uint32_t ill_index)
 		if (hlen != 0 && (rptr - mp->b_datap->db_base) >= hlen) {
 			ll_hdr = rptr - hlen;
 			bcopy(mp1->b_rptr, ll_hdr, hlen);
-			/* XXX ipha is not aligned here */
-			ipha = (ipha_t *)(rptr - hlen);
 			/*
 			 * Set the b_rptr to the start of the link layer
 			 * header
 			 */
-			mp->b_rptr = rptr;
+			mp->b_rptr = ll_hdr;
 			mp1 = mp;
 		} else {
 			mp1 = copyb(mp1);
@@ -23570,7 +23941,7 @@ ip_wput_attach_llhdr(mblk_t *mp, ire_t *ire, ip_proc_t proc, uint32_t ill_index)
 				mblk_setcred(mp1, DB_CRED(mp));
 			/*
 			 * XXX disable ICK_VALID and compute checksum
-			 * here; can happen if ire_fp_mp changes and
+			 * here; can happen if nce_fp_mp changes and
 			 * it can't be copied now due to insufficient
 			 * space. (unlikely, fp mp can change, but it
 			 * does not increase in length)
@@ -23579,7 +23950,7 @@ ip_wput_attach_llhdr(mblk_t *mp, ire_t *ire, ip_proc_t proc, uint32_t ill_index)
 		UNLOCK_IRE_FP_MP(ire);
 	} else {
 no_fp_mp:
-		mp1 = copyb(ire->ire_dlureq_mp);
+		mp1 = copyb(ire->ire_nce->nce_res_mp);
 		if (mp1 == NULL) {
 unlock_err:
 			UNLOCK_IRE_FP_MP(ire);
@@ -23914,6 +24285,7 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 	zoneid_t zoneid;
 	uint32_t cksum;
 	uint16_t *up;
+	ipxmit_state_t	pktxmit_state;
 #ifdef	_BIG_ENDIAN
 #define	LENGTH	(v_hlen_tos_len & 0xFFFF)
 #else
@@ -24273,12 +24645,77 @@ send:
 				}
 			}
 		}
-
-		/* Everything is done. Send it out on the wire */
-		mp1 = ip_wput_attach_llhdr(mp, ire, 0, 0);
-		if (mp1 == NULL) {
-			BUMP_MIB(&ip_mib, ipOutDiscards);
+		/*
+		 * Everything is done. Send it out on the wire
+		 *
+		 * ip_xmit_v4 will call ip_wput_attach_llhdr and then
+		 * either send it on the wire or, in the case of
+		 * HW acceleration, call ipsec_hw_putnext.
+		 */
+		if (ire->ire_nce &&
+		    ire->ire_nce->nce_state != ND_REACHABLE) {
+			DTRACE_PROBE2(ip__wput__ipsec__bail,
+			    (ire_t *), ire,  (mblk_t *), ipsec_mp);
+			/*
+			 * If ire's link-layer is unresolved (this
+			 * would only happen if the incomplete ire
+			 * was added to cachetable via forwarding path)
+			 * don't bother going to ip_xmit_v4. Just drop the
+			 * packet.
+			 * There is a slight risk here, in that, if we
+			 * have the forwarding path create an incomplete
+			 * IRE, then until the IRE is completed, any
+			 * transmitted IPSEC packets will be dropped
+			 * instead of being queued waiting for resolution.
+			 *
+			 * But the likelihood of a forwarding packet and a wput
+			 * packet sending to the same dst at the same time
+			 * and there not yet be an ARP entry for it is small.
+			 * Furthermore, if this actually happens, it might
+			 * be likely that wput would generate multiple
+			 * packets (and forwarding would also have a train
+			 * of packets) for that destination. If this is
+			 * the case, some of them would have been dropped
+			 * anyway, since ARP only queues a few packets while
+			 * waiting for resolution
+			 *
+			 * NOTE: We should really call ip_xmit_v4,
+			 * and let it queue the packet and send the
+			 * ARP query and have ARP come back thus:
+			 * <ARP> ip_wput->ip_output->ip-wput_nondata->
+			 * ip_xmit_v4->ip_wput_attach_llhdr + ipsec
+			 * hw accel work. But it's too complex to get
+			 * the IPsec hw  acceleration approach to fit
+			 * well with ip_xmit_v4 doing ARP without
+			 * doing IPSEC simplification. For now, we just
+			 * poke ip_xmit_v4 to trigger the arp resolve, so
+			 * that we can continue with the send on the next
+			 * attempt.
+			 *
+			 * XXX THis should be revisited, when
+			 * the IPsec/IP interaction is cleaned up
+			 */
+			ip1dbg(("ip_wput_ipsec_out: ire is incomplete"
+			    " - dropping packet\n"));
 			freemsg(ipsec_mp);
+			/*
+			 * Call ip_xmit_v4() to trigger ARP query
+			 * in case the nce_state is ND_INITIAL
+			 */
+			(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE);
+			goto drop_pkt;
+		}
+
+		ip1dbg(("ip_wput_ipsec_out: calling ip_xmit_v4\n"));
+		pktxmit_state = ip_xmit_v4(mp, ire,
+		    (io->ipsec_out_accelerated ? io : NULL), B_FALSE);
+
+		if ((pktxmit_state ==  SEND_FAILED) ||
+		    (pktxmit_state == LLHDR_RESLV_FAILED)) {
+
+			freeb(ipsec_mp); /* ip_xmit_v4 frees the mp */
+drop_pkt:
+			BUMP_MIB(&ip_mib, ipOutDiscards);
 			if (ire_need_rele)
 				ire_refrele(ire);
 			if (ire1 != NULL) {
@@ -24286,25 +24723,6 @@ send:
 				freemsg(next_mp);
 			}
 			goto done;
-		}
-		UPDATE_OB_PKT_COUNT(ire);
-		ire->ire_last_used_time = lbolt;
-		if (!io->ipsec_out_accelerated) {
-			putnext(ire->ire_stq, mp1);
-		} else {
-			/*
-			 * Safety Pup says: make sure this is going to
-			 * the right interface!
-			 */
-			ill_t *ill1 = (ill_t *)ire->ire_stq->q_ptr;
-			int ifindex = ill1->ill_phyint->phyint_ifindex;
-
-			if (ifindex != io->ipsec_out_capab_ill_index) {
-				/* IPsec kstats: bump lose counter */
-				freemsg(mp1);
-			} else {
-				ipsec_hw_putnext(ire->ire_stq, mp1);
-			}
 		}
 
 		freeb(ipsec_mp);
@@ -25160,13 +25578,15 @@ void
 ip_wput_nondata(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 {
 	mblk_t		*mp1;
-	ire_t		*ire;
+	ire_t		*ire, *fake_ire;
 	ill_t		*ill;
 	struct iocblk	*iocp;
 	ip_ioctl_cmd_t	*ipip;
 	cred_t		*cr;
 	conn_t		*connp = NULL;
 	int		cmd, err;
+	nce_t		*nce;
+	ipif_t		*ipif;
 
 	if (CONN_Q(q))
 		connp = Q_TO_CONN(q);
@@ -25561,10 +25981,10 @@ nak:
 				gw_addr_v6 = ire->ire_gateway_addr_v6;
 				mutex_exit(&ire->ire_lock);
 				if (IN6_IS_ADDR_UNSPECIFIED(&gw_addr_v6)) {
-					nce = ndp_lookup(ill,
+					nce = ndp_lookup_v6(ill,
 					    &ire->ire_addr_v6, B_FALSE);
 				} else {
-					nce = ndp_lookup(ill, &gw_addr_v6,
+					nce = ndp_lookup_v6(ill, &gw_addr_v6,
 					    B_FALSE);
 				}
 				if (nce != NULL) {
@@ -25575,9 +25995,11 @@ nak:
 			}
 			mp->b_cont = NULL;
 			freemsg(mp1);		/* frees the pkt as well */
+			ASSERT(ire->ire_nce == NULL);
 			ire_delete((ire_t *)mp->b_rptr);
 			return;
 		}
+
 		/*
 		 * Split them into IRE_MBLK and pkt and feed it into
 		 * ire_add_then_send. Then in ire_add_then_send
@@ -25599,10 +26021,10 @@ nak:
 			gw_addr_v6 = ire->ire_gateway_addr_v6;
 			mutex_exit(&ire->ire_lock);
 			if (IN6_IS_ADDR_UNSPECIFIED(&gw_addr_v6)) {
-				nce = ndp_lookup(ill, &ire->ire_addr_v6,
+				nce = ndp_lookup_v6(ill, &ire->ire_addr_v6,
 				    B_FALSE);
 			} else {
-				nce = ndp_lookup(ill, &gw_addr_v6, B_FALSE);
+				nce = ndp_lookup_v6(ill, &gw_addr_v6, B_FALSE);
 			}
 			if (nce != NULL) {
 				/*
@@ -25697,10 +26119,182 @@ nak:
 				return;
 			}
 		} else {
-			ire->ire_dlureq_mp = mp1;
+			nce_t *arpce;
+			/*
+			 * Link layer resolution succeeded. Recompute the
+			 * ire_nce.
+			 */
+			ASSERT(ire->ire_type & (IRE_CACHE|IRE_BROADCAST));
+			if ((arpce = ndp_lookup_v4(ill,
+			    (ire->ire_gateway_addr != INADDR_ANY ?
+			    &ire->ire_gateway_addr : &ire->ire_addr),
+			    B_FALSE)) == NULL) {
+				freeb(ire->ire_mp);
+				freeb(mp1);
+				freemsg(mp);
+				return;
+			}
+			mutex_enter(&arpce->nce_lock);
+			arpce->nce_last = TICK_TO_MSEC(lbolt64);
+			if (arpce->nce_state == ND_REACHABLE) {
+				/*
+				 * Someone resolved this before us;
+				 * cleanup the res_mp. Since ire has
+				 * not been added yet, the call to ire_add_v4
+				 * from ire_add_then_send (when a dup is
+				 * detected) will clean up the ire.
+				 */
+				freeb(mp1);
+			} else {
+				if (arpce->nce_res_mp != NULL)
+					freemsg(arpce->nce_res_mp);
+				arpce->nce_res_mp = mp1;
+				arpce->nce_state = ND_REACHABLE;
+			}
+			mutex_exit(&arpce->nce_lock);
+			if (ire->ire_marks & IRE_MARK_NOADD) {
+				/*
+				 * this ire will not be added to the ire
+				 * cache table, so we can set the ire_nce
+				 * here, as there are no atomicity constraints.
+				 */
+				ire->ire_nce = arpce;
+				/*
+				 * We are associating this nce with the ire
+				 * so change the nce ref taken in
+				 * ndp_lookup_v4() from
+				 * NCE_REFHOLD to NCE_REFHOLD_NOTR
+				 */
+				NCE_REFHOLD_TO_REFHOLD_NOTR(ire->ire_nce);
+			} else {
+				NCE_REFRELE(arpce);
+			}
 			ire_add_then_send(q, ire, mp);
 		}
 		return;	/* All is well, the packet has been sent. */
+	}
+	case IRE_ARPRESOLVE_TYPE: {
+
+		if ((mp->b_wptr - mp->b_rptr) != sizeof (ire_t)) /* fake_ire */
+			break;
+		mp1 = mp->b_cont;		/* dl_unitdata_req */
+		mp->b_cont = NULL;
+		/*
+		 * First, check to make sure the resolution succeeded.
+		 * If it failed, the second mblk will be empty.
+		 */
+		if (mp1->b_rptr == mp1->b_wptr) {
+			/* cleanup  the incomplete ire, free queued packets */
+			freemsg(mp); /* fake ire */
+			freeb(mp1);  /* dl_unitdata response */
+			return;
+		}
+
+		/*
+		 * update any incomplete nce_t found. we lookup the ctable
+		 * and find the nce from the ire->ire_nce because we need
+		 * to pass the ire to ip_xmit_v4 later, and can find both
+		 * ire and nce in one lookup from the ctable.
+		 */
+		fake_ire = (ire_t *)mp->b_rptr;
+		/*
+		 * By the time we come back here from ARP
+		 * the logical outgoing interface  of the incomplete ire
+		 * we added in ire_forward could have disappeared,
+		 * causing the incomplete ire to also have
+		 * dissapeared. So we need to retreive the
+		 * proper ipif for the ire  before looking
+		 * in ctable;  do the ctablelookup based on ire_ipif_seqid
+		 */
+		ill = q->q_ptr;
+
+		/* Get the outgoing ipif */
+		mutex_enter(&ill->ill_lock);
+		if (ill->ill_state_flags & ILL_CONDEMNED) {
+			mutex_exit(&ill->ill_lock);
+			freemsg(mp); /* fake ire */
+			freeb(mp1);  /* dl_unitdata response */
+			return;
+		}
+		ipif = ipif_lookup_seqid(ill, fake_ire->ire_ipif_seqid);
+
+		if (ipif == NULL) {
+			mutex_exit(&ill->ill_lock);
+			ip1dbg(("logical intrf to incomplete ire vanished\n"));
+			freemsg(mp);
+			freeb(mp1);
+			return;
+		}
+		ipif_refhold_locked(ipif);
+		mutex_exit(&ill->ill_lock);
+		ire = ire_ctable_lookup(fake_ire->ire_addr,
+		    fake_ire->ire_gateway_addr, IRE_CACHE,
+		    ipif, fake_ire->ire_zoneid, NULL,
+		    (MATCH_IRE_GW|MATCH_IRE_IPIF|MATCH_IRE_ZONEONLY));
+		ipif_refrele(ipif);
+		if (ire == NULL) {
+			/*
+			 * no ire was found; check if there is an nce
+			 * for this lookup; if it has no ire's pointing at it
+			 * cleanup.
+			 */
+			if ((nce = ndp_lookup_v4(ill,
+			    (fake_ire->ire_gateway_addr != INADDR_ANY ?
+			    &fake_ire->ire_gateway_addr : &fake_ire->ire_addr),
+			    B_FALSE)) != NULL) {
+				/*
+				 * cleanup: just reset nce.
+				 * We check for refcnt 2 (one for the nce
+				 * hash list + 1 for the ref taken by
+				 * ndp_lookup_v4) to ensure that there are
+				 * no ire's pointing at the nce.
+				 */
+				if (nce->nce_refcnt == 2) {
+					nce = nce_reinit(nce);
+				}
+				if (nce != NULL)
+					NCE_REFRELE(nce);
+			}
+			freeb(mp1);  /* dl_unitdata response */
+			freemsg(mp); /* fake ire */
+			return;
+		}
+		nce = ire->ire_nce;
+		DTRACE_PROBE2(ire__arpresolve__type,
+		    ire_t *, ire, nce_t *, nce);
+		ASSERT(nce->nce_state != ND_INITIAL);
+		mutex_enter(&nce->nce_lock);
+		nce->nce_last = TICK_TO_MSEC(lbolt64);
+		if (nce->nce_state == ND_REACHABLE) {
+			/*
+			 * Someone resolved this before us;
+			 * our response is not needed any more.
+			 */
+			mutex_exit(&nce->nce_lock);
+			freeb(mp1);  /* dl_unitdata response */
+		} else {
+			if (nce->nce_res_mp != NULL) {
+				freemsg(nce->nce_res_mp);
+				/* existing dl_unitdata template */
+			}
+			nce->nce_res_mp = mp1;
+			nce->nce_state = ND_REACHABLE;
+			mutex_exit(&nce->nce_lock);
+			ire_fastpath(ire);
+		}
+		/*
+		 * The cached nce_t has been updated to be reachable;
+		 * Set the IRE_MARK_UNCACHED flag and free the fake_ire.
+		 */
+		fake_ire->ire_marks &= ~IRE_MARK_UNCACHED;
+		freemsg(mp);
+		/*
+		 * send out queued packets.
+		 */
+		(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE);
+
+		IRE_REFRELE(ire);
+		return;
 	}
 	default:
 		break;
@@ -27222,78 +27816,181 @@ ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
 }
 
 /*
- * Martian Address Filtering [RFC 1812, Section 5.3.7]
+ * This function should be called only if all packet processing
+ * including fragmentation is complete. Callers of this function
+ * must set mp->b_prev to one of these values:
+ *	{0, IPP_FWD_OUT, IPP_LOCAL_OUT}
+ * prior to handing over the mp as first argument to this function.
+ *
+ * If the ire passed by caller is incomplete, this function
+ * queues the packet and if necessary, sends ARP request and bails.
+ * If the ire passed is fully resolved, we simply prepend
+ * the link-layer header to the packet, do ipsec hw acceleration
+ * work if necessary, and send the packet out on the wire.
+ *
+ * NOTE: IPSEC will only call this function with fully resolved
+ * ires if hw acceleration is involved.
+ * TODO list :
+ * 	a Handle M_MULTIDATA so that
+ *	  tcp_multisend->tcp_multisend_data can
+ *	  call ip_xmit_v4 directly
+ *	b Handle post-ARP work for fragments so that
+ *	  ip_wput_frag can call this function.
  */
-static boolean_t
-ip_no_forward(ipha_t *ipha, ill_t *ill)
+ipxmit_state_t
+ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 {
-	ipaddr_t ip_src, ip_dst;
-	ire_t *src_ire = NULL;
+	nce_t		*arpce;
+	queue_t		*q;
+	int		ill_index;
+	mblk_t		*nxt_mp;
+	boolean_t	xmit_drop = B_FALSE;
+	ip_proc_t	proc;
 
-	ip_src = ntohl(ipha->ipha_src);
-	ip_dst = ntohl(ipha->ipha_dst);
+	arpce = ire->ire_nce;
+	ASSERT(arpce != NULL);
 
-	if (ip_dst == INADDR_ANY)
-		goto dont_forward;
+	DTRACE_PROBE2(ip__xmit__v4, ire_t *, ire,  nce_t *, arpce);
 
-	if (IN_CLASSD(ip_src))
-		goto dont_forward;
+	mutex_enter(&arpce->nce_lock);
+	switch (arpce->nce_state) {
+	case ND_REACHABLE:
+		/* If there are other queued packets, queue this packet */
+		if (arpce->nce_qd_mp != NULL) {
+			if (mp != NULL)
+				nce_queue_mp_common(arpce, mp, B_FALSE);
+			mp = arpce->nce_qd_mp;
+		}
+		arpce->nce_qd_mp = NULL;
+		mutex_exit(&arpce->nce_lock);
 
-	if ((ip_src >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET)
-		goto dont_forward;
+		/*
+		 * Flush the queue.  In the common case, where the
+		 * ARP is already resolved,  it will go through the
+		 * while loop only once.
+		 */
+		while (mp != NULL) {
 
-	if (IN_BADCLASS(ip_dst))
-		goto dont_forward;
+			nxt_mp = mp->b_next;
+			mp->b_next = NULL;
+			/*
+			 * This info is needed for IPQOS to do COS marking
+			 * in ip_wput_attach_llhdr->ip_process.
+			 */
+			proc = (ip_proc_t)(uintptr_t)mp->b_prev;
+			mp->b_prev = NULL;
 
-	src_ire = ire_ctable_lookup(ipha->ipha_src, 0, IRE_BROADCAST, NULL,
-	    ALL_ZONES, NULL, MATCH_IRE_TYPE);
-	if (src_ire != NULL) {
-		ire_refrele(src_ire);
-		goto dont_forward;
-	}
-
-	return (B_FALSE);
-
-dont_forward:
-	if (ip_debug > 2) {
-		printf("ip_no_forward: dropping packet received on %s\n",
-		    ill->ill_name);
-		pr_addr_dbg("ip_no_forward: from src %s\n",
-		    AF_INET, &ipha->ipha_src);
-		pr_addr_dbg("ip_no_forward: to dst %s\n",
-		    AF_INET, &ipha->ipha_dst);
-	}
-	BUMP_MIB(&ip_mib, ipForwProhibits);
-	return (B_TRUE);
-}
-
-static boolean_t
-ip_loopback_src_or_dst(ipha_t *ipha, ill_t *ill)
-{
-	if (((ntohl(ipha->ipha_src) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET) ||
-	    ((ntohl(ipha->ipha_dst) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET)) {
-		if (ip_debug > 2) {
-			if (ill != NULL) {
-				printf("ip_loopback_src_or_dst: "
-				    "dropping packet received on %s\n",
-				    ill->ill_name);
-			} else {
-				printf("ip_loopback_src_or_dst: "
-				    "dropping packet\n");
+			/* set up ill index for outbound qos processing */
+			ill_index =
+			    ire->ire_ipif->ipif_ill->ill_phyint->phyint_ifindex;
+			mp = ip_wput_attach_llhdr(mp, ire, proc, ill_index);
+			if (mp == NULL) {
+				xmit_drop = B_TRUE;
+				if (proc == IPP_FWD_OUT) {
+					BUMP_MIB(&ip_mib, ipInDiscards);
+				} else {
+					BUMP_MIB(&ip_mib, ipOutDiscards);
+				}
+				goto next_mp;
 			}
+			/* non-ipsec hw accel case */
+			if (io == NULL || !io->ipsec_out_accelerated) {
+				/* send it */
+				q = ire->ire_stq;
+				if (proc == IPP_FWD_OUT) {
+					UPDATE_IB_PKT_COUNT(ire);
+				} else {
+					UPDATE_OB_PKT_COUNT(ire);
+				}
+				ire->ire_last_used_time = lbolt;
 
-			pr_addr_dbg(
-			    "ip_loopback_src_or_dst: from src %s\n",
-			    AF_INET, &ipha->ipha_src);
-			pr_addr_dbg(
-			    "ip_loopback_src_or_dst: to dst %s\n",
-			    AF_INET, &ipha->ipha_dst);
+				if (flow_ctl_enabled) {
+					/*
+					 * We are here from ip_wout_ire
+					 * which has already done canput
+					 * check and has enabled flow
+					 * control, so skip the canputnext
+					 * check.
+					 */
+					putnext(q, mp);
+					goto next_mp;
+				}
+				if (canputnext(q))  {
+					if (proc == IPP_FWD_OUT) {
+						BUMP_MIB(&ip_mib,
+						    ipForwDatagrams);
+					}
+					putnext(q, mp);
+				} else {
+					BUMP_MIB(&ip_mib,
+					    ipOutDiscards);
+					xmit_drop = B_TRUE;
+					freemsg(mp);
+				}
+			} else {
+				/*
+				 * Safety Pup says: make sure this
+				 *  is going to the right interface!
+				 */
+				ill_t *ill1 =
+				    (ill_t *)ire->ire_stq->q_ptr;
+				int ifindex =
+				    ill1->ill_phyint->phyint_ifindex;
+				if (ifindex !=
+				    io->ipsec_out_capab_ill_index) {
+					xmit_drop = B_TRUE;
+					freemsg(mp);
+				} else {
+					ipsec_hw_putnext(ire->ire_stq,
+					    mp);
+				}
+			}
+next_mp:
+			mp = nxt_mp;
+		} /* while (mp != NULL) */
+		if (xmit_drop)
+			return (SEND_FAILED);
+		else
+			return (SEND_PASSED);
+
+	case ND_INITIAL:
+	case ND_INCOMPLETE:
+
+		/*
+		 * While we do send off packets to dests that
+		 * use fully-resolved CGTP routes, we do not
+		 * handle unresolved CGTP routes.
+		 */
+		ASSERT(!(ire->ire_flags & RTF_MULTIRT));
+		ASSERT(io == NULL || !io->ipsec_out_accelerated);
+
+		if (mp != NULL) {
+			/* queue the packet */
+			nce_queue_mp_common(arpce, mp, B_FALSE);
 		}
 
-		BUMP_MIB(&ip_mib, ipInAddrErrors);
-		return (B_TRUE);
+		if (arpce->nce_state == ND_INCOMPLETE) {
+			mutex_exit(&arpce->nce_lock);
+			DTRACE_PROBE3(ip__xmit__incomplete,
+			    (ire_t *), ire, (mblk_t *), mp,
+			    (ipsec_out_t *), io);
+			return (LOOKUP_IN_PROGRESS);
+		}
+
+		arpce->nce_state = ND_INCOMPLETE;
+		mutex_exit(&arpce->nce_lock);
+		/*
+		 * Note that ire_add() (called from ire_forward())
+		 * holds a ref on the ire until ARP is completed.
+		 */
+
+		ire_arpresolve(ire, ire->ire_ipif->ipif_ill);
+		return (LOOKUP_IN_PROGRESS);
+	default:
+		ASSERT(0);
+		mutex_exit(&arpce->nce_lock);
+		return (LLHDR_RESLV_FAILED);
 	}
-	return (B_FALSE);
 }
 
 /*

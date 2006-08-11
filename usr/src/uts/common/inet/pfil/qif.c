@@ -267,10 +267,12 @@ qif_ire_walker(ire, arg)
 	    (ire_to_ill(ire) == qif->qf_ill)
 #endif
 	    ) {
-#if SOLARIS2 >= 8
+#if SOLARIS2 < 8
+		mblk_t *m = ire->ire_ll_hdr_mp;
+#elif (SOLARIS2 >= 8) && (SOLARIS2 <= 10)
 		mblk_t *m = ire->ire_fp_mp;
 #else
-		mblk_t *m = ire->ire_ll_hdr_mp;
+		mblk_t *m = ire->ire_nce->nce_fp_mp;
 #endif
 		if (m != NULL)
 			qif->qf_hl = m->b_wptr - m->b_rptr;

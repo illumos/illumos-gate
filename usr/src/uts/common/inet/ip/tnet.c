@@ -1461,6 +1461,8 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 	uint8_t		proto;
 	int		af, adjust;
 	uint16_t	iplen;
+	boolean_t	need_tpc_rele = B_FALSE;
+	ipaddr_t	*gw;
 
 	ASSERT(ire != NULL && mp != NULL);
 	ASSERT(ire->ire_stq != NULL);
@@ -1474,8 +1476,15 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 		pdst = &ipha->ipha_dst;
 		proto = ipha->ipha_protocol;
 
-		/* destination not directly reachable? */
-		off_link = (ire->ire_gateway_addr != INADDR_ANY);
+		/*
+		 * off_link is TRUE if destination not directly reachable.
+		 * Surya note: we avoid creation of per-dst IRE_CACHE entries
+		 * for forwarded packets, so we set off_link to be TRUE
+		 * if the packet dst is different from the ire_addr of
+		 * the ire for the nexthop.
+		 */
+		off_link = ((ipha->ipha_dst != ire->ire_addr) ||
+		    (ire->ire_gateway_addr != INADDR_ANY));
 	} else {
 		ASSERT(ire->ire_ipversion == IPV6_VERSION);
 		ip6h = (ip6_t *)mp->b_rptr;
@@ -1523,7 +1532,35 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 	 * Gateway template must have existed for off-link destinations,
 	 * since tsol_ire_match_gwattr has ensured such condition.
 	 */
-	if (((attrp = ire->ire_gw_secattr) == NULL || attrp->igsa_rhc == NULL ||
+	if (ire->ire_ipversion == IPV4_VERSION && off_link) {
+		/*
+		 * Surya note: first check if we can get the gw_rhtp from
+		 * the ire_gw_secattr->igsa_rhc; if this is null, then
+		 * do a lookup based on the ire_addr (address of gw)
+		 */
+		if (ire->ire_gw_secattr != NULL &&
+		    ire->ire_gw_secattr->igsa_rhc != NULL) {
+			attrp = ire->ire_gw_secattr;
+			gw_rhtp = attrp->igsa_rhc->rhc_tpc;
+		} else  {
+			/*
+			 * use the ire_addr if this is the IRE_CACHE of nexthop
+			 */
+			gw = (ire->ire_gateway_addr == NULL? &ire->ire_addr :
+			    &ire->ire_gateway_addr);
+			gw_rhtp = find_tpc(gw, ire->ire_ipversion, B_FALSE);
+			need_tpc_rele = B_TRUE;
+		}
+		if (gw_rhtp == NULL) {
+			DTRACE_PROBE3(tx__ip__log__drop__forward__nogw, char *,
+			    "mp(1) dropped, no gateway in ire attributes(2)",
+			    mblk_t *, mp, tsol_ire_gw_secattr_t *, attrp);
+			mp = NULL;
+			goto keep_label;
+		}
+	}
+	if (ire->ire_ipversion == IPV6_VERSION &&
+	    ((attrp = ire->ire_gw_secattr) == NULL || attrp->igsa_rhc == NULL ||
 	    (gw_rhtp = attrp->igsa_rhc->rhc_tpc) == NULL) && off_link) {
 		DTRACE_PROBE3(tx__ip__log__drop__forward__nogw, char *,
 		    "mp(1) dropped, no gateway in ire attributes(2)",
@@ -1649,6 +1686,8 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 
 keep_label:
 	TPC_RELE(dst_rhtp);
+	if (need_tpc_rele && gw_rhtp != NULL)
+		TPC_RELE(gw_rhtp);
 	return (mp);
 }
 

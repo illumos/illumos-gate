@@ -67,10 +67,6 @@ irb_t *ip_forwarding_table_v6[IP6_MASK_TABLE_SIZE];
 irb_t *ip_cache_table_v6;
 static	ire_t	ire_null;
 
-/* Defined in ip_ire.c */
-extern uint32_t ip6_cache_table_size;
-extern uint32_t ip6_ftable_hash_size;
-
 static ire_t	*ire_ihandle_lookup_onlink_v6(ire_t *cire);
 static	void	ire_report_ftable_v6(ire_t *ire, char *mp);
 static	void	ire_report_ctable_v6(ire_t *ire, char *mp);
@@ -272,6 +268,7 @@ ire_init_v6(ire_t *ire, const in6_addr_t *v6addr,
     uint32_t phandle, uint32_t ihandle, uint_t flags, const iulp_t *ulp_info,
     tsol_gc_t *gc, tsol_gcgrp_t *gcgrp)
 {
+
 	/*
 	 * Reject IRE security attribute creation/initialization
 	 * if system is not running in Trusted mode.
@@ -772,10 +769,10 @@ ire_add_v6(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 	/*
 	 * Start the atomic add of the ire. Grab the ill locks,
 	 * ill_g_usesrc_lock and the bucket lock. Check for condemned.
-	 * To avoid lock order problems, get the ndp_g_lock now itself.
+	 * To avoid lock order problems, get the ndp6.ndp_g_lock now itself.
 	 */
 	if (ire->ire_type == IRE_CACHE) {
-		mutex_enter(&ndp_g_lock);
+		mutex_enter(&ndp6.ndp_g_lock);
 		ndp_g_lock_held = B_TRUE;
 	}
 
@@ -787,7 +784,7 @@ ire_add_v6(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 	error = ire_atomic_start(irb_ptr, ire, q, mp, func);
 	if (error != 0) {
 		if (ndp_g_lock_held)
-			mutex_exit(&ndp_g_lock);
+			mutex_exit(&ndp6.ndp_g_lock);
 		/*
 		 * We don't know whether it is a valid ipif or not.
 		 * So, set it to NULL. This assumes that the ire has not added
@@ -874,7 +871,7 @@ ire_add_v6(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 			    (void *)ire1, (void *)ire));
 			IRE_REFHOLD(ire1);
 			if (ndp_g_lock_held)
-				mutex_exit(&ndp_g_lock);
+				mutex_exit(&ndp6.ndp_g_lock);
 			ire_atomic_end(irb_ptr, ire);
 			ire_delete(ire);
 			if (pire != NULL) {
@@ -913,16 +910,15 @@ ire_add_v6(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 		 */
 		gw_addr_v6 = ire->ire_gateway_addr_v6;
 		if (IN6_IS_ADDR_UNSPECIFIED(&gw_addr_v6)) {
-			nce = ndp_lookup(ill, &ire->ire_addr_v6, B_TRUE);
+			nce = ndp_lookup_v6(ill, &ire->ire_addr_v6, B_TRUE);
 		} else {
-			nce = ndp_lookup(ill, &gw_addr_v6, B_TRUE);
+			nce = ndp_lookup_v6(ill, &gw_addr_v6, B_TRUE);
 		}
 		if (nce == NULL)
 			goto failed;
 
 		/* Pair of refhold, refrele just to get the tracing right */
-		NCE_REFHOLD_NOTR(nce);
-		NCE_REFRELE(nce);
+		NCE_REFHOLD_TO_REFHOLD_NOTR(nce);
 		/*
 		 * Atomically make sure that new IREs don't point
 		 * to an NCE that is logically deleted (CONDEMNED).
@@ -950,7 +946,7 @@ ire_add_v6(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 		    (nce->nce_state == ND_UNREACHABLE)) {
 failed:
 			if (ndp_g_lock_held)
-				mutex_exit(&ndp_g_lock);
+				mutex_exit(&ndp6.ndp_g_lock);
 			if (nce != NULL)
 				mutex_exit(&nce->nce_lock);
 			ire_atomic_end(irb_ptr, ire);
@@ -1059,7 +1055,7 @@ failed:
 	}
 
 	if (ndp_g_lock_held)
-		mutex_exit(&ndp_g_lock);
+		mutex_exit(&ndp6.ndp_g_lock);
 	ire_atomic_end(irb_ptr, ire);
 
 	if (pire != NULL) {

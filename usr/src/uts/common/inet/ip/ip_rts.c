@@ -68,6 +68,7 @@
 #include <inet/ip6.h>
 #include <inet/ip_if.h>
 #include <inet/ip_ire.h>
+#include <inet/ip_ftable.h>
 #include <inet/ip_rts.h>
 
 #include <inet/ipclassifier.h>

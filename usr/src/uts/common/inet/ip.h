@@ -54,6 +54,7 @@ extern "C" {
 #include <net/route.h>
 #include <sys/systm.h>
 #include <sys/multidata.h>
+#include <net/radix.h>
 
 #ifdef DEBUG
 #define	ILL_DEBUG
@@ -140,6 +141,10 @@ typedef uint32_t ipaddr_t;
 	((IP_VERSION << 4) | IP_SIMPLE_HDR_LENGTH_IN_WORDS)
 
 #define	UDPH_SIZE			8
+
+/* Leave room for ip_newroute to tack on the src and target addresses */
+#define	OK_RESOLVER_MP(mp)						\
+	((mp) && ((mp)->b_wptr - (mp)->b_rptr) >= (2 * IP_ADDR_LEN))
 
 /*
  * Constants and type definitions to support IP IOCTL commands
@@ -329,6 +334,10 @@ typedef struct ipoptp_s
 #define	IRE_DB_REQ_TYPE	M_PCSIG
 #endif
 
+#ifndef	IRE_ARPRESOLVE_TYPE
+#define	IRE_ARPRESOLVE_TYPE	M_EVENT
+#endif
+
 /*
  * Values for squeue switch:
  */
@@ -418,6 +427,27 @@ typedef enum {
 	} \
 }
 
+/*
+ * NCE_EXPIRED is TRUE when we have a non-permanent nce that was
+ * found to be REACHABLE more than ip_ire_arp_interval ms ago.
+ * This macro is used to trigger re-arp of existing nce_t entries
+ * so that they can be updated with the latest information.
+ * nce's will get cleaned up (or updated with new info) in the following
+ * circumstances:
+ * - ip_ire_trash_reclaim will free nce's using ndp_cache_reclaim
+ *    when memory is low,
+ * - ip_arp_news, when updates are received.
+ * - if the nce is NCE_EXPIRED(), it will be re-initialized to ND_INITIAL,
+ *   so that a new arp request will be triggered.
+ * nce_last is the timestamp that indicates when the nce_res_mp in the
+ * nce_t was last updated to a valid link-layer address.  nce_last gets
+ * modified/updated :
+ *  - when the nce is created  or reinit-ed
+ *  - every time we get a sane arp response for the nce.
+ */
+#define	NCE_EXPIRED(nce)	(nce->nce_last > 0 && \
+	((nce->nce_flags & NCE_F_PERMANENT) == 0) && \
+	((TICK_TO_MSEC(lbolt64) - nce->nce_last) > ip_ire_arp_interval))
 
 #endif /* _KERNEL */
 
@@ -633,6 +663,23 @@ typedef struct ip_m_s {
  * in regular ire cache lookups.
  */
 #define	IRE_MARK_PRIVATE_ADDR	0x0040
+
+/*
+ * When we send an ARP resolution query for the nexthop gateway's ire,
+ * we use esballoc to create the ire_t in the AR_ENTRY_QUERY mblk
+ * chain, and mark its ire_marks with IRE_MARK_UNCACHED. This flag
+ * indicates that information from ARP has not been transferred to a
+ * permanent IRE_CACHE entry. The flag is reset only when the
+ * information is successfully transferred to an ire_cache entry (in
+ * ire_add()). Attempting to free the AR_ENTRY_QUERY mblk chain prior
+ * to ire_add (e.g., from arp, or from ip`ip_wput_nondata) will
+ * require that the resources (incomplete ire_cache and/or nce) must
+ * be cleaned up. The free callback routine (ire_freemblk()) checks
+ * for IRE_MARK_UNCACHED to see if any resources that are pinned down
+ * will need to be cleaned up or not.
+ */
+
+#define	IRE_MARK_UNCACHED	0x0080
 
 /* Flags with ire_expire routine */
 #define	FLUSH_ARP_TIME		0x0001	/* ARP info potentially stale timer */
@@ -1508,6 +1555,14 @@ typedef struct ipfb_s {
  * bumped up if the walker wants no IRES to be DELETED while walking the
  * list. Bumping up does not PREVENT ADDITION. This allows walking a given
  * hash bucket without stumbling up on a free pointer.
+ *
+ * irb_t structures in ip_ftable are dynamically allocated and freed.
+ * In order to identify the irb_t structures that cna be safely kmem_free'd
+ * we need to ensure that
+ *  - the irb_refcnt is quiescent, indicating no other walkers,
+ *  - no other threads or ire's are holding references to the irb,
+ *	i.e., irb_nire == 0,
+ *  - there are no active ire's in the bucket, i.e., irb_ire_cnt == 0
  */
 typedef struct irb {
 	struct ire_s	*irb_ire;	/* First ire in this bucket */
@@ -1515,9 +1570,23 @@ typedef struct irb {
 	krwlock_t	irb_lock;	/* Protect this bucket */
 	uint_t		irb_refcnt;	/* Protected by irb_lock */
 	uchar_t		irb_marks;	/* CONDEMNED ires in this bucket ? */
-	uint_t		irb_ire_cnt;	/* Num of IRE in this bucket */
+#define	IRB_MARK_CONDEMNED	0x0001
+#define	IRB_MARK_FTABLE		0x0002
+	uint_t		irb_ire_cnt;	/* Num of active IRE in this bucket */
 	uint_t		irb_tmp_ire_cnt; /* Num of temporary IRE */
+	struct ire_s	*irb_rr_origin;	/* origin for round-robin */
+	int		irb_nire;	/* Num of ftable ire's that ref irb */
 } irb_t;
+
+#define	IRB2RT(irb)	(rt_t *)((caddr_t)(irb) - offsetof(rt_t, rt_irb))
+
+/* The following are return values of ip_xmit_v4() */
+typedef enum {
+	SEND_PASSED = 0,	 /* sent packet out on wire */
+	SEND_FAILED,	 /* sending of packet failed */
+	LOOKUP_IN_PROGRESS, /* ire cache found, ARP resolution in progress */
+	LLHDR_RESLV_FAILED  /* macaddr resl of onlink dst or nexthop failed */
+} ipxmit_state_t;
 
 #define	IP_V4_G_HEAD	0
 #define	IP_V6_G_HEAD	1
@@ -1650,9 +1719,9 @@ typedef struct ill_rx_ring ill_rx_ring_t;
 	((ill)->ill_usesrc_grp_next != NULL))
 
 /* Is this an virtual network interface (vni) ILL ? */
-#define	IS_VNI(ill)							\
-	(((ill) != NULL) && !((ill)->ill_phyint->phyint_flags &		\
-	PHYI_LOOPBACK) && ((ill)->ill_phyint->phyint_flags &		\
+#define	IS_VNI(ill)							     \
+	(((ill) != NULL) &&						     \
+	(((ill)->ill_phyint->phyint_flags & (PHYI_LOOPBACK|PHYI_VIRTUAL)) == \
 	PHYI_VIRTUAL))
 
 /*
@@ -2044,6 +2113,10 @@ extern int ip_misc_ioctl_count;
 	(ill)->ill_move_peer = NULL;			\
 	peer_ill->ill_move_peer = NULL;			\
 }
+/* The 2 ill's are same or belong to the same IPMP group */
+#define	SAME_IPMP_GROUP(ill_1, ill_2)			\
+	(((ill_1)->ill_group != NULL) &&		\
+	    ((ill_1)->ill_group == (ill_2)->ill_group))
 
 /* Passed down by ARP to IP during I_PLINK/I_PUNLINK */
 typedef struct ipmx_s {
@@ -2302,37 +2375,54 @@ typedef struct tsol_ire_gw_secattr_s {
 	ASSERT((irb)->irb_refcnt != 0);			\
 	rw_exit(&(irb)->irb_lock);			\
 }
-
-#define	IRB_REFRELE(irb) {				\
-	rw_enter(&(irb)->irb_lock, RW_WRITER);		\
+#define	IRB_REFHOLD_LOCKED(irb) {			\
+	ASSERT(RW_WRITE_HELD(&(irb)->irb_lock));	\
+	(irb)->irb_refcnt++;				\
 	ASSERT((irb)->irb_refcnt != 0);			\
-	if (--(irb)->irb_refcnt	== 0 &&			\
-	    ((irb)->irb_marks & IRE_MARK_CONDEMNED)) {	\
-		ire_t *ire_list;			\
-							\
-		ire_list = ire_unlink(irb);		\
-		rw_exit(&(irb)->irb_lock);		\
-		ASSERT(ire_list != NULL);		\
-		ire_cleanup(ire_list);			\
-	} else {					\
-		rw_exit(&(irb)->irb_lock);		\
-	}						\
 }
 
+void irb_refrele_ftable(irb_t *);
 /*
- * Lock the fast path mp for access, since the ire_fp_mp can be deleted
+ * Note: when IRB_MARK_FTABLE (i.e., IRE_CACHETABLE entry), the irb_t
+ * is statically allocated, so that when the irb_refcnt goes to 0,
+ * we simply clean up the ire list and continue.
+ */
+#define	IRB_REFRELE(irb) {				\
+	if ((irb)->irb_marks & IRB_MARK_FTABLE) {	\
+		irb_refrele_ftable((irb));		\
+	} else {					\
+		rw_enter(&(irb)->irb_lock, RW_WRITER);		\
+		ASSERT((irb)->irb_refcnt != 0);			\
+		if (--(irb)->irb_refcnt	== 0 &&			\
+		    ((irb)->irb_marks & IRE_MARK_CONDEMNED)) {	\
+			ire_t *ire_list;			\
+								\
+			ire_list = ire_unlink(irb);		\
+			rw_exit(&(irb)->irb_lock);		\
+			ASSERT(ire_list != NULL);		\
+			ire_cleanup(ire_list);			\
+		} else {					\
+			rw_exit(&(irb)->irb_lock);		\
+		}						\
+	}							\
+}
+
+extern struct kmem_cache *rt_entry_cache;
+
+/*
+ * Lock the fast path mp for access, since the fp_mp can be deleted
  * due a DL_NOTE_FASTPATH_FLUSH in the case of IRE_BROADCAST and IRE_MIPRTUN
  */
 
 #define	LOCK_IRE_FP_MP(ire) {				\
 		if ((ire)->ire_type == IRE_BROADCAST ||	\
 		    (ire)->ire_type == IRE_MIPRTUN)	\
-			mutex_enter(&ire->ire_lock);	\
+			mutex_enter(&ire->ire_nce->nce_lock);	\
 	}
 #define	UNLOCK_IRE_FP_MP(ire) {				\
 		if ((ire)->ire_type == IRE_BROADCAST ||	\
 		    (ire)->ire_type == IRE_MIPRTUN)	\
-			mutex_exit(&ire->ire_lock);	\
+			mutex_exit(&ire->ire_nce->nce_lock);	\
 	}
 
 typedef struct ire4 {
@@ -2362,7 +2452,6 @@ typedef struct ire_s {
 	struct	ire_s	**ire_ptpn;	/* Pointer to previous next. */
 	uint32_t	ire_refcnt;	/* Number of references */
 	mblk_t		*ire_mp;	/* Non-null if allocated as mblk */
-	mblk_t		*ire_fp_mp;	/* Fast path header */
 	queue_t		*ire_rfq;	/* recv from this queue */
 	queue_t		*ire_stq;	/* send to this queue */
 	union {
@@ -2381,13 +2470,15 @@ typedef struct ire_s {
 	uint_t	ire_ob_pkt_count;	/* Outbound packets to ire_addr */
 	uint_t	ire_ll_hdr_length;	/* Non-zero if we do M_DATA prepends */
 	time_t	ire_create_time;	/* Time (in secs) IRE was created. */
-	mblk_t		*ire_dlureq_mp;	/* DL_UNIT_DATA_REQ/RESOLVER mp */
 	uint32_t	ire_phandle;	/* Associate prefix IREs to cache */
 	uint32_t	ire_ihandle;	/* Associate interface IREs to cache */
 	ipif_t		*ire_ipif;	/* the interface that this ire uses */
 	uint32_t	ire_flags;	/* flags related to route (RTF_*) */
 	uint_t	ire_ipsec_overhead;	/* IPSEC overhead */
-	struct	nce_s	*ire_nce;	/* Neighbor Cache Entry for IPv6 */
+	/*
+	 * Neighbor Cache Entry for IPv6; arp info for IPv4
+	 */
+	struct	nce_s	*ire_nce;
 	uint_t		ire_masklen;	/* # bits in ire_mask{,_v6} */
 	ire_addr_u_t	ire_u;		/* IPv4/IPv6 address info. */
 
@@ -2416,6 +2507,13 @@ typedef struct ire_s {
 	th_trace_t	*ire_trace[IP_TR_HASH_MAX];
 	boolean_t	ire_trace_disable;	/* True when alloc fails */
 #endif
+	/*
+	 * ire's that are embedded inside mblk_t and sent to the external
+	 * resolver use the ire_stq_ifindex to track the ifindex of the
+	 * ire_stq, so that the ill (if it exists) can be correctly recovered
+	 * for cleanup in the esbfree routine when arp failure occurs
+	 */
+	uint_t	ire_stq_ifindex;
 } ire_t;
 
 /* IPv4 compatiblity macros */
@@ -2710,8 +2808,7 @@ extern krwlock_t ill_g_usesrc_lock;	/* Protects usesrc related fields */
 
 extern struct kmem_cache *ire_cache;
 
-extern uint_t	ip_ire_default_count;	/* Number of IPv4 IRE_DEFAULT entries */
-extern uint_t	ip_ire_default_index;	/* Walking index used to mod in */
+extern uint_t	ip_redirect_cnt;	/* Num of redirect routes in ftable */
 
 extern ipaddr_t	ip_g_all_ones;
 extern caddr_t	ip_g_nd;		/* Named Dispatch List Head */
@@ -2801,6 +2898,9 @@ extern uint_t	loopback_packets;
 #endif /* _BIG_ENDIAN */
 #define	CLASSD(addr)	(((addr) & N_IN_CLASSD_NET) == N_INADDR_UNSPEC_GROUP)
 
+#define	IP_LOOPBACK_ADDR(addr)			\
+	((ntohl(addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET)
+
 #ifdef DEBUG
 /* IPsec HW acceleration debugging support */
 
@@ -2833,6 +2933,8 @@ extern uint32_t ipsechw_debug;
 #define	ip2dbg(a)	/* */
 #define	ip3dbg(a)	/* */
 #endif	/* IP_DEBUG */
+
+struct	ipsec_out_s;
 
 extern const char *dlpi_prim_str(int);
 extern const char *dlpi_err_str(int);
@@ -2896,6 +2998,9 @@ extern boolean_t ip_remote_addr_ok_v6(const in6_addr_t *, const in6_addr_t *);
 extern ipaddr_t ip_massage_options(ipha_t *);
 extern ipaddr_t ip_net_mask(ipaddr_t);
 extern void	ip_newroute(queue_t *, mblk_t *, ipaddr_t, ill_t *, conn_t *);
+extern ipxmit_state_t	ip_xmit_v4(mblk_t *, ire_t *, struct ipsec_out_s *,
+    boolean_t);
+extern int	ip_hdr_complete(ipha_t *, zoneid_t);
 
 extern struct qinit rinit_ipv6;
 extern struct qinit winit_ipv6;
@@ -2921,6 +3026,7 @@ extern void	ip_fanout_proto_again(mblk_t *, ill_t *, ill_t *, ire_t *);
 
 extern void	ire_cleanup(ire_t *);
 extern void	ire_inactive(ire_t *);
+extern boolean_t irb_inactive(irb_t *);
 extern ire_t	*ire_unlink(irb_t *);
 #ifdef IRE_DEBUG
 extern	void	ire_trace_ref(ire_t *ire);
@@ -2962,6 +3068,7 @@ extern void	ip_savebuf(void **, uint_t *, boolean_t, const void *, uint_t);
 extern boolean_t	ipsq_pending_mp_cleanup(ill_t *, conn_t *);
 extern void	conn_ioctl_cleanup(conn_t *);
 extern ill_t	*conn_get_held_ill(conn_t *, ill_t **, int *);
+extern ill_t	*ip_newroute_get_dst_ill(ill_t *);
 
 struct multidata_s;
 struct pdesc_s;

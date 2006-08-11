@@ -278,10 +278,12 @@ mblk_t *m;
 #endif
 
 	if (dir) {
-#if SOLARIS2 >= 8
+#if SOLARIS2 < 8
+		if (!dir->ire_ll_hdr_mp || !dir->ire_ll_hdr_length)
+#elif (SOLARIS2 >= 8) && (SOLARIS2 <= 10)
 		if (!dir->ire_fp_mp || !dir->ire_dlureq_mp)
 #else
-		if (!dir->ire_ll_hdr_mp || !dir->ire_ll_hdr_length)
+		if (dir->ire_nce && dir->ire_nce->nce_state != ND_REACHABLE)
 #endif
 			return 2;
 	}
@@ -295,10 +297,15 @@ mblk_t *m;
 #if SOLARIS2 < 8
 		mp = dir->ire_ll_hdr_mp;
 		hlen = dir->ire_ll_hdr_length;
-#else
+
+#elif ((SOLARIS2 >= 8) && (SOLARIS2 <= 10)
 		mp = dir->ire_fp_mp;
 		hlen = mp ? mp->b_wptr - mp->b_rptr : 0;
 		mp = dir->ire_dlureq_mp;
+#else
+		mp = dir->ire_nce->nce_fp_mp;
+		hlen = mp ? mp->b_wptr - mp->b_rptr : 0;
+		mp = dir->ire_nce->nce_res_mp;
 #endif
 		s = (u_char *)ip;
 

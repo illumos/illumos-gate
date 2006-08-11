@@ -417,7 +417,7 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 					ipif_refrele(ipif);
 				return (ENOMEM);
 			}
-			error = ire_add(&ire, q, mp, func);
+			error = ire_add(&ire, q, mp, func, B_FALSE);
 			if (error == 0)
 				goto save_ire;
 			/*
@@ -584,7 +584,7 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		 */
 		if (ipif->ipif_net_type == IRE_LOOPBACK)
 			ire->ire_type = IRE_IF_NORESOLVER;
-		error = ire_add(&ire, q, mp, func);
+		error = ire_add(&ire, q, mp, func, B_FALSE);
 		if (error == 0)
 			goto save_ire;
 		/*
@@ -713,7 +713,7 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	 */
 
 	/* Add the new IRE. */
-	error = ire_add(&ire, q, mp, func);
+	error = ire_add(&ire, q, mp, func, B_FALSE);
 	/*
 	 * In the result of failure, ire_add() will have already
 	 * deleted the ire in question, so there is no need to
@@ -1226,7 +1226,7 @@ ipif_ndp_setup_multicast(ipif_t *ipif, nce_t **ret_nce)
 	 * all the nces. But they can exist if ip_rput_dlpi_writer
 	 * calls this when PHYI_MULTI_BCAST is set.
 	 */
-	mnce = ndp_lookup(ill, &v6_mcast_addr, B_FALSE);
+	mnce = ndp_lookup_v6(ill, &v6_mcast_addr, B_FALSE);
 	if (mnce != NULL) {
 		ndp_delete(mnce);
 		NCE_REFRELE(mnce);
@@ -1273,7 +1273,7 @@ ipif_ndp_setup_multicast(ipif_t *ipif, nce_t **ret_nce)
 	if ((ipif->ipif_flags & IPIF_BROADCAST) ||
 	    (ill->ill_flags & ILLF_MULTICAST) ||
 	    (phyi->phyint_flags & PHYI_MULTI_BCAST)) {
-		mutex_enter(&ndp_g_lock);
+		mutex_enter(&ndp6.ndp_g_lock);
 		err = ndp_add(ill,
 		    phys_addr,
 		    &v6_mcast_addr,	/* v6 address */
@@ -1282,8 +1282,10 @@ ipif_ndp_setup_multicast(ipif_t *ipif, nce_t **ret_nce)
 		    hw_extract_start,
 		    NCE_F_MAPPING | NCE_F_PERMANENT | NCE_F_NONUD,
 		    ND_REACHABLE,
-		    &mnce);
-		mutex_exit(&ndp_g_lock);
+		    &mnce,
+		    NULL,
+		    NULL);
+		mutex_exit(&ndp6.ndp_g_lock);
 		if (err == 0) {
 			if (ret_nce != NULL) {
 				*ret_nce = mnce;
@@ -1373,7 +1375,9 @@ ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr, boolean_t macaddr_change)
 		    0,
 		    flags,
 		    ND_REACHABLE,
-		    &nce);
+		    &nce,
+		    NULL,
+		    NULL);
 		switch (err) {
 		case 0:
 			ip1dbg(("ipif_ndp_up: NCE created for %s\n",
@@ -1411,10 +1415,13 @@ ipif_ndp_down(ipif_t *ipif)
 {
 	nce_t	*nce;
 
-	nce = ndp_lookup(ipif->ipif_ill, &ipif->ipif_v6lcl_addr, B_FALSE);
-	if (nce != NULL) {
-		ndp_delete(nce);
-		NCE_REFRELE(nce);
+	if (ipif->ipif_isv6) {
+		nce = ndp_lookup_v6(ipif->ipif_ill, &ipif->ipif_v6lcl_addr,
+		    B_FALSE);
+		if (nce != NULL) {
+			ndp_delete(nce);
+			NCE_REFRELE(nce);
+		}
 	}
 	/*
 	 * Remove mapping and all other nces dependent on this ill
@@ -1560,7 +1567,7 @@ ipif_recover_ire_v6(ipif_t *ipif)
 		 * ire held by ire_add, will be refreled' in ipif_up_done
 		 * towards the end
 		 */
-		(void) ire_add(&ire, NULL, NULL, NULL);
+		(void) ire_add(&ire, NULL, NULL, NULL, B_FALSE);
 		*irep = ire;
 		irep++;
 		ip1dbg(("ipif_recover_ire_v6: added ire %p\n", (void *)ire));
@@ -2353,7 +2360,7 @@ ipif_recreate_interface_routes_v6(ipif_t *old_ipif, ipif_t *ipif)
 		 */
 		ire_delete(ipif_ire);
 		ret_ire = ire;
-		error = ire_add(&ret_ire, NULL, NULL, NULL);
+		error = ire_add(&ret_ire, NULL, NULL, NULL, B_FALSE);
 		ASSERT(error == 0);
 		ASSERT(ret_ire == ire);
 		if (ret_ire != NULL) {
@@ -2914,7 +2921,7 @@ ipif_up_done_v6(ipif_t *ipif)
 		/*
 		 * refheld by ire_add. refele towards the end of the func
 		 */
-		(void) ire_add(irep1, NULL, NULL, NULL);
+		(void) ire_add(irep1, NULL, NULL, NULL, B_FALSE);
 	}
 	if (ip6_asp_table_held) {
 		ip6_asp_table_refrele();
@@ -3080,7 +3087,7 @@ ip_siocdelndp_v6(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 
 	sin6 = (sin6_t *)&lnr->lnr_addr;
 	addr = sin6->sin6_addr;
-	nce = ndp_lookup(ipif->ipif_ill, &addr, B_FALSE);
+	nce = ndp_lookup_v6(ipif->ipif_ill, &addr, B_FALSE);
 	if (nce == NULL)
 		return (ESRCH);
 	ndp_delete(nce);

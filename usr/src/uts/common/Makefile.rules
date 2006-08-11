@@ -367,6 +367,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/ipf/%.c
 	$(COMPILE.c) $(IPFFLAGS) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(COMMONBASE)/net/patricia/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 IPFFLAG2=-I $(UTSBASE)/common/inet/ipf
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/pfil/%.c
 	$(COMPILE.c) $(IPFFLAG2) -o $@ $<
@@ -903,7 +907,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/c2/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/conf/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+	@($(LHEAD) $(LINT.c)	$< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/contract/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
@@ -1111,6 +1115,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/pfil/%.c
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/kssl/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(COMMONBASE)/net/patricia/%.c
+	@($(LHEAD) $(LINT.c) $(IPFFLAGS) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/udp/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

@@ -35,7 +35,6 @@ extern "C" {
 
 #define	IPV6_LL_PREFIXLEN	10	/* Number of bits in link-local pref */
 
-#define	IP_FTABLE_HASH_SIZE	32	/* size of each hash table in ptrs */
 #define	IP_CACHE_TABLE_SIZE	256
 #define	IP_MRTUN_TABLE_SIZE	256	/* Mobile IP reverse tunnel table */
 					/* size. Only used by mipagent */
@@ -128,6 +127,29 @@ extern "C" {
 #define	MATCH_IRE_MARK_PRIVATE_ADDR	0x8000	/* Match IRE ire_marks with */
 						/* IRE_MARK_PRIVATE_ADDR. */
 #define	MATCH_IRE_SECATTR	0x10000	/* Match gateway security attributes */
+#define	MATCH_IRE_COMPLETE	0x20000	/* ire_ftable_lookup() can return */
+					/* IRE_CACHE entry only if it is  */
+					/* ND_REACHABLE			  */
+
+/*
+ * Any ire to nce association is long term, and
+ * the refhold and refrele may be done by different
+ * threads. So all cases of making or breaking ire to
+ * nce association should all effectively use the NOTR variants.
+ * To understand the *effectively* part read on.
+ *
+ * ndp_lookup() and ndp_add() implicitly does NCE_REFHOLD. So wherever we
+ * make ire to nce association after calling these functions,
+ * we effectively want to end up with NCE_REFHOLD_NOTR,
+ * We call this macro to achieve this effect. This macro changes
+ * a NCE_REFHOLD to a NCE_REFHOLD_NOTR. The macro's NCE_REFRELE
+ * cancels off ndp_lookup[ndp_add]'s implicit NCE_REFHOLD, and what
+ * you are left with is a NCE_REFHOLD_NOTR
+ */
+#define	NCE_REFHOLD_TO_REFHOLD_NOTR(nce) {	\
+	NCE_REFHOLD_NOTR(nce);			\
+	NCE_REFRELE(nce);			\
+}
 
 /* Structure for ire_cache_count() */
 typedef struct {
@@ -157,6 +179,10 @@ typedef struct {
 } ire_stats_t;
 
 extern ire_stats_t ire_stats_v4;
+extern uint32_t ip_cache_table_size;
+extern uint32_t ip6_cache_table_size;
+extern irb_t *ip_cache_table;
+extern uint32_t ip6_ftable_hash_size;
 
 /*
  * We use atomics so that we get an accurate accounting on the ires.
@@ -190,6 +216,7 @@ extern	int	ip_ire_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 extern	int	ip_ire_report_mrtun(queue_t *, mblk_t *, caddr_t, cred_t *);
 extern	int	ip_ire_report_srcif(queue_t *, mblk_t *, caddr_t, cred_t *);
 extern	int	ip_ire_report_v6(queue_t *, mblk_t *, caddr_t, cred_t *);
+extern	void	ire_report_ftable(ire_t *, char *);
 
 extern	void	ip_ire_req(queue_t *, mblk_t *);
 
@@ -199,7 +226,7 @@ extern	int	ip_mask_to_plen_v6(const in6_addr_t *);
 extern	ire_t	*ipif_to_ire(const ipif_t *);
 extern	ire_t	*ipif_to_ire_v6(const ipif_t *);
 
-extern	int	ire_add(ire_t **, queue_t *, mblk_t *, ipsq_func_t);
+extern	int	ire_add(ire_t **, queue_t *, mblk_t *, ipsq_func_t, boolean_t);
 extern	int	ire_add_mrtun(ire_t **, queue_t *, mblk_t *, ipsq_func_t);
 extern	void	ire_add_then_send(queue_t *, ire_t *, mblk_t *);
 extern	int	ire_add_v6(ire_t **, queue_t *, mblk_t *, ipsq_func_t);
@@ -280,10 +307,6 @@ extern	boolean_t ire_fastpath_update(ire_t *, void *);
 extern	void	ire_flush_cache_v4(ire_t *, int);
 extern	void	ire_flush_cache_v6(ire_t *, int);
 
-extern	ire_t	*ire_ftable_lookup(ipaddr_t, ipaddr_t, ipaddr_t, int,
-    const ipif_t *, ire_t **, zoneid_t, uint32_t,
-    const struct ts_label_s *, int);
-
 extern	ire_t	*ire_ftable_lookup_v6(const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, int, const ipif_t *, ire_t **, zoneid_t,
     uint32_t, const struct ts_label_s *, int);
@@ -318,6 +341,10 @@ extern	void	ire_walk_ill_mrtun(uint_t, uint_t, pfv_t, void *, ill_t *);
 extern	void	ire_walk_ill_v4(uint_t, uint_t, pfv_t, void *, ill_t *);
 extern	void	ire_walk_ill_v6(uint_t, uint_t, pfv_t, void *, ill_t *);
 extern	void	ire_walk_v4(pfv_t, void *, zoneid_t);
+extern  void	ire_walk_ill_tables(uint_t match_flags, uint_t ire_type,
+    pfv_t func, void *arg, size_t ftbl_sz, size_t htbl_sz,
+    irb_t **ipftbl, size_t ctbl_sz, irb_t *ipctbl, ill_t *ill,
+    zoneid_t zoneid);
 extern	void	ire_walk_srcif_table_v4(pfv_t, void *);
 extern	void	ire_walk_v6(pfv_t, void *, zoneid_t);
 
@@ -342,6 +369,15 @@ extern mblk_t *ip_nexthop(const struct sockaddr *, const char *);
 
 extern ire_t	*ire_get_next_bcast_ire(ire_t *, ire_t *);
 extern ire_t	*ire_get_next_default_ire(ire_t *, ire_t *);
+
+extern  void	ire_arpresolve(ire_t *,  ill_t *);
+extern  void	ire_freemblk(ire_t *);
+extern  void	ire_fastpath(ire_t *);
+extern boolean_t	ire_match_args(ire_t *, ipaddr_t, ipaddr_t, ipaddr_t,
+    int, const ipif_t *, zoneid_t, uint32_t, const struct ts_label_s *, int);
+extern  int	ire_nce_init(ire_t *, mblk_t *, mblk_t *);
+extern  boolean_t	ire_walk_ill_match(uint_t, uint_t, ire_t *, ill_t *,
+    zoneid_t);
 
 #endif /* _KERNEL */
 

@@ -26,6 +26,14 @@
  *	@(#)radix.h	8.2 (Berkeley) 10/31/94
  */
 
+#ifndef RADIX_IPF_H
+#define RADIX_IPF_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#if SOLARIS2 > 10
+#include <net/radix.h>
+#else
 #if !defined(_NET_RADIX_H_) && !defined(_RADIX_H_)
 #define	_NET_RADIX_H_
 #ifndef _RADIX_H_
@@ -210,3 +218,5 @@ struct radix_node
 	 *rn_search_m __P((void *, struct radix_node *, void *));
 
 #endif /* _NET_RADIX_H_ */
+#endif /* SOLARIS2 */
+#endif /* RADIX_IPF_H */

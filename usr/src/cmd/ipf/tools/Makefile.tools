@@ -212,6 +212,9 @@ lint: 	lint_SRCS
 %.o:	../%.c
 	$(COMPILE.c) $<
 
+%.o:	$(SRC)/common/net/patricia/%.c
+	$(COMPILE.c) $<
+
 include ../../../Makefile.targ
 
 FRC:

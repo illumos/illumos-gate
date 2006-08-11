@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -297,9 +297,10 @@ typedef struct lif_nd_req {
 #define	ND_DELAY	4	/* wait for upper layer hint */
 #define	ND_PROBE	5	/* send probes */
 #define	ND_UNREACHABLE	6	/* delete this route */
+#define	ND_INITIAL	7	/* ipv4: arp resolution has not been sent yet */
 
 #define	ND_STATE_VALID_MIN	0
-#define	ND_STATE_VALID_MAX	6
+#define	ND_STATE_VALID_MAX	7
 
 /*
  * lnr_flags value of lif_nd_req.

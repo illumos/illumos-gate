@@ -443,7 +443,7 @@ IP_OBJS +=	igmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o ip6_rts.o \
 		ip_multi.o ip_ndp.o ip_opt_data.o ip_rts.o ip_srcid.o \
 		ipddi.o ipdrop.o mi.o nd.o optcom.o snmpcom.o ipsec_loader.o \
 		spd.o ipclassifier.o inet_common.o ip_squeue.o squeue.o \
-		ip_sadb.o \
+		ip_sadb.o ip_ftable.o radix.o \
 		$(IP_TCP_OBJS) \
 		$(IP_UDP_OBJS) \
 		$(IP_SCTP_OBJS)
@@ -1219,7 +1219,7 @@ PHX_OBJS += phx.o
 
 IPF_OBJS += ip_fil_solaris.o fil.o solaris.o ip_state.o ip_frag.o ip_nat.o \
 	    ip_proxy.o ip_auth.o ip_pool.o ip_htable.o ip_lookup.o \
-	    ip_log.o radix.o
+	    ip_log.o
  
 PFIL_OBJS +=  pfil.o qif.o pfildrv.o pfilstream.o pkt.o misc.o ndd.o
 

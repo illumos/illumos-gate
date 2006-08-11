@@ -131,8 +131,9 @@ extern "C" {
 	    (ipsec_len) == 0 &&						\
 	    (((ire)->ire_ipversion == IPV4_VERSION &&			\
 	    (start) == IP_SIMPLE_HDR_LENGTH &&				\
-	    (ire)->ire_fp_mp != NULL &&					\
-	    MBLKHEAD(mp) >= MBLKL((ire)->ire_fp_mp)) ||			\
+	    ((ire)->ire_nce != NULL &&					\
+	    (ire)->ire_nce->nce_fp_mp != NULL &&	\
+	    MBLKHEAD(mp) >= MBLKL((ire)->ire_nce->nce_fp_mp))) ||	\
 	    ((ire)->ire_ipversion == IPV6_VERSION &&			\
 	    (start) == IPV6_HDR_LEN &&					\
 	    (ire)->ire_nce->nce_fp_mp != NULL &&			\

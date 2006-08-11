@@ -70,7 +70,7 @@ static	void	nce_fastpath(nce_t *nce);
 static	void	nce_ire_delete(nce_t *nce);
 static	void	nce_ire_delete1(ire_t *ire, char *nce_arg);
 static	void 	nce_set_ll(nce_t *nce, uchar_t *ll_addr);
-static	nce_t	*nce_lookup_addr(ill_t *ill, const in6_addr_t *addr);
+static	nce_t	*nce_lookup_addr(ill_t *, const in6_addr_t *, nce_t *);
 static	nce_t	*nce_lookup_mapping(ill_t *ill, const in6_addr_t *addr);
 static	void	nce_make_mapping(nce_t *nce, uchar_t *addrpos,
     uchar_t *addr);
@@ -86,44 +86,72 @@ static	boolean_t	nce_xmit(ill_t *ill, uint32_t operation,
     const in6_addr_t *target, int flag);
 static	void	lla2ascii(uint8_t *lla, int addrlen, uchar_t *buf);
 extern void	th_trace_rrecord(th_trace_t *);
+static	int	ndp_lookup_then_add_v6(ill_t *, uchar_t *,
+    const in6_addr_t *, const in6_addr_t *, const in6_addr_t *,
+    uint32_t, uint16_t, uint16_t, nce_t **, mblk_t *, mblk_t *);
+static	int	ndp_lookup_then_add_v4(ill_t *, uchar_t *,
+    const in_addr_t *, const in_addr_t *, const in_addr_t *,
+    uint32_t, uint16_t, uint16_t, nce_t **, mblk_t *, mblk_t *);
+static	int	ndp_add_v6(ill_t *, uchar_t *, const in6_addr_t *,
+    const in6_addr_t *, const in6_addr_t *, uint32_t, uint16_t, uint16_t,
+    nce_t **);
+static	int	ndp_add_v4(ill_t *, uchar_t *, const in_addr_t *,
+    const in_addr_t *, const in_addr_t *, uint32_t, uint16_t, uint16_t,
+    nce_t **, mblk_t *, mblk_t *);
+
 
 #ifdef NCE_DEBUG
 void	nce_trace_inactive(nce_t *);
 #endif
 
-/* NDP Cache Entry Hash Table */
-#define	NCE_TABLE_SIZE	256
-static	nce_t	*nce_hash_tbl[NCE_TABLE_SIZE];
-static	nce_t	*nce_mask_entries;	/* mask not all ones */
-static	int	ndp_g_walker = 0;	/* # of active thread */
-					/* walking nce hash list */
-/* ndp_g_walker_cleanup will be true, when deletion have to be defered */
-static	boolean_t	ndp_g_walker_cleanup = B_FALSE;
+ndp_g_t ndp4, ndp6;
 
-#define	NCE_HASH_PTR(addr) \
-	(&(nce_hash_tbl[NCE_ADDR_HASH_V6(addr, NCE_TABLE_SIZE)]))
+#define	NCE_HASH_PTR_V4(addr) \
+	(&(ndp4.nce_hash_tbl[IRE_ADDR_HASH(addr, NCE_TABLE_SIZE)]))
+
+#define	NCE_HASH_PTR_V6(addr) \
+	(&(ndp6.nce_hash_tbl[NCE_ADDR_HASH_V6(addr, NCE_TABLE_SIZE)]))
+
+int
+ndp_add(ill_t *ill, uchar_t *hw_addr, const void *addr,
+    const void *mask, const void *extract_mask,
+    uint32_t hw_extract_start, uint16_t flags, uint16_t state,
+    nce_t **newnce, mblk_t *fp_mp, mblk_t *res_mp)
+{
+	int status;
+
+	if (ill->ill_isv6)
+		status = ndp_add_v6(ill, hw_addr, (in6_addr_t *)addr,
+		    (in6_addr_t *)mask, (in6_addr_t *)extract_mask,
+		    hw_extract_start, flags, state, newnce);
+	else
+		status = ndp_add_v4(ill, hw_addr, (in_addr_t *)addr,
+		    (in_addr_t *)mask, (in_addr_t *)extract_mask,
+		    hw_extract_start, flags, state, newnce, fp_mp, res_mp);
+	return (status);
+}
 
 /*
  * NDP Cache Entry creation routine.
  * Mapped entries will never do NUD .
- * This routine must always be called with ndp_g_lock held.
+ * This routine must always be called with ndp6.ndp_g_lock held.
  * Prior to return, nce_refcnt is incremented.
  */
-int
-ndp_add(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
+static int
+ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
     const in6_addr_t *mask, const in6_addr_t *extract_mask,
     uint32_t hw_extract_start, uint16_t flags, uint16_t state,
     nce_t **newnce)
 {
-static	nce_t		nce_nil;
+	static	nce_t		nce_nil;
 	nce_t		*nce;
 	mblk_t		*mp;
 	mblk_t		*template;
 	nce_t		**ncep;
 	boolean_t	dropped = B_FALSE;
 
-	ASSERT(MUTEX_HELD(&ndp_g_lock));
-	ASSERT(ill != NULL);
+	ASSERT(MUTEX_HELD(&ndp6.ndp_g_lock));
+	ASSERT(ill != NULL && ill->ill_isv6);
 	if (IN6_IS_ADDR_UNSPECIFIED(addr)) {
 		ip0dbg(("ndp_add: no addr\n"));
 		return (EINVAL);
@@ -167,6 +195,7 @@ static	nce_t		nce_nil;
 		return (ENOMEM);
 	}
 	nce->nce_ill = ill;
+	nce->nce_ipversion = IPV6_VERSION;
 	nce->nce_flags = flags;
 	nce->nce_state = state;
 	nce->nce_pcnt = ND_MAX_UNICAST_SOLICIT;
@@ -192,9 +221,9 @@ static	nce_t		nce_nil;
 		ASSERT(IN6_IS_ADDR_MULTICAST(addr));
 		ASSERT(!IN6_IS_ADDR_UNSPECIFIED(&nce->nce_mask));
 		ASSERT(!IN6_IS_ADDR_UNSPECIFIED(&nce->nce_extract_mask));
-		ncep = &nce_mask_entries;
+		ncep = &ndp6.nce_mask_entries;
 	} else {
-		ncep = ((nce_t **)NCE_HASH_PTR(*addr));
+		ncep = ((nce_t **)NCE_HASH_PTR_V6(*addr));
 	}
 
 #ifdef NCE_DEBUG
@@ -235,7 +264,7 @@ static	nce_t		nce_nil;
 		 * are done in ndp_timer.
 		 */
 		mutex_enter(&nce->nce_lock);
-		mutex_exit(&ndp_g_lock);
+		mutex_exit(&ndp6.ndp_g_lock);
 		nce->nce_unsolicit_count = ip_ndp_unsolicit_count - 1;
 		mutex_exit(&nce->nce_lock);
 		dropped = nce_xmit(ill,
@@ -253,7 +282,7 @@ static	nce_t		nce_nil;
 			    MSEC_TO_TICK(ip_ndp_unsolicit_interval));
 		}
 		mutex_exit(&nce->nce_lock);
-		mutex_enter(&ndp_g_lock);
+		mutex_enter(&ndp6.ndp_g_lock);
 	}
 	/*
 	 * If the hw_addr is NULL, typically for ND_INCOMPLETE nces, then
@@ -267,16 +296,41 @@ static	nce_t		nce_nil;
 }
 
 int
-ndp_lookup_then_add(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
+ndp_lookup_then_add(ill_t *ill, uchar_t *hw_addr, const void *addr,
+    const void *mask, const void *extract_mask,
+    uint32_t hw_extract_start, uint16_t flags, uint16_t state,
+    nce_t **newnce, mblk_t *fp_mp, mblk_t *res_mp)
+{
+	int status;
+
+	if (ill->ill_isv6) {
+		status = ndp_lookup_then_add_v6(ill, hw_addr,
+		    (in6_addr_t *)addr, (in6_addr_t *)mask,
+		    (in6_addr_t *)extract_mask, hw_extract_start, flags,
+		    state, newnce, fp_mp, res_mp);
+	} else  {
+		status = ndp_lookup_then_add_v4(ill, hw_addr,
+		    (in_addr_t *)addr, (in_addr_t *)mask,
+		    (in_addr_t *)extract_mask, hw_extract_start, flags,
+		    state, newnce, fp_mp, res_mp);
+	}
+
+	return (status);
+}
+
+static int
+ndp_lookup_then_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
     const in6_addr_t *mask, const in6_addr_t *extract_mask,
     uint32_t hw_extract_start, uint16_t flags, uint16_t state,
-    nce_t **newnce)
+    nce_t **newnce, mblk_t *fp_mp, mblk_t *res_mp)
 {
 	int	err = 0;
 	nce_t	*nce;
 
-	mutex_enter(&ndp_g_lock);
-	nce = nce_lookup_addr(ill, addr);
+	ASSERT(ill != NULL && ill->ill_isv6);
+	mutex_enter(&ndp6.ndp_g_lock);
+	nce = *((nce_t **)NCE_HASH_PTR_V6(*addr)); /* head of v6 hash table */
+	nce = nce_lookup_addr(ill, addr, nce);
 	if (nce == NULL) {
 		err = ndp_add(ill,
 		    hw_addr,
@@ -286,12 +340,14 @@ ndp_lookup_then_add(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 		    hw_extract_start,
 		    flags,
 		    state,
-		    newnce);
+		    newnce,
+		    fp_mp,
+		    res_mp);
 	} else {
 		*newnce = nce;
 		err = EEXIST;
 	}
-	mutex_exit(&ndp_g_lock);
+	mutex_exit(&ndp6.ndp_g_lock);
 	return (err);
 }
 
@@ -302,13 +358,13 @@ ndp_lookup_then_add(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
  * ires and only then we can do NCE_REFRELE which can make NCE inactive.
  */
 static void
-nce_remove(nce_t *nce, nce_t **free_nce_list)
+nce_remove(ndp_g_t *ndp, nce_t *nce, nce_t **free_nce_list)
 {
 	nce_t *nce1;
 	nce_t **ptpn;
 
-	ASSERT(MUTEX_HELD(&ndp_g_lock));
-	ASSERT(ndp_g_walker == 0);
+	ASSERT(MUTEX_HELD(&ndp->ndp_g_lock));
+	ASSERT(ndp->ndp_g_walker == 0);
 	for (; nce; nce = nce1) {
 		nce1 = nce->nce_next;
 		mutex_enter(&nce->nce_lock);
@@ -343,6 +399,8 @@ ndp_delete(nce_t *nce)
 {
 	nce_t	**ptpn;
 	nce_t	*nce1;
+	int	ipversion = nce->nce_ipversion;
+	ndp_g_t *ndp = (ipversion == IPV4_VERSION ? &ndp4 : &ndp6);
 
 	/* Serialize deletes */
 	mutex_enter(&nce->nce_lock);
@@ -371,22 +429,22 @@ ndp_delete(nce_t *nce)
 		nce->nce_timeout_id = 0;
 	}
 
-	mutex_enter(&ndp_g_lock);
+	mutex_enter(&ndp->ndp_g_lock);
 	if (nce->nce_ptpn == NULL) {
 		/*
 		 * The last ndp walker has already removed this nce from
 		 * the list after we marked the nce CONDEMNED and before
-		 * we grabbed the ndp_g_lock.
+		 * we grabbed the global lock.
 		 */
-		mutex_exit(&ndp_g_lock);
+		mutex_exit(&ndp->ndp_g_lock);
 		return;
 	}
-	if (ndp_g_walker > 0) {
+	if (ndp->ndp_g_walker > 0) {
 		/*
 		 * Can't unlink. The walker will clean up
 		 */
-		ndp_g_walker_cleanup = B_TRUE;
-		mutex_exit(&ndp_g_lock);
+		ndp->ndp_g_walker_cleanup = B_TRUE;
+		mutex_exit(&ndp->ndp_g_lock);
 		return;
 	}
 
@@ -401,7 +459,7 @@ ndp_delete(nce_t *nce)
 	*ptpn = nce1;
 	nce->nce_ptpn = NULL;
 	nce->nce_next = NULL;
-	mutex_exit(&ndp_g_lock);
+	mutex_exit(&ndp->ndp_g_lock);
 
 	nce_ire_delete(nce);
 }
@@ -496,9 +554,21 @@ nce_ire_delete_list(nce_t *nce)
 			(void) untimeout(nce->nce_timeout_id);
 			nce->nce_timeout_id = 0;
 		}
+		/*
+		 * We might hit this func thus in the v4 case:
+		 * ipif_down->ipif_ndp_down->ndp_walk
+		 */
 
-		ire_walk_ill_v6(MATCH_IRE_ILL | MATCH_IRE_TYPE, IRE_CACHE,
-		    nce_ire_delete1, (char *)nce, nce->nce_ill);
+		if (nce->nce_ipversion == IPV4_VERSION) {
+			ire_walk_ill_v4(MATCH_IRE_ILL | MATCH_IRE_TYPE,
+			    IRE_CACHE, nce_ire_delete1,
+			    (char *)nce, nce->nce_ill);
+		} else {
+			ASSERT(nce->nce_ipversion == IPV6_VERSION);
+			ire_walk_ill_v6(MATCH_IRE_ILL | MATCH_IRE_TYPE,
+			    IRE_CACHE, nce_ire_delete1,
+			    (char *)nce, nce->nce_ill);
+		}
 		NCE_REFRELE_NOTR(nce);
 		nce = nce_next;
 	}
@@ -511,9 +581,15 @@ nce_ire_delete_list(nce_t *nce)
 static void
 nce_ire_delete(nce_t *nce)
 {
-	ire_walk_ill_v6(MATCH_IRE_ILL | MATCH_IRE_TYPE, IRE_CACHE,
-	    nce_ire_delete1, (char *)nce, nce->nce_ill);
-	NCE_REFRELE_NOTR(nce);
+	if (nce->nce_ipversion == IPV6_VERSION) {
+		ire_walk_ill_v6(MATCH_IRE_ILL | MATCH_IRE_TYPE, IRE_CACHE,
+		    nce_ire_delete1, (char *)nce, nce->nce_ill);
+		NCE_REFRELE_NOTR(nce);
+	} else {
+		ire_walk_ill_v4(MATCH_IRE_ILL | MATCH_IRE_TYPE, IRE_CACHE,
+		    nce_ire_delete1, (char *)nce, nce->nce_ill);
+		NCE_REFRELE_NOTR(nce);
+	}
 }
 
 /*
@@ -526,44 +602,73 @@ nce_ire_delete1(ire_t *ire, char *nce_arg)
 
 	ASSERT(ire->ire_type == IRE_CACHE);
 
-	if (ire->ire_nce == nce)
+	if (ire->ire_nce == nce) {
+		ASSERT(ire->ire_ipversion == nce->nce_ipversion);
 		ire_delete(ire);
+	}
 }
 
 /*
- * Cache entry lookup.  Try to find an nce matching the parameters passed.
+ * IPv6 Cache entry lookup.  Try to find an nce matching the parameters passed.
  * If one is found, the refcnt on the nce will be incremented.
  */
 nce_t *
-ndp_lookup(ill_t *ill, const in6_addr_t *addr, boolean_t caller_holds_lock)
+ndp_lookup_v6(ill_t *ill, const in6_addr_t *addr, boolean_t caller_holds_lock)
 {
 	nce_t	*nce;
 
-	if (!caller_holds_lock)
-		mutex_enter(&ndp_g_lock);
-	nce = nce_lookup_addr(ill, addr);
+	ASSERT(ill != NULL && ill->ill_isv6);
+	if (!caller_holds_lock) {
+		mutex_enter(&ndp6.ndp_g_lock);
+	}
+	nce = *((nce_t **)NCE_HASH_PTR_V6(*addr)); /* head of v6 hash table */
+	nce = nce_lookup_addr(ill, addr, nce);
 	if (nce == NULL)
 		nce = nce_lookup_mapping(ill, addr);
 	if (!caller_holds_lock)
-		mutex_exit(&ndp_g_lock);
+		mutex_exit(&ndp6.ndp_g_lock);
+	return (nce);
+}
+/*
+ * IPv4 Cache entry lookup.  Try to find an nce matching the parameters passed.
+ * If one is found, the refcnt on the nce will be incremented.
+ * Since multicast mappings are handled in arp, there are no nce_mcast_entries
+ * so we skip the nce_lookup_mapping call.
+ * XXX TODO: if the nce is found to be ND_STALE, ndp_delete it and return NULL
+ */
+nce_t *
+ndp_lookup_v4(ill_t *ill, const in_addr_t *addr, boolean_t caller_holds_lock)
+{
+	nce_t	*nce;
+	in6_addr_t addr6;
+
+	if (!caller_holds_lock) {
+		mutex_enter(&ndp4.ndp_g_lock);
+	}
+	nce = *((nce_t **)NCE_HASH_PTR_V4(*addr)); /* head of v6 hash table */
+	IN6_IPADDR_TO_V4MAPPED(*addr, &addr6);
+	nce = nce_lookup_addr(ill, &addr6, nce);
+	if (!caller_holds_lock)
+		mutex_exit(&ndp4.ndp_g_lock);
 	return (nce);
 }
 
 /*
  * Cache entry lookup.  Try to find an nce matching the parameters passed.
  * Look only for exact entries (no mappings).  If an nce is found, increment
- * the hold count on that nce.
+ * the hold count on that nce. The caller passes in the start of the
+ * appropriate hash table, and must be holding the appropriate global
+ * lock (ndp_g_lock).
  */
 static nce_t *
-nce_lookup_addr(ill_t *ill, const in6_addr_t *addr)
+nce_lookup_addr(ill_t *ill, const in6_addr_t *addr, nce_t *nce)
 {
-	nce_t	*nce;
+	ndp_g_t *ndp = (ill->ill_isv6 ? &ndp6 : &ndp4);
 
 	ASSERT(ill != NULL);
-	ASSERT(MUTEX_HELD(&ndp_g_lock));
+	ASSERT(MUTEX_HELD(&ndp->ndp_g_lock));
 	if (IN6_IS_ADDR_UNSPECIFIED(addr))
 		return (NULL);
-	nce = *((nce_t **)NCE_HASH_PTR(*addr));
 	for (; nce != NULL; nce = nce->nce_next) {
 		if (nce->nce_ill == ill) {
 			if (IN6_ARE_ADDR_EQUAL(&nce->nce_addr, addr) &&
@@ -591,11 +696,11 @@ nce_lookup_mapping(ill_t *ill, const in6_addr_t *addr)
 {
 	nce_t	*nce;
 
-	ASSERT(ill != NULL);
-	ASSERT(MUTEX_HELD(&ndp_g_lock));
+	ASSERT(ill != NULL && ill->ill_isv6);
+	ASSERT(MUTEX_HELD(&ndp6.ndp_g_lock));
 	if (!IN6_IS_ADDR_MULTICAST(addr))
 		return (NULL);
-	nce = nce_mask_entries;
+	nce = ndp6.nce_mask_entries;
 	for (; nce != NULL; nce = nce->nce_next)
 		if (nce->nce_ill == ill &&
 		    (V6_MASK_EQ(*addr, nce->nce_mask, nce->nce_addr))) {
@@ -623,6 +728,7 @@ ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 	boolean_t ll_updated = B_FALSE;
 	boolean_t ll_changed;
 
+	ASSERT(nce->nce_ipversion == IPV6_VERSION);
 	/*
 	 * No updates of link layer address or the neighbor state is
 	 * allowed, when the cache is in NONUD state.  This still
@@ -757,7 +863,8 @@ ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
  * walking the hash list.
  */
 void
-ndp_walk_impl(ill_t *ill, pfi_t pfi, void *arg1, boolean_t trace)
+ndp_walk_common(ndp_g_t *ndp, ill_t *ill, pfi_t pfi, void *arg1,
+    boolean_t trace)
 {
 
 	nce_t	*nce;
@@ -765,11 +872,13 @@ ndp_walk_impl(ill_t *ill, pfi_t pfi, void *arg1, boolean_t trace)
 	nce_t	**ncep;
 	nce_t	*free_nce_list = NULL;
 
-	mutex_enter(&ndp_g_lock);
-	ndp_g_walker++;	/* Prevent ndp_delete from unlink and free of NCE */
-	mutex_exit(&ndp_g_lock);
-	for (ncep = nce_hash_tbl; ncep < A_END(nce_hash_tbl); ncep++) {
-		for (nce = *ncep; nce; nce = nce1) {
+	mutex_enter(&ndp->ndp_g_lock);
+	/* Prevent ndp_delete from unlink and free of NCE */
+	ndp->ndp_g_walker++;
+	mutex_exit(&ndp->ndp_g_lock);
+	for (ncep = ndp->nce_hash_tbl;
+	    ncep < A_END(ndp->nce_hash_tbl); ncep++) {
+		for (nce = *ncep; nce != NULL; nce = nce1) {
 			nce1 = nce->nce_next;
 			if (ill == NULL || nce->nce_ill == ill) {
 				if (trace) {
@@ -784,7 +893,7 @@ ndp_walk_impl(ill_t *ill, pfi_t pfi, void *arg1, boolean_t trace)
 			}
 		}
 	}
-	for (nce = nce_mask_entries; nce; nce = nce1) {
+	for (nce = ndp->nce_mask_entries; nce != NULL; nce = nce1) {
 		nce1 = nce->nce_next;
 		if (ill == NULL || nce->nce_ill == ill) {
 			if (trace) {
@@ -798,29 +907,30 @@ ndp_walk_impl(ill_t *ill, pfi_t pfi, void *arg1, boolean_t trace)
 			}
 		}
 	}
-	mutex_enter(&ndp_g_lock);
-	ndp_g_walker--;
+	mutex_enter(&ndp->ndp_g_lock);
+	ndp->ndp_g_walker--;
 	/*
 	 * While NCE's are removed from global list they are placed
 	 * in a private list, to be passed to nce_ire_delete_list().
 	 * The reason is, there may be ires pointing to this nce
 	 * which needs to cleaned up.
 	 */
-	if (ndp_g_walker_cleanup && ndp_g_walker == 0) {
+	if (ndp->ndp_g_walker_cleanup && ndp->ndp_g_walker == 0) {
 		/* Time to delete condemned entries */
-		for (ncep = nce_hash_tbl; ncep < A_END(nce_hash_tbl); ncep++) {
+		for (ncep = ndp->nce_hash_tbl;
+		    ncep < A_END(ndp->nce_hash_tbl); ncep++) {
 			nce = *ncep;
 			if (nce != NULL) {
-				nce_remove(nce, &free_nce_list);
+				nce_remove(ndp, nce, &free_nce_list);
 			}
 		}
-		nce = nce_mask_entries;
+		nce = ndp->nce_mask_entries;
 		if (nce != NULL) {
-			nce_remove(nce, &free_nce_list);
+			nce_remove(ndp, nce, &free_nce_list);
 		}
-		ndp_g_walker_cleanup = B_FALSE;
+		ndp->ndp_g_walker_cleanup = B_FALSE;
 	}
-	mutex_exit(&ndp_g_lock);
+	mutex_exit(&ndp->ndp_g_lock);
 
 	if (free_nce_list != NULL) {
 		nce_ire_delete_list(free_nce_list);
@@ -830,7 +940,8 @@ ndp_walk_impl(ill_t *ill, pfi_t pfi, void *arg1, boolean_t trace)
 void
 ndp_walk(ill_t *ill, pfi_t pfi, void *arg1)
 {
-	ndp_walk_impl(ill, pfi, arg1, B_TRUE);
+	ndp_walk_common(&ndp4, ill, pfi, arg1, B_TRUE);
+	ndp_walk_common(&ndp6, ill, pfi, arg1, B_TRUE);
 }
 
 /*
@@ -882,6 +993,7 @@ ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 	mblk_t		*mp_nce = NULL;
 
 	ASSERT(ill != NULL);
+	ASSERT(ill->ill_isv6);
 	if (IN6_IS_ADDR_MULTICAST(dst)) {
 		err = nce_set_multicast(ill, dst);
 		return (err);
@@ -894,7 +1006,9 @@ ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 	    0,
 	    (ill->ill_flags & ILLF_NONUD) ? NCE_F_NONUD : 0,
 	    ND_INCOMPLETE,
-	    &nce);
+	    &nce,
+	    NULL, /* let ndp_add figure out fastpath mp and dlureq_mp for v6 */
+	    NULL);
 
 	switch (err) {
 	case 0:
@@ -990,6 +1104,7 @@ ndp_noresolver(ill_t *ill, const in6_addr_t *dst)
 	int		err = 0;
 
 	ASSERT(ill != NULL);
+	ASSERT(ill->ill_isv6);
 	if (IN6_IS_ADDR_MULTICAST(dst)) {
 		err = nce_set_multicast(ill, dst);
 		return (err);
@@ -1003,7 +1118,9 @@ ndp_noresolver(ill_t *ill, const in6_addr_t *dst)
 	    0,
 	    (ill->ill_flags & ILLF_NONUD) ? NCE_F_NONUD : 0,
 	    ND_REACHABLE,
-	    &nce);
+	    &nce,
+	    NULL, /* let ndp_add figure out fp_mp/dlureq_mp for v6 */
+	    NULL);
 
 	switch (err) {
 	case 0:
@@ -1038,12 +1155,14 @@ nce_set_multicast(ill_t *ill, const in6_addr_t *dst)
 	int		err = 0;
 
 	ASSERT(ill != NULL);
+	ASSERT(ill->ill_isv6);
 	ASSERT(!(IN6_IS_ADDR_UNSPECIFIED(dst)));
 
-	mutex_enter(&ndp_g_lock);
-	nce = nce_lookup_addr(ill, dst);
+	mutex_enter(&ndp6.ndp_g_lock);
+	nce = *((nce_t **)NCE_HASH_PTR_V6(*dst));
+	nce = nce_lookup_addr(ill, dst, nce);
 	if (nce != NULL) {
-		mutex_exit(&ndp_g_lock);
+		mutex_exit(&ndp6.ndp_g_lock);
 		NCE_REFRELE(nce);
 		return (0);
 	}
@@ -1051,7 +1170,7 @@ nce_set_multicast(ill_t *ill, const in6_addr_t *dst)
 	mnce = nce_lookup_mapping(ill, dst);
 	if (mnce == NULL) {
 		/* Something broken for the interface. */
-		mutex_exit(&ndp_g_lock);
+		mutex_exit(&ndp6.ndp_g_lock);
 		return (ESRCH);
 	}
 	ASSERT(mnce->nce_flags & NCE_F_MAPPING);
@@ -1063,7 +1182,7 @@ nce_set_multicast(ill_t *ill, const in6_addr_t *dst)
 		 */
 		hw_addr = kmem_alloc(ill->ill_nd_lla_len, KM_NOSLEEP);
 		if (hw_addr == NULL) {
-			mutex_exit(&ndp_g_lock);
+			mutex_exit(&ndp6.ndp_g_lock);
 			NCE_REFRELE(mnce);
 			return (ENOMEM);
 		}
@@ -1082,8 +1201,10 @@ nce_set_multicast(ill_t *ill, const in6_addr_t *dst)
 	    0,
 	    NCE_F_NONUD,
 	    ND_REACHABLE,
-	    &nce);
-	mutex_exit(&ndp_g_lock);
+	    &nce,
+	    NULL,
+	    NULL);
+	mutex_exit(&ndp6.ndp_g_lock);
 	if (hw_addr != NULL)
 		kmem_free(hw_addr, ill->ill_nd_lla_len);
 	if (err != 0) {
@@ -1105,11 +1226,11 @@ ndp_query(ill_t *ill, struct lif_nd_req *lnr)
 	sin6_t		*sin6;
 	dl_unitdata_req_t	*dl;
 
-	ASSERT(ill != NULL);
+	ASSERT(ill != NULL && ill->ill_isv6);
 	sin6 = (sin6_t *)&lnr->lnr_addr;
 	addr =  &sin6->sin6_addr;
 
-	nce = ndp_lookup(ill, addr, B_FALSE);
+	nce = ndp_lookup_v6(ill, addr, B_FALSE);
 	if (nce == NULL)
 		return (ESRCH);
 	/* If in INCOMPLETE state, no link layer address is available yet */
@@ -1145,21 +1266,21 @@ ndp_mcastreq(ill_t *ill, const in6_addr_t *addr, uint32_t hw_addr_len,
 	nce_t		*nce;
 	uchar_t		*hw_addr;
 
-	ASSERT(ill != NULL);
+	ASSERT(ill != NULL && ill->ill_isv6);
 	ASSERT(ill->ill_net_type == IRE_IF_RESOLVER);
 	hw_addr = mi_offset_paramc(mp, hw_addr_offset, hw_addr_len);
 	if (hw_addr == NULL || !IN6_IS_ADDR_MULTICAST(addr)) {
 		freemsg(mp);
 		return (EINVAL);
 	}
-	mutex_enter(&ndp_g_lock);
+	mutex_enter(&ndp6.ndp_g_lock);
 	nce = nce_lookup_mapping(ill, addr);
 	if (nce == NULL) {
-		mutex_exit(&ndp_g_lock);
+		mutex_exit(&ndp6.ndp_g_lock);
 		freemsg(mp);
 		return (ESRCH);
 	}
-	mutex_exit(&ndp_g_lock);
+	mutex_exit(&ndp6.ndp_g_lock);
 	/*
 	 * Update dl_addr_length and dl_addr_offset for primitives that
 	 * have physical addresses as opposed to full saps
@@ -1343,7 +1464,7 @@ ndp_input_solicit(ill_t *ill, mblk_t *mp)
 		}
 	}
 
-	our_nce = ndp_lookup(ill, &target, B_FALSE);
+	our_nce = ndp_lookup_v6(ill, &target, B_FALSE);
 	/*
 	 * If this is a valid Solicitation, a permanent
 	 * entry should exist in the cache
@@ -1390,9 +1511,10 @@ ndp_input_solicit(ill_t *ill, mblk_t *mp)
 	 */
 	if (haddr == NULL) {
 		nce_t   *nnce;
-		mutex_enter(&ndp_g_lock);
-		nnce = nce_lookup_addr(ill, &src);
-		mutex_exit(&ndp_g_lock);
+		mutex_enter(&ndp6.ndp_g_lock);
+		nnce = *((nce_t **)NCE_HASH_PTR_V6(src));
+		nnce = nce_lookup_addr(ill, &src, nnce);
+		mutex_exit(&ndp6.ndp_g_lock);
 
 		if (nnce == NULL) {
 			in6_addr_t dst = ipv6_solicited_node_mcast;
@@ -1425,6 +1547,7 @@ ndp_input_solicit(ill_t *ill, mblk_t *mp)
 		int	err = 0;
 		nce_t	*nnce;
 
+		ASSERT(ill->ill_isv6);
 		err = ndp_lookup_then_add(ill,
 		    haddr,
 		    &src,	/* Soliciting nodes address */
@@ -1433,7 +1556,9 @@ ndp_input_solicit(ill_t *ill, mblk_t *mp)
 		    0,
 		    0,
 		    ND_STALE,
-		    &nnce);
+		    &nnce,
+		    NULL,
+		    NULL);
 		switch (err) {
 		case 0:
 			/* done with this entry */
@@ -1547,7 +1672,7 @@ ndp_input_advert(ill_t *ill, mblk_t *mp)
 		}
 		ill_refhold_locked(ill);
 		mutex_exit(&ill->ill_lock);
-		dst_nce = ndp_lookup(ill, &target, B_FALSE);
+		dst_nce = ndp_lookup_v6(ill, &target, B_FALSE);
 		/* We have to drop the lock since ndp_process calls put* */
 		rw_exit(&ill_g_lock);
 		if (dst_nce != NULL) {
@@ -1872,6 +1997,10 @@ nce_report1(nce_t *nce, uchar_t *mp_arg)
 	 * In addition, make sure that the mblk has enough space
 	 * before writing to it. If is doesn't, allocate a new one.
 	 */
+	if (nce->nce_ipversion == IPV4_VERSION)
+		/* Don't include v4 nce_ts in NDP cache entry report */
+		return;
+
 	ASSERT(ill != NULL);
 	v6addr = nce->nce_mask;
 	if (flags & NCE_F_PERMANENT)
@@ -1945,6 +2074,8 @@ nce_udreq_alloc(ill_t *ill)
 	mblk_t	*template_mp = NULL;
 	dl_unitdata_req_t *dlur;
 	int	sap_length;
+
+	ASSERT(ill->ill_isv6);
 
 	sap_length = ill->ill_sap_length;
 	template_mp = ip_dlpi_alloc(sizeof (dl_unitdata_req_t) +
@@ -2234,6 +2365,7 @@ nce_update(nce_t *nce, uint16_t new_state, uchar_t *new_ll_addr)
 	boolean_t need_fastpath_update = B_FALSE;
 
 	ASSERT(MUTEX_HELD(&nce->nce_lock));
+	ASSERT(nce->nce_ipversion == IPV6_VERSION);
 	/*
 	 * If this interface does not do NUD, there is no point
 	 * in allowing an update to the cache entry.  Although
@@ -2285,11 +2417,38 @@ nce_update(nce_t *nce, uint16_t new_state, uchar_t *new_ll_addr)
 	mutex_enter(&nce->nce_lock);
 }
 
-static void
-nce_queue_mp(nce_t *nce, mblk_t *mp)
+void
+nce_queue_mp_common(nce_t *nce, mblk_t *mp, boolean_t head_insert)
 {
 	uint_t	count = 0;
 	mblk_t  **mpp;
+
+	ASSERT(MUTEX_HELD(&nce->nce_lock));
+
+	for (mpp = &nce->nce_qd_mp; *mpp != NULL;
+	    mpp = &(*mpp)->b_next) {
+		if (++count >
+		    nce->nce_ill->ill_max_buf) {
+			mblk_t *tmp = nce->nce_qd_mp->b_next;
+
+			nce->nce_qd_mp->b_next = NULL;
+			nce->nce_qd_mp->b_prev = NULL;
+			freemsg(nce->nce_qd_mp);
+			nce->nce_qd_mp = tmp;
+		}
+	}
+	/* put this on the list */
+	if (head_insert) {
+		mp->b_next = nce->nce_qd_mp;
+		nce->nce_qd_mp = mp;
+	} else {
+		*mpp = mp;
+	}
+}
+
+static void
+nce_queue_mp(nce_t *nce, mblk_t *mp)
+{
 	boolean_t head_insert = B_FALSE;
 	ip6_t	*ip6h;
 	ip6i_t	*ip6i;
@@ -2347,26 +2506,7 @@ nce_queue_mp(nce_t *nce, mblk_t *mp)
 			head_insert = B_TRUE;
 	}
 
-	for (mpp = &nce->nce_qd_mp; *mpp != NULL;
-	    mpp = &(*mpp)->b_next) {
-		if (++count >
-		    nce->nce_ill->ill_max_buf) {
-			mblk_t *tmp = nce->nce_qd_mp->b_next;
-
-			nce->nce_qd_mp->b_next = NULL;
-			nce->nce_qd_mp->b_prev = NULL;
-			freemsg(nce->nce_qd_mp);
-			ip1dbg(("nce_queue_mp: pkt dropped\n"));
-			nce->nce_qd_mp = tmp;
-		}
-	}
-	/* put this on the list */
-	if (head_insert) {
-		mp->b_next = nce->nce_qd_mp;
-		nce->nce_qd_mp = mp;
-	} else {
-		*mpp = mp;
-	}
+	nce_queue_mp_common(nce, mp, head_insert);
 }
 
 /*
@@ -2441,6 +2581,7 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 	uint16_t	old_flags = 0;
 	int		inflags = lnr->lnr_flags;
 
+	ASSERT(ill->ill_isv6);
 	if ((lnr->lnr_state_create != ND_REACHABLE) &&
 	    (lnr->lnr_state_create != ND_STALE))
 		return (EINVAL);
@@ -2448,9 +2589,10 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 	sin6 = (sin6_t *)&lnr->lnr_addr;
 	addr = &sin6->sin6_addr;
 
-	mutex_enter(&ndp_g_lock);
+	mutex_enter(&ndp6.ndp_g_lock);
 	/* We know it can not be mapping so just look in the hash table */
-	nce = nce_lookup_addr(ill, addr);
+	nce = *((nce_t **)NCE_HASH_PTR_V6(*addr));
+	nce = nce_lookup_addr(ill, addr, nce);
 	if (nce != NULL)
 		new_flags = nce->nce_flags;
 
@@ -2462,7 +2604,7 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 		new_flags &= ~NCE_F_ISROUTER;
 		break;
 	case (NDF_ISROUTER_OFF|NDF_ISROUTER_ON):
-		mutex_exit(&ndp_g_lock);
+		mutex_exit(&ndp6.ndp_g_lock);
 		if (nce != NULL)
 			NCE_REFRELE(nce);
 		return (EINVAL);
@@ -2476,7 +2618,7 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 		new_flags &= ~NCE_F_ANYCAST;
 		break;
 	case (NDF_ANYCAST_OFF|NDF_ANYCAST_ON):
-		mutex_exit(&ndp_g_lock);
+		mutex_exit(&ndp6.ndp_g_lock);
 		if (nce != NULL)
 			NCE_REFRELE(nce);
 		return (EINVAL);
@@ -2490,7 +2632,7 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 		new_flags &= ~NCE_F_PROXY;
 		break;
 	case (NDF_PROXY_OFF|NDF_PROXY_ON):
-		mutex_exit(&ndp_g_lock);
+		mutex_exit(&ndp6.ndp_g_lock);
 		if (nce != NULL)
 			NCE_REFRELE(nce);
 		return (EINVAL);
@@ -2505,9 +2647,11 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 		    0,
 		    new_flags,
 		    lnr->lnr_state_create,
-		    &nce);
+		    &nce,
+		    NULL,
+		    NULL);
 		if (err != 0) {
-			mutex_exit(&ndp_g_lock);
+			mutex_exit(&ndp6.ndp_g_lock);
 			ip1dbg(("ndp_sioc_update: Can't create NCE %d\n", err));
 			return (err);
 		}
@@ -2519,12 +2663,12 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 		 * XXX Just delete the entry, but we need to add too.
 		 */
 		nce->nce_flags &= ~NCE_F_ISROUTER;
-		mutex_exit(&ndp_g_lock);
+		mutex_exit(&ndp6.ndp_g_lock);
 		ndp_delete(nce);
 		NCE_REFRELE(nce);
 		return (0);
 	}
-	mutex_exit(&ndp_g_lock);
+	mutex_exit(&ndp6.ndp_g_lock);
 
 	mutex_enter(&nce->nce_lock);
 	nce->nce_flags = new_flags;
@@ -2587,7 +2731,7 @@ nce_fastpath_list_dispatch(ill_t *ill, boolean_t (*func)(nce_t *, void  *),
 	nce_t *first_nce;
 	nce_t *prev_nce = NULL;
 
-	ASSERT(ill != NULL);
+	ASSERT(ill != NULL && ill->ill_isv6);
 
 	mutex_enter(&ill->ill_lock);
 	first_nce = current_nce = (nce_t *)ill->ill_fastpath_list;
@@ -2626,7 +2770,7 @@ nce_fastpath_list_add(nce_t *nce)
 	ill_t *ill;
 
 	ill = nce->nce_ill;
-	ASSERT(ill != NULL);
+	ASSERT(ill != NULL && ill->ill_isv6);
 
 	mutex_enter(&ill->ill_lock);
 	mutex_enter(&nce->nce_lock);
@@ -2657,6 +2801,12 @@ nce_fastpath_list_delete(nce_t *nce)
 
 	ill = nce->nce_ill;
 	ASSERT(ill != NULL);
+	if (!ill->ill_isv6)  {
+		/*
+		 * v4 nce_t's do not have nce_fastpath set.
+		 */
+		return;
+	}
 
 	mutex_enter(&ill->ill_lock);
 	if (nce->nce_fastpath == NULL)
@@ -2958,3 +3108,233 @@ nce_thread_exit(nce_t *nce, caddr_t arg)
 	return (0);
 }
 #endif
+
+/*
+ * Called when address resolution fails due to a timeout.
+ * Send an ICMP unreachable in response to all queued packets.
+ */
+void
+arp_resolv_failed(nce_t *nce)
+{
+	mblk_t	*mp, *nxt_mp, *first_mp;
+	char	buf[INET6_ADDRSTRLEN];
+	zoneid_t zoneid = GLOBAL_ZONEID;
+	struct in_addr ipv4addr;
+
+	IN6_V4MAPPED_TO_INADDR(&nce->nce_addr, &ipv4addr);
+	ip3dbg(("arp_resolv_failed: dst %s\n",
+	    inet_ntop(AF_INET, &ipv4addr, buf, sizeof (buf))));
+	mutex_enter(&nce->nce_lock);
+	mp = nce->nce_qd_mp;
+	nce->nce_qd_mp = NULL;
+	mutex_exit(&nce->nce_lock);
+
+	while (mp != NULL) {
+		nxt_mp = mp->b_next;
+		mp->b_next = NULL;
+		mp->b_prev = NULL;
+
+		first_mp = mp;
+		/*
+		 * Send icmp unreachable messages
+		 * to the hosts.
+		 */
+		(void) ip_hdr_complete((ipha_t *)mp->b_rptr, zoneid);
+		ip3dbg(("arp_resolv_failed: Calling icmp_unreachable\n"));
+		icmp_unreachable(nce->nce_ill->ill_wq, first_mp,
+		    ICMP_HOST_UNREACHABLE);
+		mp = nxt_mp;
+	}
+}
+
+static int
+ndp_lookup_then_add_v4(ill_t *ill, uchar_t *hw_addr, const in_addr_t *addr,
+    const in_addr_t *mask, const in_addr_t *extract_mask,
+    uint32_t hw_extract_start, uint16_t flags, uint16_t state,
+    nce_t **newnce, mblk_t *fp_mp, mblk_t *res_mp)
+{
+	int	err = 0;
+	nce_t	*nce;
+	in6_addr_t addr6;
+
+	mutex_enter(&ndp4.ndp_g_lock);
+	nce = *((nce_t **)NCE_HASH_PTR_V4(*addr));
+	IN6_IPADDR_TO_V4MAPPED(*addr, &addr6);
+	nce = nce_lookup_addr(ill, &addr6, nce);
+	if (nce == NULL) {
+		err = ndp_add_v4(ill,
+		    hw_addr,
+		    addr,
+		    mask,
+		    extract_mask,
+		    hw_extract_start,
+		    flags,
+		    state,
+		    newnce,
+		    fp_mp,
+		    res_mp);
+	} else {
+		*newnce = nce;
+		err = EEXIST;
+	}
+	mutex_exit(&ndp4.ndp_g_lock);
+	return (err);
+}
+
+/*
+ * NDP Cache Entry creation routine for IPv4.
+ * Mapped entries are handled in arp.
+ * This routine must always be called with ndp4.ndp_g_lock held.
+ * Prior to return, nce_refcnt is incremented.
+ */
+static int
+ndp_add_v4(ill_t *ill, uchar_t *hw_addr, const in_addr_t *addr,
+    const in_addr_t *mask, const in_addr_t *extract_mask,
+    uint32_t hw_extract_start, uint16_t flags, uint16_t state,
+    nce_t **newnce, mblk_t *fp_mp, mblk_t *res_mp)
+{
+	static	nce_t		nce_nil;
+	nce_t		*nce;
+	mblk_t		*mp;
+	mblk_t		*template;
+	nce_t		**ncep;
+
+	ASSERT(MUTEX_HELD(&ndp4.ndp_g_lock));
+	ASSERT(ill != NULL);
+	if ((flags & ~NCE_EXTERNAL_FLAGS_MASK)) {
+		return (EINVAL);
+	}
+	ASSERT((flags & NCE_F_MAPPING) == 0);
+	ASSERT(extract_mask == NULL);
+	/*
+	 * Allocate the mblk to hold the nce.
+	 */
+	mp = allocb(sizeof (nce_t), BPRI_MED);
+	if (mp == NULL)
+		return (ENOMEM);
+
+	nce = (nce_t *)mp->b_rptr;
+	mp->b_wptr = (uchar_t *)&nce[1];
+	*nce = nce_nil;
+
+	/*
+	 * This one holds link layer address; if res_mp has been provided
+	 * by the caller, accept it without any further checks. Otherwise,
+	 * for V4, we fill it up with ill_resolver_mp here, then in
+	 * in ire_arpresolve(), we fill it up with the ARP query
+	 * once its formulated.
+	 */
+	if (res_mp != NULL) {
+		template = res_mp;
+	} else  {
+		template = copyb(ill->ill_resolver_mp);
+	}
+	if (template == NULL) {
+		freeb(mp);
+		return (ENOMEM);
+	}
+	nce->nce_ill = ill;
+	nce->nce_ipversion = IPV4_VERSION;
+	nce->nce_flags = flags;
+	nce->nce_state = state;
+	nce->nce_pcnt = ND_MAX_UNICAST_SOLICIT;
+	nce->nce_rcnt = ill->ill_xmit_count;
+	IN6_IPADDR_TO_V4MAPPED(*addr, &nce->nce_addr);
+	if (*mask == IP_HOST_MASK) {
+		nce->nce_mask = ipv6_all_ones;
+	} else  {
+		IN6_IPADDR_TO_V4MAPPED(*mask, &nce->nce_mask);
+	}
+	nce->nce_extract_mask = ipv6_all_zeros;
+	nce->nce_ll_extract_start = hw_extract_start;
+	nce->nce_fp_mp = (fp_mp? fp_mp : NULL);
+	nce->nce_res_mp = template;
+	if (state == ND_REACHABLE)
+		nce->nce_last = TICK_TO_MSEC(lbolt64);
+	else
+		nce->nce_last = 0;
+	nce->nce_qd_mp = NULL;
+	nce->nce_mp = mp;
+	if (hw_addr != NULL)
+		nce_set_ll(nce, hw_addr);
+	/* This one is for nce getting created */
+	nce->nce_refcnt = 1;
+	mutex_init(&nce->nce_lock, NULL, MUTEX_DEFAULT, NULL);
+	ncep = ((nce_t **)NCE_HASH_PTR_V4(*addr));
+
+#ifdef NCE_DEBUG
+	bzero(nce->nce_trace, sizeof (th_trace_t *) * IP_TR_HASH_MAX);
+#endif
+	/*
+	 * Atomically ensure that the ill is not CONDEMNED, before
+	 * adding the NCE.
+	 */
+	mutex_enter(&ill->ill_lock);
+	if (ill->ill_state_flags & ILL_CONDEMNED) {
+		mutex_exit(&ill->ill_lock);
+		freeb(mp);
+		if (res_mp == NULL) {
+			/*
+			 * template was locally allocated. need to free it.
+			 */
+			freeb(template);
+		}
+		return (EINVAL);
+	}
+	if ((nce->nce_next = *ncep) != NULL)
+		nce->nce_next->nce_ptpn = &nce->nce_next;
+	*ncep = nce;
+	nce->nce_ptpn = ncep;
+	*newnce = nce;
+	/* This one is for nce being used by an active thread */
+	NCE_REFHOLD(*newnce);
+
+	/* Bump up the number of nce's referencing this ill */
+	ill->ill_nce_cnt++;
+	mutex_exit(&ill->ill_lock);
+	return (0);
+}
+
+void
+ndp_flush_qd_mp(nce_t *nce)
+{
+	mblk_t *qd_mp, *qd_next;
+
+	ASSERT(MUTEX_HELD(&nce->nce_lock));
+	qd_mp = nce->nce_qd_mp;
+	nce->nce_qd_mp = NULL;
+	while (qd_mp != NULL) {
+		qd_next = qd_mp->b_next;
+		qd_mp->b_next = NULL;
+		qd_mp->b_prev = NULL;
+		freemsg(qd_mp);
+		qd_mp = qd_next;
+	}
+}
+
+nce_t *
+nce_reinit(nce_t *nce)
+{
+	nce_t *newnce = NULL;
+	in_addr_t nce_addr, nce_mask;
+
+	IN6_V4MAPPED_TO_IPADDR(&nce->nce_addr, nce_addr);
+	IN6_V4MAPPED_TO_IPADDR(&nce->nce_mask, nce_mask);
+	/*
+	 * delete the old one. this will get rid of any ire's pointing
+	 * at this nce.
+	 */
+	ndp_delete(nce);
+	/*
+	 * create a new nce with the same addr and mask.
+	 */
+	mutex_enter(&ndp4.ndp_g_lock);
+	(void) ndp_add_v4(nce->nce_ill, NULL, &nce_addr, &nce_mask, NULL, 0, 0,
+	    ND_INITIAL, &newnce, NULL, NULL);
+	mutex_exit(&ndp4.ndp_g_lock);
+	/*
+	 * refrele the old nce.
+	 */
+	NCE_REFRELE(nce);
+	return (newnce);
+}

@@ -70,6 +70,7 @@ const char udp_version[] = "%Z%%M%	%I%	%E% SMI";
 #include <inet/ip_ire.h>
 #include <inet/ip_if.h>
 #include <inet/ip_multi.h>
+#include <inet/ip_ndp.h>
 #include <inet/mi.h>
 #include <inet/mib2.h>
 #include <inet/nd.h>
@@ -6589,10 +6590,17 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 	ASSERT(ire != NULL && ire->ire_ipversion == IPV4_VERSION);
 	ASSERT(!CLASSD(dst) || ipif != NULL);
 
+	/*
+	 * Check if we can take the fast-path.
+	 * Note that "incomplete" ire's (where the link-layer for next hop
+	 * is not resolved, or where the fast-path header in nce_fp_mp is not
+	 * available yet) are sent down the legacy (slow) path
+	 */
 	if ((ire->ire_type & (IRE_BROADCAST|IRE_LOCAL|IRE_LOOPBACK)) ||
 	    (ire->ire_flags & RTF_MULTIRT) || ire->ire_stq == NULL ||
 	    ire->ire_max_frag < ntohs(ipha->ipha_length) ||
-	    (ire_fp_mp = ire->ire_fp_mp) == NULL ||
+	    (ire->ire_nce != NULL &&
+	    (ire_fp_mp = ire->ire_nce->nce_fp_mp) == NULL) ||
 	    (connp->conn_nexthop_set) ||
 	    (ire_fp_mp_len = MBLKL(ire_fp_mp)) > MBLKHEAD(mp)) {
 		if (ipif != NULL)

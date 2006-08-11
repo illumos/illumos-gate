@@ -12,7 +12,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-
 #ifndef	__IP_COMPAT_H__
 #define	__IP_COMPAT_H__
 
@@ -151,6 +150,14 @@ struct file;
 #  include	<sys/devops.h>
 #  include	<sys/ddi_impldefs.h>
 # endif
+
+/*
+ * inet/ip.h would end up including radix.h with _KERNEL, which is not
+ * what the tools intend, so include radix.h first.
+ */
+#if SOLARIS2 > 10
+# include <net/radix.h>
+#endif
 /*
  * because Solaris 2 defines these in two places :-/
  */

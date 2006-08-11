@@ -1384,7 +1384,9 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		    0,
 		    nce_flags,
 		    ND_STALE,
-		    &nce);
+		    &nce,
+		    NULL,
+		    NULL);
 		switch (err) {
 		case 0:
 			NCE_REFRELE(nce);
@@ -1465,7 +1467,7 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 	 * case we never add the IRE_CACHE/IRE_HOST_REDIRECT. We need
 	 * to fix this.
 	 */
-	if (ire_add(&ire, NULL, NULL, NULL) == 0) {
+	if (ire_add(&ire, NULL, NULL, NULL, B_FALSE) == 0) {
 
 		/* tell routing sockets that we received a redirect */
 		ip_rts_change_v6(RTM_REDIRECT,
@@ -1962,7 +1964,7 @@ icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
 	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, B_FALSE);
 	if (mp == NULL)
 		return;
-	nce = ndp_lookup(ill, targetp, B_FALSE);
+	nce = ndp_lookup_v6(ill, targetp, B_FALSE);
 	if (nce != NULL && nce->nce_state != ND_INCOMPLETE) {
 		ll_opt_len = (sizeof (nd_opt_hdr_t) +
 		    ill->ill_phys_addr_length + 7)/8 * 8;
@@ -5022,7 +5024,10 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				    dst_ill->ill_sap,
 				    dst_ill->ill_sap_length);
 			} else {
-				dlureq_mp = ire->ire_dlureq_mp;
+				dlureq_mp = ill_dlur_gen(NULL,
+				    dst_ill->ill_phys_addr_length,
+				    dst_ill->ill_sap,
+				    dst_ill->ill_sap_length);
 			}
 			if (dlureq_mp == NULL)
 				break;
@@ -5992,7 +5997,10 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				    dst_ill->ill_sap,
 				    dst_ill->ill_sap_length);
 			} else {
-				dlureq_mp = ire->ire_dlureq_mp;
+				dlureq_mp = ill_dlur_gen(NULL,
+				    dst_ill->ill_phys_addr_length,
+				    dst_ill->ill_sap,
+				    dst_ill->ill_sap_length);
 			}
 
 			if (dlureq_mp == NULL)
@@ -11931,6 +11939,8 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 			 * Check for fastpath, we need to hold nce_lock to
 			 * prevent fastpath update from chaining nce_fp_mp.
 			 */
+
+			ASSERT(nce->nce_ipversion != IPV4_VERSION);
 			mutex_enter(&nce->nce_lock);
 			if ((mp1 = nce->nce_fp_mp) != NULL) {
 				uint32_t hlen;

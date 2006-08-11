@@ -10,7 +10,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(lint)
-static const char sccsid[] = "%W% %G% (C) 1993-2000 Darren Reed";
+static const char sccsid[] = "@(#)ip_fil_solaris.c	1.7 07/22/06 (C) 1993-2000 Darren Reed";
 static const char rcsid[] = "@(#)$Id: ip_fil_solaris.c,v 2.62.2.19 2005/07/13 21:40:46 darrenr Exp $";
 #endif
 
@@ -1389,9 +1389,18 @@ frdest_t *fdp;
 	if (dir != NULL)
 		if (dir->ire_ll_hdr_mp == NULL || dir->ire_ll_hdr_length == 0)
 			dir = NULL;
-#else
-	if (dir != NULL)
+
+#elif (SOLARIS2 >= 8) && (SOLARIS2 <= 10)
+	if (dir != NULL) {
 		if (dir->ire_fp_mp == NULL || dir->ire_dlureq_mp == NULL) {
+			ire_refrele(dir);
+			dir = NULL;
+		}
+	}
+#else
+
+	if (dir != NULL)
+		if (dir->ire_nce && dir->ire_nce->nce_state != ND_REACHABLE) {
 			ire_refrele(dir);
 			dir = NULL;
 		}
@@ -1416,11 +1425,16 @@ frdest_t *fdp;
 #if SOLARIS2 < 8
 		mp = dir->ire_ll_hdr_mp;
 		hlen = dir->ire_ll_hdr_length;
-#else
+#elif (SOLARIS2 >= 8) && (SOLARIS2 <= 10)
 		mp = dir->ire_fp_mp;
 		hlen = mp ? mp->b_wptr - mp->b_rptr : 0;
 		if (mp == NULL)
 			mp = dir->ire_dlureq_mp;
+#else
+		mp = dir->ire_nce->nce_fp_mp;
+		hlen = mp ? mp->b_wptr - mp->b_rptr : 0;
+		if (mp == NULL)
+			mp = dir->ire_nce->nce_res_mp;
 #endif
 #endif
 		if (fin->fin_out == 0) {

@@ -134,6 +134,7 @@ f none usr/include/inet/common.h 644 root bin
 f none usr/include/inet/ip.h 644 root bin
 f none usr/include/inet/ip_if.h 644 root bin
 f none usr/include/inet/ip_ire.h 644 root bin
+f none usr/include/inet/ip_ftable.h 644 root bin
 f none usr/include/inet/ip_multi.h 644 root bin
 f none usr/include/inet/ip_rts.h 644 root bin
 f none usr/include/inet/ip6.h 644 root bin
@@ -240,6 +241,7 @@ f none usr/include/net/ppp_defs.h 644 root bin
 f none usr/include/net/pppio.h 644 root bin
 f none usr/include/net/vjcompress.h 644 root bin
 f none usr/include/net/route.h 644 root bin
+f none usr/include/net/radix.h 644 root bin
 f none usr/include/netconfig.h 644 root bin
 f none usr/include/netdb.h 644 root bin
 f none usr/include/netdir.h 644 root bin

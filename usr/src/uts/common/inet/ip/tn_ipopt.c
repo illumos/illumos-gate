@@ -41,6 +41,7 @@
 #include <inet/tcp.h>
 #include <inet/ipclassifier.h>
 #include <inet/ip_ire.h>
+#include <inet/ip_ftable.h>
 
 /*
  * This routine takes a sensitivity label as input and creates a CIPSO

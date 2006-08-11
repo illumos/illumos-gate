@@ -74,6 +74,7 @@
 #include <inet/tcp.h>
 #include <inet/ip_multi.h>
 #include <inet/ip_ire.h>
+#include <inet/ip_ftable.h>
 #include <inet/ip_rts.h>
 #include <inet/ip_ndp.h>
 #include <inet/ip_if.h>
@@ -3815,7 +3816,7 @@ ill_set_nce_router_flags(ill_t *ill, boolean_t enable)
 	nce_t *nce;
 
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
-		nce = ndp_lookup(ill, &ipif->ipif_v6lcl_addr, B_FALSE);
+		nce = ndp_lookup_v6(ill, &ipif->ipif_v6lcl_addr, B_FALSE);
 		if (nce != NULL) {
 			mutex_enter(&nce->nce_lock);
 			if (enable)
@@ -5615,13 +5616,15 @@ ill_is_quiescent(ill_t *ill)
 	ASSERT(MUTEX_HELD(&ill->ill_lock));
 
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
-		if (ipif->ipif_refcnt != 0 || ipif->ipif_ire_cnt != 0)
+		if (ipif->ipif_refcnt != 0 || ipif->ipif_ire_cnt != 0) {
 			return (B_FALSE);
+		}
 	}
 	if (ill->ill_ire_cnt != 0 || ill->ill_refcnt != 0 ||
 	    ill->ill_nce_cnt != 0 || ill->ill_srcif_refcnt != 0 ||
-	    ill->ill_mrtun_refcnt != 0)
+	    ill->ill_mrtun_refcnt != 0) {
 		return (B_FALSE);
+	}
 	return (B_TRUE);
 }
 
@@ -5637,16 +5640,18 @@ ipif_is_quiescent(ipif_t *ipif)
 
 	ASSERT(MUTEX_HELD(&ipif->ipif_ill->ill_lock));
 
-	if (ipif->ipif_refcnt != 0 || ipif->ipif_ire_cnt != 0)
+	if (ipif->ipif_refcnt != 0 || ipif->ipif_ire_cnt != 0) {
 		return (B_FALSE);
+	}
 
 	ill = ipif->ipif_ill;
 	if (ill->ill_ipif_up_count != 0 || ill->ill_logical_down)
 		return (B_TRUE);
 
 	/* This is the last ipif going down or being deleted on this ill */
-	if (ill->ill_ire_cnt != 0 || ill->ill_refcnt != 0)
+	if (ill->ill_ire_cnt != 0 || ill->ill_refcnt != 0) {
 		return (B_FALSE);
+	}
 
 	return (B_TRUE);
 }
@@ -6027,7 +6032,8 @@ ip_thread_exit(void)
 	rw_exit(&ill_g_lock);
 
 	ire_walk(ire_thread_exit, NULL);
-	ndp_walk_impl(NULL, nce_thread_exit, NULL, B_FALSE);
+	ndp_walk_common(&ndp4, NULL, nce_thread_exit, NULL, B_FALSE);
+	ndp_walk_common(&ndp6, NULL, nce_thread_exit, NULL, B_FALSE);
 }
 
 /*
@@ -6274,7 +6280,7 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 					ipif_refrele(ipif);
 				return (ENOMEM);
 			}
-			error = ire_add(&ire, q, mp, func);
+			error = ire_add(&ire, q, mp, func, B_FALSE);
 			if (error == 0)
 				goto save_ire;
 			if (ipif_refheld)
@@ -6469,10 +6475,12 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		 *
 		 * Needless to say, the real IRE_LOOPBACK is NOT created by this
 		 * routine, but rather using ire_create() directly.
+		 *
 		 */
 		if (ipif->ipif_net_type == IRE_LOOPBACK)
 			ire->ire_type = IRE_IF_NORESOLVER;
-		error = ire_add(&ire, q, mp, func);
+
+		error = ire_add(&ire, q, mp, func, B_FALSE);
 		if (error == 0)
 			goto save_ire;
 
@@ -6609,7 +6617,7 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	 */
 
 	/* Add the new IRE. */
-	error = ire_add(&ire, q, mp, func);
+	error = ire_add(&ire, q, mp, func, B_FALSE);
 	if (error != 0) {
 		/*
 		 * In the result of failure, ire_add() will have already
@@ -9992,8 +10000,21 @@ ip_sioctl_iocack(queue_t *q, mblk_t *mp)
 			storage += ill_xarp_info(&xar->xarp_ha, ipsqill);
 
 		if (ire != NULL) {
+			/*
+			 * Since the ire obtained from cachetable is used for
+			 * mac addr copying below, treat an incomplete ire as if
+			 * as if we never found it.
+			 */
+			if (ire->ire_nce != NULL &&
+			    ire->ire_nce->nce_state != ND_REACHABLE) {
+				ire_refrele(ire);
+				ire = NULL;
+				ipsqill = NULL;
+				goto errack;
+			}
 			*flagsp = ATF_INUSE;
-			llmp = ire->ire_dlureq_mp;
+			llmp = (ire->ire_nce != NULL ?
+			    ire->ire_nce->nce_res_mp : NULL);
 			if (llmp != NULL && ipsqill != NULL) {
 				uchar_t *macaddr;
 
@@ -10070,7 +10091,7 @@ ip_sioctl_iocack(queue_t *q, mblk_t *mp)
 			iocp->ioc_error = 0;
 		}
 	}
-
+errack:
 	if (iocp->ioc_error || iocp->ioc_cmd != AR_ENTRY_SQUERY) {
 		err = iocp->ioc_error;
 		freemsg(mp);
@@ -14154,11 +14175,11 @@ ill_bcast_delete_and_add(ill_t *ill, ipaddr_t addr)
 		    (uchar_t *)&ire->ire_in_src_addr,
 		    ire->ire_stq == NULL ? &ip_loopback_mtu :
 			&ire->ire_ipif->ipif_mtu,
-		    ire->ire_fp_mp,
+		    (ire->ire_nce != NULL ? ire->ire_nce->nce_fp_mp : NULL),
 		    ire->ire_rfq,
 		    ire->ire_stq,
 		    ire->ire_type,
-		    ire->ire_dlureq_mp,
+		    (ire->ire_nce != NULL? ire->ire_nce->nce_res_mp : NULL),
 		    ire->ire_ipif,
 		    ire->ire_in_ill,
 		    ire->ire_cmask,
@@ -14191,7 +14212,7 @@ ill_bcast_delete_and_add(ill_t *ill, ipaddr_t addr)
 
 		/* ire_add adds the ire at the right place in the list */
 		oire = nire;
-		error = ire_add(&nire, NULL, NULL, NULL);
+		error = ire_add(&nire, NULL, NULL, NULL, B_FALSE);
 		ASSERT(error == 0);
 		ASSERT(oire == nire);
 		ire_refrele(nire);	/* Held in ire_add */
@@ -14449,7 +14470,13 @@ redo:
 	 */
 	if (clear_ire != NULL && irep != NULL && *irep != clear_ire) {
 		ire_t *clear_ire_stq = NULL;
+		mblk_t *fp_mp = NULL, *res_mp = NULL;
+
 		bzero(new_lb_ire, sizeof (ire_t));
+		if (clear_ire->ire_nce != NULL) {
+			fp_mp = clear_ire->ire_nce->nce_fp_mp;
+			res_mp = clear_ire->ire_nce->nce_res_mp;
+		}
 		/* XXX We need a recovery strategy here. */
 		if (ire_init(new_lb_ire,
 		    (uchar_t *)&clear_ire->ire_addr,
@@ -14458,11 +14485,11 @@ redo:
 		    (uchar_t *)&clear_ire->ire_gateway_addr,
 		    (uchar_t *)&clear_ire->ire_in_src_addr,
 		    &clear_ire->ire_max_frag,
-		    clear_ire->ire_fp_mp,
+		    fp_mp,
 		    clear_ire->ire_rfq,
 		    clear_ire->ire_stq,
 		    clear_ire->ire_type,
-		    clear_ire->ire_dlureq_mp,
+		    res_mp,
 		    clear_ire->ire_ipif,
 		    clear_ire->ire_in_ill,
 		    clear_ire->ire_cmask,
@@ -14483,6 +14510,14 @@ redo:
 				clear_ire_stq = ire_next;
 
 				bzero(new_nlb_ire, sizeof (ire_t));
+				if (clear_ire_stq->ire_nce != NULL) {
+					fp_mp =
+					    clear_ire_stq->ire_nce->nce_fp_mp;
+					res_mp =
+					    clear_ire_stq->ire_nce->nce_res_mp;
+				} else {
+					fp_mp = res_mp = NULL;
+				}
 				/* XXX We need a recovery strategy here. */
 				if (ire_init(new_nlb_ire,
 				    (uchar_t *)&clear_ire_stq->ire_addr,
@@ -14491,11 +14526,11 @@ redo:
 				    (uchar_t *)&clear_ire_stq->ire_gateway_addr,
 				    (uchar_t *)&clear_ire_stq->ire_in_src_addr,
 				    &clear_ire_stq->ire_max_frag,
-				    clear_ire_stq->ire_fp_mp,
+				    fp_mp,
 				    clear_ire_stq->ire_rfq,
 				    clear_ire_stq->ire_stq,
 				    clear_ire_stq->ire_type,
-				    clear_ire_stq->ire_dlureq_mp,
+				    res_mp,
 				    clear_ire_stq->ire_ipif,
 				    clear_ire_stq->ire_in_ill,
 				    clear_ire_stq->ire_cmask,
@@ -14517,7 +14552,7 @@ redo:
 		 * ire from the list and do the refrele.
 		 */
 		clear_ire->ire_marks |= IRE_MARK_CONDEMNED;
-		irb->irb_marks |= IRE_MARK_CONDEMNED;
+		irb->irb_marks |= IRB_MARK_CONDEMNED;
 
 		if (clear_ire_stq != NULL) {
 			ire_fastpath_list_delete(
@@ -17705,8 +17740,10 @@ ipif_down(ipif_t *ipif, queue_t *q, mblk_t *mp)
 			ipif_renominate_bcast(ipif);
 	}
 
-	if (ipif->ipif_isv6)
-		ipif_ndp_down(ipif);
+	/*
+	 * neighbor-discovery or arp entries for this interface.
+	 */
+	ipif_ndp_down(ipif);
 
 	/*
 	 * If mp is NULL the caller will wait for the appropriate refcnt.
@@ -18565,7 +18602,7 @@ ipif_recover_ire(ipif_t *ipif)
 		 *
 		 * As ifrt->ifrt_type reflects the already updated ire_type and
 		 * since ire_create() expects that IRE_IF_NORESOLVER will have
-		 * a valid ire_dlureq_mp field (which doesn't make sense for a
+		 * a valid nce_res_mp field (which doesn't make sense for a
 		 * IRE_LOOPBACK), ire_create() will be called in the same way
 		 * here as in ip_rt_add(), namely using ipif->ipif_net_type when
 		 * the route looks like a traditional interface route (where
@@ -18660,7 +18697,7 @@ ipif_recover_ire(ipif_t *ipif)
 		 * ire held by ire_add, will be refreled' towards the
 		 * the end of ipif_up_done
 		 */
-		(void) ire_add(&ire, NULL, NULL, NULL);
+		(void) ire_add(&ire, NULL, NULL, NULL, B_FALSE);
 		*irep = ire;
 		irep++;
 		ip1dbg(("ipif_recover_ire: added ire %p\n", (void *)ire));
@@ -19343,7 +19380,7 @@ ipif_up_done(ipif_t *ipif)
 		/*
 		 * refheld by ire_add. refele towards the end of the func
 		 */
-		(void) ire_add(irep1, NULL, NULL, NULL);
+		(void) ire_add(irep1, NULL, NULL, NULL, B_FALSE);
 	}
 	ire_added = B_TRUE;
 	/*
@@ -20139,7 +20176,7 @@ ipif_recreate_interface_routes(ipif_t *old_ipif, ipif_t *ipif)
 		 */
 		ire_delete(ipif_ire);
 		ret_ire = ire;
-		error = ire_add(&ret_ire, NULL, NULL, NULL);
+		error = ire_add(&ret_ire, NULL, NULL, NULL, B_FALSE);
 		ASSERT(error == 0);
 		ASSERT(ire == ret_ire);
 		/* Held in ire_add */
@@ -20552,7 +20589,7 @@ ipif_check_bcast_ires(ipif_t *test_ipif)
 		int error;
 
 		irep1--;
-		error = ire_add(irep1, NULL, NULL, NULL);
+		error = ire_add(irep1, NULL, NULL, NULL, B_FALSE);
 		if (error == 0) {
 			ire_refrele(*irep1);		/* Held in ire_add */
 		}
@@ -22388,7 +22425,8 @@ ip_cgtp_bcast_add(ire_t *ire, ire_t *ire_dst)
 
 		if (bcast_ire != NULL) {
 
-			if (ire_add(&bcast_ire, NULL, NULL, NULL) == 0) {
+			if (ire_add(&bcast_ire, NULL, NULL, NULL,
+			    B_FALSE) == 0) {
 				ip2dbg(("ip_cgtp_filter_bcast_add: "
 				    "added bcast_ire %p\n",
 				    (void *)bcast_ire));
