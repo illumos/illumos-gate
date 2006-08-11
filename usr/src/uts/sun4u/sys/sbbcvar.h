@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +102,7 @@ typedef struct sbbcsoft {
 	sbbc_pci_rangespec_t *rangep;
 	int range_cnt;
 	int range_len;
-	struct pci_sbbc *pci_sbbc_map;		/* sbbc registers and devices */
+	struct sbbc_regs_map *pci_sbbc_map;	/* SBBC Internal Registers */
 	ddi_acc_handle_t pci_sbbc_map_handle;
 	ddi_iblock_cookie_t sbbc_iblock_cookie; /* interrupt block cookie */
 	kmutex_t sbbc_intr_mutex;		/* lock for interrupts */

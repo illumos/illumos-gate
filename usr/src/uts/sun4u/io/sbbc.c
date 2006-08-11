@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,45 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Starcat PCI SBBC Device Nexus Driver that provides interfaces into
- * Console Bus, I2C, Error/Intr. EPLD, IOSRAM, and JTAG.
+ * Starcat PCI SBBC Nexus Driver.
+ *
+ * This source code's compiled binary runs on both a Starcat System
+ * Controller (SSC) and a Starcat Domain.  One of the SBBC hardware
+ * registers is read during attach(9e) in order to determine which
+ * environment the driver is executing on.
+ *
+ * On both the SSC and the Domain, this driver provides nexus driver
+ * services to its Device Tree children.  Note that the children in
+ * each environment are not necessarily the same.
+ *
+ * This driver allows one concurrent open(2) of its associated device
+ * (/dev/sbbc0).  The client uses the file descriptor to issue
+ * ioctl(2)'s in order to read and write from the 2MB (PCI) space
+ * reserved for "SBBC Internal Registers".  Among other things,
+ * these registers consist of command/control/status registers for
+ * devices such as Console Bus, I2C, EPLD, IOSRAM, and JTAG.  The 2MB
+ * space is very sparse; EINVAL is returned if a reserved or unaligned
+ * address is specified in the ioctl(2).
+ *
+ * Note that the 2MB region reserved for SBBC Internal Registers is
+ * a subset of the 128MB of PCI address space addressable by the SBBC
+ * ASIC.  Address space outside of the 2MB (such as the 64MB reserved
+ * for the Console Bus) is not accessible via this driver.
+ *
+ * Also, note that the SBBC Internal Registers are only read and
+ * written by the SSC; no process on the Domain accesses these
+ * registers.  As a result, the registers are unmapped (when running
+ * on the Domain) near the end of attach(9e) processing.  This conserves
+ * kernel virtual address space resources (as one instance of the driver
+ * is created for each Domain-side IO assembly).  (To be complete, only
+ * one instance of the driver is created on the SSC).
  */
 
 #include <sys/types.h>
@@ -55,7 +84,6 @@
 #include <sys/sbbcreg.h>	/* hw description */
 #include <sys/sbbcvar.h>	/* driver description */
 #include <sys/sbbcio.h>		/* ioctl description */
-
 
 #define	getprop(dip, name, addr, intp)		\
 		ddi_getlongprop(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS, \
@@ -115,6 +143,7 @@ static void sbbc_remove_reg_maps(struct sbbcsoft *);
 uint32_t sbbc_dbg_flags = 0x0;
 static void sbbc_dbg(uint32_t flag, dev_info_t *dip, char *fmt,
 	uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5);
+static void sbbc_dump_devid(dev_info_t *, struct sbbcsoft *, int instance);
 #endif
 
 /*
@@ -131,6 +160,8 @@ int sbbctrace_count;
  */
 
 static void *sbbcsoft_statep;
+
+/* Determines whether driver is executing on System Controller or Domain */
 int sbbc_scmode = FALSE;
 
 /*
@@ -261,9 +292,7 @@ sbbc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	char	name[32];
 	struct	sbbcsoft *sbbcsoftp;
 	struct ddi_device_acc_attr attr;
-	uint32_t sbbc_id_reg = 0;
-	uint16_t sbbc_id_reg_partid;
-	uint16_t sbbc_id_reg_manfid;
+	uint32_t sbbc_id_reg;
 
 	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
@@ -281,8 +310,8 @@ sbbc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DDI_RESUME:
 		if (!(sbbcsoftp =
 		    ddi_get_soft_state(sbbcsoft_statep, instance))) {
-			cmn_err(CE_WARN,
-	    "sbbc_attach:resume: unable to acquire sbbcsoftp for instance %d",
+			cmn_err(CE_WARN, "sbbc_attach:resume: unable "
+			    "to acquire sbbcsoftp for instance %d",
 			    instance);
 			return (DDI_FAILURE);
 		}
@@ -300,18 +329,16 @@ sbbc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_soft_state_zalloc(sbbcsoft_statep, instance) != 0) {
-	    cmn_err(CE_WARN,
-	    "sbbc_attach: Unable to allocate statep for instance %d",
-				    instance);
+		cmn_err(CE_WARN, "sbbc_attach: Unable to allocate statep "
+		    "for instance %d", instance);
 		return (DDI_FAILURE);
 	}
 
 	sbbcsoftp = ddi_get_soft_state(sbbcsoft_statep, instance);
 
 	if (sbbcsoftp == NULL) {
-	    cmn_err(CE_WARN,
-	    "sbbc_attach: Unable to acquire sbbcsoftp for instance %d",
-					    instance);
+		cmn_err(CE_WARN, "sbbc_attach: Unable to acquire "
+		    "sbbcsoftp for instance %d", instance);
 		ddi_soft_state_free(sbbcsoft_statep, instance);
 		return (DDI_FAILURE);
 	}
@@ -326,105 +353,73 @@ sbbc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * a child gets initialized.
 	 */
 	if (sbbc_get_ranges(sbbcsoftp)) {
-	    cmn_err(CE_WARN,
-	    "sbbc_attach: Unable to read sbbc ranges from OBP %d", instance);
-	    ddi_soft_state_free(sbbcsoft_statep, instance);
+		cmn_err(CE_WARN, "sbbc_attach: Unable to read sbbc "
+		    "ranges from OBP %d", instance);
+		ddi_soft_state_free(sbbcsoft_statep, instance);
 		return (DDI_FAILURE);
 	}
 
 	if (sbbc_config4pci(sbbcsoftp)) {
-	    cmn_err(CE_WARN,
-	    "sbbc_attach: Unable to configure sbbc on PCI %d", instance);
-	    kmem_free(sbbcsoftp->rangep, sbbcsoftp->range_len);
-	    ddi_soft_state_free(sbbcsoft_statep, instance);
+		cmn_err(CE_WARN, "sbbc_attach: Unable to configure "
+		    "sbbc on PCI %d", instance);
+		kmem_free(sbbcsoftp->rangep, sbbcsoftp->range_len);
+		ddi_soft_state_free(sbbcsoft_statep, instance);
 		return (DDI_FAILURE);
-	}
-
-	/*
-	 * Map SBBC's internal registers used by hardware access daemon.
-	 */
-
-	/* map the whole thing since OBP does not map individual devices */
-	if (ddi_regs_map_setup(dip, 1, (caddr_t *)&sbbcsoftp->pci_sbbc_map,
-	    0, 0, &attr, &sbbcsoftp->pci_sbbc_map_handle) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "(%d):sbbc_attach failed to map sbbc_reg",
-			instance);
-		goto failed;
-	}
-
-	sbbc_id_reg = ddi_get32(sbbcsoftp->pci_sbbc_map_handle,
-		    (uint32_t *)
-		    &sbbcsoftp->pci_sbbc_map->sbbc_internal_regs.device_conf);
-
-	if (sbbc_id_reg & SBBC_SC_MODE) {
-
-		SBBC_DBG5(SBBC_DBG_ATTACH, dip,
-	"Mapped sbbc %llx, regs %llx, eregs %llx, sram %llx, consbus %llx\n",
-		    sbbcsoftp->pci_sbbc_map,
-		    &sbbcsoftp->pci_sbbc_map->sbbc_internal_regs,
-		    &sbbcsoftp->pci_sbbc_map->echip_regs,
-		    &sbbcsoftp->pci_sbbc_map->sram[0],
-		    &sbbcsoftp->pci_sbbc_map->consbus);
-
-		sbbc_id_reg = ddi_get32(sbbcsoftp->pci_sbbc_map_handle,
-			    (uint32_t *)
-		    &sbbcsoftp->pci_sbbc_map->sbbc_internal_regs.devid);
-		sbbc_id_reg_partid = ((sbbc_id_reg << 4) >> 16);
-		sbbc_id_reg_manfid = ((sbbc_id_reg << 20) >> 21);
-		SBBC_DBG4(SBBC_DBG_ATTACH, dip,
-		    "FOUND SBBC(%d) Version %x, Partid %x, Manfid %x\n",
-		    instance, (sbbc_id_reg >> 28), sbbc_id_reg_partid,
-		    sbbc_id_reg_manfid);
-
-		sbbc_scmode = TRUE;
-		SBBC_DBG1(SBBC_DBG_ATTACH, dip,
-	    "SBBC(%d) nexus running in System Controller Mode.\n",
-		    instance);
-
-		/*
-		 * There will be only one SBBC instance on SC and no
-		 * chosen node stuff to deal with :-)
-		 */
-
-	} else {
-		/* The code below needs to be common with SC mode above */
-
-		SBBC_DBG4(SBBC_DBG_ATTACH, dip,
-	"Mapped sbbc %llx, regs %llx, eregs %llx, sram %llx\n",
-		    sbbcsoftp->pci_sbbc_map,
-		    &sbbcsoftp->pci_sbbc_map->sbbc_internal_regs,
-		    &sbbcsoftp->pci_sbbc_map->echip_regs,
-		    &sbbcsoftp->pci_sbbc_map->sram[0]);
-
-		sbbc_id_reg = ddi_get32(sbbcsoftp->pci_sbbc_map_handle,
-			    (uint32_t *)
-		    &sbbcsoftp->pci_sbbc_map->sbbc_internal_regs.devid);
-		sbbc_id_reg_partid = ((sbbc_id_reg << 4) >> 16);
-		sbbc_id_reg_manfid = ((sbbc_id_reg << 20) >> 21);
-		SBBC_DBG4(SBBC_DBG_ATTACH, dip,
-		    "FOUND SBBC(%d) Version %x, Partid %x, Manfid %x\n",
-		    instance, (sbbc_id_reg >> 28), sbbc_id_reg_partid,
-		    sbbc_id_reg_manfid);
-
-		sbbc_scmode = FALSE;
-		SBBC_DBG1(SBBC_DBG_ATTACH, dip,
-	    "SBBC(%d) nexus running in Domain Mode.\n",
-		    instance);
-
-		/*
-		 * There will be only one SBBC instance on SC and no
-		 * chosen node stuff to deal with :-)
-		 */
-
 	}
 
 	mutex_init(&sbbcsoftp->umutex, NULL, MUTEX_DRIVER, (void *)NULL);
 	mutex_init(&sbbcsoftp->sbbc_intr_mutex, NULL,
 	    MUTEX_DRIVER, (void *)NULL);
 
-	/* initialize sbbc */
-	if (!sbbc_init(sbbcsoftp)) {
-		goto remlock;
+	/* Map SBBC's Internal Registers */
+	if (ddi_regs_map_setup(dip, 1, (caddr_t *)&sbbcsoftp->pci_sbbc_map,
+	    offsetof(struct pci_sbbc, sbbc_internal_regs),
+	    sizeof (struct sbbc_regs_map), &attr,
+	    &sbbcsoftp->pci_sbbc_map_handle) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "(%d):sbbc_attach failed to map sbbc_reg",
+		    instance);
+		goto failed;
+	}
+
+	SBBC_DBG1(SBBC_DBG_ATTACH, dip, "Mapped sbbc at %lx\n",
+	    sbbcsoftp->pci_sbbc_map);
+#ifdef DEBUG
+	sbbc_dump_devid(dip, sbbcsoftp, instance);
+#endif
+	/*
+	 * Read a hardware register to determine if we are executing on
+	 * a Starcat System Controller or a Starcat Domain.
+	 */
+	sbbc_id_reg = ddi_get32(sbbcsoftp->pci_sbbc_map_handle,
+	    &sbbcsoftp->pci_sbbc_map->device_conf);
+
+	if (sbbc_id_reg & SBBC_SC_MODE) {
+		sbbc_scmode = TRUE;
+		SBBC_DBG1(SBBC_DBG_ATTACH, dip, "SBBC(%d) nexus running "
+		    "in System Controller Mode.\n", instance);
+
+		/* initialize SBBC ASIC */
+		if (!sbbc_init(sbbcsoftp)) {
+			goto failed;
+		}
+	} else {
+		sbbc_scmode = FALSE;
+		SBBC_DBG1(SBBC_DBG_ATTACH, dip, "SBBC(%d) nexus "
+		    "running in Domain Mode.\n", instance);
+
+		/* initialize SBBC ASIC before we unmap registers */
+		if (!sbbc_init(sbbcsoftp)) {
+			goto failed;
+		}
+
+		/*
+		 * Access to SBBC registers is no longer needed.  Unmap
+		 * the registers to conserve kernel virtual address space.
+		 */
+		SBBC_DBG1(SBBC_DBG_ATTACH, dip, "SBBC(%d): unmap "
+		    "SBBC registers\n", instance);
+		sbbc_remove_reg_maps(sbbcsoftp);
+		sbbcsoftp->pci_sbbc_map = NULL;
 	}
 
 	(void) sprintf(name, "sbbc%d", instance);
@@ -432,7 +427,7 @@ sbbc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ddi_create_minor_node(dip, name, S_IFCHR, instance, NULL,
 	    NULL) == DDI_FAILURE) {
 		ddi_remove_minor_node(dip, NULL);
-		goto remlock;
+		goto failed;
 	}
 
 	ddi_report_dev(dip);
@@ -441,11 +436,10 @@ sbbc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	return (DDI_SUCCESS);
 
-remlock:
+failed:
 	mutex_destroy(&sbbcsoftp->sbbc_intr_mutex);
 	mutex_destroy(&sbbcsoftp->umutex);
 
-failed:
 	sbbc_remove_reg_maps(sbbcsoftp);
 	kmem_free(sbbcsoftp->rangep, sbbcsoftp->range_len);
 	ddi_soft_state_free(sbbcsoft_statep, instance);
@@ -1140,6 +1134,11 @@ sbbc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		struct ssc_sbbc_regio sbbcregs;
 		uint64_t offset;
 
+		if (sbbc_scmode == FALSE) {
+			/* then we're executing on Domain; Writes not allowed */
+			return (EINVAL);
+		}
+
 		if (arg == NULL) {
 			return (ENXIO);
 		}
@@ -1164,7 +1163,7 @@ sbbc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			return (EINVAL);
 		}
 
-		offset = (uint64_t)&sbbcsoftp->pci_sbbc_map->sbbc_internal_regs;
+		offset = (uint64_t)sbbcsoftp->pci_sbbc_map;
 		offset += sbbcregs.offset;
 		ddi_put32(sbbcsoftp->pci_sbbc_map_handle, (uint32_t *)offset,
 			    sbbcregs.value);
@@ -1175,6 +1174,11 @@ sbbc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		struct ssc_sbbc_regio sbbcregs;
 		uint64_t offset;
 
+		if (sbbc_scmode == FALSE) {
+			/* then we're executing on Domain; Reads not allowed */
+			return (EINVAL);
+		}
+
 		if (arg == NULL) {
 			return (ENXIO);
 		}
@@ -1199,7 +1203,7 @@ sbbc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			return (EINVAL);
 		}
 
-		offset = (uint64_t)&sbbcsoftp->pci_sbbc_map->sbbc_internal_regs;
+		offset = (uint64_t)sbbcsoftp->pci_sbbc_map;
 		offset += sbbcregs.offset;
 
 		sbbcregs.value = ddi_get32(sbbcsoftp->pci_sbbc_map_handle,
@@ -1227,21 +1231,15 @@ sbbc_remove_reg_maps(struct sbbcsoft *sbbcsoftp)
 	SBBCTRACE(sbbc_remove_reg_maps, 'RMAP', sbbcsoftp);
 	if (sbbcsoftp->pci_sbbc_map_handle)
 		ddi_regs_map_free(&sbbcsoftp->pci_sbbc_map_handle);
-
-	/* need to unmap other registers as well */
 }
 
 
 static int
 sbbc_init(struct sbbcsoft *sbbcsoftp)
 {
-
-	/*
-	 * setup the regs. and mask all the interrupts
-	 * till we are ready.
-	 */
+	/* Mask all the interrupts until we are ready. */
 	ddi_put32(sbbcsoftp->pci_sbbc_map_handle,
-	    &sbbcsoftp->pci_sbbc_map->sbbc_internal_regs.sys_intr_enable,
+	    &sbbcsoftp->pci_sbbc_map->sys_intr_enable,
 	    0x00000000);
 
 	return (1);
@@ -1468,6 +1466,28 @@ sbbc_dbg(uint32_t flag, dev_info_t *dip, char *fmt,
 			ddi_get_instance(dip));
 		cmn_err(CE_CONT, fmt, a1, a2, a3, a4, a5);
 	}
+}
+
+/*
+ * Dump the SBBC chip's Device ID Register
+ */
+static void sbbc_dump_devid(dev_info_t *dip, struct sbbcsoft *sbbcsoftp,
+	int instance)
+{
+	uint32_t sbbc_id_reg;
+	uint16_t sbbc_id_reg_partid;
+	uint16_t sbbc_id_reg_manfid;
+
+	sbbc_id_reg = ddi_get32(sbbcsoftp->pci_sbbc_map_handle,
+	    (uint32_t *)&sbbcsoftp->pci_sbbc_map->devid);
+
+	sbbc_id_reg_partid = ((sbbc_id_reg << 4) >> 16);
+	sbbc_id_reg_manfid = ((sbbc_id_reg << 20) >> 21);
+
+	SBBC_DBG4(SBBC_DBG_ATTACH, dip,
+	    "FOUND SBBC(%d) Version %x, Partid %x, Manfid %x\n",
+	    instance, (sbbc_id_reg >> 28), sbbc_id_reg_partid,
+	    sbbc_id_reg_manfid);
 }
 
 #endif /* DEBUG */

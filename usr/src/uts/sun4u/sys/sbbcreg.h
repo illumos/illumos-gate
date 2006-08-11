@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SBBCREG_H
@@ -129,6 +128,8 @@ struct sbbc_regs_map {
 	uint32_t pci_to_consbus_map;	/* 0x0.4000 SBBC */
 	pad12_t  padab;
 	uint32_t consbus_to_pci_map;	/* 0x0.4010 SBBC */
+	uint32_t pad14[2247];
+					/* 0x0.6330 SBBC */
 };
 
 
@@ -207,7 +208,7 @@ struct ssc_eild_reg_map {
 struct pci_sbbc {
 	uint8_t fprom[0x800000];	/* FPROM */
 	struct sbbc_regs_map sbbc_internal_regs;	/* sbbc registers */
-	uint8_t dontcare[0x7BFEC];	/* non-sbbc registers */
+	uint8_t dontcare[0x79CD0];	/* reserved sbbc registers */
 	struct ssc_echip_regs echip_regs;
 	struct ssc_devpresence_regs devpres_regs;
 	struct ssc_i2cmux_regs i2cmux_regs;
