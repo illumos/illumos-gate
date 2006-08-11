@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -357,6 +357,9 @@ status(struct mtget *bp)
 		(void) printf("retries= %d\n", bp->mt_dsreg);
 		(void) printf("   file no= %ld   block no= %ld\n",
 		    bp->mt_fileno, bp->mt_blkno);
+		if ((bp->mt_flags & MTF_WORM_MEDIA) != 0) {
+			(void) printf("   WORM media\n");
+		}
 	} else {
 		/* Handle non-SCSI drives here. */
 		if (mt->t_type == 0) {

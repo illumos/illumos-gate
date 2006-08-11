@@ -162,6 +162,7 @@ struct mtdrivetype_request32 {
 
 #define	MTF_TAPE_HEAD_DIRTY	0x08
 #define	MTF_TAPE_CLN_SUPPORTED	0x10
+#define	MTF_WORM_MEDIA		0x20
 
 /*
  * Constants for mt_type byte (these are somewhat obsolete)
@@ -225,6 +226,7 @@ struct mtdrivetype_request32 {
 #define	MT_ISSTK9840	0x39		/* sun: STK 9840, 9940, 9840B */
 #define	MT_ISBMDLT1	0x3a		/* sun: Benchmark DLT1 */
 #define	MT_LTO		0x3b		/* sun: LTO,s by Hp, Seagate, IBM .. */
+#define	MT_ISAIT	0x3c		/* Sony: AIT I II III and SAIT */
 
 /*
  * Device table structure and data for looking tape name from

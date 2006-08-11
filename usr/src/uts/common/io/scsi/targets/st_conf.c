@@ -1119,15 +1119,16 @@ const struct st_drivetype st_drivetypes[] =
     MT_LTO,                   /* .type            Numeric type (cf. mtio.h)   */
     0,                        /* .bsize           Block size (0 = variable)   */
                               /* .options         Drive option flags:         */
-    ST_VARIABLE         |     /*    00001           Supports variable length  */
-    ST_BSF              |     /*    00008           Supports SPACE block fwd  */
-    ST_BSR              |     /*    00010           Supports SPACE block rev  */
-    ST_KNOWS_EOD        |     /*    00200           Recognizes end-of-data    */
-    ST_UNLOADABLE       |     /*    00400           Driver can be unloaded    */
-    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */ 
-    ST_MODE_SEL_COMP,         /*    10000           Mode select compression   */
-                              /*    -----                                     */
-                              /*    18619                                     */
+    ST_VARIABLE         |     /*  0000001           Supports variable length  */
+    ST_BSF              |     /*  0000008           Supports SPACE block fwd  */
+    ST_BSR              |     /*  0000010           Supports SPACE block rev  */
+    ST_KNOWS_EOD        |     /*  0000200           Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*  0000400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000           Supports blocks > 64KB    */ 
+    ST_MODE_SEL_COMP    |     /*  0010000           Mode select compression   */
+    ST_WORMABLE,              /*  1000000           Drive is WORM capable     */
+                              /*  -------                                     */
+                              /*  1018619                                     */
     -1,                       /* .max_rretries    [Note 3]                    */
     -1,                       /* .max_wretries    [Note 3]                    */
     {0x42, 0x42, 0x44, 0x44}, /* .densities       Density codes [Note 1]      */
@@ -1358,15 +1359,16 @@ const struct st_drivetype st_drivetypes[] =
     ST_TYPE_DLT,              /* .type            Numeric type (cf. mtio.h)   */
     0,                        /* .bsize           Block size (0 = variable)   */
                               /* .options         Drive option flags:         */
-    ST_VARIABLE         |     /*    00001         Supports variable length    */
-    ST_BSF              |     /*    00008         Supports SPACE block fwd    */
-    ST_BSR              |     /*    00010         Supports SPACE block rev    */
-    ST_KNOWS_EOD        |     /*    00200         Recognizes end-of-data      */
-    ST_UNLOADABLE       |     /*    00400         Driver can be unloaded      */
-    ST_NO_RECSIZE_LIMIT |     /*    08000         Supports blocks > 64KB      */
-    ST_MODE_SEL_COMP,         /*    10000         Uses Mode select Compress   */
-                              /* --------                                     */
-                              /* 00018619                                     */
+    ST_VARIABLE         |     /*  0000001         Supports variable length    */
+    ST_BSF              |     /*  0000008         Supports SPACE block fwd    */
+    ST_BSR              |     /*  0000010         Supports SPACE block rev    */
+    ST_KNOWS_EOD        |     /*  0000200         Recognizes end-of-data      */
+    ST_UNLOADABLE       |     /*  0000400         Driver can be unloaded      */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000         Supports blocks > 64KB      */
+    ST_MODE_SEL_COMP    |     /*  0010000         Uses Mode select Compress   */
+    ST_WORMABLE,              /*  1000000         Is capable of WORM          */
+                              /*  -------                                     */
+                              /*  1018619                                     */
     -1,                       /* .max_rretries    [Note 3]                    */
     -1,                       /* .max_wretries    [Note 3]                    */
     {0x4a, 0x4a, 0x4a, 0x4a}, /* .densities       [Note 1]                    */
@@ -1620,16 +1622,17 @@ const struct st_drivetype st_drivetypes[] =
     ST_TYPE_DLT,              /* .type            Numeric type (cf. mtio.h)   */
     0,                        /* .bsize           Block size (0 = variable)   */
                               /* .options         Drive option flags:         */
-    ST_VARIABLE         |     /*   000001           Supports variable length  */
-    ST_BSF              |     /*   000008           Supports SPACE block fwd  */
-    ST_BSR              |     /*   000010           Supports SPACE block rev  */
-    ST_KNOWS_EOD        |     /*   000200           Recognizes end-of-data    */
-    ST_UNLOADABLE       |     /*   000400           Driver can be unloaded    */
-    ST_NO_RECSIZE_LIMIT |     /*   008000           Supports blocks > 64KB    */
-    ST_MODE_SEL_COMP    |     /*   010000           [Note 1]                  */
-    ST_KNOWS_MEDIA,           /*   800000         Media detrmines density     */
+    ST_VARIABLE         |     /*  0000001           Supports variable length  */
+    ST_BSF              |     /*  0000008           Supports SPACE block fwd  */
+    ST_BSR              |     /*  0000010           Supports SPACE block rev  */
+    ST_KNOWS_EOD        |     /*  0000200           Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*  0000400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP    |     /*  0010000           [Note 1]                  */
+    ST_KNOWS_MEDIA      |     /*  0800000         Media detrmines density     */
+    ST_WORMABLE,              /*  1000000            Supports WORM            */
                               /*    -----                                     */
-                              /*   818619                                     */
+                              /*  1818619                                     */
     -1,                       /* .max_rretries    Not used any more.          */
     -1,                       /* .max_wretries    Not used any more.          */
     {0x49, 0x4a, 0x4b, 0x4b}, /* .densities       Density codes [Note 1]      */
@@ -1889,16 +1892,17 @@ const struct st_drivetype st_drivetypes[] =
     ST_TYPE_STK9840,          /* .type               Numeric type (cf. mtio.h)*/
     0,                        /* .bsize              Block size (0 = variable)*/
                               /* .options            Drive option flags:      */
-    ST_VARIABLE         |     /*    00001            Supports variable length */
-    ST_BSF              |     /*    00008            Supports SPACE block fwd */
-    ST_BSR              |     /*    00010            Supports SPACE block rev */
-    ST_AUTODEN_OVERRIDE |     /*    00040            Autodensity override flag*/
-    ST_KNOWS_EOD        |     /*    00200            Recognizes end-of-data   */
-    ST_UNLOADABLE       |     /*    00400            Driver can be unloaded   */
-    ST_NO_RECSIZE_LIMIT |     /*    08000            Supports blocks > 64KB   */
-    ST_MODE_SEL_COMP,         /*    10000            [Note 1]                 */
-                              /*    -----                                     */
-                              /*    18659                                     */
+    ST_VARIABLE         |     /*  0000001            Supports variable length */
+    ST_BSF              |     /*  0000008            Supports SPACE block fwd */
+    ST_BSR              |     /*  0000010            Supports SPACE block rev */
+    ST_AUTODEN_OVERRIDE |     /*  0000040            Autodensity override flag*/
+    ST_KNOWS_EOD        |     /*  0000200            Recognizes end-of-data   */
+    ST_UNLOADABLE       |     /*  0000400            Driver can be unloaded   */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000            Supports blocks > 64KB   */
+    ST_MODE_SEL_COMP    |     /*  0010000            [Note 1]                 */
+    ST_WORMABLE,              /*  1000000            Supports WORM            */
+                              /*  -------                                     */
+                              /*  1018659                                     */
     -1,                       /* .max_rretries       [Note 4]                 */
     -1,                       /* .max_wretries       [Note 4]                 */
     {0x4A,0x4A,0x4A,0x4A},    /* .densities          Density codes [Note 2]   */
@@ -1937,15 +1941,16 @@ const struct st_drivetype st_drivetypes[] =
     ST_TYPE_STK9840,          /* .type               Numeric type (cf. mtio.h)*/
     0,                        /* .bsize              Block size (0 = variable)*/
                               /* .options            Drive option flags:      */
-    ST_VARIABLE         |     /*    00001            Supports variable length */
-    ST_BSF              |     /*    00008            Supports SPACE block fwd */
-    ST_BSR              |     /*    00010            Supports SPACE block rev */
-    ST_KNOWS_EOD        |     /*    00200            Recognizes end-of-data   */
-    ST_UNLOADABLE       |     /*    00400            Driver can be unloaded   */
-    ST_NO_RECSIZE_LIMIT |     /*    08000            Supports blocks > 64KB   */
-    ST_MODE_SEL_COMP,         /*    10000            [Note 1]                 */
-                              /*    -----                                     */
-                              /*    18619                                     */
+    ST_VARIABLE         |     /*  0000001            Supports variable length */
+    ST_BSF              |     /*  0000008            Supports SPACE block fwd */
+    ST_BSR              |     /*  0000010            Supports SPACE block rev */
+    ST_KNOWS_EOD        |     /*  0000200            Recognizes end-of-data   */
+    ST_UNLOADABLE       |     /*  0000400            Driver can be unloaded   */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000            Supports blocks > 64KB   */
+    ST_MODE_SEL_COMP    |     /*  0010000            [Note 1]                 */
+    ST_WORMABLE,              /*  1000000            Supports WORM            */
+                              /*  -------                                     */
+                              /*  1018619                                     */
     -1,                       /* .max_rretries       [Note 4]                 */
     -1,                       /* .max_wretries       [Note 4]                 */
     {0x45,0x45,0x45,0x45},    /* .densities          Density codes [Note 2]   */
@@ -1983,15 +1988,16 @@ const struct st_drivetype st_drivetypes[] =
     ST_TYPE_STK9840,          /* .type               Numeric type (cf. mtio.h)*/
     0,                        /* .bsize              Block size (0 = variable)*/
                               /* .options            Drive option flags:      */
-    ST_VARIABLE         |     /*    00001            Supports variable length */
-    ST_BSF              |     /*    00008            Supports SPACE block fwd */
-    ST_BSR              |     /*    00010            Supports SPACE block rev */
-    ST_KNOWS_EOD        |     /*    00200            Recognizes end-of-data   */
-    ST_UNLOADABLE       |     /*    00400            Driver can be unloaded   */
-    ST_NO_RECSIZE_LIMIT |     /*    08000            Supports blocks > 64KB   */
-    ST_MODE_SEL_COMP,         /*    10000            [Note 1]                 */
-                              /*    -----                                     */
-                              /*    18619                                     */
+    ST_VARIABLE         |     /*  0000001            Supports variable length */
+    ST_BSF              |     /*  0000008            Supports SPACE block fwd */
+    ST_BSR              |     /*  0000010            Supports SPACE block rev */
+    ST_KNOWS_EOD        |     /*  0000200            Recognizes end-of-data   */
+    ST_UNLOADABLE       |     /*  0000400            Driver can be unloaded   */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000            Supports blocks > 64KB   */
+    ST_MODE_SEL_COMP    |     /*  0010000            [Note 1]                 */
+    ST_WORMABLE,              /*  1000000            Supports WORM            */
+                              /*  -------                                     */
+                              /*  1018619                                     */
     -1,                       /* .max_rretries       [Note 4]                 */
     -1,                       /* .max_wretries       [Note 4]                 */
     {0x42,0x42,0x42,0x42},    /* .densities          Density codes [Note 2]   */
@@ -2025,16 +2031,17 @@ const struct st_drivetype st_drivetypes[] =
     ST_TYPE_STK9840,          /* .type               Numeric type (cf. mtio.h) */
     0,                        /* .bsize              Block size (0 = variable) */
                               /* .options            Drive option flags:       */
-    ST_VARIABLE         |     /*    00001            Supports variable length  */
-    ST_BSF              |     /*    00008            Supports SPACE block fwd  */
-    ST_BSR              |     /*    00010            Supports SPACE block rev  */
-    ST_AUTODEN_OVERRIDE |     /*    00040            Autodensity override flag */
-    ST_KNOWS_EOD        |     /*    00200            Recognizes end-of-data    */
-    ST_UNLOADABLE       |     /*    00400            Driver can be unloaded    */
-    ST_NO_RECSIZE_LIMIT |     /*    08000            Supports blocks > 64KB    */
-    ST_MODE_SEL_COMP,         /*    10000            [Note 1]                  */
-                              /*    -----                                      */
-                              /*    18659                                      */
+    ST_VARIABLE         |     /*  0000001            Supports variable length  */
+    ST_BSF              |     /*  0000008            Supports SPACE block fwd  */
+    ST_BSR              |     /*  0000010            Supports SPACE block rev  */
+    ST_AUTODEN_OVERRIDE |     /*  0000040            Autodensity override flag */
+    ST_KNOWS_EOD        |     /*  0000200            Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*  0000400            Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000            Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP    |     /*  0010000            [Note 1]                  */
+    ST_WORMABLE,              /*  1000000            Supports WORM             */
+                              /*  -------                                      */
+                              /*  1018659                                      */
     -1,                       /* .max_rretries       [Note 4]                  */
     -1,                       /* .max_wretries       [Note 4]                  */
     {0x44,0x44,0x44,0x44},    /* .densities          Density codes [Note 2]    */
@@ -2068,15 +2075,16 @@ const struct st_drivetype st_drivetypes[] =
     ST_TYPE_STK9840,          /* .type               Numeric type (cf. mtio.h)*/
     0,                        /* .bsize              Block size (0 = variable)*/
                               /* .options            Drive option flags:      */
-    ST_VARIABLE         |     /*    00001            Supports variable length */
-    ST_BSF              |     /*    00008            Supports SPACE block fwd */
-    ST_BSR              |     /*    00010            Supports SPACE block rev */
-    ST_KNOWS_EOD        |     /*    00200            Recognizes end-of-data   */
-    ST_UNLOADABLE       |     /*    00400            Driver can be unloaded   */
-    ST_NO_RECSIZE_LIMIT |     /*    08000            Supports blocks > 64KB   */
-    ST_MODE_SEL_COMP,         /*    10000            [Note 1]                 */
-                              /*    -----                                     */
-                              /*    18619                                     */
+    ST_VARIABLE         |     /*  0000001            Supports variable length */
+    ST_BSF              |     /*  0000008            Supports SPACE block fwd */
+    ST_BSR              |     /*  0000010            Supports SPACE block rev */
+    ST_KNOWS_EOD        |     /*  0000200            Recognizes end-of-data   */
+    ST_UNLOADABLE       |     /*  0000400            Driver can be unloaded   */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000            Supports blocks > 64KB   */
+    ST_MODE_SEL_COMP    |     /*  0010000            [Note 1]                 */
+    ST_WORMABLE,              /*  1000000            Supports WORM            */
+                              /*  -------                                     */
+                              /*  1018619                                     */
     -1,                       /* .max_rretries       [Note 4]                 */
     -1,                       /* .max_wretries       [Note 4]                 */
     {0x43,0x43,0x43,0x43},    /* .densities          Density codes [Note 2]   */
@@ -2116,15 +2124,16 @@ const struct st_drivetype st_drivetypes[] =
     ST_TYPE_STK9840,          /* .type               Numeric type (cf. mtio.h)*/
     0,                        /* .bsize              Block size (0 = variable)*/
                               /* .options            Drive option flags:      */
-    ST_VARIABLE         |     /*    00001            Supports variable length */
-    ST_BSF              |     /*    00008            Supports SPACE block fwd */
-    ST_BSR              |     /*    00010            Supports SPACE block rev */
-    ST_KNOWS_EOD        |     /*    00200            Recognizes end-of-data   */
-    ST_UNLOADABLE       |     /*    00400            Driver can be unloaded   */
-    ST_NO_RECSIZE_LIMIT |     /*    08000            Supports blocks > 64KB   */
-    ST_MODE_SEL_COMP,         /*    10000            [Note 1]                 */
-                              /*    -----                                     */
-                              /*    18619                                     */
+    ST_VARIABLE         |     /*  0000001            Supports variable length */
+    ST_BSF              |     /*  0000008            Supports SPACE block fwd */
+    ST_BSR              |     /*  0000010            Supports SPACE block rev */
+    ST_KNOWS_EOD        |     /*  0000200            Recognizes end-of-data   */
+    ST_UNLOADABLE       |     /*  0000400            Driver can be unloaded   */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000            Supports blocks > 64KB   */
+    ST_MODE_SEL_COMP    |     /*  0010000            [Note 1]                 */
+    ST_WORMABLE,              /*  1000000            Supports WORM            */
+                              /*  -------                                     */
+                              /*  1018619                                     */
     10,                       /* .max_rretries       [Note 4]                 */
     10,                       /* .max_wretries       [Note 4]                 */
     {0x00, 0x00, 0x00, 0x00}, /* .densities          Density codes [Note 2]   */
@@ -2177,6 +2186,155 @@ const struct st_drivetype st_drivetypes[] =
     {0x00, 0x00, 0x00, 0x00}, /* .densities       Density codes [Note 1]      */
     MT_DENSITY1,              /* .default_density (.densities[x])             */
     {0, 0, 0, 0}              /* .speeds          Speed codes [Note 2]        */
+  },
+
+  /*
+   * Sony SAIT
+   *
+   * Only looking at part of the product ID so it will match SDZ-100 and
+   * SDZ-130. One is SCSI other is Fibre but same configuration otherwise.
+   *
+   */
+  {                           /* Structure member Description                 */
+                              /* ---------------- -----------                 */
+    "Sony Super AIT",         /* .name            Display ("pretty") name     */
+    13,                       /* .length          Length of next item...      */
+    "SONY    SDZ-1*",         /* .vid             Vendor-product ID string    */
+    ST_TYPE_AIT,              /* .type            Numeric type (cf. mtio.h)   */
+    0,
+    ST_VARIABLE         |     /*  0000001           Supports variable length  */
+    ST_BSF              |     /*  0000008           Supports SPACE block fwd  */
+    ST_BSR              |     /*  0000010           Supports SPACE block rev  */
+    ST_AUTODEN_OVERRIDE |     /*  0000040           Suports only one density  */
+    ST_KNOWS_EOD        |     /*  0000200           Knows End Of Data         */
+    ST_UNLOADABLE       |     /*  0000400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP    |     /*  0010000           mode select compression   */
+    ST_WORMABLE,              /*  1000000           Drive is WORM capable     */
+                              /*  -------                                     */
+                              /*  1018659                                     */
+    -1,                       /* .max_rretries    Not used                    */
+    -1,                       /* .max_wretries    Not used                    */
+    {0x40, 0x40, 0x40, 0x40}, /* .densities       Density codes [Note 1]      */
+    MT_DENSITY4,              /* .default_density (.densities[x])             */
+    {0, 0, 0, 0},             /* .speeds          Speed codes [Note 2]        */
+    0,                        /* .non_motion_timeout Nothing special          */
+    0,                        /* .io_timeout Four    Nothing Special          */
+    0,                        /* .rewind_timeout     Nothing Special          */
+    0,                        /* .space_timeout      Nothing Special          */
+    0,                        /* .load_timeout       Nothing Special          */
+    0,                        /* .unload_timeout     Nothing Special          */
+    0,                        /* .erase_timeout      Six hours                */
+  },
+
+  /*
+   * Sony SDX-420
+   * This drive is listed before the more generic AIT drives becouse it runs
+   * only in fixed block mode. It also responds to READ BLOCK LIMITS which
+   * leads st to beleive its a variable block capable but it will fail any
+   * i/o that doesn't have the fix bit set in the CDB.
+   */
+  {                           /* Structure member Description                 */
+                              /* ---------------- -----------                 */
+    "Sony AIT II",            /* .name            Display ("pretty") name     */
+    15,                       /* .length          Length of next item...      */
+    "SONY    SDX-420*",       /* .vid             Vendor-product ID string    */
+    ST_TYPE_AIT,              /* .type            Numeric type (cf. mtio.h)   */
+    512,
+    ST_BSF              |     /*    00008           Supports SPACE block fwd  */
+    ST_BSR              |     /*    00010           Supports SPACE block rev  */
+    ST_AUTODEN_OVERRIDE |     /*    00040           One density code          */
+    ST_KNOWS_EOD        |     /*    00200           Knows End Of Data         */
+    ST_UNLOADABLE       |     /*    00400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP,         /*    10000           mode select compression   */
+                              /*    -----                                     */
+                              /*    18658                                     */
+    -1,                       /* .max_rretries    Not used                    */
+    -1,                       /* .max_wretries    Not used                    */
+    {0x30, 0x30, 0x30, 0x30}, /* .densities       Density codes [Note 1]      */
+    MT_DENSITY4,              /* .default_density (.densities[x])             */
+    {0, 0, 0, 0},             /* .speeds          Speed codes [Note 2]        */
+    0,                        /* .non_motion_timeout Nothing special          */
+    0,                        /* .io_timeout Four    Nothing Special          */
+    0,                        /* .rewind_timeout     Nothing Special          */
+    0,                        /* .space_timeout      Nothing Special          */
+    0,                        /* .load_timeout       Nothing Special          */
+    0,                        /* .unload_timeout     Nothing Special          */
+    0,                        /* .erase_timeout      Six hours                */
+  },
+
+  /*
+   * Sony SDX-520
+   * This drive is listed before the more generic AIT drives becouse it runs
+   * only in fixed block mode. It also responds to READ BLOCK LIMITS which
+   * leads st to beleive its a variable block capable but it will fail any
+   * i/o that doesn't have the fix bit set in the CDB.
+   */
+  {                           /* Structure member Description                 */
+                              /* ---------------- -----------                 */
+    "Sony AIT II",            /* .name            Display ("pretty") name     */
+    15,                       /* .length          Length of next item...      */
+    "SONY    SDX-520*",       /* .vid             Vendor-product ID string    */
+    ST_TYPE_AIT,              /* .type            Numeric type (cf. mtio.h)   */
+    512,
+    ST_BSF              |     /*    00008           Supports SPACE block fwd  */
+    ST_BSR              |     /*    00010           Supports SPACE block rev  */
+    ST_AUTODEN_OVERRIDE |     /*    00040           One density code          */
+    ST_KNOWS_EOD        |     /*    00200           Knows End Of Data         */
+    ST_UNLOADABLE       |     /*    00400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP,         /*    10000           mode select compression   */
+                              /*    -----                                     */
+                              /*    18658                                     */
+    -1,                       /* .max_rretries    Not used                    */
+    -1,                       /* .max_wretries    Not used                    */
+    {0x30, 0x30, 0x30, 0x30}, /* .densities       Density codes [Note 1]      */
+    MT_DENSITY4,              /* .default_density (.densities[x])             */
+    {0, 0, 0, 0},             /* .speeds          Speed codes [Note 2]        */
+    0,                        /* .non_motion_timeout Nothing special          */
+    0,                        /* .io_timeout Four    Nothing Special          */
+    0,                        /* .rewind_timeout     Nothing Special          */
+    0,                        /* .space_timeout      Nothing Special          */
+    0,                        /* .load_timeout       Nothing Special          */
+    0,                        /* .unload_timeout     Nothing Special          */
+    0,                        /* .erase_timeout      Six hours                */
+  },
+
+  /* Sony generic AIT
+   *
+   *
+   */
+  {                           /* Structure member Description                 */
+                              /* ---------------- -----------                 */
+    "Sony AIT",               /* .name            Display ("pretty") name     */
+    12,                       /* .length          Length of next item...      */
+    "SONY    SDX-*",          /* .vid             Vendor-product ID string    */
+    ST_TYPE_AIT,              /* .type            Numeric type (cf. mtio.h)   */
+    0,
+    ST_VARIABLE         |     /*  0000001           Supports variable length  */
+    ST_BSF              |     /*  0000008           Supports SPACE block fwd  */
+    ST_BSR              |     /*  0000010           Supports SPACE block rev  */
+    ST_AUTODEN_OVERRIDE |     /*  0000040           One density code          */
+    ST_KNOWS_EOD        |     /*  0000200           Knows End Of Data         */
+    ST_UNLOADABLE       |     /*  0000400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP    |     /*  0010000           mode select compression   */
+    ST_WORMABLE,              /*  1000000           Drive is WORM capable     */
+                              /*  -------                                     */
+                              /*  1018659                                     */
+    -1,                       /* .max_rretries    Not used                    */
+    -1,                       /* .max_wretries    Not used                    */
+    {0x30, 0x30, 0x30, 0x30}, /* .densities       Density codes [Note 1]      */
+    MT_DENSITY4,              /* .default_density (.densities[x])             */
+    {0, 0, 0, 0},             /* .speeds          Speed codes [Note 2]        */
+    0,                        /* .non_motion_timeout Nothing special          */
+    0,                        /* .io_timeout Four    Nothing Special          */
+    0,                        /* .rewind_timeout     Nothing Special          */
+    0,                        /* .space_timeout      Nothing Special          */
+    0,                        /* .load_timeout       Nothing Special          */
+    0,                        /* .unload_timeout     Nothing Special          */
+    0,                        /* .erase_timeout      Six hours                */
   },
 
   /*
@@ -2762,16 +2920,17 @@ const struct st_drivetype st_drivetypes[] =
     MT_LTO,                   /* .type            Numeric type (cf. mtio.h)   */
     0,                        /* .bsize           Block size (0 = variable)   */
                               /* .options         Drive option flags:         */
-    ST_VARIABLE         |     /*   000001           Supports variable length  */
-    ST_BSF              |     /*   000008           Supports SPACE block fwd  */
-    ST_BSR              |     /*   000010           Supports SPACE block rev  */
-    ST_KNOWS_EOD        |     /*   000200           Recognizes end-of-data    */
-    ST_UNLOADABLE       |     /*   000400           Driver can be unloaded    */
-    ST_NO_RECSIZE_LIMIT |     /*   008000           Supports blocks > 64KB    */
-    ST_MODE_SEL_COMP    |     /*   010000           [Note 1]                  */
-    ST_KNOWS_MEDIA,           /*   800000         Media detrmines density     */
-                              /*    -----                                     */
-                              /*   818619                                     */
+    ST_VARIABLE         |     /*  0000001           Supports variable length  */
+    ST_BSF              |     /*  0000008           Supports SPACE block fwd  */
+    ST_BSR              |     /*  0000010           Supports SPACE block rev  */
+    ST_KNOWS_EOD        |     /*  0000200           Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*  0000400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP    |     /*  0010000           [Note 1]                  */
+    ST_KNOWS_MEDIA      |     /*  0800000         Media detrmines density     */
+    ST_WORMABLE,              /*  1000000         Is WORM capable             */
+                              /*  -------                                     */
+                              /*  1818619                                     */
     -1,                       /* .max_rretries    Not used any more.          */
     -1,                       /* .max_wretries    Not used any more.          */
     {0x40, 0x42, 0x44, 0x44}, /* .densities       Density codes [Note 1]      */
@@ -2803,16 +2962,17 @@ const struct st_drivetype st_drivetypes[] =
     MT_LTO,                   /* .type            Numeric type (cf. mtio.h)   */
     0,                        /* .bsize           Block size (0 = variable)   */
                               /* .options         Drive option flags:         */
-    ST_VARIABLE         |     /*   000001           Supports variable length  */
-    ST_BSF              |     /*   000008           Supports SPACE block fwd  */
-    ST_BSR              |     /*   000010           Supports SPACE block rev  */
-    ST_KNOWS_EOD        |     /*   000200           Recognizes end-of-data    */
-    ST_UNLOADABLE       |     /*   000400           Driver can be unloaded    */
-    ST_NO_RECSIZE_LIMIT |     /*   008000           Supports blocks > 64KB    */
-    ST_MODE_SEL_COMP    |     /*   010000           [Note 1]                  */
-    ST_KNOWS_MEDIA,           /*   800000         Media detrmines density     */
-                              /*    -----                                     */
-                              /*   818619                                     */
+    ST_VARIABLE         |     /*  0000001           Supports variable length  */
+    ST_BSF              |     /*  0000008           Supports SPACE block fwd  */
+    ST_BSR              |     /*  0000010           Supports SPACE block rev  */
+    ST_KNOWS_EOD        |     /*  0000200           Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*  0000400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP    |     /*  0010000           [Note 1]                  */
+    ST_KNOWS_MEDIA      |     /*  0800000         Media detrmines density     */
+    ST_WORMABLE,              /*  1000000         Is WORM capable             */
+                              /*  -------                                     */
+                              /*  1818619                                     */
     -1,                       /* .max_rretries    Not used any more.          */
     -1,                       /* .max_wretries    Not used any more.          */
     {0x40, 0x42, 0x44, 0x44}, /* .densities       Density codes [Note 1]      */

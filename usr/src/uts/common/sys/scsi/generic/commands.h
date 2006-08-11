@@ -319,6 +319,12 @@ extern "C" {
 #define	SSVC_ACTION_WRITE_LONG_G4	0x11
 
 /*
+ * Group 4 Commands, Sequential Access Devics
+ */
+#define	SCMD_READ_ATTRIBUTE	0x8c
+#define	SCMD_WRITE_ATTRIBUTE	0x8d
+
+/*
  * Define for Group 5 command.
  */
 #define	SCMD_GROUP5		0xA0
@@ -406,6 +412,8 @@ extern "C" {
 /* 0x83 */ SCMD_EXTENDED_COPY,		"extended_copy",		\
 /* 0x88 */ SCMD_READ_G4,		"read(16)",			\
 /* 0x8a */ SCMD_WRITE_G4,		"write(16)",			\
+/* 0x8c */ SCMD_READ_ATTRIBUTE,		"read_attribute",		\
+/* 0x8d */ SCMD_WRITE_ATTRIBUTE,	"write_attribute",		\
 /* 0xa0 */ SCMD_REPORT_LUNS,		"report_luns",			\
 /* 0xa8 */ SCMD_READ_G5,		"read(12)",			\
 /* 0xaa */ SCMD_WRITE_G5,		"write(12)",			\

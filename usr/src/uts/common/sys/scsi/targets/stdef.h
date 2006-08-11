@@ -94,7 +94,8 @@ extern "C" {
 #define	ST_TYPE_STK9840	MT_ISSTK9840	/* StorageTek 9840, 9940, 9840B */
 #define	ST_TYPE_BMDLT1	MT_ISBMDLT1	/* Benchmark DTL1 */
 #define	ST_TYPE_LTO	MT_LTO		/* sun: LTO's by HP, Seagate, IBM.. */
-#define	ST_LAST_TYPE	ST_TYPE_LTO	/* Add new above type and change this */
+#define	ST_TYPE_AIT	MT_ISAIT	/* Sony AIT I, II, III and SAIT */
+#define	ST_LAST_TYPE	ST_TYPE_AIT	/* Add new above type and change this */
 
 
 /* Internal flags */
@@ -232,6 +233,10 @@ extern "C" {
 #define	ST_KNOWS_MEDIA		0x800000 /* Use configured media type	*/
 					/* detected to select correct   */
 					/* density code.		*/
+#define	ST_WORMABLE		0x1000000
+					/* Drive is capable of doing	*/
+					/* Write Appends only at EOM	*/
+					/* if WORM media type is loaded */
 #define	ST_CLN_TYPE_1		0x10000000 /* When this flag is set,	*/
 					/* the tape drive provides the	*/
 					/* clean bit information in	*/
@@ -255,7 +260,7 @@ extern "C" {
 	ST_NO_RECSIZE_LIMIT | ST_MODE_SEL_COMP | ST_NO_RESERVE_RELEASE |\
 	ST_READ_IGNORE_ILI | ST_READ_IGNORE_EOFS | ST_SHORT_FILEMARKS |\
 	ST_EJECT_ON_CHANGER_FAILURE | ST_RETRY_ON_RECOVERED_DEFERRED_ERROR |\
-	ST_CLN_TYPE_1 | ST_CLN_TYPE_2 | ST_CLN_TYPE_3)
+	ST_WORMABLE | ST_CLN_TYPE_1 | ST_CLN_TYPE_2 | ST_CLN_TYPE_3)
 
 #define	NDENSITIES	MT_NDENSITIES
 #define	NSPEEDS		MT_NSPEEDS
@@ -278,10 +283,68 @@ extern "C" {
 /*
  * Tape Alert Flag definitions
  */
-#define	CLEANING_MEDIA			11
-#define	CLEAN_NOW			20
-#define	CLEAN_PERIODIC			21
-#define	CLEAN_FOR_ERRORS		24
+typedef enum {
+	TAF_READ_WARN			= 0x01,
+	TAF_WRITE_WARN			= 0x02,
+	TAF_HARD_ERR			= 0x03,
+	TAF_MEDIA_ERR			= 0x04,
+	TAF_READ_FAIL			= 0x05,
+	TAF_WRITE_FAIL			= 0x06,
+	TAF_MEDIA_LIFE			= 0x07,
+	TAF_MEDIA_NOT_DATA_GRADE	= 0x08,
+	TAF_WRITE_PROTECTED		= 0x09,
+	TAF_NO_MEDIA_REMOVE		= 0x0A,
+	TAF_CLEANING_MEDIA		= 0x0B,
+	TAF_UNSUPPERTED_FORMAT		= 0x0C,
+	TAF_RECOVERED_TAPE_BREAK	= 0x0D,
+	TAF_TAPE_BREAK_FAUL		= 0x0E,
+	TAF_CART_MEM_FAIL		= 0x0F,
+	TAF_FORCED_EJECT		= 0x10,
+	TAF_READ_ONLY_FORMAT		= 0x11,
+	TAF_TAPE_DIR_CORRUPT		= 0x12,
+	TAF_NEARING_MEDIA_LIFE		= 0x13,
+	TAF_CLEAN_NOW			= 0x14,
+	TAF_CLEAN_PERIODIC		= 0x15,
+	TAF_EXP_CLEAN_CART		= 0x16,
+	TAF_INVALID_CLEAN_MEDIA		= 0x17,
+	TAF_RETENSION_REQUEST		= 0x18,
+	TAF_DUAL_PORT_INTERFACE_ERR	= 0x19,
+	TAF_COOLING_FAN_FAIL		= 0x1A,
+	TAF_POWER_SUPPLY_FAIL		= 0x1B,
+	TAF_POWER_CONSUMPTION		= 0x1C,
+	TAF_DRIVE_MAINT_REQUEST		= 0x1D,
+	TAF_HARDWARE_A			= 0x1E,
+	TAF_HARDWARE_B			= 0x1F,
+	TAF_INTERFACE			= 0x20,
+	TAF_EJECT_MEDIA			= 0x21,
+	TAF_DOWNLOAD_FAIL		= 0x22,
+	TAF_DRIVE_HUMIDITY		= 0x23,
+	TAF_DRIVE_TEMP			= 0x24,
+	TAF_DRIVE_VOLTAGE		= 0x25,
+	TAF_PREDICTIVE_FAIL		= 0x26,
+	TAF_DIAG_REQUIRED		= 0x27,
+	TAF_LOADER_HDWR_A		= 0x28,
+	TAF_LOADER_STRAY_TAPE		= 0x29,
+	TAF_LOADER_HDWR_B		= 0x2A,
+	TAF_LOADER_DOOR			= 0x2B,
+	TAF_LOADER_HDWR_C		= 0x2C,
+	TAF_LOADER_MAGAZINE		= 0x2D,
+	TAF_LOADER_PREDICTIVE_FAIL	= 0x2E,
+	TAF_LOST_STATISTICS		= 0x32,
+	TAF_TAPE_DIR_CURRUPT_UNLOAD	= 0x33,
+	TAF_TAPE_SYS_WRT_FAIL		= 0x34,
+	TAF_TAPE_SYS_RD_FAIL		= 0x35,
+	TAF_NO_START_OF_DATA		= 0x36,
+	TAF_WORM_INTEGRITY		= 0x3B,
+	TAF_WORM_OVRWRT_ATTEMPT		= 0x3C
+}tape_alert_flags;
+
+/*
+ * For ST_TYPE_STK9840 drives only. STK drive doesn't support retension
+ * so they reuse TAF_RETENSION_REQUEST.
+ */
+#define	CLEAN_FOR_ERRORS		 0x18
+
 
 #define	TAPE_ALERT_SUPPORT_UNKNOWN	0x00
 #define	TAPE_ALERT_NOT_SUPPORTED	0x01
@@ -373,7 +436,7 @@ struct dev_mode_page {
 #if defined(_BIT_FIELDS_LTOH)
 	uchar_t	act_format:	5,	/* active format */
 		caf:		1,	/* Change Active Format */
-		cap:		1,	/* Change Active Partition */
+		cap:		1,	/* Change Active Partition OBSOLETE */
 		:		1;
 	uchar_t	act_partition;		/* active partition */
 	uchar_t	wrt_buf_full_ratio;	/* write buffer full ratio */
@@ -381,14 +444,16 @@ struct dev_mode_page {
 	uchar_t	wrt_delay_time_msb;	/* write delay time MSB */
 	uchar_t	wrt_delay_time_lsb;	/* write delay time LSB */
 	uchar_t	rew:		1,	/* Report Early Warning */
-		rbo:		1,	/* Reverse Buffer Order */
+		robo:		1,	/* Reverse Object Buffer Order */
 		socf:		2,	/* Stop On Consecutive Filemarks */
 		avc:		1,	/* Automatic Velocity Control */
-		rsmk:		1,	/* Report SetMarKs */
-		bis:		1,	/* Block Ids Supported */
-		dbr:		1;	/* Data Buffer Recovery */
-	uchar_t	gap_size;
-	uchar_t	:		3,
+		rsmk:		1,	/* Report SetMarKs OBSOLETE */
+		lois:		1,	/* Logical Object Identifiers Support */
+		obr:		1;	/* Object Buffer Recovery */
+	uchar_t	gap_size;		/* OBSOLETE */
+	uchar_t	bam:		1,	/* Block Address Mode */
+		bmal:		1,	/* Block Address Mode Lock */
+		swp:		1,	/* Software Write Protection */
 		sew:		1,	/* Sync data after Early Warning */
 		eeg:		1,	/* Enable Early Waring */
 		eod_defined:	3;
@@ -396,11 +461,16 @@ struct dev_mode_page {
 	uchar_t	buf_size_leot_mid;
 	uchar_t	buf_size_leot_lsb;
 	uchar_t	comp_alg;		/* Compression Algorithm (enable) */
-	uchar_t	reservered;
+	uchar_t	prmwp:		1,	/* PeRManent Write Protect */
+		perswp:		1,	/* persistant write protection */
+		asocwp:		1,	/* associated write protect */
+		rew_on_rst:	2,	/* rewind on reset */
+		oir:		1,	/* Only If Reserved */
+		wtre:		2;	/* Worm Tamper Read Enable */
 
 #elif defined(_BIT_FIELDS_HTOL)
 	uchar_t	:		1,
-		cap:		1,	/* Change Active Partition */
+		cap:		1,	/* Change Active Partition OBSOLETE */
 		caf:		1,	/* Change Active Format */
 		act_format:	5;	/* active format */
 	uchar_t	act_partition;		/* active partition */
@@ -408,23 +478,30 @@ struct dev_mode_page {
 	uchar_t	rd_buf_full_ratio;	/* read buffer full ratio */
 	uchar_t	wrt_delay_time_msb;	/* write delay time MSB */
 	uchar_t	wrt_delay_time_lsb;	/* write delay time LSB */
-	uchar_t	dbr:		1,	/* Data Buffer Recovery */
-		bis:		1,	/* Block Ids Supported */
-		rsmk:		1,	/* Report SetMarKs */
+	uchar_t	obr:		1,	/* Object Buffer Recovery */
+		lois:		1,	/* Logical Object Identifiers Support */
+		rsmk:		1,	/* Report SetMarKs OBSOLETE */
 		avc:		1,	/* Automatic Velocity Control */
 		socf:		2,	/* Stop On Consecutive Filemarks */
-		rbo:		1,	/* Reverse Buffer Order */
+		robo:		1,	/* Reverse Object Buffer Order */
 		rew:		1;	/* Report Early Warning */
-	uchar_t	gap_size;
+	uchar_t	gap_size;		/* OBSELETE */
 	uchar_t	eod_defined:	3,
 		eeg:		1,	/* Enable Early Waring */
 		sew:		1,	/* Sync data after Early Warning */
-		:		3;
+		swp:		1,	/* Software Write Protection */
+		bmal:		1,	/* Block Address Mode Lock */
+		bam:		1;	/* Block Address Mode */
 	uchar_t	buf_size_leot_msb;	/* Buffer size after early warning */
 	uchar_t	buf_size_leot_mid;
 	uchar_t	buf_size_leot_lsb;
 	uchar_t	comp_alg;		/* Compression Algorithm (enable) */
-	uchar_t	reservered;
+	uchar_t	wtre:		2,	/* Worm Tamper Read Enable */
+		oir:		1,	/* Only If Reserved */
+		rew_on_rst:	2,	/* rewind on reset */
+		asocwp:		1,	/* associated write protect */
+		perswp:		1,	/* persistant write protection */
+		prmwp:		1;	/* PeRManent Write Protect */
 #endif
 };
 
@@ -540,6 +617,35 @@ struct contig_mem {
 #endif /* _KERNEL */
 
 /*
+ * eof/eot/eom codes.
+ */
+
+typedef enum {
+	ST_NO_EOF,		/* 0x00 */
+	ST_EOF_PENDING,		/* 0x01	filemark pending */
+	ST_EOF,			/* 0x02	at filemark */
+	ST_EOT_PENDING,		/* 0x03	logical eot pending */
+	ST_EOT,			/* 0x04	at logical eot */
+	ST_EOM,			/* 0x05	at physical eot */
+	ST_WRITE_AFTER_EOM	/* 0x06	flag for allowing writes after EOM */
+}media_st;
+
+#define	IN_EOF(un)	(un->un_eof == ST_EOF_PENDING || un->un_eof == ST_EOF)
+
+/*
+ * operation codes
+ */
+typedef enum {
+	ST_OP_NIL,	/* 0 */
+	ST_OP_CTL,	/* 1 */
+	ST_OP_READ,	/* 2 */
+	ST_OP_WRITE,	/* 3 */
+	ST_OP_WEOF	/* 4 */
+}optype;
+
+typedef enum { RDWR, RDONLY, WORM, RDWORM, ERROR  } writablity;
+
+/*
  * Private info for scsi tapes. Pointed to by the un_private pointer
  * of one of the SCSI_DEVICE chains.
  */
@@ -573,14 +679,14 @@ struct scsi_tape {
 	int	un_pwr_mgmt;		/* power management state */
 	uchar_t	un_density_known;	/* density is known */
 	uchar_t	un_curdens;		/* index into density table */
-	uchar_t	un_lastop;		/* last I/O was: read/write/ctl */
-	uchar_t	un_eof;			/* eof states */
+	optype	un_lastop;		/* last I/O was: read/write/ctl */
+	media_st un_eof;		/* eof states */
 	uchar_t	un_laststate;		/* last state */
 	uchar_t	un_state;		/* current state */
 	uchar_t	un_status;		/* status from last sense */
 	uchar_t	un_retry_ct;		/* retry count */
 	uchar_t	un_tran_retry_ct;	/* transport retry count */
-	uchar_t	un_read_only;		/* 1 == opened O_RDONLY */
+	writablity un_read_only;	/* RDWR, RDONLY, WORM, RDWORM */
 	uchar_t	un_test_append;		/* check writing at end of tape */
 	uchar_t un_arq_enabled;		/* auto request sense enabled */
 	uchar_t un_untagged_qing;	/* hba has untagged quing */
@@ -632,6 +738,8 @@ struct scsi_tape {
 	uchar_t	un_rqs_state;		/* see define below */
 	caddr_t	un_uscsi_rqs_buf;	/* uscsi_rqs: buffer for RQS data */
 	uchar_t	un_data_mod;		/* Device required data mod */
+	writablity (*un_wormable) (struct scsi_tape *un); /* worm test fuct */
+	int un_max_cdb_sz;		/* max cdb size to use */
 
 #if defined(__i386) || defined(__amd64)
 	ddi_dma_handle_t un_contig_mem_hdl;
@@ -765,29 +873,8 @@ _NOTE(SCHEME_PROTECTS_DATA("save sharing",
 #define	ST_PWR_NORMAL				0
 #define	ST_PWR_SUSPENDED			1
 
-/*
- * operation codes
- */
 
-#define	ST_OP_NIL	0
-#define	ST_OP_CTL	1
-#define	ST_OP_READ	2
-#define	ST_OP_WRITE	3
-#define	ST_OP_WEOF	4
 
-/*
- * eof/eot/eom codes.
- */
-
-#define	ST_NO_EOF		0x00
-#define	ST_EOF_PENDING		0x01	/* filemark pending */
-#define	ST_EOF			0x02	/* at filemark */
-#define	ST_EOT_PENDING		0x03	/* logical eot pending */
-#define	ST_EOT			0x04	/* at logical eot */
-#define	ST_EOM			0x05	/* at physical eot */
-#define	ST_WRITE_AFTER_EOM	0x06	/* flag for allowing writes after EOM */
-
-#define	IN_EOF(un)	(un->un_eof == ST_EOF_PENDING || un->un_eof == ST_EOF)
 
 /* un_rqs_state codes */
 

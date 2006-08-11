@@ -108,6 +108,7 @@
  * Global External Data Definitions
  */
 extern struct scsi_key_strings scsi_cmds[];
+extern uchar_t	scsi_cdb_size[];
 
 /*
  * Local Static Data
@@ -229,7 +230,7 @@ extern const struct st_drivetype st_drivetypes[];
 
 #ifdef STDEBUG
 static int st_soft_error_report_debug = 0;
-static int st_debug = 0;
+volatile int st_debug = 0;
 #endif
 
 #define	ST_MT02_NAME	"Emulex  MT02 QIC-11/24  "
@@ -486,11 +487,16 @@ static int st_check_cmd_for_need_to_reserve(struct scsi_tape *un, uchar_t cmd,
 static int st_take_ownership(dev_t dev);
 static int st_check_asc_ascq(struct scsi_tape *un);
 static int st_check_clean_bit(dev_t dev);
-static int st_check_alert_clean_bit(dev_t dev);
+static int st_check_alert_flags(dev_t dev);
 static int st_check_sequential_clean_bit(dev_t dev);
 static int st_check_sense_clean_bit(dev_t dev);
 static int st_clear_unit_attentions(dev_t dev_instance, int max_trys);
 static void st_calculate_timeouts(struct scsi_tape *un);
+static writablity st_is_drive_worm(struct scsi_tape *un);
+static int st_read_attributes(struct scsi_tape *un, uint16_t attribute,
+    caddr_t buf, size_t size);
+static int st_get_special_inquiry(struct scsi_tape *un, uchar_t size,
+    caddr_t dest, uchar_t page);
 
 #if defined(__i386) || defined(__amd64)
 /*
@@ -932,7 +938,20 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 */
 	un->un_maxdma	= scsi_ifgetcap(&devp->sd_address, "dma-max", 1);
 	if (un->un_maxdma == -1) {
+		ST_DEBUG(devi, st_label, SCSI_DEBUG,
+		    "Receaved a value that looked like -1. Using 64k maxdma");
 		un->un_maxdma = (64 * 1024);
+	}
+
+	/*
+	 * Get the max allowable cdb size
+	 */
+	un->un_max_cdb_sz =
+	    scsi_ifgetcap(&devp->sd_address, "max-cdb-length", 1);
+	if (un->un_max_cdb_sz < CDB_GROUP0) {
+		ST_DEBUG(devi, st_label, SCSI_DEBUG,
+		    "HBA reported max-cdb-length as %d\n", un->un_max_cdb_sz);
+		un->un_max_cdb_sz = CDB_GROUP4; /* optimistic default */
 	}
 
 	un->un_maxbsize = MAXBSIZE_UNKNOWN;
@@ -1385,6 +1404,8 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 	}
 	un = ddi_get_soft_state(st_state, instance);
 
+	ASSERT(un != NULL);
+
 	un->un_sbufp = getrbuf(km_flags);
 
 	un->un_uscsi_rqs_buf = kmem_alloc(SENSE_LENGTH, KM_SLEEP);
@@ -1432,6 +1453,7 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 	un->un_rqs_bp	= bp;
 	un->un_swr_token = (opaque_t)NULL;
 	un->un_comp_page = ST_DEV_DATACOMP_PAGE | ST_DEV_CONFIG_PAGE;
+	un->un_wormable = st_is_drive_worm;
 
 	un->un_suspend_fileno 	= 0;
 	un->un_suspend_blkno 	= 0;
@@ -2016,7 +2038,8 @@ st_open(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 		if (un->un_fileno < 0 || (un->un_fileno == 0 &&
 		    un->un_blkno == 0)) {
 			un->un_state = ST_STATE_OFFLINE;
-		} else {
+		} else if (un->un_fileno > 0 ||
+		    (un->un_fileno == 0 && un->un_blkno != 0)) {
 			/*
 			 * set un_read_only/write-protect status.
 			 *
@@ -2029,14 +2052,11 @@ st_open(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 			 * Hence make the st state OFFLINE so that
 			 * we re-intialize the tape once again.
 			 */
-			if (un->un_fileno > 0 ||
-			    (un->un_fileno == 0 && un->un_blkno != 0)) {
-				un->un_read_only =
-				    (un->un_oflags & FWRITE) ? 0 : 1;
-				un->un_state = ST_STATE_OPEN_PENDING_IO;
-			} else {
-				un->un_state = ST_STATE_OFFLINE;
-			}
+			un->un_read_only =
+			    (un->un_oflags & FWRITE) ? RDWR : RDONLY;
+			un->un_state = ST_STATE_OPEN_PENDING_IO;
+		} else {
+			un->un_state = ST_STATE_OFFLINE;
 		}
 		rval = 0;
 	} else {
@@ -2046,7 +2066,10 @@ st_open(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 		un->un_state = ST_STATE_OPENING;
 
 		rval = st_tape_init(dev);
-		if (rval) {
+		if ((rval == EACCES) && (un->un_read_only & WORM)) {
+			un->un_state = ST_STATE_OPEN_PENDING_IO;
+			rval = 0; /* so open doesn't fail */
+		} else if (rval) {
 			/*
 			 * Release the tape unit, if reserved and not
 			 * preserve reserve.
@@ -2360,17 +2383,39 @@ st_tape_init(dev_t dev)
 	 */
 	if (un->un_oflags & FWRITE) {
 		err = 0;
-		if (un->un_mspl->wp)  {
+		if (un->un_mspl->wp) {
 			un->un_status = KEY_WRITE_PROTECT;
 			un->un_laststate = un->un_state;
 			un->un_state = ST_STATE_CLOSED;
 			rval = EACCES;
-			goto exit;
+			/*
+			 * STK sets the wp bit if volsafe tape is loaded.
+			 */
+			if ((un->un_dp->type == MT_ISSTK9840) &&
+			    (un->un_dp->options & ST_WORMABLE)) {
+				un->un_read_only = RDONLY;
+			} else {
+				goto exit;
+			}
 		} else {
-			un->un_read_only = 0;
+			un->un_read_only = RDWR;
 		}
 	} else {
-		un->un_read_only = 1;
+		un->un_read_only = RDONLY;
+	}
+
+	if (un->un_dp->options & ST_WORMABLE) {
+		un->un_read_only |= un->un_wormable(un);
+
+		if (((un->un_read_only == WORM) ||
+		    (un->un_read_only == RDWORM)) &&
+		    ((un->un_oflags & FWRITE) == FWRITE)) {
+			un->un_status = KEY_DATA_PROTECT;
+			rval = EACCES;
+			ST_DEBUG4(ST_DEVINFO, st_label, CE_NOTE,
+			    "read_only = %d eof = %d oflag = %d\n",
+			    un->un_read_only, un->un_eof, un->un_oflags);
+		}
 	}
 
 	/*
@@ -2378,10 +2423,13 @@ st_tape_init(dev_t dev)
 	 * write 2 filemarks on the HP 1/2 inch drive, to
 	 * create a null file.
 	 */
-	if ((un->un_oflags == FWRITE) && (un->un_dp->options & ST_REEL)) {
-		un->un_fmneeded = 2;
-	} else if (un->un_oflags == FWRITE) {
-		un->un_fmneeded = 1;
+	if ((un->un_read_only == RDWR) ||
+	    (un->un_read_only == WORM) && (un->un_oflags & FWRITE)) {
+		if (un->un_dp->options & ST_REEL) {
+			un->un_fmneeded = 2;
+		} else {
+			un->un_fmneeded = 1;
+		}
 	} else {
 		un->un_fmneeded = 0;
 	}
@@ -2391,8 +2439,12 @@ st_tape_init(dev_t dev)
 
 	/*
 	 * Make sure the density can be selected correctly.
+	 * If WORM can only write at the append point which in most cases
+	 * isn't BOP. st_determine_density() with a B_WRITE only attempts
+	 * to set and try densities if a BOP.
 	 */
-	if (st_determine_density(dev, B_WRITE)) {
+	if (st_determine_density(dev,
+	    un->un_read_only == RDWR ? B_WRITE : B_READ)) {
 		un->un_status = KEY_ILLEGAL_REQUEST;
 		un->un_laststate = un->un_state;
 		un->un_state = ST_STATE_CLOSED;
@@ -2555,6 +2607,10 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 		case ST_EOT_PENDING:
 			/* nothing to do */
 			break;
+		default:
+			scsi_log(ST_DEVINFO, st_label, CE_PANIC,
+			    "Undefined state 0x%x", un->un_eof);
+
 		}
 	}
 
@@ -3715,7 +3771,7 @@ st_check_density_or_wfm(dev_t dev, int wfm, int mode, int stepflag)
 	 * If writing, let's check that we're positioned correctly
 	 * at the end of tape before issuing the next write.
 	 */
-	if (!un->un_read_only) {
+	if (un->un_read_only == RDWR) {
 		un->un_test_append = 1;
 	}
 
@@ -3877,6 +3933,11 @@ check_commands:
 			    (un->un_dp->options & ST_NO_RECSIZE_LIMIT)) {
 				mtget->mt_bf = min(un->un_maxbsize,
 				    un->un_maxdma) / SECSIZE;
+			}
+
+			if (un->un_read_only == WORM ||
+			    un->un_read_only == RDWORM) {
+				mtget->mt_flags |= MTF_WORM_MEDIA;
 			}
 
 			rval = st_check_clean_bit(dev);
@@ -4657,15 +4718,17 @@ st_mtioctop(struct scsi_tape *un, intptr_t arg, int flag)
 		 * MTERASE rewinds the tape, erase it completely, and returns
 		 * to the beginning of the tape
 		 */
-		if (un->un_dp->options & ST_REEL)
-			un->un_fmneeded = 2;
-
-		if (un->un_mspl->wp || un->un_read_only) {
+		if (un->un_mspl->wp || un->un_read_only & WORM) {
 			un->un_status = KEY_WRITE_PROTECT;
 			un->un_err_resid = mtop->mt_count;
 			un->un_err_fileno = un->un_fileno;
 			un->un_err_blkno = un->un_blkno;
 			return (EACCES);
+		}
+		if (un->un_dp->options & ST_REEL) {
+			un->un_fmneeded = 2;
+		} else {
+			un->un_fmneeded = 1;
 		}
 		if (st_check_density_or_wfm(dev, 1, B_WRITE, NO_STEPBACK) ||
 		    st_cmd(dev, SCMD_REWIND, 0, SYNC_CMD) ||
@@ -4686,7 +4749,7 @@ st_mtioctop(struct scsi_tape *un, intptr_t arg, int flag)
 		/*
 		 * write an end-of-file record
 		 */
-		if (un->un_mspl->wp || un->un_read_only) {
+		if (un->un_mspl->wp || un->un_read_only & RDONLY) {
 			un->un_status = KEY_WRITE_PROTECT;
 			un->un_err_resid = mtop->mt_count;
 			un->un_err_fileno = un->un_fileno;
@@ -4701,7 +4764,8 @@ st_mtioctop(struct scsi_tape *un, intptr_t arg, int flag)
 		if (mtop->mt_count < 0)
 			return (EINVAL);
 
-		if (!un->un_read_only) {
+		/* Not on worm */
+		if (un->un_read_only == RDWR) {
 			un->un_test_append = 1;
 		}
 
@@ -4714,7 +4778,8 @@ st_mtioctop(struct scsi_tape *un, intptr_t arg, int flag)
 			}
 		}
 
-		if (st_write_fm(dev, (int)mtop->mt_count)) {
+		rval = st_write_fm(dev, (int)mtop->mt_count);
+		if ((rval != 0) && (rval != EACCES)) {
 			/*
 			 * Failure due to something other than illegal
 			 * request results in loss of state (st_intr).
@@ -4813,7 +4878,13 @@ st_mtioctop(struct scsi_tape *un, intptr_t arg, int flag)
 		 */
 		un->un_state = ST_STATE_INITIALIZING;
 
-		if (st_tape_init(dev)) {
+		rval = st_tape_init(dev);
+		if ((rval == EACCES) && (un->un_read_only & WORM)) {
+			rval = 0;
+			break;
+		}
+
+		if (rval != 0) {
 			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "st_mtioctop : EIO : MTLOAD calls st_tape_init\n");
 			rval = EIO;
@@ -5634,7 +5705,12 @@ st_ioctl_cmd(dev_t dev, struct uscsi_cmd *ucmd,
 	/*
 	 * First do some sanity checks for USCSI commands.
 	 */
-	if (ucmd->uscsi_cdblen <= 0) {
+	if ((ucmd->uscsi_cdblen <= 0) ||
+	    (ucmd->uscsi_cdblen > un->un_max_cdb_sz)) {
+		if (cdbspace != UIO_SYSSPACE) {
+			scsi_log(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "USCSICMD with cdb larger then transport supports");
+		}
 		return (EINVAL);
 	}
 
@@ -5658,6 +5734,17 @@ st_ioctl_cmd(dev_t dev, struct uscsi_cmd *ucmd,
 		}
 	}
 
+	/*
+	 * can't peek at the cdb till is copied into kernal space.
+	 */
+	if (scsi_cdb_size[CDB_GROUPID(kcdb[0])] > un->un_max_cdb_sz) {
+		if (cdbspace != UIO_SYSSPACE) {
+			scsi_log(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "USCSICMD with cdb larger then transport supports");
+		}
+		kmem_free(kcdb, ucmd->uscsi_cdblen);
+		return (EINVAL);
+	}
 	kcmd = kmem_alloc(sizeof (struct uscsi_cmd), KM_SLEEP);
 	bcopy(ucmd, kcmd, sizeof (struct uscsi_cmd));
 	kcmd->uscsi_cdb = kcdb;
@@ -5876,6 +5963,7 @@ static int
 st_write_fm(dev_t dev, int wfm)
 {
 	int i;
+	int rval;
 
 	GET_SOFT_STATE(dev);
 
@@ -5889,16 +5977,26 @@ st_write_fm(dev_t dev, int wfm)
 	 */
 	if (un->un_eof >= ST_EOT) {
 		for (i = 0; i < wfm; i++) {
-			if (st_cmd(dev, SCMD_WRITE_FILE_MARK, 1, SYNC_CMD)) {
+			rval = st_cmd(dev, SCMD_WRITE_FILE_MARK, 1, SYNC_CMD);
+			if (rval == EACCES) {
+				return (rval);
+			}
+			if (rval != 0) {
 				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 				    "st_write_fm : EIO : write EOT file mark");
 				return (EIO);
 			}
 		}
-	} else if (st_cmd(dev, SCMD_WRITE_FILE_MARK, wfm, SYNC_CMD)) {
-		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-		    "st_write_fm : EIO : write file mark");
-		return (EIO);
+	} else {
+		rval = st_cmd(dev, SCMD_WRITE_FILE_MARK, wfm, SYNC_CMD);
+		if (rval == EACCES) {
+			return (rval);
+		}
+		if (rval) {
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "st_write_fm : EIO : write file mark");
+			return (EIO);
+		}
 	}
 
 	ASSERT(mutex_owned(ST_MUTEX));
@@ -6199,7 +6297,6 @@ exit:
 }
 
 
-
 /*
  * st_runout a callback that is called what a resource allocatation failed
  */
@@ -6208,7 +6305,6 @@ st_runout(caddr_t arg)
 {
 	struct scsi_tape *un = (struct scsi_tape *)arg;
 	struct buf *bp;
-
 	ASSERT(un != NULL);
 
 	mutex_enter(ST_MUTEX);
@@ -6312,7 +6408,7 @@ st_done_and_mutex_exit(struct scsi_tape *un, struct buf *bp)
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
 	"st_done_and_mutex_exit(): cmd=0x%x count=%ld resid=%ld  flags=0x%x\n",
-		(int)*((caddr_t)(BP_PKT(bp))->pkt_cdbp),
+		(uchar_t)*((caddr_t)(BP_PKT(bp))->pkt_cdbp),
 		bp->b_bcount, bp->b_resid, bp->b_flags);
 
 
@@ -9908,7 +10004,7 @@ st_set_state(struct scsi_tape *un)
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
 	    "st_set_state(): un_eof=%x	fmneeded=%x  pkt_resid=0x%lx (%ld)\n",
-		un->un_eof, un->un_fmneeded, sp->pkt_resid, sp->pkt_resid);
+	    un->un_eof, un->un_fmneeded, sp->pkt_resid, sp->pkt_resid);
 
 	if (bp != un->un_sbufp) {
 #ifdef STDEBUG
@@ -10110,6 +10206,7 @@ st_set_state(struct scsi_tape *un)
 		case SCMD_LOG_SELECT_G1:
 		case SCMD_LOG_SENSE_G1:
 		case SCMD_REPORT_LUNS:
+		case SCMD_READ_ATTRIBUTE:
 			un->un_lastop = saved_lastop;
 			break;
 		case SCMD_LOCATE:	/* Locate makes position unknown */
@@ -11303,7 +11400,7 @@ st_check_clean_bit(dev_t dev)
 
 	if ((rval <= 0) && (un->un_HeadClean & TAPE_ALERT_SUPPORTED)) {
 
-		rval = st_check_alert_clean_bit(dev);
+		rval = st_check_alert_flags(dev);
 	}
 
 	if ((rval <= 0) && (un->un_dp->options & ST_CLN_MASK)) {
@@ -11426,13 +11523,13 @@ st_check_sequential_clean_bit(dev_t dev)
 
 
 static int
-st_check_alert_clean_bit(dev_t dev)
+st_check_alert_flags(dev_t dev)
 {
 	struct st_tape_alert *ta;
 	struct uscsi_cmd *com;
 	unsigned ix, length;
 	int rval;
-	ushort_t parameter;
+	tape_alert_flags flag;
 	char cdb[CDB_GROUP1] = {
 		SCMD_LOG_SENSE_G1,
 		0,
@@ -11492,37 +11589,34 @@ st_check_alert_clean_bit(dev_t dev)
 			break;
 		}
 
-		parameter = ((ta->param[ix].log_param.pc_hi << 8) +
+		flag = ((ta->param[ix].log_param.pc_hi << 8) +
 			ta->param[ix].log_param.pc_lo);
 
+		if ((ta->param[ix].param_value & 1) == 0) {
+			continue;
+		}
 		/*
 		 * check to see if current parameter is of interest.
 		 * CLEAN_FOR_ERRORS is vendor specific to 9840 9940 stk's.
 		 */
-		if ((parameter == CLEAN_NOW) ||
-		    (parameter == CLEAN_PERIODIC) ||
-		    ((parameter == CLEAN_FOR_ERRORS) &&
+		if ((flag == TAF_CLEAN_NOW) ||
+		    (flag == TAF_CLEAN_PERIODIC) ||
+		    ((flag == CLEAN_FOR_ERRORS) &&
 		    (un->un_dp->type == ST_TYPE_STK9840))) {
 
 			rval = MTF_TAPE_CLN_SUPPORTED;
 
-			if (ta->param[ix].param_value & 1) {
 
-				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-					    "alert_page drive needs clean %d\n",
-					    parameter);
-				un->un_HeadClean |= TAPE_ALERT_STILL_DIRTY;
-				rval |= MTF_TAPE_HEAD_DIRTY;
-			}
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "alert_page drive needs clean %d\n", flag);
+			un->un_HeadClean |= TAPE_ALERT_STILL_DIRTY;
+			rval |= MTF_TAPE_HEAD_DIRTY;
 
-		} else if (parameter == CLEANING_MEDIA) {
+		} else if (flag == TAF_CLEANING_MEDIA) {
 
-			if (ta->param[ix].param_value & 1) {
-
-				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-					    "alert_page drive was cleaned\n");
-				un->un_HeadClean &= ~TAPE_ALERT_STILL_DIRTY;
-			}
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "alert_page drive was cleaned\n");
+			un->un_HeadClean &= ~TAPE_ALERT_STILL_DIRTY;
 		}
 
 	}
@@ -11533,7 +11627,7 @@ st_check_alert_clean_bit(dev_t dev)
 	if (un->un_HeadClean & TAPE_ALERT_STILL_DIRTY) {
 
 		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-			    "alert_page still dirty\n");
+		    "alert_page still dirty\n");
 		rval |= MTF_TAPE_HEAD_DIRTY;
 	}
 
@@ -11710,6 +11804,550 @@ st_calculate_timeouts(struct scsi_tape *un)
 		}
 	}
 }
+
+
+/*ARGSUSED*/
+static writablity
+st_is_not_wormable(struct scsi_tape *un)
+{
+	return (RDWR);
+}
+
+static writablity
+st_is_hp_lto_tape_worm(struct scsi_tape *un)
+{
+	writablity wrt;
+
+
+	/* Mode sense should be current */
+	switch (un->un_mspl->media_type) {
+	case 0x00:
+		switch (un->un_mspl->density) {
+		case 0x40:
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "Drive has standard Gen I media loaded\n");
+			break;
+		case 0x42:
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "Drive has standard Gen II media loaded\n");
+			break;
+		case 0x44:
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "Drive has standard Gen III media loaded\n");
+			break;
+		default:
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "Drive has standard unknown 0x%X media loaded\n",
+			    un->un_mspl->density);
+		}
+		wrt = RDWR;
+		break;
+	case 0x01:
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive has WORM medium loaded\n");
+		wrt = WORM;
+		break;
+	case 0x80:
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive has CD-ROM emulation medium loaded\n");
+		wrt = WORM;
+		break;
+	default:
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive has an unexpected medium type 0x%X loaded\n",
+		    un->un_mspl->media_type);
+		wrt = RDWR;
+	}
+
+	return (wrt);
+}
+
+#define	LTO_REQ_INQUIRY 44
+static writablity
+st_is_hp_lto_worm(struct scsi_tape *un)
+{
+	char *buf;
+	int result;
+	writablity wrt;
+
+	buf = kmem_zalloc(LTO_REQ_INQUIRY, KM_SLEEP);
+
+	result = st_get_special_inquiry(un, LTO_REQ_INQUIRY, buf, 0);
+
+	if (result != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Read Standard Inquiry for WORM support failed");
+		wrt = ERROR;
+	} else if ((buf[40] & 1) == 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive is NOT WORMable\n");
+		/* This drive doesn't support it so don't check again */
+		un->un_dp->options &= ~ST_WORMABLE;
+		wrt = RDWR;
+		un->un_wormable = st_is_not_wormable;
+	} else {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive supports WORM version %d\n", buf[40] >> 1);
+		un->un_wormable = st_is_hp_lto_tape_worm;
+		wrt = un->un_wormable(un);
+	}
+
+	kmem_free(buf, LTO_REQ_INQUIRY);
+
+	/*
+	 * If drive doesn't support it no point in checking further.
+	 */
+	return (wrt);
+}
+
+static writablity
+st_is_t10_worm_device(struct scsi_tape *un)
+{
+	writablity wrt;
+
+	if (un->un_mspl->media_type == 0x3c) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive has WORM media loaded\n");
+		wrt = WORM;
+	} else {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive has non WORM media loaded\n");
+		wrt = RDWR;
+	}
+	return (wrt);
+}
+
+#define	SEQ_CAP_PAGE	(char)0xb0
+static writablity
+st_is_t10_worm(struct scsi_tape *un)
+{
+	char *buf;
+	int result;
+	writablity wrt;
+
+	buf = kmem_zalloc(6, KM_SLEEP);
+
+	result = st_get_special_inquiry(un, 6, buf, SEQ_CAP_PAGE);
+
+	if (result != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Read Vitial Inquiry for Sequental Capability"
+		    " WORM support failed %x", result);
+		wrt = ERROR;
+	} else if ((buf[4] & 1) == 0) {
+		ASSERT(buf[1] == SEQ_CAP_PAGE);
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive is NOT WORMable\n");
+		/* This drive doesn't support it so don't check again */
+		un->un_dp->options &= ~ST_WORMABLE;
+		wrt = RDWR;
+		un->un_wormable = st_is_not_wormable;
+	} else {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive supports WORM\n");
+		un->un_wormable = st_is_t10_worm_device;
+		wrt = un->un_wormable(un);
+	}
+
+	kmem_free(buf, 6);
+
+	return (wrt);
+}
+
+
+#define	STK_REQ_SENSE 26
+
+static writablity
+st_is_stk_worm(struct scsi_tape *un)
+{
+	char cdb[CDB_GROUP0] = {SCMD_REQUEST_SENSE, 0, 0, 0, STK_REQ_SENSE, 0};
+	struct scsi_extended_sense *sense;
+	struct uscsi_cmd *cmd;
+	char *buf;
+	int result;
+	writablity wrt;
+
+	cmd = kmem_zalloc(sizeof (struct uscsi_cmd), KM_SLEEP);
+	buf = kmem_alloc(STK_REQ_SENSE, KM_SLEEP);
+	sense = (struct scsi_extended_sense *)buf;
+
+	cmd->uscsi_flags = USCSI_READ;
+	cmd->uscsi_timeout = un->un_dp->non_motion_timeout;
+	cmd->uscsi_cdb = &cdb[0];
+	cmd->uscsi_bufaddr = buf;
+	cmd->uscsi_buflen = STK_REQ_SENSE;
+	cmd->uscsi_cdblen = CDB_GROUP0;
+	cmd->uscsi_rqlen = 0;
+	cmd->uscsi_rqbuf = NULL;
+
+	result = st_ioctl_cmd(un->un_dev, cmd,
+	    UIO_SYSSPACE, UIO_SYSSPACE, UIO_SYSSPACE);
+
+	if (result != 0 || cmd->uscsi_status != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Request Sense for WORM failed");
+		wrt = RDWR;
+	} else if (sense->es_add_len + 8 < 24) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive didn't send enough sense data for WORM byte %d\n",
+		    sense->es_add_len + 8);
+		wrt = RDWR;
+		un->un_wormable = st_is_not_wormable;
+	} else if ((buf[24]) & 0x02) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive has WORM tape loaded\n");
+		wrt = WORM;
+		un->un_wormable = st_is_stk_worm;
+	} else {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive has normal tape loaded\n");
+		wrt = RDWR;
+		un->un_wormable = st_is_stk_worm;
+	}
+
+	kmem_free(buf, STK_REQ_SENSE);
+	kmem_free(cmd, sizeof (struct uscsi_cmd));
+	return (wrt);
+}
+
+#define	DLT_INQ_SZ 44
+
+static writablity
+st_is_dlt_tape_worm(struct scsi_tape *un)
+{
+	caddr_t buf;
+	int result;
+	writablity wrt;
+
+	buf = kmem_alloc(DLT_INQ_SZ, KM_SLEEP);
+
+	/* Read Attribute Media Type */
+
+	result = st_read_attributes(un, 0x0408, buf, 10);
+
+	/*
+	 * If this quantum drive is attached via an HBA that cannot
+	 * support thr read attributes command return error in the
+	 * hope that someday they will support the t10 method.
+	 */
+	if (result == EINVAL && un->un_max_cdb_sz < CDB_GROUP4) {
+		scsi_log(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Read Attribute Command for WORM Media detection is not "
+		    "supported on the HBA that this drive is attached to.");
+		wrt = RDWR;
+		un->un_wormable = st_is_not_wormable;
+		goto out;
+	}
+
+	if (result != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Read Attribute Command for WORM Media returned 0x%x",
+		    result);
+		wrt = RDWR;
+		un->un_dp->options &= ~ST_WORMABLE;
+		goto out;
+	}
+
+	if ((uchar_t)buf[9] == 0x80) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive media is WORM\n");
+		wrt = WORM;
+	} else {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive media is not WORM Media 0x%x\n", (uchar_t)buf[9]);
+		wrt = RDWR;
+	}
+
+out:
+	kmem_free(buf, DLT_INQ_SZ);
+	return (wrt);
+}
+
+static writablity
+st_is_dlt_worm(struct scsi_tape *un)
+{
+	caddr_t buf;
+	int result;
+	writablity wrt;
+
+	buf = kmem_alloc(DLT_INQ_SZ, KM_SLEEP);
+
+	result = st_get_special_inquiry(un, DLT_INQ_SZ, buf, 0xC0);
+
+	if (result != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Read Vendor Specific Inquiry for WORM support failed");
+		wrt = RDWR;
+		goto out;
+	}
+
+	if ((buf[2] & 1) == 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive is not WORMable\n");
+		wrt = RDWR;
+		un->un_dp->options &= ~ST_WORMABLE;
+		un->un_wormable = st_is_not_wormable;
+		goto out;
+	} else {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Drive is WORMable\n");
+		un->un_wormable = st_is_dlt_tape_worm;
+		wrt = un->un_wormable(un);
+	}
+out:
+	kmem_free(buf, DLT_INQ_SZ);
+
+	return (wrt);
+}
+
+typedef struct {
+	struct modeheader_seq header;
+#if defined(_BIT_FIELDS_LTOH) /* X86 */
+	uchar_t pagecode	:6,
+				:2;
+	uchar_t page_len;
+	uchar_t syslogalive	:2,
+		device		:1,
+		abs		:1,
+		ulpbot		:1,
+		prth		:1,
+		ponej		:1,
+		ait		:1;
+	uchar_t span;
+
+	uchar_t			:6,
+		worm		:1,
+		mic		:1;
+	uchar_t worm_cap	:1,
+				:7;
+	uint32_t		:32;
+#else /* SPARC */
+	uchar_t			:2,
+		pagecode	:6;
+	uchar_t page_len;
+	uchar_t ait		:1,
+		device		:1,
+		abs		:1,
+		ulpbot		:1,
+		prth		:1,
+		ponej		:1,
+		syslogalive	:2;
+	uchar_t span;
+	uchar_t mic		:1,
+		worm		:1,
+				:6;
+	uchar_t			:7,
+		worm_cap	:1;
+	uint32_t		:32;
+#endif
+}ait_dev_con;
+
+#define	AIT_DEV_PAGE 0x31
+static writablity
+st_is_sony_worm(struct scsi_tape *un)
+{
+	int result;
+	writablity wrt;
+	ait_dev_con *ait_conf;
+
+	ait_conf = kmem_zalloc(sizeof (ait_dev_con), KM_SLEEP);
+
+	result = st_gen_mode_sense(un, AIT_DEV_PAGE,
+	    (struct seq_mode *)ait_conf, sizeof (ait_dev_con));
+
+	if (result == 0) {
+
+		if (ait_conf->pagecode != AIT_DEV_PAGE) {
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "returned page 0x%x not 0x%x AIT_DEV_PAGE\n",
+			    ait_conf->pagecode, AIT_DEV_PAGE);
+			wrt = RDWR;
+			un->un_wormable = st_is_not_wormable;
+
+		} else if (ait_conf->worm_cap) {
+
+			un->un_wormable = st_is_sony_worm;
+
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "Drives is WORMable\n");
+			if (ait_conf->worm) {
+				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+				    "Media is WORM\n");
+				wrt = WORM;
+			} else {
+				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+				    "Media is not WORM\n");
+				wrt = RDWR;
+			}
+
+		} else {
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "Drives not is WORMable\n");
+			wrt = RDWR;
+			/* No further checking required */
+			un->un_dp->options &= ~ST_WORMABLE;
+		}
+
+	} else {
+
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "AIT device config mode sense page read command failed"
+		    " result = %d ", result);
+		wrt = ERROR;
+		un->un_wormable = st_is_not_wormable;
+	}
+
+	kmem_free(ait_conf, sizeof (ait_dev_con));
+	return (wrt);
+}
+
+static writablity
+st_is_drive_worm(struct scsi_tape *un)
+{
+	writablity wrt;
+
+	switch (un->un_dp->type) {
+	case MT_ISDLT:
+		wrt = st_is_dlt_worm(un);
+		break;
+
+	case MT_ISSTK9840:
+		wrt = st_is_stk_worm(un);
+		break;
+
+	case MT_IS8MM:
+	case MT_ISAIT:
+		wrt = st_is_sony_worm(un);
+		break;
+
+	case MT_LTO:
+		if (strncmp("HP ", un->un_dp->vid, 3) == 0) {
+			wrt = st_is_hp_lto_worm(un);
+		} else {
+			wrt = st_is_t10_worm(un);
+		}
+		break;
+
+	default:
+		wrt = ERROR;
+		break;
+	}
+
+	/*
+	 * If any of the above failed try the t10 standard method.
+	 */
+	if (wrt == ERROR) {
+		wrt = st_is_t10_worm(un);
+	}
+
+	/*
+	 * Unknown method for detecting WORM media.
+	 */
+	if (wrt == ERROR) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "Unknown method for WORM media detection\n");
+		wrt = RDWR;
+		un->un_dp->options &= ~ST_WORMABLE;
+	}
+
+	return (wrt);
+}
+
+static int
+st_read_attributes(struct scsi_tape *un, uint16_t attribute, caddr_t buf,
+    size_t size)
+{
+	uchar_t cdb[CDB_GROUP4];
+	struct uscsi_cmd *cmd;
+	int result;
+
+	cdb[0] = SCMD_READ_ATTRIBUTE;
+	cdb[1] = 0;
+	cdb[2] = 0;
+	cdb[3] = 0;
+	cdb[4] = 0;
+	cdb[5] = 0;
+	cdb[6] = 0;
+	cdb[7] = 0;
+	cdb[8] = (uchar_t)(attribute >> 8);
+	cdb[9] = (uchar_t)(attribute);
+	cdb[10] = (uchar_t)(size >> 24);
+	cdb[11] = (uchar_t)(size >> 16);
+	cdb[12] = (uchar_t)(size >> 8);
+	cdb[13] = (uchar_t)(size);
+	cdb[14] = 0;
+	cdb[15] = 0;
+
+	cmd = kmem_zalloc(sizeof (struct uscsi_cmd), KM_SLEEP);
+
+	cmd->uscsi_flags = USCSI_READ | USCSI_DIAGNOSE;
+	cmd->uscsi_timeout = un->un_dp->non_motion_timeout;
+	cmd->uscsi_cdb = (caddr_t)&cdb[0];
+	cmd->uscsi_bufaddr = (caddr_t)buf;
+	cmd->uscsi_buflen = size;
+	cmd->uscsi_cdblen = sizeof (cdb);
+
+	result = st_ioctl_cmd(un->un_dev, cmd,
+	    UIO_SYSSPACE, UIO_SYSSPACE, UIO_SYSSPACE);
+
+	if (result != 0 || cmd->uscsi_status != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_read_attribute failed: result %d status %d\n",
+		    result, cmd->uscsi_status);
+		if (result == 0) {
+			result = EIO;
+		}
+	}
+
+	kmem_free(cmd, sizeof (cdb));
+	return (result);
+}
+
+static int
+st_get_special_inquiry(struct scsi_tape *un, uchar_t size, caddr_t dest,
+    uchar_t page)
+{
+	char cdb[CDB_GROUP0];
+	struct scsi_extended_sense *sense;
+	struct uscsi_cmd *cmd;
+	int result;
+
+	cdb[0] = SCMD_INQUIRY;
+	cdb[1] = page ? 1 : 0;
+	cdb[2] = page;
+	cdb[3] = 0;
+	cdb[4] = size;
+	cdb[5] = 0;
+
+	cmd = kmem_zalloc(sizeof (struct uscsi_cmd), KM_SLEEP);
+	sense = kmem_alloc(sizeof (struct scsi_extended_sense), KM_SLEEP);
+
+	cmd->uscsi_flags = USCSI_READ | USCSI_RQENABLE;
+	cmd->uscsi_timeout = un->un_dp->non_motion_timeout;
+	cmd->uscsi_cdb = &cdb[0];
+	cmd->uscsi_bufaddr = dest;
+	cmd->uscsi_buflen = size;
+	cmd->uscsi_cdblen = CDB_GROUP0;
+	cmd->uscsi_rqlen = sizeof (struct scsi_extended_sense);
+	cmd->uscsi_rqbuf = (caddr_t)sense;
+
+	result = st_ioctl_cmd(un->un_dev, cmd,
+	    UIO_SYSSPACE, UIO_SYSSPACE, UIO_SYSSPACE);
+
+	if (result != 0 || cmd->uscsi_status != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_special_inquiry() failed for page %x", page);
+		if (result == 0) {
+			result = EIO;
+		}
+	}
+
+	kmem_free(sense, sizeof (struct scsi_extended_sense));
+	kmem_free(cmd, sizeof (struct uscsi_cmd));
+
+	return (result);
+}
+
 
 #if defined(__i386) || defined(__amd64)
 
