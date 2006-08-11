@@ -134,8 +134,9 @@ static	void	eri_xcvr_force_mode(struct eri *, uint32_t *);
 
 static	void	eri_mif_poll(struct eri *, soft_mif_enable_t);
 static	void	eri_check_link(struct eri *);
+static	uint32_t eri_check_link_noind(struct eri *);
 static	void	eri_display_link_status(struct eri *);
-static	void	eri_mif_check(struct eri *, uint16_t, uint16_t);
+static	uint32_t eri_mif_check(struct eri *, uint16_t, uint16_t);
 static	void    eri_mii_write(struct eri *, uint8_t, uint16_t);
 static	uint32_t eri_mii_read(struct eri *, uint8_t, uint16_t *);
 
@@ -234,6 +235,7 @@ static	mblk_t *eri_dlcap_all(queue_t *);
 static	void eri_dlcap_enable(queue_t *, mblk_t *);
 
 static	void eri_notify_ind(struct eri *, uint32_t);
+static	void eri_send_notifications(struct eri *, uint32_t);
 
 static	void eri_setipq(struct eri *);
 
@@ -2440,9 +2442,11 @@ eri_dodetach(struct eristr *sbp)
 
 	rw_exit(&eristruplock);
 
-	if (tsbp == NULL)
+	if (tsbp == NULL) {
 		eri_uninit(erip);
-	else if (reinit) {
+	} else if (reinit) {
+		boolean_t needind;
+
 		mutex_enter(&erip->intrlock);
 		erip->promisc_cnt -= promisc;
 		erip->all_multi_cnt -= all_multi;
@@ -2450,11 +2454,12 @@ eri_dodetach(struct eristr *sbp)
 		if (erip->promisc_cnt == 0 || erip->all_multi_cnt == 0 ||
 		    reinit == 2)
 			eri_init_rx(erip);
-
-		if (erip->promisc_cnt == 0)
-			eri_notify_ind(erip, DL_NOTE_PROMISC_OFF_PHYS);
+		needind = (erip->promisc_cnt == 0);
 
 		mutex_exit(&erip->intrlock);
+
+		if (needind)
+			eri_notify_ind(erip, DL_NOTE_PROMISC_OFF_PHYS);
 	}
 	eri_setipq(erip);
 }
@@ -2603,6 +2608,7 @@ eri_ponreq(queue_t *wq, mblk_t *mp)
 	int	phy_flag = 0;
 	int	sap_flag = 0;
 	int	allmulti_flag = 0;
+	boolean_t needind;
 
 	sbp = (struct eristr *)wq->q_ptr;
 
@@ -2650,9 +2656,13 @@ eri_ponreq(queue_t *wq, mblk_t *mp)
 			erip->all_multi_cnt++;
 		if (erip->promisc_cnt == 1 || erip->all_multi_cnt == 1) {
 			eri_init_rx(sbp->sb_erip);
-			eri_notify_ind(erip, DL_NOTE_PROMISC_ON_PHYS);
+			needind = B_TRUE;
+		} else {
+			needind = B_FALSE;
 		}
 		mutex_exit(&erip->intrlock);
+		if (needind)
+			eri_notify_ind(erip, DL_NOTE_PROMISC_ON_PHYS);
 
 		eri_setipq(sbp->sb_erip);
 	}
@@ -2700,6 +2710,8 @@ eri_poffreq(queue_t *wq, mblk_t *mp)
 
 	erip = sbp->sb_erip;
 	if (erip) {
+		boolean_t needind;
+
 		mutex_enter(&erip->intrlock);
 		if (flag == ERI_SALLPHYS)
 			erip->promisc_cnt--;
@@ -2710,10 +2722,14 @@ eri_poffreq(queue_t *wq, mblk_t *mp)
 		if (((flag == ERI_SALLPHYS) && (erip->promisc_cnt == 0)) ||
 		    ((flag == ERI_SALLMULTI) && (erip->all_multi_cnt == 0))) {
 			eri_init_rx(sbp->sb_erip);
-			if (flag == ERI_SALLPHYS)
-				eri_notify_ind(erip, DL_NOTE_PROMISC_OFF_PHYS);
+			needind = (flag == ERI_SALLPHYS);
+		} else {
+			needind = B_FALSE;
 		}
 		mutex_exit(&erip->intrlock);
+
+		if (needind)
+			eri_notify_ind(erip, DL_NOTE_PROMISC_OFF_PHYS);
 
 		eri_setipq(sbp->sb_erip);
 	}
@@ -3242,6 +3258,18 @@ eri_notify_ind(struct eri *erip, uint32_t notification)
 	}
 }
 
+static void
+eri_send_notifications(struct eri *erip, uint32_t linkflags)
+{
+	if (linkflags & DL_NOTE_LINK_DOWN) {
+		eri_notify_ind(erip, DL_NOTE_LINK_DOWN);
+	}
+	if (linkflags & DL_NOTE_LINK_UP) {
+		eri_notify_ind(erip, DL_NOTE_LINK_UP);
+		eri_notify_ind(erip, DL_NOTE_SPEED);
+	}
+}
+
 /*
  * Set or clear the device ipq pointer.
  * XXX Assumes IPv4 and IPv6 are ERIFAST.
@@ -3614,7 +3642,6 @@ eri_stop(struct eri *erip)
 		erip->stats.link_up = ERI_LINK_DOWN;
 		erip->stats.link_duplex = ERI_UNKNOWN_DUPLEX;
 		erip->global_reset_issued = -1;
-		eri_notify_ind(erip, DL_NOTE_LINK_DOWN);
 	}
 
 	ERI_DELAY((GET_SWRSTREG(reset) == ERI_CACHE_LINE_SIZE),
@@ -4259,6 +4286,7 @@ eri_init(struct eri *erip)
 	uint32_t	mac_ctl = 0;
 	uint_t		ret;
 	uint32_t link_timeout	= ERI_LINKCHECK_TIMER;
+	uint32_t	linkflags;
 
 	ERI_DEBUG_MSG1(erip, INIT_MSG,
 			"eri_init: Entered");
@@ -4296,6 +4324,8 @@ eri_init(struct eri *erip)
 
 	mutex_enter(&erip->xcvrlock);
 	if (!param_linkup || erip->linkcheck) {
+		if (!erip->linkcheck)
+			linkflags = DL_NOTE_LINK_DOWN;
 		(void) eri_stop(erip);
 	}
 	if (!(erip->flags & ERI_DLPI_LINKUP) || !param_linkup) {
@@ -4316,12 +4346,14 @@ eri_init(struct eri *erip)
 				link_timeout = 0;
 				goto done;
 			}
+			if (erip->stats.link_up == ERI_LINK_UP)
+				linkflags |= DL_NOTE_LINK_UP;
 		} else {
 			erip->flags |= (ERI_RUNNING | ERI_INITIALIZED);
 			param_linkup = 0;
 			erip->stats.link_up = ERI_LINK_DOWN;
 			erip->stats.link_duplex = ERI_UNKNOWN_DUPLEX;
-			eri_notify_ind(erip, DL_NOTE_LINK_DOWN);
+			linkflags |= DL_NOTE_LINK_DOWN;
 			/*
 			 * Still go on and complete the MAC initialization as
 			 * xcvr might show up later.
@@ -4417,7 +4449,7 @@ eri_init(struct eri *erip)
 		param_linkup = 0;	/* force init again */
 		erip->stats.link_up = ERI_LINK_DOWN;
 		erip->stats.link_duplex = ERI_UNKNOWN_DUPLEX;
-		eri_notify_ind(erip, DL_NOTE_LINK_DOWN);
+		linkflags |= DL_NOTE_LINK_DOWN;
 		goto done;
 	}
 
@@ -4427,7 +4459,7 @@ eri_init(struct eri *erip)
 		param_linkup = 0;	/* force init again */
 		erip->stats.link_up = ERI_LINK_DOWN;
 		erip->stats.link_duplex = ERI_UNKNOWN_DUPLEX;
-		eri_notify_ind(erip, DL_NOTE_LINK_DOWN);
+		linkflags |= DL_NOTE_LINK_DOWN;
 		goto done;
 	}
 
@@ -4571,6 +4603,8 @@ done:
 	eri_start_timer(erip, eri_check_link, link_timeout);
 	mutex_exit(&erip->intrlock);
 
+	eri_send_notifications(erip, linkflags);
+
 	ret = !(erip->flags & ERI_RUNNING);
 	if (ret) {
 		ERI_FAULT_MSG1(erip, SEVERITY_NONE, ERI_VERB_MSG,
@@ -4611,6 +4645,8 @@ eri_burstsize(struct eri *erip)
 static void
 eri_uninit(struct eri *erip)
 {
+	boolean_t needind;
+
 	/*
 	 * Allow up to 'ERI_DRAINTIME' for pending xmit's to complete.
 	 */
@@ -4624,12 +4660,16 @@ eri_uninit(struct eri *erip)
 	erip->flags &= ~ERI_DLPI_LINKUP;
 	mutex_exit(&erip->xcvrlock);
 
+	needind = !erip->linkcheck;
 	(void) eri_stop(erip);
 	erip->flags &= ~ERI_RUNNING;
 
 	mutex_exit(&erip->xmitlock);
 	eri_start_timer(erip, eri_check_link, 0);
 	mutex_exit(&erip->intrlock);
+
+	if (needind)
+		eri_notify_ind(erip, DL_NOTE_LINK_DOWN);
 }
 
 /*
@@ -4841,6 +4881,8 @@ eri_intr(struct eri *erip)
 	uint32_t erisbits;
 	uint32_t mif_status;
 	uint32_t serviced = DDI_INTR_UNCLAIMED;
+	uint32_t linkflags = 0;
+
 	mutex_enter(&erip->intrlock);
 
 	erisbits = GET_GLOBREG(status);
@@ -4869,6 +4911,10 @@ eri_intr(struct eri *erip)
 
 	/* Check for interesting events */
 	if ((erisbits & ERI_G_STATUS_INTR) == 0) {
+#ifdef	ESTAR_WORKAROUND
+		uint32_t linkflags;
+#endif
+
 		ERI_DEBUG_MSG2(erip, DIAG_MSG,
 			"eri_intr: Interrupt Not Claimed gsbits  %X", erisbits);
 #ifdef	DEBUG
@@ -4887,9 +4933,12 @@ eri_intr(struct eri *erip)
 			"eri_intr:alias %X",
 			GET_GLOBREG(status_alias));
 #ifdef	ESTAR_WORKAROUND
-		eri_check_link(erip);
+		linkflags = eri_check_link_noind(erip);
 #endif
 		mutex_exit(&erip->intrlock);
+#ifdef	ESTAR_WORKAROUND
+		eri_send_notifications(erip, linkflags);
+#endif
 		return (serviced);
 	}
 	serviced = DDI_INTR_CLAIMED;
@@ -4951,12 +5000,12 @@ eri_intr(struct eri *erip)
 			"eri_intr: new MIF interrupt status %X XCVR status %X",
 			mif_status, erip->mii_status);
 		(void) eri_mii_read(erip, ERI_PHY_BMSR, &stat);
-		eri_mif_check(erip, stat, stat);
+		linkflags = eri_mif_check(erip, stat, stat);
 
 #else
 		mif_status = GET_MIFREG(mif_bsts);
 		eri_mif_poll(erip, MIF_POLL_STOP);
-		eri_mif_check(erip, (uint16_t)mif_status,
+		linkflags = eri_mif_check(erip, (uint16_t)mif_status,
 			(uint16_t)(mif_status >> 16));
 #endif
 		eri_mif_poll(erip, MIF_POLL_START);
@@ -5048,6 +5097,8 @@ rx_done_int:
 		erip->rx_completion = rmdi;
 	}
 	mutex_exit(&erip->intrlock);
+
+	eri_send_notifications(erip, linkflags);
 
 	return (serviced);
 }
@@ -7967,6 +8018,15 @@ eri_new_xcvr(struct eri *erip)
 }
 
 /*
+ * This function is used for timers.  No locks are held on timer expiry.
+ */
+static void
+eri_check_link(struct eri *erip)
+{
+	eri_send_notifications(erip, eri_check_link_noind(erip));
+}
+
+/*
  * Compare our xcvr in our structure to the xcvr that we get from
  * eri_check_mii_xcvr(). If they are different then mark the
  * link down, reset xcvr, and return.
@@ -7975,12 +8035,12 @@ eri_new_xcvr(struct eri *erip)
  * will then use a external phy, thus this code has been cleaned
  * to not even call the function or to possibly change the xcvr.
  */
-/* ARGSUSED */
-static void
-eri_check_link(struct eri *erip)
+static uint32_t
+eri_check_link_noind(struct eri *erip)
 {
 	uint16_t stat, control, mif_ints;
 	uint32_t link_timeout	= ERI_LINKCHECK_TIMER;
+	uint32_t linkflags = 0;
 
 	ERI_DEBUG_MSG1(erip, XCVR_MSG, "eri_check_link_enter");
 	eri_stop_timer(erip);	/* acquire linklock */
@@ -8023,7 +8083,7 @@ eri_check_link(struct eri *erip)
 			link_timeout = ERI_P_FAULT_TIMER;
 		} else {
 			erip->openloop_autoneg = 0;
-			eri_mif_check(erip, stat, stat);
+			linkflags = eri_mif_check(erip, stat, stat);
 			if (erip->openloop_autoneg)
 				link_timeout = ERI_P_FAULT_TIMER;
 		}
@@ -8032,10 +8092,10 @@ eri_check_link(struct eri *erip)
 		mutex_exit(&erip->xmitlock);
 
 		eri_start_timer(erip, eri_check_link, link_timeout);
-		return;
+		return (linkflags);
 	}
 
-	eri_mif_check(erip, mif_ints, stat);
+	linkflags = eri_mif_check(erip, mif_ints, stat);
 	eri_mif_poll(erip, MIF_POLL_START);
 	mutex_exit(&erip->xcvrlock);
 	mutex_exit(&erip->xmitlock);
@@ -8062,7 +8122,7 @@ eri_check_link(struct eri *erip)
 
 			eri_start_timer(erip, eri_check_link,
 			    ERI_CHECK_HANG_TIMER);
-			return;
+			return (linkflags);
 		}
 
 		if (erip->check2_rmac_hang) {
@@ -8094,7 +8154,7 @@ eri_check_link(struct eri *erip)
 				eri_start_timer(erip, eri_check_link,
 				    ERI_LINKCHECK_TIMER);
 				(void) eri_init(erip);
-				return;
+				return (linkflags);
 			}
 		}
 	}
@@ -8116,7 +8176,7 @@ eri_check_link(struct eri *erip)
 		erip->linkcheck = 1;
 		eri_start_timer(erip, eri_check_link, ERI_CHECK_HANG_TIMER);
 		(void) eri_init(erip);
-		return;
+		return (linkflags);
 	}
 #endif
 
@@ -8134,14 +8194,16 @@ eri_check_link(struct eri *erip)
 		eri_start_timer(erip, eri_check_link, ERI_CHECK_HANG_TIMER);
 	else
 		eri_start_timer(erip, eri_check_link, ERI_LINKCHECK_TIMER);
+	return (linkflags);
 }
 
-static void
+static uint32_t
 eri_mif_check(struct eri *erip, uint16_t mif_ints, uint16_t mif_data)
 {
 	uint16_t control, aner, anlpar, anar, an_common;
 	uint16_t old_mintrans;
 	int restart_autoneg = 0;
+	uint32_t retv;
 
 	ERI_DEBUG_MSG4(erip, XCVR_MSG,
 		"eri_mif_check: mif_mask: %X, %X, %X",
@@ -8166,7 +8228,7 @@ eri_mif_check(struct eri *erip, uint16_t mif_ints, uint16_t mif_data)
 				(void) eri_reset_xcvr(erip);
 			}
 		}
-		return;
+		return (0);
 	}
 
 	if (param_autoneg && (mif_ints & PHY_BMSR_LNKSTS) &&
@@ -8219,7 +8281,7 @@ eri_mif_check(struct eri *erip, uint16_t mif_ints, uint16_t mif_data)
 				ERI_FAULT_MSG1(erip, SEVERITY_NONE,
 					ERI_VERB_MSG,
 					"Transceiver speed set incorrectly.");
-				return;
+				return (0);
 			}
 
 			(void) eri_mii_write(erip, ERI_PHY_BMCR, control);
@@ -8227,7 +8289,7 @@ eri_mif_check(struct eri *erip, uint16_t mif_ints, uint16_t mif_data)
 			param_anlpar_10fdx = 0;
 			param_mode = 0;
 			erip->openloop_autoneg = 1;
-			return;
+			return (0);
 		}
 		(void) eri_mii_read(erip, ERI_PHY_ANLPAR, &anlpar);
 		(void) eri_mii_read(erip, ERI_PHY_ANAR, &anar);
@@ -8266,6 +8328,7 @@ eri_mif_check(struct eri *erip, uint16_t mif_ints, uint16_t mif_data)
 	/*	mif_ints |= PHY_BMSR_LNKSTS; prevent double msg */
 	/*	mif_data |= PHY_BMSR_LNKSTS; prevent double msg */
 	}
+	retv = 0;
 	if (mif_ints & PHY_BMSR_LNKSTS) {
 		if (mif_data & PHY_BMSR_LNKSTS) {
 			ERI_DEBUG_MSG1(erip, PHY_MSG, "Link Up");
@@ -8289,8 +8352,7 @@ eri_mif_check(struct eri *erip, uint16_t mif_ints, uint16_t mif_data)
 			else
 				erip->stats.link_duplex = ERI_HALF_DUPLEX;
 
-			eri_notify_ind(erip, DL_NOTE_LINK_UP);
-			eri_notify_ind(erip, DL_NOTE_SPEED);
+			retv = DL_NOTE_LINK_UP;
 			eri_display_link_status(erip);
 		} else {
 			ERI_DEBUG_MSG1(erip, PHY_MSG,
@@ -8298,7 +8360,7 @@ eri_mif_check(struct eri *erip, uint16_t mif_ints, uint16_t mif_data)
 			param_linkup = 0;
 			erip->stats.link_up = ERI_LINK_DOWN;
 			erip->stats.link_duplex = ERI_UNKNOWN_DUPLEX;
-			eri_notify_ind(erip, DL_NOTE_LINK_DOWN);
+			retv = DL_NOTE_LINK_DOWN;
 			if (param_autoneg) {
 				restart_autoneg = 1;
 			}
@@ -8332,8 +8394,7 @@ eri_mif_check(struct eri *erip, uint16_t mif_ints, uint16_t mif_data)
 					erip->stats.link_duplex =
 					    ERI_HALF_DUPLEX;
 
-				eri_notify_ind(erip, DL_NOTE_LINK_UP);
-				eri_notify_ind(erip, DL_NOTE_SPEED);
+				retv = DL_NOTE_LINK_UP;
 				eri_display_link_status(erip);
 			}
 		} else if (param_linkup) {
@@ -8345,7 +8406,7 @@ eri_mif_check(struct eri *erip, uint16_t mif_ints, uint16_t mif_data)
 			param_linkup = 0;
 			erip->stats.link_up = ERI_LINK_DOWN;
 			erip->stats.link_duplex = ERI_UNKNOWN_DUPLEX;
-			eri_notify_ind(erip, DL_NOTE_LINK_DOWN);
+			retv = DL_NOTE_LINK_DOWN;
 			if (param_autoneg)
 				restart_autoneg = 1;
 		}
@@ -8385,6 +8446,7 @@ eri_mif_check(struct eri *erip, uint16_t mif_ints, uint16_t mif_data)
 				 */
 		}
 	}
+	return (retv);
 }
 
 #define	PHYRST_PERIOD 500
@@ -8553,8 +8615,6 @@ reset_done:
 			else
 				erip->stats.link_duplex = ERI_HALF_DUPLEX;
 
-			eri_notify_ind(erip, DL_NOTE_LINK_UP);
-			eri_notify_ind(erip, DL_NOTE_SPEED);
 			eri_display_link_status(erip);
 		}
 	}
