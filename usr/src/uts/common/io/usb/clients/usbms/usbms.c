@@ -2289,6 +2289,20 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 			idf->ylen = rptsz;
 			limit += rptsz;
 			break;
+		case HID_GD_Z:
+			/*
+			 * z-axis not yet supported, just skip it.
+			 *
+			 * It would be ideal if the HID_GD_Z data would be
+			 * reported as horizontal wheel, and HID_GD_WHEEL
+			 * as vertical wheel.
+			 *
+			 * We can not use the default case, because
+			 * that skips rptcnt*rptsz, but for an
+			 * "Apple Might Mouse" rptsz must be used.
+			 */
+			limit += rptsz;
+			break;
 		case HID_GD_WHEEL:
 			idf->zpos = limit;
 			idf->zlen = rptsz;
