@@ -67,6 +67,8 @@ int sata_func_enable = SATA_ENABLE_PROCESS_EVENTS | SATA_ENABLE_QUEUING;
 
 #ifdef SATA_DEBUG
 #define	SATA_LOG_D(args)	sata_log args
+uint64_t mbuf_count = 0;
+uint64_t mbuffail_count = 0;
 #else
 #define	SATA_LOG_D(arg)
 #endif
@@ -271,6 +273,17 @@ static struct modlinkage modlinkage = {
  * i.e. when scsi_pkt has not timeout specified.
  */
 static int sata_default_pkt_time = 60;	/* 60 seconds */
+
+/*
+ * Intermediate buffer device access attributes - they are required,
+ * but not necessarily used.
+ */
+static ddi_device_acc_attr_t sata_acc_attr = {
+	DDI_DEVICE_ATTR_V0,
+	DDI_STRUCTURE_LE_ACC,
+	DDI_STRICTORDER_ACC
+};
+
 
 /*
  * Mutexes protecting structures in multithreaded operations.
@@ -3189,6 +3202,15 @@ sata_scsi_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 	spx = (sata_pkt_txlate_t *)pkt->pkt_ha_private;
 
 	if (spx->txlt_buf_dma_handle != NULL) {
+		if (spx->txlt_tmp_buf != NULL)  {
+		    ASSERT(spx->txlt_tmp_buf_handle != 0);
+			/*
+			 * Intermediate DMA buffer was allocated.
+			 * Free allocated buffer and associated access handle.
+			 */
+			ddi_dma_mem_free(&spx->txlt_tmp_buf_handle);
+			spx->txlt_tmp_buf = NULL;
+		}
 		/*
 		 * Free DMA resources - cookies and handles
 		 */
@@ -3236,6 +3258,9 @@ sata_scsi_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt)
  * Implementation of scsi tran_sync_pkt.
  *
  * The assumption below is that pkt is unique - there is no need to check ap
+ *
+ * Synchronize DMA buffer and, if the intermediate buffer is used, copy data
+ * into/from the real buffer.
  */
 static void
 sata_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
@@ -3245,20 +3270,36 @@ sata_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 #endif
 	int rval;
 	sata_pkt_txlate_t *spx = (sata_pkt_txlate_t *)pkt->pkt_ha_private;
+	struct buf *bp;
+	int direction;
 
+	ASSERT(spx != NULL);
 	if (spx->txlt_buf_dma_handle != NULL) {
+		direction = spx->txlt_sata_pkt->
+		    satapkt_cmd.satacmd_flags.sata_data_direction;
 		if (spx->txlt_sata_pkt != NULL &&
-		    spx->txlt_sata_pkt->satapkt_cmd.satacmd_flags.
-		    sata_data_direction != SATA_DIR_NODATA_XFER) {
-			rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
-			    (spx->txlt_sata_pkt->satapkt_cmd.
-			    satacmd_flags.sata_data_direction &
-			    SATA_DIR_WRITE) ?
-			    DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU);
-			if (rval == DDI_SUCCESS) {
-				SATA_LOG_D((spx->txlt_sata_hba_inst, CE_WARN,
-				    "sata_scsi_sync_pkt: sync pkt failed"));
+		    direction != SATA_DIR_NODATA_XFER) {
+			if (spx->txlt_tmp_buf != NULL) {
+				/* Intermediate DMA buffer used */
+				bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
+
+				if (direction & SATA_DIR_WRITE) {
+					bcopy(bp->b_un.b_addr,
+					    spx->txlt_tmp_buf, bp->b_bcount);
+				}
 			}
+			/* Sync the buffer for device or for CPU */
+			rval = ddi_dma_sync(spx->txlt_buf_dma_handle,   0, 0,
+			    (direction & SATA_DIR_WRITE) ?
+			    DDI_DMA_SYNC_FORDEV :  DDI_DMA_SYNC_FORCPU);
+			ASSERT(rval == DDI_SUCCESS);
+			if (spx->txlt_tmp_buf != NULL &&
+			    !(direction & SATA_DIR_WRITE)) {
+				/* Intermediate DMA buffer used for read */
+				bcopy(spx->txlt_tmp_buf,
+				    bp->b_un.b_addr, bp->b_bcount);
+			}
+
 		}
 	}
 }
@@ -5714,13 +5755,26 @@ sata_txlt_rw_completion(sata_pkt_t *sata_pkt)
 	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
 	struct scsi_extended_sense *sense;
 	uint64_t lba;
-
+	struct buf *bp;
+	int rval;
 	if (sata_pkt->satapkt_reason == SATA_PKT_COMPLETED) {
 		/* Normal completion */
 		scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
 		    STATE_SENT_CMD | STATE_XFERRED_DATA | STATE_GOT_STATUS;
 		scsipkt->pkt_reason = CMD_CMPLT;
 		*scsipkt->pkt_scbp = STATUS_GOOD;
+		if (spx->txlt_tmp_buf != NULL) {
+			/* Temporary buffer was used */
+			bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
+			if (bp->b_flags & B_READ) {
+				rval = ddi_dma_sync(
+				    spx->txlt_buf_dma_handle, 0, 0,
+				    DDI_DMA_SYNC_FORCPU);
+				ASSERT(rval == DDI_SUCCESS);
+				bcopy(spx->txlt_tmp_buf, bp->b_un.b_addr,
+				    bp->b_bcount);
+			}
+		}
 	} else {
 		/*
 		 * Something went wrong - analyze return
@@ -8630,10 +8684,10 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 	uint64_t		max_txfer_len;
 	uint64_t		cur_txfer_len;
 
+
 	ASSERT(spx->txlt_sata_pkt != NULL);
 	bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
 	ASSERT(bp != NULL);
-
 
 	if (spx->txlt_buf_dma_handle == NULL) {
 		/*
@@ -8661,9 +8715,104 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 		if (flags & PKT_DMA_PARTIAL)
 			dma_flags |= DDI_DMA_PARTIAL;
 
-		rval = ddi_dma_buf_bind_handle(spx->txlt_buf_dma_handle,
-		    bp, dma_flags, callback, arg,
-		    &cookie, &spx->txlt_curwin_num_dma_cookies);
+		/*
+		 * Check buffer alignment and size against dma attributes
+		 * Consider dma_attr_align only. There may be requests
+		 * with the size lower then device granularity, but they
+		 * will not read/write from/to the device, so no adjustment
+		 * is necessary. The dma_attr_minxfer theoretically should
+		 * be considered, but no HBA driver is checking it.
+		 */
+		if (IS_P2ALIGNED(bp->b_un.b_addr,
+		    cur_dma_attr->dma_attr_align)) {
+			rval = ddi_dma_buf_bind_handle(
+					spx->txlt_buf_dma_handle,
+					bp, dma_flags, callback, arg,
+					&cookie,
+					&spx->txlt_curwin_num_dma_cookies);
+		} else { /* Buffer is not aligned */
+
+			int	(*ddicallback)(caddr_t);
+			size_t	bufsz;
+
+			/* Check id sleeping is allowed */
+			ddicallback = (callback == NULL_FUNC) ?
+			    DDI_DMA_DONTWAIT : DDI_DMA_SLEEP;
+
+			SATADBG2(SATA_DBG_DMA_SETUP, spx->txlt_sata_hba_inst,
+				"mis-aligned buffer: addr=0x%p, cnt=%lu",
+				(void *)bp->b_un.b_addr, bp->b_bcount);
+
+			if (bp->b_flags & (B_PAGEIO|B_PHYS))
+				/*
+				 * CPU will need to access data in the buffer
+				 * (for copying) so map it.
+				 */
+				bp_mapin(bp);
+
+			ASSERT(spx->txlt_tmp_buf == NULL);
+
+			/* Buffer may be padded by ddi_dma_mem_alloc()! */
+			rval = ddi_dma_mem_alloc(
+				spx->txlt_buf_dma_handle,
+				bp->b_bcount,
+				&sata_acc_attr,
+				DDI_DMA_STREAMING,
+				ddicallback, NULL,
+				&spx->txlt_tmp_buf,
+				&bufsz,
+				&spx->txlt_tmp_buf_handle);
+
+			if (rval != DDI_SUCCESS) {
+				/* DMA mapping failed */
+				(void) ddi_dma_free_handle(
+				    &spx->txlt_buf_dma_handle);
+				spx->txlt_buf_dma_handle = NULL;
+#ifdef SATA_DEBUG
+				mbuffail_count++;
+#endif
+				SATADBG1(SATA_DBG_DMA_SETUP,
+				    spx->txlt_sata_hba_inst,
+				    "sata_dma_buf_setup: "
+				    "buf dma mem alloc failed %x\n", rval);
+				return (rval);
+			}
+			ASSERT(IS_P2ALIGNED(spx->txlt_tmp_buf,
+			    cur_dma_attr->dma_attr_align));
+
+#ifdef SATA_DEBUG
+			mbuf_count++;
+
+			if (bp->b_bcount != bufsz)
+				/*
+				 * This will require special handling, because
+				 * DMA cookies will be based on the temporary
+				 * buffer size, not the original buffer
+				 * b_bcount, so the residue may have to
+				 * be counted differently.
+				 */
+				SATADBG2(SATA_DBG_DMA_SETUP,
+				    spx->txlt_sata_hba_inst,
+				    "sata_dma_buf_setup: bp size %x != "
+				    "bufsz %x\n", bp->b_bcount, bufsz);
+#endif
+			if (dma_flags & DDI_DMA_WRITE) {
+				/*
+				 * Write operation - copy data into
+				 * an aligned temporary buffer. Buffer will be
+				 * synced for device by ddi_dma_addr_bind_handle
+				 */
+				bcopy(bp->b_un.b_addr, spx->txlt_tmp_buf,
+				    bp->b_bcount);
+			}
+
+			rval = ddi_dma_addr_bind_handle(
+				spx->txlt_buf_dma_handle,
+				NULL,
+				spx->txlt_tmp_buf,
+				bufsz, dma_flags, ddicallback, 0,
+				&cookie, &spx->txlt_curwin_num_dma_cookies);
+		}
 
 		switch (rval) {
 		case DDI_DMA_PARTIAL_MAP:
@@ -8675,6 +8824,11 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 			 */
 			if (ddi_dma_numwin(spx->txlt_buf_dma_handle,
 			    &spx->txlt_num_dma_win) != DDI_SUCCESS) {
+				if (spx->txlt_tmp_buf != NULL) {
+					ddi_dma_mem_free(
+					    &spx->txlt_tmp_buf_handle);
+					spx->txlt_tmp_buf = NULL;
+				}
 				(void) ddi_dma_unbind_handle(
 				    spx->txlt_buf_dma_handle);
 				(void) ddi_dma_free_handle(
@@ -8695,6 +8849,11 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 
 		default:
 			/* DMA mapping failed */
+			if (spx->txlt_tmp_buf != NULL) {
+				ddi_dma_mem_free(
+				    &spx->txlt_tmp_buf_handle);
+				spx->txlt_tmp_buf = NULL;
+			}
 			(void) ddi_dma_free_handle(&spx->txlt_buf_dma_handle);
 			spx->txlt_buf_dma_handle = NULL;
 			SATA_LOG_D((spx->txlt_sata_hba_inst, CE_WARN,
@@ -8769,7 +8928,8 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 			/* Allocate new dma cookie array */
 			spx->txlt_dma_cookie_list = kmem_zalloc(
 			    sizeof (ddi_dma_cookie_t) *
-			    spx->txlt_curwin_num_dma_cookies, KM_SLEEP);
+			    spx->txlt_curwin_num_dma_cookies,
+			    callback == NULL_FUNC ? KM_NOSLEEP : KM_SLEEP);
 			spx->txlt_dma_cookie_list_len =
 			    spx->txlt_curwin_num_dma_cookies;
 		}
@@ -8868,10 +9028,23 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 	}
 
 	ASSERT(cur_txfer_len != 0);
-	spx->txlt_total_residue -= cur_txfer_len;
+	if (cur_txfer_len <= bp->b_bcount)
+		spx->txlt_total_residue -= cur_txfer_len;
+	else
+		/*
+		 * Temporary DMA buffer has been padded by
+		 * ddi_dma_mem_alloc()!
+		 * This requires special handling, because DMA cookies are
+		 * based on the temporary buffer size, not the b_bcount,
+		 * and we have extra bytes to transfer - but the packet
+		 * residue has to stay correct because we will copy only
+		 * the requested number of bytes.
+		 */
+		spx->txlt_total_residue -= bp->b_bcount;
 
 	return (DDI_SUCCESS);
 }
+
 
 /*
  * Fetch Device Identify data.
@@ -8961,13 +9134,7 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 		/* Update sata_drive_info */
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			DDI_DMA_SYNC_FORKERNEL);
-		if (rval != DDI_SUCCESS) {
-			SATA_LOG_D((spx->txlt_sata_hba_inst, CE_WARN,
-			    "sata_fetch_device_identify_data: "
-			    "sync pkt failed"));
-			rval = -1;
-			goto fail;
-		}
+		ASSERT(rval == DDI_SUCCESS);
 		bcopy(bp->b_un.b_addr, &sdinfo->satadrv_id,
 		    sizeof (sata_id_t));
 
@@ -11184,13 +11351,7 @@ sata_fetch_smart_data(
 		    sdinfo->satadrv_addr.cport)));
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			DDI_DMA_SYNC_FORKERNEL);
-		if (rval != DDI_SUCCESS) {
-			SATA_LOG_D((spx->txlt_sata_hba_inst, CE_WARN,
-			    "sata_fetch_smart_data: "
-			    "sync pkt failed"));
-			rval = -1;
-			goto fail;
-		}
+		ASSERT(rval == DDI_SUCCESS);
 		bcopy(scmd->satacmd_bp->b_un.b_addr, (uint8_t *)smart_data,
 		    sizeof (struct smart_data));
 	}
@@ -11296,13 +11457,7 @@ sata_ext_smart_selftest_read_log(
 
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			DDI_DMA_SYNC_FORKERNEL);
-		if (rval != DDI_SUCCESS) {
-			SATA_LOG_D((spx->txlt_sata_hba_inst, CE_WARN,
-			    "sata_ext_smart_selftest_log: "
-			    "sync pkt failed"));
-			rval = -1;
-			goto fail;
-		}
+		ASSERT(rval == DDI_SUCCESS);
 		bcopy(scmd->satacmd_bp->b_un.b_addr,
 		    (uint8_t *)ext_selftest_log,
 		    sizeof (struct smart_ext_selftest_log));
@@ -11404,13 +11559,7 @@ sata_smart_selftest_log(
 		    sdinfo->satadrv_addr.cport)));
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			DDI_DMA_SYNC_FORKERNEL);
-		if (rval != DDI_SUCCESS) {
-			SATA_LOG_D((spx->txlt_sata_hba_inst, CE_WARN,
-			    "sata_smart_selftest_log: "
-			    "sync pkt failed"));
-			rval = -1;
-			goto fail;
-		}
+		ASSERT(rval == DDI_SUCCESS);
 		bcopy(scmd->satacmd_bp->b_un.b_addr, (uint8_t *)selftest_log,
 		    sizeof (struct smart_selftest_log));
 		rval = 0;
@@ -11511,12 +11660,7 @@ sata_smart_read_log(
 
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			DDI_DMA_SYNC_FORKERNEL);
-		if (rval != DDI_SUCCESS) {
-			SATA_LOG_D((spx->txlt_sata_hba_inst, CE_WARN,
-			    "sata_smart_read_log: " "sync pkt failed"));
-			rval = -1;
-			goto fail;
-		}
+		ASSERT(rval == DDI_SUCCESS);
 		bcopy(scmd->satacmd_bp->b_un.b_addr, smart_log, log_size * 512);
 		rval = 0;
 	}
@@ -11616,13 +11760,7 @@ sata_read_log_ext_directory(
 		    sdinfo->satadrv_addr.cport)));
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			DDI_DMA_SYNC_FORKERNEL);
-		if (rval != DDI_SUCCESS) {
-			SATA_LOG_D((spx->txlt_sata_hba_inst, CE_WARN,
-			    "sata_read_log_ext_directory: "
-			    "sync pkt failed"));
-			rval = -1;
-			goto fail;
-		}
+		ASSERT(rval == DDI_SUCCESS);
 		bcopy(scmd->satacmd_bp->b_un.b_addr, (uint8_t *)logdir,
 		    sizeof (struct read_log_ext_directory));
 		rval = 0;

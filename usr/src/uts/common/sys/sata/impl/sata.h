@@ -405,6 +405,10 @@ typedef struct sata_pkt_txlate {
 	int			txlt_dma_cookie_list_len; /* alloc list len */
 	ddi_dma_cookie_t 	*txlt_dma_cookie_list; /* dma cookie list */
 	int			txlt_num_dma_cookies; /* dma cookies in list */
+
+				/* temporary buffer access handle */
+	ddi_acc_handle_t	txlt_tmp_buf_handle;
+	caddr_t			txlt_tmp_buf;	/* temp buffer address */
 } sata_pkt_txlate_t;
 
 _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_pkt_txlate))
