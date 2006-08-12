@@ -58,10 +58,6 @@ init_syslog_mutex()
  * audit_syslog() -- generate syslog messages from threads that use
  * different severity, facility code, and application names.
  *
- * The syslog() call does NOT use its format capability since the
- * format string is used for generating the ID, and I want equal
- * ID's to really be equal.
- *
  * syslog(3C) is thread safe, but the set openlog() / syslog() /
  * closelog() is not.
  *
@@ -88,10 +84,10 @@ __audit_syslog(
 		if (logopen)
 			closelog();
 		openlog(app_name, flags, facility);
-		syslog(severity, message);
+		syslog(severity, "%s", message);
 		(void) pthread_mutex_unlock(&syslog_lock);
 	} else {
-		syslog(severity, message);
+		syslog(severity, "%s", message);
 		(void) pthread_mutex_unlock(&syslog_lock);
 	}
 }

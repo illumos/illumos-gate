@@ -63,6 +63,13 @@ static char	au_event_fname[PATH_MAX] = AUDITEVENTFILE;
 static FILE *au_event_file = (FILE *)0;
 static mutex_t mutex_eventfile = DEFAULTMUTEX;
 static mutex_t mutex_eventcache = DEFAULTMUTEX;
+/*
+ * If an error occurs during the call to cacheauclassnam() inside
+ * flagstohex() any return value could be seen as a valid class mask so
+ * the following global variable, cacheauclass_failure, is set to indicate
+ * that an error has occurred.
+ */
+static int cacheauclass_failure = 0;
 
 extern int _mutex_lock(mutex_t *);
 extern int _mutex_unlock(mutex_t *);
@@ -173,6 +180,10 @@ getauevent_r(au_event_entry)
 			(void) sscanf(s, "%" VAL2STR(AU_EVENT_NAME_MAX) "s",
 			    trim_buf);
 			au_event_entry->ae_class = flagstohex(trim_buf);
+			if (cacheauclass_failure == 1) {
+				error = 1;
+				cacheauclass_failure = 0;
+			}
 
 			break;
 		}
@@ -435,14 +446,17 @@ static au_class_t
 flagstohex(char *flags)
 {
 	au_class_ent_t *p_class;
-	unsigned int	hex = 0;
+	au_class_t	hex = 0;
 	char	*comma = ",";
 	char	*s;
 	char	*last;
 
 	s = strtok_r(flags, comma, &last);
 	while (s != NULL) {
-		(void) cacheauclassnam(&p_class, s);
+		if ((cacheauclassnam(&p_class, s)) < 0) {
+			cacheauclass_failure = 1;
+			return ((au_class_t)-1);
+		}
 		hex |= p_class->ac_class;
 		s = strtok_r(NULL, comma, &last);
 	}
