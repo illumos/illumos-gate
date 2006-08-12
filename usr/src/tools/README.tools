@@ -258,6 +258,13 @@ webrev
 	manually-generated list; knows how to use wx's active file for
 	lists of checked-out files and proposed SCCS comments.
 
+wsdiff
+	Detect object differences between two ON proto areas. Used by
+	nightly(1) to determine what changed between two builds. Handy
+	for identifying the set of built objects impacted by a given
+	source change. This information is needed for patch construction.
+
+
 How to do a full build
 ----------------------
 

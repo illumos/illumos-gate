@@ -75,6 +75,8 @@ check the ELF runtime attributes of all dynamic objects
 .TP
 check for unreferenced files
 .TP
+report on which proto area objects have changed (since the last build)
+.TP
 report the total build time
 .TP
 save a detailed log file for reference
@@ -180,7 +182,13 @@ recommended, especially in conjunction with the \-p option)
 .TP
 .B \-W
 Do not report warnings (for freeware gate ONLY)
-
+.TP
+.B \-w
+Report which proto area objects differ between this and the last build.
+See wsdiff(1) for details. Note that the proto areas used for comparison
+are the last ones constructed as part of the build. As an example, if both
+a non-debug and debug build are performed (in that order), then the debug
+proto area will be used for comparison (which might not be what you want).
 .LP
 .B Groups of options
 .TP 10

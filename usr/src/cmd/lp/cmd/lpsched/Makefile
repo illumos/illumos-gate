@@ -108,27 +108,15 @@ SYSLIBS=	-lcurses -lgen -lcurses -lnsl -z lazyload \
 
 LDLIBS +=	$(LPLIBS) $(SYSLIBS)
 
-LPSCHED_VERSION_STRING  = ($(ECHO) build info: \\\c; date +%D:%H:%M:%S)
-
 POFILE=		lp_cmd_lpsched.po
 
 .KEEP_STATE:
 
 all:		$(PROG) 
 
-$(PROG):	$(OBJS) $(LPLIBS) lpschedvers.o
-		$(LINK.c) $(OBJS) lpschedvers.o -o $@ $(LDLIBS)
+$(PROG):	$(OBJS) $(LPLIBS)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
-
-lpschedvers.c:	FRC
-	@-$(ECHO) "rebuilding lpschedvers.c"
-	@-( \
-	$(ECHO) "/*" ; \
-	$(ECHO) " * This file is derived from cmd/lpsched/lpsched/Makefile" ; \
-	$(ECHO) " */\n" ; \
-	$(ECHO) "#pragma\tident\t\"@(#)lpschedvers.c\tDERIVED\t96/2/1 SMI\"\n" ; \
-	$(ECHO) "char *lpsched_buildinfo = \"`$(LPSCHED_VERSION_STRING)`\\\\n\";" ; \
-	$(ECHO) "" ) > ./lpschedvers.c
 
 $(PROG).pure:	$(OBJS) $(LPLIBS)
 		$(PURIFY) $(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -142,7 +130,6 @@ check:	$(CHKMANIFEST)
 
 clean:
 		$(RM) $(OBJS)
-		$(RM) lpschedvers.c lpschedvers.o
 
 clobber:	clean
 		-$(RM) $(PROG) $(CLOBBERFILES)

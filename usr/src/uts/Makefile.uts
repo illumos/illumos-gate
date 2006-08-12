@@ -238,6 +238,7 @@ CFLAGS_uts		+= $(XAOPT)
 CFLAGS_uts		+= $(CTF_FLAGS)
 CFLAGS_uts		+= $(CERRWARN)
 CFLAGS_uts		+= $(C99_ENABLE)
+CFLAGS_uts		+= $(CGLOBALSTATIC)
 CFLAGS_uts		+= $(EXTRA_CFLAGS)
 
 #

@@ -91,6 +91,7 @@ f none opt/onbld/bin/validate_paths 555 root bin
 f none opt/onbld/bin/wdiff 555 root bin
 f none opt/onbld/bin/webrev 555 root bin
 f none opt/onbld/bin/ws 555 root bin
+f none opt/onbld/bin/wsdiff 555 root bin
 f none opt/onbld/bin/wx 555 root bin
 f none opt/onbld/bin/xref 555 root bin
 f none opt/onbld/bin/xref.mk 644 root bin
@@ -131,5 +132,6 @@ f none opt/onbld/man/man1/sccsmv.1 644 root bin
 f none opt/onbld/man/man1/sccsrm.1 644 root bin
 f none opt/onbld/man/man1/webrev.1 644 root bin
 f none opt/onbld/man/man1/ws.1 644 root bin
+f none opt/onbld/man/man1/wsdiff.1 644 root bin
 f none opt/onbld/man/man1/wx.1 644 root bin
 f none opt/onbld/man/man1/xref.1 644 root bin

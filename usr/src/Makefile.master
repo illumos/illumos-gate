@@ -383,6 +383,14 @@ COPTFLAG64= $($(MACH64)_COPTFLAG)
 # (gives them a unique prefix). Disable that.
 CNOGLOBAL= -W0,-noglobal
 
+# Direct the Sun Studio compiler to use a static globalization prefix based on the
+# name of the module rather than something unique. Otherwise, objects
+# will not build deterministically, as subsequent compilations of identical
+# source will yeild objects that always look different.
+#
+# In the same spirit, this will also remove the date from the N_OPT stab.
+CGLOBALSTATIC= -W0,-xglobalstatic
+
 # Normally, gcc uses indirect DWARF strings to save space.  However,
 # this causes relocations that ctfconvert cannot handle.  Disable this.
 CDWARFSTR=	-_gcc=-fno-dwarf2-indirect-strings
@@ -451,11 +459,14 @@ XREGSFLAG		= $($(MACH)_XREGSFLAG)
 XREGSFLAG64		= $($(MACH64)_XREGSFLAG)
 
 CFLAGS=         $(COPTFLAG) $($(MACH)_CFLAGS) $(SPACEFLAG) $(CCMODE) \
-		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) $(IROPTFLAG)
+		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) $(IROPTFLAG) \
+		$(CGLOBALSTATIC)
 CFLAGS64=       $(COPTFLAG64) $($(MACH64)_CFLAGS) $(SPACEFLAG64) $(CCMODE64) \
-		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) $(IROPTFLAG64)
+		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) $(IROPTFLAG64) \
+		$(CGLOBALSTATIC)
 NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) $(CCMODE) \
-		$(ILDOFF) $(CERRWARN) $(C99MODE) $($(NATIVE_MACH)_CCUNBOUND)
+		$(ILDOFF) $(CERRWARN) $(C99MODE) $($(NATIVE_MACH)_CCUNBOUND) \
+		$(CGLOBALSTATIC)
 
 DTEXTDOM=-DTEXT_DOMAIN=\"$(TEXT_DOMAIN)\"	# For messaging.
 DTS_ERRNO=-D_TS_ERRNO

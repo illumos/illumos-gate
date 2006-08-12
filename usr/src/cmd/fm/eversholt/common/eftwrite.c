@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * eftwrite.c -- routines for writing .eft files
@@ -35,7 +34,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-#include <time.h>
 #include <unistd.h>
 #include <errno.h>
 #include "out.h"
@@ -65,19 +63,6 @@ void
 eftwrite_init(void)
 {
 	Outbytes = stats_new_counter("eftwrite.total", "bytes written", 1);
-}
-
-static const char *
-mygetlogin(void)
-{
-	const char *result = getlogin();
-	static char id[100];
-
-	if (result != NULL)
-		return (result);
-
-	(void) snprintf(id, 100, "uid:%ld", getuid());
-	return (id);
 }
 
 /*ARGSUSED*/
@@ -121,7 +106,6 @@ eftwrite(const char *fname)
 #define	BUFLEN	8192
 	char buf[BUFLEN];
 	int cc;
-	time_t clock;
 
 	if ((tfp = tmpfile()) == NULL)
 		out(O_DIE|O_SYS, "cannot create temporary file");
@@ -144,14 +128,10 @@ eftwrite(const char *fname)
 	hdr.cminor = VERSION_MINOR;
 	hdr.identlen = Identlen;
 	hdr.dictlen = Dictlen;
-	(void) time(&clock);
-	if (gethostname(buf, BUFLEN) < 0)
-		out(O_DIE|O_SYS, "gethostname");
 	buf[BUFLEN - 1] = '\0';
 	(void) snprintf(hdr.comment, EFT_HDR_MAXCOMMENT,
-	    "Built using esc-%d.%d by %s on %s at %s\tArgs: \"%s\"\n",
-	    VERSION_MAJOR, VERSION_MINOR, mygetlogin(), buf, ctime(&clock),
-	    Args);
+	    "Built using esc-%d.%d\tArgs: \"%s\"\n", VERSION_MAJOR,
+	    VERSION_MINOR, Args);
 
 	if ((fp = fopen(fname, "w")) == NULL)
 		out(O_DIE|O_SYS, "can't open output file: %s", fname);

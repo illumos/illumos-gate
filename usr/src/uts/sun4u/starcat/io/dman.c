@@ -744,7 +744,6 @@ _init(void)
 	int		status = DDI_FAILURE;
 
 	MAN_DBG(MAN_INIT, ("_init:"));
-	MAN_DBG(MAN_INIT, ("_init: compiled %s at %s\n", __DATE__, __TIME__));
 
 	status = mod_install(&modlinkage);
 	if (status != 0) {

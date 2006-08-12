@@ -65,6 +65,9 @@ PERLFILES= \
 	validate_paths \
 	wdiff
 
+PYFILES= \
+	wsdiff
+
 MAN1FILES= \
 	Install.1 \
 	acr.1 \
@@ -84,13 +87,14 @@ MAN1FILES= \
 	sccsrm.1 \
 	webrev.1 \
 	ws.1 \
+	wsdiff.1 \
 	wx.1 \
 	xref.1
 
 MAKEFILES= \
 	xref.mk
 
-CLEANFILES = $(SHFILES) $(PERLFILES) cddlchk.1
+CLEANFILES = $(SHFILES) $(PERLFILES) $(PYFILES) cddlchk.1
 
 include ../Makefile.tools
 
@@ -101,10 +105,10 @@ $(ROOTONBLDMAKEFILES) := FILEMODE=	644
 
 .KEEP_STATE:
 
-all:	$(SHFILES) $(PERLFILES) $(MAN1FILES) $(MAKEFILES)
+all:	$(SHFILES) $(PERLFILES) $(PYFILES) $(MAN1FILES) $(MAKEFILES)
 
 install: all .WAIT $(ROOTONBLDSHFILES) $(ROOTONBLDPERLFILES) \
-		$(ROOTONBLDMAN1FILES) $(ROOTONBLDMAKEFILES)
+		$(ROOTONBLDPYFILES) $(ROOTONBLDMAN1FILES) $(ROOTONBLDMAKEFILES)
 
 clean:
 	$(RM) $(CLEANFILES)

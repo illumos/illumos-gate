@@ -832,6 +832,7 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-t	build and use the tools in $SRC/tools
 	-u	update proto_list_$MACH and friends in the parent workspace;
 		when used with -f, also build an unrefmaster.out in the parent
+	-w	report on differences between previous and current proto areas
 	-z	compress cpio archives with gzip
 	-W	Do not report warnings (freeware gate ONLY)
 	-S	Build a variant of the source product
@@ -870,6 +871,7 @@ V_FLAG=n
 M_FLAG=n
 N_FLAG=n
 z_FLAG=n
+w_FLAG=n
 W_FLAG=n
 SE_FLAG=n
 SD_FLAG=n
@@ -1040,7 +1042,7 @@ check_closed_tree
 #
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
 OPTIND=1
-while getopts ABDFNMPTCGIRafinlmoptuUxdrtzWS:X FLAG $NIGHTLY_OPTIONS
+while getopts ABDFNMPTCGIRafinlmoptuUxdrtwzWS:X FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
 	  A )	A_FLAG=y
@@ -1093,6 +1095,8 @@ do
 	  t )	t_FLAG=y
 		;;
 	  u )	u_FLAG=y
+		;;
+	  w )	w_FLAG=y
 		;;
 	  z )	z_FLAG=y
 		;;
@@ -1391,6 +1395,10 @@ logshuffle() {
 
 	if [ "$build_ok" = "y" ]; then
 		mv $ATLOG/proto_list_${MACH} $LLOG
+
+		if [ -f $TMPDIR/wsdiff.results ]; then
+		    mv $TMPDIR/wsdiff.results $LLOG
+		fi
 	fi
 
 	#
@@ -1642,6 +1650,12 @@ if [ "$f_FLAG" = "y" ]; then
 	fi
 fi
 
+if [ "$w_FLAG" = "y" -a ! -d $ROOT ]; then
+	echo "WARNING: -w specified, but no pre-existing proto area found;" \
+	    "ignoring -w\n" | tee -a $mail_msg_file >> $LOGFILE
+	w_FLAG=n
+fi
+
 if [ "$t_FLAG" = "n" ]; then
 	#
 	# We're not doing a tools build, so make sure elfsign(1) is
@@ -1749,6 +1763,14 @@ echo "\nBuild project:  $build_project\nBuild taskid:   $build_taskid" | \
 echo "\n==== Build version ====\n" | tee -a $mail_msg_file >> $LOGFILE
 echo $VERSION | tee -a $mail_msg_file >> $LOGFILE
 
+# Save the current proto area if we're comparing against the last build
+if [ "$w_FLAG" = "y" -a -d "$ROOT" ]; then
+    if [ -d "$ROOT.prev" ]; then
+	rm -rf $ROOT.prev
+    fi
+    mv $ROOT $ROOT.prev
+fi
+
 #
 #	Decide whether to clobber
 #
@@ -1784,6 +1806,7 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 		rm -rf ${TOOLS_PROTO}
 		mkdir -p ${TOOLS_PROTO}
 	fi
+
 	rm -rf $ROOT
 
 	# Get back to a clean workspace as much as possible to catch
@@ -2227,6 +2250,19 @@ if [ "$M_FLAG" != "y" -a "$build_ok" = y ]; then
 			find $d/pkgdefs -name pkginfo.tmpl -print -o -name .del\* -prune
 		fi
 	 done | sed -e 's:/pkginfo.tmpl$::' | sort -u ` >> $mail_msg_file
+fi
+
+if [ "$w_FLAG" = "y" -a "$build_ok" = "y" ]; then
+	echo "\n==== Objects that differ since last build ====\n" | \
+	    tee -a $LOGFILE >> $mail_msg_file
+
+	if [ "$t_FLAG" = "y" ]; then
+	    wsdiff -t -r ${TMPDIR}/wsdiff.results $ROOT.prev $ROOT | \
+		tee -a $LOGFILE >> $mail_msg_file
+	else
+	    wsdiff -r ${TMPDIR}/wsdiff.results $ROOT.prev $ROOT  | \
+		tee -a $LOGFILE >> $mail_msg_file
+	fi
 fi
 
 END_DATE=`date`

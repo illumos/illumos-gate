@@ -67,7 +67,6 @@ static int		signals = 0;
 #endif
 
 extern int		errno;
-extern char		*lpsched_buildinfo;
 extern void		shutdown_messages();
 
 int			am_in_background	= 0;
@@ -282,7 +281,6 @@ startup()
 
     init_memory();
 
-    note (lpsched_buildinfo);
     note ("Print services started.\n");
     Starting = 0;
 }
