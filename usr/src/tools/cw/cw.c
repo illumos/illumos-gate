@@ -1636,10 +1636,10 @@ main(int argc, char **argv)
 	if ((dir = getenv("SPRO_VROOT")) != NULL) {
 		(void) snprintf(cc_buf, MAXPATHLEN, "%s/bin", dir);
 	} else if ((dir = getenv("SPRO_ROOT")) != NULL) {
-		(void) snprintf(cc_buf, MAXPATHLEN, "%s/SS11/bin", dir);
+		(void) snprintf(cc_buf, MAXPATHLEN, "%s/SOS10/bin", dir);
 	} else if ((dir = getenv("BUILD_TOOLS")) != NULL) {
 		(void) snprintf(cc_buf, MAXPATHLEN,
-		    "%s/SUNWspro/SS11/bin", dir);
+		    "%s/SUNWspro/SOS10/bin", dir);
 	}
 	if (dir != NULL) {
 		dirs[CIDX(CW_C_CC, 0)] = (const char *)cc_buf;

@@ -65,7 +65,7 @@ CFLAGS += $(CCVERBOSE)
 #
 # Override the default -xspace setting
 #
-sparc_SPACEFLAG	= -W0,-Lt
+sparc_SPACEFLAG	= -W0,-Lt -W2,-Rcond_elim
 
 #
 # md5 depends on the kcf framework
