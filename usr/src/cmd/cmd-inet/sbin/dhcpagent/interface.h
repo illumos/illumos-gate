@@ -112,6 +112,8 @@ struct ifslist {
 
 	char		if_name[IFNAMSIZ];
 
+	uint32_t	if_index;	/* interface index */
+
 	uint16_t	if_max;		/* largest DHCP packet on this if */
 	uint16_t	if_min;		/* minimum mtu size on this if */
 	uint16_t	if_opt;		/* amount of space for options in PKT */
@@ -367,6 +369,7 @@ void		hold_ifs(struct ifslist *);
 struct ifslist *insert_ifs(const char *, boolean_t, int *);
 struct ifslist *lookup_ifs(const char *);
 struct ifslist *lookup_ifs_by_xid(uint32_t);
+struct ifslist *lookup_ifs_by_uindex(uint16_t, struct ifslist *);
 void		nuke_ifslist(boolean_t);
 void		refresh_ifslist(iu_eh_t *, int, void *);
 int		release_ifs(struct ifslist *);

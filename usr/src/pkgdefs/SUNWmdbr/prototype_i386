@@ -28,6 +28,7 @@
 !include prototype_com
 
 d none kernel/kmdb/amd64 755 root sys
+f none kernel/kmdb/amd64/arp 555 root sys
 f none kernel/kmdb/amd64/audiosup 555 root sys
 f none kernel/kmdb/amd64/cpc 555 root sys
 f none kernel/kmdb/amd64/crypto 555 root sys
@@ -52,6 +53,7 @@ f none kernel/kmdb/amd64/sppp 555 root sys
 f none kernel/kmdb/amd64/ufs 555 root sys
 f none kernel/kmdb/amd64/uhci 555 root sys
 f none kernel/kmdb/amd64/usba 555 root sys
+f none kernel/kmdb/arp 555 root sys
 f none kernel/kmdb/audiosup 555 root sys
 f none kernel/kmdb/cpc 555 root sys
 f none kernel/kmdb/crypto 555 root sys

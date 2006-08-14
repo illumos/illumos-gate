@@ -39,11 +39,9 @@ extern "C" {
 #include <inet/mib2.h>
 #include <inet/nd.h>
 #include <sys/atomic.h>
-#include <sys/socket.h>
 #include <net/if_dl.h>
 #include <net/if.h>
 #include <netinet/ip.h>
-#include <sys/dlpi.h>
 #include <netinet/igmp.h>
 
 #ifdef _KERNEL
@@ -1284,7 +1282,9 @@ typedef struct ipif_s {
 		ipif_replace_zero : 1,	/* Replacement for zero */
 		ipif_was_up : 1,	/* ipif was up before */
 
-		ipif_pad_to_31 : 28;
+		ipif_addr_ready : 1,	/* DAD is done */
+		ipif_was_dup : 1,	/* DAD had failed */
+		ipif_pad_to_31 : 26;
 
 	int	ipif_orig_ifindex;	/* ifindex before SLIFFAILOVER */
 	uint_t	ipif_seqid;		/* unique index across all ills */
@@ -1295,6 +1295,7 @@ typedef struct ipif_s {
 	uint_t	ipif_saved_ire_cnt;
 	zoneid_t
 		ipif_zoneid;		/* zone ID number */
+	timeout_id_t ipif_recovery_id;	/* Timer for DAD recovery */
 #ifdef ILL_DEBUG
 #define	IP_TR_HASH_MAX	64
 	th_trace_t *ipif_trace[IP_TR_HASH_MAX];
@@ -1740,6 +1741,7 @@ typedef struct ill_s {
 	uint_t	ill_ipif_up_count;	/* Number of IPIFs currently up. */
 	uint_t	ill_max_frag;		/* Max IDU from DLPI. */
 	char	*ill_name;		/* Our name. */
+	uint_t	ill_ipif_dup_count;	/* Number of duplicate addresses. */
 	uint_t	ill_name_length;	/* Name length, incl. terminator. */
 	char	*ill_ndd_name;		/* Name + ":ip?_forwarding" for NDD. */
 	uint_t	ill_net_type;		/* IRE_IF_RESOLVER/IRE_IF_NORESOLVER. */
@@ -1807,7 +1809,9 @@ typedef struct ill_s {
 		ill_dl_up : 1,
 		ill_up_ipifs : 1,
 
-		ill_pad_to_bit_31 : 20;
+		ill_note_link : 1,	/* supports link-up notification */
+
+		ill_pad_to_bit_31 : 19;
 
 	/* Following bit fields protected by ill_lock */
 	uint_t
@@ -1818,7 +1822,8 @@ typedef struct ill_s {
 
 		ill_arp_bringup_pending : 1,
 		ill_mtu_userspecified : 1, /* SIOCSLNKINFO has set the mtu */
-		ill_pad_bit_31 : 26;
+		ill_arp_extend : 1,	/* ARP has DAD extensions */
+		ill_pad_bit_31 : 25;
 
 	/*
 	 * Used in SIOCSIFMUXID and SIOCGIFMUXID for 'ifconfig unplumb'.
@@ -2501,12 +2506,8 @@ typedef struct ire_s {
 					/* source ip-addr of incoming packet */
 	clock_t		ire_last_used_time;	/* Last used time */
 	struct ire_s 	*ire_fastpath;	/* Pointer to next ire in fastpath */
-	zoneid_t	ire_zoneid;	/* for local address discrimination */
 	tsol_ire_gw_secattr_t *ire_gw_secattr; /* gateway security attributes */
-#ifdef IRE_DEBUG
-	th_trace_t	*ire_trace[IP_TR_HASH_MAX];
-	boolean_t	ire_trace_disable;	/* True when alloc fails */
-#endif
+	zoneid_t	ire_zoneid;	/* for local address discrimination */
 	/*
 	 * ire's that are embedded inside mblk_t and sent to the external
 	 * resolver use the ire_stq_ifindex to track the ifindex of the
@@ -2514,6 +2515,12 @@ typedef struct ire_s {
 	 * for cleanup in the esbfree routine when arp failure occurs
 	 */
 	uint_t	ire_stq_ifindex;
+	uint_t		ire_defense_count;	/* number of ARP conflicts */
+	uint_t		ire_defense_time;	/* last time defended (secs) */
+#ifdef IRE_DEBUG
+	th_trace_t	*ire_trace[IP_TR_HASH_MAX];
+	boolean_t	ire_trace_disable;	/* True when alloc fails */
+#endif
 } ire_t;
 
 /* IPv4 compatiblity macros */
@@ -2822,23 +2829,37 @@ extern int ipv6_forward;
 extern vmem_t *ip_minor_arena;
 
 #define	ip_respond_to_address_mask_broadcast ip_param_arr[0].ip_param_value
+#define	ip_g_resp_to_echo_bcast		ip_param_arr[1].ip_param_value
+#define	ip_g_resp_to_echo_mcast		ip_param_arr[2].ip_param_value
+#define	ip_g_resp_to_timestamp		ip_param_arr[3].ip_param_value
+#define	ip_g_resp_to_timestamp_bcast	ip_param_arr[4].ip_param_value
 #define	ip_g_send_redirects		ip_param_arr[5].ip_param_value
+#define	ip_g_forward_directed_bcast	ip_param_arr[6].ip_param_value
 #define	ip_debug			ip_param_arr[7].ip_param_value
 #define	ip_mrtdebug			ip_param_arr[8].ip_param_value
 #define	ip_timer_interval		ip_param_arr[9].ip_param_value
 #define	ip_ire_arp_interval		ip_param_arr[10].ip_param_value
+#define	ip_ire_redir_interval		ip_param_arr[11].ip_param_value
 #define	ip_def_ttl			ip_param_arr[12].ip_param_value
+#define	ip_forward_src_routed		ip_param_arr[13].ip_param_value
 #define	ip_wroff_extra			ip_param_arr[14].ip_param_value
+#define	ip_ire_pathmtu_interval		ip_param_arr[15].ip_param_value
+#define	ip_icmp_return			ip_param_arr[16].ip_param_value
 #define	ip_path_mtu_discovery		ip_param_arr[17].ip_param_value
 #define	ip_ignore_delete_time		ip_param_arr[18].ip_param_value
+#define	ip_ignore_redirect		ip_param_arr[19].ip_param_value
 #define	ip_output_queue			ip_param_arr[20].ip_param_value
 #define	ip_broadcast_ttl		ip_param_arr[21].ip_param_value
 #define	ip_icmp_err_interval		ip_param_arr[22].ip_param_value
 #define	ip_icmp_err_burst		ip_param_arr[23].ip_param_value
 #define	ip_reass_queue_bytes		ip_param_arr[24].ip_param_value
+#define	ip_strict_dst_multihoming	ip_param_arr[25].ip_param_value
 #define	ip_addrs_per_if			ip_param_arr[26].ip_param_value
 #define	ipsec_override_persocket_policy	ip_param_arr[27].ip_param_value
 #define	icmp_accept_clear_messages	ip_param_arr[28].ip_param_value
+#define	igmp_accept_clear_messages	ip_param_arr[29].ip_param_value
+
+/* IPv6 configuration knobs */
 #define	delay_first_probe_time		ip_param_arr[30].ip_param_value
 #define	max_unicast_solicit		ip_param_arr[31].ip_param_value
 #define	ipv6_def_hops			ip_param_arr[32].ip_param_value
@@ -2850,6 +2871,7 @@ extern vmem_t *ip_minor_arena;
 #define	ipv6_strict_dst_multihoming	ip_param_arr[38].ip_param_value
 #define	ip_ire_reclaim_fraction		ip_param_arr[39].ip_param_value
 #define	ipsec_policy_log_interval	ip_param_arr[40].ip_param_value
+#define	pim_accept_clear_messages	ip_param_arr[41].ip_param_value
 #define	ip_ndp_unsolicit_interval	ip_param_arr[42].ip_param_value
 #define	ip_ndp_unsolicit_count		ip_param_arr[43].ip_param_value
 #define	ipv6_ignore_home_address_opt	ip_param_arr[44].ip_param_value
@@ -2857,8 +2879,14 @@ extern vmem_t *ip_minor_arena;
 #define	ip_multirt_resolution_interval	ip_param_arr[46].ip_param_value
 #define	ip_multirt_ttl			ip_param_arr[47].ip_param_value
 #define	ip_multidata_outbound		ip_param_arr[48].ip_param_value
+#define	ip_ndp_defense_interval		ip_param_arr[49].ip_param_value
+#define	ip_max_temp_idle		ip_param_arr[50].ip_param_value
+#define	ip_max_temp_defend		ip_param_arr[51].ip_param_value
+#define	ip_max_defend			ip_param_arr[52].ip_param_value
+#define	ip_defend_interval		ip_param_arr[53].ip_param_value
+#define	ip_dup_recovery			ip_param_arr[54].ip_param_value
 #ifdef DEBUG
-#define	ipv6_drop_inbound_icmpv6	ip_param_arr[49].ip_param_value
+#define	ipv6_drop_inbound_icmpv6	ip_param_arr[55].ip_param_value
 #else
 #define	ipv6_drop_inbound_icmpv6	0
 #endif
@@ -2934,6 +2962,9 @@ extern uint32_t ipsechw_debug;
 #define	ip3dbg(a)	/* */
 #endif	/* IP_DEBUG */
 
+/* Default MAC-layer address string length for mac_colon_addr */
+#define	MAC_STR_LEN	128
+
 struct	ipsec_out_s;
 
 extern const char *dlpi_prim_str(int);
@@ -2945,6 +2976,7 @@ extern void	ill_frag_timer_start(ill_t *);
 extern mblk_t	*ip_carve_mp(mblk_t **, ssize_t);
 extern mblk_t	*ip_dlpi_alloc(size_t, t_uscalar_t);
 extern char	*ip_dot_addr(ipaddr_t, char *);
+extern const char *mac_colon_addr(const uint8_t *, size_t, char *, size_t);
 extern void	ip_lwput(queue_t *, mblk_t *);
 extern boolean_t icmp_err_rate_limit(void);
 extern void	icmp_time_exceeded(queue_t *, mblk_t *, uint8_t);

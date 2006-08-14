@@ -110,15 +110,13 @@
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/ip_if.h>
-#include <inet/mi.h>
 #include <inet/nd.h>
 #include <inet/ipclassifier.h>
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/sunddi.h>
-#include <sys/ddi.h>
+#include <sys/dlpi.h>
 #include <sys/squeue_impl.h>
-
 
 /*
  * We allow multiple NICs to bind to the same CPU but want to preserve 1 <-> 1

@@ -5955,7 +5955,6 @@ ddi_in_panic()
 int
 ddi_ffs(long mask)
 {
-	extern int ffs(long mask);
 	return (ffs(mask));
 }
 
@@ -5970,8 +5969,6 @@ ddi_ffs(long mask)
 int
 ddi_fls(long mask)
 {
-	extern int ffs(long);
-
 	while (mask) {
 		long nx;
 

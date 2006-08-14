@@ -37,7 +37,6 @@
 #include <dhcp_hostconf.h>
 #include <arpa/inet.h>
 #include <string.h>
-#include <stdlib.h>
 #include <unistd.h>
 #include <dhcpmsg.h>
 
@@ -46,10 +45,8 @@
 #include "packet.h"
 #include "interface.h"
 #include "agent.h"
-#include "defaults.h"
 
 static PKT_LIST		*select_best(PKT_LIST **);
-static void		restart_dhcp(struct ifslist *);
 static stop_func_t	stop_requesting;
 
 /*
@@ -139,7 +136,7 @@ dhcp_requesting(iu_tq_t *tqp, void *arg)
 		if (dhcp_bound(ifsp, offer) == 0) {
 			dhcpmsg(MSG_WARNING, "dhcp_requesting: dhcp_bound "
 			    "failed for %s", ifsp->if_name);
-			restart_dhcp(ifsp);
+			dhcp_restart(ifsp);
 			return;
 		}
 
@@ -408,7 +405,7 @@ dhcp_acknak(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 		    ifsp->if_name);
 		ifsp->if_bad_offers++;
 		free_pkt_list(&plp);
-		restart_dhcp(ifsp);
+		dhcp_restart(ifsp);
 
 		/*
 		 * remove any bogus cached configuration we might have
@@ -426,7 +423,7 @@ dhcp_acknak(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 		    "restarting DHCP on %s", ifsp->if_name);
 		ifsp->if_bad_offers++;
 		free_pkt_list(&plp);
-		restart_dhcp(ifsp);
+		dhcp_restart(ifsp);
 		return;
 	}
 
@@ -436,7 +433,7 @@ dhcp_acknak(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 	if (dhcp_bound(ifsp, plp) == 0) {
 		dhcpmsg(MSG_WARNING, "dhcp_acknak: dhcp_bound failed "
 		    "for %s", ifsp->if_name);
-		restart_dhcp(ifsp);
+		dhcp_restart(ifsp);
 		return;
 	}
 
@@ -444,14 +441,14 @@ dhcp_acknak(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 }
 
 /*
- * restart_dhcp(): restarts DHCP (from INIT) on a given interface
+ * dhcp_restart(): restarts DHCP (from INIT) on a given interface
  *
  *   input: struct ifslist *: the interface to restart DHCP on
  *  output: void
  */
 
-static void
-restart_dhcp(struct ifslist *ifsp)
+void
+dhcp_restart(struct ifslist *ifsp)
 {
 	if (iu_schedule_timer(tq, DHCP_RESTART_WAIT, dhcp_start, ifsp) == -1) {
 
@@ -461,7 +458,7 @@ restart_dhcp(struct ifslist *ifsp)
 		ipc_action_finish(ifsp, DHCP_IPC_E_MEMORY);
 		async_finish(ifsp);
 
-		dhcpmsg(MSG_ERROR, "restart_dhcp: cannot schedule dhcp_start, "
+		dhcpmsg(MSG_ERROR, "dhcp_restart: cannot schedule dhcp_start, "
 		    "reverting to INIT state on %s", ifsp->if_name);
 	} else
 		hold_ifs(ifsp);

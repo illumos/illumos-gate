@@ -29,7 +29,6 @@
 #include "tables.h"
 
 #include <time.h>
-#include <inet/ip6.h>
 
 struct phyint *phyints = NULL;
 
@@ -230,12 +229,9 @@ start_over:
 	pi->pi_flags = lifr.lifr_flags;
 
 	/*
-	 * If the  link local interface is not up yet or it's IFF_UP
-	 * and the flag is set to IFF_NOLOCAL as Duplicate Address
-	 * Detection is in progress.
-	 * IFF_NOLOCAL is "normal" on other prefixes.
+	 * If the link local interface is not up yet or it's IFF_UP and the
+	 * IFF_NOLOCAL flag is set, then ignore the interface.
 	 */
-
 	if (!(pi->pi_flags & IFF_UP) || (pi->pi_flags & IFF_NOLOCAL)) {
 		if (newsock) {
 			(void) close(pi->pi_sock);
@@ -243,7 +239,7 @@ start_over:
 		}
 		if (debug & D_PHYINT) {
 			logmsg(LOG_DEBUG, "phyint_init_from_k(%s): "
-			    "not IFF_UP\n", pi->pi_name);
+			    "IFF_NOLOCAL or not IFF_UP\n", pi->pi_name);
 		}
 		return (0);
 	}

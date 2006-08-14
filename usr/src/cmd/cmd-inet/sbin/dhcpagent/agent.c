@@ -27,7 +27,6 @@
 
 #include <sys/types.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <errno.h>
 #include <locale.h>
 #include <string.h>
@@ -36,10 +35,11 @@
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <dhcp_hostconf.h>
-#include <dhcp_symbol.h>
 #include <dhcpagent_ipc.h>
 #include <dhcpmsg.h>
 #include <netinet/dhcp.h>
+#include <net/route.h>
+#include <sys/sockio.h>
 
 #include "async.h"
 #include "agent.h"
@@ -59,11 +59,12 @@ char			*class_id;
 iu_eh_t			*eh;
 iu_tq_t			*tq;
 pid_t			grandparent;
+int			rtsock_fd;
 
 static boolean_t	shutdown_started = B_FALSE;
 static boolean_t	do_adopt = B_FALSE;
 static unsigned int	debug_level = 0;
-static iu_eh_callback_t	accept_event, ipc_event;
+static iu_eh_callback_t	accept_event, ipc_event, rtsock_event;
 
 /*
  * The ipc_cmd_allowed[] table indicates which IPC commands are allowed in
@@ -89,6 +90,7 @@ static int ipc_cmd_allowed[DHCP_NSTATES][DHCP_NIPC] = {
 	/* INIT		*/	{ 1, 0, 1, 0, 1, 1, 1, 0 },
 	/* SELECTING	*/	{ 1, 0, 1, 0, 1, 1, 0, 0 },
 	/* REQUESTING	*/	{ 1, 0, 1, 0, 1, 1, 0, 0 },
+	/* PRE_BOUND	*/	{ 1, 1, 1, 1, 0, 1, 0, 1 },
 	/* BOUND	*/	{ 1, 1, 1, 1, 0, 1, 0, 1 },
 	/* RENEWING	*/	{ 1, 1, 1, 1, 0, 1, 0, 1 },
 	/* REBINDING	*/	{ 1, 1, 1, 1, 0, 1, 0, 1 },
@@ -241,6 +243,22 @@ main(int argc, char **argv)
 
 	if (iu_register_event(eh, ipc_fd, POLLIN, accept_event, 0) == -1) {
 		dhcpmsg(MSG_ERR, "cannot register ipc fd for messages");
+		return (EXIT_FAILURE);
+	}
+
+	/*
+	 * Create the global routing socket.  This is used for monitoring
+	 * interface transitions, so that we learn about the kernel's Duplicate
+	 * Address Detection status, and for inserting and removing default
+	 * routes as learned from DHCP servers.
+	 */
+	rtsock_fd = socket(PF_ROUTE, SOCK_RAW, AF_INET);
+	if (rtsock_fd == -1) {
+		dhcpmsg(MSG_ERR, "cannot open routing socket");
+		return (EXIT_FAILURE);
+	}
+	if (iu_register_event(eh, rtsock_fd, POLLIN, rtsock_event, 0) == -1) {
+		dhcpmsg(MSG_ERR, "cannot register routing socket for messages");
 		return (EXIT_FAILURE);
 	}
 
@@ -842,5 +860,166 @@ load_option:
 
 	default:
 		return;
+	}
+}
+
+/*
+ * check_rtm_addr(): determine if routing socket message matches interface
+ *		     address
+ *
+ *   input: struct if_msghdr *: pointer to routing socket message
+ *	    struct in_addr: IP address
+ *  output: boolean_t
+ */
+static boolean_t
+check_rtm_addr(struct ifa_msghdr *ifam, int msglen, struct in_addr addr)
+{
+	char *cp, *lim;
+	uint_t flag;
+	struct sockaddr *sa;
+	struct sockaddr_in *sinp;
+
+	if (!(ifam->ifam_addrs & RTA_IFA))
+		return (B_FALSE);
+
+	cp = (char *)(ifam + 1);
+	lim = (char *)ifam + msglen;
+	for (flag = 1; flag < RTA_IFA; flag <<= 1) {
+		if (ifam->ifam_addrs & flag) {
+			/* LINTED: alignment */
+			sa = (struct sockaddr *)cp;
+			if ((char *)(sa + 1) > lim)
+				return (B_FALSE);
+			switch (sa->sa_family) {
+			case AF_UNIX:
+				cp += sizeof (struct sockaddr_un);
+				break;
+			case AF_INET:
+				cp += sizeof (struct sockaddr_in);
+				break;
+			case AF_LINK:
+				cp += sizeof (struct sockaddr_dl);
+				break;
+			case AF_INET6:
+				cp += sizeof (struct sockaddr_in6);
+				break;
+			default:
+				cp += sizeof (struct sockaddr);
+				break;
+			}
+		}
+	}
+	/* LINTED: alignment */
+	sinp = (struct sockaddr_in *)cp;
+	if ((char *)(sinp + 1) > lim)
+		return (B_FALSE);
+	return (sinp->sin_addr.s_addr == addr.s_addr);
+}
+
+/*
+ * rtsock_event(): fetches routing socket messages and updates internal
+ *		   interface state based on those messages.
+ *
+ *   input: iu_eh_t *: unused
+ *	    int: the routing socket file descriptor
+ *	    (other arguments unused)
+ *  output: void
+ */
+
+/* ARGSUSED */
+static void
+rtsock_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
+{
+	struct ifslist *ifs;
+	union {
+		struct ifa_msghdr ifam;
+		char buf[1024];
+	} msg;
+	uint16_t ifindex;
+	struct lifreq lifr;
+	char *fail;
+	int msglen;
+
+	if ((msglen = read(fd, &msg, sizeof (msg))) <= 0)
+		return;
+
+	/*
+	 * These are the messages that can identify a particular logical
+	 * interface by local IP address.
+	 */
+	if (msg.ifam.ifam_type != RTM_DELADDR &&
+	    msg.ifam.ifam_type != RTM_NEWADDR)
+		return;
+
+	/* Note that ifam_index is just 16 bits */
+	ifindex = msg.ifam.ifam_index;
+
+	for (ifs = lookup_ifs_by_uindex(ifindex, NULL);
+	    ifs != NULL;
+	    ifs = lookup_ifs_by_uindex(ifindex, ifs)) {
+
+		/*
+		 * The if_sock_ip_fd is set to a non-negative integer by
+		 * configure_bound().  If it's negative, then DHCP doesn't
+		 * think we're bound.
+		 *
+		 * For pre-bound interfaces, we want to check to see if the
+		 * IFF_UP bit has been reported.  This means that DAD is
+		 * complete.
+		 */
+		if (ifs->if_sock_ip_fd == -1 && ifs->if_state != PRE_BOUND)
+			continue;
+
+		/*
+		 * Since we cannot trust the flags reported by the routing
+		 * socket (they're just 32 bits -- and thus never include
+		 * IFF_DUPLICATE), and we can't trust the ifindex (it's only 16
+		 * bits and also doesn't reflect the alias in use), we get
+		 * flags on all matching interfaces, and go by that.
+		 */
+		(void) strlcpy(lifr.lifr_name, ifs->if_name,
+		    sizeof (lifr.lifr_name));
+		if (ioctl(ifs->if_sock_fd, SIOCGLIFFLAGS, &lifr) == -1) {
+			fail = "unable to retrieve interface flags";
+		} else if (!check_rtm_addr(&msg.ifam, msglen, ifs->if_addr)) {
+			/*
+			 * If the message is not about this logical interface,
+			 * then just ignore it.
+			 */
+			continue;
+		} else if (lifr.lifr_flags & IFF_DUPLICATE) {
+			fail = "interface has duplicate address";
+		} else {
+			/*
+			 * If we're now up and we were waiting for that, then
+			 * kick off this interface.  DAD is done.
+			 */
+			if ((lifr.lifr_flags & IFF_UP) &&
+			    ifs->if_state == PRE_BOUND)
+				dhcp_bound_complete(ifs);
+
+			continue;
+		}
+
+		if (ifs->if_sock_ip_fd != -1) {
+			(void) close(ifs->if_sock_ip_fd);
+			ifs->if_sock_ip_fd = -1;
+		}
+		dhcpmsg(MSG_ERROR, fail);
+
+		/*
+		 * The binding has evidently failed, so it's as though it never
+		 * happened.  We need to do switch back to PRE_BOUND state so
+		 * that send_pkt_internal() uses DLPI instead of sockets.  Our
+		 * logical interface has already been torn down by the kernel,
+		 * and thus we can't send DHCPDECLINE by way of regular IP.
+		 */
+		ifs->if_state = PRE_BOUND;
+
+		if (ifs->if_ack->opts[CD_DHCP_TYPE] != NULL)
+			send_decline(ifs, fail, &ifs->if_addr);
+
+		ifs->if_bad_offers++;
+		dhcp_restart(ifs);
 	}
 }

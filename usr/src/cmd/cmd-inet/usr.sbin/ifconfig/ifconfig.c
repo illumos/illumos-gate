@@ -70,7 +70,8 @@ static if_flags_t	if_flags_tbl[] = {
 	{ IFF_PREFERRED,	"PREFERRED" },
 	{ IFF_TEMPORARY,	"TEMPORARY" },
 	{ IFF_FIXEDMTU,		"FIXEDMTU" },
-	{ IFF_VIRTUAL,		"VIRTUAL"}
+	{ IFF_VIRTUAL,		"VIRTUAL" },
+	{ IFF_DUPLICATE,	"DUPLICATE" }
 };
 
 static struct	lifreq lifr;
@@ -172,7 +173,6 @@ static void	foreachinterface(void (*func)(), int argc, char *argv[],
 		    int af, int64_t onflags, int64_t offflags,
 		    int64_t lifc_flags);
 static void	ifconfig(int argc, char *argv[], int af, struct lifreq *lifrp);
-static int	ifdad(char *ifname, struct sockaddr_in6 *laddr);
 static boolean_t	in_getmask(struct sockaddr_in *saddr,
 			    boolean_t addr_set);
 static int	in_getprefixlen(char *addr, boolean_t slash, int plen);
@@ -1006,25 +1006,6 @@ setifaddr(char *addr, int64_t param)
 	sav_netmask = lifr.lifr_addr;
 
 	/*
-	 * Catch set of address for AF_INET6 to perform
-	 * duplicate address detection. Check that the interface is
-	 * up.
-	 */
-	if (afp->af_af == AF_INET6) {
-		if (ioctl(s, SIOCGLIFFLAGS, (caddr_t)&lifr) < 0) {
-			Perror0_exit("ifsetaddr: SIOCGLIFFLAGS");
-		}
-		if (lifr.lifr_flags & IFF_UP) {
-			if (debug)
-				(void) printf(
-				    "setifaddr: Calling ifdad flags %llx\n",
-				    lifr.lifr_flags);
-			if (ifdad(name, (struct sockaddr_in6 *)&laddr) == -1)
-				exit(3);
-		}
-	}
-
-	/*
 	 * If setting the address and not the mask, clear any existing mask
 	 * and the kernel will then assign the default (netmask has been set
 	 * to 0 in this case).  If setting both (either by using a prefix or
@@ -1486,25 +1467,25 @@ setifflags(char *val, int64_t value)
 		}
 	}
 
-	/*
-	 * Catch "up" transition for AF_INET6 to perform duplicate address
-	 * detection. ifdad checks if an address has been set.
-	 */
-	if (afp->af_af == AF_INET6 && !(lifr.lifr_flags & IFF_UP) &&
-	    value == IFF_UP) {
-		if (debug)
-			(void) printf(
-			    "setifaddr:Calling ifdad flags %llx value 0x%llx\n",
-			    lifr.lifr_flags, value);
-		if (ifdad(name, NULL) == -1)
-			exit(1);
-	}
-
 	if (value < 0) {
 		value = -value;
 		lifr.lifr_flags &= ~value;
-	} else
+		if ((value & IFF_UP) && (lifr.lifr_flags & IFF_DUPLICATE)) {
+			/*
+			 * If the user is trying to mark an interface with a
+			 * duplicate address as "down," then fetch the address
+			 * and set it.  This will cause IP to clear the
+			 * IFF_DUPLICATE flag and stop the automatic recovery
+			 * timer.
+			 */
+			value = lifr.lifr_flags;
+			if (ioctl(s, SIOCGLIFADDR, (caddr_t)&lifr) >= 0)
+				(void) ioctl(s, SIOCSLIFADDR, (caddr_t)&lifr);
+			lifr.lifr_flags = value;
+		}
+	} else {
 		lifr.lifr_flags |= value;
+	}
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
 	if (ioctl(s, SIOCSLIFFLAGS, (caddr_t)&lifr) < 0) {
 		Perror0_exit("setifflags: SIOCSLIFFLAGS");
@@ -1955,54 +1936,6 @@ removeif(char *str, int64_t param)
 		Perror0_exit("removeif: SIOCLIFREMOVEIF");
 	}
 	return (0);
-}
-
-/*
- * If laddr is non-NULL it is used - otherwise we use the address on
- * the interface.
- */
-/* ARGSUSED */
-static int
-ifdad(char *ifname, struct sockaddr_in6 *laddr)
-{
-	struct sockaddr_in6 testaddr;
-	struct lifreq lifr2;	/* Avoid overriting lifr */
-
-	if (debug)
-		(void) printf("ifdad(%s)\n", ifname);
-
-	assert(afp->af_af == AF_INET6);
-
-	/*
-	 * Check the address assigned to the interface.
-	 * Skip the check if IFF_NOLOCAL, IFF_NONUD, IFF_ANYCAST, or
-	 * IFF_LOOPBACK.
-	 * Note that IFF_NONUD turns of both NUD and DAD.
-	 */
-	(void) strncpy(lifr2.lifr_name, ifname,
-	    sizeof (lifr2.lifr_name));
-	if (ioctl(s, SIOCGLIFFLAGS, (caddr_t)&lifr2) < 0) {
-		Perror0_exit("ifdad: SIOCGLIFFLAGS");
-	}
-	if (lifr2.lifr_flags & (IFF_NOLOCAL|IFF_LOOPBACK|IFF_NONUD|IFF_ANYCAST))
-		return (0);
-
-	if (laddr != NULL) {
-		testaddr = *laddr;
-	} else {
-		if (ioctl(s, SIOCGLIFADDR, (caddr_t)&lifr2) < 0) {
-			Perror0_exit("ifdad: SIOCGLIFADDR");
-		}
-		testaddr = *(struct sockaddr_in6 *)&lifr2.lifr_addr;
-	}
-
-	if (IN6_IS_ADDR_UNSPECIFIED(&testaddr.sin6_addr))
-		return (0);
-
-	if (do_dad(name, &testaddr) != 0)
-		return (-1);
-	else
-		return (0);
 }
 
 /*
@@ -4134,6 +4067,7 @@ Perror2_exit(char *cmd, char *str)
 static void
 in_getaddr(char *s, struct sockaddr *saddr, int *plenp)
 {
+	/* LINTED: alignment */
 	struct sockaddr_in *sin = (struct sockaddr_in *)saddr;
 	struct hostent *hp;
 	struct netent *np;
@@ -4202,6 +4136,7 @@ in_getaddr(char *s, struct sockaddr *saddr, int *plenp)
 static void
 in6_getaddr(char *s, struct sockaddr *saddr, int *plenp)
 {
+	/* LINTED: alignment */
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)saddr;
 	struct hostent *hp;
 	char str[BUFSIZ];

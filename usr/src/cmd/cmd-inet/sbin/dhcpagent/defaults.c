@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,9 +54,9 @@ struct dhcp_default {
 static struct dhcp_default defaults[] = {
 
 	{ "RELEASE_ON_SIGTERM",  "0",	 0,   0	  },
-	{ "IGNORE_FAILED_ARP",	 "1",	 0,   0	  },
+	{ "IGNORE_FAILED_ARP",	 "1",	 0,   -1  },
 	{ "OFFER_WAIT",		 "3",	 1,   20  },
-	{ "ARP_WAIT",		 "1000", 100, 4000 },
+	{ "ARP_WAIT",		 "1000", 0,   -1  },
 	{ "CLIENT_ID",		 NULL,	 0,   0	  },
 	{ "PARAM_REQUEST_LIST",  NULL,	 0,   0    },
 	{ "REQUEST_HOSTNAME",	 "1",	 0,   0	  }
@@ -78,6 +77,7 @@ df_build_cache(void)
 	char		*param, *value, *end;
 	FILE		*fp;
 	nvlist_t 	*nvlist;
+	struct dhcp_default *defp;
 
 	if ((fp = fopen(DHCP_AGENT_DEFAULTS, "r")) == NULL)
 		return (NULL);
@@ -111,6 +111,18 @@ df_build_cache(void)
 			param = entry;
 		else
 			param++;
+
+		for (defp = defaults;
+		    (char *)defp < (char *)defaults + sizeof (defaults);
+		    defp++) {
+			if (strcasecmp(param, defp->df_name) == 0) {
+				if (defp->df_max == -1) {
+					dhcpmsg(MSG_WARNING, "parameter %s is "
+					    "obsolete; ignored", defp->df_name);
+				}
+				break;
+			}
+		}
 
 		for (; *param != '\0'; param++)
 			*param = toupper(*param);

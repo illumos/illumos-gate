@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -55,7 +55,6 @@
 #include <netdb.h>
 #include <net/if.h>
 #include <net/if_arp.h>
-#include <netinet/if_ether.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -151,14 +150,15 @@ main(int argc, char *argv[])
 /*
  * Process a file to set standard arp entries
  */
-static int file(char *name)
+static int
+file(char *name)
 {
 	/*
 	 * A line of input can be:
-	 * <hostname> <macaddr> ["temp"] ["pub"] ["trail"]
+	 * <hostname> <macaddr> ["temp"] ["pub"] ["trail"] ["permanent"]
 	 */
 #define	MAX_LINE_LEN	(MAXHOSTNAMELEN + \
-	sizeof (" xx:xx:xx:xx:xx:xx temp pub trail\n"))
+	sizeof (" xx:xx:xx:xx:xx:xx temp pub trail permanent\n"))
 #define	MIN_ARGS	2
 #define	MAX_ARGS	5
 
@@ -214,7 +214,8 @@ static int file(char *name)
 /*
  * Set an individual arp entry
  */
-static int set(int argc, char *argv[])
+static int
+set(int argc, char *argv[])
 {
 	struct xarpreq ar;
 	struct hostent *hp;
@@ -255,13 +256,26 @@ static int set(int argc, char *argv[])
 	ar.xarp_ha.sdl_family = AF_LINK;
 	ar.xarp_flags = ATF_PERM;
 	while (argc-- > 0) {
-		if (strncmp(argv[0], "temp", 4) == 0)
+		if (strncmp(argv[0], "temp", 4) == 0) {
 			ar.xarp_flags &= ~ATF_PERM;
-		if (strncmp(argv[0], "pub", 3) == 0)
+		} else if (strncmp(argv[0], "pub", 3) == 0) {
 			ar.xarp_flags |= ATF_PUBL;
-		if (strncmp(argv[0], "trail", 5) == 0)
+		} else if (strncmp(argv[0], "trail", 5) == 0) {
 			ar.xarp_flags |= ATF_USETRAILERS;
+		} else if (strcmp(argv[0], "permanent") == 0) {
+			ar.xarp_flags |= ATF_AUTHORITY;
+		} else {
+			(void) fprintf(stderr,
+			    "arp: unknown keyword '%s'\n", argv[0]);
+			return (1);
+		}
 		argv++;
+	}
+
+	if ((ar.xarp_flags & (ATF_PERM|ATF_AUTHORITY)) == ATF_AUTHORITY) {
+		(void) fprintf(stderr, "arp: 'temp' and 'permanent' flags are "
+		    "not usable together.\n");
+		return (1);
 	}
 
 	s = socket(AF_INET, SOCK_DGRAM, 0);
@@ -277,11 +291,11 @@ static int set(int argc, char *argv[])
 	return (0);
 }
 
-
 /*
  * Display an individual arp entry
  */
-static void get(char *host)
+static void
+get(char *host)
 {
 	struct xarpreq ar;
 	struct hostent *hp;
@@ -334,19 +348,22 @@ static void get(char *host)
 		(void) printf("%s (%s) at (incomplete)", host,
 		    inet_ntoa(sin->sin_addr));
 	}
-	if (ar.xarp_flags & ATF_PERM)
-		(void) printf(" permanent");
+	if (!(ar.xarp_flags & ATF_PERM))
+		(void) printf(" temp");
 	if (ar.xarp_flags & ATF_PUBL)
-		(void) printf(" published");
+		(void) printf(" pub");
 	if (ar.xarp_flags & ATF_USETRAILERS)
-		(void) printf(" trailers");
+		(void) printf(" trail");
+	if (ar.xarp_flags & ATF_AUTHORITY)
+		(void) printf(" permanent");
 	(void) printf("\n");
 }
 
 /*
  * Delete an arp entry
  */
-static void delete(char *host)
+static void
+delete(char *host)
 {
 	struct xarpreq ar;
 	struct hostent *hp;
@@ -385,12 +402,13 @@ static void delete(char *host)
 	(void) printf("%s (%s) deleted\n", host, inet_ntoa(sin->sin_addr));
 }
 
-static void usage(void)
+static void
+usage(void)
 {
 	(void) printf("Usage: arp hostname\n");
 	(void) printf("       arp -a [-n]\n");
 	(void) printf("       arp -d hostname\n");
 	(void) printf("       arp -s hostname ether_addr "
-	    "[temp] [pub] [trail]\n");
+	    "[temp] [pub] [trail] [permanent]\n");
 	(void) printf("       arp -f filename\n");
 }

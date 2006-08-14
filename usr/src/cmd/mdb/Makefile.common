@@ -50,6 +50,7 @@ COMMON_MODULES_PROC_32BIT = \
 # MDB modules used for debugging kernels.
 #
 COMMON_MODULES_KVM = \
+	arp \
 	audiosup \
 	cpc \
 	crypto	\

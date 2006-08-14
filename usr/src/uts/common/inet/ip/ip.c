@@ -956,6 +956,12 @@ static ipparam_t	lcl_param_arr[] = {
 	{  1000, 60000, 1000,	"ip_multirt_resolution_interval" },
 	{  0,	255,	1,	"ip_multirt_ttl" },
 	{  0,	1,	1,	"ip_multidata_outbound" },
+	{  0,	3600000, 300000, "ip_ndp_defense_interval" },
+	{  0,	999999,	60*60*24, "ip_max_temp_idle" },
+	{  0,	1000,	1,	"ip_max_temp_defend" },
+	{  0,	1000,	3,	"ip_max_defend" },
+	{  0,	999999,	30,	"ip_defend_interval" },
+	{  0,	3600000, 300000, "ip_dup_recovery" },
 #ifdef DEBUG
 	{  0,	1,	0,	"ip6_drop_inbound_icmpv6" },
 #endif
@@ -1021,65 +1027,6 @@ int ip_g_forward = IP_FORWARD_DEFAULT;
 /* It also has an IPv6 counterpart. */
 
 int ipv6_forward = IP_FORWARD_DEFAULT;
-
-/* Following line is external, and in ip.h.  Normally marked with * *. */
-#define	ip_respond_to_address_mask_broadcast ip_param_arr[0].ip_param_value
-#define	ip_g_resp_to_echo_bcast		ip_param_arr[1].ip_param_value
-#define	ip_g_resp_to_echo_mcast		ip_param_arr[2].ip_param_value
-#define	ip_g_resp_to_timestamp		ip_param_arr[3].ip_param_value
-#define	ip_g_resp_to_timestamp_bcast	ip_param_arr[4].ip_param_value
-#define	ip_g_send_redirects		ip_param_arr[5].ip_param_value
-#define	ip_g_forward_directed_bcast	ip_param_arr[6].ip_param_value
-#define	ip_debug			ip_param_arr[7].ip_param_value	/* */
-#define	ip_mrtdebug			ip_param_arr[8].ip_param_value	/* */
-#define	ip_timer_interval		ip_param_arr[9].ip_param_value	/* */
-#define	ip_ire_arp_interval		ip_param_arr[10].ip_param_value  /* */
-#define	ip_ire_redir_interval		ip_param_arr[11].ip_param_value
-#define	ip_def_ttl			ip_param_arr[12].ip_param_value
-#define	ip_forward_src_routed		ip_param_arr[13].ip_param_value
-#define	ip_wroff_extra			ip_param_arr[14].ip_param_value
-#define	ip_ire_pathmtu_interval		ip_param_arr[15].ip_param_value
-#define	ip_icmp_return			ip_param_arr[16].ip_param_value
-#define	ip_path_mtu_discovery		ip_param_arr[17].ip_param_value /* */
-#define	ip_ignore_delete_time		ip_param_arr[18].ip_param_value /* */
-#define	ip_ignore_redirect		ip_param_arr[19].ip_param_value
-#define	ip_output_queue			ip_param_arr[20].ip_param_value
-#define	ip_broadcast_ttl		ip_param_arr[21].ip_param_value
-#define	ip_icmp_err_interval		ip_param_arr[22].ip_param_value
-#define	ip_icmp_err_burst		ip_param_arr[23].ip_param_value
-#define	ip_reass_queue_bytes		ip_param_arr[24].ip_param_value
-#define	ip_strict_dst_multihoming	ip_param_arr[25].ip_param_value
-#define	ip_addrs_per_if			ip_param_arr[26].ip_param_value
-#define	ipsec_override_persocket_policy	ip_param_arr[27].ip_param_value /* */
-#define	icmp_accept_clear_messages	ip_param_arr[28].ip_param_value
-#define	igmp_accept_clear_messages	ip_param_arr[29].ip_param_value
-
-/* IPv6 configuration knobs */
-#define	delay_first_probe_time		ip_param_arr[30].ip_param_value
-#define	max_unicast_solicit		ip_param_arr[31].ip_param_value
-#define	ipv6_def_hops			ip_param_arr[32].ip_param_value
-#define	ipv6_icmp_return		ip_param_arr[33].ip_param_value
-#define	ipv6_forward_src_routed		ip_param_arr[34].ip_param_value
-#define	ipv6_resp_echo_mcast		ip_param_arr[35].ip_param_value
-#define	ipv6_send_redirects		ip_param_arr[36].ip_param_value
-#define	ipv6_ignore_redirect		ip_param_arr[37].ip_param_value
-#define	ipv6_strict_dst_multihoming	ip_param_arr[38].ip_param_value
-#define	ip_ire_reclaim_fraction		ip_param_arr[39].ip_param_value
-#define	ipsec_policy_log_interval	ip_param_arr[40].ip_param_value
-#define	pim_accept_clear_messages	ip_param_arr[41].ip_param_value
-#define	ip_ndp_unsolicit_interval	ip_param_arr[42].ip_param_value
-#define	ip_ndp_unsolicit_count		ip_param_arr[43].ip_param_value
-#define	ipv6_ignore_home_address_opt	ip_param_arr[44].ip_param_value
-#define	ip_policy_mask			ip_param_arr[45].ip_param_value
-#define	ip_multirt_resolution_interval  ip_param_arr[46].ip_param_value
-#define	ip_multirt_ttl  		ip_param_arr[47].ip_param_value
-#define	ip_multidata_outbound		ip_param_arr[48].ip_param_value
-#ifdef DEBUG
-#define	ipv6_drop_inbound_icmpv6	ip_param_arr[49].ip_param_value
-#else
-#define	ipv6_drop_inbound_icmpv6	0
-#endif
-
 
 /*
  * Table of IP ioctls encoding the various properties of the ioctl and
@@ -1516,28 +1463,33 @@ struct module_info ip_mod_info = {
 	IP_MOD_ID, IP_MOD_NAME, 1, INFPSZ, 65536, 1024
 };
 
-static struct qinit rinit = {
+/*
+ * Duplicate static symbols within a module confuses mdb; so we avoid the
+ * problem by making the symbols here distinct from those in udp.c.
+ */
+
+static struct qinit iprinit = {
 	(pfi_t)ip_rput, NULL, ip_open, ip_close, NULL,
 	&ip_mod_info
 };
 
-static struct qinit winit = {
+static struct qinit ipwinit = {
 	(pfi_t)ip_wput, (pfi_t)ip_wsrv, ip_open, ip_close, NULL,
 	&ip_mod_info
 };
 
-static struct qinit lrinit = {
+static struct qinit iplrinit = {
 	(pfi_t)ip_lrput, NULL, ip_open, ip_close, NULL,
 	&ip_mod_info
 };
 
-static struct qinit lwinit = {
+static struct qinit iplwinit = {
 	(pfi_t)ip_lwput, NULL, ip_open, ip_close, NULL,
 	&ip_mod_info
 };
 
 struct streamtab ipinfo = {
-	&rinit, &winit, &lrinit, &lwinit
+	&iprinit, &ipwinit, &iplrinit, &iplwinit
 };
 
 #ifdef	DEBUG
@@ -3782,6 +3734,204 @@ icmp_unreachable(queue_t *q, mblk_t *mp, uint8_t code)
 }
 
 /*
+ * Attempt to start recovery of an IPv4 interface that's been shut down as a
+ * duplicate.  As long as someone else holds the address, the interface will
+ * stay down.  When that conflict goes away, the interface is brought back up.
+ * This is done so that accidental shutdowns of addresses aren't made
+ * permanent.  Your server will recover from a failure.
+ *
+ * For DHCP, recovery is not done in the kernel.  Instead, it's handled by a
+ * user space process (dhcpagent).
+ *
+ * Recovery completes if ARP reports that the address is now ours (via
+ * AR_CN_READY).  In that case, we go to ip_arp_excl to finish the operation.
+ *
+ * This function is entered on a timer expiry; the ID is in ipif_recovery_id.
+ */
+static void
+ipif_dup_recovery(void *arg)
+{
+	ipif_t *ipif = arg;
+	ill_t *ill = ipif->ipif_ill;
+	mblk_t *arp_add_mp;
+	mblk_t *arp_del_mp;
+	area_t *area;
+
+	ipif->ipif_recovery_id = 0;
+
+	if (ill->ill_arp_closing || !(ipif->ipif_flags & IPIF_DUPLICATE) ||
+	    (ipif->ipif_flags & IPIF_POINTOPOINT)) {
+		/* No reason to try to bring this address back. */
+		return;
+	}
+
+	if ((arp_add_mp = ipif_area_alloc(ipif)) == NULL)
+		goto alloc_fail;
+
+	if (ipif->ipif_arp_del_mp == NULL) {
+		if ((arp_del_mp = ipif_ared_alloc(ipif)) == NULL)
+			goto alloc_fail;
+		ipif->ipif_arp_del_mp = arp_del_mp;
+	}
+
+	/* Setting the 'unverified' flag restarts DAD */
+	area = (area_t *)arp_add_mp->b_rptr;
+	area->area_flags = ACE_F_PERMANENT | ACE_F_PUBLISH | ACE_F_MYADDR |
+	    ACE_F_UNVERIFIED;
+	putnext(ill->ill_rq, arp_add_mp);
+	return;
+
+alloc_fail:
+	/* On allocation failure, just restart the timer */
+	freemsg(arp_add_mp);
+	if (ip_dup_recovery > 0) {
+		ipif->ipif_recovery_id = timeout(ipif_dup_recovery, ipif,
+		    MSEC_TO_TICK(ip_dup_recovery));
+	}
+}
+
+/*
+ * This is for exclusive changes due to ARP.  Either tear down an interface due
+ * to AR_CN_FAILED and AR_CN_BOGON, or bring one up for successful recovery.
+ */
+/* ARGSUSED */
+static void
+ip_arp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
+{
+	ill_t	*ill = rq->q_ptr;
+	arh_t *arh;
+	ipaddr_t src;
+	ipif_t	*ipif;
+	char ibuf[LIFNAMSIZ + 10];	/* 10 digits for logical i/f number */
+	char hbuf[MAC_STR_LEN];
+	char sbuf[INET_ADDRSTRLEN];
+	const char *failtype;
+	boolean_t bring_up;
+
+	switch (((arcn_t *)mp->b_rptr)->arcn_code) {
+	case AR_CN_READY:
+		failtype = NULL;
+		bring_up = B_TRUE;
+		break;
+	case AR_CN_FAILED:
+		failtype = "in use";
+		bring_up = B_FALSE;
+		break;
+	default:
+		failtype = "claimed";
+		bring_up = B_FALSE;
+		break;
+	}
+
+	arh = (arh_t *)mp->b_cont->b_rptr;
+	bcopy((char *)&arh[1] + arh->arh_hlen, &src, IP_ADDR_LEN);
+
+	/* Handle failures due to probes */
+	if (src == 0) {
+		bcopy((char *)&arh[1] + 2 * arh->arh_hlen + IP_ADDR_LEN, &src,
+		    IP_ADDR_LEN);
+	}
+
+	(void) strlcpy(ibuf, ill->ill_name, sizeof (ibuf));
+	(void) mac_colon_addr((uint8_t *)(arh + 1), arh->arh_hlen, hbuf,
+	    sizeof (hbuf));
+	(void) ip_dot_addr(src, sbuf);
+	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
+
+		if ((ipif->ipif_flags & IPIF_POINTOPOINT) ||
+		    ipif->ipif_lcl_addr != src) {
+			continue;
+		}
+
+		/*
+		 * If we failed on a recovery probe, then restart the timer to
+		 * try again later.
+		 */
+		if (!bring_up && (ipif->ipif_flags & IPIF_DUPLICATE) &&
+		    !(ipif->ipif_flags & (IPIF_DHCPRUNNING|IPIF_TEMPORARY)) &&
+		    ill->ill_net_type == IRE_IF_RESOLVER &&
+		    ip_dup_recovery > 0 && ipif->ipif_recovery_id == 0) {
+			ipif->ipif_recovery_id = timeout(ipif_dup_recovery,
+			    ipif, MSEC_TO_TICK(ip_dup_recovery));
+			continue;
+		}
+
+		/*
+		 * If what we're trying to do has already been done, then do
+		 * nothing.
+		 */
+		if (bring_up == ((ipif->ipif_flags & IPIF_UP) != 0))
+			continue;
+
+		if (ipif->ipif_id != 0) {
+			(void) snprintf(ibuf + ill->ill_name_length - 1,
+			    sizeof (ibuf) - ill->ill_name_length + 1, ":%d",
+			    ipif->ipif_id);
+		}
+		if (failtype == NULL) {
+			cmn_err(CE_NOTE, "recovered address %s on %s", sbuf,
+			    ibuf);
+		} else {
+			cmn_err(CE_WARN, "%s has duplicate address %s (%s "
+			    "by %s); disabled", ibuf, sbuf, failtype, hbuf);
+		}
+
+		if (bring_up) {
+			ASSERT(ill->ill_dl_up);
+			/*
+			 * Free up the ARP delete message so we can allocate
+			 * a fresh one through the normal path.
+			 */
+			freemsg(ipif->ipif_arp_del_mp);
+			ipif->ipif_arp_del_mp = NULL;
+			if (ipif_resolver_up(ipif, Res_act_initial) !=
+			    EINPROGRESS) {
+				ipif->ipif_addr_ready = 1;
+				(void) ipif_up_done(ipif);
+			}
+			continue;
+		}
+
+		mutex_enter(&ill->ill_lock);
+		ASSERT(!(ipif->ipif_flags & IPIF_DUPLICATE));
+		ipif->ipif_flags |= IPIF_DUPLICATE;
+		ill->ill_ipif_dup_count++;
+		mutex_exit(&ill->ill_lock);
+		/*
+		 * Already exclusive on the ill; no need to handle deferred
+		 * processing here.
+		 */
+		(void) ipif_down(ipif, NULL, NULL);
+		ipif_down_tail(ipif);
+		if (!(ipif->ipif_flags & (IPIF_DHCPRUNNING|IPIF_TEMPORARY)) &&
+		    ill->ill_net_type == IRE_IF_RESOLVER &&
+		    ip_dup_recovery > 0) {
+			ipif->ipif_recovery_id = timeout(ipif_dup_recovery,
+			    ipif, MSEC_TO_TICK(ip_dup_recovery));
+		}
+	}
+	freemsg(mp);
+}
+
+/* ARGSUSED */
+static void
+ip_arp_defend(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
+{
+	ill_t	*ill = rq->q_ptr;
+	arh_t *arh;
+	ipaddr_t src;
+	ipif_t	*ipif;
+
+	arh = (arh_t *)mp->b_cont->b_rptr;
+	bcopy((char *)&arh[1] + arh->arh_hlen, &src, IP_ADDR_LEN);
+	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
+		if ((ipif->ipif_flags & IPIF_UP) && ipif->ipif_lcl_addr == src)
+			(void) ipif_resolver_up(ipif, Res_act_defend);
+	}
+	freemsg(mp);
+}
+
+/*
  * News from ARP.  ARP sends notification of interesting events down
  * to its clients using M_CTL messages with the interesting ARP packet
  * attached via b_cont.
@@ -3796,15 +3946,14 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 {
 	arcn_t		*arcn;
 	arh_t		*arh;
-	char		*cp1;
-	uchar_t		*cp2;
 	ire_t		*ire = NULL;
-	int		i1;
-	char		hbuf[128];
-	char		sbuf[16];
+	char		hbuf[MAC_STR_LEN];
+	char		sbuf[INET_ADDRSTRLEN];
 	ipaddr_t	src;
 	in6_addr_t	v6src;
 	boolean_t	isv6 = B_FALSE;
+	ipif_t		*ipif;
+	ill_t		*ill;
 
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (arcn_t)	|| !mp->b_cont) {
 		if (q->q_next) {
@@ -3827,25 +3976,37 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 		return;
 	}
 
+	ill = q->q_ptr;
+
 	arcn = (arcn_t *)mp->b_rptr;
 	switch (arcn->arcn_code) {
 	case AR_CN_BOGON:
 		/*
 		 * Someone is sending ARP packets with a source protocol
-		 * address which we have published.  Either they are
-		 * pretending to be us, or we have been asked to proxy
-		 * for a machine that can do fine for itself, or two
-		 * different machines are providing proxy service for the
-		 * same protocol address, or something.  We try and do
-		 * something appropriate here.
+		 * address that we have published and for which we believe our
+		 * entry is authoritative and (when ill_arp_extend is set)
+		 * verified to be unique on the network.
+		 *
+		 * The ARP module internally handles the cases where the sender
+		 * is just probing (for DAD) and where the hardware address of
+		 * a non-authoritative entry has changed.  Thus, these are the
+		 * real conflicts, and we have to do resolution.
+		 *
+		 * We back away quickly from the address if it's from DHCP or
+		 * otherwise temporary and hasn't been used recently (or at
+		 * all).  We'd like to include "deprecated" addresses here as
+		 * well (as there's no real reason to defend something we're
+		 * discarding), but IPMP "reuses" this flag to mean something
+		 * other than the standard meaning.
+		 *
+		 * If the ARP module above is not extended (meaning that it
+		 * doesn't know how to defend the address), then we just log
+		 * the problem as we always did and continue on.  It's not
+		 * right, but there's little else we can do, and those old ATM
+		 * users are going away anyway.
 		 */
-		cp2 = (uchar_t *)&arh[1];
-		cp1 = hbuf;
-		*cp1 = '\0';
-		for (i1 = arh->arh_hlen; i1--; cp1 += 3)
-			(void) sprintf(cp1, "%02x:", *cp2++ & 0xff);
-		if (cp1 != hbuf)
-			cp1[-1] = '\0';
+		(void) mac_colon_addr((uint8_t *)(arh + 1), arh->arh_hlen,
+		    hbuf, sizeof (hbuf));
 		(void) ip_dot_addr(src, sbuf);
 		if (isv6)
 			ire = ire_cache_lookup_v6(&v6src, ALL_ZONES, NULL);
@@ -3853,16 +4014,78 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 			ire = ire_cache_lookup(src, ALL_ZONES, NULL);
 
 		if (ire != NULL	&& IRE_IS_LOCAL(ire)) {
-			cmn_err(CE_WARN,
-			    "IP: Hardware address '%s' trying"
-			    " to be our address %s!",
-			    hbuf, sbuf);
-		} else {
-			cmn_err(CE_WARN,
-			    "IP: Proxy ARP problem?  "
-			    "Hardware address '%s' thinks it is %s",
-			    hbuf, sbuf);
+			uint32_t now;
+			uint32_t maxage;
+			clock_t lused;
+			uint_t maxdefense;
+			uint_t defs;
+
+			/*
+			 * First, figure out if this address hasn't been used
+			 * in a while.  If it hasn't, then it's a better
+			 * candidate for abandoning.
+			 */
+			ipif = ire->ire_ipif;
+			ASSERT(ipif != NULL);
+			now = gethrestime_sec();
+			maxage = now - ire->ire_create_time;
+			if (maxage > ip_max_temp_idle)
+				maxage = ip_max_temp_idle;
+			lused = drv_hztousec(ddi_get_lbolt() -
+			    ire->ire_last_used_time) / MICROSEC + 1;
+			if (lused >= maxage && (ipif->ipif_flags &
+			    (IPIF_DHCPRUNNING | IPIF_TEMPORARY)))
+				maxdefense = ip_max_temp_defend;
+			else
+				maxdefense = ip_max_defend;
+
+			/*
+			 * Now figure out how many times we've defended
+			 * ourselves.  Ignore defenses that happened long in
+			 * the past.
+			 */
+			mutex_enter(&ire->ire_lock);
+			if ((defs = ire->ire_defense_count) > 0 &&
+			    now - ire->ire_defense_time > ip_defend_interval) {
+				ire->ire_defense_count = defs = 0;
+			}
+			ire->ire_defense_count++;
+			ire->ire_defense_time = now;
+			mutex_exit(&ire->ire_lock);
+			ill_refhold(ill);
+			ire_refrele(ire);
+
+			/*
+			 * If we've defended ourselves too many times already,
+			 * then give up and tear down the interface(s) using
+			 * this address.  Otherwise, defend by sending out a
+			 * gratuitous ARP.
+			 */
+			if (defs >= maxdefense && ill->ill_arp_extend) {
+				(void) qwriter_ip(NULL, ill, q, mp,
+				    ip_arp_excl, CUR_OP, B_FALSE);
+			} else {
+				cmn_err(CE_WARN,
+				    "node %s is using our IP address %s on %s",
+				    hbuf, sbuf, ill->ill_name);
+				/*
+				 * If this is an old (ATM) ARP module, then
+				 * don't try to defend the address.  Remain
+				 * compatible with the old behavior.  Defend
+				 * only with new ARP.
+				 */
+				if (ill->ill_arp_extend) {
+					(void) qwriter_ip(NULL, ill, q, mp,
+					    ip_arp_defend, CUR_OP, B_FALSE);
+				} else {
+					ill_refrele(ill);
+				}
+			}
+			return;
 		}
+		cmn_err(CE_WARN,
+		    "proxy ARP problem?  Node '%s' is using %s on %s",
+		    hbuf, sbuf, ill->ill_name);
 		if (ire != NULL)
 			ire_refrele(ire);
 		break;
@@ -3884,53 +4107,79 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 				ire_walk_v6(ire_delete_cache_gw_v6,
 				    (char *)&v6src, ALL_ZONES);
 			}
+		} else {
+			nce_hw_map_t hwm;
+
+			/*
+			 * ARP gives us a copy of any packet where it thinks
+			 * the address has changed, so that we can update our
+			 * caches.  We're responsible for caching known answers
+			 * in the current design.  We check whether the
+			 * hardware address really has changed in all of our
+			 * entries that have cached this mapping, and if so, we
+			 * blow them away.  This way we will immediately pick
+			 * up the rare case of a host changing hardware
+			 * address.
+			 */
+			if (src == 0)
+				break;
+			hwm.hwm_addr = src;
+			hwm.hwm_hwlen = arh->arh_hlen;
+			hwm.hwm_hwaddr = (uchar_t *)(arh + 1);
+			ndp_walk_common(&ndp4, NULL,
+			    (pfi_t)nce_delete_hw_changed, &hwm, ALL_ZONES);
+		}
+		break;
+	case AR_CN_READY:
+		/* No external v6 resolver has a contract to use this */
+		if (isv6)
 			break;
+		/* If the link is down, we'll retry this later */
+		if (!(ill->ill_phyint->phyint_flags & PHYI_RUNNING))
+			break;
+		ipif = ipif_lookup_addr(src, ill, ALL_ZONES, NULL, NULL,
+		    NULL, NULL);
+		if (ipif != NULL) {
+			/*
+			 * If this is a duplicate recovery, then we now need to
+			 * go exclusive to bring this thing back up.
+			 */
+			if ((ipif->ipif_flags & (IPIF_UP|IPIF_DUPLICATE)) ==
+			    IPIF_DUPLICATE) {
+				ipif_refrele(ipif);
+				ill_refhold(ill);
+				(void) qwriter_ip(NULL, ill, q, mp,
+				    ip_arp_excl, CUR_OP, B_FALSE);
+				return;
+			}
+			/*
+			 * If this is the first notice that this address is
+			 * ready, then let the user know now.
+			 */
+			if ((ipif->ipif_flags & IPIF_UP) &&
+			    !ipif->ipif_addr_ready) {
+				ipif_mask_reply(ipif);
+				ip_rts_ifmsg(ipif);
+				ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
+				sctp_update_ipif(ipif, SCTP_IPIF_UP);
+			}
+			ipif->ipif_addr_ready = 1;
+			ipif_refrele(ipif);
 		}
-		/*
-		 * ARP gives us a copy of any broadcast packet with identical
-		 * sender and receiver protocol address, in
-		 * case we want to intuit something from it.  Such a packet
-		 * usually means that a machine has just come up on the net.
-		 * If we have an IRE_CACHE, we blow it away.  This way we will
-		 * immediately pick up the rare case of a host changing
-		 * hardware address. ip_ire_clookup_and_delete achieves this.
-		 *
-		 * The address in "src" may be an entry for a router.
-		 * (Default router, or non-default router.)  If
-		 * that's true, then any off-net IRE_CACHE entries
-		 * that go through the router with address "src"
-		 * must be clobbered.  Use ire_walk to achieve this
-		 * goal.
-		 *
-		 * It should be possible to determine if the address
-		 * in src is or is not for a router.  This way,
-		 * the ire_walk() isn't called all of the time here.
-		 * Do not pass 'src' value of 0 to ire_delete_cache_gw,
-		 * as it would remove all IRE_CACHE entries for onlink
-		 * destinations. All onlink destinations have
-		 * ire_gateway_addr == 0.
-		 *
-		 *
-		 * The ip_ire_clookup_and_delete() call deletes
-		 * the nce and all relevant ire cache entries that
-		 * are associated with that nce.
-		 * The ire_walk_v4->ire_delete_cache_gw() call
-		 * will delete the appropriate redirect ires.
-		 */
-		if ((ip_ire_clookup_and_delete(src, NULL) ||
-		    (ire = ire_ftable_lookup(src, 0, 0, 0, NULL, NULL, NULL,
-		    0, NULL, MATCH_IRE_DSTONLY)) != NULL) && src != 0) {
-			ire_walk_v4(ire_delete_cache_gw, (char *)&src,
-			    ALL_ZONES);
+		ire = ire_cache_lookup(src, ALL_ZONES, MBLK_GETLABEL(mp));
+		if (ire != NULL) {
+			ire->ire_defense_count = 0;
+			ire_refrele(ire);
 		}
-		/* From ire_ftable_lookup */
-		if (ire != NULL)
-			ire_refrele(ire);
 		break;
-	default:
-		if (ire != NULL)
-			ire_refrele(ire);
-		break;
+	case AR_CN_FAILED:
+		/* No external v6 resolver has a contract to use this */
+		if (isv6)
+			break;
+		ill_refhold(ill);
+		(void) qwriter_ip(NULL, ill, q, mp, ip_arp_excl, CUR_OP,
+		    B_FALSE);
+		return;
 	}
 	freemsg(mp);
 }
@@ -5598,25 +5847,57 @@ dlpi_err_str(int err)
  * Debug formatting routine.  Returns a character string representation of the
  * addr in buf, of the form xxx.xxx.xxx.xxx.  This routine takes the address
  * in the form of a ipaddr_t and calls ip_dot_saddr with a pointer.
+ *
+ * Once the ndd table-printing interfaces are removed, this can be changed to
+ * standard dotted-decimal form.
  */
 char *
 ip_dot_addr(ipaddr_t addr, char *buf)
 {
-	return (ip_dot_saddr((uchar_t *)&addr, buf));
+	uint8_t *ap = (uint8_t *)&addr;
+
+	(void) mi_sprintf(buf, "%03d.%03d.%03d.%03d",
+	    ap[0] & 0xFF, ap[1] & 0xFF, ap[2] & 0xFF, ap[3] & 0xFF);
+	return (buf);
 }
 
 /*
- * Debug formatting routine.  Returns a character string representation of the
- * addr in buf, of the form xxx.xxx.xxx.xxx.  This routine takes the address
- * as a pointer.  The "xxx" parts including left zero padding so the final
- * string will fit easily in tables.  It would be nice to take a padding
- * length argument instead.
+ * Write the given MAC address as a printable string in the usual colon-
+ * separated format.
  */
-static char *
-ip_dot_saddr(uchar_t *addr, char *buf)
+const char *
+mac_colon_addr(const uint8_t *addr, size_t alen, char *buf, size_t buflen)
 {
-	(void) mi_sprintf(buf, "%03d.%03d.%03d.%03d",
-	    addr[0] & 0xFF, addr[1] & 0xFF, addr[2] & 0xFF, addr[3] & 0xFF);
+	char *bp;
+
+	if (alen == 0 || buflen < 4)
+		return ("?");
+	bp = buf;
+	for (;;) {
+		/*
+		 * If there are more MAC address bytes available, but we won't
+		 * have any room to print them, then add "..." to the string
+		 * instead.  See below for the 'magic number' explanation.
+		 */
+		if ((alen == 2 && buflen < 6) || (alen > 2 && buflen < 7)) {
+			(void) strcpy(bp, "...");
+			break;
+		}
+		(void) sprintf(bp, "%02x", *addr++);
+		bp += 2;
+		if (--alen == 0)
+			break;
+		*bp++ = ':';
+		buflen -= 3;
+		/*
+		 * At this point, based on the first 'if' statement above,
+		 * either alen == 1 and buflen >= 3, or alen > 1 and
+		 * buflen >= 4.  The first case leaves room for the final "xx"
+		 * number and trailing NUL byte.  The second leaves room for at
+		 * least "...".  Thus the apparently 'magic' numbers chosen for
+		 * that statement.
+		 */
+	}
 	return (buf);
 }
 
@@ -9315,8 +9596,8 @@ ip_setqinfo(queue_t *q, minor_t minor, boolean_t bump_mib)
 	} else {
 		if (bump_mib)
 			BUMP_MIB(&ip_mib, ipOutSwitchIPv6);
-		q->q_qinfo = &rinit;
-		WR(q)->q_qinfo = &winit;
+		q->q_qinfo = &iprinit;
+		WR(q)->q_qinfo = &ipwinit;
 		(Q_TO_CONN(q))->conn_pkt_isv6 = B_FALSE;
 	}
 
@@ -14891,7 +15172,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * v6 interfaces.
 			 * Unlike ARP which has to do another bind
 			 * and attach, once we get here we are
-			 * done withh NDP. Except in the case of
+			 * done with NDP. Except in the case of
 			 * ILLF_XRESOLV, in which case we send an
 			 * AR_INTERFACE_UP to the external resolver.
 			 * If all goes well, the ioctl will complete
@@ -14910,7 +15191,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 					mutex_exit(&connp->conn_lock);
 					if (success) {
 						err = ipif_resolver_up(ipif,
-						    B_FALSE);
+						    Res_act_initial);
 						if (err == EINPROGRESS) {
 							freemsg(mp);
 							return;
@@ -14939,7 +15220,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			mutex_exit(&ill->ill_lock);
 			mutex_exit(&connp->conn_lock);
 			if (success) {
-				err = ipif_resolver_up(ipif, B_FALSE);
+				err = ipif_resolver_up(ipif, Res_act_initial);
 				if (err == EINPROGRESS) {
 					freemsg(mp);
 					return;
@@ -15061,13 +15342,13 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 					/*
 					 * IPv4 ARP case
 					 *
-					 * Set B_TRUE, as we only want
+					 * Set Res_act_move, as we only want
 					 * ipif_resolver_up to send an
 					 * AR_ENTRY_ADD request up to
 					 * ARP.
 					 */
 					err = ipif_resolver_up(ipif,
-					    B_TRUE);
+					    Res_act_move);
 					if (err) {
 						ip1dbg((
 						    "ip_rput_dlpi_writer: "
@@ -15204,10 +15485,11 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			phyint_t *phyint = ill->ill_phyint;
 			uint64_t new_phyint_flags;
 			boolean_t changed = B_FALSE;
+			boolean_t went_up;
 
+			went_up = notify->dl_notification == DL_NOTE_LINK_UP;
 			mutex_enter(&phyint->phyint_lock);
-			new_phyint_flags =
-			    (notify->dl_notification == DL_NOTE_LINK_UP) ?
+			new_phyint_flags = went_up ?
 			    phyint->phyint_flags | PHYI_RUNNING :
 			    phyint->phyint_flags & ~PHYI_RUNNING;
 			if (new_phyint_flags != phyint->phyint_flags) {
@@ -15216,18 +15498,12 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			}
 			mutex_exit(&phyint->phyint_lock);
 			/*
-			 * If the flags have changed, send a message to
-			 * the routing socket.
+			 * ill_restart_dad handles the DAD restart and routing
+			 * socket notification logic.
 			 */
 			if (changed) {
-				if (phyint->phyint_illv4 != NULL) {
-					ip_rts_ifmsg(
-					    phyint->phyint_illv4->ill_ipif);
-				}
-				if (phyint->phyint_illv6 != NULL) {
-					ip_rts_ifmsg(
-					    phyint->phyint_illv6->ill_ipif);
-				}
+				ill_restart_dad(phyint->phyint_illv4, went_up);
+				ill_restart_dad(phyint->phyint_illv6, went_up);
 			}
 			break;
 		}
@@ -15274,15 +15550,14 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		 */
 		break;
 	}
-	case DL_NOTIFY_ACK:
-		/*
-		 * Don't really need to check for what notifications
-		 * are supported; we'll process what gets sent upstream,
-		 * and we know it'll be something we support changing
-		 * based on our DL_NOTIFY_REQ.
-		 */
+	case DL_NOTIFY_ACK: {
+		dl_notify_ack_t *noteack = (dl_notify_ack_t *)mp->b_rptr;
+
+		if (noteack->dl_notifications & DL_NOTE_LINK_UP)
+			ill->ill_note_link = 1;
 		ill_dlpi_done(ill, DL_NOTIFY_REQ);
 		break;
+	}
 	case DL_PHYS_ADDR_ACK: {
 		/*
 		 * We should have an IOCTL waiting on this when request
@@ -16198,7 +16473,7 @@ ip_fanout_proto_again(mblk_t *ipsec_mp, ill_t *ill, ill_t *recv_ill, ire_t *ire)
 		rput_flags |= (IN6_IS_ADDR_MULTICAST(v6dstp) ?
 		    IP6_IN_LLMCAST : 0);
 		ip_rput_data_v6(ill->ill_rq, ill, ipsec_mp, ip6h, rput_flags,
-		    NULL);
+		    NULL, NULL);
 	}
 	if (ill_need_rele)
 		ill_refrele(ill);
@@ -25801,6 +26076,17 @@ nak:
 				freemsg(mp);
 			}
 			return;
+		case AR_ARP_EXTEND:
+			/*
+			 * The ARP module above us is capable of duplicate
+			 * address detection.  Old ATM drivers will not send
+			 * this message.
+			 */
+			ASSERT(q->q_next != NULL);
+			ill = (ill_t *)q->q_ptr;
+			ill->ill_arp_extend = B_TRUE;
+			freemsg(mp);
+			return;
 		default:
 			break;
 		}
@@ -27308,7 +27594,7 @@ static void
 ip_multirt_bad_mtu(ire_t *ire, uint32_t max_frag)
 {
 	hrtime_t	current = gethrtime();
-	char		buf[16];
+	char		buf[INET_ADDRSTRLEN];
 
 	/* Convert interval in ms to hrtime in ns */
 	if (multirt_bad_mtu_last_time +

@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -28,8 +27,7 @@
 LIBRARY = libinetcfg.a
 VERS    = .1
 OBJECTS = inetcfg.o \
-	  inetcfg_nic.o \
-	  inetcfg_dad.o
+	  inetcfg_nic.o
 
 include ../../Makefile.lib
 
@@ -45,11 +43,6 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
-#
-# Turn off argument list checking because inetcfg_dad.c is written using
-# libxnet and the rest is compiled to use libsocket (yikes!)
-#
-LINTFLAGS +=	-erroff=E_INCONS_ARG_DECL2 -erroff=E_INCONS_ARG_USED2
 
 .KEEP_STATE:
 

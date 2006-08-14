@@ -129,6 +129,14 @@ extern uintptr_t mdb_qwnext(const queue_t *);
 extern uintptr_t mdb_qrnext_default(const queue_t *);
 extern uintptr_t mdb_qwnext_default(const queue_t *);
 
+extern int mdb_mblk_count(const mblk_t *);
+
+/* DLPI primitive to string; returns NULL for unknown primitives */
+extern const char *mdb_dlpi_prim(int);
+
+/* Generic function for working with MAC (network layer 2) addresses. */
+extern void mdb_mac_addr(const uint8_t *, size_t, char *, size_t);
+
 /*
  * Target-specific interfaces
  *

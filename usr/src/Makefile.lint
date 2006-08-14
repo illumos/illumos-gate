@@ -72,6 +72,7 @@ COMMON_SUBDIRS = \
 	cmd/cmd-inet/usr.lib/dsvclockd \
 	cmd/cmd-inet/usr.lib/in.dhcpd \
 	cmd/cmd-inet/usr.lib/in.mpathd \
+	cmd/cmd-inet/usr.lib/in.ndpd \
 	cmd/cmd-inet/usr.lib/inetd \
 	cmd/cmd-inet/usr.lib/mipagent \
 	cmd/cmd-inet/usr.lib/pppoe \

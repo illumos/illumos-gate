@@ -379,7 +379,7 @@ extern void	ip_output_v6(void *, mblk_t *, void *, int);
 extern void	ip_xmit_v6(mblk_t *, ire_t *, uint_t, conn_t *, int,
     struct ipsec_out_s *);
 extern void	ip_rput_data_v6(queue_t *, ill_t *, mblk_t *, ip6_t *,
-    uint_t, mblk_t *);
+    uint_t, mblk_t *, mblk_t *);
 extern void	mld_input(queue_t *, mblk_t *, ill_t *);
 extern void	mld_joingroup(ilm_t *);
 extern void	mld_leavegroup(ilm_t *);

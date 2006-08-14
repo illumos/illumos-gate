@@ -28,7 +28,9 @@
 .KEEP_STATE:
 .SUFFIXES:
 
-SRCS += mdb.c \
+SRCS += \
+	ffs.c \
+	mdb.c \
 	mdb_addrvec.c \
 	mdb_argvec.c \
 	mdb_callb.c \
@@ -130,6 +132,8 @@ mdb_conf.o := CPPFLAGS += -DMDB_VERSION='$(MDB_VERSION)'
 
 inet_ntop.o := CPPFLAGS += -Dsnprintf=mdb_snprintf
 
+ffs.o ffs.ln := CPPFLAGS += -Dffs=mdb_ffs
+
 %.o: ../../../common/mdb/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
@@ -143,6 +147,10 @@ inet_ntop.o := CPPFLAGS += -Dsnprintf=mdb_snprintf
 	$(CTFCONVERT_O)
 
 %.o: $(SRC)/common/net/util/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: $(SRC)/common/util/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
@@ -166,6 +174,9 @@ clobber: clean clean.lint
 	$(LINT.c) -c $<
 
 %.ln: $(SRC)/common/net/util/%.c
+	$(LINT.c) -c $<
+
+%.ln: $(SRC)/common/util/%.c
 	$(LINT.c) -c $<
 
 lint: $(LINTFILES)

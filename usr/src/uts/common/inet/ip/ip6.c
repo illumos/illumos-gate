@@ -102,6 +102,9 @@
 
 #include <rpc/pmap_prot.h>
 
+/* Temporary; for CR 6451644 work-around */
+#include <sys/ethernet.h>
+
 extern squeue_func_t ip_input_proc;
 
 /*
@@ -326,7 +329,7 @@ struct qinit winit_ipv6 = {
  */
 static void
 icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, uint_t hdr_length,
-    boolean_t mctl_present, uint_t flags, zoneid_t zoneid)
+    boolean_t mctl_present, uint_t flags, zoneid_t zoneid, mblk_t *dl_mp)
 {
 	icmp6_t		*icmp6;
 	ip6_t		*ip6h;
@@ -603,7 +606,7 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, uint_t hdr_length,
 		if (mctl_present)
 			freeb(first_mp);
 		/* XXX may wish to pass first_mp up to ndp_input someday. */
-		ndp_input(ill, mp);
+		ndp_input(ill, mp, dl_mp);
 		return;
 
 	case ND_NEIGHBOR_ADVERT:
@@ -612,7 +615,7 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, uint_t hdr_length,
 		if (mctl_present)
 			freeb(first_mp);
 		/* XXX may wish to pass first_mp up to ndp_input someday. */
-		ndp_input(ill, mp);
+		ndp_input(ill, mp, dl_mp);
 		return;
 
 	case ND_REDIRECT: {
@@ -5910,26 +5913,6 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				}
 				goto err_ret;
 			}
-			/* Use any ipif for source */
-			for (src_ipif = dst_ill->ill_ipif; src_ipif != NULL;
-			    src_ipif = src_ipif->ipif_next) {
-				if ((src_ipif->ipif_flags & IPIF_UP) &&
-				    IN6_IS_ADDR_UNSPECIFIED(
-				    &src_ipif->ipif_v6src_addr))
-					break;
-			}
-			if (src_ipif == NULL) {
-				if (ip_debug > 2) {
-					/* ip1dbg */
-					pr_addr_dbg("ip_newroute_ipif_v6: "
-					    "no src for dst %s\n ",
-					    AF_INET6, v6dstp);
-					printf("ip_newroute_ipif_v6: if %s"
-					    "(UNSPEC_SRC)\n",
-					    dst_ill->ill_name);
-				}
-				goto err_ret;
-			}
 			src_ipif = ipif;
 			ipif_refhold(src_ipif);
 		}
@@ -6602,7 +6585,7 @@ bad_opt:
  */
 static void
 ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
-    ill_t *ill, uint_t flags, mblk_t *hada_mp)
+    ill_t *ill, uint_t flags, mblk_t *hada_mp, mblk_t *dl_mp)
 {
 	ip6_rthdr0_t *rthdr;
 	uint_t ehdrlen;
@@ -6678,7 +6661,7 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 		    B_FALSE, B_FALSE);
 		return;
 	}
-	ip_rput_data_v6(q, ill, mp, ip6h, flags, hada_mp);
+	ip_rput_data_v6(q, ill, mp, ip6h, flags, hada_mp, dl_mp);
 	return;
 hada_drop:
 	/* IPsec kstats: bean counter? */
@@ -6692,12 +6675,15 @@ hada_drop:
 static void
 ip_rput_v6(queue_t *q, mblk_t *mp)
 {
-	mblk_t		*mp1, *first_mp, *hada_mp = NULL;
+	mblk_t		*first_mp;
+	mblk_t		*hada_mp = NULL;
 	ip6_t		*ip6h;
-	boolean_t	ll_multicast = B_FALSE, mctl_present = B_FALSE;
+	boolean_t	ll_multicast = B_FALSE;
+	boolean_t	mctl_present = B_FALSE;
 	ill_t		*ill;
 	struct iocblk	*iocp;
 	uint_t 		flags = 0;
+	mblk_t		*dl_mp;
 
 	ill = (ill_t *)q->q_ptr;
 	if (ill->ill_state_flags & ILL_CONDEMNED) {
@@ -6719,9 +6705,59 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		}
 	}
 
+	dl_mp = NULL;
 	switch (mp->b_datap->db_type) {
-	case M_DATA:
+	case M_DATA: {
+		int hlen;
+		uchar_t *ucp;
+		struct ether_header *eh;
+		dl_unitdata_ind_t *dui;
+
+		/*
+		 * This is a work-around for CR 6451644, a bug in Nemo.  It
+		 * should be removed when that problem is fixed.
+		 */
+		if (ill->ill_mactype == DL_ETHER &&
+		    (hlen = MBLKHEAD(mp)) >= sizeof (struct ether_header) &&
+		    (ucp = mp->b_rptr)[-1] == (IP6_DL_SAP & 0xFF) &&
+		    ucp[-2] == (IP6_DL_SAP >> 8)) {
+			if (hlen >= sizeof (struct ether_vlan_header) &&
+			    ucp[-5] == 0 && ucp[-6] == 0x81)
+				ucp -= sizeof (struct ether_vlan_header);
+			else
+				ucp -= sizeof (struct ether_header);
+			/*
+			 * If it's a group address, then fabricate a
+			 * DL_UNITDATA_IND message.
+			 */
+			if ((ll_multicast = (ucp[0] & 1)) != 0 &&
+			    (dl_mp = allocb(DL_UNITDATA_IND_SIZE + 16,
+			    BPRI_HI)) != NULL) {
+				eh = (struct ether_header *)ucp;
+				dui = (dl_unitdata_ind_t *)dl_mp->b_rptr;
+				DB_TYPE(dl_mp) = M_PROTO;
+				dl_mp->b_wptr = (uchar_t *)(dui + 1) + 16;
+				dui->dl_primitive = DL_UNITDATA_IND;
+				dui->dl_dest_addr_length = 8;
+				dui->dl_dest_addr_offset = DL_UNITDATA_IND_SIZE;
+				dui->dl_src_addr_length = 8;
+				dui->dl_src_addr_offset = DL_UNITDATA_IND_SIZE +
+				    8;
+				dui->dl_group_address = 1;
+				ucp = (uchar_t *)(dui + 1);
+				if (ill->ill_sap_length > 0)
+					ucp += ill->ill_sap_length;
+				bcopy(&eh->ether_dhost, ucp, 6);
+				bcopy(&eh->ether_shost, ucp + 8, 6);
+				ucp = (uchar_t *)(dui + 1);
+				if (ill->ill_sap_length < 0)
+					ucp += 8 + ill->ill_sap_length;
+				bcopy(&eh->ether_type, ucp, 2);
+				bcopy(&eh->ether_type, ucp + 8, 2);
+			}
+		}
 		break;
+	}
 
 	case M_PROTO:
 	case M_PCPROTO:
@@ -6734,10 +6770,10 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 #define	dlur	((dl_unitdata_ind_t *)mp->b_rptr)
 		ll_multicast = dlur->dl_group_address;
 #undef	dlur
-		/* Ditch the DLPI header. */
-		mp1 = mp;
+		/* Save the DLPI header. */
+		dl_mp = mp;
 		mp = mp->b_cont;
-		freeb(mp1);
+		dl_mp->b_cont = NULL;
 		break;
 	case M_BREAK:
 		panic("ip_rput_v6: got an M_BREAK");
@@ -6772,7 +6808,7 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		mutex_exit(&ill->ill_lock);
 		qwriter_ip(NULL, ill, q, mp, ip_rput_other, CUR_OP, B_FALSE);
 		return;
-	case M_CTL: {
+	case M_CTL:
 		if ((MBLKL(mp) > sizeof (int)) &&
 		    ((da_ipsec_t *)mp->b_rptr)->da_type == IPHADA_M_CTL) {
 			ASSERT(MBLKL(mp) >= sizeof (da_ipsec_t));
@@ -6781,7 +6817,6 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		}
 		putnext(q, mp);
 		return;
-	}
 	case M_IOCNAK:
 		iocp = (struct iocblk *)mp->b_rptr;
 		switch (iocp->ioc_cmd) {
@@ -6824,8 +6859,8 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		mp1 = copymsg(mp);
 		freemsg(mp);
 		if (mp1 == NULL) {
-			BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
-			return;
+			first_mp = NULL;
+			goto discard;
 		}
 		mp = mp1;
 	}
@@ -6841,10 +6876,8 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 	if (!OK_32PTR((uchar_t *)ip6h) ||
 	    (mp->b_wptr - (uchar_t *)ip6h) < IPV6_HDR_LEN) {
 		if (!pullupmsg(mp, IPV6_HDR_LEN)) {
-			BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
 			ip1dbg(("ip_rput_v6: pullupmsg failed\n"));
-			freemsg(first_mp);
-			return;
+			goto discard;
 		}
 		ip6h = (ip6_t *)mp->b_rptr;
 	}
@@ -6857,31 +6890,32 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		 * TODO: Avoid this check for e.g. connected TCP sockets
 		 */
 		if (IN6_IS_ADDR_V4MAPPED(&ip6h->ip6_src)) {
-			BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
 			ip1dbg(("ip_rput_v6: pkt with mapped src addr\n"));
-			freemsg(first_mp);
-			return;
+			goto discard;
 		}
 
 		if (IN6_IS_ADDR_LOOPBACK(&ip6h->ip6_src)) {
-			BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
 			ip1dbg(("ip_rput_v6: pkt with loopback src"));
-			freemsg(first_mp);
-			return;
+			goto discard;
 		} else if (IN6_IS_ADDR_LOOPBACK(&ip6h->ip6_dst)) {
-			BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
 			ip1dbg(("ip_rput_v6: pkt with loopback dst"));
-			freemsg(first_mp);
-			return;
+			goto discard;
 		}
 
 		flags |= (ll_multicast ? IP6_IN_LLMCAST : 0);
-		ip_rput_data_v6(q, ill, mp, ip6h, flags, hada_mp);
+		ip_rput_data_v6(q, ill, mp, ip6h, flags, hada_mp, dl_mp);
 	} else {
 		BUMP_MIB(ill->ill_ip6_mib, ipv6InIPv4);
-		BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
-		freemsg(first_mp);
+		goto discard;
 	}
+	freemsg(dl_mp);
+	return;
+
+discard:
+	if (dl_mp != NULL)
+		freeb(dl_mp);
+	freemsg(first_mp);
+	BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
 }
 
 /*
@@ -7080,10 +7114,14 @@ ipsec_early_ah_v6(queue_t *q, mblk_t *first_mp, boolean_t mctl_present,
  * actually arrived on.  We need to remember this when saving the
  * input interface index into potential IPV6_PKTINFO data in
  * ip_add_info_v6().
+ *
+ * This routine doesn't free dl_mp; that's the caller's responsibility on
+ * return.  (Note that the callers are complex enough that there's no tail
+ * recursion here anyway.)
  */
 void
 ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
-    uint_t flags, mblk_t *hada_mp)
+    uint_t flags, mblk_t *hada_mp, mblk_t *dl_mp)
 {
 	ire_t		*ire = NULL;
 	queue_t		*rq;
@@ -7939,14 +7977,15 @@ tcp_fanout:
 						continue;
 					icmp_inbound_v6(q, first_mp1, ill,
 					    hdr_len, mctl_present, 0,
-					    ilm->ilm_zoneid);
+					    ilm->ilm_zoneid, dl_mp);
 				}
 				ILM_WALKER_RELE(ill);
 			} else {
 				first_mp1 = ip_copymsg(first_mp);
 				if (first_mp1 != NULL)
 					icmp_inbound_v6(q, first_mp1, ill,
-					    hdr_len, mctl_present, 0, zoneid);
+					    hdr_len, mctl_present, 0, zoneid,
+					    dl_mp);
 			}
 		}
 			/* FALLTHRU */
@@ -8181,7 +8220,7 @@ tcp_fanout:
 					return;
 				}
 				ip_process_rthdr(q, mp, ip6h, rthdr, ill,
-				    flags, hada_mp);
+				    flags, hada_mp, dl_mp);
 				return;
 			}
 			used = ehdrlen;
@@ -10253,8 +10292,7 @@ send_from_ill:
 				    &ip6h->ip6_src, ill, zoneid);
 			}
 		}
-		if (ill != NULL)
-			ill_refrele(ill);
+		ill_refrele(ill);
 		return;
 	}
 	if (need_decref) {
@@ -10284,8 +10322,7 @@ send_from_ill:
 			}
 			if (mp == NULL) {
 				BUMP_MIB(mibptr, ipv6OutDiscards);
-				if (ill != NULL)
-					ill_refrele(ill);
+				ill_refrele(ill);
 				return;
 			}
 			ip6i = (ip6i_t *)mp->b_rptr;
@@ -10333,8 +10370,7 @@ send_from_ill:
 		ip_newroute_v6(q, first_mp, v6dstp, &ip6h->ip6_src, ill,
 		    zoneid);
 	}
-	if (ill != NULL)
-		ill_refrele(ill);
+	ill_refrele(ill);
 	return;
 
 notv6:
@@ -10553,7 +10589,8 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 						continue;
 					icmp_inbound_v6(q, first_mp1, ill,
 					    hdr_length, mctl_present,
-					    IP6_NO_IPPOLICY, ilm->ilm_zoneid);
+					    IP6_NO_IPPOLICY, ilm->ilm_zoneid,
+					    NULL);
 				}
 				ILM_WALKER_RELE(ill);
 			} else {
@@ -10561,7 +10598,8 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 				if (first_mp1 != NULL)
 					icmp_inbound_v6(q, first_mp1, ill,
 					    hdr_length, mctl_present,
-					    IP6_NO_IPPOLICY, ire->ire_zoneid);
+					    IP6_NO_IPPOLICY, ire->ire_zoneid,
+					    NULL);
 			}
 		}
 		/* FALLTHRU */

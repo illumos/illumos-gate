@@ -1,5 +1,5 @@
 /*
- * Copyright 1986-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -13,6 +13,10 @@
 #define	_NETINET_ARP_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/types.h>
+#include <sys/ethernet.h>
+#include <sys/socket.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -31,6 +35,7 @@ extern "C" {
 struct	arphdr {
 	ushort_t ar_hrd;	/* format of hardware address */
 #define	ARPHRD_ETHER 	1	/* ethernet hardware address */
+#define	ARPHRD_IEEE802 	6	/* IEEE 802 hardware address */
 #define	ARPHRD_IB	32	/* IPoIB hardware address */
 	ushort_t ar_pro;	/* format of protocol address */
 	uchar_t	ar_hln;		/* length of hardware address */
@@ -53,6 +58,9 @@ struct	arphdr {
 	uchar_t	ar_tpa[];	/* target protocol address */
 #endif	/* notdef */
 };
+
+/* Maximum hardware and protocol address length */
+#define	ARP_MAX_ADDR_LEN	255
 
 /*
  * Ethernet Address Resolution Protocol.
@@ -82,12 +90,13 @@ struct arpreq {
 	struct	sockaddr arp_ha;		/* hardware address */
 	int	arp_flags;			/* flags */
 };
-/*  arp_flags and at_flags field values */
+/*  arp_flags field values */
 #define	ATF_INUSE	0x01	/* entry in use */
 #define	ATF_COM		0x02	/* completed entry (enaddr valid) */
 #define	ATF_PERM	0x04	/* permanent entry */
 #define	ATF_PUBL	0x08	/* publish entry (respond for other host) */
 #define	ATF_USETRAILERS	0x10	/* has requested trailers */
+#define	ATF_AUTHORITY	0x20	/* hardware address is authoritative */
 
 #ifdef	__cplusplus
 }

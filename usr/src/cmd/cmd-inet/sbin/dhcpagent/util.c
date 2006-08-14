@@ -33,9 +33,7 @@
 #include <netinet/dhcp.h>
 #include <signal.h>
 #include <sys/dlpi.h>
-#include <sys/sockio.h>
 #include <sys/socket.h>
-#include <errno.h>
 #include <net/route.h>
 #include <net/if_arp.h>
 #include <string.h>
@@ -50,7 +48,6 @@
 #include "interface.h"
 #include "util.h"
 #include "packet.h"
-#include "defaults.h"
 
 /*
  * this file contains utility functions that have no real better home
@@ -395,7 +392,6 @@ static int
 update_default_route(const char *ifname, int type, struct in_addr *gateway_nbo,
     int flags)
 {
-	static int rtsock_fd = -1;
 	struct {
 		struct rt_msghdr	rm_mh;
 		struct sockaddr_in	rm_dst;
@@ -403,15 +399,6 @@ update_default_route(const char *ifname, int type, struct in_addr *gateway_nbo,
 		struct sockaddr_in	rm_mask;
 		struct sockaddr_dl	rm_ifp;
 	} rtmsg;
-
-	if (rtsock_fd == -1) {
-		rtsock_fd = socket(PF_ROUTE, SOCK_RAW, 0);
-		if (rtsock_fd == -1) {
-			dhcpmsg(MSG_ERR, "update_default_route: "
-			    "cannot create routing socket");
-			return (0);
-		}
-	}
 
 	(void) memset(&rtmsg, 0, sizeof (rtmsg));
 	rtmsg.rm_mh.rtm_version = RTM_VERSION;

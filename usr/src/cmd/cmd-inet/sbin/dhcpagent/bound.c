@@ -39,10 +39,7 @@
 #include <sys/sysmacros.h>
 #include <dhcp_hostconf.h>
 #include <dhcpmsg.h>
-#include <stdio.h>			/* snprintf */
 
-#include "defaults.h"
-#include "arp_check.h"
 #include "states.h"
 #include "packet.h"
 #include "util.h"
@@ -53,6 +50,7 @@
 #define	IS_DHCP(plp)	((plp)->opts[CD_DHCP_TYPE] != NULL)
 
 static int	configure_if(struct ifslist *);
+static int	configure_bound(struct ifslist *);
 static int	configure_timers(struct ifslist *);
 
 /*
@@ -122,15 +120,26 @@ dhcp_bound(struct ifslist *ifsp, PKT_LIST *ack)
 		(void) memcpy(ifsp->if_ack->opts[CD_LEASE_TIME]->value,
 		    &new_lease, sizeof (lease_t));
 
+		if (configure_bound(ifsp) == 0)
+			return (0);
+
 		/*
 		 * we have no idea when the REQUEST that generated
 		 * this ACK was sent, but for diagnostic purposes
 		 * we'll assume its close to the current time.
 		 */
-
 		ifsp->if_newstart_monosec = monosec();
 
-		/* FALLTHRU into REQUESTING/INIT_REBOOT */
+		if (configure_timers(ifsp) == 0)
+			return (0);
+
+		/*
+		 * if the state is ADOPTING, event loop has not been started
+		 * at this time; so don't run the EVENT_BOUND script.
+		 */
+		ifsp->if_curstart_monosec = ifsp->if_newstart_monosec;
+		ifsp->if_state = BOUND;
+		break;
 
 	case REQUESTING:
 	case INIT_REBOOT:
@@ -142,21 +151,19 @@ dhcp_bound(struct ifslist *ifsp, PKT_LIST *ack)
 			return (0);
 
 		/*
-		 * if the state is ADOPTING, event loop has not been started
-		 * at this time, so don't run the script.
+		 * We will continue configuring this interface via
+		 * dhcp_bound_complete, once kernel DAD completes.
 		 */
-
-		if (ifsp->if_state != ADOPTING) {
-			(void) script_start(ifsp, EVENT_BOUND, bound_event_cb,
-				NULL, NULL);
-		}
-
+		ifsp->if_state = PRE_BOUND;
 		break;
+
+	case PRE_BOUND:
+		/* This is just a duplicate ack; silently ignore it */
+		return (1);
 
 	case RENEWING:
 	case REBINDING:
 	case BOUND:
-
 		cur_lease = ifsp->if_lease;
 		if (configure_timers(ifsp) == 0)
 			return (0);
@@ -192,6 +199,8 @@ dhcp_bound(struct ifslist *ifsp, PKT_LIST *ack)
 		(void) script_start(ifsp, EVENT_EXTEND, bound_event_cb,
 		    NULL, NULL);
 
+		ifsp->if_state = BOUND;
+		ifsp->if_curstart_monosec = ifsp->if_newstart_monosec;
 		break;
 
 	case INFORM_SENT:
@@ -206,11 +215,6 @@ dhcp_bound(struct ifslist *ifsp, PKT_LIST *ack)
 		return (0);
 	}
 
-	if (ifsp->if_state != INFORMATION) {
-		ifsp->if_state = BOUND;
-		ifsp->if_curstart_monosec = ifsp->if_newstart_monosec;
-	}
-
 	/*
 	 * remove any stale hostconf file that might be lying around for
 	 * this interface. (in general, it's harmless, since we'll write a
@@ -222,13 +226,32 @@ dhcp_bound(struct ifslist *ifsp, PKT_LIST *ack)
 }
 
 /*
+ * dhcp_bound_complete(): complete interface configuration after DAD
+ *
+ *   input: struct ifslist *: the interface to configure
+ *  output: none
+ */
+
+void
+dhcp_bound_complete(struct ifslist *ifsp)
+{
+	if (configure_bound(ifsp) == 0)
+		return;
+
+	(void) script_start(ifsp, EVENT_BOUND, bound_event_cb, NULL, NULL);
+
+	ifsp->if_state = BOUND;
+	ifsp->if_curstart_monosec = ifsp->if_newstart_monosec;
+}
+
+/*
  * configure_timers(): configures the lease timers on an interface
  *
  *   input: struct ifslist *: the interface to configure (with a valid if_ack)
  *  output: int: 1 on success, 0 on failure
  */
 
-int
+static int
 configure_timers(struct ifslist *ifsp)
 {
 	lease_t		lease, t1, t2;
@@ -313,10 +336,6 @@ configure_if(struct ifslist *ifsp)
 	struct ifreq		ifr;
 	struct sockaddr_in	*sin;
 	PKT_LIST		*ack = ifsp->if_ack;
-	DHCP_OPT		*router_list;
-	uchar_t			*target_hwaddr;
-	int			i;
-	char			in_use[256] = "IP address already in use by";
 
 	/*
 	 * if we're using DHCP, then we'll have a valid CD_SERVER_ID
@@ -330,27 +349,6 @@ configure_if(struct ifslist *ifsp)
 	if (ifsp->if_ack->opts[CD_DHCP_TYPE] != NULL)
 		(void) memcpy(&ifsp->if_server.s_addr,
 		    ack->opts[CD_SERVER_ID]->value, sizeof (ipaddr_t));
-
-	/* no big deal if this fails; we'll just have less diagnostics */
-	target_hwaddr = malloc(ifsp->if_hwlen);
-
-	if (arp_check(ifsp, 0, ack->pkt->yiaddr.s_addr, target_hwaddr,
-	    ifsp->if_hwlen, df_get_int(ifsp->if_name, DF_ARP_WAIT)) == 1) {
-
-		for (i = 0; i < ifsp->if_hwlen; i++)
-			(void) snprintf(in_use, sizeof (in_use), "%s %02x",
-			    in_use, target_hwaddr[i]);
-
-		dhcpmsg(MSG_ERROR, in_use);
-
-		if (ifsp->if_ack->opts[CD_DHCP_TYPE] != NULL)
-			send_decline(ifsp, in_use, &ack->pkt->yiaddr);
-
-		ifsp->if_bad_offers++;
-		free(target_hwaddr);
-		return (0);
-	}
-	free(target_hwaddr);
 
 	ifsp->if_addr.s_addr = ack->pkt->yiaddr.s_addr;
 	if (ifsp->if_addr.s_addr == htonl(INADDR_ANY)) {
@@ -498,6 +496,24 @@ configure_if(struct ifslist *ifsp)
 	ifsp->if_broadcast = sin->sin_addr;
 	dhcpmsg(MSG_INFO, "using broadcast address %s on %s",
 	    inet_ntoa(ifsp->if_broadcast), ifsp->if_name);
+	return (1);
+}
+
+/*
+ * configure_bound(): configures routing with DHCP parameters from an ACK,
+ *		      and sets up the if_sock_ip_fd socket used for lease
+ *		      renewal.
+ *
+ *   input: struct ifslist *: the interface to configure (with a valid if_ack)
+ *  output: int: 1 on success, 0 on failure
+ */
+
+static int
+configure_bound(struct ifslist *ifsp)
+{
+	PKT_LIST		*ack = ifsp->if_ack;
+	DHCP_OPT		*router_list;
+	int			i;
 
 	/*
 	 * add each provided router; we'll clean them up when the
@@ -510,7 +526,7 @@ configure_if(struct ifslist *ifsp)
 		ifsp->if_nrouters = router_list->len / sizeof (ipaddr_t);
 		ifsp->if_routers  = malloc(router_list->len);
 		if (ifsp->if_routers == NULL) {
-			dhcpmsg(MSG_ERR, "configure_if: cannot allocate "
+			dhcpmsg(MSG_ERR, "configure_bound: cannot allocate "
 			    "default router list, ignoring default routers");
 			ifsp->if_nrouters = 0;
 		}
@@ -523,7 +539,7 @@ configure_if(struct ifslist *ifsp)
 
 			if (add_default_route(ifsp->if_name,
 			    &ifsp->if_routers[i]) == 0) {
-				dhcpmsg(MSG_ERR, "configure_if: cannot add "
+				dhcpmsg(MSG_ERR, "configure_bound: cannot add "
 				    "default router %s on %s", inet_ntoa(
 				    ifsp->if_routers[i]), ifsp->if_name);
 				ifsp->if_routers[i].s_addr = htonl(INADDR_ANY);
@@ -537,14 +553,14 @@ configure_if(struct ifslist *ifsp)
 
 	ifsp->if_sock_ip_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (ifsp->if_sock_ip_fd == -1) {
-		dhcpmsg(MSG_ERR, "configure_if: cannot create socket on %s",
+		dhcpmsg(MSG_ERR, "configure_bound: cannot create socket on %s",
 		    ifsp->if_name);
 		return (0);
 	}
 
 	if (bind_sock(ifsp->if_sock_ip_fd, IPPORT_BOOTPC,
 	    ntohl(ifsp->if_addr.s_addr)) == 0) {
-		dhcpmsg(MSG_ERR, "configure_if: cannot bind socket on %s",
+		dhcpmsg(MSG_ERR, "configure_bound: cannot bind socket on %s",
 		    ifsp->if_name);
 		return (0);
 	}
@@ -558,8 +574,8 @@ configure_if(struct ifslist *ifsp)
 	 */
 
 	if (bind_sock(ifsp->if_sock_fd, IPPORT_BOOTPC, INADDR_BROADCAST) == 0) {
-		dhcpmsg(MSG_ERR, "configure_if: cannot bind broadcast socket "
-		    "on %s", ifsp->if_name);
+		dhcpmsg(MSG_ERR, "configure_bound: cannot bind broadcast "
+		    "socket on %s", ifsp->if_name);
 		return (0);
 	}
 
@@ -573,6 +589,6 @@ configure_if(struct ifslist *ifsp)
 	if (ack->opts[CD_DHCP_TYPE] == NULL)
 		ifsp->if_dflags	|= DHCP_IF_BOOTP;
 
-	dhcpmsg(MSG_DEBUG, "configure_if: bound ifsp->if_sock_ip_fd");
+	dhcpmsg(MSG_DEBUG, "configure_bound: bound ifsp->if_sock_ip_fd");
 	return (1);
 }

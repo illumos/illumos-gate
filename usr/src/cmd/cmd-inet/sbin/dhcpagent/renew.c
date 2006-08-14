@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,7 +203,7 @@ dhcp_rebind(iu_tq_t *tqp, void *arg)
 }
 
 /*
- * dhcp_restart(): callback function to script_start
+ * dhcp_restart_lease(): callback function to script_start
  *
  *   input: struct ifslist *: the interface to be restarted
  *	    const char *: unused
@@ -213,7 +212,7 @@ dhcp_rebind(iu_tq_t *tqp, void *arg)
 
 /* ARGSUSED */
 static int
-dhcp_restart(struct ifslist *ifsp, const char *msg)
+dhcp_restart_lease(struct ifslist *ifsp, const char *msg)
 {
 	dhcpmsg(MSG_INFO, "lease expired on %s -- restarting DHCP",
 	    ifsp->if_name);
@@ -292,7 +291,7 @@ dhcp_expire(iu_tq_t *tqp, void *arg)
 		dhcpmsg(MSG_WARNING, "dhcp_expire: cannot start asynchronous "
 		    "transaction on %s, continuing...", ifsp->if_name);
 
-	(void) script_start(ifsp, EVENT_EXPIRE, dhcp_restart, NULL, NULL);
+	(void) script_start(ifsp, EVENT_EXPIRE, dhcp_restart_lease, NULL, NULL);
 }
 
 /*

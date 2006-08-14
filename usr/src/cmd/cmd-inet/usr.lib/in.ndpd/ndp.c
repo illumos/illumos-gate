@@ -702,7 +702,7 @@ incoming_prefix_addrconf_process(struct phyint *pi, struct prefix *pr,
 	char pbuf[INET6_ADDRSTRLEN];
 	uint32_t validtime, preftime;	/* In seconds */
 	uint32_t recorded_validtime;	/* In seconds */
-	int plen, dadfails = 0;
+	int plen;
 	struct prefix *other_pr;
 
 	validtime = ntohl(po->nd_opt_pi_valid_time);
@@ -825,7 +825,6 @@ incoming_prefix_addrconf_process(struct phyint *pi, struct prefix *pr,
 		 * Form a new local address if the lengths match.
 		 */
 		if (pr->pr_flags && IFF_TEMPORARY) {
-RETRY_TOKEN:
 			if (IN6_IS_ADDR_UNSPECIFIED(&pi->pi_tmp_token)) {
 				if (!tmptoken_create(pi)) {
 					prefix_delete(pr);
@@ -885,29 +884,6 @@ RETRY_TOKEN:
 			validtime = preftime = 0;
 		}
 		if ((pr->pr_flags & IFF_TEMPORARY) && new_prefix) {
-			struct sockaddr_in6 sin6;
-			sin6.sin6_family = AF_INET6;
-			sin6.sin6_addr = pr->pr_address;
-			if (do_dad(pi->pi_name, &sin6) != 0) {
-				/* DAD failed, need a new token */
-				dadfails++;
-				logmsg(LOG_WARNING,
-				    "incoming_prefix_addrconf_process: "
-				    "deprecating temporary token %s\n",
-				    inet_ntop(AF_INET6,
-				    (void *)&pi->pi_tmp_token, abuf,
-				    sizeof (abuf)));
-				tmptoken_delete(pi);
-				if (dadfails == MAX_DAD_FAILURES) {
-					logmsg(LOG_ERR, "Too many DAD "
-					    "failures; disabling temporary "
-					    "addresses on %s\n", pi->pi_name);
-					pi->pi_TmpAddrsEnabled = 0;
-					prefix_delete(pr);
-					return (_B_TRUE);
-				}
-				goto RETRY_TOKEN;
-			}
 			pr->pr_CreateTime = getcurrenttime() / MILLISEC;
 			if (debug & D_TMP)
 				logmsg(LOG_DEBUG,

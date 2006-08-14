@@ -73,7 +73,6 @@
 #include <net/if.h>
 #include <net/route.h>
 
-#include <inet/common.h>
 #include <inet/mib2.h>
 #include <inet/ip.h>
 #include <inet/arp.h>
@@ -3588,17 +3587,21 @@ arp_report(mib_item_t *item)
 				(void) puts(v4compat ?
 				    "Net to Media Table" :
 				    "Net to Media Table: IPv4");
-				(void) fputs("Device   "
-				    "IP Address               Mask      ",
-				    stdout);
-				(void) puts("Flags   Phys Addr ");
-				(void) puts("------ -------------------- "
-				    "--------------- ----- ---------------");
+				(void) puts("Device "
+				    "  IP Address               Mask      "
+				    "Flags      Phys Addr");
+				(void) puts("------ "
+				    "-------------------- --------------- "
+				    "-------- ---------------");
 				first = B_FALSE;
 			}
 
 			flbuf[0] = '\0';
 			flags = np->ipNetToMediaInfo.ntm_flags;
+			/*
+			 * Note that not all flags are possible at the same
+			 * time.  Patterns: SPLAy DUo
+			 */
 			if (flags & ACE_F_PERMANENT)
 				(void) strcat(flbuf, "S");
 			if (flags & ACE_F_PUBLISH)
@@ -3609,7 +3612,17 @@ arp_report(mib_item_t *item)
 				(void) strcat(flbuf, "U");
 			if (flags & ACE_F_MAPPING)
 				(void) strcat(flbuf, "M");
-			(void) printf("%-6s %-20s %-15s %-5s %s\n",
+			if (flags & ACE_F_MYADDR)
+				(void) strcat(flbuf, "L");
+			if (flags & ACE_F_UNVERIFIED)
+				(void) strcat(flbuf, "d");
+			if (flags & ACE_F_AUTHORITY)
+				(void) strcat(flbuf, "A");
+			if (flags & ACE_F_OLD)
+				(void) strcat(flbuf, "o");
+			if (flags & ACE_F_DELAYED)
+				(void) strcat(flbuf, "y");
+			(void) printf("%-6s %-20s %-15s %-8s %s\n",
 			    octetstr(&np->ipNetToMediaIfIndex, 'a',
 			    ifname, sizeof (ifname)),
 			    pr_addr(np->ipNetToMediaNetAddress,

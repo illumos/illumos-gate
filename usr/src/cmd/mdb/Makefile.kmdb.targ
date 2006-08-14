@@ -134,6 +134,10 @@ kmdb_modlinktest.c: $(MAPFILE_INTERMEDIATE)
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
+%.o: $(SRC)/common/util/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
 #
 # Lint
 #
@@ -175,4 +179,7 @@ kmdb_modlinktest.c: $(MAPFILE_INTERMEDIATE)
 	$(LINT.s) -c $<
 
 %.ln: $(SRC)/common/net/util/%.c
+	$(LINT.c) -c $<
+
+%.ln: $(SRC)/common/util/%.c
 	$(LINT.c) -c $<

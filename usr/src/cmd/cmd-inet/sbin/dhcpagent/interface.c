@@ -191,6 +191,16 @@ insert_ifs(const char *if_name, boolean_t is_adopting, int *error)
 	/* step 6 */
 	(void) strlcpy(ifr.ifr_name, if_name, IFNAMSIZ);
 
+	if (ioctl(ifsp->if_sock_fd, SIOCGIFINDEX, &ifr) == -1) {
+		if (errno == ENXIO)
+			*error = DHCP_IPC_E_INVIF;
+		else
+			*error = DHCP_IPC_E_INT;
+		dhcpmsg(MSG_ERR, "insert_ifs: SIOCGIFINDEX for %s", if_name);
+		goto failure;
+	}
+	ifsp->if_index = ifr.ifr_index;
+
 	if (ioctl(ifsp->if_sock_fd, SIOCGIFFLAGS, &ifr) == -1) {
 		if (errno == ENXIO)
 			*error = DHCP_IPC_E_INVIF;
@@ -564,6 +574,36 @@ lookup_ifs_by_xid(uint32_t xid)
 }
 
 /*
+ * lookup_ifs_by_uindex(): Looks up ifs entries given truncated index and
+ *			   previous ifs pointer (or NULL for list start).
+ *			   Caller is expected to iterate through all
+ *			   potential matches to find interface of interest.
+ *
+ *   input: int: the interface index
+ *	    struct ifslist *: the previous ifs, or NULL for list start
+ *  output: struct ifslist *: the next matching ifs, or NULL if not found
+ *    note: This operates using the 'truncated' (16-bit) ifindex as seen by
+ *	    routing socket clients.  The value stored in if_index is the
+ *	    32-bit ifindex from the ioctl interface.
+ */
+
+struct ifslist *
+lookup_ifs_by_uindex(uint16_t ifindex, struct ifslist *ifs)
+{
+	if (ifs == NULL)
+		ifs = ifsheadp;
+	else
+		ifs = ifs->next;
+
+	for (; ifs != NULL; ifs = ifs->next) {
+		if ((ifs->if_index & 0xffff) == ifindex)
+			break;
+	}
+
+	return (ifs);
+}
+
+/*
  * remove_ifs(): removes a given ifs from the ifslist.  marks the ifs
  *		 for being freed (but may not actually free it).
  *
@@ -765,6 +805,16 @@ verify_ifs(struct ifslist *ifsp)
 		case 0:
 			if ((ifr.ifr_flags & (IFF_UP|IFF_DHCPRUNNING)) !=
 			    (IFF_UP|IFF_DHCPRUNNING))
+				goto abandon;
+			break;
+		case -1:
+			if (errno == ENXIO)
+				goto abandon;
+			break;
+		}
+		switch (ioctl(ifsp->if_sock_fd, SIOCGIFINDEX, &ifr)) {
+		case 0:
+			if (ifr.ifr_index != ifsp->if_index)
 				goto abandon;
 			break;
 		case -1:

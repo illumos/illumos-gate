@@ -53,6 +53,7 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/refstr_impl.h>
 #include <sys/cpuvar.h>
+#include <sys/dlpi.h>
 #include <errno.h>
 
 #include <vm/seg_vn.h>
@@ -1483,4 +1484,106 @@ mdb_read_refstr(uintptr_t refstr_addr, char *str, size_t nbytes)
 	struct refstr *r = (struct refstr *)refstr_addr;
 
 	return (mdb_readstr(str, nbytes, (uintptr_t)r->rs_string));
+}
+
+/*
+ * Chase an mblk list by b_next and return the length.
+ */
+int
+mdb_mblk_count(const mblk_t *mb)
+{
+	int count;
+	mblk_t mblk;
+
+	if (mb == NULL)
+		return (0);
+
+	count = 1;
+	while (mb->b_next != NULL) {
+		count++;
+		if (mdb_vread(&mblk, sizeof (mblk), (uintptr_t)mb->b_next) ==
+		    -1)
+			break;
+		mb = &mblk;
+	}
+	return (count);
+}
+
+/*
+ * Write the given MAC address as a printable string in the usual colon-
+ * separated format.  Assumes that buflen is at least 2.
+ */
+void
+mdb_mac_addr(const uint8_t *addr, size_t alen, char *buf, size_t buflen)
+{
+	int slen;
+
+	if (alen == 0 || buflen < 4) {
+		(void) strcpy(buf, "?");
+		return;
+	}
+	for (;;) {
+		/*
+		 * If there are more MAC address bytes available, but we won't
+		 * have any room to print them, then add "..." to the string
+		 * instead.  See below for the 'magic number' explanation.
+		 */
+		if ((alen == 2 && buflen < 6) || (alen > 2 && buflen < 7)) {
+			(void) strcpy(buf, "...");
+			break;
+		}
+		slen = mdb_snprintf(buf, buflen, "%02x", *addr++);
+		buf += slen;
+		if (--alen == 0)
+			break;
+		*buf++ = ':';
+		buflen -= slen + 1;
+		/*
+		 * At this point, based on the first 'if' statement above,
+		 * either alen == 1 and buflen >= 3, or alen > 1 and
+		 * buflen >= 4.  The first case leaves room for the final "xx"
+		 * number and trailing NUL byte.  The second leaves room for at
+		 * least "...".  Thus the apparently 'magic' numbers chosen for
+		 * that statement.
+		 */
+	}
+}
+
+/*
+ * Produce a string that represents a DLPI primitive, or NULL if no such string
+ * is possible.
+ */
+const char *
+mdb_dlpi_prim(int prim)
+{
+	switch (prim) {
+	case DL_INFO_REQ:	return ("DL_INFO_REQ");
+	case DL_INFO_ACK:	return ("DL_INFO_ACK");
+	case DL_ATTACH_REQ:	return ("DL_ATTACH_REQ");
+	case DL_DETACH_REQ:	return ("DL_DETACH_REQ");
+	case DL_BIND_REQ:	return ("DL_BIND_REQ");
+	case DL_BIND_ACK:	return ("DL_BIND_ACK");
+	case DL_UNBIND_REQ:	return ("DL_UNBIND_REQ");
+	case DL_OK_ACK:		return ("DL_OK_ACK");
+	case DL_ERROR_ACK:	return ("DL_ERROR_ACK");
+	case DL_ENABMULTI_REQ:	return ("DL_ENABMULTI_REQ");
+	case DL_DISABMULTI_REQ:	return ("DL_DISABMULTI_REQ");
+	case DL_PROMISCON_REQ:	return ("DL_PROMISCON_REQ");
+	case DL_PROMISCOFF_REQ:	return ("DL_PROMISCOFF_REQ");
+	case DL_UNITDATA_REQ:	return ("DL_UNITDATA_REQ");
+	case DL_UNITDATA_IND:	return ("DL_UNITDATA_IND");
+	case DL_UDERROR_IND:	return ("DL_UDERROR_IND");
+	case DL_PHYS_ADDR_REQ:	return ("DL_PHYS_ADDR_REQ");
+	case DL_PHYS_ADDR_ACK:	return ("DL_PHYS_ADDR_ACK");
+	case DL_SET_PHYS_ADDR_REQ:	return ("DL_SET_PHYS_ADDR_REQ");
+	case DL_NOTIFY_REQ:	return ("DL_NOTIFY_REQ");
+	case DL_NOTIFY_ACK:	return ("DL_NOTIFY_ACK");
+	case DL_NOTIFY_IND:	return ("DL_NOTIFY_IND");
+	case DL_CAPABILITY_REQ:	return ("DL_CAPABILITY_REQ");
+	case DL_CAPABILITY_ACK:	return ("DL_CAPABILITY_ACK");
+	case DL_CONTROL_REQ:	return ("DL_CONTROL_REQ");
+	case DL_CONTROL_ACK:	return ("DL_CONTROL_ACK");
+	case DL_PASSIVE_REQ:	return ("DL_PASSIVE_REQ");
+	default:		return (NULL);
+	}
 }

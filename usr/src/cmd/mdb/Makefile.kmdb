@@ -117,6 +117,8 @@ $(VERSTGTS) := CPPFLAGS += -DKMDB_VERSION='$(KMDB_VERSION)'
 $(KCTLTGTS) := CPPFLAGS += -D_KERNEL
 $(KCTLTGTS) := ASFLAGS += -D_KERNEL
 
+ffs.o ffs.ln := CPPFLAGS += -Dffs=mdb_ffs
+
 INS.dir.root.sys=	$(INS) -s -d -m $(DIRMODE) $@
 $(CH)INS.dir.root.sys=	$(INS) -s -d -m $(DIRMODE) -u root -g sys $@
 

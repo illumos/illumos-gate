@@ -163,6 +163,7 @@ struct ifnet {
 #define	IFF_FIXEDMTU	0x1000000000ll	/* MTU manually set with SIOCSLIFMTU */
 
 #define	IFF_VIRTUAL	0x2000000000ll	/* Does not send or receive packets */
+#define	IFF_DUPLICATE	0x4000000000ll	/* Local address already in use */
 
 /*
  * The IFF_MULTICAST flag indicates that the network can support the
@@ -177,7 +178,7 @@ struct ifnet {
 	(IFF_BROADCAST | IFF_POINTOPOINT | IFF_RUNNING | IFF_PROMISC | \
 	IFF_MULTICAST | IFF_MULTI_BCAST | IFF_UNNUMBERED | IFF_IPV4 | \
 	IFF_IPV6 | IFF_INACTIVE | IFF_FIXEDMTU | IFF_VIRTUAL | \
-	IFF_LOOPBACK | IFF_ALLMULTI)
+	IFF_LOOPBACK | IFF_ALLMULTI | IFF_DUPLICATE)
 
 /*
  * Output queues (ifp->if_snd) and internetwork datagram level (pup level 1)

@@ -36,6 +36,10 @@ extern "C" {
 
 #include <sys/types.h>
 #include <sys/stream.h>
+#include <net/if.h>
+
+/* ARP kernel hash size; used for mdb support */
+#define	ARP_HASH_SIZE	256
 
 /* ARL Structure, one per link level device */
 typedef struct arl_s {
@@ -43,7 +47,6 @@ typedef struct arl_s {
 	queue_t		*arl_rq;		/* Read queue pointer */
 	queue_t		*arl_wq;		/* Write queue pointer */
 	t_uscalar_t	arl_ppa;		/* DL_ATTACH parameter */
-	t_scalar_t	arl_mac_sap;
 	uchar_t		*arl_arp_addr;		/* multicast address to use */
 	uchar_t		*arl_hw_addr;		/* Our hardware address */
 	uint32_t	arl_hw_addr_length;
@@ -56,8 +59,6 @@ typedef struct arl_s {
 	mblk_t		*arl_unbind_mp;
 	mblk_t		*arl_detach_mp;
 	t_uscalar_t	arl_provider_style;	/* From DL_INFO_ACK */
-	mblk_t		*arl_dlpiop_done;	/* DLPI opertion done */
-	queue_t		*arl_ip_pending_queue;	/* Pending queue */
 	mblk_t		*arl_queue;		/* Queued commands head */
 	mblk_t		*arl_queue_tail;	/* Queued commands tail */
 	uint32_t	arl_flags;	/* Used for IFF_NOARP */
@@ -65,7 +66,12 @@ typedef struct arl_s {
 	mblk_t		*arl_dlpi_deferred;	/* Deferred DLPI messages */
 	uint_t		arl_state;		/* lower interface state */
 	char		*arl_data;		/* address data pointer */
-	uint32_t	arl_closing : 1;
+	clock_t		arl_defend_start;	/* start of 1-hour period */
+	uint_t		arl_defend_count;	/* # of unbidden broadcasts */
+	uint_t
+			arl_closing : 1,	/* stream is closing */
+			arl_notifies : 1,	/* handles DL_NOTE_LINK */
+			arl_link_up : 1;	/* DL_NOTE status */
 } arl_t;
 
 #define	ARL_F_NOARP	0x01
@@ -81,8 +87,31 @@ typedef struct ar_s {
 	arl_t		*ar_arl;	/* Associated arl */
 	cred_t		*ar_credp;	/* Credentials associated w/ open */
 	struct ar_s	*ar_arl_ip_assoc;	/* ARL - IP association */
-	uint32_t	ar_ip_acked_close : 1;	/* IP has acked the close */
+	uint32_t
+			ar_ip_acked_close : 1,	/* IP has acked the close */
+			ar_on_ill_stream : 1;	/* Module below is IP */
 } ar_t;
+
+/* ARP Cache Entry */
+typedef struct ace_s {
+	struct ace_s	*ace_next;	/* Hash chain next pointer */
+	struct ace_s	**ace_ptpn;	/* Pointer to previous next */
+	struct arl_s	*ace_arl;	/* Associated arl */
+	uint32_t	ace_proto;	/* Protocol for this ace */
+	uint32_t	ace_flags;
+	uchar_t		*ace_proto_addr;
+	uint32_t	ace_proto_addr_length;
+	uchar_t		*ace_proto_mask; /* Mask for matching addr */
+	uchar_t		*ace_proto_extract_mask; /* For mappings */
+	uchar_t		*ace_hw_addr;
+	uint32_t	ace_hw_addr_length;
+	uint32_t	ace_hw_extract_start;	/* For mappings */
+	mblk_t		*ace_mp;		/* mblk we are in */
+	mblk_t		*ace_query_mp;		/* outstanding query chain */
+	clock_t		ace_last_bcast;		/* last broadcast Response */
+	clock_t		ace_xmit_interval;
+	int		ace_xmit_count;
+} ace_t;
 
 #endif	/* _KERNEL */
 

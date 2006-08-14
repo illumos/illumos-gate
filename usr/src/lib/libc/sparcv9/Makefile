@@ -112,6 +112,7 @@ COMOBJS=			\
 	bcopy.o			\
 	bsearch.o		\
 	bzero.o			\
+	ffs.o			\
 	memccpy.o		\
 	qsort.o			\
 	strtol.o		\
@@ -405,7 +406,6 @@ PORTGEN=			\
 	fattach.o		\
 	fdetach.o		\
 	fdopendir.o		\
-	ffs.o			\
 	fmtmsg.o		\
 	ftime.o			\
 	ftok.o			\

@@ -131,6 +131,7 @@ GENUNIX_OBJS +=	\
 		fdbuffer.o	\
 		fdsync.o	\
 		fem.o		\
+		ffs.o		\
 		fio.o		\
 		flock.o		\
 		fm.o		\

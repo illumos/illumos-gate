@@ -50,7 +50,7 @@ extern "C" {
  * timer id of the global inactivity timer, which shuts down the agent
  * if there are no interfaces to manage for DHCP_INACTIVITY_WAIT
  * seconds. `grandparent' is the pid of the original process when in
- * adopt mode.
+ * adopt mode.  `rtsock_fd' is the global routing socket file descriptor.
  */
 
 extern iu_tq_t		*tq;
@@ -59,6 +59,7 @@ extern char		*class_id;
 extern int		class_id_len;
 extern iu_timer_id_t	inactivity_id;
 extern pid_t		grandparent;
+extern int		rtsock_fd;
 
 boolean_t	drain_script(iu_eh_t *, void *);
 

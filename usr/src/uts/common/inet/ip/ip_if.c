@@ -157,10 +157,8 @@ static void	ipif_check_bcast_ires(ipif_t *test_ipif);
 static void	ipif_down_delete_ire(ire_t *ire, char *ipif);
 static void	ipif_delete_cache_ire(ire_t *, char *);
 static int	ipif_logical_down(ipif_t *ipif, queue_t *q, mblk_t *mp);
-static void	ipif_down_tail(ipif_t *ipif);
 static void	ipif_free(ipif_t *ipif);
 static void	ipif_free_tail(ipif_t *ipif);
-static void	ipif_mask_reply(ipif_t *);
 static void	ipif_mtu_change(ire_t *ire, char *ipif_arg);
 static void	ipif_multicast_down(ipif_t *ipif);
 static void	ipif_recreate_interface_routes(ipif_t *old_ipif, ipif_t *ipif);
@@ -180,6 +178,7 @@ static int	ill_arp_off(ill_t *ill);
 static int	ill_arp_on(ill_t *ill);
 static void	ill_delete_interface_type(ill_if_t *);
 static int	ill_dl_up(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q);
+static void	ill_dl_down(ill_t *ill);
 static void	ill_down(ill_t *ill);
 static void	ill_downi(ire_t *ire, char *ill_arg);
 static void	ill_downi_mrtun_srcif(ire_t *ire, char *ill_arg);
@@ -671,6 +670,20 @@ ill_arp_alloc(ill_t *ill, uchar_t *template, caddr_t addr)
 	return (mp);
 }
 
+mblk_t *
+ipif_area_alloc(ipif_t *ipif)
+{
+	return (ill_arp_alloc(ipif->ipif_ill, (uchar_t *)&ip_area_template,
+	    (char *)&ipif->ipif_lcl_addr));
+}
+
+mblk_t *
+ipif_ared_alloc(ipif_t *ipif)
+{
+	return (ill_arp_alloc(ipif->ipif_ill, (uchar_t *)&ip_ared_template,
+	    (char *)&ipif->ipif_lcl_addr));
+}
+
 /*
  * Completely vaporize a lower level tap and all associated interfaces.
  * ill_delete is called only out of ip_close when the device control
@@ -751,6 +764,19 @@ ill_delete(ill_t *ill)
 	rw_exit(&ill_g_usesrc_lock);
 }
 
+static void
+ipif_non_duplicate(ipif_t *ipif)
+{
+	ill_t *ill = ipif->ipif_ill;
+	mutex_enter(&ill->ill_lock);
+	if (ipif->ipif_flags & IPIF_DUPLICATE) {
+		ipif->ipif_flags &= ~IPIF_DUPLICATE;
+		ASSERT(ill->ill_ipif_dup_count > 0);
+		ill->ill_ipif_dup_count--;
+	}
+	mutex_exit(&ill->ill_lock);
+}
+
 /*
  * ill_delete_tail is called from ip_modclose after all references
  * to the closing ill are gone. The wait is done in ip_modclose
@@ -761,8 +787,14 @@ ill_delete_tail(ill_t *ill)
 	mblk_t	**mpp;
 	ipif_t	*ipif;
 
-	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next)
+	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
+		ipif_non_duplicate(ipif);
 		ipif_down_tail(ipif);
+	}
+
+	ASSERT(ill->ill_ipif_dup_count == 0 &&
+	    ill->ill_arp_down_mp == NULL &&
+	    ill->ill_arp_del_mapping_mp == NULL);
 
 	/*
 	 * If polling capability is enabled (which signifies direct
@@ -1489,8 +1521,10 @@ ipif_all_down_tail(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	ipif_t	*ipif;
 
 	ASSERT(IAM_WRITER_IPSQ(ipsq));
-	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next)
+	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
+		ipif_non_duplicate(ipif);
 		ipif_down_tail(ipif);
+	}
 	ill_down_tail(ill);
 	freemsg(mp);
 	ipsq->ipsq_current_ipif = NULL;
@@ -5645,8 +5679,10 @@ ipif_is_quiescent(ipif_t *ipif)
 	}
 
 	ill = ipif->ipif_ill;
-	if (ill->ill_ipif_up_count != 0 || ill->ill_logical_down)
+	if (ill->ill_ipif_up_count != 0 || ill->ill_ipif_dup_count != 0 ||
+	    ill->ill_logical_down) {
 		return (B_TRUE);
+	}
 
 	/* This is the last ipif going down or being deleted on this ill */
 	if (ill->ill_ire_cnt != 0 || ill->ill_refcnt != 0) {
@@ -9144,6 +9180,8 @@ ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp, sin_t *sin,
 		area->area_flags |= ACE_F_PERMANENT;
 	if (flags & ATF_PUBL)
 		area->area_flags |= ACE_F_PUBLISH;
+	if (flags & ATF_AUTHORITY)
+		area->area_flags |= ACE_F_AUTHORITY;
 
 	/*
 	 * Up to ARP it goes.  The response will come
@@ -10118,6 +10156,8 @@ errack:
 		*flagsp |= ATF_PERM;
 	if (area->area_flags & ACE_F_PUBLISH)
 		*flagsp |= ATF_PUBL;
+	if (area->area_flags & ACE_F_AUTHORITY)
+		*flagsp |= ATF_AUTHORITY;
 	if (area->area_hw_addr_length != 0) {
 		*flagsp |= ATF_COM;
 		/*
@@ -10524,10 +10564,11 @@ ip_sioctl_removeif(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	if (ipif->ipif_refcnt == 0 && ipif->ipif_ire_cnt == 0) {
 		mutex_exit(&ill->ill_lock);
 		mutex_exit(&connp->conn_lock);
+		ipif_non_duplicate(ipif);
 		ipif_down_tail(ipif);
 		ipif_free_tail(ipif);
 		return (0);
-	    }
+	}
 	success = ipsq_pending_mp_add(connp, ipif, CONNP_TO_WQ(connp), mp,
 	    IPIF_FREE);
 	mutex_exit(&ill->ill_lock);
@@ -10565,6 +10606,7 @@ ip_sioctl_removeif_restart(ipif_t *ipif, sin_t *dummy_sin, queue_t *q,
 	ASSERT(IAM_WRITER_IPIF(ipif));
 	ASSERT(ipif->ipif_state_flags & IPIF_CONDEMNED);
 
+	ipif_non_duplicate(ipif);
 	ipif_down_tail(ipif);
 	ipif_free_tail(ipif);
 
@@ -10682,10 +10724,19 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	ipaddr_t addr;
 	sin6_t	*sin6;
 	int	err = 0;
+	ill_t	*ill = ipif->ipif_ill;
+	boolean_t need_dl_down;
+	boolean_t need_arp_down;
 
 	ip1dbg(("ip_sioctl_addr_tail(%s:%u %p)\n",
-		ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
+	    ill->ill_name, ipif->ipif_id, (void *)ipif));
 	ASSERT(IAM_WRITER_IPIF(ipif));
+
+	/* Must cancel any pending timer before taking the ill_lock */
+	if (ipif->ipif_recovery_id != 0)
+		(void) untimeout(ipif->ipif_recovery_id);
+	ipif->ipif_recovery_id = 0;
+
 	if (ipif->ipif_isv6) {
 		sin6 = (sin6_t *)sin;
 		v6addr = sin6->sin6_addr;
@@ -10693,17 +10744,37 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		addr = sin->sin_addr.s_addr;
 		IN6_IPADDR_TO_V4MAPPED(addr, &v6addr);
 	}
-	mutex_enter(&ipif->ipif_ill->ill_lock);
+	mutex_enter(&ill->ill_lock);
 	ipif->ipif_v6lcl_addr = v6addr;
 	if (ipif->ipif_flags & (IPIF_ANYCAST | IPIF_NOLOCAL)) {
 		ipif->ipif_v6src_addr = ipv6_all_zeros;
 	} else {
 		ipif->ipif_v6src_addr = v6addr;
 	}
+	ipif->ipif_addr_ready = 0;
 
-	if ((ipif->ipif_isv6) && IN6_IS_ADDR_6TO4(&v6addr) &&
-		(!ipif->ipif_ill->ill_is_6to4tun)) {
-		queue_t *wqp = ipif->ipif_ill->ill_wq;
+	/*
+	 * If the interface was previously marked as a duplicate, then since
+	 * we've now got a "new" address, it should no longer be considered a
+	 * duplicate -- even if the "new" address is the same as the old one.
+	 * Note that if all ipifs are down, we may have a pending ARP down
+	 * event to handle.  This is because we want to recover from duplicates
+	 * and thus delay tearing down ARP until the duplicates have been
+	 * removed or disabled.
+	 */
+	need_dl_down = need_arp_down = B_FALSE;
+	if (ipif->ipif_flags & IPIF_DUPLICATE) {
+		need_arp_down = !need_up;
+		ipif->ipif_flags &= ~IPIF_DUPLICATE;
+		if (--ill->ill_ipif_dup_count == 0 && !need_up &&
+		    ill->ill_ipif_up_count == 0 && ill->ill_dl_up) {
+			need_dl_down = B_TRUE;
+		}
+	}
+
+	if (ipif->ipif_isv6 && IN6_IS_ADDR_6TO4(&v6addr) &&
+	    !ill->ill_is_6to4tun) {
+		queue_t *wqp = ill->ill_wq;
 
 		/*
 		 * The local address of this interface is a 6to4 address,
@@ -10719,7 +10790,7 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 				if (wqp->q_next->q_qinfo->qi_minfo->mi_idnum
 				    == TUN6TO4_MODID) {
 					/* set for use in IP */
-					ipif->ipif_ill->ill_is_6to4tun = 1;
+					ill->ill_is_6to4tun = 1;
 					break;
 				}
 				wqp = wqp->q_next;
@@ -10728,7 +10799,7 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	}
 
 	ipif_set_default(ipif);
-	mutex_exit(&ipif->ipif_ill->ill_lock);
+	mutex_exit(&ill->ill_lock);
 
 	if (need_up) {
 		/*
@@ -10747,6 +10818,11 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		 */
 		sctp_update_ipif(ipif, SCTP_IPIF_UPDATE);
 	}
+
+	if (need_dl_down)
+		ill_dl_down(ill);
+	if (need_arp_down)
+		ipif_arp_down(ipif);
 
 	return (err);
 }
@@ -10872,9 +10948,17 @@ ip_sioctl_dstaddr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	in6_addr_t v6addr;
 	ill_t	*ill = ipif->ipif_ill;
 	int	err = 0;
+	boolean_t need_dl_down;
+	boolean_t need_arp_down;
 
-	ip1dbg(("ip_sioctl_dstaddr_tail(%s:%u %p)\n",
-		ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
+	ip1dbg(("ip_sioctl_dstaddr_tail(%s:%u %p)\n", ill->ill_name,
+	    ipif->ipif_id, (void *)ipif));
+
+	/* Must cancel any pending timer before taking the ill_lock */
+	if (ipif->ipif_recovery_id != 0)
+		(void) untimeout(ipif->ipif_recovery_id);
+	ipif->ipif_recovery_id = 0;
+
 	if (ipif->ipif_isv6) {
 		sin6_t *sin6;
 
@@ -10898,7 +10982,24 @@ ip_sioctl_dstaddr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		ipif->ipif_flags |= IPIF_POINTOPOINT;
 		ipif->ipif_flags &= ~IPIF_BROADCAST;
 		if (ipif->ipif_isv6)
-			ipif->ipif_ill->ill_flags |= ILLF_NONUD;
+			ill->ill_flags |= ILLF_NONUD;
+	}
+
+	/*
+	 * If the interface was previously marked as a duplicate, then since
+	 * we've now got a "new" address, it should no longer be considered a
+	 * duplicate -- even if the "new" address is the same as the old one.
+	 * Note that if all ipifs are down, we may have a pending ARP down
+	 * event to handle.
+	 */
+	need_dl_down = need_arp_down = B_FALSE;
+	if (ipif->ipif_flags & IPIF_DUPLICATE) {
+		need_arp_down = !need_up;
+		ipif->ipif_flags &= ~IPIF_DUPLICATE;
+		if (--ill->ill_ipif_dup_count == 0 && !need_up &&
+		    ill->ill_ipif_up_count == 0 && ill->ill_dl_up) {
+			need_dl_down = B_TRUE;
+		}
 	}
 
 	/* Set the new address. */
@@ -10918,6 +11019,12 @@ ip_sioctl_dstaddr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		 */
 		err = ipif_up(ipif, q, mp);
 	}
+
+	if (need_dl_down)
+		ill_dl_down(ill);
+
+	if (need_arp_down)
+		ipif_arp_down(ipif);
 	return (err);
 }
 
@@ -12917,47 +13024,45 @@ void
 ipif_arp_down(ipif_t *ipif)
 {
 	mblk_t	*mp;
+	ill_t	*ill = ipif->ipif_ill;
 
-	ip1dbg(("ipif_arp_down(%s:%u)\n",
-	    ipif->ipif_ill->ill_name, ipif->ipif_id));
+	ip1dbg(("ipif_arp_down(%s:%u)\n", ill->ill_name, ipif->ipif_id));
 	ASSERT(IAM_WRITER_IPIF(ipif));
 
 	/* Delete the mapping for the local address */
 	mp = ipif->ipif_arp_del_mp;
 	if (mp != NULL) {
-		ip1dbg(("ipif_arp_down: %s (%u) for %s:%u\n",
-		    dlpi_prim_str(*(int *)mp->b_rptr), *(int *)mp->b_rptr,
-		    ipif->ipif_ill->ill_name, ipif->ipif_id));
-		putnext(ipif->ipif_ill->ill_rq, mp);
+		ip1dbg(("ipif_arp_down: arp cmd %x for %s:%u\n",
+		    *(unsigned *)mp->b_rptr, ill->ill_name, ipif->ipif_id));
+		putnext(ill->ill_rq, mp);
 		ipif->ipif_arp_del_mp = NULL;
 	}
 
 	/*
-	 * If this is the last ipif that is going down, we need
-	 * to clean up ARP completely.
+	 * If this is the last ipif that is going down and there are no
+	 * duplicate addresses we may yet attempt to re-probe, then we need to
+	 * clean up ARP completely.
 	 */
-	if (ipif->ipif_ill->ill_ipif_up_count == 0) {
+	if (ill->ill_ipif_up_count == 0 && ill->ill_ipif_dup_count == 0) {
 
 		/* Send up AR_INTERFACE_DOWN message */
-		mp = ipif->ipif_ill->ill_arp_down_mp;
+		mp = ill->ill_arp_down_mp;
 		if (mp != NULL) {
-			ip1dbg(("ipif_arp_down: %s (%u) for %s:%u\n",
-			    dlpi_prim_str(*(int *)mp->b_rptr),
-			    *(int *)mp->b_rptr, ipif->ipif_ill->ill_name,
+			ip1dbg(("ipif_arp_down: arp cmd %x for %s:%u\n",
+			    *(unsigned *)mp->b_rptr, ill->ill_name,
 			    ipif->ipif_id));
-			putnext(ipif->ipif_ill->ill_rq, mp);
-			ipif->ipif_ill->ill_arp_down_mp = NULL;
+			putnext(ill->ill_rq, mp);
+			ill->ill_arp_down_mp = NULL;
 		}
 
 		/* Tell ARP to delete the multicast mappings */
-		mp = ipif->ipif_ill->ill_arp_del_mapping_mp;
+		mp = ill->ill_arp_del_mapping_mp;
 		if (mp != NULL) {
-			ip1dbg(("ipif_arp_down: %s (%u) for %s:%u\n",
-			    dlpi_prim_str(*(int *)mp->b_rptr),
-			    *(int *)mp->b_rptr, ipif->ipif_ill->ill_name,
+			ip1dbg(("ipif_arp_down: arp cmd %x for %s:%u\n",
+			    *(unsigned *)mp->b_rptr, ill->ill_name,
 			    ipif->ipif_id));
-			putnext(ipif->ipif_ill->ill_rq, mp);
-			ipif->ipif_ill->ill_arp_del_mapping_mp = NULL;
+			putnext(ill->ill_rq, mp);
+			ill->ill_arp_del_mapping_mp = NULL;
 		}
 	}
 }
@@ -13000,9 +13105,8 @@ ipif_arp_setup_multicast(ipif_t *ipif, mblk_t **arp_add_mapping_mp)
 	 */
 	mp = ill->ill_arp_del_mapping_mp;
 	if (mp != NULL) {
-		ip1dbg(("ipif_arp_down: %s (%u) for %s:%u\n",
-		    dlpi_prim_str(*(int *)mp->b_rptr),
-		    *(int *)mp->b_rptr, ill->ill_name, ipif->ipif_id));
+		ip1dbg(("ipif_arp_down: arp cmd %x for %s:%u\n",
+		    *(unsigned *)mp->b_rptr, ill->ill_name, ipif->ipif_id));
 		putnext(ill->ill_rq, mp);
 		ill->ill_arp_del_mapping_mp = NULL;
 	}
@@ -13077,6 +13181,7 @@ ipif_arp_setup_multicast(ipif_t *ipif, mblk_t **arp_add_mapping_mp)
 		return (0);
 	}
 	ASSERT(add_mp != NULL && del_mp != NULL);
+	ASSERT(ill->ill_arp_del_mapping_mp == NULL);
 	ill->ill_arp_del_mapping_mp = del_mp;
 	if (arp_add_mapping_mp != NULL) {
 		/* The caller just wants the mblks allocated */
@@ -13095,15 +13200,18 @@ ipif_arp_setup_multicast(ipif_t *ipif, mblk_t **arp_add_mapping_mp)
  * though it only sets up the resolver for v6
  * if it's an xresolv interface (one using an external resolver).
  * Honors ILLF_NOARP.
- * The boolean value arp_just_publish, if B_TRUE, indicates that
- * it only needs to send an AR_ENTRY_ADD message up to ARP for
- * IPv4 interfaces. Currently, B_TRUE is only set when this
- * function is called by ip_rput_dlpi_writer() to handle
- * asynchronous hardware address change notification.
+ * The enumerated value res_act is used to tune the behavior.
+ * If set to Res_act_initial, then we set up all the resolver
+ * structures for a new interface.  If set to Res_act_move, then
+ * we just send an AR_ENTRY_ADD message up to ARP for IPv4
+ * interfaces; this is called by ip_rput_dlpi_writer() to handle
+ * asynchronous hardware address change notification.  If set to
+ * Res_act_defend, then we tell ARP that it needs to send a single
+ * gratuitous message in defense of the address.
  * Returns error on failure.
  */
 int
-ipif_resolver_up(ipif_t *ipif, boolean_t arp_just_publish)
+ipif_resolver_up(ipif_t *ipif, enum ip_resolver_action res_act)
 {
 	caddr_t	addr;
 	mblk_t	*arp_up_mp = NULL;
@@ -13116,22 +13224,43 @@ ipif_resolver_up(ipif_t *ipif, boolean_t arp_just_publish)
 	uchar_t	*area_p = NULL;
 	uchar_t	*ared_p = NULL;
 	int	err = ENOMEM;
+	boolean_t was_dup;
 
 	ip1dbg(("ipif_resolver_up(%s:%u) flags 0x%x\n",
-	    ipif->ipif_ill->ill_name, ipif->ipif_id,
-	    (uint_t)ipif->ipif_flags));
+	    ill->ill_name, ipif->ipif_id, (uint_t)ipif->ipif_flags));
 	ASSERT(IAM_WRITER_IPIF(ipif));
 
-	if ((ill->ill_net_type != IRE_IF_RESOLVER) ||
-	    (ill->ill_isv6 && !(ill->ill_flags & ILLF_XRESOLV))) {
+	was_dup = B_FALSE;
+	if (res_act == Res_act_initial) {
+		ipif->ipif_addr_ready = 0;
+		/*
+		 * We're bringing an interface up here.  There's no way that we
+		 * should need to shut down ARP now.
+		 */
+		mutex_enter(&ill->ill_lock);
+		if (ipif->ipif_flags & IPIF_DUPLICATE) {
+			ipif->ipif_flags &= ~IPIF_DUPLICATE;
+			ill->ill_ipif_dup_count--;
+			was_dup = B_TRUE;
+		}
+		mutex_exit(&ill->ill_lock);
+	}
+	if (ipif->ipif_recovery_id != 0)
+		(void) untimeout(ipif->ipif_recovery_id);
+	ipif->ipif_recovery_id = 0;
+	if (ill->ill_net_type != IRE_IF_RESOLVER) {
+		ipif->ipif_addr_ready = 1;
 		return (0);
 	}
+	/* NDP will set the ipif_addr_ready flag when it's ready */
+	if (ill->ill_isv6 && !(ill->ill_flags & ILLF_XRESOLV))
+		return (0);
 
 	if (ill->ill_isv6) {
 		/*
 		 * External resolver for IPv6
 		 */
-		ASSERT(!arp_just_publish);
+		ASSERT(res_act == Res_act_initial);
 		if (!IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr)) {
 			addr = (caddr_t)&ipif->ipif_v6lcl_addr;
 			area_p = (uchar_t *)&ip6_area_template;
@@ -13149,7 +13278,8 @@ ipif_resolver_up(ipif_t *ipif, boolean_t arp_just_publish)
 			err = EINVAL;
 			goto failed;
 		} else {
-			if (ill->ill_ipif_up_count == 0)
+			if (ill->ill_ipif_up_count == 0 &&
+			    ill->ill_ipif_dup_count == 0 && !was_dup)
 				ill->ill_arp_bringup_pending = 1;
 			mutex_exit(&ill->ill_lock);
 		}
@@ -13164,17 +13294,19 @@ ipif_resolver_up(ipif_t *ipif, boolean_t arp_just_publish)
 	 * Add an entry for the local address in ARP only if it
 	 * is not UNNUMBERED and the address is not INADDR_ANY.
 	 */
-	if (((ipif->ipif_flags & IPIF_UNNUMBERED) == 0) && area_p != NULL) {
+	if (!(ipif->ipif_flags & IPIF_UNNUMBERED) && area_p != NULL) {
+		area_t *area;
+
 		/* Now ask ARP to publish our address. */
 		arp_add_mp = ill_arp_alloc(ill, area_p, addr);
 		if (arp_add_mp == NULL)
 			goto failed;
-		if (arp_just_publish) {
+		area = (area_t *)arp_add_mp->b_rptr;
+		if (res_act != Res_act_initial) {
 			/*
 			 * Copy the new hardware address and length into
 			 * arp_add_mp to be sent to ARP.
 			 */
-			area_t *area = (area_t *)arp_add_mp->b_rptr;
 			area->area_hw_addr_length =
 			    ill->ill_phys_addr_length;
 			bcopy((char *)ill->ill_phys_addr,
@@ -13182,10 +13314,20 @@ ipif_resolver_up(ipif_t *ipif, boolean_t arp_just_publish)
 			    area->area_hw_addr_length);
 		}
 
-		((area_t *)arp_add_mp->b_rptr)->area_flags =
-		    ACE_F_PERMANENT | ACE_F_PUBLISH | ACE_F_MYADDR;
+		area->area_flags = ACE_F_PERMANENT | ACE_F_PUBLISH |
+		    ACE_F_MYADDR;
 
-		if (arp_just_publish)
+		if (res_act == Res_act_defend) {
+			area->area_flags |= ACE_F_DEFEND;
+			/*
+			 * If we're just defending our address now, then
+			 * there's no need to set up ARP multicast mappings.
+			 * The publish command is enough.
+			 */
+			goto done;
+		}
+
+		if (res_act != Res_act_initial)
 			goto arp_setup_multicast;
 
 		/*
@@ -13197,15 +13339,17 @@ ipif_resolver_up(ipif_t *ipif, boolean_t arp_just_publish)
 			goto failed;
 
 	} else {
-		if (arp_just_publish)
+		if (res_act != Res_act_initial)
 			goto done;
 	}
 	/*
 	 * Need to bring up ARP or setup multicast mapping only
 	 * when the first interface is coming UP.
 	 */
-	if (ill->ill_ipif_up_count != 0)
+	if (ill->ill_ipif_up_count != 0 || ill->ill_ipif_dup_count != 0 ||
+	    was_dup) {
 		goto done;
+	}
 
 	/*
 	 * Allocate an ARP down message (to be saved) and an ARP up
@@ -13236,7 +13380,7 @@ arp_setup_multicast:
 		ASSERT(arp_add_mapping_mp != NULL);
 	}
 
-done:;
+done:
 	if (arp_del_mp != NULL) {
 		ASSERT(ipif->ipif_arp_del_mp == NULL);
 		ipif->ipif_arp_del_mp = arp_del_mp;
@@ -13251,41 +13395,48 @@ done:;
 	}
 	if (arp_up_mp != NULL) {
 		ip1dbg(("ipif_resolver_up: ARP_UP for %s:%u\n",
-			ipif->ipif_ill->ill_name, ipif->ipif_id));
+		    ill->ill_name, ipif->ipif_id));
 		putnext(ill->ill_rq, arp_up_mp);
 	}
 	if (arp_add_mp != NULL) {
 		ip1dbg(("ipif_resolver_up: ARP_ADD for %s:%u\n",
-			ipif->ipif_ill->ill_name, ipif->ipif_id));
+		    ill->ill_name, ipif->ipif_id));
+		/*
+		 * If it's an extended ARP implementation, then we'll wait to
+		 * hear that DAD has finished before using the interface.
+		 */
+		if (!ill->ill_arp_extend)
+			ipif->ipif_addr_ready = 1;
 		putnext(ill->ill_rq, arp_add_mp);
+	} else {
+		ipif->ipif_addr_ready = 1;
 	}
 	if (arp_add_mapping_mp != NULL) {
 		ip1dbg(("ipif_resolver_up: MAPPING_ADD for %s:%u\n",
-			ipif->ipif_ill->ill_name, ipif->ipif_id));
+		    ill->ill_name, ipif->ipif_id));
 		putnext(ill->ill_rq, arp_add_mapping_mp);
 	}
-	if (arp_just_publish)
+	if (res_act != Res_act_initial)
 		return (0);
 
 	if (ill->ill_flags & ILLF_NOARP)
 		err = ill_arp_off(ill);
 	else
 		err = ill_arp_on(ill);
-	if (err) {
+	if (err != 0) {
 		ip0dbg(("ipif_resolver_up: arp_on/off failed %d\n", err));
 		freemsg(ipif->ipif_arp_del_mp);
-		if (arp_down_mp != NULL)
-			freemsg(ill->ill_arp_down_mp);
-		if (ill->ill_arp_del_mapping_mp != NULL)
-			freemsg(ill->ill_arp_del_mapping_mp);
+		freemsg(ill->ill_arp_down_mp);
+		freemsg(ill->ill_arp_del_mapping_mp);
 		ipif->ipif_arp_del_mp = NULL;
 		ill->ill_arp_down_mp = NULL;
 		ill->ill_arp_del_mapping_mp = NULL;
 		return (err);
 	}
-	return (ill->ill_ipif_up_count != 0 ? 0 : EINPROGRESS);
+	return ((ill->ill_ipif_up_count != 0 || was_dup ||
+	    ill->ill_ipif_dup_count != 0) ? 0 : EINPROGRESS);
 
-failed:;
+failed:
 	ip1dbg(("ipif_resolver_up: FAILED\n"));
 	freemsg(arp_add_mp);
 	freemsg(arp_del_mp);
@@ -13294,6 +13445,143 @@ failed:;
 	freemsg(arp_down_mp);
 	ill->ill_arp_bringup_pending = 0;
 	return (err);
+}
+
+/*
+ * This routine restarts IPv4 duplicate address detection (DAD) when a link has
+ * just gone back up.
+ */
+static void
+ipif_arp_start_dad(ipif_t *ipif)
+{
+	ill_t *ill = ipif->ipif_ill;
+	mblk_t *arp_add_mp;
+	area_t *area;
+
+	if (ill->ill_net_type != IRE_IF_RESOLVER || ill->ill_arp_closing ||
+	    (ipif->ipif_flags & IPIF_UNNUMBERED) ||
+	    ipif->ipif_lcl_addr == INADDR_ANY ||
+	    (arp_add_mp = ill_arp_alloc(ill, (uchar_t *)&ip_area_template,
+	    (char *)&ipif->ipif_lcl_addr)) == NULL) {
+		/*
+		 * If we can't contact ARP for some reason, that's not really a
+		 * problem.  Just send out the routing socket notification that
+		 * DAD completion would have done, and continue.
+		 */
+		ipif_mask_reply(ipif);
+		ip_rts_ifmsg(ipif);
+		ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
+		sctp_update_ipif(ipif, SCTP_IPIF_UP);
+		ipif->ipif_addr_ready = 1;
+		return;
+	}
+
+	/* Setting the 'unverified' flag restarts DAD */
+	area = (area_t *)arp_add_mp->b_rptr;
+	area->area_flags = ACE_F_PERMANENT | ACE_F_PUBLISH | ACE_F_MYADDR |
+	    ACE_F_UNVERIFIED;
+	putnext(ill->ill_rq, arp_add_mp);
+}
+
+static void
+ipif_ndp_start_dad(ipif_t *ipif)
+{
+	nce_t *nce;
+
+	nce = ndp_lookup_v6(ipif->ipif_ill, &ipif->ipif_v6lcl_addr, B_FALSE);
+	if (nce == NULL)
+		return;
+
+	if (!ndp_restart_dad(nce)) {
+		/*
+		 * If we can't restart DAD for some reason, that's not really a
+		 * problem.  Just send out the routing socket notification that
+		 * DAD completion would have done, and continue.
+		 */
+		ip_rts_ifmsg(ipif);
+		ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
+		sctp_update_ipif(ipif, SCTP_IPIF_UP);
+		ipif->ipif_addr_ready = 1;
+	}
+	NCE_REFRELE(nce);
+}
+
+/*
+ * Restart duplicate address detection on all interfaces on the given ill.
+ *
+ * This is called when an interface transitions from down to up
+ * (DL_NOTE_LINK_UP) or up to down (DL_NOTE_LINK_DOWN).
+ *
+ * Note that since the underlying physical link has transitioned, we must cause
+ * at least one routing socket message to be sent here, either via DAD
+ * completion or just by default on the first ipif.  (If we don't do this, then
+ * in.mpathd will see long delays when doing link-based failure recovery.)
+ */
+void
+ill_restart_dad(ill_t *ill, boolean_t went_up)
+{
+	ipif_t *ipif;
+
+	if (ill == NULL)
+		return;
+
+	/*
+	 * If layer two doesn't support duplicate address detection, then just
+	 * send the routing socket message now and be done with it.
+	 */
+	if ((ill->ill_isv6 && (ill->ill_flags & ILLF_XRESOLV)) ||
+	    (!ill->ill_isv6 && !ill->ill_arp_extend)) {
+		ip_rts_ifmsg(ill->ill_ipif);
+		return;
+	}
+
+	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
+		if (went_up) {
+			if (ipif->ipif_flags & IPIF_UP) {
+				if (ill->ill_isv6)
+					ipif_ndp_start_dad(ipif);
+				else
+					ipif_arp_start_dad(ipif);
+			} else if (ill->ill_isv6 &&
+			    (ipif->ipif_flags & IPIF_DUPLICATE)) {
+				/*
+				 * For IPv4, the ARP module itself will
+				 * automatically start the DAD process when it
+				 * sees DL_NOTE_LINK_UP.  We respond to the
+				 * AR_CN_READY at the completion of that task.
+				 * For IPv6, we must kick off the bring-up
+				 * process now.
+				 */
+				ndp_do_recovery(ipif);
+			} else {
+				/*
+				 * Unfortunately, the first ipif is "special"
+				 * and represents the underlying ill in the
+				 * routing socket messages.  Thus, when this
+				 * one ipif is down, we must still notify so
+				 * that the user knows the IFF_RUNNING status
+				 * change.  (If the first ipif is up, then
+				 * we'll handle eventual routing socket
+				 * notification via DAD completion.)
+				 */
+				if (ipif == ill->ill_ipif)
+					ip_rts_ifmsg(ill->ill_ipif);
+			}
+		} else {
+			/*
+			 * After link down, we'll need to send a new routing
+			 * message when the link comes back, so clear
+			 * ipif_addr_ready.
+			 */
+			ipif->ipif_addr_ready = 0;
+		}
+	}
+
+	/*
+	 * If we've torn down links, then notify the user right away.
+	 */
+	if (!went_up)
+		ip_rts_ifmsg(ill->ill_ipif);
 }
 
 /*
@@ -13716,6 +14004,7 @@ ill_down_ipifs(ill_t *ill, mblk_t *mp, int index, boolean_t chk_nofailover)
 			if (!ipif->ipif_isv6)
 				ipif_check_bcast_ires(ipif);
 			(void) ipif_logical_down(ipif, NULL, NULL);
+			ipif_non_duplicate(ipif);
 			ipif_down_tail(ipif);
 			/*
 			 * We don't do ipif_multicast_down for IPv4 in
@@ -16658,7 +16947,7 @@ ipif_move(ipif_t *ipif, ill_t *to_ill, queue_t *q, mblk_t *mp,
 		 * move.
 		 */
 		rep_ipif->ipif_flags = ipif->ipif_flags | IPIF_NOFAILOVER;
-		rep_ipif->ipif_flags &= ~IPIF_UP;
+		rep_ipif->ipif_flags &= ~IPIF_UP & ~IPIF_DUPLICATE;
 		rep_ipif->ipif_replace_zero = B_TRUE;
 		mutex_init(&rep_ipif->ipif_saved_ire_lock, NULL,
 		    MUTEX_DEFAULT, NULL);
@@ -17796,7 +18085,7 @@ ipif_down(ipif_t *ipif, queue_t *q, mblk_t *mp)
 	return (EINPROGRESS);
 }
 
-static void
+void
 ipif_down_tail(ipif_t *ipif)
 {
 	ill_t	*ill = ipif->ipif_ill;
@@ -17809,11 +18098,10 @@ ipif_down_tail(ipif_t *ipif)
 	 * there are other logical units that are up.
 	 * This occurs e.g. when we change a "significant" IFF_ flag.
 	 */
-	if (ipif->ipif_ill->ill_wq != NULL) {
-		if (!ill->ill_logical_down && (ill->ill_ipif_up_count == 0) &&
-		    ill->ill_dl_up) {
-			ill_dl_down(ill);
-		}
+	if (ill->ill_wq != NULL && !ill->ill_logical_down &&
+	    ill->ill_ipif_up_count == 0 && ill->ill_ipif_dup_count == 0 &&
+	    ill->ill_dl_up) {
+		ill_dl_down(ill);
 	}
 	ill->ill_logical_down = 0;
 
@@ -17821,7 +18109,7 @@ ipif_down_tail(ipif_t *ipif)
 	 * Have to be after removing the routes in ipif_down_delete_ire.
 	 */
 	if (ipif->ipif_isv6) {
-		if (ipif->ipif_ill->ill_flags & ILLF_XRESOLV)
+		if (ill->ill_flags & ILLF_XRESOLV)
 			ipif_arp_down(ipif);
 	} else {
 		ipif_arp_down(ipif);
@@ -18048,6 +18336,10 @@ ipif_free(ipif_t *ipif)
 {
 	ASSERT(IAM_WRITER_IPIF(ipif));
 
+	if (ipif->ipif_recovery_id != 0)
+		(void) untimeout(ipif->ipif_recovery_id);
+	ipif->ipif_recovery_id = 0;
+
 	/* Remove conn references */
 	reset_conn_ipif(ipif);
 
@@ -18127,6 +18419,9 @@ ipif_free_tail(ipif_t *ipif)
 	rw_exit(&ill_g_lock);
 
 	mutex_destroy(&ipif->ipif_saved_ire_lock);
+
+	ASSERT(!(ipif->ipif_flags & (IPIF_UP | IPIF_DUPLICATE)));
+
 	/* Free the memory. */
 	mi_free((char *)ipif);
 }
@@ -18344,7 +18639,7 @@ ipif_lookup_on_name(char *name, size_t namelen, boolean_t do_alloc,
  * but might not make the system manager very popular.	(May be called
  * as writer.)
  */
-static void
+void
 ipif_mask_reply(ipif_t *ipif)
 {
 	icmph_t	*icmph;
@@ -18900,13 +19195,14 @@ ipif_up(ipif_t *ipif, queue_t *q, mblk_t *mp)
 			err = ipif_ndp_up(ipif, &ipif->ipif_v6lcl_addr,
 			    B_FALSE);
 			if (err != 0) {
-				mp = ipsq_pending_mp_get(ipsq, &connp);
+				if (err != EINPROGRESS)
+					mp = ipsq_pending_mp_get(ipsq, &connp);
 				return (err);
 			}
 		}
 		/* Now, ARP */
-		if ((err = ipif_resolver_up(ipif, B_FALSE)) ==
-		    EINPROGRESS) {
+		err = ipif_resolver_up(ipif, Res_act_initial);
+		if (err == EINPROGRESS) {
 			/* We will complete it in ip_arp_done */
 			return (err);
 		}
@@ -19455,7 +19751,6 @@ ipif_up_done(ipif_t *ipif)
 
 	}
 
-
 	/* This is the first interface on this ill */
 	if (ipif->ipif_ipif_up_count == 1 && !loopback) {
 		/*
@@ -19496,14 +19791,7 @@ ipif_up_done(ipif_t *ipif)
 		}
 	}
 
-	/*
-	 * This had to be deferred until we had bound.
-	 * tell routing sockets that this interface is up
-	 */
-	ip_rts_ifmsg(ipif);
-	ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
-
-	if (!loopback) {
+	if (!loopback && ipif->ipif_addr_ready) {
 		/* Broadcast an address mask reply. */
 		ipif_mask_reply(ipif);
 	}
@@ -19513,8 +19801,19 @@ ipif_up_done(ipif_t *ipif)
 	}
 	if (src_ipif_held)
 		ipif_refrele(src_ipif);
-	/* Let SCTP update the status for this ipif */
-	sctp_update_ipif(ipif, SCTP_IPIF_UP);
+
+	/*
+	 * This had to be deferred until we had bound.  Tell routing sockets and
+	 * others that this interface is up if it looks like the address has
+	 * been validated.  Otherwise, if it isn't ready yet, wait for
+	 * duplicate address detection to do its thing.
+	 */
+	if (ipif->ipif_addr_ready) {
+		ip_rts_ifmsg(ipif);
+		ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
+		/* Let SCTP update the status for this ipif */
+		sctp_update_ipif(ipif, SCTP_IPIF_UP);
+	}
 	return (0);
 
 bad:
@@ -19919,7 +20218,8 @@ retry:
 			/* Always skip NOLOCAL and ANYCAST interfaces */
 			if (ipif->ipif_flags & (IPIF_NOLOCAL|IPIF_ANYCAST))
 				continue;
-			if (!(ipif->ipif_flags & IPIF_UP))
+			if (!(ipif->ipif_flags & IPIF_UP) ||
+			    !ipif->ipif_addr_ready)
 				continue;
 			if (ipif->ipif_zoneid != zoneid &&
 			    ipif->ipif_zoneid != ALL_ZONES)
@@ -20700,7 +21000,8 @@ ip_sioctl_slifname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 * This ill has not been inserted into the global list.
 	 * So we are still single threaded and don't need any lock
 	 */
-	ipif->ipif_flags = lifr->lifr_flags & IFF_LOGINT_FLAGS;
+	ipif->ipif_flags = lifr->lifr_flags & IFF_LOGINT_FLAGS &
+	    ~IFF_DUPLICATE;
 	ill->ill_flags = lifr->lifr_flags & IFF_PHYINTINST_FLAGS;
 	ill->ill_phyint->phyint_flags = lifr->lifr_flags & IFF_PHYINT_FLAGS;
 

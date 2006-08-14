@@ -98,7 +98,6 @@ extern struct	sockaddr_dl	*rta_ifp;
 #define	D_PKTBAD	0x0400		/* Malformed packet */
 #define	D_PKTOUT	0x0800		/* Sent packet */
 #define	D_TMP		0x1000		/* RFC3041 mechanism */
-#define	D_DAD		0x2000		/* Duplciate Address Detection */
 
 #define	IF_SEPARATOR		':'
 #define	IPV6_MAX_HOPS		255

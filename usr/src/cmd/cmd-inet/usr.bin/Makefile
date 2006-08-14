@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,13 +36,13 @@ MSGSUBDIRS=	nca talk
 
 # As programs get lint-clean, add them here.  Eventually.
 # This hack should go away, and all in PROG should be lint-clean.
-LINTCLEAN=	rlogin.c rsh.c rcp.c rdate.c
+LINTCLEAN=	rlogin.c rsh.c rcp.c rdate.c rwho.c
 
 # Likewise, as subdirs get lint-clean, add them here.  Once
 # they're all clean, replace the dependency of the lint target
 # with SUBDIRS.  Also (sigh) deal with the commented-out build lines
 # for the lint rule.
-LINTSUBDIRS=	nca netstat pppd tftp 
+LINTSUBDIRS=	nca netstat pppd pppstats tftp
 
 include ../../Makefile.cmd
 include ../Makefile.cmd-inet

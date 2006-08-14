@@ -230,7 +230,7 @@ int strident_valid(const char *);
 void strident_canon(char *, size_t);
 int getsubopt(char **optionsp, char * const *tokens, char **valuep);
 char *append_subopt(const char *, size_t, char *, const char *);
-int ffs(long);
+int ffs(uintmax_t);
 int copyin(const void *, void *, size_t);
 void copyin_noerr(const void *, void *, size_t);
 int xcopyin(const void *, void *, size_t);

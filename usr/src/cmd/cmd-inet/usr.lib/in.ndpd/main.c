@@ -533,6 +533,53 @@ if_process(int s, char *ifname, boolean_t first)
 	/* Detect prefixes which are removed */
 	if (pr->pr_kernel_state != 0)
 		pr->pr_in_use = _B_TRUE;
+
+	if ((lifr.lifr_flags & IFF_DUPLICATE) &&
+	    (pr->pr_flags & IFF_TEMPORARY)) {
+		in6_addr_t *token;
+		int i;
+		char abuf[INET6_ADDRSTRLEN];
+
+		if (++pr->pr_attempts >= MAX_DAD_FAILURES) {
+			logmsg(LOG_ERR, "%s: token %s is duplicate after %d "
+			    "attempts; disabling temporary addresses on %s",
+			    pr->pr_name, inet_ntop(AF_INET6,
+			    (void *)&pi->pi_tmp_token, abuf, sizeof (abuf)),
+			    pr->pr_attempts, pi->pi_name);
+			pi->pi_TmpAddrsEnabled = 0;
+			tmptoken_delete(pi);
+			prefix_delete(pr);
+			return;
+		}
+		logmsg(LOG_WARNING, "%s: token %s is duplicate; trying again",
+		    pr->pr_name, inet_ntop(AF_INET6, (void *)&pi->pi_tmp_token,
+		    abuf, sizeof (abuf)));
+		if (!tmptoken_create(pi)) {
+			prefix_delete(pr);
+			return;
+		}
+		token = &pi->pi_tmp_token;
+		for (i = 0; i < 16; i++) {
+			/*
+			 * prefix_create ensures that pr_prefix has all-zero
+			 * bits after prefixlen.
+			 */
+			pr->pr_address.s6_addr[i] = pr->pr_prefix.s6_addr[i] |
+			    token->s6_addr[i];
+		}
+		if (prefix_lookup_addr_match(pr) != NULL) {
+			prefix_delete(pr);
+			return;
+		}
+		pr->pr_CreateTime = getcurrenttime() / MILLISEC;
+		/*
+		 * We've got a new token.  Clearing PR_AUTO causes
+		 * prefix_update_k to bring the interface up and set the
+		 * address.
+		 */
+		pr->pr_kernel_state &= ~PR_AUTO;
+		prefix_update_k(pr);
+	}
 }
 
 static int ifsock = -1;
@@ -1464,7 +1511,7 @@ setup_rtsock(void)
 /*
  * Retrieve one routing socket message. If RTM_IFINFO indicates
  * new phyint do a full scan of the interfaces. If RTM_IFINFO
- * indicates an existing phyint only scan that phyint and asociated
+ * indicates an existing phyint, only scan that phyint and associated
  * prefixes.
  */
 static void
@@ -1963,7 +2010,7 @@ fprintdate(FILE *file)
 	(void) fprintf(file, "%s ", buf);
 }
 
-/* PRINTFLIKE1 */
+/* PRINTFLIKE2 */
 void
 logmsg(int level, const char *fmt, ...)
 {

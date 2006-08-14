@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992,1997-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -30,9 +29,17 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/types.h>
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+/*
+ * Warning: the interfaces described in this file are private to the
+ * implementation.  They may change at any time without notice and are not
+ * documented.  Do not depend on them.
+ */
 
 #define	ARP_REQUEST	1
 #define	ARP_RESPONSE	2
@@ -41,52 +48,40 @@ extern "C" {
 
 #define	AR_IOCTL		(((unsigned)'A' & 0xFF)<<8)
 #define	CMD_IN_PROGRESS		0x10000
-/*
- * The following ARP commands are private, and not part of a supported
- * interface. They are subject to change without notice in any release.
- */
+
 #define	AR_ENTRY_ADD		(AR_IOCTL + 1)
 #define	AR_ENTRY_DELETE		(AR_IOCTL + 2)
 #define	AR_ENTRY_QUERY		(AR_IOCTL + 3)
-#define	AR_XMIT_REQUEST		(AR_IOCTL + 4)
-#define	AR_XMIT_TEMPLATE	(AR_IOCTL + 5)
 #define	AR_ENTRY_SQUERY		(AR_IOCTL + 6)
 #define	AR_MAPPING_ADD		(AR_IOCTL + 7)
 #define	AR_CLIENT_NOTIFY	(AR_IOCTL + 8)
 #define	AR_INTERFACE_UP		(AR_IOCTL + 9)
 #define	AR_INTERFACE_DOWN	(AR_IOCTL + 10)
-#define	AR_XMIT_RESPONSE	(AR_IOCTL + 11)
 #define	AR_INTERFACE_ON		(AR_IOCTL + 12)
 #define	AR_INTERFACE_OFF	(AR_IOCTL + 13)
 #define	AR_DLPIOP_DONE		(AR_IOCTL + 14)
-#define	AR_ENTRY_LLAQUERY	(AR_IOCTL + 15)
 /*
  * This is not an ARP command per se, it is used to interface between
  * ARP and IP during close.
  */
 #define	AR_ARP_CLOSING		(AR_IOCTL + 16)
+#define	AR_ARP_EXTEND		(AR_IOCTL + 17)
 
-/*
- * The following ACE flags are private, and not part of a supported
- * interface. They are subject to change without notice in any release.
- */
-#define	ACE_F_PERMANENT		0x1
-#define	ACE_F_PUBLISH		0x2
-#define	ACE_F_DYING		0x4
-#define	ACE_F_RESOLVED		0x8
+/* Both ace_flags and area_flags; must also modify arp.c in mdb */
+#define	ACE_F_PERMANENT		0x0001
+#define	ACE_F_PUBLISH		0x0002
+#define	ACE_F_DYING		0x0004
+#define	ACE_F_RESOLVED		0x0008
 /* Using bit mask extraction from target address */
-#define	ACE_F_MAPPING		0x10
-#define	ACE_F_MYADDR		0x20	/* Strong check for duplicate MACs */
-
-/* ARP Cmd Table entry */
-typedef struct arct_s {
-	pfi_t	arct_pfi;
-	uint32_t	arct_cmd;
-	int	arct_min_len;
-	uint32_t	arct_flags;
-	int		arct_priv_req;	/* Privilege required for this cmd */
-	const char	*arct_txt;
-} arct_t;
+#define	ACE_F_MAPPING		0x0010
+#define	ACE_F_MYADDR		0x0020	/* IP claims to own this address */
+#define	ACE_F_UNVERIFIED	0x0040	/* DAD not yet complete */
+#define	ACE_F_AUTHORITY		0x0080	/* check for duplicate MACs */
+#define	ACE_F_DEFEND		0x0100	/* single transmit (area_flags only) */
+#define	ACE_F_OLD		0x0200	/* should revalidate when IP asks */
+#define	ACE_F_FAST		0x0400	/* fast probe enabled */
+#define	ACE_F_DELAYED		0x0800	/* rescheduled on arp_defend_rate */
+#define	ACE_F_DAD_ABORTED	0x1000	/* DAD was aborted on link down */
 
 /* ARP Command Structures */
 
@@ -96,12 +91,6 @@ typedef struct ar_cmd_s {
 	uint32_t	arc_name_offset;
 	uint32_t	arc_name_length;
 } arc_t;
-
-/*
- * The following ARP command structures are private, and not
- * part of a supported interface. They are subject to change
- * without notice in any release.
- */
 
 /*
  * NOTE: when using area_t for an AR_ENTRY_SQUERY, the area_hw_addr_offset
@@ -196,13 +185,10 @@ typedef struct ar_client_notify_s {
 } arcn_t;
 
 /* Client Notification Codes */
-/*
- * The following Client Notification codes are private, and not
- * part of a supported interface. They are subject to change
- * without notice in any release.
- */
 #define	AR_CN_BOGON	1
 #define	AR_CN_ANNOUNCE	2
+#define	AR_CN_READY	3		/* DAD complete; address usable */
+#define	AR_CN_FAILED	4		/* DAD failed; address unusable */
 
 /* ARP Header */
 typedef struct arh_s {

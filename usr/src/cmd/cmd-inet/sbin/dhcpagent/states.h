@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +48,7 @@ extern "C" {
 void		dhcp_acknak(iu_eh_t *, int, short, iu_event_id_t, void *);
 int		dhcp_adopt(void);
 int		dhcp_bound(struct ifslist *, PKT_LIST *);
+void		dhcp_bound_complete(struct ifslist *);
 int		dhcp_drop(struct ifslist *, const char *);
 void		dhcp_expire(iu_tq_t *, void *);
 int		dhcp_extending(struct ifslist *);
@@ -58,10 +58,10 @@ void		dhcp_rebind(iu_tq_t *, void *);
 int		dhcp_release(struct ifslist *, const char *);
 void		dhcp_renew(iu_tq_t *, void *);
 void		dhcp_requesting(iu_tq_t *, void *);
+void		dhcp_restart(struct ifslist *);
 void		dhcp_selecting(struct ifslist *);
 void		dhcp_start(iu_tq_t *, void *);
 void		send_decline(struct ifslist *, char *, struct in_addr *);
-
 
 #ifdef	__cplusplus
 }

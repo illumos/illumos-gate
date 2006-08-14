@@ -28,6 +28,12 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/mutex.h>
+#include <sys/stream.h>
+#include <netinet/in.h>
+#include <netinet/icmp6.h>
+#include <inet/ip.h>
+
 /*
  * Internal definitions for the kernel implementation of the IPv6
  * Neighbor Discovery Protocol (NDP).
@@ -69,6 +75,8 @@ typedef struct nce_s {
 	struct nce_s	*nce_fastpath;	/* for fastpath list */
 	timeout_id_t	nce_timeout_id;
 	uchar_t		nce_ipversion;	/* IPv4(ARP)/IPv6(NDP) version */
+	uint_t		nce_defense_count;	/* number of NDP conflicts */
+	uint_t		nce_defense_time;	/* last time defended (secs) */
 #ifdef NCE_DEBUG
 	th_trace_t	*nce_trace[IP_TR_HASH_MAX];
 	boolean_t	nce_trace_disable;	/* True when alloc fails */
@@ -135,6 +143,7 @@ extern ndp_g_t	ndp4, ndp6;
 #define	NDP_ISROUTER		0x2
 #define	NDP_SOLICITED		0x4
 #define	NDP_ORIDE		0x8
+#define	NDP_PROBE		0x10
 
 /* Number of packets queued in NDP for a neighbor */
 #define	ND_MAX_Q		4
@@ -219,6 +228,17 @@ typedef struct {
 	int	ncr_host;	/* Fraction for host entries */
 } nce_cache_reclaim_t;
 
+/*
+ * Structure for nce_delete_hw_changed; specifies an IPv4 address to link-layer
+ * address mapping.  Any route that has a cached copy of a mapping for that
+ * IPv4 address that doesn't match the given mapping must be purged.
+ */
+typedef struct {
+	ipaddr_t hwm_addr;	/* IPv4 address */
+	uint_t hwm_hwlen;	/* Length of hardware address (may be 0) */
+	uchar_t *hwm_hwaddr;	/* Pointer to new hardware address, if any */
+} nce_hw_map_t;
+
 /* When SAP is greater than zero address appears before SAP */
 #define	NCE_LL_ADDR_OFFSET(ill)	(((ill)->ill_sap_length) < 0 ? \
 	(sizeof (dl_unitdata_req_t)) : \
@@ -276,7 +296,8 @@ extern	void	ndp_fastpath_flush(nce_t *, char  *);
 extern	boolean_t ndp_fastpath_update(nce_t *, void  *);
 extern	nd_opt_hdr_t *ndp_get_option(nd_opt_hdr_t *, int, int);
 extern	void	ndp_inactive(nce_t *);
-extern	void	ndp_input(ill_t *, mblk_t *);
+extern	void	ndp_input(ill_t *, mblk_t *, mblk_t *);
+extern	boolean_t ndp_lookup_ipaddr(in_addr_t);
 extern	nce_t	*ndp_lookup_v6(ill_t *, const in6_addr_t *, boolean_t);
 extern	nce_t	*ndp_lookup_v4(ill_t *, const in_addr_t *, boolean_t);
 extern	int	ndp_lookup_then_add(ill_t *, uchar_t *, const void *,
@@ -298,6 +319,8 @@ extern	void	ndp_walk_common(ndp_g_t *, ill_t *, pfi_t,
 extern	int	ndp_add(ill_t *, uchar_t *, const void *,
 		    const void *, const void *,
 		    uint32_t, uint16_t, uint16_t, nce_t **, mblk_t *, mblk_t *);
+extern	boolean_t	ndp_restart_dad(nce_t *);
+extern	void	ndp_do_recovery(ipif_t *);
 extern	void	nce_resolv_failed(nce_t *);
 extern	void	arp_resolv_failed(nce_t *);
 extern	void	nce_fastpath_list_add(nce_t *);
@@ -307,6 +330,7 @@ extern	void	nce_fastpath_list_dispatch(ill_t *,
 extern	void	nce_queue_mp_common(nce_t *, mblk_t *, boolean_t);
 extern	void	ndp_flush_qd_mp(nce_t *);
 extern	nce_t	*nce_reinit(nce_t *);
+extern	void	nce_delete_hw_changed(nce_t *, void *);
 
 #ifdef NCE_DEBUG
 extern	void	nce_trace_inactive(nce_t *);

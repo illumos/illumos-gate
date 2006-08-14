@@ -235,6 +235,8 @@ extern void mdb_printf(const char *, ...);
 extern void mdb_warn(const char *, ...);
 extern void mdb_flush(void);
 
+extern int mdb_ffs(uintmax_t);
+
 extern void mdb_nhconvert(void *, const void *, size_t);
 
 #define	MDB_DUMP_RELATIVE	0x0001	/* Start numbering at 0 */

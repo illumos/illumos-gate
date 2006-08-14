@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,15 +36,14 @@
 #include <sys/sockio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <net/route.h>
 #include <netinet/in.h>
 #include <inet/ip.h>
 #include <arpa/inet.h>
-#include <netdb.h>
 #include <libintl.h>
 #include <inetcfg.h>
 
 #include "inetcfg_nic.h"
-#include "inetcfg_dad.h"
 
 #define	ICFG_FAMILY(handle) handle->ifh_interface.if_protocol
 
@@ -58,6 +56,12 @@
 	    (socklen_t)sizeof (struct sockaddr_in6)
 
 #define	ICFG_LOGICAL_SEP	':'
+
+/*
+ * Maximum amount of time (in milliseconds) to wait for Duplicate Address
+ * Detection to complete in the kernel.
+ */
+#define	DAD_WAIT_TIME	5000
 
 /*
  * Note: must be kept in sync with error codes in <inetcfg.h>
@@ -670,13 +674,67 @@ icfg_get_tunnel_upper(icfg_handle_t handle, int *protocol)
 }
 
 /*
+ * Any time that flags are changed on an interface where either the new or the
+ * existing flags have IFF_UP set, we'll get at least one RTM_IFINFO message to
+ * announce the flag status.  Typically, there are two such messages: one
+ * saying that the interface is going down, and another saying that it's coming
+ * back up.
+ *
+ * We wait here for that second message, which can take one of two forms:
+ * either IFF_UP or IFF_DUPLICATE.  If something's amiss with the kernel,
+ * though, we don't wait forever.  (Note that IFF_DUPLICATE is a high-order
+ * bit, and we can't see it in the routing socket messages.)
+ */
+static int
+dad_wait(icfg_handle_t handle, int rtsock)
+{
+	struct pollfd fds[1];
+	union {
+		struct if_msghdr ifm;
+		char buf[1024];
+	} msg;
+	int index;
+	int retv;
+	uint64_t flags;
+	hrtime_t starttime, now;
+
+	fds[0].fd = rtsock;
+	fds[0].events = POLLIN;
+	fds[0].revents = 0;
+
+	if ((retv = icfg_get_index(handle, &index)) != ICFG_SUCCESS)
+		return (retv);
+
+	starttime = gethrtime();
+	for (;;) {
+		now = gethrtime();
+		now = (now - starttime) / 1000000;
+		if (now >= DAD_WAIT_TIME)
+			break;
+		if (poll(fds, 1, DAD_WAIT_TIME - (int)now) <= 0)
+			break;
+		if (read(rtsock, &msg, sizeof (msg)) <= 0)
+			break;
+		if (msg.ifm.ifm_type != RTM_IFINFO)
+			continue;
+		/* Note that ifm_index is just 16 bits */
+		if (index == msg.ifm.ifm_index && (msg.ifm.ifm_flags & IFF_UP))
+			return (ICFG_SUCCESS);
+		if ((retv = icfg_get_flags(handle, &flags)) != ICFG_SUCCESS)
+			return (retv);
+		if (flags & IFF_DUPLICATE)
+			return (ICFG_DAD_FOUND);
+	}
+	return (ICFG_DAD_FAILED);
+}
+
+/*
  * Sets the flags for the interface represented by the 'handle'
  * argument to the value contained in the 'flags' argument.
  *
- * If the interface is an IPv6 interface and the new flags value
- * would transition the interface from "down" to "up", then
- * duplicate address detection is performed and succeeds only if
- * the no duplicate address is detected.
+ * If the new flags value will transition the interface from "down" to "up,"
+ * then duplicate address detection is performed by the kernel.  This routine
+ * waits to get the outcome of that test.
  *
  * Returns: ICFG_SUCCESS, ICFG_DAD_FOUND, ICFG_DAD_FAILED or ICFG_FAILURE.
  */
@@ -686,48 +744,39 @@ icfg_set_flags(icfg_handle_t handle, uint64_t flags)
 	struct lifreq lifr;
 	uint64_t oflags;
 	int ret;
+	int rtsock;
 
 	(void) strlcpy(lifr.lifr_name, handle->ifh_interface.if_name,
 	    sizeof (lifr.lifr_name));
 	lifr.lifr_addr.ss_family = ICFG_FAMILY(handle);
 
+	if ((ret = icfg_get_flags(handle, &oflags)) != ICFG_SUCCESS)
+		return (ret);
+	if (oflags == flags)
+		return (ICFG_SUCCESS);
+
 	/*
-	 * If we are transitioning an IPv6 interface from being down
-	 * to being up and a local address is set, then we must perform
-	 * duplicate address detection.
+	 * Any time flags are changed on an interface that has IFF_UP set,
+	 * you'll get a routing socket message.  We care about the status,
+	 * though, only when the new flags are marked "up."
 	 */
-	if ((ICFG_FAMILY(handle) == AF_INET6) &&
-	    (!(flags & IFF_NOLOCAL)) && (flags & IFF_UP)) {
-		/*
-		 * Get the old flags
-		 */
-		if ((ret = icfg_get_flags(handle, &oflags)) != ICFG_SUCCESS) {
-			return (ret);
-		}
-
-		if (!(oflags & IFF_UP)) {
-			struct sockaddr_in6 *sin6;
-
-			if (ioctl(handle->ifh_sock, SIOCGLIFADDR,
-			    (caddr_t)&lifr) < 0) {
-				return (ICFG_FAILURE);
-			}
-
-			sin6 = (struct sockaddr_in6 *)&lifr.lifr_addr;
-
-			ret = dad_test(handle, oflags, sin6);
-			if (ret != ICFG_SUCCESS) {
-				return (ret);
-			}
-		}
-	}
+	rtsock = (flags & IFF_UP) ?
+	    socket(PF_ROUTE, SOCK_RAW, ICFG_FAMILY(handle)) : -1;
 
 	lifr.lifr_flags = flags;
 	if (ioctl(handle->ifh_sock, SIOCSLIFFLAGS, (caddr_t)&lifr) < 0) {
+		if (rtsock != -1)
+			(void) close(rtsock);
 		return (ICFG_FAILURE);
 	}
 
-	return (ICFG_SUCCESS);
+	if (rtsock == -1) {
+		return (ICFG_SUCCESS);
+	} else {
+		ret = dad_wait(handle, rtsock);
+		(void) close(rtsock);
+		return (ret);
+	}
 }
 
 /*
@@ -945,6 +994,7 @@ icfg_set_addr(icfg_handle_t handle, const struct sockaddr *addr,
 	struct lifreq lifr;
 	uint64_t flags;
 	int ret;
+	int rtsock;
 
 	(void) memset(&lifr.lifr_addr, 0, sizeof (lifr.lifr_addr));
 	if ((ret = to_sockaddr_storage(ICFG_FAMILY(handle), addr, addrlen,
@@ -953,32 +1003,33 @@ icfg_set_addr(icfg_handle_t handle, const struct sockaddr *addr,
 	}
 
 	/*
-	 * Need to do duplicate address detection for IPv6
+	 * Need to do check on duplicate address detection results if the
+	 * interface is up.
 	 */
-	if (ICFG_FAMILY(handle) == AF_INET6) {
-		if ((ret = icfg_get_flags(handle, &flags)) != ICFG_SUCCESS) {
-			return (ret);
-		}
-
-		if (flags & IFF_UP) {
-			struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)
-				&lifr.lifr_addr;
-			ret = dad_test(handle, flags, sin6);
-			if (ret != ICFG_SUCCESS) {
-				return (ret);
-			}
-		}
+	if ((ret = icfg_get_flags(handle, &flags)) != ICFG_SUCCESS) {
+		return (ret);
 	}
+
+	rtsock = (flags & IFF_UP) ?
+	    socket(PF_ROUTE, SOCK_RAW, ICFG_FAMILY(handle)) : -1;
 
 	(void) strlcpy(lifr.lifr_name, handle->ifh_interface.if_name,
 	    sizeof (lifr.lifr_name));
 	lifr.lifr_addr.ss_family = ICFG_FAMILY(handle);
 
 	if (ioctl(handle->ifh_sock, SIOCSLIFADDR, (caddr_t)&lifr) < 0) {
+		if (rtsock != -1)
+			(void) close(rtsock);
 		return (ICFG_FAILURE);
 	}
 
-	return (ICFG_SUCCESS);
+	if (rtsock == -1) {
+		return (ICFG_SUCCESS);
+	} else {
+		ret = dad_wait(handle, rtsock);
+		(void) close(rtsock);
+		return (ret);
+	}
 }
 
 /*

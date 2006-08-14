@@ -1317,12 +1317,12 @@ ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr, boolean_t macaddr_change)
 	 * ND not supported on XRESOLV interfaces. If ND support (multicast)
 	 * added later, take out this check.
 	 */
-	if (ill->ill_flags & ILLF_XRESOLV)
+	if ((ill->ill_flags & ILLF_XRESOLV) ||
+	    IN6_IS_ADDR_UNSPECIFIED(addr) ||
+	    (!(ill->ill_net_type & IRE_INTERFACE))) {
+		ipif->ipif_addr_ready = 1;
 		return (0);
-
-	if (IN6_IS_ADDR_UNSPECIFIED(addr) ||
-	    (!(ill->ill_net_type & IRE_INTERFACE)))
-		return (0);
+	}
 
 	/*
 	 * Need to setup multicast mapping only when the first
@@ -1374,13 +1374,18 @@ ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr, boolean_t macaddr_change)
 		    &ipv6_all_zeros,
 		    0,
 		    flags,
-		    ND_REACHABLE,
+		    ND_PROBE,	/* Causes Duplicate Address Detection to run */
 		    &nce,
 		    NULL,
 		    NULL);
 		switch (err) {
 		case 0:
 			ip1dbg(("ipif_ndp_up: NCE created for %s\n",
+			    ill->ill_name));
+			ipif->ipif_addr_ready = 1;
+			break;
+		case EINPROGRESS:
+			ip1dbg(("ipif_ndp_up: running DAD now for %s\n",
 			    ill->ill_name));
 			break;
 		case EEXIST:
@@ -1401,6 +1406,9 @@ ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr, boolean_t macaddr_change)
 			}
 			return (err);
 		}
+	} else {
+		/* No local NCE for this entry */
+		ipif->ipif_addr_ready = 1;
 	}
 	if (nce != NULL)
 		NCE_REFRELE(nce);
@@ -1625,7 +1633,8 @@ ip_addr_xor_v6(const in6_addr_t *a1, const in6_addr_t *a2, in6_addr_t *res)
 
 #define	IPIF_VALID_IPV6_SOURCE(ipif) \
 	(((ipif)->ipif_flags & IPIF_UP) && \
-	!((ipif)->ipif_flags & (IPIF_NOLOCAL|IPIF_ANYCAST)))
+	!((ipif)->ipif_flags & (IPIF_NOLOCAL|IPIF_ANYCAST)) && \
+	(ipif)->ipif_addr_ready)
 
 /* source address candidate */
 typedef struct candidate {
@@ -3001,9 +3010,12 @@ ipif_up_done_v6(ipif_t *ipif)
 		}
 	}
 
+	if (ipif->ipif_addr_ready) {
+		ip_rts_ifmsg(ipif);
+		ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
+		sctp_update_ipif(ipif, SCTP_IPIF_UP);
+	}
 
-	ip_rts_ifmsg(ipif);
-	ip_rts_newaddrmsg(RTM_ADD, 0, ipif);
 	if (ipif_saved_irep != NULL) {
 		kmem_free(ipif_saved_irep,
 		    ipif_saved_ire_cnt * sizeof (ire_t *));
@@ -3011,7 +3023,6 @@ ipif_up_done_v6(ipif_t *ipif)
 
 	if (src_ipif_held)
 		ipif_refrele(src_ipif);
-	sctp_update_ipif(ipif, SCTP_IPIF_UP);
 	return (0);
 
 bad:

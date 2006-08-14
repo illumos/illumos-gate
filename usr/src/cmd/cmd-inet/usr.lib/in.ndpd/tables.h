@@ -203,6 +203,7 @@ struct prefix {
 
 	uint_t		pr_CreateTime;		/* tmpaddr creation time */
 						/* in SECONDS */
+	uint_t		pr_attempts;	/* attempts to configure */
 };
 
 /*
