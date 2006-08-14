@@ -258,7 +258,7 @@ rge_mii_get16(rge_t *rgep, uintptr_t mii)
 		drv_usecwait(100);
 		val32 = rge_reg_get32(rgep, PHY_ACCESS_REG);
 		if (val32 & PHY_ACCESS_WR_FLAG)
-			return (val32 & 0xffff);
+			return ((uint16_t)(val32 & 0xffff));
 	}
 
 	RGE_REPORT((rgep, "rge_mii_get16(0x%x) fail, val = %x", mii, val32));
@@ -291,6 +291,34 @@ rge_mii_put16(rge_t *rgep, uintptr_t mii, uint16_t data)
 	}
 	RGE_REPORT((rgep, "rge_mii_put16(0x%lx, 0x%x) fail",
 	    mii, data));
+}
+
+void rge_ephy_put16(rge_t *rgep, uintptr_t emii, uint16_t data);
+#pragma	no_inline(rge_ephy_put16)
+
+void
+rge_ephy_put16(rge_t *rgep, uintptr_t emii, uint16_t data)
+{
+	uint32_t regval;
+	uint32_t val32;
+	uint32_t i;
+
+	regval = (emii & EPHY_REG_MASK) << EPHY_REG_SHIFT;
+	regval |= data & EPHY_DATA_MASK;
+	regval |= EPHY_ACCESS_WR_FLAG;
+	rge_reg_put32(rgep, EPHY_ACCESS_REG, regval);
+
+	/*
+	 * Waiting for PHY writing OK
+	 */
+	for (i = 0; i < PHY_RESET_LOOP; i++) {
+		drv_usecwait(100);
+		val32 = rge_reg_get32(rgep, EPHY_ACCESS_REG);
+		if (!(val32 & EPHY_ACCESS_WR_FLAG))
+			return;
+	}
+	RGE_REPORT((rgep, "rge_ephy_put16(0x%lx, 0x%x) fail",
+	    emii, data));
 }
 
 /*
@@ -574,6 +602,8 @@ rge_phy_update(rge_t *rgep)
 		/*
 		 * Chipset limitation: need set other capabilities to true
 		 */
+		if (rgep->chipid.is_pcie)
+			adv_1000hdx = B_TRUE;
 		adv_100fdx = B_TRUE;
 		adv_100hdx  = B_TRUE;
 		adv_10fdx = B_TRUE;
@@ -610,8 +640,8 @@ rge_phy_update(rge_t *rgep)
 	rgep->phys_write_time = gethrtime();
 	rge_phy_init(rgep);
 	rge_mii_put16(rgep, MII_AN_ADVERT, anar);
-	rge_mii_put16(rgep, MII_CONTROL, control);
 	rge_mii_put16(rgep, MII_1000BASE_T_CONTROL, gigctrl);
+	rge_mii_put16(rgep, MII_CONTROL, control);
 
 	RGE_DEBUG(("rge_phy_update: anar <- 0x%x", anar));
 	RGE_DEBUG(("rge_phy_update: control <- 0x%x", control));
@@ -624,84 +654,91 @@ void rge_phy_init(rge_t *rgep);
 void
 rge_phy_init(rge_t *rgep)
 {
-	uint16_t val16;
-
 	rgep->phy_mii_addr = 1;
 
 	/*
 	 * Below phy config steps are copied from the Programming Guide
 	 * (there's no detail comments for these steps.)
 	 */
-	if ((rgep->chipid.mac_ver == MAC_VER_SD ||
-	    rgep->chipid.mac_ver == MAC_VER_SE) &&
-	    (rgep->chipid.phy_ver == PHY_VER_S)) {
-		rge_mii_put16(rgep, PHY_1F_REG, 1);
+	switch (rgep->chipid.mac_ver) {
+	case MAC_VER_8169S_D:
+	case MAC_VER_8169S_E :
+		rge_mii_put16(rgep, PHY_1F_REG, 0x0001);
 		rge_mii_put16(rgep, PHY_15_REG, 0x1000);
 		rge_mii_put16(rgep, PHY_18_REG, 0x65c7);
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, val16 & (~ANAR_ASY_PAUSE));
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, val16 & 0x0fff);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0x0000);
 		rge_mii_put16(rgep, PHY_ID_REG_2, 0x00a1);
 		rge_mii_put16(rgep, PHY_ID_REG_1, 0x0008);
 		rge_mii_put16(rgep, PHY_BMSR_REG, 0x1020);
 		rge_mii_put16(rgep, PHY_BMCR_REG, 0x1000);
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, val16 | ANAR_ASY_PAUSE);
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, val16 & (~ANAR_ASY_PAUSE));
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, (val16 & 0x0fff) | 0x7000);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0x0800);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0x0000);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0x7000);
 		rge_mii_put16(rgep, PHY_ID_REG_2, 0xff41);
 		rge_mii_put16(rgep, PHY_ID_REG_1, 0xde60);
 		rge_mii_put16(rgep, PHY_BMSR_REG, 0x0140);
 		rge_mii_put16(rgep, PHY_BMCR_REG, 0x0077);
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, val16 | ANAR_ASY_PAUSE);
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, val16 & (~ANAR_ASY_PAUSE));
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, (val16 & 0x0fff) | 0xa000);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0x7800);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0x7000);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0xa000);
 		rge_mii_put16(rgep, PHY_ID_REG_2, 0xdf01);
 		rge_mii_put16(rgep, PHY_ID_REG_1, 0xdf20);
 		rge_mii_put16(rgep, PHY_BMSR_REG, 0xff95);
 		rge_mii_put16(rgep, PHY_BMCR_REG, 0xfa00);
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, val16 | ANAR_ASY_PAUSE);
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, val16 & (~ANAR_ASY_PAUSE));
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, (val16 & 0x0fff) | 0xb000);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0xa800);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0xa000);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0xb000);
 		rge_mii_put16(rgep, PHY_ID_REG_2, 0xff41);
 		rge_mii_put16(rgep, PHY_ID_REG_1, 0xde20);
 		rge_mii_put16(rgep, PHY_BMSR_REG, 0x0140);
 		rge_mii_put16(rgep, PHY_BMCR_REG, 0x00bb);
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, val16 | ANAR_ASY_PAUSE);
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, val16 & (~ANAR_ASY_PAUSE));
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, (val16 & 0x0fff) | 0xf000);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0xb800);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0xb000);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0xf000);
 		rge_mii_put16(rgep, PHY_ID_REG_2, 0xdf01);
 		rge_mii_put16(rgep, PHY_ID_REG_1, 0xdf20);
 		rge_mii_put16(rgep, PHY_BMSR_REG, 0xff95);
 		rge_mii_put16(rgep, PHY_BMCR_REG, 0xbf00);
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, val16 | ANAR_ASY_PAUSE);
-		val16 = rge_mii_get16(rgep, PHY_ANAR_REG);
-		rge_mii_put16(rgep, PHY_ANAR_REG, val16 & (~ANAR_ASY_PAUSE));
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0xf800);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0xf000);
+		rge_mii_put16(rgep, PHY_ANAR_REG, 0x0000);
 		rge_mii_put16(rgep, PHY_1F_REG, 0x0000);
 		rge_mii_put16(rgep, PHY_0B_REG, 0x0000);
-	}
+		break;
 
-	if (rgep->chipid.mac_ver == MAC_VER_SB) {
+	case MAC_VER_8169SB:
 		rge_mii_put16(rgep, PHY_1F_REG, 0x0001);
-		rge_mii_put16(rgep, PHY_1B_REG, 0x841e);
-		rge_mii_put16(rgep, PHY_0E_REG, 0x7bfb);
+		rge_mii_put16(rgep, PHY_1B_REG, 0xD41E);
+		rge_mii_put16(rgep, PHY_0E_REG, 0x7bff);
 		rge_mii_put16(rgep, PHY_GBCR_REG, GBCR_DEFAULT);
 		rge_mii_put16(rgep, PHY_1F_REG, 0x0002);
 		rge_mii_put16(rgep, PHY_BMSR_REG, 0x90D0);
 		rge_mii_put16(rgep, PHY_1F_REG, 0x0000);
+		break;
+
+	case MAC_VER_8168:
+		rge_mii_put16(rgep, PHY_1F_REG, 0x0001);
+		rge_mii_put16(rgep, PHY_ANER_REG, 0x00aa);
+		rge_mii_put16(rgep, PHY_ANNPTR_REG, 0x3173);
+		rge_mii_put16(rgep, PHY_ANNPRR_REG, 0x08fc);
+		rge_mii_put16(rgep, PHY_GBCR_REG, 0xe2d0);
+		rge_mii_put16(rgep, PHY_0B_REG, 0x941a);
+		rge_mii_put16(rgep, PHY_18_REG, 0x65fe);
+		rge_mii_put16(rgep, PHY_1C_REG, 0x1e02);
+		rge_mii_put16(rgep, PHY_1F_REG, 0x0002);
+		rge_mii_put16(rgep, PHY_ANNPTR_REG, 0x103e);
+		rge_mii_put16(rgep, PHY_1F_REG, 0x0000);
+		break;
+
+	case MAC_VER_8168B_B:
+	case MAC_VER_8168B_C:
+		rge_mii_put16(rgep, PHY_1F_REG, 0x0001);
+		rge_mii_put16(rgep, PHY_0B_REG, 0x94b0);
+		rge_mii_put16(rgep, PHY_1B_REG, 0xc416);
+		rge_mii_put16(rgep, PHY_1F_REG, 0x0003);
+		rge_mii_put16(rgep, PHY_12_REG, 0x6096);
+		rge_mii_put16(rgep, PHY_1F_REG, 0x0000);
+		break;
 	}
 }
 
@@ -715,15 +752,60 @@ rge_chip_ident(rge_t *rgep)
 	uint32_t val32;
 	uint16_t val16;
 
+	/*
+	 * Read and record MAC version
+	 */
 	val32 = rge_reg_get32(rgep, TX_CONFIG_REG);
 	val32 &= HW_VERSION_ID_0 | HW_VERSION_ID_1;
 	chip->mac_ver = val32;
+	switch (chip->mac_ver) {
+	case MAC_VER_8168:
+	case MAC_VER_8168B_B:
+	case MAC_VER_8168B_C:
+		chip->is_pcie = B_TRUE;
+		break;
 
+	default:
+		chip->is_pcie = B_FALSE;
+		break;
+	}
+
+	/*
+	 * Read and record PHY version
+	 */
 	val16 = rge_mii_get16(rgep, PHY_ID_REG_2);
 	val16 &= PHY_VER_MASK;
 	chip->phy_ver = val16;
 
-	if (rgep->param_default_mtu > ETHERMTU) {
+	/* set pci latency timer */
+	if (chip->mac_ver == MAC_VER_8169 ||
+	    chip->mac_ver == MAC_VER_8169S_D)
+		pci_config_put8(rgep->cfg_handle, PCI_CONF_LATENCY_TIMER, 0x40);
+
+	/*
+	 * PCIE chipset require the Rx buffer start address must be
+	 * 8-byte alignment and the Rx buffer size must be multiple of 8.
+	 * We'll just use bcopy in receive procedure for the PCIE chipset.
+	 */
+	if (chip->is_pcie) {
+		rgep->chip_flags |= CHIP_FLAG_FORCE_BCOPY;
+		if (rgep->default_mtu > ETHERMTU) {
+			rge_notice(rgep, "Jumbo packets not supported "
+			    "for this PCIE chipset");
+			rgep->default_mtu = ETHERMTU;
+		}
+	}
+	if (rgep->chip_flags & CHIP_FLAG_FORCE_BCOPY)
+		rgep->head_room = 0;
+	else
+		rgep->head_room = RGE_HEADROOM;
+
+	/*
+	 * Initialize other variables.
+	 */
+	if (rgep->default_mtu < ETHERMTU || rgep->default_mtu > RGE_JUMBO_MTU)
+		rgep->default_mtu = ETHERMTU;
+	if (rgep->default_mtu > ETHERMTU) {
 		rgep->rxbuf_size = RGE_BUFF_SIZE_JUMBO;
 		rgep->txbuf_size = RGE_BUFF_SIZE_JUMBO;
 		rgep->ethmax_size = RGE_JUMBO_SIZE;
@@ -732,16 +814,11 @@ rge_chip_ident(rge_t *rgep)
 		rgep->txbuf_size = RGE_BUFF_SIZE_STD;
 		rgep->ethmax_size = ETHERMAX;
 	}
-
 	chip->rxconfig = RX_CONFIG_DEFAULT;
 	chip->txconfig = TX_CONFIG_DEFAULT;
 
 	RGE_TRACE(("%s: MAC version = %x, PHY version = %x",
 	    rgep->ifname, chip->mac_ver, chip->phy_ver));
-
-	/* set pci latency timer */
-	if (chip->mac_ver == MAC_VER_NS || chip->mac_ver == MAC_VER_SD)
-		pci_config_put8(rgep->cfg_handle, PCI_CONF_LATENCY_TIMER, 0x40);
 }
 
 /*
@@ -810,8 +887,8 @@ rge_chip_reset(rge_t *rgep)
 	/*
 	 * Disable interrupt
 	 */
-	rge_reg_clr16(rgep, INT_MASK_REG, INT_MASK_ALL);
 	rgep->int_mask = INT_MASK_NONE;
+	rge_reg_put16(rgep, INT_MASK_REG, rgep->int_mask);
 
 	/*
 	 * Clear pended interrupt
@@ -845,6 +922,31 @@ void
 rge_chip_init(rge_t *rgep)
 {
 	uint32_t val32;
+	uint32_t val16;
+	uint32_t *hashp;
+	chip_id_t *chip = &rgep->chipid;
+
+	if (chip->is_pcie) {
+		/*
+		 * Increase the threshold voltage of RX sensitivity
+		 */
+		if (chip->mac_ver != MAC_VER_8168)
+			rge_ephy_put16(rgep, 0x01, 0x1bd3);
+
+		val16 = rge_reg_get8(rgep, PHY_STATUS_REG);
+		val16 = 0x12<<8 | val16;
+		rge_reg_put16(rgep, PHY_STATUS_REG, val16);
+		rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00021c01);
+		rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f088);
+		rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00004000);
+		rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f0b0);
+		rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x0000f068);
+		val32 = rge_reg_get32(rgep, RT_CSI_DATA_REG);
+		val32 |= 0x7000;
+		val32 &= 0xffff5fff;
+		rge_reg_put32(rgep, RT_CSI_DATA_REG, val32);
+		rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f068);
+	}
 
 	/*
 	 * Config MII register
@@ -857,23 +959,20 @@ rge_chip_init(rge_t *rgep)
 	 *  Then for vlan support, we must enable receive vlan de-tagging.
 	 *  Otherwise, there'll be checksum error.
 	 */
-	rge_reg_set16(rgep, CPLUS_COMMAND_REG, RX_CKSM_OFFLOAD | RX_VLAN_DETAG);
-
-	/*
-	 * Suggested setting from Realtek
-	 */
-	if (rgep->chipid.mac_ver == MAC_VER_SD) {
-		rge_reg_set16(rgep, CPLUS_COMMAND_REG,
-		    CPLUS_BIT14 | MUL_PCI_RW_ENABLE);
+	val16 = rge_reg_get16(rgep, CPLUS_COMMAND_REG);
+	val16 |= RX_CKSM_OFFLOAD | RX_VLAN_DETAG;
+	if (chip->mac_ver == MAC_VER_8169S_D) {
+		val16 |= CPLUS_BIT14 | MUL_PCI_RW_ENABLE;
 		rge_reg_put8(rgep, RESV_82_REG, 0x01);
 	}
-	rge_reg_clr16(rgep, CPLUS_COMMAND_REG, 0x03);
+	rge_reg_put16(rgep, CPLUS_COMMAND_REG, val16 & (~0x03));
 
 	/*
 	 * Start transmit/receive before set tx/rx configuration register
 	 */
-	rge_reg_set8(rgep, RT_COMMAND_REG,
-	    RT_COMMAND_RX_ENABLE | RT_COMMAND_TX_ENABLE);
+	if (!chip->is_pcie)
+		rge_reg_set8(rgep, RT_COMMAND_REG,
+		    RT_COMMAND_RX_ENABLE | RT_COMMAND_TX_ENABLE);
 
 	/*
 	 * Set dump tally counter register
@@ -893,7 +992,7 @@ rge_chip_init(rge_t *rgep)
 	/*
 	 * Set Tx/Rx maximum packet size
 	 */
-	if (rgep->param_default_mtu > ETHERMTU) {
+	if (rgep->default_mtu > ETHERMTU) {
 		rge_reg_put8(rgep, TX_MAX_PKTSIZE_REG, TX_PKTSIZE_JUMBO);
 		rge_reg_put16(rgep, RX_MAX_PKTSIZE_REG, RX_PKTSIZE_JUMBO);
 	} else {
@@ -908,19 +1007,14 @@ rge_chip_init(rge_t *rgep)
 	val32 &= RX_CONFIG_REG_RESV;
 	if (rgep->promisc)
 		val32 |= RX_ACCEPT_ALL_PKT;
-	rge_reg_put32(rgep, RX_CONFIG_REG, val32 | rgep->chipid.rxconfig);
+	rge_reg_put32(rgep, RX_CONFIG_REG, val32 | chip->rxconfig);
 
 	/*
 	 * Set transmit configuration register
 	 */
 	val32 = rge_reg_get32(rgep, TX_CONFIG_REG);
 	val32 &= TX_CONFIG_REG_RESV;
-	rge_reg_put32(rgep, TX_CONFIG_REG, val32 | rgep->chipid.txconfig);
-
-	/*
-	 * Initialize PHY registers
-	 */
-	rge_phy_init(rgep);
+	rge_reg_put32(rgep, TX_CONFIG_REG, val32 | chip->txconfig);
 
 	/*
 	 * Set Tx/Rx descriptor register
@@ -950,14 +1044,9 @@ rge_chip_init(rge_t *rgep)
 	/*
 	 * Set multicast register
 	 */
-	rge_reg_put32(rgep, MULTICAST_0_REG, rgep->mcast_hash[0]);
-	rge_reg_put32(rgep, MULTICAST_4_REG, rgep->mcast_hash[1]);
-
-	/*
-	 * Mask and clear all Interrupt
-	 */
-	rge_reg_put16(rgep, INT_MASK_REG, INT_MASK_NONE);
-	rge_reg_put16(rgep, INT_STATUS_REG, INT_MASK_ALL);
+	hashp = (uint32_t *)rgep->mcast_hash;
+	rge_reg_put32(rgep, MULTICAST_0_REG, hashp[0]);
+	rge_reg_put32(rgep, MULTICAST_4_REG, hashp[1]);
 
 	/*
 	 * Msic register setting:
@@ -995,8 +1084,8 @@ rge_chip_start(rge_t *rgep)
 	/*
 	 * Enable interrupt
 	 */
-	rge_reg_set16(rgep, INT_MASK_REG, RGE_INT_MASK);
 	rgep->int_mask = RGE_INT_MASK;
+	rge_reg_put16(rgep, INT_MASK_REG, rgep->int_mask);
 
 	/*
 	 * All done!
@@ -1016,8 +1105,8 @@ rge_chip_stop(rge_t *rgep, boolean_t fault)
 	/*
 	 * Disable interrupt
 	 */
-	rge_reg_put16(rgep, INT_MASK_REG, INT_MASK_NONE);
 	rgep->int_mask = INT_MASK_NONE;
+	rge_reg_put16(rgep, INT_MASK_REG, rgep->int_mask);
 
 	/*
 	 * Clear pended interrupt
@@ -1126,9 +1215,9 @@ rge_set_multi_addr(rge_t *rgep)
 {
 	uint32_t *hashp;
 
-	hashp = rgep->mcast_hash;
-	rge_reg_put32(rgep, MULTICAST_0_REG, hashp[0]);
-	rge_reg_put32(rgep, MULTICAST_4_REG, hashp[1]);
+	hashp = (uint32_t *)rgep->mcast_hash;
+	rge_reg_put32(rgep, MULTICAST_0_REG, RGE_BSWAP_32(hashp[0]));
+	rge_reg_put32(rgep, MULTICAST_4_REG, RGE_BSWAP_32(hashp[1]));
 	rge_reg_set8(rgep, RT_COMMAND_REG,
 	    RT_COMMAND_RX_ENABLE | RT_COMMAND_TX_ENABLE);
 }
@@ -1237,24 +1326,25 @@ rge_wake_factotum(rge_t *rgep)
 {
 	if (rgep->factotum_flag == 0) {
 		rgep->factotum_flag = 1;
-		ddi_trigger_softintr(rgep->factotum_id);
+		(void) ddi_intr_trigger_softint(rgep->factotum_hdl, NULL);
 	}
 }
 
 /*
  *	rge_intr() -- handle chip interrupts
  */
-uint_t rge_intr(caddr_t arg);
+uint_t rge_intr(caddr_t arg1, caddr_t arg2);
 #pragma	no_inline(rge_intr)
 
 uint_t
-rge_intr(caddr_t arg)
+rge_intr(caddr_t arg1, caddr_t arg2)
 {
-	rge_t *rgep = (rge_t *)arg;
+	rge_t *rgep = (rge_t *)arg1;
 	uint16_t int_status;
 
-	mutex_enter(rgep->genlock);
+	_NOTE(ARGUNUSED(arg2))
 
+	mutex_enter(rgep->genlock);
 	/*
 	 * Was this interrupt caused by our device...
 	 */
@@ -1264,12 +1354,14 @@ rge_intr(caddr_t arg)
 		return (DDI_INTR_UNCLAIMED);
 				/* indicate it wasn't our interrupt */
 	}
-
 	rgep->stats.intr++;
 
 	/*
 	 * Clear interrupt
+	 *	For PCIE chipset, we need disable interrupt first.
 	 */
+	if (rgep->chipid.is_pcie)
+		rge_reg_put16(rgep, INT_MASK_REG, INT_MASK_NONE);
 	rge_reg_put16(rgep, INT_STATUS_REG, int_status);
 
 	/*
@@ -1278,15 +1370,20 @@ rge_intr(caddr_t arg)
 	if (int_status & LINK_CHANGE_INT) {
 		rge_chip_cyclic(rgep);
 	}
+
 	mutex_exit(rgep->genlock);
 
 	/*
 	 * Receive interrupt
 	 */
-	if (int_status & RGE_RX_OVERFLOW_INT)
-		rgep->stats.overflow++;
-	if (rgep->rge_chip_state == RGE_CHIP_RUNNING)
+	if (int_status & RGE_RX_INT)
 		rge_receive(rgep);
+
+	/*
+	 * Re-enable interrupt for PCIE chipset
+	 */
+	if (rgep->chipid.is_pcie)
+		rge_reg_put16(rgep, INT_MASK_REG, rgep->int_mask);
 
 	return (DDI_INTR_CLAIMED);	/* indicate it was our interrupt */
 }
@@ -1387,6 +1484,8 @@ rge_factotum_stall_check(rge_t *rgep)
 	 * All of which should ensure that we don't get into a state
 	 * where packets are left pending indefinitely!
 	 */
+	if (rgep->resched_needed)
+		(void) ddi_intr_trigger_softint(rgep->resched_hdl, NULL);
 	dogval = rge_atomic_shl32(&rgep->watchdog, 1);
 	if (dogval < rge_watchdog_count)
 		return (B_FALSE);
@@ -1403,18 +1502,19 @@ rge_factotum_stall_check(rge_t *rgep)
  *	reset & restart the chip after an error
  *	check the link status whenever necessary
  */
-uint_t rge_chip_factotum(caddr_t arg);
+uint_t rge_chip_factotum(caddr_t arg1, caddr_t arg2);
 #pragma	no_inline(rge_chip_factotum)
 
 uint_t
-rge_chip_factotum(caddr_t arg)
+rge_chip_factotum(caddr_t arg1, caddr_t arg2)
 {
 	rge_t *rgep;
 	uint_t result;
 	boolean_t error;
 	boolean_t linkchg;
 
-	rgep = (rge_t *)arg;
+	rgep = (rge_t *)arg1;
+	_NOTE(ARGUNUSED(arg2))
 
 	if (rgep->factotum_flag == 0)
 		return (DDI_INTR_UNCLAIMED);
@@ -1851,14 +1951,8 @@ rge_pp_ioctl(rge_t *rgep, int cmd, mblk_t *mp, struct iocblk *iocp)
 		case RGE_PP_SPACE_TXDESC:
 			areap = &rgep->dma_area_txdesc;
 			break;
-		case RGE_PP_SPACE_TXBUFF:
-			areap = &rgep->dma_area_txbuf[0];
-			break;
 		case RGE_PP_SPACE_RXDESC:
 			areap = &rgep->dma_area_rxdesc;
-			break;
-		case RGE_PP_SPACE_RXBUFF:
-			areap = &rgep->dma_area_rxbuf[0];
 			break;
 		case RGE_PP_SPACE_STATISTICS:
 			areap = &rgep->dma_area_stats;

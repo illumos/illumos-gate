@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +46,8 @@ extern "C" {
 #define	VENDOR_ID_REALTECK		0x10EC
 #define	DEVICE_ID_8169			0x8169
 #define	DEVICE_ID_8110			0x8110
+#define	DEVICE_ID_8168			0x8168
+#define	DEVICE_ID_8111			0x8111
 
 #define	RGE_REGISTER_MAX		0x0100
 
@@ -77,6 +78,7 @@ extern "C" {
 #define	MULTICAST_5_REG			0x000d
 #define	MULTICAST_6_REG			0x000e
 #define	MULTICAST_7_REG			0x000f
+#define	RGE_MCAST_NUM			8 /* total 8 registers: MAR0 - MAR7 */
 
 /*
  * Dump Tally Counter Command register
@@ -131,9 +133,8 @@ extern "C" {
 #define	INT_REG_RESV			0x3e00
 #define	INT_MASK_ALL			0xffff
 #define	INT_MASK_NONE			0x0000
-#define	RGE_RX_OVERFLOW_INT		(NO_RXDESC_INT | RX_FIFO_OVERFLOW_INT)
 #define	RGE_RX_INT			(RX_OK_INT | RX_ERR_INT | \
-					    RGE_RX_OVERFLOW_INT)
+					    NO_RXDESC_INT)
 #define	RGE_INT_MASK			(RGE_RX_INT | LINK_CHANGE_INT)
 
 /*
@@ -158,10 +159,13 @@ extern "C" {
 #define	TX_DMA_BURST_32B		0x00000100
 #define	TX_DMA_BURST_16B		0x00000000
 
-#define	MAC_VER_NS			0x00000000
-#define	MAC_VER_SD			0x00800000
-#define	MAC_VER_SE			0x04000000
-#define	MAC_VER_SB			0x10000000
+#define	MAC_VER_8169			0x00000000
+#define	MAC_VER_8169S_D			0x00800000
+#define	MAC_VER_8169S_E			0x04000000
+#define	MAC_VER_8169SB			0x10000000
+#define	MAC_VER_8168			0x20000000
+#define	MAC_VER_8168B_B			0x30000000
+#define	MAC_VER_8168B_C			0x38000000
 
 #define	TX_CONFIG_DEFAULT		(TX_INTERFRAME_GAP_802_3 | \
 					    TX_DMA_BURST_1024B)
@@ -253,6 +257,16 @@ extern "C" {
 #define	PHY_REG_SHIFT			16
 
 /*
+ * CSI data register (for PCIE chipset)
+ */
+#define	RT_CSI_DATA_REG			0x0064
+
+/*
+ * CSI access register  (for PCIE chipset)
+ */
+#define	RT_CSI_ACCESS_REG		0x0068
+
+/*
  * PHY status register
  */
 #define	PHY_STATUS_REG			0x006c
@@ -269,6 +283,17 @@ extern "C" {
 #define	RGE_SPEED_100M			100
 #define	RGE_SPEED_10M			10
 #define	RGE_SPEED_UNKNOWN		0
+
+/*
+ * EPHY access register (for PCIE chipset)
+ */
+#define	EPHY_ACCESS_REG			0x0080
+#define	EPHY_ACCESS_WR_FLAG		0x80000000
+#define	EPHY_ACCESS_REG_BITS		0x001f0000
+#define	EPHY_ACCESS_DATA_BITS		0x0000ffff
+#define	EPHY_DATA_MASK			0xffff
+#define	EPHY_REG_MASK			0x1f
+#define	EPHY_REG_SHIFT			16
 
 /*
  * Receive packet maximum size register
@@ -415,11 +440,13 @@ extern "C" {
 #define	PHY_GBESR_REG			0x0f
 
 #define	PHY_1F_REG			0x1f
+#define	PHY_1C_REG			0x1c
 #define	PHY_1B_REG			0x1b
-#define	PHY_15_REG			0x15
 #define	PHY_18_REG			0x18
-#define	PHY_0B_REG			0x0b
+#define	PHY_15_REG			0x15
+#define	PHY_12_REG			0x12
 #define	PHY_0E_REG			0x0e
+#define	PHY_0B_REG			0x0b
 
 /*
  * MII (PHY) registers, beyond those already defined in <sys/miiregs.h>
@@ -519,6 +546,7 @@ extern "C" {
 #define	RGE_BUFF_SIZE_STD		1536	/* 1536 bytes */
 #define	RGE_BUFF_SIZE_JUMBO		7168	/* maximum 7K */
 #define	RGE_JUMBO_SIZE			7014
+#define	RGE_JUMBO_MTU			7000
 #define	RGE_STATS_DUMP_SIZE		64
 
 typedef struct rge_bd {

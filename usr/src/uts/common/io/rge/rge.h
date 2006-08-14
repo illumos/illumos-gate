@@ -51,7 +51,6 @@ extern "C" {
 #include <sys/conf.h>
 
 #include <netinet/ip6.h>
-
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/mi.h>
@@ -67,20 +66,15 @@ extern "C" {
 
 /*
  * Reconfiguring the network devices requires the net_config privilege
- * in Solaris 10+.  Prior to this, root privilege is required.  In order
- * that the driver binary can run on both S10+ and earlier versions, we
- * make the decisiion as to which to use at runtime.  These declarations
- * allow for either (or both) to exist ...
+ * in Solaris 10+.
  */
 extern int secpolicy_net_config(const cred_t *, boolean_t);
-extern int drv_priv(cred_t *);
-#pragma weak    secpolicy_net_config
-#pragma weak    drv_priv
 
 #include <sys/netlb.h>			/* originally from cassini	*/
 #include <sys/miiregs.h>		/* by fjlite out of intel 	*/
 
 #include "rge_hw.h"
+
 /*
  * Name of the driver
  */
@@ -163,7 +157,6 @@ typedef struct {
 #define	PHY_RESET_LOOP		1000
 #define	STATS_DUMP_LOOP		1000
 #define	RXBUFF_FREE_LOOP	1000
-#define	RGE_SPLIT		128
 #define	RGE_RX_INT_TIME		128
 #define	RGE_RX_INT_PKTS		8
 
@@ -214,7 +207,6 @@ enum {
 	PARAM_LINK_DUPLEX,
 
 	PARAM_LOOP_MODE,
-	PARAM_DEFAULT_MTU,
 
 	PARAM_COUNT
 };
@@ -229,7 +221,8 @@ enum rge_chip_state {
 };
 
 enum rge_mac_state {
-	RGE_MAC_STOPPED = 0,
+	RGE_MAC_ATTACH = 0,
+	RGE_MAC_STOPPED,
 	RGE_MAC_STARTED,
 	RGE_MAC_UNATTACH
 };
@@ -261,13 +254,6 @@ enum {
 	RGE_KSTAT_PARAMS = 0,
 	RGE_KSTAT_DRIVER,
 	RGE_KSTAT_COUNT
-};
-
-enum {
-	IS_IPV4_PKT = 1,
-	IS_UDP_PKT,
-	IS_TCP_PKT,
-	UNKNOWN_PKT
 };
 
 /*
@@ -362,6 +348,7 @@ typedef struct {
 	uint8_t			revision;	/* revision-id		*/
 	uint8_t			clsize;		/* cache-line-size	*/
 	uint8_t			latency;	/* latency-timer	*/
+	boolean_t		is_pcie;
 	uint32_t		mac_ver;
 	uint32_t		phy_ver;
 	uint32_t		rxconfig;
@@ -377,7 +364,6 @@ typedef struct rge_stats {
 	uint32_t	in_short;
 	uint32_t	no_rcvbuf;	/* ifInDiscards */
 	uint32_t	intr;		/* interrupt count */
-	uint32_t	recycle_err;
 	uint16_t	chip_reset;
 	uint16_t	phy_reset;
 } rge_stats_t;
@@ -392,13 +378,23 @@ typedef struct rge {
 	ddi_acc_handle_t	io_handle;	/* DDI I/O handle	*/
 	caddr_t			io_regs;	/* mapped registers	*/
 	cyclic_id_t		cyclic_id;	/* cyclic callback	*/
-	ddi_softintr_t		resched_id;	/* reschedule callback	*/
-	ddi_softintr_t		factotum_id;	/* factotum callback	*/
-	ddi_iblock_cookie_t	iblk;
+	ddi_softint_handle_t	resched_hdl;	/* reschedule callback	*/
+	ddi_softint_handle_t	factotum_hdl;	/* factotum callback	*/
+	uint_t			soft_pri;
+	ddi_intr_handle_t 	*htable;	/* For array of interrupts */
+	int			intr_type;	/* What type of interrupt */
+	int			intr_rqst;	/* # of request intrs count */
+	int			intr_cnt;	/* # of intrs count returned */
+	uint_t			intr_pri;	/* Interrupt priority	*/
+	int			intr_cap;	/* Interrupt capabilities */
+	boolean_t		msi_enable;
+
 	uint32_t		ethmax_size;
+	uint32_t		default_mtu;
 	uint32_t		rxbuf_size;
 	uint32_t		txbuf_size;
-
+	uint32_t		chip_flags;
+	uint32_t		head_room;
 	char			ifname[8];	/* "rge0" ... "rge999"	*/
 	int32_t			instance;
 	uint32_t		progress;	/* attach tracking	*/
@@ -413,9 +409,6 @@ typedef struct rge {
 	 */
 	dma_area_t		dma_area_rxdesc;
 	dma_area_t		dma_area_txdesc;
-	dma_area_t		dma_area_rxbuf[RGE_SPLIT];
-	dma_area_t		dma_area_freebuf[RGE_SPLIT];
-	dma_area_t		dma_area_txbuf[RGE_SPLIT];
 	dma_area_t		dma_area_stats;
 				/* describes hardware statistics area	*/
 
@@ -424,7 +417,7 @@ typedef struct rge {
 
 	/* used for multicast/promisc mode set */
 	char			mcast_refs[RGE_MCAST_BUF_SIZE];
-	uint32_t		mcast_hash[2];
+	uint8_t			mcast_hash[RGE_MCAST_NUM];
 	boolean_t		promisc;	/* promisc state flag	*/
 
 	/* used for recv */
@@ -433,9 +426,7 @@ typedef struct rge {
 	boolean_t		rx_bcopy;
 	uint32_t		rx_next;	/* current rx bd index	*/
 	sw_rbd_t		*sw_rbds;
-	dma_buf_t		*sw_rbuf;
-	sw_rbd_t		*free_rbds;
-	dma_buf_t		*sw_freebuf;
+	sw_rbd_t		*free_srbds;
 	uint32_t		rf_next;	/* current free buf index */
 	uint32_t		rc_next;	/* current recycle buf index */
 	uint32_t		rx_free;	/* number of rx free buf */
@@ -511,11 +502,16 @@ typedef struct rge {
 #define	PROGRESS_FACTOTUM	0x0020	/* factotum softint registered	*/
 #define	PROGRESS_INTR		0X0040	/* h/w interrupt registered	*/
 					/* and mutexen initialised	*/
-#define	PROGRESS_HWINT		0x0080	/* rx/buf/tx ring initialised	*/
+#define	PROGRESS_INIT		0x0080	/* rx/buf/tx ring initialised	*/
 #define	PROGRESS_PHY		0x0100	/* PHY initialised		*/
 #define	PROGRESS_NDD		0x1000	/* NDD parameters set up	*/
 #define	PROGRESS_KSTATS		0x2000	/* kstats created		*/
 #define	PROGRESS_READY		0x8000	/* ready for work		*/
+
+/*
+ * Special chip flags
+ */
+#define	CHIP_FLAG_FORCE_BCOPY	0x10000000
 
 /*
  * Shorthand for the NDD parameters
@@ -535,7 +531,6 @@ typedef struct rge {
 #define	param_link_duplex	nd_params[PARAM_LINK_DUPLEX].ndp_val
 
 #define	param_loop_mode		nd_params[PARAM_LOOP_MODE].ndp_val
-#define	param_default_mtu	nd_params[PARAM_DEFAULT_MTU].ndp_val
 
 /*
  * Sync a DMA area described by a dma_area_t
@@ -723,8 +718,8 @@ void rge_chip_sync(rge_t *rgep, enum rge_sync_op todo);
 void rge_chip_blank(void *arg, time_t ticks, uint_t count);
 void rge_tx_trigger(rge_t *rgep);
 void rge_hw_stats_dump(rge_t *rgep);
-uint_t rge_intr(caddr_t arg);
-uint_t rge_chip_factotum(caddr_t arg);
+uint_t rge_intr(caddr_t arg1, caddr_t arg2);
+uint_t rge_chip_factotum(caddr_t arg1, caddr_t arg2);
 void rge_chip_cyclic(void *arg);
 enum ioc_reply rge_chip_ioctl(rge_t *rgep, queue_t *wq, mblk_t *mp,
 	struct iocblk *iocp);
@@ -764,7 +759,7 @@ void rge_nd_cleanup(rge_t *rgep);
 void rge_rx_recycle(caddr_t arg);
 void rge_receive(rge_t *rgep);
 mblk_t *rge_m_tx(void *arg, mblk_t *mp);
-uint_t rge_reschedule(caddr_t arg);
+uint_t rge_reschedule(caddr_t arg1, caddr_t arg2);
 
 #ifdef __cplusplus
 }

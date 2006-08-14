@@ -1,6 +1,6 @@
 #!/sbin/sh
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -107,4 +107,4 @@ check_add_drv()
 
 }
 
-check_add_drv -i '"pci10ec,8139"' -b "$BASEDIR" rtls
+check_add_drv -i '"pci10ec,8139" "pci1186,1301" "pci1113,1211"' -b "$BASEDIR" rtls

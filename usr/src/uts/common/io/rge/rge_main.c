@@ -31,7 +31,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char rge_ident[] = "Realtek Gigabit Ethernet Driver v%I%";
+static char rge_ident[] = "Realtek 1Gb Ethernet v%I%";
 
 /*
  * Used for buffers allocated by ddi_dma_mem_alloc()
@@ -102,7 +102,9 @@ static ddi_device_acc_attr_t rge_buf_accattr = {
 /*
  * Property names
  */
-static char debug_propname[] = "rge-debug-flags";
+static char debug_propname[] = "rge_debug_flags";
+static char mtu_propname[] = "default_mtu";
+static char msi_propname[] = "msi_enable";
 
 static int		rge_m_start(void *);
 static void		rge_m_stop(void *);
@@ -234,16 +236,11 @@ rge_slice_chunk(dma_area_t *slice, dma_area_t *chunk,
 	chunk->cookie.dmac_size -= totsize;
 }
 
-
 static int
 rge_alloc_bufs(rge_t *rgep)
 {
 	size_t txdescsize;
 	size_t rxdescsize;
-	size_t txbuffsize;
-	size_t rxbuffsize;
-	size_t freebuffsize;
-	int split;
 	int err;
 
 	/*
@@ -285,54 +282,6 @@ rge_alloc_bufs(rge_t *rgep)
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
-	/*
-	 * Allocate memory & handle for Tx buffers
-	 */
-	txbuffsize = RGE_SEND_SLOTS * rgep->txbuf_size;
-	ASSERT((txbuffsize % RGE_SPLIT) == 0);
-	for (split = 0; split < RGE_SPLIT; ++split) {
-		err = rge_alloc_dma_mem(rgep,
-		    txbuffsize/RGE_SPLIT,
-		    &dma_attr_buf,
-		    &rge_buf_accattr,
-		    DDI_DMA_WRITE | DDI_DMA_STREAMING,
-		    &rgep->dma_area_txbuf[split]);
-		if (err != DDI_SUCCESS)
-			return (DDI_FAILURE);
-	}
-
-	/*
-	 * Allocate memory & handle for Rx buffers
-	 */
-	rxbuffsize = RGE_RECV_SLOTS * rgep->rxbuf_size;
-	ASSERT((rxbuffsize % RGE_SPLIT) == 0);
-	for (split = 0; split < RGE_SPLIT; ++split) {
-		err = rge_alloc_dma_mem(rgep,
-		    rxbuffsize/RGE_SPLIT,
-		    &dma_attr_buf,
-		    &rge_buf_accattr,
-		    DDI_DMA_READ | DDI_DMA_STREAMING,
-		    &rgep->dma_area_rxbuf[split]);
-		if (err != DDI_SUCCESS)
-			return (DDI_FAILURE);
-	}
-
-	/*
-	 * Allocate memory & handle for free Rx buffers
-	 */
-	freebuffsize = RGE_BUF_SLOTS * rgep->rxbuf_size;
-	ASSERT((freebuffsize % RGE_SPLIT) == 0);
-	for (split = 0; split < RGE_SPLIT; ++split) {
-		err = rge_alloc_dma_mem(rgep,
-		    freebuffsize/RGE_SPLIT,
-		    &dma_attr_buf,
-		    &rge_buf_accattr,
-		    DDI_DMA_READ | DDI_DMA_STREAMING,
-		    &rgep->dma_area_freebuf[split]);
-		if (err != DDI_SUCCESS)
-			return (DDI_FAILURE);
-	}
-
 	return (DDI_SUCCESS);
 }
 
@@ -343,16 +292,9 @@ rge_alloc_bufs(rge_t *rgep)
 static void
 rge_free_bufs(rge_t *rgep)
 {
-	int i;
-
 	rge_free_dma_mem(&rgep->dma_area_stats);
 	rge_free_dma_mem(&rgep->dma_area_txdesc);
 	rge_free_dma_mem(&rgep->dma_area_rxdesc);
-	for (i = 0; i < RGE_SPLIT; i++) {
-		rge_free_dma_mem(&rgep->dma_area_txbuf[i]);
-		rge_free_dma_mem(&rgep->dma_area_rxbuf[i]);
-		rge_free_dma_mem(&rgep->dma_area_freebuf[i]);
-	}
 }
 
 /*
@@ -413,11 +355,11 @@ rge_reinit_recv_ring(rge_t *rgep)
 	for (slot = 0; slot < RGE_RECV_SLOTS; slot++) {
 		pbuf = &srbdp->rx_buf->pbuf;
 		bdp->host_buf_addr =
-		    RGE_BSWAP_32(pbuf->cookie.dmac_laddress + RGE_HEADROOM);
+		    RGE_BSWAP_32(pbuf->cookie.dmac_laddress + rgep->head_room);
 		bdp->host_buf_addr_hi =
 		    RGE_BSWAP_32(pbuf->cookie.dmac_laddress >> 32);
 		bdp->flags_len = RGE_BSWAP_32(BD_FLAG_HW_OWN |
-		    (rgep->rxbuf_size - RGE_HEADROOM));
+		    (rgep->rxbuf_size - rgep->head_room));
 		/* last BD in Tx ring */
 		if (slot == (RGE_RECV_SLOTS - 1))
 			bdp->flags_len |= RGE_BSWAP_32(BD_FLAG_EOR);
@@ -432,11 +374,14 @@ rge_reinit_recv_ring(rge_t *rgep)
 static void
 rge_reinit_buf_ring(rge_t *rgep)
 {
+
+	if (rgep->chip_flags & CHIP_FLAG_FORCE_BCOPY)
+		return;
+
 	/*
-	 * re-init free buffer ring
+	 * If all the up-sending buffers haven't been returned to driver,
+	 * use bcopy() only in rx process.
 	 */
-	rgep->rc_next = 0;
-	rgep->rf_next = 0;
 	if (rgep->rx_free != RGE_BUF_SLOTS)
 		rgep->rx_bcopy = B_TRUE;
 }
@@ -450,14 +395,88 @@ rge_reinit_rings(rge_t *rgep)
 }
 
 static void
+rge_fini_send_ring(rge_t *rgep)
+{
+	sw_sbd_t *ssbdp;
+	uint32_t slot;
+
+	ssbdp = rgep->sw_sbds;
+	for (slot = 0; slot < RGE_SEND_SLOTS; ++slot) {
+		rge_free_dma_mem(&ssbdp->pbuf);
+		ssbdp++;
+	}
+
+	kmem_free(rgep->sw_sbds, RGE_SEND_SLOTS * sizeof (sw_sbd_t));
+	rgep->sw_sbds = NULL;
+}
+
+static void
+rge_fini_recv_ring(rge_t *rgep)
+{
+	sw_rbd_t *srbdp;
+	uint32_t slot;
+
+	srbdp = rgep->sw_rbds;
+	for (slot = 0; slot < RGE_RECV_SLOTS; ++srbdp, ++slot) {
+		if (srbdp->rx_buf) {
+			if (srbdp->rx_buf->mp != NULL) {
+				freemsg(srbdp->rx_buf->mp);
+				srbdp->rx_buf->mp = NULL;
+			}
+			rge_free_dma_mem(&srbdp->rx_buf->pbuf);
+			kmem_free(srbdp->rx_buf, sizeof (dma_buf_t));
+			srbdp->rx_buf = NULL;
+		}
+	}
+
+	kmem_free(rgep->sw_rbds, RGE_RECV_SLOTS * sizeof (sw_rbd_t));
+	rgep->sw_rbds = NULL;
+}
+
+static void
+rge_fini_buf_ring(rge_t *rgep)
+{
+	sw_rbd_t *srbdp;
+	uint32_t slot;
+
+	if (rgep->chip_flags & CHIP_FLAG_FORCE_BCOPY)
+		return;
+
+	ASSERT(rgep->rx_free == RGE_BUF_SLOTS);
+
+	srbdp = rgep->free_srbds;
+	for (slot = 0; slot < RGE_BUF_SLOTS; ++srbdp, ++slot) {
+		if (srbdp->rx_buf != NULL) {
+			if (srbdp->rx_buf->mp != NULL) {
+				freemsg(srbdp->rx_buf->mp);
+				srbdp->rx_buf->mp = NULL;
+			}
+			rge_free_dma_mem(&srbdp->rx_buf->pbuf);
+			kmem_free(srbdp->rx_buf, sizeof (dma_buf_t));
+			srbdp->rx_buf = NULL;
+		}
+	}
+
+	kmem_free(rgep->free_srbds, RGE_BUF_SLOTS * sizeof (sw_rbd_t));
+	rgep->free_srbds = NULL;
+}
+
+static void
+rge_fini_rings(rge_t *rgep)
+{
+	rge_fini_send_ring(rgep);
+	rge_fini_recv_ring(rgep);
+	rge_fini_buf_ring(rgep);
+}
+
+static int
 rge_init_send_ring(rge_t *rgep)
 {
 	uint32_t slot;
-	uint32_t split;
-	rge_bd_t *bdp;
 	sw_sbd_t *ssbdp;
-	dma_area_t buf_chunk;
 	dma_area_t *pbuf;
+	dma_area_t desc;
+	int err;
 
 	/*
 	 * Allocate the array of s/w Tx Buffer Descriptors
@@ -468,55 +487,49 @@ rge_init_send_ring(rge_t *rgep)
 	/*
 	 * Init send ring
 	 */
-	rgep->tx_next = 0;
-	rgep->tc_next = 0;
-	rgep->tc_tail = 0;
-	rgep->tx_flow = 0;
-	rgep->tx_free = RGE_SEND_SLOTS;
 	rgep->tx_desc = rgep->dma_area_txdesc;
 	DMA_ZERO(rgep->tx_desc);
-	bdp = rgep->tx_desc.mem_va;
-	rgep->tx_ring = bdp;
-	for (split = 0; split < RGE_SPLIT; split++) {
-		buf_chunk = rgep->dma_area_txbuf[split];
-		for (slot = 0; slot < RGE_SEND_SLOTS/RGE_SPLIT; slot++) {
-			rge_slice_chunk(&ssbdp->desc, &rgep->dma_area_txdesc,
-			    1, sizeof (rge_bd_t));
-			pbuf = &ssbdp->pbuf;
-			rge_slice_chunk(pbuf, &buf_chunk, 1, rgep->txbuf_size);
-			bdp->host_buf_addr =
-			    RGE_BSWAP_32(pbuf->cookie.dmac_laddress);
-			bdp->host_buf_addr_hi =
-			    RGE_BSWAP_32(pbuf->cookie.dmac_laddress >> 32);
-			/* last BD in Tx ring */
-			if (split == (RGE_SPLIT - 1) &&
-			    slot == (RGE_SEND_SLOTS/RGE_SPLIT -1))
-				bdp->flags_len |= RGE_BSWAP_32(BD_FLAG_EOR);
-			ssbdp++;
-			bdp++;
+	rgep->tx_ring = rgep->tx_desc.mem_va;
+
+	desc = rgep->tx_desc;
+	for (slot = 0; slot < RGE_SEND_SLOTS; slot++) {
+		rge_slice_chunk(&ssbdp->desc, &desc, 1, sizeof (rge_bd_t));
+
+		/*
+		 * Allocate memory & handle for Tx buffers
+		 */
+		pbuf = &ssbdp->pbuf;
+		err = rge_alloc_dma_mem(rgep, rgep->txbuf_size,
+		    &dma_attr_buf, &rge_buf_accattr,
+		    DDI_DMA_WRITE | DDI_DMA_STREAMING, pbuf);
+		if (err != DDI_SUCCESS) {
+			rge_error(rgep,
+			    "rge_init_send_ring: alloc tx buffer failed");
+			rge_fini_send_ring(rgep);
+			return (DDI_FAILURE);
 		}
+		ssbdp++;
 	}
+	ASSERT(desc.alength == 0);
+
 	DMA_SYNC(rgep->tx_desc, DDI_DMA_SYNC_FORDEV);
+	return (DDI_SUCCESS);
 }
 
 static int
 rge_init_recv_ring(rge_t *rgep)
 {
 	uint32_t slot;
-	uint32_t split;
-	rge_bd_t *bdp;
 	sw_rbd_t *srbdp;
 	dma_buf_t *rx_buf;
-	dma_area_t buf_chunk;
 	dma_area_t *pbuf;
+	int err;
 
 	/*
 	 * Allocate the array of s/w Rx Buffer Descriptors
 	 */
 	srbdp = kmem_zalloc(RGE_RECV_SLOTS*sizeof (*srbdp), KM_SLEEP);
-	rx_buf = kmem_zalloc(RGE_RECV_SLOTS*sizeof (*rx_buf), KM_SLEEP);
 	rgep->sw_rbds = srbdp;
-	rgep->sw_rbuf = rx_buf;
 
 	/*
 	 * Init receive ring
@@ -524,41 +537,42 @@ rge_init_recv_ring(rge_t *rgep)
 	rgep->rx_next = 0;
 	rgep->rx_desc = rgep->dma_area_rxdesc;
 	DMA_ZERO(rgep->rx_desc);
-	bdp = rgep->rx_desc.mem_va;
-	rgep->rx_ring = bdp;
-	for (split = 0; split < RGE_SPLIT; split++) {
-		buf_chunk = rgep->dma_area_rxbuf[split];
-		for (slot = 0; slot < RGE_RECV_SLOTS/RGE_SPLIT; slot++) {
-			srbdp->rx_buf = rx_buf;
-			pbuf = &rx_buf->pbuf;
-			rge_slice_chunk(pbuf, &buf_chunk, 1, rgep->rxbuf_size);
-			pbuf->alength -= RGE_HEADROOM;
-			pbuf->offset += RGE_HEADROOM;
+	rgep->rx_ring = rgep->rx_desc.mem_va;
+
+	for (slot = 0; slot < RGE_RECV_SLOTS; slot++) {
+		srbdp->rx_buf = rx_buf =
+		    kmem_zalloc(sizeof (dma_buf_t), KM_SLEEP);
+
+		/*
+		 * Allocate memory & handle for Rx buffers
+		 */
+		pbuf = &rx_buf->pbuf;
+		err = rge_alloc_dma_mem(rgep, rgep->rxbuf_size,
+		    &dma_attr_buf, &rge_buf_accattr,
+		    DDI_DMA_READ | DDI_DMA_STREAMING, pbuf);
+		if (err != DDI_SUCCESS) {
+			rge_fini_recv_ring(rgep);
+			rge_error(rgep,
+			    "rge_init_recv_ring: alloc rx buffer failed");
+			return (DDI_FAILURE);
+		}
+
+		pbuf->alength -= rgep->head_room;
+		pbuf->offset += rgep->head_room;
+		if (!(rgep->chip_flags & CHIP_FLAG_FORCE_BCOPY)) {
 			rx_buf->rx_recycle.free_func = rge_rx_recycle;
 			rx_buf->rx_recycle.free_arg = (caddr_t)rx_buf;
 			rx_buf->private = (caddr_t)rgep;
 			rx_buf->mp = desballoc(DMA_VPTR(rx_buf->pbuf),
 			    rgep->rxbuf_size, 0, &rx_buf->rx_recycle);
 			if (rx_buf->mp == NULL) {
+				rge_fini_recv_ring(rgep);
 				rge_problem(rgep,
 				    "rge_init_recv_ring: desballoc() failed");
 				return (DDI_FAILURE);
 			}
-
-			bdp->host_buf_addr = RGE_BSWAP_32(RGE_HEADROOM +
-			    pbuf->cookie.dmac_laddress);
-			bdp->host_buf_addr_hi =
-			    RGE_BSWAP_32(pbuf->cookie.dmac_laddress >> 32);
-			bdp->flags_len = RGE_BSWAP_32(BD_FLAG_HW_OWN |
-			    (rgep->rxbuf_size - RGE_HEADROOM));
-			/* last BD in Rx ring */
-			if (split == (RGE_SPLIT - 1) &&
-			    slot == (RGE_RECV_SLOTS/RGE_SPLIT -1))
-				bdp->flags_len |= RGE_BSWAP_32(BD_FLAG_EOR);
-			srbdp++;
-			bdp++;
-			rx_buf++;
 		}
+		srbdp++;
 	}
 	DMA_SYNC(rgep->rx_desc, DDI_DMA_SYNC_FORDEV);
 	return (DDI_SUCCESS);
@@ -568,19 +582,21 @@ static int
 rge_init_buf_ring(rge_t *rgep)
 {
 	uint32_t slot;
-	uint32_t split;
-	sw_rbd_t *free_rbdp;
+	sw_rbd_t *free_srbdp;
 	dma_buf_t *rx_buf;
-	dma_area_t buf_chunk;
 	dma_area_t *pbuf;
+	int err;
+
+	if (rgep->chip_flags & CHIP_FLAG_FORCE_BCOPY) {
+		rgep->rx_bcopy = B_TRUE;
+		return (DDI_SUCCESS);
+	}
 
 	/*
 	 * Allocate the array of s/w free Buffer Descriptors
 	 */
-	free_rbdp = kmem_zalloc(RGE_BUF_SLOTS*sizeof (*free_rbdp), KM_SLEEP);
-	rx_buf = kmem_zalloc(RGE_BUF_SLOTS*sizeof (*rx_buf), KM_SLEEP);
-	rgep->free_rbds = free_rbdp;
-	rgep->sw_freebuf = rx_buf;
+	free_srbdp = kmem_zalloc(RGE_BUF_SLOTS*sizeof (*free_srbdp), KM_SLEEP);
+	rgep->free_srbds = free_srbdp;
 
 	/*
 	 * Init free buffer ring
@@ -589,27 +605,37 @@ rge_init_buf_ring(rge_t *rgep)
 	rgep->rf_next = 0;
 	rgep->rx_bcopy = B_FALSE;
 	rgep->rx_free = RGE_BUF_SLOTS;
-	for (split = 0; split < RGE_SPLIT; split++) {
-		buf_chunk = rgep->dma_area_freebuf[split];
-		for (slot = 0; slot < RGE_BUF_SLOTS/RGE_SPLIT; slot++) {
-			free_rbdp->rx_buf = rx_buf;
-			pbuf = &rx_buf->pbuf;
-			rge_slice_chunk(pbuf, &buf_chunk, 1, rgep->rxbuf_size);
-			pbuf->alength -= RGE_HEADROOM;
-			pbuf->offset += RGE_HEADROOM;
-			rx_buf->rx_recycle.free_func = rge_rx_recycle;
-			rx_buf->rx_recycle.free_arg = (caddr_t)rx_buf;
-			rx_buf->private = (caddr_t)rgep;
-			rx_buf->mp = desballoc(DMA_VPTR(rx_buf->pbuf),
-			    rgep->rxbuf_size, 0, &rx_buf->rx_recycle);
-			if (rx_buf->mp == NULL) {
-				rge_problem(rgep,
-				    "rge_init_buf_ring: desballoc() failed");
-				return (DDI_FAILURE);
-			}
-			free_rbdp++;
-			rx_buf++;
+	for (slot = 0; slot < RGE_BUF_SLOTS; slot++) {
+		free_srbdp->rx_buf = rx_buf =
+		    kmem_zalloc(sizeof (dma_buf_t), KM_SLEEP);
+
+		/*
+		 * Allocate memory & handle for free Rx buffers
+		 */
+		pbuf = &rx_buf->pbuf;
+		err = rge_alloc_dma_mem(rgep, rgep->rxbuf_size,
+		    &dma_attr_buf, &rge_buf_accattr,
+		    DDI_DMA_READ | DDI_DMA_STREAMING, pbuf);
+		if (err != DDI_SUCCESS) {
+			rge_fini_buf_ring(rgep);
+			rge_error(rgep,
+			    "rge_init_buf_ring: alloc rx free buffer failed");
+			return (DDI_FAILURE);
 		}
+		pbuf->alength -= rgep->head_room;
+		pbuf->offset += rgep->head_room;
+		rx_buf->rx_recycle.free_func = rge_rx_recycle;
+		rx_buf->rx_recycle.free_arg = (caddr_t)rx_buf;
+		rx_buf->private = (caddr_t)rgep;
+		rx_buf->mp = desballoc(DMA_VPTR(rx_buf->pbuf),
+		    rgep->rxbuf_size, 0, &rx_buf->rx_recycle);
+		if (rx_buf->mp == NULL) {
+			rge_fini_buf_ring(rgep);
+			rge_problem(rgep,
+			    "rge_init_buf_ring: desballoc() failed");
+			return (DDI_FAILURE);
+		}
+		free_srbdp++;
 	}
 	return (DDI_SUCCESS);
 }
@@ -619,48 +645,24 @@ rge_init_rings(rge_t *rgep)
 {
 	int err;
 
-	rge_init_send_ring(rgep);
+	err = rge_init_send_ring(rgep);
+	if (err != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
 	err = rge_init_recv_ring(rgep);
+	if (err != DDI_SUCCESS) {
+		rge_fini_send_ring(rgep);
+		return (DDI_FAILURE);
+	}
+
 	err = rge_init_buf_ring(rgep);
-	return (err);
-}
+	if (err != DDI_SUCCESS) {
+		rge_fini_send_ring(rgep);
+		rge_fini_recv_ring(rgep);
+		return (DDI_FAILURE);
+	}
 
-static void
-rge_fini_send_ring(rge_t *rgep)
-{
-	kmem_free(rgep->sw_sbds, RGE_SEND_SLOTS * sizeof (sw_sbd_t));
-}
-
-static void
-rge_fini_recv_ring(rge_t *rgep)
-{
-	dma_buf_t *rx_buf = rgep->sw_rbuf;
-	uint32_t slot;
-
-	for (slot = 0; slot < RGE_RECV_SLOTS; slot++, rx_buf++)
-		freemsg(rx_buf->mp);
-	kmem_free(rgep->sw_rbuf, RGE_RECV_SLOTS * sizeof (dma_buf_t));
-	kmem_free(rgep->sw_rbds, RGE_RECV_SLOTS * sizeof (sw_rbd_t));
-}
-
-static void
-rge_fini_buf_ring(rge_t *rgep)
-{
-	dma_buf_t *rx_buf = rgep->sw_freebuf;
-	uint32_t slot;
-
-	for (slot = 0; slot < RGE_BUF_SLOTS; slot++, rx_buf++)
-		freemsg(rx_buf->mp);
-	kmem_free(rgep->sw_freebuf, RGE_BUF_SLOTS * sizeof (dma_buf_t));
-	kmem_free(rgep->free_rbds, RGE_BUF_SLOTS * sizeof (sw_rbd_t));
-}
-
-static void
-rge_fini_rings(rge_t *rgep)
-{
-	rge_fini_send_ring(rgep);
-	rge_fini_recv_ring(rgep);
-	rge_fini_buf_ring(rgep);
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -759,7 +761,8 @@ rge_restart(rge_t *rgep)
 	rgep->stats.chip_reset++;
 	if (rgep->rge_mac_state == RGE_MAC_STARTED) {
 		rge_start(rgep);
-		ddi_trigger_softintr(rgep->resched_id);
+		rgep->resched_needed = B_TRUE;
+		(void) ddi_intr_trigger_softint(rgep->resched_hdl, NULL);
 	}
 }
 
@@ -859,7 +862,7 @@ rge_m_unicst(void *arg, const uint8_t *macaddr)
 static uint32_t
 rge_hash_index(const uint8_t *mca)
 {
-	uint32_t crc = (ulong_t)RGE_HASH_CRC;
+	uint32_t crc = (uint32_t)RGE_HASH_CRC;
 	uint32_t const POLY = RGE_HASH_POLY;
 	uint32_t msb;
 	int bytes;
@@ -872,14 +875,13 @@ rge_hash_index(const uint8_t *mca)
 		for (bit = 0; bit < 8; bit++) {
 			msb = crc >> 31;
 			crc <<= 1;
-			if (msb ^ (currentbyte & 1)) {
+			if (msb ^ (currentbyte & 1))
 				crc ^= POLY;
-				crc |= 0x00000001;
-			}
 			currentbyte >>= 1;
 		}
 	}
 	index = crc >> 26;
+		/* the index value is between 0 and 63(0x3f) */
 
 	return (index);
 }
@@ -893,26 +895,39 @@ rge_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	rge_t *rgep = arg;		/* private device info	*/
 	struct ether_addr *addr;
 	uint32_t index;
-	uint32_t *hashp;
+	uint32_t reg;
+	uint8_t *hashp;
 
 	mutex_enter(rgep->genlock);
 	hashp = rgep->mcast_hash;
 	addr = (struct ether_addr *)mca;
+	/*
+	 * Calculate the Multicast address hash index value
+	 *	Normally, the position of MAR0-MAR7 is
+	 *	MAR0: offset 0x08, ..., MAR7: offset 0x0F.
+	 *
+	 *	For pcie chipset, the position of MAR0-MAR7 is
+	 *	different from others:
+	 *	MAR0: offset 0x0F, ..., MAR7: offset 0x08.
+	 */
 	index = rge_hash_index(addr->ether_addr_octet);
-			/* index value is between 0 and 63 */
+	if (rgep->chipid.is_pcie)
+		reg = (~(index / RGE_MCAST_NUM)) & 0x7;
+	else
+		reg = index / RGE_MCAST_NUM;
 
 	if (add) {
 		if (rgep->mcast_refs[index]++) {
 			mutex_exit(rgep->genlock);
 			return (0);
 		}
-		hashp[index/32] |= 1<< (index % 32);
+		hashp[reg] |= 1 << (index % RGE_MCAST_NUM);
 	} else {
 		if (--rgep->mcast_refs[index]) {
 			mutex_exit(rgep->genlock);
 			return (0);
 		}
-		hashp[index/32] &= ~(1<< (index % 32));
+		hashp[reg] &= ~ (1 << (index % RGE_MCAST_NUM));
 	}
 
 	/*
@@ -1107,13 +1122,9 @@ rge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 
 	if (need_privilege) {
 		/*
-		 * Check for specific net_config privilege on Solaris 10+.
-		 * Otherwise just check for root access ...
+		 * Check for specific net_config privilege
 		 */
-		if (secpolicy_net_config != NULL)
-			err = secpolicy_net_config(iocp->ioc_cr, B_FALSE);
-		else
-			err = drv_priv(iocp->ioc_cr);
+		err = secpolicy_net_config(iocp->ioc_cr, B_FALSE);
 		if (err != 0) {
 			miocnak(wq, mp, 0, err);
 			return;
@@ -1252,6 +1263,146 @@ rge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 }
 
 /*
+ * ============ Init MSI/Fixed Interrupt routines ==============
+ */
+
+/*
+ * rge_add_intrs:
+ *
+ * Register FIXED or MSI interrupts.
+ */
+static int
+rge_add_intrs(rge_t *rgep, int intr_type)
+{
+	dev_info_t *dip = rgep->devinfo;
+	int avail;
+	int actual;
+	int intr_size;
+	int count;
+	int i, j;
+	int ret;
+
+	/* Get number of interrupts */
+	ret = ddi_intr_get_nintrs(dip, intr_type, &count);
+	if ((ret != DDI_SUCCESS) || (count == 0)) {
+		rge_error(rgep, "ddi_intr_get_nintrs() failure, ret: %d, "
+		    "count: %d", ret, count);
+		return (DDI_FAILURE);
+	}
+
+	/* Get number of available interrupts */
+	ret = ddi_intr_get_navail(dip, intr_type, &avail);
+	if ((ret != DDI_SUCCESS) || (avail == 0)) {
+		rge_error(rgep, "ddi_intr_get_navail() failure, "
+		    "ret: %d, avail: %d\n", ret, avail);
+		return (DDI_FAILURE);
+	}
+
+	/* Allocate an array of interrupt handles */
+	intr_size = count * sizeof (ddi_intr_handle_t);
+	rgep->htable = kmem_alloc(intr_size, KM_SLEEP);
+	rgep->intr_rqst = count;
+
+	/* Call ddi_intr_alloc() */
+	ret = ddi_intr_alloc(dip, rgep->htable, intr_type, 0,
+	    count, &actual, DDI_INTR_ALLOC_NORMAL);
+	if (ret != DDI_SUCCESS || actual == 0) {
+		rge_error(rgep, "ddi_intr_alloc() failed %d\n", ret);
+		kmem_free(rgep->htable, intr_size);
+		return (DDI_FAILURE);
+	}
+	if (actual < count) {
+		rge_log(rgep, "ddi_intr_alloc() Requested: %d, Received: %d\n",
+		    count, actual);
+	}
+	rgep->intr_cnt = actual;
+
+	/*
+	 * Get priority for first msi, assume remaining are all the same
+	 */
+	if ((ret = ddi_intr_get_pri(rgep->htable[0], &rgep->intr_pri)) !=
+	    DDI_SUCCESS) {
+		rge_error(rgep, "ddi_intr_get_pri() failed %d\n", ret);
+		/* Free already allocated intr */
+		for (i = 0; i < actual; i++) {
+			(void) ddi_intr_free(rgep->htable[i]);
+		}
+		kmem_free(rgep->htable, intr_size);
+		return (DDI_FAILURE);
+	}
+
+	/* Test for high level mutex */
+	if (rgep->intr_pri >= ddi_intr_get_hilevel_pri()) {
+		rge_error(rgep, "rge_add_intrs:"
+		    "Hi level interrupt not supported");
+		for (i = 0; i < actual; i++)
+			(void) ddi_intr_free(rgep->htable[i]);
+		kmem_free(rgep->htable, intr_size);
+		return (DDI_FAILURE);
+	}
+
+	/* Call ddi_intr_add_handler() */
+	for (i = 0; i < actual; i++) {
+		if ((ret = ddi_intr_add_handler(rgep->htable[i], rge_intr,
+		    (caddr_t)rgep, (caddr_t)(uintptr_t)i)) != DDI_SUCCESS) {
+			rge_error(rgep, "ddi_intr_add_handler() "
+			    "failed %d\n", ret);
+			/* Remove already added intr */
+			for (j = 0; j < i; j++)
+				(void) ddi_intr_remove_handler(rgep->htable[j]);
+			/* Free already allocated intr */
+			for (i = 0; i < actual; i++) {
+				(void) ddi_intr_free(rgep->htable[i]);
+			}
+			kmem_free(rgep->htable, intr_size);
+			return (DDI_FAILURE);
+		}
+	}
+
+	if ((ret = ddi_intr_get_cap(rgep->htable[0], &rgep->intr_cap))
+	    != DDI_SUCCESS) {
+		rge_error(rgep, "ddi_intr_get_cap() failed %d\n", ret);
+		for (i = 0; i < actual; i++) {
+			(void) ddi_intr_remove_handler(rgep->htable[i]);
+			(void) ddi_intr_free(rgep->htable[i]);
+		}
+		kmem_free(rgep->htable, intr_size);
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * rge_rem_intrs:
+ *
+ * Unregister FIXED or MSI interrupts
+ */
+static void
+rge_rem_intrs(rge_t *rgep)
+{
+	int i;
+
+	/* Disable all interrupts */
+	if (rgep->intr_cap & DDI_INTR_FLAG_BLOCK) {
+		/* Call ddi_intr_block_disable() */
+		(void) ddi_intr_block_disable(rgep->htable, rgep->intr_cnt);
+	} else {
+		for (i = 0; i < rgep->intr_cnt; i++) {
+			(void) ddi_intr_disable(rgep->htable[i]);
+		}
+	}
+
+	/* Call ddi_intr_remove_handler() */
+	for (i = 0; i < rgep->intr_cnt; i++) {
+		(void) ddi_intr_remove_handler(rgep->htable[i]);
+		(void) ddi_intr_free(rgep->htable[i]);
+	}
+
+	kmem_free(rgep->htable, rgep->intr_rqst * sizeof (ddi_intr_handle_t));
+}
+
+/*
  * ========== Per-instance setup/teardown code ==========
  */
 
@@ -1283,12 +1434,15 @@ rge_unattach(rge_t *rgep)
 	if (rgep->progress & PROGRESS_PHY)
 		(void) rge_phy_reset(rgep);
 
-	if (rgep->progress & PROGRESS_INTR) {
+	if (rgep->progress & PROGRESS_INIT) {
 		mutex_enter(rgep->genlock);
 		(void) rge_chip_reset(rgep);
 		mutex_exit(rgep->genlock);
-		ddi_remove_intr(rgep->devinfo, 0, rgep->iblk);
 		rge_fini_rings(rgep);
+	}
+
+	if (rgep->progress & PROGRESS_INTR) {
+		rge_rem_intrs(rgep);
 		mutex_destroy(rgep->rc_lock);
 		mutex_destroy(rgep->rx_lock);
 		mutex_destroy(rgep->tc_lock);
@@ -1298,10 +1452,10 @@ rge_unattach(rge_t *rgep)
 	}
 
 	if (rgep->progress & PROGRESS_FACTOTUM)
-		ddi_remove_softintr(rgep->factotum_id);
+		(void) ddi_intr_remove_softint(rgep->factotum_hdl);
 
 	if (rgep->progress & PROGRESS_RESCHED)
-		ddi_remove_softintr(rgep->resched_id);
+		(void) ddi_intr_remove_softint(rgep->resched_hdl);
 
 	rge_free_bufs(rgep);
 
@@ -1371,8 +1525,10 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	chip_id_t *cidp;
 	cyc_handler_t cychand;
 	cyc_time_t cyctime;
+	int intr_types;
 	caddr_t regs;
 	int instance;
+	int i;
 	int err;
 
 	/*
@@ -1407,8 +1563,13 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/*
 	 * Initialize more fields in RGE private data
 	 */
+	rgep->rge_mac_state = RGE_MAC_ATTACH;
 	rgep->debug = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
 		DDI_PROP_DONTPASS, debug_propname, rge_debug);
+	rgep->default_mtu = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
+		DDI_PROP_DONTPASS, mtu_propname, ETHERMTU);
+	rgep->msi_enable = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
+		DDI_PROP_DONTPASS, msi_propname, B_TRUE);
 	(void) snprintf(rgep->ifname, sizeof (rgep->ifname), "%s%d",
 		RGE_DRIVER_NAME, instance);
 
@@ -1487,37 +1648,70 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * state, just in case we aren't getting link status change
 	 * interrupts ...
 	 */
-	err = ddi_add_softintr(devinfo, DDI_SOFTINT_LOW, &rgep->resched_id,
-		NULL, NULL, rge_reschedule, (caddr_t)rgep);
+	err = ddi_intr_add_softint(devinfo, &rgep->resched_hdl,
+		DDI_INTR_SOFTPRI_MIN, rge_reschedule, (caddr_t)rgep);
 	if (err != DDI_SUCCESS) {
-		rge_problem(rgep, "ddi_add_softintr() failed");
+		rge_problem(rgep, "ddi_intr_add_softint() failed");
 		goto attach_fail;
 	}
 	rgep->progress |= PROGRESS_RESCHED;
-	err = ddi_add_softintr(devinfo, DDI_SOFTINT_LOW, &rgep->factotum_id,
-		NULL, NULL, rge_chip_factotum, (caddr_t)rgep);
+	err = ddi_intr_add_softint(devinfo, &rgep->factotum_hdl,
+		DDI_INTR_SOFTPRI_MIN, rge_chip_factotum, (caddr_t)rgep);
 	if (err != DDI_SUCCESS) {
-		rge_problem(rgep, "ddi_add_softintr() failed");
+		rge_problem(rgep, "ddi_intr_add_softint() failed");
 		goto attach_fail;
 	}
 	rgep->progress |= PROGRESS_FACTOTUM;
 
 	/*
-	 * Add the h/w interrupt handler and initialise mutexes
+	 * Get supported interrupt types
 	 */
-	err = ddi_add_intr(devinfo, 0, &rgep->iblk, NULL,
-		rge_intr, (caddr_t)rgep);
-	if (err != DDI_SUCCESS) {
-		rge_problem(rgep, "ddi_add_intr() failed");
+	if (ddi_intr_get_supported_types(devinfo, &intr_types)
+	    != DDI_SUCCESS) {
+		rge_error(rgep, "ddi_intr_get_supported_types failed\n");
 		goto attach_fail;
 	}
-	mutex_init(rgep->genlock, NULL, MUTEX_DRIVER, rgep->iblk);
-	rw_init(rgep->errlock, NULL, RW_DRIVER, rgep->iblk);
-	mutex_init(rgep->tx_lock, NULL, MUTEX_DRIVER, rgep->iblk);
-	mutex_init(rgep->tc_lock, NULL, MUTEX_DRIVER, rgep->iblk);
-	mutex_init(rgep->rx_lock, NULL, MUTEX_DRIVER, rgep->iblk);
-	mutex_init(rgep->rc_lock, NULL, MUTEX_DRIVER, rgep->iblk);
-	rgep->progress |= PROGRESS_INTR;
+
+	/*
+	 * Add the h/w interrupt handler and initialise mutexes
+	 */
+	if ((intr_types & DDI_INTR_TYPE_MSI) && rgep->msi_enable) {
+		if (rge_add_intrs(rgep, DDI_INTR_TYPE_MSI) != DDI_SUCCESS) {
+			rge_error(rgep, "MSI registration failed, "
+			    "trying FIXED interrupt type\n");
+		} else {
+			rge_log(rgep, "Using MSI interrupt type\n");
+			rgep->intr_type = DDI_INTR_TYPE_MSI;
+			rgep->progress |= PROGRESS_INTR;
+		}
+	}
+	if (!(rgep->progress & PROGRESS_INTR) &&
+	    (intr_types & DDI_INTR_TYPE_FIXED)) {
+		if (rge_add_intrs(rgep, DDI_INTR_TYPE_FIXED) != DDI_SUCCESS) {
+			rge_error(rgep, "FIXED interrupt "
+			    "registration failed\n");
+			goto attach_fail;
+		}
+		rge_log(rgep, "Using FIXED interrupt type\n");
+		rgep->intr_type = DDI_INTR_TYPE_FIXED;
+		rgep->progress |= PROGRESS_INTR;
+	}
+	if (!(rgep->progress & PROGRESS_INTR)) {
+		rge_error(rgep, "No interrupts registered\n");
+		goto attach_fail;
+	}
+	mutex_init(rgep->genlock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(rgep->intr_pri));
+	rw_init(rgep->errlock, NULL, RW_DRIVER,
+	    DDI_INTR_PRI(rgep->intr_pri));
+	mutex_init(rgep->tx_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(rgep->intr_pri));
+	mutex_init(rgep->tc_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(rgep->intr_pri));
+	mutex_init(rgep->rx_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(rgep->intr_pri));
+	mutex_init(rgep->rc_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(rgep->intr_pri));
 
 	/*
 	 * Initialize rings
@@ -1526,6 +1720,20 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	if (err != DDI_SUCCESS) {
 		rge_problem(rgep, "rge_init_rings() failed");
 		goto attach_fail;
+	}
+	rgep->progress |= PROGRESS_INIT;
+
+	/*
+	 * Now that mutex locks are initialized, enable interrupts.
+	 */
+	if (rgep->intr_cap & DDI_INTR_FLAG_BLOCK) {
+		/* Call ddi_intr_block_enable() for MSI interrupts */
+		(void) ddi_intr_block_enable(rgep->htable, rgep->intr_cnt);
+	} else {
+		/* Call ddi_intr_enable for MSI or FIXED interrupts */
+		for (i = 0; i < rgep->intr_cnt; i++) {
+			(void) ddi_intr_enable(rgep->htable[i]);
+		}
 	}
 
 	/*
@@ -1565,7 +1773,7 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	macp->m_src_addr = rgep->netaddr;
 	macp->m_callbacks = &rge_m_callbacks;
 	macp->m_min_sdu = 0;
-	macp->m_max_sdu = rgep->param_default_mtu;
+	macp->m_max_sdu = rgep->default_mtu;
 
 	/*
 	 * Finally, we're ready to register ourselves with the MAC layer
@@ -1636,7 +1844,8 @@ rge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	 * If there is any posted buffer, the driver should reject to be
 	 * detached. Need notice upper layer to release them.
 	 */
-	if (rgep->rx_free != RGE_BUF_SLOTS)
+	if (!(rgep->chip_flags & CHIP_FLAG_FORCE_BCOPY) &&
+	    rgep->rx_free != RGE_BUF_SLOTS)
 		return (DDI_FAILURE);
 
 	/*

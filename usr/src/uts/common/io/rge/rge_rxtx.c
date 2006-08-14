@@ -79,25 +79,25 @@ rge_atomic_renounce(uint32_t *count_p, uint32_t n)
  * Callback code invoked from STREAMs when the recv data buffer is free
  * for recycling.
  */
-
 void
 rge_rx_recycle(caddr_t arg)
 {
 	rge_t *rgep;
 	dma_buf_t *rx_buf;
-	sw_rbd_t *free_rbdp;
+	sw_rbd_t *free_srbdp;
 	uint32_t slot_recy;
 
 	rx_buf = (dma_buf_t *)arg;
 	rgep = (rge_t *)rx_buf->private;
 
 	/*
-	 * If rge_unattach() is called, this callback function will also
-	 * be called when we try to free the mp in rge_fini_rings().
-	 * In such situation, we needn't do below desballoc(), otherwise,
+	 * In rge_unattach() and rge_attach(), this callback function will
+	 * also be called to free mp in rge_fini_rings() and rge_init_rings().
+	 * In such situation, we shouldn't do below desballoc(), otherwise,
 	 * there'll be memory leak.
 	 */
-	if (rgep->rge_mac_state == RGE_MAC_UNATTACH)
+	if (rgep->rge_mac_state == RGE_MAC_UNATTACH ||
+	    rgep->rge_mac_state == RGE_MAC_ATTACH)
 		return;
 
 	/*
@@ -112,22 +112,16 @@ rge_rx_recycle(caddr_t arg)
 	}
 	mutex_enter(rgep->rc_lock);
 	slot_recy = rgep->rc_next;
-	free_rbdp = &rgep->free_rbds[slot_recy];
-	if (free_rbdp->rx_buf == NULL) {
-		free_rbdp->rx_buf = rx_buf;
-		rgep->rc_next = NEXT(slot_recy, RGE_BUF_SLOTS);
-		rge_atomic_renounce(&rgep->rx_free, 1);
-		if (rgep->rx_bcopy && rgep->rx_free == RGE_BUF_SLOTS)
-			rgep->rx_bcopy = B_FALSE;
-		ASSERT(rgep->rx_free <= RGE_BUF_SLOTS);
-	} else {
-		/*
-		 * This situation shouldn't happen
-		 */
-		rge_problem(rgep, "rge_rx_recycle: buffer %d recycle error",
-		    slot_recy);
-		rgep->stats.recycle_err++;
-	}
+	free_srbdp = &rgep->free_srbds[slot_recy];
+
+	ASSERT(free_srbdp->rx_buf == NULL);
+	free_srbdp->rx_buf = rx_buf;
+	rgep->rc_next = NEXT(slot_recy, RGE_BUF_SLOTS);
+	rge_atomic_renounce(&rgep->rx_free, 1);
+	if (rgep->rx_bcopy && rgep->rx_free == RGE_BUF_SLOTS)
+		rgep->rx_bcopy = B_FALSE;
+	ASSERT(rgep->rx_free <= RGE_BUF_SLOTS);
+
 	mutex_exit(rgep->rc_lock);
 }
 
@@ -145,11 +139,11 @@ rge_rx_refill(rge_t *rgep, uint32_t slot)
 	srbdp = &rgep->sw_rbds[slot];
 	hw_rbd_p = &rgep->rx_ring[slot];
 	free_slot = rgep->rf_next;
-	free_buf = rgep->free_rbds[free_slot].rx_buf;
+	free_buf = rgep->free_srbds[free_slot].rx_buf;
 	if (free_buf != NULL) {
 		srbdp->rx_buf = free_buf;
-		rgep->free_rbds[free_slot].rx_buf = NULL;
-		hw_rbd_p->host_buf_addr = RGE_BSWAP_32(RGE_HEADROOM +
+		rgep->free_srbds[free_slot].rx_buf = NULL;
+		hw_rbd_p->host_buf_addr = RGE_BSWAP_32(rgep->head_room +
 		    + free_buf->pbuf.cookie.dmac_laddress);
 		hw_rbd_p->host_buf_addr_hi =
 		    RGE_BSWAP_32(free_buf->pbuf.cookie.dmac_laddress >> 32);
@@ -188,7 +182,6 @@ rge_receive_packet(rge_t *rgep, uint32_t slot)
 
 	hw_rbd_p = &rgep->rx_ring[slot];
 	srbdp = &rgep->sw_rbds[slot];
-	packet_len = RGE_BSWAP_32(hw_rbd_p->flags_len) & RBD_LEN_MASK;
 
 	/*
 	 * Read receive status
@@ -222,16 +215,20 @@ rge_receive_packet(rge_t *rgep, uint32_t slot)
 	/*
 	 * Handle size error packet
 	 */
-	minsize = ETHERMIN  - VLAN_TAGSZ + ETHERFCSL;
-	maxsize = rgep->ethmax_size + ETHERFCSL;
-
+	packet_len = RGE_BSWAP_32(hw_rbd_p->flags_len) & RBD_LEN_MASK;
+	packet_len -= ETHERFCSL;
+	minsize = ETHERMIN;
+	pflags = RGE_BSWAP_32(hw_rbd_p->vlan_tag);
+	if (pflags & RBD_VLAN_PKT)
+		minsize -= VLAN_TAGSZ;
+	maxsize = rgep->ethmax_size;
 	if (packet_len < minsize || packet_len > maxsize) {
 		RGE_DEBUG(("rge_receive_packet: len err = %d", packet_len));
 		return (NULL);
 	}
 
 	DMA_SYNC(srbdp->rx_buf->pbuf, DDI_DMA_SYNC_FORKERNEL);
-	if (packet_len <= RGE_RECV_COPY_SIZE || rgep->rx_bcopy ||
+	if (rgep->rx_bcopy || packet_len <= RGE_RECV_COPY_SIZE ||
 	    !rge_atomic_reserve(&rgep->rx_free, 1)) {
 		/*
 		 * Allocate buffer to receive this good packet
@@ -248,12 +245,12 @@ rge_receive_packet(rge_t *rgep, uint32_t slot)
 		 */
 		rx_ptr = DMA_VPTR(srbdp->rx_buf->pbuf);
 		mp->b_rptr = dp = mp->b_rptr + RGE_HEADROOM;
-		bcopy(rx_ptr + RGE_HEADROOM, dp, packet_len);
-		mp->b_wptr = dp + packet_len - ETHERFCSL;
+		bcopy(rx_ptr + rgep->head_room, dp, packet_len);
+		mp->b_wptr = dp + packet_len;
 	} else {
 		mp = srbdp->rx_buf->mp;
-		mp->b_rptr += RGE_HEADROOM;
-		mp->b_wptr = mp->b_rptr + packet_len - ETHERFCSL;
+		mp->b_rptr += rgep->head_room;
+		mp->b_wptr = mp->b_rptr + packet_len;
 		mp->b_next = mp->b_cont = NULL;
 		/*
 		 * Refill the current receive bd buffer
@@ -267,7 +264,6 @@ rge_receive_packet(rge_t *rgep, uint32_t slot)
 	/*
 	 * VLAN packet ?
 	 */
-	pflags = RGE_BSWAP_32(hw_rbd_p->vlan_tag);
 	if (pflags & RBD_VLAN_PKT)
 		vtag = pflags & RBD_VLAN_TAG;
 	if (vtag) {
@@ -282,6 +278,7 @@ rge_receive_packet(rge_t *rgep, uint32_t slot)
 		ehp = (struct ether_vlan_header *)mp->b_rptr;
 		ehp->ether_tpid = htons(VLAN_TPID);
 		ehp->ether_tci = htons(vtag);
+		rgep->stats.rbytes += VLAN_TAGSZ;
 	}
 
 	/*
@@ -345,7 +342,7 @@ rge_receive_ring(rge_t *rgep)
 		 * Clear RBD flags
 		 */
 		hw_rbd_p->flags_len =
-		    RGE_BSWAP_32(rgep->rxbuf_size - RGE_HEADROOM);
+		    RGE_BSWAP_32(rgep->rxbuf_size - rgep->head_room);
 		HW_RBD_INIT(hw_rbd_p, slot);
 		slot = NEXT(slot, RGE_RECV_SLOTS);
 		hw_rbd_p = &rgep->rx_ring[slot];
@@ -428,12 +425,11 @@ rge_send_recycle(rge_t *rgep)
 	uint32_t tc_head;
 	uint32_t n;
 
-	if (rgep->tx_free == RGE_SEND_SLOTS)
-		return;
-
 	mutex_enter(rgep->tc_lock);
 	tc_head = rgep->tc_next;
 	tc_tail = rgep->tc_tail;
+	if (tc_head == tc_tail)
+		goto resched;
 
 	do {
 		tc_tail = LAST(tc_tail, RGE_SEND_SLOTS);
@@ -442,8 +438,9 @@ rge_send_recycle(rge_t *rgep)
 			if (hw_sbd_p->flags_len &
 			    RGE_BSWAP_32(BD_FLAG_HW_OWN)) {
 				/*
-				 * Bump the watchdog counter, thus guaranteeing
-				 * that it's nonzero (watchdog activated).
+				 * Recyled nothing: bump the watchdog counter,
+				 * thus guaranteeing that it's nonzero
+				 * (watchdog activated).
 				 */
 				rgep->watchdog += 1;
 				mutex_exit(rgep->tc_lock);
@@ -453,28 +450,34 @@ rge_send_recycle(rge_t *rgep)
 		}
 	} while (hw_sbd_p->flags_len & RGE_BSWAP_32(BD_FLAG_HW_OWN));
 
+	/*
+	 * Recyled something :-)
+	 */
 	rgep->tc_next = NEXT(tc_tail, RGE_SEND_SLOTS);
 	n = rgep->tc_next - tc_head;
 	if (rgep->tc_next < tc_head)
 		n += RGE_SEND_SLOTS;
 	rge_atomic_renounce(&rgep->tx_free, n);
 	rgep->watchdog = 0;
-	mutex_exit(rgep->tc_lock);
+	ASSERT(rgep->tx_free <= RGE_SEND_SLOTS);
 
-	if (rgep->resched_needed) {
-		rgep->resched_needed = 0;
-		ddi_trigger_softintr(rgep->resched_id);
+resched:
+	mutex_exit(rgep->tc_lock);
+	if (rgep->resched_needed &&
+	    rgep->rge_mac_state == RGE_MAC_STARTED) {
+		rgep->resched_needed = B_FALSE;
+		mac_tx_update(rgep->mh);
 	}
 }
 
 /*
  * Send a message by copying it into a preallocated (and premapped) buffer
  */
-static void rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci, uchar_t proto);
+static void rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci);
 #pragma	inline(rge_send_copy)
 
 static void
-rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci, uchar_t proto)
+rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci)
 {
 	rge_bd_t *hw_sbd_p;
 	sw_sbd_t *ssbdp;
@@ -484,6 +487,8 @@ rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci, uchar_t proto)
 	size_t totlen;
 	size_t mblen;
 	uint32_t pflags;
+	struct ether_header *ethhdr;
+	struct ip *ip_hdr;
 
 	/*
 	 * IMPORTANT:
@@ -510,14 +515,34 @@ rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci, uchar_t proto)
 	 * splitting the message across multiple buffers either.
 	 */
 	txb = DMA_VPTR(ssbdp->pbuf);
-	for (totlen = 0, bp = mp; bp != NULL; bp = bp->b_cont) {
+	totlen = 0;
+	bp = mp;
+	if (tci != 0) {
+		/*
+		 * Do not copy the vlan tag
+		 */
+		bcopy(bp->b_rptr, txb, 2 * ETHERADDRL);
+		txb += 2 * ETHERADDRL;
+		totlen += 2 * ETHERADDRL;
+		mblen = bp->b_wptr - bp->b_rptr;
+		ASSERT(mblen >= 2 * ETHERADDRL + VLAN_TAGSZ);
+		mblen -= 2 * ETHERADDRL + VLAN_TAGSZ;
+		if ((totlen += mblen) <= rgep->ethmax_size) {
+			bcopy(bp->b_rptr + 2 * ETHERADDRL + VLAN_TAGSZ,
+			    txb, mblen);
+			txb += mblen;
+		}
+		bp = bp->b_cont;
+		rgep->stats.obytes += VLAN_TAGSZ;
+	}
+	for (; bp != NULL; bp = bp->b_cont) {
 		mblen = bp->b_wptr - bp->b_rptr;
 		if ((totlen += mblen) <= rgep->ethmax_size) {
 			bcopy(bp->b_rptr, txb, mblen);
 			txb += mblen;
 		}
 	}
-	rgep->stats.obytes += totlen + ETHERFCSL;
+	rgep->stats.obytes += totlen;
 
 	/*
 	 * We'e reached the end of the chain; and we should have
@@ -528,11 +553,10 @@ rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci, uchar_t proto)
 	DMA_SYNC(ssbdp->pbuf, DDI_DMA_SYNC_FORDEV);
 
 	/*
-	 * Update the hardware send buffer descriptor; then we're done
-	 * and return. The message can be freed right away in rge_send(),
-	 * as we've already copied the contents ...
+	 * Update the hardware send buffer descriptor flags
 	 */
 	hw_sbd_p = &rgep->tx_ring[slot];
+	ASSERT(hw_sbd_p == ssbdp->desc.mem_va);
 	hw_sbd_p->flags_len = RGE_BSWAP_32(totlen & SBD_LEN_MASK);
 	if (tci != 0) {
 		tci = TCI_OS2CHIP(tci);
@@ -542,69 +566,49 @@ rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci, uchar_t proto)
 		hw_sbd_p->vlan_tag = 0;
 	}
 
+	/*
+	 * h/w checksum offload flags
+	 */
 	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &pflags);
 	if (pflags & HCK_FULLCKSUM) {
-		switch (proto) {
-		case IS_UDP_PKT:
-			hw_sbd_p->flags_len |= RGE_BSWAP_32(SBD_FLAG_UDP_CKSUM);
-			proto = IS_IPV4_PKT;
-			break;
-		case IS_TCP_PKT:
-			hw_sbd_p->flags_len |= RGE_BSWAP_32(SBD_FLAG_TCP_CKSUM);
-			proto = IS_IPV4_PKT;
-			break;
-		default:
-			break;
+		ASSERT(totlen >= sizeof (struct ether_header) +
+		    sizeof (struct ip));
+		ethhdr = (struct ether_header *)(DMA_VPTR(ssbdp->pbuf));
+		/*
+		 * Is the packet an IP(v4) packet?
+		 */
+		if (ntohs(ethhdr->ether_type) == ETHERTYPE_IP) {
+			ip_hdr = (struct ip *)
+			    ((uint8_t *)DMA_VPTR(ssbdp->pbuf) +
+			    sizeof (struct ether_header));
+			if (ip_hdr->ip_p == IPPROTO_TCP)
+				hw_sbd_p->flags_len |=
+				    RGE_BSWAP_32(SBD_FLAG_TCP_CKSUM);
+			else if (ip_hdr->ip_p == IPPROTO_UDP)
+				hw_sbd_p->flags_len |=
+				    RGE_BSWAP_32(SBD_FLAG_UDP_CKSUM);
 		}
 	}
-	if ((pflags & HCK_IPV4_HDRCKSUM) && (proto == IS_IPV4_PKT))
+	if (pflags & HCK_IPV4_HDRCKSUM)
 		hw_sbd_p->flags_len |= RGE_BSWAP_32(SBD_FLAG_IP_CKSUM);
 
 	HW_SBD_SET(hw_sbd_p, slot);
+
+	/*
+	 * We're done.
+	 * The message can be freed right away, as we've already
+	 * copied the contents ...
+	 */
+	freemsg(mp);
 }
 
 static boolean_t
 rge_send(rge_t *rgep, mblk_t *mp)
 {
 	struct ether_vlan_header *ehp;
-	boolean_t need_strip = B_FALSE;
-	uint16_t tci = 0;
-	uchar_t proto = UNKNOWN_PKT;
-	struct ether_header *ethhdr;
-	struct ip *ip_hdr;
+	uint16_t tci;
 
 	ASSERT(mp->b_next == NULL);
-
-	/*
-	 * Determine if the packet is VLAN tagged.
-	 */
-	ASSERT(MBLKL(mp) >= sizeof (struct ether_header));
-	ehp = (struct ether_vlan_header *)mp->b_rptr;
-
-	if (ehp->ether_tpid == htons(VLAN_TPID)) {
-		if (MBLKL(mp) < sizeof (struct ether_vlan_header)) {
-			uint32_t pflags;
-
-			/*
-			 * Need to preserve checksum flags across pullup.
-			 */
-			hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL,
-			    NULL, &pflags);
-
-			if (!pullupmsg(mp,
-			    sizeof (struct ether_vlan_header))) {
-				RGE_DEBUG(("rge_send: pullup failure"));
-				rgep->resched_needed = B_TRUE;
-				return (B_FALSE);
-			}
-
-			(void) hcksum_assoc(mp, NULL, NULL, NULL, NULL, NULL,
-			    NULL, pflags, KM_NOSLEEP);
-		}
-
-		ehp = (struct ether_vlan_header *)mp->b_rptr;
-		need_strip = B_TRUE;
-	}
 
 	/*
 	 * Try to reserve a place in the transmit ring.
@@ -613,9 +617,18 @@ rge_send(rge_t *rgep, mblk_t *mp)
 		RGE_DEBUG(("rge_send: no free slots"));
 		rgep->stats.defer++;
 		rgep->resched_needed = B_TRUE;
-		rge_send_recycle(rgep);
+		(void) ddi_intr_trigger_softint(rgep->resched_hdl, NULL);
 		return (B_FALSE);
 	}
+
+	/*
+	 * Determine if the packet is VLAN tagged.
+	 */
+	ASSERT(MBLKL(mp) >= sizeof (struct ether_header));
+	tci = 0;
+	ehp = (struct ether_vlan_header *)mp->b_rptr;
+	if (ehp->ether_tpid == htons(VLAN_TPID))
+		tci = ntohs(ehp->ether_tci);
 
 	/*
 	 * We've reserved a place :-)
@@ -624,39 +637,7 @@ rge_send(rge_t *rgep, mblk_t *mp)
 	 *	there must be at least one place NOT free (ours!)
 	 */
 	ASSERT(rgep->tx_free < RGE_SEND_SLOTS);
-
-	/*
-	 * Now that we know that there is space to transmit the packet
-	 * strip any VLAN tag that is present.
-	 */
-	if (need_strip) {
-		tci = ntohs(ehp->ether_tci);
-		(void) memmove(mp->b_rptr + VLAN_TAGSZ, mp->b_rptr,
-		    2 * ETHERADDRL);
-		mp->b_rptr += VLAN_TAGSZ;
-	}
-
-	/*
-	 * Check the packet protocol type for according h/w checksum offload
-	 */
-	if (MBLKL(mp) >= sizeof (struct ether_header) +
-	    sizeof (struct ip)) {
-		ethhdr = (struct ether_header *)(mp->b_rptr);
-		/*
-		 * Is the packet an IP(v4) packet?
-		 */
-		if (ntohs(ethhdr->ether_type) == ETHERTYPE_IP) {
-			proto = IS_IPV4_PKT;
-			ip_hdr = (struct ip *)(mp->b_rptr +
-			    sizeof (struct ether_header));
-			if (ip_hdr->ip_p == IPPROTO_TCP)
-				proto = IS_TCP_PKT;
-			else if (ip_hdr->ip_p == IPPROTO_UDP)
-				proto = IS_UDP_PKT;
-		}
-	}
-
-	rge_send_copy(rgep, mp, tci, proto);
+	rge_send_copy(rgep, mp, tci);
 
 	/*
 	 * Trigger chip h/w transmit ...
@@ -665,32 +646,26 @@ rge_send(rge_t *rgep, mblk_t *mp)
 	if (--rgep->tx_flow == 0) {
 		DMA_SYNC(rgep->tx_desc, DDI_DMA_SYNC_FORDEV);
 		rge_tx_trigger(rgep);
-		if (rgep->tx_free < RGE_SEND_SLOTS/32)
+		if (rgep->tx_free < RGE_SEND_SLOTS/2)
 			rge_send_recycle(rgep);
 		rgep->tc_tail = rgep->tx_next;
 	}
 	mutex_exit(rgep->tx_lock);
 
-	freemsg(mp);
 	return (B_TRUE);
 }
 
 uint_t
-rge_reschedule(caddr_t arg)
+rge_reschedule(caddr_t arg1, caddr_t arg2)
 {
 	rge_t *rgep;
-	uint_t rslt;
 
-	rgep = (rge_t *)arg;
-	rslt = DDI_INTR_UNCLAIMED;
+	rgep = (rge_t *)arg1;
+	_NOTE(ARGUNUSED(arg2))
 
-	if (rgep->rge_mac_state == RGE_MAC_STARTED && rgep->resched_needed) {
-		mac_tx_update(rgep->mh);
-		rgep->resched_needed = B_FALSE;
-		rslt = DDI_INTR_CLAIMED;
-	}
+	rge_send_recycle(rgep);
 
-	return (rslt);
+	return (DDI_INTR_CLAIMED);
 }
 
 /*
