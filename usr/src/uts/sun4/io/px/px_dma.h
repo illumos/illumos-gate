@@ -124,7 +124,10 @@ struct px_dma_impl { /* forthdebug only, keep in sync with ddi_dma_impl_t */
 #define	PX_DMAI_FLAGS_NOSYNC		0x4000
 #define	PX_DMAI_FLAGS_PTP32		0x10000
 #define	PX_DMAI_FLAGS_PTP64		0x20000
-#define	PX_DMAI_FLAGS_MAP_BUFZONE	0x40000
+/*
+ * #define PX_DMAI_FLAGS_MAP_BUFZONE	0x40000
+ * See pcie_impl.h
+ */
 #define	PX_DMAI_FLAGS_REDZONE		0x80000
 #define	PX_DMAI_FLAGS_PRESERVE	(PX_DMAI_FLAGS_PEER_ONLY | \
 	PX_DMAI_FLAGS_BYPASSREQ | PX_DMAI_FLAGS_NOSYSLIMIT | \

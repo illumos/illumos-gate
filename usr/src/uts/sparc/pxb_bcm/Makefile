@@ -72,9 +72,10 @@ CFLAGS += $(CCVERBOSE)
 CFLAGS += -dalign
 
 #
-# Enable Broadcom workaround code and lint duplicate symbol avoidance hack
+# Enable Broadcom 5714/5715 workaround code and lint duplicate symbol
+# avoidance hack
 #
-CPPFLAGS += -DBROADCOM_ADDR_LIMIT -DPX_MOD_NAME=pxb_bcm
+CPPFLAGS += -DBCM_SW_WORKAROUNDS -DPX_MOD_NAME=pxb_bcm
 
 #
 #	Dependency

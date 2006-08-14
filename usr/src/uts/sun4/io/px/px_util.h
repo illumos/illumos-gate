@@ -60,8 +60,6 @@ extern uint_t px_get_nreg_set(dev_info_t *child);
 extern uint_t px_get_nintr(dev_info_t *child);
 extern uint64_t px_get_cfg_pabase(px_t *px_p);
 
-extern boolean_t px_child_prefetch(dev_info_t *child);
-
 #ifdef	__cplusplus
 }
 #endif

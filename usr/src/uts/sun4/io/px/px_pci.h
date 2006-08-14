@@ -178,20 +178,6 @@ extern void *pxb_state;
 #define	PXB_DEVICE_PLX_8532		0x8532
 #define	PXB_DEVICE_PLX_8516		0x8516
 
-/* Broadcom bridge Vendor/Device IDs for HW workaround */
-#define	PXB_VENDOR_BCM			0x1166
-#define	PXB_DEVICE_BCM5714		0x0103
-
-/* Simple macro to test if this is a Broadcom bridge */
-#define	PXB_IS_BCM5714(pxb) \
-	((pxb->pxb_vendor_id == PXB_VENDOR_BCM) && \
-	(pxb->pxb_device_id == PXB_DEVICE_BCM5714))
-
-/* Workaround for address space limitation in Broadcom 5708, 5714, 5715 */
-#ifdef BROADCOM_ADDR_LIMIT
-#define	PXB_ADDR_LIMIT_HI		0xFFFFFFFFFFULL
-#endif
-
 #define	PXB_DEVICE_PLX_BAD_MSI_REV	0xAA	/* last known bad rev for MSI */
 
 #define	PXB_VENDOR_SUN			0x108E
@@ -204,6 +190,14 @@ extern void *pxb_state;
 #define	PXB_MSI				1
 #define	PXB_LINK_INIT			2
 #define	PXB_HOTPLUG_MSGS		3
+
+#ifdef	BCM_SW_WORKAROUNDS
+
+/* Workaround for address space limitation in Broadcom 5714/5715 */
+#define	PXB_ADDR_LIMIT_LO		0ull
+#define	PXB_ADDR_LIMIT_HI		((1ull << 40) - 1)
+
+#endif	/* BCM_SW_WORKAROUNDS */
 
 #ifdef	__cplusplus
 }

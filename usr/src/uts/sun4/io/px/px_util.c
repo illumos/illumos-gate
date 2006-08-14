@@ -652,20 +652,3 @@ px_log_cfg_err(dev_info_t *dip, ushort_t status_reg, char *err_msg)
 
 	return (nerr);
 }
-
-/*
- * This is a software workaround to fix the Broadcom PCIe-PCI bridge
- * prefetch bug. Existence of a "cross-page-prefetch" property in the
- * child or parent node means the px nexus driver has to allocate an
- * extra page and make it valid one, for any DVMA request that comes
- * from any of the Broadcom child device.
- */
-boolean_t
-px_child_prefetch(dev_info_t *child)
-{
-	if (ddi_prop_exists(DDI_DEV_T_ANY, child, DDI_PROP_NOTPROM,
-	    "cross-page-prefetch"))
-		return (B_TRUE);
-
-	return (B_FALSE);
-}

@@ -112,10 +112,6 @@ px_dma_allocmp(dev_info_t *dip, dev_info_t *rdip, int (*waitfp)(caddr_t),
 	mp->dmai_error.err_fep = NULL;
 	mp->dmai_error.err_cf = NULL;
 
-	if (px_child_prefetch(mp->dmai_rdip))
-		mp->dmai_flags |= (PX_DMAI_FLAGS_MAP_BUFZONE |
-		    PX_DMAI_FLAGS_REDZONE);
-
 	return (mp);
 }
 
@@ -376,6 +372,7 @@ px_dma_type(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	px_pec_t *pec_p = px_p->px_pec_p;
 	uint32_t offset;
 	pfn_t pfn0;
+	uint_t redzone;
 
 	mp->dmai_rflags = dmareq->dmar_flags & DMP_DDIFLAGS | DMP_NOSYNC;
 
@@ -429,9 +426,13 @@ px_dma_type(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		cmn_err(CE_WARN, "Bad peer-to-peer req %s%d", NAMEINST(rdip));
 		return (DDI_DMA_NOMAPPING);
 	}
+
+	redzone = (mp->dmai_rflags & DDI_DMA_REDZONE) ||
+	    (mp->dmai_flags & PX_DMAI_FLAGS_MAP_BUFZONE) ?
+	    PX_DMAI_FLAGS_REDZONE : 0;
+
 	mp->dmai_flags |= (mp->dmai_flags & PX_DMAI_FLAGS_BYPASSREQ) ?
-	    PX_DMAI_FLAGS_BYPASS : PX_DMAI_FLAGS_DVMA |
-	    (mp->dmai_rflags & DDI_DMA_REDZONE ? PX_DMAI_FLAGS_REDZONE : 0);
+	    PX_DMAI_FLAGS_BYPASS : (PX_DMAI_FLAGS_DVMA | redzone);
 done:
 	mp->dmai_object	 = *dobj_p;			/* whole object    */
 	mp->dmai_pfn0	 = (void *)pfn0;		/* cache pfn0	   */

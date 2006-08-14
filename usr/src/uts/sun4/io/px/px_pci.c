@@ -67,9 +67,14 @@ static boolean_t pxb_enable_msi = B_TRUE; /* MSI enabled if TRUE, else INTX */
 
 static int pxb_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
 	off_t, off_t, caddr_t *);
-static int pxb_ddi_dma_allochdl_limited(dev_info_t *dip, dev_info_t *rdip,
+#ifdef	BCM_SW_WORKAROUNDS
+static int pxb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	ddi_dma_attr_t *attr_p, int (*waitfp)(caddr_t), caddr_t arg,
 	ddi_dma_handle_t *handlep);
+static int pxb_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
+	ddi_dma_handle_t handle, enum ddi_dma_ctlops cmd, off_t *offp,
+	size_t *lenp, caddr_t *objp, uint_t cache_flags);
+#endif	/* BCM_SW_WORKAROUNDS */
 static int pxb_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t,
 	void *, void *);
 static int pxb_intr_ops(dev_info_t *dip, dev_info_t *rdip,
@@ -98,17 +103,21 @@ static struct bus_ops pxb_bus_ops = {
 	0,
 	i_ddi_map_fault,
 	ddi_dma_map,
-#if defined(PXB_ADDR_LIMIT_HI) || defined(PXB_ADDR_LIMIT_LO)
-	pxb_ddi_dma_allochdl_limited,
+#ifdef	BCM_SW_WORKAROUNDS
+	pxb_dma_allochdl,
 #else
 	ddi_dma_allochdl,
-#endif
+#endif	/* BCM_SW_WORKAROUNDS */
 	ddi_dma_freehdl,
 	ddi_dma_bindhdl,
 	ddi_dma_unbindhdl,
 	ddi_dma_flush,
 	ddi_dma_win,
+#ifdef	BCM_SW_WORKAROUNDS
+	pxb_dma_mctl,
+#else
 	ddi_dma_mctl,
+#endif	/* BCM_SW_WORKAROUNDS */
 	pxb_ctlops,
 	ddi_bus_prop_op,
 	ndi_busop_get_eventcookie,	/* (*bus_get_eventcookie)();	*/
@@ -350,23 +359,6 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pxb->pxb_rev_id = pci_config_get8(config_handle, PCI_CONF_REVID);
 
 	/*
-	 * This is a software workaround to fix the Broadcom PCIe-PCI bridge
-	 * prefetch bug. Create a boolean property and its existence means
-	 * the px nexus driver has to allocate an extra page & make it valid
-	 * one, for any DVMA request that comes from any of the Broadcom child
-	 * device.
-	 */
-	if (PXB_IS_BCM5714(pxb)) {
-		if (ndi_prop_create_boolean(DDI_DEV_T_NONE, pxb->pxb_dip,
-		    "cross-page-prefetch") != DDI_PROP_SUCCESS) {
-			DBG(DBG_ATTACH, pxb->pxb_dip,
-			    "ndi_prop_create_boolean() failed\n");
-
-			goto fail;
-		}
-	}
-
-	/*
 	 * Power management setup. This also makes sure that switch/bridge
 	 * is at D0 during attach.
 	 */
@@ -498,9 +490,6 @@ pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			pxb_intr_fini(pxb);
 		if (pxb->pxb_init_flags & PXB_INIT_FM)
 			pxb_fm_fini(pxb);
-
-		(void) ndi_prop_remove(DDI_DEV_T_NONE, pxb->pxb_dip,
-		    "cross-page-prefetch");
 
 		if (pxb->pxb_init_flags & PXB_INIT_CONFIG_HANDLE)
 			pci_config_teardown(&pxb->pxb_config_handle);
@@ -2032,7 +2021,7 @@ pxb_check_bad_devs(pxb_devstate_t *pxb, int vend)
 	return (ret);
 }
 
-#if defined(PXB_ADDR_LIMIT_HI) || defined(PXB_ADDR_LIMIT_LO)
+#ifdef	BCM_SW_WORKAROUNDS
 
 /*
  * Some PCI-X to PCI-E bridges do not support full 64-bit addressing on the
@@ -2043,27 +2032,57 @@ pxb_check_bad_devs(pxb_devstate_t *pxb, int vend)
  * PCI-E nexus driver from allocating any memory the bridge can't deal
  * with.
  */
-
 static int
-pxb_ddi_dma_allochdl_limited(dev_info_t *dip, dev_info_t *rdip,
+pxb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	ddi_dma_attr_t *attr_p, int (*waitfp)(caddr_t), caddr_t arg,
 	ddi_dma_handle_t *handlep)
 {
+	uint64_t	lim;
+	int		ret;
+
 	/*
-	 * If the leaf device's limits are outside than what the bridge can
-	 * handle, we need to clip the values passed up the chain.
+	 * If the leaf device's limits are outside than what the Broadcom
+	 * bridge can handle, we need to clip the values passed up the chain.
 	 */
-#ifdef PXB_ADDR_LIMIT_LO
-	if (attr_p->dma_attr_addr_lo < PXB_ADDR_LIMIT_LO)
-		attr_p->dma_attr_addr_lo = PXB_ADDR_LIMIT_LO;
-#endif
+	lim = attr_p->dma_attr_addr_lo;
+	attr_p->dma_attr_addr_lo = MAX(lim, PXB_ADDR_LIMIT_LO);
 
-#ifdef PXB_ADDR_LIMIT_HI
-	if (attr_p->dma_attr_addr_hi > PXB_ADDR_LIMIT_HI)
-		attr_p->dma_attr_addr_hi = PXB_ADDR_LIMIT_HI;
-#endif
+	lim = attr_p->dma_attr_addr_hi;
+	attr_p->dma_attr_addr_hi = MIN(lim, PXB_ADDR_LIMIT_HI);
 
-	return (ddi_dma_allochdl(dip, rdip, attr_p, waitfp, arg, handlep));
+	/*
+	 * This is a software workaround to fix the Broadcom 5714/5715 PCIe-PCI
+	 * bridge prefetch bug. Intercept the DMA alloc handle request and set
+	 * PX_DMAI_FLAGS_MAP_BUFZONE flag in the handle. If this flag is set,
+	 * the px nexus driver will allocate an extra page & make it valid one,
+	 * for any DVMA request that comes from any of the Broadcom bridge child
+	 * devices.
+	 */
+	if ((ret = ddi_dma_allochdl(dip, rdip, attr_p, waitfp, arg,
+	    handlep)) == DDI_SUCCESS) {
+		ddi_dma_impl_t	*mp = (ddi_dma_impl_t *)*handlep;
+		mp->dmai_inuse |= PX_DMAI_FLAGS_MAP_BUFZONE;
+	}
+
+	return (ret);
 }
 
-#endif
+/*
+ * FDVMA feature is not supported for any child device of Broadcom 5714/5715
+ * PCIe-PCI bridge due to prefetch bug. Return failure immediately, so that
+ * these drivers will switch to regular DVMA path.
+ */
+/*ARGSUSED*/
+static int
+pxb_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
+	enum ddi_dma_ctlops cmd, off_t *offp, size_t *lenp, caddr_t *objp,
+	uint_t cache_flags)
+{
+	if (cmd == DDI_DMA_RESERVE)
+		return (DDI_FAILURE);
+
+	return (ddi_dma_mctl(dip, rdip, handle, cmd, offp, lenp, objp,
+	    cache_flags));
+}
+
+#endif	/* BCM_SW_WORKAROUNDS */

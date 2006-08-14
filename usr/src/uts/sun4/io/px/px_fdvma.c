@@ -150,14 +150,6 @@ px_fdvma_reserve(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 		ddi_driver_name(rdip), ddi_get_instance(rdip));
 
 	/*
-	 * FDVMA feature is not supported for any child device of Broadcom
-	 * PCIe-PCI bridge due to prefetch bug. Return failure immediately,
-	 * so that these drivers will switch to regular DVMA path.
-	 */
-	if (px_child_prefetch(rdip))
-		return (DDI_FAILURE);
-
-	/*
 	 * Check the limit structure.
 	 */
 	if ((lo >= hi) || (hi < mmu_p->mmu_dvma_base))
