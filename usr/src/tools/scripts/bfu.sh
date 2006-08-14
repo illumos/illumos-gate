@@ -4690,12 +4690,14 @@ mondo_loop() {
 	#
 	# Remove old stuff related to libthread now that libthread has
 	# been folded into libc and libthread_db has been renamed libc_db.
-	# In addition, all the apptrace's tracing libraries (i.e., abi_*.so*)
-	# are no longer needed, should be removed.
+	# In addition, all the apptrace's tracing libraries (i.e., abi_*.so*),
+	# spec2map and spec2trace are no longer needed, should be removed.
 	rm -f	\
-	    $usr/lib/mdb/proc/libthread.so			\
-	    $usr/lib/mdb/proc/sparcv9/libthread.so		\
-	    $usr/lib/abi/abi_*.so*		\
+	    $usr/lib/mdb/proc/libthread.so		\
+	    $usr/lib/mdb/proc/sparcv9/libthread.so	\
+	    $usr/lib/abi/spec2map			\
+	    $usr/lib/abi/spec2trace			\
+	    $usr/lib/abi/abi_*.so*			\
 	    $usr/lib/abi/sparcv9/abi_*.so*
 
 	#
