@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -326,7 +326,7 @@ add_root_props(dev_info_t *devi)
 static int
 rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp, uint_t mapping_attr)
 {
-	ulong_t base;
+	uint64_t base;
 	caddr_t kaddr;
 	pgcnt_t npages;
 	pfn_t 	pfn;
@@ -334,16 +334,14 @@ rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp, uint_t mapping_attr)
 	struct regspec *rp = mp->map_obj.rp;
 	ddi_acc_hdl_t *hp;
 
-	base = (ulong_t)rp->regspec_addr & (~MMU_PAGEOFFSET); /* base addr */
+	base = (uint64_t)rp->regspec_addr & (~MMU_PAGEOFFSET); /* base addr */
 
 	/*
-	 * Take the bustype and the physical page base within the
-	 * bus space and turn it into a 28 bit page frame number.
+	 * Take the bustype and addr and convert it to a
+	 * page frame number.
 	 */
-
-	pfn = BUSTYPE_TO_PFN(((rp->regspec_bustype) & root_phys_addr_hi_mask),
-	    mmu_btop(base));
-
+	pfn =  mmu_btop(((uint64_t)(rp->regspec_bustype &
+	    root_phys_addr_hi_mask) << 32) | base);
 
 	/*
 	 * Do a quick sanity check to make sure we are in I/O space.

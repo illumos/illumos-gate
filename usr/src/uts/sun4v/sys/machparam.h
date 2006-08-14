@@ -271,9 +271,6 @@ extern "C" {
  */
 #define	KERNEL_LIMIT32	(SYSBASE32)
 
-#define	BUSTYPE_TO_PFN(btype, pfn)			\
-	(((btype) << 19) | ((pfn) & 0x7FFFF))
-
 /*
  * Defines used for the ptl1_panic parameter, which is passed to the
  * ptl1_panic assembly routine in %g1.  These #defines have string

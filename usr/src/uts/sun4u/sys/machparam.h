@@ -289,8 +289,6 @@ extern "C" {
 #define	KERNEL_LIMIT32	(SYSBASE32)
 
 #define	PFN_TO_BUSTYPE(pfn)	(((pfn) >> 19) & 0x1FF)
-#define	BUSTYPE_TO_PFN(btype, pfn)			\
-	(((pfn_t)(btype) << 19) | ((pfn) & 0x7FFFF))
 #define	IO_BUSTYPE(pfn)	((PFN_TO_BUSTYPE(pfn) & 0x100) >> 8)
 
 #ifdef	_STARFIRE
