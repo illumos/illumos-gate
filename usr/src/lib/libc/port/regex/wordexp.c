@@ -43,6 +43,9 @@
  *
  */
 
+#pragma	weak wordexp = _wordexp
+#pragma	weak wordfree = _wordfree
+
 #include "synonyms.h"
 #include <stdio.h>
 #include <unistd.h>

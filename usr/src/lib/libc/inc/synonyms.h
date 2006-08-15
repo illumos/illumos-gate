@@ -91,6 +91,7 @@ extern "C" {
 #define	acct			_acct
 #define	acctctl			_acctctl
 #define	acl			_acl
+#define	addsev			_addsev
 #define	addseverity		_addseverity
 #define	adjtime			_adjtime
 #define	alarm			_alarm
@@ -238,6 +239,7 @@ extern "C" {
 #define	cond_signal		_cond_signal
 #define	cond_timedwait		_cond_timedwait
 #define	cond_wait		_cond_wait
+#define	confstr			_confstr
 #define	core_get_default_content	_core_get_default_content
 #define	core_get_default_path		_core_get_default_path
 #define	core_get_global_content		_core_get_global_content
@@ -459,6 +461,8 @@ extern "C" {
 #define	getzoneidbyname		_getzoneidbyname
 #define	getzoneid		_getzoneid
 #define	getzonenamebyid		_getzonenamebyid
+#define	glob			_glob
+#define	globfree		_globfree
 #define	gmtime_r		_gmtime_r
 #define	grantpt			_grantpt
 #define	gsignal			_gsignal
@@ -508,6 +512,7 @@ extern "C" {
 #define	ldivide			_ldivide
 #define	lexp10			_lexp10
 #define	lfind			_lfind
+#define	lfmt			_lfmt
 #define	link			_link
 #define	llabs			_llabs
 #define	lldiv			_lldiv
@@ -630,6 +635,7 @@ extern "C" {
 #define	pause			_pause
 #define	pclose			_pclose
 #define	pcsample		_pcsample
+#define	pfmt			_pfmt
 #define	pipe			_pipe
 #define	plock			_plock
 #define	poll			_poll
@@ -891,6 +897,7 @@ extern "C" {
 #define	sem_trywait		_sem_trywait
 #define	sem_unlink		_sem_unlink
 #define	sem_wait		_sem_wait
+#define	setcat			_setcat
 #define	setcontext		_setcontext
 #define	setegid			_setegid
 #define	setenv			_setenv
@@ -901,6 +908,7 @@ extern "C" {
 #define	setitimer		_setitimer
 #define	setjmp			_setjmp
 #define	setkey			_setkey
+#define	setlabel		_setlabel
 #define	setlocale		_setlocale
 #define	setlogmask		_setlogmask
 #define	setpflags		_setpflags
@@ -976,7 +984,9 @@ extern "C" {
 #define	strdup			_strdup
 #define	strerror_r		_strerror_r
 #define	strerror		_strerror
+#define	strfmon			_strfmon
 #define	string_to_decimal	_string_to_decimal
+#define	strptime		_strptime
 #define	strtok_r		_strtok_r
 #define	strtoll			_strtoll
 #define	strtoull		_strtoull
@@ -1110,6 +1120,8 @@ extern "C" {
 #define	vfork			_vfork
 #define	vfscanf			_vfscanf
 #define	vhangup			_vhangup
+#define	vlfmt			_vlfmt
+#define	vpfmt			_vpfmt
 #define	vscanf			_vscanf
 #define	vsscanf			_vsscanf
 #define	vsyslog			_vsyslog
@@ -1141,6 +1153,8 @@ extern "C" {
 #define	wctomb			_wctomb
 #define	wctype			__wctype
 #define	wcwidth			_wcwidth
+#define	wordexp			_wordexp
+#define	wordfree		_wordfree
 #define	wracct			_wracct
 #define	writev			_writev
 #define	write			_write
