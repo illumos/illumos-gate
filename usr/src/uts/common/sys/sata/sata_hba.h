@@ -347,7 +347,7 @@ struct sata_cmd {
 						 * Ptr to FPDMA error
 						 * retrieval cmd
 						 */
-	struct sata_cmd	*satacmd_rle_sata_cmd;
+	const struct sata_cmd	*satacmd_rle_sata_cmd;
 
 	int		satacmd_num_dma_cookies; /* number of dma cookies */
 						/* ptr to dma cookie list */
@@ -379,13 +379,16 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_cmd))
 #define	SATA_DIR_WRITE		0x0004	/* Writing data to a device */
 
 /*
- * Tagged Queuing type flags (satacmd_flags).
+ * Tagged Queuing type flags
+ * 	satacmd_flags.sata_queue_stag
+ * 	satacmd_flags.sata_queue_otag
+ *
  * These flags indicate how the SATA command should be queued.
  *
- * SATA_QUEUE_STAG_CMD
+ * sata_queue_stag
  * Simple-queue-tagged command. It may be executed out-of-order in respect
  * to other queued commands.
- * SATA_QUEUE_OTAG_CMD
+ * sata_queue_otag
  * Ordered-queue-tagged command. It cannot be executed out-of-order in
  * respect to other commands, i.e. it should be executed in the order of
  * being transported to the HBA.
@@ -394,12 +397,10 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_cmd))
  * to be put at the head of the queue are treated as SATA_QUEUE_OTAG_CMD
  * tagged commands.
  */
-#define	SATA_QUEUE_STAG_CMD	0x0010	/* simple-queue-tagged command */
-#define	SATA_QUEUE_OTAG_CMD	0x0020	/* ordered-queue-tagged command */
 
 
 /*
- * Queuing command set-up flag (satacmd_flags).
+ * Queuing command set-up flag (satacmd_flags.sata_queued).
  * This flag indicates that sata_cmd was set-up for DMA Queued command
  * (either READ_DMA_QUEUED, READ_DMA_QUEUED_EXT, WRITE_DMA_QUEUED or
  * WRITE_DMA_QUEUED_EXT command) or one of the Native Command Queuing commands
@@ -409,19 +410,18 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_cmd))
  * either legacy queuing (indicated by Device Identify data word 83 bit 2)
  * or NCQ (indicated by  word 76 of Device Identify data).
  */
-#define	SATA_QUEUED_CMD			0x0100
-
 
 /*
- * Reset state handling (satacmd_flags).
+ * Reset state handling
+ *	satacmd_flags.sata_ignore_dev_reset
+ *	satacmd_flags.sata_clear_dev_reset
+ *
  * SATA HBA device enters reset state if the device was subjected to
  * the Device Reset (may also enter this state if the device was reset
  * as a side effect of port reset). SATA HBA driver sets this state.
  * Device stays in this condition until explicit request from SATA HBA
- * framework (SATA_CLEAR_DEV_RESET_STATE flag) to clear the state.
+ * framework to clear the state.
  */
-#define	SATA_IGNORE_DEV_RESET_STATE	0x1000
-#define	SATA_CLEAR_DEV_RESET_STATE	0x2000
 
 /*
  * SATA Packet structure (rev 1)

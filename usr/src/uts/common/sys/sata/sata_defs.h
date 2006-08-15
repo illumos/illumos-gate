@@ -131,6 +131,7 @@ extern "C" {
 /* Generic ATA definitions */
 
 #define	SATA_TAG_QUEUING_SHIFT 3
+#define	SATA_TAG_QUEUING_MASK 0x1f
 /*
  * Identify Device data
  * Although bot ATA and ATAPI devices' Identify Data has the same lenght,
@@ -424,8 +425,33 @@ typedef struct sata_id {
 #define	SCSI_INFO_EXCEPTIONS_PARAM_LEN	4
 
 #define	READ_LOG_EXT_LOG_DIRECTORY	0
+#define	READ_LOG_EXT_NCQ_ERROR_RECOVERY	0x10
 #define	SMART_SELFTEST_LOG_PAGE		6
 #define	EXT_SMART_SELFTEST_LOG_PAGE	7
+
+/*
+ * SATA NCQ error recovery page (0x10)
+ */
+struct sata_ncq_error_recovery_page {
+	uint8_t	ncq_tag;
+	uint8_t reserved1;
+	uint8_t ncq_status;
+	uint8_t ncq_error;
+	uint8_t ncq_sector_number;
+	uint8_t ncq_cyl_low;
+	uint8_t ncq_cyl_high;
+	uint8_t ncq_dev_head;
+	uint8_t ncq_sector_number_ext;
+	uint8_t ncq_cyl_low_ext;
+	uint8_t ncq_cyl_high_ext;
+	uint8_t reserved2;
+	uint8_t ncq_sector_count;
+	uint8_t ncq_sector_count_ext;
+	uint8_t reserved3[242];
+	uint8_t ncq_vendor_unique[255];
+	uint8_t ncq_checksum;
+};
+
 /*
  * SMART data structures
  */
@@ -496,7 +522,7 @@ struct read_log_ext_directory {
  * These eventually need to go to a generic scsi hearder file
  * for now they will reside here
  */
-#define	PC_CUMMULATIVE_VALUES			0x01
+#define	PC_CUMULATIVE_VALUES			0x01
 #define	PAGE_CODE_GET_SUPPORTED_LOG_PAGES	0x00
 #define	PAGE_CODE_SELF_TEST_RESULTS		0x10
 #define	PAGE_CODE_INFORMATION_EXCEPTIONS	0x2f

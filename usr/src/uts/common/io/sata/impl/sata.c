@@ -63,7 +63,8 @@ int	sata_debug_flags = 0;
 #define	SATA_ENABLE_QUEUING		1
 #define	SATA_ENABLE_NCQ			2
 #define	SATA_ENABLE_PROCESS_EVENTS	4
-int sata_func_enable = SATA_ENABLE_PROCESS_EVENTS | SATA_ENABLE_QUEUING;
+int sata_func_enable =
+	SATA_ENABLE_PROCESS_EVENTS | SATA_ENABLE_QUEUING | SATA_ENABLE_NCQ;
 
 #ifdef SATA_DEBUG
 #define	SATA_LOG_D(args)	sata_log args
@@ -321,6 +322,32 @@ static 	int sata_event_pending = 0;
 static 	int sata_event_thread_active = 0;
 extern 	pri_t minclsyspri;
 
+/*
+ * NCQ specific data
+ */
+static const sata_cmd_t sata_rle_cmd = {
+	SATA_CMD_REV,
+	NULL,
+	{
+		SATA_DIR_READ
+	},
+	ATA_ADDR_LBA48,
+	0,
+	0,
+	0,
+	0,
+	0,
+	1,
+	READ_LOG_EXT_NCQ_ERROR_RECOVERY,
+	0,
+	0,
+	0,
+	SATAC_READ_LOG_EXT,
+	0,
+	0,
+	0,
+};
+
 /* Warlock directives */
 
 _NOTE(SCHEME_PROTECTS_DATA("No Mutex Needed", scsi_hba_tran))
@@ -357,6 +384,10 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(sata_pmport_info::pmport_dev_type))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sata_pmport_info::pmport_sata_drive))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sata_pmult_info::pmult_dev_port))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sata_pmult_info::pmult_num_dev_ports))
+#ifdef SATA_DEBUG
+_NOTE(SCHEME_PROTECTS_DATA("No Mutex Needed", mbuf_count))
+_NOTE(SCHEME_PROTECTS_DATA("No Mutex Needed", mbuffail_count))
+#endif
 
 /* End of warlock directives */
 
@@ -3038,6 +3069,13 @@ sata_scsi_reset(struct scsi_address *ap, int level)
  * Supported capabilities:
  * auto-rqsense		(always supported)
  * tagged-qing		(supported if HBA supports it)
+ * untagged-qing	(could be supported if disk supports it, but because
+ *			 caching behavior allowing untagged queuing actually
+ *			 results in reduced performance.  sd tries to throttle
+ *			 back to only 3 outstanding commands, which may
+ *			 work for real SCSI disks, but with read ahead
+ *			 caching, having more than 1 outstanding command
+ *			 results in cache thrashing.)
  * dma_max
  * interconnect-type	(INTERCONNECT_SATA)
  *
@@ -3097,16 +3135,31 @@ sata_scsi_getcap(struct scsi_address *ap, char *cap, int whom)
 		else rval = -1;
 		break;
 
-	case SCSI_CAP_TAGGED_QING:
-		/*
-		 * It is enough if the controller supports queuing, regardless
-		 * of the device. NCQ support is an internal implementation
-		 * feature used between HBA and the device.
-		 */
+	/*
+	 * untagged queuing cause a performance inversion because of
+	 * the way sd operates.  Because of this reason we do not
+	 * use it when available.
+	 */
+#if defined(_UNTAGGED_QING_SUPPORTED)
+	case SCSI_CAP_UNTAGGED_QING:
 		if (SATA_QDEPTH(sata_hba_inst) > 1)
-			rval = 1;	/* Queuing supported */
+			rval = 1;	/* Untagged queuing supported */
 		else
-			rval = -1;	/* Queuing not supported */
+			rval = -1;	/* Untagged queuing not supported */
+		break;
+#endif
+
+	case SCSI_CAP_TAGGED_QING:
+		/* This can TCQ or NCQ */
+		if (sata_func_enable & SATA_ENABLE_QUEUING &&
+		    ((sdinfo->satadrv_features_support & SATA_DEV_F_TCQ &&
+		    SATA_FEATURES(sata_hba_inst) & SATA_CTLF_QCMD) ||
+		    (sata_func_enable & SATA_ENABLE_NCQ &&
+		    sdinfo->satadrv_features_support & SATA_DEV_F_NCQ &&
+		    SATA_FEATURES(sata_hba_inst) & SATA_CTLF_NCQ)))
+			rval = 1;	/* Tagged queuing supported */
+		else
+			rval = -1;	/* Tagged queuing not supported */
 		break;
 
 	case SCSI_CAP_DMA_MAX:
@@ -3179,8 +3232,11 @@ sata_scsi_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 	case SCSI_CAP_TAGGED_QING:
 	case SCSI_CAP_DMA_MAX:
 	case SCSI_CAP_INTERCONNECT_TYPE:
+#if defined(_UNTAGGED_QING_SUPPORTED)
+	case SCSI_CAP_UNTAGGED_QING:
 		rval = 0;		/* Capability cannot be changed */
 		break;
+#endif
 
 	default:
 		rval = -1;
@@ -4595,9 +4651,9 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 	pc = scsipkt->pkt_cdbp[2] >> 6;
 	page_code = scsipkt->pkt_cdbp[2] & 0x3f;
 
-	/* Reject not supported request for all but cummulative values */
+	/* Reject not supported request for all but cumulative values */
 	switch (pc) {
-	case PC_CUMMULATIVE_VALUES:
+	case PC_CUMULATIVE_VALUES:
 		break;
 	default:
 		*scsipkt->pkt_scbp = STATUS_CHECK;
@@ -4937,7 +4993,7 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 			scmd->satacmd_features_reg_ext =
 			    scmd->satacmd_sec_count_msb;
 			scmd->satacmd_sec_count_msb = 0;
-			scmd->satacmd_rle_sata_cmd = NULL;
+			scmd->satacmd_rle_sata_cmd = &sata_rle_cmd;
 		} else if ((sdinfo->satadrv_features_support &
 		    SATA_DEV_F_TCQ) &&
 		    (SATA_FEATURES(spx->txlt_sata_hba_inst) &
@@ -5153,7 +5209,7 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 			scmd->satacmd_features_reg_ext =
 			    scmd->satacmd_sec_count_msb;
 			scmd->satacmd_sec_count_msb = 0;
-			scmd->satacmd_rle_sata_cmd = NULL;
+			scmd->satacmd_rle_sata_cmd = &sata_rle_cmd;
 		} else if ((sdinfo->satadrv_features_support &
 		    SATA_DEV_F_TCQ) &&
 		    (SATA_FEATURES(spx->txlt_sata_hba_inst) &
@@ -5693,7 +5749,7 @@ sata_extract_error_lba(sata_pkt_txlate_t *spx, uint64_t *lba)
 	}
 	*lba = (*lba << 8) | sata_cmd->satacmd_lba_high_lsb;
 	*lba = (*lba << 8) | sata_cmd->satacmd_lba_mid_lsb;
-	*lba = (*lba << 8) | sata_cmd->satacmd_lba_high_lsb;
+	*lba = (*lba << 8) | sata_cmd->satacmd_lba_low_lsb;
 }
 
 /*
@@ -5803,9 +5859,9 @@ sata_txlt_rw_completion(sata_pkt_t *sata_pkt)
 			} else {
 				sata_extract_error_lba(spx, &lba);
 				sense->es_info_1 = (lba & 0xFF000000) >> 24;
-				sense->es_info_1 = (lba & 0xFF0000) >> 16;
-				sense->es_info_1 = (lba & 0xFF00) >> 8;
-				sense->es_info_1 = lba & 0xFF;
+				sense->es_info_2 = (lba & 0xFF0000) >> 16;
+				sense->es_info_3 = (lba & 0xFF00) >> 8;
+				sense->es_info_4 = lba & 0xFF;
 			}
 		} else {
 			/* Invalid extended sense info */
@@ -8366,7 +8422,7 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 		(void) strlcat(msg_buf, ", Native Command Queueing",
 		    MAXPATHLEN);
 	if (sdinfo->satadrv_features_support & SATA_DEV_F_TCQ)
-		(void) strlcat(msg_buf, ", Queuing", MAXPATHLEN);
+		(void) strlcat(msg_buf, ", Legacy Tagged Queuing", MAXPATHLEN);
 	if ((sdinfo->satadrv_id.ai_cmdset82 & SATA_SMART_SUPPORTED) &&
 	    (sdinfo->satadrv_id.ai_features85 & SATA_SMART_ENABLED))
 		(void) strlcat(msg_buf, ", SMART", MAXPATHLEN);
@@ -8381,6 +8437,13 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 	if (sdinfo->satadrv_features_support & SATA_DEV_F_TCQ) {
 		cmn_err(CE_CONT, "?\tQueue depth %d\n",
 			sdinfo->satadrv_queue_depth);
+	}
+
+	if (sdinfo->satadrv_features_support &
+		(SATA_DEV_F_TCQ | SATA_DEV_F_NCQ)) {
+		(void) sprintf(msg_buf, "\tqueue depth %d\n",
+				sdinfo->satadrv_queue_depth);
+		cmn_err(CE_CONT, "?%s", msg_buf);
 	}
 
 #ifdef __i386
@@ -8688,6 +8751,7 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 	ASSERT(spx->txlt_sata_pkt != NULL);
 	bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
 	ASSERT(bp != NULL);
+
 
 	if (spx->txlt_buf_dma_handle == NULL) {
 		/*
@@ -9177,14 +9241,14 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 				    SATA_DEV_F_SATA1;
 			}
 		}
-
-		sdinfo->satadrv_queue_depth = sdinfo->satadrv_id.ai_qdepth;
-		if (sdinfo->satadrv_id.ai_cmdset83 & SATA_RW_DMA_QUEUED_CMD)
-			++sdinfo->satadrv_queue_depth;
-
 		if ((sdinfo->satadrv_id.ai_cmdset83 & SATA_RW_DMA_QUEUED_CMD) &&
 		    (sdinfo->satadrv_id.ai_features86 & SATA_RW_DMA_QUEUED_CMD))
 			sdinfo->satadrv_features_support |= SATA_DEV_F_TCQ;
+
+		sdinfo->satadrv_queue_depth = sdinfo->satadrv_id.ai_qdepth;
+		if ((sdinfo->satadrv_features_support & SATA_DEV_F_NCQ) ||
+			(sdinfo->satadrv_features_support & SATA_DEV_F_TCQ))
+			++sdinfo->satadrv_queue_depth;
 
 		rval = 0;
 	}
@@ -11039,7 +11103,7 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 
 
 /*
- * sata_set_drive_featues function compares current device features setting
+ * sata_set_drive_features function compares current device features setting
  * with the saved device features settings and, if there is a difference,
  * it restores device features setting to the previously saved state.
  * Device Identify data has to be current.
@@ -11051,7 +11115,7 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
  * to be updated after features are set.
  *
  * Returns TRUE if successful or there was nothing to do.
- * Returns FALSE if device features cound not be set .
+ * Returns FALSE if device features could not be set .
  *
  * Note: This function may fail the port, making it inaccessible.
  * Explicit port disconnect/connect or physical device
@@ -11165,7 +11229,7 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 
 /*
  *
- * Returns 1 if threshold exceeded, 0 if threshold no exceeded, -1 if
+ * Returns 1 if threshold exceeded, 0 if threshold not exceeded, -1 if
  * unable to determine.
  *
  * Cannot be called in an interrupt context.
@@ -11518,7 +11582,7 @@ sata_smart_selftest_log(
 	scmd->satacmd_flags.sata_data_direction = SATA_DIR_READ;
 
 	/*
-	 * Allocate buffer for Identify Data return data
+	 * Allocate buffer for SMART SELFTEST LOG
 	 */
 	scmd->satacmd_bp = sata_alloc_local_buffer(spx,
 	    sizeof (struct smart_selftest_log));
@@ -11531,7 +11595,7 @@ sata_smart_selftest_log(
 		return (-1);
 	}
 
-	/* Build SMART_READ_DATA cmd in the sata_pkt */
+	/* Build SMART_READ_LOG cmd in the sata_pkt */
 	scmd->satacmd_addr_type = 0;		/* N/A */
 	scmd->satacmd_sec_count_lsb = 1;	/* One sector of SMART log */
 	scmd->satacmd_lba_low_lsb = SMART_SELFTEST_LOG_PAGE;
@@ -11629,7 +11693,7 @@ sata_smart_read_log(
 		return (-1);
 	}
 
-	/* Build SMART_READ_DATA cmd in the sata_pkt */
+	/* Build SMART_READ_LOG cmd in the sata_pkt */
 	scmd->satacmd_addr_type = 0;		/* N/A */
 	scmd->satacmd_sec_count_lsb = log_size;	/* what the caller asked for */
 	scmd->satacmd_lba_low_lsb = which_log;	/* which log page */
@@ -11717,7 +11781,7 @@ sata_read_log_ext_directory(
 	scmd->satacmd_flags.sata_data_direction = SATA_DIR_READ;
 
 	/*
-	 * Allocate buffer for SMART extended self-test log
+	 * Allocate buffer for SMART READ LOG EXTENDED command
 	 */
 	scmd->satacmd_bp = sata_alloc_local_buffer(spx,
 	    sizeof (struct read_log_ext_directory));
@@ -11730,7 +11794,7 @@ sata_read_log_ext_directory(
 		return (-1);
 	}
 
-	/* Build READ LOG EXT w/ extended self-test log cmd in the sata_pkt */
+	/* Build READ LOG EXT w/ log directory cmd in the  sata_pkt */
 	scmd->satacmd_addr_type = ATA_ADDR_LBA48;
 	scmd->satacmd_sec_count_lsb = 1;	/* One sector of directory */
 	scmd->satacmd_sec_count_msb = 0;	/* One sector of directory */
