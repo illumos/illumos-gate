@@ -43,12 +43,7 @@
 #include "utils.h"
 #include "krb5_repository.h"
 
-#define	PAMTXD		"SUNW_OST_SYSOSPAM"
-#define	SLEEPTIME	4
-
 #define	KRB5_DEFAULT_OPTIONS 0
-#define	QUIET	0
-#define	VERBOSE	1
 
 int forwardable_flag = 0;
 int renewable_flag = 0;
@@ -74,7 +69,7 @@ char *appdef[] = { "appdefaults", "kinit", NULL };
 #define	krb_realm (*(realmdef + 1))
 
 int	attempt_krb5_auth(void *, krb5_module_data_t *, char *, char **,
-			boolean_t, boolean_t);
+			boolean_t);
 void	krb5_cleanup(pam_handle_t *, void *, int);
 
 extern errcode_t profile_get_options_boolean();
@@ -94,8 +89,7 @@ pam_sm_authenticate(
 	int			argc,
 	const char		**argv)
 {
-	char			*user;
-	struct pam_conv 	*pam_convp;
+	char			*user = NULL;
 	int			err;
 	int			result = PAM_AUTH_ERR;
 	/* pam.conf options */
@@ -103,9 +97,7 @@ pam_sm_authenticate(
 	int			warn = 1;
 	/* return an error on password expire */
 	int			err_on_exp = 0;
-	int			invalid_user = 0;
 	int			i;
-	char			*firstpass = NULL;
 	char			*password = NULL;
 	uid_t			pw_uid;
 	krb5_module_data_t	*kmd = NULL;
@@ -132,9 +124,7 @@ pam_sm_authenticate(
 		    "PAM-KRB5 (auth): pam_sm_authenticate flags=%d",
 		    flags);
 
-	err = pam_get_item(pamh, PAM_USER, (void**) &user);
-	if (err != PAM_SUCCESS)
-		return (err);
+	(void) pam_get_item(pamh, PAM_USER, (void**) &user);
 
 	/* Prompt for user name if it is not already available */
 	if (user == NULL || !user[0]) {
@@ -148,14 +138,9 @@ pam_sm_authenticate(
 			return (PAM_USER_UNKNOWN);
 	}
 
-	err = pam_get_item(pamh, PAM_CONV, (void**) &pam_convp);
-	if (err != PAM_SUCCESS)
-		return (err);
-
 	/* make sure a password entry exists for this user */
-	if (!get_pw_uid(user, &pw_uid)) {
-		invalid_user = 1;
-	}
+	if (!get_pw_uid(user, &pw_uid))
+		return (PAM_USER_UNKNOWN);
 
 	/*
 	 * pam_get_data could fail if we are being called for the first time
@@ -220,7 +205,7 @@ pam_sm_authenticate(
 	 * PAM functions, thats why we wait until this point to
 	 * return.
 	 */
-	err = pam_get_item(pamh, PAM_REPOSITORY, (void **)&rep_data);
+	(void) pam_get_item(pamh, PAM_REPOSITORY, (void **)&rep_data);
 
 	if (rep_data != NULL) {
 		if (strcmp(rep_data->type, KRB5_REPOSITORY_NAME) != 0) {
@@ -265,53 +250,12 @@ pam_sm_authenticate(
 		goto out;
 	}
 
-	err = pam_get_item(pamh, PAM_AUTHTOK, (void **) &firstpass);
+	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **)&password);
 
-	if (firstpass != NULL && invalid_user)
-		goto out;
-
-	result = attempt_krb5_auth(pamh, kmd, user, &firstpass, 1, QUIET);
-	if (result != PAM_AUTH_ERR) {
-		goto out;
-	}
-
-	/*
-	 * Get the password from the user
-	 */
-
-	if (debug)
-		syslog(LOG_DEBUG,
-		    "PAM-KRB5 (auth): prompting for password");
-
-	/*
-	 * one last ditch attempt to login to KRB5
-	 *
-	 * we have to prompt for password even if the user does not exist
-	 * so as not to reveal the existence/non-existence of an account
-	 */
-	result = attempt_krb5_auth(pamh, kmd, user, &password, 1, VERBOSE);
-
-	if (invalid_user)
-		goto out;
-
-	if (result == PAM_SUCCESS) {
-		/*
-		 * Even if this password is expired, this saves
-		 * us from having to enter it again!
-		 */
-		(void) pam_set_item(pamh, PAM_AUTHTOK, password);
-	}
+	result = attempt_krb5_auth(pamh, kmd, user, &password, 1);
 
 out:
-
-	if (password != NULL)
-		(void) memset(password, 0, strlen(password));
-
-	if (invalid_user)
-		result = PAM_USER_UNKNOWN;
-
 	if (kmd) {
-
 		if (debug)
 			syslog(LOG_DEBUG,
 			    "PAM-KRB5 (auth): pam_sm_auth finalize"
@@ -365,8 +309,7 @@ attempt_krb5_auth(
 	krb5_module_data_t	*kmd,
 	char		*user,
 	char		**krb5_pass,
-	boolean_t	verify_tik,
-	boolean_t	verbose)
+	boolean_t	verify_tik)
 {
 	krb5_principal	me = NULL;
 	krb5_principal	server = NULL;
@@ -374,7 +317,6 @@ attempt_krb5_auth(
 	krb5_timestamp	now;
 	krb5_error_code	code = 0;
 	char		kuser[2*MAXHOSTNAMELEN];
-	char		passprompt[MAX_CANON];
 	krb5_deltat	lifetime;
 	krb5_deltat	rlife;
 	krb5_deltat	krb5_max_duration;
@@ -384,7 +326,6 @@ attempt_krb5_auth(
 		KRB5_TGS_NAME_SIZE,
 		KRB5_TGS_NAME
 	};
-	char krb5_auth_messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
 	krb5_get_init_creds_opt opts;
 	/*
 	 * "result" should not be assigned PAM_SUCCESS unless
@@ -542,26 +483,6 @@ attempt_krb5_auth(
 		krb5_get_init_creds_opt_set_address_list(&opts, NULL);
 	}
 
-	if (*krb5_pass == NULL) {
-		(void) strlcpy(passprompt, dgettext(TEXT_DOMAIN,
-			"Enter Kerberos password for "), MAX_CANON);
-		(void) strlcat(passprompt, kuser, MAX_CANON);
-		(void) strlcat(passprompt, ":  ", MAX_CANON);
-		/*
-		 * Upon success do not assign the resulting value to "result",
-		 * because this value is returned from this function when the
-		 * subsequent functions could fail which may allow unauthorized
-		 * login.
-		 */
-		code = __pam_get_authtok(pamh, PAM_PROMPT, PAM_AUTHTOK,
-		    passprompt, krb5_pass);
-		if (code != PAM_SUCCESS) {
-			/* Set correct return value for use below. */
-			result = code;
-			goto out;
-		}
-	}
-
 	/*
 	 * mech_krb5 interprets empty passwords as NULL passwords
 	 * and tries to read a password from stdin. Since we are in
@@ -608,22 +529,12 @@ attempt_krb5_auth(
 
 			if (code) {
 				result = PAM_SYSTEM_ERR;
-				if (verbose) {
-					(void) snprintf(krb5_auth_messages[0],
-						sizeof (krb5_auth_messages[0]),
-						dgettext(TEXT_DOMAIN,
-						"authentication failed:  "
-						"%s\n"),
-						error_message(code));
-					(void) __pam_display_msg(pamh,
-					    PAM_TEXT_INFO, 1,
-					    krb5_auth_messages, NULL);
-				}
 
-		/*
-		 * Give a better error message when the keytable entry isn't
-		 * found or the keytab file cannot be found
-		 */
+				/*
+				 * Give a better error message when the
+				 * keytable entry isn't found or the keytab
+				 * file cannot be found.
+				 */
 				if (krb5_sname_to_principal(kmd->kcontext, NULL,
 						NULL, KRB5_NT_SRV_HST, &sp))
 					fqdn = "<fqdn>";
@@ -692,14 +603,6 @@ attempt_krb5_auth(
 		 * generate an error if the unix password is different
 		 * than the Kerberos password...
 		 */
-		if (verbose) {
-			(void) snprintf(krb5_auth_messages[0],
-				sizeof (krb5_auth_messages[0]),
-				dgettext(TEXT_DOMAIN,
-					"Kerberos authentication failed\n"));
-			(void) __pam_display_msg(pamh, PAM_TEXT_INFO, 1,
-				krb5_auth_messages, NULL);
-		}
 		break;
 
 	case KRB5KDC_ERR_KEY_EXP:
@@ -719,14 +622,6 @@ attempt_krb5_auth(
 			if (code == 0) {
 				/* pw is good, set age status for acct_mgmt */
 				kmd->age_status = PAM_NEW_AUTHTOK_REQD;
-			} else if ((code == 2) && verbose) {
-				/* bad password */
-				(void) snprintf(krb5_auth_messages[0],
-						sizeof (krb5_auth_messages[0]),
-						dgettext(TEXT_DOMAIN,
-						    "password incorrect\n"));
-				(void) __pam_display_msg(pamh, PAM_TEXT_INFO, 1,
-						krb5_auth_messages, NULL);
 			}
 		}
 		break;

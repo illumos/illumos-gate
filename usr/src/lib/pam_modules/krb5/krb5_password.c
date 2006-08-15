@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,13 +42,12 @@
 #include "utils.h"
 #include "krb5_repository.h"
 
-#define	PAMTXD		"SUNW_OST_SYSOSPAM"
 #define	MISC_EXIT_STATUS 6
 #define	DONT_DISP_POLICY	0
 #define	DISP_POLICY		1
 
 extern int attempt_krb5_auth(void *, krb5_module_data_t *, char *, char **,
-			boolean_t, boolean_t);
+			boolean_t);
 extern int krb5_verifypw(pam_handle_t *, char *, char *, boolean_t, int);
 
 static char *get_passwd(pam_handle_t *, char *);
@@ -131,8 +129,7 @@ get_set_creds(
 	 * pwchange verified user sufficiently, so don't request strict
 	 * tgt verification (will cause rcache perm issues possibly anyways)
 	 */
-	login_result = attempt_krb5_auth(pamh, kmd, user,
-					&newpass, 0, 0);
+	login_result = attempt_krb5_auth(pamh, kmd, user, &newpass, 0);
 	if (debug)
 		syslog(LOG_DEBUG,
 		    "PAM-KRB5 (password): get_set_creds: login_result= %d",
