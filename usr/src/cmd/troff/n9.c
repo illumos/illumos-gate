@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,17 +67,18 @@ int	csi_width[4] = {
 
 /*
  * troff9.c
- * 
+ *
  * misc functions
  */
 
-tchar setz()
+tchar
+setz()
 {
 	tchar i;
 
 	if (!ismot(i = getch()))
 		i |= ZBIT;
-	return(i);
+	return (i);
 }
 
 int
@@ -120,7 +120,8 @@ s0:
 		goto s1;
 	}
 	if (rem = length % w) {
-		if (cbits(c) == RULE || cbits(c) == UNDERLINE || cbits(c) == ROOTEN)
+		if (cbits(c) == RULE || cbits(c) == UNDERLINE ||
+		    cbits(c) == ROOTEN)
 			*i++ = c | ZBIT;
 		*i++ = makem(rem);
 	}
@@ -144,9 +145,9 @@ int	c;
 {
 	int	i;
 
-	while ((i = cbits(getch())) != c &&  (i != '\n'))
+	while ((i = cbits(getch())) != c && (i != '\n'))
 		;
-	return(i);
+	return (i);
 }
 
 
@@ -160,15 +161,19 @@ setov()
 	if (ismot(i = getch()))
 		return (0);
 	delim = cbits(i);
-	for (k = 0; (k < NOV) && ((j = cbits(i = getch())) != delim) &&  (j != '\n'); k++) {
+	for (k = 0; (k < NOV) && ((j = cbits(i = getch())) != delim) &&
+	    (j != '\n'); k++) {
 		o[k] = i;
 		w[k] = width(i);
+	}
+	if (k >= NOV) {
+		k = NOV - 1;
 	}
 	o[k] = w[k] = 0;
 	if (o[0])
 		for (j = 1; j; ) {
 			j = 0;
-			for (k = 1; o[k] ; k++) {
+			for (k = 1; o[k]; k++) {
 				if (w[k-1] < w[k]) {
 					j++;
 					i = w[k];
@@ -180,12 +185,12 @@ setov()
 				}
 			}
 		}
-	else 
+	else
 		return (0);
 	*pbp++ = makem(w[0] / 2);
 	for (k = 0; o[k]; k++)
 		;
-	while (k>0) {
+	while (k > 0) {
 		k--;
 		*pbp++ = makem(-((w[k] + w[k+1]) / 2));
 		*pbp++ = o[k];
@@ -214,7 +219,8 @@ setbra()
 #ifndef NROFF
 	dwn = EM | MOT | VMOT;
 #endif
-	while (((k = cbits(i = getch())) != delim) && (k != '\n') &&  (j <= (brabuf + NC - 4))) {
+	while (((k = cbits(i = getch())) != delim) && (k != '\n') &&
+	    (j <= (brabuf + NC - 4))) {
 		*j++ = i | ZBIT;
 		*j++ = dwn;
 		cnt++;
@@ -261,8 +267,8 @@ setvline()
 		return (0);
 	}
 	if ((cbits(c = getch())) == delim) {
-		c = BOXRULE | chbits;	/*default box rule*/
-	} else 
+		c = BOXRULE | chbits;	/* default box rule */
+	} else
 		getch();
 	c |= ZBIT;
 	neg = 0;
@@ -316,17 +322,21 @@ setdraw()	/* generate internal cookies for a drawing function */
 	/* l dx dy:	line from here by dx,dy */
 	/* c x:		circle of diameter x, left side here */
 	/* e x y:	ellipse of diameters x,y, left side here */
-	/* a dx1 dy1 dx2 dy2:
-			ccw arc: ctr at dx1,dy1, then end at dx2,dy2 from there */
-	/* ~ dx1 dy1 dx2 dy2...:
-			spline to dx1,dy1 to dx2,dy2 ... */
+	/*
+	 * a dx1 dy1 dx2 dy2:	ccw arc: ctr at dx1,dy1,
+	 * then end at dx2,dy2 from there
+	 */
+	/*
+	 * ~ dx1 dy1 dx2 dy2...:
+	 * spline to dx1,dy1 to dx2,dy2 ...
+	 */
 	/* f dx dy ...:	f is any other char:  like spline */
 
 	if (ismot(c = getch()))
 		return (0);
 	delim = cbits(c);
 	type = cbits(getch());
-	for (i = 0; i < NPAIR ; i++) {
+	for (i = 0; i < NPAIR; i++) {
 		c = getch();
 		if (cbits(c) == delim)
 			break;
@@ -357,13 +367,15 @@ setdraw()	/* generate internal cookies for a drawing function */
 #ifndef NROFF
 	drawbuf[0] = DRAWFCN | chbits | ZBIT;
 	drawbuf[1] = type | chbits | ZBIT;
-	drawbuf[2] = '.' | chbits | ZBIT;	/* use default drawing character */
+	drawbuf[2] = '.' | chbits | ZBIT; /* use default drawing character */
 	for (k = 0, j = 3; k < i; k++) {
 		drawbuf[j++] = MOT | ((dx[k] >= 0) ? dx[k] : (NMOT | -dx[k]));
-		drawbuf[j++] = MOT | VMOT | ((dy[k] >= 0) ? dy[k] : (NMOT | -dy[k]));
+		drawbuf[j++] = MOT | VMOT | ((dy[k] >= 0) ?
+		    dy[k] : (NMOT | -dy[k]));
 	}
 	if (type == DRAWELLIPSE) {
-		drawbuf[5] = drawbuf[4] | NMOT;	/* so the net vertical is zero */
+		/* so the net vertical is zero */
+		drawbuf[5] = drawbuf[4] | NMOT;
 		j = 6;
 	}
 	drawbuf[j++] = DRAWFCN | chbits | ZBIT;	/* marks end for ptout */
@@ -408,9 +420,9 @@ int	x;
 	tchar rchar;
 	int savepos;
 
-	if (x == tabch) 
+	if (x == tabch)
 		rchar = tabc | chbits;
-	else if (x ==  ldrch) 
+	else if (x ==  ldrch)
 		rchar = dotc | chbits;
 	temp = npad = ws = 0;
 	savfc = fc;
@@ -429,7 +441,7 @@ int	x;
 			jj = 0;
 			goto rtn;
 		}
-		if ((length = ((tabtab[j] & TABMASK) - numtab[HP].val)) > 0 )
+		if ((length = ((tabtab[j] & TABMASK) - numtab[HP].val)) > 0)
 			break;
 	}
 	type = tabtab[j] & (~TABMASK);
@@ -447,7 +459,7 @@ int	x;
 				if (pp > (padptr + NPP - 1))
 					break;
 				goto s1;
-			} else if (j == savfc) 
+			} else if (j == savfc)
 				break;
 			else if (j == '\n') {
 				temp = j;
@@ -484,7 +496,7 @@ s1:
 		pushback(fbuf);
 		jj = 0;
 	} else if (type == 0) {
-		/*plain tab or leader*/
+		/* plain tab or leader */
 		if ((j = width(rchar)) > 0) {
 			int nchar = length / j;
 			while (nchar-->0 && pbp < &pbbuf[NC-3]) {
@@ -496,26 +508,27 @@ s1:
 		}
 		if (length)
 			jj = length | MOT;
-		else 
+		else
 			jj = getch0();
 	} else {
-		/*center tab*/
-		/*right tab*/
-		while (((j = cbits(ii = getch())) != savtc) &&  (j != '\n') && (j != savlc)) {
+		/* center tab */
+		/* right tab */
+		while (((j = cbits(ii = getch())) != savtc) &&
+		    (j != '\n') && (j != savlc)) {
 			jj = width(ii);
 			ws += jj;
 			numtab[HP].val += jj;
 			widthp = jj;
 			*fp++ = ii;
-			if (fp > (fbuf + FBUFSZ - 3)) 
+			if (fp > (fbuf + FBUFSZ - 3))
 				break;
 		}
 		*fp++ = ii;
 		*fp++ = 0;
 		if (type == RTAB)
 			length -= ws;
-		else 
-			length -= ws / 2; /*CTAB*/
+		else
+			length -= ws / 2; /* CTAB */
 		pushback(fbuf);
 		if ((j = width(rchar)) != 0 && length > 0) {
 			int nchar = length / j;
@@ -538,14 +551,15 @@ rtn:
 	gchtab[tabch] = TABBIT;
 	gchtab[ldrch] |= LDRBIT;
 	numtab[HP].val = savepos;
-	return(jj);
+	return (jj);
 }
 
 
 #ifdef EUC
 #ifdef NROFF
 /* locale specific initialization */
-int localize()
+int
+localize()
 {
 	extern int	wdbindf();
 	extern wchar_t	*wddelim();
