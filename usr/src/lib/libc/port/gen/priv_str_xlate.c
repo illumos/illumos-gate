@@ -341,34 +341,14 @@ priv_set_to_str(const priv_set_t *pset, char separator, int flag)
 	return (__priv_set_to_str(NULL, pset, separator, flag));
 }
 
-/*
- * priv_gettext() is defined to return a string that
- * the caller must deallocate with free(3C).  Grr...
- */
-char *
-priv_gettext(const char *priv)
+static char *
+do_priv_gettext(const char *priv, const char *file)
 {
-	FILE *namefp = NULL;
 	char buf[8*1024];
 	boolean_t inentry = B_FALSE;
-	char file[MAXPATHLEN];
-	const char *loc;
+	FILE	*namefp;
 
-	/* Not a valid privilege */
-	if (priv_getbyname(priv) < 0)
-		return (NULL);
-
-	if ((loc = setlocale(LC_MESSAGES, NULL)) == NULL)
-		loc = "C";
-
-	if (snprintf(file, sizeof (file),
-	    _DFLT_LOC_PATH "%s/LC_MESSAGES/priv_names", loc) < sizeof (file))
-		namefp = fopen(file, "rF");
-
-	/* If the path is too long or can't be opened, punt to default */
-	if (namefp == NULL)
-		namefp = fopen("/etc/security/priv_names", "rF");
-
+	namefp = fopen(file, "rF");
 	if (namefp == NULL)
 		return (NULL);
 
@@ -441,4 +421,34 @@ priv_gettext(const char *priv)
 out:
 	(void) fclose(namefp);
 	return (NULL);
+}
+
+/*
+ * priv_gettext() is defined to return a string that
+ * the caller must deallocate with free(3C).  Grr...
+ */
+char *
+priv_gettext(const char *priv)
+{
+	char file[MAXPATHLEN];
+	const char *loc;
+	char	*ret;
+
+	/* Not a valid privilege */
+	if (priv_getbyname(priv) < 0)
+		return (NULL);
+
+	if ((loc = setlocale(LC_MESSAGES, NULL)) == NULL)
+		loc = "C";
+
+	if (snprintf(file, sizeof (file),
+	    _DFLT_LOC_PATH "%s/LC_MESSAGES/priv_names", loc) < sizeof (file)) {
+		ret = do_priv_gettext(priv, (const char *)file);
+		if (ret != NULL)
+			return (ret);
+	}
+
+	/* If the path is too long or can't be opened, punt to default */
+	ret = do_priv_gettext(priv, "/etc/security/priv_names");
+	return (ret);
 }

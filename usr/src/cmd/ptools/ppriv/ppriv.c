@@ -596,8 +596,10 @@ dopriv(const char *p)
 		char *p, *q;
 		if (text == NULL)
 			return (1);
-		for (p = text; q = strchr(p, '\n'); p = q + 1)
-			(void) printf("\t%.*s", (int)(q - p + 1), p);
+		for (p = text; q = strchr(p, '\n'); p = q + 1) {
+			*q = '\0';
+			(void) printf("\t%s\n", p);
+		}
 		free(text);
 	}
 	return (0);
