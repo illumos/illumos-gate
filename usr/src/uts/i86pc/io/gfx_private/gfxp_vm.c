@@ -104,7 +104,7 @@ gfxp_map_kernel_space(uint64_t start, size_t size, uint32_t mode)
 	cvaddr = vmem_alloc(heap_arena, ptob(npages), VM_NOSLEEP);
 	if (cvaddr == NULL)
 		return (NULL);
-	hat_devload(kas.a_hat, cvaddr, ptob(npages), btop(base),
+	hat_devload(kas.a_hat, cvaddr, ptob(npages), base >> PAGESHIFT,
 			PROT_READ|PROT_WRITE|hat_attr, hat_flags);
 	return (cvaddr + pgoffset);
 }
