@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,6 +154,10 @@ static opt_event_t opt_events[] = {
 	{ "DC_1bit_ecc_error_found",				0x4A, 0x3 },
 	{ "DC_dispatched_prefetch_instr",			0x4B, 0x7 },
 	{ "DC_dcache_accesses_by_locks",			0x4C, 0x3 },
+	{ "BU_memory_requests",					0x65, 0x83},
+	{ "BU_data_prefetch",					0x67, 0x3 },
+	{ "BU_system_read_responses",				0x6C, 0x7 },
+	{ "BU_quadwords_written_to_system",			0x6D, 0x1 },
 	{ "BU_cpu_clk_unhalted",				0x76, 0x0 },
 	{ "BU_internal_L2_req",					0x7D, 0x1F },
 	{ "BU_fill_req_missed_L2",				0x7E, 0x7 },
@@ -206,8 +209,13 @@ static opt_event_t opt_events[] = {
 	{ "NB_mem_ctrlr_dram_cmd_slots_missed",			0xE2, 0x0 },
 	{ "NB_mem_ctrlr_turnaround",				0xE3, 0x7 },
 	{ "NB_mem_ctrlr_bypass_counter_saturation",		0xE4, 0xF },
+	{ "NB_sized_blocks_Rev_D",				0xE5, 0x3C},
+	{ "NB_ECC_errors",					0xE8, 0x80},
+	{ "NB_cpu_io_to_mem_io_Rev_E",				0xE9, 0xFF},
+	{ "NB_cache_block_commands_Rev_E",			0xEA, 0x3D},
 	{ "NB_sized_commands",					0xEB, 0x7F },
-	{ "NB_probe_result",					0xEC, 0xF },
+	{ "NB_probe_result",					0xEC, 0x7F},
+	{ "NB_gart_events",					0xEE, 0x7 },
 	{ "NB_ht_bus0_bandwidth",				0xF6, 0xF },
 	{ "NB_ht_bus1_bandwidth",				0xF7, 0xF },
 	{ "NB_ht_bus2_bandwidth",				0xF8, 0xF },
