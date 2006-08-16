@@ -415,8 +415,10 @@ cfork(int isvfork, int isfork1)
 		cp->p_flag |= p->p_flag & SLWPWRAP;
 	}
 
+	mutex_enter(&p->p_lock);
 	corectl_path_hold(cp->p_corefile = p->p_corefile);
 	corectl_content_hold(cp->p_content = p->p_content);
+	mutex_exit(&p->p_lock);
 
 	/*
 	 * Duplicate process context ops, if any.
