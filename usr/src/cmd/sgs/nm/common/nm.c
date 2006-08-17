@@ -89,10 +89,32 @@ typedef struct {		/* structure to translate symbol table data */
 
 static char *key[TYPE][BIND];
 
+/*
+ * Format type used for printing value and size items.
+ * The non-negative values here are used as array indices into
+ * several arrays found below. Renumbering, or adding items,
+ * will require changes to those arrays as well.
+ */
+typedef enum {
+	FMT_T_NONE = -1,	/* No format type yet assigned */
+
+	/* The following are used as array indices */
+	FMT_T_DEC = 0,
+	FMT_T_HEX = 1,
+	FMT_T_OCT = 2
+} FMT_T;
+
+/*
+ * Determine whether a proposed format type is compatible with the current
+ * setting. We allow setting the format as long as it hasn't already
+ * been done, or if the new setting is the same as the current one.
+ */
+#define	COMPAT_FMT_FLAG(new_fmt_flag) \
+	(fmt_flag == FMT_T_NONE) || (fmt_flag == new_fmt_flag)
+
+static FMT_T fmt_flag = FMT_T_NONE;	/* format style to use for value/size */
+
 static  int	/* flags: ?_flag corresponds to ? option */
-	o_flag = 0,	/* print value and size in octal */
-	x_flag = 0,	/* print value and size in hex */
-	d_flag = 0,	/* print value and size in decimal */
 	h_flag = 0,	/* suppress printing of headings */
 	v_flag = 0,	/* sort external symbols by value */
 	n_flag = 0,	/* sort external symbols by name */
@@ -107,10 +129,9 @@ static  int	/* flags: ?_flag corresponds to ? option */
 	l_flag = 0,	/* produce long listing of output */
 	D_flag = 0,	/* print DYNSYM instead of SYMTAB */
 	C_flag = 0,	/* print decoded C++ names */
-	A_flag = 0,	/* FIle name */
+	A_flag = 0,	/* File name */
 	e_flag = 0,	/* -e flag */
 	g_flag = 0,	/* -g flag */
-	t_flag = 0,	/* -t flag */
 	V_flag = 0;	/* print version information */
 static char A_header[DEF_MAX_SYM_SIZE+1] = {0};
 
@@ -146,7 +167,8 @@ int
 main(int argc, char *argv[], char *envp[])
 {
 	char	*optstr = OPTSTR; /* option string used by getopt() */
-	int    optchar;
+	int	optchar;
+	FMT_T	new_fmt_flag;
 
 #ifndef	XPG4
 	/*
@@ -188,18 +210,18 @@ main(int argc, char *argv[], char *envp[])
 
 	while ((optchar = getopt(argc, argv, optstr)) != -1) {
 		switch (optchar) {
-		case 'o':	if (!x_flag && !d_flag)
-					o_flag = 1;
+		case 'o':	if (COMPAT_FMT_FLAG(FMT_T_OCT))
+					fmt_flag = FMT_T_OCT;
 				else
 					(void) fprintf(stderr, gettext(
-					"%s: -x set, -o ignored\n"),
+					"%s: -x or -t set, -o ignored\n"),
 					prog_name);
 				break;
-		case 'x':	if (!o_flag && !d_flag)
-					x_flag = 1;
+		case 'x':	if (COMPAT_FMT_FLAG(FMT_T_HEX))
+					fmt_flag = FMT_T_HEX;
 				else
 					(void) fprintf(stderr, gettext(
-					"%s: -o set, -x ignored\n"),
+					"%s: -o or -t set, -x ignored\n"),
 					prog_name);
 				break;
 		case 'h':	h_flag = 1;
@@ -287,21 +309,23 @@ main(int argc, char *argv[], char *envp[])
 				break;
 		case 'T':
 				break;
-		case 't':	if (t_flag || o_flag || x_flag) {
-					(void) fprintf(stderr, gettext(
-				"nm: -t or -o or -x set. -t ignored.\n"));
-				} else if (strcmp(optarg, "o") == 0) {
-					t_flag = 1;
-					o_flag = 1;
+		case 't':	if (strcmp(optarg, "o") == 0) {
+					new_fmt_flag = FMT_T_OCT;
 				} else if (strcmp(optarg, "d") == 0) {
-					t_flag = 1;
-					d_flag = 1;
+					new_fmt_flag = FMT_T_DEC;
 				} else if (strcmp(optarg, "x") == 0) {
-					t_flag = 1;
-					x_flag = 1;
+					new_fmt_flag = FMT_T_HEX;
 				} else {
+					new_fmt_flag = FMT_T_NONE;
+				}
+				if (new_fmt_flag == FMT_T_NONE) {
 					(void) fprintf(stderr, gettext(
 "nm: illegal format '%s' for -t is specified. -t ignored.\n"), optarg);
+				} else if (COMPAT_FMT_FLAG(new_fmt_flag)) {
+					fmt_flag = new_fmt_flag;
+				} else {
+					(void) fprintf(stderr, gettext(
+				"nm: -t or -o or -x set. -t ignored.\n"));
 				}
 				break;
 		case ':':	errflag += 1;
@@ -321,6 +345,16 @@ main(int argc, char *argv[], char *envp[])
 			exit(NOARGS);
 		}
 	}
+
+	/*
+	 * If no explicit format style was specified, set the default
+	 * here. In general, the default is for value and size items
+	 * to be displayed in decimal format. The exception is that
+	 * the default for -P is hexidecimal.
+	 */
+	if (fmt_flag == FMT_T_NONE)
+		fmt_flag = P_flag ? FMT_T_HEX : FMT_T_DEC;
+
 
 	while (optind < argc) {
 		each_file(argv[optind]);
@@ -638,6 +672,11 @@ print_symtab(Elf *elf_file, unsigned int shstrndx,
 	SYM	*sym_data;
 	SYM	*s;
 	GElf_Sxword	count = 0;
+	const int ndigits_arr[] = {
+		10,		/* FMT_T_DEC */
+		8,		/* FMT_T_HEX */
+		11,		/* FMT_T_OCT */
+	};
 	static void print_header(int);
 	int ndigits;
 #ifndef XPG4
@@ -651,13 +690,7 @@ print_symtab(Elf *elf_file, unsigned int shstrndx,
 	/*
 	 * Determine # of digits to use for each numeric value.
 	 */
-	if (x_flag) {		/* Hex */
-		ndigits = 8;
-	} else if (o_flag) {	/* Octal */
-		ndigits = 11;
-	} else {		/* Decimal */
-		ndigits = 10;
-	}
+	ndigits = ndigits_arr[fmt_flag];
 	if (gelf_getclass(elf_file) == ELFCLASS64)
 		ndigits *= 2;
 
@@ -889,8 +922,11 @@ print_header(int ndigits)
 {
 	const char *fmt;
 	const char *section_title;
-	int pad;
-
+	const int pad[] = {	/* Extra prefix characters for format */
+		1,		/* FMT_T_DEC: '|' */
+		3,		/* FMT_T_HEX: '|0x' */
+		2,		/* FMT_T_OCT: '|0' */
+	};
 	if (
 #ifndef XPG4
 	    !u_flag &&
@@ -906,15 +942,9 @@ print_header(int ndigits)
 		}
 		if (A_flag != 0)
 			(void) printf("%s", A_header);
-		if (o_flag) {
-			pad = 2;	/* Allow for leading '|0' */
-		} else if (x_flag) {
-			pad = 3;	/* Allow for leading '|0x' */
-		} else {
-			pad = 1;	/* Allow for leading '|' */
-		}
-		(void) printf(fmt, "[Index]", pad + ndigits, " Value",
-			pad + ndigits, " Size", "Type", "Bind",
+		ndigits += pad[fmt_flag];
+		(void) printf(fmt, "[Index]", ndigits, " Value",
+			ndigits, " Size", "Type", "Bind",
 			"Other", section_title, "Name");
 	}
 }
@@ -1043,7 +1073,11 @@ print_with_pflag(
 )
 {
 	char *sym_key	= NULL;
-	const char *fmt;
+	const char * const fmt[] = {
+		"%.*llu ",	/* FMT_T_DEC */
+		"0x%.*llx ",	/* FMT_T_HEX */
+		"0%.*llo "	/* FMT_T_OCT */
+	};
 
 	if (is_sym_print(sym_data) != 1)
 		return;
@@ -1057,14 +1091,7 @@ print_with_pflag(
 	 * Symbol Value.
 	 *	(hex/octal/decimal)
 	 */
-	if (x_flag) {
-		fmt = "0x%.*llx ";
-	} else if (o_flag) {
-		fmt = "0%.*llo ";
-	} else {
-		fmt = "%.*llu ";
-	}
-	(void) printf(fmt, ndigits, EC_ADDR(sym_data->value));
+	(void) printf(fmt[fmt_flag], ndigits, EC_ADDR(sym_data->value));
 
 
 	/*
@@ -1151,7 +1178,11 @@ print_with_Pflag(
 #define	SYM_LEN 10
 	char sym_name[SYM_LEN+1];
 	size_t len;
-	const char *fmt;
+	const char * const fmt[] = {
+		"%*llu %*llu \n",	/* FMT_T_DEC */
+		"%*llx %*llx \n",	/* FMT_T_HEX */
+		"%*llo %*llo \n"	/* FMT_T_OCT */
+	};
 
 	if (is_sym_print(sym_data) != 1)
 		return;
@@ -1223,14 +1254,7 @@ print_with_Pflag(
 	 * Symbol Value & size
 	 *	(hex/octal/decimal)
 	 */
-	if (d_flag) {
-		fmt = "%*llu %*llu \n";
-	} else if (o_flag) {
-		fmt = "%*llo %*llo \n";
-	} else {	/* Hex and it is the default */
-		fmt = "%*llx %*llx \n";
-	}
-	(void) printf(fmt, ndigits, EC_ADDR(sym_data->value),
+	(void) printf(fmt[fmt_flag], ndigits, EC_ADDR(sym_data->value),
 		ndigits, EC_XWORD(sym_data->size));
 }
 
@@ -1246,21 +1270,23 @@ print_with_otherflags(
 	char *filename
 )
 {
-	const char *fmt;
+	const char * const fmt_value_size[] = {
+		"%*llu|%*lld|",		/* FMT_T_DEC */
+		"0x%.*llx|0x%.*llx|",	/* FMT_T_HEX */
+		"0%.*llo|0%.*llo|"	/* FMT_T_OCT */
+	};
+	const char * const fmt_int[] = {
+		"%-5d",			/* FMT_T_DEC */
+		"%#-5x",		/* FMT_T_HEX */
+		"%#-5o"			/* FMT_T_OCT */
+	};
 
 	if (is_sym_print(sym_data) != 1)
 		return;
 	(void) printf("%s", A_header);
 	(void) printf("[%d]\t|", sym_data->indx);
-	if (o_flag) {
-		fmt = "0%.*llo|0%.*llo|";
-	} else if (x_flag) {
-		fmt = "0x%.*llx|0x%.*llx|";
-	} else {
-		fmt = "%*llu|%*lld|";
-	}
-	(void) printf(fmt, ndigits, EC_ADDR(sym_data->value),
-		ndigits, EC_XWORD(sym_data->size));
+	(void) printf(fmt_value_size[fmt_flag], ndigits,
+		EC_ADDR(sym_data->value), ndigits, EC_XWORD(sym_data->size));
 
 	switch (sym_data->type) {
 	case STT_NOTYPE:(void) printf("%-5s", "NOTY"); break;
@@ -1272,12 +1298,7 @@ print_with_otherflags(
 	case STT_TLS:	(void) printf("%-5s", "TLS "); break;
 	case STT_SPARC_REGISTER: (void) printf("%-5s", "REGI"); break;
 	default:
-		if (o_flag)
-			(void) printf("%#-5o", sym_data->type);
-		else if (x_flag)
-			(void) printf("%#-5x", sym_data->type);
-		else
-			(void) printf("%-5d", sym_data->type);
+		(void) printf(fmt_int[fmt_flag], sym_data->type);
 	}
 	(void) printf("|");
 	switch (sym_data->bind) {
@@ -1286,20 +1307,10 @@ print_with_otherflags(
 	case STB_WEAK:	(void) printf("%-5s", "WEAK"); break;
 	default:
 		(void) printf("%-5d", sym_data->bind);
-		if (o_flag)
-			(void) printf("%#-5o", sym_data->bind);
-		else if (x_flag)
-			(void) printf("%#-5x", sym_data->bind);
-		else
-			(void) printf("%-5d", sym_data->bind);
+		(void) printf(fmt_int[fmt_flag], sym_data->bind);
 	}
 	(void) printf("|");
-	if (o_flag)
-		(void) printf("%#-5o", sym_data->other);
-	else if (x_flag)
-		(void) printf("%#-5x", sym_data->other);
-	else
-		(void) printf("%-5d", sym_data->other);
+	(void) printf(fmt_int[fmt_flag], sym_data->other);
 	(void)  printf("|");
 
 	if (sym_data->shndx == SHN_UNDEF) {
@@ -1333,15 +1344,8 @@ print_with_otherflags(
 			(void) printf("%-14s",
 				"COMMON");
 	} else {
-		if (o_flag && !s_flag)
-			(void) printf("%-7d",
-				sym_data->shndx);
-		else if (x_flag && !s_flag)
-			(void) printf("%-7d",
-				sym_data->shndx);
-		else if (s_flag) {
-			Elf_Scn * scn	= elf_getscn(elf_file,
-						sym_data->shndx);
+		if (s_flag) {
+			Elf_Scn *scn = elf_getscn(elf_file, sym_data->shndx);
 			GElf_Shdr shdr;
 
 			if ((gelf_getshdr(scn, &shdr) != 0) &&
@@ -1349,14 +1353,12 @@ print_with_otherflags(
 				(void) printf("%-14s",
 				(char *)elf_strptr(elf_file,
 				shstrndx, shdr.sh_name));
-			} else
-				(void) printf("%-14d",
-					sym_data->shndx);
-
+			} else {
+				(void) printf("%-14d", sym_data->shndx);
+			}
+		} else {
+			(void) printf("%-7d", sym_data->shndx);
 		}
-		else
-			(void) printf("%-7d",
-				sym_data->shndx);
 	}
 	(void) printf("|");
 	if (!r_flag) {
