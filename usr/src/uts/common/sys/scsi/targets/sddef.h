@@ -1234,6 +1234,7 @@ struct sd_fi_arq {
 #define	SD_READY_VALID			0
 #define	SD_NOT_READY_VALID		1
 #define	SD_READY_NOT_VALID		2
+#define	SD_RESERVED_BY_OTHERS		3
 
 #define	SD_PATH_STANDARD		0
 #define	SD_PATH_DIRECT			1

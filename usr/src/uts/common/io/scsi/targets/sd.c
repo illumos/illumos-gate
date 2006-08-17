@@ -10842,6 +10842,7 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
  * Return Code: SD_READY_VALID		ready and valid label
  *		SD_READY_NOT_VALID	ready, geom ops never applicable
  *		SD_NOT_READY_VALID	not ready, no label
+ *		SD_RESERVED_BY_OTHERS	reservation conflict
  *
  *     Context: Never called at interrupt context.
  */
@@ -10939,10 +10940,10 @@ sd_ready_and_valid(struct sd_lun *un)
 		 * message. This is a legacy message, as the state of the
 		 * target is not actually changed to SD_STATE_OFFLINE.
 		 *
-		 * If the TUR fails for EACCES (Reservation Conflict), it
-		 * means there actually is nothing wrong with the target that
-		 * would require invalidating the geometry, so continue in
-		 * that case as if the TUR was successful.
+		 * If the TUR fails for EACCES (Reservation Conflict),
+		 * SD_RESERVED_BY_OTHERS will be returned to indicate
+		 * reservation conflict. If the TUR fails for other
+		 * reasons, SD_NOT_READY_VALID will be returned.
 		 */
 		int err;
 
@@ -10950,11 +10951,15 @@ sd_ready_and_valid(struct sd_lun *un)
 		err = sd_send_scsi_TEST_UNIT_READY(un, 0);
 		mutex_enter(SD_MUTEX(un));
 
-		if ((err != 0) && (err != EACCES)) {
+		if (err != 0) {
 			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-			    "offline\n");
+			    "offline or reservation conflict\n");
 			un->un_f_geometry_is_valid = FALSE;
-			rval = SD_NOT_READY_VALID;
+			if (err == EACCES) {
+				rval = SD_RESERVED_BY_OTHERS;
+			} else {
+				rval = SD_NOT_READY_VALID;
+			}
 			goto done;
 		}
 	}
@@ -21159,9 +21164,12 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 				if (un->un_f_has_removable_media) {
 					err = ENXIO;
 				} else {
-					/* Do not map EACCES to EIO */
-					if (err != EACCES)
+				/* Do not map SD_RESERVED_BY_OTHERS to EIO */
+					if (err == SD_RESERVED_BY_OTHERS) {
+						err = EACCES;
+					} else {
 						err = EIO;
+					}
 				}
 				un->un_ncmds_in_driver--;
 				ASSERT(un->un_ncmds_in_driver >= 0);
