@@ -74,6 +74,27 @@ set_platform_defaults(void)
 }
 
 /*
+ * these two dummy functions are loaded over the original
+ * todm5823 set and clear_power_alarm functions. On Boston
+ * these functions are not supported, and thus we need to provide
+ * dummy functions that just returns.
+ * On Boston, clock chip is not persistant across reboots,
+ * and moreover it has a bug sending memory access.
+ * This fix is done by writing over the original
+ * tod_ops function pointer with our dummy replacement functions.
+ */
+/*ARGSUSED*/
+static void
+dummy_todm5823_set_power_alarm(timestruc_t ts)
+{
+}
+
+static void
+dummy_todm5823_clear_power_alarm(void)
+{
+}
+
+/*
  * Definitions for accessing the pci config space of the isa node
  * of Southbridge.
  */
@@ -148,6 +169,19 @@ load_platform_drivers(void)
 			cmn_err(CE_WARN, "Could not install rmclomv driver\n");
 		}
 	}
+
+	/*
+	 * These two dummy functions are loaded over the original
+	 * todm5823 set and clear_power_alarm functions. On Boston,
+	 * these functionalities are not supported.
+	 * The load_platform_drivers(void) is called from post_startup()
+	 * which is after all the initialization of the tod module is
+	 * finished, then we replace 2 of the tod_ops function pointers
+	 * with our dummy version.
+	 */
+	tod_ops.tod_set_power_alarm = dummy_todm5823_set_power_alarm;
+	tod_ops.tod_clear_power_alarm = dummy_todm5823_clear_power_alarm;
+
 	/*
 	 * create a handle to the rmc_comm_request_nowait() function
 	 * inside the rmc_comm module.
