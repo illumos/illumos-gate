@@ -502,22 +502,16 @@ notify_scf_of_hotplug(sysevent_t *ev)
 		}
 
 		while (ioctl(fd, SCFIOCSETPHPINFO, scfdata) < 0) {
-			/* Check Retry Error Number */
-			if ((errno != EBUSY) && (errno != EIO)) {
-				break;
+			/* retry a few times for EBUSY and EIO */
+			if ((++retry <= SCFRETRY) &&
+			    ((errno == EBUSY) || (errno == EIO))) {
+				(void) sleep(SCFIOCWAIT);
+				continue;
 			}
 
-			/* Check Retry Times */
-			if (++retry > SCFRETRY) {
-				break;
-			}
-
-			(void) sleep(SCFIOCWAIT);
-		}
-
-		if ((errno != EBUSY && errno != EIO) || retry > SCFRETRY) {
-			syslog(LOG_ERR, "ioctl to scf driver failed on retry "
-			"limit.\n");
+			syslog(LOG_ERR, "SCFIOCSETPHPINFO failed: %s.",
+			    strerror(errno));
+			break;
 		}
 
 		(void) close(fd);
