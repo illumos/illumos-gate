@@ -13460,7 +13460,7 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 {
 	ipha_t	*ipha;
 	ipaddr_t ip_dst, ip_src;
-	ire_t	*src_ire;
+	ire_t	*src_ire = NULL;
 	ill_t	*stq_ill;
 	uint_t	hlen;
 	uint32_t sum;
