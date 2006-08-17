@@ -400,10 +400,6 @@ match_triple_entry(struct nss_innetgr_args *ia, const ns_ldap_entry_t *entry)
 			if (*current == COMMA)
 				return (1);
 
-			/* compare first character */
-			if (tolower(*phost0) != tolower(*current))
-				continue;
-
 			/* limit hostname to COMMA */
 			if ((limit = strchr(current, COMMA)) == NULL)
 				continue;
