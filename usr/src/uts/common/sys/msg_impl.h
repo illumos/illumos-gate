@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +70,15 @@ struct msg {
 #define	MSG_RCVCOPY	00001	/* msgrcv is copying out this message */
 #define	MSG_UNLINKED	00002	/* msg has been unlinked from queue */
 
+/*
+ * msg_rcv_cv is now an array of kcondvar_t for performance reason.
+ * We use multiple condition variables (kcondvar_t) to avoid needing
+ * to wake all readers when sending a single message.
+ */
+#define	MAX_QNUM	63
+#define	MAX_QNUM_CV	64
+#define	MSG_QNUM(x)	((x < 1) ? 0 : (x % MAX_QNUM) + 1)
+
 typedef struct kmsqid {
 	kipc_perm_t	msg_perm;	/* operation permission struct */
 	list_t		msg_list;	/* list of messages on q */
@@ -84,9 +92,9 @@ typedef struct kmsqid {
 	time_t		msg_rtime;	/* last msgrcv time */
 	time_t		msg_ctime;	/* last change time */
 	uint64_t	msg_snd_cnt;	/* # of waiting senders */
-	uint64_t	msg_rcv_cnt;	/* # of waiting receivers */
+	uint64_t	msg_rcv_cnt[MAX_QNUM_CV]; /* # of waiting receivers */
 	kcondvar_t	msg_snd_cv;
-	kcondvar_t	msg_rcv_cv;
+	kcondvar_t	msg_rcv_cv[MAX_QNUM_CV];
 } kmsqid_t;
 
 #endif	/* _KERNEL */

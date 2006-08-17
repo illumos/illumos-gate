@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,8 +194,10 @@ static void
 msg_dtor(kipc_perm_t *perm)
 {
 	kmsqid_t *qp = (kmsqid_t *)perm;
+	int		ii;
 
-	ASSERT(qp->msg_rcv_cnt == 0);
+	for (ii = 0; ii < MAX_QNUM_CV; ii++)
+		ASSERT(qp->msg_rcv_cnt[ii] == 0);
 	ASSERT(qp->msg_snd_cnt == 0);
 	ASSERT(qp->msg_cbytes == 0);
 	list_destroy(&qp->msg_list);
@@ -244,14 +245,17 @@ msg_rmid(kipc_perm_t *perm)
 {
 	kmsqid_t *qp = (kmsqid_t *)perm;
 	struct msg *mp;
+	int		ii;
 
 
 	while ((mp = list_head(&qp->msg_list)) != NULL)
 		msgunlink(qp, mp);
 	ASSERT(qp->msg_cbytes == 0);
 
-	if (qp->msg_rcv_cnt)
-		cv_broadcast(&qp->msg_rcv_cv);
+	for (ii = 0; ii < MAX_QNUM_CV; ii++) {
+		if (qp->msg_rcv_cnt[ii])
+			cv_broadcast(&qp->msg_rcv_cv[ii]);
+	}
 	if (qp->msg_snd_cnt)
 		cv_broadcast(&qp->msg_snd_cv);
 }
@@ -267,7 +271,7 @@ msgctl(int msgid, int cmd, void *arg)
 {
 	STRUCT_DECL(msqid_ds, ds);		/* SVR4 queue work area */
 	kmsqid_t		*qp;		/* ptr to associated q */
-	int			error;
+	int			error, ii;
 	struct	cred		*cr;
 	model_t	mdl = get_udatamodel();
 	struct msqid_ds64	ds64;
@@ -325,8 +329,12 @@ msgctl(int msgid, int cmd, void *arg)
 			return (set_errno(error));
 		}
 
-		if (qp->msg_rcv_cnt)
-			qp->msg_perm.ipc_mode |= MSG_RWAIT;
+		for (ii = 0; ii < MAX_QNUM_CV; ii++) {
+			if (qp->msg_rcv_cnt[ii]) {
+				qp->msg_perm.ipc_mode |= MSG_RWAIT;
+				break;
+			}
+		}
 		if (qp->msg_snd_cnt)
 			qp->msg_perm.ipc_mode |= MSG_WWAIT;
 		ipcperm_stat(&STRUCT_BUF(ds)->msg_perm, &qp->msg_perm, mdl);
@@ -364,8 +372,12 @@ msgctl(int msgid, int cmd, void *arg)
 		break;
 
 	case IPC_STAT64:
-		if (qp->msg_rcv_cnt)
-			qp->msg_perm.ipc_mode |= MSG_RWAIT;
+		for (ii = 0; ii < MAX_QNUM_CV; ii++) {
+			if (qp->msg_rcv_cnt[ii]) {
+				qp->msg_perm.ipc_mode |= MSG_RWAIT;
+				break;
+			}
+		}
 		if (qp->msg_snd_cnt)
 			qp->msg_perm.ipc_mode |= MSG_WWAIT;
 		ipcperm_stat64(&ds64.msgx_perm, &qp->msg_perm);
@@ -425,6 +437,7 @@ msgget(key_t key, int msgflg)
 	kmsqid_t	*qp;
 	kmutex_t	*lock;
 	int		id, error;
+	int		ii;
 	proc_t		*pp = curproc;
 
 top:
@@ -441,7 +454,9 @@ top:
 		qp->msg_lspid = qp->msg_lrpid = 0;
 		qp->msg_stime = qp->msg_rtime = 0;
 		qp->msg_ctime = gethrestime_sec();
-		qp->msg_rcv_cnt = qp->msg_snd_cnt = 0;
+		for (ii = 0; ii < MAX_QNUM_CV; ii++)
+			qp->msg_rcv_cnt[ii] = 0;
+		qp->msg_snd_cnt = 0;
 
 		if (error = ipc_commit_begin(msq_svc, key, msgflg,
 		    (kipc_perm_t *)qp)) {
@@ -569,7 +584,14 @@ findmsg:
 				error = EIDRM;
 				goto msgrcv_out;
 			}
-			cv_broadcast(&qp->msg_rcv_cv);
+			/*
+			 * MSG_RCVCOPY was set while we dropped and reaquired
+			 * the lock. A thread looking for same message type
+			 * might have entered during that interval and seeing
+			 * MSG_RCVCOPY set, would have landed up in the sleepq.
+			 */
+			cv_broadcast(&qp->msg_rcv_cv[MSG_QNUM(smp->msg_type)]);
+			cv_broadcast(&qp->msg_rcv_cv[0]);
 
 			if (copyerror) {
 				error = EFAULT;
@@ -592,10 +614,10 @@ findmsg:
 	}
 
 	/* Wait for new message */
-	qp->msg_rcv_cnt++;
-	cvres = cv_wait_sig(&qp->msg_rcv_cv, lock);
+	qp->msg_rcv_cnt[MSG_QNUM(msgtyp)]++;
+	cvres = cv_wait_sig(&qp->msg_rcv_cv[MSG_QNUM(msgtyp)], lock);
 	lock = ipc_relock(msq_svc, qp->msg_perm.ipc_id, lock);
-	qp->msg_rcv_cnt--;
+	qp->msg_rcv_cnt[MSG_QNUM(msgtyp)]--;
 
 	if (IPC_FREE(&qp->msg_perm)) {
 		error = EIDRM;
@@ -861,8 +883,16 @@ top:
 	mp->msg_type = type;
 	mp->msg_flags = 0;
 	list_insert_tail(&qp->msg_list, mp);
-	if (qp->msg_rcv_cnt)
-		cv_broadcast(&qp->msg_rcv_cv);
+	/*
+	 * For all message type >= 1.
+	 */
+	if (qp->msg_rcv_cnt[MSG_QNUM(type)])
+		cv_broadcast(&qp->msg_rcv_cv[MSG_QNUM(type)]);
+	/*
+	 * For all message type < 1.
+	 */
+	if (qp->msg_rcv_cnt[0])
+		cv_broadcast(&qp->msg_rcv_cv[0]);
 
 msgsnd_out:
 	ipc_rele(msq_svc, (kipc_perm_t *)qp);	/* drops lock */

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,6 +127,8 @@ ipcperm(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static void
 msq_print(kmsqid_t *msqid, uintptr_t addr)
 {
+	int	ii;
+
 	mdb_printf("&list: %-?p\n", addr + OFFSETOF(kmsqid_t, msg_list));
 	mdb_printf("cbytes: 0t%lu    qnum: 0t%lu    qbytes: 0t%lu"
 	    "    qmax: 0t%lu\n", msqid->msg_cbytes, msqid->msg_qnum,
@@ -137,13 +138,19 @@ msq_print(kmsqid_t *msqid, uintptr_t addr)
 	printtime_nice("stime: ", msqid->msg_stime);
 	printtime_nice("rtime: ", msqid->msg_rtime);
 	printtime_nice("ctime: ", msqid->msg_ctime);
-	mdb_printf("snd_cnt: 0t%lld    rcv_cnt: 0t%lld\n",
-	    msqid->msg_snd_cnt, msqid->msg_rcv_cnt);
-	mdb_printf("snd_cv: %hd (%p)    rcv_cv: %hd (%p)\n",
-	    msqid->msg_snd_cv._opaque,
-	    addr + (uintptr_t)OFFSETOF(kmsqid_t, msg_snd_cv),
-	    msqid->msg_rcv_cv._opaque,
-	    addr + (uintptr_t)OFFSETOF(kmsqid_t, msg_rcv_cv));
+	mdb_printf("snd_cnt: 0t%lld    snd_cv: %hd (%p)\n",
+	    msqid->msg_snd_cnt, msqid->msg_snd_cv._opaque,
+	    addr + (uintptr_t)OFFSETOF(kmsqid_t, msg_snd_cv));
+
+	mdb_printf("#    rcv_cnt:     rcv_cv:\n");
+	for (ii = 0; ii < MAX_QNUM_CV; ii++) {
+		if (msqid->msg_rcv_cnt[ii] || msqid->msg_rcv_cv[ii]._opaque) {
+			mdb_printf("%2d    0t%lld          %hd  (%p)\n", ii,
+			    msqid->msg_rcv_cnt[ii],
+			    msqid->msg_rcv_cv[ii]._opaque, addr +
+			    (uintptr_t)OFFSETOF(kmsqid_t, msg_rcv_cv[ii]));
+		}
+	}
 }
 
 
