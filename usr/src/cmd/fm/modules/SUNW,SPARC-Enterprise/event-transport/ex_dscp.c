@@ -126,6 +126,7 @@ static int
 exs_prep_client(exs_hdl_t *hp)
 {
 	int rv, optval = 1;
+	struct linger ling;
 
 	/* Find the DSCP address for the remote endpoint */
 	if ((rv = dscpAddr(hp->h_dom, DSCP_ADDR_REMOTE,
@@ -151,6 +152,26 @@ exs_prep_client(exs_hdl_t *hp)
 		return (3);
 	}
 
+	/*
+	 * Set SO_LINGER so TCP aborts the connection when closed.
+	 * If the domain's client socket goes into the TIME_WAIT state,
+	 * ETM will be unable to connect to the SP until this clears.
+	 * This connection is over DSCP, which is a simple point-to-point
+	 * connection and therefore has no routers or multiple forwarding.
+	 * The risk of receiving old packets from a previously terminated
+	 * connection is very small.
+	 */
+	ling.l_onoff = 1;
+	ling.l_linger = 0;
+	if (setsockopt(hp->h_client.c_sd, SOL_SOCKET, SO_LINGER, &ling,
+	    sizeof (ling))) {
+		fmd_hdl_error(hp->h_hdl, "xport - set SO_LINGER failed on "
+		    "client socket for %s", hp->h_endpt_id);
+		(void) close(hp->h_client.c_sd);
+		hp->h_client.c_sd = EXS_SD_FREE;
+		return (4);
+	}
+
 	/* Bind the socket to the local IP address of the DSCP link */
 	if ((rv = dscpBind(hp->h_dom, hp->h_client.c_sd,
 	    EXS_CLIENT_PORT)) != DSCP_OK) {
@@ -158,7 +179,7 @@ exs_prep_client(exs_hdl_t *hp)
 		    "failed for %s : rv = %d\n", hp->h_endpt_id, rv);
 		(void) close(hp->h_client.c_sd);
 		hp->h_client.c_sd = EXS_SD_FREE;
-		return (4);
+		return (5);
 	}
 
 	hp->h_client.c_saddr.sin_port = htons(EXS_SERVER_PORT);
@@ -169,7 +190,7 @@ exs_prep_client(exs_hdl_t *hp)
 		    "failed for %s : rv = %d\n", hp->h_endpt_id, rv);
 		(void) close(hp->h_client.c_sd);
 		hp->h_client.c_sd = EXS_SD_FREE;
-		return (5);
+		return (6);
 	}
 
 	return (0);
