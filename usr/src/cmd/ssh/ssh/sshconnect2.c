@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -402,10 +402,12 @@ void
 input_userauth_banner(int type, u_int32_t seq, void *ctxt)
 {
 	char *msg, *lang;
+
 	debug3("input_userauth_banner");
 	msg = packet_get_string(NULL);
 	lang = packet_get_string(NULL);
-	fprintf(stderr, "%s", msg);
+	if (options.log_level > SYSLOG_LEVEL_QUIET)
+		fprintf(stderr, "%s", msg);
 	xfree(msg);
 	xfree(lang);
 }
