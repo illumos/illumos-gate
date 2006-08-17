@@ -1270,7 +1270,8 @@ nisplus_update(nis_name nis_princ, char *authtype, char *public, char *crypt)
 	nis_object	*obj = init_entry();
 	int		status;
 	bool_t		addition;
-	char		*userdomain, *cmpdomain, *domain;
+	char		cmpdomain[MAXHOSTNAMELEN + 1];
+	char		*userdomain, *domain;
 
 	if (!(userdomain = strchr(netname, '@'))) {
 		fprintf(stderr, "%s: invalid netname: '%s'.\n",
@@ -1279,9 +1280,23 @@ nisplus_update(nis_name nis_princ, char *authtype, char *public, char *crypt)
 	}
 	userdomain++;
 
-	cmpdomain = strdup(userdomain);
-	if (cmpdomain[strlen(cmpdomain) - 1] != '.')
-		strcat(cmpdomain, ".");
+	if (strlcpy(cmpdomain, userdomain, sizeof (cmpdomain)) >=
+	    sizeof (cmpdomain)) {
+		(void) fprintf(stderr,
+			    "%s: net domain name %s is too long\n",
+			    program_name, cmpdomain);
+			exit(1);
+	}
+
+	if (cmpdomain[strlen(cmpdomain) - 1] != '.') {
+		if (strlcat(cmpdomain, ".", sizeof (cmpdomain)) >=
+		    sizeof (cmpdomain)) {
+			(void) fprintf(stderr,
+				    "%s: net domain name %s is too long\n",
+				    program_name, cmpdomain);
+			exit(1);
+		}
+	}
 
 	domain = nis_domain_of(nis_princ);
 	if (strcasecmp(domain, cmpdomain) != 0)
