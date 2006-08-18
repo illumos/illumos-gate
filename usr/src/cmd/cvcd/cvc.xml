@@ -73,6 +73,14 @@
 		<service_fmri value='svc:/system/identity:node' />
 	</dependency>
 
+	<dependency
+	    name='filesystem_usr'
+	    grouping='require_all'
+	    restart_on='none' 
+	    type='service'>
+		<service_fmri value='svc:/system/filesystem/usr' />
+	</dependency>
+
 	<exec_method
 	    type='method'
 	    name='start'
