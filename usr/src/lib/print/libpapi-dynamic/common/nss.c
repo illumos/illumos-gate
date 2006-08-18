@@ -483,6 +483,11 @@ str2printer(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 {
 	if (lenstr + 1 > buflen)
 		return (NSS_STR_PARSE_ERANGE);
+
+	/* skip entries that begin with '#' */
+	if (instr[0] == '#')
+		return (NSS_STR_PARSE_PARSE);
+
 	/*
 	 * We copy the input string into the output buffer
 	 */
