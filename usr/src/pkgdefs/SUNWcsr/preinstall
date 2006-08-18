@@ -23,15 +23,34 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
+#
+# When first introduced the /etc/inet/ipnodes file was seperate from
+# /etc/inet/hosts.  It is now a symbolic link to /etc/inet/hosts.  The
+# i.hosts class action script merges the saved temporary ipnodes file 
+# into a single hosts file.
+#
+if [ ! -h $BASEDIR/etc/inet/ipnodes ]; then
+	if [ -f $BASEDIR/etc/inet/ipnodes ]; then
+		mv -f $BASEDIR/etc/inet/ipnodes \
+			$BASEDIR/etc/inet/ipnodes.hostsmerge
+	fi
+fi
+
+#
+# TIMEZONE.temp is processed and removed by the i.definit class action
+# script.
+#
 if [ -f $BASEDIR/etc/TIMEZONE ] ; then
 	cp $BASEDIR/etc/TIMEZONE $BASEDIR/etc/TIMEZONE.temp
 fi
 
+# mail.ABCsavedXYZ is processed and removed by postinstall
 if [ -h $BASEDIR/var/mail ] ; then
 	rm -rf $BASEDIR/var/mail.ABCsavedXYZ
 	mv $BASEDIR/var/mail $BASEDIR/var/mail.ABCsavedXYZ
 fi
 
+# news.ABCsavedXYZ is processed and removed by postinstall
 if [ -h $BASEDIR/var/news ] ; then
 	rm -rf $BASEDIR/var/news.ABCsavedXYZ
 	mv $BASEDIR/var/news $BASEDIR/var/news.ABCsavedXYZ

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +37,7 @@
 #include <errno.h>
 
 /*
- * Filter to convert both IPv4 and IPv6 addresses from /etc/hosts or
- * /etc/inet/ipnodes files.
+ * Filter to convert both IPv4 and IPv6 addresses from /etc/hosts file.
  */
 
 /*
@@ -197,30 +195,21 @@ main(argc, argv)
 			nadrp = NULL; /* Not a valid IPv4 address */
 		}
 
-		if (ipv4) {
-			if (nadrp == NULL) {
+		if (nadrp == NULL) {
+			if (inet_pton(AF_INET6, adr, &in6) == 1) {
+				nadrp = inet_ntop(AF_INET6, &in6,
+				    nadr, sizeof (nadr));
+			}
+			if (nadrp == NULL) { /* Invalid IPv6 too */
 				if (warn)
 					fprintf(stderr,
-					    "%s: Warning: malformed address on"
+					    "%s: Warning: malformed"
+					    " address on"
 					    " line %d, ignored\n",
 					    cmd, lineno);
 				continue;
-			}
-		} else { /* v4 or v6 for ipnodes */
-			if (nadrp == NULL) {
-				if (inet_pton(AF_INET6, adr, &in6) == 1) {
-					nadrp = inet_ntop(AF_INET6, &in6,
-					    nadr, sizeof (nadr));
-				}
-				if (nadrp == NULL) { /* Invalid IPv6 too */
-					if (warn)
-						fprintf(stderr,
-						    "%s: Warning: malformed"
-						    " address on"
-						    " line %d, ignored\n",
-						    cmd, lineno);
-					continue;
-				}
+			} else if (ipv4) {
+				continue; /* Ignore valid IPv6  */
 			}
 		}
 

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,14 +21,14 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 1989-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 SYMPROG= hosts inetd.conf networks protocols services netmasks sock2path
 
 # New /etc/inet files shouldn't have /etc entries.
-PROG= ipnodes datemsk.ndpd ipaddrsel.conf ipsecalgs ipsecinit.sample \
+PROG= datemsk.ndpd ipaddrsel.conf ipsecalgs ipsecinit.sample \
     ipqosconf.1.sample ipqosconf.2.sample ipqosconf.3.sample \
     wanboot.conf.sample
 #mipagent config file permissions need to be tighter
@@ -51,6 +50,7 @@ ETCINETPROG=	$(ETCPROG:%=$(INETETCDIR)/%)
 ETCINETPROG2=	$(PROG2:%=$(INETETCDIR)/%)
 # Only old /etc/inet files get symlinks in /etc.
 SYMETCPROG=	$(SYMPROG:%=sym_%)
+SYMIPNODES=	$(INETETCDIR)/ipnodes
 
 FILEMODE= 0444
 OWNER= root
@@ -62,7 +62,11 @@ $(ETCINETPROG2):=	FILEMODE= 0600
 
 all: $(ETCPROG) $(SUBDIRS)
 
-install: all $(DIRS) $(ETCINETPROG) $(SYMETCPROG) $(SUBDIRS)
+install: all $(DIRS) $(ETCINETPROG) $(SYMETCPROG) $(SYMIPNODES) $(SUBDIRS)
+
+$(SYMIPNODES) :
+	$(RM) $@
+	$(SYMLINK) ./hosts $@
 
 $(INETETCDIR)/% : %
 	$(INS.file)

@@ -34,6 +34,10 @@ cat >> $BASEDIR/var/svc/profile/upgrade <<\_CLRSYSID
 	/usr/sbin/svcadm clear svc:/system/sysidtool:system
 _CLRSYSID
 
+if [ -f $BASEDIR/etc/inet/ipnodes.hostsmerge ]; then
+	rm -f $BASEDIR/etc/inet/ipnodes.hostsmerge
+fi
+
 if [ -h $BASEDIR/var/mail.ABCsavedXYZ ] ; then
 	rmdir $BASEDIR/var/mail/:saved >/dev/null 2>&1
 	if [ $? = 0 ] ; then

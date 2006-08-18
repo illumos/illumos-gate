@@ -4532,6 +4532,15 @@ mondo_loop() {
 	#
 	smf_handle_new_services
 
+      	# Reflect SUNWcsr's pre-install change, ensures
+	# the i.hosts action script works during 'acr'	
+	if [[ -f $rootprefix/etc/inet/ipnodes && \
+			! -h $rootprefix/etc/inet/ipnodes ]]; then
+		rm -f $rootprefix/etc/inet/ipnodes.hostsmerge
+		cp -p $rootprefix/etc/inet/ipnodes \
+			$rootprefix/etc/inet/ipnodes.hostsmerge
+	fi
+
 	#
 	# Remove obsolete disassembler module
 	#

@@ -83,6 +83,7 @@ i i.vfstab
 i i.manifest
 i r.manifest
 i i.ttydefs
+i i.hosts
 #
 # source locations relative to the prototype file
 #
@@ -154,8 +155,8 @@ s none etc/grpck=../usr/sbin/grpck
 s none etc/halt=../usr/sbin/halt
 s none etc/hosts=./inet/hosts
 d none etc/inet 755 root sys
-e preserve etc/inet/hosts 444 root sys
-e preserve etc/inet/ipnodes 444 root sys
+e hosts etc/inet/hosts 444 root sys
+s none etc/inet/ipnodes=./hosts
 e inetdconf etc/inet/inetd.conf 444 root sys
 e preserve etc/inet/ipaddrsel.conf 444 root sys
 e preserve etc/inet/netmasks 444 root sys

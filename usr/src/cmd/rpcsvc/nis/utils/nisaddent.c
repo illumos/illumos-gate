@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1211,7 +1210,7 @@ printfkeystr_cname(fstr, entry)
 /*
  * /etc/hosts
  * nis+ table: (hosts_tbl) cname, name, addr, comment
- *
+ * Builds IPv4 entries only, IPv6 entries in hosts are ignored.
  */
 
 int
@@ -1225,6 +1224,7 @@ genent_hosts(line, cback, udata)
 	nis_object eobj;
 	entry_col ecol[4];
 	char *cname;
+	struct in6_addr in6;
 
 	/*
 	 * don't clobber our argument
@@ -1244,7 +1244,7 @@ genent_hosts(line, cback, udata)
 	 * comment (col 3)
 	 */
 	t = strchr(buf, '#');
-	if (t) {
+	if (t != NULL) {
 		*t++ = 0;
 		ecol[3].ec_value.ec_value_val = t;
 		ecol[3].ec_value.ec_value_len = strlen(t)+1;
@@ -1260,6 +1260,13 @@ genent_hosts(line, cback, udata)
 		strcpy(parse_err_msg, "no host");
 		return (GENENT_PARSEERR);
 	}
+
+	/*
+	 * Ignore IPv6 entries in hosts file, return OK.
+	 */
+	if (inet_pton(AF_INET6, t, &in6) == 1)
+		return (GENENT_OK);
+
 	ecol[2].ec_value.ec_value_val = t;
 	ecol[2].ec_value.ec_value_len = strlen(t)+1;
 
@@ -1309,6 +1316,112 @@ genent_hosts(line, cback, udata)
 		ecol[3].ec_value.ec_value_len = 0;
 
 	} while (t = strtok(NULL, " \t"));
+
+	return (GENENT_OK);
+}
+
+
+/*
+ * /etc/inet/ipnodes (symlink to /etc/inet/hosts)
+ * nis+ table: (ipnodes_tbl) cname, name, addr, comment
+ * Builds both IPv4 and IPv6 entries for ipnodes map.
+ */
+
+int
+genent_hosts6(line, cback, udata)
+	char *line;
+	int (*cback)();
+	void *udata;
+{
+	char buf[BUFSIZ+1];
+	char *t;
+	nis_object eobj;
+	entry_col ecol[4];
+	char *cname;
+
+	/*
+	 * don't clobber our argument
+	 */
+	if (strlen(line) >= sizeof (buf)) {
+		strcpy(parse_err_msg, "line too long");
+		return (GENENT_PARSEERR);
+	}
+	strcpy(buf, line);
+
+	/*
+	 * clear column data
+	 */
+	memset((char *)ecol, 0, sizeof (ecol));
+
+	/*
+	 * comment (col 3)
+	 */
+	t = strchr(buf, '#');
+	if (t != NULL) {
+		*t++ = 0;
+		ecol[3].ec_value.ec_value_val = t;
+		ecol[3].ec_value.ec_value_len = strlen(t)+1;
+	} else {
+		ecol[3].ec_value.ec_value_val = 0;
+		ecol[3].ec_value.ec_value_len = 0;
+	}
+
+	/*
+	 * addr(col 2)
+	 */
+	if ((t = strtok(buf, " \t")) == NULL) {
+		strcpy(parse_err_msg, "no host");
+		return (GENENT_PARSEERR);
+	}
+	ecol[2].ec_value.ec_value_val = t;
+	ecol[2].ec_value.ec_value_len = strlen(t)+1;
+
+	/*
+	 * cname (col 0)
+	 */
+	if ((t = strtok(NULL, " \t")) == NULL) {
+		strcpy(parse_err_msg, "no cname");
+		return (GENENT_PARSEERR);
+	}
+	ecol[0].ec_value.ec_value_val = t;
+	ecol[0].ec_value.ec_value_len = strlen(t)+1;
+	cname = t;
+
+	/*
+	 * build entry
+	 */
+	eobj = nis_default_obj;
+	eobj.zo_data.zo_type = NIS_ENTRY_OBJ;
+	eobj.EN_data.en_type = ta_type;
+	eobj.EN_data.en_cols.en_cols_val = ecol;
+	eobj.EN_data.en_cols.en_cols_len = 4;
+
+	if (cback != NULL)
+		cback = addentry;
+
+	/*
+	 * name (col 1)
+	 */
+	do {
+		/*
+		 * don't clobber comment in canonical entry
+		 */
+		if (t != cname && strcasecmp(t, cname) == 0)
+			continue;
+
+		ecol[1].ec_value.ec_value_val = t;
+		ecol[1].ec_value.ec_value_len = strlen(t)+1;
+
+		if ((*cback)(ta_name, &eobj, udata, 0))
+			return (GENENT_CBERR);
+
+		/*
+		 * only put comment in canonical entry
+		 */
+		ecol[3].ec_value.ec_value_val = 0;
+		ecol[3].ec_value.ec_value_len = 0;
+
+	} while ((t = strtok(NULL, " \t")) != NULL);
 
 	return (GENENT_OK);
 }
@@ -4269,7 +4382,7 @@ struct ttypelist_t ttypelist[] = {
 	    printfkeystr_cname },
 	{ "ipnodes", "ipnodes.byaddr", "ipnodes.org_dir", "ipnodes_tbl",
 	    0, 2, 0, " \t",
-	    dbmniskey, nisdbmkey, filedbmkey, genent_hosts,
+	    dbmniskey, nisdbmkey, filedbmkey, genent_hosts6,
 	    dump_hosts, dump_match_hosts,
 	    filedbmline_comment, filetodbm, fetchdbm,
 	    printfkeystr_cname },

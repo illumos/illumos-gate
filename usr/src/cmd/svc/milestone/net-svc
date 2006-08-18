@@ -133,13 +133,13 @@ update_nss ()
 }
 
 #
-# update_files
-# This routine takes as a parameter, the name of the respective file 
-# (hosts or ipnodes) to update with the new host name and IP address.
+# update_hosts_file
+# This routine updates the /etc/inet/hosts file with the hostname and IP
+# address that was obtained via DHCP.
 #
-update_files ()
+update_hosts_file ()
 {
-	filename=$1;
+	filename=hosts
 	# Delete any old lines added by dhcp.
 	/usr/bin/sed -e '/# Added by DHCP$/d' /etc/inet/${filename} \
 	    > /tmp/${filename}_clear.$$
@@ -286,25 +286,17 @@ if [ "$_INIT_NET_STRATEGY" = "dhcp" ]; then
 
 	hostname=`/usr/bin/uname -n`
 	ipaddr=`/sbin/dhcpinfo Yiaddr`
-	update_files hosts
-	update_files ipnodes
+	update_hosts_file
 
 else
 	# We're not using a dhcp strategy, so host entries added by
-	# DHCP should be removed from /etc/inet/hosts and /etc/inet/ipnodes.
+	# DHCP should be removed from /etc/inet/hosts.
 
 	if /usr/bin/grep '# Added by DHCP$' /etc/inet/hosts >/dev/null 2>&1;
 	    then
 		/usr/bin/sed -e '/# Added by DHCP$/d' \
 		    /etc/inet/hosts > /tmp/hosts.$$
 		mv_file /tmp/hosts.$$ /etc/inet/hosts 444
-	fi
-
-	if /usr/bin/grep '# Added by DHCP$' /etc/inet/ipnodes >/dev/null 2>&1;
-	    then
-		/usr/bin/sed -e '/# Added by DHCP$/d' \
-		    /etc/inet/ipnodes > /tmp/ipnodes.$$
-		mv_file /tmp/ipnodes.$$ /etc/inet/ipnodes 444
 	fi
 fi
 

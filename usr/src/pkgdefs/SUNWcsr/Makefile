@@ -39,6 +39,7 @@ DATAFILES += \
 	i.etcrpc	\
 	i.fstypes	\
 	i.group		\
+	i.hosts		\
 	i.inetdconf	\
 	i.initd		\
 	i.inittab	\
