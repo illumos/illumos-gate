@@ -655,6 +655,7 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				return (EINVAL);
 			}
 			if (sfv_off + sfv_len > maxoff) {
+				total_size -= (sfv_off + sfv_len - maxoff);
 				sfv_len = (ssize_t)((offset_t)maxoff -
 				    sfv_off);
 			}
@@ -1117,7 +1118,7 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 #ifdef _SYSCALL32_IMPL
 	struct ksendfilevec32 sfv32[SEND_MAX_CHUNK];
 #endif
-	ssize_t total_size = 0;
+	ssize_t total_size;
 	int i;
 	boolean_t is_sock = B_FALSE;
 	int maxblk = 0;
@@ -1204,6 +1205,7 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 	copy_vec = vec;
 
 	do {
+		total_size = 0;
 		copy_cnt = MIN(sfvcnt, SEND_MAX_CHUNK);
 #ifdef _SYSCALL32_IMPL
 		/* 32-bit callers need to have their iovec expanded. */
