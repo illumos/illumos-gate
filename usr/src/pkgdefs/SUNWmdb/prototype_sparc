@@ -53,7 +53,6 @@ f none usr/lib/mdb/kvm/sparcv9/lofs.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/logindmux.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/md.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/mdb_ks.so 555 root sys
-f none usr/lib/mdb/kvm/sparcv9/mpxio.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/nca.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/nfs.so 555 root sys
 s none usr/lib/mdb/kvm/sparcv9/pcisch.so=intr.so
@@ -63,6 +62,7 @@ s none usr/lib/mdb/kvm/sparcv9/px.so=intr.so
 f none usr/lib/mdb/kvm/sparcv9/random.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/sctp.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/s1394.so 555 root sys
+f none usr/lib/mdb/kvm/sparcv9/scsi_vhci.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/specfs.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/sppp.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/sd.so 555 root sys

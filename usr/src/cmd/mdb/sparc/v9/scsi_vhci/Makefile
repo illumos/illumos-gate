@@ -22,60 +22,14 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# MDB modules used for debugging user processes that every ISA's build
-# subdirectory will need to build.
-# 
-COMMON_MODULES_PROC = \
-	dof \
-	libavl \
-	libc \
-	libnvpair \
-	libsysevent \
-	libumem \
-	libuutil \
-	libzpool \
-	mdb_ds \
-	mdb_test
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#
-# MDB modules used for debugging user processes which are only 32-bit
-#
-COMMON_MODULES_PROC_32BIT = \
-	svc.configd \
-	svc.startd
+MODULE = scsi_vhci.so 
+MDBTGT = kvm
 
-#
-# MDB modules used for debugging kernels.
-#
-COMMON_MODULES_KVM = \
-	arp \
-	audiosup \
-	cpc \
-	crypto	\
-	dtrace	\
-	genunix \
-	ip \
-	ipc \
-	ipp \
-	krtld \
-	lofs \
-	logindmux \
-	md \
-	nca \
-	ptm \
-	random \
-	s1394 \
-	scsi_vhci \
-	sctp \
-	specfs \
-	sppp \
-	ufs \
-	usba \
-	zfs
+MODSRCS = scsi_vhci.c
 
-CLOSED_COMMON_MODULES_KVM = \
-	nfs
-
-include $(SRC)/Makefile.master
+include ../../../../Makefile.cmd
+include ../../../../Makefile.cmd.64
+include ../../Makefile.sparcv9
+include ../../../Makefile.module

@@ -99,6 +99,7 @@
 #include "vfs.h"
 #include "zone.h"
 #include "modhash.h"
+#include "mdi.h"
 
 /*
  * Surely this is defined somewhere...
@@ -3473,6 +3474,22 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "pfiles", ":[-fp]", "print process file information", pfiles,
 		pfiles_help },
 
+	/* from mdi.c */
+	{ "mdipi", NULL, "given a path, dump mdi_pathinfo "
+		"and detailed pi_prop list", mdipi },
+	{ "mdiprops", NULL, "given a pi_prop, dump the pi_prop list",
+		mdiprops },
+	{ "mdiphci", NULL, "given a phci, dump mdi_phci and "
+		"list all paths", mdiphci },
+	{ "mdivhci", NULL, "given a vhci, dump mdi_vhci and list "
+		"all phcis", mdivhci },
+	{ "mdiclient_paths", NULL, "given a path, walk mdi_pathinfo "
+		"client links", mdiclient_paths },
+	{ "mdiphci_paths", NULL, "given a path, walk through mdi_pathinfo "
+		"phci links", mdiphci_paths },
+	{ "mdiphcis", NULL, "given a phci, walk through mdi_phci ph_next links",
+		mdiphcis },
+
 	{ NULL }
 };
 
@@ -3785,6 +3802,23 @@ static const mdb_walker_t walkers[] = {
 	/* from vfs.c */
 	{ "vfs", "walk file system list",
 		vfs_walk_init, vfs_walk_step },
+
+	/* from mdi.c */
+	{ "mdipi_client_list", "Walker for mdi_pathinfo pi_client_link",
+		mdi_pi_client_link_walk_init,
+		mdi_pi_client_link_walk_step,
+		mdi_pi_client_link_walk_fini },
+
+	{ "mdipi_phci_list", "Walker for mdi_pathinfo pi_phci_link",
+		mdi_pi_phci_link_walk_init,
+		mdi_pi_phci_link_walk_step,
+		mdi_pi_phci_link_walk_fini },
+
+	{ "mdiphci_list", "Walker for mdi_phci ph_next link",
+		mdi_phci_ph_next_walk_init,
+		mdi_phci_ph_next_walk_step,
+		mdi_phci_ph_next_walk_fini },
+
 	{ NULL }
 };
 

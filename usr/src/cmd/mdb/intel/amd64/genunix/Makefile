@@ -47,6 +47,7 @@ COMMONSRCS = \
 	lgrp.c \
 	list.c \
 	log.c \
+	mdi.c \
 	memory.c \
 	mmd.c \
 	modhash.c \

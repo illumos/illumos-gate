@@ -5633,16 +5633,28 @@ mondo_loop() {
 	fi
 
 	#
-	# new: need to remove going backwards:
-	#
 	# Diskless clients have already extracted /usr so don't delete this
 	# Non-global zones never extracts /usr so don't delete these
 	#
 	if [ $diskless = no -a $zone = global ]; then
 		rm -f $usr/sbin/stmsboot
+
+		rm -f $usr/lib/mdb/kvm/mpxio.so
+		rm -f $usr/lib/mdb/kvm/sparcv9/mpxio.so
+		rm -f $usr/lib/mdb/kvm/amd64/mpxio.so
+		rm -f $usr/lib/mdb/kvm/scsi_vhci.so
+		rm -f $usr/lib/mdb/kvm/sparcv9/scsi_vhci.so
+		rm -f $usr/lib/mdb/kvm/amd64/scsi_vhci.so
 	fi
 	rm -f $root/lib/mpxio/mpxio
 	rm -f $root/lib/mpxio/stmsboot_util
+
+	rm -f $root/kernel/kmdb/mpxio
+	rm -f $root/kernel/kmdb/sparcv9/mpxio
+	rm -f $root/kernel/kmdb/amd64/mpxio
+	rm -f $root/kernel/kmdb/scsi_vhci
+	rm -f $root/kernel/kmdb/sparcv9/scsi_vhci
+	rm -f $root/kernel/kmdb/amd64/scsi_vhci
 
 	#
 	# Remove rpcib misc module (converted to driver)
