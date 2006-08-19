@@ -210,8 +210,8 @@ get_sname(char *name)
 		if (strchr(np, 's') == strrchr(np, 's')) {
 			npt = strrchr(np, 'p');
 			/* If pN is found, do not include it */
-			if (isdigit(*++npt)) {
-				*--npt = '\0';
+			if (npt != NULL) {
+				*npt = '\0';
 			}
 			(void) snprintf(buf, sizeof (buf), "%ss2", np);
 		} else {
