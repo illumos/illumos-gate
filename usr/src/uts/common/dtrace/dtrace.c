@@ -11467,7 +11467,9 @@ dtrace_state_buffer(dtrace_state_t *state, dtrace_buffer_t *buf, int which)
 		if (opt[DTRACEOPT_BUFPOLICY] == DTRACEOPT_BUFPOLICY_FILL)
 			flags |= DTRACEBUF_FILL;
 
-		flags |= DTRACEBUF_INACTIVE;
+		if (state != dtrace_anon.dta_state ||
+		    state->dts_activity != DTRACE_ACTIVITY_ACTIVE)
+			flags |= DTRACEBUF_INACTIVE;
 	}
 
 	for (size = opt[which]; size >= sizeof (uint64_t); size >>= 1) {

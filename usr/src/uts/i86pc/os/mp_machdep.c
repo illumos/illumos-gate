@@ -1008,19 +1008,11 @@ mach_set_softintr(register int ipl, struct av_softinfo *pending)
 static void
 mach_cpu_start(register int cpun)
 {
-	register struct psm_ops  *pops;
-	int	i;
+	struct psm_ops  *pops;
 
 	pops = mach_set[0];
 
 	(*pops->psm_cpu_start)(cpun, rm_platter_va);
-
-	/* wait for the auxillary cpu to be ready			*/
-	for (i = 20000; i; i--) {
-		if (cpu[cpun]->cpu_flags & CPU_READY)
-			return;
-		drv_usecwait(100);
-	}
 }
 
 /*ARGSUSED*/

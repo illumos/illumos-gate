@@ -974,11 +974,21 @@ start_other_cpus(int cprboot)
 
 	flushes_require_xcalls = 1;
 
+	ASSERT(CPU_IN_SET(procset, cpuid));
+	ASSERT(CPU_IN_SET(cpu_ready_set, cpuid));
+
+	/*
+	 * We lock our affinity to the master CPU to ensure that all slave CPUs
+	 * do their TSC syncs with the same CPU.
+	 */
 	affinity_set(CPU_CURRENT);
 
 	for (who = 0; who < NCPU; who++) {
 		if (who == cpuid)
 			continue;
+
+		delays = 0;
+
 		if (!CPU_IN_SET(mp_cpus, who))
 			continue;
 
@@ -992,7 +1002,6 @@ start_other_cpus(int cprboot)
 		(*cpu_startf)(who, rm_platter_pa);
 
 		while (!CPU_IN_SET(procset, who)) {
-
 			delay(1);
 			if (++delays > (20 * hz)) {
 
@@ -1014,23 +1023,17 @@ start_other_cpus(int cprboot)
 		if (tsc_gethrtime_enable)
 			tsc_sync_master(who);
 
-		if (dtrace_cpu_init != NULL) {
-			/*
-			 * DTrace CPU initialization expects cpu_lock
-			 * to be held.
-			 */
-			mutex_enter(&cpu_lock);
-			(*dtrace_cpu_init)(who);
-			mutex_exit(&cpu_lock);
-		}
 	}
 
 	affinity_clear();
 
+	/*
+	 * Wait for all CPUs that booted (have presence in procset)
+	 * to come online (have presence in cpu_ready_set).  Note
+	 * that the start CPU already satisfies both of these, so no
+	 * special case is needed.
+	 */
 	for (who = 0; who < NCPU; who++) {
-		if (who == cpuid)
-			continue;
-
 		if (!CPU_IN_SET(procset, who))
 			continue;
 
@@ -1144,9 +1147,7 @@ mp_startup(void)
 
 	init_cpu_info(cp);
 
-	mutex_enter(&cpu_lock);
-	CPUSET_ADD(procset, cp->cpu_id);
-	mutex_exit(&cpu_lock);
+	CPUSET_ATOMIC_ADD(procset, cp->cpu_id);
 
 	if (tsc_gethrtime_enable)
 		tsc_sync_slave();
@@ -1165,6 +1166,11 @@ mp_startup(void)
 
 	cp->cpu_flags |= CPU_RUNNING | CPU_READY | CPU_ENABLE | CPU_EXISTS;
 	cpu_add_active(cp);
+
+	if (dtrace_cpu_init != NULL) {
+		(*dtrace_cpu_init)(cp->cpu_id);
+	}
+
 	mutex_exit(&cpu_lock);
 
 	add_cpunode2devtree(cp->cpu_id, cp->cpu_m.mcpu_cpi);
