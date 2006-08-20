@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,7 +72,7 @@ extern "C" {
 
 /*
  * This stops synchronous streams for a fused tcp endpoint
- * and prevents tcp_rrw() from pulling data from it.
+ * and prevents tcp_fuse_rrw() from pulling data from it.
  */
 #define	TCP_FUSE_SYNCSTR_STOP(tcp) {				\
 	if ((tcp)->tcp_direct_sockfs) {				\
@@ -84,13 +83,27 @@ extern "C" {
 }
 
 /*
- * This resumes synchronous streams for this fused tcp endpoint
- * and allows tcp_rrw() to pull data from it again.
+ * This causes all calls to tcp_fuse_rrw() to block until
+ * TCP_FUSE_SYNCSTR_UNPLUG_DRAIN() is called.
  */
-#define	TCP_FUSE_SYNCSTR_RESUME(tcp) {				\
+#define	TCP_FUSE_SYNCSTR_PLUG_DRAIN(tcp) {			\
 	if ((tcp)->tcp_direct_sockfs) {				\
 		mutex_enter(&(tcp)->tcp_fuse_lock);		\
-		(tcp)->tcp_fuse_syncstr_stopped = B_FALSE;	\
+		ASSERT(!(tcp)->tcp_fuse_syncstr_plugged);	\
+		(tcp)->tcp_fuse_syncstr_plugged = B_TRUE;	\
+		mutex_exit(&(tcp)->tcp_fuse_lock);		\
+	}							\
+}
+
+/*
+ * This unplugs the draining of data through tcp_fuse_rrw(); see
+ * the comments in tcp_fuse_rrw() for how we preserve ordering.
+ */
+#define	TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(tcp) {			\
+	if ((tcp)->tcp_direct_sockfs) {				\
+		mutex_enter(&(tcp)->tcp_fuse_lock);		\
+		(tcp)->tcp_fuse_syncstr_plugged = B_FALSE;	\
+		(void) cv_broadcast(&(tcp)->tcp_fuse_plugcv);	\
 		mutex_exit(&(tcp)->tcp_fuse_lock);		\
 	}							\
 }
@@ -291,6 +304,7 @@ typedef struct tcp_stat {
 	kstat_named_t	tcp_fusion_unqualified;
 	kstat_named_t	tcp_fusion_rrw_busy;
 	kstat_named_t	tcp_fusion_rrw_msgcnt;
+	kstat_named_t	tcp_fusion_rrw_plugged;
 	kstat_named_t	tcp_in_ack_unsent_drop;
 	kstat_named_t	tcp_sock_fallback;
 } tcp_stat_t;

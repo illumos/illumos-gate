@@ -525,6 +525,7 @@ typedef struct tcp_s {
 	 * manipulated with squeue protection or with tcp_fuse_lock held.
 	 */
 	kmutex_t tcp_fuse_lock;
+	kcondvar_t tcp_fuse_plugcv;
 	uint_t tcp_fuse_rcv_unread_cnt;	/* # of outstanding pkts */
 	uint32_t
 		tcp_fused : 1,		/* loopback tcp in fusion mode */
@@ -533,7 +534,8 @@ typedef struct tcp_s {
 		tcp_direct_sockfs : 1,	/* direct calls to sockfs */
 
 		tcp_fuse_syncstr_stopped : 1, /* synchronous streams stopped */
-		tcp_fuse_to_bit_31 : 27;
+		tcp_fuse_syncstr_plugged : 1, /* synchronous streams plugged */
+		tcp_fuse_to_bit_31 : 26;
 
 	/*
 	 * This variable is accessed without any lock protection

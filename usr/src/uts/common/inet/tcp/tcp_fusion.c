@@ -72,16 +72,18 @@
  * used for this purpose.  When there is urgent data, the sender needs
  * to push the data up the receiver's streams read queue.  In order to
  * avoid holding the tcp_fuse_lock across putnext(), the sender sets
- * the peer tcp's tcp_fuse_syncstr_stopped bit and releases tcp_fuse_lock
- * (see macro TCP_FUSE_SYNCSTR_STOP()).  If tcp_fuse_rrw() enters after
- * this point, it will see that synchronous streams is temporarily
- * stopped and it will immediately return EBUSY without accessing the
- * tcp_rcv_list or other fields protected by the tcp_fuse_lock.  This
- * will result in strget() calling getq_noenab() to dequeue data from
- * the stream head instead.  After the sender has finished pushing up
- * all urgent data, it will clear the tcp_fuse_syncstr_stopped bit using
- * TCP_FUSE_SYNCSTR_RESUME and the receiver may then resume using
- * tcp_fuse_rrw() to retrieve data from tcp_rcv_list.
+ * the peer tcp's tcp_fuse_syncstr_plugged bit and releases tcp_fuse_lock
+ * (see macro TCP_FUSE_SYNCSTR_PLUG_DRAIN()).  If tcp_fuse_rrw() enters
+ * after this point, it will see that synchronous streams is plugged and
+ * will wait on tcp_fuse_plugcv.  After the sender has finished pushing up
+ * all urgent data, it will clear the tcp_fuse_syncstr_plugged bit using
+ * TCP_FUSE_SYNCSTR_UNPLUG_DRAIN().  This will cause any threads waiting
+ * on tcp_fuse_plugcv to return EBUSY, and in turn cause strget() to call
+ * getq_noenab() to dequeue data from the stream head instead.  Once the
+ * data on the stream head has been consumed, tcp_fuse_rrw() may again
+ * be used to process tcp_rcv_list.  However, if TCP_FUSE_SYNCSTR_STOP()
+ * has been called, all future calls to tcp_fuse_rrw() will return EBUSY,
+ * effectively disabling synchronous streams.
  *
  * The following note applies only to the synchronous streams mode.
  *
@@ -496,7 +498,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		 * below, synchronous streams will remain stopped until
 		 * someone drains the tcp_rcv_list.
 		 */
-		TCP_FUSE_SYNCSTR_STOP(peer_tcp);
+		TCP_FUSE_SYNCSTR_PLUG_DRAIN(peer_tcp);
 		tcp_fuse_output_urg(tcp, mp);
 	}
 
@@ -563,6 +565,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	} else if (flow_stopped &&
 	    TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
 		tcp_clrqfull(tcp);
+		flow_stopped = B_FALSE;
 	}
 
 	loopback_packets++;
@@ -613,7 +616,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			 * to the presence of urgent data, re-enable it.
 			 */
 			if (urgent)
-				TCP_FUSE_SYNCSTR_RESUME(peer_tcp);
+				TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(peer_tcp);
 		}
 	}
 	return (B_TRUE);
@@ -733,10 +736,27 @@ tcp_fuse_rrw(queue_t *q, struiod_t *dp)
 	mblk_t *mp;
 
 	mutex_enter(&tcp->tcp_fuse_lock);
+
+	/*
+	 * If tcp_fuse_syncstr_plugged is set, then another thread is moving
+	 * the underlying data to the stream head.  We need to wait until it's
+	 * done, then return EBUSY so that strget() will dequeue data from the
+	 * stream head to ensure data is drained in-order.
+	 */
+	if (tcp->tcp_fuse_syncstr_plugged) {
+		do {
+			cv_wait(&tcp->tcp_fuse_plugcv, &tcp->tcp_fuse_lock);
+		} while (tcp->tcp_fuse_syncstr_plugged);
+
+		TCP_STAT(tcp_fusion_rrw_plugged);
+		TCP_STAT(tcp_fusion_rrw_busy);
+		return (EBUSY);
+	}
+
 	/*
 	 * If someone had turned off tcp_direct_sockfs or if synchronous
-	 * streams is temporarily disabled, we return EBUSY.  This causes
-	 * strget() to dequeue data from the stream head instead.
+	 * streams is stopped, we return EBUSY.  This causes strget() to
+	 * dequeue data from the stream head instead.
 	 */
 	if (!tcp->tcp_direct_sockfs || tcp->tcp_fuse_syncstr_stopped) {
 		mutex_exit(&tcp->tcp_fuse_lock);
@@ -817,7 +837,7 @@ tcp_fuse_rinfop(queue_t *q, infod_t *dp)
 	 * currently not accessible.
 	 */
 	if (!tcp->tcp_direct_sockfs || tcp->tcp_fuse_syncstr_stopped ||
-	    (mp = tcp->tcp_rcv_list) == NULL)
+	    tcp->tcp_fuse_syncstr_plugged || (mp = tcp->tcp_rcv_list) == NULL)
 		goto done;
 
 	if (cmd & INFOD_COUNT) {
@@ -984,11 +1004,11 @@ tcp_fuse_disable_pair(tcp_t *tcp, boolean_t unfusing)
 	ASSERT(peer_tcp != NULL);
 
 	/*
-	 * We need to prevent tcp_fuse_rrw() from entering before
-	 * we can disable synchronous streams.
+	 * Force any tcp_fuse_rrw() calls to block until we've moved the data
+	 * onto the stream head.
 	 */
-	TCP_FUSE_SYNCSTR_STOP(tcp);
-	TCP_FUSE_SYNCSTR_STOP(peer_tcp);
+	TCP_FUSE_SYNCSTR_PLUG_DRAIN(tcp);
+	TCP_FUSE_SYNCSTR_PLUG_DRAIN(peer_tcp);
 
 	/*
 	 * Drain any pending data; the detached check is needed because
@@ -1009,6 +1029,17 @@ tcp_fuse_disable_pair(tcp_t *tcp, boolean_t unfusing)
 		(void) tcp_fuse_rcv_drain(peer_tcp->tcp_rq, peer_tcp,
 		    (unfusing ? &peer_tcp->tcp_fused_sigurg_mp : NULL));
 	}
+
+	/*
+	 * Make all current and future tcp_fuse_rrw() calls fail with EBUSY.
+	 * To ensure threads don't sneak past the checks in tcp_fuse_rrw(),
+	 * a given stream must be stopped prior to being unplugged (but the
+	 * ordering of operations between the streams is unimportant).
+	 */
+	TCP_FUSE_SYNCSTR_STOP(tcp);
+	TCP_FUSE_SYNCSTR_STOP(peer_tcp);
+	TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(tcp);
+	TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(peer_tcp);
 
 	/* Lift up any flow-control conditions */
 	if (tcp->tcp_flow_stopped) {

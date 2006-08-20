@@ -406,6 +406,7 @@ tcp_stat_t tcp_statistics = {
 	{ "tcp_fusion_unqualified",	KSTAT_DATA_UINT64 },
 	{ "tcp_fusion_rrw_busy",	KSTAT_DATA_UINT64 },
 	{ "tcp_fusion_rrw_msgcnt",	KSTAT_DATA_UINT64 },
+	{ "tcp_fusion_rrw_plugged",	KSTAT_DATA_UINT64 },
 	{ "tcp_in_ack_unsent_drop",	KSTAT_DATA_UINT64 },
 	{ "tcp_sock_fallback",		KSTAT_DATA_UINT64 },
 };
@@ -7904,6 +7905,7 @@ tcp_reinit_values(tcp)
 	tcp->tcp_fused_sigurg = B_FALSE;
 	tcp->tcp_direct_sockfs = B_FALSE;
 	tcp->tcp_fuse_syncstr_stopped = B_FALSE;
+	tcp->tcp_fuse_syncstr_plugged = B_FALSE;
 	tcp->tcp_loopback_peer = NULL;
 	tcp->tcp_fuse_rcv_hiwater = 0;
 	tcp->tcp_fuse_rcv_unread_hiwater = 0;
@@ -7996,6 +7998,7 @@ tcp_init_values(tcp_t *tcp)
 	tcp->tcp_fused_sigurg = B_FALSE;
 	tcp->tcp_direct_sockfs = B_FALSE;
 	tcp->tcp_fuse_syncstr_stopped = B_FALSE;
+	tcp->tcp_fuse_syncstr_plugged = B_FALSE;
 	tcp->tcp_loopback_peer = NULL;
 	tcp->tcp_fuse_rcv_hiwater = 0;
 	tcp->tcp_fuse_rcv_unread_hiwater = 0;
@@ -15531,18 +15534,16 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 
 		/*
 		 * Normally we would not get backenabled in synchronous
-		 * streams mode, but in case this happens, we need to stop
-		 * synchronous streams temporarily to prevent a race with
-		 * tcp_fuse_rrw() or tcp_fuse_rinfop().  It is safe to access
-		 * tcp_rcv_list here because those entry points will return
-		 * right away when synchronous streams is stopped.
+		 * streams mode, but in case this happens, we need to plug
+		 * synchronous streams during our drain to prevent a race
+		 * with tcp_fuse_rrw() or tcp_fuse_rinfop().
 		 */
-		TCP_FUSE_SYNCSTR_STOP(tcp);
+		TCP_FUSE_SYNCSTR_PLUG_DRAIN(tcp);
 		if (tcp->tcp_rcv_list != NULL)
 			(void) tcp_rcv_drain(tcp->tcp_rq, tcp);
 
 		tcp_clrqfull(peer_tcp);
-		TCP_FUSE_SYNCSTR_RESUME(tcp);
+		TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(tcp);
 		TCP_STAT(tcp_fusion_backenabled);
 		return;
 	}
@@ -22260,17 +22261,15 @@ tcp_push_timer(void *arg)
 	ASSERT(tcp->tcp_listener == NULL);
 
 	/*
-	 * We need to stop synchronous streams temporarily to prevent a race
-	 * with tcp_fuse_rrw() or tcp_fusion rinfop().  It is safe to access
-	 * tcp_rcv_list here because those entry points will return right
-	 * away when synchronous streams is stopped.
+	 * We need to plug synchronous streams during our drain to prevent
+	 * a race with tcp_fuse_rrw() or tcp_fusion_rinfop().
 	 */
-	TCP_FUSE_SYNCSTR_STOP(tcp);
+	TCP_FUSE_SYNCSTR_PLUG_DRAIN(tcp);
 	tcp->tcp_push_tid = 0;
 	if ((tcp->tcp_rcv_list != NULL) &&
 	    (tcp_rcv_drain(tcp->tcp_rq, tcp) == TH_ACK_NEEDED))
 		tcp_xmit_ctl(NULL, tcp, tcp->tcp_snxt, tcp->tcp_rnxt, TH_ACK);
-	TCP_FUSE_SYNCSTR_RESUME(tcp);
+	TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(tcp);
 }
 
 /*
