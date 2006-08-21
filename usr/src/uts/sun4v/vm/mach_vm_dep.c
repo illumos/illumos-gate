@@ -290,7 +290,7 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 /* Auto large page tunables. */
 int auto_lpg_tlb_threshold = 32;
 int auto_lpg_minszc = TTE64K;
-int auto_lpg_maxszc = TTE256M;
+int auto_lpg_maxszc = TTE64K;
 size_t auto_lpg_heap_default = MMU_PAGESIZE64K;
 size_t auto_lpg_stack_default = MMU_PAGESIZE64K;
 size_t auto_lpg_va_default = MMU_PAGESIZE64K;
@@ -317,11 +317,7 @@ map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int *remap)
 		break;
 
 	case MAPPGSZ_VA:
-		n = hat_preferred_pgsz(p->p_as->a_hat, addr, len, maptype);
-		pgsz = hw_page_array[n].hp_size;
-		if ((pgsz <= MMU_PAGESIZE) ||
-		    !IS_P2ALIGNED(addr, pgsz) || !IS_P2ALIGNED(len, pgsz))
-			pgsz = map_pgszva(p, addr, len);
+		pgsz = map_pgszva(p, addr, len);
 		break;
 
 	case MAPPGSZ_STK:
