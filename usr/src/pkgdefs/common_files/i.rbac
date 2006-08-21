@@ -42,7 +42,7 @@
 #     message is displayed at the time of completion.
 #
 
-tmp_dir=/tmp
+tmp_dir=${TMPDIR:-/tmp}
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
@@ -318,7 +318,7 @@ set_type_and_outfile() {
 		*) return 2 ;;
 	esac
 
-	outfile=$tmp_dir/rbac_${PKGINST}_${fname}_merge
+	outfile=$tmp_dir/rbac_${PKGINST}_${fname}_merge.$$
 
 	return 0
 }
