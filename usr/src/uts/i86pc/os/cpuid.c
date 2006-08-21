@@ -1864,7 +1864,13 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
 	uint_t eax;
 
-	if (cpi->cpi_vendor != X86_VENDOR_AMD)
+	/*
+	 * Bail out if this CPU isn't an AMD CPU, or if it's
+	 * a legacy (32-bit) AMD CPU.
+	 */
+	if (cpi->cpi_vendor != X86_VENDOR_AMD ||
+	    CPI_FAMILY(cpi) == 4 || CPI_FAMILY(cpi) == 5 ||
+	    CPI_FAMILY(cpi) == 6)
 		return (0);
 
 	eax = cpi->cpi_std[1].cp_eax;
