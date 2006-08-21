@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1244,6 +1243,7 @@ i8042_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			*(int *)result = 0;
 		break;
 	case DDI_INTROP_NINTRS:
+	case DDI_INTROP_NAVAIL:
 		*(int *)result = 1;
 		break;
 	case DDI_INTROP_ALLOC:
@@ -1321,9 +1321,6 @@ i8042_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		(void) ddi_intr_remove_softint(port->soft_hdl);
 		mutex_exit(&global->i8042_mutex);
 #endif	/* defined(USE_SOFT_INTRS) */
-		break;
-	case DDI_INTROP_NAVAIL:
-		*(int *)result = 1;
 		break;
 	default:
 		return (DDI_FAILURE);

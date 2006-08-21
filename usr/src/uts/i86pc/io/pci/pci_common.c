@@ -57,7 +57,6 @@
  * Function prototypes
  */
 static int	pci_get_priority(dev_info_t *, ddi_intr_handle_impl_t *, int *);
-static int	pci_get_nintrs(dev_info_t *, int, int *);
 static int	pci_enable_intr(dev_info_t *, dev_info_t *,
 		    ddi_intr_handle_impl_t *, uint32_t);
 static void	pci_disable_intr(dev_info_t *, dev_info_t *,
@@ -183,30 +182,6 @@ pci_get_priority(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp, int *pri)
 }
 
 
-/*
- * pci_get_nintrs:
- *	Figure out how many interrupts the device supports
- */
-static int
-pci_get_nintrs(dev_info_t *dip, int type, int *nintrs)
-{
-	int	ret;
-
-	*nintrs = 0;
-
-	if (DDI_INTR_IS_MSI_OR_MSIX(type))
-		ret = pci_msi_get_nintrs(dip, type, nintrs);
-	else {
-		ret = DDI_FAILURE;
-		if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		    "interrupts", -1) != -1) {
-			*nintrs = 1;
-			ret = DDI_SUCCESS;
-		}
-	}
-
-	return (ret);
-}
 
 static int pcie_pci_intr_pri_counter = 0;
 
@@ -262,9 +237,17 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			    *(int *)result));
 		}
 		break;
+	case DDI_INTROP_NAVAIL:
 	case DDI_INTROP_NINTRS:
-		if (pci_get_nintrs(rdip, hdlp->ih_type, result) != DDI_SUCCESS)
-			return (DDI_FAILURE);
+		if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type)) {
+			if (pci_msi_get_nintrs(hdlp->ih_dip, hdlp->ih_type,
+			    result) != DDI_SUCCESS)
+				return (DDI_FAILURE);
+		} else {
+			*(int *)result = i_ddi_get_intx_nintrs(hdlp->ih_dip);
+			if (*(int *)result == 0)
+				return (DDI_FAILURE);
+		}
 		break;
 	case DDI_INTROP_ALLOC:
 		/*
@@ -625,19 +608,6 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		else if (pci_rval != DDI_FAILURE)
 			*(int *)result = pci_status;
 		DDI_INTR_NEXDBG((CE_CONT, "pci: GETPENDING returned = %x\n",
-		    *(int *)result));
-		break;
-	case DDI_INTROP_NAVAIL:
-		if ((psm_intr_ops != NULL) && (pci_get_priority(rdip,
-		    hdlp, &priority) == DDI_SUCCESS)) {
-			/* Priority in the handle not initialized yet */
-			hdlp->ih_pri = priority;
-			(void) (*psm_intr_ops)(rdip, hdlp,
-			    PSM_INTR_OP_NAVAIL_VECTORS, result);
-		} else {
-			*(int *)result = 1;
-		}
-		DDI_INTR_NEXDBG((CE_CONT, "pci: NAVAIL returned = %x\n",
 		    *(int *)result));
 		break;
 	default:

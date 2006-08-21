@@ -648,11 +648,11 @@ sbbc_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		break;
 	case DDI_INTROP_NINTRS:
 	case DDI_INTROP_NAVAIL:
-		*(int *)result = i_ddi_get_nintrs(rdip);
+		*(int *)result = i_ddi_get_intx_nintrs(rdip);
 		break;
 	case DDI_INTROP_SUPPORTED_TYPES:
 		/* PCI nexus driver supports only fixed interrupts */
-		*(int *)result = i_ddi_get_nintrs(rdip) ?
+		*(int *)result = i_ddi_get_intx_nintrs(rdip) ?
 		    DDI_INTR_TYPE_FIXED : 0;
 		break;
 	default:

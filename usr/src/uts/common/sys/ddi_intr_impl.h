@@ -298,6 +298,11 @@ struct intrspec {
 #ifdef _KERNEL
 
 /*
+ * Figure out how many FIXED nintrs are supported
+ */
+int	i_ddi_get_intx_nintrs(dev_info_t *dip);
+
+/*
  * NOTE:
  *	The following 4 busops entry points are obsoleted with version
  *	9 or greater. Use i_ddi_intr_op interface in place of these

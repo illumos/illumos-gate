@@ -2609,7 +2609,7 @@ cardbus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_NINTRS:
 	case DDI_INTROP_NAVAIL:
 #ifdef sparc
-		*(int *)result = i_ddi_get_nintrs(rdip);
+		*(int *)result = i_ddi_get_intx_nintrs(rdip);
 #else
 		*(int *)result = 1;
 #endif

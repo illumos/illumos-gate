@@ -1383,11 +1383,10 @@ rootnex_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			return (DDI_FAILURE);
 		}
 		break;
+	case DDI_INTROP_NAVAIL:
 	case DDI_INTROP_NINTRS:
-		if ((pdp = ddi_get_parent_data(rdip)) == NULL)
-			return (DDI_FAILURE);
-		*(int *)result = pdp->par_nintr;
-		if (pdp->par_nintr == 0) {
+		*(int *)result = i_ddi_get_intx_nintrs(rdip);
+		if (*(int *)result == 0) {
 			/*
 			 * Special case for 'pcic' driver' only. This driver
 			 * driver is a child of 'isa' and 'rootnex' drivers.
@@ -1402,25 +1401,12 @@ rootnex_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			 */
 			if (strcmp(ddi_get_name(rdip), "pcic") == 0)
 				*(int *)result = 1;
+			else
+				return (DDI_FAILURE);
 		}
 		break;
 	case DDI_INTROP_SUPPORTED_TYPES:
-		*(int *)result = 0;
-		*(int *)result |= DDI_INTR_TYPE_FIXED;	/* Always ... */
-		break;
-	case DDI_INTROP_NAVAIL:
-		if ((ispec = rootnex_get_ispec(rdip, hdlp->ih_inum)) == NULL)
-			return (DDI_FAILURE);
-
-		if (psm_intr_ops == NULL) {
-			*(int *)result = 1;
-			break;
-		}
-
-		/* Priority in the handle not initialized yet */
-		hdlp->ih_pri = ispec->intrspec_pri;
-		(void) (*psm_intr_ops)(rdip, hdlp,
-		    PSM_INTR_OP_NAVAIL_VECTORS, result);
+		*(int *)result = DDI_INTR_TYPE_FIXED;	/* Always ... */
 		break;
 	default:
 		return (DDI_FAILURE);

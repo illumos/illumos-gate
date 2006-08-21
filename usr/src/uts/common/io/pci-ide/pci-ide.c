@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -647,7 +646,6 @@ static int
 pciide_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
-	struct ddi_parent_private_data *ppdptr;
 	struct intrspec	*ispecp;
 	int		rc;
 	int		pri = 0;
@@ -663,14 +661,9 @@ pciide_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		*(int *)result = DDI_INTR_FLAG_LEVEL;
 		break;
 	case DDI_INTROP_NINTRS:
-		if (!PCIIDE_NATIVE_MODE(rdip)) {
-			if ((ppdptr = ddi_get_parent_data(rdip)) == NULL) {
-				*(int *)result = 0;
-				return (DDI_FAILURE);
-			}
-			*(int *)result = ppdptr->par_nintr;
-		} else
-			*(int *)result = 1;
+	case DDI_INTROP_NAVAIL:
+		*(int *)result = (!PCIIDE_NATIVE_MODE(rdip)) ?
+		    i_ddi_get_intx_nintrs(rdip) : 1;
 		break;
 	case DDI_INTROP_ALLOC:
 		if ((ispecp = pciide_get_ispec(dip, rdip, hdlp->ih_inum)) ==
@@ -720,9 +713,6 @@ pciide_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			PDBG(("pciide_disable rc=%d", rc));
 #endif	/* DEBUG */
 		return (rc);
-	case DDI_INTROP_NAVAIL:
-		*(int *)result = 1;
-		break;
 	default:
 		return (DDI_FAILURE);
 	}

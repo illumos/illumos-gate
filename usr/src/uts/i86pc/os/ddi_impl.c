@@ -905,6 +905,17 @@ i_ddi_free_intr_phdl(ddi_intr_handle_impl_t *hdlp)
 	hdlp->ih_private = NULL;
 }
 
+int
+i_ddi_get_intx_nintrs(dev_info_t *dip)
+{
+	struct ddi_parent_private_data *pdp;
+
+	if ((pdp = ddi_get_parent_data(dip)) == NULL)
+		return (0);
+
+	return (pdp->par_nintr);
+}
+
 /*
  * DDI Memory/DMA
  */

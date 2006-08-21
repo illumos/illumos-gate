@@ -1306,7 +1306,7 @@ px_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 	/* Process DDI_INTROP_SUPPORTED_TYPES request here */
 	if (intr_op == DDI_INTROP_SUPPORTED_TYPES) {
-		*(int *)result = i_ddi_get_nintrs(rdip) ?
+		*(int *)result = i_ddi_get_intx_nintrs(rdip) ?
 		    DDI_INTR_TYPE_FIXED : 0;
 
 		if ((pci_msi_get_supported_type(rdip,

@@ -877,7 +877,7 @@ i_ddi_get_intr_pri(dev_info_t *dip, uint_t inumber)
 }
 
 int
-i_ddi_get_nintrs(dev_info_t *dip)
+i_ddi_get_intx_nintrs(dev_info_t *dip)
 {
 	int32_t intrlen;
 	prop_1275_cell_t intr_sz;
