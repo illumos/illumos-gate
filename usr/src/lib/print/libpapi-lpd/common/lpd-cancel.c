@@ -41,7 +41,7 @@ lpd_cancel_job(service_t *svc, int id)
 {
 	papi_status_t status = PAPI_INTERNAL_ERROR;
 	int fd;
-	char **list;
+	char *list[2];
 	char buf[128];	/* this should be overkill */
 
 	if (svc == NULL)
