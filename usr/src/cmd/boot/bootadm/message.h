@@ -237,6 +237,8 @@ the failsafe archive unbootable\n")
 
 #define	PARSEABLE_OUT_DATE	gettext("    changed %s\n")
 
+#define	PARSEABLE_STALE_FILE	gettext("    stale %s\n")
+
 #define	UPDATE_FORCE gettext("forced update of archive requested\n")
 
 #define	NO_NEW_STAT gettext("cannot create new stat data\n")

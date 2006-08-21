@@ -1610,6 +1610,46 @@ getoldstat(char *root)
 	}
 }
 
+/*
+ * Checks if a file in the current (old) archive has
+ * been deleted from the root filesystem. This is needed for
+ * software like Trusted Extensions (TX) that switch early
+ * in boot based on presence/absence of a kernel module.
+ */
+static void
+check4stale(char *root)
+{
+	nvpair_t	*nvp;
+	nvlist_t	*nvlp;
+	char 		*file;
+	char		path[PATH_MAX];
+	struct stat	sb;
+
+	/*
+	 * Skip stale file check during smf check
+	 */
+	if (bam_smf_check)
+		return;
+
+	/* Nothing to do if no old stats */
+	if ((nvlp = walk_arg.old_nvlp) == NULL)
+		return;
+
+	for (nvp = nvlist_next_nvpair(nvlp, NULL); nvp;
+	    nvp = nvlist_next_nvpair(nvlp, nvp)) {
+		file = nvpair_name(nvp);
+		if (file == NULL)
+			continue;
+		(void) snprintf(path, sizeof (path), "%s/%s",
+		    root, file);
+		if (stat(path, &sb) == -1) {
+			walk_arg.need_update = 1;
+			if (bam_verbose)
+				bam_print(PARSEABLE_STALE_FILE, path);
+		}
+	}
+}
+
 static void
 create_newstat(void)
 {
@@ -1748,6 +1788,13 @@ update_required(char *root)
 	 */
 	if (!walk_arg.need_update || bam_check)
 		getoldstat(root);
+
+	/*
+	 * Check if the archive contains files that are no longer
+	 * present on the root filesystem.
+	 */
+	if (!walk_arg.need_update || bam_check)
+		check4stale(root);
 
 	/*
 	 * read list of files
