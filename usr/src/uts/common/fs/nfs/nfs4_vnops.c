@@ -168,7 +168,7 @@ static void	nfs4_reinstitute_local_lock_state(vnode_t *, flock64_t *,
 			cred_t *, nfs4_lock_owner_t *);
 static void	push_reinstate(vnode_t *, int, flock64_t *, cred_t *,
 			nfs4_lock_owner_t *);
-static nfs4_open_stream_t *open_and_get_osp(vnode_t *, cred_t *, mntinfo4_t *);
+static int 	open_and_get_osp(vnode_t *, cred_t *, nfs4_open_stream_t **);
 static void	nfs4_delmap_callback(struct as *, void *, uint_t);
 static void	nfs4_free_delmapcall(nfs4_delmapcall_t *);
 static nfs4_delmapcall_t	*nfs4_init_delmapcall();
@@ -577,7 +577,7 @@ static int
 nfs4_open(vnode_t **vpp, int flag, cred_t *cr)
 {
 	vnode_t *dvp = NULL;
-	rnode4_t *rp;
+	rnode4_t *rp, *drp;
 	int error;
 	int just_been_created;
 	char fn[MAXNAMELEN];
@@ -601,11 +601,17 @@ nfs4_open(vnode_t **vpp, int flag, cred_t *cr)
 	 * executable or not, so as to skip OTW
 	 */
 
-	if ((error = vtoname(*vpp, fn, MAXNAMELEN)) != 0)
-		return (error);
-
 	if ((error = vtodv(*vpp, &dvp, cr, TRUE)) != 0)
 		return (error);
+
+	drp = VTOR4(dvp);
+	if (nfs_rw_enter_sig(&drp->r_rwlock, RW_READER, INTR4(dvp)))
+		return (EINTR);
+
+	if ((error = vtoname(*vpp, fn, MAXNAMELEN)) != 0) {
+		nfs_rw_exit(&drp->r_rwlock);
+		return (error);
+	}
 
 	/*
 	 * See if this file has just been CREATEd.
@@ -640,6 +646,8 @@ nfs4_open(vnode_t **vpp, int flag, cred_t *cr)
 
 	if (!error && !((*vpp)->v_flag & VROOT))
 		dnlc_update(dvp, fn, *vpp);
+
+	nfs_rw_exit(&drp->r_rwlock);
 
 	/* release the hold from vtodv */
 	VN_RELE(dvp);
@@ -861,18 +869,8 @@ recov_retry:
 	fh_differs = 0;
 	nfs4_error_zinit(&e);
 
-	/* argop is empty here */
-
-	if (nfs_rw_enter_sig(&drp->r_rwlock, RW_READER, INTR4(dvp))) {
-		if (ncr != NULL)
-			crfree(ncr);
-		kmem_free(argop, argoplist_size);
-		return (EINTR);
-	}
-
 	e.error = nfs4_start_op(VTOMI4(dvp), dvp, vpi, &recov_state);
 	if (e.error) {
-		nfs_rw_exit(&drp->r_rwlock);
 		if (ncr != NULL)
 			crfree(ncr);
 		kmem_free(argop, argoplist_size);
@@ -943,7 +941,6 @@ recov_retry:
 			if (v_error) {
 				bzero(attr, sizeof (*attr));
 				nfs4args_copen_free(open_args);
-				nfs_rw_exit(&drp->r_rwlock);
 				nfs4_end_op(VTOMI4(dvp), dvp, vpi,
 					&recov_state, FALSE);
 				if (ncr != NULL)
@@ -994,7 +991,6 @@ recov_retry:
 	if (e.error == EAGAIN) {
 		open_owner_rele(oop);
 		nfs4args_copen_free(open_args);
-		nfs_rw_exit(&drp->r_rwlock);
 		nfs4_end_op(VTOMI4(dvp), dvp, vpi, &recov_state, TRUE);
 		if (ncr != NULL) {
 			crfree(ncr);
@@ -1020,7 +1016,6 @@ recov_retry:
 			nfs4_end_open_seqid_sync(oop);
 			open_owner_rele(oop);
 			nfs4args_copen_free(open_args);
-			nfs_rw_exit(&drp->r_rwlock);
 			nfs4_end_op(VTOMI4(dvp), dvp, vpi, &recov_state, FALSE);
 			if (ncr != NULL)
 				crfree(ncr);
@@ -1109,7 +1104,6 @@ recov_retry:
 			nfs4_end_open_seqid_sync(oop);
 			open_owner_rele(oop);
 			nfs4args_copen_free(open_args);
-			nfs_rw_exit(&drp->r_rwlock);
 			nfs4_end_op(VTOMI4(dvp), dvp, vpi, &recov_state, TRUE);
 			if (ncr != NULL)
 				crfree(ncr);
@@ -1173,7 +1167,6 @@ recov_retry:
 		}
 		nfs4_end_open_seqid_sync(oop);
 		open_owner_rele(oop);
-		nfs_rw_exit(&drp->r_rwlock);
 		nfs4_end_op(VTOMI4(dvp), dvp, vpi, &recov_state, needrecov);
 		nfs4args_copen_free(open_args);
 		if (setgid_flag) {
@@ -1224,7 +1217,6 @@ recov_retry:
 			nfs4args_setattr_free(&argop[9]);
 		}
 		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
-		nfs_rw_exit(&drp->r_rwlock);
 		nfs4_end_op(VTOMI4(dvp), dvp, vpi, &recov_state, needrecov);
 		/*
 		 * If the reply is NFS4ERR_ACCESS, it may be because
@@ -1328,7 +1320,6 @@ recov_retry:
 				nfs4args_setattr_free(&argop[9]);
 			}
 			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
-			nfs_rw_exit(&drp->r_rwlock);
 			nfs4_end_op(VTOMI4(dvp), dvp, vpi, &recov_state,
 				    needrecov);
 			open_owner_rele(oop);
@@ -1369,7 +1360,6 @@ recov_retry:
 				nfs4args_setattr_free(&argop[9]);
 			}
 			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
-			nfs_rw_exit(&drp->r_rwlock);
 			nfs4_end_op(VTOMI4(dvp), dvp, vpi, &recov_state,
 				needrecov);
 			open_owner_rele(oop);
@@ -1439,7 +1429,6 @@ recov_retry:
 			nfs4args_setattr_free(&argop[9]);
 		}
 		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
-		nfs_rw_exit(&drp->r_rwlock);
 		nfs4_end_op(VTOMI4(dvp), dvp, vpi, &recov_state, needrecov);
 		if (create_flag || fh_differs)
 			VN_RELE(vp);
@@ -1539,8 +1528,7 @@ recov_retry:
 				" remove file", e.error));
 			VN_RELE(vp);
 			(void) nfs4_remove(dvp, file_name, cr);
-			nfs_rw_exit(&drp->r_rwlock);
-			goto skip_rwlock_exit;
+			goto skip_update_dircaches;
 		}
 	}
 
@@ -1570,8 +1558,7 @@ recov_retry:
 		nfs4_update_dircaches(&op_res->cinfo, dvp, vp, file_name,
 					dinfop);
 	}
-	nfs_rw_exit(&drp->r_rwlock);
-skip_rwlock_exit:
+skip_update_dircaches:
 
 	/*
 	 * If the page cache for this file was flushed from actions
@@ -10315,12 +10302,11 @@ nfs4_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 			}
 #endif
 			/* returns with 'os_sync_lock' held */
-			osp = open_and_get_osp(vp, cr, mi);
+			error = open_and_get_osp(vp, cr, &osp);
 			if (osp == NULL) {
 				NFS4_DEBUG(nfs4_mmap_debug, (CE_NOTE,
 				    "nfs4_map: we tried to OPEN the file "
 				    "but again no osp, so fail with EIO"));
-				error = EIO;
 				goto done;
 			}
 		}
@@ -10373,28 +10359,36 @@ done:
  * same name on the server (in addition to the fact that we're trying
  * to VOP_MAP withouth VOP_OPENing the file in the first place).
  */
-static nfs4_open_stream_t *
-open_and_get_osp(vnode_t *map_vp, cred_t *cr, mntinfo4_t *mi)
+static int
+open_and_get_osp(vnode_t *map_vp, cred_t *cr, nfs4_open_stream_t **ospp)
 {
 	rnode4_t		*rp, *drp;
 	vnode_t			*dvp, *open_vp;
-	char			*file_name;
+	char			file_name[MAXNAMELEN];
 	int			just_created;
-	nfs4_sharedfh_t		*sfh;
 	nfs4_open_stream_t	*osp;
 	nfs4_open_owner_t	*oop;
+	int			error;
 
+	*ospp = NULL;
 	open_vp = map_vp;
-	sfh = (open_vp->v_flag & VROOT) ? mi->mi_srvparentfh :
-				VTOSV(open_vp)->sv_dfh;
-	drp = r4find_unlocked(sfh, open_vp->v_vfsp);
-	if (!drp)
-		return (NULL);
-
-	file_name = fn_name(VTOSV(open_vp)->sv_name);
 
 	rp = VTOR4(open_vp);
-	dvp = RTOV4(drp);
+	if ((error = vtodv(open_vp, &dvp, cr, TRUE)) != 0)
+		return (error);
+	drp = VTOR4(dvp);
+
+	if (nfs_rw_enter_sig(&drp->r_rwlock, RW_READER, INTR4(dvp))) {
+		VN_RELE(dvp);
+		return (EINTR);
+	}
+
+	if ((error = vtoname(open_vp, file_name, MAXNAMELEN)) != 0) {
+		nfs_rw_exit(&drp->r_rwlock);
+		VN_RELE(dvp);
+		return (error);
+	}
+
 	mutex_enter(&rp->r_statev4_lock);
 	if (rp->created_v4) {
 		rp->created_v4 = 0;
@@ -10410,15 +10404,16 @@ open_and_get_osp(vnode_t *map_vp, cred_t *cr, mntinfo4_t *mi)
 
 	VN_HOLD(map_vp);
 
-	if (nfs4open_otw(dvp, file_name, NULL, &open_vp, cr, 0, FREAD, 0,
-	    just_created)) {
-		kmem_free(file_name, MAXNAMELEN);
+	error = nfs4open_otw(dvp, file_name, NULL, &open_vp, cr, 0, FREAD, 0,
+		just_created);
+	if (error) {
+		nfs_rw_exit(&drp->r_rwlock);
 		VN_RELE(dvp);
 		VN_RELE(map_vp);
-		return (NULL);
+		return (error);
 	}
 
-	kmem_free(file_name, MAXNAMELEN);
+	nfs_rw_exit(&drp->r_rwlock);
 	VN_RELE(dvp);
 
 	/*
@@ -10437,7 +10432,7 @@ open_and_get_osp(vnode_t *map_vp, cred_t *cr, mntinfo4_t *mi)
 		(void) nfs4close_one(open_vp, NULL, cr, FREAD, NULL, &e,
 				CLOSE_NORM, 0, 0, 0);
 		VN_RELE(map_vp);
-		return (NULL);
+		return (EIO);
 	}
 
 	VN_RELE(map_vp);
@@ -10454,11 +10449,12 @@ open_and_get_osp(vnode_t *map_vp, cred_t *cr, mntinfo4_t *mi)
 		 */
 		(void) nfs4close_one(open_vp, NULL, cr, FREAD, NULL, &e,
 				CLOSE_NORM, 0, 0, 0);
-		return (NULL);
+		return (EIO);
 	}
 	osp = find_open_stream(oop, rp);
 	open_owner_rele(oop);
-	return (osp);
+	*ospp = osp;
+	return (0);
 }
 
 /*
