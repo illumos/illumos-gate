@@ -4942,7 +4942,7 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 	 * Check if specified address exceeds device capacity
 	 */
 	if ((lba >= sdinfo->satadrv_capacity) ||
-	    ((lba + sec_count) >= sdinfo->satadrv_capacity)) {
+	    ((lba + sec_count) > sdinfo->satadrv_capacity)) {
 		/* LBA out of range */
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (sata_txlt_lba_out_of_range(spx));
@@ -5158,7 +5158,7 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 	 * Check if specified address and length exceeds device capacity
 	 */
 	if ((lba >= sdinfo->satadrv_capacity) ||
-	    ((lba + sec_count) >= sdinfo->satadrv_capacity)) {
+	    ((lba + sec_count) > sdinfo->satadrv_capacity)) {
 		/* LBA out of range */
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (sata_txlt_lba_out_of_range(spx));
