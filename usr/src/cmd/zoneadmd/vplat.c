@@ -1209,8 +1209,8 @@ build_mounted(zlog_t *zlogp, char *rootpath, size_t rootlen,
 	char luroot[MAXPATHLEN];
 	const char **cpp;
 	static const char *mkdirs[] = {
-		"/system", "/system/contract", "/proc", "/dev", "/tmp",
-		"/a", NULL
+		"/system", "/system/contract", "/system/object", "/proc",
+		"/dev", "/tmp", "/a", NULL
 	};
 	static const char *localdirs[] = {
 		"/etc", "/var", NULL
