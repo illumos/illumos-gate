@@ -777,9 +777,10 @@ px_lib_msiq_gettail(dev_info_t *dip, msiqid_t msiq_id,
 
 /*ARGSUSED*/
 void
-px_lib_get_msiq_rec(dev_info_t *dip, px_msiq_t *msiq_p, msiq_rec_t *msiq_rec_p)
+px_lib_get_msiq_rec(dev_info_t *dip, msiqhead_t *msiq_head_p,
+    msiq_rec_t *msiq_rec_p)
 {
-	msiq_rec_t	*curr_msiq_rec_p = (msiq_rec_t *)msiq_p->msiq_curr;
+	msiq_rec_t	*curr_msiq_rec_p = (msiq_rec_t *)msiq_head_p;
 
 	DBG(DBG_LIB_MSIQ, dip, "px_lib_get_msiq_rec: dip 0x%p\n", dip);
 

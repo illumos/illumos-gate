@@ -394,6 +394,7 @@ err_bad_px_softstate:
 			break;
 		}
 
+		px_msiq_resume(px_p);
 		px_lib_resume(dip);
 		(void) pcie_pwr_resume(dip);
 		px_p->px_state = PX_ATTACHED;

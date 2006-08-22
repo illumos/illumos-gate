@@ -232,41 +232,48 @@ px_msiq_intr(caddr_t arg)
 	px_msiq_t	*msiq_p = ino_p->ino_msiq_p;
 	dev_info_t	*dip = px_p->px_dip;
 	msiq_rec_t	msiq_rec, *msiq_rec_p = &msiq_rec;
-	msiqhead_t	curr_msiq_rec_cnt, new_msiq_rec_cnt;
+	msiqhead_t	new_head_index = msiq_p->msiq_curr_head_idx;
+	msiqhead_t	*curr_head_p;
+	msiqtail_t	curr_tail_index;
 	msgcode_t	msg_code;
 	px_ih_t		*ih_p;
 	int		i, ret;
+	ushort_t	msiq_recs2process;
 
 	DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: msiq_id =%x ino=%x pil=%x "
 	    "ih_size=%x ih_lst=%x\n", msiq_p->msiq_id, ino_p->ino_ino,
 	    ino_p->ino_pil, ino_p->ino_ih_size, ino_p->ino_ih_head);
 
-	/* Read current MSIQ head index */
-	px_lib_msiq_gethead(dip, msiq_p->msiq_id, &curr_msiq_rec_cnt);
-	msiq_p->msiq_curr = (uint64_t)((caddr_t)msiq_p->msiq_base +
-	    curr_msiq_rec_cnt * sizeof (msiq_rec_t));
-	new_msiq_rec_cnt = curr_msiq_rec_cnt;
+	/* Read current MSIQ tail index */
+	px_lib_msiq_gettail(dip, msiq_p->msiq_id, &curr_tail_index);
 
-	/* Read next MSIQ record */
-	px_lib_get_msiq_rec(dip, msiq_p, msiq_rec_p);
+	if (curr_tail_index < new_head_index)
+		curr_tail_index += msiq_state_p->msiq_rec_cnt;
 
 	/*
-	 * Process current MSIQ record as long as record type
-	 * field is non-zero.
+	 * Calculate the number of recs to process by taking the difference
+	 * between the head and tail pointers. For all records we always
+	 * verify that we have a valid record type before we do any processing.
+	 * If triggered, we should always have at least 1 valid record.
 	 */
-	while (msiq_rec_p->msiq_rec_type) {
+	msiq_recs2process = curr_tail_index - new_head_index;
+
+	DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: curr_head %x "
+	    "rec2process %x\n", new_head_index, msiq_recs2process);
+
+	curr_head_p = (msiqhead_t *)((caddr_t)msiq_p->msiq_base_p +
+	    new_head_index * sizeof (msiq_rec_t));
+
+	for (i = 0; i < msiq_recs2process; i++) {
+		/* Read MSIQ record */
+		px_lib_get_msiq_rec(dip, curr_head_p, msiq_rec_p);
+
 		DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: MSIQ RECORD, "
 		    "msiq_rec_type 0x%llx msiq_rec_rid 0x%llx\n",
 		    msiq_rec_p->msiq_rec_type, msiq_rec_p->msiq_rec_rid);
 
-		/* Get the pointer next EQ record */
-		msiq_p->msiq_curr = (uint64_t)
-		    ((caddr_t)msiq_p->msiq_curr + sizeof (msiq_rec_t));
-
-		/* Check for overflow condition */
-		if (msiq_p->msiq_curr >= (uint64_t)((caddr_t)msiq_p->msiq_base +
-		    msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t)))
-			msiq_p->msiq_curr = msiq_p->msiq_base;
+		if (!msiq_rec_p->msiq_rec_type)
+			break;
 
 		/* Check MSIQ record type */
 		switch (msiq_rec_p->msiq_rec_type) {
@@ -343,34 +350,41 @@ px_msiq_intr(caddr_t arg)
 
 			DTRACE_PROBE4(interrupt__complete, dev_info_t, dip,
 			    void *, handler, caddr_t, arg1, int, ret);
+
+			new_head_index++;
 		} else {
 			DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr:"
-			    "Not found matching MSIQ record\n");
-
-			/* px_spurintr(ino_p); */
-			ino_p->ino_unclaimed++;
+			    "No matching MSIQ record found\n");
 		}
-
 next_rec:
-		new_msiq_rec_cnt++;
+		/* Get the pointer next EQ record */
+		curr_head_p = (msiqhead_t *)
+		    ((caddr_t)curr_head_p + sizeof (msiq_rec_t));
+
+		/* Check for overflow condition */
+		if (curr_head_p >= (msiqhead_t *)((caddr_t)msiq_p->msiq_base_p
+		    + msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t)))
+			curr_head_p = (msiqhead_t *)msiq_p->msiq_base_p;
 
 		/* Zero out msiq_rec_type field */
 		msiq_rec_p->msiq_rec_type = 0;
-
-		/* Read next MSIQ record */
-		px_lib_get_msiq_rec(dip, msiq_p, msiq_rec_p);
 	}
 
-	DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: No of MSIQ recs processed %x\n",
-	    (new_msiq_rec_cnt - curr_msiq_rec_cnt));
+	DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: # of MSIQ recs processed %x\n",
+	    (new_head_index - msiq_p->msiq_curr_head_idx));
+
+	if (new_head_index <= msiq_p->msiq_curr_head_idx) {
+		if (px_unclaimed_intr_block) {
+			return (px_spurintr(ino_p));
+		}
+	}
 
 	/*  Update MSIQ head index with no of MSIQ records processed */
-	if (new_msiq_rec_cnt > curr_msiq_rec_cnt)  {
-		if (new_msiq_rec_cnt >= msiq_state_p->msiq_rec_cnt)
-			new_msiq_rec_cnt -= msiq_state_p->msiq_rec_cnt;
+	if (new_head_index >= msiq_state_p->msiq_rec_cnt)
+		new_head_index -= msiq_state_p->msiq_rec_cnt;
 
-		px_lib_msiq_sethead(dip, msiq_p->msiq_id, new_msiq_rec_cnt);
-	}
+	msiq_p->msiq_curr_head_idx = new_head_index;
+	px_lib_msiq_sethead(dip, msiq_p->msiq_id, new_head_index);
 
 	/* Clear the pending state */
 	if (px_lib_intr_setstate(dip, ino_p->ino_sysino,

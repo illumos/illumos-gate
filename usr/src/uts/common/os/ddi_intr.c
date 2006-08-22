@@ -375,6 +375,9 @@ ddi_intr_free(ddi_intr_handle_t h)
 		return (DDI_EINVAL);
 	}
 
+	/* Set the number of interrupts to free */
+	hdlp->ih_scratch1 = 1;
+
 	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_FREE, hdlp, NULL);
 
@@ -387,14 +390,11 @@ ddi_intr_free(ddi_intr_handle_t h)
 			i_ddi_intr_set_current_nintrs(hdlp->ih_dip,
 			    i_ddi_intr_get_current_nintrs(hdlp->ih_dip) - 1);
 
-			if (i_ddi_intr_get_current_nintrs(hdlp->ih_dip) == 0) {
-				i_ddi_intr_devi_fini(hdlp->ih_dip);
-			} else {
-				if (hdlp->ih_type & DDI_INTR_TYPE_FIXED)
-					i_ddi_set_intr_handle(hdlp->ih_dip,
-					    hdlp->ih_inum, NULL);
-			}
+			if (hdlp->ih_type & DDI_INTR_TYPE_FIXED)
+				i_ddi_set_intr_handle(hdlp->ih_dip,
+				    hdlp->ih_inum, NULL);
 
+			i_ddi_intr_devi_fini(hdlp->ih_dip);
 			i_ddi_free_intr_phdl(hdlp);
 		}
 		rw_destroy(&hdlp->ih_rwlock);

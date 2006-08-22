@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +38,8 @@ extern "C" {
 struct px_msiq {
 	msiqid_t	msiq_id;	/* MSIQ ID */
 	uint_t		msiq_state;	/* MSIQ alloc state */
-	msiqhead_t	msiq_base;	/* MSIQ base pointer */
-	msiqtail_t	msiq_curr;	/* MSIQ Curr pointer */
+	msiqhead_t	msiq_curr_head_idx; /* MSIQ current head */
+	msiqhead_t	*msiq_base_p;	/* MSIQ base pointer */
 };
 
 #define	MSIQ_STATE_FREE		0x1
@@ -90,6 +89,7 @@ typedef struct px_msi_eq_to_devino {
 
 extern	int	px_msiq_attach(px_t *px_p);
 extern	void	px_msiq_detach(px_t *px_p);
+extern	void	px_msiq_resume(px_t *px_p);
 
 extern	int	px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type,
 		    msiqid_t *msiq_id_p);

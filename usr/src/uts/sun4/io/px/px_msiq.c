@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,10 +94,8 @@ px_msiq_attach(px_t *px_p)
 		    msiq_state_p->msiq_1st_msiq_id + i;
 		msiq_state_p->msiq_p[i].msiq_state = MSIQ_STATE_FREE;
 
-		msiq_state_p->msiq_p[i].msiq_base = (uint64_t)
+		msiq_state_p->msiq_p[i].msiq_base_p = (msiqhead_t *)
 		    ((caddr_t)msiq_addr + (i * msiq_size));
-		msiq_state_p->msiq_p[i].msiq_curr =
-		    msiq_state_p->msiq_p[i].msiq_base;
 	}
 
 	if ((ret = px_lib_msiq_init(px_p->px_dip)) != DDI_SUCCESS)
@@ -126,6 +123,20 @@ px_msiq_detach(px_t *px_p)
 	    msiq_state_p->msiq_cnt * sizeof (px_msiq_t));
 
 	bzero(&px_p->px_ib_p->ib_msiq_state, sizeof (px_msiq_state_t));
+}
+
+/*
+ * px_msiq_resume()
+ */
+void
+px_msiq_resume(px_t *px_p)
+{
+	px_msiq_state_t *msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
+	int		i;
+
+	for (i = 0; i < msiq_state_p->msiq_cnt; i++)
+		(void) px_lib_msiq_gethead(px_p->px_dip, i,
+		    &msiq_state_p->msiq_p[i].msiq_curr_head_idx);
 }
 
 /*
@@ -196,9 +207,8 @@ px_msiq_free(px_t *px_p, msiqid_t msiq_id)
 
 	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
 		if (msiq_state_p->msiq_p[i].msiq_id == msiq_id) {
-			msiq_state_p->msiq_p[i].msiq_curr =
-			    msiq_state_p->msiq_p[i].msiq_base;
 			msiq_state_p->msiq_p[i].msiq_state = MSIQ_STATE_FREE;
+			msiq_state_p->msiq_p[i].msiq_curr_head_idx = 0;
 			break;
 		}
 	}

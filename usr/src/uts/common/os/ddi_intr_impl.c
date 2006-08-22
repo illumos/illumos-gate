@@ -69,7 +69,8 @@ i_ddi_intr_devi_fini(dev_info_t *dip)
 	DDI_INTR_APIDBG((CE_CONT, "i_ddi_intr_devi_fini: dip %p\n",
 	    (void *)dip));
 
-	if (DEVI(dip)->devi_intr_p == NULL)
+	if ((DEVI(dip)->devi_intr_p == NULL) ||
+	    i_ddi_intr_get_current_nintrs(dip))
 		return;
 
 	/*

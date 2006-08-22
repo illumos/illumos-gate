@@ -117,9 +117,8 @@ extern int px_lib_msiq_sethead(dev_info_t *dip, msiqid_t msiq_id,
     msiqhead_t msiq_head);
 extern int px_lib_msiq_gettail(dev_info_t *dip, msiqid_t msiq_id,
     msiqtail_t *msiq_tail);
-extern void px_lib_get_msiq_rec(dev_info_t *dip, px_msiq_t *msiq_p,
+extern void px_lib_get_msiq_rec(dev_info_t *dip, msiqhead_t *msiq_head_p,
     msiq_rec_t *msiq_rec_p);
-
 /*
  * MSI Functions:
  */
