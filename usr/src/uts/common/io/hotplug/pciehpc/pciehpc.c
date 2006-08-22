@@ -1933,11 +1933,12 @@ pciehpc_set_slot_name(pciehpc_t *ctrl_p)
 					(char *)slotname_data + 4);
 		kmem_free(slotname_data, len);
 	} else {
-		if (invalid_slotnum)
-		    (void) sprintf(p->slot_info.pci_slot_name, "pcie%ddev0",
-			p->slotNum);
+		if (invalid_slotnum)	/* use device number ie. 0 */
+		    (void) snprintf(p->slot_info.pci_slot_name,
+			sizeof (p->slot_info.pci_slot_name), "pcie0");
 		else
-		    (void) sprintf(p->slot_info.pci_slot_name, "pcie%d",
+		    (void) snprintf(p->slot_info.pci_slot_name,
+			sizeof (p->slot_info.pci_slot_name), "pcie%d",
 			p->slotNum);
 	}
 }

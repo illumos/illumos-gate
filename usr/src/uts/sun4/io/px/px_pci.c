@@ -47,6 +47,7 @@
 #include <sys/pcie_impl.h>
 #include <sys/ddi.h>
 #include <sys/sunndi.h>
+#include <sys/pci_cap.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/hotplug/pci/pciehpc.h>
 #include <sys/hotplug/pci/pcishpc.h>
@@ -56,6 +57,9 @@
 #include "pcie_pwr.h"
 #include "px_pci.h"
 #include "px_debug.h"
+
+/* 32-bit Shifts */
+#define	WDSHIFT 32
 
 /* Tunables. Beware: Some are for debug purpose only. */
 /*
@@ -172,9 +176,6 @@ static int pxb_pwr_setup(dev_info_t *dip);
 static int pxb_pwr_init_and_raise(dev_info_t *dip, pcie_pwr_t *pwr_p);
 static void pxb_pwr_teardown(dev_info_t *dip);
 
-static int pxb_get_cap(ddi_acc_handle_t config_handle, uint8_t cap_id);
-static uint16_t pxb_find_ext_cap_reg(ddi_acc_handle_t config_handle,
-	uint16_t cap_id);
 static int pxb_bad_func(pxb_devstate_t *pxb, int func);
 static int pxb_check_bad_devs(pxb_devstate_t *pxb, int vend);
 
@@ -182,6 +183,7 @@ static int pxb_check_bad_devs(pxb_devstate_t *pxb, int vend);
 static int pxb_pciehpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle);
 static int pxb_pcishpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle);
 static void pxb_init_hotplug(pxb_devstate_t *pxb);
+static void pxb_id_props(pxb_devstate_t *pxb);
 
 static struct dev_ops pxb_ops = {
 	DEVO_REV,		/* devo_rev */
@@ -231,7 +233,6 @@ static void pxb_intr_fini(pxb_devstate_t *pxb);
 static uint_t pxb_intr(caddr_t arg1, caddr_t arg2);
 static int pxb_intr_attach(pxb_devstate_t *pxb);
 
-static int pxb_get_port_type(dev_info_t *dip, ddi_acc_handle_t config_handle);
 static void pxb_removechild(dev_info_t *);
 static int pxb_initchild(dev_info_t *child);
 static dev_info_t *get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip);
@@ -305,6 +306,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pxb_devstate_t		*pxb;
 	ddi_acc_handle_t	config_handle;
 	char			device_type[8];
+	uint16_t		cap_ptr;
 
 	instance = ddi_get_instance(devi);
 
@@ -358,6 +360,9 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pxb->pxb_device_id = pci_config_get16(config_handle, PCI_CONF_DEVID);
 	pxb->pxb_rev_id = pci_config_get8(config_handle, PCI_CONF_REVID);
 
+	/* create special properties for device identification */
+	pxb_id_props(pxb);
+
 	/*
 	 * Power management setup. This also makes sure that switch/bridge
 	 * is at D0 during attach.
@@ -370,7 +375,12 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	pxb->pxb_port_type = pxb_get_port_type(devi, config_handle);
+	if ((PCI_CAP_LOCATE(pxb->pxb_config_handle, PCI_CAP_ID_PCI_E,
+		&cap_ptr)) != DDI_FAILURE)
+		pxb->pxb_port_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+			PX_CAP_REG) & PX_CAP_REG_DEV_TYPE_MASK;
+	else
+		pxb->pxb_port_type = PX_CAP_REG_DEV_TYPE_PCIE_DEV;
 
 	if ((pxb->pxb_port_type != PX_CAP_REG_DEV_TYPE_UP) &&
 	    (pxb->pxb_port_type != PX_CAP_REG_DEV_TYPE_DOWN) &&
@@ -1163,45 +1173,6 @@ pxb_intr(caddr_t arg1, caddr_t arg2)
 	return (rval);
 }
 
-static int
-pxb_get_port_type(dev_info_t *dip, ddi_acc_handle_t config_handle)
-{
-	ushort_t	caps_ptr, cap;
-	int		port_type = PX_CAP_REG_DEV_TYPE_PCIE_DEV;
-
-	/*
-	 * Check if capabilities list is supported.  If not then it is a PCI
-	 * device.  If so, check to see if it contains PCI Express Capability
-	 * Register. Eventually move this code to PCI-EX Framework.
-	 */
-	if (pci_config_get16(config_handle, PCI_CONF_STAT)
-				& PCI_STAT_CAP)
-		caps_ptr = P2ALIGN(pci_config_get8(config_handle,
-				PCI_CONF_CAP_PTR), 4);
-	else
-		caps_ptr = PCI_CAP_NEXT_PTR_NULL;
-
-	while (caps_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		if (caps_ptr < 0x40) {
-			DBG(DBG_ATTACH, dip,
-			    "Capability pointer 0x%x out of range.\n",
-			    caps_ptr);
-			break;
-		}
-
-		cap = pci_config_get8(config_handle, caps_ptr);
-		if (cap == PCI_CAP_ID_PCI_E) {
-			port_type = pci_config_get16(config_handle,
-			    caps_ptr + PX_CAP_REG) & PX_CAP_REG_DEV_TYPE_MASK;
-			break;
-		}
-		caps_ptr = P2ALIGN(pci_config_get8(config_handle,
-				(caps_ptr + PCI_CAP_NEXT_PTR)), 4);
-	}
-
-	return (port_type);
-}
-
 static void
 pxb_removechild(dev_info_t *dip)
 {
@@ -1513,8 +1484,7 @@ pxb_pwr_setup(dev_info_t *dip)
 	char *comp_array[5];
 	int i, instance;
 	ddi_acc_handle_t conf_hdl;
-	uint8_t cap_ptr, cap_id;
-	uint16_t pmcap;
+	uint16_t pmcap, cap_ptr;
 	pcie_pwr_t *pwr_p;
 	pxb_devstate_t *pxb;
 
@@ -1550,21 +1520,12 @@ pxb_pwr_setup(dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 	conf_hdl = pwr_p->pwr_conf_hdl;
-	cap_ptr = pci_config_get8(conf_hdl, PCI_BCNF_CAP_PTR);
+
 	/*
 	 * Walk the capabilities searching for a PM entry.
 	 */
-	while (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		cap_id = pci_config_get8(conf_hdl,
-		    cap_ptr + PCI_CAP_ID);
-		if (cap_id == PCI_CAP_ID_PM) {
-			break;
-		}
-		cap_ptr = pci_config_get8(conf_hdl,
-		    cap_ptr + PCI_CAP_NEXT_PTR);
-	}
-
-	if (cap_ptr == 0) {
+	if ((PCI_CAP_LOCATE(conf_hdl, PCI_CAP_ID_PM, &cap_ptr))
+		== DDI_FAILURE) {
 		DBG(DBG_PWR, dip, "switch/bridge does not support PM. PCI"
 		    " PM data structure not found in config header\n");
 		pci_config_teardown(&conf_hdl);
@@ -1574,7 +1535,7 @@ pxb_pwr_setup(dev_info_t *dip)
 	 * Save offset to pmcsr for future references.
 	 */
 	pwr_p->pwr_pmcsr_offset = cap_ptr + PCI_PMCSR;
-	pmcap = pci_config_get16(conf_hdl, cap_ptr + PCI_PMCAP);
+	pmcap = PCI_CAP_GET16(conf_hdl, NULL, cap_ptr, PCI_PMCAP);
 	if (pmcap & PCI_PMCAP_D1) {
 		DBG(DBG_PWR, dip, "D1 state supported\n");
 		pwr_p->pwr_pmcaps |= PCIE_SUPPORTS_D1;
@@ -1750,68 +1711,34 @@ pxb_pwr_teardown(dev_info_t *dip)
 /*ARGSUSED*/
 static int pxb_pciehpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle)
 {
-	uint16_t status;
-	uint8_t cap_ptr, cap_id;
+	uint16_t cap_ptr;
 
-	status = pci_config_get16(config_handle, PCI_CONF_STAT);
-
-	if (!(status & PCI_STAT_CAP))
-		cap_ptr = PCI_CAP_NEXT_PTR_NULL;
-	else {
-		cap_ptr = pci_config_get8(config_handle, PCI_CONF_CAP_PTR);
-		cap_ptr &= 0xFC;
+	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
+		!= DDI_FAILURE) {
+		uint16_t slotimpl = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+			PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
+		if (slotimpl)
+			if (PCI_CAP_GET32(config_handle, NULL, cap_ptr,
+				PCIE_SLOTCAP) & PCIE_SLOTCAP_HP_CAPABLE)
+				return (DDI_SUCCESS);
 	}
 
-	while (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		cap_id = pci_config_get8(config_handle, cap_ptr);
+	return (DDI_FAILURE);
 
-		if (cap_id == PCI_CAP_ID_PCI_E) {
-			uint16_t slotimpl;
-
-			slotimpl = pci_config_get16(config_handle, cap_ptr +
-				PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
-			if (slotimpl)
-				if (pci_config_get32(config_handle, cap_ptr +
-						PCIE_SLOTCAP) &
-						PCIE_SLOTCAP_HP_CAPABLE)
-					break;
-		}
-
-		cap_ptr = pci_config_get8(config_handle, cap_ptr +
-				PCI_CAP_NEXT_PTR);
-		cap_ptr &= 0xFC;
-	}
-
-	return ((cap_ptr != PCI_CAP_NEXT_PTR_NULL) ? DDI_SUCCESS : DDI_FAILURE);
 }
 
 /*ARGSUSED*/
 static int pxb_pcishpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle)
 {
-	uint16_t status;
-	uint8_t cap_ptr, cap_id;
+	uint16_t cap_ptr;
 
-	status = pci_config_get16(config_handle, PCI_CONF_STAT);
-
-	if (!(status & PCI_STAT_CAP))
-		cap_ptr = PCI_CAP_NEXT_PTR_NULL;
-	else {
-		cap_ptr = pci_config_get8(config_handle, PCI_CONF_CAP_PTR);
-		cap_ptr &= 0xFC;
+	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_HOTPLUG, &cap_ptr))
+		!= DDI_FAILURE) {
+		return (DDI_SUCCESS);
 	}
 
-	while (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		cap_id = pci_config_get8(config_handle, cap_ptr);
+	return (DDI_FAILURE);
 
-		if (cap_id == PCI_CAP_ID_PCI_HOTPLUG)
-			break;
-
-		cap_ptr = pci_config_get8(config_handle, cap_ptr +
-			PCI_CAP_NEXT_PTR);
-		cap_ptr &= 0xFC;
-	}
-
-	return ((cap_ptr != PCI_CAP_NEXT_PTR_NULL) ? DDI_SUCCESS : DDI_FAILURE);
 }
 
 /* check if this device has PCIe link underneath. */
@@ -1878,71 +1805,6 @@ pxb_print_plx_seeprom_crc_data(pxb_devstate_t *pxb_p)
 	ddi_regs_map_free(&h);
 }
 #endif
-
-/*
- * given a cap_id, return its cap_id location in config space
- */
-static int
-pxb_get_cap(ddi_acc_handle_t config_handle, uint8_t cap_id)
-{
-	uint8_t curcap;
-	uint_t	cap_id_loc;
-	uint16_t	status;
-	int location = -1;
-
-	/*
-	 * Need to check the Status register for ECP support first.
-	 * Also please note that for type 1 devices, the
-	 * offset could change. Should support type 1 next.
-	 */
-	status = pci_config_get16(config_handle, PCI_CONF_STAT);
-	if (!(status & PCI_STAT_CAP)) {
-		return (-1);
-	}
-	cap_id_loc = pci_config_get8(config_handle, PCI_CONF_CAP_PTR);
-
-	/* Walk the list of capabilities */
-	while (cap_id_loc) {
-
-		curcap = pci_config_get8(config_handle, cap_id_loc);
-
-		if (curcap == cap_id) {
-			location = cap_id_loc;
-			break;
-		}
-		cap_id_loc = pci_config_get8(config_handle,
-		    cap_id_loc + 1);
-	}
-	return (location);
-}
-
-static uint16_t
-pxb_find_ext_cap_reg(ddi_acc_handle_t config_handle, uint16_t cap_id)
-{
-	uint32_t	hdr, hdr_next_ptr, hdr_cap_id;
-	uint16_t	offset = P2ALIGN(PCIE_EXT_CAP, 4);
-
-	hdr = pci_config_get32(config_handle, offset);
-	hdr_next_ptr = (hdr >> PCIE_EXT_CAP_NEXT_PTR_SHIFT) &
-		PCIE_EXT_CAP_NEXT_PTR_MASK;
-	hdr_cap_id = (hdr >> PCIE_EXT_CAP_ID_SHIFT) &
-		PCIE_EXT_CAP_ID_MASK;
-
-	while ((hdr_next_ptr != PCIE_EXT_CAP_NEXT_PTR_NULL) &&
-	    (hdr_cap_id != cap_id)) {
-		offset = P2ALIGN(hdr_next_ptr, 4);
-		hdr = pci_config_get32(config_handle, offset);
-		hdr_next_ptr = (hdr >> PCIE_EXT_CAP_NEXT_PTR_SHIFT) &
-			PCIE_EXT_CAP_NEXT_PTR_MASK;
-		hdr_cap_id = (hdr >> PCIE_EXT_CAP_ID_SHIFT) &
-			PCIE_EXT_CAP_ID_MASK;
-	}
-
-	if (hdr_cap_id == cap_id)
-		return (P2ALIGN(offset, 4));
-
-	return (PCIE_EXT_CAP_NEXT_PTR_NULL);
-}
 
 /* check for known bad functionality in devices */
 static int
@@ -2019,6 +1881,46 @@ pxb_check_bad_devs(pxb_devstate_t *pxb, int vend)
 			break;
 	}
 	return (ret);
+}
+
+static void
+pxb_id_props(pxb_devstate_t *pxb)
+{
+	uint64_t serialid = 0;	/* 40b field of EUI-64 serial no. register */
+	uint16_t cap_ptr;
+	uint8_t fic = 0;	/* 1 = first in chassis device */
+
+	if ((pxb->pxb_vendor_id == PXB_VENDOR_SUN) &&
+		((pxb->pxb_device_id == PXB_DEVICE_PLX_PCIX) ||
+		(pxb->pxb_device_id == PXB_DEVICE_PLX_PCIE)))
+		fic = 1;
+	else {
+		/* look for Expansion Slot Reg and first-in-chassis bit */
+		if ((PCI_CAP_LOCATE(pxb->pxb_config_handle, PCI_CAP_ID_SLOT_ID,
+			&cap_ptr)) != DDI_FAILURE) {
+			uint8_t esr = PCI_CAP_GET8(pxb->pxb_config_handle, NULL,
+				cap_ptr, PCI_CAP_ID_REGS_OFF);
+			if (PCI_CAPSLOT_FIC(esr))
+				fic = 1;
+		}
+	}
+
+	if ((PCI_CAP_LOCATE(pxb->pxb_config_handle, PCIE_EXT_CAP_ID_SER,
+		&cap_ptr)) != DDI_FAILURE) {
+		/* serialid can be 0 thru a full 40b number */
+		serialid = PCI_XCAP_GET32(pxb->pxb_config_handle, NULL, cap_ptr,
+			4);
+		serialid <<= WDSHIFT;
+		serialid |= PCI_XCAP_GET32(pxb->pxb_config_handle, NULL,
+			cap_ptr, 8);
+	}
+
+	if (fic)
+		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, pxb->pxb_dip,
+			"first-in-chassis");
+	if (serialid)
+		(void) ddi_prop_update_int64(DDI_DEV_T_NONE, pxb->pxb_dip,
+			"serialid#", serialid);
 }
 
 #ifdef	BCM_SW_WORKAROUNDS

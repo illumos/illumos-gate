@@ -67,7 +67,7 @@ typedef enum {
 	PCI_CAP_CFGSZ_8 	= 0,
 	PCI_CAP_CFGSZ_16	= 1,
 	PCI_CAP_CFGSZ_32	= 2
-} pci_config_size_t;
+} pci_cap_config_size_t;
 
 /* Define Macros */
 
@@ -107,10 +107,10 @@ typedef enum {
 extern int pci_cap_probe(ddi_acc_handle_t h, uint16_t index,
 		uint32_t *id_p, uint16_t *base_p);
 
-extern uint32_t pci_cap_get(ddi_acc_handle_t h, pci_config_size_t size,
+extern uint32_t pci_cap_get(ddi_acc_handle_t h, pci_cap_config_size_t size,
 		uint32_t id, uint16_t base, uint16_t offset);
 
-extern int pci_cap_put(ddi_acc_handle_t h, pci_config_size_t size,
+extern int pci_cap_put(ddi_acc_handle_t h, pci_cap_config_size_t size,
 		uint32_t id, uint16_t base, uint16_t offset, uint32_t data);
 
 extern int pci_cap_read(ddi_acc_handle_t h, uint32_t id, uint16_t base,

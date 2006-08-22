@@ -6931,6 +6931,60 @@ devfsadm_root_path(void)
 	}
 }
 
+void
+devfsadm_free_dev_names(char **dev_names, int len)
+{
+	int i;
+
+	for (i = 0; i < len; i++)
+		free(dev_names[i]);
+	free(dev_names);
+}
+
+/*
+ * Return all devlinks corresponding to phys_path as an array of strings.
+ * The number of entries in the array is returned through lenp.
+ * devfsadm_free_dev_names() is used to free the returned array.
+ * NULL is returned on failure or when there are no matching devlinks.
+ *
+ * re is an extended regular expression in regex(5) format used to further
+ * match devlinks pointing to phys_path; it may be NULL to match all
+ */
+char **
+devfsadm_lookup_dev_names(char *phys_path, char *re, int *lenp)
+{
+	struct devlink_cb_arg cb_arg;
+	char **dev_names = NULL;
+	int i;
+
+	*lenp = 0;
+	cb_arg.count = 0;
+	cb_arg.rv = 0;
+	(void) di_devlink_cache_walk(devlink_cache, re, phys_path,
+	    DI_PRIMARY_LINK, &cb_arg, devlink_cb);
+
+	if (cb_arg.rv == -1 || cb_arg.count <= 0)
+		return (NULL);
+
+	dev_names = s_malloc(cb_arg.count * sizeof (char *));
+	if (dev_names == NULL)
+		goto out;
+
+	for (i = 0; i < cb_arg.count; i++) {
+		dev_names[i] = s_strdup(cb_arg.dev_names[i]);
+		if (dev_names[i] == NULL) {
+			devfsadm_free_dev_names(dev_names, i);
+			dev_names = NULL;
+			goto out;
+		}
+	}
+	*lenp = cb_arg.count;
+
+out:
+	free_dev_names(&cb_arg);
+	return (dev_names);
+}
+
 /* common exit function which ensures releasing locks */
 static void
 devfsadm_exit(int status)

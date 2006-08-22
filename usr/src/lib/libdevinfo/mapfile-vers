@@ -180,6 +180,10 @@ SUNWprivate_1.1 {
 	di_prop_sys_next;
 	di_vhci_first_node;
 	di_vhci_next_node;
+	di_dli_name;
+	di_dli_openr;
+	di_dli_openw;
+	di_dli_close;
     local:
 	*;
 };

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,16 +30,27 @@
 #include <stdio.h>
 #include <strings.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <limits.h>
+#include <unistd.h>
+#include <config_admin.h>
+#include <cfg_link.h>
+#include <sys/types.h>
+#include <sys/mkdev.h>
+#include <sys/hotplug/pci/pcihp.h>
 
-#define	SCSI_CFG_LINK_RE	"^cfg/c[0-9]+$"
-#define	SBD_CFG_LINK_RE		"^cfg/((((N[0-9]+[.])?(SB|IB))?[0-9]+)|[abcd])$"
-#define	USB_CFG_LINK_RE		"^cfg/((usb[0-9]+)/([0-9]+)([.]([0-9])+)*)$"
-#define	PCI_CFG_LINK_RE		"^cfg/[:alnum:]$"
-#define	IB_CFG_LINK_RE		"^cfg/(hca[0-9A-F]+)$"
-#define	SATA_CFG_LINK_RE	"^cfg/((sata[0-9]+)/([0-9]+)([.]([0-9])+)*)$"
+#ifdef	DEBUG
+#define	dprint(args)	devfsadm_errprint args
+/*
+ * for use in print routine arg list as a shorthand way to locate node via
+ * "prtconf -D" to avoid messy and cluttered debugging code
+ * don't forget the corresponding "%s%d" format
+ */
+#define	DRVINST(node)	di_driver_name(node), di_instance(node)
+#else
+#define	dprint(args)
+#endif
 
-#define	CFG_DIRNAME		"cfg"
 
 static int	scsi_cfg_creat_cb(di_minor_t minor, di_node_t node);
 static int	sbd_cfg_creat_cb(di_minor_t minor, di_node_t node);
@@ -49,30 +60,59 @@ static int	pci_cfg_creat_cb(di_minor_t minor, di_node_t node);
 static int	ib_cfg_creat_cb(di_minor_t minor, di_node_t node);
 static int	sata_cfg_creat_cb(di_minor_t minor, di_node_t node);
 
+static di_node_t	pci_cfg_chassis_node(di_node_t, di_prom_handle_t);
+static char 	*pci_cfg_slotname(di_node_t, di_prom_handle_t, minor_t);
+static int	pci_cfg_ap_node(minor_t, di_node_t, di_prom_handle_t,
+		    char *, int, int);
+static int	pci_cfg_iob_name(di_minor_t, di_node_t, di_prom_handle_t,
+		    char *, int);
+static minor_t	pci_cfg_pcidev(di_node_t, di_prom_handle_t);
+static int	pci_cfg_ap_path(di_minor_t, di_node_t, di_prom_handle_t,
+		    char *, int, char **);
+static char 	*pci_cfg_info_data(char *);
+static int	pci_cfg_is_ap_path(di_node_t, di_prom_handle_t);
+static int	pci_cfg_ap_legacy(di_minor_t, di_node_t, di_prom_handle_t,
+		    char *, int);
+static void	pci_cfg_rm_invalid_links(char *, char *);
+static void	pci_cfg_rm_link(char *);
+static void	pci_cfg_rm_all(char *);
+static char	*pci_cfg_devpath(di_node_t, di_minor_t);
+static di_node_t	pci_cfg_snapshot(di_node_t, di_minor_t,
+			    di_node_t *, di_minor_t *);
+
+/* flag definitions for di_propall_*(); value "0" is always the default flag */
+#define	DIPROP_PRI_NODE		0x0
+#define	DIPROP_PRI_PROM		0x1
+static int	di_propall_lookup_ints(di_prom_handle_t, int,
+		    dev_t, di_node_t, const char *, int **);
+static int	di_propall_lookup_strings(di_prom_handle_t, int,
+		    dev_t, di_node_t, const char *, char **);
+
+
 /*
  * NOTE: The CREATE_DEFER flag is private to this module.
  *	 NOT to be used by other modules
  */
 static devfsadm_create_t cfg_create_cbt[] = {
-	{ "attachment-point", "ddi_ctl:attachment_point:scsi", NULL,
+	{ "attachment-point", DDI_NT_SCSI_ATTACHMENT_POINT, NULL,
 	    TYPE_EXACT | CREATE_DEFER, ILEVEL_0, scsi_cfg_creat_cb
 	},
-	{ "attachment-point", "ddi_ctl:attachment_point:sbd", NULL,
+	{ "attachment-point", DDI_NT_SBD_ATTACHMENT_POINT, NULL,
 	    TYPE_EXACT, ILEVEL_0, sbd_cfg_creat_cb
 	},
-	{ "fc-attachment-point", "ddi_ctl:attachment_point:fc", NULL,
+	{ "fc-attachment-point", DDI_NT_FC_ATTACHMENT_POINT, NULL,
 	    TYPE_EXACT | CREATE_DEFER, ILEVEL_0, scsi_cfg_creat_cb
 	},
-	{ "attachment-point", "ddi_ctl:attachment_point:usb", NULL,
+	{ "attachment-point", DDI_NT_USB_ATTACHMENT_POINT, NULL,
 	    TYPE_EXACT, ILEVEL_0, usb_cfg_creat_cb
 	},
-	{ "attachment-point", "ddi_ctl:attachment_point:pci", NULL,
+	{ "attachment-point", DDI_NT_PCI_ATTACHMENT_POINT, NULL,
 	    TYPE_EXACT, ILEVEL_0, pci_cfg_creat_cb
 	},
-	{ "attachment-point", "ddi_ctl:attachment_point:ib", NULL,
+	{ "attachment-point", DDI_NT_IB_ATTACHMENT_POINT, NULL,
 	    TYPE_EXACT, ILEVEL_0, ib_cfg_creat_cb
 	},
-	{ "attachment-point", "ddi_ctl:attachment_point:sata", NULL,
+	{ "attachment-point", DDI_NT_SATA_ATTACHMENT_POINT, NULL,
 	    TYPE_EXACT, ILEVEL_0, sata_cfg_creat_cb
 	}
 };
@@ -94,6 +134,9 @@ static devfsadm_remove_t cfg_remove_cbt[] = {
 	},
 	{ "attachment-point", PCI_CFG_LINK_RE, RM_POST,
 	    ILEVEL_0, devfsadm_rm_all
+	},
+	{ "attachment-point", PCI_CFG_PATH_LINK_RE, RM_POST|RM_HOT,
+	    ILEVEL_0, pci_cfg_rm_all
 	},
 	{ "attachment-point", IB_CFG_LINK_RE, RM_POST|RM_HOT|RM_ALWAYS,
 	    ILEVEL_0, devfsadm_rm_all
@@ -280,36 +323,815 @@ get_roothub(const char *path, void *cb_arg)
 
 
 /*
- * pci_cfg_creat_cb() search the <device mask> data from
- * "slot-names" PROM property for the match device number,
- * then create device link with the right slot label.
+ * returns an allocted string containing the device path for <node> and
+ * <minor>
+ */
+static char *
+pci_cfg_devpath(di_node_t node, di_minor_t minor)
+{
+	char *path;
+	char *bufp;
+	char *minor_nm;
+	int buflen;
+
+	path = di_devfs_path(node);
+	minor_nm = di_minor_name(minor);
+	buflen = snprintf(NULL, 0, "%s:%s", path, minor_nm);
+
+	bufp = malloc(sizeof (char) * buflen);
+	if (bufp == NULL)
+		goto OUT;
+	(void) snprintf(bufp, buflen, "%s:%s", path, minor_nm);
+
+OUT:
+	di_devfs_path_free(path);
+	return (bufp);
+}
+
+
+static int
+di_propall_lookup_ints(di_prom_handle_t ph, int flags,
+    dev_t dev, di_node_t node, const char *prop_name, int **prop_data)
+{
+	int rv;
+
+	if (flags & DIPROP_PRI_PROM) {
+		rv = di_prom_prop_lookup_ints(ph, node, prop_name, prop_data);
+		if (rv < 0)
+			rv = di_prop_lookup_ints(dev, node, prop_name,
+			    prop_data);
+	} else {
+		rv = di_prop_lookup_ints(dev, node, prop_name, prop_data);
+		if (rv < 0)
+			rv = di_prom_prop_lookup_ints(ph, node, prop_name,
+			    prop_data);
+	}
+	return (rv);
+}
+
+
+static int
+di_propall_lookup_strings(di_prom_handle_t ph, int flags,
+    dev_t dev, di_node_t node, const char *prop_name, char **prop_data)
+{
+	int rv;
+
+	if (flags & DIPROP_PRI_PROM) {
+		rv = di_prom_prop_lookup_strings(ph, node, prop_name,
+		    prop_data);
+		if (rv < 0)
+			rv = di_prop_lookup_strings(dev, node, prop_name,
+			    prop_data);
+	} else {
+		rv = di_prop_lookup_strings(dev, node, prop_name, prop_data);
+		if (rv < 0)
+			rv = di_prom_prop_lookup_strings(ph, node, prop_name,
+			    prop_data);
+	}
+	return (rv);
+}
+
+
+static di_node_t
+pci_cfg_chassis_node(di_node_t node, di_prom_handle_t ph)
+{
+	di_node_t curnode = node;
+	int *firstchas;
+
+	do {
+		if (di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, curnode,
+		    PROP_FIRST_CHAS, &firstchas) >= 0)
+			return (curnode);
+	} while ((curnode = di_parent_node(curnode)) != DI_NODE_NIL);
+
+	return (DI_NODE_NIL);
+}
+
+
+/*
+ * yet another redundant common routine to:
+ * decode the ieee1275 "slot-names" property and returns the string matching
+ * the pci device number <pci_dev>, if any.
+ *
+ * callers must NOT free the returned string
+ *
+ * "slot-names" format: [int][string1][string2]...[stringN]
+ *	- each bit position in [int] represent a pci device number
+ *	- [string1]...[stringN] are concatenated null-terminated strings
+ *	- the number of bits set in [int] == the number of strings that follow
+ *	- each bit that is set corresponds to a string in the following segment
+ */
+static char *
+pci_cfg_slotname(di_node_t node, di_prom_handle_t ph, minor_t pci_dev)
+{
+#ifdef	DEBUG
+	char *fnm = "pci_cfg_slotname";
+#endif
+	int *snp;
+	int snlen;
+	int snentlen = sizeof (int);
+	int i, max, len, place, curplace;
+	char *str;
+
+	snlen = di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, node,
+	    PROP_SLOT_NAMES, &snp);
+	if (snlen < 1)
+		return (NULL);
+	if ((snp[0] & (1 << pci_dev)) == 0)
+		return (NULL);
+
+	/*
+	 * pci device number must be less than the amount of bits in the first
+	 * [int] component of slot-names
+	 */
+	if (pci_dev >= snentlen * 8) {
+		dprint(("%s: pci_dev out of range for %s%d\n",
+		    fnm, DRVINST(node)));
+		return (NULL);
+	}
+
+	place = 0;
+	for (i = 0; i < pci_dev; i++) {
+		if (snp[0] & (1 << i))
+			place++;
+	}
+
+	max = (snlen * snentlen) - snentlen;
+	str = (char *)&snp[1];
+	i = 0;
+	curplace = 0;
+	while (i < max && curplace < place) {
+		len = strlen(str);
+		if (len <= 0)
+			break;
+		str += len + 1;
+		i += len + 1;
+		curplace++;
+	}
+	/* the following condition indicates a badly formed slot-names */
+	if (i >= max || *str == '\0') {
+		dprint(("%s: badly formed slot-names for %s%d\n",
+		    fnm, DRVINST(node)));
+		str = NULL;
+	}
+	return (str);
+}
+
+
+/*
+ * returns non-zero if we can return a valid attachment point name for <node>,
+ * for its slot identified by child pci device number <pci_dev>, through <buf>
+ *
+ * prioritized naming scheme:
+ *	1) <PROP_SLOT_NAMES property>    (see pci_cfg_slotname())
+ *	2) <device-type><PROP_PHYS_SLOT property>
+ *	3) <drv name><drv inst>.<device-type><pci_dev>
+ *
+ * where <device-type> is derived from the PROP_DEV_TYPE property:
+ *	if its value is "pciex" then <device-type> is "pcie"
+ *	else the raw value is used
+ *
+ * if <flags> contains APNODE_DEFNAME, then scheme (3) is used
  */
 static int
-pci_cfg_creat_cb(di_minor_t minor, di_node_t node)
+pci_cfg_ap_node(minor_t pci_dev, di_node_t node, di_prom_handle_t ph,
+    char *buf, int bufsz, int flags)
 {
-	char		*minor_name, *dev_path;
-	char		path[PATH_MAX + 1];
-	int		*devlink_flags;
-	minor_t		pci_dev;
-	di_node_t	dev_node;
+	int *nump;
+	int rv;
+	char *str, *devtype;
 
-	minor_name = di_minor_name(minor);
-	pci_dev = (minor->dev_minor) & 0xFF;
+	rv = di_propall_lookup_strings(ph, 0, DDI_DEV_T_ANY, node,
+	    PROP_DEV_TYPE, &devtype);
+	if (rv < 1)
+		return (0);
 
-	dev_path = di_devfs_path(node);
-	dev_node = di_init(dev_path, DINFOCPYALL);
-	if ((di_prop_lookup_ints(DDI_DEV_T_ANY, dev_node,
-			"ap-names", &devlink_flags)) > 0) {
-		if ((*devlink_flags) & (1 << pci_dev)) {
-			(void) snprintf(path, sizeof (path), "%s/%s",
-			    CFG_DIRNAME, minor_name);
-			(void) devfsadm_mklink(path, node, minor, 0);
+	if (strcmp(devtype, PROPVAL_PCIEX) == 0)
+		devtype = DEVTYPE_PCIE;
+
+	if (flags & APNODE_DEFNAME)
+		goto DEF;
+
+	str = pci_cfg_slotname(node, ph, pci_dev);
+	if (str != NULL) {
+		(void) strlcpy(buf, str, bufsz);
+		return (1);
+	}
+
+	if (di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, node, PROP_PHYS_SLOT,
+	    &nump) > 0) {
+		if (*nump > 0) {
+			(void) snprintf(buf, bufsz, "%s%d", devtype, *nump);
+			return (1);
 		}
 	}
-	di_fini(dev_node);
-	(void) di_devfs_path_free(dev_path);
+DEF:
+	(void) snprintf(buf, bufsz, "%s%d.%s%d",
+	    di_driver_name(node), di_instance(node), devtype, pci_dev);
 
+	return (1);
+}
+
+
+/*
+ * returns non-zero if we can return a valid expansion chassis name for <node>
+ * through <buf>
+ *
+ * prioritized naming scheme:
+ *	1) <IOB_PRE string><PROP_SERID property: sun specific portion>
+ *	2) <IOB_PRE string><full PROP_SERID property in hex>
+ *	3) <IOB_PRE string>
+ *
+ * PROP_SERID encoding <64-bit int: msb ... lsb>:
+ * <24 bits: vendor id><40 bits: serial number>
+ *
+ * sun encoding of 40 bit serial number:
+ * first byte = device type indicator (ignored in naming scheme)
+ * next 4 bytes = 4 ascii characters
+ */
+/*ARGSUSED*/
+static int
+pci_cfg_iob_name(di_minor_t minor, di_node_t node, di_prom_handle_t ph,
+    char *buf, int bufsz)
+{
+	int64_t *seridp;
+	int64_t serid;
+	char *idstr;
+
+	if (di_prop_lookup_int64(DDI_DEV_T_ANY, node, PROP_SERID,
+	    &seridp) < 1) {
+		(void) strlcpy(buf, IOB_PRE, bufsz);
+		return (1);
+	}
+	serid = *seridp;
+
+	if (serid >> 40 != VENDID_SUN) {
+		(void) snprintf(buf, bufsz, "%s%llx", IOB_PRE, serid);
+		return (1);
+	}
+
+	serid &= SIZE2MASK64(40);
+	idstr = (char *)&serid;
+	idstr[sizeof (serid) - 1] = '\0';
+	/* skip device type indicator */
+	idstr++;
+	(void) snprintf(buf, bufsz, "%s%s", IOB_PRE, idstr);
+	return (1);
+}
+
+
+static minor_t
+pci_cfg_pcidev(di_node_t node, di_prom_handle_t ph)
+{
+	int rv;
+	int *regp;
+
+	rv = di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, node, PROP_REG,
+	    &regp);
+
+	if (rv < 1) {
+		dprint(("pci_cfg_pcidev: property %s not found "
+		    "for %s%d\n", PROP_REG, DRVINST(node)));
+		return (rv);
+	}
+
+	return (REG_PCIDEV(regp));
+}
+
+
+/*
+ * returns non-zero when it can successfully return an attachment point
+ * through <ap_path> whose length is less than <ap_pathsz>; returns the full
+ * path of the AP through <pathret> which may be larger than <ap_pathsz>.
+ * Callers need to free <pathret>.  If it cannot return the full path through
+ * <pathret> it will be set to NULL
+ *
+ * The ap path reflects a subset of the device path from an onboard host slot
+ * up to <node>.  We traverse up the device tree starting from <node>, naming
+ * each component using pci_cfg_ap_node().  If we detect that a certain
+ * segment is contained within an expansion chassis, then we skip any bus
+ * nodes in between our current node and the topmost node of the chassis,
+ * which is identified by the PROP_FIRST_CHAS property, and prepend the name
+ * of the expansion chassis as given by pci_cfg_iob_name()
+ *
+ * This scheme is always used for <pathret>.  If however, the size of
+ * <pathret> is greater than <ap_pathsz> then only the default name as given
+ * by pci_cfg_ap_node() for <node> will be used
+ */
+static int
+pci_cfg_ap_path(di_minor_t minor, di_node_t node, di_prom_handle_t ph,
+    char *ap_path, int ap_pathsz, char **pathret)
+{
+#ifdef	DEBUG
+	char *fnm = "pci_cfg_ap_path";
+#endif
+#define	seplen		(sizeof (AP_PATH_SEP) - 1)
+#define	iob_pre_len	(sizeof (IOB_PRE) - 1)
+#define	ap_path_iob_sep_len	(sizeof (AP_PATH_IOB_SEP) - 1)
+
+	char *bufptr;
+	char buf[MAXPATHLEN];
+	char pathbuf[MAXPATHLEN];
+	int bufsz;
+	char *pathptr;
+	char *pathend = NULL;
+	int len;
+	int rv = 0;
+	int chasflag = 0;
+	di_node_t curnode = node;
+	di_node_t chasnode = DI_NODE_NIL;
+	minor_t pci_dev;
+
+	buf[0] = '\0';
+	pathbuf[0] = '\0';
+	pathptr = &pathbuf[sizeof (pathbuf) - 1];
+	*pathptr = '\0';
+
+	/*
+	 * as we traverse up the device tree, we prepend components of our
+	 * path inside pathbuf, using pathptr and decrementing
+	 */
+	pci_dev = PCIHP_AP_MINOR_NUM_TO_PCI_DEVNUM(di_minor_devt(minor));
+	do {
+		bufptr = buf;
+		bufsz = sizeof (buf);
+
+		chasnode = pci_cfg_chassis_node(curnode, ph);
+		if (chasnode != DI_NODE_NIL) {
+			rv = pci_cfg_iob_name(minor, chasnode, ph,
+			    bufptr, bufsz);
+			if (rv == 0) {
+				dprint(("%s: cannot create iob name "
+				    "for %s%d\n", fnm, DRVINST(node)));
+				*pathptr = '\0';
+				goto OUT;
+			}
+
+			(void) strncat(bufptr, AP_PATH_IOB_SEP, bufsz);
+			len = strlen(bufptr);
+			bufptr += len;
+			bufsz -= len - 1;
+
+			/* set chasflag when the leaf node is within an iob */
+			if ((curnode == node) != NULL)
+				chasflag = 1;
+		}
+		rv = pci_cfg_ap_node(pci_dev, curnode, ph, bufptr, bufsz, 0);
+		if (rv == 0) {
+			dprint(("%s: cannot create ap node name "
+			    "for %s%d\n", fnm, DRVINST(node)));
+			*pathptr = '\0';
+			goto OUT;
+		}
+
+		/*
+		 * if we can't fit the entire path in our pathbuf, then use
+		 * the default short name and nullify pathptr; also, since
+		 * we prepend in the buffer, we must avoid adding a null char
+		 */
+		if (curnode != node) {
+			pathptr -= seplen;
+			if (pathptr < pathbuf) {
+				pathptr = pathbuf;
+				*pathptr = '\0';
+				goto DEF;
+			}
+			(void) memcpy(pathptr, AP_PATH_SEP, seplen);
+		}
+		len = strlen(buf);
+		pathptr -= len;
+		if (pathptr < pathbuf) {
+			pathptr = pathbuf;
+			*pathptr = '\0';
+			goto DEF;
+		}
+		(void) memcpy(pathptr, buf, len);
+
+		/* remember the leaf component */
+		if (curnode == node)
+			pathend = pathptr;
+
+		/*
+		 * go no further than the hosts' onboard slots
+		 */
+		if (chasnode == DI_NODE_NIL)
+			break;
+		curnode = chasnode;
+
+		/*
+		 * the pci device number of the current node is used to
+		 * identify which slot of the parent's bus (next iteration)
+		 * the current node is on
+		 */
+		pci_dev = pci_cfg_pcidev(curnode, ph);
+	} while ((curnode = di_parent_node(curnode)) != DI_NODE_NIL);
+
+	pathbuf[sizeof (pathbuf) - 1] = '\0';
+	if (strlen(pathptr) < ap_pathsz) {
+		(void) strlcpy(ap_path, pathptr, ap_pathsz);
+		rv = 1;
+		goto OUT;
+	}
+
+DEF:
+	/*
+	 * when our name won't fit <ap_pathsz> we use the endpoint/leaf
+	 * <node>'s name ONLY IF it has a serialid# which will make the apid
+	 * globally unique
+	 */
+	if (chasflag && pathend != NULL) {
+		if ((strncmp(pathend + iob_pre_len, AP_PATH_IOB_SEP,
+		    ap_path_iob_sep_len) != 0) &&
+		    (strlen(pathend) < ap_pathsz)) {
+			(void) strlcpy(ap_path, pathend, ap_pathsz);
+			rv = 1;
+			goto OUT;
+		}
+	}
+
+	/*
+	 * if our name still won't fit <ap_pathsz>, then use the leaf <node>'s
+	 * default name
+	 */
+	rv = pci_cfg_ap_node(pci_dev, node, ph, buf, bufsz, APNODE_DEFNAME);
+	if (rv == 0) {
+		dprint(("%s: cannot create default ap node name for %s%d\n",
+		    fnm, DRVINST(node)));
+		*pathptr = '\0';
+		goto OUT;
+	}
+	if (strlen(buf) < ap_pathsz) {
+		(void) strlcpy(ap_path, buf, ap_pathsz);
+		rv = 1;
+		goto OUT;
+	}
+
+	/*
+	 * in this case, cfgadm goes through an expensive process to generate
+	 * a purely dynamic logical apid: the framework will look through
+	 * the device tree for attachment point minor nodes and will invoke
+	 * each plugin responsible for that attachment point class, and if
+	 * the plugin returns a logical apid that matches the queried apid
+	 * or matches the default apid generated by the cfgadm framework for
+	 * that driver/class (occurs when plugin returns an empty logical apid)
+	 * then that is what it will use
+	 *
+	 * it is doubly expensive because the cfgadm pci plugin itself will
+	 * also search the entire device tree in the absence of a link
+	 */
+	rv = 0;
+	dprint(("%s: cannot create apid for %s%d within length of %d\n",
+	    fnm, DRVINST(node), ap_pathsz));
+
+OUT:
+	ap_path[ap_pathsz - 1] = '\0';
+	*pathret = (*pathptr == '\0') ? NULL : strdup(pathptr);
+	return (rv);
+
+#undef	seplen
+#undef	iob_pre_len
+#undef	ap_path_iob_sep_len
+}
+
+
+/*
+ * the PROP_AP_NAMES property contains the first integer section of the
+ * ieee1275 "slot-names" property and functions as a bitmask; see comment for
+ * pci_cfg_slotname()
+ *
+ * we use the name of the attachment point minor node if its pci device
+ * number (encoded in the minor number) is allowed by PROP_AP_NAMES
+ *
+ * returns non-zero if we return a valid attachment point through <path>
+ */
+static int
+pci_cfg_ap_legacy(di_minor_t minor, di_node_t node, di_prom_handle_t ph,
+    char *ap_path, int ap_pathsz)
+{
+	minor_t pci_dev;
+	int *anp;
+
+	if (di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, node, PROP_AP_NAMES,
+	    &anp) < 1)
+		return (0);
+
+	pci_dev = PCIHP_AP_MINOR_NUM_TO_PCI_DEVNUM(di_minor_devt(minor));
+	if ((*anp & (1 << pci_dev)) == 0)
+		return (0);
+
+	(void) strlcpy(ap_path, di_minor_name(minor), ap_pathsz);
+	return (1);
+}
+
+
+/*
+ * determine if <node> qualifies for a path style apid
+ */
+static int
+pci_cfg_is_ap_path(di_node_t node, di_prom_handle_t ph)
+{
+	char *devtype;
+	di_node_t curnode = node;
+
+	do {
+		if (di_propall_lookup_strings(ph, 0, DDI_DEV_T_ANY, curnode,
+		    PROP_DEV_TYPE, &devtype) > 0)
+			if (strcmp(devtype, PROPVAL_PCIEX) == 0)
+				return (1);
+	} while ((curnode = di_parent_node(curnode)) != DI_NODE_NIL);
+
+	return (0);
+}
+
+
+/*
+ * takes a full path as returned by <pathret> from pci_cfg_ap_path() and
+ * returns an allocated string intendend to be stored in a devlink info (dli)
+ * file
+ *
+ * data format: "Location: <transformed path>"
+ * where <transformed path> is <path> with occurrances of AP_PATH_SEP
+ * replaced by "/"
+ */
+static char *
+pci_cfg_info_data(char *path)
+{
+#define	head	"Location: "
+#define	headlen	(sizeof (head) - 1)
+#define	seplen	(sizeof (AP_PATH_SEP) - 1)
+
+	char *sep, *prev, *np;
+	char *newpath;
+	int pathlen = strlen(path);
+	int len;
+
+	newpath = malloc(sizeof (char) * (headlen + pathlen + 1));
+	np = newpath;
+	(void) strcpy(np, head);
+	np += headlen;
+
+	prev = path;
+	while ((sep = strstr(prev, AP_PATH_SEP)) != NULL) {
+		len = sep - prev;
+		(void) memcpy(np, prev, len);
+		np += len;
+		*np++ = '/';
+		prev = sep + seplen;
+	}
+	(void) strcpy(np, prev);
+	return (newpath);
+
+#undef	head
+#undef	headlen
+#undef	seplen
+}
+
+
+static void
+pci_cfg_rm_link(char *file)
+{
+	char *dlipath;
+
+	dlipath = di_dli_name(file);
+	(void) unlink(dlipath);
+
+	devfsadm_rm_all(file);
+	free(dlipath);
+}
+
+/*
+ * removes all registered devlinks to physical path <physpath> except for
+ * the devlink <valid> if not NULL;
+ * <physpath> must include the minor node
+ */
+static void
+pci_cfg_rm_invalid_links(char *physpath, char *valid)
+{
+	char **dnp;
+	char *cp, *vcp;
+	int i, dnlen;
+
+	dnp = devfsadm_lookup_dev_names(physpath, NULL, &dnlen);
+	if (dnp == NULL)
+		return;
+
+	if (valid != NULL) {
+		if (strncmp(valid, DEV "/", DEV_LEN + 1) == 0)
+			vcp = valid + DEV_LEN + 1;
+		else
+			vcp = valid;
+	}
+
+	for (i = 0; i < dnlen; i++) {
+		if (strncmp(dnp[i], DEV "/", DEV_LEN + 1) == 0)
+			cp = dnp[i] + DEV_LEN + 1;
+		else
+			cp = dnp[i];
+
+		if (valid != NULL) {
+			if (strcmp(vcp, cp) == 0)
+				continue;
+		}
+		pci_cfg_rm_link(cp);
+	}
+	devfsadm_free_dev_names(dnp, dnlen);
+}
+
+
+/*
+ * takes a complete devinfo snapshot and returns the root node;
+ * callers must do a di_fini() on the returned node;
+ * if the snapshot failed, DI_NODE_NIL is returned instead
+ *
+ * if <pci_node> is not DI_NODE_NIL, it will search for the same devinfo node
+ * in the new snapshot and return it through <ret_node> if it is found,
+ * else DI_NODE_NIL is returned instead
+ *
+ * in addition, if <pci_minor> is not DI_MINOR_NIL, it will also return
+ * the matching minor in the new snapshot through <ret_minor> if it is found,
+ * else DI_MINOR_NIL is returned instead
+ */
+static di_node_t
+pci_cfg_snapshot(di_node_t pci_node, di_minor_t pci_minor,
+    di_node_t *ret_node, di_minor_t *ret_minor)
+{
+	di_node_t root_node;
+	di_node_t node;
+	di_minor_t minor;
+	int pci_inst;
+	dev_t pci_devt;
+
+	*ret_node = DI_NODE_NIL;
+	*ret_minor = DI_MINOR_NIL;
+
+	root_node = di_init("/", DINFOCPYALL);
+	if (root_node == DI_NODE_NIL)
+		return (DI_NODE_NIL);
+
+	/*
+	 * narrow down search by driver, then instance, then minor
+	 */
+	if (pci_node == DI_NODE_NIL)
+		return (root_node);
+
+	pci_inst = di_instance(pci_node);
+	node = di_drv_first_node(di_driver_name(pci_node), root_node);
+	do {
+		if (pci_inst == di_instance(node)) {
+			*ret_node = node;
+			break;
+		}
+	} while ((node = di_drv_next_node(node)) != DI_NODE_NIL);
+
+	if (node == DI_NODE_NIL)
+		return (root_node);
+
+	/*
+	 * found node, now search minors
+	 */
+	if (pci_minor == DI_MINOR_NIL)
+		return (root_node);
+
+	pci_devt = di_minor_devt(pci_minor);
+	minor = DI_MINOR_NIL;
+	while ((minor = di_minor_next(node, minor)) != DI_MINOR_NIL) {
+		if (pci_devt == di_minor_devt(minor)) {
+			*ret_minor = minor;
+			break;
+		}
+	}
+	return (root_node);
+}
+
+
+static int
+pci_cfg_creat_cb(di_minor_t pci_minor, di_node_t pci_node)
+{
+#ifdef	DEBUG
+	char *fnm = "pci_cfg_creat_cb";
+#endif
+#define	ap_pathsz	(sizeof (ap_path))
+
+	char ap_path[CFGA_LOG_EXT_LEN];
+	char linkbuf[MAXPATHLEN];
+	char *fullpath = NULL;
+	char *pathinfo = NULL;
+	char *devpath = NULL;
+	int rv, fd;
+	size_t sz;
+	di_prom_handle_t ph;
+	di_node_t node;
+	di_node_t root_node = DI_NODE_NIL;
+	di_minor_t minor;
+
+	ph = di_prom_init();
+	if (ph == DI_PROM_HANDLE_NIL) {
+		dprint(("%s: di_prom_init() failed for %s%d\n",
+		    fnm, DRVINST(pci_node)));
+		goto OUT;
+	}
+
+	/*
+	 * Since incoming nodes from hotplug events are from snapshots that
+	 * do NOT contain parent/ancestor data, we must retake our own
+	 * snapshot and search for the target node
+	 */
+	root_node = pci_cfg_snapshot(pci_node, pci_minor, &node, &minor);
+	if (root_node == DI_NODE_NIL || node == DI_NODE_NIL ||
+	    minor == DI_MINOR_NIL) {
+		dprint(("%s: devinfo snapshot or search failed for %s%d\n",
+		    fnm, DRVINST(pci_node)));
+		goto OUT;
+	}
+
+	if (pci_cfg_is_ap_path(node, ph)) {
+		rv = pci_cfg_ap_path(minor, node, ph, ap_path, ap_pathsz,
+		    &fullpath);
+		if (rv == 0)
+			goto OUT;
+
+		(void) snprintf(linkbuf, sizeof (linkbuf), "%s/%s",
+		    CFG_DIRNAME, ap_path);
+
+		/*
+		 * We must remove existing links because we may have invalid
+		 * apids that are valid links.  Since these are not dangling,
+		 * devfsadm will not invoke the remove callback on them.
+		 *
+		 * What are "invalid apids with valid links"?  Consider swapping
+		 * an attachment point bus with another while the system is
+		 * down, on the same device path bound to the same drivers
+		 * but with the new AP bus having different properties
+		 * (e.g. serialid#).  If the previous apid is not removed,
+		 * there will now be two different links pointing to the same
+		 * attachment point, but only one reflects the correct
+		 * logical apid
+		 */
+		devpath = pci_cfg_devpath(node, minor);
+		if (devpath == NULL)
+			goto OUT;
+		pci_cfg_rm_invalid_links(devpath, linkbuf);
+		free(devpath);
+
+		(void) devfsadm_mklink(linkbuf, node, minor, 0);
+
+		/*
+		 * we store the full logical path of the attachment point for
+		 * cfgadm to display in its info field which is useful when
+		 * the full logical path exceeds the size limit for logical
+		 * apids (CFGA_LOG_EXT_LEN)
+		 *
+		 * for the cfgadm pci plugin to do the same would be expensive
+		 * (i.e. devinfo snapshot + top down exhaustive minor search +
+		 * equivalent of pci_cfg_ap_path() on every invocation)
+		 *
+		 * note that if we do not create a link (pci_cfg_ap_path() is
+		 * not successful), that is what cfgadm will do anyways to
+		 * create a purely dynamic apid
+		 */
+		pathinfo = pci_cfg_info_data(fullpath);
+		fd = di_dli_openw(linkbuf);
+		if (fd < 0)
+			goto OUT;
+
+		sz = strlen(pathinfo) + 1;
+		rv = write(fd, pathinfo, sz);
+		if (rv < sz) {
+			dprint(("%s: could not write full pathinfo to dli "
+			    "file for %s%d\n", fnm, DRVINST(node)));
+			goto OUT;
+		}
+		di_dli_close(fd);
+	} else {
+		rv = pci_cfg_ap_legacy(minor, node, ph, ap_path,
+		    ap_pathsz);
+		if (rv == 0)
+			goto OUT;
+
+		(void) snprintf(linkbuf, sizeof (linkbuf), "%s/%s",
+		    CFG_DIRNAME, ap_path);
+		(void) devfsadm_mklink(linkbuf, node, minor, 0);
+	}
+
+OUT:
+	if (fullpath != NULL)
+		free(fullpath);
+	if (pathinfo != NULL)
+		free(pathinfo);
+	if (ph != DI_PROM_HANDLE_NIL)
+		di_prom_fini(ph);
+	if (root_node != DI_NODE_NIL)
+		di_fini(root_node);
 	return (DEVFSADM_CONTINUE);
+
+#undef	ap_pathsz
+}
+
+
+static void
+pci_cfg_rm_all(char *file)
+{
+	pci_cfg_rm_link(file);
 }
 
 

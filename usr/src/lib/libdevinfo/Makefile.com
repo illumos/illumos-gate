@@ -29,13 +29,13 @@ LIBRARY=	libdevinfo.a
 VERS=		.1
 
 OBJECTS=	devfsinfo.o devinfo.o devinfo_prop_decode.o devinfo_devlink.o \
-		devinfo_devperm.o devfsmap.o
+		devinfo_devperm.o devfsmap.o devinfo_dli.o
 
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lnvpair -lsec -lc
+LDLIBS +=	-lnvpair -lsec -lc -lgen
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)

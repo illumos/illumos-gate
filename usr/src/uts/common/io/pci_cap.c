@@ -185,7 +185,7 @@ pci_xcap_locate(ddi_acc_handle_t h, uint16_t id, uint16_t *base_p)
  * because no cap list traversal is required.
  */
 uint32_t
-pci_cap_get(ddi_acc_handle_t h, pci_config_size_t size,
+pci_cap_get(ddi_acc_handle_t h, pci_cap_config_size_t size,
 	uint32_t id, uint16_t base, uint16_t offset)
 {
 	uint32_t data;
@@ -226,7 +226,7 @@ pci_cap_get(ddi_acc_handle_t h, pci_config_size_t size,
  * because no cap list traversal is required.
  */
 int
-pci_cap_put(ddi_acc_handle_t h, pci_config_size_t size,
+pci_cap_put(ddi_acc_handle_t h, pci_cap_config_size_t size,
 	uint32_t id, uint16_t base, uint16_t offset,
 	uint32_t data)
 {

@@ -2319,9 +2319,6 @@ pcishpc_set_slot_name(pcishpc_ctrl_t *ctrl_p, int slot)
 	}
 
 	if (!p->phy_slot_num) { /* platform may not have initialized it */
-		pcishpc_debug("%s#%d: Invalid slot number! ",
-				ddi_driver_name(ctrl_p->shpc_dip),
-				ddi_get_instance(ctrl_p->shpc_dip));
 		p->phy_slot_num = pci_config_get8(ctrl_p->shpc_config_hdl,
 				PCI_BCNF_SECBUS);
 		invalid_slotnum = 1;

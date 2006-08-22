@@ -301,15 +301,15 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if ((px_dma_attach(px_p)) != DDI_SUCCESS)
 			goto err_bad_dma; /* nothing to uninitialize on DMA */
 
+		if ((px_fm_attach(px_p)) != DDI_SUCCESS)
+			goto err_bad_dma;
+
 		/*
 		 * All of the error handlers have been registered
 		 * by now so it's time to activate the interrupt.
 		 */
 		if ((ret = px_err_add_intr(&px_p->px_fault)) != DDI_SUCCESS)
-			goto err_bad_dma;
-
-		if ((px_fm_attach(px_p)) != DDI_SUCCESS)
-			goto err_bad_fm;
+			goto err_bad_intr;
 
 		(void) px_init_hotplug(px_p);
 
@@ -353,9 +353,9 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 err_bad_pcitool_node:
 		ddi_remove_minor_node(dip, "devctl");
 err_bad_devctl_node:
-		px_fm_detach(px_p);
-err_bad_fm:
 		px_err_rem_intr(&px_p->px_fault);
+err_bad_intr:
+		px_fm_detach(px_p);
 err_bad_dma:
 		px_pec_detach(px_p);
 err_bad_pec:
@@ -456,8 +456,8 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		pxtool_uninit(dip);
 
 		ddi_remove_minor_node(dip, "devctl");
-		px_fm_detach(px_p);
 		px_err_rem_intr(&px_p->px_fault);
+		px_fm_detach(px_p);
 		px_pec_detach(px_p);
 		px_pwr_teardown(dip);
 		pwr_common_teardown(dip);

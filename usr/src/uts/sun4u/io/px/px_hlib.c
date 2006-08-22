@@ -39,6 +39,7 @@
 #include "oberon_regs.h"
 #include "px_csr.h"
 #include "px_lib4u.h"
+#include "px_err.h"
 
 /*
  * Registers that need to be saved and restored during suspend/resume.
@@ -162,6 +163,11 @@ static uint64_t	msiq_config_other_regs[] = {
 
 #define	MSIQ_STATE_SIZE		(EVENT_QUEUE_STATE_ENTRIES * sizeof (uint64_t))
 #define	MSIQ_MAPPING_SIZE	(MSI_MAPPING_ENTRIES * sizeof (uint64_t))
+
+/* OPL tuning variables for link unstable issue */
+int wait_perst = 500000; 	/* step 9, default: 500ms */
+int wait_enable_port = 45000;	/* step 11, default: 45ms */
+int link_retry_count = 2; 	/* step 11, default: 2 */
 
 static uint64_t msiq_suspend(devhandle_t dev_hdl, pxu_t *pxu_p);
 static void msiq_resume(devhandle_t dev_hdl, pxu_t *pxu_p);
@@ -2990,8 +2996,8 @@ static uint_t
 oberon_hp_pwron(caddr_t csr_base)
 {
 	volatile uint64_t reg;
-	boolean_t link_retrain, link_up;
-	int i;
+	boolean_t link_retry, link_up;
+	int loop, i;
 
 	DBG(DBG_HP, NULL, "oberon_hp_pwron the slot\n");
 
@@ -3039,14 +3045,80 @@ oberon_hp_pwron(caddr_t csr_base)
 	/* Turn on slot clock */
 	CSR_BS(csr_base, HOTPLUG_CONTROL, CLKEN);
 
-	/* Release PCI-E Reset */
-	delay(drv_usectohz(100000));
-	CSR_BS(csr_base, HOTPLUG_CONTROL, N_PERST);
+	link_up = B_FALSE;
+	link_retry = B_FALSE;
 
-	/*
-	 * Open events' mask
-	 * This should be done from pciehpc already
-	 */
+	for (loop = 0; (loop < link_retry_count) && (link_up == B_FALSE);
+		loop++) {
+		if (link_retry == B_TRUE) {
+			DBG(DBG_HP, NULL, "oberon_hp_pwron : retry link loop "
+				"%d\n", loop);
+			CSR_BS(csr_base, TLU_CONTROL, DRN_TR_DIS);
+			CSR_XS(csr_base, FLP_PORT_CONTROL, 0x1);
+			delay(drv_usectohz(10000));
+			CSR_BC(csr_base, TLU_CONTROL, DRN_TR_DIS);
+			CSR_BS(csr_base, TLU_DIAGNOSTIC, IFC_DIS);
+			CSR_BC(csr_base, HOTPLUG_CONTROL, N_PERST);
+			delay(drv_usectohz(50000));
+		}
+
+		/* Release PCI-E Reset */
+		delay(drv_usectohz(wait_perst));
+		CSR_BS(csr_base, HOTPLUG_CONTROL, N_PERST);
+
+		/*
+		 * Open events' mask
+		 * This should be done from pciehpc already
+		 */
+
+		/* Enable PCIE port */
+		delay(drv_usectohz(wait_enable_port));
+		CSR_BS(csr_base, TLU_CONTROL, DRN_TR_DIS);
+		CSR_XS(csr_base, FLP_PORT_CONTROL, 0x20);
+
+		/* wait for the link up */
+		for (i = 0; (i < 2) && (link_up == B_FALSE); i++) {
+			delay(drv_usectohz(100000));
+			reg = CSR_XR(csr_base, DLU_LINK_LAYER_STATUS);
+
+		    if ((((reg >> DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS) &
+			DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS_MASK) ==
+			DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS_FC_INIT_DONE) &&
+			(reg & (1ull << DLU_LINK_LAYER_STATUS_DLUP_STS)) &&
+			((reg & DLU_LINK_LAYER_STATUS_LNK_STATE_MACH_STS_MASK)
+			==
+			DLU_LINK_LAYER_STATUS_LNK_STATE_MACH_STS_DL_ACTIVE)) {
+			DBG(DBG_HP, NULL, "oberon_hp_pwron : link is up\n");
+				link_up = B_TRUE;
+		    } else
+			link_retry = B_TRUE;
+		}
+	}
+
+	if (link_up == B_FALSE) {
+		DBG(DBG_HP, NULL, "oberon_hp_pwron fails to enable "
+		    "PCI-E port\n");
+		goto fail2;
+	}
+
+	/* link is up */
+	CSR_BC(csr_base, TLU_DIAGNOSTIC, IFC_DIS);
+	CSR_BS(csr_base, FLP_PORT_ACTIVE_STATUS, TRAIN_ERROR);
+	CSR_BS(csr_base, TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR, TE_P);
+	CSR_BS(csr_base, TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR, TE_S);
+	CSR_BC(csr_base, TLU_CONTROL, DRN_TR_DIS);
+
+	/* Restore LUP/LDN */
+	reg = CSR_XR(csr_base, TLU_OTHER_EVENT_LOG_ENABLE);
+	if (px_tlu_oe_log_mask & (1ull << TLU_OTHER_EVENT_STATUS_SET_LUP_P))
+		reg |= 1ull << TLU_OTHER_EVENT_STATUS_SET_LUP_P;
+	if (px_tlu_oe_log_mask & (1ull << TLU_OTHER_EVENT_STATUS_SET_LDN_P))
+		reg |= 1ull << TLU_OTHER_EVENT_STATUS_SET_LDN_P;
+	if (px_tlu_oe_log_mask & (1ull << TLU_OTHER_EVENT_STATUS_SET_LUP_S))
+		reg |= 1ull << TLU_OTHER_EVENT_STATUS_SET_LUP_S;
+	if (px_tlu_oe_log_mask & (1ull << TLU_OTHER_EVENT_STATUS_SET_LDN_S))
+		reg |= 1ull << TLU_OTHER_EVENT_STATUS_SET_LDN_S;
+	CSR_XS(csr_base, TLU_OTHER_EVENT_LOG_ENABLE, reg);
 
 	/*
 	 * Initialize Leaf
@@ -3059,45 +3131,6 @@ oberon_hp_pwron(caddr_t csr_base)
 	    TLU_SLOT_CAPABILITIES_SPLS);
 	reg |= (0x19 << TLU_SLOT_CAPABILITIES_SPLS);
 	CSR_XS(csr_base, TLU_SLOT_CAPABILITIES, reg);
-
-	/* Enable PCIE port */
-	CSR_BS(csr_base, TLU_CONTROL, DRN_TR_DIS);
-	CSR_BC(csr_base, FLP_PORT_CONTROL, PORT_DIS);
-
-	/* wait for the link up */
-	link_up = B_FALSE;
-	link_retrain = B_TRUE;
-	for (i = 0; (i < 2) && (link_up == B_FALSE); i++) {
-		delay(drv_usectohz(100000));
-		reg = CSR_XR(csr_base, DLU_LINK_LAYER_STATUS);
-
-		if ((((reg >> DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS) &
-			DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS_MASK) ==
-			DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS_FC_INIT_DONE) &&
-		    (reg & (1ull << DLU_LINK_LAYER_STATUS_DLUP_STS)) &&
-		    ((reg & DLU_LINK_LAYER_STATUS_LNK_STATE_MACH_STS_MASK) ==
-			DLU_LINK_LAYER_STATUS_LNK_STATE_MACH_STS_DL_ACTIVE)) {
-			DBG(DBG_HP, NULL, "oberon_hp_pwron : link is up\n");
-			link_up = B_TRUE;
-		} else if (link_retrain == B_TRUE) {
-			DBG(DBG_HP, NULL, "oberon_hp_pwron: retrain link\n");
-			/* retrain the link */
-			CSR_BS(csr_base, FLP_PORT_LINK_CONTROL, RETRAIN);
-			link_retrain = B_FALSE;
-		}
-	}
-
-	if (link_up == B_FALSE) {
-		DBG(DBG_HP, NULL, "oberon_hp_pwron fails to enable "
-		    "PCI-E port\n");
-		goto fail2;
-	}
-
-	/* link is up */
-	CSR_BS(csr_base, FLP_PORT_ACTIVE_STATUS, TRAIN_ERROR);
-	CSR_BS(csr_base, TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR, TE_P);
-	CSR_BS(csr_base, TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR, TE_S);
-	CSR_BC(csr_base, TLU_CONTROL, DRN_TR_DIS);
 
 	/* Turn on Power LED */
 	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
@@ -3157,6 +3190,14 @@ oberon_hp_pwroff(caddr_t csr_base)
 	/* DRN_TR_DIS on */
 	CSR_BS(csr_base, TLU_CONTROL, DRN_TR_DIS);
 	delay(drv_usectohz(10000));
+
+	/* Disable LUP/LDN */
+	reg = CSR_XR(csr_base, TLU_OTHER_EVENT_LOG_ENABLE);
+	reg &= ~((1ull << TLU_OTHER_EVENT_STATUS_SET_LDN_P) |
+	    (1ull << TLU_OTHER_EVENT_STATUS_SET_LUP_P) |
+	    (1ull << TLU_OTHER_EVENT_STATUS_SET_LDN_S) |
+	    (1ull << TLU_OTHER_EVENT_STATUS_SET_LUP_S));
+	CSR_XS(csr_base, TLU_OTHER_EVENT_LOG_ENABLE, reg);
 
 	/* Save the TLU registers */
 	reg_tluue = CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE);
@@ -3310,6 +3351,7 @@ hvio_hotplug_init(dev_info_t *dip, void *arg)
 	pciehpc_regops_t *regops = (pciehpc_regops_t *)arg;
 	px_t	*px_p = DIP_TO_STATE(dip);
 	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+	volatile uint64_t reg;
 
 	if (PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON) {
 		if (!CSR_BR((caddr_t)pxu_p->px_address[PX_REG_CSR],
@@ -3317,6 +3359,22 @@ hvio_hotplug_init(dev_info_t *dip, void *arg)
 			DBG(DBG_HP, NULL, "%s%d: hotplug capabale not set\n",
 			    ddi_driver_name(dip), ddi_get_instance(dip));
 			return (DDI_FAILURE);
+		}
+
+		/* For empty or disconnected slot, disable LUP/LDN */
+		if (!CSR_BR((caddr_t)pxu_p->px_address[PX_REG_CSR],
+			TLU_SLOT_STATUS, PSD) ||
+		    !CSR_BR((caddr_t)pxu_p->px_address[PX_REG_CSR],
+			HOTPLUG_CONTROL, PWREN)) {
+
+			reg = CSR_XR((caddr_t)pxu_p->px_address[PX_REG_CSR],
+			    TLU_OTHER_EVENT_LOG_ENABLE);
+			reg &= ~((1ull << TLU_OTHER_EVENT_STATUS_SET_LDN_P) |
+			    (1ull << TLU_OTHER_EVENT_STATUS_SET_LUP_P) |
+			    (1ull << TLU_OTHER_EVENT_STATUS_SET_LDN_S) |
+			    (1ull << TLU_OTHER_EVENT_STATUS_SET_LUP_S));
+			CSR_XS((caddr_t)pxu_p->px_address[PX_REG_CSR],
+			    TLU_OTHER_EVENT_LOG_ENABLE, reg);
 		}
 
 		regops->get = oberon_hpreg_get;

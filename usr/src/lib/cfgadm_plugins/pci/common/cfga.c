@@ -162,6 +162,7 @@ static void build_control_data(struct hpc_control_data *iocdata, uint_t cmd,
     void *retdata);
 static cfga_err_t check_options(const char *options);
 static void cfga_msg(struct cfga_msg *msgp, const char *str);
+static char *findlink(char *ap_phys_id);
 
 static char *
 cfga_strs[] = {
@@ -1439,6 +1440,60 @@ fix_ap_name(char *ap_log_id, const char *ap_id, char *slot_name,
 	return (CFGA_OK);
 }
 
+
+static int
+findlink_cb(di_devlink_t devlink, void *arg)
+{
+	(*(char **)arg) = strdup(di_devlink_path(devlink));
+
+	return (DI_WALK_TERMINATE);
+}
+
+/*
+ * returns an allocated string containing the full path to the devlink for
+ * <ap_phys_id> in the devlink database; we expect only one devlink per
+ * <ap_phys_id> so we return the first encountered
+ */
+static char *
+findlink(char *ap_phys_id)
+{
+	di_devlink_handle_t hdl;
+	char *path = NULL;
+
+	hdl = di_devlink_init(NULL, 0);
+
+	if (strncmp("/devices/", ap_phys_id, 9) == 0)
+		ap_phys_id += 8;
+
+	(void) di_devlink_walk(hdl, "^cfg/.+$", ap_phys_id, DI_PRIMARY_LINK,
+	    (void *)&path, findlink_cb);
+
+	(void) di_devlink_fini(&hdl);
+	return (path);
+}
+
+
+/*
+ * returns CFGA_OK if it can succesfully retrieve the devlink info associated
+ * with devlink for <ap_phys_id> which will be returned through <ap_info>
+ */
+cfga_err_t
+get_dli(char *dlpath, char *ap_info, int ap_info_sz)
+{
+	int fd;
+
+	fd = di_dli_openr(dlpath);
+	if (fd < 0)
+		return (CFGA_ERROR);
+
+	(void) read(fd, ap_info, ap_info_sz);
+	ap_info[ap_info_sz - 1] = '\0';
+
+	di_dli_close(fd);
+	return (CFGA_OK);
+}
+
+
 /*ARGSUSED*/
 cfga_err_t
 cfga_list_ext(const char *ap_id, cfga_list_data_t **cs,
@@ -1454,6 +1509,7 @@ cfga_list_ext(const char *ap_id, cfga_list_data_t **cs,
 	struct	searcharg	slotname_arg;
 	int			fd;
 	int			rv = CFGA_OK;
+	char			*dlpath = NULL;
 
 	if ((rv = check_options(options)) != CFGA_OK) {
 		return (rv);
@@ -1479,6 +1535,7 @@ cfga_list_ext(const char *ap_id, cfga_list_data_t **cs,
 		rv = CFGA_ERROR;
 		return (rv);
 	}
+	(void) memset(*cs, 0, sizeof (cfga_list_data_t));
 
 	if ((dcp = devctl_ap_acquire((char *)ap_id, 0)) == NULL) {
 		cfga_err(errstring, CMD_GETSTAT, 0);
@@ -1618,15 +1675,25 @@ cfga_list_ext(const char *ap_id, cfga_list_data_t **cs,
 
 cont:
 	(void) strcpy((*cs)->ap_phys_id, ap_id);    /* physical path of AP */
+
+	dlpath = findlink((*cs)->ap_phys_id);
+	if (dlpath != NULL) {
+		if (get_dli(dlpath, (*cs)->ap_info,
+		    sizeof ((*cs)->ap_info)) != CFGA_OK)
+			(*cs)->ap_info[0] = '\0';
+		free(dlpath);
+	}
+
 	if ((*cs)->ap_log_id[0] == '\0')
 		(void) strcpy((*cs)->ap_log_id, slot_info.pci_slot_name);
 
-	/* slot_names of bus node  */
-	if (find_physical_slot_names(ap_id, &slotname_arg) != -1)
-		(void) strcpy((*cs)->ap_info,
-		    slotname_arg.slotnames[slotname_arg.minor]);
+	if ((*cs)->ap_info[0] == '\0') {
+		/* slot_names of bus node  */
+		if (find_physical_slot_names(ap_id, &slotname_arg) != -1)
+			(void) strcpy((*cs)->ap_info,
+			    slotname_arg.slotnames[slotname_arg.minor]);
+	}
 
-	(void) memset((*cs)->ap_type, 0, CFGA_TYPE_LEN);
 	/* class_code/subclass/boardtype */
 	get_type(boardtype, cardinfo, (*cs)->ap_type);
 
