@@ -43,6 +43,6 @@ case $error in
 	;;
 
 *)	echo "Could not start $MDMONITORD. Error $error."
-	exit 0
+	exit $SMF_EXIT_ERR_FATAL
 	;;
 esac

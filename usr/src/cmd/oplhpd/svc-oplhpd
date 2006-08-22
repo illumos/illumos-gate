@@ -26,8 +26,6 @@
 
 . /lib/svc/share/smf_include.sh
 
-FMRI=svc:/platform/sun4u/oplhpd
-
 sparc_enterprise="SUNW,SPARC-Enterprise"
 OPLHPD=/usr/platform/${sparc_enterprise}/lib/sparcv9/oplhpd
 platform=`/sbin/uname -i`

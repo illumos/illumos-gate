@@ -1,8 +1,5 @@
 #!/sbin/sh
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -22,6 +19,11 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Start script for dcs
@@ -38,10 +40,8 @@
 
 . /lib/svc/share/smf_include.sh
 
-FMRI=svc:/platform/sun4u/dcs
-
 getproparg() {
-	val=`svcprop -p $2 $FMRI`
+	val=`svcprop -p $2 $SMF_FMRI`
 	[ -n "$val" ] && [ "$val" != 'none' ] &&  echo $1 $val
 }
 

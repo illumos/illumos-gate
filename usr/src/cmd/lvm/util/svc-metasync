@@ -80,6 +80,8 @@ resolve_auto_take_sets()
 					esac
 				fi
 			done
+		fi
+		if [ -f "$TMPFILE" ]; then
 			/usr/bin/rm -f $TMPFILE
 		fi
 	fi

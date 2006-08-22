@@ -35,16 +35,14 @@
 # svc:/system/console-login> setprop ttymon/terminal_type = "xterm"
 # svc:/system/console-login> exit
 
-FMRI=svc:/system/console-login
-
 getproparg() {
-	val=`svcprop -p $2 $FMRI`
+	val=`svcprop -p $2 $SMF_FMRI`
 	[ -n "$val" ] && [ "$val" != "\"\"" ] && echo $1 $val
 }
 
 args="-g"
 
-val=`svcprop -p ttymon/device $FMRI`
+val=`svcprop -p ttymon/device $SMF_FMRI`
 # if this isn't set, recover a little
 [ -z "$val" ] && val=/dev/console
 args="$args -d $val"
@@ -55,13 +53,13 @@ args="$args `getproparg -T ttymon/terminal_type`"
 
 args="$args `getproparg -m ttymon/modules`"
 
-val=`svcprop -p ttymon/nohangup $FMRI`
+val=`svcprop -p ttymon/nohangup $SMF_FMRI`
 [ "$val" = "true" ] && args="$args -h"
 
-val=`svcprop -p ttymon/timeout $FMRI`
+val=`svcprop -p ttymon/timeout $SMF_FMRI`
 [ -n "$val" -a "$val" != "0" ] && args="$args -t $val"
 
-val=`svcprop -p ttymon/prompt $FMRI`
+val=`svcprop -p ttymon/prompt $SMF_FMRI`
 if [ -n "$val" ]; then
 	prompt=`eval echo $val`
 	exec /usr/lib/saf/ttymon $args -p "`eval echo $prompt` "

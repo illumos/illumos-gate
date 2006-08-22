@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -30,14 +29,14 @@
 
 . /lib/svc/share/smf_include.sh
 
-SVC="svc:/application/print/server"
-INS="svc:/application/print/server:default"
+# SERVICE = parent service name
+SERVICE=`echo $SMF_FMRI | /usr/sbin/cut -f1,2 -d":"`
 
 case "$1" in
 'start')
 
 isopts=`/usr/sbin/svccfg <<-EOF
-	select ${INS}
+	select $SMF_FMRI
 	listpg cmd_opts
 
 	EOF`
@@ -46,25 +45,25 @@ if [ "$isopts" ] ; then
 
 #called by /usr/lib/lpsched; use cmd_opts properties only
 
-	num_notifiers=`/bin/svcprop -p cmd_opts/num_notifiers ${INS}`
+	num_notifiers=`/bin/svcprop -p cmd_opts/num_notifiers $SMF_FMRI`
 
 	if [ "$num_notifiers" != "" ] ; then
 		OPTS="$OPTS -n $num_notifiers" 
 	fi
 
-	num_filters=`/bin/svcprop -p cmd_opts/num_filters ${INS}`
+	num_filters=`/bin/svcprop -p cmd_opts/num_filters $SMF_FMRI`
 
 	if [ "$num_filters" != "" ]  ; then
 		OPTS="$OPTS -f $num_filters"
 	fi
 
-	fd_limit=`/bin/svcprop -p cmd_opts/fd_limit ${INS}`
+	fd_limit=`/bin/svcprop -p cmd_opts/fd_limit $SMF_FMRI`
 
 	if [ "$fd_limit" != "" ]  ; then
 		OPTS="$OPTS -p $fd_limit"
 	fi
 
-	reserved_fds=`/bin/svcprop -p cmd_opts/reserved_fds ${INS}`
+	reserved_fds=`/bin/svcprop -p cmd_opts/reserved_fds $SMF_FMRI`
 
 	if [ "$reserved_fds" != "" ] ; then
 		OPTS="$OPTS -r $reserved_fds"
@@ -73,7 +72,7 @@ if [ "$isopts" ] ; then
 # clear out cmd_opts property group
 
 	svccfg <<-EOF
-	select ${INS}
+	select $SMF_FMRI
 	delpg cmd_opts
 
 	EOF
@@ -83,22 +82,22 @@ else
 # We are here through enable; use lpsched properties
 # Check for saved properties
 
-	num_notifiers=`/bin/svcprop -p lpsched/num_notifiers ${SVC}`
+	num_notifiers=`/bin/svcprop -p lpsched/num_notifiers $SERVICE`
 	if [ "$num_notifiers" != "" ] && [ "$num_notifiers" != "0" ] ; then
 		OPTS="$OPTS -n $num_notifiers"
 	fi
 
-	num_filters=`/bin/svcprop -p lpsched/num_filters ${SVC}`
+	num_filters=`/bin/svcprop -p lpsched/num_filters $SERVICE`
 	if [ "$num_filters" != "" ] && [ "$num_filters" != "0" ] ; then
 		OPTS="$OPTS -f $num_filters"
 	fi
 
-	fd_limit=`/bin/svcprop -p lpsched/fd_limit ${SVC}`
+	fd_limit=`/bin/svcprop -p lpsched/fd_limit $SERVICE`
 	if [ "$fd_limit" != "" ]  && [ "$fd_limit" != "0" ]; then
 		OPTS="$OPTS -p $fd_limit"
 	fi
 
-	reserved_fds=`/bin/svcprop -p lpsched/reserved_fds ${SVC}`
+	reserved_fds=`/bin/svcprop -p lpsched/reserved_fds $SERVICE`
 	if [ "$reserved_fds" != "" ] && [ "$reserved_fds" != "0" ] ; then
 		OPTS="$OPTS -r $reserved_fds"
 	fi

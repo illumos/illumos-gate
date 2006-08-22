@@ -24,8 +24,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-FMRI=svc:/system/filesystem/volfs:default
-
 # For modifying parameters passed to vold, do not edit
 # this script. Instead use svccfg(1m) to modify the SMF
 # repository. For example:
@@ -40,13 +38,13 @@ FMRI=svc:/system/filesystem/volfs:default
 . /lib/svc/share/smf_include.sh
 
 getpropstring() {
-        val=`svcprop -c -p $2 $FMRI`
+        val=`svcprop -c -p $2 $SMF_FMRI`
         [ -n "$val" ] && [ "$val" != '""' ] && echo $1 $val
 }
 
 config_file=/etc/vold.conf
 
-val=`svcprop -c -p vold/config_file $FMRI`
+val=`svcprop -c -p vold/config_file $SMF_FMRI`
 [ -n "$val" ] && [ "$val" != '""' ] && config_file="$val"
 
 if [ ! -f $config_file ]; then
@@ -76,14 +74,14 @@ case "$1" in
 	args="$args `getpropstring -d vold/root_dir`"
 	args="$args `getpropstring -l vold/log_file`"
 
-	val=`svcprop -c -p vold/log_debuglevel $FMRI`
+	val=`svcprop -c -p vold/log_debuglevel $SMF_FMRI`
 	[ -n "$val" ] && [ "$val" != '0' ] && args="$args -L $val"
 
-	[ `svcprop -c -p vold/never_writeback_label $FMRI` = "true" ] && args="$args -n"
+	[ `svcprop -c -p vold/never_writeback_label $SMF_FMRI` = "true" ] && args="$args -n"
 
-	[ `svcprop -c -p vold/log_nfs_trace $FMRI` = "true" ] && args="$args -t"
+	[ `svcprop -c -p vold/log_nfs_trace $SMF_FMRI` = "true" ] && args="$args -t"
 
-	[ `svcprop -c -p vold/log_verbose $FMRI` = "true" ] && args="$args -v"
+	[ `svcprop -c -p vold/log_verbose $SMF_FMRI` = "true" ] && args="$args -v"
 
 	# note that vold is not self-daemonizing and that any service depending
 	# on vold may need its own mechanism for figuring out whether vold is
