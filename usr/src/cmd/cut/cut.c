@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -45,27 +44,26 @@
 #define	MAX_RANGES	MAX_INPUT	/* maximum number of ranges */
 					/* as input args */
 
-int strcmp(), atoi();
+static void	bfunc(void);
+static void	bnfunc(void);
+static void	cfunc(void);
+static void	ffunc(void);
+static wchar_t	*read_line(FILE *);
+static void	process_list(char *);
+static void	diag(const char *);
+static void	usage(void);
 
-void	bfunc();
-void	bnfunc();
-void	cfunc();
-void	ffunc();
-void	process_list(char *list);
-void	diag(const char *s);
-void	usage(void);
+static wchar_t wdel = '\t';
+static int	dellen;
+static int	supflag = 0;
+static int	rstart[MAX_RANGES];
+static int	rend[MAX_RANGES];
+static int	nranges = 0;
+static FILE	*inptr;
+static char	dummy[MB_LEN_MAX];
 
-wchar_t wdel = '\t';
-int	dellen;
-int	supflag = 0;
-int	rstart[MAX_RANGES];
-int	rend[MAX_RANGES];
-int	nranges = 0;
-FILE	*inptr;
-char	dummy[MB_LEN_MAX];
-
-wchar_t	*linebuf = NULL;
-int	bufsiz;
+static wchar_t	*linebuf = NULL;
+static int	bufsiz;
 
 int
 main(int argc, char **argv)
@@ -195,8 +193,7 @@ main(int argc, char **argv)
 
 /* parse range list argument and set-up rstart/rend array */
 void
-process_list(list)
-char *list;
+process_list(char *list)
 {
 	int inrange = 0;
 	int start = 0;
@@ -328,7 +325,7 @@ char *list;
 /* print out those characters selected */
 
 void
-cfunc()
+cfunc(void)
 {
 	wint_t	c;		/* current character */
 	int	pos = 0;	/* current position within line */
@@ -372,7 +369,7 @@ cfunc()
 }
 
 void
-bfunc() /* called when -b is used but -n is not */
+bfunc(void) /* called when -b is used but -n is not */
 {
 	int	c;		/* current character */
 	int	pos = 0;	/* current position within line */
@@ -417,7 +414,7 @@ bfunc() /* called when -b is used but -n is not */
 
 
 void
-bnfunc() /* called when -b -n is used */
+bnfunc(void) /* called when -b -n is used */
 {
 	wint_t	c;		/* current character */
 	int	pos = 0;	/* current position within line */
@@ -434,7 +431,8 @@ bnfunc() /* called when -b -n is used */
 			inrange = 0;
 			rndx = 0;
 		} else {
-			if (rndx >= nranges) continue;
+			if (rndx >= nranges)
+				continue;
 
 			if ((wlen = wctomb(dummy, c)) < 0)
 				diag("invalid multibyte character");
@@ -450,29 +448,27 @@ bnfunc() /* called when -b -n is used */
 			 * if char starts after beginning of range,
 			 * for the moment, consider it in range.
 			 */
-			if (!inrange)
-				if (pos >= rstart[rndx])
-					inrange = 1;
+			if (!inrange && pos < rstart[rndx])
+				continue;
 
 			/*
 			 * If tail of the multibyte is out of the range.
 			 * do not print the character.
 			 * (See XCU4)
 			 */
-
-			if (inrange)
-				if (pos > rend[rndx]) {
-					inrange = 0;
-					rndx++;
-				}
-
-			/*
-			 * if we still think the character is in range
-			 * after the above, we print it.
-			 */
-			if (inrange)
+			if (pos <= rend[rndx]) {
+				inrange = 1;
 				(void) putwchar(c);
-
+				continue;
+			}
+			inrange = 0;
+			while (++rndx < nranges && pos >= rstart[rndx]) {
+				if (pos <= rend[rndx]) {
+					inrange = 1;
+					(void) putwchar(c);
+					break;
+				}
+			}
 		}
 	}
 }
@@ -525,7 +521,7 @@ read_line(FILE *fp)
 }
 
 void
-ffunc()  /* called when -f is used */
+ffunc(void)  /* called when -f is used */
 {
 	int	fpos;		/* current field position within line */
 	int	inrange;	/* is 'pos' within a range */
