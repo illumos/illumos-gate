@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -12,6 +12,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tip.h"
+#include <limits.h>
 
 /*
  * tip
@@ -42,12 +43,12 @@ intIOT(void)
 void
 intEMT(void)
 {
-	char c, line[256];
+	char c, line[PATH_MAX];
 	char *pline = line;
 	char reply;
 
 	(void) read(fildes[0], &c, 1);
-	while (c != '\n') {
+	while (c != '\n' && line + sizeof (line) - pline > 1) {
 		*pline++ = c;
 		(void) read(fildes[0], &c, 1);
 	}

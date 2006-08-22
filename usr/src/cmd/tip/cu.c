@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -23,7 +23,7 @@ void
 cumain(int argc, char *argv[])
 {
 	int i;
-	static char sbuf[12];
+	static char sbuf[14];
 
 	if (argc < 2) {
 usage:
@@ -89,7 +89,7 @@ usage:
 	 * The "cu" host name is used to define the
 	 * attributes of the generic dialer.
 	 */
-	(void) sprintf(sbuf, "cu%d", BR);
+	(void) snprintf(sbuf, sizeof (sbuf), "cu%d", BR);
 	if ((i = hunt(sbuf)) == 0) {
 		(void) printf("all ports busy\n");
 		exit(3);

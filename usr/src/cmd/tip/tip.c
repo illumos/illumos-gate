@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,7 @@ main(int argc, char *argv[])
 	char *system = NOSTR;
 	int i;
 	char *p;
-	char sbuf[12];
+	char sbuf[15];
 
 	gid = getgid();
 	egid = getegid();
@@ -115,7 +115,7 @@ main(int argc, char *argv[])
 	for (p = system; *p; p++)
 		*p = '\0';
 	PN = PNbuf;
-	(void) sprintf(sbuf, "tip%d", BR);
+	(void) snprintf(sbuf, sizeof (sbuf), "tip%d", BR);
 	system = sbuf;
 
 notnumber:

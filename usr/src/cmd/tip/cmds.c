@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -12,6 +12,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tip.h"
+#include <limits.h>
 #ifdef USG
 #include <unistd.h>
 #else
@@ -604,6 +605,11 @@ void
 setscript(void)
 {
 	char c;
+
+	if (strlen(value(RECORD)) >= PATH_MAX-1) {
+		(void) fprintf(stderr, "tip: record file name too long\r\n");
+		return;
+	}
 	/*
 	 * enable TIPOUT side for dialogue
 	 */

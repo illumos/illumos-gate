@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,7 +85,8 @@ ulockf(char *file, time_t atime)
 	static char tempfile[NAMESIZE];
 
 	if (pid[0] == '\0') {
-		(void) sprintf(pid, "%*d\n", SIZEOFPID, (int)getpid());
+		(void) snprintf(pid, sizeof (pid), "%*d\n", SIZEOFPID,
+		    (int)getpid());
 		(void) snprintf(tempfile, sizeof (tempfile),
 		    "%s/LTMP.%d", LOCKDIR, getpid());
 	}
