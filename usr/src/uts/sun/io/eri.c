@@ -3679,7 +3679,8 @@ eri_erx_reset(struct eri *erip)
 {
 	(void) eri_rxmac_disable(erip); /* Disable the RX MAC */
 
-	PUT_ERXREG(config, 0); /* Disable the RX DMA */
+	/* Disable the RX DMA */
+	PUT_ERXREG(config, GET_ERXREG(config) & ~GET_CONFIG_RXDMA_EN);
 	ERI_DELAY(((GET_ERXREG(config) &  1) == 0), ERI_MAX_RST_DELAY);
 	if ((GET_ERXREG(config) & 1) != 0)
 		ERI_FAULT_MSG1(erip, SEVERITY_LOW, ERI_VERB_MSG,
@@ -3717,7 +3718,9 @@ static uint32_t
 eri_etx_reset(struct eri *erip)
 {
 	(void) eri_txmac_disable(erip);
-	PUT_ETXREG(config, 0); /* Disable the TX DMA */
+
+	/* Disable the TX DMA */
+	PUT_ETXREG(config, GET_ETXREG(config) & ~GET_CONFIG_TXDMA_EN);
 #ifdef ORIG
 	ERI_DELAY(((GET_ETXREG(config) &  1) == 0), ERI_MAX_RST_DELAY);
 	if ((GET_ETXREG(config) &  1) != 0)
