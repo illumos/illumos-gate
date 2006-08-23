@@ -1366,7 +1366,6 @@ top:
 		vp->v_count--;
 		ASSERT3U(vp->v_count, ==, 0);
 		mutex_exit(&vp->v_lock);
-		zp->z_active = 0;
 		mutex_exit(&zp->z_lock);
 		zfs_znode_delete(zp, tx);
 		VFS_RELE(zfsvfs->z_vfs);

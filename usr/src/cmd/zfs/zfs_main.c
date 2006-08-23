@@ -1452,7 +1452,7 @@ zfs_do_promote(int argc, char **argv)
 	/* check number of arguments */
 	if (argc < 2) {
 		(void) fprintf(stderr, gettext("missing clone filesystem"
-		    "argument\n"));
+		    " argument\n"));
 		usage(B_FALSE);
 	}
 	if (argc > 2) {

@@ -341,7 +341,6 @@ zfs_purgedir(znode_t *dzp)
 	int skipped = 0;
 	int error;
 
-	ASSERT(dzp->z_active == 0);
 
 	for (zap_cursor_init(&zc, zfsvfs->z_os, dzp->z_id);
 	    (error = zap_cursor_retrieve(&zc, &zap)) == 0;
@@ -564,7 +563,6 @@ zfs_rmnode(znode_t *zp)
 	uint64_t	acl_obj;
 	int		error;
 
-	ASSERT(zp->z_active == 0);
 	ASSERT(ZTOV(zp)->v_count == 0);
 	ASSERT(zp->z_phys->zp_links == 0);
 

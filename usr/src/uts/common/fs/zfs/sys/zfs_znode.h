@@ -143,7 +143,6 @@ typedef struct znode {
 	zfs_dirlock_t	*z_dirlocks;	/* directory entry lock list */
 	kmutex_t	z_range_lock;	/* protects changes to z_range_avl */
 	avl_tree_t	z_range_avl;	/* avl tree of file range locks */
-	uint8_t		z_active;	/* znode is in use */
 	uint8_t		z_reap;		/* reap file at last reference */
 	uint8_t		z_atime_dirty;	/* atime needs to be synced */
 	uint8_t		z_dbuf_held;	/* Is z_dbuf already held? */

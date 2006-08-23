@@ -403,7 +403,6 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, uint64_t obj_num, int blksz)
 
 	zp->z_phys = db->db_data;
 	zp->z_zfsvfs = zfsvfs;
-	zp->z_active = 1;
 	zp->z_reap = 0;
 	zp->z_atime_dirty = 0;
 	zp->z_dbuf_held = 0;
@@ -683,8 +682,6 @@ zfs_zget(zfsvfs_t *zfsvfs, uint64_t obj_num, znode_t **zpp)
 			VFS_HOLD(zfsvfs->z_vfs);
 		}
 
-		if (zp->z_active == 0)
-			zp->z_active = 1;
 
 		VN_HOLD(ZTOV(zp));
 		mutex_exit(&zp->z_lock);
@@ -758,7 +755,6 @@ zfs_zinactive(znode_t *zp)
 		return;
 	}
 	mutex_exit(&vp->v_lock);
-	zp->z_active = 0;
 
 	/*
 	 * If this was the last reference to a file with no links,
@@ -1108,7 +1104,6 @@ zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx)
 
 	rootzp = kmem_cache_alloc(znode_cache, KM_SLEEP);
 	rootzp->z_zfsvfs = &zfsvfs;
-	rootzp->z_active = 1;
 	rootzp->z_reap = 0;
 	rootzp->z_atime_dirty = 0;
 	rootzp->z_dbuf_held = 0;
