@@ -2240,6 +2240,7 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 	uint_t		plen;
 	ip6i_t		*ip6i;
 	ipif_t		*src_ipif = NULL;
+	uint8_t		*hw_addr;
 
 	/*
 	 * If we have a unspecified source(sender) address, select a
@@ -2279,10 +2280,6 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 		hwaddr_ill = src_ipif->ipif_ill;
 	}
 
-	if (flag & NDP_PROBE)
-		plen = 0;
-	else
-		plen = (sizeof (nd_opt_hdr_t) + ill->ill_nd_lla_len + 7)/8;
 	/*
 	 * Always make sure that the NS/NA packets don't get load
 	 * spread. This is needed so that the probe packets sent
@@ -2293,6 +2290,7 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 	 * (neighbor doing NUD), we have to make sure that NA
 	 * also go out on the same interface.
 	 */
+	plen = (sizeof (nd_opt_hdr_t) + ill->ill_nd_lla_len + 7) / 8;
 	len = IPV6_HDR_LEN + sizeof (ip6i_t) + sizeof (nd_neighbor_advert_t) +
 	    plen * 8;
 	mp = allocb(len,  BPRI_LO);
@@ -2349,18 +2347,27 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 			na->nd_na_flags_reserved |= ND_NA_FLAG_SOLICITED;
 		if (flag & NDP_ORIDE)
 			na->nd_na_flags_reserved |= ND_NA_FLAG_OVERRIDE;
-
 	}
 
+	hw_addr = NULL;
 	if (!(flag & NDP_PROBE)) {
-		/* Fill in link layer address and option len */
-		opt->nd_opt_len = (uint8_t)plen;
 		mutex_enter(&hwaddr_ill->ill_lock);
-		bcopy(use_nd_lla ? hwaddr_ill->ill_nd_lla :
-		    hwaddr_ill->ill_phys_addr, &opt[1],
-		    hwaddr_ill->ill_nd_lla_len);
+		hw_addr = use_nd_lla ? hwaddr_ill->ill_nd_lla :
+		    hwaddr_ill->ill_phys_addr;
+		if (hw_addr != NULL) {
+			/* Fill in link layer address and option len */
+			opt->nd_opt_len = (uint8_t)plen;
+			bcopy(hw_addr, &opt[1], hwaddr_ill->ill_nd_lla_len);
+		}
 		mutex_exit(&hwaddr_ill->ill_lock);
 	}
+	if (hw_addr == NULL) {
+		/* If there's no link layer address option, then strip it. */
+		len -= plen * 8;
+		mp->b_wptr = mp->b_rptr + len;
+		ip6h->ip6_plen = htons(len - IPV6_HDR_LEN - sizeof (ip6i_t));
+	}
+
 	icmp6->icmp6_type = (uint8_t)operation;
 	icmp6->icmp6_code = 0;
 	/*

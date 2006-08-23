@@ -19210,6 +19210,13 @@ ipif_up(ipif_t *ipif, queue_t *q, mblk_t *mp)
 		ASSERT(mp != NULL);
 		if (err != 0)
 			return (err);
+	} else {
+		/*
+		 * Interfaces without underlying hardware don't do duplicate
+		 * address detection.
+		 */
+		ASSERT(!(ipif->ipif_flags & IPIF_DUPLICATE));
+		ipif->ipif_addr_ready = 1;
 	}
 	return (isv6 ? ipif_up_done_v6(ipif) : ipif_up_done(ipif));
 }

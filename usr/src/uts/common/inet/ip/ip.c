@@ -15164,8 +15164,10 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		mutex_exit(&ill->ill_lock);
 
 		/*
-		 * Now bring up the resolver, when that is
-		 * done we'll create IREs and we are done.
+		 * Now bring up the resolver; when that is complete, we'll
+		 * create IREs.  Note that we intentionally mirror what
+		 * ipif_up() would have done, because we got here by way of
+		 * ill_dl_up(), which stopped ipif_up()'s processing.
 		 */
 		if (ill->ill_isv6) {
 			/*
@@ -15205,6 +15207,8 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 						err = EINTR;
 					}
 				} else { /* Non XRESOLV interface */
+					(void) ipif_resolver_up(ipif,
+					    Res_act_initial);
 					err = ipif_up_done_v6(ipif);
 				}
 			}
@@ -15235,6 +15239,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			/*
 			 * This one is complete. Reply to pending ioctl.
 			 */
+			(void) ipif_resolver_up(ipif, Res_act_initial);
 			err = ipif_up_done(ipif);
 		}
 
