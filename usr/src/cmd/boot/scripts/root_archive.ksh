@@ -128,13 +128,13 @@ packmedia()
 	rm -rf "$MINIROOT/tmp/root/var/sadm/install"
 	rm -rf "$MINIROOT/tmp/root/var/sadm/pkg"
 
-	archive_X "$MEDIA" "$MINIROOT"
-
 	# clear out 64 bit support to conserve memory
 	#
 	if [ STRIP_AMD64 != false ] ; then
 		find "$MINIROOT" -name amd64 -type directory | xargs rm -rf
 	fi
+
+	archive_X "$MEDIA" "$MINIROOT"
 
 	cp "$MINIROOT/platform/i86pc/multiboot" "$MEDIA/boot"
 
