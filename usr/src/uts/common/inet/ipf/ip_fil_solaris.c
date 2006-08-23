@@ -691,6 +691,7 @@ mblk_t *m, **mpp;
 		ip6->ip6_hlim = 127;
 		fnew.fin_v = 6;
 		hlen = sizeof(*ip6);
+		fnew.fin_plen = ntohs(ip6->ip6_plen) + hlen;
 	} else
 #endif
 	{
@@ -719,6 +720,7 @@ mblk_t *m, **mpp;
 		ip->ip_len = ntohs(ip->ip_len);
 		ip->ip_off = ntohs(ip->ip_off);
 		hlen = sizeof(*ip);
+		fnew.fin_plen = ip->ip_len;
 	}
 
 	qpip = fin->fin_qpi;
@@ -1305,15 +1307,12 @@ frdest_t *fdp;
 		*mpp = mp;
 	}
 
-#ifdef IRE_ILL_CN
-	if (fdp != NULL) {
-#else
 	/*
 	 * If the fdp is NULL then there is no set route for this packet.
 	 */
 	if (fdp == NULL) {
 		qif = fin->fin_ifp;
-
+#ifndef IRE_ILL_CN
 		switch (fin->fin_v)
 		{
 		case 4 :
@@ -1326,8 +1325,8 @@ frdest_t *fdp;
 #endif
 		}
 		fdp = &fd;
-	} else {
 #endif
+	} else {
 		qif = fdp->fd_ifp;
 
 		if (qif == NULL || qif == (void *)-1)
