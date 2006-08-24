@@ -279,6 +279,8 @@ V9ABIWARN=
 CCREGSYM=		-Wc,-Qiselect-regsym=0
 CCCREGSYM=		-Qoption cg -Qiselect-regsym=0
 
+# prevent static symbols being optimized out
+CCSTATICSYM=		-Wc,-Qassembler-ounrefsym=0
 #
 # generate 32-bit addresses in the v9 kernel. Saves memory.
 CCABS32=		-Wc,-xcode=abs32
@@ -358,7 +360,8 @@ C99LMODE=	$(C99MODE:-xc99%=-Xc99%)
 # In most places, assignments to these macros should be appended with +=
 # (CPPFLAGS.master allows values to be prepended to CPPFLAGS).
 sparc_CFLAGS=	$(sparc_XARCH)
-sparcv9_CFLAGS=	$(sparcv9_XARCH) -dalign $(CCVERBOSE) $(V9ABIWARN) $(CCREGSYM)
+sparcv9_CFLAGS=	$(sparcv9_XARCH) -dalign $(CCVERBOSE) $(V9ABIWARN) $(CCREGSYM) \
+		$(CCSTATICSYM)
 i386_CFLAGS=	$(i386_XARCH)
 amd64_CFLAGS=	$(amd64_XARCH)
 
@@ -397,12 +400,18 @@ CDWARFSTR=	-_gcc=-fno-dwarf2-indirect-strings
 CALLSYMS=	-W0,-xdbggen=no%usedonly
 
 #
+# Default debug format for Sun Studio 11 is dwarf, so force it to
+# generate stabs.
+#
+DEBUGFORMAT=	-xdebugformat=stabs
+
+#
 # Flags used to build in debug mode for ctf generation.  Bugs in the Devpro
 # compilers currently prevent us from building with cc-emitted DWARF.
 #
 CTF_FLAGS_sparc	= -g -Wc,-Qiselect-T1 $(C99MODE) $(CNOGLOBAL) $(CDWARFSTR)
 CTF_FLAGS_i386	= -g $(C99MODE) $(CNOGLOBAL) $(CDWARFSTR)
-CTF_FLAGS	= $(CTF_FLAGS_$(MACH))
+CTF_FLAGS	= $(CTF_FLAGS_$(MACH)) $(DEBUGFORMAT)
 
 #
 # Flags used with genoffsets
@@ -420,13 +429,26 @@ OFFSETS_CREATE64 = $(GENOFFSETS) -s $(CTFSTABS) -r $(CTFCONVERT) \
 #
 # tradeoff time for space (smaller is better)
 #
-sparc_SPACEFLAG		= -xspace -W0,-Lt -W2,-Rcond_elim
-sparcv9_SPACEFLAG	= -xspace -W0,-Lt -W2,-Rcond_elim
+sparc_SPACEFLAG		= -xspace -W0,-Lt
+sparcv9_SPACEFLAG	= -xspace -W0,-Lt
 i386_SPACEFLAG		= -xspace
 amd64_SPACEFLAG		=
 
 SPACEFLAG		= $($(MACH)_SPACEFLAG)
 SPACEFLAG64		= $($(MACH64)_SPACEFLAG)
+
+#
+# The Sun Studio 11 compiler has changed the behaviour of integer
+# wrap arounds and so a flag is needed to use the legacy behaviour
+# (without this flag panics/hangs could be exposed within the source).
+#
+sparc_IROPTFLAG		= -W2,-xwrap_int
+sparcv9_IROPTFLAG	= -W2,-xwrap_int
+i386_IROPTFLAG		=
+amd64_IROPTFLAG		=
+
+IROPTFLAG		= $($(MACH)_IROPTFLAG)
+IROPTFLAG64		= $($(MACH64)_IROPTFLAG)
 
 sparc_XREGSFLAG		= -xregs=no%appl
 sparcv9_XREGSFLAG	= -xregs=no%appl
@@ -437,14 +459,18 @@ XREGSFLAG		= $($(MACH)_XREGSFLAG)
 XREGSFLAG64		= $($(MACH64)_XREGSFLAG)
 
 CFLAGS=         $(COPTFLAG) $($(MACH)_CFLAGS) $(SPACEFLAG) $(CCMODE) \
-		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) \
+		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) $(IROPTFLAG) \
 		$(CGLOBALSTATIC)
 CFLAGS64=       $(COPTFLAG64) $($(MACH64)_CFLAGS) $(SPACEFLAG64) $(CCMODE64) \
-		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) \
+		$(ILDOFF) $(CERRWARN) $(C99MODE) $(CCUNBOUND) $(IROPTFLAG64) \
 		$(CGLOBALSTATIC)
+#
+# Flags that are used to build parts of the code that are subsequently
+# run on the build machine (also known as the NATIVE_BUILD).
+#
 NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) $(CCMODE) \
 		$(ILDOFF) $(CERRWARN) $(C99MODE) $($(NATIVE_MACH)_CCUNBOUND) \
-		$(CGLOBALSTATIC)
+		$(IROPTFLAG) $(CGLOBALSTATIC)
 
 DTEXTDOM=-DTEXT_DOMAIN=\"$(TEXT_DOMAIN)\"	# For messaging.
 DTS_ERRNO=-D_TS_ERRNO
@@ -591,7 +617,7 @@ NATIVE_MACH=	$(MACH:amd64=i386)
 # Defined here so it can be overridden by developer.
 #
 SPRO_ROOT=		$(BUILD_TOOLS)/SUNWspro
-SPRO_VROOT=		$(SPRO_ROOT)/SOS10
+SPRO_VROOT=		$(SPRO_ROOT)/SS11
 GNU_ROOT=		$(SFW_ROOT)
 
 # Specify platform compiler versions for languages
