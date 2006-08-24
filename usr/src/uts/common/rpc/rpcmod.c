@@ -2395,13 +2395,11 @@ mir_svc_release(queue_t *wq, mblk_t *mp)
 		freemsg(mp);
 
 	mutex_enter(&mir->mir_mutex);
-	mir->mir_ref_cnt--;
-	ASSERT(mir->mir_ref_cnt >= 0);
 
 	/*
 	 * Start idle processing if this is the last reference.
 	 */
-	if (MIR_SVC_QUIESCED(mir)) {
+	if ((mir->mir_ref_cnt == 1) && (mir->mir_inrservice == 0)) {
 
 		RPCLOG(16, "mir_svc_release starting idle timer on 0x%p "
 		    "because ref cnt is zero\n", (void *) wq);
@@ -2410,6 +2408,16 @@ mir_svc_release(queue_t *wq, mblk_t *mp)
 		mir->mir_svc_pend_mp = NULL;
 		mir_svc_idle_start(wq, mir);
 	}
+
+	mir->mir_ref_cnt--;
+	ASSERT(mir->mir_ref_cnt >= 0);
+
+	/*
+	 * Wake up the thread waiting to close.
+	 */
+
+	if ((mir->mir_ref_cnt == 0) && mir->mir_closing)
+		cv_signal(&mir->mir_condvar);
 
 	mutex_exit(&mir->mir_mutex);
 
