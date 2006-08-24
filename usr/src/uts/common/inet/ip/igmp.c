@@ -1923,7 +1923,7 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 	if (igmpa->igmpa_cksum == 0)
 		igmpa->igmpa_cksum = 0xffff;
 
-	rtralert[0] = IPOPT_COPY & IPOPT_RTRALERT;
+	rtralert[0] = IPOPT_COPY | IPOPT_RTRALERT;
 	rtralert[1] = RTRALERT_LEN;
 	rtralert[2] = 0;
 	rtralert[3] = 0;
@@ -2109,7 +2109,7 @@ nextpkt:
 	igmp3ra->igmp3ra_numrec = htons(numrec);
 	igmp3ra->igmp3ra_cksum = IP_CSUM(mp, hdrsize, 0);
 
-	rtralert[0] = IPOPT_COPY & IPOPT_RTRALERT;
+	rtralert[0] = IPOPT_COPY | IPOPT_RTRALERT;
 	rtralert[1] = RTRALERT_LEN;
 	rtralert[2] = 0;
 	rtralert[3] = 0;
