@@ -1395,7 +1395,7 @@ args_to_rtcmd(rtcmd_irep_t *rcip, char **argv, char *cmd_string)
 				rcip->ri_rtsa_cnt++;
 			} else {
 				syntax_error(gettext("route: "
-				    "system is not labeled; cannot specify"
+				    "system is not labeled; cannot specify "
 				    "security attributes.\n"));
 				return (B_FALSE);
 			}

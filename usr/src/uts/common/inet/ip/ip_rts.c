@@ -279,7 +279,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	struct rtsa_s	*rtsap = NULL;
 	tsol_gcgrp_t	*gcgrp = NULL;
 	tsol_gc_t	*gc = NULL;
-	ts_label_t	*tsl = crgetlabel(ioc_cr);
+	ts_label_t	*tsl = NULL;
 
 	ip1dbg(("ip_rts_request: mp is %x\n", DB_TYPE(mp)));
 
@@ -728,12 +728,15 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			match_flags_local |= MATCH_IRE_SECATTR;
 			if ((found_addrs & RTA_GATEWAY) != 0)
 				match_flags |= MATCH_IRE_GW;
+			if (ioc_cr)
+				tsl = crgetlabel(ioc_cr);
 			if (rtsap != NULL) {
 				if (rtsa_validate(rtsap) != 0) {
 					error = EINVAL;
 					goto done;
 				}
-				if (crgetzoneid(ioc_cr) != GLOBAL_ZONEID &&
+				if (tsl != NULL &&
+				    crgetzoneid(ioc_cr) != GLOBAL_ZONEID &&
 				    (tsl->tsl_doi != rtsap->rtsa_doi ||
 				    !bldominates(&tsl->tsl_label,
 				    &rtsap->rtsa_slrange.lower_bound))) {
