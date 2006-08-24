@@ -52,6 +52,20 @@
 	    <service_fmri value='svc:/system/system-log' />
 	</dependency>
 
+	<!--
+	    This manifest for the DR daemon is delivered in the root ldoms
+	    package (SUNWldomr).  If the system is booted before the user
+	    ldoms package (SUNWldomu) is added, SMF will complain noisily.
+	    We add a depenency on the drd binary being present to prevent this.
+	-->
+	<dependency
+	    name='SUNWldomu'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='path'>
+		<service_fmri value='file://localhost/usr/lib/ldoms/drd' />
+	</dependency>
+
 	<exec_method
 	    type='method'
 	    name='start'

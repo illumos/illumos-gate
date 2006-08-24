@@ -305,9 +305,9 @@ mach_descrip_update(void)
 	/*
 	 * If the required MD size changes between our first call
 	 * to hv_mach_desc (to find the required buf size) and the
-	 * second call (to get the actual MD), the MD was in the
-	 * process of being updated. Loop until the two sizes are
-	 * identical.
+	 * second call (to get the actual MD) and our allocated
+	 * memory is insufficient, loop until we have allocated
+	 * sufficient space.
 	 */
 	do {
 		if (tbuf != NULL)
@@ -332,6 +332,7 @@ mach_descrip_update(void)
 		}
 
 		tbuf_pa =  va_to_pa(tbuf);
+		md_size = md_space;
 		hvret = hv_mach_desc(tbuf_pa, &md_size);
 		MDP(("MD: HV return code = %ld\n", hvret));
 
@@ -346,7 +347,7 @@ mach_descrip_update(void)
 			goto done;
 		}
 
-	} while (md_size0 != md_size || hvret == H_EINVAL);
+	} while (md_space < md_size);
 
 	tgen = mach_descrip_find_md_gen(tbuf);
 
@@ -579,16 +580,19 @@ md_get_handle(void)
 {
 	md_t *mdp;
 
+	mdp = NULL;
+
 	mutex_enter(&curr_mach_descrip_lock);
 
-	if (curr_mach_descrip == NULL) {
-		return (NULL);
-	}
+	if (curr_mach_descrip != NULL) {
 
-	curr_mach_descrip->refcnt++;
-	mdp = md_init_intern(curr_mach_descrip->va,
-	    curr_mach_descrip->memops->meta_allocp,
-	    curr_mach_descrip->memops->meta_freep);
+		mdp = md_init_intern(curr_mach_descrip->va,
+		    curr_mach_descrip->memops->meta_allocp,
+		    curr_mach_descrip->memops->meta_freep);
+
+		if (mdp != NULL)
+			curr_mach_descrip->refcnt++;
+	}
 
 	mutex_exit(&curr_mach_descrip_lock);
 

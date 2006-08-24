@@ -652,8 +652,7 @@ get_q_sizes(md_t *mdp, mde_cookie_t cpu_node_cookie)
 
 	ASSERT(nrnode == 1);
 
-	if (md_get_prop_val(mdp, platlist[0], "max-vcpus", &ncpus) == -1)
-		cmn_err(CE_CONT, "!no 'max-vcpus' prop in platform node\n");
+	(void) md_get_prop_val(mdp, platlist[0], "max-vcpus", &ncpus);
 	max_qsize = ncpus * CPU_MONDO_Q_MULTIPLIER;
 
 	md_free_scan_dag(mdp, &platlist);

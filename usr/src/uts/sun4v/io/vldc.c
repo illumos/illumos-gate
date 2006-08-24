@@ -556,7 +556,7 @@ i_vldc_add_port(vldc_t *vldcp, md_t *mdp, mde_cookie_t node)
 	}
 
 	/* set the default MTU */
-	vport->mtu = (vport->is_stream) ? VLDC_STREAM_MTU : VLDC_DEFAULT_MTU;
+	vport->mtu = VLDC_DEFAULT_MTU;
 
 	/* get the service being exported by this port */
 	if (md_get_prop_str(mdp, node, "vldc-svc-name", &sname)) {
@@ -1504,7 +1504,7 @@ vldc_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	rv = uiomove(vport->send_buf, size, UIO_WRITE, uiop);
 	if (rv == 0) {
 		rv = ldc_write(vport->ldc_handle, (caddr_t)vport->send_buf,
-			&size);
+		    &size);
 		if (rv != 0) {
 			DWARN("vldc_write: vldc@%d:%lu failed writing %lu "
 			    "bytes rv=%d\n", instance, portno, size, rv);

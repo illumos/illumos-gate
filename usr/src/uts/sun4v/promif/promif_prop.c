@@ -94,7 +94,7 @@ vc_reg_handler(ds_cb_arg_t arg, ds_ver_t *ver, ds_svc_hdl_t hdl)
 	if ((ds_svc_hdl_t *)arg == &ds_primary_handle)
 		ds_primary_handle = hdl;
 	else if ((ds_svc_hdl_t *)arg == &ds_backup_handle)
-		ds_primary_handle = hdl;
+		ds_backup_handle = hdl;
 }
 
 static void
