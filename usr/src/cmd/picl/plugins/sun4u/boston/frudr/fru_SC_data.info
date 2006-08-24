@@ -108,20 +108,14 @@ id("%Z%%M%	%I%	%E% SMI")
 #include "fru_usb-a-4_data.info"
 
 /*
- * parents for the fan tachometers
+ * fans
  */
-name:RMCLOMV/ft0_f0_tach
-	REFPROP	_location_parent name:/frutree/chassis/MB/system-board/FT0/fan-tray/F0
-name:RMCLOMV/ft1_f0_tach
-	REFPROP	_location_parent name:/frutree/chassis/MB/system-board/FT1/fan-tray/F0
-name:RMCLOMV/ft2_f0_tach
-	REFPROP _location_parent name:/frutree/chassis/MB/system-board/FT2/fan-tray/F0
-name:RMCLOMV/ft3_f0_tach
-	REFPROP _location_parent name:/frutree/chassis/MB/system-board/FT3/fan-tray/F0
-name:RMCLOMV/ft4_f0_tach
-	REFPROP _location_parent name:/frutree/chassis/MB/system-board/FT4/fan-tray/F0
-name:RMCLOMV/ft5_f0_tach
-	REFPROP _location_parent name:/frutree/chassis/MB/system-board/FT5/fan-tray/F0
+#include "fru_FT0_data.info"
+#include "fru_FT1_data.info"
+#include "fru_FT2_data.info"
+#include "fru_FT3_data.info"
+#include "fru_FT4_data.info"
+#include "fru_FT5_data.info"
 
 /*
  * parents for system leds

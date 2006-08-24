@@ -64,6 +64,16 @@ OTHERINFOS	+= $(INCDIR2)/fru_PS1_data.info
 OTHERINFOS	+= $(INCDIR2)/fru_PS2_data.info
 OTHERINFOS	+= $(INCDIR2)/fru_PS3_data.info
 OTHERINFOS	+= $(INCDIR2)/fru_SC_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_usb-a-1_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_usb-a-2_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_usb-a-3_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_usb-a-4_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT0_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT1_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT2_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT3_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT4_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT5_data.info
 
 ROOTLINTDIR =   $(ROOTLIBDIR)
 

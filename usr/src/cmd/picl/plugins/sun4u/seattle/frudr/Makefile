@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -52,6 +52,9 @@ CONFS		+= fru_HDD2.conf fru_HDD3.conf
 CONFS		+= fru_SC.conf
 CONFS		+= fru_usb-a-1.conf fru_usb-a-2.conf
 CONFS		+= fru_usb-a-3.conf fru_usb-a-4.conf
+CONFS		+= fru_FT0.conf fru_FT1.conf fru_FT2.conf
+CONFS		+= fru_FT3.conf fru_FT4.conf fru_FT5.conf
+CONFS		+= fru_FT6.conf
 ROOTCONF=	$(CONFS:%=$(ROOTLIBDIR)/%)
 $(ROOTCONF)	:= FILEMODE = 0644
 MAININFO=	$(CONFS:%.conf=%.info)
@@ -61,6 +64,9 @@ OTHERINFOS	+= fru_HDD2_data.info fru_HDD3_data.info
 OTHERINFOS	+= fru_SC_data.info SB-tables.info
 OTHERINFOS	+= fru_usb-a-1_data.info fru_usb-a-2_data.info
 OTHERINFOS	+= fru_usb-a-3_data.info fru_usb-a-4_data.info
+OTHERINFOS	+= fru_FT0_data.info fru_FT1_data.info fru_FT2_data.info
+OTHERINFOS	+= fru_FT3_data.info fru_FT4_data.info fru_FT5_data.info
+OTHERINFOS	+= fru_FT6_data.info
 
 CLEANFILES =	$(LINTOUT) $(LINTLIB)
 
@@ -72,7 +78,7 @@ install:	all $(ROOTCONF); $(MAKE) $(FRUDR_LINK)
 
 $(CONFS): $(MAININFO) $(OTHERINFOS)
 	@$(RM) -f $@
-	@echo "# Copyright 2005 Sun Microsystems, Inc. " \
+	@echo "# Copyright 2006 Sun Microsystems, Inc. " \
 	"All rights reserved." > $@
 	@echo "# Use is subject to license terms." >> $@
 	@echo "# This is a generated file. #ident lines identify sources" >> $@

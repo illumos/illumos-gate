@@ -321,6 +321,13 @@ f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_usb-a-1.conf 644 roo
 f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_usb-a-2.conf 644 root sys
 f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_usb-a-3.conf 644 root sys
 f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_usb-a-4.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT0.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT1.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT2.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT3.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT4.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT5.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_FT6.conf 644 root sys
 s none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/libpiclfrudr.so.1=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1 
 s none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/libpiclfrudr.so=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so
 d none usr/platform/SUNW,Sun-Fire-V440/lib/picl 755 root sys
@@ -364,6 +371,12 @@ f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_usb-a-1.conf 644 roo
 f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_usb-a-2.conf 644 root sys
 f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_usb-a-3.conf 644 root sys
 f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_usb-a-4.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT0.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT1.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT2.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT3.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT4.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT5.conf 644 root sys
 s none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/libpiclfrudr.so.1=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1
 s none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/libpiclfrudr.so=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so
 d none usr/lib/sparcv9 755 root bin

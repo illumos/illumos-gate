@@ -48,6 +48,8 @@ CONFS		+= fru_HDD6.conf fru_HDD7.conf
 CONFS		+= fru_SC.conf
 CONFS		+= fru_usb-a-1.conf fru_usb-a-2.conf
 CONFS		+= fru_usb-a-3.conf fru_usb-a-4.conf
+CONFS		+= fru_FT0.conf fru_FT1.conf fru_FT2.conf
+CONFS		+= fru_FT3.conf fru_FT4.conf fru_FT5.conf
 ROOTCONF=	$(CONFS:%=$(ROOTLIBDIR)/%)
 $(ROOTCONF)	:= FILEMODE = 0644
 MAININFO=	$(CONFS:%.conf=%.info)
@@ -59,6 +61,8 @@ OTHERINFOS	+= fru_HDD6_data.info fru_HDD7_data.info
 OTHERINFOS	+= fru_SC_data.info SB-tables.info
 OTHERINFOS	+= fru_usb-a-1_data.info fru_usb-a-2_data.info
 OTHERINFOS	+= fru_usb-a-3_data.info fru_usb-a-4_data.info
+OTHERINFOS	+= fru_FT0_data.info fru_FT1_data.info fru_FT2_data.info
+OTHERINFOS	+= fru_FT3_data.info fru_FT4_data.info fru_FT5_data.info
 
 ROOTLINTDIR =	$(ROOTLIBDIR)
 

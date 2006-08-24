@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,6 +60,13 @@ OTHERINFOS	+= $(INCDIR2)/fru_usb-a-1_data.info
 OTHERINFOS	+= $(INCDIR2)/fru_usb-a-2_data.info
 OTHERINFOS	+= $(INCDIR2)/fru_usb-a-3_data.info
 OTHERINFOS	+= $(INCDIR2)/fru_usb-a-4_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT0_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT1_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT2_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT3_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT4_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT5_data.info
+OTHERINFOS	+= $(INCDIR2)/fru_FT6_data.info
 
 ROOTLINTDIR =   $(ROOTLIBDIR)
 

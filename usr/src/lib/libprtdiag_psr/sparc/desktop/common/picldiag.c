@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -502,7 +502,6 @@ picldiag_get_fru_parent(picl_nodehdl_t nodeh, picl_nodehdl_t *fruparenth)
 	/* find fru parent */
 	err = picl_get_propval_by_name(nodeh, PICL_REFPROP_FRU_PARENT,
 	    &fruh, sizeof (fruh));
-
 	if (err != PICL_SUCCESS)
 		err = picl_get_propval_by_name(nodeh, PICL_REFPROP_LOC_PARENT,
 		    &fruh, sizeof (fruh));
@@ -2528,6 +2527,7 @@ logprintf_fan_info(picl_nodehdl_t fanh)
 		    PICL_PROP_LOW_WARNING_THRESHOLD, &err);
 		if (err != PICL_SUCCESS)
 			min_speed = 0;
+
 		if (speed < min_speed) {
 			log_printf("failed (%lld", speed);
 			err = picldiag_get_string_propval(fanh,
@@ -2558,7 +2558,6 @@ static int
 fan_callback(picl_nodehdl_t fanh, void *arg)
 {
 	int	*countp = arg;
-	int		err;
 
 	if (*countp == 0) {
 		log_printf(dgettext(TEXT_DOMAIN, "Fan Status:\n"));
@@ -2567,10 +2566,10 @@ fan_callback(picl_nodehdl_t fanh, void *arg)
 		log_printf("-------------------------------------------\n");
 	}
 	*countp += 1;
-	err = logprintf_fan_info(fanh);
-	if (err == PICL_SUCCESS)
-		return (PICL_WALK_CONTINUE);
-	return (err);
+
+	(void) logprintf_fan_info(fanh);
+
+	return (PICL_WALK_CONTINUE);
 }
 
 /*

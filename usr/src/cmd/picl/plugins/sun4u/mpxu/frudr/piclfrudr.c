@@ -129,6 +129,10 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	RMC_NAME		"SC"
 #define	RMC_NAME_LEN		2
 #define	RMC_FRU_NAME		"sc"
+#define	FT_NAME			"FT"
+#define	FT_NAME_LEN		2
+#define	FT_FRU_NAME		"fan-tray"
+#define	FT_ID_BUFSZ		(FT_NAME_LEN + 2)
 #define	DEV_PREFIX		"/devices"
 #define	ENXS_FRONT_SRVC_LED	0x20
 #define	ENXS_FRONT_ACT_LED	0x10
@@ -199,6 +203,27 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	BOSTON_PS2_UNITADDR	"0,52"
 #define	BOSTON_PS3_UNITADDR	"0,72"
 #define	BOSTON_PSU_COMPATIBLE	"i2c-at34c02"
+
+/*
+ * Seattle fan-tray paths
+ */
+#define	SEATTLE_FCB0_1U \
+	"/frutree/chassis/MB/system-board/FIOB/front-io-board-1" \
+	"/FCB0/fan-connector-board/%s"
+#define	SEATTLE_FCB1_1U \
+	"/frutree/chassis/MB/system-board/FIOB/front-io-board-1" \
+	"/FCB1/fan-connector-board/%s"
+#define	SEATTLE_PDB_1U \
+	"/frutree/chassis/PDB/power-distribution-board/%s"
+#define	SEATTLE_FCB0_2U	\
+	"/frutree/chassis/MB/system-board/FIOB/front-io-board-2" \
+	"/FCB0/fan-connector-board/%s"
+#define	SEATTLE_FCB1_2U \
+	"/frutree/chassis/MB/system-board/FIOB/front-io-board-2" \
+	"/FCB1/fan-connector-board/%s"
+#define	SEATTLE_PDB_2U \
+	"/frutree/chassis/PDB/power-distribution-board" \
+	"/HDDFB/fan-connector-board/%s"
 
 /*
  * disk defines
@@ -356,6 +381,7 @@ static int ps_name_to_addr(char *name);
 static char *ps_name_to_unitaddr(char *name);
 static char *ps_apid_to_nodename(char *apid);
 static void add_op_status(envmon_hpu_t *hpu, int *index);
+static void get_fantray_path(char *ap_id, char *path, int bufsz);
 
 #define	sprintf_buf2(buf, a1, a2) (void) snprintf(buf, sizeof (buf), a1, a2)
 
@@ -1024,6 +1050,8 @@ remove_fru_parents(picl_nodehdl_t fruh)
 	picl_prophdl_t		tableh;
 	picl_prophdl_t		tblh;
 	picl_prophdl_t		fruph;
+	picl_nodehdl_t		childh;
+	int			seabos_fanfru = 0;
 
 	retval = ptree_get_propval_by_name(fruh, PICL_PROP_NAME, name,
 	    sizeof (name));
@@ -1031,12 +1059,40 @@ remove_fru_parents(picl_nodehdl_t fruh)
 		syslog(LOG_ERR, EM_UNK_FRU);
 		return;
 	}
-	retval = ptree_get_prop_by_name(fruh, PICL_PROP_DEVICES,
-	    &tableh);
 
+	retval = ptree_get_prop_by_name(fruh, PICL_PROP_DEVICES, &tableh);
 	if (retval != PICL_SUCCESS) {
-		/* no Devices table, nothing to do */
-		return;
+		/*
+		 * No Devices table. However on Seattle and Boston (which
+		 * support fan fru hotplug), the Devices table will be
+		 * found under the child node (Fn) of the fru (fan-tray).
+		 * Therefore, check the first child of the fru for the
+		 * Devices table on these platforms before returning.
+		 */
+		switch (sys_platform) {
+		case PLAT_SEATTLE1U:
+		case PLAT_SEATTLE2U:
+		case PLAT_BOSTON:
+			if (strcmp(name, FT_FRU_NAME) != 0)
+				return;
+
+			retval = ptree_get_propval_by_name(fruh,
+			    PICL_PROP_CHILD, &childh, sizeof (picl_nodehdl_t));
+			if (retval != PICL_SUCCESS)
+				return;
+
+			retval = ptree_get_prop_by_name(childh,
+			    PICL_PROP_DEVICES, &tableh);
+			if (retval != PICL_SUCCESS)
+				return;
+
+			seabos_fanfru = 1;
+			break;
+
+		default:
+			/* nothing to do */
+			return;
+		}
 	}
 
 	/*
@@ -1049,12 +1105,14 @@ remove_fru_parents(picl_nodehdl_t fruh)
 		/* can't get value of table property */
 		return;
 	}
+
 	/* get first col, first row */
 	retval = ptree_get_next_by_col(tblh, &tblh);
 	if (retval != PICL_SUCCESS) {
 		/* no rows? */
 		return;
 	}
+
 	/*
 	 * starting at next col, get every entry in the column
 	 */
@@ -1077,7 +1135,17 @@ remove_fru_parents(picl_nodehdl_t fruh)
 		retval = ptree_get_prop_by_name(nodeh,
 		    PICL_REFPROP_FRU_PARENT, &fruph);
 		if (retval != PICL_SUCCESS) {
-			continue;
+			/*
+			 * on Boston and Seattle, we should actually be
+			 * looking for the _location_parent property
+			 * for fan frus
+			 */
+			if (seabos_fanfru) {
+			    retval = ptree_get_prop_by_name(nodeh,
+				PICL_REFPROP_LOC_PARENT, &fruph);
+			}
+			if (retval != PICL_SUCCESS)
+				continue;
 		}
 		/*
 		 * got a _fru_parent node reference delete it
@@ -1128,12 +1196,14 @@ remove_tables(picl_nodehdl_t rootnd)
 	}
 }
 
-/* event completion handler for PICL_FRU_ADDED/PICL_FRU_REMOVED events */
+/*
+ * Event completion handler for PICL_FRU_ADDED/PICL_FRU_REMOVED events
+ */
 static void
 frudr_completion_handler(char *ename, void *earg, size_t size)
 {
 	picl_nodehdl_t	fruh;
-	picl_nodehdl_t	childh;
+	picl_nodehdl_t	parh;
 	char	nodename[PICL_PROPNAMELEN_MAX];
 	int err;
 
@@ -1150,9 +1220,9 @@ frudr_completion_handler(char *ename, void *earg, size_t size)
 			 * first find name of the fru
 			 */
 			err = ptree_get_propval_by_name(fruh, PICL_PROP_PARENT,
-			    &childh, sizeof (childh));
+			    &parh, sizeof (parh));
 			if (err == PICL_SUCCESS) {
-				err = ptree_get_propval_by_name(childh,
+				err = ptree_get_propval_by_name(parh,
 				    PICL_PROP_NAME, nodename,
 				    sizeof (nodename));
 			}
@@ -1189,9 +1259,9 @@ frudr_completion_handler(char *ename, void *earg, size_t size)
 			}
 		}
 	}
-	nvlist_free(earg);
-	free(earg);
+
 	free(ename);
+	nvlist_free(earg);
 }
 
 /*
@@ -1287,6 +1357,52 @@ add_ps_to_platform(char *unit)
 	(void) ptree_create_and_add_prop(child_hdl, &info, unit, NULL);
 }
 
+static void
+get_fantray_path(char *ap_id, char *path, int bufsz)
+{
+	char	ft_id[FT_ID_BUFSZ];
+
+	(void) strlcpy(ft_id, ap_id, FT_ID_BUFSZ);
+
+	switch (sys_platform) {
+	case PLAT_SEATTLE1U:
+		if ((strncmp(ap_id, "FT0", 3) == 0) ||
+		    (strncmp(ap_id, "FT1", 3) == 0) ||
+		    (strncmp(ap_id, "FT2", 3) == 0)) {
+			(void) snprintf(path, bufsz, SEATTLE_FCB0_1U, ft_id);
+		} else if ((strncmp(ap_id, "FT3", 3) == 0) ||
+		    (strncmp(ap_id, "FT4", 3) == 0) ||
+		    (strncmp(ap_id, "FT5", 3) == 0)) {
+			(void) snprintf(path, bufsz, SEATTLE_FCB1_1U, ft_id);
+		} else {
+			(void) snprintf(path, bufsz, SEATTLE_PDB_1U, ft_id);
+		}
+		break;
+
+	case PLAT_SEATTLE2U:
+		if ((strncmp(ap_id, "FT0", 3) == 0) ||
+		    (strncmp(ap_id, "FT1", 3) == 0) ||
+		    (strncmp(ap_id, "FT2", 3) == 0)) {
+			(void) snprintf(path, bufsz, SEATTLE_FCB0_2U, ft_id);
+		} else if ((strncmp(ap_id, "FT3", 3) == 0) ||
+		    (strncmp(ap_id, "FT4", 3) == 0) ||
+		    (strncmp(ap_id, "FT5", 3) == 0)) {
+			(void) snprintf(path, bufsz, SEATTLE_FCB1_2U, ft_id);
+		} else {
+			(void) snprintf(path, bufsz, SEATTLE_PDB_2U, ft_id);
+		}
+		break;
+
+	case PLAT_BOSTON:
+		(void) snprintf(path, bufsz, SYS_BOARD_PATH, ft_id);
+		break;
+
+	default:
+		(void) snprintf(path, bufsz, CHASSIS_LOC_PATH, ft_id);
+		break;
+	}
+}
+
 /*
  * handle EC_DR picl events
  */
@@ -1342,6 +1458,8 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 	} else if (strncmp(ap_id, RMC_NAME, RMC_NAME_LEN) == 0) {
 		fru_name = RMC_FRU_NAME;
 		rmc_flag = B_TRUE;
+	} else if (strncmp(ap_id, FT_NAME, FT_NAME_LEN) == 0) {
+		fru_name = FT_FRU_NAME;
 	} else {
 		nvlist_free(nvlp);
 		return;
@@ -1378,9 +1496,10 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 				sprintf_buf2(path, CHASSIS_LOC_PATH, ap_id);
 				break;
 			}
+		} else if (strncmp(ap_id, FT_NAME, FT_NAME_LEN) == 0) {
+			get_fantray_path(ap_id, path, MAXPATHLEN);
 		} else	{
 			sprintf_buf2(path, CHASSIS_LOC_PATH, ap_id);
-
 		}
 	}
 
@@ -1487,18 +1606,15 @@ fru_add_handler(const char *ename, const void *earg, size_t size, void *cookie)
 
 	retval = nvlist_lookup_uint64((nvlist_t *)earg,
 	    PICLEVENTARG_PARENTHANDLE, &locnodeh);
-
 	if (retval != PICL_SUCCESS)
 		return;
 
 	retval = ptree_get_propval_by_name(locnodeh, PICL_PROP_NAME,
 	    path, sizeof (path));
-
 	if (retval != PICL_SUCCESS)
 		return;
 
 	fru_name = strdup(path);
-
 	if (fru_name == NULL)
 		return;
 
@@ -1585,7 +1701,6 @@ frutree_evhandler(const char *ename, const void *earg, size_t size,
 	}
 
 	fru_name = strdup(dpath);
-
 	if (fru_name == NULL) {
 		nvlist_free(nvlp);
 		return;
