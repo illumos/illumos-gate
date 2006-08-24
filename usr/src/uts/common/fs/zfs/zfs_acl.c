@@ -1432,6 +1432,20 @@ zfs_zaccess_rwx(znode_t *zp, mode_t mode, cred_t *cr)
 	return (zfs_zaccess(zp, v4_mode, cr));
 }
 
+static int
+zfs_delete_final_check(znode_t *zp, znode_t *dzp, cred_t *cr)
+{
+	int error;
+
+	error = secpolicy_vnode_access(cr, ZTOV(zp),
+	    dzp->z_phys->zp_uid, S_IWRITE|S_IEXEC);
+
+	if (error == 0)
+		error = zfs_sticky_remove_access(dzp, zp, cr);
+
+	return (error);
+}
+
 /*
  * Determine whether Access should be granted/deny, without
  * consulting least priv subsystem.
@@ -1473,14 +1487,13 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 	int dzp_working_mode = 0;
 	int zp_working_mode = 0;
 	int dzp_error, zp_error;
-	int error;
 
 	/*
 	 * Arghh, this check is going to require a couple of questions
 	 * to be asked.  We want specific DELETE permissions to
 	 * take precedence over WRITE/EXECUTE.  We don't
 	 * want an ACL such as this to mess us up.
-	 * user:sloar:write_data:deny,user:sloar:delete:allow
+	 * user:joe:write_data:deny,user:joe:delete:allow
 	 *
 	 * However, deny permissions may ultimately be overridden
 	 * by secpolicy_vnode_access().
@@ -1494,20 +1507,40 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 		return (dzp_error);
 
 	/*
-	 * First handle the first row
+	 * First check the first row.
+	 * We only need to see if parent Allows delete_child
 	 */
 	if ((dzp_working_mode & ACE_DELETE_CHILD) == 0)
 		return (0);
 
 	/*
 	 * Second row
+	 * we already have the necessary information in
+	 * zp_working_mode, zp_error and dzp_error.
 	 */
 
 	if ((zp_working_mode & ACE_DELETE) == 0)
 		return (0);
 
 	/*
+	 * Now zp_error should either be EACCES which indicates
+	 * a "deny" delete entry or ACCESS_UNDETERMINED if the "delete"
+	 * entry exists on the target.
+	 *
+	 * dzp_error should be either EACCES which indicates a "deny"
+	 * entry for delete_child or ACCESS_UNDETERMINED if no delete_child
+	 * entry exists.  If value is EACCES then we are done
+	 * and zfs_delete_final_check() will make the final decision
+	 * regarding to allow the delete.
+	 */
+
+	ASSERT(zp_error != 0 && dzp_error != 0);
+	if (dzp_error == EACCES)
+		return (zfs_delete_final_check(zp, dzp, cr));
+
+	/*
 	 * Third Row
+	 * Only need to check for write/execute on parent
 	 */
 
 	dzp_error = zfs_zaccess_common(dzp, ACE_WRITE_DATA|ACE_EXECUTE,
@@ -1517,7 +1550,7 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 		return (dzp_error);
 
 	if ((dzp_working_mode & (ACE_WRITE_DATA|ACE_EXECUTE)) == 0)
-		goto sticky;
+		return (zfs_sticky_remove_access(dzp, zp, cr));
 
 	/*
 	 * Fourth Row
@@ -1525,18 +1558,9 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 
 	if (((dzp_working_mode & (ACE_WRITE_DATA|ACE_EXECUTE)) != 0) &&
 	    ((zp_working_mode & ACE_DELETE) == 0))
-		goto sticky;
+		return (zfs_sticky_remove_access(dzp, zp, cr));
 
-	error = secpolicy_vnode_access(cr, ZTOV(zp),
-	    dzp->z_phys->zp_uid, S_IWRITE|S_IEXEC);
-
-	if (error)
-		return (error);
-
-sticky:
-	error = zfs_sticky_remove_access(dzp, zp, cr);
-
-	return (error);
+	return (zfs_delete_final_check(zp, dzp, cr));
 }
 
 int
