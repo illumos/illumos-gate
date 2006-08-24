@@ -24,7 +24,6 @@ extern	struct frentry	*ipfilter[2][2];
 extern	struct ipread	snoop, etherf, tcpd, pcap, iptext, iphex;
 extern	struct ifnet	*get_unit __P((char *, int));
 extern	void	init_ifp __P((void));
-extern	ipnat_t	*natparse __P((char *, int));
 extern	int	fr_running;
 
 ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;

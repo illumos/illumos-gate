@@ -44,7 +44,7 @@ extern	int	yylineNum;
 
 static	void	newrule __P((void));
 static	void	setipftype __P((void));
-static	u_32_t	lookuphost __P((char *));
+static	u_32_t	lookuphost __P((char *, i6addr_t *));
 static	void	dobpf __P((int, char *));
 static	void	resetaddr __P((void));
 static	struct	alist_s	*newalist __P((struct alist_s *));
@@ -106,8 +106,8 @@ static  int             set_ipv6_addr = 0;
 %type	<num>	facility priority icmpcode seclevel secname icmptype
 %type	<num>	opt compare range opttype flagset optlist ipv6hdrlist ipv6hdr
 %type	<num>	portc porteq
-%type	<ipa>	hostname ipv4 ipv4mask ipv4_16 ipv4_24
-%type	<ip6>	ipv6mask
+%type	<ipa>	ipv4 ipv4_16 ipv4_24
+%type	<ip6>	hostname mask
 %type	<ipp>	addr ipaddr
 %type	<str>	servicename name interfacename
 %type	<pc>	portrange portcomp
@@ -586,7 +586,10 @@ dup:	IPFY_DUPTO name
 	}
 	| IPFY_DUPTO name duptoseparator hostname
 	{ strncpy(fr->fr_dif.fd_ifname, $2, sizeof(fr->fr_dif.fd_ifname));
-	  fr->fr_dif.fd_ip = $4;
+	  if (use_inet6 == 0)
+		fr->fr_dif.fd_ip = $4.in4;
+	  else
+	  	bcopy(&$4, &fr->fr_dif.fd_ip6, sizeof(fr->fr_dif.fd_ip6));
 	  yyexpectaddr = 0;
 	  free($2);
 	}
@@ -611,7 +614,10 @@ proute:	routeto name
 	}
 	| routeto name duptoseparator hostname
 	{ strncpy(fr->fr_tif.fd_ifname, $2, sizeof(fr->fr_tif.fd_ifname));
-	  fr->fr_tif.fd_ip = $4;
+	  if (use_inet6 == 0)
+		fr->fr_tif.fd_ip = $4.in4;
+	  else
+	  	bcopy(&$4, &fr->fr_tif.fd_ip6, sizeof(fr->fr_tif.fd_ip6));
 	  yyexpectaddr = 0;
 	  free($2);
 	}
@@ -635,7 +641,17 @@ replyto:
 	}
 	| IPFY_REPLY_TO name duptoseparator hostname
 	{ strncpy(fr->fr_rif.fd_ifname, $2, sizeof(fr->fr_rif.fd_ifname));
-	  fr->fr_rif.fd_ip = $4;
+	  if (use_inet6 == 0)
+		fr->fr_rif.fd_ip = $4.in4;
+	  else
+		bcopy(&$4, &fr->fr_rif.fd_ip6, sizeof(fr->fr_rif.fd_ip6));
+	  yyexpectaddr = 0;
+	  free($2);
+	}
+	| IPFY_REPLY_TO name duptoseparator YY_IPV6
+	{ strncpy(fr->fr_rif.fd_ifname, $2, sizeof(fr->fr_rif.fd_ifname));
+	  bcopy(&$4, &fr->fr_rif.fd_ip6, sizeof(fr->fr_rif.fd_ip6));
+	  yyexpectaddr = 0;
 	  free($2);
 	}
 	;
@@ -914,14 +930,29 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  yyresetdict();
 					  yyexpectaddr = 0; }
-	| hostname			{ $$.a.in4 = $1;
-					  $$.m.in4_addr = 0xffffffff;
+	| hostname                      { if (use_inet6 == 0) { 
+						$$.a.in4 = $1.in4; 
+						$$.m.in4_addr = 0xffffffff;
+					  } else {
+						set_ipv6_addr = 1;
+						bcopy(&$1, &$$.a, sizeof($$.a));
+						fill6bits(128, (u_32_t *)&$$.m);
+					  }
 					  yyexpectaddr = 0; }
-	| hostname			{ yyresetdict();
-					  $$.a.in4_addr = $1.s_addr; }
-		maskspace		{ yysetdict(maskwords); }
-		ipv4mask		{ $$.m.in4_addr = $5.s_addr;
-					  $$.a.in4_addr &= $5.s_addr;
+	| hostname                      { yyresetdict();
+					  if (use_inet6 == 0) 
+						$$.a.in4 = $1.in4; 
+					  else { 
+						set_ipv6_addr = 1; 
+						bcopy(&$1, &$$.a, sizeof($$.a)); 
+					  } 
+					} 
+		maskspace               { yysetdict(maskwords); }
+		mask                    { if (use_inet6 == 0) { 
+						$$.m.in4_addr = $5.in4.s_addr; 
+						$$.a.in4_addr &= $5.in4.s_addr; 
+					  } else 
+						bcopy(&$5, &$$.m, sizeof($$.m)); 
 					  yyresetdict();
 					  yyexpectaddr = 0; }
 	| YY_IPV6			{ set_ipv6_addr = 1;
@@ -932,8 +963,8 @@ ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 	| YY_IPV6			{ set_ipv6_addr = 1;
 					  yyresetdict();
 					  bcopy(&$1, &$$.a, sizeof($$.a)); }
-		maskspace		{ yysetdict(maskwords); }
-		ipv6mask		{ bcopy(&$5, &$$.m, sizeof($$.m));
+		maskspace               { yysetdict(maskwords); }
+		mask                    { bcopy(&$5, &$$.m, sizeof($$.m)); 
 					  yyresetdict();
 					  yyexpectaddr = 0; }
 	;
@@ -943,81 +974,55 @@ maskspace:
 	| IPFY_MASK
 	;
 
-ipv4mask:
-	ipv4				{ $$ = $1; }
-	| YY_HEX			{ $$.s_addr = htonl($1); }
-	| YY_NUMBER			{ if (($1 >= 0) && ($1 <= 32)) {
-						ntomask(4, $1, (u_32_t *)&$$);
-					  } else
-						yyerror("invalid mask");
+mask:
+	ipv4				{ $$.in4 = $1; }
+	| YY_HEX			{ $$.in4.s_addr = htonl($1); }
+	| YY_NUMBER                     { if ((use_inet6 == 0) && ($1 <= 32)) 
+						ntomask(4, $1, (u_32_t *)&$$.in4); 
+					  else if ((use_inet6 != 0) && ($1 <= 128)) 
+						ntomask(6, $1, $$.i6); 
+					  else { 
+						yyerror("Bad value specified for netmask"); 
+						return 0; 
+					  }
 					}
 	| IPFY_BROADCAST		{ if (ifpflag == FRI_DYNAMIC) {
-						$$.s_addr = 0;
+						bzero(&$$, sizeof($$));
 						ifpflag = FRI_BROADCAST;
 					  } else
 						YYERROR;
 					}
 	| IPFY_NETWORK			{ if (ifpflag == FRI_DYNAMIC) {
-						$$.s_addr = 0;
+						bzero(&$$, sizeof($$));
 						ifpflag = FRI_NETWORK;
 					  } else
 						YYERROR;
 					}
 	| IPFY_NETMASKED		{ if (ifpflag == FRI_DYNAMIC) {
-						$$.s_addr = 0;
+						bzero(&$$, sizeof($$));
 						ifpflag = FRI_NETMASKED;
 					  } else
 						YYERROR;
 					}
 	| IPFY_PEER			{ if (ifpflag == FRI_DYNAMIC) {
-						$$.s_addr = 0;
+						bzero(&$$, sizeof($$));
 						ifpflag = FRI_PEERADDR;
 					  } else
 						YYERROR;
 					}
 	;
 
-ipv6mask:
-	YY_NUMBER			{ if (($1 >= 0) && ($1 <= 128)) {
-						ntomask(6, $1, $$.i6);
-					  } else
-						yyerror("invalid mask");
-					}
-	| IPFY_BROADCAST		{ if (ifpflag == FRI_DYNAMIC) {
-						bzero(&$$, sizeof($$));
-						ifpflag = FRI_BROADCAST;
-					  } else
-						YYERROR;
-					}
-	| IPFY_NETWORK			{ if (ifpflag == FRI_DYNAMIC) {
-						bzero(&$$, sizeof($$));
-						ifpflag = FRI_BROADCAST;
-					  } else
-						YYERROR;
-					}
-	| IPFY_NETMASKED		{ if (ifpflag == FRI_DYNAMIC) {
-						bzero(&$$, sizeof($$));
-						ifpflag = FRI_BROADCAST;
-					  } else
-						YYERROR;
-					}
-	| IPFY_PEER			{ if (ifpflag == FRI_DYNAMIC) {
-						bzero(&$$, sizeof($$));
-						ifpflag = FRI_BROADCAST;
-					  } else
-						YYERROR;
-					}
-	;
-
 hostname:
-	ipv4				{ $$ = $1; }
-	| YY_NUMBER			{ $$.s_addr = $1; }
-	| YY_HEX			{ $$.s_addr = $1; }
-	| YY_STR			{ $$.s_addr = lookuphost($1);
-					  free($1);
-					  if ($$.s_addr == 0 &&
-						ifpflag != FRI_DYNAMIC)
-						yyerror("Unknown hostname");
+	ipv4				{ $$.in4 = $1; }
+	| YY_NUMBER			{ $$.in4.s_addr = $1; }
+	| YY_HEX			{ $$.in4.s_addr = $1; }
+	| YY_STR                        { if (lookuphost($1, &$$) == 1) 
+						free($1);
+					  else { 
+						free($1); 
+						if (ifpflag != FRI_DYNAMIC) 
+							yyerror("Unknown hostname");
+					  }
 					}
 	;
 
@@ -1922,10 +1927,10 @@ static frentry_t *addrule()
 }
 
 
-static u_32_t lookuphost(name)
+static u_32_t lookuphost(name, addr)
 char *name;
+i6addr_t *addr;
 {
-	u_32_t addr;
 	int i;
 
 	hashed = 0;
@@ -1941,11 +1946,11 @@ char *name;
 		}
 	}
 
-	if (gethost(name, &addr) == -1) {
+	if (gethost(name, addr, use_inet6) == -1) {
 		fprintf(stderr, "unknown name \"%s\"\n", name);
 		return 0;
 	}
-	return addr;
+	return 1;
 }
 
 

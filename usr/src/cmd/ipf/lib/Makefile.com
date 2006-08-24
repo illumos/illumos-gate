@@ -15,14 +15,14 @@ OBJECTS=	addicmp.o addipopt.o bcopywrap.o \
 		count4bits.o debug.o extras.o facpri.o flags.o \
 		fill6bits.o genmask.o gethost.o getifname.o \
 		getline.o getnattype.o getport.o getportproto.o \
-		getproto.o getsumd.o hostmask.o hostname.o \
-		hostnum.o icmpcode.o inet_addr.o initparse.o \
+		getproto.o getsumd.o hostname.o \
+		icmpcode.o inet_addr.o initparse.o \
 		ionames.o v6ionames.o ipoptsec.o ipf_dotuning.o \
 		ipft_ef.o ipft_hx.o ipft_pc.o ipft_sn.o ipft_td.o \
 		ipft_tx.o kmem.o kmemcpywrap.o kvatoname.o \
 		load_hash.o load_pool.o load_hashnode.o \
 		load_poolnode.o loglevel.o mutex_emul.o nametokva.o \
-		natparse.o ntomask.o optname.o optprint.o \
+		nat_setgroupmap.o ntomask.o optname.o optprint.o \
 		optprintv6.o optvalue.o \
 		portname.o portnum.o ports.o print_toif.o \
 		printactivenat.o printaps.o printbuf.o printhash.o \
@@ -34,7 +34,7 @@ OBJECTS=	addicmp.o addipopt.o bcopywrap.o \
 		printsbuf.o printstate.o printtunable.o ratoi.o \
 		remove_pool.o remove_poolnode.o remove_hash.o \
 		remove_hashnode.o resetlexer.o rwlock_emul.o \
-		tcpflags.o to_interface.o var.o verbose.o \
+		tcpflags.o var.o verbose.o \
 		v6ionames.o v6optvalue.o
 
 include $(SRC)/lib/Makefile.lib

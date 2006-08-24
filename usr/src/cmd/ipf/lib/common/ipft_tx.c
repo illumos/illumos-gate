@@ -3,8 +3,12 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * $Id: ipft_tx.c,v 1.15.2.3 2005/06/18 02:41:34 darrenr Exp $
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipft_tx.c	1.7 6/5/96 (C) 1993 Darren Reed";
 static const char rcsid[] = "@(#)$Id: ipft_tx.c,v 1.15.2.3 2005/06/18 02:41:34 darrenr Exp $";
@@ -49,7 +53,7 @@ static	u_32_t	tx_hostnum(host, resolved)
 char	*host;
 int	*resolved;
 {
-	u_32_t	ipa;
+	i6addr_t ipa;
 
 	*resolved = 0;
 	if (!strcasecmp("any", host))
@@ -57,12 +61,12 @@ int	*resolved;
 	if (ISDIGIT(*host))
 		return inet_addr(host);
 
-	if (gethost(host, &ipa) == -1) {
+	if (gethost(host, &ipa, 0) == -1) {
 		*resolved = -1;
 		fprintf(stderr, "can't resolve hostname: %s\n", host);
 		return 0;
 	}
-	return ipa;
+	return ipa.in4_addr;
 }
 
 

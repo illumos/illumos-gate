@@ -359,7 +359,7 @@ ipaddr:	ipv4			{ $$ = $1; }
 	| YY_IPV6		{ set_ipv6_addr = 1;
 				  bcopy(&$1, &$$, sizeof($$));
 				  yyexpectaddr = 0; }
-	| YY_STR		{ if (gethost($1, &($$.in4.s_addr)) == -1)
+	| YY_STR		{ if (gethost($1, &$$, 0) == -1)
 					yyerror("Unknown hostname");
 				}
 	;

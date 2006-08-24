@@ -7,7 +7,8 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef  __FreeBSD__
 # ifndef __FreeBSD_cc_version
@@ -65,6 +66,7 @@ static	addfunc_t	nataddfunc = NULL;
 
 static	void	newnatrule __P((void));
 static	void	setnatproto __P((int));
+static  u_32_t  lookuphost __P((char *));
 
 %}
 %union	{
@@ -555,11 +557,10 @@ hexnumber:
 	;
 
 hostname:
-	YY_STR				{ if (gethost($1, &$$.s_addr) == -1)
-						fprintf(stderr,
-							"Unknown host '%s'\n",
-							$1);
+	YY_STR				{ $$.s_addr = lookuphost($1);
 					  free($1);
+					  if ($$.s_addr == 0)
+						yyerror("Unknown hostname");
 					}
 	| YY_NUMBER			{ $$.s_addr = htonl($1); }
 	| ipv4				{ $$.s_addr = $1.s_addr; }
@@ -836,4 +837,15 @@ void *ptr;
 			}
 		}
 	}
+}
+
+static u_32_t lookuphost(name)
+char *name;
+{
+	i6addr_t addr;
+
+	if (gethost(name, &addr, 0) == -1) {
+		return 0;
+	}
+	return addr.in4_addr;
 }
