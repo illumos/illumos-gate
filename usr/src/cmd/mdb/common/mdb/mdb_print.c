@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +66,7 @@ typedef struct printarg {
 	int pa_depth;			/* previous depth */
 	int pa_nest;			/* array nesting depth */
 	int pa_tab;			/* tabstop width */
+	uint_t pa_maxdepth;		/* Limit max depth */
 } printarg_t;
 
 #define	PA_SHOWTYPE	0x001		/* print type name */
@@ -76,8 +76,7 @@ typedef struct printarg {
 #define	PA_SHOWHOLES	0x010		/* print holes in structs */
 #define	PA_INTHEX	0x020		/* print integer values in hex */
 #define	PA_INTDEC	0x040		/* print integer values in decimal */
-#define	PA_PRETTY	0x080		/* pretty print when possible */
-#define	PA_NOSYMBOLIC	0x100		/* don't print ptrs as func+offset */
+#define	PA_NOSYMBOLIC	0x080		/* don't print ptrs as func+offset */
 
 #define	IS_CHAR(e) \
 	(((e).cte_format & (CTF_INT_CHAR | CTF_INT_SIGNED)) == \
@@ -754,8 +753,7 @@ print_int_val(const char *type, ctf_encoding_t *ep, ulong_t off,
 	/*
 	 * We pretty-print time_t values as a calendar date and time.
 	 */
-	if ((pap->pa_flags & PA_PRETTY) &&
-	    !(pap->pa_flags & (PA_INTHEX | PA_INTDEC)) &&
+	if (!(pap->pa_flags & (PA_INTHEX | PA_INTDEC)) &&
 	    strcmp(type, "time_t") == 0 && u.t != 0) {
 		mdb_printf("%Y", u.t);
 		return (0);
@@ -944,6 +942,11 @@ print_array(const char *type, const char *name, mdb_ctf_id_t id,
 	if (!(pap->pa_flags & PA_SHOWVAL))
 		return (0);
 
+	if (pap->pa_depth == pap->pa_maxdepth) {
+		mdb_printf("[ ... ]");
+		return (0);
+	}
+
 	/*
 	 * Determine the base type and size of the array's content.  If this
 	 * fails, we cannot print anything and just give up.
@@ -995,6 +998,7 @@ print_array(const char *type, const char *name, mdb_ctf_id_t id,
 	sou = IS_COMPOSITE(kind);
 
 	pa.pa_addr = addr;		/* set base address to start of array */
+	pa.pa_maxdepth = pa.pa_maxdepth - pa.pa_depth;
 	pa.pa_nest += pa.pa_depth + 1;	/* nesting level is current depth + 1 */
 	pa.pa_depth = 0;		/* reset depth to 0 for new scope */
 	pa.pa_prefix = NULL;
@@ -1052,7 +1056,10 @@ static int
 print_sou(const char *type, const char *name, mdb_ctf_id_t id,
     mdb_ctf_id_t base, ulong_t off, printarg_t *pap)
 {
-	mdb_printf("{");
+	if (pap->pa_depth == pap->pa_maxdepth)
+		mdb_printf("{ ... }");
+	else
+		mdb_printf("{");
 	pap->pa_delim = "\n";
 	return (0);
 }
@@ -1084,10 +1091,8 @@ print_enum(const char *type, const char *name, mdb_ctf_id_t id,
 	else
 		mdb_printf("%#d", value);
 
-	if (pap->pa_flags & PA_PRETTY) {
-		ename = mdb_ctf_enum_name(base, value);
-		mdb_printf(" (%s)", (ename != NULL)? ename : "???");
-	}
+	ename = mdb_ctf_enum_name(base, value);
+	mdb_printf(" (%s)", (ename != NULL)? ename : "???");
 
 	return (0);
 }
@@ -1156,7 +1161,7 @@ print_hole(printarg_t *pap, int depth, ulong_t off, ulong_t endoff)
 		mdb_printf("%*s", (depth + pap->pa_nest) * pap->pa_tab, "");
 
 	if (pap->pa_flags & PA_SHOWADDR) {
-		if (off % NBBY == 0 || !(pap->pa_flags & PA_PRETTY))
+		if (off % NBBY == 0)
 			mdb_printf("%llx ", pap->pa_addr + off / NBBY);
 		else
 			mdb_printf("%llx.%lx ",
@@ -1237,6 +1242,9 @@ elt_print(const char *name, mdb_ctf_id_t id, ulong_t off, int depth, void *data)
 	for (d = pap->pa_depth - 1; d >= depth; d--)
 		print_close_sou(pap, d);
 
+	if (depth > pap->pa_maxdepth)
+		return (0);
+
 	if (mdb_ctf_type_resolve(id, &base) == -1 ||
 	    (kind = mdb_ctf_type_kind(base)) == -1)
 		return (-1); /* errno is set for us */
@@ -1298,7 +1306,7 @@ elt_print(const char *name, mdb_ctf_id_t id, ulong_t off, int depth, void *data)
 
 	if (depth != 0) {
 		if (pap->pa_flags & PA_SHOWADDR) {
-			if (off % NBBY == 0 || !(pap->pa_flags & PA_PRETTY))
+			if (off % NBBY == 0)
 				mdb_printf("%llx ", pap->pa_addr + off / NBBY);
 			else
 				mdb_printf("%llx.%lx ",
@@ -1341,9 +1349,9 @@ elt_print(const char *name, mdb_ctf_id_t id, ulong_t off, int depth, void *data)
 		}
 
 		mdb_printf("%s ", pap->pa_flags & PA_SHOWVAL ? " =" : "");
-	} else if (IS_SCALAR(kind)) {
+	} else if (IS_SCALAR(kind) || pap->pa_maxdepth == 0) {
 		if (pap->pa_flags & PA_SHOWADDR) {
-			if (off % NBBY == 0 || !(pap->pa_flags & PA_PRETTY))
+			if (off % NBBY == 0)
 				mdb_printf("%llx ", pap->pa_addr + off / NBBY);
 			else
 				mdb_printf("%llx.%lx ",
@@ -1399,6 +1407,113 @@ elt_print(const char *name, mdb_ctf_id_t id, ulong_t off, int depth, void *data)
 		mdb_iob_puts(mdb.m_out, pap->pa_delim);
 
 	return (rc);
+}
+
+/*
+ * Special semantics for pipelines.
+ */
+static int
+pipe_print(mdb_ctf_id_t id, ulong_t off, void *data)
+{
+	printarg_t *pap = data;
+	ssize_t size;
+	static const char *const fsp[] = { "%#r", "%#r", "%#r", "%#llr" };
+	uintptr_t value;
+	uintptr_t addr = pap->pa_addr + off / NBBY;
+	mdb_ctf_id_t base;
+	ctf_encoding_t e;
+
+	union {
+		uint64_t i8;
+		uint32_t i4;
+		uint16_t i2;
+		uint8_t i1;
+	} u;
+
+	if (mdb_ctf_type_resolve(id, &base) == -1) {
+		mdb_warn("could not resolve type\n");
+		return (-1);
+	}
+
+	/*
+	 * If the user gives -a, then always print out the address of the
+	 * member.
+	 */
+	if ((pap->pa_flags & PA_SHOWADDR)) {
+		mdb_printf("%#lr\n", addr);
+		return (0);
+	}
+
+again:
+	switch (mdb_ctf_type_kind(base)) {
+	case CTF_K_POINTER:
+		if (mdb_tgt_aread(pap->pa_tgt, pap->pa_as,
+		    &value, sizeof (value), addr) != sizeof (value)) {
+			mdb_warn("failed to read pointer at %p", addr);
+			return (-1);
+		}
+		mdb_printf("%#lr\n", value);
+		break;
+
+	case CTF_K_INTEGER:
+	case CTF_K_ENUM:
+		if (mdb_ctf_type_encoding(base, &e) != 0) {
+			mdb_printf("could not get type encoding\n");
+			return (-1);
+		}
+
+		/*
+		 * For immediate values, we just print out the value.
+		 */
+		size = e.cte_bits / NBBY;
+		if (size > 8 || (e.cte_bits % NBBY) != 0 ||
+		    (size & (size - 1)) != 0) {
+			return (print_bitfield(off, pap, &e));
+		}
+
+		if (mdb_tgt_aread(pap->pa_tgt, pap->pa_as, &u.i8, size,
+		    addr) != size) {
+			mdb_warn("failed to read %lu bytes at %p",
+			    (ulong_t)size, pap->pa_addr);
+			return (-1);
+		}
+
+		switch (size) {
+		case sizeof (uint8_t):
+			mdb_printf(fsp[0], u.i1);
+			break;
+		case sizeof (uint16_t):
+			mdb_printf(fsp[1], u.i2);
+			break;
+		case sizeof (uint32_t):
+			mdb_printf(fsp[2], u.i4);
+			break;
+		case sizeof (uint64_t):
+			mdb_printf(fsp[3], u.i8);
+			break;
+		}
+		mdb_printf("\n");
+		break;
+
+	case CTF_K_FUNCTION:
+	case CTF_K_FLOAT:
+	case CTF_K_ARRAY:
+	case CTF_K_UNKNOWN:
+	case CTF_K_STRUCT:
+	case CTF_K_UNION:
+	case CTF_K_FORWARD:
+		/*
+		 * For these types, always print the address of the member
+		 */
+		mdb_printf("%#lr\n", addr);
+		break;
+
+	default:
+		mdb_warn("unknown type %d", mdb_ctf_type_kind(base));
+		break;
+	}
+
+	return (0);
 }
 
 static int
@@ -1649,6 +1764,7 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uintptr_t opt_c = MDB_ARR_NOLIMIT, opt_l = MDB_ARR_NOLIMIT;
 	uint_t opt_C = FALSE, opt_L = FALSE, opt_p = FALSE, opt_i = FALSE;
+	uintptr_t opt_s = (uintptr_t)-1ul;
 	int uflags = (flags & DCMD_ADDRSPEC) ? PA_SHOWVAL : 0;
 	mdb_ctf_id_t id;
 	int err = DCMD_OK;
@@ -1674,15 +1790,13 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'c', MDB_OPT_UINTPTR, &opt_c,
 	    'l', MDB_OPT_UINTPTR, &opt_l,
 	    'i', MDB_OPT_SETBITS, TRUE, &opt_i,
+	    's', MDB_OPT_UINTPTR, &opt_s,
 	    NULL);
 
 	if (uflags & PA_INTHEX)
 		uflags &= ~PA_INTDEC;	/* -x and -d are mutually exclusive */
 
-	if (flags & DCMD_PIPE_OUT)
-		uflags &= ~(PA_SHOWADDR | PA_SHOWTYPE);
-	else
-		uflags |= PA_SHOWNAME | PA_PRETTY;
+	uflags |= PA_SHOWNAME;
 
 	if (opt_p && opt_i) {
 		mdb_warn("-p and -i options are incompatible\n");
@@ -1746,6 +1860,7 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	pa.pa_holes = NULL;
 	pa.pa_nholes = 0;
 	pa.pa_depth = 0;
+	pa.pa_maxdepth = opt_s;
 
 	if ((flags & DCMD_ADDRSPEC) && !opt_i)
 		pa.pa_addr = opt_p ? mdb_get_dot() : addr;
@@ -1835,7 +1950,13 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			}
 
 			off %= NBBY;
-			if (off != 0) {
+			if (flags & DCMD_PIPE_OUT) {
+				if (pipe_print(mid, off, &pa) != 0) {
+					mdb_warn("failed to print type");
+					err = DCMD_ERR;
+					goto out;
+				}
+			} else if (off != 0) {
 				if (elt_print("", mid, off, 0, &pa) != 0) {
 					mdb_warn("failed to print type");
 					err = DCMD_ERR;
@@ -1860,6 +1981,12 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			pa.pa_delim = "\n";
 		}
 
+	} else if (flags & DCMD_PIPE_OUT) {
+		if (pipe_print(id, 0, &pa) != 0) {
+			mdb_warn("failed to print type");
+			err = DCMD_ERR;
+			goto out;
+		}
 	} else {
 		if (mdb_ctf_type_visit(id, elt_print, &pa) == -1) {
 			mdb_warn("failed to print type");
@@ -1894,6 +2021,7 @@ print_help(void)
 	    "-t         show type of object\n"
 	    "-i         interpret address as data of the given type\n"
 	    "-x         output values in hexadecimal\n"
+	    "-s depth   limit the recursion depth\n"
 	    "\n"
 	    "type may be omitted if the C type of addr can be inferred.\n"
 	    "\n"
