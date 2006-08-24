@@ -227,6 +227,17 @@ static const char *add_cmds[] = {
 	NULL
 };
 
+static const char *remove_cmds[] = {
+	"remove fs ",
+	"remove inherit-pkg-dir ",
+	"remove net ",
+	"remove device ",
+	"remove rctl ",
+	"remove attr ",
+	"remove dataset ",
+	NULL
+};
+
 static const char *select_cmds[] = {
 	"select fs ",
 	"select inherit-pkg-dir ",
@@ -245,6 +256,23 @@ static const char *set_cmds[] = {
 	"set pool=",
 	"set limitpriv=",
 	"set bootargs=",
+	NULL
+};
+
+static const char *info_cmds[] = {
+	"info fs ",
+	"info inherit-pkg-dir ",
+	"info net ",
+	"info device ",
+	"info rctl ",
+	"info attr ",
+	"info dataset ",
+	"info zonename",
+	"info zonepath",
+	"info autoboot",
+	"info pool",
+	"info limitpriv",
+	"info bootargs",
 	NULL
 };
 
@@ -432,6 +460,10 @@ CPL_MATCH_FN(cmd_cpl_fn)
 			return (add_stuff(cpl, line, select_cmds, word_end));
 		if (strncmp(line, "set ", MAX(MIN(word_end, 4), 3)) == 0)
 			return (add_stuff(cpl, line, set_cmds, word_end));
+		if (strncmp(line, "remove ", MAX(MIN(word_end, 7), 1)) == 0)
+			return (add_stuff(cpl, line, remove_cmds, word_end));
+		if (strncmp(line, "info ", MAX(MIN(word_end, 5), 1)) == 0)
+			return (add_stuff(cpl, line, info_cmds, word_end));
 		return (add_stuff(cpl, line, global_scope_cmds, word_end));
 	}
 	switch (resource_scope) {
@@ -882,10 +914,12 @@ usage(bool verbose, uint_t flags)
 		    gettext("<hostname> := [A-Za-z0-9][A-Za-z0-9-.]*\n"));
 	}
 	if (flags & HELP_RESOURCES) {
-		(void) fprintf(fp, "<%s> := %s | %s | %s | %s | %s | %s\n\n",
+		(void) fprintf(fp, "<%s> := %s | %s | %s | %s | %s | %s |\n\t"
+		    "%s\n\n",
 		    gettext("resource type"), rt_to_str(RT_FS),
 		    rt_to_str(RT_IPD), rt_to_str(RT_NET), rt_to_str(RT_DEVICE),
-		    rt_to_str(RT_RCTL), rt_to_str(RT_ATTR));
+		    rt_to_str(RT_RCTL), rt_to_str(RT_ATTR),
+		    rt_to_str(RT_DATASET));
 	}
 	if (flags & HELP_PROPS) {
 		(void) fprintf(fp, gettext("For resource type ... there are "

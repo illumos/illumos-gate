@@ -67,10 +67,12 @@ case "$1" in
 	egrep -vs '^#|^global:' /etc/zones/index || exit 0  # no local zones
 	[ "`zoneadm list`" = "global" ] && exit 0   # no zones running
 
-	MAXSHUT=60      # maximum time we'll wait for all zones to shutdown
-	MAXHALT=30      # maximum time we'll wait for all zones to halt
+	SVC_TIMEOUT=`svcprop -p stop/timeout_seconds $SMF_FMRI`
 
-	echo "Shutting down running zones:\c"
+	MAXSHUT=`expr 3 \* $SVC_TIMEOUT \/ 4` # 3/4 of time to zone shutdown
+	MAXHALT=`expr $SVC_TIMEOUT \/ 4`      # rest of time goes to halt
+
+	echo "Shutting down running zones (for up to $MAXSHUT seconds):\c"
 
 	# First, try letting them run their shutdown scripts.
 
@@ -97,7 +99,8 @@ case "$1" in
 	for zone in `zoneadm list`; do
 		if [ "$zone" != "global" ]; then
 			[ -z "$WAITPIDS" ] &&
-			    echo "Zones failed to shutdown; trying to halt:\c"
+			    echo "Zones failed to shutdown; trying to halt " \
+			    "(for up to $MAXHALT seconds):\c"
 			echo " $zone\c"
 			zoneadm -z $zone halt &
 			WAITPIDS="$WAITPIDS $!"
