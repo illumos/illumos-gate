@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,16 +74,13 @@ static	void	rehash(Array *);
 void
 syminit(void)
 {
-	Cell	*p;
+	init_buf(&record, &record_size, LINE_INCR);
 
-	init_buf(&recdata, &record_size, LINE_INCR);
-	record = recdata;
-
-	p = getfld(0);
 	/* initialize $0 */
-	p->nval = (uchar*) "$0";
-	p->sval = recdata;
-	p->tval = REC|STR|DONTFREE;
+	recloc = getfld(0);
+	recloc->nval = (uchar *)"$0";
+	recloc->sval = record;
+	recloc->tval = REC|STR|DONTFREE;
 
 	symtab = makesymtab(NSYMTAB);
 	(void) setsymtab((uchar *)"0", (uchar *)"0", 0.0,
@@ -93,7 +89,6 @@ syminit(void)
 	nullloc = setsymtab((uchar *)"$zero&null", (uchar *)"", 0.0,
 	    NUM|STR|CON|DONTFREE, symtab);
 	nullnode = valtonode(nullloc, CCON);
-	recloc = getfld(0);
 	FS = &setsymtab((uchar *)"FS", (uchar *)" ", 0.0,
 	    STR|DONTFREE, symtab)->sval;
 	RS = &setsymtab((uchar *)"RS", (uchar *)"\n", 0.0,

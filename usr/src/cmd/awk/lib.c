@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +33,6 @@
 #include "awk.h"
 #include "y.tab.h"
 
-uchar	*recdata;
 uchar	*record;
 size_t	record_size;
 
@@ -124,7 +122,7 @@ getrec(uchar **bufp, size_t *bufsizep)
 		free(nbuf);
 
 		if (c != 0 || buf[0] != '\0') {	/* normal record */
-			if (buf == record) {
+			if (bufp == &record) {
 				if (!(recloc->tval & DONTFREE))
 					xfree(recloc->sval);
 				recloc->sval = record;
@@ -466,34 +464,28 @@ recbld(void)
 	int i;
 	uchar *p;
 	size_t cnt, len, olen;
-	static uchar *rec;
-	size_t osize, nsize;
 
 	if (donerec == 1)
 		return;
-	/* sync up rec size */
-	adjust_buf(&rec, record_size);
 	cnt = 0;
 	olen = strlen((char *)*OFS);
 	for (i = 1; i <= *NF; i++) {
 		p = getsval(getfld(i));
 		len = strlen((char *)p);
-		osize = record_size;
-		nsize = cnt + len + olen;
-		expand_buf(&rec, &record_size, nsize);
-		if (osize != record_size)
-			adjust_buf(&recdata, record_size);
-		(void) memcpy(&rec[cnt], p, len);
+		expand_buf(&record, &record_size, cnt + len + olen);
+		(void) memcpy(&record[cnt], p, len);
 		cnt += len;
 		if (i < *NF) {
-			(void) memcpy(&rec[cnt], *OFS, olen);
+			(void) memcpy(&record[cnt], *OFS, olen);
 			cnt += olen;
 		}
 	}
-	rec[cnt] = '\0';
+	record[cnt] = '\0';
 	dprintf(("in recbld FS=%o, recloc=%p\n", **FS, (void *)recloc));
+	if (!(recloc->tval & DONTFREE))
+		xfree(recloc->sval);
 	recloc->tval = REC | STR | DONTFREE;
-	recloc->sval = record = rec;
+	recloc->sval = record;
 	dprintf(("in recbld FS=%o, recloc=%p\n", **FS, (void *)recloc));
 	dprintf(("recbld = |%s|\n", record));
 	donerec = 1;
