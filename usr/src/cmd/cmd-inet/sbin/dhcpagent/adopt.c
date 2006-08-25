@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ADOPTING state of the client state machine.
@@ -32,6 +31,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <sys/sockio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -128,21 +128,12 @@ dhcp_adopt(void)
 	ifsp->if_dflags |= DHCP_IF_PRIMARY;
 
 	/*
-	 * move to BOUND and use the information in our ACK packet
+	 * move to BOUND and use the information in our ACK packet.
+	 * adoption will continue after DAD via dhcp_adopt_complete.
 	 */
 
 	if (dhcp_bound(ifsp, plp) == 0) {
 		dhcpmsg(MSG_CRIT, "dhcp_adopt: cannot use cached packet");
-		goto failure;
-	}
-
-	if (async_start(ifsp, DHCP_EXTEND, B_FALSE) == 0) {
-		dhcpmsg(MSG_CRIT, "dhcp_adopt: async_start failed");
-		goto failure;
-	}
-
-	if (dhcp_extending(ifsp) == 0) {
-		dhcpmsg(MSG_CRIT, "dhcp_adopt: cannot send renew request");
 		goto failure;
 	}
 
@@ -155,6 +146,37 @@ failure:
 		free(plp->pkt);
 	free(plp);
 	return (0);
+}
+
+/*
+ * dhcp_adopt_complete(): completes interface adoption process after kernel
+ *			  duplicate address detection (DAD) is done.
+ *
+ *   input: struct ifslist *: the interface on which a lease is being adopted
+ *  output: none
+ */
+
+void
+dhcp_adopt_complete(struct ifslist *ifsp)
+{
+	dhcpmsg(MSG_DEBUG, "dhcp_adopt_complete: completing adoption");
+
+	if (async_start(ifsp, DHCP_EXTEND, B_FALSE) == 0) {
+		dhcpmsg(MSG_CRIT, "dhcp_adopt_complete: async_start failed");
+		return;
+	}
+
+	if (dhcp_extending(ifsp) == 0) {
+		dhcpmsg(MSG_CRIT,
+		    "dhcp_adopt_complete: cannot send renew request");
+		return;
+	}
+
+	if (grandparent != (pid_t)0) {
+		dhcpmsg(MSG_DEBUG, "adoption complete, signalling parent (%i)"
+		    " to exit.", grandparent);
+		(void) kill(grandparent, SIGALRM);
+	}
 }
 
 /*

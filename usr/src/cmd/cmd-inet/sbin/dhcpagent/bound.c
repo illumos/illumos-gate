@@ -120,9 +120,6 @@ dhcp_bound(struct ifslist *ifsp, PKT_LIST *ack)
 		(void) memcpy(ifsp->if_ack->opts[CD_LEASE_TIME]->value,
 		    &new_lease, sizeof (lease_t));
 
-		if (configure_bound(ifsp) == 0)
-			return (0);
-
 		/*
 		 * we have no idea when the REQUEST that generated
 		 * this ACK was sent, but for diagnostic purposes
@@ -130,15 +127,13 @@ dhcp_bound(struct ifslist *ifsp, PKT_LIST *ack)
 		 */
 		ifsp->if_newstart_monosec = monosec();
 
+		if (configure_if(ifsp) == 0)
+			return (0);
+
 		if (configure_timers(ifsp) == 0)
 			return (0);
 
-		/*
-		 * if the state is ADOPTING, event loop has not been started
-		 * at this time; so don't run the EVENT_BOUND script.
-		 */
 		ifsp->if_curstart_monosec = ifsp->if_newstart_monosec;
-		ifsp->if_state = BOUND;
 		break;
 
 	case REQUESTING:
@@ -238,10 +233,17 @@ dhcp_bound_complete(struct ifslist *ifsp)
 	if (configure_bound(ifsp) == 0)
 		return;
 
-	(void) script_start(ifsp, EVENT_BOUND, bound_event_cb, NULL, NULL);
+	/*
+	 * if the state is ADOPTING, event loop has not been started
+	 * at this time; so don't run the EVENT_BOUND script.
+	 */
+	if (ifsp->if_state != ADOPTING) {
+		(void) script_start(ifsp, EVENT_BOUND, bound_event_cb, NULL,
+		    NULL);
+	}
 
-	ifsp->if_state = BOUND;
 	ifsp->if_curstart_monosec = ifsp->if_newstart_monosec;
+	ifsp->if_state = BOUND;
 }
 
 /*

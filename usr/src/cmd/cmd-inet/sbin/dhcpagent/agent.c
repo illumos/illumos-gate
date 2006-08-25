@@ -264,25 +264,11 @@ main(int argc, char **argv)
 
 	/*
 	 * if the -a (adopt) option was specified, try to adopt the
-	 * kernel-managed interface before we start. Our grandparent
-	 * will be waiting for us to finish this, so signal him when
-	 * we're done.
+	 * kernel-managed interface before we start.
 	 */
 
-	if (do_adopt) {
-		int result;
-
-		result = dhcp_adopt();
-
-		if (grandparent != (pid_t)0) {
-			dhcpmsg(MSG_DEBUG, "adoption complete, signalling "
-			    "parent (%i) to exit.", grandparent);
-			(void) kill(grandparent, SIGALRM);
-		}
-
-		if (result == 0)
-			return (EXIT_FAILURE);
-	}
+	if (do_adopt && dhcp_adopt() == 0)
+		return (EXIT_FAILURE);
 
 	/*
 	 * enter the main event loop; this is where all the real work
@@ -939,6 +925,7 @@ rtsock_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 	struct lifreq lifr;
 	char *fail;
 	int msglen;
+	DHCPSTATE oldstate;
 
 	if ((msglen = read(fd, &msg, sizeof (msg))) <= 0)
 		return;
@@ -967,7 +954,9 @@ rtsock_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 		 * IFF_UP bit has been reported.  This means that DAD is
 		 * complete.
 		 */
-		if (ifs->if_sock_ip_fd == -1 && ifs->if_state != PRE_BOUND)
+		oldstate = ifs->if_state;
+		if (ifs->if_sock_ip_fd == -1 &&
+		    (oldstate != PRE_BOUND && oldstate != ADOPTING))
 			continue;
 
 		/*
@@ -980,7 +969,8 @@ rtsock_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 		(void) strlcpy(lifr.lifr_name, ifs->if_name,
 		    sizeof (lifr.lifr_name));
 		if (ioctl(ifs->if_sock_fd, SIOCGLIFFLAGS, &lifr) == -1) {
-			fail = "unable to retrieve interface flags";
+			fail = "unable to retrieve interface flags on %s";
+			lifr.lifr_flags = 0;
 		} else if (!check_rtm_addr(&msg.ifam, msglen, ifs->if_addr)) {
 			/*
 			 * If the message is not about this logical interface,
@@ -988,16 +978,19 @@ rtsock_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 			 */
 			continue;
 		} else if (lifr.lifr_flags & IFF_DUPLICATE) {
-			fail = "interface has duplicate address";
+			fail = "interface %s has duplicate address";
 		} else {
 			/*
 			 * If we're now up and we were waiting for that, then
 			 * kick off this interface.  DAD is done.
 			 */
-			if ((lifr.lifr_flags & IFF_UP) &&
-			    ifs->if_state == PRE_BOUND)
-				dhcp_bound_complete(ifs);
-
+			if (lifr.lifr_flags & IFF_UP) {
+				if (oldstate == PRE_BOUND ||
+				    oldstate == ADOPTING)
+					dhcp_bound_complete(ifs);
+				if (oldstate == ADOPTING)
+					dhcp_adopt_complete(ifs);
+			}
 			continue;
 		}
 
@@ -1005,7 +998,7 @@ rtsock_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 			(void) close(ifs->if_sock_ip_fd);
 			ifs->if_sock_ip_fd = -1;
 		}
-		dhcpmsg(MSG_ERROR, fail);
+		dhcpmsg(MSG_ERROR, fail, ifs->if_name);
 
 		/*
 		 * The binding has evidently failed, so it's as though it never
@@ -1013,10 +1006,14 @@ rtsock_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 		 * that send_pkt_internal() uses DLPI instead of sockets.  Our
 		 * logical interface has already been torn down by the kernel,
 		 * and thus we can't send DHCPDECLINE by way of regular IP.
+		 * (Unless we're adopting -- allow the grandparent to be
+		 * handled as expected.)
 		 */
-		ifs->if_state = PRE_BOUND;
+		if (oldstate != ADOPTING)
+			ifs->if_state = PRE_BOUND;
 
-		if (ifs->if_ack->opts[CD_DHCP_TYPE] != NULL)
+		if (ifs->if_ack->opts[CD_DHCP_TYPE] != NULL &&
+		    (lifr.lifr_flags & IFF_DUPLICATE))
 			send_decline(ifs, fail, &ifs->if_addr);
 
 		ifs->if_bad_offers++;

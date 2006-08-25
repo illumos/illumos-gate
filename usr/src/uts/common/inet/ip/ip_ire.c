@@ -577,8 +577,9 @@ ip_ire_advise(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
  * This function is associated with the IP_IOC_IRE_DELETE[_NO_REPLY]
  * IOCTL[s].  The NO_REPLY form is used by TCP to delete a route IRE
  * for a host that is not responding.  This will force an attempt to
- * establish a new route, if available.  Management processes may want
- * to use the version that generates a reply.
+ * establish a new route, if available, and flush out the ARP entry so
+ * it will re-resolve.  Management processes may want to use the
+ * version that generates a reply.
  *
  * This function does not support IPv6 since Neighbor Unreachability Detection
  * means that negative advise like this is useless.
@@ -594,6 +595,8 @@ ip_ire_delete(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	boolean_t	routing_sock_info = B_FALSE;	/* Sent info? */
 	zoneid_t	zoneid;
 	ire_t		*gire = NULL;
+	ill_t		*ill;
+	mblk_t		*arp_mp;
 
 	ASSERT(q->q_next == NULL);
 	zoneid = Q_TO_CONN(q)->conn_zoneid;
@@ -713,6 +716,18 @@ done:
 		    ire->ire_mask, ire->ire_src_addr, 0, 0, 0,
 		    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFA));
 		routing_sock_info = B_TRUE;
+
+		/*
+		 * TCP is really telling us to start over completely, and it
+		 * expects that we'll resend the ARP query.  Tell ARP to
+		 * discard the entry, if this is a local destination.
+		 */
+		ill = ire->ire_stq->q_ptr;
+		if (ire->ire_gateway_addr == 0 &&
+		    (arp_mp = ill_ared_alloc(ill, addr)) != NULL) {
+			putnext(ill->ill_rq, arp_mp);
+		}
+
 		ire_delete(ire);
 		ire_refrele(ire);
 	}

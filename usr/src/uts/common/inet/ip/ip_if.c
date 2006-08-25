@@ -684,6 +684,13 @@ ipif_ared_alloc(ipif_t *ipif)
 	    (char *)&ipif->ipif_lcl_addr));
 }
 
+mblk_t *
+ill_ared_alloc(ill_t *ill, ipaddr_t addr)
+{
+	return (ill_arp_alloc(ill, (uchar_t *)&ip_ared_template,
+	    (char *)&addr));
+}
+
 /*
  * Completely vaporize a lower level tap and all associated interfaces.
  * ill_delete is called only out of ip_close when the device control

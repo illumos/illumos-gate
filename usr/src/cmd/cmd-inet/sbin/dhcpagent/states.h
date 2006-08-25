@@ -47,6 +47,7 @@ extern "C" {
 
 void		dhcp_acknak(iu_eh_t *, int, short, iu_event_id_t, void *);
 int		dhcp_adopt(void);
+void		dhcp_adopt_complete(struct ifslist *);
 int		dhcp_bound(struct ifslist *, PKT_LIST *);
 void		dhcp_bound_complete(struct ifslist *);
 int		dhcp_drop(struct ifslist *, const char *);

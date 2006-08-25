@@ -156,6 +156,7 @@ extern	ill_t	*illgrp_scheduler(ill_t *);
 extern	mblk_t	*ill_arp_alloc(ill_t *, uchar_t *, caddr_t);
 extern	mblk_t	*ipif_area_alloc(ipif_t *);
 extern	mblk_t	*ipif_ared_alloc(ipif_t *);
+extern	mblk_t	*ill_ared_alloc(ill_t *, ipaddr_t);
 extern	void	ill_dlpi_done(ill_t *, t_uscalar_t);
 extern	void	ill_dlpi_send(ill_t *, mblk_t *);
 extern	mblk_t	*ill_dlur_gen(uchar_t *, uint_t, t_uscalar_t, t_scalar_t);
