@@ -52,13 +52,17 @@ struct svm_daemon {
 	char *svmd_kill_val;
 };
 
+/*
+ * This is a list of the daemons that are not stopped by the SVM smf(5)
+ * services. The mdmonitord is started via svc:/system/mdmonitor:default
+ * but no contract(4) is constructed and so it is not stopped by smf(5).
+ */
 struct svm_daemon svmd_kill_list[] = {
 		{"mdmonitord", "HUP"},
 		{"mddoors", "KILL"},
 	};
 
 #define	DAEMON_COUNT (sizeof (svmd_kill_list)/ sizeof (struct svm_daemon))
-#define	MDMONITORD	"/usr/sbin/mdmonitord"
 
 extern int procsigs(int block, sigset_t *oldsigs, md_error_t *ep);
 
@@ -1238,7 +1242,7 @@ meta_db_attach(
 	side_t			sideno;
 	daddr_t			blkno;
 	int			replicacount = 0;
-	int			start_mdmonitord = 0;
+	int			start_svmdaemons = 0;
 	int			rval = 0;
 	md_error_t		status = mdnullerror;
 	md_set_desc		*sd;
@@ -1284,9 +1288,9 @@ meta_db_attach(
 
 	assert(db_nlp != NULL);
 
-	/* if creating the metadbs for the first time start mdmonitord */
+	/* if these are the first replicas then the SVM daemons need to run */
 	if (c.c_dbcnt == 0)
-		start_mdmonitord = 1;
+		start_svmdaemons = 1;
 
 	/*
 	 * check to see if we will go over the total possible number
@@ -1571,11 +1575,7 @@ out:
 	if (metaislocalset(sp)) {
 
 		/* everything looks fine. Start mdmonitord */
-		/* Note: popen/pclose is the MT-safe replacement for system */
-		if (rval == 0 && start_mdmonitord  == 1) {
-			if (pclose(popen(MDMONITORD, "w")) == -1)
-				md_perror(MDMONITORD);
-
+		if (rval == 0 && start_svmdaemons == 1) {
 			if (meta_smf_enable(META_SMF_CORE, &status) == -1) {
 				mde_perror(&status, "");
 				mdclrerror(&status);
