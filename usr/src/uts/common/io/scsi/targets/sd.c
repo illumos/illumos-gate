@@ -20309,14 +20309,14 @@ sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp)
 		}
 		/* FALLTHRU */
 	default:
-		/* Ignore error if the media is not present */
-		if (sd_send_scsi_TEST_UNIT_READY(un, 0) != 0) {
-			status = 0;
-			goto done;
+		/*
+		 * Don't log an error message if this device
+		 * has removable media.
+		 */
+		if (!un->un_f_has_removable_media) {
+			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+			    "SYNCHRONIZE CACHE command failed (%d)\n", status);
 		}
-		/* If we reach this, we had an error */
-		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-		    "SYNCHRONIZE CACHE command failed (%d)\n", status);
 		break;
 	}
 
