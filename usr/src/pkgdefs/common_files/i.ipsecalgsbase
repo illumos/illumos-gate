@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,39 +20,39 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.	 All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.	 All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-
-target=${PKG_INSTALL_ROOT:-/}
-kcfconf=$target/etc/crypto/kcf.conf
- 
-if [ ! -f $kcfconf ]; then
-	# If there's no kcf.conf, then there's no ipsecalgs either.
-	ipsecalgs_reduce=0
-else
-	grep aes256 $kcfconf >/dev/null
-	if [ $? -eq 0 ]; then
-		ipsecalgs_reduce=0
-	else
-		ipsecalgs_reduce=1
-	fi
-fi
  
 while read src dest
 do
 	if [ ! -f $dest ] ; then
+		#
+		# new install or upgrade from much older OS revision
+		# just copy in the new base ipsecalgs file
+		#
 		cp $src $dest
 	else
-		sed -e 's/CKM_BF_CBC/CKM_BLOWFISH_CBC/' $dest > $dest.$$
+		#
+		# upgrade from a previous version of the ipsecalgs file
+		# There might be third party algorithms in this file and
+		# changes that need to be preserved, so we just substitute
+		# in the protocols and algorithms that we know we need to
+		# either update or revert from past mistakes.
+		#
+
+		#
+		# We construct the sed command like this to avoid
+		# lines greater than 80 characters
+		#
+		sedcmd="-e 's/CKM_BF_CBC/CKM_BLOWFISH_CBC/'"
+		sedcmd="${sedcmd} -e 's/CKM_BLOWFISH_CBC|128\/32-128,8/"
+		sedcmd="${sedcmd}CKM_BLOWFISH_CBC|128\/32-448,8/'"
+		sedcmd="${sedcmd} -e 's/AES_CBC|128|/AES_CBC|128\/128-256,64|/'"
+
+		eval sed $sedcmd $dest > $dest.$$
 		mv $dest.$$ $dest
-		if [ $ipsecalgs_reduce -eq 1 ]; then
-			sed -e 's/_CBC|128\/32-448,8/_CBC|128\/32-128,8/' \
-			    -e 's/AES_CBC|128\/128-256,64|/AES_CBC|128|/' \
-			    $dest > $dest.$$
-			mv $dest.$$ $dest
-		fi
-       fi
+	fi
 done
 exit 0

@@ -3328,6 +3328,10 @@ valid_algorithm(int proto_num, const char *str)
 	int ret;
 	struct ipsecalgent *alg;
 
+	/* Short-circuit "none" */
+	if (strncasecmp("none", str, 5) == 0)
+		return (-2);
+
 	alg = getipsecalgbyname(str, proto_num, NULL);
 	if (alg != NULL) {
 		ret = alg->a_alg_num;
@@ -3423,8 +3427,9 @@ parse_ipsec_alg(char *str, ips_act_props_t *iap, int alg_type)
 	} else {
 		alg_value = valid_algorithm(IPSEC_PROTO_ESP, tstr);
 	}
-	if (alg_value == -1) {
-		return (-1);
+	if (alg_value < 0) {
+		/* Invalid algorithm or "none" */
+		return (alg_value);
 	}
 
 	if (alg_type == SPD_ATTR_AH_AUTH) {
@@ -3446,7 +3451,7 @@ parse_ipsec_alg(char *str, ips_act_props_t *iap, int alg_type)
 	ap->alg_maxbits = l2;
 
 	if (!alg_rangecheck(a_type, alg_value, ap))
-		return (-1);
+		return (1);
 
 	return (0);
 }
@@ -4635,6 +4640,10 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 				ret = parse_ipsec_alg(
 				    act_props->ap[ap_num].prop[i],
 				    iap, SPD_ATTR_AH_AUTH);
+				if (ret == -2) {
+					/* "none" - ignore */
+					break;
+				}
 				if (ret != 0) {
 					error_message(BAD_ERROR,
 					    IPSEC_CONF_IPSEC_AALGS, line_no);
@@ -4663,6 +4672,10 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 				ret = parse_ipsec_alg(
 				    act_props->ap[ap_num].prop[i],
 				    iap, SPD_ATTR_ESP_ENCR);
+				if (ret == -2) {
+					/* "none" - ignore */
+					break;
+				}
 				if (ret != 0) {
 					error_message(BAD_ERROR,
 					    IPSEC_CONF_IPSEC_EALGS, line_no);
@@ -4692,6 +4705,10 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 				ret = parse_ipsec_alg(
 				    act_props->ap[ap_num].prop[i],
 				    iap, SPD_ATTR_ESP_AUTH);
+				if (ret == -2) {
+					/* "none" - ignore */
+					break;
+				}
 				if (ret != 0) {
 					error_message(BAD_ERROR,
 					    IPSEC_CONF_IPSEC_EAALGS, line_no);
