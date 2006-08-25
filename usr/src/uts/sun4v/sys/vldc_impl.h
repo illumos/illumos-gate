@@ -40,8 +40,7 @@ extern "C" {
 #include <sys/vldc.h>
 
 /* default values */
-#define	VLDC_DEFAULT_MTU	0x800	/* default mtu size */
-#define	VLDC_STREAM_MTU		0x1000	/* 4K */
+#define	VLDC_DEFAULT_MTU	0x1000	/* default mtu size 4K */
 
 /* VLDC limits */
 #define	VLDC_MAX_COOKIE		0x40000	/* max. size of xfer to/from HV */
