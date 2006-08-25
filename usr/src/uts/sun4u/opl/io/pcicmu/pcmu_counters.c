@@ -34,8 +34,6 @@
 #include <sys/machsystm.h>
 #include <sys/kstat.h>
 
-/*LINTLIBRARY*/
-
 static kstat_t *pcmu_create_picN_kstat(char *, int, int, int,
 	pcmu_kev_mask_t *);
 

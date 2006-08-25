@@ -46,8 +46,6 @@
 #include <sys/membar.h>
 #include <sys/ivintr.h>
 
-/*LINTLIBRARY*/
-
 static uint_t pcmu_pbm_error_intr(caddr_t a);
 
 /* The nexus interrupt priority values */

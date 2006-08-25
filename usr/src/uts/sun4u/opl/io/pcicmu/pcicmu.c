@@ -515,9 +515,6 @@ pcmu_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 }
 
-
-/*LINTLIBRARY*/
-
 /* ARGSUSED3 */
 static int
 pcmu_open(dev_t *devp, int flags, int otyp, cred_t *credp)

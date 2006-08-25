@@ -47,8 +47,6 @@
 #include <sys/pcicmu/pcicmu.h>
 #include <sys/promif.h>
 
-/*LINTLIBRARY*/
-
 /*
  * get_pcmu_properties
  *

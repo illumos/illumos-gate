@@ -37,8 +37,6 @@
 #include <sys/pcicmu/pcicmu.h>
 #include <sys/machsystm.h>
 
-/*LINTLIBRARY*/
-
 extern uint64_t	xc_tick_jump_limit;
 
 void

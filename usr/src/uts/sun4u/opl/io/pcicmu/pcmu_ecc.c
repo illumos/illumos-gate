@@ -45,8 +45,6 @@
 #include <sys/fm/io/ddi.h>
 #include <sys/pcicmu/pcicmu.h>
 
-/*LINTLIBRARY*/
-
 static void pcmu_ecc_disable(pcmu_ecc_t *, int);
 static uint64_t pcmu_ecc_read_afsr(pcmu_ecc_intr_info_t *);
 static void pcmu_ecc_ereport_post(dev_info_t *dip,
@@ -433,6 +431,7 @@ pcmu_ecc_err_handler(pcmu_ecc_errstate_t *ecc_err_p)
  * Function used to drain pcmu_ecc_queue, either during panic or after softint
  * is generated, to log IO detected ECC errors.
  */
+/* ARGSUSED */
 void
 pcmu_ecc_err_drain(void *not_used, pcmu_ecc_errstate_t *ecc_err)
 {

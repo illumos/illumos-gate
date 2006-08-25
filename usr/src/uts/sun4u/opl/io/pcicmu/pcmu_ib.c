@@ -39,7 +39,6 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/pcicmu/pcicmu.h>
 
-/*LINTLIBRARY*/
 static uint_t pcmu_ib_intr_reset(void *arg);
 
 extern uint64_t	xc_tick_jump_limit;
