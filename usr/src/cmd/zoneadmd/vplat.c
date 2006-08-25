@@ -108,6 +108,7 @@
 
 #include <libzonecfg.h>
 #include <synch.h>
+
 #include "zoneadmd.h"
 #include <tsol/label.h>
 #include <libtsnet.h>
@@ -1917,10 +1918,17 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 	(void) strlcpy(lifr.lifr_name, nwiftabptr->zone_nwif_physical,
 	    sizeof (lifr.lifr_name));
 	if (ioctl(s, SIOCLIFADDIF, (caddr_t)&lifr) < 0) {
-		zerror(zlogp, B_TRUE, "%s: could not add interface",
-		    lifr.lifr_name);
+		/*
+		 * Here, we know that the interface can't be brought up.
+		 * A similar warning message was already printed out to
+		 * the console by zoneadm(1M) so instead we log the
+		 * message to syslog and continue.
+		 */
+		zerror(&logsys, B_TRUE, "WARNING: skipping interface "
+		    "'%s' which may not be present/plumbed in the "
+		    "global zone.", lifr.lifr_name);
 		(void) close(s);
-		return (-1);
+		return (Z_OK);
 	}
 
 	if (ioctl(s, SIOCSLIFADDR, (caddr_t)&lifr) < 0) {
@@ -2094,22 +2102,33 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 		}
 		rlen = write(rs, (char *)&mcast_rtmsg,
 		    mcast_rtmsg.m_rtm.rtm_msglen);
+		/*
+		 * The write to the multicast socket will fail if the
+		 * interface belongs to a failed IPMP group. This is a
+		 * non-fatal error and the zone will continue booting.
+		 * While the zone is running, if any interface in the
+		 * failed IPMP group recovers, the zone will fallback to
+		 * using that interface.
+		 */
 		if (rlen < mcast_rtmsg.m_rtm.rtm_msglen) {
 			if (rlen < 0) {
-				zerror(zlogp, B_TRUE, "%s: could not set "
-				    "default interface for multicast",
-				    lifr.lifr_name);
+				zerror(zlogp, B_TRUE, "WARNING: interface "
+				    "'%s' not available as default for "
+				    "multicast.", lifr.lifr_name);
 			} else {
-				zerror(zlogp, B_FALSE, "%s: write to routing "
-				    "socket returned %d", lifr.lifr_name, rlen);
+				zerror(zlogp, B_FALSE, "WARNING: interface "
+				    "'%s' not available as default for "
+				    "multicast; routing socket returned "
+				    "unexpected %d bytes.",
+				    lifr.lifr_name, rlen);
 			}
-			(void) close(rs);
-			goto bad;
-		}
-		if (af == AF_INET) {
-			*mcast_rt_v4_setp = B_TRUE;
 		} else {
-			*mcast_rt_v6_setp = B_TRUE;
+
+			if (af == AF_INET) {
+				*mcast_rt_v4_setp = B_TRUE;
+			} else {
+				*mcast_rt_v6_setp = B_TRUE;
+			}
 		}
 		(void) close(rs);
 	}

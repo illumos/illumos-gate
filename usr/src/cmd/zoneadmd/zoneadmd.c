@@ -106,7 +106,7 @@ static char *progname;
 char *zone_name;	/* zone which we are managing */
 static zoneid_t zone_id;
 
-static zlog_t logsys;
+zlog_t logsys;
 
 mutex_t	lock = DEFAULTMUTEX;	/* to serialize stuff */
 mutex_t	msglock = DEFAULTMUTEX;	/* for calling setlocale() */

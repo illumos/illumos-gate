@@ -2503,10 +2503,18 @@ verify_handle(int cmd_num, zone_dochandle_t handle)
 			continue;
 		}
 		if (ioctl(so, SIOCGLIFFLAGS, &lifr) < 0) {
-			print_net_err(nwiftab.zone_nwif_physical,
-			    nwiftab.zone_nwif_address, af,
-			    strerror(errno));
-			return_code = Z_ERR;
+			/*
+			 * The interface failed to come up.  We continue on
+			 * anyway for the sake of consistency: a zone is not
+			 * shut down if the interface fails any time after
+			 * boot, nor does the global zone fail to boot if an
+			 * interface fails.
+			 */
+			(void) fprintf(stderr,
+			    gettext("WARNING: skipping interface '%s' which "
+			    "may not be present/plumbed in the global zone.\n"),
+			    nwiftab.zone_nwif_physical);
+
 		}
 		(void) close(so);
 	}

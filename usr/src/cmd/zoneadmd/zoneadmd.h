@@ -66,6 +66,8 @@ typedef struct zlog {
 	char *locale;	/* locale to use for gettext() */
 } zlog_t;
 
+extern zlog_t logsys;
+
 extern mutex_t lock;
 extern mutex_t msglock;
 extern boolean_t in_death_throes;
