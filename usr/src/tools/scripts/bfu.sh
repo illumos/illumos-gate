@@ -3768,13 +3768,17 @@ then
 			/etc/init.d/zones stop
 		elif [ -x /lib/svc/method/svc-zones ]; then
 			#
-			# Calling the zone service method directly is
-			# the most straightforward way to block until
-			# all zones are halted.  Finding a way that
-			# works once zones are made restartable is an
-			# exercise left to the reader.
+			# We need all zones to be down before proceeding.
+			# We can't accomplish this by just disabling the
+			# zones service, since it might already be disabled.
+			# So we pretend to be SMF, and invoke the stop method.
 			#
+			# When zones are someday independently managed as
+			# service instances, this will need to be revised.
+			#
+			export SMF_FMRI="svc:/system/zones:default"
 			/lib/svc/method/svc-zones stop
+			unset SMF_FMRI
 		fi
 
 		[ -z `zoneadm list | grep -v global` ] || \

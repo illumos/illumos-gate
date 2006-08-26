@@ -25,8 +25,14 @@
 
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+. /lib/svc/share/smf_include.sh
 
 [ ! -x /usr/sbin/zoneadm ] && exit 0	# SUNWzoneu not installed
+
+if [ -z "$SMF_FMRI" ]; then
+	echo "this script can only be invoked by smf(5)"	
+	exit $SMF_EXIT_ERR_NOSMF
+fi
 
 # Make sure working directory is / to prevent unmounting problems.
 cd /
