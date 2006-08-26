@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -52,6 +51,8 @@ struct pt_ttys {
 	kcondvar_t pt_cv;	/* condition variable for exclusive access */
 	kmutex_t pt_lock;	/* Per-element lock */
 	zoneid_t pt_zoneid;	/* Zone membership for this pty */
+	uid_t	 pt_ruid;	/* Real owner of pty */
+	gid_t	 pt_rgid;	/* Real group owner of pty */
 };
 
 /*
@@ -112,8 +113,11 @@ extern void ptms_init(void);
 extern struct pt_ttys *pt_ttys_alloc(void);
 extern void ptms_close(struct pt_ttys *, uint_t);
 extern struct pt_ttys *ptms_minor2ptty(minor_t);
-extern int ptms_create_pts_nodes(dev_info_t *);
-extern int ptms_destroy_pts_nodes(dev_info_t *);
+extern int ptms_attach_slave(void);
+extern int ptms_minor_valid(minor_t ptmin, uid_t *uid, gid_t *gid);
+extern int ptms_minor_exists(minor_t ptmin);
+extern void ptms_set_owner(minor_t ptmin, uid_t uid, gid_t gid);
+extern major_t ptms_slave_attached(void);
 
 #ifdef DEBUG
 extern void ptms_log(char *, uint_t);
@@ -141,11 +145,20 @@ extern void ptms_logp(char *, uintptr_t);
  *  ZONEPT: Sets the zoneid of the pair of master and slave devices.  It
  *	    returns 0 upon success.  Used to force a pty 'into' a zone upon
  *	    zone entry.
+ *
+ * PT_OWNER: Sets uid and gid for slave device.  It returns 0 on success.
+ *
  */
 #define	ISPTM	(('P'<<8)|1)	/* query for master */
 #define	UNLKPT	(('P'<<8)|2)	/* unlock master/slave pair */
 #define	PTSSTTY	(('P'<<8)|3)	/* set tty flag */
 #define	ZONEPT	(('P'<<8)|4)	/* set zone of master/slave pair */
+#define	PT_OWNER (('P'<<8)|5)	/* set owner and group for slave device */
+
+typedef struct pt_own {
+	uid_t	pto_ruid;
+	gid_t	pto_rgid;
+} pt_own_t;
 
 #ifdef	__cplusplus
 }

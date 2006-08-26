@@ -297,7 +297,6 @@ COMMON_SUBDIRS=		\
 	psradm		\
 	psrinfo		\
 	psrset		\
-	pt_chmod	\
 	ptools		\
 	pwck		\
 	pwconv		\

@@ -140,6 +140,7 @@ f none kernel/fs/sparcv9/autofs 755 root sys
 f none kernel/fs/sparcv9/cachefs 755 root sys
 f none kernel/fs/sparcv9/ctfs 755 root sys
 f none kernel/fs/sparcv9/devfs 755 root sys
+f none kernel/fs/sparcv9/dev 755 root sys
 f none kernel/fs/sparcv9/fifofs 755 root sys
 f none kernel/fs/sparcv9/hsfs 755 root sys
 f none kernel/fs/sparcv9/lofs 755 root sys
@@ -233,3 +234,5 @@ f none kernel/sys/sparcv9/pset 755 root sys
 l none kernel/sys/sparcv9/rpcmod=../../../kernel/strmod/sparcv9/rpcmod
 f none kernel/sys/sparcv9/semsys 755 root sys
 f none kernel/sys/sparcv9/shmsys 755 root sys
+d none kernel/devname/sparcv9 755 root sys
+f none kernel/devname/sparcv9/sdev_nsconfig_mod 755 root sys

@@ -98,6 +98,7 @@
 #include <sys/stat.h>
 #include <sys/termios.h>
 #include <sys/zcons.h>
+#include <sys/mkdev.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -118,6 +119,8 @@
 #include <libzonecfg.h>
 
 #include <syslog.h>
+#include <sys/modctl.h>
+#include <sys/fs/sdev_node.h>
 
 #include "zoneadmd.h"
 
@@ -409,38 +412,49 @@ error:
  * console to have terminal semantics.
  */
 static int
-prep_console_slave(zlog_t *zlogp, char *zonepath)
+prep_console_slave(zlog_t *zlogp, char *devroot)
 {
 	char slavename[MAXPATHLEN];
 	char zoneslavename[MAXPATHLEN];
-	struct stat st;
+	char zonedev[MAXPATHLEN];
+	di_prof_t prof = NULL;
 
 	assert(slavefd == -1);
 
 	(void) snprintf(slavename, sizeof (slavename),
-	    "/dev/zcons/%s/%s", zone_name, ZCONS_SLAVE_NAME);
+	    "zcons/%s/%s", zone_name, ZCONS_SLAVE_NAME);
 
 	(void) snprintf(zoneslavename, sizeof (zoneslavename),
-	    "%s/dev/zconsole", zonepath);
+	    "%s/dev/zconsole", devroot);
+
+	(void) snprintf(zonedev, sizeof (zonedev),
+	    "%s/dev", devroot);
 
 	/*
-	 * We mknod the zone console in $zonepath/dev/; someday it would
-	 * be nice to not have to manually mknod this stuff-- if possible,
-	 * we could move this into devfsadm.
+	 * Specify zconsole as a name map in the dev profile
 	 */
-	if (stat(slavename, &st) == -1) {
-		zerror(zlogp, B_TRUE, "failed to stat %s", slavename);
+	if (di_prof_init(zonedev, &prof)) {
+		zerror(zlogp, B_TRUE, "failed to initialize profile");
 		goto error;
 	}
-	(void) unlink(zoneslavename);
-	if (mknod(zoneslavename, st.st_mode, st.st_rdev) == -1) {
-		zerror(zlogp, B_TRUE, "failed to mknod %s", zoneslavename);
+
+	if (di_prof_add_map(prof, slavename, "zconsole")) {
+		zerror(zlogp, B_TRUE, "failed to add zconsole map");
 		goto error;
 	}
-	(void) chown(zoneslavename, st.st_uid, st.st_gid);
+
+	/* Send profile to kernel */
+	if (di_prof_commit(prof)) {
+		zerror(zlogp, B_TRUE, "failed to commit profile");
+		goto error;
+	}
+
+	di_prof_fini(prof);
+	prof = NULL;
+
 	if ((slavefd = open(zoneslavename, O_RDWR | O_NOCTTY)) < 0) {
 		zerror(zlogp, B_TRUE, "failed to open %s", zoneslavename);
-		return (-1);
+		goto error;
 	}
 
 	/*
@@ -488,8 +502,11 @@ prep_console_slave(zlog_t *zlogp, char *zonepath)
 
 	return (0);
 error:
-	(void) close(slavefd);
+	if (slavefd != -1)
+		(void) close(slavefd);
 	slavefd = -1;
+	if (prof)
+		di_prof_fini(prof);
 	return (-1);
 }
 
@@ -503,17 +520,17 @@ error:
 int
 init_console_slave(zlog_t *zlogp)
 {
-	char zonepath[MAXPATHLEN];
+	char devroot[MAXPATHLEN];
 
 	if (slavefd != -1)
 		return (0);
 
-	if (zone_get_zonepath(zone_name, zonepath, sizeof (zonepath)) != Z_OK) {
+	if (zone_get_devroot(zone_name, devroot, sizeof (devroot)) != Z_OK) {
 		zerror(zlogp, B_TRUE, "unable to determine zone root");
 		return (-1);
 	}
 
-	if (prep_console_slave(zlogp, zonepath) == -1) {
+	if (prep_console_slave(zlogp, devroot) == -1) {
 		zerror(zlogp, B_FALSE, "could not prep console slave");
 		return (-1);
 	}

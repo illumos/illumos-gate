@@ -142,8 +142,14 @@ static char *devices_dir  = DEVICES;
 /* /dev or <rootdir>/dev */
 static char *dev_dir = DEV;
 
-/* /dev for the global zone */
-static char *global_dev_dir = DEV;
+/* /etc/dev or <rootdir>/etc/dev */
+static char *etc_dev_dir = ETCDEV;
+
+/*
+ * writable root (for lock files and doors during install).
+ * This is also root dir for /dev attr dir during install.
+ */
+static char *attr_root = NULL;
 
 /* /etc/path_to_inst unless -p used */
 static char *inst_file = INSTANCE_FILE;
@@ -193,7 +199,6 @@ static char lphy_path[PATH_MAX + 1] = {""};
 /* Globals used by the link database */
 static di_devlink_handle_t devlink_cache;
 static int update_database = FALSE;
-static int devlink_door_fd = -1; /* fd of devlink handler door */
 
 /* Globals used to set logindev perms */
 static struct login_dev *login_dev_cache = NULL;
@@ -201,11 +206,6 @@ static int login_dev_enable = FALSE;
 
 /* Global to use devinfo snapshot cache */
 static int use_snapshot_cache = FALSE;
-
-/* Zone-related information */
-static int zone_cmd_mode = 0;
-static mutex_t zone_mutex; /* protects zone registration/unregistration ops */
-static struct zone_devinfo *zone_head;	/* linked list of zones */
 
 /*
  * Packaged directories - not removed even when empty.
@@ -225,9 +225,19 @@ static mutex_t rcm_eventq_lock;
 static cond_t rcm_eventq_cv;
 static volatile int need_to_exit_rcm_event_thread = 0;
 
+/* Devname globals */
+static int devname_debug_msg = 1;
+static nvlist_t *devname_maps = NULL;
+static int devname_first_call = 1;
+static int load_devname_nsmaps = FALSE;
+static int lookup_door_fd = -1;
+static char *lookup_door_path;
+
 static void load_dev_acl(void);
 static void update_drvconf(major_t);
-
+static void check_reconfig_state(void);
+static void devname_setup_nsmaps(void);
+static int s_stat(const char *, struct stat *);
 
 int
 main(int argc, char *argv[])
@@ -284,6 +294,10 @@ main(int argc, char *argv[])
 		 */
 		if (stat(DA_LABEL_CHECK, &tx_stat) == 0)
 			system_labeled = TRUE;
+		else {
+			/* test hook: see also mkdevalloc.c and allocate.c */
+			system_labeled = is_system_labeled_debug(&tx_stat);
+		}
 	}
 
 	parse_args(argc, argv);
@@ -385,57 +399,52 @@ load_dev_acl()
 }
 
 /*
- * set_zone_params sets us up to run against a specific zone.  It should
- * only be called from parse_args.
+ * As devfsadm is run early in boot to provide the kernel with
+ * minor_perm info, we might as well check for reconfig at the
+ * same time to avoid running devfsadm twice.  This gets invoked
+ * earlier than the env variable RECONFIG_BOOT is set up.
  */
-static int
-set_zone_params(char *zone_name)
+static void
+check_reconfig_state()
 {
-	char zpath[MAXPATHLEN];
-	zone_dochandle_t hdl;
-	void *dlhdl;
+	struct stat sb;
 
-	assert(daemon_mode == FALSE);
-
-	if (strcmp(zone_name, GLOBAL_ZONENAME) == 0) {
-		err_print(INVALID_ZONE, zone_name);
-		return (DEVFSADM_FAILURE);
+	if (s_stat("/reconfigure", &sb) == 0) {
+		(void) modctl(MODDEVNAME, MODDEVNAME_RECONFIG, 0);
 	}
-
-	if ((dlhdl = dlopen(LIBZONECFG_PATH, RTLD_LAZY)) == NULL) {
-		err_print(ZONE_LIB_MISSING);
-		return (DEVFSADM_FAILURE);
-	}
-
-	if (zone_get_zonepath(zone_name, zpath, sizeof (zpath)) != Z_OK) {
-		err_print(ZONE_ROOTPATH_FAILED, zone_name, strerror(errno));
-		(void) dlclose(dlhdl);
-		return (DEVFSADM_FAILURE);
-	}
-	set_root_devices_dev_dir(zpath, 1);
-
-	if ((hdl = zonecfg_init_handle()) == NULL) {
-		err_print(ZONE_REP_FAILED, zone_name, strerror(errno));
-		(void) dlclose(dlhdl);
-		return (DEVFSADM_FAILURE);
-	}
-
-	if ((zonecfg_get_snapshot_handle(zone_name, hdl)) != Z_OK) {
-		err_print(ZONE_REP_FAILED, zone_name, strerror(errno));
-		zonecfg_fini_handle(hdl);
-		(void) dlclose(dlhdl);
-		return (DEVFSADM_FAILURE);
-	}
-	(void) dlclose(dlhdl);
-
-	zone_head = s_malloc(sizeof (struct zone_devinfo));
-	zone_head->zone_path = s_strdup(zpath);
-	zone_head->zone_name = s_strdup(zone_name);
-	zone_head->zone_dochdl = hdl;
-	zone_head->zone_next = NULL;
-	zone_cmd_mode = 1;
-	return (DEVFSADM_SUCCESS);
 }
+
+static void
+modctl_sysavail()
+{
+	/*
+	 * Inform /dev that system is available, that
+	 * implicit reconfig can now be performed.
+	 */
+	(void) modctl(MODDEVNAME, MODDEVNAME_SYSAVAIL, 0);
+}
+
+static void
+set_lock_root(void)
+{
+	struct stat sb;
+	char *lock_root;
+	size_t len;
+
+	lock_root = attr_root ? attr_root : root_dir;
+
+	len = strlen(lock_root) + strlen(ETCDEV) + 1;
+	etc_dev_dir = s_malloc(len);
+	(void) snprintf(etc_dev_dir, len, "%s%s", lock_root, ETCDEV);
+
+	if (s_stat(etc_dev_dir, &sb) != 0) {
+		s_mkdirp(etc_dev_dir, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH);
+	} else if (!S_ISDIR(sb.st_mode)) {
+		err_print(NOT_DIR, etc_dev_dir);
+		devfsadm_exit(1);
+	}
+}
+
 
 /*
  * Parse arguments for all 6 programs handled from devfsadm.
@@ -489,7 +498,7 @@ parse_args(int argc, char *argv[])
 				load_attach_drv = FALSE;
 				break;
 			case 'r':
-				set_root_devices_dev_dir(optarg, 0);
+				set_root_devices_dev_dir(optarg);
 				if (zone_pathcheck(root_dir) !=
 				    DEVFSADM_SUCCESS)
 					devfsadm_exit(1);
@@ -636,10 +645,10 @@ parse_args(int argc, char *argv[])
 	} else if ((strcmp(prog, DEVFSADM) == 0) ||
 	    (strcmp(prog, DEVFSADMD) == 0)) {
 		char *zonename = NULL;
-		enum zreg_op zoneop;
 		int init_drvconf = 0;
 		int init_perm = 0;
 		int public_mode = 0;
+		int init_sysavail = 0;
 
 		if (strcmp(prog, DEVFSADMD) == 0) {
 			daemon_mode = TRUE;
@@ -648,16 +657,19 @@ parse_args(int argc, char *argv[])
 		devlinktab_file = DEVLINKTAB_FILE;
 
 		while ((opt = getopt(argc, argv,
-		    "Cc:deIi:l:np:PR:r:st:vV:x:z:Z:")) != EOF) {
-			if (opt == 'I' || opt == 'P') {
+		    "a:Cc:deIi:l:mnp:PR:r:sSt:vV:x:")) != EOF) {
+			if (opt == 'I' || opt == 'P' || opt == 'S') {
 				if (public_mode)
 					usage();
 			} else {
-				if (init_perm || init_drvconf)
+				if (init_perm || init_drvconf || init_sysavail)
 					usage();
 				public_mode = 1;
 			}
 			switch (opt) {
+			case 'a':
+				attr_root = s_strdup(optarg);
+				break;
 			case 'C':
 				cleanup = TRUE;
 				break;
@@ -698,6 +710,9 @@ parse_args(int argc, char *argv[])
 				/* specify an alternate module load path */
 				module_dirs = s_strdup(optarg);
 				break;
+			case 'm':
+				load_devname_nsmaps = TRUE;
+				break;
 			case 'n':
 				/* prevent driver loading and deferred attach */
 				load_attach_drv = FALSE;
@@ -721,7 +736,7 @@ parse_args(int argc, char *argv[])
 				devfsadm_exit(devfsadm_copy());
 				break;
 			case 'r':
-				set_root_devices_dev_dir(optarg, 0);
+				set_root_devices_dev_dir(optarg);
 				break;
 			case 's':
 				/*
@@ -730,6 +745,11 @@ parse_args(int argc, char *argv[])
 				 */
 				file_mods = FALSE;
 				flush_path_to_inst_enable = FALSE;
+				break;
+			case 'S':
+				if (daemon_mode == TRUE)
+					usage();
+				init_sysavail = 1;
 				break;
 			case 't':
 				devlinktab_file = optarg;
@@ -765,19 +785,10 @@ parse_args(int argc, char *argv[])
 					usage();
 				}
 				break;
-			case 'z':
-				zonename = optarg;
-				zoneop = ZONE_REG;
-				break;
-			case 'Z':
-				zonename = optarg;
-				zoneop = ZONE_UNREG;
-				break;
 			default:
 				usage();
 				break;
 			}
-
 		}
 		if (optind < argc) {
 			usage();
@@ -792,43 +803,26 @@ parse_args(int argc, char *argv[])
 				devfsadm_exit(1);
 		}
 
-		if (zonename != NULL) {
-			/*
-			 * -z and -Z cannot be used if we're the daemon.  The
-			 * daemon always manages all zones.
-			 */
-			if (daemon_mode == TRUE)
-				usage();
-
-			/*
-			 * -z and -Z are private flags, but to be paranoid we
-			 * check whether they have been combined with -r.
-			 */
-			if (*root_dir != '\0')
-				usage();
-
-			if (set_zone_params(optarg) != DEVFSADM_SUCCESS)
-				devfsadm_exit(1);
-
-			call_zone_register(zonename, zoneop);
-			if (zoneop == ZONE_UNREG)
-				devfsadm_exit(0);
-			/*
-			 * If we are in ZONE_REG mode we plow on, laying out
-			 * devices for this zone.
-			 */
-		}
-		if (init_drvconf || init_perm) {
+		if (init_drvconf || init_perm || init_sysavail) {
 			/*
 			 * Load minor perm before force-loading drivers
 			 * so the correct permissions are picked up.
 			 */
-			if (init_perm)
+			if (init_perm) {
+				check_reconfig_state();
 				load_dev_acl();
+			}
 			if (init_drvconf)
 				update_drvconf((major_t)-1);
+			if (init_sysavail)
+				modctl_sysavail();
 			devfsadm_exit(0);
 			/* NOTREACHED */
+		}
+
+		if (load_devname_nsmaps == TRUE) {
+			devname_setup_nsmaps();
+			devfsadm_exit(0);
 		}
 	}
 
@@ -852,7 +846,7 @@ parse_args(int argc, char *argv[])
 				load_attach_drv = FALSE;
 				break;
 			case 'r':
-				set_root_devices_dev_dir(optarg, 0);
+				set_root_devices_dev_dir(optarg);
 				if (zone_pathcheck(root_dir) !=
 				    DEVFSADM_SUCCESS)
 					devfsadm_exit(1);
@@ -879,6 +873,7 @@ parse_args(int argc, char *argv[])
 			usage();
 		}
 	}
+	set_lock_root();
 }
 
 void
@@ -1089,11 +1084,28 @@ process_devinfo_tree()
 static void
 print_cache_signal(int signo)
 {
-
 	if (signal(SIGUSR1, print_cache_signal) == SIG_ERR) {
 		err_print("signal SIGUSR1 failed: %s\n", strerror(errno));
 		devfsadm_exit(1);
 	}
+}
+
+static void
+revoke_lookup_door(void)
+{
+	if (lookup_door_fd != -1) {
+		if (door_revoke(lookup_door_fd) == -1) {
+			err_print("door_revoke of %s failed - %s\n",
+			    lookup_door_path, strerror(errno));
+		}
+	}
+}
+
+/*ARGSUSED*/
+static void
+catch_exit(int signo)
+{
+	revoke_lookup_door();
 }
 
 /*
@@ -1114,9 +1126,14 @@ daemon_update(void)
 		err_print("signal SIGUSR1 failed: %s\n", strerror(errno));
 		devfsadm_exit(1);
 	}
+	if (signal(SIGTERM, catch_exit) == SIG_ERR) {
+		err_print("signal SIGTERM failed: %s\n", strerror(errno));
+		devfsadm_exit(1);
+	}
 
 	if (snprintf(door_file, sizeof (door_file),
-	    "%s%s", root_dir, DEVFSADM_SERVICE_DOOR) >= sizeof (door_file)) {
+	    "%s%s", attr_root ? attr_root : root_dir, DEVFSADM_SERVICE_DOOR)
+	    >= sizeof (door_file)) {
 		err_print("update_daemon failed to open sysevent service "
 		    "door\n");
 		devfsadm_exit(1);
@@ -1142,33 +1159,12 @@ daemon_update(void)
 		(void) sysevent_close_channel(sysevent_hp);
 		devfsadm_exit(1);
 	}
-
-	if (snprintf(door_file, sizeof (door_file),
-	    "%s/%s", dev_dir, ZONE_REG_DOOR) >= sizeof (door_file)) {
-		err_print(CANT_CREATE_ZONE_DOOR, door_file,
+	if (snprintf(door_file, sizeof (door_file), "%s/%s",
+	    etc_dev_dir, DEVFSADM_SYNCH_DOOR) >= sizeof (door_file)) {
+		err_print(CANT_CREATE_DOOR, DEVFSADM_SYNCH_DOOR,
 		    strerror(ENAMETOOLONG));
 		devfsadm_exit(1);
 	}
-	(void) s_unlink(door_file);
-	if ((fd = open(door_file, O_RDWR | O_CREAT, ZONE_DOOR_PERMS)) == -1) {
-		err_print(CANT_CREATE_ZONE_DOOR, door_file, strerror(errno));
-		devfsadm_exit(1);
-	}
-	(void) close(fd);
-	if ((fd = door_create(zone_reg_handler, NULL,
-	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
-		err_print(CANT_CREATE_ZONE_DOOR, door_file, strerror(errno));
-		(void) s_unlink(door_file);
-		devfsadm_exit(1);
-	}
-	if (fattach(fd, door_file) == -1) {
-		err_print(CANT_CREATE_ZONE_DOOR, door_file, strerror(errno));
-		(void) s_unlink(door_file);
-		devfsadm_exit(1);
-	}
-
-	(void) snprintf(door_file, sizeof (door_file), "%s/%s", dev_dir,
-	    DEVFSADM_SYNCH_DOOR);
 
 	(void) s_unlink(door_file);
 	if ((fd = open(door_file, O_RDWR | O_CREAT, SYNCH_DOOR_PERMS)) == -1) {
@@ -1189,14 +1185,48 @@ daemon_update(void)
 		(void) s_unlink(door_file);
 		devfsadm_exit(1);
 	}
-	devlink_door_fd = fd;
 
 	/*
-	 * Make sure devfsadm is managing any and all configured system zones.
+	 * devname_lookup_door
 	 */
-	if (register_all_zones() != DEVFSADM_SUCCESS) {
-		err_print(ZONE_LIST_FAILED, strerror(errno));
+	if (snprintf(door_file, sizeof (door_file), "%s/%s",
+	    etc_dev_dir, DEVNAME_LOOKUP_DOOR) >= sizeof (door_file)) {
+		err_print(CANT_CREATE_DOOR, DEVNAME_LOOKUP_DOOR,
+		    strerror(ENAMETOOLONG));
+		devfsadm_exit(1);
 	}
+
+	(void) s_unlink(door_file);
+	if ((fd = open(door_file, O_RDWR | O_CREAT, S_IRUSR|S_IWUSR)) == -1) {
+		err_print(CANT_CREATE_DOOR, door_file, strerror(errno));
+		devfsadm_exit(1);
+	}
+	(void) close(fd);
+
+	if ((fd = door_create(devname_lookup_handler, NULL,
+	    DOOR_REFUSE_DESC)) == -1) {
+		err_print(CANT_CREATE_DOOR, door_file, strerror(errno));
+		(void) s_unlink(door_file);
+		devfsadm_exit(1);
+	}
+
+	(void) fdetach(door_file);
+	lookup_door_path = s_strdup(door_file);
+retry:
+	if (fattach(fd, door_file) == -1) {
+		if (errno == EBUSY)
+			goto retry;
+		err_print(CANT_CREATE_DOOR, door_file, strerror(errno));
+		(void) s_unlink(door_file);
+		devfsadm_exit(1);
+	}
+	lookup_door_fd = fd;
+
+	/* pass down the door name to kernel for door_ki_open */
+	if (devname_kcall(MODDEVNAME_LOOKUPDOOR, (void *)door_file) != 0)
+		err_print(DEVNAME_CONTACT_FAILED, strerror(errno));
+	else
+		devname_setup_nsmaps();
 
 	vprint(CHATTY_MID, "%spausing\n", fcn);
 	for (;;) {
@@ -1291,7 +1321,6 @@ lock_dev(void)
 	if (devlink_cache == NULL)
 		devlink_cache = di_devlink_open(root_dir, 0);
 
-
 	/*
 	 * If modules were unloaded, reload them.  Also use module status
 	 * as an indication that we should check to see if other binding
@@ -1349,351 +1378,6 @@ unlock_dev(int flag)
 }
 
 /*
- * Contact the daemon to register the identified zone.  We do everything with
- * zone names, for simplicity.
- */
-static void
-call_zone_register(char *zone_name, int regop)
-{
-	int doorfd, ret, retries = 0;
-	door_arg_t arg;
-	struct zreg z;
-	char path[MAXPATHLEN];
-
-	assert(regop == ZONE_REG || regop == ZONE_UNREG);
-
-	if (strcmp(zone_name, GLOBAL_ZONENAME) == 0) {
-		err_print(INVALID_ZONE, zone_name);
-		return;
-	}
-
-	z.zreg_error = 0;
-	z.zreg_op = regop;
-	(void) strlcpy(z.zreg_zonename, zone_name, ZONENAME_MAX);
-
-	(void) snprintf(path, sizeof (path), "/dev/%s", ZONE_REG_DOOR);
-	if ((doorfd = open(path, O_RDWR)) == -1) {
-		return;
-	}
-
-	bzero(&arg, sizeof (arg));
-	arg.data_ptr = (char *)&z;
-	arg.data_size = sizeof (z);
-	arg.rbuf = (char *)&z;
-	arg.rsize = sizeof (z);
-
-	/*
-	 * If the daemon is running, tell it about the zone.  If not, it's
-	 * ok.  When it next gets run by the system (because there is
-	 * device-related work to do), it will load the list of zones from
-	 * the kernel.
-	 */
-	while (((ret = door_call(doorfd, &arg)) == -1) && retries++ < 3) {
-		(void) sleep(retries);
-	}
-	(void) close(doorfd);
-
-	if (ret != 0) {
-		return;
-	}
-
-	switch (z.zreg_error) {
-	case ZONE_SUCCESS:
-		break;
-	case ZONE_ERR_NOZONE:
-		err_print(ZONE_REG_FAILED, zone_name, strerror(z.zreg_errno));
-		break;
-	case ZONE_ERR_DOOR:
-		err_print(ZONE_DOOR_MKFAIL, zone_name, strerror(z.zreg_errno));
-		break;
-	case ZONE_ERR_REPOSITORY:
-		err_print(ZONE_REP_FAILED, zone_name, strerror(z.zreg_errno));
-		break;
-	case ZONE_ERR_NOLIB:
-		err_print(ZONE_LIB_MISSING);
-		break;
-	default:
-		err_print(ZONE_REG_FAILED, zone_name, strerror(z.zreg_errno));
-		break;
-	}
-}
-
-/*
- * The following routines are the daemon-side code for managing the set of
- * currently registered zones.
- *
- * TODO: improve brain-dead list performance--- use libuutil avl tree or hash?
- */
-static void
-zlist_insert(struct zone_devinfo *newzone)
-{
-	struct zone_devinfo *z;
-	assert(MUTEX_HELD(&zone_mutex));
-
-	if (zone_head == NULL) {
-		zone_head = newzone;
-		return;
-	}
-	z = zlist_remove(newzone->zone_name);
-	if (z != NULL)
-		delete_zone(z);
-	newzone->zone_next = zone_head;
-	zone_head = newzone;
-}
-
-static void
-delete_zone(struct zone_devinfo *z) {
-	char door_file[PATH_MAX];
-
-	/*
-	 * Tidy up by withdrawing our door from the zone.
-	 */
-	(void) snprintf(door_file, sizeof (door_file), "%s/dev/%s",
-	    z->zone_path, DEVFSADM_SYNCH_DOOR);
-	(void) s_unlink(door_file);
-
-	zonecfg_fini_handle(z->zone_dochdl);
-	free(z->zone_path);
-	free(z->zone_name);
-	free(z);
-}
-
-static struct zone_devinfo *
-zlist_remove(char *zone_name)
-{
-	struct zone_devinfo *z, *unlinked = NULL, **prevnextp;
-	assert(MUTEX_HELD(&zone_mutex));
-
-	prevnextp = &zone_head;
-	for (z = zone_head; z != NULL; z = z->zone_next) {
-		if (strcmp(zone_name, z->zone_name) == 0) {
-			unlinked = z;
-			*prevnextp = z->zone_next;
-			return (unlinked);
-		}
-		prevnextp = &(z->zone_next);
-	}
-	return (NULL);
-}
-
-/*
- * Delete all zones.  Note that this should *only* be called in the exit
- * path of the daemon, as it does not take the zone_mutex-- this is because
- * we could wind up calling devfsadm_exit() with that zone_mutex_held.
- */
-static void
-zlist_deleteall_unlocked(void)
-{
-	struct zone_devinfo *tofree;
-
-	while (zone_head != NULL) {
-		tofree = zone_head;
-		zone_head = zone_head->zone_next;
-		delete_zone(tofree);
-	}
-	assert(zone_head == NULL);
-}
-
-static int
-zone_register(char *zone_name)
-{
-	char		door_file[MAXPATHLEN], zpath[MAXPATHLEN];
-	int		fd;
-	int 		need_unlink = 0, error = ZONE_SUCCESS, myerrno = 0;
-	zone_dochandle_t hdl = NULL;
-	void		*dlhdl = NULL;
-	struct zone_devinfo *newzone = NULL;
-
-	assert(MUTEX_HELD(&zone_mutex));
-
-	if ((dlhdl = dlopen(LIBZONECFG_PATH, RTLD_LAZY)) == NULL) {
-		error = ZONE_ERR_NOLIB;
-		goto bad;
-	}
-
-	if (zone_get_zonepath(zone_name, zpath, sizeof (zpath)) != Z_OK) {
-		error = ZONE_ERR_NOZONE;
-		myerrno = errno;
-		goto bad;
-	}
-
-	if (snprintf(door_file, sizeof (door_file), "%s/dev/%s",
-	    zpath, DEVFSADM_SYNCH_DOOR) >= sizeof (door_file)) {
-		myerrno = ENAMETOOLONG;	/* synthesize a reasonable errno */
-		error = ZONE_ERR_DOOR;
-		goto bad;
-	}
-
-	(void) s_unlink(door_file);
-	if ((fd = open(door_file, O_RDWR | O_CREAT, ZONE_DOOR_PERMS)) == -1) {
-		myerrno = errno;
-		error = ZONE_ERR_DOOR;
-		goto bad;
-	}
-	need_unlink = 1;
-	(void) close(fd);
-
-	if (fattach(devlink_door_fd, door_file) == -1) {
-		error = ZONE_ERR_DOOR;
-		myerrno = errno;
-		goto bad;
-	}
-
-	if ((hdl = zonecfg_init_handle()) == NULL) {
-		error = ZONE_ERR_REPOSITORY;
-		myerrno = errno;
-		goto bad;
-	}
-
-	if ((zonecfg_get_snapshot_handle(zone_name, hdl)) != Z_OK) {
-		error = ZONE_ERR_REPOSITORY;
-		myerrno = errno;
-		goto bad;
-	}
-
-	newzone = s_malloc(sizeof (struct zone_devinfo));
-	newzone->zone_path = s_strdup(zpath);
-	newzone->zone_name = s_strdup(zone_name);
-	newzone->zone_next = NULL;
-	newzone->zone_dochdl = hdl;
-	zlist_insert(newzone);
-	(void) dlclose(dlhdl);
-
-	return (ZONE_SUCCESS);
-
-bad:
-	(void) devfsadm_errprint("%s[%ld]: failed to register zone %s: %s",
-	    prog, getpid(), zone_name, strerror(myerrno));
-
-	assert(newzone == NULL);
-	if (need_unlink)
-		(void) s_unlink(door_file);
-	if (hdl)
-		zonecfg_fini_handle(hdl);
-	if (dlhdl)
-		(void) dlclose(dlhdl);
-	errno = myerrno;
-	return (error);
-}
-
-static int
-zone_unregister(char *zone_name)
-{
-	struct zone_devinfo *z;
-
-	assert(MUTEX_HELD(&zone_mutex));
-
-	if ((z = zlist_remove(zone_name)) == NULL)
-		return (ZONE_ERR_NOZONE);
-
-	delete_zone(z);
-	return (ZONE_SUCCESS);
-}
-
-/*
- *  Called by the daemon when it receives a door call to the zone registration
- *  door.
- */
-/*ARGSUSED*/
-static void
-zone_reg_handler(void *cookie, char *ap, size_t asize, door_desc_t *dp,
-    uint_t ndesc)
-{
-	door_cred_t	dcred;
-	struct zreg 	*zregp, rzreg;
-
-	/*
-	 * We coarsely lock the whole registration process.
-	 */
-	(void) mutex_lock(&zone_mutex);
-
-	/*
-	 * Must be root to make this call
-	 * If caller is not root, don't touch its data.
-	 */
-	if (door_cred(&dcred) != 0 || dcred.dc_euid != 0) {
-		zregp = &rzreg;
-		zregp->zreg_error = ZONE_ERR_REPOSITORY;
-		zregp->zreg_errno = EPERM;
-		goto out;
-	}
-
-	assert(ap);
-	assert(asize == sizeof (*zregp));
-
-	zregp = (struct zreg *)(void *)ap;
-
-	/*
-	 * Kernel must know about this zone; one way of discovering this
-	 * is by looking up the zone id.
-	 */
-	if (getzoneidbyname(zregp->zreg_zonename) == -1) {
-		zregp->zreg_error = ZONE_ERR_REPOSITORY;
-		zregp->zreg_errno = errno;
-		goto out;
-	}
-
-	if (zregp->zreg_op == ZONE_REG) {
-		zregp->zreg_error = zone_register(zregp->zreg_zonename);
-		zregp->zreg_errno = errno;
-	} else {
-		zregp->zreg_error = zone_unregister(zregp->zreg_zonename);
-		zregp->zreg_errno = errno;
-	}
-
-out:
-	(void) mutex_unlock(&zone_mutex);
-	(void) door_return((char *)zregp, sizeof (*zregp), NULL, 0);
-}
-
-static int
-register_all_zones(void)
-{
-	zoneid_t *zids = NULL;
-	uint_t nzents, nzents_saved;
-	int i;
-
-	(void) mutex_lock(&zone_mutex);
-	if (zone_list(NULL, &nzents) != 0)
-		return (DEVFSADM_FAILURE);
-
-again:
-	assert(zids == NULL);
-	assert(MUTEX_HELD(&zone_mutex));
-	if (nzents == 0) {
-		(void) mutex_unlock(&zone_mutex);
-		return (DEVFSADM_SUCCESS);
-	}
-	zids = s_zalloc(nzents * sizeof (zoneid_t));
-	nzents_saved = nzents;
-	if (zone_list(zids, &nzents) != 0) {
-		(void) mutex_unlock(&zone_mutex);
-		free(zids);
-		return (DEVFSADM_FAILURE);
-	}
-	if (nzents != nzents_saved) {
-		/* list changed, try again */
-		free(zids);
-		zids = NULL;
-		goto again;
-	}
-
-	assert(zids != NULL);
-	for (i = 0; i < nzents; i++) {
-		char name[ZONENAME_MAX];
-
-		if (zids[i] == GLOBAL_ZONEID)
-			continue;
-		if (getzonenamebyid(zids[i], name, sizeof (name)) >= 0)
-			(void) zone_register(name);
-	}
-
-	(void) mutex_unlock(&zone_mutex);
-	free(zids);
-	return (DEVFSADM_SUCCESS);
-}
-
-/*
  * Check that if -r is set, it is not any part of a zone--- that is, that
  * the zonepath is not a substring of the root path.
  */
@@ -1705,7 +1389,7 @@ zone_pathcheck(char *checkpath)
 	char		root[MAXPATHLEN]; /* resolved devfsadm root path */
 	char		zroot[MAXPATHLEN]; /* zone root path */
 	char		rzroot[MAXPATHLEN]; /* resolved zone root path */
-	char 		tmp[MAXPATHLEN];
+	char		tmp[MAXPATHLEN];
 	FILE		*cookie;
 	int		err = DEVFSADM_SUCCESS;
 
@@ -1722,7 +1406,7 @@ zone_pathcheck(char *checkpath)
 	bzero(root, sizeof (root));
 	if (resolvepath(checkpath, root, sizeof (root) - 1) == -1) {
 		/*
-		 * In this case the user has done 'devfsadm -r' on some path
+		 * In this case the user has done "devfsadm -r" on some path
 		 * which does not yet exist, or we got some other misc. error.
 		 * We punt and don't resolve the path in this case.
 		 */
@@ -1804,6 +1488,10 @@ event_handler(sysevent_t *ev)
 	subclass = sysevent_get_subclass_name(ev);
 	vprint(EVENT_MID, "event_handler: %s id:0X%llx\n",
 	    subclass, sysevent_get_seq(ev));
+
+	if (strcmp(subclass, ESC_DEVFS_START) == 0) {
+		return;
+	}
 
 	/* Check if event is an instance modification */
 	if (strcmp(subclass, ESC_DEVFS_INSTANCE_MOD) == 0) {
@@ -1891,7 +1579,6 @@ event_handler(sysevent_t *ev)
 		    DI_NODE_NIL);
 		unlock_dev(CACHE_STATE);
 		startup_cache_sync_thread();
-
 	} else
 		err_print(UNKNOWN_EVENT, subclass);
 
@@ -2686,129 +2373,13 @@ call_minor_init(module_t *module)
 	return (DEVFSADM_SUCCESS);
 }
 
-static int
-i_mknod(char *path, int stype, int mode, dev_t dev, uid_t uid, gid_t gid)
-{
-	struct stat sbuf;
-
-	assert((stype & (S_IFCHR|S_IFBLK)) != 0);
-	assert((mode & S_IFMT) == 0);
-
-	if (stat(path, &sbuf) == 0) {
-		/*
-		 * the node already exists, check if it's device
-		 * information is correct
-		 */
-		if (((sbuf.st_mode & S_IFMT) == stype) &&
-		    (sbuf.st_rdev == dev)) {
-			/* the device node is correct, continue */
-			return (DEVFSADM_SUCCESS);
-		}
-		/*
-		 * the device node already exists but has the wrong
-		 * mode/dev_t value.  we need to delete the current
-		 * node and re-create it with the correct mode/dev_t
-		 * value, but we also want to preserve the current
-		 * owner and permission information.
-		 */
-		uid = sbuf.st_uid;
-		gid = sbuf.st_gid;
-		mode = sbuf.st_mode & ~S_IFMT;
-		s_unlink(path);
-	}
-
-top:
-	if (mknod(path, stype | mode, dev) == -1) {
-		if (errno == ENOENT) {
-			/* dirpath to node doesn't exist, create it */
-			char *hide = strrchr(path, '/');
-			*hide = '\0';
-			s_mkdirp(path, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH);
-			*hide = '/';
-			goto top;
-		}
-		err_print(MKNOD_FAILED, path, strerror(errno));
-		return (DEVFSADM_FAILURE);
-	} else {
-		/*
-		 * If we successfully made the node, then set its owner
-		 * and group.  Existing nodes will be unaffected.
-		 */
-		(void) chown(path, uid, gid);
-	}
-	return (DEVFSADM_SUCCESS);
-}
-
-/*ARGSUSED*/
-int
-devfsadm_mklink_zone(struct zone_devinfo *z, char *link, di_node_t node,
-    di_minor_t minor, int flags)
-{
-	char path[PATH_MAX];
-	char phy_path[PATH_MAX];
-	char *dev_pathp;
-	char *acontents, *aminor = NULL;
-	mode_t mode;
-	uid_t uid;
-	gid_t gid;
-	dev_t dev;
-	struct zone_devtab out_match;
-
-	if (zonecfg_match_dev(z->zone_dochdl, link, &out_match) != Z_OK) {
-		return (DEVFSADM_FAILURE);
-	}
-
-	vprint(ZONE_MID, "zone device match: <device match=\"%s\"> "
-	    "matches /dev/%s\n", out_match.zone_dev_match, link);
-
-	/*
-	 * In daemon mode, zone_path will be non-empty.  In non-daemon mode
-	 * it will be empty since we've already stuck the zone into dev_dir,
-	 * etc.
-	 */
-	(void) snprintf(path, sizeof (path), "%s/dev/%s", z->zone_path, link);
-	dev = di_minor_devt(minor);
-
-	/*
-	 * If this is an alias node (i.e. a clone node), we have to figure
-	 * out the minor name.
-	 */
-	if (di_minor_type(minor) == DDM_ALIAS) {
-		/* use /pseudo/clone@0:<driver> as the phys path */
-		(void) snprintf(phy_path, sizeof (phy_path),
-		    "/pseudo/clone@0:%s",
-		    di_driver_name(di_minor_devinfo(minor)));
-		aminor = di_minor_name(minor);
-		acontents = phy_path;
-	} else {
-		if ((dev_pathp = di_devfs_path(node)) == NULL) {
-			err_print(DI_DEVFS_PATH_FAILED, strerror(errno));
-			devfsadm_exit(1);
-		}
-		(void) snprintf(phy_path, sizeof (phy_path), "%s:%s",
-		    dev_pathp, di_minor_name(minor));
-		di_devfs_path_free(dev_pathp);
-		acontents = phy_path;
-	}
-
-
-	getattr(acontents, aminor, di_minor_spectype(minor), dev,
-	    &mode, &uid, &gid);
-	vprint(ZONE_MID, "zone getattr(%s, %s, %d, %lu, 0%lo, %lu, %lu)\n",
-	    acontents, aminor ? aminor : "<NULL>", di_minor_spectype(minor),
-	    dev, mode, uid, gid);
-
-	/* Create the node */
-	return (i_mknod(path, di_minor_spectype(minor), mode, dev, uid, gid));
-}
-
 /*
  * Creates a symlink 'link' to the physical path of node:minor.
  * Construct link contents, then call create_link_common().
  */
 /*ARGSUSED*/
 int
-devfsadm_mklink_default(char *link, di_node_t node, di_minor_t minor, int flags)
+devfsadm_mklink(char *link, di_node_t node, di_minor_t minor, int flags)
 {
 	char rcontents[PATH_MAX];
 	char devlink[PATH_MAX];
@@ -2917,38 +2488,6 @@ devfsadm_mklink_default(char *link, di_node_t node, di_minor_t minor, int flags)
 	}
 
 	return (rv);
-}
-
-int
-devfsadm_mklink(char *link, di_node_t node, di_minor_t minor, int flags)
-{
-	struct zone_devinfo *z;
-	int error;
-
-	/*
-	 * If we're in zone mode (also implies !daemon_mode), then the
-	 * zone devinfo list has only one element, the zone we're configuring,
-	 * and we can just use zone_head.
-	 */
-	if (zone_cmd_mode)
-		return (devfsadm_mklink_zone(zone_head, link, node,
-		    minor, flags));
-	else if (!daemon_mode)
-		return (devfsadm_mklink_default(link, node, minor, flags));
-
-	/*
-	 * We're in daemon mode, so we need to make the link in the global
-	 * zone; then, walk the list of zones, creating the corresponding
-	 * mknod'd nodes in each.
-	 */
-	error = devfsadm_mklink_default(link, node, minor, flags);
-
-	(void) mutex_lock(&zone_mutex);
-	for (z = zone_head; z != NULL; z = z->zone_next) {
-		(void) devfsadm_mklink_zone(z, link, node, minor, flags);
-	}
-	(void) mutex_unlock(&zone_mutex);
-	return (error);
 }
 
 /*
@@ -3575,6 +3114,8 @@ rm_parent_dir_if_empty(char *pathname)
 {
 	char *ptr, path[PATH_MAX + 1];
 	char *fcn = "rm_parent_dir_if_empty: ";
+	char *pathlist;
+	int len;
 
 	vprint(REMOVE_MID, "%schecking %s if empty\n", fcn, pathname);
 
@@ -3592,18 +3133,30 @@ rm_parent_dir_if_empty(char *pathname)
 
 		*ptr = '\0';
 
-		if (s_rmdir(path) == 0) {
-			vprint(REMOVE_MID, "%sremoving empty dir %s\n",
-			    fcn, path);
-			continue;
+		if ((pathlist = dev_readdir(path)) == NULL) {
+			err_print(OPENDIR_FAILED, path, strerror(errno));
+			return;
 		}
-		if (errno == EEXIST) {
+
+		/*
+		 * An empty pathlist implies an empty directory
+		 */
+		len = strlen(pathlist);
+		free(pathlist);
+		if (len == 0) {
+			if (s_rmdir(path) == 0) {
+				vprint(REMOVE_MID,
+				    "%sremoving empty dir %s\n", fcn, path);
+			} else if (errno == EEXIST) {
+				vprint(REMOVE_MID,
+				    "%sfailed to remove dir: %s\n", fcn, path);
+				return;
+			}
+		} else {
+			/* some other file is here, so return */
 			vprint(REMOVE_MID, "%sdir not empty: %s\n", fcn, path);
 			return;
 		}
-		vprint(REMOVE_MID, "%s can't remove %s: %s\n", fcn, path,
-		    strerror(errno));
-		return;
 	}
 }
 
@@ -4247,9 +3800,8 @@ enter_dev_lock()
 		return (0);
 	}
 
-	s_mkdirp(dev_dir, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH);
 	(void) snprintf(dev_lockfile, sizeof (dev_lockfile),
-	    "%s/%s", dev_dir, DEV_LOCK_FILE);
+	    "%s/%s", etc_dev_dir, DEV_LOCK_FILE);
 
 	vprint(LOCK_MID, "enter_dev_lock: lock file %s\n", dev_lockfile);
 
@@ -4362,9 +3914,8 @@ enter_daemon_lock(void)
 {
 	struct flock lock;
 
-	s_mkdirp(dev_dir, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH);
 	(void) snprintf(daemon_lockfile, sizeof (daemon_lockfile),
-	    "%s/%s", dev_dir, DAEMON_LOCK_FILE);
+	    "%s/%s", etc_dev_dir, DAEMON_LOCK_FILE);
 
 	vprint(LOCK_MID, "enter_daemon_lock: lock file %s\n", daemon_lockfile);
 
@@ -4650,16 +4201,15 @@ recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd)
 	char *slash;
 	char new_path[PATH_MAX + 1];
 	char *anchored_path_re;
-	struct dirent *entp;
-	DIR *dp;
 	size_t len;
+	char *pathlist;
+	char *listp;
 
 	vprint(RECURSEDEV_MID, "recurse_dev_re: curr = %s path=%s\n",
 		current_dir, path_re);
 
-	if ((dp = opendir(current_dir)) == NULL) {
+	if ((pathlist = dev_readdir(current_dir)) == NULL)
 		return;
-	}
 
 	len = strlen(path_re);
 	if ((slash = strchr(path_re, '/')) != NULL) {
@@ -4676,18 +4226,13 @@ recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd)
 
 	free(anchored_path_re);
 
-	while ((entp = readdir(dp)) != NULL) {
+	for (listp = pathlist; (len = strlen(listp)) > 0; listp += len+1) {
 
-		if (strcmp(entp->d_name, ".") == 0 ||
-		    strcmp(entp->d_name, "..") == 0) {
-			continue;
-		}
-
-		if (regexec(&re1, entp->d_name, 0, NULL, 0) == 0) {
+		if (regexec(&re1, listp, 0, NULL, 0) == 0) {
 			/* match */
 			(void) strcpy(new_path, current_dir);
 			(void) strcat(new_path, "/");
-			(void) strcat(new_path, entp->d_name);
+			(void) strcat(new_path, listp);
 
 			vprint(RECURSEDEV_MID, "recurse_dev_re: match, new "
 				"path = %s\n", new_path);
@@ -4706,7 +4251,7 @@ recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd)
 	regfree(&re1);
 
 out:
-	s_closedir(dp);
+	free(pathlist);
 }
 
 /*
@@ -4767,7 +4312,7 @@ devfsadm_link_valid(char *link)
 	(void) strcat(devlink, "/");
 	(void) strcat(devlink, link);
 
-	if (lstat(devlink, &sb) != 0) {
+	if (!device_exists(devlink) || lstat(devlink, &sb) != 0) {
 		return (DEVFSADM_FALSE);
 	}
 
@@ -5404,14 +4949,11 @@ get_enum_cache(devfsadm_enumerate_t rules[], int nrules)
 
 	/*
 	 * For each RE, search disk and cache any matches on the
-	 * numeral list.  We are careful to use global_dev_dir here since
-	 * for zones, we want to use the global zone's enumeration as the
-	 * source for enumeration within the zone.  Otherwise, for example,
-	 * controller numbering would be wrong within the zone.
+	 * numeral list.
 	 */
 	for (i = 0; i < nrules; i++) {
 		path_left = s_strdup(setp->re[i]);
-		enumerate_recurse(global_dev_dir, path_left, setp, rules, i);
+		enumerate_recurse(dev_dir, path_left, setp, rules, i);
 		free(path_left);
 	}
 
@@ -5434,9 +4976,10 @@ get_enum_cache(devfsadm_enumerate_t rules[], int nrules)
 int
 get_stat_info(char *namebuf, struct stat *sb)
 {
-	struct dirent *entp;
-	DIR *dp;
 	char *cp;
+	char *pathlist;
+	char *listp;
+	int len;
 
 	if (lstat(namebuf, sb) < 0) {
 		(void) err_print(LSTAT_FAILED, namebuf, strerror(errno));
@@ -5453,7 +4996,7 @@ get_stat_info(char *namebuf, struct stat *sb)
 	 */
 	if ((sb->st_mode & S_IFMT) == S_IFDIR) {
 
-		if ((dp = opendir(namebuf)) == NULL) {
+		if ((pathlist = dev_readdir(namebuf)) == NULL) {
 			return (DEVFSADM_FAILURE);
 		}
 
@@ -5461,22 +5004,21 @@ get_stat_info(char *namebuf, struct stat *sb)
 		 *  Search each dir entry looking for a symlink.  Return
 		 *  the first symlink found in namebuf.  Recurse dirs.
 		 */
-		while ((entp = readdir(dp)) != NULL) {
-			if (strcmp(entp->d_name, ".") == 0 ||
-			    strcmp(entp->d_name, "..") == 0) {
-				continue;
-			}
-
+		for (listp = pathlist;
+		    (len = strlen(listp)) > 0; listp += len+1) {
 			cp = namebuf + strlen(namebuf);
-			(void) strcat(namebuf, "/");
-			(void) strcat(namebuf, entp->d_name);
+			if ((strlcat(namebuf, "/", PATH_MAX) >= PATH_MAX) ||
+			    (strlcat(namebuf, listp, PATH_MAX) >= PATH_MAX)) {
+				*cp = '\0';
+				return (DEVFSADM_FAILURE);
+			}
 			if (get_stat_info(namebuf, sb) == DEVFSADM_SUCCESS) {
-				s_closedir(dp);
+				free(pathlist);
 				return (DEVFSADM_SUCCESS);
 			}
 			*cp = '\0';
 		}
-		s_closedir(dp);
+		free(pathlist);
 	}
 
 	/* no symlink found, so return error */
@@ -5601,10 +5143,11 @@ enumerate_recurse(char *current_dir, char *path_left, numeral_set_t *setp,
 	char *slash;
 	char *new_path;
 	char *numeral_id;
-	struct dirent *entp;
-	DIR *dp;
+	char *pathlist;
+	char *listp;
+	int len;
 
-	if ((dp = opendir(current_dir)) == NULL) {
+	if ((pathlist = dev_readdir(current_dir)) == NULL) {
 		return;
 	}
 
@@ -5617,29 +5160,24 @@ enumerate_recurse(char *current_dir, char *path_left, numeral_set_t *setp,
 		*slash = '\0';
 	}
 
-	while ((entp = readdir(dp)) != NULL) {
-
-		if (strcmp(entp->d_name, ".") == 0 ||
-		    strcmp(entp->d_name, "..") == 0) {
-			continue;
-		}
+	for (listp = pathlist; (len = strlen(listp)) > 0; listp += len+1) {
 
 		/*
-		 *  Returns true if path_left matches entp->d_name
+		 *  Returns true if path_left matches the list entry.
 		 *  If it is the last path component, pass subexp
 		 *  so that it will return the corresponding ID in
 		 *  numeral_id.
 		 */
 		numeral_id = NULL;
-		if (match_path_component(path_left, entp->d_name, &numeral_id,
+		if (match_path_component(path_left, listp, &numeral_id,
 				    slash ? 0 : rules[index].subexp)) {
 
 			new_path = s_malloc(strlen(current_dir) +
-					    strlen(entp->d_name) + 2);
+			    strlen(listp) + 2);
 
 			(void) strcpy(new_path, current_dir);
 			(void) strcat(new_path, "/");
-			(void) strcat(new_path, entp->d_name);
+			(void) strcat(new_path, listp);
 
 			if (slash != NULL) {
 				enumerate_recurse(new_path, slash + 1,
@@ -5658,7 +5196,7 @@ enumerate_recurse(char *current_dir, char *path_left, numeral_set_t *setp,
 	if (slash != NULL) {
 		*slash = '/';
 	}
-	s_closedir(dp);
+	free(pathlist);
 }
 
 
@@ -7007,8 +6545,6 @@ devfsadm_exit(int status)
 		(void) dlclose(librcm_hdl);
 	}
 
-	zlist_deleteall_unlocked();		/* dispose of all zones */
-
 	exit_dev_lock();
 	exit_daemon_lock();
 
@@ -7020,14 +6556,10 @@ devfsadm_exit(int status)
 }
 
 /*
- * set root_dir, devices_dir, dev_dir using optarg.  zone_mode determines
- * whether we're operating on behalf of a zone; in this case, we need to
- * reference some things from the global zone.  Note that zone mode and
- * -R don't get along, but that should be OK since zone mode is not
- * a public interface.
+ * set root_dir, devices_dir, dev_dir using optarg.
  */
 static void
-set_root_devices_dev_dir(char *dir, int zone_mode)
+set_root_devices_dev_dir(char *dir)
 {
 	size_t len;
 
@@ -7038,14 +6570,6 @@ set_root_devices_dev_dir(char *dir, int zone_mode)
 	len = strlen(root_dir) + strlen(DEV) + 1;
 	dev_dir = s_malloc(len);
 	(void) snprintf(dev_dir, len, "%s%s", root_dir, DEV);
-	if (zone_mode) {
-		len = strlen(DEV) + 1;
-		global_dev_dir = s_malloc(len);
-		(void) snprintf(global_dev_dir, len, "%s", DEV);
-	} else {
-		global_dev_dir = s_malloc(len);
-		(void) snprintf(global_dev_dir, len, "%s%s", root_dir, DEV);
-	}
 }
 
 /*
@@ -7625,6 +7149,18 @@ alias(char *driver_name, char *alias_name)
 /*
  * convenience functions
  */
+static int
+s_stat(const char *path, struct stat *sbufp)
+{
+	int rv;
+retry:
+	if ((rv = stat(path, sbufp)) == -1) {
+		if (errno == EINTR)
+			goto retry;
+	}
+	return (rv);
+}
+
 static void *
 s_malloc(const size_t size)
 {
@@ -8476,5 +8012,274 @@ build_and_log_event(char *class, char *subclass, char *node_path,
 	if (nvl) {
 		log_event(class, subclass, nvl);
 		nvlist_free(nvl);
+	}
+}
+
+static int
+devname_kcall(int subcmd, void *args)
+{
+	int error = 0;
+	char *nvlbuf = NULL;
+	size_t nvlsize;
+
+	switch (subcmd) {
+	case MODDEVNAME_NSMAPS:
+		error = nvlist_pack((nvlist_t *)args, &nvlbuf, &nvlsize, 0, 0);
+		if (error) {
+			err_print("packing MODDEVNAME_NSMAPS failed\n");
+			break;
+		}
+		error = modctl(MODDEVNAME, subcmd, nvlbuf, nvlsize);
+		if (error) {
+			vprint(INFO_MID, "modctl(MODDEVNAME, "
+			    "MODDEVNAME_NSMAPS) failed - %s\n",
+			    strerror(errno));
+		}
+		free(nvlbuf);
+		nvlist_free(args);
+		break;
+	case MODDEVNAME_LOOKUPDOOR:
+		error = modctl(MODDEVNAME, subcmd, (uintptr_t)args);
+		if (error) {
+			vprint(INFO_MID, "modctl(MODDEVNAME, "
+			    "MODDEVNAME_LOOKUPDOOR) failed - %s\n",
+			    strerror(errno));
+		}
+		break;
+	default:
+		error = EINVAL;
+		break;
+	}
+	return (error);
+}
+
+static void
+devname_setup_nsmaps(void)
+{
+	int error = 0;
+
+	if (devname_first_call) {
+		devname_first_call = 0;
+	}
+
+	error = di_devname_get_mapinfo(DEVNAME_MASTER_MAP, &devname_maps);
+
+	if (error) {
+		vprint(INFO_MID, "devname_setup_nsmaps: error %d\n", errno);
+	} else {
+#ifdef DEBUG
+		di_devname_print_mapinfo(devname_maps);
+#endif
+		/* pass down the existing map names to kernel */
+		(void) devname_kcall(MODDEVNAME_NSMAPS, (void *)devname_maps);
+	}
+}
+
+static void
+devname_ns_services(uint8_t cmd, char *key, char *map)
+{
+	nvlist_t *nvl = NULL;
+	int32_t	error = 0;
+	sdev_door_res_t res;
+
+	vprint(DEVNAME_MID, "devname_ns_services: cmd %d key %s map %s\n",
+	    cmd, key, map);
+
+	switch (cmd) {
+	case DEVFSADMD_NS_LOOKUP:
+		vprint(DEVNAME_MID, "calling di_devname_get_mapent\n");
+		error = di_devname_get_mapent(key, map, &nvl);
+		if (nvl == NULL) {
+			error = DEVFSADM_NS_FAILED;
+			goto done;
+		}
+
+		if (error) {
+			nvlist_free(nvl);
+			goto done;
+		}
+
+		if (devname_debug_msg)
+			di_devname_print_mapinfo(nvl);
+
+		vprint(DEVNAME_MID, "calling di_devname_action_on_key for %d\n",
+		    cmd);
+		error = di_devname_action_on_key(nvl, cmd, key, (void *)&res);
+		nvlist_free(nvl);
+		break;
+	case DEVFSADMD_NS_READDIR:
+		vprint(DEVNAME_MID, "calling di_devname_get_mapinfo for cmd %d"
+		    "\n", cmd);
+		error = di_devname_get_mapinfo(map, &nvl);
+		if (nvl == NULL) {
+			error = DEVFSADM_NS_FAILED;
+			goto done;
+		}
+
+		if (error) {
+			nvlist_free(nvl);
+			goto done;
+		}
+
+		if (devname_debug_msg)
+			di_devname_print_mapinfo(nvl);
+
+		vprint(DEVNAME_MID, "calling di_devname_action_on_key\n");
+		error = di_devname_action_on_key(nvl, cmd, key, (void *)&res);
+		nvlist_free(nvl);
+		break;
+	default:
+		error = DEVFSADM_RUN_NOTSUP;
+		break;
+	}
+
+done:
+	vprint(DEVNAME_MID, "error %d\n", error);
+	res.devfsadm_error = error;
+	(void) door_return((char *)&res, sizeof (struct sdev_door_res),
+	    NULL, 0);
+}
+
+/* ARGSUSED */
+static void
+devname_lookup_handler(void *cookie, char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc)
+{
+	int32_t error = 0;
+	door_cred_t dcred;
+	struct dca_impl	dci;
+	uint8_t	cmd;
+	char *ns_map, *ns_name;
+	sdev_door_res_t res;
+	sdev_door_arg_t *args;
+
+	if (argp == NULL || arg_size == 0) {
+		vprint(DEVNAME_MID, "devname_lookup_handler: argp wrong\n");
+		error = DEVFSADM_RUN_INVALID;
+		goto done;
+	}
+	vprint(DEVNAME_MID, "devname_lookup_handler\n");
+
+	if (door_cred(&dcred) != 0 || dcred.dc_euid != 0) {
+		vprint(DEVNAME_MID, "devname_lookup_handler: cred wrong\n");
+		error = DEVFSADM_RUN_EPERM;
+		goto done;
+	}
+
+	args = (sdev_door_arg_t *)argp;
+	cmd = args->devfsadm_cmd;
+
+	vprint(DEVNAME_MID, "devname_lookup_handler: cmd %d\n", cmd);
+	switch (cmd) {
+	case DEVFSADMD_NS_LOOKUP:
+	case DEVFSADMD_NS_READDIR:
+		ns_name = s_strdup(args->ns_hdl.ns_name);
+		ns_map = s_strdup(args->ns_hdl.ns_map);
+
+		vprint(DEVNAME_MID, " ns_name %s ns_map %s\n", ns_name, ns_map);
+		if (ns_name == NULL || ns_map == NULL) {
+			error = DEVFSADM_RUN_INVALID;
+			goto done;
+		}
+
+		devname_ns_services(cmd, ns_name, ns_map);
+		return;
+	case DEVFSADMD_RUN_ALL:
+		/*
+		 * run "devfsadm"
+		 */
+		dci.dci_root = "/";
+		dci.dci_minor = NULL;
+		dci.dci_driver = NULL;
+		dci.dci_error = 0;
+		dci.dci_flags = 0;
+		dci.dci_arg = NULL;
+
+		lock_dev();
+		update_drvconf((major_t)-1);
+		dci.dci_flags |= DCA_FLUSH_PATHINST;
+
+		pre_and_post_cleanup(RM_PRE);
+		devi_tree_walk(&dci, DINFOFORCE|DI_CACHE_SNAPSHOT_FLAGS, NULL);
+		error = (int32_t)dci.dci_error;
+		if (!error) {
+			pre_and_post_cleanup(RM_POST);
+			update_database = TRUE;
+			unlock_dev(SYNC_STATE);
+			update_database = FALSE;
+		} else {
+			if (DEVFSADM_DEBUG_ON) {
+				vprint(INFO_MID, "devname_lookup_handler: "
+				    "DEVFSADMD_RUN_ALL failed\n");
+			}
+
+			unlock_dev(SYNC_STATE);
+		}
+		break;
+	default:
+		/* log an error here? */
+		error = DEVFSADM_RUN_NOTSUP;
+		break;
+	}
+
+done:
+	vprint(DEVNAME_MID, "devname_lookup_handler: error %d\n", error);
+	res.devfsadm_error = error;
+	(void) door_return((char *)&res, sizeof (struct sdev_door_res),
+	    NULL, 0);
+}
+
+/*
+ * Use of the dev filesystem's private readdir does not trigger
+ * the implicit device reconfiguration.
+ *
+ * Note: only useable with paths mounted on an instance of the
+ * dev filesystem.
+ *
+ * Does not return the . and .. entries.
+ * Empty directories are returned as an zero-length list.
+ * ENOENT is returned as a NULL list pointer.
+ */
+static char *
+dev_readdir(char *path)
+{
+	int	rv;
+	int64_t	bufsiz;
+	char	*pathlist;
+	char	*p;
+	int	len;
+
+	assert((strcmp(path, "/dev") == 0) ||
+		(strncmp(path, "/dev/", 4) == 0));
+
+	rv = modctl(MODDEVREADDIR, path, strlen(path), NULL, &bufsiz);
+	if (rv != 0) {
+		vprint(READDIR_MID, "%s: %s\n", path, strerror(errno));
+		return (NULL);
+	}
+
+	for (;;) {
+		assert(bufsiz != 0);
+		pathlist = s_malloc(bufsiz);
+
+		rv = modctl(MODDEVREADDIR, path, strlen(path),
+		    pathlist, &bufsiz);
+		if (rv == 0) {
+			vprint(READDIR_MID, "%s\n", path);
+			vprint(READDIR_ALL_MID, "%s:\n", path);
+			for (p = pathlist; (len = strlen(p)) > 0; p += len+1) {
+				vprint(READDIR_ALL_MID, "    %s\n", p);
+			}
+			return (pathlist);
+		}
+		free(pathlist);
+		switch (errno) {
+		case EAGAIN:
+			break;
+		case ENOENT:
+		default:
+			vprint(READDIR_MID, "%s: %s\n", path, strerror(errno));
+			return (NULL);
+		}
 	}
 }

@@ -57,6 +57,7 @@ f none kernel/crypto/sha1 755 root sys
 f none kernel/crypto/sha2 755 root sys
 f none kernel/crypto/swrand 755 root sys
 f none kernel/dacf/consconfig_dacf 755 root sys
+f none kernel/devname/sdev_nsconfig_mod 755 root sys
 f none kernel/drv/aggr 755 root sys
 f none kernel/drv/arp 755 root sys
 f none kernel/drv/bl 755 root sys
@@ -132,6 +133,7 @@ f none kernel/fs/autofs 755 root sys
 f none kernel/fs/cachefs 755 root sys
 f none kernel/fs/ctfs 755 root sys
 f none kernel/fs/devfs 755 root sys
+f none kernel/fs/dev 755 root sys
 f none kernel/fs/fifofs 755 root sys
 f none kernel/fs/hsfs 755 root sys
 f none kernel/fs/lofs 755 root sys
@@ -234,6 +236,8 @@ f none kernel/crypto/amd64/sha2 755 root sys
 f none kernel/crypto/amd64/swrand 755 root sys
 d none kernel/dacf/amd64 755 root sys
 f none kernel/dacf/amd64/consconfig_dacf 755 root sys
+d none kernel/devname/amd64 755 root sys
+f none kernel/devname/amd64/sdev_nsconfig_mod 755 root sys
 d none kernel/drv/amd64 755 root sys
 f none kernel/drv/amd64/aggr 755 root sys
 f none kernel/drv/amd64/arp 755 root sys
@@ -303,6 +307,7 @@ d none kernel/fs/amd64 755 root sys
 f none kernel/fs/amd64/autofs 755 root sys
 f none kernel/fs/amd64/cachefs 755 root sys
 f none kernel/fs/amd64/ctfs 755 root sys
+f none kernel/fs/amd64/dev 755 root sys
 f none kernel/fs/amd64/devfs 755 root sys
 f none kernel/fs/amd64/fifofs 755 root sys
 f none kernel/fs/amd64/hsfs 755 root sys

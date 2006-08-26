@@ -682,6 +682,8 @@ FSHDRS=				\
 	cachefs_ioctl.h		\
 	cachefs_log.h		\
 	dv_node.h		\
+	sdev_impl.h		\
+	sdev_node.h		\
 	fifonode.h		\
 	hsfs_isospec.h		\
 	hsfs_node.h		\

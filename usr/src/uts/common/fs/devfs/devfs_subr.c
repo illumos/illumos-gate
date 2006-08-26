@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -569,6 +568,57 @@ dv_vattr_merge(struct dv_node *dv, struct vattr *vap)
 }
 
 /*
+ * Get default device permission by consulting rules in
+ * privilege specification in minor node and /etc/minor_perm.
+ *
+ * This function is called from the devname filesystem to get default
+ * permissions for a device exported to a non-global zone.
+ */
+void
+devfs_get_defattr(struct vnode *vp, struct vattr *vap, int *no_fs_perm)
+{
+	mperm_t	mp;
+	struct dv_node *dv;
+
+	/* If vp isn't a dv_node, return something sensible */
+	if (!vn_matchops(vp, dv_vnodeops)) {
+		if (no_fs_perm)
+			*no_fs_perm = 0;
+		*vap = dv_vattr_file;
+		return;
+	}
+
+	/*
+	 * For minors not created by ddi_create_priv_minor_node(),
+	 * use devfs defaults.
+	 */
+	dv = VTODV(vp);
+	if (vp->v_type == VDIR) {
+		*vap = dv_vattr_dir;
+	} else if (dv->dv_flags & DV_NO_FSPERM) {
+		if (no_fs_perm)
+			*no_fs_perm = 1;
+		*vap = dv_vattr_priv;
+	} else {
+		/*
+		 * look up perm bits from minor_perm
+		 */
+		*vap = dv_vattr_file;
+		if (dev_minorperm(dv->dv_devi, dv->dv_name, &mp) == 0) {
+			VATTR_MP_MERGE((*vap), mp);
+			dcmn_err5(("%s: minor perm mode 0%o\n",
+			    dv->dv_name, vap->va_mode));
+		} else if (dv->dv_flags & DV_DFLT_MODE) {
+			ASSERT((dv->dv_dflt_mode & ~S_IAMB) == 0);
+			vap->va_mode &= ~S_IAMB;
+			vap->va_mode |= dv->dv_dflt_mode;
+			dcmn_err5(("%s: priv mode 0%o\n",
+			    dv->dv_name, vap->va_mode));
+		}
+	}
+}
+
+/*
  * dv_shadow_node
  *
  * Given a VDIR dv_node, find/create the associated VDIR
@@ -608,7 +658,6 @@ dv_shadow_node(
 	struct vattr	vattr;
 	int		create_tried;
 	int		error;
-	mperm_t		mp;
 
 	ASSERT(vp->v_type == VDIR || vp->v_type == VCHR || vp->v_type == VBLK);
 	dv = VTODV(vp);
@@ -688,30 +737,9 @@ lookup:
 
 	/*
 	 * Failed to find attribute in persistent backing store,
-	 * get default permission bits.  For minors not created by
-	 * ddi_create_priv_minor_node(), use devfs defaults.
+	 * get default permission bits.
 	 */
-	if (vp->v_type == VDIR) {
-		vattr = dv_vattr_dir;
-	} else if (dv->dv_flags & DV_NO_FSPERM) {
-		vattr = dv_vattr_priv;
-	} else {
-		/*
-		 * look up perm bits from minor_perm
-		 */
-		vattr = dv_vattr_file;
-		if (dev_minorperm(dv->dv_devi, dv->dv_name, &mp) == 0) {
-			VATTR_MP_MERGE(vattr, mp);
-			dcmn_err5(("%s: minor perm mode 0%o\n",
-			    dv->dv_name, vattr.va_mode));
-		} else if (dv->dv_flags & DV_DFLT_MODE) {
-			ASSERT((dv->dv_dflt_mode & ~S_IAMB) == 0);
-			vattr.va_mode &= ~S_IAMB;
-			vattr.va_mode |= dv->dv_dflt_mode;
-			dcmn_err5(("%s: priv mode 0%o\n",
-			    dv->dv_name, vattr.va_mode));
-		}
-	}
+	devfs_get_defattr(vp, &vattr, NULL);
 
 	dv_vattr_merge(dv, &vattr);
 	gethrestime(&vattr.va_atime);

@@ -71,10 +71,13 @@ extern "C" {
 #include <message.h>
 #include <sys/cladm.h>
 #include <librcm.h>
-#include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/dev.h>
 #include <libzonecfg.h>
 #include <device_info.h>
+#include <sys/fs/sdev_node.h>
+#include <sys/syscall.h>
+#include <rpcsvc/ypclnt.h>
+#include <sys/sysevent/eventdefs.h>
 
 #undef	DEBUG
 #ifndef DEBUG
@@ -90,6 +93,8 @@ extern "C" {
 #define	DAEMON_LOCK_FILE ".devfsadm_daemon.lock"
 
 #define	DEV "/dev"
+#define	ETC "/etc"
+#define	ETCDEV "/etc/dev"
 #define	DEV_LEN 4
 #define	DEVICES "/devices"
 #define	DEVICES_LEN 8
@@ -107,31 +112,7 @@ extern "C" {
 #define	MINOR_FINI_TIMEOUT_DEFAULT 2
 #define	FORCE_CALL_MINOR_FINI	10
 
-
 #define	SYNCH_DOOR_PERMS	(S_IRUSR | S_IWUSR)
-
-#define	ZONE_DOOR_PERMS		(S_IRUSR | S_IWUSR)
-#define	ZONE_REG_DOOR	".zone_reg_door"
-
-enum zreg_op {
-	ZONE_REG = 1,
-	ZONE_UNREG = 2
-};
-
-enum zreg_err {
-	ZONE_SUCCESS = 0,
-	ZONE_ERR_NOZONE = 1,
-	ZONE_ERR_DOOR = 2,
-	ZONE_ERR_REPOSITORY = 3,
-	ZONE_ERR_NOLIB = 4
-};
-
-struct zreg {
-	char zreg_zonename[ZONENAME_MAX];
-	enum zreg_op zreg_op;
-	enum zreg_err zreg_error;
-	int zreg_errno;
-};
 
 #define	DRVCONFIG "drvconfig"
 #define	DEVFSADM "devfsadm"
@@ -223,7 +204,9 @@ struct zreg {
 #define	LINKCACHE_MID		"devfsadm:linkcache"
 #define	ADDREMCACHE_MID		"devfsadm:addremcache"
 #define	MALLOC_MID		"devfsadm:malloc"
-#define	ZONE_MID		"devfsadm:zone"
+#define	READDIR_MID		"devfsadm:readdir"
+#define	READDIR_ALL_MID		"devfsadm:readdir_all"
+#define	DEVNAME_MID		"devfsadm:devname"
 #define	ALL_MID			"all"
 
 #define	DEVFSADM_DEBUG_ON	(verbose == NULL) ? FALSE : TRUE
@@ -376,13 +359,6 @@ struct dca_impl {
 	int dci_flags;
 };
 
-struct zone_devinfo {
-	struct zone_devinfo *zone_next;
-	char *zone_path;
-	char *zone_name;
-	zone_dochandle_t zone_dochdl;
-};
-
 /* RCM related */
 struct rcm_eventq {
 	nvlist_t *nvl;
@@ -393,7 +369,7 @@ static int devfsadm_enumerate_int_start(char *devfs_path,
 	int index, char **buf, devfsadm_enumerate_t rules[],
 	int nrules, char *start);
 static void startup_cache_sync_thread(void);
-static void set_root_devices_dev_dir(char *dir, int zone_mode);
+static void set_root_devices_dev_dir(char *dir);
 static void pre_and_post_cleanup(int flags);
 static void hot_cleanup(char *, char *, char *, char *, int);
 static void devfsadm_exit(int status);
@@ -499,14 +475,6 @@ static int lookup_enum_cache(numeral_set_t *set, char *cmp_str,
     devfsadm_enumerate_t rules[], int index, numeral_t **matchnpp);
 static void sync_handler(void *cookie, char *ap, size_t asize,
     door_desc_t *dp, uint_t ndesc);
-static void zlist_insert(struct zone_devinfo *newzone);
-static void delete_zone(struct zone_devinfo *z);
-static struct zone_devinfo *zlist_remove(char *zone_name);
-static void zlist_deleteall_unlocked(void);
-static void call_zone_register(char *zone_name, int regop);
-static int register_all_zones(void);
-static void zone_reg_handler(void *cookie, char *ap, size_t asize,
-    door_desc_t *dp, uint_t ndesc);
 static int zone_pathcheck(char *checkpath);
 static void process_deferred_links(struct dca_impl *dcip, int flag);
 static void event_handler(sysevent_t *ev);
@@ -530,18 +498,29 @@ static nvlist_t *build_event_attributes(char *, char *, char *,
     di_node_t, char *, int);
 static void log_event(char *, char *, nvlist_t *);
 static void build_and_log_event(char *, char *, char *, di_node_t);
+static char *dev_readdir(char *);
 
 static void read_logindevperm_file(void);
 static void set_logindev_perms(char *devlink);
 
 static void reset_node_permissions(di_node_t, di_minor_t);
 
+/*
+ * devname related
+ */
+static void devname_lookup_handler(void *, char *, size_t,
+    door_desc_t *, uint_t);		/* /dev name lookup server */
+static int devname_kcall(int, void *);	/* syscall into the devname fs */
 
 /* convenient short hands */
 #define	vprint		devfsadm_print
 #define	err_print	devfsadm_errprint
+#ifndef TRUE
 #define	TRUE	1
+#endif
+#ifndef FALSE
 #define	FALSE	0
+#endif
 
 #ifdef	__cplusplus
 }

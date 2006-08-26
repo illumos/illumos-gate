@@ -716,6 +716,8 @@ ZCONS_OBJS += zcons.o
 
 SI3124_OBJS += si3124.o
 
+NSCONFIG_DEVNAME_OBJS += sdev_nsconfig_mod.o
+
 PCIIDE_OBJS += pci-ide.o
 
 PCEPP_OBJS += pcepp.o
@@ -753,13 +755,16 @@ CACHEFS_OBJS +=	cachefs_cnode.o		cachefs_cod.o \
 		cachefs_subr.o		cachefs_vfsops.o \
 		cachefs_vnops.o
 
+DEVFS_OBJS +=	devfs_subr.o	devfs_vfsops.o	devfs_vnops.o
+
+DEV_OBJS  +=	sdev_subr.o	sdev_vfsops.o	sdev_vnops.o	\
+		sdev_ptsops.o	sdev_comm.o	sdev_profile.o	sdev_ncache.o
+
 CTFS_OBJS +=	ctfs_all.o ctfs_cdir.o ctfs_ctl.o ctfs_event.o \
 		ctfs_latest.o ctfs_root.o ctfs_sym.o ctfs_tdir.o ctfs_tmpl.o
 
 OBJFS_OBJS +=	objfs_vfs.o	objfs_root.o	objfs_common.o \
 		objfs_odir.o	objfs_data.o
-
-DEVFS_OBJS +=	devfs_subr.o	devfs_vfsops.o	devfs_vnops.o
 
 FDFS_OBJS +=	fdops.o
 

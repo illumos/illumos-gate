@@ -57,6 +57,7 @@
 #include <sys/kcpc.h>
 #include <sys/cpc_pcbe.h>
 #include <sys/kstat.h>
+#include <sys/fs/sdev_node.h>
 
 extern int moddebug;
 
@@ -213,6 +214,17 @@ static int mod_removedacf(struct modldacf *, struct modlinkage *);
 
 struct mod_ops mod_dacfops = {
 	mod_installdacf, mod_removedacf, mod_infodacf
+};
+
+/*
+ * /dev fs modules
+ */
+static int mod_infodev(struct modldev *, struct modlinkage *, int *);
+static int mod_installdev(struct modldev *, struct modlinkage *);
+static int mod_removedev(struct modldev *, struct modlinkage *);
+
+struct mod_ops mod_devfsops = {
+	mod_installdev, mod_removedev, mod_infodev
 };
 
 /*
@@ -483,6 +495,41 @@ mod_removepcbe(struct modlpcbe *modl, struct modlinkage *modlp)
 	return (EBUSY);
 }
 
+/*
+ * manage /dev fs modules
+ */
+/*ARGSUSED*/
+static int
+mod_infodev(struct modldev *modl, struct modlinkage *modlp, int *p0)
+{
+	if (mod_getctl(modlp) == NULL) {
+		*p0 = -1;
+		return (0);	/* module is not yet installed */
+	}
+
+	*p0 = 0;
+	return (0);
+}
+
+static int
+mod_installdev(struct modldev *modl, struct modlinkage *modlp)
+{
+	struct modctl	*mcp;
+
+	if ((mcp = mod_getctl(modlp)) == NULL)
+		return (EINVAL);
+	return (sdev_module_register(mcp->mod_modname, modl->dev_ops));
+}
+
+/*
+ * /dev modules are not unloadable.
+ */
+/*ARGSUSED*/
+static int
+mod_removedev(struct modldev *modl, struct modlinkage *modlp)
+{
+	return (EBUSY);
+}
 
 /*
  * Install a new driver

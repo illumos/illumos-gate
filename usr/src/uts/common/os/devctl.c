@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -51,7 +50,6 @@
 #include <sys/fs/snode.h>
 #include <sys/fs/dv_node.h>
 #include <sys/kobj.h>
-
 #include <sys/devctl_impl.h>
 
 
@@ -65,6 +63,8 @@ int devid_discovery_secs = 0;
 
 int devid_cache_read_disable = 0;
 int devid_cache_write_disable = 0;
+int sdev_cache_read_disable = 0;
+int sdev_cache_write_disable = 0;
 
 int kfio_report_error = 0;		/* kernel file i/o operations */
 int devid_report_error = 0;		/* devid cache operations */
@@ -78,13 +78,46 @@ static kmutex_t		devid_discovery_mutex;
 static kcondvar_t	devid_discovery_cv;
 static clock_t		devid_last_discovery = 0;
 
+
+static int		devid_nvp2nvl(nvfd_t *, nvlist_t **);
+static nvp_list_t	*devid_nvl2nvp(nvlist_t *, char *);
+static void		devid_nvp_free(nvp_list_t *);
+
+static int		sdev_nvp2nvl(nvfd_t *, nvlist_t **);
+static nvp_list_t	*sdev_nvl2nvp(nvlist_t *, char *);
+static void		sdev_nvp_free(nvp_list_t *);
+
 /*
- * Descriptor for /etc/devices/devid_cache
+ * Descriptors for the /etc/devices cache files
  */
-nvfd_t devid_cache_fd = {
+static nvfd_t devid_cache_fd = {
 	"/etc/devices/devid_cache",
+	devid_nvp2nvl,			/* nvf_nvp2nvl */
+	devid_nvl2nvp,			/* nvf_nvl2nvp */
+	devid_nvp_free,			/* nvf_nvp_free */
+	NULL,				/* nvf_write_complete */
+	0, NULL, NULL, 0
+
 };
-static nvfd_t *dcfd = &devid_cache_fd;
+static nvfd_t sdev_cache_fd = {
+	"/etc/devices/devname_cache",
+	sdev_nvp2nvl,			/* nvf_nvp2nvl */
+	sdev_nvl2nvp,			/* nvf_nvl2nvp */
+	sdev_nvp_free,			/* nvf_nvp_free */
+	NULL,				/* nvf_write_complete */
+	0, NULL, NULL, 0
+};
+
+static nvfd_t	*dcfd	= &devid_cache_fd;
+nvfd_t		*sdevfd	= &sdev_cache_fd;
+
+static nvfd_t *cachefds[] = {
+	&devid_cache_fd,
+	&sdev_cache_fd
+};
+
+#define	NCACHEFDS	((sizeof (cachefds)) / (sizeof (nvfd_t *)))
+
 
 
 extern int modrootloaded;
@@ -121,6 +154,11 @@ i_ddi_devices_init(void)
 	dcfd->nvf_list = NULL;
 	dcfd->nvf_tail = NULL;
 	rw_init(&dcfd->nvf_lock, NULL, RW_DRIVER, NULL);
+
+	sdevfd->nvf_flags = 0;
+	sdevfd->nvf_list = NULL;
+	sdevfd->nvf_tail = NULL;
+	rw_init(&sdevfd->nvf_lock, NULL, RW_DRIVER, NULL);
 
 	mutex_init(&devid_discovery_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&devid_discovery_cv, NULL, CV_DRIVER, NULL);
@@ -546,44 +584,63 @@ e_fwrite_nvlist(nvfd_t *nvfd, nvlist_t *nvl)
 }
 
 static void
-nvp_free(nvp_list_t *np)
+devid_nvp_free(nvp_list_t *np)
 {
-	if (np->nvp_devpath)
-		kmem_free(np->nvp_devpath, strlen(np->nvp_devpath)+1);
-	if (np->nvp_devid)
-		kmem_free(np->nvp_devid, ddi_devid_sizeof(np->nvp_devid));
+	nvp_devid_t *dp = NVP2DEVID(np);
 
-	kmem_free(np, sizeof (nvp_list_t));
+	if (dp->nvp_devpath)
+		kmem_free(dp->nvp_devpath, strlen(dp->nvp_devpath)+1);
+	if (dp->nvp_devid)
+		kmem_free(dp->nvp_devid, ddi_devid_sizeof(dp->nvp_devid));
+
+	kmem_free(dp, sizeof (nvp_devid_t));
 }
 
 static void
-nvp_list_free(nvp_list_t *nvp)
+sdev_nvp_free(nvp_list_t *np)
+{
+	nvp_devname_t *dp = NVP2DEVNAME(np);
+	int	i;
+	char	**p;
+
+	if (dp->nvp_npaths > 0) {
+		p = dp->nvp_paths;
+		for (i = 0; i < dp->nvp_npaths; i++, p++) {
+			kmem_free(*p, strlen(*p)+1);
+		}
+		kmem_free(dp->nvp_paths,
+			dp->nvp_npaths * sizeof (char *));
+		kmem_free(dp->nvp_expirecnts,
+			dp->nvp_npaths * sizeof (int));
+	}
+
+	kmem_free(dp, sizeof (nvp_devname_t));
+}
+
+static void
+nvp_list_free(nvfd_t *nvf, nvp_list_t *nvp)
 {
 	nvp_list_t	*np;
 	nvp_list_t	*next;
 
 	for (np = nvp; np; np = next) {
 		next = np->nvp_next;
-		nvp_free(np);
+		(nvf->nvf_nvp_free)(np);
 	}
 }
 
+
 /*
- * Free the devid-related information in an nvp element
- * If no more data is stored in the nvp element, free
- * it and unlink it from the list
- *
- * Since at present there is no further use of nvp's,
- * there's nothing to check.
+ * Free an nvp element in a list
  */
-static nvp_list_t *
-nfd_devid_free_and_unlink(nvfd_t *nvf, nvp_list_t *np)
+void
+nfd_nvp_free_and_unlink(nvfd_t *nvf, nvp_list_t *np)
 {
 	nvp_list_t *pv, *next;
 
 	pv = np->nvp_prev;
 	next = np->nvp_next;
-	nvp_free(np);
+	(nvf->nvf_nvp_free)(np);
 
 	/* remove element at head */
 	if (pv == NULL) {
@@ -602,12 +659,10 @@ nfd_devid_free_and_unlink(nvfd_t *nvf, nvp_list_t *np)
 		pv->nvp_next = next;
 		next->nvp_prev = pv;
 	}
-
-	return (next);
 }
 
-static void
-nfd_devid_link(nvfd_t *nvf, nvp_list_t *np)
+void
+nfd_nvp_link(nvfd_t *nvf, nvp_list_t *np)
 {
 	if (nvf->nvf_list == NULL) {
 		nvf->nvf_list = np;
@@ -622,16 +677,17 @@ nfd_devid_link(nvfd_t *nvf, nvp_list_t *np)
 /*
  * Convert a device path/nvlist pair to an nvp_list_t
  * Used to parse the nvlist format when reading
+ * /etc/devices/devid_cache
  */
 static nvp_list_t *
-nvlist_to_nvp(nvlist_t *nvl, char *name)
+devid_nvl2nvp(nvlist_t *nvl, char *name)
 {
-	nvp_list_t *np;
+	nvp_devid_t *np;
 	ddi_devid_t devidp;
 	int rval;
 	uint_t n;
 
-	np = kmem_zalloc(sizeof (nvp_list_t), KM_SLEEP);
+	np = kmem_zalloc(sizeof (nvp_devid_t), KM_SLEEP);
 	np->nvp_devpath = i_ddi_strdup(name, KM_SLEEP);
 
 	NVP_DEVID_DEBUG_PATH((np->nvp_devpath));
@@ -654,18 +710,70 @@ nvlist_to_nvp(nvlist_t *nvl, char *name)
 		}
 	}
 
-	return (np);
+	return (NVPLIST(np));
 }
 
 /*
+ * Convert a device path/nvlist pair to an nvp_list_t
+ * Used to parse the nvlist format when reading
+ * /etc/devices/devname_cache
+ */
+static nvp_list_t *
+sdev_nvl2nvp(nvlist_t *nvl, char *name)
+{
+	nvp_devname_t *np;
+	char	**strs;
+	int	*cnts;
+	uint_t	nstrs, ncnts;
+	int	rval, i;
+
+	/* name of the sublist must match what we created */
+	if (strcmp(name, DP_DEVNAME_ID) != 0) {
+		return (NULL);
+	}
+
+	np = kmem_zalloc(sizeof (nvp_devname_t), KM_SLEEP);
+
+	rval = nvlist_lookup_string_array(nvl,
+	    DP_DEVNAME_NCACHE_ID, &strs, &nstrs);
+	if (rval) {
+		kmem_free(np, sizeof (nvp_devname_t));
+		return (NULL);
+	}
+
+	np->nvp_npaths = nstrs;
+	np->nvp_paths = kmem_zalloc(nstrs * sizeof (char *), KM_SLEEP);
+	for (i = 0; i < nstrs; i++) {
+		np->nvp_paths[i] = i_ddi_strdup(strs[i], KM_SLEEP);
+	}
+	np->nvp_expirecnts = kmem_zalloc(nstrs * sizeof (int), KM_SLEEP);
+	for (i = 0; i < nstrs; i++) {
+		np->nvp_expirecnts[i] = 4; /* XXX sdev_nc_expirecnt */
+	}
+
+	rval = nvlist_lookup_int32_array(nvl,
+	    DP_DEVNAME_NC_EXPIRECNT_ID, &cnts, &ncnts);
+	if (rval == 0) {
+		ASSERT(ncnts == nstrs);
+		ncnts = max(ncnts, nstrs);
+		for (i = 0; i < nstrs; i++) {
+			np->nvp_expirecnts[i] = cnts[i];
+		}
+	}
+
+	return (NVPLIST(np));
+}
+
+
+/*
  * Convert a list of nvp_list_t's to a single nvlist
- * Used when writing the nvlist file
+ * Used when writing the nvlist file.
  */
 static int
-nvp_to_nvlist(nvfd_t *nvfd, nvlist_t **ret_nvl)
+devid_nvp2nvl(nvfd_t *nvfd, nvlist_t **ret_nvl)
 {
 	nvlist_t	*nvl, *sub_nvl;
-	nvp_list_t	*np;
+	nvp_devid_t	*np;
 	int		rval;
 
 	ASSERT(modrootloaded);
@@ -677,7 +785,7 @@ nvp_to_nvlist(nvfd_t *nvfd, nvlist_t **ret_nvl)
 		return (DDI_FAILURE);
 	}
 
-	for (np = nvfd->nvf_list; np; np = np->nvp_next) {
+	for (np = NVF_DEVID_LIST(nvfd); np; np = NVP_DEVID_NEXT(np)) {
 		if (np->nvp_devid == NULL)
 		    continue;
 		NVP_DEVID_DEBUG_PATH(np->nvp_devpath);
@@ -689,21 +797,89 @@ nvp_to_nvlist(nvfd_t *nvfd, nvlist_t **ret_nvl)
 			goto err;
 		}
 
-		if (np->nvp_devid) {
-			rval = nvlist_add_byte_array(sub_nvl, DP_DEVID_ID,
-				(uchar_t *)np->nvp_devid,
-				ddi_devid_sizeof(np->nvp_devid));
-			if (rval == 0) {
-				NVP_DEVID_DEBUG_DEVID(np->nvp_devid);
-			} else {
-				KFIOERR((CE_CONT,
-				    "%s: nvlist add error %d (devid)\n",
-				    nvfd->nvf_name, rval));
-				goto err;
-			}
+		rval = nvlist_add_byte_array(sub_nvl, DP_DEVID_ID,
+			(uchar_t *)np->nvp_devid,
+			ddi_devid_sizeof(np->nvp_devid));
+		if (rval == 0) {
+			NVP_DEVID_DEBUG_DEVID(np->nvp_devid);
+		} else {
+			KFIOERR((CE_CONT,
+			    "%s: nvlist add error %d (devid)\n",
+			    nvfd->nvf_name, rval));
+			goto err;
 		}
 
 		rval = nvlist_add_nvlist(nvl, np->nvp_devpath, sub_nvl);
+		if (rval != 0) {
+			KFIOERR((CE_CONT, "%s: nvlist add error %d (sublist)\n",
+			    nvfd->nvf_name, rval));
+			goto err;
+		}
+		nvlist_free(sub_nvl);
+	}
+
+	*ret_nvl = nvl;
+	return (DDI_SUCCESS);
+
+err:
+	if (sub_nvl)
+		nvlist_free(sub_nvl);
+	nvlist_free(nvl);
+	*ret_nvl = NULL;
+	return (DDI_FAILURE);
+}
+
+/*
+ * Convert a list of nvp_list_t's to a single nvlist
+ * Used when writing the nvlist file.
+ */
+static int
+sdev_nvp2nvl(nvfd_t *nvfd, nvlist_t **ret_nvl)
+{
+	nvlist_t	*nvl, *sub_nvl;
+	nvp_devname_t	*np;
+	int		rval;
+
+	ASSERT(modrootloaded);
+
+	rval = nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP);
+	if (rval != 0) {
+		KFIOERR((CE_CONT, "%s: nvlist alloc error %d\n",
+			nvfd->nvf_name, rval));
+		return (DDI_FAILURE);
+	}
+
+	if ((np = NVF_DEVNAME_LIST(nvfd)) != NULL) {
+		ASSERT(NVP_DEVNAME_NEXT(np) == NULL);
+
+		rval = nvlist_alloc(&sub_nvl, NV_UNIQUE_NAME, KM_SLEEP);
+		if (rval != 0) {
+			KFIOERR((CE_CONT, "%s: nvlist alloc error %d\n",
+				nvfd->nvf_name, rval));
+			sub_nvl = NULL;
+			goto err;
+		}
+
+		rval = nvlist_add_string_array(sub_nvl,
+		    DP_DEVNAME_NCACHE_ID, np->nvp_paths, np->nvp_npaths);
+		if (rval != 0) {
+			KFIOERR((CE_CONT,
+			    "%s: nvlist add error %d (sdev)\n",
+			    nvfd->nvf_name, rval));
+			goto err;
+		}
+
+		rval = nvlist_add_int32_array(sub_nvl,
+		    DP_DEVNAME_NC_EXPIRECNT_ID,
+		    np->nvp_expirecnts, np->nvp_npaths);
+		if (rval != 0) {
+			KFIOERR((CE_CONT,
+			    "%s: nvlist add error %d (sdev)\n",
+			    nvfd->nvf_name, rval));
+			goto err;
+		}
+
+		rval = nvlist_add_nvlist(nvl, DP_DEVNAME_ID, sub_nvl);
 		if (rval != 0) {
 			KFIOERR((CE_CONT, "%s: nvlist add error %d (sublist)\n",
 			    nvfd->nvf_name, rval));
@@ -769,17 +945,18 @@ fread_nvp_list(nvfd_t *nvfd)
 			 * convert nvlist for this device to
 			 * an nvp_list_t struct
 			 */
-			np = nvlist_to_nvp(sublist, name);
-			np->nvp_next = NULL;
-			np->nvp_prev = nvp_tail;
+			np = (nvfd->nvf_nvl2nvp)(sublist, name);
+			if (np) {
+				np->nvp_next = NULL;
+				np->nvp_prev = nvp_tail;
 
-			if (nvp_list == NULL) {
-				nvp_list = np;
-			} else {
-				nvp_tail->nvp_next = np;
+				if (nvp_list == NULL) {
+					nvp_list = np;
+				} else {
+					nvp_tail->nvp_next = np;
+				}
+				nvp_tail = np;
 			}
-			nvp_tail = np;
-
 			break;
 
 		default:
@@ -800,7 +977,7 @@ fread_nvp_list(nvfd_t *nvfd)
 error:
 	nvlist_free(nvl);
 	if (nvp_list)
-		nvp_list_free(nvp_list);
+		nvp_list_free(nvfd, nvp_list);
 	return (rval);
 }
 
@@ -810,7 +987,7 @@ i_ddi_read_one_nvfile(nvfd_t *nvfd)
 {
 	int rval;
 
-	KFDEBUG((CE_CONT, "Reading %s\n", nvfd->nvf_name));
+	KFDEBUG((CE_CONT, "reading %s\n", nvfd->nvf_name));
 
 	rval = fread_nvp_list(nvfd);
 	if (rval) {
@@ -836,39 +1013,26 @@ i_ddi_read_one_nvfile(nvfd_t *nvfd)
 	return (rval);
 }
 
+/* for information possibly required to mount root */
 void
 i_ddi_read_devices_files(void)
 {
-	nvfd_t nvfd;
-	int rval;
-
 	mdi_read_devices_files();
 
-	if (devid_cache_read_disable)
-		return;
-
-	nvfd.nvf_name = dcfd->nvf_name;
-	nvfd.nvf_flags = 0;
-	nvfd.nvf_list = NULL;
-	nvfd.nvf_tail = NULL;
-	rw_init(&nvfd.nvf_lock, NULL, RW_DRIVER, NULL);
-
-	rval = i_ddi_read_one_nvfile(&nvfd);
-
-	rw_enter(&dcfd->nvf_lock, RW_WRITER);
-
-	if (rval == 0) {
-		if (dcfd->nvf_list != NULL) {
-			nvp_list_free(dcfd->nvf_list);
-		}
-		dcfd->nvf_list = nvfd.nvf_list;
-		dcfd->nvf_tail = nvfd.nvf_tail;
+	if (devid_cache_read_disable == 0) {
+		ASSERT(dcfd->nvf_list == NULL);
+		(void) i_ddi_read_one_nvfile(dcfd);
 	}
-	dcfd->nvf_flags = nvfd.nvf_flags;
+}
 
-	rw_exit(&dcfd->nvf_lock);
-
-	rw_destroy(&nvfd.nvf_lock);
+/* may be done after root is mounted */
+void
+i_ddi_read_devname_file(void)
+{
+	if (sdev_cache_read_disable == 0) {
+		ASSERT(sdevfd->nvf_list == NULL);
+		(void) i_ddi_read_one_nvfile(sdevfd);
+	}
 }
 
 static int
@@ -1003,8 +1167,8 @@ e_ddi_devid_discovery(ddi_devid_t devid)
 int
 e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
 {
-	nvp_list_t *np;
-	nvp_list_t *new_nvp;
+	nvp_devid_t *np;
+	nvp_devid_t *new_nvp;
 	ddi_devid_t new_devid;
 	int new_devid_size;
 	char *path, *fullpath;
@@ -1022,14 +1186,14 @@ e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
 
 	DEVID_LOG_REG(("register", devid, path));
 
-	new_nvp = kmem_zalloc(sizeof (nvp_list_t), KM_SLEEP);
+	new_nvp = kmem_zalloc(sizeof (nvp_devid_t), KM_SLEEP);
 	new_devid_size = ddi_devid_sizeof(devid);
 	new_devid = kmem_alloc(new_devid_size, KM_SLEEP);
 	(void) bcopy(devid, new_devid, new_devid_size);
 
 	rw_enter(&dcfd->nvf_lock, RW_WRITER);
 
-	for (np = dcfd->nvf_list; np != NULL; np = np->nvp_next) {
+	for (np = NVF_DEVID_LIST(dcfd); np; np = NVP_DEVID_NEXT(np)) {
 		if (strcmp(path, np->nvp_devpath) == 0) {
 			DEVID_DEBUG2((CE_CONT,
 			    "register: %s path match\n", path));
@@ -1041,7 +1205,7 @@ e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
 				np->nvp_dip = dip;
 				NVF_MARK_DIRTY(dcfd);
 				rw_exit(&dcfd->nvf_lock);
-				kmem_free(new_nvp, sizeof (nvp_list_t));
+				kmem_free(new_nvp, sizeof (nvp_devid_t));
 				kmem_free(path, pathlen);
 				goto exit;
 			}
@@ -1063,8 +1227,7 @@ e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
 				 * may map to multiple paths but one path
 				 * should only map to one devid.
 				 */
-				(void) nfd_devid_free_and_unlink(
-					dcfd, np);
+				nfd_nvp_free_and_unlink(dcfd, NVPLIST(np));
 				np = NULL;
 				break;
 			} else {
@@ -1074,7 +1237,7 @@ e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
 					NVP_DEVID_DIP | NVP_DEVID_REGISTERED;
 				np->nvp_dip = dip;
 				rw_exit(&dcfd->nvf_lock);
-				kmem_free(new_nvp, sizeof (nvp_list_t));
+				kmem_free(new_nvp, sizeof (nvp_devid_t));
 				kmem_free(path, pathlen);
 				kmem_free(new_devid, new_devid_size);
 				return (DDI_SUCCESS);
@@ -1093,7 +1256,7 @@ e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
 	new_nvp->nvp_devid = new_devid;
 
 	NVF_MARK_DIRTY(dcfd);
-	nfd_devid_link(dcfd, new_nvp);
+	nfd_nvp_link(dcfd, NVPLIST(new_nvp));
 
 	rw_exit(&dcfd->nvf_lock);
 
@@ -1101,7 +1264,8 @@ exit:
 	if (free_devid)
 		kmem_free(free_devid, ddi_devid_sizeof(free_devid));
 
-	wake_nvpflush_daemon(dcfd);
+	if (!devid_cache_write_disable)
+		wake_nvpflush_daemon();
 
 	return (DDI_SUCCESS);
 }
@@ -1115,11 +1279,11 @@ exit:
 void
 e_devid_cache_unregister(dev_info_t *dip)
 {
-	nvp_list_t *np;
+	nvp_devid_t *np;
 
 	rw_enter(&dcfd->nvf_lock, RW_WRITER);
 
-	for (np = dcfd->nvf_list; np != NULL; np = np->nvp_next) {
+	for (np = NVF_DEVID_LIST(dcfd); np; np = NVP_DEVID_NEXT(np)) {
 		if (np->nvp_devid == NULL)
 			continue;
 		if ((np->nvp_flags & NVP_DEVID_DIP) && np->nvp_dip == dip) {
@@ -1138,26 +1302,26 @@ e_devid_cache_unregister(dev_info_t *dip)
 void
 e_devid_cache_cleanup(void)
 {
-	nvp_list_t *np, *next;
+	nvp_devid_t *np, *next;
 
 	rw_enter(&dcfd->nvf_lock, RW_WRITER);
 
-	for (np = dcfd->nvf_list; np != NULL; np = next) {
-		next = np->nvp_next;
+	for (np = NVF_DEVID_LIST(dcfd); np; np = next) {
+		next = NVP_DEVID_NEXT(np);
 		if (np->nvp_devid == NULL)
 			continue;
 		if ((np->nvp_flags & NVP_DEVID_REGISTERED) == 0) {
 			DEVID_LOG_REMOVE((CE_CONT,
 				    "cleanup: %s\n", np->nvp_devpath));
 			NVF_MARK_DIRTY(dcfd);
-			next = nfd_devid_free_and_unlink(dcfd, np);
+			nfd_nvp_free_and_unlink(dcfd, NVPLIST(np));
 		}
 	}
 
 	rw_exit(&dcfd->nvf_lock);
 
 	if (NVF_IS_DIRTY(dcfd))
-		wake_nvpflush_daemon(dcfd);
+		wake_nvpflush_daemon();
 }
 
 
@@ -1229,7 +1393,7 @@ static int
 e_devid_cache_devi_path_lists(ddi_devid_t devid, int retmax,
 	int *retndevis, dev_info_t **retdevis, int *retnpaths, char **retpaths)
 {
-	nvp_list_t *np;
+	nvp_devid_t *np;
 	int ndevis, npaths;
 	dev_info_t *dip, *pdip;
 	int circ;
@@ -1238,7 +1402,7 @@ e_devid_cache_devi_path_lists(ddi_devid_t devid, int retmax,
 
 	ndevis = 0;
 	npaths = 0;
-	for (np = dcfd->nvf_list; np != NULL; np = np->nvp_next) {
+	for (np = NVF_DEVID_LIST(dcfd); np; np = NVP_DEVID_NEXT(np)) {
 		if (np->nvp_devid == NULL)
 			continue;
 		if (ddi_devid_valid(np->nvp_devid) != DDI_SUCCESS) {
@@ -1514,6 +1678,25 @@ static clock_t		nvpticks;
 
 static void nvpflush_daemon(void);
 
+void
+nvf_register_write_complete(nvfd_t *fd, void (*f)(nvfd_t *))
+{
+	fd->nvf_write_complete = f;
+}
+
+void
+nvf_unregister_write_complete(nvfd_t *fd)
+{
+	fd->nvf_write_complete = NULL;
+}
+
+static void
+nvf_write_complete(nvfd_t *fd)
+{
+	if (fd->nvf_write_complete) {
+		(*(fd->nvf_write_complete))(fd);
+	}
+}
 
 void
 i_ddi_start_flush_daemon(void)
@@ -1523,8 +1706,9 @@ i_ddi_start_flush_daemon(void)
 	mutex_init(&nvpflush_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&nvpflush_cv, NULL, CV_DRIVER, NULL);
 
-	if (NVF_IS_DIRTY(dcfd)) {
-		wake_nvpflush_daemon(dcfd);
+	if ((NVF_IS_DIRTY(dcfd) && !devid_cache_write_disable) ||
+	    (NVF_IS_DIRTY(sdevfd) && !sdevfd && sdev_cache_write_disable)) {
+		wake_nvpflush_daemon();
 	}
 }
 
@@ -1542,6 +1726,7 @@ nvpflush_timeout(void *arg)
 		nvpflush_id = timeout(nvpflush_timeout, NULL, nticks);
 	} else {
 		do_nvpflush = 1;
+		NVPDAEMON_DEBUG((CE_CONT, "signal nvpdaemon\n"));
 		cv_signal(&nvpflush_cv);
 		nvpflush_id = 0;
 		nvpflush_timer_busy = 0;
@@ -1549,17 +1734,16 @@ nvpflush_timeout(void *arg)
 	}
 }
 
-static void
-wake_nvpflush_daemon(nvfd_t *nvfp)
+void
+wake_nvpflush_daemon()
 {
 	clock_t nticks;
 
 	/*
-	 * If root is readonly or the system isn't up yet
+	 * If the system isn't up yet
 	 * don't even think about starting a flush.
 	 */
-	if (devid_cache_write_disable ||
-	    !i_ddi_io_initialized() || NVF_IS_READONLY(nvfp))
+	if (!i_ddi_io_initialized())
 		return;
 
 	mutex_enter(&nvpflush_lock);
@@ -1603,7 +1787,7 @@ nvpflush_one(nvfd_t *nvfd)
 		rw_exit(&nvfd->nvf_lock);
 		return (DDI_FAILURE);
 	}
-	if (nvp_to_nvlist(nvfd, &nvl) != DDI_SUCCESS) {
+	if (((nvfd->nvf_nvp2nvl)(nvfd, &nvl)) != DDI_SUCCESS) {
 		KFIOERR((CE_CONT, "nvpflush: "
 		    "%s nvlist construction failed\n", nvfd->nvf_name));
 		rw_exit(&nvfd->nvf_lock);
@@ -1654,12 +1838,14 @@ nvpflush_one(nvfd_t *nvfd)
 	return (rval);
 }
 
+
 static void
 nvpflush_daemon(void)
 {
 	callb_cpr_t cprinfo;
 	clock_t clk;
 	int rval;
+	int i;
 
 	ASSERT(modrootloaded);
 
@@ -1701,20 +1887,39 @@ nvpflush_daemon(void)
 		 * Try flushing what's dirty, reschedule if there's
 		 * a failure or data gets marked as dirty again.
 		 */
-		NVPDAEMON_DEBUG((CE_CONT, "nvpdaemon: flush\n"));
-		rval = nvpflush_one(dcfd);
+		for (i = 0; i < NCACHEFDS; i++) {
+			rw_enter(&cachefds[i]->nvf_lock, RW_READER);
+			if (NVF_IS_DIRTY(cachefds[i])) {
+				NVPDAEMON_DEBUG((CE_CONT,
+				    "nvpdaemon: flush %s\n",
+				    cachefds[i]->nvf_name));
+				rw_exit(&cachefds[i]->nvf_lock);
+				rval = nvpflush_one(cachefds[i]);
+				rw_enter(&cachefds[i]->nvf_lock, RW_READER);
+				if (rval != DDI_SUCCESS ||
+				    NVF_IS_DIRTY(cachefds[i])) {
+					rw_exit(&cachefds[i]->nvf_lock);
+					NVPDAEMON_DEBUG((CE_CONT,
+					    "nvpdaemon: %s dirty again\n",
+					    cachefds[i]->nvf_name));
+					wake_nvpflush_daemon();
+				} else {
+					rw_exit(&cachefds[i]->nvf_lock);
+					nvf_write_complete(cachefds[i]);
+				}
+			} else {
+				NVPDAEMON_DEBUG((CE_CONT,
+				    "nvpdaemon: not dirty %s\n",
+				    cachefds[i]->nvf_name));
+				rw_exit(&cachefds[i]->nvf_lock);
+			}
+		}
 
-		rw_enter(&dcfd->nvf_lock, RW_READER);
-		if (rval != DDI_SUCCESS || NVF_IS_DIRTY(dcfd)) {
-			rw_exit(&dcfd->nvf_lock);
-			NVPDAEMON_DEBUG((CE_CONT, "nvpdaemon: dirty again\n"));
-			wake_nvpflush_daemon(dcfd);
-		} else
-			rw_exit(&dcfd->nvf_lock);
 		mutex_enter(&nvpflush_lock);
 		nvpbusy = 0;
 	}
 }
+
 
 void
 i_ddi_clean_devices_files(void)

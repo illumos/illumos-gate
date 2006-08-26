@@ -415,7 +415,7 @@ SCHED_KMODS	+= IA RT TS RT_DPTBL TS_DPTBL FSS FX FX_DPTBL
 #
 #	File System Modules (/kernel/fs):
 #
-FS_KMODS	+= autofs cachefs ctfs devfs fdfs fifofs hsfs lofs
+FS_KMODS	+= autofs cachefs ctfs dev devfs fdfs fifofs hsfs lofs
 FS_KMODS	+= mntfs namefs nfs objfs zfs
 FS_KMODS	+= pcfs procfs sockfs specfs tmpfs udfs ufs xmemfs
 
@@ -579,3 +579,8 @@ PCBE_KMODS	+= p123_pcbe p4_pcbe opteron_pcbe
 #	MAC-Type Plugin Modules (/kernel/mac)
 #
 MAC_KMODS	+= mac_ether
+
+#
+# 'Devname' Modules (kernel/devname)
+#
+DEVNAME_KMODS	+= sdev_nsconfig_mod

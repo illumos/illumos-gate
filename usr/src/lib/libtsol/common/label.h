@@ -235,6 +235,14 @@ extern int	labelfields(struct name_fields *);
 extern int	userdefs(m_label_t *, m_label_t *);
 extern int	zonecopy(m_label_t *, char *, char *, char *, int);
 
+#ifdef DEBUG
+/* testing hook: see devfsadm.c, mkdevalloc.c and allocate.c */
+#define	is_system_labeled_debug(statbufp)	\
+	((stat("/ALLOCATE_FORCE_LABEL", (statbufp)) == 0) ? 1 : 0)
+#else	/* DEBUG */
+#define	is_system_labeled_debug(statbufp)	0
+#endif	/* DEBUG */
+
 #ifdef	__cplusplus
 }
 #endif

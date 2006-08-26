@@ -1352,6 +1352,9 @@ startup_modules(void)
 	if (modload("fs", "devfs") == -1)
 		halt("Can't load devfs");
 
+	if (modload("fs", "dev") == -1)
+		halt("Can't load dev");
+
 	(void) modloadonly("sys", "lbl_edition");
 
 	dispinit();

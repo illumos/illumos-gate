@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,9 +84,6 @@ gettext("ignoring devfsadm_create entry #%d in module %s\n")
 #define	CANT_CREATE_THREAD gettext("can not create thread %s: %s\n")
 
 #define	CANT_CREATE_DOOR gettext("can not create event door %s: %s\n")
-
-#define	CANT_CREATE_ZONE_DOOR \
-    gettext("can not create zone registration door %s: %s\n")
 
 #define	FAILED_FOR_MODULE gettext("%s failed for module %s\n")
 
@@ -267,31 +263,15 @@ major_number ]\n\t\t[ -n ]\n\t\t[ -r rootdir ]\n\t\t[ -v ]\n")
 
 #define	LOG_EVENT_FAILED gettext("failed to log event: %s\n")
 
-#define	INVALID_ZONE gettext("invalid zone: '%s'\n")
-
-#define	ZONE_ROOTPATH_FAILED \
-    gettext("could not determine root path for zone %s: %s\n")
-
-#define	ZONE_LIST_FAILED \
-    gettext("could not determine system zone configuration: %s\n")
-
-#define	ZONE_DOOR_MKFAIL \
-    gettext("failed to create door server for zone %s: %s\n")
-
-#define	ZONE_REG_FAILED \
-    gettext("failed registration operation for zone %s: %s\n")
-
-#define	ZONE_REP_FAILED \
-    gettext("repository or name service failure for zone %s: %s\n")
-
-#define	ZONE_LIB_MISSING \
-    gettext("unable to load libzonecfg, make sure zone packages " \
-	"are installed\n")
-
 #define	ZONE_PATHCHECK \
     gettext("cannot manage root path '%s': path is part of zone '%s'\n")
 
+#define	DEVNAME_CONTACT_FAILED \
+    gettext("cannot talk to devname fs %s: %s\n")
+
 #define	NVLIST_ERROR gettext("nvlist interface failed: %s\n")
+
+#define	NOT_DIR gettext("file is not a directory: %s\n")
 
 #ifdef	__cplusplus
 }

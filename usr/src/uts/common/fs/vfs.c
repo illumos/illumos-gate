@@ -123,12 +123,14 @@ static struct ipmnt	*vfs_miplist_end = NULL;
  */
 vnode_t *rootdir;		/* pointer to root inode vnode. */
 vnode_t *devicesdir;		/* pointer to inode of devices root */
+vnode_t	*devdir;		/* pointer to inode of dev root */
 
 char *server_rootpath;		/* root path for diskless clients */
 char *server_hostname;		/* hostname of diskless server */
 
 static struct vfs root;
 static struct vfs devices;
+static struct vfs dev;
 struct vfs *rootvfs = &root;	/* pointer to root vfs; head of VFS list. */
 rvfs_t *rvfs_list;		/* array of vfs ptrs for vfs hash list */
 int vfshsz = 512;		/* # of heads/locks in vfs hash arrays */
@@ -651,15 +653,16 @@ vfs_mountdevices(void)
 	 */
 	if (VFS_ROOT(&devices, &devicesdir))
 		cmn_err(CE_PANIC, "vfs_mountdevices: not devices root");
-	VN_HOLD(devicesdir);
 
 	if (vfs_lock(&devices) != 0) {
+		VN_RELE(devicesdir);
 		cmn_err(CE_NOTE, "Cannot acquire vfs_lock of /devices");
 		return;
 	}
 
 	if (vn_vfswlock(mvp) != 0) {
 		vfs_unlock(&devices);
+		VN_RELE(devicesdir);
 		cmn_err(CE_NOTE, "Cannot acquire vfswlock of /devices");
 		return;
 	}
@@ -667,6 +670,85 @@ vfs_mountdevices(void)
 	vfs_add(mvp, &devices, 0);
 	vn_vfsunlock(mvp);
 	vfs_unlock(&devices);
+	VN_RELE(devicesdir);
+}
+
+/*
+ * mount the first instance of /dev  to root and remain mounted
+ */
+static void
+vfs_mountdev1(void)
+{
+	struct vfssw *vsw;
+	struct vnode *mvp;
+	struct mounta mounta = {	/* fake mounta for sdev_mount() */
+		NULL,
+		NULL,
+		MS_SYSSPACE | MS_OVERLAY,
+		NULL,
+		NULL,
+		0,
+		NULL,
+		0
+	};
+
+	/*
+	 * _init dev module to fill in the vfssw
+	 */
+	if (modload("fs", "dev") == -1)
+		cmn_err(CE_PANIC, "Cannot _init dev module\n");
+
+	/*
+	 * Hold vfs
+	 */
+	RLOCK_VFSSW();
+	vsw = vfs_getvfsswbyname("dev");
+	VFS_INIT(&dev, &vsw->vsw_vfsops, NULL);
+	VFS_HOLD(&dev);
+
+	/*
+	 * Locate mount point
+	 */
+	if (lookupname("/dev", UIO_SYSSPACE, FOLLOW, NULLVPP, &mvp))
+		cmn_err(CE_PANIC, "Cannot find /dev\n");
+
+	/*
+	 * Perform the mount of /dev
+	 */
+	if (VFS_MOUNT(&dev, mvp, &mounta, CRED()))
+		cmn_err(CE_PANIC, "Cannot mount /dev 1\n");
+
+	RUNLOCK_VFSSW();
+
+	/*
+	 * Set appropriate members and add to vfs list for mnttab display
+	 */
+	vfs_setresource(&dev, "/dev");
+	vfs_setmntpoint(&dev, "/dev");
+
+	/*
+	 * Hold the root of /dev so it won't go away
+	 */
+	if (VFS_ROOT(&dev, &devdir))
+		cmn_err(CE_PANIC, "vfs_mountdev1: not dev root");
+
+	if (vfs_lock(&dev) != 0) {
+		VN_RELE(devdir);
+		cmn_err(CE_NOTE, "Cannot acquire vfs_lock of /dev");
+		return;
+	}
+
+	if (vn_vfswlock(mvp) != 0) {
+		vfs_unlock(&dev);
+		VN_RELE(devdir);
+		cmn_err(CE_NOTE, "Cannot acquire vfswlock of /dev");
+		return;
+	}
+
+	vfs_add(mvp, &dev, 0);
+	vn_vfsunlock(mvp);
+	vfs_unlock(&dev);
+	VN_RELE(devdir);
 }
 
 /*
@@ -766,10 +848,11 @@ vfs_mountroot(void)
 	}
 
 	/*
-	 * Mount /devices, /system/contract, /etc/mnttab, /etc/svc/volatile,
-	 * /system/object, and /proc.
+	 * Mount /devices, /dev instance 1, /system/contract, /etc/mnttab,
+	 * /etc/svc/volatile, /system/object, and /proc.
 	 */
 	vfs_mountdevices();
+	vfs_mountdev1();
 
 	vfs_mountfs("ctfs", "ctfs", CTFS_ROOT);
 	vfs_mountfs("proc", "/proc", "/proc");

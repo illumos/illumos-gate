@@ -146,6 +146,8 @@ d none etc/fs/hsfs 755 root sys
 f none etc/fs/hsfs/mount 555 root bin
 d none etc/fs/ufs 755 root sys
 f none etc/fs/ufs/mount 555 root bin
+d none etc/fs/dev 755 root sys
+f none etc/fs/dev/mount 555 root bin
 s none etc/fsck=../usr/sbin/fsck
 s none etc/fsdb=../usr/sbin/fsdb
 s none etc/fstyp=../usr/sbin/fstyp

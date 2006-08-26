@@ -45,7 +45,6 @@ SUNWprivate_1.1 {
 	zonecfg_add_scratch;
 	zonecfg_attach_manifest;
 	zonecfg_check_handle;
-	zonecfg_clear_deldevs;
 	zonecfg_close_scratch;
 	zonecfg_construct_rctlblk;
 	zonecfg_create_snapshot;
@@ -109,7 +108,6 @@ SUNWprivate_1.1 {
 	zonecfg_get_template_handle;
 	zonecfg_get_uuid;
 	zonecfg_get_zonepath;
-	zonecfg_has_deldevs;
 	zonecfg_in_alt_root;
 	zonecfg_init_handle;
 	zonecfg_is_rctl;
@@ -122,7 +120,6 @@ SUNWprivate_1.1 {
 	zonecfg_lookup_ipd;
 	zonecfg_lookup_nwif;
 	zonecfg_lookup_rctl;
-	zonecfg_match_dev;
 	zonecfg_modify_attr;
 	zonecfg_modify_dev;
 	zonecfg_modify_ds;
@@ -159,7 +156,6 @@ SUNWprivate_1.1 {
 	zonecfg_setrctlent;
 	zonecfg_set_root;
 	zonecfg_set_zonepath;
-	zonecfg_should_deldev;
 	zonecfg_strerror;
 	zonecfg_validate_zonename;
 	zonecfg_valid_fs_type;
@@ -167,6 +163,7 @@ SUNWprivate_1.1 {
 	zonecfg_valid_rctl;
 	zonecfg_valid_rctlblk;
 	zonecfg_valid_rctlname;
+	zone_get_devroot;
 	zone_get_id;
 	zone_get_rootpath;
 	zone_get_state;

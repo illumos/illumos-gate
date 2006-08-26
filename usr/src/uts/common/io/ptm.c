@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -80,7 +79,9 @@
  *	    failure, the errno is set to EINVAL indicating that the master
  *	    device is not open.
  *
- *  ZONEPT: sets the zone membership of ths associated pts device.
+ *  ZONEPT: sets the zone membership of the associated pts device.
+ *
+ *  GRPPT:  sets the group owner of the associated pts device.
  *
  * Synchronization:
  *
@@ -314,8 +315,6 @@ ptmopen(
 	int	sflag,		/* open state flag */
 	cred_t  *credp)		/* credentials */
 {
-	extern dev_info_t *pts_dip;
-
 	struct pt_ttys	*ptmp;
 	mblk_t		*mop;		/* ptr to a setopts message block */
 	struct stroptions *sop;
@@ -338,12 +337,13 @@ ptmopen(
 	}
 
 	/*
-	 * pts dependency: pt_ttys_alloc(), used below, really needs the pts
-	 * driver (and pts_dip variable) to be initialized to successfully
-	 * create device nodes.
+	 * The master open requires that the slave be attached
+	 * before it returns so that attempts to open the slave will
+	 * succeeed
 	 */
-	if (pts_dip == NULL)
-		(void) i_ddi_attach_pseudo_node("pts");
+	if (ptms_attach_slave() != 0) {
+		return (ENXIO);
+	}
 
 	mop = allocb(sizeof (struct stroptions), BPRI_MED);
 	if (mop == NULL) {
@@ -544,6 +544,30 @@ ptmwput(queue_t *qp, mblk_t *mp)
 
 			mutex_enter(&ptmp->pt_lock);
 			ptmp->pt_zoneid = z;
+			mutex_exit(&ptmp->pt_lock);
+			miocack(qp, mp, 0, 0);
+			break;
+		}
+		case PT_OWNER:
+		{
+			pt_own_t *ptop;
+			int error;
+
+			if ((error = miocpullup(mp, sizeof (pt_own_t))) != 0) {
+				miocnak(qp, mp, 0, error);
+				break;
+			}
+
+			ptop = (pt_own_t *)mp->b_cont->b_rptr;
+
+			if (ptop->pto_ruid < 0 || ptop->pto_rgid < 0) {
+				miocnak(qp, mp, 0, EINVAL);
+				break;
+			}
+
+			mutex_enter(&ptmp->pt_lock);
+			ptmp->pt_ruid = ptop->pto_ruid;
+			ptmp->pt_rgid = ptop->pto_rgid;
 			mutex_exit(&ptmp->pt_lock);
 			miocack(qp, mp, 0, 0);
 			break;

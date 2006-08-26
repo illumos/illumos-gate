@@ -180,6 +180,16 @@ main(int argc, char **argv)
 		exit(1);
 
 	system_labeled = is_system_labeled();
+
+	/* test hook: see also devfsadm.c and allocate.c */
+	if (!system_labeled) {
+		system_labeled = is_system_labeled_debug(&tx_stat);
+		if (system_labeled) {
+			fprintf(stderr, "/ALLOCATE_FORCE_LABEL is set,\n"
+			    "forcing system label on for testing...\n");
+		}
+	}
+
 	if (system_labeled == 0) {
 		/*
 		 * is_system_labeled() will return false in case we are

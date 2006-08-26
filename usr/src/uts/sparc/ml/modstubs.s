@@ -306,6 +306,23 @@ stubs_base:
 #endif
 
 /*
+ * Stubs for /dev fs.
+ */
+#ifndef DEV_MODULE
+	MODULE(dev, fs);
+	NO_UNLOAD_STUB(dev, sdev_modctl_readdir,	nomod_minus_one);
+	NO_UNLOAD_STUB(dev, sdev_modctl_readdir_free,	nomod_minus_one);
+	NO_UNLOAD_STUB(dev, devname_filename_register,	nomod_minus_one);
+	NO_UNLOAD_STUB(dev, sdev_modctl_devexists,	nomod_minus_one);
+	NO_UNLOAD_STUB(dev, devname_nsmaps_register,	nomod_minus_one);
+	NO_UNLOAD_STUB(dev, devname_profile_update,	nomod_minus_one);
+	NO_UNLOAD_STUB(dev, sdev_module_register,	nomod_minus_one);
+	NO_UNLOAD_STUB(dev, sdev_devstate_change,	nomod_minus_one);
+	NO_UNLOAD_STUB(dev, devpts_getvnodeops,		nomod_zero);
+	END_MODULE(dev);
+#endif
+
+/*
  * Stubs for specfs. A non-unloadable module.
  */
 

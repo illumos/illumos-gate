@@ -34,8 +34,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <fcntl.h>
 #include <nss_dbdefs.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <tsol/label.h>
 #include <zone.h>
@@ -269,11 +271,23 @@ main(int argc, char *argv[], char *envp[])
 	char		pw_buf[NSS_BUFLEN_PASSWD];
 	struct passwd	pw_ent;
 	int 		env_num = 1;	/* PATH= is 0 entry */
+#ifdef DEBUG
+	struct stat	statbuf;
+#endif
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
 	system_labeled = is_system_labeled();
+
+	/* test hook: see also mkdevalloc.c and devfsadm.c */
+	if (!system_labeled) {
+		system_labeled = is_system_labeled_debug(&statbuf);
+		if (system_labeled) {
+			fprintf(stderr, "/ALLOCATE_FORCE_LABEL is set,\n"
+			    "forcing system label on for testing...\n");
+		}
+	}
 
 	/*
 	 * get all enviroment variables

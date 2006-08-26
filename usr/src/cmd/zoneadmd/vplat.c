@@ -91,6 +91,7 @@
 #include <limits.h>
 #include <libgen.h>
 #include <libzfs.h>
+#include <libdevinfo.h>
 #include <zone.h>
 #include <assert.h>
 #include <libcontract.h>
@@ -128,52 +129,79 @@
 #define	MAXTNZLEN	2048
 
 /*
- * A list of directories which should be created.
+ * This is the set of directories and devices (relative to <zone_root>/dev)
+ * which must be present in every zone.  Users can augment this list with
+ * additional device rules in their zone configuration, but at present cannot
+ * remove any of the this set of standard devices.
  */
+static const char *standard_devs[] = {
+	"arp",
+	"conslog",
+	"cpu/self/cpuid",
+	"crypto",
+	"cryptoadm",
+	"dsk",
+	"dtrace/helper",
+	"fd",
+	"kstat",
+	"lo0",
+	"lo1",
+	"lo2",
+	"lo3",
+	"log",
+	"logindmux",
+	"null",
+#ifdef __sparc
+	"openprom",
+#endif
+	"poll",
+	"pool",
+	"ptmx",
+	"pts/*",
+	"random",
+	"rdsk",
+	"rmt",
+	"sad/user",
+	"swap",
+	"sysevent",
+	"tcp",
+	"tcp6",
+	"term",
+	"ticlts",
+	"ticots",
+	"ticotsord",
+	"tty",
+	"udp",
+	"udp6",
+	"urandom",
+	"zero",
+	"zfs",
+	NULL
+};
 
-struct dir_info {
-	char *dir_name;
-	mode_t dir_mode;
+struct source_target {
+	const char *source;
+	const char *target;
 };
 
 /*
- * The pathnames below are relative to the zonepath
+ * Set of symlinks (relative to <zone_root>/dev) which must be present in
+ * every zone.
  */
-static struct dir_info dev_dirs[] = {
-	{ "/dev",	0755 },
-	{ "/dev/dsk",	0755 },
-	{ "/dev/fd",	0555 },
-	{ "/dev/pts",	0755 },
-	{ "/dev/rdsk",	0755 },
-	{ "/dev/rmt",	0755 },
-	{ "/dev/sad",	0755 },
-	{ "/dev/swap",	0755 },
-	{ "/dev/term",	0755 },
+static struct source_target standard_devlinks[] = {
+	{ "stderr",	"./fd/2" },
+	{ "stdin",	"./fd/0" },
+	{ "stdout",	"./fd/1" },
+	{ "dtremote",	"/dev/null" },
+	{ "console",	"zconsole" },
+	{ "syscon",	"zconsole" },
+	{ "sysmsg",	"zconsole" },
+	{ "systty",	"zconsole" },
+	{ "msglog",	"zconsole" },
+	{ NULL, NULL }
 };
 
-/*
- * A list of devices which should be symlinked to /dev/zconsole.
- */
-
-struct symlink_info {
-	char *sl_source;
-	char *sl_target;
-};
-
-/*
- * The "source" paths are relative to the zonepath
- */
-static struct symlink_info dev_symlinks[] = {
-	{ "/dev/stderr",	"./fd/2" },
-	{ "/dev/stdin",		"./fd/0" },
-	{ "/dev/stdout",	"./fd/1" },
-	{ "/dev/dtremote",	"/dev/null" },
-	{ "/dev/console",	"zconsole" },
-	{ "/dev/syscon",	"zconsole" },
-	{ "/dev/sysmsg",	"zconsole" },
-	{ "/dev/systty",	"zconsole" },
-	{ "/dev/msglog",	"zconsole" },
-};
+static int vplat_mount_dev(zlog_t *);
 
 /* for routing socket */
 static int rts_seqno = 0;
@@ -501,81 +529,6 @@ make_one_dir(zlog_t *zlogp, const char *prefix, const char *subdir, mode_t mode)
 			zerror(zlogp, B_TRUE, "mkdirp of %s failed", path);
 		return (-1);
 	}
-	return (0);
-}
-
-/*
- * Make /dev and various directories underneath it.
- */
-static int
-make_dev_dirs(zlog_t *zlogp, const char *zonepath)
-{
-	int i;
-
-	for (i = 0; i < sizeof (dev_dirs) / sizeof (struct dir_info); i++) {
-		if (make_one_dir(zlogp, zonepath, dev_dirs[i].dir_name,
-		    dev_dirs[i].dir_mode) != 0)
-			return (-1);
-	}
-	return (0);
-}
-
-/*
- * Make various sym-links underneath /dev.
- */
-static int
-make_dev_links(zlog_t *zlogp, char *zonepath)
-{
-	int i;
-
-	for (i = 0; i < sizeof (dev_symlinks) / sizeof (struct symlink_info);
-	    i++) {
-		char dev[MAXPATHLEN];
-		struct stat st;
-
-		(void) snprintf(dev, sizeof (dev), "%s%s", zonepath,
-		    dev_symlinks[i].sl_source);
-		if (lstat(dev, &st) == 0) {
-			/*
-			 * Try not to call unlink(2) on directories, since that
-			 * makes UFS unhappy.
-			 */
-			if (S_ISDIR(st.st_mode)) {
-				zerror(zlogp, B_FALSE, "symlink path %s is a "
-				    "directory", dev_symlinks[i].sl_source);
-				return (-1);
-			}
-			(void) unlink(dev);
-		}
-		if (symlink(dev_symlinks[i].sl_target, dev) != 0) {
-			zerror(zlogp, B_TRUE, "could not setup %s->%s symlink",
-			    dev_symlinks[i].sl_source,
-			    dev_symlinks[i].sl_target);
-			return (-1);
-		}
-	}
-	return (0);
-}
-
-/*
- * Create various directories and sym-links under /dev.
- */
-static int
-create_dev_files(zlog_t *zlogp)
-{
-	char zonepath[MAXPATHLEN];
-
-	if (zone_get_zonepath(zone_name, zonepath, sizeof (zonepath)) != Z_OK) {
-		zerror(zlogp, B_TRUE, "unable to determine zone root");
-		return (-1);
-	}
-	if (zonecfg_in_alt_root())
-		resolve_lofs(zlogp, zonepath, sizeof (zonepath));
-
-	if (make_dev_dirs(zlogp, zonepath) != 0)
-		return (-1);
-	if (make_dev_links(zlogp, zonepath) != 0)
-		return (-1);
 	return (0);
 }
 
@@ -1405,40 +1358,6 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 	}
 
 	/*
-	 * /dev in the zone is loopback'd from the external /dev repository,
-	 * in order to provide a largely read-only semantic.  But because
-	 * processes in the zone need to be able to chown, chmod, etc. zone
-	 * /dev files, we can't use a 'ro' lofs mount.  Instead we use a
-	 * special mode just for zones, "zonedevfs".
-	 *
-	 * In the future we should front /dev with a full-fledged filesystem.
-	 */
-	num_fs++;
-	if ((tmp_ptr = realloc(fs_ptr, num_fs * sizeof (*tmp_ptr))) == NULL) {
-		zerror(zlogp, B_TRUE, "memory allocation failed");
-		num_fs--;
-		goto bad;
-	}
-	fs_ptr = tmp_ptr;
-	fsp = &fs_ptr[num_fs - 1];
-	/*
-	 * Note that mount_one will prepend the alternate root to
-	 * zone_fs_special and do the necessary resolution, so all that is
-	 * needed here is to strip the root added by zone_get_zonepath.
-	 */
-	(void) strlcpy(fsp->zone_fs_dir, "/dev", sizeof (fsp->zone_fs_dir));
-	(void) snprintf(fsp->zone_fs_special, sizeof (fsp->zone_fs_special),
-	    "%s/dev", zonepath + strlen(zonecfg_get_root()));
-	fsp->zone_fs_raw[0] = '\0';
-	(void) strlcpy(fsp->zone_fs_type, MNTTYPE_LOFS,
-	    sizeof (fsp->zone_fs_type));
-	fsp->zone_fs_options = NULL;
-	if (zonecfg_add_fs_option(fsp, MNTOPT_LOFS_ZONEDEVFS) != Z_OK) {
-		zerror(zlogp, B_FALSE, "error adding property");
-		goto bad;
-	}
-
-	/*
 	 * Iterate through the rest of the filesystems, first the IPDs, then
 	 * the general FSs.  Sort them all, then mount them in sorted order.
 	 * This is to make sure the higher level directories (e.g., /usr)
@@ -1510,10 +1429,14 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 	handle = NULL;
 
 	/*
-	 * If we're mounting a zone for administration, then we need to set up
-	 * the "/a" environment inside the zone so that the commands that run
-	 * in there have access to both the running system's utilities and the
-	 * to-be-modified zone's files.
+	 * When we're mounting a zone for administration, / is the
+	 * scratch zone and dev is mounted at /dev.  The to-be-upgraded
+	 * zone is mounted at /a, and we set up that environment so that
+	 * process can access both the running system's utilities
+	 * and the to-be-modified zone's files.  The only exception
+	 * is the zone's /dev which isn't mounted at all, which is
+	 * the same as global zone installation where /a/dev and
+	 * /a/devices are not mounted.
 	 */
 	if (mount_cmd &&
 	    !build_mounted(zlogp, rootpath, sizeof (rootpath), zonepath))
@@ -1521,16 +1444,6 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 
 	qsort(fs_ptr, num_fs, sizeof (*fs_ptr), fs_compare);
 	for (i = 0; i < num_fs; i++) {
-		if (mount_cmd && strcmp(fs_ptr[i].zone_fs_dir, "/dev") == 0) {
-			size_t slen = strlen(rootpath) - 2;
-
-			/* /dev is special and always goes at the top */
-			rootpath[slen] = '\0';
-			if (mount_one(zlogp, &fs_ptr[i], rootpath) != 0)
-				goto bad;
-			rootpath[slen] = '/';
-			continue;
-		}
 		if (mount_one(zlogp, &fs_ptr[i], rootpath) != 0)
 			goto bad;
 	}
@@ -2322,39 +2235,6 @@ tcp_abort_connections(zlog_t *zlogp, zoneid_t zoneid)
 	if ((error = tcp_abort_conn(zlogp, zoneid, &l, &r)) != 0)
 		return (error);
 	return (0);
-}
-
-static int
-devfsadm_call(zlog_t *zlogp, const char *arg)
-{
-	char *argv[4];
-	int status;
-
-	argv[0] = DEVFSADM;
-	argv[1] = (char *)arg;
-	argv[2] = zone_name;
-	argv[3] = NULL;
-	status = forkexec(zlogp, DEVFSADM_PATH, argv);
-	if (status == 0 || status == -1)
-		return (status);
-	zerror(zlogp, B_FALSE, "%s call (%s %s %s) unexpectedly returned %d",
-	    DEVFSADM, DEVFSADM_PATH, arg, zone_name, status);
-	return (-1);
-}
-
-static int
-devfsadm_register(zlog_t *zlogp)
-{
-	/*
-	 * Ready the zone's devices.
-	 */
-	return (devfsadm_call(zlogp, "-z"));
-}
-
-static int
-devfsadm_unregister(zlog_t *zlogp)
-{
-	return (devfsadm_call(zlogp, "-Z"));
 }
 
 static int
@@ -3639,80 +3519,6 @@ write_index_file(zoneid_t zoneid)
 	_exit(0);
 }
 
-/*ARGSUSED1*/
-static int
-devcleanup_cb(const char *path, uid_t u, gid_t g, mode_t m, const char *a,
-    void *data)
-{
-	zone_dochandle_t h = (zone_dochandle_t)data;
-	boolean_t del;
-	char fullpath[MAXPATHLEN];
-	char zonepath[MAXPATHLEN];
-
-	if (zonecfg_should_deldev(h, path, &del) == Z_OK) {
-		if (del) {
-			if (zonecfg_get_zonepath(h, zonepath,
-			    sizeof (zonepath)) != Z_OK)
-				return (Z_OK);
-			(void) snprintf(fullpath, sizeof (fullpath),
-			    "%s/dev/%s", zonepath, path);
-			(void) unlink(fullpath);
-		}
-	}
-	return (Z_OK);
-}
-
-/*
- * If needed, initiate a walk of the zone's /dev tree, looking for device
- * entries which need to be cleaned up: this is a wrapper around functionality
- * in libzonecfg which keeps track of newly-defunct device entries.
- */
-static int
-devcleanup(zlog_t *zlogp)
-{
-	zone_dochandle_t handle;
-
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (-1);
-	}
-
-	/*
-	 * Note that this is a rare case when we consult the *real* zone
-	 * config handle, not a snapshot-- that's because we want to
-	 * drop the deleted-device markers out of the config once we've
-	 * purged them from the FS.
-	 */
-	if (zonecfg_get_handle(zone_name, handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
-		return (-1);
-	}
-
-	/*
-	 * Quickly check whether there is any work to do prior to scanning
-	 * all of /dev.
-	 */
-	if (zonecfg_has_deldevs(handle) != Z_OK) {
-		zonecfg_fini_handle(handle);
-		return (0);
-	}
-
-	if (zonecfg_devwalk(handle, devcleanup_cb, (void *)handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "failed to walk devices");
-		zonecfg_fini_handle(handle);
-		return (-1);
-	}
-
-	/*
-	 * We don't need to process the deleted devices more than the one time.
-	 */
-	(void) zonecfg_clear_deldevs(handle);
-	(void) zonecfg_save(handle);
-	zonecfg_fini_handle(handle);
-	return (0);
-}
-
 int
 vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd, zoneid_t zoneid)
 {
@@ -3722,18 +3528,18 @@ vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd, zoneid_t zoneid)
 		return (-1);
 	}
 
-	if (devcleanup(zlogp) != 0) {
-		zerror(zlogp, B_TRUE, "device cleanup failed");
-		return (-1);
-	}
-
-	if (create_dev_files(zlogp) != 0 ||
-	    mount_filesystems(zlogp, mount_cmd) != 0) {
+	if (mount_filesystems(zlogp, mount_cmd) != 0) {
 		lofs_discard_mnttab();
 		return (-1);
 	}
-	if (!mount_cmd && (devfsadm_register(zlogp) != 0 ||
-	    configure_network_interfaces(zlogp) != 0)) {
+
+	/* mount /dev for zone (both normal and scratch zone) */
+	if (vplat_mount_dev(zlogp) != 0) {
+		lofs_discard_mnttab();
+		return (-1);
+	}
+
+	if (!mount_cmd && configure_network_interfaces(zlogp) != 0) {
 		lofs_discard_mnttab();
 		return (-1);
 	}
@@ -3846,9 +3652,6 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
 		goto error;
 	}
 
-	if (!unmount_cmd && devfsadm_unregister(zlogp) != 0)
-		goto error;
-
 	if (!unmount_cmd &&
 	    unconfigure_network_interfaces(zlogp, zoneid) != 0) {
 		zerror(zlogp, B_FALSE,
@@ -3860,6 +3663,10 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
 		zerror(zlogp, B_TRUE, "unable to abort TCP connections");
 		goto error;
 	}
+
+	/* destroy zconsole before umount /dev */
+	if (!unmount_cmd)
+		destroy_console_slave();
 
 	if (unmount_filesystems(zlogp, zoneid, unmount_cmd) != 0) {
 		zerror(zlogp, B_FALSE,
@@ -3881,13 +3688,136 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
 	if (unmount_cmd && lu_root_teardown(zlogp) != 0)
 		goto error;
 
-	if (!unmount_cmd)
-		destroy_console_slave();
-
 	lofs_discard_mnttab();
 	return (0);
 
 error:
 	lofs_discard_mnttab();
 	return (-1);
+}
+
+/*
+ * Apply the standard lists of devices/symlinks/mappings and the user-specified
+ * list of devices (via zonecfg) to the /dev filesystem.  The filesystem will
+ * use these as a profile/filter to determine what exists in /dev.
+ */
+static int
+vplat_mount_dev(zlog_t *zlogp)
+{
+	char			zonedevpath[MAXPATHLEN];
+	zone_dochandle_t	handle = NULL;
+	struct zone_devtab	ztab;
+	zone_fsopt_t		opt_attr;
+	di_prof_t		prof = NULL;
+	int			i, err, len;
+	int			retval = -1;
+
+	struct zone_fstab devtab = {
+		"/dev",
+		"/dev",
+		MNTTYPE_DEV,
+		NULL,
+		""
+	};
+
+	if (err = zone_get_devroot(zone_name, zonedevpath,
+	    sizeof (zonedevpath))) {
+		zerror(zlogp, B_FALSE, "can't get zone dev: %s",
+		    zonecfg_strerror(err));
+		return (-1);
+	}
+
+	/*
+	 * The old /dev was a lofs mount from <zonepath>/dev, with
+	 * dev fs, that becomes a mount on <zonepath>/root/dev.
+	 * However, we need to preserve device permission bits during
+	 * upgrade.  What we should do is migrate the attribute directory
+	 * on upgrade, but for now, preserve it at <zonepath>/dev.
+	 */
+	(void) strcpy(opt_attr.zone_fsopt_opt, "attrdir=");
+	len = strlen(opt_attr.zone_fsopt_opt);
+	if (err = zone_get_zonepath(zone_name,
+	    opt_attr.zone_fsopt_opt + len, MAX_MNTOPT_STR - len)) {
+		zerror(zlogp, B_FALSE, "can't get zone path: %s",
+		    zonecfg_strerror(err));
+		return (-1);
+	}
+
+	if (make_one_dir(zlogp, opt_attr.zone_fsopt_opt + len, "/dev",
+	    DEFAULT_DIR_MODE) != 0)
+		return (-1);
+
+	(void) strlcat(opt_attr.zone_fsopt_opt, "/dev", MAX_MNTOPT_STR);
+	devtab.zone_fs_options = &opt_attr;
+	opt_attr.zone_fsopt_next = NULL;
+
+	/* mount /dev inside the zone */
+	i = strlen(zonedevpath);
+	if (mount_one(zlogp, &devtab, zonedevpath))
+		return (-1);
+
+	(void) strlcat(zonedevpath, "/dev", sizeof (zonedevpath));
+	if (di_prof_init(zonedevpath, &prof)) {
+		zerror(zlogp, B_TRUE, "failed to initialize profile");
+		goto cleanup;
+	}
+
+	/* Add the standard devices and directories */
+	for (i = 0; standard_devs[i] != NULL; ++i) {
+		if (di_prof_add_dev(prof, standard_devs[i])) {
+			zerror(zlogp, B_TRUE, "failed to add "
+			    "standard device");
+			goto cleanup;
+		}
+	}
+
+	/* Add the standard symlinks */
+	for (i = 0; standard_devlinks[i].source != NULL; ++i) {
+		if (di_prof_add_symlink(prof,
+		    standard_devlinks[i].source,
+		    standard_devlinks[i].target)) {
+			zerror(zlogp, B_TRUE, "failed to add "
+			    "standard symlink");
+			goto cleanup;
+		}
+	}
+
+	/* Add user-specified devices and directories */
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zerror(zlogp, B_FALSE, "can't initialize zone handle");
+		goto cleanup;
+	}
+	if (err = zonecfg_get_handle(zone_name, handle)) {
+		zerror(zlogp, B_FALSE, "can't get handle for zone "
+		    "%s: %s", zone_name, zonecfg_strerror(err));
+		goto cleanup;
+	}
+	if (err = zonecfg_setdevent(handle)) {
+		zerror(zlogp, B_FALSE, "%s: %s", zone_name,
+		    zonecfg_strerror(err));
+		goto cleanup;
+	}
+	while (zonecfg_getdevent(handle, &ztab) == Z_OK) {
+		if (di_prof_add_dev(prof, ztab.zone_dev_match)) {
+			zerror(zlogp, B_TRUE, "failed to add "
+			    "user-specified device");
+			goto cleanup;
+		}
+	}
+	(void) zonecfg_enddevent(handle);
+
+	/* Send profile to kernel */
+	if (di_prof_commit(prof)) {
+		zerror(zlogp, B_TRUE, "failed to commit profile");
+		goto cleanup;
+	}
+
+	retval = 0;
+
+cleanup:
+	if (handle)
+		zonecfg_fini_handle(handle);
+	if (prof)
+		di_prof_fini(prof);
+	return (retval);
 }

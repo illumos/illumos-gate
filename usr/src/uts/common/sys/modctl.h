@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -79,6 +78,7 @@ extern struct mod_ops mod_syscallops32;
 extern struct mod_ops mod_dacfops;
 extern struct mod_ops mod_ippops;
 extern struct mod_ops mod_pcbeops;
+extern struct mod_ops mod_devfsops;
 
 #endif /* _KERNEL */
 
@@ -175,6 +175,13 @@ struct modlpcbe {
 	struct __pcbe_ops	*pcbe_ops;
 };
 
+/* for devname fs */
+struct modldev {
+	struct mod_ops		*dev_modops;
+	char			*dev_linkinfo;
+	struct devname_ops	*dev_ops;
+};
+
 /*
  * Revision number of loadable modules support.  This is the value
  * that must be used in the modlinkage structure.
@@ -238,6 +245,9 @@ struct modlinkage {
 #define	MODADDMINORPERM		32
 #define	MODREMMINORPERM		33
 #define	MODREMDRVCLEANUP	34
+#define	MODDEVEXISTS		35
+#define	MODDEVREADDIR		36
+#define	MODDEVNAME		37
 
 /*
  * sub cmds for MODEVENTS
@@ -249,6 +259,17 @@ struct modlinkage {
 #define	MODEVENTS_FREEDATA			4
 #define	MODEVENTS_POST_EVENT			5
 #define	MODEVENTS_REGISTER_EVENT		6
+
+/*
+ * devname subcmds for MODDEVNAME
+ */
+#define	MODDEVNAME_LOOKUPDOOR	0
+#define	MODDEVNAME_DEVFSADMNODE	1
+#define	MODDEVNAME_NSMAPS	2
+#define	MODDEVNAME_PROFILE	3
+#define	MODDEVNAME_RECONFIG	4
+#define	MODDEVNAME_SYSAVAIL	5
+
 
 /*
  * Data structure passed to modconfig command in kernel to build devfs tree
@@ -473,6 +494,7 @@ typedef struct modctl {
 #define	MOD_NONOTIFY		0x2	/* No krtld notifications on (un)load */
 #define	MOD_NOUNLOAD		0x4	/* Assume EBUSY for all _fini's */
 
+
 #ifdef _KERNEL
 
 #define	MOD_BIND_HASHSIZE	64
@@ -540,6 +562,7 @@ extern struct dev_ops *mod_hold_dev_by_devi(dev_info_t *);
 extern void	mod_rele_dev_by_devi(dev_info_t *);
 
 extern int make_devname(char *, major_t);
+extern int gmatch(const char *, const char *);
 
 struct bind;
 extern void make_aliases(struct bind **);

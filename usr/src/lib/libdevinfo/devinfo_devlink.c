@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "libdevinfo.h"
 #include "devinfo_devlink.h"
 
 #undef DEBUG
@@ -205,7 +205,7 @@ get_db_path(
 	}
 #endif
 	if (dir == NULL) {
-		dir = hdp->dev_dir;
+		dir = hdp->db_dir;
 	}
 
 	(void) snprintf(buf, blen, "%s/%s", dir, fname);
@@ -244,6 +244,14 @@ open_db(struct di_devlink_handle *hdp, int flags)
 	} else {
 		flg = O_RDWR|O_CREAT|O_TRUNC;
 		get_db_path(hdp, DB_TMP, path, sizeof (path));
+	}
+
+	/*
+	 * Avoid triggering /dev reconfigure for read when not present
+	 */
+	if (IS_RDONLY(flags) &&
+	    (strncmp(path, "/dev/", 5) == 0) && !device_exists(path)) {
+		return (-1);
 	}
 
 	if ((fd = open(path, flg, DB_PERMS)) == -1) {
@@ -298,12 +306,13 @@ open_db(struct di_devlink_handle *hdp, int flags)
 static struct di_devlink_handle *
 handle_alloc(const char *root_dir, uint_t flags)
 {
-	char dev_dir[PATH_MAX], path[PATH_MAX];
+	char dev_dir[PATH_MAX], path[PATH_MAX], db_dir[PATH_MAX];
 	struct di_devlink_handle *hdp, proto = {0};
 
 	assert(flags == OPEN_RDWR || flags == OPEN_RDONLY);
 
 	dev_dir[0] = '\0';
+	db_dir[0] = '\0';
 
 	/*
 	 * NULL and the empty string are equivalent to "/"
@@ -319,18 +328,24 @@ handle_alloc(const char *root_dir, uint_t flags)
 		/*LINTED*/
 		assert(sizeof (dev_dir) >= PATH_MAX);
 #endif
-		if (realpath(root_dir, dev_dir) == NULL) {
+		if ((realpath(root_dir, dev_dir) == NULL) ||
+		    (realpath(root_dir, db_dir) == NULL)) {
 			return (NULL);
 		}
 	}
 
 	if (strcmp(dev_dir, "/") == 0) {
-		(void) strlcpy(dev_dir, DEV, sizeof (dev_dir));
+		dev_dir[0] = 0;
+		db_dir[0] = 0;
 	} else {
-		(void) strlcat(dev_dir, DEV, sizeof (dev_dir));
+		(void) strlcpy(db_dir, dev_dir, sizeof (db_dir));
 	}
 
+	(void) strlcat(dev_dir, DEV, sizeof (dev_dir));
+	(void) strlcat(db_dir, ETCDEV, sizeof (db_dir));
+
 	proto.dev_dir = dev_dir;
+	proto.db_dir = db_dir;
 	proto.flags = flags;
 	proto.lock_fd = -1;
 
@@ -366,6 +381,11 @@ handle_alloc(const char *root_dir, uint_t flags)
 		goto error;
 	}
 
+	if ((hdp->db_dir = strdup(proto.db_dir)) == NULL) {
+		free(hdp->dev_dir);
+		free(hdp);
+		goto error;
+	}
 
 	return (hdp);
 
@@ -1110,6 +1130,8 @@ link2minor(struct di_devlink_handle *hdp, cache_link_t *clp)
 	cache_link_t *plp;
 	const char *minor_path;
 	char *cp, buf[PATH_MAX], link[PATH_MAX];
+	char abspath[PATH_MAX];
+	struct stat st;
 
 	if (TYPE_PRI(attr2type(clp->attr))) {
 		/*
@@ -1127,7 +1149,7 @@ link2minor(struct di_devlink_handle *hdp, cache_link_t *clp)
 	/*
 	 * If secondary, the primary link is derived from the secondary
 	 * link contents. Secondary link contents can have two formats:
-	 * 	audio -> /dev/sound/0
+	 *	audio -> /dev/sound/0
 	 *	fb0 -> fbs/afb0
 	 */
 
@@ -1162,6 +1184,35 @@ follow_link:
 	/*LINTED*/
 	assert(sizeof (buf) >= PATH_MAX);
 #endif
+
+	/*
+	 * A realpath attempt to lookup a dangling link can invoke implicit
+	 * reconfig so verify there's an actual device behind the link first.
+	 */
+	if (lstat(link, &st) == -1)
+		return (NULL);
+	if (S_ISLNK(st.st_mode)) {
+		if (s_readlink(link, buf, sizeof (buf)) < 0)
+			return (NULL);
+		if (buf[0] != '/') {
+			char *p;
+			size_t n = sizeof (abspath);
+			if (strlcpy(abspath, link, n) >= n)
+				return (NULL);
+			p = strrchr(abspath, '/') + 1;
+			*p = 0;
+			n = sizeof (abspath) - strlen(p);
+			if (strlcpy(p, buf, n) >= n)
+				return (NULL);
+		} else {
+			if (strlcpy(abspath, buf, sizeof (abspath)) >=
+			    sizeof (abspath))
+				return (NULL);
+		}
+		if (!device_exists(abspath))
+			return (NULL);
+	}
+
 	if (realpath(link, buf) == NULL || !is_minor_node(buf, &minor_path)) {
 		return (NULL);
 	}
@@ -2399,13 +2450,13 @@ do_recurse(
 	recurse_t *rp,
 	int *retp)
 {
-	DIR *dp;
 	size_t len;
 	const char *rel;
 	struct stat sbuf;
 	char cur[PATH_MAX], *cp;
 	int i, rv = DI_WALK_CONTINUE;
-	struct dirent *entp;
+	finddevhdl_t handle;
+	char *d_name;
 
 
 	if ((rel = rel_path(hdp, dir)) == NULL)
@@ -2424,7 +2475,7 @@ do_recurse(
 
 	(void) dprintf(DBG_STEP, "do_recurse: dir = %s\n", dir);
 
-	if ((dp = opendir(dir)) == NULL)
+	if (finddev_readdir(dir, &handle) != 0)
 		return (DI_WALK_CONTINUE);
 
 	(void) snprintf(cur, sizeof (cur), "%s/", dir);
@@ -2432,14 +2483,12 @@ do_recurse(
 	cp = cur + len;
 	len = sizeof (cur) - len;
 
-	while ((entp = readdir(dp)) != NULL) {
+	for (;;) {
+		if ((d_name = (char *)finddev_next(handle)) == NULL)
+			break;
 
-		if (strcmp(entp->d_name, ".") == 0 ||
-		    strcmp(entp->d_name, "..") == 0) {
-			continue;
-		}
-
-		(void) snprintf(cp, len, "%s", entp->d_name);
+		if (strlcpy(cp, d_name, len) >= len)
+			break;
 
 		/*
 		 * Skip files we are not interested in.
@@ -2475,7 +2524,7 @@ next_entry:
 			break;
 	}
 
-	(void) closedir(dp);
+	finddev_close(handle);
 
 	return (rv);
 }
@@ -3011,7 +3060,7 @@ exit_update_lock(struct di_devlink_handle *hdp)
  * returns 1 if contents is a minor node in /devices.
  * If mn_root is not NULL, mn_root is set to:
  *	if contents is a /dev node, mn_root = contents
- * 			OR
+ *			OR
  *	if contents is a /devices node, mn_root set to the '/'
  *	following /devices.
  */
@@ -3203,9 +3252,17 @@ daemon_call(const char *root, struct dca_off *dcp)
 	int		fd, door_error;
 	sigset_t	oset, nset;
 	char		synch_door[PATH_MAX];
+	struct statvfs	svf;
+	char		*prefix;
 
+	/*
+	 * If readonly root, assume we are in install
+	 */
+	prefix =
+	    (statvfs("/etc/dev", &svf) == 0 && (svf.f_flag & ST_RDONLY)) ?
+		"/tmp" : (char *)root;
 	(void) snprintf(synch_door, sizeof (synch_door),
-	    "%s/dev/%s", root, DEVFSADM_SYNCH_DOOR);
+	    "%s/etc/dev/%s", prefix, DEVFSADM_SYNCH_DOOR);
 
 	if ((fd = open(synch_door, O_RDONLY)) == -1) {
 		dcp->dca_error = errno;

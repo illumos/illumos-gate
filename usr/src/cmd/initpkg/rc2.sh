@@ -105,4 +105,9 @@ case $action in
 		exit 1
 esac
 
+if smf_is_globalzone; then
+	# enable full implicit device reconfig
+	/usr/sbin/devfsadm -S
+fi
+
 exit 0

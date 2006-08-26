@@ -382,6 +382,8 @@ f none usr/lib/fs/cachefs/umount 555 root bin
 f none usr/lib/fs/cachefs/unshare 555 root bin
 d none usr/lib/fs/ctfs 755 root sys
 f none usr/lib/fs/ctfs/mount 555 root bin
+d none usr/lib/fs/dev 755 root sys
+s none usr/lib/fs/dev/mount=../../../../etc/fs/dev/mount
 d none usr/lib/fs/fd 755 root sys
 f none usr/lib/fs/fd/mount 555 root bin
 d none usr/lib/fs/hsfs 755 root sys
@@ -583,7 +585,6 @@ d none usr/lib/pci 755 root bin
 f none usr/lib/pci/pcidr 555 root bin
 f none usr/lib/pci/pcidr_plugin.so 755 root bin
 f none usr/lib/platexec 555 root bin
-f none usr/lib/pt_chmod 4511 root bin
 d none usr/lib/rcm 755 root bin
 d none usr/lib/rcm/modules 755 root bin
 f none usr/lib/rcm/modules/SUNW_cluster_rcm.so 555 root bin

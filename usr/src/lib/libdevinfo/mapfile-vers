@@ -145,6 +145,10 @@ SUNWprivate_1.1 {
 	di_devlink_walk;
 	di_devperm_login;
 	di_devperm_logout;
+	di_devname_get_mapinfo;
+	di_devname_get_mapent;
+	di_devname_action_on_key;
+	di_devname_print_mapinfo;
 	di_driver_private_data;
 	di_init_driver;
 	di_init_impl;
@@ -173,6 +177,13 @@ SUNWprivate_1.1 {
 	di_path_state;
 	di_phci_first_node;
 	di_phci_next_node;
+	di_prof_add_dev;
+	di_prof_add_exclude;
+	di_prof_add_map;
+	di_prof_add_symlink;
+	di_prof_commit;
+	di_prof_init;
+	di_prof_fini;
 	di_prop_drv_next;
 	di_prop_global_next;
 	di_prop_hw_next;
@@ -184,6 +195,10 @@ SUNWprivate_1.1 {
 	di_dli_openr;
 	di_dli_openw;
 	di_dli_close;
+	device_exists;
+	finddev_readdir;
+	finddev_close;
+	finddev_next;
     local:
 	*;
 };

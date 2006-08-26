@@ -279,12 +279,6 @@ extern	int	zonecfg_delete_dev(zone_dochandle_t, struct zone_devtab *);
 extern	int	zonecfg_modify_dev(zone_dochandle_t, struct zone_devtab *,
     struct zone_devtab *);
 extern	int	zonecfg_lookup_dev(zone_dochandle_t, struct zone_devtab *);
-extern	int	zonecfg_match_dev(zone_dochandle_t, const char *,
-    struct zone_devtab *);
-extern	int	zonecfg_should_deldev(zone_dochandle_t, const char *,
-    boolean_t *);
-extern	int	zonecfg_clear_deldevs(zone_dochandle_t);
-extern	int	zonecfg_has_deldevs(zone_dochandle_t);
 
 /*
  * Resource control configuration.
@@ -390,6 +384,7 @@ extern	int	zonecfg_set_limitpriv(zone_dochandle_t, char *);
  * Higher-level routines.
  */
 extern	int	zone_get_rootpath(char *, char *, size_t);
+extern	int	zone_get_devroot(char *, char *, size_t);
 extern	int	zone_get_zonepath(char *, char *, size_t);
 extern	int	zone_get_state(char *, zone_state_t *);
 extern	int	zone_set_state(char *, zone_state_t);

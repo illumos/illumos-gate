@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,15 +57,14 @@
 #include <thread.h>
 #include <spawn.h>
 #include <libc.h>
+#include <grp.h>
 #include "tsd.h"
 
 #define	PTSNAME "/dev/pts/"		/* slave name */
 #define	PTLEN   32			/* slave name length */
-#define	PTPATH  "/usr/lib/pt_chmod"    	/* setuid root program */
-#define	PTPGM   "pt_chmod"		/* setuid root program */
+#define	DEFAULT_TTY_GROUP	"tty"	/* slave device group owner */
 
 static void itoa(int, char *);
-static int grantpt_u(int, int);
 
 /*
  *  Check that fd argument is a file descriptor of an opened master.
@@ -94,18 +92,6 @@ ptsdev(int fd)
 	return (minor(status.st_rdev));
 }
 
-static int
-ptscreate(void)
-{
-	static mutex_t clk = DEFAULTMUTEX;
-	int ret;
-
-	lmutex_lock(&clk);
-	ret = grantpt_u(-1, 1);
-	lmutex_unlock(&clk);
-	return (ret);
-}
-
 char *
 ptsname(int fd)
 {
@@ -122,12 +108,12 @@ ptsname(int fd)
 	itoa(dev, sname + strlen(PTSNAME));
 
 	/*
-	 * devfsadm synchronization: if the node does not exist,
-	 * attempt to synchronize with slave device node creation.
+	 * This lookup will create the /dev/pts node (if the corresponding
+	 * pty exists.
 	 */
-	if (access(sname, F_OK) ==  0 ||
-	    (ptscreate() == 0 && access(sname, F_OK) == 0))
+	if (access(sname, F_OK) ==  0)
 		return (sname);
+
 	return (NULL);
 }
 
@@ -151,92 +137,36 @@ unlockpt(int fd)
 	return (0);
 }
 
-
-/*
- * Execute a setuid root program to change the mode, ownership and
- * group of the slave device. The parent forks a child process that
- * executes the setuid program. It then waits for the child to return.
- *
- * When create is 1, execute the setuid root program without arguments,
- * to create minor nodes and symlinks for all slave devices.
- */
-static int
-grantpt_u(int fd, int create)
-{
-	extern char **environ;
-	char *argvec[3];
-	int	st_loc;
-	pid_t	pid;
-	int	w;
-	char	fds[24];
-	sigset_t oset, nset;
-	int	error;
-
-	/* validate the file descriptor before proceeding */
-	if (create != 1 && ptsdev(fd) == NODEV)
-		return (-1);
-
-	if (sigemptyset(&nset) == -1)
-		return (-1);
-	if (sigaddset(&nset, SIGCHLD) == -1)
-		return (-1);
-	if (sigprocmask(SIG_BLOCK, &nset, &oset) == -1)
-		return (-1);
-
-	itoa(fd, fds);
-	argvec[0] = PTPGM;
-	argvec[1] = create == 1 ? NULL : fds;
-	argvec[2] = NULL;
-	error = posix_spawn(&pid, PTPATH, NULL, NULL, argvec, environ);
-	if (error) {
-		(void) sigprocmask(SIG_SETMASK, &oset, NULL);
-		errno = error;
-		return (-1);
-	}
-
-	/*
-	 * waitpid() returns the process id for the child process
-	 * on success or -1 on failure.
-	 */
-	while ((w = waitpid(pid, &st_loc, 0)) < 0 && errno == EINTR)
-		continue;
-
-	/* Restore signal mask */
-	(void) sigprocmask(SIG_SETMASK, &oset, NULL);
-
-	/*
-	 * If SIGCHLD is currently ignored, waitpid() fails with
-	 * ECHILD after the child terminates.
-	 * This is not a failure; assume the child succeded.
-	 */
-	if (w == -1) {
-		if (errno != ECHILD)
-			return (-1);
-		st_loc = 0;
-	}
-
-	/*
-	 * If child terminated due to exit() and the exit status is zero
-	 *	return success
-	 * else it was an exit(-1) or it was struck by a signal
-	 *	return failure (EACCES)
-	 */
-	if (WIFEXITED(st_loc) && WEXITSTATUS(st_loc) == 0)
-		return (0);
-	errno = EACCES;
-	return (-1);
-}
-
 int
 grantpt(int fd)
 {
-	static mutex_t glk = DEFAULTMUTEX;
-	int ret;
+	struct strioctl istr;
+	pt_own_t pto;
+	struct group *gr_name;
 
-	lmutex_lock(&glk);
-	ret = grantpt_u(fd, 0);
-	lmutex_unlock(&glk);
-	return (ret);
+	/* validate the file descriptor before proceeding */
+	if (ptsdev(fd) == NODEV)
+		return (-1);
+
+	pto.pto_ruid = getuid();
+
+	gr_name = getgrnam(DEFAULT_TTY_GROUP);
+	if (gr_name)
+		pto.pto_rgid = gr_name->gr_gid;
+	else
+		pto.pto_rgid = getgid();
+
+	istr.ic_cmd = PT_OWNER;
+	istr.ic_len = sizeof (pt_own_t);
+	istr.ic_timout = 0;
+	istr.ic_dp = (char *)&pto;
+
+	if (ioctl(fd, I_STR, &istr) != 0) {
+		errno = EACCES;
+		return (-1);
+	}
+
+	return (0);
 }
 
 /*

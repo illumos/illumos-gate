@@ -1099,6 +1099,9 @@ prt_mod(private_t *pri, int raw, long val)	/* print modctl() code */
 		case MODADDMINORPERM:	s = "MODADDMINORPERM"; break;
 		case MODREMMINORPERM:	s = "MODREMMINORPERM"; break;
 		case MODREMDRVCLEANUP:	s = "MODREMDRVCLEANUP"; break;
+		case MODDEVEXISTS:	s = "MODDEVEXISTS"; break;
+		case MODDEVREADDIR:	s = "MODDEVREADDIR"; break;
+		case MODDEVNAME:	s = "MODDEVNAME"; break;
 		}
 	}
 

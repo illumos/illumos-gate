@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,26 +64,57 @@ typedef struct nvpacked_file_hdr {
  * The top-level nvpair identifiers in the
  * /etc/devices/devid_cache nvlist format
  */
-#define	DP_DEVID_ID		"devid"
+#define	DP_DEVID_ID			"devid"
+#define	DP_DEVNAME_ID			"devname"
+#define	DP_DEVNAME_NCACHE_ID		"ncache"
+#define	DP_DEVNAME_NC_EXPIRECNT_ID	"expire-counts"
 
 
+#ifdef	_KERNEL
+
+/* common header for all formats */
 typedef struct nvp_list {
-	char		*nvp_devpath;
-	int		nvp_flags;
-	dev_info_t	*nvp_dip;
-	ddi_devid_t	nvp_devid;
 	struct nvp_list	*nvp_next;
 	struct nvp_list	*nvp_prev;
 } nvp_list_t;
 
+#define	NVPLIST(p)	(((nvp_list_t *)(p)))
+
+
+/* devid-specific list */
+typedef struct nvp_devid {
+	nvp_list_t	nvp_list;	/* must be first element */
+	int		nvp_flags;
+	char		*nvp_devpath;
+	dev_info_t	*nvp_dip;
+	ddi_devid_t	nvp_devid;
+} nvp_devid_t;
+
+#define	NVP2DEVID(p)		(((nvp_devid_t *)(p)))
+#define	NVP_DEVID_NEXT(p)	(NVP2DEVID((NVPLIST(p))->nvp_next))
+
 /*
- * nvp_flags
+ * nvp_flags - devid
  */
 #define	NVP_DEVID_REGISTERED	0x01	/* devid registered on this boot */
 #define	NVP_DEVID_DIP		0x02	/* devinfo valid for this devid */
 
 
-#ifdef	_KERNEL
+/* devname-specific list */
+typedef struct nvp_devname {
+	nvp_list_t	nvp_list;	/* must be first element */
+	char		**nvp_paths;
+	int		*nvp_expirecnts;
+	int		nvp_npaths;
+} nvp_devname_t;
+
+#define	NVP2DEVNAME(p)		(((nvp_devname_t *)(p)))
+#define	NVP_DEVNAME_NEXT(p)	(NVP2DEVNAME((NVPLIST(p))->nvp_next))
+
+/*
+ * nvp_flags - devname
+ */
+
 
 /*
  * Descriptor used for kernel-level file i/o
@@ -102,12 +132,20 @@ typedef struct kfile {
  */
 typedef struct nvfiledesc {
 	char		*nvf_name;
+	int		(*nvf_nvp2nvl)(struct nvfiledesc *, nvlist_t **);
+	nvp_list_t	*(*nvf_nvl2nvp)(nvlist_t *, char *name);
+	void		(*nvf_nvp_free)(nvp_list_t *);
+	void		(*nvf_write_complete)(struct nvfiledesc *);
 	int		nvf_flags;
 	nvp_list_t	*nvf_list;
 	nvp_list_t	*nvf_tail;
 	krwlock_t	nvf_lock;
 } nvfd_t;
 
+#define	NVF_DEVID_LIST(p)	((nvp_devid_t *)((p)->nvf_list))
+#define	NVF_DEVID_TAIL(p)	((nvp_devid_t *)((p)->nvf_tail))
+#define	NVF_DEVNAME_LIST(p)	((nvp_devname_t *)((p)->nvf_list))
+#define	NVF_DEVNAME_TAIL(p)	((nvp_devname_t *)((p)->nvf_tail))
 
 /*
  * Discovery refers to the heroic effort made to discover a device which
@@ -305,7 +343,24 @@ static void devid_log(char *, ddi_devid_t, char *);
 #define	DEVIDERR(args)		{ if (devid_report_error) cmn_err args; }
 
 
-static void wake_nvpflush_daemon(nvfd_t *);
+/* extern data */
+
+extern nvfd_t	*sdevfd;
+
+extern int devid_cache_read_disable;
+extern int devid_cache_write_disable;
+extern int sdev_cache_read_disable;
+extern int sdev_cache_write_disable;
+
+/* extern prototypes */
+
+void i_ddi_read_devname_file(void);
+void nvf_register_write_complete(nvfd_t *, void (*f)(nvfd_t *));
+void nvf_unregister_write_complete(nvfd_t *);
+void nfd_nvp_link(nvfd_t *, nvp_list_t *);
+void nfd_nvp_free_and_unlink(nvfd_t *, nvp_list_t *);
+void wake_nvpflush_daemon(void);
+
 
 #endif	/* _KERNEL */
 

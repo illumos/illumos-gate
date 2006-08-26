@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -79,6 +78,7 @@
 #include <ipp/ipp_impl.h>
 #include <sys/fs/dv_node.h>
 #include <sys/strsubr.h>
+#include <sys/fs/sdev_node.h>
 
 static int		mod_circdep(struct modctl *);
 static int		modinfo(modid_t, struct modinfo *);
@@ -679,7 +679,8 @@ new_vfs_in_modpath()
 	return (1);	/* always reread driver.conf the first time */
 }
 
-static int modctl_load_drvconf(major_t major)
+static int
+modctl_load_drvconf(major_t major)
 {
 	int ret;
 
@@ -785,6 +786,8 @@ modctl_getmaj(char *uname, uint_t ulen, int *umajorp)
 	int retval;
 	major_t major;
 
+	if (ulen == 0)
+		return (EINVAL);
 	if ((retval = copyinstr(uname, name,
 	    (ulen < 256) ? ulen : 256, 0)) != 0)
 		return (retval);
@@ -1640,6 +1643,144 @@ modctl_allocpriv(const char *name)
 	return (error);
 }
 
+static int
+modctl_devexists(const char *upath, int pathlen)
+{
+	char	*path;
+	int	ret;
+
+	/*
+	 * copy in the path, including the terminating null
+	 */
+	pathlen++;
+	if (pathlen <= 1 || pathlen > MAXPATHLEN)
+		return (EINVAL);
+	path = kmem_zalloc(pathlen + 1, KM_SLEEP);
+	if ((ret = copyinstr(upath, path, pathlen, NULL)) == 0) {
+		ret = sdev_modctl_devexists(path);
+	}
+
+	kmem_free(path, pathlen + 1);
+	return (ret);
+}
+
+static int
+modctl_devreaddir(const char *udir, int udirlen,
+    char *upaths, int64_t *ulensp)
+{
+	char	*paths = NULL;
+	char	**dirlist = NULL;
+	char	*dir;
+	int64_t	ulens;
+	int64_t	lens;
+	int	i, n;
+	int	ret = 0;
+	char	*p;
+	int	npaths;
+	int	npaths_alloc;
+
+	/*
+	 * If upaths is NULL then we are only computing the amount of space
+	 * needed to return the paths, with the value returned in *ulensp. If we
+	 * are copying out paths then we get the amount of space allocated by
+	 * the caller. If the actual space needed for paths is larger, or
+	 * things are changing out from under us, then we return EAGAIN.
+	 */
+	if (upaths) {
+		if (ulensp == NULL)
+			return (EINVAL);
+		if (copyin(ulensp, &ulens, sizeof (ulens)) != 0)
+			return (EFAULT);
+	}
+
+	/*
+	 * copyin the /dev path including terminating null
+	 */
+	udirlen++;
+	if (udirlen <= 1 || udirlen > MAXPATHLEN)
+		return (EINVAL);
+	dir = kmem_zalloc(udirlen + 1, KM_SLEEP);
+	if ((ret = copyinstr(udir, dir, udirlen, NULL)) != 0)
+		goto err;
+
+	if ((ret = sdev_modctl_readdir(dir, &dirlist,
+	    &npaths, &npaths_alloc)) != 0) {
+		ASSERT(dirlist == NULL);
+		goto err;
+	}
+
+	lens = 0;
+	for (i = 0; i < npaths; i++) {
+		lens += strlen(dirlist[i]) + 1;
+	}
+	lens++;		/* add one for double termination */
+
+	if (upaths) {
+		if (lens > ulens) {
+			ret = EAGAIN;
+			goto out;
+		}
+
+		paths = kmem_alloc(lens, KM_SLEEP);
+
+		p = paths;
+		for (i = 0; i < npaths; i++) {
+			n = strlen(dirlist[i]) + 1;
+			bcopy(dirlist[i], p, n);
+			p += n;
+		}
+		*p = 0;
+
+		if (copyout(paths, upaths, lens)) {
+			ret = EFAULT;
+			goto err;
+		}
+	}
+
+out:
+	/* copy out the amount of space needed to hold the paths */
+	if (copyout(&lens, ulensp, sizeof (lens)))
+		ret = EFAULT;
+
+err:
+	if (dirlist)
+		sdev_modctl_readdir_free(dirlist, npaths, npaths_alloc);
+	if (paths)
+		kmem_free(paths, lens);
+	kmem_free(dir, udirlen + 1);
+	return (ret);
+}
+
+int
+modctl_moddevname(int subcmd, uintptr_t a1, uintptr_t a2)
+{
+	int error = 0;
+
+	switch (subcmd) {
+	case MODDEVNAME_LOOKUPDOOR:
+	case MODDEVNAME_DEVFSADMNODE:
+		error = devname_filename_register(subcmd, (char *)a1);
+		break;
+	case MODDEVNAME_NSMAPS:
+		error = devname_nsmaps_register((char *)a1, (size_t)a2);
+		break;
+	case MODDEVNAME_PROFILE:
+		error = devname_profile_update((char *)a1, (size_t)a2);
+		break;
+	case MODDEVNAME_RECONFIG:
+		i_ddi_set_reconfig();
+		break;
+	case MODDEVNAME_SYSAVAIL:
+		i_ddi_set_sysavail();
+		break;
+	default:
+		error = EINVAL;
+		break;
+	}
+
+	return (error);
+}
+
 /*ARGSUSED5*/
 int
 modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
@@ -1843,6 +1984,19 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 
 	case MODREMDRVCLEANUP:
 		error = modctl_remdrv_cleanup((const char *)a1);
+		break;
+
+	case MODDEVEXISTS:	/* non-reconfiguring /dev lookup */
+		error = modctl_devexists((const char *)a1, (size_t)a2);
+		break;
+
+	case MODDEVREADDIR:	/* non-reconfiguring /dev readdir */
+		error = modctl_devreaddir((const char *)a1, (size_t)a2,
+		    (char *)a3, (int64_t *)a4);
+		break;
+
+	case MODDEVNAME:
+		error = modctl_moddevname((int)a1, a2, a3);
 		break;
 
 	default:
@@ -3626,7 +3780,7 @@ mod_in_autounload()
 	if (c == 0) \
 		return (0);
 
-static int
+int
 gmatch(const char *s, const char *p)
 {
 	int c, sc;

@@ -62,6 +62,7 @@
 #include <zone.h>
 #include <nss_dbdefs.h>
 #include <bsm/devalloc.h>
+#include <libdevinfo.h>
 #include "allocate.h"
 
 extern void print_error(int, char *);
@@ -114,7 +115,7 @@ struct zone_path {
 	char	**path;
 };
 
-struct devnames {
+struct dev_names {
 	char **dnames;
 };
 
@@ -1227,7 +1228,7 @@ out:
 }
 
 void
-_store_devnames(int *count, struct devnames *dnms, char *zonename,
+_store_devnames(int *count, struct dev_names *dnms, char *zonename,
     devalloc_t *da, int flag)
 {
 	int i;
@@ -1257,7 +1258,7 @@ allocate(int optflag, uid_t uid, char *device, char *zonename)
 	int		count = 0;
 	int		error = 0;
 	devalloc_t	*da;
-	struct devnames	dnms;
+	struct dev_names dnms;
 
 	if (optflag & (FORCE | USERID | USERNAME)) {
 		if (!_is_authorized(DEVICE_REVOKE_AUTH, getuid()))
@@ -1329,7 +1330,7 @@ deallocate(int optflag, uid_t uid, char *device, char *zonename)
 	int		count = 0;
 	int		error = 0;
 	devalloc_t	*da;
-	struct devnames dnms;
+	struct dev_names dnms;
 
 	if (optflag & (FORCE | FORCE_ALL)) {
 		if (!_is_authorized(DEVICE_REVOKE_AUTH, getuid()))
@@ -1557,14 +1558,13 @@ _check_label(devalloc_t *da, char *zonename, uid_t uid, int flag)
 int
 create_znode(char *zonename, struct zone_path *zpath, devmap_t *list)
 {
-	int		i;
 	int		size;
 	int		len = 0;
 	int		fcount = 0;
 	char		*p, *tmpfile, *zoneroot;
 	char		**file;
 	char		zonepath[MAXPATHLEN];
-	struct stat	statb;
+	di_prof_t	prof = NULL;
 
 	file = list->dmap_devarray;
 	if (file == NULL)
@@ -1575,16 +1575,15 @@ create_znode(char *zonename, struct zone_path *zpath, devmap_t *list)
 	}
 	(void) strcpy(zonepath, zoneroot);
 	free(zoneroot);
-	if ((p = strstr(zonepath, "/root")) == NULL)
-		return (1);
-	*p = '\0';
 	len = strlen(zonepath);
 	size = sizeof (zonepath);
+	(void) strlcat(zonepath, "/dev", size);
+	if (di_prof_init(zonepath, &prof)) {
+		dprintf("failed to initialize dev profile at %s\n", zonepath);
+		return (1);
+	}
+	zonepath[len] = '\0';
 	for (; *file != NULL; file++) {
-		if (stat(*file, &statb) == -1) {
-			dprintf("Couldn't stat the file %s\n", *file);
-			return (1);
-		}
 		/*
 		 * First time initialization
 		 */
@@ -1615,47 +1614,33 @@ create_znode(char *zonename, struct zone_path *zpath, devmap_t *list)
 			free(tmpfile);
 			tmpfile = strdup(dstlinkdir);
 		}
-		if ((p = rindex(tmpfile, '/')) == NULL) {
-			dprintf("bad path in create_znode for %s\n",
-			    tmpfile);
+		if (di_prof_add_dev(prof, tmpfile)) {
+			dprintf("failed to add %s to profile\n", tmpfile);
+			di_prof_fini(prof);
 			return (1);
 		}
-		*p = '\0';
-		(void) strcat(zonepath, tmpfile);
-		*p = '/';
-		if ((mkdirp(zonepath, 0755) != 0) && (errno != EEXIST)) {
-			dprintf("Unable to create directory %s\n", zonepath);
-			return (1);
-		}
-		zonepath[len] = '\0';
 		if (strlcat(zonepath, tmpfile, size) >= size) {
 			dprintf("Buffer overflow in create_znode for %s\n",
 			    *file);
 			free(tmpfile);
+			di_prof_fini(prof);
 			return (1);
 		}
 		free(tmpfile);
 		fcount++;
 		if ((zpath->path = (char **)realloc(zpath->path,
-		    (fcount * sizeof (char *)))) == NULL)
+		    (fcount * sizeof (char *)))) == NULL) {
+			di_prof_fini(prof);
 			return (1);
+		}
 		zpath->path[zpath->count] = strdup(zonepath);
 		zpath->count = fcount;
-		if (mknod(zonepath, statb.st_mode, statb.st_rdev) == -1) {
-			switch (errno) {
-			case EEXIST:
-				break;
-			default:
-				dprintf("mknod error: %s\n",
-				    strerror(errno));
-				for (i = 0; i <= fcount; i++)
-					free(zpath->path[i]);
-				free(zpath->path);
-				return (1);
-			}
-		}
 		zonepath[len] = '\0';
 	}
+
+	if (di_prof_commit(prof))
+		dprintf("failed to add devices to zone %s\n", zonename);
+	di_prof_fini(prof);
 
 	return (0);
 }
@@ -1667,6 +1652,7 @@ remove_znode(char *zonename, devmap_t *dm)
 	char		*zoneroot;
 	char		**file;
 	char		zonepath[MAXPATHLEN];
+	di_prof_t	prof = NULL;
 
 	file = dm->dmap_devarray;
 	if (file == NULL)
@@ -1674,11 +1660,6 @@ remove_znode(char *zonename, devmap_t *dm)
 	if ((zoneroot = getzonerootbyname(zonename)) == NULL) {
 		(void) snprintf(zonepath, MAXPATHLEN, "/zone/%s", zonename);
 	} else {
-		char *p;
-
-		if ((p = strstr(zoneroot, "/root")) == NULL)
-			return (1);
-		*p = '\0';
 		(void)  strcpy(zonepath, zoneroot);
 		free(zoneroot);
 	}
@@ -1688,6 +1669,10 @@ remove_znode(char *zonename, devmap_t *dm)
 	 */
 	(void) strncat(zonepath, "/dev", MAXPATHLEN);
 	len = strlen(zonepath);
+	if (di_prof_init(zonepath, &prof)) {
+		dprintf("failed to initialize dev profile at %s\n", zonepath);
+		return (1);
+	}
 	for (; *file != NULL; file++) {
 		char *devrelpath;
 
@@ -1702,19 +1687,17 @@ remove_znode(char *zonename, devmap_t *dm)
 		 */
 		devrelpath = strchr(*file + 1, '/');
 
-		if (strlcat(zonepath, devrelpath, MAXPATHLEN) >= MAXPATHLEN) {
-			dprintf("Buffer overflow in remove_znode for %s\n",
-			    *file);
-			return (1);
-		}
-		errno = 0;
-		if ((unlink(zonepath) == -1) && (errno != ENOENT)) {
-			perror(zonepath);
+		if (di_prof_add_exclude(prof, devrelpath + 1)) {
+			dprintf("Failed exclude %s in dev profile\n", *file);
+			di_prof_fini(prof);
 			return (1);
 		}
 		zonepath[len] = '\0';
 	}
 
+	if (di_prof_commit(prof))
+		dprintf("failed to remove devices from zone %s\n", zonename);
+	di_prof_fini(prof);
 	return (0);
 }
 

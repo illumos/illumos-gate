@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +42,7 @@
 #include <sys/sunddi.h>
 #include <sys/devops.h>
 #include <sys/ddi_impldefs.h>
+#include <sys/fs/sdev_node.h>
 #include <sys/devpolicy.h>
 
 #ifdef __cplusplus
@@ -82,6 +82,7 @@ typedef struct dv_node {
 	uint_t		dv_busy;	/* directory busy count */
 	devplcy_t	*dv_priv;	/* access privilege */
 	mode_t		dv_dflt_mode;	/* create_priv_minor_node mode */
+	struct sdev_dv	*dv_sdev;	/* sdev node[s] if exists */
 } dvnode_t;
 
 #define	DV_BUILD	0x1		/* directory out-of-date */
@@ -176,6 +177,7 @@ extern int devfs_clean(dev_info_t *, char *, uint_t);
 extern int devfs_lookupname(char *, vnode_t **, vnode_t **);
 extern int devfs_walk(char *, void (*f)(struct dv_node *, void *), void *);
 extern int devfs_devpolicy(vnode_t *, devplcy_t **);
+extern void devfs_get_defattr(vnode_t *, struct vattr *, int *);
 
 extern struct dv_node *devfs_dip_to_dvnode(dev_info_t *);
 extern int devfs_reset_perm(uint_t);

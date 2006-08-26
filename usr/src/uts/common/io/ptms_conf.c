@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,15 +48,13 @@
  *   pseudo-terminal subsystem, minor 0 should not be used. (Potential future
  *   development).
  *
- *   Device entries in /dev/pts directory are created dynamically via
- *   ddi_create_minor_node(). It enqueues requests to suer-mode event daemon
- *   which actually creates entries asynchronously, so they may not be available
- *   immediately. For this reason we create devices before they are actually
- *   needed, so for each slot table extension we already have node creation
- *   requests queued. To avoid overflowing of the event daemon event queue we
- *   limit the maximum extension of the slot table by the pt_maxdelta tuneable.
  *   After the table slot size reaches pt_maxdelta, we stop 2^N extension
  *   algorithm and start extending the slot table size by pt_maxdelta.
+ *
+ *   Device entries /dev/pts directory are created dynamically by the
+ *   /dev filesystem. We no longer call ddi_create_minor_node() on
+ *   behalf of the slave driver. The /dev filesystem creates /dev/pts
+ *   nodes based on the pt_ttys array.
  *
  * Synchronization:
  *
@@ -112,6 +109,24 @@
  *
  *	Find pt_ttys structure by minor number.
  *	Returns NULL when minor is out of range.
+ *
+ * int ptms_minor_valid(minor_t minor, uid_t *ruid, gid_t *rgid)
+ *
+ *	Check if minor refers to an allocated pty in the current zone.
+ *	Returns
+ *		 0 if not allocated or not for this zone.
+ *		 1 if an allocated pty in the current zone.
+ *	Also returns owner of pty.
+ *
+ * int ptms_minor_exists(minor_t minor)
+ *	Check if minor refers to an allocated pty (in any zone)
+ *	Returns
+ *		0 if not an allocated pty
+ *		1 if an allocated pty
+ *
+ * void ptms_set_owner(minor_t minor, uid_t ruid, gid_t rgid)
+ *
+ *	Sets the owner associated with a pty.
  *
  * void ptms_close(struct pt_ttys *pt, uint_t flags_to_clear);
  *
@@ -196,16 +211,12 @@ static struct pt_ttys **ptms_slots = NULL; /* Slots for actual pt structures */
 static size_t ptms_nslots = 0;		/* Size of slot array */
 static size_t ptms_ptymax = 0;		/* Maximum number of ptys */
 static size_t ptms_inuse = 0;		/* # of ptys currently allocated */
-static size_t ptms_bt_words = 0;	/* Size of minor bitmap in words */
-static size_t ptms_bt_len = 0;		/* Size of minor bitmap in bits */
 
-dev_info_t 	*pts_dip = NULL;	/* private copy of slave devinfo ptr */
+dev_info_t 	*pts_dip = NULL;	/* set if slave is attached */
 
 static struct kmem_cache *ptms_cache = NULL;	/* pty cache */
 
 static vmem_t *ptms_minor_arena = NULL; /* Arena for device minors */
-
-static ulong_t *ptms_bt = NULL;		/* pty created minor node bitmap */
 
 static uint_t ptms_roundup(uint_t);
 static int ptms_constructor(void *, void *, int);
@@ -264,12 +275,6 @@ ptms_init(void)
 		    sizeof (struct pt_ttys), 0, ptms_constructor,
 		    ptms_destructor, NULL, NULL, NULL, 0);
 
-		/* Allocate bit map for created minor nodes */
-		ptms_bt_len = pt_init_cnt * 2 + 1;
-		ptms_bt_words = howmany(ptms_bt_len, BT_NBIPUL);
-		ptms_bt = kmem_zalloc(sizeof (ulong_t) * ptms_bt_words,
-			KM_SLEEP);
-
 		ptms_nslots = pt_init_cnt;
 
 		/* Allocate integer space for minor numbers */
@@ -288,60 +293,34 @@ ptms_init(void)
 	mutex_exit(&ptms_lock);
 }
 
-static void
-ptms_create_node(dev_info_t *devi, minor_t i)
+/*
+ * This routine attaches the pts dip.
+ */
+int
+ptms_attach_slave(void)
 {
-	char name[22];		/* For representing 64-bit minor + NUL */
+	if (pts_dip == NULL && i_ddi_attach_pseudo_node("pts") == NULL)
+		return (-1);
 
-	(void) snprintf(name, sizeof (name), "%d", i);
-	if (ddi_create_minor_node(devi, name, S_IFCHR,
-	    i, DDI_PSEUDO, NULL) == DDI_SUCCESS) {
-		BT_SET(ptms_bt, i);
-	}
+	ASSERT(pts_dip);
+	return (0);
 }
 
 /*
- * Create nodes in /dev/pts directory.
- * Called from pts_attach.
+ * Called from /dev fs. Checks if dip is attached,
+ * and if it is, returns its major number.
  */
-int
-ptms_create_pts_nodes(dev_info_t *devi)
+major_t
+ptms_slave_attached(void)
 {
-	uint_t i;
+	major_t maj = (major_t)-1;
 
 	mutex_enter(&ptms_lock);
-	pts_dip = devi;
-
-	/*
-	 * /dev/pts/0 is not used, but some applications may check it, so create
-	 * it also.
-	 *
-	 * Create all minor nodes that have been pre-allocated in ptms_init().
-	 */
-	for (i = 0; i <= pt_init_cnt * 2; i++)
-		ptms_create_node(devi, i);
-
+	if (pts_dip)
+		maj = ddi_driver_major(pts_dip);
 	mutex_exit(&ptms_lock);
 
-	return (DDI_SUCCESS);
-}
-
-/*
- * Destroy nodes in /dev/pts directory.
- * Called from pts_detach.
- */
-int
-ptms_destroy_pts_nodes(dev_info_t *devi)
-{
-	mutex_enter(&ptms_lock);
-	ddi_remove_minor_node(devi, NULL);
-	if (ptms_bt != NULL && ptms_bt_words > 0) {
-		/* Clear bitmap since all minor nodes have been removed */
-		bzero(ptms_bt, sizeof (ulong_t) * ptms_bt_words);
-	}
-	pts_dip = NULL;
-	mutex_exit(&ptms_lock);
-	return (DDI_SUCCESS);
+	return (maj);
 }
 
 /*
@@ -400,14 +379,6 @@ pt_ttys_alloc(void)
 		return (NULL);
 	}
 
-	if (BT_TEST(ptms_bt, dminor) == 0) {
-		/*
-		 * Retry failed node creation.
-		 */
-		if (pts_dip != NULL)
-			ptms_create_node(pts_dip, dminor);
-	}
-
 	pt = kmem_cache_alloc(ptms_cache, KM_NOSLEEP);
 	if (pt == NULL) {
 		/* Not enough memory - this entry can't be used now. */
@@ -418,6 +389,8 @@ pt_ttys_alloc(void)
 		pt->pt_pid = curproc->p_pid;	/* For debugging */
 		pt->pt_state = (PTMOPEN | PTLOCK);
 		pt->pt_zoneid = getzoneid();
+		pt->pt_ruid = 0; /* we don't know uid/gid yet. Report as root */
+		pt->pt_rgid = 0;
 		ASSERT(ptms_slots[dminor - 1] == NULL);
 		ptms_slots[dminor - 1] = pt;
 	}
@@ -440,6 +413,102 @@ ptms_minor2ptty(minor_t dminor)
 		pt = ptms_slots[dminor - 1];
 
 	return (pt);
+}
+
+/*
+ * Invoked in response to chown on /dev/pts nodes to change the
+ * permission on a pty
+ */
+void
+ptms_set_owner(minor_t dminor, uid_t ruid, gid_t rgid)
+{
+	struct pt_ttys *pt;
+
+	ASSERT(ruid >= 0);
+	ASSERT(rgid >= 0);
+
+	if (ruid < 0 || rgid < 0)
+		return;
+
+	/*
+	 * /dev/pts/0 is not used, but some applications may check it. There
+	 * is no pty backing it - so we have nothing to do.
+	 */
+	if (dminor == 0)
+		return;
+
+	mutex_enter(&ptms_lock);
+	pt = ptms_minor2ptty(dminor);
+	if (pt != NULL && pt->pt_zoneid == getzoneid()) {
+		pt->pt_ruid = ruid;
+		pt->pt_rgid = rgid;
+	}
+	mutex_exit(&ptms_lock);
+}
+
+/*
+ * Given a ptm/pts minor number
+ * returns:
+ *	1 if the pty is allocated to the current zone.
+ *	0 otherwise
+ *
+ * If the pty is allocated to the current zone, it also returns the owner.
+ */
+int
+ptms_minor_valid(minor_t dminor, uid_t *ruid, gid_t *rgid)
+{
+	struct pt_ttys *pt;
+	int ret;
+
+	ASSERT(ruid);
+	ASSERT(rgid);
+
+	*ruid = -1;
+	*rgid = -1;
+
+	/*
+	 * /dev/pts/0 is not used, but some applications may check it, so create
+	 * it also. Report the owner as root. It belongs to all zones.
+	 */
+	if (dminor == 0) {
+		*ruid = 0;
+		*rgid = 0;
+		return (1);
+	}
+
+	ret = 0;
+	mutex_enter(&ptms_lock);
+	pt = ptms_minor2ptty(dminor);
+	if (pt != NULL) {
+		ASSERT(pt->pt_ruid >= 0);
+		ASSERT(pt->pt_rgid >= 0);
+		if (pt->pt_zoneid == getzoneid()) {
+			ret = 1;
+			*ruid = pt->pt_ruid;
+			*rgid = pt->pt_rgid;
+		}
+	}
+	mutex_exit(&ptms_lock);
+
+	return (ret);
+}
+
+/*
+ * Given a ptm/pts minor number
+ * returns:
+ *	0 if the pty is not allocated
+ *	1 if the pty is allocated
+ */
+int
+ptms_minor_exists(minor_t dminor)
+{
+	int ret;
+
+	mutex_enter(&ptms_lock);
+	ret = ptms_minor2ptty(dminor) ? 1 : 0;
+	mutex_exit(&ptms_lock);
+
+	return (ret);
 }
 
 /*
@@ -496,14 +565,9 @@ ptms_grow()
 	minor_t old_size = ptms_nslots;
 	minor_t delta = MIN(pt_maxdelta, old_size);
 	minor_t new_size = old_size + delta;
-	minor_t	new_delta = MIN(pt_maxdelta, new_size);
 	struct pt_ttys **ptms_old = ptms_slots;
 	struct pt_ttys **ptms_new;
-	ulong_t	*new_bt;
-	size_t	new_bt_words;
-	size_t	new_bt_len;
 	void  *vaddr;			/* vmem_add return value */
-	minor_t i;
 
 	ASSERT(MUTEX_HELD(&ptms_lock));
 
@@ -515,22 +579,12 @@ ptms_grow()
 	if (ptms_new == NULL)
 		return ((minor_t)0);
 
-	/* Allocate new ptms bitmap */
-	new_bt_len = ptms_bt_len + new_delta;
-	new_bt_words = howmany(new_bt_len, BT_NBIPUL);
-	new_bt = kmem_zalloc(sizeof (ulong_t) * new_bt_words, KM_NOSLEEP);
-	if (new_bt == NULL) {
-		kmem_free(ptms_new, new_size * sizeof (struct pt_ttys *));
-		return ((minor_t)0);
-	}
-
 	/* Increase clone index space */
 	vaddr = vmem_add(ptms_minor_arena, (void *)(uintptr_t)(old_size + 1),
 	    new_size - old_size, VM_NOSLEEP);
 
 	if (vaddr == NULL) {
 		kmem_free(ptms_new, new_size * sizeof (struct pt_ttys *));
-		kmem_free(new_bt, sizeof (ulong_t) * new_bt_words);
 		return ((minor_t)0);
 	}
 
@@ -539,28 +593,6 @@ ptms_grow()
 	bcopy(ptms_old, ptms_new, old_size * sizeof (struct pt_ttys *));
 	ptms_slots = ptms_new;
 	kmem_free(ptms_old, old_size * sizeof (struct pt_ttys *));
-
-	/* Migrate bitmap entries to a new location */
-	bt_copy(ptms_bt, new_bt, ptms_bt_words);
-	kmem_free(ptms_bt, sizeof (ulong_t) * ptms_bt_words);
-	ptms_bt = new_bt;
-	ptms_bt_words = new_bt_words;
-	ptms_bt_len = new_bt_len;
-
-	/*
-	 * Add new or previously failed /devices entries.
-	 * Devices are created asynchronously via event daemon requests, so we
-	 * pre-create devices before they are actually needed.
-	 * Faster performance could be obtained by keeping track of
-	 * the last uncreated node, rather than searching.
-	 */
-	if (pts_dip != NULL) {
-		for (i = bt_availbit(ptms_bt, ptms_bt_len); i < ptms_bt_len;
-			i++) {
-			if (BT_TEST(ptms_bt, i) == 0)
-				ptms_create_node(pts_dip, i);
-		}
-	}
 
 	/* Allocate minor number and return it */
 	return ((minor_t)(uintptr_t)

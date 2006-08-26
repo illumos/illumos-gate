@@ -5151,6 +5151,11 @@ mondo_loop() {
 	    done
 	fi;
 
+	# Remove pt_chmod - obsoleted by new /dev filesystem
+	if [ $zone = global ]; then
+	   rm -f $usr/lib/pt_chmod
+	fi
+
 	if [ $RM_32BIT_KERNEL -eq 1 -a $zone = global ];
 	then
 	    print "Removing 32-bit commands and kernel binaries ... \c";

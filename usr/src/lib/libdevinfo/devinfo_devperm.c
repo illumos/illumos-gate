@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -116,6 +115,7 @@ setdevaccess(char *dev, uid_t uid, gid_t gid, mode_t mode,
 		 * doesn't support ACLs, therefore, we must assume that
 		 * there were no ACLs to remove in the first place.
 		 */
+		err = 0;
 		if (errno != ENOSYS) {
 			err = -1;
 
@@ -377,8 +377,29 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 	DIR *dirp;
 	struct dirent *direntp;
 	char errstring[MAX_LINELEN];
+	char *p;
+	regex_t regex;
+	int alwaysmatch = 0;
+	char *match;
+	char *name, *newpath, *remainder_path;
+	finddevhdl_t handle;
+	int find_method;
+
+	/*
+	 * Determine to begin if the search needs to be performed via
+	 * finddev, which returns only persisted names in /dev, or readdir,
+	 * for paths other than /dev.  This use of finddev avoids triggering
+	 * potential implicit reconfig for names noted as managed by
+	 * logindevperm but not present on the system.
+	 */
+	find_method = ((strcmp(path, "/dev") == 0) ||
+	    (strncmp(path, "/dev/", 5) == 0)) ?
+		FLAG_USE_FINDDEV : FLAG_USE_READDIR;
 
 	/* path must be a valid name */
+	if (find_method == FLAG_USE_FINDDEV && !device_exists(path)) {
+		return (-1);
+	}
 	if (stat(path, &stat_buf) == -1) {
 		/*
 		 * ENOENT errors are expected errors when there are
@@ -411,76 +432,89 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 		}
 	}
 
-	dirp = opendir(path);
-	if (dirp == NULL) {
-		return (0);
+	if (find_method == FLAG_USE_READDIR) {
+		dirp = opendir(path);
+		if (dirp == NULL)
+			return (0);
 	} else {
-		char *p = strchr(left_to_do, '/');
-		regex_t regex;
-		int alwaysmatch = 0;
-		char *match;
-		char *name, *newpath, *remainder_path;
+		if (finddev_readdir(path, &handle) != 0)
+			return (0);
+	}
 
-		newpath = (char *)malloc(MAXPATHLEN);
-		if (newpath == NULL) {
-			return (-1);
-		}
-		match = (char *)calloc(MAXPATHLEN, 1);
-		if (match == NULL) {
+	p = strchr(left_to_do, '/');
+	alwaysmatch = 0;
+
+	newpath = (char *)malloc(MAXPATHLEN);
+	if (newpath == NULL) {
+		return (-1);
+	}
+	match = (char *)calloc(MAXPATHLEN, 1);
+	if (match == NULL) {
+		free(newpath);
+		return (-1);
+	}
+
+	if (p) {
+		(void) strncpy(match, left_to_do, p - left_to_do);
+	} else {
+		(void) strcpy(match, left_to_do);
+	}
+
+	if (strcmp(match, "*") == 0) {
+		alwaysmatch = 1;
+	} else {
+		if (regcomp(&regex, match, REG_EXTENDED) != 0) {
 			free(newpath);
+			free(match);
 			return (-1);
 		}
+	}
 
-		if (p) {
-			(void) strncpy(match, left_to_do, p - left_to_do);
-		} else {
-			(void) strcpy(match, left_to_do);
-		}
-
-		if (strcmp(match, "*") == 0) {
-			alwaysmatch = 1;
-		} else {
-			if (regcomp(&regex, match, REG_EXTENDED) != 0) {
-				free(newpath);
-				free(match);
-				return (-1);
-			}
-		}
-
-		while ((direntp = readdir(dirp)) != NULL) {
+	for (;;) {
+		if (find_method == FLAG_USE_READDIR) {
+			if ((direntp = readdir(dirp)) == NULL)
+				break;
 			name = direntp->d_name;
 			if ((strcmp(name, ".") == 0) ||
 			    (strcmp(name, "..") == 0))
 				continue;
+		} else {
+			if ((name = (char *)finddev_next(handle)) == NULL)
+				break;
+		}
 
-			if (alwaysmatch ||
-			    regexec(&regex, name, 0, NULL, 0) == 0) {
-				if (strcmp(path, "/") == 0) {
-					(void) snprintf(newpath,
-					    MAXPATHLEN, "%s%s", path, name);
-				} else {
-					(void) snprintf(newpath,
-					    MAXPATHLEN, "%s/%s", path, name);
-				}
+		if (alwaysmatch ||
+		    regexec(&regex, name, 0, NULL, 0) == 0) {
+			if (strcmp(path, "/") == 0) {
+				(void) snprintf(newpath,
+				    MAXPATHLEN, "%s%s", path, name);
+			} else {
+				(void) snprintf(newpath,
+				    MAXPATHLEN, "%s/%s", path, name);
+			}
 
-				/*
-				 * recurse but adjust what is still left to do
-				 */
-				remainder_path = (p ?
-				    left_to_do + (p - left_to_do) + 1 :
-				    &left_to_do[strlen(left_to_do)]);
-				if (dir_dev_acc(newpath, remainder_path,
-				    uid, gid, mode, line, errmsg)) {
-					err = -1;
-				}
+			/*
+			 * recurse but adjust what is still left to do
+			 */
+			remainder_path = (p ?
+			    left_to_do + (p - left_to_do) + 1 :
+			    &left_to_do[strlen(left_to_do)]);
+			if (dir_dev_acc(newpath, remainder_path,
+			    uid, gid, mode, line, errmsg)) {
+				err = -1;
 			}
 		}
+	}
+
+	if (find_method == FLAG_USE_READDIR) {
 		(void) closedir(dirp);
-		free(newpath);
-		free(match);
-		if (!alwaysmatch) {
-			regfree(&regex);
-		}
+	} else {
+		finddev_close(handle);
+	}
+	free(newpath);
+	free(match);
+	if (!alwaysmatch) {
+		regfree(&regex);
 	}
 
 	return (err);

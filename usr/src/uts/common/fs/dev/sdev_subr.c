@@ -1,0 +1,3657 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * utility routines for the /dev fs
+ */
+
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/t_lock.h>
+#include <sys/systm.h>
+#include <sys/sysmacros.h>
+#include <sys/user.h>
+#include <sys/time.h>
+#include <sys/vfs.h>
+#include <sys/vnode.h>
+#include <sys/file.h>
+#include <sys/fcntl.h>
+#include <sys/flock.h>
+#include <sys/kmem.h>
+#include <sys/uio.h>
+#include <sys/errno.h>
+#include <sys/stat.h>
+#include <sys/cred.h>
+#include <sys/dirent.h>
+#include <sys/pathname.h>
+#include <sys/cmn_err.h>
+#include <sys/debug.h>
+#include <sys/mode.h>
+#include <sys/policy.h>
+#include <fs/fs_subr.h>
+#include <sys/mount.h>
+#include <sys/fs/snode.h>
+#include <sys/fs/dv_node.h>
+#include <sys/fs/sdev_impl.h>
+#include <sys/fs/sdev_node.h>
+#include <sys/sunndi.h>
+#include <sys/sunmdi.h>
+#include <sys/conf.h>
+#include <sys/proc.h>
+#include <sys/user.h>
+#include <sys/modctl.h>
+
+#ifdef DEBUG
+int sdev_debug = 0x00000001;
+int sdev_debug_cache_flags = 0;
+#endif
+
+/*
+ * globals
+ */
+/* prototype memory vattrs */
+vattr_t sdev_vattr_dir = {
+	AT_TYPE|AT_MODE|AT_UID|AT_GID,		/* va_mask */
+	VDIR,					/* va_type */
+	SDEV_DIRMODE_DEFAULT,			/* va_mode */
+	SDEV_UID_DEFAULT,			/* va_uid */
+	SDEV_GID_DEFAULT,			/* va_gid */
+	0,					/* va_fsid */
+	0,					/* va_nodeid */
+	0,					/* va_nlink */
+	0,					/* va_size */
+	0,					/* va_atime */
+	0,					/* va_mtime */
+	0,					/* va_ctime */
+	0,					/* va_rdev */
+	0,					/* va_blksize */
+	0,					/* va_nblocks */
+	0					/* va_vcode */
+};
+
+vattr_t sdev_vattr_lnk = {
+	AT_TYPE|AT_MODE,			/* va_mask */
+	VLNK,					/* va_type */
+	SDEV_LNKMODE_DEFAULT,			/* va_mode */
+	SDEV_UID_DEFAULT,			/* va_uid */
+	SDEV_GID_DEFAULT,			/* va_gid */
+	0,					/* va_fsid */
+	0,					/* va_nodeid */
+	0,					/* va_nlink */
+	0,					/* va_size */
+	0,					/* va_atime */
+	0,					/* va_mtime */
+	0,					/* va_ctime */
+	0,					/* va_rdev */
+	0,					/* va_blksize */
+	0,					/* va_nblocks */
+	0					/* va_vcode */
+};
+
+vattr_t sdev_vattr_blk = {
+	AT_TYPE|AT_MODE|AT_UID|AT_GID,		/* va_mask */
+	VBLK,					/* va_type */
+	S_IFBLK | SDEV_DEVMODE_DEFAULT,		/* va_mode */
+	SDEV_UID_DEFAULT,			/* va_uid */
+	SDEV_GID_DEFAULT,			/* va_gid */
+	0,					/* va_fsid */
+	0,					/* va_nodeid */
+	0,					/* va_nlink */
+	0,					/* va_size */
+	0,					/* va_atime */
+	0,					/* va_mtime */
+	0,					/* va_ctime */
+	0,					/* va_rdev */
+	0,					/* va_blksize */
+	0,					/* va_nblocks */
+	0					/* va_vcode */
+};
+
+vattr_t sdev_vattr_chr = {
+	AT_TYPE|AT_MODE|AT_UID|AT_GID,		/* va_mask */
+	VCHR,					/* va_type */
+	S_IFCHR | SDEV_DEVMODE_DEFAULT,		/* va_mode */
+	SDEV_UID_DEFAULT,			/* va_uid */
+	SDEV_GID_DEFAULT,			/* va_gid */
+	0,					/* va_fsid */
+	0,					/* va_nodeid */
+	0,					/* va_nlink */
+	0,					/* va_size */
+	0,					/* va_atime */
+	0,					/* va_mtime */
+	0,					/* va_ctime */
+	0,					/* va_rdev */
+	0,					/* va_blksize */
+	0,					/* va_nblocks */
+	0					/* va_vcode */
+};
+
+kmem_cache_t	*sdev_node_cache;	/* sdev_node cache */
+int		devtype;		/* fstype */
+
+struct devname_ops *devname_ns_ops;	/* default name service directory ops */
+kmutex_t devname_nsmaps_lock;	/* protect devname_nsmaps */
+
+/* static */
+static struct devname_nsmap *devname_nsmaps = NULL;
+				/* contents from /etc/dev/devname_master */
+static int devname_nsmaps_invalidated = 0; /* "devfsadm -m" has run */
+
+static struct vnodeops *sdev_get_vop(struct sdev_node *);
+static void sdev_set_no_nocache(struct sdev_node *);
+static int sdev_get_moduleops(struct sdev_node *);
+static void sdev_handle_alloc(struct sdev_node *);
+static fs_operation_def_t *sdev_merge_vtab(const fs_operation_def_t []);
+static void sdev_free_vtab(fs_operation_def_t *);
+
+static void
+sdev_prof_free(struct sdev_node *dv)
+{
+	ASSERT(!SDEV_IS_GLOBAL(dv));
+	if (dv->sdev_prof.dev_name)
+		nvlist_free(dv->sdev_prof.dev_name);
+	if (dv->sdev_prof.dev_map)
+		nvlist_free(dv->sdev_prof.dev_map);
+	if (dv->sdev_prof.dev_symlink)
+		nvlist_free(dv->sdev_prof.dev_symlink);
+	if (dv->sdev_prof.dev_glob_incdir)
+		nvlist_free(dv->sdev_prof.dev_glob_incdir);
+	if (dv->sdev_prof.dev_glob_excdir)
+		nvlist_free(dv->sdev_prof.dev_glob_excdir);
+	bzero(&dv->sdev_prof, sizeof (dv->sdev_prof));
+}
+
+/*
+ * sdev_node cache constructor
+ */
+/*ARGSUSED1*/
+static int
+i_sdev_node_ctor(void *buf, void *cfarg, int flag)
+{
+	struct sdev_node *dv = (struct sdev_node *)buf;
+	struct vnode *vp;
+
+	ASSERT(flag == KM_SLEEP);
+
+	bzero(buf, sizeof (struct sdev_node));
+	rw_init(&dv->sdev_contents, NULL, RW_DEFAULT, NULL);
+	dv->sdev_vnode = vn_alloc(KM_SLEEP);
+	vp = SDEVTOV(dv);
+	vp->v_data = (caddr_t)dv;
+	return (0);
+}
+
+/* sdev_node destructor for kmem cache */
+/*ARGSUSED1*/
+static void
+i_sdev_node_dtor(void *buf, void *arg)
+{
+	struct sdev_node *dv = (struct sdev_node *)buf;
+	struct vnode *vp = SDEVTOV(dv);
+
+	rw_destroy(&dv->sdev_contents);
+	vn_free(vp);
+}
+
+/* initialize sdev_node cache */
+void
+sdev_node_cache_init()
+{
+	int flags = 0;
+
+#ifdef	DEBUG
+	flags = sdev_debug_cache_flags;
+	if (flags)
+		sdcmn_err(("cache debug flags 0x%x\n", flags));
+#endif	/* DEBUG */
+
+	ASSERT(sdev_node_cache == NULL);
+	sdev_node_cache = kmem_cache_create("sdev_node_cache",
+	    sizeof (struct sdev_node), 0, i_sdev_node_ctor, i_sdev_node_dtor,
+	    NULL, NULL, NULL, flags);
+}
+
+/* destroy sdev_node cache */
+void
+sdev_node_cache_fini()
+{
+	ASSERT(sdev_node_cache != NULL);
+	kmem_cache_destroy(sdev_node_cache);
+	sdev_node_cache = NULL;
+}
+
+void
+sdev_set_nodestate(struct sdev_node *dv, sdev_node_state_t state)
+{
+	ASSERT(dv);
+	ASSERT(RW_WRITE_HELD(&dv->sdev_contents));
+	dv->sdev_state = state;
+}
+
+static void
+sdev_attrinit(struct sdev_node *dv, vattr_t *vap)
+{
+	timestruc_t now;
+
+	ASSERT(vap);
+
+	dv->sdev_attr = kmem_zalloc(sizeof (struct vattr), KM_SLEEP);
+	*dv->sdev_attr = *vap;
+
+	dv->sdev_attr->va_mode = MAKEIMODE(vap->va_type, vap->va_mode);
+
+	gethrestime(&now);
+	dv->sdev_attr->va_atime = now;
+	dv->sdev_attr->va_mtime = now;
+	dv->sdev_attr->va_ctime = now;
+}
+
+/* alloc and initialize a sdev_node */
+int
+sdev_nodeinit(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
+    vattr_t *vap)
+{
+	struct sdev_node *dv = NULL;
+	struct vnode *vp;
+	size_t nmlen, len;
+	devname_handle_t  *dhl;
+
+	nmlen = strlen(nm) + 1;
+	if (nmlen > MAXNAMELEN) {
+		sdcmn_err9(("sdev_nodeinit: node name %s"
+		    " too long\n", nm));
+		*newdv = NULL;
+		return (ENAMETOOLONG);
+	}
+
+	dv = kmem_cache_alloc(sdev_node_cache, KM_SLEEP);
+
+	dv->sdev_name = kmem_alloc(nmlen, KM_SLEEP);
+	bcopy(nm, dv->sdev_name, nmlen);
+	dv->sdev_namelen = nmlen - 1;	/* '\0' not included */
+	len = strlen(ddv->sdev_path) + strlen(nm) + 2;
+	dv->sdev_path = kmem_alloc(len, KM_SLEEP);
+	(void) snprintf(dv->sdev_path, len, "%s/%s", ddv->sdev_path, nm);
+	/* overwritten for VLNK nodes */
+	dv->sdev_symlink = NULL;
+
+	vp = SDEVTOV(dv);
+	vn_reinit(vp);
+	vp->v_vfsp = SDEVTOV(ddv)->v_vfsp;
+	if (vap)
+		vp->v_type = vap->va_type;
+
+	/*
+	 * initialized to the parent's vnodeops.
+	 * maybe overwriten for a VDIR
+	 */
+	vn_setops(vp, vn_getops(SDEVTOV(ddv)));
+	vn_exists(vp);
+
+	dv->sdev_dotdot = NULL;
+	dv->sdev_dot = NULL;
+	dv->sdev_next = NULL;
+	dv->sdev_attrvp = NULL;
+	if (vap) {
+		sdev_attrinit(dv, vap);
+	} else {
+		dv->sdev_attr = NULL;
+	}
+
+	dv->sdev_ino = sdev_mkino(dv);
+	dv->sdev_nlink = 0;		/* updated on insert */
+	dv->sdev_flags = ddv->sdev_flags; /* inherit from the parent first */
+	dv->sdev_flags |= SDEV_BUILD;
+	mutex_init(&dv->sdev_lookup_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&dv->sdev_lookup_cv, NULL, CV_DEFAULT, NULL);
+	if (SDEV_IS_GLOBAL(ddv)) {
+		dv->sdev_flags |= SDEV_GLOBAL;
+		dv->sdev_mapinfo = NULL;
+		dhl = &(dv->sdev_handle);
+		dhl->dh_data = dv;
+		dhl->dh_spec = DEVNAME_NS_NONE;
+		dhl->dh_args = NULL;
+		sdev_set_no_nocache(dv);
+		dv->sdev_gdir_gen = 0;
+	} else {
+		dv->sdev_flags &= ~SDEV_GLOBAL;
+		dv->sdev_origin = NULL; /* set later */
+		bzero(&dv->sdev_prof, sizeof (dv->sdev_prof));
+		dv->sdev_ldir_gen = 0;
+		dv->sdev_devtree_gen = 0;
+	}
+
+	rw_enter(&dv->sdev_contents, RW_WRITER);
+	sdev_set_nodestate(dv, SDEV_INIT);
+	rw_exit(&dv->sdev_contents);
+	*newdv = dv;
+
+	return (0);
+}
+
+/*
+ * transition a sdev_node into SDEV_READY state
+ */
+int
+sdev_nodeready(struct sdev_node *dv, struct vattr *vap, struct vnode *avp,
+    void *args, struct cred *cred)
+{
+	int error = 0;
+	struct vnode *vp = SDEVTOV(dv);
+	vtype_t type;
+
+	ASSERT(dv && (dv->sdev_state != SDEV_READY) && vap);
+
+	type = vap->va_type;
+	vp->v_type = type;
+	vp->v_rdev = vap->va_rdev;
+	rw_enter(&dv->sdev_contents, RW_WRITER);
+	if (type == VDIR) {
+		dv->sdev_nlink = 2;
+		dv->sdev_flags &= ~SDEV_PERSIST;
+		dv->sdev_flags &= ~SDEV_DYNAMIC;
+		vn_setops(vp, sdev_get_vop(dv)); /* from internal vtab */
+		error = sdev_get_moduleops(dv); /* from plug-in module */
+		ASSERT(dv->sdev_dotdot);
+		ASSERT(SDEVTOV(dv->sdev_dotdot)->v_type == VDIR);
+		vp->v_rdev = SDEVTOV(dv->sdev_dotdot)->v_rdev;
+	} else if (type == VLNK) {
+		ASSERT(args);
+		dv->sdev_nlink = 1;
+		dv->sdev_symlink = i_ddi_strdup((char *)args, KM_SLEEP);
+	} else {
+		dv->sdev_nlink = 1;
+	}
+
+	if (!(SDEV_IS_GLOBAL(dv))) {
+		dv->sdev_origin = (struct sdev_node *)args;
+		dv->sdev_flags &= ~SDEV_PERSIST;
+	}
+
+	/*
+	 * shadow node is created here OR
+	 * if failed (indicated by dv->sdev_attrvp == NULL),
+	 * created later in sdev_setattr
+	 */
+	if (avp) {
+		dv->sdev_attrvp = avp;
+	} else {
+		if (dv->sdev_attr == NULL)
+			sdev_attrinit(dv, vap);
+		else
+			*dv->sdev_attr = *vap;
+
+		if ((SDEV_IS_PERSIST(dv) && (dv->sdev_attrvp == NULL)) ||
+		    ((SDEVTOV(dv)->v_type == VDIR) &&
+		    (dv->sdev_attrvp == NULL)))
+			error = sdev_shadow_node(dv, cred);
+	}
+
+	/* transition to READY state */
+	sdev_set_nodestate(dv, SDEV_READY);
+	sdev_nc_node_exists(dv);
+	rw_exit(&dv->sdev_contents);
+	return (error);
+}
+
+/*
+ * setting ZOMBIE state
+ */
+static int
+sdev_nodezombied(struct sdev_node *dv)
+{
+	rw_enter(&dv->sdev_contents, RW_WRITER);
+	sdev_set_nodestate(dv, SDEV_ZOMBIE);
+	rw_exit(&dv->sdev_contents);
+	return (0);
+}
+
+/*
+ * Build the VROOT sdev_node.
+ */
+/*ARGSUSED*/
+struct sdev_node *
+sdev_mkroot(struct vfs *vfsp, dev_t devdev, struct vnode *mvp,
+    struct vnode *avp, struct cred *cred)
+{
+	struct sdev_node *dv;
+	struct vnode *vp;
+	char devdir[] = "/dev";
+
+	ASSERT(sdev_node_cache != NULL);
+	ASSERT(avp);
+	dv = kmem_cache_alloc(sdev_node_cache, KM_SLEEP);
+	vp = SDEVTOV(dv);
+	vn_reinit(vp);
+	vp->v_flag |= VROOT;
+	vp->v_vfsp = vfsp;
+	vp->v_type = VDIR;
+	vp->v_rdev = devdev;
+	vn_setops(vp, sdev_vnodeops); /* apply the default vnodeops at /dev */
+	vn_exists(vp);
+
+	if (vfsp->vfs_mntpt)
+		dv->sdev_name = i_ddi_strdup(
+		    (char *)refstr_value(vfsp->vfs_mntpt), KM_SLEEP);
+	else
+		/* vfs_mountdev1 set mount point later */
+		dv->sdev_name = i_ddi_strdup("/dev", KM_SLEEP);
+	dv->sdev_namelen = strlen(dv->sdev_name); /* '\0' not included */
+	dv->sdev_path = i_ddi_strdup(devdir, KM_SLEEP);
+	dv->sdev_ino = SDEV_ROOTINO;
+	dv->sdev_nlink = 2;		/* name + . (no sdev_insert) */
+	dv->sdev_dotdot = dv;		/* .. == self */
+	dv->sdev_attrvp = avp;
+	dv->sdev_attr = NULL;
+	mutex_init(&dv->sdev_lookup_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&dv->sdev_lookup_cv, NULL, CV_DEFAULT, NULL);
+	if (strcmp(dv->sdev_name, "/dev") == 0) {
+		mutex_init(&devname_nsmaps_lock, NULL, MUTEX_DEFAULT, NULL);
+		dv->sdev_mapinfo = NULL;
+		dv->sdev_flags = SDEV_BUILD|SDEV_GLOBAL|SDEV_PERSIST;
+		bzero(&dv->sdev_handle, sizeof (dv->sdev_handle));
+		dv->sdev_gdir_gen = 0;
+	} else {
+		dv->sdev_flags = SDEV_BUILD;
+		dv->sdev_flags &= ~SDEV_PERSIST;
+		bzero(&dv->sdev_prof, sizeof (dv->sdev_prof));
+		dv->sdev_ldir_gen = 0;
+		dv->sdev_devtree_gen = 0;
+	}
+
+	rw_enter(&dv->sdev_contents, RW_WRITER);
+	sdev_set_nodestate(dv, SDEV_READY);
+	rw_exit(&dv->sdev_contents);
+	sdev_nc_node_exists(dv);
+	return (dv);
+}
+
+/*
+ *  1. load the module
+ *  2. modload invokes sdev_module_register, which in turn sets
+ *     the dv->sdev_mapinfo->dir_ops
+ *
+ * note: locking order:
+ *	dv->sdev_contents -> map->dir_lock
+ */
+static int
+sdev_get_moduleops(struct sdev_node *dv)
+{
+	int error = 0;
+	struct devname_nsmap *map = NULL;
+	char *module;
+	char *path;
+	int load = 1;
+
+	ASSERT(SDEVTOV(dv)->v_type == VDIR);
+
+	if (devname_nsmaps == NULL)
+		return (0);
+
+	if (!sdev_nsmaps_loaded() && !sdev_nsmaps_reloaded())
+		return (0);
+
+
+	path = dv->sdev_path;
+	if ((map = sdev_get_nsmap_by_dir(path, 0))) {
+		rw_enter(&map->dir_lock, RW_READER);
+		if (map->dir_invalid) {
+			if (map->dir_module && map->dir_newmodule &&
+			    (strcmp(map->dir_module,
+					map->dir_newmodule) == 0)) {
+				load = 0;
+			}
+			sdev_replace_nsmap(map, map->dir_newmodule,
+			    map->dir_newmap);
+		}
+
+		module = map->dir_module;
+		if (module && load) {
+			sdcmn_err6(("sdev_get_moduleops: "
+			    "load module %s", module));
+			rw_exit(&map->dir_lock);
+			error = modload("devname", module);
+			sdcmn_err6(("sdev_get_moduleops: error %d\n", error));
+			if (error < 0) {
+				return (-1);
+			}
+		} else if (module == NULL) {
+			/*
+			 * loading the module ops for name services
+			 */
+			if (devname_ns_ops == NULL) {
+				sdcmn_err6((
+				    "sdev_get_moduleops: modload default\n"));
+				error = modload("devname", DEVNAME_NSCONFIG);
+				sdcmn_err6((
+				    "sdev_get_moduleops: error %d\n", error));
+				if (error < 0) {
+					return (-1);
+				}
+			}
+
+			if (!rw_tryupgrade(&map->dir_lock)) {
+				rw_exit(&map->dir_lock);
+				rw_enter(&map->dir_lock, RW_WRITER);
+			}
+			ASSERT(devname_ns_ops);
+			map->dir_ops = devname_ns_ops;
+			rw_exit(&map->dir_lock);
+		}
+	}
+
+	dv->sdev_mapinfo = map;
+	return (0);
+}
+
+/* directory dependent vop table */
+struct sdev_vop_table {
+	char *vt_name;				/* subdirectory name */
+	const fs_operation_def_t *vt_service;	/* vnodeops table */
+	struct vnodeops *vt_vops;		/* constructed vop */
+	struct vnodeops **vt_global_vops;	/* global container for vop */
+	int (*vt_vtor)(struct sdev_node *);	/* validate sdev_node */
+	int vt_flags;
+};
+
+/*
+ * A nice improvement would be to provide a plug-in mechanism
+ * for this table instead of a const table.
+ */
+static struct sdev_vop_table vtab[] =
+{
+	{ "pts", devpts_vnodeops_tbl, NULL, &devpts_vnodeops, devpts_validate,
+	SDEV_DYNAMIC | SDEV_VTOR },
+
+	{ "zcons", NULL, NULL, NULL, NULL, SDEV_NO_NCACHE },
+
+	{ NULL, NULL, NULL, NULL, NULL, 0}
+};
+
+
+/*
+ *  sets a directory's vnodeops if the directory is in the vtab;
+ */
+static struct vnodeops *
+sdev_get_vop(struct sdev_node *dv)
+{
+	int i;
+	char *path;
+
+	path = dv->sdev_path;
+	ASSERT(path);
+
+	/* gets the relative path to /dev/ */
+	path += 5;
+
+	/* gets the vtab entry if matches */
+	for (i = 0; vtab[i].vt_name; i++) {
+		if (strcmp(vtab[i].vt_name, path) != 0)
+			continue;
+		dv->sdev_flags |= vtab[i].vt_flags;
+
+		if (vtab[i].vt_vops) {
+			if (vtab[i].vt_global_vops)
+				*(vtab[i].vt_global_vops) = vtab[i].vt_vops;
+			return (vtab[i].vt_vops);
+		}
+
+		if (vtab[i].vt_service) {
+			fs_operation_def_t *templ;
+			templ = sdev_merge_vtab(vtab[i].vt_service);
+			if (vn_make_ops(vtab[i].vt_name,
+			    (const fs_operation_def_t *)templ,
+			    &vtab[i].vt_vops) != 0) {
+				cmn_err(CE_PANIC, "%s: malformed vnode ops\n",
+				    vtab[i].vt_name);
+				/*NOTREACHED*/
+			}
+			if (vtab[i].vt_global_vops) {
+				*(vtab[i].vt_global_vops) = vtab[i].vt_vops;
+			}
+			sdev_free_vtab(templ);
+			return (vtab[i].vt_vops);
+		}
+		return (sdev_vnodeops);
+	}
+
+	/* child inherits the persistence of the parent */
+	if (SDEV_IS_PERSIST(dv->sdev_dotdot))
+		dv->sdev_flags |= SDEV_PERSIST;
+
+	return (sdev_vnodeops);
+}
+
+static void
+sdev_set_no_nocache(struct sdev_node *dv)
+{
+	int i;
+	char *path;
+
+	ASSERT(dv->sdev_path);
+	path = dv->sdev_path + strlen("/dev/");
+
+	for (i = 0; vtab[i].vt_name; i++) {
+		if (strcmp(vtab[i].vt_name, path) == 0) {
+			if (vtab[i].vt_flags & SDEV_NO_NCACHE)
+				dv->sdev_flags |= SDEV_NO_NCACHE;
+			break;
+		}
+	}
+}
+
+void *
+sdev_get_vtor(struct sdev_node *dv)
+{
+	int i;
+
+	for (i = 0; vtab[i].vt_name; i++) {
+		if (strcmp(vtab[i].vt_name, dv->sdev_name) != 0)
+			continue;
+		return ((void *)vtab[i].vt_vtor);
+	}
+	return (NULL);
+}
+
+/*
+ * Build the base root inode
+ */
+ino_t
+sdev_mkino(struct sdev_node *dv)
+{
+	ino_t	ino;
+
+	/*
+	 * for now, follow the lead of tmpfs here
+	 * need to someday understand the requirements here
+	 */
+	ino = (ino_t)(uint32_t)((uintptr_t)dv >> 3);
+	ino += SDEV_ROOTINO + 1;
+
+	return (ino);
+}
+
+static int
+sdev_getlink(struct vnode *linkvp, char **link)
+{
+	int err;
+	char *buf;
+	struct uio uio = {0};
+	struct iovec iov = {0};
+
+	if (linkvp == NULL)
+		return (ENOENT);
+	ASSERT(linkvp->v_type == VLNK);
+
+	buf = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	iov.iov_base = buf;
+	iov.iov_len = MAXPATHLEN;
+	uio.uio_iov = &iov;
+	uio.uio_iovcnt = 1;
+	uio.uio_resid = MAXPATHLEN;
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_llimit = MAXOFFSET_T;
+
+	err = VOP_READLINK(linkvp, &uio, kcred);
+	if (err) {
+		cmn_err(CE_WARN, "readlink %s failed in dev\n", buf);
+		kmem_free(buf, MAXPATHLEN);
+		return (ENOENT);
+	}
+
+	/* mission complete */
+	*link = i_ddi_strdup(buf, KM_SLEEP);
+	kmem_free(buf, MAXPATHLEN);
+	return (0);
+}
+
+/*
+ * A convenient wrapper to get the devfs node vnode for a device
+ * minor functionality: readlink() of a /dev symlink
+ * Place the link into dv->sdev_symlink
+ */
+static int
+sdev_follow_link(struct sdev_node *dv)
+{
+	int err;
+	struct vnode *linkvp;
+	char *link = NULL;
+
+	linkvp = SDEVTOV(dv);
+	if (linkvp == NULL)
+		return (ENOENT);
+	ASSERT(linkvp->v_type == VLNK);
+	err = sdev_getlink(linkvp, &link);
+	if (err) {
+		(void) sdev_nodezombied(dv);
+		dv->sdev_symlink = NULL;
+		return (ENOENT);
+	}
+
+	ASSERT(link != NULL);
+	dv->sdev_symlink = link;
+	return (0);
+}
+
+static int
+sdev_node_check(struct sdev_node *dv, struct vattr *nvap, void *nargs)
+{
+	vtype_t otype = SDEVTOV(dv)->v_type;
+
+	/*
+	 * existing sdev_node has a different type.
+	 */
+	if (otype != nvap->va_type) {
+		sdcmn_err9(("sdev_node_check: existing node "
+		    "  %s type %d does not match new node type %d\n",
+		    dv->sdev_name, otype, nvap->va_type));
+		return (EEXIST);
+	}
+
+	/*
+	 * For a symlink, the target should be the same.
+	 */
+	if (otype == VLNK) {
+		ASSERT(nargs != NULL);
+		ASSERT(dv->sdev_symlink != NULL);
+		if (strcmp(dv->sdev_symlink, (char *)nargs) != 0) {
+			sdcmn_err9(("sdev_node_check: existing node "
+			    " %s has different symlink %s as new node "
+			    " %s\n", dv->sdev_name, dv->sdev_symlink,
+			    (char *)nargs));
+			return (EEXIST);
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * sdev_mknode - a wrapper for sdev_nodeinit(), sdev_nodeready()
+ *
+ * arguments:
+ *	- ddv (parent)
+ *	- nm (child name)
+ *	- newdv (sdev_node for nm is returned here)
+ *	- vap (vattr for the node to be created, va_type should be set.
+ *	  the defaults should be used if unknown)
+ *	- cred
+ *	- args
+ *	    . tnm (for VLNK)
+ *	    . global sdev_node (for !SDEV_GLOBAL)
+ * 	- state: SDEV_INIT, SDEV_READY
+ *
+ * only ddv, nm, newddv, vap, cred are required for sdev_mknode(SDEV_INIT)
+ *
+ * NOTE:  directory contents writers lock needs to be held before
+ *	  calling this routine.
+ */
+int
+sdev_mknode(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
+    struct vattr *vap, struct vnode *avp, void *args, struct cred *cred,
+    sdev_node_state_t state)
+{
+	int error = 0;
+	sdev_node_state_t node_state;
+	struct sdev_node *dv = NULL;
+
+	ASSERT(state != SDEV_ZOMBIE);
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+
+	if (*newdv) {
+		dv = *newdv;
+	} else {
+		/* allocate and initialize a sdev_node */
+		if (ddv->sdev_state == SDEV_ZOMBIE) {
+			sdcmn_err9(("sdev_mknode: parent %s ZOMBIEd\n",
+			    ddv->sdev_path));
+			return (ENOENT);
+		}
+
+		error = sdev_nodeinit(ddv, nm, &dv, vap);
+		if (error != 0) {
+			sdcmn_err9(("sdev_mknode: error %d,"
+			    " name %s can not be initialized\n",
+			    error, nm));
+			return (ENOENT);
+		}
+		ASSERT(dv);
+
+		/* insert into the directory cache */
+		error = sdev_cache_update(ddv, &dv, nm, SDEV_CACHE_ADD);
+		if (error) {
+			sdcmn_err9(("sdev_mknode: node %s can not"
+			    " be added into directory cache\n", nm));
+			return (ENOENT);
+		}
+	}
+
+	ASSERT(dv);
+	node_state = dv->sdev_state;
+	ASSERT(node_state != SDEV_ZOMBIE);
+
+	if (state == SDEV_READY) {
+		switch (node_state) {
+		case SDEV_INIT:
+			error = sdev_nodeready(dv, vap, avp, args, cred);
+			/*
+			 * masking the errors with ENOENT
+			 */
+			if (error) {
+				sdcmn_err9(("sdev_mknode: node %s can NOT"
+				    " be transitioned into READY state, "
+				    "error %d\n", nm, error));
+				error = ENOENT;
+			}
+			break;
+		case SDEV_READY:
+			/*
+			 * Do some sanity checking to make sure
+			 * the existing sdev_node is what has been
+			 * asked for.
+			 */
+			error = sdev_node_check(dv, vap, args);
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (!error) {
+		*newdv = dv;
+		ASSERT((*newdv)->sdev_state != SDEV_ZOMBIE);
+	} else {
+		SDEV_SIMPLE_RELE(dv);
+		*newdv = NULL;
+	}
+
+	return (error);
+}
+
+/*
+ * convenient wrapper to change vp's ATIME, CTIME and ATIME
+ */
+void
+sdev_update_timestamps(struct vnode *vp, cred_t *cred, uint_t mask)
+{
+	struct vattr attr;
+	timestruc_t now;
+	int err;
+
+	ASSERT(vp);
+	gethrestime(&now);
+	if (mask & AT_CTIME)
+		attr.va_ctime = now;
+	if (mask & AT_MTIME)
+		attr.va_mtime = now;
+	if (mask & AT_ATIME)
+		attr.va_atime = now;
+
+	attr.va_mask = (mask & AT_TIMES);
+	err = VOP_SETATTR(vp, &attr, 0, cred, NULL);
+	if (err && (err != EROFS)) {
+		sdcmn_err(("update timestamps error %d\n", err));
+	}
+}
+
+/*
+ * the backing store vnode is released here
+ */
+/*ARGSUSED1*/
+void
+sdev_nodedestroy(struct sdev_node *dv, uint_t flags)
+{
+	/* no references */
+	ASSERT(dv->sdev_nlink == 0);
+
+	if (dv->sdev_attrvp != NULLVP) {
+		VN_RELE(dv->sdev_attrvp);
+		/*
+		 * reset the attrvp so that no more
+		 * references can be made on this already
+		 * vn_rele() vnode
+		 */
+		dv->sdev_attrvp = NULLVP;
+	}
+
+	if (dv->sdev_attr != NULL) {
+		kmem_free(dv->sdev_attr, sizeof (struct vattr));
+		dv->sdev_attr = NULL;
+	}
+
+	if (dv->sdev_name != NULL) {
+		kmem_free(dv->sdev_name, dv->sdev_namelen + 1);
+		dv->sdev_name = NULL;
+	}
+
+	if (dv->sdev_symlink != NULL) {
+		kmem_free(dv->sdev_symlink, strlen(dv->sdev_symlink) + 1);
+		dv->sdev_symlink = NULL;
+	}
+
+	if (dv->sdev_path) {
+		kmem_free(dv->sdev_path, strlen(dv->sdev_path) + 1);
+		dv->sdev_path = NULL;
+	}
+
+	if (!SDEV_IS_GLOBAL(dv))
+		sdev_prof_free(dv);
+
+	mutex_destroy(&dv->sdev_lookup_lock);
+	cv_destroy(&dv->sdev_lookup_cv);
+
+	/* return node to initial state as per constructor */
+	(void) memset((void *)&dv->sdev_instance_data, 0,
+	    sizeof (dv->sdev_instance_data));
+
+	vn_invalid(SDEVTOV(dv));
+	kmem_cache_free(sdev_node_cache, dv);
+}
+
+/*
+ * DIRECTORY CACHE lookup
+ */
+struct sdev_node *
+sdev_findbyname(struct sdev_node *ddv, char *nm)
+{
+	struct sdev_node *dv;
+	size_t	nmlen = strlen(nm);
+
+	ASSERT(RW_LOCK_HELD(&ddv->sdev_contents));
+	for (dv = ddv->sdev_dot; dv; dv = dv->sdev_next) {
+		if (dv->sdev_namelen != nmlen) {
+			continue;
+		}
+
+		/*
+		 * Can't lookup stale nodes
+		 */
+		if (dv->sdev_flags & SDEV_STALE) {
+			sdcmn_err9((
+			    "sdev_findbyname: skipped stale node: %s\n",
+			    dv->sdev_name));
+			continue;
+		}
+
+		if (strcmp(dv->sdev_name, nm) == 0) {
+			SDEV_HOLD(dv);
+			return (dv);
+		}
+	}
+	return (NULL);
+}
+
+/*
+ * Inserts a new sdev_node in a parent directory
+ */
+void
+sdev_direnter(struct sdev_node *ddv, struct sdev_node *dv)
+{
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+	ASSERT(SDEVTOV(ddv)->v_type == VDIR);
+	ASSERT(ddv->sdev_nlink >= 2);
+	ASSERT(dv->sdev_nlink == 0);
+
+	dv->sdev_dotdot = ddv;
+	dv->sdev_next = ddv->sdev_dot;
+	ddv->sdev_dot = dv;
+	ddv->sdev_nlink++;
+}
+
+/*
+ * The following check is needed because while sdev_nodes are linked
+ * in SDEV_INIT state, they have their link counts incremented only
+ * in SDEV_READY state.
+ */
+static void
+decr_link(struct sdev_node *dv)
+{
+	if (dv->sdev_state != SDEV_INIT)
+		dv->sdev_nlink--;
+	else
+		ASSERT(dv->sdev_nlink == 0);
+}
+
+/*
+ * Delete an existing dv from directory cache
+ *
+ * In the case of a node is still held by non-zero reference count,
+ *     the node is put into ZOMBIE state. Once the reference count
+ *     reaches "0", the node is unlinked and destroyed,
+ *     in sdev_inactive().
+ */
+static int
+sdev_dirdelete(struct sdev_node *ddv, struct sdev_node *dv)
+{
+	struct sdev_node *idv;
+	struct sdev_node *prev = NULL;
+	struct vnode *vp;
+
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+
+	vp = SDEVTOV(dv);
+	mutex_enter(&vp->v_lock);
+
+	/* dv is held still */
+	if (vp->v_count > 1) {
+		rw_enter(&dv->sdev_contents, RW_WRITER);
+		if (dv->sdev_state == SDEV_READY) {
+			sdcmn_err9((
+			    "sdev_delete: node %s busy with count %d\n",
+			    dv->sdev_name, vp->v_count));
+			dv->sdev_state = SDEV_ZOMBIE;
+		}
+		rw_exit(&dv->sdev_contents);
+		--vp->v_count;
+		mutex_exit(&vp->v_lock);
+		return (EBUSY);
+	}
+	ASSERT(vp->v_count == 1);
+
+	/* unlink from the memory cache */
+	ddv->sdev_nlink--;	/* .. to above */
+	if (vp->v_type == VDIR) {
+		decr_link(dv);		/* . to self */
+	}
+
+	for (idv = ddv->sdev_dot; idv && idv != dv;
+	    prev = idv, idv = idv->sdev_next)
+		;
+	ASSERT(idv == dv);	/* node to be deleted must exist */
+	if (prev == NULL)
+		ddv->sdev_dot = dv->sdev_next;
+	else
+		prev->sdev_next = dv->sdev_next;
+	dv->sdev_next = NULL;
+	decr_link(dv);	/* name, back to zero */
+	vp->v_count--;
+	mutex_exit(&vp->v_lock);
+
+	/* destroy the node */
+	sdev_nodedestroy(dv, 0);
+	return (0);
+}
+
+/*
+ * check if the source is in the path of the target
+ *
+ * source and target are different
+ */
+/*ARGSUSED2*/
+static int
+sdev_checkpath(struct sdev_node *sdv, struct sdev_node *tdv, struct cred *cred)
+{
+	int error = 0;
+	struct sdev_node *dotdot, *dir;
+
+	rw_enter(&tdv->sdev_contents, RW_READER);
+	dotdot = tdv->sdev_dotdot;
+	ASSERT(dotdot);
+
+	/* fs root */
+	if (dotdot == tdv) {
+		rw_exit(&tdv->sdev_contents);
+		return (0);
+	}
+
+	for (;;) {
+		/*
+		 * avoid error cases like
+		 *	mv a a/b
+		 *	mv a a/b/c
+		 *	etc.
+		 */
+		if (dotdot == sdv) {
+			error = EINVAL;
+			break;
+		}
+
+		dir = dotdot;
+		dotdot = dir->sdev_dotdot;
+
+		/* done checking because root is reached */
+		if (dir == dotdot) {
+			break;
+		}
+	}
+	rw_exit(&tdv->sdev_contents);
+	return (error);
+}
+
+/*
+ * Renaming a directory to a different parent
+ * requires modifying the ".." reference.
+ */
+static void
+sdev_fixdotdot(struct sdev_node *dv, struct sdev_node *oparent,
+    struct sdev_node *nparent)
+{
+	ASSERT(SDEVTOV(dv)->v_type == VDIR);
+	ASSERT(nparent);
+	ASSERT(oparent);
+
+	rw_enter(&nparent->sdev_contents, RW_WRITER);
+	nparent->sdev_nlink++;
+	ASSERT(dv->sdev_dotdot == oparent);
+	dv->sdev_dotdot = nparent;
+	rw_exit(&nparent->sdev_contents);
+
+	rw_enter(&oparent->sdev_contents, RW_WRITER);
+	oparent->sdev_nlink--;
+	rw_exit(&oparent->sdev_contents);
+}
+
+int
+sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
+    struct sdev_node *nddv, struct sdev_node **ndvp, char *nnm,
+    struct cred *cred)
+{
+	int error = 0;
+	struct vnode *ovp = SDEVTOV(odv);
+	struct vnode *nvp;
+	struct vattr vattr;
+	int doingdir = (ovp->v_type == VDIR);
+	char *link = NULL;
+
+	/*
+	 * If renaming a directory, and the parents are different (".." must be
+	 * changed) then the source dir must not be in the dir hierarchy above
+	 * the target since it would orphan everything below the source dir.
+	 */
+	if (doingdir && (oddv != nddv)) {
+		error = sdev_checkpath(odv, nddv, cred);
+		if (error)
+			return (error);
+	}
+
+	vattr.va_mask = AT_MODE|AT_UID|AT_GID;
+	error = VOP_GETATTR(ovp, &vattr, 0, cred);
+	if (error)
+		return (error);
+
+	if (*ndvp) {
+		/* destination existing */
+		nvp = SDEVTOV(*ndvp);
+		ASSERT(nvp);
+
+		/* handling renaming to itself */
+		if (odv == *ndvp)
+			return (0);
+
+		/* special handling directory renaming */
+		if (doingdir) {
+			if (nvp->v_type != VDIR)
+				return (ENOTDIR);
+
+			/*
+			 * Renaming a directory with the parent different
+			 * requires that ".." be re-written.
+			 */
+			if (oddv != nddv) {
+				sdev_fixdotdot(*ndvp, oddv, nddv);
+			}
+		}
+	} else {
+		/* creating the destination node with the source attr */
+		rw_enter(&nddv->sdev_contents, RW_WRITER);
+		error = sdev_mknode(nddv, nnm, ndvp, &vattr, NULL, NULL,
+		    cred, SDEV_INIT);
+		rw_exit(&nddv->sdev_contents);
+		if (error)
+			return (error);
+
+		ASSERT(*ndvp);
+		nvp = SDEVTOV(*ndvp);
+	}
+
+	/* fix the source for a symlink */
+	if (vattr.va_type == VLNK) {
+		if (odv->sdev_symlink == NULL) {
+			error = sdev_follow_link(odv);
+			if (error)
+				return (ENOENT);
+		}
+		ASSERT(odv->sdev_symlink);
+		link = i_ddi_strdup(odv->sdev_symlink, KM_SLEEP);
+	}
+
+	rw_enter(&nddv->sdev_contents, RW_WRITER);
+	error = sdev_mknode(nddv, nnm, ndvp, &vattr, NULL, (void *)link,
+	    cred, SDEV_READY);
+	rw_exit(&nddv->sdev_contents);
+
+	if (link)
+		kmem_free(link, strlen(link) + 1);
+
+	/* update timestamps */
+	sdev_update_timestamps(nvp, kcred, AT_CTIME|AT_ATIME);
+	sdev_update_timestamps(SDEVTOV(nddv), kcred, AT_MTIME|AT_ATIME);
+	SDEV_RELE(*ndvp);
+	return (0);
+}
+
+/*
+ * Merge sdev_node specific information into an attribute structure.
+ *
+ * note: sdev_node is not locked here
+ */
+void
+sdev_vattr_merge(struct sdev_node *dv, struct vattr *vap)
+{
+	struct vnode *vp = SDEVTOV(dv);
+
+	vap->va_nlink = dv->sdev_nlink;
+	vap->va_nodeid = dv->sdev_ino;
+	vap->va_fsid = SDEVTOV(dv->sdev_dotdot)->v_rdev;
+	vap->va_type = vp->v_type;
+
+	if (vp->v_type == VDIR) {
+		vap->va_rdev = 0;
+		vap->va_fsid = vp->v_rdev;
+	} else if (vp->v_type == VLNK) {
+		vap->va_rdev = 0;
+		vap->va_mode  &= ~S_IFMT;
+		vap->va_mode |= S_IFLNK;
+	} else if ((vp->v_type == VCHR) || (vp->v_type == VBLK)) {
+		vap->va_rdev = vp->v_rdev;
+		vap->va_mode &= ~S_IFMT;
+		if (vap->va_type == VCHR)
+			vap->va_mode |= S_IFCHR;
+		else
+			vap->va_mode |= S_IFBLK;
+	} else {
+		vap->va_rdev = 0;
+	}
+}
+
+static struct vattr *
+sdev_getdefault_attr(enum vtype type)
+{
+	if (type == VDIR)
+		return (&sdev_vattr_dir);
+	else if (type == VCHR)
+		return (&sdev_vattr_chr);
+	else if (type == VBLK)
+		return (&sdev_vattr_blk);
+	else if (type == VLNK)
+		return (&sdev_vattr_lnk);
+	else
+		return (NULL);
+}
+int
+sdev_to_vp(struct sdev_node *dv, struct vnode **vpp)
+{
+	int rv = 0;
+	struct vnode *vp = SDEVTOV(dv);
+
+	switch (vp->v_type) {
+	case VCHR:
+	case VBLK:
+		/*
+		 * If vnode is a device, return special vnode instead
+		 * (though it knows all about -us- via sp->s_realvp)
+		 */
+		*vpp = specvp(vp, vp->v_rdev, vp->v_type, kcred);
+		VN_RELE(vp);
+		if (*vpp == NULLVP)
+			rv = ENOSYS;
+		break;
+	default:	/* most types are returned as is */
+		*vpp = vp;
+		break;
+	}
+	return (rv);
+}
+
+/*
+ * loopback into sdev_lookup()
+ */
+static struct vnode *
+devname_find_by_devpath(char *devpath, struct vattr *vattr)
+{
+	int error = 0;
+	struct vnode *vp;
+
+	error = lookupname(devpath, UIO_SYSSPACE, NO_FOLLOW, NULLVPP, &vp);
+	if (error) {
+		return (NULL);
+	}
+
+	if (vattr)
+		(void) VOP_GETATTR(vp, vattr, 0, kcred);
+	return (vp);
+}
+
+/*
+ * the junction between devname and devfs
+ */
+static struct vnode *
+devname_configure_by_path(char *physpath, struct vattr *vattr)
+{
+	int error = 0;
+	struct vnode *vp;
+
+	ASSERT(strncmp(physpath, "/devices/", sizeof ("/devices/" - 1))
+	    == 0);
+
+	error = devfs_lookupname(physpath + sizeof ("/devices/") - 1,
+	    NULLVPP, &vp);
+	if (error != 0) {
+		if (error == ENODEV) {
+			cmn_err(CE_CONT, "%s: not found (line %d)\n",
+			    physpath, __LINE__);
+		}
+
+		return (NULL);
+	}
+
+	if (vattr)
+		(void) VOP_GETATTR(vp, vattr, 0, kcred);
+	return (vp);
+}
+
+/*
+ * junction between devname and root file system, e.g. ufs
+ */
+int
+devname_backstore_lookup(struct sdev_node *ddv, char *nm, struct vnode **rvp)
+{
+	struct vnode *rdvp = ddv->sdev_attrvp;
+	int rval = 0;
+
+	ASSERT(rdvp);
+
+	rval = VOP_LOOKUP(rdvp, nm, rvp, NULL, 0, NULL, kcred);
+	return (rval);
+}
+
+static int
+sdev_filldir_from_store(struct sdev_node *ddv, int dlen, struct cred *cred)
+{
+	struct sdev_node *dv = NULL;
+	char	*nm;
+	struct vnode *dirvp;
+	int	error;
+	vnode_t	*vp;
+	int eof;
+	struct iovec iov;
+	struct uio uio;
+	struct dirent64 *dp;
+	dirent64_t *dbuf;
+	size_t dbuflen;
+	struct vattr vattr;
+	char *link = NULL;
+
+	if (ddv->sdev_attrvp == NULL)
+		return (0);
+	if (!(ddv->sdev_flags & SDEV_BUILD))
+		return (0);
+
+	dirvp = ddv->sdev_attrvp;
+	VN_HOLD(dirvp);
+	dbuf = kmem_zalloc(dlen, KM_SLEEP);
+
+	uio.uio_iov = &iov;
+	uio.uio_iovcnt = 1;
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_fmode = 0;
+	uio.uio_extflg = UIO_COPY_CACHED;
+	uio.uio_loffset = 0;
+	uio.uio_llimit = MAXOFFSET_T;
+
+	eof = 0;
+	error = 0;
+	while (!error && !eof) {
+		uio.uio_resid = dlen;
+		iov.iov_base = (char *)dbuf;
+		iov.iov_len = dlen;
+		(void) VOP_RWLOCK(dirvp, V_WRITELOCK_FALSE, NULL);
+		error = VOP_READDIR(dirvp, &uio, kcred, &eof);
+		VOP_RWUNLOCK(dirvp, V_WRITELOCK_FALSE, NULL);
+
+		dbuflen = dlen - uio.uio_resid;
+		if (error || dbuflen == 0)
+			break;
+
+		if (!(ddv->sdev_flags & SDEV_BUILD)) {
+			error = 0;
+			break;
+		}
+
+		for (dp = dbuf; ((intptr_t)dp <
+		    (intptr_t)dbuf + dbuflen);
+		    dp = (dirent64_t *)((intptr_t)dp + dp->d_reclen)) {
+			nm = dp->d_name;
+
+			if (strcmp(nm, ".") == 0 ||
+			    strcmp(nm, "..") == 0)
+				continue;
+
+			vp = NULLVP;
+			dv = sdev_cache_lookup(ddv, nm);
+			if (dv) {
+				if (dv->sdev_state != SDEV_ZOMBIE) {
+					SDEV_SIMPLE_RELE(dv);
+				} else {
+					/*
+					 * A ZOMBIE node may not have been
+					 * cleaned up from the backing store,
+					 * bypass this entry in this case,
+					 * and clean it up from the directory
+					 * cache if this is the last call.
+					 */
+					(void) sdev_dirdelete(ddv, dv);
+				}
+				continue;
+			}
+
+			/* refill the cache if not already */
+			error = devname_backstore_lookup(ddv, nm, &vp);
+			if (error)
+				continue;
+
+			vattr.va_mask = AT_MODE|AT_UID|AT_GID;
+			error = VOP_GETATTR(vp, &vattr, 0, cred);
+			if (error)
+				continue;
+
+			if (vattr.va_type == VLNK) {
+				error = sdev_getlink(vp, &link);
+				if (error) {
+					continue;
+				}
+				ASSERT(link != NULL);
+			}
+
+			if (!rw_tryupgrade(&ddv->sdev_contents)) {
+				rw_exit(&ddv->sdev_contents);
+				rw_enter(&ddv->sdev_contents, RW_WRITER);
+			}
+			error = sdev_mknode(ddv, nm, &dv, &vattr, vp, link,
+			    cred, SDEV_READY);
+			rw_downgrade(&ddv->sdev_contents);
+
+			if (link != NULL) {
+				kmem_free(link, strlen(link) + 1);
+				link = NULL;
+			}
+
+			if (!error) {
+				ASSERT(dv);
+				ASSERT(dv->sdev_state != SDEV_ZOMBIE);
+				SDEV_SIMPLE_RELE(dv);
+			}
+			vp = NULL;
+			dv = NULL;
+		}
+	}
+
+done:
+	VN_RELE(dirvp);
+	kmem_free(dbuf, dlen);
+
+	return (error);
+}
+
+static int
+sdev_filldir_dynamic(struct sdev_node *ddv)
+{
+	int error;
+	int i;
+	struct vattr *vap;
+	char *nm = NULL;
+	struct sdev_node *dv = NULL;
+
+	if (!(ddv->sdev_flags & SDEV_BUILD)) {
+		return (0);
+	}
+
+	ASSERT(RW_READ_HELD(&ddv->sdev_contents));
+	if (!rw_tryupgrade(&ddv->sdev_contents)) {
+		rw_exit(&ddv->sdev_contents);
+		rw_enter(&ddv->sdev_contents, RW_WRITER);
+	}
+
+	vap = sdev_getdefault_attr(VDIR);
+	for (i = 0; vtab[i].vt_name != NULL; i++) {
+		nm = vtab[i].vt_name;
+		ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+		error = sdev_mknode(ddv, nm, &dv, vap, NULL,
+		    NULL, kcred, SDEV_READY);
+		if (error)
+			continue;
+		ASSERT(dv);
+		ASSERT(dv->sdev_state != SDEV_ZOMBIE);
+		SDEV_SIMPLE_RELE(dv);
+		dv = NULL;
+	}
+	rw_downgrade(&ddv->sdev_contents);
+	return (0);
+}
+
+/*
+ * Creating a backing store entry based on sdev_attr.
+ * This is called either as part of node creation in a persistent directory
+ * or from setattr/setsecattr to persist access attributes across reboot.
+ */
+int
+sdev_shadow_node(struct sdev_node *dv, struct cred *cred)
+{
+	int error = 0;
+	struct vnode *dvp = SDEVTOV(dv->sdev_dotdot);
+	struct vnode *rdvp = VTOSDEV(dvp)->sdev_attrvp;
+	struct vattr *vap = dv->sdev_attr;
+	char *nm = dv->sdev_name;
+	struct vnode *tmpvp, **rvp = &tmpvp, *rrvp = NULL;
+
+	ASSERT(dv && dv->sdev_name && rdvp);
+	ASSERT(RW_WRITE_HELD(&dv->sdev_contents) && dv->sdev_attrvp == NULL);
+
+lookup:
+	/* try to find it in the backing store */
+	error = VOP_LOOKUP(rdvp, nm, rvp, NULL, 0, NULL, cred);
+	if (error == 0) {
+		if (VOP_REALVP(*rvp, &rrvp) == 0) {
+			VN_HOLD(rrvp);
+			VN_RELE(*rvp);
+			*rvp = rrvp;
+		}
+
+		kmem_free(dv->sdev_attr, sizeof (vattr_t));
+		dv->sdev_attr = NULL;
+		dv->sdev_attrvp = *rvp;
+		return (0);
+	}
+
+	/* let's try to persist the node */
+	gethrestime(&vap->va_atime);
+	vap->va_mtime = vap->va_atime;
+	vap->va_ctime = vap->va_atime;
+	vap->va_mask |= AT_TYPE|AT_MODE;
+	switch (vap->va_type) {
+	case VDIR:
+		error = VOP_MKDIR(rdvp, nm, vap, rvp, cred);
+		sdcmn_err9(("sdev_shadow_node: mkdir vp %p error %d\n",
+		    (void *)(*rvp), error));
+		break;
+	case VCHR:
+	case VBLK:
+	case VREG:
+	case VDOOR:
+		error = VOP_CREATE(rdvp, nm, vap, NONEXCL, VREAD|VWRITE,
+		    rvp, cred, 0);
+		sdcmn_err9(("sdev_shadow_node: create vp %p, error %d\n",
+		    (void *)(*rvp), error));
+		if (!error)
+			VN_RELE(*rvp);
+		break;
+	case VLNK:
+		ASSERT(dv->sdev_symlink);
+		error = VOP_SYMLINK(rdvp, nm, vap, dv->sdev_symlink, cred);
+		sdcmn_err9(("sdev_shadow_node: create symlink error %d\n",
+		    error));
+		break;
+	default:
+		cmn_err(CE_PANIC, "dev: %s: sdev_shadow_node "
+		    "create\n", nm);
+		/*NOTREACHED*/
+	}
+
+	/* go back to lookup to factor out spec node and set attrvp */
+	if (error == 0)
+		goto lookup;
+
+	return (error);
+}
+
+static int
+sdev_cache_add(struct sdev_node *ddv, struct sdev_node **dv, char *nm)
+{
+	int error = 0;
+	struct sdev_node *dup = NULL;
+
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+	if ((dup = sdev_findbyname(ddv, nm)) == NULL) {
+		sdev_direnter(ddv, *dv);
+	} else {
+		if (dup->sdev_state == SDEV_ZOMBIE) {
+			error = sdev_dirdelete(ddv, dup);
+			/*
+			 * The ZOMBIE node is still hanging
+			 * around with more than one reference counts.
+			 * Fail the new node creation so that
+			 * the directory cache won't have
+			 * duplicate entries for the same named node
+			 */
+			if (error == EBUSY) {
+				SDEV_SIMPLE_RELE(*dv);
+				sdev_nodedestroy(*dv, 0);
+				*dv = NULL;
+				return (error);
+			}
+			sdev_direnter(ddv, *dv);
+		} else {
+			ASSERT((*dv)->sdev_state != SDEV_ZOMBIE);
+			SDEV_SIMPLE_RELE(*dv);
+			sdev_nodedestroy(*dv, 0);
+			*dv = dup;
+		}
+	}
+
+	return (0);
+}
+
+static int
+sdev_cache_delete(struct sdev_node *ddv, struct sdev_node **dv)
+{
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+	return (sdev_dirdelete(ddv, *dv));
+}
+
+/*
+ * update the in-core directory cache
+ */
+int
+sdev_cache_update(struct sdev_node *ddv, struct sdev_node **dv, char *nm,
+    sdev_cache_ops_t ops)
+{
+	int error = 0;
+
+	ASSERT((SDEV_HELD(*dv)));
+
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+	switch (ops) {
+	case SDEV_CACHE_ADD:
+		error = sdev_cache_add(ddv, dv, nm);
+		break;
+	case SDEV_CACHE_DELETE:
+		error = sdev_cache_delete(ddv, dv);
+		break;
+	default:
+		break;
+	}
+
+	return (error);
+}
+
+/*
+ * retrive the named entry from the directory cache
+ */
+struct sdev_node *
+sdev_cache_lookup(struct sdev_node *ddv, char *nm)
+{
+	struct sdev_node *dv = NULL;
+
+	ASSERT(RW_LOCK_HELD(&ddv->sdev_contents));
+	dv = sdev_findbyname(ddv, nm);
+
+	return (dv);
+}
+
+/*
+ * Implicit reconfig for nodes constructed by a link generator
+ * Start devfsadm if needed, or if devfsadm is in progress,
+ * prepare to block on devfsadm either completing or
+ * constructing the desired node.  As devfsadmd is global
+ * in scope, constructing all necessary nodes, we only
+ * need to initiate it once.
+ */
+static int
+sdev_call_devfsadmd(struct sdev_node *ddv, struct sdev_node *dv, char *nm)
+{
+	int error = 0;
+
+	if (DEVNAME_DEVFSADM_IS_RUNNING(devfsadm_state)) {
+		sdcmn_err6(("lookup: waiting for %s/%s, 0x%x\n",
+		    ddv->sdev_name, nm, devfsadm_state));
+		mutex_enter(&dv->sdev_lookup_lock);
+		SDEV_BLOCK_OTHERS(dv, (SDEV_LOOKUP | SDEV_LGWAITING));
+		mutex_exit(&dv->sdev_lookup_lock);
+		error = 0;
+	} else if (!DEVNAME_DEVFSADM_HAS_RUN(devfsadm_state)) {
+		sdcmn_err6(("lookup %s/%s starting devfsadm, 0x%x\n",
+			ddv->sdev_name, nm, devfsadm_state));
+
+		sdev_devfsadmd_thread(ddv, dv, kcred);
+		mutex_enter(&dv->sdev_lookup_lock);
+		SDEV_BLOCK_OTHERS(dv,
+		    (SDEV_LOOKUP | SDEV_LGWAITING));
+		mutex_exit(&dv->sdev_lookup_lock);
+		error = 0;
+	} else {
+		error = -1;
+	}
+
+	return (error);
+}
+
+static int
+sdev_call_modulelookup(struct sdev_node *ddv, struct sdev_node **dvp, char *nm,
+    int (*fn)(char *, devname_handle_t *, struct cred *), struct cred *cred)
+{
+	struct vnode *rvp = NULL;
+	int error = 0;
+	struct vattr *vap;
+	devname_spec_t spec;
+	devname_handle_t *hdl;
+	void *args = NULL;
+	struct sdev_node *dv = *dvp;
+
+	ASSERT(dv && ddv);
+	hdl = &(dv->sdev_handle);
+	ASSERT(hdl->dh_data == dv);
+	mutex_enter(&dv->sdev_lookup_lock);
+	SDEV_BLOCK_OTHERS(dv, SDEV_LOOKUP);
+	mutex_exit(&dv->sdev_lookup_lock);
+	error = (*fn)(nm, hdl, cred);
+	if (error) {
+		return (error);
+	}
+
+	spec = hdl->dh_spec;
+	args = hdl->dh_args;
+	ASSERT(args);
+
+	switch (spec) {
+	case DEVNAME_NS_PATH:
+		/*
+		 * symlink of:
+		 *	/dev/dir/nm -> /device/...
+		 */
+		rvp = devname_configure_by_path((char *)args, NULL);
+		break;
+	case DEVNAME_NS_DEV:
+		/*
+		 * symlink of:
+		 *	/dev/dir/nm -> /dev/...
+		 */
+		rvp = devname_find_by_devpath((char *)args, NULL);
+		break;
+	default:
+		if (args)
+			kmem_free((char *)args, strlen(args) + 1);
+		return (ENOENT);
+
+	}
+
+	if (rvp == NULL) {
+		if (args)
+			kmem_free((char *)args, strlen(args) + 1);
+		return (ENOENT);
+	} else {
+		vap = sdev_getdefault_attr(VLNK);
+		ASSERT(RW_READ_HELD(&ddv->sdev_contents));
+		/*
+		 * Could sdev_mknode return a different dv_node
+		 * once the lock is dropped?
+		 */
+		if (!rw_tryupgrade(&ddv->sdev_contents)) {
+			rw_exit(&ddv->sdev_contents);
+			rw_enter(&ddv->sdev_contents, RW_WRITER);
+		}
+		error = sdev_mknode(ddv, nm, &dv, vap, NULL, args, cred,
+		    SDEV_READY);
+		rw_downgrade(&ddv->sdev_contents);
+		if (error) {
+			if (args)
+				kmem_free((char *)args, strlen(args) + 1);
+			return (error);
+		} else {
+			mutex_enter(&dv->sdev_lookup_lock);
+			SDEV_UNBLOCK_OTHERS(dv, SDEV_LOOKUP);
+			mutex_exit(&dv->sdev_lookup_lock);
+			error = 0;
+		}
+	}
+
+	if (args)
+		kmem_free((char *)args, strlen(args) + 1);
+
+	*dvp = dv;
+	return (0);
+}
+
+/*
+ *  Support for specialized device naming construction mechanisms
+ */
+static int
+sdev_call_dircallback(struct sdev_node *ddv, struct sdev_node **dvp, char *nm,
+    int (*callback)(struct sdev_node *, char *, void **, struct cred *,
+    void *, char *), int flags, struct cred *cred)
+{
+	int rv = 0;
+	char *physpath = NULL;
+	struct vnode *rvp = NULL;
+	struct vattr vattr;
+	struct vattr *vap;
+	struct sdev_node *dv = *dvp;
+
+	mutex_enter(&dv->sdev_lookup_lock);
+	SDEV_BLOCK_OTHERS(dv, SDEV_LOOKUP);
+	mutex_exit(&dv->sdev_lookup_lock);
+
+	/* for non-devfsadm devices */
+	if (flags & SDEV_PATH) {
+		physpath = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+		rv = callback(ddv, nm, (void *)&physpath, kcred, NULL,
+		    NULL);
+		if (rv) {
+			kmem_free(physpath, MAXPATHLEN);
+			return (-1);
+		}
+
+		ASSERT(physpath);
+		rvp = devname_configure_by_path(physpath, NULL);
+		if (rvp == NULL) {
+			sdcmn_err3(("devname_configure_by_path: "
+			    "failed for /dev/%s/%s\n",
+			    ddv->sdev_name, nm));
+			kmem_free(physpath, MAXPATHLEN);
+			rv = -1;
+		} else {
+			vap = sdev_getdefault_attr(VLNK);
+			ASSERT(RW_READ_HELD(&ddv->sdev_contents));
+
+			/*
+			 * Sdev_mknode may return back a different sdev_node
+			 * that was created by another thread that
+			 * raced to the directroy cache before this thread.
+			 *
+			 * With current directory cache mechanism
+			 * (linked list with the sdev_node name as
+			 * the entity key), this is a way to make sure
+			 * only one entry exists for the same name
+			 * in the same directory. The outcome is
+			 * the winner wins.
+			 */
+			if (!rw_tryupgrade(&ddv->sdev_contents)) {
+				rw_exit(&ddv->sdev_contents);
+				rw_enter(&ddv->sdev_contents, RW_WRITER);
+			}
+			rv = sdev_mknode(ddv, nm, &dv, vap, NULL,
+			    (void *)physpath, cred, SDEV_READY);
+			rw_downgrade(&ddv->sdev_contents);
+			kmem_free(physpath, MAXPATHLEN);
+			if (rv) {
+				return (rv);
+			} else {
+				mutex_enter(&dv->sdev_lookup_lock);
+				SDEV_UNBLOCK_OTHERS(dv, SDEV_LOOKUP);
+				mutex_exit(&dv->sdev_lookup_lock);
+				return (0);
+			}
+		}
+	} else if (flags & SDEV_VNODE) {
+		/*
+		 * DBNR has its own way to create the device
+		 * and return a backing store vnode in rvp
+		 */
+		ASSERT(callback);
+		rv = callback(ddv, nm, (void *)&rvp, kcred, NULL, NULL);
+		if (rv || (rvp == NULL)) {
+			sdcmn_err3(("devname_lookup_func: SDEV_VNODE "
+			    "callback failed \n"));
+			return (-1);
+		}
+		vap = sdev_getdefault_attr(rvp->v_type);
+		if (vap == NULL)
+			return (-1);
+
+		ASSERT(RW_READ_HELD(&ddv->sdev_contents));
+		if (!rw_tryupgrade(&ddv->sdev_contents)) {
+			rw_exit(&ddv->sdev_contents);
+			rw_enter(&ddv->sdev_contents, RW_WRITER);
+		}
+		rv = sdev_mknode(ddv, nm, &dv, vap, rvp, NULL,
+		    cred, SDEV_READY);
+		rw_downgrade(&ddv->sdev_contents);
+		if (rv)
+			return (rv);
+
+		mutex_enter(&dv->sdev_lookup_lock);
+		SDEV_UNBLOCK_OTHERS(dv, SDEV_LOOKUP);
+		mutex_exit(&dv->sdev_lookup_lock);
+		return (0);
+	} else if (flags & SDEV_VATTR) {
+		/*
+		 * /dev/pts
+		 *
+		 * DBNR has its own way to create the device
+		 * "0" is returned upon success.
+		 *
+		 * callback is responsible to set the basic attributes,
+		 * e.g. va_type/va_uid/va_gid/
+		 *    dev_t if VCHR or VBLK/
+		 */
+		ASSERT(callback);
+		rv = callback(ddv, nm, (void *)&vattr, kcred, NULL, NULL);
+		if (rv) {
+			sdcmn_err3(("devname_lookup_func: SDEV_NONE "
+			    "callback failed \n"));
+			return (-1);
+		}
+
+		ASSERT(RW_READ_HELD(&ddv->sdev_contents));
+		if (!rw_tryupgrade(&ddv->sdev_contents)) {
+			rw_exit(&ddv->sdev_contents);
+			rw_enter(&ddv->sdev_contents, RW_WRITER);
+		}
+		rv = sdev_mknode(ddv, nm, &dv, &vattr, NULL, NULL,
+		    cred, SDEV_READY);
+		rw_downgrade(&ddv->sdev_contents);
+
+		if (rv)
+			return (rv);
+
+		mutex_enter(&dv->sdev_lookup_lock);
+		SDEV_UNBLOCK_OTHERS(dv, SDEV_LOOKUP);
+		mutex_exit(&dv->sdev_lookup_lock);
+		return (0);
+	} else {
+		impossible(("lookup: %s/%s by %s not supported (%d)\n",
+		    SDEVTOV(ddv)->v_path, nm, curproc->p_user.u_comm,
+		    __LINE__));
+		rv = -1;
+	}
+
+	*dvp = dv;
+	return (rv);
+}
+
+static int
+is_devfsadm_thread(char *exec_name)
+{
+	/*
+	 * note: because devfsadmd -> /usr/sbin/devfsadm
+	 * it is safe to use "devfsadm" to capture the lookups
+	 * from devfsadm and its daemon version.
+	 */
+	if (strcmp(exec_name, "devfsadm") == 0)
+		return (1);
+	return (0);
+}
+
+
+/*
+ * Lookup Order:
+ *	sdev_node cache;
+ *	backing store (SDEV_PERSIST);
+ *	DBNR: a. dir_ops implemented in the loadable modules;
+ *	      b. vnode ops in vtab.
+ */
+int
+devname_lookup_func(struct sdev_node *ddv, char *nm, struct vnode **vpp,
+    struct cred *cred, int (*callback)(struct sdev_node *, char *, void **,
+    struct cred *, void *, char *), int flags)
+{
+	int rv = 0, nmlen;
+	struct vnode *rvp = NULL;
+	struct sdev_node *dv = NULL;
+	int	retried = 0;
+	int	error = 0;
+	struct devname_nsmap *map = NULL;
+	struct devname_ops *dirops = NULL;
+	int (*fn)(char *, devname_handle_t *, struct cred *) = NULL;
+	struct vattr vattr;
+	char *lookup_thread = curproc->p_user.u_comm;
+	int failed_flags = 0;
+	int (*vtor)(struct sdev_node *) = NULL;
+	int state;
+	int parent_state;
+	char *link = NULL;
+
+	if (SDEVTOV(ddv)->v_type != VDIR)
+		return (ENOTDIR);
+
+	/*
+	 * Empty name or ., return node itself.
+	 */
+	nmlen = strlen(nm);
+	if ((nmlen == 0) || ((nmlen == 1) && (nm[0] == '.'))) {
+		*vpp = SDEVTOV(ddv);
+		VN_HOLD(*vpp);
+		return (0);
+	}
+
+	/*
+	 * .., return the parent directory
+	 */
+	if ((nmlen == 2) && (strcmp(nm, "..") == 0)) {
+		*vpp = SDEVTOV(ddv->sdev_dotdot);
+		VN_HOLD(*vpp);
+		return (0);
+	}
+
+	rw_enter(&ddv->sdev_contents, RW_READER);
+	if (ddv->sdev_flags & SDEV_VTOR) {
+		vtor = (int (*)(struct sdev_node *))sdev_get_vtor(ddv);
+		ASSERT(vtor);
+	}
+
+tryagain:
+	/*
+	 * (a) directory cache lookup:
+	 */
+	ASSERT(RW_READ_HELD(&ddv->sdev_contents));
+	parent_state = ddv->sdev_state;
+	dv = sdev_cache_lookup(ddv, nm);
+	if (dv) {
+		state = dv->sdev_state;
+		switch (state) {
+		case SDEV_INIT:
+			if (is_devfsadm_thread(lookup_thread))
+				break;
+
+			/* ZOMBIED parent won't allow node creation */
+			if (parent_state == SDEV_ZOMBIE) {
+				SD_TRACE_FAILED_LOOKUP(ddv, nm,
+				    retried);
+				goto nolock_notfound;
+			}
+
+			mutex_enter(&dv->sdev_lookup_lock);
+			/* compensate the threads started after devfsadm */
+			if (DEVNAME_DEVFSADM_IS_RUNNING(devfsadm_state) &&
+			    !(SDEV_IS_LOOKUP(dv)))
+				SDEV_BLOCK_OTHERS(dv,
+				    (SDEV_LOOKUP | SDEV_LGWAITING));
+
+			if (SDEV_IS_LOOKUP(dv)) {
+				failed_flags |= SLF_REBUILT;
+				rw_exit(&ddv->sdev_contents);
+				error = sdev_wait4lookup(dv, SDEV_LOOKUP);
+				mutex_exit(&dv->sdev_lookup_lock);
+				rw_enter(&ddv->sdev_contents, RW_READER);
+
+				if (error != 0) {
+					SD_TRACE_FAILED_LOOKUP(ddv, nm,
+					    retried);
+					goto nolock_notfound;
+				}
+
+				state = dv->sdev_state;
+				if (state == SDEV_INIT) {
+					SD_TRACE_FAILED_LOOKUP(ddv, nm,
+					    retried);
+					goto nolock_notfound;
+				} else if (state == SDEV_READY) {
+					goto found;
+				} else if (state == SDEV_ZOMBIE) {
+					rw_exit(&ddv->sdev_contents);
+					SD_TRACE_FAILED_LOOKUP(ddv, nm,
+					    retried);
+					SDEV_RELE(dv);
+					goto lookup_failed;
+				}
+			} else {
+				mutex_exit(&dv->sdev_lookup_lock);
+			}
+			break;
+		case SDEV_READY:
+			goto found;
+		case SDEV_ZOMBIE:
+			rw_exit(&ddv->sdev_contents);
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			SDEV_RELE(dv);
+			goto lookup_failed;
+		default:
+			rw_exit(&ddv->sdev_contents);
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			sdev_lookup_failed(ddv, nm, failed_flags);
+			*vpp = NULLVP;
+			return (ENOENT);
+		}
+	}
+	ASSERT(RW_READ_HELD(&ddv->sdev_contents));
+
+	/*
+	 * ZOMBIED parent does not allow new node creation.
+	 * bail out early
+	 */
+	if (parent_state == SDEV_ZOMBIE) {
+		rw_exit(&ddv->sdev_contents);
+		*vpp = NULL;
+		SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+		return (ENOENT);
+	}
+
+	/*
+	 * (b0): backing store lookup
+	 *	SDEV_PERSIST is default except:
+	 *		1) pts nodes
+	 *		2) non-chmod'ed local nodes
+	 */
+	if (SDEV_IS_PERSIST(ddv)) {
+		error = devname_backstore_lookup(ddv, nm, &rvp);
+
+		if (!error) {
+			sdcmn_err3(("devname_backstore_lookup: "
+			    "found attrvp %p for %s\n", (void *)rvp, nm));
+
+			vattr.va_mask = AT_MODE|AT_UID|AT_GID;
+			error = VOP_GETATTR(rvp, &vattr, 0, cred);
+			if (error) {
+				rw_exit(&ddv->sdev_contents);
+				if (dv)
+					SDEV_RELE(dv);
+				SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+				sdev_lookup_failed(ddv, nm, failed_flags);
+				*vpp = NULLVP;
+				return (ENOENT);
+			}
+
+			if (vattr.va_type == VLNK) {
+				error = sdev_getlink(rvp, &link);
+				if (error) {
+					rw_exit(&ddv->sdev_contents);
+					if (dv)
+						SDEV_RELE(dv);
+					SD_TRACE_FAILED_LOOKUP(ddv, nm,
+					    retried);
+					sdev_lookup_failed(ddv, nm,
+					    failed_flags);
+					*vpp = NULLVP;
+					return (ENOENT);
+				}
+				ASSERT(link != NULL);
+			}
+
+			if (!rw_tryupgrade(&ddv->sdev_contents)) {
+				rw_exit(&ddv->sdev_contents);
+				rw_enter(&ddv->sdev_contents, RW_WRITER);
+			}
+			error = sdev_mknode(ddv, nm, &dv, &vattr,
+			    rvp, link, cred, SDEV_READY);
+			rw_downgrade(&ddv->sdev_contents);
+
+			if (link != NULL) {
+				kmem_free(link, strlen(link) + 1);
+				link = NULL;
+			}
+
+			if (error) {
+				SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+				rw_exit(&ddv->sdev_contents);
+				if (dv)
+					SDEV_RELE(dv);
+				goto lookup_failed;
+			} else {
+				goto found;
+			}
+		} else if (retried) {
+			rw_exit(&ddv->sdev_contents);
+			sdcmn_err3(("retry of lookup of %s/%s: failed\n",
+			    ddv->sdev_name, nm));
+			if (dv)
+				SDEV_RELE(dv);
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			sdev_lookup_failed(ddv, nm, failed_flags);
+			*vpp = NULLVP;
+			return (ENOENT);
+		}
+	}
+
+
+	/* first thread that is doing the lookup on this node */
+	if (!dv) {
+		if (!rw_tryupgrade(&ddv->sdev_contents)) {
+			rw_exit(&ddv->sdev_contents);
+			rw_enter(&ddv->sdev_contents, RW_WRITER);
+		}
+		error = sdev_mknode(ddv, nm, &dv, NULL, NULL, NULL,
+		    cred, SDEV_INIT);
+		if (!dv) {
+			rw_exit(&ddv->sdev_contents);
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			sdev_lookup_failed(ddv, nm, failed_flags);
+			*vpp = NULLVP;
+			return (ENOENT);
+		}
+		rw_downgrade(&ddv->sdev_contents);
+	}
+	ASSERT(dv);
+	ASSERT(SDEV_HELD(dv));
+
+	if (SDEV_IS_NO_NCACHE(dv)) {
+		failed_flags |= SLF_NO_NCACHE;
+	}
+
+	if (SDEV_IS_GLOBAL(ddv)) {
+		map = sdev_get_map(ddv, 1);
+		dirops = map ? map->dir_ops : NULL;
+		fn = dirops ? dirops->devnops_lookup : NULL;
+	}
+
+	/*
+	 * (b1) invoking devfsadm once per life time for devfsadm nodes
+	 */
+	if ((fn == NULL) && !callback) {
+
+		if (sdev_reconfig_boot || !i_ddi_io_initialized() ||
+		    SDEV_IS_DYNAMIC(ddv) || SDEV_IS_NO_NCACHE(dv) ||
+		    ((moddebug & MODDEBUG_FINI_EBUSY) != 0)) {
+			ASSERT(SDEV_HELD(dv));
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			goto nolock_notfound;
+		}
+
+		/*
+		 * filter out known non-existent devices recorded
+		 * during initial reconfiguration boot for which
+		 * reconfig should not be done and lookup may
+		 * be short-circuited now.
+		 */
+		if (sdev_lookup_filter(ddv, nm)) {
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			goto nolock_notfound;
+		}
+
+		/* bypassing devfsadm internal nodes */
+		if (is_devfsadm_thread(lookup_thread)) {
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			goto nolock_notfound;
+		}
+
+		if (sdev_reconfig_disable) {
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			goto nolock_notfound;
+		}
+
+		error = sdev_call_devfsadmd(ddv, dv, nm);
+		if (error == 0) {
+			sdcmn_err8(("lookup of %s/%s by %s: reconfig\n",
+			    ddv->sdev_name, nm, curproc->p_user.u_comm));
+			if (sdev_reconfig_verbose) {
+				cmn_err(CE_CONT,
+				    "?lookup of %s/%s by %s: reconfig\n",
+				    ddv->sdev_name, nm, curproc->p_user.u_comm);
+			}
+			retried = 1;
+			failed_flags |= SLF_REBUILT;
+			ASSERT(dv->sdev_state != SDEV_ZOMBIE);
+			SDEV_SIMPLE_RELE(dv);
+			goto tryagain;
+		} else {
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			goto nolock_notfound;
+		}
+	}
+
+	/*
+	 * (b2) Directory Based Name Resolution (DBNR):
+	 *	ddv	- parent
+	 *	nm	- /dev/(ddv->sdev_name)/nm
+	 *
+	 *	note: module vnode ops take precedence than the build-in ones
+	 */
+	if (fn) {
+		error = sdev_call_modulelookup(ddv, &dv, nm, fn, cred);
+		if (error) {
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			goto notfound;
+		} else {
+			goto found;
+		}
+	} else if (callback) {
+		error = sdev_call_dircallback(ddv, &dv, nm, callback,
+		    flags, cred);
+		if (error == 0) {
+			goto found;
+		} else {
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			goto notfound;
+		}
+	}
+	ASSERT(rvp);
+
+found:
+	ASSERT(!(dv->sdev_flags & SDEV_STALE));
+	ASSERT(dv->sdev_state == SDEV_READY);
+	if (vtor) {
+		/*
+		 * Check validity of returned node
+		 */
+		switch (vtor(dv)) {
+		case SDEV_VTOR_VALID:
+			break;
+		case SDEV_VTOR_INVALID:
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			sdcmn_err7(("lookup: destroy invalid "
+			    "node: %s(%p)\n", dv->sdev_name, (void *)dv));
+			goto nolock_notfound;
+		case SDEV_VTOR_SKIP:
+			sdcmn_err7(("lookup: node not applicable - "
+			    "skipping: %s(%p)\n", dv->sdev_name, (void *)dv));
+			rw_exit(&ddv->sdev_contents);
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			SDEV_RELE(dv);
+			goto lookup_failed;
+		default:
+			cmn_err(CE_PANIC,
+			    "dev fs: validator failed: %s(%p)\n",
+			    dv->sdev_name, (void *)dv);
+			break;
+			/*NOTREACHED*/
+		}
+	}
+
+	if ((SDEVTOV(dv)->v_type == VDIR) && SDEV_IS_GLOBAL(dv)) {
+		rw_enter(&dv->sdev_contents, RW_READER);
+		(void) sdev_get_map(dv, 1);
+		rw_exit(&dv->sdev_contents);
+	}
+	rw_exit(&ddv->sdev_contents);
+	rv = sdev_to_vp(dv, vpp);
+	sdcmn_err3(("devname_lookup_func: returning vp %p v_count %d state %d "
+	    "for nm %s, error %d\n", (void *)*vpp, (*vpp)->v_count,
+	    dv->sdev_state, nm, rv));
+	return (rv);
+
+notfound:
+	mutex_enter(&dv->sdev_lookup_lock);
+	SDEV_UNBLOCK_OTHERS(dv, SDEV_LOOKUP);
+	mutex_exit(&dv->sdev_lookup_lock);
+nolock_notfound:
+	/*
+	 * Destroy the node that is created for synchronization purposes.
+	 */
+	sdcmn_err3(("devname_lookup_func: %s with state %d\n",
+	    nm, dv->sdev_state));
+	ASSERT(RW_READ_HELD(&ddv->sdev_contents));
+	if (dv->sdev_state == SDEV_INIT) {
+		if (!rw_tryupgrade(&ddv->sdev_contents)) {
+			rw_exit(&ddv->sdev_contents);
+			rw_enter(&ddv->sdev_contents, RW_WRITER);
+		}
+
+		/*
+		 * Node state may have changed during the lock
+		 * changes. Re-check.
+		 */
+		if (dv->sdev_state == SDEV_INIT) {
+			(void) sdev_dirdelete(ddv, dv);
+			rw_exit(&ddv->sdev_contents);
+			sdev_lookup_failed(ddv, nm, failed_flags);
+			*vpp = NULL;
+			return (ENOENT);
+		}
+	}
+
+	rw_exit(&ddv->sdev_contents);
+	SDEV_RELE(dv);
+
+lookup_failed:
+	sdev_lookup_failed(ddv, nm, failed_flags);
+	*vpp = NULL;
+	return (ENOENT);
+}
+
+/*
+ * Given a directory node, mark all nodes beneath as
+ * STALE, i.e. nodes that don't exist as far as new
+ * consumers are concerned
+ */
+void
+sdev_stale(struct sdev_node *ddv)
+{
+	struct sdev_node *dv;
+	struct vnode *vp;
+
+	ASSERT(SDEVTOV(ddv)->v_type == VDIR);
+
+	rw_enter(&ddv->sdev_contents, RW_WRITER);
+	for (dv = ddv->sdev_dot; dv; dv = dv->sdev_next) {
+		vp = SDEVTOV(dv);
+		if (vp->v_type == VDIR)
+			sdev_stale(dv);
+
+		sdcmn_err9(("sdev_stale: setting stale %s\n",
+		    dv->sdev_name));
+		dv->sdev_flags |= SDEV_STALE;
+	}
+	ddv->sdev_flags |= SDEV_BUILD;
+	rw_exit(&ddv->sdev_contents);
+}
+
+/*
+ * Given a directory node, clean out all the nodes beneath.
+ * If expr is specified, clean node with names matching expr.
+ * If SDEV_ENFORCE is specified in flags, busy nodes are made stale,
+ *	so they are excluded from future lookups.
+ */
+int
+sdev_cleandir(struct sdev_node *ddv, char *expr, uint_t flags)
+{
+	int error = 0;
+	int busy = 0;
+	struct vnode *vp;
+	struct sdev_node *dv, *next = NULL;
+	int bkstore = 0;
+	int len = 0;
+	char *bks_name = NULL;
+
+	ASSERT(SDEVTOV(ddv)->v_type == VDIR);
+
+	/*
+	 * We try our best to destroy all unused sdev_node's
+	 */
+	rw_enter(&ddv->sdev_contents, RW_WRITER);
+	for (dv = ddv->sdev_dot; dv; dv = next) {
+		next = dv->sdev_next;
+		vp = SDEVTOV(dv);
+
+		if (expr && gmatch(dv->sdev_name, expr) == 0)
+			continue;
+
+		if (vp->v_type == VDIR &&
+		    sdev_cleandir(dv, NULL, flags) != 0) {
+			sdcmn_err9(("sdev_cleandir: dir %s busy\n",
+			    dv->sdev_name));
+			busy++;
+			continue;
+		}
+
+		if (vp->v_count > 0 && (flags & SDEV_ENFORCE) == 0) {
+			sdcmn_err9(("sdev_cleandir: dir %s busy\n",
+			    dv->sdev_name));
+			busy++;
+			continue;
+		}
+
+		/*
+		 * at this point, either dv is not held or SDEV_ENFORCE
+		 * is specified. In either case, dv needs to be deleted
+		 */
+		SDEV_HOLD(dv);
+
+		bkstore = SDEV_IS_PERSIST(dv) ? 1 : 0;
+		if (bkstore && (vp->v_type == VDIR))
+			bkstore += 1;
+
+		if (bkstore) {
+			len = strlen(dv->sdev_name) + 1;
+			bks_name = kmem_alloc(len, KM_SLEEP);
+			bcopy(dv->sdev_name, bks_name, len);
+		}
+
+		error = sdev_dirdelete(ddv, dv);
+
+		if (error == EBUSY) {
+			sdcmn_err9(("sdev_cleandir: dir busy\n"));
+			busy++;
+		}
+
+		/* take care the backing store clean up */
+		if (bkstore && (error == 0)) {
+			ASSERT(bks_name);
+			ASSERT(ddv->sdev_attrvp);
+
+			if (bkstore == 1) {
+				error = VOP_REMOVE(ddv->sdev_attrvp,
+				    bks_name, kcred);
+			} else if (bkstore == 2) {
+				error = VOP_RMDIR(ddv->sdev_attrvp,
+				    bks_name, ddv->sdev_attrvp, kcred);
+			}
+
+			/* do not propagate the backing store errors */
+			if (error) {
+				sdcmn_err9(("sdev_cleandir: backing store"
+				    "not cleaned\n"));
+				error = 0;
+			}
+
+			bkstore = 0;
+			kmem_free(bks_name, len);
+			bks_name = NULL;
+			len = 0;
+		}
+	}
+
+	ddv->sdev_flags |= SDEV_BUILD;
+	rw_exit(&ddv->sdev_contents);
+
+	if (busy) {
+		error = EBUSY;
+	}
+
+	return (error);
+}
+
+/*
+ * a convenient wrapper for readdir() funcs
+ */
+size_t
+add_dir_entry(dirent64_t *de, char *nm, size_t size, ino_t ino, offset_t off)
+{
+	size_t reclen = DIRENT64_RECLEN(strlen(nm));
+	if (reclen > size)
+		return (0);
+
+	de->d_ino = (ino64_t)ino;
+	de->d_off = (off64_t)off + 1;
+	de->d_reclen = (ushort_t)reclen;
+	(void) strncpy(de->d_name, nm, DIRENT64_NAMELEN(reclen));
+	return (reclen);
+}
+
+/*
+ * sdev_mount service routines
+ */
+int
+sdev_copyin_mountargs(struct mounta *uap, struct sdev_mountargs *args)
+{
+	int	error;
+
+	if (uap->datalen != sizeof (*args))
+		return (EINVAL);
+
+	if (error = copyin(uap->dataptr, args, sizeof (*args))) {
+		cmn_err(CE_WARN, "sdev_copyin_mountargs: can not"
+		    "get user data. error %d\n", error);
+		return (EFAULT);
+	}
+
+	return (0);
+}
+
+#ifdef nextdp
+#undef nextdp
+#endif
+#define	nextdp(dp)	((struct dirent64 *)((char *)(dp) + (dp)->d_reclen))
+
+/*
+ * readdir helper func
+ */
+int
+devname_readdir_func(vnode_t *vp, uio_t *uiop, cred_t *cred, int *eofp,
+    int flags)
+{
+	struct sdev_node *ddv = VTOSDEV(vp);
+	struct sdev_node *dv;
+	dirent64_t	*dp;
+	ulong_t		outcount = 0;
+	size_t		namelen;
+	ulong_t		alloc_count;
+	void		*outbuf;
+	struct iovec	*iovp;
+	int		error = 0;
+	size_t		reclen;
+	offset_t	diroff;
+	offset_t	soff;
+	int		this_reclen;
+	struct devname_nsmap	*map = NULL;
+	struct devname_ops	*dirops = NULL;
+	int (*fn)(devname_handle_t *, struct cred *) = NULL;
+	int (*vtor)(struct sdev_node *) = NULL;
+	struct vattr attr;
+	timestruc_t now;
+
+	ASSERT(ddv->sdev_attr || ddv->sdev_attrvp);
+	ASSERT(RW_READ_HELD(&ddv->sdev_contents));
+
+	if (uiop->uio_loffset >= MAXOFF_T) {
+		if (eofp)
+			*eofp = 1;
+		return (0);
+	}
+
+	if (uiop->uio_iovcnt != 1)
+		return (EINVAL);
+
+	if (vp->v_type != VDIR)
+		return (ENOTDIR);
+
+	if (ddv->sdev_flags & SDEV_VTOR) {
+		vtor = (int (*)(struct sdev_node *))sdev_get_vtor(ddv);
+		ASSERT(vtor);
+	}
+
+	if (eofp != NULL)
+		*eofp = 0;
+
+	soff = uiop->uio_offset;
+	iovp = uiop->uio_iov;
+	alloc_count = iovp->iov_len;
+	dp = outbuf = kmem_alloc(alloc_count, KM_SLEEP);
+	outcount = 0;
+
+	if (ddv->sdev_state == SDEV_ZOMBIE)
+		goto get_cache;
+
+	if (!SDEV_IS_GLOBAL(ddv)) {
+		/* make sure directory content is up to date */
+		prof_filldir(ddv);
+	} else {
+		map = sdev_get_map(ddv, 0);
+		dirops = map ? map->dir_ops : NULL;
+		fn = dirops ? dirops->devnops_readdir : NULL;
+
+		if (map && map->dir_map) {
+			/*
+			 * load the name mapping rule database
+			 * through invoking devfsadm and symlink
+			 * all the entries in the map
+			 */
+			devname_rdr_result_t rdr_result;
+			int do_thread = 0;
+
+			rw_enter(&map->dir_lock, RW_READER);
+			do_thread = map->dir_maploaded ? 0 : 1;
+			rw_exit(&map->dir_lock);
+
+			if (do_thread) {
+				mutex_enter(&ddv->sdev_lookup_lock);
+				SDEV_BLOCK_OTHERS(ddv, SDEV_READDIR);
+				mutex_exit(&ddv->sdev_lookup_lock);
+
+				sdev_dispatch_to_nsrdr_thread(ddv,
+				    map->dir_map, &rdr_result);
+			}
+		} else if ((sdev_boot_state == SDEV_BOOT_STATE_COMPLETE) &&
+		    !sdev_reconfig_boot && (flags & SDEV_BROWSE) &&
+		    !SDEV_IS_DYNAMIC(ddv) && !SDEV_IS_NO_NCACHE(ddv) &&
+		    ((moddebug & MODDEBUG_FINI_EBUSY) == 0) &&
+		    !DEVNAME_DEVFSADM_HAS_RUN(devfsadm_state) &&
+		    !DEVNAME_DEVFSADM_IS_RUNNING(devfsadm_state) &&
+		    !sdev_reconfig_disable) {
+			/*
+			 * invoking "devfsadm" to do system device reconfig
+			 */
+			mutex_enter(&ddv->sdev_lookup_lock);
+			SDEV_BLOCK_OTHERS(ddv,
+			    (SDEV_READDIR|SDEV_LGWAITING));
+			mutex_exit(&ddv->sdev_lookup_lock);
+
+			sdcmn_err8(("readdir of %s by %s: reconfig\n",
+			    ddv->sdev_path, curproc->p_user.u_comm));
+			if (sdev_reconfig_verbose) {
+				cmn_err(CE_CONT,
+				    "?readdir of %s by %s: reconfig\n",
+				    ddv->sdev_path, curproc->p_user.u_comm);
+			}
+
+			sdev_devfsadmd_thread(ddv, NULL, kcred);
+		} else if (DEVNAME_DEVFSADM_IS_RUNNING(devfsadm_state)) {
+			/*
+			 * compensate the "ls" started later than "devfsadm"
+			 */
+			mutex_enter(&ddv->sdev_lookup_lock);
+			SDEV_BLOCK_OTHERS(ddv, (SDEV_READDIR|SDEV_LGWAITING));
+			mutex_exit(&ddv->sdev_lookup_lock);
+		}
+
+		/*
+		 * release the contents lock so that
+		 * the cache maybe updated by devfsadmd
+		 */
+		rw_exit(&ddv->sdev_contents);
+		mutex_enter(&ddv->sdev_lookup_lock);
+		if (SDEV_IS_READDIR(ddv))
+			(void) sdev_wait4lookup(ddv, SDEV_READDIR);
+		mutex_exit(&ddv->sdev_lookup_lock);
+		rw_enter(&ddv->sdev_contents, RW_READER);
+
+		sdcmn_err4(("readdir of directory %s by %s\n",
+		    ddv->sdev_name, curproc->p_user.u_comm));
+		while (ddv->sdev_flags & SDEV_BUILD) {
+			if (SDEV_IS_PERSIST(ddv)) {
+				error = sdev_filldir_from_store(ddv,
+				    alloc_count, cred);
+			}
+
+			/*
+			 * pre-creating the directories
+			 * defined in vtab
+			 */
+			if (SDEVTOV(ddv)->v_flag & VROOT) {
+				error = sdev_filldir_dynamic(ddv);
+			}
+
+			if (!error)
+				ddv->sdev_flags &= ~SDEV_BUILD;
+		}
+	}
+
+get_cache:
+	/* handle "." and ".." */
+	diroff = 0;
+	if (soff == 0) {
+		/* first time */
+		this_reclen = DIRENT64_RECLEN(1);
+		if (alloc_count < this_reclen) {
+			error = EINVAL;
+			goto done;
+		}
+
+		dp->d_ino = (ino64_t)ddv->sdev_ino;
+		dp->d_off = (off64_t)1;
+		dp->d_reclen = (ushort_t)this_reclen;
+
+		(void) strncpy(dp->d_name, ".",
+		    DIRENT64_NAMELEN(this_reclen));
+		outcount += dp->d_reclen;
+		dp = nextdp(dp);
+	}
+
+	diroff++;
+	if (soff <= 1) {
+		this_reclen = DIRENT64_RECLEN(2);
+		if (alloc_count < outcount + this_reclen) {
+			error = EINVAL;
+			goto done;
+		}
+
+		dp->d_reclen = (ushort_t)this_reclen;
+		dp->d_ino = (ino64_t)ddv->sdev_dotdot->sdev_ino;
+		dp->d_off = (off64_t)2;
+
+		(void) strncpy(dp->d_name, "..",
+		    DIRENT64_NAMELEN(this_reclen));
+		outcount += dp->d_reclen;
+
+		dp = nextdp(dp);
+	}
+
+
+	/* gets the cache */
+	diroff++;
+	for (dv = ddv->sdev_dot; dv; dv = dv->sdev_next, diroff++) {
+		sdcmn_err3(("sdev_readdir: diroff %lld soff %lld for '%s' \n",
+		    diroff, soff, dv->sdev_name));
+
+		/* bypassing pre-matured nodes */
+		if (diroff < soff || (dv->sdev_state != SDEV_READY)) {
+			sdcmn_err3(("sdev_readdir: pre-mature node  "
+			    "%s\n", dv->sdev_name));
+			continue;
+		}
+
+		/* don't list stale nodes */
+		if (dv->sdev_flags & SDEV_STALE) {
+			sdcmn_err4(("sdev_readdir: STALE node  "
+			    "%s\n", dv->sdev_name));
+			continue;
+		}
+
+		/*
+		 * Check validity of node
+		 */
+		if (vtor) {
+			switch (vtor(dv)) {
+			case SDEV_VTOR_VALID:
+				break;
+			case SDEV_VTOR_INVALID:
+			case SDEV_VTOR_SKIP:
+				continue;
+			default:
+				cmn_err(CE_PANIC,
+				    "dev fs: validator failed: %s(%p)\n",
+				    dv->sdev_name, (void *)dv);
+				break;
+			/*NOTREACHED*/
+			}
+		}
+
+		/*
+		 * call back into the module for the validity/bookkeeping
+		 * of this entry
+		 */
+		if (fn) {
+			error = (*fn)(&(dv->sdev_handle), cred);
+			if (error) {
+				sdcmn_err4(("sdev_readdir: module did not "
+				    "validate %s\n", dv->sdev_name));
+				continue;
+			}
+		}
+
+		namelen = strlen(dv->sdev_name);
+		reclen = DIRENT64_RECLEN(namelen);
+		if (outcount + reclen > alloc_count) {
+			goto full;
+		}
+		dp->d_reclen = (ushort_t)reclen;
+		dp->d_ino = (ino64_t)dv->sdev_ino;
+		dp->d_off = (off64_t)diroff + 1;
+		(void) strncpy(dp->d_name, dv->sdev_name,
+		    DIRENT64_NAMELEN(reclen));
+		outcount += reclen;
+		dp = nextdp(dp);
+	}
+
+full:
+	sdcmn_err4(("sdev_readdir: moving %lu bytes: "
+	    "diroff %lld, soff %lld, dv %p\n", outcount, diroff, soff,
+	    (void *)dv));
+
+	if (outcount)
+		error = uiomove(outbuf, outcount, UIO_READ, uiop);
+
+	if (!error) {
+		uiop->uio_offset = diroff;
+		if (eofp)
+			*eofp = dv ? 0 : 1;
+	}
+
+
+	if (ddv->sdev_attrvp) {
+		gethrestime(&now);
+		attr.va_ctime = now;
+		attr.va_atime = now;
+		attr.va_mask = AT_CTIME|AT_ATIME;
+
+		(void) VOP_SETATTR(ddv->sdev_attrvp, &attr, 0, kcred, NULL);
+	}
+done:
+	kmem_free(outbuf, alloc_count);
+	return (error);
+}
+
+
+static int
+sdev_modctl_lookup(const char *path, vnode_t **r_vp)
+{
+	vnode_t *vp;
+	vnode_t *cvp;
+	struct sdev_node *svp;
+	char *nm;
+	struct pathname pn;
+	int error;
+	int persisted = 0;
+
+	if (error = pn_get((char *)path, UIO_SYSSPACE, &pn))
+		return (error);
+	nm = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+
+	vp = rootdir;
+	VN_HOLD(vp);
+
+	while (pn_pathleft(&pn)) {
+		ASSERT(vp->v_type == VDIR);
+		(void) pn_getcomponent(&pn, nm);
+		error = VOP_LOOKUP(vp, nm, &cvp, NULL, 0, NULL, kcred);
+		VN_RELE(vp);
+
+		if (error)
+			break;
+
+		/* traverse mount points encountered on our journey */
+		if (vn_ismntpt(cvp) && (error = traverse(&cvp)) != 0) {
+			VN_RELE(cvp);
+			break;
+		}
+
+		/*
+		 * Direct the operation to the persisting filesystem
+		 * underlying /dev.  Bail if we encounter a
+		 * non-persistent dev entity here.
+		 */
+		if (cvp->v_vfsp->vfs_fstype == devtype) {
+
+			if ((VTOSDEV(cvp)->sdev_flags & SDEV_PERSIST) == 0) {
+				error = ENOENT;
+				VN_RELE(cvp);
+				break;
+			}
+
+			if (VTOSDEV(cvp) == NULL) {
+				error = ENOENT;
+				VN_RELE(cvp);
+				break;
+			}
+			svp = VTOSDEV(cvp);
+			if ((vp = svp->sdev_attrvp) == NULL) {
+				error = ENOENT;
+				VN_RELE(cvp);
+				break;
+			}
+			persisted = 1;
+			VN_HOLD(vp);
+			VN_RELE(cvp);
+			cvp = vp;
+		}
+
+		vp = cvp;
+		pn_skipslash(&pn);
+	}
+
+	kmem_free(nm, MAXNAMELEN);
+	pn_free(&pn);
+
+	if (error)
+		return (error);
+
+	/*
+	 * Only return persisted nodes in the filesystem underlying /dev.
+	 */
+	if (!persisted) {
+		VN_RELE(vp);
+		return (ENOENT);
+	}
+
+	*r_vp = vp;
+	return (0);
+}
+
+int
+sdev_modctl_readdir(const char *dir, char ***dirlistp,
+	int *npathsp, int *npathsp_alloc)
+{
+	char	**pathlist = NULL;
+	char	**newlist = NULL;
+	int	npaths = 0;
+	int	npaths_alloc = 0;
+	dirent64_t *dbuf = NULL;
+	int	n;
+	char	*s;
+	int error;
+	vnode_t *vp;
+	int eof;
+	struct iovec iov;
+	struct uio uio;
+	struct dirent64 *dp;
+	size_t dlen;
+	size_t dbuflen;
+	int ndirents = 64;
+	char *nm;
+
+	error = sdev_modctl_lookup(dir, &vp);
+	sdcmn_err11(("modctl readdir: %s by %s: %s\n",
+	    dir, curproc->p_user.u_comm,
+	    (error == 0) ? "ok" : "failed"));
+	if (error)
+		return (error);
+
+	dlen = ndirents * (sizeof (*dbuf));
+	dbuf = kmem_alloc(dlen, KM_SLEEP);
+
+	uio.uio_iov = &iov;
+	uio.uio_iovcnt = 1;
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_fmode = 0;
+	uio.uio_extflg = UIO_COPY_CACHED;
+	uio.uio_loffset = 0;
+	uio.uio_llimit = MAXOFFSET_T;
+
+	eof = 0;
+	error = 0;
+	while (!error && !eof) {
+		uio.uio_resid = dlen;
+		iov.iov_base = (char *)dbuf;
+		iov.iov_len = dlen;
+
+		(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
+		error = VOP_READDIR(vp, &uio, kcred, &eof);
+		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+
+		dbuflen = dlen - uio.uio_resid;
+
+		if (error || dbuflen == 0)
+			break;
+
+		for (dp = dbuf; ((intptr_t)dp < (intptr_t)dbuf + dbuflen);
+			dp = (dirent64_t *)((intptr_t)dp + dp->d_reclen)) {
+
+			nm = dp->d_name;
+
+			if (strcmp(nm, ".") == 0 || strcmp(nm, "..") == 0)
+				continue;
+
+			if (npaths == npaths_alloc) {
+				npaths_alloc += 64;
+				newlist = (char **)
+				    kmem_zalloc((npaths_alloc + 1) *
+					sizeof (char *), KM_SLEEP);
+				if (pathlist) {
+					bcopy(pathlist, newlist,
+					    npaths * sizeof (char *));
+					kmem_free(pathlist,
+					    (npaths + 1) * sizeof (char *));
+				}
+				pathlist = newlist;
+			}
+			n = strlen(nm) + 1;
+			s = kmem_alloc(n, KM_SLEEP);
+			bcopy(nm, s, n);
+			pathlist[npaths++] = s;
+			sdcmn_err11(("  %s/%s\n", dir, s));
+		}
+	}
+
+exit:
+	VN_RELE(vp);
+
+	if (dbuf)
+		kmem_free(dbuf, dlen);
+
+	if (error)
+		return (error);
+
+	*dirlistp = pathlist;
+	*npathsp = npaths;
+	*npathsp_alloc = npaths_alloc;
+
+	return (0);
+}
+
+void
+sdev_modctl_readdir_free(char **pathlist, int npaths, int npaths_alloc)
+{
+	int	i, n;
+
+	for (i = 0; i < npaths; i++) {
+		n = strlen(pathlist[i]) + 1;
+		kmem_free(pathlist[i], n);
+	}
+
+	kmem_free(pathlist, (npaths_alloc + 1) * sizeof (char *));
+}
+
+int
+sdev_modctl_devexists(const char *path)
+{
+	vnode_t *vp;
+	int error;
+
+	error = sdev_modctl_lookup(path, &vp);
+	sdcmn_err11(("modctl dev exists: %s by %s: %s\n",
+	    path, curproc->p_user.u_comm,
+	    (error == 0) ? "ok" : "failed"));
+	if (error == 0)
+		VN_RELE(vp);
+
+	return (error);
+}
+
+void
+sdev_update_newnsmap(struct devname_nsmap *map, char *module, char *mapname)
+{
+	rw_enter(&map->dir_lock, RW_WRITER);
+	if (module) {
+		ASSERT(map->dir_newmodule == NULL);
+		map->dir_newmodule = i_ddi_strdup(module, KM_SLEEP);
+	}
+	if (mapname) {
+		ASSERT(map->dir_newmap == NULL);
+		map->dir_newmap = i_ddi_strdup(mapname, KM_SLEEP);
+	}
+
+	map->dir_invalid = 1;
+	rw_exit(&map->dir_lock);
+}
+
+void
+sdev_replace_nsmap(struct devname_nsmap *map, char *module, char *mapname)
+{
+	char *old_module = NULL;
+	char *old_map = NULL;
+
+	ASSERT(RW_LOCK_HELD(&map->dir_lock));
+	if (!rw_tryupgrade(&map->dir_lock)) {
+		rw_exit(&map->dir_lock);
+		rw_enter(&map->dir_lock, RW_WRITER);
+	}
+
+	old_module = map->dir_module;
+	if (module) {
+		if (old_module && strcmp(old_module, module) != 0) {
+			kmem_free(old_module, strlen(old_module) + 1);
+		}
+		map->dir_module = module;
+		map->dir_newmodule = NULL;
+	}
+
+	old_map = map->dir_map;
+	if (mapname) {
+		if (old_map && strcmp(old_map, mapname) != 0) {
+			kmem_free(old_map, strlen(old_map) + 1);
+		}
+
+		map->dir_map = mapname;
+		map->dir_newmap = NULL;
+	}
+	map->dir_maploaded = 0;
+	map->dir_invalid = 0;
+	rw_downgrade(&map->dir_lock);
+}
+
+/*
+ * dir_name should have at least one attribute,
+ *	dir_module
+ *	or dir_map
+ *	or both
+ * caller holds the devname_nsmaps_lock
+ */
+void
+sdev_insert_nsmap(char *dir_name, char *dir_module, char *dir_map)
+{
+	struct devname_nsmap *map;
+	int len = 0;
+
+	ASSERT(dir_name);
+	ASSERT(dir_module || dir_map);
+	ASSERT(MUTEX_HELD(&devname_nsmaps_lock));
+
+	if (map = sdev_get_nsmap_by_dir(dir_name, 1)) {
+		sdev_update_newnsmap(map, dir_module, dir_map);
+		return;
+	}
+
+	map = (struct devname_nsmap *)kmem_zalloc(sizeof (*map), KM_SLEEP);
+	map->dir_name = i_ddi_strdup(dir_name, KM_SLEEP);
+	if (dir_module) {
+		map->dir_module = i_ddi_strdup(dir_module, KM_SLEEP);
+	}
+
+	if (dir_map) {
+		if (dir_map[0] != '/') {
+			len = strlen(ETC_DEV_DIR) + strlen(dir_map) + 2;
+			map->dir_map = kmem_zalloc(len, KM_SLEEP);
+			(void) snprintf(map->dir_map, len, "%s/%s", ETC_DEV_DIR,
+			    dir_map);
+		} else {
+			map->dir_map = i_ddi_strdup(dir_map, KM_SLEEP);
+		}
+	}
+
+	map->dir_ops = NULL;
+	map->dir_maploaded = 0;
+	map->dir_invalid = 0;
+	rw_init(&map->dir_lock, NULL, RW_DEFAULT, NULL);
+
+	map->next = devname_nsmaps;
+	map->prev = NULL;
+	if (devname_nsmaps) {
+		devname_nsmaps->prev = map;
+	}
+	devname_nsmaps = map;
+}
+
+struct devname_nsmap *
+sdev_get_nsmap_by_dir(char *dir_path, int locked)
+{
+	struct devname_nsmap *map = NULL;
+
+	if (!locked)
+		mutex_enter(&devname_nsmaps_lock);
+	for (map = devname_nsmaps; map; map = map->next) {
+		sdcmn_err6(("sdev_get_nsmap_by_dir: dir %s\n", map->dir_name));
+		if (strcmp(map->dir_name, dir_path) == 0) {
+			if (!locked)
+				mutex_exit(&devname_nsmaps_lock);
+			return (map);
+		}
+	}
+	if (!locked)
+		mutex_exit(&devname_nsmaps_lock);
+	return (NULL);
+}
+
+struct devname_nsmap *
+sdev_get_nsmap_by_module(char *mod_name)
+{
+	struct devname_nsmap *map = NULL;
+
+	mutex_enter(&devname_nsmaps_lock);
+	for (map = devname_nsmaps; map; map = map->next) {
+		sdcmn_err7(("sdev_get_nsmap_by_module: module %s\n",
+		    map->dir_module));
+		if (map->dir_module && strcmp(map->dir_module, mod_name) == 0) {
+			mutex_exit(&devname_nsmaps_lock);
+			return (map);
+		}
+	}
+	mutex_exit(&devname_nsmaps_lock);
+	return (NULL);
+}
+
+void
+sdev_invalidate_nsmaps()
+{
+	struct devname_nsmap *map = NULL;
+
+	ASSERT(MUTEX_HELD(&devname_nsmaps_lock));
+
+	if (devname_nsmaps == NULL)
+		return;
+
+	for (map = devname_nsmaps; map; map = map->next) {
+		rw_enter(&map->dir_lock, RW_WRITER);
+		map->dir_invalid = 1;
+		rw_exit(&map->dir_lock);
+	}
+	devname_nsmaps_invalidated = 1;
+}
+
+
+int
+sdev_nsmaps_loaded()
+{
+	int ret = 0;
+
+	mutex_enter(&devname_nsmaps_lock);
+	if (devname_nsmaps_loaded)
+		ret = 1;
+
+	mutex_exit(&devname_nsmaps_lock);
+	return (ret);
+}
+
+int
+sdev_nsmaps_reloaded()
+{
+	int ret = 0;
+
+	mutex_enter(&devname_nsmaps_lock);
+	if (devname_nsmaps_invalidated)
+		ret = 1;
+
+	mutex_exit(&devname_nsmaps_lock);
+	return (ret);
+}
+
+static void
+sdev_free_nsmap(struct devname_nsmap *map)
+{
+	ASSERT(map);
+	if (map->dir_name)
+		kmem_free(map->dir_name, strlen(map->dir_name) + 1);
+	if (map->dir_module)
+		kmem_free(map->dir_module, strlen(map->dir_module) + 1);
+	if (map->dir_map)
+		kmem_free(map->dir_map, strlen(map->dir_map) + 1);
+	rw_destroy(&map->dir_lock);
+	kmem_free(map, sizeof (*map));
+}
+
+void
+sdev_validate_nsmaps()
+{
+	struct devname_nsmap *map = NULL;
+	struct devname_nsmap *oldmap = NULL;
+
+	ASSERT(MUTEX_HELD(&devname_nsmaps_lock));
+	map = devname_nsmaps;
+	while (map) {
+		rw_enter(&map->dir_lock, RW_READER);
+		if ((map->dir_invalid == 1) && (map->dir_newmodule == NULL) &&
+		    (map->dir_newmap == NULL)) {
+			oldmap = map;
+			rw_exit(&map->dir_lock);
+			if (map->prev)
+				map->prev->next = oldmap->next;
+			if (map == devname_nsmaps)
+				devname_nsmaps = oldmap->next;
+
+			map = oldmap->next;
+			if (map)
+				map->prev = oldmap->prev;
+			sdev_free_nsmap(oldmap);
+			oldmap = NULL;
+		} else {
+			rw_exit(&map->dir_lock);
+			map = map->next;
+		}
+	}
+	devname_nsmaps_invalidated = 0;
+}
+
+static int
+sdev_map_is_invalid(struct devname_nsmap *map)
+{
+	int ret = 0;
+
+	ASSERT(map);
+	rw_enter(&map->dir_lock, RW_READER);
+	if (map->dir_invalid)
+		ret = 1;
+	rw_exit(&map->dir_lock);
+	return (ret);
+}
+
+static int
+sdev_check_map(struct devname_nsmap *map)
+{
+	struct devname_nsmap *mapp;
+
+	mutex_enter(&devname_nsmaps_lock);
+	if (devname_nsmaps == NULL) {
+		mutex_exit(&devname_nsmaps_lock);
+		return (1);
+	}
+
+	for (mapp = devname_nsmaps; mapp; mapp = mapp->next) {
+		if (mapp == map) {
+			mutex_exit(&devname_nsmaps_lock);
+			return (0);
+		}
+	}
+
+	mutex_exit(&devname_nsmaps_lock);
+	return (1);
+
+}
+
+struct devname_nsmap *
+sdev_get_map(struct sdev_node *dv, int validate)
+{
+	struct devname_nsmap *map;
+	int error;
+
+	ASSERT(RW_READ_HELD(&dv->sdev_contents));
+	map = dv->sdev_mapinfo;
+	if (map && sdev_check_map(map)) {
+		if (!rw_tryupgrade(&dv->sdev_contents)) {
+			rw_exit(&dv->sdev_contents);
+			rw_enter(&dv->sdev_contents, RW_WRITER);
+		}
+		dv->sdev_mapinfo = NULL;
+		rw_downgrade(&dv->sdev_contents);
+		return (NULL);
+	}
+
+	if (validate && (!map || (map && sdev_map_is_invalid(map)))) {
+		if (!rw_tryupgrade(&dv->sdev_contents)) {
+			rw_exit(&dv->sdev_contents);
+			rw_enter(&dv->sdev_contents, RW_WRITER);
+		}
+		error = sdev_get_moduleops(dv);
+		if (!error)
+			map = dv->sdev_mapinfo;
+		rw_downgrade(&dv->sdev_contents);
+	}
+	return (map);
+}
+
+void
+sdev_handle_alloc(struct sdev_node *dv)
+{
+	rw_enter(&dv->sdev_contents, RW_WRITER);
+	dv->sdev_handle.dh_data = dv;
+	rw_exit(&dv->sdev_contents);
+}
+
+
+extern int sdev_vnodeops_tbl_size;
+
+/*
+ * construct a new template with overrides from vtab
+ */
+static fs_operation_def_t *
+sdev_merge_vtab(const fs_operation_def_t tab[])
+{
+	fs_operation_def_t *new;
+	const fs_operation_def_t *tab_entry;
+
+	/* make a copy of standard vnode ops table */
+	new = kmem_alloc(sdev_vnodeops_tbl_size, KM_SLEEP);
+	bcopy((void *)sdev_vnodeops_tbl, new, sdev_vnodeops_tbl_size);
+
+	/* replace the overrides from tab */
+	for (tab_entry = tab; tab_entry->name != NULL; tab_entry++) {
+		fs_operation_def_t *std_entry = new;
+		while (std_entry->name) {
+			if (strcmp(tab_entry->name, std_entry->name) == 0) {
+				std_entry->func = tab_entry->func;
+				break;
+			}
+			std_entry++;
+		}
+		if (std_entry->name == NULL)
+			cmn_err(CE_NOTE, "sdev_merge_vtab: entry %s unused.",
+			    tab_entry->name);
+	}
+
+	return (new);
+}
+
+/* free memory allocated by sdev_merge_vtab */
+static void
+sdev_free_vtab(fs_operation_def_t *new)
+{
+	kmem_free(new, sdev_vnodeops_tbl_size);
+}
+
+void
+devname_get_vnode(devname_handle_t *hdl, vnode_t **vpp)
+{
+	struct sdev_node *dv = hdl->dh_data;
+
+	ASSERT(dv);
+
+	rw_enter(&dv->sdev_contents, RW_READER);
+	*vpp = SDEVTOV(dv);
+	rw_exit(&dv->sdev_contents);
+}
+
+int
+devname_get_path(devname_handle_t *hdl, char **path)
+{
+	struct sdev_node *dv = hdl->dh_data;
+
+	ASSERT(dv);
+
+	rw_enter(&dv->sdev_contents, RW_READER);
+	*path = dv->sdev_path;
+	rw_exit(&dv->sdev_contents);
+	return (0);
+}
+
+int
+devname_get_name(devname_handle_t *hdl, char **entry)
+{
+	struct sdev_node *dv = hdl->dh_data;
+
+	ASSERT(dv);
+	rw_enter(&dv->sdev_contents, RW_READER);
+	*entry = dv->sdev_name;
+	rw_exit(&dv->sdev_contents);
+	return (0);
+}
+
+void
+devname_get_dir_vnode(devname_handle_t *hdl, vnode_t **vpp)
+{
+	struct sdev_node *dv = hdl->dh_data->sdev_dotdot;
+
+	ASSERT(dv);
+
+	rw_enter(&dv->sdev_contents, RW_READER);
+	*vpp = SDEVTOV(dv);
+	rw_exit(&dv->sdev_contents);
+}
+
+int
+devname_get_dir_path(devname_handle_t *hdl, char **path)
+{
+	struct sdev_node *dv = hdl->dh_data->sdev_dotdot;
+
+	ASSERT(dv);
+	rw_enter(&dv->sdev_contents, RW_READER);
+	*path = dv->sdev_path;
+	rw_exit(&dv->sdev_contents);
+	return (0);
+}
+
+int
+devname_get_dir_name(devname_handle_t *hdl, char **entry)
+{
+	struct sdev_node *dv = hdl->dh_data->sdev_dotdot;
+
+	ASSERT(dv);
+	rw_enter(&dv->sdev_contents, RW_READER);
+	*entry = dv->sdev_name;
+	rw_exit(&dv->sdev_contents);
+	return (0);
+}
+
+int
+devname_get_dir_nsmap(devname_handle_t *hdl, struct devname_nsmap **map)
+{
+	struct sdev_node *dv = hdl->dh_data->sdev_dotdot;
+
+	ASSERT(dv);
+	rw_enter(&dv->sdev_contents, RW_READER);
+	*map = dv->sdev_mapinfo;
+	rw_exit(&dv->sdev_contents);
+	return (0);
+}
+
+int
+devname_get_dir_handle(devname_handle_t *hdl, devname_handle_t **dir_hdl)
+{
+	struct sdev_node *dv = hdl->dh_data->sdev_dotdot;
+
+	ASSERT(dv);
+	rw_enter(&dv->sdev_contents, RW_READER);
+	*dir_hdl = &(dv->sdev_handle);
+	rw_exit(&dv->sdev_contents);
+	return (0);
+}
+
+void
+devname_set_nodetype(devname_handle_t *hdl, void *args, int spec)
+{
+	struct sdev_node *dv = hdl->dh_data;
+
+	ASSERT(dv);
+	rw_enter(&dv->sdev_contents, RW_WRITER);
+	hdl->dh_spec = (devname_spec_t)spec;
+	hdl->dh_args = (void *)i_ddi_strdup((char *)args, KM_SLEEP);
+	rw_exit(&dv->sdev_contents);
+}
+
+/*
+ * a generic setattr() function
+ *
+ * note: flags only supports AT_UID and AT_GID.
+ *	 Future enhancements can be done for other types, e.g. AT_MODE
+ */
+int
+devname_setattr_func(struct vnode *vp, struct vattr *vap, int flags,
+    struct cred *cred, int (*callback)(struct sdev_node *, struct vattr *,
+    int), int protocol)
+{
+	struct sdev_node	*dv = VTOSDEV(vp);
+	struct sdev_node	*parent = dv->sdev_dotdot;
+	struct vattr		*get;
+	uint_t			mask = vap->va_mask;
+	int 			error;
+
+	/* some sanity checks */
+	if (vap->va_mask & AT_NOSET)
+		return (EINVAL);
+
+	if (vap->va_mask & AT_SIZE) {
+		if (vp->v_type == VDIR) {
+			return (EISDIR);
+		}
+	}
+
+	/* no need to set attribute, but do not fail either */
+	ASSERT(parent);
+	rw_enter(&parent->sdev_contents, RW_READER);
+	if (dv->sdev_state == SDEV_ZOMBIE) {
+		rw_exit(&parent->sdev_contents);
+		return (0);
+	}
+
+	/* If backing store exists, just set it. */
+	if (dv->sdev_attrvp) {
+		rw_exit(&parent->sdev_contents);
+		return (VOP_SETATTR(dv->sdev_attrvp, vap, flags, cred, NULL));
+	}
+
+	/*
+	 * Otherwise, for nodes with the persistence attribute, create it.
+	 */
+	ASSERT(dv->sdev_attr);
+	if (SDEV_IS_PERSIST(dv) ||
+	    ((vap->va_mask & ~AT_TIMES) != 0 && !SDEV_IS_DYNAMIC(dv))) {
+		sdev_vattr_merge(dv, vap);
+		rw_enter(&dv->sdev_contents, RW_WRITER);
+		error = sdev_shadow_node(dv, cred);
+		rw_exit(&dv->sdev_contents);
+		rw_exit(&parent->sdev_contents);
+
+		if (error)
+			return (error);
+		return (VOP_SETATTR(dv->sdev_attrvp, vap, flags, cred, NULL));
+	}
+
+
+	/*
+	 * sdev_attr was allocated in sdev_mknode
+	 */
+	rw_enter(&dv->sdev_contents, RW_WRITER);
+	error = secpolicy_vnode_setattr(cred, vp, vap, dv->sdev_attr,
+	    flags, sdev_unlocked_access, dv);
+	if (error) {
+		rw_exit(&dv->sdev_contents);
+		rw_exit(&parent->sdev_contents);
+		return (error);
+	}
+
+	get = dv->sdev_attr;
+	if (mask & AT_MODE) {
+		get->va_mode &= S_IFMT;
+		get->va_mode |= vap->va_mode & ~S_IFMT;
+	}
+
+	if ((mask & AT_UID) || (mask & AT_GID)) {
+		if (mask & AT_UID)
+			get->va_uid = vap->va_uid;
+		if (mask & AT_GID)
+			get->va_gid = vap->va_gid;
+		/*
+		 * a callback must be provided if the protocol is set
+		 */
+		if ((protocol & AT_UID) || (protocol & AT_GID)) {
+			ASSERT(callback);
+			error = callback(dv, get, protocol);
+			if (error) {
+				rw_exit(&dv->sdev_contents);
+				rw_exit(&parent->sdev_contents);
+				return (error);
+			}
+		}
+	}
+
+	if (mask & AT_ATIME)
+		get->va_atime = vap->va_atime;
+	if (mask & AT_MTIME)
+		get->va_mtime = vap->va_mtime;
+	if (mask & (AT_MODE | AT_UID | AT_GID | AT_CTIME)) {
+		gethrestime(&get->va_ctime);
+	}
+
+	sdev_vattr_merge(dv, get);
+	rw_exit(&dv->sdev_contents);
+	rw_exit(&parent->sdev_contents);
+	return (0);
+}

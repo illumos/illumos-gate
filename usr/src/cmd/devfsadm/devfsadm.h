@@ -83,6 +83,10 @@ extern "C" {
 
 /* devfsadm event service door */
 #define	DEVFSADM_SERVICE_DOOR	"/etc/sysevent/devfsadm_event_channel"
+#define	DEVNAME_LOOKUP_DOOR	".devname_lookup_door"
+
+/* /dev device name binding rule locations */
+#define	DEVNAME_MASTER_MAP	"/etc/dev/devname_master"
 
 /* flags for devfsadm_mklink */
 #define	DEV_SYNC 0x02	/* synchronous mklink */
@@ -121,7 +125,6 @@ typedef struct _devfsadm_remove_reg {
 			/* structures */
 	devfsadm_remove_t *tblp;
 } _devfsadm_remove_reg_t;
-
 
 /*
  * "flags" in the devfs_enumerate structure can take the following values.

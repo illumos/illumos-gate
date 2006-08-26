@@ -87,9 +87,9 @@ $(ROOTSECLIB)/% :=	FILEMODE = 0555
 $(ROOTSECLIB)/% :=	OWNER = root
 $(ROOTSECLIB)/% :=	GROUP = sys
 
-LAZYLIBS =	$(ZLAZYLOAD) -ltsol -lgen $(ZNOLAZYLOAD)
-lint :=		LDLIBS += -lbsm -lsec -lsecdb -ltsol -lgen
-$(PROGalloc) :=		LDLIBS += -lbsm -lsec -lsecdb $(LAZYLIBS)
+LAZYLIBS =	$(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
+lint :=		LDLIBS += -lbsm -lsec -lsecdb -ltsol -ldevinfo
+$(PROGalloc) :=		LDLIBS += -lbsm -lsec -lsecdb -ldevinfo $(LAZYLIBS)
 $(PROGmkdevalloc) :=	LDLIBS += -lbsm
 $(PROGdminfo) :=	LDLIBS += -lbsm
 $(PROGaudio) :=		LDLIBS += -lbsm

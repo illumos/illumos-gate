@@ -217,7 +217,6 @@ COMMON_SUBDIRS = \
 	cmd/psradm \
 	cmd/psrinfo \
 	cmd/psrset \
-	cmd/pt_chmod \
 	cmd/ptools \
 	cmd/pwck \
 	cmd/pwconv \

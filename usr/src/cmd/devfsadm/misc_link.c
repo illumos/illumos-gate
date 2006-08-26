@@ -60,7 +60,7 @@ static int ses_callback(di_minor_t minor, di_node_t node);
 static int kmdrv_create(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t misc_cbt[] = {
-	{ "pseudo", "ddi_pseudo", "(^pts$)|(^sad$)",
+	{ "pseudo", "ddi_pseudo", "(^sad$)",
 	    TYPE_EXACT | DRV_RE, ILEVEL_0, node_slash_minor
 	},
 	{ "pseudo", "ddi_pseudo", "zsh",

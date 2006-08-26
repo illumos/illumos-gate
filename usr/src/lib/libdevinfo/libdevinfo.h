@@ -28,7 +28,12 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
 #include <errno.h>
+#include <libnvpair.h>
 #include <sys/param.h>
 #include <sys/sunddi.h>
 #include <sys/sunmdi.h>
@@ -36,10 +41,6 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/devinfo_impl.h>
 #include <limits.h>
-
-#ifdef	__cplusplus
-extern "C" {
-#endif
 
 /*
  * flags for di_walk_node
@@ -393,6 +394,42 @@ extern char *di_dli_name(char *);
 extern int di_dli_openr(char *);
 extern int di_dli_openw(char *);
 extern void di_dli_close(int);
+
+/*
+ * Private interface for parsing devname binding info
+ */
+extern void di_devname_print_mapinfo(nvlist_t *);
+extern int di_devname_get_mapinfo(char *, nvlist_t **);
+extern int di_devname_get_mapent(char *, char *, nvlist_t **);
+extern int di_devname_action_on_key(nvlist_t *, uint8_t, char *, void *);
+
+/*
+ * finddev - alternate readdir to discover only /dev persisted device names
+ */
+typedef struct __finddevhdl *finddevhdl_t;
+
+extern int		device_exists(const char *);
+extern int		finddev_readdir(const char *, finddevhdl_t *);
+extern void		finddev_close(finddevhdl_t);
+extern const char	*finddev_next(finddevhdl_t);
+
+/* For interfaces implementing search either by readdir or finddev */
+#define	FLAG_USE_READDIR	0
+#define	FLAG_USE_FINDDEV	1
+
+
+/*
+ * Private interfaces for non-global /dev profile
+ */
+typedef struct __di_prof	*di_prof_t;
+
+extern int	di_prof_init(const char *mountpt, di_prof_t *);
+extern void	di_prof_fini(di_prof_t);
+extern int	di_prof_commit(di_prof_t);
+extern int	di_prof_add_dev(di_prof_t, const char *);
+extern int	di_prof_add_exclude(di_prof_t, const char *);
+extern int	di_prof_add_symlink(di_prof_t, const char *, const char *);
+extern int	di_prof_add_map(di_prof_t, const char *, const char *);
 
 #ifdef	__cplusplus
 }

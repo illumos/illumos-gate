@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -325,7 +324,7 @@ get_master_pty()
  * above, in get_master_pty()).
  */
 static int
-init_slave_pty(zoneid_t zoneid, char *zonepath)
+init_slave_pty(zoneid_t zoneid, char *devroot)
 {
 	int slavefd = -1;
 	char *slavename, zoneslavename[MAXPATHLEN];
@@ -346,11 +345,8 @@ init_slave_pty(zoneid_t zoneid, char *zonepath)
 	/*
 	 * We must open the slave side before zoning this pty; otherwise
 	 * the kernel would refuse us the open-- zoning a pty makes it
-	 * inaccessible to the global zone.  Since we are trying to
-	 * open the device node via the $ZONEPATH/dev path, we may have to
-	 * give devfsadm a kick to get it to create the device node for
-	 * us.  Normally this would "just work" because pt_chmod inside
-	 * the zone would take care of it for us.
+	 * inaccessible to the global zone.  Note we are trying to open
+	 * the device node via the $ZONEROOT/dev path for this pty.
 	 *
 	 * Later we'll close the slave out when once we've opened it again
 	 * from within the target zone.  Blarg.
@@ -361,18 +357,12 @@ init_slave_pty(zoneid_t zoneid, char *zonepath)
 	}
 
 	(void) snprintf(zoneslavename, sizeof (zoneslavename), "%s%s",
-	    zonepath, slavename);
+	    devroot, slavename);
 
 	if ((slavefd = open(zoneslavename, O_RDWR)) < 0) {
-		di_devlink_handle_t h = di_devlink_init("pts", DI_MAKE_LINK);
-		if (h != NULL) {
-			(void) di_devlink_fini(&h);
-		}
-		if ((slavefd = open(zoneslavename, O_RDWR)) < 0) {
-			zerror(gettext("failed to open %s: %s"), zoneslavename,
-			    strerror(errno));
-			return (-1);
-		}
+		zerror(gettext("failed to open %s: %s"), zoneslavename,
+		    strerror(errno));
+		return (-1);
 	}
 
 	/*
@@ -1338,7 +1328,7 @@ main(int argc, char **argv)
 	char **proc_args = NULL;
 	char **new_args, **new_env;
 	sigset_t block_cld;
-	char zonepath[MAXPATHLEN];
+	char devroot[MAXPATHLEN];
 	char *slavename, slaveshortname[MAXPATHLEN];
 	priv_set_t *privset;
 	int tmpl_fd;
@@ -1550,10 +1540,10 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 * We need the zone path only if we are setting up a pty.
+	 * We need the zone root path only if we are setting up a pty.
 	 */
-	if (zone_get_zonepath(zonename, zonepath, sizeof (zonepath)) == -1) {
-		zerror(gettext("could not get root path for zone %s"),
+	if (zone_get_devroot(zonename, devroot, sizeof (devroot)) == -1) {
+		zerror(gettext("could not get dev path for zone %s"),
 		    zonename);
 		return (1);
 	}
@@ -1652,7 +1642,7 @@ main(int argc, char **argv)
 
 		(void) sigprocmask(SIG_UNBLOCK, &block_cld, NULL);
 
-		if ((slavefd = init_slave_pty(zoneid, zonepath)) == -1)
+		if ((slavefd = init_slave_pty(zoneid, devroot)) == -1)
 			return (1);
 
 		/*

@@ -49,6 +49,7 @@
 #include <sys/strsubr.h>
 #include <sys/fs/snode.h>
 #include <sys/fs/dv_node.h>
+#include <sys/reboot.h>
 
 #ifdef DEBUG
 int ddidebug = DDI_AUDIT;
@@ -111,6 +112,13 @@ dev_info_t *clone_dip;
 dev_info_t *scsi_vhci_dip;		/* MPXIO dip */
 major_t clone_major;
 
+/*
+ * A non-global zone's /dev is derived from the device tree.
+ * This generation number serves to indicate when a zone's
+ * /dev may need to be updated.
+ */
+volatile ulong_t devtree_gen;		/* generation number */
+
 /* block all future dev_info state changes */
 static hrtime_t volatile devinfo_freeze = 0;
 
@@ -118,6 +126,9 @@ static hrtime_t volatile devinfo_freeze = 0;
 static ulong_t devinfo_attach_detach = 0;
 
 extern kmutex_t global_vhci_lock;
+
+/* bitset of DS_SYSAVAIL & DS_RECONFIG - no races, no lock */
+static int devname_state = 0;
 
 /*
  * The devinfo snapshot cache and related variables.
@@ -3000,8 +3011,8 @@ i_ddi_forceattach_drivers()
  * I/O subsystem initialization is considered complete when devfsadm
  * is executed.
  *
- * NOTE: The start of syseventd in S60devfsadm happen to be convenient
- *	indicator for the completion of I/O initialization during boot.
+ * NOTE: The start of syseventd happens to be a convenient indicator
+ *	of the completion of I/O initialization during boot.
  *	The implementation should be replaced by something more robust.
  */
 int
@@ -3009,6 +3020,55 @@ i_ddi_io_initialized()
 {
 	extern int sysevent_daemon_init;
 	return (sysevent_daemon_init);
+}
+
+/*
+ * May be used to determine system boot state
+ * "Available" means the system is for the most part up
+ * and initialized, with all system services either up or
+ * capable of being started.  This state is set by devfsadm
+ * during the boot process.  The /dev filesystem infers
+ * from this when implicit reconfig can be performed,
+ * ie, devfsadm can be invoked.  Please avoid making
+ * further use of this unless it's really necessary.
+ */
+int
+i_ddi_sysavail()
+{
+	return (devname_state & DS_SYSAVAIL);
+}
+
+/*
+ * May be used to determine if boot is a reconfigure boot.
+ */
+int
+i_ddi_reconfig()
+{
+	return (devname_state & DS_RECONFIG);
+}
+
+/*
+ * Note system services are up, inform /dev.
+ */
+void
+i_ddi_set_sysavail()
+{
+	if ((devname_state & DS_SYSAVAIL) == 0) {
+		devname_state |= DS_SYSAVAIL;
+		sdev_devstate_change();
+	}
+}
+
+/*
+ * Note reconfiguration boot, inform /dev.
+ */
+void
+i_ddi_set_reconfig()
+{
+	if ((devname_state & DS_RECONFIG) == 0) {
+		devname_state |= DS_RECONFIG;
+		sdev_devstate_change();
+	}
 }
 
 
@@ -6757,9 +6817,11 @@ i_ddi_di_cache_invalidate(int kmflag)
 	}
 
 	/*
-	 * Invalidate the in-core cache
+	 * Invalidate the in-core cache and
+	 * increment devtree generation number
 	 */
 	atomic_and_32(&di_cache.cache_valid, 0);
+	atomic_inc_ulong(&devtree_gen);
 
 	flag = (kmflag == KM_SLEEP) ? TQ_SLEEP : TQ_NOSLEEP;
 

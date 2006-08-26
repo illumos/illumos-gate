@@ -164,6 +164,7 @@ struct di_cache {
 
 extern struct di_cache di_cache;
 extern int di_cache_debug;
+extern volatile ulong_t devtree_gen;
 
 /*
  * Special dev_info nodes
@@ -244,6 +245,15 @@ extern dev_info_t *i_ddi_create_branch(dev_info_t *, int);
 extern void i_ddi_add_devimap(dev_info_t *dip);
 extern void i_ddi_di_cache_invalidate(int kmflag);
 extern void i_ddi_di_cache_free(struct di_cache *cache);
+
+/* devname_state - for /dev to denote reconfig and system available */
+#define	DS_RECONFIG	0x01		/* reconfig boot */
+#define	DS_SYSAVAIL	0x02		/* implicit reconfig enabled */
+
+extern int i_ddi_sysavail(void);
+extern int i_ddi_reconfig(void);
+extern void i_ddi_set_sysavail(void);
+extern void i_ddi_set_reconfig(void);
 
 #endif /* _KERNEL */
 

@@ -63,6 +63,7 @@
 extern ksema_t fsflush_sema;
 kmutex_t ualock;
 
+int sys_shutdown = 0;
 
 /*
  * Kill all user processes in said zone.  A special argument of ALL_ZONES is
@@ -201,6 +202,9 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 			if (curthread->t_cred == NULL)
 				curthread->t_cred = kcred;
 		}
+
+		/* indicate shutdown in progress */
+		sys_shutdown = 1;
 
 		/*
 		 * Communcate that init shouldn't be restarted.

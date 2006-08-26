@@ -241,6 +241,7 @@ extern "C" {
 #define	ESC_DEVFS_INSTANCE_MOD	"ESC_devfs_instance_mod"
 #define	ESC_DEVFS_BRANCH_ADD	"ESC_devfs_branch_add"
 #define	ESC_DEVFS_BRANCH_REMOVE	"ESC_devfs_branch_remove"
+#define	ESC_DEVFS_START		"ESC_devfs_start"
 
 /* Class ddi subclasses */
 #define	ESC_DDI_INITIATOR_REGISTER	"ESC_ddi_initiator_register"

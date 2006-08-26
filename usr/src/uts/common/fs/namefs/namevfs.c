@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +63,7 @@
 #include <fs/fs_subr.h>
 #include <sys/policy.h>
 #include <sys/vmem.h>
+#include <sys/fs/sdev_impl.h>
 
 #define	NM_INOQUANT		(64 * 1024)
 
@@ -346,6 +346,17 @@ nm_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *crp)
 		return (EBUSY);
 	}
 	mutex_exit(&mvp->v_lock);
+
+	/*
+	 * Cannot allow users to fattach() in /dev/pts.
+	 * First, there is no need for doing so and secondly
+	 * we cannot allow arbitrary users to park on a
+	 * /dev/pts node.
+	 */
+	if (vn_matchops(mvp, devpts_getvnodeops())) {
+		releasef(namefdp.fd);
+		return (ENOTSUP);
+	}
 
 	filevp = fp->f_vnode;
 	if (filevp->v_type == VDIR || filevp->v_type == VPORT) {
