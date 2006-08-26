@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: hwacpi - ACPI Hardware Initialization/Mode Interface
- *              $Revision: 1.73 $
+ *              $Revision: 1.74 $
  *
  *****************************************************************************/
 
@@ -144,7 +144,7 @@ AcpiHwInitialize (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("HwInitialize");
+    ACPI_FUNCTION_TRACE (HwInitialize);
 
 
     /* We must have the ACPI tables by the time we get here */
@@ -188,7 +188,7 @@ AcpiHwSetMode (
     UINT32                  Retry;
 
 
-    ACPI_FUNCTION_TRACE ("HwSetMode");
+    ACPI_FUNCTION_TRACE (HwSetMode);
 
     /*
      * ACPI 2.0 clarified that if SMI_CMD in FADT is zero,
@@ -291,7 +291,7 @@ AcpiHwGetMode (
     UINT32                  Value;
 
 
-    ACPI_FUNCTION_TRACE ("HwGetMode");
+    ACPI_FUNCTION_TRACE (HwGetMode);
 
 
     /*

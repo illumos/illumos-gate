@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utinit - Common ACPI subsystem initialization
- *              $Revision: 1.126 $
+ *              $Revision: 1.131 $
  *
  *****************************************************************************/
 
@@ -130,7 +130,7 @@ static void
 AcpiUtFadtRegisterError (
     char                    *RegisterName,
     UINT32                  Value,
-    ACPI_SIZE               Offset);
+    UINT8                   Offset);
 
 static void AcpiUtTerminate (
     void);
@@ -154,12 +154,12 @@ static void
 AcpiUtFadtRegisterError (
     char                    *RegisterName,
     UINT32                  Value,
-    ACPI_SIZE               Offset)
+    UINT8                   Offset)
 {
 
     ACPI_WARNING ((AE_INFO,
         "Invalid FADT value %s=%X at offset %X FADT=%p",
-        RegisterName, Value, (UINT32) Offset, AcpiGbl_FADT));
+        RegisterName, Value, Offset, AcpiGbl_FADT));
 }
 
 
@@ -274,7 +274,7 @@ AcpiUtTerminate (
     ACPI_GPE_XRUPT_INFO     *NextGpeXruptInfo;
 
 
-    ACPI_FUNCTION_TRACE ("UtTerminate");
+    ACPI_FUNCTION_TRACE (UtTerminate);
 
 
     /* Free global tables, etc. */
@@ -287,14 +287,14 @@ AcpiUtTerminate (
         while (GpeBlock)
         {
             NextGpeBlock = GpeBlock->Next;
-            ACPI_MEM_FREE (GpeBlock->EventInfo);
-            ACPI_MEM_FREE (GpeBlock->RegisterInfo);
-            ACPI_MEM_FREE (GpeBlock);
+            ACPI_FREE (GpeBlock->EventInfo);
+            ACPI_FREE (GpeBlock->RegisterInfo);
+            ACPI_FREE (GpeBlock);
 
             GpeBlock = NextGpeBlock;
         }
         NextGpeXruptInfo = GpeXruptInfo->Next;
-        ACPI_MEM_FREE (GpeXruptInfo);
+        ACPI_FREE (GpeXruptInfo);
         GpeXruptInfo = NextGpeXruptInfo;
     }
 
@@ -320,7 +320,7 @@ AcpiUtSubsystemShutdown (
     void)
 {
 
-    ACPI_FUNCTION_TRACE ("UtSubsystemShutdown");
+    ACPI_FUNCTION_TRACE (UtSubsystemShutdown);
 
     /* Just exit if subsystem is already shutdown */
 
@@ -334,6 +334,7 @@ AcpiUtSubsystemShutdown (
     /* Subsystem appears active, go ahead and shut it down */
 
     AcpiGbl_Shutdown = TRUE;
+    AcpiGbl_StartupFlags = 0;
     ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
         "Shutting down ACPI Subsystem\n"));
 
@@ -352,13 +353,6 @@ AcpiUtSubsystemShutdown (
     /* Purge the local caches */
 
     (void) AcpiUtDeleteCaches ();
-
-    /* Debug only - display leftover memory allocation, if any */
-
-#ifdef ACPI_DBG_TRACK_ALLOCATIONS
-    AcpiUtDumpAllocations (ACPI_UINT32_MAX, NULL);
-#endif
-
     return_VOID;
 }
 

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg6 - AML execution - opcodes with 6 arguments
- *              $Revision: 1.26 $
+ *              $Revision: 1.27 $
  *
  *****************************************************************************/
 
@@ -309,7 +309,7 @@ AcpiExOpcode_6A_0T_1R (
     ACPI_OPERAND_OBJECT     *ThisElement;
 
 
-    ACPI_FUNCTION_TRACE_STR ("ExOpcode_6A_0T_1R",
+    ACPI_FUNCTION_TRACE_STR (ExOpcode_6A_0T_1R,
         AcpiPsGetOpcodeName (WalkState->Opcode));
 
 

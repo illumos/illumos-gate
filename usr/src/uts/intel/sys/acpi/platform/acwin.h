@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acwin.h - OS specific defines, etc.
- *       $Revision: 1.24 $
+ *       $Revision: 1.25 $
  *
  *****************************************************************************/
 
@@ -176,7 +176,7 @@ typedef COMPILER_DEPENDENT_UINT64       u64;
  * For Acpi applications, we don't want to try to access the global lock
  */
 #ifdef ACPI_APPLICATION
-#define ACPI_ACQUIRE_GLOBAL_LOCK(GLptr, Acq)       if (AcpiGbl_GlobalLockPresent) Acq = TRUE;
+#define ACPI_ACQUIRE_GLOBAL_LOCK(GLptr, Acq)       if (AcpiGbl_CommonFACS.GlobalLock) Acq = TRUE;
 #define ACPI_RELEASE_GLOBAL_LOCK(GLptr, Pnd)       Pnd = 0;
 #else
 #define ACPI_ACQUIRE_GLOBAL_LOCK(GLptr, Acq)       __asm {     \

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 1.17 $
+ *              $Revision: 1.19 $
  *
  *****************************************************************************/
 
@@ -159,7 +159,7 @@ AcpiNsDumpOneDevice (
     UINT32                  i;
 
 
-    ACPI_FUNCTION_NAME ("NsDumpOneDevice");
+    ACPI_FUNCTION_NAME (NsDumpOneDevice);
 
 
     Status = AcpiNsDumpOneObject (ObjHandle, Level, Context, ReturnValue);
@@ -178,7 +178,7 @@ AcpiNsDumpOneDevice (
             "    HID: %s, ADR: %8.8X%8.8X, Status: %X\n",
             Info->HardwareId.Value, ACPI_FORMAT_UINT64 (Info->Address),
             Info->CurrentStatus));
-        ACPI_MEM_FREE (Info);
+        ACPI_FREE (Info);
     }
 
     return (Status);
@@ -205,7 +205,7 @@ AcpiNsDumpRootDevices (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_NAME ("NsDumpRootDevices");
+    ACPI_FUNCTION_NAME (NsDumpRootDevices);
 
 
     /* Only dump the table if tracing is enabled */

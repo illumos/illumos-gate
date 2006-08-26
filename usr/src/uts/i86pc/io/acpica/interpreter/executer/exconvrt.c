@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 1.71 $
+ *              $Revision: 1.73 $
  *
  *****************************************************************************/
 
@@ -164,7 +164,7 @@ AcpiExConvertToInteger (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("ExConvertToInteger", ObjDesc);
+    ACPI_FUNCTION_TRACE_PTR (ExConvertToInteger, ObjDesc);
 
 
     switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
@@ -265,6 +265,9 @@ AcpiExConvertToInteger (
         return_ACPI_STATUS (AE_NO_MEMORY);
     }
 
+    ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Converted value: %8.8X%8.8X\n",
+        ACPI_FORMAT_UINT64 (Result)));
+
     /* Save the Result */
 
     ReturnDesc->Integer.Value = Result;
@@ -297,7 +300,7 @@ AcpiExConvertToBuffer (
     UINT8                   *NewBuf;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("ExConvertToBuffer", ObjDesc);
+    ACPI_FUNCTION_TRACE_PTR (ExConvertToBuffer, ObjDesc);
 
 
     switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
@@ -518,7 +521,7 @@ AcpiExConvertToString (
     UINT8                   Separator = ',';
 
 
-    ACPI_FUNCTION_TRACE_PTR ("ExConvertToString", ObjDesc);
+    ACPI_FUNCTION_TRACE_PTR (ExConvertToString, ObjDesc);
 
 
     switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
@@ -697,7 +700,7 @@ AcpiExConvertToTargetType (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE ("ExConvertToTargetType");
+    ACPI_FUNCTION_TRACE (ExConvertToTargetType);
 
 
     /* Default behavior */

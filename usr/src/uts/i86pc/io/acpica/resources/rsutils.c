@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsutils - Utilities for the resource manager
- *              $Revision: 1.59 $
+ *              $Revision: 1.66 $
  *
  ******************************************************************************/
 
@@ -474,9 +474,10 @@ AcpiRsGetResourceSource (
          *
          * Zero the entire area of the buffer.
          */
-        TotalLength = ACPI_STRLEN (ACPI_CAST_PTR (char, &AmlResourceSource[1])) + 1;
+        TotalLength = (UINT32) ACPI_STRLEN (
+            ACPI_CAST_PTR (char, &AmlResourceSource[1])) + 1;
         TotalLength = (UINT32) ACPI_ROUND_UP_TO_NATIVE_WORD (TotalLength);
-            
+
         ACPI_MEMSET (ResourceSource->StringPtr, 0, TotalLength);
 
         /* Copy the ResourceSource string to the destination */
@@ -562,7 +563,7 @@ AcpiRsSetResourceSource (
  *
  * FUNCTION:    AcpiRsGetPrtMethodData
  *
- * PARAMETERS:  Handle          - Handle to the containing object
+ * PARAMETERS:  Node            - Device node
  *              RetBuffer       - Pointer to a buffer structure for the
  *                                results
  *
@@ -578,21 +579,21 @@ AcpiRsSetResourceSource (
 
 ACPI_STATUS
 AcpiRsGetPrtMethodData (
-    ACPI_HANDLE             Handle,
+    ACPI_NAMESPACE_NODE     *Node,
     ACPI_BUFFER             *RetBuffer)
 {
     ACPI_OPERAND_OBJECT     *ObjDesc;
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("RsGetPrtMethodData");
+    ACPI_FUNCTION_TRACE (RsGetPrtMethodData);
 
 
     /* Parameters guaranteed valid by caller */
 
     /* Execute the method, no parameters */
 
-    Status = AcpiUtEvaluateObject (Handle, METHOD_NAME__PRT,
+    Status = AcpiUtEvaluateObject (Node, METHOD_NAME__PRT,
                 ACPI_BTYPE_PACKAGE, &ObjDesc);
     if (ACPI_FAILURE (Status))
     {
@@ -616,7 +617,7 @@ AcpiRsGetPrtMethodData (
  *
  * FUNCTION:    AcpiRsGetCrsMethodData
  *
- * PARAMETERS:  Handle          - Handle to the containing object
+ * PARAMETERS:  Node            - Device node
  *              RetBuffer       - Pointer to a buffer structure for the
  *                                results
  *
@@ -632,21 +633,21 @@ AcpiRsGetPrtMethodData (
 
 ACPI_STATUS
 AcpiRsGetCrsMethodData (
-    ACPI_HANDLE             Handle,
+    ACPI_NAMESPACE_NODE     *Node,
     ACPI_BUFFER             *RetBuffer)
 {
     ACPI_OPERAND_OBJECT     *ObjDesc;
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("RsGetCrsMethodData");
+    ACPI_FUNCTION_TRACE (RsGetCrsMethodData);
 
 
     /* Parameters guaranteed valid by caller */
 
     /* Execute the method, no parameters */
 
-    Status = AcpiUtEvaluateObject (Handle, METHOD_NAME__CRS,
+    Status = AcpiUtEvaluateObject (Node, METHOD_NAME__CRS,
                 ACPI_BTYPE_BUFFER, &ObjDesc);
     if (ACPI_FAILURE (Status))
     {
@@ -671,7 +672,7 @@ AcpiRsGetCrsMethodData (
  *
  * FUNCTION:    AcpiRsGetPrsMethodData
  *
- * PARAMETERS:  Handle          - Handle to the containing object
+ * PARAMETERS:  Node            - Device node
  *              RetBuffer       - Pointer to a buffer structure for the
  *                                results
  *
@@ -687,21 +688,21 @@ AcpiRsGetCrsMethodData (
 
 ACPI_STATUS
 AcpiRsGetPrsMethodData (
-    ACPI_HANDLE             Handle,
+    ACPI_NAMESPACE_NODE     *Node,
     ACPI_BUFFER             *RetBuffer)
 {
     ACPI_OPERAND_OBJECT     *ObjDesc;
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("RsGetPrsMethodData");
+    ACPI_FUNCTION_TRACE (RsGetPrsMethodData);
 
 
     /* Parameters guaranteed valid by caller */
 
     /* Execute the method, no parameters */
 
-    Status = AcpiUtEvaluateObject (Handle, METHOD_NAME__PRS,
+    Status = AcpiUtEvaluateObject (Node, METHOD_NAME__PRS,
                 ACPI_BTYPE_BUFFER, &ObjDesc);
     if (ACPI_FAILURE (Status))
     {
@@ -751,7 +752,7 @@ AcpiRsGetMethodData (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("RsGetMethodData");
+    ACPI_FUNCTION_TRACE (RsGetMethodData);
 
 
     /* Parameters guaranteed valid by caller */
@@ -759,7 +760,8 @@ AcpiRsGetMethodData (
     /* Execute the method, no parameters */
 
     Status = AcpiUtEvaluateObject (Handle, Path, ACPI_BTYPE_BUFFER, &ObjDesc);
-    if (ACPI_FAILURE (Status)) {
+    if (ACPI_FAILURE (Status))
+    {
         return_ACPI_STATUS (Status);
     }
 
@@ -781,7 +783,7 @@ AcpiRsGetMethodData (
  *
  * FUNCTION:    AcpiRsSetSrsMethodData
  *
- * PARAMETERS:  Handle          - Handle to the containing object
+ * PARAMETERS:  Node            - Device node
  *              InBuffer        - Pointer to a buffer structure of the
  *                                parameter
  *
@@ -793,27 +795,41 @@ AcpiRsGetMethodData (
  *              If the function fails an appropriate status will be returned
  *              and the contents of the callers buffer is undefined.
  *
+ * Note: Parameters guaranteed valid by caller
+ *
  ******************************************************************************/
 
 ACPI_STATUS
 AcpiRsSetSrsMethodData (
-    ACPI_HANDLE             Handle,
+    ACPI_NAMESPACE_NODE     *Node,
     ACPI_BUFFER             *InBuffer)
 {
-    ACPI_PARAMETER_INFO     Info;
-    ACPI_OPERAND_OBJECT     *Params[2];
+    ACPI_EVALUATE_INFO      *Info;
+    ACPI_OPERAND_OBJECT     *Args[2];
     ACPI_STATUS             Status;
     ACPI_BUFFER             Buffer;
 
 
-    ACPI_FUNCTION_TRACE ("RsSetSrsMethodData");
+    ACPI_FUNCTION_TRACE (RsSetSrsMethodData);
 
 
-    /* Parameters guaranteed valid by caller */
+    /* Allocate and initialize the evaluation information block */
+
+    Info = ACPI_ALLOCATE_ZEROED (sizeof (ACPI_EVALUATE_INFO));
+    if (!Info)
+    {
+        return_ACPI_STATUS (AE_NO_MEMORY);
+    }
+
+    Info->PrefixNode = Node;
+    Info->Pathname = METHOD_NAME__SRS;
+    Info->Parameters = Args;
+    Info->ParameterType = ACPI_PARAM_ARGS;
+    Info->Flags = ACPI_IGNORE_RETURN_VALUE;
 
     /*
      * The InBuffer parameter will point to a linked list of
-     * resource parameters.  It needs to be formatted into a
+     * resource parameters. It needs to be formatted into a
      * byte stream to be sent in as an input parameter to _SRS
      *
      * Convert the linked list into a byte stream
@@ -822,45 +838,38 @@ AcpiRsSetSrsMethodData (
     Status = AcpiRsCreateAmlResources (InBuffer->Pointer, &Buffer);
     if (ACPI_FAILURE (Status))
     {
-        return_ACPI_STATUS (Status);
+        goto Cleanup;
     }
 
-    /* Init the param object */
+    /* Create and initialize the method parameter object */
 
-    Params[0] = AcpiUtCreateInternalObject (ACPI_TYPE_BUFFER);
-    if (!Params[0])
+    Args[0] = AcpiUtCreateInternalObject (ACPI_TYPE_BUFFER);
+    if (!Args[0])
     {
-        AcpiOsFree (Buffer.Pointer);
-        return_ACPI_STATUS (AE_NO_MEMORY);
+        /*
+         * Must free the buffer allocated above (otherwise it is freed
+         * later)
+         */
+        ACPI_FREE (Buffer.Pointer);
+        Status = AE_NO_MEMORY;
+        goto Cleanup;
     }
 
-    /* Set up the parameter object */
+    Args[0]->Buffer.Length  = (UINT32) Buffer.Length;
+    Args[0]->Buffer.Pointer = Buffer.Pointer;
+    Args[0]->Common.Flags   = AOPOBJ_DATA_VALID;
+    Args[1] = NULL;
 
-    Params[0]->Buffer.Length  = (UINT32) Buffer.Length;
-    Params[0]->Buffer.Pointer = Buffer.Pointer;
-    Params[0]->Common.Flags   = AOPOBJ_DATA_VALID;
-    Params[1] = NULL;
+    /* Execute the method, no return value is expected */
 
-    Info.Node = Handle;
-    Info.Parameters = Params;
-    Info.ParameterType = ACPI_PARAM_ARGS;
+    Status = AcpiNsEvaluate (Info);
 
-    /* Execute the method, no return value */
+    /* Clean up and return the status from AcpiNsEvaluate */
 
-    Status = AcpiNsEvaluateRelative (METHOD_NAME__SRS, &Info);
-    if (ACPI_SUCCESS (Status))
-    {
-        /* Delete any return object (especially if ImplicitReturn is enabled) */
+    AcpiUtRemoveReference (Args[0]);
 
-        if (Info.ReturnObject)
-        {
-            AcpiUtRemoveReference (Info.ReturnObject);
-        }
-    }
-
-    /* Clean up and return the status from AcpiNsEvaluateRelative */
-
-    AcpiUtRemoveReference (Params[0]);
+Cleanup:
+    ACPI_FREE (Info);
     return_ACPI_STATUS (Status);
 }
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 1.176 $
+ *              $Revision: 1.178 $
  *
  *****************************************************************************/
 
@@ -163,7 +163,7 @@ AcpiNsPrintPathname (
     ACPI_NATIVE_UINT        i;
 
 
-    ACPI_FUNCTION_NAME ("NsPrintPathname");
+    ACPI_FUNCTION_NAME (NsPrintPathname);
 
 
     if (!(AcpiDbgLevel & ACPI_LV_NAMES) || !(AcpiDbgLayer & ACPI_NAMESPACE))
@@ -220,7 +220,7 @@ AcpiNsDumpPathname (
     UINT32                  Component)
 {
 
-    ACPI_FUNCTION_TRACE ("NsDumpPathname");
+    ACPI_FUNCTION_TRACE (NsDumpPathname);
 
 
     /* Do this only if the requested debug level and component are enabled */
@@ -271,7 +271,7 @@ AcpiNsDumpOneObject (
     UINT32                  i;
 
 
-    ACPI_FUNCTION_NAME ("NsDumpOneObject");
+    ACPI_FUNCTION_NAME (NsDumpOneObject);
 
 
     /* Is output enabled? */
@@ -313,6 +313,8 @@ AcpiNsDumpOneObject (
 
         if (!AcpiUtValidAcpiName (ThisNode->Name.Integer))
         {
+            ThisNode->Name.Integer = AcpiUtRepairName (ThisNode->Name.Integer);
+
             ACPI_WARNING ((AE_INFO, "Invalid ACPI Name %08X",
                 ThisNode->Name.Integer));
         }
@@ -787,7 +789,7 @@ AcpiNsDumpTables (
     ACPI_HANDLE             SearchHandle = SearchBase;
 
 
-    ACPI_FUNCTION_TRACE ("NsDumpTables");
+    ACPI_FUNCTION_TRACE (NsDumpTables);
 
 
     if (!AcpiGbl_RootNode)

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbutils - AML debugger utilities
- *              $Revision: 1.80 $
+ *              $Revision: 1.81 $
  *
  ******************************************************************************/
 
@@ -423,7 +423,7 @@ AcpiDbLocalNsLookup (
                 Name, AcpiFormatException (Status));
     }
 
-    ACPI_MEM_FREE (InternalPath);
+    ACPI_FREE (InternalPath);
     return (Node);
 }
 

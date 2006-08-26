@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 1.67 $
+ *              $Revision: 1.72 $
  *
  *****************************************************************************/
 
@@ -133,13 +133,13 @@ AcpiTbInitGenericAddress (
 
 static void
 AcpiTbConvertFadt1 (
-    FADT_DESCRIPTOR_REV2   *LocalFadt,
-    FADT_DESCRIPTOR_REV1   *OriginalFadt);
+    FADT_DESCRIPTOR         *LocalFadt,
+    FADT_DESCRIPTOR_REV1    *OriginalFadt);
 
 static void
 AcpiTbConvertFadt2 (
-    FADT_DESCRIPTOR_REV2   *LocalFadt,
-    FADT_DESCRIPTOR_REV2   *OriginalFadt);
+    FADT_DESCRIPTOR         *LocalFadt,
+    FADT_DESCRIPTOR         *OriginalFadt);
 
 
 /*******************************************************************************
@@ -219,7 +219,7 @@ AcpiTbConvertToXsdt (
 
     /* Allocate an XSDT */
 
-    NewTable = ACPI_MEM_CALLOCATE (TableSize);
+    NewTable = ACPI_ALLOCATE_ZEROED (TableSize);
     if (!NewTable)
     {
         return (AE_NO_MEMORY);
@@ -239,7 +239,7 @@ AcpiTbConvertToXsdt (
         if (AcpiGbl_RootTableType == ACPI_TABLE_TYPE_RSDT)
         {
             ACPI_STORE_ADDRESS (NewTable->TableOffsetEntry[i],
-                (ACPI_CAST_PTR (RSDT_DESCRIPTOR_REV1,
+                (ACPI_CAST_PTR (RSDT_DESCRIPTOR,
                     TableInfo->Pointer))->TableOffsetEntry[i]);
         }
         else
@@ -309,8 +309,8 @@ AcpiTbInitGenericAddress (
 
 static void
 AcpiTbConvertFadt1 (
-    FADT_DESCRIPTOR_REV2   *LocalFadt,
-    FADT_DESCRIPTOR_REV1   *OriginalFadt)
+    FADT_DESCRIPTOR         *LocalFadt,
+    FADT_DESCRIPTOR_REV1    *OriginalFadt)
 {
 
     /* ACPI 1.0 FACS */
@@ -436,13 +436,13 @@ AcpiTbConvertFadt1 (
 
 static void
 AcpiTbConvertFadt2 (
-    FADT_DESCRIPTOR_REV2   *LocalFadt,
-    FADT_DESCRIPTOR_REV2   *OriginalFadt)
+    FADT_DESCRIPTOR         *LocalFadt,
+    FADT_DESCRIPTOR         *OriginalFadt)
 {
 
     /* We have an ACPI 2.0 FADT but we must copy it to our local buffer */
 
-    ACPI_MEMCPY (LocalFadt, OriginalFadt, sizeof (FADT_DESCRIPTOR_REV2));
+    ACPI_MEMCPY (LocalFadt, OriginalFadt, sizeof (FADT_DESCRIPTOR));
 
     /*
      * "X" fields are optional extensions to the original V1.0 fields, so
@@ -561,11 +561,11 @@ ACPI_STATUS
 AcpiTbConvertTableFadt (
     void)
 {
-    FADT_DESCRIPTOR_REV2   *LocalFadt;
-    ACPI_TABLE_DESC        *TableDesc;
+    FADT_DESCRIPTOR         *LocalFadt;
+    ACPI_TABLE_DESC         *TableDesc;
 
 
-    ACPI_FUNCTION_TRACE ("TbConvertTableFadt");
+    ACPI_FUNCTION_TRACE (TbConvertTableFadt);
 
 
     /*
@@ -581,7 +581,7 @@ AcpiTbConvertTableFadt (
 
     /* Allocate buffer for the ACPI 2.0(+) FADT */
 
-    LocalFadt = ACPI_MEM_CALLOCATE (sizeof (FADT_DESCRIPTOR_REV2));
+    LocalFadt = ACPI_ALLOCATE_ZEROED (sizeof (FADT_DESCRIPTOR));
     if (!LocalFadt)
     {
         return_ACPI_STATUS (AE_NO_MEMORY);
@@ -589,7 +589,7 @@ AcpiTbConvertTableFadt (
 
     if (AcpiGbl_FADT->Revision >= FADT2_REVISION_ID)
     {
-        if (AcpiGbl_FADT->Length < sizeof (FADT_DESCRIPTOR_REV2))
+        if (AcpiGbl_FADT->Length < sizeof (FADT_DESCRIPTOR))
         {
             /* Length is too short to be a V2.0 table */
 
@@ -620,14 +620,14 @@ AcpiTbConvertTableFadt (
 
     /* Free the original table */
 
-    TableDesc = AcpiGbl_TableLists[ACPI_TABLE_FADT].Next;
+    TableDesc = AcpiGbl_TableLists[ACPI_TABLE_ID_FADT].Next;
     AcpiTbDeleteSingleTable (TableDesc);
 
     /* Install the new table */
 
     TableDesc->Pointer    = ACPI_CAST_PTR (ACPI_TABLE_HEADER, AcpiGbl_FADT);
     TableDesc->Allocation = ACPI_MEM_ALLOCATED;
-    TableDesc->Length     = sizeof (FADT_DESCRIPTOR_REV2);
+    TableDesc->Length     = sizeof (FADT_DESCRIPTOR);
 
     /* Dump the entire FADT */
 
@@ -660,7 +660,7 @@ AcpiTbBuildCommonFacs (
     ACPI_TABLE_DESC         *TableInfo)
 {
 
-    ACPI_FUNCTION_TRACE ("TbBuildCommonFacs");
+    ACPI_FUNCTION_TRACE (TbBuildCommonFacs);
 
 
     /* Absolute minimum length is 24, but the ACPI spec says 64 */

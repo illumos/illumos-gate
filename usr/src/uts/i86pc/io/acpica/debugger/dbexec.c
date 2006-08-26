@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbexec - debugger control method execution
- *              $Revision: 1.74 $
+ *              $Revision: 1.77 $
  *
  ******************************************************************************/
 
@@ -420,7 +420,7 @@ AcpiDbExecute (
     }
     else
     {
-        NameString = ACPI_MEM_ALLOCATE (ACPI_STRLEN (Name) + 1);
+        NameString = ACPI_ALLOCATE (ACPI_STRLEN (Name) + 1);
         if (!NameString)
         {
             return;
@@ -437,7 +437,7 @@ AcpiDbExecute (
 
         AcpiDbExecuteSetup (&AcpiGbl_DbMethodInfo);
         Status = AcpiDbExecuteMethod (&AcpiGbl_DbMethodInfo, &ReturnObj);
-        ACPI_MEM_FREE (NameString);
+        ACPI_FREE (NameString);
     }
 
     /*
@@ -575,7 +575,7 @@ AcpiDbCreateExecutionThreads (
     UINT32                  NumThreads;
     UINT32                  NumLoops;
     UINT32                  i;
-    ACPI_HANDLE             ThreadGate;
+    ACPI_MUTEX              ThreadGate;
 
 
     /* Get the arguments */
@@ -617,7 +617,7 @@ AcpiDbCreateExecutionThreads (
 
     for (i = 0; i < (NumThreads); i++)
     {
-        Status = AcpiOsQueueForExecution (OSD_PRIORITY_MED, AcpiDbMethodThread,
+        Status = AcpiOsExecute (OSL_DEBUGGER_THREAD, AcpiDbMethodThread,
             &AcpiGbl_DbMethodInfo);
         if (ACPI_FAILURE (Status))
         {

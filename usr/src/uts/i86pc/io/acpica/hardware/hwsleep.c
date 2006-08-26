@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: hwsleep.c - ACPI Hardware Sleep/Wake Interface
- *              $Revision: 1.80 $
+ *              $Revision: 1.82 $
  *
  *****************************************************************************/
 
@@ -139,7 +139,7 @@ AcpiSetFirmwareWakingVector (
     ACPI_PHYSICAL_ADDRESS PhysicalAddress)
 {
 
-    ACPI_FUNCTION_TRACE ("AcpiSetFirmwareWakingVector");
+    ACPI_FUNCTION_TRACE (AcpiSetFirmwareWakingVector);
 
 
     /* Set the vector */
@@ -157,6 +157,8 @@ AcpiSetFirmwareWakingVector (
 
     return_ACPI_STATUS (AE_OK);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiSetFirmwareWakingVector)
 
 
 /*******************************************************************************
@@ -178,7 +180,7 @@ AcpiGetFirmwareWakingVector (
     ACPI_PHYSICAL_ADDRESS *PhysicalAddress)
 {
 
-    ACPI_FUNCTION_TRACE ("AcpiGetFirmwareWakingVector");
+    ACPI_FUNCTION_TRACE (AcpiGetFirmwareWakingVector);
 
 
     if (!PhysicalAddress)
@@ -201,6 +203,8 @@ AcpiGetFirmwareWakingVector (
 
     return_ACPI_STATUS (AE_OK);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiGetFirmwareWakingVector)
 
 
 /*******************************************************************************
@@ -227,7 +231,7 @@ AcpiEnterSleepStatePrep (
     ACPI_OBJECT         Arg;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiEnterSleepStatePrep");
+    ACPI_FUNCTION_TRACE (AcpiEnterSleepStatePrep);
 
 
     /*
@@ -296,6 +300,8 @@ AcpiEnterSleepStatePrep (
     return_ACPI_STATUS (AE_OK);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiEnterSleepStatePrep)
+
 
 /*******************************************************************************
  *
@@ -322,7 +328,7 @@ AcpiEnterSleepState (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiEnterSleepState");
+    ACPI_FUNCTION_TRACE (AcpiEnterSleepState);
 
 
     if ((AcpiGbl_SleepTypeA > ACPI_SLEEP_TYPE_MAX) ||
@@ -489,6 +495,8 @@ AcpiEnterSleepState (
     return_ACPI_STATUS (AE_OK);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiEnterSleepState)
+
 
 /*******************************************************************************
  *
@@ -511,7 +519,7 @@ AcpiEnterSleepStateS4bios (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiEnterSleepStateS4bios");
+    ACPI_FUNCTION_TRACE (AcpiEnterSleepStateS4bios);
 
 
     Status = AcpiSetRegister (ACPI_BITREG_WAKE_STATUS, 1, ACPI_MTX_DO_NOT_LOCK);
@@ -561,6 +569,8 @@ AcpiEnterSleepStateS4bios (
     return_ACPI_STATUS (AE_OK);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiEnterSleepStateS4bios)
+
 
 /*******************************************************************************
  *
@@ -588,7 +598,7 @@ AcpiLeaveSleepState (
     UINT32                  PM1BControl;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiLeaveSleepState");
+    ACPI_FUNCTION_TRACE (AcpiLeaveSleepState);
 
 
     /*
@@ -707,3 +717,6 @@ AcpiLeaveSleepState (
 
     return_ACPI_STATUS (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiLeaveSleepState)
+

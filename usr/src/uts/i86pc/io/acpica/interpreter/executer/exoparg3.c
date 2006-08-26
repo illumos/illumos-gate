@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg3 - AML execution - opcodes with 3 arguments
- *              $Revision: 1.31 $
+ *              $Revision: 1.33 $
  *
  *****************************************************************************/
 
@@ -172,7 +172,7 @@ AcpiExOpcode_3A_0T_0R (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE_STR ("ExOpcode_3A_0T_0R",
+    ACPI_FUNCTION_TRACE_STR (ExOpcode_3A_0T_0R,
         AcpiPsGetOpcodeName (WalkState->Opcode));
 
 
@@ -186,7 +186,7 @@ AcpiExOpcode_3A_0T_0R (
             (UINT32) Operand[1]->Integer.Value,
             (UINT32) Operand[2]->Integer.Value));
 
-        Fatal = ACPI_MEM_ALLOCATE (sizeof (ACPI_SIGNAL_FATAL_INFO));
+        Fatal = ACPI_ALLOCATE (sizeof (ACPI_SIGNAL_FATAL_INFO));
         if (Fatal)
         {
             Fatal->Type     = (UINT32) Operand[0]->Integer.Value;
@@ -200,7 +200,7 @@ AcpiExOpcode_3A_0T_0R (
 
         /* Might return while OS is shutting down, just continue */
 
-        ACPI_MEM_FREE (Fatal);
+        ACPI_FREE (Fatal);
         break;
 
 
@@ -243,7 +243,7 @@ AcpiExOpcode_3A_1T_1R (
     ACPI_SIZE               Length;
 
 
-    ACPI_FUNCTION_TRACE_STR ("ExOpcode_3A_1T_1R",
+    ACPI_FUNCTION_TRACE_STR (ExOpcode_3A_1T_1R,
         AcpiPsGetOpcodeName (WalkState->Opcode));
 
 
@@ -293,7 +293,7 @@ AcpiExOpcode_3A_1T_1R (
 
             /* Always allocate a new buffer for the String */
 
-            Buffer = ACPI_MEM_CALLOCATE ((ACPI_SIZE) Length + 1);
+            Buffer = ACPI_ALLOCATE_ZEROED ((ACPI_SIZE) Length + 1);
             if (!Buffer)
             {
                 Status = AE_NO_MEMORY;
@@ -309,7 +309,7 @@ AcpiExOpcode_3A_1T_1R (
             {
                 /* Allocate a new buffer for the Buffer */
 
-                Buffer = ACPI_MEM_CALLOCATE (Length);
+                Buffer = ACPI_ALLOCATE_ZEROED (Length);
                 if (!Buffer)
                 {
                     Status = AE_NO_MEMORY;

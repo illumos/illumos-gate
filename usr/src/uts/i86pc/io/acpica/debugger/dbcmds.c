@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbcmds - debug commands and output routines
- *              $Revision: 1.140 $
+ *              $Revision: 1.145 $
  *
  ******************************************************************************/
 
@@ -411,11 +411,11 @@ AcpiDbDisplayLocks (
     UINT32                  i;
 
 
-    for (i = 0; i < MAX_MUTEX; i++)
+    for (i = 0; i < ACPI_MAX_MUTEX; i++)
     {
         AcpiOsPrintf ("%26s : %s\n", AcpiUtGetMutexName (i),
-                    AcpiGbl_MutexInfo[i].ThreadId == ACPI_MUTEX_NOT_ACQUIRED
-                        ? "Locked" : "Unlocked");
+            AcpiGbl_MutexInfo[i].ThreadId == ACPI_MUTEX_NOT_ACQUIRED
+                ? "Locked" : "Unlocked");
     }
 }
 
@@ -441,7 +441,7 @@ AcpiDbDisplayTableInfo (
     ACPI_TABLE_DESC         *TableDesc;
 
 
-    for (i = 0; i < NUM_ACPI_TABLE_TYPES; i++)
+    for (i = 0; i < (ACPI_TABLE_ID_MAX+1); i++)
     {
         TableDesc = AcpiGbl_TableLists[i].Next;
         while (TableDesc)
@@ -450,7 +450,7 @@ AcpiDbDisplayTableInfo (
                     AcpiGbl_TableData[i].Name, TableDesc->Pointer,
                     (UINT32) TableDesc->Length);
 
-            if (i != ACPI_TABLE_FACS)
+            if (i != ACPI_TABLE_ID_FACS)
             {
                 AcpiOsPrintf (" OemID=%6s TableId=%8s OemRevision=%8.8X",
                         TableDesc->Pointer->OemId,
@@ -491,7 +491,7 @@ AcpiDbUnloadAcpiTable (
 
     /* Search all tables for the target type */
 
-    for (i = 0; i < NUM_ACPI_TABLE_TYPES; i++)
+    for (i = 0; i < (ACPI_TABLE_ID_MAX+1); i++)
     {
         if (!ACPI_STRNCMP (TableArg, AcpiGbl_TableData[i].Signature,
                 AcpiGbl_TableData[i].SigLength))
@@ -1022,7 +1022,7 @@ AcpiDbWalkForSpecificObjects (
     }
 
     AcpiOsPrintf ("%32s", (char *) Buffer.Pointer);
-    ACPI_MEM_FREE (Buffer.Pointer);
+    ACPI_FREE (Buffer.Pointer);
 
     /* Dump short info about the object */
 
@@ -1146,7 +1146,7 @@ AcpiDbWalkAndMatchName (
 
         AcpiOsPrintf ("%32s", (char *) Buffer.Pointer);
         (void) AcpiNsDumpOneObject (ObjHandle, NestingLevel, &Info, NULL);
-        ACPI_MEM_FREE (Buffer.Pointer);
+        ACPI_FREE (Buffer.Pointer);
     }
 
     return (AE_OK);
@@ -1221,8 +1221,8 @@ AcpiDbSetScope (
     {
         /* Validate new scope from the root */
 
-        Status = AcpiNsGetNodeByPath (Name, AcpiGbl_RootNode,
-                    ACPI_NS_NO_UPSEARCH, &Node);
+        Status = AcpiNsGetNode (AcpiGbl_RootNode, Name, ACPI_NS_NO_UPSEARCH,
+                    &Node);
         if (ACPI_FAILURE (Status))
         {
             goto ErrorExit;
@@ -1235,8 +1235,8 @@ AcpiDbSetScope (
     {
         /* Validate new scope relative to old scope */
 
-        Status = AcpiNsGetNodeByPath (Name, AcpiGbl_DbScopeNode,
-                    ACPI_NS_NO_UPSEARCH, &Node);
+        Status = AcpiNsGetNode (AcpiGbl_DbScopeNode, Name, ACPI_NS_NO_UPSEARCH,
+                    &Node);
         if (ACPI_FAILURE (Status))
         {
             goto ErrorExit;
@@ -1418,11 +1418,11 @@ AcpiDmTestResourceConversion (
 
     /* Cleanup and exit */
 
-    ACPI_MEM_FREE (NewAml.Pointer);
+    ACPI_FREE (NewAml.Pointer);
 Exit2:
-    ACPI_MEM_FREE (ResourceObj.Pointer);
+    ACPI_FREE (ResourceObj.Pointer);
 Exit1:
-    ACPI_MEM_FREE (ReturnObj.Pointer);
+    ACPI_FREE (ReturnObj.Pointer);
     return (Status);
 }
 
@@ -1762,7 +1762,7 @@ AcpiDbBusWalk (
     /* Display the full path */
 
     AcpiOsPrintf ("%-32s", (char *) Buffer.Pointer);
-    ACPI_MEM_FREE (Buffer.Pointer);
+    ACPI_FREE (Buffer.Pointer);
 
     /* _PRT info */
 
@@ -1806,7 +1806,7 @@ AcpiDbBusWalk (
     if (ACPI_SUCCESS (Status))
     {
         AcpiOsPrintf (" _CID=%s", Cid->Id[0].Value);
-        ACPI_MEM_FREE (Cid);
+        ACPI_FREE (Cid);
     }
 
     AcpiOsPrintf ("\n");

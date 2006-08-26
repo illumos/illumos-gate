@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utxface - External interfaces for "global" ACPI functions
- *              $Revision: 1.116 $
+ *              $Revision: 1.121 $
  *
  *****************************************************************************/
 
@@ -146,7 +146,7 @@ AcpiInitializeSubsystem (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiInitializeSubsystem");
+    ACPI_FUNCTION_TRACE (AcpiInitializeSubsystem);
 
 
     ACPI_DEBUG_EXEC (AcpiUtInitStackPtrTrace ());
@@ -190,6 +190,8 @@ AcpiInitializeSubsystem (
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiInitializeSubsystem)
+
 
 /*******************************************************************************
  *
@@ -211,7 +213,7 @@ AcpiEnableSubsystem (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiEnableSubsystem");
+    ACPI_FUNCTION_TRACE (AcpiEnableSubsystem);
 
 
     /*
@@ -326,6 +328,8 @@ AcpiEnableSubsystem (
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiEnableSubsystem)
+
 
 /*******************************************************************************
  *
@@ -347,7 +351,7 @@ AcpiInitializeObjects (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiInitializeObjects");
+    ACPI_FUNCTION_TRACE (AcpiInitializeObjects);
 
 
     /*
@@ -413,6 +417,8 @@ AcpiInitializeObjects (
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiInitializeObjects)
+
 
 /*******************************************************************************
  *
@@ -433,7 +439,7 @@ AcpiTerminate (
     ACPI_STATUS         Status;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiTerminate");
+    ACPI_FUNCTION_TRACE (AcpiTerminate);
 
 
     /* Terminate the AML Debugger if present */
@@ -462,6 +468,8 @@ AcpiTerminate (
     Status = AcpiOsTerminate ();
     return_ACPI_STATUS (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiTerminate)
 
 
 /*******************************************************************************
@@ -493,6 +501,8 @@ AcpiSubsystemStatus (
     }
 }
 
+ACPI_EXPORT_SYMBOL (AcpiSubsystemStatus)
+
 
 /*******************************************************************************
  *
@@ -521,7 +531,7 @@ AcpiGetSystemInfo (
     UINT32                  i;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiGetSystemInfo");
+    ACPI_FUNCTION_TRACE (AcpiGetSystemInfo);
 
 
     /* Parameter validation */
@@ -545,11 +555,11 @@ AcpiGetSystemInfo (
      */
     InfoPtr = (ACPI_SYSTEM_INFO *) OutBuffer->Pointer;
 
-    InfoPtr->AcpiCaVersion      = ACPI_CA_VERSION;
+    InfoPtr->AcpiCaVersion = ACPI_CA_VERSION;
 
     /* System flags (ACPI capabilities) */
 
-    InfoPtr->Flags              = ACPI_SYS_MODE_ACPI;
+    InfoPtr->Flags = ACPI_SYS_MODE_ACPI;
 
     /* Timer resolution - 24 or 32 bits  */
 
@@ -568,24 +578,26 @@ AcpiGetSystemInfo (
 
     /* Clear the reserved fields */
 
-    InfoPtr->Reserved1          = 0;
-    InfoPtr->Reserved2          = 0;
+    InfoPtr->Reserved1 = 0;
+    InfoPtr->Reserved2 = 0;
 
     /* Current debug levels */
 
-    InfoPtr->DebugLayer         = AcpiDbgLayer;
-    InfoPtr->DebugLevel         = AcpiDbgLevel;
+    InfoPtr->DebugLayer = AcpiDbgLayer;
+    InfoPtr->DebugLevel = AcpiDbgLevel;
 
     /* Current status of the ACPI tables, per table type */
 
-    InfoPtr->NumTableTypes = NUM_ACPI_TABLE_TYPES;
-    for (i = 0; i < NUM_ACPI_TABLE_TYPES; i++)
+    InfoPtr->NumTableTypes = ACPI_TABLE_ID_MAX+1;
+    for (i = 0; i < (ACPI_TABLE_ID_MAX+1); i++)
     {
         InfoPtr->TableInfo[i].Count = AcpiGbl_TableLists[i].Count;
     }
 
     return_ACPI_STATUS (AE_OK);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiGetSystemInfo)
 
 
 /*****************************************************************************
@@ -623,6 +635,8 @@ AcpiInstallInitializationHandler (
     return AE_OK;
 }
 
+ACPI_EXPORT_SYMBOL (AcpiInstallInitializationHandler)
+
 
 /*****************************************************************************
  *
@@ -640,7 +654,7 @@ ACPI_STATUS
 AcpiPurgeCachedObjects (
     void)
 {
-    ACPI_FUNCTION_TRACE ("AcpiPurgeCachedObjects");
+    ACPI_FUNCTION_TRACE (AcpiPurgeCachedObjects);
 
     (void) AcpiOsPurgeCache (AcpiGbl_StateCache);
     (void) AcpiOsPurgeCache (AcpiGbl_OperandCache);
@@ -648,3 +662,5 @@ AcpiPurgeCachedObjects (
     (void) AcpiOsPurgeCache (AcpiGbl_PsNodeExtCache);
     return_ACPI_STATUS (AE_OK);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiPurgeCachedObjects)

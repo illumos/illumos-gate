@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbutils - Table manipulation utilities
- *              $Revision: 1.75 $
+ *              $Revision: 1.79 $
  *
  *****************************************************************************/
 
@@ -154,7 +154,7 @@ AcpiTbIsTableInstalled (
     ACPI_TABLE_DESC         *TableDesc;
 
 
-    ACPI_FUNCTION_TRACE ("TbIsTableInstalled");
+    ACPI_FUNCTION_TRACE (TbIsTableInstalled);
 
 
     /* Get the list descriptor and first table descriptor */
@@ -247,12 +247,8 @@ AcpiTbValidateTableHeader (
     ACPI_MOVE_32_TO_32 (&Signature, TableHeader->Signature);
     if (!AcpiUtValidAcpiName (Signature))
     {
-        ACPI_ERROR ((AE_INFO,
-            "Table signature at %p [%p] has invalid characters",
-            TableHeader, &Signature));
-
-        ACPI_WARNING ((AE_INFO, "Invalid table signature found: [%4.4s]",
-            ACPI_CAST_PTR (char, &Signature)));
+        ACPI_ERROR ((AE_INFO, "Invalid table signature 0x%8.8X",
+            Signature));
 
         ACPI_DUMP_BUFFER (TableHeader, sizeof (ACPI_TABLE_HEADER));
         return (AE_BAD_SIGNATURE);
@@ -263,11 +259,9 @@ AcpiTbValidateTableHeader (
     if (TableHeader->Length < sizeof (ACPI_TABLE_HEADER))
     {
         ACPI_ERROR ((AE_INFO,
-            "Invalid length in table header %p name %4.4s",
-            TableHeader, (char *) &Signature));
-
-        ACPI_WARNING ((AE_INFO, "Invalid table header length (0x%X) found",
-            (UINT32) TableHeader->Length));
+            "Invalid length 0x%X in table with signature %4.4s",
+            (UINT32) TableHeader->Length,
+            ACPI_CAST_PTR (char, &Signature)));
 
         ACPI_DUMP_BUFFER (TableHeader, sizeof (ACPI_TABLE_HEADER));
         return (AE_BAD_HEADER);
@@ -279,14 +273,107 @@ AcpiTbValidateTableHeader (
 
 /*******************************************************************************
  *
+ * FUNCTION:    AcpiTbSumTable
+ *
+ * PARAMETERS:  Buffer              - Buffer to sum
+ *              Length              - Size of the buffer
+ *
+ * RETURN:      8 bit sum of buffer
+ *
+ * DESCRIPTION: Computes an 8 bit sum of the buffer(length) and returns it.
+ *
+ ******************************************************************************/
+
+UINT8
+AcpiTbSumTable (
+    void                    *Buffer,
+    UINT32                  Length)
+{
+    ACPI_NATIVE_UINT        i;
+    UINT8                   Sum = 0;
+
+
+    if (!Buffer || !Length)
+    {
+        return (0);
+    }
+
+    for (i = 0; i < Length; i++)
+    {
+        Sum = (UINT8) (Sum + ((UINT8 *) Buffer)[i]);
+    }
+    return (Sum);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiTbGenerateChecksum
+ *
+ * PARAMETERS:  Table               - Pointer to a valid ACPI table (with a
+ *                                    standard ACPI header)
+ *
+ * RETURN:      8 bit checksum of buffer
+ *
+ * DESCRIPTION: Computes an 8 bit checksum of the table.
+ *
+ ******************************************************************************/
+
+UINT8
+AcpiTbGenerateChecksum (
+    ACPI_TABLE_HEADER       *Table)
+{
+    UINT8                   Checksum;
+
+
+    /* Sum the entire table as-is */
+
+    Checksum = AcpiTbSumTable (Table, Table->Length);
+
+    /* Subtract off the existing checksum value in the table */
+
+    Checksum = (UINT8) (Checksum - Table->Checksum);
+
+    /* Compute the final checksum */
+
+    Checksum = (UINT8) (0 - Checksum);
+    return (Checksum);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiTbSetChecksum
+ *
+ * PARAMETERS:  Table               - Pointer to a valid ACPI table (with a
+ *                                    standard ACPI header)
+ *
+ * RETURN:      None. Sets the table checksum field
+ *
+ * DESCRIPTION: Computes an 8 bit checksum of the table and inserts the
+ *              checksum into the table header.
+ *
+ ******************************************************************************/
+
+void
+AcpiTbSetChecksum (
+    ACPI_TABLE_HEADER       *Table)
+{
+
+    Table->Checksum = AcpiTbGenerateChecksum (Table);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    AcpiTbVerifyTableChecksum
  *
  * PARAMETERS:  *TableHeader            - ACPI table to verify
  *
  * RETURN:      8 bit checksum of table
  *
- * DESCRIPTION: Does an 8 bit checksum of table and returns status.  A correct
- *              table should have a checksum of 0.
+ * DESCRIPTION: Generates an 8 bit checksum of table and returns and compares
+ *              it to the existing checksum value.
  *
  ******************************************************************************/
 
@@ -295,66 +382,28 @@ AcpiTbVerifyTableChecksum (
     ACPI_TABLE_HEADER       *TableHeader)
 {
     UINT8                   Checksum;
-    ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE ("TbVerifyTableChecksum");
+    ACPI_FUNCTION_TRACE (TbVerifyTableChecksum);
 
 
     /* Compute the checksum on the table */
 
-    Checksum = AcpiTbGenerateChecksum (TableHeader, TableHeader->Length);
+    Checksum = AcpiTbGenerateChecksum (TableHeader);
 
-    /* Return the appropriate exception */
+    /* Checksum ok? */
 
-    if (Checksum)
+    if (Checksum == TableHeader->Checksum)
     {
-        ACPI_WARNING ((AE_INFO,
-            "Invalid checksum in table [%4.4s] (%02X, sum %02X is not zero)",
-            TableHeader->Signature, (UINT32) TableHeader->Checksum,
-            (UINT32) Checksum));
-
-        Status = AE_BAD_CHECKSUM;
+        return_ACPI_STATUS (AE_OK);
     }
-    return_ACPI_STATUS (Status);
-}
 
+    ACPI_WARNING ((AE_INFO,
+        "Incorrect checksum in table [%4.4s] - is %2.2X, should be %2.2X",
+        TableHeader->Signature, TableHeader->Checksum,
+        Checksum));
 
-/*******************************************************************************
- *
- * FUNCTION:    AcpiTbGenerateChecksum
- *
- * PARAMETERS:  Buffer              - Buffer to checksum
- *              Length              - Size of the buffer
- *
- * RETURN:      8 bit checksum of buffer
- *
- * DESCRIPTION: Computes an 8 bit checksum of the buffer(length) and returns it.
- *
- ******************************************************************************/
-
-UINT8
-AcpiTbGenerateChecksum (
-    void                    *Buffer,
-    UINT32                  Length)
-{
-    UINT8                   *EndBuffer;
-    UINT8                   *Rover;
-    UINT8                   Sum = 0;
-
-
-    if (Buffer && Length)
-    {
-        /*  Buffer and Length are valid   */
-
-        EndBuffer = ACPI_ADD_PTR (UINT8, Buffer, Length);
-
-        for (Rover = Buffer; Rover < EndBuffer; Rover++)
-        {
-            Sum = (UINT8) (Sum + *Rover);
-        }
-    }
-    return (Sum);
+    return_ACPI_STATUS (AE_BAD_CHECKSUM);
 }
 
 
@@ -381,7 +430,7 @@ AcpiTbHandleToObject (
     ACPI_TABLE_DESC         *TableDesc;
 
 
-    ACPI_FUNCTION_NAME ("TbHandleToObject");
+    ACPI_FUNCTION_NAME (TbHandleToObject);
 
 
     for (i = 0; i < ACPI_TABLE_MAX; i++)

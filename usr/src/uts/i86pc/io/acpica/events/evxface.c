@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxface - External interfaces for ACPI events
- *              $Revision: 1.157 $
+ *              $Revision: 1.161 $
  *
  *****************************************************************************/
 
@@ -146,7 +146,7 @@ AcpiInstallExceptionHandler (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiInstallExceptionHandler");
+    ACPI_FUNCTION_TRACE (AcpiInstallExceptionHandler);
 
 
     Status = AcpiUtAcquireMutex (ACPI_MTX_EVENTS);
@@ -171,6 +171,8 @@ Cleanup:
     (void) AcpiUtReleaseMutex (ACPI_MTX_EVENTS);
     return_ACPI_STATUS (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiInstallExceptionHandler)
 
 
 /*******************************************************************************
@@ -198,7 +200,7 @@ AcpiInstallFixedEventHandler (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiInstallFixedEventHandler");
+    ACPI_FUNCTION_TRACE (AcpiInstallFixedEventHandler);
 
 
     /* Parameter validation */
@@ -249,6 +251,8 @@ Cleanup:
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiInstallFixedEventHandler)
+
 
 /*******************************************************************************
  *
@@ -271,7 +275,7 @@ AcpiRemoveFixedEventHandler (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiRemoveFixedEventHandler");
+    ACPI_FUNCTION_TRACE (AcpiRemoveFixedEventHandler);
 
 
     /* Parameter validation */
@@ -310,6 +314,8 @@ AcpiRemoveFixedEventHandler (
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiRemoveFixedEventHandler)
+
 
 /*******************************************************************************
  *
@@ -342,7 +348,7 @@ AcpiInstallNotifyHandler (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiInstallNotifyHandler");
+    ACPI_FUNCTION_TRACE (AcpiInstallNotifyHandler);
 
 
     /* Parameter validation */
@@ -497,6 +503,8 @@ UnlockAndExit:
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiInstallNotifyHandler)
+
 
 /*******************************************************************************
  *
@@ -527,7 +535,7 @@ AcpiRemoveNotifyHandler (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiRemoveNotifyHandler");
+    ACPI_FUNCTION_TRACE (AcpiRemoveNotifyHandler);
 
 
     /* Parameter validation */
@@ -611,8 +619,13 @@ AcpiRemoveNotifyHandler (
         if (HandlerType & ACPI_SYSTEM_NOTIFY)
         {
             NotifyObj = ObjDesc->CommonNotify.SystemNotify;
-            if ((!NotifyObj) ||
-                 (NotifyObj->Notify.Handler != Handler))
+            if (!NotifyObj)
+            {
+                Status = AE_NOT_EXIST;
+                goto UnlockAndExit;
+            }
+
+            if (NotifyObj->Notify.Handler != Handler)
             {
                 Status = AE_BAD_PARAMETER;
                 goto UnlockAndExit;
@@ -627,8 +640,13 @@ AcpiRemoveNotifyHandler (
         if (HandlerType & ACPI_DEVICE_NOTIFY)
         {
             NotifyObj = ObjDesc->CommonNotify.DeviceNotify;
-            if ((!NotifyObj) ||
-                 (NotifyObj->Notify.Handler != Handler))
+            if (!NotifyObj)
+            {
+                Status = AE_NOT_EXIST;
+                goto UnlockAndExit;
+            }
+
+            if (NotifyObj->Notify.Handler != Handler)
             {
                 Status = AE_BAD_PARAMETER;
                 goto UnlockAndExit;
@@ -646,6 +664,8 @@ UnlockAndExit:
     (void) AcpiUtReleaseMutex (ACPI_MTX_NAMESPACE);
     return_ACPI_STATUS (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiRemoveNotifyHandler)
 
 
 /*******************************************************************************
@@ -680,7 +700,7 @@ AcpiInstallGpeHandler (
     ACPI_CPU_FLAGS          Flags;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiInstallGpeHandler");
+    ACPI_FUNCTION_TRACE (AcpiInstallGpeHandler);
 
 
     /* Parameter validation */
@@ -715,7 +735,7 @@ AcpiInstallGpeHandler (
 
     /* Allocate and init handler object */
 
-    Handler = ACPI_MEM_CALLOCATE (sizeof (ACPI_HANDLER_INFO));
+    Handler = ACPI_ALLOCATE_ZEROED (sizeof (ACPI_HANDLER_INFO));
     if (!Handler)
     {
         Status = AE_NO_MEMORY;
@@ -752,6 +772,8 @@ UnlockAndExit:
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiInstallGpeHandler)
+
 
 /*******************************************************************************
  *
@@ -780,7 +802,7 @@ AcpiRemoveGpeHandler (
     ACPI_CPU_FLAGS          Flags;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiRemoveGpeHandler");
+    ACPI_FUNCTION_TRACE (AcpiRemoveGpeHandler);
 
 
     /* Parameter validation */
@@ -846,13 +868,15 @@ AcpiRemoveGpeHandler (
 
     /* Now we can free the handler object */
 
-    ACPI_MEM_FREE (Handler);
+    ACPI_FREE (Handler);
 
 
 UnlockAndExit:
     (void) AcpiUtReleaseMutex (ACPI_MTX_EVENTS);
     return_ACPI_STATUS (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiRemoveGpeHandler)
 
 
 /*******************************************************************************
@@ -900,6 +924,8 @@ AcpiAcquireGlobalLock (
     return (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiAcquireGlobalLock)
+
 
 /*******************************************************************************
  *
@@ -929,4 +955,5 @@ AcpiReleaseGlobalLock (
     return (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiReleaseGlobalLock)
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmutex - local mutex support
- *              $Revision: 1.6 $
+ *              $Revision: 1.11 $
  *
  ******************************************************************************/
 
@@ -153,13 +153,13 @@ AcpiUtMutexInitialize (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("UtMutexInitialize");
+    ACPI_FUNCTION_TRACE (UtMutexInitialize);
 
 
     /*
      * Create each of the predefined mutex objects
      */
-    for (i = 0; i < NUM_MUTEX; i++)
+    for (i = 0; i < ACPI_NUM_MUTEX; i++)
     {
         Status = AcpiUtCreateMutex (i);
         if (ACPI_FAILURE (Status))
@@ -168,7 +168,15 @@ AcpiUtMutexInitialize (
         }
     }
 
+    /* Create the spinlocks for use at interrupt level */
+
     Status = AcpiOsCreateLock (&AcpiGbl_GpeLock);
+    if (ACPI_FAILURE (Status))
+    {
+        return_ACPI_STATUS (Status);
+    }
+
+    Status = AcpiOsCreateLock (&AcpiGbl_HardwareLock);
     return_ACPI_STATUS (Status);
 }
 
@@ -192,18 +200,21 @@ AcpiUtMutexTerminate (
     UINT32                  i;
 
 
-    ACPI_FUNCTION_TRACE ("UtMutexTerminate");
+    ACPI_FUNCTION_TRACE (UtMutexTerminate);
 
 
     /*
      * Delete each predefined mutex object
      */
-    for (i = 0; i < NUM_MUTEX; i++)
+    for (i = 0; i < ACPI_NUM_MUTEX; i++)
     {
         (void) AcpiUtDeleteMutex (i);
     }
 
+    /* Delete the spinlocks */
+
     AcpiOsDeleteLock (AcpiGbl_GpeLock);
+    AcpiOsDeleteLock (AcpiGbl_HardwareLock);
     return_VOID;
 }
 
@@ -227,18 +238,17 @@ AcpiUtCreateMutex (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE_U32 ("UtCreateMutex", MutexId);
+    ACPI_FUNCTION_TRACE_U32 (UtCreateMutex, MutexId);
 
 
-    if (MutexId > MAX_MUTEX)
+    if (MutexId > ACPI_MAX_MUTEX)
     {
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
     if (!AcpiGbl_MutexInfo[MutexId].Mutex)
     {
-        Status = AcpiOsCreateSemaphore (1, 1,
-                        &AcpiGbl_MutexInfo[MutexId].Mutex);
+        Status = AcpiOsCreateMutex (&AcpiGbl_MutexInfo[MutexId].Mutex);
         AcpiGbl_MutexInfo[MutexId].ThreadId = ACPI_MUTEX_NOT_ACQUIRED;
         AcpiGbl_MutexInfo[MutexId].UseCount = 0;
     }
@@ -263,23 +273,21 @@ static ACPI_STATUS
 AcpiUtDeleteMutex (
     ACPI_MUTEX_HANDLE       MutexId)
 {
-    ACPI_STATUS             Status;
+
+    ACPI_FUNCTION_TRACE_U32 (UtDeleteMutex, MutexId);
 
 
-    ACPI_FUNCTION_TRACE_U32 ("UtDeleteMutex", MutexId);
-
-
-    if (MutexId > MAX_MUTEX)
+    if (MutexId > ACPI_MAX_MUTEX)
     {
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
-    Status = AcpiOsDeleteSemaphore (AcpiGbl_MutexInfo[MutexId].Mutex);
+    AcpiOsDeleteMutex (AcpiGbl_MutexInfo[MutexId].Mutex);
 
     AcpiGbl_MutexInfo[MutexId].Mutex = NULL;
     AcpiGbl_MutexInfo[MutexId].ThreadId = ACPI_MUTEX_NOT_ACQUIRED;
 
-    return_ACPI_STATUS (Status);
+    return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -300,13 +308,13 @@ AcpiUtAcquireMutex (
     ACPI_MUTEX_HANDLE       MutexId)
 {
     ACPI_STATUS             Status;
-    UINT32                  ThisThreadId;
+    ACPI_THREAD_ID          ThisThreadId;
 
 
-    ACPI_FUNCTION_NAME ("UtAcquireMutex");
+    ACPI_FUNCTION_NAME (UtAcquireMutex);
 
 
-    if (MutexId > MAX_MUTEX)
+    if (MutexId > ACPI_MAX_MUTEX)
     {
         return (AE_BAD_PARAMETER);
     }
@@ -324,7 +332,7 @@ AcpiUtAcquireMutex (
          * the mutex ordering rule.  This indicates a coding error somewhere in
          * the ACPI subsystem code.
          */
-        for (i = MutexId; i < MAX_MUTEX; i++)
+        for (i = MutexId; i < ACPI_MAX_MUTEX; i++)
         {
             if (AcpiGbl_MutexInfo[i].ThreadId == ThisThreadId)
             {
@@ -352,8 +360,8 @@ AcpiUtAcquireMutex (
         "Thread %X attempting to acquire Mutex [%s]\n",
         ThisThreadId, AcpiUtGetMutexName (MutexId)));
 
-    Status = AcpiOsWaitSemaphore (AcpiGbl_MutexInfo[MutexId].Mutex,
-                                    1, ACPI_WAIT_FOREVER);
+    Status = AcpiOsAcquireMutex (AcpiGbl_MutexInfo[MutexId].Mutex,
+                ACPI_WAIT_FOREVER);
     if (ACPI_SUCCESS (Status))
     {
         ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Thread %X acquired Mutex [%s]\n",
@@ -388,11 +396,10 @@ ACPI_STATUS
 AcpiUtReleaseMutex (
     ACPI_MUTEX_HANDLE       MutexId)
 {
-    ACPI_STATUS             Status;
-    UINT32                  ThisThreadId;
+    ACPI_THREAD_ID          ThisThreadId;
 
 
-    ACPI_FUNCTION_NAME ("UtReleaseMutex");
+    ACPI_FUNCTION_NAME (UtReleaseMutex);
 
 
     ThisThreadId = AcpiOsGetThreadId ();
@@ -400,7 +407,7 @@ AcpiUtReleaseMutex (
         "Thread %X releasing Mutex [%s]\n", ThisThreadId,
         AcpiUtGetMutexName (MutexId)));
 
-    if (MutexId > MAX_MUTEX)
+    if (MutexId > ACPI_MAX_MUTEX)
     {
         return (AE_BAD_PARAMETER);
     }
@@ -427,7 +434,7 @@ AcpiUtReleaseMutex (
          * ordering rule.  This indicates a coding error somewhere in
          * the ACPI subsystem code.
          */
-        for (i = MutexId; i < MAX_MUTEX; i++)
+        for (i = MutexId; i < ACPI_MAX_MUTEX; i++)
         {
             if (AcpiGbl_MutexInfo[i].ThreadId == ThisThreadId)
             {
@@ -450,20 +457,8 @@ AcpiUtReleaseMutex (
 
     AcpiGbl_MutexInfo[MutexId].ThreadId = ACPI_MUTEX_NOT_ACQUIRED;
 
-    Status = AcpiOsSignalSemaphore (AcpiGbl_MutexInfo[MutexId].Mutex, 1);
-
-    if (ACPI_FAILURE (Status))
-    {
-        ACPI_EXCEPTION ((AE_INFO, Status,
-            "Thread %X could not release Mutex [%X]", ThisThreadId, MutexId));
-    }
-    else
-    {
-        ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Thread %X released Mutex [%s]\n",
-            ThisThreadId, AcpiUtGetMutexName (MutexId)));
-    }
-
-    return (Status);
+    AcpiOsReleaseMutex (AcpiGbl_MutexInfo[MutexId].Mutex);
+    return (AE_OK);
 }
 
 

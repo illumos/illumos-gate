@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: pswalk - Parser routines to walk parsed op tree(s)
- *              $Revision: 1.76 $
+ *              $Revision: 1.77 $
  *
  *****************************************************************************/
 
@@ -143,7 +143,7 @@ AcpiPsDeleteParseTree (
     ACPI_PARSE_OBJECT       *Parent = NULL;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("PsDeleteParseTree", SubtreeRoot);
+    ACPI_FUNCTION_TRACE_PTR (PsDeleteParseTree, SubtreeRoot);
 
 
     /* Visit all nodes in the subtree */

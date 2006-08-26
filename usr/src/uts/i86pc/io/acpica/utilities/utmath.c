@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmath - Integer math support routines
- *              $Revision: 1.20 $
+ *              $Revision: 1.21 $
  *
  ******************************************************************************/
 
@@ -159,7 +159,7 @@ AcpiUtShortDivide (
     UINT32                  Remainder32;
 
 
-    ACPI_FUNCTION_TRACE ("UtShortDivide");
+    ACPI_FUNCTION_TRACE (UtShortDivide);
 
 
     /* Always check for a zero divisor */
@@ -229,7 +229,7 @@ AcpiUtDivide (
     UINT64_OVERLAY          Partial3;
 
 
-    ACPI_FUNCTION_TRACE ("UtDivide");
+    ACPI_FUNCTION_TRACE (UtDivide);
 
 
     /* Always check for a zero divisor */
@@ -368,7 +368,7 @@ AcpiUtShortDivide (
     UINT32                  *OutRemainder)
 {
 
-    ACPI_FUNCTION_TRACE ("UtShortDivide");
+    ACPI_FUNCTION_TRACE (UtShortDivide);
 
 
     /* Always check for a zero divisor */
@@ -400,7 +400,7 @@ AcpiUtDivide (
     ACPI_INTEGER            *OutQuotient,
     ACPI_INTEGER            *OutRemainder)
 {
-    ACPI_FUNCTION_TRACE ("UtDivide");
+    ACPI_FUNCTION_TRACE (UtDivide);
 
 
     /* Always check for a zero divisor */

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg2 - AML execution - opcodes with 2 arguments
- *              $Revision: 1.139 $
+ *              $Revision: 1.141 $
  *
  *****************************************************************************/
 
@@ -176,7 +176,7 @@ AcpiExOpcode_2A_0T_0R (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE_STR ("ExOpcode_2A_0T_0R",
+    ACPI_FUNCTION_TRACE_STR (ExOpcode_2A_0T_0R,
             AcpiPsGetOpcodeName (WalkState->Opcode));
 
 
@@ -278,7 +278,7 @@ AcpiExOpcode_2A_2T_1R (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE_STR ("ExOpcode_2A_2T_1R",
+    ACPI_FUNCTION_TRACE_STR (ExOpcode_2A_2T_1R,
         AcpiPsGetOpcodeName (WalkState->Opcode));
 
 
@@ -386,7 +386,7 @@ AcpiExOpcode_2A_1T_1R (
     ACPI_SIZE               Length;
 
 
-    ACPI_FUNCTION_TRACE_STR ("ExOpcode_2A_1T_1R",
+    ACPI_FUNCTION_TRACE_STR (ExOpcode_2A_1T_1R,
         AcpiPsGetOpcodeName (WalkState->Opcode));
 
 
@@ -504,7 +504,6 @@ AcpiExOpcode_2A_1T_1R (
         Index = Operand[1]->Integer.Value;
         ReturnDesc->Reference.Offset = (UINT32) Index;
         ReturnDesc->Reference.Opcode = AML_INDEX_OP;
-        ReturnDesc->Reference.Object = Operand[0];
 
         /*
          * At this point, the Source operand is a String, Buffer, or Package.
@@ -560,9 +559,10 @@ AcpiExOpcode_2A_1T_1R (
         }
 
         /*
-         * Add a reference to the target package/buffer/string for the life
+         * Save the target object and add a reference to it for the life
          * of the index
          */
+        ReturnDesc->Reference.Object = Operand[0];
         AcpiUtAddReference (Operand[0]);
 
         /* Store the reference to the Target */
@@ -640,7 +640,7 @@ AcpiExOpcode_2A_0T_1R (
     BOOLEAN                 LogicalResult = FALSE;
 
 
-    ACPI_FUNCTION_TRACE_STR ("ExOpcode_2A_0T_1R",
+    ACPI_FUNCTION_TRACE_STR (ExOpcode_2A_0T_1R,
         AcpiPsGetOpcodeName (WalkState->Opcode));
 
 

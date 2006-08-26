@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evrgnini- ACPI AddressSpace (OpRegion) init
- *              $Revision: 1.80 $
+ *              $Revision: 1.85 $
  *
  *****************************************************************************/
 
@@ -151,7 +151,7 @@ AcpiEvSystemMemoryRegionSetup (
     ACPI_MEM_SPACE_CONTEXT  *LocalRegionContext;
 
 
-    ACPI_FUNCTION_TRACE ("EvSystemMemoryRegionSetup");
+    ACPI_FUNCTION_TRACE (EvSystemMemoryRegionSetup);
 
 
     if (Function == ACPI_REGION_DEACTIVATE)
@@ -167,7 +167,7 @@ AcpiEvSystemMemoryRegionSetup (
                 AcpiOsUnmapMemory (LocalRegionContext->MappedLogicalAddress,
                     LocalRegionContext->MappedLength);
             }
-            ACPI_MEM_FREE (LocalRegionContext);
+            ACPI_FREE (LocalRegionContext);
             *RegionContext = NULL;
         }
         return_ACPI_STATUS (AE_OK);
@@ -175,7 +175,7 @@ AcpiEvSystemMemoryRegionSetup (
 
     /* Create a new context */
 
-    LocalRegionContext = ACPI_MEM_CALLOCATE (sizeof (ACPI_MEM_SPACE_CONTEXT));
+    LocalRegionContext = ACPI_ALLOCATE_ZEROED (sizeof (ACPI_MEM_SPACE_CONTEXT));
     if (!(LocalRegionContext))
     {
         return_ACPI_STATUS (AE_NO_MEMORY);
@@ -213,7 +213,7 @@ AcpiEvIoSpaceRegionSetup (
     void                    *HandlerContext,
     void                    **RegionContext)
 {
-    ACPI_FUNCTION_TRACE ("EvIoSpaceRegionSetup");
+    ACPI_FUNCTION_TRACE (EvIoSpaceRegionSetup);
 
 
     if (Function == ACPI_REGION_DEACTIVATE)
@@ -263,7 +263,7 @@ AcpiEvPciConfigRegionSetup (
     ACPI_DEVICE_ID          ObjectHID;
 
 
-    ACPI_FUNCTION_TRACE ("EvPciConfigRegionSetup");
+    ACPI_FUNCTION_TRACE (EvPciConfigRegionSetup);
 
 
     HandlerObj = RegionObj->Region.Handler;
@@ -283,7 +283,7 @@ AcpiEvPciConfigRegionSetup (
     {
         if (PciId)
         {
-            ACPI_MEM_FREE (PciId);
+            ACPI_FREE (PciId);
         }
         return_ACPI_STATUS (Status);
     }
@@ -370,7 +370,7 @@ AcpiEvPciConfigRegionSetup (
 
     /* Region is still not initialized. Create a new context */
 
-    PciId = ACPI_MEM_CALLOCATE (sizeof (ACPI_PCI_ID));
+    PciId = ACPI_ALLOCATE_ZEROED (sizeof (ACPI_PCI_ID));
     if (!PciId)
     {
         return_ACPI_STATUS (AE_NO_MEMORY);
@@ -446,7 +446,7 @@ AcpiEvPciBarRegionSetup (
     void                    *HandlerContext,
     void                    **RegionContext)
 {
-    ACPI_FUNCTION_TRACE ("EvPciBarRegionSetup");
+    ACPI_FUNCTION_TRACE (EvPciBarRegionSetup);
 
 
     return_ACPI_STATUS (AE_OK);
@@ -477,7 +477,7 @@ AcpiEvCmosRegionSetup (
     void                    *HandlerContext,
     void                    **RegionContext)
 {
-    ACPI_FUNCTION_TRACE ("EvCmosRegionSetup");
+    ACPI_FUNCTION_TRACE (EvCmosRegionSetup);
 
 
     return_ACPI_STATUS (AE_OK);
@@ -506,7 +506,7 @@ AcpiEvDefaultRegionSetup (
     void                    *HandlerContext,
     void                    **RegionContext)
 {
-    ACPI_FUNCTION_TRACE ("EvDefaultRegionSetup");
+    ACPI_FUNCTION_TRACE (EvDefaultRegionSetup);
 
 
     if (Function == ACPI_REGION_DEACTIVATE)
@@ -542,6 +542,9 @@ AcpiEvDefaultRegionSetup (
  *              a PCI address in the scope of the definition.  This address is
  *              required to perform an access to PCI config space.
  *
+ * MUTEX:       Interpreter should be unlocked, because we may run the _REG
+ *              method for this region.
+ *
  ******************************************************************************/
 
 ACPI_STATUS
@@ -559,7 +562,7 @@ AcpiEvInitializeRegion (
     ACPI_OPERAND_OBJECT     *RegionObj2;
 
 
-    ACPI_FUNCTION_TRACE_U32 ("EvInitializeRegion", AcpiNsLocked);
+    ACPI_FUNCTION_TRACE_U32 (EvInitializeRegion, AcpiNsLocked);
 
 
     if (!RegionObj)
@@ -590,8 +593,8 @@ AcpiEvInitializeRegion (
 
     /* Find any "_REG" method associated with this region definition */
 
-    Status = AcpiNsSearchNode (*RegNamePtr, Node,
-                                ACPI_TYPE_METHOD, &MethodNode);
+    Status = AcpiNsSearchOneScope (
+                *RegNamePtr, Node, ACPI_TYPE_METHOD, &MethodNode);
     if (ACPI_SUCCESS (Status))
     {
         /*

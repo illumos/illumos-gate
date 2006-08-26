@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsparse - namespace interface to AML parser
- *              $Revision: 1.11 $
+ *              $Revision: 1.12 $
  *
  *****************************************************************************/
 
@@ -149,7 +149,7 @@ AcpiNsOneCompleteParse (
     ACPI_WALK_STATE         *WalkState;
 
 
-    ACPI_FUNCTION_TRACE ("NsOneCompleteParse");
+    ACPI_FUNCTION_TRACE (NsOneCompleteParse);
 
 
     /* Create and init a Root Node */
@@ -210,7 +210,7 @@ AcpiNsParseTable (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("NsParseTable");
+    ACPI_FUNCTION_TRACE (NsParseTable);
 
 
     /*

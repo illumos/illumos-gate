@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exmisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 1.141 $
+ *              $Revision: 1.143 $
  *
  *****************************************************************************/
 
@@ -153,7 +153,7 @@ AcpiExGetObjectReference (
     ACPI_OPERAND_OBJECT     *ReferencedObj;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("ExGetObjectReference", ObjDesc);
+    ACPI_FUNCTION_TRACE_PTR (ExGetObjectReference, ObjDesc);
 
 
     *ReturnDesc = NULL;
@@ -258,7 +258,7 @@ AcpiExConcatTemplate (
     ACPI_SIZE               NewLength;
 
 
-    ACPI_FUNCTION_TRACE ("ExConcatTemplate");
+    ACPI_FUNCTION_TRACE (ExConcatTemplate);
 
 
     /*
@@ -347,7 +347,7 @@ AcpiExDoConcatenate (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("ExDoConcatenate");
+    ACPI_FUNCTION_TRACE (ExDoConcatenate);
 
 
     /*
@@ -557,11 +557,27 @@ AcpiExDoMathOp (
 
     case AML_SHIFT_LEFT_OP:         /* ShiftLeft (Operand, ShiftCount, Result)*/
 
+        /*
+         * We need to check if the shiftcount is larger than the integer bit
+         * width since the behavior of this is not well-defined in the C language.
+         */
+        if (Integer1 >= AcpiGbl_IntegerBitWidth)
+        {
+            return (0);
+        }
         return (Integer0 << Integer1);
 
 
     case AML_SHIFT_RIGHT_OP:        /* ShiftRight (Operand, ShiftCount, Result) */
 
+        /*
+         * We need to check if the shiftcount is larger than the integer bit
+         * width since the behavior of this is not well-defined in the C language.
+         */
+        if (Integer1 >= AcpiGbl_IntegerBitWidth)
+        {
+            return (0);
+        }
         return (Integer0 >> Integer1);
 
 
@@ -607,7 +623,7 @@ AcpiExDoLogicalNumericOp (
     BOOLEAN                 LocalResult = FALSE;
 
 
-    ACPI_FUNCTION_TRACE ("ExDoLogicalNumericOp");
+    ACPI_FUNCTION_TRACE (ExDoLogicalNumericOp);
 
 
     switch (Opcode)
@@ -683,7 +699,7 @@ AcpiExDoLogicalOp (
     int                     Compare;
 
 
-    ACPI_FUNCTION_TRACE ("ExDoLogicalOp");
+    ACPI_FUNCTION_TRACE (ExDoLogicalOp);
 
 
     /*

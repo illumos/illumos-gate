@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evevent - Fixed Event handling and dispatch
- *              $Revision: 1.121 $
+ *              $Revision: 1.122 $
  *
  *****************************************************************************/
 
@@ -150,7 +150,7 @@ AcpiEvInitializeEvents (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("EvInitializeEvents");
+    ACPI_FUNCTION_TRACE (EvInitializeEvents);
 
 
     /* Make sure we have ACPI tables */
@@ -208,7 +208,7 @@ AcpiEvInstallFadtGpes (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("EvInstallFadtGpes");
+    ACPI_FUNCTION_TRACE (EvInstallFadtGpes);
 
 
     /* Namespace must be locked */
@@ -253,7 +253,7 @@ AcpiEvInstallXruptHandlers (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("EvInstallXruptHandlers");
+    ACPI_FUNCTION_TRACE (EvInstallXruptHandlers);
 
 
     /* Install the SCI handler */
@@ -350,7 +350,7 @@ AcpiEvFixedEventDetect (
     ACPI_NATIVE_UINT        i;
 
 
-    ACPI_FUNCTION_NAME ("EvFixedEventDetect");
+    ACPI_FUNCTION_NAME (EvFixedEventDetect);
 
 
     /*

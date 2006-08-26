@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psparse - Parser top level AML parse routines
- *              $Revision: 1.163 $
+ *              $Revision: 1.168 $
  *
  *****************************************************************************/
 
@@ -224,7 +224,7 @@ AcpiPsCompleteThisOp (
     ACPI_PARSE_OBJECT       *ReplacementOp = NULL;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("PsCompleteThisOp", Op);
+    ACPI_FUNCTION_TRACE_PTR (PsCompleteThisOp, Op);
 
 
     /* Check for null Op, can happen if AML code is corrupt */
@@ -415,7 +415,7 @@ AcpiPsNextParseState (
     ACPI_STATUS             Status = AE_CTRL_PENDING;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("PsNextParseState", Op);
+    ACPI_FUNCTION_TRACE_PTR (PsNextParseState, Op);
 
 
     switch (CallbackStatus)
@@ -549,7 +549,7 @@ AcpiPsParseAml (
     ACPI_WALK_STATE         *PreviousWalkState;
 
 
-    ACPI_FUNCTION_TRACE ("PsParseAml");
+    ACPI_FUNCTION_TRACE (PsParseAml);
 
     ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
         "Entered with WalkState=%p Aml=%p size=%X\n",
@@ -562,10 +562,21 @@ AcpiPsParseAml (
     Thread = AcpiUtCreateThreadState ();
     if (!Thread)
     {
+        AcpiDsDeleteWalkState (WalkState);
         return_ACPI_STATUS (AE_NO_MEMORY);
     }
 
     WalkState->Thread = Thread;
+
+    /*
+     * If executing a method, the starting SyncLevel is this method's
+     * SyncLevel
+     */
+    if (WalkState->MethodDesc)
+    {
+        WalkState->Thread->CurrentSyncLevel = WalkState->MethodDesc->Method.SyncLevel;
+    }
+
     AcpiDsPushWalkState (WalkState, Thread);
 
     /*
@@ -603,6 +614,10 @@ AcpiPsParseAml (
              * Transfer control to the called control method
              */
             Status = AcpiDsCallControlMethod (Thread, WalkState, NULL);
+            if (ACPI_FAILURE (Status))
+            {
+                Status = AcpiDsMethodError (Status, WalkState);
+            }
 
             /*
              * If the transfer to the new method method call worked, a new walk
@@ -625,7 +640,7 @@ AcpiPsParseAml (
             /* Check for possible multi-thread reentrancy problem */
 
             if ((Status == AE_ALREADY_EXISTS) &&
-                (!WalkState->MethodDesc->Method.Semaphore))
+                (!WalkState->MethodDesc->Method.Mutex))
             {
                 /*
                  * Method tried to create an object twice. The probable cause is
@@ -637,7 +652,7 @@ AcpiPsParseAml (
                  * as Serialized.
                  */
                 WalkState->MethodDesc->Method.MethodFlags |= AML_METHOD_SERIALIZED;
-                WalkState->MethodDesc->Method.Concurrency = 1;
+                WalkState->MethodDesc->Method.SyncLevel = 0;
             }
         }
 
@@ -657,22 +672,7 @@ AcpiPsParseAml (
         if (((WalkState->ParseFlags & ACPI_PARSE_MODE_MASK) == ACPI_PARSE_EXECUTE) ||
             (ACPI_FAILURE (Status)))
         {
-            if (WalkState->MethodDesc)
-            {
-                /* Decrement the thread count on the method parse tree */
-
-                if (WalkState->MethodDesc->Method.ThreadCount)
-                {
-                    WalkState->MethodDesc->Method.ThreadCount--;
-                }
-                else
-                {
-                    ACPI_ERROR ((AE_INFO,
-                        "Invalid zero thread count in method"));
-                }
-            }
-
-            AcpiDsTerminateControlMethod (WalkState);
+            AcpiDsTerminateControlMethod (WalkState->MethodDesc, WalkState);
         }
 
         /* Delete this walk state and all linked control states */

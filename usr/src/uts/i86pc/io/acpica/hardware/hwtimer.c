@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: hwtimer.c - ACPI Power Management Timer Interface
- *              $Revision: 1.31 $
+ *              $Revision: 1.35 $
  *
  *****************************************************************************/
 
@@ -137,7 +137,7 @@ ACPI_STATUS
 AcpiGetTimerResolution (
     UINT32                  *Resolution)
 {
-    ACPI_FUNCTION_TRACE ("AcpiGetTimerResolution");
+    ACPI_FUNCTION_TRACE (AcpiGetTimerResolution);
 
 
     if (!Resolution)
@@ -145,7 +145,7 @@ AcpiGetTimerResolution (
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
-    if (0 == AcpiGbl_FADT->TmrValExt)
+    if (AcpiGbl_FADT->TmrValExt == 0)
     {
         *Resolution = 24;
     }
@@ -156,6 +156,8 @@ AcpiGetTimerResolution (
 
     return_ACPI_STATUS (AE_OK);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiGetTimerResolution)
 
 
 /******************************************************************************
@@ -177,7 +179,7 @@ AcpiGetTimer (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiGetTimer");
+    ACPI_FUNCTION_TRACE (AcpiGetTimer);
 
 
     if (!Ticks)
@@ -189,6 +191,8 @@ AcpiGetTimer (
 
     return_ACPI_STATUS (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiGetTimer)
 
 
 /******************************************************************************
@@ -231,7 +235,7 @@ AcpiGetTimerDuration (
     ACPI_INTEGER            Quotient;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiGetTimerDuration");
+    ACPI_FUNCTION_TRACE (AcpiGetTimerDuration);
 
 
     if (!TimeElapsed)
@@ -249,7 +253,7 @@ AcpiGetTimerDuration (
     }
     else if (StartTicks > EndTicks)
     {
-        if (0 == AcpiGbl_FADT->TmrValExt)
+        if (AcpiGbl_FADT->TmrValExt == 0)
         {
             /* 24-bit Timer */
 
@@ -280,4 +284,5 @@ AcpiGetTimerDuration (
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiGetTimerDuration)
 

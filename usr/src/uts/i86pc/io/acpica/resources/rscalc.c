@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rscalc - Calculate stream and list lengths
- *              $Revision: 1.75 $
+ *              $Revision: 1.79 $
  *
  ******************************************************************************/
 
@@ -288,7 +288,7 @@ AcpiRsGetAmlLength (
     ACPI_RS_LENGTH          TotalSize;
 
 
-    ACPI_FUNCTION_TRACE ("RsGetAmlLength");
+    ACPI_FUNCTION_TRACE (RsGetAmlLength);
 
 
     /* Traverse entire list of internal resource descriptors */
@@ -447,7 +447,7 @@ AcpiRsGetListLength (
     UINT8                   MinimumAmlResourceLength;
 
 
-    ACPI_FUNCTION_TRACE ("RsGetListLength");
+    ACPI_FUNCTION_TRACE (RsGetListLength);
 
 
     *SizeNeeded = 0;
@@ -537,7 +537,7 @@ AcpiRsGetListLength (
              * included in the minimum descriptor size (reason for the -1)
              */
             ExtraStructBytes = (Buffer[1] - 1) * sizeof (UINT32);
-                
+
             /* Add the size of the optional ResourceSource */
 
             ExtraStructBytes += AcpiRsStreamOptionLength (
@@ -557,17 +557,17 @@ AcpiRsGetListLength (
          */
         BufferSize = AcpiGbl_ResourceStructSizes[ResourceIndex] +
                         ExtraStructBytes;
-        BufferSize = ACPI_ROUND_UP_TO_NATIVE_WORD (BufferSize);
+        BufferSize = (UINT32) ACPI_ROUND_UP_TO_NATIVE_WORD (BufferSize);
 
         *SizeNeeded += BufferSize;
 
         ACPI_DEBUG_PRINT ((ACPI_DB_RESOURCES,
-            "Type %.2X, Aml %.2X internal %.2X\n", 
+            "Type %.2X, AmlLength %.2X InternalLength %.2X\n",
             AcpiUtGetResourceType (AmlBuffer),
             AcpiUtGetDescriptorLength (AmlBuffer), BufferSize));
 
         /*
-         * Point to the next resource within the AML stream using the length 
+         * Point to the next resource within the AML stream using the length
          * contained in the resource descriptor header
          */
         AmlBuffer += AcpiUtGetDescriptorLength (AmlBuffer);
@@ -611,7 +611,7 @@ AcpiRsGetPciRoutingTableLength (
     UINT32                  TableIndex;
 
 
-    ACPI_FUNCTION_TRACE ("RsGetPciRoutingTableLength");
+    ACPI_FUNCTION_TRACE (RsGetPciRoutingTableLength);
 
 
     NumberOfElements = PackageObject->Package.Count;

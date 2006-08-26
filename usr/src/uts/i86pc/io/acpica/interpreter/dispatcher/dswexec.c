@@ -2,7 +2,7 @@
  *
  * Module Name: dswexec - Dispatcher method execution callbacks;
  *                        dispatch to interpreter.
- *              $Revision: 1.125 $
+ *              $Revision: 1.130 $
  *
  *****************************************************************************/
 
@@ -124,7 +124,6 @@
 #include "acinterp.h"
 #include "acnamesp.h"
 #include "acdebug.h"
-#include "acdisasm.h"
 
 
 #define _COMPONENT          ACPI_DISPATCHER
@@ -133,19 +132,21 @@
 /*
  * Dispatch table for opcode classes
  */
-static ACPI_EXECUTE_OP      AcpiGbl_OpTypeDispatch [] = {
-                                AcpiExOpcode_0A_0T_1R,
-                                AcpiExOpcode_1A_0T_0R,
-                                AcpiExOpcode_1A_0T_1R,
-                                AcpiExOpcode_1A_1T_0R,
-                                AcpiExOpcode_1A_1T_1R,
-                                AcpiExOpcode_2A_0T_0R,
-                                AcpiExOpcode_2A_0T_1R,
-                                AcpiExOpcode_2A_1T_1R,
-                                AcpiExOpcode_2A_2T_1R,
-                                AcpiExOpcode_3A_0T_0R,
-                                AcpiExOpcode_3A_1T_1R,
-                                AcpiExOpcode_6A_0T_1R};
+static ACPI_EXECUTE_OP      AcpiGbl_OpTypeDispatch [] =
+{
+    AcpiExOpcode_0A_0T_1R,
+    AcpiExOpcode_1A_0T_0R,
+    AcpiExOpcode_1A_0T_1R,
+    AcpiExOpcode_1A_1T_0R,
+    AcpiExOpcode_1A_1T_1R,
+    AcpiExOpcode_2A_0T_0R,
+    AcpiExOpcode_2A_0T_1R,
+    AcpiExOpcode_2A_1T_1R,
+    AcpiExOpcode_2A_2T_1R,
+    AcpiExOpcode_3A_0T_0R,
+    AcpiExOpcode_3A_1T_1R,
+    AcpiExOpcode_6A_0T_1R
+};
 
 
 /*****************************************************************************
@@ -171,7 +172,7 @@ AcpiDsGetPredicateValue (
     ACPI_OPERAND_OBJECT     *LocalObjDesc = NULL;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("DsGetPredicateValue", WalkState);
+    ACPI_FUNCTION_TRACE_PTR (DsGetPredicateValue, WalkState);
 
 
     WalkState->ControlState->Common.State = 0;
@@ -305,7 +306,7 @@ AcpiDsExecBeginOp (
     UINT32                  OpcodeClass;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("DsExecBeginOp", WalkState);
+    ACPI_FUNCTION_TRACE_PTR (DsExecBeginOp, WalkState);
 
 
     Op = WalkState->Op;
@@ -394,7 +395,7 @@ AcpiDsExecBeginOp (
 
     case AML_CLASS_NAMED_OBJECT:
 
-        if (WalkState->WalkType == ACPI_WALK_METHOD)
+        if (WalkState->WalkType & ACPI_WALK_METHOD)
         {
             /*
              * Found a named object declaration during method execution;
@@ -415,10 +416,10 @@ AcpiDsExecBeginOp (
     case AML_CLASS_EXECUTE:
     case AML_CLASS_CREATE:
         /*
-         * Most operators with arguments.
+         * Most operators with arguments (except CreateXxxField operators)
          * Start a new result/operand state
          */
-        if (WalkState->Opcode != AML_CREATE_FIELD_OP)
+        if (WalkState->OpInfo->ObjectType != ACPI_TYPE_BUFFER_FIELD)
         {
             Status = AcpiDsResultStackPush (WalkState);
         }
@@ -461,7 +462,7 @@ AcpiDsExecEndOp (
     ACPI_PARSE_OBJECT       *FirstArg;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("DsExecEndOp", WalkState);
+    ACPI_FUNCTION_TRACE_PTR (DsExecEndOp, WalkState);
 
 
     Op      = WalkState->Op;
@@ -579,7 +580,6 @@ AcpiDsExecEndOp (
         {
             Status = AcpiDsResultPush (WalkState->ResultObj, WalkState);
         }
-
         break;
 
 
@@ -623,6 +623,7 @@ AcpiDsExecEndOp (
             {
                 ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
                     "Method Reference in a Package, Op=%p\n", Op));
+
                 Op->Common.Node = (ACPI_NAMESPACE_NODE *) Op->Asl.Value.Arg->Asl.Node->Object;
                 AcpiUtAddReference (Op->Asl.Value.Arg->Asl.Node->Object);
                 return_ACPI_STATUS (AE_OK);
@@ -775,7 +776,6 @@ AcpiDsExecEndOp (
 
                 Status = AcpiDsResultStackPop (WalkState);
             }
-
             break;
 
 
@@ -815,7 +815,6 @@ AcpiDsExecEndOp (
      * Check if we just completed the evaluation of a
      * conditional predicate
      */
-
     if ((ACPI_SUCCESS (Status)) &&
         (WalkState->ControlState) &&
         (WalkState->ControlState->Common.State ==

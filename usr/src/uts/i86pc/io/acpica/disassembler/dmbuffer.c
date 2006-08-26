@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dmbuffer - AML disassembler, buffer and string support
- *              $Revision: 1.20 $
+ *              $Revision: 1.22 $
  *
  ******************************************************************************/
 
@@ -156,6 +156,11 @@ AcpiDmDisasmByteList (
     UINT32                  i;
 
 
+    if (!ByteCount)
+    {
+        return;
+    }
+
     AcpiDmIndent (Level);
 
     /* Dump the byte list */
@@ -221,7 +226,7 @@ AcpiDmByteList (
     {
     case ACPI_DASM_RESOURCE:
 
-        AcpiDmResourceTemplate (Info, ByteData, ByteCount);
+        AcpiDmResourceTemplate (Info, Op->Common.Parent, ByteData, ByteCount);
         break;
 
     case ACPI_DASM_STRING:
@@ -460,7 +465,7 @@ AcpiDmIsEisaId (
 
     /* We are looking for _HID */
 
-    if (ACPI_STRNCMP ((char *) &Name, METHOD_NAME__HID, 4))
+    if (!ACPI_COMPARE_NAME (&Name, METHOD_NAME__HID))
     {
         return;
     }

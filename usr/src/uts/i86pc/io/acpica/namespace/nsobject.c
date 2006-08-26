@@ -2,7 +2,7 @@
  *
  * Module Name: nsobject - Utilities for objects attached to namespace
  *                         table entries
- *              $Revision: 1.96 $
+ *              $Revision: 1.97 $
  *
  ******************************************************************************/
 
@@ -158,7 +158,7 @@ AcpiNsAttachObject (
     ACPI_OBJECT_TYPE        ObjectType = ACPI_TYPE_ANY;
 
 
-    ACPI_FUNCTION_TRACE ("NsAttachObject");
+    ACPI_FUNCTION_TRACE (NsAttachObject);
 
 
     /*
@@ -298,7 +298,7 @@ AcpiNsDetachObject (
     ACPI_OPERAND_OBJECT     *ObjDesc;
 
 
-    ACPI_FUNCTION_TRACE ("NsDetachObject");
+    ACPI_FUNCTION_TRACE (NsDetachObject);
 
 
     ObjDesc = Node->Object;
@@ -353,7 +353,7 @@ ACPI_OPERAND_OBJECT *
 AcpiNsGetAttachedObject (
     ACPI_NAMESPACE_NODE     *Node)
 {
-    ACPI_FUNCTION_TRACE_PTR ("NsGetAttachedObject", Node);
+    ACPI_FUNCTION_TRACE_PTR (NsGetAttachedObject, Node);
 
 
     if (!Node)
@@ -391,7 +391,7 @@ ACPI_OPERAND_OBJECT *
 AcpiNsGetSecondaryObject (
     ACPI_OPERAND_OBJECT     *ObjDesc)
 {
-    ACPI_FUNCTION_TRACE_PTR ("NsGetSecondaryObject", ObjDesc);
+    ACPI_FUNCTION_TRACE_PTR (NsGetSecondaryObject, ObjDesc);
 
 
     if ((!ObjDesc)                                                ||

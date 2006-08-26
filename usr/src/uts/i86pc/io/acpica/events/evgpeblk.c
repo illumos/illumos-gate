@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evgpeblk - GPE block creation and initialization.
- *              $Revision: 1.53 $
+ *              $Revision: 1.56 $
  *
  *****************************************************************************/
 
@@ -231,7 +231,7 @@ AcpiEvWalkGpeList (
     ACPI_CPU_FLAGS          Flags;
 
 
-    ACPI_FUNCTION_TRACE ("EvWalkGpeList");
+    ACPI_FUNCTION_TRACE (EvWalkGpeList);
 
 
     Flags = AcpiOsAcquireLock (AcpiGbl_GpeLock);
@@ -290,7 +290,7 @@ AcpiEvDeleteGpeHandlers (
     ACPI_NATIVE_UINT        j;
 
 
-    ACPI_FUNCTION_TRACE ("EvDeleteGpeHandlers");
+    ACPI_FUNCTION_TRACE (EvDeleteGpeHandlers);
 
 
     /* Examine each GPE Register within the block */
@@ -306,7 +306,7 @@ AcpiEvDeleteGpeHandlers (
             if ((GpeEventInfo->Flags & ACPI_GPE_DISPATCH_MASK) ==
                     ACPI_GPE_DISPATCH_HANDLER)
             {
-                ACPI_MEM_FREE (GpeEventInfo->Dispatch.Handler);
+                ACPI_FREE (GpeEventInfo->Dispatch.Handler);
                 GpeEventInfo->Dispatch.Handler = NULL;
                 GpeEventInfo->Flags &= ~ACPI_GPE_DISPATCH_MASK;
             }
@@ -354,7 +354,7 @@ AcpiEvSaveMethodInfo (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("EvSaveMethodInfo");
+    ACPI_FUNCTION_TRACE (EvSaveMethodInfo);
 
 
     /*
@@ -386,8 +386,8 @@ AcpiEvSaveMethodInfo (
     default:
         /* Unknown method type, just ignore it! */
 
-        ACPI_ERROR ((AE_INFO,
-            "Unknown GPE method type: %s (name not of form _Lxx or _Exx)",
+        ACPI_DEBUG_PRINT ((ACPI_DB_LOAD,
+            "Ignoring unknown GPE method type: %s (name not of form _Lxx or _Exx)",
             Name));
         return_ACPI_STATUS (AE_OK);
     }
@@ -399,7 +399,7 @@ AcpiEvSaveMethodInfo (
     {
         /* Conversion failed; invalid method, just ignore it */
 
-        ACPI_ERROR ((AE_INFO,
+        ACPI_DEBUG_PRINT ((ACPI_DB_LOAD,
             "Could not extract GPE number from name: %s (name is not of form _Lxx or _Exx)",
             Name));
         return_ACPI_STATUS (AE_OK);
@@ -474,7 +474,7 @@ AcpiEvMatchPrwAndGpe (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("EvMatchPrwAndGpe");
+    ACPI_FUNCTION_TRACE (EvMatchPrwAndGpe);
 
 
     /* Check for a _PRW method under this device */
@@ -596,7 +596,7 @@ AcpiEvGetGpeXruptBlock (
     ACPI_CPU_FLAGS          Flags;
 
 
-    ACPI_FUNCTION_TRACE ("EvGetGpeXruptBlock");
+    ACPI_FUNCTION_TRACE (EvGetGpeXruptBlock);
 
 
     /* No need for lock since we are not changing any list elements here */
@@ -614,7 +614,7 @@ AcpiEvGetGpeXruptBlock (
 
     /* Not found, must allocate a new xrupt descriptor */
 
-    GpeXrupt = ACPI_MEM_CALLOCATE (sizeof (ACPI_GPE_XRUPT_INFO));
+    GpeXrupt = ACPI_ALLOCATE_ZEROED (sizeof (ACPI_GPE_XRUPT_INFO));
     if (!GpeXrupt)
     {
         return_PTR (NULL);
@@ -682,7 +682,7 @@ AcpiEvDeleteGpeXrupt (
     ACPI_CPU_FLAGS          Flags;
 
 
-    ACPI_FUNCTION_TRACE ("EvDeleteGpeXrupt");
+    ACPI_FUNCTION_TRACE (EvDeleteGpeXrupt);
 
 
     /* We never want to remove the SCI interrupt handler */
@@ -718,7 +718,7 @@ AcpiEvDeleteGpeXrupt (
 
     /* Free the block */
 
-    ACPI_MEM_FREE (GpeXrupt);
+    ACPI_FREE (GpeXrupt);
     return_ACPI_STATUS (AE_OK);
 }
 
@@ -747,7 +747,7 @@ AcpiEvInstallGpeBlock (
     ACPI_CPU_FLAGS          Flags;
 
 
-    ACPI_FUNCTION_TRACE ("EvInstallGpeBlock");
+    ACPI_FUNCTION_TRACE (EvInstallGpeBlock);
 
 
     Status = AcpiUtAcquireMutex (ACPI_MTX_EVENTS);
@@ -812,7 +812,7 @@ AcpiEvDeleteGpeBlock (
     ACPI_CPU_FLAGS          Flags;
 
 
-    ACPI_FUNCTION_TRACE ("EvInstallGpeBlock");
+    ACPI_FUNCTION_TRACE (EvInstallGpeBlock);
 
 
     Status = AcpiUtAcquireMutex (ACPI_MTX_EVENTS);
@@ -858,9 +858,9 @@ AcpiEvDeleteGpeBlock (
 
     /* Free the GpeBlock */
 
-    ACPI_MEM_FREE (GpeBlock->RegisterInfo);
-    ACPI_MEM_FREE (GpeBlock->EventInfo);
-    ACPI_MEM_FREE (GpeBlock);
+    ACPI_FREE (GpeBlock->RegisterInfo);
+    ACPI_FREE (GpeBlock->EventInfo);
+    ACPI_FREE (GpeBlock);
 
 UnlockAndExit:
     Status = AcpiUtReleaseMutex (ACPI_MTX_EVENTS);
@@ -893,12 +893,12 @@ AcpiEvCreateGpeInfoBlocks (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("EvCreateGpeInfoBlocks");
+    ACPI_FUNCTION_TRACE (EvCreateGpeInfoBlocks);
 
 
     /* Allocate the GPE register information block */
 
-    GpeRegisterInfo = ACPI_MEM_CALLOCATE (
+    GpeRegisterInfo = ACPI_ALLOCATE_ZEROED (
                             (ACPI_SIZE) GpeBlock->RegisterCount *
                             sizeof (ACPI_GPE_REGISTER_INFO));
     if (!GpeRegisterInfo)
@@ -912,7 +912,7 @@ AcpiEvCreateGpeInfoBlocks (
      * Allocate the GPE EventInfo block. There are eight distinct GPEs
      * per register. Initialization to zeros is sufficient.
      */
-    GpeEventInfo = ACPI_MEM_CALLOCATE (
+    GpeEventInfo = ACPI_ALLOCATE_ZEROED (
                         ((ACPI_SIZE) GpeBlock->RegisterCount *
                         ACPI_GPE_REGISTER_WIDTH) *
                         sizeof (ACPI_GPE_EVENT_INFO));
@@ -997,11 +997,11 @@ AcpiEvCreateGpeInfoBlocks (
 ErrorExit:
     if (GpeRegisterInfo)
     {
-        ACPI_MEM_FREE (GpeRegisterInfo);
+        ACPI_FREE (GpeRegisterInfo);
     }
     if (GpeEventInfo)
     {
-        ACPI_MEM_FREE (GpeEventInfo);
+        ACPI_FREE (GpeEventInfo);
     }
 
     return_ACPI_STATUS (Status);
@@ -1040,7 +1040,7 @@ AcpiEvCreateGpeBlock (
     ACPI_GPE_BLOCK_INFO     *GpeBlock;
 
 
-    ACPI_FUNCTION_TRACE ("EvCreateGpeBlock");
+    ACPI_FUNCTION_TRACE (EvCreateGpeBlock);
 
 
     if (!RegisterCount)
@@ -1050,7 +1050,7 @@ AcpiEvCreateGpeBlock (
 
     /* Allocate a new GPE block */
 
-    GpeBlock = ACPI_MEM_CALLOCATE (sizeof (ACPI_GPE_BLOCK_INFO));
+    GpeBlock = ACPI_ALLOCATE_ZEROED (sizeof (ACPI_GPE_BLOCK_INFO));
     if (!GpeBlock)
     {
         return_ACPI_STATUS (AE_NO_MEMORY);
@@ -1072,7 +1072,7 @@ AcpiEvCreateGpeBlock (
     Status = AcpiEvCreateGpeInfoBlocks (GpeBlock);
     if (ACPI_FAILURE (Status))
     {
-        ACPI_MEM_FREE (GpeBlock);
+        ACPI_FREE (GpeBlock);
         return_ACPI_STATUS (Status);
     }
 
@@ -1081,7 +1081,7 @@ AcpiEvCreateGpeBlock (
     Status = AcpiEvInstallGpeBlock (GpeBlock, InterruptNumber);
     if (ACPI_FAILURE (Status))
     {
-        ACPI_MEM_FREE (GpeBlock);
+        ACPI_FREE (GpeBlock);
         return_ACPI_STATUS (Status);
     }
 
@@ -1141,7 +1141,7 @@ AcpiEvInitializeGpeBlock (
     ACPI_NATIVE_UINT        j;
 
 
-    ACPI_FUNCTION_TRACE ("EvInitializeGpeBlock");
+    ACPI_FUNCTION_TRACE (EvInitializeGpeBlock);
 
 
     /* Ignore a null GPE block (e.g., if no GPE block 1 exists) */
@@ -1242,7 +1242,7 @@ AcpiEvGpeInitialize (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("EvGpeInitialize");
+    ACPI_FUNCTION_TRACE (EvGpeInitialize);
 
 
     Status = AcpiUtAcquireMutex (ACPI_MTX_NAMESPACE);

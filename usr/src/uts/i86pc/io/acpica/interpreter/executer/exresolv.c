@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresolv - AML Interpreter object resolution
- *              $Revision: 1.136 $
+ *              $Revision: 1.139 $
  *
  *****************************************************************************/
 
@@ -159,7 +159,7 @@ AcpiExResolveToValue (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("ExResolveToValue", StackPtr);
+    ACPI_FUNCTION_TRACE_PTR (ExResolveToValue, StackPtr);
 
 
     if (!StackPtr || !*StackPtr)
@@ -234,7 +234,7 @@ AcpiExResolveObjectToValue (
     UINT16                  Opcode;
 
 
-    ACPI_FUNCTION_TRACE ("ExResolveObjectToValue");
+    ACPI_FUNCTION_TRACE (ExResolveObjectToValue);
 
 
     StackDesc = *StackPtr;
@@ -354,10 +354,23 @@ AcpiExResolveObjectToValue (
 
         case AML_INT_NAMEPATH_OP:   /* Reference to a named object */
 
-            /* Get the object pointed to by the namespace node */
+            /* Dereference the name */
 
-            *StackPtr = (StackDesc->Reference.Node)->Object;
-            AcpiUtAddReference (*StackPtr);
+            if ((StackDesc->Reference.Node->Type == ACPI_TYPE_DEVICE) ||
+                (StackDesc->Reference.Node->Type == ACPI_TYPE_THERMAL))
+            {
+                /* These node types do not have 'real' subobjects */
+
+                *StackPtr = (void *) StackDesc->Reference.Node;
+            }
+            else
+            {
+                /* Get the object pointed to by the namespace node */
+
+                *StackPtr = (StackDesc->Reference.Node)->Object;
+                AcpiUtAddReference (*StackPtr);
+            }
+
             AcpiUtRemoveReference (StackDesc);
             break;
 
@@ -435,7 +448,7 @@ AcpiExResolveMultiple (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiExResolveMultiple");
+    ACPI_FUNCTION_TRACE (AcpiExResolveMultiple);
 
 
     /* Operand can be either a namespace node or an operand descriptor */

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxfevnt - External Interfaces, ACPI event disable/enable
- *              $Revision: 1.86 $
+ *              $Revision: 1.88 $
  *
  *****************************************************************************/
 
@@ -144,10 +144,10 @@ AcpiEnable (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiEnable");
+    ACPI_FUNCTION_TRACE (AcpiEnable);
 
 
-    /* Make sure we have the FADT*/
+    /* Make sure we have the FADT */
 
     if (!AcpiGbl_FADT)
     {
@@ -177,6 +177,8 @@ AcpiEnable (
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiEnable)
+
 
 /*******************************************************************************
  *
@@ -197,7 +199,7 @@ AcpiDisable (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiDisable");
+    ACPI_FUNCTION_TRACE (AcpiDisable);
 
 
     if (!AcpiGbl_FADT)
@@ -230,6 +232,8 @@ AcpiDisable (
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiDisable)
+
 
 /*******************************************************************************
  *
@@ -253,7 +257,7 @@ AcpiEnableEvent (
     UINT32                  Value;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiEnableEvent");
+    ACPI_FUNCTION_TRACE (AcpiEnableEvent);
 
 
     /* Decode the Fixed Event */
@@ -293,6 +297,8 @@ AcpiEnableEvent (
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiEnableEvent)
+
 
 /*******************************************************************************
  *
@@ -318,7 +324,7 @@ AcpiSetGpeType (
     ACPI_GPE_EVENT_INFO     *GpeEventInfo;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiSetGpeType");
+    ACPI_FUNCTION_TRACE (AcpiSetGpeType);
 
 
     /* Ensure that we have a valid GPE number */
@@ -342,6 +348,8 @@ AcpiSetGpeType (
 UnlockAndExit:
     return_ACPI_STATUS (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiSetGpeType)
 
 
 /*******************************************************************************
@@ -369,7 +377,7 @@ AcpiEnableGpe (
     ACPI_GPE_EVENT_INFO     *GpeEventInfo;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiEnableGpe");
+    ACPI_FUNCTION_TRACE (AcpiEnableGpe);
 
 
     /* Use semaphore lock if not executing at interrupt level */
@@ -404,6 +412,8 @@ UnlockAndExit:
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiEnableGpe)
+
 
 /*******************************************************************************
  *
@@ -430,7 +440,7 @@ AcpiDisableGpe (
     ACPI_GPE_EVENT_INFO     *GpeEventInfo;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiDisableGpe");
+    ACPI_FUNCTION_TRACE (AcpiDisableGpe);
 
 
     /* Use semaphore lock if not executing at interrupt level */
@@ -463,6 +473,8 @@ UnlockAndExit:
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiDisableGpe)
+
 
 /*******************************************************************************
  *
@@ -486,7 +498,7 @@ AcpiDisableEvent (
     UINT32                  Value;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiDisableEvent");
+    ACPI_FUNCTION_TRACE (AcpiDisableEvent);
 
 
     /* Decode the Fixed Event */
@@ -524,6 +536,8 @@ AcpiDisableEvent (
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiDisableEvent)
+
 
 /*******************************************************************************
  *
@@ -544,7 +558,7 @@ AcpiClearEvent (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiClearEvent");
+    ACPI_FUNCTION_TRACE (AcpiClearEvent);
 
 
     /* Decode the Fixed Event */
@@ -563,6 +577,8 @@ AcpiClearEvent (
 
     return_ACPI_STATUS (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiClearEvent)
 
 
 /*******************************************************************************
@@ -589,7 +605,7 @@ AcpiClearGpe (
     ACPI_GPE_EVENT_INFO     *GpeEventInfo;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiClearGpe");
+    ACPI_FUNCTION_TRACE (AcpiClearGpe);
 
 
     /* Use semaphore lock if not executing at interrupt level */
@@ -622,6 +638,8 @@ UnlockAndExit:
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiClearGpe)
+
 
 /*******************************************************************************
  *
@@ -645,7 +663,7 @@ AcpiGetEventStatus (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiGetEventStatus");
+    ACPI_FUNCTION_TRACE (AcpiGetEventStatus);
 
 
     if (!EventStatus)
@@ -667,6 +685,8 @@ AcpiGetEventStatus (
 
     return_ACPI_STATUS (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiGetEventStatus)
 
 
 /*******************************************************************************
@@ -696,7 +716,7 @@ AcpiGetGpeStatus (
     ACPI_GPE_EVENT_INFO     *GpeEventInfo;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiGetGpeStatus");
+    ACPI_FUNCTION_TRACE (AcpiGetGpeStatus);
 
 
     /* Use semaphore lock if not executing at interrupt level */
@@ -731,6 +751,8 @@ UnlockAndExit:
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiGetGpeStatus)
+
 
 /*******************************************************************************
  *
@@ -760,7 +782,7 @@ AcpiInstallGpeBlock (
     ACPI_GPE_BLOCK_INFO     *GpeBlock;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiInstallGpeBlock");
+    ACPI_FUNCTION_TRACE (AcpiInstallGpeBlock);
 
 
     if ((!GpeDevice)       ||
@@ -838,6 +860,8 @@ UnlockAndExit:
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiInstallGpeBlock)
+
 
 /*******************************************************************************
  *
@@ -860,7 +884,7 @@ AcpiRemoveGpeBlock (
     ACPI_NAMESPACE_NODE     *Node;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiRemoveGpeBlock");
+    ACPI_FUNCTION_TRACE (AcpiRemoveGpeBlock);
 
 
     if (!GpeDevice)
@@ -902,4 +926,6 @@ UnlockAndExit:
     (void) AcpiUtReleaseMutex (ACPI_MTX_NAMESPACE);
     return_ACPI_STATUS (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiRemoveGpeBlock)
 

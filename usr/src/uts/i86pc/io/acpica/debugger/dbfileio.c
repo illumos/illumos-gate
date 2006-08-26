@@ -2,7 +2,7 @@
  *
  * Module Name: dbfileio - Debugger file I/O commands.  These can't usually
  *              be used when running the debugger in Ring 0 (Kernel mode)
- *              $Revision: 1.87 $
+ *              $Revision: 1.92 $
  *
  ******************************************************************************/
 
@@ -120,6 +120,7 @@
 #include "acdebug.h"
 #include "acnamesp.h"
 #include "actables.h"
+#include "acdisasm.h"
 
 #if (defined ACPI_DEBUGGER || defined ACPI_DISASSEMBLER)
 
@@ -276,6 +277,11 @@ AcpiDbCheckTextModeCorruption (
         }
     }
 
+    if (!Pairs)
+    {
+        return (AE_OK);
+    }
+
     /*
      * Entire table scanned, each CR is part of a CR/LF pair --
      * meaning that the table was treated as a text file somewhere.
@@ -315,61 +321,93 @@ AcpiDbReadTable (
     UINT32                  Actual;
     ACPI_STATUS             Status;
     UINT32                  FileSize;
+    BOOLEAN                 StandardHeader = TRUE;
 
+
+    /* Get the file size */
 
     fseek (fp, 0, SEEK_END);
     FileSize = (UINT32) ftell (fp);
     fseek (fp, 0, SEEK_SET);
 
+    if (FileSize < 4)
+    {
+        return (AE_BAD_HEADER);
+    }
+
+    /* Read the signature */
+
+    if (fread (&TableHeader, 1, 4, fp) != 4)
+    {
+        AcpiOsPrintf ("Could not read the table signature\n");
+        return (AE_BAD_HEADER);
+    }
+
+    fseek (fp, 0, SEEK_SET);
+
+    /* The RSDT and FACS tables do not have standard ACPI headers */
+
+    if (ACPI_COMPARE_NAME (TableHeader.Signature, "RSD ") ||
+        ACPI_COMPARE_NAME (TableHeader.Signature, "FACS"))
+    {
+        *TableLength = FileSize;
+        StandardHeader = FALSE;
+    }
+    else
+    {
     /* Read the table header */
 
-    if (fread (&TableHeader, 1, sizeof (TableHeader), fp) !=
-            sizeof (ACPI_TABLE_HEADER))
-    {
-        AcpiOsPrintf ("Could not read the table header\n");
-        return (AE_BAD_HEADER);
-    }
+        if (fread (&TableHeader, 1, sizeof (TableHeader), fp) !=
+                sizeof (ACPI_TABLE_HEADER))
+        {
+            AcpiOsPrintf ("Could not read the table header\n");
+            return (AE_BAD_HEADER);
+        }
 
-    /* Validate the table header/length */
+        /* Validate the table header/length */
 
-    Status = AcpiTbValidateTableHeader (&TableHeader);
-    if (ACPI_FAILURE (Status))
-    {
-        AcpiOsPrintf ("Table header is invalid!\n");
-        return (Status);
-    }
+        Status = AcpiTbValidateTableHeader (&TableHeader);
+        if (ACPI_FAILURE (Status))
+        {
+            AcpiOsPrintf ("Table header is invalid!\n");
+            return (Status);
+        }
 
-    /* File size must be at least as long as the Header-specified length */
+        /* File size must be at least as long as the Header-specified length */
 
-    if (TableHeader.Length > FileSize)
-    {
-        AcpiOsPrintf (
-            "TableHeader length [0x%X] greater than the input file size [0x%X]\n",
-            TableHeader.Length, FileSize);
-        return (AE_BAD_HEADER);
-    }
+        if (TableHeader.Length > FileSize)
+        {
+            AcpiOsPrintf (
+                "TableHeader length [0x%X] greater than the input file size [0x%X]\n",
+                TableHeader.Length, FileSize);
+            return (AE_BAD_HEADER);
+        }
 
-    /* We only support a limited number of table types */
+#ifdef ACPI_OBSOLETE_CODE
+        /* We only support a limited number of table types */
 
-    if (ACPI_STRNCMP ((char *) TableHeader.Signature, DSDT_SIG, 4) &&
-        ACPI_STRNCMP ((char *) TableHeader.Signature, PSDT_SIG, 4) &&
-        ACPI_STRNCMP ((char *) TableHeader.Signature, SSDT_SIG, 4))
-    {
-        AcpiOsPrintf ("Table signature [%4.4s] is invalid or not supported\n",
-            (char *) TableHeader.Signature);
-        ACPI_DUMP_BUFFER (&TableHeader, sizeof (ACPI_TABLE_HEADER));
-        return (AE_ERROR);
+        if (ACPI_STRNCMP ((char *) TableHeader.Signature, DSDT_SIG, 4) &&
+            ACPI_STRNCMP ((char *) TableHeader.Signature, PSDT_SIG, 4) &&
+            ACPI_STRNCMP ((char *) TableHeader.Signature, SSDT_SIG, 4))
+        {
+            AcpiOsPrintf ("Table signature [%4.4s] is invalid or not supported\n",
+                (char *) TableHeader.Signature);
+            ACPI_DUMP_BUFFER (&TableHeader, sizeof (ACPI_TABLE_HEADER));
+            return (AE_ERROR);
+        }
+#endif
+
+        *TableLength = TableHeader.Length;
     }
 
     /* Allocate a buffer for the table */
 
-    *TableLength = TableHeader.Length;
-    *Table = AcpiOsAllocate ((size_t) (FileSize));
+    *Table = AcpiOsAllocate ((size_t) FileSize);
     if (!*Table)
     {
         AcpiOsPrintf (
             "Could not allocate memory for ACPI table %4.4s (size=0x%X)\n",
-            TableHeader.Signature, TableHeader.Length);
+            TableHeader.Signature, *TableLength);
         return (AE_NO_MEMORY);
     }
 
@@ -379,15 +417,18 @@ AcpiDbReadTable (
     Actual = fread (*Table, 1, (size_t) FileSize, fp);
     if (Actual == FileSize)
     {
-        /* Now validate the checksum */
-
-        Status = AcpiTbVerifyTableChecksum (*Table);
-
-        if (Status == AE_BAD_CHECKSUM)
+        if (StandardHeader)
         {
-            Status = AcpiDbCheckTextModeCorruption ((UINT8 *) *Table,
-                        FileSize, (*Table)->Length);
-            return (Status);
+            /* Now validate the checksum */
+
+            Status = AcpiTbVerifyTableChecksum (*Table);
+
+            if (Status == AE_BAD_CHECKSUM)
+            {
+                Status = AcpiDbCheckTextModeCorruption ((UINT8 *) *Table,
+                            FileSize, (*Table)->Length);
+                return (Status);
+            }
         }
         return (AE_OK);
     }
@@ -432,7 +473,7 @@ AeLocalLoadTable (
     ACPI_TABLE_DESC         TableInfo;
 
 
-    ACPI_FUNCTION_TRACE ("AeLocalLoadTable");
+    ACPI_FUNCTION_TRACE (AeLocalLoadTable);
 
 
     if (!Table)
@@ -472,7 +513,7 @@ AeLocalLoadTable (
     {
         /* Uninstall table and free the buffer */
 
-        AcpiTbDeleteTablesByType (ACPI_TABLE_DSDT);
+        AcpiTbDeleteTablesByType (ACPI_TABLE_ID_DSDT);
         return_ACPI_STATUS (Status);
     }
 #endif
@@ -551,6 +592,7 @@ AcpiDbGetTableFromFile (
 #ifdef ACPI_APPLICATION
     ACPI_STATUS             Status;
     ACPI_TABLE_HEADER       *Table;
+    BOOLEAN                 IsAmlTable = TRUE;
 
 
     Status = AcpiDbReadTableFromFile (Filename, &Table);
@@ -559,27 +601,35 @@ AcpiDbGetTableFromFile (
         return (Status);
     }
 
-   /* Attempt to recognize and install the table */
+#ifdef ACPI_DATA_TABLE_DISASSEMBLY
+    IsAmlTable = AcpiUtIsAmlTable (Table);
+#endif
 
-    Status = AeLocalLoadTable (Table);
-    if (ACPI_FAILURE (Status))
+    if (IsAmlTable)
     {
-        if (Status == AE_ALREADY_EXISTS)
+        /* Attempt to recognize and install the table */
+
+        Status = AeLocalLoadTable (Table);
+        if (ACPI_FAILURE (Status))
         {
-            AcpiOsPrintf ("Table %4.4s is already installed\n",
-                            Table->Signature);
-        }
-        else
-        {
-            AcpiOsPrintf ("Could not install table, %s\n",
-                            AcpiFormatException (Status));
+            if (Status == AE_ALREADY_EXISTS)
+            {
+                AcpiOsPrintf ("Table %4.4s is already installed\n",
+                    Table->Signature);
+            }
+            else
+            {
+                AcpiOsPrintf ("Could not install table, %s\n",
+                    AcpiFormatException (Status));
+            }
+
+            return (Status);
         }
 
-        return (Status);
+        fprintf (stderr,
+            "Acpi table [%4.4s] successfully installed and loaded\n",
+            Table->Signature);
     }
-
-    fprintf (stderr, "Acpi table [%4.4s] successfully installed and loaded\n",
-                                Table->Signature);
 
     AcpiGbl_AcpiHardwarePresent = FALSE;
     if (ReturnTable)

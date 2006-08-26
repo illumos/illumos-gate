@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 1.180 $
+ *       $Revision: 1.191 $
  *
  *****************************************************************************/
 
@@ -130,6 +130,10 @@
 #define ACPI_CLEAR_BIT(target,bit)      ((target) &= ~(bit))
 #define ACPI_MIN(a,b)                   (((a)<(b))?(a):(b))
 
+/* Size calculation */
+
+#define ACPI_ARRAY_LENGTH(x)            (sizeof(x) / sizeof((x)[0]))
+
 
 #if ACPI_MACHINE_WIDTH == 16
 
@@ -205,7 +209,6 @@
 #define ACPI_TO_POINTER(i)              ACPI_ADD_PTR (void,(void *) NULL,(ACPI_NATIVE_UINT) i)
 #define ACPI_TO_INTEGER(p)              ACPI_PTR_DIFF (p,(void *) NULL)
 #define ACPI_OFFSET(d,f)                (ACPI_SIZE) ACPI_PTR_DIFF (&(((d *)0)->f),(void *) NULL)
-#define ACPI_FADT_OFFSET(f)             ACPI_OFFSET (FADT_DESCRIPTOR, f)
 
 #if ACPI_MACHINE_WIDTH == 16
 #define ACPI_STORE_POINTER(d,s)         ACPI_MOVE_32_TO_32(d,s)
@@ -214,6 +217,12 @@
 #else
 #define ACPI_PHYSADDR_TO_PTR(i)         ACPI_TO_POINTER(i)
 #define ACPI_PTR_TO_PHYSADDR(i)         ACPI_TO_INTEGER(i)
+#endif
+
+#ifndef ACPI_MISALIGNMENT_NOT_SUPPORTED
+#define ACPI_COMPARE_NAME(a,b)          (*ACPI_CAST_PTR (UINT32,(a)) == *ACPI_CAST_PTR (UINT32,(b)))
+#else
+#define ACPI_COMPARE_NAME(a,b)          (!ACPI_STRNCMP (ACPI_CAST_PTR (char,(a)), ACPI_CAST_PTR (char,(b)), ACPI_NAME_SIZE))
 #endif
 
 /*
@@ -462,6 +471,8 @@
 #define ACPI_REGISTER_PREPARE_BITS(Val, Pos, Mask)      ((Val << Pos) & Mask)
 #define ACPI_REGISTER_INSERT_VALUE(Reg, Pos, Mask, Val)  Reg = (Reg & (~(Mask))) | ACPI_REGISTER_PREPARE_BITS(Val, Pos, Mask)
 
+#define ACPI_INSERT_BITS(Target, Mask, Source)          Target = ((Target & (~(Mask))) | (Source & Mask))
+
 /* Generate a UUID */
 
 #define ACPI_INIT_UUID(a,b,c,d0,d1,d2,d3,d4,d5,d6,d7) \
@@ -477,8 +488,8 @@
  *
  * The "Descriptor" field is the first field in both structures.
  */
-#define ACPI_GET_DESCRIPTOR_TYPE(d)     (((ACPI_DESCRIPTOR *)(void *)(d))->DescriptorId)
-#define ACPI_SET_DESCRIPTOR_TYPE(d,t)   (((ACPI_DESCRIPTOR *)(void *)(d))->DescriptorId = t)
+#define ACPI_GET_DESCRIPTOR_TYPE(d)     (((ACPI_DESCRIPTOR *)(void *)(d))->Common.DescriptorType)
+#define ACPI_SET_DESCRIPTOR_TYPE(d,t)   (((ACPI_DESCRIPTOR *)(void *)(d))->Common.DescriptorType = t)
 
 
 /* Macro to test the object type */
@@ -559,14 +570,6 @@
 #define ACPI_ERROR_NAMESPACE(s,e)       AcpiNsReportError (AE_INFO, s, e);
 #define ACPI_ERROR_METHOD(s,n,p,e)      AcpiNsReportMethodError (AE_INFO, s, n, p, e);
 
-/* Legacy interfaces. Remove when migration is complete */
-
-#define ACPI_REPORT_INFO(fp)            {AcpiUtReportInfo (AE_INFO); \
-                                            AcpiOsPrintf fp;}
-#define ACPI_REPORT_ERROR(fp)           {AcpiUtReportError (AE_INFO); \
-                                            AcpiOsPrintf fp;}
-#define ACPI_REPORT_WARNING(fp)         {AcpiUtReportWarning (AE_INFO); \
-                                            AcpiOsPrintf fp;}
 #else
 
 /* No error messages */
@@ -577,10 +580,6 @@
 #define ACPI_ERROR(plist)
 #define ACPI_ERROR_NAMESPACE(s,e)
 #define ACPI_ERROR_METHOD(s,n,p,e)
-
-#define ACPI_REPORT_INFO(fp)
-#define ACPI_REPORT_ERROR(fp)
-#define ACPI_REPORT_WARNING(fp)
 #endif
 
 /*
@@ -613,7 +612,7 @@
  * Note: (const char) is used to be compatible with the debug interfaces
  * and macros such as __FUNCTION__.
  */
-#define ACPI_FUNCTION_NAME(Name)        const char *_AcpiFunctionName = Name;
+#define ACPI_FUNCTION_NAME(Name)        const char *_AcpiFunctionName = #Name;
 
 #else
 /* Compiler supports __FUNCTION__ (or equivalent) -- Ignore this macro */
@@ -811,19 +810,19 @@
 
 /* Memory allocation */
 
-#define ACPI_MEM_ALLOCATE(a)            AcpiUtAllocate((ACPI_SIZE)(a),_COMPONENT,_AcpiModuleName,__LINE__)
-#define ACPI_MEM_CALLOCATE(a)           AcpiUtCallocate((ACPI_SIZE)(a), _COMPONENT,_AcpiModuleName,__LINE__)
-#define ACPI_MEM_FREE(a)                AcpiOsFree(a)
+#define ACPI_ALLOCATE(a)            AcpiUtAllocate((ACPI_SIZE)(a),_COMPONENT,_AcpiModuleName,__LINE__)
+#define ACPI_ALLOCATE_ZEROED(a)     AcpiUtAllocateZeroed((ACPI_SIZE)(a), _COMPONENT,_AcpiModuleName,__LINE__)
+#define ACPI_FREE(a)                AcpiOsFree(a)
 #define ACPI_MEM_TRACKING(a)
 
 #else
 
 /* Memory allocation */
 
-#define ACPI_MEM_ALLOCATE(a)            AcpiUtAllocateAndTrack((ACPI_SIZE)(a),_COMPONENT,_AcpiModuleName,__LINE__)
-#define ACPI_MEM_CALLOCATE(a)           AcpiUtCallocateAndTrack((ACPI_SIZE)(a), _COMPONENT,_AcpiModuleName,__LINE__)
-#define ACPI_MEM_FREE(a)                AcpiUtFreeAndTrack(a,_COMPONENT,_AcpiModuleName,__LINE__)
-#define ACPI_MEM_TRACKING(a)            a
+#define ACPI_ALLOCATE(a)            AcpiUtAllocateAndTrack((ACPI_SIZE)(a),_COMPONENT,_AcpiModuleName,__LINE__)
+#define ACPI_ALLOCATE_ZEROED(a)     AcpiUtAllocateZeroedAndTrack((ACPI_SIZE)(a), _COMPONENT,_AcpiModuleName,__LINE__)
+#define ACPI_FREE(a)                AcpiUtFreeAndTrack(a,_COMPONENT,_AcpiModuleName,__LINE__)
+#define ACPI_MEM_TRACKING(a)        a
 
 #endif /* ACPI_DBG_TRACK_ALLOCATIONS */
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: acparser.h - AML Parser subcomponent prototypes and defines
- *       $Revision: 1.78 $
+ *       $Revision: 1.81 $
  *
  *****************************************************************************/
 
@@ -121,7 +121,7 @@
 
 #define OP_HAS_RETURN_VALUE             1
 
-/* variable # arguments */
+/* Variable number of arguments. This field must be 32 bits */
 
 #define ACPI_VAR_ARGS                   ACPI_UINT32_MAX
 
@@ -151,7 +151,7 @@
  */
 ACPI_STATUS
 AcpiPsExecuteMethod (
-    ACPI_PARAMETER_INFO     *Info);
+    ACPI_EVALUATE_INFO      *Info);
 
 
 /*

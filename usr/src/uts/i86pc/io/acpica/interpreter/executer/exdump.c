@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 1.194 $
+ *              $Revision: 1.199 $
  *
  *****************************************************************************/
 
@@ -148,6 +148,11 @@ AcpiExOutAddress (
     ACPI_PHYSICAL_ADDRESS   Value);
 
 static void
+AcpiExDumpObject (
+    ACPI_OPERAND_OBJECT     *ObjDesc,
+    ACPI_EXDUMP_INFO        *Info);
+
+static void
 AcpiExDumpReferenceObj (
     ACPI_OPERAND_OBJECT     *ObjDesc);
 
@@ -209,15 +214,15 @@ static ACPI_EXDUMP_INFO     AcpiExDumpDevice[4] =
 static ACPI_EXDUMP_INFO     AcpiExDumpEvent[2] =
 {
     {ACPI_EXD_INIT,     ACPI_EXD_TABLE_SIZE (AcpiExDumpEvent),          NULL},
-    {ACPI_EXD_POINTER,  ACPI_EXD_OFFSET (Event.Semaphore),             "Semaphore"}
+    {ACPI_EXD_POINTER,  ACPI_EXD_OFFSET (Event.OsSemaphore),            "OsSemaphore"}
 };
 
 static ACPI_EXDUMP_INFO     AcpiExDumpMethod[8] =
 {
     {ACPI_EXD_INIT,     ACPI_EXD_TABLE_SIZE (AcpiExDumpMethod),         NULL},
     {ACPI_EXD_UINT8,    ACPI_EXD_OFFSET (Method.ParamCount),            "ParamCount"},
-    {ACPI_EXD_UINT8,    ACPI_EXD_OFFSET (Method.Concurrency),           "Concurrency"},
-    {ACPI_EXD_POINTER,  ACPI_EXD_OFFSET (Method.Semaphore),             "Semaphore"},
+    {ACPI_EXD_UINT8,    ACPI_EXD_OFFSET (Method.SyncLevel),             "Sync Level"},
+    {ACPI_EXD_POINTER,  ACPI_EXD_OFFSET (Method.Mutex),                 "Mutex"},
     {ACPI_EXD_UINT8,    ACPI_EXD_OFFSET (Method.OwnerId),               "Owner Id"},
     {ACPI_EXD_UINT8,    ACPI_EXD_OFFSET (Method.ThreadCount),           "Thread Count"},
     {ACPI_EXD_UINT32,   ACPI_EXD_OFFSET (Method.AmlLength),             "Aml Length"},
@@ -230,7 +235,7 @@ static ACPI_EXDUMP_INFO     AcpiExDumpMutex[5] =
     {ACPI_EXD_UINT8,    ACPI_EXD_OFFSET (Mutex.SyncLevel),              "Sync Level"},
     {ACPI_EXD_POINTER,  ACPI_EXD_OFFSET (Mutex.OwnerThread),            "Owner Thread"},
     {ACPI_EXD_UINT16,   ACPI_EXD_OFFSET (Mutex.AcquisitionDepth),       "Acquire Depth"},
-    {ACPI_EXD_POINTER,  ACPI_EXD_OFFSET (Mutex.Semaphore),              "Semaphore"}
+    {ACPI_EXD_POINTER,  ACPI_EXD_OFFSET (Mutex.OsMutex),                "OsMutex"}
 };
 
 static ACPI_EXDUMP_INFO     AcpiExDumpRegion[7] =
@@ -356,12 +361,11 @@ static ACPI_EXDUMP_INFO     AcpiExDumpFieldCommon[7] =
     {ACPI_EXD_POINTER,  ACPI_EXD_OFFSET (CommonField.Node),             "Parent Node"}
 };
 
-static ACPI_EXDUMP_INFO     AcpiExDumpNode[6] =
+static ACPI_EXDUMP_INFO     AcpiExDumpNode[5] =
 {
     {ACPI_EXD_INIT,     ACPI_EXD_TABLE_SIZE (AcpiExDumpNode),           NULL},
     {ACPI_EXD_UINT8,    ACPI_EXD_NSOFFSET (Flags),                      "Flags"},
     {ACPI_EXD_UINT8,    ACPI_EXD_NSOFFSET (OwnerId),                    "Owner Id"},
-    {ACPI_EXD_UINT16,   ACPI_EXD_NSOFFSET (ReferenceCount),             "Reference Count"},
     {ACPI_EXD_POINTER,  ACPI_EXD_NSOFFSET (Child),                      "Child List"},
     {ACPI_EXD_POINTER,  ACPI_EXD_NSOFFSET (Peer),                       "Next Peer"}
 };
@@ -547,7 +551,7 @@ AcpiExDumpOperand (
     UINT32                  Index;
 
 
-    ACPI_FUNCTION_NAME ("ExDumpOperand")
+    ACPI_FUNCTION_NAME (ExDumpOperand)
 
 
     if (!((ACPI_LV_EXEC & AcpiDbgLevel) && (_COMPONENT & AcpiDbgLayer)))
@@ -905,7 +909,7 @@ AcpiExDumpOperands (
     ACPI_NATIVE_UINT        i;
 
 
-    ACPI_FUNCTION_NAME ("ExDumpOperands");
+    ACPI_FUNCTION_NAME (ExDumpOperands);
 
 
     if (!Ident)
@@ -1055,7 +1059,7 @@ AcpiExDumpReferenceObj (
         else
         {
            AcpiOsPrintf ("%s\n", (char *) RetBuf.Pointer);
-           ACPI_MEM_FREE (RetBuf.Pointer);
+           ACPI_FREE (RetBuf.Pointer);
         }
     }
     else if (ObjDesc->Reference.Object)
@@ -1188,7 +1192,7 @@ AcpiExDumpObjectDescriptor (
     ACPI_OPERAND_OBJECT     *ObjDesc,
     UINT32                  Flags)
 {
-    ACPI_FUNCTION_TRACE ("ExDumpObjectDescriptor");
+    ACPI_FUNCTION_TRACE (ExDumpObjectDescriptor);
 
 
     if (!ObjDesc)

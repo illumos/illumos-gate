@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utcache - local cache allocation routines
- *              $Revision: 1.3 $
+ *              $Revision: 1.6 $
  *
  *****************************************************************************/
 
@@ -212,7 +212,7 @@ AcpiOsPurgeCache (
 
         Next = *(ACPI_CAST_INDIRECT_PTR (char,
                     &(((char *) Cache->ListHead)[Cache->LinkOffset])));
-        ACPI_MEM_FREE (Cache->ListHead);
+        ACPI_FREE (Cache->ListHead);
 
         Cache->ListHead = Next;
         Cache->CurrentDepth--;
@@ -294,7 +294,7 @@ AcpiOsReleaseObject (
 
     if (Cache->CurrentDepth >= Cache->MaxDepth)
     {
-        ACPI_MEM_FREE (Object);
+        ACPI_FREE (Object);
         ACPI_MEM_TRACKING (Cache->TotalFreed++);
     }
 
@@ -348,7 +348,7 @@ AcpiOsAcquireObject (
     void                    *Object;
 
 
-    ACPI_FUNCTION_NAME ("OsAcquireObject");
+    ACPI_FUNCTION_NAME (OsAcquireObject);
 
 
     if (!Cache)
@@ -377,8 +377,8 @@ AcpiOsAcquireObject (
         Cache->CurrentDepth--;
 
         ACPI_MEM_TRACKING (Cache->Hits++);
-        ACPI_MEM_TRACKING (ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-            "Object %p from %s cache\n", Object, Cache->ListName)));
+        ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+            "Object %p from %s cache\n", Object, Cache->ListName));
 
         Status = AcpiUtReleaseMutex (ACPI_MTX_CACHES);
         if (ACPI_FAILURE (Status))
@@ -396,7 +396,7 @@ AcpiOsAcquireObject (
 
         ACPI_MEM_TRACKING (Cache->TotalAllocated++);
 
-        /* Avoid deadlock with ACPI_MEM_CALLOCATE */
+        /* Avoid deadlock with ACPI_ALLOCATE_ZEROED */
 
         Status = AcpiUtReleaseMutex (ACPI_MTX_CACHES);
         if (ACPI_FAILURE (Status))
@@ -404,7 +404,7 @@ AcpiOsAcquireObject (
             return (NULL);
         }
 
-        Object = ACPI_MEM_CALLOCATE (Cache->ObjectSize);
+        Object = ACPI_ALLOCATE_ZEROED (Cache->ObjectSize);
         if (!Object)
         {
             return (NULL);

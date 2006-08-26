@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfname - Public interfaces to the ACPI subsystem
  *                         ACPI Namespace oriented interfaces
- *              $Revision: 1.106 $
+ *              $Revision: 1.110 $
  *
  *****************************************************************************/
 
@@ -199,8 +199,8 @@ AcpiGetHandle (
     /*
      *  Find the Node and convert to a handle
      */
-    Status = AcpiNsGetNodeByPath (Pathname, PrefixNode, ACPI_NS_NO_UPSEARCH,
-                    &Node);
+    Status = AcpiNsGetNode (PrefixNode, Pathname, ACPI_NS_NO_UPSEARCH,
+                &Node);
 
     *RetHandle = NULL;
     if (ACPI_SUCCESS (Status))
@@ -210,6 +210,8 @@ AcpiGetHandle (
 
     return (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiGetHandle)
 
 
 /******************************************************************************
@@ -298,6 +300,8 @@ UnlockAndExit:
     return (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiGetName)
+
 
 /******************************************************************************
  *
@@ -340,7 +344,7 @@ AcpiGetObjectInfo (
         return (Status);
     }
 
-    Info = ACPI_MEM_CALLOCATE (sizeof (ACPI_DEVICE_INFO));
+    Info = ACPI_ALLOCATE_ZEROED (sizeof (ACPI_DEVICE_INFO));
     if (!Info)
     {
         return (AE_NO_MEMORY);
@@ -457,11 +461,13 @@ AcpiGetObjectInfo (
 
 
 Cleanup:
-    ACPI_MEM_FREE (Info);
+    ACPI_FREE (Info);
     if (CidList)
     {
-        ACPI_MEM_FREE (CidList);
+        ACPI_FREE (CidList);
     }
     return (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiGetObjectInfo)
 

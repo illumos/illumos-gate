@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rslist - Linked list utilities
- *              $Revision: 1.54 $
+ *              $Revision: 1.61 $
  *
  ******************************************************************************/
 
@@ -127,93 +127,66 @@
  *
  * FUNCTION:    AcpiRsConvertAmlToResources
  *
- * PARAMETERS:  Aml                 - Pointer to the resource byte stream
- *              AmlLength           - Length of Aml
- *              OutputBuffer        - Pointer to the buffer that will
- *                                    contain the output structures
+ * PARAMETERS:  ACPI_WALK_AML_CALLBACK
+ *              ResourcePtr             - Pointer to the buffer that will
+ *                                        contain the output structures
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Takes the resource byte stream and parses it, creating a
- *              linked list of resources in the caller's output buffer
+ * DESCRIPTION: Convert an AML resource to an internal representation of the
+ *              resource that is aligned and easier to access.
  *
  ******************************************************************************/
 
 ACPI_STATUS
 AcpiRsConvertAmlToResources (
     UINT8                   *Aml,
-    UINT32                  AmlLength,
-    UINT8                   *OutputBuffer)
+    UINT32                  Length,
+    UINT32                  Offset,
+    UINT8                   ResourceIndex,
+    void                    *Context)
 {
-    ACPI_RESOURCE           *Resource = (void *) OutputBuffer;
+    ACPI_RESOURCE           **ResourcePtr = ACPI_CAST_INDIRECT_PTR (
+                                ACPI_RESOURCE, Context);
+    ACPI_RESOURCE           *Resource;
     ACPI_STATUS             Status;
-    UINT8                   ResourceIndex;
-    UINT8                   *EndAml;
 
 
-    ACPI_FUNCTION_TRACE ("RsConvertAmlToResources");
+    ACPI_FUNCTION_TRACE (RsConvertAmlToResources);
 
 
-    EndAml = Aml + AmlLength;
-
-    /* Loop until end-of-buffer or an EndTag is found */
-
-    while (Aml < EndAml)
+    /*
+     * Check that the input buffer and all subsequent pointers into it
+     * are aligned on a native word boundary. Most important on IA64
+     */
+    Resource = *ResourcePtr;
+    if (ACPI_IS_MISALIGNED (Resource))
     {
-        /*
-         * Check that the input buffer and all subsequent pointers into it
-         * are aligned on a native word boundary. Most important on IA64
-         */
-        if (ACPI_IS_MISALIGNED (Resource))
-        {
-            ACPI_WARNING ((AE_INFO,
-                "Misaligned resource pointer %p", Resource));
-        }
-
-        /* Validate the Resource Type and Resource Length */
-
-        Status = AcpiUtValidateResource (Aml, &ResourceIndex);
-        if (ACPI_FAILURE (Status))
-        {
-            return_ACPI_STATUS (Status);
-        }
-
-        /* Convert the AML byte stream resource to a local resource struct */
-
-        Status = AcpiRsConvertAmlToResource (
-                    Resource, ACPI_CAST_PTR (AML_RESOURCE, Aml),
-                    AcpiGbl_GetResourceDispatch[ResourceIndex]);
-        if (ACPI_FAILURE (Status))
-        {
-            ACPI_EXCEPTION ((AE_INFO, Status,
-                "Could not convert AML resource (Type %X)", *Aml));
-            return_ACPI_STATUS (Status);
-        }
-
-        ACPI_DEBUG_PRINT ((ACPI_DB_RESOURCES,
-            "Type %.2X, Aml %.2X internal %.2X\n", 
-            AcpiUtGetResourceType (Aml), AcpiUtGetDescriptorLength (Aml),
-            Resource->Length));
-
-        /* Normal exit on completion of an EndTag resource descriptor */
-
-        if (AcpiUtGetResourceType (Aml) == ACPI_RESOURCE_NAME_END_TAG)
-        {
-            return_ACPI_STATUS (AE_OK);
-        }
-
-        /* Point to the next input AML resource */
-
-        Aml += AcpiUtGetDescriptorLength (Aml);
-
-        /* Point to the next structure in the output buffer */
-
-        Resource = ACPI_ADD_PTR (ACPI_RESOURCE, Resource, Resource->Length);
+        ACPI_WARNING ((AE_INFO,
+            "Misaligned resource pointer %p", Resource));
     }
 
-    /* Did not find an EndTag resource descriptor */
+    /* Convert the AML byte stream resource to a local resource struct */
 
-    return_ACPI_STATUS (AE_AML_NO_RESOURCE_END_TAG);
+    Status = AcpiRsConvertAmlToResource (
+                Resource, ACPI_CAST_PTR (AML_RESOURCE, Aml),
+                AcpiGbl_GetResourceDispatch[ResourceIndex]);
+    if (ACPI_FAILURE (Status))
+    {
+        ACPI_EXCEPTION ((AE_INFO, Status,
+            "Could not convert AML resource (Type %X)", *Aml));
+        return_ACPI_STATUS (Status);
+    }
+
+    ACPI_DEBUG_PRINT ((ACPI_DB_RESOURCES,
+        "Type %.2X, AmlLength %.2X InternalLength %.2X\n",
+        AcpiUtGetResourceType (Aml), Length,
+        Resource->Length));
+
+    /* Point to the next structure in the output buffer */
+
+    *ResourcePtr = ACPI_ADD_PTR (void, Resource, Resource->Length);
+    return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -247,7 +220,7 @@ AcpiRsConvertResourcesToAml (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("RsConvertResourcesToAml");
+    ACPI_FUNCTION_TRACE (RsConvertResourcesToAml);
 
 
     /* Walk the resource descriptor list, convert each descriptor */

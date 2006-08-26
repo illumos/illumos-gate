@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psargs - Parse AML opcode arguments
- *              $Revision: 1.90 $
+ *              $Revision: 1.91 $
  *
  *****************************************************************************/
 
@@ -160,7 +160,7 @@ AcpiPsGetNextPackageLength (
     UINT8                   ByteZeroMask = 0x3F; /* Default [0:5] */
 
 
-    ACPI_FUNCTION_TRACE ("PsGetNextPackageLength");
+    ACPI_FUNCTION_TRACE (PsGetNextPackageLength);
 
 
     /*
@@ -215,7 +215,7 @@ AcpiPsGetNextPackageEnd (
     UINT32                  PackageLength;
 
 
-    ACPI_FUNCTION_TRACE ("PsGetNextPackageEnd");
+    ACPI_FUNCTION_TRACE (PsGetNextPackageEnd);
 
 
     /* Function below updates ParserState->Aml */
@@ -249,7 +249,7 @@ AcpiPsGetNextNamestring (
     UINT8                   *End = ParserState->Aml;
 
 
-    ACPI_FUNCTION_TRACE ("PsGetNextNamestring");
+    ACPI_FUNCTION_TRACE (PsGetNextNamestring);
 
 
     /* Point past any namestring prefix characters (backslash or carat) */
@@ -337,7 +337,7 @@ AcpiPsGetNextNamepath (
     ACPI_GENERIC_STATE      ScopeInfo;
 
 
-    ACPI_FUNCTION_TRACE ("PsGetNextNamepath");
+    ACPI_FUNCTION_TRACE (PsGetNextNamepath);
 
 
     Path = AcpiPsGetNextNamestring (ParserState);
@@ -499,7 +499,7 @@ AcpiPsGetNextSimpleArg (
     UINT8                   *Aml = ParserState->Aml;
 
 
-    ACPI_FUNCTION_TRACE_U32 ("PsGetNextSimpleArg", ArgType);
+    ACPI_FUNCTION_TRACE_U32 (PsGetNextSimpleArg, ArgType);
 
 
     switch (ArgType)
@@ -606,7 +606,7 @@ AcpiPsGetNextField (
     UINT32                  Name;
 
 
-    ACPI_FUNCTION_TRACE ("PsGetNextField");
+    ACPI_FUNCTION_TRACE (PsGetNextField);
 
 
     /* Determine field type */
@@ -719,7 +719,7 @@ AcpiPsGetNextArg (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("PsGetNextArg", ParserState);
+    ACPI_FUNCTION_TRACE_PTR (PsGetNextArg, ParserState);
 
 
     switch (ArgType)

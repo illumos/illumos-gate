@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acexcep.h - Exception codes returned by the ACPI subsystem
- *       $Revision: 1.76 $
+ *       $Revision: 1.77 $
  *
  *****************************************************************************/
 
@@ -239,8 +239,9 @@
 #define AE_AML_BAD_RESOURCE_VALUE       (ACPI_STATUS) (0x001F | AE_CODE_AML)
 #define AE_AML_CIRCULAR_REFERENCE       (ACPI_STATUS) (0x0020 | AE_CODE_AML)
 #define AE_AML_BAD_RESOURCE_LENGTH      (ACPI_STATUS) (0x0021 | AE_CODE_AML)
+#define AE_AML_ILLEGAL_ADDRESS          (ACPI_STATUS) (0x0022 | AE_CODE_AML)
 
-#define AE_CODE_AML_MAX                 0x0021
+#define AE_CODE_AML_MAX                 0x0022
 
 
 /*
@@ -361,7 +362,8 @@ char const   *AcpiGbl_ExceptionNames_Aml[] =
     "AE_AML_NO_RESOURCE_END_TAG",
     "AE_AML_BAD_RESOURCE_VALUE",
     "AE_AML_CIRCULAR_REFERENCE",
-    "AE_AML_BAD_RESOURCE_LENGTH"
+    "AE_AML_BAD_RESOURCE_LENGTH",
+    "AE_AML_ILLEGAL_ADDRESS"
 };
 
 char const   *AcpiGbl_ExceptionNames_Ctrl[] =

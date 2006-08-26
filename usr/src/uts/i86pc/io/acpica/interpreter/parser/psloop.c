@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psloop - Main AML parse loop
- *              $Revision: 1.10 $
+ *              $Revision: 1.11 $
  *
  *****************************************************************************/
 
@@ -161,7 +161,7 @@ AcpiPsParseLoop (
     UINT8                   *AmlOpStart = NULL;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("PsParseLoop", WalkState);
+    ACPI_FUNCTION_TRACE_PTR (PsParseLoop, WalkState);
 
     if (WalkState->DescendingCallback == NULL)
     {

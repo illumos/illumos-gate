@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsmisc - Miscellaneous resource descriptors
- *              $Revision: 1.44 $
+ *              $Revision: 1.45 $
  *
  ******************************************************************************/
 
@@ -163,7 +163,7 @@ AcpiRsConvertAmlToResource (
     UINT16                  Temp16 = 0;
 
 
-    ACPI_FUNCTION_TRACE ("RsConvertAmlToResource");
+    ACPI_FUNCTION_TRACE (RsConvertAmlToResource);
 
 
     if (((ACPI_NATIVE_UINT) Resource) & 0x3)
@@ -434,7 +434,7 @@ AcpiRsConvertResourceToAml (
     UINT16                  ItemCount = 0;
 
 
-    ACPI_FUNCTION_TRACE ("RsConvertResourceToAml");
+    ACPI_FUNCTION_TRACE (RsConvertResourceToAml);
 
 
     /*

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 1.189 $
+ *       $Revision: 1.196 $
  *
  *****************************************************************************/
 
@@ -124,24 +124,24 @@ extern const UINT8                      AcpiGbl_ResourceAmlSizes[];
 
 #if defined(ACPI_DISASSEMBLER) || defined (ACPI_DEBUGGER)
 
-extern const char                       *AcpiGbl_BMDecode[2];
-extern const char                       *AcpiGbl_ConfigDecode[4];
-extern const char                       *AcpiGbl_ConsumeDecode[2];
-extern const char                       *AcpiGbl_DECDecode[2];
-extern const char                       *AcpiGbl_HEDecode[2];
-extern const char                       *AcpiGbl_IoDecode[2];
-extern const char                       *AcpiGbl_LLDecode[2];
-extern const char                       *AcpiGbl_MaxDecode[2];
-extern const char                       *AcpiGbl_MEMDecode[4];
-extern const char                       *AcpiGbl_MinDecode[2];
-extern const char                       *AcpiGbl_MTPDecode[4];
-extern const char                       *AcpiGbl_RNGDecode[4];
-extern const char                       *AcpiGbl_RWDecode[2];
-extern const char                       *AcpiGbl_SHRDecode[2];
-extern const char                       *AcpiGbl_SIZDecode[4];
-extern const char                       *AcpiGbl_TRSDecode[2];
-extern const char                       *AcpiGbl_TTPDecode[2];
-extern const char                       *AcpiGbl_TYPDecode[4];
+extern const char                       *AcpiGbl_BmDecode[];
+extern const char                       *AcpiGbl_ConfigDecode[];
+extern const char                       *AcpiGbl_ConsumeDecode[];
+extern const char                       *AcpiGbl_DecDecode[];
+extern const char                       *AcpiGbl_HeDecode[];
+extern const char                       *AcpiGbl_IoDecode[];
+extern const char                       *AcpiGbl_LlDecode[];
+extern const char                       *AcpiGbl_MaxDecode[];
+extern const char                       *AcpiGbl_MemDecode[];
+extern const char                       *AcpiGbl_MinDecode[];
+extern const char                       *AcpiGbl_MtpDecode[];
+extern const char                       *AcpiGbl_RngDecode[];
+extern const char                       *AcpiGbl_RwDecode[];
+extern const char                       *AcpiGbl_ShrDecode[];
+extern const char                       *AcpiGbl_SizDecode[];
+extern const char                       *AcpiGbl_TrsDecode[];
+extern const char                       *AcpiGbl_TtpDecode[];
+extern const char                       *AcpiGbl_TypDecode[];
 #endif
 
 /* Types for Resource descriptor entries */
@@ -150,6 +150,14 @@ extern const char                       *AcpiGbl_TYPDecode[4];
 #define ACPI_FIXED_LENGTH               1
 #define ACPI_VARIABLE_LENGTH            2
 #define ACPI_SMALL_VARIABLE_LENGTH      3
+
+typedef
+ACPI_STATUS (*ACPI_WALK_AML_CALLBACK) (
+    UINT8                   *Aml,
+    UINT32                  Length,
+    UINT32                  Offset,
+    UINT8                   ResourceIndex,
+    void                    *Context);
 
 typedef
 ACPI_STATUS (*ACPI_PKG_CALLBACK) (
@@ -475,6 +483,12 @@ AcpiUtDumpBuffer (
     UINT32                  componentId);
 
 void
+AcpiUtDumpBuffer2 (
+    UINT8                   *Buffer,
+    UINT32                  Count,
+    UINT32                  Display);
+
+void
 AcpiUtReportError (
     char                    *ModuleName,
     UINT32                  LineNumber);
@@ -726,6 +740,10 @@ AcpiUtShortDivide (
 /*
  * utmisc
  */
+BOOLEAN
+AcpiUtIsAmlTable (
+    ACPI_TABLE_HEADER       *Table);
+
 ACPI_STATUS
 AcpiUtAllocateOwnerId (
     ACPI_OWNER_ID           *OwnerId);
@@ -754,9 +772,14 @@ BOOLEAN
 AcpiUtValidAcpiName (
     UINT32                  Name);
 
+ACPI_NAME
+AcpiUtRepairName (
+    ACPI_NAME               Name);
+
 BOOLEAN
-AcpiUtValidAcpiCharacter (
-    char                    Character);
+AcpiUtValidAcpiChar (
+    char                    Character,
+    ACPI_NATIVE_UINT        Position);
 
 ACPI_STATUS
 AcpiUtStrtoul64 (
@@ -767,6 +790,33 @@ AcpiUtStrtoul64 (
 /* Values for Base above (16=Hex, 10=Decimal) */
 
 #define ACPI_ANY_BASE        0
+
+UINT32
+AcpiUtDwordByteSwap (
+    UINT32                  Value);
+
+void
+AcpiUtSetIntegerWidth (
+    UINT8                   Revision);
+
+#ifdef ACPI_DEBUG_OUTPUT
+void
+AcpiUtDisplayInitPathname (
+    UINT8                   Type,
+    ACPI_NAMESPACE_NODE     *ObjHandle,
+    char                    *Path);
+#endif
+
+
+/*
+ * utresrc
+ */
+ACPI_STATUS
+AcpiUtWalkAmlResources (
+    UINT8                   *Aml,
+    ACPI_SIZE               AmlLength,
+    ACPI_WALK_AML_CALLBACK  UserFunction,
+    void                    *Context);
 
 ACPI_STATUS
 AcpiUtValidateResource (
@@ -793,23 +843,6 @@ ACPI_STATUS
 AcpiUtGetResourceEndTag (
     ACPI_OPERAND_OBJECT     *ObjDesc,
     UINT8                   **EndTag);
-
-UINT32
-AcpiUtDwordByteSwap (
-    UINT32                  Value);
-
-void
-AcpiUtSetIntegerWidth (
-    UINT8                   Revision);
-
-#ifdef ACPI_DEBUG_OUTPUT
-void
-AcpiUtDisplayInitPathname (
-    UINT8                   Type,
-    ACPI_NAMESPACE_NODE     *ObjHandle,
-    char                    *Path);
-
-#endif
 
 
 /*
@@ -860,7 +893,7 @@ AcpiUtAllocate (
     UINT32                  Line);
 
 void *
-AcpiUtCallocate (
+AcpiUtAllocateZeroed (
     ACPI_SIZE               Size,
     UINT32                  Component,
     char                    *Module,
@@ -875,7 +908,7 @@ AcpiUtAllocateAndTrack (
     UINT32                  Line);
 
 void *
-AcpiUtCallocateAndTrack (
+AcpiUtAllocateZeroedAndTrack (
     ACPI_SIZE               Size,
     UINT32                  Component,
     char                    *Module,
@@ -896,6 +929,14 @@ void
 AcpiUtDumpAllocations (
     UINT32                  Component,
     char                    *Module);
+
+ACPI_STATUS
+AcpiUtCreateList (
+    char                    *ListName,
+    UINT16                  ObjectSize,
+    ACPI_MEMORY_LIST        **ReturnCache);
+
+
 #endif
 
 #endif /* _ACUTILS_H */

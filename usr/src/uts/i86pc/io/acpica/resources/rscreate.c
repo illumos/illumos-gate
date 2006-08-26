@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rscreate - Create resource lists/tables
- *              $Revision: 1.75 $
+ *              $Revision: 1.77 $
  *
  ******************************************************************************/
 
@@ -154,9 +154,10 @@ AcpiRsCreateResourceList (
     UINT8                   *AmlStart;
     ACPI_SIZE               ListSizeNeeded = 0;
     UINT32                  AmlBufferLength;
+    void                    *Resource;
 
 
-    ACPI_FUNCTION_TRACE ("RsCreateResourceList");
+    ACPI_FUNCTION_TRACE (RsCreateResourceList);
 
 
     ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "AmlBuffer = %p\n",
@@ -191,8 +192,9 @@ AcpiRsCreateResourceList (
 
     /* Do the conversion */
 
-    Status = AcpiRsConvertAmlToResources (AmlStart, AmlBufferLength,
-                    OutputBuffer->Pointer);
+    Resource = OutputBuffer->Pointer;
+    Status = AcpiUtWalkAmlResources (AmlStart, AmlBufferLength,
+                AcpiRsConvertAmlToResources, &Resource);
     if (ACPI_FAILURE (Status))
     {
         return_ACPI_STATUS (Status);
@@ -243,7 +245,7 @@ AcpiRsCreatePciRoutingTable (
     ACPI_BUFFER             PathBuffer;
 
 
-    ACPI_FUNCTION_TRACE ("RsCreatePciRoutingTable");
+    ACPI_FUNCTION_TRACE (RsCreatePciRoutingTable);
 
 
     /* Params already validated, so we don't re-validate here */
@@ -478,7 +480,7 @@ AcpiRsCreateAmlResources (
     ACPI_SIZE               AmlSizeNeeded = 0;
 
 
-    ACPI_FUNCTION_TRACE ("RsCreateAmlResources");
+    ACPI_FUNCTION_TRACE (RsCreateAmlResources);
 
 
     ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "LinkedListBuffer = %p\n",

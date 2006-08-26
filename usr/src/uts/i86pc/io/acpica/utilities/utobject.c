@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utobject - ACPI object create/delete/size/cache routines
- *              $Revision: 1.101 $
+ *              $Revision: 1.103 $
  *
  *****************************************************************************/
 
@@ -176,7 +176,7 @@ AcpiUtCreateInternalObjectDbg (
     ACPI_OPERAND_OBJECT     *SecondObject;
 
 
-    ACPI_FUNCTION_TRACE_STR ("UtCreateInternalObjectDbg",
+    ACPI_FUNCTION_TRACE_STR (UtCreateInternalObjectDbg,
         AcpiUtGetTypeName (Type));
 
 
@@ -250,7 +250,7 @@ AcpiUtCreateBufferObject (
     UINT8                   *Buffer = NULL;
 
 
-    ACPI_FUNCTION_TRACE_U32 ("UtCreateBufferObject", BufferSize);
+    ACPI_FUNCTION_TRACE_U32 (UtCreateBufferObject, BufferSize);
 
 
     /* Create a new Buffer object */
@@ -267,7 +267,7 @@ AcpiUtCreateBufferObject (
     {
         /* Allocate the actual buffer */
 
-        Buffer = ACPI_MEM_CALLOCATE (BufferSize);
+        Buffer = ACPI_ALLOCATE_ZEROED (BufferSize);
         if (!Buffer)
         {
             ACPI_ERROR ((AE_INFO, "Could not allocate size %X",
@@ -311,7 +311,7 @@ AcpiUtCreateStringObject (
     char                    *String;
 
 
-    ACPI_FUNCTION_TRACE_U32 ("UtCreateStringObject", StringSize);
+    ACPI_FUNCTION_TRACE_U32 (UtCreateStringObject, StringSize);
 
 
     /* Create a new String object */
@@ -326,7 +326,7 @@ AcpiUtCreateStringObject (
      * Allocate the actual string buffer -- (Size + 1) for NULL terminator.
      * NOTE: Zero-length strings are NULL terminated
      */
-    String = ACPI_MEM_CALLOCATE (StringSize + 1);
+    String = ACPI_ALLOCATE_ZEROED (StringSize + 1);
     if (!String)
     {
         ACPI_ERROR ((AE_INFO, "Could not allocate size %X",
@@ -363,7 +363,7 @@ AcpiUtValidInternalObject (
     void                    *Object)
 {
 
-    ACPI_FUNCTION_NAME ("UtValidInternalObject");
+    ACPI_FUNCTION_NAME (UtValidInternalObject);
 
 
     /* Check for a null pointer */
@@ -419,7 +419,7 @@ AcpiUtAllocateObjectDescDbg (
     ACPI_OPERAND_OBJECT     *Object;
 
 
-    ACPI_FUNCTION_TRACE ("UtAllocateObjectDescDbg");
+    ACPI_FUNCTION_TRACE (UtAllocateObjectDescDbg);
 
 
     Object = AcpiOsAcquireObject (AcpiGbl_OperandCache);
@@ -458,7 +458,7 @@ void
 AcpiUtDeleteObjectDesc (
     ACPI_OPERAND_OBJECT     *Object)
 {
-    ACPI_FUNCTION_TRACE_PTR ("UtDeleteObjectDesc", Object);
+    ACPI_FUNCTION_TRACE_PTR (UtDeleteObjectDesc, Object);
 
 
     /* Object must be an ACPI_OPERAND_OBJECT  */
@@ -502,7 +502,7 @@ AcpiUtGetSimpleObjectSize (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("UtGetSimpleObjectSize", InternalObject);
+    ACPI_FUNCTION_TRACE_PTR (UtGetSimpleObjectSize, InternalObject);
 
 
     /*
@@ -694,7 +694,7 @@ AcpiUtGetPackageObjectSize (
     ACPI_PKG_INFO           Info;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("UtGetPackageObjectSize", InternalObject);
+    ACPI_FUNCTION_TRACE_PTR (UtGetPackageObjectSize, InternalObject);
 
 
     Info.Length      = 0;

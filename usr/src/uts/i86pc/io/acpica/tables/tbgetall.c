@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbgetall - Get all required ACPI tables
- *              $Revision: 1.16 $
+ *              $Revision: 1.21 $
  *
  *****************************************************************************/
 
@@ -159,7 +159,7 @@ AcpiTbGetPrimaryTable (
     ACPI_TABLE_HEADER       Header;
 
 
-    ACPI_FUNCTION_TRACE ("TbGetPrimaryTable");
+    ACPI_FUNCTION_TRACE (TbGetPrimaryTable);
 
 
     /* Ignore a NULL address in the RSDT */
@@ -230,7 +230,7 @@ AcpiTbGetSecondaryTable (
     ACPI_TABLE_HEADER       Header;
 
 
-    ACPI_FUNCTION_TRACE_STR ("TbGetSecondaryTable", Signature);
+    ACPI_FUNCTION_TRACE_STR (TbGetSecondaryTable, Signature);
 
 
     /* Get the header in order to match the signature */
@@ -243,7 +243,7 @@ AcpiTbGetSecondaryTable (
 
     /* Signature must match request */
 
-    if (ACPI_STRNCMP (Header.Signature, Signature, ACPI_NAME_SIZE))
+    if (!ACPI_COMPARE_NAME (Header.Signature, Signature))
     {
         ACPI_ERROR ((AE_INFO,
             "Incorrect table signature - wanted [%s] found [%4.4s]",
@@ -306,7 +306,7 @@ AcpiTbGetRequiredTables (
     ACPI_POINTER            Address;
 
 
-    ACPI_FUNCTION_TRACE ("TbGetRequiredTables");
+    ACPI_FUNCTION_TRACE (TbGetRequiredTables);
 
     ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%d ACPI tables in RSDT\n",
         AcpiGbl_RsdtTableCount));
@@ -410,7 +410,7 @@ AcpiTbGetRequiredTables (
 
     /* Always delete the RSDP mapping, we are done with it */
 
-    AcpiTbDeleteTablesByType (ACPI_TABLE_RSDP);
+    AcpiTbDeleteTablesByType (ACPI_TABLE_ID_RSDP);
     return_ACPI_STATUS (Status);
 }
 

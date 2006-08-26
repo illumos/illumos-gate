@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exnames - interpreter/scanner name load/execute
- *              $Revision: 1.107 $
+ *              $Revision: 1.110 $
  *
  *****************************************************************************/
 
@@ -162,7 +162,7 @@ AcpiExAllocateNameString (
     char                    *NameString;
     UINT32                   SizeNeeded;
 
-    ACPI_FUNCTION_TRACE ("ExAllocateNameString");
+    ACPI_FUNCTION_TRACE (ExAllocateNameString);
 
 
     /*
@@ -185,7 +185,7 @@ AcpiExAllocateNameString (
      * Allocate a buffer for the name.
      * This buffer must be deleted by the caller!
      */
-    NameString = ACPI_MEM_ALLOCATE (SizeNeeded);
+    NameString = ACPI_ALLOCATE (SizeNeeded);
     if (!NameString)
     {
         ACPI_ERROR ((AE_INFO,
@@ -260,7 +260,7 @@ AcpiExNameSegment (
     char                    CharBuf[5];
 
 
-    ACPI_FUNCTION_TRACE ("ExNameSegment");
+    ACPI_FUNCTION_TRACE (ExNameSegment);
 
 
     /*
@@ -278,7 +278,7 @@ AcpiExNameSegment (
     ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "Bytes from stream:\n"));
 
     for (Index = 0;
-        (Index < ACPI_NAME_SIZE) && (AcpiUtValidAcpiCharacter (*AmlAddress));
+        (Index < ACPI_NAME_SIZE) && (AcpiUtValidAcpiChar (*AmlAddress, 0));
         Index++)
     {
         CharBuf[Index] = *AmlAddress++;
@@ -366,7 +366,7 @@ AcpiExGetNameString (
     BOOLEAN                 HasPrefix = FALSE;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("ExGetNameString", AmlAddress);
+    ACPI_FUNCTION_TRACE_PTR (ExGetNameString, AmlAddress);
 
 
     if (ACPI_TYPE_LOCAL_REGION_FIELD == DataType   ||
@@ -546,7 +546,7 @@ AcpiExGetNameString (
     {
         if (NameString)
         {
-            ACPI_MEM_FREE (NameString);
+            ACPI_FREE (NameString);
         }
         return_ACPI_STATUS (Status);
     }

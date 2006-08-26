@@ -2,7 +2,7 @@
  *
  * Module Name: tbxface - Public interfaces to the ACPI subsystem
  *                         ACPI table oriented interfaces
- *              $Revision: 1.73 $
+ *              $Revision: 1.79 $
  *
  *****************************************************************************/
 
@@ -147,7 +147,7 @@ AcpiLoadTables (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiLoadTables");
+    ACPI_FUNCTION_TRACE (AcpiLoadTables);
 
 
     /* Get the RSDP */
@@ -209,6 +209,8 @@ ErrorExit:
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiLoadTables)
+
 
 /*******************************************************************************
  *
@@ -220,8 +222,8 @@ ErrorExit:
  * RETURN:      Status
  *
  * DESCRIPTION: This function is called to load a table from the caller's
- *              buffer.  The buffer must contain an entire ACPI Table including
- *              a valid header.  The header fields will be verified, and if it
+ *              buffer. The buffer must contain an entire ACPI Table including
+ *              a valid header. The header fields will be verified, and if it
  *              is determined that the table is invalid, the call will fail.
  *
  ******************************************************************************/
@@ -235,7 +237,7 @@ AcpiLoadTable (
     ACPI_POINTER            Address;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiLoadTable");
+    ACPI_FUNCTION_TRACE (AcpiLoadTable);
 
 
     if (!TablePtr)
@@ -284,12 +286,12 @@ AcpiLoadTable (
 
     switch (TableInfo.Type)
     {
-    case ACPI_TABLE_FADT:
+    case ACPI_TABLE_ID_FADT:
 
         Status = AcpiTbConvertTableFadt ();
         break;
 
-    case ACPI_TABLE_FACS:
+    case ACPI_TABLE_ID_FACS:
 
         Status = AcpiTbBuildCommonFacs (&TableInfo);
         break;
@@ -311,6 +313,8 @@ AcpiLoadTable (
     return_ACPI_STATUS (Status);
 }
 
+ACPI_EXPORT_SYMBOL (AcpiLoadTable)
+
 
 /*******************************************************************************
  *
@@ -331,12 +335,12 @@ AcpiUnloadTable (
     ACPI_TABLE_DESC         *TableDesc;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiUnloadTable");
+    ACPI_FUNCTION_TRACE (AcpiUnloadTable);
 
 
     /* Parameter validation */
 
-    if (TableType > ACPI_TABLE_MAX)
+    if (TableType > ACPI_TABLE_ID_MAX)
     {
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
@@ -344,16 +348,20 @@ AcpiUnloadTable (
     /* Find all tables of the requested type */
 
     TableDesc = AcpiGbl_TableLists[TableType].Next;
+    if (!TableDesc)
+    {
+        return_ACPI_STATUS (AE_NOT_EXIST);
+    }
+
     while (TableDesc)
     {
         /*
-         * Delete all namespace entries owned by this table.  Note that these
-         * entries can appear anywhere in the namespace by virtue of the AML
-         * "Scope" operator.  Thus, we need to track ownership by an ID, not
+         * Delete all namespace objects owned by this table. Note that these
+         * objects can appear anywhere in the namespace by virtue of the AML
+         * "Scope" operator. Thus, we need to track ownership by an ID, not
          * simply a position within the hierarchy
          */
         AcpiNsDeleteNamespaceByOwner (TableDesc->OwnerId);
-        AcpiUtReleaseOwnerId (&TableDesc->OwnerId);
         TableDesc = TableDesc->Next;
     }
 
@@ -362,6 +370,8 @@ AcpiUnloadTable (
     AcpiTbDeleteTablesByType (TableType);
     return_ACPI_STATUS (AE_OK);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiUnloadTable)
 
 
 /*******************************************************************************
@@ -374,12 +384,12 @@ AcpiUnloadTable (
  *                                see AcpiGbl_AcpiTableFlag
  *              OutTableHeader  - pointer to the ACPI_TABLE_HEADER if successful
  *
- * DESCRIPTION: This function is called to get an ACPI table header.  The caller
+ * DESCRIPTION: This function is called to get an ACPI table header. The caller
  *              supplies an pointer to a data area sufficient to contain an ACPI
  *              ACPI_TABLE_HEADER structure.
  *
  *              The header contains a length field that can be used to determine
- *              the size of the buffer needed to contain the entire table.  This
+ *              the size of the buffer needed to contain the entire table. This
  *              function is not valid for the RSD PTR table since it does not
  *              have a standard header and is fixed length.
  *
@@ -395,11 +405,11 @@ AcpiGetTableHeader (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiGetTableHeader");
+    ACPI_FUNCTION_TRACE (AcpiGetTableHeader);
 
 
-    if ((Instance == 0)                 ||
-        (TableType == ACPI_TABLE_RSDP)  ||
+    if ((Instance == 0)                   ||
+        (TableType == ACPI_TABLE_ID_RSDP) ||
         (!OutTableHeader))
     {
         return_ACPI_STATUS (AE_BAD_PARAMETER);
@@ -407,7 +417,7 @@ AcpiGetTableHeader (
 
     /* Check the table type and instance */
 
-    if ((TableType > ACPI_TABLE_MAX)    ||
+    if ((TableType > ACPI_TABLE_ID_MAX) ||
         (ACPI_IS_SINGLE_TABLE (AcpiGbl_TableData[TableType].Flags) &&
          Instance > 1))
     {
@@ -431,11 +441,13 @@ AcpiGetTableHeader (
 
     /* Copy the header to the caller's buffer */
 
-    ACPI_MEMCPY ((void *) OutTableHeader, (void *) TblPtr,
-        sizeof (ACPI_TABLE_HEADER));
+    ACPI_MEMCPY (ACPI_CAST_PTR (void, OutTableHeader),
+        ACPI_CAST_PTR (void, TblPtr), sizeof (ACPI_TABLE_HEADER));
 
     return_ACPI_STATUS (Status);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiGetTableHeader)
 
 
 /*******************************************************************************
@@ -451,12 +463,12 @@ AcpiGetTableHeader (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: This function is called to get an ACPI table.  The caller
+ * DESCRIPTION: This function is called to get an ACPI table. The caller
  *              supplies an OutBuffer large enough to contain the entire ACPI
- *              table.  The caller should call the AcpiGetTableHeader function
- *              first to determine the buffer size needed.  Upon completion
+ *              table. The caller should call the AcpiGetTableHeader function
+ *              first to determine the buffer size needed. Upon completion
  *              the OutBuffer->Length field will indicate the number of bytes
- *              copied into the OutBuffer->BufPtr buffer.  This table will be
+ *              copied into the OutBuffer->BufPtr buffer. This table will be
  *              a complete table including the header.
  *
  ******************************************************************************/
@@ -472,7 +484,7 @@ AcpiGetTable (
     ACPI_SIZE               TableLength;
 
 
-    ACPI_FUNCTION_TRACE ("AcpiGetTable");
+    ACPI_FUNCTION_TRACE (AcpiGetTable);
 
 
     /* Parameter validation */
@@ -490,7 +502,7 @@ AcpiGetTable (
 
     /* Check the table type and instance */
 
-    if ((TableType > ACPI_TABLE_MAX)    ||
+    if ((TableType > ACPI_TABLE_ID_MAX) ||
         (ACPI_IS_SINGLE_TABLE (AcpiGbl_TableData[TableType].Flags) &&
          Instance > 1))
     {
@@ -516,7 +528,7 @@ AcpiGetTable (
 
     /* Get the table length */
 
-    if (TableType == ACPI_TABLE_RSDP)
+    if (TableType == ACPI_TABLE_ID_RSDP)
     {
         /* RSD PTR is the only "table" without a header */
 
@@ -537,8 +549,12 @@ AcpiGetTable (
 
     /* Copy the table to the buffer */
 
-    ACPI_MEMCPY ((void *) RetBuffer->Pointer, (void *) TblPtr, TableLength);
+    ACPI_MEMCPY (ACPI_CAST_PTR (void, RetBuffer->Pointer),
+        ACPI_CAST_PTR (void, TblPtr), TableLength);
+
     return_ACPI_STATUS (AE_OK);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiGetTable)
 
 

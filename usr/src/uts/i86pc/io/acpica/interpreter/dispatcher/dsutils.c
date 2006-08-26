@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 1.119 $
+ *              $Revision: 1.121 $
  *
  ******************************************************************************/
 
@@ -147,7 +147,7 @@ void
 AcpiDsClearImplicitReturn (
     ACPI_WALK_STATE         *WalkState)
 {
-    ACPI_FUNCTION_NAME ("DsClearImplicitReturn");
+    ACPI_FUNCTION_NAME (DsClearImplicitReturn);
 
 
     /*
@@ -200,7 +200,7 @@ AcpiDsDoImplicitReturn (
     ACPI_WALK_STATE         *WalkState,
     BOOLEAN                 AddReference)
 {
-    ACPI_FUNCTION_NAME ("DsDoImplicitReturn");
+    ACPI_FUNCTION_NAME (DsDoImplicitReturn);
 
 
     /*
@@ -265,7 +265,7 @@ AcpiDsIsResultUsed (
 {
     const ACPI_OPCODE_INFO  *ParentInfo;
 
-    ACPI_FUNCTION_TRACE_PTR ("DsIsResultUsed", Op);
+    ACPI_FUNCTION_TRACE_PTR (DsIsResultUsed, Op);
 
 
     /* Must have both an Op and a Result Object */
@@ -442,7 +442,7 @@ AcpiDsDeleteResultIfNotUsed (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("DsDeleteResultIfNotUsed", ResultObj);
+    ACPI_FUNCTION_TRACE_PTR (DsDeleteResultIfNotUsed, ResultObj);
 
 
     if (!Op)
@@ -493,7 +493,7 @@ AcpiDsResolveOperands (
     ACPI_STATUS             Status = AE_OK;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("DsResolveOperands", WalkState);
+    ACPI_FUNCTION_TRACE_PTR (DsResolveOperands, WalkState);
 
 
     /*
@@ -533,7 +533,7 @@ AcpiDsClearOperands (
     UINT32                  i;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("DsClearOperands", WalkState);
+    ACPI_FUNCTION_TRACE_PTR (DsClearOperands, WalkState);
 
 
     /* Remove a reference on each operand on the stack */
@@ -587,7 +587,7 @@ AcpiDsCreateOperand (
     const ACPI_OPCODE_INFO  *OpInfo;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("DsCreateOperand", Arg);
+    ACPI_FUNCTION_TRACE_PTR (DsCreateOperand, Arg);
 
 
     /* A valid name must be looked up in the namespace */
@@ -693,7 +693,7 @@ AcpiDsCreateOperand (
 
         /* Free the namestring created above */
 
-        ACPI_MEM_FREE (NameString);
+        ACPI_FREE (NameString);
 
         /* Check status from the lookup */
 
@@ -826,7 +826,7 @@ AcpiDsCreateOperands (
     UINT32                  ArgCount = 0;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("DsCreateOperands", FirstArg);
+    ACPI_FUNCTION_TRACE_PTR (DsCreateOperands, FirstArg);
 
 
     /* For all arguments in the list... */

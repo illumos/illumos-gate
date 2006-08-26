@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 1.227 $
+ *              $Revision: 1.242 $
  *
  *****************************************************************************/
 
@@ -237,7 +237,6 @@ UINT32                      AcpiDbgLevel = ACPI_NORMAL_DEFAULT;
 UINT32                      AcpiDbgLayer = ACPI_COMPONENT_DEFAULT;
 UINT32                      AcpiGbl_NestingLevel = 0;
 
-
 /* Debugger globals */
 
 BOOLEAN                     AcpiGbl_DbTerminateThreads = FALSE;
@@ -270,29 +269,6 @@ const char                  *AcpiGbl_HighestDstateNames[4] =
     "_S2D",
     "_S3D",
     "_S4D"
-};
-
-/*
- * Strings supported by the _OSI predefined (internal) method.
- * When adding strings, be sure to update ACPI_NUM_OSI_STRINGS.
- */
-const char                  *AcpiGbl_ValidOsiStrings[ACPI_NUM_OSI_STRINGS] =
-{
-    /* Operating System Vendor Strings */
-
-    "Linux",
-    "Windows 2000",
-    "Windows 2001",
-    "Windows 2001.1",
-    "Windows 2001 SP0",
-    "Windows 2001 SP1",
-    "Windows 2001 SP2",
-    "Windows 2001 SP3",
-    "Windows 2001 SP4",
-
-    /* Feature Group Strings */
-
-    "Extended Address Space Descriptor"
 };
 
 
@@ -417,9 +393,9 @@ AcpiUtHexToAsciiChar (
  *
  ******************************************************************************/
 
-ACPI_TABLE_LIST             AcpiGbl_TableLists[NUM_ACPI_TABLE_TYPES];
+ACPI_TABLE_LIST             AcpiGbl_TableLists[ACPI_TABLE_ID_MAX+1];
 
-ACPI_TABLE_SUPPORT          AcpiGbl_TableData[NUM_ACPI_TABLE_TYPES] =
+ACPI_TABLE_SUPPORT          AcpiGbl_TableData[ACPI_TABLE_ID_MAX+1] =
 {
     /***********    Name,   Signature, Global typed pointer     Signature size,      Type                  How many allowed?,    Contains valid AML? */
 
@@ -496,7 +472,6 @@ ACPI_FIXED_EVENT_INFO       AcpiGbl_FixedEventInfo[ACPI_NUM_FIXED_EVENTS] =
 
 const char        *AcpiGbl_RegionTypes[ACPI_NUM_PREDEFINED_REGIONS] =
 {
-/*! [Begin] no source code translation (keep these ASL Keywords as-is) */
     "SystemMemory",
     "SystemIO",
     "PCI_Config",
@@ -505,7 +480,6 @@ const char        *AcpiGbl_RegionTypes[ACPI_NUM_PREDEFINED_REGIONS] =
     "CMOS",
     "PCIBARTarget",
     "DataTable"
-/*! [End] no source code translation !*/
 };
 
 
@@ -543,13 +517,11 @@ AcpiUtGetRegionName (
 
 static const char        *AcpiGbl_EventTypes[ACPI_NUM_FIXED_EVENTS] =
 {
-/*! [Begin] no source code translation (keep these strings as-is) */
     "PM_Timer",
     "GlobalLock",
     "PowerButton",
     "SleepButton",
     "RealTimeClock",
-/*! [End] no source code translation !*/
 };
 
 
@@ -593,7 +565,6 @@ static const char           AcpiGbl_BadType[] = "UNDEFINED";
 
 static const char           *AcpiGbl_NsTypeNames[] =
 {
-/*! [Begin] no source code translation (keep these strings as-is) */
     /* 00 */ "Untyped",
     /* 01 */ "Integer",
     /* 02 */ "String",
@@ -625,7 +596,6 @@ static const char           *AcpiGbl_NsTypeNames[] =
     /* 28 */ "Extra",
     /* 29 */ "Data",
     /* 30 */ "Invalid"
-/*! [End] no source code translation !*/
 };
 
 
@@ -693,7 +663,7 @@ AcpiUtGetNodeName (
 
     /* Descriptor must be a namespace node */
 
-    if (Node->Descriptor != ACPI_DESC_TYPE_NAMED)
+    if (ACPI_GET_DESCRIPTOR_TYPE (Node) != ACPI_DESC_TYPE_NAMED)
     {
         return ("####");
     }
@@ -702,7 +672,7 @@ AcpiUtGetNodeName (
 
     if (!AcpiUtValidAcpiName (Node->Name.Integer))
     {
-        return ("????");
+        Node->Name.Integer = AcpiUtRepairName (Node->Name.Integer);
     }
 
     /* Return the name */
@@ -727,7 +697,6 @@ AcpiUtGetNodeName (
 
 static const char           *AcpiGbl_DescTypeNames[] =
 {
-/*! [Begin] no source code translation (keep these ASL Keywords as-is) */
     /* 00 */ "Invalid",
     /* 01 */ "Cached",
     /* 02 */ "State-Generic",
@@ -744,7 +713,6 @@ static const char           *AcpiGbl_DescTypeNames[] =
     /* 13 */ "Parser",
     /* 14 */ "Operand",
     /* 15 */ "Node"
-/*! [End] no source code translation !*/
 };
 
 
@@ -792,7 +760,7 @@ AcpiUtGetMutexName (
     UINT32                  MutexId)
 {
 
-    if (MutexId > MAX_MUTEX)
+    if (MutexId > ACPI_MAX_MUTEX)
     {
         return ("Invalid Mutex ID");
     }
@@ -851,7 +819,7 @@ AcpiUtInitGlobals (
     UINT32                  i;
 
 
-    ACPI_FUNCTION_TRACE ("UtInitGlobals");
+    ACPI_FUNCTION_TRACE (UtInitGlobals);
 
 
     /* Create all memory caches */
@@ -864,7 +832,7 @@ AcpiUtInitGlobals (
 
     /* ACPI table structure */
 
-    for (i = 0; i < NUM_ACPI_TABLE_TYPES; i++)
+    for (i = 0; i < (ACPI_TABLE_ID_MAX+1); i++)
     {
         AcpiGbl_TableLists[i].Next          = NULL;
         AcpiGbl_TableLists[i].Count         = 0;
@@ -872,7 +840,7 @@ AcpiUtInitGlobals (
 
     /* Mutex locked flags */
 
-    for (i = 0; i < NUM_MUTEX; i++)
+    for (i = 0; i < ACPI_NUM_MUTEX; i++)
     {
         AcpiGbl_MutexInfo[i].Mutex          = NULL;
         AcpiGbl_MutexInfo[i].ThreadId       = ACPI_MUTEX_NOT_ACQUIRED;
@@ -908,8 +876,9 @@ AcpiUtInitGlobals (
 
     /* Global Lock support */
 
+    AcpiGbl_GlobalLockSemaphore         = NULL;
+    AcpiGbl_GlobalLockMutex             = NULL;
     AcpiGbl_GlobalLockAcquired          = FALSE;
-    AcpiGbl_GlobalLockThreadCount       = 0;
     AcpiGbl_GlobalLockHandle            = 0;
 
     /* Miscellaneous variables */
@@ -939,7 +908,7 @@ AcpiUtInitGlobals (
 
     AcpiGbl_RootNode                    = NULL;
     AcpiGbl_RootNodeStruct.Name.Integer = ACPI_ROOT_NAME;
-    AcpiGbl_RootNodeStruct.Descriptor   = ACPI_DESC_TYPE_NAMED;
+    AcpiGbl_RootNodeStruct.DescriptorType = ACPI_DESC_TYPE_NAMED;
     AcpiGbl_RootNodeStruct.Type         = ACPI_TYPE_DEVICE;
     AcpiGbl_RootNodeStruct.Child        = NULL;
     AcpiGbl_RootNodeStruct.Peer         = NULL;
@@ -953,5 +922,10 @@ AcpiUtInitGlobals (
 
     return_VOID;
 }
+
+/* Public globals */
+
+ACPI_EXPORT_SYMBOL (AcpiDbgLevel)
+ACPI_EXPORT_SYMBOL (AcpiDbgLayer)
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actables.h - ACPI table management
- *       $Revision: 1.54 $
+ *       $Revision: 1.55 $
  *
  *****************************************************************************/
 
@@ -259,9 +259,17 @@ AcpiTbVerifyTableChecksum (
     ACPI_TABLE_HEADER       *TableHeader);
 
 UINT8
-AcpiTbGenerateChecksum (
+AcpiTbSumTable (
     void                    *Buffer,
     UINT32                  Length);
+
+UINT8
+AcpiTbGenerateChecksum (
+    ACPI_TABLE_HEADER       *Table);
+
+void
+AcpiTbSetChecksum (
+    ACPI_TABLE_HEADER       *Table);
 
 ACPI_STATUS
 AcpiTbValidateTableHeader (

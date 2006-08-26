@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: hwgpe - Low level GPE enable/disable/clear functions
- *              $Revision: 1.72 $
+ *              $Revision: 1.73 $
  *
  *****************************************************************************/
 
@@ -476,7 +476,7 @@ AcpiHwDisableAllGpes (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("HwDisableAllGpes");
+    ACPI_FUNCTION_TRACE (HwDisableAllGpes);
 
 
     Status = AcpiEvWalkGpeList (AcpiHwDisableGpeBlock);
@@ -504,7 +504,7 @@ AcpiHwEnableAllRuntimeGpes (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("HwEnableAllRuntimeGpes");
+    ACPI_FUNCTION_TRACE (HwEnableAllRuntimeGpes);
 
 
     Status = AcpiEvWalkGpeList (AcpiHwEnableRuntimeGpeBlock);
@@ -531,7 +531,7 @@ AcpiHwEnableAllWakeupGpes (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("HwEnableAllWakeupGpes");
+    ACPI_FUNCTION_TRACE (HwEnableAllWakeupGpes);
 
 
     Status = AcpiEvWalkGpeList (AcpiHwEnableWakeupGpeBlock);

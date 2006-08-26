@@ -52,13 +52,15 @@ void	 __acpi_wbinvd(void);
 #define	COMPILER_DEPENDENT_INT64	int64_t
 #define	COMPILER_DEPENDENT_UINT64	uint64_t
 
+#define	ACPI_THREAD_ID		kt_did_t
+
 #define	ACPI_PRINTF_LIKE_FUNC
 #define	ACPI_UNUSED_VAR
 #define	ACPI_USE_NATIVE_DIVIDE
 #define	ACPI_FLUSH_CPU_CACHE()	(__acpi_wbinvd())
 
-#define	ACPI_MISALIGNMENT_NOT_SUPPORTED
 #define	ACPI_DISASSEMBLER
+#define	ACPI_PACKED_POINTERS_NOT_SUPPORTED
 
 /*
  * Calling conventions:

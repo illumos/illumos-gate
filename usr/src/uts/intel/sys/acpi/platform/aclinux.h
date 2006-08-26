@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclinux.h - OS specific defines, etc.
- *       $Revision: 1.38 $
+ *       $Revision: 1.41 $
  *
  *****************************************************************************/
 
@@ -131,14 +131,13 @@
 #include <asm/div64.h>
 #include <asm/acpi.h>
 
-#define strtoul simple_strtoul
+/* Host-dependent types and defines */
 
-#define ACPI_MACHINE_WIDTH  BITS_PER_LONG
-
-/* Type(s) for the OSL */
-
-#define ACPI_CACHE_T kmem_cache_t
-
+#define ACPI_MACHINE_WIDTH          BITS_PER_LONG
+#define ACPI_CACHE_T                kmem_cache_t
+#define ACPI_SPINLOCK               spinlock_t
+#define ACPI_EXPORT_SYMBOL(Symbol)  EXPORT_SYMBOL(Symbol);
+#define strtoul                     simple_strtoul
 
 #else /* !__KERNEL__ */
 

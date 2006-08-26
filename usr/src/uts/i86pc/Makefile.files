@@ -189,7 +189,7 @@ ACPICA_OBJS	+= dbcmds.o dbdisply.o \
 		   master_ops.o osl.o osl_ml.o acpica_ec.o utcache.o \
 		   utmutex.o utstate.o dmbuffer.o dmnames.o dmobject.o \
 		   dmopcode.o dmresrc.o dmresrcl.o dmresrcs.o dmutils.o \
-		   dmwalk.o psloop.o
+		   dmwalk.o psloop.o uttrack.o
 
 POWER_OBJS	+= power.o
 

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
- *              $Revision: 1.121 $
+ *              $Revision: 1.123 $
  *
  *****************************************************************************/
 
@@ -169,10 +169,10 @@ AcpiExEnterInterpreter (
 {
     ACPI_STATUS             Status;
 
-    ACPI_FUNCTION_TRACE ("ExEnterInterpreter");
+    ACPI_FUNCTION_TRACE (ExEnterInterpreter);
 
 
-    Status = AcpiUtAcquireMutex (ACPI_MTX_EXECUTE);
+    Status = AcpiUtAcquireMutex (ACPI_MTX_INTERPRETER);
     if (ACPI_FAILURE (Status))
     {
         ACPI_ERROR ((AE_INFO, "Could not acquire interpreter mutex"));
@@ -211,10 +211,10 @@ AcpiExExitInterpreter (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("ExExitInterpreter");
+    ACPI_FUNCTION_TRACE (ExExitInterpreter);
 
 
-    Status = AcpiUtReleaseMutex (ACPI_MTX_EXECUTE);
+    Status = AcpiUtReleaseMutex (ACPI_MTX_INTERPRETER);
     if (ACPI_FAILURE (Status))
     {
         ACPI_ERROR ((AE_INFO, "Could not release interpreter mutex"));
@@ -289,7 +289,7 @@ AcpiExAcquireGlobalLock (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("ExAcquireGlobalLock");
+    ACPI_FUNCTION_TRACE (ExAcquireGlobalLock);
 
 
     /* Only attempt lock if the AlwaysLock bit is set */
@@ -334,7 +334,7 @@ AcpiExReleaseGlobalLock (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("ExReleaseGlobalLock");
+    ACPI_FUNCTION_TRACE (ExReleaseGlobalLock);
 
 
     /* Only attempt unlock if the caller locked it */
@@ -380,7 +380,7 @@ AcpiExDigitsNeeded (
     ACPI_INTEGER            CurrentValue;
 
 
-    ACPI_FUNCTION_TRACE ("ExDigitsNeeded");
+    ACPI_FUNCTION_TRACE (ExDigitsNeeded);
 
 
     /* ACPI_INTEGER is unsigned, so we don't worry about a '-' prefix */

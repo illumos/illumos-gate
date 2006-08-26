@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstore - AML Interpreter object store support
- *              $Revision: 1.199 $
+ *              $Revision: 1.200 $
  *
  *****************************************************************************/
 
@@ -166,7 +166,7 @@ AcpiExDoDebugObject (
     UINT32                  i;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("ExDoDebugObject", SourceDesc);
+    ACPI_FUNCTION_TRACE_PTR (ExDoDebugObject, SourceDesc);
 
 
     ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "[ACPI Debug] %*s",
@@ -334,7 +334,7 @@ AcpiExStore (
     ACPI_OPERAND_OBJECT     *RefDesc = DestDesc;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("ExStore", DestDesc);
+    ACPI_FUNCTION_TRACE_PTR (ExStore, DestDesc);
 
 
     /* Validate parameters */
@@ -488,7 +488,7 @@ AcpiExStoreObjectToIndex (
     UINT32                  i;
 
 
-    ACPI_FUNCTION_TRACE ("ExStoreObjectToIndex");
+    ACPI_FUNCTION_TRACE (ExStoreObjectToIndex);
 
 
     /*
@@ -653,7 +653,7 @@ AcpiExStoreObjectToNode (
     ACPI_OBJECT_TYPE        TargetType;
 
 
-    ACPI_FUNCTION_TRACE_PTR ("ExStoreObjectToNode", SourceDesc);
+    ACPI_FUNCTION_TRACE_PTR (ExStoreObjectToNode, SourceDesc);
 
 
     /* Get current type of the node, and object attached to Node */

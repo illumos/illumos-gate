@@ -76,10 +76,7 @@ int acpica_eval_int(ACPI_HANDLE dev, char *method, int *rint);
  */
 int acpica_eventq_thread_count = 1;
 int acpica_eventq_init = 0;
-ddi_taskq_t *eventq_gpe = NULL;
-ddi_taskq_t *eventq_high = NULL;
-ddi_taskq_t *eventq_medium = NULL;
-ddi_taskq_t *eventq_low = NULL;
+ddi_taskq_t *osl_eventq[OSL_EC_BURST_HANDLER+1];
 
 /*
  * Note, if you change this path, you need to update
@@ -99,18 +96,15 @@ int acpica_powering_off = 0;
 static void
 discard_event_queues()
 {
+	int	i;
 
 	/*
 	 * destroy event queues
 	 */
-	if (eventq_gpe)
-		ddi_taskq_destroy(eventq_gpe);
-	if (eventq_high)
-		ddi_taskq_destroy(eventq_high);
-	if (eventq_low)
-		ddi_taskq_destroy(eventq_low);
-	if (eventq_medium)
-		ddi_taskq_destroy(eventq_medium);
+	for (i = OSL_GLOBAL_LOCK_HANDLER; i <= OSL_EC_BURST_HANDLER; i++) {
+		if (osl_eventq[i])
+			ddi_taskq_destroy(osl_eventq[i]);
+	}
 }
 
 
@@ -120,23 +114,22 @@ discard_event_queues()
 static ACPI_STATUS
 init_event_queues()
 {
+	char	namebuf[32];
+	int	i, error = 0;
 
 	/*
 	 * Initialize event queues
-	 * FUTUREWORK: taskq priorities currently the same
 	 */
 
-	eventq_gpe = ddi_taskq_create(NULL, "ACPIGPE",
-	    acpica_eventq_thread_count, TASKQ_DEFAULTPRI, 0);
-	eventq_high = ddi_taskq_create(NULL, "ACPIHIGH",
-	    acpica_eventq_thread_count, TASKQ_DEFAULTPRI, 0);
-	eventq_medium = ddi_taskq_create(NULL, "ACPIMED",
-	    acpica_eventq_thread_count, TASKQ_DEFAULTPRI, 0);
-	eventq_low = ddi_taskq_create(NULL, "ACPILOW",
-	    acpica_eventq_thread_count, TASKQ_DEFAULTPRI, 0);
+	for (i = OSL_GLOBAL_LOCK_HANDLER; i <= OSL_EC_BURST_HANDLER; i++) {
+		snprintf(namebuf, 32, "ACPI%d", i);
+		osl_eventq[i] = ddi_taskq_create(NULL, namebuf,
+		    acpica_eventq_thread_count, TASKQ_DEFAULTPRI, 0);
+		if (osl_eventq[i] == NULL)
+			error++;
+	}
 
-	if ((eventq_gpe == NULL) || (eventq_high == NULL) ||
-	    (eventq_medium == NULL) || (eventq_low == NULL)) {
+	if (error != 0) {
 		discard_event_queues();
 #ifdef	DEBUG
 		cmn_err(CE_WARN, "!acpica: could not initialize event queues");
@@ -269,8 +262,7 @@ typedef struct {
  *
  */
 void
-acpi_sema_init(acpi_sema_t *sp, unsigned max, unsigned count, void *name,
-    int type, void *arg)
+acpi_sema_init(acpi_sema_t *sp, unsigned max, unsigned count)
 {
 	mutex_init(&sp->mutex, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&sp->cv, NULL, CV_DRIVER, NULL);
@@ -366,7 +358,7 @@ ACPI_HANDLE *OutHandle)
 		return (AE_BAD_PARAMETER);
 
 	sp = (acpi_sema_t *)kmem_alloc(sizeof (acpi_sema_t), KM_SLEEP);
-	acpi_sema_init(sp, MaxUnits, InitialUnits, NULL, SEMA_DRIVER, NULL);
+	acpi_sema_init(sp, MaxUnits, InitialUnits);
 	*OutHandle = (ACPI_HANDLE)sp;
 	return (AE_OK);
 }
@@ -530,6 +522,8 @@ AcpiOsInstallInterruptHandler(UINT32 InterruptNumber,
 		ACPI_OSD_HANDLER ServiceRoutine,
 		void *Context)
 {
+	_NOTE(ARGUNUSED(InterruptNumber))
+
 	int retval;
 	int sci_vect;
 	iflag_t sci_flags;
@@ -575,25 +569,24 @@ AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber,
 }
 
 
-UINT32
+ACPI_THREAD_ID
 AcpiOsGetThreadId(void)
 {
-	kt_did_t thread_id;
-
-	/* FUTUREWORK: give back a real thread id */
-	thread_id = ddi_get_kt_did();
-	return ((UINT32)thread_id);
+	/*
+	 * ACPI CA regards thread ID as an error, but it's valid
+	 * on Solaris during kernel initialization.  Thus, 1 is added
+	 * to the kernel thread ID to avoid returning 0
+	 */
+	return (ddi_get_kt_did() + 1);
 }
 
 /*
  *
  */
 ACPI_STATUS
-AcpiOsQueueForExecution(UINT32 Priority,
-		ACPI_OSD_EXEC_CALLBACK  Function,
-		void *Context)
+AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK  Function,
+    void *Context)
 {
-	ddi_taskq_t *q;
 
 	if (!acpica_eventq_init) {
 		/*
@@ -603,32 +596,8 @@ AcpiOsQueueForExecution(UINT32 Priority,
 		    return (AE_ERROR);
 	}
 
-	switch (Priority) {
-	case OSD_PRIORITY_GPE:
-		q = eventq_gpe;
-		break;
-	case OSD_PRIORITY_HIGH:
-		q = eventq_high;
-		break;
-	case OSD_PRIORITY_MED:
-		q = eventq_medium;
-		break;
-	case OSD_PRIORITY_LO:
-		q = eventq_low;
-		break;
-	default:
-		q = NULL;
-		break;
-	}
-
-	if (q == NULL) {
-#ifdef	DEBUG
-		cmn_err(CE_WARN, "!acpica: unknown priority %d", Priority);
-#endif
-		return (AE_ERROR);
-	}
-	if (ddi_taskq_dispatch(q, Function, Context, DDI_NOSLEEP) ==
-	    DDI_FAILURE) {
+	if (ddi_taskq_dispatch(osl_eventq[Type], Function, Context,
+	    DDI_NOSLEEP) == DDI_FAILURE) {
 #ifdef	DEBUG
 		cmn_err(CE_WARN, "!acpica: unable to dispatch event");
 #endif
@@ -893,32 +862,22 @@ AcpiOsWritePciConfiguration(ACPI_PCI_ID *PciId, UINT32 Register,
 }
 
 /*
- * This took me a while to figure out, and thus warrants
- * detailed explanation lest I forget it.
- *
  * Called with ACPI_HANDLEs for both a PCI Config Space
  * OpRegion and (what ACPI CA thinks is) the PCI device
- * to which this ConfigSpace OpRegion belongs.  Problems
- * with this are:
- * - ACPI CA currently only thinks "PNP0A03" is a PCI bridge;
- *   and doesn't recognize "PNP0A08" which is a PCI Express bridge
- *   (in which case the root handle may be higher in the ACPI
- *   namespace than it should, including a non-PCI device)
- *
- * - ACPI CA depends on a valid _BBN object being present
- *   and this is known to not always be true
+ * to which this ConfigSpace OpRegion belongs.  Since
+ * ACPI CA depends on a valid _BBN object being present
+ * and this is not always true (one old x86 had broken _BBN),
+ * we go ahead and get the correct PCI bus number using the
+ * devinfo mapping (which compensates for broken _BBN).
  *
  * Default values for bus, segment, device and function are
  * all 0 when ACPI CA can't figure them out.
  *
- * This is further complicated by BIOSes that implement
- * _BBN() by reading PCI config space - it means that we'll
- * recurse when we attempt to create the devinfo-to-ACPI
- * map.  If Derive is called during create_d2a_map, we simply
- * can't help and return.  It seems this ends up doing the right
- * thing, at least on the LX50 which gets base bus numbers other
- * than 0 from PCI Config space on bus 0.
- *
+ * Some BIOSes implement _BBN() by reading PCI config space
+ * one bus #0 - which means that we'll recurse when we attempt
+ * to create the devinfo-to-ACPI map.  If Derive is called during
+ * create_d2a_map or with bus #0, we don't translate the bus # and
+ * return.
  */
 void
 AcpiOsDerivePciId(ACPI_HANDLE rhandle, ACPI_HANDLE chandle,
@@ -929,9 +888,11 @@ AcpiOsDerivePciId(ACPI_HANDLE rhandle, ACPI_HANDLE chandle,
 	int devfn;
 
 
-	/* See above - avoid recursing during create_d2a_map */
-	/* doesn't matter if multi-threaded here, either */
-	if (creating_d2a_map)
+	/*
+	 * See above - avoid recursing during create_d2a_map,
+	 * and never translate bus# 0.
+	 */
+	if ((creating_d2a_map) || ((*PciId)->Bus == 0))
 		return;
 
 	/*
@@ -963,6 +924,7 @@ AcpiOsDerivePciId(ACPI_HANDLE rhandle, ACPI_HANDLE chandle,
 }
 
 
+/*ARGSUSED*/
 BOOLEAN
 AcpiOsReadable(void *Pointer, ACPI_SIZE Length)
 {
@@ -971,6 +933,7 @@ AcpiOsReadable(void *Pointer, ACPI_SIZE Length)
 	return (1);
 }
 
+/*ARGSUSED*/
 BOOLEAN
 AcpiOsWritable(void *Pointer, ACPI_SIZE Length)
 {
@@ -982,12 +945,23 @@ AcpiOsWritable(void *Pointer, ACPI_SIZE Length)
 UINT64
 AcpiOsGetTimer(void)
 {
+	/* gethrtime() returns 1nS resolution; convert to 100nS granules */
+	return ((gethrtime() + 50) / 100);
+}
 
-	/* New ACPI 3.0 Timer() support */
-	/* FUTUREWORK: need to integrate with PSM? */
+/*ARGSUSED*/
+ACPI_STATUS
+AcpiOsValidateInterface(char *interface)
+{
+	return (AE_SUPPORT);
+}
 
-	cmn_err(CE_NOTE, "!AcpiOsGetTimer unimplemented");
-	return (0);
+/*ARGSUSED*/
+ACPI_STATUS
+AcpiOsValidateAddress(UINT8 spaceid, ACPI_PHYSICAL_ADDRESS addr,
+    ACPI_SIZE length)
+{
+	return (AE_OK);
 }
 
 ACPI_STATUS
