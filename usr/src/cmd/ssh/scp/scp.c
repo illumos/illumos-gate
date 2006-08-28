@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -861,7 +861,6 @@ bad:			run_err("%s: %s", np, strerror(errno));
 			(void) close(ofd);
 			continue;
 		}
-		cp = bp->buf;
 		wrerr = NO;
 
 		if (showprogress) {
@@ -869,11 +868,12 @@ bad:			run_err("%s: %s", np, strerror(errno));
 			progressmeter(-1);
 		}
 		statbytes = 0;
-		for (count = i = 0; i < size; i += 4096) {
-			amt = 4096;
+		for (i = 0; i < size; i += bp->cnt) {
+			amt = bp->cnt;
+			cp = bp->buf;
 			if (i + amt > size)
 				amt = size - i;
-			count += amt;
+			count = amt;
 			do {
 				j = read(remin, cp, amt);
 				if (j == -1 && (errno == EINTR ||
@@ -888,18 +888,14 @@ bad:			run_err("%s: %s", np, strerror(errno));
 				cp += j;
 				statbytes += j;
 			} while (amt > 0);
-			if (count == bp->cnt) {
-				/* Keep reading so we stay sync'd up. */
-				if (wrerr == NO) {
-					j = atomicio(write, ofd, bp->buf,
-					    count);
-					if (j != count) {
-						wrerr = YES;
-						wrerrno = j >= 0 ? EIO : errno;
-					}
+			/* Keep reading so we stay sync'd up. */
+			if (wrerr == NO) {
+				j = atomicio(write, ofd, bp->buf,
+				    count);
+				if (j != count) {
+					wrerr = YES;
+					wrerrno = j >= 0 ? EIO : errno;
 				}
-				count = 0;
-				cp = bp->buf;
 			}
 		}
 		if (showprogress)

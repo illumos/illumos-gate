@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -199,10 +198,10 @@ g11n_getlocale()
     (void) textdomain(TEXT_DOMAIN);
 
     /* If the locale is not set, set it from the env vars */
-    if (!setlocale(LC_CTYPE, NULL))
-	(void) setlocale(LC_CTYPE, "");
+    if (!setlocale(LC_MESSAGES, NULL))
+	(void) setlocale(LC_MESSAGES, "");
 
-    return setlocale(LC_CTYPE, NULL);
+    return setlocale(LC_MESSAGES, NULL);
 }
 
 void
@@ -221,48 +220,10 @@ g11n_setlocale(int category, const char *locale)
 	return;
 
     /*
-     * If <category> is bogus, setlocale() will do nothing and will
-     * return NULL.
+     * If <category> is bogus, setlocale() will do nothing.
      */
-    if (!setlocale(category, locale))
-	return;
+    (void) setlocale(category, locale);
 
-    /* If setting the locale from the environment, then we're done */
-    if (!*locale)
-	return;
-
-    /*
-     * If setting a locale from the <locale> argument, then set the
-     * related env vars.
-     */
-    switch (category) {
-    case LC_ALL:
-	/*
-	 * We must not set LC_ALL environment variable here because if we
-	 * did it would later override any other LC_* variables that were
-	 * requested from the other side.
-	 */
-	setenv("LANG", locale, 1);
-	break;
-    case LC_CTYPE:
-	setenv("LC_CTYPE", locale, 1);
-	break;
-    case LC_NUMERIC:
-	setenv("LC_NUMERIC", locale, 1);
-	break;
-    case LC_TIME:
-	setenv("LC_TIME", locale, 1);
-	break;
-    case LC_COLLATE:
-	setenv("LC_COLLATE", locale, 1);
-	break;
-    case LC_MONETARY:
-	setenv("LC_MONETARY", locale, 1);
-	break;
-    case LC_MESSAGES:
-	setenv("LC_MESSAGES", locale, 1);
-	break;
-    }
     return;
 }
 
