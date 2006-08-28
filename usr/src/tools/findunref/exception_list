@@ -112,6 +112,7 @@
 ./src/prototypes
 */tools
 ./src/cmd/pools/poold/com/sun/solaris/*/*/package.html
+./src/uts/i86pc/io/acpica/cmp_ca.sh
 
 #
 # Ignore files that are only used by internal packages.
