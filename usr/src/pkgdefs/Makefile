@@ -426,7 +426,7 @@ $(XMODS):       FRC
 		true; \
 	fi
 
-awk_pkginfo: bld_awk_pkginfo FRC
+awk_pkginfo: bld_awk_pkginfo
 	./bld_awk_pkginfo -m $(MACH) -p "$(RELEASE)/$(VERSION)" -o $@ -v \
 	$(ONVERS)
 
