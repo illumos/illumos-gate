@@ -190,6 +190,9 @@ else
 	export RELEASE_BUILD ; RELEASE_BUILD=
 	unset EXTRA_OPTIONS
 	unset EXTRA_CFLAGS
+	if [ "$SINGLE_PROTO" = "no" ]; then
+		ROOT=$ROOT-nd
+	fi
 fi
 
 # update build-type variables

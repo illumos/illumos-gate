@@ -308,6 +308,24 @@ clone_source() {
 
 }
 
+setroot() {
+	typeset suffix=$1
+
+	# Save the original $ROOT
+	ROOT_=$ROOT
+	ROOT=$ROOT$suffix
+
+	ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"
+	ENVCPPFLAGS1="-I$ROOT/usr/include"
+}
+
+resetroot() {
+	ROOT=$ROOT_
+
+	ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"
+	ENVCPPFLAGS1="-I$ROOT/usr/include"
+}
+
 # function to do the build.
 # usage: build LABEL SUFFIX
 
@@ -336,6 +354,8 @@ build() {
 	if [ -f $SRC/${OLDNOISE}.out ]; then
 		mv $SRC/${OLDNOISE}.out $SRC/${NOISE}.ref
 	fi
+
+	setroot $SUFFIX
 
 	this_build_ok=y
 	#
@@ -516,6 +536,8 @@ build() {
 	else
 		echo "\n==== Not creating $LABEL packages ====\n" >> $LOGFILE
 	fi
+
+	resetroot
 }
 
 dolint() {
@@ -615,18 +637,38 @@ dolint() {
 
 copy_ihv_proto() {
 
-	echo "\n==== Installing $IA32_IHV_ROOT  ====\n" \
+	echo "\n==== Installing IHV_ROOT ====\n" \
 		>> $LOGFILE
 	if [ -d "$IA32_IHV_ROOT" ]; then
 		if [ ! -d "$ROOT" ]; then
 			echo "mkdir -p $ROOT" >> $LOGFILE
 			mkdir -p $ROOT
 		fi
-		echo "cd $IA32_IHV_ROOT\n" >> $LOGFILE
+		echo "copying $IA32_IHV_ROOT to $ROOT\n" >> $LOGFILE
 		cd $IA32_IHV_ROOT
 		tar -cf - . | (cd $ROOT; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
 	else
 		echo "$IA32_IHV_ROOT: not found" >> $LOGFILE
+	fi
+
+	if [ "$SINGLE_PROTO" = "no" ]; then
+		if [ ! -d "$ROOT-nd" ]; then
+			echo "mkdir -p $ROOT-nd" >> $LOGFILE
+			mkdir -p $ROOT-nd
+		fi
+		# If there's a non-debug version of the IHV proto area,
+		# copy it, but copy something if there's not.
+		if [ -d "$IA32_IHV_ROOT-nd" ]; then
+			echo "copying $IA32_IHV_ROOT-nd to $ROOT-nd \n" >> $LOGFILE
+			cd $IA32_IHV_ROOT-nd
+		elif [ -d "$IA32_IHV_ROOT" ]; then
+			echo "copying $IA32_IHV_ROOT to $ROOT-nd\n" >> $LOGFILE
+			cd $IA32_IHV_ROOT
+		else
+			echo "$IA32_IHV_ROOT{-nd,}: not found" >> $LOGFILE
+			return
+		fi
+		tar -cf - . | (cd $ROOT-nd; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
 	fi
 }
 
@@ -1028,6 +1070,13 @@ if [ "$BRINGOVER_FILES" = "" ]; then
 fi
 
 #
+# If SINGLE_PROTO was not specified, default to a single proto area
+#
+if [ "$SINGLE_PROTO" = "" ]; then
+	SINGLE_PROTO="yes"
+fi
+
+#
 # If the closed sources are not present, the closed binaries must be
 # present for the build to succeed.  If there's no pointer to the
 # closed binaries, flag that now, rather than forcing the user to wait
@@ -1189,7 +1238,7 @@ POUND_SIGN="#"
 
 # we export POUND_SIGN to speed up the build process -- prevents evaluation of
 # the Makefile.master definitions.
-export o_FLAG POUND_SIGN
+export o_FLAG X_FLAG POUND_SIGN
 
 maketype="distributed"
 MAKE=dmake
@@ -1289,6 +1338,14 @@ if [ "$X_FLAG" = "y" ]; then
         fi
         if [ ! -d "$IA32_IHV_ROOT" ]; then
                 echo "$IA32_IHV_ROOT: not found"
+                args_ok=n
+        fi
+        if [ "$IA32_IHV_WS" = "" ]; then
+		echo "IA32_IHV_WS: must be set for copying ihv proto"
+		args_ok=n
+        fi
+        if [ ! -d "$IA32_IHV_WS" ]; then
+                echo "$IA32_IHV_WS: not found"
                 args_ok=n
         fi
 fi
@@ -1398,6 +1455,10 @@ logshuffle() {
 
 		if [ -f $TMPDIR/wsdiff.results ]; then
 		    mv $TMPDIR/wsdiff.results $LLOG
+		fi
+
+		if [ -f $TMPDIR/wsdiff-nd.results ]; then
+		    mv $TMPDIR/wsdiff-nd.results $LLOG
 		fi
 	fi
 
@@ -1677,14 +1738,6 @@ if [ "$t_FLAG" = "n" ]; then
 	fi
 fi
 
-# copy ihv proto area in addition to the build itself
-
-if [ "$X_FLAG" = "y" ]; then
-
-	# Install IA32 IHV proto area
-	copy_ihv_proto
-fi
-
 echo "==== Build environment ====\n" | tee -a $mail_msg_file >> $LOGFILE
 
 # System
@@ -1771,6 +1824,14 @@ if [ "$w_FLAG" = "y" -a -d "$ROOT" ]; then
     mv $ROOT $ROOT.prev
 fi
 
+# Same for non-DEBUG proto area
+if [ "$w_FLAG" = "y" -a "$SINGLE_PROTO" = "no" -a -d "$ROOT-nd" ]; then
+	if [ -d "$ROOT-nd.prev" ]; then
+		rm -rf $ROOT-nd.prev
+	fi
+	mv $ROOT-nd $ROOT-nd.prev
+fi
+
 #
 #	Decide whether to clobber
 #
@@ -1807,7 +1868,7 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 		mkdir -p ${TOOLS_PROTO}
 	fi
 
-	rm -rf $ROOT
+	rm -rf $ROOT $ROOT-nd
 
 	# Get back to a clean workspace as much as possible to catch
 	# problems that only occur on fresh workspaces.
@@ -1881,6 +1942,13 @@ if [ "$t_FLAG" = "y" ]; then
 	build_tools ${TOOLS_PROTO}
 fi
 
+#
+# copy ihv proto area in addition to the build itself
+#
+if [ "$X_FLAG" = "y" ]; then
+	copy_ihv_proto
+fi
+
 if [ "$i_FLAG" = "y" -a "$SH_FLAG" = "y" ]; then
 	echo "\n==== NOT Building base OS-Net source ====\n" | \
 	    tee -a $LOGFILE >> $mail_msg_file
@@ -1938,7 +2006,7 @@ fi
 
 if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
 	# remove proto area here, since we don't clobber
-	rm -rf "$ROOT"
+	rm -rf "$ROOT" "$ROOT-nd"
 	if [ "$t_FLAG" = "y" ]; then
 		export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
 		export RELEASE_BUILD ; RELEASE_BUILD=
@@ -1971,6 +2039,9 @@ if [ "$build_ok" = "y" ]; then
 		if [ -f $SRC/pkgdefs/$exc ]; then
 			ELIST="-e $SRC/pkgdefs/$exc"
 		fi
+		if [ "$X_FLAG" = "y" -a -f $IA32_IHV_WS/usr/src/pkgdefs/$exc ]; then
+			ELIST="$ELIST -e $IA32_IHV_WS/usr/src/pkgdefs/$exc"
+		fi
 
 		if [ -f "$REF_PROTO_LIST" ]; then
 			$PROTOCMPTERSE \
@@ -1991,6 +2062,9 @@ if [ "$build_ok" = "y" ]; then
 				PKGDEFS_LIST="$PKGDEFS_LIST -d $d/pkgdefs"
 			fi
 		done
+		if [ "$X_FLAG" = "y" -a -d $IA32_IHV_WS/usr/src/pkgdefs ]; then
+			PKGDEFS_LIST="$PKGDEFS_LIST -d $IA32_IHV_WS/usr/src/pkgdefs"
+		fi
 
 		$PROTOCMPTERSE \
 		    "Files missing from the proto area:" \
@@ -2037,6 +2111,13 @@ if [ "$U_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	cd $ROOT
 	( tar cf - . | ( cd $NIGHTLY_PARENT_ROOT;  umask 0; tar xpf - ) ) 2>&1 |
 		tee -a $mail_msg_file >> $LOGFILE
+	if [ "$SINGLE_PROTO" = "no" ]; then
+		mkdir -p $NIGHTLY_PARENT_ROOT-nd
+		cd $ROOT-nd
+		( tar cf - . |
+			( cd $NIGHTLY_PARENT_ROOT-nd; umask 0; tar xpf - ) ) 2>&1 |
+			tee -a $mail_msg_file >> $LOGFILE
+	fi
 fi
 
 #
@@ -2253,15 +2334,30 @@ if [ "$M_FLAG" != "y" -a "$build_ok" = y ]; then
 fi
 
 if [ "$w_FLAG" = "y" -a "$build_ok" = "y" ]; then
-	echo "\n==== Objects that differ since last build ====\n" | \
-	    tee -a $LOGFILE >> $mail_msg_file
+	echo "\n==== Objects that differ since last build ====\n" |
+		tee -a $LOGFILE >> $mail_msg_file
 
 	if [ "$t_FLAG" = "y" ]; then
-	    wsdiff -t -r ${TMPDIR}/wsdiff.results $ROOT.prev $ROOT | \
-		tee -a $LOGFILE >> $mail_msg_file
+		wsdiff -t -r ${TMPDIR}/wsdiff.results $ROOT.prev $ROOT |
+			tee -a $LOGFILE >> $mail_msg_file
 	else
-	    wsdiff -r ${TMPDIR}/wsdiff.results $ROOT.prev $ROOT  | \
-		tee -a $LOGFILE >> $mail_msg_file
+		wsdiff -r ${TMPDIR}/wsdiff.results $ROOT.prev $ROOT  |
+			tee -a $LOGFILE >> $mail_msg_file
+	fi
+
+	if [ "$SINGLE_PROTO" = "no" ]; then
+		echo "\n==== Objects that differ since last build (non-DEBUG) ====\n" |
+			tee -a $LOGFILE >> $mail_msg_file
+
+		if [ "$t_FLAG" = "y" ]; then
+			wsdiff -t -r ${TMPDIR}/wsdiff-nd.results \
+				$ROOT-nd.prev $ROOT-nd |
+					tee -a $LOGFILE >> $mail_msg_file
+		else
+			wsdiff -r ${TMPDIR}/wsdiff-nd.results \
+				$ROOT-nd.prev $ROOT-nd |
+					tee -a $LOGFILE >> $mail_msg_file
+		fi
 	fi
 fi
 
