@@ -308,24 +308,6 @@ clone_source() {
 
 }
 
-setroot() {
-	typeset suffix=$1
-
-	# Save the original $ROOT
-	ROOT_=$ROOT
-	ROOT=$ROOT$suffix
-
-	ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"
-	ENVCPPFLAGS1="-I$ROOT/usr/include"
-}
-
-resetroot() {
-	ROOT=$ROOT_
-
-	ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"
-	ENVCPPFLAGS1="-I$ROOT/usr/include"
-}
-
 # function to do the build.
 # usage: build LABEL SUFFIX
 
@@ -355,7 +337,12 @@ build() {
 		mv $SRC/${OLDNOISE}.out $SRC/${NOISE}.ref
 	fi
 
-	setroot $SUFFIX
+	if [[ "$SINGLE_PROTO" != "yes" ]]; then
+		ROOT=$ROOT$SUFFIX
+	fi
+
+	ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"
+	ENVCPPFLAGS1="-I$ROOT/usr/include"
 
 	this_build_ok=y
 	#
@@ -536,8 +523,6 @@ build() {
 	else
 		echo "\n==== Not creating $LABEL packages ====\n" >> $LOGFILE
 	fi
-
-	resetroot
 }
 
 dolint() {
