@@ -58,7 +58,7 @@
  * zfs_log_create() is used to handle TX_CREATE, TX_MKDIR and TX_MKXATTR
  * transactions.
  */
-uint64_t
+void
 zfs_log_create(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	znode_t *dzp, znode_t *zp, char *name)
 {
@@ -68,7 +68,7 @@ zfs_log_create(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	size_t namesize = strlen(name) + 1;
 
 	if (zilog == NULL)
-		return (0);
+		return;
 
 	itx = zil_itx_create(txtype, sizeof (*lr) + namesize);
 	lr = (lr_create_t *)&itx->itx_lr;
@@ -86,13 +86,12 @@ zfs_log_create(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	seq = zil_itx_assign(zilog, itx, tx);
 	dzp->z_last_itx = seq;
 	zp->z_last_itx = seq;
-	return (seq);
 }
 
 /*
  * zfs_log_remove() handles both TX_REMOVE and TX_RMDIR transactions.
  */
-uint64_t
+void
 zfs_log_remove(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	znode_t *dzp, char *name)
 {
@@ -102,7 +101,7 @@ zfs_log_remove(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	size_t namesize = strlen(name) + 1;
 
 	if (zilog == NULL)
-		return (0);
+		return;
 
 	itx = zil_itx_create(txtype, sizeof (*lr) + namesize);
 	lr = (lr_remove_t *)&itx->itx_lr;
@@ -111,13 +110,12 @@ zfs_log_remove(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 
 	seq = zil_itx_assign(zilog, itx, tx);
 	dzp->z_last_itx = seq;
-	return (seq);
 }
 
 /*
  * zfs_log_link() handles TX_LINK transactions.
  */
-uint64_t
+void
 zfs_log_link(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	znode_t *dzp, znode_t *zp, char *name)
 {
@@ -127,7 +125,7 @@ zfs_log_link(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	size_t namesize = strlen(name) + 1;
 
 	if (zilog == NULL)
-		return (0);
+		return;
 
 	itx = zil_itx_create(txtype, sizeof (*lr) + namesize);
 	lr = (lr_link_t *)&itx->itx_lr;
@@ -138,13 +136,12 @@ zfs_log_link(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	seq = zil_itx_assign(zilog, itx, tx);
 	dzp->z_last_itx = seq;
 	zp->z_last_itx = seq;
-	return (seq);
 }
 
 /*
  * zfs_log_symlink() handles TX_SYMLINK transactions.
  */
-uint64_t
+void
 zfs_log_symlink(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	znode_t *dzp, znode_t *zp, char *name, char *link)
 {
@@ -155,7 +152,7 @@ zfs_log_symlink(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	size_t linksize = strlen(link) + 1;
 
 	if (zilog == NULL)
-		return (0);
+		return;
 
 	itx = zil_itx_create(txtype, sizeof (*lr) + namesize + linksize);
 	lr = (lr_create_t *)&itx->itx_lr;
@@ -173,13 +170,12 @@ zfs_log_symlink(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	seq = zil_itx_assign(zilog, itx, tx);
 	dzp->z_last_itx = seq;
 	zp->z_last_itx = seq;
-	return (seq);
 }
 
 /*
  * zfs_log_rename() handles TX_RENAME transactions.
  */
-uint64_t
+void
 zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	znode_t *sdzp, char *sname, znode_t *tdzp, char *dname, znode_t *szp)
 {
@@ -190,7 +186,7 @@ zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	size_t dnamesize = strlen(dname) + 1;
 
 	if (zilog == NULL)
-		return (0);
+		return;
 
 	itx = zil_itx_create(txtype, sizeof (*lr) + snamesize + dnamesize);
 	lr = (lr_rename_t *)&itx->itx_lr;
@@ -203,7 +199,6 @@ zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	sdzp->z_last_itx = seq;
 	tdzp->z_last_itx = seq;
 	szp->z_last_itx = seq;
-	return (seq);
 }
 
 /*
@@ -211,7 +206,7 @@ zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, int txtype,
  */
 ssize_t zfs_immediate_write_sz = 32768;
 
-uint64_t
+void
 zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	znode_t *zp, offset_t off, ssize_t len, int ioflag, uio_t *uio)
 {
@@ -223,7 +218,7 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	int err;
 
 	if (zilog == NULL || zp->z_reap)
-		return (0);
+		return;
 
 	/*
 	 * Writes are handled in three different ways:
@@ -280,13 +275,12 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 
 	seq = zil_itx_assign(zilog, itx, tx);
 	zp->z_last_itx = seq;
-	return (seq);
 }
 
 /*
  * zfs_log_truncate() handles TX_TRUNCATE transactions.
  */
-uint64_t
+void
 zfs_log_truncate(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	znode_t *zp, uint64_t off, uint64_t len)
 {
@@ -295,7 +289,7 @@ zfs_log_truncate(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	lr_truncate_t *lr;
 
 	if (zilog == NULL || zp->z_reap)
-		return (0);
+		return;
 
 	itx = zil_itx_create(txtype, sizeof (*lr));
 	lr = (lr_truncate_t *)&itx->itx_lr;
@@ -305,13 +299,12 @@ zfs_log_truncate(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 
 	seq = zil_itx_assign(zilog, itx, tx);
 	zp->z_last_itx = seq;
-	return (seq);
 }
 
 /*
  * zfs_log_setattr() handles TX_SETATTR transactions.
  */
-uint64_t
+void
 zfs_log_setattr(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	znode_t *zp, vattr_t *vap, uint_t mask_applied)
 {
@@ -320,7 +313,7 @@ zfs_log_setattr(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	lr_setattr_t *lr;
 
 	if (zilog == NULL || zp->z_reap)
-		return (0);
+		return;
 
 	itx = zil_itx_create(txtype, sizeof (*lr));
 	lr = (lr_setattr_t *)&itx->itx_lr;
@@ -335,13 +328,12 @@ zfs_log_setattr(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 
 	seq = zil_itx_assign(zilog, itx, tx);
 	zp->z_last_itx = seq;
-	return (seq);
 }
 
 /*
  * zfs_log_acl() handles TX_ACL transactions.
  */
-uint64_t
+void
 zfs_log_acl(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	znode_t *zp, int aclcnt, ace_t *z_ace)
 {
@@ -350,7 +342,7 @@ zfs_log_acl(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	lr_acl_t *lr;
 
 	if (zilog == NULL || zp->z_reap)
-		return (0);
+		return;
 
 	itx = zil_itx_create(txtype, sizeof (*lr) + aclcnt * sizeof (ace_t));
 	lr = (lr_acl_t *)&itx->itx_lr;
@@ -360,5 +352,4 @@ zfs_log_acl(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 
 	seq = zil_itx_assign(zilog, itx, tx);
 	zp->z_last_itx = seq;
-	return (seq);
 }

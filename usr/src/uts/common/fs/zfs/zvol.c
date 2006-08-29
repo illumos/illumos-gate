@@ -843,7 +843,7 @@ zvol_strategy(buf_t *bp)
 		if (txg_sync_needed)
 			txg_wait_synced(dmu_objset_pool(os), 0);
 		else
-			zil_commit(zv->zv_zilog, UINT64_MAX, FDSYNC);
+			zil_commit(zv->zv_zilog, UINT64_MAX, 0);
 	}
 
 	return (0);

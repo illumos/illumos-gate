@@ -140,10 +140,10 @@ typedef enum arc_reclaim_strategy {
 static int		arc_grow_retry = 60;
 
 /*
- * minimum lifespan of a prefetched block in seconds
- * (this is converted to ticks during the arc initialization)
+ * minimum lifespan of a prefetch block in clock ticks
+ * (initialized in arc_init())
  */
-static int		arc_min_prefetch_lifespan = 1;
+static int		arc_min_prefetch_lifespan;
 
 static kmutex_t arc_reclaim_lock;
 static int arc_dead;
@@ -2407,7 +2407,7 @@ arc_init(void)
 	cv_init(&arc_reclaim_thr_cv, NULL, CV_DEFAULT, NULL);
 
 	/* Convert seconds to clock ticks */
-	arc_min_prefetch_lifespan *= hz;
+	arc_min_prefetch_lifespan = 1 * hz;
 
 	/* Start out with 1/8 of all memory */
 	arc.c = physmem * PAGESIZE / 8;

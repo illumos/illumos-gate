@@ -913,7 +913,6 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 	zilog_t *zilog = zfsvfs->z_log;
 	rl_t *rl;
-	uint64_t seq = 0;
 	uint64_t end = off + len;
 	uint64_t size, new_blksz;
 	int error;
@@ -1015,15 +1014,12 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 
 	if (log) {
 		zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
-		seq = zfs_log_truncate(zilog, tx, TX_TRUNCATE, zp, off, len);
+		zfs_log_truncate(zilog, tx, TX_TRUNCATE, zp, off, len);
 	}
 
 	zfs_range_unlock(rl);
 
 	dmu_tx_commit(tx);
-
-	if (log)
-		zil_commit(zilog, seq, 0);
 
 	/*
 	 * Clear any mapped pages in the truncated region.  This has to

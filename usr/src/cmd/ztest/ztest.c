@@ -1249,7 +1249,7 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 			dmu_tx_commit(tx);
 		}
 		if (ztest_random(5) == 0) {
-			zil_commit(zilog, seq, FSYNC);
+			zil_commit(zilog, seq, object);
 		}
 		if (ztest_random(100) == 0) {
 			error = zil_suspend(zilog);

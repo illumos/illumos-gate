@@ -1159,7 +1159,6 @@ zfs_setacl(znode_t *zp, vsecattr_t *vsecp, cred_t *cr)
 	int		error;
 	int		inherit;
 	zfs_acl_t	*aclp;
-	uint64_t	seq = 0;
 
 	if (mask == 0)
 		return (EINVAL);
@@ -1211,13 +1210,11 @@ top:
 	ASSERT(error == 0);
 
 	zfs_acl_free(aclp);
-	seq = zfs_log_acl(zilog, tx, TX_ACL, zp, aclcnt, acep);
+	zfs_log_acl(zilog, tx, TX_ACL, zp, aclcnt, acep);
 	dmu_tx_commit(tx);
 done:
 	mutex_exit(&zp->z_acl_lock);
 	mutex_exit(&zp->z_lock);
-
-	zil_commit(zilog, seq, 0);
 
 	return (error);
 }
@@ -1263,10 +1260,12 @@ zfs_zaccess_common(znode_t *zp, int v4_mode, int *working_mode, cred_t *cr)
 	uint_t		entry_type;
 	uid_t		uid = crgetuid(cr);
 
-	*working_mode = v4_mode;
-
-	if (zfsvfs->z_assign >= TXG_INITIAL)		/* ZIL replay */
+	if (zfsvfs->z_assign >= TXG_INITIAL) {		/* ZIL replay */
+		*working_mode = 0;
 		return (0);
+	}
+
+	*working_mode = v4_mode;
 
 	if ((v4_mode & WRITE_MASK) &&
 	    (zp->z_zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) &&

@@ -110,12 +110,18 @@ typedef struct zil_trailer {
  * The fields are carefully defined to allow them to be aligned
  * and sized the same on sparc & intel architectures.
  * Each log record has a common structure at the beginning.
+ *
+ * Note, lrc_seq holds two different sequence numbers. Whilst in memory
+ * it contains the transaction sequence number.  The log record on
+ * disk holds the sequence number of all log records which is used to
+ * ensure we don't replay the same record.  The two sequence numbers are
+ * different because the transactions can now be pushed out of order.
  */
 typedef struct {			/* common log record header */
 	uint64_t	lrc_txtype;	/* intent log transaction type */
 	uint64_t	lrc_reclen;	/* transaction record length */
 	uint64_t	lrc_txg;	/* dmu transaction group number */
-	uint64_t	lrc_seq;	/* intent log sequence number */
+	uint64_t	lrc_seq;	/* see comment above */
 } lr_t;
 
 typedef struct {
@@ -236,7 +242,7 @@ extern void	zil_destroy(zilog_t *zilog, boolean_t keep_first);
 extern itx_t	*zil_itx_create(int txtype, size_t lrsize);
 extern uint64_t zil_itx_assign(zilog_t *zilog, itx_t *itx, dmu_tx_t *tx);
 
-extern void	zil_commit(zilog_t *zilog, uint64_t seq, int ioflag);
+extern void	zil_commit(zilog_t *zilog, uint64_t seq, uint64_t oid);
 
 extern int	zil_claim(char *osname, void *txarg);
 extern void	zil_sync(zilog_t *zilog, dmu_tx_t *tx);
@@ -247,8 +253,6 @@ extern int	zil_suspend(zilog_t *zilog);
 extern void	zil_resume(zilog_t *zilog);
 
 extern int zil_disable;
-extern int zil_always;
-extern int zil_purge;
 
 #ifdef	__cplusplus
 }

@@ -223,8 +223,16 @@ zfs_replay_write(zfsvfs_t *zfsvfs, lr_write_t *lr, boolean_t byteswap)
 	if (byteswap)
 		byteswap_uint64_array(lr, sizeof (*lr));
 
-	if ((error = zfs_zget(zfsvfs, lr->lr_foid, &zp)) != 0)
+	if ((error = zfs_zget(zfsvfs, lr->lr_foid, &zp)) != 0) {
+		/*
+		 * As we can log writes out of order, it's possible the
+		 * file has been removed. In this case just drop the write
+		 * and return success.
+		 */
+		if (error == ENOENT)
+			error = 0;
 		return (error);
+	}
 
 	error = vn_rdwr(UIO_WRITE, ZTOV(zp), data, lr->lr_length,
 	    lr->lr_offset, UIO_SYSSPACE, 0, RLIM64_INFINITY, kcred, &resid);
@@ -244,8 +252,16 @@ zfs_replay_truncate(zfsvfs_t *zfsvfs, lr_truncate_t *lr, boolean_t byteswap)
 	if (byteswap)
 		byteswap_uint64_array(lr, sizeof (*lr));
 
-	if ((error = zfs_zget(zfsvfs, lr->lr_foid, &zp)) != 0)
+	if ((error = zfs_zget(zfsvfs, lr->lr_foid, &zp)) != 0) {
+		/*
+		 * As we can log truncates out of order, it's possible the
+		 * file has been removed. In this case just drop the truncate
+		 * and return success.
+		 */
+		if (error == ENOENT)
+			error = 0;
 		return (error);
+	}
 
 	bzero(&fl, sizeof (fl));
 	fl.l_type = F_WRLCK;
@@ -271,8 +287,16 @@ zfs_replay_setattr(zfsvfs_t *zfsvfs, lr_setattr_t *lr, boolean_t byteswap)
 	if (byteswap)
 		byteswap_uint64_array(lr, sizeof (*lr));
 
-	if ((error = zfs_zget(zfsvfs, lr->lr_foid, &zp)) != 0)
+	if ((error = zfs_zget(zfsvfs, lr->lr_foid, &zp)) != 0) {
+		/*
+		 * As we can log setattrs out of order, it's possible the
+		 * file has been removed. In this case just drop the setattr
+		 * and return success.
+		 */
+		if (error == ENOENT)
+			error = 0;
 		return (error);
+	}
 
 	zfs_init_vattr(&va, lr->lr_mask, lr->lr_mode,
 	    lr->lr_uid, lr->lr_gid, 0, lr->lr_foid);
@@ -301,8 +325,16 @@ zfs_replay_acl(zfsvfs_t *zfsvfs, lr_acl_t *lr, boolean_t byteswap)
 		zfs_ace_byteswap(ace, lr->lr_aclcnt);
 	}
 
-	if ((error = zfs_zget(zfsvfs, lr->lr_foid, &zp)) != 0)
+	if ((error = zfs_zget(zfsvfs, lr->lr_foid, &zp)) != 0) {
+		/*
+		 * As we can log acls out of order, it's possible the
+		 * file has been removed. In this case just drop the acl
+		 * and return success.
+		 */
+		if (error == ENOENT)
+			error = 0;
 		return (error);
+	}
 
 	bzero(&vsa, sizeof (vsa));
 	vsa.vsa_mask = VSA_ACE | VSA_ACECNT;

@@ -53,18 +53,15 @@ typedef struct lwb {
 	char		*lwb_buf;	/* log write buffer */
 	zio_t		*lwb_zio;	/* zio for this buffer */
 	uint64_t	lwb_max_txg;	/* highest txg in this lwb */
-	uint64_t	lwb_seq;	/* highest log record seq number */
 	txg_handle_t	lwb_txgh;	/* txg handle for txg_exit() */
 	list_node_t	lwb_node;	/* zilog->zl_lwb_list linkage */
-	lwb_state_t	lwb_state;	/* buffer state */
 } lwb_t;
 
 /*
- * [vdev, seq] element for use in flushing device write caches
+ * vdev element for use in flushing device write caches
  */
 typedef struct zil_vdev {
 	uint64_t	vdev;		/* device written */
-	uint64_t	seq;		/* itx sequence */
 	list_node_t	vdev_seq_node;	/* zilog->zl_vdev_list linkage */
 } zil_vdev_t;
 
@@ -78,14 +75,14 @@ struct zilog {
 	const zil_header_t *zl_header;	/* log header buffer */
 	objset_t	*zl_os;		/* object set we're logging */
 	zil_get_data_t	*zl_get_data;	/* callback to get object content */
+	zio_t		*zl_root_zio;	/* log writer root zio */
 	uint64_t	zl_itx_seq;	/* itx sequence number */
-	uint64_t	zl_wait_seq;	/* last tx write initiated */
 	uint64_t	zl_ss_seq;	/* last tx on stable storage */
+	uint64_t	zl_lr_seq;	/* log record sequence number */
 	uint64_t	zl_destroy_txg;	/* txg of last zil_destroy() */
 	uint64_t	zl_replay_seq[TXG_SIZE]; /* seq of last replayed rec */
 	uint32_t	zl_suspend;	/* log suspend count */
-	kcondvar_t	zl_cv_write;	/* for waiting to write to log */
-	kcondvar_t	zl_cv_seq;	/* for committing a sequence */
+	kcondvar_t	zl_cv_writer;	/* log writer thread completion */
 	kcondvar_t	zl_cv_suspend;	/* log suspend completion */
 	uint8_t		zl_suspending;	/* log is currently suspending */
 	uint8_t		zl_keep_first;	/* keep first log block in destroy */

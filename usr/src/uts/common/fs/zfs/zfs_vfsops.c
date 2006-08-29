@@ -139,7 +139,7 @@ zfs_sync(vfs_t *vfsp, short flag, cred_t *cr)
 
 		ZFS_ENTER(zfsvfs);
 		if (zfsvfs->z_log != NULL)
-			zil_commit(zfsvfs->z_log, UINT64_MAX, FSYNC);
+			zil_commit(zfsvfs->z_log, UINT64_MAX, 0);
 		else
 			txg_wait_synced(dmu_objset_pool(zfsvfs->z_os), 0);
 		ZFS_EXIT(zfsvfs);

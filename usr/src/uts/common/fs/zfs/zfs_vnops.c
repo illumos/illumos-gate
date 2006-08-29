@@ -83,7 +83,7 @@
  *	A ZFS_EXIT(zfsvfs) is needed before all returns.
  *
  *  (2)	VN_RELE() should always be the last thing except for zil_commit()
- *	and ZFS_EXIT(). This is for 3 reasons:
+ *	(if necessary) and ZFS_EXIT(). This is for 3 reasons:
  *	First, if it's the last reference, the vnode/znode
  *	can be freed, so the zp may point to freed memory.  Second, the last
  *	reference will call zfs_zinactive(), which may induce a lot of work --
@@ -117,7 +117,7 @@
  *  (6)	At the end of each vnode op, the DMU tx must always commit,
  *	regardless of whether there were any errors.
  *
- *  (7)	After dropping all locks, invoke zil_commit(zilog, seq, ioflag)
+ *  (7)	After dropping all locks, invoke zil_commit(zilog, seq, foid)
  *	to ensure that synchronous semantics are provided when necessary.
  *
  * In general, this is how things should be ordered in each vnode op:
@@ -144,12 +144,12 @@
  *	}
  *	error = do_real_work();		// do whatever this VOP does
  *	if (error == 0)
- *		seq = zfs_log_*(...);	// on success, make ZIL entry
+ *		zfs_log_*(...);		// on success, make ZIL entry
  *	dmu_tx_commit(tx);		// commit DMU tx -- error or not
  *	rw_exit(...);			// drop locks
  *	zfs_dirent_unlock(dl);		// unlock directory entry
  *	VN_RELE(...);			// release held vnodes
- *	zil_commit(zilog, seq, ioflag);	// synchronous when necessary
+ *	zil_commit(zilog, seq, foid);	// synchronous when necessary
  *	ZFS_EXIT(zfsvfs);		// finished in zfs
  *	return (error);			// done, report error
  */
@@ -422,7 +422,8 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	/*
 	 * If we're in FRSYNC mode, sync out this znode before reading it.
 	 */
-	zil_commit(zfsvfs->z_log, zp->z_last_itx, ioflag & FRSYNC);
+	if (ioflag & FRSYNC)
+		zil_commit(zfsvfs->z_log, zp->z_last_itx, zp->z_id);
 
 	/*
 	 * Lock the range against changes.
@@ -586,7 +587,6 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	dmu_tx_t	*tx;
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
-	uint64_t	seq = 0;
 	offset_t	woff;
 	ssize_t		n, nbytes;
 	rl_t		*rl;
@@ -762,7 +762,7 @@ top:
 			    uio->uio_loffset);
 		}
 		zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
-		seq = zfs_log_write(zilog, tx, TX_WRITE, zp, woff, tx_bytes,
+		zfs_log_write(zilog, tx, TX_WRITE, zp, woff, tx_bytes,
 		    ioflag, uio);
 		dmu_tx_commit(tx);
 
@@ -799,7 +799,7 @@ tx_done:
 			    uio->uio_loffset);
 		}
 		zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
-		seq = zfs_log_write(zilog, tx, TX_WRITE, zp, woff, tx_bytes,
+		zfs_log_write(zilog, tx, TX_WRITE, zp, woff, tx_bytes,
 		    ioflag, uio);
 	}
 	dmu_tx_commit(tx);
@@ -818,7 +818,8 @@ no_tx_done:
 		return (error);
 	}
 
-	zil_commit(zilog, seq, ioflag & (FSYNC | FDSYNC));
+	if (ioflag & (FSYNC | FDSYNC))
+		zil_commit(zilog, zp->z_last_itx, zp->z_id);
 
 	ZFS_EXIT(zfsvfs);
 	return (0);
@@ -913,7 +914,7 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 		/*
 		 * If we get EINPROGRESS, then we need to wait for a
 		 * write IO initiated by dmu_sync() to complete before
-		 * we can release this dbuf.  We will finish everthing
+		 * we can release this dbuf.  We will finish everything
 		 * up in the zfs_get_done() callback.
 		 */
 		if (error == EINPROGRESS)
@@ -1065,7 +1066,6 @@ zfs_create(vnode_t *dvp, char *name, vattr_t *vap, vcexcl_t excl,
 	znode_t		*zp, *dzp = VTOZ(dvp);
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
-	uint64_t	seq = 0;
 	objset_t	*os = zfsvfs->z_os;
 	zfs_dirlock_t	*dl;
 	dmu_tx_t	*tx;
@@ -1142,7 +1142,7 @@ top:
 		zfs_mknode(dzp, vap, &zoid, tx, cr, 0, &zp, 0);
 		ASSERT(zp->z_id == zoid);
 		(void) zfs_link_create(dl, zp, tx, ZNEW);
-		seq = zfs_log_create(zilog, tx, TX_CREATE, dzp, zp, name);
+		zfs_log_create(zilog, tx, TX_CREATE, dzp, zp, name);
 		dmu_tx_commit(tx);
 	} else {
 		/*
@@ -1214,8 +1214,6 @@ out:
 		}
 	}
 
-	zil_commit(zilog, seq, 0);
-
 	ZFS_EXIT(zfsvfs);
 	return (error);
 }
@@ -1242,7 +1240,6 @@ zfs_remove(vnode_t *dvp, char *name, cred_t *cr)
 	vnode_t		*vp;
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
-	uint64_t	seq = 0;
 	uint64_t	acl_obj, xattr_obj;
 	zfs_dirlock_t	*dl;
 	dmu_tx_t	*tx;
@@ -1373,7 +1370,7 @@ top:
 		zfs_dq_add(zp, tx);
 	}
 
-	seq = zfs_log_remove(zilog, tx, TX_REMOVE, dzp, name);
+	zfs_log_remove(zilog, tx, TX_REMOVE, dzp, name);
 
 	dmu_tx_commit(tx);
 out:
@@ -1385,8 +1382,6 @@ out:
 		/* this rele delayed to prevent nesting transactions */
 		VN_RELE(ZTOV(xzp));
 	}
-
-	zil_commit(zilog, seq, 0);
 
 	ZFS_EXIT(zfsvfs);
 	return (error);
@@ -1416,7 +1411,6 @@ zfs_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t **vpp, cred_t *cr)
 	znode_t		*zp, *dzp = VTOZ(dvp);
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
-	uint64_t	seq = 0;
 	zfs_dirlock_t	*dl;
 	uint64_t	zoid = 0;
 	dmu_tx_t	*tx;
@@ -1481,12 +1475,10 @@ top:
 
 	*vpp = ZTOV(zp);
 
-	seq = zfs_log_create(zilog, tx, TX_MKDIR, dzp, zp, dirname);
+	zfs_log_create(zilog, tx, TX_MKDIR, dzp, zp, dirname);
 	dmu_tx_commit(tx);
 
 	zfs_dirent_unlock(dl);
-
-	zil_commit(zilog, seq, 0);
 
 	ZFS_EXIT(zfsvfs);
 	return (0);
@@ -1516,7 +1508,6 @@ zfs_rmdir(vnode_t *dvp, char *name, vnode_t *cwd, cred_t *cr)
 	vnode_t		*vp;
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
-	uint64_t	seq = 0;
 	zfs_dirlock_t	*dl;
 	dmu_tx_t	*tx;
 	int		error;
@@ -1580,7 +1571,7 @@ top:
 	error = zfs_link_destroy(dl, zp, tx, 0, NULL);
 
 	if (error == 0)
-		seq = zfs_log_remove(zilog, tx, TX_RMDIR, dzp, name);
+		zfs_log_remove(zilog, tx, TX_RMDIR, dzp, name);
 
 	dmu_tx_commit(tx);
 
@@ -1589,8 +1580,6 @@ out:
 	zfs_dirent_unlock(dl);
 
 	VN_RELE(vp);
-
-	zil_commit(zilog, seq, 0);
 
 	ZFS_EXIT(zfsvfs);
 	return (error);
@@ -1832,7 +1821,7 @@ zfs_fsync(vnode_t *vp, int syncflag, cred_t *cr)
 		(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)0, B_ASYNC, cr);
 
 	ZFS_ENTER(zfsvfs);
-	zil_commit(zfsvfs->z_log, zp->z_last_itx, FSYNC);
+	zil_commit(zfsvfs->z_log, zp->z_last_itx, zp->z_id);
 	ZFS_EXIT(zfsvfs);
 	return (0);
 }
@@ -1935,7 +1924,6 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	znode_phys_t	*pzp = zp->z_phys;
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
-	uint64_t	seq = 0;
 	dmu_tx_t	*tx;
 	vattr_t		oldva;
 	uint_t		mask = vap->va_mask;
@@ -2168,7 +2156,7 @@ top:
 		zfs_time_stamper_locked(zp, STATE_CHANGED, tx);
 
 	if (mask != 0)
-		seq = zfs_log_setattr(zilog, tx, TX_SETATTR, zp, vap, mask);
+		zfs_log_setattr(zilog, tx, TX_SETATTR, zp, vap, mask);
 
 	mutex_exit(&zp->z_lock);
 
@@ -2176,8 +2164,6 @@ top:
 		VN_RELE(ZTOV(attrzp));
 
 	dmu_tx_commit(tx);
-
-	zil_commit(zilog, seq, 0);
 
 	ZFS_EXIT(zfsvfs);
 	return (err);
@@ -2279,7 +2265,6 @@ zfs_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm, cred_t *cr)
 	znode_t		*sdzp = VTOZ(sdvp);
 	zfsvfs_t	*zfsvfs = sdzp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
-	uint64_t	seq = 0;
 	vnode_t		*realvp;
 	zfs_dirlock_t	*sdl, *tdl;
 	dmu_tx_t	*tx;
@@ -2459,8 +2444,8 @@ top:
 		if (error == 0) {
 			error = zfs_link_destroy(sdl, szp, tx, ZRENAMING, NULL);
 			ASSERT(error == 0);
-			seq = zfs_log_rename(zilog, tx, TX_RENAME,
-			    sdzp, sdl->dl_name, tdzp, tdl->dl_name, szp);
+			zfs_log_rename(zilog, tx, TX_RENAME, sdzp,
+			    sdl->dl_name, tdzp, tdl->dl_name, szp);
 		}
 	}
 
@@ -2475,8 +2460,6 @@ out:
 	VN_RELE(ZTOV(szp));
 	if (tzp)
 		VN_RELE(ZTOV(tzp));
-
-	zil_commit(zilog, seq, 0);
 
 	ZFS_EXIT(zfsvfs);
 	return (error);
@@ -2505,7 +2488,6 @@ zfs_symlink(vnode_t *dvp, char *name, vattr_t *vap, char *link, cred_t *cr)
 	dmu_tx_t	*tx;
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
-	uint64_t	seq = 0;
 	uint64_t	zoid;
 	int		len = strlen(link);
 	int		error;
@@ -2589,16 +2571,13 @@ top:
 	(void) zfs_link_create(dl, zp, tx, ZNEW);
 out:
 	if (error == 0)
-		seq = zfs_log_symlink(zilog, tx, TX_SYMLINK,
-		    dzp, zp, name, link);
+		zfs_log_symlink(zilog, tx, TX_SYMLINK, dzp, zp, name, link);
 
 	dmu_tx_commit(tx);
 
 	zfs_dirent_unlock(dl);
 
 	VN_RELE(ZTOV(zp));
-
-	zil_commit(zilog, seq, 0);
 
 	ZFS_EXIT(zfsvfs);
 	return (error);
@@ -2675,7 +2654,6 @@ zfs_link(vnode_t *tdvp, vnode_t *svp, char *name, cred_t *cr)
 	znode_t		*tzp, *szp;
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
-	uint64_t	seq = 0;
 	zfs_dirlock_t	*dl;
 	dmu_tx_t	*tx;
 	vnode_t		*realvp;
@@ -2754,13 +2732,11 @@ top:
 	error = zfs_link_create(dl, szp, tx, 0);
 
 	if (error == 0)
-		seq = zfs_log_link(zilog, tx, TX_LINK, dzp, szp, name);
+		zfs_log_link(zilog, tx, TX_LINK, dzp, szp, name);
 
 	dmu_tx_commit(tx);
 
 	zfs_dirent_unlock(dl);
-
-	zil_commit(zilog, seq, 0);
 
 	ZFS_EXIT(zfsvfs);
 	return (error);
@@ -2916,7 +2892,8 @@ zfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr)
 		}
 	}
 out:
-	zil_commit(zfsvfs->z_log, UINT64_MAX, (flags & B_ASYNC) ? 0 : FDSYNC);
+	if ((flags & B_ASYNC) == 0)
+		zil_commit(zfsvfs->z_log, UINT64_MAX, zp->z_id);
 	ZFS_EXIT(zfsvfs);
 	return (error);
 }

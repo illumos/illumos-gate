@@ -67,8 +67,6 @@
  * These global ZIL switches affect all pools
  */
 int zil_disable = 0;	/* disable intent logging */
-int zil_always = 0;	/* make every transaction synchronous */
-int zil_purge = 0;	/* at pool open, just throw everything away */
 int zil_noflush = 0;	/* don't flush write cache buffers on disks */
 
 static kmem_cache_t *zil_lwb_cache;
@@ -365,8 +363,6 @@ zil_create(zilog_t *zilog)
 		lwb->lwb_sz = BP_GET_LSIZE(&lwb->lwb_blk);
 		lwb->lwb_buf = zio_buf_alloc(lwb->lwb_sz);
 		lwb->lwb_max_txg = txg;
-		lwb->lwb_seq = 0;
-		lwb->lwb_state = UNWRITTEN;
 		lwb->lwb_zio = NULL;
 
 		mutex_enter(&zilog->zl_lock);
@@ -433,14 +429,13 @@ zil_destroy(zilog_t *zilog, boolean_t keep_first)
 			zio_free_blk(zilog->zl_spa, &lwb->lwb_blk, txg);
 			kmem_cache_free(zil_lwb_cache, lwb);
 		}
-		mutex_exit(&zilog->zl_lock);
 	} else {
-		mutex_exit(&zilog->zl_lock);
 		if (!keep_first) {
 			(void) zil_parse(zilog, zil_free_log_block,
 			    zil_free_log_record, tx, zh->zh_claim_txg);
 		}
 	}
+	mutex_exit(&zilog->zl_lock);
 
 	dmu_tx_commit(tx);
 
@@ -491,7 +486,7 @@ zil_claim(char *osname, void *txarg)
 }
 
 void
-zil_add_vdev(zilog_t *zilog, uint64_t vdev, uint64_t seq)
+zil_add_vdev(zilog_t *zilog, uint64_t vdev)
 {
 	zil_vdev_t *zv;
 
@@ -501,12 +496,11 @@ zil_add_vdev(zilog_t *zilog, uint64_t vdev, uint64_t seq)
 	ASSERT(MUTEX_HELD(&zilog->zl_lock));
 	zv = kmem_alloc(sizeof (zil_vdev_t), KM_SLEEP);
 	zv->vdev = vdev;
-	zv->seq = seq;
 	list_insert_tail(&zilog->zl_vdev_list, zv);
 }
 
 void
-zil_flush_vdevs(zilog_t *zilog, uint64_t seq)
+zil_flush_vdevs(zilog_t *zilog)
 {
 	vdev_t *vd;
 	zil_vdev_t *zv, *zv2;
@@ -522,17 +516,16 @@ zil_flush_vdevs(zilog_t *zilog, uint64_t seq)
 	spa = zilog->zl_spa;
 	zio = NULL;
 
-	while ((zv = list_head(&zilog->zl_vdev_list)) != NULL &&
-	    zv->seq <= seq) {
+	while ((zv = list_head(&zilog->zl_vdev_list)) != NULL) {
 		vdev = zv->vdev;
 		list_remove(&zilog->zl_vdev_list, zv);
 		kmem_free(zv, sizeof (zil_vdev_t));
 
 		/*
-		 * remove all chained entries <= seq with same vdev
+		 * remove all chained entries with same vdev
 		 */
 		zv = list_head(&zilog->zl_vdev_list);
-		while (zv && zv->seq <= seq) {
+		while (zv) {
 			zv2 = list_next(&zilog->zl_vdev_list, zv);
 			if (zv->vdev == vdev) {
 				list_remove(&zilog->zl_vdev_list, zv);
@@ -570,10 +563,8 @@ zil_flush_vdevs(zilog_t *zilog, uint64_t seq)
 static void
 zil_lwb_write_done(zio_t *zio)
 {
-	lwb_t *prev;
 	lwb_t *lwb = zio->io_private;
 	zilog_t *zilog = lwb->lwb_zilog;
-	uint64_t max_seq;
 
 	/*
 	 * Now that we've written this log block, we have a stable pointer
@@ -588,37 +579,9 @@ zil_lwb_write_done(zio_t *zio)
 	if (zio->io_error) {
 		zilog->zl_log_error = B_TRUE;
 		mutex_exit(&zilog->zl_lock);
-		cv_broadcast(&zilog->zl_cv_seq);
 		return;
 	}
-
-	prev = list_prev(&zilog->zl_lwb_list, lwb);
-	if (prev && prev->lwb_state != SEQ_COMPLETE) {
-		/* There's an unwritten buffer in the chain before this one */
-		lwb->lwb_state = SEQ_INCOMPLETE;
-		mutex_exit(&zilog->zl_lock);
-		return;
-	}
-
-	max_seq = lwb->lwb_seq;
-	lwb->lwb_state = SEQ_COMPLETE;
-	/*
-	 * We must also follow up the chain for already written buffers
-	 * to see if we can set zl_ss_seq even higher.
-	 */
-	while (lwb = list_next(&zilog->zl_lwb_list, lwb)) {
-		if (lwb->lwb_state != SEQ_INCOMPLETE)
-			break;
-		lwb->lwb_state = SEQ_COMPLETE;
-		/* lwb_seq will be zero if we've written an empty buffer */
-		if (lwb->lwb_seq) {
-			ASSERT3U(max_seq, <, lwb->lwb_seq);
-			max_seq = lwb->lwb_seq;
-		}
-	}
-	zilog->zl_ss_seq = MAX(max_seq, zilog->zl_ss_seq);
 	mutex_exit(&zilog->zl_lock);
-	cv_broadcast(&zilog->zl_cv_seq);
 }
 
 /*
@@ -637,8 +600,11 @@ zil_lwb_write_init(zilog_t *zilog, lwb_t *lwb)
 	zb.zb_level = -1;
 	zb.zb_blkid = lwb->lwb_blk.blk_cksum.zc_word[ZIL_ZC_SEQ];
 
-	ASSERT(lwb->lwb_zio == NULL);
-	lwb->lwb_zio = zio_rewrite(NULL, zilog->zl_spa,
+	if (zilog->zl_root_zio == NULL) {
+		zilog->zl_root_zio = zio_root(zilog->zl_spa, NULL, NULL,
+		    ZIO_FLAG_CANFAIL);
+	}
+	lwb->lwb_zio = zio_rewrite(zilog->zl_root_zio, zilog->zl_spa,
 	    ZIO_CHECKSUM_ZILOG, 0, &lwb->lwb_blk, lwb->lwb_buf,
 	    lwb->lwb_sz, zil_lwb_write_done, lwb,
 	    ZIO_PRIORITY_LOG_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb);
@@ -690,9 +656,7 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 		 * By returning NULL the caller will call tx_wait_synced()
 		 */
 		mutex_enter(&zilog->zl_lock);
-		ASSERT(lwb->lwb_state == UNWRITTEN);
 		lwb->lwb_nused = 0;
-		lwb->lwb_seq = 0;
 		mutex_exit(&zilog->zl_lock);
 		txg_rele_to_sync(&lwb->lwb_txgh);
 		return (NULL);
@@ -716,8 +680,6 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 	nlwb->lwb_sz = BP_GET_LSIZE(&nlwb->lwb_blk);
 	nlwb->lwb_buf = zio_buf_alloc(nlwb->lwb_sz);
 	nlwb->lwb_max_txg = txg;
-	nlwb->lwb_seq = 0;
-	nlwb->lwb_state = UNWRITTEN;
 	nlwb->lwb_zio = NULL;
 
 	/*
@@ -726,23 +688,15 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 	 */
 	mutex_enter(&zilog->zl_lock);
 	list_insert_tail(&zilog->zl_lwb_list, nlwb);
-	zil_add_vdev(zilog, DVA_GET_VDEV(BP_IDENTITY(&(lwb->lwb_blk))),
-	    lwb->lwb_seq);
+	zil_add_vdev(zilog, DVA_GET_VDEV(BP_IDENTITY(&(lwb->lwb_blk))));
 	mutex_exit(&zilog->zl_lock);
 
 	/*
 	 * kick off the write for the old log block
 	 */
 	dprintf_bp(&lwb->lwb_blk, "lwb %p txg %llu: ", lwb, txg);
-	if (lwb->lwb_zio == NULL) {
-		/*
-		 * This can only happen if there are no log records in this
-		 * block (i.e. the first record to go in was too big to fit).
-		 * XXX - would be nice if we could avoid this IO
-		 */
-		ASSERT(lwb->lwb_nused == 0);
+	if (lwb->lwb_zio == NULL)
 		zil_lwb_write_init(zilog, lwb);
-	}
 	zio_nowait(lwb->lwb_zio);
 
 	return (nlwb);
@@ -753,7 +707,6 @@ zil_lwb_commit(zilog_t *zilog, itx_t *itx, lwb_t *lwb)
 {
 	lr_t *lrc = &itx->itx_lr; /* common log record */
 	lr_write_t *lr = (lr_write_t *)lrc;
-	uint64_t seq = lrc->lrc_seq;
 	uint64_t txg = lrc->lrc_txg;
 	uint64_t reclen = lrc->lrc_reclen;
 	uint64_t dlen;
@@ -780,16 +733,15 @@ zil_lwb_commit(zilog_t *zilog, itx_t *itx, lwb_t *lwb)
 		ASSERT(lwb->lwb_nused == 0);
 		if (reclen + dlen > ZIL_BLK_DATA_SZ(lwb)) {
 			txg_wait_synced(zilog->zl_dmu_pool, txg);
-			mutex_enter(&zilog->zl_lock);
-			zilog->zl_ss_seq = MAX(seq, zilog->zl_ss_seq);
-			mutex_exit(&zilog->zl_lock);
 			return (lwb);
 		}
 	}
 
-	if (lwb->lwb_zio == NULL)
-		zil_lwb_write_init(zilog, lwb);
-
+	/*
+	 * Update the lrc_seq, to be log record sequence number. See zil.h
+	 * Then copy the record to the log buffer.
+	 */
+	lrc->lrc_seq = ++zilog->zl_lr_seq; /* we are single threaded */
 	bcopy(lrc, lwb->lwb_buf + lwb->lwb_nused, reclen);
 
 	/*
@@ -822,14 +774,8 @@ zil_lwb_commit(zilog_t *zilog, itx_t *itx, lwb_t *lwb)
 		}
 	}
 
-	mutex_enter(&zilog->zl_lock);
-	ASSERT(seq > zilog->zl_wait_seq);
-	zilog->zl_wait_seq = seq;
-	mutex_exit(&zilog->zl_lock);
 	lwb->lwb_nused += reclen + dlen;
 	lwb->lwb_max_txg = MAX(lwb->lwb_max_txg, txg);
-	ASSERT3U(lwb->lwb_seq, <, seq);
-	lwb->lwb_seq = seq;
 	ASSERT3U(lwb->lwb_nused, <=, ZIL_BLK_DATA_SZ(lwb));
 	ASSERT3U(P2PHASE(lwb->lwb_nused, sizeof (uint64_t)), ==, 0);
 
@@ -876,34 +822,31 @@ zil_itx_clean(zilog_t *zilog)
 {
 	uint64_t synced_txg = spa_last_synced_txg(zilog->zl_spa);
 	uint64_t freeze_txg = spa_freeze_txg(zilog->zl_spa);
-	uint64_t max_seq = 0;
 	itx_t *itx;
 
 	mutex_enter(&zilog->zl_lock);
+	/* wait for a log writer to finish walking list */
+	while (zilog->zl_writer) {
+		cv_wait(&zilog->zl_cv_writer, &zilog->zl_lock);
+	}
+	/* no need to set zl_writer as we never drop zl_lock */
 	while ((itx = list_head(&zilog->zl_itx_list)) != NULL &&
 	    itx->itx_lr.lrc_txg <= MIN(synced_txg, freeze_txg)) {
 		list_remove(&zilog->zl_itx_list, itx);
 		zilog->zl_itx_list_sz -= itx->itx_lr.lrc_reclen;
-		ASSERT3U(max_seq, <, itx->itx_lr.lrc_seq);
-		max_seq = itx->itx_lr.lrc_seq;
 		kmem_free(itx, offsetof(itx_t, itx_lr)
 		    + itx->itx_lr.lrc_reclen);
-	}
-	if (max_seq > zilog->zl_ss_seq) {
-		zilog->zl_ss_seq = max_seq;
-		cv_broadcast(&zilog->zl_cv_seq);
 	}
 	mutex_exit(&zilog->zl_lock);
 }
 
+/*
+ * If there are in-memory intent log transactions then
+ * start up a taskq to free up any that have now been synced.
+ */
 void
 zil_clean(zilog_t *zilog)
 {
-	/*
-	 * Check for any log blocks that can be freed.
-	 * Log blocks are only freed when the log block allocation and
-	 * log records contained within are both known to be committed.
-	 */
 	mutex_enter(&zilog->zl_lock);
 	if (list_head(&zilog->zl_itx_list) != NULL)
 		(void) taskq_dispatch(zilog->zl_clean_taskq,
@@ -911,48 +854,36 @@ zil_clean(zilog_t *zilog)
 	mutex_exit(&zilog->zl_lock);
 }
 
-/*
- * Push zfs transactions to stable storage up to the supplied sequence number.
- */
 void
-zil_commit(zilog_t *zilog, uint64_t seq, int ioflag)
+zil_commit_writer(zilog_t *zilog, uint64_t seq, uint64_t foid)
 {
 	uint64_t txg;
-	uint64_t max_seq;
 	uint64_t reclen;
-	itx_t *itx;
+	itx_t *itx, *itx_next = (itx_t *)-1;
 	lwb_t *lwb;
 	spa_t *spa;
 
-	if (zilog == NULL || seq == 0 ||
-	    ((ioflag & (FSYNC | FDSYNC | FRSYNC)) == 0 && !zil_always))
-		return;
-
-	spa = zilog->zl_spa;
-	mutex_enter(&zilog->zl_lock);
-
-	seq = MIN(seq, zilog->zl_itx_seq);	/* cap seq at largest itx seq */
-
-	for (;;) {
-		if (zilog->zl_ss_seq >= seq) {	/* already on stable storage */
-			mutex_exit(&zilog->zl_lock);
-			return;
-		}
-
-		if (zilog->zl_writer == B_FALSE) /* no one writing, do it */
-			break;
-
-		cv_wait(&zilog->zl_cv_write, &zilog->zl_lock);
-	}
-
 	zilog->zl_writer = B_TRUE;
-	max_seq = 0;
+	zilog->zl_root_zio = NULL;
+	spa = zilog->zl_spa;
 
 	if (zilog->zl_suspend) {
 		lwb = NULL;
 	} else {
 		lwb = list_tail(&zilog->zl_lwb_list);
 		if (lwb == NULL) {
+			/*
+			 * Return if there's nothing to flush before we
+			 * dirty the fs by calling zil_create()
+			 */
+			if (list_is_empty(&zilog->zl_itx_list)) {
+				/* wake up others waiting to start a write */
+				zilog->zl_writer = B_FALSE;
+				cv_broadcast(&zilog->zl_cv_writer);
+				mutex_exit(&zilog->zl_lock);
+				return;
+			}
+
 			mutex_exit(&zilog->zl_lock);
 			zil_create(zilog);
 			mutex_enter(&zilog->zl_lock);
@@ -965,17 +896,50 @@ zil_commit(zilog_t *zilog, uint64_t seq, int ioflag)
 	 * until we reach the given sequence number and there's no more
 	 * room in the write buffer.
 	 */
+	DTRACE_PROBE1(zil__cw1, zilog_t *, zilog);
 	for (;;) {
-		itx = list_head(&zilog->zl_itx_list);
+		/*
+		 * Find the next itx to push:
+		 * Push all transactions related to specified foid and all
+		 * other transactions except TX_WRITE, TX_TRUNCATE,
+		 * TX_SETATTR and TX_ACL for all other files.
+		 */
+		if (itx_next != (itx_t *)-1)
+			itx = itx_next;
+		else
+			itx = list_head(&zilog->zl_itx_list);
+		for (; itx != NULL; itx = list_next(&zilog->zl_itx_list, itx)) {
+			if (foid == 0) /* push all foids? */
+				break;
+			switch (itx->itx_lr.lrc_txtype) {
+			case TX_SETATTR:
+			case TX_WRITE:
+			case TX_TRUNCATE:
+			case TX_ACL:
+				/* lr_foid is same offset for these records */
+				if (((lr_write_t *)&itx->itx_lr)->lr_foid
+				    != foid) {
+					continue; /* skip this record */
+				}
+			}
+			break;
+		}
 		if (itx == NULL)
 			break;
 
 		reclen = itx->itx_lr.lrc_reclen;
 		if ((itx->itx_lr.lrc_seq > seq) &&
-		    ((lwb == NULL) || (lwb->lwb_nused + reclen >
-		    ZIL_BLK_DATA_SZ(lwb))))
+		    ((lwb == NULL) || (lwb->lwb_nused == 0) ||
+		    (lwb->lwb_nused + reclen > ZIL_BLK_DATA_SZ(lwb))))
 			break;
 
+		/*
+		 * Save the next pointer.  Even though we soon drop
+		 * zl_lock all threads that may change the list
+		 * (another writer or zil_itx_clean) can't do so until
+		 * they have zl_writer.
+		 */
+		itx_next = list_next(&zilog->zl_itx_list, itx);
 		list_remove(&zilog->zl_itx_list, itx);
 		txg = itx->itx_lr.lrc_txg;
 		ASSERT(txg);
@@ -984,14 +948,12 @@ zil_commit(zilog_t *zilog, uint64_t seq, int ioflag)
 		if (txg > spa_last_synced_txg(spa) ||
 		    txg > spa_freeze_txg(spa))
 			lwb = zil_lwb_commit(zilog, itx, lwb);
-		else
-			max_seq = itx->itx_lr.lrc_seq;
 		kmem_free(itx, offsetof(itx_t, itx_lr)
 		    + itx->itx_lr.lrc_reclen);
 		mutex_enter(&zilog->zl_lock);
 		zilog->zl_itx_list_sz -= reclen;
 	}
-
+	DTRACE_PROBE1(zil__cw2, zilog_t *, zilog);
 	mutex_exit(&zilog->zl_lock);
 
 	/* write the last block out */
@@ -1001,35 +963,49 @@ zil_commit(zilog_t *zilog, uint64_t seq, int ioflag)
 	zilog->zl_prev_used = zilog->zl_cur_used;
 	zilog->zl_cur_used = 0;
 
-	mutex_enter(&zilog->zl_lock);
-	if (max_seq > zilog->zl_ss_seq) {
-		zilog->zl_ss_seq = max_seq;
-		cv_broadcast(&zilog->zl_cv_seq);
-	}
 	/*
-	 * Wait if necessary for our seq to be committed.
+	 * Wait if necessary for the log blocks to be on stable storage.
 	 */
-	if (lwb && zilog->zl_wait_seq) {
-		while (zilog->zl_ss_seq < zilog->zl_wait_seq &&
-		    zilog->zl_log_error == 0)
-			cv_wait(&zilog->zl_cv_seq, &zilog->zl_lock);
-		zil_flush_vdevs(zilog, seq);
+	mutex_enter(&zilog->zl_lock);
+	if (zilog->zl_root_zio) {
+		mutex_exit(&zilog->zl_lock);
+		DTRACE_PROBE1(zil__cw3, zilog_t *, zilog);
+		(void) zio_wait(zilog->zl_root_zio);
+		DTRACE_PROBE1(zil__cw4, zilog_t *, zilog);
+		mutex_enter(&zilog->zl_lock);
+		zil_flush_vdevs(zilog);
 	}
 
 	if (zilog->zl_log_error || lwb == NULL) {
 		zilog->zl_log_error = 0;
-		max_seq = zilog->zl_itx_seq;
 		mutex_exit(&zilog->zl_lock);
 		txg_wait_synced(zilog->zl_dmu_pool, 0);
 		mutex_enter(&zilog->zl_lock);
-		zilog->zl_ss_seq = MAX(max_seq, zilog->zl_ss_seq);
-		cv_broadcast(&zilog->zl_cv_seq);
 	}
 	/* wake up others waiting to start a write */
-	zilog->zl_wait_seq = 0;
 	zilog->zl_writer = B_FALSE;
+	cv_broadcast(&zilog->zl_cv_writer);
 	mutex_exit(&zilog->zl_lock);
-	cv_broadcast(&zilog->zl_cv_write);
+}
+
+/*
+ * Push zfs transactions to stable storage up to the supplied sequence number.
+ * If foid is 0 push out all transactions, otherwise push only those
+ * for that file or might have been used to create that file.
+ */
+void
+zil_commit(zilog_t *zilog, uint64_t seq, uint64_t foid)
+{
+	if (zilog == NULL || seq == 0)
+		return;
+
+	mutex_enter(&zilog->zl_lock);
+
+	seq = MIN(seq, zilog->zl_itx_seq);	/* cap seq at largest itx seq */
+
+	while (zilog->zl_writer)
+		cv_wait(&zilog->zl_cv_writer, &zilog->zl_lock);
+	zil_commit_writer(zilog, seq, foid); /* drops zl_lock */
 }
 
 /*
@@ -1078,13 +1054,13 @@ zil_sync(zilog_t *zilog, dmu_tx_t *tx)
 			mutex_exit(&zilog->zl_lock);
 			return;
 		}
+		zh->zh_log = lwb->lwb_blk;
 		if (lwb->lwb_buf != NULL || lwb->lwb_max_txg > txg)
 			break;
 		list_remove(&zilog->zl_lwb_list, lwb);
 		zio_free_blk(spa, &lwb->lwb_blk, txg);
 		kmem_cache_free(zil_lwb_cache, lwb);
 	}
-	zh->zh_log = lwb->lwb_blk;
 	mutex_exit(&zilog->zl_lock);
 }
 
@@ -1226,7 +1202,6 @@ int
 zil_suspend(zilog_t *zilog)
 {
 	const zil_header_t *zh = zilog->zl_header;
-	lwb_t *lwb;
 
 	mutex_enter(&zilog->zl_lock);
 	if (zh->zh_claim_txg != 0) {		/* unplayed log */
@@ -1247,24 +1222,14 @@ zil_suspend(zilog_t *zilog)
 	zilog->zl_suspending = B_TRUE;
 	mutex_exit(&zilog->zl_lock);
 
-	zil_commit(zilog, UINT64_MAX, FSYNC);
+	zil_commit(zilog, UINT64_MAX, 0);
 
+	/*
+	 * Wait for any in-flight log writes to complete.
+	 */
 	mutex_enter(&zilog->zl_lock);
-	for (;;) {
-		/*
-		 * Wait for any in-flight log writes to complete.
-		 */
-		for (lwb = list_head(&zilog->zl_lwb_list); lwb != NULL;
-		    lwb = list_next(&zilog->zl_lwb_list, lwb))
-			if (lwb->lwb_seq != 0 && lwb->lwb_state != SEQ_COMPLETE)
-				break;
-
-		if (lwb == NULL)
-			break;
-
-		cv_wait(&zilog->zl_cv_seq, &zilog->zl_lock);
-	}
-
+	while (zilog->zl_writer)
+		cv_wait(&zilog->zl_cv_writer, &zilog->zl_lock);
 	mutex_exit(&zilog->zl_lock);
 
 	zil_destroy(zilog, B_FALSE);
@@ -1485,17 +1450,38 @@ int
 zil_is_committed(zilog_t *zilog)
 {
 	lwb_t *lwb;
+	int ret;
 
-	if (!list_is_empty(&zilog->zl_itx_list))
-		return (B_FALSE);
+	mutex_enter(&zilog->zl_lock);
+	while (zilog->zl_writer)
+		cv_wait(&zilog->zl_cv_writer, &zilog->zl_lock);
+
+	/* recent unpushed intent log transactions? */
+	if (!list_is_empty(&zilog->zl_itx_list)) {
+		ret = B_FALSE;
+		goto out;
+	}
+
+	/* intent log never used? */
+	lwb = list_head(&zilog->zl_lwb_list);
+	if (lwb == NULL) {
+		ret = B_TRUE;
+		goto out;
+	}
 
 	/*
-	 * A log write buffer at the head of the list that is not UNWRITTEN
-	 * means there's a lwb yet to be freed after a txg commit
+	 * more than 1 log buffer means zil_sync() hasn't yet freed
+	 * entries after a txg has committed
 	 */
-	lwb = list_head(&zilog->zl_lwb_list);
-	if (lwb && lwb->lwb_state != UNWRITTEN)
-		return (B_FALSE);
+	if (list_next(&zilog->zl_lwb_list, lwb)) {
+		ret = B_FALSE;
+		goto out;
+	}
+
 	ASSERT(zil_empty(zilog));
-	return (B_TRUE);
+	ret = B_TRUE;
+out:
+	cv_broadcast(&zilog->zl_cv_writer);
+	mutex_exit(&zilog->zl_lock);
+	return (ret);
 }
