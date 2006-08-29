@@ -36,6 +36,8 @@ SAVEDIR=/etc/mpxio
 RECOVERFILE=$SAVEDIR/recover_instructions
 SVCCFG_RECOVERY=$SAVEDIR/svccfg_recover
 USAGE=`gettext "Usage: stmsboot -e | -d | -u | -L | -l controller_number"`
+TEXTDOMAIN=SUNW_OST_OSCMD
+export TEXTDOMAIN
 
 #
 # Copy all entries (including comments) from source driver.conf to destination
