@@ -19,12 +19,11 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 # Quis custodiet ipsos custodies?
 
@@ -68,8 +67,8 @@ fi
 for ROOT in $rootlist
 do
 	case "$ROOT" in
-	*sparc|*sparc-nd)	arch=sparc;;
-	*i386|*i386-nd)		arch=i386;;
+	*sparc)	arch=sparc;;
+	*i386)	arch=i386;;
 	*)
 		echo "$ROOT has unknown architecture." >&2
 		exit 1
