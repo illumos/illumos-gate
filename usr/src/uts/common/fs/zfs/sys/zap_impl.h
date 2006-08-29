@@ -172,7 +172,7 @@ uint64_t zap_hash(zap_t *zap, const char *name);
 int zap_lockdir(objset_t *os, uint64_t obj, dmu_tx_t *tx,
     krw_t lti, int fatreader, zap_t **zapp);
 void zap_unlockdir(zap_t *zap);
-void zap_pageout(dmu_buf_t *db, void *vmzap);
+void zap_evict(dmu_buf_t *db, void *vmzap);
 
 #define	ZAP_HASH_IDX(hash, n) (((n) == 0) ? 0 : ((hash) >> (64 - (n))))
 

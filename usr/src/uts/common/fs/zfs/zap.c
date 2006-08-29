@@ -88,7 +88,7 @@ fzap_upgrade(zap_t *zap, dmu_tx_t *tx)
 	zap->zap_ismicro = FALSE;
 
 	(void) dmu_buf_update_user(zap->zap_dbuf, zap, zap,
-	    &zap->zap_f.zap_phys, zap_pageout);
+	    &zap->zap_f.zap_phys, zap_evict);
 
 	mutex_init(&zap->zap_f.zap_num_entries_mtx, 0, 0, 0);
 	zap->zap_f.zap_block_shift = highbit(zap->zap_dbuf->db_size) - 1;

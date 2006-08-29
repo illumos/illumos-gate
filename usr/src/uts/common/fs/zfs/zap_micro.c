@@ -211,7 +211,7 @@ mzap_open(objset_t *os, uint64_t obj, dmu_buf_t *db)
 	 * it, because zap_lockdir() checks zap_ismicro without the lock
 	 * held.
 	 */
-	winner = dmu_buf_set_user(db, zap, &zap->zap_m.zap_phys, zap_pageout);
+	winner = dmu_buf_set_user(db, zap, &zap->zap_m.zap_phys, zap_evict);
 
 	if (winner != NULL) {
 		kmem_free(zap, sizeof (zap_t));
@@ -463,9 +463,9 @@ zap_destroy(objset_t *os, uint64_t zapobj, dmu_tx_t *tx)
 
 _NOTE(ARGSUSED(0))
 void
-zap_pageout(dmu_buf_t *db, void *vmzap)
+zap_evict(dmu_buf_t *db, void *vzap)
 {
-	zap_t *zap = vmzap;
+	zap_t *zap = vzap;
 
 	rw_destroy(&zap->zap_rwlock);
 
@@ -474,7 +474,6 @@ zap_pageout(dmu_buf_t *db, void *vmzap)
 
 	kmem_free(zap, sizeof (zap_t));
 }
-
 
 int
 zap_count(objset_t *os, uint64_t zapobj, uint64_t *count)
@@ -672,7 +671,7 @@ zap_update(objset_t *os, uint64_t zapobj, const char *name,
 		}
 	}
 	zap_unlockdir(zap);
-	return (0);
+	return (err);
 }
 
 int

@@ -363,6 +363,15 @@ dsl_prop_set(const char *ddname, const char *propname,
 	int err;
 	struct prop_set_arg psa;
 
+	/*
+	 * We must do these checks before we get to the syncfunc, since
+	 * it can't fail.
+	 */
+	if (strlen(propname) >= ZAP_MAXNAMELEN)
+		return (ENAMETOOLONG);
+	if (intsz * numints >= ZAP_MAXVALUELEN)
+		return (E2BIG);
+
 	err = dsl_dir_open(ddname, FTAG, &dd, NULL);
 	if (err)
 		return (err);
