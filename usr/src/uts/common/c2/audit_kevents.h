@@ -37,10 +37,9 @@ extern "C" {
  *
  *	0		Reserved as an invalid event number.
  *	1 -   511	Allocated for Solaris kernel
- *	512 -  1023	Allocated for Trusted Solaris/Trusted Extensions kernel
- *	1024 -  2047	(reserved but not allocated)
+ *	512 -  2047	(reserved but not allocated)
  *	2048 - 32767	Reserved for the Solaris TCB application.
- *	32768 - 65535	Available for other Trusted applications.
+ *	32768 - 65535	Available for third party applications.
  *
  *	NOTE:	libbsm/audit_event.txt must be updated elsewhere when changes
  *		are made to kernel events.
@@ -331,19 +330,10 @@ extern "C" {
 #define	AUE_MODADDPRIV		291	/* =ad modctl(2) */
 #define	AUE_CRYPTOADM		292	/* =as kernel cryptographic framework */
 #define	AUE_CONFIGKSSL		293	/* =as kernel SSL */
+/* NOTE: update MAX_KEVENTS below if events are added. */
 
-/*
- * Trusted Solaris/Trusted Extensions kernel audit events
- *	512 -  1023	allocated for Trusted Solaris/Trusted Extensions
- */
+#define	MAX_KEVENTS		293
 
-/*
- * Maximum number of kernel events in the event to class table
- * leave a couple extra ones just incase somebody wants to load a new
- * driver with build in auditing
- */
-
-#define	MAX_KEVENTS		580
 
 #ifdef __cplusplus
 }

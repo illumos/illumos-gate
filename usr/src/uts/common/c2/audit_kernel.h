@@ -326,7 +326,7 @@ struct au_kcontext {
 	kmutex_t 		auk_svc_lock;
 	/* 1 during auditsvc, 2 during auditdoor */
 	int			auk_svc_busy;
-	au_state_t		auk_ets[MAX_KEVENTS];
+	au_state_t		auk_ets[MAX_KEVENTS + 1];
 };
 #ifndef AUK_CONTEXT_T
 #define	AUK_CONTEXT_T

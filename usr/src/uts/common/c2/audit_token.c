@@ -1121,7 +1121,7 @@ au_to_privset(
 /*
  * au_to_label
  * returns:
- *	pointer to au_membuf chain containing a sensitivity label token.
+ *	pointer to au_membuf chain containing a label token.
  */
 token_t *
 au_to_label(bslabel_t *label)

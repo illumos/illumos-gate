@@ -53,14 +53,11 @@
 # (NOTE: the kernel event table, and possibly MAX_KEVENTS, must be updated
 # in audit_kevents.h when changes are made to kernel events.)
 #	    1 -   511	allocated for Solaris
-#	  512 -  1023	allocated for Trusted Solaris/Trusted Extensions
-#	 1024 -  2047	(reserved but not allocated)
+#	  512 -  2047	(reserved but not allocated)
 #
 # Allocation of user level audit events:
 #	 2048 -  5999	(reserved but not allocated)
-#	 6000 -  7999	allocated for Solaris
-#	 8000 -  8999	(reserved but not allocated)
-#	 9000 -  9999	allocated for Trusted Solaris/Trusted Extensions
+#	 6000 -  9999	allocated for Solaris
 #	10000 - 32767	(reserved but not allocated)
 #	32768 - 65535	(Available for third party TCB applications)
 #
@@ -341,14 +338,10 @@
 292:AUE_CRYPTOADM:kernel cryptographic framework:as
 293:AUE_CONFIGSSL:configure kernel SSL:as
 #
-# Trusted Solaris/Trusted Extensions kernel audit events
-#	  512 -  1023	allocated for Trusted Solaris/Trusted Extensions
-#
-#
 # user level audit events
-#	6000 -  7999	allocated for Solaris
+#	2048 -  6143	Reserved
 #
-# 2048 - 6143	Reserved
+#	6000 -  7999	allocated for Solaris
 #
 6144:AUE_at_create:at-create atjob:ua
 6145:AUE_at_delete:at-delete atjob (at or atrm):ua
@@ -430,8 +423,7 @@
 6228:AUE_su_logout:su logout:lo
 6229:AUE_role_logout:role logout:lo
 #
-# Trusted Solaris/Trusted Extensions user level audit events
-#	9000 -  9999	allocated for Trusted Solaris/Trusted Extensions
+# Trusted Extensions events:
 #
 9035:AUE_sl_change:Workspace label change:ap
 9037:AUE_file_copy:file copy:fm

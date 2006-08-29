@@ -65,31 +65,16 @@ EOF
 
 nawk -F: '{if ((NF == 4) && substr($1,0,1) != "#")
 		if ($1 >= 2048) {
-			# compute total output line length first
 			tlen = length($2);
-			llen = 8 + tlen;
-			llen += 8 - (llen % 8);
-			if (llen < 32)
-				llen = 32;
-			llen += length($1);
-			llen += 8 - (llen % 8);
-			llen += 5 + length($4) + length($3) + 3;
-
-			# if line is too long, then print the comment first
-			if (llen > 80)
-				printf("/* =%s %s */\n", $4, $3);
 
 			printf("#define\t%s\t", $2)
 			if (tlen < 8)
 				printf("\t");
 			if (tlen < 16)
-				printf("\t")
-			printf("%s", $1);
-
-			if (llen > 80)
-				printf("\n");
-			else
-				printf("\t/* =%s %s */\n", $4, $3);
+				printf("\t");
+			if (tlen < 24)
+				printf("\t");
+			printf("%s\n", $1);
 		}
 	  }' \
 < $DATABASE >> $HEADER_FILE
