@@ -2160,12 +2160,12 @@ ire_fastpath_update(ire_t *ire, void *arg)
 	up = mp->b_rptr;
 	cmplen = mp->b_wptr - up;
 	/* Serialize multiple fast path updates */
-	mutex_enter(&ire->ire_lock);
+	mutex_enter(&ire->ire_nce->nce_lock);
 	up2 = ire->ire_nce->nce_res_mp->b_rptr;
 	ASSERT(cmplen >= 0);
 	if (ire->ire_nce->nce_res_mp->b_wptr - up2 != cmplen ||
 	    bcmp(up, up2, cmplen) != 0) {
-		mutex_exit(&ire->ire_lock);
+		mutex_exit(&ire->ire_nce->nce_lock);
 		/*
 		 * Don't take the ire off the fastpath list yet,
 		 * since the response may come later.
@@ -2195,7 +2195,7 @@ ire_fastpath_update(ire_t *ire, void *arg)
 			freeb(fp_mp);
 		}
 	}
-	mutex_exit(&ire->ire_lock);
+	mutex_exit(&ire->ire_nce->nce_lock);
 	return (B_TRUE);
 }
 

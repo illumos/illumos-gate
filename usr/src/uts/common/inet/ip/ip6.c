@@ -5081,8 +5081,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				NULL,
 				gcgrp);
 
-			if (dst_ill->ill_phys_addr_length == IPV6_ADDR_LEN)
-				freeb(dlureq_mp);
+			freeb(dlureq_mp);
 
 			if (ire == NULL) {
 				if (gcgrp != NULL) {
@@ -6015,8 +6014,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 				NULL,
 				NULL);
 
-			if (dst_ill->ill_phys_addr_length == IPV6_ADDR_LEN)
-				freeb(dlureq_mp);
+			freeb(dlureq_mp);
 
 			if (ire == NULL) {
 				ire_refrele(save_ire);

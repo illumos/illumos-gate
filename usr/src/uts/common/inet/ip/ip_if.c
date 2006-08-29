@@ -22478,8 +22478,10 @@ ip_mrtun_rt_add(ipaddr_t in_src_addr, int flags, ipif_t *ipif_arg,
 	    NULL,
 	    NULL);
 
-	if (ire == NULL)
+	if (ire == NULL) {
+		freeb(dlureq_mp);
 		return (ENOMEM);
+	}
 	ip2dbg(("ip_mrtun_rt_add: mrtun route is created with type %d\n",
 	    ire->ire_type));
 	save_ire = ire;
