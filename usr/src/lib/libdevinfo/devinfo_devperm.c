@@ -54,6 +54,7 @@
 #include <regex.h>
 #include <strings.h>
 #include <libdevinfo.h>
+#include <zone.h>
 
 extern int is_minor_node(const char *, const char **);
 
@@ -386,14 +387,16 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 	int find_method;
 
 	/*
-	 * Determine to begin if the search needs to be performed via
-	 * finddev, which returns only persisted names in /dev, or readdir,
-	 * for paths other than /dev.  This use of finddev avoids triggering
-	 * potential implicit reconfig for names noted as managed by
-	 * logindevperm but not present on the system.
+	 * Determine if the search needs to be performed via finddev,
+	 * which returns only persisted names in the global /dev, or
+	 * readdir, for paths other than /dev and non-global zones.
+	 * This use of finddev avoids triggering potential implicit
+	 * reconfig for names managed by logindevperm but not present
+	 * on the system.
 	 */
-	find_method = ((strcmp(path, "/dev") == 0) ||
-	    (strncmp(path, "/dev/", 5) == 0)) ?
+	find_method = ((getzoneid() == GLOBAL_ZONEID) &&
+	    ((strcmp(path, "/dev") == 0) ||
+	    (strncmp(path, "/dev/", 5) == 0))) ?
 		FLAG_USE_FINDDEV : FLAG_USE_READDIR;
 
 	/* path must be a valid name */
