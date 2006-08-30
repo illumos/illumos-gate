@@ -166,7 +166,9 @@ uint32_t px_fabric_die_rc_ue = PCIE_AER_UCE_UR |
     PCIE_AER_UCE_RO |
     PCIE_AER_UCE_FCP |
     PCIE_AER_UCE_DLP |
-    PCIE_AER_UCE_ECRC;
+    PCIE_AER_UCE_ECRC |
+    PCIE_AER_UCE_PTLP |
+    PCIE_AER_UCE_MTLP;
 
 /* Fire PCIe Error that should cause panics even under protected access */
 uint32_t px_fabric_die_rc_ce_gos = 0;
@@ -182,7 +184,9 @@ uint32_t px_fabric_die_ue = PCIE_AER_UCE_UR |
     PCIE_AER_UCE_RO |
     PCIE_AER_UCE_FCP |
     PCIE_AER_UCE_DLP |
-    PCIE_AER_UCE_TRAINING;
+    PCIE_AER_UCE_TRAINING |
+    PCIE_AER_UCE_PTLP |
+    PCIE_AER_UCE_MTLP;
 
 /* Fabric Error that should cause panics even under protected access */
 uint32_t px_fabric_die_ce_gos = 0;

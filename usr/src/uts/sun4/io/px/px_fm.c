@@ -576,8 +576,8 @@ px_fabric_fill_cs(px_t *px_p, px_fabric_cfgspace_t *cs)
 	pcie_req_id_t	rid = cs->rid;
 
 	/* Gather Basic Device Information */
-	cs->hdr_type = (px_fab_get(px_p, rid,
-			    PCI_CONF_CACHE_LINESZ) >> 16) & 0xFF;
+	cs->hdr_type = (px_fab_get(px_p, rid, PCI_CONF_CACHE_LINESZ) >> 16) &
+	    PCI_HEADER_TYPE_M;
 
 	cs->cap_off = px_fabric_get_pciecap(px_p, rid);
 	cap_off = cs->cap_off;
