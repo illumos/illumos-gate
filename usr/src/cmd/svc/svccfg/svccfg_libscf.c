@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +53,7 @@
 #define	TEMP_FILE_PATTERN	"/tmp/svccfg-XXXXXX"
 
 /* These are characters which the lexer requires to be in double-quotes. */
-#define	CHARS_TO_QUOTE		" \t\n>=\"()"
+#define	CHARS_TO_QUOTE		" \t\n\\>=\"()"
 
 #define	HASH_SIZE		16
 #define	HASH_SVC		"smf/manifest"
@@ -941,9 +940,10 @@ string_to_value(const char *str, scf_type_t ty, boolean_t require_quotes)
 
 /*
  * Print str to strm, quoting double-quotes and backslashes with backslashes.
+ * Optionally append a comment prefix ('#') to newlines ('\n').
  */
 static int
-quote_and_print(const char *str, FILE *strm)
+quote_and_print(const char *str, FILE *strm, int commentnl)
 {
 	const char *cp;
 
@@ -952,6 +952,10 @@ quote_and_print(const char *str, FILE *strm)
 			(void) putc('\\', strm);
 
 		(void) putc(*cp, strm);
+
+		if (commentnl && *cp == '\n') {
+			(void) putc('#', strm);
+		}
 	}
 
 	return (ferror(strm));
@@ -10205,7 +10209,7 @@ list_prop_info(const scf_property_t *prop, const char *name, size_t len)
 		/* This is to be human-readable, so don't use CHARS_TO_QUOTE */
 		if (multiple_strings || strpbrk(buf, " \t\n\"()") != NULL) {
 			safe_printf(" \"");
-			(void) quote_and_print(buf, stdout);
+			(void) quote_and_print(buf, stdout, 0);
 			(void) putchar('"');
 			if (ferror(stdout)) {
 				(void) putchar('\n');
@@ -10910,7 +10914,9 @@ write_edit_script(FILE *strm)
 		while ((ret2 = scf_iter_next_property(piter, prop)) == 1) {
 			int first = 1;
 			int ret3;
-			int multiple_strings = 0;
+			int multiple;
+			int is_str;
+			scf_type_t bty;
 
 			if (scf_property_get_name(prop, pname,
 			    max_scf_name_len + 1) < 0)
@@ -10919,16 +10925,18 @@ write_edit_script(FILE *strm)
 			if (scf_property_type(prop, &ty) != 0)
 				scfdie();
 
-			if (fprintf(strm, "# setprop %s/%s = %s: (", buf,
-			    pname, scf_type_to_string(ty)) < 0) {
+			multiple = prop_has_multiple_values(prop, val);
+
+			if (fprintf(strm, "# setprop %s/%s = %s: %s", buf,
+			    pname, scf_type_to_string(ty), multiple ? "(" : "")
+			    < 0) {
 				warn(emsg_write_error, strerror(errno));
 				result = -1;
 				goto out;
 			}
 
-			if (prop_has_multiple_values(prop, val) &&
-			    (ty == SCF_TYPE_ASTRING || ty == SCF_TYPE_USTRING))
-				multiple_strings = 1;
+			(void) scf_type_base_type(ty, &bty);
+			is_str = (bty == SCF_TYPE_ASTRING);
 
 			if (scf_iter_property_values(viter, prop) !=
 			    SCF_SUCCESS)
@@ -10959,10 +10967,10 @@ write_edit_script(FILE *strm)
 					}
 				}
 
-				if (multiple_strings ||
+				if ((is_str && multiple) ||
 				    strpbrk(buf, CHARS_TO_QUOTE) != NULL) {
 					(void) putc('"', strm);
-					(void) quote_and_print(buf, strm);
+					(void) quote_and_print(buf, strm, 1);
 					(void) putc('"', strm);
 
 					if (ferror(strm)) {
@@ -10985,7 +10993,11 @@ write_edit_script(FILE *strm)
 			if (ret3 < 0)
 				scfdie();
 
-			if (fputs(")\n", strm) < 0) {
+			/* Write closing paren if mult-value property */
+			if ((multiple && putc(')', strm) == EOF) ||
+
+			    /* Write final newline */
+			    fputc('\n', strm) == EOF) {
 				warn(emsg_write_error, strerror(errno));
 				result = -1;
 				goto out;
