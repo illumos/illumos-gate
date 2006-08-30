@@ -909,9 +909,7 @@ installctx(
 }
 
 /*
- * Remove thread context ops from the current thread.
- * (Or allow the agent thread to remove thread context ops from another
- * thread in the same, stopped, process)
+ * Remove the thread context ops from a thread.
  */
 int
 removectx(
@@ -926,9 +924,29 @@ removectx(
 {
 	struct ctxop *ctx, *prev_ctx;
 
+	/*
+	 * The incoming kthread_t (which is the thread for which the
+	 * context ops will be removed) should be one of the following:
+	 *
+	 * a) the current thread,
+	 *
+	 * b) a thread of a process that's being forked (SIDL),
+	 *
+	 * c) a thread that belongs to the same process as the current
+	 *    thread and for which the current thread is the agent thread,
+	 *
+	 * d) a thread that is TS_STOPPED which is indicative of it
+	 *    being (if curthread is not an agent) a thread being created
+	 *    as part of an lwp creation.
+	 */
 	ASSERT(t == curthread || ttoproc(t)->p_stat == SIDL ||
 	    ttoproc(t)->p_agenttp == curthread || t->t_state == TS_STOPPED);
 
+	/*
+	 * Serialize modifications to t->t_ctx to prevent the agent thread
+	 * and the target thread from racing with each other during lwp exit.
+	 */
+	mutex_enter(&t->t_ctx_lock);
 	prev_ctx = NULL;
 	for (ctx = t->t_ctx; ctx != NULL; ctx = ctx->next) {
 		if (ctx->save_op == save && ctx->restore_op == restore &&
@@ -939,6 +957,7 @@ removectx(
 				prev_ctx->next = ctx->next;
 			else
 				t->t_ctx = ctx->next;
+			mutex_exit(&t->t_ctx_lock);
 			if (ctx->free_op != NULL)
 				(ctx->free_op)(ctx->arg, 0);
 			kmem_free(ctx, sizeof (struct ctxop));
@@ -946,6 +965,8 @@ removectx(
 		}
 		prev_ctx = ctx;
 	}
+	mutex_exit(&t->t_ctx_lock);
+
 	return (0);
 }
 
