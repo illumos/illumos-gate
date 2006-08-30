@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +48,7 @@ extern "C" {
 /* product id */
 #define	KEYSPAN_USA19HS_PID		0x121
 #define	KEYSPAN_USA49WLC_PID		0x12a
+#define	KEYSPAN_USA49WG_PID		0x131
 
 #define	KEYSPAN_MAX_PORT_NUM		4
 
@@ -162,6 +162,18 @@ struct keyspan_state {
 	int			ks_dev_state;	/* USB device state */
 	keyspan_pm_t		*ks_pm;		/* PM support */
 
+	/*
+	 * The following only used on USA_49WG
+	 */
+	/* Shared bulk in pipe handle */
+	usb_pipe_handle_t	ks_datain_pipe_handle;
+
+	/* counter for opened bulk in pipe */
+	uint8_t			ks_datain_open_cnt;
+
+	/* Flag for device reconnect */
+	uint8_t			ks_reconnect_flag;
+
 };
 
 _NOTE(MUTEX_PROTECTS_DATA(keyspan_state::ks_mutex, keyspan_state))
@@ -265,7 +277,21 @@ enum {
 enum {
 	KEYSPAN_BULK_TIMEOUT		= 3,	/* transfer timeout */
 	KEYSPAN_BULKIN_MAX_LEN		= 64,	/* bulk in max length */
-	KEYSPAN_BULKOUT_MAX_LEN		= 64,	/* bulk out max length */
+	KEYSPAN_BULKIN_MAX_LEN_49WG	= 512,	/* bulk in max length */
+	/*
+	 * From keyspan spec, USA49WLC max packet length for bulk out transfer
+	 * is 64, the format is [status byte][up to 63 data bytes], so the
+	 * max data length per transfer is 63 bytes, USA19HS doesn't need
+	 * extra status byte. USA49WG max packet length for bulk out transfer
+	 * is 512, the format is [status byte][63 data bytes]...[status byte]
+	 * [up to 63 data bytes], so the max data length per transfer is 504
+	 * bytes, while the port0 use intr out pipe send data, the packet
+	 * format is the same as USA49WLC, so the max data length for USA49WG
+	 * port0 is 63 bytes.
+	 */
+	KEYSPAN_BULKOUT_MAX_LEN_19HS	= 64,	/* for 19HS only */
+	KEYSPAN_BULKOUT_MAX_LEN_49WLC	= 63,	/* for 49WLC and 49WG port0 */
+	KEYSPAN_BULKOUT_MAX_LEN_49WG	= 504,	/* for 49WG other ports */
 	KEYSPAN_STATIN_MAX_LEN		= 16	/* status in max length */
 };
 
@@ -274,6 +300,8 @@ enum {
 
 /* Vendor specific ctrl req, used to set/download bytes in the device memory */
 #define	KEYSPAN_REQ_SET 0xa0
+/* Vendor specific ctrl req, used to send ctrl command for USA_49WG model */
+#define	KEYSPAN_SET_CONTROL_REQUEST	0xB0
 
 /*
  * debug printing masks

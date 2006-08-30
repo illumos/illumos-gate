@@ -59,6 +59,11 @@ root keyspan_bulkin_cb
 root keyspan_bulkout_cb
 root keyspan_status_cb
 
+root keyspan_bulkin_cb_usa49wg
+root keyspan_introut_cb_usa49wg
+root keyspan_intr_cb_usa49wg
+root keyspan_intr_ex_cb_usa49wg
+
 ### specify keyspan function pointers
 
 add        ds_ops::ds_attach targets keyspan_attach

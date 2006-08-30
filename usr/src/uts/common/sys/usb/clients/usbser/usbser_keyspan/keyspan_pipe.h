@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +67,7 @@ enum {
 
 
 int	keyspan_init_pipes(keyspan_state_t *);
+int	keyspan_init_pipes_usa49wg(keyspan_state_t *);
 void	keyspan_fini_pipes(keyspan_state_t *);
 int	keyspansp_open_pipes(keyspan_state_t *);
 void	keyspansp_close_pipes(keyspan_state_t *);
@@ -81,8 +81,10 @@ void	keyspan_close_open_pipes(keyspan_state_t *esp);
 
 int	keyspan_receive_data(keyspan_pipe_t *, int, void *);
 int	keyspan_send_data(keyspan_pipe_t *, mblk_t **, void *);
+int	keyspan_send_data_port0(keyspan_pipe_t *, mblk_t **, void *);
 
 int	keyspan_receive_status(keyspan_state_t	*);
+void	keyspan_pipe_start_polling(keyspan_pipe_t *);
 
 #ifdef	__cplusplus
 }

@@ -300,6 +300,7 @@ static int
 keyspan_attach(ds_attach_info_t *aip)
 {
 	keyspan_state_t	*ksp;
+	int	rval = USB_SUCCESS;
 
 	ksp = (keyspan_state_t *)kmem_zalloc(sizeof (keyspan_state_t),
 	    KM_SLEEP);
@@ -324,7 +325,26 @@ keyspan_attach(ds_attach_info_t *aip)
 
 	keyspan_attach_ports(ksp);
 
-	if (keyspan_init_pipes(ksp) != USB_SUCCESS) {
+	switch (ksp->ks_dev_spec.id_product) {
+	case KEYSPAN_USA19HS_PID:
+	case KEYSPAN_USA49WLC_PID:
+		rval = keyspan_init_pipes(ksp);
+
+		break;
+
+	case KEYSPAN_USA49WG_PID:
+		rval = keyspan_init_pipes_usa49wg(ksp);
+
+		break;
+
+	default:
+		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh, "keyspan_attach:"
+		    "the device's product id can't be recognized");
+
+		return (USB_FAILURE);
+	}
+
+	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
 		    "keyspan_init_pipes: failed.");
 
@@ -438,6 +458,7 @@ int
 keyspan_open_hw_port(keyspan_port_t *kp, boolean_t open_pipes)
 {
 	int		rval;
+	keyspan_state_t	*ksp = kp->kp_ksp;
 
 	USB_DPRINTF_L4(DPRINT_OPEN, kp->kp_lh,
 	    "keyspan_open_hw_port: [%d]", kp->kp_port_num);
@@ -455,10 +476,50 @@ keyspan_open_hw_port(keyspan_port_t *kp, boolean_t open_pipes)
 	kp->kp_state = KEYSPAN_PORT_OPEN;
 	mutex_exit(&kp->kp_mutex);
 
-	if ((rval = keyspan_receive_data(&kp->kp_datain_pipe,
-	    kp->kp_read_len, kp)) != USB_SUCCESS) {
+	switch (ksp->ks_dev_spec.id_product) {
+	case KEYSPAN_USA19HS_PID:
+	case KEYSPAN_USA49WLC_PID:
+		if ((rval = keyspan_receive_data(&kp->kp_datain_pipe,
+			kp->kp_read_len, kp)) != USB_SUCCESS) {
 
-		goto fail;
+				goto fail;
+		}
+
+		break;
+
+	case KEYSPAN_USA49WG_PID:
+		mutex_enter(&ksp->ks_mutex);
+		/* open data in pipe the first time, start receiving data */
+		if ((ksp->ks_datain_open_cnt == 1) && open_pipes) {
+			mutex_exit(&ksp->ks_mutex);
+			if ((rval = keyspan_receive_data(&kp->kp_datain_pipe,
+				kp->kp_read_len, kp)) != USB_SUCCESS) {
+
+					goto fail;
+			}
+		/* the device is reconnected to host, restart receiving data */
+		} else if ((ksp->ks_reconnect_flag) && (!open_pipes)) {
+			mutex_exit(&ksp->ks_mutex);
+			if ((rval = keyspan_receive_data(&kp->kp_datain_pipe,
+				kp->kp_read_len, kp)) != USB_SUCCESS) {
+
+					goto fail;
+			}
+			mutex_enter(&ksp->ks_mutex);
+			ksp->ks_reconnect_flag = 0;
+			mutex_exit(&ksp->ks_mutex);
+
+		} else {
+			mutex_exit(&ksp->ks_mutex);
+		}
+
+		break;
+
+	default:
+		USB_DPRINTF_L2(DPRINT_OPEN, ksp->ks_lh, "keyspan_open_hw_port:"
+		    "the device's product id can't be recognized");
+
+		return (USB_FAILURE);
 	}
 
 	/* set the default port parameters and send cmd msg to enable port */
@@ -594,6 +655,7 @@ keyspan_close_hw_port(keyspan_port_t *kp)
 
 
 	case KEYSPAN_USA49WLC_PID:
+	case KEYSPAN_USA49WG_PID:
 		keyspan_build_cmd_msg_usa49(kp, NULL);
 		kp->kp_ctrl_msg.usa49._txOn = 0;
 		kp->kp_ctrl_msg.usa49._txOff = 1;
@@ -620,16 +682,43 @@ keyspan_close_hw_port(keyspan_port_t *kp)
 	}
 
 	mutex_exit(&kp->kp_mutex);
-
 	/* send close port cmd to this port */
 	if (keyspan_send_cmd(kp) != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
-		    "keyspan_close_hw_port: closing hw port, send cmd FAILED");
+		"keyspan_close_hw_port: closing hw port, send cmd FAILED");
 	}
 
 	/* blow away bulkin requests or pipe close will wait until timeout */
-	usb_pipe_reset(ksp->ks_dip, kp->kp_datain_pipe.pipe_handle,
-	    USB_FLAGS_SLEEP, NULL, NULL);
+	switch (ksp->ks_dev_spec.id_product) {
+		case KEYSPAN_USA19HS_PID:
+		case KEYSPAN_USA49WLC_PID:
+			usb_pipe_reset(ksp->ks_dip,
+				kp->kp_datain_pipe.pipe_handle,
+				USB_FLAGS_SLEEP, NULL, NULL);
+
+			break;
+		case KEYSPAN_USA49WG_PID:
+			mutex_enter(&ksp->ks_mutex);
+			/*
+			 * if only this port is opened, shared data in pipe
+			 * can be reset.
+			 */
+			if (ksp->ks_datain_open_cnt == 1) {
+				mutex_exit(&ksp->ks_mutex);
+
+				usb_pipe_reset(ksp->ks_dip,
+					kp->kp_datain_pipe.pipe_handle,
+					USB_FLAGS_SLEEP, NULL, NULL);
+			} else {
+				mutex_exit(&ksp->ks_mutex);
+			}
+
+			break;
+		default:
+			USB_DPRINTF_L2(DPRINT_CLOSE, kp->kp_lh,
+			"keyspan_close_hw_port: the device's product id can't"
+			"be recognized");
+	}
 
 	(void) keyspan_close_port_pipes(kp);
 }
@@ -861,10 +950,10 @@ keyspan_set_port_params(ds_hdl_t hdl, uint_t port_num, ds_port_params_t *tp)
 	mutex_exit(&kp->kp_mutex);
 
 	if (keyspan_send_cmd(kp) != USB_SUCCESS) {
-		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
-		    "keyspan_send_cmd() FAILED");
+			USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
+			    "keyspan_send_cmd() FAILED");
 
-		return (USB_FAILURE);
+			return (USB_FAILURE);
 	}
 
 	return (USB_SUCCESS);
@@ -921,6 +1010,7 @@ keyspan_set_modem_ctl(ds_hdl_t hdl, uint_t port_num, int mask, int val)
 
 
 	case KEYSPAN_USA49WLC_PID:
+	case KEYSPAN_USA49WG_PID:
 		if (mask & TIOCM_RTS) {
 
 			kp->kp_ctrl_msg.usa49.setRts = 0x1;
@@ -962,10 +1052,10 @@ keyspan_set_modem_ctl(ds_hdl_t hdl, uint_t port_num, int mask, int val)
 	mutex_exit(&kp->kp_mutex);
 
 	if (keyspan_send_cmd(kp) != USB_SUCCESS) {
-		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
-		    "keyspan_send_cmd() FAILED");
+			USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
+			    "keyspan_send_cmd() FAILED");
 
-		return (USB_FAILURE);
+			return (USB_FAILURE);
 	}
 
 	return (USB_SUCCESS);
@@ -1012,6 +1102,7 @@ keyspan_get_modem_ctl(ds_hdl_t hdl, uint_t port_num, int mask, int *valp)
 
 
 	case KEYSPAN_USA49WLC_PID:
+	case KEYSPAN_USA49WG_PID:
 		if (kp->kp_status_msg.usa49.dcd) {
 			val |= TIOCM_CD;
 		}
@@ -1075,8 +1166,8 @@ keyspan_break_ctl(ds_hdl_t hdl, uint_t port_num, int ctl)
 
 			break;
 
-
 		case KEYSPAN_USA49WLC_PID:
+		case KEYSPAN_USA49WG_PID:
 			kp->kp_ctrl_msg.usa49.txBreak = 1;
 
 			break;
@@ -1091,9 +1182,7 @@ keyspan_break_ctl(ds_hdl_t hdl, uint_t port_num, int ctl)
 		}
 
 		mutex_exit(&kp->kp_mutex);
-
 		rval = keyspan_send_cmd(kp);
-
 		return (rval);
 	}
 
@@ -1107,6 +1196,7 @@ keyspan_break_ctl(ds_hdl_t hdl, uint_t port_num, int ctl)
 			break;
 
 		case KEYSPAN_USA49WLC_PID:
+		case KEYSPAN_USA49WG_PID:
 			kp->kp_ctrl_msg.usa49._txOn = 1;
 			kp->kp_ctrl_msg.usa49.txBreak = 0;
 
@@ -1122,9 +1212,7 @@ keyspan_break_ctl(ds_hdl_t hdl, uint_t port_num, int ctl)
 		}
 
 		mutex_exit(&kp->kp_mutex);
-
 		rval = keyspan_send_cmd(kp);
-
 		if (rval == USB_SUCCESS) {
 			mutex_enter(&kp->kp_mutex);
 
@@ -1176,8 +1264,8 @@ keyspan_loopback(ds_hdl_t hdl, uint_t port_num, int ctl)
 
 			break;
 
-
 		case KEYSPAN_USA49WLC_PID:
+		case KEYSPAN_USA49WG_PID:
 			kp->kp_ctrl_msg.usa49.loopbackMode = 0;
 
 			break;
@@ -1201,8 +1289,8 @@ keyspan_loopback(ds_hdl_t hdl, uint_t port_num, int ctl)
 
 			break;
 
-
 		case KEYSPAN_USA49WLC_PID:
+		case KEYSPAN_USA49WG_PID:
 			kp->kp_ctrl_msg.usa49.loopbackMode = 1;
 
 			break;
@@ -1491,7 +1579,6 @@ keyspan_attach_dev(keyspan_state_t *ksp)
 
 		break;
 
-
 	case KEYSPAN_USA49WLC_PID:
 		ksp->ks_dev_spec.id_product = KEYSPAN_USA49WLC_PID;
 		ksp->ks_dev_spec.port_cnt = 4;
@@ -1505,6 +1592,21 @@ keyspan_attach_dev(keyspan_state_t *ksp)
 		ksp->ks_dev_spec.datain_ep_addr[1] = 0x82;
 		ksp->ks_dev_spec.datain_ep_addr[2] = 0x83;
 		ksp->ks_dev_spec.datain_ep_addr[3] = 0x84;
+
+		break;
+
+	case KEYSPAN_USA49WG_PID:
+		ksp->ks_dev_spec.id_product = KEYSPAN_USA49WG_PID;
+		ksp->ks_dev_spec.port_cnt = 4;
+		ksp->ks_dev_spec.stat_ep_addr = 0x81;
+		ksp->ks_dev_spec.dataout_ep_addr[0] = 0x01;
+		ksp->ks_dev_spec.dataout_ep_addr[1] = 0x02;
+		ksp->ks_dev_spec.dataout_ep_addr[2] = 0x04;
+		ksp->ks_dev_spec.dataout_ep_addr[3] = 0x06;
+		ksp->ks_dev_spec.datain_ep_addr[0] = 0x88;
+		ksp->ks_dev_spec.datain_ep_addr[1] = 0x88;
+		ksp->ks_dev_spec.datain_ep_addr[2] = 0x88;
+		ksp->ks_dev_spec.datain_ep_addr[3] = 0x88;
 
 		break;
 
@@ -1580,20 +1682,58 @@ keyspan_init_port_params(keyspan_state_t *ksp)
 {
 	int		i;
 	size_t		sz;
+	uint_t		read_len;
+	uint_t		write_len;
+
+	/* the max data len of every bulk in req. */
+	if (usb_pipe_get_max_bulk_transfer_size(ksp->ks_dip, &sz) ==
+		USB_SUCCESS) {
+		if (ksp->ks_dev_spec.id_product == KEYSPAN_USA49WG_PID) {
+			read_len = min(sz, KEYSPAN_BULKIN_MAX_LEN_49WG);
+		} else {
+			read_len = min(sz, KEYSPAN_BULKIN_MAX_LEN);
+		}
+	} else {
+		if (ksp->ks_dev_spec.id_product == KEYSPAN_USA49WG_PID) {
+			read_len = KEYSPAN_BULKIN_MAX_LEN_49WG;
+		} else {
+			read_len = KEYSPAN_BULKIN_MAX_LEN;
+		}
+	}
 
 	for (i = 0; i < ksp->ks_dev_spec.port_cnt; i++) {
-
-		/* lengths for bulk requests */
-		if (usb_pipe_get_max_bulk_transfer_size(ksp->ks_dip, &sz) ==
-		    USB_SUCCESS) {
-			ksp->ks_ports[i].kp_read_len = min(sz,
-			    KEYSPAN_BULKIN_MAX_LEN);
-		} else {
-			ksp->ks_ports[i].kp_read_len = KEYSPAN_BULKIN_MAX_LEN;
-		}
-
+		ksp->ks_ports[i].kp_read_len = read_len;
 		/* the max data len of every bulk out req. */
-		ksp->ks_ports[i].kp_write_len = KEYSPAN_BULKOUT_MAX_LEN;
+		switch (ksp->ks_dev_spec.id_product) {
+		case KEYSPAN_USA19HS_PID:
+			ksp->ks_ports[i].kp_write_len =
+					KEYSPAN_BULKOUT_MAX_LEN_19HS;
+
+			break;
+		case KEYSPAN_USA49WLC_PID:
+			ksp->ks_ports[i].kp_write_len =
+					KEYSPAN_BULKOUT_MAX_LEN_49WLC;
+
+			break;
+		case KEYSPAN_USA49WG_PID:
+			/*
+			 * USA49WG port0 uses intr out pipe send data while
+			 * other ports use bulk out pipes, so port0's max
+			 * packet length for "bulk out" is different from other
+			 * ports' while the same as USA49WLC.
+			 */
+			write_len = ((i == 0) ? KEYSPAN_BULKOUT_MAX_LEN_49WLC :
+					KEYSPAN_BULKOUT_MAX_LEN_49WG);
+			ksp->ks_ports[i].kp_write_len = write_len;
+
+			break;
+		default:
+			USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
+				"keyspan_init_port_params:"
+				"the device's product id can't be recognized");
+
+			return;
+		}
 	}
 }
 
@@ -1633,10 +1773,11 @@ keyspan_set_dev_state_online(keyspan_state_t *ksp)
 }
 
 /*
- * send command to the port and save the params after its completion
+ * send command to the port and save the params after its completion for
+ * USA19HS and USA49WLC
  */
 int
-keyspan_send_cmd(keyspan_port_t *kp)
+keyspan_send_cmd_usa49(keyspan_port_t *kp)
 {
 	keyspan_state_t	*ksp = kp->kp_ksp;
 	mblk_t		*mp;
@@ -1645,7 +1786,7 @@ keyspan_send_cmd(keyspan_port_t *kp)
 	usb_bulk_req_t	*br;
 
 	ASSERT(!mutex_owned(&kp->kp_mutex));
-	USB_DPRINTF_L4(DPRINT_OUT_PIPE, kp->kp_lh, "keyspan_send_cmd");
+	USB_DPRINTF_L4(DPRINT_CTLOP, kp->kp_lh, "keyspan_send_cmd_usa49");
 
 	switch (ksp->ks_dev_spec.id_product) {
 	case KEYSPAN_USA19HS_PID:
@@ -1660,8 +1801,9 @@ keyspan_send_cmd(keyspan_port_t *kp)
 		break;
 
 	default:
-		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh, "keyspan_break_ctl:"
-		    "the device's product id can't be recognized");
+		USB_DPRINTF_L2(DPRINT_CTLOP, ksp->ks_lh,
+		"keyspan_send_cmd_usa49:"
+		"the device's product id can't be recognized");
 		return (USB_FAILURE);
 	}
 
@@ -1685,13 +1827,98 @@ keyspan_send_cmd(keyspan_port_t *kp)
 		keyspan_save_port_params(kp);
 		mutex_exit(&kp->kp_mutex);
 	} else {
-		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh, "keyspan_send_cmd:"
-		    "failure, rval=%d", rval);
+		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh, "keyspan_send_cmd_usa49"
+		": failure, rval=%d", rval);
 	}
 
 	usb_free_bulk_req(br);
 
 	return (rval);
+}
+
+/*
+ * send command to the port and save the params after its completion for
+ * USA_49WG only
+ */
+int
+keyspan_send_cmd_usa49wg(keyspan_port_t *kp)
+{
+	keyspan_state_t	*ksp = kp->kp_ksp;
+	mblk_t		*mp;
+	int		rval = USB_SUCCESS;
+	int		size = sizeof (keyspan_usa49_port_ctrl_msg_t);
+	usb_cb_flags_t	cb_flags;
+	usb_cr_t	cr;
+	usb_ctrl_setup_t setup;
+
+	ASSERT(!mutex_owned(&kp->kp_mutex));
+	USB_DPRINTF_L4(DPRINT_CTLOP, kp->kp_lh, "keyspan_send_cmd_usa49wg");
+
+	if ((mp = allocb(size, BPRI_LO)) == NULL) {
+
+		return (USB_FAILURE);
+	}
+	bcopy(&kp->kp_ctrl_msg, mp->b_rptr, size);
+
+	setup.bmRequestType = USB_DEV_REQ_TYPE_VENDOR;
+	setup.bRequest = KEYSPAN_SET_CONTROL_REQUEST;
+	setup.wValue = 0;
+	setup.wIndex = 0;
+	setup.wLength = size;
+	setup.attrs = 0;
+
+	rval = usb_pipe_ctrl_xfer_wait(ksp->ks_def_pipe.pipe_handle, &setup,
+	    &mp, &cr, &cb_flags, 0);
+
+	if (rval == USB_SUCCESS) {
+		mutex_enter(&kp->kp_mutex);
+		keyspan_save_port_params(kp);
+		mutex_exit(&kp->kp_mutex);
+	} else {
+		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
+			"keyspan_send_cmd_usa49wg: failure, rval=%d", rval);
+	}
+	if (mp) {
+		freemsg(mp);
+	}
+
+	return (rval);
+}
+
+/*
+ * send command to the port and save the params after its completion
+ */
+int
+keyspan_send_cmd(keyspan_port_t *kp)
+{
+	keyspan_state_t	*ksp = kp->kp_ksp;
+	int		rval = USB_FAILURE;
+
+	switch (ksp->ks_dev_spec.id_product) {
+	case KEYSPAN_USA19HS_PID:
+	case KEYSPAN_USA49WLC_PID:
+		rval = keyspan_send_cmd_usa49(kp);
+
+		break;
+	case KEYSPAN_USA49WG_PID:
+		rval = keyspan_send_cmd_usa49wg(kp);
+
+		break;
+	default:
+		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
+		"keyspan_send_cmd: "
+		"the device's product id can't be recognized");
+	}
+
+	if (rval != USB_SUCCESS) {
+			USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
+			    "keyspan_send_cmd() FAILED");
+
+			return (rval);
+	}
+
+	return (USB_SUCCESS);
+
 }
 
 /*
@@ -1738,6 +1965,7 @@ keyspan_restore_device_state(keyspan_state_t *ksp)
 	 */
 	mutex_enter(&ksp->ks_mutex);
 	state = ksp->ks_dev_state = USB_DEV_ONLINE;
+	ksp->ks_reconnect_flag = 1;
 	mutex_exit(&ksp->ks_mutex);
 
 	/*
@@ -1747,7 +1975,6 @@ keyspan_restore_device_state(keyspan_state_t *ksp)
 
 	return (state);
 }
-
 
 /*
  * restore ports state after CPR resume or reconnect
@@ -1776,7 +2003,6 @@ keyspan_restore_ports_state(keyspan_state_t *ksp)
 		/* open hardware serial port */
 		err = keyspan_open_hw_port(kp, B_FALSE);
 		sema_v(&ksp->ks_pipes_sema);
-
 		if (err != USB_SUCCESS) {
 			USB_DPRINTF_L2(DPRINT_HOTPLUG, kp->kp_lh,
 			    "keyspan_restore_ports_state: failed");
@@ -1932,6 +2158,7 @@ static int
 keyspan_pwrlvl0(keyspan_state_t *ksp)
 {
 	int	rval;
+	keyspan_pipe_t *statin = &ksp->ks_statin_pipe;
 
 	USB_DPRINTF_L4(DPRINT_PM, ksp->ks_lh, "keyspan_pwrlvl0");
 
@@ -1940,6 +2167,17 @@ keyspan_pwrlvl0(keyspan_state_t *ksp)
 		/* issue USB D3 command to the device */
 		rval = usb_set_device_pwrlvl3(ksp->ks_dip);
 		ASSERT(rval == USB_SUCCESS);
+
+		if (ksp->ks_dev_spec.id_product == KEYSPAN_USA49WG_PID) {
+			mutex_exit(&ksp->ks_mutex);
+			usb_pipe_stop_intr_polling(statin->pipe_handle,
+				USB_FLAGS_SLEEP);
+			mutex_enter(&ksp->ks_mutex);
+
+			mutex_enter(&statin->pipe_mutex);
+			statin->pipe_state = KEYSPAN_PIPE_CLOSED;
+			mutex_exit(&statin->pipe_mutex);
+		}
 		ksp->ks_dev_state = USB_DEV_PWRED_DOWN;
 		ksp->ks_pm->pm_cur_power = USB_DEV_OS_PWR_OFF;
 
@@ -1995,6 +2233,13 @@ keyspan_pwrlvl3(keyspan_state_t *ksp)
 		/* Issue USB D0 command to the device here */
 		rval = usb_set_device_pwrlvl0(ksp->ks_dip);
 		ASSERT(rval == USB_SUCCESS);
+
+		if (ksp->ks_dev_spec.id_product == KEYSPAN_USA49WG_PID) {
+			mutex_exit(&ksp->ks_mutex);
+			keyspan_pipe_start_polling(&ksp->ks_statin_pipe);
+			mutex_enter(&ksp->ks_mutex);
+		}
+
 		ksp->ks_dev_state = USB_DEV_ONLINE;
 		ksp->ks_pm->pm_cur_power = USB_DEV_OS_FULL_PWR;
 
@@ -2027,10 +2272,8 @@ keyspan_pwrlvl3(keyspan_state_t *ksp)
 static int
 keyspan_attach_pipes(keyspan_state_t *ksp)
 {
-
 	return (keyspan_open_dev_pipes(ksp));
 }
-
 
 void
 keyspan_detach_pipes(keyspan_state_t *ksp)
@@ -2041,9 +2284,8 @@ keyspan_detach_pipes(keyspan_state_t *ksp)
 	 * pipe close will wait until timeout.
 	 */
 	if (ksp->ks_statin_pipe.pipe_handle) {
-
-		usb_pipe_reset(ksp->ks_dip, ksp->ks_statin_pipe.pipe_handle,
-		    USB_FLAGS_SLEEP, NULL, NULL);
+		usb_pipe_stop_intr_polling(ksp->ks_statin_pipe.pipe_handle,
+			USB_FLAGS_SLEEP);
 	}
 
 	/* Close the globle pipes */
@@ -2091,8 +2333,10 @@ keyspan_tx_start(keyspan_port_t *kp, int *xferd)
 	keyspan_state_t	*ksp = kp->kp_ksp;
 	int		len;		/* # of bytes we can transmit */
 	mblk_t		*data;		/* data to be transmitted */
-	int		data_len;	/* # of bytes in 'data' */
+	int		data_len = 0;	/* # of bytes in 'data' */
+	int		tran_len;
 	int		rval;
+	int		status_len = 0;
 
 	ASSERT(!mutex_owned(&ksp->ks_mutex));
 	ASSERT(mutex_owned(&kp->kp_mutex));
@@ -2129,32 +2373,45 @@ keyspan_tx_start(keyspan_port_t *kp, int *xferd)
 		}
 		mutex_enter(&kp->kp_mutex);
 
-		break;
+		/* copy at most 'len' bytes from mblk chain for transmission */
+		data_len = keyspan_tx_copy_data(kp, data, len);
+		if (data_len <= 0) {
+			USB_DPRINTF_L3(DPRINT_OUT_PIPE, kp->kp_lh,
+			"keyspan_tx_start:keyspan_tx_copy_data copied"
+			" zero bytes");
+		}
 
+		break;
 
 	case KEYSPAN_USA49WLC_PID:
-		if (len == 64) {
-			if ((data = allocb(len, BPRI_LO)) == NULL) {
-				mutex_enter(&kp->kp_mutex);
-
-				return;
-			}
+	case KEYSPAN_USA49WG_PID:
+		status_len = len / 64 + 1;
+		if ((data = allocb(len + status_len, BPRI_LO)) == NULL) {
 			mutex_enter(&kp->kp_mutex);
-			len = 63;
-		} else {
 
-			if ((data = allocb(len + 1, BPRI_LO)) == NULL) {
-				mutex_enter(&kp->kp_mutex);
-
-				return;
-			}
-			mutex_enter(&kp->kp_mutex);
+			return;
 		}
-		*(data->b_rptr) = 0; /* zero the first byte */
-		data->b_wptr++;
+		mutex_enter(&kp->kp_mutex);
+		/*
+		 * the data format is [status byte][63 data bytes][...][status]
+		 * byte][up to 63 bytes] according to keyspan spec
+		 */
+		while (data_len < len) {
+			/* Add status byte per 63 data bytes */
+			*(data->b_wptr++) = 0;
+			/* copy at most 63 bytes from mblk chain for trans */
+			tran_len = keyspan_tx_copy_data(kp, data, 63);
+			if (tran_len <= 0) {
+				USB_DPRINTF_L3(DPRINT_OUT_PIPE, kp->kp_lh,
+				"keyspan_tx_start:keyspan_tx_copy_data copied"
+				" zero bytes");
+
+				break;
+			}
+			data_len += tran_len;
+		}
 
 		break;
-
 	default:
 
 		mutex_enter(&kp->kp_mutex);
@@ -2164,15 +2421,19 @@ keyspan_tx_start(keyspan_port_t *kp, int *xferd)
 		return;
 	}
 
-	/* copy at most 'len' bytes from mblk chain for transmission */
-	data_len = keyspan_tx_copy_data(kp, data, len);
-
-	if (data_len <= 0) {
-		USB_DPRINTF_L3(DPRINT_OUT_PIPE, kp->kp_lh, "keyspan_tx_start:"
-		    "keyspan_tx_copy_data copied zero bytes");
-	}
 	mutex_exit(&kp->kp_mutex);
-	rval = keyspan_send_data(&kp->kp_dataout_pipe, &data, kp);
+
+	/*
+	 * For USA-49WG, the port0 uses intr out pipe as data out pipe, while
+	 * other ports use bulk out pipe.
+	 */
+
+	if ((kp->kp_port_num == 0) &&
+			(ksp->ks_dev_spec.id_product == KEYSPAN_USA49WG_PID)) {
+		rval = keyspan_send_data_port0(&kp->kp_dataout_pipe, &data, kp);
+	} else {
+		rval = keyspan_send_data(&kp->kp_dataout_pipe, &data, kp);
+	}
 	mutex_enter(&kp->kp_mutex);
 
 	/*
@@ -2308,6 +2569,7 @@ keyspan_put_head(mblk_t **mpp, mblk_t *bp, keyspan_port_t *kp)
 
 
 	case KEYSPAN_USA49WLC_PID:
+	case KEYSPAN_USA49WG_PID:
 
 		/* get rid of the first byte of the msg data which is a flag */
 		if (*mpp) {
@@ -2345,6 +2607,7 @@ keyspan_default_port_params(keyspan_port_t *kp)
 
 
 	case KEYSPAN_USA49WLC_PID:
+	case KEYSPAN_USA49WG_PID:
 		keyspan_default_port_params_usa49(kp);
 
 		break;
@@ -2376,6 +2639,7 @@ keyspan_build_cmd_msg(keyspan_port_t *kp, ds_port_params_t *tp)
 
 
 	case KEYSPAN_USA49WLC_PID:
+	case KEYSPAN_USA49WG_PID:
 		keyspan_build_cmd_msg_usa49(kp, tp);
 
 		break;
@@ -2403,6 +2667,7 @@ keyspan_save_port_params(keyspan_port_t	*kp)
 
 
 	case KEYSPAN_USA49WLC_PID:
+	case KEYSPAN_USA49WG_PID:
 		keyspan_save_port_params_usa49(kp);
 
 		break;

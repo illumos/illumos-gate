@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,17 +20,18 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * This driver includes code for Keyspan USA49WLC/USA19HS adapters. It is a
- * device-specific driver (DSD) working with USB generic serial driver (GSD). It
- * implements the USB-to-serial device-specific driver interface (DSDI) which is
- * offered by GSD. The interface is defined by ds_ops_t structure.
+ * This driver includes code for Keyspan USA49WG/USA49WLC/USA19HS adapters. It
+ * is a device-specific driver (DSD) working with USB generic serial driver
+ * (GSD). It implements the USB-to-serial device-specific driver interface
+ * (DSDI) which is offered by GSD. The interface is defined by ds_ops_t
+ * structure.
  *
  * For USA49WLC, it's necessary to download firmware every time the device is
  * plugged. Before the firmware is downloaded, we say that the device is in
@@ -41,12 +41,16 @@
  * begin. No firmware is included in the driver. The functions of USA49WLC is
  * disabled.
  *
- * For USA19HS, no need to download firmware since it can be kept in the
- * device's memory.
+ * For USA49WG and USA19HS, no need to download firmware since it can be kept
+ * in the device's memory.
  *
- * For both models, it's necessary to check and switch their configrations at
- * the beginning of attach, since each of them has two configrations. This
- * driver uses the one whose endpoints are all bulk.
+ * For USA49WLC and USA19HS, it's necessary to check and switch their
+ * configrations at the beginning of attach, since each of them has two
+ * configrations. This driver uses the one whose endpoints are all bulk.
+ *
+ * For USA49WG, this driver uses the third configuration which has 6 endpoints,
+ * 3 bulk out eps, 1 bulk in ep, 1 intr in ep, 1 intr out ep. Bulk in ep is
+ * shared by 4 ports for receiving data.
  *
  * Some of Keyspan adapters have only one port, some have two or four ports.
  * This driver supports up to four ports. Each port has its own states (traced
@@ -139,7 +143,7 @@ static int	usbser_keyspan_open(queue_t *, dev_t *, int, int, cred_t *);
 
 /* functions related with set config or firmware download */
 static int	keyspan_pre_attach(dev_info_t *, ddi_attach_cmd_t, void *);
-static int	keyspan_set_cfg(dev_info_t *);
+static int	keyspan_set_cfg(dev_info_t *, uint8_t);
 static int	keyspan_pre_detach(dev_info_t *, ddi_detach_cmd_t, void *);
 static boolean_t keyspan_need_fw(usb_client_dev_data_t *);
 static int	keyspan_set_reg(keyspan_pipe_t *, uchar_t);
@@ -377,19 +381,28 @@ keyspan_pre_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, void *statep)
 	}
 
 	/*
-	 * If 19HS, needn't download firmware, but need check the current cfg.
+	 * If 19HS or 49WG, needn't download firmware, but need check the
+	 * current cfg.
 	 * If 49WLC, need check the current cfg before download fw. And after
 	 * download, the product id will change to KEYSPAN_USA49WLC_PID.
 	 */
 	if (dev_data->dev_descr->idProduct == KEYSPAN_USA19HS_PID ||
 	    dev_data->dev_descr->idProduct == KEYSPAN_USA49WLC_PID) {
-		if (keyspan_set_cfg(dip) == USB_SUCCESS) {
+		if (keyspan_set_cfg(dip, 1) == USB_SUCCESS) {
+			/* Go to keyspan_attach() by return DDI_ECONTEXT. */
+			rval =	DDI_ECONTEXT;
+		}
+
+		goto fail;
+	} else if (dev_data->dev_descr->idProduct == KEYSPAN_USA49WG_PID) {
+		if (keyspan_set_cfg(dip, 2) == USB_SUCCESS) {
 			/* Go to keyspan_attach() by return DDI_ECONTEXT. */
 			rval =	DDI_ECONTEXT;
 		}
 
 		goto fail;
 	}
+
 
 	/*
 	 * By checking KEYSPAN_FW_FLAG,  we can check whether the firmware
@@ -469,10 +482,11 @@ keyspan_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, void *statep)
 
 /* Set cfg for the device which has more than one cfg */
 static int
-keyspan_set_cfg(dev_info_t *dip)
+keyspan_set_cfg(dev_info_t *dip, uint8_t cfg_num)
 {
 
-	if (usb_set_cfg(dip, 1, USB_FLAGS_SLEEP, NULL, NULL) != USB_SUCCESS) {
+	if (usb_set_cfg(dip, cfg_num, USB_FLAGS_SLEEP,
+				NULL, NULL) != USB_SUCCESS) {
 
 		return (USB_FAILURE);
 	}
