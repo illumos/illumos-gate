@@ -2686,19 +2686,19 @@ translate_link(Ofl_desc *ofl, Os_desc *osp, Word link, const char *msg)
  * headers, fill in the program headers and update any other data in the
  * output image.  Some general rules:
  *
- *  o	If an interpretor is required always generate a PT_PHDR entry as
+ *  o	If an interpreter is required always generate a PT_PHDR entry as
  *	well.  It is this entry that triggers the kernel into passing the
- *	interpretor an aux vector instead of just a file descriptor.
+ *	interpreter an aux vector instead of just a file descriptor.
  *
  *  o	When generating an image that will be interpreted (ie. a dynamic
  *	executable, a shared object, or a static executable that has been
- *	provided with an interpretor - weird, but possible), make the initial
+ *	provided with an interpreter - weird, but possible), make the initial
  *	loadable segment include both the ehdr and phdr[].  Both of these
- *	tables are used by the interpretor therefore it seems more intuitive
+ *	tables are used by the interpreter therefore it seems more intuitive
  *	to explicitly defined them as part of the mapped image rather than
- *	relying on page rounding by the interpretor to allow their access.
+ *	relying on page rounding by the interpreter to allow their access.
  *
- *  o	When generating a static image that does not require an interpretor
+ *  o	When generating a static image that does not require an interpreter
  *	have the first loadable segment indicate the address of the first
  *	.section as the start address (things like /kernel/unix and ufsboot
  *	expect this behavior).
@@ -2975,11 +2975,11 @@ ld_update_outfile(Ofl_desc *ofl)
 
 		/*
 		 * If this is the first loadable segment of a dynamic object,
-		 * or an interpretor has been specified (a static object built
-		 * with an interpretor will still be given a PT_HDR entry), then
+		 * or an interpreter has been specified (a static object built
+		 * with an interpreter will still be given a PT_HDR entry), then
 		 * compensate for the elf header and program header array.  Both
 		 * of these are actually part of the loadable segment as they
-		 * may be inspected by the interpretor.  Adjust the segments
+		 * may be inspected by the interpreter.  Adjust the segments
 		 * size and offset accordingly.
 		 */
 		if ((_phdr == 0) && (phdr->p_type == PT_LOAD) &&
@@ -3062,7 +3062,7 @@ ld_update_outfile(Ofl_desc *ofl)
 
 				/*
 				 * Finally, if we're creating a dynamic object
-				 * (or a static object in which an interpretor
+				 * (or a static object in which an interpreter
 				 * is specified) update the vaddr to reflect
 				 * the address of the first section within this
 				 * segment.
@@ -3170,7 +3170,7 @@ ld_update_outfile(Ofl_desc *ofl)
 	 * sections with the appropriate data.  Other sections may still be
 	 * modified via reloc_process().
 	 *
-	 * Copy the interpretor name into the .interp section.
+	 * Copy the interpreter name into the .interp section.
 	 */
 	if (ofl->ofl_interp)
 		(void) strcpy((char *)ofl->ofl_osinterp->os_outdata->d_buf,

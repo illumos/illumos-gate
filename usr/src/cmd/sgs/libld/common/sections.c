@@ -896,7 +896,7 @@ ld_make_got(Ofl_desc *ofl)
 }
 
 /*
- * Build an interp section.
+ * Build an interpreter section.
  */
 static uintptr_t
 make_interp(Ofl_desc *ofl)
@@ -908,8 +908,14 @@ make_interp(Ofl_desc *ofl)
 	size_t		size;
 
 	/*
+	 * If -z nointerp is in effect, don't create an interpreter section.
+	 */
+	if (ofl->ofl_flags1 & FLG_OF1_NOINTRP)
+		return (1);
+
+	/*
 	 * We always build an .interp section for dynamic executables.  However
-	 * if the user has specifically specified an interpretor we'll build
+	 * if the user has specifically specified an interpreter we'll build
 	 * this section for any output (presumably the user knows what they are
 	 * doing. refer ABI section 5-4, and ld.1 man page use of -I).
 	 */
@@ -918,7 +924,7 @@ make_interp(Ofl_desc *ofl)
 		return (1);
 
 	/*
-	 * In the case of a dynamic executable supply a default interpretor
+	 * In the case of a dynamic executable supply a default interpreter
 	 * if a specific interpreter has not been specified.
 	 */
 	if (iname == 0) {

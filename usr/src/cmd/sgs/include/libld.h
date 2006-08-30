@@ -322,8 +322,9 @@ struct ofl_desc {
 					/*	archive file */
 #define	FLG_OF1_WEAKEXT	0x00000002	/* allow archive extraction to */
 					/*	resolve weak references */
-#define	MSK_OF1_ARCHIVE	0x0000000f	/* archive flags mask */
+#define	MSK_OF1_ARCHIVE	0x00000003	/* archive flags mask */
 
+#define	FLG_OF1_NOINTRP	0x00000008	/* -z nointerp flag set */
 #define	FLG_OF1_ZDIRECT	0x00000010	/* -z direct flag set */
 #define	FLG_OF1_NDIRECT	0x00000020	/* no-direct bindings specified */
 #define	FLG_OF1_OVHWCAP	0x00000040	/* override any input hardware or */

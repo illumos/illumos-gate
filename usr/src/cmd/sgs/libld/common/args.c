@@ -29,7 +29,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Publically available flags are defined in ld(1).   The following flags are
+ * Publicly available flags are defined in ld(1).   The following flags are
  * private, and may be removed at any time.
  *
  *    OPTION			MEANING
@@ -45,6 +45,10 @@
  *    -z rtldinfo=symbol	assigns symbol to SUNW_RTLDINF dynamic tag,
  *				providing pre-initialization specific routines
  *				for TLS initialization.
+ *
+ *    -z nointerp		suppress the addition of an interpreter
+ *				section.  This is used to generate the kernel,
+ *				but makes no sense to be used by anyone else.
  */
 #include	<sys/link.h>
 #include	<stdio.h>
@@ -151,7 +155,6 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZAE));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZAL));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZC));
-	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNC));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZDFS));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZDRS));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZE));
@@ -167,14 +170,15 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZLD64));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZLO));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZM));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNC));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNDFS));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNDEF));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNDEL));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNDLO));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNDU));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNOW));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNPA));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNV));
-	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNOW));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZO));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZPIA));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRL));
@@ -230,6 +234,12 @@ check_flags(Ofl_desc * ofl, int argc)
 	if (Blflag && Beflag) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_INCOMP),
 		    MSG_ORIG(MSG_ARG_BELIMINATE), MSG_ORIG(MSG_ARG_BLOCAL));
+		ofl->ofl_flags |= FLG_OF_FATAL;
+	}
+
+	if (ofl->ofl_interp && (ofl->ofl_flags1 & FLG_OF1_NOINTRP)) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_INCOMP),
+		    MSG_ORIG(MSG_ARG_CI), MSG_ORIG(MSG_ARG_ZNOINTERP));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 	}
 
@@ -1021,6 +1031,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_NOCOMPSTRTAB)) == 0) {
 				ofl->ofl_flags1 |= FLG_OF1_NCSTTAB;
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_NOINTERP)) == 0) {
+				ofl->ofl_flags1 |= FLG_OF1_NOINTRP;
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_INTERPOSE)) == 0) {
 				zinflag = TRUE;
