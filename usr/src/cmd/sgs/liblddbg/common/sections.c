@@ -52,7 +52,7 @@ Dbg_sec_strtab(Lm_list *lml, Os_desc *osp, Str_tbl *stp)
 	if (!osp)
 		return;
 
-	dbg_print(lml, MSG_ORIG(MSG_STR_EMPTY));
+	Dbg_util_nl(lml, DBG_NL_STD);
 	if (stp->st_flags & FLG_STTAB_COMPRESS)
 		dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_COMP), osp->os_name,
 		    stp->st_fullstringsize, stp->st_stringsize);
@@ -182,6 +182,8 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 	if (DBG_NOTDETAIL())
 		return;
 
+	Dbg_util_nl(lml, DBG_NL_STD);
+
 	/*
 	 * If the flag == 0, then the routine is called before sorting.
 	 */
@@ -199,10 +201,10 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 		    EC_WORD(sort->st_ordercnt));
 
 		for (LIST_TRAVERSE(&osp->os_isdescs, lnp2, isp1)) {
-			Word			link;
-			Ifl_desc		*ifl = isp1->is_file;
-			Is_desc			*isp2;
-			static const char	*msg;
+			Word		link;
+			Ifl_desc	*ifl = isp1->is_file;
+			Is_desc		*isp2;
+			const char	*msg;
 
 			if ((isp1->is_flags & FLG_IS_ORDERED) == 0) {
 				dbg_print(lml, MSG_INTL(MSG_ORD_TITLE_0),
@@ -212,30 +214,34 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 
 			if (isp1->is_shdr->sh_flags & SHF_ORDERED) {
 				link = isp1->is_shdr->sh_info;
-				msg = MSG_INTL(MSG_ORD_TITLE_3);
+				msg = MSG_ORIG(MSG_SH_INFO);
 			} else {
 				/* SHF_LINK_ORDER */
 				link = isp1->is_shdr->sh_link;
-				msg = MSG_INTL(MSG_ORD_TITLE_4);
+				msg = MSG_ORIG(MSG_SH_LINK);
 			}
 
 			if (link == SHN_BEFORE) {
 				dbg_print(lml, MSG_INTL(MSG_ORD_TITLE_1),
-				    isp1->is_name, isp1->is_file->ifl_name);
+				    isp1->is_name, isp1->is_file->ifl_name,
+				    msg);
 				continue;
 			}
 
 			if (link == SHN_AFTER) {
 				dbg_print(lml, MSG_INTL(MSG_ORD_TITLE_2),
-				    isp1->is_name, isp1->is_file->ifl_name);
+				    isp1->is_name, isp1->is_file->ifl_name,
+				    msg);
 				continue;
 			}
 
 			isp2 = ifl->ifl_isdesc[link];
-			dbg_print(lml, msg, isp1->is_name, ifl->ifl_name,
-			    isp2->is_name, isp2->is_key);
+			dbg_print(lml, MSG_INTL(MSG_ORD_TITLE_3),
+			    isp1->is_name, ifl->ifl_name, msg, isp2->is_name,
+			    isp2->is_key);
 		}
 	}
+	Dbg_util_nl(lml, DBG_NL_STD);
 }
 
 void

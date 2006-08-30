@@ -130,6 +130,7 @@
 			 allow extraction of\n\
 			 \t\t\tarchive members to resolvetweak references from \
 			 \n\t\t\t\archive files\n"
+@ MSG_ARG_DETAIL_ZAL	"\t[-z altexec64]\texecute the 64-bit link-editor\n"
 @ MSG_ARG_DETAIL_ZC	"\t[-z combreloc]\tcombine multiple relocation \
 			 sections\n"
 @ MSG_ARG_DETAIL_ZNC	"\t[-z nocompstrtab]\n\t\t\tdisable compression of \
@@ -1015,6 +1016,7 @@
 @ MSG_ARG_ZCOMBRELOC	"-zcombreloc"
 
 @ MSG_ARG_ABSEXEC	"absexec"
+@ MSG_ARG_ALTEXEC64	"altexec64"
 @ MSG_ARG_NOCOMPSTRTAB	"nocompstrtab"
 @ MSG_ARG_GROUPPERM	"groupperm"
 @ MSG_ARG_NOGROUPPERM	"nogroupperm"

@@ -1754,7 +1754,7 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 
 			/*
 			 * If the input relocation section had the SHF_GROUP
-			 * flag set - propogate it to the output relocation
+			 * flag set - propagate it to the output relocation
 			 * section.
 			 */
 			if (risp->is_shdr->sh_flags & SHF_GROUP) {
@@ -2413,22 +2413,41 @@ ld_make_data(Ofl_desc *ofl, size_t size)
 	return (isec);
 }
 
-static const uchar_t ret_template[] = {
-#if	defined(i386)
+/*
+ * Define a set of templates for generating "void (*)(void)" function
+ * definitions.
+ */
+#if	defined(i386) || defined(__amd64)
+#if	defined(__lint)
+static const uchar_t ret_template[] = { 0 };
+#else	/* __lint */
+#if	defined(_ELF64)
+#define	ret_template	ret64_template
+#else
+#define	ret_template	ret32_template
+#endif
+
+static const uchar_t ret32_template[] = {
 /* 0x00 */	0xc3				/* ret */
-#elif	defined(__amd64)
+};
+
+static const uchar_t ret64_template[] = {
 /* 0x00 */	0x55,				/* pushq  %rbp */
 /* 0x01 */	0x48, 0x8b, 0xec,		/* movq   %rsp,%rbp */
 /* 0x04 */	0x48, 0x8b, 0xe5,		/* movq   %rbp,%rsp */
 /* 0x07 */	0x5d,				/* popq   %rbp */
 /* 0x08 */	0xc3				/* ret */
+};
+#endif	/* __lint */
+
 #elif	defined(sparc) || defined(__sparcv9)
+static const uchar_t ret_template[] = {
 /* 0x00 */	0x81, 0xc3, 0xe0, 0x08,		/* retl */
 /* 0x04 */	0x01, 0x00, 0x00, 0x00		/* nop */
+};
 #else
 #error	unsupported architecture!
 #endif
-};
 
 /*
  * Build an additional text section - used to back FUNC symbol definitions

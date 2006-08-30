@@ -676,14 +676,12 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 		raddend += value;
 
 	/*
-	 * addend field for R_SPARC_TLS_DTPMOD32 &&
-	 * R_SPARC_TLS_DTPMOD64 mean nothing.  The addend
-	 * is propogated in the corresponding R_SPARC_TLS_DTPOFF*
-	 * relocations.
+	 * The addend field for R_SPARC_TLS_DTPMOD32 and R_SPARC_TLS_DTPMOD64
+	 * mean nothing.  The addend is propagated in the corresponding
+	 * R_SPARC_TLS_DTPOFF* relocations.
 	 */
-	if (orsp->rel_rtype == M_R_DTPMOD) {
+	if (orsp->rel_rtype == M_R_DTPMOD)
 		raddend = 0;
-	}
 
 	relbits = (char *)relosp->os_outdata->d_buf;
 
@@ -944,7 +942,9 @@ ld_do_activerelocs(Ofl_desc *ofl)
 	Word		flags = ofl->ofl_flags;
 	Word		dtflags1 = ofl->ofl_dtflags_1;
 
-	DBG_CALL(Dbg_reloc_doact_title(ofl->ofl_lml));
+	if (ofl->ofl_actrels.head)
+		DBG_CALL(Dbg_reloc_doact_title(ofl->ofl_lml));
+
 	/*
 	 * Process active relocations.
 	 */
@@ -1045,7 +1045,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 					value -= ofl->ofl_tlsphdr->p_vaddr;
 			} else {
 				/*
-				 * else the value is the symbols value
+				 * Else the value is the symbols value.
 				 */
 				value = sdp->sd_sym->st_value;
 			}

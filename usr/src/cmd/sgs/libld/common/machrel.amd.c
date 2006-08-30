@@ -356,9 +356,8 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 		raddend += value;
 
 	/*
-	 * addend field for R_AMD64_DTPMOD64 means nothing.  The addend
-	 * is propogated in the corresponding R_AMD64_DTPOFF64
-	 * relocation.
+	 * The addend field for R_AMD64_DTPMOD64 means nothing.  The addend
+	 * is propagated in the corresponding R_AMD64_DTPOFF64 relocation.
 	 */
 	if (orsp->rel_rtype == R_AMD64_DTPMOD64)
 		raddend = 0;
@@ -618,7 +617,9 @@ ld_do_activerelocs(Ofl_desc *ofl)
 	Word		flags = ofl->ofl_flags;
 	Word		dtflags1 = ofl->ofl_dtflags_1;
 
-	DBG_CALL(Dbg_reloc_doact_title(ofl->ofl_lml));
+	if (ofl->ofl_actrels.head)
+		DBG_CALL(Dbg_reloc_doact_title(ofl->ofl_lml));
+
 	/*
 	 * Process active relocations.
 	 */
@@ -728,7 +729,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 					value -= ofl->ofl_tlsphdr->p_vaddr;
 			} else {
 				/*
-				 * else the value is the symbols value
+				 * Else the value is the symbols value.
 				 */
 				value = sdp->sd_sym->st_value;
 			}

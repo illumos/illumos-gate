@@ -81,7 +81,7 @@ extern "C" {
 #if	defined(_ELF64)
 #define	M_TLSSTATALIGN	0x10
 #else
-#define	M_TLSSTATALIGN	0x8
+#define	M_TLSSTATALIGN	0x08
 #endif
 
 
@@ -232,8 +232,6 @@ extern "C" {
 #define	M_REL_DT_COUNT	DT_RELACOUNT	/* .dynamic entry */
 #define	M_REL_SHT_TYPE	SHT_RELA	/* section header type */
 #define	M_REL_ELF_TYPE	ELF_T_RELA	/* data buffer type */
-
-#define	M_REL_CONTYPSTR	conv_reloc_SPARC_type
 
 /*
  * Make common relocation types transparent to the common code

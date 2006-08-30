@@ -170,33 +170,44 @@ ld_sup_file(Ofl_desc *ofl, const char *ifile, const Elf_Kind ekind, int flags,
 }
 
 uintptr_t
-ld_sup_input_section(Ofl_desc * ofl, const char *scnname, Shdr **shdr, Word ndx,
-    const char *file, Elf_Scn *scn, Elf *elf)
+ld_sup_input_section(Ofl_desc *ofl, Ifl_desc *ifl, const char *sname,
+    Shdr **oshdr, Word ndx, Elf_Scn *scn, Elf *elf)
 {
 	Func_list	*flp;
 	Listnode	*lnp;
 	uint_t		flags = 0;
 	Elf_Data	*data = NULL;
+	Shdr		*nshdr = *oshdr;
 
 	for (LIST_TRAVERSE(&support[LDS_INP_SECTION].sup_funcs, lnp, flp)) {
 		/*
 		 * This interface was introduced in VERSION2 - so only call it
-		 * for libraries reporting support for * version 2 or above.
+		 * for libraries reporting support for version 2 or above.
 		 */
 		if (flp->fl_version < LD_SUP_VERSION2)
 			continue;
 		if ((data == NULL) &&
 		    ((data = elf_getdata(scn, NULL)) == NULL)) {
 			eprintf(ofl->ofl_lml, ERR_ELF,
-			    MSG_INTL(MSG_ELF_GETDATA), file);
+			    MSG_INTL(MSG_ELF_GETDATA), ifl->ifl_name);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (S_ERROR);
 		}
 
 		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
-		    support[LDS_INP_SECTION].sup_name, LDS_INP_SECTION,
-		    scnname));
-		(*flp->fl_fptr)(scnname, shdr, ndx, data, elf, &flags);
+		    support[LDS_INP_SECTION].sup_name, LDS_INP_SECTION, sname));
+		(*flp->fl_fptr)(sname, &nshdr, ndx, data, elf, &flags);
+	}
+
+	/*
+	 * If the section header has been re-allocated (known to occur with
+	 * libCCexcept.so), then diagnose the section header difference and
+	 * return the new section header.
+	 */
+	if (nshdr != *oshdr) {
+		Dbg_shdr_modified(ofl->ofl_lml, ifl->ifl_ehdr->e_machine,
+		    *oshdr, nshdr, sname);
+		*oshdr = nshdr;
 	}
 	return (0);
 }

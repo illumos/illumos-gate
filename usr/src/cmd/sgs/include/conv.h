@@ -150,7 +150,7 @@ typedef struct {
 /*
  * Define all generic interfaces.
  */
-extern	void		conv_check_native(char **, char **);
+extern	uchar_t		conv_check_native(char **, char **);
 extern	const char	*conv_config_feat(int);
 extern	const char	*conv_config_obj(ushort_t);
 extern	const char	*conv_config_upm(const char *, const char *,
@@ -200,7 +200,7 @@ extern	const char	*conv_ver_flags(Half);
 #define	conv_reloc_amd64_type	conv64_reloc_amd64_type
 #define	conv_reloc_SPARC_type	conv64_reloc_SPARC_type
 #define	conv_sec_flags		conv64_sec_flags
-#define	conv_sec_info		conv64_sec_info
+#define	conv_sec_linkinfo	conv64_sec_linkinfo
 #define	conv_sec_type		conv64_sec_type
 #define	conv_sym_info_bind	conv64_sym_info_bind
 #define	conv_sym_info_type	conv64_sym_info_type
@@ -236,7 +236,7 @@ extern	const char	*conv_ver_flags(Half);
 #define	conv_reloc_amd64_type	conv32_reloc_amd64_type
 #define	conv_reloc_SPARC_type	conv32_reloc_SPARC_type
 #define	conv_sec_flags		conv32_sec_flags
-#define	conv_sec_info		conv32_sec_info
+#define	conv_sec_linkinfo	conv32_sec_linkinfo
 #define	conv_sec_type		conv32_sec_type
 #define	conv_sym_info_bind	conv32_sym_info_bind
 #define	conv_sym_info_type	conv32_sym_info_type
@@ -273,7 +273,7 @@ extern	const char	*conv_reloc_386_type(Word, int);
 extern	const char	*conv_reloc_amd64_type(Word, int);
 extern	const char	*conv_reloc_SPARC_type(Word, int);
 extern	const char	*conv_sec_flags(Xword);
-extern	const char	*conv_sec_info(Word, Xword);
+extern	const char	*conv_sec_linkinfo(Word, Xword);
 extern	const char	*conv_sec_type(Half, Word, int);
 extern	const char	*conv_sym_info_bind(uchar_t, int);
 extern	const char	*conv_sym_info_type(Half, uchar_t, int);

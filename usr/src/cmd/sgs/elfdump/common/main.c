@@ -268,7 +268,7 @@ main(int argc, char **argv, char **envp)
 	 * If we're on a 64-bit kernel, try to exec a full 64-bit version of
 	 * the binary.  If successful, conv_check_native() won't return.
 	 */
-	conv_check_native(argv, envp);
+	(void) conv_check_native(argv, envp);
 
 	/*
 	 * Establish locale.

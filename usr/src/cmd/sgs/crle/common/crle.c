@@ -337,7 +337,7 @@ main(int argc, char **argv, char **envp)
 	}
 #else
 	if (c_class == ELFCLASS64) {
-		conv_check_native(argv, envp);
+		(void) conv_check_native(argv, envp);
 
 		/*
 		 * conv_check_native() should not return, as we expect
@@ -346,7 +346,7 @@ main(int argc, char **argv, char **envp)
 		 * available on this system.
 		 */
 		(void) fprintf(stderr, MSG_INTL(MSG_ISA32_NO64SUP),
-			crle.c_name);
+		    crle.c_name);
 		return (1);
 	}
 #endif

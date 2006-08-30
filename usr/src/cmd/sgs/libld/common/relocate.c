@@ -954,7 +954,7 @@ reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 
 		/*
 		 * Indicate that this relocation should be processed the same
-		 * as a section symbol.  For SPARC and AMD (Rela), indicate
+		 * as a section symbol.  For SPARC and AMD64 (Rela), indicate
 		 * that the addend also needs to be applied to this relocation.
 		 */
 #if	(defined(__i386) || defined(__amd64)) && !defined(_ELF64)
@@ -1375,8 +1375,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	if (sdp->sd_isc && (sdp->sd_isc->is_osdesc == 0) &&
 	    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION)) {
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_RELINVSEC),
-		    M_REL_CONTYPSTR(rtype, 0), ifl->ifl_name, isp->is_name,
-		    sdp->sd_isc->is_name);
+		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype, 0),
+		    ifl->ifl_name, isp->is_name, sdp->sd_isc->is_name);
 		return (1);
 	}
 
@@ -1389,8 +1389,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	if ((sdp->sd_flags & FLG_SY_INVALID) || (rsndx == 0) ||
 	    (rsndx >= ifl->ifl_symscnt)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_UNKNWSYM),
-		    M_REL_CONTYPSTR(rtype, 0), ifl->ifl_name, isp->is_name,
-		    demangle(reld->rel_sname),
+		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype, 0),
+		    ifl->ifl_name, isp->is_name, demangle(reld->rel_sname),
 		    EC_XWORD(reloc->r_offset), EC_WORD(rsndx));
 		return (S_ERROR);
 	}

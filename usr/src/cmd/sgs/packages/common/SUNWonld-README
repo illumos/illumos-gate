@@ -1117,3 +1117,4 @@ Bugid   Risk Synopsis
 6449485 ld(1) creates misaligned TLS in binary compiled with -xpg
 6424550 Write to unallocated (wua) errors when libraries are built with
 	-z lazyload
+6464235 executing the 64-bit ld(1) should be easy (D)

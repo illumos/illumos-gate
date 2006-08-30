@@ -517,6 +517,12 @@
 @ MSG_MOVE_OUTMOVE	"copying move entries for %s into .SUNW_move"
 @ MSG_MOVE_INPUT	"collecting move entries: file=%s"
 
+# Section header messages
+
+@ MSG_SHD_MODIFIED	"section=%s; section header modified by support library"
+@ MSG_SHD_ORIG		" original:"
+@ MSG_SHD_NEW		" new:"
+
 # Section messages
 
 @ MSG_SEC_INPUT		"section=%s; input from file=%s"
@@ -626,15 +632,14 @@
 
 # SHF_ORDERED related messages. Token used is sections.
 
-@ MSG_ORD_SORT_BEFORE	"Output section to be sorted=%s"
-@ MSG_ORD_SORT_AFTER	"Output section sorted=%s"
+@ MSG_ORD_SORT_BEFORE	"section=%s; requires output section reordering:"
+@ MSG_ORD_SORT_AFTER	"section=%s; output section reordered:"
 @ MSG_ORD_HDR_1		" number of SHN_BEGIN=%u, SHN_AFTER=%u, \
 			 sh_info/sh_link=%u"
 @ MSG_ORD_TITLE_0	" section=%s from %s is not an ordered section"
-@ MSG_ORD_TITLE_1	" section=%s from %s, sh_info=SHN_BEGIN"
-@ MSG_ORD_TITLE_2	" section=%s from %s, sh_info=SHN_AFTER"
-@ MSG_ORD_TITLE_3	" section=%s from %s, sh_info=%s, sort_val=%d"
-@ MSG_ORD_TITLE_4	" section=%s from %s, sh_link=%s, sort_val=%d"
+@ MSG_ORD_TITLE_1	" section=%s from %s, %s=SHN_BEGIN"
+@ MSG_ORD_TITLE_2	" section=%s from %s, %s=SHN_AFTER"
+@ MSG_ORD_TITLE_3	" section=%s from %s, %s=%s, sort_val=%d"
 
 @ MSG_ORD_ERR_TITLE	"the SHF_ORDERED section %s from %s has \
 			 an error;  flag ignored"
@@ -1070,6 +1075,9 @@
 @ MSG_SCN_FINIARRAY	".finiarray"
 @ MSG_SCN_PREINITARRAY	".preinitarray"
 
+@ MSG_SH_INFO		"sh_info"
+@ MSG_SH_LINK		"sh_link"
+
 @ MSG_UTL_SCC_ENTRY	"    [%d]  %s"
 
 @ MSG_FMT_INDEX		" [%d]"
@@ -1203,16 +1211,16 @@
 
 # Section header messages
 
-@ MSG_SHD_ADDR_32	"    sh_addr:      %#-10llx  sh_flags:   %s"
-@ MSG_SHD_SIZE_32	"    sh_size:      %#-10llx  sh_type:    %s"
-@ MSG_SHD_OFFSET_32	"    sh_offset:    %#-10llx  sh_entsize: %#llx"
-@ MSG_SHD_LINK_32	"    sh_link:      %-10d  sh_info:    %s"
+@ MSG_SHD_ADDR_32	"    sh_addr:      %#-10llx      sh_flags:   %s"
+@ MSG_SHD_SIZE_32	"    sh_size:      %#-10llx      sh_type:    %s"
+@ MSG_SHD_OFFSET_32	"    sh_offset:    %#-10llx      sh_entsize: %#llx"
+@ MSG_SHD_LINK_32	"    sh_link:      %-14s  sh_info:    %s"
 @ MSG_SHD_ALIGN_32	"    sh_addralign: %#-10llx"
 
 @ MSG_SHD_ADDR_64	"    sh_addr:      %#-18llx  sh_flags:   %s"
 @ MSG_SHD_SIZE_64	"    sh_size:      %#-18llx  sh_type:    %s"
 @ MSG_SHD_OFFSET_64	"    sh_offset:    %#-18llx  sh_entsize: %#llx"
-@ MSG_SHD_LINK_64	"    sh_link:      %-18d  sh_info:    %s"
+@ MSG_SHD_LINK_64	"    sh_link:      %-18s  sh_info:    %s"
 @ MSG_SHD_ALIGN_64	"    sh_addralign: %#-18llx"
 
 # Program header messages

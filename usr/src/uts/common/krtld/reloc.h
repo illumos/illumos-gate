@@ -122,8 +122,6 @@ extern	const Rel_entry		reloc_table[];
 					FLG_RE_ADDRELATIVE) != 0)
 #define	IS_REGISTER(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_REGISTER) != 0)
-#define	IS_FORMOFF(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_FRMOFF) != 0)
 #define	IS_NOTSUP(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_NOTSUP) != 0)
 #define	IS_SEG_RELATIVE(X)	((reloc_table[(X)].re_flags & \

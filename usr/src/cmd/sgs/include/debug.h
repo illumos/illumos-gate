@@ -308,6 +308,8 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_seg_os		Dbg64_seg_os
 #define	Dbg_seg_title		Dbg64_seg_title
 
+#define	Dbg_shdr_modified	Dbg64_shdr_modified
+
 #define	Dbg_statistics_ar	Dbg64_statistics_ar
 #define	Dbg_statistics_ld	Dbg64_statistics_ld
 
@@ -498,6 +500,8 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_seg_list		Dbg32_seg_list
 #define	Dbg_seg_os		Dbg32_seg_os
 #define	Dbg_seg_title		Dbg32_seg_title
+
+#define	Dbg_shdr_modified	Dbg32_shdr_modified
 
 #define	Dbg_statistics_ar	Dbg32_statistics_ar
 #define	Dbg_statistics_ld	Dbg32_statistics_ld
@@ -720,6 +724,9 @@ extern	void	Dbg_seg_entry(Ofl_desc *, int, Sg_desc *);
 extern	void	Dbg_seg_list(Lm_list *, Half, List *);
 extern	void	Dbg_seg_os(Ofl_desc *, Os_desc *, int);
 extern	void	Dbg_seg_title(Lm_list *);
+
+extern	void	Dbg_shdr_modified(Lm_list *, Half, Shdr *, Shdr *,
+		    const char *);
 
 extern	void	Dbg_statistics_ar(Ofl_desc *);
 extern	void	Dbg_statistics_ld(Ofl_desc *);

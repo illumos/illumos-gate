@@ -168,11 +168,11 @@ conv_sec_flags(Xword flags)
 }
 
 const char *
-conv_sec_info(Word info, Xword flags)
+conv_sec_linkinfo(Word info, Xword flags)
 {
 	static	char	string[CONV_INV_STRSIZE];
 
-	if (flags & SHF_ORDERED) {
+	if (flags & ALL_SHF_ORDER) {
 		if (info == SHN_BEFORE)
 			return (MSG_ORIG(MSG_SHN_BEFORE));
 		else if (info == SHN_AFTER)

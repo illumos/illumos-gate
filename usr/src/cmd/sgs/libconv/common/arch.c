@@ -57,10 +57,11 @@ conv_sys_eclass(void)
 
 #if	defined(_LP64)
 /* ARGSUSED */
-void
+uchar_t
 conv_check_native(char **argv, char **envp)
 {
 	/* 64-bit version does nothing */
+	return (ELFCLASS64);
 }
 
 #else
@@ -76,7 +77,7 @@ conv_check_native(char **argv, char **envp)
  * counterpart (ie. sparcv7, or sparc), but as none of the callers provide these
  * counterparts, we simply return to the caller.
  */
-void
+uchar_t
 conv_check_native(char **argv, char **envp)
 {
 	char	*str;
@@ -86,8 +87,9 @@ conv_check_native(char **argv, char **envp)
 	 * This is used by the test suite to test 32-bit support libraries.
 	 */
 	if (((str = getenv(MSG_ORIG(MSG_LD_NOEXEC64))) != NULL) && *str)
-		return;
+		return (ELFCLASS32);
 
 	(void) isaexec(getexecname(), argv, envp);
+	return (ELFCLASS32);
 }
 #endif

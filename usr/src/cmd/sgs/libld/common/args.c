@@ -149,6 +149,7 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_CY));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZA));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZAE));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZAL));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZC));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNC));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZDFS));
@@ -889,7 +890,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 		case 'z':
 			/*
 			 * For specific help, print our usage message and exit
-			 * immediately to insure a 0 return code.
+			 * immediately to ensure a 0 return code.
 			 */
 			if (strncmp(optarg, MSG_ORIG(MSG_ARG_HELP),
 			    MSG_ARG_HELP_SIZE) == 0) {
@@ -1052,6 +1053,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_NOGROUPPERM)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_NOLAZYLOAD)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_RECORD)) &&
+			    strcmp(optarg, MSG_ORIG(MSG_ARG_ALTEXEC64)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_WEAKEXT))) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_ILLEGAL),

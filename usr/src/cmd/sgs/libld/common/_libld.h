@@ -57,7 +57,7 @@ typedef enum {
 #endif
 	LD_DYN,		LD_DTRACE,	 LD_NOTE,	LD_SUNWBSS,
 	LD_TLS,
-#if defined(__x86) && defined(_ELF64)
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
 	LD_UNWIND,
 #endif
 	LD_EXTRA,
@@ -513,8 +513,8 @@ extern uintptr_t	ld_sup_loadso(Ofl_desc *, const char *);
 extern void		ld_sup_input_done(Ofl_desc *);
 extern void		ld_sup_section(Ofl_desc *, const char *, Shdr *, Word,
 			    Elf_Data *, Elf *);
-extern uintptr_t	ld_sup_input_section(Ofl_desc*, const char *, Shdr **,
-			    Word, const char *, Elf_Scn *, Elf *);
+extern uintptr_t	ld_sup_input_section(Ofl_desc*, Ifl_desc *,
+			    const char *, Shdr **, Word, Elf_Scn *, Elf *);
 extern void		ld_sup_start(Ofl_desc *, const Half, const char *);
 extern Sym_desc		*ld_sym_add_u(const char *, Ofl_desc *);
 extern void		ld_sym_adjust_vis(Sym_desc *, Ofl_desc *);
@@ -548,9 +548,6 @@ extern Word		hashbkts(Word);
 extern Xword		lcm(Xword, Xword);
 extern Listnode *	list_where(List *, Word);
 
-/*
- * AMD64 - 64-bit specific functions
- */
 #if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
 extern uintptr_t	append_amd64_unwind(Os_desc *, Ofl_desc *);
 extern uintptr_t	make_amd64_unwindhdr(Ofl_desc *);

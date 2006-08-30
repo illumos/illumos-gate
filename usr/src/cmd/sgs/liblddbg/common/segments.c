@@ -68,6 +68,7 @@ Dbg_seg_desc_entry(Lm_list *lml, Half mach, int ndx, Sg_desc *sgp)
 			    scop->sco_secname, EC_WORD(scop->sco_index));
 		}
 	}
+	Dbg_util_nl(lml, DBG_NL_STD);
 }
 
 void

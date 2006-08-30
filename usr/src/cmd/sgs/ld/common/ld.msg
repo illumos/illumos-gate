@@ -34,8 +34,10 @@
 # System error messages
 
 @ MSG_SYS_OPEN		"file %s: open failed: %s"
+@ MSG_SYS_EXEC		"file %s: exec failed: %s"
 
 @ MSG_SYS_ALLOC		"alloc failed: %s"
+@ MSG_SYS_64		"unable to execute 64-bit version of ld"
 
 # Generic error diagnostic labels
 
@@ -57,6 +59,9 @@
 
 @ MSG_STR_OPTIONS	"6:abc:d:e:f:h:il:mo:p:rstu:z:B:CD:F:GI:L:M:N:P:Q:R:\
 			 S:VY:?"
+
+@ MSG_ARG_FOUR		"4"
+@ MSG_ARG_ALTEXEC64	"altexec64"
 
 @ MSG_LD_OPTIONS	"LD_OPTIONS"
 @ MSG_LD_ALTEXEC	"LD_ALTEXEC="

@@ -99,46 +99,55 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
  * Determine whether we need the Elf32 or Elf64 libld.
  */
 static int
-determine_class(int argc, char ** argv)
+determine_class(int argc, char **argv, uchar_t *aoutclass, uchar_t *ldclass)
 {
-	unsigned char	class = 0;
-	int		c;
+#if	defined(__sparcv9) || defined(__amd64)
+	uchar_t aclass = 0, lclass = ELFCLASS64;
+#else
+	uchar_t	aclass = 0, lclass = 0;
+#endif
+	int	c;
 
 getmore:
 	/*
 	 * Skip options.
 	 *
-	 * The only option we're interested in is -64, which enforces a 64-bit
-	 * link-edit.  This option is used when the only input to ld() is a
-	 * mapfile and a 64-bit object is required.  If we've already processed
-	 * a 32-bit object and we find -64, we have an error condition, but let
-	 * this fall through to libld to obtain the default error message.
+	 * The only options we're interested in is -64 or -altzexec64.  The -64
+	 * option is used when the only input to ld() is a mapfile or archive,
+	 * and a 64-bit a.out is required.  The -zaltexec64 option requests the
+	 * 64-bit version of ld() is used regardless of the required a.out.
+	 *
+	 * If we've already processed a 32-bit object and we find -64, we have
+	 * an error condition, but let this fall through to libld to obtain the
+	 * default error message.
 	 */
 	opterr = 0;
 	while ((c = getopt(argc, argv, MSG_ORIG(MSG_STR_OPTIONS))) != -1) {
 		switch (c) {
 			case '6':
-				return (ELFCLASS64);
+				if (strncmp(optarg, MSG_ORIG(MSG_ARG_FOUR),
+				    MSG_ARG_FOUR_SIZE) == 0)
+					aclass = ELFCLASS64;
+				break;
+#if	!defined(__sparcv9) && !defined(__amd64)
+			case 'z':
+				if (strncmp(optarg, MSG_ORIG(MSG_ARG_ALTEXEC64),
+				    MSG_ARG_ALTEXEC64_SIZE) == 0)
+					lclass = ELFCLASS64;
+				break;
+#endif
 			default:
 				break;
 		}
 	}
 
 	/*
-	 * Otherwise look for the first ELF object to determine the class of
+	 * Continue to look for the first ELF object to determine the class of
 	 * objects to operate on.
 	 */
 	for (; optind < argc; optind++) {
 		int		fd;
 		unsigned char	ident[EI_NIDENT];
-
-		/*
-		 * If we've already analyzed the initial object, continue.
-		 * We're only interested in skipping all files to check for
-		 * more options, and specifically if the -64 option is set.
-		 */
-		if (class)
-			continue;
 
 		/*
 		 * If we detect some more options return to getopt().
@@ -152,25 +161,33 @@ getmore:
 				goto getmore;
 		}
 
+		/*
+		 * If we've already determined the object class, continue.
+		 * We're only interested in skipping all files to check for
+		 * more options, and specifically if the -64 option is set.
+		 */
+		if (aclass)
+			continue;
+
+		/*
+		 * Open the file and determine the files ELF class.
+		 */
 		if ((fd = open(argv[optind], O_RDONLY)) == -1) {
 			int err = errno;
 
 			eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
 			    argv[optind], strerror(err));
-			return (0);
+			return (1);
 		}
 
-		/*
-		 * Determine the files ELF class.
-		 */
 		if ((read(fd, ident, EI_NIDENT) == EI_NIDENT) &&
 		    (ident[EI_MAG0] == ELFMAG0) &&
 		    (ident[EI_MAG1] == ELFMAG1) &&
 		    (ident[EI_MAG2] == ELFMAG2) &&
 		    (ident[EI_MAG3] == ELFMAG3)) {
-			if (((class = ident[EI_CLASS]) != ELFCLASS32) &&
-			    (class != ELFCLASS64))
-				class = 0;
+			if (((aclass = ident[EI_CLASS]) != ELFCLASS32) &&
+			    (aclass != ELFCLASS64))
+				aclass = 0;
 		}
 		(void) close(fd);
 	}
@@ -178,10 +195,14 @@ getmore:
 	/*
 	 * If we couldn't establish a class default to 32-bit.
 	 */
-	if (class)
-		return (class);
+	if (aclass == 0)
+		aclass = ELFCLASS32;
+	if (lclass == 0)
+		lclass = ELFCLASS32;
 
-	return (ELFCLASS32);
+	*aoutclass = aclass;
+	*ldclass = lclass;
+	return (0);
 }
 
 /*
@@ -277,31 +298,35 @@ prepend_ldoptions(char *ld_options, int *argcp, char ***argvp)
  * arguments as the originating process.  This mechanism permits using
  * alternate link-editors (debugging/developer copies) even in complex build
  * environments.
- *
- * If LD_ALTEXEC= isn't set, or the exec() fails, silently return and allow the
- * current link-editor to execute.
  */
-void
+static int
 ld_altexec(char **argv, char **envp)
 {
 	char	*execstr;
 	char	**str;
+	int	err;
+
 	for (str = envp; *str; str++) {
 		if (strncmp(*str, MSG_ORIG(MSG_LD_ALTEXEC),
 		    MSG_LD_ALTEXEC_SIZE) == 0) {
 			break;
 		}
 	}
-	if (*str == 0)
-		return;
 
 	/*
-	 * get a pointer to the actual string - if it's
-	 * a null entry - we return.
+	 * If LD_ALTEXEC isn't set, return to continue executing the present
+	 * link-editor.
+	 */
+	if (*str == 0)
+		return (0);
+
+	/*
+	 * Get a pointer to the actual string.  If it's a null entry, return.
 	 */
 	execstr = strdup(*str + MSG_LD_ALTEXEC_SIZE);
 	if (*execstr == '\0')
-		return;
+		return (0);
+
 	/*
 	 * Null out the LD_ALTEXEC= environment entry.
 	 */
@@ -318,16 +343,19 @@ ld_altexec(char **argv, char **envp)
 	(void) execve(execstr, argv, envp);
 
 	/*
-	 * If the exec() fails, silently fall through and continue execution of
-	 * the current link-editor.
+	 * If the exec() fails, return a failure indication.
 	 */
+	err = errno;
+	eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_EXEC), execstr,
+	    strerror(err));
+	return (1);
 }
 
 int
 main(int argc, char **argv, char **envp)
 {
 	char		*ld_options, **oargv = argv;
-	uchar_t 	class;
+	uchar_t 	aoutclass, ldclass, checkclass;
 
 	/*
 	 * XX64 -- Strip "-Wl," from the head of each argument.  This is to
@@ -352,9 +380,11 @@ main(int argc, char **argv, char **envp)
 	(void) textdomain(MSG_ORIG(MSG_SUNW_OST_SGS));
 
 	/*
-	 * Execute alternate linker if LD_ALTEXEC environment variable is set.
+	 * Execute an alternate linker if the LD_ALTEXEC environment variable is
+	 * set.  If a specified alternative could not be found, bail.
 	 */
-	ld_altexec(argv, envp);
+	if (ld_altexec(argv, envp))
+		return (1);
 
 	/*
 	 * Check the LD_OPTIONS environment variable, and if present prepend
@@ -370,27 +400,31 @@ main(int argc, char **argv, char **envp)
 	}
 
 	/*
-	 * Locate the first input file and from this file determine the class of
-	 * objects we're going to process.  If the class is ELFCLASS64 we'll
-	 * call the ELF64 class of interfaces, else the ELF32 class.  Note that
-	 * if the option -64 is encountered a 64-bit link is explicitly being
-	 * requested.
+	 * Determine the object class, and link-editor class required.
 	 */
-	if ((class = determine_class(argc, argv)) == 0)
+	if (determine_class(argc, argv, &aoutclass, &ldclass))
 		return (1);
 
 	/*
-	 * If we're on a 64-bit kernel, try to exec a full 64-bit version of ld.
+	 * If we're processing 64-bit objects, or the user specifically asked
+	 * for a 64-bit link-editor, determine if a 64-bit ld() can be executed.
+	 * Bail if a 64-bit ld() was explicitly asked for, but one could not be
+	 * found.
 	 */
-	if (class == ELFCLASS64)
-		conv_check_native(oargv, envp);
+	if ((aoutclass == ELFCLASS64) || (ldclass == ELFCLASS64))
+		checkclass = conv_check_native(oargv, envp);
+
+	if ((ldclass == ELFCLASS64) && (checkclass != ELFCLASS64)) {
+		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_64));
+		return (1);
+	}
 
 	/*
 	 * Reset the getopt(3c) error message flag, and call the generic entry
 	 * point using the appropriate class.
 	 */
 	optind = opterr = 1;
-	if (class == ELFCLASS64)
+	if (aoutclass == ELFCLASS64)
 		return (ld64_main(argc, argv));
 	else
 		return (ld32_main(argc, argv));

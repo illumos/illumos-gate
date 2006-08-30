@@ -207,11 +207,11 @@ process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 		isp->is_ident = ident;
 
 		if ((ndx != 0) && (ndx == shdr->sh_link) &&
-		    (shdr->sh_flags & SHF_ORDERED))
+		    (shdr->sh_flags & SHF_ORDERED)) {
 			return ((uintptr_t)ld_place_section(ofl, isp,
 			    ident, 0));
+		}
 	}
-
 	return (1);
 }
 
@@ -1413,8 +1413,8 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 		return (0);
 	}
 
-	if (ld_sup_input_section(ofl, name, &shdr, sndx, ifl->ifl_name,
-	    scn, elf) == S_ERROR)
+	if (ld_sup_input_section(ofl, ifl, name, &shdr, sndx, scn,
+	    elf) == S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -1476,8 +1476,8 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 		}
 		name = str + (size_t)(shdr->sh_name);
 
-		if (ld_sup_input_section(ofl, name, &shdr, ndx, ifl->ifl_name,
-		    scn, elf) == S_ERROR)
+		if (ld_sup_input_section(ofl, ifl, name, &shdr, ndx, scn,
+		    elf) == S_ERROR)
 			return (S_ERROR);
 
 		/*

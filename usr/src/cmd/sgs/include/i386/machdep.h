@@ -113,7 +113,7 @@ extern "C" {
 #define	M_JMP_REG_DISP_IND	0xa3
 #define	M_NOP			0x90
 
-#define	M_BIND_ADJ		1	/* adjustment for end of */
+#define	M_BIND_ADJ	1		/* adjustment for end of */
 					/*	elf_rtbndr() address */
 #ifdef _ELF64
 #define	M_WORD_ALIGN	8
@@ -206,7 +206,6 @@ extern "C" {
 #define	M_REL_SHT_TYPE	SHT_RELA	/* section header type */
 #define	M_REL_ELF_TYPE	ELF_T_RELA	/* data buffer type */
 
-#define	M_REL_CONTYPSTR	conv_reloc_amd64_type
 #else /* _ELF32 */
 #define	M_REL_DT_TYPE	DT_REL		/* .dynamic entry */
 #define	M_REL_DT_SIZE	DT_RELSZ	/* .dynamic entry */
@@ -215,7 +214,6 @@ extern "C" {
 #define	M_REL_SHT_TYPE	SHT_REL		/* section header type */
 #define	M_REL_ELF_TYPE	ELF_T_REL	/* data buffer type */
 
-#define	M_REL_CONTYPSTR	conv_reloc_386_type
 #endif /* ELF32 */
 
 /*

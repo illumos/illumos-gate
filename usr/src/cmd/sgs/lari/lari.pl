@@ -42,14 +42,13 @@ use Getopt::Std;
 use File::Basename;
 
 # Pattern match to skip objects.
-$Rtld = qr{ ^(?:
+$Rtld = qr{
 	/lib/ld\.so\.1 |
 	/usr/lib/ld\.so\.1 |
 	/lib/sparcv9/ld\.so\.1 |
 	/usr/lib/sparcv9/ld\.so\.1 |
 	/lib/amd64/ld\.so\.1 |
 	/usr/lib/amd64/ld\.so\.1
-	)$
 }x;
 
 # Pattern matching required to determine a global symbol.
@@ -221,9 +220,15 @@ if ((getopts('abCDd:imosv', \%opt) == 0) || ($#ARGV < 0)) {
 			$opt{i} = 0;
 		}
 	}
-	if ($opt{o} && $opt{i}) {
-		inappropriate("-o", "-i", 1);
+	if ($opt{o}) {
+		if ($opt{i}) {
+			inappropriate("-o", "-i", 1);
 			$opt{i} = 0;
+		}
+		if ($opt{b}) {
+			inappropriate("-o", "-b", 1);
+			$opt{b} = 0;
+		}
 	}
 
 	# If -m is used, only one input file is applicable.
@@ -276,7 +281,7 @@ if ((getopts('abCDd:imosv', \%opt) == 0) || ($#ARGV < 0)) {
 		$opt{i} = 1;
 	}
 
-	# Determine whether we have a multiple input files.
+	# Determine whether we have multiple input files.
 	if ($#ARGV == 0) {
 		$Mult = 0;
 	} else {
@@ -397,6 +402,12 @@ sub ProcDir {
 sub ProcFile {
 	my ($File, $Mult, $CmdLine) = @_;
 	my (@Ldd, $NoFound, $DbgFile, @DbgGlob, $Type);
+
+	# If we're scanning a directory (ie. /lib) and have picked up ld.so.1,
+	# ignore it.
+	if (($CmdLine eq 0) && ($File =~ $Rtld)) {
+		return 1;
+	}
 
 	$Type = `LC_ALL=C file '$File' 2>&1`;
 	if (($Type !~ /dynamically linked/) || ($Type =~ /Sun demand paged/)) {
@@ -1025,8 +1036,14 @@ sub Interesting
 		}
 	}
 
-	# If we want all symbols, return the count.
-	if (!$opt{i}) {
+	# If we want all overhead symbols, return the count.
+	if ($opt{o}) {
+		return $ObjCnt;
+	}
+
+	# If we want all symbols, return the count.  If we want all bound
+	# symbols, return the count provided it is non-zero.
+	if ($opt{a} && (!$opt{b} || ($BndCnt > 0))) {
 		return $ObjCnt;
 	}
 
@@ -1062,9 +1079,18 @@ sub Interesting
 		return 0;
 	}
 
-	# If we're only interested in multiply-bound symbols.
-	if (($opt{b} || ($SymName =~ $MultSyms) || ($SymName =~ $CrtSyms)) &&
+	# Only display any reserved symbols if more than one binding has
+	# occurred.
+	if ((($SymName =~ $MultSyms) || ($SymName =~ $CrtSyms)) &&
 	    ($BndCnt < 2)) {
+		return (0);
+	}
+
+	# For all other symbols, determine whether a binding has occurred.
+	# Note: definitions within an executable are tagged as protected ("P")
+	# as they may have been bound to from within the executable - we can't
+	# tell.
+	if ($opt{b} && ($BndCnt == 0)) {
 		return (0);
 	}
 
@@ -1102,8 +1128,14 @@ sub GetAllSymbols {
 	# Determine whether we've already retrieved this object's symbols.
 	# Also, ignore the runtime linker, it's on a separate link-map, and
 	# except for the filtee symbols that might be bound via libdl, is
-	# uninteresting.
-	if (($Objects{$Obj}) || ($Obj =~ $Rtld)) {
+	# uninteresting.  Tag the runtime linker as versioned to simplify
+	# possible -v processing.
+	if ($Objects{$Obj}) {
+		return;
+	}
+
+	if ($Obj =~ $Rtld) {
+		$Versioned{$Obj} = 1;
 		return;
 	}
 
@@ -1177,12 +1209,12 @@ sub GetAllSymbols {
 				next;
 			}
 			@Fields = split(' ', $Rel);
-			if ($Fields[0] eq 'R_SPARC_COPY') {
-				$SymName = $Fields[4];
-			} elsif ($Fields[0] eq 'R_386_COPY') {
+			# Intel relocation records don't contain an addend,
+			# where as every other supported platform does.
+			if ($Fields[0] eq 'R_386_COPY') {
 				$SymName = $Fields[3];
 			} else {
-				next;
+				$SymName = $Fields[4];
 			}
 
 			$Symbols{$SymName}{$Obj}[$ObjFlag] |= $Cpyr;

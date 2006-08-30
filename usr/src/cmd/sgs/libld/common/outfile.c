@@ -371,7 +371,7 @@ ld_create_outfile(Ofl_desc *ofl)
 	}
 
 	/*
-	 * If there are any ordered section, handle them here.
+	 * If there are any ordered sections, handle them here.
 	 */
 	if ((ofl->ofl_ordered.head != NULL) &&
 	    (ld_sort_ordered(ofl) == S_ERROR))

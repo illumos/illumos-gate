@@ -166,11 +166,12 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 	if ((isp->is_flags & FLG_IS_ORDERED) == 0)
 		return (0);
 
-	keylink = 0;
 	if (shflags & SHF_ORDERED)
 		keylink = isp->is_shdr->sh_info;
 	else if (shflags & SHF_LINK_ORDER)
 		keylink = isp->is_shdr->sh_link;
+	else
+		keylink = 0;
 
 	if ((error = is_keylink_ok(ifl, keylink, limit)) != 0) {
 		DBG_CALL(Dbg_sec_order_error(ofl->ofl_lml, ifl, ndx, error));
@@ -182,9 +183,9 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 	}
 
 	/*
-	 * If SHF_ORDERED is in effect - the we search for
-	 * our desitination section based off of sh_link else
-	 * we follow the default rules for the desitination section.
+	 * If SHF_ORDERED is in effect, search for our destination section based
+	 * off of sh_link, otherwise follow the default rules for the
+	 * destination section.
 	 */
 	if (shflags & SHF_ORDERED) {
 		if ((dest_ndx = get_shfordered_dest(ofl, ifl,
@@ -197,8 +198,8 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 		}
 	} else {
 		/*
-		 * SHF_LINK_ORDER coelsces into default sections - so
-		 * we set dest_ndx to NULL to trigger this.
+		 * SHF_LINK_ORDER coalesces into default sections, set dest_ndx
+		 * to NULL to trigger this.
 		 */
 		dest_ndx = 0;
 	}
@@ -219,13 +220,15 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 	 * list - place it on the list.
 	 */
 	osp2 = NULL;
-	for (LIST_TRAVERSE(&ofl->ofl_ordered, lnp, osp2))
+	for (LIST_TRAVERSE(&ofl->ofl_ordered, lnp, osp2)) {
 		if (osp2 == osp)
 			break;
+	}
 
-	if (osp != osp2)
+	if (osp != osp2) {
 		if (list_appendc(&(ofl->ofl_ordered), osp) == 0)
 			return ((uintptr_t)S_ERROR);
+	}
 
 	/*
 	 * Output section has been found - set up it's

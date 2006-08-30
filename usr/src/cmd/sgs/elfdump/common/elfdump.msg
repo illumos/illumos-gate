@@ -35,7 +35,7 @@
 # Usage Messages
 
 @ MSG_USAGE_BRIEF	"usage: %s [-cCdegGhHiklmnprsuvy] [-N name] \
-			 [-W file] file(s)\n"
+			 [-w file] file(s)\n"
 @ MSG_USAGE_DETAIL1	"\t[-c]\t\tdump section header information\n"
 @ MSG_USAGE_DETAIL2	"\t[-C]\t\tdemangle C++ symbol names\n"
 @ MSG_USAGE_DETAIL3	"\t[-d]\t\tdump the contents of the .dynamic section\n"

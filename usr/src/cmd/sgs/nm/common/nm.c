@@ -174,7 +174,7 @@ main(int argc, char *argv[], char *envp[])
 	/*
 	 * Check for a binary that better fits this architecture.
 	 */
-	conv_check_native(argv, envp);
+	(void) conv_check_native(argv, envp);
 #endif
 
 	/* table of keyletters for use with -p and -P options */

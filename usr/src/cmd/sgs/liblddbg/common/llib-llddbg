@@ -297,6 +297,9 @@ void	Dbg64_seg_os(Ofl_desc *, Os_desc *, int);
 void    Dbg32_seg_title(Lm_list *);
 void    Dbg64_seg_title(Lm_list *);
 
+void	Dbg32_shdr_modified(Lm_list *, Half, Shdr *, Shdr *, const char *);
+void	Dbg64_shdr_modified(Lm_list *, Half, Shdr *, Shdr *, const char *);
+
 void	Dbg32_statistics_ar(Ofl_desc *);
 void	Dbg64_statistics_ar(Ofl_desc *);
 void	Dbg32_statistics_ld(Ofl_desc *);

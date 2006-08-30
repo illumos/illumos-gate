@@ -38,7 +38,7 @@
 #	Policy for Shared Library Version Names and Interface Definitions
 
 
-SUNWprivate_4.52 {
+SUNWprivate_4.53 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -280,6 +280,9 @@ SUNWprivate_4.52 {
 		Dbg64_seg_os;
 		Dbg32_seg_title;
 		Dbg64_seg_title;
+
+		Dbg32_shdr_modified;
+		Dbg64_shdr_modified;
 
 		Dbg32_statistics_ar;
 		Dbg64_statistics_ar;
