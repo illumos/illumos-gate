@@ -40,9 +40,6 @@
 #include <vm/as.h>
 #include <vm/seg.h>
 
-#define	IS_ZONEDEVFS(vp) \
-	(vtoli((vp)->v_vfsp)->li_flag & LO_ZONEDEVFS)
-
 /*
  * These are the vnode ops routines which implement the vnode interface to
  * the looped-back file system.  These routines just take their parameters,
@@ -177,15 +174,6 @@ lo_getattr(
 	if (error = VOP_GETATTR(realvp(vp), vap, flags, cr))
 		return (error);
 
-	/*
-	 * In zonedevfs mode, we pull a nasty trick; we make sure that
-	 * the dev_t does *not* reflect the underlying device, so that
-	 * no renames can occur to or from the /dev hierarchy.
-	 */
-	if (IS_ZONEDEVFS(vp)) {
-		vap->va_fsid = expldev(vp->v_vfsp->vfs_fsid.val[0]);
-	}
-
 	return (0);
 }
 
@@ -200,9 +188,6 @@ lo_setattr(
 #ifdef LODEBUG
 	lo_dprint(4, "lo_setattr vp %p realvp %p\n", vp, realvp(vp));
 #endif
-	if (IS_ZONEDEVFS(vp) && !IS_DEVVP(vp)) {
-		return (EACCES);
-	}
 	vp = realvp(vp);
 	return (VOP_SETATTR(vp, vap, flags, cr, ct));
 }
@@ -216,8 +201,6 @@ lo_access(vnode_t *vp, int mode, int flags, struct cred *cr)
 	if (mode & VWRITE) {
 		if (vp->v_type == VREG && vn_is_readonly(vp))
 			return (EROFS);
-		if (IS_ZONEDEVFS(vp) && !IS_DEVVP(vp))
-			return (EACCES);
 	}
 	vp = realvp(vp);
 	return (VOP_ACCESS(vp, mode, flags, cr));
@@ -677,7 +660,6 @@ lo_create(
 {
 	int error;
 	vnode_t *vp = NULL;
-	vnode_t *tvp = NULL;
 
 #ifdef LODEBUG
 	lo_dprint(4, "lo_create vp %p realvp %p\n", dvp, realvp(dvp));
@@ -685,28 +667,6 @@ lo_create(
 	if (*nm == '\0') {
 		ASSERT(vpp && dvp == *vpp);
 		vp = realvp(*vpp);
-	}
-
-	if (IS_ZONEDEVFS(dvp)) {
-
-		/*
-		 * In the case of an exclusive create, *vpp will not
-		 * be populated.  We must check to see if the file exists.
-		 */
-		if ((exclusive == EXCL) && (*nm != '\0')) {
-			(void) VOP_LOOKUP(dvp, nm, &tvp, NULL, 0, NULL, cr);
-		}
-
-		/* Is this truly a create?  If so, fail */
-		if ((*vpp == NULL) && (tvp == NULL))
-			return (EACCES);
-
-		if (tvp != NULL)
-			VN_RELE(tvp);
-
-		/* Is this an open of a non-special for writing?  If so, fail */
-		if (*vpp != NULL && (mode & VWRITE) && !IS_DEVVP(*vpp))
-			return (EACCES);
 	}
 
 	error = VOP_CREATE(realvp(dvp), nm, va, exclusive, mode, &vp, cr, flag);
@@ -732,8 +692,6 @@ lo_remove(vnode_t *dvp, char *nm, struct cred *cr)
 #ifdef LODEBUG
 	lo_dprint(4, "lo_remove vp %p realvp %p\n", dvp, realvp(dvp));
 #endif
-	if (IS_ZONEDEVFS(dvp))
-		return (EACCES);
 	dvp = realvp(dvp);
 	return (VOP_REMOVE(dvp, nm, cr));
 }
@@ -745,13 +703,9 @@ lo_link(vnode_t *tdvp, vnode_t *vp, char *tnm, struct cred *cr)
 	lo_dprint(4, "lo_link vp %p realvp %p\n", vp, realvp(vp));
 #endif
 	while (vn_matchops(vp, lo_vnodeops)) {
-		if (IS_ZONEDEVFS(vp))
-			return (EACCES);
 		vp = realvp(vp);
 	}
 	while (vn_matchops(tdvp, lo_vnodeops)) {
-		if (IS_ZONEDEVFS(tdvp))
-			return (EACCES);
 		tdvp = realvp(tdvp);
 	}
 	if (vp->v_vfsp != tdvp->v_vfsp)
@@ -772,8 +726,6 @@ lo_rename(
 #ifdef LODEBUG
 	lo_dprint(4, "lo_rename vp %p realvp %p\n", odvp, realvp(odvp));
 #endif
-	if (IS_ZONEDEVFS(odvp))
-		return (EACCES);
 	/*
 	 * If we are coming from a loop back mounted fs, that has been
 	 * mounted in the same filesystem as where we want to move to,
@@ -824,16 +776,12 @@ rename:
 	 * version of VOP_RENAME()) is also of type lofs.
 	 */
 	if (vn_matchops(ndvp, lo_vnodeops)) {
-		if (IS_ZONEDEVFS(ndvp))
-			return (EACCES);
 		ndvp = realvp(ndvp);	/* Check the next layer */
 	} else {
 		/*
 		 * We can go fast here
 		 */
 		while (vn_matchops(odvp, lo_vnodeops)) {
-			if (IS_ZONEDEVFS(odvp))
-				return (EACCES);
 			odvp = realvp(odvp);
 		}
 		if (odvp->v_vfsp != ndvp->v_vfsp)
@@ -855,8 +803,6 @@ lo_mkdir(
 #ifdef LODEBUG
 	lo_dprint(4, "lo_mkdir vp %p realvp %p\n", dvp, realvp(dvp));
 #endif
-	if (IS_ZONEDEVFS(dvp))
-		return (EACCES);
 	error = VOP_MKDIR(realvp(dvp), nm, va, vpp, cr);
 	if (!error)
 		*vpp = makelonode(*vpp, vtoli(dvp->v_vfsp), 0);
@@ -889,8 +835,6 @@ lo_rmdir(
 #ifdef LODEBUG
 	lo_dprint(4, "lo_rmdir vp %p realvp %p\n", dvp, realvp(dvp));
 #endif
-	if (IS_ZONEDEVFS(dvp))
-		return (EACCES);
 	/* if cdir is lofs vnode ptr get its real vnode ptr */
 	if (vn_matchops(dvp, vn_getops(rvp)))
 		(void) lo_realvp(cdir, &rvp);
@@ -909,8 +853,6 @@ lo_symlink(
 #ifdef LODEBUG
 	lo_dprint(4, "lo_symlink vp %p realvp %p\n", dvp, realvp(dvp));
 #endif
-	if (IS_ZONEDEVFS(dvp))
-		return (EACCES);
 	dvp = realvp(dvp);
 	return (VOP_SYMLINK(dvp, lnm, tva, tnm, cr));
 }

@@ -65,19 +65,10 @@ static vfsdef_t vfw = {
 };
 
 /*
- * Stuff needed to support "zonedevfs" mode.
- */
-static major_t lofs_major;
-static minor_t lofs_minor;
-static kmutex_t lofs_minor_lock;
-
-/*
  * LOFS mount options table
  */
 static char *xattr_cancel[] = { MNTOPT_NOXATTR, NULL };
 static char *noxattr_cancel[] = { MNTOPT_XATTR, NULL };
-static char *zonedevfs_cancel[] = { MNTOPT_LOFS_NOZONEDEVFS, NULL };
-static char *nozonedevfs_cancel[] = { MNTOPT_LOFS_ZONEDEVFS, NULL };
 static char *sub_cancel[] = { MNTOPT_LOFS_NOSUB, NULL };
 static char *nosub_cancel[] = { MNTOPT_LOFS_SUB, NULL };
 
@@ -89,10 +80,6 @@ static mntopt_t mntopts[] = {
 	{ MNTOPT_XATTR,		xattr_cancel,	NULL,		0,
 		(void *)0 },
 	{ MNTOPT_NOXATTR,	noxattr_cancel,	NULL,		0,
-		(void *)0 },
-	{ MNTOPT_LOFS_ZONEDEVFS,	zonedevfs_cancel,	NULL,	0,
-		(void *)0 },
-	{ MNTOPT_LOFS_NOZONEDEVFS,	nozonedevfs_cancel,	NULL,	0,
 		(void *)0 },
 	{ MNTOPT_LOFS_SUB,	sub_cancel,	NULL,		0,
 		(void *)0 },
@@ -174,7 +161,6 @@ lo_mount(struct vfs *vfsp,
 	struct vnode *srootvp = NULL;	/* the server's root */
 	struct vnode *realrootvp;
 	struct loinfo *li;
-	int is_zonedevfs = 0;
 	int nodev;
 
 	nodev = vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL);
@@ -190,20 +176,6 @@ lo_mount(struct vfs *vfsp,
 	 */
 	if (!nodev && vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL))
 		vfs_setmntopt(vfsp, MNTOPT_DEVICES, NULL, VFS_NODISPLAY);
-
-	/*
-	 * We must ensure that only the global zone applies the 'zonedevfs'
-	 * option; we don't want non-global zones to be able to establish
-	 * lofs mounts using the special dev_t we use to ensure that the
-	 * contents of a zone's /dev cannot be victim to link(2) or rename(2).
-	 * See below, where we set all of this up.
-	 *
-	 * Since this is more like a privilege check, we use crgetzoneid(cr)
-	 * instead of getzoneid().
-	 */
-	is_zonedevfs = vfs_optionisset(vfsp, MNTOPT_LOFS_ZONEDEVFS, NULL);
-	if (crgetzoneid(cr) != GLOBAL_ZONEID && is_zonedevfs)
-		return (EPERM);
 
 	mutex_enter(&vp->v_lock);
 	if (!(uap->flags & MS_OVERLAY) &&
@@ -265,7 +237,7 @@ lo_mount(struct vfs *vfsp,
 		 * zone case.
 		 */
 
-		if (from_zptr != to_zptr && !is_zonedevfs &&
+		if (from_zptr != to_zptr &&
 		    !(to_zptr->zone_flags & ZF_IS_SCRATCH)) {
 			/*
 			 * We know at this point that the labels aren't equal
@@ -399,31 +371,9 @@ lo_mount(struct vfs *vfsp,
 	vfsp->vfs_fstype = lofsfstype;
 	vfsp->vfs_bsize = li->li_realvfs->vfs_bsize;
 
-	/*
-	 * Test to see if we need to be in "zone /dev" mode.  In zonedevfs
-	 * mode, we pull a nasty trick; we make sure that the lofs dev_t does
-	 * *not* reflect the underlying device, so that no renames or links
-	 * can occur to or from the /dev hierarchy.
-	 */
-	if (is_zonedevfs) {
-		dev_t dev;
-
-		mutex_enter(&lofs_minor_lock);
-		do {
-			lofs_minor = (lofs_minor + 1) & MAXMIN32;
-			dev = makedevice(lofs_major, lofs_minor);
-		} while (vfs_devismounted(dev));
-		mutex_exit(&lofs_minor_lock);
-
-		vfsp->vfs_dev = dev;
-		vfs_make_fsid(&vfsp->vfs_fsid, dev, lofsfstype);
-
-		li->li_flag |= LO_ZONEDEVFS;
-	} else {
-		vfsp->vfs_dev = li->li_realvfs->vfs_dev;
-		vfsp->vfs_fsid.val[0] = li->li_realvfs->vfs_fsid.val[0];
-		vfsp->vfs_fsid.val[1] = li->li_realvfs->vfs_fsid.val[1];
-	}
+	vfsp->vfs_dev = li->li_realvfs->vfs_dev;
+	vfsp->vfs_fsid.val[0] = li->li_realvfs->vfs_fsid.val[0];
+	vfsp->vfs_fsid.val[1] = li->li_realvfs->vfs_fsid.val[1];
 
 	if (vfs_optionisset(vfsp, MNTOPT_LOFS_NOSUB, NULL)) {
 		li->li_flag |= LO_NOSUB;
@@ -615,15 +565,6 @@ lofsinit(int fstyp, char *name)
 	}
 
 	lofsfstype = fstyp;
-
-	if ((lofs_major = getudev()) == (major_t)-1) {
-		(void) vfs_freevfsops_by_type(fstyp);
-		cmn_err(CE_WARN, "lofsinit: Can't get unique device number.");
-		return (ENXIO);
-	}
-
-	lofs_minor = 0;
-	mutex_init(&lofs_minor_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	return (0);
 }
