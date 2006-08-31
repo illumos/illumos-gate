@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,22 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma weak mallopt = _mallopt
-#pragma weak mallinfo = _mallinfo
-#pragma weak cfree = _cfree
-#pragma weak memalign = _memalign
-#pragma weak valloc = _valloc
 
 #include <sys/types.h>
 
@@ -202,7 +195,7 @@ malloc(size_t nbytes)
  * ascii art below).
  */
 void *
-_memalign(size_t alignment, size_t size)
+memalign(size_t alignment, size_t size)
 {
 	void *alloc_buf;
 	struct header *hd;
@@ -296,7 +289,7 @@ _memalign(size_t alignment, size_t size)
 }
 
 void *
-_valloc(size_t size)
+valloc(size_t size)
 {
 	static unsigned pagesize;
 	if (size == 0)
@@ -896,7 +889,7 @@ calloc(size_t num, size_t size)
  */
 
 int
-_mallopt(int cmd, int value)
+mallopt(int cmd, int value)
 {
 	/* disallow changes once a small block is allocated */
 	(void) mutex_lock(&mlock);
@@ -959,7 +952,7 @@ _mallopt(int cmd, int value)
  */
 
 struct mallinfo
-_mallinfo(void)
+mallinfo(void)
 {
 	struct header *blk, *next;	/* ptr to ordinary blocks */
 	struct holdblk *hblk;		/* ptr to holding blocks */
@@ -1171,9 +1164,9 @@ rstalloc(void)
  * cfree is an undocumented, obsolete function
  */
 
-/* ARGSUSED */
+/* ARGSUSED1 */
 void
-_cfree(char *p, unsigned num, unsigned size)
+cfree(void *p, size_t num, size_t size)
 {
 	free(p);
 }

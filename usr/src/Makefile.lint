@@ -293,6 +293,7 @@ COMMON_SUBDIRS = \
 	lib/libadt_jni \
 	lib/libaio \
 	lib/libavl \
+	lib/libbsdmalloc \
 	lib/libbsm \
 	lib/libc \
 	lib/libc_db \
@@ -330,9 +331,11 @@ COMMON_SUBDIRS = \
 	lib/liblm \
 	lib/libmacadm \
 	lib/libmalloc \
+	lib/libmapmalloc \
 	lib/libmapid \
 	lib/libmd \
 	lib/libmp \
+	lib/libmtmalloc \
 	lib/libnsl \
 	lib/libnvpair \
 	lib/libpam \
@@ -377,6 +380,7 @@ COMMON_SUBDIRS = \
 	lib/print \
 	lib/fm \
 	lib/udapl \
+	lib/watchmalloc \
 	psm \
 	ucbcmd/basename \
 	ucbcmd/biff \

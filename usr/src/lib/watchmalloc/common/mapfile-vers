@@ -29,18 +29,11 @@ SUNW_1.1 {
     global:
 	calloc = NODIRECT;
 	cfree = NODIRECT;
-	_cfree = NODIRECT;
 	free = NODIRECT;
-	mallinfo = NODIRECT;
-	_mallinfo = NODIRECT;
 	malloc = NODIRECT;
-	mallopt = NODIRECT;
-	_mallopt = NODIRECT;
 	memalign = NODIRECT;
-	_memalign = NODIRECT;
 	realloc = NODIRECT;
 	valloc = NODIRECT;
-	_valloc = NODIRECT;
 };
 
 SUNWprivate_1.1 {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -455,8 +455,8 @@ bool	f;		/* f == TRUE when function */
 	if (index(name, ' ') != NULL)
 #endif
 	{
-		(void) strcpy(name, (char *) strtok(name, " "));
-		while (nametk = (char *) strtok(0, " "))
+		(void) strcpy(name, strtok(name, " "));
+		while (nametk = strtok(0, " "))
 			(void) strcat(name, nametk);
 	}
 	np->entry = savestr(name);
@@ -973,11 +973,9 @@ static void
 free_tree(node)
 NODE	*node;
 {
-	extern void cfree();
-
 	while (node) {
 		free_tree(node->right);
-		cfree(node);
+		free(node);
 		node = node->left;
 	}
 }
@@ -1450,14 +1448,14 @@ char **av;			/* ptr to original argument space	*/
 
 	i = mac = fflag = 0;	/* proper initializations */
 
-	mav_sz = (size_t) ((ac + 1) * sizeof (char *));
-	if ((mav = malloc(mav_sz)) == (char **) NULL) {
+	mav_sz = ((ac + 1) * sizeof (char *));
+	if ((mav = malloc(mav_sz)) == (char **)NULL) {
 		perror("Can't malloc argument space");
 		exit(1);
 	}
 
 	/* for each argument, see if we need to change things:		*/
-	for (; (av[i] != (char *) NULL) && (av[i][0] != (char) NULL); i++) {
+	for (; (av[i] != (char *)NULL) && (av[i][0] != (char)NULL); i++) {
 
 		if (strcmp(av[i], "--") == 0) {
 			fflag = 1;	/* just handle filenames now	*/
@@ -1486,15 +1484,15 @@ char **av;			/* ptr to original argument space	*/
 					 */
 					mav_sz += sizeof (char *);
 					if ((mav = realloc(mav, mav_sz)) ==
-					    (char **) NULL) {
+					    (char **)NULL) {
 						perror("Can't realloc "
 							"argument space");
 						exit(1);
 					}
 				}
 
-				if ((mav[mac] = malloc((size_t) CPFLAG)) ==
-				    (char *) NULL) {
+				if ((mav[mac] = malloc((size_t)CPFLAG)) ==
+				    (char *)NULL) {
 					perror("Can't malloc argument space");
 					exit(1);
 				}
@@ -1503,7 +1501,7 @@ char **av;			/* ptr to original argument space	*/
 			}
 		} else {
 			/* otherwise, just copy the argument:		*/
-			if ((mav[mac] = malloc(sz + 1)) == (char *) NULL) {
+			if ((mav[mac] = malloc(sz + 1)) == (char *)NULL) {
 				perror("Can't malloc argument space");
 				exit(1);
 			}
@@ -1512,5 +1510,5 @@ char **av;			/* ptr to original argument space	*/
 		}
 	}
 
-	mav[mac] = (char *) NULL;
+	mav[mac] = (char *)NULL;
 }

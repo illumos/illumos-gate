@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1111,14 +1110,12 @@ free_unlocked(void *old)
  *		if the requested memory could not be allocated.
  */
 
-#pragma weak memalign = _memalign
-
 #define	misaligned(p)		((unsigned)(p) & 3)
 		/* 4-byte "word" alignment is considered ok in LP64 */
 #define	nextblk(p, size)	((TREE *)((char *)(p) + (size)))
 
 void *
-_memalign(size_t align, size_t nbytes)
+memalign(size_t align, size_t nbytes)
 {
 	size_t	reqsize;	/* Num of bytes to get from malloc() */
 	TREE	*p;		/* Ptr returned from malloc() */
@@ -1249,10 +1246,8 @@ _memalign(size_t align, size_t nbytes)
 	return (DATA(aligned_blk));
 }
 
-#pragma weak valloc = _valloc
-
 void *
-_valloc(size_t size)
+valloc(size_t size)
 {
 	static unsigned pagesize;
 	if (!pagesize)
@@ -1260,9 +1255,6 @@ _valloc(size_t size)
 	return (memalign(pagesize, size));
 }
 
-/*
- * libc does not define a weak calloc as _calloc
- */
 void *
 calloc(size_t num, size_t size)
 {
@@ -1281,42 +1273,12 @@ calloc(size_t num, size_t size)
 	return (mp);
 }
 
-#pragma weak cfree = _cfree
-
 /* ARGSUSED1 */
 void
-_cfree(void *p, size_t num, size_t size)
+cfree(void *p, size_t num, size_t size)
 {
 	free(p);
 }
-
-/*
- * mallopt -- Do nothing
- */
-
-#pragma weak mallopt = _mallopt
-
-/* ARGSUSED */
-int
-_mallopt(int cmd, int value)
-{
-	return (0);
-}
-
-/*
- * mallinfo -- Do nothing
- */
-
-#pragma weak mallinfo = _mallinfo
-
-struct mallinfo
-_mallinfo()
-{
-	static struct mallinfo __mallinfo;
-
-	return (__mallinfo);
-}
-
 
 typedef struct {
 	long cmd;

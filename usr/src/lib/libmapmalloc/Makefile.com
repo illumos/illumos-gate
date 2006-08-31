@@ -31,7 +31,6 @@ VERS=		.1
 OBJECTS=  \
 	calloc.o \
 	malloc_debug.o \
-	mallopt.o \
 	textmem.o \
 	valloc.o
 
@@ -48,6 +47,9 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT
 DYNFLAGS +=	$(ZINTERPOSE)
 LDLIBS +=	-lc
+
+$(LINTLIB) lint :=	LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
+$(LINTLIB) lint :=	LINTFLAGS64 += -erroff=E_BAD_PTR_CAST_ALIGN
 
 .KEEP_STATE:
 

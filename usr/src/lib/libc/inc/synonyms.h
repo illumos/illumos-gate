@@ -215,7 +215,6 @@ extern "C" {
 #define	catopen			_catopen
 #define	cfgetispeed		_cfgetispeed
 #define	cfgetospeed		_cfgetospeed
-#define	cfree			_cfree
 #define	cfsetispeed		_cfsetispeed
 #define	cfsetospeed		_cfsetospeed
 #define	cftime			_cftime
@@ -558,7 +557,6 @@ extern "C" {
 #define	mblen			_mblen
 #define	mbstowcs		_mbstowcs
 #define	mbtowc			_mbtowc
-#define	memalign		_memalign
 #define	membar_consumer		_membar_consumer
 #define	membar_enter		_membar_enter
 #define	membar_exit		_membar_exit
@@ -1116,7 +1114,6 @@ extern "C" {
 #define	utmpname		_utmpname
 #define	utmpxname		_utmpxname
 #define	utssys			_utssys
-#define	valloc			_valloc
 #define	vfork			_vfork
 #define	vfscanf			_vfscanf
 #define	vhangup			_vhangup

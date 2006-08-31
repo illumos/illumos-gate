@@ -29,8 +29,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma weak memalign = _memalign
-
 #include "synonyms.h"
 #include "mallint.h"
 #include "mtlib.h"

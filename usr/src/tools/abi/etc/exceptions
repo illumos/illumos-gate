@@ -93,6 +93,42 @@ PSARC 2003/371: RULE E3: lib/sparcv9/libadm.so.1: asysmem
 PSARC 2003/371: RULE E3: lib/sparcv9/libadm.so.1: sysmem
 PSARC 2002/506: RULE E3: lib/libdevinfo.so.1: di_minor_class
 PSARC 2002/506: RULE E3: lib/sparcv9/libdevinfo.so.1: di_minor_class
+PSARC 2006/477: RULE E3: usr/lib/libmalloc.so.1: _cfree
+PSARC 2006/477: RULE E3: usr/lib/libmalloc.so.1: _mallinfo
+PSARC 2006/477: RULE E3: usr/lib/libmalloc.so.1: _mallopt
+PSARC 2006/477: RULE E3: usr/lib/sparcv9/libmalloc.so.1: _cfree
+PSARC 2006/477: RULE E3: usr/lib/sparcv9/libmalloc.so.1: _mallinfo
+PSARC 2006/477: RULE E3: usr/lib/sparcv9/libmalloc.so.1: _mallopt
+PSARC 2006/477: RULE E3: usr/lib/amd64/libmalloc.so.1: _cfree
+PSARC 2006/477: RULE E3: usr/lib/amd64/libmalloc.so.1: _mallinfo
+PSARC 2006/477: RULE E3: usr/lib/amd64/libmalloc.so.1: _mallopt
+PSARC 2006/477: RULE E3: usr/lib/libmapmalloc.so.1: mallinfo
+PSARC 2006/477: RULE E3: usr/lib/libmapmalloc.so.1: mallopt
+PSARC 2006/477: RULE E3: usr/lib/sparcv9/libmapmalloc.so.1: mallinfo
+PSARC 2006/477: RULE E3: usr/lib/sparcv9/libmapmalloc.so.1: mallopt
+PSARC 2006/477: RULE E3: usr/lib/amd64/libmapmalloc.so.1: mallinfo
+PSARC 2006/477: RULE E3: usr/lib/amd64/libmapmalloc.so.1: mallopt
+PSARC 2006/477: RULE E3: usr/lib/watchmalloc.so.1: _cfree
+PSARC 2006/477: RULE E3: usr/lib/watchmalloc.so.1: mallinfo
+PSARC 2006/477: RULE E3: usr/lib/watchmalloc.so.1: _mallinfo
+PSARC 2006/477: RULE E3: usr/lib/watchmalloc.so.1: mallopt
+PSARC 2006/477: RULE E3: usr/lib/watchmalloc.so.1: _mallopt
+PSARC 2006/477: RULE E3: usr/lib/watchmalloc.so.1: _memalign
+PSARC 2006/477: RULE E3: usr/lib/watchmalloc.so.1: _valloc
+PSARC 2006/477: RULE E3: usr/lib/sparcv9/watchmalloc.so.1: _cfree
+PSARC 2006/477: RULE E3: usr/lib/sparcv9/watchmalloc.so.1: mallinfo
+PSARC 2006/477: RULE E3: usr/lib/sparcv9/watchmalloc.so.1: _mallinfo
+PSARC 2006/477: RULE E3: usr/lib/sparcv9/watchmalloc.so.1: mallopt
+PSARC 2006/477: RULE E3: usr/lib/sparcv9/watchmalloc.so.1: _mallopt
+PSARC 2006/477: RULE E3: usr/lib/sparcv9/watchmalloc.so.1: _memalign
+PSARC 2006/477: RULE E3: usr/lib/sparcv9/watchmalloc.so.1: _valloc
+PSARC 2006/477: RULE E3: usr/lib/amd64/watchmalloc.so.1: _cfree
+PSARC 2006/477: RULE E3: usr/lib/amd64/watchmalloc.so.1: mallinfo
+PSARC 2006/477: RULE E3: usr/lib/amd64/watchmalloc.so.1: _mallinfo
+PSARC 2006/477: RULE E3: usr/lib/amd64/watchmalloc.so.1: mallopt
+PSARC 2006/477: RULE E3: usr/lib/amd64/watchmalloc.so.1: _mallopt
+PSARC 2006/477: RULE E3: usr/lib/amd64/watchmalloc.so.1: _memalign
+PSARC 2006/477: RULE E3: usr/lib/amd64/watchmalloc.so.1: _valloc
 
 #############################################
 # ERRORs exempted from RULE E4 (See RULES section of intf_check manpage) 
@@ -714,6 +750,12 @@ PSARC 2002/506: RULE W5: lib/libdevinfo.so.1: SUNW_1.2
 PSARC 2002/506: RULE W5: lib/sparcv9/libdevinfo.so.1: SUNW_1.2
 PSARC 2004/619: RULE W5: lib/amd64/libdevinfo.so.1: SUNW_1.2
 6442910: RULE W5: usr/lib/libpapi.so.0: FSG_1.0
+PSARC 2006/477: RULE W5: usr/lib/libmalloc.so.1: SUNWprivate_1.1
+PSARC 2006/477: RULE W5: usr/lib/sparcv9/libmalloc.so.1: SUNWprivate_1.1
+PSARC 2006/477: RULE W5: usr/lib/amd64/libmalloc.so.1: SUNWprivate_1.1
+PSARC 2006/477: RULE W5: usr/lib/libmapmalloc.so.1: SUNWprivate_1.1
+PSARC 2006/477: RULE W5: usr/lib/sparcv9/libmapmalloc.so.1: SUNWprivate_1.1
+PSARC 2006/477: RULE W5: usr/lib/amd64/libmapmalloc.so.1: SUNWprivate_1.1
 
 #############################################
 # WARNINGs exempted from RULE W6 (See RULES section of intf_check manpage)

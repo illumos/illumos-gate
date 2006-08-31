@@ -1376,7 +1376,6 @@ SUNWprivate_1.1 {
 	__btowc_euc;
 	__btowc_sb;
 	_bufsync;
-	_cfree;
 	cfree = NODIRECT;
 	_cftime;
 	__charmap_init;
@@ -1676,7 +1675,6 @@ SUNWprivate_1.1 {
 	__mbtowc_euc;
 	__mbtowc_sb;
 	mcfiller;
-	_memalign;
 	_membar_consumer;
 	_membar_enter;
 	_membar_exit;
@@ -2141,7 +2139,6 @@ SUNWprivate_1.1 {
 	_utmpxname;
 	utssys;
 	_utssys;
-	_valloc;
 	_vfork;
 	_vhangup;
 	_vsyslog;
