@@ -109,10 +109,13 @@ extern nvlist_t *opl_mem_fru_create(fmd_hdl_t *, nvlist_t *);
 extern cmd_list_t opl_cpu_list;
 
 #define	CPU_EREPORT_STRING	"ereport.cpu.SPARC64-VI."
-#define	OPL_CMU_SIGN		"CMU"
 #define	OPL_CHASSIS_DEFAULT	"0"
-#define	OPL_CPU_FRU_FMRI	FM_FMRI_SCHEME_HC":///" \
-    FM_FMRI_LEGACY_HC"="OPL_CMU_SIGN
+#define	OPL_CPU_FRU_FMRI_DC	FM_FMRI_SCHEME_HC":///" \
+    FM_FMRI_LEGACY_HC"=/CMU"
+#define	OPL_CPU_FRU_FMRI_FF1	FM_FMRI_SCHEME_HC":///" \
+    FM_FMRI_LEGACY_HC"=/MBU_A/CPUM"
+#define	OPL_CPU_FRU_FMRI_FF2	FM_FMRI_SCHEME_HC":///" \
+    FM_FMRI_LEGACY_HC"=/MBU_B/CPUM"
 #define	STR_BUFLEN		32
 #define	NPAIRS			5
 

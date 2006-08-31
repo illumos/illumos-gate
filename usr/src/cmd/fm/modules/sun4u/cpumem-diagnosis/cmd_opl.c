@@ -143,7 +143,7 @@ opl_cpursrc_create(fmd_hdl_t *hdl, uint32_t cpuid)
 {
 	nvlist_t *fmri;
 	char *frustr, *comp;
-	uint32_t cmu_num;
+	int cmu_num;
 
 	if ((errno = nvlist_alloc(&fmri, NV_UNIQUE_NAME, 0)) != 0)
 		return (NULL);
@@ -154,16 +154,29 @@ opl_cpursrc_create(fmd_hdl_t *hdl, uint32_t cpuid)
 	}
 
 	/*
-	 * get the CMU # from cpu_fru
-	 * default to zero if incorrect format
+	 * get the CMU # from cpu_fru for each model
+	 * exit with an error if we can not find one.
 	 */
-	if (strncmp(frustr, OPL_CPU_FRU_FMRI,
-	    sizeof (OPL_CPU_FRU_FMRI) - 1) == 0) {
-		comp = frustr + sizeof (OPL_CPU_FRU_FMRI) - 1;
-	} else
-		comp = "0";
-
-	(void) sscanf(comp, "%u", &cmu_num);
+	if (strncmp(frustr, OPL_CPU_FRU_FMRI_DC,
+	    sizeof (OPL_CPU_FRU_FMRI_DC) - 1) == 0) {
+		comp = frustr + sizeof (OPL_CPU_FRU_FMRI_DC) - 1;
+		(void) sscanf(comp, "%2d", &cmu_num);
+	} else if (strncmp(frustr, OPL_CPU_FRU_FMRI_FF1,
+	    sizeof (OPL_CPU_FRU_FMRI_FF1) - 1) == 0) {
+		comp = frustr + sizeof (OPL_CPU_FRU_FMRI_FF1) - 1;
+		(void) sscanf(comp, "%d", &cmu_num);
+		cmu_num /= 2;
+	} else if (strncmp(frustr, OPL_CPU_FRU_FMRI_FF2,
+	    sizeof (OPL_CPU_FRU_FMRI_FF2) - 1) == 0) {
+		comp = frustr + sizeof (OPL_CPU_FRU_FMRI_FF2) - 1;
+		(void) sscanf(comp, "%d", &cmu_num);
+		cmu_num /= 2;
+	} else {
+		CMD_STAT_BUMP(bad_cpu_asru);
+		fmd_hdl_strfree(hdl, frustr);
+		nvlist_free(fmri);
+		return (NULL);
+	}
 
 	if (cmd_fmri_hc_set(hdl, fmri, FM_HC_SCHEME_VERSION, NULL, NULL,
 	    NPAIRS, "chassis", 0, "cmu", cmu_num, "chip",

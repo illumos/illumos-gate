@@ -405,6 +405,7 @@ static const fmd_prop_t fmd_props[] = {
 	{ "thresh_tpct_sysmem", FMD_TYPE_UINT64, "100" },
 	{ "thresh_abs_sysmem", FMD_TYPE_UINT64, "0" },
 	{ "thresh_abs_badrw", FMD_TYPE_UINT64, "128" },
+	{ "max_perm_ce_dimm", FMD_TYPE_UINT32, "128" },
 	{ NULL, 0, NULL }
 };
 
@@ -633,6 +634,6 @@ _fmd_init(fmd_hdl_t *hdl)
 #ifdef	sun4v
 	init_hdl = hdl;
 	cpumem_diagnosis_lhp = ldom_init(cpumem_diagnosis_init_alloc,
-					cpumem_diagnosis_init_free);
+	    cpumem_diagnosis_init_free);
 #endif
 }

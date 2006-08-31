@@ -31,6 +31,8 @@
  * CPU/Memory error diagnosis engine.
  */
 #include <cmd.h>
+#include <cmd_dimm.h>
+#include <cmd_bank.h>
 #include <cmd_page.h>
 #include <cmd_opl.h>
 #include <string.h>
@@ -233,10 +235,75 @@ cmd_opl_ue_cpu(fmd_hdl_t *hdl, fmd_event_t *ep,
 }
 
 /*
+ * Generates DIMM fault if the number of Permanent CE
+ * threshold is exceeded.
+ */
+static void
+opl_ce_thresh_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
+{
+	nvlist_t *dflt;
+	fmd_case_t *cp;
+
+	fmd_hdl_debug(hdl,
+	    "Permanent CE event threshold checking.\n");
+
+	if (dimm->dimm_flags & CMD_MEM_F_FAULTING) {
+		/* We've already complained about this DIMM */
+		return;
+	}
+
+	if (dimm->dimm_nretired >= fmd_prop_get_int32(hdl,
+	    "max_perm_ce_dimm")) {
+		dimm->dimm_flags |= CMD_MEM_F_FAULTING;
+		cp = fmd_case_open(hdl, NULL);
+		dflt = cmd_dimm_create_fault(hdl, dimm, "fault.memory.dimm",
+		    CMD_FLTMAXCONF);
+		fmd_case_add_suspect(hdl, cp, dflt);
+		fmd_case_solve(hdl, cp);
+	}
+}
+
+/*
+ * This is the common function for processing MAC detected
+ * Permanent CE.
+ */
+/*ARGSUSED*/
+cmd_evdisp_t
+cmd_opl_mac_ce(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
+    nvlist_t *asru, nvlist_t *fru, uint64_t pa)
+{
+	cmd_dimm_t *dimm;
+	const char *uuid;
+
+	fmd_hdl_debug(hdl,
+	    "Processing Permanent CE ereport\n");
+
+	if ((dimm = cmd_dimm_lookup(hdl, asru)) == NULL &&
+	    (dimm = cmd_dimm_create(hdl, asru)) == NULL)
+		return (CMD_EVD_UNUSED);
+
+	CMD_STAT_BUMP(ce_sticky);
+
+	if (dimm->dimm_case.cc_cp == NULL) {
+		dimm->dimm_case.cc_cp = cmd_case_create(hdl,
+		    &dimm->dimm_header, CMD_PTR_DIMM_CASE, &uuid);
+	}
+
+	dimm->dimm_nretired++;
+	dimm->dimm_retstat.fmds_value.ui64++;
+	cmd_dimm_dirty(hdl, dimm);
+
+	cmd_page_fault(hdl, asru, fru, ep, pa);
+	opl_ce_thresh_check(hdl, dimm);
+
+	return (CMD_EVD_OK);
+}
+
+/*
  * This is the common entry for processing MAC detected errors.
  * It is responsible for generating the memory page fault event.
- * The permanent CE in normal mode is handled here also in the
- * same way as in the UE case.
+ * The permanent CE (sticky) in normal mode is handled here also
+ * in the same way as in the UE case.
  */
 /*ARGSUSED*/
 cmd_evdisp_t
@@ -275,14 +342,34 @@ cmd_opl_mac_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	}
 
 	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {
+		fmd_hdl_debug(hdl, "cmd_opl_mac_common expand failed\n");
 		nvlist_free(asru);
 		CMD_STAT_BUMP(bad_mem_asru);
 		return (CMD_EVD_BAD);
 	}
 
 	if ((fru = opl_mem_fru_create(hdl, asru)) == NULL) {
+		fmd_hdl_debug(hdl, "cmd_opl_mac_common fru_create failed\n");
 		nvlist_free(asru);
 		return (CMD_EVD_BAD);
+	}
+
+	/*
+	 * process PCE to create DIMM fault
+	 */
+	if (strcmp(class, "ereport.asic.mac.mi-ce") == 0 ||
+	    strcmp(class, "ereport.asic.mac.ptrl-ce") == 0) {
+		cmd_evdisp_t ret;
+
+		ret = cmd_opl_mac_ce(hdl, ep, nvl, asru, fru, pa);
+		nvlist_free(asru);
+		nvlist_free(fru);
+		if (ret != CMD_EVD_OK) {
+			fmd_hdl_debug(hdl,
+			    "cmd_opl_mac_common: mac_ce failed\n");
+			return (CMD_EVD_BAD);
+		} else
+			return (CMD_EVD_OK);
 	}
 
 	cmd_page_fault(hdl, asru, fru, ep, pa);
