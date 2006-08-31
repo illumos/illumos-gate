@@ -39,7 +39,7 @@
 i pkginfo
 i copyright
 i depend
-i i.preserve
+i i.ssdconf
 #
 # source locations relative to the prototype file
 #

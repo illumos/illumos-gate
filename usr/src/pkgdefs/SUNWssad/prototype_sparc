@@ -51,5 +51,5 @@
 d none kernel 755 root sys
 d none kernel/drv 755 root sys
 d none kernel/drv/sparcv9 755 root sys
-e preserve kernel/drv/ssd.conf 644 root sys
+e ssdconf kernel/drv/ssd.conf 644 root sys
 f none kernel/drv/sparcv9/ssd 755 root sys

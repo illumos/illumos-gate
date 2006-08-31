@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -18,35 +19,35 @@
 #
 # CDDL HEADER END
 #
-
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-#
-# This required package information file describes characteristics of the
-# package, such as package abbreviation, full package name, package version,
-# and package architecture.
-#
-PKG="SUNWssad"
-NAME="SPARCstorage Array Drivers"
-ARCH="sparc"
-CATEGORY="system"
-BASEDIR=/
-SUNW_PKGVERS="1.0"
-SUNW_PKGTYPE="root"
-CLASSES="none ssdconf"
-DESC="ssd kernel device driver"
-SUNW_PRODNAME="SunOS"
-SUNW_PRODVERS="RELEASE/VERSION"
-VERSION="ONVERS,REV=0.0.0"
-VENDOR="Sun Microsystems, Inc."
-HOTLINE="Please contact your local service provider"
-EMAIL=""
-MAXINST="1000"
-SUNW_PKG_ALLZONES="true"
-SUNW_PKG_HOLLOW="true"
-SUNW_PKG_THISZONE="false"
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+while read src dest; do
+	if [ ! -f $dest ]; then
+		cp $src $dest
+	else
+		# Remove obsoleted drivers
+		grep -v 'name="ssd" parent="SUNW,pln" port=' $dest > /tmp/d.$$
+		mv /tmp/d.$$ $dest
+
+		# Process conf files for missing entries
+		while read confline; do
+			if echo "$confline" | egrep "^[\t| ]*#|^[\t| ]*$" > /dev/null; then
+				continue
+			fi
+
+			grep "$confline" $dest > /dev/null
+			if [ $? -ne 0 ]; then
+				echo $confline >> $dest
+			fi
+		done < $src
+	fi
+done
+
+exit 0

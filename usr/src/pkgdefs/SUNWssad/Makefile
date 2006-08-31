@@ -25,7 +25,7 @@
  
 include ../Makefile.com
 
-DATAFILES += depend i.preserve
+DATAFILES += depend i.ssdconf
 
 .KEEP_STATE:
 
