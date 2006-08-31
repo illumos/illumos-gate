@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,8 @@
 #include <unistd.h>
 #include <priv.h>
 #include <errno.h>
+#include <ctype.h>
+#include <tsol/label.h>
 #include "funcs.h"
 #include "messages.h"
 #include "userdefs.h"
@@ -56,6 +57,9 @@ static const char priv[] = "privilege set";
 static const char auth[] = "authorization";
 static const char type[] = "user type";
 static const char lock[] = "lock_after_retries value";
+static const char label[] = "label";
+static const char idlecmd[] = "idlecmd value";
+static const char idletime[] = "idletime value";
 
 
 static const char *check_auth(const char *);
@@ -65,6 +69,9 @@ static const char *check_proj(const char *);
 static const char *check_privset(const char *);
 static const char *check_type(const char *);
 static const char *check_lock_after_retries(const char *);
+static const char *check_label(const char *);
+static const char *check_idlecmd(const char *);
+static const char *check_idletime(const char *);
 
 int nkeys;
 
@@ -78,6 +85,10 @@ static ua_key_t keys[] = {
 	{ USERATTR_LIMPRIV_KW,	check_privset,	priv },
 	{ USERATTR_DFLTPRIV_KW,	check_privset,	priv },
 	{ USERATTR_LOCK_AFTER_RETRIES_KW, check_lock_after_retries,  lock },
+	{ USERATTR_CLEARANCE,	check_label,	label },
+	{ USERATTR_MINLABEL,	check_label,	label },
+	{ USERATTR_IDLECMD_KW,	check_idlecmd,	idlecmd },
+	{ USERATTR_IDLETIME_KW,	check_idletime,	idletime },
 };
 
 #define	NKEYS	(sizeof (keys)/sizeof (ua_key_t))
@@ -391,5 +402,50 @@ check_lock_after_retries(const char *keyval)
 			return (keyval);
 		}
 	}
+	return (NULL);
+}
+
+static const char *
+check_label(const char *labelstr)
+{
+	int	err;
+	m_label_t *lbl = NULL;
+
+	if (!is_system_labeled())
+		return (NULL);
+
+	err = str_to_label(labelstr, &lbl, MAC_LABEL, L_NO_CORRECTION, NULL);
+	m_label_free(lbl);
+
+	if (err == -1)
+		return (labelstr);
+
+	return (NULL);
+}
+
+static const char *
+check_idlecmd(const char *cmd)
+{
+	if ((strcmp(cmd, USERATTR_IDLECMD_LOCK_KW) != 0) &&
+	    (strcmp(cmd, USERATTR_IDLECMD_LOGOUT_KW) != 0)) {
+		return (cmd);
+	}
+
+	return (NULL);
+}
+
+static const char *
+check_idletime(const char *time)
+{
+	int		c;
+	unsigned char	*up = (unsigned char *)time;
+
+	c = *up;
+	while (c != '\0') {
+		if (!isdigit(c))
+			return (time);
+		c = *++up;
+	}
+
 	return (NULL);
 }
