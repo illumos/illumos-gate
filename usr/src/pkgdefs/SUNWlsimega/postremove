@@ -23,6 +23,10 @@ deletelsimegatargets()
 	NAWK=/usr/bin/nawk
 	RM=/usr/bin/rm
 	MV=/usr/bin/mv
+	CP=/usr/bin/cp
+	CHMOD=/usr/bin/chmod
+	CHOWN=/usr/bin/chown
+	CHGRP=/usr/bin/chgrp
 
 	# Check if $SDCONF file exists
 	if [ ! -f $SDCONF ]
@@ -30,6 +34,12 @@ deletelsimegatargets()
 		echo "ERROR : $SDCONF File does not exist"
 		exit 1
 	fi
+
+	# Force correct attributes of $SDCONF to allow successful
+	# interim build upgrade
+	$CHMOD 644 $SDCONF
+	$CHOWN root $SDCONF
+	$CHGRP sys $SDCONF
 
 	$RM /tmp/$$.conf >/dev/null 2>&1
 
@@ -62,7 +72,8 @@ deletelsimegatargets()
 			| $GREP -v "$HEADER3" >> /tmp/$$.conf
 		if [ $? -eq 0 ]
 		then
-			$MV /tmp/$$.conf $SDCONF
+			$CP /tmp/$$.conf $SDCONF
+			$RM -f /tmp/$$.conf >/dev/null 2>&1
 		else
 			echo "ERROR while removing lsimega related lines from $SDCONF"
 			exit 1
@@ -90,7 +101,8 @@ deletelsimegatargets()
 		$RM -f /tmp/$$.conf
 		exit 1
 	fi
-	$MV /tmp/$$.conf $SDCONF
+	$CP /tmp/$$.conf $SDCONF
+	$RM -f /tmp/$$.conf >/dev/null 2>&1
 }
 
 BD=${BASEDIR:-/}

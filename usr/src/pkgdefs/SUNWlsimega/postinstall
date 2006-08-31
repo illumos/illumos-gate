@@ -125,6 +125,9 @@ addlsimegatargets()
 	CP=/usr/bin/cp
 	MV=/usr/bin/mv
 	RM=/usr/bin/rm
+	CHMOD=/usr/bin/chmod
+	CHOWN=/usr/bin/chown
+	CHGRP=/usr/bin/chgrp
 	target=0
 
 	# check if $SDCONF exists
@@ -133,6 +136,12 @@ addlsimegatargets()
 		echo "ERROR : $SDCONF file does not exist"
 		exit 1
 	fi
+
+	# Force correct attributes of $SDCONF to allow successful
+	# interim build upgrade
+	$CHMOD 644 $SDCONF
+	$CHOWN root $SDCONF
+	$CHGRP sys $SDCONF
 
 	$GREP -w "$HEADER" $SDCONF >/dev/null 2>&1
 	slstatus=$?
@@ -153,7 +162,8 @@ addlsimegatargets()
                         | $GREP -v "$HEADER3" >> /tmp/$$.conf
 		if [ $? -eq 0 ]
 		then
-			$MV /tmp/$$.conf $SDCONF
+			$CP /tmp/$$.conf $SDCONF
+			$RM -f /tmp/$$.conf >/dev/null 2>&1
 		else
 			$RM -f /tmp/$$.conf >/dev/null 2>&1
 			echo "ERROR while cleaning up lsimega related info in $SDCONF file"
@@ -190,7 +200,7 @@ addlsimegatargets()
 
 	# Copy the $SDCONF into /tmp as a backup
 	$RM -f /tmp/sd.conf.$$ >/dev/null 2>&1
-	$CP $SDCONF /tmp/sd.conf.$$ >/dev/null 2>&1
+	$CP -p $SDCONF /tmp/sd.conf.$$ >/dev/null 2>&1
 
 	# Now put all the lines into SDCONF file
 	# in one shot
