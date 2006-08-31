@@ -9295,46 +9295,6 @@ sfmmu_size_tsb(sfmmu_t *sfmmup, int growing, uint64_t tte8k_cnt,
 }
 
 /*
- * Get the preferred page size code for a hat.
- * This is only advice, so locking is not done;
- * this transitory information could change
- * following the call anyway.  This interface is
- * sun4 private.
- */
-/*ARGSUSED*/
-uint_t
-hat_preferred_pgsz(struct hat *hat, caddr_t vaddr, size_t maplen, int maptype)
-{
-	sfmmu_t *sfmmup = (sfmmu_t *)hat;
-	uint_t szc, maxszc = mmu_page_sizes - 1;
-	size_t pgsz;
-
-	if (maptype == MAPPGSZ_ISM) {
-		for (szc = maxszc; szc >= TTE4M; szc--) {
-			if (disable_ism_large_pages & (1 << szc))
-				continue;
-
-			pgsz = hw_page_array[szc].hp_size;
-			if ((maplen >= pgsz) && IS_P2ALIGNED(vaddr, pgsz))
-				return (szc);
-		}
-		return (TTE4M);
-	} else if (&mmu_preferred_pgsz) { /* USIII+-USIV+ */
-		return (mmu_preferred_pgsz(sfmmup, vaddr, maplen));
-	} else {	/* USIII, USII, Niagara */
-		for (szc = maxszc; szc > TTE8K; szc--) {
-			if (disable_large_pages & (1 << szc))
-				continue;
-
-			pgsz = hw_page_array[szc].hp_size;
-			if ((maplen >= pgsz) && IS_P2ALIGNED(vaddr, pgsz))
-				return (szc);
-		}
-		return (TTE8K);
-	}
-}
-
-/*
  * Free up a sfmmu
  * Since the sfmmu is currently embedded in the hat struct we simply zero
  * out our fields and free up the ism map blk list if any.

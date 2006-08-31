@@ -474,7 +474,7 @@ getexinfo(
 
 
 /*ARGSUSED*/
-size_t
+static size_t
 map_pgszva(struct proc *p, caddr_t addr, size_t len)
 {
 	size_t		pgsz = MMU_PAGESIZE;
@@ -508,7 +508,7 @@ map_pgszva(struct proc *p, caddr_t addr, size_t len)
 	return (pgsz);
 }
 
-size_t
+static size_t
 map_pgszheap(struct proc *p, caddr_t addr, size_t len)
 {
 	size_t		pgsz;
@@ -554,7 +554,7 @@ map_pgszheap(struct proc *p, caddr_t addr, size_t len)
 	return (pgsz);
 }
 
-size_t
+static size_t
 map_pgszstk(struct proc *p, caddr_t addr, size_t len)
 {
 	size_t		pgsz;
@@ -600,6 +600,57 @@ map_pgszstk(struct proc *p, caddr_t addr, size_t len)
 	return (pgsz);
 }
 
+static size_t
+map_pgszism(caddr_t addr, size_t len)
+{
+	uint_t szc;
+	size_t pgsz;
+	extern int disable_ism_large_pages;
+
+	for (szc = mmu_page_sizes - 1; szc >= TTE4M; szc--) {
+		if (disable_ism_large_pages & (1 << szc))
+			continue;
+
+		pgsz = hw_page_array[szc].hp_size;
+		if ((len >= pgsz) && IS_P2ALIGNED(addr, pgsz))
+			return (pgsz);
+	}
+	return (DEFAULT_ISM_PAGESIZE);
+}
+
+/*
+ * Suggest a page size to be used to map a segment of type maptype and length
+ * len.  Returns a page size (not a size code).
+ * If remap is non-NULL, fill in a value suggesting whether or not to remap
+ * this segment.
+ */
+size_t
+map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int *remap)
+{
+	size_t	pgsz = 0;
+
+	if (remap != NULL)
+		*remap = (len > auto_lpg_remap_threshold);
+
+	switch (maptype) {
+	case MAPPGSZ_ISM:
+		pgsz = map_pgszism(addr, len);
+		break;
+
+	case MAPPGSZ_VA:
+		pgsz = map_pgszva(p, addr, len);
+		break;
+
+	case MAPPGSZ_STK:
+		pgsz = map_pgszstk(p, addr, len);
+		break;
+
+	case MAPPGSZ_HEAP:
+		pgsz = map_pgszheap(p, addr, len);
+		break;
+	}
+	return (pgsz);
+}
 
 /*
  * Return non 0 value if the address may cause a VAC alias with KPM mappings.

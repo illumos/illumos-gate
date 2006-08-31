@@ -125,6 +125,25 @@ size_t initdata_pgsz64k_minsize = MMU_PAGESIZE64K;
 size_t max_shm_lpsize = ULONG_MAX;
 
 /*
+ * Platforms with smaller or larger TLBs may wish to change this.  Most
+ * sun4u platforms can hold 1024 8K entries by default and most processes
+ * are observed to be < 6MB on these machines, so we decide to move up
+ * here to give ourselves some wiggle room for other, smaller segments.
+ */
+int auto_lpg_tlb_threshold = 768;
+int auto_lpg_minszc = TTE4M;
+int auto_lpg_maxszc = TTE4M;
+size_t auto_lpg_heap_default = MMU_PAGESIZE;
+size_t auto_lpg_stack_default = MMU_PAGESIZE;
+size_t auto_lpg_va_default = MMU_PAGESIZE;
+size_t auto_lpg_remap_threshold = 0;
+/*
+ * Number of pages in 1 GB.  Don't enable automatic large pages if we have
+ * fewer than this many pages.
+ */
+pgcnt_t auto_lpg_min_physmem = 1 << (30 - MMU_PAGESHIFT);
+
+/*
  * map_addr_proc() is the routine called when the system is to
  * choose an address for the user.  We will pick an address
  * range which is just below the current stack limit.  The
@@ -279,75 +298,6 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 	} else {
 		*addrp = NULL;	/* no more virtual space */
 	}
-}
-
-/*
- * Platforms with smaller or larger TLBs may wish to change this.  Most
- * sun4u platforms can hold 1024 8K entries by default and most processes
- * are observed to be < 6MB on these machines, so we decide to move up
- * here to give ourselves some wiggle room for other, smaller segments.
- */
-int auto_lpg_tlb_threshold = 768;
-int auto_lpg_minszc = TTE4M;
-int auto_lpg_maxszc = TTE4M;
-size_t auto_lpg_heap_default = MMU_PAGESIZE;
-size_t auto_lpg_stack_default = MMU_PAGESIZE;
-size_t auto_lpg_va_default = MMU_PAGESIZE;
-size_t auto_lpg_remap_threshold = 0;
-/*
- * Number of pages in 1 GB.  Don't enable automatic large pages if we have
- * fewer than this many pages.
- */
-pgcnt_t auto_lpg_min_physmem = 1 << (30 - MMU_PAGESHIFT);
-
-/*
- * Suggest a page size to be used to map a segment of type maptype and length
- * len.  Returns a page size (not a size code).
- * If remap is non-NULL, fill in a value suggesting whether or not to remap
- * this segment.
- */
-size_t
-map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int *remap)
-{
-	uint_t	n;
-	size_t	pgsz = 0;
-
-	if (remap)
-		*remap = (len > auto_lpg_remap_threshold);
-
-	switch (maptype) {
-	case MAPPGSZ_ISM:
-		n = hat_preferred_pgsz(p->p_as->a_hat, addr, len, maptype);
-		pgsz = hw_page_array[n].hp_size;
-
-		/*
-		 * For non-Panther systems, the following code sets the [D]ISM
-		 * pagesize to 4M if either of the DTLBs happens to be
-		 * programmed to a different large pagesize.
-		 * The Panther code might hit this case as well,
-		 * if and only if the addr is not aligned to >= 4M.
-		 */
-		if ((pgsz > 0) && (pgsz < MMU_PAGESIZE4M))
-			pgsz = MMU_PAGESIZE4M;
-		break;
-
-	case MAPPGSZ_VA:
-		n = hat_preferred_pgsz(p->p_as->a_hat, addr, len, maptype);
-		pgsz = hw_page_array[n].hp_size;
-		if ((pgsz <= MMU_PAGESIZE) ||
-		    !IS_P2ALIGNED(addr, pgsz) || !IS_P2ALIGNED(len, pgsz))
-			pgsz = map_pgszva(p, addr, len);
-		break;
-
-	case MAPPGSZ_STK:
-		pgsz = map_pgszstk(p, addr, len);
-		break;
-
-	case MAPPGSZ_HEAP:
-		pgsz = map_pgszheap(p, addr, len);
-		break;
-	}
-	return (pgsz);
 }
 
 /*

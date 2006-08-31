@@ -212,7 +212,7 @@ set_platform_defaults(void)
 	xc_tick_limit_scale = 5;
 
 	if ((mmu_page_sizes == max_mmu_page_sizes) &&
-	    (mmu_ism_pagesize != MMU_PAGESIZE32M)) {
+	    (mmu_ism_pagesize != DEFAULT_ISM_PAGESIZE)) {
 		if (&mmu_init_large_pages)
 			mmu_init_large_pages(mmu_ism_pagesize);
 	}

@@ -700,9 +700,9 @@ send_one_mondo(int cpuid)
  */
 int init_mmu_page_sizes = 0;
 static int mmu_disable_ism_large_pages = ((1 << TTE64K) |
-	(1 << TTE512K) | (1 << TTE256M));
+	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 static int mmu_disable_auto_large_pages = ((1 << TTE64K) |
-	(1 << TTE512K) | (1 << TTE4M) | (1 << TTE256M));
+	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 static int mmu_disable_large_pages = 0;
 
 /*
@@ -719,8 +719,8 @@ mmu_init_mmu_page_sizes(int32_t not_used)
 	if (!init_mmu_page_sizes) {
 		mmu_page_sizes = MMU_PAGE_SIZES;
 		mmu_hashcnt = MAX_HASHCNT;
-		mmu_ism_pagesize = MMU_PAGESIZE32M;
-		auto_lpg_maxszc = TTE32M;
+		mmu_ism_pagesize = DEFAULT_ISM_PAGESIZE;
+		auto_lpg_maxszc = TTE4M;
 		mmu_exported_pagesize_mask = (1 << TTE8K) |
 		    (1 << TTE64K) | (1 << TTE512K) | (1 << TTE4M) |
 		    (1 << TTE32M) | (1 << TTE256M);
@@ -801,50 +801,6 @@ mmu_init_large_pages(size_t ism_pagesize)
 		    ism_pagesize);
 		break;
 	}
-}
-
-/*ARGSUSED*/
-uint_t
-mmu_preferred_pgsz(struct hat *hat, caddr_t addr, size_t len)
-{
-	sfmmu_t *sfmmup = (sfmmu_t *)hat;
-	uint_t pgsz0, pgsz1;
-	uint_t szc, maxszc = mmu_page_sizes - 1;
-	size_t pgsz;
-	extern int disable_auto_large_pages;
-
-	pgsz0 = (uint_t)sfmmup->sfmmu_pgsz[0];
-	pgsz1 = (uint_t)sfmmup->sfmmu_pgsz[1];
-
-	/*
-	 * If either of the TLBs are reprogrammed, choose
-	 * the largest mapping size as the preferred size,
-	 * if it fits the size and alignment constraints.
-	 * Else return the largest mapping size that fits,
-	 * if neither TLB is reprogrammed.
-	 */
-	if (pgsz0 > TTE8K || pgsz1 > TTE8K) {
-		if (pgsz1 > pgsz0) {	/* First try pgsz1 */
-			pgsz = hw_page_array[pgsz1].hp_size;
-			if ((len >= pgsz) && IS_P2ALIGNED(addr, pgsz))
-				return (pgsz1);
-		}
-		if (pgsz0 > TTE8K) {	/* Then try pgsz0, if !TTE8K */
-			pgsz = hw_page_array[pgsz0].hp_size;
-			if ((len >= pgsz) && IS_P2ALIGNED(addr, pgsz))
-				return (pgsz0);
-		}
-	} else { /* Otherwise pick best fit if neither TLB is reprogrammed. */
-		for (szc = maxszc; szc > TTE8K; szc--) {
-			if (disable_auto_large_pages & (1 << szc))
-				continue;
-
-			pgsz = hw_page_array[szc].hp_size;
-			if ((len >= pgsz) && IS_P2ALIGNED(addr, pgsz))
-				return (szc);
-		}
-	}
-	return (TTE8K);
 }
 
 /*

@@ -171,7 +171,7 @@ set_platform_defaults(void)
 	tsb_lgrp_affinity = 1;
 
 	if ((mmu_page_sizes == max_mmu_page_sizes) &&
-	    (mmu_ism_pagesize != MMU_PAGESIZE32M)) {
+	    (mmu_ism_pagesize != DEFAULT_ISM_PAGESIZE)) {
 		if (&mmu_init_large_pages)
 			mmu_init_large_pages(mmu_ism_pagesize);
 	}

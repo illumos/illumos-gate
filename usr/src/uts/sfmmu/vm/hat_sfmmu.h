@@ -1762,7 +1762,6 @@ extern void	sfmmu_reprog_pgsz_arr(sfmmu_t *, uint8_t *);
 
 extern void	hat_kern_setup(void);
 extern int	hat_page_relocate(page_t **, page_t **, spgcnt_t *);
-extern uint_t	hat_preferred_pgsz(struct hat *, caddr_t, size_t, int);
 extern int	sfmmu_get_ppvcolor(struct page *);
 extern int	sfmmu_get_addrvcolor(caddr_t);
 extern int	sfmmu_hat_lock_held(sfmmu_t *);
@@ -1781,12 +1780,10 @@ extern struct hme_blk *sfmmu_hmetohblk(struct sf_hment *);
  */
 #pragma weak mmu_large_pages_disabled
 #pragma weak mmu_set_ctx_page_sizes
-#pragma weak mmu_preferred_pgsz
 #pragma weak mmu_check_page_sizes
 
 extern int mmu_large_pages_disabled(uint_t);
 extern void mmu_set_ctx_page_sizes(sfmmu_t *);
-extern uint_t mmu_preferred_pgsz(sfmmu_t *, caddr_t, size_t);
 extern void mmu_check_page_sizes(sfmmu_t *, uint64_t *);
 
 extern sfmmu_t 		*ksfmmup;

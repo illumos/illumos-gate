@@ -58,10 +58,10 @@
 static int panther_only = 0;
 
 static int pan_disable_ism_large_pages = ((1 << TTE64K) |
-	(1 << TTE512K) | (1 << TTE256M));
+	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 static int pan_disable_large_pages = (1 << TTE256M);
 static int pan_disable_auto_large_pages =  ((1 << TTE64K) |
-	(1 << TTE512K) | (1 << TTE4M) | (1 << TTE256M));
+	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 
 static int chjag_disable_ism_large_pages = ((1 << TTE64K) |
 	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
@@ -205,13 +205,13 @@ mmu_init_mmu_page_sizes(int cinfo)
 		if (npanther == ncpunode) {
 			mmu_page_sizes = MMU_PAGE_SIZES;
 			mmu_hashcnt = MAX_HASHCNT;
-			mmu_ism_pagesize = MMU_PAGESIZE32M;
+			mmu_ism_pagesize = DEFAULT_ISM_PAGESIZE;
 			mmu_exported_pagesize_mask = (1 << TTE8K) |
 			    (1 << TTE64K) | (1 << TTE512K) | (1 << TTE4M) |
 			    (1 << TTE32M) | (1 << TTE256M);
 			panther_dtlb_restrictions = 1;
 			panther_only = 1;
-			auto_lpg_maxszc = TTE32M;
+			auto_lpg_maxszc = TTE4M;
 		} else if (npanther > 0) {
 			panther_dtlb_restrictions = 1;
 		}
@@ -234,50 +234,6 @@ static uint64_t ttecnt_threshold[MMU_PAGE_SIZES] = {
 	AVAIL_DTLB_ENTRIES, AVAIL_DTLB_ENTRIES,
 	AVAIL_DTLB_ENTRIES, AVAIL_DTLB_ENTRIES,
 	AVAIL_32M_ENTRIES, AVAIL_256M_ENTRIES };
-
-/*ARGSUSED*/
-uint_t
-mmu_preferred_pgsz(struct hat *hat, caddr_t addr, size_t len)
-{
-	sfmmu_t *sfmmup = (sfmmu_t *)hat;
-	uint_t pgsz0, pgsz1;
-	uint_t szc, maxszc = mmu_page_sizes - 1;
-	size_t pgsz;
-	extern int disable_auto_large_pages;
-
-	pgsz0 = (uint_t)sfmmup->sfmmu_pgsz[0];
-	pgsz1 = (uint_t)sfmmup->sfmmu_pgsz[1];
-
-	/*
-	 * If either of the TLBs are reprogrammed, choose
-	 * the largest mapping size as the preferred size,
-	 * if it fits the size and alignment constraints.
-	 * Else return the largest mapping size that fits,
-	 * if neither TLB is reprogrammed.
-	 */
-	if (pgsz0 > TTE8K || pgsz1 > TTE8K) {
-		if (pgsz1 > pgsz0) {	/* First try pgsz1 */
-			pgsz = hw_page_array[pgsz1].hp_size;
-			if ((len >= pgsz) && IS_P2ALIGNED(addr, pgsz))
-				return (pgsz1);
-		}
-		if (pgsz0 > TTE8K) {	/* Then try pgsz0, if !TTE8K */
-			pgsz = hw_page_array[pgsz0].hp_size;
-			if ((len >= pgsz) && IS_P2ALIGNED(addr, pgsz))
-				return (pgsz0);
-		}
-	} else { /* Otherwise pick best fit if neither TLB is reprogrammed. */
-		for (szc = maxszc; szc > TTE8K; szc--) {
-			if (disable_auto_large_pages & (1 << szc))
-				continue;
-
-			pgsz = hw_page_array[szc].hp_size;
-			if ((len >= pgsz) && IS_P2ALIGNED(addr, pgsz))
-				return (szc);
-		}
-	}
-	return (TTE8K);
-}
 
 /*
  * The purpose of this code is to indirectly reorganize the sfmmu_pgsz array

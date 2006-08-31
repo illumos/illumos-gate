@@ -132,6 +132,20 @@ size_t initdata_pgsz64k_minsize = MMU_PAGESIZE64K;
 
 size_t max_shm_lpsize = MMU_PAGESIZE4M;
 
+/* Auto large page tunables. */
+int auto_lpg_tlb_threshold = 32;
+int auto_lpg_minszc = TTE64K;
+int auto_lpg_maxszc = TTE64K;
+size_t auto_lpg_heap_default = MMU_PAGESIZE64K;
+size_t auto_lpg_stack_default = MMU_PAGESIZE64K;
+size_t auto_lpg_va_default = MMU_PAGESIZE64K;
+size_t auto_lpg_remap_threshold = 0; /* always remap */
+/*
+ * Number of pages in 1 GB.  Don't enable automatic large pages if we have
+ * fewer than this many pages.
+ */
+pgcnt_t auto_lpg_min_physmem = 1 << (30 - MMU_PAGESHIFT);
+
 /*
  * map_addr_proc() is the routine called when the system is to
  * choose an address for the user.  We will pick an address
@@ -285,50 +299,6 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 	} else {
 		*addrp = NULL;	/* no more virtual space */
 	}
-}
-
-/* Auto large page tunables. */
-int auto_lpg_tlb_threshold = 32;
-int auto_lpg_minszc = TTE64K;
-int auto_lpg_maxszc = TTE64K;
-size_t auto_lpg_heap_default = MMU_PAGESIZE64K;
-size_t auto_lpg_stack_default = MMU_PAGESIZE64K;
-size_t auto_lpg_va_default = MMU_PAGESIZE64K;
-size_t auto_lpg_remap_threshold = 0; /* always remap */
-/*
- * Number of pages in 1 GB.  Don't enable automatic large pages if we have
- * fewer than this many pages.
- */
-pgcnt_t auto_lpg_min_physmem = 1 << (30 - MMU_PAGESHIFT);
-
-size_t
-map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int *remap)
-{
-	uint_t	n;
-	size_t	pgsz = 0;
-
-	if (remap)
-		*remap = (len > auto_lpg_remap_threshold);
-
-	switch (maptype) {
-	case MAPPGSZ_ISM:
-		n = hat_preferred_pgsz(p->p_as->a_hat, addr, len, maptype);
-		pgsz = hw_page_array[n].hp_size;
-		break;
-
-	case MAPPGSZ_VA:
-		pgsz = map_pgszva(p, addr, len);
-		break;
-
-	case MAPPGSZ_STK:
-		pgsz = map_pgszstk(p, addr, len);
-		break;
-
-	case MAPPGSZ_HEAP:
-		pgsz = map_pgszheap(p, addr, len);
-		break;
-	}
-	return (pgsz);
 }
 
 /*

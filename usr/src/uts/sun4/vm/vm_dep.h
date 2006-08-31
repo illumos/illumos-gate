@@ -531,13 +531,6 @@ extern uint_t userszc_2_szc[];
 #define	SZC_2_USERSZC(szc)	(szc_2_userszc[szc])
 
 /*
- * Platform specific map_pgsz large page hook routines.
- */
-extern size_t map_pgszva(struct proc *p, caddr_t addr, size_t len);
-extern size_t map_pgszheap(struct proc *p, caddr_t addr, size_t len);
-extern size_t map_pgszstk(struct proc *p, caddr_t addr, size_t len);
-
-/*
  * Platform specific page routines
  */
 extern void mach_page_add(page_t **, page_t *);
