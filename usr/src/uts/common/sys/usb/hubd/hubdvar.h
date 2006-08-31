@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -258,6 +257,23 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(hubd::h_default_pipe
 ))
 
 _NOTE(SCHEME_PROTECTS_DATA("stable data", usb_ep_descr))
+
+/*
+ * hubd hotplug thread argument data structure
+ */
+typedef struct hubd_hotplug_arg {
+	hubd_t		*hubd;
+
+	/*
+	 * flag to indicate if a hotplug thread is started
+	 * during hubd attach time, if true, it means the
+	 * connected devices need to be enumerated regardless
+	 * of the connect status change bit
+	 */
+	boolean_t	hotplug_during_attach;
+} hubd_hotplug_arg_t;
+
+_NOTE(SCHEME_PROTECTS_DATA("unshared", hubd_hotplug_arg))
 
 #define	HUBD_UNIT(dev)		(getminor((dev)))
 #define	HUBD_MUTEX(hubd)	(&((hubd)->h_mutex))

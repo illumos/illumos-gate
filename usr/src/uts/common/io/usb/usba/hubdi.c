@@ -819,8 +819,8 @@ hubd_resume_port(hubd_t *hubd, usb_port_t port)
 		 */
 		/* FALLTHRU */
 	case USB_DEV_ONLINE:
-		if ((hubd->h_port_state[port] &
-		    (PORT_STATUS_PSS | PORT_STATUS_CCS)) == 0) {
+		if (((hubd->h_port_state[port] & PORT_STATUS_CCS) == 0) ||
+		    ((hubd->h_port_state[port] & PORT_STATUS_PSS) == 0)) {
 			/*
 			 * the port isn't suspended, or connected
 			 * so don't resume
@@ -2760,6 +2760,54 @@ done:
 
 
 /*
+ * hubd_determine_port_connection:
+ *	Determine which port is in connect status but does not
+ *	have connect status change bit set, and mark port change
+ *	bit accordingly.
+ *	This function is applied during hub attach time.
+ */
+static usb_port_mask_t
+hubd_determine_port_connection(hubd_t	*hubd)
+{
+	usb_port_t	port;
+	usb_hub_descr_t	*hub_descr;
+	uint16_t	status;
+	uint16_t	change;
+	usb_port_mask_t	port_change = 0;
+
+	ASSERT(mutex_owned(HUBD_MUTEX(hubd)));
+
+	hub_descr = &hubd->h_hub_descr;
+
+	for (port = 1; port <= hub_descr->bNbrPorts; port++) {
+
+		(void) hubd_determine_port_status(hubd, port, &status,
+		    &change, 0);
+
+		/* Check if port is in connect status */
+		if (!(status & PORT_STATUS_CCS)) {
+
+			continue;
+		}
+
+		/*
+		 * Check if port Connect Status Change bit has been set.
+		 * If already set, the connection will be handled by
+		 * intr polling callback, not during attach.
+		 */
+		if (change & PORT_CHANGE_CSC) {
+
+			continue;
+		}
+
+		port_change |= 1 << port;
+	}
+
+	return (port_change);
+}
+
+
+/*
  * hubd_check_ports:
  *	- get hub descriptor
  *	- check initial port status
@@ -2769,7 +2817,9 @@ done:
 static int
 hubd_check_ports(hubd_t  *hubd)
 {
-	int		rval;
+	int			rval;
+	usb_port_mask_t		port_change = 0;
+	hubd_hotplug_arg_t	*arg;
 
 	ASSERT(mutex_owned(HUBD_MUTEX(hubd)));
 
@@ -2825,14 +2875,58 @@ hubd_check_ports(hubd_t  *hubd)
 
 	hubd->h_init_state |= HUBD_CHILDREN_CREATED;
 
-	if ((rval = hubd_open_intr_pipe(hubd)) == USB_SUCCESS) {
-		hubd_start_polling(hubd, 0);
+	mutex_exit(HUBD_MUTEX(hubd));
+	arg = (hubd_hotplug_arg_t *)kmem_zalloc(
+	    sizeof (hubd_hotplug_arg_t), KM_SLEEP);
+	mutex_enter(HUBD_MUTEX(hubd));
+
+	if ((rval = hubd_open_intr_pipe(hubd)) != USB_SUCCESS) {
+		kmem_free(arg, sizeof (hubd_hotplug_arg_t));
+
+		return (rval);
+	}
+
+	hubd_start_polling(hubd, 0);
+
+	/*
+	 * Some hub devices, like the embedded hub in the CKS ErgoMagic
+	 * keyboard, may only have connection status bit set, but not
+	 * have connect status change bit set when a device has been
+	 * connected to its downstream port before the hub is enumerated.
+	 * Then when the hub is in enumeration, the devices connected to
+	 * it cannot be detected by the intr pipe and won't be enumerated.
+	 * We need to check such situation here and enumerate the downstream
+	 * devices for such hubs.
+	 */
+	port_change = hubd_determine_port_connection(hubd);
+
+	if (port_change) {
+		hubd_pm_busy_component(hubd, hubd->h_dip, 0);
+
+		arg->hubd = hubd;
+		arg->hotplug_during_attach = B_TRUE;
+		hubd->h_port_change |= port_change;
+
+		USB_DPRINTF_L3(DPRINT_MASK_PORT, hubd->h_log_handle,
+		    "hubd_check_ports: port change=0x%x, need to connect",
+		    hubd->h_port_change);
+
+		if (usb_async_req(hubd->h_dip, hubd_hotplug_thread,
+		    (void *)arg, 0) == USB_SUCCESS) {
+			hubd->h_hotplug_thread++;
+		} else {
+			/* mark this device as idle */
+			hubd_pm_idle_component(hubd, hubd->h_dip, 0);
+			kmem_free(arg, sizeof (hubd_hotplug_arg_t));
+		}
+	} else {
+		kmem_free(arg, sizeof (hubd_hotplug_arg_t));
 	}
 
 	USB_DPRINTF_L4(DPRINT_MASK_ATTA, hubd->h_log_handle,
 	    "hubd_check_ports done");
 
-	return (rval);
+	return (USB_SUCCESS);
 }
 
 
@@ -3238,6 +3332,8 @@ hubd_read_cb(usb_pipe_handle_t pipe, usb_intr_req_t *reqp)
 	hubd_t		*hubd = (hubd_t *)(reqp->intr_client_private);
 	size_t		length;
 	mblk_t		*data = reqp->intr_data;
+	int		mem_flag = 0;
+	hubd_hotplug_arg_t *arg;
 
 	USB_DPRINTF_L4(DPRINT_MASK_HUB, hubd->h_log_handle,
 	    "hubd_read_cb: ph=0x%p req=0x%p", pipe, reqp);
@@ -3255,12 +3351,17 @@ hubd_read_cb(usb_pipe_handle_t pipe, usb_intr_req_t *reqp)
 		return;
 	}
 
+	arg = (hubd_hotplug_arg_t *)kmem_zalloc(
+	    sizeof (hubd_hotplug_arg_t), KM_SLEEP);
+	mem_flag = 1;
+
 	mutex_enter(HUBD_MUTEX(hubd));
 
 	if ((hubd->h_dev_state == USB_DEV_SUSPENDED) ||
 	    (hubd->h_intr_pipe_state != HUBD_INTR_PIPE_ACTIVE)) {
 		mutex_exit(HUBD_MUTEX(hubd));
 		usb_free_intr_req(reqp);
+		kmem_free(arg, sizeof (hubd_hotplug_arg_t));
 
 		return;
 	}
@@ -3319,10 +3420,14 @@ hubd_read_cb(usb_pipe_handle_t pipe, usb_intr_req_t *reqp)
 			 */
 			(void) hubd_pm_busy_component(hubd, hubd->h_dip, 0);
 
+			arg->hubd = hubd;
+			arg->hotplug_during_attach = B_FALSE;
+
 			if (usb_async_req(hubd->h_dip,
 			    hubd_hotplug_thread,
-			    (void *)hubd, 0) == USB_SUCCESS) {
+			    (void *)arg, 0) == USB_SUCCESS) {
 				hubd->h_hotplug_thread++;
+				mem_flag = 0;
 			} else {
 				/* mark this device as idle */
 				(void) hubd_pm_idle_component(hubd,
@@ -3331,6 +3436,10 @@ hubd_read_cb(usb_pipe_handle_t pipe, usb_intr_req_t *reqp)
 		}
 	}
 	mutex_exit(HUBD_MUTEX(hubd));
+
+	if (mem_flag == 1) {
+		kmem_free(arg, sizeof (hubd_hotplug_arg_t));
+	}
 
 	usb_free_intr_req(reqp);
 }
@@ -3346,7 +3455,9 @@ hubd_read_cb(usb_pipe_handle_t pipe, usb_intr_req_t *reqp)
 static void
 hubd_hotplug_thread(void *arg)
 {
-	hubd_t		*hubd = (hubd_t *)arg;
+	hubd_hotplug_arg_t *hd_arg = (hubd_hotplug_arg_t *)arg;
+	hubd_t		*hubd = hd_arg->hubd;
+	boolean_t	attach_flg = hd_arg->hotplug_during_attach;
 	usb_port_t	port;
 	uint16_t	nports;
 	uint16_t	status, change;
@@ -3360,6 +3471,8 @@ hubd_hotplug_thread(void *arg)
 
 	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 	    "hubd_hotplug_thread:  started");
+
+	kmem_free(arg, sizeof (hubd_hotplug_arg_t));
 
 	/*
 	 * if our bus power entry point is active, process the change
@@ -3510,7 +3623,7 @@ hubd_hotplug_thread(void *arg)
 			/*
 			 * Now check what changed on the port
 			 */
-			if (change & PORT_CHANGE_CSC) {
+			if ((change & PORT_CHANGE_CSC) || attach_flg) {
 				if ((status & PORT_STATUS_CCS) &&
 				    (!was_connected)) {
 					/* new device plugged in */
