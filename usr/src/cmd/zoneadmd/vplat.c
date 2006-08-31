@@ -1152,12 +1152,21 @@ free_fs_data(struct zone_fstab *fsarray, uint_t nelem)
 }
 
 /*
- * This function constructs the miniroot-like "scratch zone" environment.  If
- * it returns B_FALSE, then the error has already been logged.
+ * This function initiates the creation of a small Solaris Environment for
+ * scratch zone. The Environment creation process is split up into two
+ * functions(build_mounted_pre_var() and build_mounted_post_var()). It
+ * is done this way because:
+ * 	We need to have both /etc and /var in the root of the scratchzone.
+ * 	We loopback mount zone's own /etc and /var into the root of the
+ * 	scratch zone. Unlike /etc, /var can be a seperate filesystem. So we
+ * 	need to delay the mount of /var till the zone's root gets populated.
+ *	So mounting of localdirs[](/etc and /var) have been moved to the
+ * 	build_mounted_post_var() which gets called only after the zone
+ * 	specific filesystems are mounted.
  */
 static boolean_t
-build_mounted(zlog_t *zlogp, char *rootpath, size_t rootlen,
-    const char *zonepath)
+build_mounted_pre_var(zlog_t *zlogp, char *rootpath,
+    size_t rootlen, const char *zonepath)
 {
 	char tmp[MAXPATHLEN], fromdir[MAXPATHLEN];
 	char luroot[MAXPATHLEN];
@@ -1166,25 +1175,10 @@ build_mounted(zlog_t *zlogp, char *rootpath, size_t rootlen,
 		"/system", "/system/contract", "/system/object", "/proc",
 		"/dev", "/tmp", "/a", NULL
 	};
-	static const char *localdirs[] = {
-		"/etc", "/var", NULL
-	};
-	static const char *loopdirs[] = {
-		"/etc/lib", "/etc/fs", "/lib", "/sbin", "/platform",
-		"/usr", NULL
-	};
-	static const char *tmpdirs[] = {
-		"/tmp", "/var/run", NULL
-	};
-	FILE *fp;
-	struct stat st;
 	char *altstr;
+	FILE *fp;
 	uuid_t uuid;
 
-	/*
-	 * Construct a small Solaris environment, including the zone root
-	 * mounted on '/a' inside that environment.
-	 */
 	resolve_lofs(zlogp, rootpath, rootlen);
 	(void) snprintf(luroot, sizeof (luroot), "%s/lu", zonepath);
 	resolve_lofs(zlogp, luroot, sizeof (luroot));
@@ -1202,6 +1196,73 @@ build_mounted(zlog_t *zlogp, char *rootpath, size_t rootlen,
 			return (B_FALSE);
 		}
 	}
+	/*
+	 * This is here to support lucopy.  If there's an instance of this same
+	 * zone on the current running system, then we mount its root up as
+	 * read-only inside the scratch zone.
+	 */
+	(void) zonecfg_get_uuid(zone_name, uuid);
+	altstr = strdup(zonecfg_get_root());
+	if (altstr == NULL) {
+		zerror(zlogp, B_TRUE, "memory allocation failed");
+		return (B_FALSE);
+	}
+	zonecfg_set_root("");
+	(void) strlcpy(tmp, zone_name, sizeof (tmp));
+	(void) zonecfg_get_name_by_uuid(uuid, tmp, sizeof (tmp));
+	if (zone_get_rootpath(tmp, fromdir, sizeof (fromdir)) == Z_OK &&
+	    strcmp(fromdir, rootpath) != 0) {
+		(void) snprintf(tmp, sizeof (tmp), "%s/b", luroot);
+		if (mkdir(tmp, 0755) != 0) {
+			zerror(zlogp, B_TRUE, "cannot create %s", tmp);
+			return (B_FALSE);
+		}
+		if (domount(zlogp, MNTTYPE_LOFS, IPD_DEFAULT_OPTS, fromdir,
+		    tmp) != 0) {
+			zerror(zlogp, B_TRUE, "cannot mount %s on %s", tmp,
+			    fromdir);
+			return (B_FALSE);
+		}
+	}
+	zonecfg_set_root(altstr);
+	free(altstr);
+
+	if ((fp = zonecfg_open_scratch(luroot, B_TRUE)) == NULL) {
+		zerror(zlogp, B_TRUE, "cannot open zone mapfile");
+		return (B_FALSE);
+	}
+	(void) ftruncate(fileno(fp), 0);
+	if (zonecfg_add_scratch(fp, zone_name, kernzone, "/") == -1) {
+		zerror(zlogp, B_TRUE, "cannot add zone mapfile entry");
+	}
+	zonecfg_close_scratch(fp);
+	(void) snprintf(tmp, sizeof (tmp), "%s/a", luroot);
+	if (domount(zlogp, MNTTYPE_LOFS, "", rootpath, tmp) != 0)
+		return (B_FALSE);
+	(void) strlcpy(rootpath, tmp, rootlen);
+	return (B_TRUE);
+}
+
+
+static boolean_t
+build_mounted_post_var(zlog_t *zlogp, char *rootpath, const char *zonepath)
+{
+	char tmp[MAXPATHLEN], fromdir[MAXPATHLEN];
+	char luroot[MAXPATHLEN];
+	const char **cpp;
+	static const char *localdirs[] = {
+		"/etc", "/var", NULL
+	};
+	static const char *loopdirs[] = {
+		"/etc/lib", "/etc/fs", "/lib", "/sbin", "/platform",
+		"/usr", NULL
+	};
+	static const char *tmpdirs[] = {
+		"/tmp", "/var/run", NULL
+	};
+	struct stat st;
+
+	(void) snprintf(luroot, sizeof (luroot), "%s/lu", zonepath);
 
 	/*
 	 * These are mounted read-write from the zone undergoing upgrade.  We
@@ -1269,51 +1330,6 @@ build_mounted(zlog_t *zlogp, char *rootpath, size_t rootlen,
 			return (B_FALSE);
 		}
 	}
-
-	/*
-	 * This is here to support lucopy.  If there's an instance of this same
-	 * zone on the current running system, then we mount its root up as
-	 * read-only inside the scratch zone.
-	 */
-	(void) zonecfg_get_uuid(zone_name, uuid);
-	altstr = strdup(zonecfg_get_root());
-	if (altstr == NULL) {
-		zerror(zlogp, B_TRUE, "memory allocation failed");
-		return (B_FALSE);
-	}
-	zonecfg_set_root("");
-	(void) strlcpy(tmp, zone_name, sizeof (tmp));
-	(void) zonecfg_get_name_by_uuid(uuid, tmp, sizeof (tmp));
-	if (zone_get_rootpath(tmp, fromdir, sizeof (fromdir)) == Z_OK &&
-	    strcmp(fromdir, rootpath) != 0) {
-		(void) snprintf(tmp, sizeof (tmp), "%s/b", luroot);
-		if (mkdir(tmp, 0755) != 0) {
-			zerror(zlogp, B_TRUE, "cannot create %s", tmp);
-			return (B_FALSE);
-		}
-		if (domount(zlogp, MNTTYPE_LOFS, IPD_DEFAULT_OPTS, fromdir,
-		    tmp) != 0) {
-			zerror(zlogp, B_TRUE, "cannot mount %s on %s", tmp,
-			    fromdir);
-			return (B_FALSE);
-		}
-	}
-	zonecfg_set_root(altstr);
-	free(altstr);
-
-	if ((fp = zonecfg_open_scratch(luroot, B_TRUE)) == NULL) {
-		zerror(zlogp, B_TRUE, "cannot open zone mapfile");
-		return (B_FALSE);
-	}
-	(void) ftruncate(fileno(fp), 0);
-	if (zonecfg_add_scratch(fp, zone_name, kernzone, "/") == -1) {
-		zerror(zlogp, B_TRUE, "cannot add zone mapfile entry");
-	}
-	zonecfg_close_scratch(fp);
-	(void) snprintf(tmp, sizeof (tmp), "%s/a", luroot);
-	if (domount(zlogp, MNTTYPE_LOFS, "", rootpath, tmp) != 0)
-		return (B_FALSE);
-	(void) strlcpy(rootpath, tmp, rootlen);
 	return (B_TRUE);
 }
 
@@ -1437,9 +1453,15 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 	 * is the zone's /dev which isn't mounted at all, which is
 	 * the same as global zone installation where /a/dev and
 	 * /a/devices are not mounted.
+	 * Zone mounting is done in three phases.
+	 *   1) Create and populate lu directory (build_mounted_pre_var()).
+	 *   2) Mount the required filesystems as per the zone configuration.
+	 *   3) Set up the rest of the scratch zone environment
+	 *	(build_mounted_post_var()).
 	 */
 	if (mount_cmd &&
-	    !build_mounted(zlogp, rootpath, sizeof (rootpath), zonepath))
+	    !build_mounted_pre_var(zlogp,
+	    rootpath, sizeof (rootpath), zonepath))
 		goto bad;
 
 	qsort(fs_ptr, num_fs, sizeof (*fs_ptr), fs_compare);
@@ -1447,6 +1469,9 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 		if (mount_one(zlogp, &fs_ptr[i], rootpath) != 0)
 			goto bad;
 	}
+	if (mount_cmd &&
+	    !build_mounted_post_var(zlogp, rootpath, zonepath))
+		goto bad;
 
 	/*
 	 * For Trusted Extensions cross-mount each lower level /export/home
