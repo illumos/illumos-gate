@@ -205,35 +205,40 @@ ulong_t
 cmd_mem_get_phys_pages(fmd_hdl_t *hdl)
 {
 	/*
-	 * return the total physical memory in pages
+	 * Compute and return the total physical memory in pages from the
+	 * MD/PRI.
+	 * Cache its value.
 	 */
+	static ulong_t npage = 0;
 	md_t *mdp;
 	mde_cookie_t *listp;
 	uint64_t bmem, physmem = 0;
-	size_t bufsiz = 0;
+	ssize_t bufsiz = 0;
 	uint64_t *bufp;
 	int num_nodes, nmblocks, i;
+
+	if (npage > 0) {
+		return (npage);
+	}
 
 	if (cpumem_hdl == NULL) {
 		cpumem_hdl = hdl;
 	}
 
-	bufsiz = (size_t)ldom_get_core_md(cpumem_diagnosis_lhp, &bufp);
-	if (bufsiz > 0) {
-		mdp = md_init_intern(bufp, cpumem_alloc,
-					cpumem_free);
-	}
-	if (mdp == NULL || bufsiz == 0)
+	if ((bufsiz = ldom_get_core_md(cpumem_diagnosis_lhp, &bufp)) <= 0) {
 		return (0);
+	}
+	if ((mdp = md_init_intern(bufp, cpumem_alloc, cpumem_free)) == NULL ||
+	    (num_nodes = md_node_count(mdp)) <= 0) {
+		cpumem_free(bufp, (size_t)bufsiz);
+		return (0);
+	}
 
-	num_nodes = md_node_count(mdp);
 	listp = (mde_cookie_t *)cpumem_alloc(sizeof (mde_cookie_t) *
 						num_nodes);
-
 	nmblocks = md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
 				md_find_name(mdp, "mblock"),
 				md_find_name(mdp, "fwd"), listp);
-
 	for (i = 0; i < nmblocks; i++) {
 		if (md_get_prop_val(mdp, listp[i], "size", &bmem) < 0) {
 			physmem = 0;
@@ -241,6 +246,11 @@ cmd_mem_get_phys_pages(fmd_hdl_t *hdl)
 		}
 		physmem += bmem;
 	}
+	npage = (ulong_t)(physmem / cmd.cmd_pagesize);
 
-	return ((ulong_t)(physmem / cmd.cmd_pagesize));
+	cpumem_free(listp, sizeof (mde_cookie_t) * num_nodes);
+	cpumem_free(bufp, (size_t)bufsiz);
+	(void) md_fini(mdp);
+
+	return (npage);
 }
