@@ -58,6 +58,7 @@
 #include <sys/vmem.h>
 #include <vm/hat_sfmmu.h>
 #include <sys/vmsystm.h>
+#include <sys/membar.h>
 
 /*
  * Function prototypes
@@ -82,7 +83,7 @@ static void delete_mcp(mc_opl_t *mcp);
 
 static int pa_to_maddr(mc_opl_t *mcp, uint64_t pa, mc_addr_t *maddr);
 
-static int mc_valid_pa(mc_opl_t *mcp, uint64_t pa);
+static int mc_rangecheck_pa(mc_opl_t *mcp, uint64_t pa);
 
 int mc_get_mem_unum(int, uint64_t, char *, int, int *);
 int mc_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *paddr);
@@ -588,21 +589,15 @@ mc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 /*
  * PA validity check:
- * This function return 1 if the PA is valid, otherwise
- * return 0.
+ * This function return 1 if the PA is a valid PA
+ * in the running Solaris instance i.e. in physinstall
+ * Otherwise, return 0.
  */
 
 /* ARGSUSED */
 static int
 pa_is_valid(mc_opl_t *mcp, uint64_t addr)
 {
-	/*
-	 * Check if the addr is on the board.
-	 */
-	if ((addr < mcp->mc_start_address) ||
-	    (mcp->mc_start_address + mcp->mc_size <= addr))
-		return (0);
-
 	if (mcp->mlist == NULL)
 		mc_get_mlist(mcp);
 
@@ -699,7 +694,7 @@ static int
 pa_to_cs(mc_opl_t *mcp, uint64_t pa_offset)
 {
 	int i;
-	int cs = 0;
+	int cs = 1;
 
 	for (i = 0; i < PA_BITS_FOR_MAC; i++) {
 		/* MAC address bit<29> is arranged on the same PA bit */
@@ -730,6 +725,7 @@ pa_to_dimm(mc_opl_t *mcp, uint64_t pa_offset)
 			dimm_addr |= pa_bit_value << mc_bit;
 		}
 	}
+	dimm_addr |= cs << CS_SHIFT;
 	return (dimm_addr);
 }
 
@@ -778,10 +774,8 @@ pa_to_maddr(mc_opl_t *mcp, uint64_t pa, mc_addr_t *maddr)
 {
 	uint64_t pa_offset;
 
-	/* PA validity check */
-	if (!pa_is_valid(mcp, pa))
+	if (!mc_rangecheck_pa(mcp, pa))
 		return (-1);
-
 
 	/* Do translation */
 	pa_offset = pa - mcp->mc_start_address;
@@ -1062,29 +1056,39 @@ mc_err_drain(mc_aflt_t *mc_aflt)
 	for (i = 0; i < mc_aflt->mflt_nflts; i++) {
 		rv = mcaddr_to_pa(mc_aflt->mflt_mcp,
 			&(mc_aflt->mflt_stat[i]->mf_flt_maddr), &pa);
-		if (rv == 0)
+
+		/* Ensure the pa is valid (not in isolated memory block) */
+		if (rv == 0 && pa_is_valid(mc_aflt->mflt_mcp, pa))
 			mc_aflt->mflt_stat[i]->mf_flt_paddr = pa;
 		else
 			mc_aflt->mflt_stat[i]->mf_flt_paddr = (uint64_t)-1;
 	}
 
-	if (mc_aflt->mflt_stat[0]->mf_type != FLT_TYPE_PERMANENT_CE) {
-		uint64_t errors = 0;
+	MC_LOG("mc_err_drain:pa = %lx\n", pa);
 
-		MC_LOG("mc_err_drain:pa = %lx\n", pa);
-
-		if (page_retire_check(pa, &errors) == 0) {
-			MC_LOG("Page retired\n");
-			return;
+	switch (page_retire_check(pa, NULL)) {
+	case 0:
+	case EAGAIN:
+		MC_LOG("Page retired or pending\n");
+		return;
+	case EIO:
+		/*
+		 * Do page retirement except for the PCE case.
+		 * This is taken care by the OPL DE
+		 */
+		if (mc_aflt->mflt_stat[0]->mf_type != FLT_TYPE_PERMANENT_CE) {
+			MC_LOG("offline page at pa %lx error %x\n", pa,
+				mc_aflt->mflt_pr);
+			(void) page_retire(pa, mc_aflt->mflt_pr);
 		}
-		if ((errors & mc_aflt->mflt_pr) == mc_aflt->mflt_pr) {
-			MC_LOG("errors %lx, mflt_pr %x\n",
-				errors, mc_aflt->mflt_pr);
-			return;
-		}
-		MC_LOG("offline page at pa %lx error %x\n", pa,
-			mc_aflt->mflt_pr);
-		(void) page_retire(pa, mc_aflt->mflt_pr);
+		break;
+	case EINVAL:
+	default:
+		/*
+		 * Some memory do not have page structure so
+		 * we keep going in case of EINVAL.
+		 */
+		break;
 	}
 
 	for (i = 0; i < mc_aflt->mflt_nflts; i++) {
@@ -1108,39 +1112,24 @@ mc_err_drain(mc_aflt_t *mc_aflt)
  * dimm offset.
  */
 static int
-restart_patrol(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr_info)
+restart_patrol(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr_info)
 {
 	uint64_t pa;
 	int rv;
-	int loop_count = 0;
 
-	if (maddr_info == NULL || (maddr_info->mi_valid == 0)) {
+	if (rsaddr_info == NULL || (rsaddr_info->mi_valid == 0)) {
 		MAC_PTRL_START(mcp, bank);
 		return (0);
 	}
 
-	rv = mcaddr_to_pa(mcp, &maddr_info->mi_maddr, &pa);
+	rv = mcaddr_to_pa(mcp, &rsaddr_info->mi_restartaddr, &pa);
 	if (rv != 0) {
 		MC_LOG("cannot convert mcaddr to pa. use auto restart\n");
 		MAC_PTRL_START(mcp, bank);
 		return (0);
 	}
 
-	/*
-	 * pa is the last address scanned by the mac patrol
-	 * we  calculate the next restart address as follows:
-	 * first we always advance it by 64 byte. Then begin the loop.
-	 * loop {
-	 * if it is not in phys_install, we advance to next 64 MB boundary
-	 * if it is not backed by a page structure, done
-	 * if the page is bad, advance to the next page boundary.
-	 * else done
-	 * if the new address exceeds the board, wrap around.
-	 * } <stop if we come back to the same page>
-	 */
-
-	if (pa < mcp->mc_start_address || pa >= (mcp->mc_start_address
-		+ mcp->mc_size)) {
+	if (!mc_rangecheck_pa(mcp, pa)) {
 		/* pa is not on this board, just retry */
 		cmn_err(CE_WARN, "restart_patrol: invalid address %lx "
 			"on board %d\n", pa, mcp->mc_board_num);
@@ -1149,63 +1138,80 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr_info)
 	}
 
 	MC_LOG("restart_patrol: pa = %lx\n", pa);
-	if (maddr_info->mi_advance) {
-		uint64_t new_pa;
 
-		if (IS_MIRROR(mcp, bank))
-			new_pa = pa + 64 * 2;
-		else
-			new_pa = pa + 64;
-
-		if (!mc_valid_pa(mcp, new_pa)) {
-			MC_LOG("Invalid PA\n");
-			pa = roundup(new_pa + 1, mc_isolation_bsize);
-		} else {
-			uint64_t errors = 0;
-			if (page_retire_check(new_pa, &errors) &&
-				(errors == 0)) {
-				MC_LOG("Page has no error\n");
-				pa = new_pa;
-				goto done;
-			}
+	if (!rsaddr_info->mi_injectrestart) {
+		/*
+		 * For non-errorinjection restart we need to
+		 * determine if the current restart pa/page is
+		 * a "good" page. A "good" page is a page that
+		 * has not been page retired. If the current
+		 * page that contains the pa is "good", we will
+		 * do a HW auto restart and let HW patrol continue
+		 * where it last stopped. Most desired scenario.
+		 *
+		 * If the current page is not "good", we will advance
+		 * to the next page to find the next "good" page and
+		 * restart the patrol from there.
+		 */
+		int wrapcount = 0;
+		uint64_t origpa = pa;
+		while (wrapcount < 2) {
+		    if (!pa_is_valid(mcp, pa)) {
 			/*
-			 * skip bad pages
-			 * and let the following loop to take care
+			 * Not in physinstall - advance to the
+			 * next memory isolation blocksize
 			 */
-			pa = roundup(new_pa + 1, PAGESIZE);
+			MC_LOG("Invalid PA\n");
+			pa = roundup(pa + 1, mc_isolation_bsize);
+		    } else {
+			int rv;
+			if ((rv = page_retire_check(pa, NULL)) != 0 &&
+			    rv != EAGAIN) {
+				/*
+				 * The page is "good" (not retired), we will
+				 * use automatic HW restart algorithm if
+				 * this is the original current starting page
+				 */
+				if (pa == origpa) {
+				    MC_LOG("Page has no error. Auto restart\n");
+				    MAC_PTRL_START(mcp, bank);
+				    return (0);
+				} else {
+				    /* found a subsequent good page */
+				    break;
+				}
+			}
+
+			/*
+			 * Skip to the next page
+			 */
+			pa = roundup(pa + 1, PAGESIZE);
 			MC_LOG("Skipping bad page to %lx\n", pa);
+		    }
+
+		    /* Check to see if we hit the end of the memory range */
+		    if (pa >= (mcp->mc_start_address + mcp->mc_size)) {
+			MC_LOG("Wrap around\n");
+			pa = mcp->mc_start_address;
+			wrapcount++;
+		    }
+		}
+
+		if (wrapcount > 1) {
+		    MC_LOG("Failed to find a good page. Just restart\n");
+		    MAC_PTRL_START(mcp, bank);
+		    return (0);
 		}
 	}
 
 	/*
-	 * if we wrap around twice, we just give up and let
-	 * mac patrol decide.
+	 * We reached here either:
+	 * 1. We are doing an error injection restart that specify
+	 *    the exact pa/page to restart. OR
+	 * 2. We found a subsequent good page different from the
+	 *    original restart pa/page.
+	 * Restart MAC patrol: PA[37:6]
 	 */
-	MC_LOG("pa is now %lx\n", pa);
-	while (loop_count <= 1) {
-		if (!mc_valid_pa(mcp, pa)) {
-			MC_LOG("pa is not valid. round up to 64 MB\n");
-			pa = roundup(pa + 1, 64 * 1024 * 1024);
-		} else {
-			uint64_t errors = 0;
-			if (page_retire_check(pa, &errors) &&
-				(errors == 0)) {
-				MC_LOG("Page has no error\n");
-				break;
-			}
-			/* skip bad pages */
-			pa = roundup(pa + 1, PAGESIZE);
-			MC_LOG("Skipping bad page to %lx\n", pa);
-		}
-		if (pa >= (mcp->mc_start_address + mcp->mc_size)) {
-			MC_LOG("Wrap around\n");
-			pa = mcp->mc_start_address;
-			loop_count++;
-		}
-	}
-
-done:
-	/* retstart MAC patrol: PA[37:6] */
 	MC_LOG("restart at pa = %lx\n", pa);
 	ST_MAC_REG(MAC_RESTART_ADD(mcp, bank), MAC_RESTART_PA(pa));
 	MAC_PTRL_START_ADD(mcp, bank);
@@ -1652,12 +1658,14 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 	return (rv);
 }
 static void
-mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
+mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
 {
 	mc_aflt_t mc_aflt;
 	mc_flt_stat_t flt_stat[2], mi_flt_stat[2];
 	int i;
 	int mi_valid;
+
+	ASSERT(rsaddr);
 
 	bzero(&mc_aflt, sizeof (mc_aflt_t));
 	bzero(&flt_stat, 2 * sizeof (mc_flt_stat_t));
@@ -1673,8 +1681,15 @@ mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 		/* patrol registers */
 		mc_read_ptrl_reg(mcp, bank, &flt_stat[i]);
 
-		ASSERT(maddr);
-		maddr->mi_maddr = flt_stat[i].mf_flt_maddr;
+		/*
+		 * In mirror mode, it is possible that only one bank
+		 * may report the error. We need to check for it to
+		 * ensure we pick the right addr value for patrol restart.
+		 * Note that if both banks reported errors, we pick the
+		 * 2nd one. Both banks should reported the same error address.
+		 */
+		if (flt_stat[i].mf_cntl & MAC_CNTL_PTRL_ERRS)
+			rsaddr->mi_restartaddr = flt_stat[i].mf_flt_maddr;
 
 		MC_LOG("ptrl registers cntl %x add %x log %x\n",
 			flt_stat[i].mf_cntl,
@@ -1726,7 +1741,7 @@ mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 		MC_LOG("discarding PTRL error because "
 		    "it is the same as MI\n");
 #endif
-		maddr->mi_valid = mi_valid;
+		rsaddr->mi_valid = mi_valid;
 		return;
 	}
 	/* if not error mode, cntl1 is 0 */
@@ -1739,7 +1754,7 @@ mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 		flt_stat[1].mf_cntl = 0;
 
 	mc_aflt.mflt_is_ptrl = 1;
-	maddr->mi_valid = mc_process_error_mir(mcp, &mc_aflt, &flt_stat[0]);
+	rsaddr->mi_valid = mc_process_error_mir(mcp, &mc_aflt, &flt_stat[0]);
 }
 static int
 mc_process_error(mc_opl_t *mcp, int bank, mc_aflt_t *mc_aflt,
@@ -1784,7 +1799,7 @@ mc_process_error(mc_opl_t *mcp, int bank, mc_aflt_t *mc_aflt,
 }
 
 static void
-mc_error_handler(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
+mc_error_handler(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
 {
 	mc_aflt_t mc_aflt;
 	mc_flt_stat_t flt_stat, mi_flt_stat;
@@ -1800,8 +1815,8 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 	/* patrol registers */
 	mc_read_ptrl_reg(mcp, bank, &flt_stat);
 
-	ASSERT(maddr);
-	maddr->mi_maddr = flt_stat.mf_flt_maddr;
+	ASSERT(rsaddr);
+	rsaddr->mi_restartaddr = flt_stat.mf_flt_maddr;
 
 	MC_LOG("ptrl registers cntl %x add %x log %x\n",
 		flt_stat.mf_cntl,
@@ -1836,7 +1851,7 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 		MC_LOG("discarding PTRL error because "
 		    "it is the same as MI\n");
 #endif
-		maddr->mi_valid = mi_valid;
+		rsaddr->mi_valid = mi_valid;
 		return;
 	}
 
@@ -1844,7 +1859,7 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 	if ((flt_stat.mf_cntl & MAC_CNTL_PTRL_ERRS) &&
 		((flt_stat.mf_err_add & MAC_ERR_ADD_INVALID) == 0) &&
 		((flt_stat.mf_err_log & MAC_ERR_LOG_INVALID) == 0)) {
-		maddr->mi_valid = mc_process_error(mcp, bank,
+		rsaddr->mi_valid = mc_process_error(mcp, bank,
 			&mc_aflt, &flt_stat);
 	}
 }
@@ -1870,7 +1885,7 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 static void
 mc_check_errors_func(mc_opl_t *mcp)
 {
-	mc_addr_info_t maddr_info;
+	mc_rsaddr_info_t rsaddr_info;
 	int i, error_count = 0;
 	uint32_t stat, cntl;
 	int running;
@@ -1972,15 +1987,17 @@ mc_check_errors_func(mc_opl_t *mcp)
 				 * Proceed to collect and report error info.
 				 */
 				mcp->mc_speedup_period[i] = 0;
-				maddr_info.mi_valid = 0;
-				maddr_info.mi_advance = 1;
-				if (IS_MIRROR(mcp, i))
-				    mc_error_handler_mir(mcp, i, &maddr_info);
-				else
-				    mc_error_handler(mcp, i, &maddr_info);
+				rsaddr_info.mi_valid = 0;
+				rsaddr_info.mi_injectrestart = 0;
+				if (IS_MIRROR(mcp, i)) {
+				    mcp->mc_speedup_period[i^1] = 0;
+				    mc_error_handler_mir(mcp, i, &rsaddr_info);
+				} else {
+				    mc_error_handler(mcp, i, &rsaddr_info);
+				}
 
 				error_count++;
-				restart_patrol(mcp, i, &maddr_info);
+				restart_patrol(mcp, i, &rsaddr_info);
 			} else {
 				/*
 				 * HW patrol scan has apparently stopped
@@ -2027,6 +2044,10 @@ mc_polling(void)
 		}
 		mutex_enter(&mcp->mc_lock);
 		mutex_exit(&mcmutex);
+		if (!(mcp->mc_status & MC_POLL_RUNNING)) {
+			mutex_exit(&mcp->mc_lock);
+			continue;
+		}
 		if (scan_error && mcp->mc_tick_left <= 0) {
 			mc_check_errors_func((void *)mcp);
 			mcp->mc_tick_left = OPL_MAX_BOARDS;
@@ -2083,19 +2104,19 @@ static char *mc_tbl_name[] = {
 	"cs1-mc-pa-trans-table"
 };
 
+/*
+ * This routine performs a rangecheck for a given PA
+ * to see if it belongs to the memory range for this board.
+ * Return 1 if it is valid (within the range) and 0 otherwise
+ */
 static int
-mc_valid_pa(mc_opl_t *mcp, uint64_t pa)
+mc_rangecheck_pa(mc_opl_t *mcp, uint64_t pa)
 {
-	struct memlist *ml;
-
-	if (mcp->mlist == NULL)
-		mc_get_mlist(mcp);
-
-	for (ml = mcp->mlist; ml; ml = ml->next) {
-		if (ml->address <= pa && pa < (ml->address + ml->size))
-			return (1);
-	}
-	return (0);
+	if ((pa < mcp->mc_start_address) ||
+		(mcp->mc_start_address + mcp->mc_size <= pa))
+		return (0);
+	else
+		return (1);
 }
 
 static void
@@ -2236,7 +2257,7 @@ mc_board_add(mc_opl_t *mcp)
 	struct mc_addr_spec *macaddr;
 	cs_status_t *cs_status;
 	int len, len1, i, bk, cc;
-	mc_addr_info_t maddr;
+	mc_rsaddr_info_t rsaddr;
 	uint32_t mirr;
 	int nbanks = 0;
 	uint64_t nbytes = 0;
@@ -2418,13 +2439,10 @@ mc_board_add(mc_opl_t *mcp)
 			BANK_PTRL_RUNNING)) {
 			MC_LOG("Starting up /LSB%d/B%d\n",
 				mcp->mc_board_num, bk);
-			get_ptrl_start_address(mcp, bk, &maddr.mi_maddr);
-			maddr.mi_maddr.ma_bd = mcp->mc_board_num;
-			maddr.mi_maddr.ma_bank = bk;
-			maddr.mi_maddr.ma_dimm_addr = 0;
-			maddr.mi_valid = 0;
-			maddr.mi_advance = 0;
-			restart_patrol(mcp, bk, &maddr);
+			get_ptrl_start_address(mcp, bk, &rsaddr.mi_restartaddr);
+			rsaddr.mi_valid = 0;
+			rsaddr.mi_injectrestart = 0;
+			restart_patrol(mcp, bk, &rsaddr);
 		} else {
 			MC_LOG("Not starting up /LSB%d/B%d\n",
 				mcp->mc_board_num, bk);
@@ -2469,9 +2487,7 @@ mc_board_del(mc_opl_t *mcp)
 	}
 
 	/* stop memory patrol checking */
-	if (mcp->mc_status & MC_POLL_RUNNING) {
-		mcp->mc_status &= ~MC_POLL_RUNNING;
-	}
+	mcp->mc_status &= ~MC_POLL_RUNNING;
 
 	/* just throw away all the scf logs */
 	for (i = 0; i < BANKNUM_PER_SB; i++) {
@@ -2504,9 +2520,8 @@ mc_suspend(mc_opl_t *mcp, uint32_t flag)
 		return (DDI_SUCCESS);
 	}
 
-	if (mcp->mc_status & MC_POLL_RUNNING) {
-		mcp->mc_status &= ~MC_POLL_RUNNING;
-	}
+	mcp->mc_status &= ~MC_POLL_RUNNING;
+
 	mcp->mc_status |= flag;
 	mutex_exit(&mcp->mc_lock);
 
@@ -2574,8 +2589,7 @@ mc_pa_to_mcp(uint64_t pa)
 		if (!(mcp->mc_status & MC_POLL_RUNNING) ||
 			(mcp->mc_status & MC_SOFT_SUSPENDED))
 			continue;
-		if ((mcp->mc_start_address <= pa) &&
-			(pa < (mcp->mc_start_address + mcp->mc_size))) {
+		if (mc_rangecheck_pa(mcp, pa)) {
 			return (mcp);
 		}
 	}
@@ -2714,7 +2728,7 @@ mc_lock_va(uint64_t pa, caddr_t new_va)
 {
 	tte_t tte;
 
-	vtag_flushpage(new_va, KCONTEXT);
+	vtag_flushpage(new_va, (uint64_t)ksfmmup);
 	sfmmu_memtte(&tte, pa >> PAGESHIFT,
 		PROC_DATA|HAT_NOSYNC, TTE8K);
 	tte.tte_intlo |= TTE_LCK_INT;
@@ -2735,7 +2749,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 	int bank;
 	uint32_t dimm_addr;
 	uint32_t cntl;
-	mc_addr_info_t maddr;
+	mc_rsaddr_info_t rsaddr;
 	uint32_t data, stat;
 	int both_sides = 0;
 	uint64_t pa0;
@@ -2855,6 +2869,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 		MC_LOG("CMPE: writing data %x to %lx\n", data, pa);
 		ST_MAC_REG(MAC_MIRR(mcp, bank), MAC_MIRR_BANK_EXCLUSIVE);
 		stphys(pa, data ^ 0xffffffff);
+		membar_sync();
 		cpu_flush_ecache();
 		ST_MAC_REG(MAC_MIRR(mcp, bank), 0);
 		MC_LOG("CMPE: write new data %xto %lx\n", data, pa);
@@ -2961,12 +2976,12 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 
 	if (flags & MC_INJECT_FLAG_RESTART) {
 		MC_LOG("Restart patrol\n");
-		maddr.mi_maddr.ma_bd = mcp->mc_board_num;
-		maddr.mi_maddr.ma_bank = bank;
-		maddr.mi_maddr.ma_dimm_addr = dimm_addr;
-		maddr.mi_valid = 1;
-		maddr.mi_advance = 0;
-		restart_patrol(mcp, bank, &maddr);
+		rsaddr.mi_restartaddr.ma_bd = mcp->mc_board_num;
+		rsaddr.mi_restartaddr.ma_bank = bank;
+		rsaddr.mi_restartaddr.ma_dimm_addr = dimm_addr;
+		rsaddr.mi_valid = 1;
+		rsaddr.mi_injectrestart = 1;
+		restart_patrol(mcp, bank, &rsaddr);
 	}
 
 	if (flags & MC_INJECT_FLAG_POLL) {
@@ -2984,14 +2999,16 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 			 * report. Do it.
 			 */
 			mcp->mc_speedup_period[bank] = 0;
-			maddr.mi_valid = 0;
-			maddr.mi_advance = 1;
-			if (IS_MIRROR(mcp, bank))
-				mc_error_handler_mir(mcp, bank, &maddr);
-			else
-				mc_error_handler(mcp, bank, &maddr);
+			rsaddr.mi_valid = 0;
+			rsaddr.mi_injectrestart = 0;
+			if (IS_MIRROR(mcp, bank)) {
+				mcp->mc_speedup_period[bank^1] = 0;
+				mc_error_handler_mir(mcp, bank, &rsaddr);
+			} else {
+				mc_error_handler(mcp, bank, &rsaddr);
+			}
 
-			restart_patrol(mcp, bank, &maddr);
+			restart_patrol(mcp, bank, &rsaddr);
 		} else {
 			/*
 			 * We are expecting to report injected

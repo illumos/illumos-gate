@@ -134,11 +134,11 @@ typedef struct mc_addr {
 	uint32_t ma_dimm_addr;	/* DIMM address (same format as ERR_ADD) */
 } mc_addr_t;
 
-typedef struct mc_addr_info {
-	struct mc_addr	mi_maddr;
+typedef struct mc_rsaddr_info {		/* patrol restart address/info */
+	struct mc_addr	mi_restartaddr;
 	int		mi_valid;
-	int		mi_advance;
-} mc_addr_info_t;
+	int		mi_injectrestart;
+} mc_rsaddr_info_t;
 
 typedef struct mc_flt_stat {
 	uint32_t  mf_type;		/* fault type */
@@ -327,7 +327,7 @@ extern void mc_write_cntl(mc_opl_t *, int, uint32_t);
 #define	MAC_EG_SETUP_MASK	0xf9cfffff
 
 /* For MAC-PA translation */
-#define	MC_ADDRESS_BITS	31
+#define	MC_ADDRESS_BITS	40
 #define	PA_BITS_FOR_MAC	39
 #define	INDEX_OF_BANK_SUPPLEMENT_BIT	39
 #define	MP_NONE		128
