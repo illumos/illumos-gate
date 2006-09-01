@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* LINTLIBRARY */
@@ -45,10 +44,8 @@
 #define TURN_OFF(X,F)	(void)Fcntl(X, F_SETFL, (Fcntl(X, F_GETFL, 0) & ~(F)))
 
 #if	defined(__STDC__)
-static MESG *	connect3_2 ( void );
 static int	checklock ( void );
 #else
-static MESG *	connect3_2();
 static int	checklock();
 #endif
 
@@ -75,8 +72,7 @@ MESG * mconnect ()
     **	invoked as mconnect(path, 0, 0)
     **
     **	Open <path>, if isastream() is true for the returned file
-    **	descriptor, then we're done.  If not, proceed with the 3.2
-    **	handshaking.
+    **	descriptor, then we're done.
     */
 
     if (path)
@@ -140,7 +136,7 @@ Again:	if (stat(path, &stbuf) == -1)
 	    return(md);
 	}
 
-	return(connect3_2());
+	return(NULL);
     }
 
     if (id1 > 0 && id2 > 0)
@@ -168,158 +164,6 @@ Again:	if (stat(path, &stbuf) == -1)
     errno = EINVAL;
     return(NULL);
 }
-
-#if	defined(__STDC__)
-static MESG * connect3_2 ( void )
-#else
-static MESG * connect3_2()
-#endif
-{
-    char		*msgbuf = 0,
-			*fifo_name	= "UUUUUUUUNNNNN";
-    int			tmp_fd = -1,
-			size;
-    short		status;
-    struct utsname	ubuf;
-    MESG		*md;
-
-    if ((md = (MESG *)Malloc(MDSIZE)) == NULL)
-	return(NULL);
-
-    memset(md, 0, sizeof (MESG));
-    md->gid = getgid();
-    md->state = MDS_IDLE;
-    md->type = MD_USR_FIFO;
-    md->uid = getuid();
-
-    if ((md->writefd = Open(Lp_FIFO, O_WRONLY, 0222)) == -1)
-    {
-	errno = ENOENT;
-	return (NULL);
-    }
-
-    /*
-    ** Combine the machine node-name with the process ID to
-    ** get a name that will be unique across the network.
-    ** The 99999 is just a safety precaution against over-running
-    ** the buffer.
-    */
-
-    (void)uname (&ubuf);
-
-    sprintf (fifo_name, "%.8s%u", ubuf.nodename, (getpid() & 99999));
-
-    if (!(md->file = makepath(Lp_Public_FIFOs, fifo_name, (char *)0)))
-    {
-	errno = ENOMEM;
-	goto Error;
-    }
-
-    (void) Unlink(md->file);
-    
-    if (Mknod(md->file, S_IFIFO | S_IRUSR, 0) == -1)
-	goto Error;
-
-    if ((md->readfd = Open(md->file, O_RDONLY|O_NDELAY, S_IRUSR)) == -1)
-	goto Error;
-    
-    TURN_OFF (md->readfd, O_NDELAY);
-
-    size = putmessage((char *)0, S_NEW_QUEUE, 0, fifo_name, ubuf.nodename);
-    if (!(msgbuf = Malloc((unsigned)size)))
-    {
-	errno = ENOMEM;
-	goto Error;
-    }
-    (void) putmessage(msgbuf, S_NEW_QUEUE, 0, fifo_name, ubuf.nodename);
-
-    if (
-	   mwrite(md, msgbuf) == -1
-	|| mread(md, msgbuf, size) == -1
-	|| getmessage(msgbuf, R_NEW_QUEUE, &status) != R_NEW_QUEUE
-       )
-    {
-	Free (msgbuf);
-	goto Error;
-    }
-    else
-	if (status != MOK)
-	{
-	    Free(msgbuf);
-	    errno = ENOSPC;
-	    goto Error;
-	}
-
-    Free (msgbuf);
-
-    /*
-     * Prepare to use the fifo the Spooler created.  This new FIFO can be
-     * read ONLY by who we said we are, so if we lied, tough luck for us!
-     */
-
-    (void)Unlink (md->file);	/* must exist to get here */
-    tmp_fd = md->readfd;			/* save the old fd */
-
-    Free(md->file);
-
-    if (!(md->file = makepath(Lp_Private_FIFOs, fifo_name, (char *)0)))
-    {
-	errno = ENOMEM;
-	goto Error;
-    }
-
-    if ((md->readfd = Open(md->file, O_RDONLY|O_NDELAY, S_IRUSR)) == -1)
-	goto Error;
-
-    TURN_OFF (md->readfd, O_NDELAY);
-
-    size = putmessage((char *)0, S_NEW_QUEUE, 1, fifo_name, ubuf.nodename);
-    if (!(msgbuf = Malloc((unsigned)size)))
-    {
-        errno = ENOMEM;
-        goto Error;
-    }
-    (void) putmessage(msgbuf, S_NEW_QUEUE, 1, fifo_name, ubuf.nodename);
-
-    if (
-	   mwrite(md, msgbuf) == -1
-	|| mread(md, msgbuf, size) == -1
-	|| getmessage(msgbuf, R_NEW_QUEUE, &status) != R_NEW_QUEUE
-       )
-    {
-	Free (msgbuf);
-	goto Error;
-    }
-    else
-	if (status != MOK)
-	{
-	    Free(msgbuf);
-	    errno = ENOSPC;
-	    goto Error;
-	}
-
-    Free (msgbuf);
-    (void) Close(tmp_fd);
-    return (md);
-
-Error:
-    if (md->writefd != -1)
-	(void) Close (md->writefd);
-    if (md->writefd != -1)
-	(void) Close (md->readfd);
-    if (md->file)
-    {
-	(void) Unlink (md->file);
-	Free (md->file);
-    }
-    if (tmp_fd != -1)
-	(void) Close(tmp_fd);
-    
-    Free(md);
-
-    return(NULL);
-}
-
 
 #if	defined(__STDC__)
 static int checklock ( void )

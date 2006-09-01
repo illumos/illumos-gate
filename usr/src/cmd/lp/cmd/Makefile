@@ -35,7 +35,7 @@ OWNER = root
 
 SUBDIRS =	lptest lpadmin lpsched adaptor scripts
 
-LOCALPROG =	lpsystem lpshut
+LOCALPROG =	lpshut
 
 SBINPROG =	lpfilter lpforms lpusers
 
@@ -48,7 +48,7 @@ OBJS=	$(SBINPROG:=.o)
 SRCS=          $(OBJS:.o=.c)
 
 POFILE=		lp_cmd.po
-POFILES=	$(SRCS:%.c=%.po) lpsystem.po lpschedlpshut.po
+POFILES=	$(SRCS:%.c=%.po) lpschedlpshut.po
 
 ROOTLIBLPLOCLPROG=	$(LOCALPROG:%=$(ROOTLIBLPLOCL)/%)
 ROOTSBINPROG=	$(SBINPROG:%=$(ROOTUSRSBIN)/%)
@@ -65,8 +65,6 @@ lpforms:=	LDLIBS += $(LIBFRM) $(LIBMSG) $(LIBREQ) $(LIBOAM) \
 			$(LIBACC) $(LIBLP) \
 			-z lazyload -lsecdb -z nolazyload
 lpshut:=	LDLIBS += $(LIBMSG) $(LIBOAM) $(LIBLP)
-lpsystem:=	LDLIBS += $(LIBSYS) $(LIBMSG) $(LIBACC) $(LIBOAM) $(LIBLP) \
-			-lnsl -z lazyload -lsecdb -z nolazyload
 lpusers:=	LDLIBS += $(LIBMSG) $(LIBACC) $(LIBOAM) $(LIBUSR) $(LIBLP)
 
 .KEEP_STATE:
@@ -85,7 +83,7 @@ clean:		$(SUBDIRS)
 clobber:	$(SUBDIRS) local_clobber
 
 local_clobber:
-		$(RM) $(OBJS) $(PROG) lpsystem.o $(CLOBBERFILES)
+		$(RM) $(OBJS) $(PROG) $(CLOBBERFILES)
 
 strip:		$(SUBDIRS)
 		$(STRIP) $(PROG)

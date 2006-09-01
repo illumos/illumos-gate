@@ -63,7 +63,6 @@ f none usr/lib/lp/model/uri 555 root lp
 d none usr/lib/lp/local 755 root lp
 f none usr/lib/lp/local/lpsched 555 root lp
 f none usr/lib/lp/local/lpadmin 555 root lp
-f none usr/lib/lp/local/lpsystem 555 root lp
 f none usr/lib/lp/local/lpshut 555 root lp
 #	links maintianed for convenience
 s none usr/lib/lpfilter=../sbin/lpfilter

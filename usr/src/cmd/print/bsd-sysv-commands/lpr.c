@@ -207,6 +207,9 @@ main(int ac, char *av[])
 	    ((printer = getenv("LPDEST")) == NULL))
 		printer = DEFAULT_DEST;
 
+	if (((optind + 1) == ac) && (strcmp(av[optind], "-") == 0))
+		optind = ac;
+
 #ifdef MAGIC_MIME
 	if (optind != ac) {
 		/* get the mime type of the file data */

@@ -246,6 +246,9 @@ main(int ac, char *av[])
 	    ((printer = getenv("LPDEST")) == NULL))
 		printer = DEFAULT_DEST;
 
+	if (((optind + 1) == ac) && (strcmp(av[optind], "-") == 0))
+		optind = ac;
+
 	if (modify == -1) {
 		char *document_format = "application/octet-stream";
 

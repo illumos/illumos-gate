@@ -528,9 +528,29 @@ papiJobSubmitByReference(papi_service_t handle, char *printer,
 				detailed_error(svc,
 					gettext("Cannot access file: %s: %s"),
 					files[file_no], strerror(errno));
-				return (PAPI_BAD_ARGUMENT);
+				return (PAPI_DOCUMENT_ACCESS_ERROR);
 			}
-			addlist(&file_list, (char *)files[file_no]);
+			if (files[file_no][0] != '/') {
+				char path[MAXPATHLEN];
+
+				if (getcwd(path, sizeof (path)) == NULL) {
+					detailed_error(svc, gettext(
+						"getcwd for file: %s: %s"),
+						files[file_no],
+						strerror(errno));
+					return (PAPI_DOCUMENT_ACCESS_ERROR);
+				}
+				strlcat(path, "/", sizeof (path));
+				if (strlcat(path, files[file_no], sizeof (path))
+						>= sizeof (path)) {
+					detailed_error(svc, gettext(
+						"pathname too long: %s"),
+						files[file_no]);
+					return (PAPI_DOCUMENT_ACCESS_ERROR);
+				}
+				addlist(&file_list, path);
+			} else
+				addlist(&file_list, (char *)files[file_no]);
 		}
 
 	if ((*job = j = calloc(1, sizeof (*j))) == NULL)

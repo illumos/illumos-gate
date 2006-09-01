@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +54,6 @@ static void		_rename (char *, char *, ...);
 void
 lpfsck(void)
 {
-	char *			cmd;
 	struct stat		stbuf;
 	int			real_am_in_background = am_in_background;
 
@@ -89,7 +88,6 @@ proto (D, 1,  Lp_Requests, Local_System, NULL,	    0770, Lp_Uid, Lp_Gid);
 proto (D, 1,  Lp_System, NULL,			    0775, Lp_Uid, Lp_Gid);
 proto (D, 1,  Lp_Tmp, NULL,			    0771, Lp_Uid, Lp_Gid);
 proto (D, 1,  Lp_Tmp, Local_System, NULL,	    0775, Lp_Uid, Lp_Gid);
-proto (D, 1,  Lp_NetTmp, NULL,			    0770, Lp_Uid, Lp_Gid);
 
 	/*
 	 * DIRECTORIES: not described in the packaging
@@ -97,25 +95,6 @@ proto (D, 1,  Lp_NetTmp, NULL,			    0770, Lp_Uid, Lp_Gid);
 proto (D, 0,  Lp_Spooldir, FIFOSDIR, NULL,	    0775, Lp_Uid, Lp_Gid);
 proto (D, 1,  Lp_Private_FIFOs, NULL,		    0771, Lp_Uid, Lp_Gid);
 proto (D, 1,  Lp_Public_FIFOs, NULL,		    0773, Lp_Uid, Lp_Gid);
-
-	/*
-	 * The lpNet <-> lpsched job transfer directories.
-	 * Strictly used for temporary file transfer, on start-up
-	 * we can safely clean them out. Indeed, we should clean
-	 * them out in case we had died suddenly and are now
-	 * restarting. The directories should never be very big,
-	 * so we are not in danger of getting ``arglist too big''.
-	 */
-proto (D, 1,  Lp_NetTmp, "tmp", NULL,		    0770, Lp_Uid, Lp_Gid);
-proto (D, 1,  Lp_NetTmp, "tmp", Local_System, NULL, 0770, Lp_Uid, Lp_Gid);
-proto (D, 1,  Lp_NetTmp, "requests", NULL,	    0770, Lp_Uid, Lp_Gid);
-proto (D, 1,  Lp_NetTmp, "requests", Local_System, NULL, 0770, Lp_Uid, Lp_Gid);
-	cmd = makestr(RMCMD, " ", Lp_NetTmp, "/tmp/*/*", (char *)0);
-	system (cmd);
-	Free (cmd);
-	cmd = makestr(RMCMD, " ", Lp_NetTmp, "/requests/*/*", (char *)0);
-	system (cmd);
-	Free (cmd);
 
 	/*
 	 * THE MAIN FIFO:
@@ -136,7 +115,6 @@ proto (S, 1,  Lp_A, NULL,			Lp_Admins, "lp", NULL);
 	/*
 	 * OTHER FILES:
 	 */
-proto (F, 1,  Lp_NetData, NULL,			    0664, Lp_Uid, Lp_Gid);
 
 	/*
 	 * SPECIAL CASE:
@@ -226,8 +204,6 @@ check_link()
 		 */
 		_rename(old_system, Local_System, Lp_Tmp, NULL);
 		_rename(old_system, Local_System, Lp_Requests, NULL);
-		_rename(old_system, Local_System, Lp_NetTmp, "tmp", NULL);
-		_rename(old_system, Local_System, Lp_NetTmp, "requests", NULL);
 
 		Unlink(Lp_Temp);
 	}

@@ -365,8 +365,6 @@ extern char	Lp_Spooldir[],
 		Lp_System[],
 		Lp_Temp[],
 		Lp_Tmp[],
-		Lp_NetTmp[],
-		Lp_NetData[],
 		Lp_Users[],
 		Lp_A[],
 		Lp_A_Classes[],
@@ -379,8 +377,6 @@ extern char	Lp_Spooldir[],
 		Lp_A_Systems[],
 		Lp_Default[],
 		Lp_A_Faults[];
-
-extern int	Lp_NTBase;
 
 /*
  * File access:
