@@ -431,7 +431,7 @@ getuserrange(const char *username)
 	char		*kv_str = NULL;
 	userattr_t 	*userp = NULL;
 	m_range_t 	*range;
-	int		err;
+	m_label_t	*def_min, *def_clr;
 
 	/*
 	 * Get some memory
@@ -444,33 +444,39 @@ getuserrange(const char *username)
 		free(range);
 		return (NULL);
 	}
+	def_min = range->lower_bound;
 	if ((range->upper_bound = m_label_alloc(USER_CLEAR)) == NULL) {
 		m_label_free(range->lower_bound);
 		free(range);
 		return (NULL);
 	}
-	/*
-	 * Since user_attr entries are optional, start with
-	 * the system default values
-	 */
-	if ((userdefs(range->lower_bound, range->upper_bound)) == -1) {
-		m_label_free(range->lower_bound);
-		m_label_free(range->upper_bound);
-		free(range);
-		return (NULL);
+	def_clr = range->upper_bound;
+
+	/* If the user has an explicit min_label or clearance, use it. */
+	if ((userp = getusernam(username)) != NULL) {
+		if ((kv_str = kva_match(userp->attr, USERATTR_MINLABEL))
+		    != NULL) {
+			(void) str_to_label(kv_str, &range->lower_bound,
+			    MAC_LABEL, L_NO_CORRECTION, NULL);
+			def_min = NULL;		/* don't get default later */
+		}
+		if ((kv_str = kva_match(userp->attr, USERATTR_CLEARANCE))
+		    != NULL) {
+			(void) str_to_label(kv_str, &range->upper_bound,
+			    USER_CLEAR, L_NO_CORRECTION, NULL);
+			def_clr = NULL;		/* don't get default later */
+		}
+		free_userattr(userp);
 	}
-	/*
-	 * If the user has an explicit min_label or clearance,
-	 * then use it instead.
-	 */
-	if ((userp = getusernam(username)) == NULL) {
-		return (range);
+	if (def_min || def_clr) {
+		/* Need to use system default clearance and/or min_label */
+		if ((userdefs(def_min, def_clr)) == -1) {
+			m_label_free(range->lower_bound);
+			m_label_free(range->upper_bound);
+			free(range);
+			return (NULL);
+		}
 	}
-	if ((kv_str = kva_match(userp->attr, USERATTR_MINLABEL)) != NULL)
-		(void) stobsl(kv_str, range->lower_bound, NO_CORRECTION, &err);
-	if ((kv_str = kva_match(userp->attr, USERATTR_CLEARANCE)) != NULL)
-		(void) stobclear(kv_str, range->upper_bound, NO_CORRECTION,
-		    &err);
-	free_userattr(userp);
+
 	return (range);
 }

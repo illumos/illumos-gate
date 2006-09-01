@@ -622,7 +622,7 @@ labelfields(struct name_fields *fields)
 
 #define	udret callp->param.aret.rvals.udefs_ret
 /*
- *	userdefs - Get default user Sensitivity Label and Clearance.
+ *	userdefs - Get default user Sensitivity Label and/or Clearance.
  *
  *	Entry   None.
  *
@@ -653,8 +653,10 @@ userdefs(bslabel_t *sl, bclear_t *clear)
 		return (-1);
 	}
 
-	*sl = udret.sl;
-	*clear = udret.clear;
+	if (sl != NULL)
+		*sl = udret.sl;
+	if (clear != NULL)
+		*clear = udret.clear;
 	return (rval);
 }  /* userdefs */
 #undef	udret
