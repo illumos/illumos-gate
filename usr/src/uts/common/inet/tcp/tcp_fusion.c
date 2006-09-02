@@ -748,6 +748,7 @@ tcp_fuse_rrw(queue_t *q, struiod_t *dp)
 			cv_wait(&tcp->tcp_fuse_plugcv, &tcp->tcp_fuse_lock);
 		} while (tcp->tcp_fuse_syncstr_plugged);
 
+		mutex_exit(&tcp->tcp_fuse_lock);
 		TCP_STAT(tcp_fusion_rrw_plugged);
 		TCP_STAT(tcp_fusion_rrw_busy);
 		return (EBUSY);
