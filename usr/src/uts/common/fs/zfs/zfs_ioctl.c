@@ -1059,7 +1059,8 @@ zfs_ioc_recvbackup(zfs_cmd_t *zc)
 	if (fp == NULL)
 		return (EBADF);
 	error = dmu_recvbackup(zc->zc_filename, &zc->zc_begin_record,
-	    &zc->zc_cookie, fp->f_vnode, fp->f_offset);
+	    &zc->zc_cookie, (boolean_t)zc->zc_numints, fp->f_vnode,
+	    fp->f_offset);
 	releasef(fd);
 	return (error);
 }

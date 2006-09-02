@@ -607,7 +607,7 @@ void dmu_traverse_objset(objset_t *os, uint64_t txg_start,
 
 int dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, struct vnode *vp);
 int dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
-    struct vnode *vp, uint64_t voffset);
+    boolean_t force, struct vnode *vp, uint64_t voffset);
 
 /* CRC64 table */
 #define	ZFS_CRC64_POLY	0xC96C5795D7870F42ULL	/* ECMA-182, reflected form */

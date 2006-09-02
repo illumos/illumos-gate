@@ -1174,7 +1174,7 @@ restore_free(struct restorearg *ra, objset_t *os,
 
 int
 dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
-    vnode_t *vp, uint64_t voffset)
+    boolean_t force, vnode_t *vp, uint64_t voffset)
 {
 	struct restorearg ra;
 	dmu_replay_record_t *drr;
@@ -1246,6 +1246,18 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 		if (ra.err)
 			goto out;
 
+		/*
+		 * Only do the rollback if the most recent snapshot
+		 * matches the incremental source
+		 */
+		if (force) {
+			if (ds->ds_prev->ds_phys->ds_guid !=
+			    drrb->drr_fromguid) {
+				dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
+				return (ENODEV);
+			}
+			(void) dsl_dataset_rollback(ds);
+		}
 		ra.err = dsl_sync_task_do(ds->ds_dir->dd_pool,
 		    replay_incremental_check, replay_incremental_sync,
 		    ds, drrb, 1);

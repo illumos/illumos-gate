@@ -186,6 +186,16 @@ dataset_namecheck(const char *path, namecheck_err_t *why, char *what)
 			found_snapshot = 1;
 		}
 
+		/*
+		 * If there is a '/' in a snapshot name
+		 * then report an error
+		 */
+		if (*end == '/' && found_snapshot) {
+			if (why)
+				*why = NAME_ERR_TRAILING_SLASH;
+			return (-1);
+		}
+
 		/* Update to the next component */
 		loc = end + 1;
 	}

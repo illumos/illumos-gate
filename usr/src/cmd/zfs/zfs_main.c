@@ -187,8 +187,9 @@ get_usage(zfs_help_t idx)
 	case HELP_PROMOTE:
 		return (gettext("\tpromote <clone filesystem>\n"));
 	case HELP_RECEIVE:
-		return (gettext("\treceive [-vn] <filesystem|volume|snapshot>\n"
-		    "\treceive [-vn] -d <filesystem>\n"));
+		return (gettext("\treceive [-vnF] <filesystem|volume|"
+		"snapshot>\n"
+		"\treceive [-vnF] -d <filesystem>\n"));
 	case HELP_RENAME:
 		return (gettext("\trename <filesystem|volume|snapshot> "
 		    "<filesystem|volume|snapshot>\n"));
@@ -1885,6 +1886,7 @@ zfs_do_send(int argc, char **argv)
 	char *fromname = NULL;
 	zfs_handle_t *zhp_from = NULL, *zhp_to;
 	int c, err;
+	char fullname[MAXPATHLEN];
 
 	/* check options */
 	while ((c = getopt(argc, argv, ":i:")) != -1) {
@@ -1925,13 +1927,32 @@ zfs_do_send(int argc, char **argv)
 		return (1);
 	}
 
+	if ((zhp_to = zfs_open(g_zfs, argv[0], ZFS_TYPE_SNAPSHOT)) == NULL)
+		return (1);
+
 	if (fromname) {
+
+		/*
+		 * If fromname is an abbreviated snapshot name,
+		 * then reconstruct the name of the parent dataset
+		 */
+		if ((strchr(fromname, '@') == NULL) ||
+		    *fromname == '@') {
+			char *cp;
+			cp = strchr(argv[0], '@');
+			if (strchr(fromname, '@') == NULL)
+				*(++cp) = '\0';
+			else
+				*cp = '\0';
+			(void) strncpy(fullname, argv[0], sizeof (fullname));
+			(void) strlcat(fullname, fromname, sizeof (fullname));
+			fromname = fullname;
+		}
+
 		if ((zhp_from = zfs_open(g_zfs, fromname,
 		    ZFS_TYPE_SNAPSHOT)) == NULL)
 			return (1);
 	}
-	if ((zhp_to = zfs_open(g_zfs, argv[0], ZFS_TYPE_SNAPSHOT)) == NULL)
-		return (1);
 
 	err = zfs_send(zhp_to, zhp_from);
 
@@ -1954,9 +1975,10 @@ zfs_do_receive(int argc, char **argv)
 	boolean_t isprefix = B_FALSE;
 	boolean_t dryrun = B_FALSE;
 	boolean_t verbose = B_FALSE;
+	boolean_t force = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":dnv")) != -1) {
+	while ((c = getopt(argc, argv, ":dnvF")) != -1) {
 		switch (c) {
 		case 'd':
 			isprefix = B_TRUE;
@@ -1966,6 +1988,9 @@ zfs_do_receive(int argc, char **argv)
 			break;
 		case 'v':
 			verbose = B_TRUE;
+			break;
+		case 'F':
+			force = B_TRUE;
 			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
@@ -2000,7 +2025,7 @@ zfs_do_receive(int argc, char **argv)
 		return (1);
 	}
 
-	err = zfs_receive(g_zfs, argv[0], isprefix, verbose, dryrun);
+	err = zfs_receive(g_zfs, argv[0], isprefix, verbose, dryrun, force);
 	return (err != 0);
 }
 

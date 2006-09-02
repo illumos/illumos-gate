@@ -2420,7 +2420,7 @@ zfs_send(zfs_handle_t *zhp_to, zfs_handle_t *zhp_from)
  */
 int
 zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
-    int verbose, int dryrun)
+    int verbose, int dryrun, boolean_t force)
 {
 	zfs_cmd_t zc = { 0 };
 	time_t begin_time;
@@ -2429,6 +2429,7 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 	dmu_replay_record_t drr;
 	struct drr_begin *drrb = &zc.zc_begin_record;
 	char errbuf[1024];
+	prop_changelist_t *clp;
 
 	begin_time = time(NULL);
 
@@ -2518,9 +2519,19 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 		if (h == NULL)
 			return (-1);
 		if (!dryrun) {
-			/* unmount destination fs or remove device link. */
+			/*
+			 * We need to unmount all the dependents of the dataset
+			 * and the dataset itself. If it's a volume
+			 * then remove device link.
+			 */
 			if (h->zfs_type == ZFS_TYPE_FILESYSTEM) {
-				(void) zfs_unmount(h, NULL, 0);
+				clp = changelist_gather(h, ZFS_PROP_NAME, 0);
+				if (clp == NULL)
+					return (-1);
+				if (changelist_prefix(clp) != 0) {
+					changelist_free(clp);
+					return (-1);
+				}
 			} else {
 				(void) zvol_remove_link(hdl, h->zfs_name);
 			}
@@ -2615,6 +2626,7 @@ ancestorerr:
 	(void) strcpy(zc.zc_prop_value, tosnap);
 	zc.zc_cookie = STDIN_FILENO;
 	zc.zc_intsz = isprefix;
+	zc.zc_numints = force;
 	if (verbose) {
 		(void) printf("%s %s stream of %s into %s\n",
 		    dryrun ? "would receive" : "receiving",
@@ -2668,7 +2680,8 @@ ancestorerr:
 	 * Mount or recreate the /dev links for the target filesystem
 	 * (if created, or if we tore them down to do an incremental
 	 * restore), and the /dev links for the new snapshot (if
-	 * created).
+	 * created). Also mount any children of the target filesystem
+	 * if we did an incremental receive.
 	 */
 	cp = strchr(zc.zc_filename, '@');
 	if (cp && (ioctl_err == 0 || drrb->drr_fromguid)) {
@@ -2679,15 +2692,20 @@ ancestorerr:
 		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
 		*cp = '@';
 		if (h) {
-			if (h->zfs_type == ZFS_TYPE_FILESYSTEM) {
-				err = zfs_mount(h, NULL, 0);
-			} else {
+			if (h->zfs_type == ZFS_TYPE_VOLUME) {
 				err = zvol_create_link(hdl, h->zfs_name);
 				if (err == 0 && ioctl_err == 0)
 					err = zvol_create_link(hdl,
 					    zc.zc_filename);
+			} else {
+				if (drrb->drr_fromguid) {
+					err = changelist_postfix(clp);
+					changelist_free(clp);
+				} else {
+					err = zfs_mount(h, NULL, 0);
+				}
 			}
-			zfs_close(h);
+		zfs_close(h);
 		}
 	}
 
@@ -2707,6 +2725,7 @@ ancestorerr:
 		(void) printf("received %sb stream in %lu seconds (%sb/sec)\n",
 		    buf1, delta, buf2);
 	}
+
 	return (0);
 }
 
@@ -2909,9 +2928,6 @@ zfs_rename(zfs_handle_t *zhp, const char *target)
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
 	char errbuf[1024];
 
-	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
-	(void) strlcpy(zc.zc_prop_value, target, sizeof (zc.zc_prop_value));
-
 	/* if we have the same exact name, just return success */
 	if (strcmp(zhp->zfs_name, target) == 0)
 		return (0);
@@ -2922,30 +2938,41 @@ zfs_rename(zfs_handle_t *zhp, const char *target)
 	/*
 	 * Make sure the target name is valid
 	 */
-	if (!zfs_validate_name(hdl, target, zhp->zfs_type))
-		return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
-
 	if (zhp->zfs_type == ZFS_TYPE_SNAPSHOT) {
-
-		if ((delim = strchr(target, '@')) == NULL) {
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "not a snapshot"));
-			return (zfs_error(hdl, EZFS_BADTYPE, errbuf));
+		if ((strchr(target, '@') == NULL) ||
+		    *target == '@') {
+			/*
+			 * Snapshot target name is abbreviated,
+			 * reconstruct full dataset name
+			 */
+			(void) strlcpy(parent, zhp->zfs_name,
+			    sizeof (parent));
+			delim = strchr(parent, '@');
+			if (strchr(target, '@') == NULL)
+				*(++delim) = '\0';
+			else
+				*delim = '\0';
+			(void) strlcat(parent, target, sizeof (parent));
+			target = parent;
+		} else {
+			/*
+			 * Make sure we're renaming within the same dataset.
+			 */
+			delim = strchr(target, '@');
+			if (strncmp(zhp->zfs_name, target, delim - target)
+			    != 0 || zhp->zfs_name[delim - target] != '@') {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "snapshots must be part of same "
+				    "dataset"));
+				return (zfs_error(hdl, EZFS_CROSSTARGET,
+					    errbuf));
+			}
 		}
-
-		/*
-		 * Make sure we're renaming within the same dataset.
-		 */
-		if (strncmp(zhp->zfs_name, target, delim - target) != 0 ||
-		    zhp->zfs_name[delim - target] != '@') {
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "snapshots must be part of same dataset"));
-			return (zfs_error(hdl, EZFS_CROSSTARGET, errbuf));
-		}
-
-		(void) strncpy(parent, target, delim - target);
-		parent[delim - target] = '\0';
+		if (!zfs_validate_name(hdl, target, zhp->zfs_type))
+			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 	} else {
+		if (!zfs_validate_name(hdl, target, zhp->zfs_type))
+			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 		/* validate parents */
 		if (check_parents(hdl, target) != 0)
 			return (-1);
@@ -2999,6 +3026,10 @@ zfs_rename(zfs_handle_t *zhp, const char *target)
 		zc.zc_objset_type = DMU_OST_ZVOL;
 	else
 		zc.zc_objset_type = DMU_OST_ZFS;
+
+	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
+	(void) strlcpy(zc.zc_prop_value, target, sizeof (zc.zc_prop_value));
+
 
 	if ((ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_RENAME, &zc)) != 0) {
 		(void) zfs_standard_error(zhp->zfs_hdl, errno, errbuf);
