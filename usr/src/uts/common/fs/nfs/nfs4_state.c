@@ -2998,11 +2998,20 @@ rfs4_state_close(rfs4_state_t *sp, bool_t lock_held,
 	/* Remove the associated lo_state owners */
 	if (!lock_held)
 		rfs4_dbe_lock(sp->dbe);
-	if (sp->closed == FALSE) {
-		sp->closed = TRUE;
 
-		rfs4_release_share_lock_state(sp, cr, close_of_client);
+	/*
+	 * If refcnt == 0, the dbe is about to be destroyed.
+	 * lock state will be released by the reaper thread.
+	 */
+
+	if (rfs4_dbe_refcnt(sp->dbe) > 0) {
+		if (sp->closed == FALSE) {
+			sp->closed = TRUE;
+
+			rfs4_release_share_lock_state(sp, cr, close_of_client);
+		}
 	}
+
 	if (!lock_held)
 		rfs4_dbe_unlock(sp->dbe);
 }
