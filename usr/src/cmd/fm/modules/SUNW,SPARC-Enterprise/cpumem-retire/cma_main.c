@@ -68,10 +68,14 @@ static const cma_subscriber_t cma_subrs[] = {
 	    NULL },
 	{ "fault.cpu.SPARC64-VI.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    cma_cpu_retire },
-	{ "fault.chassis.opl.asic.sc.ce-l2tagcpu", FM_FMRI_SCHEME_HC,
-	    FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
-	{ "fault.chassis.opl.cpu.way.ce", FM_FMRI_SCHEME_HC,
-	    FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.opl.cpu.SPARC64-VI.core.se-offlinereq",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.opl.cpu.SPARC64-VI.core.se-offlinereq-silence",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.opl.cpu.SPARC64-VI.core.ce-offlinereq",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
+	{ "fault.chassis.opl.cpu.SPARC64-VI.core.ce-offlinereq-silence",
+		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
 	{ NULL, NULL, 0, NULL }
 };
 

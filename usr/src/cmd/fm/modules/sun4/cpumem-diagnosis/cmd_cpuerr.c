@@ -215,8 +215,8 @@ CMD_OPL_UEHANDLER(opluge, opl_uge, CMD_PTR_CPU_UGESR_UGE, "core", 0)
  */
 CMD_OPL_UEHANDLER(oplinv_sfsr, opl_invsfsr, CMD_PTR_CPU_INV_SFSR, "strand", 1)
 CMD_OPL_UEHANDLER(opluecpu_detcpu, oplue_detcpu, CMD_PTR_CPU_UE_DET_CPU,
-"chip", 1)
-CMD_OPL_UEHANDLER(opluecpu_detio, oplue_detio, CMD_PTR_CPU_UE_DET_IO, "chip", 1)
+"core", 1)
+CMD_OPL_UEHANDLER(opluecpu_detio, oplue_detio, CMD_PTR_CPU_UE_DET_IO, "core", 1)
 CMD_OPL_UEHANDLER(oplmtlb, opl_mtlb, CMD_PTR_CPU_MTLB, "core", 1)
 CMD_OPL_UEHANDLER(opltlbp, opl_tlbp, CMD_PTR_CPU_TLBP, "core", 1)
 #endif	/* sun4u */
