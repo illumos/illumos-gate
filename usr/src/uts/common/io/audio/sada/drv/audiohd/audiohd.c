@@ -1114,9 +1114,12 @@ audiohd_init_state(audiohd_state_t *statep, dev_info_t *dip)
 	statep->hda_info_defaults.play.precision = AUDIOHD_DEFAULT_PREC;
 	statep->hda_info_defaults.play.encoding = AUDIOHD_DEFAULT_ENC;
 	statep->hda_info_defaults.play.gain = AUDIOHD_DEFAULT_PGAIN;
-	statep->hda_info_defaults.play.port = AUDIO_HEADPHONE;
-	statep->hda_info_defaults.play.avail_ports = AUDIO_HEADPHONE;
-	statep->hda_info_defaults.play.mod_ports = AUDIO_HEADPHONE;
+	statep->hda_info_defaults.play.port =
+	    AUDIO_HEADPHONE | AUDIO_LINE_OUT;
+	statep->hda_info_defaults.play.avail_ports =
+	    AUDIO_HEADPHONE | AUDIO_LINE_OUT;
+	statep->hda_info_defaults.play.mod_ports =
+	    AUDIO_HEADPHONE | AUDIO_LINE_OUT;
 	statep->hda_info_defaults.play.buffer_size = AUDIOHD_BSIZE;
 	statep->hda_info_defaults.play.balance = AUDIOHD_DEFAULT_BAL;
 
@@ -1196,7 +1199,7 @@ audiohd_init_state(audiohd_state_t *statep, dev_info_t *dip)
 	statep->hda_ad_info.ad_record.ad_sr_info = NULL;
 	statep->hda_ad_info.ad_record.ad_chs = audiohd_channels;
 	statep->hda_ad_info.ad_record.ad_int_rate = rints;
-	statep->hda_ad_info.ad_record.ad_max_chs = AUDIOHD_MAX_CHANNELS;
+	statep->hda_ad_info.ad_record.ad_max_chs = AUDIOHD_MAX_IN_CHANNELS;
 	statep->hda_ad_info.ad_record.ad_bsize = AUDIOHD_BSIZE;
 
 	/* fill in device info strings */
@@ -2363,6 +2366,12 @@ audiohd_alc880_enable_play(audiohd_state_t *statep)
 		    AUDIOHDC_NID(0x14), AUDIOHDC_VERB_SET_AMP_MUTE, output_val);
 		if (lTmp == AUDIOHD_CODEC_FAILURE)
 			return (AUDIO_FAILURE);
+
+		lTmp = audioha_codec_4bit_verb_get(statep, caddr,
+		    AUDIOHDC_NID(0x1b), AUDIOHDC_VERB_SET_AMP_MUTE,
+			output_val);
+		if (lTmp == AUDIOHD_CODEC_FAILURE)
+			return (AUDIO_FAILURE);
 	}
 
 	/* enable output for pin node 0x14 */
@@ -2371,6 +2380,17 @@ audiohd_alc880_enable_play(audiohd_state_t *statep)
 	if (lTmp == AUDIOHD_CODEC_FAILURE)
 		return (AUDIO_FAILURE);
 	lTmp = audioha_codec_verb_get(statep, caddr, AUDIOHDC_NID(0x14),
+	    AUDIOHDC_VERB_SET_PIN_CTRL, (lTmp |
+	    AUDIOHDC_PIN_CONTROL_OUT_ENABLE));
+	if (lTmp == AUDIOHD_CODEC_FAILURE)
+		return (AUDIO_FAILURE);
+
+	/* enable output for pin node 0x1b */
+	lTmp = audioha_codec_verb_get(statep, caddr, AUDIOHDC_NID(0x1b),
+	    AUDIOHDC_VERB_GET_PIN_CTRL, 0);
+	if (lTmp == AUDIOHD_CODEC_FAILURE)
+		return (AUDIO_FAILURE);
+	lTmp = audioha_codec_verb_get(statep, caddr, AUDIOHDC_NID(0x1b),
 	    AUDIOHDC_VERB_SET_PIN_CTRL, (lTmp |
 	    AUDIOHDC_PIN_CONTROL_OUT_ENABLE));
 	if (lTmp == AUDIOHD_CODEC_FAILURE)
@@ -2529,21 +2549,32 @@ audiohd_alc880_set_port(audiohd_state_t *statep, int dir, int port)
 			val |= AUDIOHDC_AMP_SET_MUTE;
 		}
 
-		if (tmp_port != port)
-			return (AUDIO_FAILURE);
-
-		statep->hda_out_ports = tmp_port;
-
 		if (audioha_codec_4bit_verb_get(statep, caddr,
 		    AUDIOHDC_NID(0x14), AUDIOHDC_VERB_SET_AMP_MUTE, val) ==
 		    AUDIOHD_CODEC_FAILURE)
 			return (AUDIO_FAILURE);
-		else
-			return (AUDIO_SUCCESS);
+
+		val = AUDIOHDC_AMP_SET_LR_OUTPUT;
+		if (port & AUDIO_LINE_OUT) {
+			tmp_port |= AUDIO_LINE_OUT;
+		} else { /* mute */
+			val |= AUDIOHDC_AMP_SET_MUTE;
+		}
+
+		if (audioha_codec_4bit_verb_get(statep, caddr,
+		    AUDIOHDC_NID(0x1B), AUDIOHDC_VERB_SET_AMP_MUTE,
+		    val) == AUDIOHD_CODEC_FAILURE)
+			return (AUDIO_FAILURE);
+
+		if (tmp_port != port)
+			return (AUDIO_FAILURE);
+		statep->hda_out_ports = tmp_port;
+
+		return (AUDIO_SUCCESS);
 	}
 
 	/*
-	 * Now, deal with reocrding
+	 * Now, deal with recording
 	 */
 	ASSERT(dir == AUDIO_RECORD);
 
@@ -2693,6 +2724,9 @@ audiohd_alc880_mute_outputs(audiohd_state_t *statep, boolean_t mute)
 
 	(void) audioha_codec_4bit_verb_get(statep, caddr,
 	    AUDIOHDC_NID(0x14), AUDIOHDC_VERB_SET_AMP_MUTE, val);
+
+	(void) audioha_codec_4bit_verb_get(statep, caddr,
+	    AUDIOHDC_NID(0x1b), AUDIOHDC_VERB_SET_AMP_MUTE, val);
 
 	return (AUDIO_SUCCESS);
 
