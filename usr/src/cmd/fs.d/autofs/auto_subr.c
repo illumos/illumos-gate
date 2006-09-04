@@ -53,12 +53,16 @@
 #include <rpcsvc/nfs_prot.h>
 #include <assert.h>
 #include "automount.h"
+#include <deflt.h>
 #include <zone.h>
 #include <priv.h>
 #include <fcntl.h>
 
 static char *check_hier(char *);
+static int arch(char *, size_t, bool_t);
+static int cpu(char *, size_t);
 static int natisa(char *, size_t);
+static int platform(char *, size_t);
 
 struct mntlist *current_mounts;
 
@@ -513,6 +517,7 @@ macro_expand(key, pline, plineq, size)
 	char namebuf[64], *pn;
 	int expand = 0;
 	struct utsname name;
+	char procbuf[SYS_NMLN];
 	char isaname[64];
 
 	p = pline;  q = plineq;
@@ -562,9 +567,20 @@ macro_expand(key, pline, plineq, size)
 			s = getenv(namebuf);
 			if (!s) {
 				/* not found in env */
-				if (strcmp(namebuf, "HOST") == 0) {
+				if (strcmp(namebuf, "ARCH") == 0) {
+					if (arch(procbuf, sizeof (procbuf),
+					    FALSE))
+						s = procbuf;
+				} else if (strcmp(namebuf, "CPU") == 0) {
+					if (cpu(procbuf, sizeof (procbuf)))
+						s = procbuf;
+				} else if (strcmp(namebuf, "HOST") == 0) {
 					(void) uname(&name);
 					s = name.nodename;
+				} else if (strcmp(namebuf, "KARCH") == 0) {
+					if (arch(procbuf, sizeof (procbuf),
+					    TRUE))
+						s = procbuf;
 				} else if (strcmp(namebuf, "OSREL") == 0) {
 					(void) uname(&name);
 					s = name.release;
@@ -577,6 +593,9 @@ macro_expand(key, pline, plineq, size)
 				} else if (strcmp(namebuf, "NATISA") == 0) {
 					if (natisa(isaname, sizeof (isaname)))
 						s = isaname;
+				} else if (strcmp(namebuf, "PLATFORM") == 0) {
+					if (platform(procbuf, sizeof (procbuf)))
+						s = procbuf;
 				}
 			}
 
@@ -931,6 +950,42 @@ bitness(char *isaname)
 }
 
 /*
+ * Determine the application architecture (derived from uname -m) to expand
+ * the $ARCH and $KARCH macros.
+ *
+ * Like arch(1), we need to substitute "sun4" for "sun4u", "sun4v", ... for
+ * backward compatibility. When kflag is set (like arch -k), the unmodifed
+ * value is returned instead.
+ */
+static int
+arch(char *buf, size_t bufsize, bool_t karch)
+{
+	long ret;
+
+	ret = sysinfo(SI_MACHINE, buf, bufsize);
+	if (ret == -1L)
+		return (0);
+	if (!karch && strncmp(buf, "sun4", 4) == 0)
+		(void) strlcpy(buf, "sun4", bufsize);
+	return (1);
+}
+
+/*
+ * Determine the basic ISA (uname -p) to expand the $CPU macro.
+ */
+static int
+cpu(char *buf, size_t bufsize)
+{
+	long ret;
+
+	ret = sysinfo(SI_ARCHITECTURE, buf, bufsize);
+	if (ret == -1L)
+		return (0);
+	else
+		return (1);
+}
+
+/*
  * Find the left-most element in the isalist that matches our idea of a
  * system ABI.
  *
@@ -960,4 +1015,39 @@ natisa(char *buf, size_t bufsize)
 	free(list);
 
 	return (1);
+}
+
+/*
+ * Determine the platform (uname -i) to expand the $PLATFORM macro.
+ */
+static int
+platform(char *buf, size_t bufsize)
+{
+	long ret;
+
+	ret = sysinfo(SI_PLATFORM, buf, bufsize);
+	if (ret == -1L)
+		return (0);
+	else
+		return (1);
+}
+
+/*
+ * Set environment variables specified in /etc/default/autofs.
+ */
+void
+put_automountd_env(void)
+{
+	char *defval;
+	int defflags;
+
+	if ((defval = defread("AUTOMOUNTD_ENV=")) != NULL) {
+		(void) putenv(strdup(defval));
+		defflags = defcntl(DC_GETFLAGS, 0);
+		TURNON(defflags, DC_NOREWIND);
+		defflags = defcntl(DC_SETFLAGS, defflags);
+		while ((defval = defread("AUTOMOUNTD_ENV=")) != NULL)
+			(void) putenv(strdup(defval));
+		(void) defcntl(DC_SETFLAGS, defflags);
+	}
 }

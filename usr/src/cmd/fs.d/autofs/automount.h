@@ -263,6 +263,7 @@ extern char *get_line(FILE *, char *, char *, int);
 extern int getword(char *, char *, char **, char **, char, int);
 extern int get_retry(char *);
 extern int str_opt(struct mnttab *, char *, char **);
+extern void put_automountd_env(void);
 extern void dirinit(char *, char *, char *, int, char **, char ***);
 extern void pr_msg(const char *, ...);
 extern void trace_prt(int, char *, ...);

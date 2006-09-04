@@ -103,8 +103,6 @@ extern int _autofssys(int, void *);
 #endif /* DEBUG */
 
 
-static char		str_arch[32];
-static char		str_cpu[32];
 static thread_key_t	s_thr_key;
 
 struct autodir *dir_head;
@@ -126,7 +124,6 @@ main(argc, argv)
 	int c, error;
 	struct rlimit rlset;
 	char *defval;
-	int defflags;
 
 	if (geteuid() != 0) {
 		(void) fprintf(stderr, "%s must be run as root\n", argv[0]);
@@ -156,15 +153,7 @@ main(argc, argv)
 			if (errno != 0)
 				trace = 0;
 		}
-		if ((defval = defread("AUTOMOUNTD_ENV=")) != NULL) {
-			(void) putenv(strdup(defval));
-			defflags = defcntl(DC_GETFLAGS, 0);
-			TURNON(defflags, DC_NOREWIND);
-			defflags = defcntl(DC_SETFLAGS, defflags);
-			while ((defval = defread("AUTOMOUNTD_ENV=")) != NULL)
-				(void) putenv(strdup(defval));
-			(void) defcntl(DC_SETFLAGS, defflags);
-		}
+		put_automountd_env();
 
 		/* close defaults file */
 		defopen(NULL);
@@ -210,37 +199,6 @@ main(argc, argv)
 	(void) setsid();
 	openlog("automountd", LOG_PID, LOG_DAEMON);
 	(void) setlocale(LC_ALL, "");
-
-	/*
-	 * Since the "arch" command no longer exists we
-	 * have to rely on sysinfo(SI_MACHINE) to return the closest
-	 * approximation.  For backward compatibility we
-	 * need to substitute "sun4" for "sun4m", "sun4c", ...
-	 */
-	if (getenv("ARCH") == NULL) {
-		char buf[16];
-
-		if (sysinfo(SI_MACHINE, buf, sizeof (buf)) != -1) {
-			if (strncmp(buf, "sun4", 4) == 0)
-				(void) strcpy(buf, "sun4");
-			(void) sprintf(str_arch, "ARCH=%s", buf);
-			(void) putenv(str_arch);
-		} else {
-			syslog(LOG_ERR,
-				"can't determine machine type, error: %m");
-		}
-	}
-	if (getenv("CPU") == NULL) {
-		char buf[16];
-
-		if (sysinfo(SI_ARCHITECTURE, buf, sizeof (buf)) != -1) {
-			(void) sprintf(str_cpu, "CPU=%s", buf);
-			(void) putenv(str_cpu);
-		} else {
-			syslog(LOG_ERR,
-				"can't determine processor type, error: %m");
-		}
-	}
 
 	(void) rwlock_init(&cache_lock, USYNC_THREAD, NULL);
 	(void) rwlock_init(&autofs_rddir_cache_lock, USYNC_THREAD, NULL);
