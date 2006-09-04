@@ -99,11 +99,31 @@ EOF
   Q  Exit menu
 EOF
     ;;
-    summary_menu) cat <<EOF
+    summary_menu)
+
+	SUFFIX_INFO=
+	DB_INFO=
+
+	[ -n "${NEED_CREATE_SUFFIX}" ] &&
+	{
+		SUFFIX_INFO=`cat <<EOF
+
+         Suffix to create          : $LDAP_SUFFIX
+EOF
+`
+		[ -n "${NEED_CREATE_BACKEND}" ] &&
+			DB_INFO=`cat <<EOF
+
+         Database to create        : $IDS_DATABASE
+EOF
+`
+	}
+
+	cat <<EOF
               Summary of Configuration
 
   1  Domain to serve               : $LDAP_DOMAIN
-  2  Base DN to setup              : $LDAP_BASEDN
+  2  Base DN to setup              : $LDAP_BASEDN$SUFFIX_INFO$DB_INFO
   3  Profile name to create        : $LDAP_PROFILE_NAME
   4  Default Server List           : $LDAP_SERVER_LIST
   5  Preferred Server List         : $LDAP_PREF_SRVLIST
@@ -124,6 +144,52 @@ EOF
 
 EOF
     ;;
+    sfx_not_suitable) cat <<EOF
+
+Sorry, suffix ${LDAP_SUFFIX} is not suitable for Base DN ${LDAP_BASEDN}
+
+EOF
+    ;;
+    obj_not_found) cat <<EOF
+
+Sorry, ${PROG} can't find an objectclass for "$_ATT" attribute
+
+EOF
+    ;;
+    sfx_config_incons) cat <<EOF
+
+Sorry, there is no suffix mapping for ${LDAP_SUFFIX},
+while ldbm database exists, server configuration needs to be fixed manually,
+look at cn=mapping tree,cn=config and cn=ldbm database,cn=plugins,cn=config
+
+EOF
+    ;;
+    ldbm_db_exist) cat <<EOF
+
+Database "${IDS_DATABASE}" already exists,
+however "${IDS_DATABASE_AVAIL}" name is available
+
+EOF
+    ;;
+    unable_find_db_name) cat <<EOF
+    
+Unable to find any available database name close to "${IDS_DATABASE}"
+
+EOF
+    ;;
+    create_ldbm_db_error) cat <<EOF
+
+ERROR: unable to create suffix ${LDAP_SUFFIX}
+       due to server error that occurred during creation of ldbm database
+
+EOF
+    ;;
+    create_suffix_entry_error) cat <<EOF
+
+ERROR: unable to create entry ${LDAP_SUFFIX} of ${LDAP_SUFFIX_OBJ} class
+
+EOF
+    ;;
     ldap_suffix_list) cat <<EOF
 
 No valid suffixes (naming contexts) were found for LDAP base DN:
@@ -137,6 +203,22 @@ EOF
     sorry) cat <<EOF
 
 HELP - No help is available for this topic.
+
+EOF
+    ;;
+    create_suffix_help) cat <<EOF
+
+HELP - Our Base DN is ${LDAP_BASEDN}
+       and we need to create a Directory Suffix,
+       which can be equal to Base DN itself or be any of Base DN parents.
+       All intermediate entries up to suffix will be created on demand.
+
+EOF
+    ;;
+    enter_ldbm_db_help) cat <<EOF
+
+HELP - ldbm database is an internal database for storage of our suffix data.
+       Database name must be alphanumeric due to Directory Server restriction.
 
 EOF
     ;;
@@ -1220,7 +1302,7 @@ get_basedn()
     # Get Base DN.
     while :
     do
-	get_ans_req "Enter LDAP Base DN (h=help):" "$LDAP_BASEDN"
+	get_ans_req "Enter LDAP Base DN (h=help):" "${_DOM_2_DC}"
 	check_baseDN "$ANS"
 	while [ $? -ne 0 ]
 	do
@@ -1231,22 +1313,28 @@ get_basedn()
 	    esac
 
 	    # Re-Enter the BaseDN
-	    get_ans_req "Enter LDAP Base DN (h=help):" "$LDAP_BASEDN"
+	    get_ans_req "Enter LDAP Base DN (h=help):" "${_DOM_2_DC}"
 	    check_baseDN "$ANS"
 	done
 
-	# Set base DN.
+	# Set base DN and check its suffix
 	LDAP_BASEDN=${ANS}
+	check_basedn_suffix ||
+	{
+		cleanup
+		exit 1
+	}
 
-	check_basedn_suffix
-	case $? in
-	    0) break ;;
-	    1) cleanup; exit 1 ;;
-	    2) continue ;;
-	esac
+	# suffix may need to be created, in that case get suffix from user
+	[ -n "${NEED_CREATE_SUFFIX}" ] &&
+	{
+		get_suffix || continue
+	}
+
+	# suffix is ok, break out of the base dn inquire loop
+	break
     done
 }
-
 
 #
 # get_profile_name(): Enter the profile name.
@@ -2174,6 +2262,7 @@ display_summary()
     get_confirm_nodef "WARNING: About to start committing changes. (y=continue, n=EXIT)" 
     if [ $? -eq 0 ]; then
 	${ECHO} "Terminating setup without making changes at users request."
+	cleanup
 	exit 1
     fi
 
@@ -2255,6 +2344,9 @@ export LDAP_SERV_SRCH_DES SSD_FILE
 EOF
     # Add service search descriptors.
     ssd_2_config "${OUTPUT_FILE}"
+
+    # Add LDAP suffix preferences
+    print_suffix_config >> "${OUTPUT_FILE}"
 
     # Add the end of FILE tag.
     ${ECHO} "" >> ${OUTPUT_FILE}
@@ -2356,14 +2448,6 @@ validate_suffix()
 	exit 1
     fi
 
-    # Check LDAP_SUFFIX does exist
-    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"${LDAP_SUFFIX}\" -s base \"objectclass=*\" > ${TMPDIR}/checkSuffix 2>&1"
-    if [ $? -ne 0 ]; then
-	${ECHO} "Invalid suffix ${LDAP_SUFFIX}"
-	cleanup
-	exit 1
-    fi
-
     # Check LDAP_SUFFIX and LDAP_BASEDN are consistent
     # Convert to lower case for basename.
     format_string "${LDAP_BASEDN}"
@@ -2383,6 +2467,35 @@ validate_suffix()
 	    exit 1
 	fi
     fi
+
+    # Check LDAP_SUFFIX does exist
+    ${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"${LDAP_SUFFIX}\" -s base \"objectclass=*\" > ${TMPDIR}/checkSuffix 2>&1" && return 0
+
+    # Well, suffix does not exist, try to prepare create it ...
+    NEED_CREATE_SUFFIX=1
+    prep_create_sfx_entry ||
+    {
+	cleanup
+	exit 1
+    }
+    [ -n "${NEED_CREATE_BACKEND}" ] &&
+    {
+	# try to use id attr value of the suffix as a database name
+	IDS_DATABASE=${_VAL}
+	prep_create_sfx_backend
+	case $? in
+	1)	# cann't use the name we want, so we can either exit or use
+		# some another available name - doing the last ...
+		IDS_DATABASE=${IDS_DATABASE_AVAIL}
+		;;
+	2)	# unable to determine database name
+		cleanup
+		exit 1
+		;;
+	esac
+    }
+
+    [ $DEBUG -eq 1 ] && ${ECHO} "Suffix $LDAP_SUFFIX, Database $IDS_DATABASE"
 }
 
 #
@@ -2423,11 +2536,6 @@ validate_info()
     # Check LDAP suffix
     validate_suffix
     [ $DEBUG -eq 1 ] && ${ECHO} "  LDAP suffix ... OK"
-
-    # Get backend
-    get_backend
-    [ $DEBUG -eq 1 ] && ${ECHO} "  LDAP backend ... OK"
-
 }
 
 #
@@ -2442,24 +2550,320 @@ format_string()
 	sed -e 's/[ ]*,[ ]*/,/g' -e 's/[ ]*=[ ]*/=/g'`
 }
 
+#
+# prepare for the suffix entry creation
+#
+# input  : LDAP_BASEDN, LDAP_SUFFIX - base dn and suffix;
+# in/out : LDAP_SUFFIX_OBJ, LDAP_SUFFIX_ACI - initially may come from config.
+# output : NEED_CREATE_BACKEND - backend for this suffix needs to be created;
+#          _RDN, _ATT, _VAL - suffix's RDN, id attribute name and its value.
+# return : 0 - success, otherwise error.
+#
+prep_create_sfx_entry()
+{
+    [ $DEBUG -eq 1 ] && ${ECHO} "In prep_create_sfx_entry()"
+
+    # check whether suffix corresponds to base dn
+    format_string "${LDAP_BASEDN}"
+    ${ECHO} ",${FMT_STR}" | ${GREP} ",${LDAP_SUFFIX}$" >/dev/null 2>&1 ||
+    {
+	display_msg sfx_not_suitable
+	return 1
+    }
+
+    # parse LDAP_SUFFIX
+    _RDN=`${ECHO} "${LDAP_SUFFIX}" | cut -d, -f1`
+    _ATT=`${ECHO} "${_RDN}" | cut -d= -f1`
+    _VAL=`${ECHO} "${_RDN}" | cut -d= -f2-`
+
+    # find out an objectclass for suffix entry if it is not defined yet
+    [ -z "${LDAP_SUFFIX_OBJ}" ] &&
+    {
+	get_objectclass ${_ATT}
+	[ -z "${_ATTR_NAME}" ] &&
+	{
+		display_msg obj_not_found
+		return 1
+	}
+	LDAP_SUFFIX_OBJ=${_ATTR_NAME}
+    }
+    [ $DEBUG -eq 1 ] && ${ECHO} "Suffix entry object is ${LDAP_SUFFIX_OBJ}"
+
+    # find out an aci for suffix entry if it is not defined yet
+    [ -z "${LDAP_SUFFIX_ACI}" ] &&
+    {
+	# set Directory Server default aci
+	LDAP_SUFFIX_ACI=`cat <<EOF
+aci: (targetattr != "userPassword || passwordHistory || passwordExpirationTime
+ || passwordExpWarned || passwordRetryCount || retryCountResetTime ||
+ accountUnlockTime || passwordAllowChangeTime")
+ (
+   version 3.0;
+   acl "Anonymous access";
+   allow (read, search, compare) userdn = "ldap:///anyone";
+ )
+aci: (targetattr != "nsroledn || aci || nsLookThroughLimit || nsSizeLimit ||
+ nsTimeLimit || nsIdleTimeout || passwordPolicySubentry ||
+ passwordExpirationTime || passwordExpWarned || passwordRetryCount ||
+ retryCountResetTime || accountUnlockTime || passwordHistory ||
+ passwordAllowChangeTime")
+ (
+   version 3.0;
+   acl "Allow self entry modification except for some attributes";
+   allow (write) userdn = "ldap:///self";
+ )
+aci: (targetattr = "*")
+ (
+   version 3.0;
+   acl "Configuration Administrator";
+   allow (all) userdn = "ldap:///uid=admin,ou=Administrators,
+                         ou=TopologyManagement,o=NetscapeRoot";
+ )
+aci: (targetattr ="*")
+ (
+   version 3.0;
+   acl "Configuration Administrators Group";
+   allow (all) groupdn = "ldap:///cn=Configuration Administrators,
+                          ou=Groups,ou=TopologyManagement,o=NetscapeRoot";
+ )
+EOF
+`
+    }
+    [ $DEBUG -eq 1 ] && cat <<EOF
+DEBUG: ACI for ${LDAP_SUFFIX} is
+${LDAP_SUFFIX_ACI}
+EOF
+
+    NEED_CREATE_BACKEND=
+
+    # check the suffix mapping tree ...
+    # if mapping exists, suffix should work, otherwise DS inconsistent
+    # NOTE: -b 'cn=mapping tree,cn=config' -s one 'cn=\"$1\"' won't work
+    #       in case of 'cn' value in LDAP is not quoted by '"',
+    #       -b 'cn=\"$1\",cn=mapping tree,cn=config' works in all cases
+    ${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} \
+	-b 'cn=\"${LDAP_SUFFIX}\",cn=mapping tree,cn=config' \
+	-s base 'objectclass=*' dn ${VERB}" &&
+    {
+	[ $DEBUG -eq 1 ] && ${ECHO} "Suffix mapping already exists"
+	# get_backend() either gets IDS_DATABASE or exits
+	get_backend
+	return 0
+    }
+
+    # no suffix mapping, just in case check ldbm backends consistency -
+    # there are must be NO any databases pointing to LDAP_SUFFIX 
+    [ -n "`${EVAL} \"${LDAPSEARCH} ${LDAP_ARGS} \
+	-b 'cn=ldbm database,cn=plugins,cn=config' \
+	-s one 'nsslapd-suffix=${LDAP_SUFFIX}' dn\" 2>/dev/null`" ] &&
+    {
+	display_msg sfx_config_incons
+	return 1
+    }
+
+    # ok, no suffix mapping, no ldbm database
+    [ $DEBUG -eq 1 ] && ${ECHO} "DEBUG: backend needs to be created ..."
+    NEED_CREATE_BACKEND=1
+    return 0
+}
+
+#
+# prepare for the suffix backend creation
+#
+# input  : IDS_DATABASE - requested ldbm db name (must be not null)
+# in/out : IDS_DATABASE_AVAIL - available ldbm db name
+# return : 0 - ldbm db name ok
+#          1 - IDS_DATABASE exists,
+#              so IDS_DATABASE_AVAIL contains available name
+#          2 - unable to find any available name
+#
+prep_create_sfx_backend()
+{
+    [ $DEBUG -eq 1 ] && ${ECHO} "In prep_create_sfx_backend()"
+
+    # check if requested name available
+    [ "${IDS_DATABASE}" = "${IDS_DATABASE_AVAIL}" ] && return 0
+
+    # get the list of database names start with a requested name
+    _LDBM_DBS=`${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} \
+	-b 'cn=ldbm database,cn=plugins,cn=config' \
+	-s one 'cn=${IDS_DATABASE}*' cn"` 2>/dev/null
+
+    # find available db name based on a requested name
+    _i=""; _i_MAX=10
+    while [ ${_i:-0} -lt ${_i_MAX} ]
+    do
+	_name="${IDS_DATABASE}${_i}"
+	${ECHO} "${_LDBM_DBS}" | ${GREP} -i "^cn=${_name}$" >/dev/null 2>&1 ||
+	{
+		IDS_DATABASE_AVAIL="${_name}"
+		break
+	}
+	_i=`expr ${_i:-0} + 1`
+    done
+
+    [ "${IDS_DATABASE}" = "${IDS_DATABASE_AVAIL}" ] && return 0
+
+    [ -n "${IDS_DATABASE_AVAIL}" ] &&
+    {
+	display_msg ldbm_db_exist
+	return 1
+    }
+
+    display_msg unable_find_db_name
+    return 2
+}
+
+#
+# add suffix if needed,
+#     suffix entry and backend MUST be prepared by
+#     prep_create_sfx_entry and prep_create_sfx_backend correspondingly
+#
+# input  : NEED_CREATE_SUFFIX, LDAP_SUFFIX, LDAP_SUFFIX_OBJ, _ATT, _VAL
+#          LDAP_SUFFIX_ACI, NEED_CREATE_BACKEND, IDS_DATABASE
+# return : 0 - suffix successfully created, otherwise error occured
+#
+add_suffix()
+{
+    [ $DEBUG -eq 1 ] && ${ECHO} "In add_suffix()"
+
+    [ -n "${NEED_CREATE_SUFFIX}" ] || return 0
+
+    [ -n "${NEED_CREATE_BACKEND}" ] &&
+    {
+	${EVAL} "${LDAPADD} ${LDAP_ARGS} ${VERB}" <<EOF
+dn: cn="${LDAP_SUFFIX}",cn=mapping tree,cn=config
+objectclass: top
+objectclass: extensibleObject
+objectclass: nsMappingTree
+cn: ${LDAP_SUFFIX}
+nsslapd-state: backend
+nsslapd-backend: ${IDS_DATABASE}
+
+dn: cn=${IDS_DATABASE},cn=ldbm database,cn=plugins,cn=config
+objectclass: top
+objectclass: extensibleObject
+objectclass: nsBackendInstance
+cn: ${IDS_DATABASE}
+nsslapd-suffix: ${LDAP_SUFFIX}
+EOF
+	[ $? -ne 0 ] &&
+	{
+		display_msg create_ldbm_db_error
+		return 1
+	}
+
+	${ECHO} "  ${STEP}. Database ${IDS_DATABASE} successfully created"
+	STEP=`expr $STEP + 1`
+    }
+
+    ${EVAL} "${LDAPADD} ${LDAP_ARGS} ${VERB}" <<EOF
+dn: ${LDAP_SUFFIX}
+objectclass: ${LDAP_SUFFIX_OBJ}
+${_ATT}: ${_VAL}
+${LDAP_SUFFIX_ACI}
+EOF
+    [ $? -ne 0 ] &&
+    {
+	display_msg create_suffix_entry_error
+	return 1
+    }
+
+    ${ECHO} "  ${STEP}. Suffix ${LDAP_SUFFIX} successfully created"
+    STEP=`expr $STEP + 1`
+    return 0
+}
+
+#
+# interactively get suffix and related info from a user
+#
+# input  : LDAP_BASEDN - Base DN
+# output : LDAP_SUFFIX - Suffix, _ATT, _VAL - id attribute and its value;
+#          LDAP_SUFFIX_OBJ, LDAP_SUFFIX_ACI - objectclass and aci;
+#          NEED_CREATE_BACKEND - tells whether backend needs to be created;
+#          IDS_DATABASE - prepared ldbm db name
+# return : 0 - user gave a correct suffix 
+#          1 - suffix given by user cann't be created
+#
+get_suffix()
+{
+    [ $DEBUG -eq 1 ] && ${ECHO} "In get_suffix()"
+
+    while :
+    do
+	get_ans "Enter suffix to be created (b=back/h=help):" ${LDAP_BASEDN}
+	case "${ANS}" in
+	[Hh] | Help | help | \? ) display_msg create_suffix_help ;;
+	[Bb] | Back | back | \< ) return 1 ;;
+	* )
+		format_string "${ANS}"
+		LDAP_SUFFIX=${FMT_STR}
+		prep_create_sfx_entry || continue
+
+		[ -n "${NEED_CREATE_BACKEND}" ] &&
+		{
+		    IDS_DATABASE_AVAIL= # reset the available db name
+
+		    reenter_suffix=
+		    while :
+		    do
+			get_ans "Enter ldbm database name (b=back/h=help):" \
+				${IDS_DATABASE_AVAIL:-${_VAL}}
+			case "${ANS}" in
+			[Hh] | \? ) display_msg enter_ldbm_db_help ;;
+			[Bb] | \< ) reenter_suffix=1; break ;;
+			* )
+				IDS_DATABASE="${ANS}"
+				prep_create_sfx_backend && break
+			esac
+		    done
+		    [ -n "${reenter_suffix}" ] && continue
+
+		    [ $DEBUG -eq 1 ] && cat <<EOF
+DEBUG: backend name for suffix ${LDAP_SUFFIX} will be ${IDS_DATABASE}
+EOF
+		}
+
+		# eventually everything is prepared
+		return 0
+		;;
+	esac
+    done
+}
+
+#
+# print out a script which sets LDAP suffix related preferences
+#
+print_suffix_config()
+{
+    cat <<EOF2
+# LDAP suffix related preferences used only if needed
+IDS_DATABASE="${IDS_DATABASE}" 
+LDAP_SUFFIX_OBJ="$LDAP_SUFFIX_OBJ"
+LDAP_SUFFIX_ACI=\`cat <<EOF
+${LDAP_SUFFIX_ACI}
+EOF
+\`
+export IDS_DATABASE LDAP_SUFFIX_OBJ LDAP_SUFFIX_ACI
+EOF2
+}
+
 # 
 # check_basedn_suffix(): check that there is an existing 
 # valid suffix to hold current base DN
 # return:
-#   0: valid suffix found
-#   1: no valid suffix found, or user gives up
-#   2: give it another try
+#   0: valid suffix found or new one should be created,
+#      NEED_CREATE_SUFFIX flag actually indicates that
+#   1: some error occures
 #
 check_basedn_suffix()
 {
     [ $DEBUG -eq 1 ] && ${ECHO} "In check_basedn_suffix()"
 
+    NEED_CREATE_SUFFIX=
+
     # find out existing suffixes
     discover_serv_suffix
-    if [ $? -ne 0 ]; then
-	${ECHO} "No suffixes found. Exiting."
-	return 1
-    fi
 
     ${ECHO} "  Validating LDAP Base DN and Suffix ..."
 
@@ -2480,15 +2884,11 @@ check_basedn_suffix()
     done
 
     if [ "${cur_ldap_entry}" = "${prev_ldap_entry}" ]; then
-	[ $DEBUG -eq 1 ] && ${ECHO} "No valid LDAP suffix found"
-	display_msg ldap_suffix_list
-	get_confirm "Do you want to continue (h=help):" \
-	    "y" ldap_suffix_list_help
-	if [ $? -eq 0 ]; then
-	    return 1 # users gives up
-	else
-	    return 2 # continue
-	fi 
+	${ECHO} "  No valid suffixes were found for Base DN ${LDAP_BASEDN}"
+
+	NEED_CREATE_SUFFIX=1
+	return 0
+
     else
 	[ $DEBUG -eq 1 ] && ${ECHO} "found valid LDAP entry: ${cur_ldap_entry}"
 
@@ -2558,15 +2958,13 @@ discover_serv_suffix()
     NUM_TOP=`wc -l ${TMPDIR}/treeTOP | awk '{print $1}'`
     case $NUM_TOP in
 	0)
-	    ${ECHO} "ERROR: No suffix found in LDAP tree"
+	    [ $DEBUG -eq 1 ] && ${ECHO} "DEBUG: No suffix found in LDAP tree"
 	    return 1
 	    ;;
 	*)  # build the list of suffixes; take out 'namingContexts=' in
 	    # each line of ${TMPDIR}/treeTOP
 	    LDAP_SUFFIX_LIST=`cat ${TMPDIR}/treeTOP | 
 		awk '{ printf("%s\n",substr($0,16,length-15)) }'`
-	    [ $DEBUG -eq 1 ] && ${ECHO} "final list: ${LDAP_SUFFIX_LIST}"
-	
 	    ;;
     esac
 
@@ -3407,8 +3805,9 @@ set_nisdomain()
     [ $DEBUG -eq 1 ] && ${ECHO} "In set_nisdomain()"
 
     # Check if nisDomain is already set.
-    ${LDAPSEARCH} ${SERVER_ARGS} -b "${LDAP_BASEDN}" -s base "objectclass=*" > ${TMPDIR}/chk_nisdomain 2>&1
-    eval "${GREP} -i nisDomain ${TMPDIR}/chk_nisdomain ${VERB}"
+    ${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"${LDAP_BASEDN}\" -s base \
+	\"objectclass=*\"" > ${TMPDIR}/chk_nisdomain 2>&1
+    ${EVAL} "${GREP} -i nisDomain ${TMPDIR}/chk_nisdomain ${VERB}"
     if [ $? -eq 0 ]; then
 	${ECHO} "  ${STEP}. NisDomainObject for ${LDAP_BASEDN} was already set."
 	STEP=`expr $STEP + 1`
@@ -3944,6 +4343,13 @@ fi
 # Update the schema (Attributes, Objectclass Definitions)
 update_schema_attr
 update_schema_obj
+
+# Add suffix together with its root entry (if needed)
+add_suffix ||
+{
+	cleanup
+	exit 1
+}
 
 # Add base objects (if needed)
 add_base_objects
