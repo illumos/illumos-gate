@@ -382,7 +382,6 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
 	char *name;
 	zfs_cmd_t zc = { 0 };
 	uint64_t version, guid;
-	char *packed;
 	size_t len;
 	int err;
 	uint_t children = 0;
@@ -575,50 +574,38 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
 		/*
 		 * Try to do the import in order to get vdev state.
 		 */
-		if ((err = nvlist_size(config, &len, NV_ENCODE_NATIVE)) != 0)
-			goto nomem;
-
-		if ((packed = zfs_alloc(hdl, len)) == NULL)
-			goto nomem;
-
-		if ((err = nvlist_pack(config, &packed, &len,
-		    NV_ENCODE_NATIVE, 0)) != 0)
-			goto nomem;
+		if (zcmd_write_src_nvlist(hdl, &zc, config, &len) != 0)
+			goto error;
 
 		nvlist_free(config);
 		config = NULL;
 
-		zc.zc_config_src_size = len;
-		zc.zc_config_src = (uint64_t)(uintptr_t)packed;
-
-		zc.zc_config_dst_size = 2 * len;
-		if ((zc.zc_config_dst = (uint64_t)(uintptr_t)
-		    zfs_alloc(hdl, zc.zc_config_dst_size)) == NULL)
-			goto nomem;
+		if (zcmd_alloc_dst_nvlist(hdl, &zc, len * 2) != 0) {
+			zcmd_free_nvlists(&zc);
+			goto error;
+		}
 
 		while ((err = ioctl(hdl->libzfs_fd, ZFS_IOC_POOL_TRYIMPORT,
 		    &zc)) != 0 && errno == ENOMEM) {
-			free((void *)(uintptr_t)zc.zc_config_dst);
-			if ((zc.zc_config_dst = (uint64_t)(uintptr_t)
-			    zfs_alloc(hdl, zc.zc_config_dst_size)) == NULL)
-				goto nomem;
+			if (zcmd_expand_dst_nvlist(hdl, &zc) != 0) {
+				zcmd_free_nvlists(&zc);
+				goto error;
+			}
 		}
-
-		free(packed);
 
 		if (err) {
 			(void) zpool_standard_error(hdl, errno,
 			    dgettext(TEXT_DOMAIN, "cannot discover pools"));
-			free((void *)(uintptr_t)zc.zc_config_dst);
+			zcmd_free_nvlists(&zc);
 			goto error;
 		}
 
-		if (nvlist_unpack((void *)(uintptr_t)zc.zc_config_dst,
-		    zc.zc_config_dst_size, &config, 0) != 0) {
-			free((void *)(uintptr_t)zc.zc_config_dst);
-			goto nomem;
+		if (zcmd_read_dst_nvlist(hdl, &zc, &config) != 0) {
+			zcmd_free_nvlists(&zc);
+			goto error;
 		}
-		free((void *)(uintptr_t)zc.zc_config_dst);
+
+		zcmd_free_nvlists(&zc);
 
 		/*
 		 * Go through and update the paths for spares, now that we have
@@ -640,6 +627,8 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
 		/*
 		 * Add this pool to the list of configs.
 		 */
+		verify(nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME,
+		    &name) == 0);
 		if (nvlist_add_nvlist(ret, name, config) != 0)
 			goto nomem;
 

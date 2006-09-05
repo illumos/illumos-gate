@@ -207,18 +207,15 @@ zfs_vertex_add_edge(libzfs_handle_t *hdl, zfs_vertex_t *zvp,
 		return (-1);
 
 	if (zvp->zv_edgecount == zvp->zv_edgealloc) {
-		zfs_edge_t **newedges = zfs_alloc(hdl, zvp->zv_edgealloc * 2 *
-		    sizeof (void *));
+		void *ptr;
 
-		if (newedges == NULL)
+		if ((ptr = zfs_realloc(hdl, zvp->zv_edges,
+		    zvp->zv_edgealloc * sizeof (void *),
+		    zvp->zv_edgealloc * 2 * sizeof (void *))) == NULL)
 			return (-1);
 
-		bcopy(zvp->zv_edges, newedges,
-		    zvp->zv_edgealloc * sizeof (void *));
-
+		zvp->zv_edges = ptr;
 		zvp->zv_edgealloc *= 2;
-		free(zvp->zv_edges);
-		zvp->zv_edges = newedges;
 	}
 
 	zvp->zv_edges[zvp->zv_edgecount++] = zep;

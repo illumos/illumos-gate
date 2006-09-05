@@ -26,6 +26,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h>
 #include <libgen.h>
 #include <libintl.h>
@@ -161,8 +162,10 @@ get_usage(zfs_help_t idx)
 	case HELP_CLONE:
 		return (gettext("\tclone <snapshot> <filesystem|volume>\n"));
 	case HELP_CREATE:
-		return (gettext("\tcreate <filesystem>\n"
-		    "\tcreate [-s] [-b blocksize] -V <size> <volume>\n"));
+		return (gettext("\tcreate [[-o property=value] ... ] "
+		    "<filesystem>\n"
+		    "\tcreate [-s] [-b blocksize] [[-o property=value] ...]\n"
+		    "\t    -V <size> <volume>\n"));
 	case HELP_DESTROY:
 		return (gettext("\tdestroy [-rRf] "
 		    "<filesystem|volume|snapshot>\n"));
@@ -170,7 +173,7 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tget [-rHp] [-o field[,field]...] "
 		    "[-s source[,source]...]\n"
 		    "\t    <all | property[,property]...> "
-		    "<filesystem|volume|snapshot> ...\n"));
+		    "[filesystem|volume|snapshot] ...\n"));
 	case HELP_INHERIT:
 		return (gettext("\tinherit [-r] <property> "
 		    "<filesystem|volume> ...\n"));
@@ -302,6 +305,8 @@ usage(boolean_t requested)
 		}
 		(void) fprintf(fp, gettext("\nSizes are specified in bytes "
 		    "with standard units such as K, M, G, etc.\n"));
+		(void) fprintf(fp, gettext("\n\nUser-defined properties can "
+		    "be specified by using a name containing a colon (:).\n"));
 	} else {
 		/*
 		 * TRANSLATION NOTE:
@@ -310,6 +315,14 @@ usage(boolean_t requested)
 		 */
 		(void) fprintf(fp,
 		    gettext("\nFor the property list, run: zfs set|get\n"));
+	}
+
+	/*
+	 * See comments at end of main().
+	 */
+	if (getenv("ZFS_ABORT") != NULL) {
+		(void) printf("dumping core by request\n");
+		abort();
 	}
 
 	exit(requested ? 0 : 2);
@@ -357,7 +370,7 @@ zfs_do_clone(int argc, char **argv)
 		return (1);
 
 	/* pass to libzfs */
-	ret = zfs_clone(zhp, argv[2]);
+	ret = zfs_clone(zhp, argv[2], NULL);
 
 	/* create the mountpoint if necessary */
 	if (ret == 0) {
@@ -375,8 +388,8 @@ zfs_do_clone(int argc, char **argv)
 }
 
 /*
- * zfs create fs
- * zfs create [-s] [-b blocksize] -V vol size
+ * zfs create [-o prop=value] ... fs
+ * zfs create [-s] [-b blocksize] [-o prop=value] ... -V vol size
  *
  * Create a new dataset.  This command can be used to create filesystems
  * and volumes.  Snapshot creation is handled by 'zfs snapshot'.
@@ -390,22 +403,79 @@ static int
 zfs_do_create(int argc, char **argv)
 {
 	zfs_type_t type = ZFS_TYPE_FILESYSTEM;
-	zfs_handle_t *zhp;
-	char *size = NULL;
-	char *blocksize = NULL;
+	zfs_handle_t *zhp = NULL;
+	uint64_t volsize;
 	int c;
 	boolean_t noreserve = B_FALSE;
-	int ret;
+	int ret = 1;
+	nvlist_t *props = NULL;
+	uint64_t intval;
+	char *propname;
+	char *propval, *strval;
+
+	if (nvlist_alloc(&props, NV_UNIQUE_NAME, 0) != 0) {
+		(void) fprintf(stderr, gettext("internal error: "
+		    "out of memory\n"));
+		return (1);
+	}
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":V:b:s")) != -1) {
+	while ((c = getopt(argc, argv, ":V:b:so:")) != -1) {
 		switch (c) {
 		case 'V':
 			type = ZFS_TYPE_VOLUME;
-			size = optarg;
+			if (zfs_nicestrtonum(g_zfs, optarg, &intval) != 0) {
+				(void) fprintf(stderr, gettext("bad volume "
+				    "size '%s': %s\n"), optarg,
+				    libzfs_error_description(g_zfs));
+				goto error;
+			}
+
+			if (nvlist_add_uint64(props,
+			    zfs_prop_to_name(ZFS_PROP_VOLSIZE),
+			    intval) != 0) {
+				(void) fprintf(stderr, gettext("internal "
+				    "error: out of memory\n"));
+				goto error;
+			}
+			volsize = intval;
 			break;
 		case 'b':
-			blocksize = optarg;
+			if (zfs_nicestrtonum(g_zfs, optarg, &intval) != 0) {
+				(void) fprintf(stderr, gettext("bad volume "
+				    "block size '%s': %s\n"), optarg,
+				    libzfs_error_description(g_zfs));
+				goto error;
+			}
+
+			if (nvlist_add_uint64(props,
+			    zfs_prop_to_name(ZFS_PROP_VOLBLOCKSIZE),
+			    intval) != 0) {
+				(void) fprintf(stderr, gettext("internal "
+				    "error: out of memory\n"));
+				goto error;
+			}
+			break;
+		case 'o':
+			propname = optarg;
+			if ((propval = strchr(propname, '=')) == NULL) {
+				(void) fprintf(stderr, gettext("missing "
+				    "'=' for -o option\n"));
+				goto error;
+			}
+			*propval = '\0';
+			propval++;
+			if (nvlist_lookup_string(props, propname,
+			    &strval) == 0) {
+				(void) fprintf(stderr, gettext("property '%s' "
+				    "specified multiple times\n"), propname);
+				goto error;
+			}
+			if (nvlist_add_string(props, propname, propval) != 0) {
+				(void) fprintf(stderr, gettext("internal "
+				    "error: out of memory\n"));
+				goto error;
+			}
 			break;
 		case 's':
 			noreserve = B_TRUE;
@@ -413,19 +483,19 @@ zfs_do_create(int argc, char **argv)
 		case ':':
 			(void) fprintf(stderr, gettext("missing size "
 			    "argument\n"));
-			usage(B_FALSE);
+			goto badusage;
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
-			usage(B_FALSE);
+			goto badusage;
 		}
 	}
 
 	if (noreserve && type != ZFS_TYPE_VOLUME) {
 		(void) fprintf(stderr, gettext("'-s' can only be used when "
 		    "creating a volume\n"));
-		usage(B_FALSE);
+		goto badusage;
 	}
 
 	argc -= optind;
@@ -435,33 +505,32 @@ zfs_do_create(int argc, char **argv)
 	if (argc == 0) {
 		(void) fprintf(stderr, gettext("missing %s argument\n"),
 		    zfs_type_to_name(type));
-		usage(B_FALSE);
+		goto badusage;
 	}
 	if (argc > 1) {
 		(void) fprintf(stderr, gettext("too many arguments\n"));
-		usage(B_FALSE);
+		goto badusage;
 	}
 
-	/* pass to libzfs */
-	if (zfs_create(g_zfs, argv[0], type, size, blocksize) != 0)
-		return (1);
-
-	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_ANY)) == NULL)
-		return (1);
-
-	/*
-	 * Volume handling.  By default, we try to create a reservation of equal
-	 * size for the volume.  If we can't do this, then destroy the dataset
-	 * and report an error.
-	 */
-	if (type == ZFS_TYPE_VOLUME && !noreserve) {
-		if (zfs_prop_set(zhp, ZFS_PROP_RESERVATION, size) != 0) {
-			(void) fprintf(stderr, gettext("use '-s' to create a "
-			    "volume without a matching reservation\n"));
-			(void) zfs_destroy(zhp);
+	if (type == ZFS_TYPE_VOLUME && !noreserve &&
+	    nvlist_lookup_string(props, zfs_prop_to_name(ZFS_PROP_RESERVATION),
+	    &strval) != 0) {
+		if (nvlist_add_uint64(props,
+		    zfs_prop_to_name(ZFS_PROP_RESERVATION),
+		    volsize) != 0) {
+			(void) fprintf(stderr, gettext("internal "
+			    "error: out of memory\n"));
+			nvlist_free(props);
 			return (1);
 		}
 	}
+
+	/* pass to libzfs */
+	if (zfs_create(g_zfs, argv[0], type, props) != 0)
+		goto error;
+
+	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_ANY)) == NULL)
+		goto error;
 
 	/*
 	 * Mount and/or share the new filesystem as appropriate.  We provide a
@@ -480,8 +549,15 @@ zfs_do_create(int argc, char **argv)
 		ret = 0;
 	}
 
-	zfs_close(zhp);
+error:
+	if (zhp)
+		zfs_close(zhp);
+	nvlist_free(props);
 	return (ret);
+badusage:
+	nvlist_free(props);
+	usage(B_FALSE);
+	return (2);
 }
 
 /*
@@ -765,11 +841,11 @@ zfs_do_destroy(int argc, char **argv)
 typedef struct get_cbdata {
 	int cb_sources;
 	int cb_columns[4];
-	int cb_nprop;
+	int cb_colwidths[5];
 	boolean_t cb_scripted;
 	boolean_t cb_literal;
-	boolean_t cb_isall;
-	zfs_prop_t cb_prop[ZFS_NPROP_ALL];
+	boolean_t cb_first;
+	zfs_proplist_t *cb_proplist;
 } get_cbdata_t;
 
 #define	GET_COL_NAME		1
@@ -778,15 +854,110 @@ typedef struct get_cbdata {
 #define	GET_COL_SOURCE		4
 
 /*
+ * Print the column headers for 'zfs get'.
+ */
+static void
+print_get_headers(get_cbdata_t *cbp)
+{
+	zfs_proplist_t *pl = cbp->cb_proplist;
+	int i;
+	char *title;
+	size_t len;
+
+	cbp->cb_first = B_FALSE;
+	if (cbp->cb_scripted)
+		return;
+
+	/*
+	 * Start with the length of the column headers.
+	 */
+	cbp->cb_colwidths[GET_COL_NAME] = strlen(gettext("NAME"));
+	cbp->cb_colwidths[GET_COL_PROPERTY] = strlen(gettext("PROPERTY"));
+	cbp->cb_colwidths[GET_COL_VALUE] = strlen(gettext("VALUE"));
+	cbp->cb_colwidths[GET_COL_SOURCE] = strlen(gettext("SOURCE"));
+
+	/*
+	 * Go through and calculate the widths for each column.  For the
+	 * 'source' column, we kludge it up by taking the worst-case scenario of
+	 * inheriting from the longest name.  This is acceptable because in the
+	 * majority of cases 'SOURCE' is the last column displayed, and we don't
+	 * use the width anyway.  Note that the 'VALUE' column can be oversized,
+	 * if the name of the property is much longer the any values we find.
+	 */
+	for (pl = cbp->cb_proplist; pl != NULL; pl = pl->pl_next) {
+		/*
+		 * 'PROPERTY' column
+		 */
+		if (pl->pl_prop != ZFS_PROP_INVAL) {
+			len = strlen(zfs_prop_to_name(pl->pl_prop));
+			if (len > cbp->cb_colwidths[GET_COL_PROPERTY])
+				cbp->cb_colwidths[GET_COL_PROPERTY] = len;
+		} else {
+			len = strlen(pl->pl_user_prop);
+			if (len > cbp->cb_colwidths[GET_COL_PROPERTY])
+				cbp->cb_colwidths[GET_COL_PROPERTY] = len;
+		}
+
+		/*
+		 * 'VALUE' column
+		 */
+		if ((pl->pl_prop != ZFS_PROP_NAME || !pl->pl_all) &&
+		    pl->pl_width > cbp->cb_colwidths[GET_COL_VALUE])
+			cbp->cb_colwidths[GET_COL_VALUE] = pl->pl_width;
+
+		/*
+		 * 'NAME' and 'SOURCE' columns
+		 */
+		if (pl->pl_prop == ZFS_PROP_NAME &&
+		    pl->pl_width > cbp->cb_colwidths[GET_COL_NAME]) {
+			cbp->cb_colwidths[GET_COL_NAME] = pl->pl_width;
+			cbp->cb_colwidths[GET_COL_SOURCE] = pl->pl_width +
+			    strlen(gettext("inherited from"));
+		}
+	}
+
+	/*
+	 * Now go through and print the headers.
+	 */
+	for (i = 0; i < 4; i++) {
+		switch (cbp->cb_columns[i]) {
+		case GET_COL_NAME:
+			title = gettext("NAME");
+			break;
+		case GET_COL_PROPERTY:
+			title = gettext("PROPERTY");
+			break;
+		case GET_COL_VALUE:
+			title = gettext("VALUE");
+			break;
+		case GET_COL_SOURCE:
+			title = gettext("SOURCE");
+			break;
+		default:
+			title = NULL;
+		}
+
+		if (title != NULL) {
+			if (i == 3 || cbp->cb_columns[i + 1] == 0)
+				(void) printf("%s", title);
+			else
+				(void) printf("%-*s  ",
+				    cbp->cb_colwidths[cbp->cb_columns[i]],
+				    title);
+		}
+	}
+	(void) printf("\n");
+}
+
+/*
  * Display a single line of output, according to the settings in the callback
  * structure.
  */
 static void
-print_one_property(zfs_handle_t *zhp, get_cbdata_t *cbp, zfs_prop_t prop,
+print_one_property(zfs_handle_t *zhp, get_cbdata_t *cbp, const char *propname,
     const char *value, zfs_source_t sourcetype, const char *source)
 {
 	int i;
-	int width;
 	const char *str;
 	char buf[128];
 
@@ -796,25 +967,24 @@ print_one_property(zfs_handle_t *zhp, get_cbdata_t *cbp, zfs_prop_t prop,
 	if ((sourcetype & cbp->cb_sources) == 0)
 		return;
 
+	if (cbp->cb_first)
+		print_get_headers(cbp);
+
 	for (i = 0; i < 4; i++) {
 		switch (cbp->cb_columns[i]) {
 		case GET_COL_NAME:
-			width = 15;
 			str = zfs_get_name(zhp);
 			break;
 
 		case GET_COL_PROPERTY:
-			width = 13;
-			str = zfs_prop_to_name(prop);
+			str = propname;
 			break;
 
 		case GET_COL_VALUE:
-			width = 25;
 			str = value;
 			break;
 
 		case GET_COL_SOURCE:
-			width = 15;
 			switch (sourcetype) {
 			case ZFS_SRC_NONE:
 				str = "-";
@@ -849,7 +1019,9 @@ print_one_property(zfs_handle_t *zhp, get_cbdata_t *cbp, zfs_prop_t prop,
 		else if (cbp->cb_scripted)
 			(void) printf("%s\t", str);
 		else
-			(void) printf("%-*s  ", width, str);
+			(void) printf("%-*s  ",
+			    cbp->cb_colwidths[cbp->cb_columns[i]],
+			    str);
 
 	}
 
@@ -866,20 +1038,62 @@ get_callback(zfs_handle_t *zhp, void *data)
 	zfs_source_t sourcetype;
 	char source[ZFS_MAXNAMELEN];
 	get_cbdata_t *cbp = data;
-	int i;
+	nvlist_t *userprop = zfs_get_user_props(zhp);
+	zfs_proplist_t *pl = cbp->cb_proplist;
+	nvlist_t *propval;
+	char *strval;
+	char *sourceval;
 
-	for (i = 0; i < cbp->cb_nprop; i++) {
-		if (zfs_prop_get(zhp, cbp->cb_prop[i], buf,
-		    sizeof (buf), &sourcetype, source, sizeof (source),
-		    cbp->cb_literal) != 0) {
-			if (cbp->cb_isall)
-				continue;
-			(void) strlcpy(buf, "-", sizeof (buf));
-			sourcetype = ZFS_SRC_NONE;
+	for (; pl != NULL; pl = pl->pl_next) {
+		/*
+		 * Skip the special fake placeholder.  This will also skip over
+		 * the name property when 'all' is specified.
+		 */
+		if (pl->pl_prop == ZFS_PROP_NAME &&
+		    pl == cbp->cb_proplist)
+			continue;
+
+		if (pl->pl_prop != ZFS_PROP_INVAL) {
+			if (zfs_prop_get(zhp, pl->pl_prop, buf,
+			    sizeof (buf), &sourcetype, source,
+			    sizeof (source),
+			    cbp->cb_literal) != 0) {
+				if (pl->pl_all)
+					continue;
+				sourcetype = ZFS_SRC_NONE;
+				(void) strlcpy(buf, "-", sizeof (buf));
+			}
+
+			print_one_property(zhp, cbp,
+			    zfs_prop_to_name(pl->pl_prop),
+			    buf, sourcetype, source);
+		} else {
+			if (nvlist_lookup_nvlist(userprop,
+			    pl->pl_user_prop, &propval) != 0) {
+				if (pl->pl_all)
+					continue;
+				sourcetype = ZFS_SRC_NONE;
+				strval = "-";
+			} else {
+				verify(nvlist_lookup_string(propval,
+				    ZFS_PROP_VALUE, &strval) == 0);
+				verify(nvlist_lookup_string(propval,
+				    ZFS_PROP_SOURCE, &sourceval) == 0);
+
+				if (strcmp(sourceval,
+				    zfs_get_name(zhp)) == 0) {
+					sourcetype = ZFS_SRC_LOCAL;
+				} else {
+					sourcetype = ZFS_SRC_INHERITED;
+					(void) strlcpy(source,
+					    sourceval, sizeof (source));
+				}
+			}
+
+			print_one_property(zhp, cbp,
+			    pl->pl_user_prop, strval, sourcetype,
+			    source);
 		}
-
-		print_one_property(zhp, cbp, cbp->cb_prop[i],
-		    buf, sourcetype, source);
 	}
 
 	return (0);
@@ -890,10 +1104,10 @@ zfs_do_get(int argc, char **argv)
 {
 	get_cbdata_t cb = { 0 };
 	boolean_t recurse = B_FALSE;
-	int c;
-	char *value, *fields, *badopt;
-	int i;
+	int i, c;
+	char *value, *fields;
 	int ret;
+	zfs_proplist_t fake_name = { 0 };
 
 	/*
 	 * Set up default columns and sources.
@@ -1014,62 +1228,39 @@ zfs_do_get(int argc, char **argv)
 
 	fields = argv[0];
 
-	/*
-	 * If the user specifies 'all', the behavior of 'zfs get' is slightly
-	 * different, because we don't show properties which don't apply to the
-	 * given dataset.
-	 */
-	if (strcmp(fields, "all") == 0)
-		cb.cb_isall = B_TRUE;
-
-	if ((ret = zfs_get_proplist(fields, cb.cb_prop, ZFS_NPROP_ALL,
-	    &cb.cb_nprop, &badopt)) != 0) {
-		if (ret == EINVAL)
-			(void) fprintf(stderr, gettext("invalid property "
-			    "'%s'\n"), badopt);
-		else
-			(void) fprintf(stderr, gettext("too many properties "
-			    "specified\n"));
+	if (zfs_get_proplist(g_zfs, fields, &cb.cb_proplist) != 0)
 		usage(B_FALSE);
-	}
 
 	argc--;
 	argv++;
 
-	/* check for at least one dataset name */
-	if (argc < 1) {
-		(void) fprintf(stderr, gettext("missing dataset argument\n"));
-		usage(B_FALSE);
+	/*
+	 * As part of zfs_expand_proplist(), we keep track of the maximum column
+	 * width for each property.  For the 'NAME' (and 'SOURCE') columns, we
+	 * need to know the maximum name length.  However, the user likely did
+	 * not specify 'name' as one of the properties to fetch, so we need to
+	 * make sure we always include at least this property for
+	 * print_get_headers() to work properly.
+	 */
+	if (cb.cb_proplist != NULL) {
+		fake_name.pl_prop = ZFS_PROP_NAME;
+		fake_name.pl_width = strlen(gettext("NAME"));
+		fake_name.pl_next = cb.cb_proplist;
+		cb.cb_proplist = &fake_name;
 	}
 
-	/*
-	 * Print out any headers
-	 */
-	if (!cb.cb_scripted) {
-		int i;
-		for (i = 0; i < 4; i++) {
-			switch (cb.cb_columns[i]) {
-			case GET_COL_NAME:
-				(void) printf("%-15s  ", "NAME");
-				break;
-			case GET_COL_PROPERTY:
-				(void) printf("%-13s  ", "PROPERTY");
-				break;
-			case GET_COL_VALUE:
-				(void) printf("%-25s  ", "VALUE");
-				break;
-			case GET_COL_SOURCE:
-				(void) printf("%s", "SOURCE");
-				break;
-			}
-		}
-		(void) printf("\n");
-	}
+	cb.cb_first = B_TRUE;
 
 	/* run for each object */
-	return (zfs_for_each(argc, argv, recurse, ZFS_TYPE_ANY, NULL,
-	    get_callback, &cb));
+	ret = zfs_for_each(argc, argv, recurse, ZFS_TYPE_ANY, NULL,
+	    &cb.cb_proplist, get_callback, &cb);
 
+	if (cb.cb_proplist == &fake_name)
+		zfs_free_proplist(fake_name.pl_next);
+	else
+		zfs_free_proplist(cb.cb_proplist);
+
+	return (ret);
 }
 
 /*
@@ -1086,9 +1277,7 @@ zfs_do_get(int argc, char **argv)
 static int
 inherit_callback(zfs_handle_t *zhp, void *data)
 {
-	zfs_prop_t prop = (zfs_prop_t)data;
-
-	return (zfs_prop_inherit(zhp, prop) != 0);
+	return (zfs_prop_inherit(zhp, data) != 0);
 }
 
 static int
@@ -1127,33 +1316,35 @@ zfs_do_inherit(int argc, char **argv)
 	}
 
 	propname = argv[0];
+	argc--;
+	argv++;
 
-	/*
-	 * Get and validate the property before iterating over the datasets.  We
-	 * do this now so as to avoid printing out an error message for each and
-	 * every dataset.
-	 */
-	if ((prop = zfs_name_to_prop(propname)) == ZFS_PROP_INVAL) {
-		(void) fprintf(stderr, gettext("invalid property '%s'\n"),
+	if ((prop = zfs_name_to_prop(propname)) != ZFS_PROP_INVAL) {
+		if (zfs_prop_readonly(prop)) {
+			(void) fprintf(stderr, gettext(
+			    "%s property is read-only\n"),
+			    propname);
+			return (1);
+		}
+		if (!zfs_prop_inheritable(prop)) {
+			(void) fprintf(stderr, gettext("'%s' property cannot "
+			    "be inherited\n"), propname);
+			if (prop == ZFS_PROP_QUOTA ||
+			    prop == ZFS_PROP_RESERVATION)
+				(void) fprintf(stderr, gettext("use 'zfs set "
+				    "%s=none' to clear\n"), propname);
+			return (1);
+		}
+	} else if (!zfs_prop_user(propname)) {
+		(void) fprintf(stderr, gettext(
+		    "invalid property '%s'\n"),
 		    propname);
 		usage(B_FALSE);
 	}
-	if (zfs_prop_readonly(prop)) {
-		(void) fprintf(stderr, gettext("%s property is read-only\n"),
-		    propname);
-		return (1);
-	}
-	if (!zfs_prop_inheritable(prop)) {
-		(void) fprintf(stderr, gettext("%s property cannot be "
-		    "inherited\n"), propname);
-		(void) fprintf(stderr, gettext("use 'zfs set %s=none' to "
-		    "clear\n"), propname);
-		return (1);
-	}
 
-	return (zfs_for_each(argc - 1, argv + 1, recurse,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, NULL,
-	    inherit_callback, (void *)prop));
+	return (zfs_for_each(argc, argv, recurse,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, NULL, NULL,
+	    inherit_callback, propname));
 }
 
 /*
@@ -1175,26 +1366,45 @@ zfs_do_inherit(int argc, char **argv)
 typedef struct list_cbdata {
 	boolean_t	cb_first;
 	boolean_t	cb_scripted;
-	zfs_prop_t	cb_fields[ZFS_NPROP_ALL];
-	int		cb_fieldcount;
+	zfs_proplist_t	*cb_proplist;
 } list_cbdata_t;
 
 /*
  * Given a list of columns to display, output appropriate headers for each one.
  */
 static void
-print_header(zfs_prop_t *fields, size_t count)
+print_header(zfs_proplist_t *pl)
 {
+	char headerbuf[ZFS_MAXPROPLEN];
+	const char *header;
 	int i;
+	boolean_t first = B_TRUE;
+	boolean_t right_justify;
 
-	for (i = 0; i < count; i++) {
-		if (i != 0)
+	for (; pl != NULL; pl = pl->pl_next) {
+		if (!first) {
 			(void) printf("  ");
-		if (i == count - 1)
-			(void) printf("%s", zfs_prop_column_name(fields[i]));
-		else	/* LINTED - format specifier */
-			(void) printf(zfs_prop_column_format(fields[i]),
-			    zfs_prop_column_name(fields[i]));
+		} else {
+			first = B_FALSE;
+		}
+
+		right_justify = B_FALSE;
+		if (pl->pl_prop != ZFS_PROP_INVAL) {
+			header = zfs_prop_column_name(pl->pl_prop);
+			right_justify = zfs_prop_align_right(pl->pl_prop);
+		} else {
+			for (i = 0; pl->pl_user_prop[i] != '\0'; i++)
+				headerbuf[i] = toupper(pl->pl_user_prop[i]);
+			headerbuf[i] = '\0';
+			header = headerbuf;
+		}
+
+		if (pl->pl_next == NULL && !right_justify)
+			(void) printf("%s", header);
+		else if (right_justify)
+			(void) printf("%*s", pl->pl_width, header);
+		else
+			(void) printf("%-*s", pl->pl_width, header);
 	}
 
 	(void) printf("\n");
@@ -1205,34 +1415,57 @@ print_header(zfs_prop_t *fields, size_t count)
  * to the described layout.
  */
 static void
-print_dataset(zfs_handle_t *zhp, zfs_prop_t *fields, size_t count, int scripted)
+print_dataset(zfs_handle_t *zhp, zfs_proplist_t *pl, int scripted)
 {
-	int i;
+	boolean_t first = B_TRUE;
 	char property[ZFS_MAXPROPLEN];
+	nvlist_t *userprops = zfs_get_user_props(zhp);
+	nvlist_t *propval;
+	char *propstr;
+	boolean_t right_justify;
+	int width;
 
-	for (i = 0; i < count; i++) {
-		if (i != 0) {
+	for (; pl != NULL; pl = pl->pl_next) {
+		if (!first) {
 			if (scripted)
 				(void) printf("\t");
 			else
 				(void) printf("  ");
+		} else {
+			first = B_FALSE;
 		}
 
-		if (zfs_prop_get(zhp, fields[i], property,
-		    sizeof (property), NULL, NULL, 0, B_FALSE) != 0)
-			(void) strlcpy(property, "-", sizeof (property));
+		right_justify = B_FALSE;
+		if (pl->pl_prop != ZFS_PROP_INVAL) {
+			if (zfs_prop_get(zhp, pl->pl_prop, property,
+			    sizeof (property), NULL, NULL, 0, B_FALSE) != 0)
+				propstr = "-";
+			else
+				propstr = property;
+
+			right_justify = zfs_prop_align_right(pl->pl_prop);
+		} else {
+			if (nvlist_lookup_nvlist(userprops,
+			    pl->pl_user_prop, &propval) != 0)
+				propstr = "-";
+			else
+				verify(nvlist_lookup_string(propval,
+				    ZFS_PROP_VALUE, &propstr) == 0);
+		}
+
+		width = pl->pl_width;
 
 		/*
 		 * If this is being called in scripted mode, or if this is the
 		 * last column and it is left-justified, don't include a width
 		 * format specifier.
 		 */
-		if (scripted || (i == count - 1 &&
-		    strchr(zfs_prop_column_format(fields[i]), '-') != NULL))
-			(void) printf("%s", property);
-		else	/* LINTED - format specifier */
-			(void) printf(zfs_prop_column_format(fields[i]),
-			    property);
+		if (scripted || (pl->pl_next == NULL && !right_justify))
+			(void) printf("%s", propstr);
+		else if (right_justify)
+			(void) printf("%*s", width, propstr);
+		else
+			(void) printf("%-*s", width, propstr);
 	}
 
 	(void) printf("\n");
@@ -1248,12 +1481,11 @@ list_callback(zfs_handle_t *zhp, void *data)
 
 	if (cbp->cb_first) {
 		if (!cbp->cb_scripted)
-			print_header(cbp->cb_fields, cbp->cb_fieldcount);
+			print_header(cbp->cb_proplist);
 		cbp->cb_first = B_FALSE;
 	}
 
-	print_dataset(zhp, cbp->cb_fields, cbp->cb_fieldcount,
-	    cbp->cb_scripted);
+	print_dataset(zhp, cbp->cb_proplist, cbp->cb_scripted);
 
 	return (0);
 }
@@ -1273,14 +1505,10 @@ zfs_do_list(int argc, char **argv)
 	char *value;
 	int ret;
 	char *type_subopts[] = { "filesystem", "volume", "snapshot", NULL };
-	char *badopt;
-	int alloffset;
 	zfs_sort_column_t *sortcol = NULL;
 
 	/* check options */
 	while ((c = getopt(argc, argv, ":o:rt:Hs:S:")) != -1) {
-		zfs_prop_t	prop;
-
 		switch (c) {
 		case 'o':
 			fields = optarg;
@@ -1292,22 +1520,20 @@ zfs_do_list(int argc, char **argv)
 			scripted = B_TRUE;
 			break;
 		case 's':
-			if ((prop = zfs_name_to_prop(optarg)) ==
-			    ZFS_PROP_INVAL) {
+			if (zfs_add_sort_column(&sortcol, optarg,
+			    B_FALSE) != 0) {
 				(void) fprintf(stderr,
 				    gettext("invalid property '%s'\n"), optarg);
 				usage(B_FALSE);
 			}
-			zfs_add_sort_column(&sortcol, prop, B_FALSE);
 			break;
 		case 'S':
-			if ((prop = zfs_name_to_prop(optarg)) ==
-			    ZFS_PROP_INVAL) {
+			if (zfs_add_sort_column(&sortcol, optarg,
+			    B_TRUE) != 0) {
 				(void) fprintf(stderr,
 				    gettext("invalid property '%s'\n"), optarg);
 				usage(B_FALSE);
 			}
-			zfs_add_sort_column(&sortcol, prop, B_TRUE);
 			break;
 		case 't':
 			types = 0;
@@ -1354,31 +1580,16 @@ zfs_do_list(int argc, char **argv)
 	 * normally include the name of the dataset.  For 'zfs list', we always
 	 * want this property to be first.
 	 */
-	if (strcmp(fields, "all") == 0) {
-		cb.cb_fields[0] = ZFS_PROP_NAME;
-		alloffset = 1;
-	} else {
-		alloffset = 0;
-	}
-
-	if ((ret = zfs_get_proplist(fields, cb.cb_fields + alloffset,
-	    ZFS_NPROP_ALL - alloffset, &cb.cb_fieldcount, &badopt)) != 0) {
-		if (ret == EINVAL)
-			(void) fprintf(stderr, gettext("invalid property "
-			    "'%s'\n"), badopt);
-		else
-			(void) fprintf(stderr, gettext("too many properties "
-			    "specified\n"));
+	if (zfs_get_proplist(g_zfs, fields, &cb.cb_proplist) != 0)
 		usage(B_FALSE);
-	}
 
-	cb.cb_fieldcount += alloffset;
 	cb.cb_scripted = scripted;
 	cb.cb_first = B_TRUE;
 
-	ret = zfs_for_each(argc, argv, recurse, types, sortcol,
+	ret = zfs_for_each(argc, argv, recurse, types, sortcol, &cb.cb_proplist,
 	    list_callback, &cb);
 
+	zfs_free_proplist(cb.cb_proplist);
 	zfs_free_sort_columns(sortcol);
 
 	if (ret == 0 && cb.cb_first)
@@ -1652,7 +1863,6 @@ out:
 typedef struct set_cbdata {
 	char		*cb_propname;
 	char		*cb_value;
-	zfs_prop_t	cb_prop;
 } set_cbdata_t;
 
 static int
@@ -1661,92 +1871,7 @@ set_callback(zfs_handle_t *zhp, void *data)
 	set_cbdata_t *cbp = data;
 	int ret = 1;
 
-	/* don't allow setting of properties for snapshots */
-	if (zfs_get_type(zhp) == ZFS_TYPE_SNAPSHOT) {
-		(void) fprintf(stderr, gettext("cannot set %s property for "
-		    "'%s': snapshot properties cannot be modified\n"),
-		    cbp->cb_propname, zfs_get_name(zhp));
-		return (1);
-	}
-
-	/*
-	 * If we're changing the volsize, make sure the value is appropriate,
-	 * and set the reservation if this is a non-sparse volume.
-	 */
-	if (cbp->cb_prop == ZFS_PROP_VOLSIZE &&
-	    zfs_get_type(zhp) == ZFS_TYPE_VOLUME) {
-		uint64_t volsize = zfs_prop_get_int(zhp, ZFS_PROP_VOLSIZE);
-		uint64_t avail = zfs_prop_get_int(zhp, ZFS_PROP_AVAILABLE);
-		uint64_t reservation = zfs_prop_get_int(zhp,
-		    ZFS_PROP_RESERVATION);
-		uint64_t blocksize = zfs_prop_get_int(zhp,
-		    ZFS_PROP_VOLBLOCKSIZE);
-		uint64_t value;
-
-		verify(zfs_nicestrtonum(cbp->cb_value, &value) == 0);
-
-		if (value % blocksize != 0) {
-			char buf[64];
-
-			zfs_nicenum(blocksize, buf, sizeof (buf));
-			(void) fprintf(stderr, gettext("cannot set %s for "
-			    "'%s': must be a multiple of volume block size "
-			    "(%s)\n"), cbp->cb_propname, zfs_get_name(zhp),
-			    buf);
-			return (1);
-		}
-
-		if (value == 0) {
-			(void) fprintf(stderr, gettext("cannot set %s for "
-			    "'%s': cannot be zero\n"), cbp->cb_propname,
-			    zfs_get_name(zhp));
-			return (1);
-		}
-
-		if (volsize == reservation) {
-			if (value > volsize && (value - volsize) > avail) {
-				(void) fprintf(stderr, gettext("cannot set "
-				    "%s property for '%s': volume size exceeds "
-				    "amount of available space\n"),
-				    cbp->cb_propname, zfs_get_name(zhp));
-				return (1);
-			}
-
-			if (zfs_prop_set(zhp, ZFS_PROP_RESERVATION,
-			    cbp->cb_value) != 0) {
-				(void) fprintf(stderr, gettext("volsize and "
-				    "reservation must remain equal\n"));
-				return (1);
-			}
-		}
-	}
-
-	/*
-	 * Do not allow the reservation to be set above the volume size. We do
-	 * this here instead of inside libzfs because libzfs violates this rule
-	 * internally.
-	 */
-	if (cbp->cb_prop == ZFS_PROP_RESERVATION &&
-	    zfs_get_type(zhp) == ZFS_TYPE_VOLUME) {
-		uint64_t value;
-		uint64_t volsize;
-
-		volsize = zfs_prop_get_int(zhp, ZFS_PROP_VOLSIZE);
-		if (strcmp(cbp->cb_value, "none") == 0)
-			value = 0;
-		else
-			verify(zfs_nicestrtonum(cbp->cb_value, &value) == 0);
-
-		if (value > volsize) {
-			(void) fprintf(stderr, gettext("cannot set %s "
-			    "for '%s': size is greater than current "
-			    "volume size\n"), cbp->cb_propname,
-			    zfs_get_name(zhp));
-			return (-1);
-		}
-	}
-
-	if (zfs_prop_set(zhp, cbp->cb_prop, cbp->cb_value) != 0) {
+	if (zfs_prop_set(zhp, cbp->cb_propname, cbp->cb_value) != 0) {
 		switch (libzfs_errno(g_zfs)) {
 		case EZFS_MOUNTFAILED:
 			(void) fprintf(stderr, gettext("property may be set "
@@ -1803,30 +1928,9 @@ zfs_do_set(int argc, char **argv)
 		    gettext("missing property in property=value argument\n"));
 		usage(B_FALSE);
 	}
-	if (*cb.cb_value == '\0') {
-		(void) fprintf(stderr,
-		    gettext("missing value in property=value argument\n"));
-		usage(B_FALSE);
-	}
-
-	/* get the property type */
-	if ((cb.cb_prop = zfs_name_to_prop(cb.cb_propname)) ==
-	    ZFS_PROP_INVAL) {
-		(void) fprintf(stderr,
-		    gettext("invalid property '%s'\n"), cb.cb_propname);
-		usage(B_FALSE);
-	}
-
-	/*
-	 * Validate that the value is appropriate for this property.  We do this
-	 * once now so we don't generate multiple errors each time we try to
-	 * apply it to a dataset.
-	 */
-	if (zfs_prop_validate(g_zfs, cb.cb_prop, cb.cb_value, NULL) != 0)
-		return (1);
 
 	return (zfs_for_each(argc - 2, argv + 2, B_FALSE,
-	    ZFS_TYPE_ANY, NULL, set_callback, &cb));
+	    ZFS_TYPE_ANY, NULL, NULL, set_callback, &cb));
 }
 
 /*
@@ -2125,7 +2229,7 @@ share_mount_callback(zfs_handle_t *zhp, void *data)
 	share_mount_cbdata_t *cbp = data;
 	const char *cmdname = cbp->cb_type == OP_SHARE ? "share" : "mount";
 	struct mnttab mnt;
-	uint64_t zoned;
+	uint64_t zoned, canmount;
 
 	if (cbp->cb_options == NULL)
 		mnt.mnt_mntopts = "";
@@ -2165,6 +2269,7 @@ share_mount_callback(zfs_handle_t *zhp, void *data)
 	    sizeof (mountpoint), NULL, NULL, 0, B_FALSE) == 0);
 	verify(zfs_prop_get(zhp, ZFS_PROP_SHARENFS, shareopts,
 	    sizeof (shareopts), NULL, NULL, 0, B_FALSE) == 0);
+	canmount = zfs_prop_get_int(zhp, ZFS_PROP_CANMOUNT);
 
 	if (cbp->cb_type == OP_SHARE) {
 		if (strcmp(shareopts, "off") == 0) {
@@ -2202,6 +2307,15 @@ share_mount_callback(zfs_handle_t *zhp, void *data)
 
 		(void) fprintf(stderr, gettext("cannot %s '%s': no "
 		    "mountpoint set\n"), cmdname, zfs_get_name(zhp));
+		return (1);
+	}
+
+	if (!canmount) {
+		if (!cbp->cb_explicit)
+			return (0);
+
+		(void) fprintf(stderr, gettext("cannot %s '%s': 'canmount' "
+		    "property is set to 'off'\n"), cmdname, zfs_get_name(zhp));
 		return (1);
 	}
 

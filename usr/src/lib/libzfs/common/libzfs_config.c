@@ -129,19 +129,9 @@ namespace_reload(libzfs_handle_t *hdl)
 			return (no_memory(hdl));
 	}
 
-	/*
-	 * Issue the ZFS_IOC_POOL_CONFIGS ioctl.
-	 * This can fail for one of two reasons:
-	 *
-	 * 	EEXIST		The generation counts match, nothing to do.
-	 * 	ENOMEM		The zc_config_dst buffer isn't large enough to
-	 * 			hold the config; zc_config_dst_size will have
-	 *			been modified to tell us how much to allocate.
-	 */
-	zc.zc_config_dst_size = 1024;
-	if ((zc.zc_config_dst = (uint64_t)(uintptr_t)
-	    zfs_alloc(hdl, zc.zc_config_dst_size)) == NULL)
+	if (zcmd_alloc_dst_nvlist(hdl, &zc, 0) != 0)
 		return (-1);
+
 	for (;;) {
 		zc.zc_cookie = hdl->libzfs_ns_gen;
 		if (ioctl(hdl->libzfs_fd, ZFS_IOC_POOL_CONFIGS, &zc) != 0) {
@@ -150,18 +140,18 @@ namespace_reload(libzfs_handle_t *hdl)
 				/*
 				 * The namespace hasn't changed.
 				 */
-				free((void *)(uintptr_t)zc.zc_config_dst);
+				zcmd_free_nvlists(&zc);
 				return (0);
 
 			case ENOMEM:
-				free((void *)(uintptr_t)zc.zc_config_dst);
-				if ((zc.zc_config_dst = (uint64_t)(uintptr_t)
-				    zfs_alloc(hdl, zc.zc_config_dst_size))
-				    == NULL)
+				if (zcmd_expand_dst_nvlist(hdl, &zc) != 0) {
+					zcmd_free_nvlists(&zc);
 					return (-1);
+				}
 				break;
 
 			default:
+				zcmd_free_nvlists(&zc);
 				return (zfs_standard_error(hdl, errno,
 				    dgettext(TEXT_DOMAIN, "failed to read "
 				    "pool configuration")));
@@ -172,13 +162,12 @@ namespace_reload(libzfs_handle_t *hdl)
 		}
 	}
 
-	if (nvlist_unpack((void *)(uintptr_t)zc.zc_config_dst,
-	    zc.zc_config_dst_size, &config, 0) != 0) {
-		free((void *)(uintptr_t)zc.zc_config_dst);
-		return (no_memory(hdl));
+	if (zcmd_read_dst_nvlist(hdl, &zc, &config) != 0) {
+		zcmd_free_nvlists(&zc);
+		return (-1);
 	}
 
-	free((void *)(uintptr_t)zc.zc_config_dst);
+	zcmd_free_nvlists(&zc);
 
 	/*
 	 * Clear out any existing configuration information.
@@ -256,6 +245,7 @@ zpool_refresh_stats(zpool_handle_t *zhp, boolean_t *missing)
 	zfs_cmd_t zc = { 0 };
 	int error;
 	nvlist_t *config;
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
 
 	*missing = B_FALSE;
 	(void) strcpy(zc.zc_name, zhp->zpool_name);
@@ -263,9 +253,7 @@ zpool_refresh_stats(zpool_handle_t *zhp, boolean_t *missing)
 	if (zhp->zpool_config_size == 0)
 		zhp->zpool_config_size = 1 << 16;
 
-	zc.zc_config_dst_size = zhp->zpool_config_size;
-	if ((zc.zc_config_dst = (uint64_t)(uintptr_t)
-	    zfs_alloc(zhp->zpool_hdl, zc.zc_config_dst_size)) == NULL)
+	if (zcmd_alloc_dst_nvlist(hdl, &zc, zhp->zpool_config_size) != 0)
 		return (-1);
 
 	for (;;) {
@@ -279,13 +267,12 @@ zpool_refresh_stats(zpool_handle_t *zhp, boolean_t *missing)
 		}
 
 		if (errno == ENOMEM) {
-			free((void *)(uintptr_t)zc.zc_config_dst);
-			if ((zc.zc_config_dst = (uint64_t)(uintptr_t)
-			    zfs_alloc(zhp->zpool_hdl,
-			    zc.zc_config_dst_size)) == NULL)
+			if (zcmd_expand_dst_nvlist(hdl, &zc) != 0) {
+				zcmd_free_nvlists(&zc);
 				return (-1);
+			}
 		} else {
-			free((void *)(uintptr_t)zc.zc_config_dst);
+			zcmd_free_nvlists(&zc);
 			if (errno == ENOENT || errno == EINVAL)
 				*missing = B_TRUE;
 			zhp->zpool_state = POOL_STATE_UNAVAIL;
@@ -293,14 +280,14 @@ zpool_refresh_stats(zpool_handle_t *zhp, boolean_t *missing)
 		}
 	}
 
-	if (nvlist_unpack((void *)(uintptr_t)zc.zc_config_dst,
-	    zc.zc_config_dst_size, &config, 0) != 0) {
-		free((void *)(uintptr_t)zc.zc_config_dst);
-		return (no_memory(zhp->zpool_hdl));
+	if (zcmd_read_dst_nvlist(hdl, &zc, &config) != 0) {
+		zcmd_free_nvlists(&zc);
+		return (-1);
 	}
 
-	zhp->zpool_config_size = zc.zc_config_dst_size;
-	free((void *)(uintptr_t)zc.zc_config_dst);
+	zcmd_free_nvlists(&zc);
+
+	zhp->zpool_config_size = zc.zc_nvlist_dst_size;
 
 	if (set_pool_health(config) != 0) {
 		nvlist_free(config);

@@ -67,9 +67,12 @@ dsl_prop_get_impl(dsl_dir_t *dd, const char *propname,
     int intsz, int numint, void *buf, char *setpoint)
 {
 	int err = ENOENT;
+	zfs_prop_t prop;
 
 	if (setpoint)
 		setpoint[0] = '\0';
+
+	prop = zfs_name_to_prop(propname);
 
 	/*
 	 * Note: dd may be NULL, therefore we shouldn't dereference it
@@ -85,6 +88,13 @@ dsl_prop_get_impl(dsl_dir_t *dd, const char *propname,
 				dsl_dir_name(dd, setpoint);
 			break;
 		}
+
+		/*
+		 * Break out of this loop for non-inheritable properties.
+		 */
+		if (prop != ZFS_PROP_INVAL &&
+		    !zfs_prop_inheritable(prop))
+			break;
 	}
 	if (err == ENOENT)
 		err = dodefault(propname, intsz, numint, buf);
@@ -403,7 +413,8 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 	zap_attribute_t za;
 	char setpoint[MAXNAMELEN];
 	char *tmp;
-	nvlist_t *prop;
+	nvlist_t *propval;
+	zfs_prop_t prop;
 
 	if (dsl_dataset_is_snapshot(ds)) {
 		VERIFY(nvlist_alloc(nvp, NV_UNIQUE_NAME, KM_SLEEP) == 0);
@@ -422,10 +433,19 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 		for (zap_cursor_init(&zc, mos, dd->dd_phys->dd_props_zapobj);
 		    (err = zap_cursor_retrieve(&zc, &za)) == 0;
 		    zap_cursor_advance(&zc)) {
-			if (nvlist_lookup_nvlist(*nvp, za.za_name, &prop) == 0)
+			/*
+			 * Skip non-inheritable properties.
+			 */
+			if ((prop = zfs_name_to_prop(za.za_name)) !=
+			    ZFS_PROP_INVAL && !zfs_prop_inheritable(prop) &&
+			    dd != ds->ds_dir)
 				continue;
 
-			VERIFY(nvlist_alloc(&prop, NV_UNIQUE_NAME,
+			if (nvlist_lookup_nvlist(*nvp, za.za_name,
+			    &propval) == 0)
+				continue;
+
+			VERIFY(nvlist_alloc(&propval, NV_UNIQUE_NAME,
 			    KM_SLEEP) == 0);
 			if (za.za_integer_length == 1) {
 				/*
@@ -440,7 +460,7 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 					kmem_free(tmp, za.za_num_integers);
 					break;
 				}
-				VERIFY(nvlist_add_string(prop,
+				VERIFY(nvlist_add_string(propval,
 				    ZFS_PROP_VALUE, tmp) == 0);
 				kmem_free(tmp, za.za_num_integers);
 			} else {
@@ -448,15 +468,15 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 				 * Integer property
 				 */
 				ASSERT(za.za_integer_length == 8);
-				(void) nvlist_add_uint64(prop, ZFS_PROP_VALUE,
-				    za.za_first_integer);
+				(void) nvlist_add_uint64(propval,
+				    ZFS_PROP_VALUE, za.za_first_integer);
 			}
 
-			VERIFY(nvlist_add_string(prop,
+			VERIFY(nvlist_add_string(propval,
 			    ZFS_PROP_SOURCE, setpoint) == 0);
 			VERIFY(nvlist_add_nvlist(*nvp, za.za_name,
-			    prop) == 0);
-			nvlist_free(prop);
+			    propval) == 0);
+			nvlist_free(propval);
 		}
 		zap_cursor_fini(&zc);
 

@@ -201,10 +201,6 @@ extern nvlist_t *zpool_get_config(zpool_handle_t *, nvlist_t **);
 extern int zpool_refresh_stats(zpool_handle_t *, boolean_t *);
 extern int zpool_get_errlog(zpool_handle_t *, nvlist_t ***, size_t *);
 
-#define	ZPOOL_ERR_DATASET	"dataset"
-#define	ZPOOL_ERR_OBJECT	"object"
-#define	ZPOOL_ERR_RANGE		"range"
-
 /*
  * Import and export functions
  */
@@ -246,25 +242,36 @@ typedef enum {
  * Property management functions.  Some functions are shared with the kernel,
  * and are found in sys/fs/zfs.h.
  */
-const char *zfs_prop_to_name(zfs_prop_t);
-int zfs_prop_set(zfs_handle_t *, zfs_prop_t, const char *);
-int zfs_prop_get(zfs_handle_t *, zfs_prop_t, char *, size_t, zfs_source_t *,
-    char *, size_t, boolean_t);
-int zfs_prop_get_numeric(zfs_handle_t *, zfs_prop_t, uint64_t *, zfs_source_t *,
-    char *, size_t);
-uint64_t zfs_prop_get_int(zfs_handle_t *, zfs_prop_t);
-int zfs_prop_validate(libzfs_handle_t *, zfs_prop_t, const char *, uint64_t *);
-int zfs_prop_inheritable(zfs_prop_t);
-int zfs_prop_inherit(zfs_handle_t *, zfs_prop_t);
-const char *zfs_prop_values(zfs_prop_t);
-int zfs_prop_valid_for_type(zfs_prop_t, int);
-const char *zfs_prop_default_string(zfs_prop_t prop);
-uint64_t zfs_prop_default_numeric(zfs_prop_t);
-int zfs_prop_is_string(zfs_prop_t prop);
-const char *zfs_prop_column_name(zfs_prop_t);
-const char *zfs_prop_column_format(zfs_prop_t);
-int zfs_get_proplist(char *fields, zfs_prop_t *proplist, int max, int *count,
-    char **badopt);
+extern const char *zfs_prop_to_name(zfs_prop_t);
+extern int zfs_prop_set(zfs_handle_t *, const char *, const char *);
+extern int zfs_prop_get(zfs_handle_t *, zfs_prop_t, char *, size_t,
+    zfs_source_t *, char *, size_t, boolean_t);
+extern int zfs_prop_get_numeric(zfs_handle_t *, zfs_prop_t, uint64_t *,
+    zfs_source_t *, char *, size_t);
+extern uint64_t zfs_prop_get_int(zfs_handle_t *, zfs_prop_t);
+extern const char *zfs_prop_get_string(zfs_handle_t *, zfs_prop_t);
+extern int zfs_prop_inherit(zfs_handle_t *, const char *);
+extern const char *zfs_prop_values(zfs_prop_t);
+extern int zfs_prop_valid_for_type(zfs_prop_t, int);
+extern const char *zfs_prop_default_string(zfs_prop_t prop);
+extern uint64_t zfs_prop_default_numeric(zfs_prop_t);
+extern int zfs_prop_is_string(zfs_prop_t prop);
+extern const char *zfs_prop_column_name(zfs_prop_t);
+extern boolean_t zfs_prop_align_right(zfs_prop_t);
+
+typedef struct zfs_proplist {
+	zfs_prop_t	pl_prop;
+	char		*pl_user_prop;
+	struct zfs_proplist *pl_next;
+	boolean_t	pl_all;
+	size_t		pl_width;
+	boolean_t	pl_fixed;
+} zfs_proplist_t;
+
+extern int zfs_get_proplist(libzfs_handle_t *, char *, zfs_proplist_t **);
+extern void zfs_free_proplist(zfs_proplist_t *);
+extern int zfs_expand_proplist(zfs_handle_t *, zfs_proplist_t **);
+extern nvlist_t *zfs_get_user_props(zfs_handle_t *);
 
 #define	ZFS_MOUNTPOINT_NONE	"none"
 #define	ZFS_MOUNTPOINT_LEGACY	"legacy"
@@ -283,10 +290,10 @@ extern int zfs_iter_snapshots(zfs_handle_t *, zfs_iter_f, void *);
  * Functions to create and destroy datasets.
  */
 extern int zfs_create(libzfs_handle_t *, const char *, zfs_type_t,
-    const char *, const char *);
+    nvlist_t *);
 extern int zfs_destroy(zfs_handle_t *);
 extern int zfs_destroy_snaps(zfs_handle_t *, char *);
-extern int zfs_clone(zfs_handle_t *, const char *);
+extern int zfs_clone(zfs_handle_t *, const char *, nvlist_t *);
 extern int zfs_snapshot(libzfs_handle_t *, const char *, boolean_t);
 extern int zfs_rollback(zfs_handle_t *, zfs_handle_t *, int);
 extern int zfs_rename(zfs_handle_t *, const char *);
@@ -331,7 +338,7 @@ extern int zfs_unshareall(zfs_handle_t *);
  * Utility function to convert a number to a human-readable form.
  */
 extern void zfs_nicenum(uint64_t, char *, size_t);
-extern int zfs_nicestrtonum(const char *, uint64_t *);
+extern int zfs_nicestrtonum(libzfs_handle_t *, const char *, uint64_t *);
 
 /*
  * Pool destroy special.  Remove the device information without destroying

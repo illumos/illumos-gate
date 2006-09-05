@@ -84,6 +84,7 @@ typedef enum {
 	ZFS_PROP_SNAPDIR,
 	ZFS_PROP_ACLMODE,
 	ZFS_PROP_ACLINHERIT,
+	ZFS_PROP_CANMOUNT,
 	/*
 	 * The following properties are not exposed to the user, but are
 	 * accessible by libzfs clients.
@@ -102,10 +103,12 @@ typedef enum {
  * The following functions are shared between libzfs and the kernel.
  */
 zfs_prop_t zfs_name_to_prop(const char *);
+boolean_t zfs_prop_user(const char *);
 int zfs_prop_readonly(zfs_prop_t);
 const char *zfs_prop_default_string(zfs_prop_t);
+const char *zfs_prop_to_name(zfs_prop_t);
 uint64_t zfs_prop_default_numeric(zfs_prop_t);
-
+int zfs_prop_inheritable(zfs_prop_t);
 
 /*
  * On-disk version number.
@@ -114,6 +117,7 @@ uint64_t zfs_prop_default_numeric(zfs_prop_t);
 #define	ZFS_VERSION_2			2ULL
 #define	ZFS_VERSION_3			3ULL
 #define	ZFS_VERSION			ZFS_VERSION_3
+#define	ZFS_VERSION_STRING		"3"
 
 /*
  * Symbolic names for the changes that caused a ZFS_VERSION switch.
@@ -332,10 +336,6 @@ typedef enum zfs_ioc {
 	ZFS_IOC_DATASET_LIST_NEXT,
 	ZFS_IOC_SNAPSHOT_LIST_NEXT,
 	ZFS_IOC_SET_PROP,
-	ZFS_IOC_SET_QUOTA,
-	ZFS_IOC_SET_RESERVATION,
-	ZFS_IOC_SET_VOLSIZE,
-	ZFS_IOC_SET_VOLBLOCKSIZE,
 	ZFS_IOC_CREATE_MINOR,
 	ZFS_IOC_REMOVE_MINOR,
 	ZFS_IOC_CREATE,
@@ -364,6 +364,13 @@ typedef enum {
 	SPA_LOAD_IMPORT,	/* import in progress */
 	SPA_LOAD_TRYIMPORT	/* tryimport in progress */
 } spa_load_state_t;
+
+/*
+ * Bookmark name values.
+ */
+#define	ZPOOL_ERR_DATASET	"dataset"
+#define	ZPOOL_ERR_OBJECT	"object"
+#define	ZPOOL_ERR_RANGE		"range"
 
 #ifdef	__cplusplus
 }

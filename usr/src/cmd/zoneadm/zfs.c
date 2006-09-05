@@ -407,14 +407,27 @@ clone_snap(char *snapshot_name, char *zonepath)
 	int		err;
 	zfs_handle_t	*zhp;
 	zfs_handle_t	*clone;
+	nvlist_t	*props = NULL;
 
 	if ((zhp = zfs_open(g_zfs, snapshot_name, ZFS_TYPE_SNAPSHOT)) == NULL)
 		return (Z_NO_ENTRY);
 
 	(void) printf(gettext("Cloning snapshot %s\n"), snapshot_name);
 
-	err = zfs_clone(zhp, zonepath);
+	if (nvlist_alloc(&props, NV_UNIQUE_NAME, 0) != 0 ||
+	    nvlist_add_boolean_value(props,
+	    zfs_prop_to_name(ZFS_PROP_SHARENFS), B_FALSE) != 0) {
+		nvlist_free(props);
+		(void) fprintf(stderr, gettext("could not create ZFS clone "
+		    "%s: out of memory\n"), zonepath);
+		return (Z_ERR);
+	}
+
+	err = zfs_clone(zhp, zonepath, props);
 	zfs_close(zhp);
+
+	nvlist_free(props);
+
 	if (err != 0)
 		return (Z_ERR);
 
@@ -431,20 +444,11 @@ clone_snap(char *snapshot_name, char *zonepath)
 		    "%s\n"), zfs_get_name(clone));
 		res = Z_ERR;
 
-	} else {
-		if (zfs_prop_set(clone, ZFS_PROP_SHARENFS, "off") != 0) {
-			/* we won't consider this a failure */
-			(void) fprintf(stderr, gettext("could not turn off the "
-			    "'sharenfs' property on ZFS clone %s\n"),
-			    zfs_get_name(clone));
-		}
-
-		if (clean_out_clone() != Z_OK) {
-			(void) fprintf(stderr, gettext("could not remove the "
-			    "software inventory from ZFS clone %s\n"),
-			    zfs_get_name(clone));
-			res = Z_ERR;
-		}
+	} else if (clean_out_clone() != Z_OK) {
+		(void) fprintf(stderr, gettext("could not remove the "
+		    "software inventory from ZFS clone %s\n"),
+		    zfs_get_name(clone));
+		res = Z_ERR;
 	}
 
 	zfs_close(clone);
@@ -700,25 +704,33 @@ create_zfs_zonepath(char *zonepath)
 {
 	zfs_handle_t	*zhp;
 	char		zfs_name[MAXPATHLEN];
+	nvlist_t	*props = NULL;
 
 	if (path2name(zonepath, zfs_name, sizeof (zfs_name)) != Z_OK)
 		return;
 
-	if (zfs_create(g_zfs, zfs_name, ZFS_TYPE_FILESYSTEM, NULL, NULL) != 0 ||
+	if (nvlist_alloc(&props, NV_UNIQUE_NAME, 0) != 0 ||
+	    nvlist_add_boolean_value(props, zfs_prop_to_name(ZFS_PROP_SHARENFS),
+	    B_FALSE) != 0) {
+		nvlist_free(props);
+		(void) fprintf(stderr, gettext("cannot create ZFS dataset %s: "
+		    "out of memory\n"), zfs_name);
+	}
+
+	if (zfs_create(g_zfs, zfs_name, ZFS_TYPE_FILESYSTEM, props) != 0 ||
 	    (zhp = zfs_open(g_zfs, zfs_name, ZFS_TYPE_ANY)) == NULL) {
 		(void) fprintf(stderr, gettext("cannot create ZFS dataset %s: "
 		    "%s\n"), zfs_name, libzfs_error_description(g_zfs));
+		nvlist_free(props);
 		return;
 	}
+
+	nvlist_free(props);
 
 	if (zfs_mount(zhp, NULL, 0) != 0) {
 		(void) fprintf(stderr, gettext("cannot mount ZFS dataset %s: "
 		    "%s\n"), zfs_name, libzfs_error_description(g_zfs));
 		(void) zfs_destroy(zhp);
-	} else if (zfs_prop_set(zhp, ZFS_PROP_SHARENFS, "off") != 0) {
-		(void) fprintf(stderr, gettext("file system %s successfully "
-		    "created,\nbut could not turn off the 'sharenfs' "
-		    "property\n"), zfs_name);
 	} else {
 		if (chmod(zonepath, S_IRWXU) != 0) {
 			(void) fprintf(stderr, gettext("file system %s "
@@ -849,7 +861,8 @@ move_zfs(char *zonepath, char *new_zonepath)
 	if ((zhp = mount2zhandle(zonepath)) == NULL)
 		return (Z_ERR);
 
-	if (zfs_prop_set(zhp, ZFS_PROP_MOUNTPOINT, new_zonepath) == 0) {
+	if (zfs_prop_set(zhp, zfs_prop_to_name(ZFS_PROP_MOUNTPOINT),
+	    new_zonepath) == 0) {
 		/*
 		 * Clean up the old mount point.  We ignore any failure since
 		 * the zone is already successfully mounted on the new path.

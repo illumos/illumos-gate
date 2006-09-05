@@ -116,27 +116,27 @@ zvol_size_changed(zvol_state_t *zv, dev_t dev)
 }
 
 int
-zvol_check_volsize(zfs_cmd_t *zc, uint64_t blocksize)
+zvol_check_volsize(uint64_t volsize, uint64_t blocksize)
 {
-	if (zc->zc_volsize == 0)
+	if (volsize == 0)
 		return (EINVAL);
 
-	if (zc->zc_volsize % blocksize != 0)
+	if (volsize % blocksize != 0)
 		return (EINVAL);
 
 #ifdef _ILP32
-	if (zc->zc_volsize - 1 > SPEC_MAXOFFSET_T)
+	if (volsize - 1 > SPEC_MAXOFFSET_T)
 		return (EOVERFLOW);
 #endif
 	return (0);
 }
 
 int
-zvol_check_volblocksize(zfs_cmd_t *zc)
+zvol_check_volblocksize(uint64_t volblocksize)
 {
-	if (zc->zc_volblocksize < SPA_MINBLOCKSIZE ||
-	    zc->zc_volblocksize > SPA_MAXBLOCKSIZE ||
-	    !ISP2(zc->zc_volblocksize))
+	if (volblocksize < SPA_MINBLOCKSIZE ||
+	    volblocksize > SPA_MAXBLOCKSIZE ||
+	    !ISP2(volblocksize))
 		return (EDOM);
 
 	return (0);
@@ -151,12 +151,12 @@ zvol_readonly_changed_cb(void *arg, uint64_t newval)
 }
 
 int
-zvol_get_stats(zfs_cmd_t *zc, objset_t *os)
+zvol_get_stats(objset_t *os, zvol_stats_t *zvs)
 {
 	int error;
 	dmu_object_info_t doi;
 
-	error = zap_lookup(os, ZVOL_ZAP_OBJ, "size", 8, 1, &zc->zc_volsize);
+	error = zap_lookup(os, ZVOL_ZAP_OBJ, "size", 8, 1, &zvs->zv_volsize);
 
 	if (error)
 		return (error);
@@ -164,7 +164,7 @@ zvol_get_stats(zfs_cmd_t *zc, objset_t *os)
 	error = dmu_object_info(os, ZVOL_OBJ, &doi);
 
 	if (error == 0)
-		zc->zc_volblocksize = doi.doi_data_block_size;
+		zvs->zv_volblocksize = doi.doi_data_block_size;
 
 	return (error);
 }
@@ -187,7 +187,7 @@ zvol_minor_alloc(void)
 }
 
 static zvol_state_t *
-zvol_minor_lookup(char *name)
+zvol_minor_lookup(const char *name)
 {
 	minor_t minor;
 	zvol_state_t *zv;
@@ -208,10 +208,26 @@ zvol_minor_lookup(char *name)
 void
 zvol_create_cb(objset_t *os, void *arg, dmu_tx_t *tx)
 {
-	zfs_cmd_t *zc = arg;
+	zfs_create_data_t *zc = arg;
 	int error;
+	uint64_t volblocksize, volsize;
 
-	error = dmu_object_claim(os, ZVOL_OBJ, DMU_OT_ZVOL, zc->zc_volblocksize,
+	VERIFY(nvlist_lookup_uint64(zc->zc_props,
+	    zfs_prop_to_name(ZFS_PROP_VOLSIZE), &volsize) == 0);
+	if (nvlist_lookup_uint64(zc->zc_props,
+	    zfs_prop_to_name(ZFS_PROP_VOLBLOCKSIZE), &volblocksize) != 0)
+		volblocksize = zfs_prop_default_numeric(ZFS_PROP_VOLBLOCKSIZE);
+
+	/*
+	 * These properites must be removed from the list so the generic
+	 * property setting step won't apply to them.
+	 */
+	VERIFY(nvlist_remove_all(zc->zc_props,
+	    zfs_prop_to_name(ZFS_PROP_VOLSIZE)) == 0);
+	(void) nvlist_remove_all(zc->zc_props,
+	    zfs_prop_to_name(ZFS_PROP_VOLBLOCKSIZE));
+
+	error = dmu_object_claim(os, ZVOL_OBJ, DMU_OT_ZVOL, volblocksize,
 	    DMU_OT_NONE, 0, tx);
 	ASSERT(error == 0);
 
@@ -219,7 +235,7 @@ zvol_create_cb(objset_t *os, void *arg, dmu_tx_t *tx)
 	    DMU_OT_NONE, 0, tx);
 	ASSERT(error == 0);
 
-	error = zap_update(os, ZVOL_ZAP_OBJ, "size", 8, 1, &zc->zc_volsize, tx);
+	error = zap_update(os, ZVOL_ZAP_OBJ, "size", 8, 1, &volsize, tx);
 	ASSERT(error == 0);
 }
 
@@ -284,10 +300,8 @@ zil_replay_func_t *zvol_replay_vector[TX_MAX_TYPE] = {
  * Create a minor node for the specified volume.
  */
 int
-zvol_create_minor(zfs_cmd_t *zc)
+zvol_create_minor(const char *name, dev_t dev)
 {
-	char *name = zc->zc_name;
-	dev_t dev = zc->zc_dev;
 	zvol_state_t *zv;
 	objset_t *os;
 	uint64_t volsize;
@@ -377,7 +391,8 @@ zvol_create_minor(zfs_cmd_t *zc)
 		return (EAGAIN);
 	}
 
-	(void) ddi_prop_update_string(minor, zfs_dip, ZVOL_PROP_NAME, name);
+	(void) ddi_prop_update_string(minor, zfs_dip, ZVOL_PROP_NAME,
+	    (char *)name);
 
 	(void) sprintf(chrbuf, "%uc,raw", minor);
 
@@ -431,14 +446,14 @@ zvol_create_minor(zfs_cmd_t *zc)
  * Remove minor node for the specified volume.
  */
 int
-zvol_remove_minor(zfs_cmd_t *zc)
+zvol_remove_minor(const char *name)
 {
 	zvol_state_t *zv;
 	char namebuf[30];
 
 	mutex_enter(&zvol_state_lock);
 
-	if ((zv = zvol_minor_lookup(zc->zc_name)) == NULL) {
+	if ((zv = zvol_minor_lookup(name)) == NULL) {
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
@@ -472,23 +487,23 @@ zvol_remove_minor(zfs_cmd_t *zc)
 }
 
 int
-zvol_set_volsize(zfs_cmd_t *zc)
+zvol_set_volsize(const char *name, dev_t dev, uint64_t volsize)
 {
 	zvol_state_t *zv;
-	dev_t dev = zc->zc_dev;
 	dmu_tx_t *tx;
 	int error;
 	dmu_object_info_t doi;
 
 	mutex_enter(&zvol_state_lock);
 
-	if ((zv = zvol_minor_lookup(zc->zc_name)) == NULL) {
+	if ((zv = zvol_minor_lookup(name)) == NULL) {
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
 
 	if ((error = dmu_object_info(zv->zv_objset, ZVOL_OBJ, &doi)) != 0 ||
-	    (error = zvol_check_volsize(zc, doi.doi_data_block_size)) != 0) {
+	    (error = zvol_check_volsize(volsize,
+	    doi.doi_data_block_size)) != 0) {
 		mutex_exit(&zvol_state_lock);
 		return (error);
 	}
@@ -500,7 +515,7 @@ zvol_set_volsize(zfs_cmd_t *zc)
 
 	tx = dmu_tx_create(zv->zv_objset);
 	dmu_tx_hold_zap(tx, ZVOL_ZAP_OBJ, TRUE, NULL);
-	dmu_tx_hold_free(tx, ZVOL_OBJ, zc->zc_volsize, DMU_OBJECT_END);
+	dmu_tx_hold_free(tx, ZVOL_OBJ, volsize, DMU_OBJECT_END);
 	error = dmu_tx_assign(tx, TXG_WAIT);
 	if (error) {
 		dmu_tx_abort(tx);
@@ -509,16 +524,16 @@ zvol_set_volsize(zfs_cmd_t *zc)
 	}
 
 	error = zap_update(zv->zv_objset, ZVOL_ZAP_OBJ, "size", 8, 1,
-	    &zc->zc_volsize, tx);
+	    &volsize, tx);
 	if (error == 0) {
-		error = dmu_free_range(zv->zv_objset, ZVOL_OBJ, zc->zc_volsize,
+		error = dmu_free_range(zv->zv_objset, ZVOL_OBJ, volsize,
 		    DMU_OBJECT_END, tx);
 	}
 
 	dmu_tx_commit(tx);
 
 	if (error == 0) {
-		zv->zv_volsize = zc->zc_volsize;
+		zv->zv_volsize = volsize;
 		zvol_size_changed(zv, dev);
 	}
 
@@ -528,7 +543,7 @@ zvol_set_volsize(zfs_cmd_t *zc)
 }
 
 int
-zvol_set_volblocksize(zfs_cmd_t *zc)
+zvol_set_volblocksize(const char *name, uint64_t volblocksize)
 {
 	zvol_state_t *zv;
 	dmu_tx_t *tx;
@@ -536,7 +551,7 @@ zvol_set_volblocksize(zfs_cmd_t *zc)
 
 	mutex_enter(&zvol_state_lock);
 
-	if ((zv = zvol_minor_lookup(zc->zc_name)) == NULL) {
+	if ((zv = zvol_minor_lookup(name)) == NULL) {
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
@@ -553,7 +568,7 @@ zvol_set_volblocksize(zfs_cmd_t *zc)
 		dmu_tx_abort(tx);
 	} else {
 		error = dmu_object_set_blocksize(zv->zv_objset, ZVOL_OBJ,
-		    zc->zc_volblocksize, 0, tx);
+		    volblocksize, 0, tx);
 		if (error == ENOTSUP)
 			error = EBUSY;
 		dmu_tx_commit(tx);

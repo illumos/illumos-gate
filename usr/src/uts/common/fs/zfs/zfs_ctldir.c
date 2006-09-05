@@ -513,7 +513,7 @@ zfsctl_snapdir_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 	err = zfsctl_snapshot_zname(sdvp, snm, MAXNAMELEN, from);
 	if (err)
 		return (err);
-	err = zfs_secpolicy_write(from, NULL, cr);
+	err = zfs_secpolicy_write(from, cr);
 	if (err)
 		return (err);
 
@@ -558,7 +558,7 @@ zfsctl_snapdir_remove(vnode_t *dvp, char *name, vnode_t *cwd, cred_t *cr)
 	err = zfsctl_snapshot_zname(dvp, name, MAXNAMELEN, snapname);
 	if (err)
 		return (err);
-	err = zfs_secpolicy_write(snapname, NULL, cr);
+	err = zfs_secpolicy_write(snapname, cr);
 	if (err)
 		return (err);
 

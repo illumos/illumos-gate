@@ -2605,7 +2605,8 @@ validate_datasets(zlog_t *zlogp)
 		 * first because we'll get EPERM if it is already set.
 		 */
 		if (!zfs_prop_get_int(zhp, ZFS_PROP_ZONED) &&
-		    zfs_prop_set(zhp, ZFS_PROP_ZONED, "on") != 0) {
+		    zfs_prop_set(zhp, zfs_prop_to_name(ZFS_PROP_ZONED),
+		    "on") != 0) {
 			zerror(zlogp, B_FALSE, "cannot set 'zoned' "
 			    "property for ZFS dataset '%s'\n",
 			    dstab.zone_dataset_name);

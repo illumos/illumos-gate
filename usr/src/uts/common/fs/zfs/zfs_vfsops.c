@@ -1237,5 +1237,5 @@ static vfsdef_t vfw = {
 };
 
 struct modlfs zfs_modlfs = {
-	&mod_fsops, "ZFS filesystem version 1", &vfw
+	&mod_fsops, "ZFS filesystem version " ZFS_VERSION_STRING, &vfw
 };

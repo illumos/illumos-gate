@@ -1796,17 +1796,16 @@ dmu_object_size_from_db(dmu_buf_t *db, uint32_t *blksize, u_longlong_t *nblk512)
  * human-readable format.
  */
 int
-spa_bookmark_name(spa_t *spa, zbookmark_t *zb, char *dsname, size_t dslen,
-    char *objname, size_t objlen, char *range, size_t rangelen)
+spa_bookmark_name(spa_t *spa, zbookmark_t *zb, nvlist_t *nvl)
 {
 	dsl_pool_t *dp;
 	dsl_dataset_t *ds = NULL;
 	objset_t *os = NULL;
 	dnode_t *dn = NULL;
 	int err, shift;
-
-	if (dslen < MAXNAMELEN || objlen < 32 || rangelen < 64)
-		return (ENOSPC);
+	char dsname[MAXNAMELEN];
+	char objname[32];
+	char range[64];
 
 	dp = spa_get_dsl(spa);
 	if (zb->zb_objset != 0) {
@@ -1832,9 +1831,9 @@ spa_bookmark_name(spa_t *spa, zbookmark_t *zb, char *dsname, size_t dslen,
 
 
 	if (zb->zb_object == DMU_META_DNODE_OBJECT) {
-		(void) strncpy(objname, "mdn", objlen);
+		(void) strncpy(objname, "mdn", sizeof (objname));
 	} else {
-		(void) snprintf(objname, objlen, "%lld",
+		(void) snprintf(objname, sizeof (objname), "%lld",
 		    (longlong_t)zb->zb_object);
 	}
 
@@ -1844,9 +1843,14 @@ spa_bookmark_name(spa_t *spa, zbookmark_t *zb, char *dsname, size_t dslen,
 
 	shift = (dn->dn_datablkshift?dn->dn_datablkshift:SPA_MAXBLOCKSHIFT) +
 	    zb->zb_level * (dn->dn_indblkshift - SPA_BLKPTRSHIFT);
-	(void) snprintf(range, rangelen, "%llu-%llu",
+	(void) snprintf(range, sizeof (range), "%llu-%llu",
 	    (u_longlong_t)(zb->zb_blkid << shift),
 	    (u_longlong_t)((zb->zb_blkid+1) << shift));
+
+	if ((err = nvlist_add_string(nvl, ZPOOL_ERR_DATASET, dsname)) != 0 ||
+	    (err = nvlist_add_string(nvl, ZPOOL_ERR_OBJECT, objname)) != 0 ||
+	    (err = nvlist_add_string(nvl, ZPOOL_ERR_RANGE, range)) != 0)
+		goto out;
 
 out:
 	if (dn)

@@ -36,12 +36,13 @@ typedef struct zfs_sort_column {
 	struct zfs_sort_column	*sc_next;
 	struct zfs_sort_column	*sc_last;
 	zfs_prop_t		sc_prop;
+	char			*sc_user_prop;
 	boolean_t		sc_reverse;
 } zfs_sort_column_t;
 
 int zfs_for_each(int, char **, boolean_t, zfs_type_t, zfs_sort_column_t *,
-    zfs_iter_f, void *);
-void zfs_add_sort_column(zfs_sort_column_t **, zfs_prop_t, boolean_t);
+    zfs_proplist_t **, zfs_iter_f, void *);
+int zfs_add_sort_column(zfs_sort_column_t **, const char *, boolean_t);
 void zfs_free_sort_columns(zfs_sort_column_t *);
 
 #ifdef	__cplusplus

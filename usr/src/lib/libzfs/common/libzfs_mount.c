@@ -151,6 +151,40 @@ zfs_is_mounted(zfs_handle_t *zhp, char **where)
 }
 
 /*
+ * Returns true if the given dataset is mountable, false otherwise.  Returns the
+ * mountpoint in 'buf'.
+ */
+static boolean_t
+zfs_is_mountable(zfs_handle_t *zhp, char *buf, size_t buflen,
+    zfs_source_t *source)
+{
+	char sourceloc[ZFS_MAXNAMELEN];
+	zfs_source_t sourcetype;
+
+	if (!zfs_prop_valid_for_type(ZFS_PROP_MOUNTPOINT, zhp->zfs_type))
+		return (B_FALSE);
+
+	verify(zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, buf, buflen,
+	    &sourcetype, sourceloc, sizeof (sourceloc), B_FALSE) == 0);
+
+	if (strcmp(buf, ZFS_MOUNTPOINT_NONE) == 0 ||
+	    strcmp(buf, ZFS_MOUNTPOINT_LEGACY) == 0)
+		return (B_FALSE);
+
+	if (!zfs_prop_get_int(zhp, ZFS_PROP_CANMOUNT))
+		return (B_FALSE);
+
+	if (zfs_prop_get_int(zhp, ZFS_PROP_ZONED) &&
+	    getzoneid() == GLOBAL_ZONEID)
+		return (B_FALSE);
+
+	if (source)
+		*source = sourcetype;
+
+	return (B_TRUE);
+}
+
+/*
  * Mount the given filesystem.
  */
 int
@@ -166,22 +200,7 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 	else
 		(void) strlcpy(mntopts, options, sizeof (mntopts));
 
-	/* ignore non-filesystems */
-	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mountpoint,
-	    sizeof (mountpoint), NULL, NULL, 0, B_FALSE) != 0)
-		return (0);
-
-	/* return success if there is no mountpoint set */
-	if (strcmp(mountpoint, ZFS_MOUNTPOINT_NONE) == 0 ||
-	    strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) == 0)
-		return (0);
-
-	/*
-	 * If the 'zoned' property is set, and we're in the global zone, simply
-	 * return success.
-	 */
-	if (zfs_prop_get_int(zhp, ZFS_PROP_ZONED) &&
-	    getzoneid() == GLOBAL_ZONEID)
+	if (!zfs_is_mountable(zhp, mountpoint, sizeof (mountpoint), NULL))
 		return (0);
 
 	/* Create the directory if it doesn't already exist */
@@ -334,15 +353,7 @@ zfs_share(zfs_handle_t *zhp)
 	FILE *fp;
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
 
-	/* ignore non-filesystems */
-	if (zfs_get_type(zhp) != ZFS_TYPE_FILESYSTEM)
-		return (0);
-
-	/* return success if there is no mountpoint set */
-	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT,
-	    mountpoint, sizeof (mountpoint), NULL, NULL, 0, B_FALSE) != 0 ||
-	    strcmp(mountpoint, ZFS_MOUNTPOINT_NONE) == 0 ||
-	    strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) == 0)
+	if (!zfs_is_mountable(zhp, mountpoint, sizeof (mountpoint), NULL))
 		return (0);
 
 	/* return success if there are no share options */
@@ -352,14 +363,12 @@ zfs_share(zfs_handle_t *zhp)
 		return (0);
 
 	/*
-	 * If the 'zoned' property is set, simply return success since:
-	 * 1. in a global zone, a dataset should not be shared if it's
-	 *    managed in a local zone.
-	 * 2. in a local zone, NFS server is not available.
+	 * If the 'zoned' property is set, then zfs_is_mountable() will have
+	 * already bailed out if we are in the global zone.  But local
+	 * zones cannot be NFS servers, so we ignore it for local zones as well.
 	 */
-	if (zfs_prop_get_int(zhp, ZFS_PROP_ZONED)) {
+	if (zfs_prop_get_int(zhp, ZFS_PROP_ZONED))
 		return (0);
-	}
 
 	/*
 	 * Invoke the share(1M) command.  We always do this, even if it's
@@ -509,28 +518,19 @@ void
 remove_mountpoint(zfs_handle_t *zhp)
 {
 	char mountpoint[ZFS_MAXPROPLEN];
-	char source[ZFS_MAXNAMELEN];
-	zfs_source_t sourcetype;
-	int zoneid = getzoneid();
+	zfs_source_t source;
 
-	/* ignore non-filesystems */
-	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mountpoint,
-	    sizeof (mountpoint), &sourcetype, source, sizeof (source),
-	    B_FALSE) != 0)
+	if (!zfs_is_mountable(zhp, mountpoint, sizeof (mountpoint),
+	    &source))
 		return;
 
-	if (strcmp(mountpoint, ZFS_MOUNTPOINT_NONE) != 0 &&
-	    strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) != 0 &&
-	    (sourcetype == ZFS_SRC_DEFAULT ||
-	    sourcetype == ZFS_SRC_INHERITED) &&
-	    (!zfs_prop_get_int(zhp, ZFS_PROP_ZONED) ||
-	    zoneid != GLOBAL_ZONEID)) {
-
+	if (source == ZFS_SRC_DEFAULT ||
+	    source == ZFS_SRC_INHERITED) {
 		/*
 		 * Try to remove the directory, silently ignoring any errors.
 		 * The filesystem may have since been removed or moved around,
-		 * and this isn't really useful to the administrator in any
-		 * way.
+		 * and this error isn't really useful to the administrator in
+		 * any way.
 		 */
 		(void) rmdir(mountpoint);
 	}
@@ -561,16 +561,15 @@ mount_cb(zfs_handle_t *zhp, void *data)
 	}
 
 	if (cbp->cb_alloc == cbp->cb_used) {
-		zfs_handle_t **datasets;
+		void *ptr;
 
-		if ((datasets = zfs_alloc(zhp->zfs_hdl, cbp->cb_alloc * 2 *
-		    sizeof (void *))) == NULL)
+		if ((ptr = zfs_realloc(zhp->zfs_hdl,
+		    cbp->cb_datasets, cbp->cb_alloc * sizeof (void *),
+		    cbp->cb_alloc * 2 * sizeof (void *))) == NULL)
 			return (-1);
+		cbp->cb_datasets = ptr;
 
-		(void) memcpy(cbp->cb_datasets, datasets,
-		    cbp->cb_alloc * sizeof (void *));
-		free(cbp->cb_datasets);
-		cbp->cb_datasets = datasets;
+		cbp->cb_alloc *= 2;
 	}
 
 	cbp->cb_datasets[cbp->cb_used++] = zhp;
@@ -706,23 +705,19 @@ zpool_unmount_datasets(zpool_handle_t *zhp, boolean_t force)
 
 				alloc = 8;
 			} else {
-				char **dest;
+				void *ptr;
 
-				if ((dest = zfs_alloc(hdl,
+				if ((ptr = zfs_realloc(hdl, mountpoints,
+				    alloc * sizeof (void *),
 				    alloc * 2 * sizeof (void *))) == NULL)
 					goto out;
-				(void) memcpy(dest, mountpoints,
-				    alloc * sizeof (void *));
-				free(mountpoints);
-				mountpoints = dest;
+				mountpoints = ptr;
 
-				if ((dest = zfs_alloc(hdl,
+				if ((ptr = zfs_realloc(hdl, datasets,
+				    alloc * sizeof (void *),
 				    alloc * 2 * sizeof (void *))) == NULL)
 					goto out;
-				(void) memcpy(dest, datasets,
-				    alloc * sizeof (void *));
-				free(datasets);
-				datasets = (zfs_handle_t **)dest;
+				datasets = ptr;
 
 				alloc *= 2;
 			}
@@ -753,8 +748,7 @@ zpool_unmount_datasets(zpool_handle_t *zhp, boolean_t force)
 	 */
 	for (i = 0; i < used; i++) {
 		if (is_shared(hdl, mountpoints[i]) &&
-		    unshare_one(hdl, datasets[i] ? datasets[i]->zfs_name :
-		    mountpoints[i], mountpoints[i]) != 0)
+		    unshare_one(hdl, mountpoints[i], mountpoints[i]) != 0)
 			goto out;
 	}
 
@@ -765,7 +759,9 @@ zpool_unmount_datasets(zpool_handle_t *zhp, boolean_t force)
 	for (i = 0; i < used; i++) {
 		if (unmount_one(hdl, mountpoints[i], flags) != 0)
 			goto out;
+	}
 
+	for (i = 0; i < used; i++) {
 		if (datasets[i])
 			remove_mountpoint(datasets[i]);
 	}

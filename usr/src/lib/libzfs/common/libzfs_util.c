@@ -363,6 +363,24 @@ zfs_alloc(libzfs_handle_t *hdl, size_t size)
 }
 
 /*
+ * A safe form of realloc(), which also zeroes newly allocated space.
+ */
+void *
+zfs_realloc(libzfs_handle_t *hdl, void *ptr, size_t oldsize, size_t newsize)
+{
+	void *ret;
+
+	if ((ret = realloc(ptr, newsize)) == NULL) {
+		(void) no_memory(hdl);
+		free(ptr);
+		return (NULL);
+	}
+
+	bzero((char *)ret + oldsize, (newsize - oldsize));
+	return (ret);
+}
+
+/*
  * A safe form of strdup() which will die if the allocation fails.
  */
 char *
@@ -474,4 +492,86 @@ libzfs_handle_t *
 zfs_get_handle(zfs_handle_t *zhp)
 {
 	return (zhp->zfs_hdl);
+}
+
+/*
+ * Initialize the zc_nvlist_dst member to prepare for receiving an nvlist from
+ * an ioctl().
+ */
+int
+zcmd_alloc_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, size_t len)
+{
+	if (len == 0)
+		len = 1024;
+	zc->zc_nvlist_dst_size = len;
+	if ((zc->zc_nvlist_dst = (uint64_t)(uintptr_t)
+	    zfs_alloc(hdl, zc->zc_nvlist_dst_size)) == NULL)
+		return (-1);
+
+	return (0);
+}
+
+/*
+ * Called when an ioctl() which returns an nvlist fails with ENOMEM.  This will
+ * expand the nvlist to the size specified in 'zc_nvlist_dst_size', which was
+ * filled in by the kernel to indicate the actual required size.
+ */
+int
+zcmd_expand_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc)
+{
+	free((void *)(uintptr_t)zc->zc_nvlist_dst);
+	if ((zc->zc_nvlist_dst = (uint64_t)(uintptr_t)
+	    zfs_alloc(hdl, zc->zc_nvlist_dst_size))
+	    == NULL)
+		return (-1);
+
+	return (0);
+}
+
+/*
+ * Called to free the destination nvlist stored in the command structure.  This
+ * is only needed if the caller must abort abnormally.  The various other
+ * zcmd_*() routines will free it on failure (or on success, for
+ * zcmd_read_nvlist).
+ */
+void
+zcmd_free_nvlists(zfs_cmd_t *zc)
+{
+	free((void *)(uintptr_t)zc->zc_nvlist_src);
+	free((void *)(uintptr_t)zc->zc_nvlist_dst);
+}
+
+int
+zcmd_write_src_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t *nvl,
+    size_t *size)
+{
+	char *packed;
+	size_t len;
+
+	verify(nvlist_size(nvl, &len, NV_ENCODE_NATIVE) == 0);
+
+	if ((packed = zfs_alloc(hdl, len)) == NULL)
+		return (-1);
+
+	verify(nvlist_pack(nvl, &packed, &len, NV_ENCODE_NATIVE, 0) == 0);
+
+	zc->zc_nvlist_src = (uint64_t)(uintptr_t)packed;
+	zc->zc_nvlist_src_size = len;
+
+	if (size)
+		*size = len;
+	return (0);
+}
+
+/*
+ * Unpacks an nvlist from the ZFS ioctl command structure.
+ */
+int
+zcmd_read_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t **nvlp)
+{
+	if (nvlist_unpack((void *)(uintptr_t)zc->zc_nvlist_dst,
+	    zc->zc_nvlist_dst_size, nvlp, 0) != 0)
+		return (no_memory(hdl));
+
+	return (0);
 }

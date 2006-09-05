@@ -31,6 +31,7 @@
 #include <sys/cred.h>
 #include <sys/dmu.h>
 #include <sys/zio.h>
+#include <sys/zvol.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -115,28 +116,28 @@ typedef struct zinject_record {
 
 typedef struct zfs_cmd {
 	char		zc_name[MAXPATHLEN];
-	char		zc_prop_name[MAXNAMELEN];
-	char		zc_prop_value[MAXPATHLEN];
-	char		zc_root[MAXPATHLEN];
-	char		zc_filename[MAXNAMELEN];
-	uint32_t	zc_intsz;
-	uint32_t	zc_numints;
+	char		zc_value[MAXPATHLEN];
 	uint64_t	zc_guid;
-	uint64_t	zc_config_src;	/* really (char *) */
-	uint64_t	zc_config_src_size;
-	uint64_t	zc_config_dst;	/* really (char *) */
-	uint64_t	zc_config_dst_size;
+	uint64_t	zc_nvlist_src;	/* really (char *) */
+	uint64_t	zc_nvlist_src_size;
+	uint64_t	zc_nvlist_dst;	/* really (char *) */
+	uint64_t	zc_nvlist_dst_size;
 	uint64_t	zc_cookie;
 	uint64_t	zc_cred;
 	uint64_t	zc_dev;
-	uint64_t	zc_volsize;
-	uint64_t	zc_volblocksize;
 	uint64_t	zc_objset_type;
 	dmu_objset_stats_t zc_objset_stats;
+	zvol_stats_t	zc_vol_stats;
 	struct drr_begin zc_begin_record;
 	zinject_record_t zc_inject_record;
 	zbookmark_t	zc_bookmark;
 } zfs_cmd_t;
+
+typedef struct zfs_create_data {
+	cred_t		*zc_cred;
+	dev_t		zc_dev;
+	nvlist_t	*zc_props;
+} zfs_create_data_t;
 
 #define	ZVOL_MAX_MINOR	(1 << 16)
 #define	ZFS_MIN_MINOR	(ZVOL_MAX_MINOR + 1)
@@ -145,29 +146,8 @@ typedef struct zfs_cmd {
 
 extern dev_info_t *zfs_dip;
 
-extern int zfs_secpolicy_write(const char *dataset, const char *, cred_t *cr);
+extern int zfs_secpolicy_write(const char *dataset, cred_t *cr);
 extern int zfs_busy(void);
-
-extern int zvol_check_volsize(zfs_cmd_t *zc, uint64_t blocksize);
-extern int zvol_check_volblocksize(zfs_cmd_t *zc);
-extern int zvol_get_stats(zfs_cmd_t *zc, objset_t *os);
-extern void zvol_create_cb(objset_t *os, void *arg, dmu_tx_t *tx);
-extern int zvol_create_minor(zfs_cmd_t *zc);
-extern int zvol_remove_minor(zfs_cmd_t *zc);
-extern int zvol_set_volsize(zfs_cmd_t *zc);
-extern int zvol_set_volblocksize(zfs_cmd_t *zc);
-extern int zvol_open(dev_t *devp, int flag, int otyp, cred_t *cr);
-extern int zvol_close(dev_t dev, int flag, int otyp, cred_t *cr);
-extern int zvol_strategy(buf_t *bp);
-extern int zvol_read(dev_t dev, uio_t *uiop, cred_t *cr);
-extern int zvol_write(dev_t dev, uio_t *uiop, cred_t *cr);
-extern int zvol_aread(dev_t dev, struct aio_req *aio, cred_t *cr);
-extern int zvol_awrite(dev_t dev, struct aio_req *aio, cred_t *cr);
-extern int zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr,
-    int *rvalp);
-extern int zvol_busy(void);
-extern void zvol_init(void);
-extern void zvol_fini(void);
 
 #endif	/* _KERNEL */
 

@@ -59,6 +59,7 @@ typedef struct callback_data {
 	int		cb_recurse;
 	zfs_type_t	cb_types;
 	zfs_sort_column_t *cb_sortcol;
+	zfs_proplist_t	**cb_proplist;
 } callback_data_t;
 
 uu_avl_pool_t *avl_pool;
@@ -84,6 +85,11 @@ zfs_callback(zfs_handle_t *zhp, void *data)
 		uu_avl_node_init(node, &node->zn_avlnode, avl_pool);
 		if (uu_avl_find(cb->cb_avl, node, cb->cb_sortcol,
 		    &idx) == NULL) {
+			if (cb->cb_proplist &&
+			    zfs_expand_proplist(zhp, cb->cb_proplist) != 0) {
+				free(node);
+				return (-1);
+			}
 			uu_avl_insert(cb->cb_avl, node, idx);
 			dontclose = 1;
 		} else {
@@ -105,17 +111,25 @@ zfs_callback(zfs_handle_t *zhp, void *data)
 	return (0);
 }
 
-void
-zfs_add_sort_column(zfs_sort_column_t **sc, zfs_prop_t prop,
+int
+zfs_add_sort_column(zfs_sort_column_t **sc, const char *name,
     boolean_t reverse)
 {
 	zfs_sort_column_t *col;
+	zfs_prop_t prop;
+
+	if ((prop = zfs_name_to_prop(name)) == ZFS_PROP_INVAL &&
+	    !zfs_prop_user(name))
+		return (-1);
 
 	col = safe_malloc(sizeof (zfs_sort_column_t));
 
 	col->sc_prop = prop;
 	col->sc_reverse = reverse;
-	col->sc_next = NULL;
+	if (prop == ZFS_PROP_INVAL) {
+		col->sc_user_prop = safe_malloc(strlen(name) + 1);
+		(void) strcpy(col->sc_user_prop, name);
+	}
 
 	if (*sc == NULL) {
 		col->sc_last = col;
@@ -124,6 +138,8 @@ zfs_add_sort_column(zfs_sort_column_t **sc, zfs_prop_t prop,
 		(*sc)->sc_last->sc_next = col;
 		(*sc)->sc_last = col;
 	}
+
+	return (0);
 }
 
 void
@@ -133,6 +149,7 @@ zfs_free_sort_columns(zfs_sort_column_t *sc)
 
 	while (sc != NULL) {
 		col = sc->sc_next;
+		free(sc->sc_user_prop);
 		free(sc);
 		sc = col;
 	}
@@ -214,48 +231,72 @@ zfs_sort(const void *larg, const void *rarg, void *data)
 	zfs_sort_column_t *psc;
 
 	for (psc = sc; psc != NULL; psc = psc->sc_next) {
-		char lstr[ZFS_MAXPROPLEN], rstr[ZFS_MAXPROPLEN];
+		char lbuf[ZFS_MAXPROPLEN], rbuf[ZFS_MAXPROPLEN];
+		char *lstr, *rstr;
 		uint64_t lnum, rnum;
-		int lvalid, rvalid;
+		boolean_t lvalid, rvalid;
 		int ret = 0;
 
-		if (zfs_prop_is_string(psc->sc_prop)) {
-			lvalid = zfs_prop_get(l, psc->sc_prop, lstr,
-			    sizeof (lstr), NULL, NULL, 0, B_TRUE);
-			rvalid = zfs_prop_get(r, psc->sc_prop, rstr,
-			    sizeof (rstr), NULL, NULL, 0, B_TRUE);
+		/*
+		 * We group the checks below the generic code.  If 'lstr' and
+		 * 'rstr' are non-NULL, then we do a string based comparison.
+		 * Otherwise, we compare 'lnum' and 'rnum'.
+		 */
+		lstr = rstr = NULL;
+		if (psc->sc_prop == ZFS_PROP_INVAL) {
+			nvlist_t *luser, *ruser;
+			nvlist_t *lval, *rval;
 
-			if ((lvalid == -1) && (rvalid == -1))
-				continue;
-			if (lvalid == -1)
-				return (1);
-			else if (rvalid == -1)
-				return (-1);
+			luser = zfs_get_user_props(l);
+			ruser = zfs_get_user_props(r);
 
-			ret = strcmp(lstr, rstr);
+			lvalid = (nvlist_lookup_nvlist(luser,
+			    psc->sc_user_prop, &lval) == 0);
+			rvalid = (nvlist_lookup_nvlist(ruser,
+			    psc->sc_user_prop, &rval) == 0);
+
+			if (lvalid)
+				verify(nvlist_lookup_string(lval,
+				    ZFS_PROP_VALUE, &lstr) == 0);
+			if (rvalid)
+				verify(nvlist_lookup_string(rval,
+				    ZFS_PROP_VALUE, &rstr) == 0);
+
+		} else if (zfs_prop_is_string(psc->sc_prop)) {
+			lvalid = (zfs_prop_get(l, psc->sc_prop, lbuf,
+			    sizeof (lbuf), NULL, NULL, 0, B_TRUE) == 0);
+			rvalid = (zfs_prop_get(r, psc->sc_prop, rbuf,
+			    sizeof (rbuf), NULL, NULL, 0, B_TRUE) == 0);
+
+			lstr = lbuf;
+			rstr = rbuf;
 		} else {
 			lvalid = zfs_prop_valid_for_type(psc->sc_prop,
 			    zfs_get_type(l));
 			rvalid = zfs_prop_valid_for_type(psc->sc_prop,
 			    zfs_get_type(r));
 
-			if (!lvalid && !rvalid)
-				continue;
-			else if (!lvalid)
-				return (1);
-			else if (!rvalid)
-				return (-1);
-
-			(void) zfs_prop_get_numeric(l, psc->sc_prop, &lnum,
-			    NULL, NULL, 0);
-			(void) zfs_prop_get_numeric(r, psc->sc_prop, &rnum,
-			    NULL, NULL, 0);
-
-			if (lnum < rnum)
-				ret = -1;
-			else if (lnum > rnum)
-				ret = 1;
+			if (lvalid)
+				(void) zfs_prop_get_numeric(l, psc->sc_prop,
+				    &lnum, NULL, NULL, 0);
+			if (rvalid)
+				(void) zfs_prop_get_numeric(r, psc->sc_prop,
+				    &rnum, NULL, NULL, 0);
 		}
+
+		if (!lvalid && !rvalid)
+			continue;
+		else if (!lvalid)
+			return (1);
+		else if (!rvalid)
+			return (-1);
+
+		if (lstr)
+			ret = strcmp(lstr, rstr);
+		if (lnum < rnum)
+			ret = -1;
+		else if (lnum > rnum)
+			ret = 1;
 
 		if (ret != 0) {
 			if (psc->sc_reverse == B_TRUE)
@@ -269,7 +310,8 @@ zfs_sort(const void *larg, const void *rarg, void *data)
 
 int
 zfs_for_each(int argc, char **argv, boolean_t recurse, zfs_type_t types,
-    zfs_sort_column_t *sortcol, zfs_iter_f callback, void *data)
+    zfs_sort_column_t *sortcol, zfs_proplist_t **proplist, zfs_iter_f callback,
+    void *data)
 {
 	callback_data_t cb;
 	int ret = 0;
@@ -287,6 +329,7 @@ zfs_for_each(int argc, char **argv, boolean_t recurse, zfs_type_t types,
 
 	cb.cb_sortcol = sortcol;
 	cb.cb_recurse = recurse;
+	cb.cb_proplist = proplist;
 	cb.cb_types = types;
 	if ((cb.cb_avl = uu_avl_create(avl_pool, NULL, UU_DEFAULT)) == NULL) {
 		(void) fprintf(stderr,

@@ -107,7 +107,7 @@ changelist_prefix(prop_changelist_t *clp)
 		 * If we have a volume and this was a rename, remove the
 		 * /dev/zvol links
 		 */
-		if (cn->cn_handle->zfs_volblocksize &&
+		if (ZFS_IS_VOLUME(cn->cn_handle) &&
 		    clp->cl_realprop == ZFS_PROP_NAME) {
 			if (zvol_remove_link(cn->cn_handle->zfs_hdl,
 			    cn->cn_handle->zfs_name) != 0)
@@ -166,7 +166,7 @@ changelist_postfix(prop_changelist_t *clp)
 		 * If this is a volume and we're doing a rename, recreate the
 		 * /dev/zvol links.
 		 */
-		if (cn->cn_handle->zfs_volblocksize &&
+		if (ZFS_IS_VOLUME(cn->cn_handle) &&
 		    clp->cl_realprop == ZFS_PROP_NAME) {
 			if (zvol_create_link(cn->cn_handle->zfs_hdl,
 			    cn->cn_handle->zfs_name) != 0)
@@ -358,7 +358,7 @@ change_one(zfs_handle_t *zhp, void *data)
 	 * rename, then always add it to the changelist.
 	 */
 
-	if (!(zhp->zfs_volblocksize && clp->cl_realprop == ZFS_PROP_NAME) &&
+	if (!(ZFS_IS_VOLUME(zhp) && clp->cl_realprop == ZFS_PROP_NAME) &&
 	    zfs_prop_get(zhp, clp->cl_prop, property,
 	    sizeof (property), &sourcetype, where, sizeof (where),
 	    B_FALSE) != 0) {
@@ -508,6 +508,8 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	} else if (prop == ZFS_PROP_ZONED) {
 		clp->cl_prop = ZFS_PROP_MOUNTPOINT;
 		clp->cl_allchildren = B_TRUE;
+	} else if (prop == ZFS_PROP_CANMOUNT) {
+		clp->cl_prop = ZFS_PROP_MOUNTPOINT;
 	} else {
 		clp->cl_prop = prop;
 	}

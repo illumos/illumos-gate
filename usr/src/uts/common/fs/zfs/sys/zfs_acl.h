@@ -77,11 +77,11 @@ typedef struct zfs_acl {
  * whereas acl_inherit has secure instead of groupmask.
  */
 
-#define	DISCARD		0
-#define	NOALLOW		1
-#define	GROUPMASK	2
-#define	PASSTHROUGH	3
-#define	SECURE		4
+#define	ZFS_ACL_DISCARD		0
+#define	ZFS_ACL_NOALLOW		1
+#define	ZFS_ACL_GROUPMASK	2
+#define	ZFS_ACL_PASSTHROUGH	3
+#define	ZFS_ACL_SECURE		4
 
 struct znode;
 

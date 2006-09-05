@@ -38,8 +38,11 @@ SUNWprivate_1.1 {
 	zfs_create;
 	zfs_destroy;
 	zfs_destroy_snaps;
+	zfs_expand_proplist;
+	zfs_free_proplist;
 	zfs_get_handle;
 	zfs_get_name;
+	zfs_get_user_props;
 	zfs_get_proplist;
 	zfs_get_type;
 	zfs_is_mounted;
@@ -56,7 +59,7 @@ SUNWprivate_1.1 {
 	zfs_nicestrtonum;
 	zfs_open;
 	zfs_promote;
-	zfs_prop_column_format;
+	zfs_prop_align_right;
 	zfs_prop_column_name;
 	zfs_prop_default_numeric;
 	zfs_prop_default_string;
@@ -69,9 +72,10 @@ SUNWprivate_1.1 {
 	zfs_prop_readonly;
 	zfs_prop_set;
 	zfs_prop_to_name;
-	zfs_prop_validate;
+	zfs_prop_user;
 	zfs_prop_valid_for_type;
 	zfs_prop_values;
+	zfs_prop_width;
 	zfs_receive;
 	zfs_refresh_properties;
 	zfs_rename;

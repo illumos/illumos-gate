@@ -60,13 +60,19 @@ struct zfs_handle {
 	char zfs_name[ZFS_MAXNAMELEN];
 	zfs_type_t zfs_type;
 	dmu_objset_stats_t zfs_dmustats;
+	zvol_stats_t zfs_volstats;
 	nvlist_t *zfs_props;
-	uint64_t zfs_volsize;
-	uint64_t zfs_volblocksize;
+	nvlist_t *zfs_user_props;
 	boolean_t zfs_mntcheck;
 	char *zfs_mntopts;
 	char zfs_root[MAXPATHLEN];
 };
+
+/*
+ * This is different from checking zfs_type, because it will also catch
+ * snapshots of volumes.
+ */
+#define	ZFS_IS_VOLUME(zhp) ((zhp)->zfs_volstats.zv_volblocksize != 0)
 
 struct zpool_handle {
 	libzfs_handle_t *zpool_hdl;
@@ -82,6 +88,7 @@ struct zpool_handle {
 int zfs_error(libzfs_handle_t *, int, const char *, ...);
 void zfs_error_aux(libzfs_handle_t *, const char *, ...);
 void *zfs_alloc(libzfs_handle_t *, size_t);
+void *zfs_realloc(libzfs_handle_t *, void *, size_t, size_t);
 char *zfs_strdup(libzfs_handle_t *, const char *);
 int no_memory(libzfs_handle_t *);
 
@@ -92,6 +99,12 @@ int get_dependents(libzfs_handle_t *, boolean_t, const char *, char ***,
     size_t *);
 
 typedef struct prop_changelist prop_changelist_t;
+
+int zcmd_alloc_dst_nvlist(libzfs_handle_t *, zfs_cmd_t *, size_t);
+int zcmd_write_src_nvlist(libzfs_handle_t *, zfs_cmd_t *, nvlist_t *, size_t *);
+int zcmd_expand_dst_nvlist(libzfs_handle_t *, zfs_cmd_t *);
+int zcmd_read_dst_nvlist(libzfs_handle_t *, zfs_cmd_t *, nvlist_t **);
+void zcmd_free_nvlists(zfs_cmd_t *);
 
 int changelist_prefix(prop_changelist_t *);
 int changelist_postfix(prop_changelist_t *);

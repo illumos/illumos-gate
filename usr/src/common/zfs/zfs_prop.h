@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +47,9 @@ typedef enum {
 } zfs_proptype_t;
 
 zfs_proptype_t zfs_prop_get_type(zfs_prop_t);
+int zfs_prop_string_to_index(zfs_prop_t, const char *, uint64_t *);
+int zfs_prop_index_to_string(zfs_prop_t, uint64_t, const char **);
+size_t zfs_prop_width(zfs_prop_t, boolean_t *);
 
 #ifdef	__cplusplus
 }

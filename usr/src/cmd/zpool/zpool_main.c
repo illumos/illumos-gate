@@ -291,6 +291,14 @@ usage(boolean_t requested)
 		}
 	}
 
+	/*
+	 * See comments at end of main().
+	 */
+	if (getenv("ZFS_ABORT") != NULL) {
+		(void) printf("dumping core by request\n");
+		abort();
+	}
+
 	exit(requested ? 0 : 2);
 }
 
@@ -572,7 +580,7 @@ zpool_do_create(int argc, char **argv)
 
 	if (altroot != NULL && altroot[0] != '/') {
 		(void) fprintf(stderr, gettext("invalid alternate root '%s': "
-		    "must be an absolute path\n"));
+		    "must be an absolute path\n"), altroot);
 		nvlist_free(nvroot);
 		return (1);
 	}
@@ -651,7 +659,8 @@ zpool_do_create(int argc, char **argv)
 			if (pool != NULL) {
 				if (mountpoint != NULL)
 					verify(zfs_prop_set(pool,
-					    ZFS_PROP_MOUNTPOINT,
+					    zfs_prop_to_name(
+					    ZFS_PROP_MOUNTPOINT),
 					    mountpoint) == 0);
 				if (zfs_mount(pool, NULL, 0) == 0)
 					ret = zfs_share(pool);
@@ -2362,6 +2371,7 @@ zpool_do_scrub(int argc, char **argv)
 
 typedef struct status_cbdata {
 	int		cb_count;
+	boolean_t	cb_allpools;
 	boolean_t	cb_verbose;
 	boolean_t	cb_explain;
 	boolean_t	cb_first;
@@ -2685,8 +2695,15 @@ status_callback(zpool_handle_t *zhp, void *data)
 	 * If we were given 'zpool status -x', only report those pools with
 	 * problems.
 	 */
-	if (reason == ZPOOL_STATUS_OK && cbp->cb_explain)
+	if (reason == ZPOOL_STATUS_OK && cbp->cb_explain) {
+		if (!cbp->cb_allpools) {
+			(void) printf(gettext("pool '%s' is healthy\n"),
+			    zpool_get_name(zhp));
+			if (cbp->cb_first)
+				cbp->cb_first = B_FALSE;
+		}
 		return (0);
+	}
 
 	if (cbp->cb_first)
 		cbp->cb_first = B_FALSE;
@@ -2852,8 +2869,8 @@ status_callback(zpool_handle_t *zhp, void *data)
 				(void) printf(gettext("errors: No known data "
 				    "errors\n"));
 			else if (!cbp->cb_verbose)
-				(void) printf(gettext("errors: %d data errors, "
-				    "use '-v' for a list\n"), nerr);
+				(void) printf(gettext("errors: %llu data "
+				    "errors, use '-v' for a list\n"), nerr);
 			else
 				print_error_log(zhp);
 		}
@@ -2901,20 +2918,15 @@ zpool_do_status(int argc, char **argv)
 
 	cb.cb_first = B_TRUE;
 
+	if (argc == 0)
+		cb.cb_allpools = B_TRUE;
+
 	ret = for_each_pool(argc, argv, B_TRUE, status_callback, &cb);
 
 	if (argc == 0 && cb.cb_count == 0)
 		(void) printf(gettext("no pools available\n"));
-	else if (cb.cb_explain && cb.cb_first) {
-		if (argc == 0) {
-			(void) printf(gettext("all pools are healthy\n"));
-		} else {
-			int i;
-			for (i = 0; i < argc; i++)
-				(void) printf(gettext("pool '%s' is healthy\n"),
-				    argv[i]);
-		}
-	}
+	else if (cb.cb_explain && cb.cb_first && cb.cb_allpools)
+		(void) printf(gettext("all pools are healthy\n"));
 
 	return (ret);
 }

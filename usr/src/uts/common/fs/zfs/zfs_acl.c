@@ -788,7 +788,7 @@ zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp,
 		}
 
 
-		if (zfsvfs->z_acl_mode == DISCARD) {
+		if (zfsvfs->z_acl_mode == ZFS_ACL_DISCARD) {
 			zfs_ace_remove(aclp, i);
 			continue;
 		}
@@ -820,7 +820,7 @@ zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp,
 				 * This is only applicable when the acl_mode
 				 * property == groupmask.
 				 */
-				if (zfsvfs->z_acl_mode == GROUPMASK) {
+				if (zfsvfs->z_acl_mode == ZFS_ACL_GROUPMASK) {
 
 					reuse_deny = zfs_reuse_deny(acep, i);
 
@@ -902,7 +902,7 @@ zfs_acl_chmod_setattr(znode_t *zp, uint64_t mode, dmu_tx_t *tx)
 static void
 zfs_securemode_update(zfsvfs_t *zfsvfs, ace_t *acep)
 {
-	if ((zfsvfs->z_acl_inherit == SECURE) &&
+	if ((zfsvfs->z_acl_inherit == ZFS_ACL_SECURE) &&
 	    (acep->a_type == ALLOW))
 		acep->a_access_mask &= ~SECURE_CLEAR;
 }
@@ -924,10 +924,10 @@ zfs_acl_inherit(znode_t *zp, zfs_acl_t *paclp)
 	i = j = 0;
 	pace_cnt = paclp->z_acl_count;
 	pacep = paclp->z_acl;
-	if (zfsvfs->z_acl_inherit != DISCARD) {
+	if (zfsvfs->z_acl_inherit != ZFS_ACL_DISCARD) {
 		for (i = 0; i != pace_cnt; i++) {
 
-			if (zfsvfs->z_acl_inherit == NOALLOW &&
+			if (zfsvfs->z_acl_inherit == ZFS_ACL_NOALLOW &&
 			    pacep[i].a_type == ALLOW)
 				continue;
 
@@ -941,12 +941,12 @@ zfs_acl_inherit(znode_t *zp, zfs_acl_t *paclp)
 	}
 
 	aclp = zfs_acl_alloc(ace_cnt + OGE_PAD);
-	if (ace_cnt && zfsvfs->z_acl_inherit != DISCARD) {
+	if (ace_cnt && zfsvfs->z_acl_inherit != ZFS_ACL_DISCARD) {
 		acep = aclp->z_acl;
 		pacep = paclp->z_acl;
 		for (i = 0; i != pace_cnt; i++) {
 
-			if (zfsvfs->z_acl_inherit == NOALLOW &&
+			if (zfsvfs->z_acl_inherit == ZFS_ACL_NOALLOW &&
 			    pacep[i].a_type == ALLOW)
 				continue;
 
