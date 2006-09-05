@@ -38,18 +38,14 @@ my $cmdname = basename($0);
 my $using_scengen = 0;	# 1 if using scenario simulator
 my $debug = 0;
 
-my $min_sleeptime = 1;
-my $max_sleeptime = 15;
+my $normal_sleeptime = 10;		# time to sleep between samples
+my $idle_sleeptime = 45;		# time to sleep when idle
 my $onecpu_sleeptime = (60 * 15);	# used if only 1 CPU on system
-my $sleeptime = $min_sleeptime;	# time to sleep between kstat updates
+my $sleeptime = $normal_sleeptime;	# either normal_ or idle_ or onecpu_
 
-# For timerange_foo variables, see comments at tail of &getstat()
+my $idle_intrload = .1;			# idle if interrupt load < 10%
 
 my $timerange_toohi    = .01;
-my $timerange_hithresh = .0003;
-my $timerange_lothresh = $timerange_hithresh / 2;
-my $unsafe_timerange   = .02;
-
 my $statslen = 60;	# time period (in secs) to keep in @deltas
 
 
@@ -262,14 +258,7 @@ sub getstat($)
 	# created from these kstats will contain self-consistent data,
 	# in that all CPUs and interrupts cover a similar span of time.
 	#
-	# We attempt to keep this timerange between $timerange_lothresh and
-	# $timerange_hithresh. If the timerange gets too large, not only are
-	# there the accuracy concerns above, but it means that intrd is using
-	# a lot of CPU time. If the timerange gets too small, that means our
-	# sleep time is large, and we could fail to react quickly enough to a
-	# sudden change.
-	#
-	# Finally, $timerange_toohi is the upper bound. Any timerange above
+	# $timerange_toohi is the upper bound. Any timerange above
 	# this is thrown out as garbage. If the stat is safely within this
 	# bound, we treat the stat as representing an instant in time, rather
 	# than the time range it actually spans. We arbitrarily choose minsnap
@@ -277,15 +266,6 @@ sub getstat($)
 
 	$stat{snaptime} = $minsnap;
 	my $timerange = ($maxsnap - $minsnap) / $sleeptime;
-	if ($sleeptime == $onecpu_sleeptime) {
-		$sleeptime = $min_sleeptime; # time to come out of idling
-	} elsif ($timerange > $timerange_hithresh &&
-	    $sleeptime < $max_sleeptime) {
-		$sleeptime++;
-	} elsif ($timerange < $timerange_lothresh &&
-	    $sleeptime > $min_sleeptime) {
-		$sleeptime--;
-	}
 	return (0) if ($timerange > $timerange_toohi);	# i.e. failure
 	return (\%stat);
 }
@@ -300,7 +280,7 @@ sub getstat($)
 # {"avgintrnsec"}       avg number of nsec spent in interrupts, per cpu
 # {<cpuid>}             iterates over on-line cpus
 #  ->{"intrs"}          cpu's movable intr time (sum of "time" for each ivec)
-#  ->{"tot"}            CPU load from all sources
+#  ->{"tot"}            CPU load from all sources in nsec
 #  ->{"bigintr"}        largest value of {ivecs}{<ivec#>}{time} from below
 #  ->{"intrload"}       intrs / tot
 #  ->{"ivecs"}          
@@ -503,6 +483,7 @@ sub compress_deltas ($)
 	my %newdelta = ();
 	my ($intrs, $tot);
 	my $cpus = 0;
+	my ($high_intrload) = 0;
 
 	if (VERIFY($#$deltas != -1,
 		   "compress_deltas: list of delta is empty?")) {
@@ -551,6 +532,9 @@ sub compress_deltas ($)
 		}
 		$cpu->{bigintr} = $bigintr;
 		$cpu->{intrload} = $cpu->{intrs} / $cpu->{tot};
+		if ($high_intrload < $cpu->{intrload}) {
+			$high_intrload = $cpu->{intrload};
+		}
 		$cpu->{tot} = 1 if $cpu->{tot} <= 0;
 	}
 	if ($cpus == 0) {
@@ -560,6 +544,8 @@ sub compress_deltas ($)
 		$newdelta{avgintrnsec} = $intrs / $cpus;
 		$newdelta{avgintrload} = $intrs / $tot;
 	}
+	$sleeptime = ($high_intrload < $idle_intrload) ? $idle_sleeptime :
+	    $normal_sleeptime;
 	return (\%newdelta);
 }
 
