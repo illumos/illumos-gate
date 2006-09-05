@@ -26,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "sys/bge_impl2.h"
+#include "bge_impl.h"
 
 
 #define	BGE_DBG		BGE_DBG_NDD	/* debug flag for this code	*/

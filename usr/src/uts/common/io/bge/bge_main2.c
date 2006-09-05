@@ -26,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "sys/bge_impl2.h"
+#include "bge_impl.h"
 #include <sys/sdt.h>
 
 /*
@@ -1128,6 +1128,8 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	case BGE_MII_WRITE:
 	case BGE_SEE_READ:
 	case BGE_SEE_WRITE:
+	case BGE_FLASH_READ:
+	case BGE_FLASH_WRITE:
 	case BGE_DIAG:
 	case BGE_PEEK:
 	case BGE_POKE:
@@ -1184,6 +1186,8 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	case BGE_MII_WRITE:
 	case BGE_SEE_READ:
 	case BGE_SEE_WRITE:
+	case BGE_FLASH_READ:
+	case BGE_FLASH_WRITE:
 	case BGE_DIAG:
 	case BGE_PEEK:
 	case BGE_POKE:
@@ -1222,7 +1226,7 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 			status = IOC_INVAL;
 		}
 #ifdef BGE_IPMI_ASF
-		if (bge_chip_sync(bgep, B_FALSE) == DDI_FAILURE) {
+		if (bge_chip_sync(bgep, B_TRUE) == DDI_FAILURE) {
 #else
 		if (bge_chip_sync(bgep) == DDI_FAILURE) {
 #endif
@@ -2501,16 +2505,16 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		goto attach_fail;
 	}
 
-	bge_log(bgep, "ddi_intr_get_supported_types() returned: %x",
-	    intr_types);
+	BGE_DEBUG(("%s: ddi_intr_get_supported_types() returned: %x",
+		bgep->ifname, intr_types));
 
 	if ((intr_types & DDI_INTR_TYPE_MSI) && bgep->chipid.msi_enabled) {
 		if (bge_add_intrs(bgep, DDI_INTR_TYPE_MSI) != DDI_SUCCESS) {
 			bge_error(bgep, "MSI registration failed, "
 			    "trying FIXED interrupt type\n");
 		} else {
-			bge_log(bgep, "Using MSI interrupt type\n");
-
+			BGE_DEBUG(("%s: Using MSI interrupt type",
+				bgep->ifname));
 			bgep->intr_type = DDI_INTR_TYPE_MSI;
 			bgep->progress |= PROGRESS_HWINT;
 		}
@@ -2524,7 +2528,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 			goto attach_fail;
 		}
 
-		bge_log(bgep, "Using FIXED interrupt type\n");
+		BGE_DEBUG(("%s: Using FIXED interrupt type", bgep->ifname));
 
 		bgep->intr_type = DDI_INTR_TYPE_FIXED;
 		bgep->progress |= PROGRESS_HWINT;
@@ -2582,6 +2586,12 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		mutex_exit(bgep->genlock);
 		goto attach_fail;
 	}
+
+#ifdef BGE_IPMI_ASF
+	if (bgep->asf_enabled) {
+		bgep->asf_status = ASF_STAT_RUN_INIT;
+	}
+#endif
 
 	bzero(bgep->mcast_hash, sizeof (bgep->mcast_hash));
 	bzero(bgep->mcast_refs, sizeof (bgep->mcast_refs));
@@ -2669,7 +2679,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 attach_fail:
 #ifdef BGE_IPMI_ASF
-	bge_unattach(bgep, ASF_MODE_NONE);
+	bge_unattach(bgep, ASF_MODE_SHUTDOWN);
 #else
 	bge_unattach(bgep);
 #endif
@@ -2739,10 +2749,13 @@ bge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 
 #ifdef BGE_IPMI_ASF
 	mutex_enter(bgep->genlock);
-	if (bgep->asf_enabled && (bgep->asf_status == ASF_STAT_RUN)) {
+	if (bgep->asf_enabled && ((bgep->asf_status == ASF_STAT_RUN) ||
+		(bgep->asf_status == ASF_STAT_RUN_INIT))) {
 
 		bge_asf_update_status(bgep);
-		bge_asf_stop_timer(bgep);
+		if (bgep->asf_status == ASF_STAT_RUN) {
+			bge_asf_stop_timer(bgep);
+		}
 		bgep->asf_status = ASF_STAT_STOP;
 
 		bge_asf_pre_reset_operations(bgep, BGE_SHUTDOWN_RESET);
@@ -2854,7 +2867,7 @@ bge_add_intrs(bge_t *bgep, int	intr_type)
 	int		avail, actual, intr_size, count = 0;
 	int		i, flag, ret;
 
-	bge_log(bgep, "bge_add_intrs: interrupt type 0x%x\n", intr_type);
+	BGE_DEBUG(("bge_add_intrs($%p, 0x%x)", (void *)bgep, intr_type));
 
 	/* Get number of interrupts */
 	ret = ddi_intr_get_nintrs(dip, intr_type, &count);
@@ -2875,8 +2888,8 @@ bge_add_intrs(bge_t *bgep, int	intr_type)
 	}
 
 	if (avail < count) {
-		bge_log(bgep, "nitrs() returned %d, navail returned %d\n",
-		    count, avail);
+		BGE_DEBUG(("%s: nintrs() returned %d, navail returned %d",
+		    bgep->ifname, count, avail));
 	}
 
 	/*
@@ -2906,7 +2919,8 @@ bge_add_intrs(bge_t *bgep, int	intr_type)
 	}
 
 	if (actual < count) {
-		bge_log(bgep, "Requested: %d, Received: %d\n", count, actual);
+		BGE_DEBUG(("%s: Requested: %d, Received: %d",
+			bgep->ifname, count, actual));
 	}
 
 	bgep->intr_cnt = actual;
@@ -2970,7 +2984,7 @@ bge_rem_intrs(bge_t *bgep)
 {
 	int	i;
 
-	bge_log(bgep, "bge_rem_intrs\n");
+	BGE_DEBUG(("bge_rem_intrs($%p)", (void *)bgep));
 
 	/* Call ddi_intr_remove_handler() */
 	for (i = 0; i < bgep->intr_cnt; i++) {

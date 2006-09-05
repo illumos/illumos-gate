@@ -26,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "sys/bge_impl2.h"
+#include "bge_impl.h"
 
 #define	BGE_DBG		BGE_DBG_STATS	/* debug flag for this code	*/
 
@@ -895,9 +895,7 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 	bge_t *bgep = arg;
 	bge_statistics_t *bstp;
 
-	mutex_enter(bgep->genlock);
 	if (bgep->bge_chip_state == BGE_CHIP_FAULT) {
-		mutex_exit(bgep->genlock);
 		return (EINVAL);
 	}
 
@@ -906,7 +904,6 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 	 * bge optical interface.
 	 */
 	if ((bgep->chipid.flags & CHIP_FLAG_SERDES) && ETHER_STAT_ISMII(stat)) {
-		mutex_exit(bgep->genlock);
 		return (ENOTSUP);
 	}
 
@@ -967,10 +964,12 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 			bge_reg_get32(bgep, STAT_ETHER_JABBERS_REG);
 		bgep->stat_val.etherStatsUndersizePkts +=
 			bge_reg_get32(bgep, STAT_ETHER_UNDERSIZE_REG);
+		mutex_enter(bgep->genlock);
 		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
 			ddi_fm_service_impact(bgep->devinfo,
 			    DDI_SERVICE_UNAFFECTED);
 		}
+		mutex_exit(bgep->genlock);
 	}
 
 	switch (stat) {
@@ -1162,6 +1161,7 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_XCVR_ID:
+		mutex_enter(bgep->genlock);
 		*val = bge_mii_get16(bgep, MII_PHYIDH);
 		*val <<= 16;
 		*val |= bge_mii_get16(bgep, MII_PHYIDL);
@@ -1169,6 +1169,7 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 			ddi_fm_service_impact(bgep->devinfo,
 			    DDI_SERVICE_UNAFFECTED);
 		}
+		mutex_exit(bgep->genlock);
 		break;
 
 	case ETHER_STAT_XCVR_INUSE:
@@ -1287,7 +1288,7 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = bgep->param_adv_asym_pause &&
 		    bgep->param_lp_asym_pause &&
 		    bgep->param_adv_pause != bgep->param_lp_pause;
-			break;
+		break;
 
 	case ETHER_STAT_LINK_PAUSE:
 		*val = bgep->param_link_rx_pause;
@@ -1302,10 +1303,8 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	default:
-		mutex_exit(bgep->genlock);
 		return (ENOTSUP);
 	}
 
-	mutex_exit(bgep->genlock);
 	return (0);
 }

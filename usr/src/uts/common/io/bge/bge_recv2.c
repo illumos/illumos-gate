@@ -26,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "sys/bge_impl2.h"
+#include "bge_impl.h"
 
 #define	U32TOPTR(x)	((void *)(uintptr_t)(uint32_t)(x))
 #define	PTRTOU32(x)	((uint32_t)(uintptr_t)(void *)(x))

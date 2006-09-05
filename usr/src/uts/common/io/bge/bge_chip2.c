@@ -26,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "sys/bge_impl2.h"
+#include "bge_impl.h"
 
 #define	PIO_ADDR(bgep, offset)	((void *)((caddr_t)(bgep)->io_regs+(offset)))
 
@@ -1830,6 +1830,8 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5789:
 	case DEVICE_ID_5751:
 	case DEVICE_ID_5751M:
+	case DEVICE_ID_5752:
+	case DEVICE_ID_5752M:
 	case DEVICE_ID_5721:
 	case DEVICE_ID_5714C:
 	case DEVICE_ID_5714S:
@@ -2115,6 +2117,24 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5751:
 	case DEVICE_ID_5751M:
 		cidp->chip_label = 5751;
+		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
+		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
+		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
+		cidp->mbuf_base = bge_mbuf_pool_base_5721;
+		cidp->mbuf_length = bge_mbuf_pool_len_5721;
+		cidp->recv_slots = BGE_RECV_SLOTS_5721;
+		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
+		cidp->pci_type = BGE_PCI_E;
+		cidp->statistic_type = BGE_STAT_REG;
+		cidp->flags |= CHIP_FLAG_NO_JUMBO;
+		dev_ok = B_TRUE;
+		break;
+
+	case DEVICE_ID_5752:
+	case DEVICE_ID_5752M:
+		cidp->chip_label = 5752;
 		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
 		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
 		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
@@ -2432,6 +2452,7 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 			/* Set PCIE max payload size and clear error status. */
 			if ((bgep->chipid.chip_label == 5721) ||
 			    (bgep->chipid.chip_label == 5751) ||
+			    (bgep->chipid.chip_label == 5752) ||
 			    (bgep->chipid.chip_label == 5789)) {
 				pci_config_put16(bgep->cfg_handle,
 					PCI_CONF_DEV_CTRL, READ_REQ_SIZE_MAX);
@@ -3022,6 +3043,16 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	if (bgep->asf_enabled)
 		bgep->asf_wordswapped = B_FALSE;
 #endif
+	/*
+	 * NVRAM Corruption Workaround
+	 */
+	for (i = 0; i < 600; i++)
+		if (bge_nvmem_acquire(bgep) == 0)
+			break;
+	if (i >= 600)
+		BGE_DEBUG(("%s: fail to acquire nvram lock",
+			bgep->ifname));
+
 #ifdef BGE_IPMI_ASF
 	if (!bgep->asf_enabled) {
 #endif
@@ -3041,6 +3072,7 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	 */
 	if ((bgep->chipid.chip_label == 5721) ||
 		(bgep->chipid.chip_label == 5751) ||
+		(bgep->chipid.chip_label == 5752) ||
 		(bgep->chipid.chip_label == 5789))
 		bge_reg_set32(bgep, TLP_CONTROL_REG, TLP_DATA_FIFO_PROTECT);
 

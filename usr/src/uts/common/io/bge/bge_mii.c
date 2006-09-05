@@ -26,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "sys/bge_impl2.h"
+#include "bge_impl.h"
 
 /*
  * Bit test macros, returning boolean_t values
@@ -510,6 +510,7 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 	case MHCR_CHIP_ASIC_REV_5704:
 	case MHCR_CHIP_ASIC_REV_5705:
 	case MHCR_CHIP_ASIC_REV_5721_5751:
+	case MHCR_CHIP_ASIC_REV_5752:
 	case MHCR_CHIP_ASIC_REV_5714:
 	case MHCR_CHIP_ASIC_REV_5715:
 		reset_ok = bge_phy_reset_and_check(bgep);
@@ -1488,14 +1489,9 @@ bge_phys_update(bge_t *bgep)
  * Read the link status and determine whether anything's changed ...
  *
  * This routine should be called whenever the chip flags a change
- * in the hardware link state, and repeatedly for several seconds
- * afterwards, until we're sure the state has stabilised (sometimes
- * it goes up and down several times during autonegotiation before
- * settling on the proper configuration).  This routine applies
- * timing-based heuristics to determine when the state is stable.
+ * in the hardware link state.
  *
  * This routine returns B_FALSE if the link state has not changed,
- * or if it has changed, but hasn't settled for long enough yet.  It
  * returns B_TRUE when the change to the new state should be accepted.
  * In such a case, the param_* variables give the new hardware state,
  * which the caller should use to update link_state etc.
@@ -1507,44 +1503,16 @@ bge_phys_check(bge_t *bgep)
 {
 	int32_t orig_state;
 	boolean_t recheck;
-	boolean_t linkup;
-	hrtime_t deltat;
-	hrtime_t now;
 
 	BGE_TRACE(("bge_phys_check($%p)", (void *)bgep));
 
 	ASSERT(mutex_owned(bgep->genlock));
 
-	linkup = bgep->param_link_up;
 	orig_state = bgep->link_state;
 	recheck = orig_state == LINK_STATE_UNKNOWN;
 	recheck = (*bgep->physops->phys_check)(bgep, recheck);
 	if (!recheck)
 		return (B_FALSE);
 
-	/*
-	 * At this point, the check_*_link() function above has detected
-	 * a change and updated the param_* variables to show what the
-	 * latest hardware state seems to be -- but it might still be
-	 * changing.
-	 *
-	 * The link_state must now be UNKNOWN, but if it was previously
-	 * UP, we want to recognise this immediately, whereas in any other
-	 * case (e.g. DOWN->UP) we don't accept it until a few seconds have
-	 * elapsed, to give the hardware time to settle.
-	 */
-	now = gethrtime();
-	deltat = now - bgep->phys_event_time;
-
-	BGE_DEBUG(("bge_phys_check: link was %d/%s now %d/%s",
-		orig_state, UPORDOWN(linkup),
-		bgep->link_state, UPORDOWN(bgep->param_link_up)));
-	BGE_DEBUG(("bge_phys_check: update %lld change %lld "
-			"now %lld delta %lld",
-		bgep->phys_write_time, bgep->phys_event_time, now, deltat));
-
-	if (orig_state == LINK_STATE_UP)
-		return (B_TRUE);
-	else
-		return (deltat > bgep->phys_delta_time);
+	return (B_TRUE);
 }

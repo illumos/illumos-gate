@@ -99,14 +99,14 @@ typedef uchar_t ether_addr_t[ETHERADDRL];
  */
 extern int secpolicy_net_config(const cred_t *, boolean_t);
 extern int drv_priv(cred_t *);
-#pragma weak    secpolicy_net_config
-#pragma weak    drv_priv
+#pragma	weak	secpolicy_net_config
+#pragma	weak	drv_priv
 
 #include <sys/netlb.h>			/* originally from cassini	*/
 #include <sys/miiregs.h>		/* by fjlite out of intel 	*/
 
-#include <sys/bge2.h>
-#include <sys/bge_hw2.h>
+#include "bge.h"
+#include "bge_hw.h"
 
 /*
  * Compile-time feature switches ...
@@ -1280,9 +1280,10 @@ uint32_t bge_atomic_shl32(uint32_t *sp, uint_t count);
 #define	BGE_SUSPEND_RESET	2
 
 /* For asf_status */
-#define	ASF_STAT_NONE			0
-#define	ASF_STAT_STOP			1
-#define	ASF_STAT_RUN			2
+#define	ASF_STAT_NONE		0
+#define	ASF_STAT_STOP		1
+#define	ASF_STAT_RUN		2
+#define	ASF_STAT_RUN_INIT	3	/* attached but don't plumb */
 
 /* ASF modes for bge_reset() and bge_chip_reset() */
 #define	ASF_MODE_NONE		0	/* don't launch asf	 */
