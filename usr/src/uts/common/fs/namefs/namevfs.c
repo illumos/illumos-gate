@@ -309,6 +309,7 @@ nm_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *crp)
 	struct vnode *filevp;		/* file descriptor vnode */
 	struct file *fp;
 	struct vnode *newvp;		/* vnode representing this mount */
+	struct vnode *rvp;		/* realvp (if any) for the mountpt */
 	struct namenode *nodep;		/* namenode for this mount */
 	struct vattr filevattr;		/* attributes of file dec.  */
 	struct vattr *vattrp;		/* attributes of this mount */
@@ -353,7 +354,10 @@ nm_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *crp)
 	 * we cannot allow arbitrary users to park on a
 	 * /dev/pts node.
 	 */
-	if (vn_matchops(mvp, devpts_getvnodeops())) {
+	rvp = NULLVP;
+	if (vn_matchops(mvp, spec_getvnodeops()) &&
+	    VOP_REALVP(mvp, &rvp) == 0 && rvp &&
+	    vn_matchops(rvp, devpts_getvnodeops())) {
 		releasef(namefdp.fd);
 		return (ENOTSUP);
 	}
