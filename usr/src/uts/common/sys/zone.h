@@ -32,6 +32,7 @@
 #include <sys/mutex.h>
 #include <sys/param.h>
 #include <sys/rctl.h>
+#include <sys/ipc_rctl.h>
 #include <sys/pset.h>
 #include <sys/tsol/label.h>
 #include <sys/uadmin.h>
@@ -271,6 +272,8 @@ typedef struct zone {
 					/* that are within the zone */
 	rctl_qty_t	zone_nlwps;	/* number of lwps in zone */
 	rctl_qty_t	zone_nlwps_ctl; /* protected by zone_rctls->rcs_lock */
+	rctl_qty_t	zone_shmmax;	/* System V shared memory usage */
+	ipc_rqty_t	zone_ipc;	/* System V IPC id resource usage */
 
 	uint_t		zone_rootpathlen; /* strlen(zone_rootpath) + 1 */
 	uint32_t	zone_shares;	/* FSS shares allocated to zone */

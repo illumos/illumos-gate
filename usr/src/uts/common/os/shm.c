@@ -46,6 +46,14 @@
  * Resource controls
  * -----------------
  *
+ * Control:      zone.max-shm-ids (rc_zone_shmmni)
+ * Description:  Maximum number of shared memory ids allowed a zone.
+ *
+ *   When shmget() is used to allocate a shared memory segment, one id
+ *   is allocated.  If the id allocation doesn't succeed, shmget()
+ *   fails and errno is set to ENOSPC.  Upon successful shmctl(,
+ *   IPC_RMID) the id is deallocated.
+ *
  * Control:      project.max-shm-ids (rc_project_shmmni)
  * Description:  Maximum number of shared memory ids allowed a project.
  *
@@ -53,6 +61,16 @@
  *   is allocated.  If the id allocation doesn't succeed, shmget()
  *   fails and errno is set to ENOSPC.  Upon successful shmctl(,
  *   IPC_RMID) the id is deallocated.
+ *
+ * Control:      zone.max-shm-memory (rc_zone_shmmax)
+ * Description:  Total amount of shared memory allowed a zone.
+ *
+ *   When shmget() is used to allocate a shared memory segment, the
+ *   segment's size is allocated against this limit.  If the space
+ *   allocation doesn't succeed, shmget() fails and errno is set to
+ *   EINVAL.  The size will be deallocated once the last process has
+ *   detached the segment and the segment has been successfully
+ *   shmctl(, IPC_RMID)ed.
  *
  * Control:      project.max-shm-memory (rc_project_shmmax)
  * Description:  Total amount of shared memory allowed a project.
@@ -149,6 +167,8 @@ int	shminfo_shmmni = 100;		/* (obsolete) */
 size_t	shminfo_shmmin = 1;		/* (obsolete) */
 int	shminfo_shmseg = 6;		/* (obsolete) */
 
+extern rctl_hndl_t rc_zone_shmmax;
+extern rctl_hndl_t rc_zone_shmmni;
 extern rctl_hndl_t rc_project_shmmax;
 extern rctl_hndl_t rc_project_shmmni;
 static ipc_service_t *shm_svc;
@@ -202,9 +222,9 @@ _init(void)
 {
 	int result;
 
-	shm_svc = ipcs_create("shmids", rc_project_shmmni, sizeof (kshmid_t),
-	    shm_dtor, shm_rmid, AT_IPC_SHM,
-	    offsetof(kproject_data_t, kpd_shmmni));
+	shm_svc = ipcs_create("shmids", rc_project_shmmni, rc_zone_shmmni,
+	    sizeof (kshmid_t), shm_dtor, shm_rmid, AT_IPC_SHM,
+	    offsetof(ipc_rqty_t, ipcq_shmmni));
 	zone_key_create(&shm_zone_key, NULL, shm_remove_zone, NULL);
 
 	if ((result = mod_install(&modlinkage)) == 0)
@@ -551,6 +571,7 @@ shm_dtor(kipc_perm_t *perm)
 {
 	kshmid_t *sp = (kshmid_t *)perm;
 	uint_t cnt;
+	size_t rsize;
 
 	if (sp->shm_sptinfo) {
 		if (isspt(sp))
@@ -565,9 +586,10 @@ shm_dtor(kipc_perm_t *perm)
 	shm_rm_amp(sp->shm_amp, sp->shm_lkcnt);
 
 	if (sp->shm_perm.ipc_id != IPC_ID_INVAL) {
+		rsize = ptob(btopr(sp->shm_segsz));
 		ipcs_lock(shm_svc);
-		sp->shm_perm.ipc_proj->kpj_data.kpd_shmmax -=
-		    ptob(btopr(sp->shm_segsz));
+		sp->shm_perm.ipc_proj->kpj_data.kpd_shmmax -= rsize;
+		sp->shm_perm.ipc_zone->zone_shmmax -= rsize;
 		ipcs_unlock(shm_svc);
 	}
 }
@@ -814,13 +836,17 @@ top:
 		size_t rsize = ptob(npages);
 
 		/*
-		 * Check rsize and the per-project limit on shared
-		 * memory.  Checking rsize handles both the size == 0
+		 * Check rsize and the per-project and per-zone limit on
+		 * shared memory.  Checking rsize handles both the size == 0
 		 * case and the size < ULONG_MAX & PAGEMASK case (i.e.
 		 * rounding up wraps a size_t).
 		 */
-		if (rsize == 0 || (rctl_test(rc_project_shmmax,
+		if (rsize == 0 ||
+		    (rctl_test(rc_project_shmmax,
 		    pp->p_task->tk_proj->kpj_rctls, pp, rsize,
+		    RCA_SAFE) & RCT_DENY) ||
+		    (rctl_test(rc_zone_shmmax,
+		    pp->p_zone->zone_rctls, pp, rsize,
 		    RCA_SAFE) & RCT_DENY)) {
 
 			mutex_exit(&pp->p_lock);
@@ -864,13 +890,17 @@ top:
 			return (error);
 		}
 
-		if (rctl_test(rc_project_shmmax,
+		if ((rctl_test(rc_project_shmmax,
 		    sp->shm_perm.ipc_proj->kpj_rctls, pp, rsize,
-		    RCA_SAFE) & RCT_DENY) {
+		    RCA_SAFE) & RCT_DENY) ||
+		    (rctl_test(rc_zone_shmmax,
+		    sp->shm_perm.ipc_zone->zone_rctls, pp, rsize,
+		    RCA_SAFE) & RCT_DENY)) {
 			ipc_cleanup(shm_svc, (kipc_perm_t *)sp);
 			return (EINVAL);
 		}
 		sp->shm_perm.ipc_proj->kpj_data.kpd_shmmax += rsize;
+		sp->shm_perm.ipc_zone->zone_shmmax += rsize;
 
 		lock = ipc_commit_end(shm_svc, &sp->shm_perm);
 	}

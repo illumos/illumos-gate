@@ -111,9 +111,9 @@ project_data_init(kproject_data_t *data)
 	 * Initialize subsystem-specific data
 	 */
 	data->kpd_shmmax = 0;
-	data->kpd_shmmni = 0;
-	data->kpd_semmni = 0;
-	data->kpd_msgmni = 0;
+	data->kpd_ipc.ipcq_shmmni = 0;
+	data->kpd_ipc.ipcq_semmni = 0;
+	data->kpd_ipc.ipcq_msgmni = 0;
 	data->kpd_devlockmem = 0;
 	data->kpd_contract = 0;
 	data->kpd_crypto_mem = 0;
@@ -562,7 +562,7 @@ project_shmmni_test(struct rctl *rctl, struct proc *p, rctl_entity_p_t *e,
 	rctl_qty_t v;
 	ASSERT(MUTEX_HELD(&p->p_lock));
 	ASSERT(e->rcep_t == RCENTITY_PROJECT);
-	v = e->rcep_p.proj->kpj_data.kpd_shmmni + inc;
+	v = e->rcep_p.proj->kpj_data.kpd_ipc.ipcq_shmmni + inc;
 	if (v > rval->rcv_value)
 		return (1);
 
@@ -588,7 +588,7 @@ project_semmni_test(struct rctl *rctl, struct proc *p, rctl_entity_p_t *e,
 	rctl_qty_t v;
 	ASSERT(MUTEX_HELD(&p->p_lock));
 	ASSERT(e->rcep_t == RCENTITY_PROJECT);
-	v = e->rcep_p.proj->kpj_data.kpd_semmni + inc;
+	v = e->rcep_p.proj->kpj_data.kpd_ipc.ipcq_semmni + inc;
 	if (v > rval->rcv_value)
 		return (1);
 
@@ -614,7 +614,7 @@ project_msgmni_test(struct rctl *rctl, struct proc *p, rctl_entity_p_t *e,
 	rctl_qty_t v;
 	ASSERT(MUTEX_HELD(&p->p_lock));
 	ASSERT(e->rcep_t == RCENTITY_PROJECT);
-	v = e->rcep_p.proj->kpj_data.kpd_msgmni + inc;
+	v = e->rcep_p.proj->kpj_data.kpd_ipc.ipcq_msgmni + inc;
 	if (v > rval->rcv_value)
 		return (1);
 

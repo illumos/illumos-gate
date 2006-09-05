@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,8 +71,8 @@
  * which, in conjunction with the creator and owner uid and gid,
  * control read and write access to the object (execute is ignored).
  *
- * Each object also has a creator project, which is used to account for
- * its resource usage.
+ * Each object also has a creator project and zone, which are used to
+ * account for its resource usage.
  *
  * Operations
  * ----------
@@ -640,8 +639,9 @@ ipc_key_compar(const void *a, const void *b)
  * Create an ipc service.
  */
 ipc_service_t *
-ipcs_create(const char *name, rctl_hndl_t rctl, size_t size, ipc_func_t *dtor,
-    ipc_func_t *rmid, int audit_type, size_t rctl_offset)
+ipcs_create(const char *name, rctl_hndl_t proj_rctl, rctl_hndl_t zone_rctl,
+    size_t size, ipc_func_t *dtor, ipc_func_t *rmid, int audit_type,
+    size_t rctl_offset)
 {
 	ipc_service_t *result;
 
@@ -657,9 +657,10 @@ ipcs_create(const char *name, rctl_hndl_t rctl, size_t size, ipc_func_t *dtor,
 	result->ipcs_ids = id_space_create(name, 0, IPC_IDS_MIN);
 	result->ipcs_dtor = dtor;
 	result->ipcs_rmid = rmid;
-	result->ipcs_rctl = rctl;
+	result->ipcs_proj_rctl = proj_rctl;
+	result->ipcs_zone_rctl = zone_rctl;
 	result->ipcs_atype = audit_type;
-	ASSERT(rctl_offset < sizeof (kproject_data_t));
+	ASSERT(rctl_offset < sizeof (ipc_rqty_t));
 	result->ipcs_rctlofs = rctl_offset;
 	list_create(&result->ipcs_usedids, sizeof (kipc_perm_t),
 	    offsetof(kipc_perm_t, ipc_list));
@@ -844,6 +845,7 @@ ipc_rele(ipc_service_t *s, kipc_perm_t *perm)
 		ASSERT(IPC_FREE(perm));		/* ipc_rmid clears IPC_ALLOC */
 		s->ipcs_dtor(perm);
 		project_rele(perm->ipc_proj);
+		zone_rele(perm->ipc_zone);
 		kmem_free(perm, s->ipcs_ssize);
 	}
 }
@@ -955,8 +957,10 @@ ipc_alloc_test(ipc_service_t *service, proc_t *pp)
 	 */
 retry:
 	mutex_enter(&pp->p_lock);
-	if (rctl_test(service->ipcs_rctl, pp->p_task->tk_proj->kpj_rctls, pp,
-	    1, RCA_SAFE) & RCT_DENY) {
+	if ((rctl_test(service->ipcs_proj_rctl, pp->p_task->tk_proj->kpj_rctls,
+	    pp, 1, RCA_SAFE) & RCT_DENY) ||
+	    (rctl_test(service->ipcs_zone_rctl, pp->p_zone->zone_rctls,
+	    pp, 1, RCA_SAFE) & RCT_DENY)) {
 		mutex_exit(&pp->p_lock);
 		return (ENOSPC);
 	}
@@ -1087,6 +1091,7 @@ ipc_commit_begin(ipc_service_t *service, key_t key, int flag,
 	 * Set ipc_proj so ipc_cleanup cleans up necessary state.
 	 */
 	newperm->ipc_proj = pp->p_task->tk_proj;
+	newperm->ipc_zone = pp->p_zone;
 
 	ASSERT(MUTEX_HELD(&service->ipcs_lock));
 	ASSERT(MUTEX_HELD(&pp->p_lock));
@@ -1116,6 +1121,7 @@ ipc_commit_end(ipc_service_t *service, kipc_perm_t *perm)
 	ASSERT(MUTEX_HELD(&curproc->p_lock));
 
 	(void) project_hold(perm->ipc_proj);
+	(void) zone_hold(perm->ipc_zone);
 	mutex_exit(&curproc->p_lock);
 
 	/*
@@ -1148,7 +1154,8 @@ ipc_commit_end(ipc_service_t *service, kipc_perm_t *perm)
 	/*
 	 * Update resource consumption.
 	 */
-	IPC_USAGE(perm, service) += 1;
+	IPC_PROJ_USAGE(perm, service) += 1;
+	IPC_ZONE_USAGE(perm, service) += 1;
 
 	mutex_exit(&service->ipcs_lock);
 	return (&slot->ipct_lock);
@@ -1203,9 +1210,12 @@ ipc_remove(ipc_service_t *service, kipc_perm_t *perm)
 	if (service->ipcs_table[index].ipct_seq++ == IPC_SEQ_MASK)
 		service->ipcs_table[index].ipct_seq = 0;
 	service->ipcs_count--;
-	ASSERT(IPC_USAGE(perm, service) > 0);
-	IPC_USAGE(perm, service) -= 1;
-	ASSERT(service->ipcs_count || (IPC_USAGE(perm, service) == 0));
+	ASSERT(IPC_PROJ_USAGE(perm, service) > 0);
+	ASSERT(IPC_ZONE_USAGE(perm, service) > 0);
+	IPC_PROJ_USAGE(perm, service) -= 1;
+	IPC_ZONE_USAGE(perm, service) -= 1;
+	ASSERT(service->ipcs_count || ((IPC_PROJ_USAGE(perm, service) == 0) &&
+	    (IPC_ZONE_USAGE(perm, service) == 0)));
 }
 
 

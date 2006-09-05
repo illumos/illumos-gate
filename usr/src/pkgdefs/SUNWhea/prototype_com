@@ -788,6 +788,7 @@ f none usr/include/sys/ioccom.h 644 root bin
 f none usr/include/sys/ioctl.h 644 root bin
 f none usr/include/sys/ipc.h 644 root bin
 f none usr/include/sys/ipc_impl.h 644 root bin
+f none usr/include/sys/ipc_rctl.h 644 root bin
 f none usr/include/sys/isa_defs.h 644 root bin
 f none usr/include/sys/jioctl.h 644 root bin
 f none usr/include/sys/kbd.h 644 root bin

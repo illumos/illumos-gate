@@ -258,6 +258,7 @@ CHKHDRS=			\
 	ioctl.h			\
 	ipc.h			\
 	ipc_impl.h		\
+	ipc_rctl.h		\
 	isa_defs.h		\
 	iscsi_authclient.h	\
 	iscsi_authclientglue.h	\

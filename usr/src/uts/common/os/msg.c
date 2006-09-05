@@ -37,6 +37,14 @@
  * Resource controls
  * -----------------
  *
+ * Control:      zone.max-msg-ids (rc_zone_msgmni)
+ * Description:  Maximum number of message queue ids allowed a zone.
+ *
+ *   When msgget() is used to allocate a message queue, one id is
+ *   allocated.  If the id allocation doesn't succeed, msgget() fails
+ *   and errno is set to ENOSPC.  Upon successful msgctl(, IPC_RMID)
+ *   the id is deallocated.
+ *
  * Control:      project.max-msg-ids (rc_project_msgmni)
  * Description:  Maximum number of message queue ids allowed a project.
  *
@@ -102,6 +110,7 @@ int	msginfo_msgssz = 8;	/* (obsolete) */
 int	msginfo_msgmap = 0;	/* (obsolete) */
 ushort_t msginfo_msgseg = 1024;	/* (obsolete) */
 
+extern rctl_hndl_t rc_zone_msgmni;
 extern rctl_hndl_t rc_project_msgmni;
 extern rctl_hndl_t rc_process_msgmnb;
 extern rctl_hndl_t rc_process_msgtql;
@@ -164,9 +173,9 @@ _init(void)
 {
 	int result;
 
-	msq_svc = ipcs_create("msqids", rc_project_msgmni, sizeof (kmsqid_t),
-	    msg_dtor, msg_rmid, AT_IPC_MSG,
-	    offsetof(kproject_data_t, kpd_msgmni));
+	msq_svc = ipcs_create("msqids", rc_project_msgmni, rc_zone_msgmni,
+	    sizeof (kmsqid_t), msg_dtor, msg_rmid, AT_IPC_MSG,
+	    offsetof(ipc_rqty_t, ipcq_msgmni));
 	zone_key_create(&msg_zone_key, NULL, msg_remove_zone, NULL);
 
 	if ((result = mod_install(&modlinkage)) == 0)

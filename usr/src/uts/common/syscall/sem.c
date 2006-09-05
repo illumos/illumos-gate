@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +36,14 @@
  *
  * Resource controls
  * -----------------
+ *
+ * Control:      zone.max-sem-ids (rc_zone_semmni)
+ * Description:  Maximum number of semaphore ids allowed a zone.
+ *
+ *   When semget() is used to allocate a semaphore set, one id is
+ *   allocated.  If the id allocation doesn't succeed, semget() fails
+ *   and errno is set to ENOSPC.  Upon successful semctl(, IPC_RMID)
+ *   the id is deallocated.
  *
  * Control:      project.max-sem-ids (rc_project_semmni)
  * Description:  Maximum number of semaphore ids allowed a project.
@@ -138,6 +145,7 @@
 
 #include <c2/audit.h>
 
+extern rctl_hndl_t rc_zone_semmni;
 extern rctl_hndl_t rc_project_semmni;
 extern rctl_hndl_t rc_process_semmsl;
 extern rctl_hndl_t rc_process_semopm;
@@ -205,9 +213,9 @@ _init(void)
 {
 	int result;
 
-	sem_svc = ipcs_create("semids", rc_project_semmni, sizeof (ksemid_t),
-	    sem_dtor, sem_rmid, AT_IPC_SEM,
-	    offsetof(kproject_data_t, kpd_semmni));
+	sem_svc = ipcs_create("semids", rc_project_semmni, rc_zone_semmni,
+	    sizeof (ksemid_t), sem_dtor, sem_rmid, AT_IPC_SEM,
+	    offsetof(ipc_rqty_t, ipcq_semmni));
 	zone_key_create(&sem_zone_key, NULL, sem_remove_zone, NULL);
 
 	if ((result = mod_install(&modlinkage)) == 0)

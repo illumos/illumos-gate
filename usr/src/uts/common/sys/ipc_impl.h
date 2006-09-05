@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +31,9 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/mutex.h>
+#include <sys/ipc_rctl.h>
 #include <sys/project.h>
+#include <sys/zone.h>
 #include <sys/sysmacros.h>
 #include <sys/avl.h>
 #include <sys/id_space.h>
@@ -146,8 +147,12 @@ struct msqid_ds64 {
 #define	IPC_IDS_MAX	(1 << IPC_SEQ_SHIFT)	/* maximum # of entries */
 #define	IPC_ID_INVAL	UINT_MAX
 
-#define	IPC_USAGE(p, s) \
-	(*(rctl_qty_t *)(((char *)&p->ipc_proj->kpj_data) + s->ipcs_rctlofs))
+#define	IPC_PROJ_USAGE(p, s) \
+	(*(rctl_qty_t *)(((char *)&p->ipc_proj->kpj_data.kpd_ipc) + \
+	s->ipcs_rctlofs))
+#define	IPC_ZONE_USAGE(p, s) \
+	(*(rctl_qty_t *)(((char *)&p->ipc_zone->zone_ipc) + \
+	s->ipcs_rctlofs))
 #define	IPC_LOCKED(s, o) \
 	MUTEX_HELD(&s->ipcs_table[IPC_INDEX(o->ipc_id)].ipct_lock)
 
@@ -167,6 +172,7 @@ typedef struct kipc_perm {
 	kproject_t *ipc_proj;	/* creator's project		*/
 	uint_t	ipc_id;		/* id				*/
 	zoneid_t ipc_zoneid;	/* creator's zone id		*/
+	zone_t	*ipc_zone;	/* creator's zone		*/
 } kipc_perm_t;
 
 typedef struct ipc_slot {
@@ -185,7 +191,8 @@ typedef struct ipc_service {
 	ipc_slot_t	*ipcs_table;	/* table of objects		*/
 	uint_t		ipcs_tabsz;	/* size of table		*/
 	uint_t		ipcs_count;	/* # of objects allocated	*/
-	rctl_hndl_t	ipcs_rctl;	/* id limiting rctl handle	*/
+	rctl_hndl_t	ipcs_proj_rctl;	/* id limiting rctl handle	*/
+	rctl_hndl_t	ipcs_zone_rctl;	/* id limiting rctl handle	*/
 	size_t		ipcs_rctlofs;	/* offset in kproject_data_t	*/
 	id_space_t	*ipcs_ids;	/* id space for objects		*/
 	size_t		ipcs_ssize;	/* object size (for allocation)	*/
@@ -203,8 +210,8 @@ int ipcperm_set64(ipc_service_t *, struct cred *, kipc_perm_t *,
     ipc_perm64_t *);
 void ipcperm_stat64(ipc_perm64_t *, kipc_perm_t *);
 
-ipc_service_t *ipcs_create(const char *, rctl_hndl_t, size_t, ipc_func_t *,
-    ipc_func_t *, int, size_t);
+ipc_service_t *ipcs_create(const char *, rctl_hndl_t, rctl_hndl_t, size_t,
+    ipc_func_t *, ipc_func_t *, int, size_t);
 void ipcs_destroy(ipc_service_t *);
 void ipcs_lock(ipc_service_t *);
 void ipcs_unlock(ipc_service_t *);

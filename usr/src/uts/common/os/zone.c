@@ -215,6 +215,7 @@
 #include <sys/callb.h>
 #include <sys/vmparam.h>
 #include <sys/corectl.h>
+#include <sys/ipc_impl.h>
 
 #include <sys/door.h>
 #include <sys/cpuvar.h>
@@ -315,6 +316,10 @@ const char  *zone_status_table[] = {
  */
 rctl_hndl_t rc_zone_cpu_shares;
 rctl_hndl_t rc_zone_nlwps;
+rctl_hndl_t rc_zone_shmmax;
+rctl_hndl_t rc_zone_shmmni;
+rctl_hndl_t rc_zone_semmni;
+rctl_hndl_t rc_zone_msgmni;
 /*
  * Synchronization primitives used to synchronize between mounts and zone
  * creation/destruction.
@@ -915,6 +920,91 @@ static rctl_ops_t zone_lwps_ops = {
 	zone_lwps_test,
 };
 
+/*ARGSUSED*/
+static int
+zone_shmmax_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rval,
+    rctl_qty_t incr, uint_t flags)
+{
+	rctl_qty_t v;
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+	v = e->rcep_p.zone->zone_shmmax + incr;
+	if (v > rval->rcv_value)
+		return (1);
+	return (0);
+}
+
+static rctl_ops_t zone_shmmax_ops = {
+	rcop_no_action,
+	rcop_no_usage,
+	rcop_no_set,
+	zone_shmmax_test
+};
+
+/*ARGSUSED*/
+static int
+zone_shmmni_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rval,
+    rctl_qty_t incr, uint_t flags)
+{
+	rctl_qty_t v;
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+	v = e->rcep_p.zone->zone_ipc.ipcq_shmmni + incr;
+	if (v > rval->rcv_value)
+		return (1);
+	return (0);
+}
+
+static rctl_ops_t zone_shmmni_ops = {
+	rcop_no_action,
+	rcop_no_usage,
+	rcop_no_set,
+	zone_shmmni_test
+};
+
+/*ARGSUSED*/
+static int
+zone_semmni_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rval,
+    rctl_qty_t incr, uint_t flags)
+{
+	rctl_qty_t v;
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+	v = e->rcep_p.zone->zone_ipc.ipcq_semmni + incr;
+	if (v > rval->rcv_value)
+		return (1);
+	return (0);
+}
+
+static rctl_ops_t zone_semmni_ops = {
+	rcop_no_action,
+	rcop_no_usage,
+	rcop_no_set,
+	zone_semmni_test
+};
+
+/*ARGSUSED*/
+static int
+zone_msgmni_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rval,
+    rctl_qty_t incr, uint_t flags)
+{
+	rctl_qty_t v;
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+	v = e->rcep_p.zone->zone_ipc.ipcq_msgmni + incr;
+	if (v > rval->rcv_value)
+		return (1);
+	return (0);
+}
+
+static rctl_ops_t zone_msgmni_ops = {
+	rcop_no_action,
+	rcop_no_usage,
+	rcop_no_set,
+	zone_msgmni_test
+};
+
+
 /*
  * Helper function to brand the zone with a unique ID.
  */
@@ -967,6 +1057,10 @@ zone_zsd_init(void)
 	mutex_init(&zone0.zone_nlwps_lock, NULL, MUTEX_DEFAULT, NULL);
 	zone0.zone_shares = 1;
 	zone0.zone_nlwps_ctl = INT_MAX;
+	zone0.zone_shmmax = 0;
+	zone0.zone_ipc.ipcq_shmmni = 0;
+	zone0.zone_ipc.ipcq_semmni = 0;
+	zone0.zone_ipc.ipcq_msgmni = 0;
 	zone0.zone_name = GLOBAL_ZONENAME;
 	zone0.zone_nodename = utsname.nodename;
 	zone0.zone_domain = srpc_domain;
@@ -1082,6 +1176,25 @@ zone_init(void)
 	rc_zone_nlwps = rctl_register("zone.max-lwps", RCENTITY_ZONE,
 	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT,
 	    INT_MAX, INT_MAX, &zone_lwps_ops);
+	/*
+	 * System V IPC resource controls
+	 */
+	rc_zone_msgmni = rctl_register("zone.max-msg-ids",
+	    RCENTITY_ZONE, RCTL_GLOBAL_DENY_ALWAYS | RCTL_GLOBAL_NOBASIC |
+	    RCTL_GLOBAL_COUNT, IPC_IDS_MAX, IPC_IDS_MAX, &zone_msgmni_ops);
+
+	rc_zone_semmni = rctl_register("zone.max-sem-ids",
+	    RCENTITY_ZONE, RCTL_GLOBAL_DENY_ALWAYS | RCTL_GLOBAL_NOBASIC |
+	    RCTL_GLOBAL_COUNT, IPC_IDS_MAX, IPC_IDS_MAX, &zone_semmni_ops);
+
+	rc_zone_shmmni = rctl_register("zone.max-shm-ids",
+	    RCENTITY_ZONE, RCTL_GLOBAL_DENY_ALWAYS | RCTL_GLOBAL_NOBASIC |
+	    RCTL_GLOBAL_COUNT, IPC_IDS_MAX, IPC_IDS_MAX, &zone_shmmni_ops);
+
+	rc_zone_shmmax = rctl_register("zone.max-shm-memory",
+	    RCENTITY_ZONE, RCTL_GLOBAL_DENY_ALWAYS | RCTL_GLOBAL_NOBASIC |
+	    RCTL_GLOBAL_BYTES, UINT64_MAX, UINT64_MAX, &zone_shmmax_ops);
+
 	/*
 	 * Create a rctl_val with PRIVILEGED, NOACTION, value = 1.  Then attach
 	 * this at the head of the rctl_dict_entry for ``zone.cpu-shares''.
@@ -2857,6 +2970,10 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_domain = kmem_alloc(_SYS_NMLN, KM_SLEEP);
 	zone->zone_domain[0] = '\0';
 	zone->zone_shares = 1;
+	zone->zone_shmmax = 0;
+	zone->zone_ipc.ipcq_shmmni = 0;
+	zone->zone_ipc.ipcq_semmni = 0;
+	zone->zone_ipc.ipcq_msgmni = 0;
 	zone->zone_bootargs = NULL;
 	zone->zone_initname =
 	    kmem_alloc(strlen(zone_default_initname) + 1, KM_SLEEP);
@@ -3353,7 +3470,7 @@ zone_shutdown(zoneid_t zoneid)
 
 /*
  * Systemcall entry point to finalize the zone halt process.  The caller
- * must have already successfully callefd zone_shutdown().
+ * must have already successfully called zone_shutdown().
  *
  * Upon successful completion, the zone will have been fully destroyed:
  * zsched will have exited, destructor callbacks executed, and the zone
