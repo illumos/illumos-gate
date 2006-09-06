@@ -789,16 +789,20 @@ dbuf_free_range(dnode_t *dn, uint64_t blkid, uint64_t nblks, dmu_tx_t *tx)
 
 		if (!list_link_active(&db->db_dirty_node[txg & TXG_MASK])) {
 			/*
-			 * This dbuf is not currently dirty.  We will either
+			 * This dbuf is not currently dirty.  Either
 			 * uncache it (if its not referenced in the open
 			 * context) or reset its contents to empty.
 			 */
 			dbuf_fix_old_data(db, txg);
-		} else if (db->db_d.db_overridden_by[txg & TXG_MASK] != NULL) {
-			/*
-			 * This dbuf is overridden.  Clear that state.
-			 */
-			dbuf_unoverride(db, txg);
+		} else {
+			if (db->db_d.db_overridden_by[txg & TXG_MASK] != NULL) {
+				/*
+				 * This dbuf is overridden.  Clear that state.
+				 */
+				dbuf_unoverride(db, txg);
+			}
+			if (db->db_blkid > dn->dn_maxblkid)
+				dn->dn_maxblkid = db->db_blkid;
 		}
 		/* fill in with appropriate data */
 		if (db->db_state == DB_CACHED) {
@@ -1061,15 +1065,17 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 		return;
 	}
 
-	if (db->db_level == 0)
+	if (db->db_level == 0) {
 		dnode_new_blkid(dn, db->db_blkid, tx);
+		ASSERT(dn->dn_maxblkid >= db->db_blkid);
+	}
 
 	if (!RW_WRITE_HELD(&dn->dn_struct_rwlock)) {
 		rw_enter(&dn->dn_struct_rwlock, RW_READER);
 		drop_struct_lock = TRUE;
 	}
 
-	if (db->db_level < dn->dn_nlevels-1) {
+	if (db->db_level+1 < dn->dn_nlevels) {
 		int epbs = dn->dn_indblkshift - SPA_BLKPTRSHIFT;
 		dmu_buf_impl_t *parent;
 		parent = dbuf_hold_level(dn, db->db_level+1,
@@ -1111,11 +1117,10 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	 * it, since one of the current holders may be in the
 	 * middle of an update.  Note that users of dbuf_undirty()
 	 * should not place a hold on the dbuf before the call.
-	 * XXX - this check assumes we are being called from
-	 * dbuf_free_range(), perhaps we should move it there?
 	 */
 	if (refcount_count(&db->db_holds) > db->db_dirtycnt) {
 		mutex_exit(&db->db_mtx);
+		/* Make sure we don't toss this buffer at sync phase */
 		mutex_enter(&dn->dn_mtx);
 		dnode_clear_range(dn, db->db_blkid, 1, tx);
 		mutex_exit(&dn->dn_mtx);

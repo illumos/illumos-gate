@@ -96,7 +96,7 @@
  * buffer list associated with the state.  When attempting to
  * obtain a hash table lock while holding an arc list lock you
  * must use: mutex_tryenter() to avoid deadlock.  Also note that
- * the "top" state mutex must be held before the "bot" state mutex.
+ * the active state mutex must be held before the ghost state mutex.
  *
  * Arc buffers may have an associated eviction callback function.
  * This function will be invoked prior to removing the buffer (e.g.
@@ -198,7 +198,9 @@ static struct arc {
 	uint64_t	hits;
 	uint64_t	misses;
 	uint64_t	deleted;
-	uint64_t	skipped;
+	uint64_t	recycle_miss;
+	uint64_t	mutex_miss;
+	uint64_t	evict_skip;
 	uint64_t	hash_elements;
 	uint64_t	hash_elements_max;
 	uint64_t	hash_collisions;
@@ -252,7 +254,8 @@ struct arc_buf_hdr {
 
 static arc_buf_t *arc_eviction_list;
 static kmutex_t arc_eviction_mtx;
-static void arc_access_and_exit(arc_buf_hdr_t *buf, kmutex_t *hash_lock);
+static void arc_get_data_buf(arc_buf_t *buf);
+static void arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock);
 
 #define	GHOST_STATE(state)	\
 	((state) == arc.mru_ghost || (state) == arc.mfu_ghost)
@@ -682,35 +685,38 @@ arc_buf_alloc(spa_t *spa, int size, void *tag)
 	hdr->b_arc_access = 0;
 	buf = kmem_cache_alloc(buf_cache, KM_SLEEP);
 	buf->b_hdr = hdr;
+	buf->b_data = NULL;
 	buf->b_efunc = NULL;
 	buf->b_private = NULL;
 	buf->b_next = NULL;
-	buf->b_data = zio_buf_alloc(size);
 	hdr->b_buf = buf;
+	arc_get_data_buf(buf);
 	hdr->b_datacnt = 1;
 	hdr->b_flags = 0;
 	ASSERT(refcount_is_zero(&hdr->b_refcnt));
 	(void) refcount_add(&hdr->b_refcnt, tag);
 
-	atomic_add_64(&arc.size, size);
-	atomic_add_64(&arc.anon->size, size);
-
 	return (buf);
 }
 
-static void *
-arc_data_copy(arc_buf_hdr_t *hdr, void *old_data)
+static arc_buf_t *
+arc_buf_clone(arc_buf_t *from)
 {
-	void *new_data = zio_buf_alloc(hdr->b_size);
+	arc_buf_t *buf;
+	arc_buf_hdr_t *hdr = from->b_hdr;
+	uint64_t size = hdr->b_size;
 
-	atomic_add_64(&arc.size, hdr->b_size);
-	bcopy(old_data, new_data, hdr->b_size);
-	atomic_add_64(&hdr->b_state->size, hdr->b_size);
-	if (list_link_active(&hdr->b_arc_node)) {
-		ASSERT(refcount_is_zero(&hdr->b_refcnt));
-		atomic_add_64(&hdr->b_state->lsize, hdr->b_size);
-	}
-	return (new_data);
+	buf = kmem_cache_alloc(buf_cache, KM_SLEEP);
+	buf->b_hdr = hdr;
+	buf->b_data = NULL;
+	buf->b_efunc = NULL;
+	buf->b_private = NULL;
+	buf->b_next = hdr->b_buf;
+	hdr->b_buf = buf;
+	arc_get_data_buf(buf);
+	bcopy(from->b_data, buf->b_data, size);
+	hdr->b_datacnt += 1;
+	return (buf);
 }
 
 void
@@ -742,12 +748,13 @@ arc_buf_add_ref(arc_buf_t *buf, void* tag)
 	ASSERT(!GHOST_STATE(hdr->b_state));
 	buf->b_hdr = hdr;
 	add_reference(hdr, hash_lock, tag);
-	arc_access_and_exit(hdr, hash_lock);
+	arc_access(hdr, hash_lock);
+	mutex_exit(hash_lock);
 	atomic_add_64(&arc.hits, 1);
 }
 
 static void
-arc_buf_destroy(arc_buf_t *buf, boolean_t all)
+arc_buf_destroy(arc_buf_t *buf, boolean_t recycle, boolean_t all)
 {
 	arc_buf_t **bufp;
 
@@ -756,8 +763,10 @@ arc_buf_destroy(arc_buf_t *buf, boolean_t all)
 		arc_state_t *state = buf->b_hdr->b_state;
 		uint64_t size = buf->b_hdr->b_size;
 
-		zio_buf_free(buf->b_data, size);
-		atomic_add_64(&arc.size, -size);
+		if (!recycle) {
+			zio_buf_free(buf->b_data, size);
+			atomic_add_64(&arc.size, -size);
+		}
 		if (list_link_active(&buf->b_hdr->b_arc_node)) {
 			ASSERT(refcount_is_zero(&buf->b_hdr->b_refcnt));
 			ASSERT(state != arc.anon);
@@ -806,13 +815,13 @@ arc_hdr_destroy(arc_buf_hdr_t *hdr)
 		if (buf->b_efunc) {
 			mutex_enter(&arc_eviction_mtx);
 			ASSERT(buf->b_hdr != NULL);
-			arc_buf_destroy(hdr->b_buf, FALSE);
+			arc_buf_destroy(hdr->b_buf, FALSE, FALSE);
 			hdr->b_buf = buf->b_next;
 			buf->b_next = arc_eviction_list;
 			arc_eviction_list = buf;
 			mutex_exit(&arc_eviction_mtx);
 		} else {
-			arc_buf_destroy(hdr->b_buf, TRUE);
+			arc_buf_destroy(hdr->b_buf, FALSE, TRUE);
 		}
 	}
 
@@ -837,7 +846,7 @@ arc_buf_free(arc_buf_t *buf, void *tag)
 		mutex_enter(hash_lock);
 		(void) remove_reference(hdr, hash_lock, tag);
 		if (hdr->b_datacnt > 1)
-			arc_buf_destroy(buf, TRUE);
+			arc_buf_destroy(buf, FALSE, TRUE);
 		else
 			hdr->b_flags |= ARC_BUF_AVAILABLE;
 		mutex_exit(hash_lock);
@@ -858,7 +867,7 @@ arc_buf_free(arc_buf_t *buf, void *tag)
 	} else {
 		if (remove_reference(hdr, NULL, tag) > 0) {
 			ASSERT(HDR_IO_ERROR(hdr));
-			arc_buf_destroy(buf, TRUE);
+			arc_buf_destroy(buf, FALSE, TRUE);
 		} else {
 			arc_hdr_destroy(hdr);
 		}
@@ -884,7 +893,7 @@ arc_buf_remove_ref(arc_buf_t *buf, void* tag)
 	(void) remove_reference(hdr, hash_lock, tag);
 	if (hdr->b_datacnt > 1) {
 		if (no_callback)
-			arc_buf_destroy(buf, TRUE);
+			arc_buf_destroy(buf, FALSE, TRUE);
 	} else if (no_callback) {
 		ASSERT(hdr->b_buf == buf && buf->b_next == NULL);
 		hdr->b_flags |= ARC_BUF_AVAILABLE;
@@ -904,14 +913,21 @@ arc_buf_size(arc_buf_t *buf)
 /*
  * Evict buffers from list until we've removed the specified number of
  * bytes.  Move the removed buffers to the appropriate evict state.
+ * If the recycle flag is set, then attempt to "recycle" a buffer:
+ * - look for a buffer to evict that is `bytes' long.
+ * - return the data block from this buffer rather than freeing it.
+ * This flag is used by callers that are trying to make space for a
+ * new buffer in a full arc cache.
  */
-static uint64_t
-arc_evict(arc_state_t *state, int64_t bytes)
+static void *
+arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle)
 {
 	arc_state_t *evicted_state;
-	uint64_t bytes_evicted = 0, skipped = 0;
+	uint64_t bytes_evicted = 0, skipped = 0, missed = 0;
 	arc_buf_hdr_t *ab, *ab_prev;
 	kmutex_t *hash_lock;
+	boolean_t have_lock;
+	void *steal = NULL;
 
 	ASSERT(state == arc.mru || state == arc.mfu);
 
@@ -923,19 +939,26 @@ arc_evict(arc_state_t *state, int64_t bytes)
 	for (ab = list_tail(&state->list); ab; ab = ab_prev) {
 		ab_prev = list_prev(&state->list, ab);
 		/* prefetch buffers have a minimum lifespan */
-		if (ab->b_flags & (ARC_PREFETCH|ARC_INDIRECT) &&
-		    lbolt - ab->b_arc_access < arc_min_prefetch_lifespan) {
+		if (HDR_IO_IN_PROGRESS(ab) ||
+		    (ab->b_flags & (ARC_PREFETCH|ARC_INDIRECT) &&
+		    lbolt - ab->b_arc_access < arc_min_prefetch_lifespan)) {
 			skipped++;
 			continue;
 		}
+		if (recycle && (ab->b_size != bytes || ab->b_datacnt > 1))
+			continue;
 		hash_lock = HDR_LOCK(ab);
-		if (!HDR_IO_IN_PROGRESS(ab) && mutex_tryenter(hash_lock)) {
+		have_lock = MUTEX_HELD(hash_lock);
+		if (have_lock || mutex_tryenter(hash_lock)) {
 			ASSERT3U(refcount_count(&ab->b_refcnt), ==, 0);
 			ASSERT(ab->b_datacnt > 0);
 			while (ab->b_buf) {
 				arc_buf_t *buf = ab->b_buf;
-				if (buf->b_data)
+				if (buf->b_data) {
 					bytes_evicted += ab->b_size;
+					if (recycle)
+						steal = buf->b_data;
+				}
 				if (buf->b_efunc) {
 					mutex_enter(&arc_eviction_mtx);
 					/*
@@ -944,16 +967,20 @@ arc_evict(arc_state_t *state, int64_t bytes)
 					 */
 					if (buf->b_hdr == NULL) {
 						mutex_exit(&arc_eviction_mtx);
-						mutex_exit(hash_lock);
-						goto skip;
+						bytes_evicted -= ab->b_size;
+						if (recycle)
+							steal = NULL;
+						if (!have_lock)
+							mutex_exit(hash_lock);
+						goto derailed;
 					}
-					arc_buf_destroy(buf, FALSE);
+					arc_buf_destroy(buf, recycle, FALSE);
 					ab->b_buf = buf->b_next;
 					buf->b_next = arc_eviction_list;
 					arc_eviction_list = buf;
 					mutex_exit(&arc_eviction_mtx);
 				} else {
-					arc_buf_destroy(buf, TRUE);
+					arc_buf_destroy(buf, recycle, TRUE);
 				}
 			}
 			ASSERT(ab->b_datacnt == 0);
@@ -961,13 +988,15 @@ arc_evict(arc_state_t *state, int64_t bytes)
 			ASSERT(HDR_IN_HASH_TABLE(ab));
 			ab->b_flags = ARC_IN_HASH_TABLE;
 			DTRACE_PROBE1(arc__evict, arc_buf_hdr_t *, ab);
-			mutex_exit(hash_lock);
+			if (!have_lock)
+				mutex_exit(hash_lock);
 			if (bytes >= 0 && bytes_evicted >= bytes)
 				break;
 		} else {
-skip:
-			skipped += 1;
+			missed += 1;
 		}
+derailed:
+		/* null statement */;
 	}
 	mutex_exit(&evicted_state->mtx);
 	mutex_exit(&state->mtx);
@@ -976,10 +1005,11 @@ skip:
 		dprintf("only evicted %lld bytes from %x",
 		    (longlong_t)bytes_evicted, state);
 
-	atomic_add_64(&arc.skipped, skipped);
-	if (bytes < 0)
-		return (skipped);
-	return (bytes_evicted);
+	if (skipped)
+		atomic_add_64(&arc.evict_skip, skipped);
+	if (missed)
+		atomic_add_64(&arc.mutex_miss, missed);
+	return (steal);
 }
 
 /*
@@ -1024,7 +1054,7 @@ top:
 	mutex_exit(&state->mtx);
 
 	if (bufs_skipped) {
-		atomic_add_64(&arc.skipped, bufs_skipped);
+		atomic_add_64(&arc.mutex_miss, bufs_skipped);
 		ASSERT(bytes >= 0);
 	}
 
@@ -1042,7 +1072,7 @@ arc_adjust(void)
 
 	if (top_sz > arc.p && arc.mru->lsize > 0) {
 		int64_t toevict = MIN(arc.mru->lsize, top_sz-arc.p);
-		(void) arc_evict(arc.mru, toevict);
+		(void) arc_evict(arc.mru, toevict, FALSE);
 		top_sz = arc.anon->size + arc.mru->size;
 	}
 
@@ -1060,7 +1090,7 @@ arc_adjust(void)
 
 		if (arc.mfu->lsize > 0) {
 			int64_t toevict = MIN(arc.mfu->lsize, arc_over);
-			(void) arc_evict(arc.mfu, toevict);
+			(void) arc_evict(arc.mfu, toevict, FALSE);
 		}
 
 		tbl_over = arc.size + arc.mru_ghost->lsize +
@@ -1101,8 +1131,10 @@ arc_do_user_evicts(void)
 void
 arc_flush(void)
 {
-	while (arc_evict(arc.mru, -1));
-	while (arc_evict(arc.mfu, -1));
+	while (list_head(&arc.mru->list))
+		(void) arc_evict(arc.mru, -1, FALSE);
+	while (list_head(&arc.mfu->list))
+		(void) arc_evict(arc.mfu, -1, FALSE);
 
 	arc_evict_ghost(arc.mru_ghost, -1);
 	arc_evict_ghost(arc.mfu_ghost, -1);
@@ -1383,9 +1415,9 @@ arc_evict_needed()
 }
 
 /*
- * The state, supplied as the first argument, is going to have something
- * inserted on its behalf. So, determine which cache must be victimized to
- * satisfy an insertion for this state.  We have the following cases:
+ * The buffer, supplied as the first argument, needs a data block.
+ * So, if we are at cache max, determine which cache should be victimized.
+ * We have the following cases:
  *
  * 1. Insert for MRU, p > sizeof(arc.anon + arc.mru) ->
  * In this situation if we're out of space, but the resident size of the MFU is
@@ -1406,44 +1438,61 @@ arc_evict_needed()
  * this situation, we must victimize our own cache, the MFU, for this insertion.
  */
 static void
-arc_evict_for_state(arc_state_t *state, uint64_t bytes)
+arc_get_data_buf(arc_buf_t *buf)
 {
-	uint64_t	mru_used;
-	uint64_t	mfu_space;
-	uint64_t	evicted;
+	arc_state_t	*state = buf->b_hdr->b_state;
+	uint64_t	size = buf->b_hdr->b_size;
 
-	ASSERT(state == arc.mru || state == arc.mfu);
+	arc_adapt(size, state);
 
-	if (state == arc.mru) {
-		mru_used = arc.anon->size + arc.mru->size;
-		if (arc.p > mru_used) {
-			/* case 1 */
-			evicted = arc_evict(arc.mfu, bytes);
-			if (evicted < bytes) {
-				arc_adjust();
-			}
-		} else {
-			/* case 2 */
-			evicted = arc_evict(arc.mru, bytes);
-			if (evicted < bytes) {
-				arc_adjust();
-			}
-		}
+	/*
+	 * We have not yet reached cache maximum size,
+	 * just allocate a new buffer.
+	 */
+	if (!arc_evict_needed()) {
+		buf->b_data = zio_buf_alloc(size);
+		atomic_add_64(&arc.size, size);
+		goto out;
+	}
+
+	/*
+	 * If we are prefetching from the mfu ghost list, this buffer
+	 * will end up on the mru list; so steal space from there.
+	 */
+	if (state == arc.mfu_ghost)
+		state = buf->b_hdr->b_flags & ARC_PREFETCH ? arc.mru : arc.mfu;
+	else if (state == arc.mru_ghost)
+		state = arc.mru;
+
+	if (state == arc.mru || state == arc.anon) {
+		uint64_t mru_used = arc.anon->size + arc.mru->size;
+		state = (arc.p > mru_used) ? arc.mfu : arc.mru;
 	} else {
-		/* MFU case */
-		mfu_space = arc.c - arc.p;
-		if (mfu_space > arc.mfu->size) {
-			/* case 3 */
-			evicted = arc_evict(arc.mru, bytes);
-			if (evicted < bytes) {
-				arc_adjust();
-			}
-		} else {
-			/* case 4 */
-			evicted = arc_evict(arc.mfu, bytes);
-			if (evicted < bytes) {
-				arc_adjust();
-			}
+		/* MFU cases */
+		uint64_t mfu_space = arc.c - arc.p;
+		state =  (mfu_space > arc.mfu->size) ? arc.mru : arc.mfu;
+	}
+	if ((buf->b_data = arc_evict(state, size, TRUE)) == NULL) {
+		(void) arc_evict(state, size, FALSE);
+		buf->b_data = zio_buf_alloc(size);
+		atomic_add_64(&arc.size, size);
+		atomic_add_64(&arc.recycle_miss, 1);
+		if (arc.size > arc.c)
+			arc_adjust();
+	}
+	ASSERT(buf->b_data != NULL);
+out:
+	/*
+	 * Update the state size.  Note that ghost states have a
+	 * "ghost size" and so don't need to be updated.
+	 */
+	if (!GHOST_STATE(buf->b_hdr->b_state)) {
+		arc_buf_hdr_t *hdr = buf->b_hdr;
+
+		atomic_add_64(&hdr->b_state->size, size);
+		if (list_link_active(&hdr->b_arc_node)) {
+			ASSERT(refcount_is_zero(&hdr->b_refcnt));
+			atomic_add_64(&hdr->b_state->lsize, size);
 		}
 	}
 }
@@ -1453,14 +1502,9 @@ arc_evict_for_state(arc_state_t *state, uint64_t bytes)
  * NOTE: the hash lock is dropped in this function.
  */
 static void
-arc_access_and_exit(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
+arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 {
-	arc_state_t	*evict_state = NULL;
-	int		blksz;
-
 	ASSERT(MUTEX_HELD(hash_lock));
-
-	blksz = buf->b_size;
 
 	if (buf->b_state == arc.anon) {
 		/*
@@ -1468,10 +1512,6 @@ arc_access_and_exit(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 		 * appear in our "ghost" list.  Add the new buffer
 		 * to the MRU state.
 		 */
-
-		arc_adapt(blksz, arc.anon);
-		if (arc_evict_needed())
-			evict_state = arc.mru;
 
 		ASSERT(buf->b_arc_access == 0);
 		buf->b_arc_access = lbolt;
@@ -1499,7 +1539,6 @@ arc_access_and_exit(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 				atomic_add_64(&arc.mru->hits, 1);
 			}
 			buf->b_arc_access = lbolt;
-			mutex_exit(hash_lock);
 			return;
 		}
 
@@ -1536,10 +1575,6 @@ arc_access_and_exit(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 			new_state = arc.mfu;
 			DTRACE_PROBE1(new_state__mfu, arc_buf_hdr_t *, buf);
 		}
-
-		arc_adapt(blksz, arc.mru_ghost);
-		if (arc_evict_needed())
-			evict_state = new_state;
 
 		buf->b_arc_access = lbolt;
 		arc_change_state(new_state, buf, hash_lock);
@@ -1582,10 +1617,6 @@ arc_access_and_exit(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 			new_state = arc.mru;
 		}
 
-		arc_adapt(blksz, arc.mfu_ghost);
-		if (arc_evict_needed())
-			evict_state = new_state;
-
 		buf->b_arc_access = lbolt;
 		DTRACE_PROBE1(new_state__mfu, arc_buf_hdr_t *, buf);
 		arc_change_state(new_state, buf, hash_lock);
@@ -1594,10 +1625,6 @@ arc_access_and_exit(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 	} else {
 		ASSERT(!"invalid arc state");
 	}
-
-	mutex_exit(hash_lock);
-	if (evict_state)
-		arc_evict_for_state(evict_state, blksz);
 }
 
 /* a generic arc_done_func_t which you can use */
@@ -1659,16 +1686,8 @@ arc_read_done(zio_t *zio)
 	abuf = buf;
 	for (acb = callback_list; acb; acb = acb->acb_next) {
 		if (acb->acb_done) {
-			if (abuf == NULL) {
-				abuf = kmem_cache_alloc(buf_cache, KM_SLEEP);
-				abuf->b_data = arc_data_copy(hdr, buf->b_data);
-				abuf->b_hdr = hdr;
-				abuf->b_efunc = NULL;
-				abuf->b_private = NULL;
-				abuf->b_next = hdr->b_buf;
-				hdr->b_buf = abuf;
-				hdr->b_datacnt += 1;
-			}
+			if (abuf == NULL)
+				abuf = arc_buf_clone(buf);
 			acb->acb_buf = abuf;
 			abuf = NULL;
 		}
@@ -1708,9 +1727,8 @@ arc_read_done(zio_t *zio)
 		 * getting confused).
 		 */
 		if (zio->io_error == 0 && hdr->b_state == arc.anon)
-			arc_access_and_exit(hdr, hash_lock);
-		else
-			mutex_exit(hash_lock);
+			arc_access(hdr, hash_lock);
+		mutex_exit(hash_lock);
 	} else {
 		/*
 		 * This block was freed while we waited for the read to
@@ -1809,6 +1827,7 @@ top:
 		ASSERT(hdr->b_state == arc.mru || hdr->b_state == arc.mfu);
 
 		if (done) {
+			add_reference(hdr, hash_lock, private);
 			/*
 			 * If this block is already in use, create a new
 			 * copy of the data so that we will be guaranteed
@@ -1817,27 +1836,19 @@ top:
 			buf = hdr->b_buf;
 			ASSERT(buf);
 			ASSERT(buf->b_data);
-			if (!HDR_BUF_AVAILABLE(hdr)) {
-				void *data = arc_data_copy(hdr, buf->b_data);
-				buf = kmem_cache_alloc(buf_cache, KM_SLEEP);
-				buf->b_hdr = hdr;
-				buf->b_data = data;
-				buf->b_efunc = NULL;
-				buf->b_private = NULL;
-				buf->b_next = hdr->b_buf;
-				hdr->b_buf = buf;
-				hdr->b_datacnt += 1;
-			} else {
+			if (HDR_BUF_AVAILABLE(hdr)) {
 				ASSERT(buf->b_efunc == NULL);
 				hdr->b_flags &= ~ARC_BUF_AVAILABLE;
+			} else {
+				buf = arc_buf_clone(buf);
 			}
-			add_reference(hdr, hash_lock, private);
 		} else if (*arc_flags & ARC_PREFETCH &&
 		    refcount_count(&hdr->b_refcnt) == 0) {
 			hdr->b_flags |= ARC_PREFETCH;
 		}
 		DTRACE_PROBE1(arc__hit, arc_buf_hdr_t *, hdr);
-		arc_access_and_exit(hdr, hash_lock);
+		arc_access(hdr, hash_lock);
+		mutex_exit(hash_lock);
 		atomic_add_64(&arc.hits, 1);
 		if (done)
 			done(NULL, buf, private);
@@ -1886,12 +1897,12 @@ top:
 				add_reference(hdr, hash_lock, private);
 			buf = kmem_cache_alloc(buf_cache, KM_SLEEP);
 			buf->b_hdr = hdr;
+			buf->b_data = NULL;
 			buf->b_efunc = NULL;
 			buf->b_private = NULL;
 			buf->b_next = NULL;
 			hdr->b_buf = buf;
-			buf->b_data = zio_buf_alloc(hdr->b_size);
-			atomic_add_64(&arc.size, hdr->b_size);
+			arc_get_data_buf(buf);
 			ASSERT(hdr->b_datacnt == 0);
 			hdr->b_datacnt = 1;
 
@@ -1915,9 +1926,8 @@ top:
 		 */
 
 		if (GHOST_STATE(hdr->b_state))
-			arc_access_and_exit(hdr, hash_lock);
-		else
-			mutex_exit(hash_lock);
+			arc_access(hdr, hash_lock);
+		mutex_exit(hash_lock);
 
 		ASSERT3U(hdr->b_size, ==, size);
 		DTRACE_PROBE3(arc__miss, blkptr_t *, bp, uint64_t, size,
@@ -2038,7 +2048,7 @@ arc_buf_evict(arc_buf_t *buf)
 
 	ASSERT(buf->b_data != NULL);
 	buf->b_hdr = hdr;
-	arc_buf_destroy(buf, FALSE);
+	arc_buf_destroy(buf, FALSE, FALSE);
 
 	if (hdr->b_datacnt == 0) {
 		arc_state_t *old_state = hdr->b_state;
@@ -2222,7 +2232,8 @@ arc_write_done(zio_t *zio)
 			ASSERT3P(exists, ==, NULL);
 		}
 		hdr->b_flags &= ~ARC_IO_IN_PROGRESS;
-		arc_access_and_exit(hdr, hash_lock);
+		arc_access(hdr, hash_lock);
+		mutex_exit(hash_lock);
 	} else if (acb->acb_done == NULL) {
 		int destroy_hdr;
 		/*
@@ -2444,6 +2455,11 @@ arc_init(void)
 	arc.mfu = &ARC_mfu;
 	arc.mfu_ghost = &ARC_mfu_ghost;
 	arc.size = 0;
+
+	arc.hits = 0;
+	arc.recycle_miss = 0;
+	arc.evict_skip = 0;
+	arc.mutex_miss = 0;
 
 	list_create(&arc.mru->list, sizeof (arc_buf_hdr_t),
 	    offsetof(arc_buf_hdr_t, b_arc_node));

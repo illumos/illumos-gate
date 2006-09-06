@@ -41,6 +41,9 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/zap.h>
 #include <sys/zio_checksum.h>
+#ifdef _KERNEL
+#include <sys/vmsystm.h>
+#endif
 
 const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	byteswap_uint8_array,	TRUE,	"unallocated"		},
@@ -484,6 +487,64 @@ dmu_write_uio(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 		 */
 		err = uiomove((char *)db->db_data + bufoff, tocpy,
 		    UIO_WRITE, uio);
+
+		if (tocpy == db->db_size)
+			dmu_buf_fill_done(db, tx);
+
+		if (err)
+			break;
+
+		offset += tocpy;
+		size -= tocpy;
+	}
+	dmu_buf_rele_array(dbp, numbufs, FTAG);
+	return (err);
+}
+
+int
+dmu_write_pages(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
+    page_t *pp, dmu_tx_t *tx)
+{
+	dmu_buf_t **dbp;
+	int numbufs, i;
+	int err;
+
+	if (size == 0)
+		return (0);
+
+	err = dmu_buf_hold_array(os, object, offset, size,
+	    FALSE, FTAG, &numbufs, &dbp);
+	if (err)
+		return (err);
+
+	for (i = 0; i < numbufs; i++) {
+		int tocpy, copied, thiscpy;
+		int bufoff;
+		dmu_buf_t *db = dbp[i];
+		caddr_t va;
+
+		ASSERT(size > 0);
+		ASSERT3U(db->db_size, >=, PAGESIZE);
+
+		bufoff = offset - db->db_offset;
+		tocpy = (int)MIN(db->db_size - bufoff, size);
+
+		ASSERT(i == 0 || i == numbufs-1 || tocpy == db->db_size);
+
+		if (tocpy == db->db_size)
+			dmu_buf_will_fill(db, tx);
+		else
+			dmu_buf_will_dirty(db, tx);
+
+		for (copied = 0; copied < tocpy; copied += PAGESIZE) {
+			ASSERT3U(pp->p_offset, ==, db->db_offset + bufoff);
+			thiscpy = MIN(PAGESIZE, tocpy - copied);
+			va = ppmapin(pp, PROT_READ, (caddr_t)-1);
+			bcopy(va, (char *)db->db_data + bufoff, thiscpy);
+			ppmapout(va);
+			pp = pp->p_next;
+			bufoff += PAGESIZE;
+		}
 
 		if (tocpy == db->db_size)
 			dmu_buf_fill_done(db, tx);
