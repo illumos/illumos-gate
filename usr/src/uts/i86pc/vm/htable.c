@@ -1376,7 +1376,7 @@ htable_scan(htable_t *ht, uintptr_t *vap, uintptr_t eaddr)
 	pte_ptr = (char *)x86pte_access_pagetable(ht);
 	end_pte_ptr = pte_ptr + (ht->ht_num_ptes << mmu.pte_size_shift);
 	pte_ptr += e << mmu.pte_size_shift;
-	while (*pte_ptr == 0) {
+	while (!PTE_ISVALID(*pte_ptr)) {
 		va += pgsize;
 		if (va >= eaddr)
 			break;
