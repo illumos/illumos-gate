@@ -2643,10 +2643,7 @@ devname_readdir_func(vnode_t *vp, uio_t *uiop, cred_t *cred, int *eofp,
 	if (ddv->sdev_state == SDEV_ZOMBIE)
 		goto get_cache;
 
-	if (!SDEV_IS_GLOBAL(ddv)) {
-		/* make sure directory content is up to date */
-		prof_filldir(ddv);
-	} else {
+	if (SDEV_IS_GLOBAL(ddv)) {
 		map = sdev_get_map(ddv, 0);
 		dirops = map ? map->dir_ops : NULL;
 		fn = dirops ? dirops->devnops_readdir : NULL;

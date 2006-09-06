@@ -1136,6 +1136,11 @@ sdev_readlink(struct vnode *vp, struct uio *uiop, struct cred *cred)
 static int
 sdev_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp)
 {
+	struct sdev_node *parent = VTOSDEV(dvp);
+
+	ASSERT(parent);
+	if (!SDEV_IS_GLOBAL(parent))
+		prof_filldir(parent);
 	return (devname_readdir_func(dvp, uiop, cred, eofp, SDEV_BROWSE));
 }
 
