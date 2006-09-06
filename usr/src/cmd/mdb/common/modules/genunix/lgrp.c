@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -467,39 +467,278 @@ lgrp_walk_init(mdb_walk_state_t *wsp)
 
 	return (WALK_NEXT);
 }
+
+/*
+ * Common routine for several walkers.
+ * Read lgroup from wsp->walk_addr and call wsp->walk_callback for it.
+ * Normally returns the result of the callback.
+ * Returns WALK_DONE if walk_addr is NULL and WALK_ERR if cannot read the
+ * lgroup.
+ */
+static int
+lgrp_walk_step_common(mdb_walk_state_t *wsp)
+{
+	lgrp_t lgrp;
+
+	if (wsp->walk_addr == NULL)
+		return (WALK_DONE);
+
+	if (mdb_vread(&lgrp, sizeof (lgrp_t), wsp->walk_addr) == -1) {
+		mdb_warn("unable to read lgrp at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	return (wsp->walk_callback(wsp->walk_addr, &lgrp, wsp->walk_cbdata));
+}
+
+/*
+ * Get one lgroup from the lgroup table and adjust lwd_iter to point to the next
+ * one.
+ */
 int
 lgrp_walk_step(mdb_walk_state_t *wsp)
 {
 	lgrp_walk_data_t *lwd = wsp->walk_data;
+	int status = lgrp_walk_step_common(wsp);
+
+	if (status == WALK_NEXT) {
+		lwd->lwd_iter++;
+
+		if (lwd->lwd_iter >= lwd->lwd_nlgrps) {
+			status = WALK_DONE;
+		} else {
+			wsp->walk_addr = lwd->lwd_lgrp_tbl[lwd->lwd_iter];
+
+			if (wsp->walk_addr == NULL) {
+				mdb_warn("NULL lgrp pointer in lgrp_table[%d]",
+				    lwd->lwd_iter);
+				return (WALK_ERR);
+			}
+		}
+	}
+
+	return (status);
+}
+
+/*
+ * Initialize walker to traverse parents of lgroups. Nothing to do here.
+ */
+/* ARGSUSED */
+int
+lgrp_parents_walk_init(mdb_walk_state_t *wsp)
+{
+	return (WALK_NEXT);
+}
+
+/*
+ * Call wsp callback on current lgroup in wsp and replace the lgroup with its
+ * parent.
+ */
+int
+lgrp_parents_walk_step(mdb_walk_state_t *wsp)
+{
 	lgrp_t lgrp;
 	int status;
 
-
-	if (mdb_vread(&lgrp, sizeof (struct lgrp),
-	    wsp->walk_addr) == -1) {
-		mdb_warn("unable to read lgrp at %p",
-		    wsp->walk_addr);
-		return (WALK_ERR);
-	}
-
-	status = wsp->walk_callback(wsp->walk_addr, &lgrp,
-	    wsp->walk_cbdata);
-
-	if (status != WALK_NEXT)
-		return (status);
-
-	lwd->lwd_iter++;
-
-	if (lwd->lwd_iter >= lwd->lwd_nlgrps)
+	if (wsp->walk_addr == NULL)
 		return (WALK_DONE);
 
-	wsp->walk_addr = lwd->lwd_lgrp_tbl[lwd->lwd_iter];
-
-	if (wsp->walk_addr == NULL) {
-		mdb_warn("NULL lgrp pointer in lgrp_table[%d]",
-		    lwd->lwd_iter);
+	if (mdb_vread(&lgrp, sizeof (struct lgrp), wsp->walk_addr) == -1) {
+		mdb_warn("couldn't read 'lgrp' at %p", wsp->walk_addr);
 		return (WALK_ERR);
 	}
 
+	status = wsp->walk_callback(wsp->walk_addr, &lgrp, wsp->walk_cbdata);
+
+	if (status == WALK_NEXT)
+		wsp->walk_addr = (uintptr_t)lgrp.lgrp_parent;
+
+	return (status);
+}
+
+/*
+ * Given the set return the ID of the first member of the set.
+ * Returns LGRP_NONE if the set has no elements smaller than max_lgrp.
+ */
+static lgrp_id_t
+lgrp_set_get_first(klgrpset_t set, int max_lgrp)
+{
+	lgrp_id_t id;
+	klgrpset_t bit = 1;
+
+	if (set == (klgrpset_t)0)
+		return (LGRP_NONE);
+
+	for (id = 0; (id < max_lgrp) && !(set & bit); id++, bit <<= 1)
+		;
+
+	if (id >= max_lgrp)
+		id = LGRP_NONE;
+
+	return (id);
+}
+
+/*
+ * lgrp_set_walk_data is used to walk lgroups specified by a set.
+ * On every iteration one element is removed from the set.
+ */
+typedef struct lgrp_set_walk_data {
+	int		lswd_nlgrps;		/* Number of lgroups */
+	uintptr_t	*lwsd_lgrp_tbl;		/* Full lgroup table */
+	klgrpset_t	lwsd_set;		/* Set of lgroups to walk */
+} lgrp_set_walk_data_t;
+
+/*
+ * Initialize iterator for walkers over a set of lgroups
+ */
+static int
+lgrp_set_walk_init(mdb_walk_state_t *wsp, klgrpset_t set)
+{
+	lgrp_set_walk_data_t *lwsd;
+	int nlgrps;
+	lgrp_id_t id;
+	GElf_Sym sym;
+
+	/* Nothing to do if the set is empty */
+	if (set == (klgrpset_t)0)
+		return (WALK_DONE);
+
+	lwsd = mdb_zalloc(sizeof (lgrp_set_walk_data_t), UM_SLEEP | UM_GC);
+
+	/* Get the total number of lgroups */
+	if (mdb_readsym(&nlgrps, sizeof (int), "lgrp_alloc_max") == -1) {
+		mdb_warn("symbol 'lgrp_alloc_max' not found");
+		return (WALK_ERR);
+	}
+
+	if (nlgrps < 0) {
+		mdb_warn("lgrp_alloc_max of bounds (%d)\n", nlgrps);
+		return (WALK_ERR);
+	}
+
+	nlgrps++;
+
+	/* Find ID of the first lgroup in the set */
+	if ((id = lgrp_set_get_first(set, nlgrps)) == LGRP_NONE) {
+		mdb_warn("No set elements within %d lgroups\n", nlgrps);
+		return (WALK_ERR);
+	}
+
+	/* Read lgroup_table and copy it to lwsd_lgrp_tbl */
+	if (mdb_lookup_by_name("lgrp_table", &sym) == -1) {
+		mdb_warn("failed to find 'lgrp_table'");
+		return (WALK_ERR);
+	}
+
+	/* Get number of valid entries in lgrp_table */
+	if (sym.st_size < nlgrps * sizeof (lgrp_t *)) {
+		mdb_warn("lgrp_table size inconsistent with lgrp_alloc_max");
+		return (WALK_ERR);
+	}
+
+	lwsd->lwsd_lgrp_tbl = mdb_alloc(sym.st_size, UM_SLEEP | UM_GC);
+	lwsd->lswd_nlgrps = nlgrps;
+
+	if (mdb_readsym(lwsd->lwsd_lgrp_tbl, nlgrps * sizeof (lgrp_t *),
+		"lgrp_table") == -1) {
+		mdb_warn("unable to read lgrp_table");
+		return (WALK_ERR);
+	}
+
+	wsp->walk_data = lwsd;
+
+	/* Save the first lgroup from the set and remove it from the set */
+	wsp->walk_addr = lwsd->lwsd_lgrp_tbl[id];
+	lwsd->lwsd_set = set & ~(1 << id);
+
 	return (WALK_NEXT);
+}
+
+/*
+ * Get current lgroup and advance the lgroup to the next one in the lwsd_set.
+ */
+int
+lgrp_set_walk_step(mdb_walk_state_t *wsp)
+{
+	lgrp_id_t id = 0;
+	lgrp_set_walk_data_t *lwsd = wsp->walk_data;
+	int status = lgrp_walk_step_common(wsp);
+
+	if (status == WALK_NEXT) {
+		id = lgrp_set_get_first(lwsd->lwsd_set, lwsd->lswd_nlgrps);
+		if (id == LGRP_NONE) {
+			status = WALK_DONE;
+		} else {
+			/* Move to the next lgroup in the set */
+			wsp->walk_addr = lwsd->lwsd_lgrp_tbl[id];
+
+			/* Remove id from the set */
+			lwsd->lwsd_set = lwsd->lwsd_set & ~(1 << id);
+		}
+	}
+
+	return (status);
+}
+
+/*
+ * Initialize resource walker for a given lgroup and resource. The lgroup
+ * address is specified in walk_addr.
+ */
+static int
+lgrp_rsrc_walk_init(mdb_walk_state_t *wsp, int resource)
+{
+	lgrp_t lgrp;
+
+	if (mdb_vread(&lgrp, sizeof (struct lgrp), wsp->walk_addr) == -1) {
+		mdb_warn("couldn't read 'lgrp' at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	return (lgrp_set_walk_init(wsp, lgrp.lgrp_set[resource]));
+}
+
+/*
+ * Initialize CPU resource walker
+ */
+int
+lgrp_rsrc_cpu_walk_init(mdb_walk_state_t *wsp)
+{
+	return (lgrp_rsrc_walk_init(wsp, LGRP_RSRC_CPU));
+}
+
+/*
+ * Initialize memory resource walker
+ */
+int
+lgrp_rsrc_mem_walk_init(mdb_walk_state_t *wsp)
+{
+	return (lgrp_rsrc_walk_init(wsp, LGRP_RSRC_MEM));
+}
+
+/*
+ * Display bitmap as a list of integers
+ */
+/* ARGSUSED */
+int
+lgrp_set(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uint64_t set = (uint64_t)addr;
+	uint64_t mask = 1;
+	int i = 0;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		return (DCMD_USAGE);
+	}
+
+	if (set == 0)
+		return (DCMD_OK);
+
+	for (; set != (uint64_t)0; i++, mask <<= 1) {
+		if (set & mask) {
+			mdb_printf("%d ", i);
+			set &= ~mask;
+		}
+	}
+	mdb_printf("\n");
+	return (DCMD_OK);
 }

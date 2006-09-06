@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,6 +49,7 @@ PERL_DYNAMIC_EXT = \
     $(SUN_SOLARIS)/Task \
     $(SUN_SOLARIS)/Exacct \
     $(SUN_SOLARIS)/Privilege \
+    $(SUN_SOLARIS)/Lgrp \
     $(SUN_SOLARIS)/Ucred
 
 # Add any pure-perl extensions here.

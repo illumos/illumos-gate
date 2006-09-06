@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -330,6 +330,7 @@ translator lwpsinfo_t < kthread_t *T > {
 	pr_onpro = T->t_cpu->cpu_id;
 	pr_bindpro = T->t_bind_cpu;
 	pr_bindpset = T->t_bind_pset;
+	pr_lgrp = T->t_lpl->lpl_lgrpid;
 };
 
 inline psinfo_t *curpsinfo = xlate <psinfo_t *> (curthread->t_procp);

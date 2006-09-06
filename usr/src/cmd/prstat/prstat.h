@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,7 @@ extern "C" {
 #define	OPT_PROJECTS	0x1000		/* report about system projects */
 #define	OPT_ZONES	0x2000		/* report about zones */
 #define	OPT_PSETS	0x4000		/* report for specified psets */
+#define	OPT_LGRP	0x8000		/* report home lgroups */
 
 /*
  * Flags to keep track of process or lwp status
@@ -84,6 +85,7 @@ extern "C" {
 #define	LT_TASKS	0x0004
 #define	LT_PROJECTS	0x0008
 #define	LT_ZONES	0x0010
+#define	LT_LGRPS	0x0020
 
 /*
  * Linked list of per-process or per-lwp statistics
@@ -110,13 +112,15 @@ typedef struct lwp_info {
 } lwp_info_t;
 
 /*
- * Linked list of collective per-uid, per-taskid, or per-projid statistics
+ * Linked list of collective per-uid, per-taskid, per-projid or per-lgroup
+ * statistics
  */
 typedef struct id_info {
 	uid_t		id_uid;		/* user id */
 	taskid_t	id_taskid;	/* task id */
 	projid_t	id_projid;	/* project id */
 	zoneid_t	id_zoneid;	/* zone id */
+	int		id_lgroup;	/* lgroup id */
 	uint_t		id_nproc;	/* number of processes */
 	size_t		id_size;	/* memory usage */
 	size_t		id_rssize;	/* resident set size */

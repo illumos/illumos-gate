@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -502,14 +502,13 @@ lgrp_affinity_best(kthread_t *t, struct cpupart *cpupart, lgrp_id_t start)
 	lgrpid = start;
 
 	/*
-	 * Begin with home as best lgroup if it's root or in this pset
-	 * Otherwise, use starting lgroup given above as best first.
+	 * Use starting lgroup given above as best first
 	 */
 	home = t->t_lpl->lpl_lgrpid;
-	if (LGRP_CPUS_IN_PART(home, cpupart))
-		best_lpl = &cpupart->cp_lgrploads[home];
-	else
+	if (LGRP_CPUS_IN_PART(lgrpid, cpupart))
 		best_lpl = &cpupart->cp_lgrploads[lgrpid];
+	else
+		best_lpl = &cpupart->cp_lgrploads[home];
 
 	best_aff = affs[best_lpl->lpl_lgrpid];
 
@@ -529,7 +528,7 @@ lgrp_affinity_best(kthread_t *t, struct cpupart *cpupart, lgrp_id_t start)
 		 */
 		lpl = &cpupart->cp_lgrploads[lgrpid];
 		if (affs[lgrpid] > best_aff) {
-			best_aff =  affs[lgrpid];
+			best_aff = affs[lgrpid];
 			best_lpl = lpl;
 		}
 
@@ -558,10 +557,11 @@ int
 lgrp_affinity_set_thread(kthread_t *t, lgrp_id_t lgrp, lgrp_affinity_t aff,
     lgrp_affinity_t **aff_buf)
 {
+	lgrp_affinity_t	*affs;
+	lgrp_id_t	best;
 	lpl_t		*best_lpl;
 	lgrp_id_t	home;
 	int		retval;
-	lgrp_id_t	start;
 
 	ASSERT(t != NULL);
 	ASSERT(MUTEX_HELD(&ttoproc(t)->p_lock));
@@ -589,33 +589,26 @@ lgrp_affinity_set_thread(kthread_t *t, lgrp_id_t lgrp, lgrp_affinity_t aff,
 		*aff_buf = NULL;
 	}
 
-	t->t_lgrp_affinity[lgrp] = aff;
-
-	/*
-	 * Select a new home if the thread's affinity is being cleared
-	 */
-	if (aff == LGRP_AFF_NONE) {
-		lgrp_move_thread(t, lgrp_choose(t, t->t_cpupart), 1);
-		thread_unlock(t);
-		return (retval);
-	}
+	affs = t->t_lgrp_affinity;
+	affs[lgrp] = aff;
 
 	/*
 	 * Find lgroup for which thread has most affinity,
-	 * starting after home
+	 * starting with lgroup for which affinity being set
 	 */
-	home = t->t_lpl->lpl_lgrpid;
-	start = home + 1;
-	if (start > lgrp_alloc_max)
-		start = 0;
-
-	best_lpl = lgrp_affinity_best(t, t->t_cpupart, start);
+	best_lpl = lgrp_affinity_best(t, t->t_cpupart, lgrp);
 
 	/*
-	 * Rehome if found lgroup with more affinity than home
+	 * Rehome if found lgroup with more affinity than home or lgroup for
+	 * which affinity is being set has same affinity as home
 	 */
-	if (best_lpl != NULL && best_lpl != t->t_lpl)
-		lgrp_move_thread(t, best_lpl, 1);
+	home = t->t_lpl->lpl_lgrpid;
+	if (best_lpl != NULL && best_lpl != t->t_lpl) {
+		best = best_lpl->lpl_lgrpid;
+		if (affs[best] > affs[home] || (affs[best] == affs[home] &&
+		    best == lgrp))
+			lgrp_move_thread(t, best_lpl, 1);
+	}
 
 	thread_unlock(t);
 

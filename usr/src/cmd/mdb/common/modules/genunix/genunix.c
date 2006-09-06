@@ -3356,6 +3356,7 @@ static const mdb_dcmd_t dcmds[] = {
 
 	/* from lgrp.c */
 	{ "lgrp", "?[-q] [-p | -Pih]", "display an lgrp", lgrp},
+	{ "lgrp_set", "", "display bitmask of lgroups as a list", lgrp_set},
 
 	/* from log.c */
 	{ "msgbuf", "?[-v]", "print most recent console messages", msgbuf },
@@ -3679,11 +3680,16 @@ static const mdb_walker_t walkers[] = {
 		leaky_walk_init, leaky_buf_walk_step, leaky_walk_fini },
 
 	/* from lgrp.c */
-	{ "lgrp_cpulist", "given an lgrp, walk cpus",
-		lgrp_cpulist_walk_init, lgrp_cpulist_walk_step,
-		NULL },
-	{ "lgrptbl", "walk the lgrp table",
+	{ "lgrp_cpulist", "walk CPUs in a given lgroup",
+		lgrp_cpulist_walk_init, lgrp_cpulist_walk_step, NULL },
+	{ "lgrptbl", "walk lgroup table",
 		lgrp_walk_init, lgrp_walk_step, NULL },
+	{ "lgrp_parents", "walk up lgroup lineage from given lgroup",
+		lgrp_parents_walk_init, lgrp_parents_walk_step, NULL },
+	{ "lgrp_rsrc_mem", "walk lgroup memory resources of given lgroup",
+		lgrp_rsrc_mem_walk_init, lgrp_set_walk_step, NULL },
+	{ "lgrp_rsrc_cpu", "walk lgroup CPU resources of given lgroup",
+		lgrp_rsrc_cpu_walk_init, lgrp_set_walk_step, NULL },
 
 	/* from list.c */
 	{ LIST_WALK_NAME, LIST_WALK_DESC,

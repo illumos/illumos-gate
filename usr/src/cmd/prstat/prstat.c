@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,8 +75,12 @@
 
 #define	PSINFO_HEADER_PROC \
 "   PID USERNAME  SIZE   RSS STATE  PRI NICE      TIME  CPU PROCESS/NLWP       "
+#define	PSINFO_HEADER_PROC_LGRP \
+"   PID USERNAME  SIZE   RSS STATE  PRI NICE      TIME  CPU LGRP PROCESS/NLWP  "
 #define	PSINFO_HEADER_LWP \
 "   PID USERNAME  SIZE   RSS STATE  PRI NICE      TIME  CPU PROCESS/LWPID      "
+#define	PSINFO_HEADER_LWP_LGRP \
+"   PID USERNAME  SIZE   RSS STATE  PRI NICE      TIME  CPU LGRP PROCESS/LWPID "
 #define	USAGE_HEADER_PROC \
 "   PID USERNAME USR SYS TRP TFL DFL LCK SLP LAT VCX ICX SCL SIG PROCESS/NLWP  "
 #define	USAGE_HEADER_LWP \
@@ -99,6 +103,8 @@
 "ZONEID     NLWP  SIZE   RSS MEMORY      TIME  CPU ZONE                        "
 #define	PSINFO_LINE \
 "%6d %-8s %5s %5s %-6s %3s  %3s %9s %3.3s%% %-.16s/%d"
+#define	PSINFO_LINE_LGRP \
+"%6d %-8s %5s %5s %-6s %3s  %3s %9s %3.3s%% %4d %-.16s/%d"
 #define	USAGE_LINE \
 "%6d %-8s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s "\
 "%3.3s %-.12s/%d"
@@ -133,6 +139,7 @@ static table_t	cpu_tbl = {0, 0, NULL};		/* selected processors */
 static table_t  set_tbl = {0, 0, NULL};		/* selected processor sets */
 static table_t	prj_tbl = {0, 0, NULL};		/* selected projects */
 static table_t	tsk_tbl = {0, 0, NULL};		/* selected tasks */
+static table_t	lgr_tbl = {0, 0, NULL};		/* selected lgroups */
 static zonetbl_t zone_tbl = {0, 0, NULL};	/* selected zones */
 static nametbl_t euid_tbl = {0, 0, NULL}; 	/* selected effective users */
 static nametbl_t ruid_tbl = {0, 0, NULL}; 	/* selected real users */
@@ -147,6 +154,7 @@ static list_t	users;				/* list of users */
 static list_t	tasks;				/* list of tasks */
 static list_t	projects;			/* list of projects */
 static list_t	zones;				/* list of zones */
+static list_t	lgroups;			/* list of lgroups */
 
 static volatile uint_t sigwinch = 0;
 static volatile uint_t sigtstp = 0;
@@ -235,13 +243,21 @@ list_print(list_t *list)
 		break;
 	case LT_LWPS:
 		if (opts.o_outpmode & OPT_LWPS) {
-			if (opts.o_outpmode & OPT_PSINFO)
-				(void) printf(PSINFO_HEADER_LWP);
+			if (opts.o_outpmode & OPT_PSINFO) {
+				if (opts.o_outpmode & OPT_LGRP)
+					(void) printf(PSINFO_HEADER_LWP_LGRP);
+				else
+					(void) printf(PSINFO_HEADER_LWP);
+			}
 			if (opts.o_outpmode & OPT_MSACCT)
 				(void) printf(USAGE_HEADER_LWP);
 		} else {
-			if (opts.o_outpmode & OPT_PSINFO)
-				(void) printf(PSINFO_HEADER_PROC);
+			if (opts.o_outpmode & OPT_PSINFO) {
+				if (opts.o_outpmode & OPT_LGRP)
+					(void) printf(PSINFO_HEADER_PROC_LGRP);
+				else
+					(void) printf(PSINFO_HEADER_PROC);
+			}
 			if (opts.o_outpmode & OPT_MSACCT)
 				(void) printf(USAGE_HEADER_PROC);
 		}
@@ -341,10 +357,20 @@ list_print(list_t *list)
 				if (opts.o_outpmode & OPT_TTY)
 					(void) putchar('\r');
 				stripfname(lwp->li_info.pr_fname);
-				(void) printf(PSINFO_LINE,
-				    (int)lwp->li_info.pr_pid, pname,
-				    psize, prssize, pstate, ppri, pnice,
-				    ptime, pcpu, lwp->li_info.pr_fname, lwpid);
+				if (opts.o_outpmode & OPT_LGRP) {
+					(void) printf(PSINFO_LINE_LGRP,
+					    (int)lwp->li_info.pr_pid, pname,
+					    psize, prssize, pstate, ppri, pnice,
+					    ptime, pcpu,
+					    (int)lwp->li_info.pr_lwp.pr_lgrp,
+					    lwp->li_info.pr_fname, lwpid);
+				} else {
+					(void) printf(PSINFO_LINE,
+					    (int)lwp->li_info.pr_pid, pname,
+					    psize, prssize, pstate, ppri, pnice,
+					    ptime, pcpu,
+					    lwp->li_info.pr_fname, lwpid);
+				}
 				(void) putp(t_eol);
 				(void) putchar('\n');
 			}
@@ -502,10 +528,15 @@ list_update(list_t *list, lwp_info_t *lwp)
 		if ((list->l_type == LT_ZONES) &&
 		    (id->id_zoneid != lwp->li_info.pr_zoneid))
 			continue;
+		if ((list->l_type == LT_LGRPS) &&
+		    (id->id_lgroup != lwp->li_info.pr_lwp.pr_lgrp))
+			continue;
 		id->id_nproc++;
 		id->id_taskid	= lwp->li_info.pr_taskid;
 		id->id_projid	= lwp->li_info.pr_projid;
 		id->id_zoneid	= lwp->li_info.pr_zoneid;
+		id->id_lgroup	= lwp->li_info.pr_lwp.pr_lgrp;
+
 		if (lwp->li_flags & LWP_REPRESENT) {
 			id->id_size	+= lwp->li_info.pr_size;
 			id->id_rssize	+= lwp->li_info.pr_rssize;
@@ -533,6 +564,7 @@ update:
 	id->id_projid	= lwp->li_info.pr_projid;
 	id->id_taskid	= lwp->li_info.pr_taskid;
 	id->id_zoneid	= lwp->li_info.pr_zoneid;
+	id->id_lgroup	= lwp->li_info.pr_lwp.pr_lgrp;
 	id->id_nproc++;
 	if (lwp->li_flags & LWP_REPRESENT) {
 		id->id_size	= lwp->li_info.pr_size;
@@ -756,7 +788,9 @@ prstat_scandir(DIR *procdir)
 				if (!has_element(&cpu_tbl,
 				    lwpsinfo->pr_onpro) ||
 				    !has_element(&set_tbl,
-				    lwpsinfo->pr_bindpset))
+				    lwpsinfo->pr_bindpset) ||
+				    !has_element(&lgr_tbl,
+					lwpsinfo->pr_lgrp))
 					continue;
 				nlwps++;
 				if ((opts.o_outpmode & (OPT_PSETS | OPT_LWPS))
@@ -787,7 +821,8 @@ prstat_scandir(DIR *procdir)
 			}
 		} else {
 			if (!has_element(&cpu_tbl, psinfo.pr_lwp.pr_onpro) ||
-			    !has_element(&set_tbl, psinfo.pr_lwp.pr_bindpset)) {
+			    !has_element(&set_tbl, psinfo.pr_lwp.pr_bindpset) ||
+			    !has_element(&lgr_tbl, psinfo.pr_lwp.pr_lgrp)) {
 				fd_close(fds->fds_psinfo);
 				continue;
 			}
@@ -883,6 +918,8 @@ list_refresh(list_t *list)
 				list_update(&projects, lwp);
 			if (opts.o_outpmode & OPT_ZONES)
 				list_update(&zones, lwp);
+			if (opts.o_outpmode & OPT_LGRP)
+				list_update(&lgroups, lwp);
 			lwp->li_flags &= ~LWP_ALIVE;
 			lwp = lwp->li_next;
 
@@ -1155,7 +1192,7 @@ main(int argc, char **argv)
 	lwpid_init();
 	fd_init(Setrlimit());
 
-	while ((opt = getopt(argc, argv, "vcmaRLtu:U:n:p:C:P:s:S:j:k:TJz:Z"))
+	while ((opt = getopt(argc, argv, "vcHmaRLtu:U:n:p:C:P:h:s:S:j:k:TJz:Z"))
 	    != (int)EOF) {
 		switch (opt) {
 		case 'R':
@@ -1164,6 +1201,12 @@ main(int argc, char **argv)
 		case 'c':
 			opts.o_outpmode &= ~OPT_TERMCAP;
 			opts.o_outpmode &= ~OPT_FULLSCREEN;
+			break;
+		case 'h':
+			fill_table(&lgr_tbl, optarg, 'h');
+			break;
+		case 'H':
+			opts.o_outpmode |= OPT_LGRP;
 			break;
 		case 'm':
 		case 'v':
@@ -1263,15 +1306,25 @@ main(int argc, char **argv)
 		    "-a, -J, -T or -Z\n"));
 
 	if ((opts.o_outpmode & OPT_USERS) &&
-	    (opts.o_outpmode & (OPT_TASKS | OPT_PROJECTS | OPT_ZONES)))
+	    (opts.o_outpmode &
+		(OPT_TASKS | OPT_PROJECTS | OPT_ZONES)))
 		Die(gettext("-a option cannot be used with "
 		    "-t, -J, -T or -Z\n"));
 
 	if (((opts.o_outpmode & OPT_TASKS) &&
 	    (opts.o_outpmode & (OPT_PROJECTS|OPT_ZONES))) ||
 	    ((opts.o_outpmode & OPT_PROJECTS) &&
-	    (opts.o_outpmode & (OPT_TASKS|OPT_ZONES)))) {
-		Die(gettext("-J, -T and -Z options are mutually exclusive\n"));
+		(opts.o_outpmode & (OPT_TASKS|OPT_ZONES)))) {
+		Die(gettext(
+		    "-J, -T and -Z options are mutually exclusive\n"));
+	}
+
+	/*
+	 * There is not enough space to combine microstate information and
+	 * lgroup information and still fit in 80-column output.
+	 */
+	if ((opts.o_outpmode & OPT_LGRP) && (opts.o_outpmode & OPT_MSACCT)) {
+		Die(gettext("-H and -m options are mutually exclusive\n"));
 	}
 
 	if (argc > optind)
@@ -1299,11 +1352,13 @@ main(int argc, char **argv)
 	list_alloc(&tasks, opts.o_nbottom);
 	list_alloc(&projects, opts.o_nbottom);
 	list_alloc(&zones, opts.o_nbottom);
+	list_alloc(&lgroups, opts.o_nbottom);
 	list_setkeyfunc(sortk, &opts, &lwps, LT_LWPS);
 	list_setkeyfunc(NULL, &opts, &users, LT_USERS);
 	list_setkeyfunc(NULL, &opts, &tasks, LT_TASKS);
 	list_setkeyfunc(NULL, &opts, &projects, LT_PROJECTS);
 	list_setkeyfunc(NULL, &opts, &zones, LT_ZONES);
+	list_setkeyfunc(NULL, &opts, &lgroups, LT_LGRPS);
 	if (opts.o_outpmode & OPT_TERMCAP)
 		curses_on();
 	if ((procdir = opendir("/proc")) == NULL)

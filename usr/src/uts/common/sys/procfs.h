@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,7 @@ extern "C" {
 #include <sys/pset.h>
 #include <sys/procfs_isa.h>
 #include <sys/priv.h>
+#include <sys/lgrp.h>
 
 #if !defined(_LP64) && _FILE_OFFSET_BITS == 64
 #error	"Cannot use procfs in the large file compilation environment"
@@ -262,7 +263,8 @@ typedef struct lwpsinfo {
 	processorid_t pr_onpro;		/* processor which last ran this lwp */
 	processorid_t pr_bindpro;	/* processor to which lwp is bound */
 	psetid_t pr_bindpset;	/* processor set to which lwp is bound */
-	int	pr_filler[5];	/* reserved for future use */
+	lgrp_id_t pr_lgrp;	/* lwp home lgroup */
+	int	pr_filler[4];	/* reserved for future use */
 } lwpsinfo_t;
 
 /*
@@ -633,7 +635,8 @@ typedef struct lwpsinfo32 {
 	processorid_t pr_onpro;		/* processor which last ran this lwp */
 	processorid_t pr_bindpro;	/* processor to which lwp is bound */
 	psetid_t pr_bindpset;	/* processor set to which lwp is bound */
-	int	pr_filler[5];	/* reserved for future use */
+	lgrp_id_t pr_lgrp;	/* lwp home lgroup */
+	int	pr_filler[4];	/* reserved for future use */
 } lwpsinfo32_t;
 
 /*

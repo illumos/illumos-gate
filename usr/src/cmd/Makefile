@@ -211,6 +211,7 @@ COMMON_SUBDIRS=		\
 	lastcomm	\
 	ldap		\
 	ldapcachemgr	\
+	lgrpinfo	\
 	line		\
 	link		\
 	listen		\
@@ -562,6 +563,7 @@ MSGSUBDIRS=		\
 	last		\
 	ldap		\
 	ldapcachemgr	\
+	lgrpinfo	\
 	locale		\
 	lofiadm		\
 	logadm		\
@@ -605,6 +607,7 @@ MSGSUBDIRS=		\
 	prtdiag		\
 	ps		\
 	psrinfo		\
+	ptools		\
 	pwconv		\
 	pwd		\
 	raidctl		\

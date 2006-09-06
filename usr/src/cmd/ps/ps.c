@@ -65,7 +65,7 @@
 #define	max(a, b)	((a) < (b) ? (b) : (a))
 
 #define	NTTYS	20	/* initial size of table for -t option  */
-#define	SIZ	30	/* initial size of tables for -p, -s, -g, and -z */
+#define	SIZ	30	/* initial size of tables for -p, -s, -g, -h and -z */
 
 /*
  * Size of buffer holding args for t, p, s, g, u, U, G, z options.
@@ -131,7 +131,8 @@ enum fname {	/* enumeration of field names */
 	F_PSET,		/* bound processor set */
 	F_ZONE,		/* zone name */
 	F_ZONEID,	/* zone id */
-	F_CTID		/* process contract id */
+	F_CTID,		/* process contract id */
+	F_LGRP		/* process home lgroup */
 };
 
 struct field {
@@ -204,6 +205,7 @@ static struct def_field fname[] = {
 	{ "zone",	"ZONE",		8,	8	},
 	{ "zoneid",	"ZONEID",	5,	5	},
 	{ "ctid",	"CTID",		5,	5	},
+	{ "lgrp",	"LGRP",		4,	2 	},
 };
 
 #define	NFIELDS	(sizeof (fname) / sizeof (fname[0]))
@@ -228,6 +230,8 @@ static	int	sflg;
 static	int	tflg;
 static	int	zflg;
 static	int	Zflg;
+static	int	hflg;
+static	int	Hflg;
 static	uid_t	tuid = -1;
 static	int	errflg;
 
@@ -251,6 +255,13 @@ static	int	ntty = 0;
 static	pid_t	*pid = NULL;	/* for p option */
 static	size_t	pidsz = 0;
 static	size_t	npid = 0;
+
+static	int	*lgrps = NULL;	/* list of lgroup IDs for for h option */
+static	size_t	lgrps_size = 0;	/* size of the lgrps list */
+static	size_t	nlgrps = 0;	/* number elements in the list */
+
+/* Maximum possible lgroup ID value */
+#define	MAX_LGRP_ID 256
 
 static	pid_t	*grpid = NULL;	/* for g option */
 static	size_t	grpidsz = 0;
@@ -354,9 +365,60 @@ main(int argc, char **argv)
 	fname[F_PID].width = fname[F_PPID].width = pidwidth;
 	fname[F_PGID].width = fname[F_SID].width = pidwidth;
 
-	while ((c = getopt(argc, argv, "jlfceAadLPyZt:p:g:u:U:G:n:s:o:z:")) !=
-	    EOF)
+	while ((c = getopt(argc, argv, "jlfceAadLPyZHh:t:p:g:u:U:G:n:s:o:z:"))
+	    != EOF)
 		switch (c) {
+		case 'H':		/* Show home lgroups */
+			Hflg++;
+			break;
+		case 'h':
+			/*
+			 * Show processes/threads with given home lgroups
+			 */
+			hflg++;
+			p1 = optarg;
+			do {
+				int id;
+
+				/*
+				 * Get all IDs in the list, verify for
+				 * correctness and place in lgrps array.
+				 */
+				parg = getarg(&p1);
+				/* Convert string to integer */
+				ret = str2id(parg, (pid_t *)&id, 0,
+					MAX_LGRP_ID);
+				/* Complain if ID didn't parse correctly */
+				if (ret != 0) {
+					pgerrflg++;
+					(void) fprintf(stderr,
+					    gettext("ps: %s "), parg);
+					if (ret == EINVAL)
+						(void) fprintf(stderr,
+						    gettext("is an invalid "
+						    "non-numeric argument"));
+					else
+						(void) fprintf(stderr,
+						    gettext("exceeds valid "
+						    "range"));
+					(void) fprintf(stderr,
+					    gettext(" for -h option\n"));
+					continue;
+				}
+
+				/* Extend lgrps array if needed */
+				if (nlgrps == lgrps_size) {
+					/* Double the size of the lgrps array */
+					if (lgrps_size == 0)
+						lgrps_size = SIZ;
+					lgrps_size *= 2;
+					lgrps = Realloc(lgrps,
+					    lgrps_size * sizeof (int));
+				}
+				/* place the id in the lgrps table */
+				lgrps[nlgrps++] = id;
+			} while (*p1);
+			break;
 		case 'l':		/* long listing */
 			lflg++;
 			break;
@@ -379,7 +441,7 @@ main(int argc, char **argv)
 		case 'e':		/* (obsolete) list every process */
 			Aflg++;
 			tflg = Gflg = Uflg = uflg = pflg = gflg = sflg = 0;
-			zflg = 0;
+			zflg = hflg = 0;
 			break;
 		case 'a':
 			/*
@@ -604,7 +666,7 @@ main(int argc, char **argv)
 	 * If an appropriate option has not been specified, use the
 	 * current terminal and effective uid as the default.
 	 */
-	if (!(aflg|Aflg|dflg|Gflg|Uflg|uflg|tflg|pflg|gflg|sflg|zflg)) {
+	if (!(aflg|Aflg|dflg|Gflg|hflg|Uflg|uflg|tflg|pflg|gflg|sflg|zflg)) {
 		psinfo_t info;
 		int procfd;
 		char *name;
@@ -642,7 +704,7 @@ main(int argc, char **argv)
 	}
 	if (Aflg) {
 		Gflg = Uflg = uflg = pflg = sflg = gflg = aflg = dflg = 0;
-		zflg = 0;
+		zflg = hflg = 0;
 	}
 	if (Aflg | aflg | dflg)
 		tflg = 0;
@@ -741,6 +803,8 @@ main(int argc, char **argv)
 		}
 		if (fflg)
 			(void) printf("    STIME");
+		if (Hflg)
+			(void) printf(" LGRP");
 		if (Lflg)
 			(void) printf(" TTY        LTIME CMD\n");
 		else
@@ -748,7 +812,7 @@ main(int argc, char **argv)
 	}
 
 
-	if (pflg && !(aflg|Aflg|dflg|Gflg|Uflg|uflg|tflg|gflg|sflg|zflg) &&
+	if (pflg && !(aflg|Aflg|dflg|Gflg|Uflg|uflg|hflg|tflg|gflg|sflg|zflg) &&
 	    npid <= PTHRESHOLD) {
 		/*
 		 * If we are looking at specific processes go straight
@@ -858,6 +922,8 @@ retry:
 		found++;	/* sessid in s option arg list */
 	else if (zflg && search(zoneid, nzoneid, info.pr_zoneid))
 		found++;	/* zoneid in z option arg list */
+	else if (hflg && search((pid_t *)lgrps, nlgrps, info.pr_lwp.pr_lgrp))
+		found++;	/* home lgroup in h option arg list */
 	if (!found && !tflg && !aflg)
 		return (1);
 	if (!prfind(found, &info, &tp))
@@ -919,11 +985,12 @@ static void
 usage(void)		/* print usage message and quit */
 {
 	static char usage1[] =
-	    "ps [ -aAdeflcjLPyZ ] [ -o format ] [ -t termlist ]";
+	    "ps [ -aAdefHlcjLPyZ ] [ -o format ] [ -t termlist ]";
 	static char usage2[] =
 	    "\t[ -u userlist ] [ -U userlist ] [ -G grouplist ]";
 	static char usage3[] =
-	    "\t[ -p proclist ] [ -g pgrplist ] [ -s sidlist ] [ -z zonelist ]";
+	    "\t[ -p proclist ] [ -g pgrplist ] [ -s sidlist ] [ -z zonelist ] "
+	    "[-h lgrplist]";
 	static char usage4[] =
 	    "  'format' is one or more of:";
 	static char usage5[] =
@@ -934,7 +1001,7 @@ usage(void)		/* print usage message and quit */
 	    "zoneid";
 	static char usage7[] =
 	    "\tf s c lwp nlwp psr tty addr wchan fname comm args "
-	    "projid project pset";
+	    "projid project pset lgrp";
 
 	(void) fprintf(stderr,
 	    gettext("usage: %s\n%s\n%s\n%s\n%s\n%s\n%s\n"),
@@ -1339,6 +1406,12 @@ prcom(psinfo_t *psinfo, char *ttyp)
 		else
 			prtime(psinfo->pr_start, 9, 1);
 	}
+
+	if (Hflg) {
+		/* Display home lgroup */
+		(void) printf(" %4d", (int)psinfo->pr_lwp.pr_lgrp);
+	}
+
 	(void) printf(" %-8.14s", ttyp);			/* TTY */
 	if (Lflg) {
 		tm = psinfo->pr_lwp.pr_time.tv_sec;
@@ -1361,6 +1434,7 @@ prcom(psinfo_t *psinfo, char *ttyp)
 		(void) printf(" %.*s\n", wcnt, psinfo->pr_fname);
 		return;
 	}
+
 
 	/*
 	 * PRARGSZ == length of cmd arg string.
@@ -1748,6 +1822,10 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 		else
 			(void) printf("%*ld", width, (long)psinfo->pr_contract);
 		break;
+	case F_LGRP:
+		/* Display home lgroup */
+		(void) printf("%*d", width, (int)psinfo->pr_lwp.pr_lgrp);
+		break;
 	}
 }
 
@@ -1990,6 +2068,10 @@ przom(psinfo_t *psinfo)
 		} else {
 			(void) printf("%8.8s ", zonename);
 		}
+	}
+	if (Hflg) {
+		/* Display home lgroup */
+		(void) printf(" %6d", (int)psinfo->pr_lwp.pr_lgrp); /* LGRP */
 	}
 	if (fflg) {
 		if ((pwd = getpwuid(psinfo->pr_euid)) != NULL)

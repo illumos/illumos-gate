@@ -168,13 +168,18 @@ lpl_t		*lpl_bootstrap;
 
 static lgrp_t	lroot;
 
-
 /*
  * Size, in bytes, beyond which random memory allocation policy is applied
  * to non-shared memory.  Default is the maximum size, so random memory
  * allocation won't be used for non-shared memory by default.
  */
 size_t	lgrp_privm_random_thresh = (size_t)(-1);
+
+/* the maximum effect that a single thread can have on it's lgroup's load */
+#define	LGRP_LOADAVG_MAX_EFFECT(ncpu) \
+	((lgrp_loadavg_max_effect) / (ncpu))
+uint32_t	lgrp_loadavg_max_effect = LGRP_LOADAVG_THREAD_MAX;
+
 
 /*
  * Size, in bytes, beyond which random memory allocation policy is applied to
@@ -1765,6 +1770,8 @@ lgrp_kstat_extract(kstat_t *ksp, int rw)
 		ksd[stat + LGRP_NUM_PG_FREE].value.i64 =
 		    lgrp_mem_size(lgrpid, LGRP_MEM_SIZE_FREE);
 		ksd[stat + LGRP_LOADAVG].value.i64 = lgrp_sum_loadavgs(lgrp);
+		ksd[stat + LGRP_LOADAVG_SCALE].value.i64 =
+		    lgrp_loadavg_max_effect;
 	} else {
 		lgrp_kstat_reset(lgrpid);
 	}
@@ -2944,11 +2951,6 @@ lpl_topo_bootstrap(lpl_t *target, int size)
 	 */
 	bzero(lpl_bootstrap_list, sizeof (lpl_bootstrap_list));
 }
-
-/* the maximum effect that a single thread can have on it's lgroup's load */
-#define	LGRP_LOADAVG_MAX_EFFECT(ncpu) \
-	((lgrp_loadavg_max_effect) / (ncpu))
-uint32_t	lgrp_loadavg_max_effect = LGRP_LOADAVG_THREAD_MAX;
 
 /*
  * If the lowest load among the lgroups a process' threads are currently

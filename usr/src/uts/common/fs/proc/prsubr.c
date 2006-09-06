@@ -2449,6 +2449,7 @@ prgetlwpsinfo(kthread_t *t, lwpsinfo_t *psp)
 	psp->pr_onpro = t->t_cpu->cpu_id;
 	psp->pr_bindpro = t->t_bind_cpu;
 	psp->pr_bindpset = t->t_bind_pset;
+	psp->pr_lgrp = t->t_lpl->lpl_lgrpid;
 }
 
 #ifdef _SYSCALL32_IMPL
@@ -2517,6 +2518,7 @@ prgetlwpsinfo32(kthread_t *t, lwpsinfo32_t *psp)
 	psp->pr_onpro = t->t_cpu->cpu_id;
 	psp->pr_bindpro = t->t_bind_cpu;
 	psp->pr_bindpset = t->t_bind_pset;
+	psp->pr_lgrp = t->t_lpl->lpl_lgrpid;
 }
 #endif	/* _SYSCALL32_IMPL */
 

@@ -106,8 +106,8 @@ void
 Usage()
 {
 	(void) fprintf(stderr, gettext(
-	    "Usage:\tprstat [-acJLmRtTvZ] [-u euidlist] [-U uidlist]\n"
-	    "\t[-p pidlist] [-P cpulist] [-C psrsetlist]\n"
+	    "Usage:\tprstat [-acHJLmRtTvZ] [-u euidlist] [-U uidlist]\n"
+	    "\t[-p pidlist] [-P cpulist] [-C psrsetlist] [-h lgrouplist]\n"
 	    "\t[-j projidlist] [-k taskidlist] [-z zoneidlist]\n"
 	    "\t[-s key | -S key] [-n nprocs[,nusers]]\n"
 	    "\t[interval [counter]]\n"));

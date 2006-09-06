@@ -72,6 +72,7 @@ f none usr/bin/last 555 root bin
 f none usr/bin/lastcomm 555 root bin
 f none usr/bin/logname 555 root bin
 f none usr/bin/look 755 root bin
+f none usr/bin/lgrpinfo 555 root bin
 f none usr/bin/mkfifo 555 root bin
 f none usr/bin/nawk 555 root bin
 f none usr/bin/newform 555 root bin
@@ -86,7 +87,9 @@ l none usr/bin/pcred=../../usr/lib/isaexec
 l none usr/bin/pfiles=../../usr/lib/isaexec
 l none usr/bin/pflags=../../usr/lib/isaexec
 l none usr/bin/pldd=../../usr/lib/isaexec
+l none usr/bin/plgrp=../../usr/lib/isaexec
 l none usr/bin/pmap=../../usr/lib/isaexec
+l none usr/bin/pmadvise=../../usr/lib/isaexec
 l none usr/bin/ppgsz=../../usr/lib/isaexec
 l none usr/bin/ppriv=../../usr/lib/isaexec
 l none usr/bin/preap=../../usr/lib/isaexec

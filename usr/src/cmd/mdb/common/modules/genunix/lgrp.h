@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,15 @@ extern int lgrp_cpulist_walk_step(mdb_walk_state_t *);
 extern int lgrp_walk_init(mdb_walk_state_t *);
 extern int lgrp_walk_step(mdb_walk_state_t *);
 
+extern int lgrp_parents_walk_init(mdb_walk_state_t *);
+extern int lgrp_parents_walk_step(mdb_walk_state_t *);
+
+extern int lgrp_rsrc_cpu_walk_init(mdb_walk_state_t *);
+extern int lgrp_rsrc_mem_walk_init(mdb_walk_state_t *);
+extern int lgrp_set_walk_step(mdb_walk_state_t *);
+
 extern int lgrp(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern int lgrp_set(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 extern int print_range(int start, int end, int separator);
 extern void print_cpuset_range(ulong_t *cs, int words, int width);
