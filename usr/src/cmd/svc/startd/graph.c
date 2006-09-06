@@ -2929,10 +2929,12 @@ init_state:
 			/* NOTREACHED */
 
 		case ECONNABORTED:
+			startd_free((void *)idata.i_fmri, max_scf_fmri_size);
 			scf_pg_destroy(pg);
 			return (ECONNABORTED);
 
 		case ENOENT:
+			startd_free((void *)idata.i_fmri, max_scf_fmri_size);
 			scf_pg_destroy(pg);
 			return (ECANCELED);
 
@@ -3096,9 +3098,11 @@ set_maint:
 			/* NOTREACHED */
 
 		case ECONNABORTED:
+			startd_free((void *)idata.i_fmri, max_scf_fmri_size);
 			return (ECONNABORTED);
 
 		case ENOENT:
+			startd_free((void *)idata.i_fmri, max_scf_fmri_size);
 			return (ECANCELED);
 
 		case EPERM:
@@ -5358,6 +5362,7 @@ process_actions(scf_handle_t *h, scf_propertygroup_t *pg, scf_instance_t *inst)
 	vertex = vertex_get_by_name(inst_name);
 	if (vertex == NULL) {
 		MUTEX_UNLOCK(&dgraph_lock);
+		startd_free(inst_name, max_scf_fmri_size);
 		log_framework(LOG_DEBUG, "%s: Can't find graph vertex. "
 		    "The instance must have been removed.\n", inst_name);
 		return (0);
