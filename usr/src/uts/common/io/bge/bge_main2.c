@@ -1156,12 +1156,8 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	if (need_privilege) {
 		/*
 		 * Check for specific net_config privilege on Solaris 10+.
-		 * Otherwise just check for root access ...
 		 */
-		if (secpolicy_net_config != NULL)
-			err = secpolicy_net_config(iocp->ioc_cr, B_FALSE);
-		else
-			err = drv_priv(iocp->ioc_cr);
+		err = secpolicy_net_config(iocp->ioc_cr, B_FALSE);
 		if (err != 0) {
 			miocnak(wq, mp, 0, err);
 			return;

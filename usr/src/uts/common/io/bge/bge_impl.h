@@ -92,15 +92,9 @@ typedef uchar_t ether_addr_t[ETHERADDRL];
 
 /*
  * Reconfiguring the network devices requires the net_config privilege
- * in Solaris 10+.  Prior to this, root privilege is required.  In order
- * that the driver binary can run on both S10+ and earlier versions, we
- * make the decision as to which to use at runtime.  These declarations
- * allow for either (or both) to exist ...
+ * in Solaris 10+.
  */
 extern int secpolicy_net_config(const cred_t *, boolean_t);
-extern int drv_priv(cred_t *);
-#pragma	weak	secpolicy_net_config
-#pragma	weak	drv_priv
 
 #include <sys/netlb.h>			/* originally from cassini	*/
 #include <sys/miiregs.h>		/* by fjlite out of intel 	*/
