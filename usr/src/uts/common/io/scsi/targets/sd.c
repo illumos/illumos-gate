@@ -317,6 +317,33 @@ _NOTE(MUTEX_PROTECTS_DATA(sd_detach_mutex,
 static char	sd_log_buf[1024];
 static kmutex_t	sd_log_mutex;
 
+/*
+ * Structs and globals for recording attached lun information.
+ * This maintains a chain. Each node in the chain represents a SCSI controller.
+ * The structure records the number of luns attached to each target connected
+ * with the controller.
+ * For parallel scsi device only.
+ */
+struct sd_scsi_hba_tgt_lun {
+	struct sd_scsi_hba_tgt_lun	*next;
+	dev_info_t			*pdip;
+	int				nlun[NTARGETS_WIDE];
+};
+
+/*
+ * Flag to indicate the lun is attached or detached
+ */
+#define	SD_SCSI_LUN_ATTACH	0
+#define	SD_SCSI_LUN_DETACH	1
+
+static kmutex_t	sd_scsi_target_lun_mutex;
+static struct sd_scsi_hba_tgt_lun	*sd_scsi_target_lun_head = NULL;
+
+_NOTE(MUTEX_PROTECTS_DATA(sd_scsi_target_lun_mutex,
+    sd_scsi_hba_tgt_lun::next sd_scsi_hba_tgt_lun::pdip))
+
+_NOTE(MUTEX_PROTECTS_DATA(sd_scsi_target_lun_mutex,
+    sd_scsi_target_lun_head))
 
 /*
  * "Smart" Probe Caching structs, globals, #defines, etc.
@@ -819,6 +846,10 @@ static int sd_pm_idletime = 1;
 #define	sd_scsi_probe_cache_fini	ssd_scsi_probe_cache_fini
 #define	sd_scsi_clear_probe_cache	ssd_scsi_clear_probe_cache
 #define	sd_scsi_probe_with_cache	ssd_scsi_probe_with_cache
+#define	sd_scsi_target_lun_init		ssd_scsi_target_lun_init
+#define	sd_scsi_target_lun_fini		ssd_scsi_target_lun_fini
+#define	sd_scsi_get_target_lun_count	ssd_scsi_get_target_lun_count
+#define	sd_scsi_update_lun_on_target	ssd_scsi_update_lun_on_target
 #define	sd_spin_up_unit			ssd_spin_up_unit
 #define	sd_enable_descr_sense		ssd_enable_descr_sense
 #define	sd_reenable_dsense_task		ssd_reenable_dsense_task
@@ -1128,6 +1159,14 @@ static void sd_scsi_probe_cache_init(void);
 static void sd_scsi_probe_cache_fini(void);
 static void sd_scsi_clear_probe_cache(void);
 static int  sd_scsi_probe_with_cache(struct scsi_device *devp, int (*fn)());
+
+/*
+ * Attached luns on target for parallel scsi
+ */
+static void sd_scsi_target_lun_init(void);
+static void sd_scsi_target_lun_fini(void);
+static int  sd_scsi_get_target_lun_count(dev_info_t *dip, int target);
+static void sd_scsi_update_lun_on_target(dev_info_t *dip, int target, int flag);
 
 static int	sd_spin_up_unit(struct sd_lun *un);
 #ifdef _LP64
@@ -2228,6 +2267,8 @@ _init(void)
 	 */
 	sd_scsi_probe_cache_init();
 
+	sd_scsi_target_lun_init();
+
 	/*
 	 * Creating taskq before mod_install ensures that all callers (threads)
 	 * that enter the module after a successfull mod_install encounter
@@ -2249,6 +2290,8 @@ _init(void)
 		cv_destroy(&sd_tr.srq_inprocess_cv);
 
 		sd_scsi_probe_cache_fini();
+
+		sd_scsi_target_lun_fini();
 
 		ddi_soft_state_fini(&sd_state);
 		return (err);
@@ -2285,6 +2328,8 @@ _fini(void)
 	mutex_destroy(&sd_tr.srq_resv_reclaim_mutex);
 
 	sd_scsi_probe_cache_fini();
+
+	sd_scsi_target_lun_fini();
 
 	cv_destroy(&sd_tr.srq_resv_reclaim_cv);
 	cv_destroy(&sd_tr.srq_inprocess_cv);
@@ -2841,6 +2886,144 @@ sd_scsi_probe_with_cache(struct scsi_device *devp, int (*waitfn)())
 
 	/* Do the actual probe; save & return the result */
 	return (cp->cache[tgt] = scsi_probe(devp, waitfn));
+}
+
+
+/*
+ *    Function: sd_scsi_target_lun_init
+ *
+ * Description: Initializes the attached lun chain mutex and head pointer.
+ *
+ *     Context: Kernel thread context
+ */
+
+static void
+sd_scsi_target_lun_init(void)
+{
+	mutex_init(&sd_scsi_target_lun_mutex, NULL, MUTEX_DRIVER, NULL);
+	sd_scsi_target_lun_head = NULL;
+}
+
+
+/*
+ *    Function: sd_scsi_target_lun_fini
+ *
+ * Description: Frees all resources associated with the attached lun
+ *              chain
+ *
+ *     Context: Kernel thread context
+ */
+
+static void
+sd_scsi_target_lun_fini(void)
+{
+	struct sd_scsi_hba_tgt_lun	*cp;
+	struct sd_scsi_hba_tgt_lun	*ncp;
+
+	for (cp = sd_scsi_target_lun_head; cp != NULL; cp = ncp) {
+		ncp = cp->next;
+		kmem_free(cp, sizeof (struct sd_scsi_hba_tgt_lun));
+	}
+	sd_scsi_target_lun_head = NULL;
+	mutex_destroy(&sd_scsi_target_lun_mutex);
+}
+
+
+/*
+ *    Function: sd_scsi_get_target_lun_count
+ *
+ * Description: This routine will check in the attached lun chain to see
+ * 		how many luns are attached on the required SCSI controller
+ * 		and target. Currently, some capabilities like tagged queue
+ *		are supported per target based by HBA. So all luns in a
+ *		target have the same capabilities. Based on this assumption,
+ * 		sd should only set these capabilities once per target. This
+ *		function is called when sd needs to decide how many luns
+ *		already attached on a target.
+ *
+ *   Arguments: dip	- Pointer to the system's dev_info_t for the SCSI
+ *			  controller device.
+ *              target	- The target ID on the controller's SCSI bus.
+ *
+ * Return Code: The number of luns attached on the required target and
+ *		controller.
+ *		-1 if target ID is not in parallel SCSI scope or the given
+ * 		dip is not in the chain.
+ *
+ *     Context: Kernel thread context
+ */
+
+static int
+sd_scsi_get_target_lun_count(dev_info_t *dip, int target)
+{
+	struct sd_scsi_hba_tgt_lun	*cp;
+
+	if ((target < 0) || (target >= NTARGETS_WIDE)) {
+		return (-1);
+	}
+
+	mutex_enter(&sd_scsi_target_lun_mutex);
+
+	for (cp = sd_scsi_target_lun_head; cp != NULL; cp = cp->next) {
+		if (cp->pdip == dip) {
+			break;
+		}
+	}
+
+	mutex_exit(&sd_scsi_target_lun_mutex);
+
+	if (cp == NULL) {
+		return (-1);
+	}
+
+	return (cp->nlun[target]);
+}
+
+
+/*
+ *    Function: sd_scsi_update_lun_on_target
+ *
+ * Description: This routine is used to update the attached lun chain when a
+ *		lun is attached or detached on a target.
+ *
+ *   Arguments: dip     - Pointer to the system's dev_info_t for the SCSI
+ *                        controller device.
+ *              target  - The target ID on the controller's SCSI bus.
+ *		flag	- Indicate the lun is attached or detached.
+ *
+ *     Context: Kernel thread context
+ */
+
+static void
+sd_scsi_update_lun_on_target(dev_info_t *dip, int target, int flag)
+{
+	struct sd_scsi_hba_tgt_lun	*cp;
+
+	mutex_enter(&sd_scsi_target_lun_mutex);
+
+	for (cp = sd_scsi_target_lun_head; cp != NULL; cp = cp->next) {
+		if (cp->pdip == dip) {
+			break;
+		}
+	}
+
+	if ((cp == NULL) && (flag == SD_SCSI_LUN_ATTACH)) {
+		cp = kmem_zalloc(sizeof (struct sd_scsi_hba_tgt_lun),
+		    KM_SLEEP);
+		cp->pdip = dip;
+		cp->next = sd_scsi_target_lun_head;
+		sd_scsi_target_lun_head = cp;
+	}
+
+	mutex_exit(&sd_scsi_target_lun_mutex);
+
+	if (cp != NULL) {
+		if (flag == SD_SCSI_LUN_ATTACH) {
+			cp->nlun[target] ++;
+		} else {
+			cp->nlun[target] --;
+		}
+	}
 }
 
 
@@ -7785,14 +7968,22 @@ sd_unit_attach(dev_info_t *devi)
 	int	instance;
 	int	rval;
 	int	wc_enabled;
+	int	tgt;
 	uint64_t	capacity;
 	uint_t		lbasize;
+	dev_info_t	*pdip = ddi_get_parent(devi);
 
 	/*
 	 * Retrieve the target driver's private data area. This was set
 	 * up by the HBA.
 	 */
 	devp = ddi_get_driver_private(devi);
+
+	/*
+	 * Retrieve the target ID of the device.
+	 */
+	tgt = ddi_prop_get_int(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
+	    SCSI_ADDR_PROP_TARGET, -1);
 
 	/*
 	 * Since we have no idea what state things were left in by the last
@@ -7810,8 +8001,21 @@ sd_unit_attach(dev_info_t *devi)
 	 */
 	(void) scsi_ifsetcap(&devp->sd_address, "lun-reset", 0, 1);
 	(void) scsi_ifsetcap(&devp->sd_address, "wide-xfer", 0, 1);
-	(void) scsi_ifsetcap(&devp->sd_address, "tagged-qing", 0, 1);
 	(void) scsi_ifsetcap(&devp->sd_address, "auto-rqsense", 0, 1);
+
+	/*
+	 * Currently, scsi_ifsetcap sets tagged-qing capability for all LUNs
+	 * on a target. Setting it per lun instance actually sets the
+	 * capability of this target, which affects those luns already
+	 * attached on the same target. So during attach, we can only disable
+	 * this capability only when no other lun has been attached on this
+	 * target. By doing this, we assume a target has the same tagged-qing
+	 * capability for every lun. The condition can be removed when HBA
+	 * is changed to support per lun based tagged-qing capability.
+	 */
+	if (sd_scsi_get_target_lun_count(pdip, tgt) < 1) {
+		(void) scsi_ifsetcap(&devp->sd_address, "tagged-qing", 0, 1);
+	}
 
 	/*
 	 * Use scsi_probe() to issue an INQUIRY command to the device.
@@ -8804,6 +9008,16 @@ sd_unit_attach(dev_info_t *devi)
 		break;
 	}
 
+	/*
+	 * After successfully attaching an instance, we record the information
+	 * of how many luns have been attached on the relative target and
+	 * controller for parallel SCSI. This information is used when sd tries
+	 * to set the tagged queuing capability in HBA.
+	 */
+	if (SD_IS_PARALLEL_SCSI(un) && (tgt >= 0) && (tgt < NTARGETS_WIDE)) {
+		sd_scsi_update_lun_on_target(pdip, tgt, SD_SCSI_LUN_ATTACH);
+	}
+
 	SD_TRACE(SD_LOG_ATTACH_DETACH, un,
 	    "sd_unit_attach: un:0x%p exit success\n", un);
 
@@ -8824,7 +9038,15 @@ create_minor_nodes_failed:
 	 */
 	(void) scsi_ifsetcap(SD_ADDRESS(un), "lun-reset", 0, 1);
 	(void) scsi_ifsetcap(SD_ADDRESS(un), "wide-xfer", 0, 1);
-	(void) scsi_ifsetcap(SD_ADDRESS(un), "tagged-qing", 0, 1);
+
+	/*
+	 * Refer to the comments of setting tagged-qing in the beginning of
+	 * sd_unit_attach. We can only disable tagged queuing when there is
+	 * no lun attached on the target.
+	 */
+	if (sd_scsi_get_target_lun_count(pdip, tgt) < 1) {
+		(void) scsi_ifsetcap(SD_ADDRESS(un), "tagged-qing", 0, 1);
+	}
 
 	if (un->un_f_is_fibre == FALSE) {
 	    (void) scsi_ifsetcap(SD_ADDRESS(un), "auto-rqsense", 0, 1);
@@ -8957,7 +9179,9 @@ sd_unit_detach(dev_info_t *devi)
 	struct scsi_device	*devp;
 	struct sd_lun		*un;
 	int			i;
+	int			tgt;
 	dev_t			dev;
+	dev_info_t		*pdip = ddi_get_parent(devi);
 	int			instance = ddi_get_instance(devi);
 
 	mutex_enter(&sd_detach_mutex);
@@ -8986,6 +9210,9 @@ sd_unit_detach(dev_info_t *devi)
 	 */
 	un->un_detach_count++;
 	mutex_exit(&sd_detach_mutex);
+
+	tgt = ddi_prop_get_int(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
+	    SCSI_ADDR_PROP_TARGET, -1);
 
 	dev = sd_make_device(SD_DEVINFO(un));
 
@@ -9218,7 +9445,20 @@ sd_unit_detach(dev_info_t *devi)
 	 */
 	(void) scsi_ifsetcap(SD_ADDRESS(un), "lun-reset", 0, 1);
 	(void) scsi_ifsetcap(SD_ADDRESS(un), "wide-xfer", 0, 1);
-	(void) scsi_ifsetcap(SD_ADDRESS(un), "tagged-qing", 0, 1);
+
+	/*
+	 * Currently, tagged queuing is supported per target based by HBA.
+	 * Setting this per lun instance actually sets the capability of this
+	 * target in HBA, which affects those luns already attached on the
+	 * same target. So during detach, we can only disable this capability
+	 * only when this is the only lun left on this target. By doing
+	 * this, we assume a target has the same tagged queuing capability
+	 * for every lun. The condition can be removed when HBA is changed to
+	 * support per lun based tagged queuing capability.
+	 */
+	if (sd_scsi_get_target_lun_count(pdip, tgt) <= 1) {
+		(void) scsi_ifsetcap(SD_ADDRESS(un), "tagged-qing", 0, 1);
+	}
 
 	if (un->un_f_is_fibre == FALSE) {
 		(void) scsi_ifsetcap(SD_ADDRESS(un), "auto-rqsense", 0, 1);
@@ -9350,6 +9590,20 @@ sd_unit_detach(dev_info_t *devi)
 
 	/* This frees up the INQUIRY data associated with the device. */
 	scsi_unprobe(devp);
+
+	/*
+	 * After successfully detaching an instance, we update the information
+	 * of how many luns have been attached in the relative target and
+	 * controller for parallel SCSI. This information is used when sd tries
+	 * to set the tagged queuing capability in HBA.
+	 * Since un has been released, we can't use SD_IS_PARALLEL_SCSI(un) to
+	 * check if the device is parallel SCSI. However, we don't need to
+	 * check here because we've already checked during attach. No device
+	 * that is not parallel SCSI is in the chain.
+	 */
+	if ((tgt >= 0) && (tgt < NTARGETS_WIDE)) {
+		sd_scsi_update_lun_on_target(pdip, tgt, SD_SCSI_LUN_DETACH);
+	}
 
 	return (DDI_SUCCESS);
 
