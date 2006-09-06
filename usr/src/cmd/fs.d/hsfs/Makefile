@@ -22,13 +22,13 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #  /usr/src/cmd/lib/fs/hsfs is the directory of all ufs specific commands
 #  whose executable reside in $(INSDIR1) and $(INSDIR2).
 #
 
-SUBDIR1=        fstyp mkproto labelit ident
+SUBDIR1=        fstyp labelit ident
 SUBDIR2=        mount
 SUBDIRS=        $(SUBDIR1) $(SUBDIR2)
 
