@@ -115,6 +115,14 @@ Boolean_t spc_encode_lu_addr(uint8_t *buf, int select_field, uint32_t lun);
 #define	SPC_ASCQ_CAP_CHANGE	0x09
 #define	SPC_ASC_IN_PROG		0x04
 #define	SPC_ASCQ_IN_PROG	0x07
+#define	SPC_ASC_DATA_PATH	0x41
+#define	SPC_ASCQ_DATA_PATH	0x00
+#define	SPC_ASC_MISCOMPARE	0x1d
+#define	SPC_ASCQ_MISCOMPARE	0x00
+#define	SPC_ASC_INVALID_LU	0x20
+#define	SPC_ASCQ_INVALID_LU	0x09
+#define	SPC_ASC_BLOCK_RANGE	0x21
+#define	SPC_ASCQ_BLOCK_RANGE	0x00
 
 /*
  * []------------------------------------------------------------------[]

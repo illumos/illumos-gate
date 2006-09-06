@@ -298,6 +298,7 @@ extern "C" {
  */
 #define	SCMD_GROUP4		0x80
 #define	SCMD_EXTENDED_COPY	0x83
+#define	SCMD_VERIFY_G4		0x8f
 
 /*
  * Group 4 Commands, Direct Access Devices
@@ -334,7 +335,7 @@ extern "C" {
 #define	SCMD_WRITE_G5		0xAA
 #define	SCMD_READ_MEDIA_SERIAL	0xAB
 #define	SCMD_GET_PERFORMANCE	0xAC
-
+#define	SCMD_VERIFY_G5		0xAF
 
 
 /*

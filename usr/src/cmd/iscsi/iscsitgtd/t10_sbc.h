@@ -43,6 +43,17 @@ extern "C" {
 #define	SBC_SYNC_CACHE_NV	0x04
 
 /*
+ * SBC-2 revision 16, section 5.20 - VERIFY command.
+ * Bits found in the CDB.
+ */
+/* --- Bits found in byte 1 --- */
+#define	SBC_VRPROTECT_MASK	0xe0
+#define	SBC_DPO			0x10
+#define	SBC_BYTCHK		0x02
+/* --- Bits found in byte 6 --- */
+#define	SBC_GROUP_MASK		0x1f
+
+/*
  * SBC-2 revision 16, section 5.17 START_STOP
  * Table 49 -- POWER CONDITION field
  */

@@ -327,8 +327,6 @@ sess_process(void *v)
 			    cmd->c_scb_len, (transport_t)cmd,
 			    &t10_cmd) == False) {
 
-				queue_prt(s->s_mgmtq, Q_SESS_ERRS,
-				    "SES%x  FAILED to create cmd", s->s_num);
 				/*
 				 * If the command create failed, the T10 layer
 				 * will attempt to create a sense buffer
@@ -337,12 +335,16 @@ sess_process(void *v)
 				 * things are really bad and we need to just
 				 * close the connection.
 				 */
-				if (cmd->c_t10_cmd != NULL) {
+				if (t10_cmd != NULL) {
 					queue_message_set(
 					    cmd->c_allegiance->c_dataq,
 					    0, msg_cmd_cmplt, t10_cmd);
-				} else
+				} else {
+					queue_prt(s->s_mgmtq, Q_SESS_ERRS,
+					    "SES%x  FAILED to create cmd",
+					    s->s_num);
 					conn_state(cmd->c_allegiance, T11);
+				}
 			} else {
 				(void) pthread_mutex_lock(
 				    &cmd->c_allegiance->c_mutex);

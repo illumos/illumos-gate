@@ -163,7 +163,6 @@ sbc_init_per(t10_lu_impl_t *itl)
 		itl->l_cmd	= spc_cmd_offline;
 	itl->l_data	= sbc_data;
 	itl->l_cmd_table = lba_table;
-
 }
 
 void
@@ -301,8 +300,10 @@ sbc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	disk_params_t	*d;
 	uchar_t		addl_sense_len;
 
-	if ((d = (disk_params_t *)T10_PARAMS_AREA(cmd)) == NULL)
+	if ((d = (disk_params_t *)T10_PARAMS_AREA(cmd)) == NULL) {
+		trans_send_complete(cmd, STATUS_BUSY);
 		return;
+	}
 
 	switch (u->scc_cmd) {
 	case SCMD_READ:
@@ -377,11 +378,6 @@ sbc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		else
 			err_blkno = d->d_size;
 
-		/*
-		 * XXX: What's SBC-2 say about ASC/ASCQ here. Solaris
-		 * doesn't care about these values when key is set
-		 * to KEY_ILLEGAL_REQUEST.
-		 */
 		if (err_blkno > FIXED_SENSE_ADDL_INFO_LEN)
 			addl_sense_len = INFORMATION_SENSE_DESCR;
 		else
@@ -389,7 +385,7 @@ sbc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, addl_sense_len);
 		spc_sense_info(cmd, err_blkno);
-		spc_sense_ascq(cmd, 0x21, 0x00);
+		spc_sense_ascq(cmd, SPC_ASC_BLOCK_RANGE, SPC_ASCQ_BLOCK_RANGE);
 		trans_send_complete(cmd, STATUS_CHECK);
 
 		queue_prt(mgmtq, Q_STE_ERRS,
@@ -503,8 +499,10 @@ sbc_write(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	size_t		max_out;
 	void		*mmap_area;
 
-	if ((d = (disk_params_t *)T10_PARAMS_AREA(cmd)) == NULL)
+	if ((d = (disk_params_t *)T10_PARAMS_AREA(cmd)) == NULL) {
+		trans_send_complete(cmd, STATUS_BUSY);
 		return;
+	}
 
 	/*LINTED*/
 	u = (union scsi_cdb *)cdb;
@@ -580,11 +578,6 @@ sbc_write(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		else
 			err_blkno = d->d_size;
 
-		/*
-		 * XXX: What's SBC-2 say about ASC/ASCQ here. Solaris
-		 * doesn't care about these values when key is set
-		 * to KEY_ILLEGAL_REQUEST.
-		 */
 		if (err_blkno > FIXED_SENSE_ADDL_INFO_LEN)
 			addl_sense_len = INFORMATION_SENSE_DESCR;
 		else
@@ -592,7 +585,7 @@ sbc_write(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, addl_sense_len);
 		spc_sense_info(cmd, err_blkno);
-		spc_sense_ascq(cmd, 0x21, 0x00);
+		spc_sense_ascq(cmd, SPC_ASC_BLOCK_RANGE, SPC_ASCQ_BLOCK_RANGE);
 		trans_send_complete(cmd, STATUS_CHECK);
 
 		queue_prt(mgmtq, Q_STE_ERRS,
@@ -1288,6 +1281,233 @@ sbc_release(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	trans_send_complete(cmd, STATUS_GOOD);
 }
 
+/*ARGSUSED*/
+static void
+sbc_verify(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
+{
+	/*LINTED*/
+	union scsi_cdb	*u		= (union scsi_cdb *)cdb;
+	diskaddr_t	addr;
+	uint32_t	cnt,
+			chk_size;
+	uint64_t	sz,
+			err_blkno;
+	Boolean_t	bytchk;
+	char		*chk_block;
+	disk_io_t	*io;
+	disk_params_t	*d;
+	uchar_t		addl_sense_len;
+
+	if ((d = (disk_params_t *)T10_PARAMS_AREA(cmd)) == NULL) {
+		trans_send_complete(cmd, STATUS_BUSY);
+		return;
+	}
+
+	/*
+	 * Check the common reserved bits here and check the CONTROL byte
+	 * in each specific section for the different CDB sizes.
+	 * NOTE: If the VRPROTECT is non-zero we're required by SBC-3
+	 * to return an error since our emulation code doesn't have
+	 * any protection information stored on the media that we can
+	 * access.
+	 */
+	if ((cdb[1] & ~(SBC_VRPROTECT_MASK|SBC_DPO|SBC_BYTCHK)) ||
+	    (cdb[1] & SBC_VRPROTECT_MASK)) {
+		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
+		spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
+		trans_send_complete(cmd, STATUS_CHECK);
+		return;
+	}
+
+	bytchk = cdb[1] & SBC_BYTCHK ? True : False;
+
+	switch (u->scc_cmd) {
+	case SCMD_VERIFY:
+		/*
+		 * BYTE 6 of the VERIFY(10) contains bits:
+		 * 0-4: Group number -- not supported must be zero
+		 * 5-6: Reserved
+		 * 7  : Restricted for MMC-4
+		 */
+		if (cdb[6] || SAM_CONTROL_BYTE_RESERVED(cdb[9])) {
+			spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
+			spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
+			trans_send_complete(cmd, STATUS_CHECK);
+			return;
+		}
+		addr	= (diskaddr_t)(uint32_t)GETG1ADDR(u);
+		cnt	= GETG1COUNT(u);
+		break;
+
+	case SCMD_VERIFY_G4:
+		/*
+		 * See VERIFY(10) above for definitions of what byte 14
+		 * contains.
+		 */
+		if (cdb[14] || SAM_CONTROL_BYTE_RESERVED(cdb[15])) {
+			spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
+			spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
+			trans_send_complete(cmd, STATUS_CHECK);
+			return;
+		}
+		addr	= GETG4LONGADDR(u);
+		cnt	= GETG4COUNT(u);
+		break;
+
+	case SCMD_VERIFY_G5:
+		/*
+		 * See VERIFY(10) above for definitions of what byte 10
+		 * contains.
+		 */
+		if (cdb[10] || SAM_CONTROL_BYTE_RESERVED(cdb[11])) {
+			spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
+			spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
+			trans_send_complete(cmd, STATUS_CHECK);
+			return;
+		}
+		addr	= (diskaddr_t)GETG5ADDR(u);
+		cnt	= GETG5COUNT(u);
+		break;
+
+	default:
+		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
+		spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
+		trans_send_complete(cmd, STATUS_CHECK);
+		return;
+	}
+
+	if ((addr + cnt) > d->d_size) {
+
+		if (addr > d->d_size)
+			err_blkno = addr;
+		else
+			err_blkno = d->d_size;
+
+		if (err_blkno > FIXED_SENSE_ADDL_INFO_LEN)
+			addl_sense_len = INFORMATION_SENSE_DESCR;
+		else
+			addl_sense_len = 0;
+
+		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, addl_sense_len);
+		spc_sense_info(cmd, err_blkno);
+		spc_sense_ascq(cmd, SPC_ASC_BLOCK_RANGE, SPC_ASCQ_BLOCK_RANGE);
+		trans_send_complete(cmd, STATUS_CHECK);
+
+		queue_prt(mgmtq, Q_STE_ERRS,
+		    "SBC%x  LUN%d WRITE Illegal sector "
+		    "(0x%llx + 0x%x) > 0x%ullx", cmd->c_lu->l_targ->s_targ_num,
+		    cmd->c_lu->l_common->l_num, addr, cnt, d->d_size);
+		return;
+	}
+
+	if (bytchk == False) {
+		/*
+		 * With Byte Check being false all we need to do
+		 * is make sure that we can read the data off of the
+		 * media.
+		 */
+		chk_size = 1024 * 1024;
+		if ((chk_block = malloc(chk_size)) == NULL) {
+			trans_send_complete(cmd, STATUS_BUSY);
+			return;
+		}
+		while (cnt) {
+			sz = MIN(chk_size, cnt * 512);
+			/*
+			 * Even if the device is mmap'd in use pread. This
+			 * way we know directly if a read of the data has
+			 * failed.
+			 */
+			if (pread(cmd->c_lu->l_common->l_fd, chk_block, sz,
+			    addr * 512LL) != sz) {
+				spc_sense_create(cmd, KEY_MEDIUM_ERROR, 0);
+				spc_sense_ascq(cmd, SPC_ASC_DATA_PATH,
+				    SPC_ASCQ_DATA_PATH);
+				trans_send_complete(cmd, STATUS_CHECK);
+				free(chk_block);
+				return;
+			}
+			addr += sz / 512LL;
+			cnt -= sz / 512;
+		}
+		free(chk_block);
+		trans_send_complete(cmd, STATUS_GOOD);
+	} else {
+
+		io = cmd->c_emul_id;
+		if (io == NULL) {
+			io			= sbc_io_alloc(cmd);
+			io->da_lba		= addr;
+			io->da_lba_cnt		= cnt;
+			io->da_clear_overlap	= False;
+			io->da_aio.a_aio_cmplt	= sbc_write_cmplt;
+			io->da_aio.a_id		= io;
+		}
+
+		sz = cmd->c_lu->l_targ->s_maxout;
+		io->da_data_alloc = True;
+		io->da_data_len = sz ? MIN(sz, (cnt * 512) - io->da_offset) :
+		    (cnt * 512);
+
+		/*
+		 * Since we're going to just check the data we don't wish
+		 * to possibly change the on disk data. Therefore, even if
+		 * the backing store is mmap'd in we allocate space for the
+		 * data out buffer.
+		 */
+		if ((io->da_data = malloc(io->da_data_len)) == NULL) {
+			trans_send_complete(cmd, STATUS_BUSY);
+			return;
+		}
+
+		if (trans_rqst_dataout(cmd, io->da_data, io->da_data_len,
+		    io->da_offset, io) == False)
+			trans_send_complete(cmd, STATUS_BUSY);
+	}
+}
+
+/*ARGSUSED*/
+static void
+sbc_verify_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
+    size_t data_len)
+{
+	disk_io_t	*io = (disk_io_t *)id;
+	char		*on_disk_buf;
+
+	if ((on_disk_buf = malloc(io->da_data_len)) == NULL) {
+		sbc_io_free(io);
+		trans_send_complete(cmd, STATUS_BUSY);
+	}
+
+	if (pread(cmd->c_lu->l_common->l_fd, on_disk_buf, io->da_data_len,
+	    io->da_offset + (io->da_lba * 512LL)) != io->da_data_len) {
+		spc_sense_create(cmd, KEY_MISCOMPARE, 0);
+		spc_sense_ascq(cmd, SPC_ASC_DATA_PATH, SPC_ASCQ_DATA_PATH);
+		trans_send_complete(cmd, STATUS_CHECK);
+		sbc_io_free(io);
+		return;
+	}
+	if (bcmp(on_disk_buf, io->da_data, io->da_data_len) != 0) {
+		spc_sense_create(cmd, KEY_MISCOMPARE, 0);
+		spc_sense_ascq(cmd, SPC_ASC_MISCOMPARE, SPC_ASCQ_MISCOMPARE);
+		trans_send_complete(cmd, STATUS_CHECK);
+		sbc_io_free(io);
+		return;
+	}
+	free(on_disk_buf);
+	io->da_offset += io->da_data_len;
+	if (io->da_offset < (io->da_lba_cnt * 512)) {
+		if (io->da_data_alloc == True) {
+			io->da_data_alloc = False;
+			free(io->da_data);
+		}
+		sbc_verify(cmd, cmd->c_cdb, cmd->c_cdb_len);
+		return;
+	}
+	sbc_io_free(io);
+	trans_send_complete(cmd, STATUS_GOOD);
+}
+
 /*
  * []------------------------------------------------------------------[]
  * | Support related functions for SBC-2				|
@@ -1620,7 +1840,7 @@ static scsi_cmd_table_t lba_table[] = {
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
-	{ spc_unsupported,	NULL,	NULL,	NULL },
+	{ sbc_verify,	sbc_verify_data,	NULL,	"VERIFY_G1" },
 
 	/* 0x30 -- 0x3f */
 	{ spc_unsupported,	NULL,	NULL,	NULL },
@@ -1728,7 +1948,7 @@ static scsi_cmd_table_t lba_table[] = {
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
-	{ spc_unsupported,	NULL,	NULL,	NULL },
+	{ sbc_verify,	sbc_verify_data,	NULL,	"VERIFY_G4" },
 
 	/* 0x90 -- 0x9f */
 	{ spc_unsupported,	NULL,	NULL,	NULL },
@@ -1764,7 +1984,7 @@ static scsi_cmd_table_t lba_table[] = {
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
 	{ spc_unsupported,	NULL,	NULL,	NULL },
-	{ spc_unsupported,	NULL,	NULL,	NULL },
+	{ sbc_verify,	sbc_verify_data,	NULL,	"VERIFY_G5" },
 
 	/* 0xb0 -- 0xbf */
 	{ spc_unsupported,	NULL,	NULL,	NULL },

@@ -444,6 +444,11 @@ union scsi_cdb {		/* scsi command description block */
 				((cdb)->scc5_addr1 << 8)  + \
 				((cdb)->scc5_addr0)
 
+#define	GETG5COUNT(cdb)		((cdb)->scc5_count3 << 24) + \
+				((cdb)->scc5_count2 << 16) + \
+				((cdb)->scc5_count1 << 8) + \
+				((cdb)->scc5_count0)
+
 #define	GETG5TAG(cdb)		(cdb)->scc5_reladdr
 
 

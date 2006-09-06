@@ -71,7 +71,7 @@
 /*
  * Forward declarations
  */
-static t10_lu_impl_t *t10_find_lun(t10_targ_impl_t *t, int lun);
+static Boolean_t t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *);
 static void *lu_runner(void *v);
 static Boolean_t t10_lu_initialize(t10_lu_common_t *lu, char *basedir);
 static void *t10_aio_done(void *v);
@@ -353,11 +353,8 @@ t10_cmd_create(t10_targ_handle_t t, int lun_number, uint8_t *cdb,
 
 	cmd->c_trans_id	= trans_id;
 	*cmdp		= cmd;
-	if ((cmd->c_lu = t10_find_lun((t10_targ_impl_t *)t, lun_number)) ==
-	    NULL) {
-		spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
+	if (t10_find_lun((t10_targ_impl_t *)t, lun_number, cmd) == False)
 		goto error;
-	}
 
 	(void) pthread_mutex_lock(&cmd->c_lu->l_cmd_mutex);
 	avl_add(&cmd->c_lu->l_cmds, (void *)cmd);
@@ -1095,8 +1092,8 @@ trans_params_area(t10_cmd_t *cmd)
  * []----
  */
 /*ARGSUSED*/
-static t10_lu_impl_t *
-t10_find_lun(t10_targ_impl_t *t, int lun)
+static Boolean_t
+t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 {
 	t10_lu_impl_t		*l		= NULL,
 				search;
@@ -1128,14 +1125,17 @@ t10_find_lun(t10_targ_impl_t *t, int lun)
 		 * and there's fewer than 64 an array of pointers would be
 		 * even faster than an AVL tree and not take up to much space.
 		 */
-		return (l);
+		cmd->c_lu = l;
+		return (True);
 	}
 
 	/*
 	 * First access for this I_T_L so we need to allocate space for it.
 	 */
-	if ((l = calloc(1, sizeof (*l))) == NULL)
-		return (NULL);
+	if ((l = calloc(1, sizeof (*l))) == NULL) {
+		spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
+		return (False);
+	}
 
 	/*
 	 * Initialize the various local fields. Certain fields will not be
@@ -1163,6 +1163,9 @@ t10_find_lun(t10_targ_impl_t *t, int lun)
 	(void) pthread_mutex_lock(&lu_list_mutex);
 	if ((xml_fd = open(path, O_RDONLY)) < 0) {
 		(void) pthread_mutex_unlock(&lu_list_mutex);
+		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
+		/* ---- ACCESS DENIED - INVALID LU IDENTIFIER ---- */
+		spc_sense_ascq(cmd, 0x20, 0x9);
 		goto error;
 	}
 	if ((r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd, NULL, NULL,
@@ -1172,16 +1175,25 @@ t10_find_lun(t10_targ_impl_t *t, int lun)
 				break;
 	} else {
 		(void) pthread_mutex_unlock(&lu_list_mutex);
+		spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 		goto error;
 	}
 
 	(void) close(xml_fd);
+	/*
+	 * Set xml_fd back to -1 so that if an error occurs later we don't
+	 * attempt to close a file descriptor that another thread might have
+	 * opened.
+	 */
+	xml_fd = -1;
+
 	xmlTextReaderClose(r);
 	xmlFreeTextReader(r);
 	r = NULL;
 
 	if (xml_find_value_str(n, XML_ELEMENT_GUID, &guid) == False) {
 		(void) pthread_mutex_unlock(&lu_list_mutex);
+		spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 		goto error;
 	}
 
@@ -1189,24 +1201,29 @@ t10_find_lun(t10_targ_impl_t *t, int lun)
 		free(guid);
 		if (util_create_guid(&guid) == False) {
 			(void) pthread_mutex_unlock(&lu_list_mutex);
+			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			goto error;
 		}
 		if ((n1 = xml_find_child(n, XML_ELEMENT_GUID)) == NULL) {
 			(void) pthread_mutex_unlock(&lu_list_mutex);
+			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			goto error;
 		}
 		if (xml_update_value_str(n1, XML_ELEMENT_GUID, guid) == False) {
 			(void) pthread_mutex_unlock(&lu_list_mutex);
+			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			goto error;
 		}
 		if (xml_dump2file(n, path) == False) {
 			(void) pthread_mutex_unlock(&lu_list_mutex);
+			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			goto error;
 		}
 	}
 
 	if (xml_decode_bytes(guid, &lc.l_guid, &lc.l_guid_len) == False) {
 		(void) pthread_mutex_unlock(&lu_list_mutex);
+		spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 		goto error;
 	}
 
@@ -1222,6 +1239,7 @@ t10_find_lun(t10_targ_impl_t *t, int lun)
 		 */
 		if ((common = calloc(1, sizeof (*common))) == NULL) {
 			(void) pthread_mutex_unlock(&lu_list_mutex);
+			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			goto error;
 		}
 
@@ -1242,6 +1260,7 @@ t10_find_lun(t10_targ_impl_t *t, int lun)
 			    "SAM%x  FAILED to initialize LU %d",
 			    t->s_targ_num, lun);
 			(void) pthread_mutex_unlock(&lu_list_mutex);
+			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			goto error;
 		}
 
@@ -1300,7 +1319,8 @@ t10_find_lun(t10_targ_impl_t *t, int lun)
 	free(guid);
 	xml_tree_free(n);
 
-	return (l);
+	cmd->c_lu = l;
+	return (True);
 
 error:
 	if (guid)
@@ -1319,7 +1339,7 @@ error:
 		free(lc.l_guid);
 	if (common)
 		free(common);
-	return (NULL);
+	return (False);
 }
 
 static Boolean_t
