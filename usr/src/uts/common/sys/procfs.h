@@ -61,7 +61,6 @@ extern "C" {
 #include <sys/pset.h>
 #include <sys/procfs_isa.h>
 #include <sys/priv.h>
-#include <sys/lgrp.h>
 
 #if !defined(_LP64) && _FILE_OFFSET_BITS == 64
 #error	"Cannot use procfs in the large file compilation environment"
@@ -263,7 +262,7 @@ typedef struct lwpsinfo {
 	processorid_t pr_onpro;		/* processor which last ran this lwp */
 	processorid_t pr_bindpro;	/* processor to which lwp is bound */
 	psetid_t pr_bindpset;	/* processor set to which lwp is bound */
-	lgrp_id_t pr_lgrp;	/* lwp home lgroup */
+	int	pr_lgrp;	/* lwp home lgroup */
 	int	pr_filler[4];	/* reserved for future use */
 } lwpsinfo_t;
 
@@ -635,7 +634,7 @@ typedef struct lwpsinfo32 {
 	processorid_t pr_onpro;		/* processor which last ran this lwp */
 	processorid_t pr_bindpro;	/* processor to which lwp is bound */
 	psetid_t pr_bindpset;	/* processor set to which lwp is bound */
-	lgrp_id_t pr_lgrp;	/* lwp home lgroup */
+	int	pr_lgrp;	/* lwp home lgroup */
 	int	pr_filler[4];	/* reserved for future use */
 } lwpsinfo32_t;
 
