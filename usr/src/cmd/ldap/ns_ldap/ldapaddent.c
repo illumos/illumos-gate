@@ -550,7 +550,7 @@ static int
 genent_hosts(char *line, int (*cback)())
 {
 	char buf[BUFSIZ+1];
-	char *t;
+	char *t, *comment;
 	entry_col ecol[4];
 	char *cname, *pref_addr;
 	int ctr = 0, retval = 1;
@@ -575,17 +575,23 @@ genent_hosts(char *line, int (*cback)())
 
 	/*
 	 * comment (col 3)
+	 * All leading spaces will be deleted from the comment
 	 */
-	t = strchr(buf, '#');
-	if (t) {
-		*t++ = 0;
-		ecol[3].ec_value.ec_value_val = t;
-		ecol[3].ec_value.ec_value_len = strlen(t)+1;
-	} else {
-		ecol[3].ec_value.ec_value_val = "";
-		ecol[3].ec_value.ec_value_len = 0;
-	}
+	ecol[3].ec_value.ec_value_val = "";
+	ecol[3].ec_value.ec_value_len = 0;
+	comment = t = strchr(buf, '#');
+	if (comment) {
+		do {
+			++comment;
+		} while (*comment != '\0' && isspace(*comment));
+		if (*comment != '\0') {
+			*--comment = '#';
+			ecol[3].ec_value.ec_value_val = strdup(comment);
+			ecol[3].ec_value.ec_value_len = strlen(comment)+1;
+		}
 
+		*t = '\0';
+	}
 
 	/*
 	 * addr(col 2)
@@ -672,20 +678,22 @@ genent_hosts(char *line, int (*cback)())
 			exit(1);
 		}
 		data.h_aliases[ctr-1] = alias;
-
-		/*
-		 * only put comment in canonical entry
-		 */
-		ecol[3].ec_value.ec_value_val = 0;
-		ecol[3].ec_value.ec_value_len = 0;
-
 	} while (t = strtok(NULL, " \t"));
 
-	/* End the list of all the aliases by NULL */
+	/*
+	 * End the list of all the aliases by NULL
+	 * If there is some comment, it will be stored as the last entry
+	 * in the list of the host aliases
+	 */
 	if ((data.h_aliases = (char **)realloc(data.h_aliases,
-		(ctr + 1) * sizeof (char **))) == NULL) {
+		(ecol[3].ec_value.ec_value_len != 0 ?
+			ctr + 2 : ctr + 1) * sizeof (char **))) == NULL) {
 		(void) fprintf(stderr, gettext("out of memory\n"));
 		exit(1);
+	}
+
+	if (ecol[3].ec_value.ec_value_len != 0) {
+		data.h_aliases[ctr++] = ecol[3].ec_value.ec_value_val;
 	}
 	data.h_aliases[ctr] = NULL;
 
@@ -695,6 +703,10 @@ genent_hosts(char *line, int (*cback)())
 		    data.h_name, data.h_addr_list[0]);
 
 	retval = (*cback)(&data, 0);
+
+	if (ecol[3].ec_value.ec_value_len != 0) {
+		free(ecol[3].ec_value.ec_value_val);
+	}
 
 	if (retval == LDAP_ALREADY_EXISTS) {
 		if (continue_onerror)
@@ -724,7 +736,10 @@ genent_hosts(char *line, int (*cback)())
 static void
 dump_hosts(ns_ldap_result_t *res)
 {
-	ns_ldap_attr_t	*attrptr = NULL, *cn = NULL, *iphostnumber = NULL;
+	ns_ldap_attr_t	*attrptr = NULL,
+			*cn = NULL,
+			*iphostnumber = NULL,
+			*desc = NULL;
 	int		 i, j;
 	char		*name; /* host name */
 
@@ -736,6 +751,9 @@ dump_hosts(ns_ldap_result_t *res)
 			cn = attrptr;
 		else if (strcasecmp(attrptr->attrname, "iphostnumber") == 0)
 			iphostnumber = attrptr;
+		else if (strcasecmp(attrptr->attrname, "description") == 0) {
+			desc = attrptr;
+		}
 	}
 	/* sanity check */
 	if (cn == NULL || cn->attrvalue == NULL || cn->attrvalue[0] == NULL ||
@@ -765,6 +783,12 @@ dump_hosts(ns_ldap_result_t *res)
 				continue;
 			(void) fprintf(stdout, "%s ", cn->attrvalue[j]);
 		}
+	}
+
+	/* description */
+	if (desc != NULL && desc->attrvalue != NULL &&
+	    desc->attrvalue[0] != NULL) {
+		(void) fprintf(stdout, "#%s", desc->attrvalue[0]);
 	}
 
 	/* end of line */
@@ -2267,6 +2291,7 @@ genent_publickey(char *line, int (*cback)())
 	free(data.pubkey);
 	free(data.privkey);
 	return (GENENT_OK);
+
 }
 
 static void

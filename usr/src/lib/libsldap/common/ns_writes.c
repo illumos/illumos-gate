@@ -1731,7 +1731,11 @@ __s_cvt_hosts(const void *data, char **rdn,
 	/* Error check the data and add the attributes */
 	if (ptr->h_aliases && ptr->h_aliases[0]) {
 		lm = ptr->h_aliases;
-		for (i = 0; *lm; i++, lm++)
+		/*
+		 * If there is a description, 'i' will contain
+		 * the index of the description in the aliases list
+		 */
+		for (i = 0; *lm && (*lm)[0] != '#'; i++, lm++)
 			;
 		lm = ptr->h_aliases;
 		nm = (char **)calloc(i+2, sizeof (char *));
@@ -1744,6 +1748,18 @@ __s_cvt_hosts(const void *data, char **rdn,
 			nm[j+1] = ptr->h_aliases[j];
 
 		rc = __s_add_attrlist(e, "cn", nm);
+
+		if (rc != NS_LDAP_SUCCESS) {
+			__s_cvt_freeEntryRdn(entry, rdn);
+			free(nm);
+			return (rc);
+		}
+
+		if (lm[i] && lm[i][0] == '#') {
+			nm[0] = &(lm[i][1]);
+			nm[1] = NULL;
+			rc = __s_add_attrlist(e, "description", nm);
+		}
 		free(nm);
 		nm = NULL;
 		if (rc != NS_LDAP_SUCCESS) {
