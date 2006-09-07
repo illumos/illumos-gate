@@ -3805,6 +3805,14 @@ ret:
 						warn("malloc");
 						return (ENOMEM);
 					}
+					if (strlen(tmp_buf) != 0) {
+						(void) strcpy(argvec[i],
+						    tmp_buf);
+						if (argindex >= ARG_BUF_LEN)
+							return (-1);
+						arg_indices[argindex++] =
+						    linecount;
+					}
 					/*
 					 * Copy the rest of the line into the
 					 * leftover buffer.
@@ -3814,14 +3822,6 @@ ret:
 						*leftover = lo_buf;
 					} else {
 						*leftover = NULL;
-					}
-					if (strlen(tmp_buf) != 0) {
-						(void) strcpy(argvec[i],
-						    tmp_buf);
-						if (argindex >= ARG_BUF_LEN)
-							return (-1);
-						arg_indices[argindex++] =
-						    linecount;
 					}
 					return (PARSE_SUCCESS);
 				} else {
