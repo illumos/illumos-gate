@@ -2644,68 +2644,47 @@ fr_info_t *fin;
 u_int *nflags;
 int dir;
 {
-	u_32_t sum1, sum2, sumd, sumd2;
+	u_32_t sum1, sum2, sumd, psum1, psum2, psumd, sumd2;
 	struct in_addr in;
-	icmphdr_t *icmp;
-	int flags, dlen;
-	u_short *csump;
+	icmphdr_t *icmp, *orgicmp;
+	int dlen;
+	udphdr_t *udp;
 	tcphdr_t *tcp;
 	nat_t *nat;
 	ip_t *oip;
-	void *dp;
-
 	if ((fin->fin_flx & (FI_SHORT|FI_FRAGBODY)))
 		return NULL;
+
 	/*
-	 * nat_icmperrorlookup() will return NULL for `defective' packets.
+	 * nat_icmperrorlookup() looks up nat entry associated with the
+	 * offending IP packet and returns pointer to the entry, or NULL
+	 * if packet wasn't natted or for `defective' packets.
 	 */
+
 	if ((fin->fin_v != 4) || !(nat = nat_icmperrorlookup(fin, dir)))
 		return NULL;
 
-	tcp = NULL;
-	csump = NULL;
-	flags = 0;
 	sumd2 = 0;
 	*nflags = IPN_ICMPERR;
 	icmp = fin->fin_dp;
 	oip = (ip_t *)&icmp->icmp_ip;
-	dp = (((char *)oip) + (IP_HL(oip) << 2));
-	if (oip->ip_p == IPPROTO_TCP) {
-		tcp = (tcphdr_t *)dp;
-		csump = (u_short *)&tcp->th_sum;
-		flags = IPN_TCP;
-	} else if (oip->ip_p == IPPROTO_UDP) {
-		udphdr_t *udp;
-
-		udp = (udphdr_t *)dp;
-		tcp = (tcphdr_t *)dp;
-		csump = (u_short *)&udp->uh_sum;
-		flags = IPN_UDP;
-	} else if (oip->ip_p == IPPROTO_ICMP)
-		flags = IPN_ICMPQUERY;
-	dlen = fin->fin_plen - ((char *)dp - (char *)fin->fin_ip);
+	udp = (udphdr_t *)((((char *)oip) + (IP_HL(oip) << 2)));
+	tcp = (tcphdr_t *)udp;
+	dlen = fin->fin_plen - ((char *)udp - (char *)fin->fin_ip);
 
 	/*
 	 * Need to adjust ICMP header to include the real IP#'s and
-	 * port #'s.  Only apply a checksum change relative to the
-	 * IP address change as it will be modified again in fr_checknatout
-	 * for both address and port.  Two checksum changes are
-	 * necessary for the two header address changes.  Be careful
-	 * to only modify the checksum once for the port # and twice
-	 * for the IP#.
-	 */
-
-	/*
-	 * Step 1
-	 * Fix the IP addresses in the offending IP packet. You also need
-	 * to adjust the IP header checksum of that offending IP packet
-	 * and the ICMP checksum of the ICMP error message itself.
+	 * port #'s.  There are three steps required.
 	 *
-	 * Unfortunately, for UDP and TCP, the IP addresses are also contained
-	 * in the pseudo header that is used to compute the UDP resp. TCP
-	 * checksum. So, we must compensate that as well. Even worse, the
-	 * change in the UDP and TCP checksums require yet another
-	 * adjustment of the ICMP checksum of the ICMP error message.
+	 * Step 1
+	 * Fix the IP addresses in the offending IP packet and update
+	 * ip header checksum to compensate for the change.
+	 *
+	 * No update needed here for icmp_cksum because the ICMP checksum
+	 * is calculated over the complete ICMP packet, which includes the
+	 * changed oip IP addresses and oip->ip_sum.  These two changes
+	 * cancel each other out (if the delta for the IP address is x,
+	 * then the delta for ip_sum is minus x).
 	 */
 
 	if (oip->ip_dst.s_addr == nat->nat_oip.s_addr) {
@@ -2719,245 +2698,150 @@ int dir;
 	}
 
 	sum2 = LONG_SUM(ntohl(in.s_addr));
-
 	CALC_SUMD(sum1, sum2, sumd);
-
-	/*
-	 * Fix IP checksum of the offending IP packet to adjust for
-	 * the change in the IP address.
-	 *
-	 * Normally, you would expect that the ICMP checksum of the
-	 * ICMP error message needs to be adjusted as well for the
-	 * IP address change in oip.
-	 * However, this is a NOP, because the ICMP checksum is
-	 * calculated over the complete ICMP packet, which includes the
-	 * changed oip IP addresses and oip->ip_sum. However, these
-	 * two changes cancel each other out (if the delta for
-	 * the IP address is x, then the delta for ip_sum is minus x),
-	 * so no change in the icmp_cksum is necessary.
-	 *
-	 * Be careful that nat_dir refers to the direction of the
-	 * offending IP packet (oip), not to its ICMP response (icmp)
-	 */
 	fix_datacksum(&oip->ip_sum, sumd);
-	/* Fix icmp cksum : IP Addr + Cksum */
-	sumd2 = (sumd >> 16);
 
 	/*
-	 * Fix UDP pseudo header checksum to compensate for the
-	 * IP address change.
+	 * Step 2
+	 * Perform other adjustments based on protocol of offending packet.
 	 */
-	if ((oip->ip_p == IPPROTO_UDP) && (dlen >= 8) && (*csump != 0)) {
-		/*
-		 * The UDP checksum is optional, only adjust it
-		 * if it has been set.
-		 */
-		sum1 = ntohs(*csump);
-		fix_datacksum(csump, sumd);
-		sum2 = ntohs(*csump);
 
-		/*
-		 * Fix ICMP checksum to compensate the UDP
-		 * checksum adjustment.
-		 */
-		sumd2 = sumd << 1;
-		CALC_SUMD(sum1, sum2, sumd);
-		sumd2 += sumd;
-	}
-
-	/*
-	 * Fix TCP pseudo header checksum to compensate for the
-	 * IP address change. Before we can do the change, we
-	 * must make sure that oip is sufficient large to hold
-	 * the TCP checksum (normally it does not!).
-	 * 18 = offsetof(tcphdr_t, th_sum) + 2
-	 */
-	else if (oip->ip_p == IPPROTO_TCP && dlen >= 18) {
-		sum1 = ntohs(*csump);
-		fix_datacksum(csump, sumd);
-		sum2 = ntohs(*csump);
-
-		/*
-		 * Fix ICMP checksum to compensate the TCP
-		 * checksum adjustment.
-		 */
-		sumd2 = sumd << 1;
-		CALC_SUMD(sum1, sum2, sumd);
-		sumd2 += sumd;
-	} else {
-		if (nat->nat_dir == NAT_OUTBOUND)
-			sumd2 = ~sumd2;
-		else
-			sumd2 = ~sumd2 + 1;
-	}
-
-	if (((flags & IPN_TCPUDP) != 0) && (dlen >= 4)) {
-		int mode = 0;
-
-		/*
-		 * Step 2 :
-		 * For offending TCP/UDP IP packets, translate the ports as
-		 * well, based on the NAT specification. Of course such
-		 * a change must be reflected in the ICMP checksum as well.
-		 *
-		 * Advance notice : Now it becomes complicated :-)
-		 *
-		 * Since the port fields are part of the TCP/UDP checksum
-		 * of the offending IP packet, you need to adjust that checksum
-		 * as well... but, if you change, you must change the icmp
-		 * checksum *again*, to reflect that change.
-		 *
-		 * To further complicate: the TCP checksum is not in the first
-		 * 8 bytes of the offending ip packet, so it most likely is not
-		 * available. Some OSses like Solaris return enough bytes to
-		 * include the TCP checksum. So we have to check if the
-		 * ip->ip_len actually holds the TCP checksum of the oip!
-		 */
-
-		if (nat->nat_oport == tcp->th_dport) { 
-			if (tcp->th_sport != nat->nat_inport) {
-				mode = 1;
-				sum1 = ntohs(nat->nat_inport);
-				sum2 = ntohs(tcp->th_sport);
-			}
-		} else if (tcp->th_sport == nat->nat_oport) {
-			mode = 2;
-			sum1 = ntohs(nat->nat_outport);
-			sum2 = ntohs(tcp->th_dport);
-		}
-
-		if (mode == 1) {
-			/*
-			 * Fix ICMP checksum to compensate port adjustment.
-			 */
-			tcp->th_sport = htons(sum1);
+	switch (oip->ip_p) {
+		case IPPROTO_TCP :
+		case IPPROTO_UDP :
 
 			/*
-			 * Fix udp checksum to compensate port adjustment.
-			 * NOTE : the offending IP packet flows the other
-			 * direction compared to the ICMP message.
-			 *
-			 * The UDP checksum is optional, only adjust it if
-			 * it has been set.
-			 */
-			if ((oip->ip_p == IPPROTO_UDP) &&
-			    (dlen >= 8) && (*csump != 0)) {
-				sumd = sum1 - sum2;
-				sumd2 += sumd;
+			* For offending TCP/UDP IP packets, translate the ports
+			* based on the NAT specification.
+			*
+			* Advance notice : Now it becomes complicated :-)
+			*
+			* Since the port and IP addresse fields are both part
+			* of the TCP/UDP checksum of the offending IP packet,
+			* we need to adjust that checksum as well.
+			*
+			* To further complicate things, the TCP/UDP checksum
+			* may not be present.  We must check to see if the
+			* length of the data portion is big enough to hold
+			* the checksum.  In the UDP case, a test to determine
+			* if the checksum is even set is also required.
+			*
+			* Any changes to an IP address, port or checksum within
+			* the ICMP packet requires a change to icmp_cksum.
+			*
+			* Be extremely careful here ... The change is dependent
+			* upon whether or not the TCP/UPD checksum is present.
+			*
+			* If TCP/UPD checksum is present, the icmp_cksum must
+			* compensate for checksum modification resulting from
+			* IP address change only.  Port change and resulting
+			* data checksum adjustments cancel each other out.
+			*
+			* If TCP/UDP checksum is not present, icmp_cksum must
+			* compensate for port change only.  The IP address
+			* change does not modify anything else in this case.
+			*/
 
-				sum1 = ntohs(*csump);
-				fix_datacksum(csump, sumd);
-				sum2 = ntohs(*csump);
+			psum1 = 0;
+			psum2 = 0;
+			psumd = 0;
+
+			if ((tcp->th_dport == nat->nat_oport) &&
+			    (tcp->th_sport != nat->nat_inport)) {
 
 				/*
-				 * Fix ICMP checksum to compenstate
-				 * UDP checksum adjustment.
+				 * Translate the source port.
 				 */
-				CALC_SUMD(sum1, sum2, sumd);
-				sumd2 += sumd;
-			}
 
-			/*
-			 * Fix TCP checksum (if present) to compensate port
-			 * adjustment. NOTE : the offending IP packet flows
-			 * the other direction compared to the ICMP message.
-			 */
-			if (oip->ip_p == IPPROTO_TCP) {
-				if (dlen >= 18) {
-					sumd = sum1 - sum2;
-					sumd2 += sumd;
+				psum1 = ntohs(tcp->th_sport);
+				psum2 = ntohs(nat->nat_inport);
+				tcp->th_sport = nat->nat_inport;
 
-					sum1 = ntohs(*csump);
-					fix_datacksum(csump, sumd);
-					sum2 = ntohs(*csump);
-
-					/*
-					 * Fix ICMP checksum to compensate
-					 * TCP checksum adjustment.
-					 */
-					CALC_SUMD(sum1, sum2, sumd);
-					sumd2 += sumd;
-				} else {
-					sumd = sum2 - sum1 + 1;
-					sumd2 += sumd;
-				}
-			}
-		} else if (mode == 2) {
-			/*
-			 * Fix ICMP checksum to compensate port adjustment.
-			 */
-			tcp->th_dport = htons(sum1);
-
-			/*
-			 * Fix UDP checksum to compensate port adjustment.
-			 * NOTE : the offending IP packet flows the other
-			 * direction compared to the ICMP message.
-			 *
-			 * The UDP checksum is optional, only adjust
-			 * it if it has been set.
-			 */
-			if ((oip->ip_p == IPPROTO_UDP) &&
-			    (dlen >= 8) && (*csump != 0)) {
-				sumd = sum1 - sum2;
-				sumd2 += sumd;
-
-				sum1 = ntohs(*csump);
-				fix_datacksum(csump, sumd);
-				sum2 = ntohs(*csump);
+			} else if ((tcp->th_sport == nat->nat_oport) &&
+				    (tcp->th_dport != nat->nat_outport)) {
 
 				/*
-				 * Fix ICMP checksum to compensate
-				 * UDP checksum adjustment.
+				 * Translate the destination port.
 				 */
+
+				psum1 = ntohs(tcp->th_dport);
+				psum2 = ntohs(nat->nat_outport);
+				tcp->th_dport = nat->nat_outport;
+			}
+
+			if ((oip->ip_p == IPPROTO_TCP) && (dlen >= 18)) {
+
+				/*
+				 * TCP checksum present.
+				 *
+				 * Adjust data checksum and icmp checksum to
+				 * compensate for any IP address change.
+				 */
+
+				sum1 = ntohs(tcp->th_sum);
+				fix_datacksum(&tcp->th_sum, sumd);
+				sum2 = ntohs(tcp->th_sum);
+				sumd2 = sumd << 1;
 				CALC_SUMD(sum1, sum2, sumd);
 				sumd2 += sumd;
-			}
 
-			/*
-			 * Fix TCP checksum (if present) to compensate port
-			 * adjustment. NOTE : the offending IP packet flows
-			 * the other direction compared to the ICMP message.
-			 */
-			if (oip->ip_p == IPPROTO_TCP) {
-				if (dlen >= 18) {
-					sumd = sum1 - sum2;
-					sumd2 += sumd;
+				/*
+				 * Also make data checksum adjustment to
+				 * compensate for any port change.
+				 */
 
-					sum1 = ntohs(*csump);
-					fix_datacksum(csump, sumd);
-					sum2 = ntohs(*csump);
-
-					/*
-					 * Fix ICMP checksum to compensate
-					 * TCP checksum adjustment.
-					 */
-					CALC_SUMD(sum1, sum2, sumd);
-					sumd2 += sumd;
-				} else {
-					if (nat->nat_dir == NAT_INBOUND)
-						sumd = sum2 - sum1;
-					else
-						sumd = sum2 - sum1 + 1;
-					sumd2 += sumd;
+				if (psum1 != psum2) {
+					CALC_SUMD(psum1, psum2, psumd);
+					fix_datacksum(&tcp->th_sum, psumd);
 				}
+
+			} else if ((oip->ip_p == IPPROTO_UDP) &&
+				   (dlen >= 8) && (udp->uh_sum != 0)) {
+
+				/*
+				 * The UDP checksum is present and set.
+				 *
+				 * Adjust data checksum and icmp checksum to
+				 * compensate for any IP address change.
+				 */
+
+				sum1 = ntohs(udp->uh_sum);
+				fix_datacksum(&udp->uh_sum, sumd);
+				sum2 = ntohs(udp->uh_sum);
+				sumd2 = sumd << 1;
+				CALC_SUMD(sum1, sum2, sumd);
+				sumd2 += sumd;
+
+				/*
+				 * Also make data checksum adjustment to
+				 * compensate for any port change.
+				 */
+
+				if (psum1 != psum2) {
+					CALC_SUMD(psum1, psum2, psumd);
+					fix_datacksum(&udp->uh_sum, psumd);
+				}
+
+			} else {
+
+				/*
+				 * Data checksum was not present.
+				 *
+				 * Compensate for any port change.
+				 */
+
+				CALC_SUMD(psum2, psum1, psumd);
+				sumd2 += psumd;
 			}
-		}
-		if (sumd2 != 0) {
-			sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
-			sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
-			fix_incksum(fin, &icmp->icmp_cksum, sumd2);
-		}
-	} else if (((flags & IPN_ICMPQUERY) != 0) && (dlen >= 8)) {
-		icmphdr_t *orgicmp;
+			break;
 
-		/*
-		 * XXX - what if this is bogus hl and we go off the end ?
-		 * In this case, nat_icmperrorlookup() will have returned NULL.
-		 */
-		orgicmp = (icmphdr_t *)dp;
+		case IPPROTO_ICMP :
 
-		if (nat->nat_dir == NAT_OUTBOUND) {
-			if (orgicmp->icmp_id != nat->nat_inport) {
+			orgicmp = (icmphdr_t *)udp;
+
+			if ((nat->nat_dir == NAT_OUTBOUND) &&
+			    (orgicmp->icmp_id != nat->nat_inport) &&
+			    (dlen >= 8)) {
 
 				/*
 				 * Fix ICMP checksum (of the offening ICMP
@@ -2971,13 +2855,32 @@ int dir;
 				 * minus x, you don't have to adjust the
 				 * overall icmp->icmp_cksum
 				 */
+
 				sum1 = ntohs(orgicmp->icmp_id);
 				sum2 = ntohs(nat->nat_inport);
 				CALC_SUMD(sum1, sum2, sumd);
 				orgicmp->icmp_id = nat->nat_inport;
 				fix_datacksum(&orgicmp->icmp_cksum, sumd);
-			}
-		} /* nat_dir == NAT_INBOUND is impossible for icmp queries */
+
+			} /* nat_dir can't be NAT_INBOUND for icmp queries */
+
+			break;
+
+		default :
+
+			break;
+
+	} /* switch (oip->ip_p) */
+
+	/*
+	 * Step 3
+	 * Make the adjustments to icmp checksum.
+	 */
+
+	if (sumd2 != 0) {
+		sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
+		sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
+		fix_incksum(fin, &icmp->icmp_cksum, sumd2);
 	}
 	return nat;
 }
