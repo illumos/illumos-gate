@@ -1493,6 +1493,13 @@ libc_init(void)
 
 	init_sigev_thread();
 	init_aio();
+
+	/*
+	 * We need to reset __threaded dynamically at runtime, so that
+	 * __threaded can be bound to __threaded outside libc which may not
+	 * have initial value of 1 (without a copy relocation in a.out).
+	 */
+	__threaded = 1;
 }
 
 #pragma fini(libc_fini)
