@@ -2182,6 +2182,7 @@ setup_pipe()
 {
 	struct stat stat_buf;
 	struct statvfs statvfs_buf;
+	struct sigaction act;
 
 	if ((stat(INITPIPE, &stat_buf) == 0) &&
 	    ((stat_buf.st_mode & (S_IFMT|S_IRUSR)) == (S_IFIFO|S_IRUSR)))
@@ -2200,7 +2201,12 @@ setup_pipe()
 		 * Read pipe in message discard mode.
 		 */
 		(void) ioctl(Pfd, I_SRDOPT, RMSGD);
-		(void) sigset(SIGPOLL, sigpoll);
+
+		act.sa_handler = sigpoll;
+		act.sa_flags = 0;
+		(void) sigemptyset(&act.sa_mask);
+		(void) sigaddset(&act.sa_mask, SIGCLD);
+		(void) sigaction(SIGPOLL, &act, NULL);
 	}
 }
 
@@ -3582,7 +3588,7 @@ sigpoll(int n)
 	if (Pfd < 0) {
 		return;
 	}
-	(void) sigset(SIGCLD, SIG_DFL);
+
 	for (;;) {
 		/*
 		 * Important Note: Either read will really fail (in which case
@@ -3592,7 +3598,6 @@ sigpoll(int n)
 		 */
 		if (read(Pfd, p, sizeof (struct pidrec)) !=
 						sizeof (struct pidrec)) {
-			(void) sigset(SIGCLD, childeath);
 			return;
 		}
 		switch (p->pd_type) {
