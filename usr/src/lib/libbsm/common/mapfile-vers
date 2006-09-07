@@ -201,9 +201,6 @@ SUNWprivate_1.1 {
 	audit_halt_fail;
 	audit_halt_setup;
 	audit_halt_success;
-	audit_inetd_config;
-	audit_inetd_service;
-	audit_inetd_termid;
 	audit_kadmind_auth;
 	audit_kadmind_unauth;
 	audit_krb5kdc_as_req;
@@ -213,7 +210,6 @@ SUNWprivate_1.1 {
 	audit_mountd_mount;
 	audit_mountd_setup;
 	audit_mountd_umount;
-	audit_newgrp_login;
 	audit_reboot_fail;
 	audit_reboot_setup;
 	audit_reboot_success;

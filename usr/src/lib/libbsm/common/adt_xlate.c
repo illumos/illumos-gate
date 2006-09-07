@@ -341,6 +341,22 @@ static struct translation X_network_modify = {
 	&XX_network_modify[0],
 	&XX_network_modify[0]
 };
+static struct entry XX_newgrp_login[3] = {
+	{AUT_SUBJECT,	1,	NULL,	&(XX_newgrp_login[1]),
+		0,	0,	0,	NULL},
+	{AUT_TEXT,	1,	&adr1[0],	&(XX_newgrp_login[2]),
+		0,	1,	0,	NULL},
+	{AUT_RETURN,	1,	NULL,	NULL,
+		0,	0,	0,	NULL}
+};
+static struct translation X_newgrp_login = {
+	0,
+	ADT_newgrp_login,
+	AUE_newgrp_login,
+	3,
+	&XX_newgrp_login[0],
+	&XX_newgrp_login[0]
+};
 static struct entry XX_passwd[3] = {
 	{AUT_SUBJECT,	1,	NULL,	&(XX_passwd[1]),
 		0,	0,	0,	NULL},
@@ -859,7 +875,7 @@ static struct translation X_zone_state = {
 	&XX_zone_state[0],
 	&XX_zone_state[0]
 };
-struct translation *xlate_table[41] = {
+struct translation *xlate_table[42] = {
 	&X_admin_authenticate,
 	&X_filesystem_add,
 	&X_filesystem_delete,
@@ -874,6 +890,7 @@ struct translation *xlate_table[41] = {
 	&X_network_add,
 	&X_network_delete,
 	&X_network_modify,
+	&X_newgrp_login,
 	&X_passwd,
 	&X_printer_add,
 	&X_printer_delete,

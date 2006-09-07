@@ -45,11 +45,9 @@ OBJECTS=	adr.o \
 		audit_event.o \
 		audit_ftpd.o \
 		audit_halt.o \
-		audit_inetd.o \
 		audit_kadmind.o \
 		audit_krb5kdc.o \
 		audit_mountd.o \
-		audit_newgrp.o \
 		audit_plugin.o \
 		audit_reboot.o \
 		audit_rexd.o \

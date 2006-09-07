@@ -106,6 +106,7 @@ enum	adt_login_text {
 #define	ADT_network_add		7
 #define	ADT_network_delete	8
 #define	ADT_network_modify	9
+#define	ADT_newgrp_login	41
 #define	ADT_passwd		27
 #define	ADT_printer_add		10
 #define	ADT_printer_delete	11
@@ -236,6 +237,11 @@ struct adt_network_modify {	/* ADT_network_modify */
 	char 	*changed_values;	/* required */
 };
 typedef struct adt_network_modify adt_network_modify_t;
+
+struct adt_newgrp_login {	/* ADT_newgrp_login */
+	char 	*groupname;	/* required */
+};
+typedef struct adt_newgrp_login adt_newgrp_login_t;
 
 struct adt_passwd {	/* ADT_passwd */
 	char 	*username;	/* optional */
@@ -446,6 +452,7 @@ union adt_event_data {
 		adt_network_add_t	adt_network_add;
 		adt_network_delete_t	adt_network_delete;
 		adt_network_modify_t	adt_network_modify;
+		adt_newgrp_login_t	adt_newgrp_login;
 		adt_passwd_t	adt_passwd;
 		adt_printer_add_t	adt_printer_add;
 		adt_printer_delete_t	adt_printer_delete;

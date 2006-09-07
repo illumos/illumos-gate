@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +47,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <locale.h>
+#include <syslog.h>
+#include <unistd.h>
+
+#include <bsm/adt_event.h>
 
 #define	SHELL	"/usr/bin/sh"
 
@@ -69,17 +72,13 @@ extern char **environ;
 char *path = PATH;
 char *supath = SUPATH;
 
-extern void audit_newgrp_login(char *, int);
-
 void error(char *s) __NORETURN;
 void warn(char *s);
 void usage(void);
-char *rname(char *);
 
 int
 main(int argc, char *argv[])
 {
-	char *s;
 	struct passwd *p;
 	gid_t chkgrp();
 	int eflag = 0;
@@ -164,7 +163,7 @@ main(int argc, char *argv[])
 
 
 		envinit[2] = logname;
-		chdir(dir);
+		(void) chdir(dir);
 		envinit[0] = homedir;
 		if (uid == 0)
 			envinit[1] = supath;
@@ -186,15 +185,15 @@ main(int argc, char *argv[])
 	else
 		shell = p->pw_shell;
 
-	execl(p->pw_shell, shell, NULL);
-	error(NS);
-	/* NOTREACHED */
+	(void) execl(p->pw_shell, shell, NULL);
+	warn(NS);
+	return (1);
 }
 
 void
 warn(char *s)
 {
-	fprintf(stderr, "%s\n", gettext(s));
+	(void) fprintf(stderr, "%s\n", gettext(s));
 }
 
 void
@@ -211,53 +210,62 @@ struct	passwd *p;
 {
 	char **t;
 	struct group *g;
+	gid_t	gid;
+	adt_session_data_t	*ah;
+	adt_event_data_t	*event;
+	int			sorf = ADT_SUCCESS;
+
+	if (adt_start_session(&ah, NULL, ADT_USE_PROC_DATA) != 0) {
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "adt_start_session(ADT_newgrp_login): %m");
+	}
+	if ((event = adt_alloc_event(ah, ADT_newgrp_login)) == NULL) {
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "adt_alloc_event(ADT_newgrp_login): %m");
+	} else {
+		event->adt_newgrp_login.groupname = gname;
+	}
 
 	g = getgrnam(gname);
 	endgrent();
 	if (g == NULL) {
 		warn(UG);
-		return (getgid());
+		gid = getgid();
+		goto audit;
 	}
+	gid = g->gr_gid;
 	if (p->pw_gid == g->gr_gid || getuid() == 0)
-		return (g->gr_gid);
+		goto audit;
 	for (t = g->gr_mem; *t; ++t) {
 		if (strcmp(p->pw_name, *t) == 0)
-			return (g->gr_gid);
+			goto audit;
 	}
 	if (*g->gr_passwd) {
 		if (!isatty(fileno(stdin))) {
 			error(PD);
 		}
 		if (strcmp(g->gr_passwd,
-		    crypt(getpass(PW), g->gr_passwd)) == 0) {
-			audit_newgrp_login(gname, 0);
-			return (g->gr_gid);
+		    crypt(getpassphrase(PW), g->gr_passwd)) == 0) {
+			goto audit;
 		}
-		audit_newgrp_login(gname, 1);
+		sorf = ADT_FAILURE;
 	}
 	warn(NG);
-	return (getgid());
-}
+audit:
+	if (adt_put_event(event, sorf, sorf) != 0) {
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "adt_put_event(ADT_newgrp, %d): %m", sorf);
+	}
+	adt_free_event(event);
+	(void) adt_end_session(ah);
 
-/*
- * return pointer to rightmost component of pathname
- */
-char *
-rname(char *pn)
-{
-	char *q;
-
-	q = pn;
-	while (*pn)
-		if (*pn++ == '/')
-			q = pn;
-	return (q);
+	return (gid);
 }
 
 void
 usage(void)
 {
-	fprintf(stderr, gettext(
+	(void) fprintf(stderr, gettext(
 		"usage: newgrp [-l | -] [group]\n"));
 	exit(2);
 }

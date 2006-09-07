@@ -97,15 +97,6 @@ extern	int	audit_rshd_success(char *, char *, char *, char *);
 extern	int	audit_rshd_fail(char *, char *, char *, char *, char *);
 
 /*
- * audit_inetd.c
- * interface user
- * inetd
- */
-extern	int	audit_inetd_service(char *, struct passwd *);
-extern	int	audit_inetd_config(void);
-extern	int	audit_inetd_termid(int);
-
-/*
  * audit_at.c
  * interface users
  * atrm
@@ -176,12 +167,6 @@ extern	int	audit_shutdown_fail(void);
 extern	int	audit_reboot_setup(void);
 extern	int	audit_reboot_success(void);
 extern	int	audit_reboot_fail(void);
-
-/*
- * audit_newgrp.c
- * newgrp
- */
-extern	void	audit_newgrp_login(char *, int);
 
 /*
  * audit_rexd.c

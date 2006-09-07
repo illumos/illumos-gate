@@ -257,7 +257,7 @@ Use is subject to license terms.
 	-->
 	<entry id="message">
 	    <internal token="text"/>
-	    <external opt="optional" type="msg login_text" />
+	    <external opt="optional" type="msg login_text"/>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -444,11 +444,11 @@ Use is subject to license terms.
 	</entry>
 	<entry id="auth_used">
 	    <internal token="uauth"/>
-	    <external opt="required" type="char *" />
+	    <external opt="required" type="char *"/>
 	</entry>
 	<entry id="objectname">
 	    <internal token="text"/>
-	    <external opt="required" type="char *" />
+	    <external opt="required" type="char *"/>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -503,7 +503,7 @@ Use is subject to license terms.
 	</entry>
 	<entry id="message">
 	    <internal token="text"/>
-	    <external opt="optional" type="char *" />
+	    <external opt="optional" type="char *"/>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -522,7 +522,7 @@ Use is subject to license terms.
 -->
 	<entry id="message">
 	    <internal token="text"/>
-	    <external opt="optional"  type="char *" />
+	    <external opt="optional" type="char *"/>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -537,7 +537,7 @@ Use is subject to license terms.
 	</entry>
 	<entry id="username">
 	    <internal token="text"/>
-	    <external opt="optional"  type="char *" />
+	    <external opt="optional" type="char *"/>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -553,7 +553,7 @@ Use is subject to license terms.
 	<entry id="user_name">
 	    <internal token="text" format="logout %s"/>
 	    <external opt="optional" type="char *"/>
-        </entry>
+	</entry>
 	<entry id="return">
 	    <internal token="return"/>
 	    <external opt="none"/>
@@ -581,29 +581,29 @@ Use is subject to license terms.
 	</entry>
 	<entry id="cwdpath">
 	    <internal token="path"/>
-	    <external opt="required" type="char*" />
+	    <external opt="required" type="char*"/>
 	</entry>
 	<entry id="cmdpath">
 	    <internal token="path"/>
-	    <external opt="required" type="char*" />
+	    <external opt="required" type="char*"/>
 	</entry>
 	<entry id="argc,argv,envp">
 	    <internal token="command"/>
-	    <external opt="required" type="int,char**,char**" />
+	    <external opt="required" type="int,char**,char**"/>
 	</entry>
 	<entry id="proc_auid,proc_euid,proc_egid,proc_ruid,proc_rgid,proc_pid,proc_sid,proc_termid">
 	    <internal token="process"/>
 	    <external opt="required"
-		type="uid_t,uid_t,gid_t,uid_t,gid_t,pid_t,au_asid_t,termid*" />
+		type="uid_t,uid_t,gid_t,uid_t,gid_t,pid_t,au_asid_t,termid*"/>
 	</entry>
-        <entry id="limit_set">
+	<entry id="limit_set">
 	    <internal token="priv_limit"/>
-	    <external opt="optional" type="priv_set_t*" />
-        </entry>
-        <entry id="inherit_set">
+	    <external opt="optional" type="priv_set_t*"/>
+ 	</entry>
+	<entry id="inherit_set">
 	    <internal token="priv_inherit"/>
-	    <external opt="optional" type="priv_set_t*" />
-        </entry>
+	    <external opt="optional" type="priv_set_t*"/>
+	</entry>
 	<entry id="return">
 	    <internal token="return"/>
 	    <external opt="none"/>
@@ -617,12 +617,12 @@ Use is subject to license terms.
 	</entry>
 	<entry id="service_name">
 	    <internal token="text"/>
-	    <external opt="optional" type="char *" />
+	    <external opt="optional" type="char *"/>
 	</entry>
 	<entry id="ip_type,ip_remote_port,ip_local_port,ip_adr">
 	    <internal token="tid"/>
 	    <external opt="required"
-		type="uint32_t,uint16_t,uint16_t,uint32_t[4]" />
+		type="uint32_t,uint16_t,uint16_t,uint32_t[4]"/>
 	</entry>
 	<entry id="cmd">
 	    <internal token="command_1"/>
@@ -630,7 +630,7 @@ Use is subject to license terms.
 	</entry>
 	<entry id="privileges">
 	    <internal token="priv_effective"/>
-	    <external opt="required" type="priv_set_t *" />
+	    <external opt="required" type="priv_set_t *"/>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -645,11 +645,11 @@ Use is subject to license terms.
 	</entry>
 	<entry id="service_name">
 	    <internal token="text"/>
-	    <external opt="optional" type="char *" />
+	    <external opt="optional" type="char *"/>
 	</entry>
 	<entry id="limit">
 	    <internal token="text"/>
-	    <external opt="required" type="char *" />
+	    <external opt="required" type="char *"/>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -664,11 +664,11 @@ Use is subject to license terms.
 	</entry>
 	<entry id="service_name">
 	    <internal token="text"/>
-	    <external opt="optional" type="char *" />
+	    <external opt="optional" type="char *"/>
 	</entry>
 	<entry id="limit">
 	    <internal token="text"/>
-	    <external opt="required" type="char *" />
+	    <external opt="required" type="char *"/>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -683,11 +683,11 @@ Use is subject to license terms.
 	</entry>
 	<entry id="service_name">
 	    <internal token="text"/>
-	    <external opt="optional" type="char *" />
+	    <external opt="optional" type="char *"/>
 	</entry>
 	<entry id="values">
 	    <internal token="text"/>
-	    <external opt="required" type="char *" />
+	    <external opt="required" type="char *"/>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -702,11 +702,11 @@ Use is subject to license terms.
 	</entry>
 	<entry id="new_state">
 	    <internal token="text"/>
-	    <external opt="required" type="char *" />
+	    <external opt="required" type="char *"/>
 	</entry>
 	<entry id="zonename">
 	    <internal token="zonename"/>
-	    <external opt="required" type="char *" />
+	    <external opt="required" type="char *"/>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -722,8 +722,23 @@ Use is subject to license terms.
 	header="0" idNo="40" omit="JNI">
     </event>
 
+    <event id="AUE_newgrp_login" header="0" idNo="41" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="groupname">
+	    <internal  token="text"/>
+	    <external opt="required"  type="char *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
 <!-- add new everts here with the next higher idNo -->
-<!-- Highest idNo is 40, so next is 41, then fix this comment -->
+<!-- Highest idNo is 41, so next is 42, then fix this comment -->
 <!-- end of C Only events -->
 
 
@@ -778,7 +793,6 @@ Use is subject to license terms.
     </token>
 
     <!--
-
 	privilege token is implemented as one of the pseudo tokens
 	priv_limit, priv_effective, or priv_inherit
 
@@ -817,8 +831,8 @@ Use is subject to license terms.
     the new adt_ error value list.  It is public so that praudit
     can find it.
 
-    praudit outputs "failure"  %s" for these strings, so there is
-    no need to use words such as  "failed" in the message.
+    praudit outputs "failure" %s" for these strings, so there is
+    no need to use words such as "failed" in the message.
 
     ** Add to the end only to maintain validity across versions of
     the audit log. **

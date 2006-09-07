@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -142,9 +141,6 @@ extern void	adrm_putint32(adr_t *, int32_t *, int);
 extern int	au_close(int, int, short);
 extern int	au_open(void);
 extern int	au_write(int, token_t *);
-extern int	au_read_rec(FILE *, char **);
-extern int	au_fetch_tok(au_token_t *, char *, int);
-extern int	au_print_tok(FILE *, au_token_t *, char *, char *, char *, int);
 
 /*
  * Functions than manipulate audit events
@@ -273,13 +269,6 @@ extern int	setuseraudit(au_id_t, au_mask_t *);
 /* Flags for user-level audit routines: au_open, au_close, au_to_ */
 #define	AU_TO_NO_WRITE	0
 #define	AU_TO_WRITE	1
-
-/* Flags for user-level audit routine: au_fetch_tok */
-#define	AUF_NOOP	0x0000
-#define	AUF_POINT	0x0001
-#define	AUF_DUP		0x0002
-#define	AUF_COPY_IN	0x0004
-#define	AUF_SKIP	0x0008
 
 /* system audit files for auditd */
 #define	AUDITCLASSFILE		"/etc/security/audit_class"

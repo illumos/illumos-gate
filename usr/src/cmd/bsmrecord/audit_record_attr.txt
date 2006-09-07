@@ -2285,7 +2285,7 @@ label=AUE_network_delete
 label=AUE_newgrp_login
   program=newgrp
   format=text1
-    comment=User id
+    comment=Group id
 
 label=AUE_passwd
   program=/usr/bin/passwd
