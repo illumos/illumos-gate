@@ -784,11 +784,6 @@ kernel/drv/audio810.conf			sparc
 kernel/drv/sparcv9/audiohd			sparc
 kernel/drv/audiohd.conf			sparc 
 #
-# ATI IXP audio driver doesn't ship in sparc platform.
-#
-kernel/drv/sparcv9/audioixp			sparc
-kernel/drv/audioixp.conf			sparc 
-#
 # VIA VT823x audio driver doesn't ship in sparc platform.
 #
 kernel/drv/sparcv9/audiovia823x			sparc

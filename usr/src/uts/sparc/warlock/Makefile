@@ -119,10 +119,10 @@ warlock.audio:
 	@cd ../audio1575; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../audio810; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../audiohd; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd ../audioixp; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd $(CLOSED)/uts/sparc/audiovia823x; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../audiocs; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd $(CLOSED)/uts/sparc/audioens; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/audioixp; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../audiots; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usb_ac; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usb_as; rm -f *.ll *.ok; $(MAKE) warlock

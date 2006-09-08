@@ -375,6 +375,8 @@ AUDIO810_OBJS += audio810.o
 
 AUDIOHD_OBJS +=	audiohd.o
 
+AUDIOIXP_OBJS += audioixp.o
+
 AUDIOTS_OBJS +=	audiots.o
 
 CARDBUS_OBJS += cardbus.o cardbus_hp.o cardbus_cfg.o
