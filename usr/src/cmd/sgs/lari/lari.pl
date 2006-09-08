@@ -1205,7 +1205,7 @@ sub GetAllSymbols {
 		foreach my $Rel (@Elfr) {
 			my ($SymName, @Fields);
 
-			if ($Rel !~ /^\s+R_\S+_COPY /) {
+			if ($Rel !~ / R_[A-Z0-9]+_COPY /) {
 				next;
 			}
 			@Fields = split(' ', $Rel);

@@ -1119,3 +1119,4 @@ Bugid   Risk Synopsis
 	-z lazyload
 6464235 executing the 64-bit ld(1) should be easy (D)
 6465623 need a way of building unix without an interpreter
+6467925 ld: section deletion (-z ignore) requires improvement

@@ -253,7 +253,7 @@ pad_outfile(Ofl_desc *ofl)
 		 * buffer will be added.
 		 */
 		if (phdr->p_type == PT_LOAD)
-			oscn =	osp->os_scn;
+			oscn = osp->os_scn;
 	}
 	return (1);
 }
@@ -724,10 +724,14 @@ ld_create_outfile(Ofl_desc *ofl)
 			 * Make sure that an output section was originally
 			 * created.  Input sections that had been marked as
 			 * discarded may have made an output section
-			 * unnecessary.
+			 * unnecessary.  Remove this alist entry so that
+			 * future output section descriptor processing doesn't
+			 * have to compensate for this empty section.
 			 */
-			if (osp->os_scn == NULL)
+			if (osp->os_scn == NULL) {
+				(void) alist_delete(sgp->sg_osdescs, 0, &off);
 				continue;
+			}
 
 			if ((osp->os_scn = elf_getscn(ofl->ofl_elf, ++ndx)) ==
 			    NULL) {
