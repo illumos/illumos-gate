@@ -149,7 +149,7 @@ fi
 # must match the getopts in nightly.sh
 OPTIND=1
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
-while getopts ABDFMNCGIRafinlmoptuUxdrtzWS:X FLAG $NIGHTLY_OPTIONS
+while getopts ABDFMNCGIRafinlmoptuUxdrtwzWS:X FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
 	  t )	t_FLAG=y
