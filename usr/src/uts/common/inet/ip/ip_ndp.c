@@ -125,6 +125,21 @@ ndp_g_t ndp4, ndp6;
 #define	NCE_HASH_PTR_V6(addr) \
 	(&(ndp6.nce_hash_tbl[NCE_ADDR_HASH_V6(addr, NCE_TABLE_SIZE)]))
 
+/*
+ * Compute default flags to use for an advertisement of this nce's address.
+ */
+static int
+nce_advert_flags(const nce_t *nce)
+{
+	int flag = 0;
+
+	if (nce->nce_flags & NCE_F_ISROUTER)
+		flag |= NDP_ISROUTER;
+	if (!(nce->nce_flags & NCE_F_PROXY))
+		flag |= NDP_ORIDE;
+	return (flag);
+}
+
 int
 ndp_add(ill_t *ill, uchar_t *hw_addr, const void *addr,
     const void *mask, const void *extract_mask,
@@ -301,7 +316,7 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 		    B_TRUE,	/* use ill_nd_lla */
 		    addr,	/* Source and target of the advertisement pkt */
 		    &ipv6_all_hosts_mcast, /* Destination of the packet */
-		    NDP_ORIDE);
+		    nce_advert_flags(nce));
 		mutex_enter(&nce->nce_lock);
 		if (dropped)
 			nce->nce_unsolicit_count++;
@@ -1813,7 +1828,8 @@ ip_ndp_conflict(ill_t *ill, mblk_t *mp, mblk_t *dl_mp, nce_t *nce)
 		cmn_err(CE_WARN, "node %s is using our IP address %s on %s",
 		    hbuf, sbuf, ill->ill_name);
 		(void) nce_xmit(ill, ND_NEIGHBOR_ADVERT, ill, B_FALSE,
-		    &nce->nce_addr, &ipv6_all_hosts_mcast, NDP_ORIDE);
+		    &nce->nce_addr, &ipv6_all_hosts_mcast,
+		    nce_advert_flags(nce));
 	}
 }
 
@@ -1905,11 +1921,9 @@ ndp_input_solicit(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 		}
 	}
 
-	/* Set override flag, it will be reset later if need be. */
-	flag |= NDP_ORIDE;
-	if (!IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
+	/* If sending directly to peer, set the unicast flag */
+	if (!IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst))
 		flag |= NDP_UNICAST;
-	}
 
 	/*
 	 * Create/update the entry for the soliciting node.
@@ -2014,10 +2028,7 @@ no_source:
 		 */
 		src = ipv6_all_hosts_mcast;
 	}
-	if (our_nce->nce_flags & NCE_F_ISROUTER)
-		flag |= NDP_ISROUTER;
-	if (our_nce->nce_flags & NCE_F_PROXY)
-		flag &= ~NDP_ORIDE;
+	flag |= nce_advert_flags(our_nce);
 	/* Response to a solicitation */
 	(void) nce_xmit(ill,
 	    ND_NEIGHBOR_ADVERT,
@@ -2692,7 +2703,7 @@ ndp_timer(void *arg)
 			nce->nce_unsolicit_count = 0;
 			dropped = nce_xmit(ill, ND_NEIGHBOR_ADVERT, ill,
 			    B_FALSE, &nce->nce_addr, &ipv6_all_hosts_mcast,
-			    NDP_ORIDE);
+			    nce_advert_flags(nce));
 			if (dropped) {
 				nce->nce_unsolicit_count = 1;
 				NDP_RESTART_TIMER(nce,
@@ -2790,7 +2801,7 @@ ndp_timer(void *arg)
 			    B_FALSE,	/* use ill_phys_addr */
 			    &nce->nce_addr,
 			    &ipv6_all_hosts_mcast,
-			    NDP_ORIDE);
+			    nce_advert_flags(nce));
 			if (dropped) {
 				mutex_enter(&nce->nce_lock);
 				nce->nce_unsolicit_count++;
