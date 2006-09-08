@@ -52,6 +52,16 @@
 			    value='svc:/application/management/seaport' />
 	</dependency>
 
+	<!-- snmpdx writes its pid to /var, need writable /var -->
+	<dependency
+		name='writable-var'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+			<service_fmri
+			    value='svc:/system/filesystem/minimal' />
+	</dependency>
+
 	<!-- conversion from rc3.d script: extending multi-user-server mode -->
 	<dependent
 		name='snmpdx_multi-user-server'
