@@ -33,6 +33,7 @@
  */
 
 #include <netinet/in.h>
+#include <errno.h>
 #include <sys/fm/protocol.h>
 #include <sys/sysmacros.h>
 #include <pthread.h>
@@ -129,16 +130,20 @@ static struct etm_stats {
 	fmd_stat_t read_ack;
 	fmd_stat_t read_bytes;
 	fmd_stat_t read_msg;
+	fmd_stat_t post_filter;
 	/* write counters */
 	fmd_stat_t write_ack;
 	fmd_stat_t write_bytes;
 	fmd_stat_t write_msg;
+	fmd_stat_t send_filter;
 	/* error counters */
 	fmd_stat_t error_protocol;
 	fmd_stat_t error_drop_read;
 	fmd_stat_t error_read;
 	fmd_stat_t error_read_badhdr;
 	fmd_stat_t error_write;
+	fmd_stat_t error_send_filter;
+	fmd_stat_t error_post_filter;
 	/* misc */
 	fmd_stat_t peer_count;
 
@@ -147,16 +152,20 @@ static struct etm_stats {
 	{ "read_ack", FMD_TYPE_UINT64, "ACKs read" },
 	{ "read_bytes", FMD_TYPE_UINT64, "Bytes read" },
 	{ "read_msg", FMD_TYPE_UINT64, "Messages read" },
+	{ "post_filter", FMD_TYPE_UINT64, "Drops by post_filter" },
 	/* write counters */
 	{ "write_ack", FMD_TYPE_UINT64, "ACKs sent" },
 	{ "write_bytes", FMD_TYPE_UINT64, "Bytes sent" },
 	{ "write_msg", FMD_TYPE_UINT64, "Messages sent" },
+	{ "send_filter", FMD_TYPE_UINT64, "Drops by send_filter" },
 	/* ETM error counters */
 	{ "error_protocol", FMD_TYPE_UINT64, "ETM protocol errors" },
 	{ "error_drop_read", FMD_TYPE_UINT64, "Dropped read messages" },
 	{ "error_read", FMD_TYPE_UINT64, "Read I/O errors" },
 	{ "error_read_badhdr", FMD_TYPE_UINT64, "Bad headers read" },
 	{ "error_write", FMD_TYPE_UINT64, "Write I/O errors" },
+	{ "error_send_filter", FMD_TYPE_UINT64, "Send filter errors" },
+	{ "error_post_filter", FMD_TYPE_UINT64, "Post filter errors" },
 	/* ETM Misc */
 	{ "peer_count", FMD_TYPE_UINT64, "Number of peers initialized" },
 };
@@ -294,6 +303,18 @@ etm_post_msg(fmd_hdl_t *hdl, etm_epmap_t *mp, void *buf, size_t buflen)
 	if (nvlist_unpack((char *)buf, buflen, &nvl, 0)) {
 		fmd_hdl_error(hdl, "failed to unpack message");
 		return (1);
+	}
+
+	rv = etm_xport_post_filter(hdl, nvl, mp->epm_ep_str);
+	if (rv == ETM_XPORT_FILTER_DROP) {
+		fmd_hdl_debug(hdl, "post_filter dropped event");
+		INCRSTAT(Etm_stats.post_filter.fmds_value.ui64);
+		nvlist_free(nvl);
+		return (0);
+	} else if (rv == ETM_XPORT_FILTER_ERROR) {
+		fmd_hdl_debug(hdl, "post_filter error : %s", strerror(errno));
+		INCRSTAT(Etm_stats.error_post_filter.fmds_value.ui64);
+		/* Still post event */
 	}
 
 	(void) pthread_mutex_lock(&mp->epm_lock);
@@ -1081,9 +1102,10 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 {
 	etm_epmap_t *mp;
 	nvlist_t *msgnvl;
-	int hdrstat, rv;
+	int hdrstat, rv, cnt = 0;
 	char *buf, *nvbuf, *class;
 	size_t nvsize, buflen, hdrlen;
+	struct timespec tms;
 
 	(void) pthread_mutex_lock(&Etm_mod_lock);
 	if (Etm_exit) {
@@ -1094,9 +1116,26 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 
 	mp = fmd_xprt_getspecific(hdl, xprthdl);
 
-	if (pthread_mutex_trylock(&mp->epm_lock))
-		/* Another thread may be trying to close this fmd_xprt_t */
-		return (FMD_SEND_RETRY);
+	for (;;) {
+		if (pthread_mutex_trylock(&mp->epm_lock) == 0) {
+			break;
+		} else {
+			/*
+			 * Another thread may be (1) trying to close this
+			 * fmd_xprt_t, or (2) posting an event to it.
+			 * If (1), don't want to spend too much time here.
+			 * If (2), allow it to finish and release epm_lock.
+			 */
+			if (cnt++ < 10) {
+				tms.tv_sec = 0;
+				tms.tv_nsec = (cnt * 10000);
+				(void) nanosleep(&tms, NULL);
+
+			} else {
+				return (FMD_SEND_RETRY);
+			}
+		}
+	}
 
 	mp->epm_txbusy++;
 
@@ -1156,6 +1195,21 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 		return (FMD_SEND_FAILED);
 	}
 
+	rv = etm_xport_send_filter(hdl, msgnvl, mp->epm_ep_str);
+	if (rv == ETM_XPORT_FILTER_DROP) {
+		mp->epm_txbusy--;
+		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
+		(void) pthread_mutex_unlock(&mp->epm_lock);
+		fmd_hdl_debug(hdl, "send_filter dropped event");
+		nvlist_free(msgnvl);
+		INCRSTAT(Etm_stats.send_filter.fmds_value.ui64);
+		return (FMD_SEND_SUCCESS);
+	} else if (rv == ETM_XPORT_FILTER_ERROR) {
+		fmd_hdl_debug(hdl, "send_filter error : %s", strerror(errno));
+		INCRSTAT(Etm_stats.error_send_filter.fmds_value.ui64);
+		/* Still send event */
+	}
+
 	(void) pthread_mutex_unlock(&mp->epm_lock);
 
 	(void) nvlist_size(msgnvl, &nvsize, NV_ENCODE_XDR);
@@ -1175,6 +1229,7 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
 		(void) pthread_mutex_unlock(&mp->epm_lock);
 		fmd_hdl_error(hdl, "Failed to pack event : %s\n", strerror(rv));
+		nvlist_free(msgnvl);
 		FREE_BUF(hdl, buf, buflen);
 		return (FMD_SEND_FAILED);
 	}
@@ -1346,8 +1401,9 @@ static const fmd_prop_t etm_props[] = {
 	{ "client_list", FMD_TYPE_STRING, NULL },
 	{ "server_list", FMD_TYPE_STRING, NULL },
 	{ "reconnect_interval",	FMD_TYPE_UINT64, "10000000000" },
-	{ "reconnect_timeout", FMD_TYPE_UINT64, "300000000000"},
-	{ "rw_timeout", FMD_TYPE_UINT64, "2000000000"},
+	{ "reconnect_timeout", FMD_TYPE_UINT64, "300000000000" },
+	{ "rw_timeout", FMD_TYPE_UINT64, "2000000000" },
+	{ "filter_path", FMD_TYPE_STRING, NULL },
 	{ NULL, 0, NULL }
 };
 

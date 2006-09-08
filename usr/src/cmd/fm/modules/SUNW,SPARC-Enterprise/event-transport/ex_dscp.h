@@ -52,6 +52,7 @@ extern "C" {
 #include <errno.h>
 #include <time.h>
 #include <poll.h>
+#include <dlfcn.h>
 #include <libdscp.h>
 #include "etm_xport_api.h"
 

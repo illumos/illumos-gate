@@ -50,6 +50,9 @@
 exs_hdl_t *Exh_head = NULL;		/* Head of ex_hdl_t list */
 pthread_mutex_t	List_lock = PTHREAD_MUTEX_INITIALIZER;
 					/* Protects linked list of ex_hdl_t */
+static void *Dlp = NULL;		/* Handle for dlopen/dlclose/dlsym */
+static int (*Send_filter)(fmd_hdl_t *hdl, nvlist_t *event, const char *dest);
+static int (*Post_filter)(fmd_hdl_t *hdl, nvlist_t *event, const char *src);
 
 /*
  * * * * * * * * * * * * * *
@@ -83,6 +86,55 @@ exs_hdl_alloc(fmd_hdl_t *hdl, char *endpoint_id,
 	hp->h_quit = 0;
 
 	return (hp);
+}
+
+/*
+ * dlopen() the platform filter library and dlsym() the filter funcs.
+ */
+static void
+exs_filter_init(fmd_hdl_t *hdl)
+{
+	char *propstr = fmd_prop_get_string(hdl, "filter_path");
+
+	if (propstr == NULL) {
+		fmd_hdl_debug(hdl, "No filter plugin specified");
+		Send_filter = NULL;
+		Post_filter = NULL;
+		return;
+	} else {
+		if ((Dlp = dlopen(propstr, RTLD_LOCAL | RTLD_NOW)) == NULL) {
+			fmd_hdl_debug(hdl, "Failed to dlopen filter plugin");
+			Send_filter = NULL;
+			Post_filter = NULL;
+			fmd_prop_free_string(hdl, propstr);
+			return;
+		}
+
+		if ((Send_filter = (int (*)())dlsym(Dlp, "send_filter"))
+		    == NULL) {
+			fmd_hdl_debug(hdl, "failed to dlsym send_filter()");
+			Send_filter = NULL;
+		}
+
+		if ((Post_filter = (int (*)())dlsym(Dlp, "post_filter"))
+		    == NULL) {
+			fmd_hdl_debug(hdl, "failed to dlsym post_filter()");
+			Post_filter = NULL;
+		}
+	}
+
+	fmd_prop_free_string(hdl, propstr);
+}
+
+/*
+ * If open, dlclose() the platform filter library.
+ */
+/*ARGSUSED*/
+static void
+exs_filter_fini(fmd_hdl_t *hdl)
+{
+	if (Dlp != NULL)
+		(void) dlclose(Dlp);
 }
 
 /*
@@ -413,6 +465,11 @@ etm_xport_init(fmd_hdl_t *hdl, char *endpoint_id,
 		}
 	}
 
+	if (Exh_head == NULL) {
+		/* Do one-time initializations */
+		exs_filter_init(hdl);
+	}
+
 	hp = exs_hdl_alloc(hdl, endpoint_id, cb_func, cb_func_arg, dom);
 
 	/* Add this transport instance handle to the list */
@@ -468,6 +525,11 @@ etm_xport_fini(fmd_hdl_t *hdl, etm_xport_hdl_t tlhdl)
 
 	fmd_hdl_strfree(hdl, hp->h_endpt_id);
 	fmd_hdl_free(hdl, hp, sizeof (exs_hdl_t));
+
+	if (Exh_head == NULL) {
+		/* Undo one-time initializations */
+		exs_filter_fini(hdl);
+	}
 
 	(void) pthread_mutex_unlock(&List_lock);
 
@@ -658,4 +720,36 @@ etm_xport_write(fmd_hdl_t *hdl, etm_xport_conn_t conn, hrtime_t timeout,
 		return (nbytes);
 	else
 		return (-1);
+}
+
+/*
+ * * * * * * * * * * * * * * * * * * * *
+ * ETM-to-Transport API Filter routines
+ * * * * * * * * * * * * * * * * * * * *
+ */
+
+/*
+ * Call the platform's send_filter function.
+ * Otherwise return ETM_XPORT_FILTER_OK.
+ */
+int
+etm_xport_send_filter(fmd_hdl_t *hdl, nvlist_t *event, const char *dest)
+{
+	if (Send_filter != NULL)
+		return (Send_filter(hdl, event, dest));
+	else
+		return (ETM_XPORT_FILTER_OK);
+}
+
+/*
+ * Call the platform's post_filter function.
+ * Otherwise return ETM_XPORT_FILTER_OK.
+ */
+int
+etm_xport_post_filter(fmd_hdl_t *hdl, nvlist_t *event, const char *src)
+{
+	if (Post_filter != NULL)
+		return (Post_filter(hdl, event, src));
+	else
+		return (ETM_XPORT_FILTER_OK);
 }

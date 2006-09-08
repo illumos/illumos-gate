@@ -115,6 +115,30 @@ ssize_t
 etm_xport_write(fmd_hdl_t *hdl, etm_xport_conn_t conn, hrtime_t timeout,
     void *buf, size_t byte_cnt);
 
+/*
+ * Filter
+ */
+
+#define	ETM_XPORT_FILTER_OK (1)		/* OK to send/post event */
+#define	ETM_XPORT_FILTER_DROP (0)	/* Do not send/post event */
+#define	ETM_XPORT_FILTER_ERROR (-1)	/* Error */
+
+/*
+ * Make a decision whether or not to send an event to a remote endpoint.
+ * Return ETM_XPORT_FILTER_OK, ETM_XPORT_FILTER_DROP, or ETM_XPORT_FILTER_ERROR
+ * and set errno for failure.
+ */
+int
+etm_xport_send_filter(fmd_hdl_t *hdl, nvlist_t *event, const char *dest);
+
+/*
+ * Make a decision whether or not to post an event to FMD.
+ * Return ETM_XPORT_FILTER_OK, ETM_XPORT_FILTER_DROP, or ETM_XPORT_FILTER_ERROR
+ * and set errno for failure.
+ */
+int
+etm_xport_post_filter(fmd_hdl_t *hdl, nvlist_t *event, const char *src);
+
 #ifdef __cplusplus
 }
 #endif
