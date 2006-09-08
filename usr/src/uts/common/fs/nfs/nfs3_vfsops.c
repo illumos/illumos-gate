@@ -1728,7 +1728,8 @@ nfs3_mountroot(vfs_t *vfsp, whymountroot_t why)
 
 	if (error) {
 		pn_free(&pn);
-		goto errout;
+		sv_free(svp);
+		return (error);
 	}
 
 	error = nfs_setopts(rtvp, DATAMODEL_NATIVE, &args);

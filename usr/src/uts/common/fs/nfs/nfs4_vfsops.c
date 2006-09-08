@@ -2548,7 +2548,8 @@ nfs4_mountroot(vfs_t *vfsp, whymountroot_t why)
 	if (error) {
 		crfree(cr);
 		pn_free(&pn);
-		goto errout;
+		sv4_free(svp);
+		return (error);
 	}
 
 	mi = VTOMI4(rtvp);
