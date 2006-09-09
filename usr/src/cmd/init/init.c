@@ -3515,14 +3515,16 @@ userinit(int argc, char **argv)
 			    ADT_FAIL_VALUE_BAD_TTY, argv[1]);
 			exit(1);
 		}
-		if (stat(ln, &sconbuf) != -1 &&
-		    stat(SYSCON, &conbuf) != -1 &&
-		    sconbuf.st_rdev != conbuf.st_rdev &&
-		    sconbuf.st_ino != conbuf.st_ino) {
+
+		if ((stat(ln, &sconbuf) != -1) &&
+		    (stat(SYSCON, &conbuf) == -1 ||
+		    sconbuf.st_rdev != conbuf.st_rdev)) {
 			/*
+			 * /dev/syscon needs to change.
 			 * Unlink /dev/syscon and relink it to the current line.
 			 */
-			if (unlink(SYSCON) == FAILURE) {
+			if (lstat(SYSCON, &conbuf) != -1 &&
+			    unlink(SYSCON) == FAILURE) {
 				perror("Can't unlink /dev/syscon");
 				(void) fprintf(stderr,
 				    "Run command on the system console.\n");
@@ -3530,9 +3532,9 @@ userinit(int argc, char **argv)
 				    ADT_FAIL_VALUE_PROGRAM, argv[1]);
 				exit(1);
 			}
-			if (link(ln, SYSCON) == FAILURE) {
+			if (symlink(ln, SYSCON) == FAILURE) {
 				(void) fprintf(stderr,
-				    "Can't link /dev/syscon to %s: %s", ln,
+				    "Can't symlink /dev/syscon to %s: %s", ln,
 				    strerror(errno));
 
 				/* Try to leave a syscon */
