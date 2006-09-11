@@ -117,6 +117,7 @@ struct if_entry {
 
 char *progname;
 char *targethost;
+char *nexthop;
 
 static int send_sock;			/* send sockets */
 static int send_sock6;
@@ -208,7 +209,8 @@ char *pr_name(char *, int);
 char *pr_protocol(int);
 static void print_unknown_host_msg(const char *, const char *);
 static void recv_icmp_packet(struct addrinfo *, int, int, ushort_t, ushort_t);
-static void resolve_nodes(struct addrinfo **, union any_in_addr **);
+static void resolve_nodes(struct addrinfo **, struct addrinfo **,
+    union any_in_addr **);
 void schedule_sigalrm();
 static void select_all_src_addrs(union any_in_addr **, struct addrinfo *,
     union any_in_addr *, union any_in_addr *);
@@ -219,7 +221,9 @@ extern void set_ancillary_data(struct msghdr *, int, union any_in_addr *, int,
     uint_t);
 extern void set_IPv4_options(int, union any_in_addr *, int, struct in_addr *,
     struct in_addr *);
-static boolean_t setup_socket(int, int *, int *, int *, ushort_t *);
+static void set_nexthop(int, struct addrinfo *, int);
+static boolean_t setup_socket(int, int *, int *, int *, ushort_t *,
+    struct addrinfo *);
 void sigalrm_handler();
 void tvsub(struct timeval *, struct timeval *);
 static void usage(char *);
@@ -231,6 +235,7 @@ int
 main(int argc, char *argv[])
 {
 	struct addrinfo	*ai_dst = NULL;		/* addrinfo host list */
+	struct addrinfo	*ai_nexthop = NULL;		/* addrinfo nexthop */
 	union any_in_addr *src_addr_list = NULL;	/* src addrs to use */
 	int recv_sock = -1;				/* receive sockets */
 	int recv_sock6 = -1;
@@ -250,12 +255,12 @@ main(int argc, char *argv[])
 	 * insufficient privileges.
 	 */
 	(void) __init_suid_priv(PU_CLEARLIMITSET, PRIV_NET_ICMPACCESS,
-	    (char *)NULL);
+	    PRIV_SYS_NET_CONFIG, (char *)NULL);
 
 	setbuf(stdout, (char *)0);
 
 	while ((c = getopt(argc, argv,
-	    "aA:c:dbF:G:g:I:i:LlnP:p:rRSsTt:UvX:x:Y0123?")) != -1) {
+	    "abA:c:dF:G:g:I:i:LlnN:P:p:rRSsTt:UvX:x:Y0123?")) != -1) {
 		switch ((char)c) {
 		case 'A':
 			if (strcmp(optarg, "inet") == 0) {
@@ -433,6 +438,15 @@ main(int argc, char *argv[])
 			gw_list[num_gw++] = optarg;
 			break;
 
+		case 'N':
+			if (nexthop != NULL) {
+				Fprintf(stderr, "%s: only one next hop gateway"
+				    " allowed\n", progname);
+				exit(EXIT_FAILURE);
+			}
+			nexthop = optarg;
+			break;
+
 		case 'Y':
 			use_icmp_ts = _B_TRUE;
 			use_udp = _B_FALSE;
@@ -510,7 +524,7 @@ main(int argc, char *argv[])
 	ident = (int)getpid() & 0xFFFF;
 
 	/* resolve the hostnames */
-	resolve_nodes(&ai_dst, &src_addr_list);
+	resolve_nodes(&ai_dst, &ai_nexthop, &src_addr_list);
 
 	/*
 	 * We should make sure datalen is reasonable.
@@ -596,13 +610,13 @@ main(int argc, char *argv[])
 	/* setup the sockets */
 	if (num_v6 != 0) {
 		if (!setup_socket(AF_INET6, &send_sock6, &recv_sock6,
-		    &if_index, &udp_src_port6))
+		    &if_index, &udp_src_port6, ai_nexthop))
 			exit(EXIT_FAILURE);
 	}
 
 	if (num_v4 != 0) {
 		if (!setup_socket(AF_INET, &send_sock, &recv_sock, &if_index,
-		    &udp_src_port))
+		    &udp_src_port, ai_nexthop))
 			exit(EXIT_FAILURE);
 	}
 
@@ -795,9 +809,11 @@ print_unknown_host_msg(const char *protocol, const char *hostname)
  * addresses to use for each target address.
  */
 static void
-resolve_nodes(struct addrinfo **ai_dstp, union any_in_addr **src_addr_listp)
+resolve_nodes(struct addrinfo **ai_dstp, struct addrinfo **ai_nexthopp,
+    union any_in_addr **src_addr_listp)
 {
 	struct addrinfo *ai_dst = NULL;
+	struct addrinfo *ai_nexthop = NULL;
 	struct addrinfo *aip = NULL;
 	union any_in_addr *src_addr_list = NULL;
 	int num_resolved_gw = 0;
@@ -807,6 +823,13 @@ resolve_nodes(struct addrinfo **ai_dstp, union any_in_addr **src_addr_listp)
 	if (ai_dst == NULL) {
 		print_unknown_host_msg("", targethost);
 		exit(EXIT_FAILURE);
+	}
+	if (nexthop != NULL) {
+		get_hostinfo(nexthop, family_input, &ai_nexthop);
+		if (ai_nexthop == NULL) {
+			print_unknown_host_msg("", nexthop);
+			exit(EXIT_FAILURE);
+		}
 	}
 	/* Get a count of the v4 & v6 addresses */
 	for (aip = ai_dst; aip != NULL; aip = aip->ai_next) {
@@ -851,6 +874,7 @@ resolve_nodes(struct addrinfo **ai_dstp, union any_in_addr **src_addr_listp)
 
 	select_all_src_addrs(&src_addr_list, ai_dst, gw_IP_list, gw_IP_list6);
 	*ai_dstp = ai_dst;
+	*ai_nexthopp = ai_nexthop;
 	*src_addr_listp = src_addr_list;
 }
 
@@ -1181,6 +1205,46 @@ select_src_addr(union any_in_addr *dst_addr, int family,
 }
 
 /*
+ * Set the IP_NEXTHOP/IPV6_NEXTHOP socket option.
+ * exits on failure
+ */
+static void
+set_nexthop(int family, struct addrinfo	*ai_nexthop, int sock)
+{
+	if (family == AF_INET) {
+		ipaddr_t nh;
+
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		nh = ((struct sockaddr_in *)ai_nexthop->
+		    ai_addr)->sin_addr.s_addr;
+
+		/* now we need the sys_net_config privilege */
+		(void) __priv_bracket(PRIV_ON);
+		if (setsockopt(sock, IPPROTO_IP, IP_NEXTHOP,
+		    &nh, sizeof (ipaddr_t)) < 0) {
+			Fprintf(stderr, "%s: setsockopt %s\n",
+			    progname, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		(void) __priv_bracket(PRIV_OFF);
+		/* revert to non-privileged user */
+	} else {
+		struct sockaddr_in6 *nh;
+
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		nh = (struct sockaddr_in6 *)ai_nexthop->
+		    ai_addr;
+
+		if (setsockopt(sock, IPPROTO_IPV6, IPV6_NEXTHOP,
+		    nh, sizeof (struct sockaddr_in6)) < 0) {
+			Fprintf(stderr, "%s: setsockopt %s\n",
+			    progname, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+}
+
+/*
  * Setup the socket for the given address family.
  * Returns _B_TRUE on success, _B_FALSE on failure. Failure is the case when no
  * interface can be found, or the specified interface (-i) is not found. On
@@ -1188,7 +1252,7 @@ select_src_addr(union any_in_addr *dst_addr, int family,
  */
 static boolean_t
 setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
-    ushort_t *udp_src_port)
+    ushort_t *udp_src_port, struct addrinfo *ai_nexthop)
 {
 	int send_sock;
 	int recv_sock;
@@ -1232,6 +1296,8 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 		}
 	}
 
+	if (nexthop != NULL && !use_udp)
+		set_nexthop(family, ai_nexthop, recv_sock);
 	/*
 	 * We always receive on raw icmp socket. But the sending socket can be
 	 * raw icmp or udp, depending on the use of -U flag.
@@ -1258,6 +1324,9 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 				exit(EXIT_FAILURE);
 			}
 		}
+
+		if (nexthop != NULL)
+			set_nexthop(family, ai_nexthop, send_sock);
 
 		/*
 		 * In order to distinguish replies to our UDP probes from
@@ -2262,7 +2331,7 @@ usage(char *cmdname)
 	Fprintf(stderr,
 /* CSTYLED */
 "usage: %s -s [-l | U] [abdLnRrv] [-A addr_family] [-c traffic_class]\n\t"
-"[-g gateway [-g gateway ...]] [-F flow_label] [-I interval]\n\t"
+"[-g gateway [-g gateway ...]] [-N nexthop] [-F flow_label] [-I interval]\n\t"
 "[-i interface] [-P tos] [-p port] [-t ttl] host [data_size] [npackets]\n",
 	    cmdname);
 }

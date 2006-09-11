@@ -7323,6 +7323,12 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error)
 		}
 	}
 
+	if (!(ignore & IPPF_NEXTHOP) &&
+	    (udp->udp_sticky_ipp.ipp_fields & IPPF_NEXTHOP)) {
+		option_exists |= IPPF_NEXTHOP;
+		is_sticky |= IPPF_NEXTHOP;
+	}
+
 no_options:
 
 	/*
