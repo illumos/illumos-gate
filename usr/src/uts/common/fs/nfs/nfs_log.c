@@ -835,11 +835,13 @@ nfslog_write_logrecords(struct log_file *lfp,
 	if ((error = VOP_GETATTR(vp, &va, 0, CRED())) == 0) {
 		if ((len + va.va_size) < (MAXOFF32_T)) {
 			error = VOP_WRITE(vp, &uio, ioflag, CRED(), NULL);
+			VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 			if (uio.uio_resid)
 				error = ENOSPC;
 			if (error)
 				(void) VOP_SETATTR(vp, &va, 0, CRED(), NULL);
 		} else {
+			VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 			if (!(lfp->lf_flags & L_PRINTED)) {
 				cmn_err(CE_WARN,
 				    "NFS Logging: buffer file %s exceeds 2GB; "
@@ -847,8 +849,9 @@ nfslog_write_logrecords(struct log_file *lfp,
 			}
 			error = ENOSPC;
 		}
+	} else {
+		VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 	}
-	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 
 	kmem_free(iovp, size_iovecs);
 
