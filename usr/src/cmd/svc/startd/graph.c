@@ -2243,6 +2243,7 @@ process_dependency_pg(scf_propertygroup_t *pg, struct deppg_info *info)
 {
 	scf_handle_t *h;
 	depgroup_type_t deptype;
+	restarter_error_t rerr;
 	struct depfmri_info linfo;
 	char *fmri, *pg_name;
 	size_t fmri_sz;
@@ -2313,6 +2314,16 @@ process_dependency_pg(scf_propertygroup_t *pg, struct deppg_info *info)
 		return (info->err = EINVAL);
 	}
 
+	rerr = depgroup_read_restart(h, pg);
+	if (rerr == RERR_UNSUPPORTED) {
+		log_error(LOG_INFO,
+		    "Dependency \"%s\" of %s has an unknown restart_on value."
+		    "\n", pg_name, info->v->gv_name);
+		startd_free(fmri, fmri_sz);
+		startd_free(pg_name, max_scf_name_size);
+		return (info->err = EINVAL);
+	}
+
 	prop = safe_scf_property_create(h);
 
 	if (scf_pg_get_property(pg, SCF_PROPERTY_ENTITIES, prop) != 0) {
@@ -2340,7 +2351,7 @@ process_dependency_pg(scf_propertygroup_t *pg, struct deppg_info *info)
 
 	/* Create depgroup vertex for pg */
 	err = graph_insert_vertex_unconfigured(fmri, GVT_GROUP, deptype,
-	    depgroup_read_restart(h, pg), &depgrp);
+	    rerr, &depgrp);
 	assert(err == 0);
 	startd_free(fmri, fmri_sz);
 
