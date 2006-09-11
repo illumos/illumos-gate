@@ -41,599 +41,602 @@
 #undef MIN
 #endif /* MIN */
 
-#define MIN(x, y)		    ((x) < (y) ? (x) : (y))
+#define	MIN(x, y)	((x) < (y) ? (x) : (y))
 
-#define LOCALE_PATH "/usr/bin/locale"
+#define	LOCALE_PATH	"/usr/bin/locale"
 
-#define LANGTAG_MAX 5 /* two-char country code, '-' and two-char region code */
+/* two-char country code, '-' and two-char region code */
+#define	LANGTAG_MAX	5
 
-static u_char * do_iconv(iconv_t cd, u_int *mul_ptr,
-		       const void *buf, u_int len,
-		       u_int *outlen, int *err,
-		       u_char **err_str);
+static uchar_t *do_iconv(iconv_t cd, uint_t *mul_ptr, const void *buf,
+    uint_t len, uint_t *outlen, int *err, uchar_t **err_str);
 
 static int locale_cmp(const void *d1, const void *d2);
 static char *g11n_locale2langtag(char *locale);
 
-u_int
-g11n_validate_ascii(const char *str, u_int len, u_char **error_str);
+uint_t g11n_validate_ascii(const char *str, uint_t len, uchar_t **error_str);
+uint_t g11n_validate_utf8(const uchar_t *str, uint_t len, uchar_t **error_str);
 
-u_int
-g11n_validate_utf8(const u_char *str, u_int len, u_char **error_str);
-
-static
-char *
+static char *
 g11n_locale2langtag(char *locale)
 {
-    char *langtag;
+	char *langtag;
 
-    /* base cases */
-    if (!locale || !*locale) return NULL;
+	/* base cases */
+	if (!locale || !*locale)
+		return (NULL);
 
-    if (strcmp(locale, "POSIX") == 0 ||
-	strcmp(locale, "C") == 0) return "i-default";
+	if (strcmp(locale, "POSIX") == 0 || strcmp(locale, "C") == 0)
+		return ("i-default");
 
-    /* Punt for language codes which are not exactly 2 letters */
-    if (strlen(locale) < 2 ||
-	!isalpha(locale[0]) ||
-	!isalpha(locale[1]) ||
-	(locale[2] != '\0' &&
-	locale[2] != '_' &&
-	locale[2] != '.' &&
-	locale[2] != '@'))
-	return NULL;
+	/* punt for language codes which are not exactly 2 letters */
+	if (strlen(locale) < 2 ||
+	    !isalpha(locale[0]) ||
+	    !isalpha(locale[1]) ||
+	    (locale[2] != '\0' &&
+	    locale[2] != '_' &&
+	    locale[2] != '.' &&
+	    locale[2] != '@'))
+		return (NULL);
 
 
-    /* We have a primary language sub-tag */
-    langtag = (char *) xmalloc(LANGTAG_MAX + 1);
+	/* we have a primary language sub-tag */
+	langtag = (char *)xmalloc(LANGTAG_MAX + 1);
 
-    strncpy(langtag, locale, 2);
-    langtag[2] = '\0';
+	strncpy(langtag, locale, 2);
+	langtag[2] = '\0';
 
-    /* Do we have country sub-tag? */
-    if (locale[2] == '_') {
-	if (strlen(locale) < 5 ||
-	    !isalpha(locale[3]) ||
-	    !isalpha(locale[4]) ||
-	    (locale[5] != '\0' && (locale[5] != '.' && locale[5] != '@'))) {
-	    return langtag;
+	/* do we have country sub-tag? For example: cs_CZ */
+	if (locale[2] == '_') {
+		if (strlen(locale) < 5 ||
+		    !isalpha(locale[3]) ||
+		    !isalpha(locale[4]) ||
+		    (locale[5] != '\0' && (locale[5] != '.' &&
+		    locale[5] != '@'))) {
+			return (langtag);
+		}
+
+		/* example: create cs-CZ from cs_CZ */
+		if (snprintf(langtag, 6, "%.*s-%.*s", 2, locale, 2,
+		    locale + 3) == 5)
+			return (langtag);
 	}
 
-	/* yes, we do */
-	/* if (snprintf(langtag, 6, "%s-%s,%s", lang_subtag,
-		     country_subtag, langtag) == 8) */
-	if (snprintf(langtag, 6, "%.*s-%.*s", 2, locale,
-		     2, locale+3) == 5)
-	    return langtag;
-    }
-
-    /* In all other cases we just use the primary language sub-tag */
-    return langtag;
+	/* in all other cases we just use the primary language sub-tag */
+	return (langtag);
 }
 
-u_int
+uint_t
 g11n_langtag_is_default(char *langtag)
 {
-    return (strcmp(langtag, "i-default") == 0);
+	return (strcmp(langtag, "i-default") == 0);
 }
 
 /*
  * This lang tag / locale matching function works only for two-character
  * language primary sub-tags and two-character country sub-tags.
  */
-u_int
+uint_t
 g11n_langtag_matches_locale(char *langtag, char *locale)
 {
-    /* Match "i-default" to the process' current locale if possible */
-    if (g11n_langtag_is_default(langtag)) {
-	if (strcasecmp(locale, "POSIX") == 0 ||
-	    strcasecmp(locale, "C") == 0)
-	    return 1;
-	else
-	    return 0;
-    }
+	/* match "i-default" to the process' current locale if possible */
+	if (g11n_langtag_is_default(langtag)) {
+		if (strcasecmp(locale, "POSIX") == 0 ||
+		    strcasecmp(locale, "C") == 0)
+			return (1);
+		else
+			return (0);
+	}
 
-    /* locale must be at least 2 chars long and the lang part must be
-     * exactly two characters */
-    if (strlen(locale) < 2 ||
-	(!isalpha(locale[0]) || !isalpha(locale[1]) ||
-	(locale[2] != '\0' && locale[2] != '_' && locale[2] != '.' && locale[2] != '@')))
-	return 0;
+	/*
+	 * locale must be at least 2 chars long and the lang part must be
+	 * exactly two characters
+	 */
+	if (strlen(locale) < 2 ||
+	    (!isalpha(locale[0]) || !isalpha(locale[1]) ||
+	    (locale[2] != '\0' && locale[2] != '_' &&
+	    locale[2] != '.' && locale[2] != '@')))
+		return (0);
 
-    /* same thing with the langtag */
-    if (strlen(langtag) < 2 ||
-	(!isalpha(langtag[0]) || !isalpha(langtag[1]) ||
-	(langtag[2] != '\0' && langtag[2] != '-')))
-	return 0;
+	/* same thing with the langtag */
+	if (strlen(langtag) < 2 ||
+	    (!isalpha(langtag[0]) || !isalpha(langtag[1]) ||
+	    (langtag[2] != '\0' && langtag[2] != '-')))
+		return (0);
 
-    /* primary language sub-tag and the locale's language part must match */
-    if (strncasecmp(langtag, locale, 2) != 0)
-	return 0;
+	/* primary language sub-tag and the locale's language part must match */
+	if (strncasecmp(langtag, locale, 2) != 0)
+		return (0);
 
-    /* primary language sub-tag and the locale's language match, now
-     * fuzzy check country part */
+	/*
+	 * primary language sub-tag and the locale's language match, now
+	 * fuzzy check country part
+	 */
 
-    /* neither langtag nor locale have more than one component */
-    if (langtag[2] == '\0' &&
-        (locale[2] == '\0' || locale[2] == '.' || locale[2] == '@'))
-	return 2;
+	/* neither langtag nor locale have more than one component */
+	if (langtag[2] == '\0' &&
+	    (locale[2] == '\0' || locale[2] == '.' || locale[2] == '@'))
+		return (2);
 
-    /* langtag has only one sub-tag... */
-    if (langtag[2] == '\0')
-	return 1;
+	/* langtag has only one sub-tag... */
+	if (langtag[2] == '\0')
+		return (1);
 
-    /* locale has no country code... */
-    if (locale[2] == '\0' || locale[2] == '.' || locale[2] == '@')
-	return 1;
+	/* locale has no country code... */
+	if (locale[2] == '\0' || locale[2] == '.' || locale[2] == '@')
+		return (1);
 
-    /* langtag has more than one subtag and the locale has a country code */
-    
-    /* ignore second subtag if not two chars */
-    if (strlen(langtag) < 5)
-	return 1;
+	/* langtag has more than one subtag and the locale has a country code */
 
-    if (!isalpha(langtag[3]) || !isalpha(langtag[4]) ||
-	(langtag[5] != '\0' && langtag[5] != '-'))
-	return 1;
+	/* ignore second subtag if not two chars */
+	if (strlen(langtag) < 5)
+		return (1);
 
-    /* ignore rest of locale if there is no two-character country part */
-    if (strlen(locale) < 5)
-	return 1;
+	if (!isalpha(langtag[3]) || !isalpha(langtag[4]) ||
+	    (langtag[5] != '\0' && langtag[5] != '-'))
+		return (1);
 
-    if (locale[2] != '_' || !isalpha(locale[3]) || !isalpha(locale[4]) ||
-	(locale[5] != '\0' && locale[5] != '.' && locale[5] != '@'))
-	return 1;
+	/* ignore rest of locale if there is no two-character country part */
+	if (strlen(locale) < 5)
+		return (1);
 
-    /* if the country part matches, return 2 */
-    if (strncasecmp(&langtag[3], &locale[3], 2) == 0)
-	return 2;
+	if (locale[2] != '_' || !isalpha(locale[3]) || !isalpha(locale[4]) ||
+	    (locale[5] != '\0' && locale[5] != '.' && locale[5] != '@'))
+		return (1);
 
-    return 1;
+	/* if the country part matches, return 2 */
+	if (strncasecmp(&langtag[3], &locale[3], 2) == 0)
+		return (2);
+
+	return (1);
 }
 
 char *
 g11n_getlocale()
 {
-    /* We have one text domain - always set it */
-    (void) textdomain(TEXT_DOMAIN);
+	/* we have one text domain - always set it */
+	(void) textdomain(TEXT_DOMAIN);
 
-    /* If the locale is not set, set it from the env vars */
-    if (!setlocale(LC_MESSAGES, NULL))
-	(void) setlocale(LC_MESSAGES, "");
+	/* if the locale is not set, set it from the env vars */
+	if (!setlocale(LC_MESSAGES, NULL))
+		(void) setlocale(LC_MESSAGES, "");
 
-    return setlocale(LC_MESSAGES, NULL);
+	return (setlocale(LC_MESSAGES, NULL));
 }
 
 void
 g11n_setlocale(int category, const char *locale)
 {
-    char *curr;
+	char *curr;
 
-    /* We have one text domain - always set it */
-    (void) textdomain(TEXT_DOMAIN);
+	/* we have one text domain - always set it */
+	(void) textdomain(TEXT_DOMAIN);
 
-    if (!locale)
-	return;
+	if (!locale)
+		return;
 
-    if (*locale && ((curr = setlocale(category, NULL))) &&
-	strcmp(curr, locale) == 0)
-	return;
+	if (*locale && ((curr = setlocale(category, NULL))) &&
+	    strcmp(curr, locale) == 0)
+		return;
 
-    /*
-     * If <category> is bogus, setlocale() will do nothing.
-     */
-    (void) setlocale(category, locale);
-
-    return;
+	/* if <category> is bogus, setlocale() will do nothing */
+	(void) setlocale(category, locale);
 }
 
 char **
 g11n_getlocales()
 {
-    FILE *locale_out;
-    u_int n_elems, list_size, long_line = 0;
-    char **list;
-    char locale[64];	/* 64 bytes is plenty for locale names */
+	FILE *locale_out;
+	uint_t n_elems, list_size, long_line = 0;
+	char **list;
+	char locale[64];	/* 64 bytes is plenty for locale names */
 
-    if ((locale_out = popen(LOCALE_PATH " -a", "r")) == NULL) {
-	return NULL;
-    }
+	if ((locale_out = popen(LOCALE_PATH " -a", "r")) == NULL)
+		return (NULL);
 
-    /*
-     * Start with enough room for 65 locales - that's a lot fewer than
-     * all the locales available for installation, but a lot more than
-     * what most users will need and install
-     */
-    n_elems=0;
-    list_size=192;
-    list = (char **) xmalloc(sizeof(char *) * (list_size + 1));
-    memset(list, 0, sizeof(char *) * (list_size + 1));
+	/*
+	 * start with enough room for 65 locales - that's a lot fewer than
+	 * all the locales available for installation, but a lot more than
+	 * what most users will need and install
+	 */
+	n_elems = 0;
+	list_size = 192;
+	list = (char **) xmalloc(sizeof (char *) * (list_size + 1));
+	memset(list, 0, sizeof (char *) * (list_size + 1));
 
-    while (fgets(locale, sizeof(locale), locale_out)) {
-	/* skip long locale names (if any) */
-	if (!strchr(locale, '\n')) {
-	    long_line = 1;
-	    continue;
+	while (fgets(locale, sizeof (locale), locale_out)) {
+		/* skip long locale names (if any) */
+		if (!strchr(locale, '\n')) {
+			long_line = 1;
+			continue;
+		} else if (long_line) {
+			long_line = 0;
+			continue;
+		}
+
+		if (strncmp(locale, "iso_8859", 8) == 0)
+			/* ignore locale names like "iso_8859-1" */
+			continue;
+
+		if (n_elems == list_size) {
+			list_size *= 2;
+			list = (char **)xrealloc((void *) list,
+			    (list_size + 1) * sizeof (char *));
+			memset(&list[n_elems + 1], 0,
+			    sizeof (char *) * (list_size - n_elems + 1));
+		}
+
+		*(strchr(locale, '\n')) = '\0';	/* remove the trailing \n */
+		list[n_elems++] = xstrdup(locale);
 	}
-	else if (long_line) {
-	    long_line = 0;
-	    continue;
-	}
-	if (strncmp(locale, "iso_8859", 8) == 0)
-	    continue;		    /* ignore locale names like "iso_8859-1" */
 
-	if (n_elems == list_size) {
-	    list_size *= 2;
-	    list = (char **) xrealloc((void *) list, (list_size + 1) * sizeof(char *));
-	    memset(&list[n_elems+1], 0, sizeof(char *) * (list_size - n_elems + 1));
-	}
+	list[n_elems] = NULL;
+	(void) pclose(locale_out);
 
-	*(strchr(locale, '\n')) = '\0';      /* remove the trailing \n */
-
-	list[n_elems++] = xstrdup(locale);
-    }
-    list[n_elems] = NULL;
-    (void) pclose(locale_out);
-
-    qsort(list, n_elems - 1, sizeof(char *), locale_cmp);
-    return list;
+	qsort(list, n_elems - 1, sizeof (char *), locale_cmp);
+	return (list);
 }
 
 char *
 g11n_getlangs()
 {
-    char *locale;
+	char *locale;
 
-    if (getenv("SSH_LANGS"))
-	return xstrdup(getenv("SSH_LANGS"));
+	if (getenv("SSH_LANGS"))
+		return (xstrdup(getenv("SSH_LANGS")));
 
-    locale = g11n_getlocale();
+	locale = g11n_getlocale();
 
-    if (!locale || !*locale)
-	return xstrdup("i-default");
+	if (!locale || !*locale)
+		return (xstrdup("i-default"));
 
-    return g11n_locale2langtag(locale);
+	return (g11n_locale2langtag(locale));
 }
 
 char *
 g11n_locales2langs(char **locale_set)
 {
-    char **p, **r, **q;
-    char *langtag;
-    int locales, skip;
+	char **p, **r, **q;
+	char *langtag;
+	int locales, skip;
 
-    for (locales = 0, p = locale_set ; p && *p ; p++)
-	locales++;
+	for (locales = 0, p = locale_set; p && *p; p++)
+		locales++;
 
-    r = (char **) xmalloc((locales + 1) * sizeof(char *));
-    memset(r, 0, (locales + 1) * sizeof(char *));
+	r = (char **)xmalloc((locales + 1) * sizeof (char *));
+	memset(r, 0, (locales + 1) * sizeof (char *));
 
-    for (p = locale_set ; p && *p && ((p - locale_set) <= locales); p++) {
-	skip = 0;
-	if ((langtag = g11n_locale2langtag(*p)) == NULL)
-	    continue;
-	for (q = r ; (q - r) < locales ; q++) {
-	    if (!*q) break;
-	    if (*q && strcmp(*q, langtag) == 0)
-		skip = 1;
+	for (p = locale_set; p && *p && ((p - locale_set) <= locales); p++) {
+		skip = 0;
+		if ((langtag = g11n_locale2langtag(*p)) == NULL)
+			continue;
+		for (q = r; (q - r) < locales; q++) {
+			if (!*q)
+				break;
+			if (*q && strcmp(*q, langtag) == 0)
+				skip = 1;
+		}
+		if (!skip)
+			*(q++) = langtag;
+		*q = NULL;
 	}
-	if (!skip)
-	    *(q++) = langtag;
-	*q = NULL;
-    }
-    return xjoin(r, ',');
+
+	return (xjoin(r, ','));
 }
 
-static
-int
+static int
 sortcmp(const void *d1, const void *d2)
 {
-    char *s1 = *(char **)d1;
-    char *s2 = *(char **)d2;
+	char *s1 = *(char **)d1;
+	char *s2 = *(char **)d2;
 
-    return strcmp(s1, s2);
+	return (strcmp(s1, s2));
 }
 
 int
 g11n_langtag_match(char *langtag1, char *langtag2)
 {
-    int len1, len2;
-    char c1, c2;
+	int len1, len2;
+	char c1, c2;
 
-    len1 = (strchr(langtag1, '-')) ?
+	len1 = (strchr(langtag1, '-')) ?
 		(strchr(langtag1, '-') - langtag1)
 		: strlen(langtag1);
 
-    len2 = (strchr(langtag2, '-')) ?
+	len2 = (strchr(langtag2, '-')) ?
 		(strchr(langtag2, '-') - langtag2)
 		: strlen(langtag2);
 
-    /* no match */
-    if (len1 != len2 ||
-	strncmp(langtag1, langtag2, len1) != 0)
-	return 0;
+	/* no match */
+	if (len1 != len2 || strncmp(langtag1, langtag2, len1) != 0)
+		return (0);
 
-    c1 = *(langtag1 + len1);
-    c2 = *(langtag2 + len2);
+	c1 = *(langtag1 + len1);
+	c2 = *(langtag2 + len2);
 
-    /* no country sub-tags - exact match */
-    if (c1 == '\0' && c2 == '\0')
-	return 2;
+	/* no country sub-tags - exact match */
+	if (c1 == '\0' && c2 == '\0')
+		return (2);
 
-    /* one langtag has a country sub-tag, the other doesn't */
-    if (c1 == '\0' || c2 == '\0')
-	return 1;
+	/* one langtag has a country sub-tag, the other doesn't */
+	if (c1 == '\0' || c2 == '\0')
+		return (1);
 
-    /* can't happen - both langtags have a country sub-tag */
-    if (c1 != '-' || c2 != '-')
-	return 1;
+	/* can't happen - both langtags have a country sub-tag */
+	if (c1 != '-' || c2 != '-')
+		return (1);
 
-    /* compare country subtags */
-    langtag1 = langtag1 + len1 + 1;
-    langtag2 = langtag2 + len2 + 1;
+	/* compare country subtags */
+	langtag1 = langtag1 + len1 + 1;
+	langtag2 = langtag2 + len2 + 1;
 
-    len1 = (strchr(langtag1, '-')) ?
-		(strchr(langtag1, '-') - langtag1)
-		: strlen(langtag1);
+	len1 = (strchr(langtag1, '-')) ?
+	    (strchr(langtag1, '-') - langtag1) : strlen(langtag1);
 
-    len2 = (strchr(langtag2, '-')) ?
-		(strchr(langtag2, '-') - langtag2)
-		: strlen(langtag2);
+	len2 = (strchr(langtag2, '-')) ?
+	    (strchr(langtag2, '-') - langtag2) : strlen(langtag2);
 
-    if (len1 != len2 ||
-	strncmp(langtag1, langtag2, len1) != 0)
-	return 1;
+	if (len1 != len2 || strncmp(langtag1, langtag2, len1) != 0)
+		return (1);
 
-    /* country tags matched - exact match */
-    return 2;
+	/* country tags matched - exact match */
+	return (2);
 }
 
 char *
 g11n_langtag_set_intersect(char *set1, char *set2)
 {
-    char **list1, **list2, **list3, **p, **q, **r;
-    char *set3, *lang_subtag;
-    u_int n1, n2, n3;
-    u_int do_append;
+	char **list1, **list2, **list3, **p, **q, **r;
+	char *set3, *lang_subtag;
+	uint_t n1, n2, n3;
+	uint_t do_append;
 
-    list1 = xsplit(set1, ',');
-    list2 = xsplit(set2, ',');
-    for (n1 = 0, p = list1 ; p && *p ; p++, n1++) ;
-    for (n2 = 0, p = list2 ; p && *p ; p++, n2++) ;
+	list1 = xsplit(set1, ',');
+	list2 = xsplit(set2, ',');
 
-    list3 = (char **) xmalloc(sizeof(char *) * (n1 + n2 + 1));
-    *list3 = NULL;
+	for (n1 = 0, p = list1; p && *p; p++, n1++)
+		;
+	for (n2 = 0, p = list2; p && *p; p++, n2++)
+		;
 
-    /* we must not sort the user langtags - sorting or not the server's
-     * should not affect the outcome
-     */
-    qsort(list2, n2, sizeof(char *), sortcmp);
+	list3 = (char **) xmalloc(sizeof (char *) * (n1 + n2 + 1));
+	*list3 = NULL;
 
-    for (n3 = 0, p = list1 ; p && *p ; p++) {
-	do_append = 0;
-	for (q = list2 ; q && *q ; q++) {
-	    if (g11n_langtag_match(*p, *q) != 2) continue;
-	    /* append element */
-	    for (r = list3; (r - list3) <= (n1 + n2) ; r++) {
-		do_append = 1;
-		if (!*r) break;
-		if (strcmp(*p, *r) == 0) {
-		    do_append = 0;
-		    break;
+	/*
+	 * we must not sort the user langtags - sorting or not the server's
+	 * should not affect the outcome
+	 */
+	qsort(list2, n2, sizeof (char *), sortcmp);
+
+	for (n3 = 0, p = list1; p && *p; p++) {
+		do_append = 0;
+		for (q = list2; q && *q; q++) {
+			if (g11n_langtag_match(*p, *q) != 2) continue;
+			/* append element */
+			for (r = list3; (r - list3) <= (n1 + n2); r++) {
+				do_append = 1;
+				if (!*r)
+					break;
+				if (strcmp(*p, *r) == 0) {
+					do_append = 0;
+					break;
+				}
+			}
+			if (do_append && n3 <= (n1 + n2)) {
+				list3[n3++] = xstrdup(*p);
+				list3[n3] = NULL;
+			}
 		}
-	    }
-	    if (do_append && n3 <= (n1 + n2)) {
-		list3[n3++] = xstrdup(*p);
-		list3[n3] = NULL;
-	    }
 	}
-    }
 
-    for (p = list1 ; p && *p ; p++) {
-	do_append = 0;
-	for (q = list2 ; q && *q ; q++) {
-	    if (g11n_langtag_match(*p, *q) != 1) continue;
-	    /* append element */
-	    lang_subtag = xstrdup(*p);
-	    if (strchr(lang_subtag, '-'))
-		*(strchr(lang_subtag, '-')) = '\0';
-	    for (r = list3; (r - list3) <= (n1 + n2) ; r++) {
-		do_append = 1;
-		if (!*r) break;
-		if (strcmp(lang_subtag, *r) == 0) {
-		    do_append = 0;
-		    break;
+	for (p = list1; p && *p; p++) {
+		do_append = 0;
+		for (q = list2; q && *q; q++) {
+			if (g11n_langtag_match(*p, *q) != 1)
+				continue;
+
+			/* append element */
+			lang_subtag = xstrdup(*p);
+			if (strchr(lang_subtag, '-'))
+				*(strchr(lang_subtag, '-')) = '\0';
+			for (r = list3; (r - list3) <= (n1 + n2); r++) {
+				do_append = 1;
+				if (!*r)
+					break;
+				if (strcmp(lang_subtag, *r) == 0) {
+					do_append = 0;
+					break;
+				}
+			}
+			if (do_append && n3 <= (n1 + n2)) {
+				list3[n3++] = lang_subtag;
+				list3[n3] = NULL;
+			} else
+				xfree(lang_subtag);
 		}
-	    }
-	    if (do_append && n3 <= (n1 + n2)) {
-		list3[n3++] = lang_subtag;
-		list3[n3] = NULL;
-	    }
-	    else
-		xfree(lang_subtag);
 	}
-    }
 
-    set3 = xjoin(list3, ',');
-    xfree_split_list(list1);
-    xfree_split_list(list2);
-    xfree_split_list(list3);
+	set3 = xjoin(list3, ',');
+	xfree_split_list(list1);
+	xfree_split_list(list2);
+	xfree_split_list(list3);
 
-    return set3;
+	return (set3);
 }
 
 char *
 g11n_clnt_langtag_negotiate(char *clnt_langtags, char *srvr_langtags)
 {
-    char *list, *result;
-    char **xlist;
+	char *list, *result;
+	char **xlist;
 
-    /* g11n_langtag_set_intersect uses xmalloc - should not return NULL */
-    list = g11n_langtag_set_intersect(clnt_langtags, srvr_langtags);
+	/* g11n_langtag_set_intersect uses xmalloc - should not return NULL */
+	list = g11n_langtag_set_intersect(clnt_langtags, srvr_langtags);
 
-    if (!list)
-	    return NULL;
+	if (!list)
+		return (NULL);
 
-    xlist = xsplit(list, ',');
+	xlist = xsplit(list, ',');
 
-    xfree(list);
+	xfree(list);
 
-    if (!xlist || !*xlist)
-	    return NULL;
+	if (!xlist || !*xlist)
+		return (NULL);
 
-    result = xstrdup(*xlist);
+	result = xstrdup(*xlist);
+	xfree_split_list(xlist);
 
-    xfree_split_list(xlist);
-
-    return result;
+	return (result);
 }
 
 /*
  * Compare locales, preferring UTF-8 codesets to others, otherwise doing
  * a stright strcmp()
  */
-static
-int
+static int
 locale_cmp(const void *d1, const void *d2)
 {
-    char *dot_ptr;
-    char *s1 = *(char **)d1;
-    char *s2 = *(char **)d2;
-    int s1_is_utf8 = 0;
-    int s2_is_utf8 = 0;
+	char *dot_ptr;
+	char *s1 = *(char **)d1;
+	char *s2 = *(char **)d2;
+	int s1_is_utf8 = 0;
+	int s2_is_utf8 = 0;
 
-    /* check if s1 is a UTF-8 locale */
-    if (((dot_ptr = strchr((char *) s1, '.')) != NULL) && (*dot_ptr != '\0') &&
-	(strncmp(dot_ptr+1, "UTF-8", 5) == 0) &&
-	(*(dot_ptr+6) == '\0' || *(dot_ptr+6) == '@')) {
-	s1_is_utf8++;
-    }
-    /* check if s2 is a UTF-8 locale */
-    if (((dot_ptr = strchr((char *) s2, '.')) != NULL) && (*dot_ptr != '\0') &&
-	(strncmp(dot_ptr+1, "UTF-8", 5) == 0) &&
-	(*(dot_ptr+6) == '\0' || *(dot_ptr+6) == '@')) {
-	s2_is_utf8++;
-    }
+	/* check if s1 is a UTF-8 locale */
+	if (((dot_ptr = strchr((char *)s1, '.')) != NULL) &&
+	    (*dot_ptr != '\0') && (strncmp(dot_ptr + 1, "UTF-8", 5) == 0) &&
+	    (*(dot_ptr + 6) == '\0' || *(dot_ptr + 6) == '@')) {
+		s1_is_utf8++;
+	}
 
-    /* prefer UTF-8 locales */
-    if (s1_is_utf8 && !s2_is_utf8)
-	return -1;
+	/* check if s2 is a UTF-8 locale */
+	if (((dot_ptr = strchr((char *)s2, '.')) != NULL) &&
+	    (*dot_ptr != '\0') && (strncmp(dot_ptr + 1, "UTF-8", 5) == 0) &&
+	    (*(dot_ptr + 6) == '\0' || *(dot_ptr + 6) == '@')) {
+		s2_is_utf8++;
+	}
 
-    if (s2_is_utf8 && !s1_is_utf8)
-	return 1;
+	/* prefer UTF-8 locales */
+	if (s1_is_utf8 && !s2_is_utf8)
+		return (-1);
 
-    /* prefer any locale over the default locales */
-    if (strcmp(s1, "C") == 0 ||
-	strcmp(s1, "POSIX") == 0 ||
-	strcmp(s1, "common") == 0)
-	if (strcmp(s2, "C") != 0 &&
-	    strcmp(s2, "POSIX") != 0 &&
-	    strcmp(s2, "common") != 0)
-	    return 1;
+	if (s2_is_utf8 && !s1_is_utf8)
+		return (1);
 
-    if (strcmp(s2, "C") == 0 ||
-	strcmp(s2, "POSIX") == 0 ||
-	strcmp(s2, "common") == 0)
-	if (strcmp(s1, "C") != 0 &&
-	    strcmp(s1, "POSIX") != 0 &&
-	    strcmp(s1, "common") != 0)
-	    return -1;
+	/* prefer any locale over the default locales */
+	if (strcmp(s1, "C") == 0 || strcmp(s1, "POSIX") == 0 ||
+	    strcmp(s1, "common") == 0) {
+		if (strcmp(s2, "C") != 0 && strcmp(s2, "POSIX") != 0 &&
+		    strcmp(s2, "common") != 0)
+			return (1);
+	}
 
-    return strcmp(s1, s2);
+	if (strcmp(s2, "C") == 0 || strcmp(s2, "POSIX") == 0 ||
+	    strcmp(s2, "common") == 0) {
+		if (strcmp(s1, "C") != 0 &&
+		    strcmp(s1, "POSIX") != 0 &&
+		    strcmp(s1, "common") != 0)
+			return (-1);
+	}
+
+	return (strcmp(s1, s2));
 }
 
 
 char **
-g11n_langtag_set_locale_set_intersect(char *langtag_set,
-				      char **locale_set)
+g11n_langtag_set_locale_set_intersect(char *langtag_set, char **locale_set)
 {
-    char **langtag_list, **result, **p, **q, **r;
-    char *s;
-    u_int do_append, n_langtags, n_locales, n_results, max_results;
+	char **langtag_list, **result, **p, **q, **r;
+	char *s;
+	uint_t do_append, n_langtags, n_locales, n_results, max_results;
 
-    /* Count lang tags and locales */
-    for (n_locales = 0, p = locale_set ; p && *p ; p++) n_locales++;
-    n_langtags = ((s = langtag_set) != NULL && *s && *s != ',') ? 1 : 0;
-    for ( ; s = strchr(s, ',') ; s++, n_langtags++) ;
-    /*
-    while ((s = strchr(s, ','))) {
-	n_langtags++;
-	s++;
-    }
-     */
+	/* count lang tags and locales */
+	for (n_locales = 0, p = locale_set; p && *p; p++)
+		n_locales++;
 
-    qsort(locale_set, n_locales, sizeof(char *), locale_cmp);
+	n_langtags = ((s = langtag_set) != NULL && *s && *s != ',') ? 1 : 0;
+	/* count the number of langtags */
+	for (; s = strchr(s, ','); s++, n_langtags++)
+		;
 
-    langtag_list = xsplit(langtag_set, ',');
-    for ( n_langtags = 0, p = langtag_list ; p && *p ; p++, n_langtags++);
+	qsort(locale_set, n_locales, sizeof (char *), locale_cmp);
 
-    max_results = MIN(n_locales, n_langtags) * 2;
-    result = (char **) xmalloc(sizeof(char *) * (max_results + 1));
-    *result = NULL;
-    n_results = 0;
+	langtag_list = xsplit(langtag_set, ',');
+	for (n_langtags = 0, p = langtag_list; p && *p; p++, n_langtags++)
+		;
 
-    /* More specific matches first */
-    for (p = langtag_list ; p && *p ; p++) {
-	do_append = 0;
-	for (q = locale_set ; q && *q ; q++) {
-	    if (g11n_langtag_matches_locale(*p, *q) == 2) {
-		do_append = 1;
-		for (r = result ; (r - result) <= MIN(n_locales, n_langtags) ; r++) {
-		    if (!*r) break;
-		    if (strcmp(*q, *r) == 0) {
-			do_append = 0;
-			break;
-		    }
+	max_results = MIN(n_locales, n_langtags) * 2;
+	result = (char **) xmalloc(sizeof (char *) * (max_results + 1));
+	*result = NULL;
+	n_results = 0;
+
+	/* more specific matches first */
+	for (p = langtag_list; p && *p; p++) {
+		do_append = 0;
+		for (q = locale_set; q && *q; q++) {
+			if (g11n_langtag_matches_locale(*p, *q) == 2) {
+				do_append = 1;
+				for (r = result; (r - result) <=
+				    MIN(n_locales, n_langtags); r++) {
+					if (!*r)
+						break;
+					if (strcmp(*q, *r) == 0) {
+						do_append = 0;
+						break;
+					}
+				}
+				if (do_append && n_results < max_results) {
+					result[n_results++] = xstrdup(*q);
+					result[n_results] = NULL;
+				}
+				break;
+			}
 		}
-		if (do_append && n_results < max_results) {
-		    result[n_results++] = xstrdup(*q);
-		    result[n_results] = NULL;
-		}
-		break;
-	    }
 	}
-    }
 
-    for (p = langtag_list ; p && *p ; p++) {
-	do_append = 0;
-	for (q = locale_set ; q && *q ; q++) {
-	    if (g11n_langtag_matches_locale(*p, *q) == 1) {
-		do_append = 1;
-		for (r = result ; (r - result) <= MIN(n_locales, n_langtags) ; r++) {
-		    if (!*r) break;
-		    if (strcmp(*q, *r) == 0) {
-			do_append = 0;
-			break;
-		    }
+	for (p = langtag_list; p && *p; p++) {
+		do_append = 0;
+		for (q = locale_set; q && *q; q++) {
+			if (g11n_langtag_matches_locale(*p, *q) == 1) {
+				do_append = 1;
+				for (r = result; (r - result) <=
+				    MIN(n_locales, n_langtags); r++) {
+					if (!*r)
+						break;
+					if (strcmp(*q, *r) == 0) {
+						do_append = 0;
+						break;
+					}
+				}
+				if (do_append && n_results < max_results) {
+					result[n_results++] = xstrdup(*q);
+					result[n_results] = NULL;
+				}
+				break;
+			}
 		}
-		if (do_append && n_results < max_results) {
-		    result[n_results++] = xstrdup(*q);
-		    result[n_results] = NULL;
-		}
-		break;
-	    }
 	}
-    }
-    xfree_split_list(langtag_list);
 
-    return result;
+	xfree_split_list(langtag_list);
+
+	return (result);
 }
 
 char *
 g11n_srvr_locale_negotiate(char *clnt_langtags, char **srvr_locales)
 {
-    char **results, *result = NULL;
+	char **results, *result = NULL;
 
-    if ((results = g11n_langtag_set_locale_set_intersect(clnt_langtags,
+	if ((results = g11n_langtag_set_locale_set_intersect(clnt_langtags,
 	    srvr_locales ?  srvr_locales : g11n_getlocales())) == NULL)
-	return NULL;
+		return (NULL);
 
-    if (*results != NULL)
-	    result = xstrdup(*results);
+	if (*results != NULL)
+		result = xstrdup(*results);
 
-    xfree_split_list(results);
+	xfree_split_list(results);
 
-    return result;
+	return (result);
 }
 
 
@@ -647,106 +650,124 @@ g11n_srvr_locale_negotiate(char *clnt_langtags, char **srvr_locales)
  * The return value is 0 if success, EILSEQ or EINVAL.
  *
  */
-
-u_int
-g11n_validate_ascii(const char *str, u_int len, u_char **error_str)
+uint_t
+g11n_validate_ascii(const char *str, uint_t len, uchar_t **error_str)
 {
-    u_char *p;
+	uchar_t *p;
 
-    for (p = (u_char *) str ; p && *p && (!(*p & 0x80)) ; p++) ;
+	for (p = (uchar_t *)str; p && *p && (!(*p & 0x80)); p++)
+		;
 
-    if (len && ((p - (u_char *) str) != len)) {
-	return EILSEQ;
-    }
-    return 0;
+	if (len && ((p - (uchar_t *)str) != len))
+		return (EILSEQ);
+
+	return (0);
 }
 
-u_int
-g11n_validate_utf8(const u_char *str, u_int len, u_char **error_str)
+uint_t
+g11n_validate_utf8(const uchar_t *str, uint_t len, uchar_t **error_str)
 {
-    u_char *p;
-    u_int c, l;
+	uchar_t *p;
+	uint_t c, l;
 
-    if (len == 0) len = strlen((const char *)str);
+	if (len == 0)
+		len = strlen((const char *)str);
 
-    for (p = (u_char *) str ; p && (p - str < len) && *p ; ) {
-	/* 8-bit chars begin a UTF-8 sequence */
-	if (*p & 0x80) {
-	    /* Get sequence length and sanity check first byte */
-	    if (*p < 0xc0)
-		return EILSEQ;
-	    else if (*p < 0xe0)
-		l=2;
-	    else if (*p < 0xf0)
-		l=3;
-	    else if (*p < 0xf8)
-		l=4;
-	    else if (*p < 0xfc)
-		l=5;
-	    else if (*p < 0xfe)
-		l=6;
-	    else
-		return EILSEQ;
+	for (p = (uchar_t *)str; p && (p - str < len) && *p; ) {
+		/* 8-bit chars begin a UTF-8 sequence */
+		if (*p & 0x80) {
+			/* get sequence length and sanity check first byte */
+			if (*p < 0xc0)
+				return (EILSEQ);
+			else if (*p < 0xe0)
+				l = 2;
+			else if (*p < 0xf0)
+				l = 3;
+			else if (*p < 0xf8)
+				l = 4;
+			else if (*p < 0xfc)
+				l = 5;
+			else if (*p < 0xfe)
+				l = 6;
+			else
+				return (EILSEQ);
 
-	    if ((p + l - str) >= len)
-		return EILSEQ;
+			if ((p + l - str) >= len)
+				return (EILSEQ);
 
-	    /* overlong detection - build codepoint */
-	    c = *p & 0x3f;
-	    c = c << (6 * (l-1)); /* shift c bits from first byte */
+			/* overlong detection - build codepoint */
+			c = *p & 0x3f;
+			/* shift c bits from first byte */
+			c = c << (6 * (l - 1));
 
-	    if (l > 1) {
-		if (*(p+1) && ((*(p+1) & 0xc0) == 0x80))
-		    c = c | ((*(p+1) & 0x3f) << (6 * (l-2)));
+			if (l > 1) {
+				if (*(p + 1) && ((*(p + 1) & 0xc0) == 0x80))
+					c = c | ((*(p + 1) & 0x3f) <<
+					    (6 * (l - 2)));
+				else
+					return (EILSEQ);
+
+				if (c < 0x80)
+					return (EILSEQ);
+			}
+
+			if (l > 2) {
+				if (*(p + 2) && ((*(p + 2) & 0xc0) == 0x80))
+					c = c | ((*(p + 2) & 0x3f) <<
+					    (6 * (l - 3)));
+				else
+					return (EILSEQ);
+
+				if (c < 0x800)
+					return (EILSEQ);
+			}
+
+			if (l > 3) {
+				if (*(p + 3) && ((*(p + 3) & 0xc0) == 0x80))
+					c = c | ((*(p + 3) & 0x3f) <<
+					    (6 * (l - 4)));
+				else
+					return (EILSEQ);
+
+				if (c < 0x10000)
+					return (EILSEQ);
+			}
+
+			if (l > 4) {
+				if (*(p + 4) && ((*(p + 4) & 0xc0) == 0x80))
+					c = c | ((*(p + 4) & 0x3f) <<
+					    (6 * (l - 5)));
+				else
+					return (EILSEQ);
+
+				if (c < 0x200000)
+					return (EILSEQ);
+			}
+
+			if (l > 5) {
+				if (*(p + 5) && ((*(p + 5) & 0xc0) == 0x80))
+					c = c | (*(p + 5) & 0x3f);
+				else
+					return (EILSEQ);
+
+				if (c < 0x4000000)
+					return (EILSEQ);
+			}
+
+			/*
+			 * check for UTF-16 surrogates ifs other illegal
+			 * UTF-8 * points
+			 */
+			if (((c <= 0xdfff) && (c >= 0xd800)) ||
+			    (c == 0xfffe) || (c == 0xffff))
+				return (EILSEQ);
+			p += l;
+		}
+		/* 7-bit chars are fine */
 		else
-		    return EILSEQ;
-		if (c < 0x80)
-		    return EILSEQ;
-	    }
-	    if (l > 2) {
-		if (*(p+2) && ((*(p+2) & 0xc0) == 0x80))
-		    c = c | ((*(p+2) & 0x3f) << (6 * (l-3)));
-		else
-		    return EILSEQ;
-		if (c < 0x800)
-		    return EILSEQ;
-	    }
-	    if (l > 3) {
-		if (*(p+3) && ((*(p+3) & 0xc0) == 0x80))
-		    c = c | ((*(p+3) & 0x3f) << (6 * (l-4)));
-		else
-		    return EILSEQ;
-		if (c < 0x10000)
-		    return EILSEQ;
-	    }
-	    if (l > 4) {
-		if (*(p+4) && ((*(p+4) & 0xc0) == 0x80))
-		    c = c | ((*(p+4) & 0x3f) << (6 * (l-5)));
-		else
-		    return EILSEQ;
-		if (c < 0x200000)
-		    return EILSEQ;
-	    }
-	    if (l > 5) {
-		if (*(p+5) && ((*(p+5) & 0xc0) == 0x80))
-		    c = c | (*(p+5) & 0x3f) ;
-		else
-		    return EILSEQ;
-		if (c < 0x4000000)
-		    return EILSEQ;
-	    }
-
-	    /* Check for UTF-16 surrogates ifs other illegal UTF-8 * points */
-	    if (((c <= 0xdfff) && (c >= 0xd800)) ||
-	        (c == 0xfffe) || (c == 0xffff))
-		return EILSEQ;
-	    p += l;
+			p++;
 	}
-	/* 7-bit chars are fine */
-	else
-	    p++;
-    }
-    return 0;
+	return (0);
 }
 
 /*
@@ -763,157 +784,168 @@ g11n_validate_utf8(const u_char *str, u_int len, u_char **error_str)
  * These functions return NULL if the conversion fails.
  *
  */
-
-u_char *
-g11n_convert_from_ascii(const char *str, int *err_ptr, u_char **error_str)
+uchar_t *
+g11n_convert_from_ascii(const char *str, int *err_ptr, uchar_t **error_str)
 {
-    static u_int initialized = 0;
-    static u_int do_convert = 0;
-    iconv_t cd;
-    int err;
+	static uint_t initialized = 0;
+	static uint_t do_convert = 0;
+	iconv_t cd;
+	int err;
 
-    if (!initialized) {
-	/*
-	 * iconv_open() fails if the to/from codesets are the
-	 * same, and there are aliases of codesets to boot...
-	 */
-	if (strcmp("646", nl_langinfo(CODESET)) == 0 ||
-	    strcmp("ASCII",  nl_langinfo(CODESET)) == 0 ||
-	    strcmp("US-ASCII",  nl_langinfo(CODESET)) == 0) {
-	    initialized = 1;
-	    do_convert = 0;
+	if (!initialized) {
+		/*
+		 * iconv_open() fails if the to/from codesets are the
+		 * same, and there are aliases of codesets to boot...
+		 */
+		if (strcmp("646", nl_langinfo(CODESET)) == 0 ||
+			strcmp("ASCII",  nl_langinfo(CODESET)) == 0 ||
+			strcmp("US-ASCII",  nl_langinfo(CODESET)) == 0) {
+			initialized = 1;
+			do_convert = 0;
+		} else {
+			cd = iconv_open(nl_langinfo(CODESET), "646");
+			if (cd == (iconv_t)-1) {
+				if (err_ptr)
+					*err_ptr = errno;
+				if (error_str)
+					*error_str = (uchar_t *)"Cannot "
+					    "convert ASCII strings to the local"
+					    " codeset";
+			}
+			initialized = 1;
+			do_convert = 1;
+		}
 	}
-	else {
-	    cd = iconv_open(nl_langinfo(CODESET), "646");
-	    if (cd == (iconv_t) -1) {
-		if (err_ptr) *err_ptr = errno;
-		if (error_str) *error_str = (u_char *)
-		    "Cannot convert ASCII strings to the local codeset";
-	    }
-	    initialized = 1;
-	    do_convert = 1;
-	}
-    }
 
-    if (!do_convert) {
-	if ((err = g11n_validate_ascii(str, 0, error_str))) {
-	    if (err_ptr) *err_ptr = err;
-	    return NULL;
+	if (!do_convert) {
+		if ((err = g11n_validate_ascii(str, 0, error_str))) {
+			if (err_ptr)
+				*err_ptr = err;
+			return (NULL);
+		} else
+			return ((uchar_t *)xstrdup(str));
 	}
-	else
-	    return (u_char *) xstrdup(str);
-    }
-    return do_iconv(cd, NULL, str, 0, NULL, err_ptr, error_str);
+
+	return (do_iconv(cd, NULL, str, 0, NULL, err_ptr, error_str));
 }
 
-u_char *
-g11n_convert_from_utf8(const u_char *str, int *err_ptr, u_char **error_str)
+uchar_t *
+g11n_convert_from_utf8(const uchar_t *str, int *err_ptr, uchar_t **error_str)
 {
-    static u_int initialized = 0;
-    static u_int do_convert = 0;
-    iconv_t cd;
-    int err;
+	static uint_t initialized = 0;
+	static uint_t do_convert = 0;
+	iconv_t cd;
+	int err;
 
-    if (!initialized) {
-	/*
-	 * iconv_open() fails if the to/from codesets are the
-	 * same, and there are aliases of codesets to boot...
-	 */
-	if (strcmp("UTF-8", nl_langinfo(CODESET)) == 0 ||
-	    strcmp("UTF8",  nl_langinfo(CODESET)) == 0) {
-	    initialized = 1;
-	    do_convert = 0;
+	if (!initialized) {
+		/*
+		 * iconv_open() fails if the to/from codesets are the
+		 * same, and there are aliases of codesets to boot...
+		 */
+		if (strcmp("UTF-8", nl_langinfo(CODESET)) == 0 ||
+		    strcmp("UTF8",  nl_langinfo(CODESET)) == 0) {
+			initialized = 1;
+			do_convert = 0;
+		} else {
+			cd = iconv_open(nl_langinfo(CODESET), "UTF-8");
+			if (cd == (iconv_t)-1) {
+				if (err_ptr)
+					*err_ptr = errno;
+				if (error_str)
+					*error_str = (uchar_t *)"Cannot "
+					    "convert UTF-8 strings to the "
+					    "local codeset";
+			}
+			initialized = 1;
+			do_convert = 1;
+		}
 	}
-	else {
-	    cd = iconv_open(nl_langinfo(CODESET), "UTF-8");
-	    if (cd == (iconv_t) -1) {
-		if (err_ptr) *err_ptr = errno;
-		if (error_str) *error_str = (u_char *)
-		    "Cannot convert UTF-8 strings to the local codeset";
-	    }
-	    initialized = 1;
-	    do_convert = 1;
-	}
-    }
 
-    if (!do_convert) {
-	if ((err = g11n_validate_utf8(str, 0, error_str))) {
-	    if (err_ptr) *err_ptr = err;
-	    return NULL;
+	if (!do_convert) {
+		if ((err = g11n_validate_utf8(str, 0, error_str))) {
+			if (err_ptr)
+				*err_ptr = err;
+			return (NULL);
+		} else
+			return ((uchar_t *)xstrdup((char *)str));
 	}
-	else
-	    return (u_char *) xstrdup((char *) str);
-    }
-    return do_iconv(cd, NULL, str, 0, NULL, err_ptr, error_str);
+
+	return (do_iconv(cd, NULL, str, 0, NULL, err_ptr, error_str));
 }
 
 char *
-g11n_convert_to_ascii(const u_char *str, int *err_ptr, u_char **error_str)
+g11n_convert_to_ascii(const uchar_t *str, int *err_ptr, uchar_t **error_str)
 {
-    static u_int initialized = 0;
-    static u_int do_convert = 0;
-    iconv_t cd;
+	static uint_t initialized = 0;
+	static uint_t do_convert = 0;
+	iconv_t cd;
 
-    if (!initialized) {
-	/*
-	 * iconv_open() fails if the to/from codesets are the
-	 * same, and there are aliases of codesets to boot...
-	 */
-	if (strcmp("646", nl_langinfo(CODESET)) == 0 ||
-	    strcmp("ASCII",  nl_langinfo(CODESET)) == 0 ||
-	    strcmp("US-ASCII",  nl_langinfo(CODESET)) == 0) {
-	    initialized = 1;
-	    do_convert = 0;
+	if (!initialized) {
+		/*
+		 * iconv_open() fails if the to/from codesets are the
+		 * same, and there are aliases of codesets to boot...
+		 */
+		if (strcmp("646", nl_langinfo(CODESET)) == 0 ||
+		    strcmp("ASCII",  nl_langinfo(CODESET)) == 0 ||
+		    strcmp("US-ASCII",  nl_langinfo(CODESET)) == 0) {
+			initialized = 1;
+			do_convert = 0;
+		} else {
+			cd = iconv_open("646", nl_langinfo(CODESET));
+			if (cd == (iconv_t)-1) {
+				if (err_ptr)
+					*err_ptr = errno;
+				if (error_str)
+					*error_str = (uchar_t *)"Cannot "
+					    "convert UTF-8 strings to the "
+					    "local codeset";
+			}
+			initialized = 1;
+			do_convert = 1;
+		}
 	}
-	else {
-	    cd = iconv_open("646", nl_langinfo(CODESET));
-	    if (cd == (iconv_t) -1) {
-		if (err_ptr) *err_ptr = errno;
-		if (error_str) *error_str = (u_char *)
-		    "Cannot convert UTF-8 strings to the local codeset";
-	    }
-	    initialized = 1;
-	    do_convert = 1;
-	}
-    }
 
-    if (!do_convert)
-	return xstrdup((char *) str);
-    return (char *) do_iconv(cd, NULL, str, 0, NULL, err_ptr, error_str);
+	if (!do_convert)
+		return (xstrdup((char *)str));
+
+	return ((char *)do_iconv(cd, NULL, str, 0, NULL, err_ptr, error_str));
 }
 
-u_char *
-g11n_convert_to_utf8(const u_char *str, int *err_ptr, u_char **error_str)
+uchar_t *
+g11n_convert_to_utf8(const uchar_t *str, int *err_ptr, uchar_t **error_str)
 {
-    static u_int initialized = 0;
-    static u_int do_convert = 0;
-    iconv_t cd;
+	static uint_t initialized = 0;
+	static uint_t do_convert = 0;
+	iconv_t cd;
 
-    if (!initialized) {
-	/*
-	 * iconv_open() fails if the to/from codesets are the
-	 * same, and there are aliases of codesets to boot...
-	 */
-	if (strcmp("UTF-8", nl_langinfo(CODESET)) == 0 ||
-	    strcmp("UTF8",  nl_langinfo(CODESET)) == 0) {
-	    initialized = 1;
-	    do_convert = 0;
+	if (!initialized) {
+		/*
+		 * iconv_open() fails if the to/from codesets are the
+		 * same, and there are aliases of codesets to boot...
+		 */
+		if (strcmp("UTF-8", nl_langinfo(CODESET)) == 0 ||
+		    strcmp("UTF8",  nl_langinfo(CODESET)) == 0) {
+			initialized = 1;
+			do_convert = 0;
+		} else {
+			cd = iconv_open("UTF-8", nl_langinfo(CODESET));
+			if (cd == (iconv_t)-1) {
+				if (err_ptr)
+					*err_ptr = errno;
+				if (error_str)
+					*error_str = (uchar_t *)"Cannot "
+					    "convert UTF-8 strings to the "
+					    "local codeset";
+			}
+			initialized = 1;
+			do_convert = 1;
+		}
 	}
-	else {
-	    cd = iconv_open("UTF-8", nl_langinfo(CODESET));
-	    if (cd == (iconv_t) -1) {
-		if (err_ptr) *err_ptr = errno;
-		if (error_str) *error_str = (u_char *)
-		    "Cannot convert UTF-8 strings to the local codeset";
-	    }
-	    initialized = 1;
-	    do_convert = 1;
-	}
-    }
 
-    if (!do_convert)
-	return (u_char *) xstrdup((char *) str);
-    return do_iconv(cd, NULL, str, 0, NULL, err_ptr, error_str);
+	if (!do_convert)
+		return ((uchar_t *)xstrdup((char *)str));
+
+	return (do_iconv(cd, NULL, str, 0, NULL, err_ptr, error_str));
 }
 
 
@@ -923,67 +955,80 @@ g11n_convert_to_utf8(const u_char *str, int *err_ptr, u_char **error_str)
  * The caller is responsible for freeing the result and for handling
  * (errno && errno != E2BIG) (i.e., EILSEQ, EINVAL, EBADF).
  */
-
-static
-u_char *
-do_iconv(iconv_t cd, u_int *mul_ptr,
-	 const void *buf, u_int len,
-	 u_int *outlen, int *err,
-	 u_char **err_str)
+static uchar_t *
+do_iconv(iconv_t cd, uint_t *mul_ptr, const void *buf, uint_t len,
+    uint_t *outlen, int *err, uchar_t **err_str)
 {
-    size_t inbytesleft, outbytesleft, converted_size;
-    char *outbuf;
-    u_char *converted;
-    const char *inbuf;
-    u_int mul = 0;
+	size_t inbytesleft, outbytesleft, converted_size;
+	char *outbuf;
+	uchar_t *converted;
+	const char *inbuf;
+	uint_t mul = 0;
 
-    if (!buf || !(*(char *)buf)) return NULL;
-    if (len == 0) len = strlen(buf);
-    /* reset conversion descriptor */
-    /* XXX Do we need initial shift sequences for UTF-8??? */
-    (void) iconv(cd, NULL, &inbytesleft, &outbuf, &outbytesleft);
-    inbuf = (const char *) buf;
-    if (mul_ptr) mul = *mul_ptr;
-    converted_size = (len << mul);
-    outbuf = (char *) xmalloc(converted_size + 1); /* for null */
-    converted = (u_char *) outbuf;
-    outbytesleft = len;
-    do {
-	if (iconv(cd, &inbuf, &inbytesleft, &outbuf, &outbytesleft) == 
-		(size_t) -1) {
-	    if (errno == E2BIG) {
-		/* UTF-8 codepoints are at most 8 bytes long. */
-		if (mul > 2) {
-		    if (err_str)
-			*err_str = (u_char *) "Conversion to UTF-8 failed due to"
-				  "preposterous space requirements";
-		    if (err)
-			*err = EILSEQ;
-		    return NULL;
+	if (!buf || !(*(char *)buf))
+		return (NULL);
+
+	if (len == 0)
+		len = strlen(buf);
+
+	/* reset conversion descriptor */
+	/* XXX Do we need initial shift sequences for UTF-8??? */
+	(void) iconv(cd, NULL, &inbytesleft, &outbuf, &outbytesleft);
+	inbuf = (const char *) buf;
+
+	if (mul_ptr)
+		mul = *mul_ptr;
+
+	converted_size = (len << mul);
+	outbuf = (char *)xmalloc(converted_size + 1); /* for null */
+	converted = (uchar_t *)outbuf;
+	outbytesleft = len;
+
+	do {
+		if (iconv(cd, &inbuf, &inbytesleft, &outbuf, &outbytesleft) ==
+		    (size_t)-1) {
+			if (errno == E2BIG) {
+				/* UTF-8 codepoints are at most 8 bytes long */
+				if (mul > 2) {
+					if (err_str)
+						*err_str = (uchar_t *)
+						    "Conversion to UTF-8 failed"
+						    " due to preposterous space"
+						    " requirements";
+					if (err)
+						*err = EILSEQ;
+					return (NULL);
+				}
+
+				/*
+				 * re-alloc output and ensure that the outbuf
+				 * and outbytesleft values are adjusted
+				 */
+				converted = xrealloc(converted,
+				    converted_size << 1 + 1);
+				outbuf = (char *)converted + converted_size -
+				    outbytesleft;
+				converted_size = (len << ++(mul));
+				outbytesleft = converted_size - outbytesleft;
+			} else {
+				/*
+				 * let the caller deal with iconv() errors,
+				 * probably by calling fatal(); xfree() does
+				 * not set errno
+				 */
+				if (err)
+					*err = errno;
+				xfree(converted);
+				return (NULL);
+			}
 		}
+	} while (inbytesleft);
 
-		/*
-		 * Re-alloc output and ensure that the outbuf
-		 * and outbytesleft values are adjusted.
-		 */
-		converted = xrealloc(converted, converted_size << 1 + 1);
-		outbuf = (char *) converted + converted_size - outbytesleft;
-		converted_size = (len << ++(mul));
-		outbytesleft = converted_size - outbytesleft;
-	    }
-	    else {
-		/*
-		 * Let the caller deal with iconv() errors, probably by
-		 * calling fatal(); xfree() does not set errno.
-		 */
-		if (err) *err = errno;
-		xfree(converted);
-		return NULL;
-	    }
-	}
-    } while (inbytesleft);
-    *outbuf = '\0'; /* ensure null-termination */
-    if (outlen) *outlen = converted_size - outbytesleft;
-    if (mul_ptr) *mul_ptr = mul;
-    return converted;
+	*outbuf = '\0'; /* ensure null-termination */
+	if (outlen)
+		*outlen = converted_size - outbytesleft;
+	if (mul_ptr)
+		*mul_ptr = mul;
+
+	return (converted);
 }

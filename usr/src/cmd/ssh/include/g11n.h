@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,37 +40,37 @@ extern "C" {
  */
 
 /* boolean */
-u_int g11n_langtag_is_default(char *langtag);
+uint_t g11n_langtag_is_default(char *langtag);
 
 /* return 0 if not, 1 if yes, 2 if the country is matched too */
-u_int g11n_langtag_matches_locale(char *langtag, char *locale);
+uint_t g11n_langtag_matches_locale(char *langtag, char *locale);
 
 /* get current locale */
-char * g11n_getlocale();
+char *g11n_getlocale();
 
 /* get current locale */
 void g11n_setlocale(int category, const char *locale);
 
 /* get list of locales - returns pointer to array of pointers to char */
-char ** g11n_getlocales();
+char **g11n_getlocales();
 
 /* get list of langs spoken by the user, from SSH_LANGS env var */
-char * g11n_getlangs();
+char *g11n_getlangs();
 
 /* make a comma-separated list of language tags from list of locales */
-char * g11n_locales2langs(char **locale_set);
+char *g11n_locales2langs(char **locale_set);
 
 int g11n_langtag_match(char *langtag1, char *langtag2);
 
 /* intersect comma-separated lists of IETF language tags */
-char * g11n_langtag_set_intersect(char *set1, char *set2);
+char *g11n_langtag_set_intersect(char *set1, char *set2);
 
-char * g11n_clnt_langtag_negotiate(char *clnt_langtags, char *srvr_langtags);
+char *g11n_clnt_langtag_negotiate(char *clnt_langtags, char *srvr_langtags);
 
-char ** g11n_langtag_set_locale_set_intersect(char *langtag_set,
-				      char **locale_set);
+char **g11n_langtag_set_locale_set_intersect(char *langtag_set,
+    char **locale_set);
 
-char * g11n_srvr_locale_negotiate(char *clnt_langtags, char **srvr_locales);
+char *g11n_srvr_locale_negotiate(char *clnt_langtags, char **srvr_locales);
 
 
 /*
@@ -88,9 +87,9 @@ char * g11n_srvr_locale_negotiate(char *clnt_langtags, char **srvr_locales);
  *
  */
 
-u_int g11n_validate_ascii(const char *str, u_int len, u_char **error_str);
+uint_t g11n_validate_ascii(const char *str, uint_t len, uchar_t **error_str);
 
-u_int g11n_validate_utf8(const u_char *str, u_int len, u_char **error_str);
+uint_t g11n_validate_utf8(const uchar_t *str, uint_t len, uchar_t **error_str);
 
 /*
  * Functions for converting to ASCII or UTF-8 from the local codeset
@@ -107,17 +106,18 @@ u_int g11n_validate_utf8(const u_char *str, u_int len, u_char **error_str);
  *
  */
 
-u_char * g11n_convert_from_ascii(const char *str, int *err,
-				 u_char **error_str);
+uchar_t *g11n_convert_from_ascii(const char *str, int *err,
+    uchar_t **error_str);
 
-u_char * g11n_convert_from_utf8(const u_char *str, int *err,
-				u_char **error_str);
+uchar_t *g11n_convert_from_utf8(const uchar_t *str, int *err,
+    uchar_t **error_str);
 
-char * g11n_convert_to_ascii(const u_char *str, int *err,
-			     u_char **error_str);
+char *g11n_convert_to_ascii(const uchar_t *str, int *err,
+    uchar_t **error_str);
 
-u_char * g11n_convert_to_utf8(const u_char *str, int *err,
-			      u_char **error_str);
+uchar_t *g11n_convert_to_utf8(const uchar_t *str, int *err,
+    uchar_t **error_str);
+
 #ifdef __cplusplus
 }
 #endif
