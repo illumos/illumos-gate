@@ -734,18 +734,18 @@ pool_set_status(int state)
 		 */
 		if (getenv("SMF_FMRI") == NULL) {
 			FILE *p;
+			char *cmd;
+
 			if (state) {
-				char *cmd = "/usr/sbin/svcadm enable -s " \
+				cmd = "/usr/sbin/svcadm enable -s " \
 				    SMF_SVC_INSTANCE;
-				if ((p = popen(cmd, "wF")) == NULL ||
-				    pclose(p) != 0)
-					return (PO_FAIL);
 			} else {
-				char *cmd = "/usr/sbin/svcadm disable -s " \
+				cmd = "/usr/sbin/svcadm disable -s " \
 				    SMF_SVC_INSTANCE;
-				if ((p = popen(cmd, "wF")) == NULL ||
-				    pclose(p) != 0)
-					return (PO_FAIL);
+			}
+			if ((p = popen(cmd, "wF")) == NULL || pclose(p) != 0) {
+				pool_seterror(POE_SYSTEM);
+				return (PO_FAIL);
 			}
 			return (PO_SUCCESS);
 		}
