@@ -246,16 +246,26 @@ main(int argc, char *argv[])
 	char tmp_buf[INET6_ADDRSTRLEN];
 	int c;
 	int i;
+	boolean_t has_sys_net_config;
 
 	progname = argv[0];
 
 	/*
-	 * This program needs the net_icmpaccess privileges.  We'll fail
+	 * This program needs the net_icmpaccess privilege for creating
+	 * raw ICMP sockets.  It needs sys_net_config for using the
+	 * IP_NEXTHOP socket option (IPv4 only).  We'll fail
 	 * on the socket call and report the error there when we have
 	 * insufficient privileges.
+	 *
+	 * Non-global zones don't have the sys_net_config privilege, so
+	 * we need to check for it in our limit set before trying
+	 * to set it.
 	 */
+	has_sys_net_config = priv_ineffect(PRIV_SYS_NET_CONFIG);
+
 	(void) __init_suid_priv(PU_CLEARLIMITSET, PRIV_NET_ICMPACCESS,
-	    PRIV_SYS_NET_CONFIG, (char *)NULL);
+	    has_sys_net_config ? PRIV_SYS_NET_CONFIG : (char *)NULL,
+	    (char *)NULL);
 
 	setbuf(stdout, (char *)0);
 
@@ -1222,8 +1232,13 @@ set_nexthop(int family, struct addrinfo	*ai_nexthop, int sock)
 		(void) __priv_bracket(PRIV_ON);
 		if (setsockopt(sock, IPPROTO_IP, IP_NEXTHOP,
 		    &nh, sizeof (ipaddr_t)) < 0) {
-			Fprintf(stderr, "%s: setsockopt %s\n",
-			    progname, strerror(errno));
+			if (errno == EPERM)
+				Fprintf(stderr, "%s: Insufficient privilege "
+				    "to specify IPv4 nexthop router.\n",
+				    progname);
+			else
+				Fprintf(stderr, "%s: setsockopt %s\n",
+				    progname, strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 		(void) __priv_bracket(PRIV_OFF);
