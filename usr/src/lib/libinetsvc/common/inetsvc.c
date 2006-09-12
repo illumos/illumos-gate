@@ -739,7 +739,10 @@ valid_props(inetd_prop_t *prop, const char *fmri, basic_cfg_t **cfgpp,
 			}
 		}
 
-		if (invalid_proto || (proto == NULL))
+		if (proto == NULL)
+			break;
+
+		if (invalid_proto)
 			goto past_proto_processing;
 
 		/* strip a trailing only to simplify further processing */
