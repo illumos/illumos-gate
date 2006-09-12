@@ -212,6 +212,12 @@ extern "C" {
 #define	AUDIOHDC_AUDIO_FUNC_GROUP	1
 
 /*
+ * HD audio verbs can be either 12-bit or 4-bit in length.
+ */
+#define	AUDIOHDC_12BIT_VERB_MASK	0xfffff000
+#define	AUDIOHDC_4BIT_VERB_MASK		0xfffffff0
+
+/*
  * 12-bit verbs
  */
 #define	AUDIOHDC_VERB_GET_PARAM			0xf00

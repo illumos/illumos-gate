@@ -259,7 +259,7 @@ static struct dev_ops audiohd_dev_ops = {
 /* Linkage structure for loadable drivers */
 static struct modldrv audiohd_modldrv = {
 	&mod_driverops,		/* drv_modops */
-	AUDIOHD_MOD_NAME"%I%",	/* drv_linkinfo */
+	AUDIOHD_MOD_NAME"1.3",	/* drv_linkinfo */
 	&audiohd_dev_ops,		/* drv_dev_ops */
 };
 
@@ -2139,7 +2139,7 @@ audiohd_12bit_verb_to_codec(audiohd_state_t *statep, uint8_t caddr, uint8_t nid,
 	uint16_t	wptr;
 	uint16_t	rptr;
 
-	ASSERT((cmd & 0xfff000ff) == 0);
+	ASSERT((cmd & AUDIOHDC_12BIT_VERB_MASK) == 0);
 
 	wptr = AUDIOHD_REG_GET16(AUDIOHD_REG_CORBWP) & AUDIOHD_CMDIO_ENT_MASK;
 	rptr = AUDIOHD_REG_GET16(AUDIOHD_REG_CORBRP) & AUDIOHD_CMDIO_ENT_MASK;
@@ -2178,7 +2178,7 @@ audiohd_4bit_verb_to_codec(audiohd_state_t *statep, uint8_t caddr, uint8_t nid,
 	uint16_t	wptr;
 	uint16_t	rptr;
 
-	ASSERT((cmd & 0xfff000ff) == 0);
+	ASSERT((cmd & AUDIOHDC_4BIT_VERB_MASK) == 0);
 
 	wptr = AUDIOHD_REG_GET16(AUDIOHD_REG_CORBWP) & AUDIOHD_CMDIO_ENT_MASK;
 	rptr = AUDIOHD_REG_GET16(AUDIOHD_REG_CORBRP) & AUDIOHD_CMDIO_ENT_MASK;
