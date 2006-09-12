@@ -475,6 +475,19 @@ label=AUE_BIND
       comment=1, socket type, "type":
       comment=socket address
 
+label=AUE_BRANDSYS
+# generic mechanism to allow user-space and kernel components of a brand
+# to communicate.  The interpretation of the arguments to the call is
+# left entirely up to the brand.
+  format=arg1:arg2:arg3:arg4:arg5:arg6:arg7
+    comment=1, command, "cmd":
+    comment=2, command args, "arg":
+    comment=3, command args, "arg":
+    comment=4, command args, "arg":
+    comment=5, command args, "arg":
+    comment=6, command args, "arg":
+    comment=7, command args, "arg":
+
 label=AUE_BSMSYS
   skip=Not used.
 

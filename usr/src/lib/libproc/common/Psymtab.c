@@ -26,6 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -287,15 +288,20 @@ map_iter(const rd_loadobj_t *lop, void *cd)
 
 	dprintf("encountered rd object at %p\n", (void *)lop->rl_base);
 
-	if ((mptr = Paddr2mptr(P, lop->rl_base)) == NULL)
+	if ((mptr = Paddr2mptr(P, lop->rl_base)) == NULL) {
+		dprintf("map_iter: base address doesn't match any mapping\n");
 		return (1); /* Base address does not match any mapping */
+	}
 
 	if ((fptr = mptr->map_file) == NULL &&
-	    (fptr = file_info_new(P, mptr)) == NULL)
+	    (fptr = file_info_new(P, mptr)) == NULL) {
+		dprintf("map_iter: failed to allocate a new file_info_t\n");
 		return (1); /* Failed to allocate a new file_info_t */
+	}
 
 	if ((fptr->file_lo == NULL) &&
 	    (fptr->file_lo = malloc(sizeof (rd_loadobj_t))) == NULL) {
+		dprintf("map_iter: failed to allocate rd_loadobj_t\n");
 		file_info_free(P, fptr);
 		return (1); /* Failed to allocate rd_loadobj_t */
 	}
@@ -314,6 +320,9 @@ map_iter(const rd_loadobj_t *lop, void *cd)
 	if (Pread_string(P, buf, sizeof (buf), lop->rl_nameaddr) > 0) {
 		if ((fptr->file_lname = strdup(buf)) != NULL)
 			fptr->file_lbase = basename(fptr->file_lname);
+	} else {
+		dprintf("map_iter: failed to read string at %p\n",
+		    (void *)lop->rl_nameaddr);
 	}
 
 	dprintf("loaded rd object %s lmid %lx\n",
@@ -341,17 +350,13 @@ map_set(struct ps_prochandle *P, map_info_t *mptr, const char *lname)
 	(void) memset(fptr->file_lo, 0, sizeof (rd_loadobj_t));
 	fptr->file_lo->rl_base = mptr->map_pmap.pr_vaddr;
 	fptr->file_lo->rl_bend =
-		mptr->map_pmap.pr_vaddr + mptr->map_pmap.pr_size;
+	    mptr->map_pmap.pr_vaddr + mptr->map_pmap.pr_size;
 
 	fptr->file_lo->rl_plt_base = fptr->file_plt_base;
 	fptr->file_lo->rl_plt_size = fptr->file_plt_size;
 
-	if (fptr->file_lname) {
-		free(fptr->file_lname);
-		fptr->file_lname = NULL;
-	}
-
-	if ((fptr->file_lname = strdup(lname)) != NULL)
+	if (fptr->file_lname == NULL &&
+	    (fptr->file_lname = strdup(lname)) != NULL)
 		fptr->file_lbase = basename(fptr->file_lname);
 }
 
@@ -385,7 +390,7 @@ load_static_maps(struct ps_prochandle *P)
 void
 Pupdate_maps(struct ps_prochandle *P)
 {
-	char mapfile[64];
+	char mapfile[PATH_MAX];
 	int mapfd;
 	struct stat statb;
 	prmap_t *Pmap = NULL;
@@ -401,7 +406,8 @@ Pupdate_maps(struct ps_prochandle *P)
 
 	Preadauxvec(P);
 
-	(void) sprintf(mapfile, "/proc/%d/map", (int)P->pid);
+	(void) snprintf(mapfile, sizeof (mapfile), "%s/%d/map",
+	    procfs_path, (int)P->pid);
 	if ((mapfd = open(mapfile, O_RDONLY)) < 0 ||
 	    fstat(mapfd, &statb) != 0 ||
 	    statb.st_size < sizeof (prmap_t) ||
@@ -803,7 +809,8 @@ Preadauxvec(struct ps_prochandle *P)
 		P->nauxv = 0;
 	}
 
-	(void) sprintf(auxfile, "/proc/%d/auxv", (int)P->pid);
+	(void) snprintf(auxfile, sizeof (auxfile), "%s/%d/auxv",
+	    procfs_path, (int)P->pid);
 	if ((fd = open(auxfile, O_RDONLY)) < 0)
 		return;
 
@@ -928,7 +935,7 @@ build_map_symtab(struct ps_prochandle *P, map_info_t *mptr)
 	 * fptr->file_map to be set in Pbuild_file_symtab.  librtld_db may be
 	 * unaware of what's going on in the rare case that a legitimate ELF
 	 * file has been mmap(2)ed into the process address space *without*
-	 * the use of dlopen(3x).  Why would this happen?  See pwdx ... :)
+	 * the use of dlopen(3x).
 	 */
 	if (fptr->file_map == NULL)
 		fptr->file_map = mptr;
@@ -1128,6 +1135,11 @@ found_shdr:
 		    dyn.d_tag == DT_CHECKSUM)
 			goto found_cksum;
 	}
+
+	/*
+	 * The in-memory ELF has no DT_CHECKSUM section, but we will report it
+	 * as matching the file anyhow.
+	 */
 	return (0);
 
 found_cksum:
@@ -1321,7 +1333,7 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 		uint32_t off;
 		size_t pltsz = 0, pltentsz;
 
-		if (read_ehdr32(P, &ehdr, &phnum, addr) != 0 ||
+		if ((read_ehdr32(P, &ehdr, &phnum, addr) != 0) ||
 		    read_dynamic_phdr32(P, &ehdr, phnum, &phdr, addr) != 0)
 			return (NULL);
 
@@ -1335,6 +1347,14 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 		    phdr.p_filesz) {
 			free(dp);
 			return (NULL);
+		}
+
+		/*
+		 * Allow librtld_db the opportunity to "fix" the program
+		 * headers, if it needs to, before we process them.
+		 */
+		if (P->rap != NULL && ehdr.e_type == ET_DYN) {
+			rd_fix_phdrs(P->rap, dp, phdr.p_filesz, addr);
 		}
 
 		for (i = 0; i < phdr.p_filesz / sizeof (Elf32_Dyn); i++) {
@@ -1422,8 +1442,11 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 		/* .dynsym section */
 		size += sizeof (Elf32_Shdr);
 		if (Pread(P, &nchain, sizeof (nchain),
-		    d[DI_HASH]->d_un.d_ptr + 4) != sizeof (nchain))
+		    d[DI_HASH]->d_un.d_ptr + 4) != sizeof (nchain)) {
+			dprintf("Pread of .dynsym at %lx failed\n",
+			    (long)(d[DI_HASH]->d_un.d_val + 4));
 			goto bad32;
+		}
 		size += sizeof (Elf32_Sym) * nchain;
 
 		/* .dynstr section */
@@ -1446,8 +1469,10 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 				Elf32_Rela r[2];
 
 				if (Pread(P, r, sizeof (r), jmprel +
-				    sizeof (r[0]) * ndx) != sizeof (r))
+				    sizeof (r[0]) * ndx) != sizeof (r)) {
+					dprintf("Pread of DT_RELA failed\n");
 					goto bad32;
+				}
 
 				penult = r[0].r_offset;
 				ult = r[1].r_offset;
@@ -1457,12 +1482,15 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 				Elf32_Rel r[2];
 
 				if (Pread(P, r, sizeof (r), jmprel +
-				    sizeof (r[0]) * ndx) != sizeof (r))
+				    sizeof (r[0]) * ndx) != sizeof (r)) {
+					dprintf("Pread of DT_REL failed\n");
 					goto bad32;
+				}
 
 				penult = r[0].r_offset;
 				ult = r[1].r_offset;
 			} else {
+				dprintf(".plt: unknown jmprel value\n");
 				goto bad32;
 			}
 
@@ -1505,6 +1533,7 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 		if (Pread(P, &elfdata[ep->e_phoff], phnum * ep->e_phentsize,
 		    addr + ehdr.e_phoff) != phnum * ep->e_phentsize) {
 			free(elfdata);
+			dprintf("failed to read program headers\n");
 			goto bad32;
 		}
 
@@ -1550,6 +1579,8 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 		if (Pread(P, &elfdata[off], sp->sh_size,
 		    d[DI_SYMTAB]->d_un.d_ptr) != sp->sh_size) {
 			free(elfdata);
+			dprintf("failed to read .dynsym at %lx\n",
+			    (long)d[DI_SYMTAB]->d_un.d_ptr);
 			goto bad32;
 		}
 
@@ -1575,6 +1606,7 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 		if (Pread(P, &elfdata[off], sp->sh_size,
 		    d[DI_STRTAB]->d_un.d_ptr) != sp->sh_size) {
 			free(elfdata);
+			dprintf("failed to read .dynstr\n");
 			goto bad32;
 		}
 		off += roundup(sp->sh_size, 4);
@@ -1620,6 +1652,7 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 			if (Pread(P, &elfdata[off], sp->sh_size,
 			    d[DI_PLTGOT]->d_un.d_ptr) != sp->sh_size) {
 				free(elfdata);
+				dprintf("failed to read .plt\n");
 				goto bad32;
 			}
 			off += roundup(sp->sh_size, 4);
@@ -1768,8 +1801,13 @@ bad32:
 				Elf64_Rela r[2];
 
 				if (Pread(P, r, sizeof (r), jmprel +
-				    sizeof (r[0]) * ndx) != sizeof (r))
+				    sizeof (r[0]) * ndx) != sizeof (r)) {
+					dprintf("Pread jmprel DT_RELA at %p "
+					    "failed\n",
+					    (void *)(jmprel +
+						sizeof (r[0]) * ndx));
 					goto bad64;
+				}
 
 				penult = r[0].r_offset;
 				ult = r[1].r_offset;
@@ -1779,12 +1817,19 @@ bad32:
 				Elf64_Rel r[2];
 
 				if (Pread(P, r, sizeof (r), jmprel +
-				    sizeof (r[0]) * ndx) != sizeof (r))
+				    sizeof (r[0]) * ndx) != sizeof (r)) {
+					dprintf("Pread jmprel DT_REL at %p "
+					    "failed\n",
+					    (void *)(jmprel +
+						sizeof (r[0]) * ndx));
 					goto bad64;
+				}
 
 				penult = r[0].r_offset;
 				ult = r[1].r_offset;
 			} else {
+				dprintf("DT_PLTREL value %p unknown\n",
+				    (void *)d[DI_PLTREL]->d_un.d_ptr);
 				goto bad64;
 			}
 
@@ -2172,7 +2217,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		    fptr->file_lname ? fptr->file_lname : fptr->file_pname);
 	} else {
 		(void) snprintf(objectfile, sizeof (objectfile),
-		    "/proc/%d/object/%s", (int)P->pid, fptr->file_pname);
+		    "%s/%d/object/%s",
+		    procfs_path, (int)P->pid, fptr->file_pname);
 	}
 
 	/*
@@ -2203,8 +2249,10 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	    elf_getshstrndx(elf, &shstrndx) == 0 ||
 	    (scn = elf_getscn(elf, shstrndx)) == NULL ||
 	    (shdata = elf_getdata(scn, NULL)) == NULL) {
+		int err = elf_errno();
+
 		dprintf("failed to process ELF file %s: %s\n",
-		    objectfile, elf_errmsg(elf_errno()));
+		    objectfile, (err == 0) ? "<null>" : elf_errmsg(err));
 
 		if ((elf = fake_elf(P, fptr)) == NULL ||
 		    elf_kind(elf) != ELF_K_ELF ||
@@ -2264,14 +2312,22 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	 * pointer, and name.  We use this for handling sh_link values below.
 	 */
 	for (cp = cache + 1, scn = NULL; scn = elf_nextscn(elf, scn); cp++) {
-		if (gelf_getshdr(scn, &cp->c_shdr) == NULL)
+		if (gelf_getshdr(scn, &cp->c_shdr) == NULL) {
+			dprintf("Pbuild_file_symtab: Failed to get section "
+			    "header\n");
 			goto bad; /* Failed to get section header */
+		}
 
-		if ((cp->c_data = elf_getdata(scn, NULL)) == NULL)
+		if ((cp->c_data = elf_getdata(scn, NULL)) == NULL) {
+			dprintf("Pbuild_file_symtab: Failed to get section "
+			    "data\n");
 			goto bad; /* Failed to get section data */
+		}
 
-		if (cp->c_shdr.sh_name >= shdata->d_size)
+		if (cp->c_shdr.sh_name >= shdata->d_size) {
+			dprintf("Pbuild_file_symtab: corrupt section name");
 			goto bad; /* Corrupt section name */
+		}
 
 		cp->c_name = (const char *)shdata->d_buf + cp->c_shdr.sh_name;
 	}
@@ -2286,7 +2342,6 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		if (shp->sh_type == SHT_SYMTAB || shp->sh_type == SHT_DYNSYM) {
 			sym_tbl_t *symp = shp->sh_type == SHT_SYMTAB ?
 			    &fptr->file_symtab : &fptr->file_dynsym;
-
 			/*
 			 * It's possible that the we already got the symbol
 			 * table from the core file itself. Either the file
@@ -2298,6 +2353,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 			 * check isn't essential, but it's a good idea.
 			 */
 			if (symp->sym_data == NULL) {
+				dprintf("Symbol table found for %s\n",
+				    objectfile);
 				symp->sym_data = cp->c_data;
 				symp->sym_symn = shp->sh_size / shp->sh_entsize;
 				symp->sym_strs =
@@ -2306,14 +2363,15 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 				    cache[shp->sh_link].c_data->d_size;
 				symp->sym_hdr = cp->c_shdr;
 				symp->sym_strhdr = cache[shp->sh_link].c_shdr;
+			} else {
+				dprintf("Symbol table already there for %s\n",
+				    objectfile);
 			}
 
 		} else if (shp->sh_type == SHT_DYNAMIC) {
 			dyn = cp;
-
 		} else if (strcmp(cp->c_name, ".plt") == 0) {
 			plt = cp;
-
 		} else if (strcmp(cp->c_name, ".SUNW_ctf") == 0) {
 			/*
 			 * Skip over bogus CTF sections so they don't come back
@@ -2347,8 +2405,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	if (fptr->file_etype == ET_DYN) {
 		fptr->file_dyn_base = fptr->file_map->map_pmap.pr_vaddr -
 		    fptr->file_map->map_pmap.pr_offset;
-		dprintf("setting file_dyn_base for %s to %p\n",
-		    objectfile, (void *)fptr->file_dyn_base);
+		dprintf("setting file_dyn_base for %s to %lx\n",
+		    objectfile, (long)fptr->file_dyn_base);
 	}
 
 	/*
@@ -2371,8 +2429,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	 */
 	if (fptr->file_etype == ET_DYN &&
 	    fptr->file_lo->rl_base != fptr->file_dyn_base) {
-		dprintf("resetting file_dyn_base for %s to %p\n",
-		    objectfile, (void *)fptr->file_lo->rl_base);
+		dprintf("resetting file_dyn_base for %s to %lx\n",
+		    objectfile, (long)fptr->file_lo->rl_base);
 		fptr->file_dyn_base = fptr->file_lo->rl_base;
 	}
 
@@ -2408,6 +2466,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		for (i = 0; i < ndyn; i++) {
 			if (gelf_getdyn(dyn->c_data, i, &d) != NULL &&
 			    d.d_tag == DT_JMPREL) {
+				dprintf("DT_JMPREL is %p\n",
+				    (void *)(uintptr_t)d.d_un.d_ptr);
 				fptr->file_jmp_rel =
 				    d.d_un.d_ptr + fptr->file_dyn_base;
 				break;
@@ -2533,6 +2593,13 @@ object_to_map(struct ps_prochandle *P, Lmid_t lmid, const char *objname)
 	uint_t i;
 
 	/*
+	 * If we have no rtld_db, then always treat a request as one for all
+	 * link maps.
+	 */
+	if (P->rap == NULL)
+		lmid = PR_LMID_EVERY;
+
+	/*
 	 * First pass: look for exact matches of the entire pathname or
 	 * basename (cases 1 and 2 above):
 	 */
@@ -2610,10 +2677,8 @@ object_name_to_map(struct ps_prochandle *P, Lmid_t lmid, const char *name)
 		mptr = P->map_exec;
 	else if (name == PR_OBJ_LDSO)
 		mptr = P->map_ldso;
-	else if (Prd_agent(P) != NULL || P->state == PS_IDLE)
-		mptr = object_to_map(P, lmid, name);
 	else
-		mptr = NULL;
+		mptr = object_to_map(P, lmid, name);
 
 	return (mptr);
 }

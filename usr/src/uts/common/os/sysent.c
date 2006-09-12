@@ -51,6 +51,7 @@
 int	access();
 int	alarm();
 int	auditsys();
+int64_t	brandsys();
 int	brk();
 int	chdir();
 int	chmod();
@@ -131,6 +132,8 @@ int	unlink();
 int	utime();
 int64_t	utssys32();
 int64_t	utssys64();
+int	uucopy();
+ssize_t	uucopystr();
 int64_t	wait();
 ssize_t	write();
 ssize_t	readv();
@@ -473,7 +476,7 @@ struct sysent sysent[NSYSCALL] =
 			SYSENT_NOSYS(),
 			SYSENT_CI("fstatfs",	fstatfs32,	4)),
 	/* 39 */ SYSENT_CI("setpgrp",		setpgrp,	3),
-	/* 40 */ SYSENT_LOADABLE(),			/* (was cxenix) */
+	/* 40 */ SYSENT_CI("uucopystr",		uucopystr,	3),
 	/* 41 */ SYSENT_CI("dup",		dup,		1),
 	/* 42 */ SYSENT_LOADABLE(),			/* (was pipe ) */
 	/* 43 */ SYSENT_CL("times",		times,		1),
@@ -658,7 +661,7 @@ struct sysent sysent[NSYSCALL] =
 			SYSENT_NOSYS(),
 			SYSENT_C("llseek",	llseek32,	4)),
 	/* 176 */ SYSENT_LOADABLE(),		/* inst_sync */
-	/* 177 */ SYSENT_LOADABLE(),		/* (was srmlimitsys) */
+	/* 177 */ SYSENT_CI("brandsys",		brandsys,	6),
 	/* 178 */ SYSENT_LOADABLE(),		/* kaio */
 	/* 179 */ SYSENT_LOADABLE(),		/* cpc */
 	/* 180 */ SYSENT_CI("lgrpsys",		lgrpsys,	3),
@@ -770,7 +773,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 251 */ SYSENT_CI("lwp_mutex_trylock", lwp_mutex_trylock,	1),
 	/* 252 */ SYSENT_CI("lwp_mutex_init",	lwp_mutex_init,		2),
 	/* 253 */ SYSENT_CI("cladm",		cladm,		3),
-	/* 254 */ SYSENT_LOADABLE(),		/* (was lwp_sigtimedwait) */
+	/* 254 */ SYSENT_CI("uucopy",		uucopy,		3),
 	/* 255 */ SYSENT_CI("umount2",		umount2,	2)
 /* ONC_PLUS EXTRACT START */
 };
@@ -876,7 +879,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 37 */ SYSENT_CI("kill",		kill,		2),
 	/* 38 */ SYSENT_CI("fstatfs",		fstatfs32,	4),
 	/* 39 */ SYSENT_CI("setpgrp",		setpgrp,	3),
-	/* 40 */ SYSENT_LOADABLE32(),			/* (was cxenix) */
+	/* 40 */ SYSENT_CI("uucopystr",		uucopystr,	3),
 	/* 41 */ SYSENT_CI("dup",		dup,		1),
 	/* 42 */ SYSENT_LOADABLE32(),			/* (was pipe ) */
 	/* 43 */ SYSENT_CI("times",		times32,	1),
@@ -1036,7 +1039,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 174 */ SYSENT_CI("pwrite",		pwrite32,		4),
 	/* 175 */ SYSENT_C("llseek",		llseek32,	4),
 	/* 176 */ SYSENT_LOADABLE32(),		/* inst_sync */
-	/* 177 */ SYSENT_LOADABLE32(),		/* srmlimitsys */
+	/* 177 */ SYSENT_CI("brandsys",		brandsys,	6),
 	/* 178 */ SYSENT_LOADABLE32(),		/* kaio */
 	/* 179 */ SYSENT_LOADABLE32(),		/* cpc */
 	/* 180 */ SYSENT_CI("lgrpsys",		lgrpsys,	3),
@@ -1116,7 +1119,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 251 */ SYSENT_CI("lwp_mutex_trylock", lwp_mutex_trylock,	1),
 	/* 252 */ SYSENT_CI("lwp_mutex_init",	lwp_mutex_init,		2),
 	/* 253 */ SYSENT_CI("cladm",		cladm,		3),
-	/* 254 */ SYSENT_LOADABLE32(),		/* (was lwp_sigtimedwait) */
+	/* 254 */ SYSENT_CI("uucopy",		uucopy,		3),
 	/* 255 */ SYSENT_CI("umount2",		umount2,	2)
 /* ONC_PLUS EXTRACT START */
 };

@@ -35,6 +35,8 @@
 extern "C" {
 #endif
 
+#ifdef _KERNEL
+
 /*
  * Structures and definitions supporting the pseudo terminal
  * drivers. This structure is private and should not be used by any
@@ -62,8 +64,6 @@ struct pt_ttys {
 #define	PTMOPEN 	0x02  	/* master side is open */
 #define	PTSOPEN 	0x04	/* slave side is open */
 #define	PTSTTY		0x08	/* slave side is tty */
-
-#ifdef _KERNEL
 
 /*
  * Multi-threading primitives.
@@ -129,18 +129,29 @@ extern void ptms_logp(char *, uintptr_t);
 #define	DDBGP(a, b)
 #endif
 
+typedef struct __ptmptsopencb_arg *ptmptsopencb_arg_t;
+typedef struct ptmptsopencb {
+	boolean_t		(*ppocb_func)(ptmptsopencb_arg_t);
+	ptmptsopencb_arg_t	ppocb_arg;
+} ptmptsopencb_t;
+
 #endif /* _KERNEL */
+
+typedef struct pt_own {
+	uid_t	pto_ruid;
+	gid_t	pto_rgid;
+} pt_own_t;
 
 /*
  * ioctl commands
  *
- *   ISPTM: Determines whether the file descriptor is that of an open master
- *	    device. Return code of zero indicates that the file descriptor
- *	    represents master device.
+ *  ISPTM: Determines whether the file descriptor is that of an open master
+ *	   device. Return code of zero indicates that the file descriptor
+ *	   represents master device.
  *
- *  UNLKPT: Unlocks the master and slave devices.  It returns 0 on success. On
- *	    failure, the errno is set to EINVAL indicating that the master
- *	    device is not open.
+ * UNLKPT: Unlocks the master and slave devices.  It returns 0 on success. On
+ *	   failure, the errno is set to EINVAL indicating that the master
+ *	   device is not open.
  *
  *  ZONEPT: Sets the zoneid of the pair of master and slave devices.  It
  *	    returns 0 upon success.  Used to force a pty 'into' a zone upon
@@ -149,16 +160,24 @@ extern void ptms_logp(char *, uintptr_t);
  * PT_OWNER: Sets uid and gid for slave device.  It returns 0 on success.
  *
  */
-#define	ISPTM	(('P'<<8)|1)	/* query for master */
-#define	UNLKPT	(('P'<<8)|2)	/* unlock master/slave pair */
-#define	PTSSTTY	(('P'<<8)|3)	/* set tty flag */
-#define	ZONEPT	(('P'<<8)|4)	/* set zone of master/slave pair */
-#define	PT_OWNER (('P'<<8)|5)	/* set owner and group for slave device */
+#define	ISPTM		(('P'<<8)|1)	/* query for master */
+#define	UNLKPT		(('P'<<8)|2)	/* unlock master/slave pair */
+#define	PTSSTTY		(('P'<<8)|3)	/* set tty flag */
+#define	ZONEPT		(('P'<<8)|4)	/* set zone of master/slave pair */
+#define	PT_OWNER	(('P'<<8)|5)	/* set owner/group for slave device */
 
-typedef struct pt_own {
-	uid_t	pto_ruid;
-	gid_t	pto_rgid;
-} pt_own_t;
+#ifdef _KERNEL
+/*
+ * kernel ioctl commands
+ *
+ * PTMPTSOPENCB: Returns a callback function pointer and opaque argument.
+ *	      The return value of the callback function when it's invoked
+ *	      with the opaque argument passed to it will indicate if the
+ *	      pts slave device is currently open.
+ */
+#define	PTMPTSOPENCB	(('P'<<8)|6)	/* check if the slave is open */
+
+#endif /* _KERNEL */
 
 #ifdef	__cplusplus
 }

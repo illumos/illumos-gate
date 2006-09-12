@@ -69,11 +69,17 @@ extern void sys_syscall();
 extern void sys_syscall32();
 extern void sys_lcall32();
 extern void sys_syscall_int();
+extern void brand_sys_syscall();
+extern void brand_sys_syscall32();
+extern void brand_sys_syscall_int();
 #elif defined(__i386)
 extern void sys_call();
+extern void brand_sys_call();
 #endif
 extern void sys_sysenter();
 extern void _sys_sysenter_post_swapgs();
+extern void brand_sys_sysenter();
+extern void _brand_sys_sysenter_post_swapgs();
 
 extern void dosyscall(void);
 
@@ -112,6 +118,9 @@ extern int fpu_pentium_fdivbug;
 extern void sep_save(void *);
 extern void sep_restore(void *);
 
+extern void brand_interpositioning_enable(void);
+extern void brand_interpositioning_disable(void);
+
 struct regs;
 
 extern int instr_size(struct regs *, caddr_t *, enum seg_rw);
@@ -135,6 +144,8 @@ extern void (*kcpc_hw_enable_cpc_intr)(void);
 extern void setup_mca(void);
 extern void setup_mtrr(void);
 extern void patch_tsc(void);
+
+extern user_desc_t *cpu_get_gdt(void);
 
 /*
  * Warning: these routines do -not- use normal calling conventions!

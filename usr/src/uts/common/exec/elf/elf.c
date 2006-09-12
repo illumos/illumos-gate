@@ -62,7 +62,10 @@
 #include <sys/shm_impl.h>
 #include <sys/archsystm.h>
 #include <sys/fasttrap.h>
+#include <sys/brand.h>
 #include "elf_impl.h"
+
+#include <sys/sdt.h>
 
 extern int at_flags;
 
@@ -77,7 +80,7 @@ static int getelfshdr(vnode_t *, cred_t *, const Ehdr *, int, int, caddr_t *,
 static size_t elfsize(Ehdr *, int, caddr_t, uintptr_t *);
 static int mapelfexec(vnode_t *, Ehdr *, int, caddr_t,
     Phdr **, Phdr **, Phdr **, Phdr **, Phdr *,
-    caddr_t *, caddr_t *, intptr_t *, size_t, long *, size_t *);
+    caddr_t *, caddr_t *, intptr_t *, intptr_t *, size_t, long *, size_t *);
 
 typedef enum {
 	STR_CTF,
@@ -160,10 +163,83 @@ dtrace_safe_phdr(Phdr *phdrp, struct uarg *args, uintptr_t base)
 	return (0);
 }
 
+/*
+ * Map in the executable pointed to by vp. Returns 0 on success.
+ */
+int
+mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Elf32_Addr *uphdr_vaddr,
+    intptr_t *voffset, caddr_t exec_file, int *interp, caddr_t *bssbase,
+    caddr_t *brkbase, size_t *brksize)
+{
+	size_t		len;
+	struct vattr	vat;
+	caddr_t		phdrbase = NULL;
+	ssize_t		phdrsize;
+	int		nshdrs, shstrndx, nphdrs;
+	int		error = 0;
+	Phdr		*uphdr = NULL;
+	Phdr		*junk = NULL;
+	Phdr		*dynphdr = NULL;
+	Phdr		*dtrphdr = NULL;
+	uintptr_t	lddata;
+	long		execsz;
+	intptr_t	minaddr;
+
+	if (error = execpermissions(vp, &vat, args)) {
+		uprintf("%s: Cannot execute %s\n", exec_file, args->pathname);
+		return (error);
+	}
+
+	if ((error = getelfhead(vp, CRED(), ehdr, &nshdrs, &shstrndx,
+	    &nphdrs)) != 0 ||
+	    (error = getelfphdr(vp, CRED(), ehdr, nphdrs, &phdrbase,
+	    &phdrsize)) != 0) {
+		uprintf("%s: Cannot read %s\n", exec_file, args->pathname);
+		return (error);
+	}
+
+	if ((len = elfsize(ehdr, nphdrs, phdrbase, &lddata)) == 0) {
+		uprintf("%s: Nothing to load in %s", exec_file, args->pathname);
+		kmem_free(phdrbase, phdrsize);
+		return (ENOEXEC);
+	}
+
+	if (error = mapelfexec(vp, ehdr, nphdrs, phdrbase, &uphdr, &dynphdr,
+	    &junk, &dtrphdr, NULL, bssbase, brkbase, voffset, &minaddr,
+	    len, &execsz, brksize)) {
+		uprintf("%s: Cannot map %s\n", exec_file, args->pathname);
+		kmem_free(phdrbase, phdrsize);
+		return (error);
+	}
+
+	/*
+	 * Inform our caller if the executable needs an interpreter.
+	 */
+	*interp = (dynphdr == NULL) ? 0 : 1;
+
+	/*
+	 * If this is a statically linked executable, voffset should indicate
+	 * the address of the executable itself (it normally holds the address
+	 * of the interpreter).
+	 */
+	if (ehdr->e_type == ET_EXEC && *interp == 0)
+		*voffset = minaddr;
+
+	if (uphdr != NULL) {
+		*uphdr_vaddr = uphdr->p_vaddr;
+	} else {
+		*uphdr_vaddr = (Elf32_Addr)-1;
+	}
+
+	kmem_free(phdrbase, phdrsize);
+	return (error);
+}
+
 /*ARGSUSED*/
 int
 elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
-    int level, long *execsz, int setid, caddr_t exec_file, cred_t *cred)
+    int level, long *execsz, int setid, caddr_t exec_file, cred_t *cred,
+    int brand_action)
 {
 	caddr_t		phdrbase = NULL;
 	caddr_t 	bssbase = 0;
@@ -175,10 +251,10 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	ssize_t		resid;
 	int		fd = -1;
 	intptr_t	voffset;
-	Phdr	*dyphdr = NULL;
-	Phdr	*stphdr = NULL;
-	Phdr	*uphdr = NULL;
-	Phdr	*junk = NULL;
+	Phdr		*dyphdr = NULL;
+	Phdr		*stphdr = NULL;
+	Phdr		*uphdr = NULL;
+	Phdr		*junk = NULL;
 	size_t		len;
 	ssize_t		phdrsize;
 	int		postfixsize = 0;
@@ -189,6 +265,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	int		hasu = 0;
 	int		hasauxv = 0;
 	int		hasdy = 0;
+	int		branded = 0;
 
 	struct proc *p = ttoproc(curthread);
 	struct user *up = PTOU(p);
@@ -208,6 +285,13 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	rlim64_t	roundlimit;
 
 	ASSERT(p->p_model == DATAMODEL_ILP32 || p->p_model == DATAMODEL_LP64);
+
+	if ((level < 2) &&
+	    (brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
+		return (BROP(p)->b_elfexec(vp, uap, args,
+		    idatap, level + 1, execsz, setid, exec_file, cred,
+		    brand_action));
+	}
 
 	bigwad = kmem_alloc(sizeof (struct bigwad), KM_SLEEP);
 	ehdrp = &bigwad->ehdr;
@@ -353,6 +437,22 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	} else
 		args->auxsize = 0;
 
+	/*
+	 * If this binary is using an emulator, we need to add an
+	 * AT_SUN_EMULATOR aux entry.
+	 */
+	if (args->emulator != NULL)
+		args->auxsize += sizeof (aux_entry_t);
+
+	if ((brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
+		branded = 1;
+		/*
+		 * We will be adding 2 entries to the aux vector.  One for
+		 * the branded binary's phdr and one for the brandname.
+		 */
+		args->auxsize += 2 * sizeof (aux_entry_t);
+	}
+
 	aux = bigwad->elfargs;
 	/*
 	 * Move args to the user's stack.
@@ -364,6 +464,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		}
 		goto out;
 	}
+	/* we're single threaded after this point */
 
 	/*
 	 * If this is an ET_DYN executable (shared object),
@@ -377,8 +478,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	dtrphdr = NULL;
 
 	if ((error = mapelfexec(vp, ehdrp, nphdrs, phdrbase, &uphdr, &dyphdr,
-	    &stphdr, &dtrphdr, dataphdrp, &bssbase, &brkbase, &voffset, len,
-	    execsz, &brksize)) != 0)
+	    &stphdr, &dtrphdr, dataphdrp, &bssbase, &brkbase, &voffset, NULL,
+	    len, execsz, &brksize)) != 0)
 		goto bad;
 
 	if (uphdr != NULL && dyphdr == NULL)
@@ -542,8 +643,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		dtrphdr = NULL;
 
 		error = mapelfexec(nvp, ehdrp, nphdrs, phdrbase, &junk, &junk,
-		    &junk, &dtrphdr, NULL, NULL, NULL, &voffset, len, execsz,
-		    NULL);
+		    &junk, &dtrphdr, NULL, NULL, NULL, &voffset, NULL, len,
+		    execsz, NULL);
 		if (error || junk != NULL) {
 			VN_RELE(nvp);
 			uprintf("%s: Cannot map %s\n", exec_file, dlnp);
@@ -601,6 +702,16 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 #else
 		ADDAUX(aux, AT_SUN_HWCAP, auxv_hwcap)
 #endif
+		if (branded) {
+			/*
+			 * Reserve space for the brand-private aux vector entry,
+			 * and record the user addr of that space.
+			 */
+			args->brand_auxp = (auxv32_t *)((char *)args->stackend +
+			    ((char *)&aux->a_type - (char *)bigwad->elfargs));
+			ADDAUX(aux, AT_SUN_BRAND_PHDR, 0)
+		}
+
 		ADDAUX(aux, AT_NULL, 0)
 		postfixsize = (char *)aux - (char *)bigwad->elfargs;
 		ASSERT(postfixsize == args->auxsize);
@@ -639,6 +750,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 		/*
 		 * Copy auxv to the process's user structure for use by /proc.
+		 * If this is a branded process, the brand's exec routine will
+		 * copy it's private entries to the user structure later. It
+		 * relies on the fact that the blank entries are at the end.
 		 */
 		num_auxv = postfixsize / sizeof (aux_entry_t);
 		ASSERT(num_auxv <= sizeof (up->u_auxv) / sizeof (auxv_t));
@@ -968,6 +1082,7 @@ mapelfexec(
 	caddr_t *bssbase,
 	caddr_t *brkbase,
 	intptr_t *voffset,
+	intptr_t *minaddr,
 	size_t len,
 	long *execsz,
 	size_t *brksize)
@@ -980,6 +1095,7 @@ mapelfexec(
 	int page;
 	off_t offset;
 	int hsize = ehdr->e_phentsize;
+	caddr_t mintmp = (caddr_t)-1;
 
 	if (ehdr->e_type == ET_DYN) {
 		/*
@@ -1010,6 +1126,14 @@ mapelfexec(
 				prot |= PROT_EXEC;
 
 			addr = (caddr_t)((uintptr_t)phdr->p_vaddr + *voffset);
+
+			/*
+			 * Keep track of the segment with the lowest starting
+			 * address.
+			 */
+			if (addr < mintmp)
+				mintmp = addr;
+
 			zfodsz = (size_t)phdr->p_memsz - phdr->p_filesz;
 
 			offset = phdr->p_offset;
@@ -1110,6 +1234,12 @@ mapelfexec(
 		}
 		phdr = (Phdr *)((caddr_t)phdr + hsize);
 	}
+
+	if (minaddr != NULL) {
+		ASSERT(mintmp != (caddr_t)-1);
+		*minaddr = (intptr_t)mintmp;
+	}
+
 	return (0);
 bad:
 	if (error == 0)
@@ -1850,13 +1980,14 @@ static struct execsw esw = {
 };
 
 static struct modlexec modlexec = {
-	&mod_execops, "exec module for elf", &esw
+	&mod_execops, "exec module for elf %I%", &esw
 };
 
 #ifdef	_LP64
 extern int elf32exec(vnode_t *vp, execa_t *uap, uarg_t *args,
 			intpdata_t *idatap, int level, long *execsz,
-			int setid, caddr_t exec_file, cred_t *cred);
+			int setid, caddr_t exec_file, cred_t *cred,
+			int brand_action);
 extern int elf32core(vnode_t *vp, proc_t *p, cred_t *credp,
 			rlim64_t rlimit, int sig, core_content_t content);
 

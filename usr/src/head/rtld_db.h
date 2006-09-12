@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +35,7 @@ extern "C" {
 
 #include <sys/types.h>
 #include <sys/lwp.h>
+#include <sys/elf.h>
 #include <link.h>
 #include <proc_service.h>
 
@@ -129,6 +129,10 @@ typedef struct rd_loadobj {
 					/* module which was dynamically */
 					/* loaded */
 
+/*
+ * Commands for rd_ctl()
+ */
+#define	RD_CTL_SET_HELPPATH	0x01	/* Set the path used to find helpers */
 
 typedef struct rd_agent rd_agent_t;
 #ifdef __STDC__
@@ -158,6 +162,28 @@ typedef struct rd_plt_info {
 } rd_plt_info_t;
 
 /*
+ * State kept for brand helper libraries
+ */
+typedef struct rd_helper_ops {
+	void	*(*rho_init)(struct ps_prochandle *);
+	int	(*rho_loadobj_iter)(struct ps_prochandle *, rl_iter_f *cb,
+	    void *client_data, void *helper_data);
+	void	(*rho_fix_phdrs)(struct rd_agent *, Elf32_Dyn *, size_t,
+	    psaddr_t addr);
+} rd_helper_ops_t;
+
+typedef struct rd_helper {
+	rd_helper_ops_t	*rh_ops;
+	void		*rh_data;
+	void		*rh_dlhandle;
+} rd_helper_t;
+
+/*
+ * Brand helper libraries must name their ops vector using this macro.
+ */
+#define	RTLD_DB_BRAND_OPS rtld_db_brand_ops
+
+/*
  * Values for pi_flags
  */
 #define	RD_FLG_PI_PLTBOUND	0x0001	/* Indicates that the PLT */
@@ -177,6 +203,7 @@ extern rd_err_e		rd_event_addr(rd_agent_t *, rd_event_e, rd_notify_t *);
 extern rd_err_e		rd_event_enable(rd_agent_t *, int);
 extern rd_err_e		rd_event_getmsg(rd_agent_t *, rd_event_msg_t *);
 extern rd_err_e		rd_init(int);
+extern rd_err_e		rd_ctl(int, void *);
 extern rd_err_e		rd_loadobj_iter(rd_agent_t *, rl_iter_f *,
 				void *);
 extern void		rd_log(const int);
@@ -184,6 +211,8 @@ extern rd_agent_t	*rd_new(struct ps_prochandle *);
 extern rd_err_e		rd_objpad_enable(struct rd_agent *, size_t);
 extern rd_err_e		rd_plt_resolution(rd_agent_t *, psaddr_t, lwpid_t,
 				psaddr_t, rd_plt_info_t *);
+extern void		rd_fix_phdrs(struct rd_agent *, Elf32_Dyn *,
+    size_t, uintptr_t);
 extern rd_err_e		rd_reset(struct rd_agent *);
 #else
 extern void		rd_delete();
@@ -192,11 +221,13 @@ extern rd_err_e		rd_event_addr();
 extern rd_err_e		rd_event_enable();
 extern rd_err_e		rd_event_getmsg();
 extern rd_err_e		rd_init();
+extern rd_err_e		rd_ctl();
 extern rd_err_e		rd_loadobj_iter();
 extern void		rd_log();
 extern rd_agent_t	*rd_new();
 extern rd_err_e		rd_objpad_enable();
 extern rd_err_e		rd_plt_resolution();
+extern void		rd_fix_phdrs();
 extern rd_err_e		rd_reset();
 #endif
 

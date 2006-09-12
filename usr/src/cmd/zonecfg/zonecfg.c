@@ -56,6 +56,7 @@
 #include <sys/sysmacros.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <strings.h>
 #include <unistd.h>
 #include <ctype.h>
@@ -69,8 +70,11 @@
 #include <libintl.h>
 #include <alloca.h>
 #include <signal.h>
+#include <wait.h>
 #include <libtecla.h>
 #include <libzfs.h>
+#include <sys/brand.h>
+#include <libbrand.h>
 
 #include <libzonecfg.h>
 #include "zonecfg.h"
@@ -80,6 +84,8 @@
 #endif
 
 #define	PAGER	"/usr/bin/more"
+#define	EXEC_PREFIX	"exec "
+#define	EXEC_LEN	(strlen(EXEC_PREFIX))
 
 struct help {
 	uint_t	cmd_num;
@@ -93,6 +99,7 @@ extern int lex_lineno;
 
 #define	MAX_LINE_LEN	1024
 #define	MAX_CMD_HIST	1024
+#define	MAX_CMD_LEN	1024
 
 /*
  * Each SHELP_ should be a simple string.
@@ -155,6 +162,7 @@ static char *res_types[] = {
 	"dataset",
 	"limitpriv",
 	"bootargs",
+	"brand",
 	NULL
 };
 
@@ -180,6 +188,7 @@ static char *prop_types[] = {
 	"raw",
 	"limitpriv",
 	"bootargs",
+	"brand",
 	NULL
 };
 
@@ -252,6 +261,7 @@ static const char *select_cmds[] = {
 static const char *set_cmds[] = {
 	"set zonename=",
 	"set zonepath=",
+	"set brand=",
 	"set autoboot=",
 	"set pool=",
 	"set limitpriv=",
@@ -367,6 +377,9 @@ static zone_dochandle_t handle;
 /* used all over the place */
 static char zone[ZONENAME_MAX];
 static char revert_zone[ZONENAME_MAX];
+
+/* global brand operations */
+static brand_handle_t *brand;
 
 /* set in modifying functions, checked in read_input() */
 static bool need_to_commit = FALSE;
@@ -929,6 +942,8 @@ usage(bool verbose, uint_t flags)
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_ZONEPATH));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_BRAND));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_AUTOBOOT));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_BOOTARGS));
@@ -1009,10 +1024,22 @@ static int
 initialize(bool handle_expected)
 {
 	int err;
+	char brandname[MAXNAMELEN];
 
 	if (zonecfg_check_handle(handle) != Z_OK) {
 		if ((err = zonecfg_get_handle(zone, handle)) == Z_OK) {
 			got_handle = TRUE;
+			if (zonecfg_get_brand(handle, brandname,
+			    sizeof (brandname)) != Z_OK) {
+				zerr("Zone %s is inconsistent: missing "
+				    "brand attribute", zone);
+				exit(Z_ERR);
+			}
+			if ((brand = brand_open(brandname)) == NULL) {
+				zerr("Zone %s uses non-existent brand \"%s\"."
+				    "  Unable to continue", zone, brandname);
+				exit(Z_ERR);
+			}
 		} else {
 			zone_perror(zone, err, handle_expected || got_handle);
 			if (err == Z_NO_ZONE && !got_handle &&
@@ -1224,7 +1251,8 @@ create_func(cmd_t *cmd)
 	(void) strlcpy(zone_template, "SUNWdefault", sizeof (zone_template));
 
 	optind = 0;
-	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?a:bFt:")) != EOF) {
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?a:bFt:"))
+	    != EOF) {
 		switch (arg) {
 		case '?':
 			if (optopt == '?')
@@ -1349,6 +1377,7 @@ export_func(cmd_t *cmd)
 	int err, arg;
 	char zonepath[MAXPATHLEN], outfile[MAXPATHLEN], pool[MAXNAMELEN];
 	char bootargs[BOOTARGS_MAX];
+	char brand[MAXNAMELEN];
 	char *limitpriv;
 	FILE *of;
 	boolean_t autoboot;
@@ -1399,6 +1428,11 @@ export_func(cmd_t *cmd)
 	    strlen(zonepath) > 0)
 		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
 		    pt_to_str(PT_ZONEPATH), zonepath);
+
+	if ((zone_get_brand(zone, brand, sizeof (brand)) == Z_OK) &&
+	    (strcmp(brand, NATIVE_BRAND_NAME) != 0))
+		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+		    pt_to_str(PT_BRAND), brand);
 
 	if (zonecfg_get_autoboot(handle, &autoboot) == Z_OK)
 		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
@@ -2734,6 +2768,8 @@ set_func(cmd_t *cmd)
 			res_type = RT_ZONEPATH;
 		} else if (prop_type == PT_AUTOBOOT) {
 			res_type = RT_AUTOBOOT;
+		} else if (prop_type == PT_BRAND) {
+			res_type = RT_BRAND;
 		} else if (prop_type == PT_POOL) {
 			res_type = RT_POOL;
 		} else if (prop_type == PT_LIMITPRIV) {
@@ -2830,6 +2866,18 @@ set_func(cmd_t *cmd)
 			return;
 		}
 		if ((err = zonecfg_set_zonepath(handle, prop_id)) != Z_OK)
+			zone_perror(zone, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	case RT_BRAND:
+		if (state_atleast(ZONE_STATE_INSTALLED)) {
+			zerr(gettext("Zone %s already installed; %s %s not "
+			    "allowed."), zone, cmd_to_str(CMD_SET),
+			    rt_to_str(RT_BRAND));
+			return;
+		}
+		if ((err = zonecfg_set_brand(handle, prop_id)) != Z_OK)
 			zone_perror(zone, err, TRUE);
 		else
 			need_to_commit = TRUE;
@@ -3094,6 +3142,19 @@ info_zonepath(zone_dochandle_t handle, FILE *fp)
 		(void) fprintf(fp, gettext("%s not specified\n"),
 		    pt_to_str(PT_ZONEPATH));
 	}
+}
+
+static void
+info_brand(zone_dochandle_t handle, FILE *fp)
+{
+	char brand[MAXNAMELEN];
+
+	if (zonecfg_get_brand(handle, brand, sizeof (brand)) == Z_OK)
+		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_BRAND),
+		    brand);
+	else
+		(void) fprintf(fp, "%s %s\n", pt_to_str(PT_BRAND),
+		    gettext("not specified"));
 }
 
 static void
@@ -3464,7 +3525,6 @@ info_ds(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 		    rt_to_str(RT_DATASET));
 }
 
-
 void
 info_func(cmd_t *cmd)
 {
@@ -3483,8 +3543,6 @@ info_func(cmd_t *cmd)
 			pager = PAGER;
 		if ((fp = popen(pager, "w")) != NULL)
 			need_to_close = TRUE;
-		else
-			fp = stdout;
 		setbuf(fp, NULL);
 	}
 
@@ -3519,6 +3577,7 @@ info_func(cmd_t *cmd)
 	case RT_UNKNOWN:
 		info_zonename(handle, fp);
 		info_zonepath(handle, fp);
+		info_brand(handle, fp);
 		info_autoboot(handle, fp);
 		info_bootargs(handle, fp);
 		info_pool(handle, fp);
@@ -3536,6 +3595,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_ZONEPATH:
 		info_zonepath(handle, fp);
+		break;
+	case RT_BRAND:
+		info_brand(handle, fp);
 		break;
 	case RT_AUTOBOOT:
 		info_autoboot(handle, fp);
@@ -3596,6 +3658,95 @@ check_reqd_prop(char *attr, int rt, int pt, int *ret_val)
 	}
 }
 
+static int
+do_subproc(char *cmdbuf)
+{
+	char inbuf[MAX_CMD_LEN];
+	FILE *file;
+	int status;
+
+	file = popen(cmdbuf, "r");
+	if (file == NULL) {
+		zerr(gettext("Could not launch: %s"), cmdbuf);
+		return (-1);
+	}
+
+	while (fgets(inbuf, sizeof (inbuf), file) != NULL)
+		fprintf(stderr, "%s", inbuf);
+	status = pclose(file);
+
+	if (WIFSIGNALED(status)) {
+		zerr(gettext("%s unexpectedly terminated due to signal %d"),
+		    cmdbuf, WTERMSIG(status));
+		return (-1);
+	}
+	assert(WIFEXITED(status));
+	return (WEXITSTATUS(status));
+}
+
+static int
+brand_verify(zone_dochandle_t handle)
+{
+	char *xml_file = "/tmp/zonecfg_verify.XXXXXX";
+	char cmdbuf[MAX_CMD_LEN];
+	brand_handle_t *bhp;
+	char brand[MAXNAMELEN];
+	int err;
+
+	if (zonecfg_get_brand(handle, brand, sizeof (brand)) != Z_OK) {
+		zerr("%s: %s\n", zone, gettext("could not get zone brand"));
+		return (Z_INVALID_DOCUMENT);
+	}
+	if ((bhp = brand_open(brand)) == NULL) {
+		zerr("%s: %s\n", zone, gettext("unknown brand."));
+		return (Z_INVALID_DOCUMENT);
+	}
+
+	/*
+	 * Fetch the verify command, if any, from the brand configuration
+	 * and build the command line to execute it.
+	 */
+	strcpy(cmdbuf, EXEC_PREFIX);
+	err = brand_get_verify_cfg(bhp, cmdbuf + EXEC_LEN,
+	    sizeof (cmdbuf) - (EXEC_LEN + (strlen(xml_file) + 1)));
+	brand_close(bhp);
+	if (err != Z_OK) {
+		zerr("%s: %s\n", zone,
+		    gettext("could not get brand verification command"));
+		return (Z_INVALID_DOCUMENT);
+	}
+
+	/*
+	 * If the brand doesn't provide a verification routine, we just
+	 * return success.
+	 */
+	if (strlen(cmdbuf) == EXEC_LEN)
+		return (Z_OK);
+
+	/*
+	 * Dump the current config information for this zone to a file.
+	 */
+	if (mkstemp(xml_file) == NULL)
+		return (Z_TEMP_FILE);
+	if ((err = zonecfg_verify_save(handle, xml_file)) != Z_OK) {
+		(void) unlink(xml_file);
+		return (err);
+	}
+
+	/*
+	 * Execute the verification command.
+	 */
+	if ((strlcat(cmdbuf, " ", MAX_CMD_LEN) >= MAX_CMD_LEN) ||
+	    (strlcat(cmdbuf, xml_file, MAX_CMD_LEN) >= MAX_CMD_LEN)) {
+		err = Z_BRAND_ERROR;
+	} else {
+		err = do_subproc(cmdbuf);
+	}
+
+	(void) unlink(xml_file);
+	return ((err == Z_OK) ? Z_OK : Z_BRAND_ERROR);
+}
+
 /*
  * See the DTD for which attributes are required for which resources.
  *
@@ -3614,6 +3765,7 @@ verify_func(cmd_t *cmd)
 	struct zone_rctltab rctltab;
 	struct zone_dstab dstab;
 	char zonepath[MAXPATHLEN];
+	char brand[MAXNAMELEN];
 	int err, ret_val = Z_OK, arg;
 	bool save = FALSE;
 
@@ -3652,6 +3804,17 @@ verify_func(cmd_t *cmd)
 		zerr(gettext("%s cannot be empty."), pt_to_str(PT_ZONEPATH));
 		ret_val = Z_REQD_RESOURCE_MISSING;
 		saw_error = TRUE;
+	}
+
+	if ((err = zonecfg_get_brand(handle, brand, sizeof (brand))) != Z_OK) {
+		zone_perror(zone, err, TRUE);
+		return;
+	}
+	if (strcmp(brand, NATIVE_BRAND_NAME) != 0) {
+		if ((err = brand_verify(handle)) != Z_OK) {
+			zone_perror(zone, err, TRUE);
+			return;
+		}
 	}
 
 	if ((err = zonecfg_setipdent(handle)) != Z_OK) {
@@ -4780,6 +4943,8 @@ main(int argc, char *argv[])
 		err = one_command_at_a_time(argc - optind, &(argv[optind]));
 	}
 	zonecfg_fini_handle(handle);
+	if (brand != NULL)
+		brand_close(brand);
 	(void) del_GetLine(gl);
 	return (err);
 }

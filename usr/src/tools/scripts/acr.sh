@@ -327,7 +327,7 @@ acr_a_root() {
 #
 if [ $bfu_alt_reality = "false" ]; then
 	zoneadm list -pi | nawk -F: '{
-		if ($3 == "installed") {
+		if ($3 == "installed" && $6 != "lx") {
 			printf "%s %s\n", $2, $4
 		}
 	}' > $local_zone_info_file

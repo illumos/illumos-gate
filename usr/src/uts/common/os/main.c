@@ -70,6 +70,7 @@
 #include <sys/errorq.h>
 #include <sys/class.h>
 #include <sys/stack.h>
+#include <sys/brand.h>
 
 #include <vm/as.h>
 #include <vm/seg_kmem.h>
@@ -124,6 +125,7 @@ cluster_wrapper(void)
 
 char initname[INITNAME_SZ] = "/sbin/init";	/* also referenced by zone0 */
 char initargs[BOOTARGS_MAX] = "";		/* also referenced by zone0 */
+extern int64_t lwp_sigmask(int, uint_t, uint_t);
 
 /*
  * Construct a stack for init containing the arguments to it, then
@@ -144,6 +146,7 @@ exec_init(const char *initpath, const char *args)
 	int error = 0, count = 0;
 	proc_t *p = ttoproc(curthread);
 	klwp_t *lwp = ttolwp(curthread);
+	int brand_action;
 
 	if (args == NULL)
 		args = "";
@@ -247,9 +250,17 @@ exec_init(const char *initpath, const char *args)
 	curthread->t_post_sys = 1;
 	curthread->t_sysnum = SYS_execve;
 
+	/*
+	 * If we are executing init from zsched, we may have inherited its
+	 * parent process's signal mask.  Clear it now so that we behave in
+	 * the same way as when started from the global zone.
+	 */
+	(void) lwp_sigmask(SIG_UNBLOCK, 0xffffffff, 0xffffffff);
+
+	brand_action = ZONE_IS_BRANDED(p->p_zone) ? EBA_BRAND : EBA_NONE;
 again:
 	error = exec_common((const char *)(uintptr_t)exec_fnamep,
-	    (const char **)(uintptr_t)uap, NULL);
+	    (const char **)(uintptr_t)uap, NULL, brand_action);
 
 	/*
 	 * Normally we would just set lwp_argsaved and t_post_sys and

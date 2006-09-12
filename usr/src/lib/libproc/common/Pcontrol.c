@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -33,6 +32,7 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <string.h>
+#include <strings.h>
 #include <memory.h>
 #include <errno.h>
 #include <dirent.h>
@@ -56,6 +56,7 @@
 int	_libproc_debug;		/* set non-zero to enable debugging printfs */
 sigset_t blockable_sigs;	/* signals to block when we need to be safe */
 static	int	minfd;	/* minimum file descriptor returned by dupfd(fd, 0) */
+char	procfs_path[PATH_MAX] = "/proc";
 
 /*
  * Function prototypes for static routines in this module.
@@ -95,6 +96,12 @@ _libproc_init(void)
 	(void) sigfillset(&blockable_sigs);
 	(void) sigdelset(&blockable_sigs, SIGKILL);
 	(void) sigdelset(&blockable_sigs, SIGSTOP);
+}
+
+void
+Pset_procfs_path(const char *path)
+{
+	(void) snprintf(procfs_path, sizeof (procfs_path), "%s", path);
 }
 
 /*
@@ -168,7 +175,7 @@ Pxcreate(const char *file,	/* executable file name */
 	size_t len)	/* size of the path buffer */
 {
 	char execpath[PATH_MAX];
-	char procname[100];
+	char procname[PATH_MAX];
 	struct ps_prochandle *P;
 	pid_t pid;
 	int fd;
@@ -238,7 +245,8 @@ Pxcreate(const char *file,	/* executable file name */
 	/*
 	 * Open the /proc/pid files.
 	 */
-	(void) sprintf(procname, "/proc/%d/", (int)pid);
+	(void) snprintf(procname, sizeof (procname), "%s/%d/",
+	    procfs_path, (int)pid);
 	fname = procname + strlen(procname);
 	(void) set_minfd();
 
@@ -505,7 +513,7 @@ Pgrab(pid_t pid, int flags, int *perr)
 {
 	struct ps_prochandle *P;
 	int fd, omode;
-	char procname[100];
+	char procname[PATH_MAX];
 	char *fname;
 	int rc = 0;
 
@@ -545,7 +553,8 @@ again:	/* Come back here if we lose it in the Window of Vulnerability */
 	/*
 	 * Open the /proc/pid files
 	 */
-	(void) sprintf(procname, "/proc/%d/", (int)pid);
+	(void) snprintf(procname, sizeof (procname), "%s/%d/",
+	    procfs_path, (int)pid);
 	fname = procname + strlen(procname);
 	(void) set_minfd();
 
@@ -1264,7 +1273,7 @@ int
 Preopen(struct ps_prochandle *P)
 {
 	int fd;
-	char procname[100];
+	char procname[PATH_MAX];
 	char *fname;
 
 	if (P->state == PS_DEAD || P->state == PS_IDLE)
@@ -1275,7 +1284,8 @@ Preopen(struct ps_prochandle *P)
 		Pdestroy_agent(P);
 	}
 
-	(void) sprintf(procname, "/proc/%d/", (int)P->pid);
+	(void) snprintf(procname, sizeof (procname), "%s/%d/",
+	    procfs_path, (int)P->pid);
 	fname = procname + strlen(procname);
 
 	(void) strcpy(fname, "as");
@@ -2653,13 +2663,13 @@ static prheader_t *
 read_lfile(struct ps_prochandle *P, const char *lname)
 {
 	prheader_t *Lhp;
-	char lpath[64];
+	char lpath[PATH_MAX];
 	struct stat64 statb;
 	int fd;
 	size_t size;
 	ssize_t rval;
 
-	(void) snprintf(lpath, sizeof (lpath), "/proc/%d/%s",
+	(void) snprintf(lpath, sizeof (lpath), "%s/%d/%s", procfs_path,
 	    (int)P->status.pr_pid, lname);
 	if ((fd = open(lpath, O_RDONLY)) < 0 || fstat64(fd, &statb) != 0) {
 		if (fd >= 0)
@@ -2931,7 +2941,7 @@ Lgrab(struct ps_prochandle *P, lwpid_t lwpid, int *perr)
 	struct ps_lwphandle **Lp;
 	struct ps_lwphandle *L;
 	int fd;
-	char procname[100];
+	char procname[PATH_MAX];
 	char *fname;
 	int rc = 0;
 
@@ -2974,7 +2984,8 @@ Lgrab(struct ps_prochandle *P, lwpid_t lwpid, int *perr)
 	/*
 	 * Open the /proc/<pid>/lwp/<lwpid> files
 	 */
-	(void) sprintf(procname, "/proc/%d/lwp/%d/", (int)P->pid, (int)lwpid);
+	(void) snprintf(procname, sizeof (procname), "%s/%d/lwp/%d/",
+	    procfs_path, (int)P->pid, (int)lwpid);
 	fname = procname + strlen(procname);
 	(void) set_minfd();
 

@@ -4519,6 +4519,18 @@ pt_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	return (set_errno(EMDB_NOPROC));
 }
 
+static int
+pt_auxv(mdb_tgt_t *t, const auxv_t **auxvp)
+{
+	if (t->t_pshandle != NULL) {
+		*auxvp = Pgetauxvec(t->t_pshandle);
+		return (0);
+	}
+
+	return (set_errno(EMDB_NOPROC));
+}
+
+
 static const mdb_tgt_ops_t proc_ops = {
 	pt_setflags,				/* t_setflags */
 	(int (*)()) mdb_tgt_notsup,		/* t_setcontext */
@@ -4570,7 +4582,8 @@ static const mdb_tgt_ops_t proc_ops = {
 	pt_add_fault,				/* t_add_fault */
 	pt_getareg,				/* t_getareg */
 	pt_putareg,				/* t_putareg */
-	pt_stack_iter				/* t_stack_iter */
+	pt_stack_iter,				/* t_stack_iter */
+	pt_auxv					/* t_auxv */
 };
 
 /*

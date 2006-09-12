@@ -65,6 +65,7 @@
 #include <sys/lwpchan_impl.h>
 #include <sys/pool.h>
 #include <sys/sdt.h>
+#include <sys/brand.h>
 
 #include <c2/audit.h>
 
@@ -89,7 +90,6 @@ uint_t auxv_hwcap32 = 0;	/* 32-bit version of auxv_hwcap */
 #endif
 
 int exec_lpg_disable = 0;
-
 #define	PSUIDFLAGS		(SNOCD|SUGID)
 
 /*
@@ -109,12 +109,13 @@ exece(const char *fname, const char **argp, const char **envp)
 {
 	int error;
 
-	error = exec_common(fname, argp, envp);
+	error = exec_common(fname, argp, envp, EBA_NONE);
 	return (error ? (set_errno(error)) : 0);
 }
 
 int
-exec_common(const char *fname, const char **argp, const char **envp)
+exec_common(const char *fname, const char **argp, const char **envp,
+    int brand_action)
 {
 	vnode_t *vp = NULL, *dir = NULL, *tmpvp = NULL;
 	proc_t *p = ttoproc(curthread);
@@ -136,6 +137,7 @@ exec_common(const char *fname, const char **argp, const char **envp)
 	lwpdir_t **old_tidhash;
 	uint_t old_tidhash_sz;
 	lwpent_t *lep;
+	int brandme = 0;
 
 	/*
 	 * exec() is not supported for the /proc agent lwp.
@@ -145,6 +147,35 @@ exec_common(const char *fname, const char **argp, const char **envp)
 
 	if ((error = secpolicy_basic_exec(CRED())) != 0)
 		return (error);
+
+	if (brand_action != EBA_NONE) {
+		/*
+		 * Brand actions are not supported for processes that are not
+		 * running in a branded zone.
+		 */
+		if (!ZONE_IS_BRANDED(p->p_zone))
+			return (ENOTSUP);
+
+		if (brand_action == EBA_NATIVE) {
+			/* Only branded processes can be unbranded */
+			if (!PROC_IS_BRANDED(p))
+				return (ENOTSUP);
+		} else {
+			/* Only unbranded processes can be branded */
+			if (PROC_IS_BRANDED(p))
+				return (ENOTSUP);
+			brandme = 1;
+		}
+	} else {
+		/*
+		 * If this is a native zone, or if the process is already
+		 * branded, then we don't need to do anything.  If this is
+		 * a native process in a branded zone, we need to brand the
+		 * process as it exec()s the new binary.
+		 */
+		if (ZONE_IS_BRANDED(p->p_zone) && !PROC_IS_BRANDED(p))
+			brandme = 1;
+	}
 
 	/*
 	 * Inform /proc that an exec() has started.
@@ -237,8 +268,14 @@ exec_common(const char *fname, const char **argp, const char **envp)
 	ua.argp = argp;
 	ua.envp = envp;
 
+	/* If necessary, brand this process before we start the exec. */
+	if (brandme != 0)
+		brand_setbrand(p);
+
 	if ((error = gexec(&vp, &ua, &args, NULL, 0, &execsz,
-	    exec_file, p->p_cred)) != 0) {
+	    exec_file, p->p_cred, brand_action)) != 0) {
+		if (brandme != 0)
+			BROP(p)->b_proc_exit(p, lwp);
 		VN_RELE(vp);
 		if (dir != NULL)
 			VN_RELE(dir);
@@ -351,6 +388,12 @@ exec_common(const char *fname, const char **argp, const char **envp)
 	 */
 	close_exec(P_FINFO(p));
 	TRACE_2(TR_FAC_PROC, TR_PROC_EXEC, "proc_exec:p %p up %p", p, up);
+
+	/* Unbrand ourself if requested. */
+	if (brand_action == EBA_NATIVE)
+		BROP(p)->b_proc_exit(p, lwp);
+	ASSERT((brand_action != EBA_NATIVE) || !PROC_IS_BRANDED(p));
+
 	setregs(&args);
 
 	/* Mark this as an executable vnode */
@@ -375,6 +418,9 @@ exec_common(const char *fname, const char **argp, const char **envp)
 		else
 			lep = kmem_zalloc(sizeof (*lep), KM_SLEEP);
 	}
+
+	if (PROC_IS_BRANDED(p))
+		BROP(p)->b_exec();
 
 	mutex_enter(&p->p_lock);
 	prbarrier(p);
@@ -411,6 +457,7 @@ exec_common(const char *fname, const char **argp, const char **envp)
 		lep->le_start = curthread->t_start;
 		lwp_hash_in(p, lep);
 	}
+
 	/*
 	 * Restore the saved signal mask and
 	 * inform /proc that the exec() has finished.
@@ -422,6 +469,7 @@ exec_common(const char *fname, const char **argp, const char **envp)
 		kmem_free(old_lwpdir, old_lwpdir_sz * sizeof (lwpdir_t));
 		kmem_free(old_tidhash, old_tidhash_sz * sizeof (lwpdir_t *));
 	}
+
 	ASSERT(error == 0);
 	DTRACE_PROC(exec__success);
 	return (0);
@@ -451,7 +499,8 @@ gexec(
 	int level,
 	long *execsz,
 	caddr_t exec_file,
-	struct cred *cred)
+	struct cred *cred,
+	int brand_action)
 {
 	struct vnode *vp;
 	proc_t *pp = ttoproc(curthread);
@@ -593,7 +642,7 @@ gexec(
 		setidfl |= EXECSETID_PRIVS;
 
 	error = (*eswp->exec_func)(vp, uap, args, idatap, level, execsz,
-		setidfl, exec_file, cred);
+		setidfl, exec_file, cred, brand_action);
 	rw_exit(eswp->exec_lock);
 	if (error != 0) {
 		if (newcred != NULL)
@@ -1016,17 +1065,44 @@ execmap(struct vnode *vp, caddr_t addr, size_t len, size_t zfodlen,
 	}
 
 	if (zfodlen) {
+		struct as *as = curproc->p_as;
+		struct seg *seg;
+		uint_t zprot = 0;
+
 		end = (size_t)addr + len;
 		zfodbase = (caddr_t)roundup(end, PAGESIZE);
 		zfoddiff = (uintptr_t)zfodbase - end;
 		if (zfoddiff) {
+			/*
+			 * Before we go to zero the remaining space on the last
+			 * page, make sure we have write permission.
+			 */
+
+			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+			seg = as_segat(curproc->p_as, (caddr_t)end);
+			if (seg != NULL)
+				SEGOP_GETPROT(seg, (caddr_t)end, zfoddiff - 1,
+				    &zprot);
+			AS_LOCK_EXIT(as, &as->a_lock);
+
+			if (seg != NULL && (zprot & PROT_WRITE) == 0) {
+				(void) as_setprot(as, (caddr_t)end,
+				    zfoddiff - 1, zprot | PROT_WRITE);
+			}
+
 			if (on_fault(&ljb)) {
 				no_fault();
+				if (seg != NULL && (zprot & PROT_WRITE) == 0)
+					(void) as_setprot(as, (caddr_t)end,
+					zfoddiff - 1, zprot);
 				error = EFAULT;
 				goto bad;
 			}
 			uzero((void *)end, zfoddiff);
 			no_fault();
+			if (seg != NULL && (zprot & PROT_WRITE) == 0)
+				(void) as_setprot(as, (caddr_t)end,
+				    zfoddiff - 1, zprot);
 		}
 		if (zfodlen > zfoddiff) {
 			struct segvn_crargs crargs =
@@ -1326,12 +1402,21 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	args->ne = args->na - argc;
 
 	/*
-	 * Add AT_SUN_PLATFORM and AT_SUN_EXECNAME strings to the stack.
+	 * Add AT_SUN_PLATFORM, AT_SUN_EXECNAME, AT_SUN_BRANDNAME, and
+	 * AT_SUN_EMULATOR strings to the stack.
 	 */
 	if (auxvpp != NULL && *auxvpp != NULL) {
 		if ((error = stk_add(args, platform, UIO_SYSSPACE)) != 0)
 			return (error);
 		if ((error = stk_add(args, args->pathname, UIO_SYSSPACE)) != 0)
+			return (error);
+		if (args->brandname != NULL &&
+		    (error = stk_add(args, args->brandname,
+			UIO_SYSSPACE)) != 0)
+			return (error);
+		if (args->emulator != NULL &&
+		    (error = stk_add(args, args->emulator,
+			UIO_SYSSPACE)) != 0)
 			return (error);
 	}
 
@@ -1438,19 +1523,32 @@ stk_copyout(uarg_t *args, char *usrstack, void **auxvpp, user_t *up)
 
 	/*
 	 * Fill in the aux vector now that we know the user stack addresses
-	 * for the AT_SUN_PLATFORM and AT_SUN_EXECNAME strings.
+	 * for the AT_SUN_PLATFORM, AT_SUN_EXECNAME, AT_SUN_BRANDNAME and
+	 * AT_SUN_EMULATOR strings.
 	 */
 	if (auxvpp != NULL && *auxvpp != NULL) {
 		if (args->to_model == DATAMODEL_NATIVE) {
 			auxv_t **a = (auxv_t **)auxvpp;
 			ADDAUX(*a, AT_SUN_PLATFORM, (long)&ustrp[*--offp])
 			ADDAUX(*a, AT_SUN_EXECNAME, (long)&ustrp[*--offp])
+			if (args->brandname != NULL)
+				ADDAUX(*a,
+				    AT_SUN_BRANDNAME, (long)&ustrp[*--offp])
+			if (args->emulator != NULL)
+				ADDAUX(*a,
+				    AT_SUN_EMULATOR, (long)&ustrp[*--offp])
 		} else {
 			auxv32_t **a = (auxv32_t **)auxvpp;
 			ADDAUX(*a,
 			    AT_SUN_PLATFORM, (int)(uintptr_t)&ustrp[*--offp])
 			ADDAUX(*a,
-			    AT_SUN_EXECNAME, (int)(uintptr_t)&ustrp[*--offp]);
+			    AT_SUN_EXECNAME, (int)(uintptr_t)&ustrp[*--offp])
+			if (args->brandname != NULL)
+				ADDAUX(*a, AT_SUN_BRANDNAME,
+				    (int)(uintptr_t)&ustrp[*--offp])
+			if (args->emulator != NULL)
+				ADDAUX(*a, AT_SUN_EMULATOR,
+				    (int)(uintptr_t)&ustrp[*--offp])
 		}
 	}
 

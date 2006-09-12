@@ -85,13 +85,13 @@ install_h	:=	TARGET= install_h
 .PARALLEL:	$(KMODS) $(CLOSED_KMODS) $(SVVS) $(XMODS) $(CLOSED_XMODS) \
 		config $(LINT_DEPS)
 
-def all install clean clobber modlist: $(KMODS) $(CLOSED_KMODS) \
-		$(SVVS) $(XMODS) $(CLOSED_XMODS) config
+def all install clean clobber modlist: genassym $(KMODS) $(CLOSED_KMODS) \
+	$(SVVS) $(XMODS) $(CLOSED_XMODS) config
 
 modlintlib clean.lint: $(LINT_KMODS) $(CLOSED_LINT_KMODS) $(SVVS) \
 	$(XMODS) $(CLOSED_XMODS)
 
-$(KMODS) $(SUBDIRS) config:	FRC
+genassym $(KMODS) $(SUBDIRS) config:	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(CLOSED_KMODS):	FRC

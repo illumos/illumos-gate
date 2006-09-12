@@ -69,6 +69,7 @@ uint64_t	*kaif_msr_wrexit_valp;
 
 uintptr_t	kaif_kernel_handler;
 uintptr_t	kaif_sys_sysenter;
+uintptr_t	kaif_brand_sys_sysenter;
 
 int		kaif_trap_switch;
 
@@ -919,6 +920,10 @@ kaif_init(kmdb_auxv_t *kav)
 
 	if ((kaif_sys_sysenter = kmdb_kdi_lookup_by_name("unix",
 	    "sys_sysenter")) == NULL)
+		return (set_errno(ENOENT));
+
+	if ((kaif_brand_sys_sysenter = kmdb_kdi_lookup_by_name("unix",
+	    "brand_sys_sysenter")) == NULL)
 		return (set_errno(ENOENT));
 
 	return (0);

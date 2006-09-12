@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+#include <libzonecfg.h>
 
 #include "Pcontrol.h"
 
@@ -84,7 +85,7 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 	char buf[PATH_MAX];
 	struct stat st;
 	uintptr_t addr;
-	char *p, *q;
+	char *p = path, *q;
 
 	if (P->execname)
 		return (P->execname); /* Already found */
@@ -118,10 +119,14 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 	 * Second try: read the string pointed to by the AT_SUN_EXECNAME
 	 * auxv element, saved when the program was exec'd.  If the full
 	 * pathname try_exec() forms fails, try again using just the
-	 * basename appended to our cwd.
+	 * basename appended to our cwd.  If that also fails, and the process
+	 * is in a zone, try again with the zone path instead of our cwd.
 	 */
 	if ((addr = Pgetauxval(P, AT_SUN_EXECNAME)) != (uintptr_t)-1L &&
 	    Pread_string(P, path, sizeof (path), (off_t)addr) > 0) {
+		char		zname[ZONENAME_MAX];
+		char		zpath[PATH_MAX];
+		const psinfo_t	*pi = Ppsinfo(P);
 
 		if (try_exec(cwd, path, buf, isexec, isdata))
 			goto found;
@@ -129,6 +134,14 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 		if (strchr(path, '/') != NULL && (p = basename(path)) != NULL &&
 		    try_exec(cwd, p, buf, isexec, isdata))
 			goto found;
+
+		if (getzonenamebyid(pi->pr_zoneid, zname,
+		    sizeof (zname)) != -1 && strcmp(zname, "global") != 0 &&
+		    zone_get_zonepath(zname, zpath, sizeof (zpath)) == Z_OK) {
+			(void) strcat(zpath, "/root");
+			if (try_exec(zpath, p, buf, isexec, isdata))
+				goto found;
+		}
 	}
 
 	/*
@@ -245,7 +258,7 @@ Pexecname(struct ps_prochandle *P, char *buf, size_t buflen)
 		 * Try to get the path information first.
 		 */
 		(void) snprintf(exec_name, sizeof (exec_name),
-		    "/proc/%d/path/a.out", (int)P->pid);
+		    "%s/%d/path/a.out", procfs_path, (int)P->pid);
 		if ((ret = readlink(exec_name, buf, buflen - 1)) > 0) {
 			buf[ret] = '\0';
 			return (buf);
@@ -256,7 +269,7 @@ Pexecname(struct ps_prochandle *P, char *buf, size_t buflen)
 		 * suggestions to the actual device and inode number.
 		 */
 		(void) snprintf(exec_name, sizeof (exec_name),
-		    "/proc/%d/object/a.out", (int)P->pid);
+		    "%s/%d/object/a.out", procfs_path, (int)P->pid);
 
 		if (stat64(exec_name, &st) != 0 || !S_ISREG(st.st_mode))
 			return (NULL);
@@ -267,7 +280,7 @@ Pexecname(struct ps_prochandle *P, char *buf, size_t buflen)
 		 * not changed its current directory since it was exec'd.
 		 */
 		(void) snprintf(proc_cwd, sizeof (proc_cwd),
-		    "/proc/%d/path/cwd", (int)P->pid);
+		    "%s/%d/path/cwd", procfs_path, (int)P->pid);
 
 		if ((ret = readlink(proc_cwd, cwd, PATH_MAX - 1)) > 0)
 			cwd[ret] = '\0';

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,7 +155,7 @@ static const char *const systable[] = {
 	"kill",			/* 37 */
 	"fstatfs",		/* 38 */
 	"pgrpsys",		/* 39 */
-	NULL,			/* 40 was xenix */
+	"uucopystr",		/* 40 */
 	"dup",			/* 41 */
 	"pipe",			/* 42 */
 	"times",		/* 43 */
@@ -296,7 +295,7 @@ static const char *const systable[] = {
 	"pwrite",		/* 174 */
 	"llseek",		/* 175 */
 	"inst_sync",		/* 176 */
-	NULL,			/* 177 */
+	"brand",		/* 177 */
 	"kaio",			/* 178 */
 	"cpc",			/* 179 */
 	"lgrpsys",		/* 180 */
@@ -373,7 +372,7 @@ static const char *const systable[] = {
 	"lwp_mutex_trylock",	/* 251 */
 	"lwp_mutex_init",	/* 252 */
 	"cladm",		/* 253 */
-	NULL,			/* 254 */
+	"uucopy",		/* 254 */
 	"umount2"		/* 255 */
 };
 

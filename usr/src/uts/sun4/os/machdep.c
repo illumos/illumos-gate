@@ -260,6 +260,14 @@ lwp_freeregs(klwp_t *lwp, int isexec)
 }
 
 /*
+ * This function is currently unused on sparc.
+ */
+/*ARGSUSED*/
+void
+lwp_attach_brand_hdlrs(klwp_t *lwp)
+{}
+
+/*
  * fill in the extra register state area specified with the
  * specified lwp's platform-dependent non-floating-point extra
  * register state information

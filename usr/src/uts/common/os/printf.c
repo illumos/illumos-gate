@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -142,21 +141,15 @@ retry:
 
 	if (sl & SL_USER) {
 		ssize_t resid;
-		sess_t *sessp;
+		sess_t *sp;
 
-		mutex_enter(&pidlock);
-		sessp = curproc->p_sessp;
-		SESS_HOLD(sessp);
-		TTY_HOLD(sessp);
-		mutex_exit(&pidlock);
-		if (sessp->s_vp)
-			(void) vn_rdwr(UIO_WRITE, sessp->s_vp,
-			    body, len, 0LL, UIO_SYSSPACE,
-			    FAPPEND, (rlim64_t)LOG_HIWAT, kcred, &resid);
-		mutex_enter(&pidlock);
-		TTY_RELE(sessp);
-		SESS_RELE(sessp);
-		mutex_exit(&pidlock);
+		if ((sp = tty_hold()) != NULL) {
+			if (sp->s_vp != NULL)
+				(void) vn_rdwr(UIO_WRITE, sp->s_vp, body,
+				    len, 0LL, UIO_SYSSPACE, FAPPEND,
+				    (rlim64_t)LOG_HIWAT, kcred, &resid);
+			tty_rele(sp);
+		}
 	}
 
 	if (on_intr && !panicstr) {

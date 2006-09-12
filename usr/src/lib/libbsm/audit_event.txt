@@ -337,6 +337,7 @@
 291:AUE_MODADDPRIV:modctl(2) - configure additional privilege:as
 292:AUE_CRYPTOADM:kernel cryptographic framework:as
 293:AUE_CONFIGSSL:configure kernel SSL:as
+294:AUE_BRANDSYS:brandsys(2):ot
 #
 # user level audit events
 #	2048 -  6143	Reserved

@@ -56,24 +56,13 @@ $(ROOTDTDS) :=	GROUP = bin
 $(DTDDIR)/%: %
 	$(INS.file)
 
-XMLFILES=	zones/SUNWblank.xml zones/SUNWdefault.xml
-XMLDIR =	$(ROOT)/etc
-ROOTXMLFILES=	$(XMLFILES:%=$(XMLDIR)/%)
-
-$(ROOTXMLFILES) :=	FILEMODE = 444
-$(ROOTXMLFILES) :=	OWNER = root
-$(ROOTXMLFILES) :=	GROUP = bin
-
-$(XMLDIR)/%: %
-	$(INS.file)
-
 .KEEP_STATE:
 
 all clean clobber install lint: $(SUBDIRS)
 
 $(POFILE):	pofile_MSGFILES
 
-install:	$(ROOTDTDS) $(ROOTXMLFILES)
+install:	$(ROOTDTDS)
 
 _msg:		$(MSGDOMAINPOFILE)
 

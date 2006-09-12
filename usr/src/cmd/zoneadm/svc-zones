@@ -27,6 +27,21 @@
 #
 . /lib/svc/share/smf_include.sh
 
+#
+# Return a list of running, non-global zones for which a shutdown via
+# "/sbin/init 0" may work (typically only Solaris zones.)
+#
+# At present, this means any running "lx" zones don't qualify.
+#
+shutdown_zones()
+{
+	zoneadm list -p | nawk -F: '{
+		if (($5 != "lx") && ($2 != "global")) {
+			print $2
+		}
+	}'
+}
+
 [ ! -x /usr/sbin/zoneadm ] && exit 0	# SUNWzoneu not installed
 
 if [ -z "$SMF_FMRI" ]; then
@@ -75,32 +90,39 @@ case "$1" in
 
 	SVC_TIMEOUT=`svcprop -p stop/timeout_seconds $SMF_FMRI`
 
+	#
+	# First, try shutting down any running zones for which an "init 0" may
+	# work.
+	#
 	MAXSHUT=`expr 3 \* $SVC_TIMEOUT \/ 4` # 3/4 of time to zone shutdown
 	MAXHALT=`expr $SVC_TIMEOUT \/ 4`      # rest of time goes to halt
 
-	echo "Shutting down running zones (for up to $MAXSHUT seconds):\c"
+	zonelist=`shutdown_zones`
 
-	# First, try letting them run their shutdown scripts.
+	if [ -n "$zonelist" ]; then
+		SHUTDOWN=0
+		echo "Shutting down running zones (for up to $MAXSHUT" \
+		    "seconds):\c"
 
-	SHUTDOWN=0
-	for zone in `zoneadm list`; do
-		if [ "$zone" != "global" ]; then
+		for zone in $zonelist; do
 			echo " $zone\c"
 			zlogin -S $zone /sbin/init 0 < /dev/null >&0 2>&0 &
 			SHUTDOWN=1
-		fi
-	done
-	[ $SHUTDOWN -eq 1 ] && echo "."
+		done
 
-	# Allow time for zones to shutdown cleanly
+		[ $SHUTDOWN -eq 1 ] && echo "."
 
-	while [ $MAXSHUT -gt 0 -a "`zoneadm list`" != "global" ]; do
-		MAXSHUT=`expr $MAXSHUT - 1`
-		sleep 1	# wait a bit longer
-	done
+		# Allow time for zones to shutdown cleanly
 
-	# Second, try halting them.
+		while [ $MAXSHUT -gt 0 -a "`shutdown_zones`" != "" ]; do
+			MAXSHUT=`expr $MAXSHUT - 1`
+			sleep 1	# wait a bit longer
+		done
+	fi
 
+	#
+	# Second, try halting any non-global zones still running
+	#
 	WAITPIDS=""
 	for zone in `zoneadm list`; do
 		if [ "$zone" != "global" ]; then
@@ -122,6 +144,7 @@ case "$1" in
 	# If the halts complete but a zone is still not shutdown, it might
 	# be in a state like 'shutting_down' or 'down'.  So we give it some
 	# time to come all the way down.
+
 	while [ $MAXHALT -gt 0 -a "`zoneadm list`" != "global" ]; do
 		MAXHALT=`expr $MAXHALT - 1`
 		sleep 1	# wait a bit longer

@@ -82,7 +82,8 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 	auxv_t		*auxv, *_auxv;
 	uid_t		uid = -1, euid = -1;
 	gid_t		gid = -1, egid = -1;
-	char		*_platform = 0, *_execname = 0;
+	char		*_platform = 0, *_execname = 0, *_emulator = 0;
+	int		_branded = 0;
 	int		auxflags = -1;
 	/*
 	 * Scan the bootstrap structure to pick up the basics.
@@ -174,6 +175,13 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 			hwcap_1 = (uint_t)auxv->a_un.a_val;
 			break;
 #endif
+#ifdef	AT_SUN_EMULATOR			/* Emulation library name */
+		case AT_SUN_EMULATOR:
+			/* name of emulation library, if any */
+			_emulator = auxv->a_un.a_ptr;
+			_branded = 1;
+			break;
+#endif
 		}
 	}
 
@@ -223,6 +231,16 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 		roffset = ((Rel *)reladdr)->r_offset + ld_base;
 		*((ulong_t *)roffset) += ld_base;
 		reladdr += relent;
+	}
+
+	/*
+	 * If an emulation library is being used, use that as the linker's
+	 * effective executable name. The real executable is not linked by this
+	 * linker.
+	 */
+	if (_emulator != NULL) {
+		_execname = _emulator;
+		rtld_flags2 |= RT_FL2_BRANDED;
 	}
 
 	/*

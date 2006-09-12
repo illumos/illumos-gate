@@ -80,6 +80,7 @@
 #include <sys/sdt.h>
 #include <sys/class.h>
 #include <sys/corectl.h>
+#include <sys/brand.h>
 
 static int64_t cfork(int, int);
 static int getproc(proc_t **, int);
@@ -461,8 +462,10 @@ cfork(int isvfork, int isfork1)
 		mutex_exit(&p->p_lock);
 	}
 
-	/* set return values for child */
-	lwp_setrval(clone, p->p_pid, 1);
+	if (PROC_IS_BRANDED(p))
+		BROP(p)->b_lwp_setrval(clone, p->p_pid, 1);
+	else
+		lwp_setrval(clone, p->p_pid, 1);
 
 	/* set return values for parent */
 	r.r_val1 = (int)cp->p_pid;
@@ -873,6 +876,7 @@ getproc(proc_t **cpp, int kernel)
 	/*
 	 * Make proc entry for child process
 	 */
+	mutex_init(&cp->p_splock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&cp->p_crlock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&cp->p_pflock, NULL, MUTEX_DEFAULT, NULL);
 #if defined(__x86)
@@ -882,7 +886,7 @@ getproc(proc_t **cpp, int kernel)
 	cp->p_stat = SIDL;
 	cp->p_mstart = gethrtime();
 
-	if ((newpid = pid_assign(cp)) == -1) {
+	if ((newpid = pid_allocate(cp, PID_ALLOC_PROC)) == -1) {
 		if (nproc == v.v_proc) {
 			CPU_STATS_ADDQ(CPU, sys, procovf, 1);
 			cmn_err(CE_WARN, "out of processes");
@@ -926,10 +930,13 @@ getproc(proc_t **cpp, int kernel)
 	cp->p_siginfo = pp->p_siginfo;
 	cp->p_flag = pp->p_flag & (SJCTL|SNOWAIT|SNOCD);
 	cp->p_sessp = pp->p_sessp;
-	SESS_HOLD(pp->p_sessp);
+	sess_hold(pp);
 	cp->p_exec = pp->p_exec;
 	cp->p_execdir = pp->p_execdir;
 	cp->p_zone = pp->p_zone;
+	cp->p_brand = pp->p_brand;
+	if (PROC_IS_BRANDED(pp))
+		BROP(pp)->b_copy_procdata(cp, pp);
 
 	cp->p_bssbase = pp->p_bssbase;
 	cp->p_brkbase = pp->p_brkbase;
@@ -1198,6 +1205,7 @@ try_again:
 
 			if (p->p_segacct)
 				shmexit(p);
+
 			/*
 			 * We grab p_lock for the benefit of /proc
 			 */

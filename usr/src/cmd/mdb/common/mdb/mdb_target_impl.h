@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,7 @@
 #include <mdb/mdb_module.h>
 #include <mdb/mdb_list.h>
 #include <mdb/mdb_gelf.h>
+#include <sys/auxv.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -133,6 +133,7 @@ typedef struct mdb_tgt_ops {
 	int (*t_stack_iter)(mdb_tgt_t *, const mdb_tgt_gregset_t *,
 	    mdb_tgt_stack_f *, void *);
 
+	int (*t_auxv)(mdb_tgt_t *, const auxv_t **auxvp);
 } mdb_tgt_ops_t;
 
 /*
@@ -323,6 +324,8 @@ extern int mdb_tgt_vespec_insert(mdb_tgt_t *, const mdb_se_ops_t *,
     int, mdb_tgt_se_f *, void *, void *, void (*)(mdb_vespec_t *));
 
 extern mdb_vespec_t *mdb_tgt_vespec_lookup(mdb_tgt_t *, int);
+
+extern int mdb_tgt_auxv(mdb_tgt_t *, const auxv_t **);
 
 extern void mdb_tgt_vespec_hold(mdb_tgt_t *, mdb_vespec_t *);
 extern void mdb_tgt_vespec_rele(mdb_tgt_t *, mdb_vespec_t *);

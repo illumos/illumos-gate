@@ -219,6 +219,7 @@ SUNWprivate_1.1 {
 	pr_unlink;
 	pr_waitid;
 	pr_zmap;
+	Pset_procfs_path;
 	Psetbkpt;
 	Psetcred;
 	Psetfault;
@@ -238,6 +239,7 @@ SUNWprivate_1.1 {
 	ps_lsetregs;
 	ps_lstop;
 	ps_pauxv;
+	ps_pbrandname;
 	ps_pcontinue;
 	ps_pdmodel;
 	ps_pdread;

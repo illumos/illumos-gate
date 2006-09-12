@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1990-1992,1996,1998-2003 Sun Microsystems, Inc.
+ * Copyright 2006 Sun Microsystems, Inc.
  * All rights reserved.
  * Use is subject to license terms.
  */
@@ -198,16 +197,19 @@ syopen(dev_t *devp, int flag, int otyp, struct cred *cr)
 {
 	dev_t	ttyd;
 	vnode_t	*ttyvp;
-	sess_t	*sp = curproc->p_sessp;
+	sess_t	*sp;
 	int	error;
 
-	if ((ttyd = sp->s_dev) == NODEV)
+	if ((sp = tty_hold()) == NULL)
+		return (EINTR);
+
+	if (sp->s_dev == NODEV) {
+		tty_rele(sp);
 		return (ENXIO);
-	TTY_HOLD(sp);
-	if ((ttyvp = sp->s_vp) == NULL) {
-		TTY_RELE(sp);
-		return (EIO);
 	}
+
+	ttyd = sp->s_dev;
+	ttyvp = sp->s_vp;
 
 	/*
 	 * Open the control terminal. The control terminal may be
@@ -237,10 +239,12 @@ syopen(dev_t *devp, int flag, int otyp, struct cred *cr)
 		ASSERT(vn_matchops(ttyvp, spec_getvnodeops()));
 		csp = VTOS(VTOS(ttyvp)->s_commonvp);
 		mutex_enter(&csp->s_lock);
+		ASSERT(csp->s_count > 1);
 		csp->s_count--;
 		mutex_exit(&csp->s_lock);
 	}
-	TTY_RELE(sp);
+
+	tty_rele(sp);
 	return (error);
 }
 
@@ -255,41 +259,41 @@ syclose(dev_t dev, int flag, int otyp, struct cred *cr)
 int
 syread(dev_t dev, struct uio *uiop, struct cred *cr)
 {
-	vnode_t *ttyvp;
-	sess_t	*sp = curproc->p_sessp;
+	sess_t	*sp;
 	int	error;
 
-	if (sp->s_dev == NODEV)
-		return (ENXIO);
-	TTY_HOLD(sp);
-	if ((ttyvp = sp->s_vp) == NULL) {
-		TTY_RELE(sp);
-		return (EIO);
-	}
-	error = VOP_READ(ttyvp, uiop, 0, cr, NULL);
-	TTY_RELE(sp);
-	return (error);
+	if ((sp = tty_hold()) == NULL)
+		return (EINTR);
 
+	if (sp->s_dev == NODEV) {
+		tty_rele(sp);
+		return (ENXIO);
+	}
+
+	error = VOP_READ(sp->s_vp, uiop, 0, cr, NULL);
+
+	tty_rele(sp);
+	return (error);
 }
 
 /* ARGSUSED */
 int
 sywrite(dev_t dev, struct uio *uiop, struct cred *cr)
 {
-	vnode_t *ttyvp;
-	sess_t	*sp = curproc->p_sessp;
+	sess_t	*sp;
 	int	error;
 
-	if (sp->s_dev == NODEV)
+	if ((sp = tty_hold()) == NULL)
+		return (EINTR);
+
+	if (sp->s_dev == NODEV) {
+		tty_rele(sp);
 		return (ENXIO);
-	TTY_HOLD(sp);
-	if ((ttyvp = sp->s_vp) == NULL) {
-		TTY_RELE(sp);
-		return (EIO);
 	}
 
-	error = VOP_WRITE(ttyvp, uiop, 0, cr, NULL);
-	TTY_RELE(sp);
+	error = VOP_WRITE(sp->s_vp, uiop, 0, cr, NULL);
+
+	tty_rele(sp);
 	return (error);
 }
 
@@ -299,19 +303,32 @@ int
 syioctl(dev_t dev, int cmd, intptr_t arg, int mode, struct cred *cr,
 	int *rvalp)
 {
-	vnode_t *ttyvp;
-	sess_t	*sp = curproc->p_sessp;
+	sess_t	*sp;
 	int	error;
 
-	if (sp->s_dev == NODEV)
-		return (ENXIO);
-	TTY_HOLD(sp);
-	if ((ttyvp = sp->s_vp) == NULL) {
-		TTY_RELE(sp);
-		return (EIO);
+	if (cmd == TIOCNOTTY) {
+		/*
+		 * we can't allow this ioctl.  the reason is that it
+		 * attempts to remove the ctty for a session.  to do
+		 * this the ctty can't be in use  but we grab a hold on
+		 * the current ctty (via tty_hold) to perform this ioctl.
+		 * if we were to allow this ioctl to pass through we
+		 * would deadlock with ourselves.
+		 */
+		return (EINVAL);
 	}
-	error = VOP_IOCTL(ttyvp, cmd, arg, mode, cr, rvalp);
-	TTY_RELE(sp);
+
+	if ((sp = tty_hold()) == NULL)
+		return (EINTR);
+
+	if (sp->s_dev == NODEV) {
+		tty_rele(sp);
+		return (ENXIO);
+	}
+
+	error = VOP_IOCTL(sp->s_vp, cmd, arg, mode, cr, rvalp);
+
+	tty_rele(sp);
 	return (error);
 }
 
@@ -322,18 +339,19 @@ int
 sypoll(dev_t dev, short events, int anyyet, short *reventsp,
 	struct pollhead **phpp)
 {
-	vnode_t *ttyvp;
-	sess_t  *sp = curproc->p_sessp;
+	sess_t  *sp;
 	int	error;
 
-	if (sp->s_dev == NODEV)
+	if ((sp = tty_hold()) == NULL)
+		return (EINTR);
+
+	if (sp->s_dev == NODEV) {
+		tty_rele(sp);
 		return (ENXIO);
-	TTY_HOLD(sp);
-	if ((ttyvp = sp->s_vp) == NULL) {
-		TTY_RELE(sp);
-		return (EIO);
 	}
-	error = VOP_POLL(ttyvp, events, anyyet, reventsp, phpp);
-	TTY_RELE(sp);
+
+	error = VOP_POLL(sp->s_vp, events, anyyet, reventsp, phpp);
+
+	tty_rele(sp);
 	return (error);
 }

@@ -302,6 +302,7 @@ COMSYSOBJS=			\
 	utime.o			\
 	utimes.o		\
 	utssys.o		\
+	uucopy.o		\
 	vhangup.o		\
 	waitid.o		\
 	write.o			\

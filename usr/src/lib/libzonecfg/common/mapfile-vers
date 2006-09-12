@@ -86,6 +86,7 @@ SUNWprivate_1.1 {
 	zonecfg_get_attr_uint;
 	zonecfg_get_autoboot;
 	zonecfg_get_bootargs;
+	zonecfg_get_brand;
 	zonecfg_get_detach_info;
 	zonecfg_getdevent;
 	zonecfg_getdevperment;
@@ -107,6 +108,7 @@ SUNWprivate_1.1 {
 	zonecfg_get_snapshot_handle;
 	zonecfg_get_template_handle;
 	zonecfg_get_uuid;
+	zonecfg_get_xml_handle;
 	zonecfg_get_zonepath;
 	zonecfg_in_alt_root;
 	zonecfg_init_handle;
@@ -142,6 +144,7 @@ SUNWprivate_1.1 {
 	zonecfg_setattrent;
 	zonecfg_set_autoboot;
 	zonecfg_set_bootargs;
+	zonecfg_set_brand;
 	zonecfg_setdevent;
 	zonecfg_setdevperment;
 	zonecfg_setdsent;
@@ -163,6 +166,8 @@ SUNWprivate_1.1 {
 	zonecfg_valid_rctl;
 	zonecfg_valid_rctlblk;
 	zonecfg_valid_rctlname;
+	zonecfg_verify_save;
+	zone_get_brand;
 	zone_get_devroot;
 	zone_get_id;
 	zone_get_rootpath;

@@ -1114,6 +1114,8 @@ extern "C" {
 #define	utmpname		_utmpname
 #define	utmpxname		_utmpxname
 #define	utssys			_utssys
+#define	uucopy			_uucopy
+#define	uucopystr		_uucopystr
 #define	vfork			_vfork
 #define	vfscanf			_vfscanf
 #define	vhangup			_vhangup

@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # uts/intel/Makefile.files
 #
@@ -107,6 +108,14 @@ XMEMFS_OBJS +=		\
 	xmem_vfsops.o	\
 	xmem_vnops.o
 
+LX_PROC_OBJS +=	\
+	lx_prsubr.o	\
+	lx_prvfsops.o	\
+	lx_prvnops.o
+
+LX_AUTOFS_OBJS +=	\
+	lx_autofs.o
+
 #
 #	Driver modules
 #
@@ -176,6 +185,29 @@ AAC_OBJS = aac.o aac_ioctl.o
 #	AMR module
 #
 AMR_OBJS = amr.o
+
+#
+#	Brand modules
+#
+SN1_BRAND_OBJS	=	sn1_brand.o sn1_brand_asm.o
+
+LX_BRAND_OBJS  =		\
+	lx_brand.o		\
+	lx_brand_asm.o		\
+	lx_brk.o		\
+	lx_clone.o		\
+	lx_futex.o		\
+	lx_getpid.o		\
+	lx_id.o			\
+	lx_kill.o		\
+	lx_misc.o		\
+	lx_modify_ldt.o		\
+	lx_pid.o		\
+	lx_sched.o		\
+	lx_signum.o		\
+	lx_syscall.o		\
+	lx_sysinfo.o		\
+	lx_thread_area.o
 
 #
 #	special files

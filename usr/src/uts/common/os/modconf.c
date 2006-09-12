@@ -55,6 +55,7 @@
 #include <ipp/ipp.h>
 #include <sys/strsubr.h>
 #include <sys/kcpc.h>
+#include <sys/brand.h>
 #include <sys/cpc_pcbe.h>
 #include <sys/kstat.h>
 #include <sys/fs/sdev_node.h>
@@ -235,6 +236,16 @@ static int mod_removepcbe(struct modlpcbe *, struct modlinkage *);
 
 struct mod_ops mod_pcbeops = {
 	mod_installpcbe, mod_removepcbe, mod_infonull
+};
+
+/*
+ * Brand modules.
+ */
+static int mod_installbrand(struct modlbrand *, struct modlinkage *);
+static int mod_removebrand(struct modlbrand *, struct modlinkage *);
+
+struct mod_ops mod_brandops = {
+	mod_installbrand, mod_removebrand, mod_infonull
 };
 
 static struct sysent *mod_getsysent(struct modlinkage *, struct sysent *);
@@ -493,6 +504,23 @@ static int
 mod_removepcbe(struct modlpcbe *modl, struct modlinkage *modlp)
 {
 	return (EBUSY);
+}
+
+/*
+ * Manage BrandZ modules.
+ */
+/*ARGSUSED*/
+static int
+mod_installbrand(struct modlbrand *modl, struct modlinkage *modlp)
+{
+	return (brand_register(modl->brand_branddef));
+}
+
+/*ARGSUSED*/
+static int
+mod_removebrand(struct modlbrand *modl, struct modlinkage *modlp)
+{
+	return (brand_unregister(modl->brand_branddef));
 }
 
 /*
@@ -1075,8 +1103,10 @@ mod_removefs(struct modlfs *modl, struct modlinkage *modlp)
 		return (EBUSY);
 	}
 
-	/* XXX - Shouldn't the refcount be sufficient? */
-
+	/*
+	 * A mounted filesystem could still have vsw_count = 0
+	 * so we must check whether anyone is actually using our ops
+	 */
 	if (vfs_opsinuse(&vswp->vsw_vfsops)) {
 		vfs_unrefvfssw(vswp);
 		WUNLOCK_VFSSW();

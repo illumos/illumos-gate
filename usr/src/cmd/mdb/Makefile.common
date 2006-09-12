@@ -32,6 +32,7 @@ COMMON_MODULES_PROC = \
 	libavl \
 	libc \
 	libnvpair \
+	libproc \
 	libsysevent \
 	libumem \
 	libuutil \

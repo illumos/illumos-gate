@@ -346,6 +346,11 @@ bindresvport_again:
 	}
 
 	if (!error && bound_addr) {
+		if (bound_addr->maxlen < ret->addr.len) {
+			kmem_free(bound_addr->buf, bound_addr->maxlen);
+			bound_addr->buf = kmem_zalloc(ret->addr.len, KM_SLEEP);
+			bound_addr->maxlen = ret->addr.len;
+		}
 		bcopy(ret->addr.buf, bound_addr->buf, ret->addr.len);
 		bound_addr->len = ret->addr.len;
 	}

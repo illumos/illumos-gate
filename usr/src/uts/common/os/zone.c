@@ -228,6 +228,7 @@
 #include <sys/nvpair.h>
 #include <sys/rctl.h>
 #include <sys/fss.h>
+#include <sys/brand.h>
 #include <sys/zone.h>
 #include <sys/tsol/label.h>
 
@@ -330,7 +331,6 @@ static kmutex_t mount_lock;
 
 const char * const zone_default_initname = "/sbin/init";
 static char * const zone_prefix = "/zone/";
-
 static int zone_shutdown(zoneid_t zoneid);
 
 /*
@@ -1223,6 +1223,8 @@ zone_init(void)
 	zone0.zone_nlwps = p0.p_lwpcnt;
 	zone0.zone_ntasks = 1;
 	mutex_exit(&p0.p_lock);
+	zone0.zone_restart_init = B_TRUE;
+	zone0.zone_brand = &native_brand;
 	rctl_prealloc_destroy(gp);
 	/*
 	 * pool_default hasn't been initialized yet, so we let pool_init() take
@@ -2330,8 +2332,15 @@ void
 zone_start_init(void)
 {
 	proc_t *p = ttoproc(curthread);
+	zone_t *z = p->p_zone;
 
 	ASSERT(!INGLOBALZONE(curproc));
+
+	/*
+	 * For all purposes (ZONE_ATTR_INITPID and restart_init),
+	 * storing just the pid of init is sufficient.
+	 */
+	z->zone_proc_initpid = p->p_pid;
 
 	/*
 	 * We maintain zone_boot_err so that we can return the cause of the
@@ -2340,23 +2349,23 @@ zone_start_init(void)
 	p->p_zone->zone_boot_err = start_init_common();
 
 	mutex_enter(&zone_status_lock);
-	if (p->p_zone->zone_boot_err != 0) {
+	if (z->zone_boot_err != 0) {
 		/*
 		 * Make sure we are still in the booting state-- we could have
 		 * raced and already be shutting down, or even further along.
 		 */
-		if (zone_status_get(p->p_zone) == ZONE_IS_BOOTING)
-			zone_status_set(p->p_zone, ZONE_IS_SHUTTING_DOWN);
+		if (zone_status_get(z) == ZONE_IS_BOOTING)
+			zone_status_set(z, ZONE_IS_SHUTTING_DOWN);
 		mutex_exit(&zone_status_lock);
 		/* It's gone bad, dispose of the process */
-		if (proc_exit(CLD_EXITED, p->p_zone->zone_boot_err) != 0) {
+		if (proc_exit(CLD_EXITED, z->zone_boot_err) != 0) {
 			mutex_enter(&p->p_lock);
 			ASSERT(p->p_flag & SEXITLWPS);
 			lwp_exit();
 		}
 	} else {
-		if (zone_status_get(p->p_zone) == ZONE_IS_BOOTING)
-			zone_status_set(p->p_zone, ZONE_IS_RUNNING);
+		if (zone_status_get(z) == ZONE_IS_BOOTING)
+			zone_status_set(z, ZONE_IS_RUNNING);
 		mutex_exit(&zone_status_lock);
 		/* cause the process to return to userland. */
 		lwp_rtt();
@@ -2939,6 +2948,9 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_psetid = ZONE_PS_INVAL;
 	zone->zone_ncpus = 0;
 	zone->zone_ncpus_online = 0;
+	zone->zone_restart_init = B_TRUE;
+	zone->zone_brand = &native_brand;
+	zone->zone_initname = NULL;
 	mutex_init(&zone->zone_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&zone->zone_nlwps_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&zone->zone_cv, NULL, CV_DEFAULT, NULL);
@@ -3464,6 +3476,9 @@ zone_shutdown(zoneid_t zoneid)
 		zone_rele(zone);
 		return (set_errno(EINTR));
 	}
+
+	brand_unregister_zone(zone->zone_brand);
+
 	zone_rele(zone);
 	return (0);
 }
@@ -3771,6 +3786,18 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		    copyout(&initpid, buf, bufsize) != 0)
 			error = EFAULT;
 		break;
+	case ZONE_ATTR_BRAND:
+		size = strlen(zone->zone_brand->b_name) + 1;
+
+		if (bufsize > size)
+			bufsize = size;
+		if (buf != NULL) {
+			err = copyoutstr(zone->zone_brand->b_name, buf,
+			    bufsize, NULL);
+			if (err != 0 && err != ENAMETOOLONG)
+				error = EFAULT;
+		}
+		break;
 	case ZONE_ATTR_INITNAME:
 		size = strlen(zone->zone_initname) + 1;
 		if (bufsize > size)
@@ -3797,7 +3824,12 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		}
 		break;
 	default:
-		error = EINVAL;
+		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone)) {
+			size = bufsize;
+			error = ZBROP(zone)->b_getattr(zone, attr, buf, &size);
+		} else {
+			error = EINVAL;
+		}
 	}
 	zone_rele(zone);
 
@@ -3815,6 +3847,7 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 {
 	zone_t *zone;
 	zone_status_t zone_status;
+	struct brand_attr *attrp;
 	int err;
 
 	if (secpolicy_zone_config(CRED()) != 0)
@@ -3847,8 +3880,33 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	case ZONE_ATTR_BOOTARGS:
 		err = zone_set_bootargs(zone, (const char *)buf);
 		break;
+	case ZONE_ATTR_BRAND:
+		ASSERT(!ZONE_IS_BRANDED(zone));
+		err = 0;
+		attrp = kmem_alloc(sizeof (struct brand_attr), KM_SLEEP);
+		if ((buf == NULL) ||
+		    (copyin(buf, attrp, sizeof (struct brand_attr)) != 0)) {
+			kmem_free(attrp, sizeof (struct brand_attr));
+			err = EFAULT;
+			break;
+		}
+
+		if (is_system_labeled() && strncmp(attrp->ba_brandname,
+		    NATIVE_BRAND_NAME, MAXNAMELEN) != 0) {
+			err = EPERM;
+			break;
+		}
+
+		zone->zone_brand = brand_register_zone(attrp);
+		kmem_free(attrp, sizeof (struct brand_attr));
+		if (zone->zone_brand == NULL)
+			err = EINVAL;
+		break;
 	default:
-		err = EINVAL;
+		if ((attr >= ZONE_ATTR_BRAND_ATTRS) && ZONE_IS_BRANDED(zone))
+			err = ZBROP(zone)->b_setattr(zone, attr, buf, bufsize);
+		else
+			err = EINVAL;
 	}
 
 done:
@@ -4145,10 +4203,10 @@ zone_enter(zoneid_t zoneid)
 	 */
 	mutex_enter(&pidlock);
 	sp = zone->zone_zsched->p_sessp;
-	SESS_HOLD(sp);
+	sess_hold(zone->zone_zsched);
 	mutex_enter(&pp->p_lock);
 	pgexit(pp);
-	SESS_RELE(pp->p_sessp);
+	sess_rele(pp->p_sessp, B_TRUE);
 	pp->p_sessp = sp;
 	pgjoin(pp, zone->zone_zsched->p_pidp);
 	mutex_exit(&pp->p_lock);

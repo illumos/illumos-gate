@@ -943,7 +943,7 @@ top:
 	 * Do remaining checks for FNOFOLLOW and FNOLINKS.
 	 */
 	if ((filemode & FNOFOLLOW) && vp->v_type == VLNK) {
-		error = EINVAL;
+		error = ELOOP;
 		goto out;
 	}
 	if (filemode & FNOLINKS) {

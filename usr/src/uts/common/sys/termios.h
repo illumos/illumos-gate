@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -382,6 +381,24 @@ extern pid_t tcgetsid();
 #define	TCSETSF		(_TIOC|16)
 
 /*
+ * linux terminal ioctls we need to be aware of
+ */
+#define	TIOCSETLD	(_TIOC|123)	/* set line discipline parms */
+#define	TIOCGETLD	(_TIOC|124)	/* get line discipline parms */
+
+/*
+ * The VMIN and VTIME and solaris overlap with VEOF and VEOL - This is
+ * perfectly legal except, linux expects them to be separate. So we keep
+ * them separately.
+ */
+struct lx_cc {
+	unsigned char veof;	/* veof value */
+	unsigned char veol;	/* veol value */
+	unsigned char vmin;	/* vmin value */
+	unsigned char vtime;	/* vtime value */
+};
+
+/*
  * NTP PPS ioctls
  */
 #define	TIOCGPPS	(_TIOC|125)
@@ -457,6 +474,7 @@ struct ppsclockev32 {
 #define	TIOCGLTC	(tIOC|116)	/* get local special chars */
 #define	TIOCOUTQ	(tIOC|115)	/* driver output queue size */
 #define	TIOCNOTTY	(tIOC|113)	/* void tty association */
+#define	TIOCSCTTY	(tIOC|132)	/* get a ctty */
 #define	TIOCSTOP	(tIOC|111)	/* stop output, like ^S */
 #define	TIOCSTART	(tIOC|110)	/* start output, like ^Q */
 #define	TIOCSILOOP	(tIOC|109)	/* private to Sun; do not use */

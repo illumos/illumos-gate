@@ -186,6 +186,7 @@ SUBDIRS += \
 	libxcurses	\
 	libxcurses2	\
 	libxnet		\
+	libbrand	.WAIT   \
 	libzonecfg	\
 	libzoneinfo	\
 	libtsnet	\
@@ -218,6 +219,7 @@ SUBDIRS += \
 	libzfs		\
 	libzfs_jni	\
 	libmapid	\
+	brand		\
 	$($(MACH)_SUBDIRS)
 
 sparc_SUBDIRS= .WAIT	\
@@ -248,6 +250,7 @@ DCSUBDIRS =		\
 MSGSUBDIRS=		\
 	abi		\
 	auditd_plugins	\
+	brand		\
 	cfgadm_plugins	\
 	gss_mechs/mech_dh	\
 	gss_mechs/mech_krb5	\
@@ -294,6 +297,7 @@ sparc_MSGSUBDIRS=	\
 
 HDRSUBDIRS=		\
 	auditd_plugins	\
+	libbrand	\
 	libbsm		\
 	libc		\
 	libcmdutils	\
@@ -466,6 +470,10 @@ libsocket:	libnsl
 libldap5:	libsasl libsocket libnsl libmd
 libsldap:	libldap5 libtsol
 libpool:	libnvpair libexacct
+libzonecfg:	libc libsocket libnsl libuuid libnvpair libsysevent libsec \
+		libbrand
+libproc:	../cmd/sgs/librtld_db libzonecfg ../cmd/sgs/libelf libctf \
+		libbrand
 libproject:	libpool libproc libsecdb
 libtsnet:	libnsl libtsol libsecdb
 libwrap:	libnsl libsocket
@@ -485,6 +493,7 @@ libzfs:		libdevinfo libdevid libgen libnvpair libuutil
 libzfs_jni:	libdiskmgt libnvpair libzfs
 libzpool:	libavl libumem libnvpair
 libsec:		libavl
+brand:		libc libsocket
 
 #
 # The reason this rule checks for the existence of the

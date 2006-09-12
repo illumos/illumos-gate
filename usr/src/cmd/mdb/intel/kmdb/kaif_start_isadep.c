@@ -72,7 +72,8 @@ kaif_trap_pass(kaif_cpusave_t *cpusave)
 	 * See the comments in the kernel's T_SGLSTP handler for why we need to
 	 * do this.
 	 */
-	if (tt == T_SGLSTP && pc == kaif_sys_sysenter)
+	if (tt == T_SGLSTP &&
+	    (pc == kaif_sys_sysenter || pc == kaif_brand_sys_sysenter))
 		return (1);
 
 	return (0);

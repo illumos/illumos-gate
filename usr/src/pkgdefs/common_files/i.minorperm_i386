@@ -62,7 +62,7 @@
 #  NOTE: this list should also contain entries for nodes that previously
 #  were not in /etc/minor_perm (which means the default mode of 600,
 #  owner/group == root/sys), but now have an entry
-#					
+#
 
 make_chattr_list()
 {
@@ -113,15 +113,15 @@ EOF
 #  The fields are:
 #
 #  <device>:<minor>  <optional list of logical devices to be deleted>
-#					
+#
 
 make_delete_list()
 {
 cat > /tmp/delete.$$ << EOF
 rip:rawip
 consfb:consfb
-clone:el 
-clone:elx 
+clone:el
+clone:elx
 clone:sle
 clone:sie
 clone:sp
@@ -233,6 +233,8 @@ fbt:fbt
 profile:profile
 sdt:sdt
 systrace:systrace
+lx_ptm:lx_ptmajor
+lx_systrace:*
 EOF
 }
 

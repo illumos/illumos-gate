@@ -33,17 +33,18 @@
 #include <fnmatch.h>
 #include <strings.h>
 #include <unistd.h>
-#include <sys/stat.h>
 #include <assert.h>
 #include <libgen.h>
 #include <libintl.h>
 #include <alloca.h>
 #include <ctype.h>
+#include <sys/acl.h>
+#include <sys/stat.h>
+#include <sys/brand.h>
 #include <sys/mntio.h>
 #include <sys/mnttab.h>
-#include <sys/types.h>
 #include <sys/nvpair.h>
-#include <sys/acl.h>
+#include <sys/types.h>
 #include <ftw.h>
 
 #include <arpa/inet.h>
@@ -54,8 +55,8 @@
 
 #include <libdevinfo.h>
 #include <uuid/uuid.h>
-
 #include <dirent.h>
+#include <libbrand.h>
 
 #include <libzonecfg.h>
 #include "zonecfg_impl.h"
@@ -107,6 +108,7 @@
 #define	DTD_ATTR_GID		(const xmlChar *) "gid"
 #define	DTD_ATTR_MODE		(const xmlChar *) "mode"
 #define	DTD_ATTR_ACL		(const xmlChar *) "acl"
+#define	DTD_ATTR_BRAND		(const xmlChar *) "brand"
 
 #define	DTD_ENTITY_BOOLEAN	"boolean"
 #define	DTD_ENTITY_DEVPATH	"devpath"
@@ -513,6 +515,7 @@ zonecfg_get_handle_impl(const char *zonename, const char *filename,
 
 	if (zonename == NULL)
 		return (Z_NO_ZONE);
+
 	if ((handle->zone_dh_doc = xmlParseFile(filename)) == NULL) {
 		/* distinguish file not found vs. found but not parsed */
 		if (stat(filename, &statbuf) == 0)
@@ -602,6 +605,21 @@ zonecfg_get_template_handle(const char *template, const char *zonename,
 		return (err);
 	handle->zone_dh_newzone = B_TRUE;
 	return (setrootattr(handle, DTD_ATTR_NAME, zonename));
+}
+
+int
+zonecfg_get_xml_handle(const char *path, zone_dochandle_t handle)
+{
+	struct stat buf;
+	int err;
+
+	if (stat(path, &buf) == -1)
+		return (Z_MISC_FS);
+
+	if ((err = zonecfg_get_handle_impl("xml", path, handle)) != Z_OK)
+		return (err);
+	handle->zone_dh_newzone = B_TRUE;
+	return (Z_OK);
 }
 
 /*
@@ -843,6 +861,31 @@ zonecfg_set_zonepath(zone_dochandle_t handle, char *zonepath)
 }
 
 int
+zonecfg_get_brand(zone_dochandle_t handle, char *brand, size_t brandsize)
+{
+	int ret, sz;
+
+	ret = getrootattr(handle, DTD_ATTR_BRAND, brand, brandsize);
+
+	/* If the zone has no brand, it is native. */
+	if (ret == Z_OK && brand[0] == '\0') {
+		sz = strlcpy(brand, NATIVE_BRAND_NAME, brandsize);
+		if (sz >= brandsize)
+			ret = Z_TOO_BIG;
+		else
+			ret = Z_OK;
+	}
+
+	return (ret);
+}
+
+int
+zonecfg_set_brand(zone_dochandle_t handle, char *brand)
+{
+	return (setrootattr(handle, DTD_ATTR_BRAND, brand));
+}
+
+int
 zonecfg_get_autoboot(zone_dochandle_t handle, boolean_t *autoboot)
 {
 	char autobootstr[DTD_ENTITY_BOOL_LEN];
@@ -1007,7 +1050,7 @@ zonecfg_save_impl(zone_dochandle_t handle, char *filename)
 {
 	char tmpfile[MAXPATHLEN];
 	char bakdir[MAXPATHLEN], bakbase[MAXPATHLEN], bakfile[MAXPATHLEN];
-	int tmpfd, err;
+	int tmpfd, err, valid;
 	xmlValidCtxt cvp = { NULL };
 	boolean_t backup;
 
@@ -1026,10 +1069,12 @@ zonecfg_save_impl(zone_dochandle_t handle, char *filename)
 	cvp.warning = zonecfg_error_func;
 
 	/*
-	 * We do a final validation of the document-- but the library has
-	 * malfunctioned if it fails to validate, so it's an assert.
+	 * We do a final validation of the document.  Since the library has
+	 * malfunctioned if it fails to validate, we follow-up with an
+	 * assert() that the doc is valid.
 	 */
-	assert(xmlValidateDocument(&cvp, handle->zone_dh_doc) != 0);
+	valid = xmlValidateDocument(&cvp, handle->zone_dh_doc);
+	assert(valid != 0);
 
 	if (xmlSaveFormatFile(tmpfile, handle->zone_dh_doc, 1) <= 0)
 		goto err;
@@ -1152,6 +1197,33 @@ zonecfg_save(zone_dochandle_t handle)
 }
 
 int
+zonecfg_verify_save(zone_dochandle_t handle, char *filename)
+{
+	int valid;
+
+	xmlValidCtxt cvp = { NULL };
+
+	if (zonecfg_check_handle(handle) != Z_OK)
+		return (Z_BAD_HANDLE);
+
+	cvp.error = zonecfg_error_func;
+	cvp.warning = zonecfg_error_func;
+
+	/*
+	 * We do a final validation of the document.  Since the library has
+	 * malfunctioned if it fails to validate, we follow-up with an
+	 * assert() that the doc is valid.
+	 */
+	valid = xmlValidateDocument(&cvp, handle->zone_dh_doc);
+	assert(valid != 0);
+
+	if (xmlSaveFormatFile(filename, handle->zone_dh_doc, 1) <= 0)
+		return (Z_SAVING_FILE);
+
+	return (Z_OK);
+}
+
+int
 zonecfg_detach_save(zone_dochandle_t handle, uint_t flags)
 {
 	char zname[ZONENAME_MAX];
@@ -1159,6 +1231,7 @@ zonecfg_detach_save(zone_dochandle_t handle, uint_t flags)
 	char migpath[MAXPATHLEN];
 	xmlValidCtxt cvp = { NULL };
 	int err = Z_SAVING_FILE;
+	int valid;
 
 	if (zonecfg_check_handle(handle) != Z_OK)
 		return (Z_BAD_HANDLE);
@@ -1195,10 +1268,12 @@ zonecfg_detach_save(zone_dochandle_t handle, uint_t flags)
 	cvp.warning = zonecfg_error_func;
 
 	/*
-	 * We do a final validation of the document-- but the library has
-	 * malfunctioned if it fails to validate, so it's an assert.
+	 * We do a final validation of the document.  Since the library has
+	 * malfunctioned if it fails to validate, we follow-up with an
+	 * assert() that the doc is valid.
 	 */
-	assert(xmlValidateDocument(&cvp, handle->zone_dh_doc) != 0);
+	valid = xmlValidateDocument(&cvp, handle->zone_dh_doc);
+	assert(valid != 0);
 
 	if (xmlSaveFormatFile(migpath, handle->zone_dh_doc, 1) <= 0)
 		return (Z_SAVING_FILE);
@@ -2344,7 +2419,6 @@ zonecfg_devperms_apply(zone_dochandle_t hdl, const char *inpath, uid_t owner,
  * If the callback function returns non-zero zonecfg_find_mounts
  * aborts with an error.
  */
-
 int
 zonecfg_find_mounts(char *rootpath, int (*callback)(const char *, void *),
     void *priv) {
@@ -2970,6 +3044,9 @@ zonecfg_strerror(int errnum)
 	case Z_PRIV_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN,
 		    "Specified privilege is unknown"));
+	case Z_BRAND_ERROR:
+		return (dgettext(TEXT_DOMAIN,
+		    "Brand-specific error"));
 	default:
 		return (dgettext(TEXT_DOMAIN, "Unknown error"));
 	}
@@ -3331,11 +3408,27 @@ zonecfg_endattrent(zone_dochandle_t handle)
 
 /*
  * The privileges available on the system and described in privileges(5)
- * fall into four categories with respect to non-global zones; those that
- * are required in order for a non-global zone to boot, those which are in
- * the default set of privileges available to non-global zones, those
- * privileges which should not be allowed to be given to non-global zones
- * and all other privileges, which are optional and potentially useful for
+ * fall into four categories with respect to non-global zones:
+ *
+ *      Default set of privileges considered safe for all non-global
+ *      zones.  These privileges are "safe" in the sense that a
+ *      privileged process in the zone cannot affect processes in any
+ *      other zone on the system.
+ *
+ *      Set of privileges not currently permitted within a non-global
+ *      zone.  These privileges are considered by default, "unsafe,"
+ *      and include ones which affect global resources (such as the
+ *      system clock or physical memory) or are overly broad and cover
+ *      more than one mechanism in the system.  In other cases, there
+ *      has not been sufficient virtualization in the parts of the
+ *      system the privilege covers to allow its use within a
+ *      non-global zone.
+ *
+ *      Set of privileges required in order to get a zone booted and
+ *      init(1M) started.  These cannot be removed from the zone's
+ *      privilege set.
+ *
+ * All other privileges are optional and are potentially useful for
  * processes executing inside a non-global zone.
  *
  * When privileges are added to the system, a determination needs to be
@@ -3344,76 +3437,6 @@ zonecfg_endattrent(zone_dochandle_t handle)
  * virtualized enough so that they can be made available to non-global
  * zones.
  */
-
-/*
- * Set of privileges required in order to get a zone booted and init(1M)
- * started.  These cannot be removed from the zone's privilege set.
- */
-static const char *required_priv_list[] = {
-	PRIV_PROC_EXEC,
-	PRIV_PROC_FORK,
-	PRIV_SYS_MOUNT,
-	NULL
-};
-
-/*
- * Default set of privileges considered safe for all non-global zones.
- * These privileges are "safe" in the sense that a privileged process in
- * the zone cannot affect processes in other non-global zones on the
- * system or in the global zone.  Privileges which are considered by
- * default, "unsafe", include ones which affect a global resource, such as
- * the system clock or physical memory.
- */
-static const char *default_priv_list[] = {
-	PRIV_CONTRACT_EVENT,
-	PRIV_CONTRACT_OBSERVER,
-	PRIV_FILE_CHOWN,
-	PRIV_FILE_CHOWN_SELF,
-	PRIV_FILE_DAC_EXECUTE,
-	PRIV_FILE_DAC_READ,
-	PRIV_FILE_DAC_SEARCH,
-	PRIV_FILE_DAC_WRITE,
-	PRIV_FILE_OWNER,
-	PRIV_FILE_SETID,
-	PRIV_IPC_DAC_READ,
-	PRIV_IPC_DAC_WRITE,
-	PRIV_IPC_OWNER,
-	PRIV_NET_BINDMLP,
-	PRIV_NET_ICMPACCESS,
-	PRIV_NET_MAC_AWARE,
-	PRIV_NET_PRIVADDR,
-	PRIV_PROC_CHROOT,
-	PRIV_SYS_AUDIT,
-	PRIV_PROC_AUDIT,
-	PRIV_PROC_OWNER,
-	PRIV_PROC_SETID,
-	PRIV_PROC_TASKID,
-	PRIV_SYS_ACCT,
-	PRIV_SYS_ADMIN,
-	PRIV_SYS_MOUNT,
-	PRIV_SYS_NFS,
-	PRIV_SYS_RESOURCE,
-	NULL
-};
-
-/*
- * Set of privileges not currently permitted within a non-global zone.
- * Some of these privileges are overly broad and cover more than one
- * mechanism in the system.  In other cases, there has not been sufficient
- * virtualization in the parts of the system the privilege covers to allow
- * its use within a non-global zone.
- */
-static const char *prohibited_priv_list[] = {
-	PRIV_DTRACE_KERNEL,
-	PRIV_PROC_ZONE,
-	PRIV_SYS_CONFIG,
-	PRIV_SYS_DEVICES,
-	PRIV_SYS_LINKDIR,
-	PRIV_SYS_NET_CONFIG,
-	PRIV_SYS_RES_CONFIG,
-	PRIV_SYS_SUSER_COMPAT,
-	NULL
-};
 
 /*
  * Define some of the tokens that priv_str_to_set(3C) recognizes.  Since
@@ -3427,10 +3450,118 @@ static const char *prohibited_priv_list[] = {
 #define	TOKEN_PRIV_CHAR		','
 #define	TOKEN_PRIV_STR		","
 
-int
-zonecfg_default_privset(priv_set_t *privs)
+typedef struct priv_node {
+	struct priv_node	*pn_next;	/* Next privilege */
+	char			*pn_priv;	/* Privileges name */
+} priv_node_t;
+
+/* Privileges lists can differ across brands */
+typedef struct priv_lists {
+	/* Privileges considered safe for all non-global zones of a brand */
+	struct priv_node	*pl_default;
+
+	/* Privileges not permitted for all non-global zones of a brand */
+	struct priv_node	*pl_prohibited;
+
+	/* Privileges required for all non-global zones of a brand */
+	struct priv_node	*pl_required;
+} priv_lists_t;
+
+static int
+priv_lists_cb(void *data, const char *name, const char *set)
 {
-	const char **strp;
+	priv_lists_t *plp = (priv_lists_t *)data;
+	priv_node_t *pnp;
+
+	/* Allocate a new priv list node. */
+	if ((pnp = malloc(sizeof (*pnp))) == NULL)
+		return (-1);
+	if ((pnp->pn_priv = strdup(name)) == NULL) {
+		free(pnp);
+		return (-1);
+	}
+
+	/* Insert the new priv list node into the right list */
+	if (strcmp(set, "default") == 0) {
+		pnp->pn_next = plp->pl_default;
+		plp->pl_default = pnp;
+	} else if (strcmp(set, "prohibited") == 0) {
+		pnp->pn_next = plp->pl_prohibited;
+		plp->pl_prohibited = pnp;
+	} else if (strcmp(set, "required") == 0) {
+		pnp->pn_next = plp->pl_required;
+		plp->pl_required = pnp;
+	} else {
+		free(pnp->pn_priv);
+		free(pnp);
+		return (-1);
+	}
+	return (0);
+}
+
+static void
+priv_lists_destroy(priv_lists_t *plp)
+{
+	priv_node_t *pnp;
+
+	assert(plp != NULL);
+
+	while ((pnp = plp->pl_default) != NULL) {
+		plp->pl_default = pnp->pn_next;
+		free(pnp->pn_priv);
+		free(pnp);
+	}
+	while ((pnp = plp->pl_prohibited) != NULL) {
+		plp->pl_prohibited = pnp->pn_next;
+		free(pnp->pn_priv);
+		free(pnp);
+	}
+	while ((pnp = plp->pl_required) != NULL) {
+		plp->pl_required = pnp->pn_next;
+		free(pnp->pn_priv);
+		free(pnp);
+	}
+	free(plp);
+}
+
+static int
+priv_lists_create(zone_dochandle_t handle, priv_lists_t **plpp)
+{
+	priv_lists_t *plp;
+	brand_handle_t *bhp;
+	char brand[MAXNAMELEN];
+
+	if (handle != NULL) {
+		if (zonecfg_get_brand(handle, brand, sizeof (brand)) != 0)
+			return (Z_BRAND_ERROR);
+	} else {
+		(void) strlcpy(brand, NATIVE_BRAND_NAME, MAXNAMELEN);
+	}
+
+	if ((bhp = brand_open(brand)) == NULL)
+		return (Z_BRAND_ERROR);
+
+	if ((plp = calloc(1, sizeof (priv_lists_t))) == NULL) {
+		brand_close(bhp);
+		return (Z_NOMEM);
+	}
+
+	/* construct the privilege lists */
+	if (brand_config_iter_privilege(bhp, priv_lists_cb, plp) != 0) {
+		priv_lists_destroy(plp);
+		brand_close(bhp);
+		return (Z_BRAND_ERROR);
+	}
+
+	brand_close(bhp);
+	*plpp = plp;
+	return (Z_OK);
+}
+
+static int
+get_default_privset(priv_set_t *privs, priv_lists_t *plp)
+{
+	priv_node_t *pnp;
 	priv_set_t *basic;
 
 	basic = priv_str_to_set(BASIC_TOKEN, TOKEN_PRIV_STR, NULL);
@@ -3440,12 +3571,25 @@ zonecfg_default_privset(priv_set_t *privs)
 	priv_union(basic, privs);
 	priv_freeset(basic);
 
-	for (strp = default_priv_list; *strp != NULL; strp++) {
-		if (priv_addset(privs, *strp) != 0) {
+	for (pnp = plp->pl_default; pnp != NULL; pnp = pnp->pn_next) {
+		if (priv_addset(privs, pnp->pn_priv) != 0)
 			return (Z_INVAL);
-		}
 	}
+
 	return (Z_OK);
+}
+
+int
+zonecfg_default_privset(priv_set_t *privs)
+{
+	priv_lists_t *plp;
+	int ret;
+
+	if ((ret = priv_lists_create(NULL, &plp)) != Z_OK)
+		return (ret);
+	ret = get_default_privset(privs, plp);
+	priv_lists_destroy(plp);
+	return (ret);
 }
 
 void
@@ -3465,14 +3609,12 @@ append_priv_token(char *priv, char *str, size_t strlen)
  */
 static int
 verify_privset(char *privbuf, priv_set_t *privs, char **privname,
-    boolean_t add_default)
+    boolean_t add_default, priv_lists_t *plp)
 {
-	char *cp;
-	char *lasts;
+	priv_node_t *pnp;
+	char *tmp, *cp, *lasts;
 	size_t len;
 	priv_set_t *mergeset;
-	const char **strp;
-	char *tmp;
 	const char *token;
 
 	/*
@@ -3505,14 +3647,15 @@ verify_privset(char *privbuf, priv_set_t *privs, char **privname,
 		 * set along with those of the "limitpriv" property.
 		 */
 		len = strlen(privbuf) + sizeof (BASIC_TOKEN) + 2;
-		for (strp = default_priv_list; *strp != NULL; strp++)
-			len += strlen(*strp) + 1;
+
+		for (pnp = plp->pl_default; pnp != NULL; pnp = pnp->pn_next)
+			len += strlen(pnp->pn_priv) + 1;
 		tmp = alloca(len);
 		*tmp = '\0';
 
 		append_priv_token(BASIC_TOKEN, tmp, len);
-		for (strp = default_priv_list; *strp != NULL; strp++)
-			append_priv_token((char *)*strp, tmp, len);
+		for (pnp = plp->pl_default; pnp != NULL; pnp = pnp->pn_next)
+			append_priv_token(pnp->pn_priv, tmp, len);
 		(void) strlcat(tmp, TOKEN_PRIV_STR, len);
 		(void) strlcat(tmp, privbuf, len);
 	} else {
@@ -3545,10 +3688,10 @@ verify_privset(char *privbuf, priv_set_t *privs, char **privname,
 	 * Next, verify that none of the prohibited zone privileges are
 	 * present in the merged privilege set.
 	 */
-	for (strp = prohibited_priv_list; *strp != NULL; strp++) {
-		if (priv_ismember(mergeset, *strp)) {
+	for (pnp = plp->pl_prohibited; pnp != NULL; pnp = pnp->pn_next) {
+		if (priv_ismember(mergeset, pnp->pn_priv)) {
 			priv_freeset(mergeset);
-			if ((*privname = strdup(*strp)) == NULL)
+			if ((*privname = strdup(pnp->pn_priv)) == NULL)
 				return (Z_NOMEM);
 			else
 				return (Z_PRIV_PROHIBITED);
@@ -3559,10 +3702,10 @@ verify_privset(char *privbuf, priv_set_t *privs, char **privname,
 	 * Finally, verify that all of the required zone privileges are
 	 * present in the merged privilege set.
 	 */
-	for (strp = required_priv_list; *strp != NULL; strp++) {
-		if (!priv_ismember(mergeset, *strp)) {
+	for (pnp = plp->pl_required; pnp != NULL; pnp = pnp->pn_next) {
+		if (!priv_ismember(mergeset, pnp->pn_priv)) {
 			priv_freeset(mergeset);
-			if ((*privname = strdup(*strp)) == NULL)
+			if ((*privname = strdup(pnp->pn_priv)) == NULL)
 				return (Z_NOMEM);
 			else
 				return (Z_PRIV_REQUIRED);
@@ -3588,23 +3731,27 @@ int
 zonecfg_get_privset(zone_dochandle_t handle, priv_set_t *privs,
     char **privname)
 {
-	char *cp;
-	int err;
-	int limitlen;
-	char *limitpriv = NULL;
+	priv_lists_t *plp;
+	char *cp, *limitpriv = NULL;
+	int err, limitlen;
 
 	/*
 	 * Attempt to lookup the "limitpriv" property.  If it does not
 	 * exist or matches the string DEFAULT_TOKEN exactly, then the
 	 * default, safe privilege set is returned.
 	 */
-	err = zonecfg_get_limitpriv(handle, &limitpriv);
-	if (err != Z_OK)
+	if ((err = zonecfg_get_limitpriv(handle, &limitpriv)) != Z_OK)
 		return (err);
+
+	if ((err = priv_lists_create(handle, &plp)) != Z_OK)
+		return (err);
+
 	limitlen = strlen(limitpriv);
 	if (limitlen == 0 || strcmp(limitpriv, DEFAULT_TOKEN) == 0) {
 		free(limitpriv);
-		return (zonecfg_default_privset(privs));
+		err = get_default_privset(privs, plp);
+		priv_lists_destroy(plp);
+		return (err);
 	}
 
 	/*
@@ -3614,11 +3761,12 @@ zonecfg_get_privset(zone_dochandle_t handle, priv_set_t *privs,
 	cp = strchr(limitpriv, TOKEN_PRIV_CHAR);
 	if (cp != NULL &&
 	    strncmp(limitpriv, DEFAULT_TOKEN, cp - limitpriv) == 0)
-		err = verify_privset(cp + 1, privs, privname, B_TRUE);
+		err = verify_privset(cp + 1, privs, privname, B_TRUE, plp);
 	else
-		err = verify_privset(limitpriv, privs, privname, B_FALSE);
+		err = verify_privset(limitpriv, privs, privname, B_FALSE, plp);
 
 	free(limitpriv);
+	priv_lists_destroy(plp);
 	return (err);
 }
 
@@ -3697,6 +3845,46 @@ zone_get_rootpath(char *zone_name, char *rootpath, size_t rp_sz)
 	if (strlcat(rootpath, "/root", rp_sz) >= rp_sz)
 		return (Z_TOO_BIG);
 	return (Z_OK);
+}
+
+int
+zone_get_brand(char *zone_name, char *brandname, size_t rp_sz)
+{
+	int err;
+	zone_dochandle_t handle;
+	char myzone[MAXNAMELEN];
+	int myzoneid = getzoneid();
+
+	/*
+	 * If we are not in the global zone, then we don't have the zone
+	 * .xml files with the brand name available.  Thus, we are going to
+	 * have to ask the kernel for the information.
+	 */
+	if (myzoneid != GLOBAL_ZONEID) {
+		if (zone_getattr(myzoneid, ZONE_ATTR_NAME, myzone,
+		    sizeof (myzone)) < 0)
+			return (Z_NO_ZONE);
+		if (strncmp(zone_name, myzone, MAXNAMELEN) != NULL)
+			return (Z_NO_ZONE);
+		err = zone_getattr(myzoneid, ZONE_ATTR_BRAND, brandname, rp_sz);
+		if (err < 0)
+			return ((errno == EFAULT) ? Z_TOO_BIG : Z_INVAL);
+		return (Z_OK);
+	}
+
+	if (strcmp(zone_name, "global") == NULL) {
+		(void) strlcpy(brandname, NATIVE_BRAND_NAME, rp_sz);
+		return (0);
+	}
+	if ((handle = zonecfg_init_handle()) == NULL)
+		return (Z_NOMEM);
+
+	err = zonecfg_get_handle((char *)zone_name, handle);
+	if (err == Z_OK)
+		err = zonecfg_get_brand(handle, brandname, rp_sz);
+
+	zonecfg_fini_handle(handle);
+	return (err);
 }
 
 /*

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -813,8 +812,10 @@ fake_up_symtab(struct ps_prochandle *P, const elf_file_header_t *ehdr,
 	if (symtab->sh_addr == 0 ||
 	    (mp = Paddr2mptr(P, symtab->sh_addr)) == NULL ||
 	    (fp = mp->map_file) == NULL ||
-	    fp->file_symtab.sym_data != NULL)
+	    fp->file_symtab.sym_data != NULL) {
+		dprintf("fake_up_symtab: invalid section\n");
 		return;
+	}
 
 	if (P->status.pr_dmodel == PR_MODEL_ILP32) {
 		struct {
@@ -851,6 +852,7 @@ fake_up_symtab(struct ps_prochandle *P, const elf_file_header_t *ehdr,
 
 		if (pread64(P->asfd, &b->data[off], b->shdr[1].sh_size,
 		    symtab->sh_offset) != b->shdr[1].sh_size) {
+			dprintf("fake_up_symtab: pread of symtab[1] failed\n");
 			free(b);
 			return;
 		}
@@ -866,6 +868,7 @@ fake_up_symtab(struct ps_prochandle *P, const elf_file_header_t *ehdr,
 
 		if (pread64(P->asfd, &b->data[off], b->shdr[2].sh_size,
 		    strtab->sh_offset) != b->shdr[2].sh_size) {
+			dprintf("fake_up_symtab: pread of symtab[2] failed\n");
 			free(b);
 			return;
 		}
@@ -949,8 +952,11 @@ fake_up_symtab(struct ps_prochandle *P, const elf_file_header_t *ehdr,
 	if ((scn = elf_getscn(fp->file_symtab.sym_elf, 1)) == NULL ||
 	    (fp->file_symtab.sym_data = elf_getdata(scn, NULL)) == NULL ||
 	    (scn = elf_getscn(fp->file_symtab.sym_elf, 2)) == NULL ||
-	    (data = elf_getdata(scn, NULL)) == NULL)
+	    (data = elf_getdata(scn, NULL)) == NULL) {
+		dprintf("fake_up_symtab: failed to get section data at %p\n",
+		    (void *)scn);
 		goto err;
+	}
 
 	fp->file_symtab.sym_strs = data->d_buf;
 	fp->file_symtab.sym_strsz = data->d_size;
@@ -1447,12 +1453,16 @@ core_iter_mapping(const rd_loadobj_t *rlp, struct ps_prochandle *P)
 
 	Pbuild_file_symtab(P, fp);
 
-	if (fp->file_elf == NULL)
+	if (fp->file_elf == NULL) {
+		dprintf("core_iter_mapping: no symtab - going to next\n");
 		return (1); /* No symbol table; advance to next mapping */
+	}
 
 	/*
-	 * Locate the start of a data segment associated with this file,
-	 * name it after the file, and establish the mp->map_file link:
+	 * Locate the start of a data segment associated with this file.
+	 * Starting with that data segment, name all mappings that
+	 * fall within this file's address range after the file and
+	 * establish their mp->map_file links.
 	 */
 	if ((mp = core_find_data(P, fp->file_elf, fp->file_lo)) != NULL) {
 		dprintf("found data for %s at %p (pr_offset 0x%llx)\n",
@@ -1463,14 +1473,25 @@ core_iter_mapping(const rd_loadobj_t *rlp, struct ps_prochandle *P)
 			if (mp->map_pmap.pr_vaddr > fp->file_lo->rl_bend)
 				break;
 			if (mp->map_file == NULL) {
+				dprintf("%s: associating segment at %p\n",
+				    fp->file_pname,
+				    (void *)mp->map_pmap.pr_vaddr);
 				mp->map_file = fp;
 				fp->file_ref++;
+			} else {
+				dprintf("%s: segment at %p already associated "
+				    "with %s\n", fp->file_pname,
+				    (void *)mp->map_pmap.pr_vaddr,
+				    mp->map_file->file_pname);
 			}
 
 			if (!(mp->map_pmap.pr_mflags & MA_BREAK))
 				(void) strcpy(mp->map_pmap.pr_mapname,
 				    fp->file_pname);
 		}
+	} else {
+		dprintf("core_iter_mapping: no data found for %s\n",
+		    fp->file_pname);
 	}
 
 	return (1); /* Advance to next mapping */
@@ -1514,14 +1535,17 @@ core_load_shdrs(struct ps_prochandle *P, elf_file_t *efp)
 	 * Read the section header table from the core file and then iterate
 	 * over the section headers, converting each to a GElf_Shdr.
 	 */
-	shdrs = malloc(efp->e_hdr.e_shnum * sizeof (GElf_Shdr));
-	nbytes = efp->e_hdr.e_shnum * efp->e_hdr.e_shentsize;
-	buf = malloc(nbytes);
-
-	if (shdrs == NULL || buf == NULL) {
+	if ((shdrs = malloc(efp->e_hdr.e_shnum * sizeof (GElf_Shdr))) == NULL) {
 		dprintf("failed to malloc %u section headers: %s\n",
 		    (uint_t)efp->e_hdr.e_shnum, strerror(errno));
-		free(buf);
+		return;
+	}
+
+	nbytes = efp->e_hdr.e_shnum * efp->e_hdr.e_shentsize;
+	if ((buf = malloc(nbytes)) == NULL) {
+		dprintf("failed to malloc %d bytes: %s\n", (int)nbytes,
+		    strerror(errno));
+		free(shdrs);
 		goto out;
 	}
 

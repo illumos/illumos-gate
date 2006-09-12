@@ -544,11 +544,21 @@ struct sonodeops {
 	(((len) + _CMSG_HDR_ALIGNMENT - 1) & ~(_CMSG_HDR_ALIGNMENT - 1))
 
 /*
- * Used in parsing msg_control
+ * Macros that operate on struct cmsghdr.
+ * Used in parsing msg_control.
+ * The CMSG_VALID macro does not assume that the last option buffer is padded.
  */
 #define	CMSG_NEXT(cmsg)						\
 	(struct cmsghdr *)((uintptr_t)(cmsg) +			\
 	    ROUNDUP_cmsglen((cmsg)->cmsg_len))
+#define	CMSG_CONTENT(cmsg)	(&((cmsg)[1]))
+#define	CMSG_CONTENTLEN(cmsg)	((cmsg)->cmsg_len - sizeof (struct cmsghdr))
+#define	CMSG_VALID(cmsg, start, end)					\
+	(ISALIGNED_cmsghdr(cmsg) &&					\
+	((uintptr_t)(cmsg) >= (uintptr_t)(start)) &&			\
+	((uintptr_t)(cmsg) < (uintptr_t)(end)) &&			\
+	((ssize_t)(cmsg)->cmsg_len >= sizeof (struct cmsghdr)) &&	\
+	((uintptr_t)(cmsg) + (cmsg)->cmsg_len <= (uintptr_t)(end)))
 
 /*
  * Maximum size of any argument that is copied in (addresses, options,

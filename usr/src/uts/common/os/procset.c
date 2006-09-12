@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -290,8 +289,10 @@ procinset(proc_t *pp, procset_t *psp)
 		break;
 
 	case P_SID:
+		mutex_enter(&pp->p_splock);
 		if (pp->p_sessp->s_sid == psp->p_lid)
 			loperand++;
+		mutex_exit(&pp->p_splock);
 		break;
 
 	case P_CID:
@@ -380,8 +381,10 @@ procinset(proc_t *pp, procset_t *psp)
 		break;
 
 	case P_SID:
+		mutex_enter(&pp->p_splock);
 		if (pp->p_sessp->s_sid == psp->p_rid)
 			roperand++;
+		mutex_exit(&pp->p_splock);
 		break;
 
 	case P_TASKID:
@@ -533,8 +536,10 @@ lwpinset(proc_t *pp, procset_t *psp, kthread_t *tp, int *done)
 		break;
 
 	case P_SID:
+		mutex_enter(&pp->p_splock);
 		if (pp->p_sessp->s_sid == psp->p_lid)
 			loperand++;
+		mutex_exit(&pp->p_splock);
 		break;
 
 	case P_TASKID:
@@ -617,8 +622,10 @@ lwpinset(proc_t *pp, procset_t *psp, kthread_t *tp, int *done)
 		break;
 
 	case P_SID:
+		mutex_enter(&pp->p_splock);
 		if (pp->p_sessp->s_sid == psp->p_rid)
 			roperand++;
+		mutex_exit(&pp->p_splock);
 		break;
 
 	case P_TASKID:
@@ -756,6 +763,7 @@ getmyid(idtype_t idtype)
 	proc_t	*pp;
 	uid_t uid;
 	gid_t gid;
+	pid_t sid;
 
 	pp = ttoproc(curthread);
 
@@ -773,7 +781,10 @@ getmyid(idtype_t idtype)
 		return (pp->p_pgrp);
 
 	case P_SID:
-		return (pp->p_sessp->s_sid);
+		mutex_enter(&pp->p_splock);
+		sid = pp->p_sessp->s_sid;
+		mutex_exit(&pp->p_splock);
+		return (sid);
 
 	case P_TASKID:
 		return (pp->p_task->tk_tkid);

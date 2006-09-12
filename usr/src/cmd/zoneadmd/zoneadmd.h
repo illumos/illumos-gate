@@ -53,6 +53,9 @@ extern "C" {
 #define	DEVFSADM	"devfsadm"
 #define	DEVFSADM_PATH	"/usr/sbin/devfsadm"
 
+#define	EXEC_PREFIX	"exec "
+#define	EXEC_LEN	(strlen(EXEC_PREFIX))
+
 typedef struct zlog {
 	FILE *logfile;	/* file to log to */
 
@@ -75,6 +78,7 @@ extern boolean_t bringup_failure_recovery;
 extern char *zone_name;
 extern char boot_args[BOOTARGS_MAX];
 extern char bad_boot_arg[BOOTARGS_MAX];
+extern boolean_t zone_isnative;
 
 
 extern void zerror(zlog_t *, boolean_t, const char *, ...);
@@ -104,7 +108,6 @@ extern zoneid_t vplat_create(zlog_t *, boolean_t);
 extern int vplat_bringup(zlog_t *, boolean_t, zoneid_t);
 extern int vplat_teardown(zlog_t *, boolean_t);
 
-
 /*
  * Console subsystem routines.
  */
@@ -118,6 +121,11 @@ extern void serve_console(zlog_t *);
  * Contract handling.
  */
 extern int init_template(void);
+
+/*
+ * Routine to manage child processes.
+ */
+extern int do_subproc(zlog_t *, char *);
 
 #ifdef __cplusplus
 }

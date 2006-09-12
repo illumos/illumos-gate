@@ -449,6 +449,18 @@ ptmclose(queue_t *rqp, int flag, cred_t *credp)
 	return (0);
 }
 
+static boolean_t
+ptmptsopencb(ptmptsopencb_arg_t arg)
+{
+	struct pt_ttys	*ptmp = (struct pt_ttys *)arg;
+	boolean_t rval;
+
+	PT_ENTER_READ(ptmp);
+	rval = (ptmp->pt_nullmsg != NULL);
+	PT_EXIT_READ(ptmp);
+	return (rval);
+}
+
 /*
  * The wput procedure will only handle ioctl and flush messages.
  */
@@ -572,6 +584,41 @@ ptmwput(queue_t *qp, mblk_t *mp)
 			miocack(qp, mp, 0, 0);
 			break;
 		}
+		case PTMPTSOPENCB:
+		{
+			mblk_t		*dp;	/* ioctl reply data */
+			ptmptsopencb_t	*ppocb;
+
+			/* only allow the kernel to invoke this ioctl */
+			if (iocp->ioc_cr != kcred) {
+				miocnak(qp, mp, 0, EINVAL);
+				break;
+			}
+
+			/* we don't support transparent ioctls */
+			ASSERT(iocp->ioc_count != TRANSPARENT);
+			if (iocp->ioc_count == TRANSPARENT) {
+				miocnak(qp, mp, 0, EINVAL);
+				break;
+			}
+
+			/* allocate a response message */
+			dp = allocb(sizeof (ptmptsopencb_t), BPRI_MED);
+			if (dp == NULL) {
+				miocnak(qp, mp, 0, EAGAIN);
+				break;
+			}
+
+			/* initialize the ioctl results */
+			ppocb = (ptmptsopencb_t *)dp->b_rptr;
+			ppocb->ppocb_func = ptmptsopencb;
+			ppocb->ppocb_arg = (ptmptsopencb_arg_t)ptmp;
+
+			/* send the reply data */
+			mioc2ack(mp, dp, sizeof (ptmptsopencb_t), 0);
+			qreply(qp, mp);
+			break;
+		}
 		}
 		break;
 
@@ -643,6 +690,13 @@ ptmwsrv(queue_t *qp)
 	ASSERT(qp->q_ptr);
 
 	ptmp = (struct pt_ttys *)qp->q_ptr;
+
+	if ((mp = getq(qp)) == NULL) {
+		/* If there are no messages there's nothing to do. */
+		DBG(("leaving ptmwsrv (no messages)\n"));
+		return;
+	}
+
 	PT_ENTER_READ(ptmp);
 	if ((ptmp->pt_state  & PTLOCK) || (ptmp->pts_rdq == NULL)) {
 		DBG(("in master write srv proc but no slave\n"));
@@ -652,12 +706,12 @@ ptmwsrv(queue_t *qp)
 		 * the user process waiting for ACK/NAK from
 		 * the ioctl invocation
 		 */
-		while ((mp = getq(qp)) != NULL) {
+		do {
 			if (mp->b_datap->db_type == M_IOCTL)
 				miocnak(qp, mp, 0, EINVAL);
 			else
 				freemsg(mp);
-		}
+		} while ((mp = getq(qp)) != NULL);
 		flushq(qp, FLUSHALL);
 
 		mp = mexchange(NULL, NULL, 2, M_ERROR, -1);
@@ -672,7 +726,7 @@ ptmwsrv(queue_t *qp)
 	/*
 	 * while there are messages on this write queue...
 	 */
-	while ((mp = getq(qp)) != NULL) {
+	do {
 		/*
 		 * if don't have control message and cannot put
 		 * msg. on slave's read queue, put it back on
@@ -689,7 +743,7 @@ ptmwsrv(queue_t *qp)
 		 */
 		DBG(("send message to slave\n"));
 		putnext(ptmp->pts_rdq, mp);
-	}
+	} while ((mp = getq(qp)) != NULL);
 	DBG(("leaving ptmwsrv\n"));
 	PT_EXIT_READ(ptmp);
 }

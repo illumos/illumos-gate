@@ -79,12 +79,17 @@
 #define	backup1		"statmon/sm.bak/"
 #define	state1		"statmon/state"
 
+extern void __use_portmapper(int);
+extern bool_t __pmap_unset(const rpcprog_t program, const rpcvers_t version);
+
 /*
  * User and group IDs to run as.  These are hardwired, rather than looked
  * up at runtime, because they are very unlikely to change and because they
  * provide some protection against bogus changes to the passwd and group
  * files.
  */
+uid_t	daemon_uid = DAEMON_UID;
+gid_t	daemon_gid = DAEMON_GID;
 
 char STATE[MAXPATHLEN], CURRENT[MAXPATHLEN], BACKUP[MAXPATHLEN];
 static char statd_home[MAXPATHLEN];
@@ -437,6 +442,7 @@ main(int argc, char *argv[])
 	int mode;
 	int sz;
 	int connmaxrec = RPC_MAXDATASIZE;
+	int use_pmap = 0;
 
 	addrix = 0;
 	pathix = 0;
@@ -445,7 +451,7 @@ main(int argc, char *argv[])
 	if (init_hostname() < 0)
 		exit(1);
 
-	while ((c = getopt(argc, argv, "Dd:a:p:r")) != EOF)
+	while ((c = getopt(argc, argv, "a:Dd:G:Pp:rU:")) != EOF)
 		switch (c) {
 		case 'd':
 			(void) sscanf(optarg, "%d", &debug);
@@ -473,6 +479,16 @@ main(int argc, char *argv[])
 			} else
 				(void) fprintf(stderr,
 				    "statd: -a exceeding maximum hostnames\n");
+			break;
+		case 'P':
+			__use_portmapper(1);
+			use_pmap = 1;
+			break;
+		case 'U':
+			(void) sscanf(optarg, "%d", &daemon_uid);
+			break;
+		case 'G':
+			(void) sscanf(optarg, "%d", &daemon_gid);
 			break;
 		case 'p':
 			if (strlen(optarg) < MAXPATHLEN) {
@@ -557,7 +573,7 @@ main(int argc, char *argv[])
 		openlog("statd", LOG_PID, LOG_DAEMON);
 	}
 
-	(void) _create_daemon_lock(STATD, DAEMON_UID, DAEMON_GID);
+	(void) _create_daemon_lock(STATD, daemon_uid, daemon_gid);
 	/*
 	 * establish our lock on the lock file and write our pid to it.
 	 * exit if some other process holds the lock, or if there's any
@@ -596,6 +612,11 @@ main(int argc, char *argv[])
 	 */
 	if (!rpc_control(RPC_SVC_CONNMAXREC_SET, &connmaxrec)) {
 		syslog(LOG_INFO, "unable to set maximum RPC record size");
+	}
+
+	if (use_pmap) {
+		(void) __pmap_unset(SM_PROG, SM_VERS);
+		(void) __pmap_unset(NSM_ADDR_PROGRAM, NSM_ADDR_V1);
 	}
 
 	if (!svc_create(sm_prog_1, SM_PROG, SM_VERS, "netpath")) {
@@ -692,7 +713,7 @@ set_statmon_owner(void)
 
 	can_do_mlp = priv_ineffect(PRIV_NET_BINDMLP);
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET,
-	    DAEMON_UID, DAEMON_GID, can_do_mlp ? PRIV_NET_BINDMLP : NULL,
+	    daemon_uid, daemon_gid, can_do_mlp ? PRIV_NET_BINDMLP : NULL,
 	    NULL) == -1) {
 		syslog(LOG_ERR, "can't run unprivileged: %m");
 		exit(1);
@@ -809,13 +830,13 @@ nftw_owner(const char *path, const struct stat *statp, int info,
 	}
 
 	/* If already owned by daemon, don't bother changing. */
-	if (statp->st_uid == DAEMON_UID &&
-	    statp->st_gid == DAEMON_GID)
+	if (statp->st_uid == daemon_uid &&
+	    statp->st_gid == daemon_gid)
 		return (0);
 
 	if (debug)
 		printf("lchown %s daemon:daemon\n", path);
-	if (lchown(path, DAEMON_UID, DAEMON_GID) < 0) {
+	if (lchown(path, daemon_uid, daemon_gid) < 0) {
 		int error = errno;
 
 		syslog(LOG_WARNING, "can't chown %s to daemon: %m",

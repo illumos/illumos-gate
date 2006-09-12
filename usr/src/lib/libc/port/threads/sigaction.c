@@ -306,9 +306,10 @@ sigacthandler(int sig, siginfo_t *sip, void *uvp)
 	thr_panic("sigacthandler(): __setcontext() returned");
 }
 
-#pragma weak sigaction = _sigaction
+#pragma weak sigaction = _libc_sigaction
+#pragma weak _sigaction = _libc_sigaction
 int
-_sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
+_libc_sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -404,6 +405,19 @@ _sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 	return (rv);
 }
 
+void
+setsigacthandler(void (*nsigacthandler)(int, siginfo_t *, void *),
+    void (**osigacthandler)(int, siginfo_t *, void *))
+{
+	ulwp_t *self = curthread;
+	uberdata_t *udp = self->ul_uberdata;
+
+	if (osigacthandler != NULL)
+		*osigacthandler = udp->sigacthandler;
+
+	udp->sigacthandler = nsigacthandler;
+}
+
 /*
  * Calling set_parking_flag(curthread, 1) informs the kernel that we are
  * calling __lwp_park or ___lwp_cond_wait().  If we take a signal in
@@ -451,6 +465,25 @@ block_all_signals(ulwp_t *self)
 	exit_critical(self);
 }
 
+/*
+ * _private_setcontext has code that forcibly restores the curthread
+ * pointer in a context passed to the setcontext(2) syscall.
+ *
+ * Certain processes may need to disable this feature, so these routines
+ * provide the mechanism to do so.
+ *
+ * (As an example, branded 32-bit x86 processes may use %gs for their own
+ * purposes, so they need to be able to specify a %gs value to be restored
+ * on return from a signal handler via the passed ucontext_t.)
+ */
+static int setcontext_enforcement = 1;
+
+void
+set_setcontext_enforcement(int on)
+{
+	setcontext_enforcement = on;
+}
+
 #pragma weak setcontext = _private_setcontext
 #pragma weak _setcontext = _private_setcontext
 int
@@ -490,16 +523,22 @@ _private_setcontext(const ucontext_t *ucp)
 	/*
 	 * We don't know where this context structure has been.
 	 * Preserve the curthread pointer, at least.
+	 *
+	 * Allow this feature to be disabled if a particular process
+	 * requests it.
 	 */
+	if (setcontext_enforcement) {
 #if defined(__sparc)
-	uc.uc_mcontext.gregs[REG_G7] = (greg_t)self;
+		uc.uc_mcontext.gregs[REG_G7] = (greg_t)self;
 #elif defined(__amd64)
-	uc.uc_mcontext.gregs[REG_FS] = (greg_t)self->ul_gs;
+		uc.uc_mcontext.gregs[REG_FS] = (greg_t)self->ul_gs;
 #elif defined(__i386)
-	uc.uc_mcontext.gregs[GS] = (greg_t)self->ul_gs;
+		uc.uc_mcontext.gregs[GS] = (greg_t)self->ul_gs;
 #else
 #error "none of __sparc, __amd64, __i386 defined"
 #endif
+	}
+
 	/*
 	 * Make sure that if we return to a call to __lwp_park()
 	 * or ___lwp_cond_wait() that it returns right away

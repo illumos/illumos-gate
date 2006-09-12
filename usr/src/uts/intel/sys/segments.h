@@ -453,7 +453,9 @@ void set_syssegd(system_desc_t *, void *, size_t, uint_t, uint_t);
 #define	GDT_GS		GDT_NULL /* kernel %gs segment selector */
 #define	GDT_LWPFS	55	/* lwp private %fs segment selector */
 #define	GDT_LWPGS	56	/* lwp private %gs segment selector */
-#define	NGDT		58	/* number of entries in GDT */
+#define	GDT_BRANDMIN	57	/* first entry in GDT for brand usage */
+#define	GDT_BRANDMAX	61	/* last entry in GDT for brand usage */
+#define	NGDT		62	/* number of entries in GDT */
 
 /*
  * This selector is only used in the temporary GDT used to bring additional
@@ -479,6 +481,8 @@ void set_syssegd(system_desc_t *, void *, size_t, uint_t, uint_t);
 #define	GDT_GS		54	/* kernel %gs segment selector */
 #define	GDT_LWPFS	55	/* lwp private %fs segment selector */
 #define	GDT_LWPGS	56	/* lwp private %gs segment selector */
+#define	GDT_BRANDMIN	57	/* first entry in GDT for brand usage */
+#define	GDT_BRANDMAX	61	/* last entry in GDT for brand usage */
 #define	NGDT		90	/* number of entries in GDT */
 
 #endif	/* __i386 */
@@ -501,6 +505,8 @@ void set_syssegd(system_desc_t *, void *, size_t, uint_t, uint_t);
 #define	KGS_SEL		SEL_GDT(GDT_GS, SEL_KPL)
 #define	LWPFS_SEL	SEL_GDT(GDT_LWPFS, SEL_UPL)
 #define	LWPGS_SEL	SEL_GDT(GDT_LWPGS, SEL_UPL)
+#define	BRANDMIN_SEL	SEL_GDT(GDT_BRANDMIN, SEL_UPL)
+#define	BRANDMAX_SEL	SEL_GDT(GDT_BRANDMAX, SEL_UPL)
 #if defined(__amd64)
 #define	B64CODE_SEL	SEL_GDT(GDT_B64CODE, SEL_KPL)
 #else
@@ -551,6 +557,8 @@ extern void _start(), cmnint();
 extern void achktrap(), mcetrap();
 extern void xmtrap();
 extern void fasttrap();
+extern void sys_int80();
+extern void brand_sys_int80();
 extern void dtrace_ret();
 
 #if !defined(__amd64)

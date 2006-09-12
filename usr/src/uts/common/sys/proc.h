@@ -115,6 +115,7 @@ typedef struct lwpdir {
 struct pool;
 struct task;
 struct zone;
+struct brand;
 struct corectl_path;
 struct corectl_content;
 
@@ -336,6 +337,11 @@ typedef struct	proc {
 	uintptr_t	p_portcnt;	/* event ports counter */
 	struct zone	*p_zone;	/* zone in which process lives */
 	struct vnode	*p_execdir;	/* directory that p_exec came from */
+	struct brand	*p_brand;	/* process's brand  */
+	void		*p_brand_data;	/* per-process brand state */
+
+	/* additional lock to protect p_sessp (but not its contents) */
+	kmutex_t p_splock;
 } proc_t;
 
 #define	PROC_T				/* headers relying on proc_t are OK */
@@ -408,6 +414,10 @@ struct plock {
 extern proc_t p0;		/* process 0 */
 extern struct plock p0lock;	/* p0's plock */
 extern struct pid pid0;		/* p0's pid */
+
+/* pid_allocate() flags */
+#define	PID_ALLOC_PROC	0x0001	/* assign a /proc slot as well */
+
 #endif /* _KERNEL */
 
 /* stat codes */
@@ -588,7 +598,8 @@ extern int sigcheck(proc_t *, kthread_t *);
 extern void sigdefault(proc_t *);
 
 extern void pid_setmin(void);
-extern pid_t pid_assign(proc_t *);
+extern pid_t pid_allocate(proc_t *, int);
+extern struct pid *pid_find(pid_t);
 extern int pid_rele(struct pid *);
 extern void pid_exit(proc_t *);
 extern void proc_entry_free(struct pid *);
@@ -724,6 +735,7 @@ extern	void	lwp_rtt(void);
 extern	void	lwp_rtt_initial(void);
 extern	int	lwp_setprivate(klwp_t *, int, uintptr_t);
 extern	void	lwp_stat_update(lwp_stat_id_t, long);
+extern	void	lwp_attach_brand_hdlrs(klwp_t *);
 
 /*
  * Signal queue function prototypes. Must be here due to header ordering

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -293,14 +292,15 @@ WR(queue_t *q)
 int
 drv_getparm(unsigned int parm, void *valuep)
 {
-	time_t now;
+	proc_t	*p = curproc;
+	time_t	now;
 
 	switch (parm) {
 	case UPROCP:
-		*(proc_t **)valuep = ttoproc(curthread);
+		*(proc_t **)valuep = p;
 		break;
 	case PPGRP:
-		*(pid_t *)valuep = ttoproc(curthread)->p_pgrp;
+		*(pid_t *)valuep = p->p_pgrp;
 		break;
 	case LBOLT:
 		*(clock_t *)valuep = lbolt;
@@ -317,10 +317,12 @@ drv_getparm(unsigned int parm, void *valuep)
 		}
 		break;
 	case PPID:
-		*(pid_t *)valuep = ttoproc(curthread)->p_pid;
+		*(pid_t *)valuep = p->p_pid;
 		break;
 	case PSID:
-		*(pid_t *)valuep = ttoproc(curthread)->p_sessp->s_sid;
+		mutex_enter(&p->p_splock);
+		*(pid_t *)valuep = p->p_sessp->s_sid;
+		mutex_exit(&p->p_splock);
 		break;
 	case UCRED:
 		*(cred_t **)valuep = CRED();

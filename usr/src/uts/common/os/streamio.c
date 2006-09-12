@@ -77,6 +77,19 @@
 #include <sys/autoconf.h>
 #include <sys/policy.h>
 
+
+/*
+ * This define helps improve the readability of streams code while
+ * still maintaining a very old streams performance enhancement.  The
+ * performance enhancement basically involved having all callers
+ * of straccess() perform the first check that straccess() will do
+ * locally before actually calling straccess().  (There by reducing
+ * the number of unnecessary calls to straccess().)
+ */
+#define	i_straccess(x, y)	((stp->sd_sidp == NULL) ? 0 : \
+				    (stp->sd_vnode->v_type == VFIFO) ? 0 : \
+				    straccess((x), (y)))
+
 /*
  * what is mblk_pull_len?
  *
@@ -1095,11 +1108,13 @@ strread(struct vnode *vp, struct uio *uiop, cred_t *crp)
 	ASSERT(vp->v_stream);
 	stp = vp->v_stream;
 
-	if (stp->sd_sidp != NULL && stp->sd_vnode->v_type != VFIFO)
-		if (error = straccess(stp, JCREAD))
-			return (error);
-
 	mutex_enter(&stp->sd_lock);
+
+	if ((error = i_straccess(stp, JCREAD)) != 0) {
+		mutex_exit(&stp->sd_lock);
+		return (error);
+	}
+
 	if (stp->sd_flag & (STRDERR|STPLEX)) {
 		error = strgeterr(stp, STRDERR|STPLEX, 0);
 		if (error != 0) {
@@ -1161,12 +1176,8 @@ strread(struct vnode *vp, struct uio *uiop, cred_t *crp)
 			}
 			TRACE_3(TR_FAC_STREAMS_FR, TR_STRREAD_AWAKE,
 				"strread awakes:%p, %p, %p", vp, uiop, crp);
-			if (stp->sd_sidp != NULL &&
-			    stp->sd_vnode->v_type != VFIFO) {
-				mutex_exit(&stp->sd_lock);
-				if (error = straccess(stp, JCREAD))
-					goto oops1;
-				mutex_enter(&stp->sd_lock);
+			if ((error = i_straccess(stp, JCREAD)) != 0) {
+				goto oops;
 			}
 			first = 0;
 		}
@@ -2026,8 +2037,8 @@ strrput_nondata(queue_t *q, mblk_t *bp)
 		cv_broadcast(&q->q_wait);	/* the readers */
 		cv_broadcast(&_WR(q)->q_wait);	/* the writers */
 		cv_broadcast(&stp->sd_monitor);	/* the ioctllers */
-		mutex_exit(&stp->sd_lock);
 		strhup(stp);
+		mutex_exit(&stp->sd_lock);
 		return (0);
 
 	case M_UNHANGUP:
@@ -2665,17 +2676,22 @@ strwrite_common(struct vnode *vp, struct uio *uiop, cred_t *crp, int wflag)
 	ASSERT(vp->v_stream);
 	stp = vp->v_stream;
 
-	if (stp->sd_sidp != NULL && stp->sd_vnode->v_type != VFIFO)
-		if ((error = straccess(stp, JCWRITE)) != 0)
-			return (error);
+	mutex_enter(&stp->sd_lock);
+
+	if ((error = i_straccess(stp, JCWRITE)) != 0) {
+		mutex_exit(&stp->sd_lock);
+		return (error);
+	}
 
 	if (stp->sd_flag & (STWRERR|STRHUP|STPLEX)) {
-		mutex_enter(&stp->sd_lock);
 		error = strwriteable(stp, B_TRUE, B_TRUE);
-		mutex_exit(&stp->sd_lock);
-		if (error != 0)
+		if (error != 0) {
+			mutex_exit(&stp->sd_lock);
 			return (error);
+		}
 	}
+
+	mutex_exit(&stp->sd_lock);
 
 	wqp = stp->sd_wrq;
 
@@ -2778,11 +2794,11 @@ strwrite_common(struct vnode *vp, struct uio *uiop, cred_t *crp, int wflag)
 			}
 			TRACE_1(TR_FAC_STREAMS_FR, TR_STRWRITE_WAKE,
 				"strwrite wake:q %p awakes", wqp);
+			if ((error = i_straccess(stp, JCWRITE)) != 0) {
+				mutex_exit(&stp->sd_lock);
+				goto out;
+			}
 			mutex_exit(&stp->sd_lock);
-			if (stp->sd_sidp != NULL &&
-			    stp->sd_vnode->v_type != VFIFO)
-				if (error = straccess(stp, JCWRITE))
-					goto out;
 		}
 		waitflag |= NOINTR;
 		TRACE_2(TR_FAC_STREAMS_FR, TR_STRWRITE_RESID,
@@ -3101,6 +3117,7 @@ job_control_type(int cmd)
 	case JAGENT:	/* Obsolete */
 	case JTRUN:	/* Obsolete */
 	case JXTPROTO:	/* Obsolete */
+	case TIOCSETLD:
 		return (JCSETP);
 	}
 
@@ -3162,10 +3179,12 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 	if (cmd == SRIOCSREDIR || cmd == SRIOCISREDIR)
 		return (EINVAL);
 
-	if (access != -1 && stp->sd_sidp != NULL &&
-	    stp->sd_vnode->v_type != VFIFO)
-		if (error = straccess(stp, access))
-			return (error);
+	mutex_enter(&stp->sd_lock);
+	if ((access != -1) && ((error = i_straccess(stp, access)) != 0)) {
+		mutex_exit(&stp->sd_lock);
+		return (error);
+	}
+	mutex_exit(&stp->sd_lock);
 
 	/*
 	 * Check for sgttyb-related ioctls first, and complain as
@@ -3307,11 +3326,16 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 				    secpolicy_sti(crp) != 0) {
 					return (EPERM);
 				}
-				if (stp->sd_sidp !=
-				    ttoproc(curthread)->p_sessp->s_sidp &&
+				mutex_enter(&stp->sd_lock);
+				mutex_enter(&curproc->p_splock);
+				if (stp->sd_sidp != curproc->p_sessp->s_sidp &&
 				    secpolicy_sti(crp) != 0) {
+					mutex_exit(&curproc->p_splock);
+					mutex_exit(&stp->sd_lock);
 					return (EACCES);
 				}
+				mutex_exit(&curproc->p_splock);
+				mutex_exit(&stp->sd_lock);
 
 				strioc.ic_len = sizeof (char);
 				strioc.ic_dp = (char *)arg;
@@ -3445,10 +3469,13 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			return (EINVAL);
 
 		access = job_control_type(strioc.ic_cmd);
-		if (access != -1 && stp->sd_sidp != NULL &&
-		    stp->sd_vnode->v_type != VFIFO &&
-		    (error = straccess(stp, access)) != 0)
+		mutex_enter(&stp->sd_lock);
+		if ((access != -1) &&
+		    ((error = i_straccess(stp, access)) != 0)) {
+			mutex_exit(&stp->sd_lock);
 			return (error);
+		}
+		mutex_exit(&stp->sd_lock);
 
 		/*
 		 * The I_STR facility provides a trap door for malicious
@@ -3699,7 +3726,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 				/*
 				 * try to allocate it as a controlling terminal
 				 */
-				stralloctty(stp);
+				(void) strctty(stp);
 			}
 		}
 
@@ -5053,15 +5080,11 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 				releasef(STRUCT_FGET(strfdinsert, fildes));
 				return (error);
 			}
-			if (stp->sd_sidp != NULL &&
-			    stp->sd_vnode->v_type != VFIFO) {
+			if ((error = i_straccess(stp, access)) != 0) {
 				mutex_exit(&stp->sd_lock);
-				if (error = straccess(stp, access)) {
-					releasef(
-					    STRUCT_FGET(strfdinsert, fildes));
-					return (error);
-				}
-				mutex_enter(&stp->sd_lock);
+				releasef(
+				    STRUCT_FGET(strfdinsert, fildes));
+				return (error);
 			}
 		}
 		mutex_exit(&stp->sd_lock);
@@ -5144,12 +5167,9 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 				mutex_exit(&stp->sd_lock);
 				return (error);
 			}
-			if (stp->sd_sidp != NULL &&
-			    stp->sd_vnode->v_type != VFIFO) {
+			if ((error = i_straccess(stp, access)) != 0) {
 				mutex_exit(&stp->sd_lock);
-				if (error = straccess(stp, access))
-					return (error);
-				mutex_enter(&stp->sd_lock);
+				return (error);
 			}
 		}
 		if (mp->b_datap->db_type != M_PASSFP) {
@@ -5446,13 +5466,13 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 	{
 		pid_t sid;
 
-		mutex_enter(&pidlock);
+		mutex_enter(&stp->sd_lock);
 		if (stp->sd_sidp == NULL) {
-			mutex_exit(&pidlock);
+			mutex_exit(&stp->sd_lock);
 			return (ENOTTY);
 		}
 		sid = stp->sd_sidp->pid_id;
-		mutex_exit(&pidlock);
+		mutex_exit(&stp->sd_lock);
 		return (strcopyout(&sid, (void *)arg, sizeof (pid_t),
 		    copyflag));
 	}
@@ -5494,6 +5514,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		bg_pgid = stp->sd_pgidp->pid_id;
 		CL_SET_PROCESS_GROUP(curthread, sid, bg_pgid, fg_pgid);
 		PID_RELE(stp->sd_pgidp);
+		ctty_clear_sighuped();
 		stp->sd_pgidp = q->p_pgidp;
 		PID_HOLD(stp->sd_pgidp);
 		mutex_exit(&pidlock);
@@ -5505,15 +5526,28 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 	{
 		pid_t pgrp;
 
-		mutex_enter(&pidlock);
+		mutex_enter(&stp->sd_lock);
 		if (stp->sd_sidp == NULL) {
-			mutex_exit(&pidlock);
+			mutex_exit(&stp->sd_lock);
 			return (ENOTTY);
 		}
 		pgrp = stp->sd_pgidp->pid_id;
-		mutex_exit(&pidlock);
+		mutex_exit(&stp->sd_lock);
 		return (strcopyout(&pgrp, (void *)arg, sizeof (pid_t),
 		    copyflag));
+	}
+
+	case TIOCSCTTY:
+	{
+		return (strctty(stp));
+	}
+
+	case TIOCNOTTY:
+	{
+		/* freectty() always assumes curproc. */
+		if (freectty(B_FALSE) != 0)
+			return (0);
+		return (ENOTTY);
 	}
 
 	case FIONBIO:
@@ -6233,18 +6267,21 @@ strgetmsg(
 	stp = vp->v_stream;
 	rvp->r_val1 = 0;
 
-	if (stp->sd_sidp != NULL && stp->sd_vnode->v_type != VFIFO)
-		if (error = straccess(stp, JCREAD))
-			return (error);
+	mutex_enter(&stp->sd_lock);
 
-	/* Fast check of flags before acquiring the lock */
-	if (stp->sd_flag & (STRDERR|STPLEX)) {
-		mutex_enter(&stp->sd_lock);
-		error = strgeterr(stp, STRDERR|STPLEX, 0);
+	if ((error = i_straccess(stp, JCREAD)) != 0) {
 		mutex_exit(&stp->sd_lock);
-		if (error != 0)
-			return (error);
+		return (error);
 	}
+
+	if (stp->sd_flag & (STRDERR|STPLEX)) {
+		error = strgeterr(stp, STRDERR|STPLEX, 0);
+		if (error != 0) {
+			mutex_exit(&stp->sd_lock);
+			return (error);
+		}
+	}
+	mutex_exit(&stp->sd_lock);
 
 	switch (*flagsp) {
 	case MSG_HIPRI:
@@ -6381,11 +6418,9 @@ strgetmsg(
 		}
 		TRACE_2(TR_FAC_STREAMS_FR, TR_STRGETMSG_AWAKE,
 			"strgetmsg awakes:%p, %p", vp, uiop);
-		if (stp->sd_sidp != NULL && stp->sd_vnode->v_type != VFIFO) {
+		if ((error = i_straccess(stp, JCREAD)) != 0) {
 			mutex_exit(&stp->sd_lock);
-			if (error = straccess(stp, JCREAD))
-				return (error);
-			mutex_enter(&stp->sd_lock);
+			return (error);
 		}
 		first = 0;
 	}
@@ -6797,23 +6832,26 @@ kstrgetmsg(
 	stp = vp->v_stream;
 	rvp->r_val1 = 0;
 
-	if (stp->sd_sidp != NULL && stp->sd_vnode->v_type != VFIFO)
-		if (error = straccess(stp, JCREAD))
-			return (error);
+	mutex_enter(&stp->sd_lock);
+
+	if ((error = i_straccess(stp, JCREAD)) != 0) {
+		mutex_exit(&stp->sd_lock);
+		return (error);
+	}
 
 	flags = *flagsp;
-	/* Fast check of flags before acquiring the lock */
 	if (stp->sd_flag & (STRDERR|STPLEX)) {
 		if ((stp->sd_flag & STPLEX) ||
 		    (flags & (MSG_IGNERROR|MSG_DELAYERROR)) == 0) {
-			mutex_enter(&stp->sd_lock);
 			error = strgeterr(stp, STRDERR|STPLEX,
 					(flags & MSG_IPEEK));
-			mutex_exit(&stp->sd_lock);
-			if (error != 0)
+			if (error != 0) {
+				mutex_exit(&stp->sd_lock);
 				return (error);
+			}
 		}
 	}
+	mutex_exit(&stp->sd_lock);
 
 	switch (flags & (MSG_HIPRI|MSG_ANY|MSG_BAND)) {
 	case MSG_HIPRI:
@@ -6955,11 +6993,9 @@ retry:
 		}
 		TRACE_2(TR_FAC_STREAMS_FR, TR_KSTRGETMSG_AWAKE,
 			"kstrgetmsg awakes:%p, %p", vp, uiop);
-		if (stp->sd_sidp != NULL && stp->sd_vnode->v_type != VFIFO) {
+		if ((error = i_straccess(stp, JCREAD)) != 0) {
 			mutex_exit(&stp->sd_lock);
-			if (error = straccess(stp, JCREAD))
-				return (error);
-			mutex_enter(&stp->sd_lock);
+			return (error);
 		}
 		first = 0;
 	}
@@ -7430,17 +7466,22 @@ strputmsg(
 		audit_strputmsg(vp, mctl, mdata, pri, flag, fmode);
 #endif
 
-	if (stp->sd_sidp != NULL && stp->sd_vnode->v_type != VFIFO)
-		if (error = straccess(stp, JCWRITE))
-			return (error);
+	mutex_enter(&stp->sd_lock);
+
+	if ((error = i_straccess(stp, JCWRITE)) != 0) {
+		mutex_exit(&stp->sd_lock);
+		return (error);
+	}
 
 	if (stp->sd_flag & (STWRERR|STRHUP|STPLEX)) {
-		mutex_enter(&stp->sd_lock);
 		error = strwriteable(stp, B_FALSE, xpg4);
-		mutex_exit(&stp->sd_lock);
-		if (error != 0)
+		if (error != 0) {
+			mutex_exit(&stp->sd_lock);
 			return (error);
+		}
 	}
+
+	mutex_exit(&stp->sd_lock);
 
 	/*
 	 * Check for legal flag value.
@@ -7561,10 +7602,11 @@ strputmsg(
 		}
 		TRACE_1(TR_FAC_STREAMS_FR, TR_STRPUTMSG_WAKE,
 			"strputmsg wake:stp %p wakes", stp);
+		if ((error = i_straccess(stp, JCWRITE)) != 0) {
+			mutex_exit(&stp->sd_lock);
+			return (error);
+		}
 		mutex_exit(&stp->sd_lock);
-		if (stp->sd_sidp != NULL && stp->sd_vnode->v_type != VFIFO)
-			if (error = straccess(stp, JCWRITE))
-				return (error);
 	}
 out:
 	/*
@@ -7617,24 +7659,26 @@ kstrputmsg(
 	if (mctl == NULL)
 		return (EINVAL);
 
-	if (stp->sd_sidp != NULL && stp->sd_vnode->v_type != VFIFO) {
-		if (error = straccess(stp, JCWRITE)) {
-			freemsg(mctl);
-			return (error);
-		}
+	mutex_enter(&stp->sd_lock);
+
+	if ((error = i_straccess(stp, JCWRITE)) != 0) {
+		mutex_exit(&stp->sd_lock);
+		freemsg(mctl);
+		return (error);
 	}
 
 	if ((stp->sd_flag & STPLEX) || !(flag & MSG_IGNERROR)) {
 		if (stp->sd_flag & (STWRERR|STRHUP|STPLEX)) {
-			mutex_enter(&stp->sd_lock);
 			error = strwriteable(stp, B_FALSE, B_TRUE);
-			mutex_exit(&stp->sd_lock);
 			if (error != 0) {
+				mutex_exit(&stp->sd_lock);
 				freemsg(mctl);
 				return (error);
 			}
 		}
 	}
+
+	mutex_exit(&stp->sd_lock);
 
 	/*
 	 * Check for legal flag value.
@@ -7804,13 +7848,12 @@ kstrputmsg(
 		}
 		TRACE_1(TR_FAC_STREAMS_FR, TR_KSTRPUTMSG_WAKE,
 			"kstrputmsg wake:stp %p wakes", stp);
-		mutex_exit(&stp->sd_lock);
-		if (stp->sd_sidp != NULL && stp->sd_vnode->v_type != VFIFO) {
-			if (error = straccess(stp, JCWRITE)) {
-				freemsg(mctl);
-				return (error);
-			}
+		if ((error = i_straccess(stp, JCWRITE)) != 0) {
+			mutex_exit(&stp->sd_lock);
+			freemsg(mctl);
+			return (error);
 		}
+		mutex_exit(&stp->sd_lock);
 	}
 out:
 	freemsg(mctl);

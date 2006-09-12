@@ -3107,13 +3107,18 @@ straccess(struct stdata *stp, enum jcaccess mode)
 	proc_t *p = ttoproc(t);
 	sess_t *sp;
 
+	ASSERT(mutex_owned(&stp->sd_lock));
+
 	if (stp->sd_sidp == NULL || stp->sd_vnode->v_type == VFIFO)
 		return (0);
 
-	mutex_enter(&p->p_lock);
-	sp = p->p_sessp;
+	mutex_enter(&p->p_lock);		/* protects p_pgidp */
 
 	for (;;) {
+		mutex_enter(&p->p_splock);	/* protects p->p_sessp */
+		sp = p->p_sessp;
+		mutex_enter(&sp->s_lock);	/* protects sp->* */
+
 		/*
 		 * If this is not the calling process's controlling terminal
 		 * or if the calling process is already in the foreground
@@ -3121,6 +3126,8 @@ straccess(struct stdata *stp, enum jcaccess mode)
 		 */
 		if (sp->s_dev != stp->sd_vnode->v_rdev ||
 		    p->p_pgidp == stp->sd_pgidp) {
+			mutex_exit(&sp->s_lock);
+			mutex_exit(&p->p_splock);
 			mutex_exit(&p->p_lock);
 			return (0);
 		}
@@ -3131,9 +3138,14 @@ straccess(struct stdata *stp, enum jcaccess mode)
 		if (sp->s_vp == NULL) {
 			if (!cantsend(p, t, SIGHUP))
 				sigtoproc(p, t, SIGHUP);
+			mutex_exit(&sp->s_lock);
+			mutex_exit(&p->p_splock);
 			mutex_exit(&p->p_lock);
 			return (EIO);
 		}
+
+		mutex_exit(&sp->s_lock);
+		mutex_exit(&p->p_splock);
 
 		if (mode == JCGETP) {
 			mutex_exit(&p->p_lock);
@@ -3146,7 +3158,9 @@ straccess(struct stdata *stp, enum jcaccess mode)
 				return (EIO);
 			}
 			mutex_exit(&p->p_lock);
+			mutex_exit(&stp->sd_lock);
 			pgsignal(p->p_pgidp, SIGTTIN);
+			mutex_enter(&stp->sd_lock);
 			mutex_enter(&p->p_lock);
 		} else {  /* mode == JCWRITE or JCSETP */
 			if ((mode == JCWRITE && !(stp->sd_flag & STRTOSTOP)) ||
@@ -3159,7 +3173,9 @@ straccess(struct stdata *stp, enum jcaccess mode)
 				return (EIO);
 			}
 			mutex_exit(&p->p_lock);
+			mutex_exit(&stp->sd_lock);
 			pgsignal(p->p_pgidp, SIGTTOU);
+			mutex_enter(&stp->sd_lock);
 			mutex_enter(&p->p_lock);
 		}
 
@@ -3174,10 +3190,15 @@ straccess(struct stdata *stp, enum jcaccess mode)
 		 * We can't get here if the signal is ignored or
 		 * if the current thread is blocking the signal.
 		 */
+		mutex_exit(&stp->sd_lock);
 		if (!cv_wait_sig_swap(&lbolt_cv, &p->p_lock)) {
 			mutex_exit(&p->p_lock);
+			mutex_enter(&stp->sd_lock);
 			return (EINTR);
 		}
+		mutex_exit(&p->p_lock);
+		mutex_enter(&stp->sd_lock);
+		mutex_enter(&p->p_lock);
 	}
 }
 
@@ -4001,59 +4022,12 @@ strsignal(stdata_t *stp, int sig, int32_t band)
 void
 strhup(stdata_t *stp)
 {
+	ASSERT(mutex_owned(&stp->sd_lock));
 	pollwakeup(&stp->sd_pollist, POLLHUP);
-	mutex_enter(&stp->sd_lock);
 	if (stp->sd_sigflags & S_HANGUP)
 		strsendsig(stp->sd_siglist, S_HANGUP, 0, 0);
-	mutex_exit(&stp->sd_lock);
 }
 
-void
-stralloctty(stdata_t *stp)
-{
-	proc_t *p = curproc;
-	sess_t *sp = p->p_sessp;
-
-	mutex_enter(&stp->sd_lock);
-	/*
-	 * No need to hold the session lock or do a TTY_HOLD() because
-	 * this is the only thread that can be the session leader and not
-	 * have a controlling tty.
-	 */
-	if ((stp->sd_flag &
-	    (STRHUP|STRDERR|STWRERR|STPLEX|STRISTTY)) == STRISTTY &&
-	    stp->sd_sidp == NULL &&		/* not allocated as ctty */
-	    sp->s_sidp == p->p_pidp &&		/* session leader */
-	    sp->s_flag != SESS_CLOSE &&		/* session is not closing */
-	    sp->s_vp == NULL) {			/* without ctty */
-		ASSERT(stp->sd_pgidp == NULL);
-		alloctty(p, makectty(stp->sd_vnode));
-
-		mutex_enter(&pidlock);
-		stp->sd_sidp = sp->s_sidp;
-		stp->sd_pgidp = sp->s_sidp;
-		PID_HOLD(stp->sd_pgidp);
-		PID_HOLD(stp->sd_sidp);
-		mutex_exit(&pidlock);
-	}
-	mutex_exit(&stp->sd_lock);
-}
-
-void
-strfreectty(stdata_t *stp)
-{
-	mutex_enter(&stp->sd_lock);
-	pgsignal(stp->sd_pgidp, SIGHUP);
-	mutex_enter(&pidlock);
-	PID_RELE(stp->sd_pgidp);
-	PID_RELE(stp->sd_sidp);
-	stp->sd_pgidp = NULL;
-	stp->sd_sidp = NULL;
-	mutex_exit(&pidlock);
-	mutex_exit(&stp->sd_lock);
-	if (!(stp->sd_flag & STRHUP))
-		strhup(stp);
-}
 /*
  * Backenable the first queue upstream from `q' with a service procedure.
  */

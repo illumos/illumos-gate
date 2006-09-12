@@ -386,6 +386,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	int watchcode;
 	int watchpage;
 	caddr_t vaddr;
+	int singlestep_twiddle;
 	size_t sz;
 	int ta;
 #ifdef __amd64
@@ -975,19 +976,33 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 			 *
 			 * The same thing happens for sysenter, too.
 			 */
+			singlestep_twiddle = 0;
+			if (rp->r_pc == (uintptr_t)sys_sysenter ||
+			    rp->r_pc == (uintptr_t)brand_sys_sysenter) {
+				singlestep_twiddle = 1;
 #if defined(__amd64)
-			if (rp->r_pc == (uintptr_t)sys_sysenter) {
 				/*
-				 * Adjust the pc so that we don't execute the
-				 * swapgs instruction at the head of the
-				 * handler and completely confuse things.
+				 * Since we are already on the kernel's
+				 * %gs, on 64-bit systems the sysenter case
+				 * needs to adjust the pc to avoid
+				 * executing the swapgs instruction at the
+				 * top of the handler.
 				 */
-				rp->r_pc = (uintptr_t)
-				    _sys_sysenter_post_swapgs;
-#elif defined(__i386)
-			if (rp->r_pc == (uintptr_t)sys_call ||
-			    rp->r_pc == (uintptr_t)sys_sysenter) {
+				if (rp->r_pc == (uintptr_t)sys_sysenter)
+					rp->r_pc = (uintptr_t)
+					    _sys_sysenter_post_swapgs;
+				else
+					rp->r_pc = (uintptr_t)
+					    _brand_sys_sysenter_post_swapgs;
 #endif
+			}
+#if defined(__i386)
+			else if (rp->r_pc == (uintptr_t)sys_call ||
+			    rp->r_pc == (uintptr_t)brand_sys_call) {
+				singlestep_twiddle = 1;
+			}
+#endif
+			if (singlestep_twiddle) {
 				rp->r_ps &= ~PS_T; /* turn off trace */
 				lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
 				cur_thread->t_post_sys = 1;
@@ -1161,20 +1176,17 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 			rp->r_ps &= ~PS_T;
 			/*
 			 * If both NORMAL_STEP and WATCH_STEP are in effect,
-			 * give precedence to NORMAL_STEP.  If neither is set,
+			 * give precedence to WATCH_STEP.  If neither is set,
 			 * user must have set the PS_T bit in %efl; treat this
 			 * as NORMAL_STEP.
 			 */
-			if ((pcb->pcb_flags & NORMAL_STEP) ||
-			    !(pcb->pcb_flags & WATCH_STEP)) {
+			if ((fault = undo_watch_step(&siginfo)) == 0 &&
+			    ((pcb->pcb_flags & NORMAL_STEP) ||
+			    !(pcb->pcb_flags & WATCH_STEP))) {
 				siginfo.si_signo = SIGTRAP;
 				siginfo.si_code = TRAP_TRACE;
 				siginfo.si_addr = (caddr_t)rp->r_pc;
 				fault = FLTTRACE;
-				if (pcb->pcb_flags & WATCH_STEP)
-					(void) undo_watch_step(NULL);
-			} else {
-				fault = undo_watch_step(&siginfo);
 			}
 			pcb->pcb_flags &= ~(NORMAL_STEP|WATCH_STEP);
 		} else {

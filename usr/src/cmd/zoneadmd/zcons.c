@@ -402,58 +402,28 @@ error:
 }
 
 /*
- * prep_console_slave() takes care of setting up the console slave device
- * (the side that the zone will eventually open). It is a helper for
- * init_console_slave().
+ * init_console_slave() sets up the console slave device; the device node
+ * itself has already been set up in the device tree; the primary job
+ * here is to do some STREAMS plumbing.
  *
- * We have to mknod and setup the console device; then the slave side is
- * opened, and the appropriate STREAMS modules are pushed on.  A wrinkle is that
- * 'ptem' must be anchored in place (see streamio(7i) since we always want the
- * console to have terminal semantics.
+ * The slave side of the console is opened and the appropriate STREAMS
+ * modules are pushed on.  A wrinkle is that 'ptem' must be anchored
+ * in place (see streamio(7i) since we always want the console to
+ * have terminal semantics.)
  */
-static int
-prep_console_slave(zlog_t *zlogp, char *devroot)
+int
+init_console_slave(zlog_t *zlogp)
 {
-	char slavename[MAXPATHLEN];
-	char zoneslavename[MAXPATHLEN];
-	char zonedev[MAXPATHLEN];
-	di_prof_t prof = NULL;
+	char zconspath[MAXPATHLEN];
 
-	assert(slavefd == -1);
+	if (slavefd != -1)
+		return (0);
 
-	(void) snprintf(slavename, sizeof (slavename),
-	    "zcons/%s/%s", zone_name, ZCONS_SLAVE_NAME);
+	(void) snprintf(zconspath, sizeof (zconspath),
+	    "/dev/zcons/%s/%s", zone_name, ZCONS_SLAVE_NAME);
 
-	(void) snprintf(zoneslavename, sizeof (zoneslavename),
-	    "%s/dev/zconsole", devroot);
-
-	(void) snprintf(zonedev, sizeof (zonedev),
-	    "%s/dev", devroot);
-
-	/*
-	 * Specify zconsole as a name map in the dev profile
-	 */
-	if (di_prof_init(zonedev, &prof)) {
-		zerror(zlogp, B_TRUE, "failed to initialize profile");
-		goto error;
-	}
-
-	if (di_prof_add_map(prof, slavename, "zconsole")) {
-		zerror(zlogp, B_TRUE, "failed to add zconsole map");
-		goto error;
-	}
-
-	/* Send profile to kernel */
-	if (di_prof_commit(prof)) {
-		zerror(zlogp, B_TRUE, "failed to commit profile");
-		goto error;
-	}
-
-	di_prof_fini(prof);
-	prof = NULL;
-
-	if ((slavefd = open(zoneslavename, O_RDWR | O_NOCTTY)) < 0) {
-		zerror(zlogp, B_TRUE, "failed to open %s", zoneslavename);
+	if ((slavefd = open(zconspath, O_RDWR | O_NOCTTY)) < 0) {
+		zerror(zlogp, B_TRUE, "failed to open %s", zconspath);
 		goto error;
 	}
 
@@ -501,41 +471,13 @@ prep_console_slave(zlog_t *zlogp, char *devroot)
 	}
 
 	return (0);
+
 error:
 	if (slavefd != -1)
 		(void) close(slavefd);
 	slavefd = -1;
-	if (prof)
-		di_prof_fini(prof);
+	zerror(zlogp, B_FALSE, "could not initialize console slave");
 	return (-1);
-}
-
-/*
- * init_console_slave() sets up the console slave device; the device node
- * itself has already been set up in the device tree; the primary job
- * here is to do some STREAMS plumbing (via prep_console_slave()) and then
- * to establish some symlinks.  Eventually we should move that functionality
- * into devfsadm.
- */
-int
-init_console_slave(zlog_t *zlogp)
-{
-	char devroot[MAXPATHLEN];
-
-	if (slavefd != -1)
-		return (0);
-
-	if (zone_get_devroot(zone_name, devroot, sizeof (devroot)) != Z_OK) {
-		zerror(zlogp, B_TRUE, "unable to determine zone root");
-		return (-1);
-	}
-
-	if (prep_console_slave(zlogp, devroot) == -1) {
-		zerror(zlogp, B_FALSE, "could not prep console slave");
-		return (-1);
-	}
-
-	return (0);
 }
 
 void

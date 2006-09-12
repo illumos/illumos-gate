@@ -57,6 +57,7 @@
 #include <sys/reboot.h>
 #include <sys/kdi.h>
 #include <sys/systm.h>
+#include <sys/controlregs.h>
 
 extern void syscall_int(void);
 
@@ -102,6 +103,22 @@ void (*(fasttable[]))(void) = {
 	(void (*)())get_hrestime,	/* T_GETHRESTIME */
 	(void (*)())getlgrp		/* T_GETLGRP */
 };
+
+/*
+ * Structure containing pre-computed descriptors to allow us to temporarily
+ * interpose on a standard handler.
+ */
+struct interposing_handler {
+	int ih_inum;
+	gate_desc_t ih_interp_desc;
+	gate_desc_t ih_default_desc;
+};
+
+/*
+ * The brand infrastructure interposes on two handlers, and we use one as a
+ * NULL signpost.
+ */
+static struct interposing_handler brand_tbl[3];
 
 /*
  * software prototypes for default local descriptor table
@@ -279,6 +296,7 @@ init_gdt(void)
 	desctbr_t	r_bgdt, r_gdt;
 	user_desc_t	*bgdt;
 	size_t		alen = 0xfffff;	/* entire 32-bit address space */
+	int		i;
 
 	/*
 	 * Copy in from boot's gdt to our gdt entries 1 - 4.
@@ -358,6 +376,14 @@ init_gdt(void)
 	    SEL_UPL, SDP_PAGES, SDP_OP32);
 
 	/*
+	 * Initialize the descriptors set aside for brand usage.
+	 * Only attributes and limits are initialized.
+	 */
+	for (i = GDT_BRANDMIN; i <= GDT_BRANDMAX; i++)
+		set_usegd(&gdt0[i], SDP_SHORT, NULL, alen, SDT_MEMRWA,
+		    SEL_UPL, SDP_PAGES, SDP_OP32);
+
+	/*
 	 * Install our new GDT
 	 */
 	r_gdt.dtr_limit = sizeof (gdt0) - 1;
@@ -382,6 +408,7 @@ init_gdt(void)
 {
 	desctbr_t	r_bgdt, r_gdt;
 	user_desc_t	*bgdt;
+	int		i;
 
 	/*
 	 * Copy in from boot's gdt to our gdt entries 1 - 4.
@@ -453,6 +480,14 @@ init_gdt(void)
 	    SDP_PAGES, SDP_OP32);
 	set_usegd(&gdt0[GDT_LWPGS], NULL, (size_t)-1, SDT_MEMRWA, SEL_UPL,
 	    SDP_PAGES, SDP_OP32);
+
+	/*
+	 * Initialize the descriptors set aside for brand usage.
+	 * Only attributes and limits are initialized.
+	 */
+	for (i = GDT_BRANDMIN; i <= GDT_BRANDMAX; i++)
+		set_usegd(&gdt0[i], NULL, (size_t)-1, SDT_MEMRWA, SEL_UPL,
+		    SDP_PAGES, SDP_OP32);
 
 	/*
 	 * Install our new GDT
@@ -580,6 +615,12 @@ init_idt(void)
 	}
 
 	/*
+	 * install "int80" handler at, well, 0x80.
+	 */
+	set_gatesegd(&idt0[T_INT80], &sys_int80, KCS_SEL, 0, SDT_SYSIGT,
+	    SEL_UPL);
+
+	/*
 	 * install fast trap handler at 210.
 	 */
 	set_gatesegd(&idt0[T_FASTTRAP], &fasttrap, KCS_SEL, 0,
@@ -608,6 +649,23 @@ init_idt(void)
 	idt0_default_r.dtr_limit = sizeof (idt0) - 1;
 	idt0_default_r.dtr_base = (uintptr_t)idt0;
 	wr_idtr(&idt0_default_r);
+
+	/*
+	 * Prepare interposing descriptors for the branded "int80"
+	 * and syscall handlers and cache copies of the default
+	 * descriptors.
+	 */
+	brand_tbl[0].ih_inum = T_INT80;
+	brand_tbl[0].ih_default_desc = idt0[T_INT80];
+	set_gatesegd(&(brand_tbl[0].ih_interp_desc), &brand_sys_int80, KCS_SEL,
+	    0, SDT_SYSIGT, SEL_UPL);
+
+	brand_tbl[1].ih_inum = T_SYSCALLINT;
+	brand_tbl[1].ih_default_desc = idt0[T_SYSCALLINT];
+	set_gatesegd(&(brand_tbl[1].ih_interp_desc), &brand_sys_syscall_int,
+	    KCS_SEL, 0, SDT_SYSIGT, SEL_UPL);
+
+	brand_tbl[2].ih_inum = 0;
 }
 
 #elif defined(__i386)
@@ -705,6 +763,12 @@ init_idt(void)
 	}
 
 	/*
+	 * install "int80" handler at, well, 0x80.
+	 */
+	set_gatesegd(&idt0[T_INT80], &sys_int80, KCS_SEL, 0, SDT_SYSIGT,
+	    SEL_UPL);
+
+	/*
 	 * install fast trap handler at 210.
 	 */
 	set_gatesegd(&idt0[T_FASTTRAP], &fasttrap, KCS_SEL, 0,
@@ -734,6 +798,23 @@ init_idt(void)
 	idt0_default_r.dtr_limit = sizeof (idt0) - 1;
 	idt0_default_r.dtr_base = (uintptr_t)idt0;
 	wr_idtr(&idt0_default_r);
+
+	/*
+	 * Prepare interposing descriptors for the branded "int80"
+	 * and syscall handlers and cache copies of the default
+	 * descriptors.
+	 */
+	brand_tbl[0].ih_inum = T_INT80;
+	brand_tbl[0].ih_default_desc = idt0[T_INT80];
+	set_gatesegd(&(brand_tbl[0].ih_interp_desc), &brand_sys_int80, KCS_SEL,
+	    0, SDT_SYSIGT, SEL_UPL);
+
+	brand_tbl[1].ih_inum = T_SYSCALLINT;
+	brand_tbl[1].ih_default_desc = idt0[T_SYSCALLINT];
+	set_gatesegd(&(brand_tbl[1].ih_interp_desc), &brand_sys_call,
+	    KCS_SEL, 0, SDT_SYSIGT, SEL_UPL);
+
+	brand_tbl[2].ih_inum = 0;
 }
 
 #endif	/* __i386 */
@@ -834,4 +915,50 @@ init_tables(void)
 	init_tss();
 	init_idt();
 	init_ldt();
+}
+
+/*
+ * Enable interpositioning on the system call path by rewriting the
+ * sys{call|enter} MSRs and the syscall-related entries in the IDT to use
+ * the branded entry points.
+ */
+void
+brand_interpositioning_enable(void)
+{
+	int i;
+
+	for (i = 0; brand_tbl[i].ih_inum; i++)
+		CPU->cpu_idt[brand_tbl[i].ih_inum] =
+		    brand_tbl[i].ih_interp_desc;
+
+#if defined(__amd64)
+	wrmsr(MSR_AMD_LSTAR, (uintptr_t)brand_sys_syscall);
+	wrmsr(MSR_AMD_CSTAR, (uintptr_t)brand_sys_syscall32);
+#endif
+
+	if (x86_feature & X86_SEP)
+		wrmsr(MSR_INTC_SEP_EIP, (uintptr_t)brand_sys_sysenter);
+}
+
+/*
+ * Disable interpositioning on the system call path by rewriting the
+ * sys{call|enter} MSRs and the syscall-related entries in the IDT to use
+ * the standard entry points, which bypass the interpositioning hooks.
+ */
+void
+brand_interpositioning_disable(void)
+{
+	int i;
+
+	for (i = 0; brand_tbl[i].ih_inum; i++)
+		CPU->cpu_idt[brand_tbl[i].ih_inum] =
+		    brand_tbl[i].ih_default_desc;
+
+#if defined(__amd64)
+	wrmsr(MSR_AMD_LSTAR, (uintptr_t)sys_syscall);
+	wrmsr(MSR_AMD_CSTAR, (uintptr_t)sys_syscall32);
+#endif
+
+	if (x86_feature & X86_SEP)
+		wrmsr(MSR_INTC_SEP_EIP, (uintptr_t)sys_sysenter);
 }

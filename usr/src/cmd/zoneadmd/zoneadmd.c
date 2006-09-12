@@ -93,17 +93,19 @@
 #include <wait.h>
 #include <limits.h>
 #include <zone.h>
+#include <libbrand.h>
 #include <libcontract.h>
 #include <libcontract_priv.h>
 #include <sys/contract/process.h>
 #include <sys/ctfs.h>
-#include <sys/objfs.h>
 
 #include <libzonecfg.h>
 #include "zoneadmd.h"
 
 static char *progname;
 char *zone_name;	/* zone which we are managing */
+char brand_name[MAXNAMELEN];
+boolean_t zone_isnative;
 static zoneid_t zone_id;
 
 zlog_t logsys;
@@ -123,8 +125,6 @@ boolean_t bringup_failure_recovery = B_FALSE; /* ignore certain failures */
 #define	TEXT_DOMAIN	"SYS_TEST"	/* Use this only if it wasn't */
 #endif
 
-#define	PATH_TO_INIT	"/sbin/init"
-
 #define	DEFAULT_LOCALE	"C"
 
 static const char *
@@ -132,8 +132,8 @@ z_cmd_name(zone_cmd_t zcmd)
 {
 	/* This list needs to match the enum in sys/zone.h */
 	static const char *zcmdstr[] = {
-		"ready", "boot", "reboot", "halt", "note_uninstalling",
-		"mount", "unmount"
+		"ready", "boot", "forceboot", "reboot", "halt",
+		"note_uninstalling", "mount", "forcemount", "unmount"
 	};
 
 	if (zcmd >= sizeof (zcmdstr) / sizeof (*zcmdstr))
@@ -271,8 +271,6 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 	bzero(outargs, BOOTARGS_MAX);
 	bzero(badarg, BOOTARGS_MAX);
 
-	(void) strlcpy(init_file, PATH_TO_INIT, MAXPATHLEN);
-
 	/*
 	 * If the user didn't specify transient boot arguments, check
 	 * to see if there were any specified in the zone configuration,
@@ -357,7 +355,7 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 	optind = 0;
 	opterr = 0;
 	err = Z_OK;
-	while ((c = getopt(argc, argv, "i:m:s")) != -1) {
+	while ((c = getopt(argc, argv, "fi:m:s")) != -1) {
 		switch (c) {
 		case 'i':
 			/*
@@ -365,6 +363,9 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 			 * along to userland
 			 */
 			(void) strlcpy(init_file, optarg, MAXPATHLEN);
+			break;
+		case 'f':
+			/* This has already been processed by zoneadm */
 			break;
 		case 'm':
 		case 's':
@@ -498,10 +499,17 @@ init_template(void)
 	return (fd);
 }
 
+typedef struct fs_callback {
+	zlog_t		*zlogp;
+	zoneid_t	zoneid;
+} fs_callback_t;
+
 static int
-mount_early_fs(zlog_t *zlogp, zoneid_t zoneid, const char *spec,
-    const char *dir, char *fstype)
+mount_early_fs(void *data, const char *spec, const char *dir,
+    const char *fstype, const char *opt)
 {
+	zlog_t *zlogp = ((fs_callback_t *)data)->zlogp;
+	zoneid_t zoneid = ((fs_callback_t *)data)->zoneid;
 	pid_t child;
 	int child_status;
 	int tmpl_fd;
@@ -519,6 +527,10 @@ mount_early_fs(zlog_t *zlogp, zoneid_t zoneid, const char *spec,
 		return (-1);
 
 	} else if (child == 0) {	/* child */
+		char opt_buf[MAX_MNTOPT_STR];
+		int optlen = 0;
+		int mflag = MS_DATA;
+
 		(void) ct_tmpl_clear(tmpl_fd);
 		/*
 		 * Even though there are no procs running in the zone, we
@@ -529,7 +541,23 @@ mount_early_fs(zlog_t *zlogp, zoneid_t zoneid, const char *spec,
 		if (zone_enter(zoneid) == -1) {
 			_exit(errno);
 		}
-		if (mount(spec, dir, MS_DATA, fstype, NULL, 0, NULL, 0) != 0)
+		if (opt != NULL) {
+			/*
+			 * The mount() system call is incredibly annoying.
+			 * If options are specified, we need to copy them
+			 * into a temporary buffer since the mount() system
+			 * call will overwrite the options string.  It will
+			 * also fail if the new option string it wants to
+			 * write is bigger than the one we passed in, so
+			 * you must pass in a buffer of the maximum possible
+			 * option string length.  sigh.
+			 */
+			(void) strlcpy(opt_buf, opt, sizeof (opt_buf));
+			opt = opt_buf;
+			optlen = MAX_MNTOPT_STR;
+			mflag = MS_OPTIONSTR;
+		}
+		if (mount(spec, dir, mflag, fstype, NULL, 0, opt, optlen) != 0)
 			_exit(errno);
 		_exit(0);
 	}
@@ -554,27 +582,35 @@ mount_early_fs(zlog_t *zlogp, zoneid_t zoneid, const char *spec,
 	return (0);
 }
 
-static int
-zone_mount_early(zlog_t *zlogp, zoneid_t zoneid)
+int
+do_subproc(zlog_t *zlogp, char *cmdbuf)
 {
-	if (mount_early_fs(zlogp, zoneid, "/proc", "/proc", "proc") != 0)
-		return (-1);
+	char inbuf[1024];	/* arbitrary large amount */
+	FILE *file;
+	int status;
 
-	if (mount_early_fs(zlogp, zoneid, "ctfs", CTFS_ROOT, "ctfs") != 0)
+	file = popen(cmdbuf, "r");
+	if (file == NULL) {
+		zerror(zlogp, B_TRUE, "could not launch: %s", cmdbuf);
 		return (-1);
+	}
 
-	if (mount_early_fs(zlogp, zoneid, "objfs", OBJFS_ROOT, "objfs") != 0)
+	while (fgets(inbuf, sizeof (inbuf), file) != NULL)
+		if (zlogp != &logsys)
+			zerror(zlogp, B_FALSE, "%s", inbuf);
+	status = pclose(file);
+
+	if (WIFSIGNALED(status)) {
+		zerror(zlogp, B_FALSE, "%s unexpectedly terminated due to "
+		    "signal %d", cmdbuf, WTERMSIG(status));
 		return (-1);
-
-	if (mount_early_fs(zlogp, zoneid, "swap", "/etc/svc/volatile",
-	    "tmpfs") != 0)
+	}
+	assert(WIFEXITED(status));
+	if (WEXITSTATUS(status) == ZEXIT_EXEC) {
+		zerror(zlogp, B_FALSE, "failed to exec %s", cmdbuf);
 		return (-1);
-
-	if (mount_early_fs(zlogp, zoneid, "mnttab", "/etc/mnttab",
-	    "mntfs") != 0)
-		return (-1);
-
-	return (0);
+	}
+	return (WEXITSTATUS(status));
 }
 
 static int
@@ -584,6 +620,9 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 	struct stat st;
 	char zroot[MAXPATHLEN], initpath[MAXPATHLEN], init_file[MAXPATHLEN];
 	char nbootargs[BOOTARGS_MAX];
+	char cmdbuf[MAXPATHLEN];
+	fs_callback_t cb;
+	brand_handle_t *bhp;
 	int err;
 
 	if (init_console_slave(zlogp) != 0)
@@ -595,8 +634,52 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 		return (-1);
 	}
 
-	if (zone_mount_early(zlogp, zoneid) != 0)
+	cb.zlogp = zlogp;
+	cb.zoneid = zoneid;
+
+	/* Get a handle to the brand info for this zone */
+	if ((bhp = brand_open(brand_name)) == NULL) {
+		zerror(zlogp, B_FALSE, "unable to determine zone brand");
 		return (-1);
+	}
+
+	/*
+	 * Get the list of filesystems to mount from the brand
+	 * configuration.  These mounts are done via a thread that will
+	 * enter the zone, so they are done from within the context of the
+	 * zone.
+	 */
+	if (brand_platform_iter_mounts(bhp, mount_early_fs, &cb) != 0) {
+		zerror(zlogp, B_FALSE, "unable to mount filesystems");
+		brand_close(bhp);
+		return (-1);
+	}
+
+	/*
+	 * Get the brand's boot callback if it exists.
+	 */
+	if (zone_get_zonepath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
+		zerror(zlogp, B_FALSE, "unable to determine zone root");
+		return (-1);
+	}
+	(void) strcpy(cmdbuf, EXEC_PREFIX);
+	if (brand_get_boot(bhp, zone_name, zroot, cmdbuf + EXEC_LEN,
+	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) != 0) {
+		zerror(zlogp, B_FALSE,
+		    "unable to determine branded zone's boot callback");
+		brand_close(bhp);
+		return (-1);
+	}
+
+	/* Get the path for this zone's init(1M) (or equivalent) process.  */
+	if (brand_get_initname(bhp, init_file, MAXPATHLEN) != 0) {
+		zerror(zlogp, B_FALSE,
+		    "unable to determine zone's init(1M) location");
+		brand_close(bhp);
+		return (-1);
+	}
+
+	brand_close(bhp);
 
 	err = filter_bootargs(zlogp, bootargs, nbootargs, init_file,
 	    bad_boot_arg);
@@ -607,14 +690,12 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 
 	assert(init_file[0] != '\0');
 
-	/*
-	 * Try to anticipate possible problems: Make sure whatever binary
-	 * is supposed to be init is executable.
-	 */
+	/* Try to anticipate possible problems: Make sure init is executable. */
 	if (zone_get_rootpath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to determine zone root");
 		return (-1);
 	}
+
 	(void) snprintf(initpath, sizeof (initpath), "%s%s", zroot, init_file);
 
 	if (stat(initpath, &st) == -1) {
@@ -624,6 +705,17 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 
 	if ((st.st_mode & S_IXUSR) == 0) {
 		zerror(zlogp, B_FALSE, "%s is not executable", initpath);
+		return (-1);
+	}
+
+	/*
+	 * If there is a brand 'boot' callback, execute it now to give the
+	 * brand one last chance to do any additional setup before the zone
+	 * is booted.
+	 */
+	if ((strlen(cmdbuf) > EXEC_LEN) &&
+	    (do_subproc(zlogp, cmdbuf) != Z_OK)) {
+		zerror(zlogp, B_FALSE, "%s failed", cmdbuf);
 		return (-1);
 	}
 
@@ -736,6 +828,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	zlog_t *zlogp;
 	zone_cmd_rval_t *rvalp;
 	size_t rlen = getpagesize(); /* conservative */
+	fs_callback_t cb;
+	brand_handle_t *bhp;
 
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	zargp = (zone_cmd_arg_t *)args;
@@ -811,9 +905,9 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	/*
 	 * Check for validity of command.
 	 */
-	if (cmd != Z_READY && cmd != Z_BOOT && cmd != Z_REBOOT &&
-	    cmd != Z_HALT && cmd != Z_NOTE_UNINSTALLING && cmd != Z_MOUNT &&
-	    cmd != Z_UNMOUNT) {
+	if (cmd != Z_READY && cmd != Z_BOOT && cmd != Z_FORCEBOOT &&
+	    cmd != Z_REBOOT && cmd != Z_HALT && cmd != Z_NOTE_UNINSTALLING &&
+	    cmd != Z_MOUNT && cmd != Z_FORCEMOUNT && cmd != Z_UNMOUNT) {
 		zerror(&logsys, B_FALSE, "invalid command %d", (int)cmd);
 		goto out;
 	}
@@ -856,6 +950,14 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		zlogp = &logsys;	/* Log errors to syslog */
 	}
 
+	/*
+	 * If we are being asked to forcibly mount or boot a zone, we
+	 * pretend that an INCOMPLETE zone is actually INSTALLED.
+	 */
+	if (zstate == ZONE_STATE_INCOMPLETE &&
+	    (cmd == Z_FORCEBOOT || cmd == Z_FORCEMOUNT))
+		zstate = ZONE_STATE_INSTALLED;
+
 	switch (zstate) {
 	case ZONE_STATE_CONFIGURED:
 	case ZONE_STATE_INCOMPLETE:
@@ -876,6 +978,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 				eventstream_write(Z_EVT_ZONE_READIED);
 			break;
 		case Z_BOOT:
+		case Z_FORCEBOOT:
 			eventstream_write(Z_EVT_ZONE_BOOTING);
 			if ((rval = zone_ready(zlogp, B_FALSE)) == 0)
 				rval = zone_bootup(zlogp, zargp->bootbuf);
@@ -916,13 +1019,41 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			eventstream_write(Z_EVT_ZONE_UNINSTALLING);
 			break;
 		case Z_MOUNT:
+		case Z_FORCEMOUNT:
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
-			rval = zone_ready(zlogp, B_TRUE);
-			if (rval == 0) {
-				eventstream_write(Z_EVT_ZONE_READIED);
-				rval = zone_mount_early(zlogp, zone_id);
+			if (!zone_isnative) {
+				zerror(zlogp, B_FALSE,
+				    "%s operation is invalid for branded "
+				    "zones", z_cmd_name(cmd));
+				rval = -1;
+				break;
 			}
+
+			rval = zone_ready(zlogp, B_TRUE);
+			if (rval != 0)
+				break;
+
+			eventstream_write(Z_EVT_ZONE_READIED);
+
+			/* Get a handle to the brand info for this zone */
+			if ((bhp = brand_open(brand_name)) == NULL) {
+				rval = -1;
+				break;
+			}
+
+			/*
+			 * Get the list of filesystems to mount from
+			 * the brand configuration.  These mounts are done
+			 * via a thread that will enter the zone, so they
+			 * are done from within the context of the zone.
+			 */
+			cb.zlogp = zlogp;
+			cb.zoneid = zone_id;
+			rval = brand_platform_iter_mounts(bhp,
+			    mount_early_fs, &cb);
+
+			brand_close(bhp);
 
 			/*
 			 * Ordinarily, /dev/fd would be mounted inside the zone
@@ -931,8 +1062,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			 * manually.
 			 */
 			if (rval == 0)
-				rval = mount_early_fs(zlogp, zone_id, "fd",
-				    "/dev/fd", "fd");
+				rval = mount_early_fs(&cb,
+				    "fd", "/dev/fd", "fd", NULL);
 			break;
 		case Z_UNMOUNT:
 			if (kernelcall)	/* Invalid; can't happen */
@@ -1245,6 +1376,7 @@ main(int argc, char *argv[])
 	priv_set_t *privset;
 	zone_state_t zstate;
 	char parents_locale[MAXPATHLEN];
+	brand_handle_t *bhp;
 	int err;
 
 	pid_t pid;
@@ -1347,12 +1479,21 @@ main(int argc, char *argv[])
 		    zonecfg_strerror(err));
 		return (1);
 	}
-	if (zstate < ZONE_STATE_INSTALLED) {
+	if (zstate < ZONE_STATE_INCOMPLETE) {
 		zerror(zlogp, B_FALSE,
 		    "cannot manage a zone which is in state '%s'",
 		    zone_state_str(zstate));
 		return (1);
 	}
+
+	/* Get a handle to the brand info for this zone */
+	if ((zone_get_brand(zone_name, brand_name, sizeof (brand_name))
+	    != Z_OK) || (bhp = brand_open(brand_name)) == NULL) {
+		zerror(zlogp, B_FALSE, "unable to determine zone brand");
+		return (1);
+	}
+	zone_isnative = brand_is_native(bhp);
+	brand_close(bhp);
 
 	/*
 	 * Check that we have all privileges.  It would be nice to pare

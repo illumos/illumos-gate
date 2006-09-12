@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +30,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
-#include "libproc.h"
+#include <limits.h>
+
+#include "Pcontrol.h"
 
 /*
  * These several routines simply get the indicated /proc structures
@@ -50,13 +51,14 @@
 int
 proc_get_cred(pid_t pid, prcred_t *credp, int ngroups)
 {
-	char fname[64];
+	char fname[PATH_MAX];
 	int fd;
 	int rv = -1;
 	ssize_t minsize = sizeof (*credp) - sizeof (gid_t);
 	size_t size = minsize + ngroups * sizeof (gid_t);
 
-	(void) snprintf(fname, sizeof (fname), "/proc/%d/cred", (int)pid);
+	(void) snprintf(fname, sizeof (fname), "%s/%d/cred",
+	    procfs_path, (int)pid);
 	if ((fd = open(fname, O_RDONLY)) >= 0) {
 		if (read(fd, credp, size) >= minsize)
 			rv = 0;
@@ -71,12 +73,13 @@ proc_get_cred(pid_t pid, prcred_t *credp, int ngroups)
 prpriv_t *
 proc_get_priv(pid_t pid)
 {
-	char fname[64];
+	char fname[PATH_MAX];
 	int fd;
 	struct stat statb;
 	prpriv_t *rv = NULL;
 
-	(void) snprintf(fname, sizeof (fname), "/proc/%d/priv", (int)pid);
+	(void) snprintf(fname, sizeof (fname), "%s/%d/priv",
+	    procfs_path, (int)pid);
 	if ((fd = open(fname, O_RDONLY)) >= 0) {
 		if (fstat(fd, &statb) != 0 ||
 		    (rv = malloc(statb.st_size)) == NULL ||
@@ -99,13 +102,14 @@ proc_get_priv(pid_t pid)
 int
 proc_get_ldt(pid_t pid, struct ssd *pldt, int nldt)
 {
-	char fname[64];
+	char fname[PATH_MAX];
 	int fd;
 	struct stat statb;
 	size_t size;
 	ssize_t ssize;
 
-	(void) snprintf(fname, sizeof (fname), "/proc/%d/ldt", (int)pid);
+	(void) snprintf(fname, sizeof (fname), "%s/%d/ldt",
+	    procfs_path, (int)pid);
 	if ((fd = open(fname, O_RDONLY)) < 0)
 		return (-1);
 
@@ -131,11 +135,12 @@ proc_get_ldt(pid_t pid, struct ssd *pldt, int nldt)
 int
 proc_get_psinfo(pid_t pid, psinfo_t *psp)
 {
-	char fname[64];
+	char fname[PATH_MAX];
 	int fd;
 	int rv = -1;
 
-	(void) snprintf(fname, sizeof (fname), "/proc/%d/psinfo", (int)pid);
+	(void) snprintf(fname, sizeof (fname), "%s/%d/psinfo",
+	    procfs_path, (int)pid);
 	if ((fd = open(fname, O_RDONLY)) >= 0) {
 		if (read(fd, psp, sizeof (*psp)) == sizeof (*psp))
 			rv = 0;
@@ -147,11 +152,12 @@ proc_get_psinfo(pid_t pid, psinfo_t *psp)
 int
 proc_get_status(pid_t pid, pstatus_t *psp)
 {
-	char fname[64];
+	char fname[PATH_MAX];
 	int fd;
 	int rv = -1;
 
-	(void) snprintf(fname, sizeof (fname), "/proc/%d/status", (int)pid);
+	(void) snprintf(fname, sizeof (fname), "%s/%d/status",
+	    procfs_path, (int)pid);
 	if ((fd = open(fname, O_RDONLY)) >= 0) {
 		if (read(fd, psp, sizeof (*psp)) == sizeof (*psp))
 			rv = 0;
@@ -169,11 +175,12 @@ proc_get_status(pid_t pid, pstatus_t *psp)
 int
 proc_get_auxv(pid_t pid, auxv_t *pauxv, int naux)
 {
-	char fname[64];
+	char fname[PATH_MAX];
 	int fd;
 	int rv = -1;
 
-	(void) snprintf(fname, sizeof (fname), "/proc/%d/auxv", (int)pid);
+	(void) snprintf(fname, sizeof (fname), "%s/%d/auxv",
+	    procfs_path, (int)pid);
 	if ((fd = open(fname, O_RDONLY)) >= 0) {
 		if ((rv = read(fd, pauxv, naux * sizeof (auxv_t))) >= 0)
 			rv /= sizeof (auxv_t);

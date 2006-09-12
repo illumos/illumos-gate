@@ -81,6 +81,10 @@
 @ MSG_DB_NODYNDEBUG	"rtld_db: fde: no %lld found in .dynamic"
 @ MSG_DB_FINDDYNAMIC	"rtld_db: fde: DYNAMIC entry found tag: %d found. \
 			 val: 0x%llx"
+@ MSG_DB_HELPER_PREFIX	"/usr/lib/brand/"
+
+
+
 # Diagnostic messages
 
 @ MSG_DB_LOGENABLE	"rtld_db: logging enabled!"
@@ -95,6 +99,13 @@
 @ MSG_DB_RDEVENTGETMSG	"rtld_db: rd_event_getmsg(dmodel=%d, type=%d, \
 			 state=%d)"
 @ MSG_DB_RDOBJPADE	"rtld_db: rd_objpad_enable(padsize=0x%llx)"
+@ MSG_DB_64BIT_PREFIX	"64/";
+@ MSG_DB_BRAND_HELPERPATH_PREFIX "%s/%s/%s/%s%s_librtld_db.so.1"
+@ MSG_DB_BRAND_HELPERPATH "%s/%s/%s%s_librtld_db.so.1"
+@ MSG_DB_HELPERNOOPS	"rtld_db: helper lib loaded but ops not preset"
+@ MSG_DB_HELPERLOADED	"rtld_db: helper library loaded for brand \"%s\""
+@ MSG_DB_HELPERLOADFAILED "rtld_db: couldn't load brand helper library %s"
+@ MSG_DB_HELPERINITFAILED "rtld_db: brand helper library initialization failed"
 
 @ MSG_ER_OK		"no error"
 @ MSG_ER_ERR		"generic rtld_db.so error"
@@ -111,3 +122,4 @@
 @ MSG_SYM_DLACT		"rtld_db_dlactivity"
 @ MSG_SYM_RTBIND	"elf_rtbndr"
 @ MSG_SYM_DYNAMIC	"_DYNAMIC"
+@ MSG_SYM_BRANDOPS	"rtld_db_brand_ops"

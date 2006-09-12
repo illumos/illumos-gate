@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,14 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 #ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 1998 by Sun Microsystems, Inc.
-# All rights reserved.
-#
-# cmd/devfsadm/sparc/Makefile
-#
 
-MISC_LINK_ISA = misc_link_sparc
+LINK_SRCS_sparc = misc_link_sparc.c
+LINK_OBJS_sparc = misc_link_sparc.o
+LINK_MODS_sparc = SUNW_misc_link_sparc.so
 
 include ../Makefile.com
 

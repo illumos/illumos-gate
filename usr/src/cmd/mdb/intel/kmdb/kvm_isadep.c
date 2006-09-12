@@ -627,8 +627,12 @@ kmt_startup_isadep(mdb_tgt_t *t)
 	    "cmntrap", &kmt->kmt_intrsyms._kmt_cmntrap, NULL);
 	(void) mdb_tgt_lookup_by_name(t, MDB_TGT_OBJ_EXEC,
 	    "sys_sysenter", &kmt->kmt_intrsyms._kmt_sysenter, NULL);
+	(void) mdb_tgt_lookup_by_name(t, MDB_TGT_OBJ_EXEC,
+	    "brand_sys_sysenter", &kmt->kmt_intrsyms._kmt_brand_sysenter, NULL);
 #if defined(__amd64)
 	(void) mdb_tgt_lookup_by_name(t, MDB_TGT_OBJ_EXEC,
 	    "sys_syscall", &kmt->kmt_intrsyms._kmt_syscall, NULL);
+	(void) mdb_tgt_lookup_by_name(t, MDB_TGT_OBJ_EXEC,
+	    "brand_sys_syscall", &kmt->kmt_intrsyms._kmt_brand_syscall, NULL);
 #endif
 }

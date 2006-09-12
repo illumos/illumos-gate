@@ -99,7 +99,7 @@ extern "C" {
 	 *	getpgid(pid)	  :: syscall(39,4,pid)
 	 *	setpgid(pid,pgid) :: syscall(39,5,pid,pgid)
 	 */
-#define	SYS_reserved_40	40	/* 40 not used, was xenix */
+#define	SYS_uucopystr	40
 #define	SYS_dup		41
 #define	SYS_pipe	42
 #define	SYS_times	43
@@ -355,7 +355,7 @@ extern "C" {
 #define	SYS_pwrite		174
 #define	SYS_llseek		175
 #define	SYS_inst_sync		176
-#define	SYS_reserved_177	177	/* 177 reserved */
+#define	SYS_brand		177
 #define	SYS_kaio		178
 	/*
 	 * subcodes:
@@ -464,6 +464,8 @@ extern "C" {
 	 *	zone_list(...) :: zone(ZONE_LIST, ...)
 	 *	zone_shutdown(...) :: zone(ZONE_SHUTDOWN, ...)
 	 *	zone_lookup(...) :: zone(ZONE_LOOKUP, ...)
+	 *	zone_setattr(...) :: zone(ZONE_SETATTR, ...)
+	 *	zone_getattr(...) :: zone(ZONE_GETATTR, ...)
 	 */
 #define	SYS_autofssys		228
 #define	SYS_getcwd		229
@@ -494,7 +496,7 @@ extern "C" {
 #define	SYS_lwp_mutex_trylock	251
 #define	SYS_lwp_mutex_init	252
 #define	SYS_cladm		253
-#define	SYS_reserved_254	254	/* 254 reserved */
+#define	SYS_uucopy		254
 #define	SYS_umount2		255
 
 

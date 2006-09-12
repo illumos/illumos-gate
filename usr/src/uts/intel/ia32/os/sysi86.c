@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -63,7 +62,6 @@
 #include <sys/fp.h>
 #include <sys/cmn_err.h>
 
-static int setdscr(caddr_t ap);
 static void setup_ldt(proc_t *pp);
 static void *ldt_map(proc_t *pp, uint_t seli);
 static void ldt_free(proc_t *pp);
@@ -80,6 +78,7 @@ extern void sgmtl(long);
 int
 sysi86(short cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
 {
+	struct ssd ssd;
 	int error = 0;
 	int c;
 	proc_t *pp = curproc;
@@ -121,7 +120,19 @@ sysi86(short cmd, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
 			error = EINTR;
 			break;
 		}
-		error = setdscr((caddr_t)arg1);
+
+		if (get_udatamodel() == DATAMODEL_LP64) {
+			error = EINVAL;
+			break;
+		}
+
+		if (copyin((caddr_t)arg1, &ssd, sizeof (ssd)) < 0) {
+			error = EFAULT;
+			break;
+		}
+
+		error = setdscr(&ssd);
+
 		mutex_enter(&pp->p_lock);
 		if (curthread != pp->p_agenttp)
 			continuelwps(pp);
@@ -440,30 +451,23 @@ ldt_installctx(proc_t *p, proc_t *cp)
 	mutex_exit(&targ->p_lock);
 }
 
-static int
-setdscr(caddr_t ap)
+int
+setdscr(struct ssd *ssd)
 {
-	struct ssd ssd;		/* request structure buffer */
 	ushort_t seli; 		/* selector index */
 	user_desc_t *dscrp;	/* descriptor pointer */
 	proc_t	*pp = ttoproc(curthread);
 
-	if (get_udatamodel() == DATAMODEL_LP64)
-		return (EINVAL);
-
-	if (copyin(ap, &ssd, sizeof (ssd)) < 0)
-		return (EFAULT);
-
 	/*
 	 * LDT segments: executable and data at DPL 3 only.
 	 */
-	if (!SELISLDT(ssd.sel) || !SELISUPL(ssd.sel))
+	if (!SELISLDT(ssd->sel) || !SELISUPL(ssd->sel))
 		return (EINVAL);
 
 	/*
 	 * check the selector index.
 	 */
-	seli = SELTOIDX(ssd.sel);
+	seli = SELTOIDX(ssd->sel);
 	if (seli >= MAXNLDT || seli < LDT_UDBASE)
 		return (EINVAL);
 
@@ -541,7 +545,7 @@ setdscr(caddr_t ap)
 	 * a lot better failure mode than SIGKILL and a core file
 	 * from kern_gpfault() too.)
 	 */
-	if (SI86SSD_PRES(&ssd) == 0) {
+	if (SI86SSD_PRES(ssd) == 0) {
 		kthread_t *t;
 		int bad = 0;
 
@@ -563,27 +567,27 @@ setdscr(caddr_t ap)
 			pcb_t *pcb = &lwp->lwp_pcb;
 #endif
 
-			if (ssd.sel == rp->r_cs || ssd.sel == rp->r_ss) {
+			if (ssd->sel == rp->r_cs || ssd->sel == rp->r_ss) {
 				bad = 1;
 				break;
 			}
 
 #if defined(__amd64)
 			if (pcb->pcb_flags & RUPDATE_PENDING) {
-				if (ssd.sel == pcb->pcb_ds ||
-				    ssd.sel == pcb->pcb_es ||
-				    ssd.sel == pcb->pcb_fs ||
-				    ssd.sel == pcb->pcb_gs) {
+				if (ssd->sel == pcb->pcb_ds ||
+				    ssd->sel == pcb->pcb_es ||
+				    ssd->sel == pcb->pcb_fs ||
+				    ssd->sel == pcb->pcb_gs) {
 					bad = 1;
 					break;
 				}
 			} else
 #endif
 			{
-				if (ssd.sel == rp->r_ds ||
-				    ssd.sel == rp->r_es ||
-				    ssd.sel == rp->r_fs ||
-				    ssd.sel == rp->r_gs) {
+				if (ssd->sel == rp->r_ds ||
+				    ssd->sel == rp->r_es ||
+				    ssd->sel == rp->r_fs ||
+				    ssd->sel == rp->r_gs) {
 					bad = 1;
 					break;
 				}
@@ -601,7 +605,7 @@ setdscr(caddr_t ap)
 	/*
 	 * If acc1 is zero, clear the descriptor (including the 'present' bit)
 	 */
-	if (ssd.acc1 == 0) {
+	if (ssd->acc1 == 0) {
 		bzero(dscrp, sizeof (*dscrp));
 		mutex_exit(&pp->p_ldtlock);
 		return (0);
@@ -611,17 +615,18 @@ setdscr(caddr_t ap)
 	 * Check segment type, allow segment not present and
 	 * only user DPL (3).
 	 */
-	if (SI86SSD_DPL(&ssd) != SEL_UPL) {
+	if (SI86SSD_DPL(ssd) != SEL_UPL) {
 		mutex_exit(&pp->p_ldtlock);
 		return (EINVAL);
 	}
 
 #if defined(__amd64)
 	/*
-	 * Do not allow 32-bit applications to create 64-bit mode code segments.
+	 * Do not allow 32-bit applications to create 64-bit mode code
+	 * segments.
 	 */
-	if (SI86SSD_ISUSEG(&ssd) && ((SI86SSD_TYPE(&ssd) >> 3) & 1) == 1 &&
-	    SI86SSD_ISLONG(&ssd)) {
+	if (SI86SSD_ISUSEG(ssd) && ((SI86SSD_TYPE(ssd) >> 3) & 1) == 1 &&
+	    SI86SSD_ISLONG(ssd)) {
 		mutex_exit(&pp->p_ldtlock);
 		return (EINVAL);
 	}
@@ -630,8 +635,8 @@ setdscr(caddr_t ap)
 	/*
 	 * Set up a code or data user segment descriptor.
 	 */
-	if (SI86SSD_ISUSEG(&ssd)) {
-		ssd_to_usd(&ssd, dscrp);
+	if (SI86SSD_ISUSEG(ssd)) {
+		ssd_to_usd(ssd, dscrp);
 		mutex_exit(&pp->p_ldtlock);
 		return (0);
 	}
@@ -639,8 +644,8 @@ setdscr(caddr_t ap)
 	/*
 	 * Allow a call gate only if the destination is in the LDT.
 	 */
-	if (SI86SSD_TYPE(&ssd) == SDT_SYSCGT && SELISLDT(ssd.ls)) {
-		ssd_to_sgd(&ssd, (gate_desc_t *)dscrp);
+	if (SI86SSD_TYPE(ssd) == SDT_SYSCGT && SELISLDT(ssd->ls)) {
+		ssd_to_sgd(ssd, (gate_desc_t *)dscrp);
 		mutex_exit(&pp->p_ldtlock);
 		return (0);
 	}
@@ -653,7 +658,7 @@ setdscr(caddr_t ap)
  * Allocate a private LDT for this process and initialize it with the
  * default entries.
  */
-void
+static void
 setup_ldt(proc_t *pp)
 {
 	user_desc_t *ldtp;	/* descriptor pointer */

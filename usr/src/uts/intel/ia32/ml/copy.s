@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2044,6 +2043,15 @@ void
 ucopy(const void *ufrom, void *uto, size_t ulength)
 {}
 
+/*
+ * copy a string in user space
+ */
+
+/* ARGSUSED */
+void
+ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *lencopied)
+{}
+
 #else /* __lint */
 
 #if defined(__amd64)
@@ -2089,14 +2097,23 @@ ucopy(const void *ufrom, void *uto, size_t ulength)
 	ENTRY(ucopy)
 	movq	kernelbase(%rip), %rax
 	cmpq	%rax, %rdi
-	jb	1f
-	movq	%rax, %rdi
-1:
+	cmovaeq	%rax, %rdi	/* force fault at kernelbase */
 	cmpq	%rax, %rsi
-	jb	do_copy
-	movq	%rax, %rsi
+	cmovaeq	%rax, %rsi	/* force fault at kernelbase */
 	jmp	do_copy
 	SET_SIZE(ucopy)
+
+	ENTRY(ucopystr)
+	movq	kernelbase(%rip), %rax
+	cmpq	%rax, %rdi
+	cmovaeq	%rax, %rdi	/* force fault at kernelbase */
+	cmpq	%rax, %rsi
+	cmovaeq	%rax, %rsi	/* force fault at kernelbase */
+	/* do_copystr expects lofault address in %r8 */
+	movq	%gs:CPU_THREAD, %r8
+	movq	T_LOFAULT(%r8), %r8
+	jmp	do_copystr
+	SET_SIZE(ucopystr)
 
 #elif defined(__i386)
 
@@ -2149,6 +2166,22 @@ ucopy(const void *ufrom, void *uto, size_t ulength)
 	movl	%eax, 8(%esp)	/* force fault at kernelbase */
 	jmp	do_copy
 	SET_SIZE(ucopy)
+
+	ENTRY(ucopystr)
+	movl	kernelbase, %eax
+	cmpl	%eax, 4(%esp)
+	jb	1f
+	movl	%eax, 4(%esp)	/* force fault at kernelbase */
+1:
+	cmpl	%eax, 8(%esp)
+	jb	2f
+	movl	%eax, 8(%esp)	/* force fault at kernelbase */
+2:
+	/* do_copystr expects the lofault address in %eax */
+	movl	%gs:CPU_THREAD, %eax
+	movl	T_LOFAULT(%eax), %eax
+	jmp	do_copystr
+	SET_SIZE(ucopystr)
 
 #endif	/* __i386 */
 

@@ -102,14 +102,18 @@ _pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	error = _thrp_create(ap->stkaddr, ap->stksize, start_routine, arg,
 		flag, &tid, priority, policy, ap->guardsize);
 	if (error == 0) {
+		int prio_err;
+
 		if (mapped) {
 			ulwp_t *ulwp = find_lwp(tid);
 			ulwp->ul_pri_mapped = 1;
 			ulwp->ul_mappedpri = mappedpri;
 			ulwp_unlock(ulwp, udp);
 		}
-		if (rt && _thrp_setlwpprio(tid, policy, priority))
-			thr_panic("_thrp_setlwpprio() failed");
+
+		if (rt && (prio_err = _thrp_setlwpprio(tid, policy, priority)))
+			return (prio_err);
+
 		if (thread)
 			*thread = tid;
 		(void) _thr_continue(tid);
@@ -269,9 +273,14 @@ _thread_setschedparam_main(pthread_t tid, int policy,
 		if (_validate_rt_prio(policy, prio))
 			error = EINVAL;
 		else {
+			int prio_err;
+
 			if (_private_geteuid() == 0 &&
-			    _thrp_setlwpprio(tid, policy, prio))
-				thr_panic("_thrp_setlwpprio failed");
+			    (prio_err = _thrp_setlwpprio(tid, policy, prio))) {
+				error = prio_err;
+				goto out;
+			}
+
 			ulwp->ul_policy = policy;
 			if (inheritflag == PRIO_INHERIT)
 				ulwp->ul_epri = prio;

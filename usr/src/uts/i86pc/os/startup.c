@@ -114,6 +114,7 @@
 
 extern void progressbar_init(void);
 extern void progressbar_start(void);
+extern void brand_init(void);
 
 /*
  * XXX make declaration below "static" when drivers no longer use this
@@ -1330,6 +1331,11 @@ startup_modules(void)
 	 * Initialize system parameters.
 	 */
 	param_init();
+
+	/*
+	 * Initialize the default brands
+	 */
+	brand_init();
 
 	/*
 	 * maxmem is the amount of physical memory we're playing with.

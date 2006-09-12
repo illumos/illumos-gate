@@ -113,6 +113,9 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/pcbe/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/brand/sn1/%.s
+	$(COMPILE.s) -o $@ $<
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/vm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -238,6 +241,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/os/%.c
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/pcbe/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/brand/sn1/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/vm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,19 +55,19 @@
 
 static int aoutexec(vnode_t *vp, execa_t *uap, uarg_t *args,
     intpdata_t *idatap, int level, long *execsz, int setid,
-    caddr_t exec_file, cred_t *cred);
+    caddr_t exec_file, cred_t *cred, int brand_action);
 static int get_aout_head(struct vnode **vpp, struct exdata *edp, long *execsz,
     int *isdyn);
 static int aoutcore(vnode_t *vp, proc_t *pp, cred_t *credp,
     rlim64_t rlimit, int sig, core_content_t content);
 #ifdef	_LP64
 extern int elf32exec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
-    long *, int, caddr_t, cred_t *);
+    long *, int, caddr_t, cred_t *, int);
 extern int elf32core(vnode_t *, proc_t *, cred_t *, rlim64_t, int,
     core_content_t);
 #else	/* _LP64 */
 extern int elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
-    long *, int, caddr_t, cred_t *);
+    long *, int, caddr_t, cred_t *, int);
 extern int elfcore(vnode_t *, proc_t *, cred_t *, rlim64_t, int,
     core_content_t);
 #endif	/* _LP64 */
@@ -141,7 +140,7 @@ _info(struct modinfo *modinfop)
 static int
 aoutexec(vnode_t *vp, struct execa *uap, struct uarg *args,
     struct intpdata *idatap, int level, long *execsz, int setid,
-    caddr_t exec_file, cred_t *cred)
+    caddr_t exec_file, cred_t *cred, int brand_action)
 {
 	int error;
 	struct exdata edp, edpout;
@@ -201,10 +200,10 @@ aoutexec(vnode_t *vp, struct execa *uap, struct uarg *args,
 	}
 #ifdef	_LP64
 	if (error = elf32exec(nvp, uap, args, idatap, level, execsz,
-	    setid, exec_file, cred))
+	    setid, exec_file, cred, brand_action))
 #else	/* _LP64 */
 	if (error = elfexec(nvp, uap, args, idatap, level, execsz,
-	    setid, exec_file, cred))
+	    setid, exec_file, cred, brand_action))
 #endif	/* _LP64 */
 	{
 		VN_RELE(nvp);

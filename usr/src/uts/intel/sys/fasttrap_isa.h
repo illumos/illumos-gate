@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +54,7 @@ typedef struct fasttrap_machtp {
 	uint8_t		ftmt_base;	/* branch base */
 	uint8_t		ftmt_index;	/* branch index */
 	uint8_t		ftmt_scale;	/* branch scale */
+	uint8_t		ftmt_segment;	/* segment for memory accesses */
 	uintptr_t	ftmt_dest;	/* destination of control flow */
 } fasttrap_machtp_t;
 
@@ -69,6 +69,7 @@ typedef struct fasttrap_machtp {
 #define	ftt_base	ftt_mtp.ftmt_base
 #define	ftt_index	ftt_mtp.ftmt_index
 #define	ftt_scale	ftt_mtp.ftmt_scale
+#define	ftt_segment	ftt_mtp.ftmt_segment
 #define	ftt_dest	ftt_mtp.ftmt_dest
 
 #define	FASTTRAP_T_COMMON	0x00	/* common case -- no emulation */
@@ -88,6 +89,17 @@ typedef struct fasttrap_machtp {
 #define	FASTTRAP_RIP_1		0x1
 #define	FASTTRAP_RIP_2		0x2
 #define	FASTTRAP_RIP_X		0x4
+
+/*
+ * Segment values.
+ */
+#define	FASTTRAP_SEG_NONE		0
+#define	FASTTRAP_SEG_CS			1
+#define	FASTTRAP_SEG_DS			2
+#define	FASTTRAP_SEG_ES			3
+#define	FASTTRAP_SEG_FS			4
+#define	FASTTRAP_SEG_GS			5
+#define	FASTTRAP_SEG_SS			6
 
 #define	FASTTRAP_AFRAMES		3
 #define	FASTTRAP_RETURN_AFRAMES		4

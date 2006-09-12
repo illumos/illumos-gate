@@ -260,10 +260,7 @@ const struct systable systable[] = {
 {"kill",	2, DEC, NOV, DEC, SIG},				/*  37 */
 {"fstatfs",	4, DEC, NOV, DEC, HEX, DEC, DEC},		/*  38 */
 {"pgrpsys",	3, DEC, NOV, DEC, DEC, DEC},			/*  39 */
-
-/* The following entry was xenix */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
-
+{"uucopystr",	3, DEC, NOV, STG, RST, UNS},			/*  40 */
 {"dup",		1, DEC, NOV, DEC},				/*  41 */
 {"pipe",	0, DEC, DEC},					/*  42 */
 {"times",	1, DEC, NOV, HEX},				/*  43 */
@@ -403,7 +400,7 @@ const struct systable systable[] = {
 {"pwrite",	4, DEC, NOV, DEC, IOB, UNS, DEX},		/* 174 */
 {"llseek",	4, LLO, NOV, DEC, LLO, HID, WHN},		/* 175 */
 {"inst_sync",	2, DEC, NOV, STG, DEC},				/* 176 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"brand",	6, DEC, NOV, DEC, HEX, HEX, HEX, HEX, HEX},	/* 177 */
 {"kaio",	7, DEC, NOV, AIO, HEX, HEX, HEX, HEX, HEX, HEX}, /* 178 */
 {"cpc",		5, DEC, NOV, CPC, DEC, HEX, HEX, HEX},		/* 179 */
 {"lgrpsys",	3, DEC, NOV, DEC, DEC, HEX},			/* 180 */
@@ -480,7 +477,7 @@ const struct systable systable[] = {
 {"lwp_mutex_trylock", 1, DEC, NOV, HEX},			/* 251 */
 {"lwp_mutex_init", 2, DEC, NOV, HEX, HEX},			/* 252 */
 {"cladm",	3, DEC, NOV, CLC, CLF, HEX},			/* 253 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"uucopy",	3, DEC, NOV, HEX, HEX, UNS},			/* 254 */
 {"umount2",	2, DEC, NOV, STG, MTF},				/* 255 */
 { NULL, -1, DEC, NOV},
 };

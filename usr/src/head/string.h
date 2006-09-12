@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +87,8 @@ extern char *strtok_r(char *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
 	defined(__XOPEN_OR_POSIX)
 extern void *memccpy(void *_RESTRICT_KYWD, const void *_RESTRICT_KYWD,
 		int, size_t);
+extern int uucopy(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
+extern int uucopystr(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
 #endif
 
 #if defined(__EXTENSIONS__) || \
@@ -121,6 +122,8 @@ extern char *strtok_r();
 #if defined(__EXTENSIONS__) || !defined(_STRICT_STDC) || \
 	defined(__XOPEN_OR_POSIX)
 extern void *memccpy();
+extern int uucopy();
+extern int uucopystr();
 #endif
 
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)

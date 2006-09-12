@@ -57,6 +57,7 @@
 #include <sys/types.h>
 #include <sys/contract/process.h>
 #include <sys/ctfs.h>
+#include <sys/brand.h>
 
 #include <alloca.h>
 #include <assert.h>
@@ -84,6 +85,7 @@
 #include <locale.h>
 #include <libzonecfg.h>
 #include <libcontract.h>
+#include <libbrand.h>
 
 static int masterfd;
 static struct termios save_termios;
@@ -110,7 +112,6 @@ static const char *pname;
 #define	SUPATH	"/usr/bin/su"
 #define	FAILSAFESHELL	"/sbin/sh"
 #define	DEFAULTSHELL	"/sbin/sh"
-#define	LOGINPATH	"/usr/bin/login"
 #define	DEF_PATH	"/usr/sbin:/usr/bin"
 
 /*
@@ -749,6 +750,64 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 	}
 }
 
+static char **
+zone_login_cmd(brand_handle_t *bhp, const char *login)
+{
+	static char result_buf[ARG_MAX];
+	char **new_argv, *ptr, *lasts;
+	int n, a;
+
+	/* Get the login command for the target zone. */
+	bzero(result_buf, sizeof (result_buf));
+	if (brand_get_login_cmd(bhp, login,
+	    result_buf, sizeof (result_buf)) != 0)
+		return (NULL);
+
+	/*
+	 * We got back a string that we'd like to execute.  But since
+	 * we're not doing the execution via a shell we'll need to convert
+	 * the exec string to an array of strings.  We'll do that here
+	 * but we're going to be very simplistic about it and break stuff
+	 * up based on spaces.  We're not even going to support any kind
+	 * of quoting or escape characters.  It's truly amazing that
+	 * there is no library function in OpenSolaris to do this for us.
+	 */
+
+	/*
+	 * Be paranoid.  Since we're deliniating based on spaces make
+	 * sure there are no adjacent spaces.
+	 */
+	if (strstr(result_buf, "  ") != NULL)
+		return (NULL);
+
+	/* Remove any trailing whitespace.  */
+	n = strlen(result_buf);
+	if (result_buf[n - 1] == ' ')
+		result_buf[n - 1] = '\0';
+
+	/* Count how many elements there are in the exec string. */
+	ptr = result_buf;
+	for (n = 2; ((ptr = strchr(ptr + 1, (int)' ')) != NULL); n++)
+		;
+
+	/* Allocate the argv array that we're going to return. */
+	if ((new_argv = malloc(sizeof (char *) * n)) == NULL)
+		return (NULL);
+
+	/* Tokenize the exec string and return. */
+	a = 0;
+	new_argv[a++] = result_buf;
+	if (n > 2) {
+		(void) strtok_r(result_buf, " ", &lasts);
+		while ((new_argv[a++] = strtok_r(NULL, " ", &lasts)) != NULL)
+			;
+	} else {
+		new_argv[a++] = NULL;
+	}
+	assert(n == a);
+	return (new_argv);
+}
+
 /*
  * Prepare argv array for exec'd process; if we're passing commands to the
  * new process, then use su(1M) to do the invocation.  Otherwise, use
@@ -757,7 +816,7 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
  * checks).
  */
 static char **
-prep_args(char *login, char **argv)
+prep_args(brand_handle_t *bhp, const char *login, char **argv)
 {
 	int argc = 0, a = 0, i, n = -1;
 	char **new_argv;
@@ -792,7 +851,7 @@ prep_args(char *login, char **argv)
 				return (NULL);
 
 			new_argv[a++] = SUPATH;
-			new_argv[a++] = login;
+			new_argv[a++] = (char *)login;
 		}
 		new_argv[a++] = "-c";
 		new_argv[a++] = subshell;
@@ -805,25 +864,12 @@ prep_args(char *login, char **argv)
 				return (NULL);
 			new_argv[a++] = FAILSAFESHELL;
 			new_argv[a++] = NULL;
+			assert(n == a);
 		} else {
-			n = 6;
-
-			if ((new_argv = malloc(sizeof (char *) * n)) == NULL)
-				return (NULL);
-
-			new_argv[a++] = LOGINPATH;
-			new_argv[a++] = "-z";
-			new_argv[a++] = "global";	/* hardcode, for now */
-			new_argv[a++] = "-f";
-			new_argv[a++] = login;
-			new_argv[a++] = NULL;
+			new_argv = zone_login_cmd(bhp, login);
 		}
 	}
-	/*
-	 * If this assert ever trips, it's because we've botched the setup
-	 * of ARGV above-- it's too large or too small.
-	 */
-	assert(n == a);
+
 	return (new_argv);
 }
 
@@ -1332,8 +1378,10 @@ main(int argc, char **argv)
 	char *slavename, slaveshortname[MAXPATHLEN];
 	priv_set_t *privset;
 	int tmpl_fd;
+	char zonebrand[MAXNAMELEN];
 	struct stat sb;
 	char kernzone[ZONENAME_MAX];
+	brand_handle_t *bhp;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -1548,10 +1596,18 @@ main(int argc, char **argv)
 		return (1);
 	}
 
-	if ((new_args = prep_args(login, proc_args)) == NULL) {
-		zperror(gettext("could not assemble new arguments"));
+	/* Get a handle to the brand info for this zone */
+	if ((zone_get_brand(zonename, zonebrand, sizeof (zonebrand)) != Z_OK) ||
+	    ((bhp = brand_open(zonebrand)) == NULL)) {
+		zerror(gettext("could not get brand for zone %s"), zonename);
 		return (1);
 	}
+	if ((new_args = prep_args(bhp, login, proc_args)) == NULL) {
+		zperror(gettext("could not assemble new arguments"));
+		brand_close(bhp);
+		return (1);
+	}
+	brand_close(bhp);
 
 	if ((new_env = prep_env()) == NULL) {
 		zperror(gettext("could not assemble new environment"));
@@ -1705,11 +1761,20 @@ main(int argc, char **argv)
 		/*
 		 * In failsafe mode, we don't use login(1), so don't try
 		 * setting up a utmpx entry.
+		 *
+		 * A branded zone may have very different utmpx semantics.
+		 * At the moment, we only have two brand types:
+		 * Solaris-like (native, sn1) and Linux.  In the Solaris
+		 * case, we know exactly how to do the necessary utmpx
+		 * setup.  Fortunately for us, the Linux /bin/login is
+		 * prepared to deal with a non-initialized utmpx entry, so
+		 * we can simply skip it.  If future brands don't fall into
+		 * either category, we'll have to add a per-brand utmpx
+		 * setup hook.
 		 */
-		if (!failsafe) {
+		if (!failsafe && (strcmp(zonebrand, "lx") != 0))
 			if (setup_utmpx(slaveshortname) == -1)
 				return (1);
-		}
 
 		(void) execve(new_args[0], new_args, new_env);
 		zperror(gettext("exec failure"));

@@ -71,6 +71,8 @@ extern void __svc_free_xlist(SVCXPRT_LIST **, mutex_t *);
 
 extern bool_t __rpc_try_doors(const char *, bool_t *);
 
+extern int use_portmapper;
+
 /*
  * The highest level interface for server creation.
  * It tries for all the nettokens in that particular class of token
@@ -139,8 +141,25 @@ svc_create(void (*dispatch)(), const rpcprog_t prognum, const rpcvers_t versnum,
 		(void) mutex_lock(&xprtlist_lock);
 		for (l = _svc_xprtlist; l; l = l->next) {
 			if (strcmp(l->xprt->xp_netid, nconf->nc_netid) == 0) {
-				/* Found an old one, use it */
-				(void) rpcb_unset(prognum, versnum, nconf);
+				/*
+				 * Note that if we're using a portmapper
+				 * instead of rpcbind then we can't do an
+				 * unregister operation here.
+				 *
+				 * The reason is that the portmapper unset
+				 * operation removes all the entries for a
+				 * given program/version regardelss of
+				 * transport protocol.
+				 *
+				 * The caller of this routine needs to ensure
+				 * that __pmap_unset() has been called for all
+				 * program/version service pairs they plan
+				 * to support before they start registering
+				 * each program/version/protocol triplet.
+				 */
+				if (!use_portmapper)
+					(void) rpcb_unset(prognum,
+					    versnum, nconf);
 				if (svc_reg(l->xprt, prognum, versnum,
 					dispatch, nconf) == FALSE)
 					(void) syslog(LOG_ERR,
@@ -199,7 +218,25 @@ svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
 	xprt = svc_tli_create_common(RPC_ANYFD, nconf, NULL, 0, 0, anon_mlp);
 	if (xprt == NULL)
 		return (NULL);
-	(void) rpcb_unset(prognum, versnum, (struct netconfig *)nconf);
+
+	/*
+	 * Note that if we're using a portmapper
+	 * instead of rpcbind then we can't do an
+	 * unregister operation here.
+	 *
+	 * The reason is that the portmapper unset
+	 * operation removes all the entries for a
+	 * given program/version regardelss of
+	 * transport protocol.
+	 *
+	 * The caller of this routine needs to ensure
+	 * that __pmap_unset() has been called for all
+	 * program/version service pairs they plan
+	 * to support before they start registering
+	 * each program/version/protocol triplet.
+	 */
+	if (!use_portmapper)
+		(void) rpcb_unset(prognum, versnum, (struct netconfig *)nconf);
 	if (svc_reg(xprt, prognum, versnum, dispatch, nconf) == FALSE) {
 		(void) syslog(LOG_ERR,
 		"svc_tp_create: Could not register prog %d vers %d on %s",

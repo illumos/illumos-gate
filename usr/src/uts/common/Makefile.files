@@ -41,6 +41,7 @@ sparc_CORE_OBJS +=
 COMMON_CORE_OBJS +=		\
 		atomic.o	\
 		bp_map.o	\
+		brand.o		\
 		chip.o		\
 		cpu.o		\
 		cpu_intr.o	\
@@ -78,6 +79,7 @@ GENUNIX_OBJS +=	\
 		bio.o		\
 		bitmap.o	\
 		blabel.o	\
+		brandsys.o	\
 		callb.o		\
 		callout.o	\
 		chdir.o		\
@@ -318,6 +320,7 @@ GENUNIX_OBJS +=	\
 		urw.o		\
 		utime.o		\
 		utssys.o	\
+		uucopy.o	\
 		vfs.o		\
 		vfs_conf.o	\
 		vmem.o		\
@@ -360,6 +363,8 @@ PROFILE_OBJS += profile.o
 
 SYSTRACE_OBJS += systrace.o
 
+LX_SYSTRACE_OBJS += lx_systrace.o
+
 LOCKSTAT_OBJS += lockstat.o
 
 FASTTRAP_OBJS += fasttrap.o fasttrap_isa.o
@@ -396,6 +401,10 @@ PTC_OBJS +=	tty_pty.o
 PTSL_OBJS +=	tty_pts.o
 
 PTM_OBJS +=	ptm.o
+
+LX_PTM_OBJS +=	lx_ptm.o
+
+LX_AUDIO_OBJS += lx_audio.o
 
 PTS_OBJS +=	pts.o
 
@@ -936,6 +945,8 @@ CONNLD_OBJS +=	connld.o
 DEDUMP_OBJS +=	dedump.o
 
 DRCOMPAT_OBJS +=	drcompat.o
+
+LDLINUX_OBJS +=	ldlinux.o
 
 LDTERM_OBJS +=	ldterm.o uwidth.o
 

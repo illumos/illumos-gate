@@ -51,8 +51,8 @@ struct rd_agent {
 	ulong_t				rd_flags;	/* flags */
 	ulong_t				rd_rdebugvers;	/* rtld_db_priv.vers */
 	int				rd_dmodel;	/* data model */
+	rd_helper_t			rd_helper;	/* private to helper */
 };
-
 
 /*
  * Values for rd_flags
@@ -63,10 +63,12 @@ struct rd_agent {
 
 #define	RDAGLOCK(x)	(void) mutex_lock(&(x->rd_mutex));
 #define	RDAGUNLOCK(x)	(void) mutex_unlock(&(x->rd_mutex));
-#define	LOG(func)	(void) mutex_lock(&glob_mutex); \
-			if (rtld_db_logging) \
-				func; \
-			(void) mutex_unlock(&glob_mutex);
+#define	LOG(func)	{						\
+				(void) mutex_lock(&glob_mutex);		\
+				if (rtld_db_logging)			\
+					func;				\
+				(void) mutex_unlock(&glob_mutex);	\
+			}
 
 extern mutex_t		glob_mutex;
 extern int		rtld_db_version;

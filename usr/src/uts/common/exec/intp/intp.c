@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -45,6 +44,7 @@
 #include <sys/disp.h>
 #include <sys/exec.h>
 #include <sys/kmem.h>
+#include <sys/note.h>
 
 /*
  * This is the loadable module wrapper.
@@ -166,8 +166,10 @@ intpexec(
 	long *execsz,
 	int setid,
 	caddr_t exec_file,
-	struct cred *cred)
+	struct cred *cred,
+	int brand_action)
 {
+	_NOTE(ARGUNUSED(brand_action))
 	vnode_t *nvp;
 	int error = 0;
 	struct intpdata idata;
@@ -223,8 +225,8 @@ intpexec(
 		args->fname = devfd;
 	}
 
-	error = gexec(&nvp, uap, args, &idata, ++level,
-		execsz, exec_file, cred);
+	error = gexec(&nvp, uap, args, &idata, ++level, execsz, exec_file, cred,
+	    EBA_NONE);
 done:
 	VN_RELE(nvp);
 	args->pathname = opath;

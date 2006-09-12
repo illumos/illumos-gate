@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +33,9 @@
 #include	<rtld.h>
 #include	<_rtld_db.h>
 #include	<msg.h>
-
+#include	<limits.h>
+#include	<string.h>
+#include	<sys/param.h>
 
 /*
  * 64-bit builds are going to compile this module twice, the
@@ -63,7 +64,6 @@
 #define	TListnode		Listnode
 #endif	/* _LP64 */
 
-
 static rd_err_e
 validate_rdebug(struct rd_agent *rap)
 {
@@ -87,14 +87,14 @@ validate_rdebug(struct rd_agent *rap)
 	if (ps_pread(php, db_privp, (char *)&db_priv,
 	    sizeof (Rtld_db_priv)) != PS_OK) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_READPRIVFAIL_1),
-			EC_ADDR(db_privp)));
+		    EC_ADDR(db_privp)));
 		return (RD_DBERR);
 	}
 
 	if ((db_priv.rtd_version < R_RTLDDB_VERSION1) ||
 	    (db_priv.rtd_version > R_RTLDDB_VERSION)) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_BADPVERS),
-			db_priv.rtd_version, R_RTLDDB_VERSION));
+		    db_priv.rtd_version, R_RTLDDB_VERSION));
 		return (RD_NOCAPAB);
 	}
 
@@ -114,7 +114,7 @@ validate_rdebug(struct rd_agent *rap)
 	if (((rap->rd_flags & RDF_FL_COREFILE) == 0) &&
 	    (db_priv.rtd_version != R_RTLDDB_VERSION)) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_BADPVERS),
-			db_priv.rtd_version, R_RTLDDB_VERSION));
+		    db_priv.rtd_version, R_RTLDDB_VERSION));
 		return (RD_NOCAPAB);
 	}
 
@@ -122,8 +122,8 @@ validate_rdebug(struct rd_agent *rap)
 	rap->rd_rtlddbpriv = db_privp;
 
 	LOG(ps_plog(MSG_ORIG(MSG_DB_VALIDRDEBUG), EC_ADDR(rap->rd_rdebug),
-		R_RTLDDB_VERSION, rap->rd_rdebugvers,
-		rap->rd_flags & RDF_FL_COREFILE));
+	    R_RTLDDB_VERSION, rap->rd_rdebugvers,
+	    rap->rd_flags & RDF_FL_COREFILE));
 	return (RD_OK);
 }
 
@@ -140,7 +140,7 @@ find_dynamic_ent32(struct rd_agent *rap, psaddr_t dynaddr,
 		if (ps_pread(php, dynaddr, (void *)(&d), sizeof (d)) !=
 		    PS_OK) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_READFAIL_4),
-				EC_ADDR(dynaddr)));
+			    EC_ADDR(dynaddr)));
 			return (RD_DBERR);
 		}
 		dynaddr += sizeof (d);
@@ -157,6 +157,17 @@ find_dynamic_ent32(struct rd_agent *rap, psaddr_t dynaddr,
 	return (RD_DBERR);
 }
 
+extern char rtld_db_helper_path[MAXPATHLEN];
+
+#ifndef _ELF64
+void
+rd_fix_phdrs(struct rd_agent *rap, Elf32_Dyn *dp, size_t sz, uintptr_t a)
+{
+	if (rap->rd_helper.rh_ops != NULL)
+		rap->rd_helper.rh_ops->rho_fix_phdrs(rap, dp, sz, a);
+}
+#endif
+
 rd_err_e
 _rd_reset32(struct rd_agent *rap)
 {
@@ -164,6 +175,8 @@ _rd_reset32(struct rd_agent *rap)
 	struct ps_prochandle	*php = rap->rd_psp;
 	const auxv_t		*auxvp = NULL;
 	rd_err_e		rc = RD_OK;
+	char			brandname[MAXPATHLEN];
+	char			brandlib[MAXPATHLEN];
 
 	/*
 	 * librtld_db attempts three different methods to find
@@ -192,6 +205,7 @@ _rd_reset32(struct rd_agent *rap)
 	 *
 	 * Scan the aux vector looking for AT_BASE & AT_SUN_LDDATA
 	 */
+
 	if (ps_pauxv(php, &auxvp) != PS_OK) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_NOAUXV)));
 		rc = RD_ERR;
@@ -228,12 +242,12 @@ _rd_reset32(struct rd_agent *rap)
 		if (ps_pglobal_lookup(php, PS_OBJ_LDSO, MSG_ORIG(MSG_SYM_DEBUG),
 		    &symaddr) != PS_OK) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_LOOKFAIL),
-				MSG_ORIG(MSG_SYM_DEBUG)));
+			    MSG_ORIG(MSG_SYM_DEBUG)));
 			rc = RD_DBERR;
 		} else {
 			rap->rd_rdebug = symaddr;
 			LOG(ps_plog(MSG_ORIG(MSG_DB_SYMRDEBUG),
-				EC_ADDR(symaddr)));
+			    EC_ADDR(symaddr)));
 			rc = validate_rdebug(rap);
 		}
 	}
@@ -263,11 +277,58 @@ _rd_reset32(struct rd_agent *rap)
 		}
 	}
 
+	/*
+	 * If we are debugging a branded executable, load the appropriate helper
+	 * library, and call its initialization routine.
+	 */
+	if (ps_pbrandname(php, brandname, MAXPATHLEN) == PS_OK) {
+		const char *isa = "";
+
+#ifdef __amd64
+		isa = MSG_ORIG(MSG_DB_64BIT_PREFIX);
+#endif /* __amd64 */
+
+		if (rtld_db_helper_path[0] != '\0')
+			(void) snprintf(brandlib, MAXPATHLEN,
+			    MSG_ORIG(MSG_DB_BRAND_HELPERPATH_PREFIX),
+			    rtld_db_helper_path,
+			    MSG_ORIG(MSG_DB_HELPER_PREFIX), brandname, isa,
+			    brandname);
+		else
+			(void) snprintf(brandlib, MAXPATHLEN,
+			    MSG_ORIG(MSG_DB_BRAND_HELPERPATH),
+			    MSG_ORIG(MSG_DB_HELPER_PREFIX), brandname, isa,
+			    brandname);
+
+		if ((rap->rd_helper.rh_dlhandle = dlopen(brandlib,
+		    RTLD_LAZY | RTLD_LOCAL)) == NULL) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_HELPERLOADFAILED),
+			    brandlib));
+			return (RD_ERR);
+		}
+
+		if ((rap->rd_helper.rh_ops = dlsym(rap->rd_helper.rh_dlhandle,
+		    MSG_ORIG(MSG_SYM_BRANDOPS))) == NULL) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_HELPERNOOPS),
+			    brandlib));
+			return (RD_ERR);
+		}
+
+		rap->rd_helper.rh_data = rap->rd_helper.rh_ops->rho_init(php);
+		if (rap->rd_helper.rh_data == NULL) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_HELPERINITFAILED)));
+			(void) dlclose(rap->rd_helper.rh_dlhandle);
+			rap->rd_helper.rh_dlhandle = NULL;
+			rap->rd_helper.rh_ops = NULL;
+		} else
+			LOG(ps_plog(MSG_ORIG(MSG_DB_HELPERLOADED), brandname));
+	}
+
 	if ((rap->rd_flags & RDF_FL_COREFILE) == 0) {
 		if (ps_pglobal_lookup(php, PS_OBJ_LDSO,
 		    MSG_ORIG(MSG_SYM_PREINIT), &symaddr) != PS_OK) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_LOOKFAIL),
-				MSG_ORIG(MSG_SYM_PREINIT)));
+			    MSG_ORIG(MSG_SYM_PREINIT)));
 			return (RD_DBERR);
 		}
 		rap->rd_preinit = symaddr;
@@ -275,7 +336,7 @@ _rd_reset32(struct rd_agent *rap)
 		if (ps_pglobal_lookup(php, PS_OBJ_LDSO,
 		    MSG_ORIG(MSG_SYM_POSTINIT), &symaddr) != PS_OK) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_LOOKFAIL),
-				MSG_ORIG(MSG_SYM_POSTINIT)));
+			    MSG_ORIG(MSG_SYM_POSTINIT)));
 			return (RD_DBERR);
 		}
 		rap->rd_postinit = symaddr;
@@ -283,7 +344,7 @@ _rd_reset32(struct rd_agent *rap)
 		if (ps_pglobal_lookup(php, PS_OBJ_LDSO,
 		    MSG_ORIG(MSG_SYM_DLACT), &symaddr) != PS_OK) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_LOOKFAIL),
-				MSG_ORIG(MSG_SYM_DLACT)));
+			    MSG_ORIG(MSG_SYM_DLACT)));
 			return (RD_DBERR);
 		}
 		rap->rd_dlact = symaddr;
@@ -292,7 +353,6 @@ _rd_reset32(struct rd_agent *rap)
 
 	return (RD_OK);
 }
-
 
 rd_err_e
 _rd_event_enable32(rd_agent_t *rap, int onoff)
@@ -357,7 +417,7 @@ _rd_event_getmsg32(rd_agent_t *rap, rd_event_msg_t *emsg)
 		emsg->u.state = RD_NOSTATE;
 
 	LOG(ps_plog(MSG_ORIG(MSG_DB_RDEVENTGETMSG), rap->rd_dmodel,
-		emsg->type, emsg->u.state));
+	    emsg->type, emsg->u.state));
 
 	return (RD_OK);
 }
@@ -391,9 +451,6 @@ _rd_objpad_enable32(struct rd_agent *rap, size_t padsize)
 	}
 	return (RD_OK);
 }
-
-
-
 
 static rd_err_e
 iter_map(rd_agent_t *rap, unsigned long ident, psaddr_t lmaddr,
@@ -431,9 +488,12 @@ iter_map(rd_agent_t *rap, unsigned long ident, psaddr_t lmaddr,
 		}
 
 		lobj.rl_base = (psaddr_t)ADDR(&rmap);
-		lobj.rl_lmident = ident;
 		lobj.rl_flags = 0;
 		lobj.rl_refnameaddr = (psaddr_t)REFNAME(&rmap);
+		if (rap->rd_helper.rh_dlhandle != NULL)
+			lobj.rl_lmident = LM_ID_BRAND;
+		else
+			lobj.rl_lmident = ident;
 
 		/*
 		 * refnameaddr is only valid from a core file
@@ -491,13 +551,12 @@ iter_map(rd_agent_t *rap, unsigned long ident, psaddr_t lmaddr,
 					lobj.rl_data_base = phdr.p_vaddr;
 					if (ehdr.e_type == ET_DYN)
 						lobj.rl_data_base +=
-							ADDR(&rmap);
+						    ADDR(&rmap);
 					break;
 				}
 				off += ehdr.e_phentsize;
 			}
 		}
-
 
 		/*
 		 * When we transfer control to the client we free the
@@ -505,7 +564,7 @@ iter_map(rd_agent_t *rap, unsigned long ident, psaddr_t lmaddr,
 		 * client.  This is to avoid any deadlock situations.
 		 */
 		LOG(ps_plog(MSG_ORIG(MSG_DB_ITERMAP), cb, client_data,
-			EC_ADDR(lobj.rl_base), EC_ADDR(lobj.rl_lmident)));
+		    EC_ADDR(lobj.rl_base), EC_ADDR(lobj.rl_lmident)));
 		RDAGUNLOCK(rap);
 		if ((*cb)(&lobj, client_data) == 0) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_CALLBACKR0)));
@@ -532,7 +591,7 @@ _rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)
 	uint_t		abort_iter = 0;
 
 	LOG(ps_plog(MSG_ORIG(MSG_DB_LOADOBJITER), rap->rd_dmodel, cb,
-		client_data));
+	    client_data));
 
 	if (ps_pread(rap->rd_psp, rap->rd_rtlddbpriv, (char *)&db_priv,
 	    sizeof (Rtld_db_priv)) != PS_OK) {
@@ -543,20 +602,20 @@ _rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)
 
 	if (db_priv.rtd_dynlmlst == 0) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_LKMAPNOINIT),
-			EC_ADDR((uintptr_t)db_priv.rtd_dynlmlst)));
+		    EC_ADDR((uintptr_t)db_priv.rtd_dynlmlst)));
 		return (RD_NOMAPS);
 	}
 
 	if (ps_pread(rap->rd_psp, (psaddr_t)db_priv.rtd_dynlmlst, (char *)&list,
 	    sizeof (TList)) != PS_OK) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_3),
-			EC_ADDR((uintptr_t)db_priv.rtd_dynlmlst)));
+		    EC_ADDR((uintptr_t)db_priv.rtd_dynlmlst)));
 		return (RD_DBERR);
 	}
 
 	if (list.head == 0) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_LKMAPNOINIT_1),
-			EC_ADDR((uintptr_t)list.head)));
+		    EC_ADDR((uintptr_t)list.head)));
 		return (RD_NOMAPS);
 	}
 
@@ -575,14 +634,14 @@ _rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)
 		if (ps_pread(rap->rd_psp, (psaddr_t)lnp, (char *)&lnode,
 		    sizeof (TListnode)) != PS_OK) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_4),
-				EC_ADDR(lnp)));
+			    EC_ADDR(lnp)));
 			return (RD_DBERR);
 		}
 
 		if (ps_pread(rap->rd_psp, (psaddr_t)lnode.data, (char *)&lml,
 		    sizeof (Lm_list)) != PS_OK) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_5),
-				EC_ADDR((uintptr_t)lnode.data)));
+			    EC_ADDR((uintptr_t)lnode.data)));
 			return (RD_DBERR);
 		}
 
@@ -603,5 +662,13 @@ _rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)
 		if (abort_iter)
 			break;
 	}
-	return (rc);
+
+	if (rc != RD_OK)
+		return (rc);
+
+	if (rap->rd_helper.rh_ops != NULL)
+		return (rap->rd_helper.rh_ops->rho_loadobj_iter(rap->rd_psp, cb,
+		    client_data, rap->rd_helper.rh_data));
+
+	return (RD_OK);
 }

@@ -114,6 +114,8 @@ i386_SUBDIRS= \
 	SUNWgrub \
 	SUNWgrubS \
 	SUNWkvm.i  \
+	SUNWlxr \
+	SUNWlxu \
 	SUNWonmtst.i \
 	SUNWos86r  \
 	SUNWpsdcr  \
@@ -312,6 +314,8 @@ COMMON_SUBDIRS= \
 	SUNWslpr \
 	SUNWslpu \
 	SUNWsmapi  \
+	SUNWsn1rint \
+	SUNWsn1uint \
 	SUNWsndmr  \
 	SUNWsndmu  \
 	SUNWspnego \

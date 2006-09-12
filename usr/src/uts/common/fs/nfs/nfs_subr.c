@@ -1235,7 +1235,7 @@ failoverretry:
 #endif
 			} else
 				mutex_exit(&mi->mi_lock);
-			if (*douprintf && curproc->p_sessp->s_vp != NULL) {
+			if (*douprintf && nfs_has_ctty()) {
 				*douprintf = 0;
 				if (!(mi->mi_flags & MI_NOPRINT))
 #ifdef DEBUG
@@ -1292,7 +1292,7 @@ failoverretry:
 			bufp = clnt_sperror(client, svp->sv_hostname);
 			zprintf(zoneid, "NFS%d %s failed for %s\n",
 			    mi->mi_vers, mi->mi_rfsnames[which], bufp);
-			if (curproc->p_sessp->s_vp != NULL) {
+			if (nfs_has_ctty()) {
 				if (!(mi->mi_flags & MI_NOPRINT)) {
 					uprintf("NFS%d %s failed for %s\n",
 					    mi->mi_vers, mi->mi_rfsnames[which],
@@ -1305,7 +1305,7 @@ failoverretry:
 			    "NFS %s failed for server %s: error %d (%s)\n",
 			    mi->mi_rfsnames[which], svp->sv_hostname,
 			    status, clnt_sperrno(status));
-			if (curproc->p_sessp->s_vp != NULL) {
+			if (nfs_has_ctty()) {
 				if (!(mi->mi_flags & MI_NOPRINT)) {
 					uprintf(
 				"NFS %s failed for server %s: error %d (%s)\n",
@@ -1821,7 +1821,7 @@ failoverretry:
 #endif
 			} else
 				mutex_exit(&mi->mi_lock);
-			if (*douprintf && curproc->p_sessp->s_vp != NULL) {
+			if (*douprintf && nfs_has_ctty()) {
 				*douprintf = 0;
 				if (!(mi->mi_flags & MI_NOPRINT))
 #ifdef DEBUG
@@ -1886,7 +1886,7 @@ failoverretry:
 			bufp = clnt_sperror(client, svp->sv_hostname);
 			zprintf(zoneid, "NFS_ACL%d %s failed for %s\n",
 			    mi->mi_vers, mi->mi_aclnames[which], bufp);
-			if (curproc->p_sessp->s_vp != NULL) {
+			if (nfs_has_ctty()) {
 				if (!(mi->mi_flags & MI_NOPRINT)) {
 					uprintf("NFS_ACL%d %s failed for %s\n",
 					    mi->mi_vers, mi->mi_aclnames[which],
@@ -1899,7 +1899,7 @@ failoverretry:
 			    "NFS %s failed for server %s: error %d (%s)\n",
 			    mi->mi_aclnames[which], svp->sv_hostname,
 			    status, clnt_sperrno(status));
-			if (curproc->p_sessp->s_vp != NULL) {
+			if (nfs_has_ctty()) {
 				if (!(mi->mi_flags & MI_NOPRINT))
 					uprintf(
 				"NFS %s failed for server %s: error %d (%s)\n",
@@ -5116,4 +5116,14 @@ out:
 		zone_rele(mntzone);
 	label_rele(zlabel);
 	return (retv);
+}
+
+boolean_t
+nfs_has_ctty(void)
+{
+	boolean_t rv;
+	mutex_enter(&curproc->p_splock);
+	rv = (curproc->p_sessp->s_vp != NULL);
+	mutex_exit(&curproc->p_splock);
+	return (rv);
 }

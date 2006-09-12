@@ -442,6 +442,11 @@ MISC_KMODS	+= opl_cfg
 MISC_KMODS	+= kmech_krb5
 MISC_KMODS	+= zuluvm
 
+#
+#	Brand modules
+#
+MISC_KMODS	+= sn1_brand
+
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= gptwo_cpu gptwocfg
 
 #

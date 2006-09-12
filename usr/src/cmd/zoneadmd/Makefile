@@ -43,7 +43,7 @@ CFLAGS += $(CCVERBOSE)
 LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
 lint := LAZYLIBS = -ltsol
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair -lpool \
-	-lgen -lbsm -lcontract -lzfs -ltsnet -luuid $(LAZYLIBS)
+	-lgen -lbsm -lcontract -lzfs -ltsnet -luuid -lbrand $(LAZYLIBS)
 XGETFLAGS += -a -x zoneadmd.xcl
 
 .KEEP_STATE:

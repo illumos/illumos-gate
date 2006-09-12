@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996, 1999, 2001-2003 Sun Microsystems, Inc.
- * All rights reserved.  Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -77,9 +76,11 @@ extern int	nfslib_bindit(struct netconfig *, struct netbuf **,
 			struct nd_hostserv *, int);
 extern void	nfslib_log_tli_error(char *, int, struct netconfig *);
 extern int	do_all(struct protob *,
-			int (*)(int, struct netbuf, struct netconfig *));
+			int (*)(int, struct netbuf, struct netconfig *),
+			int use_pmap);
 extern void	do_one(char *, char *, struct protob *,
-			int (*)(int, struct netbuf, struct netconfig *));
+			int (*)(int, struct netbuf, struct netconfig *),
+			int use_pmap);
 extern void	poll_for_action(void);
 
 #ifdef __cplusplus

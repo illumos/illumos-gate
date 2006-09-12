@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,7 @@
 #include <sys/regset.h>
 #include <sys/psw.h>
 #include <sys/x86_archext.h>
+#include <sys/machbrand.h>
 
 #if defined(__lint)
 
@@ -113,6 +113,52 @@
 	movzbl	%cl, %ecx;			\
 	orl	%ecx, %edi;			\
 	ORL_SYSCALLTRACE(%edi)
+
+/*
+ * When the brand's callback is invoked, the stack will look like this:
+ *	   --------------------------------------
+ *         | 'scratch space'			|
+ *         | user's %ebx			|
+ *         | user's %gs selector		|
+ *         | kernel's %gs selector		|
+ *    |    | lwp brand data			|
+ *    |    | proc brand data			|
+ *    v    | user return address		|
+ *         | callback wrapper return addr 	|
+ *         --------------------------------------
+ *
+ * The lx brand (at least) uses each of these fields.
+ * If the brand code returns, we assume that we are meant to execute the
+ * normal system call path.
+ */
+#define	BRAND_CALLBACK(callback_id)					    \
+	subl	$4, %esp		/* save some scratch space	*/ ;\
+	pushl	%ebx			/* save %ebx to use for scratch	*/ ;\
+	pushl	%gs			/* save the user %gs		*/ ;\
+	movl	$KGS_SEL, %ebx						   ;\
+	pushl	%ebx			/* push kernel's %gs		*/ ;\
+	movw	%ebx, %gs		/* switch to the kernel's %gs	*/ ;\
+	movl	%gs:CPU_THREAD, %ebx	/* load the thread pointer	*/ ;\
+	movl	T_LWP(%ebx), %ebx	/* load the lwp pointer		*/ ;\
+	pushl	LWP_BRAND(%ebx)		/* push the lwp's brand data	*/ ;\
+	movl	LWP_PROCP(%ebx), %ebx	/* load the proc pointer	*/ ;\
+	pushl	P_BRAND_DATA(%ebx)	/* push the proc's brand data	*/ ;\
+	movl	P_BRAND(%ebx), %ebx	/* load the brand pointer	*/ ;\
+	movl	B_MACHOPS(%ebx), %ebx	/* load the machops pointer	*/ ;\
+	movl	_CONST(_MUL(callback_id, CPTRSIZE))(%ebx), %ebx		   ;\
+	cmpl	$0, %ebx						   ;\
+	je	1f							   ;\
+	movl	%ebx, 20(%esp)		/* save callback to scratch	*/ ;\
+	movl	12(%esp), %ebx		/* grab the the user %gs	*/ ;\
+	movw	%ebx, %gs		/* restore the user %gs		*/ ;\
+	movl	16(%esp), %ebx		/* restore %ebx			*/ ;\
+	pushl	24(%esp)		/* push the return address	*/ ;\
+	call	*24(%esp)		/* call callback		*/ ;\
+	addl	$4, %esp		/* get rid of ret addr		*/ ;\
+1:	movl	12(%esp), %ebx		/* grab the the user %gs	*/ ;\
+	movw	%ebx, %gs		/* restore the user %gs		*/ ;\
+	movl	16(%esp), %ebx		/* restore user's %ebx		*/ ;\
+	addl	$24, %esp		/* restore stack ptr		*/ 
 
 #define	MSTATE_TRANSITION(from, to)		\
 	pushl	$to;				\
@@ -314,9 +360,12 @@ size_t _allsyscalls_size;
 
 #else	/* __lint */
 
-	ENTRY_NP2(sys_call, _allsyscalls)
+	ENTRY_NP2(brand_sys_call, _allsyscalls)
+	BRAND_CALLBACK(BRAND_CB_SYSCALL)
 
+	ALTENTRY(sys_call)
 	/ on entry	eax = system call number
+
 	/ set up the stack to look as in reg.h
 	subl    $8, %esp        / pad the stack with ERRCODE and TRAPNO
 
@@ -401,6 +450,7 @@ _syscall_fault:
 	xorl	%edx, %edx
 	jmp	_syslcall_done
 	SET_SIZE(sys_call)
+	SET_SIZE(brand_sys_call)
 
 #endif	/* __lint */
 
@@ -460,6 +510,25 @@ _syscall_fault:
  *
  * Note that we are unable to return both "rvals" to userland with this
  * call, as %edx is used by the sysexit instruction.
+ *
+ * One final complication in this routine is its interaction with
+ * single-stepping in a debugger.  For most of the system call mechanisms,
+ * the CPU automatically clears the single-step flag before we enter the
+ * kernel.  The sysenter mechanism does not clear the flag, so a user
+ * single-stepping through a libc routine may suddenly find him/herself
+ * single-stepping through the kernel.  To detect this, kmdb compares the
+ * trap %pc to the [brand_]sys_enter addresses on each single-step trap.
+ * If it finds that we have single-stepped to a sysenter entry point, it
+ * explicitly clears the flag and executes the sys_sysenter routine.
+ *
+ * One final complication in this final complication is the fact that we
+ * have two different entry points for sysenter: brand_sys_sysenter and
+ * sys_sysenter.  If we enter at brand_sys_sysenter and start single-stepping
+ * through the kernel with kmdb, we will eventually hit the instruction at
+ * sys_sysenter.  kmdb cannot distinguish between that valid single-step
+ * and the undesirable one mentioned above.  To avoid this situation, we
+ * simply add a jump over the instruction at sys_sysenter to make it
+ * impossible to single-step to it.
  */
 #if defined(__lint)
 
@@ -469,7 +538,19 @@ sys_sysenter()
 
 #else	/* __lint */
 
-	ENTRY_NP(sys_sysenter)
+	ENTRY_NP(brand_sys_sysenter)
+	pushl	%edx
+	BRAND_CALLBACK(BRAND_CB_SYSENTER)
+	popl	%edx
+	/*
+	 * Jump over sys_sysenter to allow single-stepping as described
+	 * above.
+	 */
+	ja	1f
+
+	ALTENTRY(sys_sysenter)
+	nop
+1:
 	/
 	/ do what the call gate would've done to the stack ..
 	/
@@ -544,6 +625,38 @@ _sysenter_done:
 	sti
 	sysexit
 	SET_SIZE(sys_sysenter)
+	SET_SIZE(brand_sys_sysenter)
+
+#endif	/* __lint */
+
+#if defined(__lint)
+/*
+ * System call via an int80.  This entry point is only used by the Linux
+ * application environment.  Unlike the sysenter path, there is no default
+ * action to take if no callback is registered for this process.
+ */
+void
+sys_int80()
+{}
+
+#else	/* __lint */
+
+	ENTRY_NP(brand_sys_int80)
+	BRAND_CALLBACK(BRAND_CB_INT80)
+
+	ALTENTRY(sys_int80)
+	/*
+	 * We hit an int80, but this process isn't of a brand with an int80
+	 * handler.  Bad process!  Make it look as if the INT failed.
+	 * Modify %eip to point before the INT, push the expected error
+	 * code and fake a GP fault.
+	 * 
+	 */
+	subl	$2, (%esp)	/* int insn 2-bytes */
+	pushl	$_CONST(_MUL(T_INT80, GATE_DESC_SIZE) + 2)
+	jmp	gptrap			/ GP fault
+	SET_SIZE(sys_int80)
+	SET_SIZE(brand_sys_int80)
 
 /*
  * Declare a uintptr_t which covers the entire pc range of syscall

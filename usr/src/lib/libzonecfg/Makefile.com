@@ -32,7 +32,7 @@ OBJECTS=	libzonecfg.o getzoneent.o scratchops.o
 include ../../Makefile.lib
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lsocket -lnsl -luuid -lnvpair -lsysevent -lsec
+LDLIBS +=	-lc -lsocket -lnsl -luuid -lnvpair -lsysevent -lsec -lbrand
 # DYNLIB libraries do not have lint libs and are not linted
 $(DYNLIB) :=	LDLIBS += -lxml2
 

@@ -87,6 +87,10 @@ extern "C" {
 #define	ZONE_ATTR_SLBL		8
 #define	ZONE_ATTR_INITNAME	9
 #define	ZONE_ATTR_BOOTARGS	10
+#define	ZONE_ATTR_BRAND		11
+
+/* Start of the brand-specific attribute namespace */
+#define	ZONE_ATTR_BRAND_ATTRS	32768
 
 #define	ZONE_EVENT_CHANNEL	"com.sun:zones:status"
 #define	ZONE_EVENT_STATUS_CLASS	"status"
@@ -102,6 +106,49 @@ extern "C" {
 #define	ZONE_CB_OLDSTATE	"oldstate"
 #define	ZONE_CB_TIMESTAMP	"when"
 #define	ZONE_CB_ZONEID		"zoneid"
+
+/*
+ * Exit values that may be returned by scripts or programs invoked by various
+ * zone commands.
+ *
+ * These are defined as:
+ *
+ *	ZONE_SUBPROC_OK
+ *	===============
+ *	The subprocess completed successfully.
+ *
+ *	ZONE_SUBPROC_USAGE
+ *	==================
+ *	The subprocess failed with a usage message, or a usage message should
+ *	be output in its behalf.
+ *
+ *	ZONE_SUBPROC_NOTCOMPLETE
+ *	========================
+ *	The subprocess did not complete, but the actions performed by the
+ *	subprocess require no recovery actions by the user.
+ *
+ *	For example, if the subprocess were called by "zoneadm install," the
+ *	installation of the zone did not succeed but the user need not perform
+ *	a "zoneadm uninstall" before attempting another install.
+ *
+ *	ZONE_SUBPROC_FATAL
+ *	==================
+ *	The subprocess failed in a fatal manner, usually one that will require
+ *	some type of recovery action by the user.
+ *
+ *	For example, if the subprocess were called by "zoneadm install," the
+ *	installation of the zone did not succeed and the user will need to
+ *	perform a "zoneadm uninstall" before another install attempt is
+ *	possible.
+ *
+ *	The non-success exit values are large to avoid accidental collision
+ *	with values used internally by some commands (e.g. "Z_ERR" and
+ *	"Z_USAGE" as used by zoneadm.)
+ */
+#define	ZONE_SUBPROC_OK			0
+#define	ZONE_SUBPROC_USAGE		253
+#define	ZONE_SUBPROC_NOTCOMPLETE	254
+#define	ZONE_SUBPROC_FATAL		255
 
 #ifdef _SYSCALL32
 typedef struct {
@@ -159,8 +206,8 @@ typedef enum {
  * communicates with zoneadmd, but only uses Z_REBOOT and Z_HALT.
  */
 typedef enum zone_cmd {
-	Z_READY, Z_BOOT, Z_REBOOT, Z_HALT, Z_NOTE_UNINSTALLING,
-	Z_MOUNT, Z_UNMOUNT
+	Z_READY, Z_BOOT, Z_FORCEBOOT, Z_REBOOT, Z_HALT, Z_NOTE_UNINSTALLING,
+	Z_MOUNT, Z_FORCEMOUNT, Z_UNMOUNT
 } zone_cmd_t;
 
 /*
@@ -223,6 +270,7 @@ typedef struct zone_cmd_rval {
 #define	ZF_IS_SCRATCH		0x4	/* scratch zone */
 
 struct pool;
+struct brand;
 
 /*
  * Structure to record list of ZFS datasets exported to a zone.
@@ -318,6 +366,8 @@ typedef struct zone {
 	int		zone_match;	/* require label match for packets */
 	tsol_mlp_list_t zone_mlps;	/* MLPs on zone-private addresses */
 
+	boolean_t	zone_restart_init;	/* Restart init if it dies? */
+	struct brand	*zone_brand;		/* zone's brand */
 } zone_t;
 
 /*
@@ -329,8 +379,6 @@ extern zone_t zone0;
 extern zone_t *global_zone;
 extern uint_t maxzones;
 extern rctl_hndl_t rc_zone_nlwps;
-
-extern const char * const zone_initname;
 
 extern long zone(int, void *, void *, void *, void *);
 extern void zone_zsd_init(void);

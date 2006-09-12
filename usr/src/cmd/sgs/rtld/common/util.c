@@ -2232,6 +2232,18 @@ ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
 		int	flags;
 
 		/*
+		 * In a branded process we must ignore all LD_XXXX env vars
+		 * because they are intended for the brand's linker.
+		 * To affect the Solaris linker, use LD_BRAND_XXXX instead.
+		 */
+		if (rtld_flags2 & RT_FL2_BRANDED) {
+			if (strncmp(s1, MSG_ORIG(MSG_LD_BRAND_PREFIX),
+			    MSG_LD_BRAND_PREFIX_SIZE) != 0)
+				return;
+			s1 += MSG_LD_BRAND_PREFIX_SIZE;
+		}
+
+		/*
 		 * Environment variables with no value (ie. LD_XXXX=) typically
 		 * have no impact, however if environment variables are defined
 		 * within a configuration file, these null user settings can be

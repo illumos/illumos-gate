@@ -61,6 +61,7 @@ struct mod_ops {
  * The defined set of mod_ops structures for each loadable module type
  * Defined in modctl.c
  */
+extern struct mod_ops mod_brandops;
 #if defined(__i386) || defined(__amd64)
 extern struct mod_ops mod_cpuops;
 #endif
@@ -173,6 +174,13 @@ struct modlpcbe {
 	struct mod_ops		*pcbe_modops;
 	char			*pcbe_linkinfo;
 	struct __pcbe_ops	*pcbe_ops;
+};
+
+/* For Brand modules */
+struct modlbrand {
+	struct mod_ops		*brand_modops;
+	char			*brand_linkinfo;
+	struct brand		*brand_branddef;
 };
 
 /* for devname fs */

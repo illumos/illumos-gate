@@ -315,6 +315,9 @@ SUNW_0.7 {		# SunOS 5.3 (Solaris 2.3)
 SUNWprivate_1.5 {
     global:
 	clnt_create_service_timed;
+	__pmap_set;
+	__pmap_unset;
+	__use_portmapper;
 } SUNWprivate_1.4;
 
 SUNWprivate_1.4 {

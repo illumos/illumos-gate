@@ -165,6 +165,9 @@ char *safe_strdup(char *s);
 <TSTATE>zonepath	{ return ZONEPATH; }
 <CSTATE>zonepath	{ return ZONEPATH; }
 
+<TSTATE>brand	{ return BRAND; }
+<CSTATE>brand	{ return BRAND; }
+
 <TSTATE>autoboot	{ return AUTOBOOT; }
 <CSTATE>autoboot	{ return AUTOBOOT; }
 

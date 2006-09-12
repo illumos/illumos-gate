@@ -69,7 +69,7 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 	auxv_t		*auxv, *_auxv;
 	uid_t		uid = -1, euid = -1;
 	gid_t		gid = -1, egid = -1;
-	char		*_platform = 0, *_execname = 0;
+	char		*_platform = 0, *_execname = 0, *_emulator = 0;
 	int		auxflags = -1;
 	/*
 	 * Scan the bootstrap structure to pick up the basics.
@@ -153,6 +153,12 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 		case AT_SUN_HWCAP:
 			hwcap_1 = (uint_t)auxv->a_un.a_val;
 			break;
+#ifdef	AT_SUN_EMULATOR			/* Emulation library name */
+		case AT_SUN_EMULATOR:
+			/* name of emulation library, if any */
+			_emulator = auxv->a_un.a_ptr;
+			break;
+#endif
 		}
 	}
 
@@ -206,6 +212,10 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 		*((ulong_t *)roffset) += ld_base +
 		    ((Rela *)reladdr)->r_addend;
 		reladdr += relaent;
+	}
+
+	if (_emulator != NULL) {
+		rtld_flags2 |= RT_FL2_BRANDED;
 	}
 
 	/*

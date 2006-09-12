@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -65,6 +64,8 @@
 #include <sys/auxv.h>
 #include <sys/auxv_386.h>
 #include <sys/dtrace.h>
+#include <sys/brand.h>
+#include <sys/machbrand.h>
 
 extern const struct fnsave_state x87_initial;
 extern const struct fxsave_state sse_initial;
@@ -604,6 +605,8 @@ getuserpc()
 static greg_t
 fix_segreg(greg_t sr, model_t datamodel)
 {
+	kthread_t *t = curthread;
+
 	switch (sr &= 0xffff) {
 #if defined(__amd64)
 	/*
@@ -631,6 +634,13 @@ fix_segreg(greg_t sr, model_t datamodel)
 	default:
 		break;
 	}
+
+	/*
+	 * Allow this process's brand to do any necessary segment register
+	 * manipulation.
+	 */
+	if (PROC_IS_BRANDED(t->t_procp) && BRMOP(t->t_procp)->b_fixsegreg)
+		return (BRMOP(t->t_procp)->b_fixsegreg(sr, datamodel));
 
 	/*
 	 * Force it into the LDT in ring 3 for 32-bit processes, which by

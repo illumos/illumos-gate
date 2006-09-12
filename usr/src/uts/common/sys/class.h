@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,7 @@
 #include <sys/thread.h>
 #include <sys/priocntl.h>
 #include <sys/mutex.h>
+#include <sys/uio.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -128,15 +128,15 @@ extern pri_t	minclsyspri;
 extern id_t	syscid;		/* system scheduling class ID */
 extern id_t	defaultcid;	/* "default" class id; see dispadmin(1M) */
 
-extern int		alloc_cid(char *, id_t *);
-extern int		scheduler_load(char *, sclass_t *);
-extern int		getcid(char *, id_t *);
-extern int		getcidbyname(char *, id_t *);
-extern int		parmsin(pcparms_t *, pc_vaparms_t *);
-extern int		parmsout(pcparms_t *, pc_vaparms_t *);
-extern int		parmsset(pcparms_t *, kthread_id_t);
-extern void		parmsget(kthread_id_t, pcparms_t *);
-extern int		vaparmsout(char *, pcparms_t *, pc_vaparms_t *);
+extern int	alloc_cid(char *, id_t *);
+extern int	scheduler_load(char *, sclass_t *);
+extern int	getcid(char *, id_t *);
+extern int	getcidbyname(char *, id_t *);
+extern int	parmsin(pcparms_t *, pc_vaparms_t *);
+extern int	parmsout(pcparms_t *, pc_vaparms_t *);
+extern int	parmsset(pcparms_t *, kthread_id_t);
+extern void	parmsget(kthread_id_t, pcparms_t *);
+extern int	vaparmsout(char *, pcparms_t *, pc_vaparms_t *, uio_seg_t);
 
 #endif
 

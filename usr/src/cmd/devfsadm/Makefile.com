@@ -29,6 +29,7 @@
 include ../../Makefile.cmd
 
 COMMON = ..
+UTSBASE = $(COMMON)/../../uts
 
 DEVFSADM_MOD = devfsadm
 
@@ -66,7 +67,7 @@ LINK_SRCS =			\
 	$(COMMON)/md_link.c	\
 	$(COMMON)/dtrace_link.c	\
 	$(COMMON)/zfs_link.c	\
-	$(MISC_LINK_ISA).c
+	$(LINK_SRCS_($MACH))
 
 LINT_MODULES = $(LINK_SRCS:.c=.ln)
 
@@ -87,7 +88,7 @@ LINK_OBJS =			\
 	md_link.o		\
 	dtrace_link.o		\
 	zfs_link.o		\
-	$(MISC_LINK_ISA).o
+	$(LINK_OBJS_($MACH))
 
 LINK_MODS =			\
 	SUNW_disk_link.so	\
@@ -106,7 +107,7 @@ LINK_MODS =			\
 	SUNW_md_link.so		\
 	SUNW_dtrace_link.so	\
 	SUNW_zfs_link.so	\
-	SUNW_$(MISC_LINK_ISA).so
+	$(LINK_MODS_$(MACH))
 
 DEVLINKTAB = devlink.tab
 DEVLINKTAB_SRC = $(COMMON)/$(DEVLINKTAB).sh
@@ -114,15 +115,15 @@ DEVLINKTAB_SRC = $(COMMON)/$(DEVLINKTAB).sh
 COMPAT_LINKS = disks tapes ports audlinks devlinks drvconfig
 
 CPPFLAGS +=	-D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT \
-		-I.. -I../../../uts/common -I$(MODLOADDIR)
-CFLAGS += $(CCVERBOSE) $(C_PICFLAGS) -I.. -I$(MODLOADDIR)
+		-I$(COMMON) -I$(UTSBASE)/common -I$(MODLOADDIR)
+CFLAGS += $(CCVERBOSE) $(C_PICFLAGS)
 
 LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
 LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
 
-LAZYLIBS =	$(ZLAZYLOAD) -lzonecfg -lbsm $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -lzonecfg -lbsm
+LAZYLIBS =	$(ZLAZYLOAD) -lzonecfg -lbrand -lbsm $(ZNOLAZYLOAD)
+lint := LAZYLIBS = -lzonecfg -lbrand -lbsm
 LDLIBS += -ldevinfo -lgen -lsysevent -lnvpair -lcmd -ldoor $(LAZYLIBS) -lnsl
 
 SRCS = $(DEVFSADM_SRC) $(LINK_SRCS)

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -172,7 +171,7 @@ ps_lsetfpregs(struct ps_prochandle *P, lwpid_t lwpid, const prfpregset_t *regs)
 ps_err_e
 ps_lgetxregsize(struct ps_prochandle *P, lwpid_t lwpid, int *xrsize)
 {
-	char fname[64];
+	char fname[PATH_MAX];
 	struct stat statb;
 
 	if (P->state == PS_DEAD) {
@@ -192,8 +191,8 @@ ps_lgetxregsize(struct ps_prochandle *P, lwpid_t lwpid, int *xrsize)
 		return (PS_BADLID);
 	}
 
-	(void) snprintf(fname, sizeof (fname), "/proc/%d/lwp/%d/xregs",
-	    (int)P->status.pr_pid, (int)lwpid);
+	(void) snprintf(fname, sizeof (fname), "%s/%d/lwp/%d/xregs",
+	    procfs_path, (int)P->status.pr_pid, (int)lwpid);
 
 	if (stat(fname, &statb) != 0)
 		return (PS_BADLID);
@@ -318,6 +317,12 @@ ps_pauxv(struct ps_prochandle *P, const auxv_t **aux)
 
 	*aux = (const auxv_t *)P->auxv;
 	return (PS_OK);
+}
+
+ps_err_e
+ps_pbrandname(struct ps_prochandle *P, char *buf, size_t len)
+{
+	return (Pbrandname(P, buf, len) ? PS_OK : PS_ERR);
 }
 
 /*

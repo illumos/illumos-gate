@@ -680,13 +680,16 @@ streams_open:
 		/* STREAMS devices don't have a size */
 		sp->s_size = csp->s_size = 0;
 
-		/*
-		 * try to allocate it as a controlling terminal
-		 */
-		if ((stp->sd_flag & STRISTTY) && !(flag & FNOCTTY))
-			stralloctty(stp);
+		if (!(stp->sd_flag & STRISTTY) || (flag & FNOCTTY))
+			return (0);
 
-		return (0);
+		/* try to allocate it as a controlling terminal */
+		if (strctty(stp) != EINTR)
+			return (0);
+
+		/* strctty() was interrupted by a signal */
+		(void) spec_close(vp, flag, 1, 0, cr);
+		return (EINTR);
 	}
 
 	/*

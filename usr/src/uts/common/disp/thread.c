@@ -64,6 +64,7 @@
 #include <sys/spl.h>
 #include <sys/copyops.h>
 #include <sys/rctl.h>
+#include <sys/brand.h>
 #include <sys/pool.h>
 #include <sys/zone.h>
 #include <sys/tsol/label.h>
@@ -186,6 +187,7 @@ thread_init(void)
 
 	rctl_init();
 	project_init();
+	brand_init();
 	zone_init();
 	task_init();
 	tcache_init();

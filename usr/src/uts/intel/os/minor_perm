@@ -121,3 +121,5 @@ zfs:* 0600 root sys
 zfs:zfs 0666 root sys
 scsi_vhci:* 0666 root sys
 kssl:* 0666 root sys
+lx_ptm:lx_ptmajor 0666 root sys
+lx_systrace:* 0644 root sys

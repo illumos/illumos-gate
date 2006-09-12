@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,6 +200,7 @@ extern	void	Prelease(struct ps_prochandle *, int);
 extern	void	Pfree(struct ps_prochandle *);
 
 extern	int	Pasfd(struct ps_prochandle *);
+extern	char   *Pbrandname(struct ps_prochandle *, char *, size_t);
 extern	int	Pctlfd(struct ps_prochandle *);
 extern	int	Pcreate_agent(struct ps_prochandle *);
 extern	void	Pdestroy_agent(struct ps_prochandle *);
@@ -494,6 +494,8 @@ extern	int Penv_iter(struct ps_prochandle *, proc_env_f *, void *);
 extern char *Pgetenv(struct ps_prochandle *, const char *, char *, size_t);
 extern long Pgetauxval(struct ps_prochandle *, int);
 extern const auxv_t *Pgetauxvec(struct ps_prochandle *);
+
+extern void Pset_procfs_path(const char *);
 
 /*
  * Symbol table iteration interface.  The special lmid constants LM_ID_BASE,

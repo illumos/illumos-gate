@@ -44,6 +44,7 @@
 #include <sys/mman.h>
 #include <sys/lgrp_user.h>
 #include <libproc.h>
+#include <libzonecfg.h>
 
 #define	KILOBYTE	1024
 #define	MEGABYTE	(KILOBYTE * KILOBYTE)
@@ -598,18 +599,48 @@ static char *
 make_name(struct ps_prochandle *Pr, uintptr_t addr, const char *mapname,
 	char *buf, size_t bufsz)
 {
-	const pstatus_t *Psp = Pstatus(Pr);
-	char fname[100];
-	struct stat statb;
-	int len;
+	const pstatus_t		*Psp = Pstatus(Pr);
+	const psinfo_t		*pi = Ppsinfo(Pr);
+	char			fname[100];
+	struct stat		statb;
+	int			len;
+	char			zname[ZONENAME_MAX];
+	char			zpath[PATH_MAX];
+	char			objname[PATH_MAX];
 
 	if (!lflag && strcmp(mapname, "a.out") == 0 &&
 	    Pexecname(Pr, buf, bufsz) != NULL)
 		return (buf);
 
-	if (Pobjname(Pr, addr, buf, bufsz) != NULL) {
+	if (Pobjname(Pr, addr, objname, sizeof (objname)) != NULL) {
+		(void) strncpy(buf, objname, bufsz);
+
 		if (lflag)
 			return (buf);
+
+		if ((len = resolvepath(buf, buf, bufsz)) > 0) {
+			buf[len] = '\0';
+			return (buf);
+		}
+
+		/*
+		 * If the target is in a non-global zone, attempt to prepend
+		 * the zone path in order to give the global-zone caller the
+		 * real path to the file.
+		 */
+		if (getzonenamebyid(pi->pr_zoneid, zname,
+			sizeof (zname)) != -1 && strcmp(zname, "global") != 0 &&
+		    zone_get_zonepath(zname, zpath, sizeof (zpath)) == Z_OK) {
+			(void) strncat(zpath, "/root",
+			    MAXPATHLEN - strlen(zpath));
+
+			if (bufsz <= strlen(zpath))
+				return (NULL);
+
+			(void) strncpy(buf, zpath, bufsz);
+			(void) strncat(buf, objname, bufsz - strlen(zpath));
+		}
+
 		if ((len = resolvepath(buf, buf, bufsz)) > 0) {
 			buf[len] = '\0';
 			return (buf);

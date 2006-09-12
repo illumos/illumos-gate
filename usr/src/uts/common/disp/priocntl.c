@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,7 +80,7 @@ struct stprmargs {
  * between the 64-bit kernel ABI and the 32-bit user ABI.
  */
 static int
-copyin_vaparms32(caddr_t arg, pc_vaparms_t *vap)
+copyin_vaparms32(caddr_t arg, pc_vaparms_t *vap, uio_seg_t seg)
 {
 	pc_vaparms32_t vaparms32;
 	pc_vaparm32_t *src;
@@ -90,7 +89,8 @@ copyin_vaparms32(caddr_t arg, pc_vaparms_t *vap)
 
 	ASSERT(get_udatamodel() == DATAMODEL_ILP32);
 
-	if (copyin(arg, &vaparms32, sizeof (vaparms32)))
+	if ((seg == UIO_USERSPACE ? copyin : kcopy)(arg, &vaparms32,
+	    sizeof (vaparms32)))
 		return (EFAULT);
 
 	vap->pc_vaparmscnt = vaparms32.pc_vaparmscnt;
@@ -104,13 +104,13 @@ copyin_vaparms32(caddr_t arg, pc_vaparms_t *vap)
 	return (0);
 }
 
-#define	COPYIN_VAPARMS(arg, vap, size)	\
+#define	COPYIN_VAPARMS(arg, vap, size, seg)	\
 	(get_udatamodel() == DATAMODEL_NATIVE ?	\
-	copyin(arg, vap, size) : copyin_vaparms32(arg, vap))
+	(*copyinfn)(arg, vap, size) : copyin_vaparms32(arg, vap, seg))
 
 #else
 
-#define	COPYIN_VAPARMS(arg, vap, size)	copyin(arg, vap, size)
+#define	COPYIN_VAPARMS(arg, vap, size, seg)	(*copyinfn)(arg, vap, size)
 
 #endif
 
@@ -123,7 +123,8 @@ extern int threadcmp(struct pcmpargs *, kthread_id_t);
  * The priocntl system call.
  */
 long
-priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
+priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
+    caddr_t arg2, uio_seg_t seg)
 {
 	pcinfo_t		pcinfo;
 	pcparms_t		pcparms;
@@ -144,6 +145,8 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 	int			rv = 0;
 	pid_t			saved_pid;
 	id_t			classid;
+	int (*copyinfn)(const void *, void *, size_t);
+	int (*copyoutfn)(const void *, void *, size_t);
 
 	/*
 	 * First just check the version number. Right now there is only
@@ -156,6 +159,14 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 	 */
 	if (pc_version != PC_VERSION)
 		return (set_errno(EINVAL));
+
+	if (seg == UIO_USERSPACE) {
+		copyinfn = copyin;
+		copyoutfn = copyout;
+	} else {
+		copyinfn = kcopy;
+		copyoutfn = kcopy;
+	}
 
 	switch (cmd) {
 	case PC_GETCID:
@@ -171,7 +182,7 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 			rv = loaded_classes;
 			break;
 		} else {
-			if (copyin(arg, &pcinfo, sizeof (pcinfo)))
+			if ((*copyinfn)(arg, &pcinfo, sizeof (pcinfo)))
 				return (set_errno(EFAULT));
 		}
 
@@ -204,7 +215,7 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 		if (error)
 			return (set_errno(error));
 
-		if (copyout(&pcinfo, arg, sizeof (pcinfo)))
+		if ((*copyoutfn)(&pcinfo, arg, sizeof (pcinfo)))
 			return (set_errno(EFAULT));
 
 		rv = loaded_classes;
@@ -221,7 +232,7 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 			rv = loaded_classes;
 			break;
 		} else {
-			if (copyin(arg, &pcinfo, sizeof (pcinfo)))
+			if ((*copyinfn)(arg, &pcinfo, sizeof (pcinfo)))
 				return (set_errno(EFAULT));
 		}
 
@@ -245,7 +256,7 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 		if (error)
 			return (set_errno(error));
 
-		if (copyout(&pcinfo, arg, sizeof (pcinfo)))
+		if ((*copyoutfn)(&pcinfo, arg, sizeof (pcinfo)))
 			return (set_errno(EFAULT));
 
 		rv = loaded_classes;
@@ -259,13 +270,14 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 		 * because it's done on a per thread basis by parmsset().
 		 */
 		if (cmd == PC_SETPARMS) {
-			if (copyin(arg, &pcparms, sizeof (pcparms)))
+			if ((*copyinfn)(arg, &pcparms, sizeof (pcparms)))
 				return (set_errno(EFAULT));
 
 			error = parmsin(&pcparms, NULL);
 		} else {
-			if (copyin(arg, clname, PC_CLNMSZ) ||
-			    COPYIN_VAPARMS(arg2, &vaparms, sizeof (vaparms)))
+			if ((*copyinfn)(arg, clname, PC_CLNMSZ) ||
+			    COPYIN_VAPARMS(arg2, &vaparms, sizeof (vaparms),
+			    seg))
 				return (set_errno(EFAULT));
 			clname[PC_CLNMSZ-1] = '\0';
 
@@ -281,7 +293,7 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 		/*
 		 * Get the procset from the user.
 		 */
-		if (copyin(psp, &procset, sizeof (procset)))
+		if ((*copyinfn)(psp, &procset, sizeof (procset)))
 			return (set_errno(EFAULT));
 
 		/*
@@ -372,11 +384,11 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 	case PC_GETPARMS:
 	case PC_GETXPARMS:
 		if (cmd == PC_GETPARMS) {
-			if (copyin(arg, &pcparms, sizeof (pcparms)))
+			if ((*copyinfn)(arg, &pcparms, sizeof (pcparms)))
 				return (set_errno(EFAULT));
 		} else {
 			if (arg != NULL) {
-				if (copyin(arg, clname, PC_CLNMSZ))
+				if ((*copyinfn)(arg, clname, PC_CLNMSZ))
 					return (set_errno(EFAULT));
 
 				clname[PC_CLNMSZ-1] = '\0';
@@ -385,7 +397,9 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 					return (set_errno(EINVAL));
 			} else
 				pcparms.pc_cid = PC_CLNULL;
-			if (COPYIN_VAPARMS(arg2, &vaparms, sizeof (vaparms)))
+
+			if (COPYIN_VAPARMS(arg2, &vaparms, sizeof (vaparms),
+			    seg))
 				return (set_errno(EFAULT));
 		}
 
@@ -393,7 +407,7 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 		    (pcparms.pc_cid < 1 && pcparms.pc_cid != PC_CLNULL))
 			return (set_errno(EINVAL));
 
-		if (copyin(psp, &procset, sizeof (procset)))
+		if ((*copyinfn)(psp, &procset, sizeof (procset)))
 			return (set_errno(EFAULT));
 
 		/*
@@ -590,9 +604,10 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 			return (set_errno(error));
 
 		if (cmd == PC_GETPARMS) {
-			if (copyout(&pcparms, arg, sizeof (pcparms)))
+			if ((*copyoutfn)(&pcparms, arg, sizeof (pcparms)))
 				return (set_errno(EFAULT));
-		} else if ((error = vaparmsout(arg, &pcparms, &vaparms)) != 0)
+		} else if ((error = vaparmsout(arg, &pcparms, &vaparms,
+		    seg)) != 0)
 			return (set_errno(error));
 
 		/*
@@ -603,14 +618,14 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 
 	case PC_ADMIN:
 		if (get_udatamodel() == DATAMODEL_NATIVE) {
-			if (copyin(arg, &pcadmin, sizeof (pcadmin_t)))
+			if ((*copyinfn)(arg, &pcadmin, sizeof (pcadmin_t)))
 				return (set_errno(EFAULT));
 #ifdef _SYSCALL32_IMPL
 		} else {
 			/* pcadmin struct from ILP32 callers */
 			pcadmin32_t pcadmin32;
 
-			if (copyin(arg, &pcadmin32, sizeof (pcadmin32_t)))
+			if ((*copyinfn)(arg, &pcadmin32, sizeof (pcadmin32_t)))
 				return (set_errno(EFAULT));
 			pcadmin.pc_cid = pcadmin32.pc_cid;
 			pcadmin.pc_cladmin = (caddr_t)(uintptr_t)
@@ -632,7 +647,7 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 		break;
 
 	case PC_GETPRIRANGE:
-		if (copyin(arg, &pcpri, sizeof (pcpri_t)))
+		if ((*copyinfn)(arg, &pcpri, sizeof (pcpri_t)))
 			return (set_errno(EFAULT));
 
 		if (pcpri.pc_cid >= loaded_classes || pcpri.pc_cid < 0)
@@ -640,7 +655,7 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 
 		error = CL_GETCLPRI(&sclass[pcpri.pc_cid], &pcpri);
 		if (!error) {
-			if (copyout(&pcpri, arg, sizeof (pcpri)))
+			if ((*copyoutfn)(&pcpri, arg, sizeof (pcpri)))
 				return (set_errno(EFAULT));
 		}
 		break;
@@ -649,14 +664,14 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 		/*
 		 * Get pcnice and procset structures from the user.
 		 */
-		if (copyin(arg, &pcnice, sizeof (pcnice)) ||
-		    copyin(psp, &procset, sizeof (procset)))
+		if ((*copyinfn)(arg, &pcnice, sizeof (pcnice)) ||
+		    (*copyinfn)(psp, &procset, sizeof (procset)))
 			return (set_errno(EFAULT));
 
 		error = donice(&procset, &pcnice);
 
 		if (!error && (pcnice.pc_op == PC_GETNICE)) {
-			if (copyout(&pcnice, arg, sizeof (pcnice)))
+			if ((*copyoutfn)(&pcnice, arg, sizeof (pcnice)))
 				return (set_errno(EFAULT));
 		}
 		break;
@@ -684,6 +699,12 @@ priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
 	return (error ? (set_errno(error)) : rv);
 }
 
+long
+priocntlsys(int pc_version, procset_t *psp, int cmd, caddr_t arg, caddr_t arg2)
+{
+	return (priocntl_common(pc_version, psp, cmd, arg, arg2,
+	    UIO_USERSPACE));
+}
 
 /*
  * The proccmp() function is part of the implementation of the
@@ -844,7 +865,7 @@ setparms(proc_t *targpp, struct stprmargs *stprmp)
 		return (0);
 }
 
-static int
+int
 setthreadnice(pcnice_t *pcnice, kthread_t *tp)
 {
 	int error = 0;
@@ -889,7 +910,7 @@ setthreadnice(pcnice_t *pcnice, kthread_t *tp)
 	return (error);
 }
 
-static int
+int
 setprocnice(proc_t *pp, pcnice_t *pcnice)
 {
 	kthread_t *tp;

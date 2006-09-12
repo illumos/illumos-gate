@@ -102,6 +102,7 @@ CHKHDRS=			\
 	bofi_impl.h		\
 	bpp_io.h		\
 	bootstat.h		\
+	brand.h			\
 	buf.h			\
 	bufmod.h		\
 	bustypes.h		\

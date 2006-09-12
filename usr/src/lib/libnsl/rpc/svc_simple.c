@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -56,6 +55,8 @@
 #include <sys/types.h>
 #include <syslog.h>
 #include <rpc/nettype.h>
+
+extern int use_portmapper;
 
 static struct proglst {
 	char *(*p_progname)();
@@ -175,7 +176,24 @@ rpc_reg(const rpcprog_t prognum, const rpcvers_t versnum,
 				(strcmp(pl->p_netid, netid) == 0))
 				break;
 		if (pl == NULL) { /* Not yet */
-			(void) rpcb_unset(prognum, versnum, nconf);
+			/*
+			 * Note that if we're using a portmapper
+			 * instead of rpcbind then we can't do an
+			 * unregister operation here.
+			 *
+			 * The reason is that the portmapper unset
+			 * operation removes all the entries for a
+			 * given program/version regardelss of
+			 * transport protocol.
+			 *
+			 * The caller of this routine needs to ensure
+			 * that __pmap_unset() has been called for all
+			 * program/version service pairs they plan
+			 * to support before they start registering
+			 * each program/version/protocol triplet.
+			 */
+			if (!use_portmapper)
+				(void) rpcb_unset(prognum, versnum, nconf);
 		} else {
 			/* so that svc_reg does not call rpcb_set() */
 			nconf = NULL;

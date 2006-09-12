@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -721,19 +722,16 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 			}
 			/*
 			 * If both NORMAL_STEP and WATCH_STEP are in
-			 * effect, give precedence to NORMAL_STEP.
+			 * effect, give precedence to WATCH_STEP.
 			 * One or the other must be set at this point.
 			 */
 			ASSERT(pcb->pcb_flags & (NORMAL_STEP|WATCH_STEP));
-			if (pcb->pcb_flags & NORMAL_STEP) {
+			if ((fault = undo_watch_step(&siginfo)) == 0 &&
+			    (pcb->pcb_flags & NORMAL_STEP)) {
 				siginfo.si_signo = SIGTRAP;
 				siginfo.si_code = TRAP_TRACE;
 				siginfo.si_addr = (caddr_t)rp->r_pc;
 				fault = FLTTRACE;
-				if (pcb->pcb_flags & WATCH_STEP)
-					(void) undo_watch_step(NULL);
-			} else {
-				fault = undo_watch_step(&siginfo);
 			}
 			pcb->pcb_flags &= ~(NORMAL_STEP|WATCH_STEP);
 		}

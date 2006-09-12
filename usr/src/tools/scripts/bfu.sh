@@ -6552,8 +6552,13 @@ done
 
 if [ -s $local_zone_info_file ]; then
 	cat $local_zone_info_file | while read zone zonepath; do
-		print "\nNow for zone $zone..."
-		mondo_loop $zonepath/root $zone
+		#
+		# Ignore linux zones
+		#
+		if [ -z `grep "brand=\"lx\"" /etc/zones/$zone.xml` ]; then
+			print "\nNow for zone $zone..."
+			mondo_loop $zonepath/root $zone
+		fi
 	done
 
 	#

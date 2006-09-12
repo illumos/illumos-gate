@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,6 +123,14 @@ extern "C" {
 	{ BT_WIM32((bitmap), (bitindex)) &= ~BT_BIW32(bitindex); }
 #endif /* _LP64 */
 
+
+/*
+ * BIT_ONLYONESET is a private macro not designed for bitmaps of
+ * arbitrary size.  u must be an unsigned integer/long.  It returns
+ * true if one and only one bit is set in u.
+ */
+#define	BIT_ONLYONESET(u) \
+	((((u) == 0) ? 0 : ((u) & ((u) - 1)) == 0))
 
 #if defined(_KERNEL) && !defined(_ASM)
 #include <sys/atomic.h>

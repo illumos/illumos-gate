@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -59,6 +58,7 @@
 #include <sys/cpc_impl.h>
 #include <sys/sdt.h>
 #include <sys/cmn_err.h>
+#include <sys/brand.h>
 
 void *segkp_lwp;		/* cookie for pool of segkp resources */
 
@@ -87,6 +87,7 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	uint_t old_hashsz = 0;
 	int i;
 	int rctlfail = 0;
+	boolean_t branded = 0;
 
 	mutex_enter(&p->p_lock);
 	mutex_enter(&p->p_zone->zone_nlwps_lock);
@@ -448,6 +449,19 @@ grow:
 				break;
 		} while (lwp_hash_lookup(p, t->t_tid) != NULL);
 	}
+
+	/*
+	 * If this is a branded process, let the brand do any necessary lwp
+	 * initialization.
+	 */
+	if (PROC_IS_BRANDED(p)) {
+		if (BROP(p)->b_initlwp(lwp)) {
+			err = 1;
+			goto error;
+		}
+		branded = 1;
+	}
+
 	p->p_lwpcnt++;
 	t->t_waitfor = -1;
 
@@ -539,6 +553,9 @@ error:
 		mutex_exit(&p->p_zone->zone_nlwps_lock);
 		if (cid != NOCLASS && bufp != NULL)
 			CL_FREE(cid, bufp);
+
+		if (branded)
+			BROP(p)->b_freelwp(lwp);
 
 		mutex_exit(&p->p_lock);
 		t->t_state = TS_FREE;
@@ -672,6 +689,13 @@ lwp_exit(void)
 
 	if (t->t_upimutex != NULL)
 		upimutex_cleanup();
+
+	/*
+	 * Perform any brand specific exit processing, then release any
+	 * brand data associated with the lwp
+	 */
+	if (PROC_IS_BRANDED(p))
+		BROP(p)->b_lwpexit(lwp);
 
 	mutex_enter(&p->p_lock);
 	lwp_cleanup();
@@ -1565,6 +1589,7 @@ forklwp(klwp_t *lwp, proc_t *cp, id_t lwpid)
 	proc_t *p = lwptoproc(lwp);
 	int cid;
 	void *bufp;
+	void *brand_data;
 	int val;
 
 	ASSERT(p == curproc);
@@ -1578,6 +1603,7 @@ forklwp(klwp_t *lwp, proc_t *cp, id_t lwpid)
 	if (t == curthread)
 		/* copy args out of registers first */
 		(void) save_syscall_args();
+
 	clwp = lwp_create(cp->p_lwpcnt == 0 ? lwp_rtt_initial : lwp_rtt,
 	    NULL, 0, cp, TS_STOPPED, t->t_pri, &t->t_hold, NOCLASS, lwpid);
 	if (clwp == NULL)
@@ -1591,14 +1617,16 @@ forklwp(klwp_t *lwp, proc_t *cp, id_t lwpid)
 	ct = clwp->lwp_thread;
 	tregs = clwp->lwp_regs;
 	tfpu = clwp->lwp_fpu;
+	brand_data = clwp->lwp_brand;
 
 	/* copy parent lwp to child lwp */
 	*clwp = *lwp;
 
 	/* fix up child's lwp */
 
-	clwp->lwp_pcb.pcb_flags = 0;
-#if defined(__sparc)
+#if defined(__i386) || defined(__amd64)
+	clwp->lwp_pcb.pcb_flags = clwp->lwp_pcb.pcb_flags & RUPDATE_PENDING;
+#elif defined(__sparc)
 	clwp->lwp_pcb.pcb_step = STEP_NONE;
 #endif
 	clwp->lwp_cursig = 0;
@@ -1608,6 +1636,7 @@ forklwp(klwp_t *lwp, proc_t *cp, id_t lwpid)
 	ct->t_sysnum = t->t_sysnum;
 	clwp->lwp_regs = tregs;
 	clwp->lwp_fpu = tfpu;
+	clwp->lwp_brand = brand_data;
 	clwp->lwp_ap = clwp->lwp_arg;
 	clwp->lwp_procp = cp;
 	bzero(clwp->lwp_timer, sizeof (clwp->lwp_timer));
@@ -1639,6 +1668,10 @@ forklwp(klwp_t *lwp, proc_t *cp, id_t lwpid)
 	if (cp->p_flag & SMSACCT)
 		ct->t_proc_flag |= TP_MSACCT;
 	mutex_exit(&cp->p_lock);
+
+	/* Allow brand to propagate brand-specific state */
+	if (PROC_IS_BRANDED(p))
+		BROP(p)->b_forklwp(lwp, clwp);
 
 retry:
 	cid = t->t_cid;

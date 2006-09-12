@@ -524,6 +524,7 @@ f none usr/include/sys/bofi_impl.h 644 root bin
 f none usr/include/sys/bootconf.h 644 root bin
 f none usr/include/sys/bpp_io.h 644 root bin
 f none usr/include/sys/bootstat.h 644 root bin
+f none usr/include/sys/brand.h 644 root bin
 f none usr/include/sys/buf.h 644 root bin
 f none usr/include/sys/bufmod.h 644 root bin
 f none usr/include/sys/bustypes.h 644 root bin

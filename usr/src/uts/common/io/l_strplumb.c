@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -228,7 +227,7 @@ kstr_autopush(int op, major_t *maj, minor_t *min, minor_t *lastmin,
 	li = ldi_ident_from_anon();
 	if (op == SET_AUTOPUSH || op == CLR_AUTOPUSH) {
 		error = ldi_open_by_name(SAD_ADM, FREAD|FWRITE,
-		    CRED(), &lh, li);
+		    kcred, &lh, li);
 		if (error) {
 			printf("kstr_autopush: open failed error %d\n", error);
 			ldi_ident_release(li);
@@ -236,7 +235,7 @@ kstr_autopush(int op, major_t *maj, minor_t *min, minor_t *lastmin,
 		}
 	} else	{
 		error = ldi_open_by_name(SAD_USR, FREAD|FWRITE,
-		    CRED(), &lh, li);
+		    kcred, &lh, li);
 		if (error) {
 			printf("kstr_autopush: open failed error %d\n", error);
 			ldi_ident_release(li);
@@ -253,11 +252,11 @@ kstr_autopush(int op, major_t *maj, minor_t *min, minor_t *lastmin,
 		push.sap_minor = *min;
 
 		error = ldi_ioctl(lh, SAD_GAP, (intptr_t)&push,
-		    FKIOCTL, CRED(), &rval);
+		    FKIOCTL, kcred, &rval);
 		if (error) {
 			printf("kstr_autopush: ioctl failed, error %d\n",
 			    error);
-			(void) ldi_close(lh, FREAD|FWRITE, CRED());
+			(void) ldi_close(lh, FREAD|FWRITE, kcred);
 			return (error);
 		}
 		switch (push.sap_cmd) {
@@ -288,7 +287,7 @@ kstr_autopush(int op, major_t *maj, minor_t *min, minor_t *lastmin,
 				(void) strcpy(mods[i], push.sap_list[i]);
 			mods[i] = NULL;
 		}
-		(void) ldi_close(lh, FREAD|FWRITE, CRED());
+		(void) ldi_close(lh, FREAD|FWRITE, kcred);
 		return (0);
 
 	case CLR_AUTOPUSH:
@@ -299,12 +298,12 @@ kstr_autopush(int op, major_t *maj, minor_t *min, minor_t *lastmin,
 		push.sap_major = *maj;
 
 		error = ldi_ioctl(lh, SAD_SAP, (intptr_t)&push,
-		    FKIOCTL, CRED(), &rval);
+		    FKIOCTL, kcred, &rval);
 		if (error) {
 			printf("kstr_autopush: ioctl failed, error %d\n",
 			    error);
 		}
-		(void) ldi_close(lh, FREAD|FWRITE, CRED());
+		(void) ldi_close(lh, FREAD|FWRITE, kcred);
 		return (error);
 
 	case SET_AUTOPUSH:
@@ -338,16 +337,16 @@ kstr_autopush(int op, major_t *maj, minor_t *min, minor_t *lastmin,
 		push.sap_list[i][0] = '\0';
 
 		error = ldi_ioctl(lh, SAD_SAP, (intptr_t)&push,
-		    FKIOCTL, CRED(), &rval);
+		    FKIOCTL, kcred, &rval);
 		if (error) {
 			printf("kstr_autopush: ioctl failed, error %d\n",
 			    error);
 		}
-		(void) ldi_close(lh, FREAD|FWRITE, CRED());
+		(void) ldi_close(lh, FREAD|FWRITE, kcred);
 		return (error);
 
 	default:
-		(void) ldi_close(lh, FREAD|FWRITE, CRED());
+		(void) ldi_close(lh, FREAD|FWRITE, kcred);
 		return (EINVAL);
 	}
 }

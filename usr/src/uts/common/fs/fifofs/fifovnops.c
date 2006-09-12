@@ -77,6 +77,8 @@ static int fifo_setattr(vnode_t *, vattr_t *, int, cred_t *,
 	caller_context_t *);
 static int fifo_realvp(vnode_t *, vnode_t **);
 static int fifo_access(vnode_t *, int, int, cred_t *);
+static int fifo_create(struct vnode *, char *, vattr_t *, enum vcexcl,
+    int, struct vnode **, struct cred *, int);
 static int fifo_fid(vnode_t *, fid_t *);
 static int fifo_fsync(vnode_t *, int, cred_t *);
 static int fifo_seek(vnode_t *, offset_t, offset_t *);
@@ -116,6 +118,7 @@ const fs_operation_def_t fifo_vnodeops_template[] = {
 	VOPNAME_GETATTR, fifo_getattr,
 	VOPNAME_SETATTR, fifo_setattr,
 	VOPNAME_ACCESS, fifo_access,
+	VOPNAME_CREATE, fifo_create,
 	VOPNAME_FSYNC, fifo_fsync,
 	VOPNAME_INACTIVE, (fs_generic_func_p) fifo_inactive,
 	VOPNAME_FID, fifo_fid,
@@ -1539,6 +1542,27 @@ fifo_access(vnode_t *vp, int mode, int flags, cred_t *crp)
 		return (VOP_ACCESS(VTOF(vp)->fn_realvp, mode, flags, crp));
 	else
 		return (0);
+}
+
+/*
+ * This can be called if creat or an open with O_CREAT is done on the root
+ * of a lofs mount where the mounted entity is a fifo.
+ */
+/*ARGSUSED*/
+static int
+fifo_create(struct vnode *dvp, char *name, vattr_t *vap, enum vcexcl excl,
+    int mode, struct vnode **vpp, struct cred *cr, int flag)
+{
+	int error;
+
+	ASSERT(dvp && (dvp->v_flag & VROOT) && *name == '\0');
+	if (excl == NONEXCL) {
+		if (mode && (error = fifo_access(dvp, mode, 0, cr)))
+			return (error);
+		VN_HOLD(dvp);
+		return (0);
+	}
+	return (EEXIST);
 }
 
 /*

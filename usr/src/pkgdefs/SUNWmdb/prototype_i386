@@ -101,6 +101,7 @@ d none usr/lib/mdb/proc/amd64 755 root bin
 f none usr/lib/mdb/proc/amd64/libavl.so 555 root sys
 f none usr/lib/mdb/proc/amd64/libc.so 555 root sys
 f none usr/lib/mdb/proc/amd64/libnvpair.so 555 root sys
+f none usr/lib/mdb/proc/amd64/libproc.so 555 root sys
 f none usr/lib/mdb/proc/amd64/libsysevent.so 555 root sys
 f none usr/lib/mdb/proc/amd64/libumem.so 555 root sys
 f none usr/lib/mdb/proc/amd64/libuutil.so 555 root sys

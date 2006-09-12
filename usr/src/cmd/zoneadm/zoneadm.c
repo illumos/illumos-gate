@@ -55,6 +55,7 @@
 #include <libintl.h>
 #include <libzonecfg.h>
 #include <bsm/adt.h>
+#include <sys/brand.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -72,6 +73,7 @@
 #include <libgen.h>
 #include <fnmatch.h>
 #include <sys/modctl.h>
+#include <libbrand.h>
 
 #include <pool.h>
 #include <sys/pool.h>
@@ -86,12 +88,14 @@ typedef struct zone_entry {
 	char		zname[ZONENAME_MAX];
 	char		*zstate_str;
 	zone_state_t	zstate_num;
+	char		zbrand[MAXNAMELEN];
 	char		zroot[MAXPATHLEN];
 	char		zuuid[UUID_PRINTABLE_STRING_LENGTH];
 } zone_entry_t;
 
 static zone_entry_t *zents;
 static size_t nzents;
+static boolean_t is_native_zone = B_TRUE;
 
 #define	LOOPBACK_IF	"lo0"
 #define	SOCKET_AF(af)	(((af) == AF_UNSPEC) ? AF_INET : (af))
@@ -120,13 +124,19 @@ struct cmd {
 #define	SHELP_REBOOT	"reboot [-- boot_arguments]"
 #define	SHELP_LIST	"list [-cipv]"
 #define	SHELP_VERIFY	"verify"
-#define	SHELP_INSTALL	"install [-x nodataset]"
+#define	SHELP_INSTALL	"install [-x nodataset] [brand-specific args]"
 #define	SHELP_UNINSTALL	"uninstall [-F]"
 #define	SHELP_CLONE	"clone [-m method] [-s <ZFS snapshot>] zonename"
 #define	SHELP_MOVE	"move zonepath"
 #define	SHELP_DETACH	"detach [-n]"
 #define	SHELP_ATTACH	"attach [-F] [-n <path>]"
 #define	SHELP_MARK	"mark incomplete"
+
+#define	EXEC_PREFIX	"exec "
+#define	EXEC_LEN	(strlen(EXEC_PREFIX))
+#define	RMCOMMAND	"/usr/bin/rm -rf"
+
+static int cleanup_zonepath(char *, boolean_t);
 
 static int help_func(int argc, char *argv[]);
 static int ready_func(int argc, char *argv[]);
@@ -145,7 +155,7 @@ static int detach_func(int argc, char *argv[]);
 static int attach_func(int argc, char *argv[]);
 static int mark_func(int argc, char *argv[]);
 static int sanity_check(char *zone, int cmd_num, boolean_t running,
-    boolean_t unsafe_when_running);
+    boolean_t unsafe_when_running, boolean_t force);
 static int cmd_match(char *cmd);
 static int verify_details(int);
 
@@ -174,12 +184,28 @@ static struct cmd cmdtab[] = {
 
 /* set early in main(), never modified thereafter, used all over the place */
 static char *execname;
+static char target_brand[MAXNAMELEN];
 static char *locale;
 char *target_zone;
 static char *target_uuid;
 
 /* used in do_subproc() and signal handler */
 static volatile boolean_t child_killed;
+static int do_subproc_cnt = 0;
+
+/*
+ * Used to indicate whether this zoneadm instance has another zoneadm
+ * instance in its ancestry.
+ */
+static boolean_t zoneadm_is_nested = B_FALSE;
+
+/* used to track nested zone-lock operations */
+static int zone_lock_cnt = 0;
+
+/* used to communicate lock status to children */
+#define	LOCK_ENV_VAR	"_ZONEADM_LOCK_HELD"
+static char zoneadm_lock_held[] = LOCK_ENV_VAR"=1";
+static char zoneadm_lock_not_held[] = LOCK_ENV_VAR"=0";
 
 char *
 cmd_to_str(int cmd_num)
@@ -233,7 +259,9 @@ long_help(int cmd_num)
 		return (gettext("Install the configuration on to the system.  "
 		    "The -x nodataset option\n\tcan be used to prevent the "
 		    "creation of a new ZFS file system for the\n\tzone "
-		    "(assuming the zonepath is within a ZFS file system)."));
+		    "(assuming the zonepath is within a ZFS file system).\n\t"
+		    "All other arguments are passed to the brand installation "
+		    "function;\n\tsee brand(4) for more information."));
 	case CMD_UNINSTALL:
 		return (gettext("Uninstall the configuration from the system.  "
 		    "The -F flag can be used\n\tto force the action."));
@@ -383,8 +411,8 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 	assert(!(verbose && parsable));
 	if (firsttime && verbose) {
 		firsttime = B_FALSE;
-		(void) printf("%*s %-16s %-14s %-30s\n", ZONEID_WIDTH, "ID",
-		    "NAME", "STATUS", "PATH");
+		(void) printf("%*s %-16s %-14s %-30s %-10s\n", ZONEID_WIDTH,
+		    "ID", "NAME", "STATUS", "PATH", "BRAND");
 	}
 	if (!verbose) {
 		char *cp, *clim;
@@ -403,7 +431,7 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 			(void) printf("%.*s\\:", clim - cp, cp);
 			cp = clim + 1;
 		}
-		(void) printf("%s:%s\n", cp, zent->zuuid);
+		(void) printf("%s:%s:%s\n", cp, zent->zuuid, zent->zbrand);
 		return;
 	}
 	if (zent->zstate_str != NULL) {
@@ -411,8 +439,8 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 			(void) printf("%*s", ZONEID_WIDTH, "-");
 		else
 			(void) printf("%*lu", ZONEID_WIDTH, zent->zid);
-		(void) printf(" %-16s %-14s %-30s\n", zent->zname,
-		    zent->zstate_str, zent->zroot);
+		(void) printf(" %-16s %-14s %-30s %-10s\n", zent->zname,
+		    zent->zstate_str, zent->zroot, zent->zbrand);
 	}
 }
 
@@ -425,6 +453,7 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 
 	(void) strlcpy(zent->zname, zone_name, sizeof (zent->zname));
 	(void) strlcpy(zent->zroot, "???", sizeof (zent->zroot));
+	(void) strlcpy(zent->zbrand, "???", sizeof (zent->zbrand));
 	zent->zstate_str = "???";
 
 	zent->zid = zid;
@@ -469,6 +498,11 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 		return (Z_ERR);
 	}
 	zent->zstate_str = zone_state_str(zent->zstate_num);
+	if (zone_get_brand(zent->zname, zent->zbrand,
+	    sizeof (zent->zbrand)) != Z_OK) {
+		zperror2(zent->zname, gettext("could not get brand name"));
+		return (Z_ERR);
+	}
 
 	return (Z_OK);
 }
@@ -998,9 +1032,49 @@ validate_zonepath(char *path, int cmd_num)
 	return (err ? Z_ERR : Z_OK);
 }
 
+/*
+ * The following two routines implement a simple locking mechanism to
+ * ensure that only one instance of zoneadm at a time is able to manipulate
+ * a given zone.  The lock is built on top of an fcntl(2) lock of
+ * [<altroot>]/var/run/zones/<zonename>.zoneadm.lock.  If a zoneadm instance
+ * can grab that lock, it is allowed to manipulate the zone.
+ *
+ * Since zoneadm may call external applications which in turn invoke
+ * zoneadm again, we introduce the notion of "lock inheritance".  Any
+ * instance of zoneadm that has another instance in its ancestry is assumed
+ * to be acting on behalf of the original zoneadm, and is thus allowed to
+ * manipulate its zone.
+ *
+ * This inheritance is implemented via the _ZONEADM_LOCK_HELD environment
+ * variable.  When zoneadm is granted a lock on its zone, this environment
+ * variable is set to 1.  When it releases the lock, the variable is set to
+ * 0.  Since a child process inherits its parent's environment, checking
+ * the state of this variable indicates whether or not any ancestor owns
+ * the lock.
+ */
 static void
 release_lock_file(int lockfd)
 {
+	/*
+	 * If we are cleaning up from a failed attempt to lock the zone for
+	 * the first time, we might have a zone_lock_cnt of 0.  In that
+	 * error case, we don't want to do anything but close the lock
+	 * file.
+	 */
+	assert(zone_lock_cnt >= 0);
+	if (zone_lock_cnt > 0) {
+		assert(getenv(LOCK_ENV_VAR) != NULL);
+		assert(atoi(getenv(LOCK_ENV_VAR)) == 1);
+		if (--zone_lock_cnt > 0) {
+			assert(lockfd == -1);
+			return;
+		}
+		if (putenv(zoneadm_lock_not_held) != 0) {
+			zperror(target_zone, B_TRUE);
+			exit(Z_ERR);
+		}
+	}
+	assert(lockfd >= 0);
 	(void) close(lockfd);
 }
 
@@ -1009,6 +1083,18 @@ grab_lock_file(const char *zone_name, int *lockfd)
 {
 	char pathbuf[PATH_MAX];
 	struct flock flock;
+
+	/*
+	 * If we already have the lock, we can skip this expensive song
+	 * and dance.
+	 */
+	if (zone_lock_cnt > 0) {
+		zone_lock_cnt++;
+		*lockfd = -1;
+		return (Z_OK);
+	}
+	assert(getenv(LOCK_ENV_VAR) != NULL);
+	assert(atoi(getenv(LOCK_ENV_VAR)) == 0);
 
 	if (snprintf(pathbuf, sizeof (pathbuf), "%s%s", zonecfg_get_root(),
 	    ZONES_TMPDIR) >= sizeof (pathbuf)) {
@@ -1045,12 +1131,14 @@ grab_lock_file(const char *zone_name, int *lockfd)
 	flock.l_whence = SEEK_SET;
 	flock.l_start = (off_t)0;
 	flock.l_len = (off_t)0;
-	if (fcntl(*lockfd, F_SETLKW, &flock) < 0) {
+	if ((fcntl(*lockfd, F_SETLKW, &flock) < 0) ||
+	    (putenv(zoneadm_lock_held) != 0)) {
 		zerror(gettext("unable to lock %s: %s"), pathbuf,
 		    strerror(errno));
 		release_lock_file(*lockfd);
 		return (Z_ERR);
 	}
+	zone_lock_cnt = 1;
 	return (Z_OK);
 }
 
@@ -1315,7 +1403,8 @@ ready_func(int argc, char *argv[])
 		sub_usage(SHELP_READY, CMD_READY);
 		return (Z_USAGE);
 	}
-	if (sanity_check(target_zone, CMD_READY, B_FALSE, B_FALSE) != Z_OK)
+	if (sanity_check(target_zone, CMD_READY, B_FALSE, B_FALSE, B_FALSE)
+	    != Z_OK)
 		return (Z_ERR);
 	if (verify_details(CMD_READY) != Z_OK)
 		return (Z_ERR);
@@ -1332,6 +1421,7 @@ static int
 boot_func(int argc, char *argv[])
 {
 	zone_cmd_arg_t zarg;
+	boolean_t force = B_FALSE;
 	int arg;
 
 	if (zonecfg_in_alt_root()) {
@@ -1348,15 +1438,17 @@ boot_func(int argc, char *argv[])
 	 *	zoneadm -z myzone boot [here] -- -v -m verbose
 	 *
 	 * Where [here] can either be nothing, -? (in which case we bail
-	 * and print usage), or -s.  Support for -s is vestigal and
-	 * obsolete, but is retained because it was a documented interface
-	 * and there are known consumers including admin/install; the
-	 * proper way to specify boot arguments like -s is:
+	 * and print usage), -f (a private option to indicate that the
+	 * boot operation should be 'forced'), or -s.  Support for -s is
+	 * vestigal and obsolete, but is retained because it was a
+	 * documented interface and there are known consumers including
+	 * admin/install; the proper way to specify boot arguments like -s
+	 * is:
 	 *
 	 *	zoneadm -z myzone boot -- -s -v -m verbose.
 	 */
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?s")) != EOF) {
+	while ((arg = getopt(argc, argv, "?fs")) != EOF) {
 		switch (arg) {
 		case '?':
 			sub_usage(SHELP_BOOT, CMD_BOOT);
@@ -1364,6 +1456,9 @@ boot_func(int argc, char *argv[])
 		case 's':
 			(void) strlcpy(zarg.bootbuf, "-s",
 			    sizeof (zarg.bootbuf));
+			break;
+		case 'f':
+			force = B_TRUE;
 			break;
 		default:
 			sub_usage(SHELP_BOOT, CMD_BOOT);
@@ -1384,12 +1479,12 @@ boot_func(int argc, char *argv[])
 				return (Z_ERR);
 			}
 	}
-
-	if (sanity_check(target_zone, CMD_BOOT, B_FALSE, B_FALSE) != Z_OK)
+	if (sanity_check(target_zone, CMD_BOOT, B_FALSE, B_FALSE, force)
+	    != Z_OK)
 		return (Z_ERR);
 	if (verify_details(CMD_BOOT) != Z_OK)
 		return (Z_ERR);
-	zarg.cmd = Z_BOOT;
+	zarg.cmd = force ? Z_FORCEBOOT : Z_BOOT;
 	if (call_zoneadmd(target_zone, &zarg) != 0) {
 		zerror(gettext("call to %s failed"), "zoneadmd");
 		return (Z_ERR);
@@ -1424,12 +1519,15 @@ fake_up_local_zone(zoneid_t zid, zone_entry_t *zeptr)
 	if (is_system_labeled()) {
 		(void) zone_getattr(zid, ZONE_ATTR_ROOT, zeptr->zroot,
 		    sizeof (zeptr->zroot));
+		(void) strlcpy(zeptr->zbrand, NATIVE_BRAND_NAME,
+			    sizeof (zeptr->zbrand));
 	} else {
 		(void) strlcpy(zeptr->zroot, "/", sizeof (zeptr->zroot));
+		(void) zone_getattr(zid, ZONE_ATTR_BRAND, zeptr->zbrand,
+		    sizeof (zeptr->zbrand));
 	}
 
 	zeptr->zstate_str = "running";
-
 	if (zonecfg_get_uuid(zeptr->zname, uuid) == Z_OK &&
 	    !uuid_is_null(uuid))
 		uuid_unparse(uuid, zeptr->zuuid);
@@ -1487,8 +1585,8 @@ list_func(int argc, char *argv[])
 		if (zone_id == GLOBAL_ZONEID || is_system_labeled()) {
 			retv = zone_print_list(min_state, verbose, parsable);
 		} else {
-			retv = Z_OK;
 			fake_up_local_zone(zone_id, &zent);
+			retv = Z_OK;
 			zone_print(&zent, verbose, parsable);
 		}
 		return (retv);
@@ -1552,6 +1650,7 @@ sigterm(int sig)
 	 * Ignore SIG{INT,TERM}, so we don't end up in an infinite loop,
 	 * then propagate the signal to our process group.
 	 */
+	assert(sig == SIGINT || sig == SIGTERM);
 	(void) sigset(SIGINT, SIG_IGN);
 	(void) sigset(SIGTERM, SIG_IGN);
 	(void) kill(0, sig);
@@ -1564,6 +1663,7 @@ do_subproc(char *cmdbuf)
 	char inbuf[1024];	/* arbitrary large amount */
 	FILE *file;
 
+	do_subproc_cnt++;
 	child_killed = B_FALSE;
 	/*
 	 * We use popen(3c) to launch child processes for [un]install;
@@ -1574,8 +1674,9 @@ do_subproc(char *cmdbuf)
 	 * shell, so we close stdin and reopen it as /dev/null first.
 	 */
 	(void) close(STDIN_FILENO);
-	(void) open("/dev/null", O_RDONLY);
-	(void) setpgid(0, 0);
+	(void) openat(STDIN_FILENO, "/dev/null", O_RDONLY);
+	if (!zoneadm_is_nested)
+		(void) setpgid(0, 0);
 	(void) sigset(SIGINT, sigterm);
 	(void) sigset(SIGTERM, sigterm);
 	file = popen(cmdbuf, "r");
@@ -1590,15 +1691,55 @@ do_subproc(char *cmdbuf)
 }
 
 static int
-subproc_status(const char *cmd, int status)
+do_subproc_interactive(char *cmdbuf)
+{
+	void (*saveint)(int);
+	void (*saveterm)(int);
+	void (*savequit)(int);
+	void (*savehup)(int);
+	int pid, child, status;
+
+	/*
+	 * do_subproc() links stdin to /dev/null, which would break any
+	 * interactive subprocess we try to launch here.  Similarly, we
+	 * can't have been launched as a subprocess ourselves.
+	 */
+	assert(do_subproc_cnt == 0 && !zoneadm_is_nested);
+
+	if ((child = vfork()) == 0) {
+		(void) execl("/bin/sh", "sh", "-c", cmdbuf, (char *)NULL);
+	}
+
+	if (child == -1)
+		return (-1);
+
+	saveint = sigset(SIGINT, SIG_IGN);
+	saveterm = sigset(SIGTERM, SIG_IGN);
+	savequit = sigset(SIGQUIT, SIG_IGN);
+	savehup = sigset(SIGHUP, SIG_IGN);
+
+	while ((pid = waitpid(child, &status, 0)) != child && pid != -1)
+		;
+
+	(void) sigset(SIGINT, saveint);
+	(void) sigset(SIGTERM, saveterm);
+	(void) sigset(SIGQUIT, savequit);
+	(void) sigset(SIGHUP, savehup);
+
+	return (pid == -1 ? -1 : status);
+}
+
+static int
+subproc_status(const char *cmd, int status, boolean_t verbose_failure)
 {
 	if (WIFEXITED(status)) {
 		int exit_code = WEXITSTATUS(status);
 
-		if (exit_code == 0)
-			return (Z_OK);
-		zerror(gettext("'%s' failed with exit code %d."), cmd,
-		    exit_code);
+		if ((verbose_failure) && (exit_code != ZONE_SUBPROC_OK))
+			zerror(gettext("'%s' failed with exit code %d."), cmd,
+			    exit_code);
+
+		return (exit_code);
 	} else if (WIFSIGNALED(status)) {
 		int signal = WTERMSIG(status);
 		char sigstr[SIG2STR_MAX];
@@ -1613,7 +1754,13 @@ subproc_status(const char *cmd, int status)
 	} else {
 		zerror(gettext("'%s' failed for unknown reasons."), cmd);
 	}
-	return (Z_ERR);
+
+	/*
+	 * Assume a subprocess that died due to a signal or an unknown error
+	 * should be considered an exit code of ZONE_SUBPROC_FATAL, as the
+	 * user will likely need to do some manual cleanup.
+	 */
+	return (ZONE_SUBPROC_FATAL);
 }
 
 /*
@@ -1629,11 +1776,11 @@ subproc_status(const char *cmd, int status)
  */
 static int
 sanity_check(char *zone, int cmd_num, boolean_t running,
-    boolean_t unsafe_when_running)
+    boolean_t unsafe_when_running, boolean_t force)
 {
 	zone_entry_t *zent;
 	priv_set_t *privset;
-	zone_state_t state;
+	zone_state_t state, min_state;
 	char kernzone[ZONENAME_MAX];
 	FILE *fp;
 
@@ -1691,6 +1838,12 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 		return (Z_ERR);
 	}
 
+	if (!is_native_zone && cmd_num == CMD_MOUNT) {
+		zerror(gettext("%s operation is invalid for branded zones."),
+		    cmd_to_str(cmd_num));
+			return (Z_ERR);
+	}
+
 	if (!zonecfg_in_alt_root()) {
 		zent = lookup_running_zone(zone);
 	} else if ((fp = zonecfg_open_scratch("", B_FALSE)) == NULL) {
@@ -1707,7 +1860,7 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 	/*
 	 * Look up from the kernel for 'running' zones.
 	 */
-	if (running) {
+	if (running && !force) {
 		if (zent == NULL) {
 			zerror(gettext("not running"));
 			return (Z_ERR);
@@ -1765,9 +1918,21 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 		case CMD_BOOT:
 		case CMD_MOUNT:
 		case CMD_MARK:
-			if (state < ZONE_STATE_INSTALLED) {
+			if ((cmd_num == CMD_BOOT || cmd_num == CMD_MOUNT) &&
+			    force)
+				min_state = ZONE_STATE_INCOMPLETE;
+			else
+				min_state = ZONE_STATE_INSTALLED;
+
+			if (force && cmd_num == CMD_BOOT && is_native_zone) {
+				zerror(gettext("Only branded zones may be "
+				    "force-booted."));
+				return (Z_ERR);
+			}
+
+			if (state < min_state) {
 				zerror(gettext("must be %s before %s."),
-				    zone_state_str(ZONE_STATE_INSTALLED),
+				    zone_state_str(min_state),
 				    cmd_to_str(cmd_num));
 				return (Z_ERR);
 			}
@@ -1824,7 +1989,8 @@ halt_func(int argc, char *argv[])
 	 * so even though it seems that the fourth parameter below should
 	 * perhaps be B_TRUE, it really shouldn't be.
 	 */
-	if (sanity_check(target_zone, CMD_HALT, B_FALSE, B_FALSE) != Z_OK)
+	if (sanity_check(target_zone, CMD_HALT, B_FALSE, B_FALSE, B_FALSE)
+	    != Z_OK)
 		return (Z_ERR);
 
 	zarg.cmd = Z_HALT;
@@ -1875,13 +2041,56 @@ reboot_func(int argc, char *argv[])
 	 * so even though it seems that the fourth parameter below should
 	 * perhaps be B_TRUE, it really shouldn't be.
 	 */
-	if (sanity_check(target_zone, CMD_REBOOT, B_TRUE, B_FALSE) != Z_OK)
+	if (sanity_check(target_zone, CMD_REBOOT, B_TRUE, B_FALSE, B_FALSE)
+	    != Z_OK)
 		return (Z_ERR);
 	if (verify_details(CMD_REBOOT) != Z_OK)
 		return (Z_ERR);
 
 	zarg.cmd = Z_REBOOT;
 	return ((call_zoneadmd(target_zone, &zarg) == 0) ? Z_OK : Z_ERR);
+}
+
+static int
+verify_brand(zone_dochandle_t handle)
+{
+	char cmdbuf[MAXPATHLEN];
+	int err;
+	char zonepath[MAXPATHLEN];
+	brand_handle_t *bhp = NULL;
+	int status;
+
+	/*
+	 * Fetch the verify command from the brand configuration.
+	 * "exec" the command so that the returned status is that of
+	 * the command and not the shell.
+	 */
+	if ((err = zonecfg_get_zonepath(handle, zonepath, sizeof (zonepath))) !=
+	    Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(CMD_VERIFY), B_TRUE);
+		return (Z_ERR);
+	}
+	if ((bhp = brand_open(target_brand)) == NULL) {
+		zerror(gettext("missing or invalid brand"));
+		return (Z_ERR);
+	}
+
+	/*
+	 * If the brand has its own verification routine, execute it now.
+	 */
+	(void) strcpy(cmdbuf, EXEC_PREFIX);
+	err = brand_get_verify_adm(bhp, target_zone, zonepath,
+	    cmdbuf + EXEC_LEN, sizeof (cmdbuf) - EXEC_LEN, 0, NULL);
+	brand_close(bhp);
+	if (err == 0 && strlen(cmdbuf) > EXEC_LEN) {
+		status = do_subproc_interactive(cmdbuf);
+		err = subproc_status(gettext("brand-specific verification"),
+		    status, B_FALSE);
+		return ((err == ZONE_SUBPROC_OK) ? Z_OK : Z_BRAND_ERROR);
+	}
+
+	return ((err == Z_OK) ? Z_OK : Z_BRAND_ERROR);
 }
 
 static int
@@ -2542,6 +2751,8 @@ no_net:
 		return_code = Z_ERR;
 	if (!in_alt_root && verify_pool(handle) != Z_OK)
 		return_code = Z_ERR;
+	if (!in_alt_root && verify_brand(handle) != Z_OK)
+		return_code = Z_ERR;
 	if (!in_alt_root && verify_datasets(handle) != Z_OK)
 		return_code = Z_ERR;
 
@@ -2643,31 +2854,90 @@ verify_func(int argc, char *argv[])
 		sub_usage(SHELP_VERIFY, CMD_VERIFY);
 		return (Z_USAGE);
 	}
-	if (sanity_check(target_zone, CMD_VERIFY, B_FALSE, B_FALSE) != Z_OK)
+	if (sanity_check(target_zone, CMD_VERIFY, B_FALSE, B_FALSE, B_FALSE)
+	    != Z_OK)
 		return (Z_ERR);
 	return (verify_details(CMD_VERIFY));
 }
 
-#define	LUCREATEZONE	"/usr/lib/lu/lucreatezone"
+static int
+addopt(char *buf, int opt, char *optarg, size_t bufsize)
+{
+	char optstring[4];
+
+	if (opt > 0)
+		(void) sprintf(optstring, " -%c", opt);
+	else
+		(void) strcpy(optstring, " ");
+
+	if ((strlcat(buf, optstring, bufsize) > bufsize))
+		return (Z_ERR);
+	if ((optarg != NULL) && (strlcat(buf, optarg, bufsize) > bufsize))
+		return (Z_ERR);
+	return (Z_OK);
+}
 
 static int
 install_func(int argc, char *argv[])
 {
-	/* 9: "exec " and " -z " */
-	char cmdbuf[sizeof (LUCREATEZONE) + ZONENAME_MAX + 9];
+	char cmdbuf[MAXPATHLEN];
 	int lockfd;
-	int err, arg;
+	int arg, err, subproc_err;
 	char zonepath[MAXPATHLEN];
+	brand_handle_t *bhp = NULL;
 	int status;
 	boolean_t nodataset = B_FALSE;
+	char opts[128];
+
+	if (target_zone == NULL) {
+		sub_usage(SHELP_INSTALL, CMD_INSTALL);
+		return (Z_USAGE);
+	}
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot install zone in alternate root"));
 		return (Z_ERR);
 	}
 
+	if ((err = zone_get_zonepath(target_zone, zonepath,
+	    sizeof (zonepath))) != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("could not get zone path"));
+		return (Z_ERR);
+	}
+
+	/* Fetch the install command from the brand configuration.  */
+	if ((bhp = brand_open(target_brand)) == NULL) {
+		zerror(gettext("missing or invalid brand"));
+		return (Z_ERR);
+	}
+
+	(void) strcpy(cmdbuf, EXEC_PREFIX);
+	if (brand_get_install(bhp, target_zone, zonepath, cmdbuf + EXEC_LEN,
+	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) != 0) {
+		zerror("invalid brand configuration: missing install resource");
+		brand_close(bhp);
+		return (Z_ERR);
+	}
+
+	(void) strcpy(opts, "?x:");
+	if (!is_native_zone) {
+		/*
+		 * Fetch the list of recognized command-line options from
+		 * the brand configuration file.
+		 */
+		if (brand_get_installopts(bhp, opts + strlen(opts),
+		    sizeof (opts) - strlen(opts)) != 0) {
+			zerror("invalid brand configuration: missing "
+			    "install options resource");
+			brand_close(bhp);
+			return (Z_ERR);
+		}
+	}
+	brand_close(bhp);
+
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?x:")) != EOF) {
+	while ((arg = getopt(argc, argv, opts)) != EOF) {
 		switch (arg) {
 		case '?':
 			sub_usage(SHELP_INSTALL, CMD_INSTALL);
@@ -2680,15 +2950,37 @@ install_func(int argc, char *argv[])
 			nodataset = B_TRUE;
 			break;
 		default:
-			sub_usage(SHELP_INSTALL, CMD_INSTALL);
-			return (Z_USAGE);
+			if (is_native_zone) {
+				sub_usage(SHELP_INSTALL, CMD_INSTALL);
+				return (Z_USAGE);
+			}
+
+			/*
+			 * This option isn't for zoneadm, so append it to
+			 * the command line passed to the brand-specific
+			 * install routine.
+			 */
+			if (addopt(cmdbuf, optopt, optarg,
+			    sizeof (cmdbuf)) != Z_OK) {
+				zerror("Install command line too long");
+				return (Z_ERR);
+			}
+			break;
 		}
 	}
-	if (argc > optind) {
-		sub_usage(SHELP_INSTALL, CMD_INSTALL);
-		return (Z_USAGE);
+
+	if (!is_native_zone) {
+		for (; optind < argc; optind++) {
+			if (addopt(cmdbuf, 0, argv[optind],
+			    sizeof (cmdbuf)) != Z_OK) {
+				zerror("Install command line too long");
+				return (Z_ERR);
+			}
+		}
 	}
-	if (sanity_check(target_zone, CMD_INSTALL, B_FALSE, B_TRUE) != Z_OK)
+
+	if (sanity_check(target_zone, CMD_INSTALL, B_FALSE, B_TRUE, B_FALSE)
+	    != Z_OK)
 		return (Z_ERR);
 	if (verify_details(CMD_INSTALL) != Z_OK)
 		return (Z_ERR);
@@ -2705,6 +2997,9 @@ install_func(int argc, char *argv[])
 		goto done;
 	}
 
+	if (!nodataset)
+		create_zfs_zonepath(zonepath);
+
 	/*
 	 * According to the Application Packaging Developer's Guide, a
 	 * "checkinstall" script when included in a package is executed as
@@ -2715,36 +3010,28 @@ install_func(int argc, char *argv[])
 	 * has completed, regardless of whether it was successful, the
 	 * path to the zone is again restricted.
 	 */
-	if ((err = zone_get_zonepath(target_zone, zonepath,
-	    sizeof (zonepath))) != Z_OK) {
-		errno = err;
-		zperror2(target_zone, gettext("could not get zone path"));
-		goto done;
-	}
-
-	if (!nodataset)
-		create_zfs_zonepath(zonepath);
-
 	if (chmod(zonepath, DEFAULT_DIR_MODE) != 0) {
 		zperror(zonepath, B_FALSE);
 		err = Z_ERR;
 		goto done;
 	}
 
-	/*
-	 * "exec" the command so that the returned status is that of
-	 * LUCREATEZONE and not the shell.
-	 */
-	(void) snprintf(cmdbuf, sizeof (cmdbuf), "exec " LUCREATEZONE " -z %s",
-	    target_zone);
-	status = do_subproc(cmdbuf);
+	if (is_native_zone)
+		status = do_subproc(cmdbuf);
+	else
+		status = do_subproc_interactive(cmdbuf);
+
 	if (chmod(zonepath, S_IRWXU) != 0) {
 		zperror(zonepath, B_FALSE);
 		err = Z_ERR;
 		goto done;
 	}
-	if ((err = subproc_status(LUCREATEZONE, status)) != Z_OK)
+	if ((subproc_err =
+	    subproc_status(gettext("brand-specific installation"), status,
+	    B_FALSE)) != ZONE_SUBPROC_OK) {
+		err = Z_ERR;
 		goto done;
+	}
 
 	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
 		errno = err;
@@ -2753,6 +3040,25 @@ install_func(int argc, char *argv[])
 	}
 
 done:
+	/*
+	 * If the install script exited with ZONE_SUBPROC_USAGE or
+	 * ZONE_SUBPROC_NOTCOMPLETE, try to clean up the zone and leave the
+	 * zone in the CONFIGURED state so that another install can be
+	 * attempted without requiring an uninstall first.
+	 */
+	if ((subproc_err == ZONE_SUBPROC_USAGE) ||
+	    (subproc_err == ZONE_SUBPROC_NOTCOMPLETE)) {
+		if ((err = cleanup_zonepath(zonepath, B_FALSE)) != Z_OK) {
+			errno = err;
+			zperror2(target_zone,
+			    gettext("cleaning up zonepath failed"));
+		} else if ((err = zone_set_state(target_zone,
+		    ZONE_STATE_CONFIGURED)) != Z_OK) {
+			errno = err;
+			zperror2(target_zone, gettext("could not set state"));
+		}
+	}
+
 	release_lock_file(lockfd);
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }
@@ -3064,8 +3370,8 @@ warn_ip_match(zone_dochandle_t s_handle, char *source_zone,
 }
 
 static void
-warn_dataset_match(zone_dochandle_t s_handle, char *source_zone,
-	zone_dochandle_t t_handle, char *target_zone)
+warn_dataset_match(zone_dochandle_t s_handle, char *source,
+	zone_dochandle_t t_handle, char *target)
 {
 	int err;
 	struct zone_dstab s_dstab;
@@ -3073,14 +3379,14 @@ warn_dataset_match(zone_dochandle_t s_handle, char *source_zone,
 
 	if ((err = zonecfg_setdsent(t_handle)) != Z_OK) {
 		errno = err;
-		zperror2(target_zone, gettext("could not enumerate datasets"));
+		zperror2(target, gettext("could not enumerate datasets"));
 		return;
 	}
 
 	while (zonecfg_getdsent(t_handle, &t_dstab) == Z_OK) {
 		if ((err = zonecfg_setdsent(s_handle)) != Z_OK) {
 			errno = err;
-			zperror2(source_zone,
+			zperror2(source,
 			    gettext("could not enumerate datasets"));
 			(void) zonecfg_enddsent(t_handle);
 			return;
@@ -3089,8 +3395,8 @@ warn_dataset_match(zone_dochandle_t s_handle, char *source_zone,
 		while (zonecfg_getdsent(s_handle, &s_dstab) == Z_OK) {
 			if (strcmp(t_dstab.zone_dataset_name,
 			    s_dstab.zone_dataset_name) == 0) {
-				(void) fprintf(stderr,
-				    gettext("WARNING: dataset '%s' "
+				target_zone = source;
+				zerror(gettext("WARNING: dataset '%s' "
 				    "is configured in both zones.\n"),
 				    t_dstab.zone_dataset_name);
 				break;
@@ -3100,6 +3406,37 @@ warn_dataset_match(zone_dochandle_t s_handle, char *source_zone,
 	}
 
 	(void) zonecfg_enddsent(t_handle);
+}
+
+/*
+ * Check that the clone and its source have the same brand type.
+ */
+static int
+valid_brand_clone(char *source_zone, char *target_zone)
+{
+	brand_handle_t *bhp;
+	char source_brand[MAXNAMELEN];
+
+	if ((zone_get_brand(source_zone, source_brand,
+	    sizeof (source_brand))) != Z_OK) {
+		(void) fprintf(stderr, "%s: zone '%s': %s\n",
+		    execname, source_zone, gettext("missing or invalid brand"));
+		return (Z_ERR);
+	}
+
+	if (strcmp(source_brand, target_brand) != NULL) {
+		(void) fprintf(stderr,
+		    gettext("%s: Zones '%s' and '%s' have different brand "
+		    "types.\n"), execname, source_zone, target_zone);
+		return (Z_ERR);
+	}
+
+	if ((bhp = brand_open(target_brand)) == NULL) {
+		zerror(gettext("missing or invalid brand"));
+		return (Z_ERR);
+	}
+	brand_close(bhp);
+	return (Z_OK);
 }
 
 static int
@@ -3131,6 +3468,11 @@ validate_clone(char *source_zone, char *target_zone)
 		goto done;
 	}
 
+	/* verify new zone has same brand type */
+	err = valid_brand_clone(source_zone, target_zone);
+	if (err != Z_OK)
+		goto done;
+
 	/* verify new zone has same inherit-pkg-dirs */
 	err = valid_ipd_clone(s_handle, source_zone, t_handle, target_zone);
 
@@ -3158,7 +3500,6 @@ copy_zone(char *src, char *dst)
 {
 	boolean_t out_null = B_FALSE;
 	int status;
-	int err;
 	char *outfile;
 	char cmdbuf[MAXPATHLEN * 2 + 128];
 
@@ -3182,11 +3523,11 @@ copy_zone(char *src, char *dst)
 
 	status = do_subproc(cmdbuf);
 
-	if ((err = subproc_status("copy", status)) != Z_OK) {
+	if (subproc_status("copy", status, B_TRUE) != ZONE_SUBPROC_OK) {
 		if (!out_null)
 			(void) fprintf(stderr, gettext("\nThe copy failed.\n"
 			    "More information can be found in %s\n"), outfile);
-		return (err);
+		return (Z_ERR);
 	}
 
 	if (!out_null)
@@ -3195,68 +3536,37 @@ copy_zone(char *src, char *dst)
 	return (Z_OK);
 }
 
-/*
- * Run sys-unconfig on a zone.  This will leave the zone in the installed
- * state as long as there were no errors during the sys-unconfig.
- */
 static int
-unconfigure_zone(char *zonepath)
+zone_postclone(char *zonepath)
 {
-	int		err;
-	int		status;
-	struct stat	unconfig_buf;
-	zone_cmd_arg_t	zarg;
-	char		cmdbuf[MAXPATHLEN + 51];
-
-	/* The zone has to be installed in order to mount the scratch zone. */
-	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
-		errno = err;
-		zperror2(target_zone, gettext("could not set state"));
-		return (Z_ERR);
-	}
+	char cmdbuf[MAXPATHLEN];
+	int status;
+	brand_handle_t *bhp;
+	int err = Z_OK;
 
 	/*
-	 * Trusted Extensions requires that cloned zones use the
-	 * same sysid configuration, so it is not appropriate to
-	 * unconfigure the zone.
+	 * Fetch the post-clone command, if any, from the brand
+	 * configuration.
 	 */
-	if (is_system_labeled())
-		return (Z_OK);
-
-	/*
-	 * Check if the zone is already sys-unconfiged.  This saves us
-	 * the work of bringing up the scratch zone so we can unconfigure it.
-	 */
-	(void) snprintf(cmdbuf, sizeof (cmdbuf), "%s/root/etc/.UNCONFIGURED",
-	    zonepath);
-	if (stat(cmdbuf, &unconfig_buf) == 0)
-		return (Z_OK);
-
-	zarg.cmd = Z_MOUNT;
-	if (call_zoneadmd(target_zone, &zarg) != 0) {
-		zerror(gettext("call to %s failed"), "zoneadmd");
-		(void) zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
+	if ((bhp = brand_open(target_brand)) == NULL) {
+		zerror(gettext("missing or invalid brand"));
 		return (Z_ERR);
 	}
+	(void) strcpy(cmdbuf, EXEC_PREFIX);
+	err = brand_get_postclone(bhp, target_zone, zonepath, cmdbuf + EXEC_LEN,
+	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL);
+	brand_close(bhp);
 
-	(void) snprintf(cmdbuf, sizeof (cmdbuf),
-	    "/usr/sbin/zlogin -S %s /usr/sbin/sys-unconfig -R /a", target_zone);
-
-	status = do_subproc(cmdbuf);
-	if ((err = subproc_status("sys-unconfig", status)) != Z_OK) {
-		errno = err;
-		zperror2(target_zone, gettext("sys-unconfig failed\n"));
-		(void) zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
+	if (err == 0 && strlen(cmdbuf) > EXEC_LEN) {
+		status = do_subproc(cmdbuf);
+		if ((err = subproc_status("postclone", status, B_FALSE))
+		    != ZONE_SUBPROC_OK) {
+			zerror(gettext("post-clone configuration failed."));
+			err = Z_ERR;
+		}
 	}
 
-	zarg.cmd = Z_UNMOUNT;
-	if (call_zoneadmd(target_zone, &zarg) != 0) {
-		zerror(gettext("call to %s failed"), "zoneadmd");
-		(void) fprintf(stderr, gettext("could not unmount zone\n"));
-		return (Z_ERR);
-	}
-
-	return ((err == Z_OK) ? Z_OK : Z_ERR);
+	return (err);
 }
 
 /* ARGSUSED */
@@ -3337,7 +3647,8 @@ clone_func(int argc, char *argv[])
 		return (Z_USAGE);
 	}
 	source_zone = argv[optind];
-	if (sanity_check(target_zone, CMD_CLONE, B_FALSE, B_TRUE) != Z_OK)
+	if (sanity_check(target_zone, CMD_CLONE, B_FALSE, B_TRUE, B_FALSE)
+	    != Z_OK)
 		return (Z_ERR);
 	if (verify_details(CMD_CLONE) != Z_OK)
 		return (Z_ERR);
@@ -3437,15 +3748,28 @@ clone_func(int argc, char *argv[])
 			err = clone_copy(source_zonepath, zonepath);
 	}
 
-	if (err == Z_OK)
-		err = unconfigure_zone(zonepath);
+	/*
+	 * Trusted Extensions requires that cloned zones use the same sysid
+	 * configuration, so it is not appropriate to perform any
+	 * post-clone reconfiguration.
+	 */
+	if ((err == Z_OK) && !is_system_labeled())
+		err = zone_postclone(zonepath);
 
 done:
+	/*
+	 * If everything went well, we mark the zone as installed.
+	 */
+	if (err == Z_OK) {
+		err = zone_set_state(target_zone, ZONE_STATE_INSTALLED);
+		if (err != Z_OK) {
+			errno = err;
+			zperror2(target_zone, gettext("could not set state"));
+		}
+	}
 	release_lock_file(lockfd);
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }
-
-#define	RMCOMMAND	"/usr/bin/rm -rf"
 
 /*
  * Used when removing a zonepath after uninstalling or cleaning up after
@@ -3538,7 +3862,8 @@ cleanup_zonepath(char *zonepath, boolean_t all)
 		    "removed.\n"),
 		    zonepath);
 
-		return (subproc_status(RMCOMMAND, status));
+		return ((subproc_status(RMCOMMAND, status, B_TRUE) ==
+		    ZONE_SUBPROC_OK) ? Z_OK : Z_ERR);
 	}
 
 	/*
@@ -3555,13 +3880,16 @@ cleanup_zonepath(char *zonepath, boolean_t all)
 		(void) snprintf(cmdbuf, sizeof (cmdbuf), "exec " RMCOMMAND
 		    " %s/*", zonepath);
 		status = do_subproc(cmdbuf);
-		return (subproc_status(RMCOMMAND, status));
+		return ((subproc_status(RMCOMMAND, status, B_TRUE) ==
+		    ZONE_SUBPROC_OK) ? Z_OK : Z_ERR);
 	}
 
 	(void) snprintf(cmdbuf, sizeof (cmdbuf), "exec " RMCOMMAND " %s",
 	    zonepath);
 	status = do_subproc(cmdbuf);
-	return (subproc_status(RMCOMMAND, status));
+
+	return ((subproc_status(RMCOMMAND, status, B_TRUE) == ZONE_SUBPROC_OK)
+	    ? Z_OK : Z_ERR);
 }
 
 static int
@@ -3602,7 +3930,8 @@ move_func(int argc, char *argv[])
 		return (Z_USAGE);
 	}
 	new_zonepath = argv[optind];
-	if (sanity_check(target_zone, CMD_MOVE, B_FALSE, B_TRUE) != Z_OK)
+	if (sanity_check(target_zone, CMD_MOVE, B_FALSE, B_TRUE, B_FALSE)
+	    != Z_OK)
 		return (Z_ERR);
 	if (verify_details(CMD_MOVE) != Z_OK)
 		return (Z_ERR);
@@ -3859,9 +4188,10 @@ detach_func(int argc, char *argv[])
 			return (Z_USAGE);
 		}
 	}
+
 	if (execute) {
-		if (sanity_check(target_zone, CMD_DETACH, B_FALSE, B_TRUE)
-		    != Z_OK)
+		if (sanity_check(target_zone, CMD_DETACH, B_FALSE, B_TRUE,
+		    B_FALSE) != Z_OK)
 			return (Z_ERR);
 		if (verify_details(CMD_DETACH) != Z_OK)
 			return (Z_ERR);
@@ -3984,10 +4314,11 @@ dev_fix(zone_dochandle_t handle)
 	 * "exec" the command so that the returned status is that of
 	 * RMCOMMAND and not the shell.
 	 */
-	(void) snprintf(cmdbuf, sizeof (cmdbuf), "exec " RMCOMMAND " %s",
+	(void) snprintf(cmdbuf, sizeof (cmdbuf), EXEC_PREFIX RMCOMMAND " %s",
 	    devpath);
 	status = do_subproc(cmdbuf);
-	if ((err = subproc_status(RMCOMMAND, status)) != Z_OK) {
+	if ((err = subproc_status(RMCOMMAND, status, B_TRUE)) !=
+	    ZONE_SUBPROC_OK) {
 		(void) fprintf(stderr,
 		    gettext("could not remove existing /dev\n"));
 		return (Z_ERR);
@@ -4119,6 +4450,7 @@ attach_func(int argc, char *argv[])
 	zone_dochandle_t handle;
 	zone_dochandle_t athandle = NULL;
 	char zonepath[MAXPATHLEN];
+	char brand[MAXNAMELEN], atbrand[MAXNAMELEN];
 	boolean_t execute = B_TRUE;
 	char *manifest_path;
 
@@ -4154,7 +4486,8 @@ attach_func(int argc, char *argv[])
 	if (!execute)
 		return (dryrun_attach(manifest_path));
 
-	if (sanity_check(target_zone, CMD_ATTACH, B_FALSE, B_TRUE) != Z_OK)
+	if (sanity_check(target_zone, CMD_ATTACH, B_FALSE, B_TRUE, B_FALSE)
+	    != Z_OK)
 		return (Z_ERR);
 	if (verify_details(CMD_ATTACH) != Z_OK)
 		return (Z_ERR);
@@ -4210,6 +4543,24 @@ attach_func(int argc, char *argv[])
 		errno = err;
 		zperror(gettext("getting the attach information failed"),
 		    B_TRUE);
+		goto done;
+	}
+
+	/*
+	 * Ensure that the detached and locally defined zones are both of
+	 * the same brand.
+	 */
+	if ((zonecfg_get_brand(handle, brand, sizeof (brand)) != 0) ||
+	    (zonecfg_get_brand(athandle, atbrand, sizeof (atbrand)) != 0)) {
+		err = Z_ERR;
+		zerror(gettext("missing or invalid brand"));
+		goto done;
+	}
+
+	if (strcmp(atbrand, brand) != NULL) {
+		err = Z_ERR;
+		zerror(gettext("Trying to attach a '%s' zone to a '%s' "
+		    "configuration."), atbrand, brand);
 		goto done;
 	}
 
@@ -4296,7 +4647,8 @@ uninstall_func(int argc, char *argv[])
 		return (Z_USAGE);
 	}
 
-	if (sanity_check(target_zone, CMD_UNINSTALL, B_FALSE, B_TRUE) != Z_OK)
+	if (sanity_check(target_zone, CMD_UNINSTALL, B_FALSE, B_TRUE, B_FALSE)
+	    != Z_OK)
 		return (Z_ERR);
 
 	if (!force) {
@@ -4381,15 +4733,33 @@ static int
 mount_func(int argc, char *argv[])
 {
 	zone_cmd_arg_t zarg;
+	boolean_t force = B_FALSE;
+	int arg;
 
-	if (argc > 0)
+	/*
+	 * The only supported subargument to the "mount" subcommand is
+	 * "-f", which forces us to mount a zone in the INCOMPLETE state.
+	 */
+	optind = 0;
+	if ((arg = getopt(argc, argv, "f")) != EOF) {
+		switch (arg) {
+		case 'f':
+			force = B_TRUE;
+			break;
+		default:
+			return (Z_USAGE);
+		}
+	}
+	if (argc > optind)
 		return (Z_USAGE);
-	if (sanity_check(target_zone, CMD_MOUNT, B_FALSE, B_FALSE) != Z_OK)
+
+	if (sanity_check(target_zone, CMD_MOUNT, B_FALSE, B_FALSE, force)
+	    != Z_OK)
 		return (Z_ERR);
 	if (verify_details(CMD_MOUNT) != Z_OK)
 		return (Z_ERR);
 
-	zarg.cmd = Z_MOUNT;
+	zarg.cmd = force ? Z_FORCEMOUNT : Z_MOUNT;
 	if (call_zoneadmd(target_zone, &zarg) != 0) {
 		zerror(gettext("call to %s failed"), "zoneadmd");
 		return (Z_ERR);
@@ -4405,7 +4775,8 @@ unmount_func(int argc, char *argv[])
 
 	if (argc > 0)
 		return (Z_USAGE);
-	if (sanity_check(target_zone, CMD_UNMOUNT, B_FALSE, B_FALSE) != Z_OK)
+	if (sanity_check(target_zone, CMD_UNMOUNT, B_FALSE, B_FALSE, B_FALSE)
+	    != Z_OK)
 		return (Z_ERR);
 
 	zarg.cmd = Z_UNMOUNT;
@@ -4423,7 +4794,8 @@ mark_func(int argc, char *argv[])
 
 	if (argc != 1 || strcmp(argv[0], "incomplete") != 0)
 		return (Z_USAGE);
-	if (sanity_check(target_zone, CMD_MARK, B_FALSE, B_FALSE) != Z_OK)
+	if (sanity_check(target_zone, CMD_MARK, B_FALSE, B_FALSE, B_FALSE)
+	    != Z_OK)
 		return (Z_ERR);
 
 	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
@@ -4531,6 +4903,8 @@ main(int argc, char **argv)
 	int arg;
 	zoneid_t zid;
 	struct stat st;
+	char *zone_lock_env;
+	int err;
 
 	if ((locale = setlocale(LC_ALL, "")) == NULL)
 		locale = "C";
@@ -4595,5 +4969,39 @@ main(int argc, char **argv)
 		zperror(target_zone, B_TRUE);
 		exit(Z_ERR);
 	}
-	return (parse_and_run(argc - optind, &argv[optind]));
+
+	/*
+	 * See if we have inherited the right to manipulate this zone from
+	 * a zoneadm instance in our ancestry.  If so, set zone_lock_cnt to
+	 * indicate it.  If not, make that explicit in our environment.
+	 */
+	zone_lock_env = getenv(LOCK_ENV_VAR);
+	if (zone_lock_env == NULL) {
+		if (putenv(zoneadm_lock_not_held) != 0) {
+			zperror(target_zone, B_TRUE);
+			exit(Z_ERR);
+		}
+	} else {
+		zoneadm_is_nested = B_TRUE;
+		if (atoi(zone_lock_env) == 1)
+			zone_lock_cnt = 1;
+	}
+
+	/*
+	 * If we are going to be operating on a single zone, retrieve its
+	 * brand type and determine whether it is native or not.
+	 */
+	if ((target_zone != NULL) &&
+	    (strcmp(target_zone, GLOBAL_ZONENAME) != NULL)) {
+		if (zone_get_brand(target_zone, target_brand,
+		    sizeof (target_brand)) != Z_OK) {
+			zerror(gettext("missing or invalid brand"));
+			exit(Z_ERR);
+		}
+		is_native_zone = (strcmp(target_brand, NATIVE_BRAND_NAME) == 0);
+	}
+
+	err = parse_and_run(argc - optind, &argv[optind]);
+
+	return (err);
 }

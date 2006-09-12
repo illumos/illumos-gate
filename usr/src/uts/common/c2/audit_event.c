@@ -158,6 +158,7 @@ static void	aus_sigqueue(struct t_audit_data *);
 static void	aus_p_online(struct t_audit_data *);
 static void	aus_processor_bind(struct t_audit_data *);
 static void	aus_inst_sync(struct t_audit_data *);
+static void	aus_brandsys(struct t_audit_data *);
 
 static void	auf_accept(struct t_audit_data *, int, rval_t *);
 
@@ -270,7 +271,7 @@ aui_null,	AUE_FSTATFS,	aus_fstatfs,	/* 38 fstatfs */
 		auf_null,	S2E_PUB,
 aui_null,	AUE_SETPGRP,	aus_null,	/* 39 setpgrp */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 40 (loadable) was cxenix */
+aui_null,	AUE_NULL,	aus_null,	/* 40 uucopystr */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 41 dup */
 		auf_null,	0,
@@ -564,7 +565,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 175 llseek */
 aui_null,	AUE_INST_SYNC,	aus_inst_sync,  /* 176 (loadable) */
 						/* aus_inst_sync */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 177 (loadable) */
+aui_null,	AUE_BRANDSYS,	aus_brandsys,	/* 177 brandsys */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 178 (loadable) */
 		auf_null,	0,
@@ -718,8 +719,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 252 lwp_mutex_init */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 253 cladm */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 254 (loadable) */
-						/*	was lwp_sigtimedwait */
+aui_null,	AUE_NULL,	aus_null,	/* 254 uucopy */
 		auf_null,	0,
 aui_null,	AUE_UMOUNT2,	aus_umount2,	/* 255 umount2 */
 		auf_null,	0
@@ -4702,6 +4702,40 @@ aus_inst_sync(struct t_audit_data *tad)
 	} *uap = (struct a *)ttolwp(curthread)->lwp_ap;
 
 	au_uwrite(au_to_arg32(2, "flags", (uint32_t)uap->flags));
+}
+
+/*ARGSUSED*/
+static void
+aus_brandsys(struct t_audit_data *tad)
+{
+	klwp_t *clwp = ttolwp(curthread);
+
+	struct a {
+		long	cmd;
+		long	arg1;
+		long	arg2;
+		long	arg3;
+		long	arg4;
+		long	arg5;
+		long	arg6;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	au_uwrite(au_to_arg32(1, "cmd", (uint_t)uap->cmd));
+#ifdef _LP64
+	au_uwrite(au_to_arg64(2, "arg1", (uint64_t)uap->arg1));
+	au_uwrite(au_to_arg64(3, "arg2", (uint64_t)uap->arg2));
+	au_uwrite(au_to_arg64(4, "arg3", (uint64_t)uap->arg3));
+	au_uwrite(au_to_arg64(5, "arg4", (uint64_t)uap->arg4));
+	au_uwrite(au_to_arg64(6, "arg5", (uint64_t)uap->arg5));
+	au_uwrite(au_to_arg64(7, "arg6", (uint64_t)uap->arg6));
+#else
+	au_uwrite(au_to_arg32(2, "arg1", (uint32_t)uap->arg1));
+	au_uwrite(au_to_arg32(3, "arg2", (uint32_t)uap->arg2));
+	au_uwrite(au_to_arg32(4, "arg3", (uint32_t)uap->arg3));
+	au_uwrite(au_to_arg32(5, "arg4", (uint32_t)uap->arg4));
+	au_uwrite(au_to_arg32(6, "arg5", (uint32_t)uap->arg5));
+	au_uwrite(au_to_arg32(7, "arg6", (uint32_t)uap->arg6));
+#endif
 }
 
 /*ARGSUSED*/

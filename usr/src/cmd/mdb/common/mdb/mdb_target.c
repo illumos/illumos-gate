@@ -384,6 +384,12 @@ mdb_tgt_dmodel(mdb_tgt_t *t)
 	return (t->t_ops->t_dmodel(t));
 }
 
+int
+mdb_tgt_auxv(mdb_tgt_t *t, const auxv_t **auxvp)
+{
+	return (t->t_ops->t_auxv(t, auxvp));
+}
+
 ssize_t
 mdb_tgt_aread(mdb_tgt_t *t, mdb_tgt_as_t as,
 	void *buf, size_t n, mdb_tgt_addr_t addr)

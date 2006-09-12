@@ -28,7 +28,7 @@ PROG = zlogin
 
 include ../Makefile.cmd
 
-LDLIBS += -lsocket -lzonecfg -lcontract
+LDLIBS += -lsocket -lzonecfg -lcontract -lbrand
 CFLAGS += $(CCVERBOSE)
 FILEMODE = 0555
 GROUP = bin

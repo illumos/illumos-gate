@@ -38,6 +38,7 @@ syssync			36
 kill			37
 fstatfs			38
 setpgrp			39
+uucopystr		40
 dup			41
 pipe			42
 times			43
@@ -157,6 +158,7 @@ pread			173
 pwrite			174
 llseek			175
 inst_sync		176
+brandsys		177
 kaio			178
 cpc			179
 meminfosys		180
@@ -232,4 +234,5 @@ lwp_mutex_unlock	250
 lwp_mutex_trylock	251
 lwp_mutex_init		252
 cladm			253
+uucopy			254
 umount2			255

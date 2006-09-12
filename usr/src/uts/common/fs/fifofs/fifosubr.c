@@ -304,7 +304,8 @@ static void fifo_reinit_vp(vnode_t *vp)
 {
 	vn_reinit(vp);
 	vp->v_type = VFIFO;
-	vp->v_flag = VNOMAP | VNOSWAP;
+	vp->v_flag &= VROOT;
+	vp->v_flag |= VNOMAP | VNOSWAP;
 }
 
 /*
@@ -470,6 +471,7 @@ fifovp(vnode_t *vp, cred_t *crp)
 	fifo_reinit_vp(newvp);
 	newvp->v_vfsp = vp->v_vfsp;
 	newvp->v_rdev = vp->v_rdev;
+	newvp->v_flag |= (vp->v_flag & VROOT);
 
 	fifoinsert(fnp);
 	mutex_exit(&ftable_lock);

@@ -82,9 +82,10 @@ typedef int bool;
 #define	RT_DATASET	11
 #define	RT_LIMITPRIV	12	/* really a property, but for info ... */
 #define	RT_BOOTARGS	13	/* really a property, but for info ... */
+#define	RT_BRAND	14	/* really a property, but for info ... */
 
 #define	RT_MIN		RT_UNKNOWN
-#define	RT_MAX		RT_BOOTARGS
+#define	RT_MAX		RT_BRAND
 
 /* property types: increment PT_MAX when expanding this list */
 #define	PT_UNKNOWN	0
@@ -107,9 +108,10 @@ typedef int bool;
 #define	PT_RAW		17
 #define	PT_LIMITPRIV	18
 #define	PT_BOOTARGS	19
+#define	PT_BRAND	20
 
 #define	PT_MIN		PT_UNKNOWN
-#define	PT_MAX		PT_BOOTARGS
+#define	PT_MAX		PT_BRAND
 
 #define	MAX_EQ_PROP_PAIRS	3
 

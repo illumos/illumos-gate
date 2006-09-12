@@ -289,11 +289,13 @@ COMMON_SUBDIRS = \
 	cmd/ztest \
 	lib/abi \
 	lib/auditd_plugins \
+	lib/brand/sn1 \
 	lib/crypt_modules \
 	lib/extendedFILE \
 	lib/libadt_jni \
 	lib/libaio \
 	lib/libavl \
+	lib/libbrand \
 	lib/libbsdmalloc \
 	lib/libbsm \
 	lib/libc \
@@ -408,8 +410,9 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 
 i386_SUBDIRS= \
 	cmd/biosdev \
-	cmd/rtc \
 	cmd/fs.d/xmemfs \
+	cmd/rtc \
+	lib/brand/lx \
 	lib/cfgadm_plugins/sata
 
 sparc_SUBDIRS= \

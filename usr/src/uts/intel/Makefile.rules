@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -45,6 +44,9 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/fs/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(SRC)/common/util/i386/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/brand/sn1/%.s
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/dtrace/%.c
@@ -148,6 +150,9 @@ $(LINTS_DIR)/%.ln:		$(SRC)/common/fs/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(SRC)/common/util/i386/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/brand/sn1/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/dtrace/%.c

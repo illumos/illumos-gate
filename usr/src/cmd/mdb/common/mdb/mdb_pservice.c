@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -229,14 +228,13 @@ ps_plog(const char *format, ...)
 ps_err_e
 ps_pauxv(struct ps_prochandle *P, const auxv_t **auxvp)
 {
-	static const auxv_t auxv = { AT_NULL, 0 };
-
 	mdb_tgt_t *t = mdb_tgt_from_pshandle(P);
 
 	if (t == NULL)
 		return (ps_ops.ps_pauxv(P, auxvp));
 
-	*auxvp = &auxv;
+	if (mdb_tgt_auxv(t, auxvp) != 0)
+		return (PS_ERR);
 
 	return (PS_OK);
 }

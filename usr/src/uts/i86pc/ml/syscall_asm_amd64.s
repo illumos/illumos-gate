@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +29,7 @@
 #include <sys/asm_misc.h>
 #include <sys/regset.h>
 #include <sys/psw.h>
+#include <sys/machbrand.h>
 
 #if defined(__lint)
 
@@ -117,6 +117,54 @@
 #define	ORL_SYSCALLTRACE(r32)
 #endif
 
+/*
+ * In the 32-bit kernel, we do absolutely nothing before getting into the
+ * brand callback checks.  In 64-bit land, we do swapgs and then come here.
+ * We assume that the %rsp- and %r15-stashing fields in the CPU structure
+ * are still unused.
+ *
+ * When the callback is invoked, we will be on the user's %gs and
+ * the stack will look like this:
+ *
+ * stack:  --------------------------------------
+ *         | callback pointer			|
+ *    |    | user stack pointer			|
+ *    |    | lwp brand data			|
+ *    |    | proc brand data			|
+ *    v    | userland return address		|
+ *         | callback wrapper return addr	|
+ *         --------------------------------------
+ *
+ */
+#define	BRAND_CALLBACK(callback_id)					    \
+	movq	%rsp, %gs:CPU_RTMP_RSP	/* save the stack pointer	*/ ;\
+	movq	%r15, %gs:CPU_RTMP_R15	/* save %r15			*/ ;\
+	movq	%gs:CPU_THREAD, %r15	/* load the thread pointer	*/ ;\
+	movq	T_STACK(%r15), %rsp	/* switch to the kernel stack	*/ ;\
+	subq	$16, %rsp		/* save space for two pointers	*/ ;\
+	pushq	%r14			/* save %r14			*/ ;\
+	movq	%gs:CPU_RTMP_RSP, %r14					   ;\
+	movq	%r14, 8(%rsp)		/* stash the user stack pointer	*/ ;\
+	popq	%r14			/* restore %r14			*/ ;\
+	movq	T_LWP(%r15), %r15	/* load the lwp pointer		*/ ;\
+	pushq	LWP_BRAND(%r15)		/* push the lwp's brand data	*/ ;\
+	movq	LWP_PROCP(%r15), %r15	/* load the proc pointer	*/ ;\
+	pushq	P_BRAND_DATA(%r15)	/* push the proc's brand data	*/ ;\
+	movq	P_BRAND(%r15), %r15	/* load the brand pointer	*/ ;\
+	movq	B_MACHOPS(%r15), %r15	/* load the machops pointer	*/ ;\
+	movq	_CONST(_MUL(callback_id, CPTRSIZE))(%r15), %r15		   ;\
+	cmpq	$0, %r15						   ;\
+	je	1f							   ;\
+	movq	%r15, 24(%rsp)		/* save the callback pointer	*/ ;\
+	movq	%gs:CPU_RTMP_RSP, %r15	/* grab the user stack pointer	*/ ;\
+	pushq	(%r15)			/* push the return address	*/ ;\
+	movq	%gs:CPU_RTMP_R15, %r15	/* restore %r15			*/ ;\
+	swapgs								   ;\
+	call	*32(%rsp)		/* call callback		*/ ;\
+	swapgs								   ;\
+1:	movq	%gs:CPU_RTMP_R15, %r15	/* restore %r15			*/ ;\
+	movq	%gs:CPU_RTMP_RSP, %rsp	/* restore the stack pointer	*/
+
 #define	MSTATE_TRANSITION(from, to)		\
 	movl	$from, %edi;			\
 	movl	$to, %esi;			\
@@ -192,13 +240,13 @@
 #if !defined(__lint)
 
 __lwptoregs_msg:
-	.string	"%M%:%d lwptoregs(%p) [%p] != rp [%p]"
+	.string	"syscall_asm_amd64.s:%d lwptoregs(%p) [%p] != rp [%p]"
 
 __codesel_msg:
-	.string	"%M%:%d rp->r_cs [%ld] != %ld"
+	.string	"syscall_asm_amd64.s:%d rp->r_cs [%ld] != %ld"
 
 __no_rupdate_msg:
-	.string	"%M%:%d lwp %p, pcb_flags & RUPDATE_PENDING != 0"
+	.string	"syscall_asm_amd64.s:%d lwp %p, pcb_flags & RUPDATE_PENDING != 0"
 
 #endif	/* !__lint */
 
@@ -305,8 +353,12 @@ size_t _allsyscalls_size;
 
 #else	/* __lint */
 
-	ENTRY_NP2(sys_syscall,_allsyscalls)
-
+	ENTRY_NP2(brand_sys_syscall,_allsyscalls)
+	swapgs
+	BRAND_CALLBACK(BRAND_CB_SYSCALL)
+	swapgs
+	
+	ALTENTRY(sys_syscall)
 	swapgs
 	movq	%rsp, %gs:CPU_RTMP_RSP
 	movq	%r15, %gs:CPU_RTMP_R15
@@ -506,6 +558,7 @@ _syscall_post_call:
 	MSTATE_TRANSITION(LMS_SYSTEM, LMS_USER)
 	jmp	sys_rtt_syscall
 	SET_SIZE(sys_syscall)
+	SET_SIZE(brand_sys_syscall)
 
 #endif	/* __lint */
 
@@ -518,7 +571,12 @@ sys_syscall32()
 
 #else	/* __lint */
 
-	ENTRY_NP(sys_syscall32)
+	ENTRY_NP(brand_sys_syscall32)
+	swapgs
+	BRAND_CALLBACK(BRAND_CB_SYSCALL32)
+	swapgs
+
+	ALTENTRY(sys_syscall32)
 	swapgs
 	movl	%esp, %r10d
 	movq	%gs:CPU_THREAD, %r15
@@ -693,6 +751,7 @@ _full_syscall_postsys32:
 	MSTATE_TRANSITION(LMS_SYSTEM, LMS_USER)
 	jmp	sys_rtt_syscall32
 	SET_SIZE(sys_syscall32)
+	SET_SIZE(brand_sys_syscall32)
 
 #endif	/* __lint */
 
@@ -717,6 +776,25 @@ _full_syscall_postsys32:
  *
  * Note that we are unable to return both "rvals" to userland with
  * this call, as %edx is used by the sysexit instruction.
+ *
+ * One final complication in this routine is its interaction with
+ * single-stepping in a debugger.  For most of the system call mechanisms,
+ * the CPU automatically clears the single-step flag before we enter the
+ * kernel.  The sysenter mechanism does not clear the flag, so a user
+ * single-stepping through a libc routine may suddenly find him/herself
+ * single-stepping through the kernel.  To detect this, kmdb compares the
+ * trap %pc to the [brand_]sys_enter addresses on each single-step trap.
+ * If it finds that we have single-stepped to a sysenter entry point, it
+ * explicitly clears the flag and executes the sys_sysenter routine.
+ *
+ * One final complication in this final complication is the fact that we
+ * have two different entry points for sysenter: brand_sys_sysenter and
+ * sys_sysenter.  If we enter at brand_sys_sysenter and start single-stepping
+ * through the kernel with kmdb, we will eventually hit the instruction at
+ * sys_sysenter.  kmdb cannot distinguish between that valid single-step
+ * and the undesirable one mentioned above.  To avoid this situation, we
+ * simply add a jump over the instruction at sys_sysenter to make it
+ * impossible to single-step to it.
  */
 #if defined(__lint)
 
@@ -726,8 +804,20 @@ sys_sysenter()
 
 #else	/* __lint */
 
-	ENTRY_NP(sys_sysenter)
+	ENTRY_NP(brand_sys_sysenter)
 	swapgs
+
+	ALTENTRY(_brand_sys_sysenter_post_swapgs)
+	BRAND_CALLBACK(BRAND_CB_SYSENTER)
+	/*
+	 * Jump over sys_sysenter to allow single-stepping as described
+	 * above.
+	 */
+	jmp	_sys_sysenter_post_swapgs
+
+	ALTENTRY(sys_sysenter)
+	swapgs
+
 	ALTENTRY(_sys_sysenter_post_swapgs)
 	movq	%gs:CPU_THREAD, %r15
 
@@ -909,7 +999,41 @@ sys_sysenter()
 	sysexit
 	SET_SIZE(sys_sysenter)
 	SET_SIZE(_sys_sysenter_post_swapgs)
+	SET_SIZE(brand_sys_sysenter)
 
+#endif	/* __lint */
+
+#if defined(__lint)
+/*
+ * System call via an int80.  This entry point is only used by the Linux
+ * application environment.  Unlike the other entry points, there is no
+ * default action to take if no callback is registered for this process.
+ */
+void
+sys_int80()
+{}
+
+#else	/* __lint */
+
+	ENTRY_NP(brand_sys_int80)
+	swapgs
+	BRAND_CALLBACK(BRAND_CB_INT80)
+	swapgs
+
+	ENTRY_NP(sys_int80)
+	/*
+	 * We hit an int80, but this process isn't of a brand with an int80
+	 * handler.  Bad process!  Make it look as if the INT failed.
+	 * Modify %eip to point before the INT, push the expected error
+	 * code and fake a GP fault.
+	 * 
+	 */
+	swapgs
+	subq	$2, (%rsp)	/* int insn 2-bytes */
+	pushq	$_CONST(_MUL(T_INT80, GATE_DESC_SIZE) + 2)
+	jmp	gptrap			/ GP fault
+	SET_SIZE(sys_int80)
+	SET_SIZE(brand_sys_int80)
 #endif	/* __lint */
 
 
@@ -927,7 +1051,12 @@ sys_syscall_int()
 
 #else	/* __lint */
 
-	ENTRY_NP(sys_syscall_int)
+	ENTRY_NP(brand_sys_syscall_int)
+	swapgs
+	BRAND_CALLBACK(BRAND_CB_INT91)
+	swapgs
+
+	ALTENTRY(sys_syscall_int)
 	swapgs
 	movq	%gs:CPU_THREAD, %r15
 	movq	T_STACK(%r15), %rsp
@@ -940,6 +1069,7 @@ sys_syscall_int()
 	movb	$1, T_POST_SYS(%r15)
 	jmp	_syscall32_save
 	SET_SIZE(sys_syscall_int)
+	SET_SIZE(brand_sys_syscall_int)
 
 #endif	/* __lint */
 	

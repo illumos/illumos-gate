@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1269,14 +1268,14 @@ ia_parmsset(kthread_t *tx, void *parmsp, id_t reqpcid, cred_t *reqpcredp)
 		tspp->ts_flags |= TSIASET;
 		thread_unlock(tx);
 	}
-	TTY_HOLD(p->p_sessp);
+	mutex_enter(&p->p_sessp->s_lock);
 	sess_held = 1;
 	if ((pid == sid) && (p->p_sessp->s_vp != NULL) &&
 	    ((stp = p->p_sessp->s_vp->v_stream) != NULL)) {
 		if ((stp->sd_pgidp != NULL) && (stp->sd_sidp != NULL)) {
 			pgid = stp->sd_pgidp->pid_id;
 			sess_held = 0;
-			TTY_RELE(p->p_sessp);
+			mutex_exit(&p->p_sessp->s_lock);
 			if (iaparmsp->ia_mode ==
 			    IA_SET_INTERACTIVE) {
 				off = 0;
@@ -1292,7 +1291,7 @@ ia_parmsset(kthread_t *tx, void *parmsp, id_t reqpcid, cred_t *reqpcredp)
 		}
 	}
 	if (sess_held)
-		TTY_RELE(p->p_sessp);
+		mutex_exit(&p->p_sessp->s_lock);
 
 	thread_lock(tx);
 
@@ -2130,14 +2129,14 @@ ia_set_process_group(pid_t sid, pid_t bg_pgid, pid_t fg_pgid)
 	 * that do not have focus and are changing the process group
 	 * attatched to the tty, e.g. a process that is exiting
 	 */
-	TTY_HOLD(leader->p_sessp);
+	mutex_enter(&leader->p_sessp->s_lock);
 	if (!(tspp->ts_flags & TSIASET) ||
 	    (leader->p_sessp->s_vp == NULL) ||
 	    (leader->p_sessp->s_vp->v_stream == NULL)) {
-		TTY_RELE(leader->p_sessp);
+		mutex_exit(&leader->p_sessp->s_lock);
 		return;
 	}
-	TTY_RELE(leader->p_sessp);
+	mutex_exit(&leader->p_sessp->s_lock);
 
 	/*
 	 * If we're already holding the leader's p_lock, we should use

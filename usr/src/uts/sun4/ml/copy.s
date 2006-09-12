@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -387,7 +386,8 @@ copyoutstr_noerr(const char *kaddr, char *uaddr, size_t maxlength,
 
 
 /*
- * Copy a block of storage - must not overlap (from + len <= to).
+ * Copy a block of storage.  If the source and target regions overlap,
+ * one or both of the regions will be silently corrupted.
  * No fault handler installed (to be called under on_fault())
  */
 
@@ -417,4 +417,42 @@ ucopy(const void *ufrom, void *uto, size_t ulength)
 	restore %g0, 0, %o0		! return (0)
 
 	SET_SIZE(ucopy)
+#endif /* lint */
+
+/*
+ * Copy a user-land string.  If the source and target regions overlap,
+ * one or both of the regions will be silently corrupted.
+ * No fault handler installed (to be called under on_fault())
+ */
+
+#if defined(lint)
+ 
+/* ARGSUSED */
+void
+ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *ulencopied)
+{}
+ 
+#else /* lint */
+ 
+	ENTRY(ucopystr)
+	save	%sp, -SA(MINFRAME), %sp ! get another window
+
+	brz	%i2, 5f
+	clr	%i5
+
+	lduba	[%i0 + %i5]ASI_USER, %i4
+4:	stba	%i4, [%i1 + %i5]ASI_USER
+	brz,pn	%i4, 5f
+	inc	%i5
+	deccc	%i2
+	bnz,a,pt %ncc, 4b
+	lduba	[%i0 + %i5]ASI_USER, %i4
+5:
+	brnz,a,pt %i3, 6f
+	stn	%i5, [%i3]
+6:
+	ret
+	restore %g0, 0, %o0		! return (0)
+
+	SET_SIZE(ucopystr)
 #endif /* lint */

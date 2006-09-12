@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,6 +170,15 @@ extern uint_t getisax(uint32_t *, uint_t);
 #define	AT_SUN_AUXFLAGS	2017	/* AF_SUN_ flags passed from the kernel */
 
 /*
+ * Used to indicate to the runtime linker the name of the emulation binary,
+ * if one is being used. For brands, this is the name of the brand library.
+ */
+#define	AT_SUN_EMULATOR		2018
+
+#define	AT_SUN_BRANDNAME	2019
+#define	AT_SUN_BRAND_PHDR	2020	/* Brand executable's phdr */
+
+/*
  * The kernel is in a better position to determine whether a process needs to
  * ignore dangerous LD environment variables.  If set, this flags tells
  * ld.so.1 to run "secure" and ignore the the environment.
@@ -182,7 +190,6 @@ extern uint_t getisax(uint32_t *, uint_t);
  * against the AT_SUN_HWCAP value.
  */
 #define	AF_SUN_HWCAPVERIFY	0x00000002
-
 
 #ifdef	__cplusplus
 }

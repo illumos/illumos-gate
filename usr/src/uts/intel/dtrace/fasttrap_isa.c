@@ -36,6 +36,7 @@
 #include <sys/segments.h>
 #include <sys/sysmacros.h>
 #include <sys/trap.h>
+#include <sys/archsystm.h>
 
 /*
  * Lossless User-Land Tracing on x86
@@ -230,7 +231,7 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 	size_t first = MIN(len, PAGESIZE - (pc & PAGEOFFSET));
 	uint_t start = 0;
 	int rmindex;
-	uint8_t rex = 0;
+	uint8_t seg, rex = 0;
 
 	/*
 	 * Read the instruction at the given address out of the process's
@@ -269,23 +270,49 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 	if (tp->ftt_size > len)
 		return (-1);
 
+	tp->ftt_segment = FASTTRAP_SEG_NONE;
+
 	/*
 	 * Find the start of the instruction's opcode by processing any
 	 * legacy prefixes.
 	 */
 	for (;;) {
+		seg = 0;
 		switch (instr[start]) {
+		case FASTTRAP_PREFIX_SS:
+			seg++;
+			/*FALLTHRU*/
+		case FASTTRAP_PREFIX_GS:
+			seg++;
+			/*FALLTHRU*/
+		case FASTTRAP_PREFIX_FS:
+			seg++;
+			/*FALLTHRU*/
+		case FASTTRAP_PREFIX_ES:
+			seg++;
+			/*FALLTHRU*/
+		case FASTTRAP_PREFIX_DS:
+			seg++;
+			/*FALLTHRU*/
+		case FASTTRAP_PREFIX_CS:
+			seg++;
+			/*FALLTHRU*/
 		case FASTTRAP_PREFIX_OPERAND:
 		case FASTTRAP_PREFIX_ADDRESS:
-		case FASTTRAP_PREFIX_CS:
-		case FASTTRAP_PREFIX_DS:
-		case FASTTRAP_PREFIX_ES:
-		case FASTTRAP_PREFIX_FS:
-		case FASTTRAP_PREFIX_GS:
-		case FASTTRAP_PREFIX_SS:
 		case FASTTRAP_PREFIX_LOCK:
 		case FASTTRAP_PREFIX_REP:
 		case FASTTRAP_PREFIX_REPNE:
+			if (seg != 0) {
+				/*
+				 * It's illegal for an instruction to specify
+				 * two segment prefixes -- give up on this
+				 * illegal instruction.
+				 */
+				if (tp->ftt_segment != FASTTRAP_SEG_NONE)
+					return (-1);
+
+				tp->ftt_segment = seg;
+			}
 			start++;
 			continue;
 		}
@@ -482,6 +509,19 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 			 * breakpoints so we can't instrument them.
 			 */
 			ASSERT(instr[start] == FASTTRAP_INSTR);
+			return (-1);
+
+		case FASTTRAP_INT:
+			/*
+			 * Interrupts seem like they could be traced with
+			 * no negative implications, but it's possible that
+			 * a thread could be redirected by the trap handling
+			 * code which would eventually return to the
+			 * instruction after the interrupt. If the interrupt
+			 * were in our scratch space, the subsequent
+			 * instruction might be overwritten before we return.
+			 * Accordingly we refuse to instrument any interrupt.
+			 */
 			return (-1);
 		}
 	}
@@ -694,6 +734,119 @@ fasttrap_usdt_args32(fasttrap_probe_t *probe, struct regs *rp, int argc,
 	for (; i < argc; i++) {
 		argv[i] = 0;
 	}
+}
+
+static int
+fasttrap_do_seg(fasttrap_tracepoint_t *tp, struct regs *rp, uintptr_t *addr)
+{
+	proc_t *p = curproc;
+	user_desc_t *desc;
+	uint16_t sel, ndx, type;
+	uintptr_t limit;
+
+	switch (tp->ftt_segment) {
+	case FASTTRAP_SEG_CS:
+		sel = rp->r_cs;
+		break;
+	case FASTTRAP_SEG_DS:
+		sel = rp->r_ds;
+		break;
+	case FASTTRAP_SEG_ES:
+		sel = rp->r_es;
+		break;
+	case FASTTRAP_SEG_FS:
+		sel = rp->r_fs;
+		break;
+	case FASTTRAP_SEG_GS:
+		sel = rp->r_gs;
+		break;
+	case FASTTRAP_SEG_SS:
+		sel = rp->r_ss;
+		break;
+	}
+
+	/*
+	 * Make sure the given segment register specifies a user priority
+	 * selector rather than a kernel selector.
+	 */
+	if (!SELISUPL(sel))
+		return (-1);
+
+	ndx = SELTOIDX(sel);
+
+	/*
+	 * Check the bounds and grab the descriptor out of the specified
+	 * descriptor table.
+	 */
+	if (SELISLDT(sel)) {
+		if (ndx > p->p_ldtlimit)
+			return (-1);
+
+		desc = p->p_ldt + ndx;
+
+	} else {
+		if (ndx >= NGDT)
+			return (-1);
+
+		desc = cpu_get_gdt() + ndx;
+	}
+
+	/*
+	 * The descriptor must have user privilege level and it must be
+	 * present in memory.
+	 */
+	if (desc->usd_dpl != SEL_UPL || desc->usd_p != 1)
+		return (-1);
+
+	type = desc->usd_type;
+
+	/*
+	 * If the S bit in the type field is not set, this descriptor can
+	 * only be used in system context.
+	 */
+	if ((type & 0x10) != 0x10)
+		return (-1);
+
+	limit = USEGD_GETLIMIT(desc) * (desc->usd_gran ? PAGESIZE : 1);
+
+	if (tp->ftt_segment == FASTTRAP_SEG_CS) {
+		/*
+		 * The code/data bit and readable bit must both be set.
+		 */
+		if ((type & 0xa) != 0xa)
+			return (-1);
+
+		if (*addr > limit)
+			return (-1);
+	} else {
+		/*
+		 * The code/data bit must be clear.
+		 */
+		if ((type & 0x8) != 0)
+			return (-1);
+
+		/*
+		 * If the expand-down bit is clear, we just check the limit as
+		 * it would naturally be applied. Otherwise, we need to check
+		 * that the address is the range [limit + 1 .. 0xffff] or
+		 * [limit + 1 ... 0xffffffff] depending on if the default
+		 * operand size bit is set.
+		 */
+		if ((type & 0x4) == 0) {
+			if (*addr > limit)
+				return (-1);
+		} else if (desc->usd_def32) {
+			if (*addr < limit + 1 || 0xffff < *addr)
+				return (-1);
+		} else {
+			if (*addr < limit + 1 || 0xffffffff < *addr)
+				return (-1);
+		}
+	}
+
+	*addr += USEGD_GETBASE(desc);
+
+	return (0);
 }
 
 int
@@ -1105,7 +1258,7 @@ fasttrap_pid_probe(struct regs *rp)
 		if (tp->ftt_code == 0) {
 			new_pc = tp->ftt_dest;
 		} else {
-			uintptr_t addr = tp->ftt_dest;
+			uintptr_t value, addr = tp->ftt_dest;
 
 			if (tp->ftt_base != FASTTRAP_NOREG)
 				addr += fasttrap_getreg(rp, tp->ftt_base);
@@ -1114,10 +1267,22 @@ fasttrap_pid_probe(struct regs *rp)
 				    tp->ftt_scale;
 
 			if (tp->ftt_code == 1) {
+				/*
+				 * If there's a segment prefix for this
+				 * instruction, we'll need to check permissions
+				 * and bounds on the given selector, and adjust
+				 * the address accordingly.
+				 */
+				if (tp->ftt_segment != FASTTRAP_SEG_NONE &&
+				    fasttrap_do_seg(tp, rp, &addr) != 0) {
+					fasttrap_sigsegv(p, curthread, addr);
+					new_pc = pc;
+					break;
+				}
+
 #ifdef __amd64
 				if (p->p_model == DATAMODEL_NATIVE) {
 #endif
-					uintptr_t value;
 					if (fasttrap_fulword((void *)addr,
 					    &value) == -1) {
 						fasttrap_sigsegv(p, curthread,
@@ -1128,15 +1293,16 @@ fasttrap_pid_probe(struct regs *rp)
 					new_pc = value;
 #ifdef __amd64
 				} else {
-					uint32_t value;
+					uint32_t value32;
+					addr = (uintptr_t)(uint32_t)addr;
 					if (fasttrap_fuword32((void *)addr,
-					    &value) == -1) {
+					    &value32) == -1) {
 						fasttrap_sigsegv(p, curthread,
 						    addr);
 						new_pc = pc;
 						break;
 					}
-					new_pc = value;
+					new_pc = value32;
 				}
 #endif
 			} else {

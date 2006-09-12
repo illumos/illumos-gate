@@ -850,20 +850,17 @@ deferred_singlestep_trap(caddr_t pc)
 
 	/*
 	 * If both NORMAL_STEP and WATCH_STEP are in
-	 * effect, give precedence to NORMAL_STEP.
+	 * effect, give precedence to WATCH_STEP.
 	 * If neither is set, user must have set the
 	 * PS_T bit in %efl; treat this as NORMAL_STEP.
 	 */
-	if ((pcb->pcb_flags & NORMAL_STEP) ||
-	    !(pcb->pcb_flags & WATCH_STEP)) {
+	if ((fault = undo_watch_step(&siginfo)) == 0 &&
+	    ((pcb->pcb_flags & NORMAL_STEP) ||
+	    !(pcb->pcb_flags & WATCH_STEP))) {
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_code = TRAP_TRACE;
 		siginfo.si_addr  = pc;
 		fault = FLTTRACE;
-		if (pcb->pcb_flags & WATCH_STEP)
-			(void) undo_watch_step(NULL);
-	} else {
-		fault = undo_watch_step(&siginfo);
 	}
 	pcb->pcb_flags &= ~(DEBUG_PENDING|NORMAL_STEP|WATCH_STEP);
 

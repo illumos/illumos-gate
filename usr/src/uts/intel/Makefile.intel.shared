@@ -25,9 +25,11 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
 #
 #	This makefile contains the common definitions for all intel
 #	implementation architecture independent modules.
+#
 
 #
 #	Machine type (implementation architecture):
@@ -44,6 +46,7 @@ PLATFORM	 = i86pc
 #
 UNIX_DIR	 = $(UTSBASE)/i86pc/unix
 GENLIB_DIR	 = $(UTSBASE)/intel/genunix
+GENASSYM_DIR	 = $(UTSBASE)/intel/genassym
 IPDRV_DIR	 = $(UTSBASE)/intel/ip
 MODSTUBS_DIR	 = $(UNIX_DIR)
 DSF_DIR		 = $(UTSBASE)/$(PLATFORM)/genassym
@@ -135,6 +138,7 @@ ASFLAGS_XARCH_64	= $(amd64_ASFLAGS)
 ASFLAGS_XARCH		= $(ASFLAGS_XARCH_$(CLASS))
 
 ASFLAGS			+= $(ASFLAGS_XARCH)
+AS_INC_PATH		+= -I$(GENASSYM_DIR)/$(OBJS_DIR)
 
 #
 #	Define the base directory for installation.
@@ -403,6 +407,13 @@ MISC_KMODS	+= md_stripe md_hotspares md_mirror md_raid md_trans md_notify
 MISC_KMODS	+= md_sp
 
 #
+#	Brand modules
+#
+MISC_KMODS	+= sn1_brand lx_brand
+DRV_KMODS	+= lx_systrace lx_ptm lx_audio
+STRMOD_KMODS	+= ldlinux
+
+#
 #	Exec Class Modules (/kernel/exec):
 #
 EXEC_KMODS	+= elfexec intpexec javaexec
@@ -416,7 +427,7 @@ SCHED_KMODS	+= IA RT TS RT_DPTBL TS_DPTBL FSS FX FX_DPTBL
 #	File System Modules (/kernel/fs):
 #
 FS_KMODS	+= autofs cachefs ctfs dev devfs fdfs fifofs hsfs lofs
-FS_KMODS	+= mntfs namefs nfs objfs zfs
+FS_KMODS	+= lx_afs lx_proc mntfs namefs nfs objfs zfs
 FS_KMODS	+= pcfs procfs sockfs specfs tmpfs udfs ufs xmemfs
 
 #

@@ -107,6 +107,8 @@
 #include <pool.h>
 #include <sys/pool.h>
 
+#include <libbrand.h>
+#include <sys/brand.h>
 #include <libzonecfg.h>
 #include <synch.h>
 
@@ -127,82 +129,6 @@
 
 #define	DFSTYPES	"/etc/dfs/fstypes"
 #define	MAXTNZLEN	2048
-
-/*
- * This is the set of directories and devices (relative to <zone_root>/dev)
- * which must be present in every zone.  Users can augment this list with
- * additional device rules in their zone configuration, but at present cannot
- * remove any of the this set of standard devices.
- */
-static const char *standard_devs[] = {
-	"arp",
-	"conslog",
-	"cpu/self/cpuid",
-	"crypto",
-	"cryptoadm",
-	"dsk",
-	"dtrace/*",
-	"dtrace/provider/*",
-	"fd",
-	"kstat",
-	"lo0",
-	"lo1",
-	"lo2",
-	"lo3",
-	"log",
-	"logindmux",
-	"null",
-#ifdef __sparc
-	"openprom",
-#endif
-	"poll",
-	"pool",
-	"ptmx",
-	"pts/*",
-	"random",
-	"rdsk",
-	"rmt",
-	"sad/user",
-	"swap",
-	"sysevent",
-	"tcp",
-	"tcp6",
-	"term",
-	"ticlts",
-	"ticots",
-	"ticotsord",
-	"tty",
-	"udp",
-	"udp6",
-	"urandom",
-	"zero",
-	"zfs",
-	NULL
-};
-
-struct source_target {
-	const char *source;
-	const char *target;
-};
-
-/*
- * Set of symlinks (relative to <zone_root>/dev) which must be present in
- * every zone.
- */
-static struct source_target standard_devlinks[] = {
-	{ "stderr",	"./fd/2" },
-	{ "stdin",	"./fd/0" },
-	{ "stdout",	"./fd/1" },
-	{ "dtremote",	"/dev/null" },
-	{ "console",	"zconsole" },
-	{ "syscon",	"zconsole" },
-	{ "sysmsg",	"zconsole" },
-	{ "systty",	"zconsole" },
-	{ "msglog",	"zconsole" },
-	{ NULL, NULL }
-};
-
-static int vplat_mount_dev(zlog_t *);
 
 /* for routing socket */
 static int rts_seqno = 0;
@@ -619,6 +545,8 @@ is_remote_fstype(const char *fstype, char *const *remote_fstypes)
 static void
 root_to_lu(zlog_t *zlogp, char *zroot, size_t zrootlen, boolean_t isresolved)
 {
+	assert(zone_isnative);
+
 	if (!isresolved && zonecfg_in_alt_root())
 		resolve_lofs(zlogp, zroot, zrootlen);
 	(void) strcpy(strrchr(zroot, '/') + 1, "lu");
@@ -873,7 +801,7 @@ dofsck(zlog_t *zlogp, const char *fstype, const char *rawdev)
 	 * that would cost us an extra fork/exec without buying us anything.
 	 */
 	if (snprintf(cmdbuf, sizeof (cmdbuf), "/usr/lib/fs/%s/fsck", fstype)
-	    > sizeof (cmdbuf)) {
+	    >= sizeof (cmdbuf)) {
 		zerror(zlogp, B_FALSE, "file-system type %s too long", fstype);
 		return (-1);
 	}
@@ -904,7 +832,7 @@ domount(zlog_t *zlogp, const char *fstype, const char *opts,
 	 * that would cost us an extra fork/exec without buying us anything.
 	 */
 	if (snprintf(cmdbuf, sizeof (cmdbuf), "/usr/lib/fs/%s/mount", fstype)
-	    > sizeof (cmdbuf)) {
+	    >= sizeof (cmdbuf)) {
 		zerror(zlogp, B_FALSE, "file-system type %s too long", fstype);
 		return (-1);
 	}
@@ -1005,7 +933,7 @@ valid_mount_path(zlog_t *zlogp, const char *rootpath, const char *relpath)
 	 * Make sure abspath has at least one '/' after its rootpath
 	 * component, and ends with '/'.
 	 */
-	if (snprintf(abspath, sizeof (abspath), "%s%s/", rootpath, relpath) >
+	if (snprintf(abspath, sizeof (abspath), "%s%s/", rootpath, relpath) >=
 	    sizeof (abspath)) {
 		zerror(zlogp, B_FALSE, "pathname %s%s is too long", rootpath,
 		    relpath);
@@ -1025,12 +953,113 @@ valid_mount_path(zlog_t *zlogp, const char *rootpath, const char *relpath)
 }
 
 static int
+mount_one_dev_device_cb(void *arg, const char *match, const char *name)
+{
+	di_prof_t prof = arg;
+
+	if (name == NULL)
+		return (di_prof_add_dev(prof, match));
+	return (di_prof_add_map(prof, match, name));
+}
+
+static int
+mount_one_dev_symlink_cb(void *arg, const char *source, const char *target)
+{
+	di_prof_t prof = arg;
+
+	return (di_prof_add_symlink(prof, source, target));
+}
+
+/*
+ * Apply the standard lists of devices/symlinks/mappings and the user-specified
+ * list of devices (via zonecfg) to the /dev filesystem.  The filesystem will
+ * use these as a profile/filter to determine what exists in /dev.
+ */
+static int
+mount_one_dev(zlog_t *zlogp, char *devpath)
+{
+	char			brand[MAXNAMELEN];
+	zone_dochandle_t	handle = NULL;
+	brand_handle_t		*bhp = NULL;
+	struct zone_devtab	ztab;
+	di_prof_t		prof = NULL;
+	int			err;
+	int			retval = -1;
+
+	if (di_prof_init(devpath, &prof)) {
+		zerror(zlogp, B_TRUE, "failed to initialize profile");
+		goto cleanup;
+	}
+
+	/* Get a handle to the brand info for this zone */
+	if ((zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) ||
+	    (bhp = brand_open(brand)) == NULL) {
+		zerror(zlogp, B_FALSE, "unable to determine zone brand");
+		goto cleanup;
+	}
+
+	if (brand_platform_iter_devices(bhp, zone_name,
+	    mount_one_dev_device_cb, prof) != 0) {
+		zerror(zlogp, B_TRUE, "failed to add standard device");
+		goto cleanup;
+	}
+
+	if (brand_platform_iter_link(bhp,
+	    mount_one_dev_symlink_cb, prof) != 0) {
+		zerror(zlogp, B_TRUE, "failed to add standard symlink");
+		goto cleanup;
+	}
+
+	/* Add user-specified devices and directories */
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zerror(zlogp, B_FALSE, "can't initialize zone handle");
+		goto cleanup;
+	}
+	if (err = zonecfg_get_handle(zone_name, handle)) {
+		zerror(zlogp, B_FALSE, "can't get handle for zone "
+		    "%s: %s", zone_name, zonecfg_strerror(err));
+		goto cleanup;
+	}
+	if (err = zonecfg_setdevent(handle)) {
+		zerror(zlogp, B_FALSE, "%s: %s", zone_name,
+		    zonecfg_strerror(err));
+		goto cleanup;
+	}
+	while (zonecfg_getdevent(handle, &ztab) == Z_OK) {
+		if (di_prof_add_dev(prof, ztab.zone_dev_match)) {
+			zerror(zlogp, B_TRUE, "failed to add "
+			    "user-specified device");
+			goto cleanup;
+		}
+	}
+	(void) zonecfg_enddevent(handle);
+
+	/* Send profile to kernel */
+	if (di_prof_commit(prof)) {
+		zerror(zlogp, B_TRUE, "failed to commit profile");
+		goto cleanup;
+	}
+
+	retval = 0;
+
+cleanup:
+	if (bhp != NULL)
+		brand_close(bhp);
+	if (handle)
+		zonecfg_fini_handle(handle);
+	if (prof)
+		di_prof_fini(prof);
+	return (retval);
+}
+
+static int
 mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath)
 {
-	char    path[MAXPATHLEN];
-	char	specpath[MAXPATHLEN];
-	char    optstr[MAX_MNTOPT_STR];
+	char path[MAXPATHLEN];
+	char specpath[MAXPATHLEN];
+	char optstr[MAX_MNTOPT_STR];
 	zone_fsopt_t *optptr;
+	int rv;
 
 	if (!valid_mount_path(zlogp, rootpath, fsptr->zone_fs_dir)) {
 		zerror(zlogp, B_FALSE, "%s%s is not a valid mount point",
@@ -1136,8 +1165,23 @@ mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath)
 			    sizeof (optstr));
 		}
 	}
-	return (domount(zlogp, fsptr->zone_fs_type, optstr,
-	    fsptr->zone_fs_special, path));
+
+	if ((rv = domount(zlogp, fsptr->zone_fs_type, optstr,
+	    fsptr->zone_fs_special, path)) != 0)
+		return (rv);
+
+	/*
+	 * The mount succeeded.  If this was not a mount of /dev then
+	 * we're done.
+	 */
+	if (strcmp(fsptr->zone_fs_type, MNTTYPE_DEV) != 0)
+		return (0);
+
+	/*
+	 * We just mounted an instance of a /dev filesystem, so now we
+	 * need to configure it.
+	 */
+	return (mount_one_dev(zlogp, path));
 }
 
 static void
@@ -1179,6 +1223,8 @@ build_mounted_pre_var(zlog_t *zlogp, char *rootpath,
 	char *altstr;
 	FILE *fp;
 	uuid_t uuid;
+
+	assert(zone_isnative);
 
 	resolve_lofs(zlogp, rootpath, rootlen);
 	(void) snprintf(luroot, sizeof (luroot), "%s/lu", zonepath);
@@ -1334,16 +1380,159 @@ build_mounted_post_var(zlog_t *zlogp, char *rootpath, const char *zonepath)
 	return (B_TRUE);
 }
 
+typedef struct plat_gmount_cb_data {
+	zlog_t			*pgcd_zlogp;
+	struct zone_fstab	**pgcd_fs_tab;
+	int			*pgcd_num_fs;
+} plat_gmount_cb_data_t;
+
+/*
+ * plat_gmount_cb() is a callback function invoked by libbrand to iterate
+ * through all global brand platform mounts.
+ */
+int
+plat_gmount_cb(void *data, const char *spec, const char *dir,
+    const char *fstype, const char *opt)
+{
+	plat_gmount_cb_data_t	*cp = data;
+	zlog_t			*zlogp = cp->pgcd_zlogp;
+	struct zone_fstab	*fs_ptr = *cp->pgcd_fs_tab;
+	int			num_fs = *cp->pgcd_num_fs;
+	struct zone_fstab	*fsp, *tmp_ptr;
+
+	num_fs++;
+	if ((tmp_ptr = realloc(fs_ptr, num_fs * sizeof (*tmp_ptr))) == NULL) {
+		zerror(zlogp, B_TRUE, "memory allocation failed");
+		return (-1);
+	}
+
+	fs_ptr = tmp_ptr;
+	fsp = &fs_ptr[num_fs - 1];
+
+	/* update the callback struct passed in */
+	*cp->pgcd_fs_tab = fs_ptr;
+	*cp->pgcd_num_fs = num_fs;
+
+	fsp->zone_fs_raw[0] = '\0';
+	(void) strlcpy(fsp->zone_fs_special, spec,
+	    sizeof (fsp->zone_fs_special));
+	(void) strlcpy(fsp->zone_fs_dir, dir, sizeof (fsp->zone_fs_dir));
+	(void) strlcpy(fsp->zone_fs_type, fstype, sizeof (fsp->zone_fs_type));
+	fsp->zone_fs_options = NULL;
+	if (zonecfg_add_fs_option(fsp, (char *)opt) != Z_OK) {
+		zerror(zlogp, B_FALSE, "error adding property");
+		return (-1);
+	}
+
+	return (0);
+}
+
+static int
+mount_filesystems_ipdent(zone_dochandle_t handle, zlog_t *zlogp,
+    struct zone_fstab **fs_tabp, int *num_fsp)
+{
+	struct zone_fstab *tmp_ptr, *fs_ptr, *fsp, fstab;
+	int num_fs;
+
+	num_fs = *num_fsp;
+	fs_ptr = *fs_tabp;
+
+	if (zonecfg_setipdent(handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration");
+		return (-1);
+	}
+	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
+		num_fs++;
+		if ((tmp_ptr = realloc(fs_ptr,
+		    num_fs * sizeof (*tmp_ptr))) == NULL) {
+			zerror(zlogp, B_TRUE, "memory allocation failed");
+			(void) zonecfg_endipdent(handle);
+			return (-1);
+		}
+
+		/* update the pointers passed in */
+		*fs_tabp = tmp_ptr;
+		*num_fsp = num_fs;
+
+		/*
+		 * IPDs logically only have a mount point; all other properties
+		 * are implied.
+		 */
+		fs_ptr = tmp_ptr;
+		fsp = &fs_ptr[num_fs - 1];
+		(void) strlcpy(fsp->zone_fs_dir,
+		    fstab.zone_fs_dir, sizeof (fsp->zone_fs_dir));
+		fsp->zone_fs_special[0] = '\0';
+		fsp->zone_fs_raw[0] = '\0';
+		fsp->zone_fs_type[0] = '\0';
+		fsp->zone_fs_options = NULL;
+	}
+	(void) zonecfg_endipdent(handle);
+	return (0);
+}
+
+static int
+mount_filesystems_fsent(zone_dochandle_t handle, zlog_t *zlogp,
+    struct zone_fstab **fs_tabp, int *num_fsp, int mount_cmd)
+{
+	struct zone_fstab *tmp_ptr, *fs_ptr, *fsp, fstab;
+	int num_fs;
+
+	num_fs = *num_fsp;
+	fs_ptr = *fs_tabp;
+
+	if (zonecfg_setfsent(handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration");
+		return (-1);
+	}
+	while (zonecfg_getfsent(handle, &fstab) == Z_OK) {
+		/*
+		 * ZFS filesystems will not be accessible under an alternate
+		 * root, since the pool will not be known.  Ignore them in this
+		 * case.
+		 */
+		if (mount_cmd && strcmp(fstab.zone_fs_type, MNTTYPE_ZFS) == 0)
+			continue;
+
+		num_fs++;
+		if ((tmp_ptr = realloc(fs_ptr,
+		    num_fs * sizeof (*tmp_ptr))) == NULL) {
+			zerror(zlogp, B_TRUE, "memory allocation failed");
+			(void) zonecfg_endfsent(handle);
+			return (-1);
+		}
+		/* update the pointers passed in */
+		*fs_tabp = tmp_ptr;
+		*num_fsp = num_fs;
+
+		fs_ptr = tmp_ptr;
+		fsp = &fs_ptr[num_fs - 1];
+		(void) strlcpy(fsp->zone_fs_dir,
+		    fstab.zone_fs_dir, sizeof (fsp->zone_fs_dir));
+		(void) strlcpy(fsp->zone_fs_special, fstab.zone_fs_special,
+		    sizeof (fsp->zone_fs_special));
+		(void) strlcpy(fsp->zone_fs_raw, fstab.zone_fs_raw,
+		    sizeof (fsp->zone_fs_raw));
+		(void) strlcpy(fsp->zone_fs_type, fstab.zone_fs_type,
+		    sizeof (fsp->zone_fs_type));
+		fsp->zone_fs_options = fstab.zone_fs_options;
+	}
+	(void) zonecfg_endfsent(handle);
+	return (0);
+}
+
 static int
 mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 {
-	char	rootpath[MAXPATHLEN];
-	char	zonepath[MAXPATHLEN];
-	int	num_fs = 0, i;
-	struct zone_fstab fstab, *fs_ptr = NULL, *tmp_ptr;
-	struct zone_fstab *fsp;
+	char rootpath[MAXPATHLEN];
+	char zonepath[MAXPATHLEN];
+	char brand[MAXNAMELEN];
+	int i, num_fs = 0;
+	struct zone_fstab *fs_ptr = NULL;
 	zone_dochandle_t handle = NULL;
 	zone_state_t zstate;
+	brand_handle_t *bhp;
+	plat_gmount_cb_data_t cb;
 
 	if (zone_get_state(zone_name, &zstate) != Z_OK ||
 	    (zstate != ZONE_STATE_READY && zstate != ZONE_STATE_MOUNTED)) {
@@ -1374,87 +1563,71 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 		goto bad;
 	}
 
+	/* Get a handle to the brand info for this zone */
+	if ((zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) ||
+	    (bhp = brand_open(brand)) == NULL) {
+		zerror(zlogp, B_FALSE, "unable to determine zone brand");
+		return (-1);
+	}
+
+	/*
+	 * Get the list of global filesystems to mount from the brand
+	 * configuration.
+	 */
+	cb.pgcd_zlogp = zlogp;
+	cb.pgcd_fs_tab = &fs_ptr;
+	cb.pgcd_num_fs = &num_fs;
+	if (brand_platform_iter_gmounts(bhp, zonepath,
+	    plat_gmount_cb, &cb) != 0) {
+		zerror(zlogp, B_FALSE, "unable to mount filesystems");
+		brand_close(bhp);
+		return (-1);
+	}
+	brand_close(bhp);
+
 	/*
 	 * Iterate through the rest of the filesystems, first the IPDs, then
 	 * the general FSs.  Sort them all, then mount them in sorted order.
 	 * This is to make sure the higher level directories (e.g., /usr)
 	 * get mounted before any beneath them (e.g., /usr/local).
 	 */
-	if (zonecfg_setipdent(handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
+	if (mount_filesystems_ipdent(handle, zlogp, &fs_ptr, &num_fs) != 0)
 		goto bad;
-	}
-	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
-		num_fs++;
-		if ((tmp_ptr = realloc(fs_ptr,
-		    num_fs * sizeof (*tmp_ptr))) == NULL) {
-			zerror(zlogp, B_TRUE, "memory allocation failed");
-			num_fs--;
-			(void) zonecfg_endipdent(handle);
-			goto bad;
-		}
-		fs_ptr = tmp_ptr;
-		fsp = &fs_ptr[num_fs - 1];
-		/*
-		 * IPDs logically only have a mount point; all other properties
-		 * are implied.
-		 */
-		(void) strlcpy(fsp->zone_fs_dir,
-		    fstab.zone_fs_dir, sizeof (fsp->zone_fs_dir));
-		fsp->zone_fs_special[0] = '\0';
-		fsp->zone_fs_raw[0] = '\0';
-		fsp->zone_fs_type[0] = '\0';
-		fsp->zone_fs_options = NULL;
-	}
-	(void) zonecfg_endipdent(handle);
 
-	if (zonecfg_setfsent(handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
+	if (mount_filesystems_fsent(handle, zlogp, &fs_ptr, &num_fs,
+	    mount_cmd) != 0)
 		goto bad;
-	}
-	while (zonecfg_getfsent(handle, &fstab) == Z_OK) {
-		/*
-		 * ZFS filesystems will not be accessible under an alternate
-		 * root, since the pool will not be known.  Ignore them in this
-		 * case.
-		 */
-		if (mount_cmd && strcmp(fstab.zone_fs_type, MNTTYPE_ZFS) == 0)
-			continue;
 
-		num_fs++;
-		if ((tmp_ptr = realloc(fs_ptr,
-		    num_fs * sizeof (*tmp_ptr))) == NULL) {
-			zerror(zlogp, B_TRUE, "memory allocation failed");
-			num_fs--;
-			(void) zonecfg_endfsent(handle);
-			goto bad;
-		}
-		fs_ptr = tmp_ptr;
-		fsp = &fs_ptr[num_fs - 1];
-		(void) strlcpy(fsp->zone_fs_dir,
-		    fstab.zone_fs_dir, sizeof (fsp->zone_fs_dir));
-		(void) strlcpy(fsp->zone_fs_special, fstab.zone_fs_special,
-		    sizeof (fsp->zone_fs_special));
-		(void) strlcpy(fsp->zone_fs_raw, fstab.zone_fs_raw,
-		    sizeof (fsp->zone_fs_raw));
-		(void) strlcpy(fsp->zone_fs_type, fstab.zone_fs_type,
-		    sizeof (fsp->zone_fs_type));
-		fsp->zone_fs_options = fstab.zone_fs_options;
-	}
-	(void) zonecfg_endfsent(handle);
 	zonecfg_fini_handle(handle);
 	handle = NULL;
 
 	/*
-	 * When we're mounting a zone for administration, / is the
-	 * scratch zone and dev is mounted at /dev.  The to-be-upgraded
-	 * zone is mounted at /a, and we set up that environment so that
-	 * process can access both the running system's utilities
-	 * and the to-be-modified zone's files.  The only exception
-	 * is the zone's /dev which isn't mounted at all, which is
-	 * the same as global zone installation where /a/dev and
-	 * /a/devices are not mounted.
-	 * Zone mounting is done in three phases.
+	 * Normally when we mount a zone all the zone filesystems
+	 * get mounted relative to rootpath, which is usually
+	 * <zonepath>/root.  But when mounting a zone for administration
+	 * purposes via the zone "mount" state, build_mounted_pre_var()
+	 * updates rootpath to be <zonepath>/lu/a so we'll mount all
+	 * the zones filesystems there instead.
+	 *
+	 * build_mounted_pre_var() and build_mounted_post_var() will
+	 * also do some extra work to create directories and lofs mount
+	 * a bunch of global zone file system paths into <zonepath>/lu.
+	 *
+	 * This allows us to be able to enter the zone (now rooted at
+	 * <zonepath>/lu) and run the upgrade/patch tools that are in the
+	 * global zone and have them upgrade the to-be-modified zone's
+	 * files mounted on /a.  (Which mirrors the existing standard
+	 * upgrade environment.)
+	 *
+	 * There is of course one catch.  When doing the upgrade
+	 * we need <zoneroot>/lu/dev to be the /dev filesystem
+	 * for the zone and we don't want to have any /dev filesystem
+	 * mounted at <zoneroot>/lu/a/dev.  Since /dev is specified
+	 * as a normal zone filesystem by default we'll try to mount
+	 * it at <zoneroot>/lu/a/dev, so we have to detect this
+	 * case and instead mount it at <zoneroot>/lu/dev.
+	 *
+	 * All this work is done in three phases:
 	 *   1) Create and populate lu directory (build_mounted_pre_var()).
 	 *   2) Mount the required filesystems as per the zone configuration.
 	 *   3) Set up the rest of the scratch zone environment
@@ -1466,7 +1639,25 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 		goto bad;
 
 	qsort(fs_ptr, num_fs, sizeof (*fs_ptr), fs_compare);
+
 	for (i = 0; i < num_fs; i++) {
+		if (mount_cmd &&
+		    strcmp(fs_ptr[i].zone_fs_dir, "/dev") == 0) {
+			size_t slen = strlen(rootpath) - 2;
+
+			/*
+			 * By default we'll try to mount /dev as /a/dev
+			 * but /dev is special and always goes at the top
+			 * so strip the trailing '/a' from the rootpath.
+			 */
+			assert(zone_isnative);
+			assert(strcmp(&rootpath[slen], "/a") == 0);
+			rootpath[slen] = '\0';
+			if (mount_one(zlogp, &fs_ptr[i], rootpath) != 0)
+				goto bad;
+			rootpath[slen] = '/';
+			continue;
+		}
 		if (mount_one(zlogp, &fs_ptr[i], rootpath) != 0)
 			goto bad;
 	}
@@ -2270,20 +2461,21 @@ get_privset(zlog_t *zlogp, priv_set_t *privs, boolean_t mount_cmd)
 	zone_dochandle_t handle;
 	char *privname = NULL;
 
-	if (mount_cmd) {
-		if (zonecfg_default_privset(privs) == Z_OK)
-			return (0);
-		zerror(zlogp, B_FALSE,
-		    "failed to determine the zone's default privilege set");
-		return (-1);
-	}
-
 	if ((handle = zonecfg_init_handle()) == NULL) {
 		zerror(zlogp, B_TRUE, "getting zone configuration handle");
 		return (-1);
 	}
 	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
 		zerror(zlogp, B_FALSE, "invalid configuration");
+		zonecfg_fini_handle(handle);
+		return (-1);
+	}
+
+	if (mount_cmd) {
+		if (zonecfg_default_privset(privs) == Z_OK)
+			return (0);
+		zerror(zlogp, B_FALSE,
+		    "failed to determine the zone's default privilege set");
 		zonecfg_fini_handle(handle);
 		return (-1);
 	}
@@ -2795,7 +2987,7 @@ again:
 
 			/*
 			 * Create auto_home_<zone> map for this zone
-			 * in the global zone. The local zone entry
+			 * in the global zone. The non-global zone entry
 			 * will be created by automount when the zone
 			 * is booted.
 			 */
@@ -3296,6 +3488,9 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	zoneid_t rval = -1;
 	priv_set_t *privs;
 	char rootpath[MAXPATHLEN];
+	char modname[MAXPATHLEN];
+	struct brand_attr attr;
+	brand_handle_t *bhp;
 	char *rctlbuf = NULL;
 	size_t rctlbufsz = 0;
 	char *zfsbuf = NULL;
@@ -3358,6 +3553,7 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 		goto error;
 
 	if (mount_cmd) {
+		assert(zone_isnative);
 		root_to_lu(zlogp, rootpath, sizeof (rootpath), B_TRUE);
 
 		/*
@@ -3442,6 +3638,33 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	    zonecfg_get_root()) == -1) {
 		zerror(zlogp, B_TRUE, "cannot add mapfile entry");
 		goto error;
+	}
+
+	if ((zone_get_brand(zone_name, attr.ba_brandname,
+	    MAXNAMELEN) != Z_OK) ||
+	    (bhp = brand_open(attr.ba_brandname)) == NULL) {
+		zerror(zlogp, B_FALSE, "unable to determine brand name");
+		return (-1);
+	}
+
+	/*
+	 * If this brand requires any kernel support, now is the time to
+	 * get it loaded and initialized.
+	 */
+	if (brand_get_modname(bhp, modname, MAXPATHLEN) < 0) {
+		zerror(zlogp, B_FALSE, "unable to determine brand kernel "
+		    "module");
+		return (-1);
+	}
+
+	if (strlen(modname) > 0) {
+		(void) strlcpy(attr.ba_modname, modname, MAXPATHLEN);
+		if (zone_setattr(zoneid, ZONE_ATTR_BRAND, &attr,
+		    sizeof (attr) != 0)) {
+			zerror(zlogp, B_TRUE, "could not set zone brand "
+			    "attribute.");
+			goto error;
+		}
 	}
 
 	/*
@@ -3549,19 +3772,27 @@ write_index_file(zoneid_t zoneid)
 int
 vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd, zoneid_t zoneid)
 {
+	char zonepath[MAXPATHLEN];
 
 	if (!mount_cmd && validate_datasets(zlogp) != 0) {
 		lofs_discard_mnttab();
 		return (-1);
 	}
 
-	if (mount_filesystems(zlogp, mount_cmd) != 0) {
+	/*
+	 * Before we try to mount filesystems we need to create the
+	 * attribute backing store for /dev
+	 */
+	if (zone_get_zonepath(zone_name, zonepath, sizeof (zonepath)) != Z_OK) {
+		lofs_discard_mnttab();
+		return (-1);
+	}
+	if (make_one_dir(zlogp, zonepath, "/dev", DEFAULT_DIR_MODE) != 0) {
 		lofs_discard_mnttab();
 		return (-1);
 	}
 
-	/* mount /dev for zone (both normal and scratch zone) */
-	if (vplat_mount_dev(zlogp) != 0) {
+	if (mount_filesystems(zlogp, mount_cmd) != 0) {
 		lofs_discard_mnttab();
 		return (-1);
 	}
@@ -3581,6 +3812,8 @@ static int
 lu_root_teardown(zlog_t *zlogp)
 {
 	char zroot[MAXPATHLEN];
+
+	assert(zone_isnative);
 
 	if (zone_get_rootpath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to determine zone root");
@@ -3647,6 +3880,10 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
 {
 	char *kzone;
 	zoneid_t zoneid;
+	char zroot[MAXPATHLEN];
+	char cmdbuf[MAXPATHLEN];
+	char brand[MAXNAMELEN];
+	brand_handle_t *bhp = NULL;
 
 	kzone = zone_name;
 	if (zonecfg_in_alt_root()) {
@@ -3676,6 +3913,38 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
 
 	if (zone_shutdown(zoneid) != 0) {
 		zerror(zlogp, B_TRUE, "unable to shutdown zone");
+		goto error;
+	}
+
+	/* Get the path to the root of this zone */
+	if (zone_get_zonepath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
+		zerror(zlogp, B_FALSE, "unable to determine zone root");
+		goto error;
+	}
+
+	/* Get a handle to the brand info for this zone */
+	if ((zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) ||
+	    (bhp = brand_open(brand)) == NULL) {
+		zerror(zlogp, B_FALSE, "unable to determine zone brand");
+		return (-1);
+	}
+	/*
+	 * If there is a brand 'halt' callback, execute it now to give the
+	 * brand a chance to cleanup any custom configuration.
+	 */
+	(void) strcpy(cmdbuf, EXEC_PREFIX);
+	if (brand_get_halt(bhp, zone_name, zroot, cmdbuf + EXEC_LEN,
+	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) < 0) {
+		brand_close(bhp);
+		zerror(zlogp, B_FALSE, "unable to determine branded zone's "
+		    "halt callback.");
+		goto error;
+	}
+	brand_close(bhp);
+
+	if ((strlen(cmdbuf) > EXEC_LEN) &&
+	    (do_subproc(zlogp, cmdbuf) != Z_OK)) {
+		zerror(zlogp, B_FALSE, "%s failed", cmdbuf);
 		goto error;
 	}
 
@@ -3721,130 +3990,4 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
 error:
 	lofs_discard_mnttab();
 	return (-1);
-}
-
-/*
- * Apply the standard lists of devices/symlinks/mappings and the user-specified
- * list of devices (via zonecfg) to the /dev filesystem.  The filesystem will
- * use these as a profile/filter to determine what exists in /dev.
- */
-static int
-vplat_mount_dev(zlog_t *zlogp)
-{
-	char			zonedevpath[MAXPATHLEN];
-	zone_dochandle_t	handle = NULL;
-	struct zone_devtab	ztab;
-	zone_fsopt_t		opt_attr;
-	di_prof_t		prof = NULL;
-	int			i, err, len;
-	int			retval = -1;
-
-	struct zone_fstab devtab = {
-		"/dev",
-		"/dev",
-		MNTTYPE_DEV,
-		NULL,
-		""
-	};
-
-	if (err = zone_get_devroot(zone_name, zonedevpath,
-	    sizeof (zonedevpath))) {
-		zerror(zlogp, B_FALSE, "can't get zone dev: %s",
-		    zonecfg_strerror(err));
-		return (-1);
-	}
-
-	/*
-	 * The old /dev was a lofs mount from <zonepath>/dev, with
-	 * dev fs, that becomes a mount on <zonepath>/root/dev.
-	 * However, we need to preserve device permission bits during
-	 * upgrade.  What we should do is migrate the attribute directory
-	 * on upgrade, but for now, preserve it at <zonepath>/dev.
-	 */
-	(void) strcpy(opt_attr.zone_fsopt_opt, "attrdir=");
-	len = strlen(opt_attr.zone_fsopt_opt);
-	if (err = zone_get_zonepath(zone_name,
-	    opt_attr.zone_fsopt_opt + len, MAX_MNTOPT_STR - len)) {
-		zerror(zlogp, B_FALSE, "can't get zone path: %s",
-		    zonecfg_strerror(err));
-		return (-1);
-	}
-
-	if (make_one_dir(zlogp, opt_attr.zone_fsopt_opt + len, "/dev",
-	    DEFAULT_DIR_MODE) != 0)
-		return (-1);
-
-	(void) strlcat(opt_attr.zone_fsopt_opt, "/dev", MAX_MNTOPT_STR);
-	devtab.zone_fs_options = &opt_attr;
-	opt_attr.zone_fsopt_next = NULL;
-
-	/* mount /dev inside the zone */
-	i = strlen(zonedevpath);
-	if (mount_one(zlogp, &devtab, zonedevpath))
-		return (-1);
-
-	(void) strlcat(zonedevpath, "/dev", sizeof (zonedevpath));
-	if (di_prof_init(zonedevpath, &prof)) {
-		zerror(zlogp, B_TRUE, "failed to initialize profile");
-		goto cleanup;
-	}
-
-	/* Add the standard devices and directories */
-	for (i = 0; standard_devs[i] != NULL; ++i) {
-		if (di_prof_add_dev(prof, standard_devs[i])) {
-			zerror(zlogp, B_TRUE, "failed to add "
-			    "standard device");
-			goto cleanup;
-		}
-	}
-
-	/* Add the standard symlinks */
-	for (i = 0; standard_devlinks[i].source != NULL; ++i) {
-		if (di_prof_add_symlink(prof,
-		    standard_devlinks[i].source,
-		    standard_devlinks[i].target)) {
-			zerror(zlogp, B_TRUE, "failed to add "
-			    "standard symlink");
-			goto cleanup;
-		}
-	}
-
-	/* Add user-specified devices and directories */
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_FALSE, "can't initialize zone handle");
-		goto cleanup;
-	}
-	if (err = zonecfg_get_handle(zone_name, handle)) {
-		zerror(zlogp, B_FALSE, "can't get handle for zone "
-		    "%s: %s", zone_name, zonecfg_strerror(err));
-		goto cleanup;
-	}
-	if (err = zonecfg_setdevent(handle)) {
-		zerror(zlogp, B_FALSE, "%s: %s", zone_name,
-		    zonecfg_strerror(err));
-		goto cleanup;
-	}
-	while (zonecfg_getdevent(handle, &ztab) == Z_OK) {
-		if (di_prof_add_dev(prof, ztab.zone_dev_match)) {
-			zerror(zlogp, B_TRUE, "failed to add "
-			    "user-specified device");
-			goto cleanup;
-		}
-	}
-	(void) zonecfg_enddevent(handle);
-
-	/* Send profile to kernel */
-	if (di_prof_commit(prof)) {
-		zerror(zlogp, B_TRUE, "failed to commit profile");
-		goto cleanup;
-	}
-
-	retval = 0;
-
-cleanup:
-	if (handle)
-		zonecfg_fini_handle(handle);
-	if (prof)
-		di_prof_fini(prof);
-	return (retval);
 }

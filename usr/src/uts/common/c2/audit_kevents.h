@@ -330,9 +330,10 @@ extern "C" {
 #define	AUE_MODADDPRIV		291	/* =ad modctl(2) */
 #define	AUE_CRYPTOADM		292	/* =as kernel cryptographic framework */
 #define	AUE_CONFIGKSSL		293	/* =as kernel SSL */
+#define	AUE_BRANDSYS		294	/* =ot */
 /* NOTE: update MAX_KEVENTS below if events are added. */
 
-#define	MAX_KEVENTS		293
+#define	MAX_KEVENTS		294
 
 
 #ifdef __cplusplus

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,6 +80,7 @@
 #include <sys/tuneable.h>
 #include <c2/audit.h>
 #include <sys/bootconf.h>
+#include <sys/brand.h>
 #include <sys/dumphdr.h>
 #include <sys/promif.h>
 #include <sys/systeminfo.h>
@@ -345,9 +345,20 @@ void
 lwp_forkregs(klwp_t *lwp, klwp_t *clwp)
 {
 #if defined(__amd64)
-	clwp->lwp_pcb.pcb_flags |= RUPDATE_PENDING;
-	lwptot(clwp)->t_post_sys = 1;
+	struct pcb *pcb = &clwp->lwp_pcb;
+	struct regs *rp = lwptoregs(lwp);
+
+	if ((pcb->pcb_flags & RUPDATE_PENDING) == 0) {
+		pcb->pcb_ds = rp->r_ds;
+		pcb->pcb_es = rp->r_es;
+		pcb->pcb_fs = rp->r_fs;
+		pcb->pcb_gs = rp->r_gs;
+		pcb->pcb_flags |= RUPDATE_PENDING;
+		lwptot(clwp)->t_post_sys = 1;
+	}
+	ASSERT(lwptot(clwp)->t_post_sys);
 #endif
+
 	bcopy(lwp->lwp_regs, clwp->lwp_regs, sizeof (struct regs));
 }
 
@@ -484,6 +495,32 @@ lwp_segregs_restore32(klwp_t *lwp)
 #endif	/* _SYSCALL32_IMPL */
 
 /*
+ * If this is a process in a branded zone, then we want it to use the brand
+ * syscall entry points instead of the standard Solaris entry points.  This
+ * routine must be called when a new lwp is created within a branded zone
+ * or when an existing lwp moves into a branded zone via a zone_enter()
+ * operation.
+ */
+void
+lwp_attach_brand_hdlrs(klwp_t *lwp)
+{
+	kthread_t *t = lwptot(lwp);
+
+	ASSERT(PROC_IS_BRANDED(lwptoproc(lwp)));
+	ASSERT(removectx(t, NULL, brand_interpositioning_disable,
+	    brand_interpositioning_enable, NULL, NULL, NULL, NULL) == 0);
+
+	installctx(t, NULL, brand_interpositioning_disable,
+	    brand_interpositioning_enable, NULL, NULL, NULL, NULL);
+
+	if (t == curthread) {
+		kpreempt_disable();
+		brand_interpositioning_enable();
+		kpreempt_enable();
+	}
+}
+
+/*
  * Add any lwp-associated context handlers to the lwp at the beginning
  * of the lwp's useful life.
  *
@@ -571,6 +608,9 @@ lwp_installctx(klwp_t *lwp)
 			kpreempt_enable();
 		}
 	}
+
+	if (PROC_IS_BRANDED(ttoproc(t)))
+		lwp_attach_brand_hdlrs(lwp);
 }
 
 /*
@@ -700,6 +740,13 @@ setregs(uarg_t *args)
 	 */
 	lwp_installctx(lwp);
 }
+
+user_desc_t *
+cpu_get_gdt(void)
+{
+	return (CPU->cpu_gdt);
+}
+
 
 #if !defined(lwp_getdatamodel)
 

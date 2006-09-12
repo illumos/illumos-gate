@@ -35,6 +35,7 @@
 #include <sys/cheetahregs.h>
 #include <sys/machtrap.h>
 #include <sys/machthread.h>
+#include <sys/machbrand.h>
 #include <sys/pcb.h>
 #include <sys/pte.h>
 #include <sys/mmu.h>
@@ -1440,7 +1441,11 @@ trap_table0:
 	BAD;				/* 105	range check ?? */
 	GOTO(.fix_alignment);		/* 106	do unaligned references */
 	BAD;				/* 107	unused */
-	SYSCALL(syscall_trap32);	/* 108	ILP32 system call on LP64 */
+#ifdef	DEBUG
+	GOTO(syscall_wrapper32)		/* 108	ILP32 system call on LP64 */
+#else
+	SYSCALL(syscall_trap32)		/* 108	ILP32 system call on LP64 */
+#endif
 	GOTO(set_trap0_addr);		/* 109	set trap0 address */
 	BAD; BAD; BAD4;			/* 10A - 10F unused */
 	TRP4; TRP4; TRP4; TRP4;		/* 110 - 11F V9 user trap handlers */
@@ -1460,7 +1465,11 @@ trap_table0:
 	BAD;				/* 139  unused */
 	DTRACE_RETURN;			/* 13A	dtrace pid return probe */
 	BAD; BAD4;			/* 13B - 13F unused */
+#ifdef	DEBUG
+	GOTO(syscall_wrapper)		/* 140  LP64 system call */
+#else
 	SYSCALL(syscall_trap)		/* 140  LP64 system call */
+#endif
 	SYSCALL(nosys);			/* 141  unused system call trap */
 #ifdef DEBUG_USER_TRAPTRACECTL
 	GOTO(.traptrace_freeze);	/* 142  freeze traptrace */
@@ -2967,6 +2976,7 @@ fast_trap_done:
 	  ldxa	[%g0]ASI_INTR_RECEIVE_STATUS, %g5
 	done
 
+	ALTENTRY(fast_trap_done_check_interrupts)
 fast_trap_done_chk_intr:
 	ldxa	[%g0]ASI_INTR_RECEIVE_STATUS, %g5
 
@@ -2998,5 +3008,47 @@ fast_trap_done_chk_intr:
 fast_trap_dummy_call:
 	retl
 	nop
+
+#ifdef	DEBUG
+/*
+ * Currently we only support syscall interposition for branded zones on
+ * DEBUG kernels.  The only brand that makes use of this functionality is
+ * the fake Solaris 10 brand.  Since this brand is only used for exercising
+ * the framework, we don't want this overhead incurred on production
+ * systems.
+ */
+#define	BRAND_CALLBACK(callback_id)					    \
+	CPU_ADDR(%g1, %g2)		/* load CPU struct addr to %g1	*/ ;\
+	ldn	[%g1 + CPU_THREAD], %g2	/* load thread pointer		*/ ;\
+	ldn	[%g2 + T_PROCP], %g2	/* get proc pointer		*/ ;\
+	ldn	[%g2 + P_BRAND], %g2	/* get brand pointer		*/ ;\
+	brz	%g2, 1f			/* No brand?  No callback. 	*/ ;\
+	nop 								   ;\
+	ldn	[%g2 + B_MACHOPS], %g2	/* get machops list		*/ ;\
+	ldn	[%g2 + (callback_id << 3)], %g2 			   ;\
+	brz	%g2, 1f							   ;\
+	/*								    \
+	 * This isn't pretty.  We want a low-latency way for the callback   \
+	 * routine to decline to do anything.  We just pass in an address   \
+	 * the routine can directly jmp back to, pretending that nothing    \
+	 * has happened.						    \
+	 */								    \
+	mov	%pc, %g1						   ;\
+	add	%g1, 16, %g1						   ;\
+	jmp	%g2							   ;\
+	nop								   ;\
+1:
+
+	ENTRY_NP(syscall_wrapper32)
+	BRAND_CALLBACK(BRAND_CB_SYSCALL32)
+	SYSCALL(syscall_trap32)
+	SET_SIZE(syscall_wrapper32)
+
+	ENTRY_NP(syscall_wrapper)
+	BRAND_CALLBACK(BRAND_CB_SYSCALL)
+	SYSCALL(syscall_trap)
+	SET_SIZE(syscall_wrapper)
+
+#endif	/* DEBUG */
 
 #endif	/* lint */

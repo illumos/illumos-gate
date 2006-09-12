@@ -73,6 +73,7 @@
 #include <sys/pool.h>
 #include <sys/sdt.h>
 #include <sys/corectl.h>
+#include <sys/brand.h>
 
 /*
  * convert code/data pair into old style wait status
@@ -158,7 +159,6 @@ restart_init(int what, int why)
 	user_t *up = PTOU(p);
 
 	vnode_t *oldcd, *oldrd;
-	sess_t *sp;
 	int i, err;
 	char reason_buf[64];
 
@@ -257,17 +257,9 @@ restart_init(int what, int why)
 	if (oldcd != NULL)
 		VN_RELE(oldcd);
 
-	/*
-	 * Free the controlling tty.
-	 */
-	mutex_enter(&pidlock);
-	sp = p->p_sessp;
-	if (sp->s_sidp == p->p_pidp && sp->s_vp != NULL) {
-		mutex_exit(&pidlock);
-		freectty(sp);
-	} else {
-		mutex_exit(&pidlock);
-	}
+	/* Free the controlling tty.  (freectty() always assumes curproc.) */
+	ASSERT(p == curproc);
+	(void) freectty(B_TRUE);
 
 	/*
 	 * Now exec() the new init(1M) on top of the current process.  If we
@@ -343,7 +335,6 @@ proc_exit(int why, int what)
 	timeout_id_t tmp_id;
 	int rv;
 	proc_t *q;
-	sess_t *sp;
 	task_t *tk;
 	vnode_t *exec_vp, *execdir_vp, *cdir, *rdir;
 	sigqueue_t *sqp;
@@ -367,6 +358,14 @@ proc_exit(int why, int what)
 	DTRACE_PROC1(exit, int, why);
 
 	/*
+	 * Will perform any brand specific proc exit processing, since this
+	 * is always the last lwp, will also perform lwp_exit and free brand
+	 * data
+	 */
+	if (PROC_IS_BRANDED(p))
+		BROP(p)->b_proc_exit(p, lwp);
+
+	/*
 	 * Don't let init exit unless zone_start_init() failed its exec, or
 	 * we are shutting down the zone or the machine.
 	 *
@@ -377,6 +376,7 @@ proc_exit(int why, int what)
 		if (z->zone_boot_err == 0 &&
 		    zone_status_get(z) < ZONE_IS_SHUTTING_DOWN &&
 		    zone_status_get(global_zone) < ZONE_IS_SHUTTING_DOWN &&
+		    z->zone_restart_init == B_TRUE &&
 		    restart_init(what, why) == 0)
 			return (0);
 		/*
@@ -523,13 +523,9 @@ proc_exit(int why, int what)
 
 	closeall(P_FINFO(p));
 
-	mutex_enter(&pidlock);
-	sp = p->p_sessp;
-	if (sp->s_sidp == p->p_pidp && sp->s_vp != NULL) {
-		mutex_exit(&pidlock);
-		freectty(sp);
-	} else
-		mutex_exit(&pidlock);
+	/* Free the controlling tty.  (freectty() always assumes curproc.) */
+	ASSERT(p == curproc);
+	(void) freectty(B_TRUE);
 
 #if defined(__sparc)
 	if (p->p_utraps != NULL)

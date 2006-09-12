@@ -48,6 +48,7 @@ extern "C" {
 #include <stdio.h>
 #include <rctl.h>
 #include <zone.h>
+#include <libbrand.h>
 #include <sys/uuid.h>
 
 #define	ZONE_ID_UNDEFINED	-1
@@ -88,6 +89,7 @@ extern "C" {
 #define	Z_PRIV_PROHIBITED	37	/* specified privilege is prohibited */
 #define	Z_PRIV_REQUIRED		38	/* required privilege is missing */
 #define	Z_PRIV_UNKNOWN		39	/* specified privilege is unknown */
+#define	Z_BRAND_ERROR		40	/* brand-specific error */
 
 /*
  * Warning: these are shared with the admin/install consolidation.
@@ -213,6 +215,7 @@ extern	int	zonecfg_get_handle(const char *, zone_dochandle_t);
 extern	int	zonecfg_get_snapshot_handle(const char *, zone_dochandle_t);
 extern	int	zonecfg_get_template_handle(const char *, const char *,
     zone_dochandle_t);
+extern	int	zonecfg_get_xml_handle(const char *, zone_dochandle_t);
 extern	int	zonecfg_check_handle(zone_dochandle_t);
 extern	void	zonecfg_fini_handle(zone_dochandle_t);
 extern	int	zonecfg_destroy(const char *, boolean_t);
@@ -240,6 +243,12 @@ extern	int	zonecfg_get_pool(zone_dochandle_t, char *, size_t);
 extern	int	zonecfg_set_pool(zone_dochandle_t, char *);
 extern	int	zonecfg_get_bootargs(zone_dochandle_t, char *, size_t);
 extern	int	zonecfg_set_bootargs(zone_dochandle_t, char *);
+
+/*
+ * Set/retrieve the brand for the zone
+ */
+extern	int	zonecfg_get_brand(zone_dochandle_t, char *, size_t);
+extern	int	zonecfg_set_brand(zone_dochandle_t, char *);
 
 /*
  * Filesystem configuration.
@@ -335,6 +344,10 @@ extern	int	zonecfg_devwalk(zone_dochandle_t handle,
 extern	int	zonecfg_devperms_apply(zone_dochandle_t, const char *,
     uid_t, gid_t, mode_t, const char *);
 
+/*
+ * External zone verification support.
+ */
+extern	int	zonecfg_verify_save(zone_dochandle_t, char *);
 
 /*
  * '*ent' iterator routines.
@@ -383,6 +396,7 @@ extern	int	zonecfg_set_limitpriv(zone_dochandle_t, char *);
 /*
  * Higher-level routines.
  */
+extern  int	zone_get_brand(char *, char *, size_t);
 extern	int	zone_get_rootpath(char *, char *, size_t);
 extern	int	zone_get_devroot(char *, char *, size_t);
 extern	int	zone_get_zonepath(char *, char *, size_t);

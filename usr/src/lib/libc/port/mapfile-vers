@@ -106,6 +106,8 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	timer_getoverrun;
 	timer_gettime;
 	timer_settime;
+	uucopy;
+	uucopystr;
 } SUNW_1.22.2;
 
 SUNW_1.22.2 {
@@ -1956,6 +1958,8 @@ SUNWprivate_1.1 {
 	_sem_trywait;
 	_sem_unlink;
 	_sem_wait;
+	set_setcontext_enforcement;
+	set_l10n_alternate_root;
 	_setbufend;
 	_setegid;
 	_setenv;
@@ -1966,6 +1970,7 @@ SUNWprivate_1.1 {
 	_setpwent;
 	_setregid;
 	_setreuid;
+	setsigacthandler;
 	_setspent;
 	_settimeofday;
 	_setutent;

@@ -105,7 +105,17 @@ typedef struct uarg {
 	uint_t	brkpageszc;
 	uintptr_t entry;
 	uintptr_t thrptr;
+	char	*emulator;
+	char	*brandname;
+	auxv32_t *brand_auxp;	/* starting user addr of brand auxvs on stack */
 } uarg_t;
+
+/*
+ * Possible brand actions for exec.
+ */
+#define	EBA_NONE	0
+#define	EBA_NATIVE	1
+#define	EBA_BRAND	2
 
 /*
  * The following macro is a machine dependent encapsulation of
@@ -166,7 +176,7 @@ struct execsw {
 	int	(*exec_func)(struct vnode *vp, struct execa *uap,
 		    struct uarg *args, struct intpdata *idata, int level,
 		    long *execsz, int setid, caddr_t exec_file,
-		    struct cred *cred);
+		    struct cred *cred, int brand_action);
 	int	(*exec_core)(struct vnode *vp, struct proc *p,
 		    struct cred *cred, rlim64_t rlimit, int sig,
 		    core_content_t content);
@@ -198,10 +208,10 @@ extern int exec_args(execa_t *, uarg_t *, intpdata_t *, void **);
 extern int exec(const char *fname, const char **argp);
 extern int exece(const char *fname, const char **argp, const char **envp);
 extern int exec_common(const char *fname, const char **argp,
-    const char **envp);
+    const char **envp, int brand_action);
 extern int gexec(vnode_t **vp, struct execa *uap, struct uarg *args,
     struct intpdata *idata, int level, long *execsz, caddr_t exec_file,
-    struct cred *cred);
+    struct cred *cred, int brand_action);
 extern struct execsw *allocate_execsw(char *name, char *magic,
     size_t magic_size);
 extern struct execsw *findexecsw(char *magic);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +46,9 @@
 #include <sys/resource.h>
 #include <sys/procset.h>
 #include <sys/priocntl.h>
+#include <limits.h>
 #include <errno.h>
+#include <priv.h>
 
 static idtype_t
 prio_to_idtype(int which)
@@ -149,6 +150,7 @@ setpriority(int which, id_t who, int prio)
 	id_t id;
 	idtype_t idtype;
 	pcnice_t pcnice;
+	int ret;
 
 	if ((idtype = prio_to_idtype(which)) == -1) {
 		errno = EINVAL;
@@ -178,5 +180,43 @@ setpriority(int which, id_t who, int prio)
 	pcnice.pc_val = prio;
 	pcnice.pc_op = PC_SETNICE;
 
-	return (priocntl(idtype, id, PC_DONICE, (caddr_t)&pcnice));
+	ret = priocntl(idtype, id, PC_DONICE, (caddr_t)&pcnice);
+
+	if (ret != 0 && errno == EPERM) {
+		int		incr;
+		int		tmp;
+		pcnice_t	gpcnice = { 0, PC_GETNICE };
+		priv_set_t	*pset;
+
+		/*
+		 * The priocntl PC_DONICE subcommand returns EPERM if we lack
+		 * sufficient privileges to carry out the operation, but
+		 * setpriority(3C) needs to return EACCES. We can't just change
+		 * EPERM to EACCES, because there are other conditions which
+		 * legitimately cause EPERM (such as an euid/ruid mismatch
+		 * between the current process and the target.).
+		 */
+		if ((tmp = priocntl(idtype, id, PC_DONICE,
+		    (caddr_t)&gpcnice)) != 0)
+			return (tmp);
+
+		incr = prio - gpcnice.pc_val;
+
+		if ((pset = priv_allocset()) == NULL ||
+		    getppriv(PRIV_EFFECTIVE, pset) != 0)
+			return (-1);
+
+		/*
+		 * setpriority(3C) must return EACCES if we lack the privilege
+		 * checked for below and we are trying to increase the process
+		 * priority (by lowering the numeric value of its priority).
+		 */
+		if ((incr < 0 || incr > 2 * NZERO) &&
+		    !priv_ismember(pset, "proc_priocntl"))
+			errno = EACCES;
+
+		priv_freeset(pset);
+	}
+
+	return (ret);
 }

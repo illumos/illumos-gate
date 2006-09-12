@@ -30,6 +30,7 @@ VERS = .1
 
 CMNOBJS =	\
 	P32ton.o	\
+	Pbrand.o	\
 	Pcontrol.o	\
 	Pcore.o		\
 	Pexecname.o	\
@@ -81,7 +82,7 @@ include ../../Makefile.rootfs
 SRCS =		$(CMNOBJS:%.o=../common/%.c) $(ISAOBJS:%.o=%.c)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lrtld_db -lelf -lctf -lc
+LDLIBS +=	-lrtld_db -lelf -lctf -lc -lzonecfg
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

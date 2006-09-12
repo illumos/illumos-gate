@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,13 +28,14 @@
 
 #include	<stdlib.h>
 #include	<stdio.h>
+#include	<string.h>
 #include	<proc_service.h>
 #include	<link.h>
 #include	<rtld_db.h>
 #include	<rtld.h>
 #include	<_rtld_db.h>
 #include	<msg.h>
-
+#include	<sys/param.h>
 
 /*
  * Mutex to protect global data
@@ -43,6 +43,7 @@
 mutex_t	glob_mutex = DEFAULTMUTEX;
 int	rtld_db_version = RD_VERSION1;
 int	rtld_db_logging = 0;
+char	rtld_db_helper_path[MAXPATHLEN];
 
 
 void
@@ -92,9 +93,21 @@ rd_init(int version)
 		return (RD_NOCAPAB);
 	rtld_db_version = version;
 	LOG(ps_plog(MSG_ORIG(MSG_DB_RDINIT), rtld_db_version));
+
 	return (RD_OK);
 }
 
+rd_err_e
+rd_ctl(int cmd, void *arg)
+{
+	if (cmd != RD_CTL_SET_HELPPATH || arg == NULL ||
+	    strlen((char *)arg) >= MAXPATHLEN)
+		return (RD_ERR);
+
+	(void) strcpy(rtld_db_helper_path, (char *)arg);
+
+	return (RD_OK);
+}
 
 rd_err_e
 rd_reset(struct rd_agent *rap)
@@ -138,6 +151,7 @@ rd_new(struct ps_prochandle *php)
 	rap->rd_psp = php;
 	(void) mutex_init(&rap->rd_mutex, USYNC_THREAD, 0);
 	if (rd_reset(rap) != RD_OK) {
+		(void) dlclose(rap->rd_helper.rh_dlhandle);
 		free(rap);
 		LOG(ps_plog(MSG_ORIG(MSG_DB_RESETFAIL)));
 		return ((rd_agent_t *)0);
@@ -220,7 +234,7 @@ rd_event_addr(rd_agent_t *rap, rd_event_e num, rd_notify_t *np)
 	}
 	if (rc == RD_OK) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_RDEVENTADDR), num,
-			EC_ADDR(np->u.bptaddr)));
+		    EC_ADDR(np->u.bptaddr)));
 	}
 
 	RDAGUNLOCK(rap);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,6 +114,18 @@ pid_lookup(pid_t pid)
 	return (pidp);
 }
 
+struct pid *
+pid_find(pid_t pid)
+{
+	struct pid *pidp;
+
+	mutex_enter(&pidlinklock);
+	pidp = pid_lookup(pid);
+	mutex_exit(&pidlinklock);
+
+	return (pidp);
+}
+
 void
 pid_setmin(void)
 {
@@ -154,14 +165,13 @@ pid_getlockslot(int prslot)
 }
 
 /*
- * This function assigns a pid for use in a fork request.  It allocates
- * a pid structure, tries to find an empty slot in the proc table,
- * and selects the process id.
+ * This function allocates a pid structure, a free pid, and optionally a
+ * slot in the proc table for it.
  *
- * pid_assign() returns the new pid on success, -1 on failure.
+ * pid_allocate() returns the new pid on success, -1 on failure.
  */
 pid_t
-pid_assign(proc_t *prp)
+pid_allocate(proc_t *prp, int flags)
 {
 	struct pid *pidp;
 	union procent *pep;
@@ -170,7 +180,7 @@ pid_assign(proc_t *prp)
 	pidp = kmem_zalloc(sizeof (struct pid), KM_SLEEP);
 
 	mutex_enter(&pidlinklock);
-	if ((pep = procentfree) == NULL) {
+	if ((flags & PID_ALLOC_PROC) && (pep = procentfree) == NULL) {
 		/*
 		 * ran out of /proc directory entries
 		 */
@@ -190,10 +200,6 @@ pid_assign(proc_t *prp)
 		goto failed;
 	}
 
-	procentfree = pep->pe_next;
-	pep->pe_proc = prp;
-	prp->p_pidp = pidp;
-
 	/*
 	 * Put pid into the pid hash table.
 	 */
@@ -201,8 +207,17 @@ pid_assign(proc_t *prp)
 	HASHPID(newpid) = pidp;
 	pidp->pid_ref = 1;
 	pidp->pid_id = newpid;
-	pidp->pid_prslot = pep - procdir;
-	prp->p_lockp = &proc_lock[pid_getlockslot(pidp->pid_prslot)];
+
+	if (flags & PID_ALLOC_PROC) {
+		procentfree = pep->pe_next;
+		pidp->pid_prslot = pep - procdir;
+		pep->pe_proc = prp;
+		prp->p_pidp = pidp;
+		prp->p_lockp = &proc_lock[pid_getlockslot(pidp->pid_prslot)];
+	} else {
+		pidp->pid_prslot = 0;
+	}
+
 	mutex_exit(&pidlinklock);
 
 	return (newpid);
@@ -264,7 +279,7 @@ pid_exit(proc_t *prp)
 	if (prp->p_pgidp != NULL)
 		pgexit(prp);
 
-	SESS_RELE(prp->p_sessp);
+	sess_rele(prp->p_sessp, B_TRUE);
 
 	pidp = prp->p_pidp;
 

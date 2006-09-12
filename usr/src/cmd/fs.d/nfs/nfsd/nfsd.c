@@ -536,7 +536,7 @@ main(int ac, char *av[])
 	protobp->next = (struct protob *)NULL;
 
 	if (allflag) {
-		if (do_all(protobp0, nfssvc) == -1)
+		if (do_all(protobp0, nfssvc, 0) == -1)
 			exit(1);
 	} else if (proto) {
 		/* there's more than one match for the same protocol */
@@ -551,7 +551,7 @@ main(int ac, char *av[])
 			if (strcmp(nconf->nc_proto, proto) == 0) {
 				protoFound = TRUE;
 				do_one(nconf->nc_device, NULL,
-					protobp0, nfssvc);
+					protobp0, nfssvc, 0);
 			}
 		}
 		(void) endnetconfig(nc);
@@ -560,12 +560,12 @@ main(int ac, char *av[])
 for protocol %s", proto);
 
 	} else if (provider)
-		do_one(provider, proto, protobp0, nfssvc);
+		do_one(provider, proto, protobp0, nfssvc, 0);
 	else {
 		for (providerp = defaultproviders;
 			*providerp != NULL; providerp++) {
 			provider = *providerp;
-			do_one(provider, NULL, protobp0, nfssvc);
+			do_one(provider, NULL, protobp0, nfssvc, 0);
 		}
 	}
 done:

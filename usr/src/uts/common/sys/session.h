@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,54 +36,96 @@
 extern "C" {
 #endif
 
+/*
+ * Session structure overview.
+ *
+ * Currently, the only structure in the kernel which has a pointer to a
+ * session structures is the proc_t via the p_sessp pointer.  To
+ * access a session proc_t->p_sessp pointer a caller must hold either
+ * pidlock or p_splock.  These locks only protect the p_sessp pointer
+ * itself and do not protect any of the contents of the session structure.
+ * To prevent the contents of a the session structure from changing the
+ * caller must grab s_lock.
+ *
+ * No callers should ever update the contents of the session structure
+ * directly.  Only the session management code should ever modify the
+ * contents of the session structure.  When the session code attempts
+ * to modify the contents of a session structure it must hold multiple
+ * locks.  The locking order for all the locks that may need to be
+ * acquired is:
+ * 	sd_lock -> pidlock -> p_splock -> s_lock
+ *
+ * If a caller requires access to a session structure for long
+ * periods of time or across operations that may block it should
+ * use the tty_hold() and sess_hold() interfaces.
+ *
+ * sess_hold() returns a pointer to a session structure associated
+ * with the proc_t that was passed in.  It also increments the reference
+ * count associated with that session structure to ensure that it
+ * can't be freed until after the caller is done with it and calls
+ * sess_rele().  This hold doesn't actually protect any of the
+ * contents of the session structure.
+ *
+ * tty_hold() returns a pointer to a session structure associated
+ * with the curproc.  It also "locks" the contents of the session
+ * structure.  This hold should be used when the caller will be
+ * doing operations on a controlling tty associated with the session.
+ * This operation doesn an implicit sess_hold() so that the session
+ * structure can't be free'd until after the caller is done with it
+ * and invokes tty_rele().
+ *
+ * NOTE: Neither of these functions (sess_hold() or tty_hold())
+ * prevent a process from changing its session.  Once these functions
+ * return a session pointer, that session pointer may no longer be
+ * associated with the current process.  If a caller wants to prevent
+ * a process from changing its session then it must hold pidlock or
+ * p_splock.
+ */
+
 typedef struct sess {
-	uint_t		s_ref; 		/* reference count */
-	dev_t		s_dev;		/* tty's device number */
-	struct vnode	*s_vp;		/* tty's vnode */
-	struct pid	*s_sidp;	/* session ID info */
-	struct cred	*s_cred;	/* allocation credentials */
-	kmutex_t	s_lock;		/* sync s_vp use with freectty */
-	kcondvar_t	s_wait_cv;	/* Condvar for sleeping */
-	int		s_cnt;		/* # of active users of this session */
-	int		s_flag;		/* session state flag see below */
+	struct pid *s_sidp;		/* session ID info, never changes */
+
+	kmutex_t s_lock;		/* protects everything below */
+	uint_t s_ref; 			/* reference count */
+	boolean_t s_sighuped;		/* ctty had sighup sent to it */
+
+	boolean_t s_exit;		/* sesion leader is exiting */
+	kcondvar_t s_exit_cv;		/* Condvar for s_exit */
+
+	int s_cnt;			/* active users of this ctty */
+	kcondvar_t s_cnt_cv;		/* Condvar for s_cnt */
+
+	/*
+	 * The following fields can only be updated while s_lock is held
+	 * and s_cnt is 0.  (ie, no one has a tty_hold() on this session.)
+	 */
+	dev_t s_dev;			/* tty's device number */
+	struct vnode *s_vp;		/* tty's vnode */
+	struct cred *s_cred;		/* allocation credentials */
 } sess_t;
 
-#define	SESS_CLOSE	1		/* session about to close */
 #define	s_sid s_sidp->pid_id
 
 #if defined(_KERNEL)
 
 extern sess_t session0;
 
-#define	SESS_HOLD(sp)	(++(sp)->s_ref)
-#define	SESS_RELE(sp)	sess_rele(sp)
-
-/*
- * Used to synchronize session vnode users with freectty()
- */
-
-#define	TTY_HOLD(sp)	{ \
-	mutex_enter(&(sp)->s_lock); \
-	(++(sp)->s_cnt); \
-	mutex_exit(&(sp)->s_lock); \
-}
-
-#define	TTY_RELE(sp)	{ \
-	mutex_enter(&(sp)->s_lock); \
-	if ((--(sp)->s_cnt) == 0) \
-		cv_signal(&(sp)->s_wait_cv); \
-	mutex_exit(&(sp)->s_lock); \
-}
-
 /* forward referenced structure tags */
 struct vnode;
 struct proc;
+struct stdata;
 
-extern void sess_rele(sess_t *);
+extern void sess_hold(proc_t *p);
+extern void sess_rele(sess_t *, boolean_t);
+extern sess_t *tty_hold(void);
+extern void tty_rele(sess_t *sp);
+
+
 extern void sess_create(void);
-extern void freectty(sess_t *);
-extern void alloctty(struct proc *, struct vnode *);
+extern int strctty(struct stdata *);
+extern int freectty(boolean_t);
 extern dev_t cttydev(struct proc *);
+extern void ctty_clear_sighuped(void);
 
 #endif /* defined(_KERNEL) */
 

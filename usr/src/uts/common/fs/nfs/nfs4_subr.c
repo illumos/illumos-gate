@@ -1451,7 +1451,7 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 			} else
 				mutex_exit(&mi->mi_lock);
 
-			if (*doqueue && curproc->p_sessp->s_vp != NULL) {
+			if (*doqueue && nfs_has_ctty()) {
 				*doqueue = 0;
 				if (!(mi->mi_flags & MI4_NOPRINT))
 					nfs4_queue_fact(RF_SRV_NOT_RESPOND, mi,
@@ -1481,7 +1481,7 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 			bufp = clnt_sperror(client, svp->sv_hostname);
 			zprintf(zoneid, "NFS%d %s failed for %s\n",
 			    mi->mi_vers, mi->mi_rfsnames[which], bufp);
-			if (curproc->p_sessp->s_vp != NULL) {
+			if (nfs_has_ctty()) {
 				if (!(mi->mi_flags & MI4_NOPRINT)) {
 					uprintf("NFS%d %s failed for %s\n",
 					    mi->mi_vers, mi->mi_rfsnames[which],
@@ -1494,7 +1494,7 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 			    "NFS %s failed for server %s: error %d (%s)\n",
 			    mi->mi_rfsnames[which], svp->sv_hostname,
 			    status, clnt_sperrno(status));
-			if (curproc->p_sessp->s_vp != NULL) {
+			if (nfs_has_ctty()) {
 				if (!(mi->mi_flags & MI4_NOPRINT)) {
 					uprintf(
 				"NFS %s failed for server %s: error %d (%s)\n",

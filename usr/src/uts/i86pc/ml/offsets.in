@@ -59,6 +59,7 @@
 #include <sys/ontrap.h>
 #include <sys/lgrp.h>
 #include <sys/dtrace.h>
+#include <sys/brand.h>
 
 proc		PROCSIZE
 	p_link
@@ -76,6 +77,8 @@ proc		PROCSIZE
 	p_model
 	p_pctx
 	p_agenttp
+	p_brand
+	p_brand_data
 
 _kthread	THREAD_SIZE
 	t_pcb			T_LABEL
@@ -141,6 +144,7 @@ _label_t
 _klwp
 	lwp_thread
 	lwp_procp
+	lwp_brand
 	lwp_eosys
 	lwp_regs
 	lwp_arg
@@ -376,3 +380,6 @@ copyops
 	cp_suword32
 	cp_suword64
 	cp_physio
+
+brand
+	b_machops

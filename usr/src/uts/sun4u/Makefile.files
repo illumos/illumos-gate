@@ -200,6 +200,11 @@ CPR_IMPL_OBJS	= cpr_impl.o
 SBD_OBJS	+= sbd.o sbd_cpu.o sbd_mem.o sbd_io.o
 
 #
+#			Brand modules
+#
+SN1_BRAND_OBJS	= sn1_brand.o sn1_brand_asm.o
+
+#
 #			Performance Counter BackEnd (PCBE) Modules
 #
 US_PCBE_OBJS	= us234_pcbe.o

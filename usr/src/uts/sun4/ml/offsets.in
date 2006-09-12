@@ -90,6 +90,7 @@
 #include <sys/ontrap.h>
 #include <sys/lgrp.h>
 #include <sys/ddifm_impl.h>
+#include <sys/brand.h>
 
 greg_t		GREGSIZE
 
@@ -109,6 +110,8 @@ proc		PROCSIZE
 	p_pidp
 	p_fixalignment
 	p_utraps
+	p_brand
+	p_brand_data
 
 \#define	P_UTRAP4	(UT_ILLTRAP_INSTRUCTION * CPTRSIZE)
 \#define	P_UTRAP7	(UT_FP_DISABLED * CPTRSIZE)
@@ -544,3 +547,5 @@ copyops
 	cp_suword64
 	cp_physio
 
+brand	BRAND_SIZE
+	b_machops

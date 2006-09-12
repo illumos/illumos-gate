@@ -246,6 +246,7 @@ int copyoutstr_noerr(const char *, char *, size_t, size_t *);
 int copystr(const char *, char *, size_t, size_t *);
 void bcopy(const void *, void *, size_t);
 void ucopy(const void *, void *, size_t);
+void ucopystr(const char *, char *, size_t, size_t *);
 void pgcopy(const void *, void *, size_t);
 void ovbcopy(const void *, void *, size_t);
 void bzero(void *, size_t);

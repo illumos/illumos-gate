@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -68,6 +67,11 @@
 
 extern bool_t __svc_get_door_cred();
 extern bool_t __rpc_get_local_cred();
+
+extern int use_portmapper;
+extern bool_t __pmap_set(const rpcprog_t, const rpcvers_t,
+    const struct netconfig *, const struct netbuf *);
+extern bool_t __pmap_unset(const rpcprog_t, const rpcvers_t);
 
 SVCXPRT **svc_xports;
 static int nsvc_xports; 	/* total number of svc_xports allocated */
@@ -921,10 +925,15 @@ svc_reg(const SVCXPRT *xprt, const rpcprog_t prog, const rpcvers_t vers,
 
 rpcb_it:
 	(void) rw_unlock(&svc_lock);
+	if (!nconf)
+		return (TRUE);
+
 	/* now register the information with the local binder service */
-	if (nconf)
+	if (!use_portmapper)
 		return (rpcb_set(prog, vers, nconf, &xprt->xp_ltaddr));
-	return (TRUE);
+	else
+		return (__pmap_set(prog, vers, nconf, &xprt->xp_ltaddr));
+	/*NOTREACHED*/
 }
 
 /*
@@ -937,7 +946,10 @@ svc_unreg(const rpcprog_t prog, const rpcvers_t vers)
 	struct svc_callout *s;
 
 	/* unregister the information anyway */
-	(void) rpcb_unset(prog, vers, NULL);
+	if (!use_portmapper)
+		(void) rpcb_unset(prog, vers, NULL);
+	else
+		(void) __pmap_unset(prog, vers);
 	(void) rw_wrlock(&svc_lock);
 	while ((s = svc_find(prog, vers, &prev, NULL)) != NULL_SVC) {
 		if (prev == NULL_SVC) {
