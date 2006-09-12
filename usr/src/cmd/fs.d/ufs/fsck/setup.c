@@ -388,6 +388,7 @@ derive_devstr(const caddr_t dev, caddr_t devstr, size_t str_size)
 		break;
 	case S_IFREG:
 		rflag = 0;
+		(void) strlcpy(devstr, dev, str_size);
 		break;
 	case S_IFCHR:
 	case S_IFBLK:
@@ -460,7 +461,7 @@ check_mount_state(caddr_t devstr, size_t str_size)
 			pfatal("%s IS CURRENTLY MOUNTED%s.",
 			    devstr, mountedfs == M_RW ? " READ/WRITE" : "");
 		} else {
-			if (!nflag) {
+			if (!nflag && !mflag) {
 				pwarn("%s IS CURRENTLY MOUNTED READ/%s.",
 				    devstr, mountedfs == M_RW ? "WRITE" :
 				    "ONLY");
@@ -468,10 +469,6 @@ check_mount_state(caddr_t devstr, size_t str_size)
 					exitstat = EXMOUNTED;
 					errexit("Program terminated");
 				}
-			} else {
-				pwarn("%s IS CURRENTLY MOUNTED READ/%s.\n",
-				    devstr, mountedfs == M_RW ? "WRITE" :
-				    "ONLY");
 			}
 		}
 	} else if (is_dev && rflag) {
@@ -942,6 +939,10 @@ setup(caddr_t dev)
 
 	if (open_and_intro(devstr, corefs) == -1)
 		goto cleanup;
+
+	if (mflag && mounted(devstr, devstr,
+	    sizeof (devstr)) == M_RW)
+		return (devstr);
 
 	/*
 	 * Check log state

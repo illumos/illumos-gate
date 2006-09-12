@@ -470,7 +470,8 @@ recount:
 	}
 
 	if (!nflag && mountedfs == M_RW) {
-		iscorrupt = 1;
+		(void) printf("FILESYSTEM MAY STILL BE INCONSISTENT.\n");
+		rerun = 1;
 	}
 
 	if (have_dups()) {
@@ -505,7 +506,13 @@ recount:
 	}
 
 	if (iscorrupt) {
-		(void) printf("FILESYSTEM MAY STILL BE INCONSISTENT.\n");
+		if (mountedfs == M_RW)
+			(void) printf("FS IS MOUNTED R/W AND"
+			    " FSCK DID ITS BEST TO FIX"
+			    " INCONSISTENCIES.\n");
+		else
+			(void) printf("FILESYSTEM MAY STILL BE"
+			    " INCONSISTENT.\n");
 		rerun = 1;
 	}
 
@@ -630,8 +637,13 @@ recount:
 	if (iscorrupt)
 		(void) printf("***** FILE SYSTEM IS BAD *****\n");
 
-	if (rerun)
-		(void) printf("\n***** PLEASE RERUN FSCK *****\n");
+	if (rerun) {
+		if (mountedfs == M_RW)
+			(void) printf("\n***** PLEASE RERUN FSCK ON UNMOUNTED"
+			    " FILE SYSTEM *****\n");
+		else
+			(void) printf("\n***** PLEASE RERUN FSCK *****\n");
+	}
 
 	if ((exitstat == 0) &&
 	    (((mountedfs != M_NOMNT) && !errorlocked) || hotroot)) {
