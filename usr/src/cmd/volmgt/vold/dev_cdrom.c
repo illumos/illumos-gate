@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1163,19 +1162,17 @@ cdrom_thread_wait(struct devs *dp)
 
 			/*
 			 * Generate an eject event (if we have a unit)
-			 *
-			 * XXX: this doesn't work because the DKIOCSTATE ioctl
-			 * for CD-ROMs *never* returns DKIO_EJECTED
 			 */
-			for (i = 0; i < (int)v->v_ndev; i++) {
-				if (v->v_devmap[i].dm_voldev == dp->dp_dev) {
-					vie.vie_type = VIE_EJECT;
-					vie.vie_eject.viej_force = TRUE;
-					vie.vie_eject.viej_unit =
-					    minor(v->v_devmap[i].dm_voldev);
-					vol_event(&vie, dp);
-					break;
-				}
+			/*
+			 * One device maps to only one volume object
+			 * so just select first volume object to close.
+			 */
+			if (v->v_ndev != 0) {
+				vie.vie_type = VIE_EJECT;
+				vie.vie_eject.viej_force = TRUE;
+				vie.vie_eject.viej_unit =
+				    minor(v->v_devmap[0].dm_voldev);
+				vol_event(&vie, dp);
 			}
 			(void) mutex_unlock(&vold_main_mutex);
 		}
