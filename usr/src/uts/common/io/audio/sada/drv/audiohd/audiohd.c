@@ -259,7 +259,7 @@ static struct dev_ops audiohd_dev_ops = {
 /* Linkage structure for loadable drivers */
 static struct modldrv audiohd_modldrv = {
 	&mod_driverops,		/* drv_modops */
-	AUDIOHD_MOD_NAME"1.3",	/* drv_linkinfo */
+	AUDIOHD_MOD_NAME"%I%",	/* drv_linkinfo */
 	&audiohd_dev_ops,		/* drv_dev_ops */
 };
 
