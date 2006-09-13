@@ -1960,16 +1960,21 @@ udp_close(queue_t *q)
 	ASSERT(udp->udp_rcv_list_head == NULL);
 	ASSERT(udp->udp_rcv_list_tail == NULL);
 
-	/* connp is now single threaded. */
 	udp_close_free(connp);
+
 	/*
-	 * Restore connp as an IP endpoint.  We don't need
-	 * any locks since we are now single threaded
+	 * Restore connp as an IP endpoint.
+	 * Locking required to prevent a race with udp_snmp_get()/
+	 * ipcl_get_next_conn(), which selects conn_t which are
+	 * IPCL_UDP and not CONN_CONDEMNED.
 	 */
+	mutex_enter(&connp->conn_lock);
 	connp->conn_flags &= ~IPCL_UDP;
 	connp->conn_state_flags &=
 	    ~(CONN_CLOSING | CONN_CONDEMNED | CONN_QUIESCED);
 	connp->conn_ulp_labeled = B_FALSE;
+	mutex_exit(&connp->conn_lock);
+
 	return (0);
 }
 
