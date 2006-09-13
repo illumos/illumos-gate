@@ -1102,6 +1102,10 @@ prt_mod(private_t *pri, int raw, long val)	/* print modctl() code */
 		case MODDEVEXISTS:	s = "MODDEVEXISTS"; break;
 		case MODDEVREADDIR:	s = "MODDEVREADDIR"; break;
 		case MODDEVNAME:	s = "MODDEVNAME"; break;
+		case MODGETDEVFSPATH_MI_LEN:
+					s = "MODGETDEVFSPATH_MI_LEN"; break;
+		case MODGETDEVFSPATH_MI:
+					s = "MODGETDEVFSPATH_MI"; break;
 		}
 	}
 

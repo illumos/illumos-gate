@@ -1032,6 +1032,7 @@ handle_free(struct di_devlink_handle **pp)
 	assert(hdp->lock_fd == -1);
 
 	free(hdp->dev_dir);
+	free(hdp->db_dir);
 	free(hdp);
 }
 

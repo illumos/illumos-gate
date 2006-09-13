@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * rewritten from UCB 4.13 83/09/25
@@ -203,6 +202,7 @@ main(int argc, char **argv)
 	enum snapshot_types types = SNAP_SYSTEM;
 	kstat_ctl_t *kc;
 	long hz;
+	int iiter;
 
 	do_args(argc, argv);
 	do_format();
@@ -228,6 +228,8 @@ main(int argc, char **argv)
 		df.if_allowed_types |= IODEV_PARTITION;
 	if (do_conversions)
 		types |= SNAP_IODEV_PRETTY;
+	if (do_devid)
+		types |= SNAP_IODEV_DEVID;
 	if (do_controller) {
 		if (!(do_disk & PRINT_VERTICAL) ||
 			(do_disk & DISK_EXTENDED_ERRORS))
@@ -253,6 +255,7 @@ main(int argc, char **argv)
 	kc = open_kstat();
 	newss = acquire_snapshot(kc, types, &df);
 
+	iiter = iter;
 	do {
 		if (do_tty || do_cpu) {
 			kstat_t *oldks;
@@ -277,6 +280,10 @@ main(int argc, char **argv)
 			(void) fflush(stdout);
 		}
 
+		/* only doing a single iteration, we are done */
+		if (iiter == 1)
+			continue;
+
 		if (interval > 0 && iter != 1)
 			(void) pause();
 
@@ -297,6 +304,8 @@ main(int argc, char **argv)
 
 	free_snapshot(oldss);
 	free_snapshot(newss);
+	(void) kstat_close(kc);
+
 	return (0);
 }
 
@@ -345,7 +354,7 @@ show_disk_name(void *v1, void *v2, void *data)
 		(void) snprintf(fbuf, sizeof (fbuf),
 		    "%*s", width, name);
 		name = fbuf;
-		push_out("%-14.14s", name);
+		push_out("%-13.13s ", name);
 	} else {
 		push_out(name);
 	}
@@ -1242,7 +1251,10 @@ do_format(void)
 		default:
 			break;
 	}
-	if (do_disk == DISK_ERRORS) {
+
+	/* do DISK_ERRORS header (already added above for DISK_EXTENDED) */
+	if ((do_disk & DISK_ERRORS) &&
+	    ((do_disk & DISK_IO_MASK) != DISK_EXTENDED)) {
 		char *sep;
 
 		if (!do_conversions) {
@@ -1256,9 +1268,12 @@ do_format(void)
 			if (do_raw == 0) {
 				(void) snprintf(disk_header,
 				    sizeof (disk_header),
-				    "  %s", header);
-			} else
-				(void) strcpy(disk_header, header);
+				    "  %sdevice", header);
+			} else {
+				(void) snprintf(disk_header,
+				    sizeof (disk_header),
+				    "%s,device", header);
+			}
 		}
 	} else {
 		/*
@@ -1556,6 +1571,11 @@ static void
 print_err_hdr(void)
 {
 	char obuf[SMALL_SCRATCH_BUFLEN];
+
+	if (do_raw) {
+		push_out("errors");
+		return;
+	}
 
 	if (do_conversions == 0) {
 		if (!(do_disk & DISK_EXTENDED)) {

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -543,7 +542,7 @@ get_pretty_name(enum snapshot_types types, struct iodev_snapshot *iodev,
 		if (!*tmp)
 			return;
 		(void) strlcpy(buf, iodev->is_name, 1 + tmp - iodev->is_name);
-		dl = lookup_ks_name(buf);
+		dl = lookup_ks_name(buf, (types & SNAP_IODEV_DEVID) ? 1 : 0);
 		if (dl == NULL || dl->dsk == NULL)
 			return;
 		len = strlen(dl->dsk) + strlen(tmp) + 1;
@@ -553,7 +552,7 @@ get_pretty_name(enum snapshot_types types, struct iodev_snapshot *iodev,
 		goto out;
 	}
 
-	dl = lookup_ks_name(iodev->is_name);
+	dl = lookup_ks_name(iodev->is_name, (types & SNAP_IODEV_DEVID) ? 1 : 0);
 	if (dl == NULL)
 		return;
 
@@ -654,6 +653,12 @@ acquire_iodevs(struct snapshot *ss, kstat_ctl_t *kc, struct iodev_filter *df)
 	struct iodev_snapshot *list = NULL;
 
 	ss->s_nr_iodevs = 0;
+
+	/*
+	 * Call cleanup_iodevs_snapshot() so that a cache miss in
+	 * lookup_ks_name() will result in a fresh snapshot.
+	 */
+	cleanup_iodevs_snapshot();
 
 	for (ksp = kc->kc_chain; ksp; ksp = ksp->ks_next) {
 		enum iodev_type type;

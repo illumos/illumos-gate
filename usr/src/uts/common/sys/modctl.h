@@ -256,6 +256,8 @@ struct modlinkage {
 #define	MODDEVEXISTS		35
 #define	MODDEVREADDIR		36
 #define	MODDEVNAME		37
+#define	MODGETDEVFSPATH_MI_LEN	38
+#define	MODGETDEVFSPATH_MI	39
 
 /*
  * sub cmds for MODEVENTS

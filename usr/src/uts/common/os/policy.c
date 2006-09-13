@@ -1654,13 +1654,22 @@ secpolicy_modctl(const cred_t *cr, int cmd)
 {
 	switch (cmd) {
 	case MODINFO:
+	case MODGETMAJBIND:
 	case MODGETPATH:
 	case MODGETPATHLEN:
-	case MODGETFBNAME:
 	case MODGETNAME:
+	case MODGETFBNAME:
 	case MODGETDEVPOLICY:
 	case MODGETDEVPOLICYBYNAME:
-	case MODGETMAJBIND:
+	case MODDEVT2INSTANCE:
+	case MODSIZEOF_DEVID:
+	case MODGETDEVID:
+	case MODSIZEOF_MINORNAME:
+	case MODGETMINORNAME:
+	case MODGETDEVFSPATH_LEN:
+	case MODGETDEVFSPATH:
+	case MODGETDEVFSPATH_MI_LEN:
+	case MODGETDEVFSPATH_MI:
 		/* Unprivileged */
 		return (0);
 	case MODLOAD:

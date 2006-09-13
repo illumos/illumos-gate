@@ -150,6 +150,10 @@ SUNWprivate_1.1 {
 	di_devname_action_on_key;
 	di_devname_print_mapinfo;
 	di_driver_private_data;
+	di_dim_fini;
+	di_dim_init;
+	di_dim_path_dev;
+	di_dim_path_devices;
 	di_init_driver;
 	di_init_impl;
 	di_lookup_node;

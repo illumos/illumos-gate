@@ -1098,7 +1098,7 @@ modctl_get_minorname(dev_t dev, int spectype, uint_t len, char *uname)
 }
 
 /*
- * Return the size of the devfspath name.
+ * Return the size of the (dev_t,spectype) devfspath name.
  */
 static int
 modctl_devfspath_len(dev_t dev, int spectype, uint_t *len)
@@ -1124,7 +1124,7 @@ modctl_devfspath_len(dev_t dev, int spectype, uint_t *len)
 }
 
 /*
- * Return the devfspath name.
+ * Return the (dev_t,spectype) devfspath name.
  */
 static int
 modctl_devfspath(dev_t dev, int spectype, uint_t len, char *uname)
@@ -1136,6 +1136,66 @@ modctl_devfspath(dev_t dev, int spectype, uint_t len, char *uname)
 	/* get the path name */
 	name = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 	if (ddi_dev_pathname(dev, spectype, name) == DDI_FAILURE) {
+		kmem_free(name, MAXPATHLEN);
+		return (EINVAL);
+	}
+
+	sz = strlen(name) + 1;
+
+	/* Error if the path name is larger than the space allocated */
+	if (sz > len) {
+		kmem_free(name, MAXPATHLEN);
+		return (ENOSPC);
+	}
+
+	/* copy out the path name */
+	if (copyout(name, uname, sz) != 0)
+		err = EFAULT;
+	kmem_free(name, MAXPATHLEN);
+	return (err);
+}
+
+/*
+ * Return the size of the (major,instance) devfspath name.
+ */
+static int
+modctl_devfspath_mi_len(major_t major, int instance, uint_t *len)
+{
+	uint_t	sz;
+	char	*name;
+
+	/* get the path name */
+	name = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	if (e_ddi_majorinstance_to_path(major, instance, name) != DDI_SUCCESS) {
+		kmem_free(name, MAXPATHLEN);
+		return (EINVAL);
+	}
+
+	sz = strlen(name) + 1;
+	kmem_free(name, MAXPATHLEN);
+
+	/* copy out the size of the path name */
+	if (copyout(&sz, len, sizeof (sz)) != 0)
+		return (EFAULT);
+
+	return (0);
+}
+
+/*
+ * Return the (major_instance) devfspath name.
+ * NOTE: e_ddi_majorinstance_to_path does not require the device to attach to
+ * return a path - it uses the instance tree.
+ */
+static int
+modctl_devfspath_mi(major_t major, int instance, uint_t len, char *uname)
+{
+	uint_t	sz;
+	char	*name;
+	int	err = 0;
+
+	/* get the path name */
+	name = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	if (e_ddi_majorinstance_to_path(major, instance, name) != DDI_SUCCESS) {
 		kmem_free(name, MAXPATHLEN);
 		return (EINVAL);
 	}
@@ -1874,7 +1934,7 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 		error = modctl_get_devid(dev, (uint_t)a2, (ddi_devid_t)a3);
 		break;
 
-	case MODSIZEOF_MINORNAME:	/* sizeof minor nm of dev_t/spectype */
+	case MODSIZEOF_MINORNAME:	/* sizeof minor nm (dev_t,spectype) */
 		if (get_udatamodel() == DATAMODEL_NATIVE) {
 			error = modctl_sizeof_minorname((dev_t)a1, (int)a2,
 			    (uint_t *)a3);
@@ -1888,7 +1948,7 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 #endif
 		break;
 
-	case MODGETMINORNAME:   /* get minor name of dev_t and spec type */
+	case MODGETMINORNAME:		/* get minor name of (dev_t,spectype) */
 		if (get_udatamodel() == DATAMODEL_NATIVE) {
 			error = modctl_get_minorname((dev_t)a1, (int)a2,
 			    (uint_t)a3, (char *)a4);
@@ -1901,7 +1961,7 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 #endif
 		break;
 
-	case MODGETDEVFSPATH_LEN:	/* sizeof path nm of dev_t/spectype */
+	case MODGETDEVFSPATH_LEN:	/* sizeof path nm of (dev_t,spectype) */
 		if (get_udatamodel() == DATAMODEL_NATIVE) {
 			error = modctl_devfspath_len((dev_t)a1, (int)a2,
 			    (uint_t *)a3);
@@ -1915,7 +1975,7 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 #endif
 		break;
 
-	case MODGETDEVFSPATH:   /* get path name of dev_t and spec type */
+	case MODGETDEVFSPATH:   	/* get path name of (dev_t,spec) type */
 		if (get_udatamodel() == DATAMODEL_NATIVE) {
 			error = modctl_devfspath((dev_t)a1, (int)a2,
 			    (uint_t)a3, (char *)a4);
@@ -1926,6 +1986,16 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 			    (uint_t)a3, (char *)a4);
 		}
 #endif
+		break;
+
+	case MODGETDEVFSPATH_MI_LEN:	/* sizeof path nm of (major,instance) */
+		error = modctl_devfspath_mi_len((major_t)a1, (int)a2,
+			    (uint_t *)a3);
+		break;
+
+	case MODGETDEVFSPATH_MI:   	/* get path name of (major,instance) */
+		error = modctl_devfspath_mi((major_t)a1, (int)a2,
+			    (uint_t)a3, (char *)a4);
 		break;
 
 

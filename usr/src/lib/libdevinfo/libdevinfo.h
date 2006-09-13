@@ -431,6 +431,22 @@ extern int	di_prof_add_exclude(di_prof_t, const char *);
 extern int	di_prof_add_symlink(di_prof_t, const char *, const char *);
 extern int	di_prof_add_map(di_prof_t, const char *, const char *);
 
+/*
+ * Private interfaces for <driver><instance><minor> to path conversion.
+ * NOTE: These interfaces do not require or cause attach.  The implementation
+ * uses the kernel instance-tree (/etc/path_to_inst) and the di_devlinks
+ * database information.
+ */
+typedef struct __di_dim	*di_dim_t;
+
+extern di_dim_t	di_dim_init();
+extern void	di_dim_fini(di_dim_t);
+extern char	*di_dim_path_devices(di_dim_t,
+		    char *drv_name, int instance, char *minor_name);
+extern char	*di_dim_path_dev(di_dim_t,
+		    char *drv_name, int instance, char *minor_name);
+
+
 #ifdef	__cplusplus
 }
 #endif
