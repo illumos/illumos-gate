@@ -305,12 +305,6 @@ i_make_nfs_args(lx_nfs_mount_data_t *lx_nmd, struct nfs_args *nfs_args,
 		    lx_nmd->nmd_addr.sin_family);
 		return (-ENOTSUP);
 	}
-	if (lx_nmd->nmd_root.lx_fh3_length != 0x20) {
-		lx_unsupported("unsupported nfs mount request, "
-		    "nfs file handle length: 0x%x\n",
-		    lx_nmd->nmd_root.lx_fh3_length);
-		return (-ENOTSUP);
-	}
 	for (i = 0; i < LX_NMD_MAXHOSTNAMELEN; i++) {
 		if (lx_nmd->nmd_hostname[i] == '\0')
 			break;
@@ -372,11 +366,19 @@ i_make_nfs_args(lx_nfs_mount_data_t *lx_nmd, struct nfs_args *nfs_args,
 			    options, options_size)) != 0)
 			return (rv);
 
+		if (lx_nmd->nmd_root.lx_fh3_length >
+		    sizeof (nfs_args_fh->fh3.fh3_u.data)) {
+			lx_unsupported("unsupported nfs mount request, "
+			    "nfs file handle length: 0x%x\n",
+			    lx_nmd->nmd_root.lx_fh3_length);
+			return (-ENOTSUP);
+		}
+
 		/* Set the v3 file handle info. */
 		nfs_args_fh->fh3.fh3_length = lx_nmd->nmd_root.lx_fh3_length;
 		bcopy(&lx_nmd->nmd_root.lx_fh3_data,
 		    nfs_args_fh->fh3.fh3_u.data,
-		    sizeof (nfs_args_fh->fh3.fh3_u.data));
+		    lx_nmd->nmd_root.lx_fh3_length);
 	} else {
 		/*
 		 * Assume nfs v2.  Note that this could also be a v1
