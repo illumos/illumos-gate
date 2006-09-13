@@ -295,8 +295,6 @@ zfs_prop_inheritable(zfs_prop_t prop)
 	return (zfs_prop_table[prop].pd_attr == prop_inherit);
 }
 
-#ifndef _KERNEL
-
 typedef struct zfs_index {
 	const char *name;
 	uint64_t index;
@@ -345,19 +343,14 @@ zfs_prop_index_table(zfs_prop_t prop)
 	switch (prop) {
 	case ZFS_PROP_CHECKSUM:
 		return (checksum_table);
-		break;
 	case ZFS_PROP_COMPRESSION:
 		return (compress_table);
-		break;
 	case ZFS_PROP_SNAPDIR:
 		return (snapdir_table);
-		break;
 	case ZFS_PROP_ACLMODE:
 		return (acl_mode_table);
-		break;
 	case ZFS_PROP_ACLINHERIT:
 		return (acl_inherit_table);
-		break;
 	default:
 		return (NULL);
 	}
@@ -405,6 +398,8 @@ zfs_prop_index_to_string(zfs_prop_t prop, uint64_t index, const char **string)
 
 	return (-1);
 }
+
+#ifndef _KERNEL
 
 /*
  * Returns TRUE if the property applies to the given dataset types.

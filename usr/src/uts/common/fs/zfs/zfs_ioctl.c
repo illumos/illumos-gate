@@ -738,6 +738,7 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 	zfs_prop_t prop;
 	uint64_t intval;
 	char *strval;
+	const char *unused;
 
 	elem = NULL;
 	while ((elem = nvlist_next_nvpair(nvl, elem)) != NULL) {
@@ -832,54 +833,27 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 				if (zfs_prop_get_type(prop) !=
 				    prop_type_string)
 					return (EINVAL);
-				ASSERT(nvpair_value_string(elem, &strval) == 0);
-				error = dsl_prop_set(name,
+				VERIFY(nvpair_value_string(elem, &strval) == 0);
+				if ((error = dsl_prop_set(name,
 				    nvpair_name(elem), 1, strlen(strval) + 1,
-				    strval);
+				    strval)) != 0)
+					return (error);
 			} else if (nvpair_type(elem) == DATA_TYPE_UINT64) {
-				ASSERT(nvpair_value_uint64(elem, &intval) == 0);
+				VERIFY(nvpair_value_uint64(elem, &intval) == 0);
 
 				switch (zfs_prop_get_type(prop)) {
 				case prop_type_number:
 					break;
 				case prop_type_boolean:
 					if (intval > 1)
-						error = EINVAL;
+						return (EINVAL);
 					break;
 				case prop_type_string:
-					error = EINVAL;
-					break;
+					return (EINVAL);
 				case prop_type_index:
-					switch (prop) {
-					case ZFS_PROP_CHECKSUM:
-						if (intval >=
-						    ZIO_CHECKSUM_FUNCTIONS)
-							error = EINVAL;
-						break;
-					case ZFS_PROP_COMPRESSION:
-						if (intval >=
-						    ZIO_COMPRESS_FUNCTIONS)
-							error = EINVAL;
-						break;
-					case ZFS_PROP_SNAPDIR:
-						if (intval >
-						    ZFS_SNAPDIR_VISIBLE)
-							error = EINVAL;
-						break;
-					case ZFS_PROP_ACLMODE:
-						if (intval >
-						    ZFS_ACL_PASSTHROUGH)
-							error = EINVAL;
-						break;
-					case ZFS_PROP_ACLINHERIT:
-						if (intval > ZFS_ACL_SECURE ||
-						    intval == ZFS_ACL_GROUPMASK)
-							error = EINVAL;
-						break;
-					default:
-						cmn_err(CE_PANIC,
-						    "unknown index property");
-					}
+					if (zfs_prop_index_to_string(prop,
+					    intval, &unused) != 0)
+						return (EINVAL);
 					break;
 				default:
 					cmn_err(CE_PANIC, "unknown property "
@@ -887,8 +861,9 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 					break;
 				}
 
-				error = dsl_prop_set(name, propname, 8, 1,
-				    &intval);
+				if ((error = dsl_prop_set(name, propname,
+				    8, 1, &intval)) != 0)
+					return (error);
 			} else {
 				return (EINVAL);
 			}

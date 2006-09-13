@@ -47,8 +47,6 @@ typedef enum {
 } zfs_proptype_t;
 
 zfs_proptype_t zfs_prop_get_type(zfs_prop_t);
-int zfs_prop_string_to_index(zfs_prop_t, const char *, uint64_t *);
-int zfs_prop_index_to_string(zfs_prop_t, uint64_t, const char **);
 size_t zfs_prop_width(zfs_prop_t, boolean_t *);
 
 #ifdef	__cplusplus

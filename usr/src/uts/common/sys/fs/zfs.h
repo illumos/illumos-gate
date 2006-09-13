@@ -109,6 +109,8 @@ const char *zfs_prop_default_string(zfs_prop_t);
 const char *zfs_prop_to_name(zfs_prop_t);
 uint64_t zfs_prop_default_numeric(zfs_prop_t);
 int zfs_prop_inheritable(zfs_prop_t);
+int zfs_prop_string_to_index(zfs_prop_t, const char *, uint64_t *);
+int zfs_prop_index_to_string(zfs_prop_t, uint64_t, const char **);
 
 /*
  * On-disk version number.
