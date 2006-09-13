@@ -170,7 +170,7 @@ extern	int	chip_set_isnull(chip_set_t *);
 }
 
 #define	CHIP_IN_CPUPART(chp, cp)			\
-	(CHIP_SET_TEST((cp)->cp_chipset, (chp)->chip_seqid))
+	(CHIP_SET_TEST((cp)->cp_mach->mc_chipset, (chp)->chip_seqid))
 
 #endif	/* _MACHDEP */
 

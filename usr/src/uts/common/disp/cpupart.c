@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +68,7 @@
 
 cpupart_t		*cp_list_head;
 cpupart_t		cp_default;
+struct mach_cpupart	cp_default_mach;
 static cpupartid_t	cp_id_next;
 uint_t			cp_numparts;
 uint_t			cp_numparts_nonempty;
@@ -99,7 +99,6 @@ static uint_t		cp_max_numparts;
  */
 #define	PSTOCP(psid)	((cpupartid_t)((psid) == PS_NONE ? CP_DEFAULT : (psid)))
 #define	CPTOPS(cpid)	((psetid_t)((cpid) == CP_DEFAULT ? PS_NONE : (cpid)))
-
 
 /*
  * Find a CPU partition given a processor set ID.
@@ -236,7 +235,7 @@ cpupart_initialize_default(void)
 	for (i = 0; i < S_LOADAVG_SZ; i++) {
 		cp_default.cp_loadavg.lg_loads[i] = 0;
 	}
-	CPUSET_ZERO(cp_default.cp_haltset);
+	CPUSET_ZERO(cp_default.cp_mach->mc_haltset);
 	DISP_LOCK_INIT(&cp_default.cp_kp_queue.disp_lock);
 	cp_id_next = CP_DEFAULT + 1;
 	cpupart_kstat_create(&cp_default);
@@ -416,8 +415,8 @@ again:
 	newpp->cp_ncpus++;
 	newpp->cp_gen++;
 
-	ASSERT(CPUSET_ISNULL(newpp->cp_haltset));
-	ASSERT(CPUSET_ISNULL(oldpp->cp_haltset));
+	ASSERT(CPUSET_ISNULL(newpp->cp_mach->mc_haltset));
+	ASSERT(CPUSET_ISNULL(oldpp->cp_mach->mc_haltset));
 
 	/*
 	 * let the lgroup framework know cp has entered the partition
@@ -730,6 +729,7 @@ cpupart_create(psetid_t *psid)
 	ASSERT(pool_lock_held());
 
 	pp = kmem_zalloc(sizeof (cpupart_t), KM_SLEEP);
+	pp->cp_mach = kmem_zalloc(sizeof (struct mach_cpupart), KM_SLEEP);
 	pp->cp_nlgrploads = lgrp_plat_max_lgrps();
 	pp->cp_lgrploads = kmem_zalloc(sizeof (lpl_t) * pp->cp_nlgrploads,
 	    KM_SLEEP);
@@ -739,6 +739,7 @@ cpupart_create(psetid_t *psid)
 		mutex_exit(&cpu_lock);
 		kmem_free(pp->cp_lgrploads, sizeof (lpl_t) * pp->cp_nlgrploads);
 		pp->cp_lgrploads = NULL;
+		kmem_free(pp->cp_mach, sizeof (struct mach_cpupart));
 		kmem_free(pp, sizeof (cpupart_t));
 		return (ENOMEM);
 	}
@@ -755,7 +756,7 @@ cpupart_create(psetid_t *psid)
 	pp->cp_kp_queue.disp_max_unbound_pri = -1;
 	pp->cp_kp_queue.disp_cpu = NULL;
 	pp->cp_gen = 0;
-	CPUSET_ZERO(pp->cp_haltset);
+	CPUSET_ZERO(pp->cp_mach->mc_haltset);
 	DISP_LOCK_INIT(&pp->cp_kp_queue.disp_lock);
 	*psid = CPTOPS(pp->cp_id);
 	disp_kp_alloc(&pp->cp_kp_queue, v.v_nglobpris);
@@ -763,7 +764,7 @@ cpupart_create(psetid_t *psid)
 	for (i = 0; i < pp->cp_nlgrploads; i++) {
 		pp->cp_lgrploads[i].lpl_lgrpid = i;
 	}
-	CHIP_SET_ZERO(pp->cp_chipset);
+	CHIP_SET_ZERO(pp->cp_mach->mc_chipset);
 
 	/*
 	 * Pause all CPUs while changing the partition list, to make sure
@@ -858,8 +859,8 @@ again:			p = ttoproc(t);
 		}
 	}
 
-	ASSERT(CHIP_SET_ISNULL(pp->cp_chipset));
-	ASSERT(CPUSET_ISNULL(pp->cp_haltset));
+	ASSERT(CHIP_SET_ISNULL(pp->cp_mach->mc_chipset));
+	ASSERT(CPUSET_ISNULL(pp->cp_mach->mc_haltset));
 
 	/*
 	 * Reset the pointers in any offline processors so they won't
@@ -898,6 +899,7 @@ again:			p = ttoproc(t);
 	disp_kp_free(&pp->cp_kp_queue);
 	kmem_free(pp->cp_lgrploads, sizeof (lpl_t) * pp->cp_nlgrploads);
 	pp->cp_lgrploads = NULL;
+	kmem_free(pp->cp_mach, sizeof (struct mach_cpupart));
 	kmem_free(pp, sizeof (cpupart_t));
 	mutex_exit(&cpu_lock);
 

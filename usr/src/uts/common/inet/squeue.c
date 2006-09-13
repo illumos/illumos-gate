@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -158,18 +157,6 @@
  * squeue_workerwait_ms: When worker thread is interrupted because workerdrain
  *	expired, how much time to wait before waking worker thread again.
  *    Default: 10 ms.
- *
- * DEFINES:
- *
- * SQUEUE_DEBUG: If defined as 1, special code is compiled in which records
- *	additional information aiding debugging is recorded in squeue.
- *
- * SQUEUE_PROFILE: If defined as 1, special code is compiled in which collects
- *	various squeue statistics and exports them as kstats.
- *
- * Ideally we would like both SQUEUE_DEBUG and SQUEUE_PROFILE to be always set,
- * but it affects performance, so they are enabled on DEBUG kernels and disabled
- * on non-DEBUG by default.
  */
 
 #include <sys/types.h>
@@ -199,14 +186,6 @@
 #define	SQS_PROFILE	0x0040	/* Enable profiling */
 #define	SQS_REENTER	0x0080	/* Re entered thread */
 #define	SQS_TMO_PROG	0x0100	/* Timeout is being set */
-
-#ifdef DEBUG
-#define	SQUEUE_DEBUG 1
-#define	SQUEUE_PROFILE 1
-#else
-#define	SQUEUE_DEBUG 0
-#define	SQUEUE_PROFILE 0
-#endif
 
 #include <sys/squeue_impl.h>
 

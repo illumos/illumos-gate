@@ -240,7 +240,7 @@ cpu_halt(void)
 	if (hset_update) {
 		cpup->cpu_disp_flags |= CPU_DISP_HALTED;
 		membar_producer();
-		CPUSET_ATOMIC_ADD(cp->cp_haltset, cpun);
+		CPUSET_ATOMIC_ADD(cp->cp_mach->mc_haltset, cpun);
 	}
 
 	/*
@@ -252,7 +252,7 @@ cpu_halt(void)
 	if (disp_anywork()) {
 		if (hset_update) {
 			cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
-			CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
+			CPUSET_ATOMIC_DEL(cp->cp_mach->mc_haltset, cpun);
 		}
 		return;
 	}
@@ -276,7 +276,7 @@ cpu_halt(void)
 	pstate = getpstate();
 	setpstate(pstate & ~PSTATE_IE);
 
-	if (hset_update && !CPU_IN_SET(cp->cp_haltset, cpun)) {
+	if (hset_update && !CPU_IN_SET(cp->cp_mach->mc_haltset, cpun)) {
 		cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
 		setpstate(pstate);
 		return;
@@ -291,7 +291,7 @@ cpu_halt(void)
 	if (cpup->cpu_disp->disp_nrunnable != 0) {
 		if (hset_update) {
 			cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
-			CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
+			CPUSET_ATOMIC_DEL(cp->cp_mach->mc_haltset, cpun);
 		}
 		setpstate(pstate);
 		return;
@@ -309,7 +309,7 @@ cpu_halt(void)
 	setpstate(pstate);
 	if (hset_update) {
 		cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
-		CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
+		CPUSET_ATOMIC_DEL(cp->cp_mach->mc_haltset, cpun);
 	}
 }
 
@@ -329,12 +329,12 @@ cpu_wakeup(cpu_t *cpu, int bound)
 	cpupart_t	*cp;
 
 	cp = cpu->cpu_part;
-	if (CPU_IN_SET(cp->cp_haltset, cpu->cpu_id)) {
+	if (CPU_IN_SET(cp->cp_mach->mc_haltset, cpu->cpu_id)) {
 		/*
 		 * Clear the halted bit for that CPU since it will be
 		 * poked in a moment.
 		 */
-		CPUSET_ATOMIC_DEL(cp->cp_haltset, cpu->cpu_id);
+		CPUSET_ATOMIC_DEL(cp->cp_mach->mc_haltset, cpu->cpu_id);
 		/*
 		 * We may find the current CPU present in the halted cpuset
 		 * if we're in the context of an interrupt that occurred
@@ -370,12 +370,12 @@ cpu_wakeup(cpu_t *cpu, int bound)
 	 * In that case, look again.
 	 */
 	do {
-		CPUSET_FIND(cp->cp_haltset, cpu_found);
+		CPUSET_FIND(cp->cp_mach->mc_haltset, cpu_found);
 		if (cpu_found == CPUSET_NOTINSET)
 			return;
 
 		ASSERT(cpu_found >= 0 && cpu_found < NCPU);
-		CPUSET_ATOMIC_XDEL(cp->cp_haltset, cpu_found, result);
+		CPUSET_ATOMIC_XDEL(cp->cp_mach->mc_haltset, cpu_found, result);
 	} while (result < 0);
 
 	if (cpu_found != CPU->cpu_id)

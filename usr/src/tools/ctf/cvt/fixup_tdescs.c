@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Workarounds for stabs generation bugs in the compiler
+ * Workarounds for stabs generation bugs in the compiler and general needed
+ * fixups.
  */
 
 #include <stdio.h>
@@ -147,6 +147,43 @@ fix_ptr_to_struct(tdata_t *td)
 }
 
 /*
+ * Fix stabs generation bugs.  These routines must be run before the
+ * post-conversion merge
+ */
+void
+cvt_fixstabs(tdata_t *td)
+{
+	fix_ptrptr_to_struct(td);
+	fix_ptr_to_struct(td);
+}
+
+struct match {
+	tdesc_t *m_ret;
+	const char *m_name;
+};
+
+static int
+matching_iidesc(iidesc_t *iidesc, struct match *match)
+{
+	if (!streq(iidesc->ii_name, match->m_name))
+		return (0);
+
+	if (iidesc->ii_type != II_TYPE && iidesc->ii_type != II_SOU)
+		return (0);
+
+	match->m_ret = iidesc->ii_dtype;
+	return (-1);
+}
+
+static tdesc_t *
+lookup_tdesc(tdata_t *td, const char *name)
+{
+	struct match match = { NULL, name };
+	iter_iidescs_by_name(td, name, (int (*)())matching_iidesc, &match);
+	return (match.m_ret);
+}
+
+/*
  * The cpu structure grows, with the addition of a machcpu member, if
  * _MACHDEP is defined.  This means that, for example, the cpu structure
  * in unix is different from the cpu structure in genunix.  As one might
@@ -158,24 +195,31 @@ fix_ptr_to_struct(tdata_t *td)
  * we make a forward node for it.
  */
 static void
-fix_small_cpu_struct(tdata_t *td)
+fix_small_cpu_struct(tdata_t *td, size_t ptrsize)
 {
 	tdesc_t *cput, *cpu;
 	tdesc_t *machcpu;
 	mlist_t *ml, *lml;
 	mlist_t *cpum;
 	int foundcpucyc = 0;
-	size_t lmlsz;
 
 	/*
 	 * We're going to take the circuitous route finding the cpu structure,
 	 * because we want to make sure that we find the right one.  It would
-	 * be nice if we could verify the header name too.
+	 * be nice if we could verify the header name too.  DWARF might not
+	 * have the cpu_t, so we let this pass.
 	 */
-	if ((cput = lookupname("cpu_t")) == NULL || cput->t_type != TYPEDEF)
+	if ((cput = lookup_tdesc(td, "cpu_t")) != NULL) {
+		if (cput->t_type != TYPEDEF)
+			return;
+		cpu = cput->t_tdesc;
+	} else {
+		cpu = lookup_tdesc(td, "cpu");
+	}
+
+	if (cpu == NULL)
 		return;
 
-	cpu = cput->t_tdesc;
 	if (!streq(cpu->t_name, "cpu") || cpu->t_type != STRUCT)
 		return;
 
@@ -190,33 +234,34 @@ fix_small_cpu_struct(tdata_t *td)
 		return;
 
 	/*
-	 * We need to find out how big the last element is so we can compute the
-	 * offset of the new one.  If the last element has a size, we use it.
-	 * If it doesn't, it should be a pointer, which won't have a size.  In
-	 * that case, we look up the size of a long and use that as the size of
-	 * the pointer.
+	 * We need to derive the right offset for the fake cpu_m member.  To do
+	 * that, we require a special unused member to be the last member
+	 * before the 'cpu_m', that we encode knowledge of here.  ABI alignment
+	 * on all platforms is such that we only need to add a pointer-size
+	 * number of bits to get the right offset for cpu_m.  This would most
+	 * likely break if gcc's -malign-double were ever used, but that option
+	 * breaks the ABI anyway.
 	 */
-	if (lml->ml_type->t_size)
-		lmlsz = lml->ml_type->t_size * NBBY;
-	else {
-		tdesc_t *tdp = lookupname("long");
-		lmlsz = tdp->t_intr->intr_nbits;
+	if (!streq(lml->ml_name, "cpu_m_pad") &&
+	    getenv("CTFCONVERT_PERMISSIVE") == NULL) {
+		terminate("last cpu_t member before cpu_m is %s; "
+		    "it must be cpu_m_pad.\n", lml->ml_name);
 	}
 
-	if ((machcpu = lookupname("machcpu")) == NULL) {
+	if ((machcpu = lookup_tdesc(td, "machcpu")) == NULL) {
 		machcpu = xcalloc(sizeof (*machcpu));
 		machcpu->t_name = xstrdup("machcpu");
 		machcpu->t_id = td->td_nextid++;
 		machcpu->t_type = FORWARD;
-
-	} else if (machcpu->t_type != STRUCT)
+	} else if (machcpu->t_type != STRUCT) {
 		return;
+	}
 
 	debug(3, "Adding cpu_m machcpu %s to cpu struct\n",
 	    (machcpu->t_type == FORWARD ? "forward" : "struct"));
 
 	cpum = xmalloc(sizeof (*cpum));
-	cpum->ml_offset = lml->ml_offset + lmlsz;
+	cpum->ml_offset = lml->ml_offset + (ptrsize * NBBY);
 	cpum->ml_size = 0;
 	cpum->ml_name = xstrdup("cpu_m");
 	cpum->ml_type = machcpu;
@@ -225,14 +270,8 @@ fix_small_cpu_struct(tdata_t *td)
 	lml->ml_next = cpum;
 }
 
-/*
- * Fix stabs generation bugs.  These routines must be run before the
- * post-conversion merge
- */
 void
-cvt_fixbugs(tdata_t *td)
+cvt_fixups(tdata_t *td, size_t ptrsize)
 {
-	fix_ptrptr_to_struct(td);
-	fix_ptr_to_struct(td);
-	fix_small_cpu_struct(td);
+	fix_small_cpu_struct(td, ptrsize);
 }

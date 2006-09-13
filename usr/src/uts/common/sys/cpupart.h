@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +57,17 @@ typedef int	cpupartid_t;
 #define	CP_ALL		0		/* return all cpu partitions */
 #define	CP_NONEMPTY	1		/* return only non-empty ones */
 
+#if defined(_MACHDEP)
+struct mach_cpupart {
+	cpuset_t	mc_haltset;
+	chip_set_t	mc_chipset;
+};
+
+extern struct mach_cpupart cp_default_mach;
+#else
+struct mach_cpupart;
+#endif
+
 typedef struct cpupart {
 	disp_t		cp_kp_queue;	/* partition-wide kpreempt queue */
 	cpupartid_t	cp_id;		/* partition ID */
@@ -92,13 +102,8 @@ typedef struct cpupart {
 	uint_t		cp_attr;	/* bitmask of attributes */
 	lgrp_gen_t	cp_gen;		/* generation number */
 	lgrp_id_t	cp_lgrp_hint;	/* last home lgroup chosen */
-#if defined(_MACHDEP)
-	/*
-	 * These guarded members must reside at the end of the structure
-	 */
-	cpuset_t	cp_haltset;	/* bitmask of halted cpus */
-	chip_set_t	cp_chipset;	/* set of chips spanned by this part */
-#endif	/* _MACHDEP */
+
+	struct mach_cpupart *cp_mach;   /* mach-specific */
 } cpupart_t;
 
 typedef struct cpupart_kstat {

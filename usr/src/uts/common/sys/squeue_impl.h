@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +35,25 @@ extern "C" {
 #include <sys/squeue.h>
 
 #define	SQ_NAMELEN 31
+
+/*
+ * SQUEUE_DEBUG: If defined as 1, special code is compiled in which records
+ *      additional information aiding debugging is recorded in squeue.
+ *
+ * SQUEUE_PROFILE: If defined as 1, special code is compiled in which collects
+ *      various squeue statistics and exports them as kstats.
+ *
+ * Ideally we would like both SQUEUE_DEBUG and SQUEUE_PROFILE to be always set,
+ * but it affects performance, so they are enabled on DEBUG kernels and disabled
+ * on non-DEBUG by default.
+ */
+#ifdef DEBUG
+#define	SQUEUE_DEBUG 1
+#define	SQUEUE_PROFILE 1
+#else
+#define	SQUEUE_DEBUG 0
+#define	SQUEUE_PROFILE 0
+#endif
 
 typedef struct sqstat_s {
 	uint_t		sq_max_qlen;

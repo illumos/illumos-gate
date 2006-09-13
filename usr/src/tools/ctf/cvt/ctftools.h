@@ -342,8 +342,9 @@ typedef struct ctf_buf ctf_buf_t;
 
 typedef struct symit_data symit_data_t;
 
-/* bugs.c */
-void cvt_fixbugs(tdata_t *td);
+/* fixup_tdescs.c */
+void cvt_fixstabs(tdata_t *);
+void cvt_fixups(tdata_t *, size_t);
 
 /* ctf.c */
 caddr_t ctf_gen(iiburst_t *, size_t *, int);
@@ -352,6 +353,8 @@ tdata_t *ctf_load(char *, caddr_t, size_t, symit_data_t *, char *);
 /* iidesc.c */
 iidesc_t *iidesc_new(char *);
 int iidesc_hash(int, void *);
+void iter_iidescs_by_name(tdata_t *, const char *,
+    int (*)(iidesc_t *, void *), void *);
 iidesc_t *iidesc_dup(iidesc_t *);
 iidesc_t *iidesc_dup_rename(iidesc_t *, char const *, char const *);
 void iidesc_add(hash_t *, iidesc_t *);
@@ -396,7 +399,7 @@ void parse_init(tdata_t *);
 void parse_finish(tdata_t *);
 int parse_stab(stab_t *, char *, iidesc_t **);
 tdesc_t *lookup(int);
-tdesc_t *lookupname(char *);
+tdesc_t *lookupname(const char *);
 void check_hash(void);
 void resolve_typed_bitfields(void);
 
@@ -427,8 +430,9 @@ void tdata_merge(tdata_t *, tdata_t *);
 void tdata_label_newmax(tdata_t *, int);
 
 /* util.c */
-int streq(char *, char *);
+int streq(const char *, const char *);
 int findelfsecidx(Elf *, const char *, const char *);
+size_t elf_ptrsz(Elf *);
 char *mktmpname(const char *, const char *);
 void terminate(char *, ...);
 void aborterr(char *, ...);

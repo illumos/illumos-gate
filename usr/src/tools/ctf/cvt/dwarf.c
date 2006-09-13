@@ -955,10 +955,15 @@ die_sou_create(dwarf_t *dw, Dwarf_Die str, Dwarf_Off off, tdesc_t *tdp,
 
 		ml = xcalloc(sizeof (mlist_t));
 
-		if ((ml->ml_name = die_name(dw, mem)) == NULL) {
-			terminate("die %llu: mem %llu: member has no name\n",
-			    off, memoff);
-		}
+		/*
+		 * This could be a GCC anon struct/union member, so we'll allow
+		 * an empty name, even though nothing can really handle them
+		 * properly.  Note that some versions of GCC miss out debug
+		 * info for anon structs, though recent versions are fixed (gcc
+		 * bug 11816).
+		 */
+		if ((ml->ml_name = die_name(dw, mem)) == NULL)
+			ml->ml_name = "";
 
 		ml->ml_type = die_lookup_pass1(dw, mem, DW_AT_type);
 
@@ -983,7 +988,7 @@ die_sou_create(dwarf_t *dw, Dwarf_Die str, Dwarf_Off off, tdesc_t *tdp,
 #endif
 		}
 
-		debug(3, "die %llu: mem %llu: created %s (off %u sz %u)\n",
+		debug(3, "die %llu: mem %llu: created \"%s\" (off %u sz %u)\n",
 		    off, memoff, ml->ml_name, ml->ml_offset, ml->ml_size);
 
 		*mlastp = ml;
@@ -1105,9 +1110,10 @@ die_sou_failed(tdesc_t *tdp, tdesc_t **tdpp, void *private)
 
 	for (ml = tdp->t_members; ml != NULL; ml = ml->ml_next) {
 		if (ml->ml_size == 0) {
-			fprintf(stderr, "%s %d: failed to size member %s of "
-			    "type %s (%d)\n", typename, tdp->t_id, ml->ml_name,
-			    tdesc_name(ml->ml_type), ml->ml_type->t_id);
+			fprintf(stderr, "%s %d: failed to size member \"%s\" "
+			    "of type %s (%d)\n", typename, tdp->t_id,
+			    ml->ml_name, tdesc_name(ml->ml_type),
+			    ml->ml_type->t_id);
 		}
 	}
 
@@ -1771,27 +1777,6 @@ die_resolve(dwarf_t *dw)
 	} while (dw->dw_nunres != 0);
 }
 
-static size_t
-elf_ptrsz(Elf *elf)
-{
-	GElf_Ehdr ehdr;
-
-	if (gelf_getehdr(elf, &ehdr) == NULL) {
-		terminate("failed to read ELF header: %s\n",
-		    elf_errmsg(-1));
-	}
-
-	if (ehdr.e_ident[EI_CLASS] == ELFCLASS32)
-		return (4);
-	else if (ehdr.e_ident[EI_CLASS] == ELFCLASS64)
-		return (8);
-	else
-		terminate("unknown ELF class %d\n", ehdr.e_ident[EI_CLASS]);
-
-	/*NOTREACHED*/
-	return (0);
-}
-
 /*ARGSUSED*/
 int
 dw_read(tdata_t *td, Elf *elf, const char *filename)
@@ -1870,6 +1855,8 @@ dw_read(tdata_t *td, Elf *elf, const char *filename)
 	(void) dwarf_finish(dw.dw_dw, &dw.dw_err);
 
 	die_resolve(&dw);
+
+	cvt_fixups(td, dw.dw_ptrsz);
 
 	/* leak the dwarf_t */
 

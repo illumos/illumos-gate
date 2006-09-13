@@ -1633,6 +1633,7 @@ cpu_list_init(cpu_t *cp)
 	cp->cpu_seqid = 0;
 	CPUSET_ADD(cpu_seqid_inuse, 0);
 	cp->cpu_cache_offset = KMEM_CACHE_SIZE(cp->cpu_seqid);
+	cp_default.cp_mach = &cp_default_mach;
 	cp_default.cp_cpulist = cp;
 	cp_default.cp_ncpus = 1;
 	cp->cpu_next_part = cp;

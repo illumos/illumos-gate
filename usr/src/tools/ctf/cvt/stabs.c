@@ -374,7 +374,8 @@ parse_loop_end:
 	resolve_typed_bitfields();
 	parse_finish(td);
 
-	cvt_fixbugs(td);
+	cvt_fixstabs(td);
+	cvt_fixups(td, elf_ptrsz(elf));
 
 	return (0);
 }

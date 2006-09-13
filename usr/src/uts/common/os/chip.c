@@ -267,7 +267,7 @@ chip_cpu_init(cpu_t *cp)
 		 */
 		if (chip_list == NULL) {
 			CHIP_SET_ZERO(chip_set);
-			CHIP_SET_ZERO(cp->cpu_part->cp_chipset);
+			CHIP_SET_ZERO(cp->cpu_part->cp_mach->mc_chipset);
 			chp->chip_nrunning++;	/* for t0 */
 		}
 
@@ -515,7 +515,7 @@ chip_cpu_move_part(cpu_t *cp, cpupart_t *oldpp, cpupart_t *newpp)
 		/*
 		 * Add the chip's seqid to the cpupart's chip set
 		 */
-		CHIP_SET_ADD(newpp->cp_chipset, chp->chip_seqid);
+		CHIP_SET_ADD(newpp->cp_mach->mc_chipset, chp->chip_seqid);
 	}
 
 	if (oldpp != NULL) {
@@ -534,7 +534,7 @@ chip_cpu_move_part(cpu_t *cp, cpupart_t *oldpp, cpupart_t *newpp)
 		 * No other cpu on the chip is in the old partition
 		 * so remove the chip's seqid from it's set
 		 */
-		CHIP_SET_REMOVE(oldpp->cp_chipset, chp->chip_seqid);
+		CHIP_SET_REMOVE(oldpp->cp_mach->mc_chipset, chp->chip_seqid);
 	}
 }
 

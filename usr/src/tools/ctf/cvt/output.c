@@ -190,13 +190,11 @@ matching_iidesc(iidesc_t *iidesc, iidesc_match_t *match)
 }
 
 static iidesc_t *
-find_iidesc(hash_t *hash, iidesc_match_t *match)
+find_iidesc(tdata_t *td, iidesc_match_t *match)
 {
-	iidesc_t tmpdesc;
 	match->iim_ret = NULL;
-	bzero(&tmpdesc, sizeof (iidesc_t));
-	tmpdesc.ii_name = match->iim_name;
-	(void) hash_match(hash, &tmpdesc, (int (*)())matching_iidesc, match);
+	iter_iidescs_by_name(td, match->iim_name,
+	    (int (*)())matching_iidesc, match);
 	return (match->iim_ret);
 }
 
@@ -390,7 +388,7 @@ sort_iidescs(Elf *elf, const char *file, tdata_t *td, int fuzzymatch,
 		if (ignore_symbol(&sym, match.iim_name))
 			continue;
 
-		iidesc = find_iidesc(td->td_iihash, &match);
+		iidesc = find_iidesc(td, &match);
 
 		if (iidesc != NULL) {
 			tolist[*curr] = iidesc;
@@ -412,7 +410,7 @@ sort_iidescs(Elf *elf, const char *file, tdata_t *td, int fuzzymatch,
 		debug(3, "Weak symbol %s resolved to %s\n", match.iim_name,
 		    smatch.iim_name);
 
-		iidesc = find_iidesc(td->td_iihash, &smatch);
+		iidesc = find_iidesc(td, &smatch);
 
 		if (iidesc != NULL) {
 			tolist[*curr] = copy_from_strong(td, &sym,

@@ -82,6 +82,11 @@ struct nvlist;
 
 /*
  * Per-CPU data.
+ *
+ * Be careful adding new members: if they are not the same in all modules (e.g.
+ * change size depending on a #define), CTF uniquification can fail to work
+ * properly.  Furthermore, this is transitive in that it applies recursively to
+ * all types pointed to by cpu_t.
  */
 typedef struct cpu {
 	processorid_t	cpu_id;			/* CPU number */
@@ -206,14 +211,16 @@ typedef struct cpu {
 
 	struct cpu_physid *cpu_physid;	/* physical associations */
 
-#if (defined(_KERNEL) || defined(_KMEMUSER)) && defined(_MACHDEP)
 	/*
-	 * XXX - needs to be fixed. Structure size should not change.
-	 *	 probably needs to be a pointer to an opaque structure.
-	 * XXX - this is OK as long as cpu structs aren't in an array.
-	 *	 A user program will either read the first part,
-	 *	 which is machine-independent, or read the whole thing.
+	 * New members must be added /before/ this member, as the CTF tools
+	 * rely on this being the last field before cpu_m, so they can
+	 * correctly calculate the offset when synthetically adding the cpu_m
+	 * member in objects that do not have it.  This fixup is required for
+	 * uniquification to work correctly.
 	 */
+	uintptr_t	cpu_m_pad;
+
+#if (defined(_KERNEL) || defined(_KMEMUSER)) && defined(_MACHDEP)
 	struct machcpu	cpu_m;		/* per architecture info */
 #endif
 } cpu_t;
