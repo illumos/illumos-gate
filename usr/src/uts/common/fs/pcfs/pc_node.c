@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,7 +60,7 @@ static int	syncpcp(struct pcnode *, int);
  * fake entry for root directory, since this does not have a parent
  * pointing to it.
  */
-static struct pcdir rootentry = {
+struct pcdir pcfs_rootdirentry = {
 	"",
 	"",
 	PCA_DIR
@@ -96,7 +95,7 @@ pc_getnode(
 
 	ASSERT(fsp->pcfs_flags & PCFS_LOCKED);
 	if (ep == (struct pcdir *)0) {
-		ep = &rootentry;
+		ep = &pcfs_rootdirentry;
 		scluster = 0;
 	} else {
 		scluster = pc_getstartcluster(fsp, ep);
@@ -176,6 +175,7 @@ pc_getnode(
 		pcp->pc_size = ltohi(ep->pcd_size);
 	}
 	fsp->pcfs_nrefs++;
+	VFS_HOLD(PCFSTOVFS(fsp));
 	vp->v_data = (caddr_t)pcp;
 	vp->v_vfsp = PCFSTOVFS(fsp);
 	vn_exists(vp);
@@ -262,6 +262,7 @@ retry:
 		fsp->pcfs_frefs--;
 	}
 	fsp->pcfs_nrefs--;
+	VFS_RELE(vp->v_vfsp);
 
 	if (fsp->pcfs_nrefs < 0) {
 		panic("pc_rele: nrefs count");
@@ -286,7 +287,10 @@ pc_mark_mod(struct pcnode *pcp)
 
 	if (PCTOV(pcp)->v_type == VREG) {
 		gethrestime(&now);
-		pc_tvtopct(&now, &pcp->pc_entry.pcd_mtime);
+		if (pc_tvtopct(&now, &pcp->pc_entry.pcd_mtime))
+			PC_DPRINTF1(2, "pc_mark_mod failed timestamp "
+			    "conversion, curtime = %lld\n",
+			    (long long)now.tv_sec);
 		pcp->pc_flags |= PC_CHG;
 	}
 }
@@ -297,12 +301,15 @@ pc_mark_mod(struct pcnode *pcp)
 void
 pc_mark_acc(struct pcnode *pcp)
 {
-	struct pctime pt;
+	struct pctime pt = { 0, 0 };
 	timestruc_t now;
 
 	if (PCTOV(pcp)->v_type == VREG) {
 		gethrestime(&now);
-		pc_tvtopct(&now, &pt);
+		if (pc_tvtopct(&now, &pcp->pc_entry.pcd_mtime))
+			PC_DPRINTF1(2, "pc_mark_acc failed timestamp "
+			    "conversion, curtime = %lld\n",
+			    (long long)now.tv_sec);
 		pcp->pc_entry.pcd_ladate = pt.pct_date;
 		pcp->pc_flags |= PC_CHG;
 	}
@@ -619,10 +626,11 @@ pc_mark_irrecov(struct pcfs *fsp)
 void
 pc_diskchanged(struct pcfs *fsp)
 {
-	struct pcnode *pcp, *npcp = NULL;
-	struct pchead *hp;
-	struct vnode  *vp;
-	extern vfs_t    EIO_vfs;
+	struct pcnode	*pcp, *npcp = NULL;
+	struct pchead	*hp;
+	struct vnode	*vp;
+	extern vfs_t	EIO_vfs;
+	struct vfs	*vfsp;
 
 	/*
 	 * Eliminate all pcnodes (dir & file) associated with this fs.
@@ -633,12 +641,14 @@ pc_diskchanged(struct pcfs *fsp)
 	 */
 	PC_DPRINTF1(1, "pc_diskchanged fsp=0x%p\n", (void *)fsp);
 
+	vfsp = PCFSTOVFS(fsp);
+
 	for (hp = pcdhead; hp < &pcdhead[NPCHASH]; hp++) {
 		for (pcp = hp->pch_forw;
 		    pcp != (struct pcnode *)hp; pcp = npcp) {
 			npcp = pcp -> pc_forw;
 			vp = PCTOV(pcp);
-			if (VFSTOPCFS(vp->v_vfsp) == fsp &&
+			if ((vp->v_vfsp == vfsp) &&
 			    !(pcp->pc_flags & PC_RELEHOLD)) {
 				mutex_enter(&(vp)->v_lock);
 				if (vp->v_count > 0) {
@@ -652,10 +662,16 @@ pc_diskchanged(struct pcfs *fsp)
 				vp->v_vfsp = &EIO_vfs;
 				vp->v_type = VBAD;
 				VN_RELE(vp);
-				if (!(pcp->pc_flags & PC_EXTERNAL))
+				if (!(pcp->pc_flags & PC_EXTERNAL)) {
+					(void) pvn_vplist_dirty(vp,
+					    (u_offset_t)0, pcfs_putapage,
+					    B_INVAL | B_TRUNC,
+					    (struct cred *)NULL);
 					vn_free(vp);
+				}
 				kmem_free(pcp, sizeof (struct pcnode));
 				fsp->pcfs_nrefs --;
+				VFS_RELE(vfsp);
 			}
 		}
 	}
@@ -664,7 +680,7 @@ pc_diskchanged(struct pcfs *fsp)
 		    pcp != (struct pcnode *)hp; pcp = npcp) {
 			npcp = pcp -> pc_forw;
 			vp = PCTOV(pcp);
-			if (VFSTOPCFS(vp->v_vfsp) == fsp &&
+			if ((vp->v_vfsp == vfsp) &&
 			    !(pcp->pc_flags & PC_RELEHOLD)) {
 				mutex_enter(&(vp)->v_lock);
 				if (vp->v_count > 0) {
@@ -678,11 +694,17 @@ pc_diskchanged(struct pcfs *fsp)
 				vp->v_vfsp = &EIO_vfs;
 				vp->v_type = VBAD;
 				VN_RELE(vp);
-				if (!(pcp->pc_flags & PC_EXTERNAL))
+				if (!(pcp->pc_flags & PC_EXTERNAL)) {
+					(void) pvn_vplist_dirty(vp,
+					    (u_offset_t)0, pcfs_putapage,
+					    B_INVAL | B_TRUNC,
+					    (struct cred *)NULL);
 					vn_free(vp);
+				}
 				kmem_free(pcp, sizeof (struct pcnode));
 				fsp->pcfs_frefs --;
 				fsp->pcfs_nrefs --;
+				VFS_RELE(vfsp);
 			}
 		}
 	}
@@ -696,7 +718,8 @@ pc_diskchanged(struct pcfs *fsp)
 		panic("pc_diskchanged: nrefs");
 	}
 #endif
-	if (fsp->pcfs_fatp != (uchar_t *)0) {
+	if (!(vfsp->vfs_flag & VFS_UNMOUNTED) &&
+	    fsp->pcfs_fatp != (uchar_t *)0) {
 		pc_invalfat(fsp);
 	} else {
 		binval(fsp->pcfs_xdev);

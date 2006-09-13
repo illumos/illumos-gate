@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999,2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,8 +34,10 @@
 #include <stdlib.h>
 #include <libintl.h>
 #include <ctype.h>
+#include <time.h>
 #include <sys/param.h>
 #include <sys/time.h>
+#include <sys/byteorder.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/fs/pc_fs.h>
 #include <sys/fs/pc_dir.h>
@@ -65,12 +66,6 @@ ClusterContents	TheRootDir;
 int32_t	RootDirSize;
 int	RootDirModified;
 int	OkayToRelink = 1;
-
-/*
- *  We import these routines from the pc_subr.c file in the kernel.
- */
-extern void pc_tvtopct(timestruc_t *, struct pctime *);
-extern int pc_validchar(char);
 
 /*
  * We have a bunch of routines for handling CHK names.  A CHK name is
@@ -822,40 +817,66 @@ insertDirEnt(struct pcdir *slot, struct pcdir *entry, int32_t clusterWithSlot)
 	markClusterModified(clusterWithSlot);
 }
 
+/*
+ *  Convert current UNIX time into a PCFS timestamp (which is in local time).
+ *
+ *  Since the "seconds" field of that is only accurate to 2sec precision,
+ *  we allow for the optional (used only for creation times on FAT) "msec"
+ *  parameter that takes the fractional part.
+ */
 static void
-getNow(timestruc_t *ts)
+getNow(struct pctime *pctp, uchar_t *msec)
 {
-	struct timeval	tv;
+	time_t		now;
+	struct tm	tm;
+	ushort_t	tim, dat;
 
-	if (gettimeofday(&tv, NULL) == 0) {
-		ts->tv_sec = tv.tv_sec;
-		ts->tv_nsec = tv.tv_usec * 1000;
-	} else {
-		/* Failed to get time, set create time to the Solaris epoch */
-		ts->tv_sec = 0;
-		ts->tv_nsec = 0;
-	}
+	/*
+	 * Disable daylight savings corrections - Solaris PCFS doesn't
+	 * support such conversions yet. Save timestamps in local time.
+	 */
+	daylight = 0;
+
+	(void) time(&now);
+	(void) localtime_r(&now, &tm);
+
+	dat = (tm.tm_year - 80) << YEARSHIFT;
+	dat |= tm.tm_mon << MONSHIFT;
+	dat |= tm.tm_mday << DAYSHIFT;
+	tim = tm.tm_hour << HOURSHIFT;
+	tim |= tm.tm_min << MINSHIFT;
+	tim |= (tm.tm_sec / 2) << SECSHIFT;
+
+	/*
+	 * Sanity check. If we overflow the PCFS timestamp range
+	 * we set the time to 01/01/1980, 00:00:00
+	 */
+	if (dat < 80 || dat > 227)
+		dat = tim = 0;
+
+	pctp->pct_date = LE_16(dat);
+	pctp->pct_time = LE_16(tim);
+	if (msec)
+		*msec = (tm.tm_sec & 1) ? 100 : 0;
 }
 
 /*
  *  FAT file systems store the following time information in a directory
  *  entry:
- *		creation time
- *		creation date
- *		last access date
- *		last modify time
- *		last modify date
+ *		timestamp		member of "struct pcdir"
+ * ======================================================================
+ *		creation time		pcd_crtime.pct_time
+ *		creation date		pcd_crtime.pct_date
+ *		last access date	pcd_ladate
+ *		last modify time	pcd_mtime.pct_time
+ *		last modify date	pcd_mtime.pct_date
  *
  *  No access time is kept.
  */
 static void
 updateDirEnt_CreatTime(struct pcdir *dp)
 {
-	timestruc_t	ts;
-
-	getNow(&ts);
-	pc_tvtopct(&ts, &(dp->pcd_crtime)); /* sets creation time/date */
-	dp->pcd_crtime_msec = 0;
+	getNow(&dp->pcd_crtime, &dp->pcd_crtime_msec);
 	markClusterModified(findImpactedCluster(dp));
 }
 
@@ -864,9 +885,8 @@ updateDirEnt_ModTimes(struct pcdir *dp)
 {
 	timestruc_t	ts;
 
-	getNow(&ts);
-	pc_tvtopct(&ts, &(dp->pcd_mtime)); /* sets modification time/date */
-	dp->pcd_ladate = dp->pcd_mtime.pct_date; /* sets access date */
+	getNow(&dp->pcd_mtime, NULL);
+	dp->pcd_ladate = dp->pcd_mtime.pct_date;
 	dp->pcd_attr |= PCA_ARCH;
 	markClusterModified(findImpactedCluster(dp));
 }

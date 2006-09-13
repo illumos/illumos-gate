@@ -187,23 +187,24 @@ struct pcfs {
 	uint32_t	f32fsinfo_sector; /* where to read/write fsinfo */
 	struct pcfs *pcfs_nxt;		/* linked list of all mounts */
 	int pcfs_fatjustread;		/* Used to flag a freshly found FAT */
+	struct vnode *pcfs_root;	/* vnode for the root dir of the fs */
 };
 
 /*
  * flags
  */
-#define	PCFS_FATMOD	0x01		/* FAT has been modified */
-#define	PCFS_LOCKED	0x02		/* fs is locked */
-#define	PCFS_WANTED	0x04		/* locked fs is wanted */
-#define	PCFS_FAT16	0x400		/* 16 bit FAT */
-#define	PCFS_NOCHK	0x800		/* don't resync fat on error */
-#define	PCFS_BOOTPART	0x1000		/* boot partition type */
-#define	PCFS_HIDDEN	0x2000		/* show hidden files */
-#define	PCFS_PCMCIA_NO_CIS 0x4000	/* PCMCIA psuedo floppy */
-#define	PCFS_FOLDCASE	0x8000		/* fold all names from media to */
-					/* lowercase */
-#define	PCFS_FAT32	0x10000		/* 32 bit FAT */
-#define	PCFS_IRRECOV	0x20000		/* FS was messed with during write */
+#define	PCFS_FATMOD		0x01	/* FAT has been modified */
+#define	PCFS_LOCKED		0x02	/* fs is locked */
+#define	PCFS_WANTED		0x04	/* locked fs is wanted */
+#define	PCFS_FAT16		0x400	/* 16 bit FAT */
+#define	PCFS_NOCHK		0x800	/* don't resync fat on error */
+#define	PCFS_BOOTPART		0x1000	/* boot partition type */
+#define	PCFS_HIDDEN		0x2000	/* show hidden files */
+#define	PCFS_PCMCIA_NO_CIS	0x4000	/* PCMCIA psuedo floppy */
+#define	PCFS_FOLDCASE		0x8000	/* fold filenames to lowercase */
+#define	PCFS_FAT32		0x10000	/* 32 bit FAT */
+#define	PCFS_IRRECOV		0x20000	/* FS was messed with during write */
+#define	PCFS_NOCLAMPTIME	0x40000	/* expose full FAT timestamp range */
 
 /* for compatibility */
 struct old_pcfs_args {
@@ -225,6 +226,7 @@ struct pcfs_args {
 #define	PCFS_MNT_HIDDEN		0x01	/* show hidden files */
 #define	PCFS_MNT_FOLDCASE	0x02	/* fold all names from media to */
 					/* lowercase */
+#define	PCFS_MNT_NOCLAMPTIME	0x04	/* expose full FAT timestamp range */
 
 /*
  * pcfs mount options.
@@ -233,6 +235,8 @@ struct pcfs_args {
 #define	MNTOPT_PCFS_NOHIDDEN	"nohidden"
 #define	MNTOPT_PCFS_FOLDCASE	"foldcase"
 #define	MNTOPT_PCFS_NOFOLDCASE	"nofoldcase"
+#define	MNTOPT_PCFS_CLAMPTIME	"clamptime"
+#define	MNTOPT_PCFS_NOCLAMPTIME	"noclamptime"
 
 /*
  * Disk timeout value in sec.

@@ -63,6 +63,7 @@
 #include <sys/open.h>
 #include <sys/mntent.h>
 #include <sys/policy.h>
+#include <sys/atomic.h>
 
 /*
  * The majority of PC media use a 512 sector size, but
@@ -84,6 +85,7 @@ static int pcfs_statvfs(struct vfs *, struct statvfs64 *);
 static int pc_syncfsnodes(struct pcfs *);
 static int pcfs_sync(struct vfs *, short, struct cred *);
 static int pcfs_vget(struct vfs *vfsp, struct vnode **vpp, struct fid *fidp);
+static void pcfs_freevfs(vfs_t *vfsp);
 
 static int pc_getfattype(struct vnode *, int, daddr_t *, int *);
 static int pc_readfat(struct pcfs *fsp, uchar_t *fatp, daddr_t start,
@@ -94,24 +96,23 @@ static int pc_writefat(struct pcfs *fsp, daddr_t start);
  * pcfs mount options table
  */
 
-static char *nohidden_cancel[] = {MNTOPT_PCFS_HIDDEN, NULL};
-static char *hidden_cancel[] = {MNTOPT_PCFS_NOHIDDEN, NULL};
-static char *nofoldcase_cancel[] = {MNTOPT_PCFS_FOLDCASE, NULL};
-static char *foldcase_cancel[] = {MNTOPT_PCFS_NOFOLDCASE, NULL};
+static char *nohidden_cancel[] = { MNTOPT_PCFS_HIDDEN, NULL };
+static char *hidden_cancel[] = { MNTOPT_PCFS_NOHIDDEN, NULL };
+static char *nofoldcase_cancel[] = { MNTOPT_PCFS_FOLDCASE, NULL };
+static char *foldcase_cancel[] = { MNTOPT_PCFS_NOFOLDCASE, NULL };
+static char *clamptime_cancel[] = { MNTOPT_PCFS_NOCLAMPTIME, NULL };
+static char *noclamptime_cancel[] = { MNTOPT_PCFS_CLAMPTIME, NULL };
 
 static mntopt_t mntopts[] = {
 /*
- *	option name		cancel option	default arg	flags
- *		opt data
+ *	option name	cancel option	default arg	flags	opt data
  */
-	{ MNTOPT_PCFS_NOHIDDEN,	nohidden_cancel, NULL,		0,
-		NULL },
-	{ MNTOPT_PCFS_HIDDEN,	hidden_cancel, NULL,		MO_DEFAULT,
-		NULL },
-	{ MNTOPT_PCFS_NOFOLDCASE, nofoldcase_cancel, NULL,	MO_DEFAULT,
-		NULL },
-	{ MNTOPT_PCFS_FOLDCASE,	foldcase_cancel, NULL,		0,
-		NULL }
+	{ MNTOPT_PCFS_NOHIDDEN, nohidden_cancel, NULL, 0, NULL },
+	{ MNTOPT_PCFS_HIDDEN, hidden_cancel, NULL, MO_DEFAULT, NULL },
+	{ MNTOPT_PCFS_NOFOLDCASE, nofoldcase_cancel, NULL, MO_DEFAULT, NULL },
+	{ MNTOPT_PCFS_FOLDCASE, foldcase_cancel, NULL, 0, NULL },
+	{ MNTOPT_PCFS_CLAMPTIME, clamptime_cancel, NULL, MO_DEFAULT, NULL },
+	{ MNTOPT_PCFS_NOCLAMPTIME, noclamptime_cancel, NULL, NULL, NULL }
 };
 
 static mntopts_t pcfs_mntopts = {
@@ -129,9 +130,18 @@ int pcfsdebuglevel = 0;
  * pcnodes_lock: protects the pcnode hash table "pcdhead", "pcfhead".
  *
  * Lock hierarchy: pcfslock > pcfs_lock > pcnodes_lock
+ *
+ * pcfs_mountcount:	used to prevent module unloads while there is still
+ *			pcfs state from a former mount hanging around. With
+ *			forced umount support, the filesystem module must not
+ *			be allowed to go away before the last VFS_FREEVFS()
+ *			call has been made.
+ *			Since this is just an atomic counter, there's no need
+ *			for locking.
  */
 kmutex_t	pcfslock;
-krwlock_t pcnodes_lock; /* protect the pcnode hash table "pcdhead", "pcfhead" */
+krwlock_t	pcnodes_lock;
+uint32_t	pcfs_mountcount;
 
 static int pcfstype;
 
@@ -182,6 +192,15 @@ _fini(void)
 {
 	int	error;
 
+	/*
+	 * If a forcedly unmounted instance is still hanging around,
+	 * we cannot allow the module to be unloaded because that would
+	 * cause panics once the VFS framework decides it's time to call
+	 * into VFS_FREEVFS().
+	 */
+	if (pcfs_mountcount)
+		return (EBUSY);
+
 	error = mod_remove(&modlinkage);
 	if (error)
 		return (error);
@@ -213,6 +232,7 @@ pcfsinit(int fstype, char *name)
 		VFSNAME_STATVFS, pcfs_statvfs,
 		VFSNAME_SYNC, (fs_generic_func_p) pcfs_sync,
 		VFSNAME_VGET, pcfs_vget,
+		VFSNAME_FREEVFS, (fs_generic_func_p) pcfs_freevfs,
 		NULL, NULL
 	};
 	int error;
@@ -240,6 +260,7 @@ pcfsinit(int fstype, char *name)
 
 	pcfstype = fstype;
 	(void) pc_init();
+	pcfs_mountcount = 0;
 	return (0);
 }
 
@@ -313,6 +334,7 @@ pcfs_mount(
 		struct pcfs_args tmp_tz;
 		int hidden = 0;
 		int foldcase = 0;
+		int noclamptime = 0;
 
 		tmp_tz.flags = 0;
 		if (copyin(data, &tmp_tz, datalen)) {
@@ -321,12 +343,15 @@ pcfs_mount(
 		if (datalen == sizeof (struct pcfs_args)) {
 			hidden = tmp_tz.flags & PCFS_MNT_HIDDEN;
 			foldcase = tmp_tz.flags & PCFS_MNT_FOLDCASE;
+			noclamptime = tmp_tz.flags & PCFS_MNT_NOCLAMPTIME;
 		}
 
 		if (hidden)
 			vfs_setmntopt(vfsp, MNTOPT_PCFS_HIDDEN,	NULL, 0);
 		if (foldcase)
 			vfs_setmntopt(vfsp, MNTOPT_PCFS_FOLDCASE, NULL, 0);
+		if (noclamptime)
+			vfs_setmntopt(vfsp, MNTOPT_PCFS_NOCLAMPTIME, NULL, 0);
 		/*
 		 * more than one pc filesystem can be mounted on x86
 		 * so the pc_tz structure is now a critical region
@@ -542,6 +567,8 @@ pcfs_mount(
 		fsp->pcfs_flags |= PCFS_HIDDEN;
 	if (vfs_optionisset(vfsp, MNTOPT_PCFS_FOLDCASE, NULL))
 		fsp->pcfs_flags |= PCFS_FOLDCASE;
+	if (vfs_optionisset(vfsp, MNTOPT_PCFS_NOCLAMPTIME, NULL))
+		fsp->pcfs_flags |= PCFS_NOCLAMPTIME;
 	vfsp->vfs_dev = pseudodev;
 	vfsp->vfs_fstype = pcfstype;
 	vfs_make_fsid(&vfsp->vfs_fsid, pseudodev, pcfstype);
@@ -561,6 +588,7 @@ pcfs_mount(
 	fsp->pcfs_nxt = pc_mounttab;
 	pc_mounttab = fsp;
 	mutex_exit(&pcfslock);
+	atomic_inc_32(&pcfs_mountcount);
 	return (0);
 }
 
@@ -580,38 +608,36 @@ pcfs_unmount(
 	if (secpolicy_fs_unmount(cr, vfsp) != 0)
 		return (EPERM);
 
-	/*
-	 * forced unmount is not supported by this file system
-	 * and thus, ENOTSUP, is being returned.
-	 */
-	if (flag & MS_FORCE)
-		return (ENOTSUP);
-
 	PC_DPRINTF0(4, "pcfs_unmount\n");
 	fsp = VFSTOPCFS(vfsp);
+
 	/*
 	 * We don't have to lock fsp because the VVFSLOCK in vfs layer will
 	 * prevent lookuppn from crossing the mount point.
+	 * If this is not a forced umount request and there's ongoing I/O,
+	 * don't allow the mount to proceed.
 	 */
-	if (fsp->pcfs_nrefs) {
+	if (flag & MS_FORCE)
+		vfsp->vfs_flag |= VFS_UNMOUNTED;
+	else if (fsp->pcfs_nrefs)
 		return (EBUSY);
-	}
+
+	mutex_enter(&pcfslock);
 
 	/*
-	 * Allow an unmount (regardless of state) if the fs instance has
-	 * been marked as beyond recovery.
+	 * If this is a forced umount request or if the fs instance has
+	 * been marked as beyond recovery, allow the umount to proceed
+	 * regardless of state. pc_diskchanged() forcibly releases all
+	 * inactive vnodes/pcnodes.
 	 */
-	if (fsp->pcfs_flags & PCFS_IRRECOV) {
-		mutex_enter(&pcfslock);
+	if (flag & MS_FORCE || fsp->pcfs_flags & PCFS_IRRECOV) {
 		rw_enter(&pcnodes_lock, RW_WRITER);
 		pc_diskchanged(fsp);
 		rw_exit(&pcnodes_lock);
-		mutex_exit(&pcfslock);
 	}
 
 	/* now there should be no pcp node on pcfhead or pcdhead. */
 
-	mutex_enter(&pcfslock);
 	if (fsp == pc_mounttab) {
 		pc_mounttab = fsp->pcfs_nxt;
 	} else {
@@ -620,14 +646,14 @@ pcfs_unmount(
 				fsp1->pcfs_nxt = fsp->pcfs_nxt;
 	}
 
-	if (fsp->pcfs_fatp != (uchar_t *)0) {
-		pc_invalfat(fsp);
-	}
 	mutex_exit(&pcfslock);
 
-	VN_RELE(fsp->pcfs_devvp);
-	mutex_destroy(&fsp->pcfs_lock);
-	kmem_free(fsp, (uint_t)sizeof (struct pcfs));
+	/*
+	 * Since we support VFS_FREEVFS(), there's no need to
+	 * free the fsp right now. The framework will tell us
+	 * when the right time to do so has arrived by calling
+	 * into pcfs_freevfs.
+	 */
 	return (0);
 }
 
@@ -646,6 +672,7 @@ pcfs_root(
 	fsp = VFSTOPCFS(vfsp);
 	if (error = pc_lockfs(fsp, 0, 0))
 		return (error);
+
 	pcp = pc_getnode(fsp, (daddr_t)0, 0, (struct pcdir *)0);
 	PC_DPRINTF2(9, "pcfs_root(0x%p) pcp= 0x%p\n",
 	    (void *)vfsp, (void *)pcp);
@@ -768,6 +795,8 @@ pcfs_sync(
 int
 pc_lockfs(struct pcfs *fsp, int diskchanged, int releasing)
 {
+	int err;
+
 	if ((fsp->pcfs_flags & PCFS_IRRECOV) && !releasing)
 		return (EIO);
 
@@ -784,9 +813,10 @@ pc_lockfs(struct pcfs *fsp, int diskchanged, int releasing)
 		 * had grabbed the lock and set the bit)
 		 */
 		if (!diskchanged && !(fsp->pcfs_flags & PCFS_IRRECOV)) {
-			int err;
-			if ((err = pc_getfat(fsp)))
+			if ((err = pc_getfat(fsp))) {
+				mutex_exit(&fsp->pcfs_lock);
 				return (err);
+			}
 		}
 		fsp->pcfs_flags |= PCFS_LOCKED;
 		fsp->pcfs_owner = curthread;
@@ -1365,7 +1395,7 @@ isBPB(uchar_t *cp, int *fattypep)
 		(ltohs(cp[510]) != MBB_MAGIC) ||
 		!VALID_SECSIZE(secsize) ||
 		!VALID_SPCL(bpb->spcl) ||
-		(secsize * bpb->spcl >= (64 * 1024)) ||
+		(secsize * bpb->spcl > (64 * 1024)) ||
 		!(ltohs(bpb->res_sec[0])))
 		return (0);
 
@@ -1599,8 +1629,8 @@ pc_getfat(struct pcfs *fsp)
 		fsp->pcfs_spcl = (int)bootp->spcl;
 		fsp->pcfs_fatsec = fatsec;
 		fsp->pcfs_spt = (int)ltohs(bootp->spt);
-		fsp->pcfs_rdirsec = (int)ltohs(bootp->rdirents[0])
-		    * sizeof (struct pcdir) / secsize;
+		fsp->pcfs_rdirsec = ((int)ltohs(bootp->rdirents[0])
+		    * sizeof (struct pcdir) + (secsize - 1)) / secsize;
 		fsp->pcfs_clsize = fsp->pcfs_spcl * secsize;
 		fsp->pcfs_fatstart = fsp->pcfs_dosstart +
 		    (daddr_t)ltohs(bootp->res_sec[0]);
@@ -2156,4 +2186,30 @@ int
 pc_fat_is_changed(struct pcfs *fsp, pc_cluster32_t bn)
 {
 	return (fsp->pcfs_fat_changemap[bn] == 1);
+}
+
+/*
+ * Implementation of VFS_FREEVFS() to support forced umounts.
+ * This is called by the vfs framework after umount, to trigger
+ * the release of any resources still associated with the given
+ * vfs_t once the need to keep them has gone away.
+ */
+void
+pcfs_freevfs(vfs_t *vfsp)
+{
+	struct pcfs *fsp = VFSTOPCFS(vfsp);
+
+	mutex_enter(&pcfslock);
+	if (fsp->pcfs_fatp != (uchar_t *)0)
+		pc_invalfat(fsp);
+	mutex_exit(&pcfslock);
+
+	VN_RELE(fsp->pcfs_devvp);
+	mutex_destroy(&fsp->pcfs_lock);
+	kmem_free(fsp, (uint_t)sizeof (struct pcfs));
+
+	/*
+	 * Allow _fini() to succeed now, if so desired.
+	 */
+	atomic_dec_32(&pcfs_mountcount);
 }

@@ -285,7 +285,9 @@ pc_makedirentry(struct pcnode *dp, struct pcdir *direntries,
 
 	ep = &direntries[ndirentries - 1];
 	gethrestime(&now);
-	pc_tvtopct(&now, &ep->pcd_mtime);
+	if (error = pc_tvtopct(&now, &ep->pcd_mtime))
+		return (error);
+
 	ep->pcd_crtime = ep->pcd_mtime;
 	ep->pcd_ladate = ep->pcd_mtime.pct_date;
 	ep->pcd_crtime_msec = 0;

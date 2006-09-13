@@ -242,19 +242,39 @@ struct pc_dirent {
 	char		d_name[PCMAXNAMLEN + 1];
 };
 
+/*
+ * Check FAT 8.3 filename characters for validity.
+ * Lacking a kernel iconv, codepage support for short filenames
+ * is not provided.
+ * Short names must be uppercase ASCII (no support for MSDOS
+ * codepages right now, sorry) and may not contain any of
+ * *+=|\[];:",<>.?/ which are explicitly forbidden by the
+ * FAT specifications.
+ */
+#define	pc_validchar(_c) 						\
+	(((_c) >= ' ' && !((_c) & ~0177)) &&				\
+	(((_c) >= 'A' && (_c) <= 'Z') ||				\
+	((_c) >= '0' && (_c) <= '9') ||					\
+	((_c) != '"' && (_c) != '*' && (_c) != '+' && (_c) != ',' &&	\
+	(_c) != '.' && (_c) != '/' && (_c) != ':' && (_c) != ';' &&	\
+	(_c) != '<' && (_c) != '=' && (_c) != '>' && (_c) != '?' &&	\
+	(_c) != '[' && (_c) != '\\' && (_c) != ']' && (_c) != '|')))
+
+
 #ifdef _KERNEL
 
 /*
- * macros for converting to/from upper or lower case.
+ * macros for converting ASCII to/from upper or lower case.
  * users may give and get names in lower case, but they are stored on the
- * disk in upper case to be PCDOS compatible
+ * disk in upper case to be PCDOS compatible.
+ * These would better come from some shared source in <sys/...> but
+ * there is no such place yet.
  */
 #define	toupper(C)	(((C) >= 'a' && (C) <= 'z') ? (C) - 'a' + 'A' : (C))
 #define	tolower(C)	(((C) >= 'A' && (C) <= 'Z') ? (C) - 'A' + 'a' : (C))
 
-extern void pc_tvtopct(timestruc_t *, struct pctime *);	/* timeval to pctime */
-extern void pc_pcttotv(struct pctime *, timestruc_t *);	/* pctime to timeval */
-extern int pc_validchar(char);			/* valid filename ch */
+extern int pc_tvtopct(timestruc_t *, struct pctime *);	/* timeval to pctime */
+extern void pc_pcttotv(struct pctime *, int64_t *);	/* pctime to timeval */
 extern int pc_valid_lfn_char(char);		/* valid long filename ch */
 
 extern int pc_read_long_fn(struct vnode *, struct uio *,

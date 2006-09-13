@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +54,7 @@
 #include <sys/conf.h>
 #include <sys/flock.h>
 #include <sys/policy.h>
+#include <sys/sdt.h>
 
 #include <vm/seg.h>
 #include <vm/page.h>
@@ -293,6 +293,12 @@ rwpcp(
 	rlim64_t limit = uio->uio_llimit;
 	int oresid = uio->uio_resid;
 
+	/*
+	 * If the filesystem was umounted by force, return immediately.
+	 */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
+
 	PC_DPRINTF4(5, "rwpcp pcp=%p off=%lld resid=%ld size=%u\n", (void *)pcp,
 	    uio->uio_loffset, uio->uio_resid, pcp->pc_size);
 
@@ -514,6 +520,7 @@ pcfs_getattr(
 	int error;
 	char attr;
 	struct pctime atime;
+	int64_t unixtime;
 
 	PC_DPRINTF1(8, "pcfs_getattr: vp=%p\n", (void *)vp);
 
@@ -559,11 +566,53 @@ pcfs_getattr(
 	    pc_getstartcluster(fsp, &pcp->pc_entry), fsp->pcfs_entps);
 	vap->va_nlink = 1;
 	vap->va_size = (u_offset_t)pcp->pc_size;
-	pc_pcttotv(&pcp->pc_entry.pcd_mtime, &vap->va_mtime);
+
+	pc_pcttotv(&pcp->pc_entry.pcd_mtime, &unixtime);
+	if ((fsp->pcfs_flags & PCFS_NOCLAMPTIME) == 0) {
+		if (unixtime > INT32_MAX)
+			DTRACE_PROBE1(pcfs__mtimeclamped, int64_t, unixtime);
+		unixtime = MIN(unixtime, INT32_MAX);
+	} else if (unixtime > INT32_MAX &&
+	    get_udatamodel() == DATAMODEL_ILP32) {
+		pc_unlockfs(fsp);
+		DTRACE_PROBE1(pcfs__mtimeoverflowed, int64_t, unixtime);
+		return (EOVERFLOW);
+	}
+
+	vap->va_mtime.tv_sec = (time_t)unixtime;
+	vap->va_mtime.tv_nsec = 0;
+
+	/*
+	 * FAT doesn't know about POSIX ctime.
+	 * Best approximation is to always set it to mtime.
+	 */
 	vap->va_ctime = vap->va_mtime;
-	atime.pct_time = 0;
+
+	/*
+	 * FAT only stores "last access date". If that's the
+	 * same as the date of last modification then the time
+	 * of last access is known. Otherwise, use midnight.
+	 */
 	atime.pct_date = pcp->pc_entry.pcd_ladate;
-	pc_pcttotv(&atime, &vap->va_atime);
+	if (atime.pct_date == pcp->pc_entry.pcd_mtime.pct_date)
+		atime.pct_time = pcp->pc_entry.pcd_mtime.pct_time;
+	else
+		atime.pct_time = 0;
+	pc_pcttotv(&atime, &unixtime);
+	if ((fsp->pcfs_flags & PCFS_NOCLAMPTIME) == 0) {
+		if (unixtime > INT32_MAX)
+			DTRACE_PROBE1(pcfs__atimeclamped, int64_t, unixtime);
+		unixtime = MIN(unixtime, INT32_MAX);
+	} else if (unixtime > INT32_MAX &&
+	    get_udatamodel() == DATAMODEL_ILP32) {
+		pc_unlockfs(fsp);
+		DTRACE_PROBE1(pcfs__atimeoverflowed, int64_t, unixtime);
+		return (EOVERFLOW);
+	}
+
+	vap->va_atime.tv_sec = (time_t)unixtime;
+	vap->va_atime.tv_nsec = 0;
+
 	vap->va_rdev = 0;
 	vap->va_nblocks = (fsblkcnt64_t)howmany((offset_t)pcp->pc_size,
 				DEV_BSIZE);
@@ -586,7 +635,7 @@ pcfs_setattr(
 	mode_t mask = vap->va_mask;
 	int error;
 	struct pcfs *fsp;
-	timestruc_t now;
+	timestruc_t now, *timep;
 
 	PC_DPRINTF2(6, "pcfs_setattr: vp=%p mask=%x\n", (void *)vp, (int)mask);
 	/*
@@ -596,7 +645,7 @@ pcfs_setattr(
 		return (EINVAL);
 	}
 	/*
-	 * pcfs_settar is now allowed on directories to avoid silly warnings
+	 * pcfs_setattr is now allowed on directories to avoid silly warnings
 	 * from 'tar' when it tries to set times on a directory, and console
 	 * printf's on the NFS server when it gets EINVAL back on such a
 	 * request. One possible problem with that since a directory entry
@@ -660,7 +709,7 @@ pcfs_setattr(
 	/*
 	 * Change file modified times.
 	 */
-	if ((mask & (AT_MTIME | AT_CTIME)) && (vap->va_mtime.tv_sec != -1)) {
+	if (mask & (AT_MTIME | AT_CTIME)) {
 		/*
 		 * If SysV-compatible option to set access and
 		 * modified times if privileged, owner, or write access,
@@ -668,18 +717,25 @@ pcfs_setattr(
 		 *
 		 * XXX - va_mtime.tv_sec == -1 flags this.
 		 */
+		timep = &vap->va_mtime;
 		if (vap->va_mtime.tv_sec == -1) {
 			gethrestime(&now);
-			pc_tvtopct(&now, &pcp->pc_entry.pcd_mtime);
-		} else {
-			pc_tvtopct(&vap->va_mtime, &pcp->pc_entry.pcd_mtime);
+			timep = &now;
 		}
+		if ((fsp->pcfs_flags & PCFS_NOCLAMPTIME) == 0 &&
+		    timep->tv_sec > INT32_MAX) {
+			error = EOVERFLOW;
+			goto out;
+		}
+		error = pc_tvtopct(timep, &pcp->pc_entry.pcd_mtime);
+		if (error)
+			goto out;
 		pcp->pc_flags |= PC_CHG;
 	}
 	/*
 	 * Change file access times.
 	 */
-	if ((mask & (AT_ATIME)) && (vap->va_atime.tv_sec != -1)) {
+	if (mask & AT_ATIME) {
 		/*
 		 * If SysV-compatible option to set access and
 		 * modified times if privileged, owner, or write access,
@@ -689,12 +745,19 @@ pcfs_setattr(
 		 */
 		struct pctime	atime;
 
+		timep = &vap->va_atime;
 		if (vap->va_atime.tv_sec == -1) {
 			gethrestime(&now);
-			pc_tvtopct(&now, &atime);
-		} else {
-			pc_tvtopct(&vap->va_atime, &atime);
+			timep = &now;
 		}
+		if ((fsp->pcfs_flags & PCFS_NOCLAMPTIME) == 0 &&
+		    timep->tv_sec > INT32_MAX) {
+			error = EOVERFLOW;
+			goto out;
+		}
+		error = pc_tvtopct(timep, &atime);
+		if (error)
+			goto out;
 		pcp->pc_entry.pcd_ladate = atime.pct_date;
 		pcp->pc_flags |= PC_CHG;
 	}
@@ -778,6 +841,26 @@ pcfs_inactive(
 	fsp = VFSTOPCFS(vp->v_vfsp);
 	error = pc_lockfs(fsp, 0, 1);
 
+	/*
+	 * If the filesystem was umounted by force, all dirty
+	 * pages associated with this vnode are invalidated
+	 * and then the vnode will be freed.
+	 */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED) {
+		pcp = VTOPC(vp);
+		if (vn_has_cached_data(vp)) {
+			(void) pvn_vplist_dirty(vp, (u_offset_t)0,
+			    pcfs_putapage, B_INVAL, (struct cred *)NULL);
+		}
+		remque(pcp);
+		if (error == 0)
+			pc_unlockfs(fsp);
+		vn_free(vp);
+		kmem_free(pcp, sizeof (struct pcnode));
+		VFS_RELE(PCFSTOVFS(fsp));
+		return;
+	}
+
 	mutex_enter(&vp->v_lock);
 	ASSERT(vp->v_count >= 1);
 	if (vp->v_count > 1) {
@@ -793,10 +876,15 @@ pcfs_inactive(
 	 * with a subsequent pc_diskchanged() call has released
 	 * the pcnode.  If it has then release the vnode as above.
 	 */
-	if ((pcp = VTOPC(vp)) == NULL)
+	if ((pcp = VTOPC(vp)) == NULL) {
+		if (vn_has_cached_data(vp))
+			(void) pvn_vplist_dirty(vp, (u_offset_t)0,
+			    pcfs_putapage, B_INVAL | B_TRUNC,
+			    (struct cred *)NULL);
 		vn_free(vp);
-	else
+	} else {
 		pc_rele(pcp);
+	}
 
 	if (!error)
 		pc_unlockfs(fsp);
@@ -816,6 +904,12 @@ pcfs_lookup(
 	struct pcfs *fsp;
 	struct pcnode *pcp;
 	int error;
+
+	/*
+	 * If the filesystem was umounted by force, return immediately.
+	 */
+	if (dvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
 
 	/*
 	 * verify that the dvp is still valid on the disk
@@ -1116,6 +1210,12 @@ pcfs_readdir(
 	struct pc_dirent *ld = &lbp;
 	int error;
 
+	/*
+	 * If the filesystem was umounted by force, return immediately.
+	 */
+	if (dvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
+
 	if ((uiop->uio_iovcnt != 1) ||
 	    (uiop->uio_loffset % sizeof (struct pcdir)) != 0) {
 		return (EINVAL);
@@ -1248,6 +1348,12 @@ pcfs_getapage(
 	page_t *pp;
 	page_t *pagefound;
 	int err;
+
+	/*
+	 * If the filesystem was umounted by force, return immediately.
+	 */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
 
 	PC_DPRINTF3(5, "pcfs_getapage: vp=%p off=%lld len=%lu\n",
 	    (void *)vp, off, len);
@@ -1433,6 +1539,12 @@ pcfs_putpage(
 	size_t io_len;
 	offset_t eoff;
 	int err;
+
+	/*
+	 * If the filesystem was umounted by force, return immediately.
+	 */
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+		return (EIO);
 
 	PC_DPRINTF1(6, "pcfs_putpage vp=0x%p\n", (void *)vp);
 	if (vp->v_flag & VNOMAP)
