@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -854,19 +853,19 @@ prt_a_opt(struct sa *xx)
 static void
 prt_q_opt(struct sa *xx)
 {
-	if (xx->si.runocc == 0)
+	if (xx->si.runocc == 0 || xx->si.updates == 0)
 		(void) printf(" %7.1f %7.0f", 0., 0.);
 	else {
 		(void) printf(" %7.1f %7.0f",
 		    (float)xx->si.runque / (float)xx->si.runocc,
-		    (float)xx->si.runocc / sec_diff * 100.0);
+		    (float)xx->si.runocc / (float)xx->si.updates * 100.0);
 	}
-	if (xx->si.swpocc == 0)
+	if (xx->si.swpocc == 0 || xx->si.updates == 0)
 		(void) printf(" %7.1f %7.0f\n", 0., 0.);
 	else {
 		(void) printf(" %7.1f %7.0f\n",
 		    (float)xx->si.swpque / (float)xx->si.swpocc,
-		    (float)xx->si.swpocc / sec_diff * 100.0);
+		    (float)xx->si.swpocc / (float)xx->si.updates * 100.0);
 	}
 }
 
@@ -917,9 +916,15 @@ prt_g_opt(struct sa *xx)
 static void
 prt_r_opt(struct sa *xx)
 {
-	(void) printf(" %7.0f %8.0f\n",
-		(double)xx->vmi.freemem / sec_diff,
-		(double)PGTOBLK(xx->vmi.swap_avail) / sec_diff);
+	/* Avoid divide by Zero - Should never happen */
+	if (xx->si.updates == 0)
+		(void) printf(" %7.0f %8.0f\n", 0., 0.);
+	else {
+		(void) printf(" %7.0f %8.0f\n",
+		    (double)xx->vmi.freemem / (float)xx->si.updates,
+		    (double)PGTOBLK(xx->vmi.swap_avail) /
+			(float)xx->si.updates);
+	}
 }
 
 static void
