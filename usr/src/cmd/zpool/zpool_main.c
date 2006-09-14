@@ -3133,7 +3133,7 @@ main(int argc, char **argv)
 
 	if ((g_zfs = libzfs_init()) == NULL) {
 		(void) fprintf(stderr, gettext("internal error: failed to "
-		    "initialize ZFS library"));
+		    "initialize ZFS library\n"));
 		return (1);
 	}
 
