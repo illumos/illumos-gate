@@ -67,11 +67,11 @@
  * globals
  */
 struct sdev_data *sdev_origins; /* mount info for origins under /dev */
+kmutex_t sdev_lock; /* used for mount/unmount/rename synchronization */
 
 /*
  * static
  */
-static kmutex_t sdev_lock;	/* protects global data */
 static major_t devmajor;	/* the fictitious major we live on */
 static major_t devminor;	/* the fictitious minor of this instance */
 static struct sdev_data *sdev_mntinfo = NULL;	/* linked list of instances */

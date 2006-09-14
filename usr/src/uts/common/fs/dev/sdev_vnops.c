@@ -289,7 +289,6 @@ sdev_setsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
 	if (avp == NULL) {
 		if (SDEV_IS_GLOBAL(dv) && !SDEV_IS_PERSIST(dv))
 			return (fs_nosys());
-
 		ASSERT(dv->sdev_attr);
 		/*
 		 * if coming in directly, the acl system call will
@@ -391,8 +390,7 @@ sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 	int			error = 0;
 	vtype_t			type = vap->va_type;
 
-	ASSERT(vap->va_type != VNON &&
-	    vap->va_type != VBAD);
+	ASSERT(type != VNON && type != VBAD);
 
 	if ((type == VFIFO) || (type == VSOCK) ||
 	    (type == VPROC) || (type == VPORT))
@@ -614,9 +612,9 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	struct vattr		vattr;
 	struct sdev_node	*toparent;
 	struct sdev_node	*fromdv = NULL;	/* source node */
-	struct vnode 		*ovp;	/* source vnode */
+	struct vnode 		*ovp = NULL;	/* source vnode */
 	struct sdev_node	*todv = NULL;	/* destination node */
-	struct vnode 		*nvp;		/* destination vnode */
+	struct vnode 		*nvp = NULL;	/* destination vnode */
 	int			samedir = 0;	/* set if odvp == ndvp */
 	struct vnode		*realvp;
 	int			len;
@@ -628,10 +626,13 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	int error = 0;
 	dev_t fsid;
 	int bkstore = 0;
+	vtype_t type;
 
 	/* prevent modifying "." and ".." */
 	if ((onm[0] == '.' &&
-	    (onm[1] == '\0' || (onm[1] == '.' && onm[2] == '\0')))) {
+	    (onm[1] == '\0' || (onm[1] == '.' && onm[2] == '\0'))) ||
+	    (nnm[0] == '.' &&
+	    (nnm[1] == '\0' || (nnm[1] == '.' && nnm[2] == '\0')))) {
 		return (EINVAL);
 	}
 
@@ -659,11 +660,18 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	}
 	rw_exit(&toparent->sdev_dotdot->sdev_contents);
 
+	/*
+	 * grabbing the global lock to prevent
+	 * mount/unmount/other rename activities.
+	 */
+	mutex_enter(&sdev_lock);
+
 	/* check existence of the source node */
 	error = VOP_LOOKUP(odvp, onm, &ovp, NULL, 0, NULL, cred);
 	if (error) {
 		sdcmn_err2(("sdev_rename: the source node %s exists\n",
 		    onm));
+		mutex_exit(&sdev_lock);
 		return (error);
 	}
 
@@ -676,6 +684,7 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	/* check existence of destination */
 	error = VOP_LOOKUP(ndvp, nnm, &nvp, NULL, 0, NULL, cred);
 	if (error && (error != ENOENT)) {
+		mutex_exit(&sdev_lock);
 		VN_RELE(ovp);
 		return (error);
 	}
@@ -687,32 +696,25 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	}
 
 	/*
-	 * For now, if both exist, they must be the same type.
-	 * Changing the type of a node probably needs some special
-	 * handling.
+	 * make sure the source and the destination are
+	 * in the same dev filesystem
 	 */
-	if (ovp && nvp) {
-		if (ovp->v_type != nvp->v_type) {
-			VN_RELE(ovp);
-			VN_RELE(nvp);
-			return (EINVAL);
-		}
-	}
-
-	/* make sure the source and the destination are in /dev */
 	if (odvp != ndvp) {
 		vattr.va_mask = AT_FSID;
 		if (error = VOP_GETATTR(odvp, &vattr, 0, cred)) {
+			mutex_exit(&sdev_lock);
 			VN_RELE(ovp);
 			return (error);
 		}
 		fsid = vattr.va_fsid;
 		vattr.va_mask = AT_FSID;
 		if (error = VOP_GETATTR(ndvp, &vattr, 0, cred)) {
+			mutex_exit(&sdev_lock);
 			VN_RELE(ovp);
 			return (error);
 		}
 		if (fsid != vattr.va_fsid) {
+			mutex_exit(&sdev_lock);
 			VN_RELE(ovp);
 			return (EXDEV);
 		}
@@ -721,6 +723,7 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	/* make sure the old entry can be deleted */
 	error = VOP_ACCESS(odvp, VWRITE, 0, cred);
 	if (error) {
+		mutex_exit(&sdev_lock);
 		VN_RELE(ovp);
 		return (error);
 	}
@@ -730,6 +733,7 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	if (!samedir) {
 		error = VOP_ACCESS(ndvp, VEXEC|VWRITE, 0, cred);
 		if (error) {
+			mutex_exit(&sdev_lock);
 			VN_RELE(ovp);
 			return (error);
 		}
@@ -754,113 +758,100 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 		}
 
 		if (error) {
+			mutex_exit(&sdev_lock);
+			sdcmn_err2(("sdev_rename: DBNR doesn't "
+			    "allow rename, error %d", error));
 			VN_RELE(ovp);
 			return (error);
 		}
 	}
 
-	/*
-	 * Remove the destination if exist
-	 * On failure, we should attempt to restore the current state
-	 * before returning error.
-	 */
+	/* destination file exists */
 	if (nvp) {
-		switch (nvp->v_type) {
-		case VDIR:
-			error = VOP_RMDIR(ndvp, nnm, ndvp, cred);
-			break;
-		default:
-			error = VOP_REMOVE(ndvp, nnm, cred);
-			break;
-		}
-
-		if (error) {
-			sdcmn_err2(("sdev_rename: removing existing destination"
-			    " %s failed, error %d\n", nnm, error));
-			VN_RELE(ovp);
-			VN_RELE(nvp);
-			return (error);
-		}
+		todv = VTOSDEV(nvp);
+		ASSERT(todv);
 	}
 
 	/*
 	 * link source to new target in the memory
 	 */
-	error = VOP_LOOKUP(ndvp, nnm, &nvp, NULL, 0, NULL, cred);
-	if (error && (error != ENOENT)) {
-		VN_RELE(ovp);
-		return (error);
-	} else if (error == ENOENT) {
-		/* make a new node from the old node */
-		error = sdev_rnmnode(fromparent, fromdv, toparent, &todv,
-		    nnm, cred);
-	} else {
-		ASSERT(nvp);
-		if (VOP_REALVP(nvp, &realvp) == 0) {
-			VN_HOLD(realvp);
-			VN_RELE(nvp);
-			nvp = realvp;
-		}
-
-		/* destination file exists */
-		todv = VTOSDEV(nvp);
-		ASSERT(todv);
-		error = sdev_rnmnode(fromparent, fromdv, toparent, &todv,
-		    nnm, cred);
-		if (error) {
-			sdcmn_err2(("sdev_rename: renaming %s to %s failed "
-			    " with existing destination error %d\n",
-			    onm, nnm, error));
-			VN_RELE(nvp);
-			VN_RELE(ovp);
-			return (error);
-		}
-	}
-
-	/* unlink from source */
-	if (error == 0) {
-		/*
-		 * check with the plug-in module whether source can be
-		 * re-used or not
-		 */
-		if (odirops && ((rmfn = odirops->devnops_remove) != NULL)) {
-			error = (*rmfn)(&(fromdv->sdev_handle));
-		}
-
-		if (error == 0) {
-			bkstore = SDEV_IS_PERSIST(fromdv) ? 1 : 0;
-			rw_enter(&fromparent->sdev_contents, RW_WRITER);
-			error = sdev_cache_update(fromparent, &fromdv, onm,
-			    SDEV_CACHE_DELETE);
-			rw_exit(&fromparent->sdev_contents);
-
-			/* best effforts clean up the backing store */
-			if (bkstore) {
-				ASSERT(fromparent->sdev_attrvp);
-				error = VOP_REMOVE(fromparent->sdev_attrvp,
-				    onm, kcred);
-				if (error) {
-					sdcmn_err2(("sdev_rename: device %s is "
-					    "still on disk %s\n", onm,
-					    fromparent->sdev_path));
-					error = 0;
-				}
-			}
-
-			if (error == EBUSY) {
-				error = 0;
-			}
-		}
-	}
-
-	/* book keeping the ovp v_count */
+	error = sdev_rnmnode(fromparent, fromdv, toparent, &todv, nnm, cred);
 	if (error) {
 		sdcmn_err2(("sdev_rename: renaming %s to %s failed "
 		    " with error %d\n", onm, nnm, error));
+		mutex_exit(&sdev_lock);
+		if (nvp)
+			VN_RELE(nvp);
 		VN_RELE(ovp);
+		return (error);
 	}
 
-	return (error);
+	/* notify the DBNR module the node is going away */
+	if (odirops && ((rmfn = odirops->devnops_remove) != NULL)) {
+		(void) (*rmfn)(&(fromdv->sdev_handle));
+	}
+
+	/*
+	 * unlink from source
+	 */
+	rw_enter(&fromparent->sdev_contents, RW_READER);
+	fromdv = sdev_cache_lookup(fromparent, onm);
+	if (fromdv == NULL) {
+		rw_exit(&fromparent->sdev_contents);
+		mutex_exit(&sdev_lock);
+		sdcmn_err2(("sdev_rename: the source is deleted already\n"));
+		return (0);
+	}
+
+	if (fromdv->sdev_state == SDEV_ZOMBIE) {
+		rw_exit(&fromparent->sdev_contents);
+		mutex_exit(&sdev_lock);
+		VN_RELE(SDEVTOV(fromdv));
+		sdcmn_err2(("sdev_rename: the source is being deleted\n"));
+		return (0);
+	}
+	rw_exit(&fromparent->sdev_contents);
+	ASSERT(SDEVTOV(fromdv) == ovp);
+	VN_RELE(ovp);
+
+	/* clean out the directory contents before it can be removed */
+	type = SDEVTOV(fromdv)->v_type;
+	if (type == VDIR) {
+		error = sdev_cleandir(fromdv, NULL, 0);
+		sdcmn_err2(("sdev_rename: cleandir finished with %d\n",
+		    error));
+		if (error == EBUSY)
+			error = 0;
+	}
+
+	rw_enter(&fromparent->sdev_contents, RW_WRITER);
+	bkstore = SDEV_IS_PERSIST(fromdv) ? 1 : 0;
+	error = sdev_cache_update(fromparent, &fromdv, onm,
+	    SDEV_CACHE_DELETE);
+
+	/* best effforts clean up the backing store */
+	if (bkstore) {
+		ASSERT(fromparent->sdev_attrvp);
+		if (type != VDIR) {
+			error = VOP_REMOVE(fromparent->sdev_attrvp,
+			    onm, kcred);
+		} else {
+			error = VOP_RMDIR(fromparent->sdev_attrvp,
+			    onm, fromparent->sdev_attrvp, kcred);
+		}
+
+		if (error) {
+			sdcmn_err2(("sdev_rename: device %s is "
+			    "still on disk %s\n", onm,
+			    fromparent->sdev_path));
+			error = 0;
+		}
+	}
+	rw_exit(&fromparent->sdev_contents);
+	mutex_exit(&sdev_lock);
+
+	/* once reached to this point, the rename is regarded successful */
+	return (0);
 }
 
 /*

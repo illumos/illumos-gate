@@ -967,7 +967,6 @@ sdev_nodedestroy(struct sdev_node *dv, uint_t flags)
 	/* return node to initial state as per constructor */
 	(void) memset((void *)&dv->sdev_instance_data, 0,
 	    sizeof (dv->sdev_instance_data));
-
 	vn_invalid(SDEVTOV(dv));
 	kmem_cache_free(sdev_node_cache, dv);
 }
@@ -1108,13 +1107,11 @@ sdev_checkpath(struct sdev_node *sdv, struct sdev_node *tdv, struct cred *cred)
 	int error = 0;
 	struct sdev_node *dotdot, *dir;
 
-	rw_enter(&tdv->sdev_contents, RW_READER);
 	dotdot = tdv->sdev_dotdot;
 	ASSERT(dotdot);
 
 	/* fs root */
 	if (dotdot == tdv) {
-		rw_exit(&tdv->sdev_contents);
 		return (0);
 	}
 
@@ -1138,31 +1135,7 @@ sdev_checkpath(struct sdev_node *sdv, struct sdev_node *tdv, struct cred *cred)
 			break;
 		}
 	}
-	rw_exit(&tdv->sdev_contents);
 	return (error);
-}
-
-/*
- * Renaming a directory to a different parent
- * requires modifying the ".." reference.
- */
-static void
-sdev_fixdotdot(struct sdev_node *dv, struct sdev_node *oparent,
-    struct sdev_node *nparent)
-{
-	ASSERT(SDEVTOV(dv)->v_type == VDIR);
-	ASSERT(nparent);
-	ASSERT(oparent);
-
-	rw_enter(&nparent->sdev_contents, RW_WRITER);
-	nparent->sdev_nlink++;
-	ASSERT(dv->sdev_dotdot == oparent);
-	dv->sdev_dotdot = nparent;
-	rw_exit(&nparent->sdev_contents);
-
-	rw_enter(&oparent->sdev_contents, RW_WRITER);
-	oparent->sdev_nlink--;
-	rw_exit(&oparent->sdev_contents);
 }
 
 int
@@ -1176,6 +1149,35 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 	struct vattr vattr;
 	int doingdir = (ovp->v_type == VDIR);
 	char *link = NULL;
+	int samedir = (oddv == nddv) ? 1 : 0;
+	int bkstore = 0;
+	int bypass = 0;
+	struct sdev_node *idv = NULL;
+	struct sdev_node *ndv = NULL;
+	timestruc_t now;
+
+	vattr.va_mask = AT_MODE|AT_UID|AT_GID;
+	error = VOP_GETATTR(ovp, &vattr, 0, cred);
+	if (error)
+		return (error);
+
+	if (!samedir)
+		rw_enter(&oddv->sdev_contents, RW_WRITER);
+	rw_enter(&nddv->sdev_contents, RW_WRITER);
+
+	/*
+	 * the source may have been deleted by another thread before
+	 * we gets here.
+	 */
+	if (odv->sdev_state != SDEV_READY) {
+		error = ENOENT;
+		goto err_out;
+	}
+
+	if (doingdir && (odv == nddv)) {
+		error = EINVAL;
+		goto err_out;
+	}
 
 	/*
 	 * If renaming a directory, and the parents are different (".." must be
@@ -1185,73 +1187,150 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 	if (doingdir && (oddv != nddv)) {
 		error = sdev_checkpath(odv, nddv, cred);
 		if (error)
-			return (error);
+			goto err_out;
 	}
 
-	vattr.va_mask = AT_MODE|AT_UID|AT_GID;
-	error = VOP_GETATTR(ovp, &vattr, 0, cred);
-	if (error)
-		return (error);
-
+	/* destination existing */
 	if (*ndvp) {
-		/* destination existing */
 		nvp = SDEVTOV(*ndvp);
 		ASSERT(nvp);
 
 		/* handling renaming to itself */
-		if (odv == *ndvp)
-			return (0);
+		if (odv == *ndvp) {
+			error = 0;
+			goto err_out;
+		}
 
-		/* special handling directory renaming */
-		if (doingdir) {
-			if (nvp->v_type != VDIR)
-				return (ENOTDIR);
+		if (nvp->v_type == VDIR) {
+			if (!doingdir) {
+				error = EISDIR;
+				goto err_out;
+			}
+
+			if (vn_vfswlock(nvp)) {
+				error = EBUSY;
+				goto err_out;
+			}
+
+			if (vn_mountedvfs(nvp) != NULL) {
+				vn_vfsunlock(nvp);
+				error = EBUSY;
+				goto err_out;
+			}
+
+			/* in case dir1 exists in dir2 and "mv dir1 dir2" */
+			if ((*ndvp)->sdev_nlink > 2) {
+				vn_vfsunlock(nvp);
+				error = EEXIST;
+				goto err_out;
+			}
+			vn_vfsunlock(nvp);
+
+			(void) sdev_dirdelete(nddv, *ndvp);
+			*ndvp = NULL;
+			error = VOP_RMDIR(nddv->sdev_attrvp, nnm,
+				    nddv->sdev_attrvp, cred);
+			if (error)
+				goto err_out;
+		} else {
+			if (doingdir) {
+				error = ENOTDIR;
+				goto err_out;
+			}
+
+			if (SDEV_IS_PERSIST((*ndvp))) {
+				bkstore = 1;
+			}
 
 			/*
-			 * Renaming a directory with the parent different
-			 * requires that ".." be re-written.
+			 * get rid of the node from the directory cache
+			 * note, in case EBUSY is returned, the ZOMBIE
+			 * node is taken care in sdev_mknode.
 			 */
-			if (oddv != nddv) {
-				sdev_fixdotdot(*ndvp, oddv, nddv);
+			(void) sdev_dirdelete(nddv, *ndvp);
+			*ndvp = NULL;
+			if (bkstore) {
+				error = VOP_REMOVE(nddv->sdev_attrvp,
+				    nnm, cred);
+				if (error)
+				    goto err_out;
 			}
 		}
-	} else {
-		/* creating the destination node with the source attr */
-		rw_enter(&nddv->sdev_contents, RW_WRITER);
-		error = sdev_mknode(nddv, nnm, ndvp, &vattr, NULL, NULL,
-		    cred, SDEV_INIT);
-		rw_exit(&nddv->sdev_contents);
-		if (error)
-			return (error);
-
-		ASSERT(*ndvp);
-		nvp = SDEVTOV(*ndvp);
 	}
 
 	/* fix the source for a symlink */
 	if (vattr.va_type == VLNK) {
 		if (odv->sdev_symlink == NULL) {
 			error = sdev_follow_link(odv);
-			if (error)
-				return (ENOENT);
+			if (error) {
+				error = ENOENT;
+				goto err_out;
+			}
 		}
 		ASSERT(odv->sdev_symlink);
 		link = i_ddi_strdup(odv->sdev_symlink, KM_SLEEP);
 	}
 
-	rw_enter(&nddv->sdev_contents, RW_WRITER);
-	error = sdev_mknode(nddv, nnm, ndvp, &vattr, NULL, (void *)link,
-	    cred, SDEV_READY);
-	rw_exit(&nddv->sdev_contents);
+	/*
+	 * make a fresh node from the source attrs
+	 */
+	ASSERT(RW_WRITE_HELD(&nddv->sdev_contents));
+	error = sdev_mknode(nddv, nnm, ndvp, &vattr,
+	    NULL, (void *)link, cred, SDEV_READY);
 
 	if (link)
 		kmem_free(link, strlen(link) + 1);
 
-	/* update timestamps */
-	sdev_update_timestamps(nvp, kcred, AT_CTIME|AT_ATIME);
-	sdev_update_timestamps(SDEVTOV(nddv), kcred, AT_MTIME|AT_ATIME);
+	if (error)
+		goto err_out;
+	ASSERT(*ndvp);
+	ASSERT((*ndvp)->sdev_state == SDEV_READY);
+
+	/* move dir contents */
+	if (doingdir) {
+		for (idv = odv->sdev_dot; idv; idv = idv->sdev_next) {
+			error = sdev_rnmnode(odv, idv,
+			    (struct sdev_node *)(*ndvp), &ndv,
+			    idv->sdev_name, cred);
+
+			if (error)
+				goto err_out;
+			ndv = NULL;
+		}
+
+	}
+
+	if ((*ndvp)->sdev_attrvp) {
+		sdev_update_timestamps((*ndvp)->sdev_attrvp, kcred,
+		    AT_CTIME|AT_ATIME);
+	} else {
+		ASSERT((*ndvp)->sdev_attr);
+		gethrestime(&now);
+		(*ndvp)->sdev_attr->va_ctime = now;
+		(*ndvp)->sdev_attr->va_atime = now;
+	}
+
+	if (nddv->sdev_attrvp) {
+		sdev_update_timestamps(nddv->sdev_attrvp, kcred,
+		    AT_MTIME|AT_ATIME);
+	} else {
+		ASSERT(nddv->sdev_attr);
+		gethrestime(&now);
+		nddv->sdev_attr->va_mtime = now;
+		nddv->sdev_attr->va_atime = now;
+	}
+	rw_exit(&nddv->sdev_contents);
+	if (!samedir)
+		rw_exit(&oddv->sdev_contents);
+
 	SDEV_RELE(*ndvp);
-	return (0);
+	return (error);
+
+err_out:
+	rw_exit(&nddv->sdev_contents);
+	if (!samedir)
+		rw_exit(&oddv->sdev_contents);
+	return (error);
 }
 
 /*
@@ -1355,7 +1434,7 @@ devname_configure_by_path(char *physpath, struct vattr *vattr)
 	int error = 0;
 	struct vnode *vp;
 
-	ASSERT(strncmp(physpath, "/devices/", sizeof ("/devices/" - 1))
+	ASSERT(strncmp(physpath, "/devices/", sizeof ("/devices/") - 1)
 	    == 0);
 
 	error = devfs_lookupname(physpath + sizeof ("/devices/") - 1,

@@ -8065,11 +8065,11 @@ devname_setup_nsmaps(void)
 	error = di_devname_get_mapinfo(DEVNAME_MASTER_MAP, &devname_maps);
 
 	if (error) {
-		vprint(INFO_MID, "devname_setup_nsmaps: error %d\n", errno);
+		vprint(DEVNAME_MID, "devname_setup_nsmaps: non-existing/empty"
+		    "%s\n", DEVNAME_MASTER_MAP);
 	} else {
-#ifdef DEBUG
 		di_devname_print_mapinfo(devname_maps);
-#endif
+
 		/* pass down the existing map names to kernel */
 		(void) devname_kcall(MODDEVNAME_NSMAPS, (void *)devname_maps);
 	}

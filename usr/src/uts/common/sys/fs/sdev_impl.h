@@ -614,6 +614,7 @@ extern void sdev_modctl_dump_files(void);
 /*
  * globals
  */
+extern kmutex_t sdev_lock;
 extern int devtype;
 extern kmem_cache_t *sdev_node_cache;
 extern struct vnodeops		*sdev_vnodeops;
