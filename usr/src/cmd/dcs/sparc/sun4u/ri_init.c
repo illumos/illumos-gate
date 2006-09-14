@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1018,13 +1017,15 @@ mem_cm_info(ri_ap_t *ap, cfga_list_data_t *cfga, int flags, rcmd_t *rcm)
 {
 	ri_dev_t	*mem;
 	char		*cp;
-	uint64_t	base_addr;		/* required */
-	int32_t		size_kb;		/* required */
-	int32_t		perm_kb = 0;		/* optional */
-	char		*target = NULL;		/* optional */
-	int32_t		del_kb = 0;		/* optional */
-	int32_t		rem_kb = 0;		/* optional */
-	char		*source = NULL;		/* optional */
+	char		*cpval;
+	int		len;
+	uint64_t	base_addr;				/* required */
+	int32_t		size_kb;				/* required */
+	int32_t		perm_kb = 0;				/* optional */
+	char		target[CFGA_AP_LOG_ID_LEN] = "";	/* optional */
+	int32_t		del_kb = 0;				/* optional */
+	int32_t		rem_kb = 0;				/* optional */
+	char		source[CFGA_AP_LOG_ID_LEN] = "";	/* optional */
 
 	if (sscanf(cfga->ap_info, "address=0x%llx size=%u", &base_addr,
 	    &size_kb) != 2) {
@@ -1036,15 +1037,33 @@ mem_cm_info(ri_ap_t *ap, cfga_list_data_t *cfga, int flags, rcmd_t *rcm)
 		goto err_fmt;
 	}
 
-	if ((cp = strstr(cfga->ap_info, "target")) != NULL &&
-	    sscanf(cp, "target=%s deleted=%u remaining=%u", &target, &del_kb,
-	    &rem_kb) != 3) {
-		goto err_fmt;
+	if ((cp = strstr(cfga->ap_info, "target")) != NULL) {
+		if ((cpval = strstr(cp, "=")) == NULL) {
+			goto err_fmt;
+		}
+		for (len = 0; cpval[len] != '\0' && cpval[len] != ' '; len++) {
+			if (len >= CFGA_AP_LOG_ID_LEN) {
+				goto err_fmt;
+			}
+		}
+		if (sscanf(cp, "target=%s deleted=%u remaining=%u", &target,
+		    &del_kb, &rem_kb) != 3) {
+			goto err_fmt;
+		}
 	}
 
-	if ((cp = strstr(cfga->ap_info, "source")) != NULL &&
-	    sscanf(cp, "source=%s", &source) != 1) {
-		goto err_fmt;
+	if ((cp = strstr(cfga->ap_info, "source")) != NULL) {
+		if ((cpval = strstr(cp, "=")) == NULL) {
+			goto err_fmt;
+		}
+		for (len = 0; cpval[len] != '\0' && cpval[len] != ' '; len++) {
+			if (len >= CFGA_AP_LOG_ID_LEN) {
+				goto err_fmt;
+			}
+		}
+		if (sscanf(cp, "source=%s", &source) != 1) {
+			goto err_fmt;
+		}
 	}
 
 	dprintf((stderr, "%s: base=0x%llx, size=%u, permanent=%u\n",
@@ -1065,7 +1084,7 @@ mem_cm_info(ri_ap_t *ap, cfga_list_data_t *cfga, int flags, rcmd_t *rcm)
 		return (-1);
 	}
 
-	if (target != NULL &&
+	if (target[0] != '\0' &&
 	    (nvlist_add_string(mem->conf_props, RI_MEM_TARG, target) != 0 ||
 	    nvlist_add_int32(mem->conf_props, RI_MEM_DEL, del_kb/KBYTE) != 0 ||
 	    nvlist_add_int32(mem->conf_props, RI_MEM_REMAIN,
@@ -1075,8 +1094,8 @@ mem_cm_info(ri_ap_t *ap, cfga_list_data_t *cfga, int flags, rcmd_t *rcm)
 		return (-1);
 	}
 
-	if (source != NULL && nvlist_add_string(mem->conf_props, RI_MEM_SRC,
-	    source) != 0) {
+	if (source[0] != '\0' &&
+	    nvlist_add_string(mem->conf_props, RI_MEM_SRC, source) != 0) {
 		dprintf((stderr, "nvlist_add failure\n"));
 		ri_dev_free(mem);
 		return (-1);

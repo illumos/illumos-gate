@@ -461,6 +461,7 @@ init_server(struct pollfd *pfd, uint8_t ah_auth_alg, uint8_t esp_encr_alg,
 	struct sockaddr_storage	ss;
 	struct sockaddr_in	*sin;
 	struct sockaddr_in6	*sin6;
+	struct linger		ling;
 	ipsec_req_t		ipsec_req;
 	int			req_port;
 	int			act_port;
@@ -560,6 +561,17 @@ init_server(struct pollfd *pfd, uint8_t ah_auth_alg, uint8_t esp_encr_alg,
 	    sock_opts, num_sock_opts, DCS_BACKLOG);
 
 	if (init_status != RDR_OK) {
+		return (-1);
+	}
+
+	/*
+	 * Set the SO_LINGER socket option so that TCP aborts the connection
+	 * when the socket is closed.  This avoids encountering a TIME_WAIT
+	 * state if the daemon ever crashes and is instantly restarted.
+	 */
+	ling.l_onoff = 1;
+	ling.l_linger = 0;
+	if (setsockopt(pfd->fd, SOL_SOCKET, SO_LINGER, &ling, sizeof (ling))) {
 		return (-1);
 	}
 
