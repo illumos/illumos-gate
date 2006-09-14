@@ -440,7 +440,7 @@ build() {
 			| egrep -v -- '-xcache' \
 			| egrep -v '^\+' \
 			| egrep -v '^cc1: note: -fwritable-strings' \
-			| egrep -v 'svc:/' \
+			| egrep -v 'svccfg-native -s svc:/' \
 			| sort | uniq >$SRC/${NOISE}.out
 		if [ ! -f $SRC/${NOISE}.ref ]; then
 			cp $SRC/${NOISE}.out $SRC/${NOISE}.ref

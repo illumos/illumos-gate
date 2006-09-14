@@ -177,7 +177,7 @@
 
 	<!-- Authorization -->
 	<property_group name='general' type='framework'>
-		<!-- to enable/disable rpc/bind -->
+		<!-- to operate rpc/bind -->
 		<propval name='action_authorization' type='astring'
 			value='solaris.smf.manage.rpc.bind' />
 	</property_group>

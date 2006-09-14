@@ -218,10 +218,11 @@ if [ $? -eq 0 ]; then
 fi
 _ENABLE_AUDIT
 
+PROFILEDIR=$BASEDIR/var/svc/profile
+GENERICXML=${PROFILEDIR}/generic.xml
 if [ -f $BASEDIR/var/SUNWcsr-apply-limited-net ]; then
-	PROFILEDIR=$BASEDIR/var/svc/profile
 	UPGRADEFILE=${PROFILEDIR}/upgrade
-	ln -sf ./generic_limited_net.xml ${PROFILEDIR}/generic.xml
+	ln -sf ./generic_limited_net.xml ${GENERICXML}
 	cat >> ${UPGRADEFILE} <<\_ENABLE_LIMITED_NET
 #
 # apply the generic_limit_net profile selected at install
@@ -246,11 +247,10 @@ else
 	# Otherwise (upgrade from pre-SMF filesystem) take the default 
 	# action, i.e., sym-link to ./generic_open.xml
 	#
-	if [ -f $BASEDIR/var/svc/profile/generic.xml.ABCsavedXYZ ]; then
-		mv $BASEDIR/var/svc/profile/generic.xml.ABCsavedXYZ \
-			$BASEDIR/var/svc/profile/generic.xml
-	else
-		ln -s ./generic_open.xml $BASEDIR/var/svc/profile/generic.xml
+	if [ -h $GENERICXML.ABCsavedXYZ -o -f $GENERICXML.ABCsavedXYZ ]; then
+		mv $GENERICXML.ABCsavedXYZ $GENERICXML
+	elif [ ! -h $GENERICXML -a ! -f $GENERICXML ]; then
+		ln -s ./generic_open.xml $GENERICXML
 	fi
 fi
 

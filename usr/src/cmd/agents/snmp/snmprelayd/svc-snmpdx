@@ -53,5 +53,7 @@ else
 	exit $SMF_EXIT_ERR_CONFIG
 fi
 
-${SNMP_BIN}  -y -c ${SNMP_CONFDIR}
-exit $SMF_EXIT_OK
+#
+# Since snmpdx isn't SMF_EXIT_*-aware, report any failures generically.
+#
+${SNMP_BIN} -y -c ${SNMP_CONFDIR} || exit 1

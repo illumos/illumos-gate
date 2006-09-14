@@ -27,8 +27,8 @@
 
 # Keep /var/svc/profile/generic.xml across OS upgrades.
 
-if [ -f $BASEDIR/var/svc/profile/generic.xml ]; then
-	mv $BASEDIR/var/svc/profile/generic.xml \
-	    $BASEDIR/var/svc/profile/generic.xml.ABCsavedXYZ
+GENERICXML=$BASEDIR/var/svc/profile/generic.xml
+if [ -h $GENERICXML -o -f $GENERICXML ]; then
+	mv $GENERICXML $GENERICXML.ABCsavedXYZ
 fi
 exit 0
