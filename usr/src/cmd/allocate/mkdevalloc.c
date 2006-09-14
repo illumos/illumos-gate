@@ -854,12 +854,6 @@ docd()
 		(void) strcat(nm, dep->d_name);
 		cd[i].name = nm;
 
-		/* save id # */
-		if (dep->d_name[0] == 'r')
-			(void) sscanf(dep->d_name, "rsr%d", &cd[i].id);
-		else
-			(void) sscanf(dep->d_name, "sr%d", &cd[i].id);
-
 		/* ignore if not symbolic link (note i not incremented) */
 		if (lstat(cd[i].name, &stat) < 0) {
 			perror(gettext("stat(2) failed "));
@@ -883,6 +877,7 @@ docd()
 		cp = strrchr(cd[i].device, '/');
 		cp++;				/* advance to device # */
 		(void) sscanf(cp, "c%dt%d", &cd[i].controller, &cd[i].number);
+		cd[i].id = cd[i].number;
 
 		i++;
 	}
@@ -1135,7 +1130,7 @@ dormdisk(int cd_count)
 
 		/* ignore if this is a cd */
 		for (j = 0; j < cd_count; j++) {
-			if (id == cd[j].number && ctrl == cd[j].controller) {
+			if (id == cd[j].id && ctrl == cd[j].controller) {
 				is_cd = 1;
 				break;
 			}
