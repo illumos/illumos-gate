@@ -980,7 +980,7 @@ mount_one_dev(zlog_t *zlogp, char *devpath)
 {
 	char			brand[MAXNAMELEN];
 	zone_dochandle_t	handle = NULL;
-	brand_handle_t		*bhp = NULL;
+	brand_handle_t		bh = NULL;
 	struct zone_devtab	ztab;
 	di_prof_t		prof = NULL;
 	int			err;
@@ -993,18 +993,18 @@ mount_one_dev(zlog_t *zlogp, char *devpath)
 
 	/* Get a handle to the brand info for this zone */
 	if ((zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) ||
-	    (bhp = brand_open(brand)) == NULL) {
+	    (bh = brand_open(brand)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
 		goto cleanup;
 	}
 
-	if (brand_platform_iter_devices(bhp, zone_name,
+	if (brand_platform_iter_devices(bh, zone_name,
 	    mount_one_dev_device_cb, prof) != 0) {
 		zerror(zlogp, B_TRUE, "failed to add standard device");
 		goto cleanup;
 	}
 
-	if (brand_platform_iter_link(bhp,
+	if (brand_platform_iter_link(bh,
 	    mount_one_dev_symlink_cb, prof) != 0) {
 		zerror(zlogp, B_TRUE, "failed to add standard symlink");
 		goto cleanup;
@@ -1043,8 +1043,8 @@ mount_one_dev(zlog_t *zlogp, char *devpath)
 	retval = 0;
 
 cleanup:
-	if (bhp != NULL)
-		brand_close(bhp);
+	if (bh != NULL)
+		brand_close(bh);
 	if (handle)
 		zonecfg_fini_handle(handle);
 	if (prof)
@@ -1531,7 +1531,7 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 	struct zone_fstab *fs_ptr = NULL;
 	zone_dochandle_t handle = NULL;
 	zone_state_t zstate;
-	brand_handle_t *bhp;
+	brand_handle_t bh;
 	plat_gmount_cb_data_t cb;
 
 	if (zone_get_state(zone_name, &zstate) != Z_OK ||
@@ -1565,7 +1565,7 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 
 	/* Get a handle to the brand info for this zone */
 	if ((zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) ||
-	    (bhp = brand_open(brand)) == NULL) {
+	    (bh = brand_open(brand)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
 		return (-1);
 	}
@@ -1577,13 +1577,13 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 	cb.pgcd_zlogp = zlogp;
 	cb.pgcd_fs_tab = &fs_ptr;
 	cb.pgcd_num_fs = &num_fs;
-	if (brand_platform_iter_gmounts(bhp, zonepath,
+	if (brand_platform_iter_gmounts(bh, zonepath,
 	    plat_gmount_cb, &cb) != 0) {
 		zerror(zlogp, B_FALSE, "unable to mount filesystems");
-		brand_close(bhp);
+		brand_close(bh);
 		return (-1);
 	}
-	brand_close(bhp);
+	brand_close(bh);
 
 	/*
 	 * Iterate through the rest of the filesystems, first the IPDs, then
@@ -3490,7 +3490,7 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	char rootpath[MAXPATHLEN];
 	char modname[MAXPATHLEN];
 	struct brand_attr attr;
-	brand_handle_t *bhp;
+	brand_handle_t bh;
 	char *rctlbuf = NULL;
 	size_t rctlbufsz = 0;
 	char *zfsbuf = NULL;
@@ -3642,7 +3642,7 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 
 	if ((zone_get_brand(zone_name, attr.ba_brandname,
 	    MAXNAMELEN) != Z_OK) ||
-	    (bhp = brand_open(attr.ba_brandname)) == NULL) {
+	    (bh = brand_open(attr.ba_brandname)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine brand name");
 		return (-1);
 	}
@@ -3651,7 +3651,7 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	 * If this brand requires any kernel support, now is the time to
 	 * get it loaded and initialized.
 	 */
-	if (brand_get_modname(bhp, modname, MAXPATHLEN) < 0) {
+	if (brand_get_modname(bh, modname, MAXPATHLEN) < 0) {
 		zerror(zlogp, B_FALSE, "unable to determine brand kernel "
 		    "module");
 		return (-1);
@@ -3883,7 +3883,7 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
 	char zroot[MAXPATHLEN];
 	char cmdbuf[MAXPATHLEN];
 	char brand[MAXNAMELEN];
-	brand_handle_t *bhp = NULL;
+	brand_handle_t bh = NULL;
 
 	kzone = zone_name;
 	if (zonecfg_in_alt_root()) {
@@ -3924,7 +3924,7 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
 
 	/* Get a handle to the brand info for this zone */
 	if ((zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) ||
-	    (bhp = brand_open(brand)) == NULL) {
+	    (bh = brand_open(brand)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
 		return (-1);
 	}
@@ -3933,14 +3933,14 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
 	 * brand a chance to cleanup any custom configuration.
 	 */
 	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	if (brand_get_halt(bhp, zone_name, zroot, cmdbuf + EXEC_LEN,
+	if (brand_get_halt(bh, zone_name, zroot, cmdbuf + EXEC_LEN,
 	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) < 0) {
-		brand_close(bhp);
+		brand_close(bh);
 		zerror(zlogp, B_FALSE, "unable to determine branded zone's "
 		    "halt callback.");
 		goto error;
 	}
-	brand_close(bhp);
+	brand_close(bh);
 
 	if ((strlen(cmdbuf) > EXEC_LEN) &&
 	    (do_subproc(zlogp, cmdbuf) != Z_OK)) {

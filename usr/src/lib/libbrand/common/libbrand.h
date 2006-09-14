@@ -35,41 +35,41 @@ extern "C" {
 
 #include <sys/types.h>
 
-typedef struct brand_handle brand_handle_t;
+typedef struct __brand_handle *brand_handle_t;
 
-extern brand_handle_t *brand_open(const char *);
-extern void brand_close(brand_handle_t *);
+extern brand_handle_t brand_open(const char *);
+extern void brand_close(brand_handle_t);
 
-extern int brand_is_native(brand_handle_t *);
+extern int brand_is_native(brand_handle_t);
 
-extern int brand_get_boot(brand_handle_t *, const char *, const char *,
+extern int brand_get_boot(brand_handle_t, const char *, const char *,
     char *, size_t, int, char **);
-extern int brand_get_brandname(brand_handle_t *, char *, size_t);
-extern int brand_get_halt(brand_handle_t *, const char *, const char *,
+extern int brand_get_brandname(brand_handle_t, char *, size_t);
+extern int brand_get_halt(brand_handle_t, const char *, const char *,
     char *, size_t, int, char **);
-extern int brand_get_initname(brand_handle_t *, char *, size_t);
-extern int brand_get_install(brand_handle_t *, const char *, const char *,
+extern int brand_get_initname(brand_handle_t, char *, size_t);
+extern int brand_get_install(brand_handle_t, const char *, const char *,
     char *, size_t, int, char **);
-extern int brand_get_installopts(brand_handle_t *, char *, size_t);
-extern int brand_get_login_cmd(brand_handle_t *, const char *, char *, size_t);
-extern int brand_get_modname(brand_handle_t *, char *, size_t);
-extern int brand_get_postclone(brand_handle_t *, const char *, const char *,
+extern int brand_get_installopts(brand_handle_t, char *, size_t);
+extern int brand_get_login_cmd(brand_handle_t, const char *, char *, size_t);
+extern int brand_get_modname(brand_handle_t, char *, size_t);
+extern int brand_get_postclone(brand_handle_t, const char *, const char *,
     char *, size_t, int, char **);
-extern int brand_get_verify_cfg(brand_handle_t *, char *, size_t);
-extern int brand_get_verify_adm(brand_handle_t *, const char *, const char *,
+extern int brand_get_verify_cfg(brand_handle_t, char *, size_t);
+extern int brand_get_verify_adm(brand_handle_t, const char *, const char *,
     char *, size_t, int, char **);
 
-extern int brand_config_iter_privilege(brand_handle_t *,
+extern int brand_config_iter_privilege(brand_handle_t,
     int (*func)(void *, const char *, const char *), void *);
 
-extern int brand_platform_iter_devices(brand_handle_t *, const char *,
+extern int brand_platform_iter_devices(brand_handle_t, const char *,
     int (*)(void *, const char *, const char *), void *);
-extern int brand_platform_iter_gmounts(brand_handle_t *, const char *,
+extern int brand_platform_iter_gmounts(brand_handle_t, const char *,
     int (*)(void *, const char *, const char *, const char *, const char *),
     void *);
-extern int brand_platform_iter_link(brand_handle_t *, int (*)(void *,
+extern int brand_platform_iter_link(brand_handle_t, int (*)(void *,
     const char *, const char *), void *);
-extern int brand_platform_iter_mounts(brand_handle_t *, int (*)(void *,
+extern int brand_platform_iter_mounts(brand_handle_t, int (*)(void *,
     const char *, const char *, const char *, const char *), void *);
 
 #ifdef	__cplusplus

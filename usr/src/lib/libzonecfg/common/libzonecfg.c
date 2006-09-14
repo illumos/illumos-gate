@@ -3528,7 +3528,7 @@ static int
 priv_lists_create(zone_dochandle_t handle, priv_lists_t **plpp)
 {
 	priv_lists_t *plp;
-	brand_handle_t *bhp;
+	brand_handle_t bh;
 	char brand[MAXNAMELEN];
 
 	if (handle != NULL) {
@@ -3538,22 +3538,22 @@ priv_lists_create(zone_dochandle_t handle, priv_lists_t **plpp)
 		(void) strlcpy(brand, NATIVE_BRAND_NAME, MAXNAMELEN);
 	}
 
-	if ((bhp = brand_open(brand)) == NULL)
+	if ((bh = brand_open(brand)) == NULL)
 		return (Z_BRAND_ERROR);
 
 	if ((plp = calloc(1, sizeof (priv_lists_t))) == NULL) {
-		brand_close(bhp);
+		brand_close(bh);
 		return (Z_NOMEM);
 	}
 
 	/* construct the privilege lists */
-	if (brand_config_iter_privilege(bhp, priv_lists_cb, plp) != 0) {
+	if (brand_config_iter_privilege(bh, priv_lists_cb, plp) != 0) {
 		priv_lists_destroy(plp);
-		brand_close(bhp);
+		brand_close(bh);
 		return (Z_BRAND_ERROR);
 	}
 
-	brand_close(bhp);
+	brand_close(bh);
 	*plpp = plp;
 	return (Z_OK);
 }

@@ -251,13 +251,11 @@ lx_ioctl_msg(int fd, int cmd, char *lx_cmd_str, struct stat *stat, char *msg)
 }
 
 static int
-ldlinux_check(int fd, struct stat *stat)
+ldlinux_check(int fd)
 {
 	struct str_mlist	mlist[MAX_STRMODS];
 	struct str_list		strlist;
 	int			i;
-
-	assert((stat->st_mode & S_IFMT) == S_IFCHR);
 
 	/* Get the number of modules on the stream. */
 	lx_debug("\tioctl(%d, 0x%x - %s, ...)",
@@ -1087,7 +1085,7 @@ ict_tcsets(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
 	 * ldlinux strmod.  So make sure the module exists on the
 	 * target stream before we invoke the ioctl.
 	 */
-	if ((ldlinux = ldlinux_check(fd, stat)) < 0)
+	if ((ldlinux = ldlinux_check(fd)) < 0)
 		return (ldlinux);
 
 	if (ldlinux == 1) {
@@ -1124,7 +1122,7 @@ ict_tcseta(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
 	 * ldlinux strmod.  So make sure the module exists on the
 	 * target stream before we invoke the ioctl.
 	 */
-	if ((ldlinux = ldlinux_check(fd, stat)) < 0)
+	if ((ldlinux = ldlinux_check(fd)) < 0)
 		return (ldlinux);
 
 	if (ldlinux == 1) {
@@ -1259,7 +1257,7 @@ ict_tcgets_native(int fd, struct stat *stat,
 
 	assert(cmd == LX_TCGETS);
 
-	if ((ldlinux = ldlinux_check(fd, stat)) < 0)
+	if ((ldlinux = ldlinux_check(fd)) < 0)
 		return (ldlinux);
 
 	lx_debug("\tioctl(%d, 0x%x - %s, ...)",
@@ -1308,7 +1306,7 @@ ict_tcgeta(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
 
 	assert(cmd == LX_TCGETA);
 
-	if ((ldlinux = ldlinux_check(fd, stat)) < 0)
+	if ((ldlinux = ldlinux_check(fd)) < 0)
 		return (ldlinux);
 
 	lx_debug("\tioctl(%d, 0x%x - %s, ...)",

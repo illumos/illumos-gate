@@ -379,7 +379,7 @@ static char zone[ZONENAME_MAX];
 static char revert_zone[ZONENAME_MAX];
 
 /* global brand operations */
-static brand_handle_t *brand;
+static brand_handle_t brand;
 
 /* set in modifying functions, checked in read_input() */
 static bool need_to_commit = FALSE;
@@ -3689,7 +3689,7 @@ brand_verify(zone_dochandle_t handle)
 {
 	char *xml_file = "/tmp/zonecfg_verify.XXXXXX";
 	char cmdbuf[MAX_CMD_LEN];
-	brand_handle_t *bhp;
+	brand_handle_t bh;
 	char brand[MAXNAMELEN];
 	int err;
 
@@ -3697,7 +3697,7 @@ brand_verify(zone_dochandle_t handle)
 		zerr("%s: %s\n", zone, gettext("could not get zone brand"));
 		return (Z_INVALID_DOCUMENT);
 	}
-	if ((bhp = brand_open(brand)) == NULL) {
+	if ((bh = brand_open(brand)) == NULL) {
 		zerr("%s: %s\n", zone, gettext("unknown brand."));
 		return (Z_INVALID_DOCUMENT);
 	}
@@ -3707,9 +3707,9 @@ brand_verify(zone_dochandle_t handle)
 	 * and build the command line to execute it.
 	 */
 	strcpy(cmdbuf, EXEC_PREFIX);
-	err = brand_get_verify_cfg(bhp, cmdbuf + EXEC_LEN,
+	err = brand_get_verify_cfg(bh, cmdbuf + EXEC_LEN,
 	    sizeof (cmdbuf) - (EXEC_LEN + (strlen(xml_file) + 1)));
-	brand_close(bhp);
+	brand_close(bh);
 	if (err != Z_OK) {
 		zerr("%s: %s\n", zone,
 		    gettext("could not get brand verification command"));

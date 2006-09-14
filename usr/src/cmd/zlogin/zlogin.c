@@ -751,7 +751,7 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 }
 
 static char **
-zone_login_cmd(brand_handle_t *bhp, const char *login)
+zone_login_cmd(brand_handle_t bh, const char *login)
 {
 	static char result_buf[ARG_MAX];
 	char **new_argv, *ptr, *lasts;
@@ -759,7 +759,7 @@ zone_login_cmd(brand_handle_t *bhp, const char *login)
 
 	/* Get the login command for the target zone. */
 	bzero(result_buf, sizeof (result_buf));
-	if (brand_get_login_cmd(bhp, login,
+	if (brand_get_login_cmd(bh, login,
 	    result_buf, sizeof (result_buf)) != 0)
 		return (NULL);
 
@@ -816,7 +816,7 @@ zone_login_cmd(brand_handle_t *bhp, const char *login)
  * checks).
  */
 static char **
-prep_args(brand_handle_t *bhp, const char *login, char **argv)
+prep_args(brand_handle_t bh, const char *login, char **argv)
 {
 	int argc = 0, a = 0, i, n = -1;
 	char **new_argv;
@@ -866,7 +866,7 @@ prep_args(brand_handle_t *bhp, const char *login, char **argv)
 			new_argv[a++] = NULL;
 			assert(n == a);
 		} else {
-			new_argv = zone_login_cmd(bhp, login);
+			new_argv = zone_login_cmd(bh, login);
 		}
 	}
 
@@ -1381,7 +1381,7 @@ main(int argc, char **argv)
 	char zonebrand[MAXNAMELEN];
 	struct stat sb;
 	char kernzone[ZONENAME_MAX];
-	brand_handle_t *bhp;
+	brand_handle_t bh;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -1598,16 +1598,16 @@ main(int argc, char **argv)
 
 	/* Get a handle to the brand info for this zone */
 	if ((zone_get_brand(zonename, zonebrand, sizeof (zonebrand)) != Z_OK) ||
-	    ((bhp = brand_open(zonebrand)) == NULL)) {
+	    ((bh = brand_open(zonebrand)) == NULL)) {
 		zerror(gettext("could not get brand for zone %s"), zonename);
 		return (1);
 	}
-	if ((new_args = prep_args(bhp, login, proc_args)) == NULL) {
+	if ((new_args = prep_args(bh, login, proc_args)) == NULL) {
 		zperror(gettext("could not assemble new arguments"));
-		brand_close(bhp);
+		brand_close(bh);
 		return (1);
 	}
-	brand_close(bhp);
+	brand_close(bh);
 
 	if ((new_env = prep_env()) == NULL) {
 		zperror(gettext("could not assemble new environment"));

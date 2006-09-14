@@ -2057,7 +2057,7 @@ verify_brand(zone_dochandle_t handle)
 	char cmdbuf[MAXPATHLEN];
 	int err;
 	char zonepath[MAXPATHLEN];
-	brand_handle_t *bhp = NULL;
+	brand_handle_t bh = NULL;
 	int status;
 
 	/*
@@ -2071,7 +2071,7 @@ verify_brand(zone_dochandle_t handle)
 		zperror(cmd_to_str(CMD_VERIFY), B_TRUE);
 		return (Z_ERR);
 	}
-	if ((bhp = brand_open(target_brand)) == NULL) {
+	if ((bh = brand_open(target_brand)) == NULL) {
 		zerror(gettext("missing or invalid brand"));
 		return (Z_ERR);
 	}
@@ -2080,9 +2080,9 @@ verify_brand(zone_dochandle_t handle)
 	 * If the brand has its own verification routine, execute it now.
 	 */
 	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	err = brand_get_verify_adm(bhp, target_zone, zonepath,
+	err = brand_get_verify_adm(bh, target_zone, zonepath,
 	    cmdbuf + EXEC_LEN, sizeof (cmdbuf) - EXEC_LEN, 0, NULL);
-	brand_close(bhp);
+	brand_close(bh);
 	if (err == 0 && strlen(cmdbuf) > EXEC_LEN) {
 		status = do_subproc_interactive(cmdbuf);
 		err = subproc_status(gettext("brand-specific verification"),
@@ -2884,7 +2884,7 @@ install_func(int argc, char *argv[])
 	int lockfd;
 	int arg, err, subproc_err;
 	char zonepath[MAXPATHLEN];
-	brand_handle_t *bhp = NULL;
+	brand_handle_t bh = NULL;
 	int status;
 	boolean_t nodataset = B_FALSE;
 	char opts[128];
@@ -2907,16 +2907,16 @@ install_func(int argc, char *argv[])
 	}
 
 	/* Fetch the install command from the brand configuration.  */
-	if ((bhp = brand_open(target_brand)) == NULL) {
+	if ((bh = brand_open(target_brand)) == NULL) {
 		zerror(gettext("missing or invalid brand"));
 		return (Z_ERR);
 	}
 
 	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	if (brand_get_install(bhp, target_zone, zonepath, cmdbuf + EXEC_LEN,
+	if (brand_get_install(bh, target_zone, zonepath, cmdbuf + EXEC_LEN,
 	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) != 0) {
 		zerror("invalid brand configuration: missing install resource");
-		brand_close(bhp);
+		brand_close(bh);
 		return (Z_ERR);
 	}
 
@@ -2926,15 +2926,15 @@ install_func(int argc, char *argv[])
 		 * Fetch the list of recognized command-line options from
 		 * the brand configuration file.
 		 */
-		if (brand_get_installopts(bhp, opts + strlen(opts),
+		if (brand_get_installopts(bh, opts + strlen(opts),
 		    sizeof (opts) - strlen(opts)) != 0) {
 			zerror("invalid brand configuration: missing "
 			    "install options resource");
-			brand_close(bhp);
+			brand_close(bh);
 			return (Z_ERR);
 		}
 	}
-	brand_close(bhp);
+	brand_close(bh);
 
 	optind = 0;
 	while ((arg = getopt(argc, argv, opts)) != EOF) {
@@ -3414,7 +3414,7 @@ warn_dataset_match(zone_dochandle_t s_handle, char *source,
 static int
 valid_brand_clone(char *source_zone, char *target_zone)
 {
-	brand_handle_t *bhp;
+	brand_handle_t bh;
 	char source_brand[MAXNAMELEN];
 
 	if ((zone_get_brand(source_zone, source_brand,
@@ -3431,11 +3431,11 @@ valid_brand_clone(char *source_zone, char *target_zone)
 		return (Z_ERR);
 	}
 
-	if ((bhp = brand_open(target_brand)) == NULL) {
+	if ((bh = brand_open(target_brand)) == NULL) {
 		zerror(gettext("missing or invalid brand"));
 		return (Z_ERR);
 	}
-	brand_close(bhp);
+	brand_close(bh);
 	return (Z_OK);
 }
 
@@ -3541,21 +3541,21 @@ zone_postclone(char *zonepath)
 {
 	char cmdbuf[MAXPATHLEN];
 	int status;
-	brand_handle_t *bhp;
+	brand_handle_t bh;
 	int err = Z_OK;
 
 	/*
 	 * Fetch the post-clone command, if any, from the brand
 	 * configuration.
 	 */
-	if ((bhp = brand_open(target_brand)) == NULL) {
+	if ((bh = brand_open(target_brand)) == NULL) {
 		zerror(gettext("missing or invalid brand"));
 		return (Z_ERR);
 	}
 	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	err = brand_get_postclone(bhp, target_zone, zonepath, cmdbuf + EXEC_LEN,
+	err = brand_get_postclone(bh, target_zone, zonepath, cmdbuf + EXEC_LEN,
 	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL);
-	brand_close(bhp);
+	brand_close(bh);
 
 	if (err == 0 && strlen(cmdbuf) > EXEC_LEN) {
 		status = do_subproc(cmdbuf);

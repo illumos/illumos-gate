@@ -200,10 +200,10 @@ open_xml_file(const char *file)
  * Returns a handle to the named brand, which is used for all subsequent brand
  * interaction, or NULL if unable to open or initialize the brand.
  */
-brand_handle_t *
+brand_handle_t
 brand_open(const char *name)
 {
-	brand_handle_t *bhp;
+	struct brand_handle *bhp;
 	char path[MAXPATHLEN];
 	xmlNodePtr node;
 	xmlChar *property;
@@ -226,9 +226,9 @@ brand_open(const char *name)
 	/*
 	 * Allocate brand handle
 	 */
-	if ((bhp = malloc(sizeof (brand_handle_t))) == NULL)
+	if ((bhp = malloc(sizeof (struct brand_handle))) == NULL)
 		return (NULL);
-	bzero(bhp, sizeof (brand_handle_t));
+	bzero(bhp, sizeof (struct brand_handle));
 
 	(void) strcpy(bhp->bh_name, name);
 
@@ -238,7 +238,7 @@ brand_open(const char *name)
 	(void) snprintf(path, sizeof (path), "%s/%s/%s", BRAND_DIR, name,
 	    BRAND_CONFIG);
 	if ((bhp->bh_config = open_xml_file(path)) == NULL) {
-		brand_close(bhp);
+		brand_close((brand_handle_t)bhp);
 		return (NULL);
 	}
 
@@ -247,23 +247,23 @@ brand_open(const char *name)
 	 * is installed.
 	 */
 	if ((node = xmlDocGetRootElement(bhp->bh_config)) == NULL) {
-		brand_close(bhp);
+		brand_close((brand_handle_t)bhp);
 		return (NULL);
 	}
 
 	if (xmlStrcmp(node->name, DTD_ELEM_BRAND) != 0) {
-		brand_close(bhp);
+		brand_close((brand_handle_t)bhp);
 		return (NULL);
 	}
 
 	if ((property = xmlGetProp(node, DTD_ATTR_NAME)) == NULL) {
-		brand_close(bhp);
+		brand_close((brand_handle_t)bhp);
 		return (NULL);
 	}
 
 	if (strcmp((char *)property, name) != 0) {
 		xmlFree(property);
-		brand_close(bhp);
+		brand_close((brand_handle_t)bhp);
 		return (NULL);
 	}
 	xmlFree(property);
@@ -274,19 +274,20 @@ brand_open(const char *name)
 	(void) snprintf(path, sizeof (path), "%s/%s/%s", BRAND_DIR, name,
 	    BRAND_PLATFORM);
 	if ((bhp->bh_platform = open_xml_file(path)) == NULL) {
-		brand_close(bhp);
+		brand_close((brand_handle_t)bhp);
 		return (NULL);
 	}
 
-	return (bhp);
+	return ((brand_handle_t)bhp);
 }
 
 /*
  * Closes the given brand handle
  */
 void
-brand_close(brand_handle_t *bhp)
+brand_close(brand_handle_t bh)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	if (bhp->bh_platform != NULL)
 		xmlFreeDoc(bhp->bh_platform);
 	if (bhp->bh_config != NULL)
@@ -372,7 +373,7 @@ i_substitute_tokens(const char *sbuf, char *dbuf, int dbuf_size,
  * Returns 0 on success, -1 on failure.
  */
 static int
-brand_get_value(brand_handle_t *bhp, const char *zonename,
+brand_get_value(struct brand_handle *bhp, const char *zonename,
     const char *zoneroot, const char *username, const char *curr_zone,
     char *buf, size_t len, int argc, char **argv, const xmlChar *tagname,
     boolean_t substitute, boolean_t optional)
@@ -432,16 +433,18 @@ brand_get_value(brand_handle_t *bhp, const char *zonename,
 }
 
 int
-brand_get_boot(brand_handle_t *bhp, const char *zonename,
+brand_get_boot(brand_handle_t bh, const char *zonename,
     const char *zoneroot, char *buf, size_t len, int argc, char **argv)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
 	    buf, len, argc, argv, DTD_ELEM_BOOT, B_TRUE, B_TRUE));
 }
 
 int
-brand_get_brandname(brand_handle_t *bhp, char *buf, size_t len)
+brand_get_brandname(brand_handle_t bh, char *buf, size_t len)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	if (len <= strlen(bhp->bh_name))
 		return (-1);
 
@@ -451,77 +454,87 @@ brand_get_brandname(brand_handle_t *bhp, char *buf, size_t len)
 }
 
 int
-brand_get_halt(brand_handle_t *bhp, const char *zonename,
+brand_get_halt(brand_handle_t bh, const char *zonename,
     const char *zoneroot, char *buf, size_t len, int argc, char **argv)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
 	    buf, len, argc, argv, DTD_ELEM_HALT, B_TRUE, B_TRUE));
 }
 
 int
-brand_get_initname(brand_handle_t *bhp, char *buf, size_t len)
+brand_get_initname(brand_handle_t bh, char *buf, size_t len)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, NULL, NULL, NULL, NULL,
 	    buf, len, 0, NULL, DTD_ELEM_INITNAME, B_FALSE, B_FALSE));
 }
 
 int
-brand_get_login_cmd(brand_handle_t *bhp, const char *username,
+brand_get_login_cmd(brand_handle_t bh, const char *username,
     char *buf, size_t len)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	const char *curr_zone = get_curr_zone();
 	return (brand_get_value(bhp, NULL, NULL, username, curr_zone,
 	    buf, len, 0, NULL, DTD_ELEM_LOGIN_CMD, B_TRUE, B_FALSE));
 }
 
 int
-brand_get_install(brand_handle_t *bhp, const char *zonename,
+brand_get_install(brand_handle_t bh, const char *zonename,
     const char *zoneroot, char *buf, size_t len, int argc, char **argv)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
 	    buf, len, argc, argv, DTD_ELEM_INSTALL, B_TRUE, B_FALSE));
 }
 
 int
-brand_get_installopts(brand_handle_t *bhp, char *buf, size_t len)
+brand_get_installopts(brand_handle_t bh, char *buf, size_t len)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, NULL, NULL, NULL, NULL,
 	    buf, len, 0, NULL, DTD_ELEM_INSTALLOPTS, B_FALSE, B_TRUE));
 }
 
 int
-brand_get_modname(brand_handle_t *bhp, char *buf, size_t len)
+brand_get_modname(brand_handle_t bh, char *buf, size_t len)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, NULL, NULL, NULL, NULL,
 	    buf, len, 0, NULL, DTD_ELEM_MODNAME, B_FALSE, B_TRUE));
 }
 
 int
-brand_get_postclone(brand_handle_t *bhp, const char *zonename,
+brand_get_postclone(brand_handle_t bh, const char *zonename,
     const char *zoneroot, char *buf, size_t len, int argc, char **argv)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
 	    buf, len, argc, argv, DTD_ELEM_POSTCLONE, B_TRUE, B_TRUE));
 }
 
 int
-brand_get_verify_cfg(brand_handle_t *bhp, char *buf, size_t len)
+brand_get_verify_cfg(brand_handle_t bh, char *buf, size_t len)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, NULL, NULL, NULL, NULL,
 	    buf, len, 0, NULL, DTD_ELEM_VERIFY_CFG, B_FALSE, B_TRUE));
 }
 
 int
-brand_get_verify_adm(brand_handle_t *bhp, const char *zonename,
+brand_get_verify_adm(brand_handle_t bh, const char *zonename,
     const char *zoneroot, char *buf, size_t len, int argc, char **argv)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
 	    buf, len, argc, argv, DTD_ELEM_VERIFY_ADM, B_TRUE, B_TRUE));
 }
 
 int
-brand_is_native(brand_handle_t *bhp)
+brand_is_native(brand_handle_t bh)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return ((strcmp(bhp->bh_name, NATIVE_BRAND_NAME) == 0) ? 1 : 0);
 }
 
@@ -532,9 +545,10 @@ brand_is_native(brand_handle_t *bhp)
  * specified callback for each.  Returns 0 on success, or -1 on failure.
  */
 int
-brand_config_iter_privilege(brand_handle_t *bhp, int (*func)(void *,
+brand_config_iter_privilege(brand_handle_t bh, int (*func)(void *,
     const char *, const char *), void *data)
 {
+	struct brand_handle	*bhp = (struct brand_handle *)bh;
 	xmlNodePtr		node;
 	xmlChar			*name, *set;
 	int			ret;
@@ -571,7 +585,7 @@ brand_config_iter_privilege(brand_handle_t *bhp, int (*func)(void *,
 }
 
 static int
-i_brand_platform_iter_mounts(brand_handle_t *bhp, const char *zoneroot,
+i_brand_platform_iter_mounts(struct brand_handle *bhp, const char *zoneroot,
     int (*func)(void *, const char *, const char *, const char *,
     const char *), void *data, const xmlChar *mount_type)
 {
@@ -646,10 +660,11 @@ next:
  *	%R	Root of zone
  */
 int
-brand_platform_iter_gmounts(brand_handle_t *bhp, const char *zoneroot,
+brand_platform_iter_gmounts(brand_handle_t bh, const char *zoneroot,
     int (*func)(void *, const char *, const char *, const char *,
     const char *), void *data)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (i_brand_platform_iter_mounts(bhp, zoneroot, func, data,
 	    DTD_ELEM_GLOBAL_MOUNT));
 }
@@ -661,9 +676,10 @@ brand_platform_iter_gmounts(brand_handle_t *bhp, const char *zoneroot,
  * specified callback for each.  Returns 0 on success, or -1 on failure.
  */
 int
-brand_platform_iter_mounts(brand_handle_t *bhp, int (*func)(void *,
+brand_platform_iter_mounts(brand_handle_t bh, int (*func)(void *,
     const char *, const char *, const char *, const char *), void *data)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (i_brand_platform_iter_mounts(bhp, NULL, func, data,
 	    DTD_ELEM_MOUNT));
 }
@@ -675,9 +691,10 @@ brand_platform_iter_mounts(brand_handle_t *bhp, int (*func)(void *,
  * specified callback for each.  Returns 0 on success, or -1 on failure.
  */
 int
-brand_platform_iter_link(brand_handle_t *bhp,
+brand_platform_iter_link(brand_handle_t bh,
     int (*func)(void *, const char *, const char *), void *data)
 {
+	struct brand_handle *bhp = (struct brand_handle *)bh;
 	xmlNodePtr node;
 	xmlChar *source, *target;
 	int ret;
@@ -720,15 +737,16 @@ brand_platform_iter_link(brand_handle_t *bhp,
  * specified callback for each.  Returns 0 on success, or -1 on failure.
  */
 int
-brand_platform_iter_devices(brand_handle_t *bhp, const char *zonename,
+brand_platform_iter_devices(brand_handle_t bh, const char *zonename,
     int (*func)(void *, const char *, const char *), void *data)
 {
-	const char	*curr_arch = get_curr_arch();
-	xmlNodePtr	node;
-	xmlChar		*match, *name, *arch;
-	char		match_exp[MAXPATHLEN];
-	boolean_t	err = B_FALSE;
-	int		ret = 0;
+	struct brand_handle	*bhp = (struct brand_handle *)bh;
+	const char		*curr_arch = get_curr_arch();
+	xmlNodePtr		node;
+	xmlChar			*match, *name, *arch;
+	char			match_exp[MAXPATHLEN];
+	boolean_t		err = B_FALSE;
+	int			ret = 0;
 
 
 	assert(bhp != NULL);

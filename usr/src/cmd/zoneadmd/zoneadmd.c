@@ -622,7 +622,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 	char nbootargs[BOOTARGS_MAX];
 	char cmdbuf[MAXPATHLEN];
 	fs_callback_t cb;
-	brand_handle_t *bhp;
+	brand_handle_t bh;
 	int err;
 
 	if (init_console_slave(zlogp) != 0)
@@ -638,7 +638,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 	cb.zoneid = zoneid;
 
 	/* Get a handle to the brand info for this zone */
-	if ((bhp = brand_open(brand_name)) == NULL) {
+	if ((bh = brand_open(brand_name)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
 		return (-1);
 	}
@@ -649,9 +649,9 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 	 * enter the zone, so they are done from within the context of the
 	 * zone.
 	 */
-	if (brand_platform_iter_mounts(bhp, mount_early_fs, &cb) != 0) {
+	if (brand_platform_iter_mounts(bh, mount_early_fs, &cb) != 0) {
 		zerror(zlogp, B_FALSE, "unable to mount filesystems");
-		brand_close(bhp);
+		brand_close(bh);
 		return (-1);
 	}
 
@@ -663,23 +663,23 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 		return (-1);
 	}
 	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	if (brand_get_boot(bhp, zone_name, zroot, cmdbuf + EXEC_LEN,
+	if (brand_get_boot(bh, zone_name, zroot, cmdbuf + EXEC_LEN,
 	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) != 0) {
 		zerror(zlogp, B_FALSE,
 		    "unable to determine branded zone's boot callback");
-		brand_close(bhp);
+		brand_close(bh);
 		return (-1);
 	}
 
 	/* Get the path for this zone's init(1M) (or equivalent) process.  */
-	if (brand_get_initname(bhp, init_file, MAXPATHLEN) != 0) {
+	if (brand_get_initname(bh, init_file, MAXPATHLEN) != 0) {
 		zerror(zlogp, B_FALSE,
 		    "unable to determine zone's init(1M) location");
-		brand_close(bhp);
+		brand_close(bh);
 		return (-1);
 	}
 
-	brand_close(bhp);
+	brand_close(bh);
 
 	err = filter_bootargs(zlogp, bootargs, nbootargs, init_file,
 	    bad_boot_arg);
@@ -829,7 +829,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	zone_cmd_rval_t *rvalp;
 	size_t rlen = getpagesize(); /* conservative */
 	fs_callback_t cb;
-	brand_handle_t *bhp;
+	brand_handle_t bh;
 
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	zargp = (zone_cmd_arg_t *)args;
@@ -1037,7 +1037,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			eventstream_write(Z_EVT_ZONE_READIED);
 
 			/* Get a handle to the brand info for this zone */
-			if ((bhp = brand_open(brand_name)) == NULL) {
+			if ((bh = brand_open(brand_name)) == NULL) {
 				rval = -1;
 				break;
 			}
@@ -1050,10 +1050,10 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			 */
 			cb.zlogp = zlogp;
 			cb.zoneid = zone_id;
-			rval = brand_platform_iter_mounts(bhp,
+			rval = brand_platform_iter_mounts(bh,
 			    mount_early_fs, &cb);
 
-			brand_close(bhp);
+			brand_close(bh);
 
 			/*
 			 * Ordinarily, /dev/fd would be mounted inside the zone
@@ -1376,7 +1376,7 @@ main(int argc, char *argv[])
 	priv_set_t *privset;
 	zone_state_t zstate;
 	char parents_locale[MAXPATHLEN];
-	brand_handle_t *bhp;
+	brand_handle_t bh;
 	int err;
 
 	pid_t pid;
@@ -1488,12 +1488,12 @@ main(int argc, char *argv[])
 
 	/* Get a handle to the brand info for this zone */
 	if ((zone_get_brand(zone_name, brand_name, sizeof (brand_name))
-	    != Z_OK) || (bhp = brand_open(brand_name)) == NULL) {
+	    != Z_OK) || (bh = brand_open(brand_name)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
 		return (1);
 	}
-	zone_isnative = brand_is_native(bhp);
-	brand_close(bhp);
+	zone_isnative = brand_is_native(bh);
+	brand_close(bh);
 
 	/*
 	 * Check that we have all privileges.  It would be nice to pare
