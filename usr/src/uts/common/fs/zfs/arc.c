@@ -722,31 +722,30 @@ arc_buf_clone(arc_buf_t *from)
 void
 arc_buf_add_ref(arc_buf_t *buf, void* tag)
 {
-	arc_buf_hdr_t *hdr;
+	arc_buf_hdr_t *hdr = buf->b_hdr;
 	kmutex_t *hash_lock;
 
-	mutex_enter(&arc_eviction_mtx);
-	hdr = buf->b_hdr;
+	/*
+	 * Check to see if this buffer is currently being evicted via
+	 * arc_do_user_evicts().  We can do this without holding any
+	 * locks because if we happen to obtain the header before its
+	 * cleared, we will find b_data is NULL later.
+	 */
+	if (hdr == NULL)
+		return;
+
+	hash_lock = HDR_LOCK(hdr);
+	mutex_enter(hash_lock);
 	if (buf->b_data == NULL) {
 		/*
 		 * This buffer is evicted.
 		 */
-		mutex_exit(&arc_eviction_mtx);
+		mutex_exit(hash_lock);
 		return;
-	} else {
-		/*
-		 * Prevent this buffer from being evicted
-		 * while we add a reference.
-		 */
-		buf->b_hdr = NULL;
 	}
-	mutex_exit(&arc_eviction_mtx);
 
-	ASSERT(hdr->b_state != arc.anon);
-	hash_lock = HDR_LOCK(hdr);
-	mutex_enter(hash_lock);
-	ASSERT(!GHOST_STATE(hdr->b_state));
-	buf->b_hdr = hdr;
+	ASSERT(buf->b_hdr == hdr);
+	ASSERT(hdr->b_state == arc.mru || hdr->b_state == arc.mfu);
 	add_reference(hdr, hash_lock, tag);
 	arc_access(hdr, hash_lock);
 	mutex_exit(hash_lock);
@@ -961,19 +960,6 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle)
 				}
 				if (buf->b_efunc) {
 					mutex_enter(&arc_eviction_mtx);
-					/*
-					 * arc_buf_add_ref() could derail
-					 * this eviction.
-					 */
-					if (buf->b_hdr == NULL) {
-						mutex_exit(&arc_eviction_mtx);
-						bytes_evicted -= ab->b_size;
-						if (recycle)
-							steal = NULL;
-						if (!have_lock)
-							mutex_exit(hash_lock);
-						goto derailed;
-					}
 					arc_buf_destroy(buf, recycle, FALSE);
 					ab->b_buf = buf->b_next;
 					buf->b_next = arc_eviction_list;
@@ -995,8 +981,6 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle)
 		} else {
 			missed += 1;
 		}
-derailed:
-		/* null statement */;
 	}
 	mutex_exit(&evicted_state->mtx);
 	mutex_exit(&state->mtx);
@@ -1998,44 +1982,48 @@ arc_set_callback(arc_buf_t *buf, arc_evict_func_t *func, void *private)
 int
 arc_buf_evict(arc_buf_t *buf)
 {
-	arc_buf_hdr_t *hdr;
+	arc_buf_hdr_t *hdr = buf->b_hdr;
 	kmutex_t *hash_lock;
 	arc_buf_t **bufp;
 
-	mutex_enter(&arc_eviction_mtx);
-	hdr = buf->b_hdr;
 	if (hdr == NULL) {
 		/*
 		 * We are in arc_do_user_evicts().
-		 * NOTE: We can't be in arc_buf_add_ref() because
-		 * that would violate the interface rules.
 		 */
 		ASSERT(buf->b_data == NULL);
-		mutex_exit(&arc_eviction_mtx);
 		return (0);
-	} else if (buf->b_data == NULL) {
-		arc_buf_t copy = *buf; /* structure assignment */
-		/*
-		 * We are on the eviction list.  Process this buffer
-		 * now but let arc_do_user_evicts() do the reaping.
-		 */
-		buf->b_efunc = NULL;
-		buf->b_hdr = NULL;
-		mutex_exit(&arc_eviction_mtx);
-		VERIFY(copy.b_efunc(&copy) == 0);
-		return (1);
-	} else {
-		/*
-		 * Prevent a race with arc_evict()
-		 */
-		ASSERT3U(refcount_count(&hdr->b_refcnt), <, hdr->b_datacnt);
-		buf->b_hdr = NULL;
 	}
-	mutex_exit(&arc_eviction_mtx);
 
 	hash_lock = HDR_LOCK(hdr);
 	mutex_enter(hash_lock);
 
+	if (buf->b_data == NULL) {
+		/*
+		 * We are on the eviction list.
+		 */
+		mutex_exit(hash_lock);
+		mutex_enter(&arc_eviction_mtx);
+		if (buf->b_hdr == NULL) {
+			/*
+			 * We are already in arc_do_user_evicts().
+			 */
+			mutex_exit(&arc_eviction_mtx);
+			return (0);
+		} else {
+			arc_buf_t copy = *buf; /* structure assignment */
+			/*
+			 * Process this buffer now
+			 * but let arc_do_user_evicts() do the reaping.
+			 */
+			buf->b_efunc = NULL;
+			mutex_exit(&arc_eviction_mtx);
+			VERIFY(copy.b_efunc(&copy) == 0);
+			return (1);
+		}
+	}
+
+	ASSERT(buf->b_hdr == hdr);
+	ASSERT3U(refcount_count(&hdr->b_refcnt), <, hdr->b_datacnt);
 	ASSERT(hdr->b_state == arc.mru || hdr->b_state == arc.mfu);
 
 	/*
