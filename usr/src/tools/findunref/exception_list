@@ -215,12 +215,13 @@
 ./src/common/bignum/mont_mulf.c
 
 #
-# Ignore the sparc Makefiles for sata, si3124 and marvell88sx. These are used
-# for warlock purpose only.
+# Ignore the sparc Makefiles for sata, si3124, marvell88sx and audioixp. These
+# are used for warlock purposes only.
 #
 ./src/uts/sparc/sata/Makefile
 ./src/uts/sparc/si3124/Makefile
 ./closed/uts/sparc/marvell88sx/Makefile
+./src/uts/sparc/audioixp/Makefile
 
 #
 # Ignore any files that get used during a gcc build only.
