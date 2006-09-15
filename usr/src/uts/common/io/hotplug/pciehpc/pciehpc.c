@@ -1985,6 +1985,7 @@ pciehpc_enable_errors(pciehpc_t *ctrl_p)
 {
 	if (ctrl_p->soft_state & PCIEHPC_SOFT_STATE_PCIE_DEV) {
 		pcie_enable_errors(ctrl_p->dip, ctrl_p->cfghdl);
+		(void) pcie_enable_ce(ctrl_p->dip, ctrl_p->cfghdl);
 		PCIEHPC_DEBUG3((CE_NOTE, "%s%d: pciehpc_enable_errors\n",
 		    ddi_driver_name(ctrl_p->dip),
 		    ddi_get_instance(ctrl_p->dip)));

@@ -176,6 +176,20 @@ fail:
 	return (DDI_FAILURE);
 }
 
+int
+pcie_postattach_child(dev_info_t *dip)
+{
+	ddi_acc_handle_t config_handle;
+	int rval = DDI_FAILURE;
+
+	if (pci_config_setup(dip, &config_handle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	rval = pcie_enable_ce(dip, config_handle);
+
+	pci_config_teardown(&config_handle);
+	return (rval);
+}
 
 /*
  * PCI-Express child device de-initialization.
@@ -263,7 +277,7 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	pcie_clear_errors(dip, config_handle);
 
 	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
-			== DDI_FAILURE)
+		== DDI_FAILURE)
 		return;
 
 	rval = PCI_CAP_LOCATE(config_handle, PCI_CAP_XCFG_SPC
@@ -272,12 +286,13 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 		PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 
 	/*
-	 * Enable PCI-Express Baseline Error Handling
+	 * Enable Baseline Error Handling but leave CE reporting off (poweron
+	 * default).
 	 */
 	if ((device_ctl = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
 		PCIE_DEVCTL)) != PCI_CAP_EINVAL16) {
 		PCI_CAP_PUT16(config_handle, NULL, cap_ptr, PCIE_DEVCTL,
-			pcie_base_err_default);
+			pcie_base_err_default & (~PCIE_DEVCTL_CE_REPORTING_EN));
 
 		PCIE_DBG("%s: device control=0x%x->0x%x\n",
 			ddi_driver_name(dip), device_ctl, PCI_CAP_GET16
@@ -301,16 +316,6 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 			PCIE_AER_UCE_MASK));
 	}
 
-	/* Enable Correctable errors */
-	if ((aer_reg = PCI_XCAP_GET32(config_handle, NULL, aer_ptr,
-		PCIE_AER_CE_MASK)) != PCI_CAP_EINVAL32) {
-		PCI_XCAP_PUT32(config_handle, PCIE_EXT_CAP_ID_AER,
-			aer_ptr, PCIE_AER_CE_MASK, pcie_aer_ce_mask);
-		PCIE_DBG("%s: AER CE=0x%x->0x%x\n", ddi_driver_name(dip),
-			aer_reg, PCI_XCAP_GET32(config_handle, NULL, aer_ptr,
-			PCIE_AER_CE_MASK));
-	}
-
 	/*
 	 * Enable Secondary Uncorrectable errors if this is a bridge
 	 */
@@ -328,6 +333,69 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 			aer_reg, PCI_XCAP_GET32(config_handle,
 			PCIE_EXT_CAP_ID_AER, aer_ptr, PCIE_AER_SUCE_MASK));
 	}
+}
+
+/*
+ * This function is used for enabling CE reporting and setting the AER CE mask.
+ * When called from outside the pcie module it should always be preceded by
+ * a call to pcie_enable_errors.
+ */
+int
+pcie_enable_ce(dev_info_t *dip, ddi_acc_handle_t config_handle)
+{
+	uint16_t	cap_ptr, aer_ptr, device_sts;
+	uint32_t	tmp_pcie_aer_ce_mask;
+
+	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
+	    == DDI_FAILURE)
+		return (DDI_FAILURE);
+
+	/*
+	 * The "pcie_ce_mask" property is used to control both the CE reporting
+	 * enable field in the device control register and the AER CE mask. We
+	 * leave CE reporting disabled if pcie_ce_mask is set to -1.
+	 */
+
+	tmp_pcie_aer_ce_mask = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "pcie_ce_mask", pcie_aer_ce_mask);
+
+	if (tmp_pcie_aer_ce_mask == -1) {
+		/*
+		 * Nothing to do since CE reporting has already been disabled.
+		 */
+		return (DDI_SUCCESS);
+	}
+
+	if (PCI_CAP_LOCATE(config_handle, PCI_CAP_XCFG_SPC
+	    (PCIE_EXT_CAP_ID_AER), &aer_ptr) != DDI_FAILURE) {
+		/* Enable AER CE */
+		PCI_XCAP_PUT32(config_handle, PCIE_EXT_CAP_ID_AER,
+		    aer_ptr, PCIE_AER_CE_MASK, tmp_pcie_aer_ce_mask);
+
+		PCIE_DBG("%s: AER CE set to 0x%x\n",
+		    ddi_driver_name(dip), PCI_XCAP_GET32(config_handle, NULL,
+		    aer_ptr, PCIE_AER_CE_MASK));
+
+		/* Clear any pending AER CE errors */
+		PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_CE_STS,
+		    -1);
+	}
+
+	/* clear any pending CE errors */
+	if ((device_sts = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+		PCIE_DEVSTS)) != PCI_CAP_EINVAL16)
+		PCI_CAP_PUT16(config_handle, PCI_CAP_ID_PCI_E, cap_ptr,
+			PCIE_DEVSTS, device_sts & (~PCIE_DEVSTS_CE_DETECTED));
+
+	/* Enable CE reporting */
+	PCI_CAP_PUT16(config_handle, NULL, cap_ptr, PCIE_DEVCTL,
+	    pcie_base_err_default);
+
+	PCIE_DBG("%s: device control set to 0x%x\n",
+	    ddi_driver_name(dip), PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+	    PCIE_DEVCTL));
+
+	return (DDI_SUCCESS);
 }
 
 /* ARGSUSED */

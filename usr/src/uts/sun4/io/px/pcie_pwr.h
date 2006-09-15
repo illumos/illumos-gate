@@ -149,7 +149,7 @@ typedef struct pcie_pm {
  */
 
 /*
- * We link pcie_pwr.o into several drivers (px, px_pci, and pxb_bcm), which
+ * We link pcie_pwr.o into several drivers (px, px_pci, pxb_bcm, pxb_plx), which
  * causes the symbols below to be duplicated.  This isn't an issue in
  * practice, since they aren't used from outside the module that they're
  * part of.  However, lint does not know this, and when it does global
@@ -157,7 +157,8 @@ typedef struct pcie_pm {
  * symbols to driver-specific names when we're doing a lint run.
  */
 
-#if defined(lint) && defined(PX_MOD_NAME)
+#if defined(lint)
+#if defined(PX_MOD_NAME)
 #define	pwr_common_setup	PX_MOD_NAME##_pwr_common_setup
 #define	pwr_common_teardown	PX_MOD_NAME##_pwr_common_teardown
 #define	pcie_bus_power		PX_MOD_NAME##_pcie_bus_power
@@ -168,7 +169,21 @@ typedef struct pcie_pm {
 #define	pcie_pwr_resume		PX_MOD_NAME##_pcie_pwr_resume
 #define	pcie_pm_hold		PX_MOD_NAME##_pcie_pm_hold
 #define	pcie_pm_release		PX_MOD_NAME##_pcie_pm_release
-#endif
+#endif /* PX_MOD_NAME */
+
+#if defined(PX_PLX)
+#define	pwr_common_setup	PX_PLX##_pwr_common_setup
+#define	pwr_common_teardown	PX_PLX##_pwr_common_teardown
+#define	pcie_bus_power		PX_PLX##_pcie_bus_power
+#define	pcie_power		PX_PLX##_pcie_power
+#define	pcie_pm_add_child	PX_PLX##_pcie_pm_add_child
+#define	pcie_pm_remove_child	PX_PLX##_pcie_pm_remove_child
+#define	pcie_pwr_suspend	PX_PLX##_pcie_pwr_suspend
+#define	pcie_pwr_resume		PX_PLX##_pcie_pwr_resume
+#define	pcie_pm_hold		PX_PLX##_pcie_pm_hold
+#define	pcie_pm_release		PX_PLX##_pcie_pm_release
+#endif /* PX_PLX */
+#endif /* lint */
 
 extern int pwr_common_setup(dev_info_t *dip);
 extern void pwr_common_teardown(dev_info_t *dip);

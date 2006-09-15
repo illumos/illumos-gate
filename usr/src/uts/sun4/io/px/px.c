@@ -1233,6 +1233,9 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			    ddi_driver_name(rdip), ddi_get_instance(rdip));
 			if (as->cmd == DDI_ATTACH && as->result != DDI_SUCCESS)
 				pcie_pm_release(dip);
+
+			(void) pcie_postattach_child(rdip);
+
 			return (DDI_SUCCESS);
 		default:
 			break;

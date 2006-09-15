@@ -173,11 +173,9 @@ static int pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
 static int pxb_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
     void *arg, void **result);
 static int pxb_pwr_setup(dev_info_t *dip);
+static int plx_pwr_disable(dev_info_t *dip);
 static int pxb_pwr_init_and_raise(dev_info_t *dip, pcie_pwr_t *pwr_p);
 static void pxb_pwr_teardown(dev_info_t *dip);
-
-static int pxb_bad_func(pxb_devstate_t *pxb, int func);
-static int pxb_check_bad_devs(pxb_devstate_t *pxb, int vend);
 
 /* Hotplug related functions */
 static int pxb_pciehpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle);
@@ -370,8 +368,15 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if (pwr_common_setup(devi) != DDI_SUCCESS) {
 		DBG(DBG_PWR, devi, "pwr_common_setup failed\n");
 		goto fail;
-	} else if (pxb_pwr_setup(devi) != DDI_SUCCESS) {
+	}
+
+#ifdef PX_PLX
+	if (plx_pwr_disable(devi) != DDI_SUCCESS) {
+		DBG(DBG_PWR, devi, "plx_pwr_disable failed \n");
+#else
+	if (pxb_pwr_setup(devi) != DDI_SUCCESS) {
 		DBG(DBG_PWR, devi, "pxb_pwr_setup failed \n");
+#endif /* PX_PLX */
 		goto fail;
 	}
 
@@ -455,6 +460,17 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 	pxb->pxb_init_flags |= PXB_INIT_FM;
 
+#ifdef PX_PLX
+	/*
+	 * Due to a PLX HW bug we need to disable the receiver error CE on all
+	 * ports. To this end we create a property "pcie_ce_mask" with value
+	 * set to PCIE_AER_CE_RECEIVER_ERR. The pcie module will check for this
+	 * property before setting the AER CE mask.
+	 */
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, pxb->pxb_dip,
+		"pcie_ce_mask", PCIE_AER_CE_RECEIVER_ERR);
+#endif /* PX_PLX */
+
 	ddi_report_dev(devi);
 
 	return (DDI_SUCCESS);
@@ -481,6 +497,11 @@ pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		 */
 		pxb = (pxb_devstate_t *)
 		    ddi_get_soft_state(pxb_state, ddi_get_instance(devi));
+
+#ifdef PX_PLX
+		(void) ndi_prop_remove(DDI_DEV_T_NONE, pxb->pxb_dip,
+		    "pcie_ce_mask");
+#endif /* PX_PLX */
 
 		if (pxb->pxb_hotplug_capable == B_TRUE) {
 			if (pcihp_uninit(devi) == DDI_FAILURE)
@@ -604,6 +625,9 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			    ddi_driver_name(rdip), ddi_get_instance(rdip));
 			if (as->cmd == DDI_ATTACH && as->result != DDI_SUCCESS)
 				pcie_pm_release(dip);
+
+			(void) pcie_postattach_child(rdip);
+
 			return (DDI_SUCCESS);
 		default:
 			break;
@@ -782,12 +806,14 @@ pxb_name_child(dev_info_t *child, char *name, int namelen)
 static int
 pxb_initchild(dev_info_t *child)
 {
-	ddi_acc_handle_t	config_handle;
 	char 			name[MAXNAMELEN];
 	pxb_devstate_t		*pxb;
 	int			result = DDI_FAILURE;
+#ifdef PX_PLX
 	int			i;
 	uint16_t		reg = 0;
+	ddi_acc_handle_t	config_handle;
+#endif /* PX_PLX */
 
 	/*
 	 * Name the child
@@ -880,6 +906,7 @@ pxb_initchild(dev_info_t *child)
 		goto cleanup;
 	}
 
+#ifdef PX_PLX
 	/*
 	 * Due to a PLX HW bug, a SW workaround to prevent the chip from
 	 * wedging is needed.  SW just needs to tranfer 64 TLPs from
@@ -892,16 +919,7 @@ pxb_initchild(dev_info_t *child)
 	 * The code needs to be written in a way to make sure it isn't
 	 * optimized out.
 	 */
-	if ((!pxb_tlp_count) ||
-	    ((pxb->pxb_vendor_id != PXB_VENDOR_SUN) &&
-		(pxb->pxb_vendor_id != PXB_VENDOR_PLX)) ||
-	    ((pxb->pxb_vendor_id == PXB_VENDOR_SUN) &&
-		(pxb->pxb_device_id != PXB_DEVICE_PLX_PCIX) &&
-		(pxb->pxb_device_id != PXB_DEVICE_PLX_PCIE)) ||
-	    ((pxb->pxb_vendor_id == PXB_VENDOR_PLX) &&
-		(pxb->pxb_device_id != PXB_DEVICE_PLX_8532) &&
-		(pxb->pxb_device_id != PXB_DEVICE_PLX_8516))) {
-		/* Workaround not needed return success */
+	if (!pxb_tlp_count) {
 		result = DDI_SUCCESS;
 		goto cleanup;
 	}
@@ -915,6 +933,7 @@ pxb_initchild(dev_info_t *child)
 		reg |= pci_config_get16(config_handle, PCI_CONF_VENID);
 
 	pci_config_teardown(&config_handle);
+#endif /* PX_PLX */
 
 	result = DDI_SUCCESS;
 cleanup:
@@ -928,7 +947,6 @@ pxb_intr_attach(pxb_devstate_t *pxb)
 {
 	int			intr_types;
 	dev_info_t		*devi;
-	uint8_t			bad_msi_dev = 0;
 
 	devi = pxb->pxb_dip;
 	/*
@@ -942,11 +960,12 @@ pxb_intr_attach(pxb_devstate_t *pxb)
 		return (DDI_FAILURE);
 	}
 
-	if (pxb_bad_func(pxb, PXB_MSI))
-		bad_msi_dev = 1;
+#ifdef PX_PLX
+	if (pxb->pxb_rev_id <= PXB_DEVICE_PLX_BAD_MSI_REV)
+		intr_types &= DDI_INTR_TYPE_FIXED;
+#endif /* PX_PLX */
 
-	if ((intr_types & DDI_INTR_TYPE_MSI) && pxb_enable_msi &&
-				!bad_msi_dev) {
+	if ((intr_types & DDI_INTR_TYPE_MSI) && pxb_enable_msi) {
 		if (pxb_intr_init(pxb, DDI_INTR_TYPE_MSI) == DDI_SUCCESS)
 			intr_types = DDI_INTR_TYPE_MSI;
 		else
@@ -1475,6 +1494,28 @@ static int pxb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 }
 
 /*
+ * Disable PM for PLX 8532 switch. Transitioning one port on
+ * this switch to low power causes links on other ports on the
+ * same station to die.
+ * Due to PLX erratum #34, we can't allow the downstream device
+ * go to non-D0 state.
+ */
+static int
+plx_pwr_disable(dev_info_t *dip)
+{
+	pcie_pwr_t *pwr_p;
+
+	ASSERT(PCIE_PMINFO(dip));
+	pwr_p = PCIE_NEXUS_PMINFO(dip);
+	ASSERT(pwr_p);
+	DBG(DBG_PWR, dip, "plx_pwr_disable: PLX8532/PLX8516 found "
+	    "disabling PM\n");
+	pwr_p->pwr_func_lvl = PM_LEVEL_D0;
+	pwr_p->pwr_flags = PCIE_NO_CHILD_PM;
+	return (DDI_SUCCESS);
+}
+
+/*
  * Power management related initialization specific to px_pci.
  * Called by pxb_attach()
  */
@@ -1482,37 +1523,14 @@ static int
 pxb_pwr_setup(dev_info_t *dip)
 {
 	char *comp_array[5];
-	int i, instance;
+	int i;
 	ddi_acc_handle_t conf_hdl;
 	uint16_t pmcap, cap_ptr;
 	pcie_pwr_t *pwr_p;
-	pxb_devstate_t *pxb;
 
 	ASSERT(PCIE_PMINFO(dip));
 	pwr_p = PCIE_NEXUS_PMINFO(dip);
 	ASSERT(pwr_p);
-
-	instance = ddi_get_instance(dip);
-	pxb = (pxb_devstate_t *)ddi_get_soft_state(pxb_state, instance);
-	/*
-	 * Disable PM for PLX 8532 switch. Transitioning one port on
-	 * this switch to low power causes links on other ports on the
-	 * same station to die.
-	 * Due to PLX erratum #34, we can't allow the downstream device
-	 * go to non-D0 state.
-	 */
-	if (((pxb->pxb_vendor_id == PXB_VENDOR_SUN) &&
-		((pxb->pxb_device_id == PXB_DEVICE_PLX_PCIX) ||
-		(pxb->pxb_device_id == PXB_DEVICE_PLX_PCIE))) ||
-	    ((pxb->pxb_vendor_id == PXB_VENDOR_PLX) &&
-		((pxb->pxb_device_id == PXB_DEVICE_PLX_8516) ||
-		(pxb->pxb_device_id == PXB_DEVICE_PLX_8532)))) {
-		DBG(DBG_PWR, dip, "pxb_pwr_setup: PLX8532/PLX8516 found "
-		    "disabling PM\n");
-		pwr_p->pwr_func_lvl = PM_LEVEL_D0;
-		pwr_p->pwr_flags = PCIE_NO_CHILD_PM;
-		return (DDI_SUCCESS);
-	}
 
 	/* Code taken from pci_pci driver */
 	if (pci_config_setup(dip, &pwr_p->pwr_conf_hdl) != DDI_SUCCESS) {
@@ -1805,83 +1823,6 @@ pxb_print_plx_seeprom_crc_data(pxb_devstate_t *pxb_p)
 	ddi_regs_map_free(&h);
 }
 #endif
-
-/* check for known bad functionality in devices */
-static int
-pxb_bad_func(pxb_devstate_t *pxb, int func)
-{
-	int ret = B_FALSE;
-
-	switch (func) {
-		/* some devices do not render MSI well. */
-		case PXB_MSI:
-			if (pxb_check_bad_devs(pxb, PXB_VENDOR_SUN) ||
-				pxb_check_bad_devs(pxb, PXB_VENDOR_PLX)) {
-
-				if (pxb->pxb_rev_id <=
-						PXB_DEVICE_PLX_BAD_MSI_REV)
-					ret = B_TRUE;
-			}
-			break;
-
-		case PXB_LINK_INIT:
-		/*
-		 * some devices require certain initialization sequence so
-		 * as to not get wedged.
-		 */
-
-		case PXB_HOTPLUG_MSGS:
-		/*
-		 * disable UR for 1.0a implementations where
-		 * hotplug messages sent downstream cause URs to be
-		 * detected causing error messages to be sent to the fabric.
-		 */
-			if (pxb_check_bad_devs(pxb, PXB_VENDOR_SUN) ||
-				pxb_check_bad_devs(pxb, PXB_VENDOR_PLX)) {
-
-				ret = B_TRUE;
-			}
-			if (func == PXB_HOTPLUG_MSGS)
-				ret = B_TRUE;
-			break;
-
-
-		default:
-			break;
-	}
-	return (ret);
-}
-
-/* check for known bad devices from a vendor */
-static int
-pxb_check_bad_devs(pxb_devstate_t *pxb, int vend)
-{
-	int ret = B_FALSE;
-
-	switch (vend) {
-		case PXB_VENDOR_SUN:
-			if ((pxb->pxb_vendor_id == PXB_VENDOR_SUN) &&
-					((pxb->pxb_device_id ==
-						PXB_DEVICE_PLX_PCIX) ||
-					(pxb->pxb_device_id ==
-						PXB_DEVICE_PLX_PCIE))) {
-				ret = B_TRUE;
-			}
-			break;
-		case PXB_VENDOR_PLX:
-			if ((pxb->pxb_vendor_id == PXB_VENDOR_PLX) &&
-					((pxb->pxb_device_id ==
-						PXB_DEVICE_PLX_8532) ||
-					(pxb->pxb_device_id ==
-						PXB_DEVICE_PLX_8516))) {
-				ret = B_TRUE;
-			}
-			break;
-		default:
-			break;
-	}
-	return (ret);
-}
 
 static void
 pxb_id_props(pxb_devstate_t *pxb)
