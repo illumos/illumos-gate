@@ -279,7 +279,10 @@ V9ABIWARN=
 CCREGSYM=		-Wc,-Qiselect-regsym=0
 CCCREGSYM=		-Qoption cg -Qiselect-regsym=0
 
-# prevent static symbols being optimized out
+# Prevent the removal of static symbols by the SPARC code generator (cg).
+# The x86 code generator (ube) does not remove such symbols and as such
+# using this workaround is not applicable for x86.
+#
 CCSTATICSYM=		-Wc,-Qassembler-ounrefsym=0
 #
 # generate 32-bit addresses in the v9 kernel. Saves memory.
@@ -359,7 +362,7 @@ C99LMODE=	$(C99MODE:-xc99%=-Xc99%)
 
 # In most places, assignments to these macros should be appended with +=
 # (CPPFLAGS.master allows values to be prepended to CPPFLAGS).
-sparc_CFLAGS=	$(sparc_XARCH)
+sparc_CFLAGS=	$(sparc_XARCH) $(CCSTATICSYM)
 sparcv9_CFLAGS=	$(sparcv9_XARCH) -dalign $(CCVERBOSE) $(V9ABIWARN) $(CCREGSYM) \
 		$(CCSTATICSYM)
 i386_CFLAGS=	$(i386_XARCH)
