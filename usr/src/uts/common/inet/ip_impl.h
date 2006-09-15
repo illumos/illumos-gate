@@ -491,6 +491,7 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 
 extern int	ip_wput_frag_mdt_min;
 extern boolean_t ip_can_frag_mdt(mblk_t *, ssize_t, ssize_t);
+extern mblk_t   *ip_prepend_zoneid(mblk_t *, zoneid_t);
 
 #endif	/* _KERNEL */
 

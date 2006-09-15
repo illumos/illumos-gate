@@ -2885,8 +2885,9 @@ extern vmem_t *ip_minor_arena;
 #define	ip_max_defend			ip_param_arr[52].ip_param_value
 #define	ip_defend_interval		ip_param_arr[53].ip_param_value
 #define	ip_dup_recovery			ip_param_arr[54].ip_param_value
+#define	ip_restrict_interzone_loopback	ip_param_arr[55].ip_param_value
 #ifdef DEBUG
-#define	ipv6_drop_inbound_icmpv6	ip_param_arr[55].ip_param_value
+#define	ipv6_drop_inbound_icmpv6	ip_param_arr[56].ip_param_value
 #else
 #define	ipv6_drop_inbound_icmpv6	0
 #endif
@@ -2979,8 +2980,8 @@ extern char	*ip_dot_addr(ipaddr_t, char *);
 extern const char *mac_colon_addr(const uint8_t *, size_t, char *, size_t);
 extern void	ip_lwput(queue_t *, mblk_t *);
 extern boolean_t icmp_err_rate_limit(void);
-extern void	icmp_time_exceeded(queue_t *, mblk_t *, uint8_t);
-extern void	icmp_unreachable(queue_t *, mblk_t *, uint8_t);
+extern void	icmp_time_exceeded(queue_t *, mblk_t *, uint8_t, zoneid_t);
+extern void	icmp_unreachable(queue_t *, mblk_t *, uint8_t, zoneid_t);
 extern mblk_t	*ip_add_info(mblk_t *, ill_t *, uint_t);
 extern mblk_t	*ip_bind_v4(queue_t *, mblk_t *, conn_t *);
 extern int	ip_bind_connected(conn_t *, mblk_t *, ipaddr_t *, uint16_t,
@@ -3018,10 +3019,11 @@ extern void	ip_wput(queue_t *, mblk_t *);
 extern void	ip_output(void *, mblk_t *, void *, int);
 extern void	ip_wput_md(queue_t *, mblk_t *, conn_t *);
 
-extern void	ip_wput_ire(queue_t *, mblk_t *, ire_t *, conn_t *, int);
+extern void	ip_wput_ire(queue_t *, mblk_t *, ire_t *, conn_t *, int,
+		    zoneid_t);
 extern void	ip_wput_local(queue_t *, ill_t *, ipha_t *, mblk_t *, ire_t *,
-    int, zoneid_t);
-extern void	ip_wput_multicast(queue_t *, mblk_t *, ipif_t *);
+		    int, zoneid_t);
+extern void	ip_wput_multicast(queue_t *, mblk_t *, ipif_t *, zoneid_t);
 extern void	ip_wput_nondata(ipsq_t *, queue_t *, mblk_t *, void *);
 extern void	ip_wsrv(queue_t *);
 extern char	*ip_nv_lookup(nv_t *, int);
@@ -3029,7 +3031,8 @@ extern boolean_t ip_local_addr_ok_v6(const in6_addr_t *, const in6_addr_t *);
 extern boolean_t ip_remote_addr_ok_v6(const in6_addr_t *, const in6_addr_t *);
 extern ipaddr_t ip_massage_options(ipha_t *);
 extern ipaddr_t ip_net_mask(ipaddr_t);
-extern void	ip_newroute(queue_t *, mblk_t *, ipaddr_t, ill_t *, conn_t *);
+extern void	ip_newroute(queue_t *, mblk_t *, ipaddr_t, ill_t *, conn_t *,
+		    zoneid_t);
 extern ipxmit_state_t	ip_xmit_v4(mblk_t *, ire_t *, struct ipsec_out_s *,
     boolean_t);
 extern int	ip_hdr_complete(ipha_t *, zoneid_t);

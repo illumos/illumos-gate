@@ -56,6 +56,7 @@
 #include <inet/mib2.h>
 #include <inet/nd.h>
 #include <inet/ip.h>
+#include <inet/ip_impl.h>
 #include <inet/ip_if.h>
 #include <inet/ip_ire.h>
 #include <inet/ip_rts.h>
@@ -1023,37 +1024,6 @@ ndp_walk(ill_t *ill, pfi_t pfi, void *arg1)
 }
 
 /*
- * Prepend the zoneid using an ipsec_out_t for later use by functions like
- * ip_rput_v6() after neighbor discovery has taken place.  If the message
- * block already has a M_CTL at the front of it, then simply set the zoneid
- * appropriately.
- */
-static mblk_t *
-ndp_prepend_zone(mblk_t *mp, zoneid_t zoneid)
-{
-	mblk_t		*first_mp;
-	ipsec_out_t	*io;
-
-	ASSERT(zoneid != ALL_ZONES);
-	if (mp->b_datap->db_type == M_CTL) {
-		io = (ipsec_out_t *)mp->b_rptr;
-		ASSERT(io->ipsec_out_type == IPSEC_OUT);
-		io->ipsec_out_zoneid = zoneid;
-		return (mp);
-	}
-
-	first_mp = ipsec_alloc_ipsec_out();
-	if (first_mp == NULL)
-		return (NULL);
-	io = (ipsec_out_t *)first_mp->b_rptr;
-	/* This is not a secure packet */
-	io->ipsec_out_secure = B_FALSE;
-	io->ipsec_out_zoneid = zoneid;
-	first_mp->b_cont = mp;
-	return (first_mp);
-}
-
-/*
  * Process resolve requests.  Handles both mapped entries
  * as well as cases that needs to be send out on the wire.
  * Lookup a NCE for a given IRE.  Regardless of whether one exists
@@ -1111,7 +1081,7 @@ ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 			NCE_REFRELE(nce);
 			return (0);
 		}
-		mp_nce = ndp_prepend_zone(mp, zoneid);
+		mp_nce = ip_prepend_zoneid(mp, zoneid);
 		if (mp_nce == NULL) {
 			/* The caller will free mp */
 			mutex_exit(&nce->nce_lock);
@@ -1139,7 +1109,7 @@ ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 		/* Resolution in progress just queue the packet */
 		mutex_enter(&nce->nce_lock);
 		if (nce->nce_state == ND_INCOMPLETE) {
-			mp_nce = ndp_prepend_zone(mp, zoneid);
+			mp_nce = ip_prepend_zoneid(mp, zoneid);
 			if (mp_nce == NULL) {
 				err = ENOMEM;
 			} else {
@@ -3092,7 +3062,7 @@ nce_resolv_failed(nce_t *nce)
 		 */
 		(void) ip_hdr_complete_v6((ip6_t *)mp->b_rptr, zoneid);
 		icmp_unreachable_v6(nce->nce_ill->ill_wq, first_mp,
-		    ICMP6_DST_UNREACH_ADDR, B_FALSE, B_FALSE);
+		    ICMP6_DST_UNREACH_ADDR, B_FALSE, B_FALSE, zoneid);
 		mp = nxt_mp;
 	}
 }
@@ -3674,7 +3644,7 @@ arp_resolv_failed(nce_t *nce)
 		(void) ip_hdr_complete((ipha_t *)mp->b_rptr, zoneid);
 		ip3dbg(("arp_resolv_failed: Calling icmp_unreachable\n"));
 		icmp_unreachable(nce->nce_ill->ill_wq, first_mp,
-		    ICMP_HOST_UNREACHABLE);
+		    ICMP_HOST_UNREACHABLE, zoneid);
 		mp = nxt_mp;
 	}
 }

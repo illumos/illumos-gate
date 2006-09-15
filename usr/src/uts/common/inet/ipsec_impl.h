@@ -588,9 +588,9 @@ extern void ipsec_actvec_from_req(ipsec_req_t *, ipsec_act_t **, uint_t *);
 extern void ipsec_actvec_free(ipsec_act_t *, uint_t);
 extern mblk_t *ipsec_construct_inverse_acquire(sadb_msg_t *, sadb_ext_t **);
 extern mblk_t *ip_wput_attach_policy(mblk_t *, ipha_t *, ip6_t *, ire_t *,
-    conn_t *, boolean_t);
+    conn_t *, boolean_t, zoneid_t);
 extern mblk_t	*ip_wput_ire_parse_ipsec_out(mblk_t *, ipha_t *, ip6_t *,
-    ire_t *, conn_t *, boolean_t);
+    ire_t *, conn_t *, boolean_t, zoneid_t);
 extern ipsec_policy_t *ipsec_find_policy(int, conn_t *,
     struct ipsec_out_s *, ipsec_selector_t *);
 extern ipsid_t *ipsid_lookup(int, char *);

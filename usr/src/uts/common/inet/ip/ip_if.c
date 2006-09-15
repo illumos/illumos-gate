@@ -3514,6 +3514,7 @@ ill_frag_timeout(ill_t *ill, time_t dead_interval)
 	uint32_t	hdr_length;
 	mblk_t	*send_icmp_head;
 	mblk_t	*send_icmp_head_v6;
+	zoneid_t zoneid;
 
 	ipfb = ill->ill_frag_hash_tbl;
 	if (ipfb == NULL)
@@ -3594,18 +3595,44 @@ ill_frag_timeout(ill_t *ill, time_t dead_interval)
 		 * above.
 		 */
 		while (send_icmp_head_v6 != NULL) {
+			ip6_t *ip6h;
+
 			mp = send_icmp_head_v6;
 			send_icmp_head_v6 = send_icmp_head_v6->b_next;
 			mp->b_next = NULL;
-			icmp_time_exceeded_v6(ill->ill_wq, mp,
-			    ICMP_REASSEMBLY_TIME_EXCEEDED, B_FALSE, B_FALSE);
+			if (mp->b_datap->db_type == M_CTL)
+				ip6h = (ip6_t *)mp->b_cont->b_rptr;
+			else
+				ip6h = (ip6_t *)mp->b_rptr;
+			zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst,
+			    ill);
+			if (zoneid == ALL_ZONES) {
+				freemsg(mp);
+			} else {
+				icmp_time_exceeded_v6(ill->ill_wq, mp,
+				    ICMP_REASSEMBLY_TIME_EXCEEDED, B_FALSE,
+				    B_FALSE, zoneid);
+			}
 		}
 		while (send_icmp_head != NULL) {
+			ipaddr_t dst;
+
 			mp = send_icmp_head;
 			send_icmp_head = send_icmp_head->b_next;
 			mp->b_next = NULL;
-			icmp_time_exceeded(ill->ill_wq, mp,
-			    ICMP_REASSEMBLY_TIME_EXCEEDED);
+
+			if (mp->b_datap->db_type == M_CTL)
+				dst = ((ipha_t *)mp->b_cont->b_rptr)->ipha_dst;
+			else
+				dst = ((ipha_t *)mp->b_rptr)->ipha_dst;
+
+			zoneid = ipif_lookup_addr_zoneid(dst, ill);
+			if (zoneid == ALL_ZONES) {
+				freemsg(mp);
+			} else {
+				icmp_time_exceeded(ill->ill_wq, mp,
+				    ICMP_REASSEMBLY_TIME_EXCEEDED, zoneid);
+			}
 		}
 	}
 	/*
@@ -5136,7 +5163,8 @@ ip_ipif_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 	rw_enter(&ill_g_lock, RW_READER);
 	ill = ILL_START_WALK_ALL(&ctx);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
-		for (ipif = ill->ill_ipif; ipif; ipif = ipif->ipif_next) {
+		for (ipif = ill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
 			if (zoneid != GLOBAL_ZONEID &&
 			    zoneid != ipif->ipif_zoneid &&
 			    ipif->ipif_zoneid != ALL_ZONES)
@@ -5564,12 +5592,74 @@ repeat:
 		RELEASE_CONN_LOCK(q);
 	}
 
-	/* Now try the ptp case */
+	/* If we already did the ptp case, then we are done */
 	if (ptp) {
 		rw_exit(&ill_g_lock);
 		if (error != NULL)
 			*error = ENXIO;
 		return (NULL);
+	}
+	ptp = B_TRUE;
+	goto repeat;
+}
+
+/*
+ * Look for an ipif with the specified address. For point-point links
+ * we look for matches on either the destination address and the local
+ * address, but we ignore the check on the local address if IPIF_UNNUMBERED
+ * is set.
+ * Matches on a specific ill if match_ill is set.
+ * Return the zoneid for the ipif which matches. ALL_ZONES if no match.
+ */
+zoneid_t
+ipif_lookup_addr_zoneid(ipaddr_t addr, ill_t *match_ill)
+{
+	zoneid_t zoneid;
+	ipif_t  *ipif;
+	ill_t   *ill;
+	boolean_t ptp = B_FALSE;
+	ill_walk_context_t	ctx;
+
+	rw_enter(&ill_g_lock, RW_READER);
+	/*
+	 * Repeat twice, first based on local addresses and
+	 * next time for pointopoint.
+	 */
+repeat:
+	ill = ILL_START_WALK_V4(&ctx);
+	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
+		if (match_ill != NULL && ill != match_ill) {
+			continue;
+		}
+		mutex_enter(&ill->ill_lock);
+		for (ipif = ill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
+			/* Allow the ipif to be down */
+			if ((!ptp && (ipif->ipif_lcl_addr == addr) &&
+			    ((ipif->ipif_flags & IPIF_UNNUMBERED) == 0)) ||
+			    (ptp && (ipif->ipif_flags & IPIF_POINTOPOINT) &&
+			    (ipif->ipif_pp_dst_addr == addr)) &&
+			    !(ipif->ipif_state_flags & IPIF_CONDEMNED)) {
+				zoneid = ipif->ipif_zoneid;
+				mutex_exit(&ill->ill_lock);
+				rw_exit(&ill_g_lock);
+				/*
+				 * If ipif_zoneid was ALL_ZONES then we have
+				 * a trusted extensions shared IP address.
+				 * In that case GLOBAL_ZONEID works to send.
+				 */
+				if (zoneid == ALL_ZONES)
+					zoneid = GLOBAL_ZONEID;
+				return (zoneid);
+			}
+		}
+		mutex_exit(&ill->ill_lock);
+	}
+
+	/* If we already did the ptp case, then we are done */
+	if (ptp) {
+		rw_exit(&ill_g_lock);
+		return (ALL_ZONES);
 	}
 	ptp = B_TRUE;
 	goto repeat;
@@ -8201,7 +8291,7 @@ ip_sioctl_get_ifconf(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 	rw_enter(&ill_g_lock, RW_READER);
 	ill = ILL_START_WALK_V4(&ctx);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
-		for (ipif = ill->ill_ipif; ipif;
+		for (ipif = ill->ill_ipif; ipif != NULL;
 		    ipif = ipif->ipif_next) {
 			if (zoneid != ipif->ipif_zoneid &&
 			    ipif->ipif_zoneid != ALL_ZONES)
@@ -10364,7 +10454,8 @@ ip_sioctl_addif(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 
 	if (found_sep && orig_ifindex == 0) {
 		/* Now see if there is an IPIF with this unit number. */
-		for (ipif = ill->ill_ipif; ipif; ipif = ipif->ipif_next) {
+		for (ipif = ill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
 			if (ipif->ipif_id == id) {
 				err = EEXIST;
 				goto done;
@@ -18560,7 +18651,7 @@ ipif_lookup_on_name(char *name, size_t namelen, boolean_t do_alloc,
 	GRAB_CONN_LOCK(q);
 	mutex_enter(&ill->ill_lock);
 	/* Now see if there is an IPIF with this unit number. */
-	for (ipif = ill->ill_ipif; ipif; ipif = ipif->ipif_next) {
+	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
 		if (ipif->ipif_id == id) {
 			if (zoneid != ALL_ZONES &&
 			    zoneid != ipif->ipif_zoneid &&

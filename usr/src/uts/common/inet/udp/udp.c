@@ -7922,7 +7922,7 @@ udp_wput_iocdata(queue_t *q, mblk_t *mp)
 	case TI_GETPEERNAME:
 		break;
 	default:
-		ip_output(Q_TO_CONN(q), mp, q, IP_WPUT);
+		ip_output(udp->udp_connp, mp, q, IP_WPUT);
 		return;
 	}
 

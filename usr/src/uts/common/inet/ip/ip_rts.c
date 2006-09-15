@@ -280,11 +280,13 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	tsol_gcgrp_t	*gcgrp = NULL;
 	tsol_gc_t	*gc = NULL;
 	ts_label_t	*tsl = NULL;
+	zoneid_t	zoneid;
 
 	ip1dbg(("ip_rts_request: mp is %x\n", DB_TYPE(mp)));
 
 	ASSERT(CONN_Q(q));
 	connp = Q_TO_CONN(q);
+	zoneid = connp->conn_zoneid;
 
 	ASSERT(mp->b_cont != NULL);
 	/* ioc_mp holds mp */
@@ -771,12 +773,25 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 		case AF_INET:
 			if (net_mask == IP_HOST_MASK) {
 				ire = ire_ctable_lookup(dst_addr, gw_addr,
-				    IRE_LOCAL | IRE_LOOPBACK, NULL, ALL_ZONES,
+				    IRE_LOCAL | IRE_LOOPBACK, NULL, zoneid,
 				    tsl, match_flags_local);
+				/*
+				 * If we found an IRE_LOCAL, make sure
+				 * it is one that would be used by this
+				 * zone to send packets.
+				 */
+				if (ire != NULL &&
+				    ire->ire_type == IRE_LOCAL &&
+				    ip_restrict_interzone_loopback &&
+				    !ire_local_ok_across_zones(ire,
+				    zoneid, &dst_addr, tsl)) {
+					ire_refrele(ire);
+					ire = NULL;
+				}
 			}
 			if (ire == NULL) {
 				ire = ire_ftable_lookup(dst_addr, net_mask,
-				    gw_addr, 0, ipif, &sire, ALL_ZONES, 0,
+				    gw_addr, 0, ipif, &sire, zoneid, 0,
 				    tsl, match_flags);
 			}
 			break;
@@ -784,12 +799,25 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			if (IN6_ARE_ADDR_EQUAL(&net_mask_v6, &ipv6_all_ones)) {
 				ire = ire_ctable_lookup_v6(&dst_addr_v6,
 				    &gw_addr_v6, IRE_LOCAL | IRE_LOOPBACK, NULL,
-				    ALL_ZONES, tsl, match_flags_local);
+				    zoneid, tsl, match_flags_local);
+				/*
+				 * If we found an IRE_LOCAL, make sure
+				 * it is one that would be used by this
+				 * zone to send packets.
+				 */
+				if (ire != NULL &&
+				    ire->ire_type == IRE_LOCAL &&
+				    ip_restrict_interzone_loopback &&
+				    !ire_local_ok_across_zones(ire,
+				    zoneid, (void *)&dst_addr_v6, tsl)) {
+					ire_refrele(ire);
+					ire = NULL;
+				}
 			}
 			if (ire == NULL) {
 				ire = ire_ftable_lookup_v6(&dst_addr_v6,
 				    &net_mask_v6, &gw_addr_v6, 0, ipif, &sire,
-				    ALL_ZONES, 0, tsl, match_flags);
+				    zoneid, 0, tsl, match_flags);
 			}
 			break;
 		}

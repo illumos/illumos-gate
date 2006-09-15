@@ -1952,7 +1952,7 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 	ASSERT(ill->ill_rq != NULL);
 	ip_multicast_loopback(ill->ill_rq, ill, first_mp, 0, ilm->ilm_zoneid);
 
-	ip_wput_multicast(ill->ill_wq, first_mp, ipif);
+	ip_wput_multicast(ill->ill_wq, first_mp, ipif, zoneid);
 
 	++igmpstat.igps_snd_reports;
 }
@@ -2135,7 +2135,7 @@ nextpkt:
 	ASSERT(ill->ill_rq != NULL);
 	ip_multicast_loopback(ill->ill_rq, ill, mp, 0, ipif->ipif_zoneid);
 
-	ip_wput_multicast(ill->ill_wq, first_mp, ipif);
+	ip_wput_multicast(ill->ill_wq, first_mp, ipif, zoneid);
 
 	++igmpstat.igps_snd_reports;
 

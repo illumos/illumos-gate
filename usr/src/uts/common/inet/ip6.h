@@ -347,9 +347,9 @@ extern void	convert2ascii(char *buf, const in6_addr_t *addr);
 extern char	*inet_ntop(int, const void *, char *, int);
 extern int	inet_pton(int, char *, void *);
 extern void	icmp_time_exceeded_v6(queue_t *, mblk_t *, uint8_t,
-    boolean_t, boolean_t);
+    boolean_t, boolean_t, zoneid_t);
 extern void	icmp_unreachable_v6(queue_t *, mblk_t *, uint8_t,
-    boolean_t, boolean_t);
+    boolean_t, boolean_t, zoneid_t);
 extern void	icmp_inbound_error_fanout_v6(queue_t *, mblk_t *, ip6_t *,
     icmp6_t *, ill_t *, boolean_t, zoneid_t);
 extern boolean_t conn_wantpacket_v6(conn_t *, ill_t *, ip6_t *, int, zoneid_t);

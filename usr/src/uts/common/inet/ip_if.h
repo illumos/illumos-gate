@@ -210,6 +210,8 @@ extern	ipif_t	*ipif_lookup_addr(ipaddr_t, ill_t *, zoneid_t, queue_t *,
     mblk_t *, ipsq_func_t, int *);
 extern	ipif_t	*ipif_lookup_addr_v6(const in6_addr_t *, ill_t *, zoneid_t,
     queue_t *, mblk_t *, ipsq_func_t, int *);
+extern	zoneid_t ipif_lookup_addr_zoneid(ipaddr_t, ill_t *);
+extern	zoneid_t ipif_lookup_addr_zoneid_v6(const in6_addr_t *, ill_t *);
 extern	ipif_t	*ipif_lookup_group(ipaddr_t, zoneid_t);
 extern	ipif_t	*ipif_lookup_group_v6(const in6_addr_t *, zoneid_t);
 extern  ipif_t	*ipif_lookup_interface(ipaddr_t, ipaddr_t,

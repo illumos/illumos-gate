@@ -632,7 +632,7 @@ uint32_t (*cl_inet_ipident)(uint8_t protocol, sa_family_t addr_family,
  * --------				----------------
  * IRE_BROADCAST			Exclusive
  * IRE_DEFAULT (default routes)		Shared (*)
- * IRE_LOCAL				Exclusive
+ * IRE_LOCAL				Exclusive (x)
  * IRE_LOOPBACK				Exclusive
  * IRE_PREFIX (net routes)		Shared (*)
  * IRE_CACHE				Exclusive
@@ -643,6 +643,22 @@ uint32_t (*cl_inet_ipident)(uint8_t protocol, sa_family_t addr_family,
  * (*) A zone can only use a default or off-subnet route if the gateway is
  * directly reachable from the zone, that is, if the gateway's address matches
  * one of the zone's logical interfaces.
+ *
+ * (x) IRE_LOCAL are handled a bit differently, since for all other entries
+ * in ire_ctable and IRE_INTERFACE, ire_src_addr is what can be used as source
+ * when sending packets using the IRE. For IRE_LOCAL ire_src_addr is the IP
+ * address of the zone itself (the destination). Since IRE_LOCAL is used
+ * for communication between zones, ip_wput_ire has special logic to set
+ * the right source address when sending using an IRE_LOCAL.
+ *
+ * Furthermore, when ip_restrict_interzone_loopback is set (the default),
+ * ire_cache_lookup restricts loopback using an IRE_LOCAL
+ * between zone to the case when L2 would have conceptually looped the packet
+ * back, i.e. the loopback which is required since neither Ethernet drivers
+ * nor Ethernet hardware loops them back. This is the case when the normal
+ * routes (ignoring IREs with different zoneids) would send out the packet on
+ * the same ill (or ill group) as the ill with which is IRE_LOCAL is
+ * associated.
  *
  * Multiple zones can share a common broadcast address; typically all zones
  * share the 255.255.255.255 address. Incoming as well as locally originated
@@ -689,7 +705,7 @@ static int	conn_set_held_ipif(conn_t *, ipif_t **, ipif_t *);
 static mblk_t	*ip_wput_attach_llhdr(mblk_t *, ire_t *, ip_proc_t, uint32_t);
 static void	ip_ipsec_out_prepend(mblk_t *, mblk_t *, ill_t *);
 
-static void	icmp_frag_needed(queue_t *, mblk_t *, int);
+static void	icmp_frag_needed(queue_t *, mblk_t *, int, zoneid_t);
 static void	icmp_inbound(queue_t *, mblk_t *, boolean_t, ill_t *, int,
     uint32_t, boolean_t, boolean_t, ill_t *, zoneid_t);
 static ipaddr_t	icmp_get_nexthop_addr(ipha_t *, ill_t *, zoneid_t, mblk_t *mp);
@@ -699,8 +715,9 @@ static void	icmp_inbound_error_fanout(queue_t *, ill_t *, mblk_t *,
 		    icmph_t *, ipha_t *, int, int, boolean_t, boolean_t,
 		    ill_t *, zoneid_t);
 static void	icmp_options_update(ipha_t *);
-static void	icmp_param_problem(queue_t *, mblk_t *, uint8_t);
-static void	icmp_pkt(queue_t *, mblk_t *, void *, size_t, boolean_t);
+static void	icmp_param_problem(queue_t *, mblk_t *, uint8_t, zoneid_t);
+static void	icmp_pkt(queue_t *, mblk_t *, void *, size_t, boolean_t,
+		    zoneid_t zoneid);
 static mblk_t	*icmp_pkt_err_ok(mblk_t *);
 static void	icmp_redirect(mblk_t *);
 static void	icmp_send_redirect(queue_t *, mblk_t *, ipaddr_t);
@@ -722,9 +739,10 @@ static void	ip_lrput(queue_t *, mblk_t *);
 ipaddr_t	ip_massage_options(ipha_t *);
 static void	ip_mrtun_forward(ire_t *, ill_t *, mblk_t *);
 ipaddr_t	ip_net_mask(ipaddr_t);
-void		ip_newroute(queue_t *, mblk_t *, ipaddr_t, ill_t *, conn_t *);
+void		ip_newroute(queue_t *, mblk_t *, ipaddr_t, ill_t *, conn_t *,
+		    zoneid_t);
 static void	ip_newroute_ipif(queue_t *, mblk_t *, ipif_t *, ipaddr_t,
-		    conn_t *, uint32_t);
+		    conn_t *, uint32_t, zoneid_t);
 char		*ip_nv_lookup(nv_t *, int);
 static boolean_t	ip_check_for_ipsec_opt(queue_t *, mblk_t *);
 static int	ip_param_get(queue_t *, mblk_t *, caddr_t, cred_t *);
@@ -766,11 +784,12 @@ int		ip_snmp_set(queue_t *, int, int, uchar_t *, int);
 static boolean_t	ip_source_routed(ipha_t *);
 static boolean_t	ip_source_route_included(ipha_t *);
 
-static void	ip_wput_frag(ire_t *, mblk_t *, ip_pkt_t, uint32_t, uint32_t);
+static void	ip_wput_frag(ire_t *, mblk_t *, ip_pkt_t, uint32_t, uint32_t,
+		    zoneid_t);
 static mblk_t	*ip_wput_frag_copyhdr(uchar_t *, int, int);
 static void	ip_wput_local_options(ipha_t *);
 static int	ip_wput_options(queue_t *, mblk_t *, ipha_t *, boolean_t,
-    zoneid_t);
+		    zoneid_t);
 
 static void	conn_drain_init(void);
 static void	conn_drain_fini(void);
@@ -962,6 +981,7 @@ static ipparam_t	lcl_param_arr[] = {
 	{  0,	1000,	3,	"ip_max_defend" },
 	{  0,	999999,	30,	"ip_defend_interval" },
 	{  0,	3600000, 300000, "ip_dup_recovery" },
+	{  0,	1,	1,	"ip_restrict_interzone_loopback" },
 #ifdef DEBUG
 	{  0,	1,	0,	"ip6_drop_inbound_icmpv6" },
 #endif
@@ -1495,6 +1515,38 @@ struct streamtab ipinfo = {
 #ifdef	DEBUG
 static boolean_t skip_sctp_cksum = B_FALSE;
 #endif
+
+/*
+ * Prepend the zoneid using an ipsec_out_t for later use by functions like
+ * ip_rput_v6(), ip_output(), etc.  If the message
+ * block already has a M_CTL at the front of it, then simply set the zoneid
+ * appropriately.
+ */
+mblk_t *
+ip_prepend_zoneid(mblk_t *mp, zoneid_t zoneid)
+{
+	mblk_t		*first_mp;
+	ipsec_out_t	*io;
+
+	ASSERT(zoneid != ALL_ZONES);
+	if (mp->b_datap->db_type == M_CTL) {
+		io = (ipsec_out_t *)mp->b_rptr;
+		ASSERT(io->ipsec_out_type == IPSEC_OUT);
+		io->ipsec_out_zoneid = zoneid;
+		return (mp);
+	}
+
+	first_mp = ipsec_alloc_ipsec_out();
+	if (first_mp == NULL)
+		return (NULL);
+	io = (ipsec_out_t *)first_mp->b_rptr;
+	/* This is not a secure packet */
+	io->ipsec_out_secure = B_FALSE;
+	io->ipsec_out_zoneid = zoneid;
+	first_mp->b_cont = mp;
+	return (first_mp);
+}
+
 /*
  * Copy an M_CTL-tagged message, preserving reference counts appropriately.
  */
@@ -1527,7 +1579,7 @@ ip_copymsg(mblk_t *mp)
 
 /* Generate an ICMP fragmentation needed message. */
 static void
-icmp_frag_needed(queue_t *q, mblk_t *mp, int mtu)
+icmp_frag_needed(queue_t *q, mblk_t *mp, int mtu, zoneid_t zoneid)
 {
 	icmph_t	icmph;
 	mblk_t *first_mp;
@@ -1547,7 +1599,7 @@ icmp_frag_needed(queue_t *q, mblk_t *mp, int mtu)
 	icmph.icmph_du_mtu = htons((uint16_t)mtu);
 	BUMP_MIB(&icmp_mib, icmpOutFragNeeded);
 	BUMP_MIB(&icmp_mib, icmpOutDestUnreachs);
-	icmp_pkt(q, first_mp, &icmph, sizeof (icmph_t), mctl_present);
+	icmp_pkt(q, first_mp, &icmph, sizeof (icmph_t), mctl_present, zoneid);
 }
 
 /*
@@ -3261,7 +3313,7 @@ icmp_redirect(mblk_t *mp)
  * Generate an ICMP parameter problem message.
  */
 static void
-icmp_param_problem(queue_t *q, mblk_t *mp, uint8_t ptr)
+icmp_param_problem(queue_t *q, mblk_t *mp, uint8_t ptr, zoneid_t zoneid)
 {
 	icmph_t	icmph;
 	boolean_t mctl_present;
@@ -3279,7 +3331,7 @@ icmp_param_problem(queue_t *q, mblk_t *mp, uint8_t ptr)
 	icmph.icmph_type = ICMP_PARAM_PROBLEM;
 	icmph.icmph_pp_ptr = ptr;
 	BUMP_MIB(&icmp_mib, icmpOutParmProbs);
-	icmp_pkt(q, first_mp, &icmph, sizeof (icmph_t), mctl_present);
+	icmp_pkt(q, first_mp, &icmph, sizeof (icmph_t), mctl_present, zoneid);
 }
 
 /*
@@ -3296,7 +3348,7 @@ icmp_param_problem(queue_t *q, mblk_t *mp, uint8_t ptr)
  */
 static void
 icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
-    boolean_t mctl_present)
+    boolean_t mctl_present, zoneid_t zoneid)
 {
 	ipaddr_t dst;
 	icmph_t	*icmph;
@@ -3309,7 +3361,6 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 	mblk_t *ipsec_mp;
 	ipsec_out_t	*io = NULL;
 	boolean_t xmit_if_on = B_FALSE;
-	zoneid_t	zoneid;
 
 	if (mctl_present) {
 		/*
@@ -3354,7 +3405,7 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 			 */
 			io->ipsec_out_proc_begin = B_FALSE;
 		}
-		zoneid = io->ipsec_out_zoneid;
+		ASSERT(zoneid == io->ipsec_out_zoneid);
 		ASSERT(zoneid != ALL_ZONES);
 	} else {
 		/*
@@ -3376,13 +3427,14 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 
 		/* This is not a secure packet */
 		ii->ipsec_in_secure = B_FALSE;
-		if (CONN_Q(q)) {
-			zoneid = Q_TO_CONN(q)->conn_zoneid;
-		} else {
-			zoneid = GLOBAL_ZONEID;
-		}
-		ii->ipsec_in_zoneid = zoneid;
-		ASSERT(zoneid != ALL_ZONES);
+		/*
+		 * For trusted extensions using a shared IP address we can
+		 * send using any zoneid.
+		 */
+		if (zoneid == ALL_ZONES)
+			ii->ipsec_in_zoneid = GLOBAL_ZONEID;
+		else
+			ii->ipsec_in_zoneid = zoneid;
 		ipsec_mp->b_cont = mp;
 		ipha = (ipha_t *)mp->b_rptr;
 		/*
@@ -3679,14 +3731,15 @@ icmp_send_redirect(queue_t *q, mblk_t *mp, ipaddr_t gateway)
 	icmph.icmph_code = 1;
 	icmph.icmph_rd_gateway = gateway;
 	BUMP_MIB(&icmp_mib, icmpOutRedirects);
-	icmp_pkt(q, mp, &icmph, sizeof (icmph_t), B_FALSE);
+	/* Redirects sent by router, and router is global zone */
+	icmp_pkt(q, mp, &icmph, sizeof (icmph_t), B_FALSE, GLOBAL_ZONEID);
 }
 
 /*
  * Generate an ICMP time exceeded message.
  */
 void
-icmp_time_exceeded(queue_t *q, mblk_t *mp, uint8_t code)
+icmp_time_exceeded(queue_t *q, mblk_t *mp, uint8_t code, zoneid_t zoneid)
 {
 	icmph_t	icmph;
 	boolean_t mctl_present;
@@ -3704,14 +3757,14 @@ icmp_time_exceeded(queue_t *q, mblk_t *mp, uint8_t code)
 	icmph.icmph_type = ICMP_TIME_EXCEEDED;
 	icmph.icmph_code = code;
 	BUMP_MIB(&icmp_mib, icmpOutTimeExcds);
-	icmp_pkt(q, first_mp, &icmph, sizeof (icmph_t), mctl_present);
+	icmp_pkt(q, first_mp, &icmph, sizeof (icmph_t), mctl_present, zoneid);
 }
 
 /*
  * Generate an ICMP unreachable message.
  */
 void
-icmp_unreachable(queue_t *q, mblk_t *mp, uint8_t code)
+icmp_unreachable(queue_t *q, mblk_t *mp, uint8_t code, zoneid_t zoneid)
 {
 	icmph_t	icmph;
 	mblk_t *first_mp;
@@ -3730,7 +3783,8 @@ icmp_unreachable(queue_t *q, mblk_t *mp, uint8_t code)
 	icmph.icmph_code = code;
 	BUMP_MIB(&icmp_mib, icmpOutDestUnreachs);
 	ip2dbg(("send icmp destination unreachable code %d\n", code));
-	icmp_pkt(q, first_mp, (char *)&icmph, sizeof (icmph_t), mctl_present);
+	icmp_pkt(q, first_mp, (char *)&icmph, sizeof (icmph_t), mctl_present,
+	    zoneid);
 }
 
 /*
@@ -5968,7 +6022,7 @@ ip_fanout_send_icmp(queue_t *q, mblk_t *mp, uint_t flags,
 		}
 		switch (icmp_type) {
 		case ICMP_DEST_UNREACHABLE:
-			icmp_unreachable(WR(q), first_mp, icmp_code);
+			icmp_unreachable(WR(q), first_mp, icmp_code, zoneid);
 			break;
 		default:
 			freemsg(first_mp);
@@ -6382,7 +6436,7 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 		BUMP_MIB(&ip_mib, ipInDelivers);
 		ip2dbg(("ip_fanout_tcp: no listener; send reset to zone %d\n",
 		    zoneid));
-		tcp_xmit_listeners_reset(first_mp, ip_hdr_len);
+		tcp_xmit_listeners_reset(first_mp, ip_hdr_len, zoneid);
 		return;
 	}
 
@@ -6426,7 +6480,7 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 			return;
 		}
 		if (flags & TH_ACK) {
-			tcp_xmit_listeners_reset(first_mp, ip_hdr_len);
+			tcp_xmit_listeners_reset(first_mp, ip_hdr_len, zoneid);
 			CONN_DEC_REF(connp);
 			return;
 		}
@@ -7197,8 +7251,9 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 			goto drop_pkt;
 		}
 		ip_ipsec_out_prepend(first_mp, mp, in_ill);
-		icmp_time_exceeded(q, first_mp, ICMP_TTL_EXCEEDED);
-
+		/* Sent by forwarding path, and router is global zone */
+		icmp_time_exceeded(q, first_mp, ICMP_TTL_EXCEEDED,
+		    GLOBAL_ZONEID);
 		return;
 	}
 
@@ -7241,7 +7296,7 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 		ip_ipsec_out_prepend(first_mp, mp, in_ill);
 		mp = first_mp;
 
-		ip_wput_frag(ire, mp, IB_PKT, max_frag, 0);
+		ip_wput_frag(ire, mp, IB_PKT, max_frag, 0, GLOBAL_ZONEID);
 		return;
 	}
 
@@ -7424,7 +7479,8 @@ ip_grab_attach_ill(ill_t *ill, mblk_t *first_mp, int ifindex, boolean_t isv6)
  *	are not NULL.
  */
 void
-ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
+ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
+    zoneid_t zoneid)
 {
 	areq_t	*areq;
 	ipaddr_t gw = 0;
@@ -7453,7 +7509,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 	boolean_t multirt_resolve_next;
 	boolean_t do_attach_ill = B_FALSE;
 	boolean_t ip_nexthop = B_FALSE;
-	zoneid_t zoneid;
 	tsol_ire_gw_secattr_t *attrp = NULL;
 	tsol_gcgrp_t *gcgrp = NULL;
 	tsol_gcgrp_addr_t ga;
@@ -7466,12 +7521,9 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
 	if (mctl_present) {
 		io = (ipsec_out_t *)first_mp->b_rptr;
-		zoneid = io->ipsec_out_zoneid;
+		ASSERT(io->ipsec_out_type == IPSEC_OUT);
+		ASSERT(zoneid == io->ipsec_out_zoneid);
 		ASSERT(zoneid != ALL_ZONES);
-	} else if (connp != NULL) {
-		zoneid = connp->conn_zoneid;
-	} else {
-		zoneid = GLOBAL_ZONEID;
 	}
 
 	ipha = (ipha_t *)mp->b_rptr;
@@ -8654,10 +8706,11 @@ icmp_err_ret:
 		ire_refrele(ire);
 	}
 	if (ip_source_routed(ipha)) {
-		icmp_unreachable(q, first_mp, ICMP_SOURCE_ROUTE_FAILED);
+		icmp_unreachable(q, first_mp, ICMP_SOURCE_ROUTE_FAILED,
+		    zoneid);
 		return;
 	}
-	icmp_unreachable(q, first_mp, ICMP_HOST_UNREACHABLE);
+	icmp_unreachable(q, first_mp, ICMP_HOST_UNREACHABLE, zoneid);
 }
 
 /*
@@ -8688,7 +8741,7 @@ icmp_err_ret:
  */
 static void
 ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
-    conn_t *connp, uint32_t flags)
+    conn_t *connp, uint32_t flags, zoneid_t zoneid)
 {
 	areq_t	*areq;
 	ire_t	*ire = NULL;
@@ -8709,7 +8762,6 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 	mblk_t  *copy_mp = NULL;
 	boolean_t multirt_resolve_next;
 	ipaddr_t ipha_dst;
-	zoneid_t zoneid = (connp != NULL ? connp->conn_zoneid : ALL_ZONES);
 
 	/*
 	 * CGTP goes in a loop which looks up a new ipif, do an ipif_refhold
@@ -9352,7 +9404,7 @@ err_ret:
 		}
 		ire_refrele(ire);
 	}
-	icmp_unreachable(q, first_mp, ICMP_HOST_UNREACHABLE);
+	icmp_unreachable(q, first_mp, ICMP_HOST_UNREACHABLE, zoneid);
 }
 
 /* Name/Value Table Lookup Routine */
@@ -12787,7 +12839,7 @@ try_again:
 			return (NULL);
 		}
 		if (flags & TH_ACK) {
-			tcp_xmit_listeners_reset(first_mp, ip_hdr_len);
+			tcp_xmit_listeners_reset(first_mp, ip_hdr_len, zoneid);
 			CONN_DEC_REF(connp);
 			return (NULL);
 		}
@@ -12892,7 +12944,7 @@ no_conn:
 		}
 	}
 	BUMP_MIB(&ip_mib, ipInDelivers);
-	tcp_xmit_listeners_reset(first_mp, IPH_HDR_LENGTH(mp->b_rptr));
+	tcp_xmit_listeners_reset(first_mp, IPH_HDR_LENGTH(mp->b_rptr), zoneid);
 	return (NULL);
 ipoptions:
 	if (!ip_options_cksum(q, first_mp, ipha, ire)) {
@@ -13302,7 +13354,7 @@ ip_rput_noire(queue_t *q, ill_t *in_ill, mblk_t *mp, int ll_multicast,
 		/*
 		 * Now hand the packet to ip_newroute.
 		 */
-		ip_newroute(q, mp, dst, in_ill, NULL);
+		ip_newroute(q, mp, dst, in_ill, NULL, GLOBAL_ZONEID);
 		return (NULL);
 	}
 	ire = ire_forward(dst, &check_multirt, NULL, NULL,
@@ -13310,7 +13362,7 @@ ip_rput_noire(queue_t *q, ill_t *in_ill, mblk_t *mp, int ll_multicast,
 
 	if (ire == NULL && check_multirt) {
 		/* Let ip_newroute handle CGTP  */
-		ip_newroute(q, mp, dst, in_ill, NULL);
+		ip_newroute(q, mp, dst, in_ill, NULL, GLOBAL_ZONEID);
 		return (NULL);
 	}
 
@@ -13320,10 +13372,13 @@ ip_rput_noire(queue_t *q, ill_t *in_ill, mblk_t *mp, int ll_multicast,
 	mp->b_prev = mp->b_next = 0;
 	/* send icmp unreachable */
 	q = WR(q);
-	if (ip_source_routed(ipha))
-		icmp_unreachable(q, mp, ICMP_SOURCE_ROUTE_FAILED);
-	else
-		icmp_unreachable(q, mp, ICMP_HOST_UNREACHABLE);
+	/* Sent by forwarding path, and router is global zone */
+	if (ip_source_routed(ipha)) {
+		icmp_unreachable(q, mp, ICMP_SOURCE_ROUTE_FAILED,
+		    GLOBAL_ZONEID);
+	} else {
+		icmp_unreachable(q, mp, ICMP_HOST_UNREACHABLE, GLOBAL_ZONEID);
+	}
 
 	return (NULL);
 
@@ -13504,12 +13559,13 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 			BUMP_MIB(&ip_mib, ipInDiscards);
 			mp->b_prev = mp->b_next = 0;
 			/* send icmp unreachable */
+			/* Sent by forwarding path, and router is global zone */
 			if (ip_source_routed(ipha)) {
 				icmp_unreachable(ill->ill_wq, mp,
-				    ICMP_SOURCE_ROUTE_FAILED);
+				    ICMP_SOURCE_ROUTE_FAILED, GLOBAL_ZONEID);
 			} else {
 				icmp_unreachable(ill->ill_wq, mp,
-				    ICMP_HOST_UNREACHABLE);
+				    ICMP_HOST_UNREACHABLE, GLOBAL_ZONEID);
 			}
 			return (ire);
 		}
@@ -13633,8 +13689,9 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 			 * hardware checksum as we are not using it.
 			 */
 			DB_CKSUMFLAGS(mp) = 0;
+			/* Sent by forwarding path, and router is global zone */
 			icmp_unreachable(q, mp,
-			    ICMP_SOURCE_ROUTE_FAILED);
+			    ICMP_SOURCE_ROUTE_FAILED, GLOBAL_ZONEID);
 			return;
 		}
 		goto drop_pkt;
@@ -16014,9 +16071,11 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 		 * multicast packets.
 		 */
 		q = ire->ire_stq;
-		if (q)
-			icmp_time_exceeded(q, mp, ICMP_TTL_EXCEEDED);
-		else
+		if (q != NULL) {
+			/* Sent by forwarding path, and router is global zone */
+			icmp_time_exceeded(q, mp, ICMP_TTL_EXCEEDED,
+			    GLOBAL_ZONEID);
+		} else
 			freemsg(mp);
 		return;
 	}
@@ -16081,7 +16140,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 				return;
 			}
 		}
-		ip_wput_frag(ire, mp, IB_PKT, max_frag, 0);
+		ip_wput_frag(ire, mp, IB_PKT, max_frag, 0, GLOBAL_ZONEID);
 		ip2dbg(("ip_rput_forward:sent to ip_wput_frag\n"));
 		return;
 	}
@@ -16122,7 +16181,7 @@ ip_rput_forward_multicast(ipaddr_t dst, mblk_t *mp, ipif_t *ipif)
 		mp->b_prev = NULL;
 		mp->b_next = mp;
 		ip_newroute_ipif(ipif->ipif_ill->ill_wq, mp, ipif, dst,
-		    NULL, 0);
+		    NULL, 0, GLOBAL_ZONEID);
 	} else {
 		ip_rput_forward(ire, (ipha_t *)mp->b_rptr, mp, NULL);
 		IRE_REFRELE(ire);
@@ -16160,10 +16219,15 @@ ip_rput_forward_options(mblk_t *mp, ipha_t *ipha, ire_t *ire)
 			/* Check if adminstratively disabled */
 			if (!ip_forward_src_routed) {
 				BUMP_MIB(&ip_mib, ipForwProhibits);
-				if (ire->ire_stq)
+				if (ire->ire_stq != NULL) {
+					/*
+					 * Sent by forwarding path, and router
+					 * is global zone
+					 */
 					icmp_unreachable(ire->ire_stq, mp,
-					    ICMP_SOURCE_ROUTE_FAILED);
-				else {
+					    ICMP_SOURCE_ROUTE_FAILED,
+					    GLOBAL_ZONEID);
+				} else {
 					ip0dbg(("ip_rput_forward_options: "
 					    "unable to send unreach\n"));
 					freemsg(mp);
@@ -17089,6 +17153,8 @@ ip_rput_local_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire)
 	uint32_t	ts;
 	ire_t		*dst_ire;
 	timestruc_t	now;
+	zoneid_t	zoneid;
+	ill_t		*ill;
 
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
 
@@ -17213,9 +17279,18 @@ ip_rput_local_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire)
 
 bad_src_route:
 	q = WR(q);
+	if (q->q_next != NULL)
+		ill = q->q_ptr;
+	else
+		ill = NULL;
+
 	/* make sure we clear any indication of a hardware checksum */
 	DB_CKSUMFLAGS(mp) = 0;
-	icmp_unreachable(q, mp, ICMP_SOURCE_ROUTE_FAILED);
+	zoneid = ipif_lookup_addr_zoneid(ipha->ipha_dst, ill);
+	if (zoneid == ALL_ZONES)
+		freemsg(mp);
+	else
+		icmp_unreachable(q, mp, ICMP_SOURCE_ROUTE_FAILED, zoneid);
 	return (B_FALSE);
 
 }
@@ -17236,6 +17311,8 @@ ip_rput_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ipaddr_t *dstp)
 	ipaddr_t	dst;
 	intptr_t	code = 0;
 	ire_t		*ire = NULL;
+	zoneid_t	zoneid;
+	ill_t		*ill;
 
 	ip2dbg(("ip_rput_options\n"));
 	dst = ipha->ipha_dst;
@@ -17397,16 +17474,35 @@ ip_rput_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ipaddr_t *dstp)
 
 param_prob:
 	q = WR(q);
+	if (q->q_next != NULL)
+		ill = q->q_ptr;
+	else
+		ill = NULL;
+
 	/* make sure we clear any indication of a hardware checksum */
 	DB_CKSUMFLAGS(mp) = 0;
-	icmp_param_problem(q, mp, (uint8_t)code);
+	/* Don't know whether this is for non-global or global/forwarding */
+	zoneid = ipif_lookup_addr_zoneid(dst, ill);
+	if (zoneid == ALL_ZONES)
+		freemsg(mp);
+	else
+		icmp_param_problem(q, mp, (uint8_t)code, zoneid);
 	return (-1);
 
 bad_src_route:
 	q = WR(q);
+	if (q->q_next != NULL)
+		ill = q->q_ptr;
+	else
+		ill = NULL;
+
 	/* make sure we clear any indication of a hardware checksum */
 	DB_CKSUMFLAGS(mp) = 0;
-	icmp_unreachable(q, mp, ICMP_SOURCE_ROUTE_FAILED);
+	zoneid = ipif_lookup_addr_zoneid(dst, ill);
+	if (zoneid == ALL_ZONES)
+		freemsg(mp);
+	else
+		icmp_unreachable(q, mp, ICMP_SOURCE_ROUTE_FAILED, zoneid);
 	return (-1);
 }
 
@@ -17756,7 +17852,8 @@ ip_snmp_get_mib2_ip6_addr(queue_t *q, mblk_t *mpctl)
 	rw_enter(&ill_g_lock, RW_READER);
 	ill = ILL_START_WALK_V6(&ctx);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
-		for (ipif = ill->ill_ipif; ipif; ipif = ipif->ipif_next) {
+		for (ipif = ill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
 			if (ipif->ipif_zoneid != zoneid &&
 			    ipif->ipif_zoneid != ALL_ZONES)
 				continue;
@@ -19181,6 +19278,11 @@ ip_unbind(queue_t *q, mblk_t *mp)
 /*
  * Write side put procedure.  Outbound data, IOCTLs, responses from
  * resolvers, etc, come down through here.
+ *
+ * arg2 is always a queue_t *.
+ * When that queue is an ill_t (i.e. q_next != NULL), then arg must be
+ * the zoneid.
+ * When that queue is not an ill_t, then arg must be a conn_t pointer.
  */
 void
 ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
@@ -19227,11 +19329,14 @@ ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 	 */
 
 	/* is packet from ARP ? */
-	if (q->q_next != NULL)
+	if (q->q_next != NULL) {
+		zoneid = (zoneid_t)(uintptr_t)arg;
 		goto qnext;
+	}
 
 	connp = (conn_t *)arg;
-	zoneid = (connp != NULL ? connp->conn_zoneid : ALL_ZONES);
+	ASSERT(connp != NULL);
+	zoneid = connp->conn_zoneid;
 
 	/* is queue flow controlled? */
 	if ((q->q_first != NULL || connp->conn_draining) &&
@@ -19468,14 +19573,14 @@ standard_path:
 			}
 		}
 
-		ip_wput_ire(q, first_mp, ire, connp, caller);
+		ip_wput_ire(q, first_mp, ire, connp, caller, zoneid);
 
 		/*
 		 * Try to resolve another multiroute if
 		 * ire_multirt_need_resolve() deemed it necessary.
 		 */
 		if (copy_mp != NULL) {
-			ip_newroute(q, copy_mp, dst, NULL, connp);
+			ip_newroute(q, copy_mp, dst, NULL, connp, zoneid);
 		}
 		if (need_decref)
 			CONN_DEC_REF(connp);
@@ -19597,14 +19702,14 @@ standard_path:
 		}
 	}
 
-	ip_wput_ire(q, first_mp, ire, connp, caller);
+	ip_wput_ire(q, first_mp, ire, connp, caller, zoneid);
 
 	/*
 	 * Try to resolve another multiroute if
 	 * ire_multirt_resolvable() deemed it necessary
 	 */
 	if (copy_mp != NULL) {
-		ip_newroute(q, copy_mp, dst, NULL, connp);
+		ip_newroute(q, copy_mp, dst, NULL, connp, zoneid);
 	}
 	if (need_decref)
 		CONN_DEC_REF(connp);
@@ -19899,7 +20004,7 @@ qnext:
 				ill_refrele(attach_ill);
 			if (need_decref)
 				mp->b_flag |= MSGHASREF;
-			(void) ip_output_v6(connp, first_mp, q, caller);
+			(void) ip_output_v6(arg, first_mp, arg2, caller);
 			return;
 		}
 
@@ -20207,7 +20312,7 @@ qnext:
 			if (xmit_ill == NULL ||
 			    xmit_ill->ill_ipif_up_count > 0) {
 				ip_newroute_ipif(q, first_mp, ipif, dst, connp,
-				    setsrc | RTF_MULTIRT);
+				    setsrc | RTF_MULTIRT, zoneid);
 				TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
 				    "ip_wput_end: q %p (%S)", q, "noire");
 			} else {
@@ -20382,7 +20487,7 @@ send_from_ill:
 				ipif = ipif_get_next_ipif(NULL, xmit_ill);
 				if (ipif != NULL) {
 					ip_newroute_ipif(q, first_mp, ipif,
-					    dst, connp, 0);
+					    dst, connp, 0, zoneid);
 					ipif_refrele(ipif);
 					ip1dbg(("ip_wput: ip_unicast_if\n"));
 				}
@@ -20463,7 +20568,7 @@ noirefound:
 			 */
 			mp->b_prev = NULL;
 			mp->b_next = NULL;
-			ip_newroute(q, first_mp, dst, NULL, connp);
+			ip_newroute(q, first_mp, dst, NULL, connp, zoneid);
 			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
 			    "ip_wput_end: q %p (%S)", q, "newroute");
 			if (attach_ill != NULL)
@@ -20522,7 +20627,7 @@ noirefound:
 		}
 	}
 
-	ip_wput_ire(q, first_mp, ire, connp, caller);
+	ip_wput_ire(q, first_mp, ire, connp, caller, zoneid);
 	/*
 	 * Try to resolve another multiroute if
 	 * ire_multirt_resolvable() deemed it necessary.
@@ -20536,7 +20641,7 @@ noirefound:
 			ipif_t *ipif = ipif_lookup_group(dst, zoneid);
 			if (ipif) {
 				ip_newroute_ipif(q, copy_mp, ipif, dst, connp,
-				    RTF_SETSRC | RTF_MULTIRT);
+				    RTF_SETSRC | RTF_MULTIRT, zoneid);
 				ipif_refrele(ipif);
 			} else {
 				MULTIRT_DEBUG_UNTAG(copy_mp);
@@ -20544,7 +20649,7 @@ noirefound:
 				copy_mp = NULL;
 			}
 		} else {
-			ip_newroute(q, copy_mp, dst, NULL, connp);
+			ip_newroute(q, copy_mp, dst, NULL, connp, zoneid);
 		}
 	}
 	if (attach_ill != NULL)
@@ -20561,7 +20666,7 @@ icmp_parameter_problem:
 	if (ip_hdr_complete(ipha, zoneid) == 0) {
 		BUMP_MIB(&ip_mib, ipOutNoRoutes);
 		/* it's the IP header length that's in trouble */
-		icmp_param_problem(q, first_mp, 0);
+		icmp_param_problem(q, first_mp, 0, zoneid);
 		first_mp = NULL;
 	}
 
@@ -20580,10 +20685,20 @@ drop_pkt:
 	    "ip_wput_end: q %p (%S)", q, "droppkt");
 }
 
+/*
+ * If this is a conn_t queue, then we pass in the conn. This includes the
+ * zoneid.
+ * Otherwise, this is a message coming back from ARP or for an ill_t queue,
+ * in which case we use the global zoneid since those are all part of
+ * the global zone.
+ */
 void
 ip_wput(queue_t *q, mblk_t *mp)
 {
-	ip_output(Q_TO_CONN(q), mp, q, IP_WPUT);
+	if (CONN_Q(q))
+		ip_output(Q_TO_CONN(q), mp, q, IP_WPUT);
+	else
+		ip_output(GLOBAL_ZONEID, mp, q, IP_WPUT);
 }
 
 /*
@@ -20693,7 +20808,7 @@ conn_set_held_ipif(conn_t *connp, ipif_t **ipifp, ipif_t *ipif)
  * NOTE : This function does not ire_refrele the ire argument passed in.
  */
 static void
-ip_wput_ire_fragmentit(mblk_t *ipsec_mp, ire_t *ire)
+ip_wput_ire_fragmentit(mblk_t *ipsec_mp, ire_t *ire, zoneid_t zoneid)
 {
 	ipha_t		*ipha;
 	mblk_t		*mp;
@@ -20751,7 +20866,7 @@ ip_wput_ire_fragmentit(mblk_t *ipsec_mp, ire_t *ire)
 	    ip_source_route_included(ipha)) || CLASSD(ipha->ipha_dst));
 
 	ip_wput_frag(ire, ipsec_mp, OB_PKT, max_frag,
-	    (dont_use ? 0 : frag_flag));
+	    (dont_use ? 0 : frag_flag), zoneid);
 }
 
 /*
@@ -20863,7 +20978,7 @@ ip_get_dst(ipha_t *ipha)
 
 mblk_t *
 ip_wput_ire_parse_ipsec_out(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
-    conn_t *connp, boolean_t unspec_src)
+    conn_t *connp, boolean_t unspec_src, zoneid_t zoneid)
 {
 	ipsec_out_t	*io;
 	mblk_t		*first_mp;
@@ -20897,7 +21012,7 @@ ip_wput_ire_parse_ipsec_out(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 		if ((io->ipsec_out_latch == NULL) &&
 		    (io->ipsec_out_use_global_policy)) {
 			return (ip_wput_attach_policy(first_mp, ipha, ip6h,
-			    ire, connp, unspec_src));
+				    ire, connp, unspec_src, zoneid));
 		}
 		if (!io->ipsec_out_secure) {
 			/*
@@ -20956,7 +21071,8 @@ ip_wput_ire_parse_ipsec_out(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 	if (!policy_present)
 		return (mp);
 
-	return (ip_wput_attach_policy(mp, ipha, ip6h, ire, connp, unspec_src));
+	return (ip_wput_attach_policy(mp, ipha, ip6h, ire, connp, unspec_src,
+		    zoneid));
 }
 
 ire_t *
@@ -21061,7 +21177,8 @@ conn_set_outgoing_ill(conn_t *connp, ire_t *ire, ill_t **conn_outgoing_ill)
  *
  */
 void
-ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller)
+ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller,
+    zoneid_t zoneid)
 {
 	ipha_t		*ipha;
 #define	rptr	((uchar_t *)ipha)
@@ -21094,7 +21211,6 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller)
 	uint32_t 	ill_index = 0;
 	boolean_t	multirt_send = B_FALSE;
 	int		err;
-	zoneid_t	zoneid;
 	ipxmit_state_t	pktxmit_state;
 
 	TRACE_1(TR_FAC_IP, TR_IP_WPUT_IRE_START,
@@ -21177,11 +21293,10 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller)
 
 	if (mp->b_datap->db_type != M_CTL) {
 		ipha = (ipha_t *)mp->b_rptr;
-		zoneid = (connp != NULL ? connp->conn_zoneid : ALL_ZONES);
 	} else {
 		io = (ipsec_out_t *)mp->b_rptr;
 		ASSERT(io->ipsec_out_type == IPSEC_OUT);
-		zoneid = io->ipsec_out_zoneid;
+		ASSERT(zoneid == io->ipsec_out_zoneid);
 		ASSERT(zoneid != ALL_ZONES);
 		ipha = (ipha_t *)mp->b_cont->b_rptr;
 		dst = ipha->ipha_dst;
@@ -21216,12 +21331,24 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller)
 		 * matching route in the forwarding table.
 		 * RTF_REJECT and RTF_BLACKHOLE are handled just like
 		 * ip_newroute() does.
+		 * Note that IRE_LOCAL are special, since they are used
+		 * when the zoneid doesn't match in some cases. This means that
+		 * we need to handle ipha_src differently since ire_src_addr
+		 * belongs to the receiving zone instead of the sending zone.
+		 * When ip_restrict_interzone_loopback is set, then
+		 * ire_cache_lookup() ensures that IRE_LOCAL are only used
+		 * for loopback between zones when the logical "Ethernet" would
+		 * have looped them back.
 		 */
-		ire_t *src_ire = ire_ftable_lookup(ipha->ipha_dst, 0, 0, 0,
+		ire_t *src_ire;
+
+		src_ire = ire_ftable_lookup(ipha->ipha_dst, 0, 0, 0,
 		    NULL, NULL, zoneid, 0, NULL, (MATCH_IRE_RECURSIVE |
 		    MATCH_IRE_DEFAULT | MATCH_IRE_RJ_BHOLE));
 		if (src_ire != NULL &&
-		    !(src_ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE))) {
+		    !(src_ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE)) &&
+		    (!ip_restrict_interzone_loopback ||
+		    ire_local_same_ill_group(ire, src_ire))) {
 			if (ipha->ipha_src == INADDR_ANY && !unspec_src)
 				ipha->ipha_src = src_ire->ire_src_addr;
 			ire_refrele(src_ire);
@@ -21243,7 +21370,7 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller)
 				freemsg(mp);
 				return;
 			}
-			icmp_unreachable(q, mp, ICMP_HOST_UNREACHABLE);
+			icmp_unreachable(q, mp, ICMP_HOST_UNREACHABLE, zoneid);
 			return;
 		}
 	}
@@ -21251,7 +21378,7 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller)
 	if (mp->b_datap->db_type == M_CTL ||
 	    ipsec_outbound_v4_policy_present) {
 		mp = ip_wput_ire_parse_ipsec_out(mp, ipha, NULL, ire, connp,
-		    unspec_src);
+		    unspec_src, zoneid);
 		if (mp == NULL) {
 			ire_refrele(ire);
 			if (conn_outgoing_ill != NULL)
@@ -21269,7 +21396,8 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller)
 		mp = first_mp->b_cont;
 		ipsec_len = ipsec_out_extra_length(first_mp);
 		ASSERT(ipsec_len >= 0);
-		zoneid = io->ipsec_out_zoneid;
+		/* We already picked up the zoneid from the M_CTL above */
+		ASSERT(zoneid == io->ipsec_out_zoneid);
 		ASSERT(zoneid != ALL_ZONES);
 
 		/*
@@ -22260,7 +22388,7 @@ broadcast:
 					ipha->ipha_hdr_checksum =
 					    (uint16_t)ip_csum_hdr(ipha);
 					icmp_frag_needed(ire->ire_stq, first_mp,
-					    max_frag);
+					    max_frag, zoneid);
 					if (!next_mp) {
 						ire_refrele(ire);
 						if (conn_outgoing_ill != NULL) {
@@ -22331,13 +22459,14 @@ broadcast:
 					TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
 					    "ip_wput_ire_end: q %p (%S)",
 					    q, "last fragmentation");
-					ip_wput_ire_fragmentit(mp, ire);
+					ip_wput_ire_fragmentit(mp, ire,
+					    zoneid);
 					ire_refrele(ire);
 					if (conn_outgoing_ill != NULL)
 						ill_refrele(conn_outgoing_ill);
 					return;
 				}
-				ip_wput_ire_fragmentit(mp, ire);
+				ip_wput_ire_fragmentit(mp, ire, zoneid);
 			}
 		}
 	} else {
@@ -22899,7 +23028,7 @@ pbuf_panic:
  */
 static void
 ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
-    uint32_t frag_flag)
+    uint32_t frag_flag, zoneid_t zoneid)
 {
 	int		i1;
 	mblk_t		*ll_hdr_mp;
@@ -22979,7 +23108,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		 */
 		ipha->ipha_hdr_checksum = 0;
 		ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
-		icmp_frag_needed(ire->ire_stq, first_mp, max_frag);
+		icmp_frag_needed(ire->ire_stq, first_mp, max_frag, zoneid);
 		TRACE_1(TR_FAC_IP, TR_IP_WPUT_FRAG_END,
 		    "ip_wput_frag_end:(%S)",
 		    "don't fragment");
@@ -24078,7 +24207,7 @@ ip_wput_local_options(ipha_t *ipha)
  * Caller verifies that this isn't a PHYI_LOOPBACK.
  */
 void
-ip_wput_multicast(queue_t *q, mblk_t *mp, ipif_t *ipif)
+ip_wput_multicast(queue_t *q, mblk_t *mp, ipif_t *ipif, zoneid_t zoneid)
 {
 	ipha_t	*ipha;
 	ire_t	*ire;
@@ -24117,7 +24246,7 @@ ip_wput_multicast(queue_t *q, mblk_t *mp, ipif_t *ipif)
 	 * ipsec_out_attach_if so that this will not be load spread in
 	 * ip_newroute_ipif.
 	 */
-	ire = ire_ctable_lookup(dst, 0, 0, ipif, ALL_ZONES, NULL,
+	ire = ire_ctable_lookup(dst, 0, 0, ipif, zoneid, NULL,
 	    MATCH_IRE_ILL);
 	if (!ire) {
 		/*
@@ -24127,7 +24256,8 @@ ip_wput_multicast(queue_t *q, mblk_t *mp, ipif_t *ipif)
 		 */
 		mp->b_prev = NULL;
 		mp->b_next = NULL;
-		ip_newroute_ipif(q, first_mp, ipif, dst, NULL, RTF_SETSRC);
+		ip_newroute_ipif(q, first_mp, ipif, dst, NULL, RTF_SETSRC,
+		    zoneid);
 		return;
 	}
 
@@ -24141,7 +24271,7 @@ ip_wput_multicast(queue_t *q, mblk_t *mp, ipif_t *ipif)
 		ipha->ipha_src = ire->ire_src_addr;
 	}
 
-	ip_wput_ire(q, first_mp, ire, NULL, B_FALSE);
+	ip_wput_ire(q, first_mp, ire, NULL, B_FALSE, zoneid);
 }
 
 /*
@@ -24675,7 +24805,8 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 		 *
 		 * Also handle RTF_MULTIRT routes.
 		 */
-		ip_newroute_ipif(q, ipsec_mp, ipif, dst, NULL, RTF_MULTIRT);
+		ip_newroute_ipif(q, ipsec_mp, ipif, dst, NULL, RTF_MULTIRT,
+		    zoneid);
 	} else {
 		if (attach_if) {
 			ire = ire_ctable_lookup(dst, 0, 0, ill->ill_ipif,
@@ -24729,7 +24860,7 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 		 */
 		ipha->ipha_ident = IP_HDR_INCLUDED;
 		ip_newroute(q, ipsec_mp, dst, NULL,
-		    (CONN_Q(q) ? Q_TO_CONN(q) : NULL));
+		    (CONN_Q(q) ? Q_TO_CONN(q) : NULL), zoneid);
 	}
 	goto done;
 send:
@@ -24808,7 +24939,7 @@ send:
 			    "fragmented accelerated packet!\n"));
 			freemsg(ipsec_mp);
 		} else {
-			ip_wput_ire_fragmentit(ipsec_mp, ire);
+			ip_wput_ire_fragmentit(ipsec_mp, ire, zoneid);
 		}
 		if (ire_need_rele)
 			ire_refrele(ire);
@@ -26729,7 +26860,7 @@ param_prob:
 		freemsg(ipsec_mp);
 		return (-1);
 	}
-	icmp_param_problem(q, ipsec_mp, (uint8_t)code);
+	icmp_param_problem(q, ipsec_mp, (uint8_t)code, zoneid);
 	return (-1);
 
 bad_src_route:
@@ -26742,7 +26873,7 @@ bad_src_route:
 		freemsg(ipsec_mp);
 		return (-1);
 	}
-	icmp_unreachable(q, ipsec_mp, ICMP_SOURCE_ROUTE_FAILED);
+	icmp_unreachable(q, ipsec_mp, ICMP_SOURCE_ROUTE_FAILED, zoneid);
 	return (-1);
 }
 
@@ -27050,6 +27181,8 @@ ip_wsrv(queue_t *q)
 		connp->conn_draining = 1;
 		noenable(q);
 		while ((mp = getq(q)) != NULL) {
+			ASSERT(CONN_Q(q));
+
 			ip_output(Q_TO_CONN(q), mp, q, IP_WSRV);
 			if (connp->conn_did_putbq) {
 				/* ip_wput did a putbq */

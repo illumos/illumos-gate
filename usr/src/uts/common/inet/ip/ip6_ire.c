@@ -1882,8 +1882,10 @@ ire_ftable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *mask,
 					 * ire_route_lookup_v6() is avoided when
 					 * we have only one default route.
 					 */
+					match_flags |= MATCH_IRE_TYPE;
 					rire = ire_route_lookup_v6(&gw_addr_v6,
-					    NULL, NULL, 0, ire->ire_ipif, NULL,
+					    NULL, NULL, IRE_INTERFACE,
+					    ire->ire_ipif, NULL,
 					    zoneid, tsl, match_flags);
 					if (rire != NULL) {
 						ire_refrele(rire);
@@ -2152,6 +2154,19 @@ ire_ctable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *gateway,
  * Lookup cache. Don't return IRE_MARK_HIDDEN entries. Callers
  * should use ire_ctable_lookup with MATCH_IRE_MARK_HIDDEN to get
  * to the hidden ones.
+ *
+ * In general the zoneid has to match (where ALL_ZONES match all of them).
+ * But for IRE_LOCAL we also need to handle the case where L2 should
+ * conceptually loop back the packet. This is necessary since neither
+ * Ethernet drivers nor Ethernet hardware loops back packets sent to their
+ * own MAC address. This loopback is needed when the normal
+ * routes (ignoring IREs with different zoneids) would send out the packet on
+ * the same ill (or ill group) as the ill with which this IRE_LOCAL is
+ * associated.
+ *
+ * Earlier versions of this code always matched an IRE_LOCAL independently of
+ * the zoneid. We preserve that earlier behavior when
+ * ip_restrict_interzone_loopback is turned off.
  */
 ire_t *
 ire_cache_lookup_v6(const in6_addr_t *addr, zoneid_t zoneid,
@@ -2179,8 +2194,18 @@ ire_cache_lookup_v6(const in6_addr_t *addr, zoneid_t zoneid,
 			}
 
 			if (zoneid == ALL_ZONES || ire->ire_zoneid == zoneid ||
-			    ire->ire_zoneid == ALL_ZONES ||
-			    ire->ire_type == IRE_LOCAL) {
+			    ire->ire_zoneid == ALL_ZONES) {
+				IRE_REFHOLD(ire);
+				rw_exit(&irb_ptr->irb_lock);
+				return (ire);
+			}
+
+			if (ire->ire_type == IRE_LOCAL) {
+				if (ip_restrict_interzone_loopback &&
+				    !ire_local_ok_across_zones(ire, zoneid,
+				    (void *)addr, tsl))
+					continue;
+
 				IRE_REFHOLD(ire);
 				rw_exit(&irb_ptr->irb_lock);
 				return (ire);

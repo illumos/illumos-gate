@@ -144,7 +144,8 @@ ipif_lookup_interface_v6(const in6_addr_t *if_addr, const in6_addr_t *dst,
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
 		GRAB_CONN_LOCK(q);
 		mutex_enter(&ill->ill_lock);
-		for (ipif = ill->ill_ipif; ipif; ipif = ipif->ipif_next) {
+		for (ipif = ill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
 			/* Allow the ipif to be down */
 			if ((ipif->ipif_flags & IPIF_POINTOPOINT) &&
 			    (IN6_ARE_ADDR_EQUAL(&ipif->ipif_v6lcl_addr,
@@ -216,7 +217,8 @@ repeat:
 		}
 		GRAB_CONN_LOCK(q);
 		mutex_enter(&ill->ill_lock);
-		for (ipif = ill->ill_ipif; ipif; ipif = ipif->ipif_next) {
+		for (ipif = ill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
 			if (zoneid != ALL_ZONES &&
 			    ipif->ipif_zoneid != zoneid &&
 			    ipif->ipif_zoneid != ALL_ZONES)
@@ -252,12 +254,76 @@ repeat:
 		RELEASE_CONN_LOCK(q);
 	}
 
-	/* Repeat once more if needed */
+	/* If we already did the ptp case, then we are done */
 	if (ptp) {
 		rw_exit(&ill_g_lock);
 		if (error != NULL)
 			*error = ENXIO;
 		return (NULL);
+	}
+	ptp = B_TRUE;
+	goto repeat;
+}
+
+/*
+ * Look for an ipif with the specified address. For point-point links
+ * we look for matches on either the destination address and the local
+ * address, but we ignore the check on the local address if IPIF_UNNUMBERED
+ * is set.
+ * Matches on a specific ill if match_ill is set.
+ * Return the zoneid for the ipif. ALL_ZONES if none found.
+ */
+zoneid_t
+ipif_lookup_addr_zoneid_v6(const in6_addr_t *addr, ill_t *match_ill)
+{
+	ipif_t	*ipif;
+	ill_t	*ill;
+	boolean_t  ptp = B_FALSE;
+	ill_walk_context_t ctx;
+	zoneid_t	zoneid;
+
+	rw_enter(&ill_g_lock, RW_READER);
+	/*
+	 * Repeat twice, first based on local addresses and
+	 * next time for pointopoint.
+	 */
+repeat:
+	ill = ILL_START_WALK_V6(&ctx);
+	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
+		if (match_ill != NULL && ill != match_ill) {
+			continue;
+		}
+		mutex_enter(&ill->ill_lock);
+		for (ipif = ill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
+			/* Allow the ipif to be down */
+			if ((!ptp && (IN6_ARE_ADDR_EQUAL(
+			    &ipif->ipif_v6lcl_addr, addr) &&
+			    (ipif->ipif_flags & IPIF_UNNUMBERED) == 0)) ||
+			    (ptp && (ipif->ipif_flags & IPIF_POINTOPOINT) &&
+			    IN6_ARE_ADDR_EQUAL(&ipif->ipif_v6pp_dst_addr,
+			    addr)) &&
+			    !(ipif->ipif_state_flags & IPIF_CONDEMNED)) {
+				zoneid = ipif->ipif_zoneid;
+				mutex_exit(&ill->ill_lock);
+				rw_exit(&ill_g_lock);
+				/*
+				 * If ipif_zoneid was ALL_ZONES then we have
+				 * a trusted extensions shared IP address.
+				 * In that case GLOBAL_ZONEID works to send.
+				 */
+				if (zoneid == ALL_ZONES)
+					zoneid = GLOBAL_ZONEID;
+				return (zoneid);
+			}
+		}
+		mutex_exit(&ill->ill_lock);
+	}
+
+	/* If we already did the ptp case, then we are done */
+	if (ptp) {
+		rw_exit(&ill_g_lock);
+		return (ALL_ZONES);
 	}
 	ptp = B_TRUE;
 	goto repeat;

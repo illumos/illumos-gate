@@ -248,7 +248,7 @@ uint_t	icmp_redirect_v6_src_index;
 static void	icmp_inbound_too_big_v6(queue_t *, mblk_t *, ill_t *ill,
     boolean_t, zoneid_t);
 static void	icmp_pkt_v6(queue_t *, mblk_t *, void *, size_t,
-    const in6_addr_t *, boolean_t);
+    const in6_addr_t *, boolean_t, zoneid_t);
 static void	icmp_redirect_v6(queue_t *, mblk_t *, ill_t *ill);
 static boolean_t	icmp_redirect_ok_v6(ill_t *ill, mblk_t *mp);
 static int	ip_bind_connected_v6(conn_t *, mblk_t *, in6_addr_t *,
@@ -270,7 +270,7 @@ static mblk_t	*ip_rput_frag_v6(queue_t *, mblk_t *, ip6_t *,
     ip6_frag_t *, uint_t, uint_t *, uint32_t *, uint16_t *);
 static boolean_t	ip_source_routed_v6(ip6_t *, mblk_t *);
 static void	ip_wput_ire_v6(queue_t *, mblk_t *, ire_t *, int, int,
-    conn_t *, int, int, int);
+    conn_t *, int, int, int, zoneid_t);
 static boolean_t ip_ulp_cando_pkt2big(int);
 
 static void ip_rput_v6(queue_t *, mblk_t *);
@@ -1540,20 +1540,17 @@ ip_queue_to_ill_v6(queue_t *q)
  */
 static in6_addr_t *
 icmp_pick_source_v6(queue_t *wq, in6_addr_t *origsrc, in6_addr_t *origdst,
-    in6_addr_t *src)
+    in6_addr_t *src, zoneid_t zoneid)
 {
 	ill_t	*ill;
 	ire_t	*ire;
 	ipif_t	*ipif;
-	zoneid_t	zoneid;
 
 	ASSERT(!(wq->q_flag & QREADR));
 	if (wq->q_next != NULL) {
 		ill = (ill_t *)wq->q_ptr;
-		zoneid = GLOBAL_ZONEID;
 	} else {
 		ill = NULL;
-		zoneid = Q_TO_CONN(wq)->conn_zoneid;
 	}
 
 	ire = ire_route_lookup_v6(origdst, 0, 0, (IRE_LOCAL|IRE_LOOPBACK),
@@ -1625,7 +1622,7 @@ icmp_pick_source_v6(queue_t *wq, in6_addr_t *origsrc, in6_addr_t *origdst,
  */
 static void
 icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
-    const in6_addr_t *v6src_ptr, boolean_t mctl_present)
+    const in6_addr_t *v6src_ptr, boolean_t mctl_present, zoneid_t zoneid)
 {
 	ip6_t		*ip6h;
 	in6_addr_t	v6dst;
@@ -1703,6 +1700,14 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 
 		/* This is not a secure packet */
 		ii->ipsec_in_secure = B_FALSE;
+		/*
+		 * For trusted extensions using a shared IP address we can
+		 * send using any zoneid.
+		 */
+		if (zoneid == ALL_ZONES)
+			ii->ipsec_in_zoneid = GLOBAL_ZONEID;
+		else
+			ii->ipsec_in_zoneid = zoneid;
 		ipsec_mp->b_cont = mp;
 		ip6h = (ip6_t *)mp->b_rptr;
 		/*
@@ -1720,7 +1725,7 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		v6src = *v6src_ptr;
 	} else {
 		if (icmp_pick_source_v6(q, &ip6h->ip6_src, &ip6h->ip6_dst,
-		    &v6src) == NULL) {
+		    &v6src, zoneid) == NULL) {
 			freemsg(ipsec_mp);
 			ill_refrele(ill);
 			return;
@@ -2041,7 +2046,8 @@ icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
 		srcp = &ill->ill_ipif->ipif_v6src_addr;
 	}
 	rw_exit(&ill_g_lock);
-	icmp_pkt_v6(q, mp, buf, len, srcp, B_FALSE);
+	/* Redirects sent by router, and router is global zone */
+	icmp_pkt_v6(q, mp, buf, len, srcp, B_FALSE, GLOBAL_ZONEID);
 	kmem_free(buf, len);
 }
 
@@ -2049,7 +2055,7 @@ icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
 /* Generate an ICMP time exceeded message.  (May be called as writer.) */
 void
 icmp_time_exceeded_v6(queue_t *q, mblk_t *mp, uint8_t code,
-    boolean_t llbcast, boolean_t mcast_ok)
+    boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid)
 {
 	icmp6_t	icmp6;
 	boolean_t mctl_present;
@@ -2066,7 +2072,8 @@ icmp_time_exceeded_v6(queue_t *q, mblk_t *mp, uint8_t code,
 	bzero(&icmp6, sizeof (icmp6_t));
 	icmp6.icmp6_type = ICMP6_TIME_EXCEEDED;
 	icmp6.icmp6_code = code;
-	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present);
+	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present,
+	    zoneid);
 }
 
 /*
@@ -2074,7 +2081,7 @@ icmp_time_exceeded_v6(queue_t *q, mblk_t *mp, uint8_t code,
  */
 void
 icmp_unreachable_v6(queue_t *q, mblk_t *mp, uint8_t code,
-    boolean_t llbcast, boolean_t mcast_ok)
+    boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid)
 {
 	icmp6_t	icmp6;
 	boolean_t mctl_present;
@@ -2091,7 +2098,8 @@ icmp_unreachable_v6(queue_t *q, mblk_t *mp, uint8_t code,
 	bzero(&icmp6, sizeof (icmp6_t));
 	icmp6.icmp6_type = ICMP6_DST_UNREACH;
 	icmp6.icmp6_code = code;
-	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present);
+	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present,
+	    zoneid);
 }
 
 /*
@@ -2099,7 +2107,7 @@ icmp_unreachable_v6(queue_t *q, mblk_t *mp, uint8_t code,
  */
 static void
 icmp_pkt2big_v6(queue_t *q, mblk_t *mp, uint32_t mtu,
-    boolean_t llbcast, boolean_t mcast_ok)
+    boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid)
 {
 	icmp6_t	icmp6;
 	mblk_t *first_mp;
@@ -2118,7 +2126,8 @@ icmp_pkt2big_v6(queue_t *q, mblk_t *mp, uint32_t mtu,
 	icmp6.icmp6_code = 0;
 	icmp6.icmp6_mtu = htonl(mtu);
 
-	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present);
+	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present,
+	    zoneid);
 }
 
 /*
@@ -2127,7 +2136,7 @@ icmp_pkt2big_v6(queue_t *q, mblk_t *mp, uint32_t mtu,
  */
 static void
 icmp_param_problem_v6(queue_t *q, mblk_t *mp, uint8_t code,
-    uint32_t offset, boolean_t llbcast, boolean_t mcast_ok)
+    uint32_t offset, boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid)
 {
 	icmp6_t	icmp6;
 	boolean_t mctl_present;
@@ -2145,7 +2154,8 @@ icmp_param_problem_v6(queue_t *q, mblk_t *mp, uint8_t code,
 	icmp6.icmp6_type = ICMP6_PARAM_PROB;
 	icmp6.icmp6_code = code;
 	icmp6.icmp6_pptr = htonl(offset);
-	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present);
+	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present,
+	    zoneid);
 }
 
 /*
@@ -3487,11 +3497,11 @@ ip_fanout_send_icmp_v6(queue_t *q, mblk_t *mp, uint_t flags,
 		switch (icmp_type) {
 		case ICMP6_DST_UNREACH:
 			icmp_unreachable_v6(WR(q), first_mp, icmp_code,
-			    B_FALSE, B_FALSE);
+			    B_FALSE, B_FALSE, zoneid);
 			break;
 		case ICMP6_PARAM_PROB:
 			icmp_param_problem_v6(WR(q), first_mp, icmp_code,
-			    nexthdr_offset, B_FALSE, B_FALSE);
+			    nexthdr_offset, B_FALSE, B_FALSE, zoneid);
 			break;
 		default:
 #ifdef DEBUG
@@ -3557,7 +3567,7 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 			}
 		}
 		BUMP_MIB(ill->ill_ip6_mib, ipv6InDelivers);
-		tcp_xmit_listeners_reset(first_mp, hdr_len);
+		tcp_xmit_listeners_reset(first_mp, hdr_len, zoneid);
 		if (connp != NULL)
 			CONN_DEC_REF(connp);
 		return;
@@ -3603,7 +3613,7 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 			return;
 		}
 		if (flags & TH_ACK) {
-			tcp_xmit_listeners_reset(first_mp, hdr_len);
+			tcp_xmit_listeners_reset(first_mp, hdr_len, zoneid);
 			CONN_DEC_REF(connp);
 			return;
 		}
@@ -5710,7 +5720,7 @@ icmp_err_ret:
 		    AF_INET6, v6dstp);
 	}
 	icmp_unreachable_v6(WR(q), first_mp, ICMP6_DST_UNREACH_NOROUTE,
-	    B_FALSE, B_FALSE);
+	    B_FALSE, B_FALSE, zoneid);
 }
 
 /*
@@ -6394,6 +6404,8 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	int ret = 0;
 	mblk_t *first_mp;
 	const char *errtype;
+	zoneid_t zoneid;
+	ill_t *ill = q->q_ptr;
 
 	first_mp = mp;
 	if (mp->b_datap->db_type == M_CTL) {
@@ -6531,6 +6543,9 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 				errtype = "unknown";
 				/* FALLTHROUGH */
 			opt_error:
+				/* Determine which zone should send error */
+				zoneid = ipif_lookup_addr_zoneid_v6(
+				    &ip6h->ip6_dst, ill);
 				switch (IP6OPT_TYPE(opt_type)) {
 				case IP6OPT_TYPE_SKIP:
 					optused = 2 + optptr[1];
@@ -6547,18 +6562,26 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 					freemsg(first_mp);
 					return (-1);
 				case IP6OPT_TYPE_ICMP:
+					if (zoneid == ALL_ZONES) {
+						freemsg(first_mp);
+						return (-1);
+					}
 					icmp_param_problem_v6(WR(q), first_mp,
 					    ICMP6_PARAMPROB_OPTION,
 					    (uint32_t)(optptr -
 					    (uint8_t *)ip6h),
-					    B_FALSE, B_FALSE);
+					    B_FALSE, B_FALSE, zoneid);
 					return (-1);
 				case IP6OPT_TYPE_FORCEICMP:
+					if (zoneid == ALL_ZONES) {
+						freemsg(first_mp);
+						return (-1);
+					}
 					icmp_param_problem_v6(WR(q), first_mp,
 					    ICMP6_PARAMPROB_OPTION,
 					    (uint32_t)(optptr -
 					    (uint8_t *)ip6h),
-					    B_FALSE, B_TRUE);
+					    B_FALSE, B_TRUE, zoneid);
 					return (-1);
 				default:
 					ASSERT(0);
@@ -6571,9 +6594,15 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	return (ret);
 
 bad_opt:
-	icmp_param_problem_v6(WR(q), first_mp, ICMP6_PARAMPROB_OPTION,
-	    (uint32_t)(optptr - (uint8_t *)ip6h),
-	    B_FALSE, B_FALSE);
+	/* Determine which zone should send error */
+	zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst, ill);
+	if (zoneid == ALL_ZONES) {
+		freemsg(first_mp);
+	} else {
+		icmp_param_problem_v6(WR(q), first_mp, ICMP6_PARAMPROB_OPTION,
+		    (uint32_t)(optptr - (uint8_t *)ip6h),
+		    B_FALSE, B_FALSE, zoneid);
+	}
 	return (-1);
 }
 
@@ -6605,10 +6634,11 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 	if (rth->ip6r_type != 0) {
 		if (hada_mp != NULL)
 			goto hada_drop;
+		/* Sent by forwarding path, and router is global zone */
 		icmp_param_problem_v6(WR(q), mp,
 		    ICMP6_PARAMPROB_HEADER,
 		    (uint32_t)((uchar_t *)&rth->ip6r_type - (uchar_t *)ip6h),
-		    B_FALSE, B_FALSE);
+		    B_FALSE, B_FALSE, GLOBAL_ZONEID);
 		return;
 	}
 	rthdr = (ip6_rthdr0_t *)rth;
@@ -6620,10 +6650,11 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 		/* An odd length is impossible */
 		if (hada_mp != NULL)
 			goto hada_drop;
+		/* Sent by forwarding path, and router is global zone */
 		icmp_param_problem_v6(WR(q), mp,
 		    ICMP6_PARAMPROB_HEADER,
 		    (uint32_t)((uchar_t *)&rthdr->ip6r0_len - (uchar_t *)ip6h),
-		    B_FALSE, B_FALSE);
+		    B_FALSE, B_FALSE, GLOBAL_ZONEID);
 		return;
 	}
 	numaddr = rthdr->ip6r0_len / 2;
@@ -6631,11 +6662,12 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 		/* segleft exceeds number of addresses in routing header */
 		if (hada_mp != NULL)
 			goto hada_drop;
+		/* Sent by forwarding path, and router is global zone */
 		icmp_param_problem_v6(WR(q), mp,
 		    ICMP6_PARAMPROB_HEADER,
 		    (uint32_t)((uchar_t *)&rthdr->ip6r0_segleft -
 			(uchar_t *)ip6h),
-		    B_FALSE, B_FALSE);
+		    B_FALSE, B_FALSE, GLOBAL_ZONEID);
 		return;
 	}
 	addrptr += (numaddr - rthdr->ip6r0_segleft);
@@ -6655,8 +6687,9 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 	if (IN6_IS_ADDR_V4MAPPED(&ip6h->ip6_dst)) {
 		if (hada_mp != NULL)
 			goto hada_drop;
+		/* Sent by forwarding path, and router is global zone */
 		icmp_unreachable_v6(WR(q), mp, ICMP6_DST_UNREACH_NOROUTE,
-		    B_FALSE, B_FALSE);
+		    B_FALSE, B_FALSE, GLOBAL_ZONEID);
 		return;
 	}
 	ip_rput_data_v6(q, ill, mp, ip6h, flags, hada_mp, dl_mp);
@@ -7385,8 +7418,10 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 		if (ip6h->ip6_hops <= 1) {
 			if (hada_mp != NULL)
 				goto hada_drop;
+			/* Sent by forwarding path, and router is global zone */
 			icmp_time_exceeded_v6(WR(q), first_mp,
-			    ICMP6_TIME_EXCEED_TRANSIT, ll_multicast, B_FALSE);
+			    ICMP6_TIME_EXCEED_TRANSIT, ll_multicast, B_FALSE,
+			    GLOBAL_ZONEID);
 			return;
 		}
 		/*
@@ -7442,8 +7477,10 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 		}
 		if (ip6h->ip6_hops <= 1) {
 			ip1dbg(("ip_rput_data_v6: hop limit expired.\n"));
+			/* Sent by forwarding path, and router is global zone */
 			icmp_time_exceeded_v6(WR(q), mp,
-			    ICMP6_TIME_EXCEED_TRANSIT, ll_multicast, B_FALSE);
+			    ICMP6_TIME_EXCEED_TRANSIT, ll_multicast, B_FALSE,
+			    GLOBAL_ZONEID);
 			ire_refrele(ire);
 			return;
 		}
@@ -7475,8 +7512,9 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 
 		if (pkt_len > ire->ire_max_frag) {
 			BUMP_MIB(ill->ill_ip6_mib, ipv6InTooBigErrors);
+			/* Sent by forwarding path, and router is global zone */
 			icmp_pkt2big_v6(WR(q), mp, ire->ire_max_frag,
-			    ll_multicast, B_TRUE);
+			    ll_multicast, B_TRUE, GLOBAL_ZONEID);
 			ire_refrele(ire);
 			return;
 		}
@@ -8176,7 +8214,7 @@ tcp_fanout:
 			icmp_param_problem_v6(WR(q), first_mp,
 			    ICMP6_PARAMPROB_NEXTHEADER,
 			    prev_nexthdr_offset,
-			    B_FALSE, B_FALSE);
+			    B_FALSE, B_FALSE, zoneid);
 			return;
 
 		case IPPROTO_ROUTING: {
@@ -8503,10 +8541,17 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	 * of eight?
 	 */
 	if (more_frags && (ntohs(ip6h->ip6_plen) & 7)) {
+		zoneid_t zoneid;
+
 		BUMP_MIB(ill->ill_ip6_mib, ipv6InHdrErrors);
+		zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst, ill);
+		if (zoneid == ALL_ZONES) {
+			freemsg(mp);
+			return (NULL);
+		}
 		icmp_param_problem_v6(WR(q), mp, ICMP6_PARAMPROB_HEADER,
 		    (uint32_t)((char *)&ip6h->ip6_plen -
-		    (char *)ip6h), B_FALSE, B_FALSE);
+		    (char *)ip6h), B_FALSE, B_FALSE, zoneid);
 		return (NULL);
 	}
 
@@ -8522,10 +8567,17 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	 * greater than IP_MAXPACKET - the max payload size?
 	 */
 	if (end > IP_MAXPACKET) {
+		zoneid_t	zoneid;
+
 		BUMP_MIB(ill->ill_ip6_mib, ipv6InHdrErrors);
+		zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst, ill);
+		if (zoneid == ALL_ZONES) {
+			freemsg(mp);
+			return (NULL);
+		}
 		icmp_param_problem_v6(WR(q), mp, ICMP6_PARAMPROB_HEADER,
 		    (uint32_t)((char *)&fraghdr->ip6f_offlg -
-		    (char *)ip6h), B_FALSE, B_FALSE);
+		    (char *)ip6h), B_FALSE, B_FALSE, zoneid);
 		return (NULL);
 	}
 
@@ -9131,6 +9183,11 @@ ip_source_routed_v6(ip6_t *ip6h, mblk_t *mp)
  *    look for the best IRE match for the unspecified group to determine
  *    the ill.
  * 7. For unicast: Just do an IRE lookup for the best match.
+ *
+ * arg2 is always a queue_t *.
+ * When that queue is an ill_t (i.e. q_next != NULL), then arg must be
+ * the zoneid.
+ * When that queue is not an ill_t, then arg must be a conn_t pointer.
  */
 void
 ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
@@ -9239,7 +9296,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 
 		if ((mlen == sizeof (ipsec_ctl_t)) &&
 		    (mctltype == IPSEC_CTL)) {
-			ip_output(Q_TO_CONN(q), first_mp, q, caller);
+			ip_output(arg, first_mp, arg2, caller);
 			return;
 		}
 
@@ -9313,9 +9370,11 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 		unspec_src = 0;
 		BUMP_MIB(mibptr, ipv6OutRequests);
 		do_outrequests = B_FALSE;
+		zoneid = (zoneid_t)(uintptr_t)arg;
 	} else {
 		connp = (conn_t *)arg;
 		ASSERT(connp != NULL);
+		zoneid = connp->conn_zoneid;
 
 		/* is queue flow controlled? */
 		if ((q->q_first || connp->conn_draining) &&
@@ -9394,10 +9453,13 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 	 * prepended ipsec_out_t.
 	 */
 	if (io != NULL) {
+		/*
+		 * When coming from icmp_input_v6, the zoneid might not match
+		 * for the loopback case, because inside icmp_input_v6 the
+		 * queue_t is a conn queue from the sending side.
+		 */
 		zoneid = io->ipsec_out_zoneid;
 		ASSERT(zoneid != ALL_ZONES);
-	} else {
-		zoneid = (connp != NULL ? connp->conn_zoneid : ALL_ZONES);
 	}
 
 	if (ip6h->ip6_nxt == IPPROTO_RAW) {
@@ -9832,7 +9894,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 			}
 		}
 		ip_wput_ire_v6(q, first_mp, ire, unspec_src, cksum_request,
-		    connp, caller, 0, ip6i_flags);
+		    connp, caller, 0, ip6i_flags, zoneid);
 		if (need_decref) {
 			CONN_DEC_REF(connp);
 			connp = NULL;
@@ -10253,7 +10315,7 @@ send_from_ill:
 		ip_wput_ire_v6(q, first_mp, ire, unspec_src, cksum_request,
 		    connp, caller,
 		    (attach_if ? ill->ill_phyint->phyint_ifindex : 0),
-		    ip6i_flags);
+		    ip6i_flags, zoneid);
 		ire_refrele(ire);
 		if (need_decref) {
 			CONN_DEC_REF(connp);
@@ -10390,15 +10452,25 @@ notv6:
 		}
 	}
 	BUMP_MIB(mibptr, ipv6OutIPv4);
-	(void) ip_output(connp, first_mp, q, caller);
+	(void) ip_output(arg, first_mp, arg2, caller);
 	if (ill != NULL)
 		ill_refrele(ill);
 }
 
+/*
+ * If this is a conn_t queue, then we pass in the conn. This includes the
+ * zoneid.
+ * Otherwise, this is a message for an ill_t queue,
+ * in which case we use the global zoneid since those are all part of
+ * the global zone.
+ */
 static void
 ip_wput_v6(queue_t *q, mblk_t *mp)
 {
-	ip_output_v6(Q_TO_CONN(q), mp, q, IP_WPUT);
+	if (CONN_Q(q))
+		ip_output_v6(Q_TO_CONN(q), mp, q, IP_WPUT);
+	else
+		ip_output_v6(GLOBAL_ZONEID, mp, q, IP_WPUT);
 }
 
 static void
@@ -10647,7 +10719,8 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
  */
 static void
 ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
-    int cksum_request, conn_t *connp, int caller, int attach_index, int flags)
+    int cksum_request, conn_t *connp, int caller, int attach_index, int flags,
+    zoneid_t zoneid)
 {
 	ip6_t		*ip6h;
 	uint8_t		nexthdr;
@@ -10662,9 +10735,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 	boolean_t	conn_multicast_loop;	/* conn value for multicast */
 	boolean_t 	multicast_forward;	/* Should we forward ? */
 	int		max_frag;
-	zoneid_t	zoneid;
 
-	zoneid = (connp != NULL ? connp->conn_zoneid : ALL_ZONES);
 	ill = ire_to_ill(ire);
 	first_mp = mp;
 	multicast_forward = B_FALSE;
@@ -10678,7 +10749,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 		 * Grab the zone id now because the M_CTL can be discarded by
 		 * ip_wput_ire_parse_ipsec_out() below.
 		 */
-		zoneid = io->ipsec_out_zoneid;
+		ASSERT(zoneid == io->ipsec_out_zoneid);
 		ASSERT(zoneid != ALL_ZONES);
 		ip6h = (ip6_t *)first_mp->b_cont->b_rptr;
 		/*
@@ -10723,12 +10794,24 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 		 * matching route in the forwarding table.
 		 * RTF_REJECT and RTF_BLACKHOLE are handled just like
 		 * ip_newroute_v6() does.
+		 * Note that IRE_LOCAL are special, since they are used
+		 * when the zoneid doesn't match in some cases. This means that
+		 * we need to handle ipha_src differently since ire_src_addr
+		 * belongs to the receiving zone instead of the sending zone.
+		 * When ip_restrict_interzone_loopback is set, then
+		 * ire_cache_lookup_v6() ensures that IRE_LOCAL are only used
+		 * for loopback between zones when the logical "Ethernet" would
+		 * have looped them back.
 		 */
-		ire_t *src_ire = ire_ftable_lookup_v6(&ip6h->ip6_dst, 0, 0, 0,
+		ire_t *src_ire;
+
+		src_ire = ire_ftable_lookup_v6(&ip6h->ip6_dst, 0, 0, 0,
 		    NULL, NULL, zoneid, 0, NULL, (MATCH_IRE_RECURSIVE |
 		    MATCH_IRE_DEFAULT | MATCH_IRE_RJ_BHOLE));
 		if (src_ire != NULL &&
-		    !(src_ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE))) {
+		    !(src_ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE)) &&
+		    (!ip_restrict_interzone_loopback ||
+		    ire_local_same_ill_group(ire, src_ire))) {
 			if (IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src) &&
 			    !unspec_src) {
 				ip6h->ip6_src = src_ire->ire_src_addr_v6;
@@ -10750,14 +10833,15 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 				return;
 			}
 			icmp_unreachable_v6(q, first_mp,
-			    ICMP6_DST_UNREACH_NOROUTE, B_FALSE, B_FALSE);
+			    ICMP6_DST_UNREACH_NOROUTE, B_FALSE, B_FALSE,
+			    zoneid);
 			return;
 		}
 	}
 
 	if (mp->b_datap->db_type == M_CTL || ipsec_outbound_v6_policy_present) {
 		mp = ip_wput_ire_parse_ipsec_out(first_mp, NULL, ip6h, ire,
-		    connp, unspec_src);
+		    connp, unspec_src, zoneid);
 		if (mp == NULL) {
 			return;
 		}
@@ -11174,7 +11258,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 		    (ire->ire_frag_flag & IPH_FRAG_HDR)) {
 			if (connp != NULL && (flags & IP6I_DONTFRAG)) {
 				icmp_pkt2big_v6(ire->ire_stq, first_mp,
-				    max_frag, B_FALSE, B_TRUE);
+				    max_frag, B_FALSE, B_TRUE, zoneid);
 				return;
 			}
 
@@ -11225,7 +11309,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 				 * generate.
 				 */
 				icmp_pkt2big_v6(ire->ire_stq, first_mp,
-				    max_frag, B_FALSE, B_TRUE);
+				    max_frag, B_FALSE, B_TRUE, zoneid);
 				return;
 			}
 			if (attach_index != 0)

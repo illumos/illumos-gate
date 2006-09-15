@@ -315,6 +315,10 @@ extern	ire_t	*ire_ihandle_lookup_onlink(ire_t *);
 extern	ire_t	*ire_ihandle_lookup_offlink(ire_t *, ire_t *);
 extern	ire_t	*ire_ihandle_lookup_offlink_v6(ire_t *, ire_t *);
 
+extern	boolean_t	ire_local_same_ill_group(ire_t *, ire_t *);
+extern	boolean_t	ire_local_ok_across_zones(ire_t *, zoneid_t, void *,
+			    const struct ts_label_s *tsl);
+
 extern	ire_t 	*ire_lookup_local(zoneid_t);
 extern	ire_t 	*ire_lookup_local_v6(zoneid_t);
 

@@ -924,7 +924,8 @@ static mblk_t	*tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send,
 static void	tcp_ack_timer(void *arg);
 static mblk_t	*tcp_ack_mp(tcp_t *tcp);
 static void	tcp_xmit_early_reset(char *str, mblk_t *mp,
-		    uint32_t seq, uint32_t ack, int ctl, uint_t ip_hdr_len);
+		    uint32_t seq, uint32_t ack, int ctl, uint_t ip_hdr_len,
+		    zoneid_t zoneid);
 static void	tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq,
 		    uint32_t ack, int ctl);
 static tcp_hsp_t *tcp_hsp_lookup(ipaddr_t addr);
@@ -21432,7 +21433,7 @@ tcp_ip_advise_mblk(void *addr, int addr_len, ipic_t **ipic)
  */
 static void
 tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
-    uint32_t ack, int ctl, uint_t ip_hdr_len)
+    uint32_t ack, int ctl, uint_t ip_hdr_len, zoneid_t zoneid)
 {
 	ipha_t		*ipha = NULL;
 	ip6_t		*ip6h = NULL;
@@ -21449,6 +21450,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 	queue_t		*q = tcp_g_q;
 	tcp_t		*tcp = Q_TO_TCP(q);
 	cred_t		*cr;
+	mblk_t		*nmp;
 
 	if (!tcp_send_rst_chk()) {
 		tcp_rst_unsent++;
@@ -21610,6 +21612,16 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 			return;
 		}
 	}
+	if (zoneid == ALL_ZONES)
+		zoneid = GLOBAL_ZONEID;
+
+	/* Add the zoneid so ip_output routes it properly */
+	if ((nmp = ip_prepend_zoneid(ipsec_mp, zoneid)) == NULL) {
+		freemsg(ipsec_mp);
+		return;
+	}
+	ipsec_mp = nmp;
+
 	/*
 	 * NOTE:  one might consider tracing a TCP packet here, but
 	 * this function has no active TCP state and no tcp structure
@@ -21750,7 +21762,7 @@ tcp_xmit_end(tcp_t *tcp)
  * RST.
  */
 void
-tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len)
+tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len, zoneid_t zoneid)
 {
 	uchar_t		*rptr;
 	uint32_t	seg_len;
@@ -21829,7 +21841,7 @@ tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len)
 		freemsg(ipsec_mp);
 	} else if (flags & TH_ACK) {
 		tcp_xmit_early_reset("no tcp, reset",
-		    ipsec_mp, seg_ack, 0, TH_RST, ip_hdr_len);
+		    ipsec_mp, seg_ack, 0, TH_RST, ip_hdr_len, zoneid);
 	} else {
 		if (flags & TH_SYN) {
 			seg_len++;
@@ -21848,7 +21860,7 @@ tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len)
 
 		tcp_xmit_early_reset("no tcp, reset/ack",
 		    ipsec_mp, 0, seg_seq + seg_len,
-		    TH_RST | TH_ACK, ip_hdr_len);
+		    TH_RST | TH_ACK, ip_hdr_len, zoneid);
 	}
 }
 

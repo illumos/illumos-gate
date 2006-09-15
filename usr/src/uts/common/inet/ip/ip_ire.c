@@ -1055,12 +1055,20 @@ ire_send(queue_t *q, mblk_t *pkt, ire_t *ire)
 	boolean_t is_secure;
 	uint_t ifindex;
 	ill_t	*ill;
+	zoneid_t zoneid = ire->ire_zoneid;
 
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
+	ASSERT(!(ire->ire_type & IRE_LOCAL)); /* Has different ire_zoneid */
 	ipsec_mp = pkt;
 	is_secure = (pkt->b_datap->db_type == M_CTL);
-	if (is_secure)
+	if (is_secure) {
+		ipsec_out_t *io;
+
 		pkt = pkt->b_cont;
+		io = (ipsec_out_t *)ipsec_mp->b_rptr;
+		if (io->ipsec_out_type == IPSEC_OUT)
+			zoneid = io->ipsec_out_zoneid;
+	}
 
 	/* If the packet originated externally then */
 	if (pkt->b_prev) {
@@ -1132,7 +1140,13 @@ ire_send(queue_t *q, mblk_t *pkt, ire_t *ire)
 		if (ipha->ipha_dst != ire->ire_addr &&
 		    !(ire->ire_marks & IRE_MARK_NOADD)) {
 			ire_refrele(ire);	/* Held in ire_add */
-			(void) ip_output(Q_TO_CONN(q), ipsec_mp, q, IRE_SEND);
+			if (CONN_Q(q)) {
+				(void) ip_output(Q_TO_CONN(q), ipsec_mp, q,
+				    IRE_SEND);
+			} else {
+				(void) ip_output((void *)(uintptr_t)zoneid,
+				    ipsec_mp, q, IRE_SEND);
+			}
 		} else {
 			if (is_secure) {
 				ipsec_out_t *oi;
@@ -1158,14 +1172,14 @@ ire_send(queue_t *q, mblk_t *pkt, ire_t *ire)
 					 * ip_wput_ire.
 					 */
 					ip_wput_ire(q, ipsec_mp, ire, NULL,
-					    IRE_SEND);
+					    IRE_SEND, zoneid);
 				}
 			} else {
 				/*
 				 * IRE_REFRELE will be done in ip_wput_ire.
 				 */
 				ip_wput_ire(q, ipsec_mp, ire, NULL,
-				    IRE_SEND);
+				    IRE_SEND, zoneid);
 			}
 		}
 		/*
@@ -1213,12 +1227,19 @@ ire_send_v6(queue_t *q, mblk_t *pkt, ire_t *ire)
 	mblk_t *ipsec_mp;
 	boolean_t secure;
 	uint_t ifindex;
+	zoneid_t zoneid = ire->ire_zoneid;
 
 	ASSERT(ire->ire_ipversion == IPV6_VERSION);
+	ASSERT(!(ire->ire_type & IRE_LOCAL)); /* Has different ire_zoneid */
 	if (pkt->b_datap->db_type == M_CTL) {
+		ipsec_out_t *io;
+
 		ipsec_mp = pkt;
 		pkt = pkt->b_cont;
 		secure = B_TRUE;
+		io = (ipsec_out_t *)ipsec_mp->b_rptr;
+		if (io->ipsec_out_type == IPSEC_OUT)
+			zoneid = io->ipsec_out_zoneid;
 	} else {
 		ipsec_mp = pkt;
 		secure = B_FALSE;
@@ -1284,16 +1305,27 @@ ire_send_v6(queue_t *q, mblk_t *pkt, ire_t *ire)
 				ip_wput_ipsec_out_v6(q, ipsec_mp, ip6h,
 				    NULL, NULL);
 			} else {
-				(void) ip_output_v6(Q_TO_CONN(q), ipsec_mp,
-				    q, IRE_SEND);
+				if (CONN_Q(q)) {
+					(void) ip_output_v6(Q_TO_CONN(q),
+					    ipsec_mp, q, IRE_SEND);
+				} else {
+					(void) ip_output_v6(
+					    (void *)(uintptr_t)zoneid,
+					    ipsec_mp, q, IRE_SEND);
+				}
 			}
 		} else {
 			/*
 			 * Send packets through ip_output_v6 so that any
 			 * ip6_info header can be processed again.
 			 */
-			(void) ip_output_v6(Q_TO_CONN(q), ipsec_mp, q,
-			    IRE_SEND);
+			if (CONN_Q(q)) {
+				(void) ip_output_v6(Q_TO_CONN(q), ipsec_mp, q,
+				    IRE_SEND);
+			} else {
+				(void) ip_output_v6((void *)(uintptr_t)zoneid,
+				    ipsec_mp, q, IRE_SEND);
+			}
 		}
 		/*
 		 * Special code to support sending a single packet with
@@ -1566,7 +1598,8 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 				 * ire->ire_zoneid.
 				 */
 				ip_newroute(q, mp, ipha->ipha_dst, 0,
-				    (CONN_Q(q) ? Q_TO_CONN(q) : NULL));
+				    (CONN_Q(q) ? Q_TO_CONN(q) : NULL),
+				    ire->ire_zoneid);
 			} else {
 				ASSERT(ire->ire_ipversion == IPV6_VERSION);
 				ip_newroute_v6(q, mp, &ip6h->ip6_dst, NULL,
@@ -2656,28 +2689,30 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 
 		/*
 		 * Match all default routes from the global zone, irrespective
-		 * of reachability.
+		 * of reachability. For a non-global zone only match those
+		 * where ire_gateway_addr has a IRE_INTERFACE for the zoneid.
 		 */
 		if (ire->ire_type == IRE_DEFAULT && zoneid != GLOBAL_ZONEID) {
 			int ire_match_flags = 0;
 			in6_addr_t gw_addr_v6;
 			ire_t *rire;
 
+			ire_match_flags |= MATCH_IRE_TYPE;
 			if (ire->ire_ipif != NULL) {
 				ire_match_flags |= MATCH_IRE_ILL_GROUP;
 			}
 			if (ire->ire_ipversion == IPV4_VERSION) {
 				rire = ire_route_lookup(ire->ire_gateway_addr,
-				    0, 0, 0, ire->ire_ipif, NULL, zoneid, NULL,
-				    ire_match_flags);
+				    0, 0, IRE_INTERFACE, ire->ire_ipif, NULL,
+				    zoneid, NULL, ire_match_flags);
 			} else {
 				ASSERT(ire->ire_ipversion == IPV6_VERSION);
 				mutex_enter(&ire->ire_lock);
 				gw_addr_v6 = ire->ire_gateway_addr_v6;
 				mutex_exit(&ire->ire_lock);
 				rire = ire_route_lookup_v6(&gw_addr_v6,
-				    NULL, NULL, 0, ire->ire_ipif, NULL, zoneid,
-				    NULL, ire_match_flags);
+				    NULL, NULL, IRE_INTERFACE, ire->ire_ipif,
+				    NULL, zoneid, NULL, ire_match_flags);
 			}
 			if (rire == NULL) {
 				return (B_FALSE);
@@ -4777,9 +4812,85 @@ ire_ctable_lookup(ipaddr_t addr, ipaddr_t gateway, int type, const ipif_t *ipif,
 }
 
 /*
+ * Check whether the IRE_LOCAL and the IRE potentially used to transmit
+ * (could be an IRE_CACHE, IRE_BROADCAST, or IRE_INTERFACE) are part of
+ * the same ill group.
+ */
+boolean_t
+ire_local_same_ill_group(ire_t *ire_local, ire_t *xmit_ire)
+{
+	ill_t		*recv_ill, *xmit_ill;
+	ill_group_t	*recv_group, *xmit_group;
+
+	ASSERT(ire_local->ire_type == IRE_LOCAL);
+	ASSERT(ire_local->ire_rfq != NULL);
+	ASSERT(xmit_ire->ire_type & (IRE_CACHE|IRE_BROADCAST|IRE_INTERFACE));
+	ASSERT(xmit_ire->ire_stq != NULL);
+	ASSERT(xmit_ire->ire_ipif != NULL);
+
+	recv_ill = ire_local->ire_rfq->q_ptr;
+	xmit_ill = xmit_ire->ire_stq->q_ptr;
+
+	if (recv_ill == xmit_ill)
+		return (B_TRUE);
+
+	recv_group = recv_ill->ill_group;
+	xmit_group = xmit_ill->ill_group;
+
+	if (recv_group != NULL && recv_group == xmit_group)
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
+/*
+ * Check if the IRE_LOCAL uses the same ill (group) as another route would use.
+ */
+boolean_t
+ire_local_ok_across_zones(ire_t *ire_local, zoneid_t zoneid, void *addr,
+    const ts_label_t *tsl)
+{
+	ire_t		*alt_ire;
+	boolean_t	rval;
+
+	if (ire_local->ire_ipversion == IPV4_VERSION) {
+		alt_ire = ire_ftable_lookup(*((ipaddr_t *)addr), 0, 0, 0, NULL,
+		    NULL, zoneid, 0, tsl,
+		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
+		    MATCH_IRE_RJ_BHOLE);
+	} else {
+		alt_ire = ire_ftable_lookup_v6((in6_addr_t *)addr, NULL, NULL,
+		    0, NULL, NULL, zoneid, 0, tsl,
+		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
+		    MATCH_IRE_RJ_BHOLE);
+	}
+
+	if (alt_ire == NULL)
+		return (B_FALSE);
+
+	rval = ire_local_same_ill_group(ire_local, alt_ire);
+
+	ire_refrele(alt_ire);
+	return (rval);
+}
+
+/*
  * Lookup cache. Don't return IRE_MARK_HIDDEN entries. Callers
  * should use ire_ctable_lookup with MATCH_IRE_MARK_HIDDEN to get
  * to the hidden ones.
+ *
+ * In general the zoneid has to match (where ALL_ZONES match all of them).
+ * But for IRE_LOCAL we also need to handle the case where L2 should
+ * conceptually loop back the packet. This is necessary since neither
+ * Ethernet drivers nor Ethernet hardware loops back packets sent to their
+ * own MAC address. This loopback is needed when the normal
+ * routes (ignoring IREs with different zoneids) would send out the packet on
+ * the same ill (or ill group) as the ill with which this IRE_LOCAL is
+ * associated.
+ *
+ * Earlier versions of this code always matched an IRE_LOCAL independently of
+ * the zoneid. We preserve that earlier behavior when
+ * ip_restrict_interzone_loopback is turned off.
  */
 ire_t *
 ire_cache_lookup(ipaddr_t addr, zoneid_t zoneid, const ts_label_t *tsl)
@@ -4807,8 +4918,18 @@ ire_cache_lookup(ipaddr_t addr, zoneid_t zoneid, const ts_label_t *tsl)
 			}
 
 			if (zoneid == ALL_ZONES || ire->ire_zoneid == zoneid ||
-			    ire->ire_zoneid == ALL_ZONES ||
-			    ire->ire_type == IRE_LOCAL) {
+			    ire->ire_zoneid == ALL_ZONES) {
+				IRE_REFHOLD(ire);
+				rw_exit(&irb_ptr->irb_lock);
+				return (ire);
+			}
+
+			if (ire->ire_type == IRE_LOCAL) {
+				if (ip_restrict_interzone_loopback &&
+				    !ire_local_ok_across_zones(ire, zoneid,
+				    &addr, tsl))
+					continue;
+
 				IRE_REFHOLD(ire);
 				rw_exit(&irb_ptr->irb_lock);
 				return (ire);
