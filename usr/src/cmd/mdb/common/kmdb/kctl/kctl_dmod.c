@@ -177,7 +177,7 @@ kctl_dmod_load(kmdb_wr_load_t *dlr)
 	else
 		rc = kobj_load_primary_module(modp);
 
-	if (rc < 0) {
+	if (rc != 0) {
 		kctl_warn("failed to load dmod %s", modp->mod_modname);
 
 		if (kctl.kctl_boot_ops == NULL)
