@@ -221,7 +221,7 @@ tdesc_bitsize(tdesc_t *tdp)
 		case UNION:
 		case ENUM:
 		case POINTER:
-			return (tdp->t_size);
+			return (tdp->t_size * NBBY);
 
 		case FORWARD:
 			return (0);
@@ -983,8 +983,8 @@ die_sou_create(dwarf_t *dw, Dwarf_Die str, Dwarf_Off off, tdesc_t *tdp,
 #ifdef	_BIG_ENDIAN
 			ml->ml_offset += bitoff;
 #else
-			ml->ml_offset += (dw->dw_ptrsz * NBBY - bitoff -
-			    ml->ml_size);
+			ml->ml_offset += tdesc_bitsize(ml->ml_type) - bitoff -
+			    ml->ml_size;
 #endif
 		}
 
