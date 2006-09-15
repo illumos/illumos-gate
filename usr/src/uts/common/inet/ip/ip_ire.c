@@ -1770,11 +1770,12 @@ ire_create_mp(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
 	    NULL, fp_mp, rfq, stq, type, dlureq_mp, ipif, in_ill, cmask,
 	    phandle, ihandle, flags, ulp_info, gc, gcgrp);
 
+	ill = (ill_t *)(stq->q_ptr);
 	if (ret_ire == NULL) {
+		ire->ire_stq_ifindex = ill->ill_phyint->phyint_ifindex;
 		freeb(ire->ire_mp);
 		return (NULL);
 	}
-	ill = ire_to_ill(ret_ire);
 	ret_ire->ire_stq_ifindex = ill->ill_phyint->phyint_ifindex;
 	ASSERT(ret_ire == ire);
 	/*
