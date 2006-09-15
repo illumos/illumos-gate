@@ -680,6 +680,7 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 #define	SATA_DBG_EVENTS_CNTRL	0x80
 #define	SATA_DBG_EVENTS_DAEMON	0x100
 #define	SATA_DBG_DMA_SETUP	0x400
+#define	SATA_DBG_DEV_SETTINGS	0x800
 
 extern int sata_debug_flag;
 

@@ -138,8 +138,7 @@ static	int sata_set_udma_mode(sata_hba_inst_t *, sata_drive_info_t *);
 static	int sata_set_cache_mode(sata_hba_inst_t *, sata_drive_info_t *, int);
 static	int sata_set_drive_features(sata_hba_inst_t *,
     sata_drive_info_t *, int flag);
-static	int sata_init_write_cache_mode(sata_hba_inst_t *,
-    sata_drive_info_t *sdinfo);
+static	void sata_init_write_cache_mode(sata_drive_info_t *sdinfo);
 static	int sata_initialize_device(sata_hba_inst_t *, sata_drive_info_t *);
 
 /* Event processing functions */
@@ -7657,16 +7656,6 @@ sata_create_target_node(dev_info_t *dip, sata_hba_inst_t *sata_hba_inst,
 	}
 
 	/*
-	 * Set default write cache mode
-	 */
-	rval = sata_init_write_cache_mode(sata_hba_inst, sdinfo);
-	if (rval != SATA_SUCCESS) {
-		sata_log(sata_hba_inst, CE_WARN, "sata_create_target_node: "
-		    "cannot set deafult write cache mode for "
-		    "device at port %d", sata_addr->cport);
-	}
-
-	/*
 	 * Now, try to attach the driver. If probing of the device fails,
 	 * the target node may be removed
 	 */
@@ -7697,7 +7686,7 @@ fail:
 
 
 /*
- * Re-probe sata port, check for a device and attach necessary info
+ * Re-probe sata port, check for a device and attach info
  * structures when necessary. Identify Device data is fetched, if possible.
  * Assumption: sata address is already validated.
  * SATA_SUCCESS is returned if port is re-probed sucessfully, regardless of
@@ -7710,6 +7699,8 @@ sata_reprobe_port(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 	sata_cport_info_t *cportinfo;
 	sata_drive_info_t *sdinfo;
 	boolean_t init_device = B_FALSE;
+	int prev_device_type = SATA_DTYPE_NONE;
+	int prev_device_settings = 0;
 	int rval;
 
 	/* We only care about host sata cport for now */
@@ -7799,7 +7790,7 @@ sata_reprobe_port(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 			    sizeof (sata_drive_info_t), KM_SLEEP);
 			mutex_enter(&cportinfo->cport_mutex);
 			/*
-			 * Recheck, if port state did not change when we
+			 * Recheck, that the port state did not change when we
 			 * released mutex.
 			 */
 			if (cportinfo->cport_state & SATA_STATE_READY) {
@@ -7823,6 +7814,12 @@ sata_reprobe_port(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 			 * as well as some internal framework states).
 			 */
 			init_device = B_TRUE;
+		} else {
+			/*
+			 * Save previous device type and settings
+			 */
+			prev_device_type = cportinfo->cport_dev_type;
+			prev_device_settings = sdinfo->satadrv_settings;
 		}
 
 		cportinfo->cport_dev_type = SATA_DTYPE_UNKNOWN;
@@ -7839,12 +7836,16 @@ sata_reprobe_port(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 	 */
 	rval = sata_probe_device(sata_hba_inst, sata_device);
 
+	/*
+	 * If we are dealing with the same type of a device as before,
+	 * restore its settings flags.
+	 */
+	if (sata_device->satadev_type == prev_device_type)
+		sdinfo->satadrv_settings = prev_device_settings;
+
 	/* Set initial device features, if necessary */
 	if (rval == SATA_SUCCESS && init_device == B_TRUE) {
-		if (sata_initialize_device(sata_hba_inst, sdinfo) !=
-		    SATA_SUCCESS)
-			/* retry */
-			(void) sata_initialize_device(sata_hba_inst, sdinfo);
+		rval = sata_initialize_device(sata_hba_inst, sdinfo);
 	}
 	return (rval);
 }
@@ -7869,6 +7870,8 @@ sata_initialize_device(sata_hba_inst_t *sata_hba_inst,
 
 	sdinfo->satadrv_settings |= SATA_DEV_READ_AHEAD;
 
+	sata_init_write_cache_mode(sdinfo);
+
 	return (sata_set_drive_features(sata_hba_inst, sdinfo, 0));
 }
 
@@ -7887,9 +7890,8 @@ sata_initialize_device(sata_hba_inst_t *sata_hba_inst,
  * Returns SATA_SUCCESS if all device features are set successfully,
  * SATA_FAILURE otherwise.
  */
-static int
-sata_init_write_cache_mode(sata_hba_inst_t *sata_hba_inst,
-    sata_drive_info_t *sdinfo)
+static void
+sata_init_write_cache_mode(sata_drive_info_t *sdinfo)
 {
 	if (sata_write_cache == 1)
 		sdinfo->satadrv_settings |= SATA_DEV_WRITE_CACHE;
@@ -7898,10 +7900,7 @@ sata_init_write_cache_mode(sata_hba_inst_t *sata_hba_inst,
 	/*
 	 * When sata_write_cache value is not 0 or 1,
 	 * a current setting of the drive's write cache is used.
-	 *
-	 * Now set the write cache mode
 	 */
-	return (sata_set_drive_features(sata_hba_inst, sdinfo, 0));
 }
 
 
@@ -8054,7 +8053,7 @@ sata_devt_to_devinfo(dev_t dev)
 
 /*
  * Probe device.
- * This function issues Identify Device command and initialize local
+ * This function issues Identify Device command and initializes local
  * sata_drive_info structure if the device can be identified.
  * The device type is determined by examining Identify Device
  * command response.
@@ -9195,6 +9194,15 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 		 */
 		rval = -1;
 	} else {
+#ifdef SATA_DEBUG
+		if ((sdinfo->satadrv_id.ai_config & 4) == 1) {
+			sata_log(sata_hba_inst, CE_WARN,
+			    "SATA disk device at port %d - "
+			    "partial Identify Data",
+			    sdinfo->satadrv_addr.cport);
+			goto fail;
+		}
+#endif
 		/* Update sata_drive_info */
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			DDI_DMA_SYNC_FORKERNEL);
@@ -9249,7 +9257,6 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 		if ((sdinfo->satadrv_features_support & SATA_DEV_F_NCQ) ||
 			(sdinfo->satadrv_features_support & SATA_DEV_F_TCQ))
 			++sdinfo->satadrv_queue_depth;
-
 		rval = 0;
 	}
 fail:
@@ -10537,6 +10544,9 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 				sata_hba_inst->satahba_event_flags |=
 				    SATA_EVNT_MAIN;
 				mutex_exit(&sata_hba_inst->satahba_mutex);
+				mutex_enter(&sata_mutex);
+				sata_event_pending |= SATA_EVNT_MAIN;
+				mutex_exit(&sata_mutex);
 				return;
 			}
 		} else {
@@ -11153,7 +11163,7 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 	if (!(new_sdinfo.satadrv_id.ai_cmdset82 & SATA_LOOK_AHEAD) &&
 	    !(new_sdinfo.satadrv_id.ai_cmdset82 & SATA_WRITE_CACHE)) {
 		/* None of the features is supported - do nothing */
-		SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
+		SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
 		    "settable features not supported\n", NULL);
 		return (SATA_SUCCESS);
 	}
@@ -11163,7 +11173,7 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 	    ((new_sdinfo.satadrv_id.ai_features85 & SATA_WRITE_CACHE) &&
 	    (sdinfo->satadrv_settings & SATA_DEV_WRITE_CACHE))) {
 		/* Nothing to do */
-		SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
+		SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
 		    "no device features to set\n", NULL);
 		return (SATA_SUCCESS);
 	}
@@ -11173,12 +11183,17 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 
 	if (!((new_sdinfo.satadrv_id.ai_features85 & SATA_LOOK_AHEAD) &&
 	    (sdinfo->satadrv_settings & SATA_DEV_READ_AHEAD))) {
-		if (sdinfo->satadrv_settings & SATA_DEV_READ_AHEAD)
+		if (sdinfo->satadrv_settings & SATA_DEV_READ_AHEAD) {
 			/* Enable read ahead / read cache */
 			cache_op = SATAC_SF_ENABLE_READ_AHEAD;
-		else
+			SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
+			    "enabling read cache\n", NULL);
+		} else {
 			/* Disable read ahead  / read cache */
 			cache_op = SATAC_SF_DISABLE_READ_AHEAD;
+			SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
+			    "disabling read cache\n", NULL);
+		}
 
 		/* Try to set read cache mode */
 		if (sata_set_cache_mode(sata_hba_inst, &new_sdinfo,
@@ -11190,13 +11205,17 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 
 	if (!((new_sdinfo.satadrv_id.ai_features85 & SATA_WRITE_CACHE) &&
 	    (sdinfo->satadrv_settings & SATA_DEV_WRITE_CACHE))) {
-		if (sdinfo->satadrv_settings & SATA_DEV_WRITE_CACHE)
+		if (sdinfo->satadrv_settings & SATA_DEV_WRITE_CACHE) {
 			/* Enable write cache */
 			cache_op = SATAC_SF_ENABLE_WRITE_CACHE;
-		else
+			SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
+			    "enabling write cache\n", NULL);
+		} else {
 			/* Disable write cache */
 			cache_op = SATAC_SF_DISABLE_WRITE_CACHE;
-
+			SATADBG1(SATA_DBG_DEV_SETTINGS, sata_hba_inst,
+			    "disabling write cache\n", NULL);
+		}
 		/* Try to set write cache mode */
 		if (sata_set_cache_mode(sata_hba_inst, &new_sdinfo,
 		    cache_op) != SATA_SUCCESS) {
