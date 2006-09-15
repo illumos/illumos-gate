@@ -285,11 +285,27 @@ _usba_check_req(usba_pipe_handle_data_t *ph_data, usb_opaque_t req,
 
 				return (USB_INVALID_REQUEST);
 			}
+
+			if (isoc_req->isoc_pkts_length == 0) {
+
+				return (USB_INVALID_REQUEST);
+			}
 		}
 
-		if (data == NULL || isoc_req->isoc_pkts_length) {
+		if (data == NULL) {
 
 			return (USB_INVALID_REQUEST);
+		}
+
+		/*
+		 * Since ehci/ohci/uhci use (data->b_wptr - data->b_rptr) as
+		 * real isoc_pkts_length, it should be checked.
+		 */
+		if (direction == USB_EP_DIR_OUT) {
+			if ((data->b_wptr - data->b_rptr) <= 0) {
+
+				return (USB_INVALID_REQUEST);
+			}
 		}
 
 		/* special isoc checks */
