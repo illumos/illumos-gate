@@ -48,39 +48,6 @@ static	uchar_t pci_msix_bir_index[8] = {0x10, 0x14, 0x18, 0x1c,
  * Library utility functions
  */
 
-
-/*
- * pci_check_pciex:
- *
- * check whether the device has PCI-E capability
- */
-int
-pci_check_pciex(dev_info_t *dip)
-{
-	ddi_acc_handle_t h;
-	ushort_t cap_off;
-
-	DDI_INTR_NEXDBG((CE_CONT, "pci_check_pciex: dip: 0x%p, driver: %s, "
-	    "binding: %s, nodename: %s\n", (void *)dip, ddi_driver_name(dip),
-	    ddi_binding_name(dip), ddi_node_name(dip)));
-
-	if (pci_config_setup(dip, &h) != DDI_SUCCESS) {
-		DDI_INTR_NEXDBG((CE_CONT, "pci_check_pciex: "
-		    "pci_config_setup() failed\n"));
-		return (DDI_FAILURE);
-	}
-
-	if ((PCI_CAP_LOCATE(h, PCI_CAP_ID_PCI_E, &cap_off))
-			== DDI_SUCCESS) {
-		pci_config_teardown(&h);
-		return (DDI_SUCCESS);
-	}
-
-	pci_config_teardown(&h);
-	return (DDI_FAILURE);
-}
-
-
 /*
  * pci_get_msi_ctrl:
  *

@@ -32,8 +32,6 @@
 extern "C" {
 #endif
 
-extern	int	pci_check_pciex(dev_info_t *dip);
-
 extern	int	pci_msi_get_cap(dev_info_t *rdip, int type, int *flagsp);
 extern	int	pci_msi_configure(dev_info_t *rdip, int type, int count,
 		    int inum, uint64_t addr, uint64_t data);
