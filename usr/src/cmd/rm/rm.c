@@ -46,6 +46,8 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/resource.h>
+#include <sys/avl.h>
+#include <libcmdutils.h>
 
 #define	ARGCNT		5		/* Number of arguments */
 #define	CHILD		0
@@ -87,6 +89,7 @@ static rlim_t	maxfiles;	/* maximum number of open files */
 static int	first_dir = 1;	/* flag set when first trying to remove a dir */
 	/* flag set when can't get dev/inode of a parent dir */
 static int	parent_err = 0;
+static avl_tree_t *tree;	/* tree to keep track of nodes visited */
 
 struct dir_id {
 	dev_t	dev;
@@ -168,10 +171,10 @@ main(int argc, char *argv[])
 		maxfiles = rl.rlim_cur - 2;
 
 	while (argc-- > 0) {
+		tree = NULL;
 		rm(*argv, 1);
 		argv++;
 	}
-
 	cleanup();
 	return (errcode ? 2 : 0);
 	/* NOTREACHED */
@@ -184,6 +187,7 @@ rm(char *path, int first)
 	char	*filepath;
 	char	*p;
 	char	resolved_path[PATH_MAX];
+	int ret;
 
 	/*
 	 * Check file to see if it exists.
@@ -193,6 +197,24 @@ rm(char *path, int first)
 			perror(path);
 			++errcode;
 		}
+		return;
+	}
+
+	/*
+	 * Add this node to the search tree so we don't
+	 * get into a endless loop. If the add fails then
+	 * we have visited this node before.
+	 */
+	ret = add_tnode(&tree, buffer.st_dev, buffer.st_ino);
+	if (ret != 1) {
+		if (ret == 0) {
+			filepath = get_filename(path);
+			(void) fprintf(stderr,
+			    gettext("rm: cycle detected for %s\n"), filepath);
+		} else if (ret == -1) {
+			perror("rm");
+		}
+		errcode++;
 		return;
 	}
 
@@ -239,7 +261,6 @@ rm(char *path, int first)
 		undir(path, first, buffer.st_dev, buffer.st_ino);
 		return;
 	}
-
 	filepath = get_filename(path);
 
 	/*
@@ -718,7 +739,6 @@ static void
 pop_name(int first)
 {
 	char *slash;
-
 	if (first) {
 		*fullpath = '\0';
 		return;
@@ -941,7 +961,6 @@ check_homedir(void)
 
 static void
 cleanup(void) {
-
 	struct dir_id *lastdir, *curdir;
 
 	curdir = homedir.next;
@@ -951,4 +970,5 @@ cleanup(void) {
 		curdir = curdir->next;
 		free(lastdir);
 	}
+	destroy_tree(tree);
 }
