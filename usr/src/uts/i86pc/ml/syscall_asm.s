@@ -137,7 +137,7 @@
 	pushl	%gs			/* save the user %gs		*/ ;\
 	movl	$KGS_SEL, %ebx						   ;\
 	pushl	%ebx			/* push kernel's %gs		*/ ;\
-	movw	%ebx, %gs		/* switch to the kernel's %gs	*/ ;\
+	movw	%bx, %gs		/* switch to the kernel's %gs	*/ ;\
 	movl	%gs:CPU_THREAD, %ebx	/* load the thread pointer	*/ ;\
 	movl	T_LWP(%ebx), %ebx	/* load the lwp pointer		*/ ;\
 	pushl	LWP_BRAND(%ebx)		/* push the lwp's brand data	*/ ;\
@@ -150,13 +150,13 @@
 	je	1f							   ;\
 	movl	%ebx, 20(%esp)		/* save callback to scratch	*/ ;\
 	movl	12(%esp), %ebx		/* grab the the user %gs	*/ ;\
-	movw	%ebx, %gs		/* restore the user %gs		*/ ;\
+	movw	%bx, %gs		/* restore the user %gs		*/ ;\
 	movl	16(%esp), %ebx		/* restore %ebx			*/ ;\
 	pushl	24(%esp)		/* push the return address	*/ ;\
 	call	*24(%esp)		/* call callback		*/ ;\
 	addl	$4, %esp		/* get rid of ret addr		*/ ;\
 1:	movl	12(%esp), %ebx		/* grab the the user %gs	*/ ;\
-	movw	%ebx, %gs		/* restore the user %gs		*/ ;\
+	movw	%bx, %gs		/* restore the user %gs		*/ ;\
 	movl	16(%esp), %ebx		/* restore user's %ebx		*/ ;\
 	addl	$24, %esp		/* restore stack ptr		*/ 
 

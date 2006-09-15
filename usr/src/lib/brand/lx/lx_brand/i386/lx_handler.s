@@ -195,7 +195,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	 * Switch to the Solaris libc's %gs.
 	 */
 	movl	$LWPGS_SEL, %ebx
-	movw	%ebx, %gs
+	movw	%bx, %gs
 
 	/*
 	 * Call lx_emulate() whose only argument is a pointer to the
@@ -240,7 +240,7 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	movl	0xc(%esp),%eax	/* 2nd param is a pointer */
 	movw	%gs,(%eax)	/* use the pointer to save current gs */
 	movl	0x8(%esp),%eax	/* first parameter is the new gs value */
-	movw	%eax, %gs	/* switch to the new gs value */
+	movw	%ax, %gs	/* switch to the new gs value */
 	pop	%eax		/* restore eax */
 	ret
 	SET_SIZE(lx_swap_gs)

@@ -44,7 +44,7 @@ $(ROOTDISTRODIR):
 $(ROOTDISTRODIR)/%: %
 	$(INS.file)
 
-install: $(ROOTDISTRODIR) $(ROOTDISTROS)
+install: $(ROOTDISTROS)
 
 lint clean all:
 

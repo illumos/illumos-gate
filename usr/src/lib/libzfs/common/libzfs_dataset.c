@@ -2248,10 +2248,10 @@ zfs_clone(zfs_handle_t *zhp, const char *target, nvlist_t *props)
 	/* do the clone */
 	if (ZFS_IS_VOLUME(zhp)) {
 		zc.zc_objset_type = DMU_OST_ZVOL;
-		type = ZFS_TYPE_FILESYSTEM;
+		type = ZFS_TYPE_VOLUME;
 	} else {
 		zc.zc_objset_type = DMU_OST_ZFS;
-		type = ZFS_TYPE_VOLUME;
+		type = ZFS_TYPE_FILESYSTEM;
 	}
 
 	if (props) {

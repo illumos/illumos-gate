@@ -32,4 +32,4 @@ include $(SRC)/lib/Makefile.lib.64
 DYNFLAGS +=	$(LX_THUNK)/$(MACH64)/lx_thunk.so.1
 CLOBBERFILES =	$(ROOTLIBDIR64)/$(DYNLIB) $(ROOTLIBDIR64)/$(LINTLIB)
 
-install: $(ROOTLIBDIR64) all $(ROOTLIBS64)
+install: all $(ROOTLIBS64)

@@ -42,7 +42,7 @@ lint :=         TARGET= lint
 
 .KEEP_STATE:
 
-all install clean clobber: $(ROOTBRANDDIR) $(ROOTBRANDDIR64) $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 lint: $(LINT_SUBDIRS)
 

@@ -34,4 +34,4 @@ include ../Makefile.com
 
 CLOBBERFILES =	$(ROOTLIBDIR)/$(DYNLIB)
 
-install: $(ROOTLIBDIR) all $(ROOTLIBS)
+install: all $(ROOTLIBS)

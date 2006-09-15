@@ -35,7 +35,7 @@ include ../Makefile.lx
 
 lint:
 
-install: $(ROOTBRANDDIR) $(ROOTTXTS)
+install: $(ROOTTXTS)
 
 clean:
 	-$(RM) etc_default_nfs

@@ -45,7 +45,7 @@ LDLIBS +=	-lzonecfg
 
 .KEEP_STATE:
 
-install:	all $(ROOTBRANDDIR) $(ROOTPROGS)
+install:	all $(ROOTPROGS)
 
 clean:
 		$(RM) $(PROG) $(OBJS)

@@ -39,7 +39,7 @@ lint:
 
 all:		$(PROGS)
 
-install:	all $(ROOTBRANDDIR) $(ROOTPROGS)
+install:	all $(ROOTPROGS)
 
 clean:
 	$(RM) $(PROGS)

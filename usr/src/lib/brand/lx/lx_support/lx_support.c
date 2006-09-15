@@ -54,6 +54,9 @@
 #include <sys/lx_audio.h>
 #include <sys/lx_brand.h>
 
+static void lxs_err(char *msg, ...) __NORETURN;
+static void usage(void) __NORETURN;
+
 #define	CP_CMD		"/usr/bin/cp"
 #define	MOUNT_CMD	"/sbin/mount"
 

@@ -31,4 +31,4 @@ include $(SRC)/lib/Makefile.lib.64
 
 CLOBBERFILES	= $(ROOTLIBDIR64)/$(DYNLIB) $(ROOTLIBDIR64)/$(LINTLIB)
 
-install: $(ROOTLIBDIR64) all $(ROOTLIBS64)
+install: all $(ROOTLIBS64)

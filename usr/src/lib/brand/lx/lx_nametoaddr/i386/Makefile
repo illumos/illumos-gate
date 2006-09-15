@@ -31,4 +31,4 @@ include ../Makefile.com
 DYNFLAGS +=	$(LX_THUNK)/$(MACH)/lx_thunk.so.1
 CLOBBERFILES =	$(ROOTLIBDIR)/$(DYNLIB) $(ROOTLIBDIR)/$(LINTLIB)
 
-install: $(ROOTLIBDIR) all $(ROOTLIBS)
+install: all $(ROOTLIBS)

@@ -171,7 +171,10 @@ XROOT.BIN= \
 	/usr/lib/inet/wanboot
 # EXPORT DELETE END
 
-i386_ROOT.BIN=
+i386_ROOT.BIN= \
+	/usr/lib/brand/lx \
+	/usr/lib/brand/lx/amd64 \
+	/usr/lib/brand/lx/distros
 
 sparc_ROOT.BIN= \
 	/usr/lib/ldoms
@@ -211,6 +214,9 @@ ROOT.BIN= \
 	/usr/include/security \
 	/usr/lib \
 	/usr/lib/abi \
+	/usr/lib/brand \
+	/usr/lib/brand/native \
+	/usr/lib/brand/sn1 \
 	/usr/lib/class \
 	/usr/lib/class/FSS \
 	/usr/lib/class/FX \
@@ -429,7 +435,14 @@ SYM.ROOT.BIN= \
 	/var/ld/32 \
 	/usr/ucblib/32
 
+
+i386_SYM.ROOT.BIN64= \
+	/usr/lib/brand/lx/64
+
+sparc_SYM.ROOT.BIN64=
+
 SYM.ROOT.BIN64= \
+	$($(MACH)_SYM.ROOT.BIN64) \
 	/lib/64 \
 	/lib/secure/64 \
 	/usr/lib/64 \
@@ -576,6 +589,7 @@ $(ROOT)/usr/ucblib/32:=			LINKDEST=.
 $(BUILD64) $(ROOT)/lib/64:=		LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/lib/secure/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/64:=		LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/brand/lx/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/libp/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/lwp/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/link_audit/64:=	LINKDEST=$(MACH64)
