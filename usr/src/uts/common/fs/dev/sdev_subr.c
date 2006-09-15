@@ -1151,7 +1151,6 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 	char *link = NULL;
 	int samedir = (oddv == nddv) ? 1 : 0;
 	int bkstore = 0;
-	int bypass = 0;
 	struct sdev_node *idv = NULL;
 	struct sdev_node *ndv = NULL;
 	timestruc_t now;
