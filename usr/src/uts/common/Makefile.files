@@ -870,6 +870,7 @@ ZFS_COMMON_OBJS +=		\
 	bplist.o		\
 	dbuf.o			\
 	dmu.o			\
+	dmu_send.o		\
 	dmu_object.o		\
 	dmu_objset.o		\
 	dmu_traverse.o		\
