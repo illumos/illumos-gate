@@ -35,7 +35,7 @@
  * All functions are called with dgraph_lock held.
  *
  * The start action for this state machine is not explicit.  The states
- * (ONLINE and DEGRADED) which needs to know when they're entering the state
+ * (ONLINE and DEGRADED) which need to know when they're entering the state
  * due to a daemon restart implement this understanding by checking for
  * transition from uninitialized.  In the future, this would likely be better
  * as an explicit start action instead of relying on an overloaded transition.
@@ -63,8 +63,6 @@ gt_enter_uninit(scf_handle_t *h, graph_vertex_t *v,
 {
 	int err;
 	scf_instance_t *inst;
-
-	vertex_subgraph_dependencies_shutdown(h, v, gt_running(old_state));
 
 	/* Initialize instance by refreshing it. */
 
@@ -103,12 +101,11 @@ gt_enter_uninit(scf_handle_t *h, graph_vertex_t *v,
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 gt_enter_maint(scf_handle_t *h, graph_vertex_t *v,
     restarter_instance_state_t old_state, restarter_error_t rerr)
 {
-	vertex_subgraph_dependencies_shutdown(h, v, gt_running(old_state));
-
 	/*
 	 * If the service was running, propagate a stop event.  If the
 	 * service was not running the maintenance transition may satisfy
@@ -131,12 +128,11 @@ gt_enter_maint(scf_handle_t *h, graph_vertex_t *v,
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
     restarter_instance_state_t old_state, restarter_error_t rerr)
 {
-	vertex_subgraph_dependencies_shutdown(h, v, gt_running(old_state));
-
 	/*
 	 * If the instance should be enabled, see if we can start it.
 	 * Otherwise send a disable command.
@@ -160,12 +156,11 @@ gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 gt_enter_disabled(scf_handle_t *h, graph_vertex_t *v,
     restarter_instance_state_t old_state, restarter_error_t rerr)
 {
-	vertex_subgraph_dependencies_shutdown(h, v, gt_running(old_state));
-
 	/*
 	 * If the instance should be disabled, no problem.  Otherwise,
 	 * send an enable command, which should result in the instance
@@ -300,13 +295,27 @@ int
 gt_transition(scf_handle_t *h, graph_vertex_t *v, restarter_error_t rerr,
     restarter_instance_state_t old_state)
 {
-	int err = 0;
+	int err;
+	int lost_repository = 0;
 
 	/*
 	 * If there's a common set of work to be done on exit from the
 	 * old_state, include it as a separate set of functions here.  For
 	 * now there's no such work, so there are no gt_exit functions.
 	 */
+
+	err = vertex_subgraph_dependencies_shutdown(h, v, old_state);
+	switch (err) {
+	case 0:
+		break;
+
+	case ECONNABORTED:
+		lost_repository = 1;
+		break;
+
+	default:
+		bad_error("vertex_subgraph_dependencies_shutdown", err);
+	}
 
 	/*
 	 * Now call the appropriate gt_enter function for the new state.
@@ -339,11 +348,28 @@ gt_transition(scf_handle_t *h, graph_vertex_t *v, restarter_error_t rerr,
 	default:
 		/* Shouldn't be in an invalid state. */
 #ifndef NDEBUG
-		uu_warn("%s:%d: Uncaught case %d.\n", __FILE__, __LINE__,
+		uu_warn("%s:%d: Invalid state %d.\n", __FILE__, __LINE__,
 		    v->gv_state);
 #endif
 		abort();
 	}
 
-	return (err);
+	switch (err) {
+	case 0:
+		break;
+
+	case ECONNABORTED:
+		lost_repository = 1;
+		break;
+
+	default:
+#ifndef NDEBUG
+		uu_warn("%s:%d: "
+		    "gt_enter_%s() failed with unexpected error %d.\n",
+		    __FILE__, __LINE__, instance_state_str[v->gv_state], err);
+#endif
+		abort();
+	}
+
+	return (lost_repository ? ECONNABORTED : 0);
 }

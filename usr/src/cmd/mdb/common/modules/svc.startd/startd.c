@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -279,18 +278,18 @@ pr_vertex(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 logbuf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	size_t logbuf_sz;
+	GElf_Sym sym;
 	char *buf;
 	char *cp;
 
-	if (mdb_readvar(&logbuf_sz, "logbuf_sz") == -1) {
-		mdb_warn("failed to read 'logbuf_sz'\n");
+	if (mdb_lookup_by_name("logbuf", &sym) == -1) {
+		mdb_warn("The 'logbuf' symbol is missing.\n");
 		return (DCMD_ERR);
 	}
 
-	buf = mdb_alloc(logbuf_sz, UM_SLEEP | UM_GC);
+	buf = mdb_alloc(sym.st_size, UM_SLEEP | UM_GC);
 
-	if (mdb_readsym(buf, logbuf_sz, "logbuf") == -1) {
+	if (mdb_vread(buf, sym.st_size, sym.st_value) == -1) {
 		mdb_warn("failed to read 'logbuf'\n");
 		return (DCMD_ERR);
 	}
@@ -301,7 +300,8 @@ logbuf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		/* Empty */
 		return (DCMD_OK);
 
-	if (cp >= buf + logbuf_sz || strchr(cp + 1, '\0') >= buf + logbuf_sz) {
+	if (cp >= buf + sym.st_size ||
+	    strchr(cp + 1, '\0') >= buf + sym.st_size) {
 		mdb_warn("'logbuf' is corrupt\n");
 		return (DCMD_ERR);
 	}

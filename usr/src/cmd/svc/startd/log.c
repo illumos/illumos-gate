@@ -133,8 +133,6 @@ static FILE *logfile = NULL;
  * null, go until the second, and then go back to the beginning until the
  * first null.  Or use ::startd_log in mdb.
  */
-/* LINTED unused */
-static const size_t logbuf_sz = LOGBUF_SZ;		/* For mdb */
 static char logbuf[LOGBUF_SZ] = "";
 static pthread_mutex_t logbuf_mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif

@@ -126,6 +126,14 @@
 #define	VERTEX_REMOVED	0	/* vertex has been freed  */
 #define	VERTEX_INUSE	1	/* vertex is still in use */
 
+/*
+ * Services in these states are not considered 'down' by the
+ * milestone/shutdown code.
+ */
+#define	up_state(state)	((state) == RESTARTER_STATE_ONLINE || \
+	(state) == RESTARTER_STATE_DEGRADED || \
+	(state) == RESTARTER_STATE_OFFLINE)
+
 static uu_list_pool_t *graph_edge_pool, *graph_vertex_pool;
 static uu_list_t *dgraph;
 static pthread_mutex_t dgraph_lock;
@@ -2973,6 +2981,14 @@ init_state:
 		 */
 		if (milestone == MILESTONE_NONE ||
 		    !(v->gv_flags & GV_INSUBGRAPH)) {
+			/*
+			 * This might seem unjustified after the milestone
+			 * transition has completed (non_subgraph_svcs == 0),
+			 * but it's important because when we boot to
+			 * a milestone, we set the milestone before populating
+			 * the graph, and all of the new non-subgraph services
+			 * need to be disabled here.
+			 */
 			switch (err = libscf_set_enable_ovr(inst, 0)) {
 			case 0:
 				break;
@@ -3852,11 +3868,11 @@ dgraph_refresh_instance(graph_vertex_t *v, scf_instance_t *inst)
 }
 
 /*
- * Returns 1 if any instances which directly depend on the passed instance
- * (or it's service) are running.
+ * Returns true only if none of this service's dependents are 'up' -- online,
+ * degraded, or offline.
  */
 static int
-has_running_nonsubgraph_dependents(graph_vertex_t *v)
+is_nonsubgraph_leaf(graph_vertex_t *v)
 {
 	graph_vertex_t *vv;
 	graph_edge_t *e;
@@ -3869,71 +3885,69 @@ has_running_nonsubgraph_dependents(graph_vertex_t *v)
 
 		vv = e->ge_vertex;
 		if (vv->gv_type == GVT_INST) {
-			if (inst_running(vv) &&
-			    ((vv->gv_flags & GV_INSUBGRAPH) == 0))
-				return (1);
+			if ((vv->gv_flags & GV_CONFIGURED) == 0)
+				continue;
+
+			if (vv->gv_flags & GV_INSUBGRAPH)
+				continue;
+
+			if (up_state(vv->gv_state))
+				return (0);
 		} else {
 			/*
 			 * For dependency group or service vertices, keep
 			 * traversing to see if instances are running.
 			 */
-			if (has_running_nonsubgraph_dependents(vv))
-				return (1);
+			if (!is_nonsubgraph_leaf(vv))
+				return (0);
 		}
 	}
-	return (0);
+
+	return (1);
 }
 
 /*
- * For the dependency, disable the instance which makes up the dependency if
- * it is not in the subgraph and running.  If the dependency instance is in
- * the subgraph or it is not running, continue by disabling all of its
- * non-subgraph dependencies.
+ * Disable v temporarily.  Attempt to do this by setting its enabled override
+ * property in the repository.  If that fails, send a _DISABLE command.
+ * Returns 0 on success and ECONNABORTED if the repository connection is
+ * broken.
  */
-static void
-disable_nonsubgraph_dependencies(graph_vertex_t *v, void *arg)
+static int
+disable_service_temporarily(graph_vertex_t *v, scf_handle_t *h)
 {
+	const char * const emsg = "Could not temporarily disable %s because "
+	    "%s.  Will stop service anyways.  Repository status for the "
+	    "service may be inaccurate.\n";
+	const char * const emsg_cbroken =
+	    "the repository connection was broken";
+
+	scf_instance_t *inst;
 	int r;
-	scf_handle_t *h = (scf_handle_t *)arg;
-	scf_instance_t *inst = NULL;
-
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
-
-	/* Continue recursing non-inst nodes */
-	if (v->gv_type != GVT_INST)
-		goto recurse;
-
-	/*
-	 * For instances that are in the subgraph or already not running,
-	 * skip and attempt to disable their non-dependencies.
-	 */
-	if ((v->gv_flags & GV_INSUBGRAPH) || (!inst_running(v)))
-		goto recurse;
-
-	/*
-	 * If not all this instance's dependents have stopped
-	 * running, do not disable.
-	 */
-	if (has_running_nonsubgraph_dependents(v))
-		return;
 
 	inst = scf_instance_create(h);
 	if (inst == NULL) {
-		log_error(LOG_WARNING, "Unable to gracefully disable instance:"
-		    "  %s due to lack of resources\n", v->gv_name);
-		goto disable;
+		char buf[100];
+
+		(void) snprintf(buf, sizeof (buf),
+		    "scf_instance_create() failed (%s)",
+		    scf_strerror(scf_error()));
+		log_error(LOG_WARNING, emsg, v->gv_name, buf);
+
+		graph_enable_by_vertex(v, 0, 0);
+		return (0);
 	}
-again:
+
 	r = scf_handle_decode_fmri(h, v->gv_name, NULL, NULL, inst,
 	    NULL, NULL, SCF_DECODE_FMRI_EXACT);
 	if (r != 0) {
 		switch (scf_error()) {
 		case SCF_ERROR_CONNECTION_BROKEN:
-			libscf_handle_rebind(h);
-			goto again;
+			log_error(LOG_WARNING, emsg, v->gv_name, emsg_cbroken);
+			graph_enable_by_vertex(v, 0, 0);
+			return (ECONNABORTED);
 
 		case SCF_ERROR_NOT_FOUND:
-			goto recurse;
+			return (0);
 
 		case SCF_ERROR_HANDLE_MISMATCH:
 		case SCF_ERROR_INVALID_ARGUMENT:
@@ -3944,33 +3958,84 @@ again:
 			    scf_error());
 		}
 	}
+
 	r = libscf_set_enable_ovr(inst, 0);
 	switch (r) {
 	case 0:
 		scf_instance_destroy(inst);
-		return;
+		return (0);
+
 	case ECANCELED:
 		scf_instance_destroy(inst);
-		goto recurse;
+		return (0);
+
 	case ECONNABORTED:
-		libscf_handle_rebind(h);
-		goto again;
+		log_error(LOG_WARNING, emsg, v->gv_name, emsg_cbroken);
+		graph_enable_by_vertex(v, 0, 0);
+		return (ECONNABORTED);
+
 	case EPERM:
+		log_error(LOG_WARNING, emsg, v->gv_name,
+		    "the repository denied permission");
+		graph_enable_by_vertex(v, 0, 0);
+		return (0);
+
 	case EROFS:
-		log_error(LOG_WARNING,
-		    "Could not set %s/%s for %s: %s.\n",
-		    SCF_PG_GENERAL_OVR, SCF_PROPERTY_ENABLED,
-		    v->gv_name, strerror(r));
-		goto disable;
+		log_error(LOG_WARNING, emsg, v->gv_name,
+		    "the repository is read-only");
+		graph_enable_by_vertex(v, 0, 0);
+		return (0);
+
 	default:
 		bad_error("libscf_set_enable_ovr", r);
+		/* NOTREACHED */
 	}
-disable:
-	graph_enable_by_vertex(v, 0, 0);
+}
+
+/*
+ * Of the transitive instance dependencies of v, disable those which are not
+ * in the subgraph and which are leaves (i.e., have no dependents which are
+ * "up").
+ */
+static void
+disable_nonsubgraph_leaves(graph_vertex_t *v, void *arg)
+{
+	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+
+	/* If v isn't an instance, recurse on its dependencies. */
+	if (v->gv_type != GVT_INST)
+		goto recurse;
+
+	if ((v->gv_flags & GV_CONFIGURED) == 0)
+		/*
+		 * Unconfigured instances should have no dependencies, but in
+		 * case they ever get them,
+		 */
+		goto recurse;
+
+	/*
+	 * If v is in the subgraph, so should all of its dependencies, so do
+	 * nothing.
+	 */
+	if (v->gv_flags & GV_INSUBGRAPH)
+		return;
+
+	/* If v isn't a leaf because it's already down, recurse. */
+	if (!up_state(v->gv_state))
+		goto recurse;
+
+	/* If v is disabled but not down yet, be patient. */
+	if ((v->gv_flags & GV_ENABLED) == 0)
+		return;
+
+	/* If v is a leaf, disable it. */
+	if (is_nonsubgraph_leaf(v))
+		(void) disable_service_temporarily(v, (scf_handle_t *)arg);
+
 	return;
+
 recurse:
-	graph_walk_dependencies(v, disable_nonsubgraph_dependencies,
-	    arg);
+	graph_walk_dependencies(v, disable_nonsubgraph_leaves, arg);
 }
 
 /*
@@ -4001,6 +4066,8 @@ dgraph_set_instance_state(scf_handle_t *h, const char *inst_name,
 		return (ENOENT);
 	}
 
+	assert(v->gv_type == GVT_INST);
+
 	switch (state) {
 	case RESTARTER_STATE_UNINIT:
 	case RESTARTER_STATE_DISABLED:
@@ -4028,23 +4095,45 @@ dgraph_set_instance_state(scf_handle_t *h, const char *inst_name,
 }
 
 /*
- * If this is a service shutdown and we're in the middle of a subgraph
- * shutdown, we need to check if either we're the last service to go
- * and should kickoff system shutdown, or if we should disable other
- * services.
+ * Handle state changes during milestone shutdown.  See
+ * dgraph_set_milestone().  If the repository connection is broken,
+ * ECONNABORTED will be returned, though a _DISABLE command will be sent for
+ * the vertex anyway.
  */
-void
+int
 vertex_subgraph_dependencies_shutdown(scf_handle_t *h, graph_vertex_t *v,
-    int was_running)
+    restarter_instance_state_t old_state)
 {
-	int up_or_down;
+	int was_up, now_up;
+	int ret = 0;
 
-	up_or_down = was_running ^ inst_running(v);
+	assert(v->gv_type == GVT_INST);
 
-	if (up_or_down && milestone != NULL && !inst_running(v) &&
-	    ((v->gv_flags & GV_INSUBGRAPH) == 0 ||
-	    milestone == MILESTONE_NONE)) {
+	/* Don't care if we're not going to a milestone. */
+	if (milestone == NULL)
+		return (0);
+
+	/* Don't care if we already finished coming down. */
+	if (non_subgraph_svcs == 0)
+		return (0);
+
+	/* Don't care if the service is in the subgraph. */
+	if (v->gv_flags & GV_INSUBGRAPH)
+		return (0);
+
+	/*
+	 * Update non_subgraph_svcs.  It is the number of non-subgraph
+	 * services which are in online, degraded, or offline.
+	 */
+
+	was_up = up_state(old_state);
+	now_up = up_state(v->gv_state);
+
+	if (!was_up && now_up) {
+		++non_subgraph_svcs;
+	} else if (was_up && !now_up) {
 		--non_subgraph_svcs;
+
 		if (non_subgraph_svcs == 0) {
 			if (halting != -1) {
 				do_uadmin();
@@ -4052,11 +4141,37 @@ vertex_subgraph_dependencies_shutdown(scf_handle_t *h, graph_vertex_t *v,
 				(void) startd_thread_create(single_user_thread,
 				    NULL);
 			}
-		} else {
-			graph_walk_dependencies(v,
-			    disable_nonsubgraph_dependencies, (void *)h);
+			return (0);
 		}
 	}
+
+	/* If this service is a leaf, it should be disabled. */
+	if ((v->gv_flags & GV_ENABLED) && is_nonsubgraph_leaf(v)) {
+		int r;
+
+		r = disable_service_temporarily(v, h);
+		switch (r) {
+		case 0:
+			break;
+
+		case ECONNABORTED:
+			ret = ECONNABORTED;
+			break;
+
+		default:
+			bad_error("disable_service_temporarily", r);
+		}
+	}
+
+	/*
+	 * If the service just came down, propagate the disable to the newly
+	 * exposed leaves.
+	 */
+	if (was_up && !now_up)
+		graph_walk_dependencies(v, disable_nonsubgraph_leaves,
+		    (void *)h);
+
+	return (ret);
 }
 
 /*
@@ -4605,11 +4720,30 @@ mark_subgraph(graph_edge_t *e, void *arg)
 }
 
 /*
- * "Restrict" the graph to dependencies of fmri.  We implement it by walking
- * all services, override-disabling those which are not descendents of the
- * instance, and removing any enable-override for the rest.  milestone is set
- * to the vertex which represents fmri so that the other graph operations may
- * act appropriately.
+ * Bring down all services which are not dependencies of fmri.  The
+ * dependencies of fmri (direct & indirect) will constitute the "subgraph",
+ * and will have the GV_INSUBGRAPH flag set.  The rest must be brought down,
+ * which means the state is "disabled", "maintenance", or "uninitialized".  We
+ * could consider "offline" to be down, and refrain from sending start
+ * commands for such services, but that's not strictly necessary, so we'll
+ * decline to intrude on the state machine.  It would probably confuse users
+ * anyway.
+ *
+ * The services should be brought down in reverse-dependency order, so we
+ * can't do it all at once here.  We initiate by override-disabling the leaves
+ * of the dependency tree -- those services which are up but have no
+ * dependents which are up.  When they come down,
+ * vertex_subgraph_dependencies_shutdown() will override-disable the newly
+ * exposed leaves.  Perseverance will ensure completion.
+ *
+ * Sometimes we need to take action when the transition is complete, like
+ * start sulogin or halt the system.  To tell when we're done, we initialize
+ * non_subgraph_svcs here to be the number of services which need to come
+ * down.  As each does, we decrement the counter.  When it hits zero, we take
+ * the appropriate action.  See vertex_subgraph_dependencies_shutdown().
+ *
+ * In case we're coming up, we also remove any enable-overrides for the
+ * services which are dependencies of fmri.
  *
  * If norepository is true, the function will not change the repository.
  *
@@ -4762,10 +4896,20 @@ again:
 		} else {
 			assert(isnone || (v->gv_flags & GV_INSUBGRAPH) == 0);
 
-			if (inst_running(v))
+			/*
+			 * Services which are up need to come down before
+			 * we're done, but we can only disable the leaves
+			 * here.
+			 */
+
+			if (up_state(v->gv_state))
 				++non_subgraph_svcs;
 
-			if (has_running_nonsubgraph_dependents(v))
+			/* If it's already disabled, don't bother. */
+			if ((v->gv_flags & GV_ENABLED) == 0)
+				continue;
+
+			if (!is_nonsubgraph_leaf(v))
 				continue;
 
 			r = libscf_set_enable_ovr(inst, 0);

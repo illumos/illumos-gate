@@ -589,8 +589,8 @@ void graph_enable_by_vertex(graph_vertex_t *, int, int);
 int refresh_vertex(graph_vertex_t *, scf_instance_t *);
 void vertex_send_event(graph_vertex_t *, restarter_event_type_t);
 void graph_start_if_satisfied(graph_vertex_t *);
-void vertex_subgraph_dependencies_shutdown(scf_handle_t *h,
-    graph_vertex_t *v, int was_running);
+int vertex_subgraph_dependencies_shutdown(scf_handle_t *, graph_vertex_t *,
+    restarter_instance_state_t);
 void graph_transition_sulogin(restarter_instance_state_t,
     restarter_instance_state_t);
 void graph_transition_propagate(graph_vertex_t *, propagate_event_t,
