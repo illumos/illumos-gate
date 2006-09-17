@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,7 +136,20 @@ rmc_comm_request_nowait(rmc_comm_msg_t *request, uint8_t flag)
 		DPRINTF(rcs, DAPI, (CE_CONT, "going to send request=%x (URG)\n",
 		    request->msg_type));
 
-		mutex_enter(dps->dp_mutex);
+		/*
+		 * Handle the case where we are called during panic
+		 * processing.  If that occurs, then another thread in
+		 * rmc_comm might have been idled by panic() while
+		 * holding dp_mutex.  As a result, do not unconditionally
+		 * grab dp_mutex.
+		 */
+		if (ddi_in_panic() != 0) {
+			if (mutex_tryenter(dps->dp_mutex) == 0) {
+				return (RCENODATALINK);
+			}
+		} else {
+			mutex_enter(dps->dp_mutex);
+		}
 
 		/*
 		 * send the request only if the protocol data link is up.
@@ -289,7 +302,20 @@ rmc_comm_send_req_resp(struct rmc_comm_state *rcs, rmc_comm_msg_t *request,
 	drr = &dps->req_resp;
 	exp_resp = &drr->response;
 
-	mutex_enter(dps->dp_mutex);
+	/*
+	 * Handle the case where we are called during panic
+	 * processing.  If that occurs, then another thread in
+	 * rmc_comm might have been idled by panic() while
+	 * holding dp_mutex.  As a result, do not unconditionally
+	 * grab dp_mutex.
+	 */
+	if (ddi_in_panic() != 0) {
+		if (mutex_tryenter(dps->dp_mutex) == 0) {
+			return (RCENODATALINK);
+		}
+	} else {
+		mutex_enter(dps->dp_mutex);
+	}
 
 	/*
 	 * if the data link set up is suspended, just return.

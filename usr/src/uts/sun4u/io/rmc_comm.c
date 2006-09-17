@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * The "rmc_comm" driver provides access to the RMC so that its clients need
@@ -306,7 +306,21 @@ rmc_comm_hi_intr(caddr_t arg)
 
 	claim = DDI_INTR_UNCLAIMED;
 	if (rcs->sd_state.cycid != CYCLIC_NONE) {
-		mutex_enter(rcs->sd_state.hw_mutex);
+		/*
+		 * Handle the case where this interrupt fires during
+		 * panic processing.  If that occurs, then a thread
+		 * in rmc_comm might have been idled while holding
+		 * hw_mutex.  If so, that thread will never make
+		 * progress, and so we do not want to unconditionally
+		 * grab hw_mutex.
+		 */
+		if (ddi_in_panic() != 0) {
+			if (mutex_tryenter(rcs->sd_state.hw_mutex) == 0) {
+				return (claim);
+			}
+		} else {
+			mutex_enter(rcs->sd_state.hw_mutex);
+		}
 		if (rcs->sd_state.hw_int_enabled) {
 			rmc_comm_set_irq(rcs, B_FALSE);
 			ddi_trigger_softintr(rcs->sd_state.softid);
