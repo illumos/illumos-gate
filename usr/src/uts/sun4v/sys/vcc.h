@@ -81,6 +81,7 @@ extern "C" {
 typedef enum {
 	VCC_CONS_ADDED,		    /* a port was added */
 	VCC_CONS_DELETED,	    /* a port was removed */
+	VCC_CONS_MISS_ADDED,	    /* wakeup after an added port was deleted */
 	/* XXX not implemented yet */
 	VCC_CONS_UPDATED	    /* a port configuration was changed */
 } vcc_reason_t;

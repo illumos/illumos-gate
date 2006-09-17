@@ -541,7 +541,7 @@ vntsd_log(vntsd_status_t status, char *msg)
 		break;
 
 	case VNTSD_STATUS_NO_CONS:
-		status_msg = "GROUP HAS NO CONSOLE";
+		status_msg = "All console(s) in the group have been deleted.";
 		break;
 
 	case VNTSD_ERR_NO_MEM:

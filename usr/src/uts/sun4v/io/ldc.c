@@ -5135,7 +5135,7 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 
 				/* free kernel virtual space */
 				vmem_free(heap_arena, (void *)memseg->vaddr,
-				    memseg->size);
+				    map_size);
 
 				/* direct map failed - revert to shadow map */
 				mtype = LDC_SHADOW_MAP;

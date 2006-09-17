@@ -80,14 +80,7 @@ static void
 exit_sig_handler(int sig)
 {
 
-	char err_msg[VNTSD_LINE_LEN];
-
 	D1(stderr, "t@%d exit_sig_handler%d \n", thr_self(), sig);
-
-	(void) snprintf(err_msg, sizeof (err_msg), "exit_sig_handler() sig=%d",
-	    sig);
-
-	vntsd_log(VNTSD_STATUS_EXIT_SIG, err_msg);
 
 	exit(0);
 }
@@ -528,9 +521,7 @@ vntsd_vcc_ioctl(int ioctl_code, uint_t portno, void *buf)
 	}
 
 	if (ioctl(vntsdp->ctrl_fd, ioctl_code, (caddr_t)buf)) {
-		/*  control port get error */
-		syslog(LOG_ERR, "vcc control port error! abort vntsd");
-		(void) thr_kill(vntsdp->tid, SIGINT);
+		/*  ioctl request error */
 		return (VNTSD_STATUS_VCC_IO_ERR);
 	}
 

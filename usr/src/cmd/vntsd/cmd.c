@@ -465,7 +465,6 @@ vntsd_ctrl_cmd(vntsd_client_t *clientp, char c)
 	}
 
 	if (c == START) {
-
 		D3(stderr, "t@%d client restart\n", thr_self());
 
 		/* send resume read */
@@ -475,12 +474,6 @@ vntsd_ctrl_cmd(vntsd_client_t *clientp, char c)
 			return (VNTSD_STATUS_VCC_IO_ERR);
 		}
 
-		/* send resume write */
-		cmd = 3;
-
-		if (ioctl(clientp->cons->vcc_fd, TCXONC, &cmd)) {
-			return (VNTSD_STATUS_VCC_IO_ERR);
-		}
 	}
 
 	if (c == STOP) {
@@ -493,13 +486,6 @@ vntsd_ctrl_cmd(vntsd_client_t *clientp, char c)
 			return (VNTSD_STATUS_VCC_IO_ERR);
 		}
 
-		/* send suspend write */
-		cmd = 2;
-
-		if (ioctl(clientp->cons->vcc_fd, TCXONC, &cmd)) {
-			perror("ioctl TCXONC");
-			return (VNTSD_STATUS_VCC_IO_ERR);
-		}
 	}
 
 	return (VNTSD_STATUS_CONTINUE);

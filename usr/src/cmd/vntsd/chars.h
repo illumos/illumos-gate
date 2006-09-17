@@ -43,8 +43,8 @@ extern "C" {
 #define	    HT	    9	    /* eoln */
 #define	    VT	    11	    /* not support */
 #define	    FF	    12	    /* not support */
-#define	    STOP    18
-#define	    START   19
+#define	    STOP    19
+#define	    START   17
 
 #define	    SE	    240	    /* end of subnegotiation params */
 #define	    NOP	    241

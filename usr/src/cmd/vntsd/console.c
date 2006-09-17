@@ -382,10 +382,12 @@ connect_cons(vntsd_cons_t *consp, vntsd_client_t *clientp)
 	/* enable daemon cmd */
 	clientp->status &= ~VNTSD_CLIENT_DISABLE_DAEMON_CMD;
 
-	if (consp->clientpq == NULL) {
-		/* first connect to console - a writer */
-		assert(consp->vcc_fd == -1);
-		/* open vcc */
+	if (consp->clientpq == NULL && consp->vcc_fd == -1) {
+
+		/*
+		 *  the first connection to a console - a writer
+		 *  and the console has not opened.
+		 */
 		consp->vcc_fd = vntsd_open_vcc(consp->dev_name, consp->cons_no);
 		if (consp->vcc_fd < 0) {
 			(void) mutex_unlock(&clientp->lock);
@@ -455,10 +457,6 @@ connect_cons(vntsd_cons_t *consp, vntsd_client_t *clientp)
 		/* clean up console since there is no client connected to it */
 		assert(consp->vcc_fd != -1);
 
-		/* close vcc port */
-		(void) close(consp->vcc_fd);
-		consp->vcc_fd = -1;
-
 		/* force write thread to exit */
 		assert(consp->wr_tid != (thread_t)-1);
 		(void) thr_kill(consp->wr_tid, SIGUSR1);
@@ -522,6 +520,43 @@ client_init(vntsd_client_t *clientp)
 	clientp->status = 0;
 	(void) mutex_unlock(&clientp->lock);
 }
+/* is there any connection to a given console? */
+static boolean_t
+is_client_que_empty(vntsd_cons_t *consp)
+{
+	boolean_t  has_client = B_FALSE;
+
+	(void) mutex_lock(&consp->lock);
+
+	if (consp->clientpq != NULL)
+		has_client = B_TRUE;
+
+	(void) mutex_unlock(&consp->lock);
+
+	return (has_client);
+}
+
+/*
+ * close one opened console.
+ * This function is passed to vntsd_que_walk to close one console.
+ * The function returns B_FALSE so that vntsd_que_walk will
+ * continue to apply the function to all consoles in the group.
+ */
+static boolean_t
+close_one_vcc_fd(vntsd_cons_t *consp)
+{
+	(void) mutex_lock(&consp->lock);
+
+	if (consp->vcc_fd != -1) {
+		(void) close(consp->vcc_fd);
+		consp->vcc_fd = -1;
+	}
+
+	(void) mutex_unlock(&consp->lock);
+
+	return (B_FALSE);
+}
+
 
 /* clean up client and exit the thread */
 static void
@@ -536,6 +571,18 @@ client_fini(vntsd_group_t *groupp, vntsd_client_t *clientp)
 	(void) close(clientp->sockfd);
 
 	(void) mutex_lock(&groupp->lock);
+
+	/*
+	 * close all consoles in the group if the client is the
+	 * last one connected to the group
+	 */
+	if (vntsd_que_walk(groupp->conspq, (el_func_t)is_client_que_empty) ==
+	    VNTSD_SUCCESS) {
+		(void) vntsd_que_walk(groupp->conspq,
+		    (el_func_t)close_one_vcc_fd);
+	}
+
+
 	(void) vntsd_que_rm(&groupp->no_cons_clientpq, clientp);
 
 	if ((groupp->no_cons_clientpq == NULL) &&

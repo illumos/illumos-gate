@@ -975,13 +975,6 @@ vd_process_task(vd_task_t *task)
 	ASSERT(vd != NULL);
 	ASSERT(request != NULL);
 
-	/* Range-check slice */
-	if (request->slice >= vd->nslices) {
-		PRN("Invalid \"slice\" %u (max %u) for virtual disk",
-		    request->slice, (vd->nslices - 1));
-		return (EINVAL);
-	}
-
 	/* Find the requested operation */
 	for (i = 0; i < vds_noperations; i++)
 		if (request->operation == vds_operation[i].operation)
@@ -989,6 +982,18 @@ vd_process_task(vd_task_t *task)
 	if (i == vds_noperations) {
 		PRN("Unsupported operation %u", request->operation);
 		return (ENOTSUP);
+	}
+
+	/* Handle client using absolute disk offsets */
+	if ((vd->vdisk_type == VD_DISK_TYPE_DISK) &&
+	    (request->slice == UINT8_MAX))
+		request->slice = VD_ENTIRE_DISK_SLICE;
+
+	/* Range-check slice */
+	if (request->slice >= vd->nslices) {
+		PRN("Invalid \"slice\" %u (max %u) for virtual disk",
+		    request->slice, (vd->nslices - 1));
+		return (EINVAL);
 	}
 
 	/* Start the operation */

@@ -423,6 +423,7 @@ sparc_SUBDIRS= \
 	cmd/prtdscp \
 	cmd/prtfru \
 	cmd/sckmd \
+	cmd/vntsd \
 	cmd/wrsmconf \
 	cmd/wrsmstat \
 	lib/libdscp \

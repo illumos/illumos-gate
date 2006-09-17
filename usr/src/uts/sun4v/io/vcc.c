@@ -88,6 +88,7 @@ static int	i_vcc_cons_tbl(vcc_t *vccp, uint_t num_ports,
 static int	i_vcc_del_cons_ok(vcc_t *vccp, caddr_t buf, int mode);
 static int	i_vcc_close_port(vcc_port_t *vport);
 static int	i_vcc_write_ldc(vcc_port_t *vport, vcc_msg_t *buf);
+static int	i_vcc_read_ldc(vcc_port_t *vport, char *data_buf, size_t *sz);
 
 static void *vcc_ssp;
 
@@ -460,6 +461,7 @@ i_vcc_ldc_fini(vcc_port_t *vport)
 {
 	int 		rv = EIO;
 	vcc_msg_t	buf;
+	size_t		sz;
 
 	D1("i_vcc_ldc_fini: port@%lld, ldc_id%%llx\n", vport->number,
 	    vport->ldc_id);
@@ -484,6 +486,21 @@ i_vcc_ldc_fini(vcc_port_t *vport)
 	mutex_exit(&vport->lock);
 	i_vcc_set_port_status(vport, &vport->write_cv, VCC_PORT_USE_WRITE_LDC);
 	mutex_enter(&vport->lock);
+
+	/* flush ldc channel */
+	rv = i_vcc_wait_port_status(vport, &vport->read_cv,
+	    VCC_PORT_USE_READ_LDC);
+	if (rv) {
+		return (rv);
+	}
+
+	vport->status &= ~VCC_PORT_USE_READ_LDC;
+	do {
+		sz = sizeof (buf);
+		rv = i_vcc_read_ldc(vport, (char *)&buf, &sz);
+	} while (rv == 0 && sz > 0);
+
+	vport->status |= VCC_PORT_USE_READ_LDC;
 
 	(void) ldc_set_cb_mode(vport->ldc_handle, LDC_CB_DISABLE);
 	if ((rv = ldc_close(vport->ldc_handle)) != 0) {
@@ -1220,7 +1237,6 @@ vcc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 
 	D1("vcc_close: closing virtual-console-concentrator@%d:%d\n",
 	    instance, portno);
-
 	vport = &(vccp->port[portno]);
 
 
@@ -1491,7 +1507,17 @@ i_vcc_inquiry(vcc_t *vccp, caddr_t buf, int mode)
 		}
 	}
 
-	return (EINVAL);
+	/* the added port was deleted before vntsd wakes up */
+	msg.reason = VCC_CONS_MISS_ADDED;
+
+	if (ddi_copyout((void *)&msg, (void *)buf,
+		    sizeof (msg), mode) == -1) {
+		cmn_err(CE_CONT, "i_vcc_find_changed_port: ddi_copyout"
+		    " failed\n");
+		return (EFAULT);
+	}
+
+	return (0);
 }
 
 /* clean up events after vntsd exits */
@@ -1828,38 +1854,30 @@ i_vcc_port_ioctl(vcc_t *vccp, minor_t minor, int portno, int cmd, void *arg,
 		switch (cmd) {
 
 		case 0:
-			vport->status |= VCC_PORT_TERM_WR;
-			cv_broadcast(&vport->write_cv);
+			/* suspend read */
+			vport->status &= ~VCC_PORT_TERM_RD;
 			break;
+
 		case 1:
-			/* get write lock */
-			rv = i_vcc_wait_port_status(vport, &vport->write_cv,
-			    VCC_PORT_USE_WRITE_LDC);
-			if (rv) {
-				mutex_exit(&vport->lock);
-				return (rv);
-			}
-			vport->status &= ~VCC_PORT_TERM_WR;
-			cv_broadcast(&vport->write_cv);
-			break;
-		case 2:
+			/* resume read */
 			vport->status |= VCC_PORT_TERM_RD;
 			cv_broadcast(&vport->read_cv);
 			break;
+
+		case 2:
+			/* suspend write */
+			vport->status &= ~VCC_PORT_TERM_WR;
+			break;
+
 		case 3:
-			/* get read lock */
-			rv = i_vcc_wait_port_status(vport, &vport->write_cv,
-			    VCC_PORT_USE_READ_LDC);
-			if (rv) {
-				mutex_exit(&vport->lock);
-				return (rv);
-			}
-			vport->status &= ~VCC_PORT_TERM_RD;
-			cv_broadcast(&vport->read_cv);
+			/* resume write */
+			vport->status |= VCC_PORT_TERM_WR;
+			cv_broadcast(&vport->write_cv);
 			break;
 
 		default:
-			break;
+			mutex_exit(&vport->lock);
+			return (EINVAL);
 		}
 
 		mutex_exit(&vport->lock);
@@ -1869,7 +1887,7 @@ i_vcc_port_ioctl(vcc_t *vccp, minor_t minor, int portno, int cmd, void *arg,
 		return (0);
 
 	default:
-		return (ENODEV);
+		return (EINVAL);
 	}
 
 }
@@ -1967,7 +1985,6 @@ vcc_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		return (rv);
 	}
 
-
 	rv = i_vcc_wait_port_status(vport, &vport->read_cv,
 		    VCC_PORT_TERM_RD|VCC_PORT_LDC_CHANNEL_READY|
 		    VCC_PORT_USE_READ_LDC);
@@ -2004,11 +2021,20 @@ vcc_read(dev_t dev, struct uio *uiop, cred_t *credp)
 
 		/* wait for data from ldc */
 		vport->status &= ~VCC_PORT_LDC_DATA_READY;
+
+		mutex_exit(&vport->lock);
+		i_vcc_set_port_status(vport, &vport->read_cv,
+		    VCC_PORT_USE_READ_LDC);
+		mutex_enter(&vport->lock);
+
 		rv = i_vcc_wait_port_status(vport, &vport->read_cv,
-			    VCC_PORT_LDC_DATA_READY);
+		    VCC_PORT_TERM_RD|VCC_PORT_LDC_CHANNEL_READY|
+		    VCC_PORT_USE_READ_LDC| VCC_PORT_LDC_DATA_READY);
 		if (rv) {
 			break;
 		}
+
+		vport->status &= ~VCC_PORT_USE_READ_LDC;
 	}
 
 	mutex_exit(&vport->lock);

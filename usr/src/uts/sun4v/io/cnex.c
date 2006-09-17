@@ -290,6 +290,7 @@ cnex_intr_redist(void *arg)
 				return;
 			}
 			if (intr_state == HV_INTR_NOTVALID) {
+				mutex_exit(&cldcp->lock);
 				cldcp = cldcp->next;
 				continue;
 			}
@@ -350,6 +351,7 @@ cnex_intr_redist(void *arg)
 				return;
 			}
 			if (intr_state == HV_INTR_NOTVALID) {
+				mutex_exit(&cldcp->lock);
 				cldcp = cldcp->next;
 				continue;
 			}
@@ -833,7 +835,7 @@ cnex_clr_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
 	} else if (itype == CNEX_RX_INTR) {
 		iinfo = &(cldcp->rx);
 	} else {
-		DWARN("cnex_rem_intr: invalid interrupt type\n");
+		DWARN("cnex_clr_intr: invalid interrupt type\n");
 		mutex_exit(&cldcp->lock);
 		return (EINVAL);
 	}
@@ -850,7 +852,7 @@ cnex_clr_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
 	rv = hvldc_intr_setstate(cnex_ssp->cfghdl, iinfo->ino,
 	    HV_INTR_IDLE_STATE);
 	if (rv) {
-		DWARN("cnex_intr_wrapper: cannot clear interrupt state\n");
+		DWARN("cnex_clr_intr: cannot clear interrupt state\n");
 		mutex_exit(&cldcp->lock);
 		return (ENXIO);
 	}

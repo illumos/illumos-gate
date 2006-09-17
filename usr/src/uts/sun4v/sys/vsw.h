@@ -385,6 +385,51 @@ typedef struct vsw_ctrl_task {
 } vsw_ctrl_task_t;
 
 /*
+ * Vsw queue -- largely modeled after squeue
+ */
+#define	VSW_QUEUE_RUNNING	0x01
+#define	VSW_QUEUE_STOP		0x02
+#define	VSW_QUEUE_DRAINED	0x04
+
+typedef struct vsw_queue_s {
+	kmutex_t	vq_lock;	/* Lock, before using any member. */
+	kcondvar_t	vq_cv;		/* Async threads block on. */
+	uint32_t	vq_state;	/* State flags. */
+
+	mblk_t		*vq_first;	/* First mblk chain or NULL. */
+	mblk_t		*vq_last;	/* Last mblk chain. */
+
+	processorid_t	vq_bind;	/* Process to bind to */
+	kthread_t	*vq_worker;	/* Queue's thread */
+} vsw_queue_t;
+
+/*
+ * VSW MAC Ring Resources.
+ *	MAC Ring resource is composed of this state structure and
+ *	a kernel thread to perform the processing of the ring.
+ */
+typedef struct vsw_mac_ring_s {
+	uint32_t	ring_state;
+
+	mac_blank_t	ring_blank;
+	void		*ring_arg;
+
+	vsw_queue_t	*ring_vqp;
+	struct vsw	*ring_vswp;
+} vsw_mac_ring_t;
+
+/*
+ * Maximum Ring Resources.
+ */
+#define	VSW_MAC_RX_RINGS	0x40
+
+/*
+ * States for entry in ring table.
+ */
+#define	VSW_MAC_RING_FREE	1
+#define	VSW_MAC_RING_INUSE	2
+
+/*
  * Number of hash chains in the multicast forwarding database.
  */
 #define		VSW_NCHAINS	8
@@ -442,6 +487,15 @@ typedef struct	vsw {
 	mac_rx_handle_t		mrh;
 	multiaddress_capab_t	maddr;		/* Multiple uni addr capable */
 	const mac_txinfo_t	*txinfo;	/* MAC tx routine */
+	boolean_t		mstarted;	/* Mac Started? */
+	boolean_t		mresources;	/* Mac Resources cb? */
+
+	/*
+	 * MAC Ring Resources.
+	 */
+	kmutex_t		mac_ring_lock;	/* Lock for the table. */
+	uint32_t		mac_ring_tbl_sz;
+	vsw_mac_ring_t		*mac_ring_tbl;	/* Mac ring table. */
 
 	boolean_t		recfg_reqd;	/* Reconfig of addrs needed */
 	int			promisc_cnt;

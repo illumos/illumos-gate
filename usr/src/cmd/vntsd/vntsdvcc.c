@@ -152,7 +152,9 @@ vntsd_delete_cons(vntsd_t *vntsdp)
 			(void) mutex_unlock(&vntsdp->lock);
 			return;
 		}
+		(void) mutex_lock(&groupp->lock);
 		groupp->status &= ~VNTSD_GROUP_CLEAN_CONS;
+		(void) mutex_unlock(&groupp->lock);
 		(void) mutex_unlock(&vntsdp->lock);
 
 		for (; ; ) {
@@ -207,6 +209,11 @@ vntsd_clean_group(vntsd_group_t *groupp)
 
 	/* prevent from reentry */
 	if (groupp->status & VNTSD_GROUP_CLEANUP) {
+		if (groupp->listen_tid == thr_self()) {
+			/* signal that the listen thread is exiting */
+			groupp->status &= ~VNTSD_GROUP_SIG_WAIT;
+			(void) cond_signal(&groupp->cvp);
+		}
 		(void) mutex_unlock(&groupp->lock);
 		return;
 	}
@@ -560,6 +567,10 @@ vntsd_daemon_wakeup(vntsd_t *vntsdp)
 	case VCC_CONS_ADDED:
 		do_add_cons(vntsdp, inq_data.cons_no);
 		break;
+
+	case VCC_CONS_MISS_ADDED:
+		/* an added port was deleted before vntsd can process it */
+		return;
 
 	default:
 		DERR(stderr, "t@%d daemon_wakeup:ioctl_unknown %d\n",

@@ -82,15 +82,27 @@ static	int vsw_get_physaddr(vsw_t *);
 static	int vsw_setup_layer2(vsw_t *);
 static	int vsw_setup_layer3(vsw_t *);
 
+/* MAC Ring table functions. */
+static void vsw_mac_ring_tbl_init(vsw_t *vswp);
+static void vsw_mac_ring_tbl_destroy(vsw_t *vswp);
+static void vsw_queue_worker(vsw_mac_ring_t *rrp);
+static void vsw_queue_stop(vsw_queue_t *vqp);
+static vsw_queue_t *vsw_queue_create();
+static void vsw_queue_destroy(vsw_queue_t *vqp);
+
 /* MAC layer routines */
-static	int vsw_mac_attach(vsw_t *vswp);
-static	void vsw_mac_detach(vsw_t *vswp);
+static mac_resource_handle_t vsw_mac_ring_add_cb(void *arg,
+		mac_resource_t *mrp);
 static	int vsw_get_hw_maddr(vsw_t *);
 static	int vsw_set_hw(vsw_t *, vsw_port_t *);
 static	int vsw_set_hw_promisc(vsw_t *, vsw_port_t *);
 static	int vsw_unset_hw(vsw_t *, vsw_port_t *);
 static	int vsw_unset_hw_promisc(vsw_t *, vsw_port_t *);
 static	int vsw_reconfig_hw(vsw_t *);
+static int vsw_mac_attach(vsw_t *vswp);
+static void vsw_mac_detach(vsw_t *vswp);
+
+static void vsw_rx_queue_cb(void *, mac_resource_handle_t, mblk_t *);
 static void vsw_rx_cb(void *, mac_resource_handle_t, mblk_t *);
 static mblk_t *vsw_tx_msg(vsw_t *, mblk_t *);
 static int vsw_mac_register(vsw_t *);
@@ -344,6 +356,13 @@ static mdeg_prop_spec_t vsw_prop_template[] = {
 #define	VSW_SET_MDEG_PROP_INST(specp, val)	(specp)[1].ps_val = (val);
 
 /*
+ * From /etc/system enable/disable thread per ring. This is a mode
+ * selection that is done a vsw driver attach time.
+ */
+boolean_t vsw_multi_ring_enable = B_FALSE;
+int vsw_mac_rx_rings = VSW_MAC_RX_RINGS;
+
+/*
  * Print debug messages - set to 0x1f to enable all msgs
  * or 0x0 to turn all off.
  */
@@ -496,9 +515,12 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	char		hashname[MAXNAMELEN];
 	char		qname[TASKQ_NAMELEN];
 	int		rv = 1;
-	enum		{ PROG_init = 0x0, PROG_if_lock = 0x1,
-				PROG_fdb = 0x2, PROG_mfdb = 0x4,
-				PROG_report_dev = 0x8, PROG_plist = 0x10,
+	enum		{ PROG_init = 0x00,
+				PROG_if_lock = 0x01,
+				PROG_fdb = 0x02,
+				PROG_mfdb = 0x04,
+				PROG_report_dev = 0x08,
+				PROG_plist = 0x10,
 				PROG_taskq = 0x20}
 			progress;
 
@@ -532,7 +554,6 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_set_driver_private(dip, (caddr_t)vswp);
 
 	rw_init(&vswp->if_lockrw, NULL, RW_DRIVER, NULL);
-
 	progress |= PROG_if_lock;
 
 	/*
@@ -737,7 +758,10 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * the physical device.
 	 */
 	if (vswp->mh != NULL) {
-		mac_stop(vswp->mh);
+		if (vswp->mstarted)
+			mac_stop(vswp->mh);
+		if (vswp->mresources)
+			mac_resource_set(vswp->mh, NULL, NULL);
 		mac_close(vswp->mh);
 
 		vswp->mh = NULL;
@@ -1126,7 +1150,8 @@ vsw_get_hw_maddr(vsw_t *vswp)
 	}
 
 	if (vswp->maddr.maddr_naddrfree == 0) {
-		cmn_err(CE_WARN, "!device %s has no free unicast address slots",
+		cmn_err(CE_WARN,
+			"!device %s has no free unicast address slots",
 			vswp->physname);
 		return (1);
 	}
@@ -1219,10 +1244,12 @@ vsw_mac_attach(vsw_t *vswp)
 	char	drv[LIFNAMSIZ];
 	uint_t	ddi_instance;
 
-	D1(vswp, "vsw_mac_attach: enter");
+	D1(vswp, "%s: enter", __func__);
 
 	vswp->mh = NULL;
 	vswp->mrh = NULL;
+	vswp->mstarted = B_FALSE;
+	vswp->mresources = B_FALSE;
 
 	ASSERT(vswp->mdprops & VSW_MD_PHYSNAME);
 
@@ -1235,12 +1262,40 @@ vsw_mac_attach(vsw_t *vswp)
 		goto mac_fail_exit;
 	}
 
+	ASSERT(vswp->mh != NULL);
+
 	D2(vswp, "vsw_mac_attach: using device %s", vswp->physname);
 
-	/* register our rx callback function */
-	vswp->mrh = mac_rx_add(vswp->mh, vsw_rx_cb, (void *)vswp);
+	if (vsw_multi_ring_enable) {
+		vsw_mac_ring_tbl_init(vswp);
 
-	/* get the MAC tx fn */
+		/*
+		 * Register our receive callback.
+		 */
+		vswp->mrh = mac_rx_add(vswp->mh,
+			vsw_rx_queue_cb, (void *)vswp);
+
+		/*
+		 * Register our mac resource callback.
+		 */
+		mac_resource_set(vswp->mh, vsw_mac_ring_add_cb, (void *)vswp);
+		vswp->mresources = B_TRUE;
+
+		/*
+		 * Get the ring resources available to us from
+		 * the mac below us.
+		 */
+		mac_resources(vswp->mh);
+	} else {
+		/*
+		 * Just register our rx callback function
+		 */
+		vswp->mrh = mac_rx_add(vswp->mh, vsw_rx_cb, (void *)vswp);
+	}
+
+	ASSERT(vswp->mrh != NULL);
+
+	/* Get the MAC tx fn */
 	vswp->txinfo = mac_tx_get(vswp->mh);
 
 	/* start the interface */
@@ -1249,22 +1304,15 @@ vsw_mac_attach(vsw_t *vswp)
 		goto mac_fail_exit;
 	}
 
-	D1(vswp, "vsw_mac_attach: exit");
+	vswp->mstarted = B_TRUE;
+
+	D1(vswp, "%s: exit", __func__);
 	return (0);
 
 mac_fail_exit:
-	if (vswp->mh != NULL) {
-		if (vswp->mrh != NULL)
-			mac_rx_remove(vswp->mh, vswp->mrh);
+	vsw_mac_detach(vswp);
 
-		mac_close(vswp->mh);
-	}
-
-	vswp->mrh = NULL;
-	vswp->mh = NULL;
-	vswp->txinfo = NULL;
-
-	D1(vswp, "vsw_mac_attach: fail exit");
+	D1(vswp, "%s: exit", __func__);
 	return (1);
 }
 
@@ -1273,17 +1321,25 @@ vsw_mac_detach(vsw_t *vswp)
 {
 	D1(vswp, "vsw_mac_detach: enter");
 
-	if (vswp->mh != NULL) {
-		if (vswp->mrh != NULL)
-			mac_rx_remove(vswp->mh, vswp->mrh);
+	ASSERT(vswp != NULL);
+	ASSERT(vswp->mh != NULL);
 
-		mac_stop(vswp->mh);
-		mac_close(vswp->mh);
+	if (vsw_multi_ring_enable) {
+		vsw_mac_ring_tbl_destroy(vswp);
 	}
+
+	if (vswp->mstarted)
+		mac_stop(vswp->mh);
+	if (vswp->mrh != NULL)
+		mac_rx_remove(vswp->mh, vswp->mrh);
+	if (vswp->mresources)
+		mac_resource_set(vswp->mh, NULL, NULL);
+	mac_close(vswp->mh);
 
 	vswp->mrh = NULL;
 	vswp->mh = NULL;
 	vswp->txinfo = NULL;
+	vswp->mstarted = B_FALSE;
 
 	D1(vswp, "vsw_mac_detach: exit");
 }
@@ -1628,6 +1684,305 @@ vsw_reconfig_hw(vsw_t *vswp)
 
 reconfig_err_exit:
 	return (rv);
+}
+
+static void
+vsw_mac_ring_tbl_entry_init(vsw_t *vswp, vsw_mac_ring_t *ringp)
+{
+	ringp->ring_state = VSW_MAC_RING_FREE;
+	ringp->ring_arg = NULL;
+	ringp->ring_blank = NULL;
+	ringp->ring_vqp = NULL;
+	ringp->ring_vswp = vswp;
+}
+
+static void
+vsw_mac_ring_tbl_init(vsw_t *vswp)
+{
+	int		i;
+
+	mutex_init(&vswp->mac_ring_lock, NULL, MUTEX_DRIVER, NULL);
+
+	vswp->mac_ring_tbl_sz = vsw_mac_rx_rings;
+	vswp->mac_ring_tbl  =
+		kmem_alloc(vsw_mac_rx_rings * sizeof (vsw_mac_ring_t),
+		KM_SLEEP);
+
+	for (i = 0; i < vswp->mac_ring_tbl_sz; i++)
+		vsw_mac_ring_tbl_entry_init(vswp, &vswp->mac_ring_tbl[i]);
+}
+
+static void
+vsw_mac_ring_tbl_destroy(vsw_t *vswp)
+{
+	int	i;
+
+	mutex_enter(&vswp->mac_ring_lock);
+	for (i = 0; i < vswp->mac_ring_tbl_sz; i++) {
+		if (vswp->mac_ring_tbl[i].ring_state != VSW_MAC_RING_FREE) {
+			/*
+			 * Destroy the queue.
+			 */
+			vsw_queue_stop(vswp->mac_ring_tbl[i].ring_vqp);
+			vsw_queue_destroy(vswp->mac_ring_tbl[i].ring_vqp);
+
+			/*
+			 * Re-initialize the structure.
+			 */
+			vsw_mac_ring_tbl_entry_init(vswp,
+				&vswp->mac_ring_tbl[i]);
+		}
+	}
+	mutex_exit(&vswp->mac_ring_lock);
+
+	mutex_destroy(&vswp->mac_ring_lock);
+	kmem_free(vswp->mac_ring_tbl,
+		vswp->mac_ring_tbl_sz * sizeof (vsw_mac_ring_t));
+	vswp->mac_ring_tbl_sz = 0;
+}
+
+/*
+ * Handle resource add callbacks from the driver below.
+ */
+static mac_resource_handle_t
+vsw_mac_ring_add_cb(void *arg, mac_resource_t *mrp)
+{
+	vsw_t		*vswp = (vsw_t *)arg;
+	mac_rx_fifo_t	*mrfp = (mac_rx_fifo_t *)mrp;
+	vsw_mac_ring_t	*ringp;
+	vsw_queue_t	*vqp;
+	int		i;
+
+	ASSERT(vswp != NULL);
+	ASSERT(mrp != NULL);
+	ASSERT(vswp->mac_ring_tbl != NULL);
+
+	D1(vswp, "%s: enter", __func__);
+
+	/*
+	 * Check to make sure we have the correct resource type.
+	 */
+	if (mrp->mr_type != MAC_RX_FIFO)
+		return (NULL);
+
+	/*
+	 * Find a open entry in the ring table.
+	 */
+	mutex_enter(&vswp->mac_ring_lock);
+	for (i = 0; i < vswp->mac_ring_tbl_sz; i++) {
+		ringp = &vswp->mac_ring_tbl[i];
+
+		/*
+		 * Check for an empty slot, if found, then setup queue
+		 * and thread.
+		 */
+		if (ringp->ring_state == VSW_MAC_RING_FREE) {
+			/*
+			 * Create the queue for this ring.
+			 */
+			vqp = vsw_queue_create();
+
+			/*
+			 * Initialize the ring data structure.
+			 */
+			ringp->ring_vqp = vqp;
+			ringp->ring_arg = mrfp->mrf_arg;
+			ringp->ring_blank = mrfp->mrf_blank;
+			ringp->ring_state = VSW_MAC_RING_INUSE;
+
+			/*
+			 * Create the worker thread.
+			 */
+			vqp->vq_worker = thread_create(NULL, 0,
+				vsw_queue_worker, ringp, 0, &p0,
+				TS_RUN, minclsyspri);
+			if (vqp->vq_worker == NULL) {
+				vsw_queue_destroy(vqp);
+				vsw_mac_ring_tbl_entry_init(vswp, ringp);
+				ringp = NULL;
+			}
+
+			mutex_exit(&vswp->mac_ring_lock);
+			D1(vswp, "%s: exit", __func__);
+			return ((mac_resource_handle_t)ringp);
+		}
+	}
+	mutex_exit(&vswp->mac_ring_lock);
+
+	/*
+	 * No slots in the ring table available.
+	 */
+	D1(vswp, "%s: exit", __func__);
+	return (NULL);
+}
+
+static void
+vsw_queue_stop(vsw_queue_t *vqp)
+{
+	mutex_enter(&vqp->vq_lock);
+
+	if (vqp->vq_state == VSW_QUEUE_RUNNING) {
+		vqp->vq_state = VSW_QUEUE_STOP;
+		cv_signal(&vqp->vq_cv);
+
+		while (vqp->vq_state != VSW_QUEUE_DRAINED)
+			cv_wait(&vqp->vq_cv, &vqp->vq_lock);
+	}
+
+	mutex_exit(&vqp->vq_lock);
+}
+
+static vsw_queue_t *
+vsw_queue_create()
+{
+	vsw_queue_t *vqp;
+
+	vqp = kmem_zalloc(sizeof (vsw_queue_t), KM_SLEEP);
+
+	mutex_init(&vqp->vq_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&vqp->vq_cv, NULL, CV_DRIVER, NULL);
+	vqp->vq_first = NULL;
+	vqp->vq_last = NULL;
+	vqp->vq_state = VSW_QUEUE_STOP;
+
+	return (vqp);
+}
+
+static void
+vsw_queue_destroy(vsw_queue_t *vqp)
+{
+	cv_destroy(&vqp->vq_cv);
+	mutex_destroy(&vqp->vq_lock);
+	kmem_free(vqp, sizeof (vsw_queue_t));
+}
+
+static void
+vsw_queue_worker(vsw_mac_ring_t *rrp)
+{
+	mblk_t		*mp;
+	vsw_queue_t	*vqp = rrp->ring_vqp;
+	vsw_t		*vswp = rrp->ring_vswp;
+
+	mutex_enter(&vqp->vq_lock);
+
+	ASSERT(vqp->vq_state == VSW_QUEUE_STOP);
+
+	/*
+	 * Set the state to running, since the thread is now active.
+	 */
+	vqp->vq_state = VSW_QUEUE_RUNNING;
+
+	while (vqp->vq_state == VSW_QUEUE_RUNNING) {
+		/*
+		 * Wait for work to do or the state has changed
+		 * to not running.
+		 */
+		while ((vqp->vq_state == VSW_QUEUE_RUNNING) &&
+				(vqp->vq_first == NULL)) {
+			cv_wait(&vqp->vq_cv, &vqp->vq_lock);
+		}
+
+		/*
+		 * Process packets that we received from the interface.
+		 */
+		if (vqp->vq_first != NULL) {
+			mp = vqp->vq_first;
+
+			vqp->vq_first = NULL;
+			vqp->vq_last = NULL;
+
+			mutex_exit(&vqp->vq_lock);
+
+			/* switch the chain of packets received */
+			vsw_switch_frame(vswp, mp, VSW_PHYSDEV, NULL, NULL);
+
+			mutex_enter(&vqp->vq_lock);
+		}
+	}
+
+	/*
+	 * We are drained and signal we are done.
+	 */
+	vqp->vq_state = VSW_QUEUE_DRAINED;
+	cv_signal(&vqp->vq_cv);
+
+	/*
+	 * Exit lock and drain the remaining packets.
+	 */
+	mutex_exit(&vqp->vq_lock);
+
+	/*
+	 * Exit the thread
+	 */
+	thread_exit();
+}
+
+/*
+ * static void
+ * vsw_rx_queue_cb() - Receive callback routine when
+ *	vsw_multi_ring_enable is non-zero.  Queue the packets
+ *	to a packet queue for a worker thread to process.
+ */
+static void
+vsw_rx_queue_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
+{
+	vsw_mac_ring_t	*ringp = (vsw_mac_ring_t *)mrh;
+	vsw_t		*vswp = (vsw_t *)arg;
+	vsw_queue_t	*vqp;
+	mblk_t		*bp, *last;
+
+	ASSERT(mrh != NULL);
+	ASSERT(vswp != NULL);
+	ASSERT(mp != NULL);
+
+	D1(vswp, "%s: enter", __func__);
+
+	/*
+	 * Find the last element in the mblk chain.
+	 */
+	bp = mp;
+	do {
+		last = bp;
+		bp = bp->b_next;
+	} while (bp != NULL);
+
+	/* Get the queue for the packets */
+	vqp = ringp->ring_vqp;
+
+	/*
+	 * Grab the lock such we can queue the packets.
+	 */
+	mutex_enter(&vqp->vq_lock);
+
+	if (vqp->vq_state != VSW_QUEUE_RUNNING) {
+		freemsg(mp);
+		goto vsw_rx_queue_cb_exit;
+	}
+
+	/*
+	 * Add the mblk chain to the queue.  If there
+	 * is some mblks in the queue, then add the new
+	 * chain to the end.
+	 */
+	if (vqp->vq_first == NULL)
+		vqp->vq_first = mp;
+	else
+		vqp->vq_last->b_next = mp;
+
+	vqp->vq_last = last;
+
+	/*
+	 * Signal the worker thread that there is work to
+	 * do.
+	 */
+	cv_signal(&vqp->vq_cv);
+
+	/*
+	 * Let go of the lock and exit.
+	 */
+vsw_rx_queue_cb_exit:
+	mutex_exit(&vqp->vq_lock);
+	D1(vswp, "%s: exit", __func__);
 }
 
 /*

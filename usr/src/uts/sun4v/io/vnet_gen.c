@@ -1794,7 +1794,8 @@ vgen_ldc_init(vgen_ldc_t *ldcp)
 	ldc_status_t	istatus;
 	int		rv;
 	enum		{ ST_init = 0x0, ST_init_tbufs = 0x1,
-			    ST_ldc_open = 0x2, ST_dring_bind = 0x4
+			    ST_ldc_open = 0x2, ST_dring_bind = 0x4,
+			    ST_cb_enable = 0x8
 			    }
 			init_state;
 	uint32_t	ncookies = 0;
@@ -1845,6 +1846,15 @@ vgen_ldc_init(vgen_ldc_t *ldcp)
 
 	init_state |= ST_dring_bind;
 
+	rv = ldc_set_cb_mode(ldcp->ldc_handle, LDC_CB_ENABLE);
+	if (rv != 0) {
+		DWARN((vnetp, "vgen_ldc_init: id (%lx) "
+		    "ldc_set_cb_mode failed\n", ldcp->ldc_id));
+		goto ldcinit_failed;
+	}
+
+	init_state |= ST_cb_enable;
+
 	do {
 		rv = ldc_up(ldcp->ldc_handle);
 		if ((rv != 0) && (rv == EWOULDBLOCK)) {
@@ -1874,6 +1884,9 @@ vgen_ldc_init(vgen_ldc_t *ldcp)
 	return (DDI_SUCCESS);
 
 ldcinit_failed:
+	if (init_state & ST_cb_enable) {
+		(void) ldc_set_cb_mode(ldcp->ldc_handle, LDC_CB_DISABLE);
+	}
 	if (init_state & ST_dring_bind) {
 		(void) ldc_mem_dring_unbind(ldcp->tx_dhandle);
 	}
@@ -1909,6 +1922,12 @@ vgen_ldc_uninit(vgen_ldc_t *ldcp)
 	if (rv != 0) {
 		DWARN((vnetp, "vgen_ldc_uninit: id (%lx) "
 		    "ldc_set_cb_mode failed\n", ldcp->ldc_id));
+	}
+
+	rv = ldc_down(ldcp->ldc_handle);
+	if (rv != 0) {
+		DWARN((vnetp, "vgen_ldc_uninit: id (%lx) "
+		    "ldc_down failed\n", ldcp->ldc_id));
 	}
 
 	/* clear handshake done bit and wait for pending tx and cb to finish */
@@ -2046,29 +2065,21 @@ static void
 vgen_uninit_tbufs(vgen_ldc_t *ldcp)
 {
 	vgen_private_desc_t	*tbufp = ldcp->tbufp;
-	vnet_public_desc_t	*txdp;
-	vio_dring_entry_hdr_t		*hdrp;
 	int 			i;
 
 	/* for each tbuf (priv_desc), free ldc mem_handle */
 	for (i = 0; i < ldcp->num_txds; i++) {
 
 		tbufp = &(ldcp->tbufp[i]);
-		txdp = tbufp->descp;
-		hdrp = &txdp->hdr;
 
 		if (tbufp->datap) { /* if bound to a ldc memhandle */
 			(void) ldc_mem_unbind_handle(tbufp->memhandle);
 			tbufp->datap = NULL;
 		}
-		tbufp->flags = VGEN_PRIV_DESC_FREE;
-		hdrp->dstate = VIO_DESC_FREE;
-		hdrp->ack = B_FALSE;
 		if (tbufp->memhandle) {
 			(void) ldc_mem_free_handle(tbufp->memhandle);
 			tbufp->memhandle = 0;
 		}
-		tbufp->descp = NULL;
 	}
 
 	if (ldcp->tx_datap) {
@@ -2077,8 +2088,8 @@ vgen_uninit_tbufs(vgen_ldc_t *ldcp)
 		ldcp->tx_datap = NULL;
 	}
 
-	bzero(ldcp->tbufp, sizeof (*tbufp) * (ldcp->num_txds));
-	bzero(ldcp->txdp, sizeof (*txdp) * (ldcp->num_txds));
+	bzero(ldcp->tbufp, sizeof (vgen_private_desc_t) * (ldcp->num_txds));
+	bzero(ldcp->txdp, sizeof (vnet_public_desc_t) * (ldcp->num_txds));
 }
 
 /* clobber tx descriptor ring */
