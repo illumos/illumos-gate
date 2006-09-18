@@ -1432,20 +1432,6 @@ phyint_check_for_repair(struct phyint *pi)
 			logerr("At least 1 interface (%s) of group %s has "
 			    "repaired\n", pi->pi_name, pi->pi_group->pg_name);
 			phyint_group_chstate(pi->pi_group, PG_RUNNING);
-			/*
-			 * If this is the STANDBY phyint to be repaired after a
-			 * group failure. Move data addresses on other failed
-			 * phyints in the group to this one.
-			 */
-			if (pi->pi_flags & IFF_STANDBY) {
-				struct phyint *fpi = pi->pi_group->pg_phyint;
-				for (; fpi != NULL; fpi = fpi->pi_pgnext) {
-					if (fpi != pi) {
-						(void) try_failover(fpi,
-						    FAILOVER_NORMAL);
-					}
-				}
-			}
 		}
 	}
 }

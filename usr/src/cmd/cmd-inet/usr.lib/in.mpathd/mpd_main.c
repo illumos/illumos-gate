@@ -496,17 +496,15 @@ initifs()
 			struct phyint_instance *pii;
 
 			/*
-			 * Skip interfaces which are not capable of probing,
-			 * and interfaces that have downed links (as we will
-			 * not get any response).
+			 * Skip LINK UP interfaces which are not capable
+			 * of probing.
 			 */
-			if (LINK_DOWN(pi))
-				continue;
-
 			pii = pi->pi_v4;
-			if (!PROBE_CAPABLE(pii)) {
+			if (pii == NULL ||
+			    (LINK_UP(pi) && !PROBE_CAPABLE(pii))) {
 				pii = pi->pi_v6;
-				if (!PROBE_CAPABLE(pii))
+				if (pii == NULL ||
+				    (LINK_UP(pi) && !PROBE_CAPABLE(pii)))
 					continue;
 			}
 
