@@ -1788,8 +1788,10 @@ ah_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs)
 		comb->sadb_comb_encrypt_maxbits = 0;
 
 		comb->sadb_comb_auth = aalg->alg_id;
-		comb->sadb_comb_auth_minbits = prot->ipp_ah_minbits;
-		comb->sadb_comb_auth_maxbits = prot->ipp_ah_maxbits;
+		comb->sadb_comb_auth_minbits =
+		    MAX(prot->ipp_ah_minbits, aalg->alg_ef_minbits);
+		comb->sadb_comb_auth_maxbits =
+		    MIN(prot->ipp_ah_maxbits, aalg->alg_ef_maxbits);
 
 		/*
 		 * The following may be based on algorithm

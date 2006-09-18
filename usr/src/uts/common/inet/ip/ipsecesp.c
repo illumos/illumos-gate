@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1204,16 +1203,20 @@ esp_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs)
 		comb->sadb_comb_flags = 0;
 		comb->sadb_comb_reserved = 0;
 		comb->sadb_comb_encrypt = ealg->alg_id;
-		comb->sadb_comb_encrypt_minbits = prot->ipp_espe_minbits;
-		comb->sadb_comb_encrypt_maxbits = prot->ipp_espe_maxbits;
+		comb->sadb_comb_encrypt_minbits =
+		    MAX(prot->ipp_espe_minbits, ealg->alg_ef_minbits);
+		comb->sadb_comb_encrypt_maxbits =
+		    MIN(prot->ipp_espe_maxbits, ealg->alg_ef_maxbits);
 		if (aalg == NULL) {
 			comb->sadb_comb_auth = 0;
 			comb->sadb_comb_auth_minbits = 0;
 			comb->sadb_comb_auth_maxbits = 0;
 		} else {
 			comb->sadb_comb_auth = aalg->alg_id;
-			comb->sadb_comb_auth_minbits = prot->ipp_espa_minbits;
-			comb->sadb_comb_auth_maxbits = prot->ipp_espa_maxbits;
+			comb->sadb_comb_auth_minbits =
+			    MAX(prot->ipp_espa_minbits, aalg->alg_ef_minbits);
+			comb->sadb_comb_auth_maxbits =
+			    MIN(prot->ipp_espa_maxbits, aalg->alg_ef_maxbits);
 		}
 
 		/*

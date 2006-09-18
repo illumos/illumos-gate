@@ -4194,19 +4194,38 @@ sadb_destroy_acqlist(iacqf_t **listp, uint_t numentries, boolean_t forever)
 	}
 }
 
+/*
+ * Create an algorithm descriptor for an extended ACQUIRE.  Filter crypto
+ * framework's view of reality vs. IPsec's.  EF's wins, BTW.
+ */
 static uint8_t *
 sadb_new_algdesc(uint8_t *start, uint8_t *limit,
     sadb_x_ecomb_t *ecomb, uint8_t satype, uint8_t algtype,
     uint8_t alg, uint16_t minbits, uint16_t maxbits)
 {
 	uint8_t *cur = start;
-
+	ipsec_alginfo_t *algp;
 	sadb_x_algdesc_t *algdesc = (sadb_x_algdesc_t *)cur;
+
 	cur += sizeof (*algdesc);
 	if (cur >= limit)
 		return (NULL);
 
 	ecomb->sadb_x_ecomb_numalgs++;
+
+	/*
+	 * Normalize vs. crypto framework's limits.  This way, you can specify
+	 * a stronger policy, and when the framework loads a stronger version,
+	 * you can just keep plowing w/o rewhacking your SPD.
+	 */
+	mutex_enter(&alg_lock);
+	algp = ipsec_alglists[(algtype == SADB_X_ALGTYPE_AUTH) ?
+	    IPSEC_ALG_AUTH : IPSEC_ALG_ENCR][alg];
+	if (minbits < algp->alg_ef_minbits)
+		minbits = algp->alg_ef_minbits;
+	if (maxbits > algp->alg_ef_maxbits)
+		maxbits = algp->alg_ef_maxbits;
+	mutex_exit(&alg_lock);
 
 	algdesc->sadb_x_algdesc_satype = satype;
 	algdesc->sadb_x_algdesc_algtype = algtype;
