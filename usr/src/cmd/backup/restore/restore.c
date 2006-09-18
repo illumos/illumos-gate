@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -329,10 +329,13 @@ nodeupdates(name, ino, type)
 	 */
 	case ONTAPE|NAMEFND:
 	case ONTAPE|NAMEFND|MODECHG:
-		if (lookuptype == LINK) {
+		if (lookuptype == LINK || key == (ONTAPE|NAMEFND)) {
 			removeleaf(np);
 			freeentry(np);
 		} else {
+			/*
+			 * Create a temporary node only if MODECHG.
+			 */
 			mktempname(np);
 		}
 		/*FALLTHROUGH*/
@@ -398,7 +401,10 @@ nodeupdates(name, ino, type)
 	 * A previously known file which is to be updated.
 	 */
 	case ONTAPE|INOFND|NAMEFND:
-		if (type == LEAF && lookuptype != LINK) {
+		/*
+		 * Extract leaf nodes.
+		 */
+		if (type == LEAF) {
 			/* LINTED: result fits into a short */
 			np->e_flags |= EXTRACT;
 		}
