@@ -3186,8 +3186,8 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 	znode_t		*zp = VTOZ(vp);
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	page_t		*pp, **pl0 = pl;
-	rl_t		*rl;
-	int		cnt = 0, need_unlock = 0, err = 0;
+	int		need_unlock = 0, err = 0;
+	offset_t	orig_off;
 
 	ZFS_ENTER(zfsvfs);
 
@@ -3202,24 +3202,19 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 		return (0);
 	}
 
-	/*
-	 * Make sure nobody restructures the file in the middle of the getpage.
-	 */
-	rl = zfs_range_lock(zp, off, len, RL_READER);
-
 	/* can't fault past EOF */
 	if (off >= zp->z_phys->zp_size) {
-		zfs_range_unlock(rl);
 		ZFS_EXIT(zfsvfs);
 		return (EFAULT);
 	}
+	orig_off = off;
 
 	/*
 	 * If we already own the lock, then we must be page faulting
 	 * in the middle of a write to this file (i.e., we are writing
 	 * to this file using data from a mapped region of the file).
 	 */
-	if (!rw_owner(&zp->z_map_lock)) {
+	if (rw_owner(&zp->z_map_lock) != curthread) {
 		rw_enter(&zp->z_map_lock, RW_WRITER);
 		need_unlock = TRUE;
 	}
@@ -3240,6 +3235,8 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 			plsz -= PAGESIZE;
 		} else {
 			err = zfs_fillpage(vp, off, seg, addr, pl, plsz, rw);
+			if (err)
+				goto out;
 			/*
 			 * klustering may have changed our region
 			 * to be block aligned.
@@ -3252,7 +3249,6 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 			}
 			while (*pl) {
 				pl++;
-				cnt++;
 				off += PAGESIZE;
 				addr += PAGESIZE;
 				plsz -= PAGESIZE;
@@ -3260,14 +3256,6 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 					len -= PAGESIZE;
 				else
 					len = 0;
-			}
-			if (err) {
-				/*
-				 * Release any pages we have locked.
-				 */
-				while (pl > pl0)
-					page_unlock(*--pl);
-				goto out;
 			}
 		}
 	}
@@ -3286,11 +3274,25 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 
 	ZFS_ACCESSTIME_STAMP(zfsvfs, zp);
 out:
+	/*
+	 * We can't grab the range lock for the page as reader which would
+	 * stop truncation as this leads to deadlock. So we need to recheck
+	 * the file size.
+	 */
+	if (orig_off >= zp->z_phys->zp_size)
+		err = EFAULT;
+	if (err) {
+		/*
+		 * Release any pages we have previously locked.
+		 */
+		while (pl > pl0)
+			page_unlock(*--pl);
+	}
+
 	*pl = NULL;
 
 	if (need_unlock)
 		rw_exit(&zp->z_map_lock);
-	zfs_range_unlock(rl);
 
 	ZFS_EXIT(zfsvfs);
 	return (err);
