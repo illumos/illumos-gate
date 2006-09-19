@@ -316,6 +316,16 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 			PCIE_AER_UCE_MASK));
 	}
 
+	/* Enable ECRC generation and checking */
+	if ((aer_reg = PCI_XCAP_GET32(config_handle, NULL, aer_ptr,
+	    PCIE_AER_CTL)) != PCI_CAP_EINVAL32) {
+		aer_reg |= (PCIE_AER_CTL_ECRC_GEN_ENA |
+		    PCIE_AER_CTL_ECRC_CHECK_ENA);
+
+		PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_CTL,
+		    aer_reg);
+	}
+
 	/*
 	 * Enable Secondary Uncorrectable errors if this is a bridge
 	 */
@@ -403,6 +413,7 @@ void
 pcie_disable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 {
 	uint16_t		cap_ptr, aer_ptr, dev_type;
+	uint32_t		aer_reg;
 	int			rval = DDI_FAILURE;
 
 	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
@@ -434,6 +445,15 @@ pcie_disable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_CE_MASK,
 		PCIE_AER_CE_BITS);
 
+	/* Disable ECRC generation and checking */
+	if ((aer_reg = PCI_XCAP_GET32(config_handle, NULL, aer_ptr,
+	    PCIE_AER_CTL)) != PCI_CAP_EINVAL32) {
+		aer_reg &= ~(PCIE_AER_CTL_ECRC_GEN_ENA |
+		    PCIE_AER_CTL_ECRC_CHECK_ENA);
+
+		PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_CTL,
+		    aer_reg);
+	}
 	/*
 	 * Disable Secondary Uncorrectable errors if this is a bridge
 	 */

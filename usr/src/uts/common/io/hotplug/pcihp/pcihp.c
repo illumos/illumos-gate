@@ -2303,6 +2303,7 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 	int rval;
 	int hint;
 	hpc_slot_state_t rstate;
+	struct hpc_led_info led_info;
 
 	/*
 	 * Get the soft state structure.
@@ -2944,6 +2945,12 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 		    ddi_driver_name(pcihp_p->dip),
 		    ddi_get_instance(pcihp_p->dip),
 		    slotinfop->name);
+
+		/* turn on ATTN led */
+		led_info.led = HPC_ATTN_LED;
+		led_info.state = HPC_LED_ON;
+		rv = hpc_nexus_control(slotinfop->slot_hdl,
+		    HPC_CTRL_SET_LED_STATE, (caddr_t)&led_info);
 
 		if (slotinfop->rstate == AP_RSTATE_CONNECTED)
 			(void) hpc_nexus_disconnect(slotinfop->slot_hdl,

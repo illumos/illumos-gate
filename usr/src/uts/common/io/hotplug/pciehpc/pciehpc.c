@@ -909,9 +909,6 @@ pciehpc_intr(dev_info_t *dip)
 		pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
 		    PCIE_SLOTCTL, control & ~PCIE_SLOTCTL_PWR_FAULT_EN);
 
-		/* turn on ATTN LED */
-		pciehpc_set_led_state(ctrl_p, HPC_ATTN_LED, HPC_LED_OFF);
-
 		/* send the event to HPS framework */
 		(void) hpc_slot_event_notify(ctrl_p->slot.slot_handle,
 		    HPC_EVENT_SLOT_POWER_FAULT, HPC_EVENT_NORMAL);
@@ -947,9 +944,6 @@ pciehpc_intr(dev_info_t *dip)
 		if (control & PCIE_SLOTCTL_PWR_FAULT_EN)
 		    pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
 			PCIE_SLOTCTL, control & ~PCIE_SLOTCTL_PWR_FAULT_EN);
-
-		/* turn off ATTN LED */
-		pciehpc_set_led_state(ctrl_p, HPC_ATTN_LED, HPC_LED_OFF);
 
 		/* send the event to HPS framework */
 		(void) hpc_slot_event_notify(ctrl_p->slot.slot_handle,
