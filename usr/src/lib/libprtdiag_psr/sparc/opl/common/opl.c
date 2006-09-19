@@ -566,7 +566,7 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 {
 	Board_node	*bnode = tree->bd_list;
 	uint64_t	total_mem = 0, total_sys_mem = 0;
-	char *hdrfmt =	"\n%-5.5s  %-6.6s  %-12.12s  %-10.10s"
+	char *hdrfmt =	"\n%-5.5s  %-6.6s  %-18.18s  %-10.10s"
 			    " %-8.8s  %-10.10s";
 
 	(void) textdomain(TEXT_DOMAIN);
@@ -594,7 +594,7 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 	    gettext("DIMMs"), 0);
 
 	log_printf(hdrfmt,
-	    "---", "-------", "------------", "-------", "-----",
+	    "---", "-------", "------------------", "-------", "------",
 	    "---------", 0);
 
 	log_printf("\n", 0);
@@ -651,7 +651,7 @@ print_opl_memory_line(int lsb, struct cs_status *cs_stat, int ngrps)
 			log_printf("%-6.6s", "B", 0);
 
 		/* Memory Group Size */
-		log_printf("  %4lldMB        ", mem_size/MBYTE, 0);
+		log_printf("%8lldMB            ", mem_size/MBYTE, 0);
 
 		total_board_mem += (mem_size/MBYTE);
 
@@ -665,7 +665,7 @@ print_opl_memory_line(int lsb, struct cs_status *cs_stat, int ngrps)
 		    + cs_stat[i].dimm_lo)/MBYTE, 0);
 
 		/* Number of DIMMs */
-		log_printf("%9d\n", cs_stat[i].dimms);
+		log_printf("        %2d\n", cs_stat[i].dimms);
 	}
 	return (total_board_mem);
 }
