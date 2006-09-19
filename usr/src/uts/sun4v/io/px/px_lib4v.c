@@ -547,7 +547,7 @@ px_lib_msiq_init(dev_info_t *dip)
 {
 	px_t		*px_p = DIP_TO_STATE(dip);
 	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
-	uint64_t	*msiq_addr, ra;
+	r_addr_t	ra;
 	size_t		msiq_size;
 	uint_t		rec_cnt;
 	int		i, err = DDI_SUCCESS;
@@ -555,13 +555,11 @@ px_lib_msiq_init(dev_info_t *dip)
 
 	DBG(DBG_LIB_MSIQ, dip, "px_lib_msiq_init: dip 0x%p\n", dip);
 
-	msiq_addr = (uint64_t *)(((uint64_t)msiq_state_p->msiq_buf_p +
-	    (MMU_PAGE_SIZE - 1)) >> MMU_PAGE_SHIFT << MMU_PAGE_SHIFT);
-
 	msiq_size = msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t);
 
 	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
-		ra = (r_addr_t)va_to_pa((caddr_t)msiq_addr + (i * msiq_size));
+		ra = (r_addr_t)va_to_pa((caddr_t)msiq_state_p->msiq_buf_p +
+		    (i * msiq_size));
 
 		if ((ret = hvio_msiq_conf(DIP_TO_HANDLE(dip),
 		    (i + msiq_state_p->msiq_1st_msiq_id),

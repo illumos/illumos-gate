@@ -664,7 +664,6 @@ px_lib_msiq_init(dev_info_t *dip)
 	px_t		*px_p = DIP_TO_STATE(dip);
 	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
 	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
-	caddr_t		msiq_addr;
 	px_dvma_addr_t	pg_index;
 	size_t		size;
 	int		ret;
@@ -680,9 +679,6 @@ px_lib_msiq_init(dev_info_t *dip)
 	 * entry.  Note: The size of the mapping is assumed to be a multiple
 	 * of the page size.
 	 */
-	msiq_addr = (caddr_t)(((uint64_t)msiq_state_p->msiq_buf_p +
-	    (MMU_PAGE_SIZE - 1)) >> MMU_PAGE_SHIFT << MMU_PAGE_SHIFT);
-
 	size = msiq_state_p->msiq_cnt *
 	    msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t);
 
@@ -696,8 +692,8 @@ px_lib_msiq_init(dev_info_t *dip)
 	    MMU_BTOP((ulong_t)pxu_p->msiq_mapped_p));
 
 	if ((ret = px_lib_iommu_map(px_p->px_dip, PCI_TSBID(0, pg_index),
-	    MMU_BTOP(size), PCI_MAP_ATTR_WRITE, (void *)msiq_addr, 0,
-	    MMU_MAP_BUF)) != DDI_SUCCESS) {
+	    MMU_BTOP(size), PCI_MAP_ATTR_WRITE, msiq_state_p->msiq_buf_p,
+	    0, MMU_MAP_BUF)) != DDI_SUCCESS) {
 		DBG(DBG_LIB_MSIQ, dip,
 		    "hvio_msiq_init failed, ret 0x%lx\n", ret);
 
@@ -749,16 +745,14 @@ px_lib_msiq_info(dev_info_t *dip, msiqid_t msiq_id, r_addr_t *ra_p,
 {
 	px_t		*px_p = DIP_TO_STATE(dip);
 	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
-	uint64_t	*msiq_addr;
 	size_t		msiq_size;
 
 	DBG(DBG_LIB_MSIQ, dip, "px_msiq_info: dip 0x%p msiq_id 0x%x\n",
 	    dip, msiq_id);
 
-	msiq_addr = (uint64_t *)(((uint64_t)msiq_state_p->msiq_buf_p +
-	    (MMU_PAGE_SIZE - 1)) >> MMU_PAGE_SHIFT << MMU_PAGE_SHIFT);
 	msiq_size = msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t);
-	ra_p = (r_addr_t *)((caddr_t)msiq_addr + (msiq_id * msiq_size));
+	ra_p = (r_addr_t *)((caddr_t)msiq_state_p->msiq_buf_p +
+	    (msiq_id * msiq_size));
 
 	*msiq_rec_cnt_p = msiq_state_p->msiq_rec_cnt;
 

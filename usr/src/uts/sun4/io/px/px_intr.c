@@ -677,7 +677,7 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 		break;
 	case DDI_INTROP_FREE:
-		(void) pci_msi_disable_mode(rdip, hdlp->ih_type, hdlp->ih_inum);
+		(void) pci_msi_disable_mode(rdip, hdlp->ih_type, NULL);
 		(void) pci_msi_unconfigure(rdip, hdlp->ih_type, hdlp->ih_inum);
 
 		if (hdlp->ih_type == DDI_INTR_TYPE_MSI)
@@ -761,16 +761,18 @@ msi_free:
 		    PCI_MSI_VALID)) != DDI_SUCCESS)
 			return (ret);
 
-		if (pci_is_msi_enabled(rdip, hdlp->ih_type) != DDI_SUCCESS) {
+		if ((pci_is_msi_enabled(rdip, hdlp->ih_type) != DDI_SUCCESS) ||
+		    (hdlp->ih_type == DDI_INTR_TYPE_MSIX)) {
 			nintrs = i_ddi_intr_get_current_nintrs(hdlp->ih_dip);
 
 			if ((ret = pci_msi_configure(rdip, hdlp->ih_type,
 			    nintrs, hdlp->ih_inum, msi_addr,
-			    msi_num & ~(nintrs - 1))) != DDI_SUCCESS)
+			    hdlp->ih_type == DDI_INTR_TYPE_MSIX ?
+			    msi_num : msi_num & ~(nintrs - 1))) != DDI_SUCCESS)
 				return (ret);
 
-			if ((ret = pci_msi_enable_mode(rdip, hdlp->ih_type,
-			    hdlp->ih_inum)) != DDI_SUCCESS)
+			if ((ret = pci_msi_enable_mode(rdip, hdlp->ih_type))
+			    != DDI_SUCCESS)
 				return (ret);
 		}
 
@@ -838,14 +840,14 @@ msi_free:
 				return (ret);
 		}
 
-		ret = pci_msi_enable_mode(rdip, hdlp->ih_type, hdlp->ih_inum);
+		ret = pci_msi_enable_mode(rdip, hdlp->ih_type);
 		break;
 	case DDI_INTROP_BLOCKDISABLE:
 		nintrs = i_ddi_intr_get_current_nintrs(hdlp->ih_dip);
 		msi_num = hdlp->ih_vector;
 
 		if ((ret = pci_msi_disable_mode(rdip, hdlp->ih_type,
-		    hdlp->ih_inum)) != DDI_SUCCESS)
+		    hdlp->ih_cap & DDI_INTR_FLAG_BLOCK)) != DDI_SUCCESS)
 			return (ret);
 
 		for (i = 0; i < nintrs; i++, msi_num++) {

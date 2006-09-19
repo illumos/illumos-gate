@@ -49,7 +49,6 @@ int
 px_msiq_attach(px_t *px_p)
 {
 	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
-	caddr_t		msiq_addr;
 	size_t		msiq_size;
 	int		i, ret = DDI_SUCCESS;
 
@@ -81,13 +80,9 @@ px_msiq_attach(px_t *px_p)
 	mutex_init(&msiq_state_p->msiq_mutex, NULL, MUTEX_DRIVER, NULL);
 	msiq_state_p->msiq_p = kmem_zalloc(msiq_state_p->msiq_cnt *
 	    sizeof (px_msiq_t), KM_SLEEP);
-
 	msiq_size = msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t);
 	msiq_state_p->msiq_buf_p = kmem_zalloc(msiq_state_p->msiq_cnt *
 	    msiq_size, KM_SLEEP);
-
-	msiq_addr = (caddr_t)(((uint64_t)msiq_state_p->msiq_buf_p +
-	    (MMU_PAGE_SIZE - 1)) >> MMU_PAGE_SHIFT << MMU_PAGE_SHIFT);
 
 	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
 		msiq_state_p->msiq_p[i].msiq_id =
@@ -95,7 +90,7 @@ px_msiq_attach(px_t *px_p)
 		msiq_state_p->msiq_p[i].msiq_state = MSIQ_STATE_FREE;
 
 		msiq_state_p->msiq_p[i].msiq_base_p = (msiqhead_t *)
-		    ((caddr_t)msiq_addr + (i * msiq_size));
+		    ((caddr_t)msiq_state_p->msiq_buf_p + (i * msiq_size));
 	}
 
 	if ((ret = px_lib_msiq_init(px_p->px_dip)) != DDI_SUCCESS)
@@ -208,7 +203,6 @@ px_msiq_free(px_t *px_p, msiqid_t msiq_id)
 	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
 		if (msiq_state_p->msiq_p[i].msiq_id == msiq_id) {
 			msiq_state_p->msiq_p[i].msiq_state = MSIQ_STATE_FREE;
-			msiq_state_p->msiq_p[i].msiq_curr_head_idx = 0;
 			break;
 		}
 	}

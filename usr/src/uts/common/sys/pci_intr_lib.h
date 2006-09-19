@@ -37,8 +37,8 @@ extern	int	pci_msi_configure(dev_info_t *rdip, int type, int count,
 		    int inum, uint64_t addr, uint64_t data);
 extern	int	pci_msi_unconfigure(dev_info_t *rdip, int type, int inum);
 extern	int	pci_is_msi_enabled(dev_info_t *rdip, int type);
-extern	int	pci_msi_enable_mode(dev_info_t *rdip, int type, int inum);
-extern	int	pci_msi_disable_mode(dev_info_t *rdip, int type, int inum);
+extern	int	pci_msi_enable_mode(dev_info_t *rdip, int type);
+extern	int	pci_msi_disable_mode(dev_info_t *rdip, int type, uint_t flags);
 extern	int	pci_msi_set_mask(dev_info_t *rdip, int type, int inum);
 extern	int	pci_msi_clr_mask(dev_info_t *rdip, int type, int inum);
 extern	int	pci_msi_get_pending(dev_info_t *rdip, int type, int inum,

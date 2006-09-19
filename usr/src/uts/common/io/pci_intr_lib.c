@@ -240,11 +240,11 @@ pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
 	ushort_t		msi_ctrl, caps_ptr;
 	ddi_acc_handle_t	h;
 
-	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_unconfigure: rdip = 0x%p\n",
-	    (void *)rdip));
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_unconfigure: rdip = 0x%p type 0x%x "
+	    "inum 0x%x\n", (void *)rdip, type, inum));
 
 	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl, &caps_ptr, &h) !=
-		DDI_SUCCESS)
+	    DDI_SUCCESS)
 		return (DDI_FAILURE);
 
 	if (type == DDI_INTR_TYPE_MSI) {
@@ -278,7 +278,8 @@ pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
 		ddi_put32(msix_p->msix_tbl_hdl,
 		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), 0);
 
-		ddi_put64(msix_p->msix_tbl_hdl, (uint64_t *)off, 0);
+		ddi_put64(msix_p->msix_tbl_hdl,
+		    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), 0);
 	}
 
 	pci_config_teardown(&h);
@@ -322,15 +323,19 @@ pci_is_msi_enabled(dev_info_t *rdip, int type)
  *
  * This function sets the MSI_ENABLE bit in the capability structure
  * (for MSI) and MSIX_ENABLE bit in the MSI-X capability structure.
+ *
+ * NOTE: It is the nexus driver's responsibility to clear the MSI/X
+ * interrupt's mask bit in the MSI/X capability structure before the
+ * interrupt can be used.
  */
 int
-pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
+pci_msi_enable_mode(dev_info_t *rdip, int type)
 {
 	ushort_t		caps_ptr, msi_ctrl;
 	ddi_acc_handle_t	cfg_hdle;
 
-	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_enable_mode: rdip = 0x%p, "
-	    "inum  = 0x%x\n", (void *)rdip, inum));
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_enable_mode: rdip = 0x%p\n",
+	    (void *)rdip));
 
 	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
 	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
@@ -344,28 +349,12 @@ pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
 		PCI_CAP_PUT16(cfg_hdle, NULL, caps_ptr, PCI_MSI_CTRL, msi_ctrl);
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
-		uintptr_t	off;
-		ddi_intr_msix_t	*msix_p;
-
 		if (msi_ctrl & PCI_MSIX_ENABLE_BIT)
 			goto finished;
 
 		msi_ctrl |= PCI_MSIX_ENABLE_BIT;
 		PCI_CAP_PUT16(cfg_hdle, NULL, caps_ptr, PCI_MSIX_CTRL,
-			msi_ctrl);
-
-		msix_p = i_ddi_get_msix(rdip);
-
-		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
-		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
-
-		/* Clear the Mask bit */
-		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, 0x0);
-
-		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_enable: "
-		    "msix_vector_mask 0x%x\n",
-		    ddi_get32(msix_p->msix_tbl_hdl, (uint32_t *)off)));
+		    msi_ctrl);
 	}
 
 finished:
@@ -382,15 +371,27 @@ finished:
  *
  * This function resets the MSI_ENABLE bit in the capability structure
  * (for MSI) and MSIX_ENABLE bit in the MSI-X capability structure.
+ *
+ * NOTE: It is the nexus driver's responsibility to set the MSI/X
+ * interrupt's mask bit in the MSI/X capability structure before the
+ * interrupt can be disabled.
  */
 int
-pci_msi_disable_mode(dev_info_t *rdip, int type, int inum)
+pci_msi_disable_mode(dev_info_t *rdip, int type, uint_t flags)
 {
 	ushort_t		caps_ptr, msi_ctrl;
 	ddi_acc_handle_t	cfg_hdle;
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_disable_mode: rdip = 0x%p "
-	    "inum = 0x%x\n", (void *)rdip, inum));
+	    "flags = 0x%x\n", (void *)rdip, flags));
+
+	/*
+	 * Do not turn off the master enable bit if other interrupts are
+	 * still active.
+	 */
+	if ((flags != DDI_INTR_FLAG_BLOCK) &&
+	    ((i_ddi_intr_get_current_nintrs(rdip) - 1) > 0))
+		return (DDI_SUCCESS);
 
 	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
 	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
@@ -403,20 +404,12 @@ pci_msi_disable_mode(dev_info_t *rdip, int type, int inum)
 		msi_ctrl &= ~PCI_MSI_ENABLE_BIT;
 		PCI_CAP_PUT16(cfg_hdle, NULL, caps_ptr, PCI_MSI_CTRL, msi_ctrl);
 	} else if (type == DDI_INTR_TYPE_MSIX) {
-		uintptr_t		off;
-		ddi_intr_msix_t		*msix_p;
-
 		if (!(msi_ctrl & PCI_MSIX_ENABLE_BIT))
 			goto finished;
 
-		msix_p = i_ddi_get_msix(rdip);
-
-		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
-		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
-
-		/* Set the Mask bit */
-		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, 0x1);
+		msi_ctrl &= ~PCI_MSIX_ENABLE_BIT;
+		PCI_CAP_PUT16(cfg_hdle, NULL, caps_ptr, PCI_MSIX_CTRL,
+		    msi_ctrl);
 	}
 
 finished:
@@ -1107,7 +1100,7 @@ pci_intx_get_pending(dev_info_t *dip, int *pendingp)
 /*
  * pci_devclass_to_ipl:
  *	translate from device class to ipl
- *	NOTE: This function is  added here as pci_intx_get_ispec()
+ *	NOTE: This function is added here as pci_intx_get_ispec()
  *	calls this to figure out the priority.
  *	It is moved over from x86 pci.c
  */
