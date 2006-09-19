@@ -247,7 +247,6 @@ _init(void)
 	 */
 	sn1_emulation_table = kmem_zalloc(NSYSCALL, KM_SLEEP);
 	sn1_emulation_table[SYS_uname] = 1;
-	sn1_emulation_table[SYS_fork1] = 1;
 
 	err = mod_install(&modlinkage);
 	if (err) {

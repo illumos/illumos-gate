@@ -254,7 +254,7 @@ sn1_sysent_table:
 	NOSYS					/* 140 */
 	NOSYS					/* 141 */
 	NOSYS					/* 142 */
-	EMULATE(sn1_fork1, RVAL2_FLAG | 0)	/* 143 */
+	NOSYS					/* 143 */
 	NOSYS					/* 144 */
 	NOSYS					/* 145 */
 	NOSYS					/* 146 */

@@ -39,23 +39,6 @@
 
 extern int errno;
 
-longlong_t
-sn1_fork1()
-{
-	sysret_t rval;
-	longlong_t r;
-	int err;
-
-	err = __systemcall(&rval, SYS_fork1 + 1024);
-
-	if (err) {
-		r = ((-1ll) << 32) | (-err);
-		return (r);
-	}
-	r = ((longlong_t)rval.sys_rval2 << 32) | rval.sys_rval1;
-	return (r);
-}
-
 int
 sn1_uname(uintptr_t p1)
 {

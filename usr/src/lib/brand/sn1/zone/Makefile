@@ -42,5 +42,5 @@ clean:
 
 install: $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
 
-clobber:
+clobber: clean
 	-$(RM) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)

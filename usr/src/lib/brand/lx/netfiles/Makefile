@@ -40,7 +40,7 @@ install: $(ROOTTXTS)
 clean:
 	-$(RM) etc_default_nfs
 
-clobber:
+clobber: clean
 	-$(RM) $(ROOTXMLDOCS) $(ROOTTXTS)
 
 etc_default_nfs: $(NFS_DFL)

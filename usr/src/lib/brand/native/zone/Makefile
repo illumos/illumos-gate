@@ -52,7 +52,7 @@ install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
 clean:
 	-$(RM) $(PROGS)
 
-clobber:
+clobber: clean
 	-$(RM) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
 
 include $(SRC)/Makefile.msg.targ

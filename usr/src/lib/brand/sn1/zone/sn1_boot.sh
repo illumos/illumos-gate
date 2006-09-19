@@ -34,9 +34,9 @@ PATH=/sbin:/usr/bin:/usr/sbin; export PATH
 
 ZONEROOT=$1
 
-if [ `uname -p` -eq "i386" ]; then
+if [ `uname -p` = "i386" ]; then
         ARCH64=amd64
-elif [ `uname -p` -eq "sparc" ]; then
+elif [ `uname -p` = "sparc" ]; then
         ARCH64=sparcv9
 else
         echo "Unsupported architecture: " `uname -p`
