@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,8 +233,8 @@ page_lock(page_t *pp, se_t se, kmutex_t *lock, reclaim_t reclaim)
  * SE_EXCL        any [1][2]   unlocked/any        grant lock, clear SE_EWANTED
  * SE_EXCL        SE_EWANTED   any lock/any        deny, set SE_EWANTED
  * SE_EXCL        none         any lock/any        deny
- * SE_SHARED      n/a [2][3]     shared/0          grant
- * SE_SHARED      n/a [2][3]   unlocked/0          grant
+ * SE_SHARED      n/a [2]        shared/0          grant
+ * SE_SHARED      n/a [2]      unlocked/0          grant
  * SE_SHARED      n/a            shared/1          deny
  * SE_SHARED      n/a          unlocked/1          deny
  * SE_SHARED      n/a              excl/any        deny
@@ -250,8 +249,6 @@ page_lock(page_t *pp, se_t se, kmutex_t *lock, reclaim_t reclaim)
  *
  * [2] Retired pages may not be locked at any time, regardless of the
  *   dispostion of se, unless the es parameter has SE_RETIRED flag set.
- *
- * [3] If the page is slated for retirement by an agent, the lock is denied.
  *
  * Notes on values of "es":
  *
@@ -354,15 +351,9 @@ page_lock_es(page_t *pp, se_t se, kmutex_t *lock, reclaim_t reclaim, int es)
 	} else {
 		retval = 0;
 		if (pp->p_selock >= 0) {
-			/*
-			 * Readers are not allowed when excl wanted or
-			 * an FMA retire is pending.
-			 */
 			if ((pp->p_selock & SE_EWANTED) == 0) {
-				if (!PP_PR_NOSHARE(pp)) {
-					pp->p_selock += SE_READER;
-					retval = 1;
-				}
+				pp->p_selock += SE_READER;
+				retval = 1;
 			}
 		}
 	}
@@ -508,14 +499,11 @@ page_try_reclaim_lock(page_t *pp, se_t se, int es)
 			if (old >= 0) {
 				/*
 				 * Readers are not allowed when excl wanted
-				 * or a retire is pending.
 				 */
 				if ((old & SE_EWANTED) == 0) {
-					if (!PP_PR_NOSHARE(pp)) {
-						pp->p_selock = old + SE_READER;
-						mutex_exit(pse);
-						return (1);
-					}
+					pp->p_selock = old + SE_READER;
+					mutex_exit(pse);
+					return (1);
 				}
 			}
 			mutex_exit(pse);
