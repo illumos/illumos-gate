@@ -70,7 +70,11 @@
 #include <vm/anon.h>
 #include <vm/page.h>
 #include <vm/vpage.h>
-
+#include <sys/proc.h>
+#include <sys/task.h>
+#include <sys/project.h>
+#include <sys/zone.h>
+#include <sys/shm_impl.h>
 /*
  * Private seg op routines.
  */
@@ -210,7 +214,7 @@ static struct segvnvmstats_str {
 #define	SDR_RANGE	1		/* demote entire range */
 #define	SDR_END		2		/* demote non aligned ends only */
 
-#define	CALC_LPG_REGION(pgsz, seg, addr, len, lpgaddr, lpgeaddr) {            \
+#define	CALC_LPG_REGION(pgsz, seg, addr, len, lpgaddr, lpgeaddr) {	    \
 		if ((len) != 0) { 		      	      		      \
 			lpgaddr = (caddr_t)P2ALIGN((uintptr_t)(addr), pgsz);  \
 			ASSERT(lpgaddr >= (seg)->s_base);	      	      \
@@ -2393,13 +2397,29 @@ segvn_faultpage(
 			 *    allocating vpage here if it's absent requires
 			 *    upgrading the segvn reader lock, the cost of
 			 *    which does not seem worthwhile.
+			 *
+			 * Usually testing and setting VPP_ISPPLOCK and
+			 * VPP_SETPPLOCK requires holding the segvn lock as
+			 * writer, but in this case all readers are
+			 * serializing on the anon array lock.
 			 */
 			if (AS_ISPGLCK(seg->s_as) && vpage != NULL &&
-			    (svd->flags & MAP_NORESERVE)) {
-				claim = VPP_PROT(vpage) & PROT_WRITE;
+			    (svd->flags & MAP_NORESERVE) &&
+			    !VPP_ISPPLOCK(vpage)) {
+				proc_t *p = seg->s_as->a_proc;
 				ASSERT(svd->type == MAP_PRIVATE);
-				if (page_pp_lock(pp, claim, 0))
-					VPP_SETPPLOCK(vpage);
+				mutex_enter(&p->p_lock);
+				if (rctl_incr_locked_mem(p, NULL, PAGESIZE,
+				    1) == 0) {
+					claim = VPP_PROT(vpage) & PROT_WRITE;
+					if (page_pp_lock(pp, claim, 0)) {
+						VPP_SETPPLOCK(vpage);
+					} else {
+						rctl_decr_locked_mem(p, NULL,
+						    PAGESIZE, 1);
+					}
+				}
+				mutex_exit(&p->p_lock);
 			}
 
 			hat_memload(hat, addr, pp, prot, hat_flag);
@@ -5826,7 +5846,7 @@ segvn_claim_pages(
 	page_t *pp;
 	pgcnt_t pg_idx, i;
 	int err = 0;
-	anoff_t	aoff;
+	anoff_t aoff;
 	int anon = (amp != NULL) ? 1 : 0;
 
 	ASSERT(svd->type == MAP_PRIVATE);
@@ -6931,12 +6951,31 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 	struct anon *ap;
 	struct vattr va;
 	anon_sync_obj_t cookie;
+	struct kshmid *sp = NULL;
+	struct proc	*p = curproc;
+	kproject_t	*proj = NULL;
+	int chargeproc = 1;
+	size_t locked_bytes = 0;
+	size_t unlocked_bytes = 0;
+	int err = 0;
 
 	/*
 	 * Hold write lock on address space because may split or concatenate
 	 * segments
 	 */
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+
+	/*
+	 * If this is a shm, use shm's project and zone, else use
+	 * project and zone of calling process
+	 */
+
+	/* Determine if this segment backs a sysV shm */
+	if (svd->amp != NULL && svd->amp->a_sp != NULL) {
+		sp = svd->amp->a_sp;
+		proj = sp->shm_perm.ipc_proj;
+		chargeproc = 0;
+	}
 
 	SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
 	if (attr) {
@@ -6990,6 +7029,61 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 	offset = svd->offset + (uintptr_t)(addr - seg->s_base);
 	evp = &svd->vpage[seg_page(seg, addr + len)];
 
+	if (sp != NULL)
+		mutex_enter(&sp->shm_mlock);
+
+	/* determine number of unlocked bytes in range for lock operation */
+	if (op == MC_LOCK) {
+
+		if (sp == NULL) {
+			for (vpp = &svd->vpage[seg_page(seg, addr)]; vpp < evp;
+			    vpp++) {
+				if (!VPP_ISPPLOCK(vpp))
+					unlocked_bytes += PAGESIZE;
+			}
+		} else {
+			ulong_t		i_idx, i_edx;
+			anon_sync_obj_t	i_cookie;
+			struct anon	*i_ap;
+			struct vnode	*i_vp;
+			u_offset_t	i_off;
+
+			/* Only count sysV pages once for locked memory */
+			i_edx = svd->anon_index + seg_page(seg, addr + len);
+			ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
+			for (i_idx = anon_index; i_idx < i_edx; i_idx++) {
+				anon_array_enter(amp, i_idx, &i_cookie);
+				i_ap = anon_get_ptr(amp->ahp, i_idx);
+				if (i_ap == NULL) {
+					unlocked_bytes += PAGESIZE;
+					anon_array_exit(&i_cookie);
+					continue;
+				}
+				swap_xlate(i_ap, &i_vp, &i_off);
+				anon_array_exit(&i_cookie);
+				pp = page_lookup(i_vp, i_off, SE_SHARED);
+				if (pp == NULL) {
+					unlocked_bytes += PAGESIZE;
+					continue;
+				} else if (pp->p_lckcnt == 0)
+					unlocked_bytes += PAGESIZE;
+				page_unlock(pp);
+			}
+			ANON_LOCK_EXIT(&amp->a_rwlock);
+		}
+
+		mutex_enter(&p->p_lock);
+		err = rctl_incr_locked_mem(p, proj, unlocked_bytes,
+		    chargeproc);
+		mutex_exit(&p->p_lock);
+
+		if (err) {
+			if (sp != NULL)
+				mutex_exit(&sp->shm_mlock);
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			return (err);
+		}
+	}
 	/*
 	 * Loop over all pages in the range.  Process if we're locking and
 	 * page has not already been locked in this mapping; or if we're
@@ -7022,9 +7116,8 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 					if (pp == NULL) {
 						anon_array_exit(&cookie);
 						ANON_LOCK_EXIT(&amp->a_rwlock);
-						SEGVN_LOCK_EXIT(seg->s_as,
-						    &svd->lock);
-						return (ENOMEM);
+						err = ENOMEM;
+						goto out;
 					}
 					ASSERT(anon_get_ptr(amp->ahp,
 						anon_index) == NULL);
@@ -7096,8 +7189,8 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 				 * 4125102 for details of the problem.
 				 */
 				if (error == EDEADLK) {
-					SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
-					return (error);
+					err = error;
+					goto out;
 				}
 				/*
 				 * Quit if we fail to fault in the page.  Treat
@@ -7108,21 +7201,19 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 					va.va_mask = AT_SIZE;
 					if (VOP_GETATTR(svd->vp, &va, 0,
 					    svd->cred) != 0) {
-						SEGVN_LOCK_EXIT(seg->s_as,
-						    &svd->lock);
-						return (EIO);
+						err = EIO;
+						goto out;
 					}
 					if (btopr(va.va_size) >=
 					    btopr(off + 1)) {
-						SEGVN_LOCK_EXIT(seg->s_as,
-						    &svd->lock);
-						return (EIO);
+						err = EIO;
+						goto out;
 					}
-					SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
-					return (0);
+					goto out;
+
 				} else if (error) {
-					SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
-					return (EIO);
+					err = EIO;
+					goto out;
 				}
 				pp = pl[0];
 				ASSERT(pp != NULL);
@@ -7154,39 +7245,75 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 			if (op == MC_LOCK) {
 				int ret = 1;	/* Assume success */
 
-				/*
-				 * Make sure another thread didn't lock
-				 * the page after we released the segment
-				 * lock.
-				 */
-				if ((attr == 0 || VPP_PROT(vpp) == pageprot) &&
-				    !VPP_ISPPLOCK(vpp)) {
-					ret = page_pp_lock(pp, claim, 0);
-					if (ret != 0) {
-						VPP_SETPPLOCK(vpp);
-						if (lockmap != (ulong_t *)NULL)
-							BT_SET(lockmap, pos);
-					}
-				}
-				page_unlock(pp);
+				ASSERT(!VPP_ISPPLOCK(vpp));
+
+				ret = page_pp_lock(pp, claim, 0);
 				if (ret == 0) {
-					SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
-					return (EAGAIN);
-				}
-			} else {
-				if (pp != NULL) {
-					if ((attr == 0 ||
-					    VPP_PROT(vpp) == pageprot) &&
-					    VPP_ISPPLOCK(vpp))
-						page_pp_unlock(pp, claim, 0);
+					/* locking page failed */
 					page_unlock(pp);
+					err = EAGAIN;
+					goto out;
+				}
+				VPP_SETPPLOCK(vpp);
+				if (sp != NULL) {
+					if (pp->p_lckcnt == 1)
+						locked_bytes += PAGESIZE;
+				} else
+					locked_bytes += PAGESIZE;
+
+				if (lockmap != (ulong_t *)NULL)
+					BT_SET(lockmap, pos);
+
+				page_unlock(pp);
+			} else {
+				ASSERT(VPP_ISPPLOCK(vpp));
+				if (pp != NULL) {
+					/* sysV pages should be locked */
+					ASSERT(sp == NULL || pp->p_lckcnt > 0);
+					page_pp_unlock(pp, claim, 0);
+					if (sp != NULL) {
+						if (pp->p_lckcnt == 0)
+							unlocked_bytes
+							    += PAGESIZE;
+					} else
+						unlocked_bytes += PAGESIZE;
+					page_unlock(pp);
+				} else {
+					ASSERT(sp != NULL);
+					unlocked_bytes += PAGESIZE;
 				}
 				VPP_CLRPPLOCK(vpp);
 			}
 		}
 	}
+out:
+	if (op == MC_LOCK) {
+		/* Credit back bytes that did not get locked */
+		if ((unlocked_bytes - locked_bytes) > 0) {
+			if (proj == NULL)
+				mutex_enter(&p->p_lock);
+			rctl_decr_locked_mem(p, proj,
+			    (unlocked_bytes - locked_bytes), chargeproc);
+			if (proj == NULL)
+				mutex_exit(&p->p_lock);
+		}
+
+	} else {
+		/* Account bytes that were unlocked */
+		if (unlocked_bytes > 0) {
+			if (proj == NULL)
+				mutex_enter(&p->p_lock);
+			rctl_decr_locked_mem(p, proj, unlocked_bytes,
+			    chargeproc);
+			if (proj == NULL)
+				mutex_exit(&p->p_lock);
+		}
+	}
+	if (sp != NULL)
+		mutex_exit(&sp->shm_mlock);
 	SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
-	return (0);
+
+	return (err);
 }
 
 /*

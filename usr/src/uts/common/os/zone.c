@@ -316,6 +316,7 @@ const char  *zone_status_table[] = {
  * This isn't static so lint doesn't complain.
  */
 rctl_hndl_t rc_zone_cpu_shares;
+rctl_hndl_t rc_zone_locked_mem;
 rctl_hndl_t rc_zone_nlwps;
 rctl_hndl_t rc_zone_shmmax;
 rctl_hndl_t rc_zone_shmmni;
@@ -903,8 +904,8 @@ zone_lwps_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rcntl,
 
 /*ARGSUSED*/
 static int
-zone_lwps_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e, rctl_qty_t nv) {
-
+zone_lwps_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e, rctl_qty_t nv)
+{
 	ASSERT(MUTEX_HELD(&p->p_lock));
 	ASSERT(e->rcep_t == RCENTITY_ZONE);
 	if (e->rcep_p.zone == NULL)
@@ -1004,6 +1005,51 @@ static rctl_ops_t zone_msgmni_ops = {
 	zone_msgmni_test
 };
 
+/*ARGSUSED*/
+static rctl_qty_t
+zone_locked_mem_usage(rctl_t *rctl, struct proc *p)
+{
+	rctl_qty_t q;
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	mutex_enter(&p->p_zone->zone_rctl_lock);
+	q = p->p_zone->zone_locked_mem;
+	mutex_exit(&p->p_zone->zone_rctl_lock);
+	return (q);
+}
+
+/*ARGSUSED*/
+static int
+zone_locked_mem_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e,
+    rctl_val_t *rcntl, rctl_qty_t incr, uint_t flags)
+{
+	rctl_qty_t q;
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(MUTEX_HELD(&p->p_zone->zone_rctl_lock));
+	q = p->p_zone->zone_locked_mem;
+	if (q + incr > rcntl->rcv_value)
+		return (1);
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+zone_locked_mem_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
+    rctl_qty_t nv)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+	if (e->rcep_p.zone == NULL)
+		return (0);
+	e->rcep_p.zone->zone_locked_mem_ctl = nv;
+	return (0);
+}
+
+static rctl_ops_t zone_locked_mem_ops = {
+	rcop_no_action,
+	zone_locked_mem_usage,
+	zone_locked_mem_set,
+	zone_locked_mem_test
+};
 
 /*
  * Helper function to brand the zone with a unique ID.
@@ -1209,6 +1255,10 @@ zone_init(void)
 	rde = rctl_dict_lookup("zone.cpu-shares");
 	(void) rctl_val_list_insert(&rde->rcd_default_value, dval);
 
+	rc_zone_locked_mem = rctl_register("zone.max-locked-memory",
+	    RCENTITY_ZONE, RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_BYTES |
+	    RCTL_GLOBAL_DENY_ALWAYS, UINT64_MAX, UINT64_MAX,
+	    &zone_locked_mem_ops);
 	/*
 	 * Initialize the ``global zone''.
 	 */
@@ -2458,6 +2508,14 @@ zsched(void *arg)
 	mutex_exit(&global_zone->zone_nlwps_lock);
 
 	/*
+	 * Decrement locked memory counts on old zone and project.
+	 */
+	mutex_enter(&global_zone->zone_rctl_lock);
+	global_zone->zone_locked_mem -= pp->p_locked_mem;
+	pj->kpj_data.kpd_locked_mem -= pp->p_locked_mem;
+	mutex_exit(&global_zone->zone_rctl_lock);
+
+	/*
 	 * Create and join a new task in project '0' of this zone.
 	 *
 	 * We don't need to call holdlwps() since we know we're the only lwp in
@@ -2468,20 +2526,28 @@ zsched(void *arg)
 	tk = task_create(0, zone);
 	mutex_enter(&cpu_lock);
 	oldtk = task_join(tk, 0);
-	mutex_exit(&curproc->p_lock);
-	mutex_exit(&cpu_lock);
-	task_rele(oldtk);
+
+	pj = pp->p_task->tk_proj;
+
+	mutex_enter(&zone->zone_rctl_lock);
+	zone->zone_locked_mem += pp->p_locked_mem;
+	pj->kpj_data.kpd_locked_mem += pp->p_locked_mem;
+	mutex_exit(&zone->zone_rctl_lock);
 
 	/*
 	 * add lwp counts to zsched's zone, and increment project's task count
 	 * due to the task created in the above tasksys_settaskid
 	 */
-	pj = pp->p_task->tk_proj;
+
 	mutex_enter(&zone->zone_nlwps_lock);
 	pj->kpj_nlwps += pp->p_lwpcnt;
 	pj->kpj_ntasks += 1;
 	zone->zone_nlwps += pp->p_lwpcnt;
 	mutex_exit(&zone->zone_nlwps_lock);
+
+	mutex_exit(&curproc->p_lock);
+	mutex_exit(&cpu_lock);
+	task_rele(oldtk);
 
 	/*
 	 * The process was created by a process in the global zone, hence the
@@ -2953,6 +3019,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_initname = NULL;
 	mutex_init(&zone->zone_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&zone->zone_nlwps_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&zone->zone_rctl_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&zone->zone_cv, NULL, CV_DEFAULT, NULL);
 	list_create(&zone->zone_zsd, sizeof (struct zsd_entry),
 	    offsetof(struct zsd_entry, zsd_linkage));
@@ -2990,6 +3057,8 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_initname =
 	    kmem_alloc(strlen(zone_default_initname) + 1, KM_SLEEP);
 	(void) strcpy(zone->zone_initname, zone_default_initname);
+	zone->zone_locked_mem = 0;
+	zone->zone_locked_mem_ctl = UINT64_MAX;
 
 	/*
 	 * Zsched initializes the rctls.
@@ -4145,14 +4214,25 @@ zone_enter(zoneid_t zoneid)
 	zone->zone_nlwps += pp->p_lwpcnt;
 	/* add 1 task to zone's proj0 */
 	zone_proj0->kpj_ntasks += 1;
-	mutex_exit(&pp->p_lock);
 	mutex_exit(&zone->zone_nlwps_lock);
+
+	mutex_enter(&zone->zone_rctl_lock);
+	zone->zone_locked_mem += pp->p_locked_mem;
+	zone_proj0->kpj_data.kpd_locked_mem += pp->p_locked_mem;
+	mutex_exit(&zone->zone_rctl_lock);
 
 	/* remove lwps from proc's old zone and old project */
 	mutex_enter(&pp->p_zone->zone_nlwps_lock);
 	pp->p_zone->zone_nlwps -= pp->p_lwpcnt;
 	pp->p_task->tk_proj->kpj_nlwps -= pp->p_lwpcnt;
 	mutex_exit(&pp->p_zone->zone_nlwps_lock);
+
+	mutex_enter(&pp->p_zone->zone_rctl_lock);
+	pp->p_zone->zone_locked_mem -= pp->p_locked_mem;
+	pp->p_task->tk_proj->kpj_data.kpd_locked_mem -= pp->p_locked_mem;
+	mutex_exit(&pp->p_zone->zone_rctl_lock);
+
+	mutex_exit(&pp->p_lock);
 
 	/*
 	 * Joining the zone cannot fail from now on.

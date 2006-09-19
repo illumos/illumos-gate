@@ -241,6 +241,8 @@ struct anon_hdr {
 #define	ANON_ALLOC_FORCE	0x2	/* force single level anon array */
 #define	ANON_GROWDOWN		0x4	/* anon array should grow downward */
 
+struct kshmid;
+
 /*
  * The anon_map structure is used by various clients of the anon layer to
  * manage anonymous memory.   When anonymous memory is shared,
@@ -284,6 +286,7 @@ struct anon_map {
 	ulong_t	refcnt;		/* reference count on this structure */
 	ushort_t a_szc;		/* max szc among shared processes */
 	void	*locality;	/* lgroup locality info */
+	struct kshmid *a_sp;	/* kshmid if amp backs sysV, or NULL */
 };
 
 #ifdef _KERNEL

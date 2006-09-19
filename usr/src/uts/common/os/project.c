@@ -55,7 +55,7 @@ rctl_hndl_t rc_project_semmni;
 rctl_hndl_t rc_project_shmmax;
 rctl_hndl_t rc_project_shmmni;
 rctl_hndl_t rc_project_portids;
-rctl_hndl_t rc_project_devlockmem;
+rctl_hndl_t rc_project_locked_mem;
 rctl_hndl_t rc_project_contract;
 rctl_hndl_t rc_project_crypto_mem;
 
@@ -114,7 +114,8 @@ project_data_init(kproject_data_t *data)
 	data->kpd_ipc.ipcq_shmmni = 0;
 	data->kpd_ipc.ipcq_semmni = 0;
 	data->kpd_ipc.ipcq_msgmni = 0;
-	data->kpd_devlockmem = 0;
+	data->kpd_locked_mem = 0;
+	data->kpd_locked_mem_ctl = UINT64_MAX;
 	data->kpd_contract = 0;
 	data->kpd_crypto_mem = 0;
 }
@@ -442,6 +443,7 @@ project_lwps_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e, rctl_val_t *rcntl,
 	rctl_qty_t nlwps;
 
 	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(MUTEX_HELD(&p->p_zone->zone_nlwps_lock));
 	ASSERT(e->rcep_t == RCENTITY_PROJECT);
 	if (e->rcep_p.proj == NULL)
 		return (0);
@@ -628,29 +630,51 @@ static rctl_ops_t project_msgmni_ops = {
 	project_msgmni_test
 };
 
-/*
- * project.max-device-locked-memory resource control support.
- */
+/*ARGSUSED*/
+static rctl_qty_t
+project_locked_mem_usage(rctl_t *rctl, struct proc *p)
+{
+	rctl_qty_t q;
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	mutex_enter(&p->p_zone->zone_rctl_lock);
+	q = p->p_task->tk_proj->kpj_data.kpd_locked_mem;
+	mutex_exit(&p->p_zone->zone_rctl_lock);
+	return (q);
+}
 
 /*ARGSUSED*/
 static int
-project_devlockmem_test(struct rctl *rctl, struct proc *p, rctl_entity_p_t *e,
+project_locked_mem_test(struct rctl *rctl, struct proc *p, rctl_entity_p_t *e,
     rctl_val_t *rval, rctl_qty_t inc, uint_t flags)
 {
-	rctl_qty_t v;
+	rctl_qty_t q;
 	ASSERT(MUTEX_HELD(&p->p_lock));
-	ASSERT(e->rcep_t == RCENTITY_PROJECT);
-	v = e->rcep_p.proj->kpj_data.kpd_devlockmem + inc;
-	if (v > rval->rcv_value)
+	ASSERT(MUTEX_HELD(&p->p_zone->zone_rctl_lock));
+	q = p->p_task->tk_proj->kpj_data.kpd_locked_mem;
+	if (q + inc > rval->rcv_value)
 		return (1);
 	return (0);
 }
 
-static rctl_ops_t project_devlockmem_ops = {
+/*ARGSUSED*/
+static int
+project_locked_mem_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
+    rctl_qty_t nv) {
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_PROJECT);
+	if (e->rcep_p.proj == NULL)
+		return (0);
+
+	e->rcep_p.proj->kpj_data.kpd_locked_mem_ctl = nv;
+	return (0);
+}
+
+static rctl_ops_t project_locked_mem_ops = {
 	rcop_no_action,
-	rcop_no_usage,
-	rcop_no_set,
-	project_devlockmem_test
+	project_locked_mem_usage,
+	project_locked_mem_set,
+	project_locked_mem_test
 };
 
 /*
@@ -826,17 +850,13 @@ project_init(void)
 	/*
 	 * Resource control for locked memory
 	 */
-	rc_project_devlockmem = rctl_register(
-	    "project.max-device-locked-memory", RCENTITY_PROJECT,
+	rc_project_locked_mem = rctl_register(
+	    "project.max-locked-memory", RCENTITY_PROJECT,
 	    RCTL_GLOBAL_DENY_ALWAYS | RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_BYTES,
-	    UINT64_MAX, UINT64_MAX, &project_devlockmem_ops);
+	    UINT64_MAX, UINT64_MAX, &project_locked_mem_ops);
 
-	/*
-	 * Defaults to 1/16th of the machine's memory
-	 */
-	qty = availrmem_initial << (PAGESHIFT - 4);
-
-	rctl_add_default_limit("project.max-device-locked-memory", qty,
+	/* Default value equals that of max-shm-memory. */
+	rctl_add_default_limit("project.max-locked-memory", qty,
 	    RCPRIV_PRIVILEGED, RCTL_LOCAL_DENY);
 
 	/*

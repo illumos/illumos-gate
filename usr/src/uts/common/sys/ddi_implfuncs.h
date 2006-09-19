@@ -273,10 +273,8 @@ void e_devid_cache_free_devt_list(int, dev_t *);
 /*
  * Resource control functions to lock down device memory.
  */
-extern int i_ddi_incr_locked_memory(proc_t *, task_t *, kproject_t *,
-	zone_t *, rctl_qty_t);
-extern void i_ddi_decr_locked_memory(proc_t *, task_t *, kproject_t *,
-	zone_t *, rctl_qty_t);
+extern int i_ddi_incr_locked_memory(proc_t *, rctl_qty_t);
+extern void i_ddi_decr_locked_memory(proc_t *, rctl_qty_t);
 
 #endif	/* _KERNEL */
 

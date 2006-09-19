@@ -2566,3 +2566,110 @@ rctl_init(void)
 
 	rctlproc_init();
 }
+
+/*
+ * rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc)
+ *
+ * Increments the amount of locked memory on a project, and
+ * zone. If proj is NULL, the proj and zone of proc_t p is used.  If
+ * chargeproc is non-zero, then the charged amount is cached on p->p_locked_mem
+ * so that the charge can be migrated when a process changes projects.
+ *
+ * Return values
+ *    0 - success
+ *    EAGAIN - attempting to increment locked memory is denied by one
+ *      or more resource entities.
+ */
+int
+rctl_incr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
+    int chargeproc)
+{
+	kproject_t *projp;
+	zone_t *zonep;
+	rctl_entity_p_t e;
+	int ret = 0;
+
+	ASSERT(p != NULL);
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	if (proj != NULL) {
+		projp = proj;
+		zonep = zone_find_by_id(projp->kpj_zoneid);
+	} else {
+		projp = p->p_task->tk_proj;
+		zonep = p->p_zone;
+	}
+
+	mutex_enter(&zonep->zone_rctl_lock);
+
+	e.rcep_p.proj = projp;
+	e.rcep_t = RCENTITY_PROJECT;
+	if (projp->kpj_data.kpd_locked_mem + inc >
+	    projp->kpj_data.kpd_locked_mem_ctl) {
+		if (rctl_test_entity(rc_project_locked_mem, projp->kpj_rctls,
+		    p, &e, inc, 0) & RCT_DENY) {
+			ret = EAGAIN;
+			goto out;
+		}
+	}
+	e.rcep_p.zone = zonep;
+	e.rcep_t = RCENTITY_ZONE;
+	if (zonep->zone_locked_mem + inc > zonep->zone_locked_mem_ctl) {
+		if (rctl_test_entity(rc_zone_locked_mem, zonep->zone_rctls,
+		    p, &e, inc, 0) & RCT_DENY) {
+			ret = EAGAIN;
+			goto out;
+		}
+	}
+
+	zonep->zone_locked_mem += inc;
+	projp->kpj_data.kpd_locked_mem += inc;
+	if (chargeproc != 0) {
+		p->p_locked_mem += inc;
+	}
+out:
+	mutex_exit(&zonep->zone_rctl_lock);
+	if (proj != NULL)
+		zone_rele(zonep);
+	return (ret);
+}
+
+/*
+ * rctl_decr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc)
+ *
+ * Decrements the amount of locked memory on a project and
+ * zone.  If proj is NULL, the proj and zone of proc_t p is used.  If
+ * creditproc is non-zero, then the quantity of locked memory is subtracted
+ * from p->p_locked_mem.
+ *
+ * Return values
+ *   none
+ */
+void
+rctl_decr_locked_mem(proc_t *p, kproject_t *proj, rctl_qty_t inc,
+    int creditproc)
+{
+	kproject_t *projp;
+	zone_t *zonep;
+
+	if (proj != NULL) {
+		projp = proj;
+		zonep = zone_find_by_id(projp->kpj_zoneid);
+	} else {
+		ASSERT(p != NULL);
+		ASSERT(MUTEX_HELD(&p->p_lock));
+		projp = p->p_task->tk_proj;
+		zonep = p->p_zone;
+	}
+
+	mutex_enter(&zonep->zone_rctl_lock);
+	zonep->zone_locked_mem -= inc;
+	projp->kpj_data.kpd_locked_mem -= inc;
+	if (creditproc != 0) {
+		ASSERT(p != NULL);
+		ASSERT(MUTEX_HELD(&p->p_lock));
+		p->p_locked_mem -= inc;
+	}
+	mutex_exit(&zonep->zone_rctl_lock);
+	if (proj != NULL)
+		zone_rele(zonep);
+}

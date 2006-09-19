@@ -38,7 +38,6 @@
 #include <sys/ddidevmap.h>
 #include <sys/vnode.h>
 #include <sys/sysmacros.h>
-#include <sys/project.h>
 #include <vm/seg_dev.h>
 #include <sys/pmem.h>
 #include <vm/hat_i86.h>
@@ -126,7 +125,7 @@ static int lpp_create(page_t **, pgcnt_t, pgcnt_t *, pmem_lpg_t **,
 static void tlist_in(page_t *, pgcnt_t, vnode_t *, u_offset_t *);
 static void tlist_out(page_t *, pgcnt_t);
 static int pmem_cookie_alloc(struct devmap_pmem_cookie **, pgcnt_t, uint_t);
-static int pmem_lock(pgcnt_t, kproject_t **);
+static int pmem_lock(pgcnt_t, proc_t *p);
 
 /*
  * Called by driver devmap routine to pass physical memory mapping info to
@@ -314,13 +313,12 @@ devmap_pmem_alloc(size_t size, uint_t flags, devmap_pmem_cookie_t *cookiep)
 	pcp->dp_npages = npages;
 
 	/*
-	 * See if the requested memory can be locked. Currently we do resource
-	 * controls on the project levlel only.
+	 * See if the requested memory can be locked.
 	 */
-	if (pmem_lock(npages, &(pcp->dp_projp)) == DDI_FAILURE)
+	pcp->dp_proc = curproc;
+	if (pmem_lock(npages, curproc) == DDI_FAILURE)
 		goto alloc_fail;
 	locked = 1;
-
 	/*
 	 * First, grab as many as possible from pmem_mpool. If pages in
 	 * pmem_mpool are enough for this request, we are done.
@@ -402,8 +400,7 @@ alloc_fail:
 		mutex_exit(&pmem_mutex);
 	}
 	if (locked == 1)
-		i_ddi_decr_locked_memory(NULL, NULL, pcp->dp_projp, NULL,
-		    ptob(pcp->dp_npages));
+		i_ddi_decr_locked_memory(pcp->dp_proc, ptob(pcp->dp_npages));
 	/* Freeing pmem_cookie. */
 	kmem_free(pcp->dp_vnp, sizeof (vnode_t));
 	kmem_free(pcp->dp_pparray, npages * sizeof (page_t *));
@@ -492,8 +489,8 @@ devmap_pmem_free(devmap_pmem_cookie_t cookie)
 	pmem_lpg_concat(&pmem_occ_lpgs, &pf_lpgs);
 	mutex_exit(&pmem_mutex);
 
-	i_ddi_decr_locked_memory(NULL, NULL, (kproject_t *)pcp->dp_projp, NULL,
-	    ptob(pcp->dp_npages));
+	if (curproc == pcp->dp_proc)
+		i_ddi_decr_locked_memory(curproc, ptob(pcp->dp_npages));
 	kmem_free(pcp->dp_vnp, sizeof (vnode_t));
 	kmem_free(pcp->dp_pparray, pcp->dp_npages * sizeof (page_t *));
 	kmem_free(pcp, sizeof (struct devmap_pmem_cookie));
@@ -552,19 +549,13 @@ pmem_cookie_alloc(struct devmap_pmem_cookie **pcpp, pgcnt_t n, uint_t kflags)
 	return (DDI_SUCCESS);
 }
 
-/* Try to lock down n pages resource for current project. */
+/* Try to lock down n pages resource */
 static int
-pmem_lock(pgcnt_t n, kproject_t **prjpp)
+pmem_lock(pgcnt_t n, proc_t *p)
 {
-	mutex_enter(&curproc->p_lock);
-	if (i_ddi_incr_locked_memory(curproc, NULL, NULL, NULL,
-	    ptob(n)) != 0) {
-		mutex_exit(&curproc->p_lock);
+	if (i_ddi_incr_locked_memory(p, ptob(n)) != 0) {
 		return (DDI_FAILURE);
 	}
-	/* Store this project in cookie for later lock/unlock. */
-	*prjpp = curproc->p_task->tk_proj;
-	mutex_exit(&curproc->p_lock);
 	return (DDI_SUCCESS);
 }
 

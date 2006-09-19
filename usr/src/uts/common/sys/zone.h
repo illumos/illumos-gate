@@ -326,6 +326,14 @@ typedef struct zone {
 	uint_t		zone_rootpathlen; /* strlen(zone_rootpath) + 1 */
 	uint32_t	zone_shares;	/* FSS shares allocated to zone */
 	rctl_set_t	*zone_rctls;	/* zone-wide (zone.*) rctls */
+	kmutex_t	zone_rctl_lock; /* protects zone_locked_mem and */
+					/* kpd_locked_mem for all */
+					/* projects in zone */
+					/* grab after p_lock, before rcs_lock */
+	rctl_qty_t	zone_locked_mem; /* bytes of locked memory in zone */
+	rctl_qty_t	zone_locked_mem_ctl;	/* current locked memory */
+						/* limit.  Protected by */
+						/* zone_rctls->rcs_lock */
 	list_t		zone_zsd;	/* list of Zone-Specific Data values */
 	kcondvar_t	zone_cv;	/* used to signal state changes */
 	struct proc	*zone_zsched;	/* Dummy kernel "zsched" process */
@@ -543,6 +551,8 @@ extern void mount_in_progress(void);
 extern void mount_completed(void);
 
 extern int zone_walk(int (*)(zone_t *, void *), void *);
+
+extern rctl_hndl_t rc_zone_locked_mem;
 
 #endif	/* _KERNEL */
 

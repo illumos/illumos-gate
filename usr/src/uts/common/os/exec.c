@@ -1816,6 +1816,7 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 
 	as = as_alloc();
 	p->p_as = as;
+	as->a_proc = p;
 	if (p->p_model == DATAMODEL_ILP32)
 		as->a_userlimit = (caddr_t)USERLIMIT32;
 	(void) hat_setup(as->a_hat, HAT_ALLOC);

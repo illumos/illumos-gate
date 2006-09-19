@@ -108,6 +108,7 @@
 #include <sys/project.h>
 #include <sys/policy.h>
 #include <sys/zone.h>
+#include <sys/rctl.h>
 
 #include <sys/ipc.h>
 #include <sys/ipc_impl.h>
@@ -125,11 +126,11 @@
 
 #include <c2/audit.h>
 
-static int shmem_lock(struct anon_map *amp);
-static void shmem_unlock(struct anon_map *amp, uint_t lck);
+static int shmem_lock(kshmid_t *sp, struct anon_map *amp);
+static void shmem_unlock(kshmid_t *sp, struct anon_map *amp);
 static void sa_add(struct proc *pp, caddr_t addr, size_t len, ulong_t flags,
 	kshmid_t *id);
-static void shm_rm_amp(struct anon_map *amp, uint_t lckflag);
+static void shm_rm_amp(struct anon_map *amp);
 static void shm_dtor(kipc_perm_t *);
 static void shm_rmid(kipc_perm_t *);
 static void shm_remove_zone(zoneid_t, void *);
@@ -464,7 +465,6 @@ shmat(int shmid, caddr_t uaddr, int uflags, uintptr_t *rvp)
 			sp->shm_sptinfo->sptas = segspt->s_as;
 			sp->shm_sptseg = segspt;
 			sp->shm_sptprot = prot;
-			sp->shm_lkcnt = 0;
 		} else if ((prot & sp->shm_sptprot) != sp->shm_sptprot) {
 			/*
 			 * Ensure we're attaching to an ISM segment with
@@ -573,6 +573,11 @@ shm_dtor(kipc_perm_t *perm)
 	uint_t cnt;
 	size_t rsize;
 
+	if (sp->shm_lkcnt > 0) {
+		shmem_unlock(sp, sp->shm_amp);
+		sp->shm_lkcnt = 0;
+	}
+
 	if (sp->shm_sptinfo) {
 		if (isspt(sp))
 			sptdestroy(sp->shm_sptinfo->sptas, sp->shm_amp);
@@ -583,7 +588,7 @@ shm_dtor(kipc_perm_t *perm)
 	cnt = --sp->shm_amp->refcnt;
 	ANON_LOCK_EXIT(&sp->shm_amp->a_rwlock);
 	ASSERT(cnt == 0);
-	shm_rm_amp(sp->shm_amp, sp->shm_lkcnt);
+	shm_rm_amp(sp->shm_amp);
 
 	if (sp->shm_perm.ipc_id != IPC_ID_INVAL) {
 		rsize = ptob(btopr(sp->shm_segsz));
@@ -705,8 +710,13 @@ shmctl(int shmid, int cmd, void *arg)
 		if ((error = secpolicy_lock_memory(cr)) != 0)
 			break;
 
+		/* protect against overflow */
+		if (sp->shm_lkcnt >= USHRT_MAX) {
+			error = ENOMEM;
+			break;
+		}
 		if (!isspt(sp) && (sp->shm_lkcnt++ == 0)) {
-			if (error = shmem_lock(sp->shm_amp)) {
+			if (error = shmem_lock(sp, sp->shm_amp)) {
 			    ANON_LOCK_ENTER(&sp->shm_amp->a_rwlock, RW_WRITER);
 			    cmn_err(CE_NOTE,
 				"shmctl - couldn't lock %ld pages into memory",
@@ -714,7 +724,6 @@ shmctl(int shmid, int cmd, void *arg)
 			    ANON_LOCK_EXIT(&sp->shm_amp->a_rwlock);
 			    error = ENOMEM;
 			    sp->shm_lkcnt--;
-			    shmem_unlock(sp->shm_amp, 0);
 			}
 		}
 		break;
@@ -724,10 +733,8 @@ shmctl(int shmid, int cmd, void *arg)
 		if ((error = secpolicy_lock_memory(cr)) != 0)
 			break;
 
-		if (!isspt(sp)) {
-			if (sp->shm_lkcnt && (--sp->shm_lkcnt == 0)) {
-				shmem_unlock(sp->shm_amp, 1);
-			}
+		if (sp->shm_lkcnt && (--sp->shm_lkcnt == 0)) {
+			shmem_unlock(sp, sp->shm_amp);
 		}
 		break;
 
@@ -863,7 +870,7 @@ top:
 		}
 
 		sp->shm_amp = anonmap_alloc(rsize, rsize);
-
+		sp->shm_amp->a_sp = sp;
 		/*
 		 * Store the original user's requested size, in bytes,
 		 * rather than the page-aligned size.  The former is
@@ -878,7 +885,6 @@ top:
 		sp->shm_cpid = curproc->p_pid;
 		sp->shm_ismattch = 0;
 		sp->shm_sptinfo = NULL;
-
 		/*
 		 * Check limits one last time, push id into global
 		 * visibility, and update resource usage counts.
@@ -1094,115 +1100,58 @@ shmexit(struct proc *pp)
  * At this time pages should be in memory, so just lock them.
  */
 static void
-lock_again(size_t npages, struct anon_map *amp)
+lock_again(size_t npages, kshmid_t *sp, struct anon_map *amp)
 {
 	struct anon *ap;
 	struct page *pp;
 	struct vnode *vp;
-	anoff_t off;
+	u_offset_t off;
 	ulong_t anon_idx;
 	anon_sync_obj_t cookie;
 
+	mutex_enter(&sp->shm_mlock);
 	ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
-
 	for (anon_idx = 0; npages != 0; anon_idx++, npages--) {
 
 		anon_array_enter(amp, anon_idx, &cookie);
 		ap = anon_get_ptr(amp->ahp, anon_idx);
+		ASSERT(ap != NULL);
 		swap_xlate(ap, &vp, &off);
 		anon_array_exit(&cookie);
 
-		pp = page_lookup(vp, (u_offset_t)off, SE_SHARED);
+		pp = page_lookup(vp, off, SE_SHARED);
 		if (pp == NULL) {
 			panic("lock_again: page not in the system");
 			/*NOTREACHED*/
 		}
+		/* page should already be locked by caller */
+		ASSERT(pp->p_lckcnt > 0);
 		(void) page_pp_lock(pp, 0, 0);
 		page_unlock(pp);
 	}
 	ANON_LOCK_EXIT(&amp->a_rwlock);
+	mutex_exit(&sp->shm_mlock);
 }
-
-/* check if this segment is already locked. */
-/*ARGSUSED*/
-static int
-check_locked(struct as *as, struct segvn_data *svd, size_t npages)
-{
-	struct vpage *vpp = svd->vpage;
-	size_t i;
-	if (svd->vpage == NULL)
-		return (0);		/* unlocked */
-
-	SEGVN_LOCK_ENTER(as, &svd->lock, RW_READER);
-	for (i = 0; i < npages; i++, vpp++) {
-		if (VPP_ISPPLOCK(vpp) == 0) {
-			SEGVN_LOCK_EXIT(as, &svd->lock);
-			return (1);	/* partially locked */
-		}
-	}
-	SEGVN_LOCK_EXIT(as, &svd->lock);
-	return (2);			/* locked */
-}
-
 
 /*
  * Attach the shared memory segment to the process
  * address space and lock the pages.
  */
 static int
-shmem_lock(struct anon_map *amp)
+shmem_lock(kshmid_t *sp, struct anon_map *amp)
 {
 	size_t npages = btopr(amp->size);
-	struct seg *seg;
 	struct as *as;
 	struct segvn_crargs crargs;
-	struct segvn_data *svd;
-	proc_t *p = curproc;
-	caddr_t addr;
-	uint_t error, ret;
-	caddr_t seg_base;
-	size_t  seg_sz;
+	uint_t error;
 
-	as = p->p_as;
-	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
-	/* check if shared memory is already attached */
-	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg)) {
-		svd = (struct segvn_data *)seg->s_data;
-		if ((seg->s_ops == &segvn_ops) && (svd->amp == amp) &&
-		    (amp->size == seg->s_size)) {
-			switch (ret = check_locked(as, svd, npages)) {
-			case 0:			/* unlocked */
-			case 1:			/* partially locked */
-				seg_base = seg->s_base;
-				seg_sz = seg->s_size;
+	/*
+	 * A later ISM/DISM attach may increase the size of the amp, so
+	 * cache the number of pages locked for the future shmem_unlock()
+	 */
+	sp->shm_lkpages = npages;
 
-				AS_LOCK_EXIT(as, &as->a_lock);
-				if ((error = as_ctl(as, seg_base, seg_sz,
-					MC_LOCK, 0, 0, NULL, 0)) == 0)
-					lock_again(npages, amp);
-				(void) as_ctl(as, seg_base, seg_sz, MC_UNLOCK,
-					0, 0, NULL, NULL);
-				return (error);
-			case 2:			/* locked */
-				AS_LOCK_EXIT(as, &as->a_lock);
-				lock_again(npages, amp);
-				return (0);
-			default:
-				cmn_err(CE_WARN, "shmem_lock: deflt %d", ret);
-				break;
-			}
-		}
-	}
-	AS_LOCK_EXIT(as, &as->a_lock);
-
-	/* attach shm segment to our address space */
-	as_rangelock(as);
-	map_addr(&addr, amp->size, 0ll, 1, 0);
-	if (addr == NULL) {
-		as_rangeunlock(as);
-		return (ENOMEM);
-	}
-
+	as = as_alloc();
 	/* Initialize the create arguments and map the segment */
 	crargs = *(struct segvn_crargs *)zfod_argsp;	/* structure copy */
 	crargs.offset = (u_offset_t)0;
@@ -1211,16 +1160,15 @@ shmem_lock(struct anon_map *amp)
 	crargs.prot = PROT_ALL;
 	crargs.maxprot = crargs.prot;
 	crargs.flags = 0;
-
-	error = as_map(as, addr, amp->size, segvn_create, &crargs);
-	as_rangeunlock(as);
+	error = as_map(as, 0x0, amp->size, segvn_create, &crargs);
 	if (!error) {
-		if ((error = as_ctl(as, addr, amp->size, MC_LOCK, 0, 0,
+		if ((error = as_ctl(as, 0x0, amp->size, MC_LOCK, 0, 0,
 			NULL, 0)) == 0) {
-			lock_again(npages, amp);
+			lock_again(npages, sp, amp);
 		}
-		(void) as_unmap(as, addr, amp->size);
+		(void) as_unmap(as, 0x0, amp->size);
 	}
+	as_free(as);
 	return (error);
 }
 
@@ -1229,38 +1177,53 @@ shmem_lock(struct anon_map *amp)
  * Unlock shared memory
  */
 static void
-shmem_unlock(struct anon_map *amp, uint_t lck)
+shmem_unlock(kshmid_t *sp, struct anon_map *amp)
 {
 	struct anon *ap;
-	pgcnt_t npages = btopr(amp->size);
+	pgcnt_t npages = sp->shm_lkpages;
 	struct vnode *vp;
 	struct page *pp;
-	anoff_t off;
+	u_offset_t off;
 	ulong_t anon_idx;
+	size_t unlocked_bytes = 0;
+	kproject_t	*proj;
+	anon_sync_obj_t cookie;
 
+	proj = sp->shm_perm.ipc_proj;
+	mutex_enter(&sp->shm_mlock);
+	ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
 	for (anon_idx = 0; anon_idx < npages; anon_idx++) {
 
+		anon_array_enter(amp, anon_idx, &cookie);
 		if ((ap = anon_get_ptr(amp->ahp, anon_idx)) == NULL) {
-			if (lck) {
-				panic("shmem_unlock: null app");
-				/*NOTREACHED*/
-			}
-			continue;
+			panic("shmem_unlock: null app");
+			/*NOTREACHED*/
 		}
 		swap_xlate(ap, &vp, &off);
+		anon_array_exit(&cookie);
 		pp = page_lookup(vp, off, SE_SHARED);
 		if (pp == NULL) {
-			if (lck) {
-				panic("shmem_unlock: page not in the system");
-				/*NOTREACHED*/
-			}
-			continue;
+			panic("shmem_unlock: page not in the system");
+			/*NOTREACHED*/
 		}
-		if (pp->p_lckcnt) {
-			page_pp_unlock(pp, 0, 0);
-		}
+		/*
+		 * Page should at least have once lock from previous
+		 * shmem_lock
+		 */
+		ASSERT(pp->p_lckcnt > 0);
+		page_pp_unlock(pp, 0, 0);
+		if (pp->p_lckcnt == 0)
+			unlocked_bytes += PAGESIZE;
+
 		page_unlock(pp);
 	}
+
+	if (unlocked_bytes > 0) {
+		rctl_decr_locked_mem(NULL, proj, unlocked_bytes, 0);
+	}
+
+	ANON_LOCK_EXIT(&amp->a_rwlock);
+	mutex_exit(&sp->shm_mlock);
 }
 
 /*
@@ -1268,15 +1231,8 @@ shmem_unlock(struct anon_map *amp, uint_t lck)
  * amp.  This means all shmdt()s and the IPC_RMID have been done.
  */
 static void
-shm_rm_amp(struct anon_map *amp, uint_t lckflag)
+shm_rm_amp(struct anon_map *amp)
 {
-	/*
-	 * If we are finally deleting the
-	 * shared memory, and if no one did
-	 * the SHM_UNLOCK, we must do it now.
-	 */
-	shmem_unlock(amp, lckflag);
-
 	/*
 	 * Free up the anon_map.
 	 */

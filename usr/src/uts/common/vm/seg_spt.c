@@ -45,10 +45,13 @@
 #include <sys/debug.h>
 #include <sys/vtrace.h>
 #include <sys/shm.h>
+#include <sys/shm_impl.h>
 #include <sys/lgrp.h>
 #include <sys/vmsystm.h>
-
+#include <sys/policy.h>
+#include <sys/project.h>
 #include <sys/tnf_probe.h>
+#include <sys/zone.h>
 
 #define	SEGSPTADDR	(caddr_t)0x0
 
@@ -181,7 +184,7 @@ static int spt_anon_getpages(struct seg *seg, caddr_t addr, size_t len,
 /*ARGSUSED*/
 int
 sptcreate(size_t size, struct seg **sptseg, struct anon_map *amp,
-    uint_t prot, uint_t flags, uint_t share_szc)
+	uint_t prot, uint_t flags, uint_t share_szc)
 {
 	int 	err;
 	struct  as	*newas;
@@ -189,7 +192,7 @@ sptcreate(size_t size, struct seg **sptseg, struct anon_map *amp,
 
 #ifdef DEBUG
 	TNF_PROBE_1(sptcreate, "spt", /* CSTYLED */,
-                	tnf_ulong, size, size );
+			tnf_ulong, size, size );
 #endif
 	if (segspt_minfree == 0)	/* leave min 5% of availrmem for */
 		segspt_minfree = availrmem/20;	/* for the system */
@@ -201,11 +204,11 @@ sptcreate(size_t size, struct seg **sptseg, struct anon_map *amp,
 	 * get a new as for this shared memory segment
 	 */
 	newas = as_alloc();
+	newas->a_proc = NULL;
 	sptcargs.amp = amp;
 	sptcargs.prot = prot;
 	sptcargs.flags = flags;
 	sptcargs.szc = share_szc;
-
 	/*
 	 * create a shared page table (spt) segment
 	 */
@@ -245,10 +248,10 @@ segspt_free(struct seg	*seg)
 		if (sptd->spt_realsize)
 			segspt_free_pages(seg, seg->s_base, sptd->spt_realsize);
 
-		if (sptd->spt_ppa_lckcnt)
-			kmem_free(sptd->spt_ppa_lckcnt,
-				sizeof (*sptd->spt_ppa_lckcnt)
-				* btopr(sptd->spt_amp->size));
+	if (sptd->spt_ppa_lckcnt)
+		kmem_free(sptd->spt_ppa_lckcnt,
+		    sizeof (*sptd->spt_ppa_lckcnt)
+		    * btopr(sptd->spt_amp->size));
 		kmem_free(sptd->spt_vp, sizeof (*sptd->spt_vp));
 		mutex_destroy(&sptd->spt_lock);
 		kmem_free(sptd, sizeof (*sptd));
@@ -370,6 +373,7 @@ segspt_create(struct seg *seg, caddr_t argsp)
 	struct spt_data *sptd;
 	struct 	segspt_crargs *sptcargs = (struct segspt_crargs *)argsp;
 	struct anon_map *amp = sptcargs->amp;
+	struct kshmid	*sp = amp->a_sp;
 	struct	cred	*cred = CRED();
 	ulong_t		i, j, anon_index = 0;
 	pgcnt_t		npages = btopr(amp->size);
@@ -381,16 +385,20 @@ segspt_create(struct seg *seg, caddr_t argsp)
 	caddr_t		a;
 	pgcnt_t		pidx;
 	size_t		sz;
+	proc_t		*procp = curproc;
+	rctl_qty_t	lockedbytes = 0;
+	kproject_t	*proj;
 
 	/*
 	 * We are holding the a_lock on the underlying dummy as,
 	 * so we can make calls to the HAT layer.
 	 */
 	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(sp != NULL);
 
 #ifdef DEBUG
 	TNF_PROBE_2(segspt_create, "spt", /* CSTYLED */,
-                                tnf_opaque, addr, addr,
+				tnf_opaque, addr, addr,
 				tnf_ulong, len, seg->s_size);
 #endif
 	if ((sptcargs->flags & SHM_PAGEABLE) == 0) {
@@ -484,25 +492,49 @@ segspt_create(struct seg *seg, caddr_t argsp)
 	    seg, addr, S_CREATE, cred)) != 0)
 		goto out4;
 
+	mutex_enter(&sp->shm_mlock);
+
+	/* May be partially locked, so, count bytes to charge for locking */
+	for (i = 0; i < npages; i++)
+		if (ppa[i]->p_lckcnt == 0)
+			lockedbytes += PAGESIZE;
+
+	proj = sp->shm_perm.ipc_proj;
+
+	if (lockedbytes > 0) {
+		mutex_enter(&procp->p_lock);
+		if (rctl_incr_locked_mem(procp, proj, lockedbytes, 0)) {
+			mutex_exit(&procp->p_lock);
+			mutex_exit(&sp->shm_mlock);
+			for (i = 0; i < npages; i++)
+				page_unlock(ppa[i]);
+			err = ENOMEM;
+			goto out4;
+		}
+		mutex_exit(&procp->p_lock);
+	}
+
 	/*
 	 * addr is initial address corresponding to the first page on ppa list
 	 */
 	for (i = 0; i < npages; i++) {
 		/* attempt to lock all pages */
-		if (!page_pp_lock(ppa[i], 0, 1)) {
+		if (page_pp_lock(ppa[i], 0, 1) == 0) {
 			/*
 			 * if unable to lock any page, unlock all
 			 * of them and return error
 			 */
 			for (j = 0; j < i; j++)
 				page_pp_unlock(ppa[j], 0, 1);
-			for (i = 0; i < npages; i++) {
+			for (i = 0; i < npages; i++)
 				page_unlock(ppa[i]);
-			}
+			rctl_decr_locked_mem(NULL, proj, lockedbytes, 0);
+			mutex_exit(&sp->shm_mlock);
 			err = ENOMEM;
 			goto out4;
 		}
 	}
+	mutex_exit(&sp->shm_mlock);
 
 	/*
 	 * Some platforms assume that ISM mappings are HAT_LOAD_LOCK
@@ -582,6 +614,9 @@ segspt_free_pages(struct seg *seg, caddr_t addr, size_t len)
 	int		root = 0;
 	pgcnt_t		pgs, curnpgs = 0;
 	page_t		*rootpp;
+	rctl_qty_t	unlocked_bytes = 0;
+	kproject_t	*proj;
+	kshmid_t	*sp;
 
 	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
 
@@ -601,7 +636,13 @@ segspt_free_pages(struct seg *seg, caddr_t addr, size_t len)
 	if (sptd->spt_flags & SHM_PAGEABLE)
 		npages = btop(amp->size);
 
-	ASSERT(amp);
+	ASSERT(amp != NULL);
+
+	if ((sptd->spt_flags & SHM_PAGEABLE) == 0) {
+		sp = amp->a_sp;
+		proj = sp->shm_perm.ipc_proj;
+		mutex_enter(&sp->shm_mlock);
+	}
 	for (anon_idx = 0; anon_idx < npages; anon_idx++) {
 		if ((sptd->spt_flags & SHM_PAGEABLE) == 0) {
 			if ((ap = anon_get_ptr(amp->ahp, anon_idx)) == NULL) {
@@ -647,11 +688,13 @@ segspt_free_pages(struct seg *seg, caddr_t addr, size_t len)
 				    "page not in the system");
 				/*NOTREACHED*/
 			}
+			ASSERT(pp->p_lckcnt > 0);
 			page_pp_unlock(pp, 0, 1);
+			if (pp->p_lckcnt == 0)
+				    unlocked_bytes += PAGESIZE;
 		} else {
 			if ((pp = page_lookup(vp, off, SE_EXCL)) == NULL)
 				continue;
-			page_pp_unlock(pp, 0, 0);
 		}
 		/*
 		 * It's logical to invalidate the pages here as in most cases
@@ -697,7 +740,11 @@ segspt_free_pages(struct seg *seg, caddr_t addr, size_t len)
 			VN_DISPOSE(pp, B_INVAL, 0, kcred);
 		}
 	}
-
+	if ((sptd->spt_flags & SHM_PAGEABLE) == 0) {
+		if (unlocked_bytes > 0)
+			rctl_decr_locked_mem(NULL, proj, unlocked_bytes, 0);
+		mutex_exit(&sp->shm_mlock);
+	}
 	if (root != 0 || curnpgs != 0) {
 		panic("segspt_free_pages: bad large page");
 		/*NOTREACHED*/
@@ -1392,7 +1439,6 @@ segspt_reclaim(struct seg *seg, caddr_t addr, size_t len, struct page **pplist,
 	ASSERT(sptd->spt_pcachecnt != 0);
 	ASSERT(sptd->spt_ppa == pplist);
 	ASSERT(npages == btopr(sptd->spt_amp->size));
-
 	/*
 	 * Acquire the lock on the dummy seg and destroy the
 	 * ppa array IF this is the last pcachecnt.
@@ -1409,7 +1455,7 @@ segspt_reclaim(struct seg *seg, caddr_t addr, size_t len, struct page **pplist,
 				hat_setref(pplist[i]);
 			}
 			if ((sptd->spt_flags & SHM_PAGEABLE) &&
-				(sptd->spt_ppa_lckcnt[i] == 0))
+			    (sptd->spt_ppa_lckcnt[i] == 0))
 				free_availrmem++;
 			page_unlock(pplist[i]);
 		}
@@ -2363,15 +2409,35 @@ lpgs_err:
 	return (err);
 }
 
+/*
+ * count the number of bytes in a set of spt pages that are currently not
+ * locked
+ */
+static rctl_qty_t
+spt_unlockedbytes(pgcnt_t npages, page_t **ppa)
+{
+	ulong_t	i;
+	rctl_qty_t unlocked = 0;
+
+	for (i = 0; i < npages; i++) {
+		if (ppa[i]->p_lckcnt == 0)
+			unlocked += PAGESIZE;
+	}
+	return (unlocked);
+}
+
 int
 spt_lockpages(struct seg *seg, pgcnt_t anon_index, pgcnt_t npages,
-    page_t **ppa, ulong_t *lockmap, size_t pos)
+    page_t **ppa, ulong_t *lockmap, size_t pos,
+    rctl_qty_t *locked)
 {
 	struct shm_data *shmd = seg->s_data;
 	struct spt_data *sptd = shmd->shm_sptseg->s_data;
 	ulong_t	i;
 	int	kernel;
 
+	/* return the number of bytes actually locked */
+	*locked = 0;
 	for (i = 0; i < npages; anon_index++, pos++, i++) {
 		if (!(shmd->shm_vpage[anon_index] & DISM_PG_LOCKED)) {
 			if (sptd->spt_ppa_lckcnt[anon_index] <
@@ -2386,11 +2452,12 @@ spt_lockpages(struct seg *seg, pgcnt_t anon_index, pgcnt_t npages,
 				kernel = (sptd->spt_ppa &&
 				    sptd->spt_ppa[anon_index]) ? 1 : 0;
 				if (!page_pp_lock(ppa[i], 0, kernel)) {
-					/* unlock rest of the pages */
-					for (; i < npages; i++)
-						page_unlock(ppa[i]);
 					sptd->spt_ppa_lckcnt[anon_index]--;
 					return (EAGAIN);
+				}
+				/* if this is a newly locked page, count it */
+				if (ppa[i]->p_lckcnt == 1) {
+					*locked += PAGESIZE;
 				}
 				shmd->shm_lckpgs++;
 				shmd->shm_vpage[anon_index] |= DISM_PG_LOCKED;
@@ -2398,7 +2465,6 @@ spt_lockpages(struct seg *seg, pgcnt_t anon_index, pgcnt_t npages,
 					BT_SET(lockmap, pos);
 			}
 		}
-		page_unlock(ppa[i]);
 	}
 	return (0);
 }
@@ -2411,6 +2477,7 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 	struct shm_data *shmd = seg->s_data;
 	struct seg	*sptseg = shmd->shm_sptseg;
 	struct spt_data *sptd = sptseg->s_data;
+	struct kshmid	*sp = sptd->spt_amp->a_sp;
 	pgcnt_t		npages, a_npages;
 	page_t		**ppa;
 	pgcnt_t 	an_idx, a_an_idx, ppa_idx;
@@ -2419,8 +2486,13 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 	size_t		share_sz;
 	ulong_t		i;
 	int		sts = 0;
+	rctl_qty_t	unlocked = 0;
+	rctl_qty_t	locked = 0;
+	struct proc	*p = curproc;
+	kproject_t	*proj;
 
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(sp != NULL);
 
 	if ((sptd->spt_flags & SHM_PAGEABLE) == 0) {
 		return (0);
@@ -2434,7 +2506,16 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 		return (ENOMEM);
 	}
 
+	/*
+	 * A shm's project never changes, so no lock needed.
+	 * The shm has a hold on the project, so it will not go away.
+	 * Since we have a mapping to shm within this zone, we know
+	 * that the zone will not go away.
+	 */
+	proj = sp->shm_perm.ipc_proj;
+
 	if (op == MC_LOCK) {
+
 		/*
 		 * Need to align addr and size request if they are not
 		 * aligned so we can always allocate large page(s) however
@@ -2469,18 +2550,36 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 			return (sts);
 		}
 
-		sts = spt_lockpages(seg, an_idx, npages,
-		    &ppa[ppa_idx], lockmap, pos);
+		mutex_enter(&sp->shm_mlock);
+		/* enforce locked memory rctl */
+		unlocked = spt_unlockedbytes(npages, &ppa[ppa_idx]);
+
+		mutex_enter(&p->p_lock);
+		if (rctl_incr_locked_mem(p, proj, unlocked, 0)) {
+			mutex_exit(&p->p_lock);
+			sts = EAGAIN;
+		} else {
+			mutex_exit(&p->p_lock);
+			sts = spt_lockpages(seg, an_idx, npages,
+			    &ppa[ppa_idx], lockmap, pos, &locked);
+
+			/*
+			 * correct locked count if not all pages could be
+			 * locked
+			 */
+			if ((unlocked - locked) > 0) {
+				rctl_decr_locked_mem(NULL, proj,
+				    (unlocked - locked), 0);
+			}
+		}
 		/*
-		 * unlock remaining pages for requests which are not
-		 * aligned or not in 4 M chunks
+		 * unlock pages
 		 */
-		for (i = 0; i < ppa_idx; i++)
-			page_unlock(ppa[i]);
-		for (i = ppa_idx + npages; i < a_npages; i++)
+		for (i = 0; i < a_npages; i++)
 			page_unlock(ppa[i]);
 		if (sptd->spt_ppa != NULL)
 			sptd->spt_flags |= DISM_PPA_CHANGED;
+		mutex_exit(&sp->shm_mlock);
 		mutex_exit(&sptd->spt_lock);
 
 		kmem_free(ppa, ((sizeof (page_t *)) * a_npages));
@@ -2493,6 +2592,7 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 		struct page	*pp;
 		int		kernel;
 		anon_sync_obj_t cookie;
+		rctl_qty_t	unlocked = 0;
 
 		amp = sptd->spt_amp;
 		mutex_enter(&sptd->spt_lock);
@@ -2506,13 +2606,13 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 		if (sptd->spt_ppa != NULL)
 			sptd->spt_flags |= DISM_PPA_CHANGED;
 
+		mutex_enter(&sp->shm_mlock);
 		ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
 		for (i = 0; i < npages; i++, an_idx++) {
 			if (shmd->shm_vpage[an_idx] & DISM_PG_LOCKED) {
 				anon_array_enter(amp, an_idx, &cookie);
 				ap = anon_get_ptr(amp->ahp, an_idx);
 				ASSERT(ap);
-				ASSERT(sptd->spt_ppa_lckcnt[an_idx] > 0);
 
 				swap_xlate(ap, &vp, &off);
 				anon_array_exit(&cookie);
@@ -2527,7 +2627,10 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 				 */
 				kernel = (sptd->spt_ppa &&
 				    sptd->spt_ppa[an_idx]) ? 1 : 0;
+				ASSERT(pp->p_lckcnt > 0);
 				page_pp_unlock(pp, 0, kernel);
+				if (pp->p_lckcnt == 0)
+					unlocked += PAGESIZE;
 				page_unlock(pp);
 				shmd->shm_vpage[an_idx] &= ~DISM_PG_LOCKED;
 				sptd->spt_ppa_lckcnt[an_idx]--;
@@ -2538,6 +2641,9 @@ segspt_shmlockop(struct seg *seg, caddr_t addr, size_t len,
 		if (sptd->spt_ppa != NULL)
 			sptd->spt_flags |= DISM_PPA_CHANGED;
 		mutex_exit(&sptd->spt_lock);
+
+		rctl_decr_locked_mem(NULL, proj, unlocked, 0);
+		mutex_exit(&sp->shm_mlock);
 	}
 	return (sts);
 }

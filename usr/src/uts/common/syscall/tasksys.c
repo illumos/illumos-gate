@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +40,7 @@
 #include <sys/cpuvar.h>
 #include <sys/policy.h>
 #include <sys/zone.h>
+#include <sys/rctl.h>
 
 /*
  * Limit projlist to 256k projects.
@@ -51,7 +51,6 @@ typedef struct projlist_walk {
 	projid_t	*pw_buf;
 	size_t		pw_bufsz;
 } projlist_walk_t;
-
 
 /*
  * taskid_t tasksys_settaskid(projid_t projid, uint_t flags);
@@ -112,6 +111,7 @@ tasksys_settaskid(projid_t projid, uint_t flags)
 	zone = p->p_zone;
 
 	mutex_enter(&zone->zone_nlwps_lock);
+	mutex_enter(&zone->zone_rctl_lock);
 
 	if (kpj->kpj_nlwps + p->p_lwpcnt > kpj->kpj_nlwps_ctl)
 		if (rctl_test_entity(rc_project_nlwps, kpj->kpj_rctls, p, &e,
@@ -123,18 +123,28 @@ tasksys_settaskid(projid_t projid, uint_t flags)
 		    1, 0) & RCT_DENY)
 			rctlfail = 1;
 
+	if (kpj->kpj_data.kpd_locked_mem + p->p_locked_mem
+	    > kpj->kpj_data.kpd_locked_mem_ctl)
+		if (rctl_test_entity(rc_project_locked_mem, kpj->kpj_rctls, p,
+		    &e, p->p_locked_mem, 0) &RCT_DENY)
+			rctlfail = 1;
+
 	if (rctlfail) {
+		mutex_exit(&zone->zone_rctl_lock);
 		mutex_exit(&zone->zone_nlwps_lock);
 		if (curthread != p->p_agenttp)
 			continuelwps(p);
 		mutex_exit(&p->p_lock);
 		return (set_errno(EAGAIN));
 	}
+	kpj->kpj_data.kpd_locked_mem += p->p_locked_mem;
 	kpj->kpj_nlwps += p->p_lwpcnt;
 	kpj->kpj_ntasks++;
 
+	oldpj->kpj_data.kpd_locked_mem -= p->p_locked_mem;
 	oldpj->kpj_nlwps -= p->p_lwpcnt;
 
+	mutex_exit(&zone->zone_rctl_lock);
 	mutex_exit(&zone->zone_nlwps_lock);
 	mutex_exit(&p->p_lock);
 

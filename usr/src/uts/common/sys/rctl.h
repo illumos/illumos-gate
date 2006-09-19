@@ -319,6 +319,12 @@ int rctl_rlimit_set(rctl_hndl_t, struct proc *, struct rlimit64 *,
     rctl_alloc_gp_t *, int, int, const struct cred *);
 int rctl_rlimit_get(rctl_hndl_t, struct proc *, struct rlimit64 *);
 
+/* specific rctl utility functions */
+int rctl_incr_locked_mem(struct proc *, struct kproject *, rctl_qty_t,
+    int);
+void rctl_decr_locked_mem(struct proc *, struct kproject *, rctl_qty_t,
+    int);
+
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus

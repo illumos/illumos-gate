@@ -342,6 +342,8 @@ typedef struct	proc {
 
 	/* additional lock to protect p_sessp (but not its contents) */
 	kmutex_t p_splock;
+	rctl_qty_t	p_locked_mem;	/* locked memory charged to proc */
+					/* protected by p_lock */
 } proc_t;
 
 #define	PROC_T				/* headers relying on proc_t are OK */
@@ -486,8 +488,8 @@ extern struct pid pid0;		/* p0's pid */
  * These flags are used to synchronize with the pool subsystem to allow
  * re-binding of processes to new pools.
  */
-#define	PBWAIT		0x0001	/* process should wait outside fork/exec/exit */
-#define	PEXITED		0x0002	/* process exited and about to become zombie */
+#define	PBWAIT		0x0001  /* process should wait outside fork/exec/exit */
+#define	PEXITED		0x0002  /* process exited and about to become zombie */
 
 /* Macro to convert proc pointer to a user block pointer */
 #define	PTOU(p)		(&(p)->p_user)

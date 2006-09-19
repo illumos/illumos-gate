@@ -318,6 +318,7 @@ start_init_common()
 	p->p_stk_ctl = INT32_MAX;
 
 	p->p_as = as_alloc();
+	p->p_as->a_proc = p;
 	p->p_as->a_userlimit = (caddr_t)USERLIMIT32;
 	(void) hat_setup(p->p_as->a_hat, HAT_INIT);
 

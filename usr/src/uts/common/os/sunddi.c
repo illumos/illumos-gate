@@ -82,10 +82,12 @@
 #include <sys/devpolicy.h>
 #include <sys/ctype.h>
 #include <net/if.h>
+#include <sys/rctl.h>
 
 extern	pri_t	minclsyspri;
 
-extern	rctl_hndl_t rc_project_devlockmem;
+extern	rctl_hndl_t rc_project_locked_mem;
+extern	rctl_hndl_t rc_zone_locked_mem;
 
 #ifdef DEBUG
 static int sunddi_debug = 0;
@@ -103,13 +105,6 @@ static	kthread_t	*ddi_umem_unlock_thread;
  */
 static	struct	ddi_umem_cookie *ddi_umem_unlock_head = NULL;
 static	struct	ddi_umem_cookie *ddi_umem_unlock_tail = NULL;
-
-/*
- * This lock protects the project.max-device-locked-memory counter.
- * When both p_lock (proc_t) and this lock need to acquired, p_lock
- * should be acquired first.
- */
-static kmutex_t umem_devlockmem_rctl_lock;
 
 
 /*
@@ -7819,32 +7814,15 @@ umem_lock_undo(struct as *as, void *arg, uint_t event)
  */
 int
 /* ARGSUSED */
-i_ddi_incr_locked_memory(proc_t *procp, task_t *taskp,
-    kproject_t *projectp, zone_t *zonep, rctl_qty_t inc)
+i_ddi_incr_locked_memory(proc_t *procp, rctl_qty_t inc)
 {
-	kproject_t *projp;
-
-	ASSERT(procp);
-	ASSERT(mutex_owned(&procp->p_lock));
-
-	projp = procp->p_task->tk_proj;
-	mutex_enter(&umem_devlockmem_rctl_lock);
-	/*
-	 * Test if the requested memory can be locked without exceeding the
-	 * limits.
-	 */
-	if (rctl_test(rc_project_devlockmem, projp->kpj_rctls,
-	    procp, inc, RCA_SAFE) & RCT_DENY) {
-		mutex_exit(&umem_devlockmem_rctl_lock);
+	ASSERT(procp != NULL);
+	mutex_enter(&procp->p_lock);
+	if (rctl_incr_locked_mem(procp, NULL, inc, 1)) {
+		mutex_exit(&procp->p_lock);
 		return (ENOMEM);
 	}
-	projp->kpj_data.kpd_devlockmem += inc;
-	mutex_exit(&umem_devlockmem_rctl_lock);
-	/*
-	 * Grab a hold on the project.
-	 */
-	(void) project_hold(projp);
-
+	mutex_exit(&procp->p_lock);
 	return (0);
 }
 
@@ -7854,24 +7832,16 @@ i_ddi_incr_locked_memory(proc_t *procp, task_t *taskp,
  */
 /* ARGSUSED */
 void
-i_ddi_decr_locked_memory(proc_t *procp, task_t *taskp,
-    kproject_t *projectp, zone_t *zonep, rctl_qty_t dec)
+i_ddi_decr_locked_memory(proc_t *procp, rctl_qty_t dec)
 {
-	ASSERT(projectp);
-
-	mutex_enter(&umem_devlockmem_rctl_lock);
-	projectp->kpj_data.kpd_devlockmem -= dec;
-	mutex_exit(&umem_devlockmem_rctl_lock);
-
-	/*
-	 * Release the project pointer reference accquired in
-	 * i_ddi_incr_locked_memory().
-	 */
-	(void) project_rele(projectp);
+	ASSERT(procp != NULL);
+	mutex_enter(&procp->p_lock);
+	rctl_decr_locked_mem(procp, NULL, dec, 1);
+	mutex_exit(&procp->p_lock);
 }
 
 /*
- * This routine checks if the max-device-locked-memory resource ctl is
+ * This routine checks if the max-locked-memory resource ctl is
  * exceeded, if not increments it, grabs a hold on the project.
  * Returns 0 if successful otherwise returns error code
  */
@@ -7885,41 +7855,27 @@ umem_incr_devlockmem(struct ddi_umem_cookie *cookie)
 	procp = cookie->procp;
 	ASSERT(procp);
 
-	mutex_enter(&procp->p_lock);
-
-	if ((ret = i_ddi_incr_locked_memory(procp, NULL,
-		NULL, NULL, cookie->size)) != 0) {
-		mutex_exit(&procp->p_lock);
+	if ((ret = i_ddi_incr_locked_memory(procp,
+		cookie->size)) != 0) {
 		return (ret);
 	}
-
-	/*
-	 * save the project pointer in the
-	 * umem cookie, project pointer already
-	 * hold in i_ddi_incr_locked_memory
-	 */
-	cookie->lockmem_proj = (void *)procp->p_task->tk_proj;
-	mutex_exit(&procp->p_lock);
-
 	return (0);
 }
 
 /*
- * Decrements the max-device-locked-memory resource ctl and releases
+ * Decrements the max-locked-memory resource ctl and releases
  * the hold on the project that was acquired during umem_incr_devlockmem
  */
 static void
 umem_decr_devlockmem(struct ddi_umem_cookie *cookie)
 {
-	kproject_t	*projp;
+	proc_t		*proc;
 
-	if (!cookie->lockmem_proj)
+	proc = (proc_t *)cookie->procp;
+	if (!proc)
 		return;
 
-	projp = (kproject_t *)cookie->lockmem_proj;
-	i_ddi_decr_locked_memory(NULL, NULL, projp, NULL, cookie->size);
-
-	cookie->lockmem_proj = NULL;
+	i_ddi_decr_locked_memory(proc, cookie->size);
 }
 
 /*
@@ -7954,7 +7910,7 @@ umem_decr_devlockmem(struct ddi_umem_cookie *cookie)
  *	EINVAL - for invalid parameters
  *	EPERM, ENOMEM and other error codes returned by as_pagelock
  *	ENOMEM - is returned if the current request to lock memory exceeds
- *		project.max-device-locked-memory resource control value.
+ *		*.max-locked-memory resource control value.
  *      EFAULT - memory pertains to a regular file mapped shared and
  *		and DDI_UMEMLOCK_LONGTERM flag is set
  *	EAGAIN - could not start the ddi_umem_unlock list processing thread
@@ -8043,12 +7999,6 @@ umem_lockmemory(caddr_t addr, size_t len, int flags, ddi_umem_cookie_t *cookie,
 		*cookie = (ddi_umem_cookie_t)NULL;
 		return (ENOMEM);
 	}
-	/*
-	 * umem_incr_devlockmem stashes the project ptr into the
-	 * cookie. This is needed during unlock since that can
-	 * happen in a non-USER context
-	 */
-	ASSERT(p->lockmem_proj);
 
 	/* Lock the pages corresponding to addr, len in memory */
 	error = as_pagelock(as, &(p->pparray), addr, len, p->s_flags);
@@ -8169,7 +8119,7 @@ i_ddi_umem_unlock(struct ddi_umem_cookie *p)
 
 	/*
 	 * Now that we have unlocked the memory decrement the
-	 * max-device-locked-memory rctl
+	 * *.max-locked-memory rctl
 	 */
 	umem_decr_devlockmem(p);
 
@@ -8269,7 +8219,7 @@ i_ddi_umem_unlock_thread_start(void)
  *	EINVAL - for invalid parameters
  *	EPERM, ENOMEM and other error codes returned by as_pagelock
  *	ENOMEM - is returned if the current request to lock memory exceeds
- *		project.max-device-locked-memory resource control value.
+ *		*.max-locked-memory resource control value.
  *	EAGAIN - could not start the ddi_umem_unlock list processing thread
  */
 int
@@ -8338,12 +8288,6 @@ ddi_umem_lock(caddr_t addr, size_t len, int flags, ddi_umem_cookie_t *cookie)
 		*cookie = (ddi_umem_cookie_t)NULL;
 		return (ENOMEM);
 	}
-	/*
-	 * umem_incr_devlockmem stashes the project ptr into the
-	 * cookie. This is needed during unlock since that can
-	 * happen in a non-USER context
-	 */
-	ASSERT(p->lockmem_proj);
 
 	/* Lock the pages corresponding to addr, len in memory */
 	error = as_pagelock(((proc_t *)p->procp)->p_as, &(p->pparray),

@@ -40,9 +40,11 @@ extern "C" {
 typedef struct kproject_data {		/* Datum protected by: */
 	rctl_qty_t	kpd_shmmax;	/* shm's ipcs_lock */
 	ipc_rqty_t	kpd_ipc;	/* shm|sem|msg's ipcs lock */
-	rctl_qty_t	kpd_devlockmem;	/* umem_devlockmem_rctl_lock */
+	rctl_qty_t	kpd_locked_mem;	 /* zone_rctl_lock */
+	rctl_qty_t	kpd_locked_mem_ctl; /* kpj_rctls->rcs_lock */
 	rctl_qty_t	kpd_contract;	/* contract_lock */
 	rctl_qty_t	kpd_crypto_mem;	/* crypto_rctl_lock */
+
 } kproject_data_t;
 
 /*
@@ -84,7 +86,7 @@ projid_t curprojid(void);
 extern kproject_t *proj0p;
 extern rctl_hndl_t rc_project_nlwps;
 extern rctl_hndl_t rc_project_ntasks;
-
+extern rctl_hndl_t rc_project_locked_mem;
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus

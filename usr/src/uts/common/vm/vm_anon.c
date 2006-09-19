@@ -3139,6 +3139,7 @@ anonmap_alloc(size_t size, size_t swresv)
 	amp->swresv = swresv;
 	amp->locality = 0;
 	amp->a_szc = 0;
+	amp->a_sp = NULL;
 	return (amp);
 }
 

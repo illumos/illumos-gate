@@ -593,6 +593,11 @@ swap_putapage(
 	size_t swap_klustsize;
 
 	/*
+	 * Clear force flag so that p_lckcnt pages are not invalidated.
+	 */
+	flags &= ~B_FORCE;
+
+	/*
 	 * This check is added for callers who access swap_putpage with len = 0.
 	 * swap_putpage calls swap_putapage page-by-page via pvn_vplist_dirty.
 	 * And it's necessary to do the same queuing if users have the same
