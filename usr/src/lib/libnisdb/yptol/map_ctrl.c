@@ -526,6 +526,7 @@ insert_map_in_list(char *map_name, int unique_value)
 	}
 	new_elt->map_name = strdup(map_name);
 	if (new_elt->map_name == NULL) { /* strdup() failed */
+		sfree(new_elt);
 		return (FAILURE);
 	}
 	new_elt->map_id = unique_value;
