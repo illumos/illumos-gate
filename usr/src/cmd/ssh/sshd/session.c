@@ -32,7 +32,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1033,8 +1033,8 @@ deflt_do_setup_env(Session *s, const char *shell, char ***env, u_int *envsize)
 static char **
 do_setup_env(Session *s, const char *shell)
 {
-	char buf[256];
-	u_int i, envsize;
+	char buf[256], *path_maildir = _PATH_MAILDIR;
+	u_int i, envsize, pm_len;
 	char **env;
 	struct passwd *pw = s->pw;
 
@@ -1085,8 +1085,11 @@ do_setup_env(Session *s, const char *shell)
 # endif /* HAVE_CYGWIN */
 #endif /* HAVE_LOGIN_CAP */
 
+		pm_len = strlen(path_maildir);
+		if (path_maildir[pm_len - 1] == '/' && pm_len > 1)
+			path_maildir[pm_len - 1] = NULL;
 		snprintf(buf, sizeof buf, "%.200s/%.50s",
-			 _PATH_MAILDIR, pw->pw_name);
+			 path_maildir, pw->pw_name);
 		child_set_env(&env, &envsize, "MAIL", buf);
 
 		/* Normal systems set SHELL by default. */

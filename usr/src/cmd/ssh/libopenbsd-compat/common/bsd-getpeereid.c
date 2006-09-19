@@ -22,6 +22,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #include "includes.h"
 
 RCSID("$Id: bsd-getpeereid.c,v 1.1 2002/09/12 00:33:02 djm Exp $");
@@ -41,6 +46,23 @@ getpeereid(int s, uid_t *euid, gid_t *gid)
 		return (-1);
 	*euid = cred.uid;
 	*gid = cred.gid;
+
+	return (0);
+}
+#elif defined(HAVE_GETPEERUCRED)
+int
+getpeereid(int s, uid_t *euid, gid_t *gid)
+{
+	ucred_t *ucred = NULL;
+
+	if (getpeerucred(s, &ucred) == -1)
+		return (-1);
+	if ((*euid = ucred_geteuid(ucred)) == -1)
+		return (-1);
+	if ((*gid = ucred_getrgid(ucred)) == -1)
+		return (-1);
+
+	ucred_free(ucred);
 
 	return (0);
 }

@@ -506,6 +506,9 @@ extern "C" {
 /* Define to 1 if you have the `getpeereid' function. */
 /* #undef HAVE_GETPEEREID */
 
+/* Define to 1 if you have the `getpeerucred' function. */
+#define HAVE_GETPEERUCRED 1
+
 /* Define to 1 if you have the `getpwanam' function. */
 /* #undef HAVE_GETPWANAM */
 
@@ -867,6 +870,9 @@ extern "C" {
 
 /* Define to 1 if you have the <ttyent.h> header file. */
 /* #undef HAVE_TTYENT_H */
+
+/* Define to 1 if you have the <ucred.h> header file. */
+#define HAVE_UCRED_H 1
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #define HAVE_UNISTD_H 1

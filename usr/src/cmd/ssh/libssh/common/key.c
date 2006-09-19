@@ -692,24 +692,38 @@ key_from_blob(u_char *blob, int blen)
 #endif
 	buffer_init(&b);
 	buffer_append(&b, blob, blen);
-	ktype = buffer_get_string(&b, NULL);
+	if ((ktype = buffer_get_string_ret(&b, NULL)) == NULL) {
+		error("key_from_blob: can't read key type");
+		goto out;
+	}
+
 	type = key_type_from_name(ktype);
 
 	switch (type) {
 	case KEY_RSA:
 		key = key_new(type);
-		buffer_get_bignum2(&b, key->rsa->e);
-		buffer_get_bignum2(&b, key->rsa->n);
+		if (buffer_get_bignum2_ret(&b, key->rsa->e) == -1 ||
+		    buffer_get_bignum2_ret(&b, key->rsa->n) == -1) {
+			error("key_from_blob: can't read rsa key");
+			key_free(key);
+			key = NULL;
+			goto out;
+		}
 #ifdef DEBUG_PK
 		RSA_print_fp(stderr, key->rsa, 8);
 #endif
 		break;
 	case KEY_DSA:
 		key = key_new(type);
-		buffer_get_bignum2(&b, key->dsa->p);
-		buffer_get_bignum2(&b, key->dsa->q);
-		buffer_get_bignum2(&b, key->dsa->g);
-		buffer_get_bignum2(&b, key->dsa->pub_key);
+		if (buffer_get_bignum2_ret(&b, key->dsa->p) == -1 ||
+		    buffer_get_bignum2_ret(&b, key->dsa->q) == -1 ||
+		    buffer_get_bignum2_ret(&b, key->dsa->g) == -1 ||
+		    buffer_get_bignum2_ret(&b, key->dsa->pub_key) == -1) {
+			error("key_from_blob: can't read dsa key");
+			key_free(key);
+			key = NULL;
+			goto out;
+		}
 #ifdef DEBUG_PK
 		DSA_print_fp(stderr, key->dsa, 8);
 #endif
@@ -719,12 +733,14 @@ key_from_blob(u_char *blob, int blen)
 		break;
 	default:
 		error("key_from_blob: cannot handle type %s", ktype);
-		break;
+		goto out;
 	}
 	rlen = buffer_len(&b);
 	if (key != NULL && rlen != 0)
 		error("key_from_blob: remaining bytes in key blob %d", rlen);
-	xfree(ktype);
+ out:
+	if (ktype != NULL)
+		xfree(ktype);
 	buffer_free(&b);
 	return key;
 }

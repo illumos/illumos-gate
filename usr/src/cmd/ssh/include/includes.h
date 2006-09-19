@@ -23,6 +23,11 @@ extern "C" {
  * called by a name other than "ssh" or "Secure Shell".
  */
 
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #define RCSID(msg) \
 static /**/const char *const rcsid[] = { (char *)rcsid, "\100(#)" msg }
 
@@ -88,6 +93,10 @@ static /**/const char *const rcsid[] = { (char *)rcsid, "\100(#)" msg }
 #endif
 #ifdef HAVE_LOGIN_H
 # include <login.h>
+#endif
+
+#ifdef HAVE_UCRED_H
+#  include <ucred.h>
 #endif
 
 #ifdef HAVE_UTMP_H

@@ -347,9 +347,9 @@ main(argc, argv)
 	if ((targ = colon(argv[argc - 1])))	/* Dest is remote host. */
 		toremote(targ, argc, argv);
 	else {
-		tolocal(argc, argv);	/* Dest is local host. */
 		if (targetshouldbedirectory)
 			verifydir(argv[argc - 1]);
+		tolocal(argc, argv);	/* Dest is local host. */
 	}
 	/*
 	 * Finally check the exit status of the ssh process, if one was forked
@@ -799,6 +799,10 @@ sink(argc, argv)
 			size = size * 10 + (*cp++ - '0');
 		if (*cp++ != ' ')
 			SCREWUP("size not delimited")
+		if ((strchr(cp, '/') != NULL) || (strcmp(cp, "..") == 0)) {
+			run_err("error: unexpected filename: %s", cp);
+			exit(1);
+		}
 		if (targisdir) {
 			static char *namebuf;
 			static int cursize;
@@ -820,6 +824,8 @@ sink(argc, argv)
 		exists = stat(np, &stb) == 0;
 		if (buf[0] == 'D') {
 			int mod_flag = pflag;
+			if (!iamrecursive)
+				SCREWUP("received directory without -r");
 			if (exists) {
 				if (!S_ISDIR(stb.st_mode)) {
 					errno = ENOTDIR;
@@ -900,11 +906,6 @@ bad:			run_err("%s: %s", np, strerror(errno));
 		}
 		if (showprogress)
 			progressmeter(1);
-		if (count != 0 && wrerr == NO &&
-		    (j = atomicio(write, ofd, bp->buf, count)) != count) {
-			wrerr = YES;
-			wrerrno = j >= 0 ? EIO : errno;
-		}
 		if (ftruncate(ofd, size)) {
 			run_err("%s: truncate: %s", np, strerror(errno));
 			wrerr = DISPLAYED;
@@ -1011,8 +1012,17 @@ run_err(const char *fmt, ...)
 	va_list ap;
 
 	++errs;
+
+	if (!iamremote) {
+		va_start(ap, fmt);
+		vfprintf(stderr, fmt, ap);
+		va_end(ap);
+		fprintf(stderr, "\n");
+	}
+
 	if (fp == NULL && !(fp = fdopen(remout, "w")))
 		return;
+
 	(void) fprintf(fp, "%c", 0x01);
 	(void) fprintf(fp, "scp: ");
 	va_start(ap, fmt);
@@ -1021,12 +1031,6 @@ run_err(const char *fmt, ...)
 	(void) fprintf(fp, "\n");
 	(void) fflush(fp);
 
-	if (!iamremote) {
-		va_start(ap, fmt);
-		vfprintf(stderr, fmt, ap);
-		va_end(ap);
-		fprintf(stderr, "\n");
-	}
 }
 
 void

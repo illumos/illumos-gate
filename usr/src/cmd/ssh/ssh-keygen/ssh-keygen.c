@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -33,6 +33,7 @@ RCSID("$OpenBSD: ssh-keygen.c,v 1.101 2002/06/23 09:39:55 deraadt Exp $");
 #include "pathnames.h"
 #include "log.h"
 #include "readpass.h"
+#include "misc.h"
 #include <langinfo.h>
 
 #ifdef SMARTCARD
@@ -946,7 +947,7 @@ main(int ac, char **av)
 		(void) fflush(stdout);
 		if (fgets(yesno, sizeof(yesno), stdin) == NULL)
 			exit(1);
-		if (strcasecmp(yesno, nl_langinfo(YESSTR)) != 0)
+		if (strcasecmp(chop(yesno), nl_langinfo(YESSTR)) != 0)
 			exit(1);
 	}
 	/* Ask for a passphrase (twice). */
