@@ -812,7 +812,7 @@ int mode;
 		}
 		break;
 	case SIOCSTPUT :
-		if (fr_nat_lock && (mode & FWRITE)) {
+		if ((mode & FWRITE) != 0) {
 			error = fr_natputent(data, getlock);
 		} else {
 			error = EACCES;
