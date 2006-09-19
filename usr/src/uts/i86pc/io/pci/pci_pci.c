@@ -43,58 +43,46 @@
 #include <sys/ndifm.h>
 #include <sys/fm/protocol.h>
 #include <sys/hotplug/pci/pcihp.h>
-#if defined(__i386) || defined(__amd64)
 #include <sys/pci_intr_lib.h>
 #include <sys/psm.h>
-#endif
-
-/*
- * For PCI Hotplug support, the misc/pcihp module provides devctl control
- * device and cb_ops functions to support hotplug operations.
- */
-char _depends_on[] = "misc/pcihp";
 
 /*
  * The variable controls the default setting of the command register
  * for pci devices.  See ppb_initchild() for details.
  */
-#if defined(__i386) || defined(__amd64)
-static ushort_t ppb_command_default = PCI_COMM_ME |
-					PCI_COMM_MAE |
-					PCI_COMM_IO;
-#else
-static ushort_t ppb_command_default = PCI_COMM_SERR_ENABLE |
-					PCI_COMM_WAIT_CYC_ENAB |
-					PCI_COMM_PARITY_DETECT |
-					PCI_COMM_ME |
-					PCI_COMM_MAE |
-					PCI_COMM_IO;
-#endif
+static ushort_t ppb_command_default = PCI_COMM_ME | PCI_COMM_MAE | PCI_COMM_IO;
 
 
-static int ppb_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
-	off_t, off_t, caddr_t *);
-static int ppb_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t,
-	void *, void *);
+static int	ppb_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
+		    off_t, off_t, caddr_t *);
+static int	ppb_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t,
+		    void *, void *);
 static int	ppb_fm_init(dev_info_t *, dev_info_t *, int,
 		    ddi_iblock_cookie_t *);
-
 static int	ppb_fm_callback(dev_info_t *, ddi_fm_error_t *, const void *);
-
-#if defined(__i386) || defined(__amd64)
-static int ppb_intr_ops(dev_info_t *, dev_info_t *, ddi_intr_op_t,
-	ddi_intr_handle_impl_t *, void *);
+static int	ppb_intr_ops(dev_info_t *, dev_info_t *, ddi_intr_op_t,
+		    ddi_intr_handle_impl_t *, void *);
 
 /*
- * Not to allow MSI by default except special case like AMD8132 with
- * MSI enabled.
- * However, this flag can be patched to allow MSI if needed.
- *  0 = default value, MSI is allowed only for special case
- *  1 = MSI supported without check
- * -1 = MSI not supported at all
+ * ppb_support_msi: Flag that controls MSI support across P2P Bridges.
+ * By default, MSI is not supported.  Special case is AMD-8132 chipset.
+ *
+ * However, MSI support behavior can be patched on a system by changing
+ * the value of this flag as shown below:-
+ *	 0 = default value, MSI is allowed only for special case (AMD-8132)
+ *	 1 = MSI supported without any checks
+ *	-1 = MSI not supported at all
  */
 int ppb_support_msi = 0;
-#endif
+
+#define	PCI_VENID_AMD			0x1022		/* AMD vendor-id */
+#define	PCI_DEVID_8132			0x7458		/* 8132 chipset id */
+#define	PCI_MSI_MAPPING_CAP_OFF		0xF4
+#define	PCI_MSI_MAPPING_CAP_MASK	0xFF01000F
+#define	PCI_MSI_MAPPING_ENABLE		0xA8010008
+
+extern int	(*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
+		    psm_intr_op_t, int *);
 
 struct bus_ops ppb_bus_ops = {
 	BUSO_REV,
@@ -125,11 +113,7 @@ struct bus_ops ppb_bus_ops = {
 	NULL,		/* (*bus_fm_access_enter)(); 	*/
 	NULL,		/* (*bus_fm_access_exit)(); 	*/
 	NULL,		/* (*bus_power)(); 	*/
-#if defined(__i386) || defined(__amd64)
 	ppb_intr_ops	/* (*bus_intr_op)(); 		*/
-#else
-	i_ddi_intr_ops	/* (*bus_intr_op)(); 		*/
-#endif
 };
 
 /*
@@ -204,27 +188,15 @@ static struct modlinkage modlinkage = {
 static void *ppb_state;
 
 typedef struct {
-
 	dev_info_t *dip;
 	int ppb_fmcap;
 	ddi_iblock_cookie_t ppb_fm_ibc;
 	kmutex_t ppb_peek_poke_mutex;
 	kmutex_t ppb_err_mutex;
 
-#if defined(__sparc)
-	/*
-	 * configuration register state for the bus:
-	 */
-	uchar_t ppb_cache_line_size;
-	uchar_t ppb_latency_timer;
-#endif
-
 	/*
 	 * cpr support:
 	 */
-#define	PCI_MAX_DEVICES		32
-#define	PCI_MAX_FUNCTIONS	8
-#define	PCI_MAX_CHILDREN	PCI_MAX_DEVICES * PCI_MAX_FUNCTIONS
 	uint_t config_state_index;
 	struct {
 		dev_info_t *dip;
@@ -237,43 +209,14 @@ typedef struct {
 	} config_state[PCI_MAX_CHILDREN];
 } ppb_devstate_t;
 
-#if defined(__sparc)
-/*
- * The following variable enables a workaround for the following obp bug:
- *
- *	1234181 - obp should set latency timer registers in pci
- *		configuration header
- *
- * Until this bug gets fixed in the obp, the following workaround should
- * be enabled.
- */
-static uint_t ppb_set_latency_timer_register = 1;
-
-/*
- * The following variable enables a workaround for an obp bug to be
- * submitted.  A bug requesting a workaround fof this problem has
- * been filed:
- *
- *	1235094 - need workarounds on positron nexus drivers to set cache
- *		line size registers
- *
- * Until this bug gets fixed in the obp, the following workaround should
- * be enabled.
- */
-static uint_t ppb_set_cache_line_size_register = 1;
-#endif
-
 
 /*
  * forward function declarations:
  */
-static void ppb_removechild(dev_info_t *);
-static int ppb_initchild(dev_info_t *child);
-static void ppb_save_config_regs(ppb_devstate_t *ppb_p);
-static void ppb_restore_config_regs(ppb_devstate_t *ppb_p);
-#if	defined(__sparc)
-static int ppb_create_pci_prop(dev_info_t *);
-#endif	/* defined(__sparc) */
+static void	ppb_removechild(dev_info_t *);
+static int	ppb_initchild(dev_info_t *child);
+static void	ppb_save_config_regs(ppb_devstate_t *ppb_p);
+static void	ppb_restore_config_regs(ppb_devstate_t *ppb_p);
 
 
 int
@@ -369,12 +312,6 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			ddi_soft_state_free(ppb_state, instance);
 			return (DDI_FAILURE);
 		}
-#if defined(__sparc)
-		ppb->ppb_cache_line_size =
-			pci_config_get8(config_handle, PCI_CONF_CACHE_LINESZ);
-		ppb->ppb_latency_timer =
-			pci_config_get8(config_handle, PCI_CONF_LATENCY_TIMER);
-#endif
 		pci_config_teardown(&config_handle);
 
 		/*
@@ -587,15 +524,6 @@ ppb_initchild(dev_info_t *child)
 	char name[MAXNAMELEN];
 	ddi_acc_handle_t config_handle;
 	ushort_t command_preserve, command;
-#if !defined(__i386) && !defined(__amd64)
-	ushort_t bcr;
-	uchar_t header_type;
-#endif
-#if defined(__sparc)
-	int ret;
-	uchar_t min_gnt, latency_timer;
-	ppb_devstate_t *ppb;
-#endif
 
 	if (ppb_name_child(child, name, MAXNAMELEN) != DDI_SUCCESS)
 		return (DDI_FAILURE);
@@ -641,11 +569,6 @@ ppb_initchild(dev_info_t *child)
 	}
 
 	/* transfer select properties from PROM to kernel */
-#if	defined(__sparc)
-	if ((ret = ppb_create_pci_prop(child)) != DDI_SUCCESS)
-		return (ret);
-#endif	/* defined(__sparc) */
-
 	if (ddi_getprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS, "interrupts",
 		-1) != -1) {
 		pdptr = kmem_zalloc((sizeof (struct ddi_parent_private_data) +
@@ -659,98 +582,15 @@ ppb_initchild(dev_info_t *child)
 	if (pci_config_setup(child, &config_handle) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
-#if !defined(__i386) && !defined(__amd64)
-	/*
-	 * Determine the configuration header type.
-	 */
-	header_type = pci_config_get8(config_handle, PCI_CONF_HEADER);
-#endif
-
 	/*
 	 * Support for the "command-preserve" property.
 	 */
 	command_preserve = ddi_prop_get_int(DDI_DEV_T_ANY, child,
-						DDI_PROP_DONTPASS,
-						"command-preserve", 0);
+	    DDI_PROP_DONTPASS, "command-preserve", 0);
 	command = pci_config_get16(config_handle, PCI_CONF_COMM);
 	command &= (command_preserve | PCI_COMM_BACK2BACK_ENAB);
 	command |= (ppb_command_default & ~command_preserve);
 	pci_config_put16(config_handle, PCI_CONF_COMM, command);
-
-#if !defined(__i386) && !defined(__amd64)
-	/*
-	 * If the device has a bus control register then program it
-	 * based on the settings in the command register.
-	 */
-	if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
-		/*
-		 * These flags should be moved to uts/common/sys/pci.h:
-		 */
-#ifndef PCI_BCNF_BCNTRL
-#define	PCI_BCNF_BCNTRL			0x3e
-#define	PCI_BCNF_BCNTRL_PARITY_ENABLE	0x0001
-#define	PCI_BCNF_BCNTRL_SERR_ENABLE	0x0002
-#define	PCI_BCNF_BCNTRL_MAST_AB_MODE	0x0020
-#endif
-		bcr = pci_config_get8(config_handle, PCI_BCNF_BCNTRL);
-		if (ppb_command_default & PCI_COMM_PARITY_DETECT)
-			bcr |= PCI_BCNF_BCNTRL_PARITY_ENABLE;
-		if (ppb_command_default & PCI_COMM_SERR_ENABLE)
-			bcr |= PCI_BCNF_BCNTRL_SERR_ENABLE;
-		bcr |= PCI_BCNF_BCNTRL_MAST_AB_MODE;
-		pci_config_put8(config_handle, PCI_BCNF_BCNTRL, bcr);
-	}
-#endif
-
-#if defined(__sparc)
-	/*
-	 * Initialize cache-line-size configuration register if needed.
-	 */
-	if (ppb_set_cache_line_size_register &&
-	    ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-	    "cache-line-size", 0) == 0) {
-		ppb = ddi_get_soft_state(ppb_state,
-		    ddi_get_instance(ddi_get_parent(child)));
-		pci_config_put8(config_handle, PCI_CONF_CACHE_LINESZ,
-		    ppb->ppb_cache_line_size);
-		n = pci_config_get8(config_handle, PCI_CONF_CACHE_LINESZ);
-		if (n != 0) {
-			(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-			    "cache-line-size", n);
-		}
-	}
-
-	/*
-	 * Initialize latency timer configuration registers if needed.
-	 */
-	if (ppb_set_latency_timer_register &&
-			ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-					"latency-timer", 0) == 0) {
-
-		if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
-			latency_timer = ppb->ppb_latency_timer;
-		/*
-		 * This flags should be moved to uts/common/sys/pci.h:
-		 */
-#ifndef	PCI_BCNF_LATENCY_TIMER
-#define	PCI_BCNF_LATENCY_TIMER		0x1b
-#endif
-			pci_config_put8(config_handle, PCI_BCNF_LATENCY_TIMER,
-					ppb->ppb_latency_timer);
-		} else {
-			min_gnt = pci_config_get8(config_handle,
-						    PCI_CONF_MIN_G);
-			latency_timer = min_gnt * 8;
-		}
-		pci_config_put8(config_handle, PCI_CONF_LATENCY_TIMER,
-				latency_timer);
-		n = pci_config_get8(config_handle, PCI_CONF_LATENCY_TIMER);
-		if (n != 0) {
-			(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-					"latency-timer", n);
-		}
-	}
-#endif
 
 	pci_config_teardown(&config_handle);
 	return (DDI_SUCCESS);
@@ -774,56 +614,6 @@ ppb_removechild(dev_info_t *dip)
 
 	impl_rem_dev_props(dip);
 }
-
-/*
- * Transfer select properties from PROM to kernel.
- * For x86 pci is already enumerated by the kernel.
- */
-#if	defined(__sparc)
-static int
-ppb_create_pci_prop(dev_info_t *child)
-{
-	pci_regspec_t *pci_rp;
-	int	length;
-	int	value;
-
-	/* get child "reg" property */
-	value = ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_CANSLEEP,
-		"reg", (caddr_t)&pci_rp, &length);
-	if (value != DDI_SUCCESS)
-		return (value);
-
-	(void) ndi_prop_update_byte_array(DDI_DEV_T_NONE, child, "reg",
-		(uchar_t *)pci_rp, length);
-
-	/*
-	 * free the memory allocated by ddi_getlongprop ().
-	 */
-	kmem_free(pci_rp, length);
-
-	/* assign the basic PCI Properties */
-
-	value = ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_CANSLEEP,
-		"vendor-id", -1);
-	if (value != -1)
-		(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-		"vendor-id", value);
-
-	value = ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_CANSLEEP,
-		"device-id", -1);
-	if (value != -1)
-		(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-		"device-id", value);
-
-	value = ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_CANSLEEP,
-		"interrupts", -1);
-	if (value != -1)
-		(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-		"interrupts", value);
-	return (DDI_SUCCESS);
-}
-#endif	/* defined(__sparc) */
-
 
 /*
  * ppb_save_config_regs
@@ -857,26 +647,6 @@ ppb_save_config_regs(ppb_devstate_t *ppb_p)
 		ppb_p->config_state[i].dip = dip;
 		ppb_p->config_state[i].command =
 			pci_config_get16(config_handle, PCI_CONF_COMM);
-#if !defined(__i386) && !defined(__amd64)
-		ppb_p->config_state[i].header_type =
-			pci_config_get8(config_handle, PCI_CONF_HEADER);
-		if ((ppb_p->config_state[i].header_type & PCI_HEADER_TYPE_M) ==
-				PCI_HEADER_ONE)
-			ppb_p->config_state[i].bridge_control =
-				pci_config_get16(config_handle,
-						PCI_BCNF_BCNTRL);
-#endif
-#if defined(__sparc)
-		ppb_p->config_state[i].cache_line_size =
-			pci_config_get8(config_handle, PCI_CONF_CACHE_LINESZ);
-		ppb_p->config_state[i].latency_timer =
-			pci_config_get8(config_handle, PCI_CONF_LATENCY_TIMER);
-		if ((ppb_p->config_state[i].header_type &
-				PCI_HEADER_TYPE_M) == PCI_HEADER_ONE)
-			ppb_p->config_state[i].sec_latency_timer =
-				pci_config_get8(config_handle,
-						PCI_BCNF_LATENCY_TIMER);
-#endif
 		pci_config_teardown(&config_handle);
 	}
 	ppb_p->config_state_index = i;
@@ -912,36 +682,10 @@ ppb_restore_config_regs(ppb_devstate_t *ppb_p)
 		}
 		pci_config_put16(config_handle, PCI_CONF_COMM,
 				ppb_p->config_state[i].command);
-#if !defined(__i386) && !defined(__amd64)
-		if ((ppb_p->config_state[i].header_type & PCI_HEADER_TYPE_M) ==
-				PCI_HEADER_ONE)
-			pci_config_put16(config_handle, PCI_BCNF_BCNTRL,
-					ppb_p->config_state[i].bridge_control);
-#endif
-#if defined(__sparc)
-		pci_config_put8(config_handle, PCI_CONF_CACHE_LINESZ,
-				ppb_p->config_state[i].cache_line_size);
-		pci_config_put8(config_handle, PCI_CONF_LATENCY_TIMER,
-				ppb_p->config_state[i].latency_timer);
-		if ((ppb_p->config_state[i].header_type &
-				PCI_HEADER_TYPE_M) == PCI_HEADER_ONE)
-			pci_config_put8(config_handle, PCI_BCNF_LATENCY_TIMER,
-				ppb_p->config_state[i].sec_latency_timer);
-#endif
 		pci_config_teardown(&config_handle);
 	}
 }
 
-#if defined(__i386) || defined(__amd64)
-
-#define	PCI_VENID_AMD			0x1022
-#define	PCI_DEVID_8132			0x7458
-#define	PCI_MSI_MAPPING_CAP_OFF		0xF4
-#define	PCI_MSI_MAPPING_CAP_MASK	0xFF01000F
-#define	PCI_MSI_MAPPING_ENABLE		0xA8010008
-
-extern int (*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
-		psm_intr_op_t, int *);
 
 /*
  * ppb_intr_ops
@@ -982,8 +726,8 @@ ppb_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		}
 	} else if (pci_config_setup(pdip, &config_handle) == DDI_SUCCESS) {
 		/*
-		 * ppb_support_msi == 0
-		 * only for check special case like AMD8132 which supports MSI
+		 * ppb_support_msi == 0 i.e. by default, MSI is disabled
+		 * Check only for special case like AMD8132 which supports MSI
 		 */
 		if ((pci_config_get16(config_handle, PCI_CONF_VENID) ==
 		    PCI_VENID_AMD) && (pci_config_get16(config_handle,
@@ -1014,7 +758,6 @@ ppb_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	    (void *)rdip, *(int *)result));
 	return (DDI_SUCCESS);
 }
-#endif
 
 static int
 ppb_open(dev_t *devp, int flags, int otyp, cred_t *credp)

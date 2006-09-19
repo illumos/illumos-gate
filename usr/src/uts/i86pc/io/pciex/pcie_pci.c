@@ -180,9 +180,6 @@ typedef struct {
 	/*
 	 * cpr support:
 	 */
-#define	PCI_MAX_DEVICES		32
-#define	PCI_MAX_FUNCTIONS	8
-#define	PCI_MAX_CHILDREN	PCI_MAX_DEVICES * PCI_MAX_FUNCTIONS
 	uint_t	config_state_index;
 	struct {
 		dev_info_t	*dip;

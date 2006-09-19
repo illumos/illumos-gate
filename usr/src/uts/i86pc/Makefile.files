@@ -111,6 +111,7 @@ SPECIAL_OBJS += $(SPECIAL_OBJS_$(CLASS))
 ROOTNEX_OBJS += rootnex.o
 ISANEXUS_OBJS += isa.o dma_engine.o i8237A.o
 PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o
+PCI_PCINEXUS_OBJS += pci_pci.o
 
 TCIC_OBJS +=	tcic.o
 

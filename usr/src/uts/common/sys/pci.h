@@ -812,6 +812,9 @@ typedef struct pcix_attr {
 #define	PCI_BASE_SIZE	4	/* size of base reg in bytes */
 #define	PCI_CONF_HDR_SIZE	256	/* configuration header size */
 #define	PCI_MAX_BUS_NUM		256		/* Maximum PCI buses allowed */
+#define	PCI_MAX_DEVICES		32		/* Max PCI devices allowed */
+#define	PCI_MAX_FUNCTIONS	8		/* Max PCI functions allowed */
+#define	PCI_MAX_CHILDREN	PCI_MAX_DEVICES * PCI_MAX_FUNCTIONS
 #define	PCI_CLK_33MHZ	(33 * 1000 * 1000)	/* 33MHz clock speed */
 #define	PCI_CLK_66MHZ	(66 * 1000 * 1000)	/* 66MHz clock speed */
 #define	PCI_CLK_133MHZ	(133 * 1000 * 1000)	/* 133MHz clock speed */

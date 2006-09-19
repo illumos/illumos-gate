@@ -394,8 +394,6 @@ DIAUDIO_OBJS += audio.o
 
 OLDPTY_OBJS +=	tty_ptyconf.o
 
-PCI_PCINEXUS_OBJS += pci_pci.o
-
 PTC_OBJS +=	tty_pty.o
 
 PTSL_OBJS +=	tty_pts.o

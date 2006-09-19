@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# uts/intel/pci_pci/Makefile
+# uts/i86pc/pci_pci/Makefile
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -40,14 +40,14 @@ UTSBASE	= ../..
 MODULE		= pci_pci
 OBJECTS		= $(PCI_PCINEXUS_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(PCI_PCINEXUS_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 
 INC_PATH	+= -I../../i86pc
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/intel/Makefile.intel
+include $(UTSBASE)/i86pc/Makefile.i86pc
 
 #
 #	Define targets
@@ -55,6 +55,11 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+#
+# depends on misc/pcihp
+#
+LDFLAGS		+= -dy -Nmisc/pcihp
 
 #
 #	Override defaults to build a unique, local modstubs.o.
@@ -86,5 +91,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/intel/Makefile.targ
-
+include $(UTSBASE)/i86pc/Makefile.targ
