@@ -41,7 +41,7 @@
 #include	"_libld.h"
 
 /*
- * Comparison routine used by qsort() for sorting of the global yymbol list
+ * Comparison routine used by qsort() for sorting of the global symbol list
  * based off of the hashbuckets the symbol will eventually be deposited in.
  */
 static int
@@ -77,13 +77,17 @@ update_osym(Ofl_desc *ofl)
 	Addr		tlsbssaddr = 0;
 	Addr 		sunwbssaddr = 0, sunwdata1addr;
 	int		start_set = 0;
-	Sym		_sym = {0}, *sym, *symtab = 0, *dynsym = 0;
+	Sym		_sym = {0}, *sym, *symtab = 0;
+	Sym		*dynsym = 0, *ldynsym = 0;
 	Word		symtab_ndx = 0;	/* index into .symtab */
-	Word		dynsym_ndx = 0;	/* index into .dynsym */
+	Word		ldynsym_ndx = 0;	/* index into .SUNW_ldynsym */
+	Word		dynsym_ndx = 0;		/* index into .dynsym */
 	Word		scopesym_ndx = 0; /* index into scoped symbols */
-	Word		*symndx = 0;	/* Symbol index (for relocation use) */
+	Word		ldynscopesym_ndx = 0; /* index to ldynsym scoped syms */
+	Word		*symndx;	/* Symbol index (for relocation use) */
 	Word		*symshndx = 0;	/* .symtab_shndx table */
 	Word		*dynshndx = 0;	/* .dynsym_shndx table */
+	Word		*ldynshndx = 0;	/* .SUNW_ldynsym_shndx table */
 	Str_tbl		*shstrtab;
 	Str_tbl		*strtab;
 	Str_tbl		*dynstr;
@@ -118,9 +122,18 @@ update_osym(Ofl_desc *ofl)
 		if (ofl->ofl_ossymshndx)
 		    symshndx = (Word *)ofl->ofl_ossymshndx->os_outdata->d_buf;
 	}
-	if ((flags & FLG_OF_DYNAMIC) && !(flags & FLG_OF_RELOBJ)) {
+	if (OFL_ALLOW_DYNSYM(ofl)) {
 		dynsym = (Sym *)ofl->ofl_osdynsym->os_outdata->d_buf;
 		dynsym[dynsym_ndx++] = _sym;
+		/*
+		 * If we are also constructing a .SUNW_ldynsym section
+		 * to contain local function symbols, then set it up too.
+		 */
+		if (ofl->ofl_osldynsym) {
+			ldynsym = (Sym *)ofl->ofl_osldynsym->os_outdata->d_buf;
+			ldynsym[ldynsym_ndx++] = _sym;
+		}
+
 		/*
 		 * Initialize the hash table.
 		 */
@@ -132,6 +145,8 @@ update_osym(Ofl_desc *ofl)
 		    ofl->ofl_lregsymcnt + 1;
 		if (ofl->ofl_osdynshndx)
 		    dynshndx = (Word *)ofl->ofl_osdynshndx->os_outdata->d_buf;
+		if (ofl->ofl_osldynshndx)
+		    ldynshndx = (Word *)ofl->ofl_osldynshndx->os_outdata->d_buf;
 	}
 
 	/*
@@ -173,7 +188,7 @@ update_osym(Ofl_desc *ofl)
 	DBG_CALL(Dbg_syms_sec_title(ofl->ofl_lml));
 
 	/*
-	 * Add the output file name to the first .symtab symbol.
+	 * Put output file name to the first .symtab and .SUNW_ldynsym symbol.
 	 */
 	if (symtab) {
 		(void) st_setstring(strtab, ofl->ofl_name, &stoff);
@@ -188,6 +203,21 @@ update_osym(Ofl_desc *ofl)
 
 		if (versym && !dynsym)
 			versym[1] = 0;
+	}
+	if (ldynsym && ofl->ofl_dynscopecnt) {
+		(void) st_setstring(dynstr, ofl->ofl_name, &stoff);
+		sym = &ldynsym[ldynsym_ndx];
+		/* LINTED */
+		sym->st_name = stoff;
+		sym->st_value = 0;
+		sym->st_size = 0;
+		sym->st_info = ELF_ST_INFO(STB_LOCAL, STT_FILE);
+		sym->st_other = 0;
+		sym->st_shndx = SHN_ABS;
+
+		/* Scoped symbols get filled in global loop below */
+		ldynscopesym_ndx = ldynsym_ndx + 1;
+		ldynsym_ndx += ofl->ofl_dynscopecnt;
 	}
 
 	/*
@@ -474,6 +504,8 @@ update_osym(Ofl_desc *ofl)
 			Gotndx		*gnp;
 			unsigned char	type;
 			Word		*_symshndx;
+			int		enter_in_symtab, enter_in_ldynsym;
+			int		update_done;
 
 			sdp = ifl->ifl_oldndx[lndx];
 			sym = sdp->sd_sym;
@@ -524,13 +556,16 @@ update_osym(Ofl_desc *ofl)
 			 * we still need to update any local symbols that are
 			 * used during relocation.
 			 */
+			enter_in_symtab = symtab &&
+			    (!(ofl->ofl_flags1 & FLG_OF1_REDLSYM) ||
+			    (sdp->sd_psyminfo));
+			enter_in_ldynsym = ldynsym && sdp->sd_name &&
+			    ((type == STT_FUNC) || (type == STT_FILE));
 			_symshndx = 0;
-			if (symtab && (!(ofl->ofl_flags1 & FLG_OF1_REDLSYM) ||
-			    (sdp->sd_psyminfo))) {
+			if (enter_in_symtab) {
 				if (!dynsym)
 					sdp->sd_symndx = *symndx;
 				symtab[symtab_ndx] = *sym;
-
 				/*
 				 * Provided this isn't an unnamed register
 				 * symbol, update its name.
@@ -547,9 +582,24 @@ update_osym(Ofl_desc *ofl)
 				sdp->sd_sym = sym = &symtab[symtab_ndx++];
 
 				if ((sdp->sd_flags & FLG_SY_SPECSEC) &&
-				    (sym->st_shndx == SHN_ABS))
+				    (sym->st_shndx == SHN_ABS) &&
+				    !enter_in_ldynsym)
 					continue;
-			} else {
+			} else if (enter_in_ldynsym) {
+				/*
+				 * Not using symtab, but we do have ldynsym
+				 * available.
+				 */
+				ldynsym[ldynsym_ndx] = *sym;
+				(void) st_setstring(dynstr, sdp->sd_name,
+					&stoff);
+				ldynsym[ldynsym_ndx].st_name = stoff;
+
+				sdp->sd_flags &= ~FLG_SY_CLEAN;
+				if (ldynshndx)
+					_symshndx = &ldynshndx[ldynsym_ndx];
+				sdp->sd_sym = sym = &ldynsym[ldynsym_ndx++];
+			} else {	/* Not using symtab or ldynsym */
 				/*
 				 * If this symbol requires modifying to provide
 				 * for a relocation or move table update, make
@@ -570,10 +620,11 @@ update_osym(Ofl_desc *ofl)
 			/*
 			 * Update the symbols contents if necessary.
 			 */
+			update_done = 0;
 			if (type == STT_FILE) {
 				sdp->sd_shndx = sym->st_shndx = SHN_ABS;
 				sdp->sd_flags |= FLG_SY_SPECSEC;
-				continue;
+				update_done = 1;
 			}
 
 			/*
@@ -581,14 +632,14 @@ update_osym(Ofl_desc *ofl)
 			 * initialized symbols, then update the address here.
 			 */
 			if (ofl->ofl_issunwdata1 &&
-			    (sdp->sd_flags & FLG_SY_PAREXPN)) {
+			    (sdp->sd_flags & FLG_SY_PAREXPN) && !update_done) {
 				static	Addr	laddr = 0;
 
 				sym->st_shndx = sunwdata1ndx;
 				sdp->sd_isc = ofl->ofl_issunwdata1;
-				if (ofl->ofl_flags & FLG_OF_RELOBJ)
+				if (ofl->ofl_flags & FLG_OF_RELOBJ) {
 					sym->st_value = sunwdata1addr;
-				else {
+				} else {
 					sym->st_value = laddr;
 					laddr += sym->st_size;
 				}
@@ -599,7 +650,7 @@ update_osym(Ofl_desc *ofl)
 			 * If this isn't an UNDEF symbol (ie. an input section
 			 * is associated), update the symbols value and index.
 			 */
-			if ((isc = sdp->sd_isc) != 0) {
+			if (((isc = sdp->sd_isc) != 0) && !update_done) {
 				Word	sectndx;
 
 				osp = isc->is_osdesc;
@@ -613,9 +664,10 @@ update_osym(Ofl_desc *ofl)
 					 * the TLS segment.
 					 */
 					if ((ELF_ST_TYPE(sym->st_info) ==
-					    STT_TLS) && (ofl->ofl_tlsphdr))
+					    STT_TLS) && (ofl->ofl_tlsphdr)) {
 						sym->st_value -=
 						    ofl->ofl_tlsphdr->p_vaddr;
+					}
 				}
 				/* LINTED */
 				if ((sdp->sd_shndx = sectndx =
@@ -628,6 +680,25 @@ update_osym(Ofl_desc *ofl)
 					/* LINTED */
 					sym->st_shndx = sectndx;
 				}
+			}
+
+			/*
+			 * If entering the symbol in both the symtab and the
+			 * ldynsym, then the one in symtab needs to be
+			 * copied to ldynsym. If it is only in the ldynsym,
+			 * then the code above already set it up and we have
+			 * nothing more to do here.
+			 */
+			if (enter_in_symtab && enter_in_ldynsym) {
+				ldynsym[ldynsym_ndx] = *sym;
+				(void) st_setstring(dynstr, sdp->sd_name,
+					&stoff);
+				ldynsym[ldynsym_ndx].st_name = stoff;
+
+				if (_symshndx && ldynshndx)
+					ldynshndx[ldynsym_ndx] = *_symshndx;
+
+				ldynsym_ndx++;
 			}
 		}
 	}
@@ -897,7 +968,7 @@ update_osym(Ofl_desc *ofl)
 		Sym		*sym;
 		Sym_aux		*sap;
 		Half		spec;
-		int		local = 0, enter_in_symtab;
+		int		local = 0, dynlocal = 0, enter_in_symtab;
 		Listnode	*lnp2;
 		Gotndx		*gnp;
 		Word		sectndx;
@@ -953,10 +1024,15 @@ update_osym(Ofl_desc *ofl)
 			else
 				sdp->sd_symndx = 0;
 
-			if (sdp->sd_flags1 & FLG_SY1_ELIM)
+			if (sdp->sd_flags1 & FLG_SY1_ELIM) {
 				enter_in_symtab = 0;
-		} else
+			} else if (ldynsym && sdp->sd_sym->st_name &&
+			    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_FUNC)) {
+				dynlocal = 1;
+			}
+		} else {
 			sdp->sd_symndx = *symndx;
+		}
 
 		/*
 		 * Copy basic symbol and string information.
@@ -1146,7 +1222,7 @@ update_osym(Ofl_desc *ofl)
 		 * first, followed by the .dynsym, thus the `sym' value will
 		 * remain as the .dynsym value when the .dynsym is present.
 		 * This ensures that any versioning symbols st_name value will
-		 * be appropriate for the string table used to by version
+		 * be appropriate for the string table used by version
 		 * entries.
 		 */
 		if (enter_in_symtab) {
@@ -1156,42 +1232,45 @@ update_osym(Ofl_desc *ofl)
 				_symndx = scopesym_ndx;
 			else
 				_symndx = symtab_ndx;
+
 			symtab[_symndx] = *sdp->sd_sym;
 			sdp->sd_sym = sym = &symtab[_symndx];
 			(void) st_setstring(strtab, name, &stoff);
 			sym->st_name = stoff;
 		}
+		if (dynlocal) {
+			ldynsym[ldynscopesym_ndx] = *sdp->sd_sym;
+			sdp->sd_sym = sym = &ldynsym[ldynscopesym_ndx];
+			(void) st_setstring(dynstr, name, &stoff);
+			ldynsym[ldynscopesym_ndx].st_name = stoff;
+		}
 
 		if (dynsym && !local) {
 			dynsym[dynsym_ndx] = *sdp->sd_sym;
-
 			/*
 			 * Provided this isn't an unnamed register symbol,
 			 * update its name and hash value.
 			 */
 			if (((sdp->sd_flags & FLG_SY_REGSYM) == 0) ||
 			    dynsym[dynsym_ndx].st_name) {
-				(void) st_setstring(dynstr, name, &stoff);
-				dynsym[dynsym_ndx].st_name = stoff;
-				if (stoff) {
-					Word	_hashndx;
-					hashval =
-					    sap->sa_hash % ofl->ofl_hashbkts;
-					/* LINTED */
-					if (_hashndx = hashbkt[hashval]) {
-						while (hashchain[_hashndx])
-							_hashndx =
-							    hashchain[_hashndx];
-						hashchain[_hashndx] =
-						    sdp->sd_symndx;
-					} else
-						hashbkt[hashval] =
-						    sdp->sd_symndx;
+			    (void) st_setstring(dynstr, name, &stoff);
+			    dynsym[dynsym_ndx].st_name = stoff;
+			    if (stoff) {
+				Word _hashndx;
+				hashval = sap->sa_hash % ofl->ofl_hashbkts;
+				/* LINTED */
+				if (_hashndx = hashbkt[hashval]) {
+				    while (hashchain[_hashndx])
+					_hashndx = hashchain[_hashndx];
+					hashchain[_hashndx] = sdp->sd_symndx;
+				} else {
+					hashbkt[hashval] = sdp->sd_symndx;
 				}
+			    }
 			}
 			sdp->sd_sym = sym = &dynsym[dynsym_ndx];
 		}
-		if (!enter_in_symtab && (!dynsym || local)) {
+		if (!enter_in_symtab && (!dynsym || (local && !dynlocal))) {
 			if (!(sdp->sd_flags & FLG_SY_UPREQD))
 				continue;
 			sym = sdp->sd_sym;
@@ -1219,15 +1298,23 @@ update_osym(Ofl_desc *ofl)
 				    libld_calloc(sizeof (Wk_desc), 1)) == 0)
 					return ((Addr)S_ERROR);
 
-				if (enter_in_symtab)
+				if (enter_in_symtab) {
 					if (local)
 						wkp->wk_symtab =
 						    &symtab[scopesym_ndx];
 					else
 						wkp->wk_symtab =
 						    &symtab[symtab_ndx];
-				if (dynsym && !local)
-					wkp->wk_dynsym = &dynsym[dynsym_ndx];
+				}
+				if (dynsym) {
+					if (!local) {
+						wkp->wk_dynsym =
+						    &dynsym[dynsym_ndx];
+					} else if (dynlocal) {
+						wkp->wk_dynsym =
+						    &ldynsym[ldynscopesym_ndx];
+					}
+				}
 				wkp->wk_weak = sdp;
 				wkp->wk_alias = _sdp;
 
@@ -1239,8 +1326,13 @@ update_osym(Ofl_desc *ofl)
 						scopesym_ndx++;
 					else
 						symtab_ndx++;
-				if (dynsym && !local)
-					dynsym_ndx++;
+				if (dynsym) {
+					if (!local) {
+						dynsym_ndx++;
+					} else if (dynlocal) {
+						ldynscopesym_ndx++;
+					}
+				}
 				continue;
 			}
 		}
@@ -1446,11 +1538,13 @@ update_osym(Ofl_desc *ofl)
 		 * .symtab entry.
 		 */
 		sdp->sd_shndx = sectndx;
-		if (enter_in_symtab && dynsym && !local) {
-			symtab[symtab_ndx].st_value = sym->st_value;
-			symtab[symtab_ndx].st_size = sym->st_size;
-			symtab[symtab_ndx].st_info = sym->st_info;
-			symtab[symtab_ndx].st_other = sym->st_other;
+		if (enter_in_symtab && dynsym && (!local || dynlocal)) {
+			Word _symndx = dynlocal ? scopesym_ndx : symtab_ndx;
+
+			symtab[_symndx].st_value = sym->st_value;
+			symtab[_symndx].st_size = sym->st_size;
+			symtab[_symndx].st_info = sym->st_info;
+			symtab[_symndx].st_other = sym->st_other;
 		}
 
 
@@ -1472,17 +1566,34 @@ update_osym(Ofl_desc *ofl)
 			}
 		}
 
-		if (dynsym && !local) {
+		if (dynsym && (!local || dynlocal)) {
+			/*
+			 * dynsym and ldynsym are distinct tables, so
+			 * we use indirection to access the right one
+			 * and the related extended section index array.
+			 */
+			Word	_symndx;
+			Sym	*_dynsym;
+			Word	*_dynshndx;
+
+			if (!local) {
+				_symndx = dynsym_ndx++;
+				_dynsym = dynsym;
+				_dynshndx = dynshndx;
+			} else {
+				_symndx = ldynscopesym_ndx++;
+				_dynsym = ldynsym;
+				_dynshndx = ldynshndx;
+			}
 			if (((sdp->sd_flags & FLG_SY_SPECSEC) == 0) &&
 			    (sectndx >= SHN_LORESERVE)) {
-				assert(dynshndx != 0);
-				dynshndx[dynsym_ndx] = sectndx;
-				dynsym[dynsym_ndx].st_shndx = SHN_XINDEX;
+				assert(_dynshndx != 0);
+				_dynshndx[_symndx] = sectndx;
+				_dynsym[_symndx].st_shndx = SHN_XINDEX;
 			} else {
 				/* LINTED */
-				dynsym[dynsym_ndx].st_shndx = (Half)sectndx;
+				_dynsym[_symndx].st_shndx = (Half)sectndx;
 			}
-			dynsym_ndx++;
 		}
 
 		DBG_CALL(Dbg_syms_new(ofl, sym, sdp));
@@ -1551,7 +1662,11 @@ update_osym(Ofl_desc *ofl)
 	DBG_CALL(Dbg_got_display(ofl, 0, 0));
 
 	/*
-	 * Update the section headers information.
+	 * Update the section headers information. sh_info is
+	 * supposed to contain the offset at which the first
+	 * global symbol resides in the symbol table, while
+	 * sh_link contains the section index of the associated
+	 * string table.
 	 */
 	if (symtab) {
 		Shdr *	shdr = ofl->ofl_ossymtab->os_shdr;
@@ -1569,7 +1684,7 @@ update_osym(Ofl_desc *ofl)
 	if (dynsym) {
 		Shdr *	shdr = ofl->ofl_osdynsym->os_shdr;
 
-		shdr->sh_info = ofl->ofl_dynshdrcnt + ofl->ofl_lregsymcnt + 1;
+		shdr->sh_info = 1 + ofl->ofl_dynshdrcnt + ofl->ofl_lregsymcnt;
 		/* LINTED */
 		shdr->sh_link = (Word)elf_ndxscn(ofl->ofl_osdynstr->os_scn);
 
@@ -1580,6 +1695,39 @@ update_osym(Ofl_desc *ofl)
 			shdr = ofl->ofl_osdynshndx->os_shdr;
 			shdr->sh_link =
 				(Word)elf_ndxscn(ofl->ofl_osdynsym->os_scn);
+		}
+	}
+	if (ldynsym) {
+		Shdr *	shdr = ofl->ofl_osldynsym->os_shdr;
+
+		/* ldynsym has no globals, so give index one past the end */
+		shdr->sh_info = ldynsym_ndx;
+
+		/*
+		 * The ldynsym and dynsym must be adjacent. The
+		 * idea is that rtld should be able to start with
+		 * the ldynsym and march straight through the end
+		 * of dynsym, seeing them as a single symbol table,
+		 * despite the fact that they are in distinct sections.
+		 * Ensure that this happened correctly.
+		 *
+		 * Note that I use ldynsym_ndx here instead of the
+		 * computation I used to set the section size
+		 * (1 + ofl->ofl_dynlocscnt + ofl->ofl_dynscopecnt).
+		 * The two will agree, unless we somehow miscounted symbols
+		 * or failed to insert them all. Using ldynsym_ndx here
+		 * catches that error in addition to checking for adjacency.
+		 */
+		assert(dynsym == (ldynsym + ldynsym_ndx));
+
+
+		/* LINTED */
+		shdr->sh_link = (Word)elf_ndxscn(ofl->ofl_osdynstr->os_scn);
+
+		if (ldynshndx) {
+			shdr = ofl->ofl_osldynshndx->os_shdr;
+			shdr->sh_link =
+				(Word)elf_ndxscn(ofl->ofl_osldynsym->os_scn);
 		}
 	}
 
@@ -1744,6 +1892,26 @@ update_odynamic(Ofl_desc *ofl)
 		dyn->d_tag = DT_SYMENT;
 		dyn->d_un.d_ptr = shdr->sh_entsize;
 		dyn++;
+
+		if (ofl->ofl_osldynsym) {
+			/*
+			 * We have arranged for the .SUNW_ldynsym data to be
+			 * immediately in front of the .dynsym data.
+			 * This means that you could start at the top
+			 * of .SUNW_ldynsym and see the data for both tables
+			 * without a break. This is the view we want to
+			 * provide for DT_SUNW_SYMTAB, which is why we
+			 * add the lengths together.
+			 */
+			Shdr *lshdr = ofl->ofl_osldynsym->os_shdr;
+			dyn->d_tag = DT_SUNW_SYMTAB;
+			dyn->d_un.d_ptr = lshdr->sh_addr;
+			dyn++;
+
+			dyn->d_tag = DT_SUNW_SYMSZ;
+			dyn->d_un.d_val = lshdr->sh_size + shdr->sh_size;
+			dyn++;
+		}
 
 		/*
 		 * Reserve the DT_CHECKSUM entry.  Its value will be filled in
@@ -2432,7 +2600,7 @@ update_move(Ofl_desc *ofl)
 	 * Determine the index of the symbol table that will be referenced by
 	 * the relocation entries.
 	 */
-	if ((flags & (FLG_OF_DYNAMIC|FLG_OF_RELOBJ)) == FLG_OF_DYNAMIC)
+	if (OFL_ALLOW_DYNSYM(ofl))
 		/* LINTED */
 		ndx = (Word) elf_ndxscn(ofl->ofl_osdynsym->os_scn);
 	else if (!(flags & FLG_OF_STRIP) || (flags & FLG_OF_RELOBJ))
@@ -2807,8 +2975,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * figured out by now.
 		 */
 		if (phdr->p_type == PT_DYNAMIC) {
-			if ((flags & (FLG_OF_DYNAMIC | FLG_OF_RELOBJ)) ==
-			    FLG_OF_DYNAMIC) {
+			if (OFL_ALLOW_DYNSYM(ofl)) {
 				Shdr *	shdr = ofl->ofl_osdynamic->os_shdr;
 
 				phdr->p_vaddr = shdr->sh_addr;

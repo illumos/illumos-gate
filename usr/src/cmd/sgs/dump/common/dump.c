@@ -1142,6 +1142,7 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			case DT_PREINIT_ARRAYSZ:
 			case DT_SUNW_RTLDINF:
 			case DT_SUNW_CAP:
+			case DT_SUNW_SYMTAB:
 			case DT_PLTPAD:
 			case DT_MOVETAB:
 			case DT_SYMINFO:
@@ -1202,6 +1203,7 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			case DT_SYMINENT:
 			case DT_VERNEEDNUM:
 			case DT_SPARC_REGISTER:
+			case DT_SUNW_SYMSZ:
 				(void) printf(pdyn_Fmtptr,
 					EC_XWORD(p_dyn.d_un.d_val));
 				break;

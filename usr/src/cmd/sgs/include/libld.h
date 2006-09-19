@@ -208,8 +208,10 @@ struct ofl_desc {
 	Word		ofl_entercnt;	/* no. of global symbols entered */
 	Word		ofl_globcnt;	/* no. of global symbols to output */
 	Word		ofl_scopecnt;	/* no. of scoped symbols to output */
+	Word		ofl_dynscopecnt; /* no. scoped syms in .SUNW_ldynsym */
 	Word		ofl_elimcnt;	/* no. of eliminated symbols */
-	Word		ofl_locscnt;	/* no. of local symbols to output */
+	Word		ofl_locscnt;	/* no. of local symbols in .symtab */
+	Word		ofl_dynlocscnt;	/* no. local symbols in .SUNW_ldynsym */
 	Word		ofl_dynshdrcnt;	/* no. of output section in .dynsym */
 	Word		ofl_shdrcnt;	/* no. of output sections */
 	Str_tbl		*ofl_shdrsttab;	/* Str_tbl for shdr strtab */
@@ -239,6 +241,7 @@ struct ofl_desc {
 	Is_desc		*ofl_issunwbss;	/* .SUNW_bss input section (globals) */
 	Os_desc		*ofl_osdynamic;	/* .dynamic output section */
 	Os_desc		*ofl_osdynsym;	/* .dynsym output section */
+	Os_desc		*ofl_osldynsym;	/* .SUNW_ldynsym output section */
 	Os_desc		*ofl_osdynstr;	/* .dynstr output section */
 	Os_desc		*ofl_osgot;	/* .got output section */
 	Os_desc		*ofl_oshash;	/* .hash output section */
@@ -256,6 +259,7 @@ struct ofl_desc {
 	Os_desc		*ofl_ossymtab;	/* .symtab output section */
 	Os_desc		*ofl_ossymshndx; /* .symtab_shndx output section */
 	Os_desc		*ofl_osdynshndx; /* .dynsym_shndx output section */
+	Os_desc		*ofl_osldynshndx; /* .SUNW_ldynsym_shndx output sec */
 	Os_desc		*ofl_osverdef;	/* .version definition output section */
 	Os_desc		*ofl_osverneed;	/* .version needed output section */
 	Os_desc		*ofl_osversym;	/* .version symbol ndx output section */
@@ -291,7 +295,7 @@ struct ofl_desc {
 #define	FLG_OF_DYNLIBS	0x00001000	/* dynamic input allowed: -Bdynamic */
 #define	FLG_OF_SYMBOLIC	0x00002000	/* bind global symbols: -Bsymbolic */
 #define	FLG_OF_ADDVERS	0x00004000	/* add version stamp: -Qy */
-#define	FLG_OF_MEMORY	0x00008000	/* produce a memory model */
+#define	FLG_OF_NOLDYNSYM 0x00008000	/* -znoldynsym set */
 #define	FLG_OF_SEGORDER	0x00010000	/* segment ordering is required */
 #define	FLG_OF_SEGSORT	0x00020000	/* segment sorting is required */
 #define	FLG_OF_TEXTREL	0x00040000	/* text relocations have been found */
@@ -347,6 +351,7 @@ struct ofl_desc {
 					/*	section */
 #define	FLG_OF1_TLSOREL	0x00100000	/* output relocation against .tlsbss */
 					/*	section */
+#define	FLG_OF1_MEMORY	0x00200000	/* produce a memory model */
 #define	FLG_OF1_VADDR	0x01000000	/* vaddr was explicitly set */
 #define	FLG_OF1_EXTRACT	0x02000000	/* archive member has been extracted */
 #define	FLG_OF1_RESCAN	0x04000000	/* any archives should be rescanned */
@@ -357,6 +362,23 @@ struct ofl_desc {
 					/*	the output file */
 #define	FLG_OF1_ALNODIR	0x80000000	/* establish NODIRECT for all */
 					/*	exported interfaces. */
+
+/*
+ * Test to see if the output file would allow the presence of
+ * a .dynsym section.
+ */
+#define	OFL_ALLOW_DYNSYM(ofl) ((ofl->ofl_flags & \
+	(FLG_OF_DYNAMIC | FLG_OF_RELOBJ)) == FLG_OF_DYNAMIC)
+
+/*
+ * Test to see if the output file would allow the presence of
+ * a .SUNW_ldynsym section. The requirements are that a .dynsym
+ * is allowed, and -znoldynsym has not been specified. Note that
+ * even if the answer is True (1), we will only generate one if there
+ * are local symbols that require it.
+ */
+#define	OFL_ALLOW_LDYNSYM(ofl) ((ofl->ofl_flags & \
+	(FLG_OF_DYNAMIC | FLG_OF_RELOBJ | FLG_OF_NOLDYNSYM)) == FLG_OF_DYNAMIC)
 
 /*
  * Relocation (active & output) processing structure - transparent to common

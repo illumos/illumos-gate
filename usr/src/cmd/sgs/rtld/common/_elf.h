@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
  *	  All Rights Reserved
  *
  *
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -87,6 +86,7 @@ typedef struct pltpadinfo {
  */
 typedef struct _rt_elf_private {
 	void		*e_symtab;	/* symbol table */
+	void		*e_sunwsymtab;	/* symtab augmented with local fcns */
 	uint_t		*e_hash;	/* hash table */
 	char		*e_strtab;	/* string table */
 	void		*e_reloc;	/* relocation table */
@@ -94,6 +94,7 @@ typedef struct _rt_elf_private {
 	void		*e_pltreserve;	/* ia64: DT_IA_64_PLTRESERVE */
 	void		*e_dynplt;	/* dynamic plt table - used by prof */
 	void		*e_jmprel;	/* plt relocations */
+	ulong_t		e_sunwsymsz;	/* size of w_sunwsymtab */
 	ulong_t		e_pltrelsize;	/* size of PLT relocation entries */
 	ulong_t		e_relsz;	/* size of relocs */
 	ulong_t		e_relent;	/* size of base reloc entry */
@@ -120,6 +121,7 @@ typedef struct _rt_elf_private {
  */
 #define	ELFPRV(X)	((X)->rt_priv)
 #define	SYMTAB(X)	(((Rt_elfp *)(X)->rt_priv)->e_symtab)
+#define	SUNWSYMTAB(X)	(((Rt_elfp *)(X)->rt_priv)->e_sunwsymtab)
 #define	HASH(X)		(((Rt_elfp *)(X)->rt_priv)->e_hash)
 #define	STRTAB(X)	(((Rt_elfp *)(X)->rt_priv)->e_strtab)
 #define	REL(X)		(((Rt_elfp *)(X)->rt_priv)->e_reloc)
@@ -129,6 +131,7 @@ typedef struct _rt_elf_private {
 #define	MOVETAB(X)	(((Rt_elfp *)(X)->rt_priv)->e_movetab)
 #define	DYNPLT(X)	(((Rt_elfp *)(X)->rt_priv)->e_dynplt)
 #define	JMPREL(X)	(((Rt_elfp *)(X)->rt_priv)->e_jmprel)
+#define	SUNWSYMSZ(X)	(((Rt_elfp *)(X)->rt_priv)->e_sunwsymsz)
 #define	PTTLS(X)	(((Rt_elfp *)(X)->rt_priv)->e_pttls)
 #define	PTUNWIND(X)	(((Rt_elfp *)(X)->rt_priv)->e_ptunwind)
 #define	TLSSTATOFF(X)	(((Rt_elfp *)(X)->rt_priv)->e_tlsstatoff)

@@ -466,7 +466,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 			 * implicit shared object.
 			 */
 			if (ifl->ifl_vercnt) {
-				Ver_index *	vip;
+				Ver_index	*vip;
 				Half		vndx = ifl->ifl_versym[ndx];
 
 				sap->sa_dverndx = vndx;
@@ -745,9 +745,7 @@ sym_undef_entry(Ofl_desc *ofl, Sym_desc *sdp, Type type)
 uintptr_t
 ld_sym_spec(Ofl_desc *ofl)
 {
-	Word		flags = ofl->ofl_flags;
-
-	if (!(flags & FLG_OF_RELOBJ)) {
+	if (!(ofl->ofl_flags & FLG_OF_RELOBJ)) {
 
 		DBG_CALL(Dbg_syms_spec_title(ofl->ofl_lml));
 
@@ -781,8 +779,7 @@ ld_sym_spec(Ofl_desc *ofl)
 		    FLG_SY1_GLOB, ofl) == S_ERROR)
 			return (S_ERROR);
 
-		if ((flags & (FLG_OF_DYNAMIC | FLG_OF_RELOBJ)) ==
-		    FLG_OF_DYNAMIC)
+		if (OFL_ALLOW_DYNSYM(ofl))
 			if (sym_add_spec(MSG_ORIG(MSG_SYM_PLKTBL),
 			    MSG_ORIG(MSG_SYM_PLKTBL_U), SDAUX_ID_PLT,
 			    FLG_SY1_GLOB, ofl) == S_ERROR)
@@ -958,6 +955,7 @@ ld_sym_validate(Ofl_desc *ofl)
 	Xword		lbssalign = 0, lbsssize = 0;
 #endif
 	int		ret;
+	int		allow_ldynsym;
 
 	/*
 	 * If a symbol is undefined and this link-edit calls for no undefined
@@ -992,6 +990,7 @@ ld_sym_validate(Ofl_desc *ofl)
 	if ((oflags & FLG_OF_VERDEF) && (ofl->ofl_vercnt > VER_NDX_GLOBAL))
 		verdesc = FLG_OF_FATAL;
 
+	allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
 	/*
 	 * Collect and validate the globals from the internal symbol table.
 	 */
@@ -1319,6 +1318,13 @@ ld_sym_validate(Ofl_desc *ofl)
 				    sym->st_name) && (st_insert(ofl->ofl_strtab,
 				    sdp->sd_name) == -1))
 					return (S_ERROR);
+				if (allow_ldynsym && sym->st_name &&
+				    (ELF_ST_TYPE(sym->st_info) == STT_FUNC)) {
+					ofl->ofl_dynscopecnt++;
+					if (st_insert(ofl->ofl_dynstrtab,
+					    sdp->sd_name) == -1)
+						return (S_ERROR);
+				}
 			}
 		} else {
 			ofl->ofl_globcnt++;
@@ -1636,6 +1642,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * index array.
 	 */
 	if (local) {
+		int allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
 		for (sym++, ndx = 1; ndx < local; sym++, ndx++) {
 			Word		shndx, sdflags = FLG_SY_CLEAN;
 			const char	*name;
@@ -1827,6 +1834,15 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				    sym->st_name) && (st_insert(ofl->ofl_strtab,
 				    sdp->sd_name) == -1))
 					return (S_ERROR);
+
+				if (allow_ldynsym && sym->st_name &&
+				    ((type == STT_FUNC) ||
+				    (type == STT_FILE))) {
+					ofl->ofl_dynlocscnt++;
+					if (st_insert(ofl->ofl_dynstrtab,
+					    sdp->sd_name) == -1)
+						return (S_ERROR);
+				}
 			}
 		}
 	}

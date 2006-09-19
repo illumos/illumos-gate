@@ -117,6 +117,10 @@ typedef struct {
 #define	DT_SUNW_FILTER		0x6000000f	/* symbol filter name */
 #define	DT_SUNW_CAP		0x60000010	/* hardware/software */
 						/*	capabilities */
+#define	DT_SUNW_SYMTAB		0x60000011	/* symtab with local fcn */
+						/*	symbols immediately */
+						/*	preceding DT_SYMTAB */
+#define	DT_SUNW_SYMSZ		0x60000012	/* Size of SUNW_SYMTAB table */
 #define	DT_HIOS			0x6ffff000
 
 /*

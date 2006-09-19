@@ -263,6 +263,10 @@ conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 			return (MSG_ORIG(MSG_DYN_SUNW_FILTER));
 		else if (tag == DT_SUNW_CAP)
 			return (MSG_ORIG(MSG_DYN_SUNW_CAP));
+		else if (tag == DT_SUNW_SYMTAB)
+			return (MSG_ORIG(MSG_DYN_SUNW_SYMTAB));
+		else if (tag == DT_SUNW_SYMSZ)
+			return (MSG_ORIG(MSG_DYN_SUNW_SYMSZ));
 
 		/*
 		 * SUNW: DT_VALRNGLO - DT_VALRNGHI range.

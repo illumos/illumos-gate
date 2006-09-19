@@ -806,14 +806,24 @@ main(int argc, char **argv, char **envp)
 			/*
 			 * Remember the version sections and symbol table.
 			 */
-			if ((shdr.sh_type == SHT_SUNW_verdef) && dflag)
-				_cache_def = _cache;
-			else if ((shdr.sh_type == SHT_SUNW_verneed) && rflag)
-				_cache_need = _cache;
-			else if ((shdr.sh_type == SHT_SUNW_versym) && sflag)
-				_cache_sym = _cache;
-			else if ((shdr.sh_type == SHT_SYMTAB) && lflag)
-				_cache_loc = _cache;
+			switch (shdr.sh_type) {
+			case SHT_SUNW_verdef:
+				if (dflag)
+					_cache_def = _cache;
+				break;
+			case SHT_SUNW_verneed:
+				if (rflag)
+					_cache_need = _cache;
+				break;
+			case SHT_SUNW_versym:
+				if (sflag)
+					_cache_sym = _cache;
+				break;
+			case SHT_SYMTAB:
+				if (lflag)
+					_cache_loc = _cache;
+				break;
+			}
 		}
 
 		/*

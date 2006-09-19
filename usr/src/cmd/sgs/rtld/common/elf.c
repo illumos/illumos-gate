@@ -1926,8 +1926,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 * symbol binding information.
 	 */
 	if ((sip = SYMINFO(ilmp)) != 0)
-		/* LINTED */
-		sip = (Syminfo *)((char *)sip + (ndx * SYMINENT(ilmp)));
+		sip += ndx;
 
 	/*
 	 * If this is a direct binding request, but the symbol definition has
@@ -2084,6 +2083,13 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 			switch ((Xword)ld->d_tag) {
 			case DT_SYMTAB:
 				SYMTAB(lmp) = (void *)(ld->d_un.d_ptr + base);
+				break;
+			case DT_SUNW_SYMTAB:
+				SUNWSYMTAB(lmp) =
+				    (void *)(ld->d_un.d_ptr + base);
+				break;
+			case DT_SUNW_SYMSZ:
+				SUNWSYMSZ(lmp) = ld->d_un.d_val;
 				break;
 			case DT_STRTAB:
 				STRTAB(lmp) = (void *)(ld->d_un.d_ptr + base);
@@ -2376,6 +2382,37 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 			return (0);
 		}
 		DYNINFOCNT(lmp) = dyncnt;
+	}
+
+	/*
+	 * A dynsym contains only global functions. We want to have
+	 * a version of it that also includes local functions, so that
+	 * dladdr() will be able to report names for local functions
+	 * when used to generate a stack trace for a stripped file.
+	 * This version of the dynsym is provided via DT_SUNW_SYMTAB.
+	 *
+	 * In producing DT_SUNW_SYMTAB, ld uses a non-obvious trick
+	 * in order to avoid having to have two copies of the global
+	 * symbols held in DT_SYMTAB: The local symbols are placed in
+	 * a separate section than the globals in the dynsym, but the
+	 * linker conspires to put the data for these two sections adjacent
+	 * to each other. DT_SUNW_SYMTAB points at the top of the local
+	 * symbols, and DT_SUNW_SYMSZ is the combined length of both tables.
+	 *
+	 * If the two sections are not adjacent, then something went wrong
+	 * at link time. We use ASSERT to kill the process if this is
+	 * a debug build. In a production build, we will silently ignore
+	 * the presence of the .ldynsym and proceed. We can detect this
+	 * situation by checking to see that DT_SYMTAB lies in
+	 * the range given by DT_SUNW_SYMTAB/DT_SUNW_SYMSZ.
+	 */
+	if ((SUNWSYMTAB(lmp) != NULL) &&
+	    (((char *)SYMTAB(lmp) <= (char *)SUNWSYMTAB(lmp)) ||
+	    (((char *)SYMTAB(lmp) >=
+	    (SUNWSYMSZ(lmp) + (char *)SUNWSYMTAB(lmp)))))) {
+		ASSERT(0);
+		SUNWSYMTAB(lmp) = NULL;
+		SUNWSYMSZ(lmp) = 0;
 	}
 
 	/*
@@ -2929,14 +2966,32 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 	int		_flags;
 
 	/*
-	 * If we don't have a .hash table there are no symbols to look at.
+	 * If SUNWSYMTAB() is non-NULL, then it sees a special version of
+	 * the dynsym that starts with any local function symbols that exist in
+	 * the library and then moves to the data held in SYMTAB(). In this
+	 * case, SUNWSYMSZ tells us how long the symbol table is. The
+	 * availability of local function symbols will enhance the results
+	 * we can provide.
+	 *
+	 * If SUNWSYMTAB() is NULL, then SYMTAB() references a dynsym that
+	 * contains only global symbols. In that case, the length of
+	 * the symbol table comes from the nchain field of the related
+	 * symbol lookup hash table.
 	 */
-	if (HASH(lmp) == 0)
-		return;
-
-	cnt = HASH(lmp)[1];
 	str = STRTAB(lmp);
-	sym = SYMTAB(lmp);
+	if (SUNWSYMSZ(lmp) == NULL) {
+		sym = SYMTAB(lmp);
+		/*
+		 * If we don't have a .hash table there are no symbols
+		 * to look at.
+		 */
+		if (HASH(lmp) == 0)
+			return;
+		cnt = HASH(lmp)[1];
+	} else {
+		sym = SUNWSYMTAB(lmp);
+		cnt = SUNWSYMSZ(lmp) / SYMENT(lmp);
+	}
 
 	if (FLAGS(lmp) & FLG_RT_FIXED)
 		base = 0;
@@ -2946,7 +3001,19 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 	for (_sym = 0, _value = 0, sym++, ndx = 1; ndx < cnt; ndx++, sym++) {
 		ulong_t	value;
 
-		if (sym->st_shndx == SHN_UNDEF)
+		/*
+		 * Skip expected symbol types that are not functions
+		 * or data:
+		 *	- A symbol table starts with an undefined symbol
+		 *		in slot 0. If we are using SUNWSYMTAB(),
+		 *		there will be a second undefined symbol
+		 *		right before the globals.
+		 *	- The local part of SUNWSYMTAB() contains a
+		 *		series of function symbols. Each section
+		 *		starts with an initial STT_FILE symbol.
+		 */
+		if ((sym->st_shndx == SHN_UNDEF) ||
+		    (ELF_ST_TYPE(sym->st_info) == STT_FILE))
 			continue;
 
 		value = sym->st_value + base;

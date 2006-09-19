@@ -385,7 +385,7 @@
 @ MSG_ELF_ARSYM		"file %s ignored: unable to locate archive symbol table"
 
 @ MSG_ELF_VERSYM	"file %s: version symbol section entry mismatch:\n\t\
-			 (section %s entries=%d; section %s entires=%d)"
+			 (section %s entries=%d; section %s entries=%d)"
 
 @ MSG_ELF_NOGROUPSECT	"file %s: section %s: SHF_GROUP flag set, but no \
 			 corresponding SHT_GROUP section found"
@@ -550,7 +550,6 @@
 @ MSG_ELF_NEWPHDR	"file %s: elf_newphdr"
 @ MSG_ELF_STRPTR	"file %s: elf_strptr"
 @ MSG_ELF_UPDATE	"file %s: elf_update"
-@ MSG_ELF_FSIZE		"file %s: elf_fsize"
 
 
 @ MSG_REJ_MACH		"file %s: wrong ELF machine type: %s"
@@ -604,6 +603,8 @@
 @ MSG_SCN_DYNSTR	".dynstr"
 @ MSG_SCN_DYNSYM	".dynsym"
 @ MSG_SCN_DYNSYM_SHNDX	".dynsym_shndx"
+@ MSG_SCN_LDYNSYM	".SUNW_ldynsym"
+@ MSG_SCN_LDYNSYM_SHNDX	".SUNW_ldynsym_shndx"
 @ MSG_SCN_EX_SHARED	".ex_shared"
 @ MSG_SCN_EX_RANGES	".exception_ranges"
 @ MSG_SCN_EXCL		".excl"
@@ -1062,6 +1063,7 @@
 @ MSG_ARG_LD32		"ld32="
 @ MSG_ARG_LD64		"ld64="
 @ MSG_ARG_RESCAN	"rescan"
+@ MSG_ARG_NOLDYNSYM	"noldynsym"
 
 @ MSG_ARG_HELP		"help"
 @ MSG_ARG_GROUP		"group"

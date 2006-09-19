@@ -111,11 +111,13 @@ update_dynamic(Cache *cache, Cache *_cache, Rt_map *lmp, int flags,
 		case DT_CONFIG:
 		case DT_DEPAUDIT:
 		case DT_AUDIT:
+		case DT_SUNW_SYMSZ:
 			break;
 		case DT_PLTGOT:
 		case DT_HASH:
 		case DT_STRTAB:
 		case DT_SYMTAB:
+		case DT_SUNW_SYMTAB:
 		case DT_INIT:
 		case DT_FINI:
 		case DT_VERSYM:

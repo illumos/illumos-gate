@@ -371,6 +371,7 @@ ld_create_outfile(Ofl_desc *ofl)
 	Elf_Data	*tlsdata = 0;
 	Aliste		off;
 	Word		flags = ofl->ofl_flags;
+	Word		flags1 = ofl->ofl_flags1;
 	size_t		ndx = 0, fndx = 0;
 	Elf_Cmd		cmd;
 	Boolean		fixalign = FALSE;
@@ -380,12 +381,12 @@ ld_create_outfile(Ofl_desc *ofl)
 	 * If DF_1_NOHDR was set in map_parse() or FLG_OF1_VADDR was set,
 	 * we need to do alignment adjustment.
 	 */
-	if ((ofl->ofl_flags1 & FLG_OF1_VADDR) ||
+	if ((flags1 & FLG_OF1_VADDR) ||
 	    (ofl->ofl_dtflags_1 & DF_1_NOHDR)) {
 		fixalign = TRUE;
 	}
 
-	if (flags & FLG_OF_MEMORY) {
+	if (flags1 & FLG_OF1_MEMORY) {
 		cmd = ELF_C_IMAGE;
 		fd = 0;
 	} else {
@@ -671,7 +672,7 @@ ld_create_outfile(Ofl_desc *ofl)
 	/*
 	 * If we need to generate a memory model, pad the image.
 	 */
-	if (flags & FLG_OF_MEMORY) {
+	if (flags1 & FLG_OF1_MEMORY) {
 		if (pad_outfile(ofl) == S_ERROR)
 			return (S_ERROR);
 	}

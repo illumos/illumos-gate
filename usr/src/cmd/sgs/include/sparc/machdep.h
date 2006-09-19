@@ -319,10 +319,11 @@ extern "C" {
 #define	M_ID_CAP	0x03
 #define	M_ID_SYMINFO	0x04
 #define	M_ID_HASH	0x05
-#define	M_ID_DYNSYM	0x06
-#define	M_ID_DYNSTR	0x07
-#define	M_ID_VERSION	0x08
-#define	M_ID_REL	0x09
+#define	M_ID_LDYNSYM	0x06			/* always right before DYNSYM */
+#define	M_ID_DYNSYM	0x07
+#define	M_ID_DYNSTR	0x08
+#define	M_ID_VERSION	0x09
+#define	M_ID_REL	0x0a
 #define	M_ID_TEXT	0x0b			/* SHF_ALLOC + SHF_EXECINSTR */
 #define	M_ID_DATA	0x0c
 

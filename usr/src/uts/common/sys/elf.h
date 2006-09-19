@@ -401,7 +401,8 @@ typedef struct {
 #define	SHT_NUM			19
 
 #define	SHT_LOOS		0x60000000	/* OS specific range */
-#define	SHT_LOSUNW		0x6ffffff4
+#define	SHT_LOSUNW		0x6ffffff3
+#define	SHT_SUNW_LDYNSYM	0x6ffffff3
 #define	SHT_SUNW_dof		0x6ffffff4
 #define	SHT_SUNW_cap		0x6ffffff5
 #define	SHT_SUNW_SIGNATURE	0x6ffffff6

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,7 +52,7 @@
 
 #if	!defined(_LP64)
 static void
-gelf_sym_to_elf32(GElf_Sym * src, Elf32_Sym * dst)
+gelf_sym_to_elf32(GElf_Sym *src, Elf32_Sym *dst)
 {
 	dst->st_name	= src->st_name;
 	/* LINTED */
@@ -68,14 +67,13 @@ gelf_sym_to_elf32(GElf_Sym * src, Elf32_Sym * dst)
 #endif
 
 static void
-get_ldbase(struct ps_prochandle * procp)
+get_ldbase(struct ps_prochandle *procp)
 {
 	int		pauxvfd;
 	char		pname[MAXPATHLEN];
 	struct stat	stbuf;
-	void *		auxvptr;
-	void *		auxvtail;
-	auxv_t *	auxvp;
+	void		*auxvptr, *auxvtail;
+	auxv_t		*auxvp;
 	uint_t		entsize;
 
 	(void) snprintf(pname, MAXPATHLEN, "/proc/%d/auxv", procp->pp_pid);
@@ -127,7 +125,7 @@ get_ldbase(struct ps_prochandle * procp)
 }
 
 retc_t
-ps_init(int pctlfd, int pstatusfd, pid_t pid, struct ps_prochandle * procp)
+ps_init(int pctlfd, int pstatusfd, pid_t pid, struct ps_prochandle *procp)
 {
 	rd_notify_t	rd_notify;
 	char		procname[MAXPATHLEN];
@@ -228,7 +226,7 @@ ps_init(int pctlfd, int pstatusfd, pid_t pid, struct ps_prochandle * procp)
 
 
 retc_t
-ps_close(struct ps_prochandle * ph)
+ps_close(struct ps_prochandle *ph)
 {
 	delete_all_breakpoints(ph);
 	if (ph->pp_auxvp)
@@ -239,7 +237,7 @@ ps_close(struct ps_prochandle * ph)
 
 
 ps_err_e
-ps_pauxv(struct ps_prochandle * ph, const auxv_t ** auxvp)
+ps_pauxv(struct ps_prochandle *ph, const auxv_t **auxvp)
 {
 	*auxvp = ph->pp_auxvp;
 	return (PS_OK);
@@ -247,7 +245,7 @@ ps_pauxv(struct ps_prochandle * ph, const auxv_t ** auxvp)
 
 
 ps_err_e
-ps_pdmodel(struct ps_prochandle * ph, int * dm)
+ps_pdmodel(struct ps_prochandle *ph, int *dm)
 {
 	pstatus_t	pstatus;
 
@@ -260,8 +258,7 @@ ps_pdmodel(struct ps_prochandle * ph, int * dm)
 
 
 ps_err_e
-ps_pread(struct ps_prochandle * ph, psaddr_t addr, void * buf,
-	size_t size)
+ps_pread(struct ps_prochandle *ph, psaddr_t addr, void *buf, size_t size)
 {
 	/* LINTED */
 	if (pread(ph->pp_asfd, buf, size, (off_t)addr) != size)
@@ -272,8 +269,7 @@ ps_pread(struct ps_prochandle * ph, psaddr_t addr, void * buf,
 
 
 ps_err_e
-ps_pwrite(struct ps_prochandle * ph, psaddr_t addr, const void * buf,
-	size_t size)
+ps_pwrite(struct ps_prochandle *ph, psaddr_t addr, const void *buf, size_t size)
 {
 	/* LINTED */
 	if (pwrite(ph->pp_asfd, buf, size, (off_t)addr) != size)
@@ -284,11 +280,10 @@ ps_pwrite(struct ps_prochandle * ph, psaddr_t addr, const void * buf,
 
 
 ps_err_e
-ps_pglobal_sym(struct ps_prochandle * ph,
-	const char * object_name, const char * sym_name,
-	ps_sym_t * symp)
+ps_pglobal_sym(struct ps_prochandle *ph, const char *object_name,
+    const char *sym_name, ps_sym_t *symp)
 {
-	map_info_t *	mip;
+	map_info_t	*mip;
 	GElf_Sym	gsym;
 
 	if ((mip = str_to_map(ph, object_name)) == 0)
@@ -308,12 +303,11 @@ ps_pglobal_sym(struct ps_prochandle * ph,
 
 
 ps_err_e
-ps_pglobal_lookup(struct ps_prochandle * ph,
-	const char * object_name, const char * sym_name,
-	ulong_t * sym_addr)
+ps_pglobal_lookup(struct ps_prochandle *ph, const char *object_name,
+    const char *sym_name, ulong_t *sym_addr)
 {
 	GElf_Sym	sym;
-	map_info_t *	mip;
+	map_info_t	*mip;
 
 	if ((mip = str_to_map(ph, object_name)) == 0)
 		return (PS_ERR);
@@ -328,8 +322,7 @@ ps_pglobal_lookup(struct ps_prochandle * ph,
 
 
 ps_err_e
-ps_lgetregs(struct ps_prochandle * ph, lwpid_t lid,
-	prgregset_t gregset)
+ps_lgetregs(struct ps_prochandle *ph, lwpid_t lid, prgregset_t gregset)
 {
 	char		procname[MAXPATHLEN];
 	int		lwpfd;
@@ -352,10 +345,10 @@ ps_lgetregs(struct ps_prochandle * ph, lwpid_t lid,
 
 
 void
-ps_plog(const char * fmt, ...)
+ps_plog(const char *fmt, ...)
 {
 	va_list		args;
-	static FILE *	log_fp = 0;
+	static FILE	*log_fp = 0;
 
 	if (log_fp == 0) {
 		char		log_fname[256];
@@ -376,4 +369,10 @@ ps_plog(const char * fmt, ...)
 	va_end(args);
 	fputc('\n', log_fp);
 	fflush(log_fp);
+}
+
+ps_err_e
+ps_pbrandname(struct ps_prochandle *P, char *buf, size_t len)
+{
+	return (PS_ERR);
 }

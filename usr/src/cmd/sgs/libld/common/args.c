@@ -717,6 +717,18 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 
 		case 'b':
 			bflag = TRUE;
+
+			/*
+			 * This is a hack, and may be undone later.
+			 * The -b option is only used to build the Unix
+			 * kernel and its related kernel-mode modules.
+			 * We do not want those files to get a .SUNW_ldynsym
+			 * section. At least for now, the kernel makes no
+			 * use of .SUNW_ldynsym, and we do not want to use
+			 * the space to hold it. Therefore, we overload
+			 * the use of -b to also imply -znoldynsym.
+			 */
+			ofl->ofl_flags |= FLG_OF_NOLDYNSYM;
 			break;
 
 		case 'c':
@@ -1040,7 +1052,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_IGNORE)) == 0) {
 				ofl->ofl_flags1 |= FLG_OF1_IGNPRC;
-
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_NOLDYNSYM)) == 0) {
+				ofl->ofl_flags |= FLG_OF_NOLDYNSYM;
 			/*
 			 * The following options just need validation as they
 			 * are interpreted on the second pass through the

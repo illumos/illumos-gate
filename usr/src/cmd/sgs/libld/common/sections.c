@@ -62,6 +62,9 @@ ignore_section_processing(Ofl_desc *ofl)
 	Listnode	*lnp;
 	Ifl_desc	*ifl;
 	Rel_cache	*rcp;
+	int		allow_ldynsym;
+
+	allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
 
 	for (LIST_TRAVERSE(&ofl->ofl_objs, lnp, ifl)) {
 		uint_t	num, discard;
@@ -136,6 +139,15 @@ ignore_section_processing(Ofl_desc *ofl)
 					err = st_delstring(ofl->ofl_strtab,
 					    sdp->sd_name);
 					assert(err != -1);
+					if (allow_ldynsym &&
+					    (ELF_ST_TYPE(symp->st_info) ==
+					    STT_FILE)) {
+						ofl->ofl_dynlocscnt--;
+						err = st_delstring(
+							ofl->ofl_dynstrtab,
+							sdp->sd_name);
+						assert(err != -1);
+					}
 				}
 				sdp->sd_flags |= FLG_SY_ISDISC;
 				continue;
@@ -173,11 +185,19 @@ ignore_section_processing(Ofl_desc *ofl)
 					if ((ofl->ofl_flags1 &
 					    FLG_OF1_REDLSYM) == 0) {
 						ofl->ofl_locscnt--;
-
 						err = st_delstring(
 						    ofl->ofl_strtab,
 						    sdp->sd_name);
 						assert(err != -1);
+						if (allow_ldynsym &&
+						    (ELF_ST_TYPE(symp->st_info)
+							== STT_FUNC)) {
+							ofl->ofl_dynlocscnt--;
+							err = st_delstring(
+							    ofl->ofl_dynstrtab,
+							    sdp->sd_name);
+							assert(err != -1);
+						}
 					}
 					sdp->sd_flags |= FLG_SY_ISDISC;
 				}
@@ -200,6 +220,15 @@ ignore_section_processing(Ofl_desc *ofl)
 					assert(err != -1);
 
 					sdp->sd_flags1 |= FLG_SY1_ELIM;
+					if (allow_ldynsym &&
+					    (ELF_ST_TYPE(symp->st_info) ==
+						STT_FUNC)) {
+						ofl->ofl_dynscopecnt--;
+						err = st_delstring(
+							ofl->ofl_dynstrtab,
+							sdp->sd_name);
+						assert(err != -1);
+					}
 				}
 				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml,
 				    sdp, sdp->sd_isc));
@@ -262,6 +291,238 @@ ignore_section_processing(Ofl_desc *ofl)
 }
 
 /*
+ * Allocate Elf_Data, Shdr, and Is_desc structures for a new
+ * section.
+ *
+ * entry:
+ *	ofl - Output file descriptor
+ *	shtype - SHT_ type code for section.
+ *	shname - String giving the name for the new section.
+ *	entcnt - # of items contained in the data part of the new section.
+ *		This value is multiplied against the known element size
+ *		for the section type to determine the size of the data
+ *		area for the section. It is only meaningful in cases where
+ *		the section type has a non-zero element size. In other cases,
+ *		the caller must set the size fields in the *ret_data and
+ *		*ret_shdr structs manually.
+ *	ret_isec, ret_shdr, ret_data - Address of pointers to
+ *		receive address of newly allocated structs.
+ *
+ * exit:
+ *	On error, returns S_ERROR. On success, returns (1), and the
+ *	ret_ pointers have been updated to point at the new structures,
+ *	which has been filled in. To finish the task, the caller must
+ *	update any fields within the supplied descriptors that differ
+ *	from its needs, and then call ld_place_section().
+ */
+static uintptr_t
+new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
+	Is_desc **ret_isec, Shdr **ret_shdr, Elf_Data **ret_data)
+{
+	typedef struct sec_info {
+		Word d_type;
+		Word align;	/* Used in both data and section header */
+		Word sh_flags;
+		Word sh_entsize;
+	} SEC_INFO_T;
+
+	const SEC_INFO_T	*sec_info;
+
+	Shdr		*shdr;
+	Elf_Data	*data;
+	Is_desc		*isec;
+	size_t		size;
+
+	/*
+	 * For each type of section, we have a distinct set of
+	 * SEC_INFO_T values. This macro defines a static structure
+	 * containing those values and generates code to set the sec_info
+	 * pointer to refer to it. The pointer in sec_info remains valid
+	 * outside of the declaration scope because the info_s struct is static.
+	 */
+#define	SET_SEC_INFO(d_type, d_align, sh_flags, sh_entsize) \
+	{ \
+		static const SEC_INFO_T info_s = { d_type, d_align, sh_flags, \
+		    sh_entsize}; \
+		sec_info = &info_s; \
+	}
+
+	switch (shtype) {
+	case SHT_PROGBITS:
+		/*
+		 * SHT_PROGBITS sections contain are used for many
+		 * different sections. Alignments and flags differ.
+		 * Some have a standard entsize, and others don't.
+		 * We set some defaults here, but there is no expectation
+		 * that they are correct or complete for any specific
+		 * purpose. The caller must provide the correct values.
+		 */
+		SET_SEC_INFO(ELF_T_BYTE, M_WORD_ALIGN, SHF_ALLOC, 0)
+		break;
+
+	case SHT_SYMTAB:
+		SET_SEC_INFO(ELF_T_SYM, M_WORD_ALIGN, 0, sizeof (Sym))
+		break;
+
+	case SHT_DYNSYM:
+	case SHT_SUNW_LDYNSYM:
+		SET_SEC_INFO(ELF_T_SYM, M_WORD_ALIGN, SHF_ALLOC, sizeof (Sym))
+		break;
+
+	case SHT_STRTAB:
+		/*
+		 * A string table may or may not be allocable, depending
+		 * on context, so we leave that flag unset and leave it to
+		 * the caller to add it if necessary.
+		 *
+		 * String tables do not have a standard entsize, so
+		 * we set it to 0.
+		 */
+		SET_SEC_INFO(ELF_T_BYTE, 1, SHF_STRINGS, 0)
+		break;
+
+	case SHT_RELA:
+		/*
+		 * Relocations with an addend (Everything except 32-bit X86).
+		 * The caller is expected to set all section header flags.
+		 */
+		SET_SEC_INFO(ELF_T_RELA, M_WORD_ALIGN, 0, sizeof (Rela))
+		break;
+
+	case SHT_REL:
+		/*
+		 * Relocations without an addend (32-bit X86 only).
+		 * The caller is expected to set all section header flags.
+		 */
+		SET_SEC_INFO(ELF_T_REL, M_WORD_ALIGN, 0, sizeof (Rel))
+		break;
+
+	case SHT_HASH:
+		SET_SEC_INFO(ELF_T_WORD, M_WORD_ALIGN, SHF_ALLOC, sizeof (Word))
+		break;
+
+	case SHT_DYNAMIC:
+		/*
+		 * A dynamic section may or may not be allocable, depending
+		 * on context, so we leave that flag unset and leave it to
+		 * the caller to add it if necessary.
+		 */
+		SET_SEC_INFO(ELF_T_DYN, M_WORD_ALIGN, SHF_WRITE, sizeof (Dyn))
+		break;
+
+	case SHT_NOBITS:
+		/*
+		 * SHT_NOBITS is used for BSS-type sections. The size and
+		 * alignment depend on the specific use and must be adjusted
+		 * by the caller.
+		 */
+		SET_SEC_INFO(ELF_T_BYTE, 0, SHF_ALLOC | SHF_WRITE, 0)
+		break;
+
+	case SHT_INIT_ARRAY:
+	case SHT_FINI_ARRAY:
+	case SHT_PREINIT_ARRAY:
+		SET_SEC_INFO(ELF_T_ADDR, sizeof (Addr), SHF_ALLOC | SHF_WRITE,
+		    sizeof (Addr))
+		break;
+
+	case SHT_SYMTAB_SHNDX:
+		/*
+		 * Note that these sections are created to be associated
+		 * with both symtab and dynsym symbol tables. However, they
+		 * are non-allocable in all cases, because the runtime
+		 * linker has no need for this information. It is purely
+		 * informational, used by elfdump(1), debuggers, etc.
+		 */
+		SET_SEC_INFO(ELF_T_WORD, M_WORD_ALIGN, 0, sizeof (Word));
+		break;
+
+	case SHT_SUNW_cap:
+		SET_SEC_INFO(ELF_T_CAP, M_WORD_ALIGN, SHF_ALLOC, sizeof (Cap));
+		break;
+
+	case SHT_SUNW_move:
+		/*
+		 * The sh_info field of the SHT_*_syminfo section points
+		 * to the header index of the associated .dynamic section,
+		 * so we also set SHF_INFO_LINK.
+		 */
+		SET_SEC_INFO(ELF_T_BYTE, sizeof (Lword),
+		    SHF_ALLOC | SHF_WRITE, sizeof (Move));
+		break;
+
+	case SHT_SUNW_syminfo:
+		/*
+		 * The sh_info field of the SHT_*_syminfo section points
+		 * to the header index of the associated .dynamic section,
+		 * so we also set SHF_INFO_LINK.
+		 */
+		SET_SEC_INFO(ELF_T_BYTE, M_WORD_ALIGN,
+		    SHF_ALLOC | SHF_INFO_LINK, sizeof (Syminfo));
+		break;
+
+	case SHT_SUNW_verneed:
+	case SHT_SUNW_verdef:
+		/*
+		 * The info for verneed and versym happen to be the same.
+		 * The entries in these sections are not of uniform size,
+		 * so we set the entsize to 0.
+		 */
+		SET_SEC_INFO(ELF_T_BYTE, M_WORD_ALIGN, SHF_ALLOC, 0);
+		break;
+
+	case SHT_SUNW_versym:
+		SET_SEC_INFO(ELF_T_BYTE, M_WORD_ALIGN, SHF_ALLOC,
+		    sizeof (Versym));
+		break;
+
+	default:
+		/* Should not happen: fcn called with unknown section type */
+		assert(0);
+		return (S_ERROR);
+	}
+#undef	SET_SEC_INFO
+
+	size = entcnt * sec_info->sh_entsize;
+
+	/*
+	 * Allocate and initialize the Elf_Data structure.
+	 */
+	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+		return (S_ERROR);
+	data->d_type = sec_info->d_type;
+	data->d_size = size;
+	data->d_align = sec_info->align;
+	data->d_version = ofl->ofl_dehdr->e_version;
+
+	/*
+	 * Allocate and initialize the Shdr structure.
+	 */
+	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
+		return (S_ERROR);
+	shdr->sh_type = shtype;
+	shdr->sh_size = size;
+	shdr->sh_flags = sec_info->sh_flags;
+	shdr->sh_addralign = sec_info->align;
+	shdr->sh_entsize = sec_info->sh_entsize;
+
+	/*
+	 * Allocate and initialize the Is_desc structure.
+	 */
+	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
+		return (S_ERROR);
+	isec->is_name = shname;
+	isec->is_shdr = shdr;
+	isec->is_indata = data;
+
+
+	*ret_isec = isec;
+	*ret_shdr = shdr;
+	*ret_data = data;
+	return (1);
+}
+
+/*
  * Build a .bss section for allocation of tentative definitions.  Any `static'
  * .bss definitions would have been associated to their own .bss sections and
  * thus collected from the input files.  `global' .bss definitions are tagged
@@ -280,33 +541,19 @@ ld_make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
 	Xword		rsize = (Xword)ofl->ofl_relocbsssz;
 
 	/*
-	 * Allocate and initialize the Elf_Data structure.
+	 * Allocate header structs. We will set the name ourselves below,
+	 * and there is no entcnt for a BSS. So, the shname and entcnt
+	 * arguments are 0.
 	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_NOBITS, NULL, 0,
+	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_BYTE;
+
 	data->d_size = (size_t)size;
 	data->d_align = (size_t)align;
-	data->d_version = ofl->ofl_dehdr->e_version;
 
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = SHT_NOBITS;
-	shdr->sh_flags = SHF_ALLOC | SHF_WRITE;
 	shdr->sh_size = size;
 	shdr->sh_addralign = align;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	if (which == MAKE_TLS) {
 		isec->is_name = MSG_ORIG(MSG_SCN_TBSS);
@@ -383,37 +630,12 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 	for (LIST_TRAVERSE(list, lnp, sdp))
 		entcount++;
 
-	/*
-	 * Allocate and initialize the Elf_Data structure.
-	 */
-	if (((data = libld_calloc(sizeof (Elf_Data), 1)) == 0) ||
-	    ((data->d_buf = libld_calloc(sizeof (Addr), entcount)) == 0))
+	if (new_section(ofl, shtype, sectname, entcount, &isec, &shdr, &data) ==
+	    S_ERROR)
 		return (S_ERROR);
 
-	data->d_type = ELF_T_ADDR;
-	data->d_size = sizeof (Addr) * entcount;
-	data->d_align = sizeof (Addr);
-	data->d_version = ofl->ofl_dehdr->e_version;
-
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
+	if ((data->d_buf = libld_calloc(sizeof (Addr), entcount)) == 0)
 		return (S_ERROR);
-	shdr->sh_type = shtype;
-	shdr->sh_size = (Xword)data->d_size;
-	shdr->sh_entsize = sizeof (Addr);
-	shdr->sh_addralign = (Xword)data->d_align;
-	shdr->sh_flags = SHF_ALLOC | SHF_WRITE;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = sectname;
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	if (ld_place_section(ofl, isec, M_ID_ARRAY, 0) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
@@ -479,34 +701,17 @@ make_comment(Ofl_desc *ofl)
 	Elf_Data	*data;
 	Is_desc		*isec;
 
-	/*
-	 * Allocate and initialize the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_PROGBITS, MSG_ORIG(MSG_SCN_COMMENT), 0,
+	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_BYTE;
+
 	data->d_buf = (void *)ofl->ofl_sgsid;
 	data->d_size = strlen(ofl->ofl_sgsid) + 1;
 	data->d_align = 1;
-	data->d_version = ofl->ofl_dehdr->e_version;
 
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = SHT_PROGBITS;
 	shdr->sh_size = (Xword)data->d_size;
+	shdr->sh_flags = 0;
 	shdr->sh_addralign = 1;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_COMMENT);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	return ((uintptr_t)ld_place_section(ofl, isec, M_ID_NOTE, 0));
 }
@@ -531,42 +736,13 @@ make_dynamic(Ofl_desc *ofl)
 	Word		flags = ofl->ofl_flags;
 	int		unused = 0;
 
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
+	if (new_section(ofl, SHT_DYNAMIC, MSG_ORIG(MSG_SCN_DYNAMIC), 0,
+	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	shdr->sh_type = SHT_DYNAMIC;
-	shdr->sh_flags = SHF_WRITE;
+
+	/* new_section() does not set SHF_ALLOC. Add it if needed */
 	if (!(flags & FLG_OF_RELOBJ))
 		shdr->sh_flags |= SHF_ALLOC;
-	shdr->sh_addralign = M_WORD_ALIGN;
-	if ((shdr->sh_entsize = (Xword)elf_fsize(ELF_T_DYN, 1,
-	    ofl->ofl_dehdr->e_version)) == 0) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_FSIZE),
-		    ofl->ofl_name);
-		return (S_ERROR);
-	}
-
-	/*
-	 * Allocate and initialize the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
-		return (S_ERROR);
-	data->d_type = ELF_T_DYN;
-	data->d_size = 0;
-	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) ==
-	    (Is_desc *)0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_DYNAMIC);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	osp = ofl->ofl_osdynamic = ld_place_section(ofl, isec, M_ID_DYNAMIC, 0);
 
@@ -732,6 +908,15 @@ make_dynamic(Ofl_desc *ofl)
 		 */
 		cnt += 6;
 
+		/*
+		 * If we are including local functions at the head of
+		 * the dynsym, then also reserve entries for DT_SUNW_SYMTAB
+		 * and DT_SUNW_SYMSZ.
+		 */
+		if (!(ofl->ofl_flags & FLG_OF_NOLDYNSYM) &&
+		    ((ofl->ofl_dynlocscnt + ofl->ofl_dynscopecnt) > 0))
+			cnt += 2;
+
 		if ((flags & (FLG_OF_VERDEF | FLG_OF_NOVERSEC)) ==
 		    FLG_OF_VERDEF)
 			cnt += 2;		/* DT_VERDEF & DT_VERDEFNUM */
@@ -790,7 +975,7 @@ make_dynamic(Ofl_desc *ofl)
 			cnt += 3;
 
 		/*
-		 * Allocate one DT_REGISTER entry for ever register symbol.
+		 * Allocate one DT_REGISTER entry for every register symbol.
 		 */
 		cnt += ofl->ofl_regsymcnt;
 
@@ -856,35 +1041,15 @@ ld_make_got(Ofl_desc *ofl)
 	size_t		size = (size_t)ofl->ofl_gotcnt * M_GOT_ENTSIZE;
 	size_t		rsize = (size_t)ofl->ofl_relocgotsz;
 
-	/*
-	 * Allocate and initialize the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_PROGBITS, MSG_ORIG(MSG_SCN_GOT), 0,
+	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_BYTE;
+
 	data->d_size = size;
-	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
 
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = SHT_PROGBITS;
-	shdr->sh_flags = SHF_ALLOC | SHF_WRITE;
+	shdr->sh_flags |= SHF_WRITE;
 	shdr->sh_size = (Xword)size;
-	shdr->sh_addralign = M_WORD_ALIGN;
 	shdr->sh_entsize = M_GOT_ENTSIZE;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_GOT);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	if ((ofl->ofl_osgot = ld_place_section(ofl, isec, M_ID_GOT, 0)) ==
 	    (Os_desc *)S_ERROR)
@@ -940,32 +1105,13 @@ make_interp(Ofl_desc *ofl)
 
 	size = strlen(iname) + 1;
 
-	/*
-	 * Allocate and initialize the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_PROGBITS, MSG_ORIG(MSG_SCN_INTERP), 0,
+	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_BYTE;
+
 	data->d_size = size;
-	data->d_version = ofl->ofl_dehdr->e_version;
-
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = SHT_PROGBITS;
-	shdr->sh_flags = SHF_ALLOC;
 	shdr->sh_size = (Xword)size;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_INTERP);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
+	data->d_align = shdr->sh_addralign = 1;
 
 	ofl->ofl_osinterp = ld_place_section(ofl, isec, M_ID_INTERP, 0);
 	return ((uintptr_t)ofl->ofl_osinterp);
@@ -995,46 +1141,11 @@ make_cap(Ofl_desc *ofl)
 		return (1);
 	size++;				/* Add CA_SUNW_NULL */
 
-	/*
-	 * Allocate and initialize the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_SUNW_cap, MSG_ORIG(MSG_SCN_SUNWCAP), size,
+	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_CAP;
-	data->d_version = ofl->ofl_dehdr->e_version;
-	data->d_align = M_WORD_ALIGN;
 
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = SHT_SUNW_cap;
-	shdr->sh_flags = SHF_ALLOC;
-	shdr->sh_addralign = M_WORD_ALIGN;
-	if ((shdr->sh_entsize = (Xword)elf_fsize(ELF_T_CAP, 1,
-	    ofl->ofl_dehdr->e_version)) == 0) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_FSIZE),
-		    ofl->ofl_name);
-		return (S_ERROR);
-	}
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_SUNWCAP);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
-
-	/*
-	 * Determine the size of the section, and create the data.
-	 */
-	size = size * (size_t)shdr->sh_entsize;
-	shdr->sh_size = (Xword)size;
-	data->d_size = size;
-	if ((data->d_buf = libld_malloc(size)) == 0)
+	if ((data->d_buf = libld_malloc(shdr->sh_size)) == 0)
 		return (S_ERROR);
 
 	cap = (Cap *)data->d_buf;
@@ -1053,7 +1164,7 @@ make_cap(Ofl_desc *ofl)
 
 	/*
 	 * If we're not creating a relocatable object, save the output section
-	 * to trigger the creation of an associated  a program header.
+	 * to trigger the creation of an associated program header.
 	 */
 	osec = ld_place_section(ofl, isec, M_ID_CAP, 0);
 	if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)
@@ -1083,35 +1194,17 @@ make_plt(Ofl_desc *ofl)
 	size += sizeof (Word);
 #endif
 
-	/*
-	 * Allocate and initialize the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_PROGBITS, MSG_ORIG(MSG_SCN_PLT), 0,
+	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_BYTE;
+
 	data->d_size = size;
 	data->d_align = M_PLT_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
 
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = SHT_PROGBITS;
 	shdr->sh_flags = M_PLT_SHF_FLAGS;
 	shdr->sh_size = (Xword)size;
 	shdr->sh_addralign = M_PLT_ALIGN;
 	shdr->sh_entsize = M_PLT_ENTSIZE;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == (Is_desc *)0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_PLT);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	if ((ofl->ofl_osplt = ld_place_section(ofl, isec, M_ID_PLT, 0)) ==
 	    (Os_desc *)S_ERROR)
@@ -1138,37 +1231,12 @@ make_hash(Ofl_desc *ofl)
 	size_t		cnt;
 
 	/*
-	 * Allocate and initialize the Elf_Data structure.
+	 * Allocate section header structures. We set entcnt to 0
+	 * because it's going to change after we place this section.
 	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_HASH, MSG_ORIG(MSG_SCN_HASH), 0,
+	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_WORD;
-	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
-
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = SHT_HASH;
-	shdr->sh_flags = SHF_ALLOC;
-	shdr->sh_addralign = M_WORD_ALIGN;
-	if ((shdr->sh_entsize = (Xword)elf_fsize(ELF_T_WORD, 1,
-	    ofl->ofl_dehdr->e_version)) == 0) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_FSIZE),
-		    ofl->ofl_name);
-		return (S_ERROR);
-	}
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_HASH);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	/*
 	 * Place the section first since it will affect the local symbol
@@ -1221,36 +1289,12 @@ make_symtab(Ofl_desc *ofl)
 	Word		symcnt;
 
 	/*
-	 * Allocate and initialize the Elf_Data structure.
+	 * Create the section headers. Note that we supply an ent_cnt
+	 * of 0. We won't know the count until the section has been placed.
 	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_SYMTAB, MSG_ORIG(MSG_SCN_SYMTAB), 0,
+	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_SYM;
-	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
-
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = SHT_SYMTAB;
-	shdr->sh_addralign = M_WORD_ALIGN;
-	if ((shdr->sh_entsize = (Xword)elf_fsize(ELF_T_SYM, 1,
-	    ofl->ofl_dehdr->e_version)) == 0) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_FSIZE),
-		    ofl->ofl_name);
-		return (S_ERROR);
-	}
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_SYMTAB);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	/*
 	 * Place the section first since it will affect the local symbol
@@ -1269,21 +1313,11 @@ make_symtab(Ofl_desc *ofl)
 		Shdr		*xshdr;
 		Elf_Data	*xdata;
 
-		if ((xdata = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+		if (new_section(ofl, SHT_SYMTAB_SHNDX,
+		    MSG_ORIG(MSG_SCN_SYMTAB_SHNDX), 0, &xisec,
+		    &xshdr, &xdata) == S_ERROR)
 			return (S_ERROR);
-		xdata->d_type = ELF_T_WORD;
-		xdata->d_align = M_WORD_ALIGN;
-		xdata->d_version = ofl->ofl_dehdr->e_version;
-		if ((xshdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-			return (S_ERROR);
-		xshdr->sh_type = SHT_SYMTAB_SHNDX;
-		xshdr->sh_addralign = M_WORD_ALIGN;
-		xshdr->sh_entsize = sizeof (Word);
-		if ((xisec = libld_calloc(1, sizeof (Is_desc))) == 0)
-			return (S_ERROR);
-		xisec->is_name = MSG_ORIG(MSG_SCN_SYMTAB_SHNDX);
-		xisec->is_shdr = xshdr;
-		xisec->is_indata = xdata;
+
 		if ((ofl->ofl_ossymshndx = ld_place_section(ofl, xisec,
 		    M_ID_SYMTAB_NDX, 0)) == (Os_desc *)S_ERROR)
 			return (S_ERROR);
@@ -1323,51 +1357,38 @@ make_symtab(Ofl_desc *ofl)
 static uintptr_t
 make_dynsym(Ofl_desc *ofl)
 {
-	Shdr		*shdr;
-	Elf_Data	*data;
-	Is_desc		*isec;
+	Shdr		*shdr, *lshdr;
+	Elf_Data	*data, *ldata;
+	Is_desc		*isec, *lisec;
 	size_t		size;
 	Xword		cnt;
+	int		need_ldynsym;
+
+	need_ldynsym = !(ofl->ofl_flags & FLG_OF_NOLDYNSYM) &&
+	    ((ofl->ofl_dynlocscnt + ofl->ofl_dynscopecnt) > 0);
 
 	/*
-	 * Allocate and initialize the Elf_Data structure.
+	 * Create the section headers. Note that we supply an ent_cnt
+	 * of 0. We won't know the count until the section has been placed.
 	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (need_ldynsym && new_section(ofl, SHT_SUNW_LDYNSYM,
+	    MSG_ORIG(MSG_SCN_LDYNSYM), 0, &lisec, &lshdr, &ldata) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_SYM;
-	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
+
+	if (new_section(ofl, SHT_DYNSYM, MSG_ORIG(MSG_SCN_DYNSYM), 0,
+	    &isec, &shdr, &data) == S_ERROR)
+		return (S_ERROR);
 
 	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = SHT_DYNSYM;
-	shdr->sh_flags = SHF_ALLOC;
-	shdr->sh_addralign = M_WORD_ALIGN;
-	if ((shdr->sh_entsize = (Xword)elf_fsize(ELF_T_SYM, 1,
-	    ofl->ofl_dehdr->e_version)) == 0) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_FSIZE),
-		    ofl->ofl_name);
-		return (S_ERROR);
-	}
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_DYNSYM);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
-
-	/*
-	 * Place the section first since it will affect the local symbol
+	 * Place the section(s) first since it will affect the local symbol
 	 * count.
 	 */
-	if ((ofl->ofl_osdynsym = ld_place_section(ofl, isec, M_ID_DYNSYM, 0)) ==
-	    (Os_desc *)S_ERROR)
+	if (need_ldynsym &&
+	    ((ofl->ofl_osldynsym = ld_place_section(ofl, lisec,
+	    M_ID_LDYNSYM, 0)) == (Os_desc *)S_ERROR))
+		return (S_ERROR);
+	if ((ofl->ofl_osdynsym = ld_place_section(ofl, isec, M_ID_DYNSYM, 0))
+	    == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -1382,57 +1403,75 @@ make_dynsym(Ofl_desc *ofl)
 	data->d_size = size;
 	shdr->sh_size = (Xword)size;
 
+	/*
+	 * An ldynsym contains local function symbols. It is not
+	 * used for linking, but if present, serves to allow better
+	 * stack traces to be generated in contexts where the symtab
+	 * is not available. (dladdr(), or stripped executable/library files).
+	 */
+	if (need_ldynsym) {
+		cnt = 1 + ofl->ofl_dynlocscnt + ofl->ofl_dynscopecnt;
+		size = (size_t)cnt * shdr->sh_entsize;
+
+		ldata->d_size = size;
+		lshdr->sh_size = (Xword)size;
+	}
+
 	return (1);
 }
 
 /*
- * Build a SHT_SYMTAB_SHNDX for the .dynsym
+ * Helper routine for make_dynsym_shndx. Builds a
+ * a SHT_SYMTAB_SHNDX for dynsym or ldynsym, without knowing
+ * which one it is.
  */
 static uintptr_t
-make_dynsym_shndx(Ofl_desc *ofl)
+make_dyn_shndx(Ofl_desc *ofl, const char *shname, Os_desc *symtab,
+    Os_desc **ret_os)
 {
 	Is_desc		*isec;
 	Is_desc		*dynsymisp;
 	Shdr		*shdr, *dynshdr;
 	Elf_Data	*data;
 
-	/*
-	 * Allocate the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
-		return (S_ERROR);
-	data->d_type = ELF_T_WORD;
-	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
+	dynsymisp = (Is_desc *)symtab->os_isdescs.head->data;
+	dynshdr = dynsymisp->is_shdr;
 
-	/*
-	 * Allocate the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
+	if (new_section(ofl, SHT_SYMTAB_SHNDX, shname,
+	    (dynshdr->sh_size / dynshdr->sh_entsize),
+	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	shdr->sh_type = SHT_SYMTAB_SHNDX;
-	shdr->sh_addralign = M_WORD_ALIGN;
-	shdr->sh_entsize = sizeof (Word);
 
-	/*
-	 * Allocate the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_DYNSYM_SHNDX);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
-
-	if ((ofl->ofl_osdynshndx = ld_place_section(ofl, isec,
+	if ((*ret_os = ld_place_section(ofl, isec,
 	    M_ID_DYNSYM_NDX, 0)) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
-	assert(ofl->ofl_osdynsym);
-	dynsymisp = (Is_desc *)ofl->ofl_osdynsym->os_isdescs.head->data;
-	dynshdr = dynsymisp->is_shdr;
-	shdr->sh_size = (Xword)((dynshdr->sh_size / dynshdr->sh_entsize) *
-		sizeof (Word));
-	data->d_size = shdr->sh_size;
+	assert(*ret_os);
+
+	return (1);
+}
+
+/*
+ * Build a SHT_SYMTAB_SHNDX for the .dynsym, and .SUNW_ldynsym
+ */
+static uintptr_t
+make_dynsym_shndx(Ofl_desc *ofl)
+{
+	/*
+	 * If there is an ldynsym, generate a section for its extended
+	 * index section as well.
+	 */
+	if (!(ofl->ofl_flags & FLG_OF_NOLDYNSYM) &&
+	    ((ofl->ofl_dynlocscnt + ofl->ofl_dynscopecnt) > 0)) {
+		if (make_dyn_shndx(ofl, MSG_ORIG(MSG_SCN_LDYNSYM_SHNDX),
+		    ofl->ofl_osldynsym, &ofl->ofl_osldynshndx) == S_ERROR)
+			return (S_ERROR);
+	}
+
+	/* The Generate a section for the dynsym */
+	if (make_dyn_shndx(ofl, MSG_ORIG(MSG_SCN_DYNSYM_SHNDX),
+	    ofl->ofl_osdynsym, &ofl->ofl_osdynshndx) == S_ERROR)
+		return (S_ERROR);
 
 	return (1);
 }
@@ -1449,32 +1488,9 @@ make_shstrtab(Ofl_desc *ofl)
 	Is_desc		*isec;
 	size_t		size;
 
-	/*
-	 * Allocate the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_STRTAB, MSG_ORIG(MSG_SCN_SHSTRTAB),
+	    0, &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_BYTE;
-	data->d_align = 1;
-	data->d_version = ofl->ofl_dehdr->e_version;
-
-	/*
-	 * Allocate the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = SHT_STRTAB;
-	shdr->sh_flags |= SHF_STRINGS;
-	shdr->sh_addralign = 1;
-
-	/*
-	 * Allocate the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_SHSTRTAB);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	/*
 	 * Place the section first, as it may effect the number of section
@@ -1515,34 +1531,13 @@ make_strtab(Ofl_desc *ofl)
 	size = st_getstrtab_sz(ofl->ofl_strtab);
 	assert(size > 0);
 
-	/*
-	 * Allocate the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_STRTAB, MSG_ORIG(MSG_SCN_STRTAB),
+	    0, &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
+
+	/* Set the size of the data area */
 	data->d_size = size;
-	data->d_type = ELF_T_BYTE;
-	data->d_align = 1;
-	data->d_version = ofl->ofl_dehdr->e_version;
-
-	/*
-	 * Allocate the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
 	shdr->sh_size = (Xword)size;
-	shdr->sh_addralign = 1;
-	shdr->sh_type = SHT_STRTAB;
-	shdr->sh_flags |= SHF_STRINGS;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_STRTAB);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	ofl->ofl_osstrtab = ld_place_section(ofl, isec, M_ID_STRTAB, 0);
 	return ((uintptr_t)ofl->ofl_osstrtab);
@@ -1558,6 +1553,18 @@ make_dynstr(Ofl_desc *ofl)
 	Elf_Data	*data;
 	Is_desc		*isec;
 	size_t		size;
+
+	/*
+	 * If this dynstr is to contain local symbols, and if we
+	 * have scope reduced global symbols to put there, then
+	 * account for the STT_FILE symbol that precedes those symbols.
+	 */
+	if (!(ofl->ofl_flags & FLG_OF_NOLDYNSYM) && ofl->ofl_dynscopecnt) {
+		if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_name) == -1)
+			return (S_ERROR);
+		ofl->ofl_dynscopecnt++;
+	}
+
 
 	/*
 	 * Account for any local, named register symbols.  These locals are
@@ -1599,37 +1606,17 @@ make_dynstr(Ofl_desc *ofl)
 	size = st_getstrtab_sz(ofl->ofl_dynstrtab);
 	assert(size > 0);
 
-	/*
-	 * Allocate the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_STRTAB, MSG_ORIG(MSG_SCN_DYNSTR),
+	    0, &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_BYTE;
-	data->d_size = size;
-	data->d_align = 1;
-	data->d_version = ofl->ofl_dehdr->e_version;
 
-	/*
-	 * Allocate the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
+	/* Make it allocable if necessary */
 	if (!(ofl->ofl_flags & FLG_OF_RELOBJ))
-		shdr->sh_flags = SHF_ALLOC;
+		shdr->sh_flags |= SHF_ALLOC;
 
-	shdr->sh_type = SHT_STRTAB;
-	shdr->sh_flags |= SHF_STRINGS;
+	/* Set the size of the data area */
+	data->d_size = size;
 	shdr->sh_size = (Xword)size;
-	shdr->sh_addralign = 1;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_DYNSTR);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	ofl->ofl_osdynstr = ld_place_section(ofl, isec, M_ID_DYNSTR, 0);
 	return ((uintptr_t)ofl->ofl_osdynstr);
@@ -1691,29 +1678,14 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 	/* LINTED */
 	ofl->ofl_relocsz += (Xword)size;
 
-	/*
-	 * Allocate and initialize the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, M_REL_SHT_TYPE, sectname, 0, &isec, &shdr, &data)
+	    == S_ERROR)
 		return (S_ERROR);
-	data->d_type = M_REL_ELF_TYPE;
+
 	data->d_size = size;
-	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
 
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = M_REL_SHT_TYPE;
 	shdr->sh_size = (Xword)size;
-	shdr->sh_addralign = M_WORD_ALIGN;
-	shdr->sh_entsize = relsize;
-
-	if ((ofl->ofl_flags & FLG_OF_DYNAMIC) &&
-	    !(ofl->ofl_flags & FLG_OF_RELOBJ) &&
-	    (sh_flags & SHF_ALLOC))
+	if (OFL_ALLOW_DYNSYM(ofl) && (sh_flags & SHF_ALLOC))
 		shdr->sh_flags = SHF_ALLOC;
 
 	if (osp) {
@@ -1723,17 +1695,6 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 		 */
 		shdr->sh_flags |= SHF_INFO_LINK;
 	}
-
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
-	isec->is_name = sectname;
-
 
 	/*
 	 * Associate this relocation section to the section its going to
@@ -1791,36 +1752,18 @@ make_verneed(Ofl_desc *ofl)
 	Shdr		*shdr;
 	Elf_Data	*data;
 	Is_desc		*isec;
-	size_t		size = ofl->ofl_verneedsz;
 
 	/*
-	 * Allocate and initialize the Elf_Data structure.
+	 * verneed sections do not have a constant element size, so the
+	 * value of ent_cnt specified here (0) is meaningless.
 	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_SUNW_verneed, MSG_ORIG(MSG_SCN_SUNWVERSION),
+			0, &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_BYTE;
-	data->d_size = size;
-	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
 
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = (Word)SHT_SUNW_verneed;
-	shdr->sh_flags = SHF_ALLOC;
-	shdr->sh_size = (Xword)size;
-	shdr->sh_addralign = M_WORD_ALIGN;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_SUNWVERSION);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
+	/* During version processing we calculated the total size. */
+	data->d_size = ofl->ofl_verneedsz;
+	shdr->sh_size = (Xword)ofl->ofl_verneedsz;
 
 	ofl->ofl_osverneed = ld_place_section(ofl, isec, M_ID_VERSION, 0);
 	return ((uintptr_t)ofl->ofl_osverneed);
@@ -1839,7 +1782,6 @@ make_verdef(Ofl_desc *ofl)
 	Elf_Data	*data;
 	Is_desc		*isec;
 	Ver_desc	*vdp;
-	size_t		size;
 
 	/*
 	 * Reserve a string table entry for the base version dependency (other
@@ -1847,7 +1789,6 @@ make_verdef(Ofl_desc *ofl)
 	 * accounted for during symbol processing).
 	 */
 	vdp = (Ver_desc *)ofl->ofl_verdesc.head->data;
-	size = strlen(vdp->vd_name) + 1;
 
 	if (ofl->ofl_flags & FLG_OF_DYNAMIC) {
 		if (st_insert(ofl->ofl_dynstrtab, vdp->vd_name) == -1)
@@ -1858,36 +1799,16 @@ make_verdef(Ofl_desc *ofl)
 	}
 
 	/*
-	 * During version processing we calculated the total number of entries.
-	 * Allocate and initialize the Elf_Data structure.
+	 * verdef sections do not have a constant element size, so the
+	 * value of ent_cnt specified here (0) is meaningless.
 	 */
-	size = ofl->ofl_verdefsz;
-
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_SUNW_verdef, MSG_ORIG(MSG_SCN_SUNWVERSION),
+			0, &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_BYTE;
-	data->d_size = size;
-	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
 
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = (Word)SHT_SUNW_verdef;
-	shdr->sh_flags = SHF_ALLOC;
-	shdr->sh_size = (Xword)size;
-	shdr->sh_addralign = M_WORD_ALIGN;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_SUNWVERSION);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
+	/* During version processing we calculated the total size. */
+	data->d_size = ofl->ofl_verdefsz;
+	shdr->sh_size = (Xword)ofl->ofl_verdefsz;
 
 	ofl->ofl_osverdef = ld_place_section(ofl, isec, M_ID_VERSION, 0);
 	return ((uintptr_t)ofl->ofl_osverdef);
@@ -1899,49 +1820,19 @@ make_verdef(Ofl_desc *ofl)
  * provides additional symbol information.
  */
 static Os_desc *
-make_sym_sec(Ofl_desc *ofl, const char *sectname, Word entsize,
-    Word stype, int ident)
+make_sym_sec(Ofl_desc *ofl, const char *sectname, Word stype, int ident)
 {
 	Shdr		*shdr;
 	Elf_Data	*data;
 	Is_desc		*isec;
 
 	/*
-	 * Allocate and initialize the Elf_Data structures for the symbol index
-	 * array.
+	 * We don't know the size of this section yet, so set it to 0.
+	 * It gets filled in after the dynsym is sized.
 	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, stype, sectname, 0, &isec, &shdr, &data) ==
+	    S_ERROR)
 		return ((Os_desc *)S_ERROR);
-	data->d_type = ELF_T_BYTE;
-	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
-
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return ((Os_desc *)S_ERROR);
-	shdr->sh_type = (Word)stype;
-	shdr->sh_flags = SHF_ALLOC;
-	shdr->sh_addralign = M_WORD_ALIGN;
-	shdr->sh_entsize = entsize;
-
-	if (stype == SHT_SUNW_syminfo) {
-		/*
-		 * The sh_info field of the SHT_*_syminfo section points
-		 * to the header index of the associated .dynamic section.
-		 */
-		shdr->sh_flags |= SHF_INFO_LINK;
-	}
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return ((Os_desc *)S_ERROR);
-	isec->is_name = sectname;
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	return (ld_place_section(ofl, isec, ident, 0));
 }
@@ -1957,33 +1848,19 @@ ld_make_sunwbss(Ofl_desc *ofl, size_t size, Xword align)
 	Is_desc		*isec;
 
 	/*
-	 * Allocate and initialize the Elf_Data structure.
+	 * Allocate header structs. We will set the name ourselves below,
+	 * and there is no entcnt for a BSS. So, the shname and entcnt
+	 * arguments are 0.
 	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_NOBITS, MSG_ORIG(MSG_SCN_SUNWBSS), 0,
+	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_BYTE;
+
 	data->d_size = size;
 	data->d_align = align;
-	data->d_version = ofl->ofl_dehdr->e_version;
 
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = SHT_NOBITS;
-	shdr->sh_flags = SHF_ALLOC | SHF_WRITE;
 	shdr->sh_size = (Xword)size;
 	shdr->sh_addralign = align;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_SUNWBSS);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	/*
 	 * Retain this .sunwbss input section as this will be where global
@@ -2007,39 +1884,20 @@ ld_make_sunwdata(Ofl_desc *ofl, size_t size, Xword align)
 	Is_desc		*isec;
 	Os_desc		*osp;
 
-	/*
-	 * Allocate and initialize the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_PROGBITS, MSG_ORIG(MSG_SCN_SUNWDATA1), 0,
+	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_BYTE;
+
+	shdr->sh_flags |= SHF_WRITE;
 	data->d_size = size;
+	shdr->sh_size = (Xword)size;
+	if (align != 0) {
+		data->d_align = align;
+		shdr->sh_addralign = align;
+	}
+
 	if ((data->d_buf = libld_calloc(size, 1)) == 0)
 		return (S_ERROR);
-	data->d_align = (size_t)M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
-
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return (S_ERROR);
-	shdr->sh_type = SHT_PROGBITS;
-	shdr->sh_flags = SHF_ALLOC | SHF_WRITE;
-	shdr->sh_size = (Xword)size;
-	if (align == 0)
-		shdr->sh_addralign = M_WORD_ALIGN;
-	else
-		shdr->sh_addralign = align;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_SUNWDATA1);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
 
 	/*
 	 * Retain this .sunwdata1 input section as this will
@@ -2067,50 +1925,17 @@ ld_make_sunwmove(Ofl_desc *ofl, int mv_nums)
 	Shdr		*shdr;
 	Elf_Data	*data;
 	Is_desc		*isec;
-	size_t		size;
 	Listnode	*lnp1;
 	Psym_info	*psym;
 	int 		cnt = 1;
 
-	/*
-	 * Generate the move input sections and output sections
-	 */
-	size = mv_nums * sizeof (Move);
 
-	/*
-	 * Allocate and initialize the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_SUNW_move, MSG_ORIG(MSG_SCN_SUNWMOVE),
+	    mv_nums, &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
-	data->d_type = ELF_T_BYTE;
-	if ((data->d_buf = libld_calloc(size, 1)) == 0)
-		return (S_ERROR);
-	data->d_size = size;
-	data->d_align = sizeof (Lword);
-	data->d_version = ofl->ofl_dehdr->e_version;
 
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
+	if ((data->d_buf = libld_calloc(data->d_size, 1)) == 0)
 		return (S_ERROR);
-	shdr->sh_link = 0;
-	shdr->sh_info = 0;
-	shdr->sh_type = SHT_SUNW_move;
-	shdr->sh_size = (Xword)size;
-	shdr->sh_flags = SHF_ALLOC | SHF_WRITE;
-	shdr->sh_addralign = sizeof (Lword);
-	shdr->sh_entsize = sizeof (Move);
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
-		return (S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_SUNWMOVE);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
-	isec->is_file = 0;
 
 	/*
 	 * Copy move entries
@@ -2206,18 +2031,18 @@ ld_make_sections(Ofl_desc *ofl)
 		if (make_verdef(ofl) == S_ERROR)
 			return (S_ERROR);
 		if ((ofl->ofl_osversym = make_sym_sec(ofl,
-		    MSG_ORIG(MSG_SCN_SUNWVERSYM), sizeof (Versym),
-		    SHT_SUNW_versym, M_ID_VERSION)) == (Os_desc*)S_ERROR)
+		    MSG_ORIG(MSG_SCN_SUNWVERSYM), SHT_SUNW_versym,
+		    M_ID_VERSION)) == (Os_desc*)S_ERROR)
 			return (S_ERROR);
 	}
 
 	/*
-	 * Create a syminfo section is necessary.
+	 * Create a syminfo section if necessary.
 	 */
 	if (ofl->ofl_flags & FLG_OF_SYMINFO) {
 		if ((ofl->ofl_ossyminfo = make_sym_sec(ofl,
-		    MSG_ORIG(MSG_SCN_SUNWSYMINFO), sizeof (Syminfo),
-		    SHT_SUNW_syminfo, M_ID_SYMINFO)) == (Os_desc *)S_ERROR)
+		    MSG_ORIG(MSG_SCN_SUNWSYMINFO), SHT_SUNW_syminfo,
+		    M_ID_SYMINFO)) == (Os_desc *)S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -2342,13 +2167,14 @@ ld_make_sections(Ofl_desc *ofl)
 		size_t		size;
 		ulong_t		cnt;
 
-		if ((flags & FLG_OF_RELOBJ) || (flags & FLG_OF_STATIC))
+		if (flags & (FLG_OF_RELOBJ | FLG_OF_STATIC)) {
 			isec = (Is_desc *)ofl->ofl_ossymtab->
 				os_isdescs.head->data;
-		else
+		} else {
 			isec = (Is_desc *)ofl->ofl_osdynsym->
 				os_isdescs.head->data;
-		cnt = isec->is_shdr->sh_size / isec->is_shdr->sh_entsize;
+		}
+		cnt = (isec->is_shdr->sh_size / isec->is_shdr->sh_entsize);
 
 		if (ofl->ofl_osversym) {
 			isec = (Is_desc *)ofl->ofl_osversym->os_isdescs.
@@ -2384,34 +2210,13 @@ ld_make_data(Ofl_desc *ofl, size_t size)
 	Elf_Data	*data;
 	Is_desc		*isec;
 
-	/*
-	 * Allocate and initialize the Elf_Data structure.
-	 */
-	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if (new_section(ofl, SHT_PROGBITS, MSG_ORIG(MSG_SCN_DATA), 0,
+	    &isec, &shdr, &data) == S_ERROR)
 		return ((Is_desc *)S_ERROR);
-	data->d_type = ELF_T_BYTE;
+
 	data->d_size = size;
-	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
-
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return ((Is_desc *)S_ERROR);
-	shdr->sh_type = SHT_PROGBITS;
-	shdr->sh_flags = SHF_ALLOC | SHF_WRITE;
 	shdr->sh_size = (Xword)size;
-	shdr->sh_addralign = M_WORD_ALIGN;
-
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == (Is_desc *)0)
-		return ((Is_desc *)S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_DATA);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
+	shdr->sh_flags |= SHF_WRITE;
 
 	if (ld_place_section(ofl, isec, M_ID_DATA, 0) == (Os_desc *)S_ERROR)
 		return ((Is_desc *)S_ERROR);
@@ -2473,38 +2278,18 @@ ld_make_text(Ofl_desc *ofl, size_t size)
 	if (size < sizeof (ret_template))
 		size = sizeof (ret_template);
 
-	/*
-	 * Allocate and initialize the Elf_Data structure.  Fill the buffer
-	 * with the appropriate return instruction.
-	 */
-	if (((data = libld_calloc(sizeof (Elf_Data), 1)) == 0) ||
-	    ((data->d_buf = libld_calloc(size, 1)) == 0))
+	if (new_section(ofl, SHT_PROGBITS, MSG_ORIG(MSG_SCN_TEXT), 0,
+	    &isec, &shdr, &data) == S_ERROR)
 		return ((Is_desc *)S_ERROR);
-	data->d_type = ELF_T_BYTE;
+
 	data->d_size = size;
-	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_dehdr->e_version;
-
-	(void) memcpy(data->d_buf, ret_template, sizeof (ret_template));
-
-	/*
-	 * Allocate and initialize the Shdr structure.
-	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
-		return ((Is_desc *)S_ERROR);
-	shdr->sh_type = SHT_PROGBITS;
-	shdr->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
 	shdr->sh_size = (Xword)size;
-	shdr->sh_addralign = M_WORD_ALIGN;
+	shdr->sh_flags |= SHF_EXECINSTR;
 
-	/*
-	 * Allocate and initialize the Is_desc structure.
-	 */
-	if ((isec = libld_calloc(1, sizeof (Is_desc))) == (Is_desc *)0)
+	/* Fill the buffer with the appropriate return instruction. */
+	if ((data->d_buf = libld_calloc(size, 1)) == 0)
 		return ((Is_desc *)S_ERROR);
-	isec->is_name = MSG_ORIG(MSG_SCN_TEXT);
-	isec->is_shdr = shdr;
-	isec->is_indata = data;
+	(void) memcpy(data->d_buf, ret_template, sizeof (ret_template));
 
 	if (ld_place_section(ofl, isec, M_ID_TEXT, 0) == (Os_desc *)S_ERROR)
 		return ((Is_desc *)S_ERROR);

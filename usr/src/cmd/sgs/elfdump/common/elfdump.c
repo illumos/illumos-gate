@@ -1077,7 +1077,8 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
 		uint_t		symnshxndx;
 
 		if ((shdr->sh_type != SHT_SYMTAB) &&
-		    (shdr->sh_type != SHT_DYNSYM))
+		    (shdr->sh_type != SHT_DYNSYM) &&
+		    (shdr->sh_type != SHT_SUNW_LDYNSYM))
 			continue;
 		if (name && strcmp(name, secname))
 			continue;

@@ -83,7 +83,6 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 	uid_t		uid = -1, euid = -1;
 	gid_t		gid = -1, egid = -1;
 	char		*_platform = 0, *_execname = 0, *_emulator = 0;
-	int		_branded = 0;
 	int		auxflags = -1;
 	/*
 	 * Scan the bootstrap structure to pick up the basics.
@@ -179,7 +178,6 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 		case AT_SUN_EMULATOR:
 			/* name of emulation library, if any */
 			_emulator = auxv->a_un.a_ptr;
-			_branded = 1;
 			break;
 #endif
 		}
