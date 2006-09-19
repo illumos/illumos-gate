@@ -276,7 +276,7 @@ rge_receive_packet(rge_t *rgep, uint32_t slot)
 		    2 * ETHERADDRL);
 		mp->b_rptr -= VLAN_TAGSZ;
 		ehp = (struct ether_vlan_header *)mp->b_rptr;
-		ehp->ether_tpid = htons(VLAN_TPID);
+		ehp->ether_tpid = htons(ETHERTYPE_VLAN);
 		ehp->ether_tci = htons(vtag);
 		rgep->stats.rbytes += VLAN_TAGSZ;
 	}
@@ -627,7 +627,7 @@ rge_send(rge_t *rgep, mblk_t *mp)
 	ASSERT(MBLKL(mp) >= sizeof (struct ether_header));
 	tci = 0;
 	ehp = (struct ether_vlan_header *)mp->b_rptr;
-	if (ehp->ether_tpid == htons(VLAN_TPID))
+	if (ehp->ether_tpid == htons(ETHERTYPE_VLAN))
 		tci = ntohs(ehp->ether_tci);
 
 	/*

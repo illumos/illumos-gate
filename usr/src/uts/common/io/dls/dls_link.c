@@ -119,50 +119,69 @@ i_dls_link_destructor(void *buf, void *arg)
 }
 
 /*
+ * - Parse the mac header information of the given packet.
+ * - Strip the padding and skip over the header. Note that because some
+ *   DLS consumers only check the db_ref count of the first mblk, we
+ *   pullup the message into a single mblk. The dls_link_header_info()
+ *   function ensures that the size of the pulled message is greater
+ *   than the MAC header size.
+ *
+ * We choose to use a macro for performance reasons.
+ */
+#define	DLS_PREPARE_PKT(dlp, mp, mhip, err) {				\
+	mblk_t *nextp = (mp)->b_next;					\
+	if (((err) = dls_link_header_info((dlp), (mp), (mhip))) == 0) {	\
+		DLS_STRIP_PADDING((mhip)->mhi_pktsize, (mp));		\
+		if (MBLKL((mp)) < (mhip)->mhi_hdrsize) {		\
+			mblk_t *newmp;					\
+			if ((newmp = msgpullup((mp), -1)) == NULL) {	\
+				(err) = EINVAL;				\
+			} else {					\
+				freemsg((mp));				\
+				(mp) = newmp;				\
+				(mp)->b_next = nextp;			\
+				(mp)->b_rptr += (mhip)->mhi_hdrsize;	\
+			}						\
+		} else {						\
+			(mp)->b_rptr += (mhip)->mhi_hdrsize;		\
+		}							\
+	}								\
+}
+
+/*
  * Truncate the chain starting at mp such that all packets in the chain
- * have identical source and destination addresses, saps, and VLAN tags (if
- * any).  It returns a pointer to the mblk following the chain, NULL if
- * there is no further packet following the processed chain.  The countp
- * argument is set to the number of valid packets in the chain.  It is set
- * to 0 if the function encountered a problem with the first packet.
+ * have identical source and destination addresses, saps, and tag types
+ * (see below).  It returns a pointer to the mblk following the chain,
+ * NULL if there is no further packet following the processed chain.
+ * The countp argument is set to the number of valid packets in the chain.
+ * Note that the whole MAC header (including the VLAN tag if any) in each
+ * packet will be stripped.
  */
 static mblk_t *
-i_dls_link_subchain(dls_link_t *dlp, mblk_t *mp, mac_header_info_t *mhip,
-    uint16_t *vidp, uint_t *countp)
+i_dls_link_subchain(dls_link_t *dlp, mblk_t *mp, const mac_header_info_t *mhip,
+    uint_t *countp)
 {
-	mblk_t		**pp;
-	mblk_t		*p;
-	uint_t		npacket;
+	mblk_t		*prevp;
+	uint_t		npacket = 1;
 	size_t		addr_size = dlp->dl_mip->mi_addr_length;
-
-	/*
-	 * Packets should always be at least 16 bit aligned.
-	 */
-	ASSERT(IS_P2ALIGNED(mp->b_rptr, sizeof (uint16_t)));
-
-	if (dls_link_header_info(dlp, mp, mhip, vidp) != 0) {
-		/*
-		 * Something is wrong with the initial header.  No chain is
-		 * possible.
-		 */
-		p = mp->b_next;
-		mp->b_next = NULL;
-		*countp = 0;
-		return (p);
-	}
+	uint16_t	vid = VLAN_ID(mhip->mhi_tci);
+	uint16_t	pri = VLAN_PRI(mhip->mhi_tci);
 
 	/*
 	 * Compare with subsequent headers until we find one that has
 	 * differing header information. After checking each packet
 	 * strip padding and skip over the header.
 	 */
-	npacket = 1;
-	for (pp = &(mp->b_next); (p = *pp) != NULL; pp = &(p->b_next)) {
+	for (prevp = mp; (mp = mp->b_next) != NULL; prevp = mp) {
 		mac_header_info_t cmhi;
-		uint16_t cvid;
+		uint16_t cvid, cpri;
+		int err;
 
-		if (dls_link_header_info(dlp, p, &cmhi, &cvid) != 0)
+		DLS_PREPARE_PKT(dlp, mp, &cmhi, err);
+		if (err != 0)
 			break;
+
+		prevp->b_next = mp;
 
 		/*
 		 * The source, destination, sap, and vlan id must all match
@@ -171,30 +190,46 @@ i_dls_link_subchain(dls_link_t *dlp, mblk_t *mp, mac_header_info_t *mhip,
 		if (memcmp(mhip->mhi_daddr, cmhi.mhi_daddr, addr_size) != 0 ||
 		    memcmp(mhip->mhi_saddr, cmhi.mhi_saddr, addr_size) != 0 ||
 		    mhip->mhi_bindsap != cmhi.mhi_bindsap) {
+			/*
+			 * Note that we don't need to restore the padding.
+			 */
+			mp->b_rptr -= cmhi.mhi_hdrsize;
 			break;
 		}
 
-		if (cvid != *vidp)
-			break;
+		cvid = VLAN_ID(cmhi.mhi_tci);
+		cpri = VLAN_PRI(cmhi.mhi_tci);
 
-		DLS_STRIP_PADDING(cmhi.mhi_pktsize, p);
-		p->b_rptr += cmhi.mhi_hdrsize;
+		/*
+		 * There are several types of packets. Packets don't match
+		 * if they are classified to different type or if they are
+		 * VLAN packets but belong to different VLANs:
+		 *
+		 * packet type		tagged		vid		pri
+		 * ---------------------------------------------------------
+		 * untagged		No		zero		zero
+		 * VLAN packets		Yes		non-zero	-
+		 * priority tagged	Yes		zero		non-zero
+		 * 0 tagged		Yes		zero		zero
+		 */
+		if ((mhip->mhi_istagged != cmhi.mhi_istagged) ||
+		    (vid != cvid) || ((vid == VLAN_ID_NONE) &&
+		    (((pri == 0) && (cpri != 0)) ||
+		    ((pri != 0) && (cpri == 0))))) {
+			mp->b_rptr -= cmhi.mhi_hdrsize;
+			break;
+		}
+
 		npacket++;
 	}
-
-	/*
-	 * Strip padding and skip over the initial packet's header.
-	 */
-	DLS_STRIP_PADDING(mhip->mhi_pktsize, mp);
-	mp->b_rptr += mhip->mhi_hdrsize;
 
 	/*
 	 * Break the chain at this point and return a pointer to the next
 	 * sub-chain.
 	 */
-	*pp = NULL;
+	prevp->b_next = NULL;
 	*countp = npacket;
-	return (p);
+	return (mp);
 }
 
 static void
@@ -226,6 +261,73 @@ i_dls_head_free(dls_head_t *dhp)
 	kmem_free(dhp, sizeof (dls_head_t));
 }
 
+/*
+ * Try to send mp up to the streams of the given sap and vid. Return B_TRUE
+ * if this message is sent to any streams.
+ * Note that this function will copy the message chain and the original
+ * mp will remain valid after this function
+ */
+static uint_t
+i_dls_link_rx_func(dls_link_t *dlp, mac_resource_handle_t mrh,
+    mac_header_info_t *mhip, mblk_t *mp, uint32_t sap, uint16_t vid,
+    boolean_t (*acceptfunc)())
+{
+	mod_hash_t	*hash = dlp->dl_impl_hash;
+	mod_hash_key_t	key;
+	dls_head_t	*dhp;
+	dls_impl_t	*dip;
+	mblk_t		*nmp;
+	dls_rx_t	di_rx;
+	void		*di_rx_arg;
+	uint_t		naccepted = 0;
+
+	/*
+	 * Construct a hash key from the VLAN identifier and the
+	 * DLSAP that represents dls_impl_t in promiscuous mode.
+	 */
+	key = MAKE_KEY(sap, vid);
+
+	/*
+	 * Search the hash table for dls_impl_t eligible to receive
+	 * a packet chain for this DLSAP/VLAN combination.
+	 */
+	rw_enter(&dlp->dl_impl_lock, RW_READER);
+	if (mod_hash_find(hash, key, (mod_hash_val_t *)&dhp) != 0) {
+		rw_exit(&dlp->dl_impl_lock);
+		return (B_FALSE);
+	}
+	i_dls_head_hold(dhp);
+	rw_exit(&dlp->dl_impl_lock);
+
+	/*
+	 * Find dls_impl_t that will accept the sub-chain.
+	 */
+	for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp) {
+		if (!acceptfunc(dip, mhip, &di_rx, &di_rx_arg))
+			continue;
+
+		/*
+		 * We have at least one acceptor.
+		 */
+		naccepted ++;
+
+		/*
+		 * There will normally be at least more dls_impl_t
+		 * (since we've yet to check for non-promiscuous
+		 * dls_impl_t) so dup the sub-chain.
+		 */
+		if ((nmp = copymsgchain(mp)) != NULL)
+			di_rx(di_rx_arg, mrh, nmp, mhip);
+	}
+
+	/*
+	 * Release the hold on the dls_impl_t chain now that we have
+	 * finished walking it.
+	 */
+	i_dls_head_rele(dhp);
+	return (naccepted);
+}
+
 static void
 i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 {
@@ -233,7 +335,6 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 	mod_hash_t			*hash = dlp->dl_impl_hash;
 	mblk_t				*nextp;
 	mac_header_info_t		mhi;
-	uint16_t			vid;
 	dls_head_t			*dhp;
 	dls_impl_t			*dip;
 	dls_impl_t			*ndip;
@@ -243,31 +344,61 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 	boolean_t			accepted;
 	dls_rx_t			di_rx, ndi_rx;
 	void				*di_rx_arg, *ndi_rx_arg;
+	uint16_t			vid;
+	int				err;
 
 	/*
 	 * Walk the packet chain.
 	 */
-	while (mp != NULL) {
+	for (; mp != NULL; mp = nextp) {
 		/*
 		 * Wipe the accepted state.
 		 */
 		accepted = B_FALSE;
 
+		DLS_PREPARE_PKT(dlp, mp, &mhi, err);
+		if (err != 0) {
+			atomic_add_32(&(dlp->dl_unknowns), 1);
+			nextp = mp->b_next;
+			freemsg(mp);
+			continue;
+		}
+
 		/*
 		 * Grab the longest sub-chain we can process as a single
 		 * unit.
 		 */
-		nextp = i_dls_link_subchain(dlp, mp, &mhi, &vid, &npacket);
+		nextp = i_dls_link_subchain(dlp, mp, &mhi, &npacket);
+		ASSERT(npacket != 0);
 
-		if (npacket == 0) {
+		vid = VLAN_ID(mhi.mhi_tci);
+
+		if (mhi.mhi_istagged) {
 			/*
-			 * The first packet had an unrecognized header.
-			 * Modify npacket so that this stray can be
-			 * accounted for.
+			 * If it is tagged traffic, send it upstream to
+			 * all dls_impl_t which are attached to the physical
+			 * link and bound to SAP 0x8100.
 			 */
-			npacket = 1;
-			freemsg(mp);
-			goto loop;
+			if (i_dls_link_rx_func(dlp, mrh, &mhi, mp,
+			    ETHERTYPE_VLAN, VLAN_ID_NONE, dls_accept) > 0) {
+				accepted = B_TRUE;
+			}
+
+			/*
+			 * Don't pass the packets up if they are tagged
+			 * packets and:
+			 *  - their VID and priority are both zero (invalid
+			 *    packets).
+			 *  - their sap is ETHERTYPE_VLAN and their VID is
+			 *    zero as they have already been sent upstreams.
+			 */
+			if ((vid == VLAN_ID_NONE &&
+			    VLAN_PRI(mhi.mhi_tci) == 0) ||
+			    (mhi.mhi_bindsap == ETHERTYPE_VLAN &&
+			    vid == VLAN_ID_NONE)) {
+				freemsgchain(mp);
+				goto loop;
+			}
 		}
 
 		/*
@@ -327,7 +458,7 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 			 * it before handing it to the current one.
 			 */
 			if (ndip == NULL) {
-				di_rx(di_rx_arg, mrh, mp, mhi.mhi_hdrsize);
+				di_rx(di_rx_arg, mrh, mp, &mhi);
 
 				/*
 				 * Since there are no more dls_impl_t, we're
@@ -340,7 +471,7 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 			 * There are more dls_impl_t so dup the sub-chain.
 			 */
 			if ((nmp = copymsgchain(mp)) != NULL)
-				di_rx(di_rx_arg, mrh, nmp, mhi.mhi_hdrsize);
+				di_rx(di_rx_arg, mrh, nmp, &mhi);
 
 			dip = ndip;
 			di_rx = ndi_rx;
@@ -360,361 +491,201 @@ loop:
 		 */
 		if (!accepted)
 			atomic_add_32(&(dlp->dl_unknowns), npacket);
+	}
+}
+
+/*
+ * Try to send mp up to the DLS_SAP_PROMISC listeners. Return B_TRUE if this
+ * message is sent to any streams.
+ */
+static uint_t
+i_dls_link_rx_common_promisc(dls_link_t *dlp, mac_resource_handle_t mrh,
+    mac_header_info_t *mhip, mblk_t *mp, uint16_t vid,
+    boolean_t (*acceptfunc)())
+{
+	uint_t naccepted;
+
+	naccepted = i_dls_link_rx_func(dlp, mrh, mhip, mp, DLS_SAP_PROMISC,
+	    vid, acceptfunc);
+
+	if (vid != VLAN_ID_NONE) {
+		naccepted += i_dls_link_rx_func(dlp, mrh, mhip, mp,
+		    DLS_SAP_PROMISC, VLAN_ID_NONE, acceptfunc);
+	}
+	return (naccepted);
+}
+
+static void
+i_dls_link_rx_common(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    boolean_t (*acceptfunc)())
+{
+	dls_link_t			*dlp = arg;
+	mod_hash_t			*hash = dlp->dl_impl_hash;
+	mblk_t				*nextp;
+	mac_header_info_t		mhi;
+	uint16_t			vid, vidkey, pri;
+	dls_head_t			*dhp;
+	dls_impl_t			*dip;
+	mblk_t				*nmp;
+	mod_hash_key_t			key;
+	uint_t				npacket;
+	uint32_t			sap;
+	boolean_t			accepted;
+	dls_rx_t			di_rx, fdi_rx;
+	void				*di_rx_arg, *fdi_rx_arg;
+	boolean_t			pass2;
+	int				err;
+
+	/*
+	 * Walk the packet chain.
+	 */
+	for (; mp != NULL; mp = nextp) {
+		/*
+		 * Wipe the accepted state and the receive information of
+		 * the first eligible dls_impl_t.
+		 */
+		accepted = B_FALSE;
+		pass2 = B_FALSE;
+		fdi_rx = NULL;
+		fdi_rx_arg = NULL;
+
+		DLS_PREPARE_PKT(dlp, mp, &mhi, err);
+		if (err != 0) {
+			if (acceptfunc == dls_accept)
+				atomic_add_32(&(dlp->dl_unknowns), 1);
+			nextp = mp->b_next;
+			freemsg(mp);
+			continue;
+		}
 
 		/*
-		 * Move onto the next sub-chain.
+		 * Grab the longest sub-chain we can process as a single
+		 * unit.
 		 */
-		mp = nextp;
+		nextp = i_dls_link_subchain(dlp, mp, &mhi, &npacket);
+		ASSERT(npacket != 0);
+
+		vid = VLAN_ID(mhi.mhi_tci);
+		pri = VLAN_PRI(mhi.mhi_tci);
+
+		vidkey = vid;
+
+		/*
+		 * Note that we need to first send to the dls_impl_t
+		 * in promiscuous mode in order to avoid the packet reordering
+		 * when snooping.
+		 */
+		if (i_dls_link_rx_common_promisc(dlp, mrh, &mhi, mp, vidkey,
+		    acceptfunc) > 0) {
+			accepted = B_TRUE;
+		}
+
+		/*
+		 * Non promisc case. Two passes:
+		 *   1. send tagged packets to ETHERTYPE_VLAN listeners
+		 *   2. send packets to listeners bound to the specific SAP.
+		 */
+		if (mhi.mhi_istagged) {
+			vidkey = VLAN_ID_NONE;
+			sap = ETHERTYPE_VLAN;
+		} else {
+			goto non_promisc_loop;
+		}
+non_promisc:
+		/*
+		 * Construct a hash key from the VLAN identifier and the
+		 * DLSAP.
+		 */
+		key = MAKE_KEY(sap, vidkey);
+
+		/*
+		 * Search the has table for dls_impl_t eligible to receive
+		 * a packet chain for this DLSAP/VLAN combination.
+		 */
+		rw_enter(&dlp->dl_impl_lock, RW_READER);
+		if (mod_hash_find(hash, key, (mod_hash_val_t *)&dhp) != 0) {
+			rw_exit(&dlp->dl_impl_lock);
+			goto non_promisc_loop;
+		}
+		i_dls_head_hold(dhp);
+		rw_exit(&dlp->dl_impl_lock);
+
+		/*
+		 * Find the first dls_impl_t that will accept the sub-chain.
+		 */
+		for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp) {
+			if (!acceptfunc(dip, &mhi, &di_rx, &di_rx_arg))
+				continue;
+
+			accepted = B_TRUE;
+
+			/*
+			 * To avoid the extra copymsgchain(), if this
+			 * is the first eligible dls_impl_t, remember required
+			 * information and send up the message afterwards.
+			 */
+			if (fdi_rx == NULL) {
+				fdi_rx = di_rx;
+				fdi_rx_arg = di_rx_arg;
+				continue;
+			}
+
+			if ((nmp = copymsgchain(mp)) != NULL)
+				di_rx(di_rx_arg, mrh, nmp, &mhi);
+		}
+
+		/*
+		 * Release the hold on the dls_impl_t chain now that we have
+		 * finished walking it.
+		 */
+		i_dls_head_rele(dhp);
+
+non_promisc_loop:
+		/*
+		 * Don't pass the packets up again if:
+		 * - First pass is done and the packets are tagged and their:
+		 *	- VID and priority are both zero (invalid packets).
+		 *	- their sap is ETHERTYPE_VLAN and their VID is zero
+		 *	  (they have already been sent upstreams).
+		 *  - Second pass is done:
+		 */
+		if (pass2 || (mhi.mhi_istagged &&
+		    ((vid == VLAN_ID_NONE && pri == 0) ||
+		    (mhi.mhi_bindsap == ETHERTYPE_VLAN &&
+		    vid == VLAN_ID_NONE)))) {
+			/*
+			 * Send the message up to the first eligible dls_impl_t.
+			 */
+			if (fdi_rx != NULL)
+				fdi_rx(fdi_rx_arg, mrh, mp, &mhi);
+			else
+				freemsgchain(mp);
+		} else {
+			vidkey = vid;
+			sap = mhi.mhi_bindsap;
+			pass2 = B_TRUE;
+			goto non_promisc;
+		}
+
+		/*
+		 * If there were no acceptors then add the packet count to the
+		 * 'unknown' count.
+		 */
+		if (!accepted && (acceptfunc == dls_accept))
+			atomic_add_32(&(dlp->dl_unknowns), npacket);
 	}
 }
 
 static void
 i_dls_link_rx_promisc(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 {
-	dls_link_t			*dlp = arg;
-	mod_hash_t			*hash = dlp->dl_impl_hash;
-	mblk_t				*nextp;
-	mac_header_info_t		mhi;
-	uint16_t			vid;
-	dls_head_t			*dhp;
-	dls_impl_t			*dip;
-	dls_impl_t			*ndip;
-	mblk_t				*nmp;
-	mod_hash_key_t			key;
-	uint_t				npacket;
-	boolean_t			accepted;
-	dls_rx_t			di_rx, ndi_rx;
-	void				*di_rx_arg, *ndi_rx_arg;
-
-	/*
-	 * Walk the packet chain.
-	 */
-	while (mp != NULL) {
-		/*
-		 * Wipe the accepted state.
-		 */
-		accepted = B_FALSE;
-
-		/*
-		 * Grab the longest sub-chain we can process as a single
-		 * unit.
-		 */
-		nextp = i_dls_link_subchain(dlp, mp, &mhi, &vid, &npacket);
-
-		if (npacket == 0) {
-			/*
-			 * The first packet had an unrecognized header.
-			 * Modify npacket so that this stray can be
-			 * accounted for.
-			 */
-			npacket = 1;
-			freemsg(mp);
-			goto loop;
-		}
-
-		/*
-		 * Construct a hash key from the VLAN identifier and the
-		 * DLSAP that represents dls_impl_t in promiscuous mode.
-		 */
-		key = MAKE_KEY(DLS_SAP_PROMISC, vid);
-
-		/*
-		 * Search the has table for dls_impl_t eligible to receive
-		 * a packet chain for this DLSAP/VLAN combination.
-		 */
-		rw_enter(&dlp->dl_impl_lock, RW_READER);
-		if (mod_hash_find(hash, key, (mod_hash_val_t *)&dhp) != 0) {
-			rw_exit(&dlp->dl_impl_lock);
-			goto non_promisc;
-		}
-		i_dls_head_hold(dhp);
-		rw_exit(&dlp->dl_impl_lock);
-
-		/*
-		 * Find dls_impl_t that will accept the sub-chain.
-		 */
-		for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp) {
-			if (!dls_accept(dip, &mhi, &di_rx, &di_rx_arg))
-				continue;
-
-			/*
-			 * We have at least one acceptor.
-			 */
-			accepted = B_TRUE;
-
-			/*
-			 * There will normally be at least more dls_impl_t
-			 * (since we've yet to check for non-promiscuous
-			 * dls_impl_t) so dup the sub-chain.
-			 */
-			if ((nmp = copymsgchain(mp)) != NULL)
-				di_rx(di_rx_arg, mrh, nmp, mhi.mhi_hdrsize);
-		}
-
-		/*
-		 * Release the hold on the dls_impl_t chain now that we have
-		 * finished walking it.
-		 */
-		i_dls_head_rele(dhp);
-
-non_promisc:
-		/*
-		 * Construct a hash key from the VLAN identifier and the
-		 * DLSAP.
-		 */
-		key = MAKE_KEY(mhi.mhi_bindsap, vid);
-
-		/*
-		 * Search the has table for dls_impl_t eligible to receive
-		 * a packet chain for this DLSAP/VLAN combination.
-		 */
-		rw_enter(&dlp->dl_impl_lock, RW_READER);
-		if (mod_hash_find(hash, key, (mod_hash_val_t *)&dhp) != 0) {
-			rw_exit(&dlp->dl_impl_lock);
-			freemsgchain(mp);
-			goto loop;
-		}
-		i_dls_head_hold(dhp);
-		rw_exit(&dlp->dl_impl_lock);
-
-		/*
-		 * Find the first dls_impl_t that will accept the sub-chain.
-		 */
-		for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp)
-			if (dls_accept(dip, &mhi, &di_rx, &di_rx_arg))
-				break;
-
-		/*
-		 * If we did not find any dls_impl_t willing to accept the
-		 * sub-chain then throw it away.
-		 */
-		if (dip == NULL) {
-			i_dls_head_rele(dhp);
-			freemsgchain(mp);
-			goto loop;
-		}
-
-		/*
-		 * We have at least one acceptor.
-		 */
-		accepted = B_TRUE;
-		for (;;) {
-			/*
-			 * Find the next dls_impl_t that will accept the
-			 * sub-chain.
-			 */
-			for (ndip = dip->di_nextp; ndip != NULL;
-			    ndip = ndip->di_nextp)
-				if (dls_accept(ndip, &mhi, &ndi_rx,
-				    &ndi_rx_arg))
-					break;
-
-			/*
-			 * If there are no more dls_impl_t that are willing
-			 * to accept the sub-chain then we don't need to dup
-			 * it before handing it to the current one.
-			 */
-			if (ndip == NULL) {
-				di_rx(di_rx_arg, mrh, mp, mhi.mhi_hdrsize);
-
-				/*
-				 * Since there are no more dls_impl_t, we're
-				 * done.
-				 */
-				break;
-			}
-
-			/*
-			 * There are more dls_impl_t so dup the sub-chain.
-			 */
-			if ((nmp = copymsgchain(mp)) != NULL)
-				di_rx(di_rx_arg, mrh, nmp, mhi.mhi_hdrsize);
-
-			dip = ndip;
-			di_rx = ndi_rx;
-			di_rx_arg = ndi_rx_arg;
-		}
-
-		/*
-		 * Release the hold on the dls_impl_t chain now that we have
-		 * finished walking it.
-		 */
-		i_dls_head_rele(dhp);
-
-loop:
-		/*
-		 * If there were no acceptors then add the packet count to the
-		 * 'unknown' count.
-		 */
-		if (!accepted)
-			atomic_add_32(&(dlp->dl_unknowns), npacket);
-
-		/*
-		 * Move onto the next sub-chain.
-		 */
-		mp = nextp;
-	}
+	i_dls_link_rx_common(arg, mrh, mp, dls_accept);
 }
 
 static void
 i_dls_link_txloop(void *arg, mblk_t *mp)
 {
-	dls_link_t			*dlp = arg;
-	mod_hash_t			*hash = dlp->dl_impl_hash;
-	mblk_t				*nextp;
-	mac_header_info_t		mhi;
-	uint16_t			vid;
-	dls_head_t			*dhp;
-	dls_impl_t			*dip;
-	dls_impl_t			*ndip;
-	mblk_t				*nmp;
-	mod_hash_key_t			key;
-	uint_t				npacket;
-	dls_rx_t			di_rx, ndi_rx;
-	void				*di_rx_arg, *ndi_rx_arg;
-
-	/*
-	 * Walk the packet chain.
-	 */
-	while (mp != NULL) {
-		/*
-		 * Grab the longest sub-chain we can process as a single
-		 * unit.
-		 */
-		nextp = i_dls_link_subchain(dlp, mp, &mhi, &vid, &npacket);
-
-		if (npacket == 0) {
-			freemsg(mp);
-			goto loop;
-		}
-
-		/*
-		 * Construct a hash key from the VLAN identifier and the
-		 * DLSAP.
-		 */
-		key = MAKE_KEY(mhi.mhi_bindsap, vid);
-
-		/*
-		 * Search the has table for dls_impl_t eligible to receive
-		 * a packet chain for this DLSAP/VLAN combination.
-		 */
-		rw_enter(&dlp->dl_impl_lock, RW_READER);
-		if (mod_hash_find(hash, key, (mod_hash_val_t *)&dhp) != 0) {
-			rw_exit(&dlp->dl_impl_lock);
-			goto promisc;
-		}
-		i_dls_head_hold(dhp);
-		rw_exit(&dlp->dl_impl_lock);
-
-		/*
-		 * Find dls_impl_t that will accept the sub-chain.
-		 */
-		for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp) {
-			if (!dls_accept_loopback(dip, &di_rx, &di_rx_arg))
-				continue;
-
-			/*
-			 * There should be at least more dls_impl_t (since
-			 * we've yet to check for dls_impl_t in promiscuous
-			 * mode) so dup the sub-chain.
-			 */
-			if ((nmp = copymsgchain(mp)) != NULL)
-				di_rx(di_rx_arg, NULL, nmp, mhi.mhi_hdrsize);
-		}
-
-		/*
-		 * Release the hold on the dls_impl_t chain now that we have
-		 * finished walking it.
-		 */
-		i_dls_head_rele(dhp);
-
-promisc:
-		/*
-		 * Construct a hash key from the VLAN identifier and the
-		 * DLSAP that represents dls_impl_t in promiscuous mode.
-		 */
-		key = MAKE_KEY(DLS_SAP_PROMISC, vid);
-
-		/*
-		 * Search the has table for dls_impl_t eligible to receive
-		 * a packet chain for this DLSAP/VLAN combination.
-		 */
-		rw_enter(&dlp->dl_impl_lock, RW_READER);
-		if (mod_hash_find(hash, key, (mod_hash_val_t *)&dhp) != 0) {
-			rw_exit(&dlp->dl_impl_lock);
-			freemsgchain(mp);
-			goto loop;
-		}
-		i_dls_head_hold(dhp);
-		rw_exit(&dlp->dl_impl_lock);
-
-		/*
-		 * Find the first dls_impl_t that will accept the sub-chain.
-		 */
-		for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp)
-			if (dls_accept_loopback(dip, &di_rx, &di_rx_arg))
-				break;
-
-		/*
-		 * If we did not find any dls_impl_t willing to accept the
-		 * sub-chain then throw it away.
-		 */
-		if (dip == NULL) {
-			i_dls_head_rele(dhp);
-			freemsgchain(mp);
-			goto loop;
-		}
-
-		for (;;) {
-			/*
-			 * Find the next dls_impl_t that will accept the
-			 * sub-chain.
-			 */
-			for (ndip = dip->di_nextp; ndip != NULL;
-			    ndip = ndip->di_nextp)
-				if (dls_accept_loopback(ndip, &ndi_rx,
-				    &ndi_rx_arg)) {
-					break;
-				}
-
-			/*
-			 * If there are no more dls_impl_t that are willing
-			 * to accept the sub-chain then we don't need to dup
-			 * it before handing it to the current one.
-			 */
-			if (ndip == NULL) {
-				di_rx(di_rx_arg, NULL, mp, mhi.mhi_hdrsize);
-
-				/*
-				 * Since there are no more dls_impl_t, we're
-				 * done.
-				 */
-				break;
-			}
-
-			/*
-			 * There are more dls_impl_t so dup the sub-chain.
-			 */
-			if ((nmp = copymsgchain(mp)) != NULL)
-				di_rx(di_rx_arg, NULL, nmp, mhi.mhi_hdrsize);
-
-			dip = ndip;
-			di_rx = ndi_rx;
-			di_rx_arg = ndi_rx_arg;
-		}
-
-		/*
-		 * Release the hold on the dls_impl_t chain now that we have
-		 * finished walking it.
-		 */
-		i_dls_head_rele(dhp);
-
-loop:
-		/*
-		 * Move onto the next sub-chain.
-		 */
-		mp = nextp;
-	}
+	i_dls_link_rx_common(arg, NULL, mp, dls_accept_loopback);
 }
 
 /*ARGSUSED*/
@@ -1125,32 +1096,55 @@ dls_link_remove(dls_link_t *dlp, dls_impl_t *dip)
 }
 
 int
-dls_link_header_info(dls_link_t *dlp, mblk_t *mp, mac_header_info_t *mhip,
-    uint16_t *vidp)
+dls_link_header_info(dls_link_t *dlp, mblk_t *mp, mac_header_info_t *mhip)
 {
 	boolean_t	is_ethernet = (dlp->dl_mip->mi_media == DL_ETHER);
 	int		err = 0;
+
+	/*
+	 * Packets should always be at least 16 bit aligned.
+	 */
+	ASSERT(IS_P2ALIGNED(mp->b_rptr, sizeof (uint16_t)));
 
 	if ((err = mac_header_info(dlp->dl_mh, mp, mhip)) != 0)
 		return (err);
 
 	/*
 	 * If this is a VLAN-tagged Ethernet packet, then the SAP in the
-	 * mac_header_info_t as returned by mac_header_info() is VLAN_TPID.
-	 * We need to grab the ethertype from the VLAN header.
+	 * mac_header_info_t as returned by mac_header_info() is
+	 * ETHERTYPE_VLAN. We need to grab the ethertype from the VLAN header.
 	 */
-	if (is_ethernet && (mhip->mhi_bindsap == VLAN_TPID)) {
+	if (is_ethernet && (mhip->mhi_bindsap == ETHERTYPE_VLAN)) {
 		struct ether_vlan_header *evhp;
 		uint16_t sap;
+		mblk_t *tmp = NULL;
+		size_t size;
 
+		size = sizeof (struct ether_vlan_header);
+		if (MBLKL(mp) < size) {
+			/*
+			 * Pullup the message in order to get the MAC header
+			 * infomation. Note that this is a read-only function,
+			 * we keep the input packet intact.
+			 */
+			if ((tmp = msgpullup(mp, size)) == NULL)
+				return (EINVAL);
+
+			mp = tmp;
+		}
 		evhp = (struct ether_vlan_header *)mp->b_rptr;
 		sap = ntohs(evhp->ether_type);
 		(void) mac_sap_verify(dlp->dl_mh, sap, &mhip->mhi_bindsap);
 		mhip->mhi_hdrsize = sizeof (struct ether_vlan_header);
-		if (vidp != NULL)
-			*vidp = VLAN_ID(ntohs(evhp->ether_tci));
-	} else if (vidp != NULL) {
-		*vidp = VLAN_ID_NONE;
+		mhip->mhi_tci = ntohs(evhp->ether_tci);
+		mhip->mhi_istagged = B_TRUE;
+		freemsg(tmp);
+
+		if (VLAN_CFI(mhip->mhi_tci) != ETHER_CFI)
+			return (EINVAL);
+	} else {
+		mhip->mhi_istagged = B_FALSE;
+		mhip->mhi_tci = 0;
 	}
 	return (0);
 }

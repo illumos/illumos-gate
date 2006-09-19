@@ -216,17 +216,16 @@ extern void		dld_str_destroy(dld_str_t *);
 extern int		dld_str_attach(dld_str_t *, t_uscalar_t);
 extern void		dld_str_detach(dld_str_t *);
 extern void		dld_str_rx_raw(void *, mac_resource_handle_t,
-    mblk_t *, size_t);
+    mblk_t *, mac_header_info_t *);
 extern void		dld_str_rx_fastpath(void *, mac_resource_handle_t,
-    mblk_t *, size_t);
+    mblk_t *, mac_header_info_t *);
 extern void		dld_str_rx_unitdata(void *, mac_resource_handle_t,
-    mblk_t *, size_t);
+    mblk_t *, mac_header_info_t *);
 extern void		dld_tx_flush(dld_str_t *);
 extern void		dld_tx_enqueue(dld_str_t *, mblk_t *, boolean_t);
 extern void		dld_str_notify_ind(dld_str_t *);
-
 extern void		str_mdata_fastpath_put(dld_str_t *, mblk_t *);
-extern void		str_mdata_raw_put(dld_str_t *, mblk_t *);
+extern void		dld_tx_single(dld_str_t *, mblk_t *);
 
 /*
  * dld_proto.c

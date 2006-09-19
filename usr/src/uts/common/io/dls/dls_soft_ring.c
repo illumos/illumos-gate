@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -371,7 +370,7 @@ soft_ring_process(soft_ring_t *ringp, mblk_t *mp_chain, uint8_t tag)
 			arg2 = ringp->s_ring_upcall_arg2;
 
 			mutex_exit(&ringp->s_ring_lock);
-			(*proc)(arg1, arg2, mp_chain, -1);
+			(*proc)(arg1, arg2, mp_chain, NULL);
 
 			ASSERT(MUTEX_NOT_HELD(&ringp->s_ring_lock));
 			mutex_enter(&ringp->s_ring_lock);
@@ -481,7 +480,7 @@ soft_ring_drain(soft_ring_t *ringp, clock_t expire)
 			tid = 0;
 		}
 
-		(*proc)(arg1, arg2, mp, -1);
+		(*proc)(arg1, arg2, mp, NULL);
 
 		mutex_enter(&ringp->s_ring_lock);
 	}
@@ -632,7 +631,7 @@ dls_soft_ring_enable(dls_channel_t dc, dl_capab_dls_t *soft_ringp)
 /* ARGSUSED */
 void
 dls_ether_soft_ring_fanout(void *rx_handle, void *rx_cookie, mblk_t *mp_chain,
-    size_t hdrlen)
+    mac_header_info_t *mhip)
 {
 	ipha_t		*ipha = (ipha_t *)mp_chain->b_rptr;
 	dls_impl_t	*dip = (dls_impl_t *)rx_handle;

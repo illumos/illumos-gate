@@ -28,6 +28,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/stream.h>
@@ -350,6 +351,8 @@ typedef struct mac_header_info_s {
 	uint32_t	mhi_origsap;
 	uint32_t	mhi_bindsap;
 	mac_addrtype_t	mhi_dsttype;
+	boolean_t	mhi_istagged;
+	uint16_t	mhi_tci;
 } mac_header_info_t;
 
 /*

@@ -836,8 +836,6 @@ static int	ip_conn_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 static mblk_t	*ip_tcp_input(mblk_t *, ipha_t *, ill_t *, boolean_t,
     ire_t *, mblk_t *, uint_t, queue_t *, ill_rx_ring_t *);
 
-void	ip_input(ill_t *, ill_rx_ring_t *, mblk_t *, size_t);
-
 static void	ip_rput_process_forward(queue_t *, mblk_t *, ire_t *,
     ipha_t *, ill_t *, boolean_t);
 
@@ -14358,7 +14356,7 @@ ip_rput(queue_t *q, mblk_t *mp)
 	TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
 	    "ip_rput_end: q %p (%S)", q, "end");
 
-	ip_input(ill, NULL, mp, 0);
+	ip_input(ill, NULL, mp, NULL);
 }
 
 /*
@@ -14369,10 +14367,19 @@ ip_rput(queue_t *q, mblk_t *mp)
  *
  * The ill will always be valid if this function is called directly from
  * the driver.
+ *
+ * If ip_input() is called from GLDv3:
+ *
+ *   - This must be a non-VLAN IP stream.
+ *   - 'mp' is either an untagged or a special priority-tagged packet.
+ *   - Any VLAN tag that was in the MAC header has been stripped.
+ *
+ * Thus, there is no need to adjust b_rptr in this function.
  */
 /* ARGSUSED */
 void
-ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
+ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
+    struct mac_header_info_s *mhip)
 {
 	ipaddr_t		dst = NULL;
 	ipaddr_t		prev_dst;

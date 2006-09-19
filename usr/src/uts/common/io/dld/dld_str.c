@@ -42,7 +42,7 @@
 
 static int	str_constructor(void *, void *, int);
 static void	str_destructor(void *, void *);
-static mblk_t	*str_unitdata_ind(dld_str_t *, mblk_t *);
+static mblk_t	*str_unitdata_ind(dld_str_t *, mblk_t *, boolean_t);
 static void	str_notify_promisc_on_phys(dld_str_t *);
 static void	str_notify_promisc_off_phys(dld_str_t *);
 static void	str_notify_phys_addr(dld_str_t *, const uint8_t *);
@@ -58,6 +58,9 @@ static void	ioc(dld_str_t *, mblk_t *);
 static void	dld_ioc(dld_str_t *, mblk_t *);
 static minor_t	dld_minor_hold(boolean_t);
 static void	dld_minor_rele(minor_t);
+static void	str_mdata_raw_put(dld_str_t *, mblk_t *);
+static mblk_t	*i_dld_ether_header_update_tag(mblk_t *, uint_t, uint16_t);
+static mblk_t	*i_dld_ether_header_strip_tag(mblk_t *);
 
 static uint32_t		str_count;
 static kmem_cache_t	*str_cachep;
@@ -79,8 +82,8 @@ static mod_hash_t	*str_hashp;
  * the DL_CAPAB_POLL negotiation.  The put procedure handles all control
  * and data operations, while the fast-path routine deals only with M_DATA
  * fast-path packets.  Regardless of the entry point, all outbound packets
- * will end up in str_mdata_fastpath_put(), where they will be delivered to
- * the MAC driver.
+ * will end up in dld_tx_single(), where they will be delivered to the MAC
+ * driver.
  *
  * The transmit logic operates in two modes: a "not busy" mode where the
  * packets will be delivered to the MAC for a send attempt, or "busy" mode
@@ -452,7 +455,7 @@ dld_wsrv(queue_t *wq)
 	 * Discard packets unless we are attached and bound; note that
 	 * the driver mode (fastpath/raw/unitdata) is irrelevant here,
 	 * because regardless of the mode all transmit will end up in
-	 * str_mdata_fastpath_put() where the packets may be queued.
+	 * dld_tx_single() where the packets may be queued.
 	 */
 	ASSERT(DB_TYPE(mp) == M_DATA);
 	if (dsp->ds_dlstate != DL_IDLE) {
@@ -786,10 +789,10 @@ str_destructor(void *buf, void *cdrarg)
 }
 
 /*
- * M_DATA put (IP fast-path mode)
+ * M_DATA put. Note that mp is a single message, not a chained message.
  */
 void
-str_mdata_fastpath_put(dld_str_t *dsp, mblk_t *mp)
+dld_tx_single(dld_str_t *dsp, mblk_t *mp)
 {
 	/*
 	 * This function can be called from within dld or from an upper
@@ -811,14 +814,133 @@ str_mdata_fastpath_put(dld_str_t *dsp, mblk_t *mp)
 }
 
 /*
- * M_DATA put (raw mode)
+ * Update the priority bits and VID (may need to insert tag if mp points
+ * to an untagged packet.
+ * If vid is VLAN_ID_NONE, use the VID encoded in the packet.
+ */
+static mblk_t *
+i_dld_ether_header_update_tag(mblk_t *mp, uint_t pri, uint16_t vid)
+{
+	mblk_t *hmp;
+	struct ether_vlan_header *evhp;
+	struct ether_header *ehp;
+	uint16_t old_tci = 0;
+	size_t len;
+
+	ASSERT(pri != 0 || vid != VLAN_ID_NONE);
+
+	evhp = (struct ether_vlan_header *)mp->b_rptr;
+	if (ntohs(evhp->ether_tpid) == ETHERTYPE_VLAN) {
+		/*
+		 * Tagged packet, update the priority bits.
+		 */
+		old_tci = ntohs(evhp->ether_tci);
+		len = sizeof (struct ether_vlan_header);
+
+		if ((DB_REF(mp) > 1) || (MBLKL(mp) < len)) {
+			/*
+			 * In case some drivers only check the db_ref
+			 * count of the first mblk, we pullup the
+			 * message into a single mblk.
+			 */
+			hmp = msgpullup(mp, -1);
+			if ((hmp == NULL) || (MBLKL(hmp) < len)) {
+				freemsg(hmp);
+				return (NULL);
+			} else {
+				freemsg(mp);
+				mp = hmp;
+			}
+		}
+
+		evhp = (struct ether_vlan_header *)mp->b_rptr;
+	} else {
+		/*
+		 * Untagged packet. Insert the special priority tag.
+		 * First allocate a header mblk.
+		 */
+		hmp = allocb(sizeof (struct ether_vlan_header), BPRI_MED);
+		if (hmp == NULL)
+			return (NULL);
+
+		evhp = (struct ether_vlan_header *)hmp->b_rptr;
+		ehp = (struct ether_header *)mp->b_rptr;
+
+		/*
+		 * Copy the MAC addresses and typelen
+		 */
+		bcopy(ehp, evhp, (ETHERADDRL * 2));
+		evhp->ether_type = ehp->ether_type;
+		evhp->ether_tpid = htons(ETHERTYPE_VLAN);
+
+		hmp->b_wptr += sizeof (struct ether_vlan_header);
+		mp->b_rptr += sizeof (struct ether_header);
+
+		/*
+		 * Free the original message if it's now empty. Link the
+		 * rest of messages to the header message.
+		 */
+		if (MBLKL(mp) == 0) {
+			hmp->b_cont = mp->b_cont;
+			freeb(mp);
+		} else {
+			hmp->b_cont = mp;
+		}
+		mp = hmp;
+	}
+
+	if (pri == 0)
+		pri = VLAN_PRI(old_tci);
+	if (vid == VLAN_ID_NONE)
+		vid = VLAN_ID(old_tci);
+	evhp->ether_tci = htons(VLAN_TCI(pri, VLAN_CFI(old_tci), vid));
+	return (mp);
+}
+
+/*
+ * M_DATA put (IP fast-path mode)
  */
 void
+str_mdata_fastpath_put(dld_str_t *dsp, mblk_t *mp)
+{
+	boolean_t is_ethernet = (dsp->ds_mip->mi_media == DL_ETHER);
+	mblk_t *newmp;
+	uint_t pri;
+
+	if (is_ethernet) {
+		/*
+		 * Update the priority bits to the assigned priority.
+		 */
+		pri = (VLAN_MBLKPRI(mp) == 0) ? dsp->ds_pri : VLAN_MBLKPRI(mp);
+
+		if (pri != 0) {
+			newmp = i_dld_ether_header_update_tag(mp, pri,
+			    VLAN_ID_NONE);
+			if (newmp == NULL)
+				goto discard;
+			mp = newmp;
+		}
+	}
+
+	dld_tx_single(dsp, mp);
+	return;
+
+discard:
+	/* TODO: bump kstat? */
+	freemsg(mp);
+}
+
+/*
+ * M_DATA put (DLIOCRAW mode)
+ */
+static void
 str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 {
-	mblk_t			*bp, *newmp;
-	size_t			size;
-	mac_header_info_t	mhi;
+	boolean_t is_ethernet = (dsp->ds_mip->mi_media == DL_ETHER);
+	mblk_t *bp, *newmp;
+	size_t size;
+	mac_header_info_t mhi;
+	uint_t pri, vid;
 
 	/*
 	 * Certain MAC type plugins provide an illusion for raw DLPI
@@ -854,23 +976,43 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 	if (size > dsp->ds_mip->mi_sdu_max + mhi.mhi_hdrsize)
 		goto discard;
 
-	if (dsp->ds_mip->mi_media == DL_ETHER && mhi.mhi_origsap == VLAN_TPID) {
-		struct ether_vlan_header	*evhp;
-
-		if (size < sizeof (struct ether_vlan_header))
-			goto discard;
+	if (is_ethernet) {
 		/*
-		 * Replace vtag with our own
+		 * Discard the packet if this is a VLAN stream but the VID in
+		 * the packet is not correct.
 		 */
-		evhp = (struct ether_vlan_header *)mp->b_rptr;
-		evhp->ether_tci = htons(VLAN_TCI(dsp->ds_pri,
-		    ETHER_CFI, dsp->ds_vid));
+		vid = VLAN_ID(mhi.mhi_tci);
+		if ((dsp->ds_vid != VLAN_ID_NONE) && (vid != VLAN_ID_NONE))
+			goto discard;
+
+		/*
+		 * Discard the packet if this packet is a tagged packet
+		 * but both pri and VID are 0.
+		 */
+		pri = VLAN_PRI(mhi.mhi_tci);
+		if (mhi.mhi_istagged && (pri == 0) && (vid == VLAN_ID_NONE))
+			goto discard;
+
+		/*
+		 * Update the priority bits to the per-stream priority if
+		 * priority is not set in the packet. Update the VID for
+		 * packets on a VLAN stream.
+		 */
+		pri = (pri == 0) ? dsp->ds_pri : 0;
+		if ((pri != 0) || (dsp->ds_vid != VLAN_ID_NONE)) {
+			if ((newmp = i_dld_ether_header_update_tag(mp,
+			    pri, dsp->ds_vid)) == NULL) {
+				goto discard;
+			}
+			mp = newmp;
+		}
 	}
 
-	str_mdata_fastpath_put(dsp, mp);
+	dld_tx_single(dsp, mp);
 	return;
 
 discard:
+	/* TODO: bump kstat? */
 	freemsg(mp);
 }
 
@@ -979,15 +1121,56 @@ dld_str_detach(dld_str_t *dsp)
 }
 
 /*
+ * This function is only called for VLAN streams. In raw mode, we strip VLAN
+ * tags before sending packets up to the DLS clients, with the exception of
+ * special priority tagged packets, in that case, we set the VID to 0.
+ * mp must be a VLAN tagged packet.
+ */
+static mblk_t *
+i_dld_ether_header_strip_tag(mblk_t *mp)
+{
+	mblk_t *newmp;
+	struct ether_vlan_header *evhp;
+	uint16_t tci, new_tci;
+
+	ASSERT(MBLKL(mp) >= sizeof (struct ether_vlan_header));
+	if (DB_REF(mp) > 1) {
+		newmp = copymsg(mp);
+		if (newmp == NULL)
+			return (NULL);
+		freemsg(mp);
+		mp = newmp;
+	}
+	evhp = (struct ether_vlan_header *)mp->b_rptr;
+
+	tci = ntohs(evhp->ether_tci);
+	if (VLAN_PRI(tci) == 0) {
+		/*
+		 * Priority is 0, strip the tag.
+		 */
+		ovbcopy(mp->b_rptr, mp->b_rptr + VLAN_TAGSZ, 2 * ETHERADDRL);
+		mp->b_rptr += VLAN_TAGSZ;
+	} else {
+		/*
+		 * Priority is not 0, update the VID to 0.
+		 */
+		new_tci = VLAN_TCI(VLAN_PRI(tci), VLAN_CFI(tci), VLAN_ID_NONE);
+		evhp->ether_tci = htons(new_tci);
+	}
+	return (mp);
+}
+
+/*
  * Raw mode receive function.
  */
 /*ARGSUSED*/
 void
 dld_str_rx_raw(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
-    size_t header_length)
+    mac_header_info_t *mhip)
 {
-	dld_str_t		*dsp = (dld_str_t *)arg;
-	mblk_t			*next, *newmp;
+	dld_str_t *dsp = (dld_str_t *)arg;
+	boolean_t is_ethernet = (dsp->ds_mip->mi_media == DL_ETHER);
+	mblk_t *next, *newmp;
 
 	ASSERT(mp != NULL);
 	do {
@@ -1001,8 +1184,8 @@ dld_str_rx_raw(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		/*
 		 * Wind back b_rptr to point at the MAC header.
 		 */
-		ASSERT(mp->b_rptr >= DB_BASE(mp) + header_length);
-		mp->b_rptr -= header_length;
+		ASSERT(mp->b_rptr >= DB_BASE(mp) + mhip->mhi_hdrsize);
+		mp->b_rptr -= mhip->mhi_hdrsize;
 
 		/*
 		 * Certain MAC type plugins provide an illusion for raw
@@ -1017,24 +1200,22 @@ dld_str_rx_raw(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		 */
 		if ((newmp = mac_header_uncook(dsp->ds_mh, mp)) == NULL) {
 			freemsg(mp);
-			mp = next;
-			continue;
+			goto next;
 		}
 		mp = newmp;
 
-		if (dsp->ds_mip->mi_media == DL_ETHER) {
-			struct ether_header *ehp =
-			    (struct ether_header *)mp->b_rptr;
-
-			if (ntohs(ehp->ether_type) == VLAN_TPID) {
-				/*
-				 * Strip off the vtag
-				 */
-				ovbcopy(mp->b_rptr, mp->b_rptr + VLAN_TAGSZ,
-				    2 * ETHERADDRL);
-				mp->b_rptr += VLAN_TAGSZ;
+		/*
+		 * Strip the VLAN tag for VLAN streams.
+		 */
+		if (is_ethernet && dsp->ds_vid != VLAN_ID_NONE) {
+			newmp = i_dld_ether_header_strip_tag(mp);
+			if (newmp == NULL) {
+				freemsg(mp);
+				goto next;
 			}
+			mp = newmp;
 		}
+
 		/*
 		 * Pass the packet on.
 		 */
@@ -1043,6 +1224,7 @@ dld_str_rx_raw(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		else
 			freemsg(mp);
 
+next:
 		/*
 		 * Move on to the next packet in the chain.
 		 */
@@ -1056,10 +1238,32 @@ dld_str_rx_raw(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 /*ARGSUSED*/
 void
 dld_str_rx_fastpath(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
-    size_t header_length)
+    mac_header_info_t *mhip)
 {
-	dld_str_t		*dsp = (dld_str_t *)arg;
-	mblk_t			*next;
+	dld_str_t *dsp = (dld_str_t *)arg;
+	mblk_t *next;
+	size_t offset = 0;
+
+	/*
+	 * MAC header stripping rules:
+	 *    - Tagged packets:
+	 *	a. VLAN streams. Strip the whole VLAN header including the tag.
+	 *	b. Physical streams
+	 *	- VLAN packets (non-zero VID). The stream must be either a
+	 *	  DL_PROMISC_SAP listener or a ETHERTYPE_VLAN listener.
+	 *	  Strip the Ethernet header but keep the VLAN header.
+	 *	- Special tagged packets (zero VID)
+	 *	  * The stream is either a DL_PROMISC_SAP listener or a
+	 *	    ETHERTYPE_VLAN listener, strip the Ethernet header but
+	 *	    keep the VLAN header.
+	 *	  * Otherwise, strip the whole VLAN header.
+	 *    - Untagged packets. Strip the whole MAC header.
+	 */
+	if (mhip->mhi_istagged && (dsp->ds_vid == VLAN_ID_NONE) &&
+	    ((dsp->ds_sap == ETHERTYPE_VLAN) ||
+	    (dsp->ds_promisc & DLS_PROMISC_SAP))) {
+		offset = VLAN_TAGSZ;
+	}
 
 	ASSERT(mp != NULL);
 	do {
@@ -1069,6 +1273,12 @@ dld_str_rx_fastpath(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		 */
 		next = mp->b_next;
 		mp->b_next = NULL;
+
+		/*
+		 * Wind back b_rptr to point at the VLAN header.
+		 */
+		ASSERT(mp->b_rptr >= DB_BASE(mp) + offset);
+		mp->b_rptr -= offset;
 
 		/*
 		 * Pass the packet on.
@@ -1090,11 +1300,23 @@ dld_str_rx_fastpath(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 /*ARGSUSED*/
 void
 dld_str_rx_unitdata(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
-    size_t header_length)
+    mac_header_info_t *mhip)
 {
 	dld_str_t		*dsp = (dld_str_t *)arg;
 	mblk_t			*ud_mp;
 	mblk_t			*next;
+	size_t			offset = 0;
+	boolean_t		strip_vlan = B_TRUE;
+
+	/*
+	 * See MAC header stripping rules in the dld_str_rx_fastpath() function.
+	 */
+	if (mhip->mhi_istagged && (dsp->ds_vid == VLAN_ID_NONE) &&
+	    ((dsp->ds_sap == ETHERTYPE_VLAN) ||
+	    (dsp->ds_promisc & DLS_PROMISC_SAP))) {
+		offset = VLAN_TAGSZ;
+		strip_vlan = B_FALSE;
+	}
 
 	ASSERT(mp != NULL);
 	do {
@@ -1108,21 +1330,21 @@ dld_str_rx_unitdata(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		/*
 		 * Wind back b_rptr to point at the MAC header.
 		 */
-		ASSERT(mp->b_rptr >= DB_BASE(mp) + header_length);
-		mp->b_rptr -= header_length;
+		ASSERT(mp->b_rptr >= DB_BASE(mp) + mhip->mhi_hdrsize);
+		mp->b_rptr -= mhip->mhi_hdrsize;
 
 		/*
 		 * Create the DL_UNITDATA_IND M_PROTO.
 		 */
-		if ((ud_mp = str_unitdata_ind(dsp, mp)) == NULL) {
+		if ((ud_mp = str_unitdata_ind(dsp, mp, strip_vlan)) == NULL) {
 			freemsgchain(mp);
 			return;
 		}
 
 		/*
-		 * Advance b_rptr to point at the payload again.
+		 * Advance b_rptr to point at the payload (or the VLAN header).
 		 */
-		mp->b_rptr += header_length;
+		mp->b_rptr += (mhip->mhi_hdrsize - offset);
 
 		/*
 		 * Prepend the DL_UNITDATA_IND.
@@ -1167,7 +1389,7 @@ typedef struct dl_unitdata_ind_wrapper {
  * Create a DL_UNITDATA_IND M_PROTO message.
  */
 static mblk_t *
-str_unitdata_ind(dld_str_t *dsp, mblk_t *mp)
+str_unitdata_ind(dld_str_t *dsp, mblk_t *mp, boolean_t strip_vlan)
 {
 	mblk_t				*nmp;
 	dl_unitdata_ind_wrapper_t	*dlwp;
@@ -1207,9 +1429,12 @@ str_unitdata_ind(dld_str_t *dsp, mblk_t *mp)
 	bcopy(mhi.mhi_daddr, daddr, addr_length);
 
 	/*
-	 * Set the destination DLSAP to our bound DLSAP value.
+	 * Set the destination DLSAP to the SAP value encoded in the packet.
 	 */
-	*(uint16_t *)(daddr + addr_length) = dsp->ds_sap;
+	if (mhi.mhi_istagged && !strip_vlan)
+		*(uint16_t *)(daddr + addr_length) = ETHERTYPE_VLAN;
+	else
+		*(uint16_t *)(daddr + addr_length) = mhi.mhi_bindsap;
 	dlp->dl_dest_addr_length = addr_length + sizeof (uint16_t);
 
 	/*
@@ -1703,6 +1928,15 @@ ioc_fast(dld_str_t *dsp, mblk_t *mp)
 		goto failed;
 	}
 
+	/*
+	 * DLIOCHDRINFO should only come from IP. The one initiated from
+	 * user-land should not be allowed.
+	 */
+	if (((struct iocblk *)mp->b_rptr)->ioc_cr != kcred) {
+		err = EINVAL;
+		goto failed;
+	}
+
 	nmp = mp->b_cont;
 	if (nmp == NULL || MBLKL(nmp) < sizeof (dl_unitdata_req_t) ||
 	    (dlp = (dl_unitdata_req_t *)nmp->b_rptr,
@@ -1737,7 +1971,7 @@ ioc_fast(dld_str_t *dsp, mblk_t *mp)
 	sap = *(uint16_t *)(nmp->b_rptr + off + addr_length);
 	dc = dsp->ds_dc;
 
-	if ((hmp = dls_header(dc, addr, sap, dsp->ds_pri, NULL)) == NULL) {
+	if ((hmp = dls_header(dc, addr, sap, 0, NULL)) == NULL) {
 		rw_exit(&dsp->ds_lock);
 		err = ENOMEM;
 		goto failed;

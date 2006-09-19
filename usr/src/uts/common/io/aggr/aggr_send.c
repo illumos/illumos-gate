@@ -84,7 +84,7 @@ aggr_send_port(aggr_grp_t *grp, mblk_t *mp)
 
 	/* skip ethernet header */
 
-	if (ntohs(ehp->ether_type) == VLAN_TPID) {
+	if (ntohs(ehp->ether_type) == ETHERTYPE_VLAN) {
 		struct ether_vlan_header *evhp;
 
 		ASSERT(MBLKL(mp) >= sizeof (struct ether_vlan_header));

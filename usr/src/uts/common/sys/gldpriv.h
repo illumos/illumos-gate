@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -207,6 +206,7 @@ typedef struct pktinfo {
 	uint_t		vid:12;
 	uint_t		wasAccepted:1;
 	uint_t		nosource:1;
+	uint_t		isTagged:1;
 	uint_t		macLen;
 	uint_t		hdrLen;
 	uint_t		pktLen;
@@ -246,9 +246,10 @@ typedef struct {
 	uint_t	mac_type;
 	uint_t	mtu_size;
 	int	hdr_size;
-	int	(*interpreter)(gld_mac_info_t *, mblk_t *, pktinfo_t *, int);
+	int	(*interpreter)(gld_mac_info_t *, mblk_t *, pktinfo_t *,
+		    packet_flag_t);
 	void	(*interpreter_mdt)(gld_mac_info_t *, mblk_t *,
-		    struct pdescinfo_s *, pktinfo_t *, int);
+		    struct pdescinfo_s *, pktinfo_t *, mdt_packet_flag_t);
 	mblk_t	*(*mkfastpath)(gld_t *, mblk_t *);
 	mblk_t	*(*mkunitdata)(gld_t *, mblk_t *);
 	void	(*init)(gld_mac_info_t *);
@@ -338,15 +339,15 @@ typedef struct gld_vlan {
 	gld_mac_info_t		*gldv_mac;
 	queue_t			*gldv_ipq;
 	queue_t			*gldv_ipv6q;
-	uint8_t			gldv_ipq_flags;
 	struct gld		*gldv_str_next;	/* list of attached streams */
 	struct gld		*gldv_str_prev;
 	kstat_t			*gldv_kstatp;
 	struct gld_stats	*gldv_stats;
+	/* The number of streams that are in promiscous mode */
+	uint_t			gldv_nprom;
+	/* The number of streams that are interested in VLAN tagged packets. */
+	uint_t			gldv_nvlan_sap;
 } gld_vlan_t;
-
-#define	IPQ_DISABLED	0x01
-#define	IPQ_FORBIDDEN	0x02
 
 #define	VLAN_HASHSZ	23
 
@@ -587,16 +588,6 @@ struct llc_snap_hdr {
 #define	LSAP_SNAP		0xaa	/* SAP for SubNet Access Protocol */
 #define	CNTL_LLC_UI		0x03	/* un-numbered information packet */
 
-/* ============================ */
-/* Ethernet related definitions */
-/* ============================ */
-
-struct ether_mac_frm {
-	mac_addr_t	ether_dhost;
-	mac_addr_t	ether_shost;
-	ushort_t	ether_type;
-};
-
 /* ======================== */
 /* FDDI related definitions */
 /* ======================== */
@@ -625,6 +616,42 @@ struct tr_mac_frm {
 	mac_addr_t	tr_shost;
 	struct gld_ri	tr_ri;		/* Routing Information Field */
 };
+
+/*
+ * Note that the pad field is used to save the value of tci.
+ */
+#define	GLD_SAVE_MBLK_VTAG(mp, vtag)	(DB_TCI(mp) = GLD_VTAG_TCI(vtag))
+#define	GLD_CLEAR_MBLK_VTAG(mp)		GLD_SAVE_MBLK_VTAG(mp, 0)
+#define	GLD_GET_MBLK_VTAG(mp)		GLD_TCI2VTAG(DB_TCI(mp))
+
+int gld_interpret_ether(gld_mac_info_t *, mblk_t *, pktinfo_t *, packet_flag_t);
+int gld_interpret_fddi(gld_mac_info_t *, mblk_t *, pktinfo_t *, packet_flag_t);
+int gld_interpret_tr(gld_mac_info_t *, mblk_t *, pktinfo_t *, packet_flag_t);
+int gld_interpret_ib(gld_mac_info_t *, mblk_t *, pktinfo_t *, packet_flag_t);
+void gld_interpret_mdt_ib(gld_mac_info_t *, mblk_t *, pdescinfo_t *,
+    pktinfo_t *, mdt_packet_flag_t);
+
+mblk_t *gld_fastpath_ether(gld_t *, mblk_t *);
+mblk_t *gld_fastpath_fddi(gld_t *, mblk_t *);
+mblk_t *gld_fastpath_tr(gld_t *, mblk_t *);
+mblk_t *gld_fastpath_ib(gld_t *, mblk_t *);
+
+mblk_t *gld_insert_vtag_ether(mblk_t *, uint32_t);
+
+mblk_t *gld_unitdata_ether(gld_t *, mblk_t *);
+mblk_t *gld_unitdata_fddi(gld_t *, mblk_t *);
+mblk_t *gld_unitdata_tr(gld_t *, mblk_t *);
+mblk_t *gld_unitdata_ib(gld_t *, mblk_t *);
+
+void gld_init_ether(gld_mac_info_t *);
+void gld_init_fddi(gld_mac_info_t *);
+void gld_init_tr(gld_mac_info_t *);
+void gld_init_ib(gld_mac_info_t *);
+
+void gld_uninit_ether(gld_mac_info_t *);
+void gld_uninit_fddi(gld_mac_info_t *);
+void gld_uninit_tr(gld_mac_info_t *);
+void gld_uninit_ib(gld_mac_info_t *);
 
 #ifdef	__cplusplus
 }

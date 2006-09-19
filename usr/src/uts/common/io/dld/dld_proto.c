@@ -301,46 +301,35 @@ proto_info_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		dlp->dl_brdcst_addr_length = addr_length;
 	}
 
+	dlp->dl_qos_range_offset = (uintptr_t)rangep - (uintptr_t)dlp;
+	dlp->dl_qos_range_length = sizeof (dl_qos_cl_range1_t);
+
+	rangep->dl_qos_type = DL_QOS_CL_RANGE1;
+	rangep->dl_trans_delay.dl_target_value = DL_UNKNOWN;
+	rangep->dl_trans_delay.dl_accept_value = DL_UNKNOWN;
+	rangep->dl_protection.dl_min = DL_UNKNOWN;
+	rangep->dl_protection.dl_max = DL_UNKNOWN;
+	rangep->dl_residual_error = DL_UNKNOWN;
+
 	/*
-	 * We only support QoS information for VLAN interfaces.
+	 * Specify the supported range of priorities.
 	 */
-	if (dsp->ds_vid != VLAN_ID_NONE) {
-		dlp->dl_qos_range_offset = (uintptr_t)rangep - (uintptr_t)dlp;
-		dlp->dl_qos_range_length = sizeof (dl_qos_cl_range1_t);
+	rangep->dl_priority.dl_min = 0;
+	rangep->dl_priority.dl_max = (1 << VLAN_PRI_SIZE) - 1;
 
-		rangep->dl_qos_type = DL_QOS_CL_RANGE1;
-		rangep->dl_trans_delay.dl_target_value = DL_UNKNOWN;
-		rangep->dl_trans_delay.dl_accept_value = DL_UNKNOWN;
-		rangep->dl_protection.dl_min = DL_UNKNOWN;
-		rangep->dl_protection.dl_max = DL_UNKNOWN;
-		rangep->dl_residual_error = DL_UNKNOWN;
+	dlp->dl_qos_offset = (uintptr_t)selp - (uintptr_t)dlp;
+	dlp->dl_qos_length = sizeof (dl_qos_cl_sel1_t);
 
-		/*
-		 * Specify the supported range of priorities.
-		 */
-		rangep->dl_priority.dl_min = 0;
-		rangep->dl_priority.dl_max = (1 << VLAN_PRI_SIZE) - 1;
+	selp->dl_qos_type = DL_QOS_CL_SEL1;
+	selp->dl_trans_delay = DL_UNKNOWN;
+	selp->dl_protection = DL_UNKNOWN;
+	selp->dl_residual_error = DL_UNKNOWN;
 
-		dlp->dl_qos_offset = (uintptr_t)selp - (uintptr_t)dlp;
-		dlp->dl_qos_length = sizeof (dl_qos_cl_sel1_t);
-
-		selp->dl_qos_type = DL_QOS_CL_SEL1;
-		selp->dl_trans_delay = DL_UNKNOWN;
-		selp->dl_protection = DL_UNKNOWN;
-		selp->dl_residual_error = DL_UNKNOWN;
-
-		/*
-		 * Specify the current priority (which can be changed by
-		 * the DL_UDQOS_REQ primitive).
-		 */
-		selp->dl_priority = dsp->ds_pri;
-	} else {
-		/*
-		 * Shorten the buffer to lose the unused QoS information
-		 * structures.
-		 */
-		mp->b_wptr = (uint8_t *)rangep;
-	}
+	/*
+	 * Specify the current priority (which can be changed by
+	 * the DL_UDQOS_REQ primitive).
+	 */
+	selp->dl_priority = dsp->ds_pri;
 
 	dlp->dl_addr_length = addr_length + sizeof (uint16_t);
 	if (dsp->ds_dlstate == DL_IDLE) {
@@ -1100,8 +1089,7 @@ proto_udqos_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
-	if (dsp->ds_vid == VLAN_ID_NONE ||
-	    selp->dl_priority > (1 << VLAN_PRI_SIZE) - 1 ||
+	if (selp->dl_priority > (1 << VLAN_PRI_SIZE) - 1 ||
 	    selp->dl_priority < 0) {
 		dl_err = DL_BADQOSPARAM;
 		goto failed;
@@ -1476,8 +1464,8 @@ proto_unitdata_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	/*
 	 * Build a packet header.
 	 */
-	bp = dls_header(dsp->ds_dc, addr, sap, dsp->ds_pri, payload);
-	if (bp == NULL) {
+	if ((bp = dls_header(dsp->ds_dc, addr, sap, dlp->dl_priority.dl_max,
+	    &payload)) == NULL) {
 		dl_err = DL_BADADDR;
 		goto failed;
 	}
@@ -1500,7 +1488,7 @@ proto_unitdata_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	ASSERT(bp->b_cont == NULL);
 	bp->b_cont = payload;
 
-	str_mdata_fastpath_put(dsp, bp);
+	dld_tx_single(dsp, bp);
 	rw_exit(&dsp->ds_lock);
 	return (B_TRUE);
 failed:

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -344,21 +343,27 @@ extern int gld_rsrv(queue_t *);
 
 /*
  * Macros to construct a TCI or VTAG.  The user must ensure values are in
- * range.  In particular, VID 0 is not a valid argument to these constructor
- * macros; when the VID is 0 (VLAN_VID_NONE), the whole VTAG should be 0
- * (VLAN_VTAG_NONE), not 0x81000000.
+ * range.  Note that in the special case of priority tag, VLAN_VID_NONE
+ * is also a valid argument to these constructor macros.
  */
 #define	GLD_MAKE_TCI(pri, cfi, vid)    (((pri) << VLAN_PRI_SHIFT) |	\
 					((cfi) << VLAN_CFI_SHIFT) |	\
 					((vid) << VLAN_VID_SHIFT))
 
-#define	GLD_MAKE_VTAG(tci)	((VLAN_TPID << VLAN_TPID_SHIFT) | (tci))
+#define	GLD_MAKE_VTAG(pri, cfi, vid)				\
+	(((uint32_t)ETHERTYPE_VLAN << VLAN_TPID_SHIFT) |	\
+	((pri) << VLAN_PRI_SHIFT) |				\
+	((cfi) << VLAN_CFI_SHIFT) |				\
+	((vid) << VLAN_VID_SHIFT))
+
+#define	GLD_TCI2VTAG(tci)	\
+	(((uint32_t)ETHERTYPE_VLAN << VLAN_TPID_SHIFT) | (tci))
 
 /*
  * Macros to construct a prototype TCI/VTAG and then convert it to a real one
  */
 #define	GLD_MK_PTCI(cfi, vid)	GLD_MAKE_TCI(VLAN_PRI_MAX, cfi, vid)
-#define	GLD_MK_PTAG(cfi, vid)	GLD_MAKE_VTAG(GLD_MK_PTCI(cfi, vid))
+#define	GLD_MK_PTAG(cfi, vid)	GLD_MAKE_VTAG(VLAN_PRI_MAX, cfi, vid)
 #define	GLD_MK_PMSK(pri)	(((pri) << VLAN_PRI_SHIFT) | ~VLAN_PRI_MASK)
 #define	GLD_MK_VTAG(ptag, pri)	((ptag) & GLD_MK_PMSK(pri))
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS	*/
 
 #include <stdio.h>
+#include <stddef.h>
 #include <ctype.h>
 #include <string.h>
 #include <fcntl.h>
@@ -38,6 +38,7 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/dlpi.h>
+#include <sys/vlan.h>
 #include <net/if.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
@@ -51,6 +52,7 @@
 
 #include <sys/pfmod.h>
 #include "snoop.h"
+#include "snoop_vlan.h"
 
 /*
  * This module generates code for the kernel packet filter.
@@ -97,8 +99,8 @@ static int link_addr_len = 6;
 #define	IPV4_DSTADDR_OFFSET	(link_header_len + 16)
 #define	IPV6_SRCADDR_OFFSET	(link_header_len + 8)
 #define	IPV6_DSTADDR_OFFSET	(link_header_len + 24)
-#define	IPV4_TYPE_OFFSET	(link_header_len + 9)
-#define	IPV6_TYPE_OFFSET	(link_header_len + 6)
+#define	IPV4_TYPE_HEADER_OFFSET	(9)
+#define	IPV6_TYPE_HEADER_OFFSET	(6)
 
 static int inBrace = 0, inBraceOR = 0;
 static int foundOR = 0;
@@ -114,6 +116,26 @@ enum direction dir;
 extern void next();
 
 static void pf_expression();
+static void pf_check_vlan_tag(uint_t offset);
+static void pf_clear_offset_register();
+static void pf_emit_load_offset(uint_t offset);
+static void pf_match_ethertype(uint_t ethertype);
+static void pf_check_transport_protocol(uint_t transport_protocol);
+static void pf_compare_value_mask_generic(int offset, uint_t len,
+    uint_t val, int mask, uint_t op);
+
+/*
+ * This pointer points to the function that last generated
+ * instructions to change the offset register.  It's used
+ * for comparisons to see if we need to issue more instructions
+ * to change the register.
+ *
+ * It's initialized to pf_clear_offset_register because the offset
+ * register in pfmod is initialized to zero, similar to the state
+ * it would be in after executing the instructions issued by
+ * pf_clear_offset_register.
+ */
+static void *last_offset_operation = (void*)pf_clear_offset_register;
 
 static void
 pf_emit(x)
@@ -170,6 +192,18 @@ pf_codeprint(code, len)
 			printf("PUSH00FF ");
 			break;
 #endif
+		case ENF_LOAD_OFFSET:
+			printf("LOAD_OFFSET ");
+			break;
+		case ENF_BRTR:
+			printf("BRTR ");
+			break;
+		case ENF_BRFL:
+			printf("BRFL ");
+			break;
+		case ENF_POP:
+			printf("POP ");
+			break;
 		}
 
 		if (action >= ENF_PUSHWORD)
@@ -217,7 +251,10 @@ pf_codeprint(code, len)
 			break;
 		}
 
-		if (action == ENF_PUSHLIT) {
+		if (action == ENF_PUSHLIT ||
+		    action == ENF_LOAD_OFFSET ||
+		    action == ENF_BRTR ||
+		    action == ENF_BRFL) {
 			pc++;
 			printf("\n\t%3d:   %d (0x%04x)", pc - code, *pc, *pc);
 		}
@@ -323,10 +360,35 @@ pf_compare_value_v6(int offset, uint_t len, struct in6_addr val)
 
 /*
  * Same as above except mask the field value
- * before doing the comparison.
+ * before doing the comparison.  The comparison checks
+ * to make sure the values are equal.
  */
 static void
 pf_compare_value_mask(int offset, uint_t len, uint_t val, int mask)
+{
+	pf_compare_value_mask_generic(offset, len, val, mask, ENF_EQ);
+}
+
+/*
+ * Same as above except the values are compared to see if they are not
+ * equal.
+ */
+static void
+pf_compare_value_mask_neq(int offset, uint_t len, uint_t val, int mask)
+{
+	pf_compare_value_mask_generic(offset, len, val, mask, ENF_NEQ);
+}
+
+/*
+ * Similar to pf_compare_value.
+ *
+ * This is the utility function that does the actual work to compare
+ * two values using a mask.  The comparison operation is passed into
+ * the function.
+ */
+static void
+pf_compare_value_mask_generic(int offset, uint_t len, uint_t val, int mask,
+    uint_t op)
 {
 	/*
 	 * If the property being filtered on is absent in the media
@@ -346,12 +408,12 @@ pf_compare_value_mask(int offset, uint_t len, uint_t val, int mask)
 		{
 			pf_emit(ENF_PUSHLIT | ENF_AND);
 			pf_emit(mask & 0x00ff);
-			pf_emit(ENF_PUSHLIT | ENF_EQ);
+			pf_emit(ENF_PUSHLIT | op);
 			pf_emit(val);
 		} else {
 			pf_emit(ENF_PUSHLIT | ENF_AND);
 			pf_emit((mask << 8) & 0xff00);
-			pf_emit(ENF_PUSHLIT | ENF_EQ);
+			pf_emit(ENF_PUSHLIT | op);
 			pf_emit(val << 8);
 		}
 		break;
@@ -360,7 +422,7 @@ pf_compare_value_mask(int offset, uint_t len, uint_t val, int mask)
 		pf_emit(ENF_PUSHWORD + offset / 2);
 		pf_emit(ENF_PUSHLIT | ENF_AND);
 		pf_emit(htons((ushort_t)mask));
-		pf_emit(ENF_PUSHLIT | ENF_EQ);
+		pf_emit(ENF_PUSHLIT | op);
 		pf_emit(htons((ushort_t)val));
 		break;
 
@@ -368,13 +430,13 @@ pf_compare_value_mask(int offset, uint_t len, uint_t val, int mask)
 		pf_emit(ENF_PUSHWORD + offset / 2);
 		pf_emit(ENF_PUSHLIT | ENF_AND);
 		pf_emit(htons((ushort_t)((mask >> 16) & 0xffff)));
-		pf_emit(ENF_PUSHLIT | ENF_EQ);
+		pf_emit(ENF_PUSHLIT | op);
 		pf_emit(htons((ushort_t)((val >> 16) & 0xffff)));
 
 		pf_emit(ENF_PUSHWORD + (offset / 2) + 1);
 		pf_emit(ENF_PUSHLIT | ENF_AND);
 		pf_emit(htons((ushort_t)(mask & 0xffff)));
-		pf_emit(ENF_PUSHLIT | ENF_EQ);
+		pf_emit(ENF_PUSHLIT | op);
 		pf_emit(htons((ushort_t)(val & 0xffff)));
 
 		pf_emit(ENF_AND);
@@ -491,7 +553,8 @@ pf_ipaddr_match(which, hostname, inet_type)
 	}
 
 	if (hp != NULL && hp->h_addrtype == AF_INET) {
-		pf_compare_value(link_type_offset, 2, htons(ETHERTYPE_IP));
+		pf_match_ethertype(ETHERTYPE_IP);
+		pf_check_vlan_tag(ENCAP_ETHERTYPE_OFF/2);
 		h_addr_index = 0;
 		addr4ptr = (uint_t *)hp->h_addr_list[h_addr_index];
 		while (addr4ptr != NULL) {
@@ -520,8 +583,9 @@ pf_ipaddr_match(which, hostname, inet_type)
 		while (addr6ptr != NULL) {
 			if (IN6_IS_ADDR_V4MAPPED(addr6ptr)) {
 				if (first) {
-					pf_compare_value(link_type_offset, 2,
-						htons(ETHERTYPE_IP));
+					pf_match_ethertype(ETHERTYPE_IP);
+					pf_check_vlan_tag(
+					    ENCAP_ETHERTYPE_OFF/2);
 					pass++;
 				}
 				IN6_V4MAPPED_TO_INADDR(addr6ptr,
@@ -556,8 +620,9 @@ pf_ipaddr_match(which, hostname, inet_type)
 		while (addr6ptr != NULL) {
 			if (!IN6_IS_ADDR_V4MAPPED(addr6ptr)) {
 				if (first) {
-					pf_compare_value(link_type_offset, 2,
-						htons(ETHERTYPE_IPV6));
+					pf_match_ethertype(ETHERTYPE_IPV6);
+					pf_check_vlan_tag(
+					    ENCAP_ETHERTYPE_OFF/2);
 					pass++;
 				}
 				if (addr6offset == -1) {
@@ -651,6 +716,8 @@ pf_etheraddr_match(which, hostname)
 		ep = &e;
 	}
 
+	pf_clear_offset_register();
+
 	switch (which) {
 	case TO:
 		pf_compare_address(link_dest_offset, link_addr_len,
@@ -705,6 +772,8 @@ pf_netaddr_match(which, netname)
 		}
 	}
 
+	pf_check_vlan_tag(ENCAP_ETHERTYPE_OFF/2);
+
 	switch (which) {
 	case TO:
 		pf_compare_value_mask(IPV4_DSTADDR_OFFSET, 4, addr, mask);
@@ -720,6 +789,223 @@ pf_netaddr_match(which, netname)
 	}
 }
 
+/*
+ * A helper function to keep the code to emit instructions
+ * to change the offset register in one place.
+ *
+ * INPUTS: offset - An value representing an offset in 16-bit
+ *                  words.
+ * OUTPUTS:  If there is enough room in the storage for the
+ *           packet filtering program, instructions to load
+ *           a constant to the offset register.  Otherwise,
+ *           nothing.
+ */
+static void
+pf_emit_load_offset(uint_t offset)
+{
+	pf_emit(ENF_LOAD_OFFSET | ENF_NOP);
+	pf_emit(offset);
+}
+
+/*
+ * Clear pfmod's offset register.
+ *
+ * INPUTS:  none
+ * OUTPUTS:  Instructions to clear the offset register if
+ *           there is enough space remaining in the packet
+ *           filtering program structure's storage, and
+ *           the last thing done to the offset register was
+ *           not clearing the offset register.  Otherwise,
+ *           nothing.
+ */
+static void
+pf_clear_offset_register()
+{
+	if (last_offset_operation != (void*)pf_clear_offset_register) {
+		pf_emit_load_offset(0);
+		last_offset_operation = (void*)pf_clear_offset_register;
+	}
+}
+
+/*
+ * This function will issue opcodes to check if a packet
+ * is VLAN tagged, and if so, update the offset register
+ * with the appropriate offset.
+ *
+ * Note that if the packet is not VLAN tagged, then the offset
+ * register will be cleared.
+ *
+ * If the interface type is not an ethernet type, then this
+ * function returns without doing anything.
+ *
+ * If the last attempt to change the offset register occured because
+ * of a call to this function that was called with the same offset,
+ * then we don't issue packet filtering instructions.
+ *
+ * INPUTS:  offset - an offset in 16 bit words.  The function
+ *                   will set the offset register to this
+ *                   value if the packet is VLAN tagged.
+ * OUTPUTS:  If the conditions are met, packet filtering instructions.
+ */
+static void
+pf_check_vlan_tag(uint_t offset)
+{
+	static uint_t last_offset = 0;
+
+	if ((interface->mac_type == DL_ETHER ||
+	    interface->mac_type == DL_CSMACD) &&
+	    (last_offset_operation != (void*)pf_check_vlan_tag ||
+	    last_offset != offset)) {
+		/*
+		 * First thing is to clear the offset register.
+		 * We don't know what state it is in, and if it
+		 * is not zero, then we have no idea what we load
+		 * when we execute ENF_PUSHWORD.
+		 */
+		pf_clear_offset_register();
+
+		/*
+		 * Check the ethertype.
+		 */
+		pf_compare_value(link_type_offset, 2, htons(ETHERTYPE_VLAN));
+
+		/*
+		 * And if it's not VLAN, don't load offset to the offset
+		 * register.
+		 */
+		pf_emit(ENF_BRFL | ENF_NOP);
+		pf_emit(3);
+
+		/*
+		 * Otherwise, load offset to the offset register.
+		 */
+		pf_emit_load_offset(offset);
+
+		/*
+		 * Now get rid of the results of the comparison,
+		 * we don't want the results of the comparison to affect
+		 * other logic in the packet filtering program.
+		 */
+		pf_emit(ENF_POP | ENF_NOP);
+
+		/*
+		 * Set the last operation at the end, or any time
+		 * after the call to pf_clear_offset because
+		 * pf_clear_offset uses it.
+		 */
+		last_offset_operation = (void*)pf_check_vlan_tag;
+		last_offset = offset;
+	}
+}
+
+/*
+ * Utility function used to emit packet filtering code
+ * to match an ethertype.
+ *
+ * INPUTS:  ethertype - The ethertype we want to check for.
+ *                      Don't call htons on the ethertype before
+ *                      calling this function.
+ * OUTPUTS:  If there is sufficient storage available, packet
+ *           filtering code to check an ethertype.  Otherwise,
+ *           nothing.
+ */
+static void
+pf_match_ethertype(uint_t ethertype)
+{
+	/*
+	 * If the user wants to filter on ethertype VLAN,
+	 * then clear the offset register so that the offset
+	 * for ENF_PUSHWORD points to the right place in the
+	 * packet.
+	 *
+	 * Otherwise, call pf_check_vlan_tag to set the offset
+	 * register such that the contents of the offset register
+	 * plus the argument for ENF_PUSHWORD point to the right
+	 * part of the packet, whether or not the packet is VLAN
+	 * tagged.  We call pf_check_vlan_tag with an offset of
+	 * two words because if the packet is VLAN tagged, we have
+	 * to move past the ethertype in the ethernet header, and
+	 * past the lower two octets of the VLAN header to get to
+	 * the ethertype in the VLAN header.
+	 */
+	if (ethertype == ETHERTYPE_VLAN)
+		pf_clear_offset_register();
+	else
+		pf_check_vlan_tag(2);
+
+	pf_compare_value(link_type_offset, 2, htons(ethertype));
+}
+
+typedef struct {
+	int	transport_protocol;
+	int	network_protocol;
+	/*
+	 * offset is the offset in bytes from the beginning
+	 * of the network protocol header to where the transport
+	 * protocol type is.
+	 */
+	int	offset;
+} transport_protocol_table_t;
+
+static transport_protocol_table_t mapping_table[] = {
+	{IPPROTO_TCP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_TCP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_UDP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_UDP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_OSPF, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_OSPF, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_SCTP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_SCTP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_ICMP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_ICMPV6, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_ENCAP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_ESP, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_ESP, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{IPPROTO_AH, ETHERTYPE_IP,   IPV4_TYPE_HEADER_OFFSET},
+	{IPPROTO_AH, ETHERTYPE_IPV6, IPV6_TYPE_HEADER_OFFSET},
+	{-1, 0, 0}	/* must be the final entry */
+};
+
+/*
+ * This function uses the table above to generate a
+ * piece of a packet filtering program to check a transport
+ * protocol type.
+ *
+ * INPUTS:  tranport_protocol - the transport protocol we're
+ *                              interested in.
+ * OUTPUTS:  If there is sufficient storage, then packet filtering
+ *           code to check a transport protocol type.  Otherwise,
+ *           nothing.
+ */
+static void
+pf_check_transport_protocol(uint_t transport_protocol)
+{
+	int i = 0;
+	uint_t number_of_matches = 0;
+
+	for (i = 0; mapping_table[i].transport_protocol != -1; i++) {
+		if (transport_protocol ==
+		    (uint_t)mapping_table[i].transport_protocol) {
+			number_of_matches++;
+			pf_match_ethertype(mapping_table[i].network_protocol);
+			pf_check_vlan_tag(ENCAP_ETHERTYPE_OFF/2);
+			pf_compare_value(
+				mapping_table[i].offset + link_header_len, 1,
+				transport_protocol);
+			pf_emit(ENF_AND);
+			if (number_of_matches > 1) {
+				/*
+				 * Since we have two or more matches, in
+				 * order to have a correct and complete
+				 * program we need to OR the result of
+				 * each block of comparisons together.
+				 */
+				pf_emit(ENF_OR);
+			}
+		}
+	}
+}
+
 static void
 pf_primary()
 {
@@ -728,26 +1014,22 @@ pf_primary()
 			break;
 
 		if (EQ("ip")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IP));
+			pf_match_ethertype(ETHERTYPE_IP);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("ip6")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IPV6));
+			pf_match_ethertype(ETHERTYPE_IPV6);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("pppoe")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_PPPOED));
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_PPPOES));
+			pf_match_ethertype(ETHERTYPE_PPPOED);
+			pf_match_ethertype(ETHERTYPE_PPPOES);
 			pf_emit(ENF_OR);
 			opstack++;
 			next();
@@ -755,77 +1037,72 @@ pf_primary()
 		}
 
 		if (EQ("pppoed")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_PPPOED));
+			pf_match_ethertype(ETHERTYPE_PPPOED);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("pppoes")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_PPPOES));
+			pf_match_ethertype(ETHERTYPE_PPPOES);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("arp")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_ARP));
+			pf_match_ethertype(ETHERTYPE_ARP);
+			opstack++;
+			next();
+			break;
+		}
+
+		if (EQ("vlan")) {
+			pf_match_ethertype(ETHERTYPE_VLAN);
+			pf_compare_value_mask_neq(VLAN_ID_OFFSET, 2,
+			    0, VLAN_ID_MASK);
+			pf_emit(ENF_AND);
+			opstack++;
+			next();
+			break;
+		}
+
+		if (EQ("vlan-id")) {
+			next();
+			if (tokentype != NUMBER)
+				pr_err("VLAN ID expected");
+			pf_match_ethertype(ETHERTYPE_VLAN);
+			pf_compare_value_mask(VLAN_ID_OFFSET, 2, tokenval,
+			    VLAN_ID_MASK);
+			pf_emit(ENF_AND);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("rarp")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_REVARP));
+			pf_match_ethertype(ETHERTYPE_REVARP);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("tcp")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IP));
-			pf_compare_value(IPV4_TYPE_OFFSET, 1, IPPROTO_TCP);
-			pf_emit(ENF_AND);
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IPV6));
-			pf_compare_value(IPV6_TYPE_OFFSET, 1, IPPROTO_TCP);
-			pf_emit(ENF_AND);
-			pf_emit(ENF_OR);
+			pf_check_transport_protocol(IPPROTO_TCP);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("udp")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IP));
-			pf_compare_value(IPV4_TYPE_OFFSET, 1, IPPROTO_UDP);
-			pf_emit(ENF_AND);
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IPV6));
-			pf_compare_value(IPV6_TYPE_OFFSET, 1, IPPROTO_UDP);
-			pf_emit(ENF_AND);
-			pf_emit(ENF_OR);
+			pf_check_transport_protocol(IPPROTO_UDP);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("ospf")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IP));
-			pf_compare_value(IPV4_TYPE_OFFSET, 1, IPPROTO_OSPF);
-			pf_emit(ENF_AND);
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IPV6));
-			pf_compare_value(IPV6_TYPE_OFFSET, 1, IPPROTO_OSPF);
-			pf_emit(ENF_AND);
-			pf_emit(ENF_OR);
+			pf_check_transport_protocol(IPPROTO_OSPF);
 			opstack++;
 			next();
 			break;
@@ -833,75 +1110,42 @@ pf_primary()
 
 
 		if (EQ("sctp")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IP));
-			pf_compare_value(IPV4_TYPE_OFFSET, 1, IPPROTO_SCTP);
-			pf_emit(ENF_AND);
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IPV6));
-			pf_compare_value(IPV6_TYPE_OFFSET, 1, IPPROTO_SCTP);
-			pf_emit(ENF_AND);
-			pf_emit(ENF_OR);
+			pf_check_transport_protocol(IPPROTO_SCTP);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("icmp")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IP));
-			pf_compare_value(IPV4_TYPE_OFFSET, 1, IPPROTO_ICMP);
-			pf_emit(ENF_AND);
+			pf_check_transport_protocol(IPPROTO_ICMP);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("icmp6")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IPV6));
-			pf_compare_value(IPV6_TYPE_OFFSET, 1, IPPROTO_ICMPV6);
-			pf_emit(ENF_AND);
+			pf_check_transport_protocol(IPPROTO_ICMPV6);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("ip-in-ip")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IP));
-			pf_compare_value(IPV4_TYPE_OFFSET, 1, IPPROTO_ENCAP);
-			pf_emit(ENF_AND);
+			pf_check_transport_protocol(IPPROTO_ENCAP);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("esp")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IP));
-			pf_compare_value(IPV4_TYPE_OFFSET, 1, IPPROTO_ESP);
-			pf_emit(ENF_AND);
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IPV6));
-			pf_compare_value(IPV6_TYPE_OFFSET, 1, IPPROTO_ESP);
-			pf_emit(ENF_AND);
-			pf_emit(ENF_OR);
+			pf_check_transport_protocol(IPPROTO_ESP);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("ah")) {
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IP));
-			pf_compare_value(IPV4_TYPE_OFFSET, 1, IPPROTO_AH);
-			pf_emit(ENF_AND);
-			pf_compare_value(link_type_offset, 2,
-			    htons(ETHERTYPE_IPV6));
-			pf_compare_value(IPV6_TYPE_OFFSET, 1, IPPROTO_AH);
-			pf_emit(ENF_AND);
-			pf_emit(ENF_OR);
+			pf_check_transport_protocol(IPPROTO_AH);
 			opstack++;
 			next();
 			break;
@@ -966,13 +1210,15 @@ pf_primary()
 			next();
 			if (tokentype != NUMBER)
 				pr_err("IP proto type expected");
-			pf_compare_value(IPV4_TYPE_OFFSET, 1, tokenval);
+			pf_check_vlan_tag(ENCAP_ETHERTYPE_OFF/2);
+			pf_compare_value(IPV4_TYPE_HEADER_OFFSET, 1, tokenval);
 			opstack++;
 			next();
 			break;
 		}
 
 		if (EQ("broadcast")) {
+			pf_clear_offset_register();
 			pf_compare_value(link_dest_offset, 4, 0xffffffff);
 			opstack++;
 			next();
@@ -980,6 +1226,7 @@ pf_primary()
 		}
 
 		if (EQ("multicast")) {
+			pf_clear_offset_register();
 			pf_compare_value_mask(link_dest_offset, 1, 0x01, 0x01);
 			opstack++;
 			next();
@@ -990,7 +1237,7 @@ pf_primary()
 			next();
 			if (tokentype != NUMBER)
 				pr_err("ether type expected");
-			pf_compare_value(link_type_offset, 2, htons(tokenval));
+			pf_match_ethertype(tokenval);
 			opstack++;
 			next();
 			break;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,7 +97,7 @@ gld_init_ether(gld_mac_info_t *macinfo)
 	ASSERT(macinfo->gldm_addrlen == 6);
 	ASSERT(macinfo->gldm_saplen == -2);
 #ifndef	lint
-	ASSERT(sizeof (struct ether_mac_frm) == 14);
+	ASSERT(sizeof (struct ether_header) == 14);
 	ASSERT(sizeof (mac_addr_t) == 6);
 #endif
 
@@ -145,11 +144,12 @@ int
 gld_interpret_ether(gld_mac_info_t *macinfo, mblk_t *mp, pktinfo_t *pktinfo,
     packet_flag_t flags)
 {
-	struct ether_mac_frm *mh;
+	struct ether_header *mh;
 	gld_mac_pvt_t *mac_pvt = (gld_mac_pvt_t *)macinfo->gldm_mac_pvt;
 	struct llc_snap_hdr *snaphdr;
-	mblk_t *pmp = NULL;
+	mblk_t *pmp = NULL, *savemp = mp;
 	unsigned short typelen;
+	int ret = 0;
 
 	/*
 	 * Quickly handle receive fastpath for IPQ hack.
@@ -160,13 +160,13 @@ gld_interpret_ether(gld_mac_info_t *macinfo, mblk_t *mp, pktinfo_t *pktinfo,
 		 * Check whether the header is contiguous, which
 		 * also implicitly makes sure the packet is big enough.
 		 */
-		if (MBLKL(mp) < sizeof (struct ether_mac_frm))
+		if (MBLKL(mp) < sizeof (struct ether_header))
 			return (-1);
-		mh = (struct ether_mac_frm *)mp->b_rptr;
+		mh = (struct ether_header *)mp->b_rptr;
 		pktinfo->ethertype = REF_NET_USHORT(mh->ether_type);
-		pktinfo->isForMe = mac_eq(mh->ether_dhost,
+		pktinfo->isForMe = mac_eq(&mh->ether_dhost,
 		    mac_pvt->curr_macaddr, macinfo->gldm_addrlen);
-		pktinfo->macLen = sizeof (struct ether_mac_frm);
+		pktinfo->macLen = sizeof (struct ether_header);
 
 		return (0);
 	}
@@ -176,11 +176,11 @@ gld_interpret_ether(gld_mac_info_t *macinfo, mblk_t *mp, pktinfo_t *pktinfo,
 	pktinfo->pktLen = msgdsize(mp);
 
 	/* make sure packet has at least a whole mac header */
-	if (pktinfo->pktLen < sizeof (struct ether_mac_frm))
+	if (pktinfo->pktLen < sizeof (struct ether_header))
 		return (-1);
 
 	/* make sure the mac header falls into contiguous memory */
-	if (MBLKL(mp) < sizeof (struct ether_mac_frm)) {
+	if (MBLKL(mp) < sizeof (struct ether_header)) {
 		if ((pmp = msgpullup(mp, -1)) == NULL) {
 #ifdef GLD_DEBUG
 			if (gld_debug & GLDERRS)
@@ -192,12 +192,12 @@ gld_interpret_ether(gld_mac_info_t *macinfo, mblk_t *mp, pktinfo_t *pktinfo,
 		mp = pmp;	/* this mblk contains the whole mac header */
 	}
 
-	mh = (struct ether_mac_frm *)mp->b_rptr;
+	mh = (struct ether_header *)mp->b_rptr;
 
 	/* Check to see if the mac is a broadcast or multicast address. */
-	if (mac_eq(mh->ether_dhost, ether_broadcast, macinfo->gldm_addrlen))
+	if (mac_eq(&mh->ether_dhost, ether_broadcast, macinfo->gldm_addrlen))
 		pktinfo->isBroadcast = 1;
-	else if (mh->ether_dhost[0] & 1)
+	else if (mh->ether_dhost.ether_addr_octet[0] & 1)
 		pktinfo->isMulticast = 1;
 
 	typelen = REF_NET_USHORT(mh->ether_type);
@@ -208,11 +208,40 @@ gld_interpret_ether(gld_mac_info_t *macinfo, mblk_t *mp, pktinfo_t *pktinfo,
 	 * of non null 'macinfo->gldm_send_tagged'.
 	 */
 	if (flags == GLD_TX) {
-		if ((typelen == VLAN_TPID) &&
-			(macinfo->gldm_send_tagged != NULL)) {
-			ovbcopy(mp->b_rptr,
-					mp->b_rptr + VTAG_SIZE,
-					2 * ETHERADDRL);
+		if ((typelen == ETHERTYPE_VLAN) &&
+		    (macinfo->gldm_send_tagged != NULL)) {
+			struct ether_vlan_header *evhp;
+			uint16_t tci;
+
+			if ((MBLKL(mp) < sizeof (struct ether_vlan_header)) &&
+			    (pullupmsg(mp, sizeof (struct ether_vlan_header))
+			    == 0)) {
+				ret = -1;
+				goto out;
+			}
+			evhp = (struct ether_vlan_header *)mp->b_rptr;
+			tci = REF_NET_USHORT(evhp->ether_tci);
+
+			/*
+			 * We don't allow the VID and priority are both zero.
+			 */
+			if ((GLD_VTAG_PRI((int32_t)tci) == 0 &&
+			    GLD_VTAG_VID((int32_t)tci) == VLAN_VID_NONE) ||
+			    (GLD_VTAG_CFI((uint32_t)tci)) != VLAN_CFI_ETHER) {
+				ret = -1;
+				goto out;
+			}
+
+			/*
+			 * Remember the VTAG info in order to reinsert it,
+			 * Then strip the tag. This is required because some
+			 * drivers do not allow the size of message (passed
+			 * by the gldm_send_tagged() function) to be greater
+			 * than ETHERMAX.
+			 */
+			GLD_SAVE_MBLK_VTAG(savemp, GLD_TCI2VTAG(tci));
+			ovbcopy(mp->b_rptr, mp->b_rptr + VTAG_SIZE,
+			    2 * ETHERADDRL);
 			mp->b_rptr += VTAG_SIZE;
 		}
 		goto out;	/* Got all info we need for xmit case */
@@ -224,15 +253,15 @@ gld_interpret_ether(gld_mac_info_t *macinfo, mblk_t *mp, pktinfo_t *pktinfo,
 	 * Deal with the mac header
 	 */
 
-	mac_copy(mh->ether_dhost, pktinfo->dhost, macinfo->gldm_addrlen);
-	mac_copy(mh->ether_shost, pktinfo->shost, macinfo->gldm_addrlen);
+	mac_copy(&mh->ether_dhost, pktinfo->dhost, macinfo->gldm_addrlen);
+	mac_copy(&mh->ether_shost, pktinfo->shost, macinfo->gldm_addrlen);
 
 	pktinfo->isLooped = mac_eq(pktinfo->shost,
 	    mac_pvt->curr_macaddr, macinfo->gldm_addrlen);
 	pktinfo->isForMe = mac_eq(pktinfo->dhost,
 	    mac_pvt->curr_macaddr, macinfo->gldm_addrlen);
 
-	pktinfo->macLen = sizeof (struct ether_mac_frm);
+	pktinfo->macLen = sizeof (struct ether_header);
 
 	if (typelen > ETHERMTU) {
 		pktinfo->ethertype = typelen; /* use type interpretation */
@@ -247,7 +276,7 @@ gld_interpret_ether(gld_mac_info_t *macinfo, mblk_t *mp, pktinfo_t *pktinfo,
 	 */
 	{
 	int delta = pktinfo->pktLen -
-	    (sizeof (struct ether_mac_frm) + typelen);
+	    (sizeof (struct ether_header) + typelen);
 
 	if (delta > 0 && adjmsg(mp, -delta))
 		pktinfo->pktLen -= delta;
@@ -263,10 +292,10 @@ gld_interpret_ether(gld_mac_info_t *macinfo, mblk_t *mp, pktinfo_t *pktinfo,
 	pktinfo->isLLC = 1;
 
 	if (gld_global_options & GLD_OPT_NO_ETHRXSNAP ||
-	    pktinfo->pktLen < pktinfo->macLen + LLC_SNAP_HDR_LEN)
+	    pktinfo->pktLen <  pktinfo->macLen + LLC_SNAP_HDR_LEN)
 		goto out;
 
-	if (MBLKL(mp) < sizeof (struct ether_mac_frm) + LLC_SNAP_HDR_LEN &&
+	if (MBLKL(mp) < sizeof (struct ether_header) + LLC_SNAP_HDR_LEN &&
 	    MBLKL(mp) < pktinfo->pktLen) {
 		/*
 		 * we don't have the entire packet within the first mblk (and
@@ -298,7 +327,7 @@ out:
 	if (pmp != NULL)
 		freemsg(pmp);
 
-	return (0);
+	return (ret);
 }
 
 mblk_t *
@@ -310,7 +339,7 @@ gld_unitdata_ether(gld_t *gld, mblk_t *mp)
 	mac_addr_t dhost;
 	unsigned short typelen;
 	mblk_t *nmp;
-	struct ether_mac_frm *mh;
+	struct ether_header *mh;
 	int hdrlen;
 	uint32_t vptag;
 	gld_vlan_t *gld_vlan;
@@ -335,7 +364,7 @@ gld_unitdata_ether(gld_t *gld, mblk_t *mp)
 	if (typelen <= ETHERMTU)
 		typelen = msgdsize(mp);
 
-	hdrlen = sizeof (struct ether_mac_frm);
+	hdrlen = sizeof (struct ether_header);
 
 	/*
 	 * Check to see if VLAN is enabled on this stream
@@ -371,7 +400,7 @@ gld_unitdata_ether(gld_t *gld, mblk_t *mp)
 
 	nmp->b_rptr -= sizeof (typelen);
 	SET_NET_USHORT(*(uint16_t *)nmp->b_rptr, typelen);
-	if (hdrlen > sizeof (struct ether_mac_frm)) {
+	if (hdrlen > sizeof (struct ether_header)) {
 		nmp->b_rptr -= sizeof (uint16_t);
 		SET_NET_USHORT(*(uint16_t *)nmp->b_rptr, vptag);
 		vptag >>= 16;
@@ -379,16 +408,67 @@ gld_unitdata_ether(gld_t *gld, mblk_t *mp)
 		SET_NET_USHORT(*(uint16_t *)nmp->b_rptr, vptag);
 	}
 	nmp->b_rptr -= (ETHERADDRL * 2);
-	mh = (struct ether_mac_frm *)nmp->b_rptr;
-	mac_copy(dhost, mh->ether_dhost, macinfo->gldm_addrlen);
+	mh = (struct ether_header *)nmp->b_rptr;
+	mac_copy(dhost, &mh->ether_dhost, macinfo->gldm_addrlen);
 
 	/*
 	 * We access the mac address without the mutex to prevent
 	 * mutex contention (BUG 4211361)
 	 */
 	mac_copy(((gld_mac_pvt_t *)macinfo->gldm_mac_pvt)->curr_macaddr,
-	    mh->ether_shost, macinfo->gldm_addrlen);
+	    &mh->ether_shost, macinfo->gldm_addrlen);
 
+	return (nmp);
+}
+
+/*
+ * Insert the VLAN tag into the packet. The packet now is an Ethernet header
+ * without VLAN tag information.
+ */
+mblk_t *
+gld_insert_vtag_ether(mblk_t *mp, uint32_t vtag)
+{
+	struct ether_vlan_header *evhp;
+	struct ether_header *ehp;
+	mblk_t *nmp;
+
+	if (vtag == VLAN_VID_NONE)
+		return (mp);
+
+	if (DB_REF(mp) == 1 && MBLKHEAD(mp) >= VTAG_SIZE) {
+		/* it fits at the beginning of the message block */
+		nmp = mp;
+		ovbcopy(nmp->b_rptr, nmp->b_rptr - VTAG_SIZE, 2 * ETHERADDRL);
+		nmp->b_rptr -= VTAG_SIZE;
+		evhp = (struct ether_vlan_header *)nmp->b_rptr;
+	} else {
+		/* we need to allocate one */
+		if ((nmp = allocb(sizeof (struct ether_vlan_header),
+		    BPRI_MED)) == NULL) {
+			return (NULL);
+		}
+		nmp->b_wptr += sizeof (struct ether_vlan_header);
+
+		/* transfer the ether_header fields */
+		evhp = (struct ether_vlan_header *)nmp->b_rptr;
+		ehp = (struct ether_header *)mp->b_rptr;
+		mac_copy(&ehp->ether_dhost, &evhp->ether_dhost, ETHERADDRL);
+		mac_copy(&ehp->ether_shost, &evhp->ether_shost, ETHERADDRL);
+		bcopy(&ehp->ether_type, &evhp->ether_type, sizeof (uint16_t));
+
+		/* offset the mp of the MAC header length. */
+		mp->b_rptr += sizeof (struct ether_header);
+		if (MBLKL(mp) == 0) {
+			nmp->b_cont = mp->b_cont;
+			freeb(mp);
+		} else {
+			nmp->b_cont = mp;
+		}
+	}
+
+	SET_NET_USHORT(evhp->ether_tci, vtag);
+	vtag >>= 16;
+	SET_NET_USHORT(evhp->ether_tpid, vtag);
 	return (nmp);
 }
 
@@ -400,7 +480,7 @@ gld_fastpath_ether(gld_t *gld, mblk_t *mp)
 	struct gld_dlsap *gldp = DLSAP(dlp, dlp->dl_dest_addr_offset);
 	unsigned short typelen;
 	mblk_t *nmp;
-	struct ether_mac_frm *mh;
+	struct ether_header *mh;
 	int hdrlen;
 	uint32_t vptag;
 	gld_vlan_t *gld_vlan;
@@ -425,7 +505,7 @@ gld_fastpath_ether(gld_t *gld, mblk_t *mp)
 	 * Initialize the fast path header to include the
 	 * basic source address information and type field.
 	 */
-	hdrlen = sizeof (struct ether_mac_frm);
+	hdrlen = sizeof (struct ether_header);
 
 	/*
 	 * Check to see if VLAN is enabled on this stream
@@ -452,7 +532,7 @@ gld_fastpath_ether(gld_t *gld, mblk_t *mp)
 	 * If the header is for a VLAN stream, then add
 	 * in the VLAN tag to the clone header.
 	 */
-	if (hdrlen > sizeof (struct ether_mac_frm)) {
+	if (hdrlen > sizeof (struct ether_header)) {
 		nmp->b_rptr -= sizeof (uint16_t);
 		SET_NET_USHORT(*(uint16_t *)nmp->b_rptr, vptag);
 		vptag >>= 16;
@@ -460,12 +540,12 @@ gld_fastpath_ether(gld_t *gld, mblk_t *mp)
 		SET_NET_USHORT(*(uint16_t *)nmp->b_rptr, vptag);
 	}
 	nmp->b_rptr -= (ETHERADDRL * 2);
-	mh = (struct ether_mac_frm *)nmp->b_rptr;
-	mac_copy(gldp->glda_addr, mh->ether_dhost, macinfo->gldm_addrlen);
+	mh = (struct ether_header *)nmp->b_rptr;
+	mac_copy(gldp->glda_addr, &mh->ether_dhost, macinfo->gldm_addrlen);
 
 	GLDM_LOCK(macinfo, RW_WRITER);
 	mac_copy(((gld_mac_pvt_t *)macinfo->gldm_mac_pvt)->curr_macaddr,
-	    mh->ether_shost, macinfo->gldm_addrlen);
+	    &mh->ether_shost, macinfo->gldm_addrlen);
 	GLDM_UNLOCK(macinfo);
 
 	return (nmp);

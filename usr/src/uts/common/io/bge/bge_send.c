@@ -407,7 +407,7 @@ bge_send(bge_t *bgep, mblk_t *mp)
 	ASSERT(MBLKL(mp) >= sizeof (struct ether_header));
 	ehp = (struct ether_vlan_header *)mp->b_rptr;
 
-	if (ehp->ether_tpid == htons(VLAN_TPID)) {
+	if (ehp->ether_tpid == htons(ETHERTYPE_VLAN)) {
 		if (MBLKL(mp) < sizeof (struct ether_vlan_header)) {
 			uint32_t pflags;
 

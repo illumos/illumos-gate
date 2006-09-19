@@ -2968,6 +2968,8 @@ extern uint32_t ipsechw_debug;
 
 struct	ipsec_out_s;
 
+struct	mac_header_info_s;
+
 extern const char *dlpi_prim_str(int);
 extern const char *dlpi_err_str(int);
 extern void	ill_frag_timer(void *);
@@ -3002,7 +3004,8 @@ extern int	ip_reassemble(mblk_t *, ipf_t *, uint_t, boolean_t, ill_t *,
 extern int	ip_opt_set_ill(conn_t *, int, boolean_t, boolean_t,
     int, int, mblk_t *);
 extern void	ip_rput(queue_t *, mblk_t *);
-extern void	ip_input(ill_t *, ill_rx_ring_t *, mblk_t *, size_t);
+extern void	ip_input(ill_t *, ill_rx_ring_t *, mblk_t *,
+    struct mac_header_info_s *);
 extern void	ip_rput_dlpi(queue_t *, mblk_t *);
 extern void	ip_rput_forward(ire_t *, ipha_t *, mblk_t *, ill_t *);
 extern void	ip_rput_forward_multicast(ipaddr_t, mblk_t *, ipif_t *);
@@ -3308,7 +3311,7 @@ extern int ip_squeue_bind_get(queue_t *, mblk_t *, caddr_t, cred_t *);
 extern void ip_squeue_clean(void *, mblk_t *, void *);
 extern void ip_resume_tcp_bind(void *, mblk_t *, void *);
 extern void	ip_soft_ring_assignment(ill_t *, ill_rx_ring_t *,
-    mblk_t *, size_t);
+    mblk_t *, struct mac_header_info_s *);
 
 extern void tcp_wput(queue_t *, mblk_t *);
 

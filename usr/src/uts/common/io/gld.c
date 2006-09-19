@@ -68,27 +68,52 @@
 #include <sys/sunddi.h>
 
 /*
- * Macro to atomically increment counters of type uint32_t, uint64_t
- * and ulong_t.
+ * Macros to increment statistics.
  */
-#define	BUMP(stat, delta)	do {				\
+
+/*
+ * Increase kstats. Note this operation is not atomic. It can be used when
+ * GLDM_LOCK_HELD_WRITE(macinfo).
+ */
+#define	BUMP(stats, vstats, stat, delta)	do {			\
+	((stats)->stat) += (delta);					\
+	_NOTE(CONSTANTCONDITION)					\
+	if ((vstats) != NULL)						\
+		((struct gld_stats *)(vstats))->stat += (delta);	\
+	_NOTE(CONSTANTCONDITION)					\
+} while (0)
+
+#define	ATOMIC_BUMP_STAT(stat, delta)	do {			\
 	_NOTE(CONSTANTCONDITION)				\
-	if (sizeof (stat) == sizeof (uint32_t))	{		\
-		atomic_add_32((uint32_t *)&stat, delta);	\
+	if (sizeof ((stat)) == sizeof (uint32_t)) {		\
+		atomic_add_32((uint32_t *)&(stat), (delta));	\
 	_NOTE(CONSTANTCONDITION)				\
-	} else if (sizeof (stat) == sizeof (uint64_t)) {	\
-		atomic_add_64((uint64_t *)&stat, delta);	\
+	} else if (sizeof ((stat)) == sizeof (uint64_t)) {	\
+		atomic_add_64((uint64_t *)&(stat), (delta));	\
 	}							\
 	_NOTE(CONSTANTCONDITION)				\
 } while (0)
 
-#define	UPDATE_STATS(vlan, pktinfo, number)	{		\
-	if ((pktinfo).isBroadcast)				\
-		(vlan)->gldv_stats->glds_brdcstxmt += (number);	\
-	else if ((pktinfo).isMulticast)				\
-		(vlan)->gldv_stats->glds_multixmt += (number);	\
-	(vlan)->gldv_stats->glds_bytexmt64 += (pktinfo).pktLen;	\
-	(vlan)->gldv_stats->glds_pktxmt64 += (number);		\
+#define	ATOMIC_BUMP(stats, vstats, stat, delta)	do {			\
+	ATOMIC_BUMP_STAT((stats)->stat, (delta));			\
+	_NOTE(CONSTANTCONDITION)					\
+	if ((vstats) != NULL) {						\
+		ATOMIC_BUMP_STAT(((struct gld_stats *)(vstats))->stat,	\
+		    (delta));						\
+	}								\
+	_NOTE(CONSTANTCONDITION)					\
+} while (0)
+
+#define	UPDATE_STATS(stats, vstats, pktinfo, delta) {			\
+	if ((pktinfo).isBroadcast) {					\
+		ATOMIC_BUMP((stats), (vstats),				\
+		    glds_brdcstxmt, (delta));				\
+	} else if ((pktinfo).isMulticast) {				\
+		ATOMIC_BUMP((stats), (vstats), glds_multixmt, (delta));	\
+	}								\
+	ATOMIC_BUMP((stats), (vstats), glds_bytexmt64,			\
+	    ((pktinfo).pktLen));					\
+	ATOMIC_BUMP((stats), (vstats), glds_pktxmt64, (delta));		\
 }
 
 #ifdef GLD_DEBUG
@@ -114,12 +139,12 @@ static int gld_start(queue_t *, mblk_t *, int, uint32_t);
 static int gld_start_mdt(queue_t *, mblk_t *, int);
 
 /* called from gld_start[_mdt] to loopback packet(s) in promiscuous mode */
-static void gld_precv(gld_mac_info_t *, gld_vlan_t *, mblk_t *);
+static void gld_precv(gld_mac_info_t *, mblk_t *, uint32_t, struct gld_stats *);
 static void gld_precv_mdt(gld_mac_info_t *, gld_vlan_t *, mblk_t *,
     pdesc_t *, pktinfo_t *);
 
 /* receive group: called from gld_recv and gld_precv* with maclock held */
-static void gld_sendup(gld_mac_info_t *, gld_vlan_t *, pktinfo_t *, mblk_t *,
+static void gld_sendup(gld_mac_info_t *, pktinfo_t *, mblk_t *,
     int (*)());
 static int gld_accept(gld_t *, pktinfo_t *);
 static int gld_mcmatch(gld_t *, pktinfo_t *);
@@ -127,7 +152,7 @@ static int gld_multicast(unsigned char *, gld_t *);
 static int gld_paccept(gld_t *, pktinfo_t *);
 static void gld_passon(gld_t *, mblk_t *, pktinfo_t *,
     void (*)(queue_t *, mblk_t *));
-static mblk_t *gld_addudind(gld_t *, mblk_t *, pktinfo_t *);
+static mblk_t *gld_addudind(gld_t *, mblk_t *, pktinfo_t *, boolean_t);
 
 /* wsrv group: called from wsrv, single threaded per queue */
 static int gld_ioctl(queue_t *, mblk_t *);
@@ -241,33 +266,6 @@ static char *gld_duplex[] = {
 	"full"		/* GLD_DUPLEX_FULL */
 };
 
-extern int gld_interpret_ether(gld_mac_info_t *, mblk_t *, pktinfo_t *, int);
-extern int gld_interpret_fddi(gld_mac_info_t *, mblk_t *, pktinfo_t *, int);
-extern int gld_interpret_tr(gld_mac_info_t *, mblk_t *, pktinfo_t *, int);
-extern int gld_interpret_ib(gld_mac_info_t *, mblk_t *, pktinfo_t *, int);
-extern void gld_interpret_mdt_ib(gld_mac_info_t *, mblk_t *, pdescinfo_t *,
-    pktinfo_t *, int);
-
-extern mblk_t *gld_fastpath_ether(gld_t *, mblk_t *);
-extern mblk_t *gld_fastpath_fddi(gld_t *, mblk_t *);
-extern mblk_t *gld_fastpath_tr(gld_t *, mblk_t *);
-extern mblk_t *gld_fastpath_ib(gld_t *, mblk_t *);
-
-extern mblk_t *gld_unitdata_ether(gld_t *, mblk_t *);
-extern mblk_t *gld_unitdata_fddi(gld_t *, mblk_t *);
-extern mblk_t *gld_unitdata_tr(gld_t *, mblk_t *);
-extern mblk_t *gld_unitdata_ib(gld_t *, mblk_t *);
-
-extern void gld_init_ether(gld_mac_info_t *);
-extern void gld_init_fddi(gld_mac_info_t *);
-extern void gld_init_tr(gld_mac_info_t *);
-extern void gld_init_ib(gld_mac_info_t *);
-
-extern void gld_uninit_ether(gld_mac_info_t *);
-extern void gld_uninit_fddi(gld_mac_info_t *);
-extern void gld_uninit_tr(gld_mac_info_t *);
-extern void gld_uninit_ib(gld_mac_info_t *);
-
 /*
  * Interface types currently supported by GLD.
  * If you add new types, you must check all "XXX" strings in the GLD source
@@ -283,7 +281,7 @@ static gld_interface_t interfaces[] = {
 	{
 		DL_ETHER,
 		(uint_t)-1,
-		sizeof (struct ether_mac_frm),
+		sizeof (struct ether_header),
 		gld_interpret_ether,
 		NULL,
 		gld_fastpath_ether,
@@ -1703,6 +1701,7 @@ gld_wput(queue_t *q, mblk_t *mp)
 	gld_t  *gld = (gld_t *)(q->q_ptr);
 	int	rc;
 	boolean_t multidata = B_TRUE;
+	uint32_t upri;
 
 #ifdef GLD_DEBUG
 	if (gld_debug & GLDTRACE)
@@ -1720,6 +1719,11 @@ gld_wput(queue_t *q, mblk_t *mp)
 			merror(q, mp, EPROTO);
 			break;
 		}
+		/*
+		 * Cleanup MBLK_VTAG in case it is set by other
+		 * modules. MBLK_VTAG is used to save the vtag information.
+		 */
+		GLD_CLEAR_MBLK_VTAG(mp);
 		multidata = B_FALSE;
 		/* LINTED: E_CASE_FALLTHRU */
 	case M_MULTIDATA:
@@ -1752,8 +1756,15 @@ gld_wput(queue_t *q, mblk_t *mp)
 			goto use_wsrv;
 		}
 
+		/*
+		 * Get the priority value. Note that in raw mode, the
+		 * per-packet priority value kept in b_band is ignored.
+		 */
+		upri = (gld->gld_flags & GLD_RAW) ? gld->gld_upri :
+		    UPRI(gld, mp->b_band);
+
 		rc = (multidata) ? gld_start_mdt(q, mp, GLD_WPUT) :
-		    gld_start(q, mp, GLD_WPUT, UPRI(gld, mp->b_band));
+		    gld_start(q, mp, GLD_WPUT, upri);
 
 		/* Allow DL_UNBIND again */
 		membar_exit();
@@ -1828,6 +1839,7 @@ gld_wsrv(queue_t *q)
 	union DL_primitives *prim;
 	int err;
 	boolean_t multidata;
+	uint32_t upri;
 
 #ifdef GLD_DEBUG
 	if (gld_debug & GLDTRACE)
@@ -1868,8 +1880,16 @@ gld_wsrv(queue_t *q)
 
 			gld->gld_sched_ran = B_FALSE;
 			membar_enter();
+
+			/*
+			 * Get the priority value. Note that in raw mode, the
+			 * per-packet priority value kept in b_band is ignored.
+			 */
+			upri = (gld->gld_flags & GLD_RAW) ? gld->gld_upri :
+			    UPRI(gld, mp->b_band);
+
 			err = (multidata) ? gld_start_mdt(q, mp, GLD_WSRV) :
-			    gld_start(q, mp, GLD_WSRV, UPRI(gld, mp->b_band));
+			    gld_start(q, mp, GLD_WSRV, upri);
 			if (err == GLD_NORESOURCES) {
 				/* gld_sched will qenable us later */
 				gld->gld_xwait = B_TRUE; /* want qenable */
@@ -1992,6 +2012,25 @@ gld_wsrv(queue_t *q)
  * and the DL_DETACH will succeed.  It's hard to test this since the odds
  * of the failure even trying to happen are so small.  I probably could
  * have ignored the whole issue and never been the worse for it.
+ *
+ * Because some GLDv2 Ethernet drivers do not allow the size of transmitted
+ * packet to be greater than ETHERMAX, we must first strip the VLAN tag
+ * from a tagged packet before passing it to the driver's gld_send() entry
+ * point function, and pass the VLAN tag as a separate argument. The
+ * gld_send() function may fail. In that case, the packet will need to be
+ * queued in order to be processed again in GLD's service routine. As the
+ * VTAG has already been stripped at that time, we save the VTAG information
+ * in (the unused fields of) dblk using GLD_SAVE_MBLK_VTAG(), so that the
+ * VTAG can also be queued and be able to be got when gld_start() is called
+ * next time from gld_wsrv().
+ *
+ * Some rules to use GLD_{CLEAR|SAVE}_MBLK_VTAG macros:
+ *
+ * - GLD_SAVE_MBLK_VTAG() must be called to save the VTAG information each time
+ *   the message is queued by putbq().
+ *
+ * - GLD_CLEAR_MBLK_VTAG() must be called to clear the bogus VTAG information
+ *   (if any) in dblk before the message is passed to the gld_start() function.
  */
 static int
 gld_start(queue_t *q, mblk_t *mp, int caller, uint32_t upri)
@@ -2003,24 +2042,95 @@ gld_start(queue_t *q, mblk_t *mp, int caller, uint32_t upri)
 	int rc;
 	gld_interface_t *ifp;
 	pktinfo_t pktinfo;
-	uint32_t vtag;
+	uint32_t vtag, vid;
+	uint32_t raw_vtag = 0;
 	gld_vlan_t *vlan;
+	struct gld_stats *stats0, *stats = NULL;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 	macinfo = gld->gld_mac_info;
 	mac_pvt = (gld_mac_pvt_t *)macinfo->gldm_mac_pvt;
 	ifp = mac_pvt->interfacep;
 	vlan = (gld_vlan_t *)gld->gld_vlan;
+	vid = vlan->gldv_id;
+
+	/*
+	 * If this interface is a VLAN, the kstats of corresponding
+	 * "VLAN 0" should also be updated. Note that the gld_vlan_t
+	 * structure for VLAN 0 might not exist if there are no DLPI
+	 * consumers attaching on VLAN 0. Fortunately we can directly
+	 * access VLAN 0's kstats from macinfo.
+	 *
+	 * Therefore, stats0 (VLAN 0's kstats) must always be
+	 * updated, and stats must to be updated if it is not NULL.
+	 */
+	stats0 = mac_pvt->statistics;
+	if (vid != VLAN_VID_NONE)
+		stats = vlan->gldv_stats;
 
 	if ((*ifp->interpreter)(macinfo, mp, &pktinfo, GLD_TX) != 0) {
-		freemsg(mp);
 #ifdef GLD_DEBUG
 		if (gld_debug & GLDERRS)
 			cmn_err(CE_WARN,
 			    "gld_start: failed to interpret outbound packet");
 #endif
-		vlan->gldv_stats->glds_xmtbadinterp++;
-		return (GLD_BADARG);
+		goto badarg;
+	}
+
+	vtag = VLAN_VID_NONE;
+	raw_vtag = GLD_GET_MBLK_VTAG(mp);
+	if (GLD_VTAG_TCI(raw_vtag) != 0) {
+		uint16_t raw_pri, raw_vid, evid;
+
+		/*
+		 * Tagged packet.
+		 */
+		raw_pri = GLD_VTAG_PRI(raw_vtag);
+		raw_vid = GLD_VTAG_VID(raw_vtag);
+		GLD_CLEAR_MBLK_VTAG(mp);
+
+		if (gld->gld_flags & GLD_RAW) {
+			/*
+			 * In raw mode, we only expect untagged packets or
+			 * special priority-tagged packets on a VLAN stream.
+			 * Drop the packet if its VID is not zero.
+			 */
+			if (vid != VLAN_VID_NONE && raw_vid != VLAN_VID_NONE)
+				goto badarg;
+
+			/*
+			 * If it is raw mode, use the per-stream priority if
+			 * the priority is not specified in the packet.
+			 * Otherwise, ignore the priority bits in the packet.
+			 */
+			upri = (raw_pri != 0) ? raw_pri : upri;
+		}
+
+		if (vid == VLAN_VID_NONE && vid != raw_vid) {
+			gld_vlan_t *tmp_vlan;
+
+			/*
+			 * This link is a physical link but the packet is
+			 * a VLAN tagged packet, the kstats of corresponding
+			 * VLAN (if any) should also be updated.
+			 */
+			tmp_vlan = gld_find_vlan(macinfo, raw_vid);
+			if (tmp_vlan != NULL)
+				stats = tmp_vlan->gldv_stats;
+		}
+
+		evid = (vid == VLAN_VID_NONE) ? raw_vid : vid;
+		if (evid != VLAN_VID_NONE || upri != 0)
+			vtag = GLD_MAKE_VTAG(upri, VLAN_CFI_ETHER, evid);
+	} else {
+		/*
+		 * Untagged packet:
+		 * Get vtag from the attached PPA of this stream.
+		 */
+		if ((vid != VLAN_VID_NONE) ||
+		    ((macinfo->gldm_type == DL_ETHER) && (upri != 0))) {
+			vtag = GLD_MAKE_VTAG(upri, VLAN_CFI_ETHER, vid);
+		}
 	}
 
 	/*
@@ -2039,6 +2149,7 @@ gld_start(queue_t *q, mblk_t *mp, int caller, uint32_t upri)
 		 * driver's send routine.
 		 */
 		if (caller == GLD_WPUT) {
+			GLD_SAVE_MBLK_VTAG(mp, raw_vtag);
 			(void) putbq(q, mp);
 			return (GLD_NORESOURCES);
 		}
@@ -2049,11 +2160,9 @@ gld_start(queue_t *q, mblk_t *mp, int caller, uint32_t upri)
 	} else
 		nmp = NULL;		/* we need no loopback */
 
-	vtag = GLD_MK_VTAG(vlan->gldv_ptag, upri);
 	if (ifp->hdr_size > 0 &&
 	    pktinfo.pktLen > ifp->hdr_size + (vtag == 0 ? 0 : VTAG_SIZE) +
 	    macinfo->gldm_maxpkt) {
-		freemsg(mp);	/* discard oversized outbound packet */
 		if (nmp)
 			freemsg(nmp);	/* free the duped message */
 #ifdef GLD_DEBUG
@@ -2061,23 +2170,24 @@ gld_start(queue_t *q, mblk_t *mp, int caller, uint32_t upri)
 			cmn_err(CE_WARN,
 			    "gld_start: oversize outbound packet, size %d,"
 			    "max %d", pktinfo.pktLen,
-			    ifp->hdr_size + macinfo->gldm_maxpkt);
+			    ifp->hdr_size + (vtag == 0 ? 0 : VTAG_SIZE) +
+			    macinfo->gldm_maxpkt);
 #endif
-		vlan->gldv_stats->glds_xmtbadinterp++;
-		return (GLD_BADARG);
+		goto badarg;
 	}
 
 	rc = (*gld->gld_send)(macinfo, mp, vtag);
 
 	if (rc != GLD_SUCCESS) {
 		if (rc == GLD_NORESOURCES) {
-			vlan->gldv_stats->glds_xmtretry++;
+			ATOMIC_BUMP(stats0, stats, glds_xmtretry, 1);
+			GLD_SAVE_MBLK_VTAG(mp, raw_vtag);
 			(void) putbq(q, mp);
 		} else {
 			/* transmit error; drop the packet */
 			freemsg(mp);
 			/* We're supposed to count failed attempts as well */
-			UPDATE_STATS(vlan, pktinfo, 1);
+			UPDATE_STATS(stats0, stats, pktinfo, 1);
 #ifdef GLD_DEBUG
 			if (gld_debug & GLDERRS)
 				cmn_err(CE_WARN,
@@ -2089,21 +2199,27 @@ gld_start(queue_t *q, mblk_t *mp, int caller, uint32_t upri)
 		return (rc);
 	}
 
-	UPDATE_STATS(vlan, pktinfo, 1);
+	UPDATE_STATS(stats0, stats, pktinfo, 1);
 
 	/*
 	 * Loopback case. The message needs to be returned back on
-	 * the read side. This would silently fail if the dumpmsg fails
+	 * the read side. This would silently fail if the dupmsg fails
 	 * above. This is probably OK, if there is no memory to dup the
 	 * block, then there isn't much we could do anyway.
 	 */
 	if (nmp) {
 		GLDM_LOCK(macinfo, RW_WRITER);
-		gld_precv(macinfo, vlan, nmp);
+		gld_precv(macinfo, nmp, vtag, stats);
 		GLDM_UNLOCK(macinfo);
 	}
 
 	return (GLD_SUCCESS);
+
+badarg:
+	freemsg(mp);
+
+	ATOMIC_BUMP(stats0, stats, glds_xmtbadinterp, 1);
+	return (GLD_BADARG);
 }
 
 /*
@@ -2244,7 +2360,7 @@ gld_start_mdt(queue_t *q, mblk_t *mp, int caller)
 			}
 			(*macinfo->gldm_mdt_post)(macinfo, mp, cookie);
 			pktinfo.pktLen = totLen;
-			UPDATE_STATS(vlan, pktinfo, numpacks);
+			UPDATE_STATS(vlan->gldv_stats, NULL, pktinfo, numpacks);
 
 			/*
 			 * In the noresources case (when driver indicates it
@@ -2260,7 +2376,8 @@ gld_start_mdt(queue_t *q, mblk_t *mp, int caller)
 					    &pinfo);
 					mmd_rempdesc(dl_pkt);
 				}
-				vlan->gldv_stats->glds_xmtretry++;
+				ATOMIC_BUMP(vlan->gldv_stats, NULL,
+				    glds_xmtretry, 1);
 				mp->b_cont = nextmp;
 				(void) putbq(q, mp);
 				return (GLD_NORESOURCES);
@@ -2270,7 +2387,7 @@ gld_start_mdt(queue_t *q, mblk_t *mp, int caller)
 			 * Driver indicates it can not transmit any packets
 			 * currently and will request retrial later.
 			 */
-			vlan->gldv_stats->glds_xmtretry++;
+			ATOMIC_BUMP(vlan->gldv_stats, NULL, glds_xmtretry, 1);
 			mp->b_cont = nextmp;
 			(void) putbq(q, mp);
 			return (GLD_NORESOURCES);
@@ -2293,7 +2410,7 @@ gld_start_mdt(queue_t *q, mblk_t *mp, int caller)
 				dl_pkt = mmd_getnextpdesc(dl_pkt, &pinfo);
 			}
 			pktinfo.pktLen = totLen;
-			UPDATE_STATS(vlan, pktinfo, mdtpacks);
+			UPDATE_STATS(vlan->gldv_stats, NULL, pktinfo, mdtpacks);
 
 			/*
 			 * Transmit error; drop the message, move on
@@ -2373,11 +2490,15 @@ gld_sched(gld_mac_info_t *macinfo)
 }
 
 /*
- * gld_precv (macinfo, mp)
+ * gld_precv (macinfo, mp, vtag, stats)
  * called from gld_start to loopback a packet when in promiscuous mode
+ *
+ * VLAN 0's statistics need to be updated. If stats is not NULL,
+ * it needs to be updated as well.
  */
 static void
-gld_precv(gld_mac_info_t *macinfo, gld_vlan_t *vlan, mblk_t *mp)
+gld_precv(gld_mac_info_t *macinfo, mblk_t *mp, uint32_t vtag,
+    struct gld_stats *stats)
 {
 	gld_mac_pvt_t *mac_pvt;
 	gld_interface_t *ifp;
@@ -2393,7 +2514,7 @@ gld_precv(gld_mac_info_t *macinfo, gld_vlan_t *vlan, mblk_t *mp)
 	 */
 	if ((*ifp->interpreter)(macinfo, mp, &pktinfo, GLD_RXLOOP) != 0) {
 		freemsg(mp);
-		BUMP(vlan->gldv_stats->glds_rcvbadinterp, 1);
+		BUMP(mac_pvt->statistics, stats, glds_rcvbadinterp, 1);
 #ifdef GLD_DEBUG
 		if (gld_debug & GLDERRS)
 			cmn_err(CE_WARN,
@@ -2402,12 +2523,23 @@ gld_precv(gld_mac_info_t *macinfo, gld_vlan_t *vlan, mblk_t *mp)
 		return;
 	}
 
-	gld_sendup(macinfo, vlan, &pktinfo, mp, gld_paccept);
+	/*
+	 * Update the vtag information.
+	 */
+	pktinfo.isTagged = (vtag != VLAN_VID_NONE);
+	pktinfo.vid = GLD_VTAG_VID(vtag);
+	pktinfo.cfi = GLD_VTAG_CFI(vtag);
+	pktinfo.user_pri = GLD_VTAG_PRI(vtag);
+
+	gld_sendup(macinfo, &pktinfo, mp, gld_paccept);
 }
 
 /*
- * called from gld_start_mdt to loopback packet(s) when in promiscuous mode
+ * Called from gld_start_mdt to loopback packet(s) when in promiscuous mode.
+ * Note that 'vlan' is always a physical link, because MDT can only be
+ * enabled on non-VLAN streams.
  */
+/*ARGSUSED*/
 static void
 gld_precv_mdt(gld_mac_info_t *macinfo, gld_vlan_t *vlan, mblk_t *mp,
     pdesc_t *dl_pkt, pktinfo_t *pktinfo)
@@ -2424,7 +2556,7 @@ gld_precv_mdt(gld_mac_info_t *macinfo, gld_vlan_t *vlan, mblk_t *mp,
 	(void) (*ifp->interpreter_mdt)(macinfo, mp, NULL, pktinfo,
 	    GLD_MDT_RXLOOP);
 	if ((adjmp = mmd_transform(dl_pkt)) != NULL)
-		gld_sendup(macinfo, vlan, pktinfo, adjmp, gld_paccept);
+		gld_sendup(macinfo, pktinfo, adjmp, gld_paccept);
 }
 
 /*
@@ -2448,8 +2580,10 @@ gld_recv_tagged(gld_mac_info_t *macinfo, mblk_t *mp, uint32_t vtag)
 	pktinfo_t pktinfo;
 	gld_interface_t *ifp;
 	queue_t *ipq = NULL;
-	gld_vlan_t *vlan;
+	gld_vlan_t *vlan = NULL, *vlan0 = NULL, *vlann = NULL;
+	struct gld_stats *stats0, *stats = NULL;
 	uint32_t vid;
+	int err;
 
 	ASSERT(macinfo != NULL);
 	ASSERT(mp->b_datap->db_ref);
@@ -2462,21 +2596,62 @@ gld_recv_tagged(gld_mac_info_t *macinfo, mblk_t *mp, uint32_t vtag)
 		goto done;
 	}
 
+	/*
+	 * If this packet is a VLAN tagged packet, the kstats of corresponding
+	 * "VLAN 0" should also be updated. We can directly access VLAN 0's
+	 * kstats from macinfo.
+	 *
+	 * Further, the packets needs to be passed to VLAN 0 if there is
+	 * any DLPI consumer on VLAN 0 who is interested in tagged packets
+	 * (DL_PROMISC_SAP is on or is bounded to ETHERTYPE_VLAN SAP).
+	 */
+	mac_pvt = (gld_mac_pvt_t *)macinfo->gldm_mac_pvt;
+	stats0 = mac_pvt->statistics;
+
 	vid = GLD_VTAG_VID(vtag);
-	if ((vlan = gld_find_vlan(macinfo, vid)) == NULL) {
+	vlan0 = gld_find_vlan(macinfo, VLAN_VID_NONE);
+	if (vid != VLAN_VID_NONE) {
+		/*
+		 * If there are no physical DLPI consumers interested in the
+		 * VLAN packet, clear vlan0.
+		 */
+		if ((vlan0 != NULL) && (vlan0->gldv_nvlan_sap == 0))
+			vlan0 = NULL;
+		/*
+		 * vlann is the VLAN with the same VID as the VLAN packet.
+		 */
+		vlann = gld_find_vlan(macinfo, vid);
+		if (vlann != NULL)
+			stats = vlann->gldv_stats;
+	}
+
+	vlan = (vid == VLAN_VID_NONE) ? vlan0 : vlann;
+
+	ifp = mac_pvt->interfacep;
+	err = (*ifp->interpreter)(macinfo, mp, &pktinfo, GLD_RXQUICK);
+
+	BUMP(stats0, stats, glds_bytercv64, pktinfo.pktLen);
+	BUMP(stats0, stats, glds_pktrcv64, 1);
+
+	if ((vlann == NULL) && (vlan0 == NULL)) {
 		freemsg(mp);
 		goto done;
 	}
 
 	/*
-	 * Check whether underlying media code supports the IPQ hack,
-	 * and if so, whether the interpreter can quickly parse the
-	 * packet to get some relevant parameters.
+	 * Check whether underlying media code supports the IPQ hack:
+	 *
+	 * - the interpreter could quickly parse the packet
+	 * - the device type supports IPQ (ethernet and IPoIB)
+	 * - there is one, and only one, IP stream bound (to this VLAN)
+	 * - that stream is a "fastpath" stream
+	 * - the packet is of type ETHERTYPE_IP or ETHERTYPE_IPV6
+	 * - there are no streams in promiscuous mode (on this VLAN)
+	 * - if this packet is tagged, there is no need to send this
+	 *   packet to physical streams
 	 */
-	mac_pvt = (gld_mac_pvt_t *)macinfo->gldm_mac_pvt;
-	ifp = mac_pvt->interfacep;
-	if (((*ifp->interpreter)(macinfo, mp, &pktinfo,
-	    GLD_RXQUICK) == 0) && (vlan->gldv_ipq_flags == 0)) {
+	if ((err != 0) && ((vlan != NULL) && (vlan->gldv_nprom == 0)) &&
+	    (vlan == vlan0 || vlan0 == NULL)) {
 		switch (pktinfo.ethertype) {
 		case ETHERTYPE_IP:
 			ipq = vlan->gldv_ipq;
@@ -2487,19 +2662,9 @@ gld_recv_tagged(gld_mac_info_t *macinfo, mblk_t *mp, uint32_t vtag)
 		}
 	}
 
-	BUMP(vlan->gldv_stats->glds_bytercv64, pktinfo.pktLen);
-	BUMP(vlan->gldv_stats->glds_pktrcv64, 1);
-
 	/*
 	 * Special case for IP; we can simply do the putnext here, if:
-	 * o ipq != NULL, and therefore:
-	 * - the device type supports IPQ (ethernet and IPoIB);
-	 * - the interpreter could quickly parse the packet;
-	 * - there are no PROMISC_SAP streams (on this VLAN);
-	 * - there is one, and only one, IP stream bound (to this VLAN);
-	 * - that stream is a "fastpath" stream;
-	 * - the packet is of type ETHERTYPE_IP or ETHERTYPE_IPV6
-	 *
+	 * o The IPQ hack is possible (ipq != NULL).
 	 * o the packet is specifically for me, and therefore:
 	 * - the packet is not multicast or broadcast (fastpath only
 	 *   wants unicast packets).
@@ -2522,7 +2687,7 @@ gld_recv_tagged(gld_mac_info_t *macinfo, mblk_t *mp, uint32_t vtag)
 	 * call the media specific packet interpreter routine
 	 */
 	if ((*ifp->interpreter)(macinfo, mp, &pktinfo, GLD_RX) != 0) {
-		BUMP(vlan->gldv_stats->glds_rcvbadinterp, 1);
+		BUMP(stats0, stats, glds_rcvbadinterp, 1);
 #ifdef GLD_DEBUG
 		if (gld_debug & GLDERRS)
 			cmn_err(CE_WARN,
@@ -2535,7 +2700,6 @@ gld_recv_tagged(gld_mac_info_t *macinfo, mblk_t *mp, uint32_t vtag)
 	/*
 	 * This is safe even if vtag is VLAN_VTAG_NONE
 	 */
-
 	pktinfo.vid = vid;
 	pktinfo.cfi = GLD_VTAG_CFI(vtag);
 #ifdef GLD_DEBUG
@@ -2543,6 +2707,7 @@ gld_recv_tagged(gld_mac_info_t *macinfo, mblk_t *mp, uint32_t vtag)
 		cmn_err(CE_WARN, "gld_recv_tagged: non-ETHER CFI");
 #endif
 	pktinfo.user_pri = GLD_VTAG_PRI(vtag);
+	pktinfo.isTagged = (vtag != VLAN_VID_NONE);
 
 #ifdef GLD_DEBUG
 	if ((gld_debug & GLDRECV) &&
@@ -2567,7 +2732,7 @@ gld_recv_tagged(gld_mac_info_t *macinfo, mblk_t *mp, uint32_t vtag)
 	}
 #endif
 
-	gld_sendup(macinfo, vlan, &pktinfo, mp, gld_accept);
+	gld_sendup(macinfo, &pktinfo, mp, gld_accept);
 
 done:
 	GLDM_UNLOCK(macinfo);
@@ -2578,63 +2743,33 @@ done:
 /* =================================================================== */
 
 /*
- * gld_sendup (macinfo, mp)
- * called with an ethernet packet in a mblock; must decide whether
- * packet is for us and which streams to queue it to.
+ * Search all the streams attached to the specified VLAN looking for
+ * those eligible to receive the packet.
+ * Note that in order to avoid an extra dupmsg(), if this is the first
+ * eligible stream, remember it (in fgldp) so that we can send up the
+ * message after this function.
+ *
+ * Return errno if fails. Currently the only error is ENOMEM.
  */
-static void
-gld_sendup(gld_mac_info_t *macinfo, gld_vlan_t *vlan, pktinfo_t *pktinfo,
-    mblk_t *mp, int (*acceptfunc)())
+static int
+gld_sendup_vlan(gld_vlan_t *vlan, pktinfo_t *pktinfo, mblk_t *mp,
+    int (*acceptfunc)(), void (*send)(), int (*cansend)(), gld_t **fgldp)
 {
-	gld_t *gld;
-	gld_t *fgld = NULL;
 	mblk_t *nmp;
-	void (*send)(queue_t *qp, mblk_t *mp);
-	int (*cansend)(queue_t *qp);
+	gld_t *gld;
+	int err = 0;
 
-#ifdef GLD_DEBUG
-	if (gld_debug & GLDTRACE)
-		cmn_err(CE_NOTE, "gld_sendup(%p, %p)", (void *)mp,
-		    (void *)macinfo);
-#endif
-
-	ASSERT(mp != NULL);
-	ASSERT(macinfo != NULL);
 	ASSERT(vlan != NULL);
-	ASSERT(pktinfo != NULL);
-	ASSERT(GLDM_LOCK_HELD(macinfo));
-
-	/*
-	 * The "fast" in "GLDOPT_FAST_RECV" refers to the speed at which
-	 * gld_recv returns to the caller's interrupt routine.  The total
-	 * network throughput would normally be lower when selecting this
-	 * option, because we putq the messages and process them later,
-	 * instead of sending them with putnext now.  Some time critical
-	 * device might need this, so it's here but undocumented.
-	 */
-	if (macinfo->gldm_options & GLDOPT_FAST_RECV) {
-		send = (void (*)(queue_t *, mblk_t *))putq;
-		cansend = canput;
-	} else {
-		send = (void (*)(queue_t *, mblk_t *))putnext;
-		cansend = canputnext;
-	}
-
-	/*
-	 * Search all the streams attached to this macinfo looking for
-	 * those eligible to receive the present packet.
-	 */
-	for (gld = vlan->gldv_str_next;
-	    gld != (gld_t *)&vlan->gldv_str_next; gld = gld->gld_next) {
+	for (gld = vlan->gldv_str_next; gld != (gld_t *)&vlan->gldv_str_next;
+	    gld = gld->gld_next) {
 #ifdef GLD_VERBOSE_DEBUG
-		cmn_err(CE_NOTE, "gld_sendup: SAP: %4x QPTR: %p QSTATE: %s",
+		cmn_err(CE_NOTE, "gld_sendup: SAP: %4x QPTR: %p "QSTATE: %s",
 		    gld->gld_sap, (void *)gld->gld_qptr,
 		    gld->gld_state == DL_IDLE ? "IDLE": "NOT IDLE");
 #endif
 		ASSERT(gld->gld_qptr != NULL);
 		ASSERT(gld->gld_state == DL_IDLE ||
 		    gld->gld_state == DL_UNBOUND);
-		ASSERT(gld->gld_mac_info == macinfo);
 		ASSERT(gld->gld_vlan == vlan);
 
 		if (gld->gld_state != DL_IDLE)
@@ -2660,7 +2795,7 @@ gld_sendup(gld_mac_info_t *macinfo, gld_vlan_t *vlan, pktinfo_t *pktinfo,
 		 */
 		if ((*acceptfunc)(gld, pktinfo)) {
 			/* sap matches */
-			pktinfo->wasAccepted = 1;	/* known protocol */
+			pktinfo->wasAccepted = 1; /* known protocol */
 
 			if (!(*cansend)(gld->gld_qptr)) {
 				/*
@@ -2673,35 +2808,113 @@ gld_sendup(gld_mac_info_t *macinfo, gld_vlan_t *vlan, pktinfo_t *pktinfo,
 					cmn_err(CE_WARN,
 					    "gld_sendup: canput failed");
 #endif
-				BUMP(vlan->gldv_stats->glds_blocked, 1);
+				BUMP(vlan->gldv_stats, NULL, glds_blocked, 1);
 				qenable(gld->gld_qptr);
 				continue;
 			}
 
 			/*
-			 * we are trying to avoid an extra dumpmsg() here.
-			 * If this is the first eligible queue, remember the
-			 * queue and send up the message after the loop.
+			 * In order to avoid an extra dupmsg(), remember this
+			 * gld if this is the first eligible stream.
 			 */
-			if (!fgld) {
-				fgld = gld;
+			if (*fgldp == NULL) {
+				*fgldp = gld;
 				continue;
 			}
 
 			/* duplicate the packet for this stream */
 			nmp = dupmsg(mp);
 			if (nmp == NULL) {
-				BUMP(vlan->gldv_stats->glds_gldnorcvbuf, 1);
+				BUMP(vlan->gldv_stats, NULL,
+				    glds_gldnorcvbuf, 1);
 #ifdef GLD_DEBUG
 				if (gld_debug & GLDERRS)
 					cmn_err(CE_WARN,
 					    "gld_sendup: dupmsg failed");
 #endif
-				break;	/* couldn't get resources; drop it */
+				/* couldn't get resources; drop it */
+				err = ENOMEM;
+				break;
 			}
 			/* pass the message up the stream */
 			gld_passon(gld, nmp, pktinfo, send);
 		}
+	}
+	return (err);
+}
+
+/*
+ * gld_sendup (macinfo, pktinfo, mp, acceptfunc)
+ * called with an ethernet packet in an mblk; must decide whether
+ * packet is for us and which streams to queue it to.
+ */
+static void
+gld_sendup(gld_mac_info_t *macinfo, pktinfo_t *pktinfo,
+    mblk_t *mp, int (*acceptfunc)())
+{
+	gld_t *fgld = NULL;
+	void (*send)(queue_t *qp, mblk_t *mp);
+	int (*cansend)(queue_t *qp);
+	gld_vlan_t *vlan0, *vlann = NULL;
+	struct gld_stats *stats0, *stats = NULL;
+	int err = 0;
+
+#ifdef GLD_DEBUG
+	if (gld_debug & GLDTRACE)
+		cmn_err(CE_NOTE, "gld_sendup(%p, %p)", (void *)mp,
+		    (void *)macinfo);
+#endif
+
+	ASSERT(mp != NULL);
+	ASSERT(macinfo != NULL);
+	ASSERT(pktinfo != NULL);
+	ASSERT(GLDM_LOCK_HELD(macinfo));
+
+	/*
+	 * The tagged packets should also be looped back (transmit-side)
+	 * or sent up (receive-side) to VLAN 0 if VLAN 0 is set to
+	 * DL_PROMISC_SAP or there is any DLPI consumer bind to the
+	 * ETHERTYPE_VLAN SAP. The kstats of VLAN 0 needs to be updated
+	 * as well.
+	 */
+	stats0 = ((gld_mac_pvt_t *)macinfo->gldm_mac_pvt)->statistics;
+	vlan0 = gld_find_vlan(macinfo, VLAN_VID_NONE);
+	if (pktinfo->vid != VLAN_VID_NONE) {
+		if ((vlan0 != NULL) && (vlan0->gldv_nvlan_sap == 0))
+			vlan0 = NULL;
+		vlann = gld_find_vlan(macinfo, pktinfo->vid);
+		if (vlann != NULL)
+			stats = vlann->gldv_stats;
+	}
+
+	ASSERT((vlan0 != NULL) || (vlann != NULL));
+
+	/*
+	 * The "fast" in "GLDOPT_FAST_RECV" refers to the speed at which
+	 * gld_recv returns to the caller's interrupt routine.  The total
+	 * network throughput would normally be lower when selecting this
+	 * option, because we putq the messages and process them later,
+	 * instead of sending them with putnext now.  Some time critical
+	 * device might need this, so it's here but undocumented.
+	 */
+	if (macinfo->gldm_options & GLDOPT_FAST_RECV) {
+		send = (void (*)(queue_t *, mblk_t *))putq;
+		cansend = canput;
+	} else {
+		send = (void (*)(queue_t *, mblk_t *))putnext;
+		cansend = canputnext;
+	}
+
+	/*
+	 * Send the packets for all eligible streams.
+	 */
+	if (vlan0 != NULL) {
+		err = gld_sendup_vlan(vlan0, pktinfo, mp, acceptfunc, send,
+		    cansend, &fgld);
+	}
+	if ((err == 0) && (vlann != NULL)) {
+		err = gld_sendup_vlan(vlann, pktinfo, mp, acceptfunc, send,
+		    cansend, &fgld);
 	}
 
 	ASSERT(mp);
@@ -2716,23 +2929,28 @@ gld_sendup(gld_mac_info_t *macinfo, gld_vlan_t *vlan, pktinfo_t *pktinfo,
 		return;		/* transmit loopback case */
 
 	if (pktinfo->isBroadcast)
-		BUMP(vlan->gldv_stats->glds_brdcstrcv, 1);
+		BUMP(stats0, stats, glds_brdcstrcv, 1);
 	else if (pktinfo->isMulticast)
-		BUMP(vlan->gldv_stats->glds_multircv, 1);
+		BUMP(stats0, stats, glds_multircv, 1);
 
 	/* No stream accepted this packet */
 	if (!pktinfo->wasAccepted)
-		BUMP(vlan->gldv_stats->glds_unknowns, 1);
+		BUMP(stats0, stats, glds_unknowns, 1);
 }
+
+#define	GLD_IS_PHYS(gld)	\
+	(((gld_vlan_t *)gld->gld_vlan)->gldv_id == VLAN_VID_NONE)
 
 /*
  * A packet matches a stream if:
- *     the stream accepts EtherType encoded packets and the type matches
- *  or the stream accepts LLC packets and the packet is an LLC packet
+ *      The stream's VLAN id is the same as the one in the packet.
+ *  and the stream accepts EtherType encoded packets and the type matches
+ *  or  the stream accepts LLC packets and the packet is an LLC packet
  */
 #define	MATCH(stream, pktinfo) \
+	((((gld_vlan_t *)stream->gld_vlan)->gldv_id == pktinfo->vid) && \
 	((stream->gld_ethertype && stream->gld_sap == pktinfo->ethertype) || \
-	(!stream->gld_ethertype && pktinfo->isLLC))
+	(!stream->gld_ethertype && pktinfo->isLLC)))
 
 /*
  * This function validates a packet for sending up a particular
@@ -2745,8 +2963,16 @@ gld_accept(gld_t *gld, pktinfo_t *pktinfo)
 {
 	/*
 	 * if there is no match do not bother checking further.
+	 * Note that it is okay to examine gld_vlan because
+	 * macinfo->gldm_lock is held.
+	 *
+	 * Because all tagged packets have SAP value ETHERTYPE_VLAN,
+	 * these packets will pass the SAP filter check if the stream
+	 * is a ETHERTYPE_VLAN listener.
 	 */
-	if (!MATCH(gld, pktinfo) && !(gld->gld_flags & GLD_PROM_SAP))
+	if ((!MATCH(gld, pktinfo) && !(gld->gld_flags & GLD_PROM_SAP) &&
+	    !(GLD_IS_PHYS(gld) && gld->gld_sap == ETHERTYPE_VLAN &&
+	    pktinfo->isTagged)))
 		return (0);
 
 	/*
@@ -2836,15 +3062,29 @@ gld_multicast(unsigned char *macaddr, gld_t *gld)
 static int
 gld_paccept(gld_t *gld, pktinfo_t *pktinfo)
 {
+	/*
+	 * Note that it is okay to examine gld_vlan because macinfo->gldm_lock
+	 * is held.
+	 *
+	 * If a stream is a ETHERTYPE_VLAN listener, it must
+	 * accept all tagged packets as those packets have SAP value
+	 * ETHERTYPE_VLAN.
+	 */
 	return (gld->gld_flags & GLD_PROM_PHYS &&
-	    (MATCH(gld, pktinfo) || gld->gld_flags & GLD_PROM_SAP));
+	    (MATCH(gld, pktinfo) || gld->gld_flags & GLD_PROM_SAP ||
+	    (GLD_IS_PHYS(gld) && gld->gld_sap == ETHERTYPE_VLAN &&
+	    pktinfo->isTagged)));
+
 }
 
 static void
 gld_passon(gld_t *gld, mblk_t *mp, pktinfo_t *pktinfo,
 	void (*send)(queue_t *qp, mblk_t *mp))
 {
+	boolean_t is_phys = GLD_IS_PHYS(gld);
 	int skiplen;
+	boolean_t addtag = B_FALSE;
+	uint32_t vtag = 0;
 
 #ifdef GLD_DEBUG
 	if (gld_debug & GLDTRACE)
@@ -2857,26 +3097,39 @@ gld_passon(gld_t *gld, mblk_t *mp, pktinfo_t *pktinfo,
 		    (void *)gld->gld_qptr->q_next, (void *)mp, gld->gld_minor,
 		    gld->gld_sap);
 #endif
-
 	/*
 	 * Figure out how much of the packet header to throw away.
-	 *
-	 * RAW streams expect to see the whole packet.
-	 *
-	 * Other streams expect to see the packet with the MAC header
-	 * removed.
 	 *
 	 * Normal DLPI (non RAW/FAST) streams also want the
 	 * DL_UNITDATA_IND M_PROTO message block prepended to the M_DATA.
 	 */
 	if (gld->gld_flags & GLD_RAW) {
+		/*
+		 * The packet will be tagged in the following cases:
+		 *   - if priority is not 0
+		 *   - a tagged packet sent on a physical link
+		 */
+		if ((pktinfo->isTagged && is_phys) || (pktinfo->user_pri != 0))
+			addtag = B_TRUE;
 		skiplen = 0;
 	} else {
+		/*
+		 * The packet will be tagged if it meets all below conditions:
+		 *   -  this is a physical stream
+		 *   -  this packet is tagged packet
+		 *   -  the stream is either a DL_PROMISC_SAP listener or a
+		 *	ETHERTYPE_VLAN listener
+		 */
+		if (is_phys && pktinfo->isTagged &&
+		    ((gld->gld_sap == ETHERTYPE_VLAN) ||
+		    (gld->gld_flags & GLD_PROM_SAP))) {
+			addtag = B_TRUE;
+		}
+
 		skiplen = pktinfo->macLen;		/* skip mac header */
 		if (gld->gld_ethertype)
 			skiplen += pktinfo->hdrLen;	/* skip any extra */
 	}
-
 	if (skiplen >= pktinfo->pktLen) {
 		/*
 		 * If the interpreter did its job right, then it cannot be
@@ -2891,6 +3144,17 @@ gld_passon(gld_t *gld, mblk_t *mp, pktinfo_t *pktinfo,
 		return;
 	}
 
+	if (addtag) {
+		mblk_t *savemp = mp;
+
+		vtag = GLD_MAKE_VTAG(pktinfo->user_pri, pktinfo->cfi,
+		    is_phys ? pktinfo->vid : VLAN_VID_NONE);
+		if ((mp = gld_insert_vtag_ether(mp, vtag)) == NULL) {
+			freemsg(savemp);
+			return;
+		}
+	}
+
 	/*
 	 * Skip over the header(s), taking care to possibly handle message
 	 * fragments shorter than the amount we need to skip.  Hopefully
@@ -2898,11 +3162,11 @@ gld_passon(gld_t *gld, mblk_t *mp, pktinfo_t *pktinfo,
 	 * header, into a single message block.  But we handle it if not.
 	 */
 	while (skiplen >= MBLKL(mp)) {
-		mblk_t *tmp = mp;
+		mblk_t *savemp = mp;
 		skiplen -= MBLKL(mp);
 		mp = mp->b_cont;
 		ASSERT(mp != NULL);	/* because skiplen < pktinfo->pktLen */
-		freeb(tmp);
+		freeb(savemp);
 	}
 	mp->b_rptr += skiplen;
 
@@ -2913,7 +3177,7 @@ gld_passon(gld_t *gld, mblk_t *mp, pktinfo_t *pktinfo,
 		(*send)(gld->gld_qptr, mp);
 	} else {
 		/* everybody else wants to see a unitdata_ind structure */
-		mp = gld_addudind(gld, mp, pktinfo);
+		mp = gld_addudind(gld, mp, pktinfo, addtag);
 		if (mp)
 			(*send)(gld->gld_qptr, mp);
 		/* if it failed, gld_addudind already bumped statistic */
@@ -2925,7 +3189,7 @@ gld_passon(gld_t *gld, mblk_t *mp, pktinfo_t *pktinfo,
  * format a DL_UNITDATA_IND message to be sent upstream to the user
  */
 static mblk_t *
-gld_addudind(gld_t *gld, mblk_t *mp, pktinfo_t *pktinfo)
+gld_addudind(gld_t *gld, mblk_t *mp, pktinfo_t *pktinfo, boolean_t tagged)
 {
 	gld_mac_info_t		*macinfo = gld->gld_mac_info;
 	gld_vlan_t		*vlan = (gld_vlan_t *)gld->gld_vlan;
@@ -2949,7 +3213,7 @@ gld_addudind(gld_t *gld, mblk_t *mp, pktinfo_t *pktinfo)
 	    2 * (macinfo->gldm_addrlen + abs(macinfo->gldm_saplen));
 	if ((nmp = allocb(size, BPRI_MED)) == NULL) {
 		freemsg(mp);
-		BUMP(vlan->gldv_stats->glds_gldnorcvbuf, 1);
+		BUMP(vlan->gldv_stats, NULL, glds_gldnorcvbuf, 1);
 #ifdef GLD_DEBUG
 		if (gld_debug & GLDERRS)
 			cmn_err(CE_WARN,
@@ -2960,7 +3224,11 @@ gld_addudind(gld_t *gld, mblk_t *mp, pktinfo_t *pktinfo)
 	DB_TYPE(nmp) = M_PROTO;
 	nmp->b_rptr = nmp->b_datap->db_lim - size;
 
-	type = (gld->gld_ethertype) ? pktinfo->ethertype : 0;
+	if (tagged)
+		type = ETHERTYPE_VLAN;
+	else
+		type = (gld->gld_ethertype) ? pktinfo->ethertype : 0;
+
 
 	/*
 	 * now setup the DL_UNITDATA_IND header
@@ -3116,7 +3384,12 @@ gld_ioctl(queue_t *q, mblk_t *mp)
 		break;
 
 	case DL_IOC_HDR_INFO:	/* fastpath */
-		if (gld_global_options & GLD_OPT_NO_FASTPATH) {
+		/*
+		 * DL_IOC_HDR_INFO should only come from IP. The one
+		 * initiated from user-land should not be allowed.
+		 */
+		if ((gld_global_options & GLD_OPT_NO_FASTPATH) ||
+		    (iocp->ioc_cr != kcred)) {
 			miocnak(q, mp, 0, EINVAL);
 			break;
 		}
@@ -3157,7 +3430,6 @@ gld_fastpath(gld_t *gld, queue_t *q, mblk_t *mp)
 	t_scalar_t off, len;
 	uint_t maclen;
 	int error;
-	gld_vlan_t *vlan;
 
 	if (gld->gld_state != DL_IDLE) {
 		miocnak(q, mp, 0, EINVAL);
@@ -3194,8 +3466,6 @@ gld_fastpath(gld_t *gld, queue_t *q, mblk_t *mp)
 	 */
 	GLDM_LOCK(macinfo, RW_WRITER);
 	gld->gld_flags |= GLD_FAST;
-	vlan = (gld_vlan_t *)gld->gld_vlan;
-	vlan->gldv_ipq_flags &= ~IPQ_DISABLED;
 	GLDM_UNLOCK(macinfo);
 
 	ifp = ((gld_mac_pvt_t *)macinfo->gldm_mac_pvt)->interfacep;
@@ -3952,6 +4222,8 @@ gld_bind(queue_t *q, mblk_t *mp)
 	GLDM_LOCK(macinfo, RW_WRITER);
 	gld->gld_state = DL_IDLE;	/* bound and ready */
 	gld->gld_sap = sap;
+	if ((macinfo->gldm_type == DL_ETHER) && (sap == ETHERTYPE_VLAN))
+		((gld_vlan_t *)gld->gld_vlan)->gldv_nvlan_sap++;
 	gld_set_ipq(gld);
 
 #ifdef GLD_DEBUG
@@ -4017,6 +4289,10 @@ gld_unbind(queue_t *q, mblk_t *mp)
 	}
 
 	GLDM_LOCK(macinfo, RW_WRITER);
+	if ((macinfo->gldm_type == DL_ETHER) &&
+	    (gld->gld_sap == ETHERTYPE_VLAN)) {
+		((gld_vlan_t *)gld->gld_vlan)->gldv_nvlan_sap--;
+	}
 	gld->gld_state = DL_UNBOUND;
 	gld->gld_sap = 0;
 	gld_set_ipq(gld);
@@ -4052,7 +4328,6 @@ gld_inforeq(queue_t *q, mblk_t *mp)
 	int		sap_length;
 	int		brdcst_offset;
 	int		brdcst_length;
-	gld_vlan_t	*vlan;
 	uchar_t		*sapp;
 
 #ifdef GLD_DEBUG
@@ -4088,8 +4363,7 @@ gld_inforeq(queue_t *q, mblk_t *mp)
 	brdcst_offset = bufsize;
 	bufsize += brdcst_length;
 
-	if ((vlan = (gld_vlan_t *)gld->gld_vlan) != NULL &&
-	    vlan->gldv_id != VLAN_VID_NONE) {
+	if (((gld_vlan_t *)gld->gld_vlan) != NULL) {
 		sel_offset = P2ROUNDUP(bufsize, sizeof (int64_t));
 		bufsize = sel_offset + sizeof (dl_qos_cl_sel1_t);
 
@@ -4276,6 +4550,7 @@ gld_unitdata(queue_t *q, mblk_t *mp)
 	(void) hcksum_assoc(nmp, NULL, NULL, start, stuff, end, value,
 	    flags, 0);
 
+	GLD_CLEAR_MBLK_VTAG(nmp);
 	if (gld_start(q, nmp, GLD_WSRV, upri) == GLD_NORESOURCES) {
 		qenable(q);
 		return (GLDE_RETRY);
@@ -4458,8 +4733,6 @@ gldunattach(queue_t *q, mblk_t *mp)
 	mult_off = (gld->gld_flags & GLD_PROM_MULT &&
 	    --mac_pvt->nprom_multi == 0);
 
-	gld->gld_flags &= ~(GLD_PROM_PHYS | GLD_PROM_SAP | GLD_PROM_MULT);
-
 	if (phys_off) {
 		op = (mac_pvt->nprom_multi == 0) ? GLD_MAC_PROMISC_NONE :
 		    GLD_MAC_PROMISC_MULTI;
@@ -4470,6 +4743,18 @@ gldunattach(queue_t *q, mblk_t *mp)
 
 	if (op != GLD_MAC_PROMISC_NOOP)
 		(void) (*macinfo->gldm_set_promiscuous)(macinfo, op);
+
+	vlan = (gld_vlan_t *)gld->gld_vlan;
+	if (gld->gld_flags & GLD_PROM_PHYS)
+		vlan->gldv_nprom--;
+	if (gld->gld_flags & GLD_PROM_MULT)
+		vlan->gldv_nprom--;
+	if (gld->gld_flags & GLD_PROM_SAP) {
+		vlan->gldv_nprom--;
+		vlan->gldv_nvlan_sap--;
+	}
+
+	gld->gld_flags &= ~(GLD_PROM_PHYS | GLD_PROM_SAP | GLD_PROM_MULT);
 
 	GLDM_UNLOCK(macinfo);
 
@@ -4486,7 +4771,6 @@ gldunattach(queue_t *q, mblk_t *mp)
 	/* disassociate this stream with its vlan and underlying mac */
 	gldremque(gld);
 
-	vlan = (gld_vlan_t *)gld->gld_vlan;
 	if (--vlan->gldv_nstreams == 0) {
 		gld_rem_vlan(vlan);
 		gld->gld_vlan = NULL;
@@ -4909,16 +5193,20 @@ gld_promisc(queue_t *q, mblk_t *mp, t_uscalar_t req, boolean_t on)
 			switch (prim->promiscon_req.dl_level) {
 			case DL_PROMISC_PHYS:
 				mac_pvt->nprom++;
+				vlan->gldv_nprom++;
 				gld->gld_flags |= GLD_PROM_PHYS;
 				break;
 
 			case DL_PROMISC_MULTI:
 				mac_pvt->nprom_multi++;
+				vlan->gldv_nprom++;
 				gld->gld_flags |= GLD_PROM_MULT;
 				break;
 
 			case DL_PROMISC_SAP:
 				gld->gld_flags |= GLD_PROM_SAP;
+				vlan->gldv_nprom++;
+				vlan->gldv_nvlan_sap++;
 				break;
 
 			default:
@@ -4928,16 +5216,20 @@ gld_promisc(queue_t *q, mblk_t *mp, t_uscalar_t req, boolean_t on)
 			switch (prim->promiscoff_req.dl_level) {
 			case DL_PROMISC_PHYS:
 				mac_pvt->nprom--;
+				vlan->gldv_nprom--;
 				gld->gld_flags &= ~GLD_PROM_PHYS;
 				break;
 
 			case DL_PROMISC_MULTI:
 				mac_pvt->nprom_multi--;
+				vlan->gldv_nprom--;
 				gld->gld_flags &= ~GLD_PROM_MULT;
 				break;
 
 			case DL_PROMISC_SAP:
 				gld->gld_flags &= ~GLD_PROM_SAP;
+				vlan->gldv_nvlan_sap--;
+				vlan->gldv_nprom--;
 				break;
 
 			default:
@@ -4952,14 +5244,6 @@ gld_promisc(queue_t *q, mblk_t *mp, t_uscalar_t req, boolean_t on)
 		(void) putbq(q, mp);
 		gld->gld_xwait = B_TRUE;
 	}
-
-	/*
-	 * Update VLAN IPQ status -- it may have changed
-	 */
-	if (gld->gld_flags & (GLD_PROM_SAP | GLD_PROM_MULT | GLD_PROM_PHYS))
-		vlan->gldv_ipq_flags |= IPQ_FORBIDDEN;
-	else
-		vlan->gldv_ipq_flags &= ~IPQ_FORBIDDEN;
 
 	GLDM_UNLOCK(macinfo);
 

@@ -91,10 +91,11 @@ extern int	dls_multicst_add(dls_channel_t, const uint8_t *);
 extern int	dls_multicst_remove(dls_channel_t, const uint8_t *);
 
 extern mblk_t	*dls_header(dls_channel_t, const uint8_t *, uint16_t, uint_t,
-    mblk_t *);
+    mblk_t **);
 extern int	dls_header_info(dls_channel_t, mblk_t *, mac_header_info_t *);
 
-typedef	void	(*dls_rx_t)(void *, mac_resource_handle_t, mblk_t *, size_t);
+typedef	void	(*dls_rx_t)(void *, mac_resource_handle_t, mblk_t *,
+    mac_header_info_t *);
 
 extern void	dls_rx_set(dls_channel_t, dls_rx_t, void *);
 

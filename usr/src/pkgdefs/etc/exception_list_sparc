@@ -508,6 +508,7 @@ usr/include/sys/dumpadm.h	sparc
 usr/include/sys/ontrap.h	sparc
 usr/include/sys/sysmsg_impl.h	sparc
 usr/include/sys/cryptmod.h	sparc
+usr/include/sys/vlan.h		sparc
 #
 # These files are installed in the proto area so lvm can use
 # them during the build process.

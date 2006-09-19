@@ -118,7 +118,7 @@ extern void		dls_link_rele(dls_link_t *);
 extern void		dls_link_add(dls_link_t *, uint32_t, dls_impl_t *);
 extern void		dls_link_remove(dls_link_t *, dls_impl_t *);
 extern int		dls_link_header_info(dls_link_t *, mblk_t *,
-    mac_header_info_t *, uint16_t *);
+    mac_header_info_t *);
 extern int		dls_mac_hold(dls_link_t *);
 extern void		dls_mac_rele(dls_link_t *);
 
@@ -138,7 +138,8 @@ extern void		dls_init(void);
 extern int		dls_fini(void);
 extern boolean_t	dls_accept(dls_impl_t *, mac_header_info_t *,
     dls_rx_t *, void **);
-extern boolean_t	dls_accept_loopback(dls_impl_t *, dls_rx_t *, void **);
+extern boolean_t	dls_accept_loopback(dls_impl_t *, mac_header_info_t *,
+    dls_rx_t *, void **);
 
 #ifdef	__cplusplus
 }

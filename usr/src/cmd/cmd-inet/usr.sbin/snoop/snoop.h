@@ -126,6 +126,7 @@ extern char *prot_nest_prefix;
 
 extern char *get_sum_line(void);
 extern char *get_detail_line(int, int);
+extern void set_vlan_id(int);
 extern struct timeval prev_time;
 extern void process_pkt(struct sb_hdr *, char *, int, int);
 extern char *getflag(int, int, char *, char *);
@@ -263,22 +264,28 @@ extern char *print_ethertype(int);
  * The mac_type is one of the supported DLPI media
  * types (see <sys/dlpi.h>).
  * The mtu_size is the size of the largest frame.
+ * network_type_offset is where the network type
+ * is located in the link layer header.
  * The header length is returned by a function to
  * allow for variable header size - for ethernet it's
  * just a constant 14 octets.
  * The interpreter is the function that "knows" how
  * to interpret the frame.
+ * try_kernel_filter tells snoop to first try a kernel
+ * filter (because the header size is fixed, or if it could
+ * be of variable size where the variable size is easy for a kernel
+ * filter to handle, for example, Ethernet and VLAN tags)
+ * and only use a user space filter if the filter expression
+ * cannot be expressed in kernel space.
  */
 typedef struct interface {
 	uint_t	mac_type;
 	uint_t	mtu_size;
+	uint_t  network_type_offset;
 	uint_t	(*header_len)(char *);
 	uint_t 	(*interpreter)(int, char *, int, int);
-	uint_t	mac_hdr_fixed_size;
+	uint_t	try_kernel_filter;
 } interface_t;
-
-#define	IF_HDR_FIXED	0
-#define	IF_HDR_VAR	1
 
 extern interface_t INTERFACES[], *interface;
 extern char *device;

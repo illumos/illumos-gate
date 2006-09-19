@@ -602,42 +602,90 @@ done:
 
 mblk_t *
 dls_header(dls_channel_t dc, const uint8_t *addr, uint16_t sap, uint_t pri,
-    mblk_t *payload)
+    mblk_t **payloadp)
 {
-	dls_impl_t	*dip = (dls_impl_t *)dc;
-	uint16_t	vid;
-	size_t		extra_len;
-	uint16_t	mac_sap;
-	mblk_t		*mp;
+	dls_impl_t *dip = (dls_impl_t *)dc;
+	uint16_t vid;
+	size_t extra_len;
+	uint16_t mac_sap;
+	mblk_t *mp, *payload;
+	boolean_t is_ethernet = (dip->di_mip->mi_media == DL_ETHER);
 	struct ether_vlan_header *evhp;
 
 	vid = dip->di_dvp->dv_id;
-	if (vid != VLAN_ID_NONE) {
-		/*
-		 * We know ahead of time that we'll need to fill in
-		 * additional VLAN information in the link-layer header.
-		 * We will tell the MAC layer to pre-allocate some space at
-		 * the end of the Ethernet header for us.
-		 */
-		ASSERT(dip->di_mip->mi_media == DL_ETHER);
+	payload = (payloadp == NULL) ? NULL : (*payloadp);
+
+	/*
+	 * If the following conditions are satisfied:
+	 *	- This is not a ETHERTYPE_VLAN listener; and
+	 *	- This is either a VLAN stream or this is a physical stream
+	 *	  but the priority is not 0.
+	 *
+	 * then we know ahead of time that we'll need to fill in additional
+	 * VLAN information in the link-layer header. We will tell the MAC
+	 * layer to pre-allocate some space at the end of the Ethernet
+	 * header for us.
+	 */
+	if (is_ethernet && sap != ETHERTYPE_VLAN &&
+	    (vid != VLAN_ID_NONE || pri != 0)) {
 		extra_len = sizeof (struct ether_vlan_header) -
 		    sizeof (struct ether_header);
-		mac_sap = VLAN_TPID;
+		mac_sap = ETHERTYPE_VLAN;
 	} else {
 		extra_len = 0;
 		mac_sap = sap;
 	}
 
 	mp = mac_header(dip->di_mh, addr, mac_sap, payload, extra_len);
-	if (vid == VLAN_ID_NONE || mp == NULL)
+	if (mp == NULL)
+		return (NULL);
+
+	if ((vid == VLAN_ID_NONE && pri == 0) || !is_ethernet)
 		return (mp);
 
-	/* This is an Ethernet VLAN link.  Fill in the VLAN information */
+	/*
+	 * Fill in the tag information.
+	 */
 	ASSERT(MBLKL(mp) == sizeof (struct ether_header));
-	mp->b_wptr += extra_len;
-	evhp = (struct ether_vlan_header *)mp->b_rptr;
-	evhp->ether_tci = htons(VLAN_TCI(pri, ETHER_CFI, vid));
-	evhp->ether_type = htons(sap);
+	if (extra_len != 0) {
+		mp->b_wptr += extra_len;
+		evhp = (struct ether_vlan_header *)mp->b_rptr;
+		evhp->ether_tci = htons(VLAN_TCI(pri, ETHER_CFI, vid));
+		evhp->ether_type = htons(sap);
+	} else {
+		/*
+		 * The stream is ETHERTYPE_VLAN listener, so its VLAN tag is
+		 * in the payload. Update the priority.
+		 */
+		struct ether_vlan_extinfo *extinfo;
+		size_t len = sizeof (struct ether_vlan_extinfo);
+
+		ASSERT(sap == ETHERTYPE_VLAN);
+		ASSERT(payload != NULL);
+
+		if ((DB_REF(payload) > 1) || (MBLKL(payload) < len)) {
+			mblk_t *newmp;
+
+			/*
+			 * Because some DLS consumers only check the db_ref
+			 * count of the first mblk, we pullup 'payload' into
+			 * a single mblk.
+			 */
+			newmp = msgpullup(payload, -1);
+			if ((newmp == NULL) || (MBLKL(newmp) < len)) {
+				freemsg(newmp);
+				freemsg(mp);
+				return (NULL);
+			} else {
+				freemsg(payload);
+				*payloadp = payload = newmp;
+			}
+		}
+
+		extinfo = (struct ether_vlan_extinfo *)payload->b_rptr;
+		extinfo->ether_tci = htons(VLAN_TCI(pri, ETHER_CFI,
+		    VLAN_ID(ntohs(extinfo->ether_tci))));
+	}
 	return (mp);
 }
 
@@ -645,7 +693,7 @@ int
 dls_header_info(dls_channel_t dc, mblk_t *mp, mac_header_info_t *mhip)
 {
 	return (dls_link_header_info(((dls_impl_t *)dc)->di_dvp->dv_dlp,
-	    mp, mhip, NULL));
+	    mp, mhip));
 }
 
 void
@@ -738,8 +786,10 @@ accept:
 	return (B_TRUE);
 }
 
+/* ARGSUSED */
 boolean_t
-dls_accept_loopback(dls_impl_t *dip, dls_rx_t *di_rx, void **di_rx_arg)
+dls_accept_loopback(dls_impl_t *dip, mac_header_info_t *mhip, dls_rx_t *di_rx,
+    void **di_rx_arg)
 {
 	/*
 	 * We must not accept packets if the dls_impl_t is not marked as bound

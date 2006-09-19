@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -16,10 +16,11 @@ extern "C" {
 #include <sys/processor.h>
 #include <sys/stream.h>
 #include <sys/squeue.h>
+#include <sys/mac.h>
 
 #define	S_RING_NAMELEN 64
 
-typedef void (*s_ring_proc_t)(void *, void *, mblk_t *, size_t);
+typedef void (*s_ring_proc_t)(void *, void *, mblk_t *, mac_header_info_t *);
 
 typedef struct soft_ring_s {
 	/* Keep the most used members 64bytes cache aligned */
@@ -85,8 +86,8 @@ extern void soft_ring_set_destroy(soft_ring_t **, int);
 extern void soft_ring_process(soft_ring_t *, mblk_t *, uint8_t);
 extern void soft_ring_bind(void *, processorid_t);
 extern void soft_ring_unbind(void *);
-extern void dls_ether_soft_ring_fanout(void *,
-    void *, mblk_t *, size_t);
+extern void dls_ether_soft_ring_fanout(void *, void *, mblk_t *,
+    mac_header_info_t *);
 extern boolean_t dls_soft_ring_enable(dls_channel_t, dl_capab_dls_t *);
 extern void dls_soft_ring_disable(dls_channel_t);
 extern boolean_t dls_soft_ring_workers(dls_channel_t);

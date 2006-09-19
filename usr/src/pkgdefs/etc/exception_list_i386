@@ -501,6 +501,7 @@ usr/include/sys/dumpadm.h	i386
 usr/include/sys/ontrap.h	i386
 usr/include/sys/sysmsg_impl.h	i386
 usr/include/sys/cryptmod.h	i386
+usr/include/sys/vlan.h		i386
 #
 # These files are installed in the proto area so lvm can use
 # them during the build process. 

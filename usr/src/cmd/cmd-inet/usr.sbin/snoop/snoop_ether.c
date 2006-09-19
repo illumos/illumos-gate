@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +29,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <stddef.h>
 #include <fcntl.h>
 #include <string.h>
 #include <sys/types.h>
@@ -44,11 +44,13 @@
 #include <netinet/ip.h>
 #include <netinet/if_ether.h>
 #include <sys/ib/clients/ibd/ibd.h>
+#include <sys/ethernet.h>
+#include <sys/vlan.h>
 
 #include "at.h"
 #include "snoop.h"
 
-static 	uint_t ether_header_len(char *), fddi_header_len(char *),
+static	uint_t ether_header_len(char *), fddi_header_len(char *),
 		tr_header_len(char *), ib_header_len(char *);
 static uint_t interpret_ether(), interpret_fddi(), interpret_tr();
 static uint_t interpret_ib(int, char *, int, int);
@@ -58,24 +60,23 @@ interface_t *interface;
 interface_t INTERFACES[] = {
 
 	/* IEEE 802.3 CSMA/CD network */
-	{ DL_CSMACD, 1550, ether_header_len, interpret_ether, IF_HDR_FIXED },
+	{ DL_CSMACD, 1550, 12, ether_header_len, interpret_ether, B_TRUE },
 
 	/* Ethernet Bus */
-	{ DL_ETHER, 1550, ether_header_len, interpret_ether, IF_HDR_FIXED },
+	{ DL_ETHER, 1550, 12, ether_header_len, interpret_ether, B_TRUE },
 
 	/* Fiber Distributed data interface */
-	{ DL_FDDI, 4500, fddi_header_len, interpret_fddi, IF_HDR_VAR },
+	{ DL_FDDI, 4500, 19, fddi_header_len, interpret_fddi, B_FALSE },
 
 	/* Token Ring interface */
-	{ DL_TPR, 17800, tr_header_len, interpret_tr, IF_HDR_VAR },
+	{ DL_TPR, 17800, 0, tr_header_len, interpret_tr, B_FALSE },
 
 	/* Infiniband */
-	{ DL_IB, 4096, ib_header_len, interpret_ib, IF_HDR_FIXED },
+	{ DL_IB, 4096, 0, ib_header_len, interpret_ib, B_TRUE },
 
-	{ (uint_t)-1, 0, 0, 0, 0 }
+	{ (uint_t)-1, 0, 0, 0, 0, 0 }
 
 };
-
 
 /* externals */
 extern char *dlc_header;
@@ -109,6 +110,7 @@ interpret_ether(flags, e, elen, origlen)
 	extern char *dst_name;
 	int ethertype;
 	boolean_t data_copied = B_FALSE;
+	struct ether_vlan_extinfo *evx = NULL;
 	int blen = MAX(origlen, ETHERMTU);
 
 	if (data != NULL && datalen != 0 && datalen < blen) {
@@ -153,7 +155,7 @@ interpret_ether(flags, e, elen, origlen)
 	if (ethertype <= 1514) {
 		/*
 		 * Fake out the IEEE 802.3 packets.
-		 * Should be DSAP=170, SSAP=170, control=3
+		 * Should be DSAP=0xAA, SSAP=0xAA, control=0x03
 		 * then three padding bytes of zero,
 		 * followed by a normal ethernet-type packet.
 		 */
@@ -161,6 +163,29 @@ interpret_ether(flags, e, elen, origlen)
 		ethertype = ntohs(*(ushort_t *)(off + 6));
 		off += 8;
 		len -= 8;
+	}
+
+	if (ethertype == ETHERTYPE_VLAN) {
+		if (origlen < sizeof (struct ether_vlan_header)) {
+			if (flags & F_SUM) {
+				(void) sprintf(get_sum_line(),
+				    "RUNT (short VLAN packet - %d bytes)",
+				    origlen);
+			}
+			if (flags & F_DTAIL) {
+				show_header("RUNT:  ", "Short VLAN packet",
+				    origlen);
+			}
+			return (elen);
+		}
+		if (len < sizeof (struct ether_vlan_extinfo))
+			return (elen);
+
+		evx = (struct ether_vlan_extinfo *)off;
+		off += sizeof (struct ether_vlan_extinfo);
+		len -= sizeof (struct ether_vlan_extinfo);
+
+		ethertype = ntohs(evx->ether_type);
 	}
 
 	/*
@@ -174,11 +199,27 @@ interpret_ether(flags, e, elen, origlen)
 	}
 
 	if (flags & F_SUM) {
-		(void) sprintf(get_sum_line(),
-			"ETHER Type=%04X (%s), size = %d bytes",
-			ethertype,
-			print_ethertype(ethertype),
-			origlen);
+		/*
+		 * Set the flag that says don't display VLAN information.
+		 * If it needs to change, that will be done later if the
+		 * packet is VLAN tagged and if snoop is in its default
+		 * summary mode.
+		 */
+		set_vlan_id(0);
+		if (evx == NULL) {
+			(void) sprintf(get_sum_line(),
+			    "ETHER Type=%04X (%s), size=%d bytes",
+			    ethertype, print_ethertype(ethertype),
+			    origlen);
+		} else {
+			(void) sprintf(get_sum_line(),
+			    "ETHER Type=%04X (%s), VLAN ID=%hu, size=%d "
+			    "bytes", ethertype, print_ethertype(ethertype),
+			    VLAN_ID(ntohs(evx->ether_tci)), origlen);
+
+			if (!(flags & F_ALLSUM))
+				set_vlan_id(VLAN_ID(ntohs(evx->ether_tci)));
+		}
 	}
 
 	if (flags & F_DTAIL) {
@@ -200,10 +241,16 @@ interpret_ether(flags, e, elen, origlen)
 		"Source      = %s, %s",
 		printether(&e->ether_shost),
 		print_etherinfo(&e->ether_shost));
-	if (ieee8023 > 0)
+	if (ieee8023 > 0) {
 		(void) sprintf(get_line(12, 2),
-			"IEEE 802.3 length = %d bytes",
-			ieee8023);
+		    "IEEE 802.3 length = %d bytes", ieee8023);
+	}
+	if (evx != NULL) {
+		(void) sprintf(get_line(0, 0),
+		    "VLAN ID     = %hu", VLAN_ID(ntohs(evx->ether_tci)));
+		(void) sprintf(get_line(0, 0),
+		    "VLAN Priority = %hu", VLAN_PRI(ntohs(evx->ether_tci)));
+	}
 	(void) sprintf(get_line(12, 2),
 		"Ethertype = %04X (%s)",
 		ethertype, print_ethertype(ethertype));
@@ -242,12 +289,32 @@ interpret_ether(flags, e, elen, origlen)
 	return (elen);
 }
 
-/* ARGSUSED */
+/*
+ * Return the length of the ethernet header.  In the case
+ * where we have a VLAN tagged packet, return the length of
+ * the ethernet header plus the length of the VLAN tag.
+ *
+ * INPUTS:  e  -  A buffer pointer.  Passing a NULL pointer
+ *                is not allowed, e must be non-NULL.
+ * OUTPUTS:  Return the size of an untagged ethernet header
+ *           if the packet is not VLAN tagged, and the size
+ *           of an untagged ethernet header plus the size of
+ *           a VLAN header otherwise.
+ */
 uint_t
 ether_header_len(e)
 char *e;
 {
-	return (14);
+	uint16_t ether_type = 0;
+	e += (offsetof(struct ether_header, ether_type));
+
+	GETINT16(ether_type, e);
+
+	if (ether_type == (uint16_t)ETHERTYPE_VLAN) {
+		return (sizeof (struct ether_vlan_header));
+	} else {
+		return (sizeof (struct ether_header));
+	}
 }
 
 

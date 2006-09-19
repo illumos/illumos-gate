@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -343,7 +342,9 @@ pfioctl(queue_t *wq, mblk_t *mp)
 	struct	Pf_ext_packetfilt	*upfp;
 	struct	packetfilt	*opfp;
 	ushort_t	*fwp;
-	int	maxoff, arg;
+	int	arg;
+	int	maxoff = 0;
+	int	maxoffreg = 0;
 	struct iocblk	*iocp = (struct iocblk *)mp->b_rptr;
 	int	error;
 
@@ -406,7 +407,6 @@ pfioctl(queue_t *wq, mblk_t *mp)
 		 * body to pull up.  This code depends on the
 		 * filter encoding.
 		 */
-		maxoff = 0;
 		for (fwp = pfp->pf_Filter; fwp < pfp->pf_FilterEnd; fwp++) {
 			arg = *fwp & ((1 << ENF_NBPA) - 1);
 			switch (arg) {
@@ -415,7 +415,16 @@ pfioctl(queue_t *wq, mblk_t *mp)
 					maxoff = arg;
 				break;
 
+			case ENF_LOAD_OFFSET:
+				/* Point to the offset */
+				fwp++;
+				if (*fwp > maxoffreg)
+					maxoffreg = *fwp;
+				break;
+
 			case ENF_PUSHLIT:
+			case ENF_BRTR:
+			case ENF_BRFL:
 				/* Skip over the literal. */
 				fwp++;
 				break;
@@ -426,6 +435,7 @@ pfioctl(queue_t *wq, mblk_t *mp)
 			case ENF_PUSHFF00:
 			case ENF_PUSH00FF:
 			case ENF_NOPUSH:
+			case ENF_POP:
 				break;
 			}
 		}
@@ -433,8 +443,7 @@ pfioctl(queue_t *wq, mblk_t *mp)
 		/*
 		 * Convert word offset to length in bytes.
 		 */
-		pfp->pf_PByteLen = (maxoff + 1) * sizeof (ushort_t);
-
+		pfp->pf_PByteLen = (maxoff + maxoffreg + 1) * sizeof (ushort_t);
 		miocack(wq, mp, 0, 0);
 		break;
 
@@ -448,23 +457,10 @@ pfioctl(queue_t *wq, mblk_t *mp)
 /* #define	INNERDEBUG	1 */
 
 #ifdef	INNERDEBUG
-#define	enprintf(flags)	if (enDebug & (flags)) printf
-
-/*
- * Symbolic definitions for enDebug flag bits
- *	ENDBG_TRACE should be 1 because it is the most common
- *	use in the code, and the compiler generates faster code
- *	for testing the low bit in a word.
- */
-
-#define	ENDBG_TRACE	1	/* trace most operations */
-#define	ENDBG_DESQ	2	/* trace descriptor queues */
-#define	ENDBG_INIT	4	/* initialization info */
-#define	ENDBG_SCAV	8	/* scavenger operation */
-#define	ENDBG_ABNORM	16	/* abnormal events */
-
-int	enDebug = /* ENDBG_ABNORM | ENDBG_INIT | ENDBG_TRACE */ -1;
-#endif /* INNERDEBUG */
+#define	enprintf(a)	printf a
+#else
+#define	enprintf(a)
+#endif
 
 /*
  * Apply the packet filter given by pfp to the packet given by
@@ -493,15 +489,13 @@ FilterPacket(struct packdesc *pp, struct epacketfilt *pfp)
 	ushort_t	*fpe;
 	unsigned	op;
 	unsigned	arg;
+	unsigned	offreg = 0;
 	ushort_t	stack[ENMAXFILTERS+1];
 
 	fp = &pfp->pf_Filter[0];
 	fpe = pfp->pf_FilterEnd;
 
-#ifdef	INNERDEBUG
-	enprintf(ENDBG_TRACE)("FilterPacket(%p, %p, %p, %p):\n",
-		pp, pfp, fp, fpe);
-#endif
+	enprintf(("FilterPacket(%p, %p, %p, %p):\n", pp, pfp, fp, fpe));
 
 	/*
 	 * Push TRUE on stack to start.  The stack size is chosen such
@@ -525,14 +519,12 @@ FilterPacket(struct packdesc *pp, struct epacketfilt *pfp)
 		 * if it were less than ENF_PUSHWORD before,
 		 * it would now be huge.
 		 */
-		if (arg < maxhdr)
-			*--sp = pp->pd_hdr[arg];
-		else if (arg < maxword)
-			*--sp = pp->pd_body[arg - maxhdr];
+		if (arg + offreg < maxhdr)
+			*--sp = pp->pd_hdr[arg + offreg];
+		else if (arg + offreg < maxword)
+			*--sp = pp->pd_body[arg - maxhdr + offreg];
 		else {
-#ifdef	INNERDEBUG
-			enprintf(ENDBG_TRACE)("=>0(len)\n");
-#endif
+			enprintf(("=>0(len)\n"));
 			return (0);
 		}
 		break;
@@ -554,14 +546,42 @@ FilterPacket(struct packdesc *pp, struct epacketfilt *pfp)
 	case ENF_PUSH00FF:
 		*--sp = 0x00ff;
 		break;
+	case ENF_LOAD_OFFSET:
+		offreg = *fp++;
+		break;
+	case ENF_BRTR:
+		if (*sp != 0)
+			fp += *fp;
+		else
+			fp++;
+		if (fp >= fpe) {
+			enprintf(("BRTR: fp>=fpe\n"));
+			return (0);
+		}
+		break;
+	case ENF_BRFL:
+		if (*sp == 0)
+			fp += *fp;
+		else
+			fp++;
+		if (fp >= fpe) {
+			enprintf(("BRFL: fp>=fpe\n"));
+			return (0);
+		}
+		break;
+	case ENF_POP:
+		++sp;
+		if (sp > &stack[ENMAXFILTERS]) {
+			enprintf(("stack underflow\n"));
+			return (0);
+		}
+		break;
 	case ENF_NOPUSH:
 		break;
 	}
 
 	if (sp < &stack[2]) {	/* check stack overflow: small yellow zone */
-#ifdef	INNERDEBUG
-		enprintf(ENDBG_TRACE)("=>0(--sp)\n");
-#endif
+		enprintf(("=>0(--sp)\n"));
 		return (0);
 	}
 
@@ -573,18 +593,14 @@ FilterPacket(struct packdesc *pp, struct epacketfilt *pfp)
 	 * on stack to evaluate.
 	 */
 	if (sp > &stack[ENMAXFILTERS-2]) {
-#ifdef	INNERDEBUG
-		enprintf(ENDBG_TRACE)("=>0(sp++)\n");
-#endif
+		enprintf(("=>0(sp++)\n"));
 		return (0);
 	}
 
 	arg = *sp++;
 	switch (op) {
 	default:
-#ifdef	INNERDEBUG
-		enprintf(ENDBG_TRACE)("=>0(def)\n");
-#endif
+		enprintf(("=>0(def)\n"));
 		return (0);
 	case opx(ENF_AND):
 		*sp &= arg;
@@ -618,40 +634,30 @@ FilterPacket(struct packdesc *pp, struct epacketfilt *pfp)
 
 	case opx(ENF_COR):
 		if (*sp++ == arg) {
-#ifdef	INNERDEBUG
-			enprintf(ENDBG_TRACE)("=>COR %x\n", *sp);
-#endif
+			enprintf(("=>COR %x\n", *sp));
 			return (1);
 		}
 		break;
 	case opx(ENF_CAND):
 		if (*sp++ != arg) {
-#ifdef	INNERDEBUG
-			enprintf(ENDBG_TRACE)("=>CAND %x\n", *sp);
-#endif
+			enprintf(("=>CAND %x\n", *sp));
 			return (0);
 		}
 		break;
 	case opx(ENF_CNOR):
 		if (*sp++ == arg) {
-#ifdef	INNERDEBUG
-			enprintf(ENDBG_TRACE)("=>COR %x\n", *sp);
-#endif
+			enprintf(("=>COR %x\n", *sp));
 			return (0);
 		}
 		break;
 	case opx(ENF_CNAND):
 		if (*sp++ != arg) {
-#ifdef	INNERDEBUG
-			enprintf(ENDBG_TRACE)("=>CNAND %x\n", *sp);
-#endif
+			enprintf(("=>CNAND %x\n", *sp));
 			return (1);
 		}
 		break;
 	}
 	}
-#ifdef	INNERDEBUG
-	enprintf(ENDBG_TRACE)("=>%x\n", *sp);
-#endif
+	enprintf(("=>%x\n", *sp));
 	return (*sp);
 }

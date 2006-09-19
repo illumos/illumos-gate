@@ -240,10 +240,7 @@ check_device(char **devicep, int *ppap)
 	if (interface->mtu_size > (uint_t)netdl.info_ack.dl_max_sdu)
 		netdl.info_ack.dl_max_sdu = (t_scalar_t)interface->mtu_size;
 
-	if (interface->mac_hdr_fixed_size == IF_HDR_FIXED)
-		return (B_TRUE);
-
-	return (B_FALSE);
+	return (interface->try_kernel_filter);
 }
 
 /*

@@ -37,6 +37,7 @@
 
 #include <sys/socket.h>
 #include <sys/sockio.h>
+#include <sys/vlan.h>
 #include <net/if.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
@@ -54,6 +55,7 @@
 
 #include <sys/dlpi.h>
 #include <snoop.h>
+#include "snoop_vlan.h"
 
 #define	IPV4_ONLY	0
 #define	IPV6_ONLY	1
@@ -73,6 +75,7 @@
 #define	MASKED_IPV6_VERS	0x60
 #define	IP_HDR_LEN(p)	(((*(uchar_t *)p) & 0xf) * 4)
 #define	TCP_HDR_LEN(p)	((((*((uchar_t *)p+12)) >> 4) & 0xf) * 4)
+
 /*
  * Coding the constant below is tacky, but the compiler won't let us
  * be more clever.  E.g., &((struct ip *)0)->ip_xxx
@@ -128,6 +131,11 @@ int opstack;	/* operand stack depth */
  * It points the base at the cached RPC header.  For the
  * purposes of selection, RPC reply headers look like call
  * headers except for the direction value.
+ * OP_OFFSET_ETHERTYPE sets base according to the following
+ * algorithm:
+ *   if the packet is not VLAN tagged, then set base to
+ *         the ethertype field in the ethernet header
+ *   else set base to the ethertype field of the VLAN header
  * OP_OFFSET_POP restores the offset base to the value prior
  * to the most recent OP_OFFSET call.
  */
@@ -163,6 +171,7 @@ enum optype {
 	OP_OFFSET_UDP,
 	OP_OFFSET_RPC,
 	OP_OFFSET_SLP,
+	OP_OFFSET_ETHERTYPE,
 	OP_LAST
 };
 
@@ -198,6 +207,7 @@ static char *opnames[] = {
 	"OFFSET_UDP",
 	"OFFSET_RPC",
 	"OP_OFFSET_SLP",
+	"OFFSET_ETHERTYPE",
 	""
 };
 
@@ -219,6 +229,27 @@ static struct xid_entry *find_rpc();
 static void optimize();
 static void ethertype_match();
 
+/*
+ * Get a ushort from a possibly unaligned character buffer.
+ *
+ * INPUTS:  buffer - where the data is.  Must be at least
+ *          sizeof(uint16_t) bytes long.
+ * OUPUTS:  An unsigned short that contains the data at buffer.
+ *          No calls to ntohs or htons are done on the data.
+ */
+static uint16_t
+get_u16(uchar_t *buffer)
+{
+	uint8_t	*bufraw = buffer;
+
+	/*
+	 * ntohs is used only as a cheap way to flip the bits
+	 * around on a little endian platform.  The value will
+	 * still be in host order or network order, depending on
+	 * the order it was in when it was passed in.
+	 */
+	return (ntohs(bufraw[0] << 8 | bufraw[1]));
+}
 
 /*
  * Returns the ULP for an IPv4 or IPv6 packet
@@ -524,6 +555,7 @@ want_packet(uchar_t *pkt, int len, int origlen)
 	uchar_t **offp;		/* current offset */
 	uchar_t *opkt = NULL;
 	uint_t olen;
+	uint_t ethertype = 0;
 
 	sp = stack;
 	*sp = 1;
@@ -546,21 +578,7 @@ want_packet(uchar_t *pkt, int len, int origlen)
 			if ((base + off + sizeof (uint16_t) - 1) > (pkt + len))
 				return (0); /* packet too short */
 
-			/*
-			 * Handle 2 possible alignments
-			 */
-			switch ((((unsigned)base)+off) % sizeof (ushort_t)) {
-			case 0:
-				*sp = ntohs(*((ushort_t *)(base + *sp)));
-				break;
-			case 1:
-				*((uchar_t *)(sp)) =
-					*((uchar_t *)(base + off));
-				*(((uchar_t *)sp) + 1) =
-					*((uchar_t *)(base + off) + 1);
-				*sp = ntohs(*(ushort_t *)sp);
-				break;
-			}
+			*sp = ntohs(get_u16((uchar_t *)(base + off)));
 			break;
 		case OP_LOAD_LONG:
 			off = *sp;
@@ -899,6 +917,45 @@ want_packet(uchar_t *pkt, int len, int origlen)
 			if (sp >= &stack[MAXSS])
 				return (0);
 			*(++sp) = 0;
+			break;
+		case OP_OFFSET_ETHERTYPE:
+			/*
+			 * Set base to the location of the ethertype.
+			 * If the packet is VLAN tagged, move base
+			 * to the ethertype field in the VLAN header.
+			 * Otherwise, set it to the appropriate field
+			 * for this link type.
+			 */
+			if (offp >= &offstack[MAXSS])
+				return (0);
+			*++offp = base;
+			base = pkt + interface->network_type_offset;
+			if (base > pkt + len) {
+				/* Went too far, drop the packet */
+				return (0);
+			}
+
+			/*
+			 * VLAN links are only supported on Ethernet-like
+			 * links.
+			 */
+			if (interface->mac_type == DL_ETHER ||
+			    interface->mac_type == DL_CSMACD) {
+				if (ntohs(get_u16(base)) == ETHERTYPE_VLAN) {
+					/*
+					 * We need to point to the
+					 * ethertype field in the VLAN
+					 * tag, so also move past the
+					 * ethertype field in the
+					 * ethernet header.
+					 */
+					base += (ENCAP_ETHERTYPE_OFF);
+				}
+				if (base > pkt + len) {
+					/* Went too far, drop the packet */
+					return (0);
+				}
+			}
 			break;
 		}
 	}
@@ -1250,36 +1307,36 @@ static struct match_type {
 } match_types[] = {
 	/*
 	 * Table initialized assuming Ethernet data link headers.
+	 * m_offset is an offset beyond the offset op, which is why
+	 * the offset is zero for when snoop needs to check an ethertype.
 	 */
-	"ip",		12, 2, ETHERTYPE_IP,	-1,	OP_OFFSET_ZERO,
-	"ip6",		12, 2, ETHERTYPE_IPV6,	-1,	OP_OFFSET_ZERO,
-	"arp",		12, 2, ETHERTYPE_ARP,	-1,	OP_OFFSET_ZERO,
-	"rarp",		12, 2, ETHERTYPE_REVARP, -1,	OP_OFFSET_ZERO,
-	"pppoed",	12, 2, ETHERTYPE_PPPOED, -1,	OP_OFFSET_ZERO,
-	"pppoes",	12, 2, ETHERTYPE_PPPOES, -1,	OP_OFFSET_ZERO,
-	"tcp",		9, 1, IPPROTO_TCP,	0,	OP_OFFSET_LINK,
-	"tcp",		6, 1, IPPROTO_TCP,	1,	OP_OFFSET_LINK,
-	"udp",		9, 1, IPPROTO_UDP,	0,	OP_OFFSET_LINK,
-	"udp",		6, 1, IPPROTO_UDP,	1,	OP_OFFSET_LINK,
-	"icmp",		9, 1, IPPROTO_ICMP,	0,	OP_OFFSET_LINK,
-	"icmp6",	6, 1, IPPROTO_ICMPV6,	1,	OP_OFFSET_LINK,
-	"ospf",		9, 1, IPPROTO_OSPF,	0,	OP_OFFSET_LINK,
-	"ospf",		6, 1, IPPROTO_OSPF,	1,	OP_OFFSET_LINK,
-	"ip-in-ip",	9, 1, IPPROTO_ENCAP,	0,	OP_OFFSET_LINK,
-	"esp",		9, 1, IPPROTO_ESP,	0,	OP_OFFSET_LINK,
-	"esp",		6, 1, IPPROTO_ESP,	1,	OP_OFFSET_LINK,
-	"ah",		9, 1, IPPROTO_AH,	0,	OP_OFFSET_LINK,
-	"ah",		6, 1, IPPROTO_AH,	1,	OP_OFFSET_LINK,
-	"sctp",		9, 1, IPPROTO_SCTP,	0,	OP_OFFSET_LINK,
-	"sctp",		6, 1, IPPROTO_SCTP,	1,	OP_OFFSET_LINK,
-	0,		0, 0, 0,		0,	0
+	"ip",		0,  2, ETHERTYPE_IP,	 -1,	OP_OFFSET_ETHERTYPE,
+	"ip6",		0,  2, ETHERTYPE_IPV6,	 -1,	OP_OFFSET_ETHERTYPE,
+	"arp",		0,  2, ETHERTYPE_ARP,	 -1,	OP_OFFSET_ETHERTYPE,
+	"rarp",		0,  2, ETHERTYPE_REVARP, -1,	OP_OFFSET_ETHERTYPE,
+	"pppoed",	0,  2, ETHERTYPE_PPPOED, -1,	OP_OFFSET_ETHERTYPE,
+	"pppoes",	0,  2, ETHERTYPE_PPPOES, -1,	OP_OFFSET_ETHERTYPE,
+	"tcp",		9,  1, IPPROTO_TCP,	 0,	OP_OFFSET_LINK,
+	"tcp",		6,  1, IPPROTO_TCP,	 1,	OP_OFFSET_LINK,
+	"udp",		9,  1, IPPROTO_UDP,	 0,	OP_OFFSET_LINK,
+	"udp",		6,  1, IPPROTO_UDP,	 1,	OP_OFFSET_LINK,
+	"icmp",		9,  1, IPPROTO_ICMP,	 0,	OP_OFFSET_LINK,
+	"icmp6",	6,  1, IPPROTO_ICMPV6,	 1,	OP_OFFSET_LINK,
+	"ospf",		9,  1, IPPROTO_OSPF,	 0,	OP_OFFSET_LINK,
+	"ospf",		6,  1, IPPROTO_OSPF,	 1,	OP_OFFSET_LINK,
+	"ip-in-ip",	9,  1, IPPROTO_ENCAP,	 0,	OP_OFFSET_LINK,
+	"esp",		9,  1, IPPROTO_ESP,	 0,	OP_OFFSET_LINK,
+	"esp",		6,  1, IPPROTO_ESP,	 1,	OP_OFFSET_LINK,
+	"ah",		9,  1, IPPROTO_AH,	 0,	OP_OFFSET_LINK,
+	"ah",		6,  1, IPPROTO_AH,	 1,	OP_OFFSET_LINK,
+	"sctp",		9,  1, IPPROTO_SCTP,	 0,	OP_OFFSET_LINK,
+	"sctp",		6,  1, IPPROTO_SCTP,	 1,	OP_OFFSET_LINK,
+	0,		0,  0, 0,		 0,	0
 };
 
 static void
 generate_check(struct match_type *mtp)
 {
-	int	offset;
-
 	/*
 	 * Note: this code assumes the above dependencies are
 	 * not cyclic.  This *should* always be true.
@@ -1287,45 +1344,10 @@ generate_check(struct match_type *mtp)
 	if (mtp->m_depend != -1)
 		generate_check(&match_types[mtp->m_depend]);
 
-	offset = mtp->m_offset;
-	if (mtp->m_optype == OP_OFFSET_ZERO) {
-
-		/*
-		 * The table is filled with ethernet offsets.  Here we
-		 * fudge the value based on what know about the
-		 * interface.  It is okay to do this because we are
-		 * checking what we believe to be an IP/ARP/RARP
-		 * packet, and we know those are carried in LLC-SNAP
-		 * headers on FDDI.  We assume that it's unlikely
-		 * another kind of packet, with a shorter FDDI header
-		 * will happen to match the filter.
-		 *
-		 *		Ether	FDDI	IPoIB
-		 *  edst addr	0	1	none
-		 *  esrc addr	6	7	none
-		 *  ethertype	12	19	0
-		 *
-		 * XXX token ring?
-		 */
-		if (interface->mac_type == DL_FDDI) {
-			if (offset < 12)
-				offset++;
-			else if (offset == 12)
-				offset = 19;
-		} else if (interface->mac_type == DL_IB) {
-			offset = 0;
-		}
-	}
-
-	if (mtp->m_optype != OP_OFFSET_ZERO) {
-		emitop(mtp->m_optype);
-		load_value(offset, mtp->m_size);
-		load_const(mtp->m_value);
-		emitop(OP_OFFSET_POP);
-	} else {
-		load_value(offset, mtp->m_size);
-		load_const(mtp->m_value);
-	}
+	emitop(mtp->m_optype);
+	load_value(mtp->m_offset, mtp->m_size);
+	load_const(mtp->m_value);
+	emitop(OP_OFFSET_POP);
 
 	emitop(OP_EQ);
 
@@ -1732,6 +1754,7 @@ etheraddr_match(enum direction which, char *hostname)
 	memcpy(&addr, (ushort_t *)ep, 4);
 	addrp = (ushort_t *)ep + 2;
 
+	emitop(OP_OFFSET_ZERO);
 	switch (which) {
 	case TO:
 		compare_value(to_offset, 4, ntohl(addr));
@@ -1760,33 +1783,40 @@ etheraddr_match(enum direction which, char *hostname)
 		resolve_chain(m);
 		break;
 	}
+	emitop(OP_OFFSET_POP);
 }
 
 static void
 ethertype_match(int val)
 {
-	int	m;
-	int	ether_offset;
+	int ether_offset = interface->network_type_offset;
 
-	switch (interface->mac_type) {
-	case DL_ETHER:
-		ether_offset = 12;
-		break;
-
-	case DL_IB:
-		ether_offset = 0;
-		break;
-
-	case DL_FDDI:
-		/* XXX Okay to assume LLC SNAP? */
-		ether_offset = 19;
-		break;
-
-	default:
-		load_const(1);	/* Assume a match */
-		return;
+	/*
+	 * If the user is interested in ethertype VLAN,
+	 * then we need to set the offset to the beginning of the packet.
+	 * But if the user is interested in another ethertype,
+	 * such as IPv4, then we need to take into consideration
+	 * the fact that the packet might be VLAN tagged.
+	 */
+	if (interface->mac_type == DL_ETHER ||
+	    interface->mac_type == DL_CSMACD) {
+		if (val != ETHERTYPE_VLAN) {
+			/*
+			 * OP_OFFSET_ETHERTYPE puts us at the ethertype
+			 * field whether or not there is a VLAN tag,
+			 * so ether_offset goes to zero if we get here.
+			 */
+			emitop(OP_OFFSET_ETHERTYPE);
+			ether_offset = 0;
+		} else {
+			emitop(OP_OFFSET_ZERO);
+		}
 	}
-	compare_value(ether_offset, 2, val); /* XXX.sparker */
+	compare_value(ether_offset, 2, val);
+	if (interface->mac_type == DL_ETHER ||
+	    interface->mac_type == DL_CSMACD) {
+		emitop(OP_OFFSET_POP);
+	}
 }
 
 /*
@@ -2076,9 +2106,11 @@ primary()
 			 * bytes long, this works for FDDI & ethernet.
 			 * XXX - Token ring?
 			 */
+			emitop(OP_OFFSET_ZERO);
 			if (interface->mac_type == DL_IB)
 				pr_err("filter option unsupported on media");
 			compare_value(1, 4, 0xffffffff);
+			emitop(OP_OFFSET_POP);
 			opstack++;
 			next();
 			break;
@@ -2086,6 +2118,7 @@ primary()
 
 		if (EQ("multicast")) {
 			/* XXX Token ring? */
+			emitop(OP_OFFSET_ZERO);
 			if (interface->mac_type == DL_FDDI) {
 				compare_value_mask(1, 1, 0x01, 0x01);
 			} else if (interface->mac_type == DL_IB) {
@@ -2093,6 +2126,7 @@ primary()
 			} else {
 				compare_value_mask(0, 1, 0x01, 0x01);
 			}
+			emitop(OP_OFFSET_POP);
 			opstack++;
 			next();
 			break;
@@ -2111,16 +2145,35 @@ primary()
 				emitop(OP_LE);
 				resolve_chain(m);
 			} else {
-				load_value(12, 2);	/* ether type */
+				emitop(OP_OFFSET_ETHERTYPE);
+				load_value(0, 2);	/* ether type */
 				load_const(0x6000);
 				emitop(OP_GE);
 				emitop(OP_BRFL);
 				m = chain(0);
-				load_value(12, 2);	/* ether type */
+				load_value(0, 2);	/* ether type */
 				load_const(0x6009);
 				emitop(OP_LE);
 				resolve_chain(m);
+				emitop(OP_OFFSET_POP);
 			}
+			opstack++;
+			next();
+			break;
+		}
+
+		if (EQ("vlan-id")) {
+			next();
+			if (tokentype != NUMBER)
+				pr_err("vlan id expected");
+			emitop(OP_OFFSET_ZERO);
+			ethertype_match(ETHERTYPE_VLAN);
+			emitop(OP_BRFL);
+			m = chain(0);
+			compare_value_mask(VLAN_ID_OFFSET, 2, tokenval,
+			    VLAN_ID_MASK);
+			resolve_chain(m);
+			emitop(OP_OFFSET_POP);
 			opstack++;
 			next();
 			break;
@@ -2148,6 +2201,16 @@ primary()
 			break;
 		}
 
+		if (EQ("vlan")) {
+			ethertype_match(ETHERTYPE_VLAN);
+			compare_value_mask(VLAN_ID_OFFSET, 2, 0, VLAN_ID_MASK);
+			emitop(OP_NOT);
+			emitop(OP_AND);
+			opstack++;
+			next();
+			break;
+		}
+
 		if (EQ("bootp") || EQ("dhcp")) {
 			emitop(OP_OFFSET_LINK);
 			emitop(OP_LOAD_CONST);
@@ -2163,6 +2226,8 @@ primary()
 			compare_value(0, 4,
 			    (IPPORT_BOOTPC << 16 | IPPORT_BOOTPS));
 			resolve_chain(m);
+			emitop(OP_OFFSET_POP);
+			emitop(OP_OFFSET_POP);
 			opstack++;
 			dir = ANY;
 			next();

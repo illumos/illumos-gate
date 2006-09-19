@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +70,15 @@ struct	ether_vlan_header {
 	ushort_t		ether_type;
 };
 
+/*
+ * The VLAN tag.  Available for applications that cannot make use of struct
+ * ether_vlan_header because they assume Ethernet encapsulation.
+ */
+struct ether_vlan_extinfo {
+	ushort_t		ether_tci;
+	ushort_t		ether_type;
+};
+
 #define	ETHERTYPE_PUP		(0x0200)	/* PUP protocol */
 #define	ETHERTYPE_802_MIN	(0x0600)	/* Min valid ethernet type */
 						/* under IEEE 802.3 rules */
@@ -79,6 +87,7 @@ struct	ether_vlan_header {
 #define	ETHERTYPE_REVARP	(0x8035)	/* Reverse ARP */
 #define	ETHERTYPE_AT		(0x809b)	/* AppleTalk protocol */
 #define	ETHERTYPE_AARP		(0x80f3)	/* AppleTalk ARP */
+#define	ETHERTYPE_VLAN		(0x8100)	/* 802.1Q VLAN */
 #define	ETHERTYPE_IPV6		(0x86dd)	/* IPv6 */
 #define	ETHERTYPE_SLOW		(0x8809)	/* Slow Protocol */
 #define	ETHERTYPE_PPPOED	(0x8863)	/* PPPoE Discovery Stage */

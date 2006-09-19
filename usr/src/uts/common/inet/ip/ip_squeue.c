@@ -596,7 +596,7 @@ ip_squeue_soft_ring_affinity(void *arg)
 /* ARGSUSED */
 void
 ip_soft_ring_assignment(ill_t *ill, ill_rx_ring_t *ip_ring,
-mblk_t *mp_chain, size_t hdrlen)
+    mblk_t *mp_chain, struct mac_header_info_s *mhip)
 {
 	ip_taskq_arg_t	*taskq_arg;
 	boolean_t	refheld;
@@ -645,7 +645,7 @@ mblk_t *mp_chain, size_t hdrlen)
 	kmem_free(taskq_arg, sizeof (ip_taskq_arg_t));
 
 out:
-	ip_input(ill, NULL, mp_chain, hdrlen);
+	ip_input(ill, NULL, mp_chain, mhip);
 }
 
 static squeue_t *

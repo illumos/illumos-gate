@@ -88,6 +88,8 @@ boolean_t zflg = B_FALSE;		/* debugging packet corrupt flag */
 #endif
 struct Pf_ext_packetfilt pf;
 
+static int vlanid = 0;
+
 static void usage(void);
 void show_count();
 static void snoop_sigrecover(int sig, siginfo_t *info, void *p);
@@ -584,6 +586,11 @@ show_pktinfo(flags, num, src, dst, ptvp, tvp, drops, len)
 		}
 	}
 
+	if ((flags & F_SUM) && !(flags & F_ALLSUM) && (vlanid != 0)) {
+		(void) snprintf(lp, MAXLINE, "VLAN#%i: ", vlanid);
+		lp += strlen(lp);
+	}
+
 	if (flags & F_WHO) {
 		(void) sprintf(lp, "%12s -> %-12s ", src, dst);
 		lp += strlen(lp);
@@ -622,7 +629,7 @@ show_pktinfo(flags, num, src, dst, ptvp, tvp, drops, len)
 }
 
 /*
- * The following two routines are called back
+ * The following three routines are called back
  * from the interpreters to display their stuff.
  * The theory is that when snoop becomes a window
  * based tool we can just supply a new version of
@@ -655,6 +662,27 @@ get_detail_line(off, len)
 		detail_line[0] = '\0';
 	}
 	return (detail_line);
+}
+
+/*
+ * This function exists to make sure that VLAN information is
+ * prepended to summary lines displayed.  The problem this function
+ * solves is how to display VLAN information while in summary mode.
+ * Each interpretor uses the get_sum_line and get_detail_line functions
+ * to get a character buffer to display information to the user.
+ * get_sum_line is the important one here.  Each call to get_sum_line
+ * gets a buffer which stores one line of information.  In summary mode,
+ * the last line generated is the line printed.  Instead of changing each
+ * interpreter to add VLAN information to the summary line, the ethernet
+ * interpreter changes to call this function and set an ID.  If the ID is not
+ * zero and snoop is in default summary mode, snoop displays the
+ * VLAN information at the beginning of the output line.  Otherwise,
+ * no VLAN information is displayed.
+ */
+void
+set_vlan_id(int id)
+{
+	vlanid = id;
 }
 
 /*

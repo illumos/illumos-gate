@@ -533,6 +533,7 @@ CHKHDRS=			\
 	vfstab.h		\
 	vgareg.h		\
 	visual_io.h		\
+	vlan.h			\
 	vm.h			\
 	vmem.h			\
 	vmem_impl.h		\

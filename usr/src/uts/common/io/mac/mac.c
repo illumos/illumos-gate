@@ -1719,6 +1719,8 @@ mac_header_cook(mac_handle_t mh, mblk_t *mp)
 	if (mip->mi_type->mt_ops.mtops_ops & MTOPS_HEADER_COOK) {
 		if (DB_REF(mp) > 1) {
 			mblk_t *newmp = copymsg(mp);
+			if (newmp == NULL)
+				return (NULL);
 			freemsg(mp);
 			mp = newmp;
 		}
@@ -1735,6 +1737,8 @@ mac_header_uncook(mac_handle_t mh, mblk_t *mp)
 	if (mip->mi_type->mt_ops.mtops_ops & MTOPS_HEADER_UNCOOK) {
 		if (DB_REF(mp) > 1) {
 			mblk_t *newmp = copymsg(mp);
+			if (newmp == NULL)
+				return (NULL);
 			freemsg(mp);
 			mp = newmp;
 		}
