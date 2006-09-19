@@ -80,6 +80,13 @@ ld_open_outfile(Ofl_desc * ofl)
 	mode_t		mode;
 	struct stat	status;
 
+	/*
+	 * Determine the required file mode from the type of output file we
+	 * are creating.
+	 */
+	mode = (ofl->ofl_flags & (FLG_OF_EXEC | FLG_OF_SHAROBJ))
+		? 0777 : 0666;
+
 	/* Determine if the output file already exists */
 	if (stat(ofl->ofl_name, &status) == 0) {
 		if ((status.st_mode & S_IFMT) != S_IFREG) {
@@ -106,7 +113,30 @@ ld_open_outfile(Ofl_desc * ofl)
 			 * file has a (link_count > 1), the other names will
 			 * continue to reference the old inode, thus
 			 * breaking the link.
+			 *
+			 * A subtlety here is that POSIX says we are not
+			 * supposed to replace a non-writable file, which
+			 * is something that unlink() is happy to do. The
+			 * only 100% reliable test against this is to open
+			 * the file for non-destructive write access. If the
+			 * open succeeds, we are clear to unlink it, and if
+			 * not, then the error generated is the error we
+			 * need to report.
 			 */
+			if ((ofl->ofl_fd = open(ofl->ofl_name, O_RDWR,
+			    mode)) < 0) {
+				int	err = errno;
+
+				if (err != ENOENT) {
+					eprintf(ofl->ofl_lml, ERR_FATAL,
+					    MSG_INTL(MSG_SYS_OPEN),
+					    ofl->ofl_name, strerror(err));
+					return (S_ERROR);
+				}
+			} else {
+				(void) close(ofl->ofl_fd);
+			}
+
 			if ((unlink(ofl->ofl_name) == -1) &&
 			    (errno != ENOENT)) {
 				int err = errno;
@@ -118,13 +148,6 @@ ld_open_outfile(Ofl_desc * ofl)
 			}
 		}
 	}
-
-	/*
-	 * Determine the required file mode from the type of output file we
-	 * are creating.
-	 */
-	mode = (ofl->ofl_flags & (FLG_OF_EXEC | FLG_OF_SHAROBJ))
-		? 0777 : 0666;
 
 	/*
 	 * Open (or create) the output file name (ofl_fd acts as a global

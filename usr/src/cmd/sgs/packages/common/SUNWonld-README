@@ -77,9 +77,13 @@ SUNWonld - link-editors development package.
 
   History:
 
-    Note, starting after Solaris 10, a (D) following the bug synopsis indicates
-    that a documentation change accompanies the implementation change.  See the
-    implementation bug report for details.
+    Note, starting after Solaris 10, letter codes in parenthesis may
+    be found following the bug synopsis. Their meanings are as follows:
+
+	(D) A documentation change accompanies the implementation change.
+	(P) A packaging change accompanies the implementation change.
+
+    In all cases, see the implementation bug report for details.
 
     The following bug fixes exist in the OSNET consolidation workspace
     from which this package is created:
@@ -1090,7 +1094,7 @@ Bugid   Risk Synopsis
 6391407 Insufficient alignment of 32-bit object in archive makes ld segfault
         (libelf component only) (D)
 6316708 LD_DEBUG should provide a means of identifying/isolating individual
-        link-map lists
+        link-map lists (P)
 6280209 elfdump cores on memory model 0x3
 6197234 elfdump and dump don't handle 64-bit symbols correctly
 6398893 Extended section processing needs some work
@@ -1100,7 +1104,7 @@ Bugid   Risk Synopsis
 6382945 AMD64-GCC: dbx: internal error: dwarf reference attribute out of bounds
 6262333 init section of .so dlopened from audit interface not being called
 6409613 elf_outsync() should fsync()
-6174390 crle configuration files are inconsistent across platforms (D)
+6174390 crle configuration files are inconsistent across platforms (D, P)
 6426048 C++ exceptions broken in Nevada for amd64
 6429418 ld.so.1: need work-around for Nvidia drivers use of static TLS
 6429504 crle(1) shows wrong defaults for non-existent 64-bit config file
@@ -1113,10 +1117,16 @@ Bugid   Risk Synopsis
 	instead
 6229145 ld: initarray/finiarray processing occurs after got size is determined
 6324924 the linker should warn if there's a .init section but not _init
-6421380 elfdump inserts extra whitespace in bitmap value display
+6424132 elfdump inserts extra whitespace in bitmap value display
 6449485 ld(1) creates misaligned TLS in binary compiled with -xpg
 6424550 Write to unallocated (wua) errors when libraries are built with
 	-z lazyload
 6464235 executing the 64-bit ld(1) should be easy (D)
 6465623 need a way of building unix without an interpreter
 6467925 ld: section deletion (-z ignore) requires improvement
+6357230 specfiles should be nuked (link-editor components only)
+6409350 BrandZ project integration into Solaris (link-editor components only)
+6459189 UNIX03: *VSC* c99 compiler overwrites non-writable file
+6423746 add an option to relax the resolution of COMDAT relocs (D)
+4934427 runtime linker should load up static symbol names visible to
+	dladdr() (D)
