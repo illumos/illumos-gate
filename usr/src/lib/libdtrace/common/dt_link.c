@@ -86,23 +86,23 @@ static const char DOFSTR[] = "__SUNW_dof";
 static const char DOFLAZYSTR[] = "___SUNW_dof";
 
 typedef struct dt_link_pair {
-	struct dt_link_pair *dlp_next; /* next pair in linked list */
-	void *dlp_str;		/* buffer for string table */
-	void *dlp_sym;		/* buffer for symbol table */
+	struct dt_link_pair *dlp_next;	/* next pair in linked list */
+	void *dlp_str;			/* buffer for string table */
+	void *dlp_sym;			/* buffer for symbol table */
 } dt_link_pair_t;
 
 typedef struct dof_elf32 {
-	uint32_t de_nrel;	/* relocation count */
+	uint32_t de_nrel;		/* relocation count */
 #ifdef __sparc
-	Elf32_Rela *de_rel;	/* array of relocations for sparc */
+	Elf32_Rela *de_rel;		/* array of relocations for sparc */
 #else
-	Elf32_Rel *de_rel;	/* array of relocations for x86 */
+	Elf32_Rel *de_rel;		/* array of relocations for x86 */
 #endif
-	uint32_t de_nsym;	/* symbol count */
-	Elf32_Sym *de_sym;	/* array of symbols */
-	uint32_t de_strlen;	/* size of of string table */
-	char *de_strtab;	/* string table */
-	uint32_t de_global;	/* index of the first global symbol */
+	uint32_t de_nsym;		/* symbol count */
+	Elf32_Sym *de_sym;		/* array of symbols */
+	uint32_t de_strlen;		/* size of of string table */
+	char *de_strtab;		/* string table */
+	uint32_t de_global;		/* index of the first global symbol */
 } dof_elf32_t;
 
 static int
@@ -994,9 +994,10 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 	dt_provider_t *pvp;
 	dt_probe_t *prp;
 	uint32_t off, eclass, emachine1, emachine2;
-	size_t count_sym, count_str, symsize;
+	size_t symsize, nsym, isym, istr, len;
 	key_t objkey;
 	dt_link_pair_t *pair, *bufs = NULL;
+	dt_strtab_t *strtab;
 
 	if ((fd = open64(obj, O_RDWR)) == -1) {
 		return (dt_link_error(dtp, elf, fd, bufs,
@@ -1130,11 +1131,12 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 		 *   $dtrace<key>.<function>
 		 *
 		 * We take a first pass through all the relocations to
-		 * calculate an upper bound on the number of symbols we may
-		 * need to add as well as the size of the strings we may need
-		 * to add to the string table for those symbols.
+		 * populate our string table and count the number of extra
+		 * symbols we'll require.
 		 */
-		count_sym = count_str = 0;
+		strtab = dt_strtab_create(1);
+		nsym = 0;
+
 		for (i = 0; i < shdr_rel.sh_size / shdr_rel.sh_entsize; i++) {
 
 			if (shdr_rel.sh_type == SHT_RELA) {
@@ -1150,8 +1152,10 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 			}
 
 			if (gelf_getsym(data_sym, GELF_R_SYM(rela.r_info),
-			    &rsym) == NULL)
+			    &rsym) == NULL) {
+				dt_strtab_destroy(strtab);
 				goto err;
+			}
 
 			s = (char *)data_str->d_buf + rsym.st_name;
 
@@ -1159,14 +1163,18 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 				continue;
 
 			if (dt_symtab_lookup(data_sym, rela.r_offset,
-			    shdr_rel.sh_info, &fsym) != 0)
+			    shdr_rel.sh_info, &fsym) != 0) {
+				dt_strtab_destroy(strtab);
 				goto err;
+			}
 
 			if (GELF_ST_BIND(fsym.st_info) != STB_LOCAL)
 				continue;
 
-			if (fsym.st_name > data_str->d_size)
+			if (fsym.st_name > data_str->d_size) {
+				dt_strtab_destroy(strtab);
 				goto err;
+			}
 
 			s = (char *)data_str->d_buf + fsym.st_name;
 
@@ -1175,13 +1183,26 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 			 * driven off the rails or the object file is corrupt.
 			 */
 			if (GELF_ST_TYPE(fsym.st_info) != STT_FUNC) {
+				dt_strtab_destroy(strtab);
 				return (dt_link_error(dtp, elf, fd, bufs,
 				    "expected %s to be of type function", s));
 			}
 
-			count_sym++;
-			count_str += 1 + snprintf(NULL, 0, dt_symfmt,
-			    dt_symprefix, objkey, s);
+			len = snprintf(NULL, 0, dt_symfmt, dt_symprefix,
+			    objkey, s) + 1;
+			if ((p = dt_alloc(dtp, len)) == NULL) {
+				dt_strtab_destroy(strtab);
+				goto err;
+			}
+			(void) snprintf(p, len, dt_symfmt, dt_symprefix,
+			    objkey, s);
+
+			if (dt_strtab_index(strtab, p) == -1) {
+				nsym++;
+				(void) dt_strtab_insert(strtab, p);
+			}
+
+			dt_free(dtp, p);
 		}
 
 		/*
@@ -1192,20 +1213,29 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 		 * are still responsible for freeing them once we're done with
 		 * the elf handle.
 		 */
-		if (count_sym > 0) {
-			assert(count_str > 0);
+		if (nsym > 0) {
+			/*
+			 * The first byte of the string table is reserved for
+			 * the \0 entry.
+			 */
+			len = dt_strtab_size(strtab) - 1;
+
+			assert(len > 0);
+			assert(dt_strtab_index(strtab, "") == 0);
+
+			dt_strtab_destroy(strtab);
 
 			if ((pair = dt_alloc(dtp, sizeof (*pair))) == NULL)
 				goto err;
 
 			if ((pair->dlp_str = dt_alloc(dtp, data_str->d_size +
-			    count_str)) == NULL) {
+			    len)) == NULL) {
 				dt_free(dtp, pair);
 				goto err;
 			}
 
 			if ((pair->dlp_sym = dt_alloc(dtp, data_sym->d_size +
-			    count_sym * symsize)) == NULL) {
+			    nsym * symsize)) == NULL) {
 				dt_free(dtp, pair->dlp_str);
 				dt_free(dtp, pair);
 				goto err;
@@ -1214,25 +1244,31 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 			pair->dlp_next = bufs;
 			bufs = pair;
 
+			istr = data_str->d_size;
+			isym = data_sym->d_size / symsize;
+
 			bcopy(data_str->d_buf, pair->dlp_str, data_str->d_size);
 			data_str->d_buf = pair->dlp_str;
-			data_str->d_size += count_str;
+			data_str->d_size += len;
 			(void) elf_flagdata(data_str, ELF_C_SET, ELF_F_DIRTY);
 
-			shdr_str.sh_size += count_str;
+			shdr_str.sh_size += len;
 			(void) gelf_update_shdr(scn_str, &shdr_str);
 
 			bcopy(data_sym->d_buf, pair->dlp_sym, data_sym->d_size);
 			data_sym->d_buf = pair->dlp_sym;
-			data_sym->d_size += count_sym * symsize;
+			data_sym->d_size += nsym * symsize;
 			(void) elf_flagdata(data_sym, ELF_C_SET, ELF_F_DIRTY);
 
-			shdr_sym.sh_size += count_sym * symsize;
+			shdr_sym.sh_size += nsym * symsize;
 			(void) gelf_update_shdr(scn_sym, &shdr_sym);
-		}
 
-		count_str = shdr_str.sh_size - count_str;
-		count_sym = data_sym->d_size / symsize - count_sym;
+			nsym += isym;
+		} else {
+			istr = 0;
+			isym = 0;
+			dt_strtab_destroy(strtab);
+		}
 
 		/*
 		 * Now that the tables have been allocated, perform the
@@ -1315,17 +1351,17 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 
 			if (GELF_ST_BIND(fsym.st_info) == STB_LOCAL) {
 				dsym = fsym;
-				dsym.st_name = count_str;
+				dsym.st_name = istr;
 				dsym.st_info = GELF_ST_INFO(STB_GLOBAL,
 				    STT_FUNC);
 				dsym.st_other = ELF64_ST_VISIBILITY(STV_HIDDEN);
-				(void) gelf_update_sym(data_sym, count_sym,
-				    &dsym);
+				(void) gelf_update_sym(data_sym, isym, &dsym);
 
-				r = (char *)data_str->d_buf + count_str;
-				count_str += 1 + sprintf(r, dt_symfmt,
+				r = (char *)data_str->d_buf + istr;
+				istr += 1 + sprintf(r, dt_symfmt,
 				    dt_symprefix, objkey, s);
-				count_sym++;
+				isym++;
+				assert(isym <= nsym);
 
 			} else if (strncmp(s, dt_symprefix,
 			    strlen(dt_symprefix)) == 0) {
@@ -1373,13 +1409,6 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 				(void) gelf_update_sym(data_sym, ndx, &rsym);
 			}
 		}
-
-		/*
-		 * The full buffer may not have been used so shrink them here
-		 * to match the sizes actually used.
-		 */
-		data_str->d_size = count_str;
-		data_sym->d_size = count_sym * symsize;
 	}
 
 	if (mod && elf_update(elf, ELF_C_WRITE) == -1)

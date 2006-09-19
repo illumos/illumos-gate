@@ -24,45 +24,23 @@
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_SYSTRACE_H
-#define	_SYS_SYSTRACE_H
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/dtrace.h>
+/*
+ * ASSERTION: Make sure we're correctly reporting arguments to syscall probes.
+ */
 
-#ifdef	__cplusplus
-extern "C" {
-#endif
+#pragma D option quiet
 
-#ifdef _KERNEL
-
-typedef struct systrace_sysent {
-	dtrace_id_t	stsy_entry;
-	dtrace_id_t	stsy_return;
-	int64_t		(*stsy_underlying)();
-} systrace_sysent_t;
-
-extern systrace_sysent_t *systrace_sysent;
-extern systrace_sysent_t *systrace_sysent32;
-
-extern void (*systrace_probe)(dtrace_id_t, uintptr_t, uintptr_t,
-    uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-extern void systrace_stub(dtrace_id_t, uintptr_t, uintptr_t,
-    uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-
-extern int64_t dtrace_systrace_syscall(uintptr_t arg0, uintptr_t arg1,
-    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
-
-#ifdef _SYSCALL32_IMPL
-extern int64_t dtrace_systrace_syscall32(uintptr_t arg0, uintptr_t arg1,
-    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
-#endif
-
-#endif
-
-#ifdef	__cplusplus
+syscall::mmap*:entry
+/pid == $1 && arg0 == 0 && arg1 == 1 && arg2 == 2 && arg3 == 3 &&
+ (int)arg4 == -1 && arg5 == 0x12345678/
+{
+	exit(0);
 }
-#endif
 
-#endif	/* _SYS_SYSTRACE_H */
+tick-1s
+/i++ == 3/
+{
+	exit(0);
+}

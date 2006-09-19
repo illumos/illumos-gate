@@ -333,6 +333,11 @@ static kmutex_t dtrace_errlock;
 	    (((uint64_t)1 << 61) - 1)) | ((uint64_t)intr << 61); \
 }
 
+#define	DT_BSWAP_8(x)	((x) & 0xff)
+#define	DT_BSWAP_16(x)	((DT_BSWAP_8(x) << 8) | DT_BSWAP_8((x) >> 8))
+#define	DT_BSWAP_32(x)	((DT_BSWAP_16(x) << 16) | DT_BSWAP_16((x) >> 16))
+#define	DT_BSWAP_64(x)	((DT_BSWAP_32(x) << 32) | DT_BSWAP_32((x) >> 32))
+
 #define	DTRACE_STORE(type, tomax, offset, what) \
 	*((type *)((uintptr_t)(tomax) + (uintptr_t)offset)) = (type)(what);
 
@@ -3477,6 +3482,36 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		mstate->dtms_scratch_ptr += size;
 		break;
 	}
+
+	case DIF_SUBR_HTONS:
+	case DIF_SUBR_NTOHS:
+#ifdef _BIG_ENDIAN
+		regs[rd] = (uint16_t)tupregs[0].dttk_value;
+#else
+		regs[rd] = DT_BSWAP_16((uint16_t)tupregs[0].dttk_value);
+#endif
+		break;
+
+
+	case DIF_SUBR_HTONL:
+	case DIF_SUBR_NTOHL:
+#ifdef _BIG_ENDIAN
+		regs[rd] = (uint32_t)tupregs[0].dttk_value;
+#else
+		regs[rd] = DT_BSWAP_32((uint32_t)tupregs[0].dttk_value);
+#endif
+		break;
+
+
+	case DIF_SUBR_HTONLL:
+	case DIF_SUBR_NTOHLL:
+#ifdef _BIG_ENDIAN
+		regs[rd] = (uint64_t)tupregs[0].dttk_value;
+#else
+		regs[rd] = DT_BSWAP_64((uint64_t)tupregs[0].dttk_value);
+#endif
+		break;
+
 
 	case DIF_SUBR_DIRNAME:
 	case DIF_SUBR_BASENAME: {
@@ -7589,7 +7624,13 @@ dtrace_difo_validate_helper(dtrace_difo_t *dp)
 			    subr == DIF_SUBR_STRCHR ||
 			    subr == DIF_SUBR_STRJOIN ||
 			    subr == DIF_SUBR_STRRCHR ||
-			    subr == DIF_SUBR_STRSTR)
+			    subr == DIF_SUBR_STRSTR ||
+			    subr == DIF_SUBR_HTONS ||
+			    subr == DIF_SUBR_HTONL ||
+			    subr == DIF_SUBR_HTONLL ||
+			    subr == DIF_SUBR_NTOHS ||
+			    subr == DIF_SUBR_NTOHL ||
+			    subr == DIF_SUBR_NTOHLL)
 				break;
 
 			err += efunc(pc, "invalid subr %u\n", subr);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -213,6 +212,12 @@ dfatal(const char *fmt, ...)
 		(void) fprintf(stderr, "%s\n",
 		    dtrace_errmsg(g_dtp, dtrace_errno(g_dtp)));
 	}
+
+	/*
+	 * Close the DTrace handle to ensure that any controlled processes are
+	 * correctly restored and continued.
+	 */
+	dtrace_close(g_dtp);
 
 	exit(E_ERROR);
 }
@@ -640,7 +645,7 @@ link_prog(dtrace_cmd_t *dcp)
 	}
 
 	if (dtrace_program_link(g_dtp, dcp->dc_prog, DTRACE_D_PROBES,
-	    dcp->dc_ofile, g_objc - 1, g_objv + 1) != 0)
+	    dcp->dc_ofile, g_objc, g_objv) != 0)
 		dfatal("failed to link %s %s", dcp->dc_desc, dcp->dc_name);
 }
 
@@ -1269,6 +1274,56 @@ main(int argc, char *argv[])
 		return (printf("%s: %s\n", g_pname, _dtrace_version) <= 0);
 
 	/*
+	 * If we're in linker mode and the data model hasn't been specified,
+	 * we try to guess the appropriate setting by examining the object
+	 * files. We ignore certain errors since we'll catch them later when
+	 * we actually process the object files.
+	 */
+	if (g_mode == DMODE_LINK &&
+	    (g_oflags & (DTRACE_O_ILP32 | DTRACE_O_LP64)) == 0 &&
+	    elf_version(EV_CURRENT) != EV_NONE) {
+		int fd;
+		Elf *elf;
+		GElf_Ehdr ehdr;
+
+		for (i = 1; i < g_argc; i++) {
+			if ((fd = open64(g_argv[i], O_RDONLY)) == -1)
+				break;
+
+			if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
+				(void) close(fd);
+				break;
+			}
+
+			if (elf_kind(elf) != ELF_K_ELF ||
+			    gelf_getehdr(elf, &ehdr) == NULL) {
+				(void) close(fd);
+				(void) elf_end(elf);
+				break;
+			}
+
+			(void) close(fd);
+			(void) elf_end(elf);
+
+			if (ehdr.e_ident[EI_CLASS] == ELFCLASS64) {
+				if (g_oflags & DTRACE_O_ILP32) {
+					fatal("can't mix 32-bit and 64-bit "
+					    "object files\n");
+				}
+				g_oflags |= DTRACE_O_LP64;
+			} else if (ehdr.e_ident[EI_CLASS] == ELFCLASS32) {
+				if (g_oflags & DTRACE_O_LP64) {
+					fatal("can't mix 32-bit and 64-bit "
+					    "object files\n");
+				}
+				g_oflags |= DTRACE_O_ILP32;
+			} else {
+				break;
+			}
+		}
+	}
+
+	/*
 	 * Open libdtrace.  If we are not actually going to be enabling any
 	 * instrumentation attempt to reopen libdtrace using DTRACE_O_NODEV.
 	 */
@@ -1295,8 +1350,12 @@ main(int argc, char *argv[])
 		(void) dtrace_setopt(g_dtp, "linkmode", "dynamic");
 		(void) dtrace_setopt(g_dtp, "unodefs", NULL);
 
-		g_objc = g_argc;
-		g_objv = g_argv;
+		/*
+		 * Use the remaining arguments as the list of object files
+		 * when in linker mode.
+		 */
+		g_objc = g_argc - 1;
+		g_objv = g_argv + 1;
 
 		/*
 		 * We still use g_argv[0], the name of the executable.

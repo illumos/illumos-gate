@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,7 +204,7 @@ err:
 }
 
 ssize_t
-dt_strtab_insert(dt_strtab_t *sp, const char *str)
+dt_strtab_index(dt_strtab_t *sp, const char *str)
 {
 	dt_strhash_t *hp;
 	size_t len;
@@ -215,14 +215,26 @@ dt_strtab_insert(dt_strtab_t *sp, const char *str)
 
 	h = dt_strtab_hash(str, &len) % sp->str_hashsz;
 
-	/*
-	 * If the string is already in our hash table, just return the offset
-	 * of the existing string element and do not add a duplicate string.
-	 */
 	for (hp = sp->str_hash[h]; hp != NULL; hp = hp->str_next) {
 		if (dt_strtab_compare(sp, hp, str, len + 1) == 0)
 			return (hp->str_off);
 	}
+
+	return (-1);
+}
+
+ssize_t
+dt_strtab_insert(dt_strtab_t *sp, const char *str)
+{
+	dt_strhash_t *hp;
+	size_t len;
+	ssize_t off;
+	ulong_t h;
+
+	if ((off = dt_strtab_index(sp, str)) != -1)
+		return (off);
+
+	h = dt_strtab_hash(str, &len) % sp->str_hashsz;
 
 	/*
 	 * Create a new hash bucket, initialize it, and insert it at the front

@@ -24,45 +24,55 @@
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_SYSTRACE_H
-#define	_SYS_SYSTRACE_H
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/dtrace.h>
+#pragma D option bufsize=1000
+#pragma D option bufpolicy=ring
+#pragma D option statusrate=10ms
 
-#ifdef	__cplusplus
-extern "C" {
-#endif
-
-#ifdef _KERNEL
-
-typedef struct systrace_sysent {
-	dtrace_id_t	stsy_entry;
-	dtrace_id_t	stsy_return;
-	int64_t		(*stsy_underlying)();
-} systrace_sysent_t;
-
-extern systrace_sysent_t *systrace_sysent;
-extern systrace_sysent_t *systrace_sysent32;
-
-extern void (*systrace_probe)(dtrace_id_t, uintptr_t, uintptr_t,
-    uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-extern void systrace_stub(dtrace_id_t, uintptr_t, uintptr_t,
-    uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-
-extern int64_t dtrace_systrace_syscall(uintptr_t arg0, uintptr_t arg1,
-    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
-
-#ifdef _SYSCALL32_IMPL
-extern int64_t dtrace_systrace_syscall32(uintptr_t arg0, uintptr_t arg1,
-    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
-#endif
-
-#endif
-
-#ifdef	__cplusplus
+fbt:::
+{
+	on = (timestamp / 1000000000) & 1;
 }
-#endif
 
-#endif	/* _SYS_SYSTRACE_H */
+fbt:::
+/on/
+{
+	trace(htons(0x1122));
+}
+
+fbt:::
+/on/
+{
+	trace(htonl(0x11223344));
+}
+
+fbt:::
+/on/
+{
+	trace(htonll(0x1122334455667788));
+}
+
+fbt:::
+/on/
+{
+	trace(ntohs(0x1122));
+}
+
+fbt:::
+/on/
+{
+	trace(ntohl(0x11223344));
+}
+
+fbt:::
+/on/
+{
+	trace(ntohll(0x1122334455667788));
+}
+
+tick-1sec
+/n++ == 10/
+{
+	exit(0);
+}

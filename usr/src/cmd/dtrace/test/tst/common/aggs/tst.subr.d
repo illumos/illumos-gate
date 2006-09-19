@@ -89,6 +89,12 @@ STRFUNC(strtok("The SystemTap, The.", "T"))
 STRFUNC(substr("The SystemTap, The.", 0))
 INTFUNC(index("The SystemTap, The.", "The"))
 INTFUNC(rindex("The SystemTap, The.", "The"))
+INTFUNC(htons(0x1234))
+INTFUNC(htonl(0x12345678))
+INTFUNC(htonll(0x1234567890abcdefL))
+INTFUNC(ntohs(0x1234))
+INTFUNC(ntohl(0x12345678))
+INTFUNC(ntohll(0x1234567890abcdefL))
 
 BEGIN
 /subr == DIF_SUBR_MAX + 1/

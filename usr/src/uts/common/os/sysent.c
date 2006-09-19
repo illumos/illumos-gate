@@ -1133,12 +1133,12 @@ char **syscallnames;
 
 systrace_sysent_t *systrace_sysent;
 void (*systrace_probe)(dtrace_id_t, uintptr_t, uintptr_t,
-    uintptr_t, uintptr_t, uintptr_t);
+    uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 /*ARGSUSED*/
 void
 systrace_stub(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
-    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4)
+    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5)
 {}
 
 /*ARGSUSED*/
@@ -1152,7 +1152,7 @@ dtrace_systrace_syscall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2,
 	proc_t *p;
 
 	if ((id = sy->stsy_entry) != DTRACE_IDNONE)
-		(*systrace_probe)(id, arg0, arg1, arg2, arg3, arg4);
+		(*systrace_probe)(id, arg0, arg1, arg2, arg3, arg4, arg5);
 
 	/*
 	 * We want to explicitly allow DTrace consumers to stop a process
@@ -1173,7 +1173,7 @@ dtrace_systrace_syscall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2,
 
 	if ((id = sy->stsy_return) != DTRACE_IDNONE)
 		(*systrace_probe)(id, (uintptr_t)rval, (uintptr_t)rval,
-		    0, 0, 0);
+		    (uintptr_t)((int64_t)rval >> 32), 0, 0, 0);
 
 	return (rval);
 }
@@ -1193,7 +1193,7 @@ dtrace_systrace_syscall32(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2,
 	proc_t *p;
 
 	if ((id = sy->stsy_entry) != DTRACE_IDNONE)
-		(*systrace_probe)(id, arg0, arg1, arg2, arg3, arg4);
+		(*systrace_probe)(id, arg0, arg1, arg2, arg3, arg4, arg5);
 
 	/*
 	 * We want to explicitly allow DTrace consumers to stop a process
@@ -1214,7 +1214,7 @@ dtrace_systrace_syscall32(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2,
 
 	if ((id = sy->stsy_return) != DTRACE_IDNONE)
 		(*systrace_probe)(id, (uintptr_t)rval, (uintptr_t)rval,
-		    0, 0, 0);
+		    (uintptr_t)((uint64_t)rval >> 32), 0, 0, 0);
 
 	return (rval);
 }
@@ -1242,5 +1242,5 @@ dtrace_systrace_rtt(void)
 	}
 
 	if ((id = sy->stsy_return) != DTRACE_IDNONE)
-		(*systrace_probe)(id, 0, 0, 0, 0, 0);
+		(*systrace_probe)(id, 0, 0, 0, 0, 0, 0);
 }

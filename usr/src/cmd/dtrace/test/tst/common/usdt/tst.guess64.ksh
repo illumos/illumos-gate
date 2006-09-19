@@ -24,37 +24,71 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-PROG = dtrace
-OBJS = dtrace.o
-SRCS = $(OBJS:%.o=../%.c)
+DIR=/var/tmp/dtest.$$
 
-include ../../Makefile.cmd
+mkdir $DIR
+cd $DIR
 
-CFLAGS += $(CCVERBOSE)
-CFLAGS64 += $(CCVERBOSE)
-LDLIBS += -ldtrace -lproc -lctf -lelf
+cat > prov.d <<EOF
+provider test_prov {
+	probe go();
+};
+EOF
 
-FILEMODE = 0555
-GROUP = bin
+dtrace -h -s prov.d
+if [ $? -ne 0 ]; then
+	print -u2 "failed to generate header file"
+	exit 1
+fi
 
-CLEANFILES += $(OBJS)
+cat > test.c <<EOF
+#include <sys/types.h>
+#include "prov.h"
 
-.KEEP_STATE:
+int
+main(int argc, char **argv)
+{
+	if (TEST_PROV_GO_ENABLED()) {
+		TEST_PROV_GO();
+	}
+}
+EOF
 
-all: $(PROG)
+cc -xarch=generic64 -c test.c
+if [ $? -ne 0 ]; then
+	print -u2 "failed to compile test.c"
+	exit 1
+fi
+dtrace -G -s prov.d test.o
+if [ $? -ne 0 ]; then
+	print -u2 "failed to create DOF"
+	exit 1
+fi
+cc -xarch=generic64 -o test test.o prov.o
+if [ $? -ne 0 ]; then
+	print -u2 "failed to link final executable"
+	exit 1
+fi
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS) ; $(STRIP_STABS)
+script()
+{
+	dtrace -c ./test -qs /dev/stdin <<EOF
+	test_prov\$target:::
+	{
+		printf("%s:%s:%s\n", probemod, probefunc, probename);
+	}
+EOF
+}
 
-clean:
-	-$(RM) $(CLEANFILES)
+if [ `isainfo -b` -ne '64']; then
+	script
+	status=$?
+else
+	status=0
+fi
 
-lint: lint_SRCS
+cd /
+/usr/bin/rm -rf $DIR
 
-%.o: ../%.c
-	$(COMPILE.c) $<
-
-include ../../Makefile.targ
+exit $status

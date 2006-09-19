@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 i pkginfo
 i copyright
@@ -513,6 +513,7 @@ f none opt/SUNWdtrt/tst/common/funcs/tst.default.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/tst.freopen.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/tst.ftruncate.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/tst.ftruncate.ksh.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/funcs/tst.hton.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/tst.index.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/tst.index.d.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/tst.lltostr.d 0444 root bin
@@ -948,6 +949,7 @@ f none opt/SUNWdtrt/tst/common/safety/tst.cleanpath.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.copyin.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.ddi_pathname.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.dirname.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/safety/tst.hton.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.errno.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.gid.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.index.d 0444 root bin
@@ -1140,6 +1142,8 @@ f none opt/SUNWdtrt/tst/common/struct/tst.clauselocal.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/struct/tst.clauselocal.d.out 0444 root bin
 d none opt/SUNWdtrt/tst/common/syscall 0755 root bin
 f none opt/SUNWdtrt/tst/common/syscall/tst.openret.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/syscall/tst.args.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/syscall/tst.args.exe 0555 root bin
 d none opt/SUNWdtrt/tst/common/tick-n 0755 root bin
 f none opt/SUNWdtrt/tst/common/tick-n/err.D_PDESC_ZERO.tick.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/tick-n/err.D_PDESC_ZEROonens.d 0444 root bin
@@ -1287,6 +1291,7 @@ f none opt/SUNWdtrt/tst/common/usdt/tst.argmap.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.argmap.exe 0555 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.args.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.args.exe 0555 root bin
+f none opt/SUNWdtrt/tst/common/usdt/tst.badguess.ksh 0555 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.enabled.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.enabled.ksh.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.entryreturn.ksh 0444 root bin
@@ -1297,11 +1302,15 @@ f none opt/SUNWdtrt/tst/common/usdt/tst.dlclose2.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.dlclose2.ksh.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.fork.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.fork.ksh.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/usdt/tst.guess32.ksh 0555 root bin
+f none opt/SUNWdtrt/tst/common/usdt/tst.guess64.ksh 0555 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.header.ksh 0555 root bin
+f none opt/SUNWdtrt/tst/common/usdt/tst.include.ksh 0555 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.linkpriv.ksh 0555 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.linkunpriv.ksh 0555 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.multiple.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.multiple.ksh.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/usdt/tst.nodtrace.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.onlyenabled.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.reeval.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/usdt/tst.static.ksh 0444 root bin

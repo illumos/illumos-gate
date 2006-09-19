@@ -24,7 +24,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 require 5.6.1;
 
@@ -213,7 +213,7 @@ if ($opt_g) {
 # Ensure that $PATH contains a cc(1) so that we can execute the
 # test programs that require compilation of C code.
 #
-$ENV{'PATH'} = $ENV{'PATH'} . ':/ws/on10-tools/SUNWspro/SOS8/bin';
+$ENV{'PATH'} = $ENV{'PATH'} . ':/ws/onnv-tools/SUNWspro/SS11/bin';
 
 if ($opt_b) {
 	logmsg("badioctl'ing ... ");

@@ -241,7 +241,7 @@ systrace_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	systrace_probe = dtrace_probe;
+	systrace_probe = (void (*)())dtrace_probe;
 	membar_enter();
 
 	if (ddi_create_minor_node(devi, "systrace", S_IFCHR, 0,

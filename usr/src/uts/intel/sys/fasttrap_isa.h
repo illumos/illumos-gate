@@ -85,6 +85,7 @@ typedef struct fasttrap_machtp {
  * For performance rather than correctness.
  */
 #define	FASTTRAP_T_PUSHL_EBP	0x10	/* pushl %ebp (for function entry) */
+#define	FASTTRAP_T_NOP		0x11	/* nop */
 
 #define	FASTTRAP_RIP_1		0x1
 #define	FASTTRAP_RIP_2		0x2

@@ -98,8 +98,9 @@
 #define	DT_VERS_1_2	DT_VERSION_NUMBER(1, 2, 0)
 #define	DT_VERS_1_2_1	DT_VERSION_NUMBER(1, 2, 1)
 #define	DT_VERS_1_2_2	DT_VERSION_NUMBER(1, 2, 2)
-#define	DT_VERS_LATEST	DT_VERS_1_2_2
-#define	DT_VERS_STRING	"Sun D 1.2.2"
+#define	DT_VERS_1_3	DT_VERSION_NUMBER(1, 3, 0)
+#define	DT_VERS_LATEST	DT_VERS_1_3
+#define	DT_VERS_STRING	"Sun D 1.3"
 
 const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_0,	/* D API 1.0.0 (PSARC 2001/466) Solaris 10 FCS */
@@ -107,6 +108,7 @@ const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_2,	/* D API 1.2.0 Solaris 10 Update 1 */
 	DT_VERS_1_2_1,	/* D API 1.2.1 Solaris Express 4/06 */
 	DT_VERS_1_2_2,	/* D API 1.2.2 Solaris Express 6/06 */
+	DT_VERS_1_3,	/* D API 1.3 Solaris Express 10/06 */
 	0
 };
 
@@ -214,6 +216,12 @@ static const dt_ident_t _dtrace_globals[] = {
 { "getminor", DT_IDENT_FUNC, 0, DIF_SUBR_GETMINOR,
 	DT_ATTR_EVOLCMN, DT_VERS_1_0,
 	&dt_idops_func, "genunix`minor_t(genunix`dev_t)" },
+{ "htonl", DT_IDENT_FUNC, 0, DIF_SUBR_HTONL, DT_ATTR_EVOLCMN, DT_VERS_1_3,
+	&dt_idops_func, "uint32_t(uint32_t)" },
+{ "htonll", DT_IDENT_FUNC, 0, DIF_SUBR_HTONLL, DT_ATTR_EVOLCMN, DT_VERS_1_3,
+	&dt_idops_func, "uint64_t(uint64_t)" },
+{ "htons", DT_IDENT_FUNC, 0, DIF_SUBR_HTONS, DT_ATTR_EVOLCMN, DT_VERS_1_3,
+	&dt_idops_func, "uint16_t(uint16_t)" },
 { "gid", DT_IDENT_SCALAR, 0, DIF_VAR_GID, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_type, "gid_t" },
 { "id", DT_IDENT_SCALAR, 0, DIF_VAR_ID, DT_ATTR_STABCMN, DT_VERS_1_0,
@@ -253,6 +261,12 @@ static const dt_ident_t _dtrace_globals[] = {
 { "mutex_type_spin", DT_IDENT_FUNC, 0, DIF_SUBR_MUTEX_TYPE_SPIN,
 	DT_ATTR_EVOLCMN, DT_VERS_1_0,
 	&dt_idops_func, "int(genunix`kmutex_t *)" },
+{ "ntohl", DT_IDENT_FUNC, 0, DIF_SUBR_NTOHL, DT_ATTR_EVOLCMN, DT_VERS_1_3,
+	&dt_idops_func, "uint32_t(uint32_t)" },
+{ "ntohll", DT_IDENT_FUNC, 0, DIF_SUBR_NTOHLL, DT_ATTR_EVOLCMN, DT_VERS_1_3,
+	&dt_idops_func, "uint64_t(uint64_t)" },
+{ "ntohs", DT_IDENT_FUNC, 0, DIF_SUBR_NTOHS, DT_ATTR_EVOLCMN, DT_VERS_1_3,
+	&dt_idops_func, "uint16_t(uint16_t)" },
 { "normalize", DT_IDENT_ACTFUNC, 0, DT_ACT_NORMALIZE, DT_ATTR_STABCMN,
 	DT_VERS_1_0, &dt_idops_func, "void(...)" },
 { "panic", DT_IDENT_ACTFUNC, 0, DT_ACT_PANIC, DT_ATTR_STABCMN, DT_VERS_1_0,

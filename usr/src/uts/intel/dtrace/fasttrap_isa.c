@@ -104,6 +104,8 @@
 #define	FASTTRAP_JLE		0x7e
 #define	FASTTRAP_JG		0x7f
 
+#define	FASTTRAP_NOP		0x90
+
 #define	FASTTRAP_MOV_EAX	0xb8
 #define	FASTTRAP_MOV_ECX	0xb9
 
@@ -230,7 +232,7 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 	size_t len = FASTTRAP_MAX_INSTR_SIZE;
 	size_t first = MIN(len, PAGESIZE - (pc & PAGEOFFSET));
 	uint_t start = 0;
-	int rmindex;
+	int rmindex, size;
 	uint8_t seg, rex = 0;
 
 	/*
@@ -252,14 +254,13 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 	/*
 	 * If the disassembly fails, then we have a malformed instruction.
 	 */
-	if ((tp->ftt_size = dtrace_instr_size_isa(instr, p->p_model,
-	    &rmindex)) <= 0)
+	if ((size = dtrace_instr_size_isa(instr, p->p_model, &rmindex)) <= 0)
 		return (-1);
 
 	/*
 	 * Make sure the disassembler isn't completely broken.
 	 */
-	ASSERT(-1 <= rmindex && rmindex < tp->ftt_size);
+	ASSERT(-1 <= rmindex && rmindex < size);
 
 	/*
 	 * If the computed size is greater than the number of bytes read,
@@ -267,9 +268,10 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 	 * page boundary and the subsequent page was missing or because of
 	 * some malicious user.
 	 */
-	if (tp->ftt_size > len)
+	if (size > len)
 		return (-1);
 
+	tp->ftt_size = (uint8_t)size;
 	tp->ftt_segment = FASTTRAP_SEG_NONE;
 
 	/*
@@ -501,6 +503,21 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 		case FASTTRAP_PUSHL_EBP:
 			if (start == 0)
 				tp->ftt_type = FASTTRAP_T_PUSHL_EBP;
+			break;
+
+		case FASTTRAP_NOP:
+#ifdef __amd64
+			ASSERT(p->p_model == DATAMODEL_LP64 || rex == 0);
+
+			/*
+			 * On amd64 we have to be careful not to confuse a nop
+			 * (actually xchgl %eax, %eax) with an instruction using
+			 * the same opcode, but that does something different
+			 * (e.g. xchgl %r8d, %eax or xcghq %r8, %rax).
+			 */
+			if (FASTTRAP_REX_B(rex) == 0)
+#endif
+				tp->ftt_type = FASTTRAP_T_NOP;
 			break;
 
 		case FASTTRAP_INT3:
@@ -1253,6 +1270,10 @@ fasttrap_pid_probe(struct regs *rp)
 		break;
 	}
 
+	case FASTTRAP_T_NOP:
+		new_pc = pc + tp->ftt_size;
+		break;
+
 	case FASTTRAP_T_JMP:
 	case FASTTRAP_T_CALL:
 		if (tp->ftt_code == 0) {
@@ -1603,7 +1624,6 @@ done:
 		}
 	}
 
-	ASSERT(new_pc != 0);
 	rp->r_pc = new_pc;
 
 	return (0);

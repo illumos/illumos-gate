@@ -355,8 +355,8 @@ typedef struct dt_header_info {
 	FILE *dthi_out;		/* output file */
 	char *dthi_pmname;	/* provider macro name */
 	char *dthi_pfname;	/* provider function name */
+	int dthi_empty;		/* should we generate empty macros */
 } dt_header_info_t;
-
 
 static void
 dt_header_fmt_macro(char *buf, const char *str)
@@ -472,32 +472,40 @@ dt_header_probe(dt_idhash_t *dhp, dt_ident_t *idp, void *data)
 			return (dt_set_errno(dtp, errno));
 	}
 
-	if (fprintf(infop->dthi_out, ") \\\n\t") < 0)
-		return (dt_set_errno(dtp, errno));
-
-	if (fprintf(infop->dthi_out, "__dtrace_%s___%s(",
-	    infop->dthi_pfname, fname) < 0)
-		return (dt_set_errno(dtp, errno));
-
-	for (i = 0; i < prp->pr_nargc; i++) {
-		if (fprintf(infop->dthi_out, "arg%d", i) < 0)
+	if (!infop->dthi_empty) {
+		if (fprintf(infop->dthi_out, ") \\\n\t") < 0)
 			return (dt_set_errno(dtp, errno));
 
-		if (i + 1 != prp->pr_nargc &&
-		    fprintf(infop->dthi_out, ", ") < 0)
+		if (fprintf(infop->dthi_out, "__dtrace_%s___%s(",
+		    infop->dthi_pfname, fname) < 0)
 			return (dt_set_errno(dtp, errno));
+
+		for (i = 0; i < prp->pr_nargc; i++) {
+			if (fprintf(infop->dthi_out, "arg%d", i) < 0)
+				return (dt_set_errno(dtp, errno));
+
+			if (i + 1 != prp->pr_nargc &&
+			    fprintf(infop->dthi_out, ", ") < 0)
+				return (dt_set_errno(dtp, errno));
+		}
 	}
 
 	if (fprintf(infop->dthi_out, ")\n") < 0)
 		return (dt_set_errno(dtp, errno));
 
-	if (fprintf(infop->dthi_out, "#define\t%s_%s_ENABLED() \\\n",
-	    infop->dthi_pmname, mname) < 0)
-		return (dt_set_errno(dtp, errno));
+	if (!infop->dthi_empty) {
+		if (fprintf(infop->dthi_out, "#define\t%s_%s_ENABLED() \\\n",
+		    infop->dthi_pmname, mname) < 0)
+			return (dt_set_errno(dtp, errno));
 
-	if (fprintf(infop->dthi_out, "\t__dtraceenabled_%s___%s()\n",
-	    infop->dthi_pfname, fname) < 0)
-		return (dt_set_errno(dtp, errno));
+		if (fprintf(infop->dthi_out, "\t__dtraceenabled_%s___%s()\n",
+		    infop->dthi_pfname, fname) < 0)
+			return (dt_set_errno(dtp, errno));
+	} else {
+		if (fprintf(infop->dthi_out, "#define\t%s_%s_ENABLED() (0)\n",
+		    infop->dthi_pmname, mname) < 0)
+			return (dt_set_errno(dtp, errno));
+	}
 
 	return (0);
 }
@@ -512,12 +520,17 @@ dt_header_provider(dtrace_hdl_t *dtp, dt_provider_t *pvp, FILE *out)
 	if (pvp->pv_flags & DT_PROVIDER_IMPL)
 		return (0);
 
+	/*
+	 * Count the instances of the '-' character since we'll need to double
+	 * those up.
+	 */
 	p = pvp->pv_desc.dtvd_name;
 	for (i = 0; (p = strchr(p, '-')) != NULL; i++)
 		p++;
 
 	info.dthi_dtp = dtp;
 	info.dthi_out = out;
+	info.dthi_empty = 0;
 
 	info.dthi_pmname = alloca(strlen(pvp->pv_desc.dtvd_name) + 1);
 	dt_header_fmt_macro(info.dthi_pmname, pvp->pv_desc.dtvd_name);
@@ -525,6 +538,8 @@ dt_header_provider(dtrace_hdl_t *dtp, dt_provider_t *pvp, FILE *out)
 	info.dthi_pfname = alloca(strlen(pvp->pv_desc.dtvd_name) + 1 + i);
 	dt_header_fmt_func(info.dthi_pfname, pvp->pv_desc.dtvd_name);
 
+	if (fprintf(out, "#if _DTRACE_VERSION\n\n") < 0)
+		return (dt_set_errno(dtp, errno));
 
 	if (dt_idhash_iter(pvp->pv_probes, dt_header_probe, &info) != 0)
 		return (-1); /* dt_errno is set for us */
@@ -532,6 +547,17 @@ dt_header_provider(dtrace_hdl_t *dtp, dt_provider_t *pvp, FILE *out)
 		return (dt_set_errno(dtp, errno));
 	if (dt_idhash_iter(pvp->pv_probes, dt_header_decl, &info) != 0)
 		return (-1); /* dt_errno is set for us */
+
+	if (fprintf(out, "\n#else\n\n") < 0)
+		return (dt_set_errno(dtp, errno));
+
+	info.dthi_empty = 1;
+
+	if (dt_idhash_iter(pvp->pv_probes, dt_header_probe, &info) != 0)
+		return (-1); /* dt_errno is set for us */
+
+	if (fprintf(out, "\n#endif\n\n") < 0)
+		return (dt_set_errno(dtp, errno));
 
 	return (0);
 }
@@ -552,6 +578,9 @@ dtrace_program_header(dtrace_hdl_t *dtp, FILE *out, const char *fname)
 		    mfname, mfname) < 0)
 			return (dt_set_errno(dtp, errno));
 	}
+
+	if (fprintf(out, "#include <unistd.h>\n\n") < 0)
+		return (-1);
 
 	if (fprintf(out, "#ifdef\t__cplusplus\nextern \"C\" {\n#endif\n\n") < 0)
 		return (-1);

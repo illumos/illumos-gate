@@ -24,37 +24,38 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-PROG = dtrace
-OBJS = dtrace.o
-SRCS = $(OBJS:%.o=../%.c)
+# Make sure <unistd.h> defines _DTRACE_VERSION
 
-include ../../Makefile.cmd
+DIR=/var/tmp/dtest.$$
 
-CFLAGS += $(CCVERBOSE)
-CFLAGS64 += $(CCVERBOSE)
-LDLIBS += -ldtrace -lproc -lctf -lelf
+mkdir $DIR
+cd $DIR
 
-FILEMODE = 0555
-GROUP = bin
+cat > test.c <<EOF
+#include <unistd.h>
 
-CLEANFILES += $(OBJS)
+int
+main(int argc, char **argv)
+{
+#ifdef _DTRACE_VERSION
+	return (0);
+#else
+	return (1);
+#endif
+}
+EOF
 
-.KEEP_STATE:
+cc -xarch=generic -o test test.c
+if [ $? -ne 0 ]; then
+	print -u2 "failed to compile test.c"
+	exit 1
+fi
 
-all: $(PROG)
+./test
+status=$?
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS) ; $(STRIP_STABS)
+cd /
+/usr/bin/rm -rf $DIR
 
-clean:
-	-$(RM) $(CLEANFILES)
-
-lint: lint_SRCS
-
-%.o: ../%.c
-	$(COMPILE.c) $<
-
-include ../../Makefile.targ
+exit $status

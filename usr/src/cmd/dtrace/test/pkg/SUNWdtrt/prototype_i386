@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 !include prototype_com
 
@@ -40,6 +40,8 @@ f none opt/SUNWdtrt/tst/i386/funcs/tst.badcopyinstr.d 0444 root bin
 f none opt/SUNWdtrt/tst/i386/funcs/tst.badcopyout.d 0444 root bin
 f none opt/SUNWdtrt/tst/i386/funcs/tst.badcopyoutstr.d 0444 root bin
 d none opt/SUNWdtrt/tst/i386/pid 0755 root bin
+f none opt/SUNWdtrt/tst/i386/pid/tst.badinstr.d 0444 root bin
+f none opt/SUNWdtrt/tst/i386/pid/tst.badinstr.exe 0555 root bin
 f none opt/SUNWdtrt/tst/i386/pid/tst.branch.d 0444 root bin
 f none opt/SUNWdtrt/tst/i386/pid/tst.branch.exe 0555 root bin
 f none opt/SUNWdtrt/tst/i386/pid/tst.embedded.d 0444 root bin

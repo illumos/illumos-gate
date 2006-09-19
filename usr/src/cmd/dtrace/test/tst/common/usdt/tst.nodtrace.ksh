@@ -24,37 +24,61 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-PROG = dtrace
-OBJS = dtrace.o
-SRCS = $(OBJS:%.o=../%.c)
+# Fake up a scenario where _DTRACE_VERSION is not defined by having our own
+# <unistd.h>. This tests that dtrace -h will produce a header file which can
+# be used on a system where DTrace is not present.
 
-include ../../Makefile.cmd
+DIR=/var/tmp/dtest.$$
 
-CFLAGS += $(CCVERBOSE)
-CFLAGS64 += $(CCVERBOSE)
-LDLIBS += -ldtrace -lproc -lctf -lelf
+mkdir $DIR
+cd $DIR
 
-FILEMODE = 0555
-GROUP = bin
+touch unistd.h
 
-CLEANFILES += $(OBJS)
+cat > prov.d <<EOF
+provider test_prov {
+	probe go();
+};
+EOF
 
-.KEEP_STATE:
+dtrace -h -s prov.d
+if [ $? -ne 0 ]; then
+	print -u2 "failed to generate header file"
+	exit 1
+fi
 
-all: $(PROG)
+cat > test.c <<EOF
+#include "prov.h"
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS) ; $(STRIP_STABS)
+int
+main(int argc, char **argv)
+{
+	TEST_PROV_GO();
 
-clean:
-	-$(RM) $(CLEANFILES)
+	if (TEST_PROV_GO_ENABLED()) {
+		TEST_PROV_GO();
+	}
 
-lint: lint_SRCS
+	return (0);
+}
+EOF
 
-%.o: ../%.c
-	$(COMPILE.c) $<
+cc -I. -xarch=generic -c test.c
+if [ $? -ne 0 ]; then
+	print -u2 "failed to compile test.c"
+	exit 1
+fi
+cc -xarch=generic -o test test.o
+if [ $? -ne 0 ]; then
+	print -u2 "failed to link final executable"
+	exit 1
+fi
 
-include ../../Makefile.targ
+./test
+status=$?
+
+cd /
+/usr/bin/rm -rf $DIR
+
+exit $status
