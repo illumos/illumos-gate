@@ -2494,6 +2494,12 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		if (DTRACE_ANCHORED(mstate->dtms_probe) && CPU_ON_INTR(CPU))
 			return (pid0.pid_id);
 
+		/*
+		 * It is always safe to dereference one's own t_procp pointer:
+		 * it always points to a valid, allocated proc structure.
+		 * (This is true because threads don't clean up their own
+		 * state -- they leave that task to whomever reaps them.)
+		 */
 		return ((uint64_t)curthread->t_procp->p_ppid);
 
 	case DIF_VAR_TID:
@@ -2553,7 +2559,16 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		if (DTRACE_ANCHORED(mstate->dtms_probe) && CPU_ON_INTR(CPU))
 			return ((uint64_t)p0.p_cred->cr_uid);
 
-		return ((uint64_t)curthread->t_cred->cr_uid);
+		/*
+		 * It is always safe to dereference one's own t_procp pointer:
+		 * it always points to a valid, allocated proc structure.
+		 * (This is true because threads don't clean up their own
+		 * state -- they leave that task to whomever reaps them.)
+		 *
+		 * Additionally, it is safe to dereference one's own process
+		 * credential, since this is never NULL after process birth.
+		 */
+		return ((uint64_t)curthread->t_procp->p_cred->cr_uid);
 
 	case DIF_VAR_GID:
 		if (!dtrace_priv_proc(state))
@@ -2565,7 +2580,16 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		if (DTRACE_ANCHORED(mstate->dtms_probe) && CPU_ON_INTR(CPU))
 			return ((uint64_t)p0.p_cred->cr_gid);
 
-		return ((uint64_t)curthread->t_cred->cr_gid);
+		/*
+		 * It is always safe to dereference one's own t_procp pointer:
+		 * it always points to a valid, allocated proc structure.
+		 * (This is true because threads don't clean up their own
+		 * state -- they leave that task to whomever reaps them.)
+		 *
+		 * Additionally, it is safe to dereference one's own process
+		 * credential, since this is never NULL after process birth.
+		 */
+		return ((uint64_t)curthread->t_procp->p_cred->cr_gid);
 
 	case DIF_VAR_ERRNO: {
 		klwp_t *lwp;
@@ -2578,6 +2602,12 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		if (DTRACE_ANCHORED(mstate->dtms_probe) && CPU_ON_INTR(CPU))
 			return (0);
 
+		/*
+		 * It is always safe to dereference one's own t_lwp pointer in
+		 * the event that this pointer is non-NULL.  (This is true
+		 * because threads and lwps don't clean up their own state --
+		 * they leave that task to whomever reaps them.)
+		 */
 		if ((lwp = curthread->t_lwp) == NULL)
 			return (0);
 

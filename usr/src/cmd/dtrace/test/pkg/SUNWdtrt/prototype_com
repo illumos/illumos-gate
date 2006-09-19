@@ -948,10 +948,13 @@ f none opt/SUNWdtrt/tst/common/safety/tst.cleanpath.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.copyin.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.ddi_pathname.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.dirname.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/safety/tst.errno.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/safety/tst.gid.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.index.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.msgdsize.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.msgsize.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.null.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/safety/tst.ppid.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.progenyof.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.random.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.rw.d 0444 root bin
@@ -963,6 +966,7 @@ f none opt/SUNWdtrt/tst/common/safety/tst.strjoin.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.strstr.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.strtok.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.substr.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/safety/tst.uid.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.unalign.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.uregs.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.ustack.d 0444 root bin
