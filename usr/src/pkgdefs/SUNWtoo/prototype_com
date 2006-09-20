@@ -80,3 +80,6 @@ s none usr/lib/link_audit/32=.
 f none usr/lib/link_audit/ldprof.so.1 755 root bin
 f none usr/lib/link_audit/truss.so.1 755 root bin
 f none usr/lib/link_audit/who.so.1 755 root bin
+d none usr/lib/abi 755 root bin
+f none usr/lib/abi/spec2map 755 root bin
+f none usr/lib/abi/spec2trace 755 root bin

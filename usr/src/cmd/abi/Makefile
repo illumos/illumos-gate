@@ -25,7 +25,7 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIRS = apptracecmd appcert
+SUBDIRS = spectrans apptracecmd appcert
 
 all		:=	TARGET= all
 install		:=	TARGET= install
