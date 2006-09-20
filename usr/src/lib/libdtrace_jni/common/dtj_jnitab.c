@@ -109,6 +109,7 @@ jmethodID g_pdataadd_jm = 0;
 jmethodID g_pdataadd_rec_jm = 0;
 jmethodID g_pdataadd_trace_jm = 0;
 jmethodID g_pdataadd_stack_jm = 0;
+jmethodID g_pdataadd_symbol_jm = 0;
 jmethodID g_pdataadd_printf_jm = 0;
 jmethodID g_pdataadd_printa_jm = 0;
 jmethodID g_pdatainvalidate_printa_jm = 0;
@@ -196,6 +197,20 @@ jmethodID g_distinit_jm = 0;
 /* LinearDistribution */
 jclass g_ldist_jc = 0;
 jmethodID g_ldistinit_jm = 0;
+
+/* KernelSymbolRecord */
+jclass g_symbol_jc = 0;
+jmethodID g_symbolinit_jm = 0;
+jmethodID g_symbolset_name_jm = 0;
+
+/* UserSymbolRecord */
+jclass g_usymbol_jc = 0;
+jmethodID g_usymbolinit_jm = 0;
+jmethodID g_usymbolset_name_jm = 0;
+
+/* ScalarRecord */
+jclass g_scalar_jc = 0;
+jmethodID g_scalarinit_jm = 0;
 
 
 static dtj_status_t
@@ -292,11 +307,13 @@ dtj_table_load(JNIEnv *jenv)
 			"(IILorg/opensolaris/os/dtrace/ProbeDescription;"
 			    "Lorg/opensolaris/os/dtrace/Flow;I)V" },
 		{ JMETHOD, &g_pdataadd_jm, "addDataElement",
-			"(Ljava/lang/Object;)V" },
+			"(Lorg/opensolaris/os/dtrace/Record;)V" },
 		{ JMETHOD, &g_pdataadd_rec_jm, "addRecord",
 			"(Lorg/opensolaris/os/dtrace/Record;)V" },
 		{ JMETHOD, &g_pdataadd_trace_jm, "addTraceRecord", "(I)V" },
 		{ JMETHOD, &g_pdataadd_stack_jm, "addStackRecord",
+			"(ILjava/lang/String;)V" },
+		{ JMETHOD, &g_pdataadd_symbol_jm, "addSymbolRecord",
 			"(ILjava/lang/String;)V" },
 		{ JMETHOD, &g_pdataadd_printf_jm, "addPrintfRecord", "()V" },
 		{ JMETHOD, &g_pdataadd_printa_jm, "addPrintaRecord", "(JZ)V" },
@@ -354,7 +371,7 @@ dtj_table_load(JNIEnv *jenv)
 		{ JCLASS,  &g_tuple_jc, "org/opensolaris/os/dtrace/Tuple" },
 		{ JMETHOD, &g_tupleinit_jm, CONSTRUCTOR, "()V" },
 		{ JMETHOD, &g_tupleadd_jm, "addElement",
-			"(Ljava/lang/Object;)V" },
+			"(Lorg/opensolaris/os/dtrace/ValueRecord;)V" },
 		{ JMETHOD, &g_tuplesize_jm, "size", "()I" },
 		{ JFIELD_STATIC, &g_tuple_EMPTY_jsf, "EMPTY",
 			"Lorg/opensolaris/os/dtrace/Tuple;" },
@@ -424,6 +441,26 @@ dtj_table_load(JNIEnv *jenv)
 		{ JCLASS,  &g_ldist_jc,
 			"org/opensolaris/os/dtrace/LinearDistribution" },
 		{ JMETHOD,  &g_ldistinit_jm, CONSTRUCTOR, "(JJ[J)V" },
+
+		/* KernelSymbolRecord */
+		{ JCLASS,  &g_symbol_jc,
+			"org/opensolaris/os/dtrace/KernelSymbolRecord" },
+		{ JMETHOD,  &g_symbolinit_jm, CONSTRUCTOR, "(J)V" },
+		{ JMETHOD,  &g_symbolset_name_jm, "setSymbol",
+			"(Ljava/lang/String;)V" },
+
+		/* UserSymbolRecord */
+		{ JCLASS,  &g_usymbol_jc,
+			"org/opensolaris/os/dtrace/UserSymbolRecord" },
+		{ JMETHOD,  &g_usymbolinit_jm, CONSTRUCTOR, "(IJ)V" },
+		{ JMETHOD,  &g_usymbolset_name_jm, "setSymbol",
+			"(Ljava/lang/String;)V" },
+
+		/* ScalarRecord */
+		{ JCLASS,  &g_scalar_jc,
+			"org/opensolaris/os/dtrace/ScalarRecord" },
+		{ JMETHOD,  &g_scalarinit_jm, CONSTRUCTOR,
+			"(Ljava/lang/Object;I)V" },
 
 		{ DTJ_TYPE_END }
 	};

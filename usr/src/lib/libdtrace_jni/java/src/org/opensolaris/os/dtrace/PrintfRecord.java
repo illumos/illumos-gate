@@ -108,9 +108,9 @@ public final class PrintfRecord implements Record, Serializable {
      * @throws NullPointerException if o is null
      */
     void
-    addUnformattedElement(Object o)
+    addUnformattedElement(ScalarRecord rec)
     {
-	records.add(new ScalarRecord(o));
+	records.add(rec);
     }
 
     /**

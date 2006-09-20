@@ -69,6 +69,7 @@ f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Interface
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/InterfaceAttributes.Stability.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/InterfaceAttributes.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/KernelStackRecord.html 0644 root other
+f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/KernelSymbolRecord.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/LinearDistribution.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/LocalConsumer.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/LogDistribution.html 0644 root other
@@ -93,9 +94,12 @@ f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Record.ht
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ScalarRecord.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/StackFrame.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/StackValueRecord.html 0644 root other
+f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/SymbolValueRecord.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/SumValue.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Tuple.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/UserStackRecord.html 0644 root other
+f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/UserSymbolRecord.html 0644 root other
+f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/UserSymbolRecord.Value.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/ValueRecord.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/package-frame.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/package-summary.html 0644 root other
@@ -130,6 +134,7 @@ f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/InterfaceAttributes.Stability.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/InterfaceAttributes.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/KernelStackRecord.html 0644 root other
+f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/KernelSymbolRecord.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/LinearDistribution.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/LocalConsumer.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/LogDistribution.html 0644 root other
@@ -154,9 +159,12 @@ f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ScalarRecord.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/StackFrame.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/StackValueRecord.html 0644 root other
+f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/SymbolValueRecord.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/SumValue.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/Tuple.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/UserStackRecord.html 0644 root other
+f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/UserSymbolRecord.html 0644 root other
+f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/UserSymbolRecord.Value.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ValueRecord.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/package-use.html 0644 root other
 f none usr/share/lib/java/javadoc/dtrace/api/package-list 0644 root other

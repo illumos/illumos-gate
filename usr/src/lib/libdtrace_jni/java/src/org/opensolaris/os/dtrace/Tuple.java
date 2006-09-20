@@ -154,17 +154,13 @@ public final class Tuple implements Serializable, Comparable <Tuple>,
      * {@link ScalarRecord#getValue()}
      */
     private void
-    addElement(Object element)
+    addElement(ValueRecord element)
     {
 	if (element == null) {
 	    throw new NullPointerException("tuple element is null at " +
 		    "index " + elements.size());
 	}
-	if (element instanceof ValueRecord) {
-	    elements.add(ValueRecord.class.cast(element));
-	} else {
-	    elements.add(new ScalarRecord(element));
-	}
+	elements.add(element);
     }
 
     /**
@@ -269,24 +265,34 @@ public final class Tuple implements Serializable, Comparable <Tuple>,
 
     // lenient sort does not throw exceptions
     @SuppressWarnings("unchecked")
-    private int
+    private static int
     compareObjects(Object o1, Object o2)
     {
 	int cmp;
-	Class c1 = o1.getClass();
-	Class c2 = o2.getClass();
-	if (c1.isAssignableFrom(c2) && (o1 instanceof Comparable)) {
-	    Comparable c = Comparable.class.cast(o1);
-	    cmp = c.compareTo(c1.cast(o2));
+
+	if (o1 instanceof Comparable) {
+	    Class c1 = o1.getClass();
+	    Class c2 = o2.getClass();
+	    if (c1.equals(c2)) {
+		cmp = ProbeData.compareUnsigned(Comparable.class.cast(o1),
+			Comparable.class.cast(o2));
+	    } else {
+		// Compare string values.
+		String s1 = o1.toString();
+		String s2 = o2.toString();
+		cmp = s1.compareTo(s2);
+	    }
+	} else if (o1 instanceof byte[] && o2 instanceof byte[]) {
+	    byte[] a1 = byte[].class.cast(o1);
+	    byte[] a2 = byte[].class.cast(o2);
+	    cmp = ProbeData.compareByteArrays(a1, a2);
 	} else {
-	    // Compare string values.  If matching, compare object class.
+	    // Compare string values.
 	    String s1 = o1.toString();
 	    String s2 = o2.toString();
 	    cmp = s1.compareTo(s2);
-	    if (cmp == 0) {
-		cmp = c1.getName().compareTo(c2.getName());
-	    }
 	}
+
 	return cmp;
     }
 
@@ -297,13 +303,13 @@ public final class Tuple implements Serializable, Comparable <Tuple>,
      * of corresponding elements and comparing subsequent pairs only
      * when all previous pairs are equal (as a tie breaker).  If
      * corresponding elements are not mutually comparable, it compares
-     * the string values of those elements, then if the string values
-     * are equal, it compares the class names of those elements' types.
-     * If all corresponding elements are equal, then the tuple with more
-     * elements sorts higher than the tuple with fewer elements.
+     * the string values of those elements.  If all corresponding
+     * elements are equal, then the tuple with more elements sorts
+     * higher than the tuple with fewer elements.
      *
      * @return a negative integer, zero, or a postive integer as this
      * tuple is less than, equal to, or greater than the given tuple
+     * @see Tuple#compare(Tuple t1, Tuple t2, int pos)
      */
     public int
     compareTo(Tuple t)
@@ -311,29 +317,50 @@ public final class Tuple implements Serializable, Comparable <Tuple>,
 	int cmp = 0;
 	int len = size();
 	int tlen = t.size();
-	ValueRecord rec;
-	ValueRecord trec;
-	Object val;
-	Object tval;
 	for (int i = 0; (cmp == 0) && (i < len) && (i < tlen); ++i) {
-	    rec = get(i);
-	    trec = t.get(i);
-	    if (rec instanceof ScalarRecord) {
-		val = rec.getValue();
-	    } else {
-		val = rec;
-	    }
-	    if (trec instanceof ScalarRecord) {
-		tval = trec.getValue();
-	    } else {
-		tval = trec;
-	    }
-	    cmp = compareObjects(val, tval);
+	    cmp = Tuple.compare(this, t, i);
 	}
 	if (cmp == 0) {
 	    cmp = (len < tlen ? -1 : (len > tlen ? 1 : 0));
 	}
 	return cmp;
+    }
+
+    /**
+     * Compares corresponding tuple elements at the given zero-based
+     * index. Elements are ordered as defined in the native DTrace
+     * library, which treats integer values as unsigned when sorting.
+     *
+     * @param t1 first tuple
+     * @param t2 second tuple
+     * @param pos nth tuple element, starting at zero
+     * @return a negative integer, zero, or a postive integer as the
+     * element in the first tuple is less than, equal to, or greater
+     * than the element in the second tuple
+     * @throws IndexOutOfBoundsException if the given tuple index {@code
+     * pos} is out of range {@code (pos < 0 || pos >= size())} for
+     * either of the given tuples
+     */
+    public static int
+    compare(Tuple t1, Tuple t2, int pos)
+    {
+	int cmp = 0;
+	ValueRecord rec1 = t1.get(pos);
+	ValueRecord rec2 = t2.get(pos);
+	Object val1;
+	Object val2;
+	if (rec1 instanceof ScalarRecord) {
+	    val1 = rec1.getValue();
+	} else {
+	    val1 = rec1;
+	}
+	if (rec2 instanceof ScalarRecord) {
+	    val2 = rec2.getValue();
+	} else {
+	    val2 = rec2;
+	}
+	cmp = compareObjects(val1, val2);
+	return (cmp);
     }
 
     private void

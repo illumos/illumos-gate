@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -729,16 +729,36 @@ dt_aggregate_keycmp(const void *lhs, const void *rhs)
 			break;
 
 		default:
-			for (j = 0; j < lrec->dtrd_size; j++) {
-				lval = ((uint8_t *)ldata)[j];
-				rval = ((uint8_t *)rdata)[j];
+			switch (lrec->dtrd_action) {
+			case DTRACEACT_UMOD:
+			case DTRACEACT_UADDR:
+			case DTRACEACT_USYM:
+				for (j = 0; j < 2; j++) {
+					/* LINTED - alignment */
+					lval = ((uint64_t *)ldata)[j];
+					/* LINTED - alignment */
+					rval = ((uint64_t *)rdata)[j];
 
-				if (lval < rval)
-					return (DT_LESSTHAN);
+					if (lval < rval)
+						return (DT_LESSTHAN);
 
-				if (lval > rval)
-					return (DT_GREATERTHAN);
+					if (lval > rval)
+						return (DT_GREATERTHAN);
+				}
 
+				break;
+
+			default:
+				for (j = 0; j < lrec->dtrd_size; j++) {
+					lval = ((uint8_t *)ldata)[j];
+					rval = ((uint8_t *)rdata)[j];
+
+					if (lval < rval)
+						return (DT_LESSTHAN);
+
+					if (lval > rval)
+						return (DT_GREATERTHAN);
+				}
 			}
 
 			continue;

@@ -282,12 +282,13 @@ public final class KernelStackRecord implements StackValueRecord,
     }
 
     /**
-     * Compares this record with the given stack record.  Compares the
-     * first unequal pair of bytes at the same index in each record's
-     * raw stack data, or if all corresponding bytes are equal, compares
-     * the length of each record's array of raw stack data.  The {@code
-     * compareTo()} method is compatible with {@link #equals(Object o)
-     * equals()}.
+     * Compares this record with the given {@code KernelStackRecord}.
+     * Compares the first unequal pair of bytes at the same index in
+     * each record's raw stack data, or if all corresponding bytes are
+     * equal, compares the length of each record's array of raw stack
+     * data.  Corresponding bytes are compared as unsigned values.  The
+     * {@code compareTo()} method is compatible with {@link
+     * #equals(Object o) equals()}.
      * <p>
      * This implementation first checks if the specified record is this
      * {@code KernelStackRecord}.  If so, it returns {@code 0}.
@@ -302,17 +303,7 @@ public final class KernelStackRecord implements StackValueRecord,
 	    return 0;
 	}
 
-	int len1 = rawStackData.length;
-	int len2 = r.rawStackData.length;
-	int cmp = 0;
-	for (int i = 0; (cmp == 0) && (i < len1) && (i < len2); ++i) {
-	    cmp = ((rawStackData[i] < r.rawStackData[i]) ? -1 :
-		    ((rawStackData[i] > r.rawStackData[i]) ? 1 : 0));
-	}
-	if (cmp == 0) {
-	    cmp = ((len1 < len2) ? -1 : ((len1 > len2) ? 1 : 0));
-	}
-	return cmp;
+	return ProbeData.compareByteArrays(rawStackData, r.rawStackData);
     }
 
     private void

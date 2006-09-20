@@ -84,7 +84,7 @@
  * LocalConsumer itself.
  */
 
-#define	DTRACE_JNI_VERSION 1
+#define	DTRACE_JNI_VERSION 2
 
 #define	FIRST_HANDLE 0		/* sequence-generated consumer ID */
 #define	NO_HANDLE -1

@@ -111,7 +111,7 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
     private Flow flow;
     // Scratch data, one element per native probedata->dtpda_edesc->dtepd_nrecs
     // element, cleared after records list is fully populated.
-    private transient List <Object> nativeElements;
+    private transient List <Record> nativeElements;
     /** @serial */
     private List <Record> records;
 
@@ -142,7 +142,7 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
 	cpu = cpuID;
 	enabledProbeDescription = p;
 	flow = f;
-	nativeElements = new ArrayList <Object> (nativeElementCount);
+	nativeElements = new ArrayList <Record> (nativeElementCount);
 	records = new ArrayList <Record> ();
 	validate();
     }
@@ -192,8 +192,11 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
     }
 
     private void
-    addDataElement(Object o)
+    addDataElement(Record o)
     {
+	// Early error detection if native code adds the wrong type
+	Record r = Record.class.cast(o);
+
 	nativeElements.add(o);
     }
 
@@ -217,9 +220,29 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
 	// assignment to a variable (results in a native probedata
 	// record with no data).
 	int len = nativeElements.size();
-	Object o = null;
-	for (; ((o = nativeElements.get(i)) == null) && (i < len); ++i);
-	records.add(new ScalarRecord(o));
+	Record rec = null;
+	for (; ((rec = nativeElements.get(i)) == null) && (i < len); ++i);
+	records.add(rec);
+    }
+
+    /**
+     * Called by native code.
+     */
+    private void
+    addSymbolRecord(int i, String lookupString)
+    {
+	int len = nativeElements.size();
+	Record rec = null;
+	for (; ((rec = nativeElements.get(i)) == null) && (i < len); ++i);
+	SymbolValueRecord symbol = SymbolValueRecord.class.cast(rec);
+	if (symbol instanceof KernelSymbolRecord) {
+	    KernelSymbolRecord.class.cast(symbol).setSymbol(lookupString);
+	} else if (symbol instanceof UserSymbolRecord) {
+	    UserSymbolRecord.class.cast(symbol).setSymbol(lookupString);
+	} else {
+	    throw new IllegalStateException("no symbol record at index " + i);
+	}
+	records.add(symbol);
     }
 
     /**
@@ -229,14 +252,14 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
     addStackRecord(int i, String framesString)
     {
 	int len = nativeElements.size();
-	Object o = null;
-	for (; ((o = nativeElements.get(i)) == null) && (i < len); ++i);
-	StackValueRecord stack = (StackValueRecord)o;
+	Record rec = null;
+	for (; ((rec = nativeElements.get(i)) == null) && (i < len); ++i);
+	StackValueRecord stack = StackValueRecord.class.cast(rec);
 	StackFrame[] frames = KernelStackRecord.parse(framesString);
 	if (stack instanceof KernelStackRecord) {
-	    ((KernelStackRecord)stack).setStackFrames(frames);
+	    KernelStackRecord.class.cast(stack).setStackFrames(frames);
 	} else if (stack instanceof UserStackRecord) {
-	    ((UserStackRecord)stack).setStackFrames(frames);
+	    UserStackRecord.class.cast(stack).setStackFrames(frames);
 	} else {
 	    throw new IllegalStateException("no stack record at index " + i);
 	}
@@ -270,7 +293,7 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
 	while (itr.hasPrevious() && (printa == null)) {
 	    record = itr.previous();
 	    if (record instanceof PrintaRecord) {
-		printa = (PrintaRecord)record;
+		printa = PrintaRecord.class.cast(record);
 	    }
 	}
 	return printa;
@@ -326,9 +349,10 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
     addExitRecord(int i)
     {
 	int len = nativeElements.size();
-	Object o = null;
-	for (; ((o = nativeElements.get(i)) == null) && (i < len); ++i);
-	Integer exitStatus = (Integer)o;
+	Record rec = null;
+	for (; ((rec = nativeElements.get(i)) == null) && (i < len); ++i);
+	ScalarRecord scalar = ScalarRecord.class.cast(rec);
+	Integer exitStatus = Integer.class.cast(scalar.getValue());
 	records.add(new ExitRecord(exitStatus));
     }
 
@@ -342,8 +366,8 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
     {
 	Record record = records.get(records.size() - 1);
 	if (record instanceof PrintfRecord) {
-	    PrintfRecord printf = (PrintfRecord)record;
-	    Object e;
+	    PrintfRecord printf = PrintfRecord.class.cast(record);
+	    Record e;
 	    for (int i = first; i <= last; ++i) {
 		e = nativeElements.get(i);
 		if (e == null) {
@@ -354,7 +378,7 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
 		    // record with no data).
 		    continue;
 		}
-		printf.addUnformattedElement(e);
+		printf.addUnformattedElement(ScalarRecord.class.cast(e));
 	    }
 	}
     }
@@ -376,7 +400,7 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
     {
 	Record record = records.get(records.size() - 1);
 	if (record instanceof PrintfRecord) {
-	    PrintfRecord printf = (PrintfRecord)record;
+	    PrintfRecord printf = PrintfRecord.class.cast(record);
 	    printf.setFormattedString(s);
 	}
     }
@@ -416,8 +440,107 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
 	}
     }
 
+    static int
+    compareUnsigned(int i1, int i2)
+    {
+	int cmp;
+
+	if (i1 < 0) {
+	    if (i2 < 0) {
+		cmp = (i1 < i2 ? -1 : (i1 > i2 ? 1 : 0));
+	    } else {
+		cmp = 1; // negative > positive
+	    }
+	} else if (i2 < 0) {
+	    cmp = -1; // positive < negative
+	} else {
+	    cmp = (i1 < i2 ? -1 : (i1 > i2 ? 1 : 0));
+	}
+
+	return cmp;
+    }
+
+    static int
+    compareUnsigned(long i1, long i2)
+    {
+	int cmp;
+
+	if (i1 < 0) {
+	    if (i2 < 0) {
+		cmp = (i1 < i2 ? -1 : (i1 > i2 ? 1 : 0));
+	    } else {
+		cmp = 1; // negative > positive
+	    }
+	} else if (i2 < 0) {
+	    cmp = -1; // positive < negative
+	} else {
+	    cmp = (i1 < i2 ? -1 : (i1 > i2 ? 1 : 0));
+	}
+
+	return cmp;
+    }
+
+    static int
+    compareUnsigned(byte i1, byte i2)
+    {
+	int cmp;
+
+	if (i1 < 0) {
+	    if (i2 < 0) {
+		cmp = (i1 < i2 ? -1 : (i1 > i2 ? 1 : 0));
+	    } else {
+		cmp = 1; // negative > positive
+	    }
+	} else if (i2 < 0) {
+	    cmp = -1; // positive < negative
+	} else {
+	    cmp = (i1 < i2 ? -1 : (i1 > i2 ? 1 : 0));
+	}
+
+	return cmp;
+    }
+
+    static int
+    compareByteArrays(byte[] a1, byte[] a2)
+    {
+	int cmp = 0;
+	int len1 = a1.length;
+	int len2 = a2.length;
+
+	for (int i = 0; (cmp == 0) && (i < len1) && (i < len2); ++i) {
+	    cmp = compareUnsigned(a1[i], a2[i]);
+	}
+
+	if (cmp == 0) {
+	    cmp = (len1 < len2 ? -1 : (len1 > len2 ? 1 : 0));
+	}
+
+	return cmp;
+    }
+
+    @SuppressWarnings("unchecked")
+    static int
+    compareUnsigned(Comparable v1, Comparable v2)
+    {
+	int cmp;
+
+	if (v1 instanceof Integer) {
+	    int i1 = Integer.class.cast(v1);
+	    int i2 = Integer.class.cast(v2);
+	    cmp = compareUnsigned(i1, i2);
+	} else if (v1 instanceof Long) {
+	    long i1 = Long.class.cast(v1);
+	    long i2 = Long.class.cast(v2);
+	    cmp = compareUnsigned(i1, i2);
+	} else {
+	    cmp = v1.compareTo(v2);
+	}
+
+	return cmp;
+    }
+
     /**
-     * @throws ClassCastException if records or their data are are not
+     * @throws ClassCastException if records or their data are not
      * mutually comparable
      */
     @SuppressWarnings("unchecked")
@@ -428,15 +551,22 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
 	if (r1 instanceof ScalarRecord) {
 	    ScalarRecord t1 = ScalarRecord.class.cast(r1);
 	    ScalarRecord t2 = ScalarRecord.class.cast(r2);
-	    Comparable v1 = Comparable.class.cast(t1.getValue());
-	    Comparable v2 = Comparable.class.cast(t2.getValue());
+	    Object o1 = t1.getValue();
+	    Object o2 = t2.getValue();
+	    if (o1 instanceof byte[]) {
+		byte[] a1 = byte[].class.cast(o1);
+		byte[] a2 = byte[].class.cast(o2);
+		cmp = compareByteArrays(a1, a2);
+	    } else {
+		Comparable v1 = Comparable.class.cast(o1);
+		Comparable v2 = Comparable.class.cast(o2);
+		cmp = v1.compareTo(v2); // compare signed values
+	    }
+	} else if (r1 instanceof Comparable) {
+	    // StackValueRecord, SymbolValueRecord
+	    Comparable v1 = Comparable.class.cast(r1);
+	    Comparable v2 = Comparable.class.cast(r2);
 	    cmp = v1.compareTo(v2);
-	} else if (r1 instanceof PrintfRecord) {
-	    PrintfRecord t1 = PrintfRecord.class.cast(r1);
-	    PrintfRecord t2 = PrintfRecord.class.cast(r2);
-	    String s1 = t1.toString();
-	    String s2 = t2.toString();
-	    cmp = s1.compareTo(s2);
 	} else if (r1 instanceof ExitRecord) {
 	    ExitRecord e1 = ExitRecord.class.cast(r1);
 	    ExitRecord e2 = ExitRecord.class.cast(r2);
@@ -444,8 +574,11 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
 	    int status2 = e2.getStatus();
 	    cmp = (status1 < status2 ? -1 : (status1 > status2 ? 1 : 0));
 	} else {
-	    throw new IllegalArgumentException("Unexpected record type: " +
-		    r1.getClass());
+	    // PrintfRecord, PrintaRecord
+	    r1.getClass().cast(r2);
+	    String s1 = r1.toString();
+	    String s2 = r2.toString();
+	    cmp = s1.compareTo(s2);
 	}
 
 	return cmp;
@@ -673,10 +806,10 @@ public final class ProbeData implements Serializable, Comparable <ProbeData> {
 	    }
 	    record = records.get(i);
 	    if (record instanceof ValueRecord) {
-		value = ((ValueRecord)record).getValue();
+		value = ValueRecord.class.cast(record).getValue();
 		if (value instanceof String) {
 		    buf.append("\"");
-		    buf.append((String)value);
+		    buf.append(String.class.cast(value));
 		    buf.append("\"");
 		} else {
 		    buf.append(record);

@@ -51,7 +51,7 @@ public class LocalConsumer implements Consumer {
 
     static Logger logger = Logger.getLogger(LocalConsumer.class.getName());
 
-    private static final int DTRACE_JNI_VERSION = 1;
+    private static final int DTRACE_JNI_VERSION = 2;
 
     private static final Option[] DEFAULT_OPTIONS = new Option[] {
 	new Option(Option.bufsize, Option.kb(256)),
@@ -635,9 +635,22 @@ public class LocalConsumer implements Consumer {
 		// that listeners finish executing consumerStopped()
 		// before the stop() method returns.
 		synchronized (this) {
-		    state = State.STOPPED;
-		    fireConsumerStopped(new ConsumerEvent(this,
-			    System.nanoTime()));
+		    if (state == State.STOPPED || state == state.CLOSED) {
+			//
+			// This consumer was stopped just after calling
+			// go() but before starting (the premature return
+			// case at the top of this work() method). It is
+			// possible to call close() on a consumer that has
+			// been stopped before starting. In that case the
+			// premature return above still takes us here in the
+			// finally clause, and we must not revert the CLOSED
+			// state to STOPPED.
+			//
+		    } else {
+			state = State.STOPPED;
+			fireConsumerStopped(new ConsumerEvent(this,
+				System.nanoTime()));
+		    }
 		}
 
 		// Notify the stop() method to stop waiting
@@ -776,6 +789,8 @@ public class LocalConsumer implements Consumer {
 			    _stop();
 			}
 			state = State.STOPPED;
+			fireConsumerStopped(new ConsumerEvent(this,
+				System.nanoTime()));
 		    } catch (DTraceException e) {
 			if (exceptionHandler != null) {
 			    exceptionHandler.handleException(e);

@@ -216,12 +216,7 @@ public final class UserStackRecord implements StackValueRecord,
 	}
 	if (o instanceof UserStackRecord) {
 	    UserStackRecord r = (UserStackRecord)o;
-	    // raw stack data includes the process ID, but the process
-	    // ID passed to the constructor is not validated against the
-	    // raw stack data; probably best for this class to test all
-	    // of its state without making assumptions
-	    return ((processID == r.processID) &&
-		    stackRecord.equals(r.stackRecord));
+	    return stackRecord.equals(r.stackRecord);
 	}
 	return false;
     }
@@ -233,21 +228,23 @@ public final class UserStackRecord implements StackValueRecord,
     public int
     hashCode()
     {
-	return (stackRecord.hashCode() + processID);
+	return stackRecord.hashCode();
     }
 
     /**
      * Compares this record with the given {@code UserStackRecord}.
-     * Compares process ID first, then if those are equal, compares the
-     * views returned by {@link #asKernelStackRecord()}.  The {@code
-     * compareTo()} method is compatible with {@link #equals(Object o)
-     * equals()}.
+     * Compares the first unequal pair of bytes at the same index in
+     * each record's raw stack data, or if all corresponding bytes are
+     * equal, compares the length of each record's array of raw stack
+     * data.  Corresponding bytes are compared as unsigned values.  The
+     * {@code compareTo()} method is compatible with {@link
+     * #equals(Object o) equals()}.
      * <p>
      * This implementation first checks if the specified object is this
      * {@code UserStackRecord}.  If so, it returns {@code 0}.
      *
-     * @return -1, 0, or 1 as this record is less than, equal to, or
-     * greater than the given record
+     * @return -1, 0, or 1 as this record's raw stack data is less than,
+     * equal to, or greater than the given record's raw stack data
      */
     public int
     compareTo(UserStackRecord r)
@@ -256,13 +253,7 @@ public final class UserStackRecord implements StackValueRecord,
 	    return 0;
 	}
 
-	int cmp = 0;
-	cmp = ((processID < r.processID) ? -1 :
-		((processID > r.processID) ? 1 : 0));
-	if (cmp == 0) {
-	    cmp = stackRecord.compareTo(r.stackRecord);
-	}
-	return cmp;
+	return stackRecord.compareTo(r.stackRecord);
     }
 
     /**

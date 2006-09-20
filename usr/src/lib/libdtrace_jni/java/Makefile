@@ -125,6 +125,7 @@ API_CLASSNAMES=\
 	Flow \
 	InterfaceAttributes \
 	KernelStackRecord \
+	KernelSymbolRecord \
 	LinearDistribution \
 	LocalConsumer \
 	LogDistribution \
@@ -148,8 +149,10 @@ API_CLASSNAMES=\
 	StackFrame \
 	StackValueRecord \
 	SumValue \
+	SymbolValueRecord \
 	Tuple \
 	UserStackRecord \
+	UserSymbolRecord \
 	Utility \
 	ValueRecord
 

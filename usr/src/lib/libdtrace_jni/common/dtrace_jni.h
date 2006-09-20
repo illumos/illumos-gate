@@ -313,6 +313,7 @@ extern jmethodID g_pdataadd_jm;
 extern jmethodID g_pdataadd_rec_jm;
 extern jmethodID g_pdataadd_trace_jm;
 extern jmethodID g_pdataadd_stack_jm;
+extern jmethodID g_pdataadd_symbol_jm;
 extern jmethodID g_pdataadd_printf_jm;
 extern jmethodID g_pdataadd_printa_jm;
 extern jmethodID g_pdatainvalidate_printa_jm;
@@ -400,6 +401,20 @@ extern jmethodID g_distinit_jm;
 /* LinearDistribution */
 extern jclass g_ldist_jc;
 extern jmethodID g_ldistinit_jm;
+
+/* KernelSymbolRecord */
+extern jclass g_symbol_jc;
+extern jmethodID g_symbolinit_jm;
+extern jmethodID g_symbolset_name_jm;
+
+/* UserSymbolRecord */
+extern jclass g_usymbol_jc;
+extern jmethodID g_usymbolinit_jm;
+extern jmethodID g_usymbolset_name_jm;
+
+/* ScalarRecord */
+extern jclass g_scalar_jc;
+extern jmethodID g_scalarinit_jm;
 
 /*
  * Populates the java class references and associated method and field IDs

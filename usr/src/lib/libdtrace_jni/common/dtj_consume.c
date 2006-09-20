@@ -76,8 +76,14 @@ static jobject dtj_new_stack_record(const caddr_t, const dtrace_recdesc_t *,
     dtj_java_consumer_t *);
 static jobject dtj_new_probedata_stack_record(const dtrace_probedata_t *,
     const dtrace_recdesc_t *, dtj_java_consumer_t *);
+static jobject dtj_new_symbol_record(const caddr_t, const dtrace_recdesc_t *,
+    dtj_java_consumer_t *);
+static jobject dtj_new_probedata_symbol_record(const dtrace_probedata_t *,
+    const dtrace_recdesc_t *, dtj_java_consumer_t *);
 /* Aggregation data */
 static jobject dtj_new_tuple_stack_record(const dtrace_aggdata_t *,
+    const dtrace_recdesc_t *, const char *, dtj_java_consumer_t *);
+static jobject dtj_new_tuple_symbol_record(const dtrace_aggdata_t *,
     const dtrace_recdesc_t *, const char *, dtj_java_consumer_t *);
 static jobject dtj_new_distribution(const dtrace_aggdata_t *,
     const dtrace_recdesc_t *, dtj_java_consumer_t *);
@@ -92,9 +98,10 @@ static void dtj_aggwalk_init(dtj_java_consumer_t *);
 static int dtj_agghandler(const dtrace_bufdata_t *, dtj_java_consumer_t *);
 static boolean_t dtj_is_included(const dtrace_aggdata_t *,
     dtj_java_consumer_t *);
-static void dtj_attach_frames(dtj_java_consumer_t *, jobject,
-    jobjectArray);
+static void dtj_attach_frames(dtj_java_consumer_t *, jobject, jobjectArray);
+static void dtj_attach_name(dtj_java_consumer_t *, jobject, jstring);
 static boolean_t dtj_is_stack_action(dtrace_actkind_t);
+static boolean_t dtj_is_symbol_action(dtrace_actkind_t);
 static int dtj_clear(const dtrace_aggdata_t *, void *);
 
 /*
@@ -134,12 +141,6 @@ dtj_set_callback_handlers(dtj_java_consumer_t *jc)
 	dtrace_hdl_t *dtp = jc->dtjj_consumer->dtjc_dtp;
 	dtrace_optval_t optval;
 
-	/*
-	 * The user argument to the bufhandler is the lookup key used to obtain
-	 * the thread-specific java consumer.  The java consumer contains JNI
-	 * state specific to either the consumer loop or the getAggregate()
-	 * call.
-	 */
 	if (dtrace_handle_buffered(dtp, &dtj_bufhandler, NULL) == -1) {
 		dtj_throw_dtrace_exception(jc,
 		    "failed to establish buffered handler: %s",
@@ -562,16 +563,17 @@ dtj_recdata(dtj_java_consumer_t *jc, uint32_t size, caddr_t addr)
 {
 	JNIEnv *jenv = jc->dtjj_jenv;
 	jobject jobj;
+	jobject jrec;
 
 	switch (size) {
 	case 1:
-		jobj = (*jenv)->NewObject(jenv, g_byte_jc,
-		    g_byteinit_jm, *((char *)addr));
+		jobj = (*jenv)->NewObject(jenv, g_int_jc,
+		    g_intinit_jm, (int)(*((uint8_t *)addr)));
 		break;
 	case 2:
-		jobj = (*jenv)->NewObject(jenv, g_short_jc,
+		jobj = (*jenv)->NewObject(jenv, g_int_jc,
 		    /* LINTED - alignment */
-		    g_shortinit_jm, *((int16_t *)addr));
+		    g_intinit_jm, (int)(*((uint16_t *)addr)));
 		break;
 	case 4:
 		jobj = (*jenv)->NewObject(jenv, g_int_jc,
@@ -588,7 +590,15 @@ dtj_recdata(dtj_java_consumer_t *jc, uint32_t size, caddr_t addr)
 		break;
 	}
 
-	return (jobj);
+	if (!jobj) {
+		return (NULL); /* OutOfMemoryError pending */
+	}
+
+	jrec = (*jenv)->NewObject(jenv, g_scalar_jc,
+	    g_scalarinit_jm, jobj, size);
+	(*jenv)->DeleteLocalRef(jenv, jobj);
+
+	return (jrec);
 }
 
 /*
@@ -909,6 +919,9 @@ dtj_chew(const dtrace_probedata_t *data, void *arg)
 			if (dtj_is_stack_action(rec->dtrd_action)) {
 				jobj = dtj_new_probedata_stack_record(data,
 				    rec, jc);
+			} else if (dtj_is_symbol_action(rec->dtrd_action)) {
+				jobj = dtj_new_probedata_symbol_record(data,
+				    rec, jc);
 			} else {
 				jobj = dtj_recdata(jc, rec->dtrd_size,
 				    (data->dtpda_data + rec->dtrd_offset));
@@ -1095,6 +1108,26 @@ dtj_bufhandler(const dtrace_bufdata_t *bufdata, void *arg)
 			return (DTRACE_HANDLE_ABORT);
 		}
 		break;
+	case DTRACEACT_USYM:
+	case DTRACEACT_UADDR:
+	case DTRACEACT_UMOD:
+	case DTRACEACT_SYM:
+	case DTRACEACT_MOD:
+		/* stand-alone symbol lookup action */
+		jstr = (*jenv)->NewStringUTF(jenv, s);
+		if (!jstr) {
+			/* OutOfMemoryError pending */
+			return (DTRACE_HANDLE_ABORT);
+		}
+		(*jenv)->CallVoidMethod(jenv, jc->dtjj_probedata,
+		    g_pdataadd_symbol_jm,
+		    jc->dtjj_consumer->dtjc_probedata_rec_i, jstr);
+		(*jenv)->DeleteLocalRef(jenv, jstr);
+		if ((*jenv)->ExceptionCheck(jenv)) {
+			WRAP_EXCEPTION(jenv);
+			return (DTRACE_HANDLE_ABORT);
+		}
+		break;
 	default:
 		/*
 		 * The record handler dtj_chewrec() defers nothing else to this
@@ -1120,6 +1153,24 @@ dtj_is_stack_action(dtrace_actkind_t act)
 		stack_action = B_FALSE;
 	}
 	return (stack_action);
+}
+
+static boolean_t
+dtj_is_symbol_action(dtrace_actkind_t act)
+{
+	boolean_t symbol_action;
+	switch (act) {
+	case DTRACEACT_USYM:
+	case DTRACEACT_UADDR:
+	case DTRACEACT_UMOD:
+	case DTRACEACT_SYM:
+	case DTRACEACT_MOD:
+		symbol_action = B_TRUE;
+		break;
+	default:
+		symbol_action = B_FALSE;
+	}
+	return (symbol_action);
 }
 
 /*
@@ -1229,6 +1280,58 @@ dtj_new_tuple_stack_record(const dtrace_aggdata_t *data,
 	dtj_attach_frames(jc, jobj, frames);
 	(*jenv)->DeleteLocalRef(jenv, frames);
 	if ((*jenv)->ExceptionCheck(jenv)) {
+		WRAP_EXCEPTION(jenv);
+		return (NULL);
+	}
+
+	return (jobj);
+}
+
+static jobject
+dtj_new_probedata_symbol_record(const dtrace_probedata_t *data,
+    const dtrace_recdesc_t *rec, dtj_java_consumer_t *jc)
+{
+	caddr_t addr;
+
+	addr = data->dtpda_data + rec->dtrd_offset;
+	return (dtj_new_symbol_record(addr, rec, jc));
+}
+
+static jobject
+dtj_new_tuple_symbol_record(const dtrace_aggdata_t *data,
+    const dtrace_recdesc_t *rec, const char *s, dtj_java_consumer_t *jc)
+{
+	caddr_t addr;
+	JNIEnv *jenv = jc->dtjj_jenv;
+
+	jobject jobj = NULL; /* tuple element */
+	jstring jstr = NULL; /* lookup value */
+	jstring tstr = NULL; /* trimmed lookup value */
+
+	addr = data->dtada_data + rec->dtrd_offset;
+	jobj = dtj_new_symbol_record(addr, rec, jc);
+	if (!jobj) {
+		return (NULL); /* java exception pending */
+	}
+
+	/* Get symbol lookup */
+	jstr = (*jenv)->NewStringUTF(jenv, s);
+	if (!jstr) {
+		/* OutOfMemoryError pending */
+		(*jenv)->DeleteLocalRef(jenv, jobj);
+		return (NULL);
+	}
+	/* Trim leading and trailing whitespace */
+	tstr = (*jenv)->CallObjectMethod(jenv, jstr, g_trim_jm);
+	/* trim() returns a new string; don't leak the old one */
+	(*jenv)->DeleteLocalRef(jenv, jstr);
+	jstr = tstr;
+	tstr = NULL;
+
+	dtj_attach_name(jc, jobj, jstr);
+	(*jenv)->DeleteLocalRef(jenv, jstr);
+	if ((*jenv)->ExceptionCheck(jenv)) {
+		WRAP_EXCEPTION(jenv);
 		return (NULL);
 	}
 
@@ -1249,7 +1352,7 @@ dtj_aggwalk_init(dtj_java_consumer_t *jc)
 }
 
 static jobject
-dtj_new_stack_record(caddr_t addr, const dtrace_recdesc_t *rec,
+dtj_new_stack_record(const caddr_t addr, const dtrace_recdesc_t *rec,
     dtj_java_consumer_t *jc)
 {
 	JNIEnv *jenv = jc->dtjj_jenv;
@@ -1304,6 +1407,48 @@ dtj_new_stack_record(caddr_t addr, const dtrace_recdesc_t *rec,
 		return (NULL);
 	}
 	return (stack);
+}
+
+static jobject
+dtj_new_symbol_record(const caddr_t addr, const dtrace_recdesc_t *rec,
+    dtj_java_consumer_t *jc)
+{
+	JNIEnv *jenv = jc->dtjj_jenv;
+
+	dtrace_actkind_t act;
+	uint64_t *pc;
+	pid_t pid = -1;
+
+	jobject symbol = NULL; /* return value */
+
+	act = rec->dtrd_action;
+	switch (act) {
+	case DTRACEACT_SYM:
+	case DTRACEACT_MOD:
+		/* LINTED - alignment */
+		pc = (uint64_t *)addr;
+		symbol = (*jenv)->NewObject(jenv, g_symbol_jc,
+		    g_symbolinit_jm, *pc);
+		break;
+	case DTRACEACT_USYM:
+	case DTRACEACT_UADDR:
+	case DTRACEACT_UMOD:
+		/* Get pid of user process */
+		pc = (uint64_t *)(uintptr_t)addr;
+		pid = (pid_t)*pc;
+		++pc;
+		symbol = (*jenv)->NewObject(jenv, g_usymbol_jc,
+		    g_usymbolinit_jm, pid, *pc);
+		break;
+	default:
+		dtj_throw_illegal_argument(jenv,
+		    "Expected stack action, got %d\n", act);
+	}
+	if ((*jenv)->ExceptionCheck(jenv)) {
+		WRAP_EXCEPTION(jenv);
+		return (NULL);
+	}
+	return (symbol);
 }
 
 /*
@@ -1405,6 +1550,18 @@ dtj_attach_frames(dtj_java_consumer_t *jc, jobject stack,
 	} else if ((*jenv)->IsInstanceOf(jenv, stack, g_ustack_jc)) {
 		(*jenv)->CallVoidMethod(jenv, stack, g_ustackset_frames_jm,
 		    frames);
+	}
+}
+
+static void
+dtj_attach_name(dtj_java_consumer_t *jc, jobject symbol, jstring s)
+{
+	JNIEnv *jenv = jc->dtjj_jenv;
+
+	if ((*jenv)->IsInstanceOf(jenv, symbol, g_symbol_jc)) {
+		(*jenv)->CallVoidMethod(jenv, symbol, g_symbolset_name_jm, s);
+	} else if ((*jenv)->IsInstanceOf(jenv, symbol, g_usymbol_jc)) {
+		(*jenv)->CallVoidMethod(jenv, symbol, g_usymbolset_name_jm, s);
 	}
 }
 
@@ -1540,6 +1697,13 @@ dtj_agghandler(const dtrace_bufdata_t *bufdata, dtj_java_consumer_t *jc)
 		case DTRACEACT_USTACK:
 		case DTRACEACT_JSTACK:
 			jobj = dtj_new_tuple_stack_record(aggdata, rec, s, jc);
+			break;
+		case DTRACEACT_USYM:
+		case DTRACEACT_UADDR:
+		case DTRACEACT_UMOD:
+		case DTRACEACT_SYM:
+		case DTRACEACT_MOD:
+			jobj = dtj_new_tuple_symbol_record(aggdata, rec, s, jc);
 			break;
 		default:
 			jobj = dtj_recdata(jc, rec->dtrd_size,

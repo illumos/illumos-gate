@@ -41,7 +41,7 @@ import java.beans.*;
  * @author Tom Erickson
  */
 public final class ScalarRecord implements ValueRecord, Serializable {
-    static final long serialVersionUID = -34046471695050108L;
+    static final long serialVersionUID = -6920826443240176724L;
     static final int RAW_BYTES_INDENT = 5;
 
     static {
@@ -49,7 +49,7 @@ public final class ScalarRecord implements ValueRecord, Serializable {
 	    BeanInfo info = Introspector.getBeanInfo(ScalarRecord.class);
 	    PersistenceDelegate persistenceDelegate =
 		    new DefaultPersistenceDelegate(
-		    new String[] {"value"})
+		    new String[] {"value", "numberOfBytes"})
 	    {
 		/*
 		 * Need to prevent DefaultPersistenceDelegate from using
@@ -75,20 +75,33 @@ public final class ScalarRecord implements ValueRecord, Serializable {
 
     /** @serial */
     private final Object value;
+    /** @serial */
+    private int numberOfBytes;
 
     /**
-     * Creates a scalar record with the given DTrace primitive.
+     * Creates a scalar record with the given DTrace primitive and the
+     * number of bytes used to store the primitive in the native DTrace
+     * buffer.  Since traced 8- and 16-bit integers are promoted (as
+     * unsigned values) to 32-bit integers, it may be important for
+     * output formatting to know the number of bytes used to represent
+     * the primitive before promotion.
      *
      * @param v DTrace primitive data value
-     * @throws NullPointerException if the given value is null
+     * @param nativeByteCount number of bytes used to store the given
+     * primitive in the native DTrace buffer
+     * @throws NullPointerException if the given value is {@code null}
+     * @throws IllegalArgumentException if the given number of bytes is
+     * not consistent with the given primitive type or is not greater
+     * than zero
      * @throws ClassCastException if the given value is not a DTrace
      * primitive type listed as a possible return value of {@link
      * #getValue()}
      */
     public
-    ScalarRecord(Object v)
+    ScalarRecord(Object v, int nativeByteCount)
     {
 	value = v;
+	numberOfBytes = nativeByteCount;
 	validate();
     }
 
@@ -98,12 +111,47 @@ public final class ScalarRecord implements ValueRecord, Serializable {
 	if (value == null) {
 	    throw new NullPointerException();
 	}
+
 	// Short-circuit-evaluate common cases first
-	if (!((value instanceof Number) ||
-		(value instanceof String) ||
-		(value instanceof byte[]))) {
-	    throw new ClassCastException("value is not a D primitive");
-        }
+	if (value instanceof Integer) {
+	    switch (numberOfBytes) {
+		case 1:
+		case 2:
+		case 4:
+		    break;
+		default:
+		    throw new IllegalArgumentException(
+			    "number of bytes is " + numberOfBytes +
+			    ", expected 1, 2, or 4 for Integer primitive");
+	    }
+	} else if (value instanceof Long) {
+	    if (numberOfBytes != 8) {
+		throw new IllegalArgumentException(
+			"number of bytes is " + numberOfBytes +
+			", expected 8 for Long primitive");
+	    }
+	} else if ((value instanceof String) || (value instanceof byte[])) {
+	    switch (numberOfBytes) {
+		case 1:
+		case 2:
+		case 4:
+		case 8:
+		    throw new IllegalArgumentException(
+			    "number of bytes is " + numberOfBytes +
+			    ", expected a number other than " +
+			    "1, 2, 4, or 8 for String or byte-array " +
+			    "primitive");
+	    }
+	} else if (value instanceof Number) {
+	    if (numberOfBytes <= 0) {
+		throw new IllegalArgumentException(
+			"number of bytes is " + numberOfBytes +
+			", must be greater than zero");
+	    }
+	} else {
+	    throw new ClassCastException(value.getClass().getName() +
+		    " value is not a D primitive");
+	}
     }
 
     /**
@@ -120,6 +168,24 @@ public final class ScalarRecord implements ValueRecord, Serializable {
     getValue()
     {
 	return value;
+    }
+
+    /**
+     * Gets the number of bytes used to store the primitive value of
+     * this record in the native DTrace buffer.  Since traced 8- and
+     * 16-bit integers are promoted (as unsigned values) to 32-bit
+     * integers, it may be important for output formatting to know the
+     * number of bytes used to represent the primitive before promotion.
+     *
+     * @return the number of bytes used to store the primitive value
+     * of this record in the native DTrace buffer, guaranteed to be
+     * greater than zero and consisitent with the type of the primitive
+     * value
+     */
+    public int
+    getNumberOfBytes()
+    {
+	return numberOfBytes;
     }
 
     /**
