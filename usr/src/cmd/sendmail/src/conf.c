@@ -12,7 +12,7 @@
  */
 
 /*
- * Copyright 1999-2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 1999-2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -829,8 +829,8 @@ inithostmaps()
 			(void) makemapentry(buf);
 		}
 #endif /* HESIOD */
-#if defined(LDAPMAP) && defined(SUN_EXTENSIONS) && \
-    defined(SUN_SIMPLIFIED_LDAP) && defined(HASLDAPGETALIASBYNAME)
+#if LDAPMAP && defined(SUN_EXTENSIONS) && \
+    defined(SUN_SIMPLIFIED_LDAP) && HASLDAPGETALIASBYNAME
 		else if (strcmp(maptype[i], "ldap") == 0 &&
 		    stab("aliases.ldap", ST_MAP, ST_FIND) == NULL)
 		{
@@ -838,7 +838,7 @@ inithostmaps()
 				sizeof buf);
 			(void) makemapentry(buf);
 		}
-#endif
+#endif /* LDAPMAP && defined(SUN_EXTENSIONS) && ... */
 	}
 	if (stab("aliases", ST_MAP, ST_FIND) == NULL)
 	{
@@ -1344,6 +1344,25 @@ checkcompat(to, e)
 #endif /* EXAMPLE_CODE */
 	return EX_OK;
 }
+
+#ifdef SUN_EXTENSIONS
+static void
+init_md_sun()
+{
+	struct stat sbuf;
+
+	/* Check for large file descriptor */
+	if (fstat(fileno(stdin), &sbuf) < 0)
+	{
+		if (errno == EOVERFLOW)
+		{
+			perror("stdin");
+			exit(EX_NOINPUT);
+		}
+	}
+}
+#endif /* SUN_EXTENSIONS */
+
 /*
 **  INIT_MD -- do machine dependent initializations
 **

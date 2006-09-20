@@ -33,14 +33,11 @@ PROG=	sendmail
 include 	../../Makefile.cmd
 include 	../Makefile.cmd
 
-# additional .o files needed
-OBJADD=sun_compat.o
- 
 OBJS= alias.o arpadate.o bf.o collect.o conf.o control.o convtime.o daemon.o \
 	deliver.o domain.o envelope.o err.o headers.o macro.o main.o map.o \
 	mci.o milter.o mime.o parseaddr.o queue.o ratectrl.o readcf.o \
 	recipient.o savemail.o sfsasl.o sm_resolve.o srvrsmtp.o stab.o stats.o \
-	sysexits.o tls.o trace.o udb.o usersmtp.o util.o version.o ${OBJADD}
+	sysexits.o tls.o trace.o udb.o usersmtp.o util.o version.o
 
 SRCS=	$(OBJS:%.o=%.c)
 

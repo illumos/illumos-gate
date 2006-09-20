@@ -12,7 +12,7 @@
  */
 
 /*
- * Copyright 1996-2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 1996-2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -667,6 +667,50 @@ map_close(s, bogus)
 	}
 	map->map_mflags &= ~(MF_OPEN|MF_WRITABLE|MF_OPENBOGUS|MF_CLOSING);
 }
+
+#if defined(SUN_EXTENSIONS) && defined(SUN_INIT_DOMAIN)
+extern int getdomainname();
+
+/* this is mainly for backward compatibility in Sun environment */
+static char *
+sun_init_domain()
+{
+	/*
+	**  Get the domain name from the kernel.
+	**  If it does not start with a leading dot, then remove
+	**  the first component.  Since leading dots are funny Unix
+	**  files, we treat a leading "+" the same as a leading dot.
+	**  Finally, force there to be at least one dot in the domain name
+	**  (i.e. top-level domains are not allowed, like "com", must be
+	**  something like "sun.com").
+	*/
+
+	char buf[MAXNAME];
+	char *period, *autodomain;
+
+	if (getdomainname(buf, sizeof buf) < 0)
+		return NULL;
+
+	if (buf[0] == '\0')
+		return NULL;
+
+	if (tTd(0, 20))
+		printf("domainname = %s\n", buf);
+
+	if (buf[0] == '+')
+		buf[0] = '.';
+	period = strchr(buf, '.');
+	if (period == NULL)
+		autodomain = buf;
+	else
+		autodomain = period + 1;
+	if (strchr(autodomain, '.') == NULL)
+		return newstr(buf);
+	else
+		return newstr(autodomain);
+}
+#endif /* SUN_EXTENSIONS && SUN_INIT_DOMAIN */
+
 /*
 **  GETCANONNAME -- look up name using service switch
 **
@@ -698,7 +742,6 @@ getcanonname(host, hbsize, trymx, pttl)
 #if defined(SUN_EXTENSIONS) && defined(SUN_INIT_DOMAIN)
 	bool should_try_nis_domain = false;
 	static char *nis_domain = NULL;
-	extern char *sun_init_domain();
 #endif
 
 	nmaps = switch_map_find("hosts", maptype, mapreturn);
@@ -722,7 +765,7 @@ getcanonname(host, hbsize, trymx, pttl)
 # if defined(SUN_EXTENSIONS) && defined(SUN_INIT_DOMAIN)
 			if (nis_domain == NULL)
 				nis_domain = sun_init_domain();
-# endif
+# endif /* defined(SUN_EXTENSIONS) && defined(SUN_INIT_DOMAIN) */
 		}
 #endif /* NIS */
 #if NISPLUS
@@ -732,7 +775,7 @@ getcanonname(host, hbsize, trymx, pttl)
 # if defined(SUN_EXTENSIONS) && defined(SUN_INIT_DOMAIN)
 			if (nis_domain == NULL)
 				nis_domain = sun_init_domain();
-# endif
+# endif /* defined(SUN_EXTENSIONS) && defined(SUN_INIT_DOMAIN) */
 		}
 #endif /* NISPLUS */
 #if NAMED_BIND
@@ -769,7 +812,7 @@ getcanonname(host, hbsize, trymx, pttl)
 		if (found)
 			should_try_nis_domain = true;
 		/* but don't break, as we need to try all methods first */
-#endif
+#endif /* defined(SUN_EXTENSIONS) && defined(SUN_INIT_DOMAIN) */
 
 		/* see if we should continue */
 		if (status == EX_TEMPFAIL)
@@ -814,11 +857,11 @@ getcanonname(host, hbsize, trymx, pttl)
 			{
 #if defined(SUN_EXTENSIONS) && defined(SUN_INIT_DOMAIN)
 				if (VendorCode == VENDOR_SUN &&
-					should_try_nis_domain)
+				    should_try_nis_domain)
 				{
 					goto try_nis_domain;
 				}
-#endif
+#endif /* defined(SUN_EXTENSIONS) && defined(SUN_INIT_DOMAIN) */
 				return false;
 			}
 		}
@@ -828,15 +871,15 @@ getcanonname(host, hbsize, trymx, pttl)
 #if defined(SUN_EXTENSIONS) && defined(SUN_INIT_DOMAIN)
 	if (VendorCode == VENDOR_SUN && should_try_nis_domain)
 	{
-try_nis_domain:
+  try_nis_domain:
 		if (nis_domain != NULL &&
-			strlen(nis_domain) + strlen(host) + 1 < hbsize)
+		    strlen(nis_domain) + strlen(host) + 1 < hbsize)
 		{
 			(void) sm_strlcat2(host, ".", nis_domain, hbsize);
 			return true;
 		}
 	}
-#endif
+#endif /* defined(SUN_EXTENSIONS) && defined(SUN_INIT_DOMAIN) */
 
 	if (tTd(38, 20))
 		sm_dprintf("getcanonname(%s), failed, status=%d\n", host,
@@ -3368,13 +3411,13 @@ ldapmap_open(map, mode)
 		sm_dprintf("ldapmap_open(%s, %d): ", map->map_mname, mode);
 
 #if defined(SUN_EXTENSIONS) && defined(SUN_SIMPLIFIED_LDAP) && \
-    defined(HASLDAPGETALIASBYNAME)
+    HASLDAPGETALIASBYNAME
 	if (VendorCode == VENDOR_SUN &&
 	    strcmp(map->map_mname, "aliases.ldap") == 0)
 	{
 		return true;
 	}
-#endif
+#endif /* defined(SUN_EXTENSIONS) && defined(SUN_SIMPLIFIED_LDAP) && ... */
 
 	mode &= O_ACCMODE;
 
@@ -3557,7 +3600,7 @@ ldapmap_lookup(map, name, av, statp)
 		sm_dprintf("ldapmap_lookup(%s, %s)\n", map->map_mname, name);
 
 #if defined(SUN_EXTENSIONS) && defined(SUN_SIMPLIFIED_LDAP) && \
-    defined(HASLDAPGETALIASBYNAME)
+    HASLDAPGETALIASBYNAME
 	if (VendorCode == VENDOR_SUN &&
 	    strcmp(map->map_mname, "aliases.ldap") == 0)
 	{
@@ -3583,7 +3626,7 @@ ldapmap_lookup(map, name, av, statp)
 			result = map_rewrite(map, answer, strlen(answer), av);
 		return result;
 	}
-#endif
+#endif /* defined(SUN_EXTENSIONS) && defined(SUN_SIMPLIFIED_LDAP) && ... */
 
 	/* Get ldap struct pointer from map */
 	lmap = (SM_LDAP_STRUCT *) map->map_db1;
