@@ -1126,10 +1126,10 @@ mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath)
 		struct stat64 st;
 
 		if (stat64(fsptr->zone_fs_special, &st) != -1 &&
-		    S_ISBLK(st.st_mode) &&
-		    check_lofs_needed(zlogp, fsptr) == -1)
-			return (-1);
-		if (strcmp(fsptr->zone_fs_type, MNTTYPE_LOFS) == 0) {
+		    S_ISBLK(st.st_mode)) {
+			if (check_lofs_needed(zlogp, fsptr) == -1)
+				return (-1);
+		} else if (strcmp(fsptr->zone_fs_type, MNTTYPE_LOFS) == 0) {
 			if (snprintf(specpath, sizeof (specpath), "%s%s",
 			    zonecfg_get_root(), fsptr->zone_fs_special) >=
 			    sizeof (specpath)) {
