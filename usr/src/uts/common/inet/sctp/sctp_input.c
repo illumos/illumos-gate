@@ -3656,7 +3656,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				goto done;
 			}
 			case CHUNK_INIT:
-				sctp_send_initack(sctp, ch, mp);
+				sctp_send_initack(sctp, sctph, ch, mp);
 				break;
 			case CHUNK_COOKIE:
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
@@ -3713,7 +3713,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 		case SCTPS_LISTEN:
 			switch (ch->sch_id) {
 			case CHUNK_INIT:
-				sctp_send_initack(sctp, ch, mp);
+				sctp_send_initack(sctp, sctph, ch, mp);
 				break;
 			case CHUNK_COOKIE: {
 				sctp_t *eager;
@@ -3836,7 +3836,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				sctp_process_abort(sctp, ch, ECONNREFUSED);
 				goto done;
 			case CHUNK_INIT:
-				sctp_send_initack(sctp, ch, mp);
+				sctp_send_initack(sctp, sctph, ch, mp);
 				break;
 			case CHUNK_COOKIE:
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
@@ -3944,7 +3944,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				trysend = 1;
 				break;
 			case CHUNK_INIT:
-				sctp_send_initack(sctp, ch, mp);
+				sctp_send_initack(sctp, sctph, ch, mp);
 				break;
 			case CHUNK_ERROR: {
 				sctp_parm_hdr_t *p;

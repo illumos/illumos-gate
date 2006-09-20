@@ -1100,7 +1100,8 @@ extern void	sctp_send_abort(sctp_t *, uint32_t, uint16_t, char *, size_t,
 extern void	sctp_send_cookie_ack(sctp_t *);
 extern void	sctp_send_cookie_echo(sctp_t *, sctp_chunk_hdr_t *, mblk_t *);
 extern void	sctp_send_err(sctp_t *, mblk_t *, sctp_faddr_t *);
-extern void	sctp_send_initack(sctp_t *, sctp_chunk_hdr_t *, mblk_t *);
+extern void	sctp_send_initack(sctp_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
+		    mblk_t *);
 extern void	sctp_send_shutdown(sctp_t *, int);
 extern void	sctp_send_heartbeat(sctp_t *, sctp_faddr_t *);
 extern void	sctp_sendfail_event(sctp_t *, mblk_t *, int, boolean_t);

@@ -1011,7 +1011,7 @@ tsol_remove_secopt_v6(ip6_t *ip6h, int buflen)
 		next_hdr = ip6hbh[0];
 		ovbcopy(ip6hbh + hbhlen, ip6hbh,
 		    buflen - (IPV6_HDR_LEN + hbhlen));
-		ip6h->ip6_plen -= hbhlen;
+		ip6h->ip6_plen = htons(ntohs(ip6h->ip6_plen) - hbhlen);
 		ip6h->ip6_nxt = next_hdr;
 		return (hbhlen);
 	}
@@ -1043,7 +1043,7 @@ tsol_remove_secopt_v6(ip6_t *ip6h, int buflen)
 	ovbcopy(after_secopt, secopt,
 	    (uchar_t *)ip6h + buflen - after_secopt);
 	ip6hbh[1] -= delta/8;
-	ip6h->ip6_plen -= delta;
+	ip6h->ip6_plen = htons(ntohs(ip6h->ip6_plen) - delta);
 
 	return (delta);
 }
@@ -1134,7 +1134,7 @@ tsol_prepend_option_v6(uchar_t *optbuf, ip6_t *ip6h, int buflen)
 		if (pad_len > 2)
 			bzero(pad_position + 2, pad_len - 2);
 	}
-	ip6h->ip6_plen += delta;
+	ip6h->ip6_plen = htons(ntohs(ip6h->ip6_plen) + delta);
 	return (delta);
 }
 
@@ -1235,6 +1235,7 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, int *addedp,
 		    (mp->b_rptr - mp->b_datap->db_base), BPRI_HI);
 		if (new_mp == NULL)
 			return (ENOMEM);
+		mblk_setcred(new_mp, DB_CRED(mp));
 
 		/* keep the bias */
 		new_mp->b_rptr += mp->b_rptr - mp->b_datap->db_base;

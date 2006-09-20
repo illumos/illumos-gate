@@ -411,7 +411,8 @@ cl_sctp_cookie_paddr(sctp_chunk_hdr_t *ch, in6_addr_t *addr)
 	16				/* MD5 hash */
 
 void
-sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
+sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
+    mblk_t *initmp)
 {
 	ipha_t			*initiph;
 	ip6_t			*initip6h;
@@ -421,7 +422,6 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 	sctp_init_chunk_t	*iack;
 	sctp_init_chunk_t	*init;
 	sctp_hdr_t		*iacksh;
-	sctp_hdr_t		*initsh;
 	size_t			cookielen;
 	size_t			iacklen;
 	size_t			ipsctplen;
@@ -443,6 +443,7 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 	boolean_t		initcollision = B_FALSE;
 	boolean_t		linklocal = B_FALSE;
 	cred_t			*cr;
+	ts_label_t		*initlabel;
 
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 	isv4 = (IPH_HDR_VERSION(initmp->b_rptr) == IPV4_VERSION);
@@ -450,13 +451,10 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 	/* Extract the INIT chunk */
 	if (isv4) {
 		initiph = (ipha_t *)initmp->b_rptr;
-		initsh = (sctp_hdr_t *)((char *)initiph +
-		    IPH_HDR_LENGTH(initmp->b_rptr));
 		ipsctplen = sctp->sctp_ip_hdr_len;
 		supp_af |= PARM_SUPP_V4;
 	} else {
 		initip6h = (ip6_t *)initmp->b_rptr;
-		initsh = (sctp_hdr_t *)(initip6h + 1);
 		ipsctplen = sctp->sctp_ip_hdr6_len;
 		if (IN6_IS_ADDR_LINKLOCAL(&initip6h->ip6_src))
 			linklocal = B_TRUE;
@@ -535,8 +533,41 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 		pad = 4 - pad;
 		ipsctplen += pad;
 	}
-	iackmp = allocb_cred(ipsctplen + sctp_wroff_xtra,
-	    CONN_CRED(sctp->sctp_connp));
+
+	/*
+	 * If the listen socket is bound to a trusted extensions
+	 * multi-label port, attach a copy of the listener's cred
+	 * to the new INITACK mblk. Modify the cred to contain
+	 * the security label of the received INIT packet.
+	 * If not a multi-label port, attach the unmodified
+	 * listener's cred directly.
+	 *
+	 * We expect Sun developed kernel modules to properly set
+	 * cred labels for sctp connections. We can't be so sure this
+	 * will be done correctly when 3rd party kernel modules
+	 * directly use sctp. The initlabel panic guard logic was
+	 * added to cover this possibility.
+	 */
+	if (sctp->sctp_connp->conn_mlp_type != mlptSingle) {
+		initlabel = MBLK_GETLABEL(initmp);
+		if (initlabel == NULL) {
+			sctp_send_abort(sctp, sctp_init2vtag(ch),
+			    SCTP_ERR_UNKNOWN, NULL, 0, initmp, 0, B_FALSE);
+			return;
+		}
+		cr = copycred_from_bslabel(CONN_CRED(sctp->sctp_connp),
+		    &initlabel->tsl_label, initlabel->tsl_doi, KM_NOSLEEP);
+		if (cr == NULL) {
+			sctp_send_abort(sctp, sctp_init2vtag(ch),
+			    SCTP_ERR_NO_RESOURCES, NULL, 0, initmp, 0, B_FALSE);
+			return;
+		}
+		iackmp = allocb_cred(ipsctplen + sctp_wroff_xtra, cr);
+		crfree(cr);
+	} else {
+		iackmp = allocb_cred(ipsctplen + sctp_wroff_xtra,
+		    CONN_CRED(sctp->sctp_connp));
+	}
 	if (iackmp == NULL) {
 		sctp_send_abort(sctp, sctp_init2vtag(ch),
 		    SCTP_ERR_NO_RESOURCES, NULL, 0, initmp, 0, B_FALSE);
@@ -696,7 +727,7 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 	iackmp->b_wptr = iackmp->b_rptr + ipsctplen;
 	iackmp->b_cont = errmp;		/*  OK if NULL */
 
-	if (is_system_labeled() && (cr = DB_CRED(initmp)) != NULL &&
+	if (is_system_labeled() && (cr = DB_CRED(iackmp)) != NULL &&
 	    crgetlabel(cr) != NULL) {
 		conn_t *connp = sctp->sctp_connp;
 		int err, adjust;

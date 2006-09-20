@@ -384,10 +384,12 @@ sctp_fanout(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
     uint_t ipif_seqid, zoneid_t zoneid, mblk_t *mp)
 {
 	sctp_t *sctp;
+	boolean_t shared_addr;
 
 	if ((sctp = sctp_conn_match(src, dst, ports, ipif_seqid,
 	    zoneid)) == NULL) {
-		if (zoneid == ALL_ZONES) {
+		shared_addr = (zoneid == ALL_ZONES);
+		if (shared_addr) {
 			zoneid = tsol_mlp_findzone(IPPROTO_SCTP,
 			    htons(ntohl(ports) & 0xFFFF));
 			/*
@@ -404,6 +406,23 @@ sctp_fanout(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
 		/* Not in conn fanout; check listen fanout */
 		if ((sctp = listen_match(dst, ports, ipif_seqid,
 		    zoneid)) == NULL) {
+			return (NULL);
+		}
+		/*
+		 * On systems running trusted extensions, check if dst
+		 * should accept the packet. "IPV6_VERSION" indicates
+		 * that dst is in 16 byte AF_INET6 format. IPv4-mapped
+		 * IPv6 addresses are supported.
+		 */
+		if (is_system_labeled() &&
+		    !tsol_receive_local(mp, dst, IPV6_VERSION,
+		    shared_addr, sctp->sctp_connp)) {
+			DTRACE_PROBE3(
+			    tx__ip__log__info__classify__sctp,
+			    char *,
+			    "connp(1) could not receive mp(2)",
+			    conn_t *, sctp->sctp_connp, mblk_t *, mp);
+			SCTP_REFRELE(sctp);
 			return (NULL);
 		}
 	}

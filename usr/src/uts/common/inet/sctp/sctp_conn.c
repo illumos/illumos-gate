@@ -64,6 +64,7 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	sctp_init_chunk_t	*init;
 	int			err;
 	uint_t			sctp_options;
+	conn_t			*aconnp;
 	conn_t			*lconnp;
 	cred_t			*cr;
 
@@ -83,15 +84,12 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	if (err != 0)
 		return (err);
 
+	aconnp = acceptor->sctp_connp;
 	lconnp = listener->sctp_connp;
 	if (lconnp->conn_mlp_type != mlptSingle) {
-		cr = lconnp->conn_peercred = DB_CRED(cr_pkt);
+		cr = aconnp->conn_peercred = DB_CRED(cr_pkt);
 		if (cr != NULL)
 			crhold(cr);
-		else
-			cr = lconnp->conn_cred;
-	} else {
-		cr = lconnp->conn_cred;
 	}
 
 	if ((err = sctp_set_hdraddrs(acceptor)) != 0)
