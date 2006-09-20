@@ -327,12 +327,11 @@ log_conswitch(log_t *src, log_t *dst)
 		lc->flags |= SL_LOGONLY;
 
 		/*
-		 * In the early boot phase hrestime is invalid.
-		 * hrestime becomes valid when clock() runs for the first time.
-		 * At this time is lbolt == 1. log_sendmsg() saves the lbolt
-		 * value in ltime.
+		 * The ttime is written with 0 in log_sensmsg() only when
+		 * good gethrestime_sec() data is not available to store in
+		 * the log_ctl_t in the early boot phase.
 		 */
-		if (lc->ltime < 2) {
+		if (lc->ttime == 0) {
 			/*
 			 * Look ahead to first early boot message with time.
 			 */
@@ -605,8 +604,21 @@ log_sendmsg(mblk_t *mp, zoneid_t zoneid)
 
 	log_enter();
 
+	/*
+	 * In the early boot phase hrestime is invalid, then timechanged is 0.
+	 * If hrestime is not valid, the ttime is set to 0 here and the correct
+	 * ttime is calculated in log_conswitch() later. The log_conswitch()
+	 * calculation to determine the correct ttime does not use ttime data
+	 * from these log_ctl_t structures; it only uses ttime from log_ctl_t's
+	 * that contain good data.
+	 *
+	 */
 	lc->ltime = lbolt;
-	lc->ttime = gethrestime_sec();
+	if (timechanged) {
+		lc->ttime = gethrestime_sec();
+	} else {
+		lc->ttime = 0;
+	}
 
 	flags = lc->flags & lzp->lz_active;
 	log_seq_no[flags & SL_ERROR]++;
