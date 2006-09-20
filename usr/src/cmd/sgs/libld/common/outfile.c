@@ -510,6 +510,14 @@ ld_create_outfile(Ofl_desc *ofl)
 				Ifl_desc *	ifl = isp->is_file;
 
 				/*
+				 * An input section in the list that has
+				 * been previously marked to be discarded
+				 * should be completely ignored.
+				 */
+				if (isp->is_flags & FLG_IS_DISCARD)
+					continue;
+
+				/*
 				 * At this point we know whether a section has
 				 * been referenced.  If it hasn't, and the whole
 				 * file hasn't been referenced (which would have

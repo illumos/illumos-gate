@@ -352,6 +352,7 @@ struct ofl_desc {
 #define	FLG_OF1_TLSOREL	0x00100000	/* output relocation against .tlsbss */
 					/*	section */
 #define	FLG_OF1_MEMORY	0x00200000	/* produce a memory model */
+#define	FLG_OF1_RLXREL	0x00400000	/* -z relaxreloc flag set */
 #define	FLG_OF1_VADDR	0x01000000	/* vaddr was explicitly set */
 #define	FLG_OF1_EXTRACT	0x02000000	/* archive member has been extracted */
 #define	FLG_OF1_RESCAN	0x04000000	/* any archives should be rescanned */

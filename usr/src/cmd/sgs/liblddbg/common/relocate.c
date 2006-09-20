@@ -284,6 +284,29 @@ Dbg_reloc_in(Lm_list *lml, int caller, Half mach, Word type, void *reloc,
 }
 
 /*
+ * Used by ld when '-z relaxreloc' is in use and a relocation
+ * is redirected to a kept section.
+ *
+ * entry:
+ *	lml - Link map control list
+ *	sdp - The replacement symbol to be used with the relocation,
+ *		which references the kept section.
+ */
+void
+Dbg_reloc_sloppycomdat(Lm_list *lml, const char *secname, Sym_desc *sdp)
+{
+	const char *nfname;
+
+	if (DBG_NOTCLASS(DBG_C_RELOC) || DBG_NOTDETAIL())
+		return;
+
+	nfname = (sdp && sdp->sd_file && sdp->sd_file->ifl_name)
+		? sdp->sd_file->ifl_name : MSG_INTL(MSG_STR_NULL);
+
+	dbg_print(lml, MSG_INTL(MSG_REL_SLOPPYCOMDAT), secname, nfname);
+}
+
+/*
  * Print a output relocation structure (Rel_desc).
  */
 void

@@ -182,6 +182,7 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZO));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZPIA));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRL));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRREL));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZRS));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZT));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTO));
@@ -1052,6 +1053,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_IGNORE)) == 0) {
 				ofl->ofl_flags1 |= FLG_OF1_IGNPRC;
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_RELAXRELOC)) == 0) {
+				ofl->ofl_flags1 |= FLG_OF1_RLXREL;
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_NOLDYNSYM)) == 0) {
 				ofl->ofl_flags |= FLG_OF_NOLDYNSYM;

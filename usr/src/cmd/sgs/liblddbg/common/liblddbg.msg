@@ -334,6 +334,9 @@
 @ MSG_REL_DISCARDED	"relocation against discarded section=%s from file=%s; \
 			 relocation type=%s offset=0x%llx; relocation discarded"
 @ MSG_REL_COPY		"copy data from file=%s to file=%s: symbol `%s'%s"
+@ MSG_REL_SLOPPYCOMDAT	"the following relocation references a discarded \
+			 section; relocation redirected to section %s in \
+			 file %s"
 
 # Entrance criteria messages
 

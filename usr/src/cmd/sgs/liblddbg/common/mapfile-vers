@@ -252,6 +252,8 @@ SUNWprivate_4.53 {
 		Dbg64_reloc_proc;
 		Dbg32_reloc_run;
 		Dbg64_reloc_run;
+		Dbg32_reloc_sloppycomdat;
+		Dbg64_reloc_sloppycomdat;
 		Dbg32_reloc_transition;
 		Dbg64_reloc_transition;
 

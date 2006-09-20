@@ -52,6 +52,10 @@ set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 {
 	Shdr *		shdr = isp->is_shdr;
 
+	/* A discarded section has no influence on the output */
+	if (isp->is_flags & FLG_IS_DISCARD)
+		return;
+
 	/*
 	 * If this section has data or will be assigned data
 	 * later, mark this segment not-empty.
@@ -119,7 +123,17 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 			 */
 			if (gdesc->gd_flags & GRP_FLG_DISCARD) {
 				isp->is_flags |= FLG_IS_DISCARD;
-				return ((Os_desc *)0);
+				/*
+				 * Since we're discarding the section, we
+				 * can skip assigning it to an output section.
+				 * The exception is that if the user
+				 * specifies -z relaxreloc, then
+				 * we need to assign the output section so
+				 * that the sloppy relocation logic will have
+				 * the information necessary to do its work.
+				 */
+				if (!(ofl->ofl_flags1 & FLG_OF1_RLXREL))
+					return ((Os_desc *)0);
 			}
 		}
 
@@ -256,6 +270,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 					continue;
 
 				isp->is_flags |= FLG_IS_DISCARD;
+				isp->is_osdesc = osp;
 				DBG_CALL(Dbg_sec_discarded(ofl->ofl_lml,
 				    isp, cisp));
 				return (0);
@@ -354,6 +369,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 						continue;
 
 					isp->is_flags |= FLG_IS_DISCARD;
+					isp->is_osdesc = osp;
 					DBG_CALL(Dbg_sec_discarded(ofl->ofl_lml,
 					    isp, cisp));
 					return (0);

@@ -192,6 +192,8 @@
 			 .preinitarray\n"
 @ MSG_ARG_DETAIL_ZRL	"\t[-z redlocsym]\treduce local syms in .symtab to \
 			 a minimum\n"
+@ MSG_ARG_DETAIL_ZRREL	"\t[-z relaxreloc]\trelax rules used for relocations \
+			 against COMDAT sections\n"
 @ MSG_ARG_DETAIL_ZRS	"\t[-z rescan]\trescan archive list until no further \
 			 member\n\t\t\textraction occurs\n"
 @ MSG_ARG_DETAIL_ZT	"\t[-z text]\tdisallow output relocations against \
@@ -283,6 +285,12 @@
 			 relocation has restricted use when building a shared \
 			 object"
 
+@ MSG_REL_SLOPCDATNONAM	"relocation warning: %s: file %s: section %s: \
+			 relocation against discarded COMDAT section %s \
+			 redirected to file %s"
+@ MSG_REL_SLOPCDATNAM	"relocation warning: %s: file %s: section %s: \
+			 symbol %s: relocation against discarded COMDAT \
+			 section %s redirected to file %s"
 #
 # TRANSLATION_NOTE
 # 	The following 7 messages are the message to print the
@@ -1064,6 +1072,7 @@
 @ MSG_ARG_LD64		"ld64="
 @ MSG_ARG_RESCAN	"rescan"
 @ MSG_ARG_NOLDYNSYM	"noldynsym"
+@ MSG_ARG_RELAXRELOC	"relaxreloc"
 
 @ MSG_ARG_HELP		"help"
 @ MSG_ARG_GROUP		"group"

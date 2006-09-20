@@ -292,6 +292,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_reloc_proc		Dbg64_reloc_proc
 #define	Dbg_reloc_run		Dbg64_reloc_run
 #define	Dbg_reloc_transition	Dbg64_reloc_transition
+#define	Dbg_reloc_sloppycomdat	Dbg64_reloc_sloppycomdat
 
 #define	Dbg_sec_added		Dbg64_sec_added
 #define	Dbg_sec_created		Dbg64_sec_created
@@ -485,6 +486,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_reloc_proc		Dbg32_reloc_proc
 #define	Dbg_reloc_run		Dbg32_reloc_run
 #define	Dbg_reloc_transition	Dbg32_reloc_transition
+#define	Dbg_reloc_sloppycomdat	Dbg32_reloc_sloppycomdat
 
 #define	Dbg_sec_added		Dbg32_sec_added
 #define	Dbg_sec_created		Dbg32_sec_created
@@ -709,6 +711,7 @@ extern	void	Dbg_reloc_proc(Lm_list *, Os_desc *, Is_desc *, Is_desc *);
 extern	void	Dbg_reloc_run(Rt_map *, uint_t, int, int);
 extern	void	Dbg_reloc_transition(Lm_list *, Half, Word, Word, Xword,
 		    const char *);
+extern	void	Dbg_reloc_sloppycomdat(Lm_list *, const char *, Sym_desc *);
 
 extern	void	Dbg_sec_added(Lm_list *, Os_desc *, Sg_desc *);
 extern	void	Dbg_sec_created(Lm_list *, Os_desc *, Sg_desc *);
