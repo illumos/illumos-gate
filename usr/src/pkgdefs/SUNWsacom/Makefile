@@ -35,6 +35,7 @@ ACTION_all=grep SUNWter depend > /dev/null || \
 	( chmod 666 depend; \
 	echo "P SUNWmibii     Solstice Enterprise Agents SNMP daemon" >> depend; \
 	echo "P SUNWsasnm     Solstice Enterprise Agents Simple Network Management Protocol" >> depend; \
+	echo "P SUNWsmmgr     System Management Agent Startup scripts" >> depend; \
 	echo "P SUNWlibC      SPARCompilers Bundled libC" >> depend; \
 	chmod 444 depend )
 
