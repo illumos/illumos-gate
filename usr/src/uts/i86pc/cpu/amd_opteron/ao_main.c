@@ -39,6 +39,7 @@
 #include <sys/kmem.h>
 #include <sys/modctl.h>
 #include <sys/mc.h>
+#include <sys/mca_x86.h>
 
 #include "ao.h"
 
@@ -54,8 +55,16 @@ static int
 ao_init(cpu_t *cp, void **datap)
 {
 	ao_data_t *ao;
+	uint64_t cap;
 
 	if (cpuid_getmodel(cp) >= ao_model_limit)
+		return (ENOTSUP);
+
+	if (!(x86_feature & X86_MCA))
+		return (ENOTSUP);
+
+	cap = rdmsr(IA32_MSR_MCG_CAP);
+	if (!(cap & MCG_CAP_CTL_P))
 		return (ENOTSUP);
 
 	ao = *datap = kmem_zalloc(sizeof (ao_data_t), KM_SLEEP);
