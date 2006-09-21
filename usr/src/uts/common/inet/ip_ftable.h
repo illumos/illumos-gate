@@ -85,18 +85,8 @@ extern int ipfil_sendpkt(const struct sockaddr *, mblk_t *, uint_t, zoneid_t);
 
 extern struct radix_node_head *ip_ftable;
 
-#define	IRB_REFHOLD_RN(rn)					\
-	if ((rn->rn_flags & RNF_ROOT) == 0)			\
-		IRB_REFHOLD(&((rt_t *)(rn))->rt_irb)
-
-#define	IRB_REFRELE_RN(rn)					\
-	if ((rn->rn_flags & RNF_ROOT) == 0)			\
-		irb_refrele_ftable(&((rt_t *)(rn))->rt_irb);
-
-#else
-
-#define	IRB_REFHOLD_RN(rn)	/* */
-#define	IRB_REFRELE_RN(rn)	/* */
+extern void  irb_refhold_rn(struct radix_node *);
+extern void  irb_refrele_rn(struct radix_node *);
 
 #endif /* _KERNEL */
 

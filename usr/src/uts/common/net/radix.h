@@ -66,7 +66,6 @@ struct radix_node {
 #define	RNF_NORMAL	1		/* leaf contains normal route */
 #define	RNF_ROOT	2		/* leaf is root leaf for tree */
 #define	RNF_ACTIVE	4		/* This node is alive (for rtfree) */
-#define	RNF_SUNW_FT	8		/* kernel ip ftable */
 	union {
 		struct {			/* leaf only data: */
 			caddr_t	rn_Key;		/* object of search */
@@ -110,6 +109,7 @@ struct radix_mask {
 
 typedef int walktree_f_t(struct radix_node *, void *);
 typedef boolean_t match_leaf_t(struct radix_node *, void *);
+typedef void (*lockf_t)(struct radix_node *);
 
 struct radix_node_head {
 	struct	radix_node *rnh_treetop;
@@ -137,6 +137,10 @@ struct radix_node_head {
 		(void *v, struct radix_node_head *head);
 	int	(*rnh_walktree)			/* traverse tree */
 		(struct radix_node_head *head, walktree_f_t *f, void *w);
+	int	(*rnh_walktree_mt)			/* traverse tree */
+		(struct radix_node_head *head, walktree_f_t *f, void *w,
+		lockf_t lockf, lockf_t unlockf);
+	/* rn_walktree_mt: MT safe version of rn_walktree */
 	int	(*rnh_walktree_from)		/* traverse tree below a */
 		(struct radix_node_head *head, void *a, void *m,
 		    walktree_f_t *f, void *w);

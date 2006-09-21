@@ -57,7 +57,6 @@
 #include <strings.h>
 #endif	/* _KERNEL */
 #include <net/radix.h>
-#include <inet/ip_ftable.h>
 #endif
 
 #ifndef	_KERNEL
@@ -70,6 +69,8 @@ panic(const char *str)
 #endif	/* _KERNEL */
 
 static int	rn_walktree(struct radix_node_head *, walktree_f_t *, void *);
+static int	rn_walktree_mt(struct radix_node_head *, walktree_f_t *,
+    void *, lockf_t, lockf_t);
 static struct radix_node
 	*rn_insert(void *, struct radix_node_head *, int *,
 	    struct radix_node [2]),
@@ -1038,16 +1039,23 @@ rn_walktree(h, f, w)
 	walktree_f_t *f;
 	void *w;
 {
+	return (rn_walktree_mt(h, f, w, NULL, NULL));
+}
+static int
+rn_walktree_mt(h, f, w, lockf, unlockf)
+	struct radix_node_head *h;
+	walktree_f_t *f;
+	void *w;
+	lockf_t lockf, unlockf;
+{
 	int error;
 	struct radix_node *base, *next;
 	struct radix_node *rn = h->rnh_treetop;
-	boolean_t is_ftable = B_FALSE;
+	boolean_t is_mt = B_FALSE;
 
-	if (h->rnh_treetop->rn_flags & RNF_SUNW_FT) {
-		/*
-		 * this is a kernel ip ftable with rt_t leaf structures.
-		 */
-		is_ftable = B_TRUE;
+	if (lockf != NULL) {
+		ASSERT(unlockf != NULL);
+		is_mt = B_TRUE;
 	}
 	/*
 	 * This gets complicated because we may delete the node
@@ -1060,8 +1068,8 @@ rn_walktree(h, f, w)
 		rn = rn->rn_left;
 	}
 
-	if (is_ftable)
-		IRB_REFHOLD_RN(rn);
+	if (is_mt)
+		(*lockf)(rn);
 
 	for (;;) {
 		base = rn;
@@ -1076,36 +1084,39 @@ rn_walktree(h, f, w)
 		}
 		next = rn;
 
-		if (is_ftable && next != NULL)
-			IRB_REFHOLD_RN(next);
+		if (is_mt && next != NULL)
+			(*lockf)(next);
 
 		/* Process leaves */
 		while ((rn = base) != NULL) {
 			base = rn->rn_dupedkey;
 
-			if (is_ftable && base != NULL)
-				IRB_REFHOLD_RN(base);
+			if (is_mt && base != NULL)
+				(*lockf)(base);
 
 			RADIX_NODE_HEAD_UNLOCK(h);
 			if (!(rn->rn_flags & RNF_ROOT) &&
 			    (error = (*f)(rn, w))) {
-				if (is_ftable) {
-					if (rn != NULL)
-						IRB_REFRELE_RN(rn);
+				if (is_mt) {
+					(*unlockf)(rn);
 					if (base != NULL)
-						IRB_REFRELE_RN(base);
+						(*unlockf)(base);
 					if (next != NULL)
-						IRB_REFRELE_RN(next);
+						(*unlockf)(next);
 				}
 				return (error);
 			}
-			if (is_ftable && rn != NULL)
-				IRB_REFRELE_RN(rn);
+			if (is_mt)
+				(*unlockf)(rn);
 			RADIX_NODE_HEAD_RLOCK(h);
 		}
 		rn = next;
 		if (rn->rn_flags & RNF_ROOT) {
 			RADIX_NODE_HEAD_UNLOCK(h);
+			/*
+			 * no ref to release, since we never take a ref
+			 * on the root node- it can't be deleted.
+			 */
 			return (0);
 		}
 	}
@@ -1151,6 +1162,7 @@ rn_inithead(head, off)
 	rnh->rnh_matchaddr_args = rn_match_args;
 	rnh->rnh_lookup = rn_lookup;
 	rnh->rnh_walktree = rn_walktree;
+	rnh->rnh_walktree_mt = rn_walktree_mt;
 	rnh->rnh_walktree_from = NULL;  /* not implemented */
 	rnh->rnh_treetop = t;
 	return (1);

@@ -2827,8 +2827,8 @@ ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
 			rtfarg.rt_ire_type = ire_type;
 			rtfarg.rt_ill = ill;
 			rtfarg.rt_zoneid = zoneid;
-			(void) ip_ftable->rnh_walktree(ip_ftable, rtfunc,
-			    &rtfarg);
+			(void) ip_ftable->rnh_walktree_mt(ip_ftable, rtfunc,
+			    &rtfarg, irb_refhold_rn, irb_refrele_rn);
 		}
 	}
 
@@ -5234,10 +5234,6 @@ ip_ire_init()
 
 	rn_init();
 	(void) rn_inithead((void **)&ip_ftable, 32);
-	/*
-	 * mark kernel ip ftable with RNF_SUNW_FT flag.
-	 */
-	ip_ftable->rnh_treetop->rn_flags |= RNF_SUNW_FT;
 	rt_entry_cache = kmem_cache_create("rt_entry",
 	    sizeof (struct rt_entry), 0, NULL, NULL, NULL, NULL, NULL, 0);
 

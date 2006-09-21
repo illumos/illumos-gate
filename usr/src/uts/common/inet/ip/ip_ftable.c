@@ -575,7 +575,8 @@ ire_delete_host_redirects(ipaddr_t gateway)
 	(void) memset(&rtfarg, 0, sizeof (rtfarg));
 	rtfarg.rt_func = ire_del_host_redir;
 	rtfarg.rt_arg = (void *)&gateway;
-	(void) ip_ftable->rnh_walktree(ip_ftable, rtfunc, &rtfarg);
+	(void) ip_ftable->rnh_walktree_mt(ip_ftable, rtfunc, &rtfarg,
+	    irb_refhold_rn, irb_refrele_rn);
 }
 
 struct ihandle_arg {
@@ -664,8 +665,8 @@ ire_ihandle_lookup_onlink(ire_t *cire)
 	 */
 	(void) memset(&ih, 0, sizeof (ih));
 	ih.ihandle = cire->ire_ihandle;
-	(void) ip_ftable->rnh_walktree(ip_ftable,
-	    ire_ihandle_onlink_match, &ih);
+	(void) ip_ftable->rnh_walktree_mt(ip_ftable, ire_ihandle_onlink_match,
+	    &ih, irb_refhold_rn, irb_refrele_rn);
 	return (ih.ire);
 }
 
@@ -1686,4 +1687,18 @@ next_ire:
 		IRE_REFHOLD(maybe_ire);
 	IRB_REFRELE(irb_ptr);
 	return (maybe_ire);
+}
+
+void
+irb_refhold_rn(struct radix_node *rn)
+{
+	if ((rn->rn_flags & RNF_ROOT) == 0)
+		IRB_REFHOLD(&((rt_t *)(rn))->rt_irb);
+}
+
+void
+irb_refrele_rn(struct radix_node *rn)
+{
+	if ((rn->rn_flags & RNF_ROOT) == 0)
+		irb_refrele_ftable(&((rt_t *)(rn))->rt_irb);
 }
