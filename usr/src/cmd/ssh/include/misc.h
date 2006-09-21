@@ -22,7 +22,7 @@ extern "C" {
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@ struct arglist {
 	int     nalloc;
 };
 void	 addargs(arglist *, char *, ...) __attribute__((format(printf, 2, 3)));
+void	 freeargs(arglist *);
 
 /* wrapper for signal interface */
 typedef void (*mysig_t)(int);

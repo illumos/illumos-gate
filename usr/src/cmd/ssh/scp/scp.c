@@ -133,7 +133,69 @@ int showprogress = 1;
 char *ssh_program = _PATH_SSH_PROGRAM;
 
 /* This is used to store the pid of ssh_program */
-static pid_t do_cmd_pid;
+static pid_t do_cmd_pid = -1;
+
+static void
+killchild(int signo)
+{
+	if (do_cmd_pid > 1) {
+		kill(do_cmd_pid, signo ? signo : SIGTERM);
+		waitpid(do_cmd_pid, NULL, 0);
+	}
+
+	if (signo)
+		_exit(1);
+	exit(1);
+}
+
+/*
+ * Run a command via fork(2)/exec(2). This can be a local-to-local copy via
+ * cp(1) or one side of a remote-to-remote copy. We must not use system(3) here
+ * because we don't want filenames to go through a command expansion in the
+ * underlying shell. Note that the user can create a filename that is a piece of
+ * shell code itself and this must not be executed.
+ */
+static int
+do_local_cmd(arglist *a)
+{
+	uint_t i;
+	int status;
+	pid_t pid;
+
+	if (a->num == 0)
+		fatal("do_local_cmd: no arguments");
+
+	if (verbose_mode) {
+		fprintf(stderr, gettext("Executing:"));
+		for (i = 0; i < a->num; i++)
+			fprintf(stderr, " %s", a->list[i]);
+		fprintf(stderr, "\n");
+	}
+	if ((pid = fork()) == -1)
+		fatal("do_local_cmd: fork: %s", strerror(errno));
+
+	if (pid == 0) {
+		execvp(a->list[0], a->list);
+		perror(a->list[0]);
+		exit(1);
+	}
+
+	do_cmd_pid = pid;
+	signal(SIGTERM, killchild);
+	signal(SIGINT, killchild);
+	signal(SIGHUP, killchild);
+
+	while (waitpid(pid, &status, 0) == -1)
+		if (errno != EINTR)
+			fatal("do_local_cmd: waitpid: %s", strerror(errno));
+
+	do_cmd_pid = -1;
+
+	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+		return (-1);
+
+	return (0);
+}
 
 /*
  * This function executes the given command as the specified user on the
@@ -378,39 +440,51 @@ toremote(targ, argc, argv)
 	int argc;
 {
 	int i, len;
-	char *bp, *host, *src, *suser, *thost, *tuser;
+	char *bp, *host, *src, *suser, *thost, *tuser, *arg;
+	arglist alist;
+
+	memset(&alist, '\0', sizeof (alist));
+	alist.list = NULL;
 
 	*targ++ = 0;
 	if (*targ == 0)
 		targ = ".";
 
-	if ((thost = strchr(argv[argc - 1], '@'))) {
+	arg = xstrdup(argv[argc - 1]);
+	if ((thost = strchr(arg, '@'))) {
 		/* user@host */
 		*thost++ = 0;
-		tuser = argv[argc - 1];
+		tuser = arg;
 		if (*tuser == '\0')
 			tuser = NULL;
 		else if (!okname(tuser))
 			exit(1);
 	} else {
-		thost = argv[argc - 1];
+		thost = arg;
 		tuser = NULL;
+	}
+
+	if (tuser != NULL && !okname(tuser)) {
+		xfree(arg);
+		return;
 	}
 
 	for (i = 0; i < argc - 1; i++) {
 		src = colon(argv[i]);
 		if (src) {	/* remote to remote */
-			static char *ssh_options =
-			    "-x -o'ClearAllForwardings yes'";
+			freeargs(&alist);
+			addargs(&alist, "%s", ssh_program);
+			if (verbose_mode)
+				addargs(&alist, "-v");
+			addargs(&alist, "-x");
+			addargs(&alist, "-oClearAllForwardings yes");
+			addargs(&alist, "-n");
+
 			*src++ = 0;
 			if (*src == 0)
 				src = ".";
 			host = strchr(argv[i], '@');
-			len = strlen(ssh_program) + strlen(argv[i]) +
-			    strlen(src) + (tuser ? strlen(tuser) : 0) +
-			    strlen(thost) + strlen(targ) +
-			    strlen(ssh_options) + CMDNEEDS + 20;
-			bp = xmalloc(len);
+
 			if (host) {
 				*host++ = 0;
 				host = cleanhostname(host);
@@ -419,27 +493,19 @@ toremote(targ, argc, argv)
 					suser = pwd->pw_name;
 				else if (!okname(suser))
 					continue;
-				snprintf(bp, len,
-				    "%s%s %s -n "
-				    "-l %s %s %s %s '%s%s%s:%s'",
-				    ssh_program, verbose_mode ? " -v" : "",
-				    ssh_options, suser, host, cmd, src,
-				    tuser ? tuser : "", tuser ? "@" : "",
-				    thost, targ);
+				addargs(&alist, "-l");
+				addargs(&alist, "%s", suser);
 			} else {
 				host = cleanhostname(argv[i]);
-				snprintf(bp, len,
-				    "exec %s%s %s -n %s "
-				    "%s %s '%s%s%s:%s'",
-				    ssh_program, verbose_mode ? " -v" : "",
-				    ssh_options, host, cmd, src,
+			}
+			addargs(&alist, "%s", host);
+			addargs(&alist, "%s", cmd);
+			addargs(&alist, "%s", src);
+			addargs(&alist, "%s%s%s:%s",
 				    tuser ? tuser : "", tuser ? "@" : "",
 				    thost, targ);
-			}
-			if (verbose_mode)
-				fprintf(stderr, gettext("Executing: %s\n"), bp);
-			(void) system(bp);
-			(void) xfree(bp);
+			if (do_local_cmd(&alist) != 0)
+				errs = 1;
 		} else {	/* local to remote */
 			if (remin == -1) {
 				len = strlen(targ) + CMDNEEDS + 20;
@@ -465,20 +531,23 @@ tolocal(argc, argv)
 {
 	int i, len;
 	char *bp, *host, *src, *suser;
+	arglist alist;
+
+	memset(&alist, '\0', sizeof (alist));
+	alist.list = NULL;
 
 	for (i = 0; i < argc - 1; i++) {
 		if (!(src = colon(argv[i]))) {	/* Local to local. */
-			len = strlen(_PATH_CP) + strlen(argv[i]) +
-			    strlen(argv[argc - 1]) + 20;
-			bp = xmalloc(len);
-			(void) snprintf(bp, len, "exec %s%s%s %s %s", _PATH_CP,
-			    iamrecursive ? " -r" : "", pflag ? " -p" : "",
-			    argv[i], argv[argc - 1]);
-			if (verbose_mode)
-				fprintf(stderr, gettext("Executing: %s\n"), bp);
-			if (system(bp))
+			freeargs(&alist);
+			addargs(&alist, "%s", _PATH_CP);
+			if (iamrecursive)
+				addargs(&alist, "-r");
+			if (pflag)
+				addargs(&alist, "-p");
+			addargs(&alist, "%s", argv[i]);
+			addargs(&alist, "%s", argv[argc-1]);
+			if (do_local_cmd(&alist))
 				++errs;
-			(void) xfree(bp);
 			continue;
 		}
 		*src++ = 0;

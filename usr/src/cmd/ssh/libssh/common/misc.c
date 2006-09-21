@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -352,6 +352,20 @@ addargs(arglist *args, char *fmt, ...)
 	args->list = xrealloc(args->list, args->nalloc * sizeof(char *));
 	args->list[args->num++] = xstrdup(buf);
 	args->list[args->num] = NULL;
+}
+
+void
+freeargs(arglist *args)
+{
+	u_int i;
+
+	if (args->list != NULL) {
+		for (i = 0; i < args->num; i++)
+			xfree(args->list[i]);
+		xfree(args->list);
+		args->nalloc = args->num = 0;
+		args->list = NULL;
+	}
 }
 
 mysig_t
