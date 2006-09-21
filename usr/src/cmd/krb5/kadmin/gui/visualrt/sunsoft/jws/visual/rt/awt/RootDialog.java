@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,8 +21,8 @@
 /*
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -39,8 +38,6 @@ import sunsoft.jws.visual.rt.base.DesignerAccess;
 import sunsoft.jws.visual.rt.base.*;
 
 import java.awt.*;
-// For overriden pack() hack
-import java.awt.peer.ComponentPeer;
 
 public class RootDialog extends Dialog implements RootWindow {
     private RWHelper helper;
@@ -86,15 +83,15 @@ public class RootDialog extends Dialog implements RootWindow {
      */
     public void pack() {
         Component parent = getParent();
-        ComponentPeer peer = getPeer();
+        Boolean dis = isDisplayable();
         
-        if (parent != null && parent.getPeer() == null) {
+        if (parent != null && parent.isDisplayable() == false) {
             parent.addNotify();
         }
-        if (peer == null) {
+        if (dis.equals(false)) {
             addNotify();
         }
-        
+
         Dimension d = getPreferredSize();
         Point p = getDialogLocation(d);
         
@@ -102,7 +99,7 @@ public class RootDialog extends Dialog implements RootWindow {
         // the peer has been created.  There is an AWT bug that screws
         // up the location of the dialog, so we
         // have to make this adjustment.
-        if (Global.isMotif() && (peer == null)) {
+        if (Global.isMotif() && dis.equals(false)) {
             p.x -= d.width/2;
             p.y -= d.height/2;
         }

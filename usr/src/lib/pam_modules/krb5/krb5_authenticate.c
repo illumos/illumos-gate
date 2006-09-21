@@ -126,16 +126,11 @@ pam_sm_authenticate(
 
 	(void) pam_get_item(pamh, PAM_USER, (void**) &user);
 
-	/* Prompt for user name if it is not already available */
-	if (user == NULL || !user[0]) {
+	if (user == NULL || *user == '\0') {
 		if (debug)
 			syslog(LOG_DEBUG, "PAM-KRB5 (auth): user empty "
 				"or null");
-		if ((err = pam_get_user(pamh, &user, NULL)) != PAM_SUCCESS)
-			return (err);
-
-		if (user == NULL || !user[0])
-			return (PAM_USER_UNKNOWN);
+		return (PAM_USER_UNKNOWN);
 	}
 
 	/* make sure a password entry exists for this user */
