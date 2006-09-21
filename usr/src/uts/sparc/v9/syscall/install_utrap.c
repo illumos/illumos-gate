@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +33,6 @@
 #include <sys/machpcb.h>
 #include <sys/utrap.h>
 #include <sys/model.h>
-#include <sys/cmn_err.h>
 
 int
 install_utrap(utrap_entry_t type, utrap_handler_t new_handler,
@@ -54,11 +52,8 @@ install_utrap(utrap_entry_t type, utrap_handler_t new_handler,
 		{
 		extern int spitfire_call_bug;
 
-		if (spitfire_call_bug) {
-			cmn_err(CE_WARN, "UTRAP_V8P_FP_DISABLED "
-			    "not supported for cpu version < 2.2");
+		if (spitfire_call_bug)
 			return ((int)set_errno(ENOSYS));
-		}
 		}
 #endif /* SF_ERRATA_30 */
 		idx = UTRAP_V8P_FP_DISABLED;
@@ -69,11 +64,8 @@ install_utrap(utrap_entry_t type, utrap_handler_t new_handler,
 	default:
 		return ((int)set_errno(EINVAL));
 	}
-	if (get_udatamodel() == DATAMODEL_LP64) {
-		cmn_err(CE_WARN, "install_utrap private interface "
-		    "not supported for LP64 user programs");
+	if (get_udatamodel() == DATAMODEL_LP64)
 		return ((int)set_errno(EINVAL));
-	}
 
 	/*
 	 * Be sure handler address is word aligned.  The uintptr_t casts are
@@ -175,11 +167,8 @@ sparc_utrap_install(utrap_entry_t type,
 		{
 		extern int spitfire_call_bug;
 
-		if (spitfire_call_bug) {
-			cmn_err(CE_WARN, "UT_FP_DISABLED "
-			    "not supported for cpu version < 2.2");
+		if (spitfire_call_bug)
 			return ((int)set_errno(ENOSYS));
-		}
 		}
 #endif /* SF_ERRATA_30 */
 		idx = UT_FP_DISABLED;
@@ -221,11 +210,8 @@ sparc_utrap_install(utrap_entry_t type,
 		return ((int)set_errno(EINVAL));
 	}
 
-	if (get_udatamodel() == DATAMODEL_ILP32) {
-		cmn_err(CE_WARN, "__sparc_utrap_install interface "
-		    "not supported for ILP32 user programs");
+	if (get_udatamodel() == DATAMODEL_ILP32)
 		return ((int)set_errno(EINVAL));
-	}
 
 	/*
 	 * Be sure handler address is word aligned.
