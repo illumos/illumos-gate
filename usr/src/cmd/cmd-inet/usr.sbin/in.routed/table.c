@@ -903,6 +903,10 @@ kern_find(in_addr_t dst, in_addr_t mask, in_addr_t gate,
 {
 	struct khash *k, **pk;
 
+	if (ifp != NULL && ifp->int_phys != NULL) {
+		ifp = ifwithname(ifp->int_phys->phyi_name);
+	}
+
 	for (pk = &KHASH(dst, mask); (k = *pk) != NULL; pk = &k->k_next) {
 		if (k->k_dst == dst && k->k_mask == mask &&
 		    (gate == 0 || k->k_gate == gate) &&
@@ -926,6 +930,9 @@ kern_alternate(in_addr_t dst, in_addr_t mask, in_addr_t gate,
 {
 	struct khash *k, **pk;
 
+	if (ifp != NULL && ifp->int_phys != NULL) {
+		ifp = ifwithname(ifp->int_phys->phyi_name);
+	}
 	for (pk = &KHASH(dst, mask); (k = *pk) != NULL; pk = &k->k_next) {
 		if (k->k_dst == dst && k->k_mask == mask &&
 		    (k->k_gate != gate) &&
@@ -943,6 +950,9 @@ kern_add(in_addr_t dst, uint32_t mask, in_addr_t gate, struct interface *ifp)
 {
 	struct khash *k, **pk;
 
+	if (ifp != NULL && ifp->int_phys != NULL) {
+		ifp = ifwithname(ifp->int_phys->phyi_name);
+	}
 	k = kern_find(dst, mask, gate, ifp, &pk);
 	if (k != NULL)
 		return (k);
@@ -968,6 +978,9 @@ kern_flush_ifp(struct interface *ifp)
 	struct khash *k, *kprev, *knext;
 	int i;
 
+	if (ifp != NULL && ifp->int_phys != NULL) {
+		ifp = ifwithname(ifp->int_phys->phyi_name);
+	}
 	for (i = 0; i < KHASH_SIZE; i++) {
 		kprev = NULL;
 		for (k = khash_bins[i]; k != NULL; k = knext) {
@@ -995,6 +1008,12 @@ kern_rewire_ifp(struct interface *oldifp, struct interface *newifp)
 	struct khash *k;
 	int i;
 
+	if (oldifp != NULL && oldifp->int_phys != NULL) {
+		oldifp = ifwithname(oldifp->int_phys->phyi_name);
+	}
+	if (newifp != NULL && newifp->int_phys != NULL) {
+		newifp = ifwithname(newifp->int_phys->phyi_name);
+	}
 	for (i = 0; i < KHASH_SIZE; i++) {
 		for (k = khash_bins[i]; k; k = k->k_next) {
 			if (k->k_ifp == oldifp) {
@@ -1020,6 +1039,9 @@ kern_check_static(struct khash *k, struct interface *ifp)
 	struct rt_spare new;
 	uint16_t rt_state = RS_STATIC;
 
+	if (ifp != NULL && ifp->int_phys != NULL) {
+		ifp = ifwithname(ifp->int_phys->phyi_name);
+	}
 	(void) memset(&new, 0, sizeof (new));
 	new.rts_ifp = ifp;
 	new.rts_gate = k->k_gate;
@@ -1127,11 +1149,16 @@ rtm_add(struct rt_msghdr *rtm,
 	if (ifp == NULL) {
 		if (INFO_GATE(info) != NULL)
 			ifp = iflookup(gate);
-		if (ifp == NULL)
+		if (ifp == NULL) {
 			msglim(&msg_no_ifp, gate,
 			    "route %s --> %s nexthop is not directly connected",
 			    addrname(S_ADDR(INFO_DST(info)), mask, 0),
 			    naddr_ntoa(gate));
+		} else {
+			if (ifp->int_phys != NULL) {
+				ifp = ifwithname(ifp->int_phys->phyi_name);
+			}
+		}
 	}
 
 	k = kern_add(S_ADDR(INFO_DST(info)), mask, gate, ifp);
@@ -1438,8 +1465,13 @@ sync_kern(void)
 			 */
 			if ((ifp = gwkludge_iflookup(rp->ipRouteDest,
 			    rp->ipRouteNextHop,
-			    ntohl(rp->ipRouteMask))) == NULL)
+			    ntohl(rp->ipRouteMask))) == NULL) {
 				ifp = ifwithname(ifname);
+				if (ifp != NULL && ifp->int_phys != NULL) {
+					ifp = ifwithname(
+					    ifp->int_phys->phyi_name);
+				}
+			}
 
 			info.rti_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
 			if (rp->ipRouteInfo.re_ire_type & IRE_HOST_REDIRECT)
@@ -1810,6 +1842,13 @@ static void
 kern_out(struct ag_info *ag)
 {
 	struct khash *k;
+	struct interface *ifp;
+
+	ifp = ag->ag_ifp;
+
+	if (ifp != NULL && ifp->int_phys != NULL) {
+		ifp = ifwithname(ifp->int_phys->phyi_name);
+	}
 
 	/*
 	 * Do not install bad routes if they are not already present.
@@ -1823,7 +1862,7 @@ kern_out(struct ag_info *ag)
 			return;
 	} else {
 		k = kern_add(htonl(ag->ag_dst_h), ag->ag_mask, ag->ag_nhop,
-		    ag->ag_ifp);
+		    ifp);
 	}
 
 	if (k->k_state & KS_NEW) {
@@ -1838,7 +1877,7 @@ kern_out(struct ag_info *ag)
 		if (ag->ag_state & AGS_FILE)
 			k->k_state |= KS_FILE;
 		k->k_gate = ag->ag_nhop;
-		k->k_ifp = ag->ag_ifp;
+		k->k_ifp = ifp;
 		k->k_metric = ag->ag_metric;
 		return;
 	}

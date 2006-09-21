@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -103,7 +103,11 @@ receiving_interface(struct msghdr *msg, boolean_t findremote)
 	 * IP_RECVIF index we requested), try to deduce the receiving
 	 * interface based on the source address of the packet.
 	 */
-	return (iflookup(from->sin_addr.s_addr));
+	ifp = iflookup(from->sin_addr.s_addr);
+	if (ifp != NULL && ifp->int_phys != NULL) {
+		ifp = ifwithname(ifp->int_phys->phyi_name);
+	}
+	return (ifp);
 }
 
 /*
@@ -1121,7 +1125,6 @@ input_route(in_addr_t dst,			/* network order */
 	 */
 
 	rts0 = rt->rt_spares;
-	trace_misc("rt 0x%lx num_spares %d", rt, rt->rt_num_spares);
 	for (rts = rts0, i = rt->rt_num_spares; i != 0; i--, rts++) {
 		if (rts->rts_router == new->rts_router)
 			break;
