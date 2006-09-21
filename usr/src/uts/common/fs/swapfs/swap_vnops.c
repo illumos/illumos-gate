@@ -476,6 +476,11 @@ swap_putpage(
 
 	ASSERT(vp->v_count != 0);
 
+	/*
+	 * Clear force flag so that p_lckcnt pages are not invalidated.
+	 */
+	flags &= ~B_FORCE;
+
 	SWAPFS_PRINT(SWAP_VOPS,
 	    "swap_putpage: vp %p, off %llx len %lx, flags %x\n",
 	    (void *)vp, off, len, flags, 0);
@@ -591,11 +596,6 @@ swap_putapage(
 	se_t se;
 	struct async_reqs *arg;
 	size_t swap_klustsize;
-
-	/*
-	 * Clear force flag so that p_lckcnt pages are not invalidated.
-	 */
-	flags &= ~B_FORCE;
 
 	/*
 	 * This check is added for callers who access swap_putpage with len = 0.

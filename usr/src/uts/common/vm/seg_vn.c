@@ -7279,7 +7279,7 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 						unlocked_bytes += PAGESIZE;
 					page_unlock(pp);
 				} else {
-					ASSERT(sp != NULL);
+					ASSERT(sp == NULL);
 					unlocked_bytes += PAGESIZE;
 				}
 				VPP_CLRPPLOCK(vpp);
