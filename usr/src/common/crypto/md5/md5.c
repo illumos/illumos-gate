@@ -157,6 +157,7 @@ static uint8_t PADDING[64] = { 0x80, /* all zeros */ };
 
 /* CSTYLED */
 #pragma align 64 (md5_consts)
+#define	_MD5_CHECK_ALIGNMENT
 
 #endif /* sun4v */
 
