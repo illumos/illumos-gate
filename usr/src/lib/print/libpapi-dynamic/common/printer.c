@@ -179,6 +179,7 @@ printers_from_name_service(service_t *svc, char **requested_attrs,
 		return (PAPI_BAD_ARGUMENT);
 
 	/* retrieve printers from the nameservice */
+	setprinterentry(0, NULL);
 	while ((attrs = getprinterentry(NULL)) != NULL) {
 		printer_t *p = NULL;
 

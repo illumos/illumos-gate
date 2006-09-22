@@ -465,11 +465,29 @@ process(int ac, char **av)
 		return (-1);
 	}
 
-	if (((printer != NULL) && (strcmp(printer, "all") != 0)) ||
-	    (num_args <= ac))
-		rc = process_one(handler, av, num_args);
-	else
+	if (((ac == 0) && (num_args != 0)) ||
+	    ((printer != NULL) && strcmp(printer, "all") == 0))
 		rc = process_all(handler, av, num_args);
+	else if (num_args < ac) {
+		int i;
+		char *argv[4];
+
+		memset(argv, 0, sizeof (argv));
+		argv[0] = av[0];
+
+		if (strcmp(av[0], "topq") == 0) {
+			argv[1] = av[1];
+			for (i = 2; i <= ac; i++) {
+				argv[2] = av[i];
+				process_one(handler, argv, num_args);
+			}
+		} else
+			for (i = 1; i <= ac; i++) {
+				argv[1] = av[i];
+				process_one(handler, argv, num_args);
+			}
+	} else
+		rc = process_one(handler, av, num_args);
 
 	return (rc);
 }
@@ -508,7 +526,7 @@ lpc_shell()
 		if ((av = strsplit(line, " \t\n")) != NULL)
 			for (ac = 0; av[ac] != NULL; ac++);
 
-		(void) process(ac, av);
+		(void) process(ac - 1, av);
 		free(av);
 	}
 }
@@ -534,7 +552,7 @@ main(int ac, char *av[])
 	if (optind == ac)
 		lpc_shell();
 	else
-		result = process(optind - 2, &av[optind]);
+		result = process(ac - optind - 1, &av[optind]);
 
 	return (result);
 }
