@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +41,8 @@
 #include <sys/sdt.h>
 #include <sys/archsystm.h>
 #include <sys/privregs.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 static int64_t diff3931(uint64_t sample, uint64_t old);
 static uint64_t trunc3931(uint64_t value);
@@ -104,7 +105,7 @@ typedef struct _ptm_pcbe_config {
 } ptm_pcbe_config_t;
 
 struct nametable {
-	const uint8_t	bits;
+	uint8_t		bits;
 	const char	*name;
 };
 
@@ -600,6 +601,7 @@ ptm_pcbe_configure(uint_t picnum, char *eventname, uint64_t preset,
 {
 	ptm_pcbe_config_t	*conf;
 	const struct nametable	*n;
+	struct nametable	nt_raw = { 0, "raw" };
 	int			i;
 	int			ptm_flags = 0;
 
@@ -616,8 +618,24 @@ ptm_pcbe_configure(uint_t picnum, char *eventname, uint64_t preset,
 	if (picnum != 0 && picnum != 1)
 		return (CPC_INVALID_PICNUM);
 
-	if ((n = find_event(picnum, eventname)) == NULL)
-		return (CPC_INVALID_EVENT);
+	if ((n = find_event(picnum, eventname)) == NULL) {
+		long tmp;
+
+		/*
+		 * If ddi_strtol() likes this event, use it as a raw event code.
+		 */
+		if (ddi_strtol(eventname, NULL, 0, &tmp) != 0)
+			return (CPC_INVALID_EVENT);
+
+		nt_raw.bits = tmp;
+
+		if (ptm_ver == PTM_VER_P5)
+			nt_raw.bits &= CPC_P5_CESR_ES0_MASK;
+		else
+			nt_raw.bits &= CPC_P6_PES_PIC0_MASK;
+
+		n = &nt_raw;
+	}
 
 	conf = kmem_alloc(sizeof (ptm_pcbe_config_t), KM_SLEEP);
 

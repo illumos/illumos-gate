@@ -41,6 +41,8 @@
 #include <sys/archsystm.h>
 #include <sys/x86_archext.h>
 #include <sys/privregs.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 static int opt_pcbe_init(void);
 static uint_t opt_pcbe_ncounters(void);
@@ -342,6 +344,7 @@ opt_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 {
 	opt_pcbe_config_t	*cfg;
 	opt_event_t		*evp;
+	opt_event_t		ev_raw = { "raw", 0, 0xFF };
 	int			i;
 	uint32_t		evsel = 0;
 
@@ -358,8 +361,18 @@ opt_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	if (picnum >= 4)
 		return (CPC_INVALID_PICNUM);
 
-	if ((evp = find_event(event)) == NULL)
-		return (CPC_INVALID_EVENT);
+	if ((evp = find_event(event)) == NULL) {
+		long tmp;
+
+		/*
+		 * If ddi_strtol() likes this event, use it as a raw event code.
+		 */
+		if (ddi_strtol(event, NULL, 0, &tmp) != 0)
+			return (CPC_INVALID_EVENT);
+
+		ev_raw.emask = tmp;
+		evp = &ev_raw;
+	}
 
 	evsel |= evp->emask;
 
