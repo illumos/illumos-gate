@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,11 +119,12 @@ C_Encrypt(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	if (rv != CKR_OK)
 		return (rv);
 
-	if (ulDataLen == 0) {
-		SES_REFRELE(session_p, lock_held);
-		return (CKR_OK);
-	}
-
+	/*
+	 * Only check if input buffer is null.  How to handle zero input
+	 * length depends on the mechanism in use.  For secret key mechanisms,
+	 * unpadded ones yield zero length output, but padded ones always
+	 * result in greater than zero length output.
+	 */
 	if (pData == NULL) {
 		rv = CKR_ARGUMENTS_BAD;
 		goto clean_exit;
@@ -220,11 +220,12 @@ C_EncryptUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 	if (rv != CKR_OK)
 		return (rv);
 
-	if (ulPartLen == 0) {
-		SES_REFRELE(session_p, lock_held);
-		return (CKR_OK);
-	}
-
+	/*
+	 * Only check if input buffer is null.  How to handle zero input
+	 * length depends on the mechanism in use.  For secret key mechanisms,
+	 * unpadded ones yeild zero length output, but padded ones always
+	 * result in greater than zero length output.
+	 */
 	if (pPart == NULL) {
 		rv = CKR_ARGUMENTS_BAD;
 		goto clean_exit;

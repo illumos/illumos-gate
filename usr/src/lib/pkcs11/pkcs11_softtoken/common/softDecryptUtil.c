@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -329,9 +328,16 @@ soft_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 
 	case CKM_DES_ECB:
 	case CKM_DES_CBC:
-	case CKM_DES_CBC_PAD:
 	case CKM_DES3_ECB:
 	case CKM_DES3_CBC:
+
+		if (ulEncryptedLen == 0) {
+			*pulDataLen = 0;
+			return (CKR_OK);
+		}
+		/* FALLTHROUGH */
+
+	case CKM_DES_CBC_PAD:
 	case CKM_DES3_CBC_PAD:
 
 		return (soft_des_decrypt_common(session_p, pEncrypted,
@@ -339,6 +345,13 @@ soft_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 
 	case CKM_AES_ECB:
 	case CKM_AES_CBC:
+
+		if (ulEncryptedLen == 0) {
+			*pulDataLen = 0;
+			return (CKR_OK);
+		}
+		/* FALLTHROUGH */
+
 	case CKM_AES_CBC_PAD:
 
 		return (soft_aes_decrypt_common(session_p, pEncrypted,
@@ -346,24 +359,24 @@ soft_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 
 	case CKM_BLOWFISH_CBC:
 
+		if (ulEncryptedLen == 0) {
+			*pulDataLen = 0;
+			return (CKR_OK);
+		}
+
 		return (soft_blowfish_decrypt_common(session_p, pEncrypted,
 		    ulEncryptedLen, pData, pulDataLen, Update));
 
 	case CKM_RC4:
-	{
-		ARCFour_key *keystream = session_p->decrypt.context;
-		CK_RV rv;
 
-		rv = soft_arcfour_crypt(&(session_p->decrypt), pEncrypted,
-		    ulEncryptedLen, pData, pulDataLen);
-
-		if ((rv == CKR_OK) && (pData != NULL)) {
-			bzero(keystream, sizeof (*keystream));
-			free(keystream);
-			session_p->decrypt.context = NULL;
+		if (ulEncryptedLen == 0) {
+			*pulDataLen = 0;
+			return (CKR_OK);
 		}
-		return (rv);
-	}
+
+
+		return (soft_arcfour_crypt(&(session_p->decrypt), pEncrypted,
+		    ulEncryptedLen, pData, pulDataLen));
 
 	case CKM_RSA_X_509:
 	case CKM_RSA_PKCS:
@@ -443,14 +456,10 @@ soft_decrypt_update(soft_session_t *session_p, CK_BYTE_PTR pEncryptedPart,
 	case CKM_AES_CBC:
 	case CKM_AES_CBC_PAD:
 	case CKM_BLOWFISH_CBC:
+	case CKM_RC4:
 
 		return (soft_decrypt_common(session_p, pEncryptedPart,
 		    ulEncryptedPartLen, pPart, pulPartLen, B_TRUE));
-
-	case CKM_RC4:
-
-		return (soft_arcfour_crypt(&(session_p->decrypt),
-		    pEncryptedPart, ulEncryptedPartLen, pPart, pulPartLen));
 
 	default:
 		/* PKCS11: The mechanism only supports single-part operation. */
