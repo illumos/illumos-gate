@@ -3382,11 +3382,24 @@ walk_dependency_pgs(scf_instance_t *inst, callback_t cb, void *arg)
 		if (r == 0)
 			break;
 		if (r == -1) {
-			assert(scf_error() == SCF_ERROR_CONNECTION_BROKEN);
 			scf_snapshot_destroy(snap);
 			scf_pg_destroy(pg);
 			scf_iter_destroy(iter);
-			return (ECONNABORTED);
+
+			switch (scf_error()) {
+			case SCF_ERROR_CONNECTION_BROKEN:
+				return (ECONNABORTED);
+
+			case SCF_ERROR_DELETED:
+				return (ECANCELED);
+
+			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_INVALID_ARGUMENT:
+			case SCF_ERROR_NOT_BOUND:
+			case SCF_ERROR_HANDLE_MISMATCH:
+			default:
+				bad_error("scf_iter_next_pg", scf_error());
+			}
 		}
 
 		r = cb(pg, arg);
@@ -3466,11 +3479,24 @@ walk_property_astrings(scf_property_t *prop, callback_t cb, void *arg)
 	for (;;) {
 		r = scf_iter_next_value(iter, val);
 		if (r < 0) {
-			assert(scf_error() == SCF_ERROR_CONNECTION_BROKEN);
 			startd_free(buf, max_scf_value_size);
 			scf_iter_destroy(iter);
 			scf_value_destroy(val);
-			return (ECONNABORTED);
+
+			switch (scf_error()) {
+			case SCF_ERROR_CONNECTION_BROKEN:
+				return (ECONNABORTED);
+
+			case SCF_ERROR_DELETED:
+				return (ECANCELED);
+
+			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_INVALID_ARGUMENT:
+			case SCF_ERROR_NOT_BOUND:
+			case SCF_ERROR_HANDLE_MISMATCH:
+			default:
+				bad_error("scf_iter_next_value", scf_error());
+			}
 		}
 		if (r == 0)
 			break;
