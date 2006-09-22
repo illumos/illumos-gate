@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -857,13 +856,11 @@ pr_read_lpsinfo(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_map_common(prnode_t *pnp, uio_t *uiop, int reserved)
+pr_read_map_common(prnode_t *pnp, uio_t *uiop, prnodetype_t type)
 {
 	proc_t *p;
 	struct as *as;
-	int nmaps;
-	prmap_t *prmapp;
-	size_t size;
+	list_t iolhead;
 	int error;
 
 	if ((error = prlock(pnp, ZNO)) != 0)
@@ -879,13 +876,23 @@ pr_read_map_common(prnode_t *pnp, uio_t *uiop, int reserved)
 
 	mutex_exit(&p->p_lock);
 	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
-	nmaps = prgetmap(p, reserved, &prmapp, &size);
+	switch (type) {
+	case PR_XMAP:
+		error = prgetxmap(p, &iolhead);
+		break;
+	case PR_RMAP:
+		error = prgetmap(p, 1, &iolhead);
+		break;
+	case PR_MAP:
+		error = prgetmap(p, 0, &iolhead);
+		break;
+	}
 	AS_LOCK_EXIT(as, &as->a_lock);
 	mutex_enter(&p->p_lock);
 	prunlock(pnp);
 
-	error = pr_uioread(prmapp, nmaps * sizeof (prmap_t), uiop);
-	kmem_free(prmapp, size);
+	error = pr_iol_uiomove_and_free(&iolhead, uiop, error);
+
 	return (error);
 }
 
@@ -893,49 +900,21 @@ static int
 pr_read_map(prnode_t *pnp, uio_t *uiop)
 {
 	ASSERT(pnp->pr_type == PR_MAP);
-	return (pr_read_map_common(pnp, uiop, 0));
+	return (pr_read_map_common(pnp, uiop, pnp->pr_type));
 }
 
 static int
 pr_read_rmap(prnode_t *pnp, uio_t *uiop)
 {
 	ASSERT(pnp->pr_type == PR_RMAP);
-	return (pr_read_map_common(pnp, uiop, 1));
+	return (pr_read_map_common(pnp, uiop, pnp->pr_type));
 }
 
 static int
 pr_read_xmap(prnode_t *pnp, uio_t *uiop)
 {
-	proc_t *p;
-	struct as *as;
-	int nmems;
-	prxmap_t *prxmapp;
-	size_t size;
-	int error;
-
 	ASSERT(pnp->pr_type == PR_XMAP);
-
-	if ((error = prlock(pnp, ZNO)) != 0)
-		return (error);
-
-	p = pnp->pr_common->prc_proc;
-	as = p->p_as;
-
-	if ((p->p_flag & SSYS) || as == &kas) {
-		prunlock(pnp);
-		return (0);
-	}
-
-	mutex_exit(&p->p_lock);
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
-	nmems = prgetxmap(p, &prxmapp, &size);
-	AS_LOCK_EXIT(as, &as->a_lock);
-	mutex_enter(&p->p_lock);
-	prunlock(pnp);
-
-	error = pr_uioread(prxmapp, nmems * sizeof (prxmap_t), uiop);
-	kmem_free(prxmapp, size);
-	return (error);
+	return (pr_read_map_common(pnp, uiop, pnp->pr_type));
 }
 
 static int
@@ -1954,13 +1933,11 @@ pr_read_lpsinfo_32(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_map_common_32(prnode_t *pnp, uio_t *uiop, int reserved)
+pr_read_map_common_32(prnode_t *pnp, uio_t *uiop, prnodetype_t type)
 {
 	proc_t *p;
 	struct as *as;
-	int nmaps;
-	prmap32_t *prmapp;
-	size_t size;
+	list_t	iolhead;
 	int error;
 
 	if ((error = prlock(pnp, ZNO)) != 0)
@@ -1981,13 +1958,23 @@ pr_read_map_common_32(prnode_t *pnp, uio_t *uiop, int reserved)
 
 	mutex_exit(&p->p_lock);
 	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
-	nmaps = prgetmap32(p, reserved, &prmapp, &size);
+	switch (type) {
+	case PR_XMAP:
+		error = prgetxmap32(p, &iolhead);
+		break;
+	case PR_RMAP:
+		error = prgetmap32(p, 1, &iolhead);
+		break;
+	case PR_MAP:
+		error = prgetmap32(p, 0, &iolhead);
+		break;
+	}
 	AS_LOCK_EXIT(as, &as->a_lock);
 	mutex_enter(&p->p_lock);
 	prunlock(pnp);
 
-	error = pr_uioread(prmapp, nmaps * sizeof (prmap32_t), uiop);
-	kmem_free(prmapp, size);
+	error = pr_iol_uiomove_and_free(&iolhead, uiop, error);
+
 	return (error);
 }
 
@@ -1995,54 +1982,21 @@ static int
 pr_read_map_32(prnode_t *pnp, uio_t *uiop)
 {
 	ASSERT(pnp->pr_type == PR_MAP);
-	return (pr_read_map_common_32(pnp, uiop, 0));
+	return (pr_read_map_common_32(pnp, uiop, pnp->pr_type));
 }
 
 static int
 pr_read_rmap_32(prnode_t *pnp, uio_t *uiop)
 {
 	ASSERT(pnp->pr_type == PR_RMAP);
-	return (pr_read_map_common_32(pnp, uiop, 1));
+	return (pr_read_map_common_32(pnp, uiop, pnp->pr_type));
 }
 
 static int
 pr_read_xmap_32(prnode_t *pnp, uio_t *uiop)
 {
-	proc_t *p;
-	struct as *as;
-	int nmems;
-	prxmap32_t *prxmapp;
-	size_t size;
-	int error;
-
 	ASSERT(pnp->pr_type == PR_XMAP);
-
-	if ((error = prlock(pnp, ZNO)) != 0)
-		return (error);
-
-	p = pnp->pr_common->prc_proc;
-	as = p->p_as;
-
-	if ((p->p_flag & SSYS) || as == &kas) {
-		prunlock(pnp);
-		return (0);
-	}
-
-	if (PROCESS_NOT_32BIT(p)) {
-		prunlock(pnp);
-		return (EOVERFLOW);
-	}
-
-	mutex_exit(&p->p_lock);
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
-	nmems = prgetxmap32(p, &prxmapp, &size);
-	AS_LOCK_EXIT(as, &as->a_lock);
-	mutex_enter(&p->p_lock);
-	prunlock(pnp);
-
-	error = pr_uioread(prxmapp, nmems * sizeof (prxmap32_t), uiop);
-	kmem_free(prxmapp, size);
-	return (error);
+	return (pr_read_map_common_32(pnp, uiop, pnp->pr_type));
 }
 
 static int

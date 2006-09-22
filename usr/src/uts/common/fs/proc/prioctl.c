@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,7 +84,7 @@ static	void	prsetrun(kthread_t *, prrun_t *);
 static	int	propenm(prnode_t *, caddr_t, caddr_t, int *, cred_t *);
 extern	void	oprgetstatus(kthread_t *, prstatus_t *, zone_t *);
 extern	void	oprgetpsinfo(proc_t *, prpsinfo_t *, kthread_t *);
-static	int	oprgetmap(proc_t *, prmap_t **, size_t *);
+static	int	oprgetmap(proc_t *, list_t *);
 
 /*ARGSUSED*/
 static int
@@ -957,29 +956,32 @@ startover:
 
 	case PIOCMAP:		/* get memory map information */
 	{
-		int n;
-		prmap_t *prmapp;
-		size_t size;
+		list_t iolhead;
 		struct as *as = p->p_as;
-		int issys = ((p->p_flag & SSYS) || as == &kas);
 
-		if (issys) {
-			n = 1;
-			prmapp = &un.prmap;
-			bzero(prmapp, sizeof (*prmapp));
+		if ((p->p_flag & SSYS) || as == &kas) {
+			error = 0;
+			prunlock(pnp);
 		} else {
 			mutex_exit(&p->p_lock);
 			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
-			n = oprgetmap(p, &prmapp, &size);
+			error = oprgetmap(p, &iolhead);
 			AS_LOCK_EXIT(as, &as->a_lock);
 			mutex_enter(&p->p_lock);
-		}
-		prunlock(pnp);
+			prunlock(pnp);
 
-		if (copyout(prmapp, cmaddr, n * sizeof (prmap_t)))
+			error = pr_iol_copyout_and_free(&iolhead,
+			    &cmaddr, error);
+		}
+		/*
+		 * The procfs PIOCMAP ioctl returns an all-zero buffer
+		 * to indicate the end of the prmap[] array.
+		 * Append it to whatever has already been copied out.
+		 */
+		bzero(&un.prmap, sizeof (un.prmap));
+		if (!error && copyout(&un.prmap, cmaddr, sizeof (un.prmap)))
 			error = EFAULT;
-		if (!issys)
-			kmem_free(prmapp, size);
+
 		break;
 	}
 
@@ -1311,7 +1313,7 @@ startover:
 
 #ifdef _SYSCALL32_IMPL
 
-static int oprgetmap32(proc_t *, ioc_prmap32_t **, size_t *);
+static int oprgetmap32(proc_t *, list_t *);
 
 void
 oprgetstatus32(kthread_t *t, prstatus32_t *sp, zone_t *zp)
@@ -2567,33 +2569,35 @@ startover:
 
 	case PIOCMAP:		/* get memory map information */
 	{
-		int n;
-		ioc_prmap32_t *prmapp;
-		size_t size;
+		list_t iolhead;
 		struct as *as = p->p_as;
-		int issys = ((p->p_flag & SSYS) || as == &kas);
 
-		if (issys) {
-			n = 1;
-			prmapp = &un32.prmap;
-			bzero(prmapp, sizeof (*prmapp));
+		if ((p->p_flag & SSYS) || as == &kas) {
+			error = 0;
+			prunlock(pnp);
 		} else if (PROCESS_NOT_32BIT(p)) {
 			error = EOVERFLOW;
 			prunlock(pnp);
-			break;
 		} else {
 			mutex_exit(&p->p_lock);
 			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
-			n = oprgetmap32(p, &prmapp, &size);
+			error = oprgetmap32(p, &iolhead);
 			AS_LOCK_EXIT(as, &as->a_lock);
 			mutex_enter(&p->p_lock);
-		}
-		prunlock(pnp);
+			prunlock(pnp);
 
-		if (copyout(prmapp, cmaddr, n * sizeof (ioc_prmap32_t)))
-			error = EFAULT;
-		if (!issys)
-			kmem_free(prmapp, size);
+			error = pr_iol_copyout_and_free(&iolhead,
+			    &cmaddr, error);
+		}
+		/*
+		 * The procfs PIOCMAP ioctl returns an all-zero buffer
+		 * to indicate the end of the prmap[] array.
+		 * Append it to whatever has already been copied out.
+		 */
+		bzero(&un32.prmap, sizeof (un32.prmap));
+		if (!error &&
+		    copyout(&un32.prmap, cmaddr, sizeof (un32.prmap)))
+				error = EFAULT;
 		break;
 	}
 
@@ -3468,32 +3472,29 @@ oprgetpsinfo(proc_t *p, prpsinfo_t *psp, kthread_t *tp)
 
 /*
  * Return an array of structures with memory map information.
- * In addition to the "real" segments we need space for the
- * zero-filled entry that terminates the list.
  * We allocate here; the caller must deallocate.
+ * The caller is also responsible to append the zero-filled entry
+ * that terminates the PIOCMAP output buffer.
  */
-#define	MAPSIZE	8192
 static int
-oprgetmap(proc_t *p, prmap_t **prmapp, size_t *sizep)
+oprgetmap(proc_t *p, list_t *iolhead)
 {
 	struct as *as = p->p_as;
-	int nmaps = 0;
 	prmap_t *mp;
-	size_t size;
 	struct seg *seg;
 	struct seg *brkseg, *stkseg;
 	uint_t prot;
 
 	ASSERT(as != &kas && AS_WRITE_HELD(as, &as->a_lock));
 
-	/* initial allocation */
-	*sizep = size = MAPSIZE;
-	*prmapp = mp = kmem_alloc(MAPSIZE, KM_SLEEP);
+	/*
+	 * Request an initial buffer size that doesn't waste memory
+	 * if the address space has only a small number of segments.
+	 */
+	pr_iol_initlist(iolhead, sizeof (*mp), avl_numnodes(&as->a_segtree));
 
-	if ((seg = AS_SEGFIRST(as)) == NULL) {
-		bzero(mp, sizeof (*mp));
-		return (1);
-	}
+	if ((seg = AS_SEGFIRST(as)) == NULL)
+		return (0);
 
 	brkseg = break_seg(p);
 	stkseg = as_segat(as, prgetstackbase(p));
@@ -3507,18 +3508,9 @@ oprgetmap(proc_t *p, prmap_t **prmapp, size_t *sizep)
 			prot = pr_getprot(seg, 0, &tmp, &saddr, &naddr, eaddr);
 			if (saddr == naddr)
 				continue;
-			/* reallocate if necessary */
-			if ((nmaps + 2) * sizeof (prmap_t) > size) {
-				size_t newsize = size + MAPSIZE;
-				prmap_t *newmp = kmem_alloc(newsize, KM_SLEEP);
 
-				bcopy(*prmapp, newmp, nmaps * sizeof (prmap_t));
-				kmem_free(*prmapp, size);
-				*sizep = size = newsize;
-				*prmapp = newmp;
-				mp = newmp + nmaps;
-			}
-			bzero(mp, sizeof (*mp));
+			mp = pr_iol_newbuf(iolhead, sizeof (*mp));
+
 			mp->pr_vaddr = saddr;
 			mp->pr_size = naddr - saddr;
 			mp->pr_off = SEGOP_GETOFFSET(seg, saddr);
@@ -3536,38 +3528,33 @@ oprgetmap(proc_t *p, prmap_t **prmapp, size_t *sizep)
 			else if (seg == stkseg)
 				mp->pr_mflags |= MA_STACK;
 			mp->pr_pagesize = PAGESIZE;
-			mp++;
-			nmaps++;
 		}
 		ASSERT(tmp == NULL);
 	} while ((seg = AS_SEGNEXT(as, seg)) != NULL);
 
-	bzero(mp, sizeof (*mp));
-	return (nmaps + 1);
+	return (0);
 }
 
 #ifdef _SYSCALL32_IMPL
 static int
-oprgetmap32(proc_t *p, ioc_prmap32_t **prmapp, size_t *sizep)
+oprgetmap32(proc_t *p, list_t *iolhead)
 {
 	struct as *as = p->p_as;
-	int nmaps = 0;
 	ioc_prmap32_t *mp;
-	size_t size;
 	struct seg *seg;
 	struct seg *brkseg, *stkseg;
 	uint_t prot;
 
 	ASSERT(as != &kas && AS_WRITE_HELD(as, &as->a_lock));
 
-	/* initial allocation */
-	*sizep = size = MAPSIZE;
-	*prmapp = mp = kmem_alloc(MAPSIZE, KM_SLEEP);
+	/*
+	 * Request an initial buffer size that doesn't waste memory
+	 * if the address space has only a small number of segments.
+	 */
+	pr_iol_initlist(iolhead, sizeof (*mp), avl_numnodes(&as->a_segtree));
 
-	if ((seg = AS_SEGFIRST(as)) == NULL) {
-		bzero(mp, sizeof (*mp));
-		return (1);
-	}
+	if ((seg = AS_SEGFIRST(as)) == NULL)
+		return (0);
 
 	brkseg = break_seg(p);
 	stkseg = as_segat(as, prgetstackbase(p));
@@ -3581,20 +3568,9 @@ oprgetmap32(proc_t *p, ioc_prmap32_t **prmapp, size_t *sizep)
 			prot = pr_getprot(seg, 0, &tmp, &saddr, &naddr, eaddr);
 			if (saddr == naddr)
 				continue;
-			/* reallocate if necessary */
-			if ((nmaps + 2) * sizeof (ioc_prmap32_t) > size) {
-				size_t newsize = size + MAPSIZE;
-				ioc_prmap32_t *newmp =
-					kmem_alloc(newsize, KM_SLEEP);
 
-				bcopy(*prmapp, newmp,
-					nmaps * sizeof (ioc_prmap32_t));
-				kmem_free(*prmapp, size);
-				*sizep = size = newsize;
-				*prmapp = newmp;
-				mp = newmp + nmaps;
-			}
-			bzero(mp, sizeof (*mp));
+			mp = pr_iol_newbuf(iolhead, sizeof (*mp));
+
 			mp->pr_vaddr = (caddr32_t)(uintptr_t)saddr;
 			mp->pr_size = (size32_t)(naddr - saddr);
 			mp->pr_off = (off32_t)SEGOP_GETOFFSET(seg, saddr);
@@ -3612,14 +3588,11 @@ oprgetmap32(proc_t *p, ioc_prmap32_t **prmapp, size_t *sizep)
 			else if (seg == stkseg)
 				mp->pr_mflags |= MA_STACK;
 			mp->pr_pagesize = PAGESIZE;
-			mp++;
-			nmaps++;
 		}
 		ASSERT(tmp == NULL);
 	} while ((seg = AS_SEGNEXT(as, seg)) != NULL);
 
-	bzero(mp, sizeof (*mp));
-	return (nmaps + 1);
+	return (0);
 }
 #endif	/* _SYSCALL32_IMPL */
 

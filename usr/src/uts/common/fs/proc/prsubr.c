@@ -86,6 +86,7 @@
 #include <sys/pool.h>
 #include <sys/zone.h>
 #include <sys/atomic.h>
+#include <sys/sdt.h>
 
 #define	MAX_ITERS_SPIN	5
 
@@ -1475,18 +1476,130 @@ break_seg(proc_t *p)
 }
 
 /*
+ * Implementation of service functions to handle procfs generic chained
+ * copyout buffers.
+ */
+typedef struct pr_iobuf_list {
+	list_node_t	piol_link;	/* buffer linkage */
+	size_t		piol_size;	/* total size (header + data) */
+	size_t		piol_usedsize;	/* amount to copy out from this buf */
+} piol_t;
+
+#define	MAPSIZE	(64 * 1024)
+#define	PIOL_DATABUF(iol)	((void *)(&(iol)[1]))
+
+void
+pr_iol_initlist(list_t *iolhead, size_t itemsize, int n)
+{
+	piol_t	*iol;
+	size_t	initial_size = MIN(1, n) * itemsize;
+
+	list_create(iolhead, sizeof (piol_t), offsetof(piol_t, piol_link));
+
+	ASSERT(list_head(iolhead) == NULL);
+	ASSERT(itemsize < MAPSIZE - sizeof (*iol));
+	ASSERT(initial_size > 0);
+
+	/*
+	 * Someone creating chained copyout buffers may ask for less than
+	 * MAPSIZE if the amount of data to be buffered is known to be
+	 * smaller than that.
+	 * But in order to prevent involuntary self-denial of service,
+	 * the requested input size is clamped at MAPSIZE.
+	 */
+	initial_size = MIN(MAPSIZE, initial_size + sizeof (*iol));
+	iol = kmem_alloc(initial_size, KM_SLEEP);
+	list_insert_head(iolhead, iol);
+	iol->piol_usedsize = 0;
+	iol->piol_size = initial_size;
+}
+
+void *
+pr_iol_newbuf(list_t *iolhead, size_t itemsize)
+{
+	piol_t	*iol;
+	char	*new;
+
+	ASSERT(itemsize < MAPSIZE - sizeof (*iol));
+	ASSERT(list_head(iolhead) != NULL);
+
+	iol = (piol_t *)list_tail(iolhead);
+
+	if (iol->piol_size <
+	    iol->piol_usedsize + sizeof (*iol) + itemsize) {
+		/*
+		 * Out of space in the current buffer. Allocate more.
+		 */
+		piol_t *newiol;
+
+		newiol = kmem_alloc(MAPSIZE, KM_SLEEP);
+		newiol->piol_size = MAPSIZE;
+		newiol->piol_usedsize = 0;
+
+		list_insert_after(iolhead, iol, newiol);
+		iol = list_next(iolhead, iol);
+		ASSERT(iol == newiol);
+	}
+	new = (char *)PIOL_DATABUF(iol) + iol->piol_usedsize;
+	iol->piol_usedsize += itemsize;
+	bzero(new, itemsize);
+	return (new);
+}
+
+int
+pr_iol_copyout_and_free(list_t *iolhead, caddr_t *tgt, int errin)
+{
+	int error = errin;
+	piol_t	*iol;
+
+	while ((iol = list_head(iolhead)) != NULL) {
+		list_remove(iolhead, iol);
+		if (!error) {
+			if (copyout(PIOL_DATABUF(iol), *tgt,
+			    iol->piol_usedsize))
+				error = EFAULT;
+			*tgt += iol->piol_usedsize;
+		}
+		kmem_free(iol, iol->piol_size);
+	}
+	list_destroy(iolhead);
+
+	return (error);
+}
+
+int
+pr_iol_uiomove_and_free(list_t *iolhead, uio_t *uiop, int errin)
+{
+	offset_t	off = uiop->uio_offset;
+	char		*base;
+	size_t		size;
+	piol_t		*iol;
+	int		error = errin;
+
+	while ((iol = list_head(iolhead)) != NULL) {
+		list_remove(iolhead, iol);
+		base = PIOL_DATABUF(iol);
+		size = iol->piol_usedsize;
+		if (off <= size && error == 0 && uiop->uio_resid > 0)
+			error = uiomove(base + off, size - off,
+			    UIO_READ, uiop);
+		off = MAX(0, off - (offset_t)size);
+		kmem_free(iol, iol->piol_size);
+	}
+	list_destroy(iolhead);
+
+	return (error);
+}
+
+/*
  * Return an array of structures with memory map information.
  * We allocate here; the caller must deallocate.
  */
-#define	INITIAL_MAPSIZE	65536
-#define	MAPSIZE	8192
 int
-prgetmap(proc_t *p, int reserved, prmap_t **prmapp, size_t *sizep)
+prgetmap(proc_t *p, int reserved, list_t *iolhead)
 {
 	struct as *as = p->p_as;
-	int nmaps = 0;
 	prmap_t *mp;
-	size_t size;
 	struct seg *seg;
 	struct seg *brkseg, *stkseg;
 	struct vnode *vp;
@@ -1495,9 +1608,11 @@ prgetmap(proc_t *p, int reserved, prmap_t **prmapp, size_t *sizep)
 
 	ASSERT(as != &kas && AS_WRITE_HELD(as, &as->a_lock));
 
-	/* initial allocation */
-	*sizep = size = INITIAL_MAPSIZE;
-	*prmapp = mp = kmem_alloc(size, KM_SLEEP);
+	/*
+	 * Request an initial buffer size that doesn't waste memory
+	 * if the address space has only a small number of segments.
+	 */
+	pr_iol_initlist(iolhead, sizeof (*mp), avl_numnodes(&as->a_segtree));
 
 	if ((seg = AS_SEGFIRST(as)) == NULL)
 		return (0);
@@ -1515,18 +1630,9 @@ prgetmap(proc_t *p, int reserved, prmap_t **prmapp, size_t *sizep)
 			    &saddr, &naddr, eaddr);
 			if (saddr == naddr)
 				continue;
-			/* reallocate if necessary */
-			if ((nmaps + 1) * sizeof (prmap_t) > size) {
-				size_t newsize = size + 3 * size / 16;
-				prmap_t *newmp = kmem_alloc(newsize, KM_SLEEP);
 
-				bcopy(*prmapp, newmp, nmaps * sizeof (prmap_t));
-				kmem_free(*prmapp, size);
-				*sizep = size = newsize;
-				*prmapp = newmp;
-				mp = newmp + nmaps;
-			}
-			bzero(mp, sizeof (*mp));
+			mp = pr_iol_newbuf(iolhead, sizeof (*mp));
+
 			mp->pr_vaddr = (uintptr_t)saddr;
 			mp->pr_size = naddr - saddr;
 			mp->pr_offset = SEGOP_GETOFFSET(seg, saddr);
@@ -1592,24 +1698,19 @@ prgetmap(proc_t *p, int reserved, prmap_t **prmapp, size_t *sizep)
 			} else {
 				mp->pr_shmid = -1;
 			}
-
-			mp++;
-			nmaps++;
 		}
 		ASSERT(tmp == NULL);
 	} while ((seg = AS_SEGNEXT(as, seg)) != NULL);
 
-	return (nmaps);
+	return (0);
 }
 
 #ifdef _SYSCALL32_IMPL
 int
-prgetmap32(proc_t *p, int reserved, prmap32_t **prmapp, size_t *sizep)
+prgetmap32(proc_t *p, int reserved, list_t *iolhead)
 {
 	struct as *as = p->p_as;
-	int nmaps = 0;
 	prmap32_t *mp;
-	size_t size;
 	struct seg *seg;
 	struct seg *brkseg, *stkseg;
 	struct vnode *vp;
@@ -1618,9 +1719,11 @@ prgetmap32(proc_t *p, int reserved, prmap32_t **prmapp, size_t *sizep)
 
 	ASSERT(as != &kas && AS_WRITE_HELD(as, &as->a_lock));
 
-	/* initial allocation */
-	*sizep = size = INITIAL_MAPSIZE;
-	*prmapp = mp = kmem_alloc(size, KM_SLEEP);
+	/*
+	 * Request an initial buffer size that doesn't waste memory
+	 * if the address space has only a small number of segments.
+	 */
+	pr_iol_initlist(iolhead, sizeof (*mp), avl_numnodes(&as->a_segtree));
 
 	if ((seg = AS_SEGFIRST(as)) == NULL)
 		return (0);
@@ -1638,20 +1741,9 @@ prgetmap32(proc_t *p, int reserved, prmap32_t **prmapp, size_t *sizep)
 			    &saddr, &naddr, eaddr);
 			if (saddr == naddr)
 				continue;
-			/* reallocate if necessary */
-			if ((nmaps + 1) * sizeof (prmap32_t) > size) {
-				size_t newsize = size + 3 * size / 16;
-				prmap32_t *newmp =
-					kmem_alloc(newsize, KM_SLEEP);
 
-				bcopy(*prmapp, newmp,
-					nmaps * sizeof (prmap32_t));
-				kmem_free(*prmapp, size);
-				*sizep = size = newsize;
-				*prmapp = newmp;
-				mp = newmp + nmaps;
-			}
-			bzero(mp, sizeof (*mp));
+			mp = pr_iol_newbuf(iolhead, sizeof (*mp));
+
 			mp->pr_vaddr = (caddr32_t)(uintptr_t)saddr;
 			mp->pr_size = (size32_t)(naddr - saddr);
 			mp->pr_offset = SEGOP_GETOFFSET(seg, saddr);
@@ -1718,14 +1810,11 @@ prgetmap32(proc_t *p, int reserved, prmap32_t **prmapp, size_t *sizep)
 			} else {
 				mp->pr_shmid = -1;
 			}
-
-			mp++;
-			nmaps++;
 		}
 		ASSERT(tmp == NULL);
 	} while ((seg = AS_SEGNEXT(as, seg)) != NULL);
 
-	return (nmaps);
+	return (0);
 }
 #endif	/* _SYSCALL32_IMPL */
 
@@ -3791,12 +3880,10 @@ pr_getpagesize(struct seg *seg, caddr_t saddr, caddr_t *naddrp, caddr_t eaddr)
  * We allocate here; the caller must deallocate.
  */
 int
-prgetxmap(proc_t *p, prxmap_t **prxmapp, size_t *sizep)
+prgetxmap(proc_t *p, list_t *iolhead)
 {
 	struct as *as = p->p_as;
-	int nmaps = 0;
 	prxmap_t *mp;
-	size_t size;
 	struct seg *seg;
 	struct seg *brkseg, *stkseg;
 	struct vnode *vp;
@@ -3805,9 +3892,11 @@ prgetxmap(proc_t *p, prxmap_t **prxmapp, size_t *sizep)
 
 	ASSERT(as != &kas && AS_WRITE_HELD(as, &as->a_lock));
 
-	/* initial allocation */
-	*sizep = size = INITIAL_MAPSIZE;
-	*prxmapp = mp = kmem_alloc(size, KM_SLEEP);
+	/*
+	 * Request an initial buffer size that doesn't waste memory
+	 * if the address space has only a small number of segments.
+	 */
+	pr_iol_initlist(iolhead, sizeof (*mp), avl_numnodes(&as->a_segtree));
 
 	if ((seg = AS_SEGFIRST(as)) == NULL)
 		return (0);
@@ -3843,21 +3932,8 @@ prgetxmap(proc_t *p, prxmap_t **prxmapp, size_t *sizep)
 				psz = pr_getpagesize(seg, saddr, &naddr, baddr);
 				ASSERT(naddr >= saddr && naddr <= baddr);
 
-				/* reallocate if necessary */
-				if ((nmaps + 1) * sizeof (prxmap_t) > size) {
-					size_t newsize = size + 3 * size / 16;
-					prxmap_t *newmp =
-					    kmem_alloc(newsize, KM_SLEEP);
+				mp = pr_iol_newbuf(iolhead, sizeof (*mp));
 
-					bcopy(*prxmapp, newmp,
-					    nmaps * sizeof (prxmap_t));
-					kmem_free(*prxmapp, size);
-					*sizep = size = newsize;
-					*prxmapp = newmp;
-					mp = newmp + nmaps;
-				}
-
-				bzero(mp, sizeof (*mp));
 				mp->pr_vaddr = (uintptr_t)saddr;
 				mp->pr_size = naddr - saddr;
 				mp->pr_offset = SEGOP_GETOFFSET(seg, saddr);
@@ -3939,14 +4015,12 @@ prgetxmap(proc_t *p, prxmap_t **prxmapp, size_t *sizep)
 						mp->pr_locked++;
 				}
 				kmem_free(parr, npages);
-				mp++;
-				nmaps++;
 			}
 		}
 		ASSERT(tmp == NULL);
 	} while ((seg = AS_SEGNEXT(as, seg)) != NULL);
 
-	return (nmaps);
+	return (0);
 }
 
 /*
@@ -3989,12 +4063,10 @@ prgetpriv(proc_t *p, prpriv_t *pprp)
  * We allocate here; the caller must deallocate.
  */
 int
-prgetxmap32(proc_t *p, prxmap32_t **prxmapp, size_t *sizep)
+prgetxmap32(proc_t *p, list_t *iolhead)
 {
 	struct as *as = p->p_as;
-	int nmaps = 0;
 	prxmap32_t *mp;
-	size_t size;
 	struct seg *seg;
 	struct seg *brkseg, *stkseg;
 	struct vnode *vp;
@@ -4003,9 +4075,11 @@ prgetxmap32(proc_t *p, prxmap32_t **prxmapp, size_t *sizep)
 
 	ASSERT(as != &kas && AS_WRITE_HELD(as, &as->a_lock));
 
-	/* initial allocation */
-	*sizep = size = INITIAL_MAPSIZE;
-	*prxmapp = mp = kmem_alloc(size, KM_SLEEP);
+	/*
+	 * Request an initial buffer size that doesn't waste memory
+	 * if the address space has only a small number of segments.
+	 */
+	pr_iol_initlist(iolhead, sizeof (*mp), avl_numnodes(&as->a_segtree));
 
 	if ((seg = AS_SEGFIRST(as)) == NULL)
 		return (0);
@@ -4041,21 +4115,8 @@ prgetxmap32(proc_t *p, prxmap32_t **prxmapp, size_t *sizep)
 				psz = pr_getpagesize(seg, saddr, &naddr, baddr);
 				ASSERT(naddr >= saddr && naddr <= baddr);
 
-				/* reallocate if necessary */
-				if ((nmaps + 1) * sizeof (prxmap32_t) > size) {
-					size_t newsize = size + 3 * size / 16;
-					prxmap32_t *newmp =
-					    kmem_alloc(newsize, KM_SLEEP);
+				mp = pr_iol_newbuf(iolhead, sizeof (*mp));
 
-					bcopy(*prxmapp, newmp,
-					    nmaps * sizeof (prxmap32_t));
-					kmem_free(*prxmapp, size);
-					*sizep = size = newsize;
-					*prxmapp = newmp;
-					mp = newmp + nmaps;
-				}
-
-				bzero(mp, sizeof (*mp));
 				mp->pr_vaddr = (caddr32_t)(uintptr_t)saddr;
 				mp->pr_size = (size32_t)(naddr - saddr);
 				mp->pr_offset = SEGOP_GETOFFSET(seg, saddr);
@@ -4138,13 +4199,11 @@ prgetxmap32(proc_t *p, prxmap32_t **prxmapp, size_t *sizep)
 						mp->pr_locked++;
 				}
 				kmem_free(parr, npages);
-				mp++;
-				nmaps++;
 			}
 		}
 		ASSERT(tmp == NULL);
 	} while ((seg = AS_SEGNEXT(as, seg)) != NULL);
 
-	return (nmaps);
+	return (0);
 }
 #endif	/* _SYSCALL32_IMPL */

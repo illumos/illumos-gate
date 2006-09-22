@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +38,7 @@
 #include <sys/prsystm.h>
 #include <sys/model.h>
 #include <sys/poll.h>
+#include <sys/list.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -268,6 +268,47 @@ extern	int	nproc_highbit;	/* highbit(v.v_nproc) */
 
 extern	struct vnodeops	*prvnodeops;
 
+/*
+ * Generic chained copyout buffers for procfs use.
+ * In order to prevent procfs from making huge oversize kmem_alloc calls,
+ * a list of smaller buffers can be concatenated and copied to userspace in
+ * sequence.
+ *
+ * The implementation is opaque.
+ *
+ * A user of this will perform the following steps:
+ *
+ *	list_t	listhead;
+ *	struct my *mp;
+ *
+ *	pr_iol_initlist(&listhead, sizeof (*mp), n);
+ *	while (whatever) {
+ *		mp = pr_iol_newbuf(&listhead, sizeof (*mp);
+ *		...
+ *		error = ...
+ *	}
+ *
+ * When done, depending on whether copyout() or uiomove() is supposed to
+ * be used for transferring the buffered data to userspace, call either:
+ *
+ *	error = pr_iol_copyout_and_free(&listhead, &cmaddr, error);
+ *
+ * or else:
+ *
+ *	error = pr_iol_uiomove_and_free(&listhead, uiop, error);
+ *
+ * These two functions will in any case kmem_free() all list items, but
+ * if an error occurred before they will not perform the copyout/uiomove.
+ * If copyout/uiomove are done, the passed target address / uio_t
+ * are updated. The error returned will either be the one passed in, or
+ * the error that occurred during copyout/uiomove.
+ */
+
+extern	void	pr_iol_initlist(list_t *head, size_t itemsize, int nitems);
+extern	void *	pr_iol_newbuf(list_t *head, size_t itemsize);
+extern	int	pr_iol_copyout_and_free(list_t *head, caddr_t *tgt, int errin);
+extern	int	pr_iol_uiomove_and_free(list_t *head, uio_t *uiop, int errin);
+
 #if defined(_SYSCALL32_IMPL)
 
 extern	int	prwritectl32(vnode_t *, struct uio *, cred_t *);
@@ -278,11 +319,11 @@ extern	void	prcvtusage32(struct prhusage *, prusage32_t *);
 
 /* kludge to support old /proc interface */
 #if !defined(_SYS_OLD_PROCFS_H)
-extern	int	prgetmap(proc_t *, int, prmap_t **, size_t *);
-extern	int	prgetxmap(proc_t *, prxmap_t **, size_t *);
+extern	int	prgetmap(proc_t *, int, list_t *);
+extern	int	prgetxmap(proc_t *, list_t *);
 #if defined(_SYSCALL32_IMPL)
-extern	int	prgetmap32(proc_t *, int, prmap32_t **, size_t *);
-extern	int	prgetxmap32(proc_t *, prxmap32_t **, size_t *);
+extern	int	prgetmap32(proc_t *, int, list_t *);
+extern	int	prgetxmap32(proc_t *, list_t *);
 #endif	/* _SYSCALL32_IMPL */
 #endif /* !_SYS_OLD_PROCFS_H */
 
