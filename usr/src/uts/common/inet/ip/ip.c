@@ -20098,7 +20098,7 @@ qnext:
 			 * and ipif_ill same anymore and the assert
 			 * below would fail.
 			 */
-			if (mctl_present) {
+			if (mctl_present && io->ipsec_out_attach_if) {
 				io->ipsec_out_ill_index = 0;
 				io->ipsec_out_attach_if = B_FALSE;
 				ASSERT(attach_ill != NULL);
