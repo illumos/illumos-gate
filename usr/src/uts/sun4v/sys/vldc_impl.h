@@ -92,6 +92,7 @@ typedef struct vldc_minor {
 typedef struct vldc_port {
 	uint_t		number;			/* port number */
 	uint32_t	status;			/* port status */
+	uint_t		inst;			/* vldc instance */
 	vldc_minor_t	*minorp;		/* minor table entry pointer */
 	uint32_t	mtu;			/* port mtu */
 	caddr_t		send_buf;		/* send buffer */

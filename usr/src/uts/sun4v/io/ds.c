@@ -212,7 +212,6 @@ static int ds_ldc_fini(ds_port_t *port);
 /* event processing functions */
 static uint_t ds_ldc_cb(uint64_t event, caddr_t arg);
 static void ds_dispatch_event(void *arg);
-static void ds_handle_ldc_event(ds_port_t *port, int newstate);
 static int ds_recv_msg(ldc_handle_t ldc_hdl, caddr_t msgp, size_t msglen);
 static void ds_handle_recv(void *arg);
 
@@ -393,11 +392,12 @@ static int
 ds_ports_init(void)
 {
 	int		idx;
-	int		rv;
+	int		rv = 0;
 	md_t		*mdp;
 	int		num_nodes;
 	int		listsz;
 	mde_cookie_t	rootnode;
+	mde_cookie_t	dsnode;
 	mde_cookie_t	*portp = NULL;
 	mde_cookie_t	*chanp = NULL;
 	int		nport;
@@ -421,13 +421,32 @@ ds_ports_init(void)
 	rootnode = md_root_node(mdp);
 	ASSERT(rootnode != MDE_INVAL_ELEM_COOKIE);
 
-	/* find all the DS ports in the MD */
-	nport = md_scan_dag(mdp, rootnode, md_find_name(mdp, DS_MD_PORT_NAME),
+	/*
+	 * The root of the search for DS port nodes is the
+	 * DS node. Perform a scan to find that node.
+	 */
+	nport = md_scan_dag(mdp, rootnode, md_find_name(mdp, DS_MD_ROOT_NAME),
 	    md_find_name(mdp, "fwd"), portp);
 
 	if (nport <= 0) {
-		cmn_err(CE_NOTE, "No '%s' nodes in MD", DS_MD_PORT_NAME);
-		rv = -1;
+		DS_DBG("No '%s' node in MD\n", DS_MD_ROOT_NAME);
+		goto done;
+	}
+
+	/* expecting only one DS node */
+	if (nport != 1) {
+		DS_DBG("expected one '%s' node in the MD, found %d\n",
+		    DS_MD_ROOT_NAME, nport);
+	}
+
+	dsnode = portp[0];
+
+	/* find all the DS ports in the MD */
+	nport = md_scan_dag(mdp, dsnode, md_find_name(mdp, DS_MD_PORT_NAME),
+	    md_find_name(mdp, "fwd"), portp);
+
+	if (nport <= 0) {
+		DS_DBG("No '%s' nodes in MD\n", DS_MD_PORT_NAME);
 		goto done;
 	}
 
@@ -450,7 +469,7 @@ ds_ports_init(void)
 
 		/* expecting only one channel */
 		if (nchan != 1) {
-			DS_DBG("expected 1 '%s' node for DS port, found %d\n",
+			DS_DBG("expected one '%s' node for DS port, found %d\n",
 			    DS_MD_CHAN_NAME, nchan);
 		}
 
@@ -632,7 +651,7 @@ ds_ldc_cb(uint64_t event, caddr_t arg)
 	ds_port_t	*port = (ds_port_t *)arg;
 	ldc_handle_t	ldc_hdl;
 
-	DS_DBG("ds@%lx: ds_ldc_cb...\n", port->id);
+	DS_DBG("ds@%lx: LDC event received: 0x%lx\n", port->id, event);
 
 	if (!ds_enabled) {
 		DS_DBG("ds@%lx: callback handling is disabled\n", port->id);
@@ -645,34 +664,67 @@ ds_ldc_cb(uint64_t event, caddr_t arg)
 	 * Check the LDC event.
 	 */
 
+	mutex_enter(&port->lock);
+
+	if (event & LDC_EVT_WRITE) {
+		DS_DBG("ds@%lx: LDC write event received, not supported\n",
+		    port->id);
+		goto done;
+	}
+
+	if (event & (LDC_EVT_DOWN | LDC_EVT_RESET)) {
+
+		/* reset the port state */
+		ds_port_reset(port);
+		(void) ldc_up(ldc_hdl);
+
+		/* read status after bringing LDC up */
+		if ((rv = ldc_status(ldc_hdl, &ldc_state)) != 0) {
+			cmn_err(CE_NOTE, "ds@%lx: ldc_status error (%d)\n",
+			    port->id, rv);
+			goto done;
+		}
+		port->ldc.state = ldc_state;
+
+		/*
+		 * If the channel is already up, initiate
+		 * the handshake.
+		 */
+		if (ldc_state == LDC_UP)
+			ds_send_init_req(port);
+
+		ASSERT((event & (LDC_EVT_UP | LDC_EVT_READ)) == 0);
+
+		goto done;
+	}
+
+	if (event & LDC_EVT_UP) {
+		if ((rv = ldc_status(ldc_hdl, &ldc_state)) != 0) {
+			cmn_err(CE_NOTE, "ds@%lx: ldc_status error (%d)\n",
+			    port->id, rv);
+			goto done;
+		}
+		port->ldc.state = ldc_state;
+
+		/* initiate the handshake */
+		ds_send_init_req(port);
+	}
+
 	if (event & LDC_EVT_READ) {
 		/* dispatch a thread to handle the read event */
 		if (DS_DISPATCH(ds_handle_recv, port) == NULL) {
 			cmn_err(CE_WARN, "error initiating event handler");
 		}
-		return (LDC_SUCCESS);
 	}
 
-	/* only check status if not a read event */
-	if ((rv = ldc_status(ldc_hdl, &ldc_state)) != 0) {
-		DS_DBG("ds@%lx: ldc_status error (%d)", port->id, rv);
-		return (LDC_SUCCESS);
+	/* report any unknown LDC events */
+	if (event & ~(LDC_EVT_UP | LDC_EVT_READ)) {
+		cmn_err(CE_NOTE, "ds@%lx: Unexpected LDC event received: "
+		    "0x%lx\n", port->id, event);
 	}
 
-	if (event & LDC_EVT_DOWN || event & LDC_EVT_UP) {
-		mutex_enter(&port->lock);
-		ds_handle_ldc_event(port, ldc_state);
-		mutex_exit(&port->lock);
-		return (LDC_SUCCESS);
-	}
-
-	if (event & LDC_EVT_RESET || event & LDC_EVT_WRITE) {
-		DS_DBG("ds@%lx: LDC event (%lx) received", port->id, event);
-		return (LDC_SUCCESS);
-	}
-
-	cmn_err(CE_NOTE, "ds@%lx: Unexpected LDC event (%lx) received",
-	    port->id, event);
+done:
+	mutex_exit(&port->lock);
 
 	return (LDC_SUCCESS);
 }
@@ -722,7 +774,7 @@ ds_handle_recv(void *arg)
 	ldc_handle_t	ldc_hdl;
 	ds_event_t	*devent;
 
-	DS_DBG("ds@%lx: ds_ldc_cb...\n", port->id);
+	DS_DBG("ds@%lx: ds_handle_recv...\n", port->id);
 
 	ldc_hdl = port->ldc.hdl;
 
@@ -744,8 +796,8 @@ ds_handle_recv(void *arg)
 
 		if ((rv = ds_recv_msg(ldc_hdl, currp, read_size)) != 0) {
 			/*
-			 * failed to read message drop it and see if there
-			 * are anymore messages
+			 * Failed to read message. Drop it and see if
+			 * there are any more messages.
 			 */
 			cmn_err(CE_NOTE, "ldc_read returned %d", rv);
 			continue;
@@ -767,8 +819,8 @@ ds_handle_recv(void *arg)
 
 		if ((rv = ds_recv_msg(ldc_hdl, currp, read_size)) != 0) {
 			/*
-			 * failed to read message drop it and see if there
-			 * are anymore messages
+			 * Failed to read message. Drop it and see if
+			 * there are any more messages.
 			 */
 			kmem_free(msg, (DS_HDR_SZ + read_size));
 			cmn_err(CE_NOTE, "ldc_read returned %d", rv);
@@ -799,6 +851,7 @@ ds_handle_recv(void *arg)
 		}
 
 	}
+
 	mutex_exit(&port->lock);
 }
 
@@ -825,47 +878,6 @@ ds_dispatch_event(void *arg)
 	(*ds_msg_handlers[hdr->msg_type])(port, event->buf, event->buflen);
 
 	kmem_free(event, sizeof (ds_event_t));
-}
-
-static void
-ds_handle_ldc_event(ds_port_t *port, int newstate)
-{
-	ldc_status_t oldstate = port->ldc.state;
-
-	ASSERT(MUTEX_HELD(&port->lock));
-
-	DS_DBG_LDC("ds@%lx: LDC state change: 0x%x -> 0x%x\n",
-	    port->id, oldstate, newstate);
-
-	switch (newstate) {
-	case LDC_UP:
-		if ((oldstate == LDC_OPEN) || (oldstate == LDC_READY)) {
-			/* start the version negotiation */
-			ds_send_init_req(port);
-		} else {
-			DS_DBG_LDC("unsupported LDC state change\n");
-		}
-		break;
-
-	case LDC_READY:
-	case LDC_OPEN:
-		if (oldstate != LDC_UP) {
-			/* not worried about this state change */
-			break;
-		}
-
-		_NOTE(FALLTHROUGH)
-
-	default:
-		if (oldstate == LDC_UP) {
-			ds_port_reset(port);
-		} else {
-			DS_DBG_LDC("unsupported LDC state change\n");
-		}
-		break;
-	}
-
-	port->ldc.state = newstate;
 }
 
 /*
@@ -1076,7 +1088,7 @@ ds_handle_reg_req(ds_port_t *port, caddr_t buf, size_t len)
 		cmn_err(CE_NOTE, "ds@%lx: <reg_req: invalid message length "
 		    "(%ld), expected at least %ld", port->id, len, explen);
 	} else {
-		DS_DBG("ds@%lx: <reg_req: id='%s', ver=%d.%d, hdl=0x%lx\n",
+		DS_DBG("ds@%lx: <reg_req: id='%s', ver=%d.%d, hdl=0x%09lx\n",
 		    port->id, req->svc_id, req->major_vers, req->minor_vers,
 		    req->svc_handle);
 	}
@@ -1137,7 +1149,7 @@ ds_handle_reg_ack(ds_port_t *port, caddr_t buf, size_t len)
 
 	ver = &(svc->cap.vers[svc->ver_idx]);
 
-	DS_DBG("ds@%lx: <reg_ack: hdl=0x%lx, ack=v%d.%d\n", port->id,
+	DS_DBG("ds@%lx: <reg_ack: hdl=0x%09lx, ack=v%d.%d\n", port->id,
 	    ack->svc_handle, ver->major, ack->minor_vers);
 
 	/* major version has been agreed upon */
@@ -1160,7 +1172,7 @@ ds_handle_reg_ack(ds_port_t *port, caddr_t buf, size_t len)
 
 	svc->state = DS_SVC_ACTIVE;
 
-	DS_DBG("ds@%lx: <reg_ack: %s v%d.%d ready, hdl=0x%lx\n", port->id,
+	DS_DBG("ds@%lx: <reg_ack: %s v%d.%d ready, hdl=0x%09lx\n", port->id,
 	    svc->cap.svc_id, svc->ver.major, svc->ver.minor, svc->hdl);
 
 	/* notify the client that registration is complete */
@@ -1186,6 +1198,7 @@ ds_handle_reg_nack(ds_port_t *port, caddr_t buf, size_t len)
 	ds_reg_nack_t	*nack;
 	ds_svc_t	*svc;
 	int		idx;
+	boolean_t	reset_svc = B_FALSE;
 	size_t		explen = DS_MSG_LEN(ds_reg_nack_t);
 
 	/* sanity check the incoming message */
@@ -1216,6 +1229,7 @@ ds_handle_reg_nack(ds_port_t *port, caddr_t buf, size_t len)
 	if (nack->result == DS_REG_DUP) {
 		cmn_err(CE_NOTE, "ds@%lx: <reg_nack: duplicate registration "
 		    "for %s", port->id, svc->cap.svc_id);
+		reset_svc = B_TRUE;
 		goto done;
 	}
 
@@ -1226,11 +1240,11 @@ ds_handle_reg_nack(ds_port_t *port, caddr_t buf, size_t len)
 	if (nack->major_vers == 0) {
 		DS_DBG("ds@%lx: <reg_nack: %s not supported\n", port->id,
 		    svc->cap.svc_id);
-		ds_reset_svc(svc, port);
+		reset_svc = B_TRUE;
 		goto done;
 	}
 
-	DS_DBG("ds@%lx: <reg_nack: hdl=0x%lx, nack=%d.x\n", port->id,
+	DS_DBG("ds@%lx: <reg_nack: hdl=0x%09lx, nack=%d.x\n", port->id,
 	    nack->svc_handle, nack->major_vers);
 
 	/*
@@ -1249,7 +1263,7 @@ ds_handle_reg_nack(ds_port_t *port, caddr_t buf, size_t len)
 		/* no supported version */
 		DS_DBG("ds@%lx: <reg_nack: %s v%d.x not supported\n",
 		    port->id, svc->cap.svc_id, nack->major_vers);
-		svc->state = DS_SVC_INACTIVE;
+		reset_svc = B_TRUE;
 		goto done;
 	}
 
@@ -1260,6 +1274,9 @@ ds_handle_reg_nack(ds_port_t *port, caddr_t buf, size_t len)
 	(void) ds_svc_register(svc, NULL);
 
 done:
+	if (reset_svc)
+		ds_reset_svc(svc, port);
+
 	rw_exit(&ds_svcs.rwlock);
 }
 
@@ -1297,7 +1314,7 @@ ds_handle_unreg_req(ds_port_t *port, caddr_t buf, size_t len)
 	/* unregister the service */
 	(void) ds_svc_unregister(svc, svc->port);
 
-	DS_DBG("ds@%lx: unreg_ack>: hdl=0x%lx\n", port->id, req->svc_handle);
+	DS_DBG("ds@%lx: unreg_ack>: hdl=0x%09lx\n", port->id, req->svc_handle);
 
 	msglen = DS_HDR_SZ + sizeof (ds_unreg_ack_t);
 	msg = kmem_zalloc(msglen, KM_SLEEP);
@@ -1333,7 +1350,7 @@ ds_handle_unreg_ack(ds_port_t *port, caddr_t buf, size_t len)
 
 	ack = (ds_unreg_ack_t *)(buf + DS_HDR_SZ);
 
-	DS_DBG("ds@%lx: <unreg_ack: hdl=0x%lx\n", port->id, ack->svc_handle);
+	DS_DBG("ds@%lx: <unreg_ack: hdl=0x%09lx\n", port->id, ack->svc_handle);
 
 	rw_enter(&ds_svcs.rwlock, RW_READER);
 
@@ -1366,7 +1383,7 @@ ds_handle_unreg_nack(ds_port_t *port, caddr_t buf, size_t len)
 
 	nack = (ds_unreg_nack_t *)(buf + DS_HDR_SZ);
 
-	DS_DBG("ds@%lx: <unreg_nack: hdl=0x%lx\n", port->id,
+	DS_DBG("ds@%lx: <unreg_nack: hdl=0x%09lx\n", port->id,
 	    nack->svc_handle);
 
 	rw_enter(&ds_svcs.rwlock, RW_READER);
@@ -1422,7 +1439,7 @@ ds_handle_data(ds_port_t *port, caddr_t buf, size_t len)
 
 	rw_exit(&ds_svcs.rwlock);
 
-	DS_DBG("ds@%lx: <data: client=%s hdl=0x%lx\n", port->id,
+	DS_DBG("ds@%lx: <data: client=%s hdl=0x%09lx\n", port->id,
 	    (svc->cap.svc_id) ? svc->cap.svc_id : "NULL", svc->hdl);
 
 	/* dispatch this message to the client */
@@ -1445,7 +1462,7 @@ ds_handle_nack(ds_port_t *port, caddr_t buf, size_t len)
 
 	nack = (ds_data_nack_t *)(buf + DS_HDR_SZ);
 
-	DS_DBG("ds@%lx: data_nack: hdl=0x%lx, result=0x%lx\n", port->id,
+	DS_DBG("ds@%lx: data_nack: hdl=0x%09lx, result=0x%lx\n", port->id,
 	    nack->svc_handle, nack->result);
 
 	if (nack->result == DS_INV_HDL) {
@@ -1601,7 +1618,7 @@ ds_send_reg_req(ds_svc_t *svc)
 	bcopy(svc->cap.svc_id, req->svc_id, idlen + 1);
 
 	/* send the message */
-	DS_DBG("ds@%lx: reg_req>: id='%s', ver=%d.%d, hdl=0x%lx\n", port->id,
+	DS_DBG("ds@%lx: reg_req>: id='%s', ver=%d.%d, hdl=0x%09lx\n", port->id,
 	    svc->cap.svc_id, ver->major, ver->minor, svc->hdl);
 
 	nbytes = msglen;
@@ -1638,7 +1655,7 @@ ds_send_unreg_req(ds_svc_t *svc)
 	/* check on the LDC to Zeus */
 	if (port->ldc.state != LDC_UP) {
 		/* can not send message */
-		cmn_err(CE_NOTE, "ds@%lx: unreg_req>: channel %ld is not up",
+		cmn_err(CE_NOTE, "ds@%lx: unreg_req>: channel %ld is not up\n",
 		    port->id, port->ldc.id);
 		mutex_exit(&port->lock);
 		return (-1);
@@ -1647,7 +1664,7 @@ ds_send_unreg_req(ds_svc_t *svc)
 	/* make sure port is ready */
 	if (port->state != DS_PORT_READY) {
 		/* can not send message */
-		cmn_err(CE_NOTE, "ds@%lx: unreg_req>: port is not ready",
+		cmn_err(CE_NOTE, "ds@%lx: unreg_req>: port is not ready\n",
 		    port->id);
 		mutex_exit(&port->lock);
 		return (-1);
@@ -1667,7 +1684,7 @@ ds_send_unreg_req(ds_svc_t *svc)
 	req->svc_handle = svc->hdl;
 
 	/* send the message */
-	DS_DBG("ds@%lx: unreg_req>: id='%s', hdl=0x%lx\n", port->id,
+	DS_DBG("ds@%lx: unreg_req>: id='%s', hdl=0x%09lx\n", port->id,
 	    (svc->cap.svc_id) ? svc->cap.svc_id : "NULL", svc->hdl);
 
 	nbytes = msglen;
@@ -1724,7 +1741,7 @@ ds_send_unreg_nack(ds_port_t *port, ds_svc_hdl_t bad_hdl)
 	nack->svc_handle = bad_hdl;
 
 	/* send the message */
-	DS_DBG("ds@%lx: unreg_nack>: hdl=0x%lx\n", port->id, bad_hdl);
+	DS_DBG("ds@%lx: unreg_nack>: hdl=0x%09lx\n", port->id, bad_hdl);
 
 	nbytes = msglen;
 	mutex_enter(&port->lock);
@@ -1776,7 +1793,7 @@ ds_send_data_nack(ds_port_t *port, ds_svc_hdl_t bad_hdl)
 	nack->result = DS_INV_HDL;
 
 	/* send the message */
-	DS_DBG("ds@%lx: data_nack>: hdl=0x%lx\n", port->id, bad_hdl);
+	DS_DBG("ds@%lx: data_nack>: hdl=0x%09lx\n", port->id, bad_hdl);
 
 	nbytes = msglen;
 	mutex_enter(&port->lock);
@@ -1990,6 +2007,9 @@ ds_svc_unregister(ds_svc_t *svc, void *arg)
 	if (svc->port != port) {
 		return (0);
 	}
+
+	DS_DBG("ds@%lx: svc_unreg: id='%s', ver=%d.%d, hdl=0x%09lx\n", port->id,
+	    svc->cap.svc_id, svc->ver.major, svc->ver.minor, svc->hdl);
 
 	/* reset the service structure */
 	ds_reset_svc(svc, port);
@@ -2589,7 +2609,7 @@ ds_cap_init(ds_capability_t *cap, ds_clnt_ops_t *ops)
 	/* attempt to register the service */
 	(void) ds_svc_register(svc, NULL);
 
-	DS_DBG("ds_cap_init: service '%s' assigned handle 0x%lx\n",
+	DS_DBG("ds_cap_init: service '%s' assigned handle 0x%09lx\n",
 	    svc->cap.svc_id, svc->hdl);
 
 	return (0);
@@ -2616,7 +2636,7 @@ ds_cap_fini(ds_capability_t *cap)
 
 	svc = ds_svcs.tbl[idx];
 
-	DS_DBG("ds_cap_fini: svcid='%s', hdl=0x%lx\n", svc->cap.svc_id,
+	DS_DBG("ds_cap_fini: svcid='%s', hdl=0x%09lx\n", svc->cap.svc_id,
 	    svc->hdl);
 
 	/*
@@ -2665,7 +2685,7 @@ ds_cap_send(ds_svc_hdl_t hdl, void *buf, size_t len)
 	rw_enter(&ds_svcs.rwlock, RW_READER);
 
 	if ((hdl == DS_INVALID_HDL) || (svc = ds_get_svc(hdl)) == NULL) {
-		cmn_err(CE_NOTE, "ds_cap_send: invalid handle 0x%lx", hdl);
+		cmn_err(CE_NOTE, "ds_cap_send: invalid handle 0x%09lx", hdl);
 		rw_exit(&ds_svcs.rwlock);
 		return (EINVAL);
 	}
@@ -2714,7 +2734,7 @@ ds_cap_send(ds_svc_hdl_t hdl, void *buf, size_t len)
 		bcopy(buf, payload, len);
 	}
 
-	DS_DBG("ds@%lx: data>: hdl=0x%lx, len=%ld, payload_len=%d\n",
+	DS_DBG("ds@%lx: data>: hdl=0x%09lx, len=%ld, payload_len=%d\n",
 	    port->id, svc->hdl, msglen, hdr->payload_len);
 
 	if ((rv = ds_send_msg(port, msg, msglen)) != 0) {

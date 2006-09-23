@@ -56,6 +56,7 @@
 
 /* Virtual disk server tunable parameters */
 #define	VDS_LDC_RETRIES		3
+#define	VDS_LDC_DELAY		1000 /* usec */
 #define	VDS_NCHAINS		32
 
 /* Identification parameters for MD, synthetic dkio(7i) structures, etc. */
@@ -111,6 +112,10 @@
 
 /* Debugging macros */
 #ifdef DEBUG
+
+static int	vd_msglevel = 0;
+
+
 #define	PR0 if (vd_msglevel > 0)	PRN
 #define	PR1 if (vd_msglevel > 1)	PRN
 #define	PR2 if (vd_msglevel > 2)	PRN
@@ -124,12 +129,86 @@
 	    elem->payload.addr,						\
 	    elem->payload.ncookies);
 
+char *
+vd_decode_state(int state)
+{
+	char *str;
+
+#define	CASE_STATE(_s)	case _s: str = #_s; break;
+
+	switch (state) {
+	CASE_STATE(VD_STATE_INIT)
+	CASE_STATE(VD_STATE_VER)
+	CASE_STATE(VD_STATE_ATTR)
+	CASE_STATE(VD_STATE_DRING)
+	CASE_STATE(VD_STATE_RDX)
+	CASE_STATE(VD_STATE_DATA)
+	default: str = "unknown"; break;
+	}
+
+#undef CASE_STATE
+
+	return (str);
+}
+
+void
+vd_decode_tag(vio_msg_t *msg)
+{
+	char *tstr, *sstr, *estr;
+
+#define	CASE_TYPE(_s)	case _s: tstr = #_s; break;
+
+	switch (msg->tag.vio_msgtype) {
+	CASE_TYPE(VIO_TYPE_CTRL)
+	CASE_TYPE(VIO_TYPE_DATA)
+	CASE_TYPE(VIO_TYPE_ERR)
+	default: tstr = "unknown"; break;
+	}
+
+#undef CASE_TYPE
+
+#define	CASE_SUBTYPE(_s) case _s: sstr = #_s; break;
+
+	switch (msg->tag.vio_subtype) {
+	CASE_SUBTYPE(VIO_SUBTYPE_INFO)
+	CASE_SUBTYPE(VIO_SUBTYPE_ACK)
+	CASE_SUBTYPE(VIO_SUBTYPE_NACK)
+	default: sstr = "unknown"; break;
+	}
+
+#undef CASE_SUBTYPE
+
+#define	CASE_ENV(_s)	case _s: estr = #_s; break;
+
+	switch (msg->tag.vio_subtype_env) {
+	CASE_ENV(VIO_VER_INFO)
+	CASE_ENV(VIO_ATTR_INFO)
+	CASE_ENV(VIO_DRING_REG)
+	CASE_ENV(VIO_DRING_UNREG)
+	CASE_ENV(VIO_RDX)
+	CASE_ENV(VIO_PKT_DATA)
+	CASE_ENV(VIO_DESC_DATA)
+	CASE_ENV(VIO_DRING_DATA)
+	default: estr = "unknown"; break;
+	}
+
+#undef CASE_ENV
+
+	PR1("(%x/%x/%x) message : (%s/%s/%s)",
+	    msg->tag.vio_msgtype, msg->tag.vio_subtype,
+	    msg->tag.vio_subtype_env, tstr, sstr, estr);
+}
+
 #else	/* !DEBUG */
+
 #define	PR0(...)
 #define	PR1(...)
 #define	PR2(...)
 
 #define	VD_DUMP_DRING_ELEM(elem)
+
+#define	vd_decode_state(_s)	(NULL)
+#define	vd_decode_tag(_s)	(NULL)
 
 #endif	/* DEBUG */
 
@@ -162,7 +241,6 @@ typedef struct vd_task {
 	int			index;		/* dring elem index for task */
 	vio_msg_t		*msg;		/* VIO message task is for */
 	size_t			msglen;		/* length of message content */
-	size_t			msgsize;	/* size of message buffer */
 	vd_dring_payload_t	*request;	/* request task will perform */
 	struct buf		buf;		/* buf(9s) for I/O request */
 	ldc_mem_handle_t	mhdl;		/* task memory handle */
@@ -199,6 +277,7 @@ typedef struct vd {
 	uint32_t		descriptor_size;	/* num bytes in desc */
 	uint32_t		dring_len;	/* number of dring elements */
 	caddr_t			dring;		/* address of dring */
+	caddr_t			vio_msgp;	/* vio msg staging buffer */
 	vd_task_t		inband_task;	/* task for inband descriptor */
 	vd_task_t		*dring_task;	/* tasks dring elements */
 
@@ -209,6 +288,7 @@ typedef struct vd {
 } vd_t;
 
 typedef struct vds_operation {
+	char	*namep;
 	uint8_t	operation;
 	int	(*start)(vd_task_t *task);
 	void	(*complete)(void *arg);
@@ -232,6 +312,7 @@ typedef struct vd_ioctl {
 
 
 static int	vds_ldc_retries = VDS_LDC_RETRIES;
+static int	vds_ldc_delay = VDS_LDC_DELAY;
 static void	*vds_state;
 static uint64_t	vds_operations;	/* see vds_operation[] definition below */
 
@@ -248,10 +329,7 @@ static const vio_ver_t	vds_version[] = {{1, 0}};
 static const size_t	vds_num_versions =
     sizeof (vds_version)/sizeof (vds_version[0]);
 
-#ifdef DEBUG
-static int	vd_msglevel;
-#endif /* DEBUG */
-
+static void vd_free_dring_task(vd_t *vdp);
 
 static int
 vd_start_bio(vd_task_t *task)
@@ -289,7 +367,7 @@ vd_start_bio(vd_task_t *task)
 	    mtype, (request->operation == VD_OP_BREAD) ? LDC_MEM_W : LDC_MEM_R,
 	    &(buf->b_un.b_addr), NULL);
 	if (status != 0) {
-		PRN("ldc_mem_map() returned err %d ", status);
+		PR0("ldc_mem_map() returned err %d ", status);
 		biofini(buf);
 		return (status);
 	}
@@ -297,7 +375,7 @@ vd_start_bio(vd_task_t *task)
 	status = ldc_mem_acquire(task->mhdl, 0, buf->b_bcount);
 	if (status != 0) {
 		(void) ldc_mem_unmap(task->mhdl);
-		PRN("ldc_mem_map() returned err %d ", status);
+		PR0("ldc_mem_acquire() returned err %d ", status);
 		biofini(buf);
 		return (status);
 	}
@@ -311,11 +389,11 @@ vd_start_bio(vd_task_t *task)
 	/* Clean up after error */
 	rv = ldc_mem_release(task->mhdl, 0, buf->b_bcount);
 	if (rv) {
-		PRN("ldc_mem_release() returned err %d ", status);
+		PR0("ldc_mem_release() returned err %d ", rv);
 	}
 	rv = ldc_mem_unmap(task->mhdl);
 	if (rv) {
-		PRN("ldc_mem_unmap() returned err %d ", status);
+		PR0("ldc_mem_unmap() returned err %d ", status);
 	}
 
 	biofini(buf);
@@ -325,23 +403,23 @@ vd_start_bio(vd_task_t *task)
 static int
 send_msg(ldc_handle_t ldc_handle, void *msg, size_t msglen)
 {
-	int	retry, status;
+	int	status;
 	size_t	nbytes;
 
-
-	for (retry = 0, status = EWOULDBLOCK;
-	    retry < vds_ldc_retries && status == EWOULDBLOCK;
-	    retry++) {
-		PR1("ldc_write() attempt %d", (retry + 1));
+	do {
 		nbytes = msglen;
 		status = ldc_write(ldc_handle, msg, &nbytes);
-	}
+		if (status != EWOULDBLOCK)
+			break;
+		drv_usecwait(vds_ldc_delay);
+	} while (status == EWOULDBLOCK);
 
 	if (status != 0) {
-		PRN("ldc_write() returned errno %d", status);
+		if (status != ECONNRESET)
+			PR0("ldc_write() returned errno %d", status);
 		return (status);
 	} else if (nbytes != msglen) {
-		PRN("ldc_write() performed only partial write");
+		PR0("ldc_write() performed only partial write");
 		return (EIO);
 	}
 
@@ -361,14 +439,12 @@ vd_need_reset(vd_t *vd, boolean_t reset_ldc)
 /*
  * Reset the state of the connection with a client, if needed; reset the LDC
  * transport as well, if needed.  This function should only be called from the
- * "startq", as it waits for tasks on the "completionq" and will deadlock if
- * called from that queue.
+ * "vd_recv_msg", as it waits for tasks - otherwise a deadlock can occur.
  */
 static void
 vd_reset_if_needed(vd_t *vd)
 {
-	int		status = 0;
-
+	int	status = 0;
 
 	mutex_enter(&vd->lock);
 	if (!vd->reset_state) {
@@ -377,7 +453,6 @@ vd_reset_if_needed(vd_t *vd)
 		return;
 	}
 	mutex_exit(&vd->lock);
-
 
 	PR0("Resetting connection state with %s", VD_CLIENT(vd));
 
@@ -390,30 +465,64 @@ vd_reset_if_needed(vd_t *vd)
 
 	if ((vd->initialized & VD_DRING) &&
 	    ((status = ldc_mem_dring_unmap(vd->dring_handle)) != 0))
-		PRN("ldc_mem_dring_unmap() returned errno %d", status);
+		PR0("ldc_mem_dring_unmap() returned errno %d", status);
 
-	if (vd->dring_task != NULL) {
-		ASSERT(vd->dring_len != 0);
-		/* Free all dring_task memory handles */
-		for (int i = 0; i < vd->dring_len; i++)
-			(void) ldc_mem_free_handle(vd->dring_task[i].mhdl);
-		kmem_free(vd->dring_task,
-		    (sizeof (*vd->dring_task)) * vd->dring_len);
-		vd->dring_task = NULL;
+	vd_free_dring_task(vd);
+
+	/* Free the staging buffer for msgs */
+	if (vd->vio_msgp != NULL) {
+		kmem_free(vd->vio_msgp, vd->max_msglen);
+		vd->vio_msgp = NULL;
 	}
 
+	/* Free the inband message buffer */
+	if (vd->inband_task.msg != NULL) {
+		kmem_free(vd->inband_task.msg, vd->max_msglen);
+		vd->inband_task.msg = NULL;
+	}
 
 	mutex_enter(&vd->lock);
+
+	if (vd->reset_ldc)
+		PR0("taking down LDC channel");
 	if (vd->reset_ldc && ((status = ldc_down(vd->ldc_handle)) != 0))
-		PRN("ldc_down() returned errno %d", status);
+		PR0("ldc_down() returned errno %d", status);
 
 	vd->initialized	&= ~(VD_SID | VD_SEQ_NUM | VD_DRING);
 	vd->state	= VD_STATE_INIT;
 	vd->max_msglen	= sizeof (vio_msg_t);	/* baseline vio message size */
 
+	/* Allocate the staging buffer */
+	vd->vio_msgp = kmem_alloc(vd->max_msglen, KM_SLEEP);
+
+	status = ldc_status(vd->ldc_handle, &vd->ldc_state);
+	if (vd->reset_ldc && vd->ldc_state != LDC_UP) {
+		PR0("calling ldc_up\n");
+		(void) ldc_up(vd->ldc_handle);
+	}
+
 	vd->reset_state	= B_FALSE;
 	vd->reset_ldc	= B_FALSE;
+
 	mutex_exit(&vd->lock);
+}
+
+static void vd_recv_msg(void *arg);
+
+static void
+vd_mark_in_reset(vd_t *vd)
+{
+	int status;
+
+	PR0("vd_mark_in_reset: marking vd in reset\n");
+
+	vd_need_reset(vd, B_FALSE);
+	status = ddi_taskq_dispatch(vd->startq, vd_recv_msg, vd, DDI_SLEEP);
+	if (status == DDI_FAILURE) {
+		PR0("cannot schedule task to recv msg\n");
+		vd_need_reset(vd, B_TRUE);
+		return;
+	}
 }
 
 static int
@@ -423,11 +532,20 @@ vd_mark_elem_done(vd_t *vd, int idx, int elem_status)
 	int			status;
 	vd_dring_entry_t	*elem = VD_DRING_ELEM(idx);
 
+	if (vd->reset_state)
+		return (0);
 
 	/* Acquire the element */
-	if ((status = ldc_mem_dring_acquire(vd->dring_handle, idx, idx)) != 0) {
-		PRN("ldc_mem_dring_acquire() returned errno %d", status);
-		return (status);
+	if (!vd->reset_state &&
+	    (status = ldc_mem_dring_acquire(vd->dring_handle, idx, idx)) != 0) {
+		if (status == ECONNRESET) {
+			vd_mark_in_reset(vd);
+			return (0);
+		} else {
+			PR0("ldc_mem_dring_acquire() returned errno %d",
+			    status);
+			return (status);
+		}
 	}
 
 	/* Set the element's status and mark it done */
@@ -437,13 +555,20 @@ vd_mark_elem_done(vd_t *vd, int idx, int elem_status)
 		elem->hdr.dstate	= VIO_DESC_DONE;
 	} else {
 		/* Perhaps client timed out waiting for I/O... */
-		PRN("element %u no longer \"accepted\"", idx);
+		PR0("element %u no longer \"accepted\"", idx);
 		VD_DUMP_DRING_ELEM(elem);
 	}
 	/* Release the element */
-	if ((status = ldc_mem_dring_release(vd->dring_handle, idx, idx)) != 0) {
-		PRN("ldc_mem_dring_release() returned errno %d", status);
-		return (status);
+	if (!vd->reset_state &&
+	    (status = ldc_mem_dring_release(vd->dring_handle, idx, idx)) != 0) {
+		if (status == ECONNRESET) {
+			vd_mark_in_reset(vd);
+			return (0);
+		} else {
+			PR0("ldc_mem_dring_release() returned errno %d",
+			    status);
+			return (status);
+		}
 	}
 
 	return (accepted ? 0 : EINVAL);
@@ -463,30 +588,40 @@ vd_complete_bio(void *arg)
 	ASSERT(request != NULL);
 	ASSERT(task->msg != NULL);
 	ASSERT(task->msglen >= sizeof (*task->msg));
-	ASSERT(task->msgsize >= task->msglen);
 
 	/* Wait for the I/O to complete */
 	request->status = biowait(buf);
 
 	/* Release the buffer */
-	status = ldc_mem_release(task->mhdl, 0, buf->b_bcount);
+	if (!vd->reset_state)
+		status = ldc_mem_release(task->mhdl, 0, buf->b_bcount);
 	if (status) {
-		PRN("ldc_mem_release() returned errno %d copying to client",
-		    status);
+		PR0("ldc_mem_release() returned errno %d copying to "
+		    "client", status);
+		if (status == ECONNRESET) {
+			vd_mark_in_reset(vd);
+		}
 	}
 
-	/* Unmap the memory */
+	/* Unmap the memory, even if in reset */
 	status = ldc_mem_unmap(task->mhdl);
 	if (status) {
-		PRN("ldc_mem_unmap() returned errno %d copying to client",
+		PR0("ldc_mem_unmap() returned errno %d copying to client",
 		    status);
+		if (status == ECONNRESET) {
+			vd_mark_in_reset(vd);
+		}
 	}
 
 	biofini(buf);
 
 	/* Update the dring element for a dring client */
-	if ((status == 0) && (vd->xfer_mode == VIO_DRING_MODE))
+	if (!vd->reset_state && (status == 0) &&
+	    (vd->xfer_mode == VIO_DRING_MODE)) {
 		status = vd_mark_elem_done(vd, task->index, request->status);
+		if (status == ECONNRESET)
+			vd_mark_in_reset(vd);
+	}
 
 	/*
 	 * If a transport error occurred, arrange to "nack" the message when
@@ -499,8 +634,9 @@ vd_complete_bio(void *arg)
 	 * Only the final task for a range of elements will respond to and
 	 * free the message
 	 */
-	if (task->type == VD_NONFINAL_RANGE_TASK)
+	if (task->type == VD_NONFINAL_RANGE_TASK) {
 		return;
+	}
 
 	/*
 	 * Send the "ack" or "nack" back to the client; if sending the message
@@ -509,11 +645,20 @@ vd_complete_bio(void *arg)
 	 */
 	PR1("Sending %s",
 	    (task->msg->tag.vio_subtype == VIO_SUBTYPE_ACK) ? "ACK" : "NACK");
-	if (send_msg(vd->ldc_handle, task->msg, task->msglen) != 0)
-		vd_need_reset(vd, B_TRUE);
-
-	/* Free the message now that it has been used for the reply */
-	kmem_free(task->msg, task->msgsize);
+	if (!vd->reset_state) {
+		status = send_msg(vd->ldc_handle, task->msg, task->msglen);
+		switch (status) {
+		case 0:
+			break;
+		case ECONNRESET:
+			vd_mark_in_reset(vd);
+			break;
+		default:
+			PR0("initiating full reset");
+			vd_need_reset(vd, B_TRUE);
+			break;
+		}
+	}
 }
 
 static void
@@ -598,14 +743,14 @@ vd_read_vtoc(ldi_handle_t handle, struct vtoc *vtoc, vd_disk_label_t *label)
 		*label = VD_DISK_LABEL_VTOC;
 		return (0);
 	} else if (status != ENOTSUP) {
-		PRN("ldi_ioctl(DKIOCGVTOC) returned error %d", status);
+		PR0("ldi_ioctl(DKIOCGVTOC) returned error %d", status);
 		return (status);
 	}
 
 	status = vds_efi_alloc_and_read(handle, &efi, &efi_len);
 
 	if (status) {
-		PRN("vds_efi_alloc_and_read returned error %d", status);
+		PR0("vds_efi_alloc_and_read returned error %d", status);
 		return (status);
 	}
 
@@ -675,7 +820,7 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 		if ((status = ldc_mem_copy(vd->ldc_handle, buf, 0, &nbytes,
 			    request->cookie, request->ncookies,
 			    LDC_COPY_IN)) != 0) {
-			PRN("ldc_mem_copy() returned errno %d "
+			PR0("ldc_mem_copy() returned errno %d "
 			    "copying from client", status);
 			return (status);
 		}
@@ -703,7 +848,7 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 	}
 #ifdef DEBUG
 	if (rval != 0) {
-		PRN("%s set rval = %d, which is not being returned to client",
+		PR0("%s set rval = %d, which is not being returned to client",
 		    ioctl->cmd_name, rval);
 	}
 #endif /* DEBUG */
@@ -720,7 +865,7 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 		if ((status = ldc_mem_copy(vd->ldc_handle, buf, 0, &nbytes,
 			    request->cookie, request->ncookies,
 			    LDC_COPY_OUT)) != 0) {
-			PRN("ldc_mem_copy() returned errno %d "
+			PR0("ldc_mem_copy() returned errno %d "
 			    "copying to client", status);
 			return (status);
 		}
@@ -770,7 +915,7 @@ vd_open_new_slices(vd_t *vd)
 	/* Get the (new) partitions for updated slice sizes */
 	if ((status = vd_read_vtoc(vd->ldi_handle[0], &vtoc,
 	    &vd->vdisk_label)) != 0) {
-		PRN("vd_read_vtoc returned error %d", status);
+		PR0("vd_read_vtoc returned error %d", status);
 		return;
 	}
 
@@ -791,7 +936,7 @@ vd_open_new_slices(vd_t *vd)
 		if ((status = ldi_open_by_dev(&vd->dev[slice], OTYP_BLK,
 			    vd_open_flags, kcred, &vd->ldi_handle[slice],
 			    vd->vds->ldi_ident)) != 0) {
-			PRN("ldi_open_by_dev() returned errno %d "
+			PR0("ldi_open_by_dev() returned errno %d "
 			    "for slice %u", status, slice);
 		}
 	}
@@ -864,14 +1009,14 @@ vd_ioctl(vd_task_t *task)
 			    request->operation == VD_OP_SET_EFI) {
 				if (request->nbytes >= ioctl[i].nbytes)
 					break;
-				PRN("%s:  Expected at least nbytes = %lu, "
+				PR0("%s:  Expected at least nbytes = %lu, "
 				    "got %lu", ioctl[i].operation_name,
 				    ioctl[i].nbytes, request->nbytes);
 				return (EINVAL);
 			}
 
 			if (request->nbytes != ioctl[i].nbytes) {
-				PRN("%s:  Expected nbytes = %lu, got %lu",
+				PR0("%s:  Expected nbytes = %lu, got %lu",
 				    ioctl[i].operation_name, ioctl[i].nbytes,
 				    request->nbytes);
 				return (EINVAL);
@@ -903,19 +1048,28 @@ vd_get_devid(vd_task_t *task)
 	vd_devid_t *vd_devid;
 	impl_devid_t *devid;
 	int status, bufid_len, devid_len, len;
+	int bufbytes;
 
-	PR1("Get Device ID");
+	PR1("Get Device ID, nbytes=%ld", request->nbytes);
 
 	if (ddi_lyr_get_devid(vd->dev[request->slice],
 	    (ddi_devid_t *)&devid) != DDI_SUCCESS) {
 		/* the most common failure is that no devid is available */
+		PR2("No Device ID");
 		return (ENOENT);
 	}
 
 	bufid_len = request->nbytes - sizeof (vd_devid_t) + 1;
 	devid_len = DEVID_GETLEN(devid);
 
-	vd_devid = kmem_zalloc(request->nbytes, KM_SLEEP);
+	/*
+	 * Save the buffer size here for use in deallocation.
+	 * The actual number of bytes copied is returned in
+	 * the 'nbytes' field of the request structure.
+	 */
+	bufbytes = request->nbytes;
+
+	vd_devid = kmem_zalloc(bufbytes, KM_SLEEP);
 	vd_devid->length = devid_len;
 	vd_devid->type = DEVID_GETTYPE(devid);
 
@@ -929,11 +1083,12 @@ vd_get_devid(vd_task_t *task)
 	if ((status = ldc_mem_copy(vd->ldc_handle, (caddr_t)vd_devid, 0,
 	    &request->nbytes, request->cookie, request->ncookies,
 	    LDC_COPY_OUT)) != 0) {
-		PRN("ldc_mem_copy() returned errno %d copying to client",
+		PR0("ldc_mem_copy() returned errno %d copying to client",
 		    status);
 	}
+	PR1("post mem_copy: nbytes=%ld", request->nbytes);
 
-	kmem_free(vd_devid, request->nbytes);
+	kmem_free(vd_devid, bufbytes);
 	ddi_devid_free((ddi_devid_t)devid);
 
 	return (status);
@@ -944,18 +1099,20 @@ vd_get_devid(vd_task_t *task)
  * been defined
  */
 static const vds_operation_t	vds_operation[] = {
-	{VD_OP_BREAD,		vd_start_bio,	vd_complete_bio},
-	{VD_OP_BWRITE,		vd_start_bio,	vd_complete_bio},
-	{VD_OP_FLUSH,		vd_ioctl,	NULL},
-	{VD_OP_GET_WCE,		vd_ioctl,	NULL},
-	{VD_OP_SET_WCE,		vd_ioctl,	NULL},
-	{VD_OP_GET_VTOC,	vd_ioctl,	NULL},
-	{VD_OP_SET_VTOC,	vd_ioctl,	NULL},
-	{VD_OP_GET_DISKGEOM,	vd_ioctl,	NULL},
-	{VD_OP_SET_DISKGEOM,	vd_ioctl,	NULL},
-	{VD_OP_GET_EFI,		vd_ioctl,	NULL},
-	{VD_OP_SET_EFI,		vd_ioctl,	NULL},
-	{VD_OP_GET_DEVID,	vd_get_devid,	NULL},
+#define	X(_s)	#_s, _s
+	{X(VD_OP_BREAD),	vd_start_bio,	vd_complete_bio},
+	{X(VD_OP_BWRITE),	vd_start_bio,	vd_complete_bio},
+	{X(VD_OP_FLUSH),	vd_ioctl,	NULL},
+	{X(VD_OP_GET_WCE),	vd_ioctl,	NULL},
+	{X(VD_OP_SET_WCE),	vd_ioctl,	NULL},
+	{X(VD_OP_GET_VTOC),	vd_ioctl,	NULL},
+	{X(VD_OP_SET_VTOC),	vd_ioctl,	NULL},
+	{X(VD_OP_GET_DISKGEOM),	vd_ioctl,	NULL},
+	{X(VD_OP_SET_DISKGEOM),	vd_ioctl,	NULL},
+	{X(VD_OP_GET_EFI),	vd_ioctl,	NULL},
+	{X(VD_OP_SET_EFI),	vd_ioctl,	NULL},
+	{X(VD_OP_GET_DEVID),	vd_get_devid,	NULL},
+#undef	X
 };
 
 static const size_t	vds_noperations =
@@ -980,7 +1137,7 @@ vd_process_task(vd_task_t *task)
 		if (request->operation == vds_operation[i].operation)
 			break;
 	if (i == vds_noperations) {
-		PRN("Unsupported operation %u", request->operation);
+		PR0("Unsupported operation %u", request->operation);
 		return (ENOTSUP);
 	}
 
@@ -991,24 +1148,30 @@ vd_process_task(vd_task_t *task)
 
 	/* Range-check slice */
 	if (request->slice >= vd->nslices) {
-		PRN("Invalid \"slice\" %u (max %u) for virtual disk",
+		PR0("Invalid \"slice\" %u (max %u) for virtual disk",
 		    request->slice, (vd->nslices - 1));
 		return (EINVAL);
 	}
 
+	PR1("operation : %s", vds_operation[i].namep);
+
 	/* Start the operation */
 	if ((status = vds_operation[i].start(task)) != EINPROGRESS) {
+		PR0("operation : %s returned status %d",
+			vds_operation[i].namep, status);
 		request->status = status;	/* op succeeded or failed */
 		return (0);			/* but request completed */
 	}
 
 	ASSERT(vds_operation[i].complete != NULL);	/* debug case */
 	if (vds_operation[i].complete == NULL) {	/* non-debug case */
-		PRN("Unexpected return of EINPROGRESS "
+		PR0("Unexpected return of EINPROGRESS "
 		    "with no I/O completion handler");
 		request->status = EIO;	/* operation failed */
 		return (0);		/* but request completed */
 	}
+
+	PR1("operation : kick off taskq entry for %s", vds_operation[i].namep);
 
 	/* Queue a task to complete the operation */
 	status = ddi_taskq_dispatch(vd->completionq, vds_operation[i].complete,
@@ -1110,13 +1273,13 @@ vd_process_ver_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	}
 
 	if (msglen != sizeof (*ver_msg)) {
-		PRN("Expected %lu-byte version message; "
+		PR0("Expected %lu-byte version message; "
 		    "received %lu bytes", sizeof (*ver_msg), msglen);
 		return (EBADMSG);
 	}
 
 	if (ver_msg->dev_class != VDEV_DISK) {
-		PRN("Expected device class %u (disk); received %u",
+		PR0("Expected device class %u (disk); received %u",
 		    VDEV_DISK, ver_msg->dev_class);
 		return (EBADMSG);
 	}
@@ -1179,26 +1342,27 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	}
 
 	if (msglen != sizeof (*attr_msg)) {
-		PRN("Expected %lu-byte attribute message; "
+		PR0("Expected %lu-byte attribute message; "
 		    "received %lu bytes", sizeof (*attr_msg), msglen);
 		return (EBADMSG);
 	}
 
 	if (attr_msg->max_xfer_sz == 0) {
-		PRN("Received maximum transfer size of 0 from client");
+		PR0("Received maximum transfer size of 0 from client");
 		return (EBADMSG);
 	}
 
 	if ((attr_msg->xfer_mode != VIO_DESC_MODE) &&
 	    (attr_msg->xfer_mode != VIO_DRING_MODE)) {
-		PRN("Client requested unsupported transfer mode");
+		PR0("Client requested unsupported transfer mode");
 		return (EBADMSG);
 	}
 
-
 	/* Success:  valid message and transfer mode */
 	vd->xfer_mode = attr_msg->xfer_mode;
+
 	if (vd->xfer_mode == VIO_DESC_MODE) {
+
 		/*
 		 * The vd_dring_inband_msg_t contains one cookie; need room
 		 * for up to n-1 more cookies, where "n" is the number of full
@@ -1228,6 +1392,7 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		 * request descriptors
 		 */
 		vd->inband_task.vd	= vd;
+		vd->inband_task.msg	= kmem_alloc(vd->max_msglen, KM_SLEEP);
 		vd->inband_task.index	= 0;
 		vd->inband_task.type	= VD_FINAL_RANGE_TASK;	/* range == 1 */
 	}
@@ -1240,6 +1405,9 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	attr_msg->vdisk_type = vd->vdisk_type;
 	attr_msg->operations = vds_operations;
 	PR0("%s", VD_CLIENT(vd));
+
+	ASSERT(vd->dring_task == NULL);
+
 	return (0);
 }
 
@@ -1261,7 +1429,7 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	}
 
 	if (msglen < sizeof (*reg_msg)) {
-		PRN("Expected at least %lu-byte register-dring message; "
+		PR0("Expected at least %lu-byte register-dring message; "
 		    "received %lu bytes", sizeof (*reg_msg), msglen);
 		return (EBADMSG);
 	}
@@ -1269,18 +1437,18 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	expected = sizeof (*reg_msg) +
 	    (reg_msg->ncookies - 1)*(sizeof (reg_msg->cookie[0]));
 	if (msglen != expected) {
-		PRN("Expected %lu-byte register-dring message; "
+		PR0("Expected %lu-byte register-dring message; "
 		    "received %lu bytes", expected, msglen);
 		return (EBADMSG);
 	}
 
 	if (vd->initialized & VD_DRING) {
-		PRN("A dring was previously registered; only support one");
+		PR0("A dring was previously registered; only support one");
 		return (EBADMSG);
 	}
 
 	if (reg_msg->num_descriptors > INT32_MAX) {
-		PRN("reg_msg->num_descriptors = %u; must be <= %u (%s)",
+		PR0("reg_msg->num_descriptors = %u; must be <= %u (%s)",
 		    reg_msg->ncookies, INT32_MAX, STRINGIZE(INT32_MAX));
 		return (EBADMSG);
 	}
@@ -1299,7 +1467,7 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		 * reasonably demand exchanging an additional attribute or
 		 * making a minor protocol adjustment
 		 */
-		PRN("reg_msg->ncookies = %u != 1", reg_msg->ncookies);
+		PR0("reg_msg->ncookies = %u != 1", reg_msg->ncookies);
 		return (EBADMSG);
 	}
 
@@ -1307,7 +1475,7 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	    reg_msg->ncookies, reg_msg->num_descriptors,
 	    reg_msg->descriptor_size, LDC_DIRECT_MAP, &vd->dring_handle);
 	if (status != 0) {
-		PRN("ldc_mem_dring_map() returned errno %d", status);
+		PR0("ldc_mem_dring_map() returned errno %d", status);
 		return (status);
 	}
 
@@ -1320,14 +1488,14 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 
 	if ((status =
 		ldc_mem_dring_info(vd->dring_handle, &dring_minfo)) != 0) {
-		PRN("ldc_mem_dring_info() returned errno %d", status);
+		PR0("ldc_mem_dring_info() returned errno %d", status);
 		if ((status = ldc_mem_dring_unmap(vd->dring_handle)) != 0)
-			PRN("ldc_mem_dring_unmap() returned errno %d", status);
+			PR0("ldc_mem_dring_unmap() returned errno %d", status);
 		return (status);
 	}
 
 	if (dring_minfo.vaddr == NULL) {
-		PRN("Descriptor ring virtual address is NULL");
+		PR0("Descriptor ring virtual address is NULL");
 		return (ENXIO);
 	}
 
@@ -1356,9 +1524,11 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		status = ldc_mem_alloc_handle(vd->ldc_handle,
 		    &(vd->dring_task[i].mhdl));
 		if (status) {
-			PRN("ldc_mem_alloc_handle() returned err %d ", status);
+			PR0("ldc_mem_alloc_handle() returned err %d ", status);
 			return (ENXIO);
 		}
+
+		vd->dring_task[i].msg = kmem_alloc(vd->max_msglen, KM_SLEEP);
 	}
 
 	return (0);
@@ -1379,13 +1549,13 @@ vd_process_dring_unreg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	}
 
 	if (msglen != sizeof (*unreg_msg)) {
-		PRN("Expected %lu-byte unregister-dring message; "
+		PR0("Expected %lu-byte unregister-dring message; "
 		    "received %lu bytes", sizeof (*unreg_msg), msglen);
 		return (EBADMSG);
 	}
 
 	if (unreg_msg->dring_ident != vd->dring_ident) {
-		PRN("Expected dring ident %lu; received %lu",
+		PR0("Expected dring ident %lu; received %lu",
 		    vd->dring_ident, unreg_msg->dring_ident);
 		return (EBADMSG);
 	}
@@ -1404,7 +1574,7 @@ process_rdx_msg(vio_msg_t *msg, size_t msglen)
 	}
 
 	if (msglen != sizeof (vio_rdx_msg_t)) {
-		PRN("Expected %lu-byte RDX message; received %lu bytes",
+		PR0("Expected %lu-byte RDX message; received %lu bytes",
 		    sizeof (vio_rdx_msg_t), msglen);
 		return (EBADMSG);
 	}
@@ -1417,8 +1587,9 @@ static int
 vd_check_seq_num(vd_t *vd, uint64_t seq_num)
 {
 	if ((vd->initialized & VD_SEQ_NUM) && (seq_num != vd->seq_num + 1)) {
-		PRN("Received seq_num %lu; expected %lu",
+		PR0("Received seq_num %lu; expected %lu",
 		    seq_num, (vd->seq_num + 1));
+		PR0("initiating soft reset");
 		vd_need_reset(vd, B_FALSE);
 		return (1);
 	}
@@ -1445,7 +1616,7 @@ expected_inband_size(vd_dring_inband_msg_t *msg)
  * operating on them within a descriptor ring
  */
 static int
-vd_process_desc_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
+vd_process_desc_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 {
 	size_t			expected;
 	vd_dring_inband_msg_t	*desc_msg = (vd_dring_inband_msg_t *)msg;
@@ -1460,13 +1631,13 @@ vd_process_desc_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 	}
 
 	if (msglen < sizeof (*desc_msg)) {
-		PRN("Expected at least %lu-byte descriptor message; "
+		PR0("Expected at least %lu-byte descriptor message; "
 		    "received %lu bytes", sizeof (*desc_msg), msglen);
 		return (EBADMSG);
 	}
 
 	if (msglen != (expected = expected_inband_size(desc_msg))) {
-		PRN("Expected %lu-byte descriptor message; "
+		PR0("Expected %lu-byte descriptor message; "
 		    "received %lu bytes", expected, msglen);
 		return (EBADMSG);
 	}
@@ -1482,16 +1653,25 @@ vd_process_desc_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 	 */
 	PR1("Valid in-band-descriptor message");
 	msg->tag.vio_subtype = VIO_SUBTYPE_ACK;
-	vd->inband_task.msg	= msg;
+
+	ASSERT(vd->inband_task.msg != NULL);
+
+	bcopy(msg, vd->inband_task.msg, msglen);
 	vd->inband_task.msglen	= msglen;
-	vd->inband_task.msgsize	= msgsize;
+
+	/*
+	 * The task request is now the payload of the message
+	 * that was just copied into the body of the task.
+	 */
+	desc_msg = (vd_dring_inband_msg_t *)vd->inband_task.msg;
 	vd->inband_task.request	= &desc_msg->payload;
+
 	return (vd_process_task(&vd->inband_task));
 }
 
 static int
 vd_process_element(vd_t *vd, vd_task_type_t type, uint32_t idx,
-    vio_msg_t *msg, size_t msglen, size_t msgsize)
+    vio_msg_t *msg, size_t msglen)
 {
 	int			status;
 	boolean_t		ready;
@@ -1500,18 +1680,18 @@ vd_process_element(vd_t *vd, vd_task_type_t type, uint32_t idx,
 
 	/* Accept the updated dring element */
 	if ((status = ldc_mem_dring_acquire(vd->dring_handle, idx, idx)) != 0) {
-		PRN("ldc_mem_dring_acquire() returned errno %d", status);
+		PR0("ldc_mem_dring_acquire() returned errno %d", status);
 		return (status);
 	}
 	ready = (elem->hdr.dstate == VIO_DESC_READY);
 	if (ready) {
 		elem->hdr.dstate = VIO_DESC_ACCEPTED;
 	} else {
-		PRN("descriptor %u not ready", idx);
+		PR0("descriptor %u not ready", idx);
 		VD_DUMP_DRING_ELEM(elem);
 	}
 	if ((status = ldc_mem_dring_release(vd->dring_handle, idx, idx)) != 0) {
-		PRN("ldc_mem_dring_release() returned errno %d", status);
+		PR0("ldc_mem_dring_release() returned errno %d", status);
 		return (status);
 	}
 	if (!ready)
@@ -1521,9 +1701,11 @@ vd_process_element(vd_t *vd, vd_task_type_t type, uint32_t idx,
 	/* Initialize a task and process the accepted element */
 	PR1("Processing dring element %u", idx);
 	vd->dring_task[idx].type	= type;
-	vd->dring_task[idx].msg		= msg;
+
+	/* duplicate msg buf for cookies etc. */
+	bcopy(msg, vd->dring_task[idx].msg, msglen);
+
 	vd->dring_task[idx].msglen	= msglen;
-	vd->dring_task[idx].msgsize	= msgsize;
 	if ((status = vd_process_task(&vd->dring_task[idx])) != EINPROGRESS)
 		status = vd_mark_elem_done(vd, idx, elem->payload.status);
 
@@ -1532,7 +1714,7 @@ vd_process_element(vd_t *vd, vd_task_type_t type, uint32_t idx,
 
 static int
 vd_process_element_range(vd_t *vd, int start, int end,
-    vio_msg_t *msg, size_t msglen, size_t msgsize)
+    vio_msg_t *msg, size_t msglen)
 {
 	int		i, n, nelem, status = 0;
 	boolean_t	inprogress = B_FALSE;
@@ -1556,7 +1738,7 @@ vd_process_element_range(vd_t *vd, int start, int end,
 	for (i = start, n = nelem; n > 0; i = (i + 1) % vd->dring_len, n--) {
 		((vio_dring_msg_t *)msg)->end_idx = i;
 		type = (n == 1) ? VD_FINAL_RANGE_TASK : VD_NONFINAL_RANGE_TASK;
-		status = vd_process_element(vd, type, i, msg, msglen, msgsize);
+		status = vd_process_element(vd, type, i, msg, msglen);
 		if (status == EINPROGRESS)
 			inprogress = B_TRUE;
 		else if (status != 0)
@@ -1578,7 +1760,7 @@ vd_process_element_range(vd_t *vd, int start, int end,
 }
 
 static int
-vd_process_dring_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
+vd_process_dring_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 {
 	vio_dring_msg_t	*dring_msg = (vio_dring_msg_t *)msg;
 
@@ -1592,7 +1774,7 @@ vd_process_dring_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 	}
 
 	if (msglen != sizeof (*dring_msg)) {
-		PRN("Expected %lu-byte dring message; received %lu bytes",
+		PR0("Expected %lu-byte dring message; received %lu bytes",
 		    sizeof (*dring_msg), msglen);
 		return (EBADMSG);
 	}
@@ -1601,20 +1783,20 @@ vd_process_dring_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 		return (EBADMSG);
 
 	if (dring_msg->dring_ident != vd->dring_ident) {
-		PRN("Expected dring ident %lu; received ident %lu",
+		PR0("Expected dring ident %lu; received ident %lu",
 		    vd->dring_ident, dring_msg->dring_ident);
 		return (EBADMSG);
 	}
 
 	if (dring_msg->start_idx >= vd->dring_len) {
-		PRN("\"start_idx\" = %u; must be less than %u",
+		PR0("\"start_idx\" = %u; must be less than %u",
 		    dring_msg->start_idx, vd->dring_len);
 		return (EBADMSG);
 	}
 
 	if ((dring_msg->end_idx < 0) ||
 	    (dring_msg->end_idx >= vd->dring_len)) {
-		PRN("\"end_idx\" = %u; must be >= 0 and less than %u",
+		PR0("\"end_idx\" = %u; must be >= 0 and less than %u",
 		    dring_msg->end_idx, vd->dring_len);
 		return (EBADMSG);
 	}
@@ -1623,7 +1805,7 @@ vd_process_dring_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 	PR1("Processing descriptor range, start = %u, end = %u",
 	    dring_msg->start_idx, dring_msg->end_idx);
 	return (vd_process_element_range(vd, dring_msg->start_idx,
-		dring_msg->end_idx, msg, msglen, msgsize));
+		dring_msg->end_idx, msg, msglen));
 }
 
 static int
@@ -1641,8 +1823,10 @@ recv_msg(ldc_handle_t ldc_handle, void *msg, size_t *nbytes)
 		status = ldc_read(ldc_handle, msg, nbytes);
 	}
 
-	if (status != 0) {
-		PRN("ldc_read() returned errno %d", status);
+	if (status) {
+		PR0("ldc_read() returned errno %d", status);
+		if (status != ECONNRESET)
+			return (ENOMSG);
 		return (status);
 	} else if (*nbytes == 0) {
 		PR1("ldc_read() returned 0 and no message read");
@@ -1654,24 +1838,28 @@ recv_msg(ldc_handle_t ldc_handle, void *msg, size_t *nbytes)
 }
 
 static int
-vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
+vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 {
 	int		status;
 
 
 	PR1("Processing (%x/%x/%x) message", msg->tag.vio_msgtype,
 	    msg->tag.vio_subtype, msg->tag.vio_subtype_env);
+#ifdef	DEBUG
+	vd_decode_tag(msg);
+#endif
 
 	/*
 	 * Validate session ID up front, since it applies to all messages
 	 * once set
 	 */
 	if ((msg->tag.vio_sid != vd->sid) && (vd->initialized & VD_SID)) {
-		PRN("Expected SID %u, received %u", vd->sid,
+		PR0("Expected SID %u, received %u", vd->sid,
 		    msg->tag.vio_sid);
 		return (EBADMSG);
 	}
 
+	PR1("\tWhile in state %d (%s)", vd->state, vd_decode_state(vd->state));
 
 	/*
 	 * Process the received message based on connection state
@@ -1714,7 +1902,7 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 
 		default:
 			ASSERT("Unsupported transfer mode");
-			PRN("Unsupported transfer mode");
+			PR0("Unsupported transfer mode");
 			return (ENOTSUP);
 		}
 
@@ -1750,7 +1938,7 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 	case VD_STATE_DATA:
 		switch (vd->xfer_mode) {
 		case VIO_DESC_MODE:	/* expect in-band-descriptor message */
-			return (vd_process_desc_msg(vd, msg, msglen, msgsize));
+			return (vd_process_desc_msg(vd, msg, msglen));
 
 		case VIO_DRING_MODE:	/* expect dring-data or unreg-dring */
 			/*
@@ -1758,7 +1946,7 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 			 * them first
 			 */
 			if ((status = vd_process_dring_msg(vd, msg,
-				    msglen, msgsize)) != ENOMSG)
+				    msglen)) != ENOMSG)
 				return (status);
 
 			/*
@@ -1772,19 +1960,19 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 
 		default:
 			ASSERT("Unsupported transfer mode");
-			PRN("Unsupported transfer mode");
+			PR0("Unsupported transfer mode");
 			return (ENOTSUP);
 		}
 
 	default:
 		ASSERT("Invalid client connection state");
-		PRN("Invalid client connection state");
+		PR0("Invalid client connection state");
 		return (ENOTSUP);
 	}
 }
 
 static int
-vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
+vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 {
 	int		status;
 	boolean_t	reset_ldc = B_FALSE;
@@ -1795,8 +1983,9 @@ vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 	 * message processing can proceed based on tag-specified message type
 	 */
 	if (msglen < sizeof (vio_msg_tag_t)) {
-		PRN("Received short (%lu-byte) message", msglen);
+		PR0("Received short (%lu-byte) message", msglen);
 		/* Can't "nack" short message, so drop the big hammer */
+		PR0("initiating full reset");
 		vd_need_reset(vd, B_TRUE);
 		return (EBADMSG);
 	}
@@ -1804,7 +1993,7 @@ vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 	/*
 	 * Process the message
 	 */
-	switch (status = vd_do_process_msg(vd, msg, msglen, msgsize)) {
+	switch (status = vd_do_process_msg(vd, msg, msglen)) {
 	case 0:
 		/* "ack" valid, successfully-processed messages */
 		msg->tag.vio_subtype = VIO_SUBTYPE_ACK;
@@ -1814,7 +2003,7 @@ vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 		/* The completion handler will "ack" or "nack" the message */
 		return (EINPROGRESS);
 	case ENOMSG:
-		PRN("Received unexpected message");
+		PR0("Received unexpected message");
 		_NOTE(FALLTHROUGH);
 	case EBADMSG:
 	case ENOTSUP:
@@ -1830,6 +2019,9 @@ vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 		break;
 	}
 
+	PR1("\tResulting in state %d (%s)", vd->state,
+		vd_decode_state(vd->state));
+
 	/* Send the "ack" or "nack" to the client */
 	PR1("Sending %s",
 	    (msg->tag.vio_subtype == VIO_SUBTYPE_ACK) ? "ACK" : "NACK");
@@ -1837,8 +2029,11 @@ vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen, size_t msgsize)
 		reset_ldc = B_TRUE;
 
 	/* Arrange to reset the connection for nack'ed or failed messages */
-	if ((status != 0) || reset_ldc)
+	if ((status != 0) || reset_ldc) {
+		PR0("initiating %s reset",
+		    (reset_ldc) ? "full" : "soft");
 		vd_need_reset(vd, reset_ldc);
+	}
 
 	return (status);
 }
@@ -1859,34 +2054,71 @@ static void
 vd_recv_msg(void *arg)
 {
 	vd_t	*vd = (vd_t *)arg;
-	int	status = 0;
-
+	int	rv = 0, status = 0;
 
 	ASSERT(vd != NULL);
+
 	PR2("New task to receive incoming message(s)");
+
+
 	while (vd_enabled(vd) && status == 0) {
 		size_t		msglen, msgsize;
-		vio_msg_t	*vio_msg;
-
+		ldc_status_t	lstatus;
 
 		/*
 		 * Receive and process a message
 		 */
 		vd_reset_if_needed(vd);	/* can change vd->max_msglen */
-		msgsize = vd->max_msglen;	/* stable copy for alloc/free */
-		msglen	= msgsize;	/* actual length after recv_msg() */
-		vio_msg = kmem_alloc(msgsize, KM_SLEEP);
-		if ((status = recv_msg(vd->ldc_handle, vio_msg, &msglen)) ==
-		    0) {
-			if (vd_process_msg(vd, vio_msg, msglen, msgsize) ==
-			    EINPROGRESS)
-				continue;	/* handler will free msg */
-		} else if (status != ENOMSG) {
-			/* Probably an LDC failure; arrange to reset it */
-			vd_need_reset(vd, B_TRUE);
+
+		/*
+		 * check if channel is UP - else break out of loop
+		 */
+		status = ldc_status(vd->ldc_handle, &lstatus);
+		if (lstatus != LDC_UP) {
+			PR0("channel not up (status=%d), exiting recv loop\n",
+			    lstatus);
+			break;
 		}
-		kmem_free(vio_msg, msgsize);
+
+		ASSERT(vd->max_msglen != 0);
+
+		msgsize = vd->max_msglen; /* stable copy for alloc/free */
+		msglen	= msgsize;	  /* actual len after recv_msg() */
+
+		status = recv_msg(vd->ldc_handle, vd->vio_msgp, &msglen);
+		switch (status) {
+		case 0:
+			rv = vd_process_msg(vd, (vio_msg_t *)vd->vio_msgp,
+				msglen);
+			/* check if max_msglen changed */
+			if (msgsize != vd->max_msglen) {
+				PR0("max_msglen changed 0x%lx to 0x%lx bytes\n",
+				    msgsize, vd->max_msglen);
+				kmem_free(vd->vio_msgp, msgsize);
+				vd->vio_msgp =
+					kmem_alloc(vd->max_msglen, KM_SLEEP);
+			}
+			if (rv == EINPROGRESS)
+				continue;
+			break;
+
+		case ENOMSG:
+			break;
+
+		case ECONNRESET:
+			PR0("initiating soft reset (ECONNRESET)\n");
+			vd_need_reset(vd, B_FALSE);
+			status = 0;
+			break;
+
+		default:
+			/* Probably an LDC failure; arrange to reset it */
+			PR0("initiating full reset (status=0x%x)", status);
+			vd_need_reset(vd, B_TRUE);
+			break;
+		}
 	}
+
 	PR2("Task finished");
 }
 
@@ -1894,6 +2126,7 @@ static uint_t
 vd_handle_ldc_events(uint64_t event, caddr_t arg)
 {
 	vd_t	*vd = (vd_t *)(void *)arg;
+	int	status;
 
 
 	ASSERT(vd != NULL);
@@ -1901,14 +2134,51 @@ vd_handle_ldc_events(uint64_t event, caddr_t arg)
 	if (!vd_enabled(vd))
 		return (LDC_SUCCESS);
 
+	if (event & LDC_EVT_DOWN) {
+		PRN("LDC_EVT_DOWN: LDC channel went down");
+
+		vd_need_reset(vd, B_TRUE);
+		status = ddi_taskq_dispatch(vd->startq, vd_recv_msg, vd,
+		    DDI_SLEEP);
+		if (status == DDI_FAILURE) {
+			PR0("cannot schedule task to recv msg\n");
+			vd_need_reset(vd, B_TRUE);
+		}
+	}
+
 	if (event & LDC_EVT_RESET) {
-		PR0("LDC channel was reset");
+		PR0("LDC_EVT_RESET: LDC channel was reset");
+
+		if (vd->state != VD_STATE_INIT) {
+			PR0("scheduling full reset");
+			vd_need_reset(vd, B_FALSE);
+			status = ddi_taskq_dispatch(vd->startq, vd_recv_msg,
+			    vd, DDI_SLEEP);
+			if (status == DDI_FAILURE) {
+				PR0("cannot schedule task to recv msg\n");
+				vd_need_reset(vd, B_TRUE);
+			}
+
+		} else {
+			PR0("channel already reset, ignoring...\n");
+			PR0("doing ldc up...\n");
+			(void) ldc_up(vd->ldc_handle);
+		}
+
 		return (LDC_SUCCESS);
 	}
 
 	if (event & LDC_EVT_UP) {
-		PR0("LDC channel came up:  Resetting client connection state");
+		PR0("EVT_UP: LDC is up\nResetting client connection state");
+		PR0("initiating soft reset");
 		vd_need_reset(vd, B_FALSE);
+		status = ddi_taskq_dispatch(vd->startq, vd_recv_msg,
+		    vd, DDI_SLEEP);
+		if (status == DDI_FAILURE) {
+			PR0("cannot schedule task to recv msg\n");
+			vd_need_reset(vd, B_TRUE);
+			return (LDC_SUCCESS);
+		}
 	}
 
 	if (event & LDC_EVT_READ) {
@@ -1918,8 +2188,11 @@ vd_handle_ldc_events(uint64_t event, caddr_t arg)
 		/* Queue a task to receive the new data */
 		status = ddi_taskq_dispatch(vd->startq, vd_recv_msg, vd,
 		    DDI_SLEEP);
-		/* ddi_taskq_dispatch(9f) guarantees success with DDI_SLEEP */
-		ASSERT(status == DDI_SUCCESS);
+
+		if (status == DDI_FAILURE) {
+			PR0("cannot schedule task to recv msg\n");
+			vd_need_reset(vd, B_TRUE);
+		}
 	}
 
 	return (LDC_SUCCESS);
@@ -1950,14 +2223,14 @@ vds_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		PR0("No action required for DDI_SUSPEND");
 		return (DDI_SUCCESS);
 	default:
-		PRN("Unrecognized \"cmd\"");
+		PR0("Unrecognized \"cmd\"");
 		return (DDI_FAILURE);
 	}
 
 	ASSERT(cmd == DDI_DETACH);
 	instance = ddi_get_instance(dip);
 	if ((vds = ddi_get_soft_state(vds_state, instance)) == NULL) {
-		PRN("Could not get state for instance %u", instance);
+		PR0("Could not get state for instance %u", instance);
 		ddi_soft_state_free(vds_state, instance);
 		return (DDI_FAILURE);
 	}
@@ -2219,11 +2492,11 @@ vd_setup_vd(char *device_path, vd_t *vd)
 
 	/* Initialize dk_geom structure for single-slice device */
 	if (vd->dk_geom.dkg_nsect == 0) {
-		PRN("%s geometry claims 0 sectors per track", device_path);
+		PR0("%s geometry claims 0 sectors per track", device_path);
 		return (EIO);
 	}
 	if (vd->dk_geom.dkg_nhead == 0) {
-		PRN("%s geometry claims 0 heads", device_path);
+		PR0("%s geometry claims 0 heads", device_path);
 		return (EIO);
 	}
 	vd->dk_geom.dkg_ncyl =
@@ -2316,20 +2589,24 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t ldc_id,
 	ldc_attr.mode		= LDC_MODE_UNRELIABLE;
 	ldc_attr.mtu		= VD_LDC_MTU;
 	if ((status = ldc_init(ldc_id, &ldc_attr, &vd->ldc_handle)) != 0) {
-		PRN("ldc_init(%lu) = errno %d", ldc_id, status);
+		PR0("ldc_init(%lu) = errno %d", ldc_id, status);
 		return (status);
 	}
 	vd->initialized |= VD_LDC;
 
 	if ((status = ldc_reg_callback(vd->ldc_handle, vd_handle_ldc_events,
 		(caddr_t)vd)) != 0) {
-		PRN("ldc_reg_callback() returned errno %d", status);
+		PR0("ldc_reg_callback() returned errno %d", status);
 		return (status);
 	}
 
 	if ((status = ldc_open(vd->ldc_handle)) != 0) {
-		PRN("ldc_open() returned errno %d", status);
+		PR0("ldc_open() returned errno %d", status);
 		return (status);
+	}
+
+	if ((status = ldc_up(vd->ldc_handle)) != 0) {
+		PRN("ldc_up() returned errno %d", status);
 	}
 
 	/* Allocate the inband task memory handle */
@@ -2345,7 +2622,31 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t ldc_id,
 		return (EIO);
 	}
 
+	/* Allocate the staging buffer */
+	vd->max_msglen	= sizeof (vio_msg_t);	/* baseline vio message size */
+	vd->vio_msgp = kmem_alloc(vd->max_msglen, KM_SLEEP);
+
+	/* store initial state */
+	vd->state = VD_STATE_INIT;
+
 	return (0);
+}
+
+static void
+vd_free_dring_task(vd_t *vdp)
+{
+	if (vdp->dring_task != NULL) {
+		ASSERT(vdp->dring_len != 0);
+		/* Free all dring_task memory handles */
+		for (int i = 0; i < vdp->dring_len; i++) {
+			(void) ldc_mem_free_handle(vdp->dring_task[i].mhdl);
+			kmem_free(vdp->dring_task[i].msg, vdp->max_msglen);
+			vdp->dring_task[i].msg = NULL;
+		}
+		kmem_free(vdp->dring_task,
+		    (sizeof (*vdp->dring_task)) * vdp->dring_len);
+		vdp->dring_task = NULL;
+	}
 }
 
 /*
@@ -2380,13 +2681,18 @@ vds_destroy_vd(void *arg)
 	if (vd->completionq != NULL)
 		ddi_taskq_destroy(vd->completionq);	/* waits for tasks */
 
-	if (vd->dring_task != NULL) {
-		ASSERT(vd->dring_len != 0);
-		/* Free all dring_task memory handles */
-		for (int i = 0; i < vd->dring_len; i++)
-			(void) ldc_mem_free_handle(vd->dring_task[i].mhdl);
-		kmem_free(vd->dring_task,
-		    (sizeof (*vd->dring_task)) * vd->dring_len);
+	vd_free_dring_task(vd);
+
+	/* Free the staging buffer for msgs */
+	if (vd->vio_msgp != NULL) {
+		kmem_free(vd->vio_msgp, vd->max_msglen);
+		vd->vio_msgp = NULL;
+	}
+
+	/* Free the inband message buffer */
+	if (vd->inband_task.msg != NULL) {
+		kmem_free(vd->inband_task.msg, vd->max_msglen);
+		vd->inband_task.msg = NULL;
 	}
 
 	/* Free the inband task memory handle */
@@ -2424,10 +2730,6 @@ vds_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t ldc_id)
 	int	status;
 	vd_t	*vd = NULL;
 
-
-#ifdef lint
-	(void) vd;
-#endif	/* lint */
 
 	if ((status = vds_do_init_vd(vds, id, device_path, ldc_id, &vd)) != 0)
 		vds_destroy_vd(vd);
@@ -2589,9 +2891,11 @@ vds_change_vd(vds_t *vds, md_t *prev_md, mde_cookie_t prev_vd_node,
 		return;	/* no relevant (supported) change */
 
 	PR0("Changing vdisk ID %lu", prev_id);
+
 	/* Remove old state, which will close vdisk and reset */
 	if (mod_hash_destroy(vds->vd_table, (mod_hash_key_t)prev_id) != 0)
 		PRN("No entry found for vdisk ID %lu", prev_id);
+
 	/* Re-initialize vdisk with new state */
 	if (vds_init_vd(vds, curr_id, curr_dev, curr_ldc_id) != 0) {
 		PRN("Failed to change vdisk ID %lu", curr_id);

@@ -116,6 +116,10 @@ vio_create_mblks(uint64_t num_mblks, size_t mblk_size, vio_mblk_pool_t **poolp)
 int
 vio_destroy_mblks(vio_mblk_pool_t *vmplp)
 {
+	uint64_t i;
+	uint64_t num_mblks;
+	vio_mblk_t *vmp;
+
 	if (vmplp == NULL)
 		return (EINVAL);
 
@@ -128,9 +132,26 @@ vio_destroy_mblks(vio_mblk_pool_t *vmplp)
 		return (EBUSY);
 	}
 
-	kmem_free(vmplp->basep, vmplp->quelen * sizeof (vio_mblk_t));
-	kmem_free(vmplp->datap, vmplp->quelen * vmplp->mblk_size);
-	kmem_free(vmplp->quep, vmplp->quelen * sizeof (vio_mblk_t *));
+	num_mblks = vmplp->quelen;
+
+	/*
+	 * Set pool flag to tell vio_freeb() which is invoked from freeb(),
+	 * that it is being called in the context of vio_destroy_mblks().
+	 * This results in freeing only mblk_t and dblk_t structures for
+	 * each mp. The associated data buffers are freed below as one big
+	 * chunk through kmem_free(vmplp->datap).
+	 */
+	vmplp->flag |= VMPL_FLAG_DESTROYING;
+	for (i = 0; i < num_mblks; i++) {
+		vmp = &(vmplp->basep[i]);
+		if (vmp->mp)
+			freeb(vmp->mp);
+	}
+	vmplp->flag &= ~(VMPL_FLAG_DESTROYING);
+
+	kmem_free(vmplp->basep, num_mblks * sizeof (vio_mblk_t));
+	kmem_free(vmplp->datap, num_mblks * vmplp->mblk_size);
+	kmem_free(vmplp->quep, num_mblks * sizeof (vio_mblk_t *));
 
 	mutex_destroy(&vmplp->hlock);
 	mutex_destroy(&vmplp->tlock);
@@ -173,6 +194,17 @@ vio_freeb(void *arg)
 {
 	vio_mblk_t	*vmp = (vio_mblk_t *)arg;
 	vio_mblk_pool_t	*vmplp = vmp->vmplp;
+
+	if (vmplp->flag & VMPL_FLAG_DESTROYING) {
+		/*
+		 * This flag indicates that freeb() is being called from
+		 * vio_destroy_mblks().
+		 * We don't need to alloc a new mblk_t/dblk_t pair for
+		 * this data buffer, return from here and the data buffer
+		 * itself will be freed in vio_destroy_mblks().
+		 */
+		return;
+	}
 
 	vmp->mp = desballoc(vmp->datap, vmplp->mblk_size,
 					BPRI_MED, &vmp->reclaim);

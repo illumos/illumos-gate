@@ -249,28 +249,32 @@ _fini(void)
 static uint_t
 i_vldc_cb(uint64_t event, caddr_t arg)
 {
-	vldc_port_t *vport = (vldc_port_t *)arg;
-	short pollevents = 0;
-	int rv;
+	vldc_port_t	*vport = (vldc_port_t *)arg;
+	short		pollevents = 0;
 
-	D1("i_vldc_cb: callback invoked port=%d, event=0x%lx\n",
-	    vport->number, event);
+	D1("i_vldc_cb: vldc@%d:%d callback invoked, channel=0x%lx, "
+	    "event=0x%lx\n", vport->inst, vport->number, vport->ldc_id, event);
 
 	if (event & LDC_EVT_UP) {
 		pollevents |= POLLOUT;
 		vport->hanged_up = B_FALSE;
 
-	} else if (event & LDC_EVT_DOWN) {
-		pollevents |= POLLHUP;
-		vport->hanged_up = B_TRUE;
-
 	} else if (event & LDC_EVT_RESET) {
-		/* do an ldc_up because we can't be sure the other side will */
-		if ((rv = ldc_up(vport->ldc_handle)) != 0)
-			if (rv != ECONNREFUSED)
-				DWARN("i_vldc_cb: port@%d failed to"
-				    " bring up LDC channel=%ld, err=%d\n",
-				    vport->number, vport->ldc_id, rv);
+		/*
+		 * Mark the port in reset. This implies that it
+		 * cannot be used until it has been closed and
+		 * reopened.
+		 */
+		if (vport->status != VLDC_PORT_CLOSED)
+			vport->status = VLDC_PORT_RESET;
+		return (LDC_SUCCESS);
+
+	} else if (event & LDC_EVT_DOWN) {
+		/*
+		 * The other side went away
+		 */
+		vport->hanged_up = B_TRUE;
+		pollevents = POLLHUP;
 	}
 
 	if (event & LDC_EVT_READ)
@@ -592,19 +596,20 @@ i_vldc_add_port(vldc_t *vldcp, md_t *mdp, mde_cookie_t node)
 
 	ASSERT(vldcp->minor_tbl[minor_idx].portno == VLDC_INVALID_PORTNO);
 
+	vldc_inst = ddi_get_instance(vldcp->dip);
+
+	vport->inst = vldc_inst;
 	vport->minorp = &vldcp->minor_tbl[minor_idx];
 	vldcp->minor_tbl[minor_idx].portno = portno;
 	vldcp->minor_tbl[minor_idx].in_use = 0;
 
-	D1("i_vldc_add_port: port@%d  mtu=%d, ldc=%ld, service=%s\n",
-	    vport->number, vport->mtu, vport->ldc_id, sname);
+	D1("i_vldc_add_port: vldc@%d:%d  mtu=%d, ldc=%ld, service=%s\n",
+	    vport->inst, vport->number, vport->mtu, vport->ldc_id, sname);
 
 	/*
 	 * Create a minor node. The minor number is
 	 * (vldc_inst << VLDC_INST_SHIFT) | minor_idx
 	 */
-	vldc_inst = ddi_get_instance(vldcp->dip);
-
 	minor = (vldc_inst << VLDC_INST_SHIFT) | (minor_idx);
 
 	rv = ddi_create_minor_node(vldcp->dip, sname, S_IFCHR,
@@ -663,8 +668,7 @@ i_vldc_remove_port(vldc_t *vldcp, uint_t portno)
 		cv_wait(&vminor->cv, &vminor->lock);
 	}
 
-	if ((vport->status == VLDC_PORT_READY) ||
-	    (vport->status == VLDC_PORT_OPEN)) {
+	if (vport->status != VLDC_PORT_CLOSED) {
 		/* close the port before it is torn down */
 		(void) i_vldc_close_port(vldcp, portno);
 	}
@@ -697,6 +701,8 @@ i_vldc_ldc_close(vldc_port_t *vport)
 	if ((err != 0) && (rv != 0))
 		rv = err;
 
+	vport->status = VLDC_PORT_OPEN;
+
 	return (rv);
 }
 
@@ -704,26 +710,30 @@ i_vldc_ldc_close(vldc_port_t *vport)
 static int
 i_vldc_close_port(vldc_t *vldcp, uint_t portno)
 {
-	vldc_port_t *vport;
-	int rv;
+	vldc_port_t	*vport;
+	int		rv = DDI_SUCCESS;
 
 	vport = &(vldcp->port[portno]);
 
 	ASSERT(MUTEX_HELD(&vport->minorp->lock));
 
-	if (vport->status == VLDC_PORT_CLOSED) {
+	D1("i_vldc_close_port: vldc@%d:%d: closing port\n",
+	    vport->inst, vport->minorp->portno);
+
+	switch (vport->status) {
+	case VLDC_PORT_CLOSED:
 		/* nothing to do */
 		DWARN("i_vldc_close_port: port %d in an unexpected "
 		    "state (%d)\n", portno, vport->status);
 		return (DDI_SUCCESS);
+
+	case VLDC_PORT_READY:
+	case VLDC_PORT_RESET:
+		rv = i_vldc_ldc_close(vport);
+		break;
 	}
 
-	rv = DDI_SUCCESS;
-	if (vport->status == VLDC_PORT_READY) {
-		rv = i_vldc_ldc_close(vport);
-	} else {
-		ASSERT(vport->status == VLDC_PORT_OPEN);
-	}
+	ASSERT(vport->status == VLDC_PORT_OPEN);
 
 	/* free memory */
 	kmem_free(vport->send_buf, vport->mtu);
@@ -988,7 +998,6 @@ vldc_set_ldc_mode(vldc_port_t *vport, vldc_t *vldcp, int channel_mode)
 
 	if (vport->status == VLDC_PORT_READY) {
 		rv = i_vldc_ldc_close(vport);
-		vport->status = VLDC_PORT_OPEN;
 		if (rv != 0) {
 			DWARN("vldc_set_ldc_mode: i_vldc_ldc_close "
 			    "failed, rv=%d\n", rv);
@@ -1087,7 +1096,7 @@ i_vldc_ioctl_read_cookie(vldc_port_t *vport, int vldc_instance, void *arg,
 		    dst_addr, copy_size, src_addr);
 
 		/* read from the HV into the temporary buffer */
-		rv = ldc_mem_rdwr_pa(vport->ldc_handle, vport->cookie_buf,
+		rv = ldc_mem_rdwr_cookie(vport->ldc_handle, vport->cookie_buf,
 		    &copy_size, dst_addr, LDC_COPY_IN);
 		if (rv != 0) {
 			DWARN("i_vldc_ioctl_read_cookie: vldc@%d:%d cannot "
@@ -1164,7 +1173,7 @@ i_vldc_ioctl_write_cookie(vldc_port_t *vport, int vldc_instance, void *arg,
 		mutex_enter(&vport->minorp->lock);
 
 		/* write the data from the temporary buffer to the HV */
-		rv = ldc_mem_rdwr_pa(vport->ldc_handle, vport->cookie_buf,
+		rv = ldc_mem_rdwr_cookie(vport->ldc_handle, vport->cookie_buf,
 		    &copy_size, dst_addr, LDC_COPY_OUT);
 		if (rv != 0) {
 			DWARN("i_vldc_ioctl_write_cookie: vldc@%d:%d "

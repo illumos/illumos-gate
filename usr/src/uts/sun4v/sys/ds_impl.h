@@ -210,6 +210,7 @@ typedef uint64_t ds_portset_t;
 /*
  * Machine Description Constants
  */
+#define	DS_MD_ROOT_NAME		"domain-services"
 #define	DS_MD_PORT_NAME		"domain-services-port"
 #define	DS_MD_CHAN_NAME		"channel-endpoint"
 

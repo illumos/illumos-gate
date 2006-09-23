@@ -90,6 +90,9 @@ extern "C" {
  *
  */
 
+/* mblk pool flags */
+#define	VMPL_FLAG_DESTROYING	0x1	/* pool is being destroyed */
+
 struct vio_mblk_pool;
 
 typedef struct vio_mblk {
@@ -111,6 +114,7 @@ typedef struct vio_mblk_pool {
 	uint64_t		quelen;	/* queue len (# mblks) */
 	uint64_t		quemask; /* quelen - 1 */
 	size_t			mblk_size; /* data buf size of each mblk */
+	uint32_t		flag;	/* pool-related flags */
 } vio_mblk_pool_t;
 
 int vio_create_mblks(uint64_t num_mblks,

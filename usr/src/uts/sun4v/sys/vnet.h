@@ -39,8 +39,6 @@ extern "C" {
 #define	KMEM_FREE(_p)		kmem_free((_p), sizeof (*(_p)))
 
 #define	VNET_NTXDS		512		/* power of 2 tx descriptors */
-#define	VNET_RECLAIM_LOWAT	32		/* tx reclaim low watermark */
-#define	VNET_RECLAIM_HIWAT	(512 - 32)	/* tx reclaim high watermark */
 #define	VNET_LDCWD_INTERVAL	1000		/* watchdog freq in msec */
 #define	VNET_LDCWD_TXTIMEOUT	1000		/* tx timeout in msec */
 #define	VNET_LDC_MTU		64		/* ldc mtu */

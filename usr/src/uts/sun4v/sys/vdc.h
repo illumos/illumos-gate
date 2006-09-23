@@ -151,13 +151,36 @@ extern "C" {
 		dmsg.seq_num = vdc->seq_num;
 
 /*
- * The states the message processing thread can be in.
+ * The states that the read thread can be in.
  */
-typedef enum vdc_thr_state {
-	VDC_THR_RUNNING,	/* thread is running & ready to process */
-	VDC_THR_STOP,		/* The detach func signals the thread to stop */
-	VDC_THR_DONE		/* Thread has exited */
-} vdc_thr_state_t;
+typedef enum vdc_rd_state {
+	VDC_READ_IDLE,			/* idling - conn is not up */
+	VDC_READ_WAITING,		/* waiting for data */
+	VDC_READ_PENDING,		/* pending data avail for read */
+	VDC_READ_RESET			/* channel was reset - stop reads */
+} vdc_rd_state_t;
+
+/*
+ * The states that the vdc-vds connection can be in.
+ */
+typedef enum vdc_state {
+	VDC_STATE_INIT,			/* device is initialized */
+	VDC_STATE_INIT_WAITING,		/* waiting for ldc connection */
+	VDC_STATE_NEGOTIATE,		/* doing handshake negotiation */
+	VDC_STATE_HANDLE_PENDING,	/* handle requests in backup dring */
+	VDC_STATE_RUNNING,		/* running and accepting requests */
+	VDC_STATE_DETACH,		/* detaching */
+	VDC_STATE_RESETTING		/* resetting connection with vds */
+} vdc_state_t;
+
+/*
+ * The states that the vdc instance can be in.
+ */
+typedef enum vdc_lc_state {
+	VDC_LC_ATTACHING,	/* driver is attaching */
+	VDC_LC_ONLINE,		/* driver is attached and online */
+	VDC_LC_DETACHING	/* driver is detaching */
+} vdc_lc_state_t;
 
 /*
  * Local Descriptor Ring entry
@@ -165,42 +188,78 @@ typedef enum vdc_thr_state {
  * vdc creates a Local (private) descriptor ring the same size as the
  * public descriptor ring it exports to vds.
  */
+
+typedef enum {
+	VIO_read_dir,		/* read data from server */
+	VIO_write_dir,		/* write data to server */
+	VIO_both_dir		/* transfer both in and out in same buffer */
+} vio_desc_direction_t;
+
+typedef enum {
+	CB_STRATEGY,		/* non-blocking strategy call */
+	CB_SYNC			/* synchronous operation */
+} vio_cb_type_t;
+
 typedef struct vdc_local_desc {
-	kmutex_t		lock;		/* protects all fields */
-	kcondvar_t		cv;		/* indicate processing done */
-	int			flags;		/* Dring entry state, etc */
+	boolean_t		is_free;	/* local state - inuse or not */
+
 	int			operation;	/* VD_OP_xxx to be performed */
 	caddr_t			addr;		/* addr passed in by consumer */
+	int			slice;
+	diskaddr_t		offset;		/* disk offset */
+	size_t			nbytes;
+	vio_cb_type_t		cb_type;	/* operation type blk/nonblk */
+	void			*cb_arg;	/* buf passed to strategy() */
+	vio_desc_direction_t	dir;		/* direction of transfer */
+
 	caddr_t			align_addr;	/* used if addr non-aligned */
-	struct buf 		*buf;		/* buf passed to strategy() */
 	ldc_mem_handle_t	desc_mhdl;	/* Mem handle of buf */
 	vd_dring_entry_t	*dep;		/* public Dring Entry Pointer */
+
 } vdc_local_desc_t;
 
 /*
  * vdc soft state structure
  */
 typedef struct vdc {
-	kmutex_t	attach_lock;	/* used by CV which waits in attach */
-	kcondvar_t	attach_cv;	/* signal when attach can finish */
 
 	kmutex_t	lock;		/* protects next 2 sections of vars */
-	kcondvar_t	cv;		/* signal when upper layers can send */
+	kcondvar_t	running_cv;	/* signal when upper layers can send */
+	kcondvar_t	initwait_cv;	/* signal when ldc conn is up */
+	kcondvar_t	dring_free_cv;	/* signal when desc is avail */
+	kcondvar_t	membind_cv;	/* signal when mem can be bound */
+	boolean_t	self_reset;
 
 	int		initialized;	/* keeps track of what's init'ed */
+	vdc_lc_state_t	lifecycle;	/* Current state of the vdc instance */
+
 	int		hshake_cnt;	/* number of failed handshakes */
-	int		open;		/* count of outstanding opens */
-	int		dkio_flush_pending;	/* # outstanding DKIO flushes */
+	int		open_count;	/* count of outstanding opens */
+	int		dkio_flush_pending; /* # outstanding DKIO flushes */
+
+	kthread_t	*msg_proc_thr;	/* main msg processing thread */
+
+	kmutex_t	read_lock;	/* lock to protect read */
+	kcondvar_t	read_cv;	/* cv to wait for READ events */
+	vdc_rd_state_t	read_state;	/* current read state */
+
+	uint32_t	sync_op_cnt;	/* num of active sync operations */
+	boolean_t	sync_op_pending; /* sync operation is pending */
+	boolean_t	sync_op_blocked; /* blocked waiting to do sync op */
+	uint32_t	sync_op_status;	/* status of sync operation */
+	kcondvar_t	sync_pending_cv; /* cv wait for sync op to finish */
+	kcondvar_t	sync_blocked_cv; /* cv wait for other syncs to finish */
 
 	uint64_t	session_id;	/* common ID sent with all messages */
 	uint64_t	seq_num;	/* most recent sequence num generated */
 	uint64_t	seq_num_reply;	/* Last seq num ACK/NACK'ed by vds */
 	uint64_t	req_id;		/* Most recent Request ID generated */
 	uint64_t	req_id_proc;	/* Last request ID processed by vdc */
-	vd_state_t	state;		/* Current handshake state */
+	vdc_state_t	state;		/* Current disk client-server state */
 
 	dev_info_t	*dip;		/* device info pointer */
 	int		instance;	/* driver instance number */
+
 	vio_ver_t	ver;		/* version number agreed with server */
 	vd_disk_type_t	vdisk_type;	/* type of device/disk being imported */
 	vd_disk_label_t vdisk_label; 	/* label type of device/disk imported */
@@ -213,40 +272,26 @@ typedef struct vdc {
 	struct vtoc	*vtoc;		/* structure to store VTOC data */
 	ddi_devid_t	devid;		/* device id */
 
-	/*
-	 * The mutex 'msg_proc_lock' protects the following group of fields.
-	 *
-	 * The callback function checks to see if LDC triggered it due to
-	 * there being data available and the callback will signal to
-	 * the message processing thread waiting on 'msg_proc_cv'.
-	 */
-	kmutex_t		msg_proc_lock;
-	kcondvar_t		msg_proc_cv;
-	boolean_t		msg_pending;
-	vdc_thr_state_t		msg_proc_thr_state;
-	kthread_t		*msg_proc_thr_id;
+	ldc_mem_info_t		dring_mem_info;		/* dring information */
+	uint_t			dring_curr_idx;		/* current index */
+	uint32_t		dring_len;		/* dring length */
+	uint32_t		dring_max_cookies;	/* dring max cookies */
+	uint32_t		dring_cookie_count;	/* num cookies */
+	uint32_t		dring_entry_size;	/* descriptor size */
+	ldc_mem_cookie_t 	*dring_cookie;		/* dring cookies */
+	uint64_t		dring_ident;		/* dring ident */
 
-	/*
-	 * The mutex 'dring_lock'  protects the following group of fields.
-	 */
-	kmutex_t		dring_lock;
-	ldc_mem_info_t		dring_mem_info;
-	uint_t			dring_curr_idx;
-	uint_t			dring_proc_idx;
-	uint32_t		dring_len;
-	uint32_t		dring_max_cookies;
-	uint32_t		dring_cookie_count;
-	uint32_t		dring_entry_size;
-	boolean_t		dring_notify_server;
-	ldc_mem_cookie_t	*dring_cookie;
-	uint64_t		dring_ident;
+	uint64_t		threads_pending; 	/* num of threads */
 
-	vdc_local_desc_t	*local_dring;
+	vdc_local_desc_t	*local_dring;		/* local dring */
+	vdc_local_desc_t	*local_dring_backup;	/* local dring backup */
+	int			local_dring_backup_tail; /* backup dring tail */
+	int			local_dring_backup_len;	/* backup dring len */
 
-	uint64_t		ldc_id;
-	ldc_status_t		ldc_state;
-	ldc_handle_t		ldc_handle;
-	ldc_dring_handle_t	ldc_dring_hdl;
+	uint64_t		ldc_id;			/* LDC channel id */
+	ldc_status_t		ldc_state;		/* LDC channel state */
+	ldc_handle_t		ldc_handle;		/* LDC handle */
+	ldc_dring_handle_t	ldc_dring_hdl;		/* LDC dring handle */
 } vdc_t;
 
 /*
@@ -254,21 +299,33 @@ typedef struct vdc {
  */
 #ifdef DEBUG
 extern int	vdc_msglevel;
+extern uint64_t	vdc_matchinst;
 
-#define	DMSG(err_level, format, ...)					\
+#define	DMSG(_vdc, err_level, format, ...)				\
+	do {								\
+		if (vdc_msglevel > err_level &&				\
+		(vdc_matchinst & (1ull << (_vdc)->instance)))		\
+			cmn_err(CE_CONT, "?[%d,t@%p] %s: "format,	\
+			(_vdc)->instance, (void *)curthread,		\
+			__func__, __VA_ARGS__);				\
+		_NOTE(CONSTANTCONDITION)				\
+	} while (0);
+
+#define	DMSGX(err_level, format, ...)					\
 	do {								\
 		if (vdc_msglevel > err_level)				\
-			cmn_err(CE_CONT, "?%s"format, __func__, __VA_ARGS__);\
+			cmn_err(CE_CONT, "?%s: "format, __func__, __VA_ARGS__);\
 		_NOTE(CONSTANTCONDITION)				\
 	} while (0);
 
 #define	VDC_DUMP_DRING_MSG(dmsgp)					\
-		DMSG(0, "sq:%lu start:%d end:%d ident:%lu\n",		\
+		DMSGX(0, "sq:%lu start:%d end:%d ident:%lu\n",		\
 			dmsgp->seq_num, dmsgp->start_idx,		\
 			dmsgp->end_idx, dmsgp->dring_ident);
 
 #else	/* !DEBUG */
 #define	DMSG(err_level, ...)
+#define	DMSGX(err_level, format, ...)
 #define	VDC_DUMP_DRING_MSG(dmsgp)
 
 #endif	/* !DEBUG */

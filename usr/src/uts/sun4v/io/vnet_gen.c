@@ -79,7 +79,8 @@ static void vgen_ioctl(void *arg, queue_t *wq, mblk_t *mp);
 /* externs - functions provided by vnet to add/remove/modify entries in fdb */
 void vnet_add_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg);
 void vnet_del_fdb(void *arg, uint8_t *macaddr);
-void vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg);
+void vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx,
+	void *txarg, boolean_t upgrade);
 void vnet_add_def_rte(void *arg, mac_tx_t m_tx, void *txarg);
 void vnet_del_def_rte(void *arg);
 void vnet_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp);
@@ -153,20 +154,22 @@ static void vgen_reset_hphase(vgen_ldc_t *ldcp);
 static void vgen_handshake(vgen_ldc_t *ldcp);
 static int vgen_handshake_done(vgen_ldc_t *ldcp);
 static void vgen_handshake_retry(vgen_ldc_t *ldcp);
-static void vgen_handle_version_negotiate(vgen_ldc_t *ldcp,
+static int vgen_handle_version_negotiate(vgen_ldc_t *ldcp,
 	vio_msg_tag_t *tagp);
-static void vgen_handle_attr_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
-static void vgen_handle_dring_reg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
-static void vgen_handle_rdx_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
-static void vgen_handle_mcast_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
-static void vgen_handle_ctrlmsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
-static void vgen_handle_dring_data(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
+static int vgen_handle_attr_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
+static int vgen_handle_dring_reg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
+static int vgen_handle_rdx_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
+static int vgen_handle_mcast_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
+static int vgen_handle_ctrlmsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
+static int vgen_handle_dring_data(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
 	mblk_t **headp, mblk_t **tailp);
-static void vgen_send_dring_ack(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
+static int vgen_send_dring_ack(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
 	uint32_t start, int32_t end, uint8_t pstate);
-static void vgen_handle_datamsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
+static int vgen_handle_datamsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
 	mblk_t **headp, mblk_t **tailp);
 static void vgen_handle_errmsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
+static void vgen_handle_evt_up(vgen_ldc_t *ldcp, boolean_t flag);
+static void vgen_handle_evt_reset(vgen_ldc_t *ldcp, boolean_t flag);
 static int vgen_check_sid(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
 static uint64_t	vgen_macaddr_strtoul(const uint8_t *macaddr);
 static int vgen_macaddr_ultostr(uint64_t value, uint8_t *macaddr);
@@ -301,8 +304,6 @@ static mac_callbacks_t vgen_m_callbacks = {
 
 /* externs */
 extern uint32_t vnet_ntxds;
-extern uint32_t vnet_reclaim_lowat;
-extern uint32_t vnet_reclaim_hiwat;
 extern uint32_t vnet_ldcwd_interval;
 extern uint32_t vnet_ldcwd_txtimeout;
 extern uint32_t vnet_ldc_mtu;
@@ -313,7 +314,7 @@ extern void _vnetdebug_printf(void *vnetp, const char *fmt, ...);
 #ifdef DEBUG
 
 /*
- * XXX: definitions below need to be in sync with those in vnet.c
+ * NOTE: definitions below need to be in sync with those in vnet.c
  */
 
 /*
@@ -593,7 +594,7 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 {
 	void		*vnetp;
 	size_t		size;
-	int		rv;
+	int		rv = 0;
 	uint64_t	tbuf_ix;
 	vgen_private_desc_t	*tbufp;
 	vgen_private_desc_t	*ntbufp;
@@ -603,10 +604,10 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 	struct ether_header	*ehp;
 	boolean_t	is_bcast = B_FALSE;
 	boolean_t	is_mcast = B_FALSE;
-	boolean_t	need_intr = B_FALSE;
 	size_t		mblksz;
 	caddr_t		dst;
 	mblk_t		*bp;
+	ldc_status_t	istatus;
 
 	vnetp = LDC_TO_VNET(ldcp);
 	statsp = ldcp->statsp;
@@ -683,8 +684,6 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 	/* initialize the corresponding public descriptor (txd) */
 	txdp = tbufp->descp;
 	hdrp = &txdp->hdr;
-	if (need_intr)
-		hdrp->ack = B_TRUE;
 	txdp->nbytes = size;
 	txdp->ncookies = tbufp->ncookies;
 	bcopy((tbufp->memcookie), (txdp->memcookie),
@@ -725,6 +724,35 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 
 vgen_tx_exit:
 	mutex_exit(&ldcp->txlock);
+
+	if (rv == ECONNRESET) {
+		/*
+		 * Check if either callback thread or another tx thread is
+		 * already running. Calling mutex_enter() will result in a
+		 * deadlock if the other thread already holds cblock and is
+		 * blocked in vnet_modify_fdb() (which is called from
+		 * vgen_handle_evt_reset()) waiting for write access on rwlock,
+		 * as this transmit thread already holds that lock as a reader
+		 * in vnet_m_tx(). See comments in vnet_modify_fdb() in vnet.c.
+		 */
+		if (mutex_tryenter(&ldcp->cblock)) {
+			if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
+				DWARN((vnetp,
+				    "vgen_ldcsend: ldc_status err id(%lx)\n"));
+			} else {
+				ldcp->ldc_status = istatus;
+			}
+			if (ldcp->ldc_status != LDC_UP) {
+				/*
+				 * Second arg is TRUE, as we know that
+				 * the caller of this function - vnet_m_tx(),
+				 * already holds fdb-rwlock as a reader.
+				 */
+				vgen_handle_evt_reset(ldcp, B_TRUE);
+			}
+			mutex_exit(&ldcp->cblock);
+		}
+	}
 
 	DBG1((vnetp, "vgen_ldcsend: exit: ldcid (%lx)\n", ldcp->ldc_id));
 
@@ -1477,7 +1505,7 @@ vgen_update_port(vgen_t *vgenp, md_t *curr_mdp, mde_cookie_t curr_mdex,
 {
 	 _NOTE(ARGUNUSED(vgenp, curr_mdp, curr_mdex, prev_mdp, prev_mdex))
 
-	/* XXX: TBD */
+	/* NOTE: TBD */
 	return (DDI_SUCCESS);
 }
 
@@ -1526,8 +1554,6 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 	}
 	ldcp->ldc_id = ldc_id;
 	ldcp->portp = portp;
-	ldcp->reclaim_lowat = vnet_reclaim_lowat;
-	ldcp->reclaim_hiwat = vnet_reclaim_hiwat;
 
 	attach_state |= AST_ldc_alloc;
 
@@ -1793,12 +1819,10 @@ vgen_ldc_init(vgen_ldc_t *ldcp)
 	void *vnetp = LDC_TO_VNET(ldcp);
 	ldc_status_t	istatus;
 	int		rv;
-	enum		{ ST_init = 0x0, ST_init_tbufs = 0x1,
-			    ST_ldc_open = 0x2, ST_dring_bind = 0x4,
-			    ST_cb_enable = 0x8
+	enum		{ ST_init = 0x0, ST_ldc_open = 0x1,
+			    ST_init_tbufs = 0x2, ST_cb_enable = 0x4
 			    }
 			init_state;
-	uint32_t	ncookies = 0;
 	uint32_t	retries = 0;
 
 	init_state = ST_init;
@@ -1832,24 +1856,10 @@ vgen_ldc_init(vgen_ldc_t *ldcp)
 	}
 	init_state |= ST_init_tbufs;
 
-	/* Bind descriptor ring to the channel */
-	rv = ldc_mem_dring_bind(ldcp->ldc_handle, ldcp->tx_dhandle,
-	    LDC_SHADOW_MAP, LDC_MEM_RW, &ldcp->tx_dcookie, &ncookies);
-	if (rv != 0) {
-		DWARN((vnetp, "vgen_ldcinit: id (%lx) "
-		    "ldc_mem_dring_bind failed rv(%x)\n", ldcp->ldc_id, rv));
-		goto ldcinit_failed;
-	}
-
-	ASSERT(ncookies == 1);
-	ldcp->num_txdcookies = ncookies;
-
-	init_state |= ST_dring_bind;
-
 	rv = ldc_set_cb_mode(ldcp->ldc_handle, LDC_CB_ENABLE);
 	if (rv != 0) {
-		DWARN((vnetp, "vgen_ldc_init: id (%lx) "
-		    "ldc_set_cb_mode failed\n", ldcp->ldc_id));
+		DWARN((vnetp, "vgen_ldc_init: ldc_set_cb_mode failed: id(%lx) "
+		    "rv(%d)\n", ldcp->ldc_id, rv));
 		goto ldcinit_failed;
 	}
 
@@ -1868,27 +1878,57 @@ vgen_ldc_init(vgen_ldc_t *ldcp)
 	} while (rv == EWOULDBLOCK);
 
 	(void) ldc_status(ldcp->ldc_handle, &istatus);
-	if (istatus != LDC_UP) {
-		DBG2((vnetp, "vgen_ldcinit: id(%lx) status(%d) is not UP\n",
+	if (istatus == LDC_UP) {
+		DWARN((vnetp, "vgen_ldc_init: id(%lx) status(%d) is UP\n",
 		    ldcp->ldc_id, istatus));
 	}
+
 	ldcp->ldc_status = istatus;
 
 	/* initialize transmit watchdog timeout */
 	ldcp->wd_tid = timeout(vgen_ldc_watchdog, (caddr_t)ldcp,
 	    drv_usectohz(vnet_ldcwd_interval * 1000));
 
+	ldcp->hphase = -1;
 	ldcp->flags |= CHANNEL_STARTED;
 
-	LDC_UNLOCK(ldcp);
+	/* if channel is already UP - start handshake */
+	if (istatus == LDC_UP) {
+		vgen_t *vgenp = LDC_TO_VGEN(ldcp);
+		if (ldcp->portp != vgenp->vsw_portp) {
+			/*
+			 * modify fdb entry to use this port as the
+			 * channel is up, instead of going through the
+			 * vsw-port (see comments in vgen_port_init())
+			 */
+			vnet_modify_fdb(vnetp,
+			    (uint8_t *)&ldcp->portp->macaddr,
+			    vgen_tx, ldcp->portp, B_FALSE);
+		}
+
+		/* Initialize local session id */
+		ldcp->local_sid = ddi_get_lbolt();
+
+		/* clear peer session id */
+		ldcp->peer_sid = 0;
+		ldcp->hretries = 0;
+
+		/* Initiate Handshake process with peer ldc endpoint */
+		vgen_reset_hphase(ldcp);
+
+		mutex_exit(&ldcp->tclock);
+		mutex_exit(&ldcp->txlock);
+		vgen_handshake(vh_nextphase(ldcp));
+		mutex_exit(&ldcp->cblock);
+	} else {
+		LDC_UNLOCK(ldcp);
+	}
+
 	return (DDI_SUCCESS);
 
 ldcinit_failed:
 	if (init_state & ST_cb_enable) {
 		(void) ldc_set_cb_mode(ldcp->ldc_handle, LDC_CB_DISABLE);
-	}
-	if (init_state & ST_dring_bind) {
-		(void) ldc_mem_dring_unbind(ldcp->tx_dhandle);
 	}
 	if (init_state & ST_init_tbufs) {
 		vgen_uninit_tbufs(ldcp);
@@ -1924,12 +1964,6 @@ vgen_ldc_uninit(vgen_ldc_t *ldcp)
 		    "ldc_set_cb_mode failed\n", ldcp->ldc_id));
 	}
 
-	rv = ldc_down(ldcp->ldc_handle);
-	if (rv != 0) {
-		DWARN((vnetp, "vgen_ldc_uninit: id (%lx) "
-		    "ldc_down failed\n", ldcp->ldc_id));
-	}
-
 	/* clear handshake done bit and wait for pending tx and cb to finish */
 	ldcp->hphase &= ~(VH_DONE);
 	LDC_UNLOCK(ldcp);
@@ -1942,13 +1976,6 @@ vgen_ldc_uninit(vgen_ldc_t *ldcp)
 	if (ldcp->wd_tid) {
 		(void) untimeout(ldcp->wd_tid);
 		ldcp->wd_tid = 0;
-	}
-
-	/* unbind tx descriptor ring from the channel */
-	rv = ldc_mem_dring_unbind(ldcp->tx_dhandle);
-	if (rv != 0) {
-		DWARN((vnetp, "vgen_ldcuninit: ldc_mem_dring_unbind "
-		    "failed id(%lx)\n", ldcp->ldc_id));
 	}
 
 	vgen_uninit_tbufs(ldcp);
@@ -2303,6 +2330,105 @@ vgen_ldc_stat(vgen_ldc_t *ldcp, uint_t stat)
 	return (val);
 }
 
+/*
+ * LDC channel is UP, start handshake process with peer.
+ * Flag tells vnet_modify_fdb() about the context: set to B_TRUE if this
+ * function is being called from transmit routine, otherwise B_FALSE.
+ */
+static void
+vgen_handle_evt_up(vgen_ldc_t *ldcp, boolean_t flag)
+{
+	vgen_t	*vgenp = LDC_TO_VGEN(ldcp);
+	void 	*vnetp = LDC_TO_VNET(ldcp);
+
+	DBG1((vnetp, "vgen_handle_evt_up: enter: id(%lx)\n", ldcp->ldc_id));
+
+	ASSERT(MUTEX_HELD(&ldcp->cblock));
+
+	if (ldcp->portp != vgenp->vsw_portp) {
+		/*
+		 * modify fdb entry to use this port as the
+		 * channel is up, instead of going through the
+		 * vsw-port (see comments in vgen_port_init())
+		 */
+		vnet_modify_fdb(vnetp, (uint8_t *)&ldcp->portp->macaddr,
+		    vgen_tx, ldcp->portp, flag);
+	}
+
+	/* Initialize local session id */
+	ldcp->local_sid = ddi_get_lbolt();
+
+	/* clear peer session id */
+	ldcp->peer_sid = 0;
+	ldcp->hretries = 0;
+
+	if (ldcp->hphase != VH_PHASE0) {
+		vgen_handshake_reset(ldcp);
+	}
+
+	/* Initiate Handshake process with peer ldc endpoint */
+	vgen_handshake(vh_nextphase(ldcp));
+
+	DBG1((vnetp, "vgen_handle_evt_up: exit: id(%lx)\n", ldcp->ldc_id));
+}
+
+/*
+ * LDC channel is Reset, terminate connection with peer and try to
+ * bring the channel up again.
+ * Flag tells vnet_modify_fdb() about the context: set to B_TRUE if this
+ * function is being called from transmit routine, otherwise B_FALSE.
+ */
+static void
+vgen_handle_evt_reset(vgen_ldc_t *ldcp, boolean_t flag)
+{
+	ldc_status_t istatus;
+	vgen_t	*vgenp = LDC_TO_VGEN(ldcp);
+	void	*vnetp = LDC_TO_VNET(ldcp);
+	int	rv;
+
+	DBG1((vnetp, "vgen_handle_evt_reset: enter: id(%lx)\n", ldcp->ldc_id));
+
+	ASSERT(MUTEX_HELD(&ldcp->cblock));
+
+	if ((ldcp->portp != vgenp->vsw_portp) &&
+		(vgenp->vsw_portp != NULL)) {
+		/*
+		 * modify fdb entry to use vsw-port  as the
+		 * channel is reset and we don't have a direct
+		 * link to the destination (see comments
+		 * in vgen_port_init()).
+		 */
+		vnet_modify_fdb(vnetp, (uint8_t *)&ldcp->portp->macaddr,
+		    vgen_tx, vgenp->vsw_portp, flag);
+	}
+
+	if (ldcp->hphase != VH_PHASE0) {
+		vgen_handshake_reset(ldcp);
+	}
+
+	/* try to bring the channel up */
+	rv = ldc_up(ldcp->ldc_handle);
+	if (rv != 0) {
+		DWARN((vnetp,
+		    "vgen_handle_evt_reset: ldc_up err id(%lx) rv(%d)\n",
+		    ldcp->ldc_id, rv));
+	}
+
+	if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
+		DWARN((vnetp,
+		    "vgen_handle_evt_reset: ldc_status err id(%lx)\n"));
+	} else {
+		ldcp->ldc_status = istatus;
+	}
+
+	/* if channel is already UP - restart handshake */
+	if (ldcp->ldc_status == LDC_UP) {
+		vgen_handle_evt_up(ldcp, flag);
+	}
+
+	DBG1((vnetp, "vgen_handle_evt_reset: exit: id(%lx)\n", ldcp->ldc_id));
+}
+
 /* Interrupt handler for the channel */
 static uint_t
 vgen_ldc_cb(uint64_t event, caddr_t arg)
@@ -2314,7 +2440,7 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 	size_t		msglen;
 	ldc_status_t 	istatus;
 	uint64_t	ldcmsg[7];
-	int 		rv;
+	int 		rv = 0;
 	vio_msg_tag_t	*tagp;
 	mblk_t		*mp = NULL;
 	mblk_t		*bp = NULL;
@@ -2339,80 +2465,57 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 		return (LDC_SUCCESS);
 	}
 
-	/* check ldc status change events first */
-	(void) ldc_status(ldcp->ldc_handle, &istatus);
-
-	if (istatus != ldcp->ldc_status) {
-		switch (istatus) {
-		case LDC_UP:
-			ldcp->ldc_status = istatus;
-			DBG1((vnetp,
-			    "vgen_ldc_cb: id(%lx) status(%d) is LDC_UP\n",
-			    ldcp->ldc_id, ldcp->ldc_status));
-
-			if (ldcp->portp != vgenp->vsw_portp) {
-				/*
-				 * modify fdb entry to use this port as the
-				 * channel is up, instead of going through the
-				 * vsw-port (see comments in vgen_port_init())
-				 */
-				vnet_modify_fdb(vnetp,
-				    (uint8_t *)&ldcp->portp->macaddr,
-				    vgen_tx, ldcp->portp);
-			}
-			/* Initialize local session id */
-			ldcp->local_sid = ddi_get_lbolt();
-			/* clear peer session id */
-			ldcp->peer_sid = 0;
-			ldcp->hretries = 0;
-			/* Initiate Handshake process with peer ldc endpoint */
-			vgen_handshake_reset(ldcp);
-			vgen_handshake(vh_nextphase(ldcp));
-			break;
-
-		case LDC_OPEN:
-		case LDC_READY:
-			ldcp->ldc_status = istatus;
-			if ((ldcp->portp != vgenp->vsw_portp) &&
-				(vgenp->vsw_portp != NULL)) {
-				/*
-				 * modify fdb entry to use vsw-port  as the
-				 * channel is reset and we don't have a direct
-				 * link to the destination (see comments
-				 * in vgen_port_init()).
-				 */
-				vnet_modify_fdb(vnetp,
-				    (uint8_t *)&ldcp->portp->macaddr,
-				    vgen_tx, vgenp->vsw_portp);
-			}
-			/* clear sids */
-			ldcp->local_sid = 0;
-			ldcp->peer_sid = 0;
-			if (ldcp->hphase != VH_PHASE0) {
-				vgen_handshake_reset(ldcp);
-			}
-			DBG1((vnetp,
-			    "vgen_ldc_cb: id(%lx) status is (%d)\n",
-			    ldcp->ldc_id, ldcp->ldc_status));
-			break;
-
-		default:
+	/*
+	 * NOTE: not using switch() as event could be triggered by
+	 * a state change and a read request. Also the ordering	of the
+	 * check for the event types is deliberate.
+	 */
+	if (event & LDC_EVT_UP) {
+		if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
 			DWARN((vnetp,
-			    "vgen_ldc_cb: id(%lx) istatus=(%d) status(%d) is"
-			    " *UNKNOWN*\n",
-			    ldcp->ldc_id, istatus, ldcp->ldc_status));
-			break;
+			    "vgen_ldc_cb: ldc_status err id(%lx)\n"));
+		} else {
+			ldcp->ldc_status = istatus;
 		}
+		ASSERT(ldcp->ldc_status == LDC_UP);
+		DWARN((vnetp,
+		    "vgen_ldc_cb: id(%lx) event(%lx) UP, status(%d)\n",
+		    ldcp->ldc_id, event, ldcp->ldc_status));
+
+		vgen_handle_evt_up(ldcp, B_FALSE);
+
+		ASSERT((event & (LDC_EVT_RESET | LDC_EVT_DOWN)) == 0);
 	}
 
-	if (istatus != LDC_UP) {
-		DBG1((vnetp, "vgen_ldc_cb: id(%lx) status(%d) is NOT LDC_UP\n",
-			    ldcp->ldc_id, ldcp->ldc_status));
-		mutex_exit(&ldcp->cblock);
-		return (LDC_SUCCESS);
+	if (event & LDC_EVT_READ) {
+		DBG2((vnetp,
+		    "vgen_ldc_cb: id(%lx) event(%lx) READ, status(%d)\n",
+		    ldcp->ldc_id, event, ldcp->ldc_status));
+
+		ASSERT((event & (LDC_EVT_RESET | LDC_EVT_DOWN)) == 0);
+		goto vgen_ldccb_rcv;
 	}
 
-	/* if ldc_status is UP, receive all packets */
+	if (event & (LDC_EVT_RESET | LDC_EVT_DOWN)) {
+		if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
+			DWARN((vnetp,
+			    "vgen_ldc_cb: ldc_status err id(%lx)\n"));
+		} else {
+			ldcp->ldc_status = istatus;
+		}
+		DWARN((vnetp,
+		    "vgen_ldc_cb: id(%lx) event(%lx) RESET/DOWN, status(%d)\n",
+		    ldcp->ldc_id, event, ldcp->ldc_status));
+
+		vgen_handle_evt_reset(ldcp, B_FALSE);
+	}
+
+	mutex_exit(&ldcp->cblock);
+	return (LDC_SUCCESS);
+
+vgen_ldccb_rcv:
+
+	/* if event is LDC_EVT_READ, receive all packets */
 	do {
 		msglen = sizeof (ldcmsg);
 		rv = ldc_read(ldcp->ldc_handle, (caddr_t)&ldcmsg, &msglen);
@@ -2421,6 +2524,8 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 			DWARN((vnetp,
 			    "vgen_ldc_cb:ldc_read err id(%lx) rv(%d) "
 			    "len(%d)\n", ldcp->ldc_id, rv, msglen));
+			if (rv == ECONNRESET)
+				goto exit_error;
 			break;
 		}
 		if (msglen == 0) {
@@ -2445,26 +2550,25 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 				vgen_hdbg &= ~(HDBG_BAD_SID);
 			}
 #endif
-			if (vgen_check_sid(ldcp, tagp) == VGEN_FAILURE) {
+			rv = vgen_check_sid(ldcp, tagp);
+			if (rv != VGEN_SUCCESS) {
 				/*
 				 * If sid mismatch is detected,
 				 * reset the channel.
 				 */
 				ldcp->need_ldc_reset = B_TRUE;
-				vgen_handshake_reset(ldcp);
-				mutex_exit(&ldcp->cblock);
-				return (LDC_SUCCESS);
+				goto exit_error;
 			}
 		}
 
 		switch (tagp->vio_msgtype) {
 		case VIO_TYPE_CTRL:
-			vgen_handle_ctrlmsg(ldcp, tagp);
+			rv = vgen_handle_ctrlmsg(ldcp, tagp);
 			break;
 
 		case VIO_TYPE_DATA:
 			headp = tailp = NULL;
-			vgen_handle_datamsg(ldcp, tagp, &headp, &tailp);
+			rv = vgen_handle_datamsg(ldcp, tagp, &headp, &tailp);
 			/* build a chain of received packets */
 			if (headp != NULL) {
 				if (bp == NULL) {
@@ -2488,9 +2592,25 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 			break;
 		}
 
+exit_error:
+		if (rv == ECONNRESET) {
+			if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
+				DWARN((vnetp,
+				    "vgen_ldc_cb: ldc_status err id(%lx)\n"));
+			} else {
+				ldcp->ldc_status = istatus;
+			}
+			vgen_handle_evt_reset(ldcp, B_FALSE);
+			break;
+		} else if (rv) {
+			vgen_handshake_retry(ldcp);
+			break;
+		}
+
 	} while (msglen);
 
 	mutex_exit(&ldcp->cblock);
+
 	/* send up the received packets to MAC layer */
 	while (bp != NULL) {
 		mp = bp;
@@ -2608,12 +2728,20 @@ vgen_sendmsg(vgen_ldc_t *ldcp, caddr_t msg,  size_t msglen,
 		mutex_exit(&ldcp->txlock);
 	}
 
-	if ((rv != 0) || (len != msglen)) {
+	if (rv != 0) {
+		DWARN((vnetp,
+		    "vgen_sendmsg: ldc_write failed: id(%lx) rv(%d)\n",
+		    ldcp->ldc_id, rv, msglen));
+		return (rv);
+	}
+
+	if (len != msglen) {
 		DWARN((vnetp,
 		    "vgen_sendmsg: ldc_write failed: id(%lx) rv(%d)"
 		    " msglen (%d)\n", ldcp->ldc_id, rv, msglen));
 		return (VGEN_FAILURE);
 	}
+
 	return (VGEN_SUCCESS);
 }
 
@@ -2642,7 +2770,7 @@ vgen_send_version_negotiate(vgen_ldc_t *ldcp)
 	if (rv != VGEN_SUCCESS) {
 		DWARN((vnetp, "vgen_send_version_negotiate: vgen_sendmsg failed"
 		    "id (%lx)\n", ldcp->ldc_id));
-		return (VGEN_FAILURE);
+		return (rv);
 	}
 
 	ldcp->hstate |= VER_INFO_SENT;
@@ -2680,7 +2808,7 @@ vgen_send_attr_info(vgen_ldc_t *ldcp)
 	if (rv != VGEN_SUCCESS) {
 		DWARN((vnetp, "vgen_send_attr_info: vgen_sendmsg failed"
 		    "id (%lx)\n", ldcp->ldc_id));
-		return (VGEN_FAILURE);
+		return (rv);
 	}
 
 	ldcp->hstate |= ATTR_INFO_SENT;
@@ -2724,7 +2852,7 @@ vgen_send_dring_reg(vgen_ldc_t *ldcp)
 	if (rv != VGEN_SUCCESS) {
 		DWARN((vnetp, "vgen_send_dring_reg: vgen_sendmsg failed"
 		    "id (%lx)\n", ldcp->ldc_id));
-		return (VGEN_FAILURE);
+		return (rv);
 	}
 
 	ldcp->hstate |= DRING_INFO_SENT;
@@ -2753,7 +2881,7 @@ vgen_send_rdx_info(vgen_ldc_t *ldcp)
 	if (rv != VGEN_SUCCESS) {
 		DWARN((vnetp, "vgen_send_rdx_info: vgen_sendmsg failed"
 		    "id (%lx)\n", ldcp->ldc_id));
-		return (VGEN_FAILURE);
+		return (rv);
 	}
 
 	ldcp->hstate |= RDX_INFO_SENT;
@@ -2787,8 +2915,8 @@ vgen_send_dring_data(vgen_ldc_t *ldcp, uint32_t start, int32_t end)
 	rv = vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (dringmsg), B_TRUE);
 	if (rv != VGEN_SUCCESS) {
 		DWARN((vnetp, "vgen_send_dring_data: vgen_sendmsg failed"
-		    "id (%lx)\n", ldcp->ldc_id));
-		return (VGEN_FAILURE);
+		    " id (%lx)\n", ldcp->ldc_id));
+		return (rv);
 	}
 
 	ldcp->next_txseq++;
@@ -2843,7 +2971,7 @@ vgen_send_mcast_info(vgen_ldc_t *ldcp)
 		if (rv != VGEN_SUCCESS) {
 			DWARN((vnetp, "vgen_send_mcast_info: vgen_sendmsg err"
 			    "id (%lx)\n", ldcp->ldc_id));
-			return (VGEN_FAILURE);
+			return (rv);
 		}
 
 		mccount -= n;
@@ -2859,6 +2987,8 @@ static int
 vgen_handshake_phase2(vgen_ldc_t *ldcp)
 {
 	int rv;
+	uint32_t ncookies = 0;
+	void	*vnetp = LDC_TO_VNET(ldcp);
 #ifdef DEBUG
 	if (vgen_hdbg & HDBG_OUT_STATE) {
 		/* simulate out of state condition */
@@ -2872,10 +3002,34 @@ vgen_handshake_phase2(vgen_ldc_t *ldcp)
 		return (VGEN_SUCCESS);
 	}
 #endif
-	if ((rv = vgen_send_attr_info(ldcp)) != VGEN_SUCCESS) {
+	rv = vgen_send_attr_info(ldcp);
+	if (rv != VGEN_SUCCESS) {
 		return (rv);
 	}
-	if ((rv = vgen_send_dring_reg(ldcp)) != VGEN_SUCCESS) {
+
+	/* Bind descriptor ring to the channel */
+	if (ldcp->num_txdcookies == 0) {
+		rv = ldc_mem_dring_bind(ldcp->ldc_handle, ldcp->tx_dhandle,
+		    LDC_SHADOW_MAP, LDC_MEM_RW, &ldcp->tx_dcookie, &ncookies);
+		if (rv != 0) {
+			DWARN((vnetp, "vgen_handshake_phase2: id (%lx) "
+			    "ldc_mem_dring_bind failed rv(%x)\n",
+			    ldcp->ldc_id, rv));
+			return (rv);
+		}
+		ASSERT(ncookies == 1);
+		ldcp->num_txdcookies = ncookies;
+	}
+
+	/* update local dring_info params */
+	bcopy(&(ldcp->tx_dcookie), &(ldcp->local_hparams.dring_cookie),
+		sizeof (ldc_mem_cookie_t));
+	ldcp->local_hparams.num_dcookies = ldcp->num_txdcookies;
+	ldcp->local_hparams.num_desc = ldcp->num_txds;
+	ldcp->local_hparams.desc_size = sizeof (vnet_public_desc_t);
+
+	rv = vgen_send_dring_reg(ldcp);
+	if (rv != VGEN_SUCCESS) {
 		return (rv);
 	}
 
@@ -2893,6 +3047,7 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 	vgen_t	*vgenp = LDC_TO_VGEN(ldcp);
 	void	*vnetp = LDC_TO_VNET(ldcp);
 	ldc_status_t istatus;
+	int rv;
 
 	DBG2((vnetp, "vgen_reset_hphase: id(0x%lx)\n", ldcp->ldc_id));
 	/* reset hstate and hphase */
@@ -2905,12 +3060,19 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 		ldcp->htid = 0;
 	}
 
-	/*
-	 * Unmap drings, if dring_ready is set.
-	 */
 	if (ldcp->local_hparams.dring_ready) {
 		ldcp->local_hparams.dring_ready = B_FALSE;
-		/* do not unbind our dring */
+	}
+
+	/* Unbind tx descriptor ring from the channel */
+	if (ldcp->num_txdcookies) {
+		rv = ldc_mem_dring_unbind(ldcp->tx_dhandle);
+		if (rv != 0) {
+			DWARN((vnetp,
+			    "vgen_reset_hphase: ldc_mem_dring_unbind "
+			    "failed id(%lx)\n", ldcp->ldc_id));
+		}
+		ldcp->num_txdcookies = 0;
 	}
 
 	if (ldcp->peer_hparams.dring_ready) {
@@ -2943,16 +3105,9 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 	ldcp->local_hparams.ack_freq = 0;	/* don't need acks */
 
 	/*
-	 * set dring_info params.
-	 * Note: dring is already created and bound.
-	 */
-	bcopy(&(ldcp->tx_dcookie), &(ldcp->local_hparams.dring_cookie),
-		sizeof (ldc_mem_cookie_t));
-	ldcp->local_hparams.num_dcookies = ldcp->num_txdcookies;
-	ldcp->local_hparams.num_desc = ldcp->num_txds;
-	ldcp->local_hparams.desc_size = sizeof (vnet_public_desc_t);
-
-	/*
+	 * Note: dring is created, but not bound yet.
+	 * local dring_info params will be updated when we bind the dring in
+	 * vgen_handshake_phase2().
 	 * dring_ident is set to 0. After mapping the dring, peer sets this
 	 * value and sends it in the ack, which is saved in
 	 * vgen_handle_dring_reg().
@@ -2971,13 +3126,35 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 		(void) ldc_down(ldcp->ldc_handle);
 		(void) ldc_status(ldcp->ldc_handle, &istatus);
 		DBG2((vnetp,
-		    "vgen_reset_hphase: id (%lx), RESET Done,ldc_status(%x)\n",
+		    "vgen_reset_hphase: id (%lx), Reset Done,ldc_status(%x)\n",
 		    ldcp->ldc_id, istatus));
 		ldcp->ldc_status = istatus;
+
 		/* clear sids */
 		ldcp->local_sid = 0;
 		ldcp->peer_sid = 0;
-		(void) ldc_up(ldcp->ldc_handle);
+
+		/* try to bring the channel up */
+		rv = ldc_up(ldcp->ldc_handle);
+		if (rv != 0) {
+			DWARN((vnetp,
+			    "vgen_reset_hphase: ldc_up err id(%lx) rv(%d)\n",
+			    ldcp->ldc_id, rv));
+		}
+
+		if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
+			DWARN((vnetp,
+			    "vgen_reset_hphase: ldc_status err id(%lx)\n"));
+		} else {
+			ldcp->ldc_status = istatus;
+		}
+
+		/* if channel is already UP - restart handshake */
+		if (istatus == LDC_UP) {
+			/* Initialize local session id */
+			ldcp->local_sid = ddi_get_lbolt();
+			vgen_handshake(vh_nextphase(ldcp));
+		}
 	}
 }
 
@@ -3005,6 +3182,8 @@ vgen_handshake(vgen_ldc_t *ldcp)
 	uint32_t hphase = ldcp->hphase;
 	void	*vnetp = LDC_TO_VNET(ldcp);
 	vgen_t	*vgenp = LDC_TO_VGEN(ldcp);
+	ldc_status_t	istatus;
+	int	rv = 0;
 
 	switch (hphase) {
 
@@ -3022,21 +3201,15 @@ vgen_handshake(vgen_ldc_t *ldcp)
 		    drv_usectohz(vgen_hwd_interval * 1000));
 
 		/* Phase 1 involves negotiating the version */
-		if (vgen_send_version_negotiate(ldcp) != VGEN_SUCCESS) {
-			vgen_handshake_reset(ldcp);
-		}
+		rv = vgen_send_version_negotiate(ldcp);
 		break;
 
 	case VH_PHASE2:
-		if (vgen_handshake_phase2(ldcp) != VGEN_SUCCESS) {
-			vgen_handshake_reset(ldcp);
-		}
+		rv = vgen_handshake_phase2(ldcp);
 		break;
 
 	case VH_PHASE3:
-		if (vgen_send_rdx_info(ldcp) != VGEN_SUCCESS) {
-			vgen_handshake_reset(ldcp);
-		}
+		rv = vgen_send_rdx_info(ldcp);
 		break;
 
 	case VH_DONE:
@@ -3059,16 +3232,43 @@ vgen_handshake(vgen_ldc_t *ldcp)
 			mutex_exit(&ldcp->cblock);
 
 			mutex_enter(&vgenp->lock);
-			(void) vgen_send_mcast_info(ldcp);
+			rv = vgen_send_mcast_info(ldcp);
 			mutex_exit(&vgenp->lock);
 
 			mutex_enter(&ldcp->cblock);
-
+			if (rv != VGEN_SUCCESS)
+				break;
 		}
+
+		/*
+		 * Check if mac layer should be notified to restart
+		 * transmissions. This can happen if the channel got
+		 * reset and vgen_clobber_tbufs() is called, while
+		 * need_resched is set.
+		 */
+		mutex_enter(&ldcp->tclock);
+		if (ldcp->need_resched) {
+			ldcp->need_resched = B_FALSE;
+			vnet_tx_update(vgenp->vnetp);
+		}
+		mutex_exit(&ldcp->tclock);
+
 		break;
 
 	default:
 		break;
+	}
+
+	if (rv == ECONNRESET) {
+		if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
+			DWARN((vnetp,
+			    "vgen_handshake: ldc_status err id(%lx)\n"));
+		} else {
+			ldcp->ldc_status = istatus;
+		}
+		vgen_handle_evt_reset(ldcp, B_FALSE);
+	} else if (rv) {
+		vgen_handshake_reset(ldcp);
 	}
 }
 
@@ -3138,7 +3338,7 @@ vgen_handshake_retry(vgen_ldc_t *ldcp)
  * Handle a version info msg from the peer or an ACK/NACK from the peer
  * to a version info msg that we sent.
  */
-static void
+static int
 vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 {
 	vio_ver_msg_t	*vermsg = (vio_ver_msg_t *)tagp;
@@ -3147,6 +3347,7 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 	void		*vnetp = LDC_TO_VNET(ldcp);
 	int		idx;
 	vgen_ver_t	*versions = ldcp->vgen_versions;
+	int		rv = 0;
 
 	DBG1((vnetp, "vgen_handle_version_negotiate: enter\n"));
 	switch (tagp->vio_subtype) {
@@ -3180,16 +3381,19 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		    (vermsg->dev_class != VDEV_NETWORK_SWITCH)) {
 			/* unsupported dev_class, send NACK */
 
-			tagp->vio_subtype = VIO_SUBTYPE_NACK;
-			tagp->vio_sid = ldcp->local_sid;
-			/* send reply msg back to peer */
-			(void) vgen_sendmsg(ldcp, (caddr_t)tagp,
-			    sizeof (*vermsg), B_FALSE);
 			DWARN((vnetp,
 			    "vgen_handle_version_negotiate: Version"
 			    " Negotiation Failed id (%lx)\n", ldcp->ldc_id));
-			vgen_handshake_reset(ldcp);
-			return;
+
+			tagp->vio_subtype = VIO_SUBTYPE_NACK;
+			tagp->vio_sid = ldcp->local_sid;
+			/* send reply msg back to peer */
+			rv = vgen_sendmsg(ldcp, (caddr_t)tagp,
+			    sizeof (*vermsg), B_FALSE);
+			if (rv != VGEN_SUCCESS) {
+				return (rv);
+			}
+			return (VGEN_FAILURE);
 		}
 
 		DBG2((vnetp, "vgen_handle_version_negotiate: VER_INFO_RCVD,"
@@ -3246,10 +3450,10 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		tagp->vio_sid = ldcp->local_sid;
 
 		/* send reply msg back to peer */
-		if (vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (*vermsg),
-		    B_FALSE) != VGEN_SUCCESS) {
-			vgen_handshake_reset(ldcp);
-			return;
+		rv = vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (*vermsg),
+		    B_FALSE);
+		if (rv != VGEN_SUCCESS) {
+			return (rv);
 		}
 
 		if (ack) {
@@ -3263,8 +3467,7 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 			DWARN((vnetp, "vgen_handle_version_negotiate:"
 			    " Version Negotiation Failed id (%lx)\n",
 			    ldcp->ldc_id));
-			vgen_handshake_reset(ldcp);
-			return;
+			return (VGEN_FAILURE);
 		}
 		if (vgen_handshake_done(ldcp) == VGEN_SUCCESS) {
 
@@ -3290,8 +3493,7 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 			    "vgen_handle_version_negotiate:"
 			    " VER_ACK_RCVD id (%lx) Invalid Phase(%u)\n",
 			    ldcp->ldc_id, ldcp->hphase));
-			vgen_handshake_reset(ldcp);
-			return;
+			return (VGEN_FAILURE);
 		}
 
 		/* SUCCESS - we have agreed on a version */
@@ -3326,8 +3528,7 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 			    "vgen_handle_version_negotiate:"
 			    " VER_NACK_RCVD id (%lx) Invalid Phase(%u)\n",
 			    ldcp->ldc_id, ldcp->hphase));
-			vgen_handshake_reset(ldcp);
-			return;
+			return (VGEN_FAILURE);
 		}
 
 		DBG2((vnetp, "vgen_handle_version_negotiate:"
@@ -3342,8 +3543,7 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 			DWARN((vnetp, "vgen_handle_version_negotiate:"
 			    " Version Negotiation Failed id (%lx)\n",
 			    ldcp->ldc_id));
-			vgen_handshake_reset(ldcp);
-			return;
+			return (VGEN_FAILURE);
 		}
 
 		idx = 0;
@@ -3381,20 +3581,21 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 				DWARN((vnetp, "vgen_handle_version_negotiate:"
 				    " Version Negotiation Failed id (%lx)\n",
 				    ldcp->ldc_id));
-				vgen_handshake_reset(ldcp);
-				return;
+				return (VGEN_FAILURE);
 			}
 
 		}
 
-		if (vgen_send_version_negotiate(ldcp) != VGEN_SUCCESS) {
-			vgen_handshake_reset(ldcp);
-			return;
+		rv = vgen_send_version_negotiate(ldcp);
+		if (rv != VGEN_SUCCESS) {
+			return (rv);
 		}
 
 		break;
 	}
+
 	DBG1((vnetp, "vgen_handle_version_negotiate: exit\n"));
+	return (VGEN_SUCCESS);
 }
 
 /* Check if the attributes are supported */
@@ -3434,12 +3635,13 @@ cmn_err(CE_CONT, "vgen_check_attr_info: msg->addr(%lx), port_macaddr(%lx)\n",
  * Handle an attribute info msg from the peer or an ACK/NACK from the peer
  * to an attr info msg that we sent.
  */
-static void
+static int
 vgen_handle_attr_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 {
 	vnet_attr_msg_t *attrmsg = (vnet_attr_msg_t *)tagp;
 	void		*vnetp = LDC_TO_VNET(ldcp);
 	int		ack = 0;
+	int		rv = 0;
 
 	DBG1((vnetp, "vgen_handle_attr_info: enter\n"));
 	if (ldcp->hphase != VH_PHASE2) {
@@ -3447,8 +3649,7 @@ vgen_handle_attr_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		    "vgen_handle_attr_info: Rcvd ATTR_INFO id(%lx)"
 		    " subtype (%d), Invalid Phase(%u)\n", ldcp->ldc_id,
 		    tagp->vio_subtype, ldcp->hphase));
-		vgen_handshake_reset(ldcp);
-		return;
+		return (VGEN_FAILURE);
 	}
 	switch (tagp->vio_subtype) {
 	case VIO_SUBTYPE_INFO:
@@ -3474,10 +3675,10 @@ vgen_handle_attr_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		tagp->vio_sid = ldcp->local_sid;
 
 		/* send reply msg back to peer */
-		if (vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (*attrmsg),
-		    B_FALSE) != VGEN_SUCCESS) {
-			vgen_handshake_reset(ldcp);
-			return;
+		rv = vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (*attrmsg),
+		    B_FALSE);
+		if (rv != VGEN_SUCCESS) {
+			return (rv);
 		}
 
 		if (ack) {
@@ -3488,8 +3689,7 @@ vgen_handle_attr_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 			/* failed */
 			DWARN((vnetp, "vgen_handle_attr_info:"
 			    " ATTR_NACK_SENT id(%lx)\n", ldcp->ldc_id));
-			vgen_handshake_reset(ldcp);
-			return;
+			return (VGEN_FAILURE);
 		}
 
 		if (vgen_handshake_done(ldcp) == VGEN_SUCCESS) {
@@ -3514,10 +3714,10 @@ vgen_handle_attr_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 
 		DBG2((vnetp, "vgen_handle_attr_info: ATTR_NACK_RCVD id(%lx)\n",
 		    ldcp->ldc_id));
-		vgen_handshake_reset(ldcp);
-		break;
+		return (VGEN_FAILURE);
 	}
 	DBG1((vnetp, "vgen_handle_attr_info: exit\n"));
+	return (VGEN_SUCCESS);
 }
 
 /* Check if the dring info msg is ok */
@@ -3536,7 +3736,7 @@ vgen_check_dring_reg(vio_dring_reg_msg_t *msg)
  * Handle a descriptor ring register msg from the peer or an ACK/NACK from
  * the peer to a dring register msg that we sent.
  */
-static void
+static int
 vgen_handle_dring_reg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 {
 	vio_dring_reg_msg_t *msg = (vio_dring_reg_msg_t *)tagp;
@@ -3552,8 +3752,7 @@ vgen_handle_dring_reg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		    "vgen_handle_dring_reg: Rcvd DRING_INFO, id (%lx)"
 		    " Subtype (%d), Invalid Phase(%u)\n", ldcp->ldc_id,
 		    tagp->vio_subtype, ldcp->hphase));
-		vgen_handshake_reset(ldcp);
-		return;
+		return (VGEN_FAILURE);
 	}
 	switch (tagp->vio_subtype) {
 	case VIO_SUBTYPE_INFO:
@@ -3608,10 +3807,10 @@ vgen_handle_dring_reg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		}
 		tagp->vio_sid = ldcp->local_sid;
 		/* send reply msg back to peer */
-		if (vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (*msg),
-		    B_FALSE) != VGEN_SUCCESS) {
-			vgen_handshake_reset(ldcp);
-			return;
+		rv = vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (*msg),
+		    B_FALSE);
+		if (rv != VGEN_SUCCESS) {
+			return (rv);
 		}
 
 		if (ack) {
@@ -3621,8 +3820,7 @@ vgen_handle_dring_reg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		} else {
 			DWARN((vnetp, "vgen_handle_dring_reg: DRING_NACK_SENT"
 			    " id (%lx)\n", ldcp->ldc_id));
-			vgen_handshake_reset(ldcp);
-			return;
+			return (VGEN_FAILURE);
 		}
 
 		if (vgen_handshake_done(ldcp) == VGEN_SUCCESS) {
@@ -3657,20 +3855,21 @@ vgen_handle_dring_reg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 
 		DBG2((vnetp, "vgen_handle_dring_reg: DRING_NACK_RCVD"
 		    " id (%lx)\n", ldcp->ldc_id));
-		vgen_handshake_reset(ldcp);
-		break;
+		return (VGEN_FAILURE);
 	}
 	DBG1((vnetp, "vgen_handle_dring_reg: exit\n"));
+	return (VGEN_SUCCESS);
 }
 
 /*
  * Handle a rdx info msg from the peer or an ACK/NACK
  * from the peer to a rdx info msg that we sent.
  */
-static void
+static int
 vgen_handle_rdx_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 {
 	void *vnetp = LDC_TO_VNET(ldcp);
+	int rv = 0;
 
 	DBG1((vnetp, "vgen_handle_rdx_info: enter\n"));
 	if (ldcp->hphase != VH_PHASE3) {
@@ -3678,8 +3877,7 @@ vgen_handle_rdx_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		    "vgen_handle_rdx_info: Rcvd RDX_INFO, id (%lx)"
 		    "  Subtype (%d), Invalid Phase(%u)\n", ldcp->ldc_id,
 		    tagp->vio_subtype, ldcp->hphase));
-		vgen_handshake_reset(ldcp);
-		return;
+		return (VGEN_FAILURE);
 	}
 	switch (tagp->vio_subtype) {
 	case VIO_SUBTYPE_INFO:
@@ -3691,10 +3889,10 @@ vgen_handle_rdx_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		tagp->vio_subtype = VIO_SUBTYPE_ACK;
 		tagp->vio_sid = ldcp->local_sid;
 		/* send reply msg back to peer */
-		if (vgen_sendmsg(ldcp, (caddr_t)tagp,
-		    sizeof (vio_rdx_msg_t), B_FALSE) != VGEN_SUCCESS) {
-			vgen_handshake_reset(ldcp);
-			return;
+		rv = vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (vio_rdx_msg_t),
+		    B_FALSE);
+		if (rv != VGEN_SUCCESS) {
+			return (rv);
 		}
 
 		ldcp->hstate |= RDX_ACK_SENT;
@@ -3723,14 +3921,14 @@ vgen_handle_rdx_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 
 		DBG2((vnetp, "vgen_handle_rdx_info: RDX_NACK_RCVD id (%lx)\n",
 		    ldcp->ldc_id));
-		vgen_handshake_reset(ldcp);
-		break;
+		return (VGEN_FAILURE);
 	}
 	DBG1((vnetp, "vgen_handle_rdx_info: exit\n"));
+	return (VGEN_SUCCESS);
 }
 
 /* Handle ACK/NACK from vsw to a set multicast msg that we sent */
-static void
+static int
 vgen_handle_mcast_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 {
 	void *vnetp = LDC_TO_VNET(ldcp);
@@ -3790,82 +3988,92 @@ vgen_handle_mcast_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 
 	}
 	DBG1((vnetp, "vgen_handle_mcast_info: exit\n"));
+
+	return (VGEN_SUCCESS);
 }
 
 /* handler for control messages received from the peer ldc end-point */
-static void
+static int
 vgen_handle_ctrlmsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 {
 	void *vnetp = LDC_TO_VNET(ldcp);
+	int rv = 0;
 
 	DBG1((vnetp, "vgen_handle_ctrlmsg: enter\n"));
 	switch (tagp->vio_subtype_env) {
 
 	case VIO_VER_INFO:
-		vgen_handle_version_negotiate(ldcp, tagp);
+		rv = vgen_handle_version_negotiate(ldcp, tagp);
 		break;
 
 	case VIO_ATTR_INFO:
-		vgen_handle_attr_info(ldcp, tagp);
+		rv = vgen_handle_attr_info(ldcp, tagp);
 		break;
 
 	case VIO_DRING_REG:
-		vgen_handle_dring_reg(ldcp, tagp);
+		rv = vgen_handle_dring_reg(ldcp, tagp);
 		break;
 
 	case VIO_RDX:
-		vgen_handle_rdx_info(ldcp, tagp);
+		rv = vgen_handle_rdx_info(ldcp, tagp);
 		break;
 
 	case VNET_MCAST_INFO:
-		vgen_handle_mcast_info(ldcp, tagp);
+		rv = vgen_handle_mcast_info(ldcp, tagp);
 		break;
 
 	}
+
 	DBG1((vnetp, "vgen_handle_ctrlmsg: exit\n"));
+	return (rv);
 }
 
 /* handler for data messages received from the peer ldc end-point */
-static void
+static int
 vgen_handle_datamsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
 	mblk_t **headp, mblk_t **tailp)
 {
 	void *vnetp = LDC_TO_VNET(ldcp);
+	int rv = 0;
 
 	DBG1((vnetp, "vgen_handle_datamsg: enter\n"));
 
 	if (ldcp->hphase != VH_DONE)
-		return;
+		return (rv);
 	switch (tagp->vio_subtype_env) {
 	case VIO_DRING_DATA:
-		vgen_handle_dring_data(ldcp, tagp, headp, tailp);
+		rv = vgen_handle_dring_data(ldcp, tagp, headp, tailp);
 		break;
 	default:
 		break;
 	}
 
 	DBG1((vnetp, "vgen_handle_datamsg: exit\n"));
+	return (rv);
 }
 
-static void
+static int
 vgen_send_dring_ack(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp, uint32_t start,
     int32_t end, uint8_t pstate)
 {
 	vio_dring_msg_t *msgp = (vio_dring_msg_t *)tagp;
 	void *vnetp = LDC_TO_VNET(ldcp);
+	int rv = 0;
 
 	tagp->vio_subtype = VIO_SUBTYPE_ACK;
 	tagp->vio_sid = ldcp->local_sid;
 	msgp->start_idx = start;
 	msgp->end_idx = end;
 	msgp->dring_process_state = pstate;
-	if (vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (*msgp), B_FALSE)) {
+	rv = vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (*msgp), B_FALSE);
+	if (rv != VGEN_SUCCESS) {
 		DWARN((vnetp, "vgen_send_dring_ack: id(%lx) vgen_sendmsg "
 		    "failed\n", (ldcp)->ldc_id));
 	}
+	return (rv);
 }
 
-static void
+static int
 vgen_handle_dring_data(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
 	mblk_t **headp, mblk_t **tailp)
 {
@@ -3889,7 +4097,7 @@ vgen_handle_dring_data(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
 	uint32_t ack_end;
 	uint32_t rxi;
 	uint32_t txi;
-	int rv;
+	int rv = 0;
 	boolean_t rxd_err = B_FALSE;
 	boolean_t set_ack_start = B_FALSE;
 	vgen_private_desc_t *tbufp;
@@ -3903,6 +4111,7 @@ vgen_handle_dring_data(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
 	uint64_t seqnum;
 #endif
 	void *vnetp = LDC_TO_VNET(ldcp);
+	boolean_t ack_needed = B_FALSE;
 
 	dringmsg = (vio_dring_msg_t *)tagp;
 	start = dringmsg->start_idx;
@@ -3998,12 +4207,14 @@ vgen_handle_dring_data(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
 				DECR_RXI(rxi, ldcp);
 				dringmsg->end_idx = rxi;
 				/* dring ident is left unchanged */
-				if (vgen_sendmsg(ldcp, (caddr_t)tagp,
-				    sizeof (*dringmsg), B_FALSE)) {
+				rv = vgen_sendmsg(ldcp, (caddr_t)tagp,
+				    sizeof (*dringmsg), B_FALSE);
+				if (rv != VGEN_SUCCESS) {
 					DWARN((vnetp,
 					    "vgen_handle_dring_data: id(%lx) "
 					    "vgen_sendmsg failed, "
 					    "stype: NACK\n", ldcp->ldc_id));
+					goto error_ret;
 				}
 #ifdef VGEN_REXMIT
 				/*
@@ -4073,13 +4284,13 @@ vgen_handle_dring_data(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp,
 		next_rxi = rxi =  start;
 		do {
 
-vgen_recv_retry:	if (ldc_mem_dring_acquire(ldcp->rx_dhandle,
-			    rxi, rxi)) {
+vgen_recv_retry:	rv = ldc_mem_dring_acquire(ldcp->rx_dhandle, rxi, rxi);
+			if (rv != 0) {
 				DWARN((vnetp, "vgen_handle_dring_data: "
-				    "id(%lx), ldc_mem_dring_acquire() failed\n",
-				    ldcp->ldc_id));
+				    "ldc_mem_dring_acquire() failed"
+				    " id(%lx) rv(%d)\n", ldcp->ldc_id, rv));
 				statsp->ierrors++;
-				break;
+				goto error_ret;
 			}
 
 			rxdp = &(ldcp->rxdp[rxi]);
@@ -4147,22 +4358,34 @@ vgen_recv_retry:	if (ldc_mem_dring_acquire(ldcp->rx_dhandle,
 					statsp->rx_allocb_fail++;
 				}
 
+				ack_needed = hdrp->ack;
+
 				/* set descriptor done bit */
 				hdrp->dstate = VIO_DESC_DONE;
 
-				(void) ldc_mem_dring_release(ldcp->rx_dhandle,
+				rv = ldc_mem_dring_release(ldcp->rx_dhandle,
 				    rxi, rxi);
+				if (rv != 0) {
+					DWARN((vnetp, "vgen_handle_dring_data: "
+					    "ldc_mem_dring_release err id(%lx)"
+					    " rv(%d)\n", ldcp->ldc_id, rv));
+					goto error_ret;
+				}
 
-				if (hdrp->ack) {
+				if (ack_needed) {
+					ack_needed = B_FALSE;
 					/*
 					 * sender needs ack for this packet,
 					 * ack pkts upto this index.
 					 */
 					ack_end = rxi;
 
-					vgen_send_dring_ack(ldcp, tagp,
+					rv = vgen_send_dring_ack(ldcp, tagp,
 					    ack_start, ack_end,
 					    VIO_DP_ACTIVE);
+					if (rv != VGEN_SUCCESS) {
+						goto error_ret;
+					}
 
 					/* need to set new ack start index */
 					set_ack_start = B_TRUE;
@@ -4175,37 +4398,47 @@ vgen_recv_retry:	if (ldc_mem_dring_acquire(ldcp->rx_dhandle,
 			    (caddr_t)mp->b_rptr, off, &nread,
 			    rxdp->memcookie, ncookies, LDC_COPY_IN);
 
-			/* set done bit irrespective of rv of ldc_mem_copy() */
+			/* if ldc_mem_copy() failed */
+			if (rv) {
+				DWARN((vnetp,
+				    "vgen_handle_dring_data: ldc_mem_copy err "
+				    " id(%lx) rv(%d)\n", ldcp->ldc_id, rv));
+				statsp->ierrors++;
+				freemsg(mp);
+				goto error_ret;
+			}
+
+			ack_needed = hdrp->ack;
 			hdrp->dstate = VIO_DESC_DONE;
 
-			(void) ldc_mem_dring_release(ldcp->rx_dhandle,
-			    rxi, rxi);
+			rv = ldc_mem_dring_release(ldcp->rx_dhandle, rxi, rxi);
+			if (rv != 0) {
+				DWARN((vnetp, "vgen_handle_dring_data: "
+				    "ldc_mem_dring_release err id(%lx)"
+				    " rv(%d)\n", ldcp->ldc_id, rv));
+				goto error_ret;
+			}
 
 			mp->b_rptr += VNET_IPALIGN;
 
-			if (hdrp->ack) {
+			if (ack_needed) {
+				ack_needed = B_FALSE;
 				/*
 				 * sender needs ack for this packet,
 				 * ack pkts upto this index.
 				 */
 				ack_end = rxi;
 
-				vgen_send_dring_ack(ldcp, tagp,
+				rv = vgen_send_dring_ack(ldcp, tagp,
 				    ack_start, ack_end, VIO_DP_ACTIVE);
+				if (rv != VGEN_SUCCESS) {
+					goto error_ret;
+				}
 
 				/* need to set new ack start index */
 				set_ack_start = B_TRUE;
 			}
 
-			/* if ldc_mem_copy() failed */
-			if (rv) {
-				DWARN((vnetp,
-				    "vgen_handle_dring_data: id(%lx) "
-				    "ldc_mem_copy failed\n", ldcp->ldc_id));
-				statsp->ierrors++;
-				freemsg(mp);
-				goto vgen_next_rxi;
-			}
 			if (nread != nbytes) {
 				DWARN((vnetp,
 				    "vgen_handle_dring_data: id(%lx) "
@@ -4276,8 +4509,11 @@ vgen_next_rxi:
 			ack_start = ack_end;
 		}
 
-		vgen_send_dring_ack(ldcp, tagp, ack_start, ack_end,
+		rv = vgen_send_dring_ack(ldcp, tagp, ack_start, ack_end,
 		    VIO_DP_STOPPED);
+		if (rv != VGEN_SUCCESS) {
+			goto error_ret;
+		}
 
 		/* save new recv index and expected seqnum of next dring msg */
 		ldcp->next_rxi = next_rxi;
@@ -4380,8 +4616,11 @@ vgen_next_rxi:
 			 * of ready descriptors.
 			 */
 			rv = vgen_send_dring_data(ldcp, txi, -1);
-			if (rv != 0) {
+			if (rv != VGEN_SUCCESS) {
 				ldcp->resched_peer = B_TRUE;
+				mutex_exit(&ldcp->tclock);
+				mutex_exit(&ldcp->txlock);
+				goto error_ret;
 			}
 		} else {
 			/*
@@ -4475,10 +4714,13 @@ vgen_next_rxi:
 		break;
 	}
 
+error_ret:
+
 	DBG1((vnetp, "vgen_handle_dring_data: exit\n"));
 	*headp = bp;
 	*tailp = bpt;
 
+	return (rv);
 }
 
 static void
@@ -4606,7 +4848,8 @@ vgen_ldc_watchdog(void *arg)
 		}
 #endif
 		mutex_enter(&ldcp->cblock);
-		vgen_handshake_retry(ldcp);
+		ldcp->need_ldc_reset = B_TRUE;
+		vgen_handshake_reset(ldcp);
 		mutex_exit(&ldcp->cblock);
 		if (ldcp->need_resched) {
 			ldcp->need_resched = B_FALSE;

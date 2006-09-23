@@ -58,6 +58,7 @@ extern "C" {
 #define	VLDC_PORT_CLOSED	0x1	    /* port is closed */
 #define	VLDC_PORT_OPEN		0x2	    /* port is already open */
 #define	VLDC_PORT_READY		0x4	    /* port is open and ready */
+#define	VLDC_PORT_RESET		0x8	    /* port has been reset */
 
 /*
  * Values for VLDC_OPT_MODE are defined in ldc.h.

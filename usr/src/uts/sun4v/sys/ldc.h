@@ -182,7 +182,7 @@ int ldc_mem_info(ldc_mem_handle_t mhandle, ldc_mem_info_t *minfo);
 int ldc_mem_nextcookie(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie);
 int ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *len,
     ldc_mem_cookie_t *cookies, uint32_t ccount, uint8_t direction);
-int ldc_mem_rdwr_pa(ldc_handle_t handle, caddr_t vaddr, size_t *size,
+int ldc_mem_rdwr_cookie(ldc_handle_t handle, caddr_t vaddr, size_t *size,
     caddr_t paddr, uint8_t  direction);
 int ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie,
     uint32_t ccount, uint8_t mtype, uint8_t perm, caddr_t *vaddr,

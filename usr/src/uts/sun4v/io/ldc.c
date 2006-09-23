@@ -71,9 +71,9 @@
 /* Core internal functions */
 static int i_ldc_h2v_error(int h_error);
 static int i_ldc_txq_reconf(ldc_chan_t *ldcp);
-static int i_ldc_rxq_reconf(ldc_chan_t *ldcp);
+static int i_ldc_rxq_reconf(ldc_chan_t *ldcp, boolean_t force_reset);
 static void i_ldc_reset_state(ldc_chan_t *ldcp);
-static void i_ldc_reset(ldc_chan_t *ldcp);
+static void i_ldc_reset(ldc_chan_t *ldcp, boolean_t force_reset);
 
 static int i_ldc_get_tx_tail(ldc_chan_t *ldcp, uint64_t *tail);
 static int i_ldc_set_tx_tail(ldc_chan_t *ldcp, uint64_t tail);
@@ -203,6 +203,7 @@ clock_t ldc_delay = LDC_DELAY;
 
 int ldcdbg = 0x0;
 int64_t ldcdbgchan = DBG_ALL_LDCS;
+boolean_t ldc_inject_reset_flag = B_FALSE;
 
 static void
 ldcdebug(int64_t id, const char *fmt, ...)
@@ -226,7 +227,22 @@ ldcdebug(int64_t id, const char *fmt, ...)
 	(void) vsprintf(buf, fmt, ap);
 	va_end(ap);
 
-	cmn_err(CE_CONT, "?%s\n", buf);
+	cmn_err(CE_CONT, "?%s", buf);
+}
+
+static boolean_t
+ldc_inject_reset(ldc_chan_t *ldcp)
+{
+	if ((ldcdbgchan != DBG_ALL_LDCS) && (ldcdbgchan != ldcp->id))
+		return (B_FALSE);
+
+	if (!ldc_inject_reset_flag)
+		return (B_FALSE);
+
+	/* clear the injection state */
+	ldc_inject_reset_flag = 0;
+
+	return (B_TRUE);
 }
 
 #define	D1		\
@@ -268,6 +284,8 @@ if (ldcdbg & 0x04)	\
 	} 								\
 }
 
+#define	LDC_INJECT_RESET(_ldcp)	ldc_inject_reset(_ldcp)
+
 #else
 
 #define	DBG_ALL_LDCS -1
@@ -278,6 +296,8 @@ if (ldcdbg & 0x04)	\
 
 #define	DUMP_PAYLOAD(id, addr)
 #define	DUMP_LDC_PKT(c, s, addr)
+
+#define	LDC_INJECT_RESET(_ldcp)	(B_FALSE)
 
 #endif
 
@@ -489,17 +509,17 @@ i_ldc_txq_reconf(ldc_chan_t *ldcp)
 	rv = hv_ldc_tx_qconf(ldcp->id, ldcp->tx_q_ra, ldcp->tx_q_entries);
 	if (rv) {
 		cmn_err(CE_WARN,
-		    "ldc_tx_qconf: (0x%lx) cannot set qconf", ldcp->id);
+		    "i_ldc_txq_reconf: (0x%lx) cannot set qconf", ldcp->id);
 		return (EIO);
 	}
 	rv = hv_ldc_tx_get_state(ldcp->id, &(ldcp->tx_head),
 	    &(ldcp->tx_tail), &(ldcp->link_state));
 	if (rv) {
 		cmn_err(CE_WARN,
-		    "ldc_tx_get_state: (0x%lx) cannot get qptrs", ldcp->id);
+		    "i_ldc_txq_reconf: (0x%lx) cannot get qptrs", ldcp->id);
 		return (EIO);
 	}
-	D1(ldcp->id, "ldc_tx_get_state: (0x%llx) h=0x%llx,t=0x%llx,"
+	D1(ldcp->id, "i_ldc_txq_reconf: (0x%llx) h=0x%llx,t=0x%llx,"
 	    "s=0x%llx\n", ldcp->id, ldcp->tx_head, ldcp->tx_tail,
 	    ldcp->link_state);
 
@@ -510,7 +530,7 @@ i_ldc_txq_reconf(ldc_chan_t *ldcp)
  * Reconfigure the receive queue
  */
 static int
-i_ldc_rxq_reconf(ldc_chan_t *ldcp)
+i_ldc_rxq_reconf(ldc_chan_t *ldcp, boolean_t force_reset)
 {
 	int rv;
 	uint64_t rx_head, rx_tail;
@@ -520,21 +540,21 @@ i_ldc_rxq_reconf(ldc_chan_t *ldcp)
 	    &(ldcp->link_state));
 	if (rv) {
 		cmn_err(CE_WARN,
-		    "ldc_rx_getstate: (0x%lx) cannot get state",
+		    "i_ldc_rxq_reconf: (0x%lx) cannot get state",
 		    ldcp->id);
 		return (EIO);
 	}
 
-	if (rx_head != rx_tail || ldcp->tstate > TS_READY) {
+	if (force_reset || (ldcp->tstate & ~TS_IN_RESET) == TS_UP) {
 		rv = hv_ldc_rx_qconf(ldcp->id, ldcp->rx_q_ra,
 			ldcp->rx_q_entries);
 		if (rv) {
 			cmn_err(CE_WARN,
-			    "ldc_rx_qconf: (0x%lx) cannot set qconf",
+			    "i_ldc_rxq_reconf: (0x%lx) cannot set qconf",
 			    ldcp->id);
 			return (EIO);
 		}
-		D1(ldcp->id, "ldc_rx_qconf: (0x%llx) completed qconf",
+		D1(ldcp->id, "i_ldc_rxq_reconf: (0x%llx) completed q reconf",
 		    ldcp->id);
 	}
 
@@ -574,16 +594,26 @@ i_ldc_reset_state(ldc_chan_t *ldcp)
  * Reset a LDC channel
  */
 static void
-i_ldc_reset(ldc_chan_t *ldcp)
+i_ldc_reset(ldc_chan_t *ldcp, boolean_t force_reset)
 {
-	D2(ldcp->id, "i_ldc_reset: (0x%llx) channel reset\n", ldcp->id);
+	DWARN(ldcp->id, "i_ldc_reset: (0x%llx) channel reset\n", ldcp->id);
 
 	ASSERT(MUTEX_HELD(&ldcp->lock));
 	ASSERT(MUTEX_HELD(&ldcp->tx_lock));
 
+	/* reconfig Tx and Rx queues */
 	(void) i_ldc_txq_reconf(ldcp);
-	(void) i_ldc_rxq_reconf(ldcp);
+	(void) i_ldc_rxq_reconf(ldcp, force_reset);
+
+	/* Clear Tx and Rx interrupts */
+	(void) i_ldc_clear_intr(ldcp, CNEX_TX_INTR);
+	(void) i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
+
+	/* Reset channel state */
 	i_ldc_reset_state(ldcp);
+
+	/* Mark channel in reset */
+	ldcp->tstate |= TS_IN_RESET;
 }
 
 
@@ -596,28 +626,30 @@ i_ldc_clear_intr(ldc_chan_t *ldcp, cnex_intrtype_t itype)
 	ldc_cnex_t *cinfo = &ldcssp->cinfo;
 
 	ASSERT(MUTEX_HELD(&ldcp->lock));
+	ASSERT(cinfo->dip != NULL);
 
-	if (cinfo->dip) {
+	switch (itype) {
+	case CNEX_TX_INTR:
 		/* check Tx interrupt */
-		if (itype == CNEX_TX_INTR) {
-			if (ldcp->tx_intr_pending)
-				ldcp->tx_intr_pending = B_FALSE;
-			else
-				return;
-		}
-		/* check Rx interrupt */
-		if (itype == CNEX_RX_INTR) {
-			if (ldcp->rx_intr_pending)
-				ldcp->rx_intr_pending = B_FALSE;
-			else
-				return;
-		}
+		if (ldcp->tx_intr_state)
+			ldcp->tx_intr_state = LDC_INTR_NONE;
+		else
+			return;
+		break;
 
-		(void) cinfo->clr_intr(cinfo->dip, ldcp->id, itype);
-		D2(ldcp->id,
-		    "i_ldc_clear_intr: (0x%llx) cleared 0x%x intr\n",
-		    ldcp->id, itype);
+	case CNEX_RX_INTR:
+		/* check Rx interrupt */
+		if (ldcp->rx_intr_state)
+			ldcp->rx_intr_state = LDC_INTR_NONE;
+		else
+			return;
+		break;
 	}
+
+	(void) cinfo->clr_intr(cinfo->dip, ldcp->id, itype);
+	D2(ldcp->id,
+	    "i_ldc_clear_intr: (0x%llx) cleared 0x%x intr\n",
+	    ldcp->id, itype);
 }
 
 /*
@@ -646,7 +678,7 @@ i_ldc_set_rx_head(ldc_chan_t *ldcp, uint64_t head)
 	cmn_err(CE_WARN, "ldc_rx_set_qhead: (0x%lx) cannot set qhead 0x%lx",
 		ldcp->id, head);
 	mutex_enter(&ldcp->tx_lock);
-	i_ldc_reset(ldcp);
+	i_ldc_reset(ldcp, B_TRUE);
 	mutex_exit(&ldcp->tx_lock);
 
 	return (ECONNRESET);
@@ -855,13 +887,20 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 	switch (msg->stype) {
 	case LDC_INFO:
 
+		if ((ldcp->tstate & ~TS_IN_RESET) == TS_VREADY) {
+			(void) i_ldc_txq_reconf(ldcp);
+			i_ldc_reset_state(ldcp);
+			mutex_exit(&ldcp->tx_lock);
+			return (EAGAIN);
+		}
+
 		/* get the current tail and pkt for the response */
 		rv = i_ldc_get_tx_tail(ldcp, &tx_tail);
 		if (rv != 0) {
 			DWARN(ldcp->id,
 			    "i_ldc_process_VER: (0x%llx) err sending "
 			    "version ACK/NACK\n", ldcp->id);
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_TRUE);
 			mutex_exit(&ldcp->tx_lock);
 			return (ECONNRESET);
 		}
@@ -940,14 +979,15 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 				ldcp->hstate |= TS_RCVD_VER;
 				ldcp->tstate |= TS_VER_DONE;
 				DWARN(DBG_ALL_LDCS,
-				    "(0x%llx) Agreed on version v%u.%u\n",
+				    "(0x%llx) Sent ACK, "
+				    "Agreed on version v%u.%u\n",
 				    ldcp->id, rcvd_ver->major, rcvd_ver->minor);
 			}
 		} else {
 			DWARN(ldcp->id,
 			    "i_ldc_process_VER: (0x%llx) error sending "
 			    "ACK/NACK\n", ldcp->id);
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_TRUE);
 			mutex_exit(&ldcp->tx_lock);
 			return (ECONNRESET);
 		}
@@ -955,21 +995,36 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 		break;
 
 	case LDC_ACK:
-		/* SUCCESS - we have agreed on a version */
-		ldcp->version.major = rcvd_ver->major;
-		ldcp->version.minor = rcvd_ver->minor;
-		ldcp->tstate |= TS_VER_DONE;
+		if ((ldcp->tstate & ~TS_IN_RESET) == TS_VREADY) {
+			if (ldcp->version.major != rcvd_ver->major ||
+				ldcp->version.minor != rcvd_ver->minor) {
 
-		D1(DBG_ALL_LDCS, "(0x%llx) Agreed on version v%u.%u\n",
+				/* mismatched version - reset connection */
+				DWARN(ldcp->id,
+					"i_ldc_process_VER: (0x%llx) recvd"
+					" ACK ver != sent ACK ver\n", ldcp->id);
+				i_ldc_reset(ldcp, B_TRUE);
+				mutex_exit(&ldcp->tx_lock);
+				return (ECONNRESET);
+			}
+		} else {
+			/* SUCCESS - we have agreed on a version */
+			ldcp->version.major = rcvd_ver->major;
+			ldcp->version.minor = rcvd_ver->minor;
+			ldcp->tstate |= TS_VER_DONE;
+		}
+
+		DWARN(DBG_ALL_LDCS,
+		    "(0x%llx) Got ACK, Agreed on version v%u.%u\n",
 		    ldcp->id, rcvd_ver->major, rcvd_ver->minor);
 
 		/* initiate RTS-RTR-RDX handshake */
 		rv = i_ldc_get_tx_tail(ldcp, &tx_tail);
 		if (rv) {
 			DWARN(ldcp->id,
-			    "i_ldc_process_VER: (0x%llx) cannot send RTS\n",
+		    "i_ldc_process_VER: (0x%llx) cannot send RTS\n",
 			    ldcp->id);
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_TRUE);
 			mutex_exit(&ldcp->tx_lock);
 			return (ECONNRESET);
 		}
@@ -997,7 +1052,7 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 			D2(ldcp->id,
 			    "i_ldc_process_VER: (0x%llx) no listener\n",
 			    ldcp->id);
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_TRUE);
 			mutex_exit(&ldcp->tx_lock);
 			return (ECONNRESET);
 		}
@@ -1014,7 +1069,7 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 			DWARN(DBG_ALL_LDCS,
 			    "i_ldc_process_VER: (0x%llx) no version match\n",
 			    ldcp->id);
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_TRUE);
 			mutex_exit(&ldcp->tx_lock);
 			return (ECONNRESET);
 		}
@@ -1025,7 +1080,7 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 			cmn_err(CE_NOTE,
 			    "i_ldc_process_VER: (0x%lx) err sending "
 			    "version ACK/NACK\n", ldcp->id);
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_TRUE);
 			mutex_exit(&ldcp->tx_lock);
 			return (ECONNRESET);
 		}
@@ -1095,7 +1150,7 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 			cmn_err(CE_NOTE,
 			    "i_ldc_process_VER: (0x%lx) error sending version"
 			    "INFO\n", ldcp->id);
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_TRUE);
 			mutex_exit(&ldcp->tx_lock);
 			return (ECONNRESET);
 		}
@@ -1129,7 +1184,7 @@ i_ldc_process_RTS(ldc_chan_t *ldcp, ldc_msg_t *msg)
 
 		/* Reset the channel -- as we cannot continue */
 		mutex_enter(&ldcp->tx_lock);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_TRUE);
 		mutex_exit(&ldcp->tx_lock);
 		rv = ECONNRESET;
 		break;
@@ -1149,7 +1204,7 @@ i_ldc_process_RTS(ldc_chan_t *ldcp, ldc_msg_t *msg)
 			if (rv) {
 				/* if cannot send NACK - reset channel */
 				mutex_enter(&ldcp->tx_lock);
-				i_ldc_reset(ldcp);
+				i_ldc_reset(ldcp, B_TRUE);
 				mutex_exit(&ldcp->tx_lock);
 				rv = ECONNRESET;
 				break;
@@ -1161,7 +1216,7 @@ i_ldc_process_RTS(ldc_chan_t *ldcp, ldc_msg_t *msg)
 		DWARN(ldcp->id, "i_ldc_process_RTS: (0x%llx) unexp ACK\n",
 		    ldcp->id);
 		mutex_enter(&ldcp->tx_lock);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_TRUE);
 		mutex_exit(&ldcp->tx_lock);
 		rv = ECONNRESET;
 		break;
@@ -1191,7 +1246,7 @@ i_ldc_process_RTS(ldc_chan_t *ldcp, ldc_msg_t *msg)
 		cmn_err(CE_NOTE,
 		    "i_ldc_process_RTS: (0x%lx) err sending RTR\n",
 		    ldcp->id);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_TRUE);
 		mutex_exit(&ldcp->tx_lock);
 		return (ECONNRESET);
 	}
@@ -1226,7 +1281,7 @@ i_ldc_process_RTS(ldc_chan_t *ldcp, ldc_msg_t *msg)
 		cmn_err(CE_NOTE,
 		    "i_ldc_process_RTS: (0x%lx) error sending RTR\n",
 		    ldcp->id);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_TRUE);
 		mutex_exit(&ldcp->tx_lock);
 		return (ECONNRESET);
 	}
@@ -1255,7 +1310,7 @@ i_ldc_process_RTR(ldc_chan_t *ldcp, ldc_msg_t *msg)
 
 		/* Reset the channel -- as we cannot continue */
 		mutex_enter(&ldcp->tx_lock);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_TRUE);
 		mutex_exit(&ldcp->tx_lock);
 		rv = ECONNRESET;
 
@@ -1276,7 +1331,7 @@ i_ldc_process_RTR(ldc_chan_t *ldcp, ldc_msg_t *msg)
 			if (rv) {
 				/* if cannot send NACK - reset channel */
 				mutex_enter(&ldcp->tx_lock);
-				i_ldc_reset(ldcp);
+				i_ldc_reset(ldcp, B_TRUE);
 				mutex_exit(&ldcp->tx_lock);
 				rv = ECONNRESET;
 				break;
@@ -1291,7 +1346,7 @@ i_ldc_process_RTR(ldc_chan_t *ldcp, ldc_msg_t *msg)
 
 		/* Reset the channel -- as we cannot continue */
 		mutex_enter(&ldcp->tx_lock);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_TRUE);
 		mutex_exit(&ldcp->tx_lock);
 		rv = ECONNRESET;
 		break;
@@ -1315,7 +1370,7 @@ i_ldc_process_RTR(ldc_chan_t *ldcp, ldc_msg_t *msg)
 		    "i_ldc_process_RTR: (0x%lx) cannot send RDX\n",
 		    ldcp->id);
 		mutex_enter(&ldcp->tx_lock);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_TRUE);
 		mutex_exit(&ldcp->tx_lock);
 		return (ECONNRESET);
 	}
@@ -1324,7 +1379,8 @@ i_ldc_process_RTR(ldc_chan_t *ldcp, ldc_msg_t *msg)
 
 	ldcp->hstate |= TS_SENT_RDX;
 	ldcp->tstate |= TS_HSHAKE_DONE;
-	ldcp->status = LDC_UP;
+	if ((ldcp->tstate & TS_IN_RESET) == 0)
+		ldcp->status = LDC_UP;
 
 	DWARN(DBG_ALL_LDCS, "(0x%llx) Handshake Complete\n", ldcp->id);
 
@@ -1351,7 +1407,7 @@ i_ldc_process_RDX(ldc_chan_t *ldcp, ldc_msg_t *msg)
 
 		/* Reset the channel -- as we cannot continue */
 		mutex_enter(&ldcp->tx_lock);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_TRUE);
 		mutex_exit(&ldcp->tx_lock);
 		rv = ECONNRESET;
 
@@ -1368,14 +1424,15 @@ i_ldc_process_RDX(ldc_chan_t *ldcp, ldc_msg_t *msg)
 			    "i_ldc_process_RDX: (0x%llx) unexpected RDX"
 			    " - LDC reset\n", ldcp->id);
 			mutex_enter(&ldcp->tx_lock);
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_TRUE);
 			mutex_exit(&ldcp->tx_lock);
 			return (ECONNRESET);
 		}
 
 		ldcp->hstate |= TS_RCVD_RDX;
 		ldcp->tstate |= TS_HSHAKE_DONE;
-		ldcp->status = LDC_UP;
+		if ((ldcp->tstate & TS_IN_RESET) == 0)
+			ldcp->status = LDC_UP;
 
 		D1(DBG_ALL_LDCS, "(0x%llx) Handshake Complete\n", ldcp->id);
 		break;
@@ -1386,7 +1443,7 @@ i_ldc_process_RDX(ldc_chan_t *ldcp, ldc_msg_t *msg)
 
 		/* Reset the channel -- as we cannot continue */
 		mutex_enter(&ldcp->tx_lock);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_TRUE);
 		mutex_exit(&ldcp->tx_lock);
 		rv = ECONNRESET;
 		break;
@@ -1419,7 +1476,7 @@ i_ldc_process_data_ACK(ldc_chan_t *ldcp, ldc_msg_t *msg)
 		    ldcp->id);
 
 		/* Reset the channel -- as we cannot continue */
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_TRUE);
 		mutex_exit(&ldcp->tx_lock);
 		return (ECONNRESET);
 	}
@@ -1451,7 +1508,7 @@ i_ldc_process_data_ACK(ldc_chan_t *ldcp, ldc_msg_t *msg)
 			    ldcp->id);
 
 			/* Reset the channel -- as we cannot continue */
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_TRUE);
 			mutex_exit(&ldcp->tx_lock);
 			return (ECONNRESET);
 		}
@@ -1472,7 +1529,10 @@ i_ldc_ctrlmsg(ldc_chan_t *ldcp, ldc_msg_t *msg)
 {
 	int 		rv = 0;
 
-	switch (ldcp->tstate) {
+	D1(ldcp->id, "i_ldc_ctrlmsg: (%llx) tstate = %lx, hstate = %lx\n",
+	    ldcp->id, ldcp->tstate, ldcp->hstate);
+
+	switch (ldcp->tstate & ~TS_IN_RESET) {
 
 	case TS_OPEN:
 	case TS_READY:
@@ -1496,12 +1556,8 @@ i_ldc_ctrlmsg(ldc_chan_t *ldcp, ldc_msg_t *msg)
 
 		switch (msg->ctrl & LDC_CTRL_MASK) {
 		case LDC_VER:
-			/* peer is redoing version negotiation */
-			mutex_enter(&ldcp->tx_lock);
-			(void) i_ldc_txq_reconf(ldcp);
-			i_ldc_reset_state(ldcp);
-			mutex_exit(&ldcp->tx_lock);
-			rv = EAGAIN;
+			/* process version message */
+			rv = i_ldc_process_VER(ldcp, msg);
 			break;
 		case LDC_RTS:
 			/* process RTS message */
@@ -1623,9 +1679,29 @@ i_ldc_unregister_channel(ldc_chan_t *ldcp)
 		/* Remove the Rx interrupt */
 		rv = cinfo->rem_intr(cinfo->dip, ldcp->id, CNEX_RX_INTR);
 		if (rv) {
-			DWARN(ldcp->id,
-			    "i_ldc_unregister_channel: err removing Rx intr\n");
-			return (rv);
+			if (rv != EAGAIN) {
+				DWARN(ldcp->id,
+				    "i_ldc_unregister_channel: err removing "
+				    "Rx intr\n");
+				return (rv);
+			}
+
+			/*
+			 * If interrupts are pending and handler has
+			 * finished running, clear interrupt and try
+			 * again
+			 */
+			if (ldcp->rx_intr_state != LDC_INTR_PEND)
+				return (rv);
+
+			(void) i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
+			rv = cinfo->rem_intr(cinfo->dip, ldcp->id,
+			    CNEX_RX_INTR);
+			if (rv) {
+				DWARN(ldcp->id, "i_ldc_unregister_channel: "
+				    "err removing Rx interrupt\n");
+				return (rv);
+			}
 		}
 
 		/* Remove the Tx interrupt */
@@ -1664,7 +1740,7 @@ i_ldc_tx_hdlr(caddr_t arg1, caddr_t arg2)
 	int 		rv;
 	ldc_chan_t 	*ldcp;
 	boolean_t 	notify_client = B_FALSE;
-	uint64_t	notify_event = 0;
+	uint64_t	notify_event = 0, link_state;
 
 	/* Get the channel for which interrupt was received */
 	ASSERT(arg1 != NULL);
@@ -1680,7 +1756,10 @@ i_ldc_tx_hdlr(caddr_t arg1, caddr_t arg2)
 	mutex_enter(&ldcp->tx_lock);
 
 	/* mark interrupt as pending */
-	ldcp->tx_intr_pending = B_TRUE;
+	ldcp->tx_intr_state = LDC_INTR_ACTIVE;
+
+	/* save current link state */
+	link_state = ldcp->link_state;
 
 	rv = hv_ldc_tx_get_state(ldcp->id, &ldcp->tx_head, &ldcp->tx_tail,
 	    &ldcp->link_state);
@@ -1699,21 +1778,25 @@ i_ldc_tx_hdlr(caddr_t arg1, caddr_t arg2)
 	 * (other side unconfigured queue) or channel was reset
 	 * (other side reconfigured its queue)
 	 */
-	if (ldcp->link_state == LDC_CHANNEL_DOWN) {
+	if (link_state != ldcp->link_state &&
+	    ldcp->link_state == LDC_CHANNEL_DOWN) {
 		D1(ldcp->id, "i_ldc_tx_hdlr: channel link down\n", ldcp->id);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_FALSE);
 		notify_client = B_TRUE;
 		notify_event = LDC_EVT_DOWN;
 	}
 
-	if (ldcp->link_state == LDC_CHANNEL_RESET) {
+	if (link_state != ldcp->link_state &&
+	    ldcp->link_state == LDC_CHANNEL_RESET) {
 		D1(ldcp->id, "i_ldc_tx_hdlr: channel link reset\n", ldcp->id);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_FALSE);
 		notify_client = B_TRUE;
 		notify_event = LDC_EVT_RESET;
 	}
 
-	if (ldcp->tstate == TS_OPEN && ldcp->link_state == LDC_CHANNEL_UP) {
+	if (link_state != ldcp->link_state &&
+	    (ldcp->tstate & ~TS_IN_RESET) == TS_OPEN &&
+	    ldcp->link_state == LDC_CHANNEL_UP) {
 		D1(ldcp->id, "i_ldc_tx_hdlr: channel link up\n", ldcp->id);
 		notify_client = B_TRUE;
 		notify_event = LDC_EVT_RESET;
@@ -1725,14 +1808,12 @@ i_ldc_tx_hdlr(caddr_t arg1, caddr_t arg2)
 	if (!ldcp->cb_enabled)
 		notify_client = B_FALSE;
 
-	if (notify_client)
-		ldcp->cb_inprogress = B_TRUE;
-
 	/* Unlock channel */
-	mutex_exit(&ldcp->tx_lock);
-	mutex_exit(&ldcp->lock);
 
 	if (notify_client) {
+		ldcp->cb_inprogress = B_TRUE;
+		mutex_exit(&ldcp->tx_lock);
+		mutex_exit(&ldcp->lock);
 		rv = ldcp->cb(notify_event, ldcp->cb_arg);
 		if (rv) {
 			DWARN(ldcp->id, "i_ldc_tx_hdlr: (0x%llx) callback "
@@ -1740,10 +1821,8 @@ i_ldc_tx_hdlr(caddr_t arg1, caddr_t arg2)
 		}
 		mutex_enter(&ldcp->lock);
 		ldcp->cb_inprogress = B_FALSE;
-		mutex_exit(&ldcp->lock);
 	}
 
-	mutex_enter(&ldcp->lock);
 	i_ldc_clear_intr(ldcp, CNEX_TX_INTR);
 	mutex_exit(&ldcp->lock);
 
@@ -1768,7 +1847,8 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 	ldc_chan_t 	*ldcp;
 	boolean_t 	notify_client = B_FALSE;
 	uint64_t	notify_event = 0;
-	uint64_t	first_fragment = 0;
+	uint64_t	link_state, first_fragment = 0;
+
 
 	/* Get the channel for which interrupt was received */
 	if (arg1 == NULL) {
@@ -1780,18 +1860,22 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 
 	D1(ldcp->id, "i_ldc_rx_hdlr: (0x%llx) Received intr, ldcp=0x%p\n",
 	    ldcp->id, ldcp);
+	D1(ldcp->id, "i_ldc_rx_hdlr: (%llx) USR%lx/TS%lx/HS%lx, LSTATE=%lx\n",
+	    ldcp->id, ldcp->status, ldcp->tstate, ldcp->hstate,
+	    ldcp->link_state);
 
 	/* Lock channel */
 	mutex_enter(&ldcp->lock);
 
 	/* mark interrupt as pending */
-	ldcp->rx_intr_pending = B_TRUE;
+	ldcp->rx_intr_state = LDC_INTR_ACTIVE;
 
 	/*
 	 * Read packet(s) from the queue
 	 */
 	for (;;) {
 
+		link_state = ldcp->link_state;
 		rv = hv_ldc_rx_get_state(ldcp->id, &rx_head, &rx_tail,
 		    &ldcp->link_state);
 		if (rv) {
@@ -1806,43 +1890,60 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 		/*
 		 * reset the channel state if the channel went down
 		 * (other side unconfigured queue) or channel was reset
-		 * (other side reconfigured its queue
+		 * (other side reconfigured its queue)
 		 */
-		if (ldcp->link_state == LDC_CHANNEL_DOWN) {
-			D1(ldcp->id, "i_ldc_rx_hdlr: channel link down\n",
-			    ldcp->id);
-			mutex_enter(&ldcp->tx_lock);
-			i_ldc_reset(ldcp);
-			mutex_exit(&ldcp->tx_lock);
-			notify_client = B_TRUE;
-			notify_event = LDC_EVT_DOWN;
-			break;
-		}
-		if (ldcp->link_state == LDC_CHANNEL_RESET) {
-			D1(ldcp->id, "i_ldc_rx_hdlr: channel link reset\n",
-			    ldcp->id);
-			mutex_enter(&ldcp->tx_lock);
-			i_ldc_reset(ldcp);
-			mutex_exit(&ldcp->tx_lock);
-			notify_client = B_TRUE;
-			notify_event = LDC_EVT_RESET;
+
+		if (link_state != ldcp->link_state) {
+			switch (ldcp->link_state) {
+			case LDC_CHANNEL_DOWN:
+				D1(ldcp->id, "i_ldc_rx_hdlr: channel "
+				    "link down\n", ldcp->id);
+				mutex_enter(&ldcp->tx_lock);
+				i_ldc_reset(ldcp, B_FALSE);
+				mutex_exit(&ldcp->tx_lock);
+				notify_client = B_TRUE;
+				notify_event = LDC_EVT_DOWN;
+				goto loop_exit;
+
+			case LDC_CHANNEL_UP:
+				D1(ldcp->id, "i_ldc_rx_hdlr: "
+				    "channel link up\n", ldcp->id);
+
+				if ((ldcp->tstate & ~TS_IN_RESET) == TS_OPEN) {
+					notify_client = B_TRUE;
+					notify_event = LDC_EVT_RESET;
+					ldcp->tstate |= TS_LINK_READY;
+					ldcp->status = LDC_READY;
+				}
+				break;
+
+			case LDC_CHANNEL_RESET:
+			default:
+#ifdef DEBUG
+force_reset:
+#endif
+				D1(ldcp->id, "i_ldc_rx_hdlr: channel "
+				    "link reset\n", ldcp->id);
+				mutex_enter(&ldcp->tx_lock);
+				i_ldc_reset(ldcp, B_FALSE);
+				mutex_exit(&ldcp->tx_lock);
+				notify_client = B_TRUE;
+				notify_event = LDC_EVT_RESET;
+				break;
+			}
 		}
 
-		if (ldcp->tstate == TS_OPEN &&
-		    ldcp->link_state == LDC_CHANNEL_UP) {
-			D1(ldcp->id, "i_ldc_rx_hdlr: channel link up\n",
-			    ldcp->id);
-			notify_client = B_TRUE;
-			notify_event = LDC_EVT_RESET;
-			ldcp->tstate |= TS_LINK_READY;
-			ldcp->status = LDC_READY;
-		}
+#ifdef DEBUG
+		if (LDC_INJECT_RESET(ldcp))
+			goto force_reset;
+#endif
 
 		if (rx_head == rx_tail) {
 			D2(ldcp->id, "i_ldc_rx_hdlr: (0x%llx) No packets\n",
 			    ldcp->id);
 			break;
 		}
+
 		D2(ldcp->id, "i_ldc_rx_hdlr: head=0x%llx, tail=0x%llx\n",
 		    rx_head, rx_tail);
 		DUMP_LDC_PKT(ldcp, "i_ldc_rx_hdlr rcd",
@@ -1861,7 +1962,7 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 		if ((msg->type & LDC_DATA) && (msg->stype & LDC_INFO)) {
 
 			/* discard packet if channel is not up */
-			if (ldcp->tstate != TS_UP) {
+			if ((ldcp->tstate & ~TS_IN_RESET) != TS_UP) {
 
 				/* move the head one position */
 				rx_head = (rx_head + LDC_PACKET_SIZE) %
@@ -1872,14 +1973,16 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 
 				continue;
 			} else {
-				notify_client = B_TRUE;
+				if ((ldcp->tstate & TS_IN_RESET) == 0)
+					notify_client = B_TRUE;
 				notify_event |= LDC_EVT_READ;
 				break;
 			}
 		}
 
 		/* Check the sequence ID for the message received */
-		if ((rv = i_ldc_check_seqid(ldcp, msg)) != 0) {
+		rv = i_ldc_check_seqid(ldcp, msg);
+		if (rv != 0) {
 
 			DWARN(ldcp->id, "i_ldc_rx_hdlr: (0x%llx) seqid error, "
 			    "q_ptrs=0x%lx,0x%lx", ldcp->id, rx_head, rx_tail);
@@ -1903,7 +2006,7 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 
 				/* if cannot send NACK - reset channel */
 				mutex_enter(&ldcp->tx_lock);
-				i_ldc_reset(ldcp);
+				i_ldc_reset(ldcp, B_TRUE);
 				mutex_exit(&ldcp->tx_lock);
 				rv = ECONNRESET;
 				break;
@@ -1938,7 +2041,8 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 			 * channel transitioned to ready for communication
 			 */
 			if (rv == 0 && ldcp->tstate == TS_UP &&
-			    tstate != ldcp->tstate) {
+			    (tstate & ~TS_IN_RESET) !=
+			    (ldcp->tstate & ~TS_IN_RESET)) {
 				notify_client = B_TRUE;
 				notify_event = LDC_EVT_UP;
 			}
@@ -1964,14 +2068,21 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 
 	} /* for */
 
+loop_exit:
+
 	/* if callbacks are disabled, do not notify */
 	if (!ldcp->cb_enabled)
 		notify_client = B_FALSE;
 
-	if (notify_client)
-		ldcp->cb_inprogress = B_TRUE;
+	/*
+	 * If there are data packets in the queue, the ldc_read will
+	 * clear interrupts after draining the queue, else clear interrupts
+	 */
+	if ((notify_event & LDC_EVT_READ) == 0) {
+		i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
+	} else
+		ldcp->rx_intr_state = LDC_INTR_PEND;
 
-	/* Unlock channel */
 	mutex_exit(&ldcp->lock);
 
 	if (notify_client) {
@@ -1981,22 +2092,7 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 			    "i_ldc_rx_hdlr: (0x%llx) callback failure",
 			    ldcp->id);
 		}
-		mutex_enter(&ldcp->lock);
-		ldcp->cb_inprogress = B_FALSE;
-		mutex_exit(&ldcp->lock);
 	}
-
-	mutex_enter(&ldcp->lock);
-
-	/*
-	 * If there are data packets in the queue, the ldc_read will
-	 * clear interrupts after draining the queue, else clear interrupts
-	 */
-	if ((notify_event & LDC_EVT_READ) == 0) {
-		i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
-	}
-
-	mutex_exit(&ldcp->lock);
 
 	D1(ldcp->id, "i_ldc_rx_hdlr: (0x%llx) exiting handler", ldcp->id);
 	return (DDI_INTR_CLAIMED);
@@ -2099,7 +2195,7 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 	    ldcp->id, ldcp->devclass, ldcp->devinst, ldcp->mode, ldcp->mtu);
 
 	ldcp->next_vidx = 0;
-	ldcp->tstate = 0;
+	ldcp->tstate = TS_IN_RESET;
 	ldcp->hstate = 0;
 	ldcp->last_msg_snt = LDC_INIT_SEQID;
 	ldcp->last_ack_rcd = 0;
@@ -2109,6 +2205,9 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 	ldcp->exp_dring_list = NULL;
 	ldcp->imp_dring_list = NULL;
 	ldcp->mhdl_list = NULL;
+
+	ldcp->tx_intr_state = LDC_INTR_NONE;
+	ldcp->rx_intr_state = LDC_INTR_NONE;
 
 	/* Initialize payload size depending on whether channel is reliable */
 	switch (ldcp->mode) {
@@ -2253,7 +2352,7 @@ ldc_fini(ldc_handle_t handle)
 
 	mutex_enter(&ldcp->lock);
 
-	if (ldcp->tstate > TS_INIT) {
+	if ((ldcp->tstate & ~TS_IN_RESET) > TS_INIT) {
 		DWARN(ldcp->id, "ldc_fini: (0x%llx) channel is open\n",
 		    ldcp->id);
 		mutex_exit(&ldcp->lock);
@@ -2290,7 +2389,10 @@ ldc_fini(ldc_handle_t handle)
 	/* Free the map table for this channel */
 	if (ldcp->mtbl) {
 		(void) hv_ldc_set_map_table(ldcp->id, NULL, NULL);
-		contig_mem_free(ldcp->mtbl->table, ldcp->mtbl->size);
+		if (ldcp->mtbl->contigmem)
+			contig_mem_free(ldcp->mtbl->table, ldcp->mtbl->size);
+		else
+			kmem_free(ldcp->mtbl->table, ldcp->mtbl->size);
 		mutex_destroy(&ldcp->mtbl->lock);
 		kmem_free(ldcp->mtbl, sizeof (ldc_mtbl_t));
 	}
@@ -2313,7 +2415,6 @@ ldc_fini(ldc_handle_t handle)
 	contig_mem_free((caddr_t)ldcp->tx_q_va,
 	    (ldcp->tx_q_entries << LDC_PACKET_SHIFT));
 	ldcp->tstate &= ~TS_TXQ_RDY;
-
 
 	mutex_exit(&ldcp->lock);
 
@@ -2355,7 +2456,7 @@ ldc_open(ldc_handle_t handle)
 		mutex_exit(&ldcp->lock);
 		return (EFAULT);
 	}
-	if (ldcp->tstate >= TS_OPEN) {
+	if ((ldcp->tstate & ~TS_IN_RESET) >= TS_OPEN) {
 		DWARN(ldcp->id,
 		    "ldc_open: (0x%llx) channel is already open\n", ldcp->id);
 		mutex_exit(&ldcp->lock);
@@ -2471,9 +2572,10 @@ ldc_open(ldc_handle_t handle)
 	ldcssp->channels_open++;
 	mutex_exit(&ldcssp->lock);
 
-	D1(ldcp->id,
-	    "ldc_open: (0x%llx) channel (0x%p) open for use (tstate=0x%x)\n",
-	    ldcp->id, ldcp, ldcp->tstate);
+	DWARN(ldcp->id,
+	    "ldc_open: (0x%llx) channel (0x%p) open for use "
+	    "(tstate=0x%x, status=0x%x)\n",
+	    ldcp->id, ldcp, ldcp->tstate, ldcp->status);
 
 	return (0);
 }
@@ -2499,7 +2601,7 @@ ldc_close(ldc_handle_t handle)
 	mutex_enter(&ldcp->lock);
 
 	/* return error if channel is not open */
-	if (ldcp->tstate < TS_OPEN) {
+	if ((ldcp->tstate & ~TS_IN_RESET) < TS_OPEN) {
 		DWARN(ldcp->id,
 		    "ldc_close: (0x%llx) channel is not open\n", ldcp->id);
 		mutex_exit(&ldcp->lock);
@@ -2566,6 +2668,12 @@ ldc_close(ldc_handle_t handle)
 	}
 
 	/*
+	 * Drain the Tx and Rx queues
+	 */
+	(void) i_ldc_txq_reconf(ldcp);
+	(void) i_ldc_rxq_reconf(ldcp, B_TRUE);
+
+	/*
 	 * Unregister the channel with the nexus
 	 */
 	while ((rv = i_ldc_unregister_channel(ldcp)) != 0) {
@@ -2621,7 +2729,7 @@ ldc_close(ldc_handle_t handle)
 	/* Mark channel as down and in initialized state */
 	ldcp->tx_ackd_head = 0;
 	ldcp->tx_head = 0;
-	ldcp->tstate = TS_INIT;
+	ldcp->tstate = TS_IN_RESET|TS_INIT;
 	ldcp->status = LDC_INIT;
 
 	mutex_exit(&ldcp->tx_lock);
@@ -2742,7 +2850,7 @@ ldc_up(ldc_handle_t handle)
 	int 		rv;
 	ldc_chan_t 	*ldcp;
 	ldc_msg_t 	*ldcmsg;
-	uint64_t 	tx_tail;
+	uint64_t 	tx_tail, tstate;
 
 	if (handle == NULL) {
 		DWARN(DBG_ALL_LDCS, "ldc_up: invalid channel handle\n");
@@ -2752,10 +2860,34 @@ ldc_up(ldc_handle_t handle)
 
 	mutex_enter(&ldcp->lock);
 
+	D1(ldcp->id, "ldc_up: (0x%llx) doing channel UP\n", ldcp->id);
+
+	/* clear the reset state */
+	tstate = ldcp->tstate;
+	ldcp->tstate &= ~TS_IN_RESET;
+
 	if (ldcp->tstate == TS_UP) {
-		D2(ldcp->id,
+		DWARN(ldcp->id,
 		    "ldc_up: (0x%llx) channel is already in UP state\n",
 		    ldcp->id);
+
+		/* mark channel as up */
+		ldcp->status = LDC_UP;
+
+		/*
+		 * if channel was in reset state and there was
+		 * pending data clear interrupt state. this will
+		 * trigger an interrupt, causing the RX handler to
+		 * to invoke the client's callback
+		 */
+		if ((tstate & TS_IN_RESET) &&
+		    ldcp->rx_intr_state == LDC_INTR_PEND) {
+			DWARN(ldcp->id,
+			    "ldc_up: (0x%llx) channel has pending data, "
+			    "clearing interrupt\n", ldcp->id);
+			i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
+		}
+
 		mutex_exit(&ldcp->lock);
 		return (0);
 	}
@@ -2769,7 +2901,7 @@ ldc_up(ldc_handle_t handle)
 
 	/* Don't start another handshake if there is one in progress */
 	if (ldcp->hstate) {
-		D2(ldcp->id,
+		D1(ldcp->id,
 		    "ldc_up: (0x%llx) channel handshake in progress\n",
 		    ldcp->id);
 		mutex_exit(&ldcp->lock);
@@ -2837,10 +2969,9 @@ ldc_down(ldc_handle_t handle)
 		return (EINVAL);
 	}
 	ldcp = (ldc_chan_t *)handle;
-
 	mutex_enter(&ldcp->lock);
 	mutex_enter(&ldcp->tx_lock);
-	i_ldc_reset(ldcp);
+	i_ldc_reset(ldcp, B_TRUE);
 	mutex_exit(&ldcp->tx_lock);
 	mutex_exit(&ldcp->lock);
 
@@ -2863,7 +2994,7 @@ ldc_status(ldc_handle_t handle, ldc_status_t *status)
 
 	*status = ((ldc_chan_t *)handle)->status;
 
-	D1(ldcp->id,
+	DWARN(ldcp->id,
 	    "ldc_status: (0x%llx) returned status %d\n", ldcp->id, *status);
 	return (0);
 }
@@ -2963,7 +3094,7 @@ ldc_chkq(ldc_handle_t handle, boolean_t *hasdata)
 	if (ldcp->link_state == LDC_CHANNEL_DOWN ||
 	    ldcp->link_state == LDC_CHANNEL_RESET) {
 		mutex_enter(&ldcp->tx_lock);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_FALSE);
 		mutex_exit(&ldcp->tx_lock);
 		mutex_exit(&ldcp->lock);
 		return (ECONNRESET);
@@ -3020,8 +3151,22 @@ ldc_read(ldc_handle_t handle, caddr_t bufp, size_t *sizep)
 	 */
 	rv = hv_ldc_rx_get_state(ldcp->id, &rx_head, &rx_tail,
 	    &ldcp->link_state);
-	if (exit_val == 0 && rv == 0 && rx_head == rx_tail) {
-		i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
+
+	ASSERT(rv == 0);
+
+	if (exit_val == 0) {
+		if (ldcp->link_state == LDC_CHANNEL_DOWN ||
+		    ldcp->link_state == LDC_CHANNEL_RESET) {
+			mutex_enter(&ldcp->tx_lock);
+			i_ldc_reset(ldcp, B_FALSE);
+			exit_val = ECONNRESET;
+			mutex_exit(&ldcp->tx_lock);
+		}
+		if ((rv == 0) &&
+		    (ldcp->rx_intr_state == LDC_INTR_PEND) &&
+		    (rx_head == rx_tail)) {
+			i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
+		}
 	}
 
 	mutex_exit(&ldcp->lock);
@@ -3069,9 +3214,10 @@ i_ldc_read_raw(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 		ldcp->id, rx_head, rx_tail, ldcp->link_state);
 
 	/* reset the channel state if the channel went down */
-	if (ldcp->link_state == LDC_CHANNEL_DOWN) {
+	if (ldcp->link_state == LDC_CHANNEL_DOWN ||
+	    ldcp->link_state == LDC_CHANNEL_RESET) {
 		mutex_enter(&ldcp->tx_lock);
-		i_ldc_reset(ldcp);
+		i_ldc_reset(ldcp, B_FALSE);
 		mutex_exit(&ldcp->tx_lock);
 		return (ECONNRESET);
 	}
@@ -3125,6 +3271,13 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 
 	ASSERT(mutex_owned(&ldcp->lock));
 
+	/* check if the buffer and size are valid */
+	if (target_bufp == NULL || *sizep == 0) {
+		DWARN(ldcp->id, "ldc_read: (0x%llx) invalid buffer/size\n",
+		    ldcp->id);
+		return (EINVAL);
+	}
+
 	/* compute mask for increment */
 	q_size_mask = (ldcp->rx_q_entries-1)<<LDC_PACKET_SHIFT;
 
@@ -3134,21 +3287,19 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 	rv = hv_ldc_rx_get_state(ldcp->id, &curr_head, &rx_tail,
 	    &ldcp->link_state);
 	if (rv != 0) {
-		cmn_err(CE_WARN,
-		    "ldc_read: (0x%lx) unable to read queue ptrs",
+		cmn_err(CE_WARN, "ldc_read: (0x%lx) unable to read queue ptrs",
 		    ldcp->id);
-		return (EIO);
+		mutex_enter(&ldcp->tx_lock);
+		i_ldc_reset(ldcp, B_TRUE);
+		mutex_exit(&ldcp->tx_lock);
+		return (ECONNRESET);
 	}
 	D1(ldcp->id, "ldc_read: (0x%llx) chd=0x%llx, tl=0x%llx, st=0x%llx\n",
 	    ldcp->id, curr_head, rx_tail, ldcp->link_state);
 
 	/* reset the channel state if the channel went down */
-	if (ldcp->link_state == LDC_CHANNEL_DOWN) {
-		mutex_enter(&ldcp->tx_lock);
-		i_ldc_reset(ldcp);
-		mutex_exit(&ldcp->tx_lock);
-		return (ECONNRESET);
-	}
+	if (ldcp->link_state != LDC_CHANNEL_UP)
+		goto channel_is_reset;
 
 	for (;;) {
 
@@ -3159,37 +3310,35 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 				cmn_err(CE_WARN,
 				    "ldc_read: (0x%lx) cannot read queue ptrs",
 				    ldcp->id);
-				return (EIO);
-			}
-			/* reset the channel state if the channel went down */
-			if (ldcp->link_state == LDC_CHANNEL_DOWN) {
 				mutex_enter(&ldcp->tx_lock);
-				i_ldc_reset(ldcp);
+				i_ldc_reset(ldcp, B_TRUE);
 				mutex_exit(&ldcp->tx_lock);
 				return (ECONNRESET);
 			}
-		}
+			if (ldcp->link_state != LDC_CHANNEL_UP)
+				goto channel_is_reset;
 
-		if (curr_head == rx_tail) {
+			if (curr_head == rx_tail) {
 
-			/* If in the middle of a fragmented xfer */
-			if (first_fragment != 0) {
+				/* If in the middle of a fragmented xfer */
+				if (first_fragment != 0) {
 
-				/* wait for ldc_delay usecs */
-				drv_usecwait(ldc_delay);
+					/* wait for ldc_delay usecs */
+					drv_usecwait(ldc_delay);
 
-				if (++retries < ldc_max_retries)
-					continue;
+					if (++retries < ldc_max_retries)
+						continue;
 
+					*sizep = 0;
+					ldcp->last_msg_rcd = first_fragment - 1;
+					DWARN(DBG_ALL_LDCS, "ldc_read: "
+						"(0x%llx) read timeout",
+						ldcp->id);
+					return (EAGAIN);
+				}
 				*sizep = 0;
-				ldcp->last_msg_rcd = first_fragment - 1;
-				DWARN(DBG_ALL_LDCS,
-					"ldc_read: (0x%llx) read timeout",
-					ldcp->id);
-				return (ETIMEDOUT);
+				break;
 			}
-			*sizep = 0;
-			break;
 		}
 		retries = 0;
 
@@ -3230,7 +3379,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 
 				/* if cannot send NACK - reset channel */
 				mutex_enter(&ldcp->tx_lock);
-				i_ldc_reset(ldcp);
+				i_ldc_reset(ldcp, B_FALSE);
 				mutex_exit(&ldcp->tx_lock);
 				rv = ECONNRESET;
 				break;
@@ -3418,21 +3567,24 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 		ldcp->mode == LDC_MODE_STREAM)) {
 
 		rv = i_ldc_send_pkt(ldcp, LDC_DATA, LDC_ACK, 0);
-		if (rv) {
+		if (rv && rv != EWOULDBLOCK) {
 			cmn_err(CE_NOTE,
 			    "ldc_read: (0x%lx) cannot send ACK\n", ldcp->id);
 
 			/* if cannot send ACK - reset channel */
-			mutex_enter(&ldcp->tx_lock);
-			i_ldc_reset(ldcp);
-			mutex_exit(&ldcp->tx_lock);
-			rv = ECONNRESET;
+			goto channel_is_reset;
 		}
 	}
 
 	D2(ldcp->id, "ldc_read: (0x%llx) end size=%d", ldcp->id, *sizep);
 
 	return (rv);
+
+channel_is_reset:
+	mutex_enter(&ldcp->tx_lock);
+	i_ldc_reset(ldcp, B_FALSE);
+	mutex_exit(&ldcp->tx_lock);
+	return (ECONNRESET);
 }
 
 /*
@@ -3587,7 +3739,7 @@ i_ldc_write_raw(ldc_chan_t *ldcp, caddr_t buf, size_t *sizep)
 
 		*sizep = 0;
 		if (mutex_tryenter(&ldcp->lock)) {
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_FALSE);
 			mutex_exit(&ldcp->lock);
 		} else {
 			/*
@@ -3597,7 +3749,7 @@ i_ldc_write_raw(ldc_chan_t *ldcp, caddr_t buf, size_t *sizep)
 			mutex_exit(&ldcp->tx_lock);
 			mutex_enter(&ldcp->lock);
 			mutex_enter(&ldcp->tx_lock);
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_FALSE);
 			mutex_exit(&ldcp->lock);
 		}
 		return (ECONNRESET);
@@ -3642,7 +3794,7 @@ i_ldc_write_raw(ldc_chan_t *ldcp, caddr_t buf, size_t *sizep)
 
 		*sizep = 0;
 		if (mutex_tryenter(&ldcp->lock)) {
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_FALSE);
 			mutex_exit(&ldcp->lock);
 		} else {
 			/*
@@ -3652,7 +3804,7 @@ i_ldc_write_raw(ldc_chan_t *ldcp, caddr_t buf, size_t *sizep)
 			mutex_exit(&ldcp->tx_lock);
 			mutex_enter(&ldcp->lock);
 			mutex_enter(&ldcp->tx_lock);
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_FALSE);
 			mutex_exit(&ldcp->lock);
 		}
 		return (ECONNRESET);
@@ -3712,7 +3864,7 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 		    "ldc_write: (0x%llx) channel down/reset\n", ldcp->id);
 		*size = 0;
 		if (mutex_tryenter(&ldcp->lock)) {
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_FALSE);
 			mutex_exit(&ldcp->lock);
 		} else {
 			/*
@@ -3722,7 +3874,7 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 			mutex_exit(&ldcp->tx_lock);
 			mutex_enter(&ldcp->lock);
 			mutex_enter(&ldcp->tx_lock);
-			i_ldc_reset(ldcp);
+			i_ldc_reset(ldcp, B_FALSE);
 			mutex_exit(&ldcp->lock);
 		}
 		return (ECONNRESET);
@@ -3787,8 +3939,6 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 		curr_seqid++;
 		ldcmsg->seqid = curr_seqid;
 
-		DUMP_LDC_PKT(ldcp, "ldc_write snd data", (uint64_t)ldcmsg);
-
 		/* copy the data into pkt */
 		bcopy(source, msgbuf, len);
 
@@ -3821,7 +3971,7 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 		if (rv != EWOULDBLOCK) {
 			*size = 0;
 			if (mutex_tryenter(&ldcp->lock)) {
-				i_ldc_reset(ldcp);
+				i_ldc_reset(ldcp, B_FALSE);
 				mutex_exit(&ldcp->lock);
 			} else {
 				/*
@@ -3831,7 +3981,7 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 				mutex_exit(&ldcp->tx_lock);
 				mutex_enter(&ldcp->lock);
 				mutex_enter(&ldcp->tx_lock);
-				i_ldc_reset(ldcp);
+				i_ldc_reset(ldcp, B_FALSE);
 				mutex_exit(&ldcp->lock);
 			}
 			return (ECONNRESET);
@@ -3975,7 +4125,7 @@ ldc_mem_alloc_handle(ldc_handle_t handle, ldc_mem_handle_t *mhandle)
 	mutex_enter(&ldcp->lock);
 
 	/* check to see if channel is initalized */
-	if (ldcp->tstate < TS_INIT) {
+	if ((ldcp->tstate & ~TS_IN_RESET) < TS_INIT) {
 		DWARN(ldcp->id,
 		    "ldc_mem_alloc_handle: (0x%llx) channel not initialized\n",
 		    ldcp->id);
@@ -4157,18 +4307,22 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 		mtbl->num_entries = mtbl->num_avail = ldc_maptable_entries;
 		mtbl->size = ldc_maptable_entries * sizeof (ldc_mte_slot_t);
 		mtbl->next_entry = NULL;
+		mtbl->contigmem = B_TRUE;
 
 		/* Allocate the table itself */
 		mtbl->table = (ldc_mte_slot_t *)
 			contig_mem_alloc_align(mtbl->size, MMU_PAGESIZE);
 		if (mtbl->table == NULL) {
-			cmn_err(CE_WARN,
-			    "ldc_mem_bind_handle: (0x%lx) error allocating "
-			    "table memory", ldcp->id);
-			kmem_free(mtbl, sizeof (ldc_mtbl_t));
-			mutex_exit(&ldcp->lock);
-			mutex_exit(&mhdl->lock);
-			return (ENOMEM);
+
+			/* allocate a page of memory using kmem_alloc */
+			mtbl->table = kmem_alloc(MMU_PAGESIZE, KM_SLEEP);
+			mtbl->size = MMU_PAGESIZE;
+			mtbl->contigmem = B_FALSE;
+			mtbl->num_entries = mtbl->num_avail =
+				mtbl->size / sizeof (ldc_mte_slot_t);
+			DWARN(ldcp->id,
+			    "ldc_mem_bind_handle: (0x%llx) reduced tbl size "
+			    "to %lx entries\n", ldcp->id, mtbl->num_entries);
 		}
 
 		/* zero out the memory */
@@ -4184,7 +4338,10 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 			cmn_err(CE_WARN,
 			    "ldc_mem_bind_handle: (0x%lx) err %d mapping tbl",
 			    ldcp->id, rv);
-			contig_mem_free(mtbl->table, mtbl->size);
+			if (mtbl->contigmem)
+				contig_mem_free(mtbl->table, mtbl->size);
+			else
+				kmem_free(mtbl->table, mtbl->size);
 			mutex_destroy(&mtbl->lock);
 			kmem_free(mtbl, sizeof (ldc_mtbl_t));
 			mutex_exit(&ldcp->lock);
@@ -4225,8 +4382,7 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 	mutex_enter(&mtbl->lock);
 
 	if (npages > mtbl->num_avail) {
-		DWARN(ldcp->id,
-		    "ldc_mem_bind_handle: (0x%llx) no table entries\n",
+		D1(ldcp->id, "ldc_mem_bind_handle: (0x%llx) no table entries\n",
 		    ldcp->id);
 		mutex_exit(&mtbl->lock);
 		mutex_exit(&mhdl->lock);
@@ -4619,27 +4775,26 @@ ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *size,
 	size_t		len = *size;
 	int 		i, rv = 0;
 
+	uint64_t	chid;
+
 	if (handle == NULL) {
 		DWARN(DBG_ALL_LDCS, "ldc_mem_copy: invalid channel handle\n");
 		return (EINVAL);
 	}
 	ldcp = (ldc_chan_t *)handle;
-
-	mutex_enter(&ldcp->lock);
+	chid = ldcp->id;
 
 	/* check to see if channel is UP */
 	if (ldcp->tstate != TS_UP) {
-		DWARN(ldcp->id, "ldc_mem_copy: (0x%llx) channel is not UP\n",
-		    ldcp->id);
-		mutex_exit(&ldcp->lock);
-		return (EINVAL);
+		DWARN(chid, "ldc_mem_copy: (0x%llx) channel is not UP\n",
+		    chid);
+		return (ECONNRESET);
 	}
 
 	/* Force address and size to be 8-byte aligned */
 	if ((((uintptr_t)vaddr | len) & 0x7) != 0) {
-		DWARN(ldcp->id,
+		DWARN(chid,
 		    "ldc_mem_copy: addr/sz is not 8-byte aligned\n");
-		mutex_exit(&ldcp->lock);
 		return (EINVAL);
 	}
 
@@ -4650,10 +4805,9 @@ ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *size,
 
 	/* check to see if offset is valid */
 	if (off > export_size) {
-		DWARN(ldcp->id,
+		DWARN(chid,
 		    "ldc_mem_copy: (0x%llx) start offset > export mem size\n",
-		    ldcp->id);
-		mutex_exit(&ldcp->lock);
+		    chid);
 		return (EINVAL);
 	}
 
@@ -4662,10 +4816,9 @@ ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *size,
 	 * are requesting to copy - if so flag an error
 	 */
 	if ((export_size - off) < *size) {
-		DWARN(ldcp->id,
+		DWARN(chid,
 		    "ldc_mem_copy: (0x%llx) copy size > export mem size\n",
-		    ldcp->id);
-		mutex_exit(&ldcp->lock);
+		    chid);
 		return (EINVAL);
 	}
 
@@ -4676,9 +4829,9 @@ ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *size,
 	pg_size_code = page_szc(pg_size);
 	pg_shift = page_get_shift(pg_size_code);
 
-	D1(ldcp->id, "ldc_mem_copy: copying data "
+	D1(chid, "ldc_mem_copy: copying data "
 	    "(0x%llx) va 0x%llx pgsz=0x%llx, pgszc=0x%llx, pg_shift=0x%llx\n",
-	    ldcp->id, vaddr, pg_size, pg_size_code, pg_shift);
+	    chid, vaddr, pg_size, pg_size_code, pg_shift);
 
 	/* aligned VA and its offset */
 	local_valign = (((uintptr_t)vaddr) & ~(pg_size - 1));
@@ -4687,9 +4840,9 @@ ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *size,
 	npages = (len+local_voff)/pg_size;
 	npages = ((len+local_voff)%pg_size == 0) ? npages : npages+1;
 
-	D1(ldcp->id,
+	D1(chid,
 	    "ldc_mem_copy: (0x%llx) v=0x%llx,val=0x%llx,off=0x%x,pgs=0x%x\n",
-	    ldcp->id, vaddr, local_valign, local_voff, npages);
+	    chid, vaddr, local_valign, local_voff, npages);
 
 	local_ra = va_to_pa((void *)local_valign);
 	local_poff = local_voff;
@@ -4719,40 +4872,62 @@ ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *size,
 
 		copy_size = min(export_psize, local_psize);
 
-		D1(ldcp->id,
+		D1(chid,
 		    "ldc_mem_copy:(0x%llx) dir=0x%x, caddr=0x%llx,"
 		    " loc_ra=0x%llx, exp_poff=0x%llx, loc_poff=0x%llx,"
 		    " exp_psz=0x%llx, loc_psz=0x%llx, copy_sz=0x%llx,"
 		    " total_bal=0x%llx\n",
-		    ldcp->id, direction, export_caddr, local_ra, export_poff,
+		    chid, direction, export_caddr, local_ra, export_poff,
 		    local_poff, export_psize, local_psize, copy_size,
 		    total_bal);
 
-		rv = hv_ldc_copy(ldcp->id, direction,
+		rv = hv_ldc_copy(chid, direction,
 		    (export_caddr + export_poff), (local_ra + local_poff),
 		    copy_size, &copied_len);
 
 		if (rv != 0) {
-			cmn_err(CE_WARN,
-			    "ldc_mem_copy: (0x%lx) err %d during copy\n",
-			    ldcp->id, rv);
-			DWARN(ldcp->id,
-			    "ldc_mem_copy: (0x%lx) dir=0x%x, caddr=0x%lx, "
+			int 		error = EIO;
+			uint64_t	rx_hd, rx_tl;
+
+			DWARN(chid,
+			    "ldc_mem_copy: (0x%llx) err %d during copy\n",
+			    (unsigned long long)chid, rv);
+			DWARN(chid,
+			    "ldc_mem_copy: (0x%llx) dir=0x%x, caddr=0x%lx, "
 			    "loc_ra=0x%lx, exp_poff=0x%lx, loc_poff=0x%lx,"
 			    " exp_psz=0x%lx, loc_psz=0x%lx, copy_sz=0x%lx,"
 			    " copied_len=0x%lx, total_bal=0x%lx\n",
-			    ldcp->id, direction, export_caddr, local_ra,
+			    chid, direction, export_caddr, local_ra,
 			    export_poff, local_poff, export_psize, local_psize,
 			    copy_size, copied_len, total_bal);
 
 			*size = *size - total_bal;
+
+			/*
+			 * check if reason for copy error was due to
+			 * a channel reset. we need to grab the lock
+			 * just in case we have to do a reset.
+			 */
+			mutex_enter(&ldcp->lock);
+			mutex_enter(&ldcp->tx_lock);
+
+			rv = hv_ldc_rx_get_state(ldcp->id,
+			    &rx_hd, &rx_tl, &(ldcp->link_state));
+			if (ldcp->link_state == LDC_CHANNEL_DOWN ||
+			    ldcp->link_state == LDC_CHANNEL_RESET) {
+				i_ldc_reset(ldcp, B_FALSE);
+				error = ECONNRESET;
+			}
+
+			mutex_exit(&ldcp->tx_lock);
 			mutex_exit(&ldcp->lock);
-			return (EIO);
+
+			return (error);
 		}
 
 		ASSERT(copied_len <= copy_size);
 
-		D2(ldcp->id, "ldc_mem_copy: copied=0x%llx\n", copied_len);
+		D2(chid, "ldc_mem_copy: copied=0x%llx\n", copied_len);
 		export_poff += copied_len;
 		local_poff += copied_len;
 		export_psize -= copied_len;
@@ -4795,11 +4970,10 @@ ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *size,
 			break;
 	}
 
-	mutex_exit(&ldcp->lock);
 
-	D1(ldcp->id,
+	D1(chid,
 	    "ldc_mem_copy: (0x%llx) done copying sz=0x%llx\n",
-	    ldcp->id, *size);
+	    chid, *size);
 
 	return (0);
 }
@@ -4813,7 +4987,7 @@ ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *size,
  * to the ldc_mem_copy interface
  */
 int
-ldc_mem_rdwr_pa(ldc_handle_t handle, caddr_t vaddr, size_t *size,
+ldc_mem_rdwr_cookie(ldc_handle_t handle, caddr_t vaddr, size_t *size,
     caddr_t paddr, uint8_t direction)
 {
 	ldc_chan_t 	*ldcp;
@@ -4828,7 +5002,7 @@ ldc_mem_rdwr_pa(ldc_handle_t handle, caddr_t vaddr, size_t *size,
 
 	if (handle == NULL) {
 		DWARN(DBG_ALL_LDCS,
-		    "ldc_mem_rdwr_pa: invalid channel handle\n");
+		    "ldc_mem_rdwr_cookie: invalid channel handle\n");
 		return (EINVAL);
 	}
 	ldcp = (ldc_chan_t *)handle;
@@ -4838,16 +5012,16 @@ ldc_mem_rdwr_pa(ldc_handle_t handle, caddr_t vaddr, size_t *size,
 	/* check to see if channel is UP */
 	if (ldcp->tstate != TS_UP) {
 		DWARN(ldcp->id,
-		    "ldc_mem_rdwr_pa: (0x%llx) channel is not UP\n",
+		    "ldc_mem_rdwr_cookie: (0x%llx) channel is not UP\n",
 		    ldcp->id);
 		mutex_exit(&ldcp->lock);
-		return (EINVAL);
+		return (ECONNRESET);
 	}
 
 	/* Force address and size to be 8-byte aligned */
 	if ((((uintptr_t)vaddr | len) & 0x7) != 0) {
 		DWARN(ldcp->id,
-		    "ldc_mem_rdwr_pa: addr/size is not 8-byte aligned\n");
+		    "ldc_mem_rdwr_cookie: addr/size is not 8-byte aligned\n");
 		mutex_exit(&ldcp->lock);
 		return (EINVAL);
 	}
@@ -4859,7 +5033,7 @@ ldc_mem_rdwr_pa(ldc_handle_t handle, caddr_t vaddr, size_t *size,
 	pg_size_code = page_szc(pg_size);
 	pg_shift = page_get_shift(pg_size_code);
 
-	D1(ldcp->id, "ldc_mem_rdwr_pa: copying data "
+	D1(ldcp->id, "ldc_mem_rdwr_cookie: copying data "
 	    "(0x%llx) va 0x%llx pgsz=0x%llx, pgszc=0x%llx, pg_shift=0x%llx\n",
 	    ldcp->id, vaddr, pg_size, pg_size_code, pg_shift);
 
@@ -4870,8 +5044,8 @@ ldc_mem_rdwr_pa(ldc_handle_t handle, caddr_t vaddr, size_t *size,
 	npages = (len + local_voff) / pg_size;
 	npages = ((len + local_voff) % pg_size == 0) ? npages : npages+1;
 
-	D1(ldcp->id,
-	    "ldc_mem_rdwr_pa: (0x%llx) v=0x%llx,val=0x%llx,off=0x%x,pgs=0x%x\n",
+	D1(ldcp->id, "ldc_mem_rdwr_cookie: (0x%llx) v=0x%llx, "
+	    "val=0x%llx,off=0x%x,pgs=0x%x\n",
 	    ldcp->id, vaddr, local_valign, local_voff, npages);
 
 	local_ra = va_to_pa((void *)local_valign);
@@ -4889,7 +5063,7 @@ ldc_mem_rdwr_pa(ldc_handle_t handle, caddr_t vaddr, size_t *size,
 		copy_size = min(target_psize, local_psize);
 
 		D1(ldcp->id,
-		    "ldc_mem_rdwr_pa: (0x%llx) dir=0x%x, tar_pa=0x%llx,"
+		    "ldc_mem_rdwr_cookie: (0x%llx) dir=0x%x, tar_pa=0x%llx,"
 		    " loc_ra=0x%llx, tar_poff=0x%llx, loc_poff=0x%llx,"
 		    " tar_psz=0x%llx, loc_psz=0x%llx, copy_sz=0x%llx,"
 		    " total_bal=0x%llx\n",
@@ -4902,14 +5076,14 @@ ldc_mem_rdwr_pa(ldc_handle_t handle, caddr_t vaddr, size_t *size,
 		    copy_size, &copied_len);
 
 		if (rv != 0) {
-			cmn_err(CE_WARN,
-			    "ldc_mem_rdwr_pa: (0x%lx) err %d during copy\n",
+			DWARN(DBG_ALL_LDCS,
+			    "ldc_mem_rdwr_cookie: (0x%lx) err %d during copy\n",
 			    ldcp->id, rv);
 			DWARN(DBG_ALL_LDCS,
-			    "ldc_mem_rdwr_pa: (0x%llx) dir=%lld,tar_pa=0x%llx, "
-			    "loc_ra=0x%llx, tar_poff=0x%llx, loc_poff=0x%llx,"
-			    " tar_psz=0x%llx, loc_psz=0x%llx, copy_sz=0x%llx,"
-			    " total_bal=0x%llx\n",
+			    "ldc_mem_rdwr_cookie: (0x%llx) dir=%lld, "
+			    "tar_pa=0x%llx, loc_ra=0x%llx, tar_poff=0x%llx, "
+			    "loc_poff=0x%llx, tar_psz=0x%llx, loc_psz=0x%llx, "
+			    "copy_sz=0x%llx, total_bal=0x%llx\n",
 			    ldcp->id, direction, target_pa, local_ra,
 			    target_poff, local_poff, target_psize, local_psize,
 			    copy_size, target_size);
@@ -4919,7 +5093,8 @@ ldc_mem_rdwr_pa(ldc_handle_t handle, caddr_t vaddr, size_t *size,
 			return (i_ldc_h2v_error(rv));
 		}
 
-		D2(ldcp->id, "ldc_mem_rdwr_pa: copied=0x%llx\n", copied_len);
+		D2(ldcp->id, "ldc_mem_rdwr_cookie: copied=0x%llx\n",
+		    copied_len);
 		target_poff += copied_len;
 		local_poff += copied_len;
 		target_psize -= copied_len;
@@ -4951,7 +5126,7 @@ ldc_mem_rdwr_pa(ldc_handle_t handle, caddr_t vaddr, size_t *size,
 
 	mutex_exit(&ldcp->lock);
 
-	D1(ldcp->id, "ldc_mem_rdwr_pa: (0x%llx) done copying sz=0x%llx\n",
+	D1(ldcp->id, "ldc_mem_rdwr_cookie: (0x%llx) done copying sz=0x%llx\n",
 	    ldcp->id, *size);
 
 	return (0);
@@ -5005,7 +5180,7 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 		    ldcp->id);
 		mutex_exit(&ldcp->lock);
 		mutex_exit(&mhdl->lock);
-		return (EINVAL);
+		return (ECONNRESET);
 	}
 
 	if ((mtype & (LDC_SHADOW_MAP|LDC_DIRECT_MAP|LDC_IO_MAP)) == 0) {
@@ -5106,7 +5281,6 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 
 				rv = hv_ldc_mapin(ldcp->id, cookie_addr,
 				    &memseg->pages[i].raddr, &map_perm);
-
 				if (rv != H_EWOULDBLOCK && rv != H_ETOOMANY)
 					break;
 
@@ -5176,22 +5350,7 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 
 	if (mtype == LDC_SHADOW_MAP) {
 		if (*vaddr == NULL) {
-			memseg->vaddr =
-				contig_mem_alloc_align(exp_size, PAGESIZE);
-			if (memseg->vaddr == NULL) {
-				cmn_err(CE_WARN, "ldc_mem_map: shadow memory "
-				    "allocation failed\n");
-				kmem_free(memseg->cookies,
-				    (sizeof (ldc_mem_cookie_t) * ccount));
-				kmem_free(memseg->pages,
-				    (sizeof (ldc_page_t) * npages));
-				kmem_cache_free(ldcssp->memseg_cache, memseg);
-				mutex_exit(&ldcp->lock);
-				mutex_exit(&mhdl->lock);
-				return (ENOMEM);
-			}
-
-			bzero(memseg->vaddr, exp_size);
+			memseg->vaddr = kmem_zalloc(exp_size, KM_SLEEP);
 			mhdl->myshadow = B_TRUE;
 
 			D1(ldcp->id, "ldc_mem_map: (0x%llx) allocated "
@@ -5273,7 +5432,7 @@ ldc_mem_unmap(ldc_mem_handle_t mhandle)
 
 	/* if we allocated shadow memory - free it */
 	if (mhdl->mtype == LDC_SHADOW_MAP && mhdl->myshadow) {
-		contig_mem_free(memseg->vaddr, memseg->size);
+		kmem_free(memseg->vaddr, memseg->size);
 	} else if (mhdl->mtype == LDC_DIRECT_MAP) {
 
 		/* unmap in the case of DIRECT_MAP */
@@ -5458,15 +5617,7 @@ ldc_mem_dring_create(uint32_t len, uint32_t dsize, ldc_dring_handle_t *dhandle)
 	dringp->status = LDC_UNBOUND;
 
 	/* allocate descriptor ring memory */
-	dringp->base = contig_mem_alloc_align(dringp->size, PAGESIZE);
-	if (dringp->base == NULL) {
-		cmn_err(CE_WARN,
-		    "ldc_mem_dring_create: unable to alloc desc\n");
-		kmem_free(dringp, sizeof (ldc_dring_t));
-		return (ENOMEM);
-	}
-
-	bzero(dringp->base, dringp->size);
+	dringp->base = kmem_zalloc(dringp->size, KM_SLEEP);
 
 	/* initialize the desc ring lock */
 	mutex_init(&dringp->lock, NULL, MUTEX_DRIVER, NULL);
@@ -5539,7 +5690,7 @@ ldc_mem_dring_destroy(ldc_dring_handle_t dhandle)
 	mutex_exit(&ldcssp->lock);
 
 	/* free the descriptor ring */
-	contig_mem_free((caddr_t)dringp->base, dringp->size);
+	kmem_free(dringp->base, dringp->size);
 
 	mutex_exit(&dringp->lock);
 

@@ -303,6 +303,7 @@ typedef struct vsw_ldc {
 	int			drain_state;
 	uint32_t		hphase;		/* handshake phase */
 	int			hcnt;		/* # handshake attempts */
+	kmutex_t		status_lock;
 	ldc_status_t		ldc_status;	/* channel status */
 	uint64_t		local_session;	/* Our session id */
 	uint64_t		peer_session;	/* Our peers session id */

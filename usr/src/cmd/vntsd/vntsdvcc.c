@@ -108,6 +108,12 @@ cleanup_cons(vntsd_cons_t *consp)
 		(void) cond_reltimedwait(&consp->cvp, &consp->lock, &to);
 	}
 
+	/* reduce console count in the group */
+	(void) mutex_lock(&groupp->lock);
+	assert(groupp->num_cons > 0);
+	groupp->num_cons--;
+	(void) mutex_unlock(&groupp->lock);
+
 	(void) mutex_unlock(&consp->lock);
 
 	free_cons(consp);
@@ -171,7 +177,6 @@ vntsd_delete_cons(vntsd_t *vntsdp)
 
 			/* remove console from the group */
 			(void) vntsd_que_rm(&groupp->conspq, consp);
-			groupp->num_cons--;
 			(void) mutex_unlock(&groupp->lock);
 
 			/* clean up the console */
@@ -218,8 +223,9 @@ vntsd_clean_group(vntsd_group_t *groupp)
 		return;
 	}
 	groupp->status |= VNTSD_GROUP_CLEANUP;
-	vntsd_free_que(&groupp->conspq, (clean_func_t)cleanup_cons);
 	(void) mutex_unlock(&groupp->lock);
+
+	vntsd_free_que(&groupp->conspq, (clean_func_t)cleanup_cons);
 
 	/* walk through no cons client queue */
 	while (groupp->no_cons_clientpq != NULL) {

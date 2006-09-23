@@ -88,6 +88,8 @@ extern "C" {
 #define	TS_HSHAKE_DONE	0x40	/* completed handshake */
 #define	TS_UP		(TS_READY | TS_VER_DONE | TS_HSHAKE_DONE)
 
+#define	TS_IN_RESET	0x100	/* channel is in reset state */
+
 /*  LDC Channel Transport Handshake states */
 #define	TS_SENT_VER	0x01	/* Sent version */
 #define	TS_SENT_RTS	0x02	/* Sent RTS */
@@ -97,6 +99,11 @@ extern "C" {
 #define	TS_RCVD_RTS	0x20	/* Received RTS */
 #define	TS_SENT_RTR	0x40	/* Sent RTR */
 #define	TS_RCVD_RDX	0x80	/* Received RDX */
+
+/* LDC Interrupt State */
+#define	LDC_INTR_NONE	0x00	/* No interrupts */
+#define	LDC_INTR_ACTIVE	0x01	/* Interrupt being processed */
+#define	LDC_INTR_PEND	0x02	/* Interrupt pending */
 
 /* LDC MSG Envelope */
 #define	LDC_LEN_MASK	0x3F
@@ -321,6 +328,7 @@ typedef struct ldc_mtbl {
 	uint64_t		next_entry;	/* Next entry to use */
 	uint64_t		num_entries;	/* Num entries in table */
 	uint64_t		num_avail;	/* Num of available entries */
+	boolean_t		contigmem;	/* TRUE=Contig mem alloc'd */
 	ldc_mte_slot_t		*table;		/* The table itself */
 } ldc_mtbl_t;
 
@@ -416,7 +424,7 @@ struct ldc_chan {
 	uint64_t	devinst;	/* Associated device instance */
 	ldc_mode_t	mode;		/* Channel mode */
 
-	uint64_t	mtu;		/* Max TU size (streaming for now) */
+	uint64_t	mtu;		/* Max TU size */
 
 	ldc_ver_t	version;	/* Channel version */
 	uint32_t	next_vidx;	/* Next version to match */
@@ -426,8 +434,8 @@ struct ldc_chan {
 	boolean_t	cb_inprogress;	/* Channel callback in progress */
 	boolean_t	cb_enabled;	/* Channel callbacks are enabled */
 
-	boolean_t	tx_intr_pending; /* TRUE if Tx interrupts are pending */
-	boolean_t	rx_intr_pending; /* TRUE if Rx interrupts are pending */
+	uint8_t		tx_intr_state;	/* Tx interrupt state */
+	uint8_t		rx_intr_state;	/* Rx interrupt state */
 
 	kmutex_t	tx_lock;	/* Transmit lock */
 	uint64_t	tx_q_entries;	/* Num entries in transmit queue */

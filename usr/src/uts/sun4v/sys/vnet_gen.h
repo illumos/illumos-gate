@@ -264,8 +264,6 @@ typedef struct vgen_ldc {
 	uint32_t		num_rxdcookies;	/* # of rx dring cookies */
 	uint32_t		next_txi;	/* next tx descriptor index */
 	uint32_t		num_txds;	/* number of tx descriptors */
-	uint32_t		reclaim_lowat;	/* lowat for tx reclaim */
-	uint32_t		reclaim_hiwat;	/* hiwat for tx reclaim */
 	clock_t			reclaim_lbolt;	/* time of last tx reclaim */
 	timeout_id_t		wd_tid;		/* tx watchdog timeout id */
 	vnet_public_desc_t	*rxdp;		/* receive frame descriptors */

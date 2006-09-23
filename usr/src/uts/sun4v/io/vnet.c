@@ -77,7 +77,8 @@ static fdb_t *vnet_lookup_fdb(fdb_fanout_t *fdbhp, uint8_t *macaddr);
 /* exported functions */
 void vnet_add_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg);
 void vnet_del_fdb(void *arg, uint8_t *macaddr);
-void vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg);
+void vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx,
+	void *txarg, boolean_t upgrade);
 void vnet_add_def_rte(void *arg, mac_tx_t m_tx, void *txarg);
 void vnet_del_def_rte(void *arg);
 void vnet_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp);
@@ -110,8 +111,6 @@ static krwlock_t vnet_rw;
 
 /* Tunables */
 uint32_t vnet_ntxds = VNET_NTXDS;	/* power of 2 transmit descriptors */
-uint32_t vnet_reclaim_lowat = VNET_RECLAIM_LOWAT;  /* tx recl low watermark */
-uint32_t vnet_reclaim_hiwat = VNET_RECLAIM_HIWAT;  /* tx recl high watermark */
 uint32_t vnet_ldcwd_interval = VNET_LDCWD_INTERVAL; /* watchdog freq in msec */
 uint32_t vnet_ldcwd_txtimeout = VNET_LDCWD_TXTIMEOUT;  /* tx timeout in msec */
 uint32_t vnet_ldc_mtu = VNET_LDC_MTU;		/* ldc mtu */
@@ -195,7 +194,7 @@ _vnetdebug_printf(void *arg, const char *fmt, ...)
 #ifdef DEBUG
 
 /*
- * XXX: any changes to the definitions below need corresponding changes in
+ * NOTE: any changes to the definitions below need corresponding changes in
  * vnet_gen.c
  */
 
@@ -492,7 +491,7 @@ vnet_m_start(void *arg)
 	DBG1((vnetp, "vnet_m_start: enter\n"));
 
 	/*
-	 * XXX
+	 * NOTE:
 	 * Currently, we only have generic transport. m_start() invokes
 	 * vgen_start() which enables ports/channels in vgen and
 	 * initiates handshake with peer vnets and vsw. In the future when we
@@ -546,7 +545,7 @@ vnet_m_unicst(void *arg, const uint8_t *macaddr)
 
 	DBG1((vnetp, "vnet_m_unicst: enter\n"));
 	/*
-	 * XXX: setting mac address dynamically is not supported.
+	 * NOTE: setting mac address dynamically is not supported.
 	 */
 	DBG1((vnetp, "vnet_m_unicst: exit\n"));
 
@@ -589,7 +588,7 @@ vnet_m_promisc(void *arg, boolean_t on)
 	vnet_t *vnetp = arg;
 	DBG1((vnetp, "vnet_m_promisc: enter\n"));
 	/*
-	 * XXX: setting promiscuous mode is not supported, just return success.
+	 * NOTE: setting promiscuous mode is not supported, just return success.
 	 */
 	DBG1((vnetp, "vnet_m_promisc: exit\n"));
 	return (VNET_SUCCESS);
@@ -889,7 +888,8 @@ vnet_del_fdb(void *arg, uint8_t *macaddr)
 
 /* modify an existing entry in the forwarding database */
 void
-vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg)
+vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg,
+	boolean_t upgrade)
 {
 	vnet_t *vnetp = (vnet_t *)arg;
 	uint32_t fdbhash;
@@ -900,7 +900,23 @@ vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg)
 	fdbhash = MACHASH(macaddr, vnetp->nfdb_hash);
 	fdbhp = &(vnetp->fdbhp[fdbhash]);
 
-	WRITE_ENTER(&fdbhp->rwlock);
+	if (upgrade == B_TRUE) {
+		/*
+		 * Caller already holds the lock as a reader. This can
+		 * occur if this function is invoked in the context
+		 * of transmit routine - vnet_m_tx(), where the lock
+		 * is held as a reader before calling the transmit
+		 * function of an fdb entry (fdbp->m_tx).
+		 * See comments in vgen_ldcsend() in vnet_gen.c
+		 */
+		if (!rw_tryupgrade(&fdbhp->rwlock)) {
+			RW_EXIT(&fdbhp->rwlock);
+			WRITE_ENTER(&fdbhp->rwlock);
+		}
+	} else {
+		/* Caller does not hold the lock */
+		WRITE_ENTER(&fdbhp->rwlock);
+	}
 
 	for (fdbp = fdbhp->headp; fdbp != NULL; fdbp = fdbp->nextp) {
 		if (bcmp(fdbp->macaddr, macaddr, ETHERADDRL) == 0) {
@@ -911,7 +927,12 @@ vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg)
 		}
 	}
 
-	RW_EXIT(&fdbhp->rwlock);
+	if (upgrade == B_TRUE) {
+		/* restore the caller as a reader */
+		rw_downgrade(&fdbhp->rwlock);
+	} else {
+		RW_EXIT(&fdbhp->rwlock);
+	}
 }
 
 /* look up an fdb entry based on the mac address, caller holds lock */
