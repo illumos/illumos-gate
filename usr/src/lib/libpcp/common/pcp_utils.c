@@ -233,7 +233,7 @@ svc_name_to_glvc_dev_path(char *service)
 		return (NULL);
 
 	/* Ensure that the 'glvc' driver is loaded */
-	di_init_driver("glvc", DI_CACHE_SNAPSHOT_FLAGS | DINFOFORCE);
+	(void) di_init_driver("glvc", DI_CACHE_SNAPSHOT_FLAGS | DINFOFORCE);
 
 	/* Get device node */
 	root_node = di_init("/", DINFOCPYALL);
