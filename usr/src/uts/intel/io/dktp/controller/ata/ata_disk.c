@@ -2,7 +2,7 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").  
+ * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
@@ -943,7 +943,8 @@ ata_disk_ioctl(opaque_t ctl_data, int cmd, intptr_t arg, int flag)
 	ata_ctl_t	*ata_ctlp = GTGTP2ATAP(gtgtp);
 	ata_drv_t	*ata_drvp = GTGTP2ATADRVP(gtgtp);
 	int		rc;
-	struct tgdk_geom *tg;
+	struct tgdk_geom tgdk;
+	int		wce;
 	struct ata_id	*aidp = &ata_drvp->ad_id;
 
 	ADBG_TRACE(("ata_disk_ioctl entered, cmd = %d\n", cmd));
@@ -952,13 +953,14 @@ ata_disk_ioctl(opaque_t ctl_data, int cmd, intptr_t arg, int flag)
 
 	case DIOCTL_GETGEOM:
 	case DIOCTL_GETPHYGEOM:
-		tg = (struct tgdk_geom *)arg;
-		tg->g_cyl = ata_drvp->ad_drvrcyl;
-		tg->g_head = ata_drvp->ad_drvrhd;
-		tg->g_sec = ata_drvp->ad_drvrsec;
-		tg->g_acyl = ata_drvp->ad_acyl;
-		tg->g_secsiz = 512;
-		tg->g_cap = tg->g_cyl * tg->g_head * tg->g_sec;
+		tgdk.g_cyl = ata_drvp->ad_drvrcyl;
+		tgdk.g_head = ata_drvp->ad_drvrhd;
+		tgdk.g_sec = ata_drvp->ad_drvrsec;
+		tgdk.g_acyl = ata_drvp->ad_acyl;
+		tgdk.g_secsiz = 512;
+		tgdk.g_cap = tgdk.g_cyl * tgdk.g_head * tgdk.g_sec;
+		if (ddi_copyout(&tgdk, (caddr_t)arg, sizeof (tgdk), flag))
+			return (EFAULT);
 		return (0);
 
 	case DCMD_UPDATE_GEOM:
@@ -993,9 +995,13 @@ ata_disk_ioctl(opaque_t ctl_data, int cmd, intptr_t arg, int flag)
 		 * is added to the driver to change WCE, this code
 		 * must be updated appropriately.
 		 */
-		*(int *)arg = (aidp->ai_majorversion == 0xffff) ||
+		wce = (aidp->ai_majorversion == 0xffff) ||
 			((aidp->ai_majorversion & ATAC_MAJVER_4) == 0) ||
 			(aidp->ai_features85 & ATAC_FEATURES85_WCE) != 0;
+
+		if (ddi_copyout(&wce, (caddr_t)arg, sizeof (wce), flag) != 0)
+			return (EFAULT);
+
 		return (0);
 
 	case DCMD_GET_STATE:

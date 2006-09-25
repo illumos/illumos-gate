@@ -56,6 +56,8 @@ static void dadk_pktcb(struct cmpkt *pktp);
 static void dadk_iodone(struct buf *bp);
 static void dadk_polldone(struct buf *bp);
 static void dadk_setcap(struct dadk *dadkp);
+static void dadk_create_errstats(struct dadk *dadkp, int instance);
+static void dadk_destroy_errstats(struct dadk *dadkp);
 
 static int dadk_chkerr(struct cmpkt *pktp);
 static int dadk_ioprep(struct dadk *dadkp, struct cmpkt *pktp);
@@ -479,24 +481,27 @@ dadk_open(opaque_t objp, int flag)
 	 * must be updated appropriately.
 	 */
 	error = CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETWCE,
-	    (uintptr_t)&wce, 0);
+	    (uintptr_t)&wce, FKIOCTL | FNATIVE);
 	mutex_enter(&dadkp->dad_mutex);
 	dadkp->dad_wce = (error != 0) || (wce != 0);
 	mutex_exit(&dadkp->dad_mutex);
 
 	/* logical disk geometry */
 	CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETGEOM,
-	    (uintptr_t)&dadkp->dad_logg, 0);
+	    (uintptr_t)&dadkp->dad_logg, FKIOCTL | FNATIVE);
 	if (dadkp->dad_logg.g_cap == 0)
 		return (DDI_FAILURE);
 
 	/* get physical disk geometry */
 	CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETPHYGEOM,
-	    (uintptr_t)&dadkp->dad_phyg, 0);
+	    (uintptr_t)&dadkp->dad_phyg, FKIOCTL | FNATIVE);
 	if (dadkp->dad_phyg.g_cap == 0)
 		return (DDI_FAILURE);
 
 	dadk_setcap(dadkp);
+
+	dadk_create_errstats(dadkp,
+	    ddi_get_instance(CTL_DIP_DEV(dadkp->dad_ctlobjp)));
 
 	/* start profiling */
 	FLC_START_KSTAT(dadkp->dad_flcobjp, "disk",
@@ -533,6 +538,81 @@ dadk_setcap(struct dadk *dadkp)
 }
 
 
+static void
+dadk_create_errstats(struct dadk *dadkp, int instance)
+{
+	dadk_errstats_t *dep;
+	char kstatname[KSTAT_STRLEN];
+	dadk_ioc_string_t dadk_ioc_string;
+
+	if (dadkp->dad_errstats)
+		return;
+
+	(void) sprintf(kstatname, "cmdk%d,error", instance);
+	dadkp->dad_errstats = kstat_create("cmdkerror", instance,
+	    kstatname, "device_error", KSTAT_TYPE_NAMED,
+	    sizeof (dadk_errstats_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_PERSISTENT);
+
+	if (!dadkp->dad_errstats)
+		return;
+
+	dep = (dadk_errstats_t *)dadkp->dad_errstats->ks_data;
+
+	kstat_named_init(&dep->dadk_softerrs,
+	    "Soft Errors", KSTAT_DATA_UINT32);
+	kstat_named_init(&dep->dadk_harderrs,
+	    "Hard Errors", KSTAT_DATA_UINT32);
+	kstat_named_init(&dep->dadk_transerrs,
+	    "Transport Errors", KSTAT_DATA_UINT32);
+	kstat_named_init(&dep->dadk_model,
+	    "Model", KSTAT_DATA_CHAR);
+	kstat_named_init(&dep->dadk_revision,
+	    "Revision", KSTAT_DATA_CHAR);
+	kstat_named_init(&dep->dadk_serial,
+	    "Serial No", KSTAT_DATA_CHAR);
+	kstat_named_init(&dep->dadk_capacity,
+	    "Size", KSTAT_DATA_ULONGLONG);
+	kstat_named_init(&dep->dadk_rq_media_err,
+	    "Media Error", KSTAT_DATA_UINT32);
+	kstat_named_init(&dep->dadk_rq_ntrdy_err,
+	    "Device Not Ready", KSTAT_DATA_UINT32);
+	kstat_named_init(&dep->dadk_rq_nodev_err,
+	    "No Device", KSTAT_DATA_UINT32);
+	kstat_named_init(&dep->dadk_rq_recov_err,
+	    "Recoverable", KSTAT_DATA_UINT32);
+	kstat_named_init(&dep->dadk_rq_illrq_err,
+	    "Illegal Request", KSTAT_DATA_UINT32);
+
+	dadkp->dad_errstats->ks_private = dep;
+	dadkp->dad_errstats->ks_update = nulldev;
+	kstat_install(dadkp->dad_errstats);
+
+	/* get model */
+	dep->dadk_model.value.c[0] = 0;
+	dadk_ioc_string.is_buf = &dep->dadk_model.value.c[0];
+	dadk_ioc_string.is_size = 16;
+	CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETMODEL,
+	    (uintptr_t)&dadk_ioc_string, FKIOCTL | FNATIVE);
+
+	/* get serial */
+	dep->dadk_serial.value.c[0] = 0;
+	dadk_ioc_string.is_buf = &dep->dadk_serial.value.c[0];
+	dadk_ioc_string.is_size = 16;
+	CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETSERIAL,
+	    (uintptr_t)&dadk_ioc_string, FKIOCTL | FNATIVE);
+
+	/* Get revision */
+	dep->dadk_revision.value.c[0] = 0;
+
+	/* Get capacity */
+
+	dep->dadk_capacity.value.ui64 =
+	    (uint64_t)dadkp->dad_logg.g_cap *
+	    (uint64_t)dadkp->dad_logg.g_secsiz;
+}
+
+
 int
 dadk_close(opaque_t objp)
 {
@@ -544,8 +624,22 @@ dadk_close(opaque_t objp)
 		(void) dadk_rmb_ioctl(dadkp, DCMD_UNLOCK, 0, 0, DADK_SILENT);
 	}
 	FLC_STOP_KSTAT(dadkp->dad_flcobjp);
+
+	dadk_destroy_errstats(dadkp);
+
 	return (DDI_SUCCESS);
 }
+
+static void
+dadk_destroy_errstats(struct dadk *dadkp)
+{
+	if (!dadkp->dad_errstats)
+		return;
+
+	kstat_delete(dadkp->dad_errstats);
+	dadkp->dad_errstats = NULL;
+}
+
 
 int
 dadk_strategy(opaque_t objp, struct buf *bp)
@@ -1256,20 +1350,76 @@ static int
 dadk_chkerr(struct cmpkt *pktp)
 {
 	int err_blkno;
-	struct dadk *dadkp;
-	int scb;
+	struct dadk *dadkp = PKT2DADK(pktp);
+	dadk_errstats_t *dep;
+	int scb = *(char *)pktp->cp_scbp;
+	int action;
 
-	if (*(char *)pktp->cp_scbp == DERR_SUCCESS)
+	if (scb == DERR_SUCCESS) {
+		if (pktp->cp_retry != 0 && dadkp->dad_errstats != NULL) {
+			dep = (dadk_errstats_t *)
+			    dadkp->dad_errstats->ks_data;
+			dep->dadk_rq_recov_err.value.ui32++;
+		}
 		return (COMMAND_DONE);
+	}
 
 	/* check error code table */
-	dadkp = PKT2DADK(pktp);
-	scb = (int)(*(char *)pktp->cp_scbp);
+	action = dadk_errtab[scb].d_action;
+
 	if (pktp->cp_retry) {
 		err_blkno = pktp->cp_srtsec + ((pktp->cp_bytexfer -
 			pktp->cp_resid) >> dadkp->dad_secshf);
 	} else
 		err_blkno = -1;
+
+	if (dadkp->dad_errstats != NULL) {
+		dep = (dadk_errstats_t *)dadkp->dad_errstats->ks_data;
+
+		if (action == GDA_RETRYABLE)
+			dep->dadk_softerrs.value.ui32++;
+		else if (action == GDA_FATAL)
+			dep->dadk_harderrs.value.ui32++;
+
+		switch (scb) {
+			case DERR_INVCDB:
+			case DERR_ILI:
+			case DERR_EOM:
+			case DERR_HW:
+			case DERR_ICRC:
+				dep->dadk_transerrs.value.ui32++;
+				break;
+
+			case DERR_AMNF:
+			case DERR_TKONF:
+			case DERR_DWF:
+			case DERR_BBK:
+			case DERR_UNC:
+			case DERR_HARD:
+			case DERR_MEDIUM:
+			case DERR_DATA_PROT:
+			case DERR_MISCOMP:
+				dep->dadk_rq_media_err.value.ui32++;
+				break;
+
+			case DERR_NOTREADY:
+				dep->dadk_rq_ntrdy_err.value.ui32++;
+				break;
+
+			case DERR_IDNF:
+			case DERR_UNIT_ATTN:
+				dep->dadk_rq_nodev_err.value.ui32++;
+				break;
+
+			case DERR_ILL:
+			case DERR_RESV:
+				dep->dadk_rq_illrq_err.value.ui32++;
+				break;
+
+			default:
+				break;
+		}
+	}
 
 	/* if attempting to read a sector from a cdrom audio disk */
 	if ((dadkp->dad_cdrom) &&
@@ -1287,7 +1437,7 @@ dadk_chkerr(struct cmpkt *pktp)
 		(void) timeout(dadk_restart, (void *)pktp, DADK_BSY_TIMEOUT);
 	}
 
-	return (dadk_errtab[scb].d_action);
+	return (action);
 }
 
 static void

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +62,7 @@ struct	dadk {
 	kcondvar_t	dad_state_cv;	/* condition variable for state */
 	uchar_t		dad_thread_cnt;	/* reference count on removable	*/
 					/* - disk state watcher thread	*/
+	kstat_t		*dad_errstats;	/* error stats			*/
 };
 
 #define	DAD_SECSIZ	dad_phyg.g_secsiz
@@ -90,6 +90,21 @@ struct	dadk {
 #define	QUE_COMMAND		2
 #define	QUE_SENSE		3
 #define	JUST_RETURN		4
+
+typedef	struct	dadk_errstats {
+	kstat_named_t dadk_softerrs;		/* Collecting Softerrs */
+	kstat_named_t dadk_harderrs;		/* Collecting harderrs */
+	kstat_named_t dadk_transerrs;		/* Collecting Transfer errs */
+	kstat_named_t dadk_model;		/* model # of the disk */
+	kstat_named_t dadk_revision;		/* The disk revision */
+	kstat_named_t dadk_serial;		/* The disk serial number */
+	kstat_named_t dadk_capacity;		/* Capacity of the disk */
+	kstat_named_t dadk_rq_media_err;	/* Any media err seen */
+	kstat_named_t dadk_rq_ntrdy_err;	/* Not ready errs */
+	kstat_named_t dadk_rq_nodev_err;	/* No device errs */
+	kstat_named_t dadk_rq_recov_err;	/* Recovered errs */
+	kstat_named_t dadk_rq_illrq_err;	/* Illegal requests */
+} dadk_errstats_t;
 
 int dadk_init(opaque_t objp, opaque_t devp, opaque_t flcobjp,
     opaque_t queobjp, opaque_t bbhobjp, void *lkarg);
