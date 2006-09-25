@@ -164,8 +164,9 @@ CHKHDRS=			\
 	dditypes.h		\
 	debug.h			\
 	des.h			\
-	devctl.h		\
-	devctl_impl.h		\
+	devcache.h		\
+	devcache_impl.h		\
+	devid_cache.h		\
 	devinfo_impl.h		\
 	devops.h		\
 	devpolicy.h		\

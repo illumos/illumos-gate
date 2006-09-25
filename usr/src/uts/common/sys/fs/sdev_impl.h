@@ -520,6 +520,22 @@ typedef struct sdev_nc_node {
 #define	SLF_REBUILT	0x02	/* reconfig performed during lookup attempt */
 
 /*
+ * The nvlist name and nvpair identifiers in the
+ * /etc/devices/devname_cache nvlist format
+ */
+#define	DP_DEVNAME_ID			"devname"
+#define	DP_DEVNAME_NCACHE_ID		"ncache"
+#define	DP_DEVNAME_NC_EXPIRECNT_ID	"expire-counts"
+
+/* devname-cache list element */
+typedef struct nvp_devname {
+	char			**nvp_paths;
+	int			*nvp_expirecnts;
+	int			nvp_npaths;
+	list_node_t		nvp_link;
+} nvp_devname_t;
+
+/*
  * name service globals and prototypes
  */
 

@@ -59,7 +59,7 @@
 #include <sys/sunmdi.h>
 #include <sys/ddi.h>
 #include <sys/modctl.h>
-#include <sys/devctl_impl.h>
+#include <sys/devcache.h>
 
 
 /*
@@ -108,23 +108,27 @@
 #define	SDEV_NC_MAX_ENTRIES	64
 #define	SEV_RECONFIG_DELAY	6	/* seconds */
 
-int			sdev_nc_expirecnt = SDEV_NC_EXPIRECNT;
-int			sdev_nc_max_entries = SDEV_NC_MAX_ENTRIES;
-int			sdev_reconfig_delay = SEV_RECONFIG_DELAY;
-int			sdev_reconfig_verbose = 0;
-int			sdev_reconfig_disable = 0;
-int			sdev_nc_disable = 0;
-int			sdev_nc_disable_reset = 0;
-int			sdev_nc_verbose = 0;
+/* tunables */
+int	sdev_nc_expirecnt = SDEV_NC_EXPIRECNT;
+int	sdev_nc_max_entries = SDEV_NC_MAX_ENTRIES;
+int	sdev_reconfig_delay = SEV_RECONFIG_DELAY;
+int	sdev_reconfig_verbose = 0;
+int	sdev_reconfig_disable = 0;
+int	sdev_nc_disable = 0;
+int	sdev_nc_disable_reset = 0;
+int	sdev_nc_verbose = 0;
+int	sdev_cache_read_disable = 0;
+int	sdev_cache_write_disable = 0;
 
 /* globals */
-sdev_nc_list_t		*sdev_ncache;
-int			sdev_boot_state = SDEV_BOOT_STATE_INITIAL;
-int			sdev_reconfig_boot = 0;
-static timeout_id_t	sdev_timeout_id = 0;
+int	sdev_boot_state = SDEV_BOOT_STATE_INITIAL;
+int	sdev_reconfig_boot = 0;
+sdev_nc_list_t *sdev_ncache;
+static timeout_id_t sdev_timeout_id = 0;
+static nvf_handle_t sdevfd_handle;
 
 /* static prototypes */
-static void sdev_ncache_write_complete(nvfd_t *);
+static void sdev_ncache_write_complete(nvf_handle_t);
 static void sdev_ncache_write(void);
 static void sdev_ncache_process_store(void);
 static sdev_nc_list_t *sdev_nc_newlist(void);
@@ -134,7 +138,21 @@ static void sdev_nc_freelist(sdev_nc_list_t *);
 static sdev_nc_node_t *sdev_nc_findpath(sdev_nc_list_t *, char *);
 static void sdev_nc_insertnode(sdev_nc_list_t *, sdev_nc_node_t *);
 static void sdev_nc_free_bootonly(void);
+static int sdev_ncache_unpack_nvlist(nvf_handle_t, nvlist_t *, char *);
+static int sdev_ncache_pack_list(nvf_handle_t, nvlist_t **);
+static void sdev_ncache_list_free(nvf_handle_t);
+static void sdev_nvp_free(nvp_devname_t *);
 
+/*
+ * Registration for /etc/devices/devname_cache
+ */
+static nvf_ops_t sdev_cache_ops = {
+	"/etc/devices/devname_cache",		/* path to cache */
+	sdev_ncache_unpack_nvlist,		/* read: unpack nvlist */
+	sdev_ncache_pack_list,			/* write: pack list */
+	sdev_ncache_list_free,			/* free data list */
+	sdev_ncache_write_complete		/* write complete callback */
+};
 
 /*
  * called once at filesystem initialization
@@ -152,41 +170,210 @@ sdev_ncache_init(void)
 void
 sdev_ncache_setup(void)
 {
-	nvfd_t	*nvf = sdevfd;
+	sdevfd_handle = nvf_register_file(&sdev_cache_ops);
+	ASSERT(sdevfd_handle);
 
-	nvf_register_write_complete(nvf, sdev_ncache_write_complete);
+	list_create(nvf_list(sdevfd_handle), sizeof (nvp_devname_t),
+	    offsetof(nvp_devname_t, nvp_link));
 
-	i_ddi_read_devname_file();
+	rw_enter(nvf_lock(sdevfd_handle), RW_WRITER);
+	if (!sdev_cache_read_disable) {
+		(void) nvf_read_file(sdevfd_handle);
+	}
 	sdev_ncache_process_store();
+	rw_exit(nvf_lock(sdevfd_handle));
+
 	sdev_devstate_change();
 }
 
 static void
-sdev_nvp_cache_free(nvfd_t *nvf)
+sdev_nvp_free(nvp_devname_t *dp)
 {
-	nvp_devname_t	*np;
-	nvp_devname_t	*next;
+	int	i;
+	char	**p;
 
-	for (np = NVF_DEVNAME_LIST(nvf); np; np = next) {
-		next = NVP_DEVNAME_NEXT(np);
-		nfd_nvp_free_and_unlink(nvf, NVPLIST(np));
+	if (dp->nvp_npaths > 0) {
+		p = dp->nvp_paths;
+		for (i = 0; i < dp->nvp_npaths; i++, p++) {
+			kmem_free(*p, strlen(*p)+1);
+		}
+		kmem_free(dp->nvp_paths,
+			dp->nvp_npaths * sizeof (char *));
+		kmem_free(dp->nvp_expirecnts,
+			dp->nvp_npaths * sizeof (int));
 	}
+
+	kmem_free(dp, sizeof (nvp_devname_t));
 }
 
 static void
+sdev_ncache_list_free(nvf_handle_t fd)
+{
+	list_t		*listp;
+	nvp_devname_t	*dp;
+
+	ASSERT(fd == sdevfd_handle);
+	ASSERT(RW_WRITE_HELD(nvf_lock(fd)));
+
+	listp = nvf_list(fd);
+	if ((dp = list_head(listp)) != NULL) {
+		list_remove(listp, dp);
+		sdev_nvp_free(dp);
+	}
+}
+
+/*
+ * Unpack a device path/nvlist pair to internal data list format.
+ * Used to decode the nvlist format into the internal representation
+ * when reading /etc/devices/devname_cache.
+ * Note that the expiration counts are optional, for compatibility
+ * with earlier instances of the cache.  If not present, the
+ * expire counts are initialized to defaults.
+ */
+static int
+sdev_ncache_unpack_nvlist(nvf_handle_t fd, nvlist_t *nvl, char *name)
+{
+	nvp_devname_t *np;
+	char	**strs;
+	int	*cnts;
+	uint_t	nstrs, ncnts;
+	int	rval, i;
+
+	ASSERT(fd == sdevfd_handle);
+	ASSERT(RW_WRITE_HELD(nvf_lock(fd)));
+
+	/* name of the sublist must match what we created */
+	if (strcmp(name, DP_DEVNAME_ID) != 0) {
+		return (-1);
+	}
+
+	np = kmem_zalloc(sizeof (nvp_devname_t), KM_SLEEP);
+
+	rval = nvlist_lookup_string_array(nvl,
+	    DP_DEVNAME_NCACHE_ID, &strs, &nstrs);
+	if (rval) {
+		kmem_free(np, sizeof (nvp_devname_t));
+		return (-1);
+	}
+
+	np->nvp_npaths = nstrs;
+	np->nvp_paths = kmem_zalloc(nstrs * sizeof (char *), KM_SLEEP);
+	for (i = 0; i < nstrs; i++) {
+		np->nvp_paths[i] = i_ddi_strdup(strs[i], KM_SLEEP);
+	}
+	np->nvp_expirecnts = kmem_zalloc(nstrs * sizeof (int), KM_SLEEP);
+	for (i = 0; i < nstrs; i++) {
+		np->nvp_expirecnts[i] = sdev_nc_expirecnt;
+	}
+
+	rval = nvlist_lookup_int32_array(nvl,
+	    DP_DEVNAME_NC_EXPIRECNT_ID, &cnts, &ncnts);
+	if (rval == 0) {
+		ASSERT(ncnts == nstrs);
+		ncnts = min(ncnts, nstrs);
+		for (i = 0; i < nstrs; i++) {
+			np->nvp_expirecnts[i] = cnts[i];
+		}
+	}
+
+	list_insert_tail(nvf_list(sdevfd_handle), np);
+
+	return (0);
+}
+
+/*
+ * Pack internal format cache data to a single nvlist.
+ * Used when writing the nvlist file.
+ * Note this is called indirectly by the nvpflush daemon.
+ */
+static int
+sdev_ncache_pack_list(nvf_handle_t fd, nvlist_t **ret_nvl)
+{
+	nvlist_t	*nvl, *sub_nvl;
+	nvp_devname_t	*np;
+	int		rval;
+	list_t		*listp;
+
+	ASSERT(fd == sdevfd_handle);
+	ASSERT(RW_WRITE_HELD(nvf_lock(fd)));
+
+	rval = nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP);
+	if (rval != 0) {
+		nvf_error("%s: nvlist alloc error %d\n",
+			nvf_cache_name(fd), rval);
+		return (DDI_FAILURE);
+	}
+
+	listp = nvf_list(sdevfd_handle);
+	if ((np = list_head(listp)) != NULL) {
+		ASSERT(list_next(listp, np) == NULL);
+
+		rval = nvlist_alloc(&sub_nvl, NV_UNIQUE_NAME, KM_SLEEP);
+		if (rval != 0) {
+			nvf_error("%s: nvlist alloc error %d\n",
+				nvf_cache_name(fd), rval);
+			sub_nvl = NULL;
+			goto err;
+		}
+
+		rval = nvlist_add_string_array(sub_nvl,
+		    DP_DEVNAME_NCACHE_ID, np->nvp_paths, np->nvp_npaths);
+		if (rval != 0) {
+			nvf_error("%s: nvlist add error %d (sdev)\n",
+			    nvf_cache_name(fd), rval);
+			goto err;
+		}
+
+		rval = nvlist_add_int32_array(sub_nvl,
+		    DP_DEVNAME_NC_EXPIRECNT_ID,
+		    np->nvp_expirecnts, np->nvp_npaths);
+		if (rval != 0) {
+			nvf_error("%s: nvlist add error %d (sdev)\n",
+			    nvf_cache_name(fd), rval);
+			goto err;
+		}
+
+		rval = nvlist_add_nvlist(nvl, DP_DEVNAME_ID, sub_nvl);
+		if (rval != 0) {
+			nvf_error("%s: nvlist add error %d (sublist)\n",
+			    nvf_cache_name(fd), rval);
+			goto err;
+		}
+		nvlist_free(sub_nvl);
+	}
+
+	*ret_nvl = nvl;
+	return (DDI_SUCCESS);
+
+err:
+	if (sub_nvl)
+		nvlist_free(sub_nvl);
+	nvlist_free(nvl);
+	*ret_nvl = NULL;
+	return (DDI_FAILURE);
+}
+
+/*
+ * Run through the data read from the backing cache store
+ * to establish the initial state of the neg. cache.
+ */
+static void
 sdev_ncache_process_store(void)
 {
-	nvfd_t		*nvf = sdevfd;
 	sdev_nc_list_t	*ncl = sdev_ncache;
 	nvp_devname_t	*np;
 	sdev_nc_node_t	*lp;
 	char		*path;
 	int		i, n;
+	list_t		*listp;
 
 	if (sdev_nc_disable)
 		return;
 
-	for (np = NVF_DEVNAME_LIST(nvf); np; np = NVP_DEVNAME_NEXT(np)) {
+	ASSERT(RW_WRITE_HELD(nvf_lock(sdevfd_handle)));
+
+	listp = nvf_list(sdevfd_handle);
+	for (np = list_head(listp); np; np = list_next(listp, np)) {
 		for (i = 0; i < np->nvp_npaths; i++) {
 			sdcmn_err5(("    %s %d\n",
 			    np->nvp_paths[i], np->nvp_expirecnts[i]));
@@ -209,10 +396,16 @@ sdev_ncache_process_store(void)
 	}
 }
 
+/*
+ * called by nvpflush daemon to inform us that an update of
+ * the cache file has been completed.
+ */
 static void
-sdev_ncache_write_complete(nvfd_t *nvf)
+sdev_ncache_write_complete(nvf_handle_t fd)
 {
 	sdev_nc_list_t	*ncl = sdev_ncache;
+
+	ASSERT(fd == sdevfd_handle);
 
 	mutex_enter(&ncl->ncl_mutex);
 
@@ -227,16 +420,18 @@ sdev_ncache_write_complete(nvfd_t *nvf)
 		sdcmn_err5(("ncache write complete\n"));
 		ncl->ncl_flags &= ~NCL_LIST_WRITING;
 		mutex_exit(&ncl->ncl_mutex);
-		rw_enter(&nvf->nvf_lock, RW_WRITER);
-		sdev_nvp_cache_free(nvf);
-		rw_exit(&nvf->nvf_lock);
+		rw_enter(nvf_lock(fd), RW_WRITER);
+		sdev_ncache_list_free(fd);
+		rw_exit(nvf_lock(fd));
 	}
 }
 
+/*
+ * Prepare to perform an update of the neg. cache backing store.
+ */
 static void
 sdev_ncache_write(void)
 {
-	nvfd_t		*nvf = sdevfd;
 	sdev_nc_list_t	*ncl = sdev_ncache;
 	nvp_devname_t	*np;
 	sdev_nc_node_t	*lp;
@@ -250,8 +445,8 @@ sdev_ncache_write(void)
 	}
 
 	/* proper lock ordering here is essential */
-	rw_enter(&nvf->nvf_lock, RW_WRITER);
-	sdev_nvp_cache_free(nvf);
+	rw_enter(nvf_lock(sdevfd_handle), RW_WRITER);
+	sdev_ncache_list_free(sdevfd_handle);
 
 	rw_enter(&ncl->ncl_lock, RW_READER);
 	n = ncl->ncl_nentries;
@@ -274,11 +469,11 @@ sdev_ncache_write(void)
 
 	rw_exit(&ncl->ncl_lock);
 
-	NVF_MARK_DIRTY(nvf);
-	nfd_nvp_link(nvf, NVPLIST(np));
-	rw_exit(&nvf->nvf_lock);
+	nvf_mark_dirty(sdevfd_handle);
+	list_insert_tail(nvf_list(sdevfd_handle), np);
+	rw_exit(nvf_lock(sdevfd_handle));
 
-	wake_nvpflush_daemon();
+	nvf_wake_daemon();
 }
 
 static void

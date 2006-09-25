@@ -111,8 +111,9 @@ GENUNIX_OBJS +=	\
 		ddi_nodeid.o	\
 		ddi_strtol.o	\
 		devcfg.o	\
-		devctl.o	\
+		devcache.o	\
 		devid.o		\
+		devid_cache.o	\
 		devid_scsi.o	\
 		devpolicy.o	\
 		disp_lock.o	\
