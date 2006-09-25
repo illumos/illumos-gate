@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +69,23 @@ typedef struct kssl_fallback_s {
 	void			*fallback_bound;
 } kssl_fallback_t;
 
+/*
+ * Structure to support using a non-extractable key in
+ * a crypto provider. We keep the token label and pin so
+ * that we can reauthenticate when needed.
+ */
+typedef struct kssl_session_info_s {
+	boolean_t		is_valid_handle;
+	boolean_t		do_reauth;
+	crypto_provider_t	prov;
+	crypto_session_id_t	sid;
+	crypto_key_t		key;
+	crypto_notify_handle_t	evnt_handle;
+	char			toklabel[CRYPTO_EXT_SIZE_LABEL];
+	int			pinlen;
+	char			tokpin[1];
+} kssl_session_info_t;
+
 /* kssl_entry_t structure. */
 
 typedef struct kssl_entry_s {
@@ -88,6 +104,9 @@ typedef struct kssl_entry_s {
 	uint16_t		kssl_cipherSuites[CIPHER_SUITE_COUNT];
 	int			kssl_cipherSuites_nentries;
 	uint16_t		kssl_saved_Suites[CIPHER_SUITE_COUNT];
+
+	boolean_t		ke_is_nxkey;
+	kssl_session_info_t	*ke_sessinfo;
 
 	crypto_key_t		*ke_private_key; /* instance's private key */
 	Certificate_t		*ke_server_certificate;
@@ -156,7 +175,7 @@ extern int kssl_enabled;
 extern int kssl_cache_count;
 extern struct kmem_cache *kssl_cache;
 
-#define	KSSL_TAB_INITSIZE	32
+#define	KSSL_TAB_INITSIZE	4
 extern kssl_entry_t **kssl_entry_tab;
 extern int kssl_entry_tab_size;
 extern int kssl_entry_tab_nentries;
@@ -200,6 +219,8 @@ extern void kssl_uncache_sid(sslSessionID *, kssl_entry_t *);
 extern int kssl_mac_encrypt_record(ssl_t *, SSL3ContentType, uchar_t *,
     uchar_t *, mblk_t *);
 extern mblk_t *kssl_get_next_record(ssl_t *);
+extern int kssl_get_obj_handle(kssl_entry_t *);
+extern void kssl_prov_evnt(uint32_t, void *);
 
 #ifdef	__cplusplus
 }

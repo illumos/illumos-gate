@@ -7449,6 +7449,7 @@ dprov_mgmt_task(dprov_req_t *taskq_req)
 		ext_info->ei_firmware_version.cv_minor = 0;
 
 		ext_info->ei_flags = CRYPTO_EXTF_RNG |
+		    CRYPTO_EXTF_LOGIN_REQUIRED |
 		    CRYPTO_EXTF_DUAL_CRYPTO_OPERATIONS;
 		if (softc->ds_user_pin_set)
 			ext_info->ei_flags |= CRYPTO_EXTF_USER_PIN_INITIALIZED;

@@ -318,10 +318,10 @@ crypto_notify_events(crypto_notify_callback_t nf, uint32_t event_mask)
 	kcf_ntfy_elem_t *nep;
 	crypto_notify_handle_t hndl;
 
-	/*
-	 * The only valid value for event_mask is CRYPTO_EVENT_PROVIDERS_CHANGE.
-	 */
-	if (nf == NULL || !(event_mask & CRYPTO_EVENT_PROVIDERS_CHANGE)) {
+	/* Check the input */
+	if (nf == NULL || !(event_mask & (CRYPTO_EVENT_MECHS_CHANGED |
+	    CRYPTO_EVENT_PROVIDER_REGISTERED |
+	    CRYPTO_EVENT_PROVIDER_UNREGISTERED))) {
 		return (NULL);
 	}
 
@@ -410,9 +410,8 @@ retry:
 		 * We have to remove the element from the notification list.
 		 * So, start over and do the work (acquire locks etc.). This is
 		 * safe (i.e. We won't be in this routine forever) as the
-		 * CRYPTO_EVENT_PROVIDERS_CHANGE event does not happen
-		 * frequently. We have to revisit this code if we
-		 * add a new event that happens often.
+		 * events do not happen frequently. We have to revisit this
+		 * code if we add a new event that happens often.
 		 */
 		goto retry;
 	}
@@ -428,9 +427,6 @@ retry:
 }
 
 /*
- * This routine is called from crypto_register_provider() and
- * crypto_unregister_provider() with the CRYPTO_EVENT_PROVIDERS_CHANGE event.
- *
  * We walk the notification list and do the callbacks.
  */
 void
@@ -767,25 +763,10 @@ static boolean_t
 match_ext_info(kcf_provider_desc_t *pd, char *label, char *manuf, char *serial,
     crypto_provider_ext_info_t *ext_info)
 {
-	kcf_provider_desc_t *real_provider;
 	int rv;
-	kcf_req_params_t params;
 
-	(void) kcf_get_hardware_provider_nomech(
-	    CRYPTO_OPS_OFFSET(provider_ops), CRYPTO_PROVIDER_OFFSET(ext_info),
-	    CHECK_RESTRICT_FALSE, pd, &real_provider);
-
-	if (real_provider != NULL) {
-		ASSERT(real_provider == pd ||
-		    pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER);
-		KCF_WRAP_PROVMGMT_OPS_PARAMS(&params, KCF_OP_MGMT_EXTINFO,
-		    0, NULL, 0, NULL, 0, NULL, ext_info, pd);
-		rv = kcf_submit_request(real_provider, NULL, NULL, &params,
-		    B_FALSE);
-		ASSERT(rv != CRYPTO_NOT_SUPPORTED);
-		KCF_PROV_REFRELE(real_provider);
-	}
-
+	rv = crypto_get_provinfo(pd, ext_info);
+	ASSERT(rv != CRYPTO_NOT_SUPPORTED);
 	if (rv != CRYPTO_SUCCESS)
 		return (B_FALSE);
 
@@ -802,7 +783,7 @@ match_ext_info(kcf_provider_desc_t *pd, char *label, char *manuf, char *serial,
 
 	if (serial != NULL) {
 		if (memcmp_pad_max(ext_info->ei_serial_number,
-		    CRYPTO_EXT_SIZE_SERIAL, label, strlen(label),
+		    CRYPTO_EXT_SIZE_SERIAL, serial, strlen(serial),
 		    CRYPTO_EXT_SIZE_SERIAL))
 			return (B_FALSE);
 	}
@@ -846,6 +827,36 @@ crypto_get_provider(char *label, char *manuf, char *serial)
 	kcf_free_provider_tab(count, provider_array);
 	kmem_free(ext_info, sizeof (crypto_provider_ext_info_t));
 	return (pd);
+}
+
+/*
+ * Get the provider information given a provider handle. The caller
+ * needs to allocate the space for the argument, info.
+ */
+int
+crypto_get_provinfo(crypto_provider_t hndl, crypto_provider_ext_info_t *info)
+{
+	int rv;
+	kcf_req_params_t params;
+	kcf_provider_desc_t *pd;
+	kcf_provider_desc_t *real_provider;
+
+	pd = (kcf_provider_desc_t *)hndl;
+	rv = kcf_get_hardware_provider_nomech(
+	    CRYPTO_OPS_OFFSET(provider_ops), CRYPTO_PROVIDER_OFFSET(ext_info),
+	    CHECK_RESTRICT_FALSE, pd, &real_provider);
+
+	if (rv == CRYPTO_SUCCESS && real_provider != NULL) {
+		ASSERT(real_provider == pd ||
+		    pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER);
+		KCF_WRAP_PROVMGMT_OPS_PARAMS(&params, KCF_OP_MGMT_EXTINFO,
+		    0, NULL, 0, NULL, 0, NULL, info, pd);
+		rv = kcf_submit_request(real_provider, NULL, NULL, &params,
+		    B_FALSE);
+		KCF_PROV_REFRELE(real_provider);
+	}
+
+	return (rv);
 }
 
 void

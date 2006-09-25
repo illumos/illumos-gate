@@ -1281,7 +1281,7 @@ kssl_spec_init(ssl_t *ssl, int dir)
 		spec->cipher_mech.cm_param_len =
 		    cipher_defs[ssl->pending_calg].bsize;
 
-		/* cilent_write_key */
+		/* client_write_key */
 		spec->cipher_key.ck_data =
 		    &(ssl->pending_keyblock[2 * spec->mac_hashsz]);
 
@@ -1520,14 +1520,16 @@ kssl_handle_client_key_exchange(ssl_t *ssl, mblk_t *mp, int msglen,
 	uchar_t *pms;
 	size_t pmslen;
 	int allocated;
-	int err;
+	int err, rverr = ENOMEM;
+	kssl_entry_t *ep;
 	crypto_key_t *privkey;
 	crypto_data_t *wrapped_pms_data, *pms_data;
 	crypto_call_req_t creq, *creqp;
 
-	privkey = ssl->kssl_entry->ke_private_key;
+	ep = ssl->kssl_entry;
+	privkey = ep->ke_private_key;
 	if (privkey == NULL) {
-	    return (ENOENT);
+		return (ENOENT);
 	}
 
 	ASSERT(ssl->msg.type == client_key_exchange);
@@ -1584,8 +1586,53 @@ kssl_handle_client_key_exchange(ssl_t *ssl, mblk_t *mp, int msglen,
 		creqp = &creq;
 	}
 
-	err = crypto_decrypt(&rsa_x509_mech, wrapped_pms_data,
-		privkey, NULL, pms_data, creqp);
+	if (ep->ke_is_nxkey) {
+		kssl_session_info_t *s;
+
+		s = ep->ke_sessinfo;
+		err = CRYPTO_SUCCESS;
+		if (!s->is_valid_handle) {
+			/* Reauthenticate to the provider */
+			if (s->do_reauth) {
+				err = kssl_get_obj_handle(ep);
+				if (err == CRYPTO_SUCCESS) {
+					s->is_valid_handle = B_TRUE;
+					s->do_reauth = B_FALSE;
+				}
+			} else
+				err = CRYPTO_FAILED;
+		}
+
+		if (err == CRYPTO_SUCCESS) {
+			ASSERT(s->is_valid_handle);
+			err = crypto_decrypt_prov(s->prov, s->sid,
+			    &rsa_x509_mech, wrapped_pms_data, &s->key,
+			    NULL, pms_data, creqp);
+		}
+
+		/*
+		 * Deal with session specific errors. We translate to
+		 * the closest errno.
+		 */
+		switch (err) {
+		case CRYPTO_KEY_HANDLE_INVALID:
+		case CRYPTO_SESSION_HANDLE_INVALID:
+			s->is_valid_handle = B_FALSE;
+			s->do_reauth = B_TRUE;
+			rverr = EINVAL;
+			break;
+		case CRYPTO_PIN_EXPIRED:
+		case CRYPTO_PIN_LOCKED:
+			rverr = EACCES;
+			break;
+		case CRYPTO_UNKNOWN_PROVIDER:
+			rverr = ENXIO;
+			break;
+		}
+	} else {
+		err = crypto_decrypt(&rsa_x509_mech, wrapped_pms_data,
+		    privkey, NULL, pms_data, creqp);
+	}
 
 	switch (err) {
 	case CRYPTO_SUCCESS:
@@ -1607,7 +1654,7 @@ kssl_handle_client_key_exchange(ssl_t *ssl, mblk_t *mp, int msglen,
 			"crypto_decrypt error 0x%02X", err);
 #endif	/* DEBUG */
 		kmem_free(buf, allocated);
-		return (ENOMEM);
+		return (rverr);
 	}
 
 	pmslen = pms_data->cd_length;

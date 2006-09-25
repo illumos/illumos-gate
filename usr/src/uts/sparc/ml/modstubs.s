@@ -1116,6 +1116,7 @@ stubs_base:
 	NO_UNLOAD_STUB(kcf, crypto_notify_events, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, crypto_unnotify_events, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, crypto_get_provider, nomod_minus_one);
+	NO_UNLOAD_STUB(kcf, crypto_get_provinfo, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, crypto_release_provider, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, crypto_sign, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, crypto_sign_prov, nomod_minus_one);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -352,6 +351,7 @@ extern void crypto_free_mech_list(crypto_mech_name_t *mech_names,
     uint_t count);
 
 extern crypto_provider_t crypto_get_provider(char *, char *, char *);
+extern int crypto_get_provinfo(crypto_provider_t, crypto_provider_ext_info_t *);
 extern void crypto_release_provider(crypto_provider_t);
 
 /*
@@ -360,11 +360,13 @@ extern void crypto_release_provider(crypto_provider_t);
  * be called to register or unregister for notification are defined below.
  */
 
-#define	CRYPTO_EVENT_PROVIDERS_CHANGE	0x00000001
+#define	CRYPTO_EVENT_MECHS_CHANGED		0x00000001
+#define	CRYPTO_EVENT_PROVIDER_REGISTERED	0x00000002
+#define	CRYPTO_EVENT_PROVIDER_UNREGISTERED	0x00000004
 
-typedef enum crypto_provider_type {
-	CRYPTO_EVENT_CHANGE_ADDED = 1,
-	CRYPTO_EVENT_CHANGE_REMOVED
+typedef enum {
+	CRYPTO_MECH_ADDED = 1,
+	CRYPTO_MECH_REMOVED
 } crypto_event_change_t;
 
 /* The event_arg argument structure for CRYPTO_EVENT_PROVIDERS_CHANGE event */

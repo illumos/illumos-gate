@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -44,13 +43,11 @@ typedef struct kssl_object_attribute {
 	uint32_t	ka_value_len;		/* length of attribute value */
 } kssl_object_attribute_t;
 
-
 typedef struct kssl_key {
 	crypto_key_format_t ks_format;	/* format identifier */
 	uint32_t ks_count;		/* number of attributes */
 	uint32_t ks_attrs_offset;	/* offset to the attributes */
 } kssl_key_t;
-
 
 typedef struct kssl_certs_s {
 	uint32_t sc_count;		/* number of certificates */
@@ -58,6 +55,14 @@ typedef struct kssl_certs_s {
 	uint32_t sc_certs_offset;	/* offset to certificates array */
 } kssl_certs_t;
 
+#define	MAX_PIN_LENGTH			1024
+
+typedef struct kssl_tokinfo_s {
+	uint8_t toklabel[CRYPTO_EXT_SIZE_LABEL];
+	uint32_t pinlen;
+	uint32_t tokpin_offset;		/* offset to the pin */
+	uint32_t ck_rv;			/* PKCS #11 specific error */
+} kssl_tokinfo_t;
 
 #define	SSL_RSA_WITH_NULL_SHA		0x0002
 #define	SSL_RSA_WITH_RC4_128_MD5	0x0004
@@ -84,6 +89,9 @@ typedef struct kssl_params_s {
 	 * the one suite with no encryption. Hence the -1.
 	 */
 	uint16_t		kssl_suites[CIPHER_SUITE_COUNT - 1];
+
+	uint8_t			kssl_is_nxkey;
+	kssl_tokinfo_t		kssl_token;
 
 	/* certificates */
 	kssl_certs_t		kssl_certs;

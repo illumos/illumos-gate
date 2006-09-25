@@ -156,6 +156,12 @@ typedef enum {
 #define	KCF_IS_PROV_REMOVED(pd)	((pd)->pd_state >= KCF_PROV_REMOVED)
 
 /*
+ * Internal flag set to indicate if a provider is a member of
+ * a logical provider.
+ */
+#define	KCF_LPROV_MEMBER	0x80000000
+
+/*
  * A provider descriptor structure. There is one such structure per
  * provider. It is allocated and initialized at registration time and
  * freed when the provider unregisters.
@@ -190,6 +196,8 @@ typedef enum {
  * pd_restricted:	true if this is an export restricted provider
  * pd_provider_list:	Used to cross-reference logical providers and their
  *			members. Not used for software providers.
+ * pd_flags		Could be CRYPTO_HIDE_PROVIDER from pi_flags
+ *			or KCF_LPROV_MEMBER set internally.
  */
 typedef struct kcf_provider_desc {
 	crypto_provider_type_t		pd_prov_type;

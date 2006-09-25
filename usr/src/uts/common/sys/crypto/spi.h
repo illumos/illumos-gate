@@ -113,34 +113,6 @@ typedef struct crypto_ctx {
 #define	CRYPTO_EXTF_SO_PIN_LOCKED			0x00400000
 #define	CRYPTO_EXTF_SO_PIN_TO_BE_CHANGED		0x00800000
 
-#endif /* _KERNEL */
-
-#define	CRYPTO_EXT_SIZE_LABEL		32
-#define	CRYPTO_EXT_SIZE_MANUF		32
-#define	CRYPTO_EXT_SIZE_MODEL		16
-#define	CRYPTO_EXT_SIZE_SERIAL		16
-#define	CRYPTO_EXT_SIZE_TIME		16
-
-#ifdef _KERNEL
-
-typedef struct crypto_provider_ext_info {
-	uchar_t			ei_label[CRYPTO_EXT_SIZE_LABEL];
-	uchar_t			ei_manufacturerID[CRYPTO_EXT_SIZE_MANUF];
-	uchar_t			ei_model[CRYPTO_EXT_SIZE_MODEL];
-	uchar_t			ei_serial_number[CRYPTO_EXT_SIZE_SERIAL];
-	ulong_t			ei_flags;
-	ulong_t			ei_max_session_count;
-	ulong_t			ei_max_pin_len;
-	ulong_t			ei_min_pin_len;
-	ulong_t			ei_total_public_memory;
-	ulong_t			ei_free_public_memory;
-	ulong_t			ei_total_private_memory;
-	ulong_t			ei_free_private_memory;
-	crypto_version_t	ei_hardware_version;
-	crypto_version_t	ei_firmware_version;
-	uchar_t			ei_time[CRYPTO_EXT_SIZE_TIME];
-} crypto_provider_ext_info_t;
-
 /*
  * The crypto_control_ops structure contains pointers to control
  * operations for cryptographic providers.  It is passed through
@@ -701,7 +673,8 @@ typedef struct crypto_provider_info {
 #define	pi_flags			piu.piu_v2.pi_flags
 
 /* hidden providers can only be accessed via a logical provider */
-#define	CRYPTO_HIDE_PROVIDER		1
+#define	CRYPTO_HIDE_PROVIDER		0x00000001
+#define	CRYPTO_PIFLAGS_UNAVAILABLE	0x80000000
 
 /*
  * Provider status passed by a provider to crypto_provider_notification(9F)

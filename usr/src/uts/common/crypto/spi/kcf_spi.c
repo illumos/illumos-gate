@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -278,12 +277,13 @@ crypto_register_provider(crypto_provider_info_t *info,
 		process_logical_providers(info, prov_desc);
 
 	/*
-	 * Inform interested kernel clients of the event.
-	 * Logical providers are not visible to kernel clients.
+	 * Inform interested clients of the mechanisms becoming
+	 * available. We skip this for logical providers as they
+	 * do not affect mechanisms.
 	 */
 	if (prov_desc->pd_prov_type != CRYPTO_LOGICAL_PROVIDER) {
 		ec.ec_provider_type = prov_desc->pd_prov_type;
-		ec.ec_change = CRYPTO_EVENT_CHANGE_ADDED;
+		ec.ec_change = CRYPTO_MECH_ADDED;
 		for (i = 0; i < prov_desc->pd_mech_list_count; i++) {
 			/* Skip any mechanisms not allowed by the policy */
 			if (is_mech_disabled(prov_desc,
@@ -293,9 +293,20 @@ crypto_register_provider(crypto_provider_info_t *info,
 			(void) strncpy(ec.ec_mech_name,
 			    prov_desc->pd_mechanisms[i].cm_mech_name,
 			    CRYPTO_MAX_MECH_NAME);
-			kcf_walk_ntfylist(CRYPTO_EVENT_PROVIDERS_CHANGE, &ec);
+			kcf_walk_ntfylist(CRYPTO_EVENT_MECHS_CHANGED, &ec);
 		}
+
 	}
+
+	/*
+	 * Inform interested clients of the new provider. In case of a
+	 * logical provider, we need to notify the event only
+	 * for the logical provider and not for the underlying
+	 * providers which are known by pi_logical_provider_count > 0.
+	 */
+	if (prov_desc->pd_prov_type == CRYPTO_LOGICAL_PROVIDER ||
+	    info->pi_logical_provider_count == 0)
+		kcf_walk_ntfylist(CRYPTO_EVENT_PROVIDER_REGISTERED, prov_desc);
 
 	mutex_enter(&prov_desc->pd_lock);
 	prov_desc->pd_state = (vstatus == 0) ? KCF_PROV_READY :
@@ -430,12 +441,13 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 	}
 
 	/*
-	 * Inform interested kernel clients of the event.
-	 * Logical providers are not visible to kernel clients.
+	 * Inform interested clients of the mechanisms becoming
+	 * unavailable. We skip this for logical providers as they
+	 * do not affect mechanisms.
 	 */
 	if (desc->pd_prov_type != CRYPTO_LOGICAL_PROVIDER) {
 		ec.ec_provider_type = desc->pd_prov_type;
-		ec.ec_change = CRYPTO_EVENT_CHANGE_REMOVED;
+		ec.ec_change = CRYPTO_MECH_REMOVED;
 		for (i = 0; i < desc->pd_mech_list_count; i++) {
 			/* Skip any mechanisms not allowed by the policy */
 			if (is_mech_disabled(desc,
@@ -445,9 +457,20 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 			(void) strncpy(ec.ec_mech_name,
 			    desc->pd_mechanisms[i].cm_mech_name,
 			    CRYPTO_MAX_MECH_NAME);
-			kcf_walk_ntfylist(CRYPTO_EVENT_PROVIDERS_CHANGE, &ec);
+			kcf_walk_ntfylist(CRYPTO_EVENT_MECHS_CHANGED, &ec);
 		}
+
 	}
+
+	/*
+	 * Inform interested clients about the departing provider.
+	 * In case of a logical provider, we need to notify the event only
+	 * for the logical provider and not for the underlying
+	 * providers which are known by the KCF_LPROV_MEMBER bit.
+	 */
+	if (desc->pd_prov_type == CRYPTO_LOGICAL_PROVIDER ||
+	    (desc->pd_flags & KCF_LPROV_MEMBER) == 0)
+		kcf_walk_ntfylist(CRYPTO_EVENT_PROVIDER_UNREGISTERED, desc);
 
 	if (desc->pd_prov_type == CRYPTO_SW_PROVIDER) {
 		/*
@@ -909,6 +932,7 @@ process_logical_providers(crypto_provider_info_t *info, kcf_provider_desc_t *hp)
 			continue;
 		}
 		add_provider_to_array(hp, lp);
+		hp->pd_flags |= KCF_LPROV_MEMBER;
 
 		/*
 		 * A hardware provider has to have the provider descriptor of
@@ -936,6 +960,9 @@ remove_provider(kcf_provider_desc_t *pp)
 	for (e = pp->pd_provider_list; e != NULL; e = next) {
 		p = e->pl_provider;
 		remove_provider_from_array(pp, p);
+		if (p->pd_prov_type == CRYPTO_HW_PROVIDER &&
+		    p->pd_provider_list == NULL)
+			p->pd_flags &= ~KCF_LPROV_MEMBER;
 		KCF_PROV_IREFRELE(p);
 		next = e->pl_next;
 		kmem_free(e, sizeof (*e));

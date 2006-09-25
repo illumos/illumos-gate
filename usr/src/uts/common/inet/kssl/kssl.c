@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -251,7 +250,7 @@ kssl_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	if (rsa_x509_mech.cm_type == CRYPTO_MECH_INVALID) {
 		kssl_init_mechs();
 		prov_update_handle = crypto_notify_events(
-		    kssl_event_callback, CRYPTO_EVENT_PROVIDERS_CHANGE);
+		    kssl_event_callback, CRYPTO_EVENT_MECHS_CHANGED);
 	}
 
 	/* exclusive opens are not supported */
@@ -285,14 +284,16 @@ kssl_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 
 	switch (cmd) {
 	case KSSL_ADD_ENTRY: {
-		kssl_params_t kssl_params_s, *kssl_params = &kssl_params_s;
 		uint64_t len;
+		uint32_t ck_rv;
+		size_t off;
+		kssl_params_t *kssl_params;
 
-		if (copyin(ARG, kssl_params, sizeof (kssl_params_s)) != 0) {
+		off = offsetof(kssl_params_t, kssl_params_size);
+		if (copyin(ARG + off, &len, sizeof (len)) != 0) {
 			return (EFAULT);
 		}
 
-		len = kssl_params->kssl_params_size;
 		if (len < sizeof (kssl_params_t) ||
 		    len > KSSL_MAX_KEYANDCERTS) {
 			return (EINVAL);
@@ -310,6 +311,14 @@ kssl_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 	if (audit_active)
 		audit_kssl(KSSL_ADD_ENTRY, kssl_params, error);
 #endif
+		off = offsetof(kssl_params_t, kssl_token) +
+		    offsetof(kssl_tokinfo_t, ck_rv);
+		ck_rv = kssl_params->kssl_token.ck_rv;
+		if (copyout(&ck_rv, ARG + off, sizeof (ck_rv)) != 0) {
+			error = EFAULT;
+		}
+
+		bzero(kssl_params, len);
 		kmem_free(kssl_params, len);
 		break;
 	}
@@ -417,7 +426,7 @@ kssl_event_callback(uint32_t event, void *event_arg)
 	    (crypto_notify_event_change_t *)event_arg;
 
 	/* ignore events for which we didn't register */
-	if (event != CRYPTO_EVENT_PROVIDERS_CHANGE) {
+	if (event != CRYPTO_EVENT_MECHS_CHANGED) {
 		return;
 	}
 
@@ -583,4 +592,59 @@ kssl_destructor(void *buf, void *arg)
 {
 	ssl_t *ssl = buf;
 	mutex_destroy(&ssl->kssl_lock);
+}
+
+/*
+ * Handler routine called by the crypto framework when a
+ * provider is unregistered or registered. We invalidate the
+ * private key handle if our provider is unregistered. We set
+ * a flag to reauthenticate if our provider came back.
+ */
+void
+kssl_prov_evnt(uint32_t event, void *event_arg)
+{
+	int i, rv;
+	kssl_entry_t *ep;
+	kssl_session_info_t *s;
+	crypto_provider_t prov;
+	crypto_provider_ext_info_t info;
+
+	if (event != CRYPTO_EVENT_PROVIDER_UNREGISTERED &&
+	    event != CRYPTO_EVENT_PROVIDER_REGISTERED)
+		return;
+
+	prov = (crypto_provider_t)event_arg;
+	if (event == CRYPTO_EVENT_PROVIDER_REGISTERED) {
+		rv = crypto_get_provinfo(prov, &info);
+		if (rv != CRYPTO_SUCCESS)
+			return;
+	}
+
+	mutex_enter(&kssl_tab_mutex);
+
+	for (i = 0; i < kssl_entry_tab_size; i++) {
+		if ((ep = kssl_entry_tab[i]) == NULL)
+			continue;
+
+		s = ep->ke_sessinfo;
+		switch (event) {
+		case CRYPTO_EVENT_PROVIDER_UNREGISTERED:
+			if (s->is_valid_handle && s->prov == prov) {
+				s->is_valid_handle = B_FALSE;
+				crypto_release_provider(s->prov);
+			}
+			break;
+
+		case CRYPTO_EVENT_PROVIDER_REGISTERED:
+			if (s->is_valid_handle)
+				break;
+			if (bcmp(s->toklabel, info.ei_label,
+			    CRYPTO_EXT_SIZE_LABEL) == 0) {
+				s->do_reauth = B_TRUE;
+			}
+			break;
+		}
+	}
+
+	mutex_exit(&kssl_tab_mutex);
 }

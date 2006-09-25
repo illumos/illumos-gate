@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -336,8 +335,8 @@ kcf_change_mechs(kcf_provider_desc_t *provider, uint_t count,
 	char *mech;
 	int i, j, n;
 
-	ASSERT(direction == CRYPTO_EVENT_CHANGE_ADDED ||
-	    direction == CRYPTO_EVENT_CHANGE_REMOVED);
+	ASSERT(direction == CRYPTO_MECH_ADDED ||
+	    direction == CRYPTO_MECH_REMOVED);
 
 	if (provider == NULL) {
 		/*
@@ -364,11 +363,11 @@ kcf_change_mechs(kcf_provider_desc_t *provider, uint_t count,
 			continue;
 
 		switch (direction) {
-		case CRYPTO_EVENT_CHANGE_ADDED:
+		case CRYPTO_MECH_ADDED:
 			(void) kcf_add_mech_provider(mi, provider, &pmd);
 			break;
 
-		case CRYPTO_EVENT_CHANGE_REMOVED:
+		case CRYPTO_MECH_REMOVED:
 			kcf_remove_mech_provider(mech, provider);
 			break;
 		}
@@ -378,7 +377,7 @@ kcf_change_mechs(kcf_provider_desc_t *provider, uint_t count,
 		ec.ec_change = direction;
 
 		(void) strncpy(ec.ec_mech_name, mech, CRYPTO_MAX_MECH_NAME);
-		kcf_walk_ntfylist(CRYPTO_EVENT_PROVIDERS_CHANGE, &ec);
+		kcf_walk_ntfylist(CRYPTO_EVENT_MECHS_CHANGED, &ec);
 	}
 }
 
@@ -447,11 +446,11 @@ crypto_load_dev_disabled(char *name, uint_t instance, uint_t new_count,
 			kcf_compare_mechs(new_count, new_array,
 			    prev_count, prev_array);
 			kcf_change_mechs(provider, prev_count, prev_array,
-			    CRYPTO_EVENT_CHANGE_ADDED);
+			    CRYPTO_MECH_ADDED);
 		}
 
 		kcf_change_mechs(provider, new_count, new_array,
-		    CRYPTO_EVENT_CHANGE_REMOVED);
+		    CRYPTO_MECH_REMOVED);
 	}
 
 	kcf_free_provider_tab(provider_count, provider_array);

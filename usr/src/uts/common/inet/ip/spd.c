@@ -4714,7 +4714,7 @@ ipsec_prov_update_callback(uint32_t event, void *event_arg)
 	boolean_t alg_changed = B_FALSE;
 
 	/* ignore events for which we didn't register */
-	if (event != CRYPTO_EVENT_PROVIDERS_CHANGE) {
+	if (event != CRYPTO_EVENT_MECHS_CHANGED) {
 		ip1dbg(("ipsec_prov_update_callback: unexpected event 0x%x "
 			" received from crypto framework\n", event));
 		return;
@@ -4788,7 +4788,7 @@ ipsec_prov_update_callback(uint32_t event, void *event_arg)
 			    CRYPTO_SW_PROVIDER)
 				sadb_alg_update(algtype, alg->alg_id,
 				    prov_change->ec_change ==
-				    CRYPTO_EVENT_CHANGE_ADDED);
+				    CRYPTO_MECH_ADDED);
 		}
 	}
 	mutex_exit(&alg_lock);
@@ -4816,7 +4816,7 @@ void
 ipsec_register_prov_update(void)
 {
 	prov_update_handle = crypto_notify_events(
-	    ipsec_prov_update_callback, CRYPTO_EVENT_PROVIDERS_CHANGE);
+	    ipsec_prov_update_callback, CRYPTO_EVENT_MECHS_CHANGED);
 }
 
 /*

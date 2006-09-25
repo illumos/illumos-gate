@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +62,6 @@ int kssl_entry_tab_size;
 int kssl_entry_tab_nentries;
 kmutex_t kssl_tab_mutex;
 
-
 static void
 certificate_free(Certificate_t *cert)
 {
@@ -74,18 +72,37 @@ certificate_free(Certificate_t *cert)
 static void
 privateKey_free(crypto_key_t *privkey)
 {
-	crypto_object_attribute_t *attrs = privkey->ck_attrs;
-	size_t attrs_size
-		= privkey->ck_count * sizeof (crypto_object_attribute_t);
-
 	int i;
+	size_t attrs_size;
+	crypto_object_attribute_t *attrs;
 
+	attrs = privkey->ck_attrs;
+	attrs_size = privkey->ck_count * sizeof (crypto_object_attribute_t);
 	for (i = 0; i < privkey->ck_count; i++) {
 		bzero(attrs[i].oa_value, attrs[i].oa_value_len);
 		kmem_free(attrs[i].oa_value, attrs[i].oa_value_len);
 	}
 	kmem_free(attrs, attrs_size);
 	kmem_free(privkey, sizeof (crypto_key_t));
+}
+
+static void
+sess_free(kssl_session_info_t *s)
+{
+	if (s->is_valid_handle) {
+		(void) crypto_session_logout(s->prov, s->sid, NULL);
+		(void) crypto_session_close(s->prov, s->sid, NULL);
+		crypto_release_provider(s->prov);
+		s->is_valid_handle = B_FALSE;
+	}
+
+	if (s->evnt_handle != NULL) {
+		crypto_unnotify_events(s->evnt_handle);
+		s->evnt_handle = NULL;
+	}
+
+	bzero(s->tokpin, s->pinlen);
+	kmem_free(s, sizeof (kssl_session_info_t) + s->pinlen);
 }
 
 /*
@@ -98,6 +115,7 @@ kssl_free_entry(kssl_entry_t *kssl_entry)
 	int i;
 	Certificate_t *cert;
 	crypto_key_t *privkey;
+	kssl_session_info_t *s;
 
 	if (kssl_entry->ke_no_freeall) {
 		kmem_free(kssl_entry, sizeof (kssl_entry_t));
@@ -110,7 +128,7 @@ kssl_free_entry(kssl_entry_t *kssl_entry)
 
 	if ((privkey = kssl_entry->ke_private_key) != NULL) {
 		privateKey_free(privkey);
-	};
+	}
 
 	for (i = 0; i < kssl_entry->sid_cache_nentries; i++)
 		mutex_destroy(&(kssl_entry->sid_cache[i].se_lock));
@@ -120,6 +138,11 @@ kssl_free_entry(kssl_entry_t *kssl_entry)
 
 	ASSERT(kssl_entry->ke_proxy_head == NULL);
 	ASSERT(kssl_entry->ke_fallback_head == NULL);
+
+	if ((s = kssl_entry->ke_sessinfo) != NULL) {
+		ASSERT(kssl_entry->ke_is_nxkey);
+		sess_free(s);
+	}
 
 	kmem_free(kssl_entry, sizeof (kssl_entry_t));
 }
@@ -198,7 +221,7 @@ extract_certificate(kssl_params_t *kssl_params, Certificate_t **certpp)
 		return (EINVAL);
 	}
 
-	/* Trusting that the system call preserved the 4-byte aligment */
+	/* Trusting that the system call preserved the 4-byte alignment */
 	cert_sizes = (uint32_t *)(begin +
 	    kssl_params->kssl_certs.sc_sizes_offset);
 
@@ -291,21 +314,16 @@ extract_private_key(kssl_params_t *kssl_params, crypto_key_t **privkey)
 	attrs_size = kssl_privkey->ck_count *
 	    sizeof (crypto_object_attribute_t);
 
-	newattrs = kmem_alloc(attrs_size, KM_NOSLEEP);
-	if (newattrs == NULL) {
-		rv = ENOMEM;
-		goto err1;
-	}
-
 	mp_attrs = begin + kssl_params->kssl_privkey.ks_attrs_offset;
 	if (mp_attrs + attrs_size > end_pos) {
 		rv = EINVAL;
 		goto err1;
 	}
 
+	newattrs = kmem_alloc(attrs_size, KM_SLEEP);
+
 	/* Now the individual attributes */
 	for (i = 0; i < kssl_privkey->ck_count; i++) {
-
 		bcopy(mp_attrs, &att, sizeof (kssl_object_attribute_t));
 
 		mp_attrs += sizeof (kssl_object_attribute_t);
@@ -320,11 +338,7 @@ extract_private_key(kssl_params_t *kssl_params, crypto_key_t **privkey)
 
 		newattrs[i].oa_type = att.ka_type;
 		newattrs[i].oa_value_len = attlen;
-		newattrs[i].oa_value = kmem_alloc(attlen, KM_NOSLEEP);
-		if (newattrs[i].oa_value == NULL) {
-			rv = ENOMEM;
-			goto err2;
-		}
+		newattrs[i].oa_value = kmem_alloc(attlen, KM_SLEEP);
 
 		bcopy(attval, newattrs[i].oa_value, attlen);
 	}
@@ -337,12 +351,54 @@ extract_private_key(kssl_params_t *kssl_params, crypto_key_t **privkey)
 
 err2:
 	for (j = 0; j < i; j++) {
+		bzero(newattrs[j].oa_value, newattrs[j].oa_value_len);
 		kmem_free(newattrs[j].oa_value, newattrs[j].oa_value_len);
 	}
 	kmem_free(newattrs, attrs_size);
 err1:
 	kmem_free(kssl_privkey, sizeof (crypto_key_t));
 	return (rv);
+}
+
+static int
+create_sessinfo(kssl_params_t *kssl_params, kssl_entry_t *kssl_entry)
+{
+	int rv;
+	char *p;
+	kssl_session_info_t *s;
+	kssl_tokinfo_t *t;
+
+	t =  &kssl_params->kssl_token;
+	/* Do a sanity check */
+	if (t->pinlen > MAX_PIN_LENGTH) {
+		return (EINVAL);
+	}
+
+	s = kmem_zalloc(sizeof (kssl_session_info_t) + t->pinlen, KM_SLEEP);
+	s->pinlen = t->pinlen;
+	bcopy(t->toklabel, s->toklabel, CRYPTO_EXT_SIZE_LABEL);
+	p = (char *)kssl_params + t->tokpin_offset;
+	bcopy(p, s->tokpin, s->pinlen);
+	ASSERT(kssl_entry->ke_sessinfo == NULL);
+	kssl_entry->ke_sessinfo = s;
+
+	/* Get the handle to the non extractable key */
+	rv = kssl_get_obj_handle(kssl_entry);
+	kssl_params->kssl_token.ck_rv = rv;
+	if (rv != CRYPTO_SUCCESS) {
+		sess_free(s);
+		kssl_entry->ke_sessinfo = NULL;
+		return (EINVAL);
+	}
+
+	kssl_entry->ke_sessinfo->is_valid_handle = B_TRUE;
+	kssl_entry->ke_sessinfo->do_reauth = B_FALSE;
+	kssl_entry->ke_sessinfo->evnt_handle =
+	    crypto_notify_events(kssl_prov_evnt,
+		CRYPTO_EVENT_PROVIDER_REGISTERED |
+		CRYPTO_EVENT_PROVIDER_UNREGISTERED);
+
+	return (0);
 }
 
 static kssl_entry_t *
@@ -373,6 +429,14 @@ create_kssl_entry(kssl_params_t *kssl_params, Certificate_t *cert,
 		    kssl_params->kssl_session_cache_size;
 	kssl_entry->ke_private_key = privkey;
 	kssl_entry->ke_server_certificate = cert;
+
+	kssl_entry->ke_is_nxkey = kssl_params->kssl_is_nxkey;
+	if (kssl_entry->ke_is_nxkey) {
+		if (create_sessinfo(kssl_params, kssl_entry) != 0) {
+			kmem_free(kssl_entry, sizeof (kssl_entry_t));
+			return (NULL);
+		}
+	}
 
 	mechs = crypto_get_mech_list(&mech_count, KM_SLEEP);
 	if (mechs != NULL) {
@@ -468,6 +532,11 @@ kssl_add_entry(kssl_params_t *kssl_params)
 	}
 
 	kssl_entry = create_kssl_entry(kssl_params, cert, privkey);
+	if (kssl_entry == NULL) {
+		certificate_free(cert);
+		privateKey_free(privkey);
+		return (EINVAL);
+	}
 
 	/* Revisit here for IPv6 support */
 	laddr = kssl_params->kssl_addr.sin_addr.s_addr;
@@ -596,4 +665,88 @@ kssl_delete_entry(struct sockaddr_in *kssl_addr)
 	mutex_exit(&kssl_tab_mutex);
 
 	return (0);
+}
+
+/*
+ * We care about only one private key object.
+ * So, set the max count to only 1.
+ */
+#define	MAX_OBJECT_COUNT	1
+
+/*
+ * Open a session to the provider specified by the label and
+ * authenticate to it. Find the private key object with the
+ * specified  attributes and save the handle. The userland component
+ * must set all the attributes in the template so as to uniquely
+ * identify the object.
+ *
+ * Note that the handle will be invalid if we logout or close
+ * the session to the provider.
+ */
+int
+kssl_get_obj_handle(kssl_entry_t *kp)
+{
+	int rv;
+	unsigned int count;
+	void *cookie = NULL;
+	crypto_provider_t prov;
+	kssl_session_info_t *s;
+	crypto_session_id_t sid;
+	crypto_object_attribute_t *attrs;
+	crypto_object_id_t ohndl[MAX_OBJECT_COUNT];
+	char label[CRYPTO_EXT_SIZE_LABEL + 1];
+
+	ASSERT(kp->ke_is_nxkey);
+	s = kp->ke_sessinfo;
+
+	bcopy(s->toklabel, label, CRYPTO_EXT_SIZE_LABEL);
+	label[CRYPTO_EXT_SIZE_LABEL] = '\0';
+	prov = crypto_get_provider(label, NULL, NULL);
+	if (prov == NULL)
+		return (CRYPTO_UNKNOWN_PROVIDER);
+
+	rv = crypto_session_open(prov, &sid, NULL);
+	if (rv != CRYPTO_SUCCESS) {
+		goto err1;
+	}
+
+	rv = crypto_session_login(prov, sid, CRYPTO_USER,
+	    s->tokpin, s->pinlen, NULL);
+	if (rv != CRYPTO_SUCCESS) {
+		goto err2;
+	}
+
+	count = kp->ke_private_key->ck_count;
+	attrs = kp->ke_private_key->ck_attrs;
+
+	rv = crypto_object_find_init(prov, sid, attrs, count, &cookie, NULL);
+	if (rv != CRYPTO_SUCCESS) {
+		goto err3;
+	}
+
+	rv = crypto_object_find(prov, cookie, ohndl, &count,
+	    MAX_OBJECT_COUNT, NULL);
+	if (rv != CRYPTO_SUCCESS || count == 0) {
+		if (count == 0)
+			rv = CRYPTO_FAILED;
+		goto err3;
+	}
+
+	(void) crypto_object_find_final(prov, cookie, NULL);
+
+	s->sid = sid;
+	s->prov = prov;
+	s->key.ck_format = CRYPTO_KEY_REFERENCE;
+	/* Keep the handle around for later use */
+	s->key.ck_obj_id = ohndl[0];
+
+	return (CRYPTO_SUCCESS);
+
+err3:
+	(void) crypto_session_logout(prov, sid, NULL);
+err2:
+	(void) crypto_session_close(prov, sid, NULL);
+err1:
+	crypto_release_provider(prov);
+	return (rv);
 }
