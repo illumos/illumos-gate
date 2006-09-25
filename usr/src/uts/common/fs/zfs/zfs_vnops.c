@@ -1929,7 +1929,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	vattr_t		oldva;
 	uint_t		mask = vap->va_mask;
 	uint_t		saved_mask;
-	int		trim_mask = FALSE;
+	int		trim_mask = 0;
 	uint64_t	new_mode;
 	znode_t		*attrzp;
 	int		need_policy = FALSE;
@@ -2023,8 +2023,7 @@ top:
 				 * Remove setuid/setgid for non-privileged users
 				 */
 				secpolicy_setid_clear(vap, cr);
-				trim_mask = TRUE;
-				saved_mask = vap->va_mask;
+				trim_mask = (mask & (AT_UID|AT_GID));
 			} else {
 				need_policy =  TRUE;
 			}
@@ -2033,25 +2032,40 @@ top:
 		}
 	}
 
-	if (mask & AT_MODE)
-		need_policy = TRUE;
+	mutex_enter(&zp->z_lock);
+	oldva.va_mode = pzp->zp_mode;
+	oldva.va_uid = zp->z_phys->zp_uid;
+	oldva.va_gid = zp->z_phys->zp_gid;
+	mutex_exit(&zp->z_lock);
+
+	if (mask & AT_MODE) {
+		if (zfs_zaccess_v4_perm(zp, ACE_WRITE_ACL, cr) == 0) {
+			err = secpolicy_setid_setsticky_clear(vp, vap,
+			    &oldva, cr);
+			if (err) {
+				ZFS_EXIT(zfsvfs);
+				return (err);
+			}
+			trim_mask |= AT_MODE;
+		} else {
+			need_policy = TRUE;
+		}
+	}
 
 	if (need_policy) {
-		mutex_enter(&zp->z_lock);
-		oldva.va_mode = pzp->zp_mode;
-		oldva.va_uid = zp->z_phys->zp_uid;
-		oldva.va_gid = zp->z_phys->zp_gid;
-		mutex_exit(&zp->z_lock);
-
 		/*
 		 * If trim_mask is set then take ownership
-		 * has been granted.  In that case remove
-		 * UID|GID from mask so that
+		 * has been granted or write_acl is present and user
+		 * has the ability to modify mode.  In that case remove
+		 * UID|GID and or MODE from mask so that
 		 * secpolicy_vnode_setattr() doesn't revoke it.
 		 */
-		if (trim_mask)
-			vap->va_mask &= ~(AT_UID|AT_GID);
 
+		if (trim_mask) {
+			saved_mask = vap->va_mask;
+			vap->va_mask &= ~trim_mask;
+
+		}
 		err = secpolicy_vnode_setattr(cr, vp, vap, &oldva, flags,
 		    (int (*)(void *, int, cred_t *))zfs_zaccess_rwx, zp);
 		if (err) {
@@ -2060,7 +2074,7 @@ top:
 		}
 
 		if (trim_mask)
-			vap->va_mask |= (saved_mask & (AT_UID|AT_GID));
+			vap->va_mask |= saved_mask;
 	}
 
 	/*

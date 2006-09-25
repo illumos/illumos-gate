@@ -925,6 +925,39 @@ secpolicy_setid_clear(vattr_t *vap, cred_t *cr)
 	}
 }
 
+int
+secpolicy_setid_setsticky_clear(vnode_t *vp, vattr_t *vap, const vattr_t *ovap,
+    cred_t *cr)
+{
+	int error;
+
+	if ((vap->va_mode & S_ISUID) != 0 &&
+	    (error = secpolicy_vnode_setid_modify(cr,
+	    ovap->va_uid)) != 0) {
+		return (error);
+	}
+
+	/*
+	 * Check privilege if attempting to set the
+	 * sticky bit on a non-directory.
+	 */
+	if (vp->v_type != VDIR && (vap->va_mode & S_ISVTX) != 0 &&
+	    secpolicy_vnode_stky_modify(cr) != 0) {
+	    vap->va_mode &= ~S_ISVTX;
+	}
+
+	/*
+	 * Check for privilege if attempting to set the
+	 * group-id bit.
+	 */
+	if ((vap->va_mode & S_ISGID) != 0 &&
+	    secpolicy_vnode_setids_setgids(cr, ovap->va_gid) != 0) {
+	    vap->va_mode &= ~S_ISGID;
+	}
+
+	return (0);
+}
+
 /*
  * This function checks the policy decisions surrounding the
  * vop setattr call.
@@ -986,30 +1019,9 @@ secpolicy_vnode_setattr(cred_t *cr, struct vnode *vp, struct vattr *vap,
 		if ((error = secpolicy_vnode_setdac(cr, ovap->va_uid)) != 0)
 			goto out;
 
-		if ((vap->va_mode & S_ISUID) != 0 &&
-		    (error = secpolicy_vnode_setid_modify(cr,
-							ovap->va_uid)) != 0) {
+		if ((error = secpolicy_setid_setsticky_clear(vp, vap,
+		    ovap, cr)) != 0)
 			goto out;
-		}
-
-		/*
-		 * Check privilege if attempting to set the
-		 * sticky bit on a non-directory.
-		 */
-		if (vp->v_type != VDIR && (vap->va_mode & S_ISVTX) != 0 &&
-		    secpolicy_vnode_stky_modify(cr) != 0) {
-			vap->va_mode &= ~S_ISVTX;
-		}
-
-		/*
-		 * Check for privilege if attempting to set the
-		 * group-id bit.
-		 */
-		if ((vap->va_mode & S_ISGID) != 0 &&
-		    secpolicy_vnode_setids_setgids(cr, ovap->va_gid) != 0) {
-			vap->va_mode &= ~S_ISGID;
-		}
-
 	} else
 		vap->va_mode = ovap->va_mode;
 

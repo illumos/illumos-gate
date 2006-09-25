@@ -146,6 +146,8 @@ int secpolicy_vnode_stky_modify(const cred_t *);
 int secpolicy_zinject(const cred_t *);
 int secpolicy_zfs(const cred_t *);
 void secpolicy_setid_clear(vattr_t *, cred_t *);
+int secpolicy_setid_setsticky_clear(vnode_t *, vattr_t *,
+    const vattr_t *, cred_t *);
 
 int secpolicy_basic_exec(const cred_t *);
 int secpolicy_basic_fork(const cred_t *);

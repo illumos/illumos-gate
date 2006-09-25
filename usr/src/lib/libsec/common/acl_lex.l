@@ -71,8 +71,7 @@ int yybufpos;
  */
 
 ID	[1-9][0-9]*
-LOGNAME [a-z0-9A-Z]+:
-BADLOGNAME [a-z0-9A-Z]+
+LOGNAME [\.a-z0-9A-Z\-_]+:
 PERM_STR [rRwWxpdDaAcCos-]+
 INHERIT_STR [fdinFS-]+
 
@@ -205,13 +204,6 @@ INHERIT_STR [fdinFS-]+
 				BEGIN PS;
 				return (IDNAME);
 			}
-<NS>{BADLOGNAME}	{
-				acl_error(dgettext(TEXT_DOMAIN,
-				    "Missing fields after "
-				    "user/group '%s'.\n"), yytext);
-				yylval.val = EACL_MISSING_FIELDS;
-				return (ERROR);
-			}
 <NS>"\n"		{
 				acl_error(dgettext(TEXT_DOMAIN,
 				    "Missing user/group name"
@@ -238,71 +230,71 @@ INHERIT_STR [fdinFS-]+
 				}
 				return (ERROR);
 			}
-<PS>read_data/[:/]	{
+<PS>read_data/[:/,]	{
 				yylval.val = ACE_READ_DATA;
 				return (ACE_PERM);
 			}
-<PS>list_directory/[:/] {
+<PS>list_directory/[:/,] {
 				yylval.val = ACE_LIST_DIRECTORY;
 			 	return (ACE_PERM);
 			}
-<PS>write_data/[:/]	{
+<PS>write_data/[:/,]	{
 				yylval.val = ACE_WRITE_DATA;
 				return (ACE_PERM);
 			}
-<PS>add_file/[:/]	{
+<PS>add_file/[:/,]	{
 				yylval.val = ACE_ADD_FILE;
 				return (ACE_PERM);
 			}
-<PS>append_data/[:/]	{
+<PS>append_data/[:/,]	{
 				yylval.val = ACE_APPEND_DATA;
 				return (ACE_PERM);
 			}
-<PS>add_subdirectory/[:/] {
+<PS>add_subdirectory/[:/,] {
 				yylval.val = ACE_ADD_SUBDIRECTORY;
 				return (ACE_PERM);
 			}
-<PS>read_xattr/[:/]	{
+<PS>read_xattr/[:/,]	{
 				yylval.val = ACE_READ_NAMED_ATTRS;
 				return (ACE_PERM);
 			}
-<PS>write_xattr/[:/]	{
+<PS>write_xattr/[:/,]	{
 				yylval.val = ACE_WRITE_NAMED_ATTRS;
 				return (ACE_PERM);
 			}
-<PS>execute/[:/]	{
+<PS>execute/[:/,]	{
 				yylval.val = ACE_EXECUTE;
 				return (ACE_PERM);
 			}
-<PS>delete_child/[:/]	{
+<PS>delete_child/[:/,]	{
 				yylval.val = ACE_DELETE_CHILD;
 				return (ACE_PERM);
 			}
-<PS>read_attributes/[:/] {
+<PS>read_attributes/[:/,] {
 				yylval.val = ACE_READ_ATTRIBUTES;
 				return (ACE_PERM);
 			}
-<PS>write_attributes/[:/] {
+<PS>write_attributes/[:/,] {
 				yylval.val = ACE_WRITE_ATTRIBUTES;
 			 	return (ACE_PERM);
 			}
-<PS>delete/[:/]		{
+<PS>delete/[:/,]		{
 				yylval.val = ACE_DELETE;
 				return (ACE_PERM);
 			}
-<PS>read_acl/[:/]	{
+<PS>read_acl/[:/,]	{
 				yylval.val = ACE_READ_ACL;
 				return (ACE_PERM);
 			}
-<PS>write_acl/[:/]	{
+<PS>write_acl/[:/,]	{
 				yylval.val = ACE_WRITE_ACL;
 				return (ACE_PERM);
 			}
-<PS>write_owner/[:/]	{
+<PS>write_owner/[:/,]	{
 				yylval.val = ACE_WRITE_OWNER;
 				return (ACE_PERM);
 			}
-<PS>synchronize/[:/]	{
+<PS>synchronize/[:/,]	{
 				yylval.val = ACE_SYNCHRONIZE;
 				return (ACE_PERM);
 			}
@@ -352,6 +344,16 @@ INHERIT_STR [fdinFS-]+
 				    "ACL entry is missing "
 				    "permission fields.\n"));
 				yylval.val = EACL_MISSING_FIELDS;
+				return (ERROR);
+			}
+<PS>","			{
+				acl_error(
+				    dgettext(TEXT_DOMAIN,
+				    "The ',' is not a valid permission field "
+				    "separator.\nThe comma is used to separate "
+				    "access control entries.\nSee acl(5) for "
+				    "examples of specifying ACL entries.\n"));
+				yylval.val = EACL_PERM_MASK_ERROR;
 				return (ERROR);
 			}
 <PS>. 			{
@@ -464,19 +466,19 @@ INHERIT_STR [fdinFS-]+
 				yylval.val = ACE_ACCESS_DENIED_ACE_TYPE;
 				return (ACCESS_TYPE);
 			}
-<AIS>file_inherit/[:/] {
+<AIS>file_inherit/[:/,] {
 				yylval.val = ACE_FILE_INHERIT_ACE;
 				return (ACE_INHERIT);
 			}
-<AIS>dir_inherit/[:/]	{
+<AIS>dir_inherit/[:/,]	{
 				yylval.val = ACE_DIRECTORY_INHERIT_ACE;
 				return (ACE_INHERIT);
 			}
-<AIS>no_propagate/[/:]	{
+<AIS>no_propagate/[/:,]	{
 				yylval.val = ACE_NO_PROPAGATE_INHERIT_ACE;
 				return (ACE_INHERIT);
 			}
-<AIS>inherit_only/[/:]	{
+<AIS>inherit_only/[/:,]	{
 				yylval.val = ACE_INHERIT_ONLY_ACE;
 				return (ACE_INHERIT);
 			}
@@ -508,6 +510,16 @@ INHERIT_STR [fdinFS-]+
 				    " access type or inheritance flags.\n"),
 				    yylval.str);
 				yylval.val = EACL_UNKNOWN_DATA;
+				return (ERROR);
+			}
+<AIS>","		{
+				acl_error(
+				    dgettext(TEXT_DOMAIN,
+				    "The ',' is not a valid inheritance field "
+				    "separator.\nThe comma is used to separate "
+				    "access control entries.\nSee acl(5) for "
+				    "examples of specifying ACL entries.\n"));
+				yylval.val = EACL_INVALID_ACCESS_TYPE;
 				return (ERROR);
 			}
 <AIS>.			{
