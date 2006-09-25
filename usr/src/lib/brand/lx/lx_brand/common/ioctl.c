@@ -1189,12 +1189,25 @@ static int
 ict_gptn(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
 {
 	int		ptyno, *ptynop = (int *)arg;
+	pt_own_t	pto;
 
 	assert(cmd == LX_TIOCGPTN);
 	assert(getmajor(stat->st_rdev) == ioc_translator_ptm.idt_major);
 
 	/* This operation is only valid for the lx_ptm device. */
 	ptyno = LX_PTM_DEV_TO_PTS(stat->st_rdev);
+
+	/*
+	 * We'd like to just use grantpt() directly, but we can't since
+	 * it assumes the fd node that's passed to it is a ptm node,
+	 * and in our case it's an lx_ptm node.  It also relies on
+	 * naming services to get the current process group name.
+	 * Hence we have to invoke the PT_OWNER ioctl directly here.
+	 */
+	pto.pto_ruid = getuid();
+	pto.pto_rgid = getgid();
+	if (ioctl_istr(fd, PT_OWNER, "PT_OWNER", &pto, sizeof (pto)) != 0)
+		return (-EACCES);
 
 	/* Copy out the data. */
 	if (uucopy(&ptyno, ptynop, sizeof (ptyno)) != 0)
