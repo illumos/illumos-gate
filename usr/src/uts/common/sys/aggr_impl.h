@@ -127,6 +127,7 @@ typedef struct aggr_grp_s {
 	aggr_lacp_mode_t lg_lacp_mode;		/* off, active, or passive */
 	Agg_t		aggr;			/* 802.3ad data */
 	uint32_t	lg_hcksum_txflags;
+	uint_t		lg_max_sdu;
 } aggr_grp_t;
 
 #define	AGGR_LACP_LOCK(grp)	mutex_enter(&(grp)->aggr.gl_lock);

@@ -73,6 +73,8 @@ static int aggr_grp_rem_port(aggr_grp_t *, aggr_port_t *, boolean_t *,
     boolean_t *);
 static void aggr_grp_capab_set(aggr_grp_t *);
 static boolean_t aggr_grp_capab_check(aggr_grp_t *, aggr_port_t *);
+static uint_t aggr_grp_max_sdu(aggr_grp_t *);
+static boolean_t aggr_grp_sdu_check(aggr_grp_t *, aggr_port_t *);
 
 static kmem_cache_t	*aggr_grp_cache;
 static mod_hash_t	*aggr_grp_hash;
@@ -488,7 +490,8 @@ aggr_grp_add_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 		nadded++;
 
 		/* check capabilities */
-		if (!aggr_grp_capab_check(grp, port)) {
+		if (!aggr_grp_capab_check(grp, port) ||
+		    !aggr_grp_sdu_check(grp, port)) {
 			rc = ENOTSUP;
 			goto bail;
 		}
@@ -750,7 +753,7 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 	mac->m_src_addr = grp->lg_addr;
 	mac->m_callbacks = &aggr_m_callbacks;
 	mac->m_min_sdu = 0;
-	mac->m_max_sdu = ETHERMTU;
+	mac->m_max_sdu = grp->lg_max_sdu = aggr_grp_max_sdu(grp);
 	err = mac_register(mac, &grp->lg_mh);
 	mac_free(mac);
 	if (err != 0)
@@ -1469,4 +1472,38 @@ aggr_grp_capab_check(aggr_grp_t *grp, aggr_port_t *port)
 	}
 
 	return (B_TRUE);
+}
+
+/*
+ * Returns the maximum SDU according to the SDU of the constituent ports.
+ */
+static uint_t
+aggr_grp_max_sdu(aggr_grp_t *grp)
+{
+	uint_t max_sdu = (uint_t)-1;
+	aggr_port_t *port;
+
+	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	ASSERT(grp->lg_ports != NULL);
+
+	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
+		const mac_info_t *port_mi = mac_info(port->lp_mh);
+		if (max_sdu > port_mi->mi_sdu_max)
+			max_sdu = port_mi->mi_sdu_max;
+	}
+
+	return (max_sdu);
+}
+
+/*
+ * Checks if the maximum SDU of the specified port is compatible
+ * with the maximum SDU of the specified aggregation group, returns
+ * B_TRUE if it is, B_FALSE otherwise.
+ */
+static boolean_t
+aggr_grp_sdu_check(aggr_grp_t *grp, aggr_port_t *port)
+{
+	const mac_info_t *port_mi = mac_info(port->lp_mh);
+
+	return (port_mi->mi_sdu_max >= grp->lg_max_sdu);
 }
