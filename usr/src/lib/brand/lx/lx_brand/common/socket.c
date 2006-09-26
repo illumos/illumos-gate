@@ -34,6 +34,7 @@
 #include <libintl.h>
 #include <strings.h>
 #include <alloca.h>
+#include <ucred.h>
 
 #include <sys/param.h>
 #include <sys/brand.h>
@@ -174,12 +175,12 @@ static const int ltos_igmp_sockopts[IGMP_MTRACE + 1] = {
 };
 
 static const int ltos_socket_sockopts[LX_SO_ACCEPTCONN + 1] = {
-	OPTNOTSUP,	SO_DEBUG,	SO_REUSEADDR,   SO_TYPE,
-	SO_ERROR,	SO_DONTROUTE,   SO_BROADCAST,   SO_SNDBUF,
-	SO_RCVBUF,	SO_KEEPALIVE,   SO_OOBINLINE,   OPTNOTSUP,
+	OPTNOTSUP,	SO_DEBUG,	SO_REUSEADDR,	SO_TYPE,
+	SO_ERROR,	SO_DONTROUTE,	SO_BROADCAST,	SO_SNDBUF,
+	SO_RCVBUF,	SO_KEEPALIVE,	SO_OOBINLINE,	OPTNOTSUP,
 	OPTNOTSUP,	SO_LINGER,	OPTNOTSUP,	OPTNOTSUP,
-	OPTNOTSUP,	OPTNOTSUP,	SO_RCVLOWAT,    SO_SNDLOWAT,
-	SO_RCVTIMEO,    SO_SNDTIMEO,    OPTNOTSUP,	OPTNOTSUP,
+	OPTNOTSUP,	OPTNOTSUP,	SO_RCVLOWAT,	SO_SNDLOWAT,
+	SO_RCVTIMEO,	SO_SNDTIMEO,	OPTNOTSUP,	OPTNOTSUP,
 	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,	OPTNOTSUP,
 	OPTNOTSUP,	OPTNOTSUP,	SO_ACCEPTCONN
 };
@@ -954,7 +955,7 @@ lx_setsockopt(ulong_t *args)
 	    optname <= 0 || optname >= (ltos_proto_opts[level].maxentries))
 		return (-ENOPROTOOPT);
 
-	if (optname == LX_TCP_CORK) {
+	if ((level == IPPROTO_TCP) && (optname == LX_TCP_CORK)) {
 		/*
 		 * TCP_CORK is a Linux-only option that instructs the TCP
 		 * stack not to send out partial frames.  Solaris doesn't
@@ -995,11 +996,11 @@ lx_getsockopt(ulong_t *args)
 	int level = (int)args[1];
 	int optname = (int)args[2];
 	void *optval = (void *)args[3];
-	int *optlen = (int *)args[4];
+	int *optlenp = (int *)args[4];
 	int r;
 
 	lx_debug("\tgetsockopt(%d, %d, %d, 0x%p, 0x%p)", sockfd, level, optname,
-	    optval, optlen);
+	    optval, optlenp);
 
 	/*
 	 * According to the Linux man page, a NULL optval should indicate
@@ -1019,7 +1020,7 @@ lx_getsockopt(ulong_t *args)
 	    optname <= 0 || optname >= (ltos_proto_opts[level].maxentries))
 		return (-ENOPROTOOPT);
 
-	if (optname == LX_TCP_CORK) {
+	if ((level == IPPROTO_TCP) && (optname == LX_TCP_CORK)) {
 		/*
 		 * We don't support TCP_CORK but some apps rely on it.  So,
 		 * rather than return an error we just return 0.  This
@@ -1031,7 +1032,47 @@ lx_getsockopt(ulong_t *args)
 		if (uucopy(&r, optval, sizeof (int)) != 0)
 			return (-errno);
 		r = sizeof (int);
-		if (uucopy(&r, optlen, sizeof (int)) != 0)
+		if (uucopy(&r, optlenp, sizeof (int)) != 0)
+			return (-errno);
+		return (0);
+	}
+	if ((level == LX_SOL_SOCKET) && (optname == LX_SO_PEERCRED)) {
+		struct lx_ucred	lx_ucred;
+		ucred_t		*ucp;
+
+		/*
+		 * We don't support SO_PEERCRED, but we do have equivalent
+		 * functionality in getpeerucred() so invoke that here.
+		 */
+
+		/* Verify there's going to be enough room for the results. */
+		if (uucopy(optlenp, &r, sizeof (int)) != 0)
+			return (-errno);
+		if (r < sizeof (struct lx_ucred))
+			return (-EOVERFLOW);
+
+		/*
+		 * We allocate a ucred_t ourselves rather than allow
+		 * getpeerucred() to do it for us because getpeerucred()
+		 * uses malloc(3C) and we'd rather use SAFE_ALLOCA().
+		 */
+		if ((ucp = (ucred_t *)SAFE_ALLOCA(ucred_size())) == NULL)
+			return (-ENOMEM);
+
+		/* Get the credential for the remote end of this socket. */
+		if (getpeerucred(sockfd, &ucp) != 0)
+			return (-errno);
+		if (((lx_ucred.lxu_pid = ucred_getpid(ucp)) == -1) ||
+		    ((lx_ucred.lxu_uid = ucred_geteuid(ucp)) == (uid_t)-1) ||
+		    ((lx_ucred.lxu_gid = ucred_getegid(ucp)) == (gid_t)-1)) {
+			return (-errno);
+		}
+
+		/* Copy out the results. */
+		if ((uucopy(&lx_ucred, optval, sizeof (lx_ucred))) != 0)
+			return (-errno);
+		r = sizeof (lx_ucred);
+		if ((uucopy(&r, optlenp, sizeof (int))) != 0)
 			return (-errno);
 		return (0);
 	}
@@ -1044,7 +1085,7 @@ lx_getsockopt(ulong_t *args)
 	if (level == LX_SOL_SOCKET)
 		level = SOL_SOCKET;
 
-	r = getsockopt(sockfd, level, optname, optval, optlen);
+	r = getsockopt(sockfd, level, optname, optval, optlenp);
 
 	return ((r < 0) ? -errno : r);
 }

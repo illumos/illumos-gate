@@ -32,6 +32,8 @@
 extern "C" {
 #endif
 
+#include <sys/lx_types.h>
+
 /*
  * Linux address family definitions
  * Some of these are not supported
@@ -241,6 +243,12 @@ struct lx_msghdr {
 	void		*msg_control;		/* ancillary data */
 	socklen_t	msg_controllen;		/* ancillary data buffer len */
 	int		msg_flags;		/* flags on received message */
+};
+
+struct lx_ucred {
+	pid_t		lxu_pid;
+	lx_uid_t	lxu_uid;
+	lx_gid_t	lxu_gid;
 };
 
 #ifdef	__cplusplus
