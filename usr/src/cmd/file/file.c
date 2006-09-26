@@ -1008,7 +1008,7 @@ print_elf_machine(int machine)
 		"i960",				/* 19 - EM_960 */
 		"PowerPC",			/* 20 - EM_PPC */
 		"PowerPC64",			/* 21 - EM_PPC64 */
-		NULL,				/* 22 - EM_UNKNOWN22 */
+		"S/390",			/* 22 - EM_S390 */
 		NULL,				/* 23 - EM_UNKNOWN23 */
 		NULL,				/* 24 - EM_UNKNOWN24 */
 		NULL,				/* 25 - EM_UNKNOWN25 */

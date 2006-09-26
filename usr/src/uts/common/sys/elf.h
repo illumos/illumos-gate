@@ -162,13 +162,15 @@ typedef struct {
 #define	EM_UNKNOWN13	13
 #define	EM_UNKNOWN14	14
 #define	EM_PA_RISC	15		/* PA-RISC */
+#define	EM_PARISC	EM_PA_RISC	/* Alias: GNU compatibility */
 #define	EM_nCUBE	16		/* nCUBE */
 #define	EM_VPP500	17		/* Fujitsu VPP500 */
 #define	EM_SPARC32PLUS	18		/* Sun SPARC 32+ */
 #define	EM_960		19		/* Intel 80960 */
 #define	EM_PPC		20		/* PowerPC */
 #define	EM_PPC64	21		/* 64-bit PowerPC */
-#define	EM_UNKNOWN22	22
+#define	EM_S390		22		/* IBM System/390 Processor */
+#define	EM_UNKNOWN22	EM_S390		/* Alias: Older published name */
 #define	EM_UNKNOWN23	23
 #define	EM_UNKNOWN24	24
 #define	EM_UNKNOWN25	25
@@ -261,6 +263,7 @@ typedef struct {
 
 
 #define	ELFOSABI_NONE		0	/* No extensions or unspecified */
+#define	ELFOSABI_SYSV		ELFOSABI_NONE
 #define	ELFOSABI_HPUX		1	/* Hewlett-Packard HP-UX */
 #define	ELFOSABI_NETBSD		2	/* NetBSD */
 #define	ELFOSABI_LINUX		3	/* Linux */
@@ -273,7 +276,11 @@ typedef struct {
 #define	ELFOSABI_TRU64		10	/* Compaq TRU64 UNIX */
 #define	ELFOSABI_MODESTO	11	/* Novell Modesto */
 #define	ELFOSABI_OPENBSD	12	/* Open BSD */
-
+#define	ELFOSABI_OPENVMS	13	/* Open VMS */
+#define	ELFOSABI_NSK		14	/* Hewlett-Packard Non-Stop Kernel */
+#define	ELFOSABI_AROS		15	/* Amiga Research OS */
+#define	ELFOSABI_ARM		97	/* ARM */
+#define	ELFOSABI_STANDALONE	255	/* standalone (embedded) application */
 
 /*
  *	Program header
@@ -400,6 +407,7 @@ typedef struct {
 #define	SHT_SYMTAB_SHNDX	18
 #define	SHT_NUM			19
 
+/* Solaris ABI specific values */
 #define	SHT_LOOS		0x60000000	/* OS specific range */
 #define	SHT_LOSUNW		0x6ffffff3
 #define	SHT_SUNW_LDYNSYM	0x6ffffff3
@@ -417,6 +425,11 @@ typedef struct {
 #define	SHT_SUNW_versym		0x6fffffff
 #define	SHT_HISUNW		0x6fffffff
 #define	SHT_HIOS		0x6fffffff
+
+/* GNU/Linux ABI specific values */
+#define	SHT_GNU_verdef		0x6ffffffd
+#define	SHT_GNU_verneed		0x6ffffffe
+#define	SHT_GNU_versym		0x6fffffff
 
 #define	SHT_LOPROC	0x70000000	/* processor specific range */
 #define	SHT_HIPROC	0x7fffffff

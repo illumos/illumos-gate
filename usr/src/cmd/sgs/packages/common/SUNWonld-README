@@ -1130,3 +1130,4 @@ Bugid   Risk Synopsis
 6423746 add an option to relax the resolution of COMDAT relocs (D)
 4934427 runtime linker should load up static symbol names visible to
 	dladdr() (D)
+6448719 sys/elf.h could be updated with additional machine and ABI types
