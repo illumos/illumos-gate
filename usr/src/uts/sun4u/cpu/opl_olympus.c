@@ -546,7 +546,8 @@ cpu_setup(void)
 	    "sparcv8plus+vis2 sparcv8plus+vis sparcv8plus "
 	    "sparcv8 sparcv8-fsmuld sparcv7 sparc";
 
-	cpu_hwcap_flags = AV_SPARC_VIS | AV_SPARC_VIS2;
+	cpu_hwcap_flags = AV_SPARC_VIS | AV_SPARC_VIS2 |
+	    AV_SPARC_POPC | AV_SPARC_FMAF;
 
 	/*
 	 * On SPARC64-VI, there's no hole in the virtual address space
