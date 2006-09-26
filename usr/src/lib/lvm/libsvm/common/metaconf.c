@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,13 +45,20 @@
 
 extern int _map_to_effective_dev();
 
-int
-is_blankline(char *buf)
+static int is_blank(char *);
+
+/*
+ * is_blank() returns 1 (true) if a line specified is composed of
+ * whitespace characters only. otherwise, it returns 0 (false).
+ *
+ * Note. the argument (line) must be null-terminated.
+ */
+static int
+is_blank(char *line)
 {
-	for (; *buf != 0; buf++) {
-		if (!isspace(*buf))
+	for (/* nothing */; *line != '\0'; line++)
+		if (!isspace(*line))
 			return (0);
-	}
 	return (1);
 }
 
@@ -87,9 +93,11 @@ write_targ_nm_table(char *path)
 
 	while (fgets(buf, PATH_MAX, targfp) != NULL &&
 				(retval == RET_SUCCESS)) {
-		cp = strrchr(buf, '\n');
-		*cp = 0;
-		if (is_blankline(buf))
+		/* cut off comments starting with '#' */
+		if ((cp = strchr(buf, '#')) != NULL)
+			*cp = 0;
+		/* ignore comment or blank lines */
+		if (is_blank(buf))
 			continue;
 		if (first_entry) {
 			if (fprintf(mdfp, "md_targ_nm_table=\"%s\"", buf) < 0)

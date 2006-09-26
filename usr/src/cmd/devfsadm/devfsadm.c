@@ -239,6 +239,8 @@ static void check_reconfig_state(void);
 static void devname_setup_nsmaps(void);
 static int s_stat(const char *, struct stat *);
 
+static int is_blank(char *);
+
 int
 main(int argc, char *argv[])
 {
@@ -388,7 +390,6 @@ update_drvconf(major_t major)
 		err_print(gettext("update_drvconf failed for major %d\n"),
 		    major);
 }
-
 
 static void
 load_dev_acl()
@@ -5556,7 +5557,7 @@ static int
 load_n2m_table(char *file)
 {
 	FILE *fp;
-	char line[1024];
+	char line[1024], *cp;
 	char driver[PATH_MAX + 1];
 	major_t major;
 	n2m_t *ptr;
@@ -5569,9 +5570,13 @@ load_n2m_table(char *file)
 
 	while (fgets(line, sizeof (line), fp) != NULL) {
 		ln++;
-		if (line[0] == '#') {
+		/* cut off comments starting with '#' */
+		if ((cp = strchr(line, '#')) != NULL)
+			*cp = '\0';
+		/* ignore comment or blank lines */
+		if (is_blank(line))
 			continue;
-		}
+		/* sanity-check */
 		if (sscanf(line, "%1024s%lu", driver, &major) != 2) {
 			err_print(IGNORING_LINE_IN, ln, file);
 			continue;
@@ -5600,7 +5605,7 @@ read_devlinktab_file(void)
 	devlinktab_list_t *entryp;
 	devlinktab_list_t **previous;
 	devlinktab_list_t *save;
-	char line[MAX_DEVLINK_LINE];
+	char line[MAX_DEVLINK_LINE], *cp;
 	char *selector;
 	char *p_link;
 	char *s_link;
@@ -5664,10 +5669,12 @@ read_devlinktab_file(void)
 			continue;
 		}
 
-		if ((line[0] == '#') || (line[0] == '\0')) {
-			/* Ignore comments and blank lines */
+		/* cut off comments starting with '#' */
+		if ((cp = strchr(line, '#')) != NULL)
+			*cp = '\0';
+		/* ignore comment or blank lines */
+		if (is_blank(line))
 			continue;
-		}
 
 		vprint(DEVLINK_MID, "table: %s line %d: '%s'\n",
 			devlinktab_file, devlinktab_line, line);
@@ -7085,8 +7092,14 @@ read_driver_aliases_file(void)
 		devfsadm_exit(1);
 	}
 
-	while (fgets(line, sizeof (line) - 1, afd) != NULL) {
+	while (fgets(line, sizeof (line), afd) != NULL) {
 		ln++;
+		/* cut off comments starting with '#' */
+		if ((cp = strchr(line, '#')) != NULL)
+			*cp = '\0';
+		/* ignore comment or blank lines */
+		if (is_blank(line))
+			continue;
 		cp = line;
 		if (getnexttoken(cp, &cp, &p, &t) == DEVFSADM_FAILURE) {
 			err_print(IGNORING_LINE_IN, ln, ALIASFILE);
@@ -8013,6 +8026,21 @@ build_and_log_event(char *class, char *subclass, char *node_path,
 		log_event(class, subclass, nvl);
 		nvlist_free(nvl);
 	}
+}
+
+/*
+ * is_blank() returns 1 (true) if a line specified is composed of
+ * whitespace characters only. otherwise, it returns 0 (false).
+ *
+ * Note. the argument (line) must be null-terminated.
+ */
+static int
+is_blank(char *line)
+{
+	for (/* nothing */; *line != '\0'; line++)
+		if (!isspace(*line))
+			return (0);
+	return (1);
 }
 
 static int

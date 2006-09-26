@@ -32,6 +32,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <string.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -63,6 +64,8 @@ static int dir_dev_acc(char *, char *, uid_t, gid_t, mode_t, char *line,
 	void (*)());
 static int setdevaccess(char *, uid_t, gid_t, mode_t, void (*)());
 static void logerror(char *);
+
+static int is_blank(char *);
 
 #define	MAX_LINELEN	256
 #define	LOGINDEVPERM	"/etc/logindevperm"
@@ -772,14 +775,21 @@ i_devfs_read_minor_perm(char *drvname, void (*errcb)(minorperm_err_t, int))
 		(*errcb)(MP_FOPEN_ERR, errno);
 		return (NULL);
 	}
-	while (fgets(line, MAX_MINOR_PERM_LINE - 1, pfd) != NULL) {
+	while (fgets(line, MAX_MINOR_PERM_LINE, pfd) != NULL) {
 		ln++;
+		/* cut off comments starting with '#' */
+		if ((cp = strchr(line, '#')) != NULL)
+			*cp = '\0';
+		/* ignore comment or blank lines */
+		if (is_blank(line))
+			continue;
 		mp = (struct mperm *)calloc(1, sizeof (struct mperm));
 		if (mp == NULL) {
 			(*errcb)(MP_ALLOC_ERR, sizeof (struct mperm));
 			continue;
 		}
 		cp = line;
+		/* sanity-check */
 		if (getnexttoken(cp, &cp, &p, &t) == 0) {
 			(*errcb)(MP_IGNORING_LINE_ERR, ln);
 			devfs_free_minor_perm(mp);
@@ -1056,4 +1066,19 @@ devfs_rm_minor_perm(char *drv,
 	void (*errcb)(minorperm_err_t, int))
 {
 	return (i_devfs_update_minor_perm(drv, MODREMMINORPERM, errcb));
+}
+
+/*
+ * is_blank() returns 1 (true) if a line specified is composed of
+ * whitespace characters only. otherwise, it returns 0 (false).
+ *
+ * Note. the argument (line) must be null-terminated.
+ */
+static int
+is_blank(char *line)
+{
+	for (/* nothing */; *line != '\0'; line++)
+		if (!isspace(*line))
+			return (0);
+	return (1);
 }

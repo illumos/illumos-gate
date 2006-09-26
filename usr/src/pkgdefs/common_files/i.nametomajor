@@ -21,81 +21,12 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 PATH=/usr/bin:/usr/sbin:$PATH; export PATH
-
-#
-# add_major - adds new major numbers to system for device drivers on older
-# Solaris systems where add_drv -b was not available or had bugs.  This 
-# code will be removed when doing a server_upgrade on systems with missing
-# or broken add_drv is eventually EOL'd.  DO NOT COPY THIS CODE TO OTHER
-# PACKAGE SCRIPTS!
-#
-add_major()
-{
-	tmpfile=/tmp/nm.$$.tmp
-
-	if [ -f $BASEDIR/etc/rem_name_to_major ]; then
-		rem_file="$BASEDIR/etc/rem_name_to_major"
-	fi
-
-	sort +1 -2n $dest $rem_file | nawk '#
-BEGIN	{oldmajor = -1}
-NR == 1	{n=split(namelist,x)
-	 if (n < 1)
-	    exit(1)
-	 for (i=1; i<=n; i++)
-	    chklist[x[i]]++
-	}
-	{for (name in chklist)
-	 {
-	    if ($1 == name)
-		delete chklist[name]
-	 }
-	 if (($2 - oldmajor) > 1)
-	 {
-	    gap++
-	    gaplist[gap] = oldmajor " " $2;
-	 }
-	 oldmajor = $2;
-	}
-END	{addsize=1
-	 for (name in chklist)
-	    addlist[addsize++] = name
-	
-	 addidx = 1
-	 for (i=1; i<=gap && addidx < addsize; i++)
-	 {
-	    split(gaplist[i],x)
-	    begmajor = x[1]
-	    endmajor = x[2]
-	    for (begmajor++;begmajor < endmajor && addidx < addsize;)
-	    {
-		printf "%s %d\n",addlist[addidx],begmajor
-		addidx++
-		begmajor++
-	    }
-	 }
-	 for (; addidx < addsize; addidx++)
-	 {
-	    oldmajor++
-	    printf "%s %d\n",addlist[addidx],oldmajor
-	 }
-	}
-' namelist="$*" - > $tmpfile
-
-	if [ -s $tmpfile ]; then
-		echo "Adding the following devices to $dest :"
-		cat $tmpfile
-		sort +1 -2n $dest $tmpfile -o $dest
-	fi
-
-	rm -f $tmpfile
-}
 
 #
 # obsolete_sparc - Filter function to remove obsolete SPARC driver entries.
@@ -173,7 +104,7 @@ obsolete_sparc()
 		obs["soc"] = 1;
 		obs["sc_nct"] = 1;
 		obs["tomtppm"] = 1;
-	} !($1 in obs) { print $1, $2 }'
+	} !($1 in obs) { print $0 }'
 }
 
 #
@@ -244,7 +175,7 @@ obsolete_i386()
 		obs["tiqmouse"] = 1;
 		obs["tr"] = 1;
 		obs["trantor"] = 1;
-	} !($1 in obs) { print $1, $2 }'
+	} !($1 in obs) { print $0 }'
 }
 
 #
@@ -256,6 +187,26 @@ obsolete_i386()
 for file in driver_aliases driver_classes minor_perm name_to_major; do
 	cp $BASEDIR/etc/$file $PKGSAV/$file.orig >/dev/null 2>&1
 done
+
+#
+# check if the driver specified is already installed.
+# the second token must be the decimal digit.
+# ignore a comment if exists.
+#
+is_installed ()
+{
+	file=$2
+	nawk -v driver=$1 -v delimiter='#' ' \
+	$1 == driver && $2 ~ /^[0-9][0-9]*$/ \
+		{ found = 1; exit 0 } \
+	$1 == driver \
+		{ num = split($2, n_array, delimiter); \
+			if (num > 1 && n_array[1] ~ /^[0-9][0-9]*$/) \
+				{ found = 1; exit 0 } \
+		} \
+	END { if (!found) exit 1 } ' $file
+	return $?
+}
 
 #
 # Add_drv needs /etc/driver_aliases in order to work properly; if for
@@ -290,52 +241,31 @@ while read src dest; do
 		cp /tmp/onm.$$.tmp $dest
 		rm -f /tmp/onm.$$.tmp
 
-		# PKG_CLIENT_VERSION is provided by PSARC 2001/472 for allowing
-		# package developers to inspect a client's OS VERSION from
-		# within a package procedure script. It returns following
-		# possible OS VERSION #'s(up to S10): 2.3, 2.4, 2.5, 2.5.1, 2.6
-		# 2.7, 8, 9, 10...
-		if [ "$PKG_CLIENT_VERSION" ]; then
-			# remove the leading "2.", if any
-			os_rev=`echo $PKG_CLIENT_VERSION | sed -e 's/^2\.//'`
-		else
-			# fall back to use "uname" and remove the leading "5."
-			os_rev=`uname -r | sed -e 's/^5\.//'`
-		fi
-
+		#
+		# Remove comment and/or blank lines before reading
+		#
+		nawk '$1 !~ /^#|^$/ {print $0}' $src | sed -e 's/#.*$//' | \
 		while read name major; do
 			#
 			# If the driver is already present in name_to_major,
 			# leave the existing number and continue
 			#
-			grep -w $name $dest >/dev/null 2>&1 && continue
-
+			is_installed $name $dest >/dev/null 2>&1 && continue
 			#
 			# Otherwise add the driver to name_to_major using
-			# add_major or add_drv:
+			# add_drv. add_drv produces spurious output even on
+			# success, so save its output in a temporary
+			# file in case an error occurs.
 			#
-			case $os_rev in
-			   "3") add_major $name;;
-			   "4") add_major $name;; 
-			   "5") add_major $name;; 
-			 "5.1") add_major $name;; 
-			     *)
-				#
-				# add_drv produces spurious output even on
-				# success, so save its output in a temporary
-				# file in case an error occurs.
-				#
-				if add_drv -b $BASEDIR $name \
-				    >/tmp/ad.$$.tmp 2>&1; then
-					echo "added $name to $dest"
-				else
-					echo "$PKG: failed to add $name to " \
-					    "$dest:" >& 2
-					cat /tmp/ad.$$.tmp >& 2
-				fi
-				;;
-			esac
-		done < $src
+			if add_drv -b $BASEDIR $name \
+			    >/tmp/ad.$$.tmp 2>&1; then
+				echo "added $name to $dest"
+			else
+				echo "$PKG: failed to add $name to " \
+				    "$dest:" >& 2
+				cat /tmp/ad.$$.tmp >& 2
+			fi
+		done
 		rm -f /tmp/ad.$$.tmp
 	else
 		#
@@ -344,7 +274,5 @@ while read src dest; do
 		#
 		cp -p $src $dest
 	fi
-
-    	sort +1 -2n -o $dest $dest
 done
 exit 0

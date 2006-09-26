@@ -1921,6 +1921,9 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 			kobj_newline(file);
 			break;
 		case POUND:
+			/*
+			 * Skip comments.
+			 */
 			kobj_find_eol(file);
 			break;
 		case EOF:
@@ -2169,7 +2172,9 @@ make_aliases(struct bind **bhash)
 		token = kobj_lex(file, tokbuf, sizeof (tokbuf));
 		switch (token) {
 		case POUND:
-			state = AL_NEW;
+			/*
+			 * Skip comments.
+			 */
 			kobj_find_eol(file);
 			break;
 		case NAME:
@@ -2202,6 +2207,11 @@ make_aliases(struct bind **bhash)
 				    != 0) {
 					cmn_err(CE_WARN, dupwarn, drvbuf);
 				}
+				/*
+				 * copy this token just in case that there
+				 * are multiple names on the same line.
+				 */
+				(void) strcpy(drvbuf, tokbuf);
 				break;
 			}
 			break;
@@ -2288,7 +2298,9 @@ read_binding_file(char *bindfile, struct bind **hashtab,
 
 		switch (token) {
 		case POUND:
-			state = B_NEW;
+			/*
+			 * Skip comments.
+			 */
 			kobj_find_eol(file);
 			break;
 		case NAME:
@@ -2831,6 +2843,9 @@ read_class_file(void)
 
 		switch (token) {
 		case POUND:
+			/*
+			 * Skip comments.
+			 */
 			kobj_find_eol(file);
 			break;
 		case NAME:
@@ -2958,6 +2973,9 @@ open_mach_list(void)
 	while ((token = kobj_lex(file, tokbuf, sizeof (tokbuf))) != EOF) {
 		switch (token) {
 		case POUND:
+			/*
+			 * Skip comments.
+			 */
 			kobj_find_eol(file);
 			break;
 		case NAME:
@@ -3041,6 +3059,9 @@ process_rtc_config_file(void)
 
 		switch (token) {
 		case POUND:
+			/*
+			 * Skip comments.
+			 */
 			kobj_find_eol(file);
 			break;
 		case NAME:

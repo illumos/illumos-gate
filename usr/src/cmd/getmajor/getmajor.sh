@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,10 +20,9 @@
 # CDDL HEADER END
 #
 
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-#	Copyright (c) 1991, Sun Microsystems Inc.
-#
-
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 if [ $# -ne 1 ]
@@ -33,6 +31,8 @@ then
 	exit 2
 fi
 
-exec awk -e "BEGIN	{found = 0}
-/^$1[ 	]/	{print \$2; found = 1; exit 0}
-END	{if (found == 0) exit 1}" </etc/name_to_major
+exec nawk -v a="$1" -v del='#' '$1 !~ /^#|^$/ && $1 == a { \
+    num = split($2, maj, del); \
+    if (num > 1) { print maj[1] } else { print $2 } \
+    found = 1; exit 0 } \
+    END {if (!found) exit 1}' < /etc/name_to_major

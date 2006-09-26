@@ -36,6 +36,7 @@
  * filesystems that are on top of metadevices.
  */
 
+#include <ctype.h>
 #include <meta.h>
 #include <limits.h>
 #include <sys/types.h>
@@ -61,6 +62,23 @@ extern	void	preen_addunit(void *cookie, char *dname, int (*cf)(),
 		    void *datap, uint_t unit);
 extern	int	preen_subdev(char *name, struct dk_cinfo *dkiop, void *dp);
 
+static	int	is_blank(char *);
+
+/*
+ * is_blank() returns 1 (true) if a line specified is composed of
+ * whitespace characters only. otherwise, it returns 0 (false).
+ *
+ * Note. the argument (line) must be null-terminated.
+ */
+static int
+is_blank(char *line)
+{
+	for (/* nothing */; *line != '\0'; line++)
+		if (!isspace(*line))
+			return (0);
+	return (1);
+}
+
 static int
 get_major_from_n2m(char *modname, int *major)
 {
@@ -68,7 +86,7 @@ get_major_from_n2m(char *modname, int *major)
 	char drv[FILENAME_MAX + 1];
 	int entry;
 	int found = 0;
-	char line[MAX_N2M_ALIAS_LINE];
+	char line[MAX_N2M_ALIAS_LINE], *cp;
 	int status = 0;
 
 	if ((fp = fopen(NAME_TO_MAJOR, "r")) == NULL) {
@@ -77,7 +95,13 @@ get_major_from_n2m(char *modname, int *major)
 
 	while ((fgets(line, sizeof (line), fp) != NULL) &&
 						status == 0) {
-
+		/* cut off comments starting with '#' */
+		if ((cp = strchr(line, '#')) != NULL)
+			*cp = '\0';
+		/* ignore comment or blank lines */
+		if (is_blank(line))
+			continue;
+		/* sanity-check */
 		if (sscanf(line, "%" VAL2STR(FILENAME_MAX) "s %d",
 		    drv, &entry) != 2) {
 			status = -1;

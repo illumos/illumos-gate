@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +59,7 @@
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<unistd.h>
+#include	<ctype.h>
 #include	<fcntl.h>
 #include	<sys/types.h>
 #include	<sys/fcntl.h>
@@ -252,6 +252,8 @@ static void *event_read(void *);
 static void task_create(int);
 static void task_init(int);
 
+static int is_blank(char *);
+
 int
 main(int argc, char *argv[])
 {
@@ -342,6 +344,21 @@ main(int argc, char *argv[])
 }
 
 /*
+ * is_blank() returns 1 (true) if a line specified is composed of
+ * whitespace characters only. otherwise, it returns 0 (false).
+ *
+ * Note. the argument (line) must be null-terminated.
+ */
+static int
+is_blank(char *line)
+{
+	for (/* nothing */; *line != '\0'; line++)
+		if (!isspace(*line))
+			return (0);
+	return (1);
+}
+
+/*
  * alias handling
  * we need to be able to find the mapping between certain
  * device names and the appropriate driver.  This code
@@ -361,14 +378,22 @@ static void
 init_aliases(char *path)
 {
 	FILE *file;
-	char name[128], alias[128];
+	char name[128], alias[128], line[256], *cp;
 	int i, len;
 	struct driver_aliases *nalias;
 
 	file = fopen(path, "r");
 	if (file != NULL) {
-		while (fscanf(file, "%s %[^\n]\n", name, alias)
-							!= EOF) {
+		while (fgets(line, sizeof (line), file) != NULL) {
+			/* cut off comments starting with '#' */
+			if ((cp = strchr(line, '#')) != NULL)
+				*cp = '\0';
+			/* ignore comment or blank lines */
+			if (is_blank(line))
+				continue;
+			/* sanity-check */
+			if (sscanf(line, "%s %[^\n]\n", name, alias) != 2)
+				continue;
 			if (alias[0] == '"') {
 				len = strlen(alias);
 				for (i = 1; i < len; i++)

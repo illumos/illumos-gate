@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,11 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright (c) 1991 by Sun Microsystems, Inc.
+
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PATH=/sbin:/usr/sbin:/usr/bin:/etc
 export PATH
@@ -168,7 +167,11 @@ cat <<\!EOD >$GENSED
 # "major number" field into its corresponding 'name'.  This is so that
 # the difference in major-numbers among different machines can be hidden.
 #
-grep -v '^#' /etc/name_to_major | sed -e '1,$s-^\([^ 	]*\)[ 	][ 	]*\([^ 	][^ 	]*\)$-/^\2	/s/^\2	/\1	/-' >>$GENSED
+nawk -v del='#' '$1 !~ /^#|^$/ { \
+    num = split($2, maj, del); \
+    if (num > 1) { printf("/^%s\t/ s/^%s\t/%s\t/\n", maj[1], maj[1], $1) } \
+    else { printf("/^%s\t/ s/^%s\t/%s\t/\n", $2, $2, $1) } \
+} ' /etc/name_to_major >> $GENSED
 
 #
 #----------------------------------------------------------------------

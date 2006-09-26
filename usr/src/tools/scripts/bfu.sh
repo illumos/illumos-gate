@@ -3690,7 +3690,8 @@ then
 	# Load modules and drivers here not to reload them when you access
 	# /devices or its subdirectories later.
 	#
-	cut -d' ' -f1 /etc/name_to_major | while read driver
+	nawk '$1 !~ /^#|^$/ {print $1}' /etc/name_to_major | \
+	sed -e 's/#.*$//' | while read driver
 	do
 		modload -p drv/${driver} >/dev/null 2>&1
 	done

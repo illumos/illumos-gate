@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,6 +27,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <sys/sysmacros.h>
 #include <libintl.h>
@@ -49,6 +49,8 @@ static char *tmphold;		/* temperary file for updating */
 static int get_cached_n_to_m_file(char *filename, char ***cache);
 static int get_name_to_major_entry(int *major_no, char *driver_name,
     char *file_name);
+
+static int is_blank(char *);
 
 /*ARGSUSED*/
 void
@@ -207,7 +209,7 @@ delete_entry(
 	int		status = NOERR;
 	int		drvr_found = 0;
 	boolean_t 	nomatch = B_TRUE;
-	char		*newfile, *tptr;
+	char		*newfile, *tptr, *cp, *dup;
 	char		line[MAX_DBFILE_ENTRY], drv[FILENAME_MAX + 1];
 	FILE		*fp, *newfp;
 	struct group	*sysgrp;
@@ -260,20 +262,36 @@ delete_entry(
 	}
 
 	while ((fgets(line, sizeof (line), fp) != NULL) && status == NOERR) {
-		if (*line == '#' || *line == '\n') {
-			if ((fputs(line, newfp)) == EOF) {
+		/* copy the whole line into dup */
+		if ((dup = strdup(line)) == NULL) {
+			perror(NULL);
+			(void) fprintf(stderr, gettext(ERR_NO_MEM));
+			status = ERROR;
+			break;
+		}
+		/* cut off comments starting with '#' */
+		if ((cp = strchr(dup, '#')) != NULL)
+			*cp = '\0';
+		/* ignore comment or blank lines */
+		if (is_blank(dup)) {
+			if (fputs(line, newfp) == EOF) {
 				(void) fprintf(stderr, gettext(ERR_UPDATE),
 				    oldfile);
 				status = ERROR;
 			}
+			free(dup);
 			continue;
 		}
-		if (sscanf(line, "%s", drv) != 1) {
+
+		/* get the driver name */
+		if (sscanf(dup, "%s", drv) != 1) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    oldfile, line);
 			status = ERROR;
+			free(dup);
+			break;
 		}
-
+		free(dup);
 
 		for (i = strcspn(drv, marker); i < FILENAME_MAX; i++) {
 			drv[i] =  '\0';
@@ -415,7 +433,7 @@ get_cached_n_to_m_file(char *filename, char ***cache)
 	FILE *fp;
 	char drv[FILENAME_MAX + 1];
 	char entry[FILENAME_MAX + 1];
-	char line[MAX_N2M_ALIAS_LINE];
+	char line[MAX_N2M_ALIAS_LINE], *cp;
 	int maj;
 	int size = 0;
 
@@ -440,6 +458,13 @@ get_cached_n_to_m_file(char *filename, char ***cache)
 		}
 
 		while (fgets(line, sizeof (line), fp) != NULL) {
+			/* cut off comments starting with '#' */
+			if ((cp = strchr(line, '#')) != NULL)
+				*cp = '\0';
+			/* ignore comment or blank lines */
+			if (is_blank(line))
+				continue;
+			/* sanity-check */
 			if (sscanf(line, "%s%s", drv, entry) != 2) {
 				(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 				    filename, line);
@@ -474,6 +499,13 @@ get_cached_n_to_m_file(char *filename, char ***cache)
 		 * number
 		 */
 		while (fgets(line, sizeof (line), fp) != NULL) {
+			/* cut off comments starting with '#' */
+			if ((cp = strchr(line, '#')) != NULL)
+				*cp = '\0';
+			/* ignore comment or blank lines */
+			if (is_blank(line))
+				continue;
+			/* sanity-check */
 			if (sscanf(line, "%s%s", drv, entry) != 2) {
 				(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 				    filename, line);
@@ -580,7 +612,6 @@ get_name_to_major_entry(int *major_no, char *driver_name, char *file_name)
 	}
 	return (ret);
 }
-
 
 /*
  * given pointer to member n in space separated list, return pointer
@@ -1065,9 +1096,8 @@ update_minor_entry(char *driver_name, char *perm_list)
 	FILE *newfp;
 	struct group *sysgrp;
 	int match = 0;
-	char line[MAX_DBFILE_ENTRY];
-	char drv[FILENAME_MAX + 1];
-	char *drv_minor, new_minor[FILENAME_MAX + 1];
+	char line[MAX_DBFILE_ENTRY], *cp, *dup;
+	char drv[FILENAME_MAX + 1], *drv_minor;
 	char minor[FILENAME_MAX + 1], perm[OPT_LEN + 1];
 	char own[OPT_LEN + 1], grp[OPT_LEN + 1];
 	int status = NOERR, i;
@@ -1113,43 +1143,75 @@ update_minor_entry(char *driver_name, char *perm_list)
 		status = ERROR;
 	}
 
-	(void) sscanf(perm_list, "%s%s%s%s", minor, perm, own, grp);
-
 	while ((fgets(line, sizeof (line), fp) != NULL) && status == NOERR) {
-		if (*line == '#' || *line == '\n') {
-			if ((fputs(line, newfp)) == EOF) {
+		/* copy the whole line into dup */
+		if ((dup = strdup(line)) == NULL) {
+			perror(NULL);
+			(void) fprintf(stderr, gettext(ERR_NO_MEM));
+			status = ERROR;
+			break;
+		}
+		/* cut off comments starting with '#' */
+		if ((cp = strchr(dup, '#')) != NULL)
+			*cp = '\0';
+		/* ignore comment or blank lines */
+		if (is_blank(dup)) {
+			if (fputs(line, newfp) == EOF) {
 				(void) fprintf(stderr, gettext(ERR_UPDATE),
 				    minor_perm);
 				status = ERROR;
 			}
+			free(dup);
 			continue;
 		}
 
-		if (sscanf(line, "%s", drv) != 1) {
+		/* get the driver name */
+		if (sscanf(dup, "%s", drv) != 1) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    minor_perm, line);
 			status = ERROR;
-		}
-		for (i = strcspn(drv, ":"); i < FILENAME_MAX; i++) {
-			drv[i] =  '\0';
+			free(dup);
+			break;
 		}
 
-		if (sscanf(line, "%s", new_minor) != 1) {
+		/*
+		 * get the minor name; place the NULL character at the
+		 * end of the driver name, then make the drv_minor
+		 * point to the first character of the minor name.
+		 * the line missing ':' must be treated as a broken one.
+		 */
+		i = strcspn(drv, ":");
+		if (i == strlen(drv)) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    minor_perm, line);
 			status = ERROR;
+			free(dup);
+			break;
 		}
+		drv[i] =  '\0';
+		drv_minor = &drv[strlen(drv) + 1];
 
-		drv_minor = &new_minor[strlen(drv) + 1];
-
-		/* replace it */
+		/*
+		 * compare both of the driver name and the minor name.
+		 * then the new line should be written to the file if
+		 * both of them match
+		 */
 		if ((strcmp(drv, driver_name) == 0) &&
 		    (strcmp(minor, drv_minor) == 0)) {
-			(void) sprintf(line, "%s:%s %s %s %s\n",
-			    drv, minor, perm, own, grp);
+			/* if it has a comment, keep it */
+			if (cp != NULL) {
+				cp++; /* skip a terminator */
+				(void) sprintf(line, "%s:%s %s %s %s #%s\n",
+				    drv, minor, perm, own, grp, cp);
+			} else {
+				(void) sprintf(line, "%s:%s %s %s %s\n",
+				    drv, minor, perm, own, grp);
+			}
 			match = 1;
 		}
+		free(dup);
 
+		/* update the file */
 		if ((fputs(line, newfp)) == EOF) {
 			(void) fprintf(stderr, gettext(ERR_UPDATE),
 			    minor_perm);
@@ -1229,7 +1291,7 @@ list_entry(
 {
 	FILE	*fp;
 	int	i;
-	char	line[MAX_DBFILE_ENTRY];
+	char	line[MAX_DBFILE_ENTRY], *cp;
 	char	drv[FILENAME_MAX + 1];
 
 	if ((fp = fopen(oldfile, "r")) == NULL) {
@@ -1240,10 +1302,13 @@ list_entry(
 	}
 
 	while (fgets(line, sizeof (line), fp) != NULL) {
-		if (*line == '#' || *line == '\n') {
+		/* cut off comments starting with '#' */
+		if ((cp = strchr(line, '#')) != NULL)
+			*cp = '\0';
+		/* ignore comment or blank lines */
+		if (is_blank(line))
 			continue;
-		}
-
+		/* sanity-check */
 		if (sscanf(line, "%s", drv) != 1) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    oldfile, line);
@@ -1261,6 +1326,25 @@ list_entry(
 	(void) fclose(fp);
 }
 
+static boolean_t
+is_token(char *tok)
+{
+	/*
+	 * Check the token here. According to IEEE1275 Open Firmware Boot
+	 * Standard, the name is composed of 1 to 31 letters,
+	 * digits and punctuation characters from the set ",._+-", and
+	 * uppercase and lowercase characters are considered distinct.
+	 * (ie. token := [a-zA-Z0-9,._+-]+, length(token) <= 31)
+	 * However, since either the definition of driver or aliase names is
+	 * not known well, only '#' is avoided explicitly. (the kernel lexical
+	 * analyzer treats it as a start of a comment)
+	 */
+	for (/* nothing */; *tok != '\0'; tok++)
+		if (*tok == '#' || iscntrl(*tok))
+			return (B_FALSE);
+
+	return (B_TRUE);
+}
 
 /*
  * check each entry in perm_list for:
@@ -1326,7 +1410,6 @@ check_perm_opts(char *perm_list)
 			(void) fprintf(stderr, gettext(ERR_BAD_MODE), perm);
 			status = ERROR;
 		}
-
 	}
 
 	free(one_entry);
@@ -1384,6 +1467,13 @@ aliases_unique(char *aliases)
 			return (ERROR);
 		}
 
+		if (!is_token(one_entry)) {
+			(void) fprintf(stderr, gettext(ERR_BAD_TOK),
+			    "-i", one_entry);
+			free(one_entry);
+			return (ERROR);
+		}
+
 	} while (*current_head != '\0');
 
 	free(one_entry);
@@ -1409,7 +1499,7 @@ unique_drv_alias(char *drv_alias)
 {
 	FILE *fp;
 	char drv[FILENAME_MAX + 1];
-	char line[MAX_N2M_ALIAS_LINE + 1];
+	char line[MAX_N2M_ALIAS_LINE + 1], *cp;
 	char alias[FILENAME_MAX + 1];
 	int status = NOERR;
 
@@ -1418,6 +1508,13 @@ unique_drv_alias(char *drv_alias)
 	if (fp != NULL) {
 		while ((fgets(line, sizeof (line), fp) != 0) &&
 		    status != ERROR) {
+			/* cut off comments starting with '#' */
+			if ((cp = strchr(line, '#')) != NULL)
+				*cp = '\0';
+			/* ignore comment or blank lines */
+			if (is_blank(line))
+				continue;
+			/* sanity-check */
 			if (sscanf(line, "%s %s", drv, alias) != 2)
 				(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 				    driver_aliases, line);
@@ -1684,7 +1781,7 @@ int
 fill_n2m_array(char *filename, char **array, int *nelems)
 {
 	FILE *fp;
-	char line[MAX_N2M_ALIAS_LINE + 1];
+	char line[MAX_N2M_ALIAS_LINE + 1], *cp;
 	char drv[FILENAME_MAX + 1];
 	u_longlong_t dnum;
 	major_t drv_majnum;
@@ -1700,7 +1797,13 @@ fill_n2m_array(char *filename, char **array, int *nelems)
 	}
 
 	while (fgets(line, sizeof (line), fp) != 0) {
-
+		/* cut off comments starting with '#' */
+		if ((cp = strchr(line, '#')) != NULL)
+			*cp = '\0';
+		/* ignore comment or blank lines */
+		if (is_blank(line))
+			continue;
+		/* sanity-check */
 		if (sscanf(line, "%s %llu", drv, &dnum) != 2) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    filename, line);
@@ -1748,4 +1851,19 @@ do_the_update(char *driver_name, char *major_number)
 {
 	return (append_to_file(driver_name, major_number, name_to_major,
 	    ' ', " "));
+}
+
+/*
+ * is_blank() returns 1 (true) if a line specified is composed of
+ * whitespace characters only. otherwise, it returns 0 (false).
+ *
+ * Note. the argument (line) must be null-terminated.
+ */
+static int
+is_blank(char *line)
+{
+	for (/* nothing */; *line != '\0'; line++)
+		if (!isspace(*line))
+			return (0);
+	return (1);
 }

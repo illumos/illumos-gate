@@ -199,6 +199,7 @@ static void set_depth(void);
 static void get_devices(void);
 static void get_dev_links(void);
 static void call_device_rules(void);
+static int is_blank(char *);
 
 /*
  * The command-line arguments to ucblinks are:
@@ -381,8 +382,8 @@ static void
 get_major_nums(void)
 {
 	FILE *fp;
-	char line[80];
-	char *name, *maj, *end;
+	char line[FILENAME_MAX*2 + 1];	/* use the same size as add_drv does */
+	char *name, *maj, *end, *cp;
 	int majnum;
 	struct drvinfo *drp;
 
@@ -394,18 +395,18 @@ get_major_nums(void)
 	}
 
 	while (fgets(line, sizeof (line), fp) != NULL) {
-		name = strtok(line, " \t");
-		if (name == NULL)
+		/* cut off comments starting with '#' */
+		if ((cp = strchr(line, '#')) != NULL)
+			*cp = '\0';
+		/* ignore comment or blank lines */
+		if (is_blank(line))
 			continue;
-
-		maj = strtok(NULL, "\n");
-		if (maj == NULL)
+		name = strtok(line, " \t"); /* must not be NULL */
+		if ((maj = strtok(NULL, "\n")) == NULL)
 			continue;
-
 		majnum = strtol(maj, &end, 10);
 		if (end == maj)
 			continue;
-
 		/*
 		 * Compare against our list and set the major
 		 * number it it's a name we care about.
@@ -1483,4 +1484,19 @@ rule_zs(struct devices_ent *dep)
 	}
 
 	(void) closedir(dirp);
+}
+
+/*
+ * is_blank() returns 1 (true) if a line specified is composed of
+ * whitespace characters only. otherwise, it returns 0 (false).
+ *
+ * Note. the argument (line) must be null-terminated.
+ */
+static int
+is_blank(char *line)
+{
+	for (/* nothing */; *line != '\0'; line++)
+		if (!isspace(*line))
+			return (0);
+	return (1);
 }
