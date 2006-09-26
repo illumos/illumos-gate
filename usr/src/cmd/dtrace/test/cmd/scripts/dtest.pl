@@ -32,9 +32,11 @@ use File::Find;
 use File::Basename;
 use Getopt::Std;
 use Cwd;
+use Cwd 'abs_path';
 
 $PNAME = $0;
 $PNAME =~ s:.*/::;
+$OPTSTR = 'abd:ghi:lqsux:';
 $USAGE = "Usage: $PNAME [-abghlqsu] [-d dir] [-i isa] "
     . "[-x opt[=arg]] [file | dir ...]\n";
 ($MACH = `uname -p`) =~ s/\W*\n//;
@@ -45,6 +47,7 @@ $dtrace_path = '/usr/sbin/dtrace';
 $ksh_path = '/usr/bin/ksh';
 
 @files = ();
+%exceptions = ();
 $errs = 0;
 $bypassed = 0;
 
@@ -80,6 +83,8 @@ sub usage
 	print "\t -q  set quiet mode (only report errors and summary)\n";
 	print "\t -s  save results files even for tests that pass\n";
 	print "\t -x  pass corresponding -x argument to dtrace(1M)\n";
+	print "\n\tUse \"-i java\" to run tests using the ";
+	print "Java DTrace API.\n";
 	exit(2);
 }
 
@@ -159,7 +164,48 @@ sub logmsg
 	print LOG $msg if ($opt_l);
 }
 
-die $USAGE unless (getopts('abd:ghi:lqsux:'));
+# Trim leading and trailing whitespace
+sub trim {
+	my($s) = @_;
+
+	$s =~ s/^\s*//;
+	$s =~ s/\s*$//;
+	return $s;
+}
+
+# Loads exception set of skipped tests
+sub load_exceptions {
+	my($listfile) = @_;
+	my($line) = "";
+
+	exit(123) unless open(STDIN, "<$listfile");
+	while (<STDIN>) {
+		chomp;
+		$line = $_;
+		# line is non-empty and not a comment
+		if ((length($line) > 0) && ($line =~ /^\s*[^\s#]/ )) {
+			$exceptions{trim($line)} = 1;
+		}
+	}
+	return 0;
+}
+
+# Return 1 if file name found in exception set, 0 otherwise
+sub is_exception {
+	my($file) = @_;
+	my($i) = -1;
+
+	# hash absolute pathname after $dt_tst/
+	$file = abs_path($file);
+	$i = index($file, $dt_tst);
+	if ($i == 0) {
+		$file = substr($file, length($dt_tst) + 1);
+		return $exceptions{$file};
+	}
+	return 0;
+}
+
+die $USAGE unless (getopts($OPTSTR));
 usage() if ($opt_h);
 
 foreach $arg (@ARGV) {
@@ -172,8 +218,10 @@ foreach $arg (@ARGV) {
 	}
 }
 
-$defdir = -d '/opt/SUNWdtrt/tst' ? '/opt/SUNWdtrt/tst' : '.';
-$bindir = -d '/opt/SUNWdtrt/bin' ? '/opt/SUNWdtrt/bin' : '.';
+$dt_tst = '/opt/SUNWdtrt/tst';
+$dt_bin = '/opt/SUNWdtrt/bin';
+$defdir = -d $dt_tst ? $dt_tst : '.';
+$bindir = -d $dt_bin ? $dt_bin : '.';
 
 find(\&wanted, "$defdir/common") if (scalar(@ARGV) == 0);
 find(\&wanted, "$defdir/$MACH") if (scalar(@ARGV) == 0);
@@ -190,9 +238,16 @@ if ($opt_d) {
 }
 
 if ($opt_i) {
-	$dtrace_path = "/usr/sbin/$opt_i/dtrace";
-	die "$PNAME: dtrace(1M) for ISA $opt_i not found\n"
-	    unless (-x "$dtrace_path");
+	if ($opt_i eq "java") {
+		$dtrace_path = $bindir . "/jdtrace";
+		die "$PNAME: jdtrace not found\n"
+		    unless (-x "$dtrace_path");
+		load_exceptions($bindir . "/exception.lst");
+	} else {
+		$dtrace_path = "/usr/sbin/$opt_i/dtrace";
+		die "$PNAME: dtrace(1M) for ISA $opt_i not found\n"
+		    unless (-x "$dtrace_path");
+	}
 }
 
 if ($opt_x) {
@@ -372,6 +427,13 @@ foreach $file (sort @files) {
 		next;
 	}
 
+	if ($opt_i eq "java") {
+		if (is_exception("$dir/$name")) {
+			$bypassed++;
+			next;
+		}
+	}
+
 	if (!$isksh && -x $exe) {
 		if (($exe_pid = fork()) == -1) {
 			errmsg("ERROR: failed to fork to run $exe: $!\n");
@@ -410,7 +472,7 @@ foreach $file (sort @files) {
 
 		if ($isksh) {
 			exit(123) unless open(STDIN, "<$name");
-			exec($ksh_path);
+			exec("$ksh_path /dev/stdin $dtrace_path");
 		} elsif (-x $name) {
 		        warn "ERROR: $name is executable\n";
 			exit(1);

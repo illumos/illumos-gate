@@ -27,7 +27,7 @@
 
 script()
 {
-	dtrace -s /dev/stdin -x bufpolicy=$1 $1 <<EOF
+	$dtrace -s /dev/stdin -x bufpolicy=$1 $1 <<EOF
 
 	#pragma D option quiet
 	#pragma D option statusrate=1hz
@@ -69,6 +69,13 @@ script()
 	}
 EOF
 }
+
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
 
 for policy in "fill ring switch"; do
 	script $policy

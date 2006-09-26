@@ -37,7 +37,12 @@
 #
 ##
 
-dtrace=/usr/sbin/dtrace
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
 
 $dtrace -qwP syscall'{chill(15); printf("Done chilling"); exit(0);}'
 status=$?

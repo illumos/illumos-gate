@@ -44,10 +44,6 @@ BEGIN
 	printf("strrchr(\"%s\", '%c') = \"%s\"\n", strchr(str, c), c,
 	    strrchr(strchr(str, c), c));
 
-	c = '\0';
-	printf("strchr(\"%s\", '%c') = \"%s\"\n", str, c, strchr(str, c));
-	printf("strrchr(\"%s\", '%c') = \"%s\"\n", str, c, strrchr(str, c));
-
 	this->success = 1;
 }
 

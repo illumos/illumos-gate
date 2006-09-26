@@ -29,6 +29,13 @@
 #pragma D option switchrate=100hz
 
 sched:::on-cpu
+/stackdepth > 0/
 {
-	exit(stackdepth == 0);
+	exit(0);
+}
+
+tick-1s
+/i++ == 3/
+{
+	exit(1);
 }

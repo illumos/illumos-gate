@@ -307,10 +307,5 @@ BEGIN
 	printa("%8d %8@d %8@d\n", @agg999, @agg246);
 	printf("\n");
 
-	/*
-	 * freopen() /dev/null so we don't see all of the non-printed
-	 * aggregations at the end of the output.
-	 */
-	freopen("/dev/null");
 	exit(0);
 }

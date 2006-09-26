@@ -34,7 +34,7 @@ script()
 	# Nauseatingly, the #defines below must be in the 0th column to
 	# satisfy the ancient cpp that -C defaults to.
 	#
-	dtrace -C -s /dev/stdin <<EOF
+	$dtrace -C -s /dev/stdin <<EOF
 #define	PROF1		profile:::profile-4000hz
 #define	PROF4		PROF1, PROF1, PROF1, PROF1
 #define	PROF16		PROF4, PROF4, PROF4, PROF4
@@ -67,6 +67,12 @@ script()
 EOF
 }
 
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
 let i=0
 
 while [ "$i" -lt 20 ]; do

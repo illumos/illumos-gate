@@ -29,6 +29,12 @@
 # <unistd.h>. This tests that dtrace -h will produce a header file which can
 # be used on a system where DTrace is not present.
 
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
 DIR=/var/tmp/dtest.$$
 
 mkdir $DIR
@@ -42,7 +48,7 @@ provider test_prov {
 };
 EOF
 
-dtrace -h -s prov.d
+$dtrace -h -s prov.d
 if [ $? -ne 0 ]; then
 	print -u2 "failed to generate header file"
 	exit 1

@@ -29,6 +29,12 @@
 # files containing the probes have already been modified. This tests that
 # case by generating the DOF object, removing it, and building it again.
 
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
 DIR=/var/tmp/dtest.$$
 
 mkdir $DIR
@@ -66,13 +72,13 @@ if [ $? -ne 0 ]; then
 	print -u2 "failed to compile test.c"
 	exit 1
 fi
-dtrace -G -32 -s prov.d test.o
+$dtrace -G -32 -s prov.d test.o
 if [ $? -ne 0 ]; then
 	print -u2 "failed to create initial DOF"
 	exit 1
 fi
 rm -f prov.o
-dtrace -G -32 -s prov.d test.o
+$dtrace -G -32 -s prov.d test.o
 if [ $? -ne 0 ]; then
 	print -u2 "failed to create final DOF"
 	exit 1
@@ -85,7 +91,7 @@ fi
 
 script()
 {
-	dtrace -c ./test -qs /dev/stdin <<EOF
+	$dtrace -c ./test -qs /dev/stdin <<EOF
 	test_prov\$target:::
 	{
 		printf("%s:%s:%s\n", probemod, probefunc, probename);

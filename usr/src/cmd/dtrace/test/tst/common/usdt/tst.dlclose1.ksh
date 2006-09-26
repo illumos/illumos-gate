@@ -26,6 +26,12 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
 DIR=/var/tmp/dtest.$$
 
 mkdir $DIR
@@ -48,10 +54,10 @@ livelib.o: livelib.c prov.h
 	cc -c livelib.c
 
 prov.o: livelib.o prov.d
-	dtrace -G -s prov.d livelib.o
+	$dtrace -G -s prov.d livelib.o
 
 prov.h: prov.d
-	dtrace -h -s prov.d
+	$dtrace -h -s prov.d
 
 
 deadlib.so: deadlib.o
@@ -121,11 +127,11 @@ if [ $? -ne 0 ]; then
 fi
 
 script() {
-	dtrace -w -c ./main -qs /dev/stdin <<EOF
+	$dtrace -w -c ./main -qs /dev/stdin <<EOF
 	syscall::pause:entry
 	/pid == \$target/
 	{
-		system("dtrace -l -P test_prov*");
+		system("$dtrace -l -P test_prov*");
 		system("kill %d", \$target);
 		exit(0);
 	}

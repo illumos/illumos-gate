@@ -25,7 +25,22 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-dtrace -F -s /dev/stdin -c '/usr/ccs/bin/nm /bin/ls' stat <<EOF
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
+
+#
+# /usr/ccs/bin/nm execs a 64-bit version of itself. DTrace uses libproc
+# (which uses /proc) to find out when the traced process exits, but a
+# 32-bit process can't examine a 64-bit one with libproc. The
+# LD_NOEXEC_64 variable prevents nm from re-execing itself.
+#
+LD_NOEXEC_64=tomeeisrad $dtrace -F -s /dev/stdin -c \
+    '/usr/ccs/bin/nm /bin/ls' stat <<EOF
+
 pid\$target::\$1:entry
 {
 	self->start = vtimestamp;

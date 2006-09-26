@@ -25,7 +25,14 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-dtrace -c date -s /dev/stdin <<EOF
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
+
+$dtrace -c date -s /dev/stdin <<EOF
 plockstat\$target::mutex_lock_impl:,
 pid\$target::mutex_lock_impl:
 {}

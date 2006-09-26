@@ -27,7 +27,6 @@
 
 include $(SRC)/Makefile.master
 
-PKGARCHIVE = $(CODEMGR_WS)/pkgarchive/$(MACH)
 PACKAGE :sh= basename `pwd`
 ROOTOPTPKG = $(ROOT)/opt/$(PACKAGE)
 PSTAMP :sh= echo "`echo \$LOGNAME`:`date +%Y-%m-%d`:`basename \$CODEMGR_WS`"

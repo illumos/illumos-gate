@@ -58,8 +58,13 @@ sleeper()
 	done
 }
 
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
 badexec=/tmp/execfail.ENOENT.ksh.$$
-dtrace=/usr/sbin/dtrace
+dtrace=$1
 
 cat > $badexec <<EOF
 #!/this_is_a_bogus_interpreter

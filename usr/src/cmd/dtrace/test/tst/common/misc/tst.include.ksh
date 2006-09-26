@@ -25,6 +25,12 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
 CC=/usr/sfw/bin/gcc
 CFLAGS=
 
@@ -42,7 +48,7 @@ main()
 {}
 EOF
 	if $CC $CFLAGS -o $cofile $cfile >/dev/null 2>&1; then
-		dtrace -xerrtags -C -s /dev/stdin \
+		$dtrace -xerrtags -C -s /dev/stdin \
 		    >/dev/null 2>$errfile <<EOF
 #include <sys/$file>
 BEGIN

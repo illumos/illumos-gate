@@ -25,6 +25,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
+include $(SRC)/Makefile.master
 include ../Makefile.com
 
 fasttrap/tst.fasttrap.exe := LIBS += -ldtrace
@@ -51,3 +52,6 @@ usdt/tst.argmap.exe: usdt/tst.argmap.o usdt/argmap.o
 usdt/argmap.o: usdt/argmap.d usdt/tst.argmap.o
 	/usr/sbin/dtrace -G -32 -o usdt/argmap.o -s usdt/argmap.d \
 		usdt/tst.argmap.o
+
+SUBDIRS = java_api
+include ../../Makefile.subdirs

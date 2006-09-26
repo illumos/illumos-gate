@@ -27,7 +27,7 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 script() {
-	dtrace -c 'cat shajirosan' -qs /dev/stdin <<EOF
+	$dtrace -c 'cat shajirosan' -qs /dev/stdin <<EOF
 	syscall::open*:entry
 	/pid == \$target/
 	{
@@ -61,6 +61,13 @@ script() {
 	}
 EOF
 }
+
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
 
 script
 status=$?

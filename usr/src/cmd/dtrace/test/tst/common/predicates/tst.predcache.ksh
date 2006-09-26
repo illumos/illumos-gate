@@ -93,8 +93,13 @@ script2()
 EOF
 }
 
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
 ppid=$$
-dtrace=/usr/sbin/dtrace
+dtrace=$1
 
 unload
 script1 &

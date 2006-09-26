@@ -36,7 +36,14 @@
 # SECTION: Errtags/D_MACRO_OFLOW
 #
 
-/usr/sbin/dtrace -n 'BEGIN { $1; }' 0x12345678123456781
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
+
+$dtrace -n 'BEGIN { $1; }' 0x12345678123456781
 status=$?
 
 if [ "$status" -ne  0 ]; then

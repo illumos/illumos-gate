@@ -61,10 +61,15 @@ script()
 EOF
 }
 
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
 tempfile=/tmp/test.h
 echo "#define VALUE 1520" > $tempfile
 
-dtrace=/usr/sbin/dtrace
+dtrace=$1
 script
 status=$?
 

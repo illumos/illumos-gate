@@ -25,6 +25,12 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
 DIR=/var/tmp/dtest.$$
 
 mkdir $DIR
@@ -36,7 +42,7 @@ provider test_prov {
 };
 EOF
 
-dtrace -h -s prov.d
+$dtrace -h -s prov.d
 if [ $? -ne 0 ]; then
 	print -u2 "failed to generate header file"
 	exit 1
@@ -60,7 +66,7 @@ if [ $? -ne 0 ]; then
 	print -u2 "failed to compile test.c"
 	exit 1
 fi
-dtrace -G -s prov.d test.o
+$dtrace -G -s prov.d test.o
 if [ $? -ne 0 ]; then
 	print -u2 "failed to create DOF"
 	exit 1
@@ -73,7 +79,7 @@ fi
 
 script()
 {
-	dtrace -c ./test -qs /dev/stdin <<EOF
+	$dtrace -c ./test -qs /dev/stdin <<EOF
 	test_prov\$target:::
 	{
 		printf("%s:%s:%s\n", probemod, probefunc, probename);

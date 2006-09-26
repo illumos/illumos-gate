@@ -174,6 +174,10 @@ f none opt/SUNWdtrt/tst/common/aggs/tst.quantround.d.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/aggs/tst.quantzero.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/aggs/tst.quantzero.d.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/aggs/tst.signature.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/aggs/tst.signedkeys.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/aggs/tst.signedkeys.d.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/aggs/tst.signedkeyspos.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/aggs/tst.signedkeyspos.d.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/aggs/tst.subr.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/aggs/tst.sum.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/aggs/tst.sum.d.out 0444 root bin
@@ -183,6 +187,8 @@ f none opt/SUNWdtrt/tst/common/aggs/tst.trunc0.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/aggs/tst.trunc0.d.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/aggs/tst.truncquant.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/aggs/tst.truncquant.d.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/aggs/tst.valsortkeypos.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/aggs/tst.valsortkeypos.d.out 0444 root bin
 d none opt/SUNWdtrt/tst/common/arithmetic 0755 root bin
 f none opt/SUNWdtrt/tst/common/arithmetic/err.D_DIV_ZERO.divby0.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/arithmetic/err.D_DIV_ZERO.divby0_1.d 0444 root bin
@@ -898,6 +904,9 @@ f none opt/SUNWdtrt/tst/common/profile-n/tst.profileusec.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/profile-n/tst.profileusec.d.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/profile-n/tst.sym.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/profile-n/tst.ufunc.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/profile-n/tst.ufuncsort.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/profile-n/tst.ufuncsort.exe 0555 root bin
+f none opt/SUNWdtrt/tst/common/profile-n/tst.ufuncsort.ksh.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/profile-n/tst.umod.ksh 0444 root bin
 f none opt/SUNWdtrt/tst/common/profile-n/tst.usym.ksh 0444 root bin
 d none opt/SUNWdtrt/tst/common/providers 0755 root bin
@@ -1333,3 +1342,37 @@ f none opt/SUNWdtrt/tst/common/vars/tst.uid.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/vars/tst.walltimestamp.d 0444 root bin
 d none opt/SUNWdtrt/tst/common/version 0755 root bin
 f none opt/SUNWdtrt/tst/common/version/tst.1.0.d 0444 root bin
+
+# Java DTrace API
+d none opt/SUNWdtrt/lib 0755 root bin
+d none opt/SUNWdtrt/lib/java 0755 root bin
+f none opt/SUNWdtrt/lib/java/jdtrace.jar 0644 root bin
+f none opt/SUNWdtrt/bin/jdtrace 0555 root bin
+f none opt/SUNWdtrt/bin/exception.lst 0444 root bin
+d none opt/SUNWdtrt/tst/common/java_api 0755 root bin
+f none opt/SUNWdtrt/tst/common/java_api/test.jar 0644 root bin
+f none opt/SUNWdtrt/tst/common/java_api/bitarch.exe 0555 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.ProbeDescription.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.ProbeDescription.ksh.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.Bean.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.Bean.ksh.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.StopLock.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.StopLock.ksh.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.FunctionLookup.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.FunctionLookup.exe 0555 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.FunctionLookup.ksh.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.Close.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.Close.ksh.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.Abort.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.Abort.ksh.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.MultiAggPrinta.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.MultiAggPrinta.ksh.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.printa.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.printa.d.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.ProbeData.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.ProbeData.exe 0555 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.ProbeData.ksh.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.StateMachine.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.StateMachine.ksh.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.Enable.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/java_api/tst.Enable.ksh.out 0444 root bin

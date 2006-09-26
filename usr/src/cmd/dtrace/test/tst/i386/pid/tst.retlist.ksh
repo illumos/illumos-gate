@@ -31,7 +31,14 @@
 ./tst.retlist.exe&
 PID=$!
 
-match=`dtrace -l -n pid$PID:a.out:simple: -n pid$PID:a.out:complex: | wc -l`
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
+
+match=`$dtrace -l -n pid$PID:a.out:simple: -n pid$PID:a.out:complex: | wc -l`
 
 kill $PID
 

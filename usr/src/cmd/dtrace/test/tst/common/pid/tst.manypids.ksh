@@ -25,7 +25,12 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-dtrace=/usr/sbin/dtrace
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
 
 set -A pids
 

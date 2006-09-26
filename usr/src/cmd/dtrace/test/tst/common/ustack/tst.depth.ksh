@@ -25,8 +25,13 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
 file=out.$$
-dtrace=/usr/sbin/dtrace
+dtrace=$1
 
 rm -f $file
 

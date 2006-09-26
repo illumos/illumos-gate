@@ -35,13 +35,19 @@
 #
 ############################################################################
 
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
 bname=`/bin/basename $0`
 dfilename=/var/tmp/$bname.$$
 
 ## Create .d file
 ##########################################################################
 cat > $dfilename <<-EOF
-#!/usr/sbin/dtrace -qs
+#!$dtrace -qs
 
 
 BEGIN
@@ -70,6 +76,7 @@ if [ $? -ne 0 ]; then
 fi
 
 $dfilename $sessionid >/dev/null 2>&1
+
 if [ $? -ne 0 ]; then
 	print -u2 "Error in executing $dfilename"
 	exit 1

@@ -66,6 +66,8 @@ struct OuterMost {
 	int dummy_More;
 } OMost;
 
+struct OuterMost OMostCopy;
+
 BEGIN
 {
 
@@ -95,7 +97,7 @@ BEGIN
 	printf("OMost.OMore.O.I.IMore.IMost.content: %c\n",
 	OMost.OMore.O.I.IMore.IMost.content);
 
-	this->OMost = OMost;
+	OMostCopy = OMost;
 
 	exit(0);
 }
@@ -111,12 +113,12 @@ END
 }
 
 END
-/(0 != this->OMost.dummy_More) || (1 != this->OMost.OMore.dummy_More) ||
-    (2 != this->OMost.OMore.O.dummy_More) ||
-    (3 != this->OMost.OMore.O.I.dummy_More) ||
-    (4 != this->OMost.OMore.O.I.IMore.dummy_More) ||
-    (5 != this->OMost.OMore.O.I.IMore.IMost.position) ||
-    ('e' != this->OMost.OMore.O.I.IMore.IMost.content)/
+/(0 != OMostCopy.dummy_More) || (1 != OMostCopy.OMore.dummy_More) ||
+    (2 != OMostCopy.OMore.O.dummy_More) ||
+    (3 != OMostCopy.OMore.O.I.dummy_More) ||
+    (4 != OMostCopy.OMore.O.I.IMore.dummy_More) ||
+    (5 != OMostCopy.OMore.O.I.IMore.IMost.position) ||
+    ('e' != OMostCopy.OMore.O.I.IMore.IMost.content)/
 {
 	exit(2);
 }

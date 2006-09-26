@@ -31,7 +31,14 @@
 # implementation of malloc(3C).  If you're reading this comment because
 # those assumptions have become false, please accept my apologies...
 #
-dtrace -qs /dev/stdin -c "/usr/bin/echo" <<EOF
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
+
+$dtrace -qs /dev/stdin -c "/usr/bin/echo" <<EOF
 pid\$target:ld.so.1:calloc:entry
 {
 	self->calloc = 1;
