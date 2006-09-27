@@ -416,7 +416,7 @@ so_strinit(struct sonode *so, struct sonode *tso)
 
 		/* the following do_tcapability may update so->so_mode */
 		if ((tso->so_serv_type != T_CLTS) &&
-		    !(so->so_state & SS_DIRECT)) {
+		    !(tso->so_state & SS_DIRECT)) {
 			error = do_tcapability(so, TC1_ACCEPTOR_ID);
 			if (error)
 				return (error);

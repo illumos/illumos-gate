@@ -207,13 +207,13 @@ socktpi_open(struct vnode **vpp, int flag, struct cred *cr)
 		 * interface to/from transport module, probe the module
 		 * directly beneath the streamhead to see if it qualifies.
 		 *
-		 * We turn off direct interface when qualifications fail;
-		 * note that we do these checks for everything other than
-		 * the tcp acceptor case, because the acceptor inherits
-		 * the capabilities of the listener and we've already done
-		 * the checks against the listening socket.
+		 * We turn off the direct interface when qualifications fail.
+		 * In the acceptor case, we simply turn off the SS_DIRECT
+		 * flag on the socket. We do the fallback after the accept
+		 * has completed, before the new socket is returned to the
+		 * application.
 		 */
-		if (!(flag & SO_ACCEPTOR) && (so->so_state & SS_DIRECT)) {
+		if (so->so_state & SS_DIRECT) {
 			queue_t *tq = stp->sd_wrq->q_next;
 
 			/*
@@ -243,11 +243,14 @@ socktpi_open(struct vnode **vpp, int flag, struct cred *cr)
 
 				/* Continue on without direct calls */
 				so->so_state &= ~SS_DIRECT;
-				if ((error = strioctl(vp, _SIOCSOCKFALLBACK,
-				    0, 0, K_TO_K, CRED(), &rval)) != 0) {
-					(void) socktpi_close(vp, flag, 1,
-					    (offset_t)0, cr);
-					return (error);
+				if (!(flag & SO_ACCEPTOR)) {
+					if ((error = strioctl(vp,
+					    _SIOCSOCKFALLBACK, 0, 0, K_TO_K,
+					    CRED(), &rval)) != 0) {
+						(void) socktpi_close(vp, flag,
+						    1, (offset_t)0, cr);
+						return (error);
+					}
 				}
 			}
 		}

@@ -1679,7 +1679,6 @@ again:
 	if ((so->so_state & SS_DIRECT) != 0) {
 		mblk_t *ack_mp;
 
-		ASSERT(nso->so_state & SS_DIRECT);
 		ASSERT(opt != NULL);
 
 		conn_res->OPT_length = optlen;
@@ -1762,6 +1761,25 @@ again:
 		}
 
 		mutex_exit(&nso->so_lock);
+
+		/*
+		 * It's possible, through the use of autopush for example,
+		 * that the acceptor stream may not support SS_DIRECT
+		 * semantics. If the new socket does not support SS_DIRECT
+		 * we issue a _SIOCSOCKFALLBACK to inform the transport
+		 * as we would in the I_PUSH case.
+		 */
+		if (!(nso->so_state & SS_DIRECT)) {
+			int	rval;
+
+			if ((error = strioctl(SOTOV(nso), _SIOCSOCKFALLBACK,
+			    0, 0, K_TO_K, CRED(), &rval)) != 0) {
+				mutex_enter(&so->so_lock);
+				so_lock_single(so);
+				eprintsoline(so, error);
+				goto disconnect_vp;
+			}
+		}
 
 		/*
 		 * Pass out new socket.
