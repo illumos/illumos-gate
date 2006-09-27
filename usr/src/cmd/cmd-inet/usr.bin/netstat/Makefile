@@ -44,9 +44,9 @@ COMMONSRCS=	$(CMDINETCOMMONDIR)/$(COMMONOBJS:%.o=%.c)
 SRCS=		$(LOCALSRCS) $(COMMONSRCS)
 
 CPPFLAGS += -DNDEBUG -I$(CMDINETCOMMONDIR)
-LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -ltsol
-LDLIBS += -ldhcpagent -lcmd -lsocket -lnsl -lkstat -ltsnet $(LAZYLIBS)
+LAZYLIBS = $(ZLAZYLOAD) -ltsnet -ltsol $(ZNOLAZYLOAD)
+lint := LAZYLIBS = -ltsnet -ltsol
+LDLIBS += -ldhcpagent -lcmd -lsocket -lnsl -lkstat $(LAZYLIBS)
 
 .KEEP_STATE:
 

@@ -150,7 +150,7 @@ $(K5PROGS)		:=	CPPFLAGS += -I$(SRC)/head \
 				-I$(SRC)/lib/pam_modules/krb5
 LDLIBS +=	$(K5LIBS)
 $(IPSECUTILPROG)	:=	LDLIBS += -lipsecutil
-$(TSNETPROG)		:=	LDLIBS += -ltsnet
+$(TSNETPROG)		:=	LDLIBS += $(ZLAZYLOAD) -ltsnet $(ZNOLAZYLOAD)
 
 in.rarpd		:=	LDLIBS += -linetutil
 route			:=	CPPFLAGS += -DNDEBUG

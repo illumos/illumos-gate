@@ -96,7 +96,9 @@ $(USERDEL) :=	LIBS = $(LIBUSRGRP)
 $(USERMOD) :=	OBJS = $(MOD_OBJ)
 $(USERMOD) :=	LIBS = $(LIBUSRGRP)
 
-LDLIBS +=	-lsecdb -lproject -ltsol
+LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
+lint := LAZYLIBS = -ltsol
+LDLIBS +=	-lsecdb -lproject $(LAZYLIBS)
 
 .PARALLEL: $(OBJECTS)
 
