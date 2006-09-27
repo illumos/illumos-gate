@@ -94,7 +94,10 @@ exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 			 * FILES and the entry is a directory, its excluded!
 			 */
 			if (fname_type == 'D') {
-				ret_val = 1;
+				if (mod_ptr->include == B_FALSE)
+					ret_val = 0;
+				else
+					ret_val = 1;
 				break;
 			}
 
@@ -356,7 +359,6 @@ gen_rulestruct(void)
 	struct rule	*new_rule;
 
 	new_rule = (struct rule *)safe_calloc(sizeof (struct rule));
-	new_rule->traversed = B_FALSE;
 	return (new_rule);
 }
 
@@ -418,6 +420,7 @@ read_rules(FILE *file, char *reloc_root, uint_t in_flags, int create)
 	struct rule	*block_begin = NULL, *new_rule, *rp;
 	struct attr_keyword *akp;
 	int		check_flag, ignore_flag, syntax_err, ret_code;
+	int		global_block;
 
 	ret_code = EXIT;
 
@@ -425,6 +428,7 @@ read_rules(FILE *file, char *reloc_root, uint_t in_flags, int create)
 	check_flag = 0;
 	ignore_flag = 0;
 	syntax_err = 0;
+	global_block = 1;
 
 	if (file == NULL) {
 		(void) setup_default_rule(reloc_root, in_flags);
@@ -454,6 +458,9 @@ read_rules(FILE *file, char *reloc_root, uint_t in_flags, int create)
 		 * subtrees.
 		 */
 		if (s[0] == '/') {
+			/* subtree definition hence not a global block */
+			global_block = 0;
+
 			new_rule = add_subtree_rule(s, reloc_root, create,
 			    &ret_code);
 
@@ -496,14 +503,14 @@ read_rules(FILE *file, char *reloc_root, uint_t in_flags, int create)
 
 				/*
 				 * For all the flags, check if this is a global
-				 * IGNORE/CHECK. If so, set the global flag.
+				 * IGNORE/CHECK. If so, set the global flags.
 				 *
 				 * NOTE: The only time you can have a
 				 * global ignore is when its the
 				 * stmt before any blocks have been
 				 * spec'd.
 				 */
-				if (block_begin == NULL) {
+				if (global_block) {
 					if (check_kw)
 						in_flags |= akp->ak_flags;
 					else

@@ -242,16 +242,6 @@ create_manifest_rule(char *reloc_root, FILE *rule_fp)
 	    root = get_next_subtree(root)) {
 
 		/*
-		 * This subtree has already been traversed by a
-		 * previous stanza, i.e. this rule is a subset of a
-		 * previous rule.
-		 *
-		 * Subtree has already been handled so move on!
-		 */
-		if (root->traversed)
-			continue;
-
-		/*
 		 * Check to see if this subtree should have contents
 		 * checking turned on or off.
 		 *
@@ -273,7 +263,6 @@ create_manifest_rule(char *reloc_root, FILE *rule_fp)
 		 */
 		subtree_root = root;
 		(void) nftw64(root->subtree, &walker, 20, FTW_PHYS);
-		root->traversed = B_TRUE;
 
 		/*
 		 * Ugly but necessary:
@@ -340,7 +329,7 @@ output_manifest(void)
 	 * Also, make sure the output is unique, since a given file may be
 	 * included by several stanzas.
 	 */
-	if (execle("/usr/bin/sort", "sort", NULL, env) < 0) {
+	if (execle("/usr/bin/sort", "sort", "-u", NULL, env) < 0) {
 		perror("");
 		exit(FATAL_EXIT);
 	}
@@ -375,19 +364,6 @@ walker(const char *name, const struct stat64 *sp, int type, struct FTW *ftwx)
 	case FTW_NS:	/* unstatable file	*/
 		break;
 	case FTW_D:	/* enter directory 		*/
-
-		/*
-		 * Check to see if any subsequent rules are a subset
-		 * of this rule; if they are, then mark them as
-		 * "traversed".
-		 */
-		rule = subtree_root->next;
-		while (rule != NULL) {
-			if (strcmp(name, rule->subtree) == 0)
-				rule->traversed = B_TRUE;
-
-			rule = rule->next;
-		}
 		dir_flag = B_TRUE;
 		ret = statvfs(name, &path_vfs);
 		if (ret < 0)
