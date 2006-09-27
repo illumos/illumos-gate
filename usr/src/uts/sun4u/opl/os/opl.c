@@ -851,7 +851,7 @@ plat_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp)
 
 	case MODEL_FF2:
 		plen = snprintf(buf, buflen, "/%s/CPUM%d", "MBU_B",
-		    CHIP_ID(cpuid) / 2);
+		    (CHIP_ID(cpuid) / 2) + (sb * 2));
 		break;
 
 	case MODEL_DC:

@@ -246,7 +246,7 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "client.tmrlim", &fmd_conf_uint32, "1024" },	/* client pending timer limit */
 { "client.xprtlim", &fmd_conf_uint32, "256" },	/* client transport limit */
 { "client.xprtlog", &fmd_conf_bool, NULL },	/* client transport logging? */
-{ "client.xprtqlim", &fmd_conf_uint32, "256" }, /* client transport queue lim */
+{ "client.xprtqlim", &fmd_conf_uint32, "1024" }, /* client transport queue li */
 { "clock", &fmd_clkmode_ops, "native" },	/* clock operation mode */
 { "conf_path", &fmd_conf_path, _fmd_conf_path }, /* root config file path */
 { "conf_file", &fmd_conf_string, "fmd.conf" },	/* root config file name */
