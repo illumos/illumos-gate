@@ -3126,14 +3126,20 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic)
 			*diagnostic = SADB_X_DIAGNOSTIC_BAD_AALG;
 			return (EINVAL);
 		}
-		ASSERT(aalg->alg_mech_type != CRYPTO_MECHANISM_INVALID);
 
-		/* sanity check key sizes */
+		/*
+		 * Sanity check key sizes.
+		 * Note: It's not possible to use SADB_AALG_NONE because
+		 * this auth_alg is not defined with ALG_FLAG_VALID. If this
+		 * ever changes, the same check for SADB_AALG_NONE and
+		 * a auth_key != NULL should be made here ( see below).
+		 */
 		if (!ipsec_valid_key_size(akey->sadb_key_bits, aalg)) {
 			mutex_exit(&alg_lock);
 			*diagnostic = SADB_X_DIAGNOSTIC_BAD_AKEYBITS;
 			return (EINVAL);
 		}
+		ASSERT(aalg->alg_mech_type != CRYPTO_MECHANISM_INVALID);
 
 		/* check key and fix parity if needed */
 		if (ipsec_check_key(aalg->alg_mech_type, akey, B_TRUE,
@@ -3157,14 +3163,19 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic)
 			*diagnostic = SADB_X_DIAGNOSTIC_BAD_EALG;
 			return (EINVAL);
 		}
-		ASSERT(ealg->alg_mech_type != CRYPTO_MECHANISM_INVALID);
 
-		/* sanity check key sizes */
-		if (!ipsec_valid_key_size(ekey->sadb_key_bits, ealg)) {
+		/*
+		 * Sanity check key sizes. If the encryption algorithm is
+		 * SADB_EALG_NULL but the encryption key is NOT
+		 * NULL then complain.
+		 */
+		if ((assoc->sadb_sa_encrypt == SADB_EALG_NULL) ||
+		    (!ipsec_valid_key_size(ekey->sadb_key_bits, ealg))) {
 			mutex_exit(&alg_lock);
 			*diagnostic = SADB_X_DIAGNOSTIC_BAD_EKEYBITS;
 			return (EINVAL);
 		}
+		ASSERT(ealg->alg_mech_type != CRYPTO_MECHANISM_INVALID);
 
 		/* check key */
 		if (ipsec_check_key(ealg->alg_mech_type, ekey, B_FALSE,
