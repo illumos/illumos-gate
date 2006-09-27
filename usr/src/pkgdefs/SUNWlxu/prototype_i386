@@ -63,9 +63,11 @@ d none usr/lib/brand/lx/distros 755 root bin
 f none usr/lib/brand/lx/distros/centos35.distro 444 root bin
 f none usr/lib/brand/lx/distros/centos36.distro 444 root bin
 f none usr/lib/brand/lx/distros/centos37.distro 444 root bin
+f none usr/lib/brand/lx/distros/centos38.distro 444 root bin
 f none usr/lib/brand/lx/distros/rhel35.distro 444 root bin
 f none usr/lib/brand/lx/distros/rhel36.distro 444 root bin
 f none usr/lib/brand/lx/distros/rhel37.distro 444 root bin
+f none usr/lib/brand/lx/distros/rhel38.distro 444 root bin
 f none usr/lib/brand/lx/distros/rhel_centos_common 444 root bin
 f none usr/lib/brand/lx/lx_distro_install 755 root bin
 f none usr/lib/brand/lx/lx_init_zone 755 root bin

@@ -3687,7 +3687,7 @@ do_subproc(char *cmdbuf)
 static int
 brand_verify(zone_dochandle_t handle)
 {
-	char *xml_file = "/tmp/zonecfg_verify.XXXXXX";
+	char xml_file[32];
 	char cmdbuf[MAX_CMD_LEN];
 	brand_handle_t bh;
 	char brand[MAXNAMELEN];
@@ -3726,6 +3726,7 @@ brand_verify(zone_dochandle_t handle)
 	/*
 	 * Dump the current config information for this zone to a file.
 	 */
+	strcpy(xml_file, "/tmp/zonecfg_verify.XXXXXX");
 	if (mkstemp(xml_file) == NULL)
 		return (Z_TEMP_FILE);
 	if ((err = zonecfg_verify_save(handle, xml_file)) != Z_OK) {

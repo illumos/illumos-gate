@@ -54,7 +54,15 @@ unset distro_system_rpms
 delta_miniroot_rpms=centos-release
 delta_core_rpms="centos-yumconf centos-yumcache yum"
 delta_server_rpms=$delta_core_rpms
-delta_desktop_rpms="$delta_server_rpms openoffice.org-style-gnome"
+delta_desktop_rpms="$delta_server_rpms \
+	mozilla \
+	mozilla-chat \
+	mozilla-dom-inspector \
+	mozilla-js-debugger \
+	mozilla-mail \
+	mozilla-nspr \
+	mozilla-nss \
+	openoffice.org-style-gnome"
 delta_developer_rpms="$delta_desktop_rpms gd-progs"
 delta_all_rpms="$delta_developer_rpms emacs-nox"
 

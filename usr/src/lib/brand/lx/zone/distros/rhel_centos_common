@@ -359,6 +359,7 @@ common_server_rpms="$common_core_rpms \
 	distcache \
 	distcache-devel \
 	esound \
+	expect \
 	fam \
 	finger-server \
 	foomatic \
@@ -625,13 +626,6 @@ common_desktop_rpms="$common_server_rpms \
 	magicdev \
 	metacity \
 	mikmod \
-	mozilla \
-	mozilla-chat \
-	mozilla-dom-inspector \
-	mozilla-js-debugger \
-	mozilla-mail \
-	mozilla-nspr \
-	mozilla-nss \
 	mrproject \
 	mrtg \
 	mutt \
@@ -775,7 +769,6 @@ common_developer_rpms="$common_desktop_rpms \
 	emacs-el \
 	emacs-leim \
 	esound-devel \
-	expect \
 	flex \
 	fontconfig-devel \
 	freetype-devel \

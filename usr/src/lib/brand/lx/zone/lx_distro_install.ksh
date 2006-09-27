@@ -143,6 +143,8 @@ $(gettext "Installing %s RPM packages; this may take a few minutes...")
 install_nrpms_several=\
 $(gettext "Installing %s RPM packages; this may take several minutes...")
 
+install_defmkfail=$(gettext "Could not create the temporary directory '%s'")
+install_defcpfail=$(gettext "Could not make local copy of deferred RPM '%s'")
 install_zonefail=$(gettext "Attempt to install zone '%s' FAILED.")
 install_dist=$(gettext "Installing distribution '%s'...")
 
@@ -228,14 +230,13 @@ check_mbfree()
 # Arguments:
 #
 #	Argument 1:  Mounted CD-ROM/ISO directory
-#	Argument 2:  RPM directory
-#	Arguments [3 - n]: RPM names to process
+#	Arguments [2 - n]: RPM names to process
 #
 # The expanded RPM names are returned in the shell array "rpm_names."
 #
 # For example:
 #
-#	expand_rpm_names /mnt/iso RedHat/RPMS dev kernel tetex redhat-menus
+#	expand_rpm_names /mnt/iso dev kernel tetex redhat-menus
 #
 # would return something like:
 #
@@ -251,7 +252,7 @@ expand_rpm_names()
 	typeset found=0
 	typeset left=0
 
-	typeset rpmdir="$1/$2"
+	typeset rpmdir="$1/$distro_rpmdir"
 	typeset curdir=${PWD:=$(pwd)}
 
 	typeset arch
@@ -262,7 +263,7 @@ expand_rpm_names()
 	unset rpms_found
 	unset rpms_left
 
-	shift; shift
+	shift
 	cd "$rpmdir"
 
 	typeset rpmcheck="$(echo *.rpm)"
@@ -433,22 +434,21 @@ build_rpm_list()
 # by one to rpm2cpio(1).
 #
 # Usage:
-#    install_miniroot <mounted media dir> <RPM directory> <RPMS to install>
+#    install_miniroot <mounted media dir> <RPMS to install>
 #      
 #
 install_miniroot()
 {
         typeset mediadir="$1"
-	typeset rpmdir="$2"
 	typeset rpm
 
-	shift; shift
+	shift
 
         for rpm in "$@"; do
 		verbose "Installing RPM \"$rpm\" to miniroot at" \
 			"\n    \"$zoneroot\"..."
 
-		rpm2cpio "$mediadir/$rpmdir/$rpm" | \
+		rpm2cpio "$mediadir/$distro_rpmdir/$rpm" | \
 		    ( cd "$rootdir" && cpio -idu ) 1>&2
 
 		if [[ $? -ne 0 ]]; then
@@ -465,21 +465,73 @@ install_miniroot()
 # install from this image to RPM running on the zone via zlogin(1).
 #
 # Usage:
-#    install_zone <root dir> <RPM directory> <RPMS to install>
+#    install_zone <root dir> <mounted ISO/CD dir> [<RPMS to install>]
+#
+# If the caller doesn't supply a list of RPMs to install, we install any
+# we previously stashed away in the deferred RPMs directory.
 #
 install_zone()
 {
 	#
 	# convert media directory to zone-relative path
 	#
-	typeset zonerpmdir=${1##$rootdir}/$2
+	typeset zonerpmdir=${1##$rootdir}/$distro_rpmdir
+	typeset defdir=$rootdir/var/lx_install/deferred_rpms
+	typeset rpmdir=$2
 	typeset rpmopts="-i"
 
 	typeset rpmerr
+	typeset deferred_found
+	typeset install_rpms
 
 	shift; shift
 
 	[[ -n $verbose_mode ]] && rpmopts="-ivh"
+
+	#
+	# If the caller provided a list of RPMs, determine which of them
+	# should be installed now, and which should be deferred until
+	# later.
+	#
+	if [[ $# -gt 0 ]]; then
+		if [[ -n $deferred_rpms ]]; then
+			[[ -d $defdir ]] || if ! mkdir -p $defdir; then
+				screenlog "$install_defmkfail" "$mntdir"
+				return 1
+			fi
+			expand_rpm_names $rpmdir $deferred_rpms
+			deferred_found="${rpms_found[@]}"
+		else
+			deferred_found=""
+		fi
+
+		install_rpms="$@"
+
+		#
+		# If this distro has any deferred RPMs, we want to simply
+	 	# copy them into the zone instead of installing them.  We
+		# then remove them from the list of RPMs to be installed on
+		# this pass.
+		#
+		for rpm in $deferred_found; do
+			if echo $install_rpms | grep $rpm > /dev/null; then
+				verbose "deferring installation of" $rpm
+				install_rpms=`echo " $install_rpms " | \
+				    sed "s/ $rpm / /g"`
+				deferred_saved="$deferred_saved $rpm"
+				if ! cp $rpmdir/$distro_rpmdir/$rpm $defdir; then
+					screenlog "$install_defcpfail" "$rpm"
+					return 1
+				fi
+			fi
+		done
+	elif [[ -z $deferred_saved ]]; then
+		# There are no deferred RPMs to install, so we're done.
+		return 0
+	else
+		install_rpms=${deferred_saved[@]}
+		zonerpmdir=/var/lx_install/deferred_rpms
+	fi
 
 	#
 	# There's a quirk in our version of ksh that sometimes resets the
@@ -496,7 +548,9 @@ install_zone()
 	# Ten RPMS seems like a reasonable boundary between when an install may
 	# take a "few" or "several" minutes.
 	#
-	if [[ $# -eq 1 ]]; then
+	if [[ $# -eq 0 ]]; then
+		screenlog "$(gettext 'Installing the deferred RPMs.')"
+	elif [[ $# -eq 1 ]]; then
 		screenlog "$(gettext 'Installing 1 RPM package.')"
 	elif [[ $# -lt 10 ]]; then
 		screenlog "$install_nrpms_few" "$#"
@@ -505,7 +559,7 @@ install_zone()
 	fi
 
 	log ""
-	log "Installing: $@"
+	log "Installing: $install_rpms"
 	log ""
 
 	echo
@@ -516,7 +570,8 @@ install_zone()
 	# the dev package (which may not actually write to /dev) to function.
 	#
 	zlogin "$zonename" "( cd "$zonerpmdir" ; LX_INSTALL=1 \
-	    /bin/rpm $rpmopts --force --aid --nosignature --root /a $@ )"
+	    /bin/rpm $rpmopts --force --aid --nosignature --root /a \
+	    $install_rpms )"
 
 	rpmerr=$?
 
@@ -688,8 +743,8 @@ replace_miniroot()
 	mv -f "$zoneroot/a" "$rootdir" || return 1
 
 	screenlog \
-	    "$(gettext 'Completing install processing; this may take a few')"
-	screenlog "$(gettext 'minutes...')"
+	    "$(gettext \
+	    'Completing install processing; this may take a few minutes')"
 	rm -rf "$zoneroot/oldroot"
 
 	#
@@ -779,6 +834,12 @@ finish_install()
 	# newly installed zone will still boot even if the commands fail.
 	#
 	typeset file
+	typeset defdir=$rootdir/var/lx_install/deferred_rpms
+
+	if [[ -d $defdir ]]; then
+		rm -f $defdir/*.rpm
+		rmdir $defdir
+	fi
 
 	#
 	# Run ldconfig in the new root
@@ -1186,8 +1247,9 @@ install_from_discs()
 
 	discnum=1
 	while ((discnum <= distro_ndiscs)); do
-		expand_rpm_names "$mntdir" "$distro_rpmdir" \
-		    $distro_miniroot_rpms
+		expand_rpm_names "$mntdir" $distro_miniroot_rpms
+		# Save a copy of $rpms_left.  Other functions clobber it.
+		rpms_left_save="${rpms_left[@]}"
 
 		retval=0
 
@@ -1195,8 +1257,7 @@ install_from_discs()
 			verbose "Installing miniroot from disc" \
 			    "${discorder[$discnum]}..."
 
-			if ! install_miniroot "$mntdir" "$distro_rpmdir" \
-			    "${rpms_found[@]}"; then
+			if ! install_miniroot "$mntdir" "${rpms_found[@]}"; then
 				screenlog "$mini_discfail" "$zonename" \
 				    "$rd_discnum"
 				return 1
@@ -1209,7 +1270,7 @@ install_from_discs()
 		# ejecting the disk as we'll need it again to start the actual
 		# install.
 		#
-		if [[ "$discnum" = "1" && -z $rpms_left ]]; then
+		if [[ "$discnum" = "1" && -z $rpms_left_save ]]; then
 			umount "$mntdir"
 			unset zone_mounted
 			break
@@ -1218,9 +1279,9 @@ install_from_discs()
 		eject_removable_disc "$mntdir"
 		unset zone_mounted
 
-		[[ -z $rpms_left ]] && break
+		[[ -z $rpms_left_save ]] && break
 
-		distro_miniroot_rpms="${rpms_left[@]}"
+		distro_miniroot_rpms="${rpms_left_save[@]}"
 		((discnum += 1))
 
 		if ! get_discnum "$mountdev" "${discorder[$discnum]}"; then
@@ -1232,10 +1293,10 @@ install_from_discs()
 		zone_mounted="$mntdir"
 	done
 
-	if [[ -n $rpms_left ]]; then
+	if [[ -n $rpms_left_save ]]; then
 		log ""
 		log "Unable to locate some packages on install media:\n" \
-		    "  ${rpms_left[@]}"
+		    "  ${rpms_left_save[@]}"
 		log ""
 		screenlog "$mini_instfail" "$zonename"
 		return 1
@@ -1264,7 +1325,9 @@ install_from_discs()
 
 		zone_mounted="$mntdir"
 
-		expand_rpm_names "$rootdir/disc" "$distro_rpmdir" $distro_rpms
+		expand_rpm_names "$rootdir/disc" $distro_rpms
+		# Save a copy of $rpms_left.  Other functions clobber it.
+		rpms_left_save="${rpms_left[@]}"
 
 		retval=0
 
@@ -1274,7 +1337,7 @@ install_from_discs()
 			screenlog "$install_discmsg" "$zonename" \
 			    "$rd_discnum"
 
-			if ! install_zone "$mntdir" "$distro_rpmdir" \
+			if ! install_zone "$mntdir" "$rootdir/disc" \
 			    ${rpms_found[@]}; then
 				screenlog "$zone_discfail" "$zonename" \
 				    "$rd_discnum"
@@ -1293,16 +1356,22 @@ install_from_discs()
 		#
 		# No more RPMs means we're done!
 		#
-		[[ -z $rpms_left ]] && break
+		[[ -z $rpms_left_save ]] && break
 
-		distro_rpms="${rpms_left[@]}"
+		distro_rpms="${rpms_left_save[@]}"
 		((discnum += 1))
 	done
 
-	if [[ -n $rpms_left ]]; then
+	if [[ -n $deferred_rpms ]]; then
+		if ! install_zone "$mntdir" "$rootdir/disc"; then
+			return 1
+		fi
+	fi
+
+	if [[ -n $rpms_left_save ]]; then
 		log ""
 		log "Unable to locate some packages on install media:\n" \
-		    "  ${rpms_left[@]}"
+		    "  ${rpms_left_save[@]}"
 		log ""
 		screenlog "$install_zonefail" "$zonename"
 		return 1
@@ -1527,26 +1596,27 @@ install_from_isos()
 		    "${distro_ndiscs[$distro]})"
 
 		ldir="${lofi_mntdir[$isonum]}"
-		expand_rpm_names "$ldir" "$distro_rpmdir" $distro_miniroot_rpms
+		expand_rpm_names "$ldir" $distro_miniroot_rpms
+		# Save a copy of $rpms_left.  Other functions clobber it.
+		rpms_left_save="${rpms_left[@]}"
 
 		if [[ -n $rpms_found ]]; then
-			if ! install_miniroot "$ldir" "$distro_rpmdir" \
-			    "${rpms_found[@]}"; then
+			if ! install_miniroot "$ldir" "${rpms_found[@]}"; then
 				screenlog "$mini_isofail" "$zonename" "$ldir"
 				return 1
 			fi
 		fi
 
-		[[ -z $rpms_left ]] && break
+		[[ -z $rpms_left_save ]] && break
 
-		distro_miniroot_rpms="${rpms_left[@]}"
+		distro_miniroot_rpms="${rpms_left_save[@]}"
 		((isonum += 1))
 	done
 
-	if [[ -n $rpms_left ]]; then
+	if [[ -n $rpms_left_save ]]; then
 		log ""
 		log "Unable to locate some packages on ISO images:\n" \
-		    "  ${rpms_left[@]}"
+		    "  ${rpms_left_save[@]}"
 		log ""
 		screenlog "$mini_instfail" "$zonename"
 		return 1
@@ -1578,13 +1648,12 @@ install_from_isos()
 
 		zone_mounted="$rootdir/iso"
 
-		expand_rpm_names "$rootdir/iso" "$distro_rpmdir" $distro_rpms
+		expand_rpm_names "$rootdir/iso" $distro_rpms
+		# Save a copy of $rpms_left.  Other functions clobber it.
+		rpms_left_save="${rpms_left[@]}"
 
 		if [[ -n $rpms_found ]]; then
-			log ""
-			log "Installing: ${rpms_found[@]}"
-
-			if ! install_zone "$rootdir/iso" "$distro_rpmdir" \
+			if ! install_zone "$rootdir/iso" "$rootdir/iso" \
 			    ${rpms_found[@]}; then
 				screenlog "$zone_isofail" "$zonename" "$iso"
 				umount "$rootdir/iso"
@@ -1599,16 +1668,22 @@ install_from_isos()
 
 		unset zone_mounted
 
-		[[ -z $rpms_left ]] && break
+		[[ -z $rpms_left_save ]] && break
 
-		distro_rpms="${rpms_left[@]}"
+		distro_rpms="${rpms_left_save[@]}"
 		((isonum += 1))
 	done
 
-	if [[ -n $rpms_left ]]; then
+	if [[ -n $deferred_rpms ]]; then
+		if ! install_zone "$mntdir" "$rootdir/disc"; then
+			return 1
+		fi
+	fi
+
+	if [[ -n $rpms_left_save ]]; then
 		log ""
 		log "Unable to locate some packages on ISO images:\n" \
-		    "  ${rpms_left[@]}"
+		    "  ${rpms_left_save[@]}"
 		log ""
 		screenlog "$install_zonefail" "$zonename"
 		return 1
@@ -1796,6 +1871,7 @@ unset verbose_mode
 unset zone_mounted
 unset zoneroot
 unset zonename
+unset deferred_saved
 
 #
 # Exit values used by the script, as #defined in <sys/zone.h>

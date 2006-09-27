@@ -43,10 +43,12 @@ lx_getpid()
 	lx_lwp_data_t *lwpd = ttolxlwp(curthread);
 	long rv;
 
-	if (curproc->p_pid == curproc->p_zone->zone_proc_initpid)
+	if (curproc->p_pid == curproc->p_zone->zone_proc_initpid) {
 		rv = 1;
-	else
+	} else {
+		ASSERT(lwpd != NULL);
 		rv = lwpd->br_tgid;
+	}
 
 	return (rv);
 }

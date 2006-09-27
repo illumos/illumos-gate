@@ -29,7 +29,8 @@
 include ../../Makefile.lx
 
 DISTROS =	centos35.distro centos36.distro centos37.distro \
-		rhel35.distro rhel36.distro rhel37.distro rhel_centos_common
+		centos38.distro rhel35.distro rhel36.distro rhel37.distro \
+		rhel38.distro rhel_centos_common
 
 ROOTDISTRODIR=	$(ROOTBRANDDIR)/distros
 ROOTDISTROS=	$(DISTROS:%=$(ROOTDISTRODIR)/%)

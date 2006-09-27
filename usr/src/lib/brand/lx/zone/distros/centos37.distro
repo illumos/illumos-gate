@@ -54,7 +54,14 @@ unset distro_system_rpms
 delta_miniroot_rpms=centos-release
 delta_core_rpms="centos-yumconf centos-yumcache yum"
 delta_server_rpms="$delta_core_rpms nss_db-compat sendmail-doc qt-config"
-delta_desktop_rpms="$delta_server_rpms"
+delta_desktop_rpms="$delta_server_rpms \
+	mozilla \
+	mozilla-chat \
+	mozilla-dom-inspector \
+	mozilla-js-debugger \
+	mozilla-mail \
+	mozilla-nspr \
+	mozilla-nss"
 delta_developer_rpms="$delta_desktop_rpms gd-progs ruby-docs irb ruby-tcltk"
 delta_all_rpms="$delta_developer_rpms emacs-nox"
 
