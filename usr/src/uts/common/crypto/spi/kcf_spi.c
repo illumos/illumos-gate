@@ -753,14 +753,12 @@ init_prov_mechs(crypto_provider_info_t *info, kcf_provider_desc_t *desc)
 	}
 
 	/*
-	 * The provider will not be used for any mechanism. So, we fail its
-	 * registration. Note that if at least one of the mechanisms from the
-	 * provider can be used, we do it. This means there can be a overlap
-	 * between the mechanisms offered by providers. The first one to
-	 * register is used. Also, a policy to disable mechanisms of a provider
-	 * will cause the provider to be not used for those mechanisms.
+	 * Don't allow multiple software providers with disabled mechanisms
+	 * to register. Subsequent enabling of mechanisms will result in
+	 * an unsupported configuration, i.e. multiple software providers
+	 * per mechanism.
 	 */
-	if (desc_use_count == 0)
+	if (desc_use_count == 0 && desc->pd_prov_type == CRYPTO_SW_PROVIDER)
 		return (CRYPTO_ARGUMENTS_BAD);
 
 	if (err == KCF_SUCCESS)
