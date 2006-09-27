@@ -64,6 +64,7 @@ static char *pam_inames [PAM_MAX_ITEMS] = {
 /* PAM_USER_PROMPT */	"user_prompt",
 /* PAM_REPOSITORY */	"repository",
 /* PAM_RESOURCE */	"resource",
+/* PAM_AUSER */ 	"auser",
 /* Undefined Items */
 };
 
@@ -458,6 +459,7 @@ pam_set_item(pam_handle_t *pamh, int item_type, const void *item)
 	case PAM_RUSER:
 	case PAM_USER_PROMPT:
 	case PAM_RESOURCE:
+	case PAM_AUSER:
 		if (pip->pi_addr != NULL) {
 			free(pip->pi_addr);
 		}

@@ -158,7 +158,7 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	uint_t	nowarn = flags & PAM_SILENT;
 	int	ret = PAM_SUCCESS;
 	char	*user;
-	char	*ruser;
+	char	*auser;
 	char	*rhost;
 	char	*tty;
 	au_id_t	auid;
@@ -194,15 +194,15 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		    "pam_unix_cred: USER NULL or empty!\n");
 		return (PAM_USER_UNKNOWN);
 	}
-	(void) pam_get_item(pamh, PAM_RUSER, (void **)&ruser);
+	(void) pam_get_item(pamh, PAM_AUSER, (void **)&auser);
 	(void) pam_get_item(pamh, PAM_RHOST, (void **)&rhost);
 	(void) pam_get_item(pamh, PAM_TTY, (void **)&tty);
 	if (debug)
 		syslog(LOG_AUTH | LOG_DEBUG,
-		    "pam_unix_cred: user = %s, ruser = %s, rhost = %s, "
+		    "pam_unix_cred: user = %s, auser = %s, rhost = %s, "
 		    "tty = %s", user,
-		    (ruser == NULL) ? "NULL" : (*ruser == '\0') ? "ZERO" :
-		    ruser,
+		    (auser == NULL) ? "NULL" : (*auser == '\0') ? "ZERO" :
+		    auser,
 		    (rhost == NULL) ? "NULL" : (*rhost == '\0') ? "ZERO" :
 		    rhost,
 		    (tty == NULL) ? "NULL" : (*tty == '\0') ? "ZERO" :
@@ -258,8 +258,8 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	if ((auid == AU_NOAUDITID) &&
 	    (flags & PAM_ESTABLISH_CRED)) {
-		struct passwd	rpwd;
-		char	rpwbuf[NSS_BUFLEN_PASSWD];
+		struct passwd	apwd;
+		char	apwbuf[NSS_BUFLEN_PASSWD];
 
 		if ((rhost == NULL || *rhost == '\0')) {
 			if (adt_load_ttyname(tty, &termid) != 0) {
@@ -276,17 +276,17 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 				goto adt_done;
 			}
 		}
-		if ((ruser != NULL) && (*ruser != '\0') &&
-		    (getpwnam_r(ruser, &rpwd, rpwbuf,
-		    sizeof (rpwbuf)) != NULL)) {
+		if ((auser != NULL) && (*auser != '\0') &&
+		    (getpwnam_r(auser, &apwd, apwbuf,
+		    sizeof (apwbuf)) != NULL)) {
 			/*
 			 * set up the initial audit for user coming
 			 * from another user
 			 */
-			if (adt_set_user(ah, rpwd.pw_uid, rpwd.pw_gid,
-			    rpwd.pw_uid, rpwd.pw_gid, termid, ADT_NEW) != 0) {
+			if (adt_set_user(ah, apwd.pw_uid, apwd.pw_gid,
+			    apwd.pw_uid, apwd.pw_gid, termid, ADT_NEW) != 0) {
 				syslog(LOG_AUTH | LOG_ERR,
-				    "pam_unix_cred: cannot set ruser audit "
+				    "pam_unix_cred: cannot set auser audit "
 				    "%m");
 				ret = PAM_SYSTEM_ERR;
 				goto adt_done;
@@ -303,13 +303,13 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 			if (debug) {
 				syslog(LOG_AUTH | LOG_DEBUG,
 				    "pam_unix_cred: new audit set for %d:%d",
-				    rpwd.pw_uid, pwd.pw_uid);
+				    apwd.pw_uid, pwd.pw_uid);
 			}
 		} else {
 			/*
-			 * No remote user or remote user is not a local
-			 * user, no remote attribution, set up the initial
-			 * audit as for direct user login
+			 * No authenticated user or authenticated user is
+			 * not a local user, no remote attribution, set
+			 * up the initial audit as for direct user login
 			 */
 			if (adt_set_user(ah, pwd.pw_uid, pwd.pw_gid,
 			    pwd.pw_uid, pwd.pw_gid, termid, ADT_NEW) != 0) {
