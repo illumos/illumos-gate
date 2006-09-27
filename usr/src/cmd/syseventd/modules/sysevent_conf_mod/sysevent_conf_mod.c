@@ -534,30 +534,23 @@ parse_conf_file(char *conf_file)
 		syseventd_print(DBG_CONF_FILE, "[%d]: %s\n",
 			lineno, lp);
 
-		if ((class = next_field(&lp)) != NULL) {
-			subclass = next_field(&lp);
-			if (lp == NULL)
-				goto mal_formed;
-			vendor = next_field(&lp);
-			if (lp == NULL)
-				goto mal_formed;
-			publisher = next_field(&lp);
-			if (lp == NULL)
-				goto mal_formed;
-			user = next_field(&lp);
-			if (lp == NULL)
-				goto mal_formed;
-			reserved1 = next_field(&lp);
-			if (lp == NULL)
-				goto mal_formed;
-			reserved2 = next_field(&lp);
-			if (lp == NULL)
-				goto mal_formed;
-			path = next_field(&lp);
-			if (lp == NULL)
-				goto mal_formed;
-			args = skip_spaces(&lp);
-		}
+		if ((class = next_field(&lp)) == NULL)
+			goto mal_formed;
+		if ((subclass = next_field(&lp)) == NULL)
+			goto mal_formed;
+		if ((vendor = next_field(&lp)) == NULL)
+			goto mal_formed;
+		if ((publisher = next_field(&lp)) == NULL)
+			goto mal_formed;
+		if ((user = next_field(&lp)) == NULL)
+			goto mal_formed;
+		if ((reserved1 = next_field(&lp)) == NULL)
+			goto mal_formed;
+		if ((reserved2 = next_field(&lp)) == NULL)
+			goto mal_formed;
+		if ((path = next_field(&lp)) == NULL)
+			goto mal_formed;
+		args = skip_spaces(&lp);
 
 		/*
 		 * validate user
