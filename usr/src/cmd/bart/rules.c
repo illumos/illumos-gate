@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,8 +58,8 @@ static struct rule	*first_rule = NULL, *current_rule = NULL;
 int
 exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 {
-	char	*pattern, *ptr, component[PATH_MAX], fname_cp[PATH_MAX],
-		pattern_cp[PATH_MAX];
+	char	*pattern, *ptr, *fname_ptr, fname_cp[PATH_MAX],
+		pattern_cp[PATH_MAX], saved_char;
 	int	match, num_pattern_slash, num_fname_slash, i, slashes_to_adv,
 		ret_val = 0;
 	struct  tree_modifier   *mod_ptr;
@@ -163,7 +162,7 @@ exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 			 * only want to include subtrees that look like:
 			 * "/dir1/dir2/dir3/....dir3/....."
 			 *
-			 * NOTE: the 'pattern_cp' does NOT have a trailing '/':
+			 * NOTE: the 'fname_cp' does NOT have a trailing '/':
 			 * necessary for fnmatch().
 			 */
 			(void) strlcpy(fname_cp,
@@ -185,7 +184,10 @@ exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 
 				/* Trivial case: simple filename */
 				if (strlen(fname_cp) == 0) {
-					ret_val = 1;
+					if (mod_ptr->include == B_FALSE)
+						ret_val = 0;
+					else
+						ret_val = 1;
 					break;
 				}
 			}
@@ -198,100 +200,124 @@ exclude_fname(const char *fname, char fname_type, struct rule *rule_ptr)
 			 * fname_cp is too short, bail!
 			 */
 			if (num_pattern_slash > num_fname_slash) {
-				ret_val = 1;
+				if (mod_ptr->include == B_FALSE)
+					ret_val = 0;
+				else
+					ret_val = 1;
+
 				break;
 			}
 
+			/* set the return value before we enter the loop */
+			ret_val = 1;
+
 			/*
-			 * OK, walk through the filename and check for the
-			 * pattern.
-			 * This loop will termate when the match is found OR
-			 * there fname is too short to possibly match.
+			 * Take the leading '/' from fname_cp before
+			 * decrementing the number of slashes.
 			 */
-			while (strlen(fname_cp) > 0) {
-				num_fname_slash = count_slashes(fname_cp);
+			if (fname_cp[0] == '/') {
+				(void) strlcpy(fname_cp,
+				    strchr(fname_cp, '/') + 1,
+				    sizeof (fname_cp));
+				num_fname_slash--;
+			}
+
+			/*
+			 * Begin the loop, walk through the file name until
+			 * it can be determined that there is no match.
+			 * For example: if pattern is C/D/, and fname_cp is
+			 * A/B/C/D/E then compare A/B/ with C/D/, if it doesn't
+			 * match, then walk further so that the next iteration
+			 * checks B/C/ against C/D/, continue until we have
+			 * exhausted options.
+			 * In the above case, the 3rd iteration will match
+			 * C/D/ with C/D/.
+			 */
+			while (num_pattern_slash <= num_fname_slash) {
+				/* get a pointer to our filename */
+				fname_ptr = fname_cp;
 
 				/*
-				 * fname is too short, bail!
+				 * Walk the filename through the slashes
+				 * so that we have a component of the same
+				 * number of slashes as the pattern.
 				 */
-				if (num_pattern_slash > num_fname_slash) {
-					ret_val = 1;
-					break;
+
+				for (i = 0; i < num_pattern_slash; i++) {
+					ptr = strchr(fname_ptr, '/');
+					fname_ptr = ptr + 1;
 				}
 
 				/*
-				 * The next stanza selects an appropriate
-				 * substring of the filename.
-				 * For example, if pattern is 'C/D/E' and
-				 * filename is '/A/B/C/D/E', this stanza will
-				 * set ptr to 'C/D/E'.
+				 * Save the character after our target slash
+				 * before breaking the string for use with
+				 * fnmatch
 				 */
+				saved_char = *(++ptr);
 
-				component[0] = '\0';
-				if (num_fname_slash > 0) {
-					ptr = (fname_cp+1);
-
-					for (i = 0; i < (num_pattern_slash-1);
-					    i++) {
-						ptr = strchr(ptr, '/');
-						ptr++;
-					}
-
-					if (ptr != NULL)
-						(void) strlcpy(component, ptr,
-						    sizeof (component));
-
-				} else
-					(void) strlcpy(component, fname_cp,
-					    sizeof (component));
+				*ptr = '\0';
 
 				/*
-				 * See if they match.  If they do, set exclude
-				 * to appropriate value and exit.
+				 * Try to match the current component with the
+				 * pattern we are looking for.
 				 */
-				match =  fnmatch(pattern_cp, component,
+				match = fnmatch(pattern_cp, fname_cp,
 				    FNM_PATHNAME);
 
 				/*
-				 * Special case: match "/" and "*" or "?".
-				 * Necessary since explicitly NOT matched by
-				 * fnmatch()
-				 */
-				if ((match == 1) && (strlen(component) == 1) &&
-				    (component[0] == '/') &&
-				    (strlen(pattern_cp) == 1)) {
-					if ((pattern_cp[0] == '?') ||
-					    (pattern_cp[0] == '*'))
-						match = 0;
-				}
-
-				/*
-				 * Test to see if there is a match.
-				 *
-				 * If it matches we are done for this rule.
-				 *
-				 * If there is NOT a match, then we need
-				 * to iterate down the filename until it
-				 * matches OR we determine it cannot match.
+				 * If we matched, set ret_val and break.
+				 * No need to invert ret_val here as it is done
+				 * outside of this inner while loop.
 				 */
 				if (match == 0) {
 					ret_val = 0;
 					break;
-				} else {
+				}
+
+				/*
+				 * We didn't match, so restore the saved
+				 * character to the original position.
+				 */
+				*ptr = saved_char;
+
+				/*
+				 * Break down fname_cp, if it was A/B/C
+				 * then after this operation it will be B/C
+				 * in preparation for the next iteration.
+				 */
+				(void) strlcpy(fname_cp,
+				    strchr(fname_cp, '/') + 1,
+				    sizeof (fname_cp));
+
+				/*
+				 * Decrement the number of slashes to
+				 * compensate for the one removed above.
+				 */
+				num_fname_slash--;
+			}
+
+			/*
+			 * If we didn't get a match above then we may be on the
+			 * last component of our filename.
+			 * This is to handle the following cases
+			 *    - filename is A/B/C/D/E and pattern may be D/E/
+			 *    - filename is D/E and pattern may be D/E/
+			 */
+			if ((ret_val != 0) &&
+			    (num_pattern_slash == (num_fname_slash + 1))) {
+
+				/* strip the trailing slash from the pattern */
+				ptr = strrchr(pattern_cp, '/');
+				*ptr = '\0';
+
+				match = fnmatch(pattern_cp,
+				    fname_cp, FNM_PATHNAME);
+				if (match == 0) {
 					/*
-					 * No match.  Remove the last 'segment'
-					 * of the filename, e.g., if its
-					 * "/A/B/C/D/E", then remove "/E".
-					 *  If nothing left to remove, we are
-					 * done.
+					 * No need to invert ret_val as it is
+					 * done below.
 					 */
-					ptr = strrchr(fname_cp, '/');
-					if (ptr != NULL)
-						*ptr = '\0';
-					else {
-						fname_cp[0] = '\0';
-						ret_val = 1;
-					}
+					ret_val = 0;
 				}
 			}
 		}
