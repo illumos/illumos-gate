@@ -1553,7 +1553,7 @@ lxpr_read_version(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    __SUNPRO_C & 0xf,
 #endif
 	    LX_UNAME_VERSION,
-	    __TIME__ " " __DATE__);
+	    "00:00:00 %E%");
 }
 
 
