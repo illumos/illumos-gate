@@ -173,6 +173,8 @@ extern "C" {
 
 #define	DDI_NT_DISPLAY	"ddi_display"		/* display devices */
 
+#define	DDI_NT_DISPLAY_DRM	"ddi_display:drm" /* drm display devices */
+
 #define	DDI_PSEUDO	"ddi_pseudo"		/* general pseudo devices */
 
 #define	DDI_NT_AUDIO	"ddi_audio"		/* audio device */

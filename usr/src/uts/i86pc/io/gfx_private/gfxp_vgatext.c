@@ -53,12 +53,11 @@
 #include <sys/pci.h>
 #include <sys/kd.h>
 #include <sys/ddi_impldefs.h>
+
 #include "gfx_private.h"
 
 #define	MYNAME	"gfxp_vgatext"
 
-/* I don't know exactly where these should be defined, but this is a	*/
-/* heck of a lot better than constants in the code.			*/
 #define	TEXT_ROWS		25
 #define	TEXT_COLS		80
 
@@ -96,44 +95,6 @@ struct vgatext_softc {
 	}			colormap[VGA8_CMAP_ENTRIES];
 	unsigned char attrib_palette[VGA_ATR_NUM_PLT];
 };
-
-int gfxp_vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd,
-	gfxp_vgatext_softc_ptr_t ptr);
-
-static int vgatext_devinit(struct vgatext_softc *, struct vis_devinit *data);
-static void	vgatext_cons_copy(struct vgatext_softc *,
-			struct vis_conscopy *);
-static void	vgatext_cons_display(struct vgatext_softc *,
-			struct vis_consdisplay *);
-static void	vgatext_cons_cursor(struct vgatext_softc *,
-			struct vis_conscursor *);
-static void	vgatext_polled_copy(struct vis_polledio_arg *,
-			struct vis_conscopy *);
-static void	vgatext_polled_display(struct vis_polledio_arg *,
-			struct vis_consdisplay *);
-static void	vgatext_polled_cursor(struct vis_polledio_arg *,
-			struct vis_conscursor *);
-static void	vgatext_init(struct vgatext_softc *);
-static void	vgatext_set_text(struct vgatext_softc *);
-#if	defined(USE_BORDERS)
-static void	vgatext_init_graphics(struct vgatext_softc *);
-#endif
-static int vgatext_kdsetmode(struct vgatext_softc *softc, int mode);
-static void vgatext_setfont(struct vgatext_softc *softc);
-static void vgatext_get_cursor(struct vgatext_softc *softc,
-		screen_pos_t *row, screen_pos_t *col);
-static void vgatext_set_cursor(struct vgatext_softc *softc, int row, int col);
-static void vgatext_hide_cursor(struct vgatext_softc *softc);
-static void vgatext_save_colormap(struct vgatext_softc *softc);
-static void vgatext_restore_colormap(struct vgatext_softc *softc);
-static int vgatext_get_pci_reg_index(dev_info_t *const devi,
-		unsigned long himask, unsigned long hival, unsigned long addr,
-		off_t *offset);
-static int vgatext_get_isa_reg_index(dev_info_t *const devi,
-		unsigned long hival, unsigned long addr, off_t *offset);
-
-static char	vgatext_silent;
-static char	happyface_boot;
 
 typedef enum pc_colors {
 	pc_black	= 0,
@@ -191,6 +152,43 @@ static struct fbgattr vgatext_attr =  {
 	{ -1 }
 };
 
+int gfxp_vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd,
+	gfxp_vgatext_softc_ptr_t ptr);
+static int vgatext_devinit(struct vgatext_softc *, struct vis_devinit *data);
+static void	vgatext_cons_copy(struct vgatext_softc *,
+			struct vis_conscopy *);
+static void	vgatext_cons_display(struct vgatext_softc *,
+			struct vis_consdisplay *);
+static void	vgatext_cons_cursor(struct vgatext_softc *,
+			struct vis_conscursor *);
+static void	vgatext_polled_copy(struct vis_polledio_arg *,
+			struct vis_conscopy *);
+static void	vgatext_polled_display(struct vis_polledio_arg *,
+			struct vis_consdisplay *);
+static void	vgatext_polled_cursor(struct vis_polledio_arg *,
+			struct vis_conscursor *);
+static void	vgatext_init(struct vgatext_softc *);
+static void	vgatext_set_text(struct vgatext_softc *);
+#if	defined(USE_BORDERS)
+static void	vgatext_init_graphics(struct vgatext_softc *);
+#endif
+static int vgatext_kdsetmode(struct vgatext_softc *softc, int mode);
+static void vgatext_setfont(struct vgatext_softc *softc);
+static void vgatext_get_cursor(struct vgatext_softc *softc,
+		screen_pos_t *row, screen_pos_t *col);
+static void vgatext_set_cursor(struct vgatext_softc *softc, int row, int col);
+static void vgatext_hide_cursor(struct vgatext_softc *softc);
+static void vgatext_save_colormap(struct vgatext_softc *softc);
+static void vgatext_restore_colormap(struct vgatext_softc *softc);
+static int vgatext_get_pci_reg_index(dev_info_t *const devi,
+		unsigned long himask, unsigned long hival, unsigned long addr,
+		off_t *offset);
+static int vgatext_get_isa_reg_index(dev_info_t *const devi,
+		unsigned long hival, unsigned long addr, off_t *offset);
+
+static char	vgatext_silent;
+static char	happyface_boot;
+
 gfxp_vgatext_softc_ptr_t
 gfxp_vgatext_softc_alloc(void)
 {
@@ -241,6 +239,7 @@ gfxp_vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
 		goto fail;
 	}
 
+	/* Not enable AGP and DRM by default */
 #define	STREQ(a, b)	(strcmp((a), (b)) == 0)
 	if (STREQ(parent_type, "isa") || STREQ(parent_type, "eisa")) {
 		reg_rnumber = vgatext_get_isa_reg_index(devi, 1, VGA_REG_ADDR,
@@ -542,7 +541,7 @@ vgatext_kdsetmode(struct vgatext_softc *softc, int mode)
 }
 
 /*ARGSUSED*/
-static int
+int
 gfxp_vgatext_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 		size_t *maplen, uint_t model, void *ptr)
 {

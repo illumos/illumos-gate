@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +88,10 @@ typedef struct _agp_unbind {
 #define	AGPIOC_DEALLOCATE	_IOW(AGPIOC_BASE, 5, int)
 #define	AGPIOC_BIND		_IOW(AGPIOC_BASE, 6, agp_bind_t)
 #define	AGPIOC_UNBIND		_IOW(AGPIOC_BASE, 7, agp_unbind_t)
+#define	AGPIOC_IOREMAP		_IO(AGPIOC_BASE, 8)
+#define	AGPIOC_IOREMAP_FREE	_IO(AGPIOC_BASE, 9)
+#define	AGPIOC_READ		_IO(AGPIOC_BASE, 10)
+#define	AGPIOC_WRITE		_IO(AGPIOC_BASE, 11)
 
 /* AGP status register bits definition */
 #define	AGPSTAT_RQ_MASK		0xff000000	/* target only */

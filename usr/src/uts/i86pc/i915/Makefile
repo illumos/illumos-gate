@@ -18,45 +18,64 @@
 #
 # CDDL HEADER END
 #
+
 #
-# uts/intel/vgatext/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the VGA text driver
+# uts/i86pc/drm_i915/Makefile
 #
-#	intel implementation architecture independent
+#	This makefile drives the production of i915 graphics device driver,
+#	which supports the DRI (Direct Rendering Infrastructure), with the help
+#	of drm common misc module.
 #
-
+#	i86pc platform dependent
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE	= ../..
+UTSBASE = ../..
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= vgatext
-OBJECTS		= $(VGATEXT_OBJS:%=$(OBJS_DIR)/%) $(OBJS_DIR)/$(VGATEXT_FONT).o
-LINTS		= $(VGATEXT_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-VGATEXT_FONT	= 8859-1
-VGATEXT_SRC	= $(UTSBASE)/intel/io/vgatext
+MODULE		= i915
+OBJECTS		= $(I915_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(I915_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+I915_DRV_O	= $(OBJS_DIR)/i915_drv.o
+I915_DRV_C	= $(PSM_DRM_SRC)/i915_drv.c
+DRM_PCIIDS_H	= $(CMN_DRM_SRC)/drm_pciids.h
+DRM_PCIIDS_TXT	= $(CMN_DRM_SRC)/drm_pciids.txt
+CREATE_SUNOS_PCI_LISTS_SH	= $(CMN_DRM_SRC)/create_sunos_pci_lists.sh
 
-LDFLAGS +=	-dy -Nmisc/agpmaster
+# i915 driver depends on drm, agpmaster and gfx_private misc modules
+INC_PATH        += -I$(UTSBASE)/i86pc/io/drm \
+		   -I$(UTSBASE)/common/io/drm \
+		   -I$(UTSBASE)/i86pc/io/agpmaster \
+		   -I$(UTSBASE)/i86pc/io/gfx_private
+
+PSM_DRM_SRC	= $(UTSBASE)/i86pc/io/drm
+CMN_DRM_SRC	= $(UTSBASE)/common/io/drm
+
+#
+#	dependency
+LDFLAGS	+=      -dy -Nmisc/drm -Nmisc/agpmaster -Nmisc/gfx_private -Nmisc/pci_autoconfig
+
 #
 #	Include common rules.
 #
-include $(UTSBASE)/intel/Makefile.intel
+include $(UTSBASE)/i86pc/Makefile.i86pc
 
 #
-#	Define targets
+#	Re-define targets to add drm_pciids.h dependency
 #
-ALL_TARGET	= $(BINARY) # $(SRC_CONFILE)
+ALL_TARGET	= $(DRM_PCIIDS_H) $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+CLEANFILES	+= $(DRM_PCIIDS_H)
 
 #
 #	Default build targets.
@@ -79,19 +98,14 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-# Custom targets and rules
+$(I915_DRV_O):	$(DRM_PCIIDS_H)
 
-$(OBJS_DIR)/$(VGATEXT_FONT).c:	$(VGATEXT_SRC)/$(VGATEXT_FONT).bdf
-	awk -f $(VGATEXT_SRC)/bdf_to_c.awk	\
-		$(VGATEXT_SRC)/$(VGATEXT_FONT).bdf > $@
+$(I915_DRV_C):	$(DRM_PCIIDS_H)
 
-$(OBJS_DIR)/$(VGATEXT_FONT).o:	$(OBJS_DIR)/$(VGATEXT_FONT).c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
+$(DRM_PCIIDS_H):	$(DRM_PCIIDS_TXT)
+	$(CREATE_SUNOS_PCI_LISTS_SH) $(DRM_PCIIDS_TXT) > $@
 
 #
 #	Include common targets.
 #
-include $(UTSBASE)/intel/Makefile.targ
-
-CLEANFILES	+= $(OBJS_DIR)/$(VGATEXT_FONT).c
+include $(UTSBASE)/i86pc/Makefile.targ

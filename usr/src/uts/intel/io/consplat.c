@@ -45,6 +45,14 @@
 #include <sys/modctl.h>
 #include <sys/termios.h>
 
+/* The names of currently supported graphics drivers on x86 */
+static char *
+gfxdrv_name[] = {
+	"vgatext",
+	"i915",
+	"nvidia"
+};
+
 int
 plat_use_polled_debug() {
 	return (0);
@@ -137,38 +145,28 @@ plat_fbpath(void)
 	static char fbpath_buf[MAXPATHLEN];
 	major_t major;
 	dev_info_t *dip;
+	int i;
 
-	if (fbpath)
-		return (fbpath);
-
-	/*
-	 * look for first instance of vgatext
-	 */
-	major = ddi_name_to_major("vgatext");
-	if (major != (major_t)-1) {
-		dip = devnamesp[major].dn_head;
-		if (dip && i_ddi_attach_node_hierarchy(dip) == DDI_SUCCESS) {
-			(void) ddi_pathname(dip, fbpath_buf);
-			fbpath = fbpath_buf;
+	for (i = 0; i < (sizeof (gfxdrv_name) / sizeof (char *)); i++) {
+		/*
+		 * look for first instance of each driver
+		 */
+		major = ddi_name_to_major(gfxdrv_name[i]);
+		if (major != (major_t)-1) {
+			dip = devnamesp[major].dn_head;
+			if (dip &&
+			    i_ddi_attach_node_hierarchy(dip) == DDI_SUCCESS) {
+				(void) ddi_pathname(dip, fbpath_buf);
+				fbpath = fbpath_buf;
+			}
 		}
+
+		if (fbpath)
+			return (fbpath);
 	}
 
-	if (fbpath)
-		return (fbpath);
-
-	/*
-	 * Workaround for nvdia (the intrusive and unsupportable) driver
-	 */
-	major = ddi_name_to_major("nvidia");
-	if (major != (major_t)-1) {
-		dip = devnamesp[major].dn_head;
-		if (dip && i_ddi_attach_node_hierarchy(dip) == DDI_SUCCESS) {
-			(void) ddi_pathname(dip, fbpath_buf);
-			fbpath = fbpath_buf;
-		}
-	}
-
-	return (fbpath);
+	/* No screen found */
+	return (NULL);
 }
 
 char *

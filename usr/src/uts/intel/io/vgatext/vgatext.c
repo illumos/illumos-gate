@@ -57,21 +57,18 @@
 #define	MYNAME	"vgatext"
 
 /*
- * agp support macros
+ * Each instance of this driver has 2 minor nodes:
+ * 0: for common graphics operations
+ * 1: for agpmaster operations
  */
-#define	I8XX_MMIO_REGSET	2
-#define	I8XX_FB_REGSET		1
-#define	I8XX_PTE_OFFSET		0x10000
-#define	I8XX_PGTBL_CTL		0x2020
-#define	I915_GTTADDR_BAR	4
-#define	I915_FB_REGSET		3
+#define	GFX_MINOR		0
+#define	AGPMASTER_MINOR		1
 
-#define	IS_IGD(agp_master) ((agp_master->agpm_dev_type == DEVICE_IS_I810) || \
-		    (agp_master->agpm_dev_type == DEVICE_IS_I830))
-
-#define	DEV2INST(dev)		(getminor(dev) >> 1)
-#define	INST2NODE1(inst)	((inst) << 1)
-#define	INST2NODE2(inst)	(((inst) << 1) + 1)
+#define	MY_NBITSMINOR		1
+#define	DEV2INST(dev)		(getminor(dev) >> MY_NBITSMINOR)
+#define	DEV2MINOR(dev)		(getminor(dev) & ((1 << MY_NBITSMINOR) - 1))
+#define	INST2NODE1(inst)	((inst) << MY_NBITSMINOR + GFX_MINOR)
+#define	INST2NODE2(inst)	(((inst) << MY_NBITSMINOR) + AGPMASTER_MINOR)
 
 /* I don't know exactly where these should be defined, but this is a	*/
 /* heck of a lot better than constants in the code.			*/
@@ -113,7 +110,6 @@ static 	struct cb_ops cb_vgatext_ops = {
 	D_NEW | D_MTSAFE	/* cb_flag */
 };
 
-
 static int vgatext_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 		void **result);
 static int vgatext_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -134,29 +130,6 @@ static struct dev_ops vgatext_ops = {
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
 	NULL			/* power */
 };
-
-
-/*
- * agp support data structures
- */
-typedef struct gtt_impl {
-	ddi_acc_handle_t	gtt_mmio_handle; /* mmaped graph registers */
-	caddr_t			gtt_mmio_base; /* pointer to register base */
-	caddr_t			gtt_addr; /* pointer to gtt */
-	igd_info_t		gtt_info; /* for I8XX_GET_INFO ioctl */
-} gtt_impl_t;
-
-typedef struct agp_master_softc {
-	uint32_t		agpm_id; /* agp master device id */
-	ddi_acc_handle_t	agpm_acc_hdl; /* agp master pci conf handle */
-	int			agpm_dev_type; /* which agp device type */
-	union {
-		off_t		agpm_acaptr; /* AGP capability reg pointer */
-		gtt_impl_t	agpm_gtt; /* for gtt table */
-	} agpm_data;
-} agp_master_softc_t;
-
-
 
 struct vgatext_softc {
 	struct vgaregmap 	regs;
@@ -181,6 +154,7 @@ struct vgatext_softc {
 	}			colormap[VGA8_CMAP_ENTRIES];
 	unsigned char attrib_palette[VGA_ATR_NUM_PLT];
 	agp_master_softc_t	*agp_master; /* NULL mean not PCI, for AGP */
+	ddi_acc_handle_t	*pci_cfg_hdlp;	/* PCI conf handle */
 };
 
 static int vgatext_devinit(struct vgatext_softc *, struct vis_devinit *data);
@@ -214,18 +188,6 @@ static int vgatext_get_pci_reg_index(dev_info_t *const devi,
 		off_t *offset);
 static int vgatext_get_isa_reg_index(dev_info_t *const devi,
 		unsigned long hival, unsigned long addr, off_t *offset);
-/*
- * agp support functions prototype
- */
-static off_t agp_master_cap_find(ddi_acc_handle_t);
-static int detect_i8xx_device(agp_master_softc_t *);
-static int detect_agp_devcice(agp_master_softc_t *);
-static int agp_master_init(struct vgatext_softc *);
-static void agp_master_end(agp_master_softc_t *);
-static int phys2entry(uint32_t, uint32_t, uint32_t *);
-static int i8xx_add_to_gtt(gtt_impl_t *, igd_gtt_seg_t);
-static void i8xx_remove_from_gtt(gtt_impl_t *, igd_gtt_seg_t);
-
 static void	*vgatext_softc_head;
 static char	vgatext_silent;
 static char	happyface_boot;
@@ -356,6 +318,7 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	int	error;
 	char	*parent_type = NULL;
 	int	reg_rnumber;
+	int	agpm = 0;
 	off_t	reg_offset;
 	off_t	mem_offset;
 	char	buf[80], *cons;
@@ -434,8 +397,7 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			error = DDI_FAILURE;
 			goto fail;
 		}
-		softc->agp_master = (agp_master_softc_t *)
-		    kmem_zalloc(sizeof (agp_master_softc_t), KM_SLEEP);
+		agpm = 1;	/* should have AGP master support */
 	} else {
 		cmn_err(CE_WARN, MYNAME ": unknown parent type \"%s\".",
 			parent_type);
@@ -495,13 +457,19 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		vgatext_save_colormap(softc);
 	}
 
-	if (softc->agp_master != NULL) { /* is PCI */
-		if (agp_master_init(softc) != 0) { /* unsuccessful */
-			kmem_free(softc->agp_master,
-			    sizeof (agp_master_softc_t));
-			softc->agp_master = NULL;
-
+	if (agpm != 0) { /* try AGP master attach */
+		/* setup mapping for PCI config space access */
+		softc->pci_cfg_hdlp = (ddi_acc_handle_t *)
+		    kmem_zalloc(sizeof (ddi_acc_handle_t), KM_SLEEP);
+		error = pci_config_setup(devi, softc->pci_cfg_hdlp);
+		if (error != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "vgatext_attach: "
+			    "PCI configuration space setup failed");
+			goto fail;
 		}
+
+		(void) agpmaster_attach(softc->devi, &softc->agp_master,
+		    *softc->pci_cfg_hdlp, INST2NODE2(unit));
 	}
 
 	return (DDI_SUCCESS);
@@ -523,12 +491,8 @@ vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_DETACH:
 		if (softc->agp_master != NULL) { /* agp initiated */
-			agp_master_end(softc->agp_master);
-
-			kmem_free(softc->agp_master,
-			    sizeof (agp_master_softc_t));
-			softc->agp_master = NULL;
-
+			agpmaster_detach(&softc->agp_master);
+			pci_config_teardown(softc->pci_cfg_hdlp);
 		}
 
 		if (softc->fb.mapped)
@@ -600,18 +564,11 @@ vgatext_close(dev_t devp, int flag, int otyp, cred_t *cred)
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
-vgatext_ioctl(
-    dev_t dev,
-    int cmd,
-    intptr_t data,
-    int mode,
-    cred_t *cred,
-    int *rval)
+do_gfx_ioctl(int cmd, intptr_t data, int mode, struct vgatext_softc *softc)
 {
-	struct vgatext_softc *softc = getsoftc(DEV2INST(dev));
-	static char kernel_only[] = "vgatext_ioctl: %s is a kernel only ioctl";
+	static char kernel_only[] =
+	    "do_gfx_ioctl: %s is a kernel only ioctl";
 	int err;
 	int kd_mode;
 
@@ -709,261 +666,42 @@ vgatext_ioctl(
 			return (EFAULT);
 		break;
 
-#if 0
-	case GLY_LD_GLYPH:
-	{
-		temstat_t	*ap;
-		da_t	da;
-		struct glyph	g;
-		int	size;
-		uchar_t	*c;
-
-		if (ddi_copyin(arg, &g, sizeof (g), flag))
-			return (EFAULT);
-
-		size = g.width * g.height;
-		c = kmem_alloc(size, KM_SLEEP);
-
-		if (ddi_copyin(g.raster, c, size, flag)) {
-			kmem_free(c, size);
-			return (EFAULT);
-		}
-		ap = (temstat_t *)something;
-		da.data = c;
-		da.width = g.width;
-		da.height = g.height;
-		da.col = g.x_dest;
-		da.row = g.y_dest;
-		ap->a_fp.f_ad_display(ap->a_private, &da);
-		kmem_free(c, size);
-		return (0);
-	}
-#endif
-	case DEVICE_DETECT:
-	{
-		agp_master_softc_t *agp_master;
-
-		if (!(mode & FKIOCTL)) {
-			cmn_err(CE_CONT, kernel_only, "DEVICE_DETECT");
-			return (ENXIO);
-		}
-		agp_master = softc->agp_master;
-		ASSERT(agp_master);
-
-		if (!agp_master)
-			return (EINVAL);
-
-		if (ddi_copyout(&agp_master->agpm_dev_type,
-		    (void *)data, sizeof (int), mode))
-			return (EFAULT);
-		break;
-	}
-	case I8XX_GET_INFO:
-	{
-		agp_master_softc_t *agp_master;
-
-		if (!(mode & FKIOCTL)) {
-			cmn_err(CE_CONT, kernel_only, "I8XX_GET_INFO");
-			return (ENXIO);
-		}
-		agp_master = softc->agp_master;
-		ASSERT(agp_master);
-
-		if (!agp_master)
-			return (EINVAL);
-		ASSERT(IS_IGD(agp_master));
-
-		if (!IS_IGD(agp_master))
-			return (EINVAL);
-
-		if (ddi_copyout(&agp_master->agpm_data.agpm_gtt.gtt_info,
-		    (void *)data, sizeof (igd_info_t), mode))
-			return (EFAULT);
-		break;
-	}
-	case I810_SET_GTT_BASE:
-	{
-		uint32_t base;
-		uint32_t addr;
-		agp_master_softc_t *agp_master;
-
-		if (!(mode & FKIOCTL)) {
-			cmn_err(CE_CONT, kernel_only, "I8XX_SET_GTT_ADDR");
-			return (ENXIO);
-		}
-		agp_master = softc->agp_master;
-		ASSERT(agp_master);
-		if (!agp_master)
-			return (EINVAL);
-		ASSERT(agp_master->agpm_dev_type == DEVICE_IS_I810);
-
-		if (agp_master->agpm_dev_type != DEVICE_IS_I810)
-			return (EINVAL);
-
-		if (ddi_copyin((void *)data, &base, sizeof (uint32_t), mode))
-			return (EFAULT);
-
-		/* enables page table */
-		addr = (base & GTT_BASE_MASK) | GTT_TABLE_VALID;
-
-		ddi_put32(agp_master->agpm_data.agpm_gtt.gtt_mmio_handle,
-		    (uint32_t *)(agp_master->agpm_data.agpm_gtt.gtt_mmio_base +
-		    I8XX_PGTBL_CTL),
-		    addr);
-		break;
-	}
-	case I8XX_ADD2GTT:
-	{
-		igd_gtt_seg_t seg;
-		agp_master_softc_t *agp_master;
-
-		if (!(mode & FKIOCTL)) {
-			cmn_err(CE_CONT, kernel_only, "I8XX_ADD2GTT");
-			return (ENXIO);
-		}
-		agp_master = softc->agp_master;
-		ASSERT(agp_master);
-		if (!agp_master)
-			return (EINVAL);
-		ASSERT(IS_IGD(agp_master));
-
-		if (!IS_IGD(agp_master))
-			return (EINVAL);
-
-		if (ddi_copyin((void *)data, &seg,
-		    sizeof (igd_gtt_seg_t), mode))
-			return (EFAULT);
-
-		if (i8xx_add_to_gtt(&agp_master->agpm_data.agpm_gtt, seg))
-			return (EINVAL);
-		break;
-	}
-	case I8XX_REM_GTT:
-	{
-		igd_gtt_seg_t seg;
-		agp_master_softc_t *agp_master;
-
-		if (!(mode & FKIOCTL)) {
-			cmn_err(CE_CONT, kernel_only, "I8XX_REM_GTT");
-			return (ENXIO);
-		}
-		agp_master = softc->agp_master;
-		ASSERT(agp_master);
-		if (!agp_master)
-			return (EINVAL);
-		ASSERT(IS_IGD(agp_master));
-
-		if (!IS_IGD(agp_master))
-			return (EINVAL);
-
-		if (ddi_copyin((void *)data, &seg,
-		    sizeof (igd_gtt_seg_t), mode))
-			return (EFAULT);
-
-		i8xx_remove_from_gtt(&agp_master->agpm_data.agpm_gtt, seg);
-		break;
-	}
-	case I8XX_UNCONFIG:
-	{
-		agp_master_softc_t *agp_master;
-
-		if (!(mode & FKIOCTL)) {
-		    cmn_err(CE_CONT, kernel_only, "I8XX_UNCONFIG");
-		    return (ENXIO);
-		}
-		agp_master = softc->agp_master;
-		ASSERT(agp_master);
-		if (!agp_master)
-			return (EINVAL);
-		ASSERT(IS_IGD(agp_master));
-
-		if (!IS_IGD(agp_master))
-			return (EINVAL);
-
-		if (agp_master->agpm_dev_type == DEVICE_IS_I810)
-			ddi_put32(
-			    agp_master->agpm_data.agpm_gtt.gtt_mmio_handle,
-			    (uint32_t *)
-			    (agp_master->agpm_data.agpm_gtt.gtt_mmio_base +
-			    I8XX_PGTBL_CTL),
-			    0);
-		/*
-		 * may clear all gtt entries here for i830,
-		 * but may not be necessary
-		 */
-		break;
-	}
-	case AGP_MASTER_GETINFO:
-	{
-		agp_info_t info;
-		uint32_t value;
-		off_t cap;
-		agp_master_softc_t *agp_master;
-
-		if (!(mode & FKIOCTL)) {
-			cmn_err(CE_CONT, kernel_only, "AGP_MASTER_GETINFO");
-			return (ENXIO);
-		}
-		agp_master = softc->agp_master;
-		ASSERT(agp_master);
-		if (!agp_master)
-			return (EINVAL);
-		ASSERT(agp_master->agpm_dev_type == DEVICE_IS_AGP);
-		if (agp_master->agpm_dev_type != DEVICE_IS_AGP)
-			return (EINVAL);
-
-		ASSERT(agp_master->agpm_data.agpm_acaptr);
-		if (agp_master->agpm_data.agpm_acaptr == 0)
-			return (EINVAL);
-
-		cap = agp_master->agpm_data.agpm_acaptr;
-		value = pci_config_get32(agp_master->agpm_acc_hdl, cap);
-		info.agpi_version.agpv_major = (uint16_t)((value >> 20) & 0xf);
-		info.agpi_version.agpv_minor = (uint16_t)((value >> 16) & 0xf);
-		info.agpi_devid = agp_master->agpm_id;
-		info.agpi_mode = pci_config_get32(
-		    agp_master->agpm_acc_hdl, cap + AGP_CONF_STATUS);
-
-		if (ddi_copyout(&info, (void *)data,
-		    sizeof (agp_info_t), mode))
-			return (EFAULT);
-		break;
-	}
-	case AGP_MASTER_SETCMD:
-	{
-		uint32_t command;
-		agp_master_softc_t *agp_master;
-
-		if (!(mode & FKIOCTL)) {
-			cmn_err(CE_CONT, kernel_only, "AGP_MASTER_SETCMD");
-			return (ENXIO);
-		}
-		agp_master = softc->agp_master;
-		ASSERT(agp_master);
-		if (!agp_master)
-			return (EINVAL);
-		ASSERT(agp_master->agpm_dev_type == DEVICE_IS_AGP);
-		if (agp_master->agpm_dev_type != DEVICE_IS_AGP)
-			return (EINVAL);
-
-		ASSERT(agp_master->agpm_data.agpm_acaptr);
-		if (agp_master->agpm_data.agpm_acaptr == 0)
-			return (EINVAL);
-
-		if (ddi_copyin((void *)data, &command,
-		    sizeof (uint32_t), mode))
-			return (EFAULT);
-
-		pci_config_put32(agp_master->agpm_acc_hdl,
-		    agp_master->agpm_data.agpm_acaptr + AGP_CONF_COMMAND,
-		    command);
-		break;
-
-	}
 	default:
 		return (ENXIO);
 	}
 	return (0);
+}
+
+
+/*ARGSUSED*/
+static int
+vgatext_ioctl(
+    dev_t dev,
+    int cmd,
+    intptr_t data,
+    int mode,
+    cred_t *cred,
+    int *rval)
+{
+	struct vgatext_softc *softc = getsoftc(DEV2INST(dev));
+	int err;
+
+	switch (DEV2MINOR(dev)) {
+	case GFX_MINOR:
+		err = do_gfx_ioctl(cmd, data, mode, softc);
+		break;
+
+	case AGPMASTER_MINOR:
+		err = agpmaster_ioctl(dev, cmd, data, mode, cred, rval,
+		    softc->agp_master);
+		break;
+
+	default:
+		/* not a valid minor node */
+		return (EBADF);
+	}
+	return (err);
+
 }
 
 static int
@@ -1608,311 +1346,4 @@ vgatext_get_isa_reg_index(
 	kmem_free(reg, (size_t)length);
 
 	return (-1);
-}
-
-/*
- * If AGP cap pointer is successfully found, none-zero value is returned.
- * Otherwise 0 is returned.
- */
-static off_t
-agp_master_cap_find(ddi_acc_handle_t acc_handle)
-{
-	off_t		nextcap;
-	uint32_t	ncapid;
-	uint8_t		value;
-
-	/* check if this device supports capibility pointer */
-	value = (uint8_t)(pci_config_get16(acc_handle, PCI_CONF_STAT)
-			    & PCI_CONF_CAP_MASK);
-
-	if (!value)
-		return (0);
-	/* get the offset of the first capability pointer from CAPPTR */
-	nextcap = (off_t)(pci_config_get8(acc_handle, AGP_CONF_CAPPTR));
-
-	/* check AGP capability from the first capability pointer */
-	while (nextcap) {
-		ncapid = pci_config_get32(acc_handle, nextcap);
-		if ((ncapid & PCI_CONF_CAPID_MASK)
-		    == AGP_CAP_ID) /* find AGP cap */
-			break;
-
-		nextcap = (off_t)((ncapid & PCI_CONF_NCAPID_MASK) >> 8);
-	}
-
-	return (nextcap);
-
-}
-
-/*
- * If i8xx device is successfully detected, 0 is returned.
- * Otherwise -1 is returned.
- */
-static int
-detect_i8xx_device(agp_master_softc_t *master_softc)
-{
-
-	switch (master_softc->agpm_id) {
-	case INTEL_IGD_810:
-	case INTEL_IGD_810DC:
-	case INTEL_IGD_810E:
-	case INTEL_IGD_815:
-		master_softc->agpm_dev_type = DEVICE_IS_I810;
-		break;
-	case INTEL_IGD_830M:
-	case INTEL_IGD_845G:
-	case INTEL_IGD_855GM:
-	case INTEL_IGD_865G:
-	case INTEL_IGD_910:
-	case INTEL_IGD_910M:
-		master_softc->agpm_dev_type = DEVICE_IS_I830;
-		break;
-	default:		/* unknown id */
-		return (-1);
-	}
-
-	return (0);
-}
-
-/*
- * If agp master is succssfully detected, 0 is returned.
- * Otherwise -1 is returned.
- */
-static int
-detect_agp_devcice(agp_master_softc_t *master_softc)
-{
-	off_t cap;
-
-	cap = agp_master_cap_find(master_softc->agpm_acc_hdl);
-	if (cap) {
-		master_softc->agpm_dev_type = DEVICE_IS_AGP;
-		master_softc->agpm_data.agpm_acaptr = cap;
-		return (0);
-	} else {
-		return (-1);
-	}
-
-}
-
-/*
- * If agp master is successfully initialized, 0 is returned.
- * Otherwise -1 is returned.
- */
-static int
-agp_master_init(struct vgatext_softc *softc)
-{
-	dev_info_t *devi;
-	int instance;
-	int status;
-	agp_master_softc_t *agp_master;
-	uint32_t value;
-	off_t reg_size;
-
-
-	ASSERT(softc);
-	agp_master = softc->agp_master;
-
-	devi = softc->devi;
-
-	instance = ddi_get_instance(devi);
-
-	status = pci_config_setup(devi, &agp_master->agpm_acc_hdl);
-
-	if (status != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "agp_master_init: pci_config_setup failed");
-		return (-1);
-	}
-
-	agp_master->agpm_id =
-	    pci_config_get32(agp_master->agpm_acc_hdl, PCI_CONF_VENID);
-
-	if (!detect_i8xx_device(agp_master)) {
-		/* map mmio register set */
-		if ((agp_master->agpm_id == INTEL_IGD_910) ||
-		    (agp_master->agpm_id == INTEL_IGD_910M)) {
-			status = ddi_regs_map_setup(devi, I915_GTTADDR_BAR,
-			    &agp_master->agpm_data.agpm_gtt.gtt_mmio_base,
-			    0, 0, &i8xx_dev_access,
-			    &agp_master->agpm_data.agpm_gtt.gtt_mmio_handle);
-
-		} else {
-			status = ddi_regs_map_setup(devi, I8XX_MMIO_REGSET,
-			    &agp_master->agpm_data.agpm_gtt.gtt_mmio_base,
-			    0, 0, &i8xx_dev_access,
-			    &agp_master->agpm_data.agpm_gtt.gtt_mmio_handle);
-		}
-
-		if (status != DDI_SUCCESS) {
-			cmn_err(CE_WARN,
-			    "agp_master_init: ddi_regs_map_setup failed");
-			agp_master_end(agp_master);
-			return (-1);
-		}
-		/* get GTT range base offset */
-		if ((agp_master->agpm_id == INTEL_IGD_910) ||
-		    (agp_master->agpm_id == INTEL_IGD_910M)) {
-			agp_master->agpm_data.agpm_gtt.gtt_addr =
-			    agp_master->agpm_data.agpm_gtt.gtt_mmio_base;
-		} else
-			agp_master->agpm_data.agpm_gtt.gtt_addr =
-			    agp_master->agpm_data.agpm_gtt.gtt_mmio_base +
-			    I8XX_PTE_OFFSET;
-
-		/* get graphics memory size */
-		if ((agp_master->agpm_id == INTEL_IGD_910) ||
-		    (agp_master->agpm_id == INTEL_IGD_910M)) {
-			status = ddi_dev_regsize(devi, I915_FB_REGSET,
-			    &reg_size);
-		} else
-			status = ddi_dev_regsize(devi, I8XX_FB_REGSET,
-			    &reg_size);
-		/*
-		 * if memory size is smaller than a certain value, it means
-		 * the register set number for graphics memory range might
-		 * be wrong
-		 */
-		if (status != DDI_SUCCESS || reg_size < 0x400000) {
-			cmn_err(CE_WARN,
-			    "agp_master_init: ddi_dev_regsize error");
-			agp_master_end(agp_master);
-			return (-1);
-		}
-
-		agp_master->agpm_data.agpm_gtt.gtt_info.igd_apersize =
-		    BYTES2MB(reg_size);
-
-		if ((agp_master->agpm_id == INTEL_IGD_910) ||
-		    (agp_master->agpm_id == INTEL_IGD_910M))
-			value = pci_config_get32(agp_master->agpm_acc_hdl,
-			    I915_CONF_GMADR);
-		else
-			value = pci_config_get32(agp_master->agpm_acc_hdl,
-			    I8XX_CONF_GMADR);
-		agp_master->agpm_data.agpm_gtt.gtt_info.igd_aperbase =
-		    value & GTT_BASE_MASK;
-		agp_master->agpm_data.agpm_gtt.gtt_info.igd_devid =
-		    agp_master->agpm_id;
-	} else if (detect_agp_devcice(agp_master)) {
-		/*
-		 * non IGD or AGP devices, not error
-		 */
-		agp_master_end(agp_master);
-		return (-1);
-	}
-
-	/* create extra minor node for IGD or AGP device */
-	status = ddi_create_minor_node(softc->devi, AGPMASTER_NAME,
-		    S_IFCHR, INST2NODE2(instance), DDI_NT_AGP_MASTER, 0);
-
-	if (status != DDI_SUCCESS) {
-		cmn_err(CE_WARN,
-		    "agp_master_init: create agpmaster node failed");
-		agp_master_end(agp_master);
-		return (-1);
-	}
-
-	return (0);
-}
-
-/*
- * Minor node is not removed here, since vgatext_detach is responsible
- * for removing all nodes.
- */
-static void
-agp_master_end(agp_master_softc_t *master_softc)
-{
-	ASSERT(master_softc);
-
-	/* intel integrated device */
-	if (IS_IGD(master_softc)) {
-		if (master_softc->agpm_data.agpm_gtt.gtt_mmio_handle != NULL) {
-			ddi_regs_map_free(
-			    &master_softc->agpm_data.agpm_gtt.gtt_mmio_handle);
-		}
-	}
-	if (master_softc->agpm_acc_hdl != NULL) {
-		pci_config_teardown(&master_softc->agpm_acc_hdl);
-	}
-
-	bzero(master_softc, sizeof (agp_master_softc_t));
-	return;
-
-}
-
-/*
- * Please refer to GART and GTT entry format table in agpdefs.h for
- * intel GTT entry format.
- */
-static int
-phys2entry(uint32_t type, uint32_t physaddr, uint32_t *entry)
-{
-	uint32_t value;
-
-	switch (type) {
-	case AGP_PHYSICAL:
-	case AGP_NORMAL:
-		value = (physaddr & GTT_PTE_MASK) | GTT_PTE_VALID;
-		break;
-	default:
-		return (-1);
-	}
-
-	*entry = value;
-
-	return (0);
-}
-
-static int
-i8xx_add_to_gtt(gtt_impl_t *gtt, igd_gtt_seg_t seg)
-{
-	int i;
-	uint32_t *paddr;
-	uint32_t entry;
-	uint32_t maxpages;
-
-	maxpages = gtt->gtt_info.igd_apersize;
-	maxpages = GTT_MB_TO_PAGES(maxpages);
-
-	paddr = seg.igs_phyaddr;
-
-	/*
-	 * check if gtt max pages reached
-	 */
-	if ((seg.igs_pgstart + seg.igs_npage) > maxpages)
-		return (-1);
-
-	paddr = seg.igs_phyaddr;
-	for (i = seg.igs_pgstart; i < (seg.igs_pgstart + seg.igs_npage);
-	    i++, paddr++) {
-		if (phys2entry(seg.igs_type, *paddr, &entry))
-			return (-1);
-		ddi_put32(gtt->gtt_mmio_handle,
-		    (uint32_t *)(gtt->gtt_addr + i * sizeof (uint32_t)),
-		    entry);
-	}
-
-	return (0);
-}
-
-static void
-i8xx_remove_from_gtt(gtt_impl_t *gtt, igd_gtt_seg_t seg)
-{
-	int i;
-	uint32_t maxpages;
-
-	maxpages = gtt->gtt_info.igd_apersize;
-	maxpages = GTT_MB_TO_PAGES(maxpages);
-
-	/*
-	 * check if gtt max pages reached
-	 */
-	if ((seg.igs_pgstart + seg.igs_npage) > maxpages)
-		return;
-
-	for (i = seg.igs_pgstart; i < (seg.igs_pgstart + seg.igs_npage); i++) {
-		ddi_put32(gtt->gtt_mmio_handle,
-		    (uint32_t *)(gtt->gtt_addr +
-		    i * sizeof (uint32_t)),
-		    0);
-	}
 }

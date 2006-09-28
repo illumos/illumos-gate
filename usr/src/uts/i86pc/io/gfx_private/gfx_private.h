@@ -87,6 +87,8 @@ extern int gfxp_vgatext_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 
 extern int gfxp_mlock_user_memory(caddr_t address, size_t length);
 extern int gfxp_munlock_user_memory(caddr_t address, size_t length);
+extern int gfxp_vgatext_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off,
+	size_t len, size_t *maplen, uint_t model, void *ptr);
 
 #ifdef __cplusplus
 }

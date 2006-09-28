@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #	This Makefile defines the build rules for the directory uts/i86pc
@@ -127,6 +127,17 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/agpgart/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/gfx_private/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/agpmaster/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/drm/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/drm/%.s
+	$(COMPILE.s) -o $@ $<
 
 # ridiculous contortions ---
 ATOMIC_SUBDIR_32	= i386
@@ -319,4 +330,13 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/disassembler/%.c
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/gfx_private/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/agpmaster/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/drm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/drm/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 

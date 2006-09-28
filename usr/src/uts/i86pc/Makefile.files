@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This Makefile defines file modules in the directory uts/i86pc
 #	and its children. These are the source files which are i86pc
@@ -196,6 +196,10 @@ POWER_OBJS	+= power.o
 
 GFX_PRIVATE_OBJS	+= gfx_private.o gfxp_pci.o gfxp_segmap.o \
 			   gfxp_devmap.o gfxp_vgatext.o gfxp_vm.o vgasubr.o
+AGP_OBJS	+= agpmaster.o
+
+#	DRM Intel integrated chipsets (i915) codes
+I915_OBJS	+= i915_sundrv.o i915_dma.o i915_drv.o i915_irq.o i915_mem.o
 
 #
 #	Build up defines and paths.

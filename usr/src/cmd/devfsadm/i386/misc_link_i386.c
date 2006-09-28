@@ -46,11 +46,15 @@ static int kdmouse(di_minor_t minor, di_node_t node);
 static int bmc(di_minor_t minor, di_node_t node);
 static int smbios(di_minor_t minor, di_node_t node);
 static int agp_process(di_minor_t minor, di_node_t node);
+static int drm_node(di_minor_t minor, di_node_t node);
 static int mc_node(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t misc_cbt[] = {
 	{ "vt00", "ddi_display", NULL,
 	    TYPE_EXACT, ILEVEL_0,	vt00
+	},
+	{ "drm", "ddi_display:drm", NULL,
+	    TYPE_EXACT, ILEVEL_0,	drm_node
 	},
 	{ "mouse", "ddi_mouse", "mouse8042",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, kdmouse
@@ -92,13 +96,14 @@ static devfsadm_create_t misc_cbt[] = {
 
 DEVFSADM_CREATE_INIT_V0(misc_cbt);
 
-static char *debug_mid = "agp_mid";
+static char *debug_mid = "misc_mid";
 
 typedef enum {
 	DRIVER_AGPPSEUDO = 0,
 	DRIVER_AGPTARGET,
 	DRIVER_CPUGART,
-	DRIVER_AGPMASTER,
+	DRIVER_AGPMASTER_DRM,
+	DRIVER_AGPMASTER_VGATEXT,
 	DRIVER_UNKNOWN
 } driver_defs_t;
 
@@ -111,7 +116,9 @@ static driver_name_table_entry_t driver_name_table[] = {
 	{ "agpgart",		DRIVER_AGPPSEUDO },
 	{ "agptarget",		DRIVER_AGPTARGET },
 	{ "amd64_gart",		DRIVER_CPUGART },
-	{ "vgatext",		DRIVER_AGPMASTER },
+	/* AGP master device managed by drm driver */
+	{ "i915",		DRIVER_AGPMASTER_DRM },
+	{ "vgatext",		DRIVER_AGPMASTER_VGATEXT },
 	{ NULL,			DRIVER_UNKNOWN }
 };
 
@@ -403,7 +410,8 @@ agp_process(di_minor_t minor, di_node_t node)
 		rules[0] = cpugart_rules[0];
 		name = "cpugart";
 		break;
-	case DRIVER_AGPMASTER:
+	case DRIVER_AGPMASTER_DRM:
+	case DRIVER_AGPMASTER_VGATEXT:
 		devfsadm_print(debug_mid,
 			    "agp_process: agpmaster driver name\n");
 		rules[0] = agpmaster_rules[0];
@@ -440,6 +448,78 @@ agp_process(di_minor_t minor, di_node_t node)
 	free(I_path);
 
 	return (DEVFSADM_CONTINUE);
+}
+
+static int
+drm_node(di_minor_t minor, di_node_t node)
+{
+	char *minor_nm, *drv_nm;
+	char *devfspath;
+	char *I_path, *p_path, *buf;
+	char *name = "card";
+
+	devfsadm_enumerate_t drm_rules[1] = {"^dri$/^card([0-9]+)$", 1,
+		MATCH_ALL };
+
+
+	minor_nm = di_minor_name(minor);
+	drv_nm = di_driver_name(node);
+	if ((minor_nm == NULL) || (drv_nm == NULL)) {
+		return (DEVFSADM_CONTINUE);
+	}
+
+	devfsadm_print(debug_mid, "drm_node: minor=%s node=%s type=%s\n",
+	    minor_nm, di_node_name(node), di_minor_nodetype(minor));
+
+	devfspath = di_devfs_path(node);
+	if (devfspath == NULL) {
+		devfsadm_print(debug_mid, "drm_node: devfspath is NULL\n");
+		return (DEVFSADM_CONTINUE);
+	}
+
+	I_path = (char *)malloc(PATH_MAX);
+
+	if (I_path == NULL) {
+		di_devfs_path_free(devfspath);
+		devfsadm_print(debug_mid,  "drm_node: malloc failed\n");
+		return (DEVFSADM_CONTINUE);
+	}
+
+	p_path = (char *)malloc(PATH_MAX);
+
+	if (p_path == NULL) {
+		devfsadm_print(debug_mid,  "drm_node: malloc failed\n");
+		di_devfs_path_free(devfspath);
+		free(I_path);
+		return (DEVFSADM_CONTINUE);
+	}
+
+	(void) strlcpy(p_path, devfspath, PATH_MAX);
+	(void) strlcat(p_path, ":", PATH_MAX);
+	(void) strlcat(p_path, minor_nm, PATH_MAX);
+	di_devfs_path_free(devfspath);
+
+	devfsadm_print(debug_mid, "drm_node: p_path %s\n", p_path);
+
+	if (devfsadm_enumerate_int(p_path, 0, &buf, drm_rules, 1)) {
+		free(p_path);
+		devfsadm_print(debug_mid, "drm_node: exit/coninue\n");
+		return (DEVFSADM_CONTINUE);
+	}
+	(void) snprintf(I_path, PATH_MAX, "dri/%s%s", name, buf);
+
+	devfsadm_print(debug_mid, "drm_node: p_path=%s buf=%s\n",
+		    p_path, buf);
+
+	free(buf);
+
+	devfsadm_print(debug_mid, "mklink %s -> %s\n", I_path, p_path);
+	(void) devfsadm_mklink(I_path, node, minor, 0);
+
+	free(p_path);
+	free(I_path);
+
+	return (0);
 }
 
 /*

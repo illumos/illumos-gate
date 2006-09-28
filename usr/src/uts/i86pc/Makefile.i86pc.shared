@@ -263,6 +263,7 @@ DRV_KMODS	+= pcplusmp
 DRV_KMODS	+= agpgart
 DRV_KMODS	+= agptarget
 DRV_KMODS	+= amd64_gart
+DRV_KMODS	+= i915
 
 DRV_KMODS	+= cpc
 DRV_KMODS	+= mc-amd
@@ -321,7 +322,8 @@ SYS_KMODS	+=
 #
 #	'Misc' Modules (/kernel/misc):
 #
-MISC_KMODS	+= pci_autoconfig bootdev acpica pciehpc gfx_private
+MISC_KMODS	+= pci_autoconfig bootdev acpica pciehpc gfx_private \
+		agpmaster drm
 
 #
 #	'Mach' Modules (/kernel/mach):

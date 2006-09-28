@@ -104,10 +104,12 @@ f none platform/i86pc/kernel/mach/amd64/uppc 755 root sys
 f none platform/i86pc/kernel/mach/uppc 755 root sys
 d none platform/i86pc/kernel/misc 755 root sys
 d none platform/i86pc/kernel/misc/amd64 755 root sys
+f none platform/i86pc/kernel/misc/amd64/agpmaster 755 root sys
 f none platform/i86pc/kernel/misc/amd64/bootdev 755 root sys
 f none platform/i86pc/kernel/misc/amd64/gfx_private 755 root sys
 f none platform/i86pc/kernel/misc/amd64/pci_autoconfig 755 root sys
 f none platform/i86pc/kernel/misc/amd64/pciehpc 755 root sys
+f none platform/i86pc/kernel/misc/agpmaster 755 root sys
 f none platform/i86pc/kernel/misc/bootdev 755 root sys
 f none platform/i86pc/kernel/misc/gfx_private 755 root sys
 f none platform/i86pc/kernel/misc/pci_autoconfig 755 root sys

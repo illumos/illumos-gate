@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,29 @@ typedef struct igd_info {
 	uint32_t	igd_aperbase;
 	size_t		igd_apersize; /* in MB */
 } igd_info_t;
+
+typedef struct gtt_impl {
+	ddi_acc_handle_t	gtt_mmio_handle; /* mmaped graph registers */
+	caddr_t			gtt_mmio_base; /* pointer to register base */
+	caddr_t			gtt_addr; /* pointer to gtt */
+	igd_info_t		gtt_info; /* for I8XX_GET_INFO ioctl */
+} gtt_impl_t;
+
+typedef struct agp_master_softc {
+	uint32_t		agpm_id; /* agp master device id */
+	ddi_acc_handle_t	agpm_acc_hdl; /* agp master pci conf handle */
+	int			agpm_dev_type; /* which agp device type */
+	union {
+		off_t		agpm_acaptr; /* AGP capability reg pointer */
+		gtt_impl_t	agpm_gtt; /* for gtt table */
+	} agpm_data;
+} agp_master_softc_t;
+
+extern int agpmaster_attach(dev_info_t *, agp_master_softc_t **,
+    ddi_acc_handle_t, minor_t);
+extern void agpmaster_detach(agp_master_softc_t **);
+extern int agpmaster_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
+    cred_t *cred, int *rval, agp_master_softc_t *softc);
 
 #endif /* _KERNEL */
 

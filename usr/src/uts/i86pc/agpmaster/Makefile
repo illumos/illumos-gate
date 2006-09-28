@@ -18,16 +18,18 @@
 #
 # CDDL HEADER END
 #
+
+# uts/i86pc/agpmaster/Makefile
 #
-# uts/intel/vgatext/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the VGA text driver
+#	This makefile drives the production of the common graphics
+#	interface kernel module.
 #
-#	intel implementation architecture independent
+#	i86pc platform dependent
 #
 
 #
@@ -38,23 +40,26 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= vgatext
-OBJECTS		= $(VGATEXT_OBJS:%=$(OBJS_DIR)/%) $(OBJS_DIR)/$(VGATEXT_FONT).o
-LINTS		= $(VGATEXT_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-VGATEXT_FONT	= 8859-1
-VGATEXT_SRC	= $(UTSBASE)/intel/io/vgatext
+MODULE		= agpmaster
+OBJECTS		= $(AGP_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(AGP_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
+INC_PATH	+= -I$(UTSBASE)/i86pc/io/agpmaster
 
-LDFLAGS +=	-dy -Nmisc/agpmaster
+#
+#	dependency
+#
+LDFLAGS	+=      -dy -Nmisc/pci_autoconfig
+
 #
 #	Include common rules.
 #
-include $(UTSBASE)/intel/Makefile.intel
+include $(UTSBASE)/i86pc/Makefile.i86pc
 
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) # $(SRC_CONFILE)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
@@ -79,19 +84,7 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-# Custom targets and rules
-
-$(OBJS_DIR)/$(VGATEXT_FONT).c:	$(VGATEXT_SRC)/$(VGATEXT_FONT).bdf
-	awk -f $(VGATEXT_SRC)/bdf_to_c.awk	\
-		$(VGATEXT_SRC)/$(VGATEXT_FONT).bdf > $@
-
-$(OBJS_DIR)/$(VGATEXT_FONT).o:	$(OBJS_DIR)/$(VGATEXT_FONT).c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 #
 #	Include common targets.
 #
-include $(UTSBASE)/intel/Makefile.targ
-
-CLEANFILES	+= $(OBJS_DIR)/$(VGATEXT_FONT).c
+include $(UTSBASE)/i86pc/Makefile.targ
