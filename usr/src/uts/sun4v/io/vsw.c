@@ -1324,19 +1324,20 @@ vsw_mac_detach(vsw_t *vswp)
 	D1(vswp, "vsw_mac_detach: enter");
 
 	ASSERT(vswp != NULL);
-	ASSERT(vswp->mh != NULL);
 
 	if (vsw_multi_ring_enable) {
 		vsw_mac_ring_tbl_destroy(vswp);
 	}
 
-	if (vswp->mstarted)
-		mac_stop(vswp->mh);
-	if (vswp->mrh != NULL)
-		mac_rx_remove(vswp->mh, vswp->mrh);
-	if (vswp->mresources)
-		mac_resource_set(vswp->mh, NULL, NULL);
-	mac_close(vswp->mh);
+	if (vswp->mh != NULL) {
+		if (vswp->mstarted)
+			mac_stop(vswp->mh);
+		if (vswp->mrh != NULL)
+			mac_rx_remove(vswp->mh, vswp->mrh);
+		if (vswp->mresources)
+			mac_resource_set(vswp->mh, NULL, NULL);
+		mac_close(vswp->mh);
+	}
 
 	vswp->mrh = NULL;
 	vswp->mh = NULL;
