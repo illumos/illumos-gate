@@ -526,8 +526,7 @@ rfs4_server_start(int nfs4_srv_delegation)
 				/* cold start */
 				rfs4_state_init();
 				nfs4_drc = rfs4_init_drc(nfs4_drc_max,
-							nfs4_drc_hash,
-							nfs4_drc_lifetime);
+							nfs4_drc_hash);
 			}
 
 			/*

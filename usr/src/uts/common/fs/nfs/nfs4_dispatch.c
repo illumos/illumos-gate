@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -45,13 +44,6 @@
 rfs4_drc_t *nfs4_drc = NULL;
 
 /*
- * How long the entry can remain in the cache
- * once it has been sent to the client and not
- * used in a reply (in seconds)
- */
-unsigned nfs4_drc_lifetime = 1;
-
-/*
  * The default size of the duplicate request cache
  */
 uint32_t nfs4_drc_max = 8 * 1024;
@@ -66,7 +58,7 @@ uint32_t nfs4_drc_hash = 541;
  * Initialize a duplicate request cache.
  */
 rfs4_drc_t *
-rfs4_init_drc(uint32_t drc_size, uint32_t drc_hash_size, unsigned ttl)
+rfs4_init_drc(uint32_t drc_size, uint32_t drc_hash_size)
 {
 	rfs4_drc_t *drc;
 	uint32_t   bki;
@@ -78,7 +70,6 @@ rfs4_init_drc(uint32_t drc_size, uint32_t drc_hash_size, unsigned ttl)
 
 	drc->max_size = drc_size;
 	drc->in_use = 0;
-	drc->drc_ttl = ttl;
 
 	mutex_init(&drc->lock, NULL, MUTEX_DEFAULT, NULL);
 
@@ -166,15 +157,10 @@ rfs4_dr_chstate(rfs4_dupreq_t *drp, int new_state)
 /*
  * rfs4_alloc_dr:
  *
- * Pick an entry off the tail -- Use if it is
- * marked NFS4_DUP_FREE, or is an entry in the
- * NFS4_DUP_REPLAY state that has timed-out...
- * Otherwise malloc a new one if we have not reached
- * our maximum cache limit.
- *
- * The list should be in time order, so no need
- * to traverse backwards looking for a timed out
- * entry, NFS4_DUP_FREE's are place on the tail.
+ * Malloc a new one if we have not reached our maximum cache
+ * limit, otherwise pick an entry off the tail -- Use if it
+ * is marked as NFS4_DUP_FREE, or is an entry in the
+ * NFS4_DUP_REPLAY state.
  */
 rfs4_dupreq_t *
 rfs4_alloc_dr(rfs4_drc_t *drc)
@@ -184,7 +170,27 @@ rfs4_alloc_dr(rfs4_drc_t *drc)
 	ASSERT(drc);
 	ASSERT(MUTEX_HELD(&drc->lock));
 
-	if ((drp_tail = list_tail(&drc->dr_cache)) != NULL) {
+	/*
+	 * Have we hit the cache limit yet ?
+	 */
+	if (drc->in_use < drc->max_size) {
+		/*
+		 * nope, so let's malloc a new one
+		 */
+		drp = kmem_zalloc(sizeof (rfs4_dupreq_t), KM_SLEEP);
+		drp->drc = drc;
+		drc->in_use++;
+		gethrestime(&drp->dr_time_created);
+		DTRACE_PROBE1(nfss__i__drc_new, rfs4_dupreq_t *, drp);
+		return (drp);
+	}
+
+	/*
+	 * Cache is all allocated now traverse the list
+	 * backwards to find one we can reuse.
+	 */
+	for (drp_tail = list_tail(&drc->dr_cache); drp_tail != NULL;
+	    drp_tail = list_prev(&drc->dr_cache, drp_tail)) {
 
 		switch (drp_tail->dr_state) {
 
@@ -196,37 +202,16 @@ rfs4_alloc_dr(rfs4_drc_t *drc)
 			/* NOTREACHED */
 
 		case NFS4_DUP_REPLAY:
-			if (gethrestime_sec() >
-			    drp_tail->dr_time_used.tv_sec+drc->drc_ttl) {
-				/* this entry has timedout so grab it. */
-				rfs4_dr_chstate(drp_tail, NFS4_DUP_FREE);
-				DTRACE_PROBE1(nfss__i__drc_ttlclaim,
+			/* grab it. */
+			rfs4_dr_chstate(drp_tail, NFS4_DUP_FREE);
+			DTRACE_PROBE1(nfss__i__drc_replayclaim,
 					rfs4_dupreq_t *, drp_tail);
-				return (drp_tail);
-			}
-			break;
+			return (drp_tail);
+			/* NOTREACHED */
 		}
 	}
-
-	/*
-	 * Didn't find something to recycle have
-	 * we hit the cache limit ?
-	 */
-	if (drc->in_use >= drc->max_size) {
-		DTRACE_PROBE1(nfss__i__drc_full,
-			rfs4_drc_t *, drc);
-		return (NULL);
-	}
-
-
-	/* nope, so let's malloc a new one */
-	drp = kmem_zalloc(sizeof (rfs4_dupreq_t), KM_SLEEP);
-	drp->drc = drc;
-	drc->in_use++;
-	gethrestime(&drp->dr_time_created);
-	DTRACE_PROBE1(nfss__i__drc_new, rfs4_dupreq_t *, drp);
-
-	return (drp);
+	DTRACE_PROBE1(nfss__i__drc_full, rfs4_drc_t *, drc);
+	return (NULL);
 }
 
 /*
@@ -236,9 +221,9 @@ rfs4_alloc_dr(rfs4_drc_t *drc)
  * calculating the hash index based on the XID, and examining
  * the entries in the hash bucket. If we find a match stamp the
  * time_used and return. If the entry does not match it could be
- * ready to be freed. Once we have searched the bucket and we
- * have not exhausted the maximum limit for the cache we will
- * allocate a new entry.
+ * ready to be freed. Once we have searched the bucket we call
+ * rfs4_alloc_dr() to allocate a new entry, or reuse one that is
+ * available.
  */
 int
 rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
@@ -283,7 +268,7 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
 			 * Found a match so REPLAY the Reply
 			 */
 			if (drp->dr_state == NFS4_DUP_REPLAY) {
-				gethrestime(&drp->dr_time_used);
+				rfs4_dr_chstate(drp, NFS4_DUP_INUSE);
 				mutex_exit(&drc->lock);
 				*dup = drp;
 				DTRACE_PROBE1(nfss__i__drc_replay,
@@ -300,12 +285,10 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
 		}
 
 		/*
-		 * Not a match, but maybe this entry is ready
+		 * Not a match, but maybe this entry is okay
 		 * to be reused.
 		 */
-		if (drp->dr_state == NFS4_DUP_REPLAY &&
-			(gethrestime_sec() >
-			drp->dr_time_used.tv_sec+drc->drc_ttl)) {
+		if (drp->dr_state == NFS4_DUP_REPLAY) {
 			rfs4_dr_chstate(drp, NFS4_DUP_FREE);
 			list_insert_tail(&(drp->drc->dr_cache), drp);
 		}
@@ -314,15 +297,19 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
 	drp = rfs4_alloc_dr(drc);
 	mutex_exit(&drc->lock);
 
-	if (drp == NULL) {
+	/*
+	 * The DRC is full and all entries are in use. Upper function
+	 * should error out this request and force the client to
+	 * retransmit -- effectively this is a resource issue. NFSD
+	 * threads tied up with native File System, or the cache size
+	 * is too small for the server load.
+	 */
+	if (drp == NULL)
 		return (NFS4_DUP_ERROR);
-	}
 
 	/*
-	 * Place at the head of the list, init the state
-	 * to NEW and clear the time used field.
+	 * Init the state to NEW and clear the time used field.
 	 */
-
 	drp->dr_state = NFS4_DUP_NEW;
 	drp->dr_time_used.tv_sec = drp->dr_time_used.tv_nsec = 0;
 
@@ -517,9 +504,21 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 
 	/*
 	 * If this reply was just inserted into the duplicate cache
-	 * mark it as available for replay
+	 * or it was replayed from the dup cache; (re)mark it as
+	 * available for replay
+	 *
+	 * At first glance, this 'if' statement seems a little strange;
+	 * testing for NFS4_DUP_REPLAY, and then calling...
+	 *
+	 *	rfs4_dr_chatate(NFS4_DUP_REPLAY)
+	 *
+	 * ... but notice that we are checking dr_stat, and not the
+	 * state of the entry itself, the entry will be NFS4_DUP_INUSE,
+	 * we do that so that we know not to prematurely reap it whilst
+	 * we resent it to the client.
+	 *
 	 */
-	if (dr_stat == NFS4_DUP_NEW) {
+	if (dr_stat == NFS4_DUP_NEW || dr_stat == NFS4_DUP_REPLAY) {
 		mutex_enter(&drp->drc->lock);
 		rfs4_dr_chstate(drp, NFS4_DUP_REPLAY);
 		mutex_exit(&drp->drc->lock);

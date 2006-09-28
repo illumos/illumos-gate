@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +40,6 @@ typedef struct rfs4_drc {
 	uint32_t	dr_hash;
 	uint32_t 	max_size;
 	uint32_t 	in_use;
-	unsigned	drc_ttl;
 	list_t		dr_cache;
 	list_t  	*dr_buckets;
 } rfs4_drc_t;
@@ -72,13 +70,14 @@ typedef struct rfs4_dupreq {
 #define	NFS4_DUP_FREE		3
 
 #define	NFS4_DUP_REPLAY 	4
+#define	NFS4_DUP_INUSE		5
 
 extern rfs4_drc_t *nfs4_drc;
 extern unsigned nfs4_drc_lifetime;
 extern uint32_t nfs4_drc_max;
 extern uint32_t nfs4_drc_hash;
 
-rfs4_drc_t *rfs4_init_drc(uint32_t, uint32_t, unsigned);
+rfs4_drc_t *rfs4_init_drc(uint32_t, uint32_t);
 void rfs4_fini_drc(rfs4_drc_t *);
 void rfs4_dr_chstate(rfs4_dupreq_t *, int);
 rfs4_dupreq_t *rfs4_alloc_dr(rfs4_drc_t *);
