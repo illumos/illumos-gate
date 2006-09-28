@@ -199,6 +199,7 @@ COMMON_SUBDIRS= \
 	SUNWgssk \
 	SUNWhea  \
 	SUNWib \
+	SUNWibhca \
 	SUNWiotu  \
 	SUNWioth  \
 	SUNWipc  \
