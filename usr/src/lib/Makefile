@@ -472,8 +472,7 @@ libsldap:	libldap5 libtsol
 libpool:	libnvpair libexacct
 libzonecfg:	libc libsocket libnsl libuuid libnvpair libsysevent libsec \
 		libbrand
-libproc:	../cmd/sgs/librtld_db libzonecfg ../cmd/sgs/libelf libctf \
-		libbrand
+libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf
 libproject:	libpool libproc libsecdb
 libtsnet:	libnsl libtsol libsecdb
 libwrap:	libnsl libsocket

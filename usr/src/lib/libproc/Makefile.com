@@ -82,7 +82,7 @@ include ../../Makefile.rootfs
 SRCS =		$(CMNOBJS:%.o=../common/%.c) $(ISAOBJS:%.o=%.c)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lrtld_db -lelf -lctf -lc -lzonecfg
+LDLIBS +=	-lrtld_db -lelf -lctf -lc
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

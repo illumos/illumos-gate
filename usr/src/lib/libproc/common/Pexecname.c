@@ -34,7 +34,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
-#include <libzonecfg.h>
+#include <zone.h>
 
 #include "Pcontrol.h"
 
@@ -124,7 +124,6 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 	 */
 	if ((addr = Pgetauxval(P, AT_SUN_EXECNAME)) != (uintptr_t)-1L &&
 	    Pread_string(P, path, sizeof (path), (off_t)addr) > 0) {
-		char		zname[ZONENAME_MAX];
 		char		zpath[PATH_MAX];
 		const psinfo_t	*pi = Ppsinfo(P);
 
@@ -135,10 +134,19 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 		    try_exec(cwd, p, buf, isexec, isdata))
 			goto found;
 
-		if (getzonenamebyid(pi->pr_zoneid, zname,
-		    sizeof (zname)) != -1 && strcmp(zname, "global") != 0 &&
-		    zone_get_zonepath(zname, zpath, sizeof (zpath)) == Z_OK) {
-			(void) strcat(zpath, "/root");
+		if (getzoneid() == GLOBAL_ZONEID &&
+		    pi->pr_zoneid != GLOBAL_ZONEID &&
+		    zone_getattr(pi->pr_zoneid, ZONE_ATTR_ROOT, zpath,
+			sizeof (zpath)) != -1) {
+			/*
+			 * try_exec() only combines its cwd and path arguments
+			 * if path is relative; but in our case even an absolute
+			 * path inside a zone is a relative path from the global
+			 * zone perspective. So we turn a non-global zone's
+			 * absolute path into a relative path here before
+			 * calling try_exec().
+			 */
+			p = (path[0] == '/') ? path + 1 : path;
 			if (try_exec(zpath, p, buf, isexec, isdata))
 				goto found;
 		}
