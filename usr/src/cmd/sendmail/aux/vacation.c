@@ -82,6 +82,7 @@ typedef int bool;
 static time_t	Timeout = ONEWEEK;	/* timeout between notices per user */
 static DBM	*db;
 static bool	Debug = FALSE;
+static bool	ListMode = FALSE;
 static bool	AnswerAll = FALSE;	/* default: answer if in To:/Cc: only */
 static char	*Subject = NULL;	/* subject in message header */
 static char	*EncodedSubject = NULL;	/* subject in message header */
@@ -105,6 +106,7 @@ static void	AutoInstall();
 static void	initialize(char *);
 static void	sendmessage(char *, char *, char *);
 static void	setknows(char *);
+static void	dumplist();
 
 void	usrerr(const char *, ...);
 
@@ -163,6 +165,10 @@ main(argc, argv)
 			AnswerAll = TRUE;
 			break;
 
+		    case 'l':	/* list all respondees */
+			ListMode = TRUE;
+			break;
+
 		    case 'm':	/* alternate message file */
 			message_file = argv[1];
 			if (argc > 0) {
@@ -195,12 +201,13 @@ main(argc, argv)
 	}
 
 	/* verify recipient argument */
-	if (argc == 0)
+	if (argc == 0 && !ListMode)
 		AutoInstall();
 
-	if (argc != 1)
+	if (argc != 1 && !ListMode)
 	{
-		usrerr("Usage: vacation username (or) vacation -I");
+		usrerr("Usage:\tvacation username\n\tvacation -I\n"
+		    "\tvacation -l");
 		exit(EX_USAGE);
 	}
 
@@ -208,7 +215,10 @@ main(argc, argv)
 	Charset[0] = '\0';
 
 	/* find user's home directory */
-	pw = getpwnam(myname);
+	if (ListMode)
+		pw = getpwuid(getuid());
+	else
+		pw = getpwnam(myname);
 	if (pw == NULL)
 	{
 		usrerr("user %s look up failed, name services outage ?",
@@ -222,6 +232,11 @@ main(argc, argv)
 	if (!(db = dbm_open(buf, O_RDWR, 0))) {
 		usrerr("%s: %s\n", buf, strerror(errno));
 		exit(EX_DATAERR);
+	}
+
+	if (ListMode) {
+		dumplist();
+		exit(EX_OK);
 	}
 
 	if (sender_oob)
@@ -260,6 +275,93 @@ main(argc, argv)
 	while (fgets(buf, MAXLINE, stdin) != NULL)
 		continue; /* drain input */
 	return (EX_OK);
+}
+
+struct entry {
+	time_t	when;
+	long	when_size;
+	char	*who;
+	long	who_size;
+	struct	entry *next;
+	struct	entry *prev;
+};
+
+static void
+dump_content(key_size, key_ptr, content_size, content_ptr)
+	long key_size, content_size;
+	char *key_ptr, *content_ptr;
+{
+	time_t then;
+
+	if (content_size == sizeof (then)) {
+		bcopy(content_ptr, (char *)&then, sizeof (then));
+		(void) printf("%-53.40*s: %s", (int)key_size, key_ptr,
+		    ctime(&then));
+	} else {
+		(void) fprintf(stderr, "content size error: %d\n",
+		    (int)content_size);
+	}
+}
+
+static void
+dump_all_content(first)
+	struct entry *first;
+{
+	struct entry *which;
+
+	for (which = first; which != NULL; which = which->next) {
+		dump_content(which->who_size, which->who, which->when_size,
+		    (char *)&(which->when));
+	}
+}
+
+static void
+dumplist()
+{
+	datum content, key;
+	struct entry *first = NULL, *last = NULL, *new_entry, *curr;
+
+	for (key = dbm_firstkey(db); key.dptr != NULL; key = dbm_nextkey(db)) {
+		content = dbm_fetch(db, key);
+		new_entry = (struct entry *)malloc(sizeof (struct entry));
+		if (new_entry == NULL)
+			perror("out of memory");
+		new_entry->next = NULL;
+		new_entry->who = (char *)malloc(key.dsize);
+		if (new_entry->who == NULL)
+			perror("out of memory");
+		new_entry->who_size = key.dsize;
+		(void) strlcpy(new_entry->who, key.dptr, key.dsize);
+		bcopy(content.dptr, (char *)&(new_entry->when),
+		    sizeof (new_entry->when));
+		new_entry->when_size = content.dsize;
+		if (first == NULL) { /* => so is last */
+			new_entry->prev = NULL;
+			new_entry->next = NULL;
+			first = new_entry;
+			last = new_entry;
+		} else {
+			for (curr = first; curr != NULL &&
+			    new_entry->when > curr->when; curr = curr->next)
+				;
+			if (curr == NULL) {
+				last->next = new_entry;
+				new_entry->prev = last;
+				new_entry->next = NULL;
+				last = new_entry;
+			} else {
+				new_entry->next = curr;
+				new_entry->prev = curr->prev;
+				if (curr->prev == NULL)
+					first = new_entry;
+				else
+					curr->prev->next = new_entry;
+				curr->prev = new_entry;
+			}
+		}
+	}
+	dump_all_content(first);
+	dbm_close(db);
 }
 
 /*
@@ -965,7 +1067,7 @@ AutoInstall()
 				f = NULL;
 		} else {
 			printf("You need to create a message file"
-				" in %s first.\n", file);
+			    " in %s first.\n", file);
 			f = fopen(file, "w");
 			if (f == NULL) {
 				usrerr("Cannot open %s", file);
@@ -973,9 +1075,9 @@ AutoInstall()
 			}
 			fprintf(f, "Subject: away from my mail\n");
 			fprintf(f, "\nI will not be reading my mail"
-				" for a while.\n");
+			    " for a while.\n");
 			fprintf(f, "Your mail regarding \"$SUBJECT\" will"
-				" be read when I return.\n");
+			    " be read when I return.\n");
 			fclose(f);
 			f = NULL;
 		}
@@ -988,7 +1090,7 @@ AutoInstall()
 			(void) snprintf(cmd, sizeof (cmd), "%s %s", editor,
 			    file);
 			printf("Please use your editor (%s)"
-				" to edit this file.\n", editor);
+			    " to edit this file.\n", editor);
 			system(cmd);
 		}
 	} while (f == NULL);
@@ -998,12 +1100,12 @@ AutoInstall()
 	f = fopen(forward, "r");
 	if (f) {
 		printf("You have a .forward file"
-			" in your home directory containing:\n");
+		    " in your home directory containing:\n");
 		while (fgets(line, MAXLINE, f))
 			printf("    %s", line);
 		fclose(f);
 		if (!ask("Would you like to remove it and"
-				" disable the vacation feature"))
+		    " disable the vacation feature"))
 			exit(EX_OK);
 		if (unlink(forward))
 			perror("Error removing .forward file:");
@@ -1013,7 +1115,7 @@ AutoInstall()
 	}
 
 	printf("To enable the vacation feature"
-		" a \".forward\" file is created.\n");
+	    " a \".forward\" file is created.\n");
 	if (!ask("Would you like to enable the vacation feature")) {
 		printf("OK, vacation feature NOT enabled.\n");
 		exit(EX_OK);
@@ -1026,7 +1128,7 @@ AutoInstall()
 	fprintf(f, "\\%s, \"|/usr/bin/vacation %s\"\n", myname, myname);
 	fclose(f);
 	printf("Vacation feature ENABLED."
-		" Please remember to turn it off when\n");
+	    " Please remember to turn it off when\n");
 	printf("you get back from vacation. Bon voyage.\n");
 
 	initialize(DbFileBase);
