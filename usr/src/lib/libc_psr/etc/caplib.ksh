@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -39,14 +38,17 @@ if [ -z "$FLASH_PID" ]; then
 	echo "$0: ERROR: FLASH_PID not set in execution environment, exiting..."
 	exit 1 
 fi
+if [ -z "$FLASH_DIR" ]; then
+	echo "$0: ERROR: FLASH_DIR not set in execution environment, exiting..."
+	exit 1 
+fi
 
 CHMOD=/usr/bin/chmod
-ELFDUMP=/usr/ccs/bin/elfdump
 MOUNT=/usr/sbin/mount
 UMOUNT=/usr/sbin/umount
 EGREP=/usr/bin/egrep
 SED=/usr/bin/sed
-CMD_LIST="$CHMOD $ELFDUMP $MOUNT $UMOUNT $EGREP $SED"
+CMD_LIST="$CHMOD $MOUNT $UMOUNT $EGREP $SED"
 
 for cmd in $CMD_LIST
 do
@@ -69,7 +71,7 @@ if [ -z "$LIBS" ]; then
 	exit 0
 fi
 
-REMOUNT_DIR=/etc/flash/preexit
+REMOUNT_DIR=${FLASH_DIR}/preexit
 REMOUNT=${REMOUNT_DIR}/remount_hwcap.${FLASH_PID}
 
 #
