@@ -205,6 +205,7 @@ extern void cmd_cpu_uec_set_allmatch(fmd_hdl_t *, cmd_cpu_t *);
 
 typedef struct cmd_xxcu_trw {
 	uint64_t trw_ena;	/* the ENA for this group of ereports */
+	uint64_t trw_afar;	/* the AFAR for this group of ereports */
 	cmd_errcl_t trw_mask;	/* ereports seen thus far with this ENA */
 	uint16_t trw_cpuid;	/* CPU to which this watcher belongs */
 	uint8_t	 trw_ref;	/* number of ereports with this ENA */
@@ -212,8 +213,8 @@ typedef struct cmd_xxcu_trw {
 	uint32_t trw_pad;
 } cmd_xxcu_trw_t;
 
-extern cmd_xxcu_trw_t *cmd_trw_lookup(uint64_t);
-extern cmd_xxcu_trw_t *cmd_trw_alloc(uint64_t);
+extern cmd_xxcu_trw_t *cmd_trw_lookup(uint64_t, uint8_t, uint64_t);
+extern cmd_xxcu_trw_t *cmd_trw_alloc(uint64_t, uint64_t);
 extern void cmd_trw_restore(fmd_hdl_t *);
 extern void cmd_trw_write(fmd_hdl_t *);
 extern void cmd_trw_ref(fmd_hdl_t *, cmd_xxcu_trw_t *, cmd_errcl_t);
@@ -662,6 +663,9 @@ extern int cmd_cpu_synd_check(uint16_t);
 #else /* sun4u */
 extern int cmd_cpu_synd_check(uint32_t);
 #endif /* sun4u */
+
+extern int cmd_afar_valid(fmd_hdl_t *hdl, nvlist_t *nvl, cmd_errcl_t,
+    uint64_t *afar);
 
 #ifdef __cplusplus
 }

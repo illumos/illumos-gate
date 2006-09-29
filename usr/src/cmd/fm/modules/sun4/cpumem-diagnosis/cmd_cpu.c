@@ -1239,22 +1239,32 @@ cmd_xxcu_train_match(cmd_errcl_t mask)
 
 	return (0);
 }
-
+/*
+ * Search for the entry that matches the ena and the AFAR
+ * if we have a valid AFAR, otherwise just match the ENA
+ */
 cmd_xxcu_trw_t *
-cmd_trw_lookup(uint64_t ena)
+cmd_trw_lookup(uint64_t ena, uint8_t afar_status, uint64_t afar)
 {
 	int i;
 
-	for (i = 0; i < cmd.cmd_xxcu_ntrw; i++) {
+	if (afar_status == AFLT_STAT_VALID) {
+		for (i = 0; i < cmd.cmd_xxcu_ntrw; i++) {
+			if (cmd.cmd_xxcu_trw[i].trw_ena == ena &&
+			    cmd.cmd_xxcu_trw[i].trw_afar == afar)
+				return (&cmd.cmd_xxcu_trw[i]);
+		}
+	} else  {
+		for (i = 0; i < cmd.cmd_xxcu_ntrw; i++) {
 		if (cmd.cmd_xxcu_trw[i].trw_ena == ena)
 			return (&cmd.cmd_xxcu_trw[i]);
+		}
 	}
-
 	return (NULL);
 }
 
 cmd_xxcu_trw_t *
-cmd_trw_alloc(uint64_t ena)
+cmd_trw_alloc(uint64_t ena, uint64_t afar)
 {
 	int i;
 
@@ -1262,6 +1272,7 @@ cmd_trw_alloc(uint64_t ena)
 		cmd_xxcu_trw_t *trw = &cmd.cmd_xxcu_trw[i];
 		if (trw->trw_ena == NULL) {
 			trw->trw_ena = ena;
+			trw->trw_afar = afar;
 			return (trw);
 		}
 	}

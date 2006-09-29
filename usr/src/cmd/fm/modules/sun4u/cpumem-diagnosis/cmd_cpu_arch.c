@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,4 +77,21 @@ cmd_cpu_synd_check(uint16_t synd)
 		return (-1);
 	else
 		return (0);
+}
+int
+cmd_afar_valid(fmd_hdl_t *hdl, nvlist_t *nvl, cmd_errcl_t clcode,
+    uint64_t *afar)
+{
+	uint8_t afar_status;
+
+	if (nvlist_lookup_uint8(nvl,
+	    FM_EREPORT_PAYLOAD_NAME_AFAR_STATUS, &afar_status) == 0) {
+		if (afar_status == AFLT_STAT_VALID) {
+			(void) nvlist_lookup_uint64(nvl,
+			    FM_EREPORT_PAYLOAD_NAME_AFAR, afar);
+			return (0);
+		} else
+			return (-1);
+	}
+	return (-1);
 }

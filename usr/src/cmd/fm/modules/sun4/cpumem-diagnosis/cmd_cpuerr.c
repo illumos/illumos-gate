@@ -352,9 +352,17 @@ cmd_xxcu_resolve(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep,
 {
 	cmd_xxcu_trw_t *trw;
 	cmd_errcl_t cause;
+	uint64_t afar;
 
-	if ((trw = cmd_trw_lookup(xr->xr_ena)) == NULL) {
-		hdlr(hdl, xr, ep);
+
+	afar = NULL;
+
+	if (xr->xr_afar_status == AFLT_STAT_VALID)
+		afar = xr->xr_afar;
+
+	if ((trw = cmd_trw_lookup(xr->xr_ena,
+		xr->xr_afar_status, afar)) == NULL) {
+		fmd_hdl_debug(hdl, "cmd_trw_lookup: Not found\n");
 		return;
 	}
 
@@ -414,7 +422,9 @@ cmd_xxcu_initial(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	cmd_cpu_t *cpu;
 	cmd_xr_t *xr;
 	uint64_t ena;
+	uint64_t afar;
 	uint8_t level = clcode & CMD_ERRCL_LEVEL_EXTRACT;
+	uint8_t	afar_status;
 
 	clcode &= CMD_ERRCL_LEVEL_MASK; /* keep level bits out of train masks */
 
@@ -428,11 +438,21 @@ cmd_xxcu_initial(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 
 	(void) nvlist_lookup_uint64(nvl, FM_EREPORT_ENA, &ena);
 
+	if (cmd_afar_valid(hdl, nvl, clcode, &afar) != 0) {
+		afar_status = AFLT_STAT_INVALID;
+		afar = NULL;
+	} else {
+		afar_status = AFLT_STAT_VALID;
+	}
+
 	fmd_hdl_debug(hdl, "scheduling %s (%llx) for redelivery\n",
 	    class, clcode);
+	fmd_hdl_debug(hdl, "looking up ena %llx,afar %llx with\n", ena, afar);
 
-	if ((trw = cmd_trw_lookup(ena)) == NULL) {
-		if ((trw = cmd_trw_alloc(ena)) == NULL) {
+	fmd_hdl_debug(hdl, "afar status of %02x\n", afar_status);
+
+	if ((trw = cmd_trw_lookup(ena, afar_status, afar)) == NULL) {
+		if ((trw = cmd_trw_alloc(ena, afar)) == NULL) {
 			fmd_hdl_debug(hdl, "failed to get new trw\n");
 			goto redeliver;
 		}

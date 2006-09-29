@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +44,8 @@
 #include <sys/fm/cpu/UltraSPARC-T1.h>
 #include <sys/niagararegs.h>
 
+int cmd_afsr_check(fmd_hdl_t *,  uint64_t, cmd_errcl_t, uint8_t *);
+
 int
 cmd_xr_fill(fmd_hdl_t *hdl, nvlist_t *nvl, cmd_xr_t *xr, cmd_errcl_t clcode)
 {
@@ -60,50 +61,10 @@ cmd_xr_fill(fmd_hdl_t *hdl, nvlist_t *nvl, cmd_xr_t *xr, cmd_errcl_t clcode)
 	    &xr->xr_synd) != 0)
 		return (-1);
 
-	/*
-	 * Set Niagara afar and synd validity.
-	 * For a given set of error registers, the payload value is valid iff
-	 * no higher priority error status bit is set.  See niagararegs.h
-	 * for error status bit values and priority settings.
-	 */
-	switch (clcode) {
-	case CMD_ERRCL_LDAU:
-	case CMD_ERRCL_LDSU:
-		xr->xr_synd_status =
-		    ((niagara_l2_afsr & NI_L2AFSR_P02) == 0) ?
-		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
-		break;
-	case CMD_ERRCL_LDWU:
-		xr->xr_synd_status =
-		    ((niagara_l2_afsr & NI_L2AFSR_P03) == 0) ?
-		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
-		break;
-	case CMD_ERRCL_LDRU:
-		xr->xr_synd_status =
-		    ((niagara_l2_afsr & NI_L2AFSR_P04) == 0) ?
-		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
-		break;
-	case CMD_ERRCL_LDAC:
-	case CMD_ERRCL_LDSC:
-		xr->xr_synd_status =
-		    ((niagara_l2_afsr & NI_L2AFSR_P07) == 0) ?
-		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
-		break;
-	case CMD_ERRCL_LDWC:
-		xr->xr_synd_status =
-		    ((niagara_l2_afsr & NI_L2AFSR_P08) == 0) ?
-		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
-		break;
-	case CMD_ERRCL_LDRC:
-		xr->xr_synd_status =
-		    ((niagara_l2_afsr & NI_L2AFSR_P09) == 0) ?
-		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
-		break;
-	default:
-		fmd_hdl_debug(hdl, "Niagara unrecognized l2cache error\n");
-		xr->xr_synd_status = 0;
+	if (cmd_afsr_check(hdl, niagara_l2_afsr, clcode,
+	    &xr->xr_synd_status) != 0)
 		return (-1);
-	}
+
 	xr->xr_afar_status = xr->xr_synd_status;
 	return (0);
 }
@@ -130,4 +91,76 @@ cmd_cpu_synd_check(uint32_t synd)
 			return (-1);
 	}
 	return (0);
+}
+
+int
+cmd_afsr_check(fmd_hdl_t *hdl, uint64_t afsr,
+    cmd_errcl_t clcode, uint8_t *stat_val)
+{
+	/*
+	 * Set Niagara afar and synd validity.
+	 * For a given set of error registers, the payload value is valid iff
+	 * no higher priority error status bit is set.  See niagararegs.h
+	 * for error status bit values and priority settings.
+	 */
+	switch (clcode) {
+	case CMD_ERRCL_LDAU:
+	case CMD_ERRCL_LDSU:
+		*stat_val =
+			((afsr & NI_L2AFSR_P02) == 0) ?
+			AFLT_STAT_VALID: AFLT_STAT_INVALID;
+		break;
+	case CMD_ERRCL_LDWU:
+		*stat_val =
+			((afsr & NI_L2AFSR_P03) == 0) ?
+			AFLT_STAT_VALID : AFLT_STAT_INVALID;
+		break;
+	case CMD_ERRCL_LDRU:
+		*stat_val =
+			((afsr & NI_L2AFSR_P04) == 0) ?
+			AFLT_STAT_VALID : AFLT_STAT_INVALID;
+		break;
+	case CMD_ERRCL_LDAC:
+	case CMD_ERRCL_LDSC:
+		*stat_val =
+			((afsr & NI_L2AFSR_P07) == 0) ?
+			AFLT_STAT_VALID : AFLT_STAT_INVALID;
+		break;
+	case CMD_ERRCL_LDWC:
+		*stat_val =
+			((afsr & NI_L2AFSR_P08) == 0) ?
+			AFLT_STAT_VALID : AFLT_STAT_INVALID;
+		break;
+	case CMD_ERRCL_LDRC:
+		*stat_val =
+			((afsr & NI_L2AFSR_P09) == 0) ?
+			AFLT_STAT_VALID : AFLT_STAT_INVALID;
+		break;
+	default:
+		fmd_hdl_debug(hdl, "Niagara unrecognized l2cache error\n");
+		return (-1);
+	}
+	return (0);
+}
+
+
+int
+cmd_afar_valid(fmd_hdl_t *hdl, nvlist_t *nvl, cmd_errcl_t clcode,
+    uint64_t *afar)
+{
+	uint64_t niagara_l2_afsr = 0;
+	uint8_t stat_val;
+	if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_L2_AFSR,
+	    &niagara_l2_afsr) != 0)
+		return (-1);
+
+	if (cmd_afsr_check(hdl, niagara_l2_afsr, clcode, &stat_val) != 0)
+		return (-1);
+
+	if (stat_val == AFLT_STAT_VALID) {
+		if (nvlist_lookup_uint64(nvl,
+		    FM_EREPORT_PAYLOAD_NAME_L2_REAL_AFAR, afar) == 0)
+			return (0);
+	}
+	return (-1);
 }
