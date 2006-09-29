@@ -34,6 +34,7 @@
 #include <bsm/libbsm.h>
 #include <priv.h>
 #include <bsm/adt_event.h>
+#include <tsol/label.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -194,6 +195,8 @@ struct adt_internal_state {
 	int			as_kernel_audit_policy;
 	int			as_session_model;
 	adt_session_flags_t	as_flags;
+	pid_t			as_pid;
+	m_label_t		*as_label;	/* if is_system_labeled */
 };
 
 /*
@@ -201,7 +204,8 @@ struct adt_internal_state {
  * version number changes when adt_internal_state's export portion
  * changes.
  */
-#define	PROTOCOL_VERSION 1
+#define	PROTOCOL_VERSION_1	1
+#define	PROTOCOL_VERSION_2	2
 
 /*
  * most recent version is at the top; down level consumers are
@@ -210,6 +214,23 @@ struct adt_internal_state {
  * order for future use.
  */
 
+struct adt_export_v2 {
+	int32_t		ax_euid;
+	int32_t		ax_ruid;
+	int32_t		ax_egid;
+	int32_t		ax_rgid;
+	int32_t		ax_auid;
+	uint32_t	ax_mask_success;
+	uint32_t	ax_mask_failure;
+	uint32_t	ax_port;
+	uint32_t	ax_type;
+	uint32_t	ax_addr[4];
+	uint32_t	ax_asid;
+	int		ax_audit_enabled;
+	pid_t		ax_pid;
+	size_t		ax_label_len;	/* 0, unlabeled */
+/*	char		ax_label[ax_label_len];	if, is_system_labeled */
+};
 struct adt_export_v1 {
 	int32_t		ax_euid;
 	int32_t		ax_ruid;
@@ -238,6 +259,11 @@ struct export_header {
 struct adt_export_data {
 	struct export_header	ax_header;
 
+	struct		adt_export_v2 ax_v2;
+	/*
+	 * end of version 2 data
+	 */
+	struct export_link	ax_next_v1;
 	struct		adt_export_v1 ax_v1;
 	/*
 	 * end of version 1 data
@@ -259,7 +285,7 @@ struct entry {
 	struct entry	*en_next_token;	/* linked list pointer */
 	size_t		en_offset;	/* offset into structure for input */
 	int		en_required;	/* if 1, always output a token */
-	int		en_tsol;	/* if 1, output only #ifdef TSOL */
+	int		en_tsol;	/* if 1, reserved if for TX */
 	char		*en_msg_format;	/* pointer to sprintf format string */
 };
 

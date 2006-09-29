@@ -530,18 +530,18 @@ adt_to_subject(datadef *def, void *p_data, int required,
 	(void) au_write(event->ae_event_handle,
 	    au_to_subject_ex(sp->as_info.ai_auid,
 		sp->as_euid, sp->as_egid, sp->as_ruid, sp->as_rgid,
-		getpid(), sp->as_info.ai_asid,
+		sp->as_pid, sp->as_info.ai_asid,
 		&(sp->as_info.ai_termid)));
+	if (is_system_labeled()) {
+		(void) au_write(event->ae_event_handle,
+		    au_to_label(sp->as_label));
+	}
 	/*
 	 * Add optional tokens if in the process model.
 	 * In a session model, the groups list is undefined and label
-	 * is wrong, so don't do anything.
+	 * is in the state.
 	 */
 	if (sp->as_session_model == ADT_PROCESS_MODEL) {
-		if (is_system_labeled())
-			(void) au_write(event->ae_event_handle,
-			    au_to_mylabel());
-
 		if (sp->as_kernel_audit_policy & AUDIT_GROUP) {
 			int group_count;
 			gid_t grouplist[NGROUPS_MAX];

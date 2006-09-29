@@ -54,6 +54,7 @@
 static int adt_selected(struct adt_event_state *, au_event_t, int);
 static int adt_init(adt_internal_state_t *, int);
 static int adt_import(adt_internal_state_t *, const adt_export_data_t *);
+static m_label_t *adt_ucred_label(ucred_t *);
 
 #ifdef C2_DEBUG
 #define	DPRINTF(x) {printf x; }
@@ -332,8 +333,9 @@ adt_start_session(adt_session_data_t **new_session,
 	 */
 
 	if (imported_state != NULL) {
-		if (adt_import(state, imported_state) != 0)
+		if (adt_import(state, imported_state) != 0) {
 			goto return_err_free;
+		}
 	} else if (flags & ADT_USE_PROC_DATA) {
 		state->as_session_model = ADT_PROCESS_MODEL;
 	}
@@ -341,10 +343,11 @@ adt_start_session(adt_session_data_t **new_session,
 	DPRINTF(("(%d) Starting session id = %08X\n",
 	    getpid(), state->as_info.ai_asid));
 
-	if (state->as_audit_enabled)
+	if (state->as_audit_enabled) {
 		*new_session = (adt_session_data_t *)state;
-	else
+	} else {
 		free(state);
+	}
 
 	return (0);
 return_err_free:
@@ -802,13 +805,11 @@ adt_get_session_id(const adt_session_data_t *session_data, char **buff)
 	*buff = malloc(length);
 
 	if (*buff == NULL) {
-		length = 0;
-		goto return_length;
+		return (0);
 	}
 	if (session_data == NULL) { /* NULL is not an error */
 		**buff = '\0';
-		length = 1;
-		goto return_length; /* empty string */
+		return (1);
 	}
 	adt_get_asid(session_data, &session_id);
 
@@ -817,7 +818,6 @@ adt_get_session_id(const adt_session_data_t *session_data, char **buff)
 	/* length < 1 is a bug: the session data type may have changed */
 	assert(length > 0);
 
-return_length:
 	return (length);
 }
 
@@ -836,10 +836,11 @@ adt_end_session(adt_session_data_t *session_data)
 
 	if (session_data != NULL) {
 		state = (adt_internal_state_t *)session_data;
-		if (state->as_check != ADT_VALID)
+		if (state->as_check != ADT_VALID) {
 			adt_write_syslog("freeing invalid data", EINVAL);
-		else {
+		} else {
 			state->as_check = 0;
+			m_label_free(state->as_label);
 			free(session_data);
 		}
 	}
@@ -855,7 +856,7 @@ int
 adt_dup_session(const adt_session_data_t *source, adt_session_data_t **dest)
 {
 	adt_internal_state_t	*source_state;
-	adt_session_data_t	*dest_state = NULL;
+	adt_internal_state_t	*dest_state = NULL;
 	int			rc = 0;
 
 	if (source != NULL) {
@@ -869,9 +870,18 @@ adt_dup_session(const adt_session_data_t *source, adt_session_data_t **dest)
 		}
 		(void) memcpy(dest_state, source,
 		    sizeof (struct adt_internal_state));
+
+		if (source_state->as_label != NULL) {
+			dest_state->as_label = NULL;
+			if ((rc = m_label_dup(&dest_state->as_label,
+			    source_state->as_label)) != 0) {
+				free(dest_state);
+				dest_state = NULL;
+			}
+		}
 	}
 return_rc:
-	*dest = dest_state;
+	*dest = (adt_session_data_t *)dest_state;
 	return (rc);
 }
 
@@ -890,6 +900,7 @@ adt_from_export_format(adt_internal_state_t *internal,
 	int32_t 		offset;
 	int32_t 		length;
 	int32_t 		version;
+	size_t			label_len;
 	char			*p = (char *)external;
 
 	adrm_start(&context, (char *)external);
@@ -904,13 +915,13 @@ adt_from_export_format(adt_internal_state_t *internal,
 	length = head.ax_buffer_length;
 
 	/*
-	 * adjust buffer pointer to the first data item (euid)
-	 * if versions mismatch; otherwise it's ok as is.
+	 * Skip newer versions.
 	 */
-	while (version != PROTOCOL_VERSION) {
-		if (offset < 1)
+	while (version > PROTOCOL_VERSION_2) {
+		if (offset < 1) {
 			return (0);	/* failed to match version */
-		p += offset;	/* point to next version # */
+		}
+		p += offset;		/* point to next version # */
 
 		if (p > (char *)external + length) {
 			return (0);
@@ -921,31 +932,80 @@ adt_from_export_format(adt_internal_state_t *internal,
 		version = link.ax_version;
 		assert(version != 0);
 	}
-	if (p == (char *)external)
+	/*
+	 * Adjust buffer pointer to the first data item (euid).
+	 */
+	if (p == (char *)external) {
 		adrm_start(&context, (char *)(p + sizeof (head)));
-	else
+	} else {
 		adrm_start(&context, (char *)(p + sizeof (link)));
+	}
+	/*
+	 * if down rev version, neither pid nor label are included
+	 * in v1 ax_size_of_tsol_data intentionally ignored
+	 */
+	if (version == PROTOCOL_VERSION_1) {
+		adrm_int32(&context, (int *)&(internal->as_euid), 1);
+		adrm_int32(&context, (int *)&(internal->as_ruid), 1);
+		adrm_int32(&context, (int *)&(internal->as_egid), 1);
+		adrm_int32(&context, (int *)&(internal->as_rgid), 1);
+		adrm_int32(&context, (int *)&(internal->as_info.ai_auid), 1);
+		adrm_int32(&context,
+		    (int *)&(internal->as_info.ai_mask.am_success), 2);
+		adrm_int32(&context,
+		    (int *)&(internal->as_info.ai_termid.at_port), 1);
+		adrm_int32(&context,
+		    (int *)&(internal->as_info.ai_termid.at_type), 1);
+		adrm_int32(&context,
+		    (int *)&(internal->as_info.ai_termid.at_addr[0]), 4);
+		adrm_int32(&context, (int *)&(internal->as_info.ai_asid), 1);
+		adrm_int32(&context, (int *)&(internal->as_audit_enabled), 1);
+		internal->as_pid = (pid_t)-1;
+		internal->as_label = NULL;
+	} else if (version == PROTOCOL_VERSION_2) {
+		adrm_int32(&context, (int *)&(internal->as_euid), 1);
+		adrm_int32(&context, (int *)&(internal->as_ruid), 1);
+		adrm_int32(&context, (int *)&(internal->as_egid), 1);
+		adrm_int32(&context, (int *)&(internal->as_rgid), 1);
+		adrm_int32(&context, (int *)&(internal->as_info.ai_auid), 1);
+		adrm_int32(&context,
+		    (int *)&(internal->as_info.ai_mask.am_success), 2);
+		adrm_int32(&context,
+		    (int *)&(internal->as_info.ai_termid.at_port), 1);
+		adrm_int32(&context,
+		    (int *)&(internal->as_info.ai_termid.at_type), 1);
+		adrm_int32(&context,
+		    (int *)&(internal->as_info.ai_termid.at_addr[0]), 4);
+		adrm_int32(&context, (int *)&(internal->as_info.ai_asid), 1);
+		adrm_int32(&context, (int *)&(internal->as_audit_enabled), 1);
+		adrm_int32(&context, (int *)&(internal->as_pid), 1);
+		adrm_int32(&context, (int *)&label_len, 1);
+		if (label_len > 0) {
+			/* read in and deal with different sized labels. */
+			size_t	my_label_len = blabel_size();
 
-	adrm_int32(&context, (int *)&(internal->as_euid), 1);
-	adrm_int32(&context, (int *)&(internal->as_ruid), 1);
-	adrm_int32(&context, (int *)&(internal->as_egid), 1);
-	adrm_int32(&context, (int *)&(internal->as_rgid), 1);
-	adrm_int32(&context, (int *)&(internal->as_info.ai_auid), 1);
-	adrm_int32(&context, (int *)&(internal->as_info.ai_mask.am_success), 2);
-	adrm_int32(&context, (int *)&(internal->as_info.ai_termid.at_port), 1);
-	adrm_int32(&context, (int *)&(internal->as_info.ai_termid.at_type), 1);
-	adrm_int32(&context, (int *)&(internal->as_info.ai_termid.at_addr[0]),
-	    4);
-	adrm_int32(&context, (int *)&(internal->as_info.ai_asid), 1);
-	adrm_int32(&context, (int *)&(internal->as_audit_enabled), 1);
+			if ((internal->as_label =
+			    m_label_alloc(MAC_LABEL)) == NULL) {
+				return (0);
+			}
+			if (label_len > my_label_len) {
+				errno = EINVAL;
+				m_label_free(internal->as_label);
+				return (0);
+			}
+			(void) memset(internal->as_label, 0, my_label_len);
+			adrm_int32(&context, (int *)(internal->as_label),
+			    label_len / sizeof (int32_t));
+		} else {
+			internal->as_label = NULL;
+		}
+	}
 
-	/* ax_size_of_tsol_data intentionally ignored */
-
-	return (sizeof (struct adt_export_data));
+	return (length);
 }
 
 /*
- * to_export_format
+ * adt_to_export_format
  * read from struct adt_session_data into a network order buffer.
  *
  * (network order 'cause this data may be shared with a remote host.)
@@ -958,14 +1018,23 @@ adt_to_export_format(adt_export_data_t *external,
 	struct export_header	head;
 	struct export_link	tail;
 	adr_t			context;
-	size_t			tsol_size = 0;
+	size_t			label_len = 0;
 
 	adrm_start(&context, (char *)external);
 
+	if (internal->as_label != NULL) {
+		label_len = blabel_size();
+	}
+
 	head.ax_check = ADT_VALID;
-	head.ax_buffer_length = sizeof (struct adt_export_data);
-	head.ax_link.ax_version = PROTOCOL_VERSION;
-	head.ax_link.ax_offset = 0;
+	head.ax_buffer_length = sizeof (struct adt_export_data) + label_len;
+
+	/* version 2 first */
+
+	head.ax_link.ax_version = PROTOCOL_VERSION_2;
+	head.ax_link.ax_offset = sizeof (struct export_header) +
+	    sizeof (struct adt_export_v2) + label_len;
+
 	adrm_putint32(&context, (int *)&head, 4);
 
 	adrm_putint32(&context, (int *)&(internal->as_euid), 1);
@@ -983,16 +1052,49 @@ adt_to_export_format(adt_export_data_t *external,
 	    (int *)&(internal->as_info.ai_termid.at_addr[0]), 4);
 	adrm_putint32(&context, (int *)&(internal->as_info.ai_asid), 1);
 	adrm_putint32(&context, (int *)&(internal->as_audit_enabled), 1);
-	adrm_putint32(&context, (int *)&tsol_size, 1);
+	adrm_putint32(&context, (int *)&(internal->as_pid), 1);
+	adrm_putint32(&context, (int *)&label_len, 1);
+	if (internal->as_label != NULL) {
+		/* serialize the label */
+		adrm_putint32(&context, (int *)(internal->as_label),
+		    (label_len / sizeof (int32_t)));
+	}
 
-	/* terminator */
+	/* now version 1 */
+
+	tail.ax_version = PROTOCOL_VERSION_1;
+	tail.ax_offset = 0;
+
+	adrm_putint32(&context, (int *)&tail, 2);
+
+	adrm_putint32(&context, (int *)&(internal->as_euid), 1);
+	adrm_putint32(&context, (int *)&(internal->as_ruid), 1);
+	adrm_putint32(&context, (int *)&(internal->as_egid), 1);
+	adrm_putint32(&context, (int *)&(internal->as_rgid), 1);
+	adrm_putint32(&context, (int *)&(internal->as_info.ai_auid), 1);
+	adrm_putint32(&context,
+	    (int *)&(internal->as_info.ai_mask.am_success), 2);
+	adrm_putint32(&context,
+	    (int *)&(internal->as_info.ai_termid.at_port), 1);
+	adrm_putint32(&context,
+	    (int *)&(internal->as_info.ai_termid.at_type), 1);
+	adrm_putint32(&context,
+	    (int *)&(internal->as_info.ai_termid.at_addr[0]), 4);
+	adrm_putint32(&context, (int *)&(internal->as_info.ai_asid), 1);
+	adrm_putint32(&context, (int *)&(internal->as_audit_enabled), 1);
+	/* ignored in v1 */
+	adrm_putint32(&context, (int *)&label_len, 1);
+
+	/* finally terminator */
+
 	tail.ax_version = 0; /* invalid version number */
 	tail.ax_offset = 0;
 
 	adrm_putint32(&context, (int *)&tail, 2);
 
-	return (sizeof (struct adt_export_data));
+	return (head.ax_buffer_length);
 }
+
 
 /*
  * adt_import_proc() is used by a server acting on behalf
@@ -1016,7 +1118,7 @@ adt_import_proc(pid_t pid, uid_t euid, gid_t egid, uid_t ruid, gid_t rgid,
 	state = calloc(1, sizeof (adt_internal_state_t));
 
 	if (state == NULL)
-		goto return_length;
+		return (0);
 
 	if (adt_init(state, 0) != 0)
 		goto return_length_free;    /* errno from adt_init() */
@@ -1073,7 +1175,11 @@ adt_import_proc(pid_t pid, uid_t euid, gid_t egid, uid_t ruid, gid_t rgid,
 	    state->as_info.ai_mask.am_success,
 	    state->as_info.ai_mask.am_failure));
 
-	*external = malloc(sizeof (adt_export_data_t));
+	if (state->as_label == NULL) {
+		*external = malloc(sizeof (adt_export_data_t));
+	} else {
+		*external = malloc(sizeof (adt_export_data_t) + blabel_size());
+	}
 
 	if (*external == NULL)
 		goto return_all_free;
@@ -1086,8 +1192,23 @@ return_all_free:
 	ucred_free(ucred);
 return_length_free:
 	free(state);
-return_length:
 	return (length);
+}
+
+/*
+ * adt_ucred_label() -- if label is available, duplicate it.
+ */
+
+static m_label_t *
+adt_ucred_label(ucred_t *uc)
+{
+	m_label_t	*ul = NULL;
+
+	if (ucred_getlabel(uc) != NULL) {
+		(void) m_label_dup(&ul, ucred_getlabel(uc));
+	}
+
+	return (ul);
 }
 
 /*
@@ -1155,15 +1276,20 @@ size_t
 adt_export_session_data(const adt_session_data_t *internal,
     adt_export_data_t **external)
 {
-	adt_internal_state_t	*dummy;
 	size_t			length = 0;
 
-	*external = malloc(sizeof (adt_export_data_t));
+	if (((adt_internal_state_t *)internal)->as_label != NULL) {
+		length = blabel_size();
+	}
+
+	*external = malloc(sizeof (adt_export_data_t) + length);
 
 	if (*external == NULL)
-		goto return_length;
+		return (0);
 
 	if (internal == NULL) {
+		adt_internal_state_t	*dummy;
+
 		dummy = malloc(sizeof (adt_internal_state_t));
 		if (dummy == NULL)
 			goto return_length_free;
@@ -1178,14 +1304,12 @@ adt_export_session_data(const adt_session_data_t *internal,
 		length = adt_to_export_format(*external,
 		    (adt_internal_state_t *)internal);
 	}
-
-return_length:
 	return (length);
 
 return_length_free:
 	free(*external);
 	*external = NULL;
-	return (length);
+	return (0);
 }
 
 static void
@@ -1195,6 +1319,8 @@ adt_setto_unaudited(adt_internal_state_t *state)
 	state->as_euid = AU_NOAUDITID;
 	state->as_rgid = AU_NOAUDITID;
 	state->as_egid = AU_NOAUDITID;
+	state->as_pid = (pid_t)-1;
+	state->as_label = NULL;
 
 	if (state->as_audit_enabled) {
 		state->as_info.ai_asid = 0;
@@ -1229,6 +1355,7 @@ adt_init(adt_internal_state_t *state, int use_proc_data)
 		state->as_euid = geteuid();
 		state->as_rgid = getgid();
 		state->as_egid = getegid();
+		state->as_pid = getpid();
 
 		if (state->as_audit_enabled) {
 			const au_tid64_addr_t	*tid;
@@ -1266,6 +1393,7 @@ adt_init(adt_internal_state_t *state, int use_proc_data)
 				}
 				state->as_info.ai_asid = ucred_getasid(ucred);
 				state->as_info.ai_auid = ucred_getauid(ucred);
+				state->as_label = adt_ucred_label(ucred);
 				ucred_free(ucred);
 			}
 			state->as_have_user_data = ADT_HAVE_ALL;
@@ -1572,6 +1700,8 @@ adt_set_from_ucred(const adt_session_data_t *session_data, const ucred_t *uc,
 	state->as_euid = ucred_geteuid(ucred);
 	state->as_rgid = ucred_getrgid(ucred);
 	state->as_egid = ucred_getegid(ucred);
+	state->as_pid = ucred_getpid(ucred);
+	state->as_label = adt_ucred_label(ucred);
 
 return_rc:
 	if (local_uc) {
