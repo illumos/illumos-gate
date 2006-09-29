@@ -60,24 +60,6 @@ extern au_user_str_t *_getauuserent(au_user_str_t *, char *, int, int *);
 extern au_user_str_t *_getauusernam(char *, au_user_str_t *, char *, int,
     int *);
 
-#ifdef __STDC__
-int
-setauuserfile(char *fname)
-#else
-int
-setauuserfile(fname)
-	char *fname;
-#endif
-{
-	_mutex_lock(&mutex_userfile);
-	if (fname) {
-		(void) strcpy(au_user_fname, fname);
-		use_nsswitch = 0;
-	}
-	_mutex_unlock(&mutex_userfile);
-	return (0);
-}
-
 
 void
 setauuser()

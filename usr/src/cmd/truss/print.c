@@ -1204,7 +1204,6 @@ prt_aud(private_t *pri, int raw, long val)	/* print auditsys() code */
 		case BSM_GETUSERAUDIT:	s = "BSM_GETUSERAUDIT";	break;
 		case BSM_SETUSERAUDIT:	s = "BSM_SETUSERAUDIT";	break;
 		case BSM_AUDIT:		s = "BSM_AUDIT";	break;
-		case BSM_AUDITUSER:	s = "BSM_AUDITUSER";	break;
 		case BSM_AUDITSVC:	s = "BSM_AUDITSVC";	break;
 		case BSM_AUDITON:	s = "BSM_AUDITON";	break;
 		case BSM_AUDITCTL:	s = "BSM_AUDITCTL";	break;

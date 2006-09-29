@@ -476,11 +476,3 @@ endac()
 	DIRINIT = 0;
 	_mutex_unlock(&mutex_acf);
 }
-
-int
-testac()
-{
-	if (acf == NULL)
-		return (1);
-	return (0);
-}

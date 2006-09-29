@@ -173,7 +173,7 @@ extern "C" {
 #define	AUE_GETUSERAUDIT	134	/* =no getuseraudit(2) */
 #define	AUE_SETUSERAUDIT	135	/* =no setuseraudit(2) */
 #define	AUE_AUDITSVC		136	/* =as auditsvc(2) */
-#define	AUE_AUDITUSER		137	/* =no audituser(2) */
+/*				137	    OBSOLETE */
 #define	AUE_AUDITON		138	/* =no auditon(2) */
 #define	AUE_AUDITON_GTERMID	139	/* =no auditctl(2): GETTERMID */
 #define	AUE_AUDITON_STERMID	140	/* =no auditctl(2): SETTERMID */

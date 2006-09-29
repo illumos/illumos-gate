@@ -74,22 +74,6 @@ static int cacheauclass_failure = 0;
 extern int _mutex_lock(mutex_t *);
 extern int _mutex_unlock(mutex_t *);
 
-int
-#ifdef __STDC__
-setaueventfile(char *fname)
-#else
-setaueventfile(fname)
-	char	*fname;
-#endif
-{
-	_mutex_lock(&mutex_eventfile);
-	if (fname) {
-		(void) strcpy(au_event_fname, fname);
-	}
-	_mutex_unlock(&mutex_eventfile);
-	return (0);
-}
-
 
 void
 setauevent()

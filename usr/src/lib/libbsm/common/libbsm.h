@@ -148,7 +148,6 @@ extern int	au_write(int, token_t *);
 
 extern void	setauevent(void);
 extern void	endauevent(void);
-extern int	setaueventfile(char *);
 
 extern au_event_ent_t	*getauevent(void);
 extern au_event_ent_t	*getauevent_r(au_event_ent_t *);
@@ -166,7 +165,6 @@ extern int		cacheauevent(au_event_ent_t **, au_event_t);
 
 extern void	setauclass(void);
 extern void	endauclass(void);
-extern int	setauclassfile(char *);
 
 extern int	cacheauclass(au_class_ent_t **, au_class_t);
 extern int	cacheauclassnam(au_class_ent_t **, char *);
@@ -181,7 +179,6 @@ extern au_class_ent_t *getauclassnam_r(au_class_ent_t *, char *);
 
 void	setauuser(void);
 void	endauuser(void);
-int	setauuserfile(char *);
 
 au_user_ent_t *getauuserent(void);
 au_user_ent_t *getauuserent_r(au_user_ent_t *);
@@ -194,7 +191,6 @@ au_user_ent_t *getauusernam_r(au_user_ent_t *, char *);
 
 void	endac(void);
 void	setac(void);
-int	testac(void);
 
 int	getacdir(char *, int);
 int	getacmin(int *);
@@ -235,7 +231,6 @@ extern int	auditon(int, caddr_t, int);
 extern int	auditstat(au_stat_t *);
 extern int	auditsvc(int, int);
 extern int	auditdoor(int);
-extern int	audituser(char *);
 extern int	getaudit(auditinfo_t *);
 extern int	getaudit_addr(auditinfo_addr_t *, int);
 extern int	getauid(au_id_t *);

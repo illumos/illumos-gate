@@ -46,23 +46,6 @@ static mutex_t	mutex_classcache = DEFAULTMUTEX;
 extern int _mutex_lock(mutex_t *);
 extern int _mutex_unlock(mutex_t *);
 
-int
-#ifdef __STDC__
-setauclassfile(char *fname)
-#else
-setauclassfile(fname)
-	char	*fname;
-#endif
-{
-	_mutex_lock(&mutex_classfile);
-	if (fname) {
-		(void) strcpy(au_class_fname, fname);
-	}
-	_mutex_unlock(&mutex_classfile);
-	return (0);
-}
-
-
 void
 setauclass()
 {

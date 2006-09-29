@@ -218,7 +218,7 @@ typedef au_id_t auid_t;
 #define	BSM_GETUSERAUDIT	23
 #define	BSM_SETUSERAUDIT	24
 #define	BSM_AUDIT		25
-#define	BSM_AUDITUSER		26
+/* 				26	OBSOLETE */
 #define	BSM_AUDITSVC		27	/* EOL announced for Sol 10 */
 #define	BSM_AUDITON		28
 #define	BSM_AUDITCTL		29
@@ -267,16 +267,15 @@ typedef au_id_t auid_t;
 #define	AUDIT_ARGE	0x0008	/* include arge with execv system call events */
 #define	AUDIT_SEQ	0x0010	/* include sequence attribute */
 #define	AUDIT_WINDATA	0x0020	/* include interwindow moved data */
-#define	AUDIT_USER	0x0040	/* make audituser(2) un-privileged */
-#define	AUDIT_GROUP	0x0080	/* include group attribute with each record */
-#define	AUDIT_TRAIL	0x0100	/* include trailer token */
-#define	AUDIT_PATH	0x0200	/* allow multiple paths per event */
-#define	AUDIT_SCNT	0x0400	/* sleep user events but not kernel events */
-#define	AUDIT_PUBLIC	0x0800	/* audit even "public" files */
-#define	AUDIT_ZONENAME	0x1000	/* emit zonename token */
-#define	AUDIT_PERZONE	0x2000	/* auditd and audit queue for each zone */
-#define	AUDIT_WINDATA_DOWN	0x4000	/* include paste downgraded data */
-#define	AUDIT_WINDATA_UP	0x8000	/* include paste upgraded data */
+#define	AUDIT_GROUP	0x0040	/* include group attribute with each record */
+#define	AUDIT_TRAIL	0x0080	/* include trailer token */
+#define	AUDIT_PATH	0x0100	/* allow multiple paths per event */
+#define	AUDIT_SCNT	0x0200	/* sleep user events but not kernel events */
+#define	AUDIT_PUBLIC	0x0400	/* audit even "public" files */
+#define	AUDIT_ZONENAME	0x0800	/* emit zonename token */
+#define	AUDIT_PERZONE	0x1000	/* auditd and audit queue for each zone */
+#define	AUDIT_WINDATA_DOWN	0x2000	/* include paste downgraded data */
+#define	AUDIT_WINDATA_UP	0x4000	/* include paste upgraded data */
 
 /*
  * If AUDIT_GLOBAL changes, corresponding changes are required in
@@ -284,7 +283,7 @@ typedef au_id_t auid_t;
  */
 #define	AUDIT_GLOBAL	(AUDIT_AHLT | AUDIT_PERZONE)
 #define	AUDIT_LOCAL	(AUDIT_CNT | AUDIT_ARGV | AUDIT_ARGE |\
-			AUDIT_SEQ | AUDIT_WINDATA | AUDIT_USER |\
+			AUDIT_SEQ | AUDIT_WINDATA |\
 			AUDIT_GROUP | AUDIT_TRAIL | AUDIT_PATH |\
 			AUDIT_PUBLIC | AUDIT_SCNT | AUDIT_ZONENAME |\
 			AUDIT_WINDATA_DOWN | AUDIT_WINDATA_UP)

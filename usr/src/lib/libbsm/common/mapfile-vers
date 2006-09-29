@@ -107,14 +107,10 @@ SUNW_0.7 {
 	getfauditflags;
 	setac;
 	setauclass;
-	setauclassfile;
 	setaudit;
 	setauevent;
-	setaueventfile;
 	setauid;
 	setauuser;
-	setauuserfile;
-	testac;
 };
 
 SUNWprivate_1.1 {
