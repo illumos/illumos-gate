@@ -78,6 +78,7 @@ cmd_cpu_synd_check(uint16_t synd)
 	else
 		return (0);
 }
+/*ARGSUSED*/
 int
 cmd_afar_valid(fmd_hdl_t *hdl, nvlist_t *nvl, cmd_errcl_t clcode,
     uint64_t *afar)
