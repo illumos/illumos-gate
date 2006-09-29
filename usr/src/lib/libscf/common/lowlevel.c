@@ -1823,7 +1823,6 @@ datael_get_child(const scf_datael_t *dp, const char *name, uint32_t type,
  *   _PERMISSION_DENIED
  *   _BACKEND_ACCESS
  *   _BACKEND_READONLY
- *   _NOT_FOUND - could not allocate new id
  */
 static int
 datael_add_child(const scf_datael_t *dp, const char *name, uint32_t type,
@@ -4025,7 +4024,11 @@ scf_entry_add_value(scf_transaction_entry_t *entry, scf_value_t *v)
 		(void) pthread_mutex_unlock(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_NOT_SET));
 	}
-	assert(entry->entry_state == ENTRY_STATE_IN_TX_ACTION);
+
+	if (entry->entry_state != ENTRY_STATE_IN_TX_ACTION) {
+		(void) pthread_mutex_unlock(&h->rh_lock);
+		return (scf_set_error(SCF_ERROR_INTERNAL));
+	}
 
 	if (entry->entry_tx->tran_state != TRAN_STATE_SETUP) {
 		(void) pthread_mutex_unlock(&h->rh_lock);
@@ -4622,7 +4625,7 @@ scf_value_set_from_string(scf_value_t *v, scf_type_t type, const char *str)
 		char *endp;
 
 		errno = 0;
-		c = strtoul(str, &endp, 0);
+		c = strtoull(str, &endp, 0);
 
 		if (errno != 0 || endp == str || *endp != '\0')
 			goto bad;
@@ -4636,7 +4639,7 @@ scf_value_set_from_string(scf_value_t *v, scf_type_t type, const char *str)
 		char *endp;
 
 		errno = 0;
-		i = strtol(str, &endp, 0);
+		i = strtoll(str, &endp, 0);
 
 		if (errno != 0 || endp == str || *endp != '\0')
 			goto bad;
