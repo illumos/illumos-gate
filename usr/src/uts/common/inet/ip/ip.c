@@ -2224,7 +2224,7 @@ icmp_get_nexthop_addr(ipha_t *ipha, ill_t *ill, zoneid_t zoneid, mblk_t *mp)
 			while ((connp != NULL) &&
 			    (!IPCL_UDP_MATCH(connp, dstport,
 			    ipha->ipha_src, srcport, ipha->ipha_dst) ||
-			    connp->conn_zoneid != zoneid)) {
+			    !IPCL_ZONE_MATCH(connp, zoneid))) {
 				connp = connp->conn_next;
 			}
 			if (connp != NULL)
@@ -4788,7 +4788,8 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 			ipif_t *ipif;
 
 			ipif = ipif_lookup_onlink_addr(connp->conn_dontroute ?
-			    dst_addr : connp->conn_nexthop_v4, zoneid);
+			    dst_addr : connp->conn_nexthop_v4,
+			    connp->conn_zoneid);
 			if (ipif == NULL) {
 				error = ENETUNREACH;
 				goto bad_addr;
@@ -6723,9 +6724,8 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 		 * IPv4 unicast packets.
 		 */
 		while ((connp != NULL) &&
-		    (!IPCL_UDP_MATCH(connp, dstport, dst,
-		    srcport, src) ||
-		    (connp->conn_zoneid != zoneid && !connp->conn_allzones))) {
+		    (!IPCL_UDP_MATCH(connp, dstport, dst, srcport, src) ||
+		    !IPCL_ZONE_MATCH(connp, zoneid))) {
 			connp = connp->conn_next;
 		}
 
@@ -10078,7 +10078,8 @@ ip_opt_set_ipif(conn_t *connp, ipaddr_t addr, boolean_t checkonly, int option,
 		ASSERT(connp != NULL);
 		zoneid = IPCL_ZONEID(connp);
 		if (option == IP_NEXTHOP) {
-			ipif = ipif_lookup_onlink_addr(addr, zoneid);
+			ipif = ipif_lookup_onlink_addr(addr,
+			    connp->conn_zoneid);
 		} else {
 			ipif = ipif_lookup_addr(addr, NULL, zoneid,
 			    CONNP_TO_WQ(connp), first_mp, ip_restart_optmgmt,

@@ -2426,8 +2426,10 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	if (eager->tcp_cred != NULL)
 		crfree(eager->tcp_cred);
 	eager->tcp_cred = econnp->conn_cred = aconnp->conn_cred;
-	econnp->conn_zoneid = aconnp->conn_zoneid;
 	aconnp->conn_cred = NULL;
+
+	econnp->conn_zoneid = aconnp->conn_zoneid;
+	econnp->conn_allzones = aconnp->conn_allzones;
 
 	econnp->conn_mac_exempt = aconnp->conn_mac_exempt;
 	aconnp->conn_mac_exempt = B_FALSE;
@@ -5574,6 +5576,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	 * zone id before the accept is completed in tcp_wput_accept().
 	 */
 	econnp->conn_zoneid = connp->conn_zoneid;
+	econnp->conn_allzones = connp->conn_allzones;
 
 	/* Copy nexthop information from listener to eager */
 	if (connp->conn_nexthop_set) {
@@ -17726,7 +17729,9 @@ tcp_wput_accept(queue_t *q, mblk_t *mp)
 		q->q_qinfo = &tcp_winit;
 		listener = eager->tcp_listener;
 		eager->tcp_issocket = B_TRUE;
+
 		econnp->conn_zoneid = listener->tcp_connp->conn_zoneid;
+		econnp->conn_allzones = listener->tcp_connp->conn_allzones;
 
 		/* Put the ref for IP */
 		CONN_INC_REF(econnp);

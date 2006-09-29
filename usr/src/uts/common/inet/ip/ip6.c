@@ -3783,7 +3783,7 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 		 */
 		while (connp != NULL) {
 			if (IPCL_UDP_MATCH_V6(connp, dstport, dst, srcport,
-			    src) && connp->conn_zoneid == zoneid &&
+			    src) && IPCL_ZONE_MATCH(connp, zoneid) &&
 			    conn_wantpacket_v6(connp, ill, ip6h,
 			    flags, zoneid)) {
 				break;
@@ -11826,7 +11826,7 @@ conn_wantpacket_v6(conn_t *connp, ill_t *ill, ip6_t *ip6h, int fanout_flags,
 		 * Unicast case: we match the conn only if it's in the specified
 		 * zone.
 		 */
-		return (connp->conn_zoneid == zoneid || zoneid == ALL_ZONES);
+		return (IPCL_ZONE_MATCH(connp, zoneid));
 	}
 
 	if ((fanout_flags & IP_FF_NO_MCAST_LOOP) &&
