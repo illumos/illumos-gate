@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -209,7 +208,8 @@ shim_changepasswd(SVCXPRT *transp)
 	 * we try to get a list of password related domains from the mapping
 	 * file.
 	 */
-	if (0 != (dom_count = get_mapping_domain_list(&domain_list))) {
+	if (0 !=
+	    (dom_count = get_mapping_yppasswdd_domain_list(&domain_list))) {
 		/* Got a domain list ... process all the domains */
 		for (i = 0; i < dom_count; i ++) {
 			ret = proc_domain(&yppwd, root_on_master,
