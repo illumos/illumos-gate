@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,194 +55,105 @@ static const char *gr_attrs[] = {
 
 
 /*
- * _nss_ldap_group2ent is the data marshaling method for the group getXbyY
+ * _nss_ldap_group2str is the data marshaling method for the group getXbyY
  * (e.g., getgrnam(), getgrgid(), getgrent()) backend processes. This method
  * is called after a successful ldap search has been performed. This method
- * will parse the ldap search values into struct group = argp->buf.buffer
- * which the frontend process expects. Three error conditions are expected
- * and returned to nsswitch.
+ * will parse the ldap search values into the file format.
+ * e.g.
+ *
+ * adm::4:root,adm,daemon
+ *
  */
 
 static int
-_nss_ldap_group2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_group2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int		i, j;
+	int		i;
 	int		nss_result;
-	int		buflen = (int)0;
-	int		firstime = (int)1;
-	unsigned long	len = 0L;
-	char		**mp = NULL;
-	char		*val = (char *)NULL;
-	char		*buffer = (char *)NULL;
-	char		*ceiling = (char *)NULL;
-	struct group	*grp = (struct group *)NULL;
+	int		buflen = 0, len;
+	int		firstime = 1;
+	char		*buffer = NULL;
 	ns_ldap_result_t	*result = be->result;
-	ns_ldap_attr_t	*attrptr;
+	char		**gname, **passwd, **gid, *password;
+	ns_ldap_attr_t	*members;
 
-	buffer = argp->buf.buffer;
-	buflen = (size_t)argp->buf.buflen;
-	if (!argp->buf.result) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_grp2ent;
+
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
+	buflen = argp->buf.buflen;
+
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, buflen)) == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_grp2str;
+		}
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
+
+	nss_result = NSS_STR_PARSE_SUCCESS;
+	(void) memset(buffer, 0, buflen);
+
+	gname = __ns_ldap_getAttr(result->entry, _G_NAME);
+	if (gname == NULL || gname[0] == NULL || (strlen(gname[0]) < 1)) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_grp2str;
 	}
-	grp = (struct group *)argp->buf.result;
-	ceiling = buffer + buflen;
-	mp = grp->gr_mem = (char **)NULL;
-
-	/* initialize no group password */
-	grp->gr_passwd = (char *)NULL;
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
-	(void) memset(argp->buf.buffer, 0, buflen);
-
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_grp2ent;
-	}
-
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_grp2ent;
-		}
-		if (strcasecmp(attrptr->attrname, _G_NAME) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_grp2ent;
-			}
-			grp->gr_name = buffer;
-			buffer += len + 1;
-			if (buffer > ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_grp2ent;
-			}
-			(void) strcpy(grp->gr_name, attrptr->attrvalue[0]);
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _G_PASSWD) == 0) {
-			val = attrptr->attrvalue[0];
-			/*
-			 * Preen "{crypt}" if necessary.
-			 * If the password does not include the {crypt} prefix
-			 * then the password may be plain text.  And thus
-			 * perhaps crypt(3c) should be used to encrypt it.
-			 * Currently the password is copied verbatim.
-			 */
-			if (strncasecmp(val, _CRYPT,
-			    (sizeof (_CRYPT) - 1)) == 0)
-				val += (sizeof (_CRYPT) - 1);
-			len = strlen(val);
-			grp->gr_passwd = buffer;
-			buffer += len + 1;
-			if (buffer > ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_grp2ent;
-			}
-			(void) strcpy(grp->gr_passwd, val);
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _G_GID) == 0) {
-			if (strlen(attrptr->attrvalue[0]) == 0) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_grp2ent;
-			}
-			errno = 0;
-			grp->gr_gid = (gid_t)strtol(attrptr->attrvalue[0],
-						    (char **)NULL, 10);
-			if (errno != 0) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_grp2ent;
-			}
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _G_MEM) == 0) {
-			for (j = 0; j < attrptr->value_count; j++) {
-				if (firstime) {
-					mp = grp->gr_mem =
-						    (char **)ROUND_UP(buffer,
-						    sizeof (char **));
-					buffer = (char *)grp->gr_mem +
-						    sizeof (char *) *
-						    (attrptr->value_count + 1);
-					buffer = (char *)ROUND_UP(buffer,
-						    sizeof (char **));
-					if (buffer > ceiling) {
-						nss_result =
-						    (int)NSS_STR_PARSE_ERANGE;
-						goto result_grp2ent;
-					}
-					firstime = (int)0;
-				}
-				if (attrptr->attrvalue[j] == NULL) {
-					nss_result = (int)NSS_STR_PARSE_PARSE;
-					goto result_grp2ent;
-				}
-				len = strlen(attrptr->attrvalue[j]);
-				if (len == 0)
-					continue;
-				*mp = buffer;
-				buffer += len + 1;
-				if (buffer > ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_grp2ent;
-				}
-				(void) strcpy(*mp++, attrptr->attrvalue[j]);
-				continue;
-			}
-		}
-	}
-	/* Don't leave password as null */
-	if (grp->gr_passwd == (char *)NULL) {
+	passwd = __ns_ldap_getAttr(result->entry, _G_PASSWD);
+	if (passwd == NULL || passwd[0] == NULL || (strlen(passwd[0]) == 0)) {
+		/* group password could be NULL, replace it with "" */
+		password = _NO_PASSWD_VAL;
+	} else {
 		/*
-		 * The password may be missing; rfc2307bis defines
-		 * the 'posixGroup' attributes 'authPassword' and
-		 * 'userPassword' as being optional.  Or a directory
-		 * access control may be preventing us from reading
-		 * the password.  Currently we don't know which it is.
-		 * If it's an access problem then perhaps the password
-		 * should be set to "*NP*".  But for now a simple empty
-		 * string is returned.
+		 * Preen "{crypt}" if necessary.
+		 * If the password does not include the {crypt} prefix
+		 * then the password may be plain text.  And thus
+		 * perhaps crypt(3c) should be used to encrypt it.
+		 * Currently the password is copied verbatim.
 		 */
-		grp->gr_passwd = buffer;
-		buffer += sizeof (_NO_PASSWD_VAL);
-		if (buffer > ceiling) {
-			nss_result = (int)NSS_STR_PARSE_ERANGE;
-			goto result_grp2ent;
+		if (strncasecmp(passwd[0], _CRYPT, strlen(_CRYPT)) == 0)
+			password = passwd[0] + strlen(_CRYPT);
+		else
+			password = passwd[0];
+	}
+	gid = __ns_ldap_getAttr(result->entry, _G_GID);
+	if (gid == NULL || gid[0] == NULL || (strlen(gid[0]) < 1)) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_grp2str;
+	}
+	len = snprintf(buffer, buflen, "%s:%s:%s:",
+			gname[0], password, gid[0]);
+	TEST_AND_ADJUST(len, buffer, buflen, result_grp2str);
+
+	members = __ns_ldap_getAttrStruct(result->entry, _G_MEM);
+	if (members == NULL || members->attrvalue == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_grp2str;
+	}
+
+	for (i = 0; i < members->value_count; i++) {
+		if (members->attrvalue[i] == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_grp2str;
 		}
-		(void) strcpy(grp->gr_passwd, _NO_PASSWD_VAL);
-	}
-	if (mp == NULL) {
-		mp = grp->gr_mem = (char **)ROUND_UP(buffer, sizeof (char **));
-		buffer = (char *)grp->gr_mem + sizeof (char *);
-		buffer = (char *)ROUND_UP(buffer, sizeof (char **));
-		if (buffer > ceiling) {
-			nss_result = (int)NSS_STR_PARSE_ERANGE;
-			goto result_grp2ent;
+		if (firstime) {
+			len = snprintf(buffer, buflen, "%s",
+					members->attrvalue[i]);
+			TEST_AND_ADJUST(len, buffer, buflen, result_grp2str);
+			firstime = 0;
+		} else {
+			len = snprintf(buffer, buflen, ",%s",
+					members->attrvalue[i]);
+			TEST_AND_ADJUST(len, buffer, buflen, result_grp2str);
 		}
 	}
-	*mp = NULL;
-
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getgrent.c: _nss_ldap_group2ent]\n");
-	(void) fprintf(stdout, "       gr_name: [%s]\n", grp->gr_name);
-	if (grp->gr_passwd != (char *)NULL)
-		(void) fprintf(stdout, "     gr_passwd: [%s]\n",
-			    grp->gr_passwd);
-	(void) fprintf(stdout, "        gr_gid: [%ld]\n", grp->gr_gid);
-	if (mp != NULL) {
-		for (mp = grp->gr_mem; *mp != NULL; mp++)
-			(void) fprintf(stdout, "        gr_mem: [%s]\n", *mp);
-	}
-#endif /* DEBUG */
-
-result_grp2ent:
-
+	/* The front end marshaller doesn't need the trailing nulls */
+	if (argp->buf.result != NULL)
+		be->buflen = strlen(be->buffer);
+result_grp2str:
 	(void) __ns_ldap_freeResult(&be->result);
-	return ((int)nss_result);
+	return (nss_result);
 }
-
 
 /*
  * getbynam gets a group entry by name. This function constructs an ldap
@@ -262,9 +172,6 @@ getbynam(ldap_backend_ptr be, void *a)
 	char		groupname[SEARCHFILTERLEN];
 	int		ret;
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getgrent.c: getbyname]\n");
-#endif /* DBEUG */
 	if (_ldap_filter_name(groupname, argp->key.name, sizeof (groupname))
 			!= 0)
 		return ((nss_status_t)NSS_NOTFOUND);
@@ -300,9 +207,6 @@ getbygid(ldap_backend_ptr be, void *a)
 	char userdata[SEARCHFILTERLEN];
 	int ret;
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getgrent.c: getbygid]\n");
-#endif /* DBEUG */
 	ret = snprintf(searchfilter, sizeof (searchfilter),
 	    _F_GETGRGID, (long)argp->key.uid);
 	if (ret >= sizeof (searchfilter) || ret < 0)
@@ -354,10 +258,7 @@ getbymember(ldap_backend_ptr be, void *a)
 	gid_t			gid;
 	int			ret;
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getgrent.c: getbymember]\n");
-#endif /* DBEUG */
-
+	/* LINTED E_EXPR_NULL_EFFECT */
 	NSS_XbyY_ALLOC(&gb, sizeof (struct group), NSS_BUFLEN_GROUP);
 	NSS_XbyY_INIT(&argb, gb->result, gb->buffer, gb->buflen, 0);
 
@@ -414,7 +315,7 @@ getbymember(ldap_backend_ptr be, void *a)
 		curEntry = curEntry->next;
 	}
 
-	__ns_ldap_freeResult((ns_ldap_result_t **)&be->result);
+	(void) __ns_ldap_freeResult((ns_ldap_result_t **)&be->result);
 	NSS_XbyY_FREE(&gb);
 	if (gcnt == argp->numgids)
 		return ((nss_status_t)NSS_NOTFOUND);
@@ -441,5 +342,5 @@ _nss_ldap_group_constr(const char *dummy1, const char *dummy2,
 
 	return ((nss_backend_t *)_nss_ldap_constr(gr_ops,
 		sizeof (gr_ops)/sizeof (gr_ops[0]), _GROUP, gr_attrs,
-		_nss_ldap_group2ent));
+		_nss_ldap_group2str));
 }

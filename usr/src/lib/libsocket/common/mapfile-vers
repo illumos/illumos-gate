@@ -140,6 +140,15 @@ SUNWprivate_1.3 {
     global:
 	_link_aton;
 	_link_ntoa;
+	_nss_initf_ethers;
+	_nss_initf_net;
+	_nss_initf_netmasks;
+	_nss_initf_proto;
+	_nss_initf_services;
+	str2ether;
+	str2addr;
+	str2netent;
+	str2protoent;
 } SUNWprivate_1.2;
 
 SUNWprivate_1.2 {

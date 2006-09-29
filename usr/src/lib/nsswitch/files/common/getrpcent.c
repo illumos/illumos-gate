@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,10 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 1988-1995 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
- *	files/getrpcent.c -- "files" backend for nsswitch "rpc" database
+ * files/getrpcent.c -- "files" backend for nsswitch "rpc" database
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,43 +30,39 @@
 #include <rpc/rpcent.h>
 #include "files_common.h"
 #include <strings.h>
-
-static int
-check_name(args)
-	nss_XbyY_args_t		*args;
-{
-	struct rpcent		*rpc	= (struct rpcent *) args->returnval;
-	const char		*name	= args->key.name;
-	char			**aliasp;
-
-	if (strcmp(rpc->r_name, name) == 0) {
-		return (1);
-	}
-	for (aliasp = rpc->r_aliases;  *aliasp != 0;  aliasp++) {
-		if (strcmp(*aliasp, name) == 0) {
-			return (1);
-		}
-	}
-	return (0);
-}
+#include <ctype.h>
+#include <stdlib.h>
 
 static nss_status_t
 getbyname(be, a)
 	files_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
-	return (_nss_files_XY_all(be, argp, 1, argp->key.name, check_name));
+	return (_nss_files_XY_all(be, argp, 1, argp->key.name,
+			_nss_files_check_name_aliases));
 }
 
 static int
-check_rpcnum(argp)
-	nss_XbyY_args_t		*argp;
+check_rpcnum(nss_XbyY_args_t *argp, const char *line, int linelen)
 {
-	struct rpcent		*rpc = (struct rpcent *) argp->returnval;
+	int		r_number;
+	const char	*limit, *linep;
 
-	return (rpc->r_number == argp->key.number);
+	linep = line;
+	limit = line + linelen;
+
+	/* skip name */
+	while (linep < limit && !isspace(*linep))
+		linep++;
+	/* skip the delimiting spaces */
+	while (linep < limit && isspace(*linep))
+		linep++;
+	if (linep == limit)
+		return (0);
+	r_number = (int)strtol(linep, NULL, 10);
+	return (r_number == argp->key.number);
 }
 
 
@@ -76,10 +71,10 @@ getbynumber(be, a)
 	files_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	char			numstr[12];
 
-	sprintf(numstr, "%d", argp->key.number);
+	(void) snprintf(numstr, 12, "%d", argp->key.number);
 	return (_nss_files_XY_all(be, argp, 1, numstr, check_rpcnum));
 }
 

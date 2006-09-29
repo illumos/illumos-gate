@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,8 +87,7 @@ _print_execstr(execstr_t *exec)
 static nss_status_t
 _exec_process_val(_exec_nisplus_args * eargp, nis_object * obj)
 {
-	int			parse_stat;
-	nss_status_t		res;
+	int			parsestat;
 	nss_XbyY_args_t		*argp = eargp->argp;
 	nisplus_backend_t	*be = eargp->be;
 	_priv_execattr *_priv_exec = (_priv_execattr *)(argp->key.attrp);
@@ -98,30 +96,70 @@ _exec_process_val(_exec_nisplus_args * eargp, nis_object * obj)
 	(void) fprintf(stdout, "\n[getexecattr.c: _exec_process_val]\n");
 #endif	/* DEBUG */
 
-	parse_stat = (be->obj2ent) (1, obj, argp);	/* passing one obj */
-	switch (parse_stat) {
-	case NSS_STR_PARSE_SUCCESS:
-		argp->returnval = argp->buf.result;
-		res = NSS_SUCCESS;
-		if (_priv_exec->search_flag == GET_ALL) {
-			if (_doexeclist(argp) == 0) {
-				res = NSS_UNAVAIL;
-			}
-		}
-		break;
-	case NSS_STR_PARSE_ERANGE:
-		argp->erange = 1;
-		res = NSS_NOTFOUND; /* We won't find this otherwise, anyway */
-		break;
-	case NSS_STR_PARSE_PARSE:
-		res = NSS_NOTFOUND;
-		break;
-	default:
-		res = NSS_UNAVAIL;
-		break;
+	/* passing one obj */
+	parsestat = (be->obj2str) (1, obj, be, argp);
+	if (parsestat != NSS_STR_PARSE_SUCCESS)
+		goto fail;
+
+	/*
+	 * If caller is nscd's switch engine, the data
+	 * will be in argp->buf.buffer. nscd does not
+	 * support GET_ALL at this time so return
+	 * success from here.
+	 */
+	if (argp->buf.result == NULL && be->buffer == NULL) {
+		argp->returnval = argp->buf.buffer;
+		if (argp->buf.buffer != NULL)
+			argp->returnlen = strlen(argp->buf.buffer);
+		return (NSS_SUCCESS);
 	}
 
-	return (res);
+	/*
+	 * If the data is in be->buffer it needs
+	 * to be marshalled.
+	 */
+	if (argp->str2ent == NULL) {
+		parsestat = NSS_STR_PARSE_PARSE;
+		goto fail;
+	}
+	parsestat = (*argp->str2ent)(be->buffer,
+		be->buflen,
+		argp->buf.result,
+		argp->buf.buffer,
+		argp->buf.buflen);
+	if (parsestat == NSS_STR_PARSE_SUCCESS) {
+		if (be->buffer != NULL) {
+			free(be->buffer);
+			be->buffer = NULL;
+			be->buflen = 0;
+		}
+		argp->returnval = argp->buf.result;
+		if (argp->buf.result != NULL)
+			argp->returnlen = 1;
+		else if (argp->buf.buffer != NULL) {
+			argp->returnval = argp->buf.buffer;
+			argp->returnlen = strlen(argp->buf.buffer);
+		}
+		if (_priv_exec->search_flag == GET_ALL)
+			if (_doexeclist(argp) == 0)
+				return (NSS_UNAVAIL);
+		return (NSS_SUCCESS);
+	}
+
+fail:
+	if (be->buffer != NULL) {
+		free(be->buffer);
+		be->buffer = NULL;
+		be->buflen = 0;
+	}
+	if (parsestat == NSS_STR_PARSE_ERANGE) {
+		argp->erange = 1;
+		/* We won't find this otherwise, anyway */
+		return (NSS_NOTFOUND);
+	} else if (parsestat == NSS_STR_PARSE_PARSE) {
+		return (NSS_NOTFOUND);
+	}
+	return (NSS_UNAVAIL);
 }
 
 
@@ -131,17 +169,16 @@ _exec_process_val(_exec_nisplus_args * eargp, nis_object * obj)
  *		returns 0 if -  no matching entry found,
  *				matching entry found and next match needed.
  */
+/*ARGSUSED*/
 static int
 check_match(nis_name table, nis_object * obj, void *eargs)
 {
-	int			len;
-	int			status = 0;
-	char			*p, *val;
+	int			len, status = 0;
+	char			*val;
 	struct entry_col	*ecol;
 	nss_status_t		res;
 	_exec_nisplus_args	*eargp = (_exec_nisplus_args *)eargs;
 	nss_XbyY_args_t		*argp = eargp->argp;
-	nisplus_backend_t	*be = eargp->be;
 	_priv_execattr *_priv_exec = (_priv_execattr *)(argp->key.attrp);
 	const char		*type = _priv_exec->type;
 	const char		*policy = _priv_exec->policy;
@@ -171,7 +208,7 @@ check_match(nis_name table, nis_object * obj, void *eargs)
 		 * check policy; it was not a searchable column in old servers.
 		 */
 		EC_SET(ecol, EXECATTR_NDX_POLICY, len, val);
-		if ((len == NULL) || (strcmp(val, policy) != 0)) {
+		if ((len == 0) || (strcmp(val, policy) != 0)) {
 			return (0);
 		}
 	}
@@ -181,7 +218,7 @@ check_match(nis_name table, nis_object * obj, void *eargs)
 		 * check type
 		 */
 		EC_SET(ecol, EXECATTR_NDX_TYPE, len, val);
-		if ((len == NULL) || (strcmp(val, type) != 0)) {
+		if ((len == 0) || (strcmp(val, type) != 0)) {
 			return (0);
 		}
 	}
@@ -210,11 +247,9 @@ _exec_nisplus_lookup(nisplus_backend_t *be,
     nss_XbyY_args_t *argp,
     int getby_flag)
 {
-	int			status;
 	char			key[MAX_INPUT];
 	char			policy_key[POLICY_LEN];
 	const char		*column1, *key1, *column2, *key2;
-	nis_object		*obj;
 	nis_result		*r = NULL;
 	nss_status_t		res = NSS_NOTFOUND;
 	_exec_nisplus_args	eargs;
@@ -347,7 +382,6 @@ getbyid(nisplus_backend_ptr_t be, void *a)
 {
 	nss_status_t	res;
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
-	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 
 #ifdef	DEBUG
 	(void) fprintf(stdout, "\n[getexecattr.c: getbyid]\n");
@@ -369,7 +403,6 @@ getbynameid(nisplus_backend_ptr_t be, void *a)
 {
 	nss_status_t	res;
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
-	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 
 #ifdef	DEBUG
 	(void) fprintf(stdout, "\n[getexecattr.c: getbynameid]\n");
@@ -387,27 +420,19 @@ getbynameid(nisplus_backend_ptr_t be, void *a)
 
 
 /*
- * place the results from the nis_object structure into argp->buf.result
  * Returns NSS_STR_PARSE_{SUCCESS, ERANGE, PARSE}
  */
+/*ARGSUSED*/
 static int
-nis_object2execstr(int nobj, nis_object *obj, nss_XbyY_args_t *argp)
+nis_object2execstr(int nobj, nis_object *obj,
+		nisplus_backend_ptr_t be,
+		nss_XbyY_args_t *argp)
 {
-	int			len;
-	int			buflen = argp->buf.buflen;
-	char			*limit, *val, *endnum, *nullstring;
-	char			*buffer = NULL;
-	char			*empty = "";
-	execstr_t		*exec = NULL;
+	char			*buffer, *name, *type, *policy;
+	char			*res1, *res2, *id, *attr;
+	int			buflen, namelen, typelen, policylen;
+	int			res1len, res2len, idlen, attrlen;
 	struct entry_col	*ecol;
-
-	limit = argp->buf.buffer + buflen;
-	exec = (execstr_t *)argp->buf.result;
-	buffer = argp->buf.buffer;
-
-	if ((buffer == NULL) || (exec == NULL)) {
-		return (NSS_STR_PARSE_PARSE);
-	}
 
 	/*
 	 * If we got more than one nis_object, we just ignore object(s) except
@@ -422,113 +447,49 @@ nis_object2execstr(int nobj, nis_object *obj, nss_XbyY_args_t *argp)
 	}
 	ecol = obj->EN_data.en_cols.en_cols_val;
 
-	/*
-	 * execstr->name: profile name
-	 */
-	EC_SET(ecol, EXECATTR_NDX_NAME, len, val);
-	if (len < 1 || (*val == '\0')) {
-		val = empty;
-	}
-	exec->name = buffer;
-	buffer += len;
-	if (buffer >= limit) {
-		return (NSS_STR_PARSE_ERANGE);
-	}
-	strcpy(exec->name, val);
-	nullstring = (buffer - 1);
+	/* profile name */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, EXECATTR_NDX_NAME, namelen, name);
 
-	/*
-	 * execstr->type: exec type
-	 */
-	EC_SET(ecol, EXECATTR_NDX_TYPE, len, val);
-	if (len < 1 || (*val == '\0')) {
-		val = empty;
-	}
-	exec->type = buffer;
-	buffer += len;
-	if (buffer >= limit) {
-		return (NSS_STR_PARSE_ERANGE);
-	}
-	strcpy(exec->type, val);
-	nullstring = (buffer - 1);
+	/* exec type */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, EXECATTR_NDX_TYPE, typelen, type);
 
-	/*
-	 * execstr->policy
-	 */
-	EC_SET(ecol, EXECATTR_NDX_POLICY, len, val);
-	if (len < 1 || (*val == '\0')) {
-		val = empty;
-	}
-	exec->policy = buffer;
-	buffer += len;
-	if (buffer >= limit) {
-		return (NSS_STR_PARSE_ERANGE);
-	}
-	strcpy(exec->policy, val);
-	nullstring = (buffer - 1);
+	/* policy */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, EXECATTR_NDX_POLICY,
+		policylen, policy);
 
-	/*
-	 * execstr->res1: reserved field 1
-	 */
-	EC_SET(ecol, EXECATTR_NDX_RES1, len, val);
-	if (len < 1 || (*val == '\0')) {
-		val = empty;
-	}
-	exec->res1 = buffer;
-	buffer += len;
-	if (buffer >= limit) {
-		return (NSS_STR_PARSE_ERANGE);
-	}
-	strcpy(exec->res1, val);
-	nullstring = (buffer - 1);
+	/* reserved field 1 */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, EXECATTR_NDX_RES1, res1len, res1);
 
-	/*
-	 * execstr->res2: reserved field 2
-	 */
-	EC_SET(ecol, EXECATTR_NDX_RES2, len, val);
-	if (len < 1 || (*val == '\0')) {
-		val = empty;
-	}
-	exec->res2 = buffer;
-	buffer += len;
-	if (buffer >= limit) {
-		return (NSS_STR_PARSE_ERANGE);
-	}
-	strcpy(exec->res2, val);
-	nullstring = (buffer - 1);
+	/* reserved field 2 */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, EXECATTR_NDX_RES2, res2len, res2);
 
-	/*
-	 * execstr->id: unique id
-	 */
-	EC_SET(ecol, EXECATTR_NDX_ID, len, val);
-	if (len < 1 || (*val == '\0')) {
-		val = empty;
-	}
-	exec->id = buffer;
-	buffer += len;
-	if (buffer >= limit) {
-		return (NSS_STR_PARSE_ERANGE);
-	}
-	strcpy(exec->id, val);
-	nullstring = (buffer - 1);
+	/* unique id */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, EXECATTR_NDX_ID, idlen, id);
 
-	/*
-	 * execstr->attrs: key-value pairs of attributes
-	 */
-	EC_SET(ecol, EXECATTR_NDX_ATTR, len, val);
-	if (len < 1 || (*val == '\0')) {
-		val = empty;
-	}
-	exec->attr = buffer;
-	buffer += len;
-	if (buffer >= limit) {
-		return (NSS_STR_PARSE_ERANGE);
-	}
-	strcpy(exec->attr, val);
-	nullstring = (buffer - 1);
+	/* key-value pairs of attributes */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, EXECATTR_NDX_ATTR, attrlen, attr);
 
-	exec->next = (execstr_t *)NULL;
-
+	buflen = namelen + policylen + typelen + res1len + res2len
+		+ idlen + attrlen + 7;
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, buflen)) == NULL)
+			return (NSS_STR_PARSE_PARSE);
+		/* exclude trailing null from length */
+		be->buflen = buflen - 1;
+		buffer = be->buffer;
+	} else {
+		if (buflen > argp->buf.buflen)
+			return (NSS_STR_PARSE_ERANGE);
+		buflen = argp->buf.buflen;
+		buffer = argp->buf.buffer;
+		(void) memset(buffer, 0, buflen);
+	}
+	(void) snprintf(buffer, buflen, "%s:%s:%s:%s:%s:%s:%s",
+		name, policy, type, res1, res2, id, attr);
+#ifdef DEBUG
+	(void) fprintf(stdout, "execattr [%s]\n", buffer);
+	(void) fflush(stdout);
+#endif  /* DEBUG */
 	return (NSS_STR_PARSE_SUCCESS);
 }
 
@@ -542,6 +503,7 @@ static nisplus_backend_op_t execattr_ops[] = {
 	getbynameid
 };
 
+/*ARGSUSED*/
 nss_backend_t  *
 _nss_nisplus_exec_attr_constr(const char *dummy1,
     const char *dummy2,

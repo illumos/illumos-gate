@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -186,3 +185,49 @@ char *__s_api_get_canonical_name(
 	ns_ldap_entry_t *entry,
 	ns_ldap_attr_t *attrptr,
 	int case_ignore);
+
+void __ns_ldap_setServer(
+	int set);
+
+ns_ldap_error_t *__ns_ldap_LoadConfiguration(
+	void);
+
+ns_ldap_error_t *__ns_ldap_DumpConfiguration(
+	char *file);
+
+ns_ldap_error_t *__ns_ldap_DumpLdif(
+	char *filename);
+
+ns_ldap_error_t *__ns_ldap_print_config(
+	int verbose);
+
+void __ns_ldap_default_config(
+	void);
+
+int __ns_ldap_download(
+	const char *profile,
+	char *addr,
+	char *baseDN,
+	ns_ldap_error_t **errorp);
+
+int __ns_ldap_check_dns_preq(
+	int foreground,
+	int mode_verbose,
+	int mode_quiet,
+	const char *fname,
+	ns_ldap_self_gssapi_config_t config,
+	ns_ldap_error_t **errpp);
+
+int __ns_ldap_check_gssapi_preq(
+	int foreground,
+	int mode_verbose,
+	int mode_quiet,
+	ns_ldap_self_gssapi_config_t config,
+	ns_ldap_error_t **errpp);
+
+int __ns_ldap_check_all_preq(
+	int foreground,
+	int mode_verbose,
+	int mode_quiet,
+	ns_ldap_self_gssapi_config_t config,
+	ns_ldap_error_t **errpp);

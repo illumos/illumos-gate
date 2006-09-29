@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,7 +99,7 @@ getnetgr_get(be, a)
 	struct nis_getnetgr_be	*be;
 	void			*a;
 {
-	struct nss_getnetgrent_args *args = (struct nss_getnetgrent_args *) a;
+	struct nss_getnetgrent_args *args = (struct nss_getnetgrent_args *)a;
 	struct grouplist	*mem;
 
 	if ((mem = be->next_member) == 0) {
@@ -120,7 +119,7 @@ getnetgr_get(be, a)
 				args->retp[i] = 0;
 			} else if ((len = strlen(str) + 1) <= buflen) {
 				args->retp[i] = buffer;
-				memcpy(buffer, str, len);
+				(void) memcpy(buffer, str, len);
 				buffer += len;
 				buflen -= len;
 			} else {
@@ -170,7 +169,7 @@ getnetgr_destr(be, dummy)
 	void			*dummy;
 {
 	if (be != 0) {
-		getnetgr_end(be, (void *)0);
+		(void) getnetgr_end(be, (void *)0);
 		free(be);
 	}
 	return (NSS_SUCCESS);
@@ -248,7 +247,7 @@ static void
 ngt_init(ngt)
 	struct netgrtab	*ngt;
 {
-	memset((void *)ngt, 0, sizeof (*ngt));
+	(void) memset((void *)ngt, 0, sizeof (*ngt));
 	ngt->expand_lastp = &ngt->expand_first;
 }
 
@@ -285,7 +284,7 @@ ngt_insert(ngt, name, namelen)
 	if (cur == 0) {
 		return;			/* Out of memory, too bad */
 	}
-	memcpy(cur->name, name, namelen);
+	(void) memcpy(cur->name, name, namelen);
 	cur->name[namelen] = 0;
 
 	/* Insert in hash table */
@@ -349,7 +348,7 @@ top_down(struct nis_netgr_be *be, const char **groups, int ngroups,
 	int			done;
 	nss_status_t		result;
 
-	if ((ngt = (struct netgrtab *) malloc(sizeof (*ngt))) == 0) {
+	if ((ngt = (struct netgrtab *)malloc(sizeof (*ngt))) == 0) {
 		return (NSS_UNAVAIL);
 	}
 	ngt_init(ngt);
@@ -373,7 +372,9 @@ top_down(struct nis_netgr_be *be, const char **groups, int ngroups,
 		result = _nss_nis_ypmatch(be->domain, "netgroup", group,
 					&val, &vallen, &yperr);
 		if (result != NSS_SUCCESS) {
+			/*LINTED E_NOP_IF_STMT*/
 			if (result == NSS_NOTFOUND) {
+				;
 #ifdef	DEBUG
 				syslog(LOG_WARNING,
 				    "NIS netgroup lookup: %s doesn't exist",
@@ -550,11 +551,11 @@ netgr_set(be, a)
 	struct nis_netgr_be	*be;
 	void			*a;
 {
-	struct nss_setnetgrent_args *args = (struct nss_setnetgrent_args *) a;
+	struct nss_setnetgrent_args *args = (struct nss_setnetgrent_args *)a;
 	struct nis_getnetgr_be	*get_be;
 	nss_status_t		res;
 
-	get_be = (struct nis_getnetgr_be *) malloc(sizeof (*get_be));
+	get_be = (struct nis_getnetgr_be *)malloc(sizeof (*get_be));
 	if (get_be == 0) {
 		return (NSS_UNAVAIL);
 	}
@@ -570,7 +571,7 @@ netgr_set(be, a)
 		get_be->netgroup	= strdup(args->netgroup);
 		get_be->next_member	= get_be->all_members;
 
-		args->iterator		= (nss_backend_t *) get_be;
+		args->iterator		= (nss_backend_t *)get_be;
 	} else {
 		args->iterator		= 0;
 		free(get_be);
@@ -815,7 +816,7 @@ netgr_in(be, a)
 	struct nis_netgr_be	*be;
 	void			*a;
 {
-	struct nss_innetgr_args	*ia = (struct nss_innetgr_args *) a;
+	struct nss_innetgr_args	*ia = (struct nss_innetgr_args *)a;
 	nss_status_t		res;
 
 	ia->status = NSS_NETGR_NO;
@@ -852,7 +853,7 @@ netgr_in(be, a)
  */
 
 /*ARGSUSED*/
-nss_status_t
+static nss_status_t
 netgr_destr(be, dummy)
 	struct nis_netgr_be	*be;
 	void			*dummy;
@@ -882,12 +883,12 @@ _nss_nis_netgroup_constr(dummy1, dummy2, dummy3)
 	struct nis_netgr_be	*be;
 
 	if ((domain = _nss_nis_domain()) == 0 ||
-	    (be = (struct nis_netgr_be *) malloc(sizeof (*be))) == 0) {
+	    (be = (struct nis_netgr_be *)malloc(sizeof (*be))) == 0) {
 		return (0);
 	}
 	be->ops		= netgroup_ops;
 	be->n_ops	= sizeof (netgroup_ops) / sizeof (netgroup_ops[0]);
 	be->domain	= domain;
 
-	return ((nss_backend_t *) be);
+	return ((nss_backend_t *)be);
 }

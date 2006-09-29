@@ -90,17 +90,10 @@
 #define	UDPDEV	"/dev/udp"
 #define	UDP6DEV	"/dev/udp6"
 
-#ifdef PIC
-#define	DOOR_GETHOSTBYNAME_R	_door_gethostbyname_r
-#define	DOOR_GETHOSTBYADDR_R	_door_gethostbyaddr_r
-#define	DOOR_GETIPNODEBYNAME_R	_door_getipnodebyname_r
-#define	DOOR_GETIPNODEBYADDR_R	_door_getipnodebyaddr_r
-#else
 #define	DOOR_GETHOSTBYNAME_R	_switch_gethostbyname_r
 #define	DOOR_GETHOSTBYADDR_R	_switch_gethostbyaddr_r
 #define	DOOR_GETIPNODEBYNAME_R	_switch_getipnodebyname_r
 #define	DOOR_GETIPNODEBYADDR_R	_switch_getipnodebyaddr_r
-#endif /* PIC */
 
 #define	DONT_SORT	"SORT_ADDRS=NO"
 #define	DONT_SORT2	"SORT_ADDRS=FALSE"

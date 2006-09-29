@@ -691,7 +691,7 @@ write_state_machine(
 		switch (state) {
 		case W_EXIT:
 			if (connectionId > -1)
-				DropConnection(connectionId, 0);
+				DropConnection(connectionId, NS_LDAP_NEW_CONN);
 			if (ref_list)
 				__s_api_deleteRefInfo(ref_list);
 			if (target_dn && target_dn_allocated)
@@ -723,7 +723,7 @@ write_state_machine(
 			break;
 		case GET_CONNECTION:
 			rc = __s_api_getConnection(NULL,
-				flags,
+				flags | NS_LDAP_NEW_CONN,
 				cred,
 				&connectionId,
 				&conp,
@@ -912,7 +912,7 @@ write_state_machine(
 			if (*errorp)
 				(void) __ns_ldap_freeError(errorp);
 			if (connectionId > -1)
-				DropConnection(connectionId, 0);
+				DropConnection(connectionId, NS_LDAP_NEW_CONN);
 			rc = __s_api_getConnection(current_ref->refHost,
 				0,
 				cred,

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,261 +51,203 @@ static const char *hosts_attrs[] = {
 	(char *)NULL
 };
 
-
 /*
- * _nss_ldap_hosts2ent is the data marshaling method for the hosts getXbyY
- * system call gethostbyname() and gethostbyaddr. The format of this call
- * is a cononical name and alias (alias is cononical name too) and one or
- * more IP addresses in support of multihomed hosts. This method is called
- * after a successful synchronous search has been performed. This method
- * will parse the search results into struct hostent = argp->buf.buffer
- * which gets returned to the frontend process. One of three error
- * conditions is also returned to nsswitch.
+ * _nss_ldap_hosts2str is the data marshaling method for the hosts getXbyY
+ * system call gethostbyname() and gethostbyaddr.
+ * This method is called after a successful search has been performed.
+ * This method will parse the search results into the file format.
+ * e.g.
+ *
+ * 9.9.9.9 jurassic jurassic1 jurassic2
+ * 10.10.10.10 puppy
+ *
  */
-
-static int
-_nss_ldap_hosts2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+int
+_nss_ldap_hosts2str_int(int af, ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int			i, j;
+	uint_t			i;
 	int			nss_result;
-	int			buflen = (int)0;
-	int			firstimename = (int)1;
-	int			firstimedn   = (int)1;
-	int			firstimeaddr = (int)1;
-	unsigned long		len = 0L;
-	char			**hn, **ha, **dp;
-	char			*cname = (char *)NULL;
-	char			*buffer = (char *)NULL;
-	char			*ceiling = (char *)NULL;
-	struct hostent		*host = (struct hostent *)NULL;
-	in_addr_t		addr;
+	int			buflen, buflen1, buflen2, len;
+	int			firstimedn   = 1, first_entry;
+	int			validaddress = 0, copy_cname;
+	char			*cname = NULL, *h_name = NULL;
+	char			*buffer = NULL;
+	char			*name;
 	ns_ldap_result_t	*result = be->result;
-	ns_ldap_attr_t		*attrptr;
-	in_addr_t		inet_addr(const char *cp);
-	int			namecount = 0;
-	int			addrcount = 0;
-	int			aliascount = 0;
-	int			validaddress = 0;
-	int			gluelen = 0;
+	ns_ldap_attr_t		*names;
 	ns_ldap_entry_t		*entry;
-	ns_ldap_attr_t		*attr;
-#ifdef DEBUG
-	struct in_addr		in;
-#endif /* DEBUG */
+	char			**ips = NULL, **dns = NULL;
+	char			*first_host = NULL, *other_hosts = NULL;
+	char			*buf1, *buf2;
 
-	buffer = argp->buf.buffer;
-	buflen = (size_t)argp->buf.buflen;
-	if (!argp->buf.result) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_hosts2ent;
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
+	buflen = buflen1 = buflen2 = argp->buf.buflen;
+
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, buflen)) == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_host2str;
+		}
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
+	if ((first_host = calloc(1, buflen1)) == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_host2str;
+	}
+	if ((other_hosts = calloc(1, buflen2)) == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_host2str;
 	}
 
-	host = (struct hostent *)argp->buf.result;
-	ceiling = buffer + buflen;
-
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
+	nss_result = NSS_STR_PARSE_SUCCESS;
 	(void) memset(argp->buf.buffer, 0, buflen);
-
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_hosts2ent;
-	}
-
-	namecount = 0;
-	addrcount = 0;
+	/*
+	 * Multiple lines return will be sepereated by newlines
+	 * Single line return or last line does not have newline
+	 * e.g.
+	 *
+	 * 8.8.8.8 hostname
+	 *
+	 * or the search for hostname h1 returns 3 entries
+	 *
+	 * 9.9.9.9 h1
+	 * 10.10.10.10 h1 xx
+	 * 20.20.20.20 h1 yyy
+	 *
+	 * str2hostent expects all name/aliases in the first entry
+	 * so the string is organized as
+	 *
+	 * "9.9.9.9 h1 xx yy\n10.10.10.10 \n20.20.20.20 "
+	 *
+	 * Use first_host to hold "9.9.9.9 h1 xx yy" and other_hosts to hold
+	 * "\n10.10.10.10 \n20.20.20.20 "
+	 *
+	 */
+	buf1 = first_host;
+	buf2 = other_hosts;
+	first_entry = 1;
 	for (entry = result->entry; entry != NULL; entry = entry->next) {
-		for (i = 0, attr = entry->attr_pair[i];
-			i < entry->attr_count; i++) {
-			attr = entry->attr_pair[i];
-			if (strcasecmp(attr->attrname, _H_NAME) == 0)
-				namecount += attr->value_count;
-			if (strcasecmp(attr->attrname, _H_ADDR) == 0)
-				addrcount += attr->value_count;
-		}
-	}
-	for (entry = result->entry; entry != NULL; entry = entry->next) {
-	    for (i = 0; i < entry->attr_count; i++) {
-		attrptr = entry->attr_pair[i];
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_hosts2ent;
-		}
-		if (strcasecmp(attrptr->attrname, _H_DN) == 0) {
-		    for (j = 0; j < attrptr->value_count; j++) {
-			if (firstimedn) {
-			    /* get domain name associated with this dn */
-			    be->toglue = _get_domain_name(
-					attrptr->attrvalue[j]);
-			    firstimedn = (int)0;
-			}
+	    if (firstimedn) {
+		    dns =  __ns_ldap_getAttr(entry, _H_DN);
+		    if (dns == NULL || dns[0] == NULL || strlen(dns[0]) < 1) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_host2str;
 		    }
-		}
-		if (strcasecmp(attrptr->attrname, _H_NAME) == 0) {
-		    for (j = 0; j < attrptr->value_count; j++) {
-			if (firstimename) {
-			    /* canonical name */
-			    cname = __s_api_get_canonical_name(result->entry,
-				attrptr, 1);
-			    if (cname == NULL ||
-				    (len = strlen(cname)) < 1) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_hosts2ent;
-			    }
-			    if (be->toglue != NULL &&
-				!DOTTEDSUBDOMAIN(cname))
-				gluelen = strlen(be->toglue) + 1;
-			    else
-				gluelen = 0;
-			    host->h_name = buffer;
-			    buffer += len + gluelen + 1;
-			    if (buffer >= ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_hosts2ent;
-			    }
-			    (void) strcpy(host->h_name, cname);
-			    if (gluelen > 0) {
-				(void) strcat(host->h_name, ".");
-				(void) strcat(host->h_name, be->toglue);
-			    }
-			    /* alias name */
-			    aliascount = (namecount >= 1 ? (namecount - 1) : 0);
-			    hn = host->h_aliases = (char **)ROUND_UP(buffer,
-				sizeof (char **));
-			    buffer = (char *)host->h_aliases +
-				(sizeof (char *) * (aliascount + 1));
-			    buffer = (char *)ROUND_UP(buffer,
-				sizeof (char **));
-			    if (buffer >= ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_hosts2ent;
-			    }
-			    firstimename = (int)0;
-			}
-			/* alias list */
-			if (aliascount > 0) {
-				if ((attrptr->attrvalue[j] == NULL) ||
-				    (len = strlen(attrptr->attrvalue[j])) < 1) {
-				    nss_result = (int)NSS_STR_PARSE_PARSE;
-				    goto result_hosts2ent;
-				}
-				/* skip canonical name */
-				if (strcmp(cname, attrptr->attrvalue[j]) == 0)
-					continue;
-				/* check for duplicates */
-				for (dp = host->h_aliases; *dp != NULL; dp++) {
-				    if (strcmp(*dp, attrptr->attrvalue[j]) == 0)
-					goto next_alias;
-				}
-				if (be->toglue != NULL &&
-					!DOTTEDSUBDOMAIN(attrptr->attrvalue[j]))
-					gluelen = strlen(be->toglue) + 1;
-				else
-					gluelen = 0;
-				*hn = buffer;
-				buffer += len + gluelen + 1;
-				if (buffer >= ceiling) {
-				    nss_result = (int)NSS_STR_PARSE_ERANGE;
-				    goto result_hosts2ent;
-				}
-				(void) strcpy(*hn, attrptr->attrvalue[j]);
-				if (gluelen > 0) {
-				    (void) strcat(*hn, ".");
-				    (void) strcat(*hn, be->toglue);
-				}
-				hn++;
-			}
-next_alias:
-			continue;
-		    }
-		}
+		    /* get domain name associated with this dn */
+		    be->toglue = _get_domain_name(dns[0]);
+		    firstimedn = 0;
 	    }
-	}
 
-	for (entry = result->entry; entry != NULL; entry = entry->next) {
-	    for (i = 0; i < entry->attr_count; i++) {
-		attrptr = entry->attr_pair[i];
-		if (attrptr == NULL) {
-		    nss_result = (int)NSS_STR_PARSE_PARSE;
-		    goto result_hosts2ent;
+	    /* Get IP */
+	    ips = __ns_ldap_getAttr(entry, _H_ADDR);
+	    if (ips == NULL || ips[0] == NULL || strlen(ips[0]) < 1) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_host2str;
+	    }
+	    /* Skip IPV6 address in AF_INET mode */
+	    if (af == AF_INET &&
+		(inet_addr(_strip_quotes(ips[0])) == (in_addr_t)-1))
+		    continue;
+
+	    /* A valid address for either af mode */
+	    validaddress++;
+
+	    if (first_entry) {
+		len = snprintf(buf1, buflen1, "%s", ips[0]);
+		TEST_AND_ADJUST(len, buf1, buflen1, result_host2str);
+	    } else {
+		len = snprintf(buf2, buflen2, "\n%s ", ips[0]);
+		TEST_AND_ADJUST(len, buf2, buflen2, result_host2str);
+	    }
+
+	    /* Get host names */
+	    names = __ns_ldap_getAttrStruct(entry, _H_NAME);
+	    if (names == NULL || names->attrvalue == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_host2str;
+	    }
+
+	    /* Get canonical name of each entry */
+	    cname = __s_api_get_canonical_name(entry,
+			names, 1);
+	    if (cname == NULL || strlen(cname) < 1) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_host2str;
+	    }
+
+	    /* Filter cname that's identical to h_name */
+	    if (first_entry) {
+		    h_name = cname;
+		    first_entry = 0;
+		    copy_cname = 1;
+	    } else if (strcasecmp(cname, h_name) != 0) {
+		    copy_cname = 1;
+	    } else
+		    copy_cname = 0;
+
+	    if (copy_cname) {
+		/* Use the canonical name as the host name */
+		if (DOTTEDSUBDOMAIN(cname))
+			len = snprintf(buf1, buflen1, " %s", cname);
+		else
+			/* append domain name */
+			len = snprintf(buf1, buflen1, " %s.%s", cname,
+					be->toglue);
+
+		TEST_AND_ADJUST(len, buf1, buflen1, result_host2str);
+	    }
+
+	    /* Append aliases */
+	    for (i = 0; i < names->value_count; i++) {
+		name = names->attrvalue[i];
+		if (name == NULL) {
+		    nss_result = NSS_STR_PARSE_PARSE;
+		    goto result_host2str;
 		}
-		if (strcasecmp(attrptr->attrname, _H_ADDR) == 0) {
-		    for (j = 0; j < attrptr->value_count; j++) {
-			if (firstimeaddr) {
-			    /* allocate 1 address per entry */
-			    ha = host->h_addr_list =
-				(char **)ROUND_UP(buffer,
-				sizeof (char **));
-			    buffer = (char *)host->h_addr_list +
-				sizeof (char *) *
-				(addrcount + 1);
-			    buffer = (char *)ROUND_UP(buffer,
-				sizeof (char **));
-			    if (buffer >= ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_hosts2ent;
-			    }
-			    firstimeaddr = (int)0;
-			}
-			/* filter out IPV6 addresses */
-			addr = inet_addr(_strip_quotes(attrptr->attrvalue[j]));
-			if (addr == (in_addr_t)-1) {
-			    goto next_addr;
-			}
-			validaddress++;
-			/* check for duplicates */
-			for (dp = host->h_addr_list; *dp != NULL; dp++) {
-			if (memcmp(*dp, &addr, (size_t)sizeof (in_addr_t)) == 0)
-			    goto next_addr;
-			}
-			*ha = buffer;
-			len = (unsigned long)sizeof (in_addr_t);
-			buffer += len;
-			if (buffer >= ceiling) {
-			    nss_result = (int)NSS_STR_PARSE_ERANGE;
-			    goto result_hosts2ent;
-			}
-			(void) memcpy(*ha++, (char *)&addr, (size_t)len);
-next_addr:
-			continue;
-		    }
+		/* Skip the canonical name and h_name */
+		if (strcasecmp(name, cname) != 0 &&
+				strcasecmp(name, h_name) != 0) {
+		    if (DOTTEDSUBDOMAIN(name))
+			len = snprintf(buf1, buflen1, " %s", name);
+		    else
+			/* append domain name */
+			len = snprintf(buf1, buflen1, " %s.%s",
+					    name, be->toglue);
+		    TEST_AND_ADJUST(len, buf1, buflen1, result_host2str);
 		}
 	    }
 	}
 
 	if (validaddress == 0) {
-	    nss_result = (int)NSS_STR_PARSE_NO_ADDR;
-	    goto result_hosts2ent;
+	/*
+	 * For AF_INET mode, it found an IPv6 address and skipped it.
+	 */
+	    nss_result = NSS_STR_PARSE_NO_ADDR;
+	    goto result_host2str;
 	}
+	/* Combine 2 strings */
+	len = snprintf(buffer, buflen, "%s%s", first_host, other_hosts);
+	TEST_AND_ADJUST(len, buffer, buflen, result_host2str);
 
-	host->h_addrtype = AF_INET;
-	host->h_length = sizeof (uint_t);
+	/* The front end marshaller doesn't need to copy trailing nulls */
+	if (argp->buf.result != NULL)
+		be->buflen = strlen(be->buffer);
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[gethostent.c: _nss_ldap_hosts2ent]\n");
-	(void) fprintf(stdout, "        h_name: [%s]\n", host->h_name);
-	if (host->h_aliases != NULL) {
-		for (hn = host->h_aliases; *hn != NULL; hn++)
-			(void) fprintf(stdout, "     h_aliases: [%s]\n", *hn);
-	}
-	(void) fprintf(stdout, "    h_addrtype: [%d]\n", host->h_addrtype);
-	(void) fprintf(stdout, "      h_length: [%d]\n", host->h_length);
-	for (ha = host->h_addr_list; *ha != NULL; ha++) {
-		(void) memcpy(&in.s_addr, *ha, sizeof (in.s_addr));
-		if (inet_ntoa(in) != NULL)
-			(void) fprintf(stdout, "   h_addr_list: [%s]\n",
-				inet_ntoa(in));
-		else
-			(void) fprintf(stdout, "   h_addr_list: <NULL>\n");
-	}
-#endif /* DEBUG */
-
-result_hosts2ent:
-
+result_host2str:
+	if (first_host)
+		free(first_host);
+	if (other_hosts)
+		free(other_hosts);
 	(void) __ns_ldap_freeResult(&be->result);
-	return ((int)nss_result);
+	return (nss_result);
 }
 
+static int
+_nss_ldap_hosts2str(ldap_backend_ptr be, nss_XbyY_args_t *argp) {
+	return (_nss_ldap_hosts2str_int(AF_INET, be, argp));
+}
 
 /*
  * getbyname gets a struct hostent by hostname. This function constructs
@@ -484,10 +425,7 @@ _nss_ldap_hosts_constr(const char *dummy1, const char *dummy2,
 			const char *dummy3)
 {
 
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[gethostent.c: _nss_ldap_hosts_constr]\n");
-#endif	/* DEBUG */
 	return ((nss_backend_t *)_nss_ldap_constr(hosts_ops,
 		sizeof (hosts_ops)/sizeof (hosts_ops[0]), _HOSTS,
-		hosts_attrs, _nss_ldap_hosts2ent));
+		hosts_attrs, _nss_ldap_hosts2str));
 }

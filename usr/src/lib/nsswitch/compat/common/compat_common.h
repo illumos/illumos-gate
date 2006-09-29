@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1992, by Sun Microsystems, Inc.
- *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
  * Common code and structures used by name-service-switch "compat" backends.
  */
 
@@ -57,6 +58,42 @@ typedef const char 	*(*compat_get_name)(nss_XbyY_args_t *);
 typedef int		(*compat_merge_func)(compat_backend_ptr_t,
 					    nss_XbyY_args_t	*,
 					    const char		**fields);
+
+typedef struct setofstrings	*strset_t;
+
+struct compat_backend {
+	compat_backend_op_t	*ops;
+	int			n_ops;
+	const char		*filename;
+	FILE			*f;
+	int			minbuf;
+	char			*buf;
+	int			linelen;	/* <== Explain use, lifetime */
+
+	nss_db_initf_t		db_initf;
+	nss_db_root_t		*db_rootp;	/* Shared between instances */
+	nss_getent_t		db_context;	/* Per-instance enumeration */
+
+	compat_get_name		getnamef;
+	compat_merge_func	mergef;
+
+	/* We wouldn't need all this hokey state stuff if we */
+	/*   used another thread to implement a coroutine... */
+	enum {
+		GETENT_FILE,
+		GETENT_NETGROUP,
+		GETENT_ATTRDB,
+		GETENT_ALL,
+		GETENT_DONE
+	}			state;
+	strset_t		minuses;
+
+	int			permit_netgroups;
+	const char		*yp_domain;
+	nss_backend_t		*getnetgrent_backend;
+	char			*netgr_buffer;
+	int			return_string_data;
+};
 
 #if defined(__STDC__)
 extern nss_backend_t	*_nss_compat_constr(compat_backend_op_t	*ops,

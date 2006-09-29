@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,37 +19,71 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 1988-1995 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
- *	files/getgrent.c -- "files" backend for nsswitch "group" database
+ * files/getgrent.c -- "files" backend for nsswitch "group" database
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <grp.h>
 #include <unistd.h>		/* for GF_PATH */
+#include <stdlib.h>		/* for GF_PATH */
 #include "files_common.h"
 #include <strings.h>
 
-static u_int
-hash_grname(nss_XbyY_args_t *argp, int keyhash)
+static uint_t
+hash_grname(nss_XbyY_args_t *argp, int keyhash, const char *line,
+	int linelen)
 {
-	struct group *g = argp->returnval;
-	const char *name = keyhash ? argp->key.name : g->gr_name;
-	u_int hash = 0;
+	const char 	*name;
+	int		namelen, i;
+	uint_t		hash = 0;
 
-	while (*name != 0)
-		hash = hash * 15 + *name++;
+	if (keyhash) {
+		name = argp->key.name;
+		namelen = strlen(name);
+	} else {
+		name = line;
+		namelen = 0;
+		while (linelen-- && *line++ != ':')
+			namelen++;
+	}
 
+	for (i = 0; i < namelen; i++)
+		hash = hash * 15 + name[i];
 	return (hash);
 }
 
-static u_int
-hash_grgid(nss_XbyY_args_t *argp, int keyhash)
+static uint_t
+hash_grgid(nss_XbyY_args_t *argp, int keyhash, const char *line,
+	int linelen)
 {
-	struct group *g = argp->returnval;
-	return (keyhash ? (u_int)argp->key.gid : (u_int)g->gr_gid);
+	uint_t		id;
+	const char	*linep, *limit, *end;
+
+	linep = line;
+	limit = line + linelen;
+
+	if (keyhash)
+		return ((uint_t)argp->key.gid);
+
+	/* skip groupname */
+	while (linep < limit && *linep++ != ':');
+	/* skip password */
+	while (linep < limit && *linep++ != ':');
+	if (linep == limit)
+		return (GID_NOBODY);
+
+	/* gid */
+	end = linep;
+	id = (uint_t)strtol(linep, (char **)&end, 10);
+	/* empty gid */
+	if (linep == end)
+		return (GID_NOBODY);
+
+	return (id);
 }
 
 static files_hash_func hash_gr[2] = { hash_grname, hash_grgid };
@@ -64,15 +97,22 @@ static files_hash_t hashinfo = {
 };
 
 static int
-check_grname(argp)
-	nss_XbyY_args_t		*argp;
+check_grname(nss_XbyY_args_t *argp, const char *line, int linelen)
 {
-	struct group		*g = (struct group *)argp->returnval;
+	const char *linep, *limit;
+	const char *keyp = argp->key.name;
 
-	/* +/- entries only valid in compat source */
-	if (g->gr_name != 0 && (g->gr_name[0] == '+' || g->gr_name[0] == '-'))
+	linep = line;
+	limit = line + linelen;
+
+	/* +/- entries valid for compat source only */
+	if (linelen == 0 || *line == '+' || *line == '-')
 		return (0);
-	return (strcmp(g->gr_name, argp->key.name) == 0);
+	while (*keyp && linep < limit && *keyp == *linep) {
+		keyp++;
+		linep++;
+	}
+	return (linep < limit && *keyp == '\0' && *linep == ':');
 }
 
 static nss_status_t
@@ -84,15 +124,34 @@ getbyname(be, a)
 }
 
 static int
-check_grgid(argp)
-	nss_XbyY_args_t		*argp;
+check_grgid(nss_XbyY_args_t *argp, const char *line, int linelen)
 {
-	struct group		*g = (struct group *)argp->returnval;
+	const char	*linep, *limit, *end;
+	gid_t		gr_gid;
 
-	/* +/- entries only valid in compat source */
-	if (g->gr_name != 0 && (g->gr_name[0] == '+' || g->gr_name[0] == '-'))
+	linep = line;
+	limit = line + linelen;
+
+	/* +/- entries valid for compat source only */
+	if (linelen == 0 || *line == '+' || *line == '-')
 		return (0);
-	return (g->gr_gid == argp->key.gid);
+
+	/* skip username */
+	while (linep < limit && *linep++ != ':');
+	/* skip password */
+	while (linep < limit && *linep++ != ':');
+	if (linep == limit)
+		return (0);
+
+	/* uid */
+	end = linep;
+	gr_gid = (gid_t)strtol(linep, (char **)&end, 10);
+
+	/* empty gid is not valid */
+	if (linep == end)
+		return (0);
+
+	return (gr_gid == argp->key.gid);
 }
 
 static nss_status_t
@@ -108,7 +167,7 @@ getbymember(be, a)
 	files_backend_ptr_t	be;
 	void			*a;
 {
-	struct nss_groupsbymem	*argp = (struct nss_groupsbymem *) a;
+	struct nss_groupsbymem	*argp = (struct nss_groupsbymem *)a;
 
 	return (_nss_files_do_all(be, argp, argp->username,
 				(files_do_all_func_t)argp->process_cstr));

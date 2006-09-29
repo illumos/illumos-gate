@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,15 +98,12 @@ str2execattr(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 	char		*sep = KV_TOKEN_DELIMIT;
 	execstr_t	*exec = (execstr_t *)ent;
 
-	if (exec == NULL)
-		return (NSS_STR_PARSE_PARSE);
-
-	if ((instr >= buffer && (buffer + buflen) > instr) ||
-	    (buffer >= instr && (instr + lenstr) > buffer))
-		return (NSS_STR_PARSE_PARSE);
 	if (lenstr >= buflen)
 		return (NSS_STR_PARSE_ERANGE);
-	(void) strncpy(buffer, instr, buflen);
+
+	if (instr != buffer)
+		(void) strncpy(buffer, instr, buflen);
+
 	/*
 	 * Remove newline that nis (yp_match) puts at the
 	 * end of the entry it retrieves from the map.
@@ -115,6 +111,10 @@ str2execattr(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 	if (buffer[lenstr] == '\n') {
 		buffer[lenstr] = '\0';
 	}
+
+	/* quick exit do not entry fill if not needed */
+	if (ent == (void *)NULL)
+		return (NSS_STR_PARSE_SUCCESS);
 
 	exec->name = _strtok_escape(buffer, sep, &last);
 	exec->policy = _strtok_escape(NULL, sep, &last);
@@ -245,9 +245,12 @@ retry_policy:
 					res = nss_search(&pexec_root,
 					    _nsw_initf_execattr, getby_flag,
 					    &arg);
-					_nss_db_state_destr(pexec_root.s);
+					if (pexec_root.s != NULL)
+						_nss_db_state_destr(
+							pexec_root.s);
 				}
-				_nss_db_state_destr(prof_root.s);
+				if (prof_root.s != NULL)
+					_nss_db_state_destr(prof_root.s);
 				(void) mutex_unlock(&_nsw_exec_lock);
 				if ((pres == NSS_SUCCESS) || (conf == NULL))
 					break;

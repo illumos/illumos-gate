@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,6 +139,7 @@ static ns_enum_map ns_auth_enum_v2[] = {
 	{ ENUM2INT(NS_LDAP_EA_SASL_DIGEST_MD5_CONF),
 			"sasl/DIGEST-MD5:auth-conf" },
 	{ ENUM2INT(NS_LDAP_EA_SASL_EXTERNAL), "sasl/EXTERNAL" },
+	{ ENUM2INT(NS_LDAP_EA_SASL_GSSAPI), "sasl/GSSAPI" },
 	{ ENUM2INT(NS_LDAP_EA_TLS_NONE), "tls:none" },
 	{ ENUM2INT(NS_LDAP_EA_TLS_SIMPLE), "tls:simple" },
 	{ ENUM2INT(NS_LDAP_EA_TLS_SASL_CRAM_MD5), "tls:sasl/CRAM-MD5" },
@@ -1005,7 +1005,7 @@ __s_api_crosscheck(ns_config_t *ptr, char *errstr, int check_dn)
 	int		i, len, cnt;
 	const char	*begin;
 	char		**ppc;
-	int		*pi;
+	int		*pi, self, gssapi;
 
 
 	if (ptr == NULL)
@@ -1171,7 +1171,38 @@ __s_api_crosscheck(ns_config_t *ptr, char *errstr, int check_dn)
 		}
 		ptr->paramList[NS_LDAP_EXP_P].ns_tm = tm;
 	}
-
+	/*
+	 * If credential level self is defined, there should be
+	 * at least an auth method sasl/GSSAPI and vice versa.
+	 */
+	self = 0;
+	cnt = ptr->paramList[NS_LDAP_CREDENTIAL_LEVEL_P].ns_acnt;
+	for (i = 0; i < cnt; i++) {
+		if (ptr->paramList[NS_LDAP_CREDENTIAL_LEVEL_P].ns_pi[i] ==
+				NS_LDAP_CRED_SELF)
+			self++;
+	}
+	gssapi = 0;
+	cnt = ptr->paramList[NS_LDAP_AUTH_P].ns_acnt;
+	for (i = 0; i < cnt; i++) {
+		if (ptr->paramList[NS_LDAP_AUTH_P].ns_pi[i] ==
+			NS_LDAP_EA_SASL_GSSAPI)
+			gssapi++;
+	}
+	if (gssapi == 0 && self > 0) {
+		(void) snprintf(errstr, MAXERROR,
+			gettext("Configuration Error: "
+				"Credential level self requires "
+				"authentication method sasl/GSSAPI"));
+		return (NS_PARSE_ERR);
+	}
+	if (gssapi > 0 && self == 0) {
+		(void) snprintf(errstr, MAXERROR,
+			gettext("Configuration Error: "
+				"Authentication method sasl/GSSAPI "
+				"requires credential level self"));
+		return (NS_PARSE_ERR);
+	}
 	return (NS_SUCCESS);
 }
 
@@ -3452,6 +3483,12 @@ __s_api_AuthEnumtoStruct(const EnumAuthType_t i)
 		case NS_LDAP_EA_SASL_EXTERNAL:
 			ap->type = NS_LDAP_AUTH_SASL;
 			ap->saslmech = NS_LDAP_SASL_EXTERNAL;
+			break;
+		case NS_LDAP_EA_SASL_GSSAPI:
+			ap->type = NS_LDAP_AUTH_SASL;
+			ap->saslmech = NS_LDAP_SASL_GSSAPI;
+			ap->saslopt = NS_LDAP_SASLOPT_INT |
+					NS_LDAP_SASLOPT_PRIV;
 			break;
 		case NS_LDAP_EA_TLS_NONE:
 			ap->type = NS_LDAP_AUTH_TLS;

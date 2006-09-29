@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,11 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 1988-1995 Sun Microsystems Inc
- *	All Rights Reserved.
- *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  *  nisplus/getspent.c: implementations of getspnam(), getspent(), setspent(),
  *  endspent() for NIS+.  We keep the shadow information in a column
  *  ("shadow") of the same table that stores vanilla passwd information.
@@ -62,8 +63,8 @@ getbynam(be, a)
 	nisplus_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp	= (nss_XbyY_args_t *) a;
-	struct spwd		*sp	= (struct spwd *) argp->buf.result;
+	nss_XbyY_args_t		*argp	= (nss_XbyY_args_t *)a;
+	struct spwd		*sp	= (struct spwd *)argp->buf.result;
 	int			buflen	= argp->buf.buflen;
 	nss_status_t		status;
 	const char		*username;
@@ -76,12 +77,17 @@ getbynam(be, a)
 	_mutex_lock(&one_lane);
 
 	/*
-	 * There is a dirty little private protocol with the nis_object2ent()
+	 * There is a dirty little private protocol with the nis_object2str()
 	 * routine below:  it gives us back a uid in the argp->key.uid
 	 * field.  Since "key" is a union, and we're using key.name,
 	 * we save/restore it in case anyone cares.
+	 *
+	 * NSS2: be->flag is used to indicate *NP* case since we
+	 * may not have the shadow passwd available at this point
+	 * if called by nscd's switch.
 	 */
 	username = argp->key.name;
+	be->flag = 0;
 
 	status = _nss_nisplus_lookup(be, argp, PW_TAG_NAME, username);
 
@@ -95,13 +101,13 @@ getbynam(be, a)
 
 	/* fix for bugid 4301477 DELETED if (_thr_main() != -1) goto out; */
 
-	if (!(status == NSS_SUCCESS && argp->returnval != 0 &&
-	    sp->sp_pwdp != 0 && strcmp(sp->sp_pwdp, "*NP*") == 0))
+	if (status != NSS_SUCCESS || argp->returnval == 0 || be->flag == 0)
 		goto out;
 
 	/* Get our current euid and that of the entry */
 	orig_uid = geteuid();
 	entry_uid = argp->key.uid;
+	be->flag = 0;
 
 	/*
 	 * If the entry uid differs from our own euid, set our euid to
@@ -116,10 +122,10 @@ getbynam(be, a)
 		 * results.
 		 */
 		if (key_secretkey_is_set_g(0, 0) &&
-		    ((save_buf = (char *) malloc(buflen)) != 0)) {
+		    ((save_buf = (char *)malloc(buflen)) != 0)) {
 
 			/* Save the old results in case the new lookup fails */
-			memcpy(save_buf, argp->buf.buffer, buflen);
+			(void) memcpy(save_buf, argp->buf.buffer, buflen);
 			save_sp = *sp;
 
 			/* Do the lookup (this time as the user). */
@@ -128,7 +134,8 @@ getbynam(be, a)
 
 			/* If it failed, restore the old results */
 			if (status != NSS_SUCCESS) {
-				memcpy(argp->buf.buffer, save_buf, buflen);
+				(void) memcpy(argp->buf.buffer, save_buf,
+					buflen);
 				*sp = save_sp;
 				status = NSS_SUCCESS;
 			}
@@ -137,7 +144,7 @@ getbynam(be, a)
 		}
 
 		/* Set uid back */
-		seteuid(orig_uid);
+		(void) seteuid(orig_uid);
 	}
 
 out:
@@ -154,24 +161,17 @@ out:
  */
 /*ARGSUSED*/
 static int
-nis_object2ent(nobj, obj, argp)
-	int		nobj;
-	nis_object	*obj;
-	nss_XbyY_args_t	*argp;
+nis_object2str(nobj, obj, be, argp)
+	int			nobj;
+	nis_object		*obj;
+	nisplus_backend_ptr_t	be;
+	nss_XbyY_args_t		*argp;
 {
-	struct spwd	*sp	= (struct spwd *) argp->buf.result;
-	char		*buffer	= argp->buf.buffer;
-	int		buflen	= argp->buf.buflen;
-	char		*limit	= buffer + buflen;
-
-	struct entry_col *ecol;
-	char		*val;
-	int		len;
-
-	char		*endnum;
-	uid_t		uid;
-	char		*p;
-	long		x;
+	char			*buffer, *name, *passwd, *shadow;
+	int			buflen, namelen, passwdlen, shadowlen;
+	char			*endnum, *uidstr;
+	int			uidlen;
+	struct entry_col	*ecol;
 
 	/*
 	 * If we got more than one nis_object, we just ignore it.
@@ -188,47 +188,16 @@ nis_object2ent(nobj, obj, argp)
 	}
 	ecol = obj->EN_data.en_cols.en_cols_val;
 
-	/*
-	 * sp_namp: user name
-	 */
-	EC_SET(ecol, PW_NDX_NAME, len, val);
-	if (len < 2)
-		return (NSS_STR_PARSE_PARSE);
-	sp->sp_namp = buffer;
-	buffer += len;
-	if (buffer >= limit)
-		return (NSS_STR_PARSE_ERANGE);
-	strcpy(sp->sp_namp, val);
+	/* name: user name */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, PW_NDX_NAME, namelen, name);
 
-	/*
-	 * sp_pwdp: password
-	 */
-	EC_SET(ecol, PW_NDX_PASSWD, len, val);
-	if (len < 2) {
-		/*
-		 * don't return NULL pointer, lot of stupid programs
-		 * out there.
-		 */
-		*buffer = '\0';
-		sp->sp_pwdp = buffer++;
-		if (buffer >= limit)
-			return (NSS_STR_PARSE_ERANGE);
-	} else {
-		sp->sp_pwdp = buffer;
-		buffer += len;
-		if (buffer >= limit)
-			return (NSS_STR_PARSE_ERANGE);
-		strcpy(sp->sp_pwdp, val);
-	}
+	/* passwd */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, PW_NDX_PASSWD, passwdlen, passwd);
 
-	/*
-	 * get uid
-	 */
-	EC_SET(ecol, PW_NDX_UID, len, val);
-	if (len < 2)
-		return (NSS_STR_PARSE_PARSE);
-	uid = strtol(val, &endnum, 10);
-	if (*endnum != 0)
+	/* uid */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, PW_NDX_UID, uidlen, uidstr);
+	(void) strtol(uidstr, &endnum, 10);
+	if (*endnum != 0 || endnum == uidstr)
 		return (NSS_STR_PARSE_PARSE);
 	/*
 	 * See discussion of private protocol in getbynam() above.
@@ -236,18 +205,8 @@ nis_object2ent(nobj, obj, argp)
 	 *   _nss_nisplus_getent(), but that's OK -- when we're doing
 	 *   enumerations we don't care what's in the argp->key union.
 	 */
-	argp->key.uid = uid;
-
-	/*
-	 * Default values
-	 */
-	sp->sp_lstchg = -1;
-	sp->sp_min = -1;
-	sp->sp_max = -1;
-	sp->sp_warn = -1;
-	sp->sp_inact = -1;
-	sp->sp_expire = -1;
-	sp->sp_flag = 0;
+	if (strncmp(passwd, "*NP*", passwdlen) == 0)
+		be->flag = 1;
 
 	/*
 	 * shadow information
@@ -256,67 +215,28 @@ nis_object2ent(nobj, obj, argp)
 	 * with less than the desired number of ":" separated longs.
 	 * XXX - should we be more strict ?
 	 */
-	EC_SET(ecol, PW_NDX_SHADOW, len, val);
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, PW_NDX_SHADOW, shadowlen, shadow);
 
-	if (len < 2)
-		return (NSS_STR_PARSE_SUCCESS);
-
-	/*
-	 * Parse val for the aging fields (quickly, they might die)
-	 */
-
-	limit = val + len;
-	p = val;
-
-	x = strtol(p, &endnum, 10);
-	if (*endnum != ':' || endnum >= limit)
-		return (NSS_STR_PARSE_SUCCESS);
-	if (endnum != p)
-		sp->sp_lstchg = (int) x;
-	p = endnum + 1;
-
-	x = strtol(p, &endnum, 10);
-	if (*endnum != ':' || endnum >= limit)
-		return (NSS_STR_PARSE_SUCCESS);
-	if (endnum != p)
-		sp->sp_min = (int) x;
-	p = endnum + 1;
-
-	x = strtol(p, &endnum, 10);
-	if (*endnum != ':' || endnum >= limit)
-		return (NSS_STR_PARSE_SUCCESS);
-	if (endnum != p)
-		sp->sp_max = (int) x;
-	p = endnum + 1;
-
-	x = strtol(p, &endnum, 10);
-	if (*endnum != ':' || endnum >= limit)
-		return (NSS_STR_PARSE_SUCCESS);
-	if (endnum != p)
-		sp->sp_warn = (int) x;
-	p = endnum + 1;
-
-	x = strtol(p, &endnum, 10);
-	if (*endnum != ':' || endnum >= limit)
-		return (NSS_STR_PARSE_SUCCESS);
-	if (endnum != p) {
-		sp->sp_inact = (int) x;
+	buflen = namelen + passwdlen + shadowlen + 3;
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, buflen)) == NULL)
+			return (NSS_STR_PARSE_PARSE);
+		/* exclude trailing null from length */
+		be->buflen = buflen - 1;
+		buffer = be->buffer;
+	} else {
+		if (buflen > argp->buf.buflen)
+			return (NSS_STR_PARSE_ERANGE);
+		buflen = argp->buf.buflen;
+		buffer = argp->buf.buffer;
+		(void) memset(buffer, 0, buflen);
 	}
-	p = endnum + 1;
-
-	x = strtol(p, &endnum, 10);
-	if (*endnum != ':' || endnum >= limit)
-		return (NSS_STR_PARSE_SUCCESS);
-	if (endnum != p)
-		sp->sp_expire = (int) x;
-	p = endnum + 1;
-
-	x = strtol(p, &endnum, 10);
-	if (*endnum != '\0' && *endnum != ':')
-		return (NSS_STR_PARSE_SUCCESS);
-	if (endnum != p)
-		sp->sp_flag = (int) x;
-
+	(void) snprintf(buffer, buflen, "%s:%s:%s",
+		name, passwd, shadow);
+#ifdef DEBUG
+	(void) fprintf(stdout, "shadow [%s]\n", buffer);
+	(void) fflush(stdout);
+#endif  /* DEBUG */
 	return (NSS_STR_PARSE_SUCCESS);
 }
 
@@ -335,5 +255,5 @@ _nss_nisplus_shadow_constr(dummy1, dummy2, dummy3)
 {
 	return (_nss_nisplus_constr(sp_ops,
 				    sizeof (sp_ops) / sizeof (sp_ops[0]),
-				    PW_TBLNAME, nis_object2ent));
+				    PW_TBLNAME, nis_object2str));
 }

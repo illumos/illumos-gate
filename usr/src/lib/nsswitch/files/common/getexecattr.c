@@ -52,29 +52,47 @@ extern int _readbufline(char *, int, char *, int, int *);
 extern char *_exec_wild_id(char *, const char *);
 extern void _exec_cleanup(nss_status_t, nss_XbyY_args_t *);
 
-typedef int (*_exec_XY_check_func) (nss_XbyY_args_t *);
-
 
 /*
  * check_match: returns 1 if matching entry found, else returns 0.
  */
 static int
-check_match(nss_XbyY_args_t *argp)
+check_match(nss_XbyY_args_t *argp, const char *line, int linelen)
 {
+	const char	*limit, *linep, *keyp;
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
-	const char	*name = _priv_exec->name;
-	const char	*type = _priv_exec->type;
-	const char	*id = _priv_exec->id;
-	const char	*policy = _priv_exec->policy;
-	execstr_t	*exec = (execstr_t *)argp->returnval;
+	const char	*exec_field[6];
+	int		i;
 
-	if ((policy && exec->policy && (strcmp(policy, exec->policy) != 0)) ||
-	    (name && exec->name && (strcmp(name, exec->name) != 0)) ||
-	    (type && exec->type && (strcmp(type, exec->type) != 0)) ||
-	    (id && exec->id && (strcmp(id, exec->id) != 0))) {
-		return (0);
+	exec_field[0] = _priv_exec->name;	/* name */
+	exec_field[1] = _priv_exec->policy;	/* policy */
+	exec_field[2] = _priv_exec->type;	/* type */
+	exec_field[3] = NULL;			/* res1 */
+	exec_field[4] = NULL;			/* res2 */
+	exec_field[5] = _priv_exec->id;		/* id */
+	/* No need to check attr field */
+
+	linep = line;
+	limit = line + linelen;
+
+	for (i = 0; i < 6; i++) {
+		keyp = exec_field[i];
+		if (keyp) {
+			/* compare field */
+			while (*keyp && linep < limit &&
+				*linep != ':' && *keyp == *linep) {
+				keyp++;
+				linep++;
+			}
+			if (*keyp || linep == limit || *linep != ':')
+				return (0);
+		} else {
+			/* skip field */
+			while (linep < limit && *linep != ':')
+				linep++;
+		}
+		linep++;
 	}
-
 	return (1);
 }
 
@@ -90,7 +108,6 @@ _exec_files_XY_all(files_backend_ptr_t be,
 	int		f_size = 0;
 	time_t		f_time = 0;
 	static time_t	read_time = 0;
-	char		*key = NULL;
 	char		*first;
 	char		*last;
 	static char	*f_buf = NULL;
@@ -169,16 +186,15 @@ _exec_files_XY_all(files_backend_ptr_t be,
 	}
 
 	res = NSS_NOTFOUND;
+	/*CONSTCOND*/
 	while (1) {
 		int	linelen = 0;
-		int	check_stat = 0;
 		char	*instr = be->buf;
 
 		linelen = _readbufline(f_buf, f_size, instr, be->minbuf,
 		    &lastlen);
 		if (linelen < 0) {
 			/* End of file */
-			argp->erange = 0;
 			break;
 		}
 
@@ -235,26 +251,25 @@ _exec_files_XY_all(files_backend_ptr_t be,
 		if (first != instr)
 			instr = first;
 
-		/*
-		 * Parse the entry.
-		 */
+		/* Check the entry */
 		argp->returnval = NULL;
+		argp->returnlen = 0;
+		if (check_match(argp, instr, linelen) == 0)
+			continue;
+
+		/* Marshall the data */
 		parse_stat = (*argp->str2ent)(instr, linelen, argp->buf.result,
 		    argp->buf.buffer, argp->buf.buflen);
 		if (parse_stat == NSS_STR_PARSE_SUCCESS) {
-			argp->returnval = argp->buf.result;
-			if (check_match(argp)) {
-				res = NSS_SUCCESS;
-				if (_priv_exec->search_flag == GET_ONE) {
-					break;
-				} else if (_doexeclist(argp) == 0) {
-					res = NSS_UNAVAIL;
-					break;
-				}
-			} else {
-				argp->returnval = NULL;
-				memset(argp->buf.buffer, NULL,
-				    argp->buf.buflen);
+			argp->returnval = (argp->buf.result != NULL)?
+					argp->buf.result : argp->buf.buffer;
+			argp->returnlen = linelen;
+			res = NSS_SUCCESS;
+			if (_priv_exec->search_flag == GET_ONE) {
+				break;
+			} else if (_doexeclist(argp) == 0) {
+				res = NSS_UNAVAIL;
+				break;
 			}
 		} else if (parse_stat == NSS_STR_PARSE_ERANGE) {
 			argp->erange = 1;
@@ -276,13 +291,13 @@ _exec_files_XY_all(files_backend_ptr_t be,
 static nss_status_t
 get_wild(files_backend_ptr_t be, nss_XbyY_args_t *argp, int getby_flag)
 {
-	char		*orig_id = NULL;
+	const char	*orig_id = NULL;
 	char		*old_id = NULL;
 	char		*wild_id = NULL;
 	nss_status_t	res = NSS_NOTFOUND;
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 
-	orig_id = strdup(_priv_exec->id);
+	orig_id = _priv_exec->id;
 	old_id = strdup(_priv_exec->id);
 	wild_id = old_id;
 	while ((wild_id = _exec_wild_id(wild_id, _priv_exec->type)) != NULL) {
@@ -318,6 +333,7 @@ getbyid(files_backend_ptr_t be, void *a)
 {
 	nss_status_t	res;
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
+	/*LINTED*/
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 
 	res = _exec_files_XY_all(be, argp, NSS_DBOP_EXECATTR_BYID);
@@ -336,6 +352,7 @@ getbynameid(files_backend_ptr_t be, void *a)
 {
 	nss_status_t	res;
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
+	/*LINTED*/
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 
 	res = _exec_files_XY_all(be, argp, NSS_DBOP_EXECATTR_BYNAMEID);
@@ -359,6 +376,7 @@ static files_backend_op_t execattr_ops[] = {
 	getbynameid
 };
 
+/*ARGSUSED*/
 nss_backend_t  *
 _nss_files_exec_attr_constr(const char *dummy1,
     const char *dummy2,

@@ -91,7 +91,7 @@ typedef enum ScopeType {
 typedef enum CredLevel {
 	NS_LDAP_CRED_ANON	= 0,
 	NS_LDAP_CRED_PROXY	= 1,
-	NS_LDAP_CRED_SELF	= 2	/* currently not supported */
+	NS_LDAP_CRED_SELF	= 2
 } CredLevel_t;
 
 typedef enum AuthType {
@@ -113,14 +113,14 @@ typedef enum SaslMech {
 	NS_LDAP_SASL_CRAM_MD5	= 1,
 	NS_LDAP_SASL_DIGEST_MD5	= 2,
 	NS_LDAP_SASL_EXTERNAL	= 3,	/* currently not supported */
-	NS_LDAP_SASL_GSSAPI	= 4,	/* currently not supported */
+	NS_LDAP_SASL_GSSAPI	= 4,
 	NS_LDAP_SASL_SPNEGO	= 5	/* currently not supported */
 } SaslMech_t;
 
 typedef enum SaslOpt {
 	NS_LDAP_SASLOPT_NONE	= 0,
-	NS_LDAP_SASLOPT_INT	= 1,	/* currently not supported */
-	NS_LDAP_SASLOPT_PRIV	= 2	/* currently not supported */
+	NS_LDAP_SASLOPT_INT	= 1,
+	NS_LDAP_SASLOPT_PRIV	= 2
 } SaslOpt_t;
 
 typedef enum PrefOnly {
@@ -209,6 +209,17 @@ typedef enum {
 	NS_LDAP_MAX_PIT_P		= 28
 
 } ParamIndexType;
+
+/*
+ * NONE - No self / SASL/GSSAPI configured
+ * ONLY - Only self / SASL/GSSAPI configured
+ * MIXED - self / SASL/GSSAPI is mixed with other types of configuration
+ */
+typedef enum {
+	NS_LDAP_SELF_GSSAPI_CONFIG_NONE = 0,
+	NS_LDAP_SELF_GSSAPI_CONFIG_ONLY = 1,
+	NS_LDAP_SELF_GSSAPI_CONFIG_MIXED = 2
+} ns_ldap_self_gssapi_config_t;
 
 /*
  * __ns_ldap_*() return codes
@@ -614,6 +625,10 @@ char **__ns_ldap_getAttr(
 	const ns_ldap_entry_t *entry,
 	const char *attrname);
 
+ns_ldap_attr_t	*__ns_ldap_getAttrStruct(
+	const ns_ldap_entry_t *entry,
+	const char *attrname);
+
 int __ns_ldap_getServiceAuthMethods(
 	const char *service,
 	ns_auth_t ***auth,
@@ -666,6 +681,12 @@ int __ns_ldap_getParamType(
 int __ns_ldap_getAcctMgmt(
 	const char *user,
 	AcctUsableResponse_t *acctResp);
+void
+__ns_ldap_self_gssapi_only_set(
+	int flag);
+int
+__ns_ldap_self_gssapi_config(
+	ns_ldap_self_gssapi_config_t *config);
 #ifdef __cplusplus
 }
 #endif

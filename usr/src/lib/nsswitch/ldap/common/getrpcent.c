@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,143 +46,85 @@ static const char *rpc_attrs[] = {
 };
 
 /*
- * _nss_ldap_rpc2ent is the data marshaling method for the rpc getXbyY
+ * _nss_ldap_rpc2str is the data marshaling method for the rpc getXbyY
  * (e.g., getbyname(), getbynumber(), getrpcent()) backend processes.
  * This method is called after a successful ldap search has been performed.
- * This method will parse the ldap search values into *rpc = (struct
- * rpcent *)argp->buf.result which the frontend process expects. Three
- * error conditions are expected and returned to nsswitch.
+ * This method will parse the ldap search values into the file format.
+ * e.g.
+ *
+ * nfs_acl 100227
+ * snmp 100122  na.snmp snmp-cmc snmp-synoptics snmp-unisys snmp-utk
  */
-
 static int
-_nss_ldap_rpc2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_rpc2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int		i, j;
+	uint_t		i;
 	int		nss_result;
-	int		buflen = (int)0;
-	int		firstime = (int)1;
-	unsigned long	len = 0L;
-	char		**mp, *cname = NULL;
-	char		*buffer = (char *)NULL;
-	char		*ceiling = (char *)NULL;
-	struct rpcent	*rpc = (struct rpcent *)NULL;
+	int		buflen = 0, len;
+	char		*cname = NULL;
+	char		*buffer = NULL;
 	ns_ldap_result_t	*result = be->result;
-	ns_ldap_attr_t	*attrptr;
+	ns_ldap_attr_t	*names;
+	char		**rpcnumber;
 
-	buffer = (char *)argp->buf.buffer;
-	buflen = (size_t)argp->buf.buflen;
-	if (!argp->buf.result) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_rpc2ent;
-	}
-	rpc = (struct rpcent *)argp->buf.result;
-	ceiling = buffer + buflen;
-
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
+	nss_result = NSS_STR_PARSE_SUCCESS;
 	(void) memset(argp->buf.buffer, 0, buflen);
 
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_rpc2ent;
-	}
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_rpc2ent;
+	buflen = argp->buf.buflen;
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, buflen)) == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_rpc2str;
 		}
-		if (strcasecmp(attrptr->attrname, _R_NAME) == 0) {
-			for (j = 0; j < attrptr->value_count; j++) {
-			/* traverse for all multivalued values */
-				if (firstime) {
-					/* rpc name */
-					cname = __s_api_get_canonical_name(
-						result->entry, attrptr, 1);
-					if (cname == NULL ||
-						(len = strlen(cname)) < 1) {
-						nss_result =
-							NSS_STR_PARSE_PARSE;
-						goto result_rpc2ent;
-					}
-					rpc->r_name = buffer;
-					buffer += len + 1;
-					if (buffer >= ceiling) {
-						nss_result =
-						    (int)NSS_STR_PARSE_ERANGE;
-						goto result_rpc2ent;
-					}
-					(void) strcpy(rpc->r_name, cname);
-					/* alias list */
-					mp = rpc->r_aliases =
-						    (char **)ROUND_UP(buffer,
-						    sizeof (char **));
-					buffer = (char *)rpc->r_aliases +
-						    sizeof (char *) *
-						    (attrptr->value_count + 1);
-					buffer = (char *)ROUND_UP(buffer,
-						    sizeof (char **));
-					if (buffer >= ceiling) {
-						nss_result =
-						    (int)NSS_STR_PARSE_ERANGE;
-						goto result_rpc2ent;
-					}
-					firstime = (int)0;
-				}
-				/* alias list */
-				if ((attrptr->attrvalue[j] == NULL) ||
-				    (len = strlen(attrptr->attrvalue[j])) < 1) {
-					nss_result = (int)NSS_STR_PARSE_PARSE;
-					goto result_rpc2ent;
-				}
-				/* skip canonical name */
-				if (strcmp(attrptr->attrvalue[j], cname) == 0)
-					continue;
-				*mp = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_rpc2ent;
-				}
-				(void) strcpy(*mp++, attrptr->attrvalue[j]);
-				continue;
-			}
-		}
-		if (strcasecmp(attrptr->attrname, _R_NUMBER) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_rpc2ent;
-			}
-			errno = 0;
-			rpc->r_number = (int)strtol(attrptr->attrvalue[0],
-						    (char **)NULL, 10);
-			if (errno != 0) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_rpc2ent;
-			}
-			continue;
-		}
-	}
-	if (mp != NULL)
-		*mp = NULL;
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getrpcent.c: _nss_ldap_rpc2ent]\n");
-	(void) fprintf(stdout, "        r_name: [%s]\n", rpc->r_name);
-	if (mp != NULL) {
-		for (mp = rpc->r_aliases; *mp != NULL; mp++)
-			(void) fprintf(stdout, "     r_aliases: [%s]\n", *mp);
-	}
-	(void) fprintf(stdout, "      r_number: [%d]\n", rpc->r_number);
-#endif /* DEBUG */
 
-result_rpc2ent:
+	names = __ns_ldap_getAttrStruct(result->entry, _R_NAME);
+	if (names == NULL || names->attrvalue == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_rpc2str;
+	}
+	/* Get the canonical rpc name */
+	cname = __s_api_get_canonical_name(result->entry, names, 1);
+	if (cname == NULL || (len = strlen(cname)) < 1) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_rpc2str;
+	}
+	rpcnumber = __ns_ldap_getAttr(result->entry, _R_NUMBER);
+	if (rpcnumber == NULL || rpcnumber[0] == NULL ||
+			(len = strlen(rpcnumber[0])) < 1) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_rpc2str;
+	}
+	len = snprintf(buffer, buflen,  "%s %s", cname, rpcnumber[0]);
+	TEST_AND_ADJUST(len, buffer, buflen, result_rpc2str);
+	/* Append aliases */
+	for (i = 0; i < names->value_count; i++) {
+		if (names->attrvalue[i] == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_rpc2str;
+		}
+		/* Skip the canonical name */
+		if (strcasecmp(names->attrvalue[i], cname) != 0) {
+			len = snprintf(buffer, buflen,  " %s",
+					names->attrvalue[i]);
+			TEST_AND_ADJUST(len, buffer, buflen, result_rpc2str);
+		}
+	}
+
+	/* The front end marshaller doesn't need to copy trailing nulls */
+	if (argp->buf.result != NULL)
+		be->buflen = strlen(be->buffer);
+
+result_rpc2str:
 
 	(void) __ns_ldap_freeResult(&be->result);
-	return ((int)nss_result);
+	return (nss_result);
 }
-
 
 /*
  * getbyname gets struct rpcent values by rpc name. This function
@@ -276,5 +217,5 @@ _nss_ldap_rpc_constr(const char *dummy1, const char *dummy2,
 
 	return ((nss_backend_t *)_nss_ldap_constr(rpc_ops,
 		sizeof (rpc_ops)/sizeof (rpc_ops[0]),
-		_RPC, rpc_attrs, _nss_ldap_rpc2ent));
+		_RPC, rpc_attrs, _nss_ldap_rpc2str));
 }

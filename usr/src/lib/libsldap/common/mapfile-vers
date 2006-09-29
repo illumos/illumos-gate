@@ -32,6 +32,12 @@ SUNWprivate_1.1 {
     global:
 	__ns_ldap_getAcctMgmt;
 	__s_api_get_canonical_name;
+	__ns_ldap_getAttrStruct;
+	__ns_ldap_self_gssapi_config;
+	__ns_ldap_self_gssapi_only_set;
+	__ns_ldap_check_dns_preq;
+	__ns_ldap_check_gssapi_preq;
+	__ns_ldap_check_all_preq;
 } SUNWprivate_1.0;
 
 SUNWprivate_1.0 {

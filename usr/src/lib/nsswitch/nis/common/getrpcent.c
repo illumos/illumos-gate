@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  *	nis/getrpcent.c -- "nis" backend for nsswitch "rpc" database
  */
@@ -41,19 +40,29 @@ static int
 check_name(args)
 	nss_XbyY_args_t		*args;
 {
-	struct rpcent		*rpc	= (struct rpcent *) args->returnval;
+	struct rpcent		*rpc	= (struct rpcent *)args->returnval;
 	const char		*name	= args->key.name;
 	char			**aliasp;
 
-	if (strcmp(rpc->r_name, name) == 0) {
-		return (1);
-	}
-	for (aliasp = rpc->r_aliases;  *aliasp != 0;  aliasp++) {
-		if (strcmp(*aliasp, name) == 0) {
+	if (rpc) {
+		if (strcmp(rpc->r_name, name) == 0) {
 			return (1);
 		}
+		for (aliasp = rpc->r_aliases;  *aliasp != 0;  aliasp++) {
+			if (strcmp(*aliasp, name) == 0) {
+				return (1);
+			}
+		}
+		return (0);
+	} else {
+		/*
+		 *  NSS2: nscd is running.
+		 */
+		return (_nss_nis_check_name_aliases(args,
+					(const char *)args->buf.buffer,
+					strlen(args->buf.buffer)));
+
 	}
-	return (0);
 }
 
 static mutex_t	no_byname_lock	= DEFAULTMUTEX;
@@ -64,30 +73,31 @@ getbyname(be, a)
 	nis_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	int			no_map;
 	sigset_t		oldmask, newmask;
 
-	sigfillset(&newmask);
+	(void) sigfillset(&newmask);
 	(void) _thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
 	(void) _mutex_lock(&no_byname_lock);
 	no_map = no_byname_map;
 	(void) _mutex_unlock(&no_byname_lock);
-	(void) _thr_sigsetmask(SIG_SETMASK, &oldmask, (sigset_t*)NULL);
+	(void) _thr_sigsetmask(SIG_SETMASK, &oldmask, (sigset_t *)NULL);
 
 	if (no_map == 0) {
 		int		yp_status;
 		nss_status_t	res;
 
 		res = _nss_nis_lookup(be, argp, 1, "rpc.byname",
-				      argp->key.name, &yp_status);
+					argp->key.name, &yp_status);
 		if (yp_status == YPERR_MAP) {
-			sigfillset(&newmask);
+			(void) sigfillset(&newmask);
 			_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
 			_mutex_lock(&no_byname_lock);
 			no_byname_map = 1;
 			_mutex_unlock(&no_byname_lock);
-			_thr_sigsetmask(SIG_SETMASK, &oldmask, (sigset_t*)NULL);
+			_thr_sigsetmask(SIG_SETMASK, &oldmask,
+					(sigset_t *)NULL);
 		} else /* if (res == NSS_SUCCESS) <==== */ {
 			return (res);
 		}
@@ -101,10 +111,10 @@ getbynumber(be, a)
 	nis_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	char			numstr[12];
 
-	sprintf(numstr, "%d", argp->key.number);
+	(void) sprintf(numstr, "%d", argp->key.number);
 	return (_nss_nis_lookup(be, argp, 1, "rpc.bynumber", numstr, 0));
 }
 

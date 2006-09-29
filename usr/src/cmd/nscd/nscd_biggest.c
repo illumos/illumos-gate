@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,87 +29,54 @@
 #include <string.h>
 #include <stdlib.h>
 
-/*
- * routines to find largest n numbers, carrying 4 bytes of data
- */
+#include "cache.h"
 
-int *
+nsc_keephot_t *
 maken(int n)
 {
-	int * ret;
+	nsc_keephot_t	*ret;
 
-	n++;
-
-	ret = (int *) memset(malloc(2 * n *sizeof (int)),
-	    -1, 2 * n * sizeof (int));
-	ret[0] = n - 1;
+	++n;
+	ret = (nsc_keephot_t *)calloc(n, sizeof (nsc_keephot_t));
+	if (ret == NULL)
+		return (NULL);
+	ret[0].num = n - 1;
 	return (ret);
 }
 
-int
-insertn(int * table, int n, int data)
+void *
+insertn(nsc_keephot_t *table, uint_t n, void *data)
 {
-	int size = *table;
-	int guess, base, last;
-	int olddata;
+	void	*olddata;
+	int	size, guess, base, last;
 
-	if (table[1] > n)
+	if (n < 1 || table[1].num > n) {
 		return (data);
+	}
 
-	if (table[size] < n)  /* biggest so far */
+	size = table[0].num;
+	if (table[size].num < n)  /* biggest so far */
 		guess = size;
 	else {
 		base = 1;
 		last = size;
 		while (last >= base) {
 			guess = (last+base)/2;
-			if (table[guess] == n)
+			if (table[guess].num == n)
 				goto doit;
-			if (table[guess] > n)
-				last = guess -1;
+			if (table[guess].num > n)
+				last = guess - 1;
 			else
 				base = guess + 1;
 		}
 		guess = last;
 	}
-	doit:
-	olddata = table[2 + size];
-	memmove(table + 1, table+2, sizeof (int) * (guess-1));
-	memmove(table + 2 + size, table + 3 + size, sizeof (int) * (guess-1));
-	table[guess + size + 1] = data;
-	table[guess] = n;
+
+doit:
+	olddata = table[1].ptr;
+	(void) memmove(table + 1, table + 2,
+			sizeof (nsc_keephot_t) * (guess-1));
+	table[guess].ptr = data;
+	table[guess].num = n;
 	return (olddata);
 }
-
-/*
- *  test code
- */
-#if 0
-int
-main(int argc, char * argv[])
-{
-	int * t;
-	char buffer[100];
-	int i, n;
-	char * tmp;
-
-	t = maken(100);
-
-	for (i = 0; i < 1100; i++) {
-		n = random();
-		sprintf(buffer, "trial %d: %d", i, n);
-		tmp = (char *)insertn(t, n, (int)strdup(buffer));
-		if (tmp != -1) {
-			printf("freeing %s\n", tmp);
-			free(tmp);
-		}
-	}
-
-	for (i = 1; i <= 100; i++) {
-		printf("%d: %s\n", i, t[100 + 1 + i]);
-		free((char *)t[100 + 1 + i]);
-	}
-
-	free(t);
-}
-#endif

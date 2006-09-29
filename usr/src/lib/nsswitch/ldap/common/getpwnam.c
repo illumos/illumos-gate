@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,189 +57,105 @@ static const char *pwd_attrs[] = {
 	(char *)NULL
 };
 
-
 /*
- * _nss_ldap_passwd2ent is the data marshaling method for the passwd getXbyY
+ * _nss_ldap_passwd2str is the data marshaling method for the passwd getXbyY
  * (e.g., getbyuid(), getbyname(), getpwent()) backend processes. This method is
  * called after a successful ldap search has been performed. This method will
- * parse the ldap search values into struct passwd = argp->buf.buffer which
- * the frontend process expects. Three error conditions are expected and
- * returned to nsswitch.
+ * parse the ldap search values into the file format.
+ * e.g.
+ *
+ * nobody:x:60001:60001:Nobody:/:
+ *
  */
-
 static int
-_nss_ldap_passwd2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_passwd2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int		i = 0;
 	int		nss_result;
-	int		buflen = (int)0;
-	unsigned long	len = 0L;
-	char		*buffer = (char *)NULL;
-	char		*ptr2x;
-	char		*ceiling = (char *)NULL;
-	char		*nullstring = (char *)NULL;
-	struct passwd	*pwd = (struct passwd *)NULL;
+	int		buflen = 0;
+	unsigned long	str_len = 0L;
+	char		*buffer = NULL;
 	ns_ldap_result_t	*result = be->result;
-	ns_ldap_attr_t	*attrptr;
-	int		have_uid = 0;
-	int		have_uidn = 0;
-	int		have_gidn = 0;
+	ns_ldap_entry_t	*entry;
+	char		**uid_v, **uidn_v, **gidn_v;
+	char		**gecos_v, **homedir_v, **shell_v;
+	char		*NULL_STR = "";
 
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getpwnam.c: _nss_ldap_passwd2ent]\n");
-#endif	/* DEBUG */
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
 
+	entry = result->entry;
+
+	buflen = argp->buf.buflen;
 	buffer = argp->buf.buffer;
-	buflen = (size_t)argp->buf.buflen;
-	if (!argp->buf.result) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_pwd2ent;
-	}
-	pwd = (struct passwd *)argp->buf.result;
-	ceiling = buffer + buflen;
-	nullstring = (buffer + (buflen - 1));
 
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
+	nss_result = NSS_STR_PARSE_SUCCESS;
 	(void) memset(buffer, 0, buflen);
 
-	/*
-	 * need to always return password as "x"
-	 * so put "x" at top of the buffer
-	 */
-	ptr2x = buffer;
-	*buffer++ = 'x';
-	*buffer++ = '\0';
+	/* 8 = 6 ':' + 1 '\0' + 1 'x' */
+	buflen -=  8;
 
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_pwd2ent;
+	uid_v = __ns_ldap_getAttr(entry, _PWD_UID);
+	uidn_v = __ns_ldap_getAttr(entry, _PWD_UIDNUMBER);
+	gidn_v = __ns_ldap_getAttr(entry, _PWD_GIDNUMBER);
+	if (uid_v == NULL || uidn_v == NULL || gidn_v == NULL ||
+		uid_v[0] == NULL || uidn_v[0] == NULL || gidn_v[0] == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_pwd2str;
+	}
+	str_len = strlen(uid_v[0]) + strlen(uidn_v[0]) + strlen(gidn_v[0]);
+	if (str_len >  buflen) {
+		nss_result = NSS_STR_PARSE_ERANGE;
+		goto result_pwd2str;
 	}
 
-	pwd->pw_gecos = nullstring;
-	pwd->pw_dir = nullstring;
-	pwd->pw_shell = nullstring;
+	gecos_v = __ns_ldap_getAttr(entry, _PWD_GECOS);
+	if (gecos_v == NULL || gecos_v[0] == NULL || *gecos_v[0] == '\0')
+		gecos_v = &NULL_STR;
+	else
+		str_len += strlen(gecos_v[0]);
 
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_pwd2ent;
-		}
-		if (strcasecmp(attrptr->attrname, _PWD_UID) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_pwd2ent;
-			}
-			pwd->pw_name = buffer;
-			buffer += len + 1;
-			if (buffer >= ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_pwd2ent;
-			}
-			(void) strcpy(pwd->pw_name, attrptr->attrvalue[0]);
-			have_uid = 1;
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _PWD_UIDNUMBER) == 0) {
-			if (attrptr->attrvalue[0] == '\0') {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_pwd2ent;
-			}
-			pwd->pw_uid = strtol(attrptr->attrvalue[0],
-					    (char **)NULL, 10);
-			have_uidn = 1;
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _PWD_GIDNUMBER) == 0) {
-			if (attrptr->attrvalue[0] == '\0') {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_pwd2ent;
-			}
-			pwd->pw_gid = strtol(attrptr->attrvalue[0],
-					    (char **)NULL, 10);
-			have_gidn = 1;
-			continue;
-		}
-		if ((strcasecmp(attrptr->attrname, _PWD_GECOS) == 0) &&
-		    (attrptr->value_count > 0)) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				pwd->pw_gecos = nullstring;
-			} else {
-				pwd->pw_gecos = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_pwd2ent;
-				}
-				(void) strcpy(pwd->pw_gecos,
-					    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
-		if ((strcasecmp(attrptr->attrname, _PWD_HOMEDIRECTORY) == 0) &&
-		    (attrptr->value_count > 0)) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				pwd->pw_dir = nullstring;
-			} else {
-				pwd->pw_dir = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_pwd2ent;
-				}
-				(void) strcpy(pwd->pw_dir,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
-		if ((strcasecmp(attrptr->attrname, _PWD_LOGINSHELL) == 0) &&
-		    (attrptr->value_count > 0)) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				pwd->pw_shell = nullstring;
-			} else {
-				pwd->pw_shell = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_pwd2ent;
-				}
-				(void) strcpy(pwd->pw_shell,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
+	homedir_v = __ns_ldap_getAttr(entry, _PWD_HOMEDIRECTORY);
+	if (homedir_v == NULL || homedir_v[0] == NULL || *homedir_v[0] == '\0')
+		homedir_v = &NULL_STR;
+	else
+		str_len += strlen(homedir_v[0]);
+
+	shell_v = __ns_ldap_getAttr(entry, _PWD_LOGINSHELL);
+	if (shell_v == NULL || shell_v[0] == NULL || *shell_v[0] == '\0')
+		shell_v = &NULL_STR;
+	else
+		str_len += strlen(shell_v[0]);
+
+	if (str_len >  buflen) {
+		nss_result = NSS_STR_PARSE_ERANGE;
+		goto result_pwd2str;
 	}
 
-	/* error if missing required attributes */
-	if (have_uid == 0 || have_uidn == 0 || have_gidn == 0) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
+	if (argp->buf.result != NULL) {
+		be->buflen = str_len + 8;
+		be->buffer = malloc(be->buflen);
+		if (be->buffer == NULL) {
+			nss_result = (int)NSS_STR_PARSE_ERANGE;
+			goto result_pwd2str;
+		}
+
+		(void) snprintf(be->buffer, be->buflen,
+				"%s:%s:%s:%s:%s:%s:%s",
+			uid_v[0], "x", uidn_v[0], gidn_v[0],
+			gecos_v[0], homedir_v[0], shell_v[0]);
+	} else {
+		(void) snprintf(argp->buf.buffer, (str_len + 8),
+				"%s:%s:%s:%s:%s:%s:%s",
+			uid_v[0], "x", uidn_v[0], gidn_v[0],
+			gecos_v[0], homedir_v[0], shell_v[0]);
+
 	}
 
-	pwd->pw_age = nullstring;
-	pwd->pw_comment = nullstring;
-	pwd->pw_passwd = ptr2x;
-
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getpwnam.c: _nss_ldap_passwd2ent]\n");
-	(void) fprintf(stdout, "       pw_name: [%s]\n", pwd->pw_name);
-	(void) fprintf(stdout, "        pw_uid: [%ld]\n", pwd->pw_uid);
-	(void) fprintf(stdout, "        pw_gid: [%ld]\n", pwd->pw_gid);
-	(void) fprintf(stdout, "      pw_gecos: [%s]\n", pwd->pw_gecos);
-	(void) fprintf(stdout, "        pw_dir: [%s]\n", pwd->pw_dir);
-	(void) fprintf(stdout, "      pw_shell: [%s]\n", pwd->pw_shell);
-#endif	/* DEBUG */
-
-result_pwd2ent:
+result_pwd2str:
 
 	(void) __ns_ldap_freeResult(&be->result);
 	return ((int)nss_result);
 }
-
 
 /*
  * getbyname gets a passwd entry by uid name. This function constructs an ldap
@@ -258,10 +173,6 @@ getbyname(ldap_backend_ptr be, void *a)
 	char		userdata[SEARCHFILTERLEN];
 	char		name[SEARCHFILTERLEN];
 	int		ret;
-
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getpwnam.c: getbyname]\n");
-#endif	/* DEBUG */
 
 	if (_ldap_filter_name(name, argp->key.name, sizeof (name)) != 0)
 		return ((nss_status_t)NSS_NOTFOUND);
@@ -295,10 +206,6 @@ getbyuid(ldap_backend_ptr be, void *a)
 	char		searchfilter[SEARCHFILTERLEN];
 	char		userdata[SEARCHFILTERLEN];
 	int		ret;
-
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getpwnam.c: getbyuid]\n");
-#endif	/* DEBUG */
 
 	ret = snprintf(searchfilter, sizeof (searchfilter),
 	    _F_GETPWUID, (long)argp->key.uid);
@@ -337,11 +244,7 @@ _nss_ldap_passwd_constr(const char *dummy1, const char *dummy2,
 			const char *dummy3)
 {
 
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getpwnam.c: _nss_ldap_passwd_constr]\n");
-#endif	/* DEBUG */
-
 	return ((nss_backend_t *)_nss_ldap_constr(passwd_ops,
 		    sizeof (passwd_ops)/sizeof (passwd_ops[0]),
-		    _PASSWD, pwd_attrs, _nss_ldap_passwd2ent));
+		    _PASSWD, pwd_attrs, _nss_ldap_passwd2str));
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,10 +73,14 @@ _nss_initf_netgroup(p)
  *      - getnetgrent(...) is repeatedly invoked by the user to extract the
  *	  contents of the entry found by setnetgrent().
  *	- endnetgrent() is almost like a real endXXXent routine.
- * If we were certain that all the backends could provide netgroup information
- * in a common form, we could make the setnetgrent() backend return the entire
- * entry to the frontend, then implement getnetgrent() and endnetgrent()
- * strictly in the frontend (aka here).  But we're not certain, so we won't.
+ * The behaviour in NSS was:
+ *  If we were certain that all the backends could provide netgroup information
+ *  in a common form, we could make the setnetgrent() backend return the entire
+ *  entry to the frontend, then implement getnetgrent() and endnetgrent()
+ *  strictly in the frontend (aka here).  But we're not certain, so we won't.
+ * In NSS2:
+ *  Since nscd returns the results, and it is nscd that accumulates
+ *  the results, then we can return the entire result on the setnetgrent.
  *
  * NOTE:
  *	In the SunOS 4.x (YP) version of this code, innetgr() did not

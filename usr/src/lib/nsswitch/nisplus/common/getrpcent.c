@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,11 @@
  * CDDL HEADER END
  */
 /*
- *	getrpcent.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
- *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  *	nisplus/getrpcent.c -- NIS+ backend for nsswitch "rpc" database
  */
 
@@ -42,7 +41,7 @@ getbyname(be, a)
 	nisplus_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
 	/*
 	 * Don't have to do anything for case-insensitivity;  the NIS+ table
@@ -56,74 +55,78 @@ getbynumber(be, a)
 	nisplus_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	char		 numstr[12];
 
-	sprintf(numstr, "%d", argp->key.number);
+	(void) snprintf(numstr, 12, "%d", argp->key.number);
 	return (_nss_nisplus_lookup(be, argp, RPC_TAG_NUMBER, numstr));
 }
 
 
 /*
- * place the results from the nis_object structure into argp->buf.result
+ * Convert nisplus object into files format
  * Returns NSS_STR_PARSE_{SUCCESS, ERANGE, PARSE}
  */
 static int
-nis_object2ent(nobj, obj, argp)
-	int		nobj;
-	nis_object	*obj;
-	nss_XbyY_args_t	*argp;
+nis_object2str(nobj, obj, be, argp)
+	int			nobj;
+	nis_object		*obj;
+	nisplus_backend_ptr_t	be;
+	nss_XbyY_args_t		*argp;
 {
-	char	*buffer, *limit, *val;
-	int		buflen = argp->buf.buflen;
-	struct 	rpcent *rpc;
-	int		len, ret;
-	struct	entry_col *ecol;
+	char			*buffer, *linep, *limit;
+	char			*cname, *number, *endnum;
+	int			buflen, cnamelen, numberlen;
+	int			stat;
+	struct	entry_col	*ecol;
 
-	limit = argp->buf.buffer + buflen;
-	rpc = (struct rpcent *)argp->buf.result;
-	buffer = argp->buf.buffer;
-
-	/*
-	 * <-----buffer + buflen -------------->
-	 * |-----------------|----------------|
-	 * | pointers vector | aliases grow   |
-	 * | for aliases     |                |
-	 * | this way ->     | <- this way    |
-	 * |-----------------|----------------|
-	 *
-	 *
-	 * ASSUME: name, aliases and number columns in NIS+ tables ARE
-	 * null terminated.
-	 *
-	 * get cname and aliases
-	 */
-
-	rpc->r_aliases = (char **) ROUND_UP(buffer, (sizeof (char **)));
-	if ((char *)rpc->r_aliases >= limit) {
-		return (NSS_STR_PARSE_ERANGE);
-	}
-
-	rpc->r_name = NULL;
-
-	/*
-	 * Assume that CNAME is the first column and NAME the second.
-	 */
-	ret = netdb_aliases_from_nisobj(obj, nobj, NULL,
-		rpc->r_aliases, &limit, &(rpc->r_name), &len);
-	if (ret != NSS_STR_PARSE_SUCCESS)
-		return (ret);
-
-	/*
-	 * get program number from the first object
-	 *
-	 */
-	ecol = obj->EN_data.en_cols.en_cols_val;
-	EC_SET(ecol, RPC_NDX_NUMBER, len, val);
-	if (len <= 0)
+	if (obj->zo_data.zo_type != NIS_ENTRY_OBJ ||
+		obj->EN_data.en_cols.en_cols_len < RPC_COL) {
+		/* namespace/table/object is curdled */
 		return (NSS_STR_PARSE_PARSE);
-	rpc->r_number = atoi(val);
+	}
+	ecol = obj->EN_data.en_cols.en_cols_val;
 
+	buflen = argp->buf.buflen;
+	buffer = argp->buf.buffer;
+	(void) memset(buffer, 0, buflen);
+
+	/* cname */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, RPC_NDX_CNAME,
+		cnamelen, cname);
+
+	/* number */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, RPC_NDX_NUMBER,
+		numberlen, number);
+	(void) strtol(number, &endnum, 10);
+	if (*endnum != 0 || endnum == number)
+		return (NSS_STR_PARSE_PARSE);
+
+	if (cnamelen + numberlen + 2  > buflen)
+		return (NSS_STR_PARSE_ERANGE);
+	(void) snprintf(buffer, buflen, "%s %s", cname, number);
+
+	linep = buffer + cnamelen + numberlen + 1;
+	limit = buffer + buflen;
+
+	stat = nis_aliases_object2str(obj, nobj, cname, NULL, linep, limit);
+	if (stat != NSS_STR_PARSE_SUCCESS)
+		return (stat);
+
+	if (argp->buf.result != NULL) {
+		/*
+		 * Some front end marshallers may require the
+		 * files formatted data in a distinct buffer
+		 */
+		if ((be->buffer = strdup(buffer)) == NULL)
+			return (NSS_STR_PARSE_PARSE);
+		be->buflen = strlen(buffer);
+		buffer = be->buffer;
+	}
+#ifdef DEBUG
+	(void) fprintf(stdout, "rpc [%s]\n", buffer);
+	(void) fflush(stdout);
+#endif  /* DEBUG */
 	return (NSS_STR_PARSE_SUCCESS);
 }
 
@@ -143,5 +146,5 @@ _nss_nisplus_rpc_constr(dummy1, dummy2, dummy3)
 {
 	return (_nss_nisplus_constr(rpc_ops,
 				sizeof (rpc_ops) / sizeof (rpc_ops[0]),
-				RPC_TBLNAME, nis_object2ent));
+				RPC_TBLNAME, nis_object2str));
 }

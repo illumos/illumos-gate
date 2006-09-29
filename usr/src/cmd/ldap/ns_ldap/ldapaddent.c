@@ -80,9 +80,6 @@ extern	int	optind;
 extern	char	*optarg;
 
 extern	char	*__nis_quote_key(const char *, char *, int);
-/* from ns_internal.h */
-extern	int __s_api_prepend_automountmapname_to_dn(
-	const char *, char **, ns_ldap_error_t **);
 
 static char	*inputbasedn = NULL;
 static char	*databasetype = NULL;
@@ -439,7 +436,13 @@ addentry(void *entry, int mod)
 		if (eres->status == LDAP_ALREADY_EXISTS ||
 			eres->status == LDAP_NO_SUCH_OBJECT)
 			rc = eres->status;
-		else {
+		else if (eres->status == LDAP_INSUFFICIENT_ACCESS) {
+			(void) fprintf(stderr,
+				gettext("The user does not have permission"
+					" to add/modify entries\n"));
+			perr(eres);
+			exit(1);
+		} else {
 			rc = 1;
 			perr(eres);
 		}
@@ -2110,20 +2113,24 @@ dump_aliases(ns_ldap_result_t *res)
  * /etc/publickey
  */
 
+static char *h_errno2str(int h_errno);
+
 static int
 genent_publickey(char *line, int (*cback)())
 {
 	char buf[BUFSIZ+1], tmpbuf[BUFSIZ+1], cname[BUFSIZ+1];
 	char *t, *p, *tmppubkey, *tmpprivkey;
 	entry_col ecol[3];
-	int buflen, uid, retval = 1;
+	int buflen, uid, retval = 1, errnum = 0;
 	struct passwd *pwd;
-	char auth_type[BUFSIZ+1];
+	char auth_type[BUFSIZ+1], *dot;
 	keylen_t keylen;
 	algtype_t algtype;
 	struct _ns_pubkey data;
 	struct hostent *hp;
 	struct in_addr in;
+	struct in6_addr in6;
+	char abuf[INET6_ADDRSTRLEN];
 
 	/*
 	 * don't clobber our argument
@@ -2179,17 +2186,48 @@ genent_publickey(char *line, int (*cback)())
 		(void) strcpy(cname, pwd->pw_name);
 		data.hostcred = NS_HOSTCRED_FALSE;
 	} else {
-		if ((hp = gethostbyname(tmpbuf)) == 0) {
+		if ((hp = getipnodebyname(tmpbuf, AF_INET6,
+				AI_ALL | AI_V4MAPPED, &errnum)) == NULL) {
 			(void) fprintf(stderr,
-		gettext("can't map hostname %s to hostaddress, skipping\n"),
-			tmpbuf);
+			gettext("can't map hostname %s to hostaddress, "
+				"errnum %d %s skipping\n"), tmpbuf, errnum,
+				h_errno2str(errnum));
 			return (GENENT_OK);
 		}
-		(void) memcpy((char *)&in.s_addr, hp->h_addr_list[0],
-		    sizeof (in));
+		(void) memcpy((char *)&in6.s6_addr, hp->h_addr_list[0],
+				hp->h_length);
+		if (IN6_IS_ADDR_V4MAPPED(&in6) ||
+					IN6_IS_ADDR_V4COMPAT(&in6)) {
+			IN6_V4MAPPED_TO_INADDR(&in6, &in);
+			if (inet_ntop(AF_INET, (const void *)&in, abuf,
+					INET6_ADDRSTRLEN) == NULL) {
+				(void) fprintf(stderr,
+					gettext("can't convert IPV4 address of"
+						" hostname %s to string, "
+						"skipping\n"), tmpbuf);
+					return (GENENT_OK);
+			}
+		} else {
+			if (inet_ntop(AF_INET6, (const void *)&in6, abuf,
+					INET6_ADDRSTRLEN) == NULL) {
+				(void) fprintf(stderr,
+					gettext("can't convert IPV6 address of"
+						" hostname %s to string, "
+						"skipping\n"), tmpbuf);
+					return (GENENT_OK);
+			}
+		}
 		data.hostcred = NS_HOSTCRED_TRUE;
+		/*
+		 * tmpbuf could be an alias, use hp->h_name instead.
+		 * hp->h_name is in FQDN format, so extract 1st field.
+		 */
+		if ((dot = strchr(hp->h_name, '.')) != NULL)
+			*dot = '\0';
 		(void) snprintf(cname, sizeof (cname),
-		    "%s+ipHostNumber=%s", tmpbuf, inet_ntoa(in));
+		    "%s+ipHostNumber=%s", hp->h_name, abuf);
+		if (dot)
+			*dot = '.';
 	}
 
 	ecol[0].ec_value.ec_value_val = cname;
@@ -2233,7 +2271,16 @@ genent_publickey(char *line, int (*cback)())
 	/*
 	 * auth_type (col 1)
 	 */
-	if (!(__nis_keyalg2authtype(keylen, algtype, auth_type,
+	if (AUTH_DES_KEY(keylen, algtype))
+		/*
+		 * {DES} and {DH192-0} means same thing.
+		 * However, nisplus uses "DES" and ldap uses "DH192-0"
+		 * internally.
+		 * See newkey(1M), __nis_mechalias2authtype() which is
+		 * called by __nis_keyalg2authtype() and getkey_ldap_g()
+		 */
+		(void) strlcpy(auth_type, "DH192-0", BUFSIZ+1);
+	else if (!(__nis_keyalg2authtype(keylen, algtype, auth_type,
 						MECH_MAXATNAME))) {
 		(void) fprintf(stderr,
 		gettext("Could not convert algorithm type to "
@@ -2291,7 +2338,6 @@ genent_publickey(char *line, int (*cback)())
 	free(data.pubkey);
 	free(data.privkey);
 	return (GENENT_OK);
-
 }
 
 static void
@@ -3816,7 +3862,7 @@ main(int argc, char **argv)
 	int	rc;
 	int	ldaprc;
 	int		authstried = 0;
-	int		supportedauth = 0;
+	int		supportedauth = 0, gssapi = 0;
 	int		op = OP_ADD;
 	char	*ttype, *authmech = 0, *etcfile = 0;
 	char	ps[LDAP_MAXNAMELEN]; /* Temporary password variable */
@@ -3916,6 +3962,15 @@ main(int argc, char **argv)
 		authority.auth.saslopt = NS_LDAP_SASLOPT_NONE;
 		supportedauth = 1;
 		}
+		if (strcasecmp(authmech, "sasl/GSSAPI") == 0) {
+		authority.auth.type = NS_LDAP_AUTH_SASL;
+		authority.auth.tlstype = NS_LDAP_TLS_SASL;
+		authority.auth.saslmech = NS_LDAP_SASL_GSSAPI;
+		authority.auth.saslopt = NS_LDAP_SASLOPT_PRIV |
+					NS_LDAP_SASLOPT_INT;
+		gssapi = 1;
+		supportedauth = 1;
+		}
 		if (strcasecmp(authmech, "tls:simple") == 0) {
 		authority.auth.type = NS_LDAP_AUTH_TLS;
 		authority.auth.tlstype = NS_LDAP_TLS_SIMPLE;
@@ -3942,6 +3997,23 @@ main(int argc, char **argv)
 			gettext("Invalid authentication method specified"));
 			exit(1);
 		}
+	}
+
+	if (!gssapi && authority.cred.unix_cred.userID == NULL &&
+			op != OP_DUMP) {
+	    /* This is not an optional parameter. Exit */
+		(void) fprintf(stderr,
+			gettext("Distinguished Name to bind to directory"
+				" must be specified. use option -D.\n"));
+		exit(1);
+	}
+
+	if (!gssapi && authority.cred.unix_cred.passwd == NULL &&
+			op != OP_DUMP) {
+		/* If password is not specified, then prompt user for it. */
+		password = getpassphrase("Enter password:");
+		(void) strcpy(ps, password);
+		authority.cred.unix_cred.passwd = strdup(ps);
 	}
 
 	if (authmech == NULL) {
@@ -3975,6 +4047,21 @@ main(int argc, char **argv)
 			gettext("No legal authentication method configured.\n"
 				"Provide a legal authentication method using "
 				"-a option"));
+			exit(1);
+		}
+		if (authority.auth.saslmech == NS_LDAP_SASL_GSSAPI &&
+				authority.cred.unix_cred.passwd != NULL &&
+				authority.cred.unix_cred.userID != NULL) {
+			/*
+			 * -a is not specified and the auth method sasl/GSSAPI
+			 * is defined in the configuration of the ldap profile.
+			 * Even -D and -w is provided it's not valid usage.
+			 */
+
+			(void) fprintf(stderr,
+			gettext("The default authentication is sasl/GSSAPI.\n"
+				"The bind DN and and password is not allowed."
+				"\n"));
 			exit(1);
 		}
 	}
@@ -4222,4 +4309,24 @@ static int get_basedn(char *service, char **basedn) {
 
 		return (NS_LDAP_SUCCESS);
 	}
+}
+static char *
+h_errno2str(int h_errno) {
+	switch (h_errno) {
+	case HOST_NOT_FOUND:
+		return ("HOST_NOT_FOUND");
+		break;
+	case TRY_AGAIN:
+		return ("TRY_AGAIN");
+		break;
+	case NO_RECOVERY:
+		return ("NO_RECOVERY");
+		break;
+	case NO_DATA:
+		return ("NO_DATA");
+		break;
+	default:
+		break;
+	}
+	return ("UNKNOWN_ERROR");
 }

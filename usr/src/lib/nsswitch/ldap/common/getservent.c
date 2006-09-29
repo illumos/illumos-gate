@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,14 +90,15 @@ _nss_services_cookie_new(ns_ldap_result_t *result, int index, char *cname) {
 
 	return (cookie);
 }
-
 /*
- * _nss_ldap_services2ent is the data marshaling method for the services
+ * _nss_ldap_services2str is the data marshaling method for the services
  * getXbyY * (e.g., getbyname(), getbyport(), getent()) backend processes.
  * This method is called after a successful ldap search has been performed.
- * This method will parse the ldap search values into *serv = (struct
- * servent *)argp->buf.result which the frontend process expects. Three error
- * conditions are expected and returned to nsswitch.
+ * This method will parse the ldap search values into the file format.
+ * e.g.
+ *
+ * nfsd 2049/udp nfs
+ * nfsd 2049/tcp nfs
  *
  * In section 5.5 of RFC 2307, it specifies that a "services" LDAP entry
  * containing multiple ipserviceprotocol values should be able to be mapped
@@ -107,29 +107,17 @@ _nss_services_cookie_new(ns_ldap_result_t *result, int index, char *cname) {
  */
 
 static int
-_nss_ldap_services2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_services2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int		i, j, k;
+	uint_t		i, k;
 	int		nss_result;
-	int		buflen = (int)0;
-	int		firstime = (int)1;
-	unsigned long	len = 0L;
-	char		**mp, *cname = NULL, *protoval = NULL;
-	char		*buffer = (char *)NULL;
-	char		*ceiling = (char *)NULL;
-	struct servent *serv = (struct servent *)NULL;
+	int		buflen = 0, len;
+	char		**ipport, *cname = NULL, *protoval = NULL;
+	char		*buffer = NULL;
 	ns_ldap_result_t	*result;
-	ns_ldap_attr_t	*attrptr, *protocol = NULL;
+	ns_ldap_attr_t	*names = NULL, *protocol = NULL;
 	_nss_services_cookie_t	*cookie = (_nss_services_cookie_t *)
 						be->services_cookie;
-
-	buffer = (char *)argp->buf.buffer;
-	buflen = (size_t)argp->buf.buflen;
-	serv = (struct servent *)argp->buf.result;
-	ceiling = buffer + buflen;
-#ifdef DEBUG
-	(void) fprintf(stderr, "[getservent.c: _nss_ldap_services2ent]\n");
-#endif /* DEBUG */
 
 	if (cookie) {
 		/*
@@ -146,159 +134,122 @@ _nss_ldap_services2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		 */
 		result = be->result;
 	}
+	if (result == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_srvs2str;
+	}
 
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
+	buflen = argp->buf.buflen;
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, buflen)) == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_srvs2str;
+		}
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
+
+
+	nss_result = NSS_STR_PARSE_SUCCESS;
 	(void) memset(argp->buf.buffer, 0, buflen);
 
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_srvs2ent;
+	/* Get services names */
+	names = __ns_ldap_getAttrStruct(result->entry, _S_NAME);
+	if (names == NULL || names->attrvalue == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_srvs2str;
 	}
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_srvs2ent;
-		}
-		if (strcasecmp(attrptr->attrname, _S_NAME) == 0) {
-			for (j = 0; j < attrptr->value_count; j++) {
-				if (firstime) {
-					/* service name */
-					if (cname == NULL) {
-					    cname = __s_api_get_canonical_name(
-					    result->entry, attrptr, 1);
-					}
-					if (cname == NULL ||
-						(len = strlen(cname)) < 1) {
-						nss_result =
-							NSS_STR_PARSE_PARSE;
-						goto result_srvs2ent;
-					}
-					serv->s_name = buffer;
-					buffer += len + 1;
-					if (buffer >= ceiling) {
-						nss_result =
-						    (int)NSS_STR_PARSE_ERANGE;
-						goto result_srvs2ent;
-					}
-					(void) strcpy(serv->s_name, cname);
-					/* alias list */
-					mp = serv->s_aliases =
-						(char **)ROUND_UP(buffer,
-						sizeof (char **));
-					buffer = (char *)serv->s_aliases +
-						sizeof (char *) *
-						(attrptr->value_count + 1);
-					buffer = (char *)ROUND_UP(buffer,
-						sizeof (char **));
-					if (buffer >= ceiling) {
-						nss_result =
-						    (int)NSS_STR_PARSE_ERANGE;
-						goto result_srvs2ent;
-					}
-					firstime = (int)0;
-				}
-				/* alias list */
-				if ((attrptr->attrvalue[j] == NULL) ||
-				    (len = strlen(attrptr->attrvalue[j])) < 1) {
-					nss_result = (int)NSS_STR_PARSE_PARSE;
-					goto result_srvs2ent;
-				}
-				/* skip canonical name */
-				if (strcmp(cname, attrptr->attrvalue[j]) == 0)
-					continue;
+	/* Get canonical services name */
+	if (cname == NULL) {
+	    cname = __s_api_get_canonical_name(result->entry, names, 1);
+	    if (cname == NULL || (len = strlen(cname)) < 1) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_srvs2str;
+	    }
+	}
+	/* Get port */
+	ipport = __ns_ldap_getAttr(result->entry, _S_PORT);
+	if (ipport == NULL || ipport[0] == NULL ||
+			(len = strlen(cname)) < 1) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_srvs2str;
+	}
+	/* Set services name and port and '/' */
+	len = snprintf(buffer, buflen, "%s %s/", cname, ipport[0]);
+	TEST_AND_ADJUST(len, buffer, buflen, result_srvs2str);
 
-				*mp = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_srvs2ent;
-				}
-				(void) strcpy(*mp++, attrptr->attrvalue[j]);
-				continue;
+	/* Get protocol */
+	protocol = __ns_ldap_getAttrStruct(result->entry, _S_PROTOCOL);
+	if (protocol == NULL || protocol->attrvalue == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_srvs2str;
+	}
+
+	if (cookie) {
+		/*
+		 * getservent_r
+		 * Get current value then increment index
+		 */
+		protoval = protocol->attrvalue[cookie->index++];
+	} else if (protocol->value_count > 1 && be->setcalled == 0 &&
+			argp->key.serv.proto) {
+		/*
+		 * getserverbyname_r and getservbyport_r
+		 *
+		 * If there are more than one value and
+		 * it needs to match protocol too,
+		 * iterate each value to find matching one.
+		 */
+		for (k = 0; k < protocol->value_count; k++) {
+			if (protocol->attrvalue[k] == NULL) {
+				nss_result = NSS_STR_PARSE_PARSE;
+				goto result_srvs2str;
+			}
+			if (strcmp(protocol->attrvalue[k],
+				argp->key.serv.proto) == 0) {
+				protoval = protocol->attrvalue[k];
+				break;
 			}
 		}
+	} else {
+		/*
+		 * 1. getserverbyname_r and getservbyport_r
+		 *
+		 * It does not need to match protocol or
+		 * ipserviceprotocol has single value,
+		 * return the first one.
+		 *
+		 * 2. getservent_r with single ipserviceprotocol value
+		 * or multiple values and the entry is
+		 * enumerated 1st time,  return the first one.
+		 *
+		 */
+		protoval = protocol->attrvalue[0];
+	}
 
-		if (strcasecmp(attrptr->attrname, _S_PORT) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_srvs2ent;
-			}
-			serv->s_port =
-			    htons((ushort_t)atoi(attrptr->attrvalue[0]));
-			continue;
+	if (protoval == NULL || (len = strlen(protoval)) < 1) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_srvs2str;
+	}
+
+	/* Set protocol */
+	len = snprintf(buffer, buflen, "%s", protoval);
+	TEST_AND_ADJUST(len, buffer, buflen, result_srvs2str);
+
+	/* Append aliases */
+	for (i = 0; i < names->value_count; i++) {
+		if (names->attrvalue[i] == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_srvs2str;
 		}
-
-		if (strcasecmp(attrptr->attrname, _S_PROTOCOL) == 0) {
-			/* protocol name */
-			if (attrptr->attrvalue == NULL) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_srvs2ent;
-			}
-			protocol = attrptr;
-			if (cookie) {
-				/*
-				 * getservent_r
-				 * Get current value then increment index
-				 */
-				protoval = attrptr->attrvalue[cookie->index++];
-			} else if (attrptr->value_count > 1 &&
-						argp->key.serv.proto) {
-				/*
-				 * getserverbyname_r and getservbyport_r
-				 *
-				 * If there are more than one value and
-				 * it needs to match protocol too,
-				 * iterate each value to find matching one.
-				 * getservent_r sets key.serv.proto to NULL,
-				 * so it wouldn't run this part of code.
-				 */
-				for (k = 0; k < attrptr->value_count; k++) {
-					if (attrptr->attrvalue[k] == NULL) {
-						nss_result =
-							NSS_STR_PARSE_PARSE;
-						goto result_srvs2ent;
-					}
-					if (strcmp(attrptr->attrvalue[k],
-						argp->key.serv.proto) == 0) {
-						protoval =
-							attrptr->attrvalue[k];
-						break;
-					}
-				}
-			} else {
-				/*
-				 * 1. getserverbyname_r and getservbyport_r
-				 *
-				 * It does not need to match protocol or
-				 * ipserviceprotocol has single value,
-				 * return the first one
-				 *
-				 * 2. getservent_r with single value
-				 * or multiple values and the entry is
-				 * enumerated 1st time,
-				 * return the first one
-				 *
-				 */
-				protoval = attrptr->attrvalue[0];
-			}
-
-			if (protoval == NULL || (len = strlen(protoval)) < 1) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_srvs2ent;
-			}
-			serv->s_proto = buffer;
-			buffer += len + 1;
-			if (buffer >= ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_srvs2ent;
-			}
-			(void) strcpy(serv->s_proto, protoval);
-			continue;
+		/* Skip the canonical name */
+		if (strcmp(cname, names->attrvalue[i]) != 0) {
+			len = snprintf(buffer, buflen, " %s",
+					names->attrvalue[i]);
+			TEST_AND_ADJUST(len, buffer, buflen, result_srvs2str);
 		}
 	}
+
 
 	if (be->enumcookie != NULL && cookie == NULL &&
 			protocol->value_count > 1) {
@@ -314,25 +265,18 @@ _nss_ldap_services2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 			(void *)_nss_services_cookie_new(be->result, 1, cname);
 		if (be->services_cookie == NULL) {
 			nss_result = NSS_STR_PARSE_PARSE;
-			goto result_srvs2ent;
+			goto result_srvs2str;
 		}
 
 		/* reset be->result so it won't get freed later */
 		be->result = NULL;
 	}
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getservent.c: _nss_ldap_services2ent]\n");
-	(void) fprintf(stdout, "        s_name: [%s]\n", serv->s_name);
-	if (mp != NULL) {
-		for (mp = serv->s_aliases; *mp != NULL; mp++)
-			(void) fprintf(stdout, "     s_aliases: [%s]\n", *mp);
-	}
-	(void) fprintf(stdout, "        s_port: [%d]\n", serv->s_port);
-	(void) fprintf(stdout, "    s_protocol: [%s]\n", serv->s_proto);
-#endif /* DEBUG */
+	/* The front end marshaller doesn't need to copy trailing nulls */
+	if (argp->buf.result != NULL)
+		be->buflen = strlen(be->buffer);
 
-result_srvs2ent:
+result_srvs2str:
 	if (cookie) {
 		/*
 		 * getservent_r with multiple ipserviceprotocol values and
@@ -356,9 +300,8 @@ result_srvs2ent:
 		 */
 		(void) __ns_ldap_freeResult(&be->result);
 	}
-	return ((int)nss_result);
+	return (nss_result);
 }
-
 
 /*
  * getbyname gets struct servent values by service name. This
@@ -498,5 +441,5 @@ _nss_ldap_services_constr(const char *dummy1, const char *dummy2,
 
 	return ((nss_backend_t *)_nss_ldap_constr(serv_ops,
 		sizeof (serv_ops)/sizeof (serv_ops[0]), _SERVICES,
-		services_attrs, _nss_ldap_services2ent));
+		services_attrs, _nss_ldap_services2str));
 }

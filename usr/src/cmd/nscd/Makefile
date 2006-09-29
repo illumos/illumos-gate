@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Makefile for name service cache daemon
 #
 
 PROG=	nscd
@@ -39,9 +40,21 @@ $(ROOTMANIFEST)		:= FILEMODE= 444
 $(ROOTMANIFESTDIR)/%: %
 		$(INS.file)
 
-OBJS=	server.o getpw.o getgr.o gethost.o getnode.o hash.o \
-	nscd_biggest.o nscd_parse.o nscd_wait.o \
-	getexec.o getprof.o getuser.o attrstr.o
+OBJS=	server.o getpw.o getgr.o gethost.o getnode.o \
+	getether.o getrpc.o getproto.o getnet.o \
+	getbootp.o getauuser.o getauth.o getserv.o \
+	getnetmasks.o getprinter.o getproject.o \
+	getexec.o getprof.o getuser.o cache.o \
+	nscd_biggest.o nscd_wait.o \
+	nscd_init.o nscd_access.o nscd_cfgfile.o nscd_config.o \
+	nscd_dbimpl.o nscd_getentctx.o nscd_intaddr.o \
+	nscd_log.o nscd_nswconfig.o nscd_nswstate.o nscd_nswcfgst.o \
+	nscd_seqnum.o nscd_smfmonitor.o \
+	nscd_switch.o nscd_nswparse.o nscd_initf.o nscd_selfcred.o \
+	nscd_frontend.o nscd_admin.o nscd_door.o \
+	gettnrhtp.o gettnrhdb.o
+	
+	
 
 NISOBJS=	nscd_nischeck.o  
 
@@ -51,13 +64,18 @@ SRCS=	${OBJS:%.o=%.c}
 
 NISSRC=	${NISOBJS:%.o=%.c}
 
-CPPFLAGS += 	-D_REENTRANT -DSUN_THREADS
+CPPFLAGS += 	-D_REENTRANT -DSUN_THREADS \
+		-I../../lib/libc/port/gen -I../../lib/libc/inc \
+		-I../../lib/libsldap/common
+LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
+LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
+LINTFLAGS +=	-erroff=E_NAME_DEF_NOT_USED2
 
 # TCOV_FLAG=	-ql
 # GPROF_FLAG=	-xpg
 # DEBUG_FLAG=	-g
 
-$(PROG) :=	LDLIBS += -lresolv -lnsl -lsocket -lumem -lscf
+$(PROG) :=	LDLIBS += -lresolv -lnsl -lsocket -lumem -lscf -lavl -lgss
 $(NISPROG) :=	LDLIBS += -lnsl
 
 # install macros and rule
@@ -77,8 +95,6 @@ ${PROG}: ${OBJS}
 ${NISPROG}: ${NISOBJS}
 	${LINK.c} ${OPT} -o $@ ${NISOBJS} ${LDLIBS}
 	${POST_PROCESS}
-
-lint :=	LINTFLAGS=-x -b -u
 
 lint:
 	$(LINT.c) ${SRCS}

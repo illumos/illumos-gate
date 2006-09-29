@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -59,6 +58,10 @@ getrpcbyname_r(const char *name, struct rpcent *result, char *buffer,
 	nss_XbyY_args_t arg;
 	nss_status_t	res;
 
+	if (name == (const char *)NULL) {
+		errno = ERANGE;
+		return (NULL);
+	}
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2rpcent);
 	arg.key.name	= name;
 	arg.stayopen	= rpc_stayopen;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,131 +47,58 @@ static const char *ethers_attrs[] = {
 	(char *)NULL
 };
 
-
 /*
- * _nss_ldap_ethers2ent is the data marshaling method for the ethers
- * getXbyY * (e.g., getbyhost(), getbyether()) backend processes. This
- * method is called after a successful ldap search has been performed.
- * This method will parse the ldap search values into uchar_t *ether
- * = argp->buf.buffer which the frontend process expects. Three error
- * conditions are expected and returned to nsswitch.
+ * _nss_ldap_ethers2str is the data marshaling method for the ethers
+ * ether_hostton/ether_ntohost backend processes.
+ * This method is called after a successful ldap search has been performed.
+ * This method will parse the ldap search values into the file format.
+ * e.g.
  *
- * Place the resulting struct ether_addr from the ldap query into
- * argp->buf.result only if argp->buf.result is initialized (not NULL).
- * e.g., it happens for the call ether_hostton.
+ * 8:0:20:8e:eb:8a8 borealis
  *
- * Place the resulting hostname into argp->buf.buffer only if
- * argp->buf.buffer is initialized. I.e. it happens for the call
- * ether_ntohost.
+ * The front end marshaller str2ether uses argp->buf.result for a different
+ * purpose so a flag be->db_type is set to work around this oddity.
  *
- * argp->buf.buflen does not make sense for ethers. It is always set
- * to 0 by the frontend. The caller only passes a hostname pointer in
- * case of ether_ntohost, that is assumed to be big enough. For
- * ether_hostton, the struct ether_addr passed is a fixed size.
- *
- * The interface does not let the caller specify how long is the buffer
- * pointed by host. We make a safe assumption that the callers will
- * always give MAXHOSTNAMELEN. In any case, it is the only finite number
- * we can lay our hands on in case of runaway strings, memory corruption etc.
  */
-
+/*ARGSUSED0*/
 static int
-_nss_ldap_ethers2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_ethers2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int			i, ip;
 	int			nss_result;
-	int			buflen = (int)0;
-	unsigned int		t[ETHERADDRL];
-	unsigned long		len = 0L;
-	char			*host = NULL;
-	struct ether_addr	*ether = NULL;
 	ns_ldap_result_t	*result = be->result;
-	ns_ldap_attr_t	*attrptr;
-	int etherflag = 0, hostflag = 0;
+	char			**host, **macaddress;
 
-	if (argp->buf.buffer) {
-		hostflag = 1;
-		host = argp->buf.buffer;
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
+	nss_result = NSS_STR_PARSE_SUCCESS;
+
+	host = __ns_ldap_getAttr(result->entry, _E_HOSTNAME);
+	if (host == NULL || host[0] == NULL || (strlen(host[0]) < 1)) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_ea2str;
+	}
+	macaddress = __ns_ldap_getAttr(result->entry, _E_MACADDRESS);
+	if (macaddress == NULL || macaddress[0] == NULL ||
+				(strlen(macaddress[0]) < 1)) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_ea2str;
+	}
+	be->buflen = strlen(host[0]) + strlen(macaddress[0]) + 1; /* ' ' */
+	/* Add a trailing null for easy debug */
+	be->buffer = calloc(1, be->buflen + 1);
+	if (be->buffer == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_ea2str;
 	}
 
-	buflen = (size_t)argp->buf.buflen;
+	(void) snprintf(be->buffer, be->buflen + 1, "%s %s",
+			macaddress[0], host[0]);
+	be->db_type = NSS_LDAP_DB_ETHERS;
 
-	if (argp->buf.result) {
-		etherflag = 1;
-		ether = (struct ether_addr *)argp->buf.result;
-	}
-
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
-	(void) memset(argp->buf.buffer, 0, buflen);
-
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_ea2ent;
-	}
-
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_ea2ent;
-		}
-		if (hostflag) {
-			if (strcasecmp(attrptr->attrname, _E_HOSTNAME) == 0) {
-				if ((attrptr->attrvalue[0] == NULL) ||
-				    (len = strlen(attrptr->attrvalue[0])) < 1) {
-					nss_result = (int)NSS_STR_PARSE_PARSE;
-					goto result_ea2ent;
-				}
-				if (len > MAXHOSTNAMELEN) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_ea2ent;
-				}
-				(void) strcpy(host, attrptr->attrvalue[0]);
-				continue;
-			}
-		}
-		if (etherflag) {
-			if (strcasecmp(attrptr->attrname, _E_MACADDRESS) == 0) {
-				if ((attrptr->attrvalue[0] == NULL) ||
-				    (len = strlen(attrptr->attrvalue[0])) < 1) {
-					nss_result = (int)NSS_STR_PARSE_PARSE;
-					goto result_ea2ent;
-				}
-				ip = (int)sscanf(attrptr->attrvalue[0],
-					"%x:%x:%x:%x:%x:%x", &t[0], &t[1],
-					&t[2], &t[3], &t[4], &t[5]);
-				if (ip != ETHERADDRL) {
-					nss_result = (int)NSS_STR_PARSE_PARSE;
-					goto result_ea2ent;
-				}
-				for (ip = 0; ip < ETHERADDRL; ip++)
-					ether->ether_addr_octet[ip] =
-						(uchar_t)t[ip];
-				continue;
-			}
-		}
-	}
-
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[ether_addr.c: _nss_ldap_ethers2ent]\n");
-	if (host != NULL)
-		(void) fprintf(stdout, "      hostname: [%s]\n", host);
-	if (ether != NULL)
-		(void) fprintf(stdout,
-		    "    ether_addr: [%x:%x:%x:%x:%x:%x]\n",
-		    ether->ether_addr_octet[0],
-		    ether->ether_addr_octet[1],
-		    ether->ether_addr_octet[2],
-		    ether->ether_addr_octet[3],
-		    ether->ether_addr_octet[4],
-		    ether->ether_addr_octet[5]);
-#endif /* DEBUG */
-
-result_ea2ent:
+result_ea2str:
 
 	(void) __ns_ldap_freeResult(&be->result);
-	return ((int)nss_result);
+	return (nss_result);
 }
 
 /*
@@ -197,23 +123,28 @@ getbyhost(ldap_backend_ptr be, void *a)
 	char		searchfilter[SEARCHFILTERLEN];
 	char		userdata[SEARCHFILTERLEN];
 	int		ret;
+	nss_status_t	rc;
 
 	if (_ldap_filter_name(hostname, argp->key.name, sizeof (hostname)) != 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	ret = snprintf(searchfilter, sizeof (searchfilter),
 	    _F_GETETHERBYHOST, hostname);
+
 	if (ret >= sizeof (searchfilter) || ret < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	ret = snprintf(userdata, sizeof (userdata),
 	    _F_GETETHERBYHOST_SSD, hostname);
+
 	if (ret >= sizeof (userdata) || ret < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 
-	return ((nss_status_t)_nss_ldap_lookup(be, argp,
+	rc = (nss_status_t)_nss_ldap_lookup(be, argp,
 		_ETHERS, searchfilter, NULL,
-		_merge_SSD_filter, userdata));
+		_merge_SSD_filter, userdata);
+
+	return (rc);
 }
 
 
@@ -279,5 +210,5 @@ _nss_ldap_ethers_constr(const char *dummy1, const char *dummy2,
 
 	return ((nss_backend_t *)_nss_ldap_constr(ethers_ops,
 		sizeof (ethers_ops)/sizeof (ethers_ops[0]), _ETHERS,
-		ethers_attrs, _nss_ldap_ethers2ent));
+		ethers_attrs, _nss_ldap_ethers2str));
 }

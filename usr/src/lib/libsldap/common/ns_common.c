@@ -2223,16 +2223,24 @@ __s_api_removeServer(const char *server)
 	(void) memset(ret, 0, sizeof (ns_server_info_t));
 	(void) memset(space.s_b, 0, DOORBUFFERSIZE);
 
-	adata = (sizeof (ldap_call_t) + strlen(ireq) +1);
+	adata = (sizeof (ldap_call_t) + strlen(ireq) +
+			strlen(NS_CACHE_ADDR_IP) + 1);
 	adata += strlen(DOORLINESEP) + 1;
 	adata += strlen(server) + 1;
 
 	ndata = sizeof (space);
 	space.s_d.ldap_call.ldap_callnumber = GETLDAPSERVER;
 	len = sizeof (space) - sizeof (space.s_d.ldap_call.ldap_callnumber);
-	(void) strlcpy(space.s_d.ldap_call.ldap_u.domainname, ireq, len);
-	(void) strlcat(space.s_d.ldap_call.ldap_u.domainname, DOORLINESEP, len);
-	(void) strlcat(space.s_d.ldap_call.ldap_u.domainname, server, len);
+	if (strlcpy(space.s_d.ldap_call.ldap_u.domainname, ireq, len) >= len)
+		return (-1);
+	if (strlcat(space.s_d.ldap_call.ldap_u.domainname,
+		NS_CACHE_ADDR_IP, len) >= len)
+		return (-1);
+	if (strlcat(space.s_d.ldap_call.ldap_u.domainname, DOORLINESEP, len) >=
+			len)
+		return (-1);
+	if (strlcat(space.s_d.ldap_call.ldap_u.domainname, server, len) >= len)
+		return (-1);
 	sptr = &space.s_d;
 
 	/* try to remove the server via the door interface */

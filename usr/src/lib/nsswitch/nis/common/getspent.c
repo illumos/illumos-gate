@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  *	nis/getspent.c -- "nis" backend for nsswitch "shadow" database
  */
@@ -54,7 +54,7 @@ nis_str2spent(instr, lenstr, ent, buffer, buflen)
 	int	buflen;
 {
 	struct spwd		*spwd	= (struct spwd *)ent;
-	char			*p, *q;
+	char			*p, *q, *r;
 
 	/*
 	 * We know that instr != 0 because we're in 'nis', not 'files'
@@ -70,19 +70,34 @@ nis_str2spent(instr, lenstr, ent, buffer, buflen)
 	if (q + 1 - instr > buflen) {
 		return (NSS_STR_PARSE_ERANGE);
 	}
-	memcpy(buffer, instr, q - instr);
-	buffer[p - instr] = '\0';
-	buffer[q - instr] = '\0';
+	/*
+	 * "name:password" is copied
+	 */
+	(void) memcpy(buffer, instr, q - instr);
+	if (spwd) {
+		buffer[p - instr] = '\0';
+		buffer[q - instr] = '\0';
 
-	spwd->sp_namp	= buffer;
-	spwd->sp_pwdp	= buffer + (p + 1 - instr);
-	spwd->sp_lstchg	= -1;
-	spwd->sp_min	= -1;
-	spwd->sp_max	= -1;
-	spwd->sp_warn	= -1;
-	spwd->sp_inact	= -1;
-	spwd->sp_expire	= -1;
-	spwd->sp_flag	= 0;
+		spwd->sp_namp	= buffer;
+		spwd->sp_pwdp	= buffer + (p + 1 - instr);
+		spwd->sp_lstchg	= -1;
+		spwd->sp_min	= -1;
+		spwd->sp_max	= -1;
+		spwd->sp_warn	= -1;
+		spwd->sp_inact	= -1;
+		spwd->sp_expire	= -1;
+		spwd->sp_flag	= 0;
+	} else {
+		/*
+		 *  NSS2: nscd is running. Return files format.
+		 *
+		 *  name:password:::::::
+		 */
+		r = buffer + (q - instr);
+		*r = '\0';
+		if (strlcat(buffer, ":::::::", buflen) >= buflen)
+			return (NSS_STR_PARSE_ERANGE);
+	}
 	return (NSS_STR_PARSE_SUCCESS);
 }
 
@@ -93,10 +108,11 @@ getbyname(be, a)
 	nis_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	cstr2ent_t		save_c2e;
 	nss_status_t		res;
 	struct spwd 		*spwd;
+	char			*p;
 
 	save_c2e	= argp->str2ent;
 	argp->str2ent	= nis_str2spent;
@@ -110,12 +126,32 @@ getbyname(be, a)
 	 * succeed if the caller's uid is 0 because only root user
 	 * can use privilege port.
 	 */
-	if ((res == NSS_SUCCESS) && (spwd->sp_pwdp) &&
-	    (*(spwd->sp_pwdp) == '#') && (*(spwd->sp_pwdp + 1) == '#')) {
-		/* get password from passwd.adjunct.byname */
-		res = _nss_nis_lookup_rsvdport(be, argp, 0,
+	if (res == NSS_SUCCESS) {
+		if (spwd) {
+			if ((spwd->sp_pwdp) && (*(spwd->sp_pwdp) == '#') &&
+				(*(spwd->sp_pwdp + 1) == '#')) {
+			/* get password from passwd.adjunct.byname */
+				res = _nss_nis_lookup_rsvdport(be, argp, 0,
 						"passwd.adjunct.byname",
 						argp->key.name, 0);
+			}
+		} else {
+			/*
+			 * getent request from nscd
+			 */
+			if ((p = memchr(argp->buf.buffer, ':',
+					argp->buf.buflen)) == NULL)
+				return (NSS_STR_PARSE_PARSE);
+			if (strncmp(p + 1, "##", 2) == 0)
+				/* get password from passwd.adjunct.byname */
+				res = _nss_nis_lookup_rsvdport(be, argp, 0,
+						"passwd.adjunct.byname",
+						argp->key.name, 0);
+			if (res ==  NSS_SUCCESS) {
+				argp->returnval = argp->buf.buffer;
+				argp->returnlen = strlen(argp->buf.buffer);
+			}
+		}
 	}
 
 	argp->str2ent	= save_c2e;
@@ -131,10 +167,11 @@ getent(be, a)
 	nis_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	cstr2ent_t		save_c2e;
 	nss_status_t		res;
 	struct spwd 		*spwd;
+	char			*p;
 
 	save_c2e	= argp->str2ent;
 	argp->str2ent	= nis_str2spent;
@@ -148,13 +185,36 @@ getent(be, a)
 	 * succeed if the caller's uid is 0 because only root user
 	 * can use privilege port.
 	 */
-	if ((res == NSS_SUCCESS) && (spwd->sp_pwdp) &&
-	    (*(spwd->sp_pwdp) == '#') && (*(spwd->sp_pwdp + 1) == '#')) {
-		/* get password from passwd.adjunct.byname */
-		res = _nss_nis_lookup_rsvdport(be, argp, 0,
+	if (res == NSS_SUCCESS) {
+		if (spwd) {
+			if ((spwd->sp_pwdp) && (*(spwd->sp_pwdp) == '#') &&
+				(*(spwd->sp_pwdp + 1) == '#')) {
+				/* get password from passwd.adjunct.byname */
+				res = _nss_nis_lookup_rsvdport(be, argp, 0,
 					"passwd.adjunct.byname",
 					spwd->sp_namp, 0);
+			}
+		} else {
+			/*
+			 * getent request from nscd
+			 */
+			if ((p = memchr(argp->buf.buffer, ':',
+					argp->buf.buflen)) == NULL)
+				return (NSS_STR_PARSE_PARSE);
+			if (strncmp(p + 1, "##", 2) == 0) {
+				/* need the name for the next search */
+				*p = '\0';
+				/* get password from passwd.adjunct.byname */
+				res = _nss_nis_lookup_rsvdport(be, argp, 0,
+					"passwd.adjunct.byname", p, 0);
+			}
+			if (res ==  NSS_SUCCESS) {
+				argp->returnval = argp->buf.buffer;
+				argp->returnlen = strlen(argp->buf.buffer);
+			}
+		}
 	}
+
 	argp->str2ent	= save_c2e;
 	return (res);
 }
@@ -173,6 +233,7 @@ static nis_backend_op_t shadow_ops[] = {
 	getbyname
 };
 
+/*ARGSUSED*/
 nss_backend_t *
 _nss_nis_shadow_constr(dummy1, dummy2, dummy3)
 	const char	*dummy1, *dummy2, *dummy3;

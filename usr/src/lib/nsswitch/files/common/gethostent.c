@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * files/gethostent.c -- "files" backend for nsswitch "hosts" database
@@ -38,33 +37,84 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/nameser.h>
+#include <arpa/inet.h>
 #include <ctype.h>
 
-static int check_name();
+static int	check_name(nss_XbyY_args_t *, const char *, int,
+			int, const char **, int *, void *, int *);
 static char *do_aliases();
-static char *strcasestr();
+static char *strcasestr(const char *as1, const char *as2);
 nss_status_t __nss_files_XY_hostbyname();
 int __nss_files_2herrno();
+static int	__nss_files_get_addr(int, const char *, int,
+			void *, int, int *);
 
 static int
-check_name(host, args)
-	struct hostent		*host;
-	nss_XbyY_args_t		*args;
+check_name(nss_XbyY_args_t *argp, const char *line, int linelen,
+	int type, const char **namep, int *namelen,
+	void *addrp, int *addrsize)
 {
-	const char		*name = args->key.name;
-	char			**aliasp;
+	const char	*limit, *linep, *keyp, *addrstart;
+	int		v6flag = 0, addrlen;
 
-	if (!host->h_name)
-		return (0);
-	if (strcasecmp(host->h_name, name) == 0) {
-		return (1);
+	linep = line;
+	limit = line + linelen;
+
+	/* Address */
+	addrstart = linep;
+	while (linep < limit && !isspace(*linep)) {
+		if (*linep == ':')
+			v6flag++;
+		linep++;
 	}
-	for (aliasp = host->h_aliases;  *aliasp != 0;  aliasp++) {
-		if (strcasecmp(*aliasp, name) == 0) {
+	addrlen = linep - addrstart;
+
+	/* skip the delimiting spaces */
+	while (linep < limit && isspace(*linep))
+		linep++;
+
+	/* Canonical name */
+	keyp = argp->key.name;
+	*namep = linep;
+	while (*keyp && linep < limit && !isspace(*linep) &&
+			tolower(*keyp) == tolower(*linep)) {
+		keyp++;
+		linep++;
+	}
+	if (*keyp == '\0' && (linep == limit || isspace(*linep))) {
+		if (__nss_files_get_addr(type, addrstart, addrlen,
+					addrp, v6flag, addrsize)) {
+			*namelen = linep - *namep;
 			return (1);
 		}
 	}
+	while (linep < limit && !isspace(*linep))
+		linep++;
+	*namelen = linep - *namep;
+
+	/* Aliases */
+	while (linep < limit) {
+		/* skip the delimiting spaces */
+		while (linep < limit && isspace(*linep))
+			linep++;
+
+		/* compare name (case insensitive) */
+		keyp = argp->key.name;
+		while (*keyp && linep < limit && !isspace(*linep) &&
+				tolower(*keyp) == tolower(*linep)) {
+			keyp++;
+			linep++;
+		}
+		if (*keyp == '\0' && (linep == limit || isspace(*linep)))
+			return (__nss_files_get_addr(type, addrstart, addrlen,
+					addrp, v6flag, addrsize));
+
+		/* skip remainder of alias, if any */
+		while (linep < limit && !isspace(*linep))
+			linep++;
+	}
 	return (0);
+
 }
 
 static nss_status_t
@@ -81,22 +131,87 @@ getbyname(be, a)
 	return (res);
 }
 
+static int
+__nss_files_get_addr(int af, const char *addrstart, int addrlen,
+	void *addrp, int v6flag, int *h_length)
+{
+	struct in_addr	addr_ipv4;
+	struct in6_addr	*addrpv6;
+	in_addr_t	*addrpv4;
+	char		addrbuf[INET6_ADDRSTRLEN + 1];
+
+	if (addrlen >= sizeof (addrbuf))
+		return (0);
+	(void) memcpy(addrbuf, addrstart, addrlen);
+	addrbuf[addrlen] = '\0';
+
+	if (af == AF_INET) {
+		addrpv4 = (in_addr_t *)addrp;
+		if ((*addrpv4 = inet_addr(addrbuf)) == 0xffffffffU)
+			return (0);
+		*h_length = sizeof (in_addr_t);
+	} else if (af == AF_INET6) {
+		addrpv6 = (struct in6_addr *)addrp;
+		if (v6flag) {
+			if (inet_pton(af, addrbuf, addrpv6) != 1)
+				return (0);
+		} else {
+			if ((addr_ipv4.s_addr = inet_addr(addrbuf)) ==
+							0xffffffffU)
+				return (0);
+			IN6_INADDR_TO_V4MAPPED(&addr_ipv4, addrpv6);
+		}
+		*h_length = sizeof (struct in6_addr);
+	} else {
+		return (0);
+	}
+	return (1);
+}
+
 
 int
-__nss_files_check_addr(argp)
-	nss_XbyY_args_t		*argp;
+__nss_files_check_addr(int af, nss_XbyY_args_t *argp, const char *line,
+		int linelen)
 {
-	struct hostent		*host	= (struct hostent *)argp->returnval;
+	const char	*limit, *linep, *addrstart;
+	int		v6flag = 0, addrlen, h_length;
+	in_addr_t	addr_ipv4;
+	struct in6_addr	addr_ipv6;
+	char		*h_addrp;
 
-	/*
-	 * We know that /etc/hosts can only store one address per host, so...
-	 */
-	return (host->h_length == argp->key.hostaddr.len &&
-		host->h_addrtype == argp->key.hostaddr.type &&
-		memcmp(host->h_addr_list[0], argp->key.hostaddr.addr,
+	/* Compare the address type */
+	if (argp->key.hostaddr.type != af)
+		return (0);
+
+	/* Retrieve the address */
+	if (af == AF_INET)
+		h_addrp = (char *)&addr_ipv4;
+	else
+		h_addrp = (char *)&addr_ipv6;
+	linep = line;
+	limit = line + linelen;
+	addrstart = linep;
+	while (linep < limit && !isspace(*linep)) {
+		if (*linep == ':')
+			v6flag++;
+		linep++;
+	}
+	addrlen = linep - addrstart;
+	if (__nss_files_get_addr(af, addrstart, addrlen, h_addrp,
+			v6flag, &h_length) == 0)
+		return (0);
+
+	/* Compare the address */
+	return (h_length == argp->key.hostaddr.len &&
+		memcmp(h_addrp, argp->key.hostaddr.addr,
 			argp->key.hostaddr.len) == 0);
 }
 
+static int
+check_addr(nss_XbyY_args_t *argp, const char *line, int linelen)
+{
+	return (__nss_files_check_addr(AF_INET, argp, line, linelen));
+}
 
 static nss_status_t
 getbyaddr(be, a)
@@ -106,7 +221,7 @@ getbyaddr(be, a)
 	nss_XbyY_args_t		*argp	= (nss_XbyY_args_t *)a;
 	nss_status_t		res;
 
-	res = _nss_files_XY_all(be, argp, 1, 0, __nss_files_check_addr);
+	res = _nss_files_XY_all(be, argp, 1, 0, check_addr);
 	if (res != NSS_SUCCESS)
 		argp->h_errno = __nss_files_2herrno(res);
 	return (res);
@@ -146,20 +261,21 @@ __nss_files_XY_hostbyname(be, args, filter, type)
 	const char *filter;		/* hint for name string */
 	int type;
 {
-	nss_status_t res;
-	int parsestat;
-	char *first;
-	char *last;
-	int i, nhosts = 0;
-	struct hostent he, *hp, *thp;
-	in_addr_t taddr[MAXADDRS];
-	struct in6_addr taddr6[MAXADDRS];
-	char *abuf = 0;		/* alias buffer */
-	char *abuf_start = 0, *abuf_end;
-	int	(*func)();
+	nss_status_t	res;
+	char		*abuf = NULL, *abuf_start = NULL, *abuf_end;
+	char		*first, *last, *buffer;
+	int		parsestat, i, nhosts = 0, buflen;
+	const char	*namep;
+	char		*h_name;
+	int		h_namelen, namelen;
+	struct hostent	*hp;
+	in_addr_t	*taddr = NULL;
+	struct in6_addr	*taddr6 = NULL;
+	size_t		ntaddr;
+	void		*addrp;
+	char		*alias_end = NULL;
 
-	if (be->buf == 0 &&
-		(be->buf = malloc(be->minbuf)) == 0) {
+	if (be->buf == 0 && (be->buf = malloc(be->minbuf)) == 0) {
 		return (NSS_UNAVAIL);
 	}
 
@@ -168,10 +284,25 @@ __nss_files_XY_hostbyname(be, args, filter, type)
 			return (res);
 	}
 
+	ntaddr = MAXADDRS;
+	if (type == AF_INET) {
+		taddr = (in_addr_t *)calloc(ntaddr, sizeof (*taddr));
+		if (taddr == NULL)
+			return (NSS_UNAVAIL);
+	} else {
+		taddr6 = (struct in6_addr *)calloc(ntaddr, sizeof (*taddr6));
+		if (taddr6 == NULL)
+			return (NSS_UNAVAIL);
+	}
+
 	res = NSS_NOTFOUND;
-	args->erange = 0;
 	args->returnval = (char *)0;
-	hp = thp = (struct hostent *)args->buf.result;
+	args->returnlen = 0;
+	hp = (struct hostent *)args->buf.result;
+	buffer = args->buf.buffer;
+	buflen = args->buf.buflen;
+	h_namelen = 0;
+	h_name = NULL;
 
 	for (;;) {
 		char *instr = be->buf;
@@ -207,83 +338,189 @@ __nss_files_XY_hostbyname(be, args, filter, type)
 		if (first != instr)
 			instr = first;
 
-		if (nhosts && strcasestr(instr, hp->h_name) == 0) {
-			break;
-		}
-		/*
-		 * If we've already matched once and have a possible match
-		 * on this line, copy the aliases where they're safe from
-		 * being overwritten when we look at the next entry. They're
-		 * saved as a string of blank separated names for the alias
-		 * parser. On errors, we return failure whether or not we
-		 * have already obtained a valid address.
-		 */
-		if (nhosts == 1 && !abuf) {
-			abuf = malloc(args->buf.buflen);
-			if (abuf == NULL) {
-				res = NSS_UNAVAIL;
-				break;
-			}
-			abuf_start = &abuf[0];
-			abuf_end = abuf_start + args->buf.buflen;
-			if (abuf + strlen(hp->h_name) + 1 > abuf_end) {
-				free(abuf_start);
-				abuf = NULL;
-				args->erange = 1;
-				res = NSS_NOTFOUND;
-				break;
-			}
-			(void) strcpy(abuf, hp->h_name);
-			abuf += strlen(hp->h_name);
-			*abuf++ = ' ';
-			abuf = do_aliases(hp, abuf, abuf_start, abuf_end);
-			if (abuf == NULL) {
-				args->erange = 1;
-				res = NSS_NOTFOUND;
-				break;
-			}
-		}
-		func = args->str2ent;
-		parsestat = (*func)(instr, linelen, thp,
-		    args->buf.buffer, args->buf.buflen);
-
-		if (parsestat != NSS_STR_PARSE_SUCCESS) {
-			if (parsestat == NSS_STR_PARSE_ERANGE)
-				args->erange = 1;
+		/* Bail out if the canonical name does not match */
+		if (nhosts && strcasestr(instr, h_name) == 0) {
 			continue;
 		}
 
 		/*
 		 * Still need to check, strcasestr() above is just a hint.
 		 */
+		addrp = (type == AF_INET)?
+				(void *)&taddr[nhosts]:
+				(void *)&taddr6[nhosts];
 
-		if (type == thp->h_addrtype)
-		if (check_name(thp, args)) {
-			if (type == AF_INET)
-				taddr[nhosts++] =
-				(*(in_addr_t *)thp->h_addr_list[0]);
-			else {
-				memcpy(&taddr6[nhosts++], thp->h_addr_list[0],
-				sizeof (struct in6_addr));
+		if (check_name(args, instr, linelen,
+				type, &namep, &namelen,
+				addrp, &i)) {
+
+			/*
+			 * If we've already matched once and have a possible
+			 * match on this line, copy the aliases where they're
+			 * safe from being overwritten when we look at the
+			 * next entry. They're saved as a string of blank
+			 * separated names for the alias parser. On errors,
+			 * we return failure whether or not we have already
+			 * obtained a valid address.
+			 */
+			if (nhosts == 1 && hp) {
+				if (h_namelen + 1 > args->buf.buflen) {
+					args->erange = 1;
+					res = NSS_NOTFOUND;
+					break;
+				}
+				abuf = (char *)malloc(args->buf.buflen);
+				if (abuf == NULL) {
+					res = NSS_UNAVAIL;
+					break;
+				}
+				abuf_start = abuf;
+				abuf_end = abuf_start + args->buf.buflen;
+				(void) memcpy(abuf, h_name, h_namelen);
+				abuf += h_namelen;
+				*abuf = '\0';
+				abuf = do_aliases(hp, abuf, abuf_end);
+				if (abuf == NULL) {
+					args->erange = 1;
+					res = NSS_NOTFOUND;
+					break;
+				}
 			}
 
+			if (hp != NULL) {
+				/* inside the application */
+				parsestat = (*args->str2ent)(instr, linelen,
+						hp, buffer, buflen);
+				if (parsestat != NSS_STR_PARSE_SUCCESS) {
+					if (parsestat == NSS_STR_PARSE_ERANGE)
+						args->erange = 1;
+					(void) memset(buffer, 0, buflen);
+					continue;
+				}
+			} else {
+				/* inside nscd */
+				int	alen, cplen, erange = 0;
+				char	*ap;
 
-			if (nhosts == 1) {
+				/* Add alias to the first line if any */
+				if (nhosts > 0) {
+
+					/* get to the start of alias */
+					ap = (char *)namep + namelen;
+					/* see if there's any alias */
+					if (ap == instr + linelen)
+						alen = 0;
+					else
+						alen = linelen - (ap - instr);
+					if (alen + 1 >= buflen)
+						erange  = 1;
+					if (erange == 0 && alen != 0) {
+						/* make room for the alias */
+						if (alias_end != NULL)
+						(void) memmove(alias_end +
+						alen, alias_end, buffer -
+						alias_end);
+						/* copy in the alias */
+						(void) memmove(alias_end,
+							ap, alen);
+						buffer += alen;
+						buflen -= alen;
+						alias_end += alen;
+					}
+
+					/* Add delimiter to the buffer */
+					*buffer++ = '\n';
+					buflen--;
+					args->returnlen++;
+				}
+
+				/* copy just the addr if not first one */
+				if (alias_end == NULL)
+					cplen = linelen;
+				else
+					cplen = namep - instr;
+
+				if (cplen >= buflen || erange == 1) {
+					args->erange = 1;
+					if (nhosts > 0) {
+						*(--buffer) = '\0';
+						buflen++;
+						args->returnlen--;
+					}
+					continue;
+				}
+
+				(void) memcpy(buffer, instr, cplen);
+				/* Adjust buffer */
+				buffer += cplen;
+				*buffer = '\0';
+				buflen -= cplen;
+				if (alias_end == NULL)
+					alias_end = buffer;
+			}
+
+			args->returnlen += linelen;
+
+			/*
+			 * If this is the first one, save the canonical
+			 * name for future matches and continue.
+			 */
+			if (++nhosts == 1) {
+				h_name = malloc(namelen + 1);
+				if (h_name == NULL) {
+					res = NSS_UNAVAIL;
+					break;
+				}
 				res = NSS_SUCCESS;
-				args->returnval = args->buf.result;
-				thp = &he;	/* switch to tmp hostent */
+				(void) memcpy(h_name, namep, namelen);
+				h_name[namelen] = '\0';
+				h_namelen = namelen;
+				if (hp)
+					args->returnval = hp;
+				else
+					args->returnval = args->buf.buffer;
 				continue;
 			}
-			if (nhosts >= MAXADDRS)
-				break;
-			abuf = do_aliases(thp, abuf, abuf_start, abuf_end);
-			if (abuf == NULL) {
-				args->erange = 1;
-				res = NSS_NOTFOUND;
-				break;
+
+
+			/* Extend the array */
+			if (nhosts >= ntaddr) {
+				ntaddr *= 2;
+				if (type == AF_INET) {
+					addrp = realloc(taddr,
+						sizeof (*taddr) * ntaddr);
+					if (addrp == NULL) {
+						res = NSS_UNAVAIL;
+						break;
+					}
+					taddr = (in_addr_t *)addrp;
+				} else {
+					addrp = realloc(taddr6,
+						sizeof (*taddr6) * ntaddr);
+					if (addrp == NULL) {
+						res = NSS_UNAVAIL;
+						break;
+					}
+					taddr6 = (struct in6_addr *)addrp;
+				}
 			}
-		} else if (abuf &&
-		    strcasecmp(hp->h_name, thp->h_name) == 0) {
+
+			/*
+			 * For non-nscd, save aliases in a temporary buffer
+			 * Don't have to do this for nscd as 'buffer' already
+			 * contains the required data in the appropriate
+			 * format
+			 */
+			if (hp) {
+				abuf = do_aliases(hp, abuf, abuf_end);
+				if (abuf == NULL) {
+					args->erange = 1;
+					res = NSS_NOTFOUND;
+					break;
+				}
+			}
+		} else if (namep && h_namelen == namelen &&
+		    strncasecmp(h_name, namep, namelen) == 0) {
 			/*
 			 * This line didn't have the requested name but
 			 * is part of the same multihomed host (i.e. it
@@ -296,7 +533,10 @@ __nss_files_XY_hostbyname(be, args, filter, type)
 		}
 	}
 
-	if (abuf) {
+	if (abuf && res == NSS_SUCCESS) {
+
+		/* abuf != NULL implies hp and abuf_start != NULL */
+
 		struct in_addr *addrp;
 		struct in6_addr *addrp6;
 
@@ -318,8 +558,8 @@ __nss_files_XY_hostbyname(be, args, filter, type)
 			    ((nhosts + 1) * sizeof (char *) +
 			    (nhosts * sizeof (*addrp6))), sizeof (char *)));
 			for (i = 0, --addrp6; i < nhosts; i++, --addrp6) {
-				memcpy(addrp6, &taddr6[i],
-				sizeof (struct in6_addr));
+				(void) memcpy(addrp6, &taddr6[i],
+						sizeof (struct in6_addr));
 				hp->h_addr_list[i] = (char *)addrp6;
 			}
 		}
@@ -330,12 +570,11 @@ __nss_files_XY_hostbyname(be, args, filter, type)
 		    (char *)hp->h_addr_list - args->buf.buffer);
 		if (hp->h_aliases == 0) {
 			args->erange = 1;
-			res = NSS_STR_PARSE_ERANGE;
+			res = NSS_NOTFOUND;
 		} else {
 			hp->h_name = hp->h_aliases[0];
 			hp->h_aliases++;
 		}
-		free(abuf_start);
 	}
 
 	/*
@@ -345,6 +584,15 @@ __nss_files_XY_hostbyname(be, args, filter, type)
 	if (!args->stayopen)
 		(void) _nss_files_endent(be, 0);
 
+	if (taddr)
+		free(taddr);
+	if (taddr6)
+		free(taddr6);
+	if (h_name)
+		free(h_name);
+	if (abuf_start)
+		free(abuf_start);
+
 	return (res);
 }
 
@@ -352,13 +600,11 @@ __nss_files_XY_hostbyname(be, args, filter, type)
  * A case-insensitive version of strstr().
  */
 static char *
-strcasestr(as1, as2)
-	char *as1;
-	char *as2;
+strcasestr(const char *as1, const char *as2)
 {
 	int c2;
-	register char *tptr;
-	register char *s1, *s2;
+	register const char *tptr;
+	register const char *s1, *s2;
 
 	s1 = as1;
 	s2 = as2;
@@ -383,25 +629,22 @@ strcasestr(as1, as2)
 
 
 static char *
-do_aliases(hp, abuf, start, end)
-	struct hostent *hp;
-	char *abuf;
-	char *start;
-	char *end;
+do_aliases(struct hostent *hp, char *abuf, char *end)
 {
-	char **cp;
+	char	**cp;
+	size_t	len;
 
-	for (cp = hp->h_aliases; cp && *cp && **cp; cp++) {
-		size_t len;
+	if ((cp = hp->h_aliases) == NULL)
+		return (abuf);
 
+	for (; *cp; cp++) {
 		len = strlen(*cp);
 		if (abuf+len+1 >= end) {
-			free(start);
-			return ((char *)0);
+			return (NULL);
 		}
-		(void) strcpy(abuf, *cp);
-		abuf += len;
 		*abuf++ = ' ';
+		(void) memcpy(abuf, *cp, len);
+		abuf += len;
 	}
 	*abuf = '\0';
 

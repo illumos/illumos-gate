@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1986-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +36,7 @@
 #include <nss_dbdefs.h>
 
 
-static int str2netent(const char *, int, void *, char *, int);
+int str2netent(const char *, int, void *, char *, int);
 
 static int net_stayopen;
 /*
@@ -48,7 +47,7 @@ static int net_stayopen;
 static DEFINE_NSS_DB_ROOT(db_root);
 static DEFINE_NSS_GETENT(context);
 
-static void
+void
 _nss_initf_net(nss_db_params_t *p)
 {
 	p->name	= NSS_DBNAM_NETWORKS;
@@ -62,6 +61,10 @@ getnetbyname_r(const char *name, struct netent *result,
 	nss_XbyY_args_t arg;
 	nss_status_t	res;
 
+	if (name == (const char *)NULL) {
+		errno = ERANGE;
+		return (NULL);
+	}
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2netent);
 	arg.key.name	= name;
 	arg.stayopen	= net_stayopen;
@@ -127,7 +130,7 @@ getnetent_r(struct netent *result, char *buffer, int buflen)
  * wherein the field pointers would be set to areas in the buffer if
  * need be. instring and buffer should be separate areas.
  */
-static int
+int
 str2netent(const char *instr, int lenstr,
 	void *ent /* really (struct netnet *) */, char *buffer, int buflen)
 {

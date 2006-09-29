@@ -64,7 +64,7 @@ _nss_initf_printers(p)
 		/* regular behaviour */
 		p->name = NSS_DBNAM_PRINTERS;	 /* "printers" */
 		p->default_config = NSS_DEFCONF_PRINTERS;
-		initialized = 1;
+		/* keep reinitializing as needed was: initialized = 1; */
 	}
 	syslog(LOG_DEBUG, "database: %s, services: %s",
 		(p->name ? p->name : "NULL"),

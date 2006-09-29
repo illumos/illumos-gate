@@ -43,6 +43,7 @@
 #include <sys/stat.h>
 #include <string.h>
 
+/*ARGSUSED*/
 nss_status_t
 _nss_user_setent(be, dummy)
 	user_backend_ptr_t	be;
@@ -62,13 +63,14 @@ _nss_user_setent(be, dummy)
 	return (NSS_SUCCESS);
 }
 
+/*ARGSUSED*/
 nss_status_t
 _nss_user_endent(be, dummy)
 	user_backend_ptr_t	be;
 	void			*dummy;
 {
 	if (be->f != 0) {
-		fclose(be->f);
+		(void) fclose(be->f);
 		be->f = 0;
 	}
 	if (be->buf != 0) {
@@ -98,6 +100,7 @@ _nss_user_read_line(f, buffer, buflen)
 	int			linelen;	/* 1st unused slot in buffer */
 	int			c;
 
+	/*CONSTCOND*/
 	while (1) {
 		linelen = 0;
 		while (linelen < buflen - 1) {	/* "- 1" saves room for \n\0 */
@@ -168,6 +171,7 @@ _nss_user_XY_all(be, args, netdb, filter, check)
 
 	res = NSS_NOTFOUND;
 
+	/*CONSTCOND*/
 	while (1) {
 		char		*instr	= be->buf;
 		int		linelen;
@@ -250,6 +254,7 @@ _nss_user_XY_all(be, args, netdb, filter, check)
 }
 
 
+/*ARGSUSED*/
 nss_status_t
 _nss_user_destr(be, dummy)
 	user_backend_ptr_t	be;
@@ -257,7 +262,7 @@ _nss_user_destr(be, dummy)
 {
 	if (be != 0) {
 		if (be->f != 0) {
-			_nss_user_endent(be, 0);
+			(void) _nss_user_endent(be, 0);
 		}
 		free((char *)be->filename);
 		free(be);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,11 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
- *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  *	nisplus/gethostent.c -- NIS+ backend for nsswitch "hosts" database
  */
 
@@ -30,6 +31,8 @@
 
 #include <string.h>
 #include <netdb.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include "nisplus_common.h"
@@ -40,7 +43,7 @@ getbyname(be, a)
 	nisplus_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	nss_status_t		res;
 
 	/*
@@ -59,13 +62,13 @@ getbyaddr(be, a)
 	nisplus_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	struct in_addr		addr;
 	char			addrbuf[18];
 	nss_status_t		res;
 
-	memcpy(&addr, argp->key.hostaddr.addr, sizeof (addr));
-	inet_ntoa_r(addr, addrbuf);
+	(void) memcpy(&addr, argp->key.hostaddr.addr, sizeof (addr));
+	(void) inet_ntoa_r(addr, addrbuf);
 	res = _nss_nisplus_expand_lookup(be, argp, HOST_TAG_ADDR, addrbuf,
 		HOST_TBLNAME);
 	if (res != NSS_SUCCESS)
@@ -75,74 +78,120 @@ getbyaddr(be, a)
 
 
 /*
- * place the results from the nis_object structure into argp->buf.result
  * Returns NSS_STR_PARSE_{SUCCESS, ERANGE, PARSE}
  */
 static int
-nis_object2ent(nobj, obj, argp)
-	int		nobj;
-	nis_object	*obj;
-	nss_XbyY_args_t	*argp;
+nis_object2str(nobj, obj, be, argp)
+	int			nobj;
+	nis_object		*obj;
+	nisplus_backend_ptr_t	be;
+	nss_XbyY_args_t		*argp;
 {
-	char	*buffer, *limit;
-	int		buflen = argp->buf.buflen;
-	struct 	hostent *host;
-	struct	in_addr *addrp;
-	int		count, ret;
+	return (nis_hosts_object2str(nobj, obj, be, argp, AF_INET));
+}
 
-	limit = argp->buf.buffer + buflen;
-	host = (struct hostent *)argp->buf.result;
-	buffer = argp->buf.buffer;
 
 /*
- * <--------------- buffer + buflen -------------------------------------->
- * |-----------------|-----------------|----------------|----------------|
- * | pointers vector | pointers vector | aliases grow   | addresses grow |
- * | for addresses   | for aliases     |		|		 |
- * | this way ->     | this way ->     | <- this way	|<- this way	 |
- * |-----------------|-----------------|----------------|----------------|
- * | grows in PASS 1 | grows in PASS2  | grows in PASS2 | grows in PASS 1|
- *
- *
- * ASSUME: the name and aliases columns in NIS+ tables ARE
- * null terminated.
- *
- *
- * PASS 1: get addresses
+ * Returns NSS_STR_PARSE_{SUCCESS, ERANGE, PARSE}
  */
+int
+nis_hosts_object2str(nobj, obj, be, argp, af)
+	int			nobj;
+	nis_object		*obj;
+	nisplus_backend_ptr_t	be;
+	nss_XbyY_args_t		*argp;
+	int			af;
+{
+	char			*buffer;
+	char			*cname, *name, *addr;
+	int			buflen, cnamelen, namelen, addrlen;
+	int			first;
+	struct in_addr		addr4;
+	struct entry_col	*ecol;
 
-	addrp = (struct in_addr *) ROUND_DOWN(limit, sizeof (*addrp));
-	host->h_addr_list = (char **) ROUND_UP(buffer, sizeof (char **));
-	if ((char *)host->h_addr_list >= limit ||
-			(char *)addrp <= (char *)host->h_addr_list) {
-		return (NSS_STR_PARSE_ERANGE);
+	buflen = argp->buf.buflen;
+	buffer = argp->buf.buffer;
+	(void) memset(buffer, 0, buflen);
+
+	for (first = 1; nobj > 0; nobj--, obj++) {
+		if (obj == NULL)
+			return (NSS_STR_PARSE_PARSE);
+		if (obj->zo_data.zo_type != NIS_ENTRY_OBJ ||
+			obj->EN_data.en_cols.en_cols_len < HOST_COL) {
+			/* namespace/table/object is curdled */
+			return (NSS_STR_PARSE_PARSE);
+		}
+		ecol = obj->EN_data.en_cols.en_cols_val;
+
+		/* cname */
+		__NISPLUS_GETCOL_OR_RETURN(ecol, HOST_NDX_CNAME,
+			cnamelen, cname);
+
+		/* addr */
+		__NISPLUS_GETCOL_OR_RETURN(ecol, HOST_NDX_ADDR,
+			addrlen, addr);
+		if (af == AF_INET) {
+			addr4.s_addr = inet_addr(addr);
+			if (addr4.s_addr == INADDR_NONE)
+				return (NSS_STR_PARSE_PARSE);
+		}
+
+		/* name */
+		__NISPLUS_GETCOL_OR_EMPTY(ecol, HOST_NDX_NAME,
+			namelen, name);
+
+		/*
+		 * newline is used to separate multiple
+		 * entries. There is no newline before
+		 * the first entry and after the last
+		 * entry
+		 */
+		if (first) {
+			first = 0;
+		} else if (buflen > 1) {
+			*buffer = '\n';
+			buffer++;
+			buflen--;
+		} else {
+			return (NSS_STR_PARSE_ERANGE);
+		}
+
+		if (namelen > 1) {
+			if ((addrlen + cnamelen + namelen + 3)
+					> buflen)
+				return (NSS_STR_PARSE_ERANGE);
+			(void) snprintf(buffer, buflen, "%s %s %s",
+					addr, cname, name);
+			buffer += addrlen + cnamelen + namelen + 2;
+			buflen -= (addrlen + cnamelen + namelen + 2);
+		} else {
+			if ((addrlen + cnamelen + 2) > buflen)
+				return (NSS_STR_PARSE_ERANGE);
+			(void) snprintf(buffer, buflen, "%s %s",
+					addr, cname);
+			buffer += addrlen + cnamelen + 1;
+			buflen -= (addrlen + cnamelen + 1);
+		}
 	}
 
-	ret = __netdb_aliases_from_nisobj(obj, nobj, NULL,
-		host->h_addr_list, (char **)&addrp, 0, &count, AF_INET);
-	if (ret != NSS_STR_PARSE_SUCCESS)
-		return (ret);
-
-	/*
-	 * PASS 2: get cname and aliases
-	 */
-
-	host->h_aliases =  host->h_addr_list + count + 1;
-	host->h_name = NULL;
-
-	/*
-	 * Assume that CNAME is the first column and NAME the second.
-	 */
-	ret = __netdb_aliases_from_nisobj(obj, nobj, NULL, host->h_aliases,
-		(char **)&addrp, &(host->h_name), &count, AF_INET);
-	if (ret != NSS_STR_PARSE_SUCCESS)
-		return (ret);
-
-	host->h_addrtype = AF_INET;
-	host->h_length   = sizeof (u_int);
-
+	if (argp->buf.result != NULL) {
+		/*
+		 * Some front end marshallers may require the
+		 * files formatted data in a distinct buffer
+		 */
+		if ((be->buffer = strdup(argp->buf.buffer)) == NULL)
+			return (NSS_STR_PARSE_PARSE);
+		be->buflen = strlen(be->buffer);
+	}
+#ifdef	DEBUG
+	(void) fprintf(stdout, "%s [%s]\n",
+			(af == AF_INET)?"hosts":"ipnodes",
+			argp->buf.buffer);
+	(void) fflush(stdout);
+#endif	/* DEBUG */
 	return (NSS_STR_PARSE_SUCCESS);
 }
+
 
 static nisplus_backend_op_t host_ops[] = {
 	_nss_nisplus_destr,
@@ -160,5 +209,5 @@ _nss_nisplus_hosts_constr(dummy1, dummy2, dummy3)
 {
 	return (_nss_nisplus_constr(host_ops,
 				    sizeof (host_ops) / sizeof (host_ops[0]),
-				    HOST_TBLNAME, nis_object2ent));
+				    HOST_TBLNAME, nis_object2str));
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +36,9 @@
 #define	_PROF_RES2		"SolarisAttrReserved2"
 #define	_PROF_DESC		"SolarisAttrLongDesc"
 #define	_PROF_ATTRS		"SolarisAttrKeyValue"
-#define	_PROF_GETPROFNAME	"(&(objectClass=SolarisProfAttr)(cn=%s))"
+/* Negate an exec_attr attribute to exclude exec_attr entries */
+#define	_PROF_GETPROFNAME \
+"(&(objectClass=SolarisProfAttr)(!(SolarisKernelSecurityPolicy=*))(cn=%s))"
 #define	_PROF_GETPROFNAME_SSD	"(&(%%s)(cn=%s))"
 
 static const char *prof_attrs[] = {
@@ -48,150 +49,88 @@ static const char *prof_attrs[] = {
 	_PROF_ATTRS,
 	(char *)NULL
 };
-
-
+/*
+ * _nss_ldap_prof2str is the data marshaling method for the prof_attr
+ * system call getprofattr, getprofnam and getproflist.
+ * This method is called after a successful search has been performed.
+ * This method will parse the search results into the file format.
+ * e.g.
+ *
+ * All:::Execute any command as the user or role:help=RtAll.html
+ *
+ */
 static int
-_nss_ldap_prof2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_prof2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int			i, nss_result;
-	int			buflen = (int)0;
+	int			nss_result;
+	int			buflen = 0;
 	unsigned long		len = 0L;
-	char			*nullstring = (char *)NULL;
-	char			*buffer = (char *)NULL;
-	char			*ceiling = (char *)NULL;
-	profstr_t		*prof = (profstr_t *)NULL;
-	ns_ldap_attr_t		*attrptr;
+	char			*buffer = NULL;
 	ns_ldap_result_t	*result = be->result;
+	char			**name, **res1, **res2, **des, **attr;
+	char			*res1_str, *res2_str, *des_str, *attr_str;
 
-	buffer = argp->buf.buffer;
-	buflen = (size_t)argp->buf.buflen;
-	if (!argp->buf.result) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_prof2ent;
-	}
-	prof = (profstr_t *)(argp->buf.result);
-	ceiling = buffer + buflen;
-	prof->name = (char *)NULL;
-	prof->res1 = (char *)NULL;
-	prof->res2 = (char *)NULL;
-	prof->desc = (char *)NULL;
-	prof->attr = (char *)NULL;
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
+
+	buflen = argp->buf.buflen;
+	nss_result = NSS_STR_PARSE_SUCCESS;
 	(void) memset(argp->buf.buffer, 0, buflen);
 
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_prof2ent;
+	name = __ns_ldap_getAttr(result->entry, _PROF_NAME);
+	if (name == NULL || name[0] == NULL ||
+			(strlen(name[0]) < 1)) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_prof2str;
+	}
+	res1 = __ns_ldap_getAttr(result->entry, _PROF_RES1);
+	if (res1 == NULL || res1[0] == NULL || (strlen(res1[0]) < 1))
+		res1_str = _NO_VALUE;
+	else
+		res1_str = res1[0];
+
+	res2 = __ns_ldap_getAttr(result->entry, _PROF_RES2);
+	if (res2 == NULL || res2[0] == NULL || (strlen(res2[0]) < 1))
+		res2_str = _NO_VALUE;
+	else
+		res2_str = res2[0];
+
+	des = __ns_ldap_getAttr(result->entry, _PROF_DESC);
+	if (des == NULL || des[0] == NULL || (strlen(des[0]) < 1))
+		des_str = _NO_VALUE;
+	else
+		des_str = des[0];
+
+	attr = __ns_ldap_getAttr(result->entry, _PROF_ATTRS);
+	if (attr == NULL || attr[0] == NULL || (strlen(attr[0]) < 1))
+		attr_str = _NO_VALUE;
+	else
+		attr_str = attr[0];
+	/* 5 = 4 ':' + 1 '\0' */
+	len = strlen(name[0]) + strlen(res1_str) + strlen(res2_str) +
+		strlen(des_str) + strlen(attr_str) + 6;
+	if (len > buflen) {
+		nss_result = NSS_STR_PARSE_ERANGE;
+		goto result_prof2str;
 	}
 
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_prof2ent;
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, len)) == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_prof2str;
 		}
-		if (strcasecmp(attrptr->attrname, _PROF_NAME) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_prof2ent;
-			}
-			prof->name = buffer;
-			buffer += len + 1;
-			if (buffer >= ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_prof2ent;
-			}
-			(void) strcpy(prof->name, attrptr->attrvalue[0]);
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _PROF_RES1) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				prof->res1 = nullstring;
-			} else {
-				prof->res1 = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_prof2ent;
-				}
-				(void) strcpy(prof->res1,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _PROF_RES2) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				prof->res2 = nullstring;
-			} else {
-				prof->res2 = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_prof2ent;
-				}
-				(void) strcpy(prof->res2,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _PROF_DESC) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				prof->desc = nullstring;
-			} else {
-				prof->desc = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_prof2ent;
-				}
-				(void) strcpy(prof->desc,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _PROF_ATTRS) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				prof->attr = nullstring;
-			} else {
-				prof->attr = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_prof2ent;
-				}
-				(void) strcpy(prof->attr,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
-	}
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
+	(void) snprintf(buffer, len, "%s:%s:%s:%s:%s",
+			name[0], res1_str, res2_str, des_str, attr_str);
+	/* The front end marshaller doesn't need the trailing null */
+	if (argp->buf.result != NULL)
+		be->buflen = strlen(be->buffer);
 
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getprofattr.c: _nss_ldap_prof2ent]\n");
-	(void) fprintf(stdout, "      prof-name: [%s]\n", prof->name);
-	if (prof->res1 != (char *)NULL) {
-		(void) fprintf(stdout, "      res1: [%s]\n", prof->res1);
-	}
-	if (prof->res2 != (char *)NULL) {
-		(void) fprintf(stdout, "      res2: [%s]\n", prof->res2);
-	}
-	if (prof->desc != (char *)NULL) {
-		(void) fprintf(stdout, "      desc: [%s]\n", prof->desc);
-	}
-	if (prof->attr != (char *)NULL) {
-		(void) fprintf(stdout, "      attr: [%s]\n", prof->attr);
-	}
-#endif	/* DEBUG */
-
-result_prof2ent:
+result_prof2str:
 	(void) __ns_ldap_freeResult(&be->result);
-	return ((int)nss_result);
+	return (nss_result);
 }
 
 
@@ -203,10 +142,6 @@ getbyname(ldap_backend_ptr be, void *a)
 	char		name[SEARCHFILTERLEN];
 	int		ret;
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
-
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getprofattr.c: getbyname]\n");
-#endif	/* DEBUG */
 
 	if (_ldap_filter_name(name, argp->key.name, sizeof (name)) != 0)
 		return ((nss_status_t)NSS_NOTFOUND);
@@ -243,11 +178,7 @@ _nss_ldap_prof_attr_constr(const char *dummy1,
     const char *dummy4,
     const char *dummy5)
 {
-#ifdef	DEBUG
-	(void) fprintf(stdout,
-	    "\n[getprofattr.c: _nss_ldap_prof_attr_constr]\n");
-#endif
 	return ((nss_backend_t *)_nss_ldap_constr(profattr_ops,
 		sizeof (profattr_ops)/sizeof (profattr_ops[0]), _PROFATTR,
-		prof_attrs, _nss_ldap_prof2ent));
+		prof_attrs, _nss_ldap_prof2str));
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,7 +146,7 @@ getnetgr_get(be, a)
 				args->retp[i] = 0;
 			} else if ((len = strlen(str) + 1) <= buflen) {
 				args->retp[i] = buffer;
-				memcpy(buffer, str, len);
+				(void) memcpy(buffer, str, len);
 				buffer += len;
 				buflen -= len;
 			} else {
@@ -196,7 +195,7 @@ getnetgr_destr(be, dummy)
 	void			*dummy;
 {
 	if (be != 0) {
-		getnetgr_end(be, 0);
+		(void) getnetgr_end(be, 0);
 		free(be);
 	}
 	return (NSS_SUCCESS);
@@ -273,7 +272,7 @@ static void
 ngt_init(ngt)
 	struct netgrtab	*ngt;
 {
-	memset((void *)ngt, 0, sizeof (*ngt));
+	(void) memset((void *)ngt, 0, sizeof (*ngt));
 	ngt->expand_lastp = &ngt->expand_first;
 }
 
@@ -339,7 +338,7 @@ ngt_insert(ngt, name, namelen, breadth_first)
 	if (cur == 0) {
 		return;			/* Out of memory, too bad */
 	}
-	memcpy(cur->name, name, namelen);
+	(void) memcpy(cur->name, name, namelen);
 	cur->name[namelen] = 0;
 
 	/* Insert in hash table */
@@ -497,26 +496,25 @@ top_down(be, groups, ngroups, func, iter_args)
 		int		i;
 
 		/* %%% was NETGR_NDX_NAME */
-		sprintf(search_crit, "[%s=%s]%s",
+		(void) snprintf(search_crit, NIS_MAXNAMELEN, "[%s=%s]%s",
 			NETGR_TAG_NAME, group, be->table_name);
 		result = _nss_nisplus_list(search_crit, 0, &r);
 
 		if (result != NSS_SUCCESS) {
-			if (result == NSS_NOTFOUND) {
 #ifdef	DEBUG
+			if (result == NSS_NOTFOUND) {
 				syslog(LOG_WARNING,
 					"innetgr: no such NIS+ netgroup as %s",
 					group);
-#endif	/* DEBUG */
 			} else {
-#ifdef	DEBUG
 				syslog(LOG_WARNING,
 					"innetgr: nis_list returned [%s]",
 					(r == 0) ? "A null pointer !?" :
 					nis_sperrno(NIS_RES_STATUS(r)));
-#endif	/* DEBUG */
-				done = 1;	/* Give up, return result */
 			}
+#endif	/* DEBUG */
+			if (result != NSS_NOTFOUND)
+				done = 1;	/* Give up, return result */
 			if (r != 0) {
 				nis_freeresult(r);
 			}
@@ -750,7 +748,7 @@ every_which_way(be, args)
 	enum { BAD, BAD_NSS_TRYAGAIN, NO, YES }	verdict;
 
 /* Copy NIS+ search value; ==== Should really do NIS+ quoting */
-#define	catquoted(to, from)	strcat(to, from)
+#define	catquoted(to, from)	(void) strcat(to, from)
 
 /*
  * ====>
@@ -813,7 +811,7 @@ every_which_way(be, args)
 	pusers = nusers ? args->arg[NSS_NETGR_USER].argv : 0;
 	do {
 		if (pusers != 0) {
-			strcpy(users, ",user=");
+			(void) strcpy(users, ",user=");
 			if (nusers != 0) {
 				catquoted(users, *pusers);
 				pusers++;
@@ -825,7 +823,7 @@ every_which_way(be, args)
 		phosts = nhosts ? args->arg[NSS_NETGR_MACHINE].argv : 0;
 		do {
 			if (phosts != 0) {
-				strcpy(hosts, ",host=");
+				(void) strcpy(hosts, ",host=");
 				if (nhosts != 0) {
 					catquoted(hosts, *phosts);
 					phosts++;
@@ -833,8 +831,8 @@ every_which_way(be, args)
 			}
 
 			search_crit[0] = '[';	/* Was temporarily a comma */
-			strcat(search_crit, "]");
-			strcat(search_crit, be->table_name);
+			(void) strcat(search_crit, "]");
+			(void) strcat(search_crit, be->table_name);
 			switch (_nss_nisplus_list(search_crit, 0, &r)) {
 			    case NSS_SUCCESS:
 				break;
@@ -913,7 +911,8 @@ every_which_way(be, args)
 #ifdef	SEARCH_DOWN_TOO
 		if (top->n_total < bottom->n_total /* and a fudge factor? */) {
 			group = ngt_next(top);
-			sprintf(search_crit, "[%s=%s]%s",
+			(void) snprintf(search_crit, NIS_MAXNAMELEN,
+				"[%s=%s]%s",
 				NETGR_NDX_NAME, group, be->table_name);
 			switch (_nss_nisplus_list(search_crit, 0, &r)) {
 			    case NSS_SUCCESS:
@@ -962,7 +961,8 @@ every_which_way(be, args)
 #endif	/* SEARCH_DOWN_TOO */
 			group = ngt_next(bottom);
 			/* %%% was NETGR_NDX_GROUP */
-			sprintf(search_crit, "[%s=%s],%s",
+			(void) snprintf(search_crit, NIS_MAXNAMELEN,
+				"[%s=%s],%s",
 				NETGR_TAG_GROUP, group, be->table_name);
 			switch (_nss_nisplus_list(search_crit, 0, &r)) {
 			    case NSS_SUCCESS:
@@ -1067,10 +1067,11 @@ netgr_in(be, a)
 
 /*ARGSUSED*/
 static int
-bogus_object2ent(nobj, obj, argp)
-	int		nobj;
-	nis_object	*obj;
-	nss_XbyY_args_t	*argp;
+bogus_object2str(nobj, obj, be, argp)
+	int			nobj;
+	nis_object		*obj;
+	nisplus_backend_ptr_t	be;
+	nss_XbyY_args_t		*argp;
 {
 	/*
 	 * This should never get used in the netgroup backend;
@@ -1098,5 +1099,5 @@ _nss_nisplus_netgroup_constr(dummy1, dummy2, dummy3)
 {
 	return (_nss_nisplus_constr(netgroup_ops,
 			sizeof (netgroup_ops) / sizeof (netgroup_ops[0]),
-			NETGR_TBLNAME, bogus_object2ent));
+			NETGR_TBLNAME, bogus_object2str));
 }

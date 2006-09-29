@@ -890,7 +890,7 @@ netgr_set(ldap_backend_ptr be, void *a)
 	get_be->tablename = NULL;
 	get_be->attrs = netgrent_attrs;
 	get_be->result = NULL;
-	get_be->ldapobj2ent = NULL;
+	get_be->ldapobj2str = NULL;
 	get_be->setcalled = 1;
 	get_be->filter = NULL;
 	get_be->toglue = NULL;

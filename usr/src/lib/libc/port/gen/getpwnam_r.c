@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,86 +66,6 @@ struct passwd *
 _uncached_getpwnam_r(const char *name, struct passwd *result, char *buffer,
     int buflen);
 
-static struct passwd *
-process_getpw(struct passwd *result, char *buffer, int buflen,
-	nsc_data_t *sptr, int ndata);
-
-/* ARGSUSED4 */
-static struct passwd *
-process_getpw(struct passwd *result, char *buffer, int buflen,
-	nsc_data_t *sptr, int ndata)
-{
-
-	char *fixed;
-#ifdef	_LP64
-	struct passwd	pass64;
-#endif
-
-#ifdef	_LP64
-	fixed = (char *)(((uintptr_t)buffer + 7) & ~7);
-#else
-	fixed = (char *)(((uintptr_t)buffer + 3) & ~3);
-#endif
-	buflen -= fixed - buffer;
-	buffer = fixed;
-
-	if (sptr->nsc_ret.nsc_return_code != SUCCESS)
-		return (NULL);
-
-#ifdef	_LP64
-	if (sptr->nsc_ret.nsc_bufferbytesused - (int)sizeof (passwd32_t)
-	    > buflen) {
-#else
-	if (sptr->nsc_ret.nsc_bufferbytesused - (int)sizeof (struct passwd)
-	    > buflen) {
-#endif
-		errno = ERANGE;
-		return (NULL);
-	}
-
-#ifdef	_LP64
-
-	(void) memcpy(buffer,
-	    (sptr->nsc_ret.nsc_u.buff + sizeof (passwd32_t)),
-	    (sptr->nsc_ret.nsc_bufferbytesused - sizeof (passwd32_t)));
-
-	pass64.pw_name = (char *)(sptr->nsc_ret.nsc_u.pwd.pw_name +
-				(uintptr_t)buffer);
-	pass64.pw_passwd = (char *)(sptr->nsc_ret.nsc_u.pwd.pw_passwd +
-				(uintptr_t)buffer);
-	pass64.pw_uid = sptr->nsc_ret.nsc_u.pwd.pw_uid;
-	pass64.pw_gid = sptr->nsc_ret.nsc_u.pwd.pw_gid;
-	pass64.pw_age = (char *)(sptr->nsc_ret.nsc_u.pwd.pw_age +
-				(uintptr_t)buffer);
-	pass64.pw_comment = (char *)(sptr->nsc_ret.nsc_u.pwd.pw_comment +
-				(uintptr_t)buffer);
-	pass64.pw_gecos = (char *)(sptr->nsc_ret.nsc_u.pwd.pw_gecos +
-				(uintptr_t)buffer);
-	pass64.pw_dir = (char *)(sptr->nsc_ret.nsc_u.pwd.pw_dir +
-				(uintptr_t)buffer);
-	pass64.pw_shell = (char *)(sptr->nsc_ret.nsc_u.pwd.pw_shell +
-				(uintptr_t)buffer);
-
-	*result = pass64;
-#else
-	sptr->nsc_ret.nsc_u.pwd.pw_name += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.pwd.pw_passwd += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.pwd.pw_age += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.pwd.pw_comment += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.pwd.pw_gecos += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.pwd.pw_dir += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.pwd.pw_shell += (uintptr_t)buffer;
-
-	*result = sptr->nsc_ret.nsc_u.pwd;
-
-	(void) memcpy(buffer,
-	    (sptr->nsc_ret.nsc_u.buff + sizeof (struct passwd)),
-	    (sptr->nsc_ret.nsc_bufferbytesused - sizeof (struct passwd)));
-#endif
-
-	return (result);
-}
-
 /*
  * POSIX.1c Draft-6 version of the function getpwnam_r.
  * It was implemented by Solaris 2.3.
@@ -154,48 +73,17 @@ process_getpw(struct passwd *result, char *buffer, int buflen,
 struct passwd *
 _getpwnam_r(const char *name, struct passwd *result, char *buffer, int buflen)
 {
-	/*
-	 * allocate data on the stack for passwd information
-	 */
-	union {
-		nsc_data_t 	s_d;
-		char		s_b[1024];
-	} space;
-	nsc_data_t	*sptr;
-	int		ndata;
-	int		adata;
-	struct passwd	*resptr = NULL;
+	nss_XbyY_args_t arg;
 
-	if ((name == (const char *)NULL) ||
-	    (strlen(name) >= (sizeof (space) - sizeof (nsc_data_t)))) {
+	if (name == (const char *)NULL) {
 		errno = ERANGE;
-		return ((struct passwd *)NULL);
-	}
-	ndata = sizeof (space);
-	adata = strlen(name) + sizeof (nsc_call_t) + 1;
-	space.s_d.nsc_call.nsc_callnumber = GETPWNAM;
-	(void) strcpy(space.s_d.nsc_call.nsc_u.name, name);
-	sptr = &space.s_d;
-
-	switch (_nsc_trydoorcall(&sptr, &ndata, &adata)) {
-	case SUCCESS:	/* positive cache hit */
-		break;
-	case NOTFOUND:	/* negative cache hit */
 		return (NULL);
-	default:
-		return ((struct passwd *)_uncached_getpwnam_r(name, result,
-		    buffer, buflen));
 	}
-	resptr = process_getpw(result, buffer, buflen, sptr, ndata);
-
-	/*
-	 * check if doors reallocated the memory underneath us
-	 * if they did munmap it or suffer a memory leak
-	 */
-	if (sptr != &space.s_d)
-		munmap((void *)sptr, ndata);
-
-	return (resptr);
+	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2passwd);
+	arg.key.name = name;
+	(void) nss_search(&db_root, _nss_initf_passwd, NSS_DBOP_PASSWD_BYNAME,
+				&arg);
+	return ((struct passwd *)NSS_XbyY_FINI(&arg));
 }
 
 /*
@@ -205,40 +93,13 @@ _getpwnam_r(const char *name, struct passwd *result, char *buffer, int buflen)
 struct passwd *
 _getpwuid_r(uid_t uid, struct passwd *result, char *buffer, int buflen)
 {
-	union {
-		nsc_data_t	s_d;
-		char		s_b[1024];
-	} space;
-	nsc_data_t	*sptr;
-	int		ndata;
-	int		adata;
-	struct passwd	*resptr = NULL;
+	nss_XbyY_args_t arg;
 
-	ndata = sizeof (space);
-	adata = sizeof (nsc_call_t) + 1;
-	space.s_d.nsc_call.nsc_callnumber = GETPWUID;
-	space.s_d.nsc_call.nsc_u.uid = uid;
-	sptr = &space.s_d;
-
-	switch (_nsc_trydoorcall(&sptr, &ndata, &adata)) {
-	case SUCCESS:	/* positive cache hit */
-		break;
-	case NOTFOUND:	/* negative cache hit */
-		return (NULL);
-	default:
-		return ((struct passwd *)_uncached_getpwuid_r(uid, result,
-		    buffer, buflen));
-	}
-	resptr = process_getpw(result, buffer, buflen, sptr, ndata);
-
-	/*
-	 * check if doors reallocated the memory underneath us
-	 * if they did munmap it or suffer a memory leak
-	 */
-	if (sptr != &space.s_d)
-		munmap((void *)sptr, ndata);
-
-	return (resptr);
+	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2passwd);
+	arg.key.uid = uid;
+	(void) nss_search(&db_root, _nss_initf_passwd, NSS_DBOP_PASSWD_BYUID,
+				&arg);
+	return ((struct passwd *)NSS_XbyY_FINI(&arg));
 }
 
 
@@ -397,8 +258,15 @@ str2passwd(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 	 * We copy the input string into the output buffer and
 	 * operate on it in place.
 	 */
-	(void) memcpy(buffer, instr, lenstr);
-	buffer[lenstr] = '\0';
+	if (instr != buffer) {
+		/* Overlapping buffer copies are OK */
+		(void) memmove(buffer, instr, lenstr);
+		buffer[lenstr] = '\0';
+	}
+
+	/* quick exit do not entry fill if not needed */
+	if (ent == (void *)NULL)
+		return (NSS_STR_PARSE_SUCCESS);
 
 	next = buffer;
 

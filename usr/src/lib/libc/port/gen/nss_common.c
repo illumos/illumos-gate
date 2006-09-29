@@ -44,15 +44,58 @@
 #undef	__NSS_PRIVATE_INTERFACE
 
 #include <nss_common.h>
+#include <nss_dbdefs.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <thread.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <errno.h>
 #include "libc.h"
 #include "tsd.h"
 
+#include <getxby_door.h>
+
 /*
+ * policy component function interposing definitions:
+ * nscd if so desired can interpose it's own switch functions over
+ * the internal unlocked counterparts.  This will allow nscd to replace
+ * the switch policy state engine with one that uses it's internal
+ * components.
+ * Only nscd can change this through it's use of nss_config.
+ * The golden rule is: ptr == NULL checking is used in the switch to
+ * see if a function was interposed.  But nscd is responsible for seeing
+ * that mutex locking to change the values are observed when the data is
+ * changed.  Especially if it happens > once.  The switch does not lock
+ * the pointer with mutexs.
+ */
+
+typedef struct {
+	void	*p;
+#if 0
+	void		(*nss_delete_fp)(nss_db_root_t *rootp);
+	nss_status_t	(*nss_search_fp)(nss_db_root_t *rootp,
+				nss_db_initf_t initf, int search_fnum,
+				void *search_args);
+	void		(*nss_setent_u_fp)(nss_db_root_t *,
+				nss_db_initf_t, nss_getent_t *);
+	nss_status_t	(*nss_getent_u_fp)(nss_db_root_t *,
+				nss_db_initf_t, nss_getent_t *, void *);
+	void		(*nss_endent_u_fp)(nss_db_root_t *,
+				nss_db_initf_t, nss_getent_t *);
+	void		(*end_iter_u_fp)(nss_db_root_t *rootp,
+				struct nss_getent_context *contextp);
+#endif
+} nss_policyf_t;
+
+static mutex_t nss_policyf_lock = DEFAULTMUTEX;
+static nss_policyf_t nss_policyf_ptrs =
+	{ (void *)NULL };
+
+/*
+ * nsswitch db_root state machine definitions:
  * The golden rule is:  if you hold a pointer to an nss_db_state struct and
  * you don't hold the lock, you'd better have incremented the refcount
  * while you held the lock;  otherwise, it may vanish or change
@@ -126,7 +169,11 @@ void				_nss_db_state_destr(struct nss_db_state *);
 /* === the config info hasn't changed (by comparing version numbers) */
 
 
-/* NSS_OPTIONS infrastructure BEGIN */
+/*
+ * NSS_OPTIONS/NIS_OPTIONS environment varibles data definitions:
+ * This remains for backwards compatibility.  But generally nscd will
+ * decide if/how this gets used.
+ */
 static int checked_env = 0;		/* protected by "rootlock" */
 
 	/* allowing __nss_debug_file to be set could be a security hole. */
@@ -177,6 +224,397 @@ static struct option nis_options[] = {
 	{ "pref_type", OPT_STRING, &__nis_preftype },
 	{ 0, 0, 0 },
 };
+
+/*
+ * switch configuration parameter "database" definitions:
+ * The switch maintains a simmple read/write parameter database
+ * that nscd and the switch components can use to communicate
+ * nscd data to other components for configuration or out of band
+ * [IE no in the context of a getXbyY or putXbyY operation] data.
+ * The data passed are pointers to a lock  data buffer and a length.
+ * Use of this is treated as SunwPrivate between nscd and the switch
+ * unless other wise stated.
+ */
+
+typedef struct nss_cfgparam {
+	char 		*name;
+	mutex_t		*lock;
+	void		*buffer;
+	size_t		length;
+} nss_cfgparam_t;
+
+typedef struct nss_cfglist {
+	char 		*name;
+	nss_cfgparam_t	*list;
+	int		count;
+	int		max;
+} nss_cfglist_t;
+
+#define	NSS_CFG_INCR	16
+
+static nss_cfglist_t *nss_cfg = (nss_cfglist_t *)NULL;
+static int nss_cfgcount = 0;
+static int nss_cfgmax = 0;
+static mutex_t nss_cfglock = DEFAULTMUTEX;
+
+static int nss_cfg_policy_init();
+
+/*
+ * A config parameters are in the form component:parameter
+ * as in: nss:parameter - switch (internal FE/policy/BE) parameter
+ *	  nscd:param - nscd application parameter
+ *	  ldap:param - nss_ldap BE parameter
+ *	  passwd:param - get/put passwd FE parameter
+ */
+
+#define	NSS_CONFIG_BRK	':'
+
+/*
+ * The policy components initial parameter list
+ */
+static nss_config_t	nss_policy_params[] = {
+	{ "nss:policyfunc", NSS_CONFIG_ADD, &nss_policyf_lock,
+		(void *)&nss_policyf_ptrs, (size_t)sizeof (nss_policyf_t) },
+	{ NULL,	NSS_CONFIG_ADD,	(mutex_t *)NULL, (void *)NULL, (size_t)0 },
+};
+
+/*
+ * NSS parameter configuration routines
+ */
+
+/* compare config name (component:parameter) to a component name */
+static int
+nss_cfgcn_cmp(const char *cfgname, const char *compname)
+{
+	char *c;
+	size_t len, len2;
+
+	/* this code assumes valid pointers */
+	if ((c = strchr(cfgname, NSS_CONFIG_BRK)) == NULL)
+		return (-1);
+	len = (size_t)(c - cfgname);
+	len2 = strlen(compname);
+	if (len2 != len)
+		return (-1);
+	return (strncmp(cfgname, compname, len));
+}
+
+/* init configuration arena */
+static int
+nss_cfg_init()
+{
+	int i;
+
+	/* First time caller? */
+	if (nss_cfg != NULL)
+		return (0);
+
+	/* Initialize internal tables */
+	lmutex_lock(&nss_cfglock);
+	if (nss_cfg != NULL) {
+		lmutex_unlock(&nss_cfglock);
+		return (0);
+	}
+	nss_cfg = (nss_cfglist_t *)libc_malloc(NSS_CFG_INCR *
+					    sizeof (nss_cfglist_t));
+	if (nss_cfg == (nss_cfglist_t *)NULL) {
+		errno = ENOMEM;
+		lmutex_unlock(&nss_cfglock);
+		return (-1);
+	}
+	nss_cfgmax = NSS_CFG_INCR;
+	for (i = 0; i < nss_cfgmax; i++) {
+		nss_cfg[i].list = (nss_cfgparam_t *)libc_malloc(NSS_CFG_INCR *
+					sizeof (nss_cfgparam_t));
+		if (nss_cfg[i].list == (nss_cfgparam_t *)NULL) {
+			errno = ENOMEM;
+			lmutex_unlock(&nss_cfglock);
+			return (-1);
+		}
+		nss_cfg[i].max = NSS_CFG_INCR;
+	}
+
+	/* Initialize Policy Engine values */
+	lmutex_unlock(&nss_cfglock);
+	if (nss_cfg_policy_init() < 0) {
+		return (-1);
+	}
+	return (0);
+}
+
+/* find the name'd component list - create it if non-existent */
+static nss_cfglist_t *
+nss_cfgcomp_get(char *name, int add)
+{
+	nss_cfglist_t	*next;
+	char	*c;
+	int	i, len;
+	size_t	nsize;
+
+	/* Make sure system is init'd */
+	if (nss_cfg == NULL && nss_cfg_init() < 0)
+		return ((nss_cfglist_t *)NULL);
+
+	/* and check component:name validity */
+	if (name == NULL || (c = strchr(name, NSS_CONFIG_BRK)) == NULL)
+		return ((nss_cfglist_t *)NULL);
+
+	lmutex_lock(&nss_cfglock);
+	next = nss_cfg;
+	for (i = 0; i < nss_cfgcount; i++) {
+		if (next->name && nss_cfgcn_cmp(name, next->name) == 0) {
+			lmutex_unlock(&nss_cfglock);
+			return (next);
+		}
+		next++;
+	}
+	if (!add) {
+		lmutex_unlock(&nss_cfglock);
+		return (NULL);
+	}
+
+	/* not found, create a fresh one */
+	if (nss_cfgcount >= nss_cfgmax) {
+		/* realloc first */
+		nsize = (nss_cfgmax + NSS_CFG_INCR) * sizeof (nss_cfgparam_t);
+		next = (nss_cfglist_t *)libc_realloc(nss_cfg, nsize);
+		if (next == NULL) {
+			errno = ENOMEM;
+			lmutex_unlock(&nss_cfglock);
+			return ((nss_cfglist_t *)NULL);
+		}
+		(void) memset((void *)(next + nss_cfgcount), '\0',
+			NSS_CFG_INCR * sizeof (nss_cfglist_t));
+		nss_cfgmax += NSS_CFG_INCR;
+		nss_cfg = next;
+	}
+	next = nss_cfg + nss_cfgcount;
+	len = (size_t)(c - name) + 1;
+	if ((next->name = libc_malloc(len)) == NULL) {
+		errno = ENOMEM;
+		lmutex_unlock(&nss_cfglock);
+		return ((nss_cfglist_t *)NULL);
+	}
+	nss_cfgcount++;
+	(void) strlcpy(next->name, name, len);
+	lmutex_unlock(&nss_cfglock);
+	return (next);
+}
+
+/* find the name'd parameter - create it if non-existent */
+static nss_cfgparam_t *
+nss_cfgparam_get(char *name, int add)
+{
+	nss_cfglist_t	*comp;
+	nss_cfgparam_t	*next;
+	int	count, i;
+	size_t	nsize;
+
+	if ((comp = nss_cfgcomp_get(name, add)) == NULL)
+		return ((nss_cfgparam_t *)NULL);
+	lmutex_lock(&nss_cfglock);
+	count = comp->count;
+	next = comp->list;
+	for (i = 0; i < count; i++) {
+		if (next->name && strcmp(name, next->name) == 0) {
+			lmutex_unlock(&nss_cfglock);
+			return (next);
+		}
+		next++;
+	}
+	if (!add) {
+		lmutex_unlock(&nss_cfglock);
+		return (NULL);
+	}
+
+	/* not found, create a fresh one */
+	if (count >= comp->max) {
+		/* realloc first */
+		nsize = (comp->max + NSS_CFG_INCR) * sizeof (nss_cfgparam_t);
+		next = (nss_cfgparam_t *)libc_realloc(comp->list, nsize);
+		if (next == NULL) {
+			errno = ENOMEM;
+			lmutex_unlock(&nss_cfglock);
+			return ((nss_cfgparam_t *)NULL);
+		}
+		comp->max += NSS_CFG_INCR;
+		comp->list = next;
+	}
+	next = comp->list + comp->count;
+	if ((next->name = libc_strdup(name)) == NULL) {
+		errno = ENOMEM;
+		lmutex_unlock(&nss_cfglock);
+		return ((nss_cfgparam_t *)NULL);
+	}
+	comp->count++;
+	lmutex_unlock(&nss_cfglock);
+	return (next);
+}
+
+/* find the name'd parameter - delete it if it exists */
+static void
+nss_cfg_del(nss_config_t *cfgp)
+{
+	char		*name;
+	nss_cfglist_t	*comp;
+	nss_cfgparam_t	*next, *cur;
+	int	count, i, j;
+
+	/* exit if component name does not already exist */
+	if ((name = cfgp->name) == NULL ||
+	    (comp = nss_cfgcomp_get(name, 0)) == NULL)
+		return;
+
+	/* find it */
+	lmutex_lock(&nss_cfglock);
+	count = comp->count;
+	next = comp->list;
+	for (i = 0; i < count; i++) {
+		if (next->name && strcmp(name, next->name) == 0) {
+			break;	/* found it... */
+		}
+		next++;
+	}
+	if (i >= count) {
+		/* not found, already deleted */
+		lmutex_unlock(&nss_cfglock);
+		return;
+	}
+
+	/* copy down the remaining parameters, and clean up */
+	/* don't try to clean up component tables */
+	cur = next;
+	next++;
+	for (j = i+1; j < count; j++) {
+		*cur = *next;
+		cur++;
+		next++;
+	}
+	/* erase the last one */
+	if (cur->name) {
+		libc_free(cur->name);
+		cur->name = (char *)NULL;
+	}
+	cur->lock = (mutex_t *)NULL;
+	cur->buffer = (void *)NULL;
+	cur->length = 0;
+	comp->count--;
+	lmutex_unlock(&nss_cfglock);
+}
+
+static int
+nss_cfg_get(nss_config_t *next)
+{
+	nss_cfgparam_t	*param;
+
+	errno = 0;
+	if ((param = nss_cfgparam_get(next->name, 0)) == NULL)
+		return (-1);
+	next->lock = param->lock;
+	next->buffer = param->buffer;
+	next->length = param->length;
+	return (0);
+}
+
+static int
+nss_cfg_put(nss_config_t *next, int add)
+{
+	nss_cfgparam_t	*param;
+
+	errno = 0;
+	if ((param = nss_cfgparam_get(next->name, add)) == NULL)
+		return (-1);
+	param->lock = next->lock;
+	param->buffer = next->buffer;
+	param->length = next->length;
+	return (0);
+}
+
+/*
+ * Policy engine configurator - set and get interface
+ * argument is a NULL terminated list of set/get requests
+ * with input/result buffers and lengths.  nss_cname is the
+ * specifier of a set or get operation and the property being
+ * managed.  The intent is limited functions and expandability.
+ */
+
+nss_status_t
+nss_config(nss_config_t **plist, int cnt)
+{
+	nss_config_t	*next;
+	int 	i;
+
+	/* interface is only available to nscd */
+	if (_nsc_proc_is_cache() <= 0) {
+		return (NSS_UNAVAIL);
+	}
+	if (plist == NULL || cnt <= 0)
+		return (NSS_SUCCESS);
+	for (i = 0; i < cnt; i++) {
+		next = plist[i];
+		if (next == NULL)
+			break;
+		if (next->name == NULL) {
+			errno = EFAULT;
+			return (NSS_ERROR);
+		}
+		switch (next->cop) {
+		case NSS_CONFIG_GET:
+			/* get current lock/buffer/length fields */
+			if (nss_cfg_get(next) < 0) {
+				return (NSS_ERROR);
+			}
+			break;
+		case NSS_CONFIG_PUT:
+			/* set new lock/buffer/length fields */
+			if (nss_cfg_put(next, 0) < 0) {
+				return (NSS_ERROR);
+			}
+			break;
+		case NSS_CONFIG_ADD:
+			/* add parameter & set new lock/buffer/length fields */
+			if (nss_cfg_put(next, 1) < 0) {
+				return (NSS_ERROR);
+			}
+			break;
+		case NSS_CONFIG_DELETE:
+			/* delete parameter - should always work... */
+			nss_cfg_del(next);
+			break;
+		case NSS_CONFIG_LIST:
+			break;
+		default:
+			continue;
+		}
+	}
+	return (NSS_SUCCESS);
+}
+
+/*
+ * This routine is called immediately after nss_cfg_init but prior to
+ * any commands from nscd being processed.  The intent here is to
+ * initialize the nss:* parameters allowed by the policy component
+ * so that nscd can then proceed and modify them if so desired.
+ *
+ * We know we can only get here if we are nscd so we can skip the
+ * preliminaries.
+ */
+
+static int
+nss_cfg_policy_init()
+{
+	nss_config_t	*next = &nss_policy_params[0];
+
+	for (; next && next->name != NULL; next++) {
+		if (nss_cfg_put(next, 1) < 0)
+			return (-1);
+	}
+	return (0);
+}
+
+/*
+ * NSS_OPTION & NIS_OPTION environment variable functions
+ */
 
 static
 void
@@ -293,8 +731,11 @@ __nis_get_environment()
 		return;
 	__parse_environment(nis_options, p);
 }
-/* NSS_OPTIONS/NIS_OPTIONS infrastructure END */
 
+
+/*
+ * Switch policy component backend state machine functions
+ */
 
 static nss_backend_t *
 nss_get_backend_u(nss_db_root_t **rootpp, struct nss_db_state *s, int n_src)
@@ -512,6 +953,10 @@ _nss_src_state_destr(struct nss_src_state *src, int max_dormant)
 void
 _nss_db_state_destr(struct nss_db_state *s)
 {
+
+	if (s == NULL)
+		return;
+
 	/* === _private_mutex_destroy(&s->orphan_root.lock); */
 	if (s->p.cleanup != 0) {
 		(*s->p.cleanup)(&s->p);
@@ -529,20 +974,6 @@ _nss_db_state_destr(struct nss_db_state *s)
 		libc_free(s->src);
 	}
 	libc_free(s);
-}
-
-void
-nss_delete(nss_db_root_t *rootp)
-{
-	struct nss_db_state	*s;
-
-	NSS_ROOTLOCK(rootp, &s);
-	if (s == 0) {
-		NSS_UNLOCK(rootp);
-	} else {
-		rootp->s = 0;
-		NSS_UNREF_UNLOCK(rootp, s);
-	}
 }
 
 
@@ -675,6 +1106,28 @@ retry_test(nss_status_t res, int n, struct __nsw_lookup_v1 *lkp)
 	return (0);
 }
 
+/*
+ * Switch policy component functional interfaces
+ */
+
+void
+nss_delete(nss_db_root_t *rootp)
+{
+	struct nss_db_state	*s;
+
+	/* no name service cache daemon divert here */
+	/* local nss_delete decrements state reference counts */
+	/* and may free up opened switch resources. */
+
+	NSS_ROOTLOCK(rootp, &s);
+	if (s == 0) {
+		NSS_UNLOCK(rootp);
+	} else {
+		rootp->s = 0;
+		NSS_UNREF_UNLOCK(rootp, s);
+	}
+}
+
 nss_status_t
 nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 	void *search_args)
@@ -682,7 +1135,17 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 	nss_status_t		res = NSS_UNAVAIL;
 	struct nss_db_state	*s;
 	int			n_src;
-	unsigned int		*status_vec_p = _nss_status_vec_p();
+	unsigned int		*status_vec_p;
+
+	/* name service cache daemon divert */
+	res = _nsc_search(rootp, initf, search_fnum, search_args);
+	if (res != NSS_TRYLOCAL)
+		return (res);
+
+	/* fall through - process locally */
+	errno = 0;			/* just in case ... */
+	res = NSS_UNAVAIL;
+	status_vec_p = _nss_status_vec_p();
 
 	if (status_vec_p == NULL) {
 		return (NSS_UNAVAIL);
@@ -763,7 +1226,7 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 
 
 /*
- * Start of nss_setent()/nss_getent()/nss_endent()
+ * Start of nss_{setent|getent|endent}
  */
 
 /*
@@ -772,16 +1235,31 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
  *   database;  in practice, since Posix and UI have helpfully said that
  *   getent() state is global rather than, say, per-thread or user-supplied,
  *   we have at most one of these per nss_db_state.
+ *   XXX ? Is this statement still true?
+ *
+ * NSS2 - a client's context is maintained as a cookie delivered by and
+ * passed to nscd.  The cookie is a 64 bit (nssuint_t) unique opaque value
+ * created by nscd.
+ * cookie states:
+ *	NSCD_NEW_COOKIE		- cookie value uninitialized
+ *	NSCD_LOCAL_COOKIE	- setent is a local setent
+ *	all other		- NSCD unique opaque id for this setent
+ * A client's context is also associated with a seq_num.  This is a nscd
+ * opaque 64 bit (nssuint_t) value passed with a cookie, and used to by nscd
+ * to validate the sequencing of the context.  The client treats this as
+ * a pass through value.
+ *
+ * XXX ??  Use Cookie as cross-check info so that we can detect an
+ * nss_context that missed an nss_delete() or similar.
  */
 
 struct nss_getent_context {
 	int			n_src;	/* >= max_src ==> end of sequence */
 	nss_backend_t		*be;
 	struct nss_db_state	*s;
-	/*
-	 * XXX ??  Should contain enough cross-check info that we can detect an
-	 * nss_context that missed an nss_delete() or similar.
-	 */
+	nssuint_t		cookie;
+	nssuint_t		seq_num;
+	nss_db_params_t		param;
 };
 
 static void		nss_setent_u(nss_db_root_t *,
@@ -834,7 +1312,7 @@ nss_endent(nss_db_root_t *rootp, nss_db_initf_t initf, nss_getent_t *contextpp)
 
 /*
  * Each of the _u versions of the nss interfaces assume that the context
- * lock is held.
+ * lock is held.  No need to divert to nscd.  Private to local sequencing.
  */
 
 static void
@@ -864,21 +1342,31 @@ static void
 nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 	nss_getent_t *contextpp)
 {
+	nss_status_t		status;
 	struct nss_db_state	*s;
 	struct nss_getent_context *contextp;
 	nss_backend_t		*be;
 	int			n_src;
 
+	/* setup process wide context while locked */
 	if ((contextp = contextpp->ctx) == 0) {
 		if ((contextp = libc_malloc(sizeof (*contextp))) == 0) {
 			return;
 		}
 		contextpp->ctx = contextp;
+		contextp->cookie = NSCD_NEW_COOKIE;	/* cookie init */
+		contextp->seq_num = 0;			/* seq_num init */
 		s = 0;
 	} else {
 		s = contextp->s;
 	}
 
+	/* name service cache daemon divert */
+	status = _nsc_setent_u(rootp, initf, contextpp);
+	if (status != NSS_TRYLOCAL)
+		return;
+
+	/* fall through - process locally */
 	if (s == 0) {
 		NSS_LOCK_CHECK(rootp, initf, &s);
 		if (s == 0) {
@@ -935,6 +1423,7 @@ static nss_status_t
 nss_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 	nss_getent_t *contextpp, void *args)
 {
+	nss_status_t		status;
 	struct nss_db_state	*s;
 	struct nss_getent_context *contextp;
 	int			n_src;
@@ -947,6 +1436,12 @@ nss_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 			return (NSS_UNAVAIL);
 		}
 	}
+	/* name service cache daemon divert */
+	status = _nsc_getent_u(rootp, initf, contextpp, args);
+	if (status != NSS_TRYLOCAL)
+		return (status);
+
+	/* fall through - process locally */
 	s	= contextp->s;
 	n_src	= contextp->n_src;
 	be	= contextp->be;
@@ -1009,12 +1504,25 @@ static void
 nss_endent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 	nss_getent_t *contextpp)
 {
+	nss_status_t		status;
 	struct nss_getent_context *contextp;
 
 	if ((contextp = contextpp->ctx) == 0) {
 		/* nss_endent() on an unused context is a no-op */
 		return;
 	}
+
+	/* notify name service cache daemon */
+	status = _nsc_endent_u(rootp, initf, contextpp);
+	if (status != NSS_TRYLOCAL) {
+		/* clean up */
+		libc_free(contextp);
+		contextpp->ctx = 0;
+		return;
+	}
+
+	/* fall through - process locally */
+
 	/*
 	 * Existing code (BSD, SunOS) works in such a way that getXXXent()
 	 *   following an endXXXent() behaves as though the user had invoked
@@ -1032,4 +1540,699 @@ nss_endent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 	end_iter_u(rootp, contextp);
 	libc_free(contextp);
 	contextpp->ctx = 0;
+}
+
+/*
+ * pack dbd data into header
+ * Argment pointers assumed valid.
+ * poff offset position pointer
+ *   IN = starting offset for dbd header
+ *   OUT = starting offset for next section
+ */
+
+static nss_status_t
+nss_pack_dbd(void *buffer, size_t bufsize, nss_db_params_t *p, size_t *poff)
+{
+	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
+	nss_dbd_t		*pdbd;
+	size_t			off = *poff;
+	size_t			len, blen;
+	size_t			n, nc, dc;
+	char			*bptr;
+
+	pbuf->dbd_off = (nssuint_t)off;
+	bptr = (char *)buffer + off;
+	blen = bufsize - off;
+	len = sizeof (nss_dbd_t);
+
+	n = nc = dc = 0;
+	if (p->name == NULL) {
+		errno = ERANGE;			/* actually EINVAL */
+		return (NSS_ERROR);
+	}
+
+	/* if default config not specified, the flag should be reset */
+	if (p->default_config == NULL) {
+		p->default_config = "<NULL>";
+		p->flags = p->flags & ~NSS_USE_DEFAULT_CONFIG;
+	}
+
+	n = strlen(p->name) + 1;
+	dc = strlen(p->default_config) + 1;
+	if (n < 2 || dc < 2) {			/* What no DB? */
+		errno = ERANGE;			/* actually EINVAL */
+		return (NSS_ERROR);
+	}
+	if (p->config_name != NULL) {
+		nc = strlen(p->config_name) + 1;
+	}
+	if ((len + n + nc + dc) >= blen) {
+		errno = ERANGE;			/* actually EINVAL */
+		return (NSS_ERROR);
+	}
+
+	pdbd = (nss_dbd_t *)((void *)bptr);
+	bptr += len;
+	pdbd->flags = p->flags;
+	pdbd->o_name = len;
+	(void) strlcpy(bptr, p->name, n);
+	len += n;
+	bptr += n;
+	if (nc == 0) {
+		pdbd->o_config_name = 0;
+	} else {
+		pdbd->o_config_name = len;
+		(void) strlcpy(bptr, p->config_name, nc);
+		bptr += nc;
+		len += nc;
+	}
+	pdbd->o_default_config = len;
+	(void) strlcpy(bptr, p->default_config, dc);
+	len += dc;
+	pbuf->dbd_len = (nssuint_t)len;
+	off += ROUND_UP(len, sizeof (nssuint_t));
+	*poff = off;
+	return (NSS_SUCCESS);
+}
+
+/*
+ * Switch packed and _nsc (switch->nscd) interfaces
+ * Return: NSS_SUCCESS (OK to proceed), NSS_ERROR, NSS_NOTFOUND
+ */
+
+/*ARGSUSED*/
+nss_status_t
+nss_pack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
+	    nss_db_initf_t initf, int search_fnum, void *search_args)
+{
+	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
+	nss_XbyY_args_t		*in = (nss_XbyY_args_t *)search_args;
+	nss_db_params_t		tparam = { 0 };
+	nss_status_t		ret = NSS_ERROR;
+	const char		*dbn;
+	size_t			blen, len, off = 0;
+	char			*bptr;
+	nssuint_t		*uptr;
+	struct nss_groupsbymem	*gbm;
+
+	if (pbuf == NULL || in == NULL || initf == (nss_db_initf_t)NULL) {
+		errno = ERANGE;			/* actually EINVAL */
+		return (ret);
+	}
+	tparam.cleanup = NULL;
+	(*initf)(&tparam);
+	if ((dbn = tparam.name) == 0) {
+		if (tparam.cleanup != 0)
+			(tparam.cleanup)(&tparam);
+		errno = ERANGE;			/* actually EINVAL */
+		return (ret);
+	}
+
+	/* init buffer header */
+	pbuf->pbufsiz = (nssuint_t)bufsize;
+	pbuf->p_ruid = (uint32_t)getuid();
+	pbuf->p_euid = (uint32_t)geteuid();
+	pbuf->p_version = NSCD_HEADER_REV;
+	pbuf->p_status = 0;
+	pbuf->p_errno = 0;
+	pbuf->p_herrno = 0;
+
+	/* possible audituser init */
+	if (strcmp(dbn, NSS_DBNAM_AUTHATTR) == 0 && in->h_errno != 0)
+		pbuf->p_herrno = (uint32_t)in->h_errno;
+
+	pbuf->libpriv = 0;
+
+	off = sizeof (nss_pheader_t);
+
+	/* setup getXbyY operation - database and sub function */
+	pbuf->nss_dbop = (uint32_t)search_fnum;
+	ret = nss_pack_dbd(buffer, bufsize, &tparam, &off);
+	if (ret != NSS_SUCCESS) {
+		errno = ERANGE;			/* actually EINVAL */
+		return (ret);
+	}
+	ret = NSS_ERROR;
+	/* setup request key */
+	pbuf->key_off = (nssuint_t)off;
+	bptr = (char *)buffer + off;
+	blen = bufsize - off;
+	/* use key2str if provided, else call default getXbyY packer */
+	if (strcmp(dbn, NSS_DBNAM_NETGROUP) == 0) {
+		/* This has to run locally due to backend knowledge */
+		if (search_fnum == NSS_DBOP_NETGROUP_SET) {
+			errno = 0;
+			return (NSS_TRYLOCAL);
+		}
+		/* use default packer for known getXbyY ops */
+		ret = nss_default_key2str(bptr, blen, in, dbn,
+						search_fnum, &len);
+	} else if (in->key2str == NULL ||
+		(search_fnum == NSS_DBOP_GROUP_BYMEMBER &&
+			strcmp(dbn, NSS_DBNAM_GROUP) == 0)) {
+		/* use default packer for known getXbyY ops */
+		ret = nss_default_key2str(bptr, blen, in, dbn,
+						search_fnum, &len);
+	} else {
+		ret = (*in->key2str)(bptr, blen, &in->key, &len);
+	}
+	if (tparam.cleanup != 0)
+		(tparam.cleanup)(&tparam);
+	if (ret != NSS_SUCCESS) {
+		errno = ERANGE;			/* actually ENOMEM */
+		return (ret);
+	}
+	pbuf->key_len = (nssuint_t)len;
+	off += ROUND_UP(len, sizeof (nssuint_t));
+
+	pbuf->data_off = (nssuint_t)off;
+	pbuf->data_len = (nssuint_t)(bufsize - off);
+	/*
+	 * Prime data return with first result if
+	 * the first result is passed in
+	 * [_getgroupsbymember oddness]
+	 */
+	gbm = (struct nss_groupsbymem *)search_args;
+	if (search_fnum == NSS_DBOP_GROUP_BYMEMBER &&
+	    strcmp(dbn, NSS_DBNAM_GROUP) == 0 && gbm->numgids == 1) {
+		uptr = (nssuint_t *)((void *)((char *)buffer + off));
+		*uptr = (nssuint_t)gbm->gid_array[0];
+	}
+
+	errno = 0;				/* just in case ... */
+	return (NSS_SUCCESS);
+}
+
+/*
+ * Switch packed and _nsc (switch->nscd) {set/get/end}ent interfaces
+ * Return: NSS_SUCCESS (OK to proceed), NSS_ERROR, NSS_NOTFOUND
+ */
+
+/*ARGSUSED*/
+nss_status_t
+nss_pack_ent(void *buffer, size_t bufsize, nss_db_root_t *rootp,
+	    nss_db_initf_t initf, nss_getent_t *contextpp)
+{
+	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
+	struct nss_getent_context *contextp = contextpp->ctx;
+	nss_status_t		ret = NSS_ERROR;
+	size_t			blen, len = 0, off = 0;
+	char			*bptr;
+	nssuint_t		*nptr;
+
+	if (pbuf == NULL || initf == (nss_db_initf_t)NULL) {
+		errno = ERANGE;			/* actually EINVAL */
+		return (ret);
+	}
+
+	/* init buffer header */
+	pbuf->pbufsiz = (nssuint_t)bufsize;
+	pbuf->p_ruid = (uint32_t)getuid();
+	pbuf->p_euid = (uint32_t)geteuid();
+	pbuf->p_version = NSCD_HEADER_REV;
+	pbuf->p_status = 0;
+	pbuf->p_errno = 0;
+	pbuf->p_herrno = 0;
+	pbuf->libpriv = 0;
+
+	off = sizeof (nss_pheader_t);
+
+	/* setup getXXXent operation - database and sub function */
+	pbuf->nss_dbop = (uint32_t)0;	/* iterators have no dbop */
+	ret = nss_pack_dbd(buffer, bufsize, &contextp->param, &off);
+	if (ret != NSS_SUCCESS) {
+		errno = ERANGE;			/* actually EINVAL */
+		return (ret);
+	}
+	ret = NSS_ERROR;
+	off += ROUND_UP(len, sizeof (nssuint_t));
+
+	pbuf->key_off = (nssuint_t)off;
+	bptr = (char *)buffer + off;
+	blen = bufsize - off;
+	len = (size_t)(sizeof (nssuint_t) * 2);
+	if (len >= blen) {
+		errno = ERANGE;			/* actually EINVAL */
+		return (ret);
+	}
+	nptr = (nssuint_t *)((void *)bptr);
+	*nptr++ = contextp->cookie;
+	*nptr = contextp->seq_num;
+	pbuf->key_len = (nssuint_t)len;
+
+	off += len;
+	pbuf->data_off = (nssuint_t)off;
+	pbuf->data_len = (nssuint_t)(bufsize - off);
+	return (NSS_SUCCESS);
+}
+
+/*
+ * Unpack packed arguments buffer
+ * Return: status, errnos and results from requested operation.
+ *
+ * NOTES: When getgroupsbymember is being processed in the NSCD backend,
+ * or via the backwards compatibility interfaces then the standard
+ * str2group API is used in conjunction with process_cstr.  When,
+ * processing a returned buffer, in NSS2 the return results are the
+ * already digested groups array.  Therefore, unpack the digested results
+ * back to the return buffer.
+ *
+ * Note: the digested results are nssuint_t quantities.  _getgroupsbymember
+ * digests int quantities.  Therefore convert.  Assume input is in nssuint_t
+ * quantities.  Store in an int array... Assume gid's are <= 32 bits...
+ */
+
+/*ARGSUSED*/
+nss_status_t
+nss_unpack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
+	    nss_db_initf_t initf, int search_fnum, void *search_args)
+{
+	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
+	nss_XbyY_args_t		*in = (nss_XbyY_args_t *)search_args;
+	nss_dbd_t		*pdbd;
+	char			*dbn;
+	nss_status_t		status;
+	char			*buf;
+	int			len;
+	int			ret;
+	int			i;
+	gid_t			*gidp;
+	nssuint_t		*uptr;
+	struct nss_groupsbymem	*arg;
+
+
+	if (pbuf == NULL || in == NULL)
+		return (-1);
+	status = pbuf->p_status;
+	/* if error - door's switch error */
+	/* extended data could contain additional information? */
+	if (status != NSS_SUCCESS) {
+		in->h_errno = (int)pbuf->p_herrno;
+		if (pbuf->p_errno == ERANGE)
+			in->erange = 1;
+		return (status);
+	}
+
+	if (pbuf->data_off == 0 || pbuf->data_len == 0)
+		return (NSS_NOTFOUND);
+
+	buf = (char *)buffer + pbuf->data_off;
+	len = pbuf->data_len;
+
+	/* sidestep odd cases */
+	pdbd = (nss_dbd_t *)((void *)((char *)buffer + pbuf->dbd_off));
+	dbn = (char *)pdbd + pdbd->o_name;
+	if (search_fnum == NSS_DBOP_GROUP_BYMEMBER) {
+		if (strcmp(dbn, NSS_DBNAM_GROUP) == 0) {
+			arg = (struct nss_groupsbymem *)in;
+			/* copy returned gid array from returned nscd buffer */
+			i = len / sizeof (nssuint_t);
+			/* not enough buffer */
+			if (i > arg->maxgids) {
+				i = arg->maxgids;
+			}
+			arg->numgids = i;
+			gidp = arg->gid_array;
+			uptr = (nssuint_t *)((void *)buf);
+			while (--i >= 0)
+				*gidp++ = (gid_t)*uptr++;
+			return (NSS_SUCCESS);
+		}
+	}
+	if (search_fnum == NSS_DBOP_NETGROUP_IN) {
+		if (strcmp(dbn, NSS_DBNAM_NETGROUP) == 0) {
+			struct nss_innetgr_args *arg =
+				(struct nss_innetgr_args *)in;
+
+			if (pbuf->p_status == NSS_SUCCESS) {
+				arg->status = NSS_NETGR_FOUND;
+				return (NSS_SUCCESS);
+			} else {
+				arg->status = NSS_NETGR_NO;
+				return (NSS_NOTFOUND);
+			}
+		}
+	}
+
+	/* process the normal cases */
+	/* marshall data directly into users buffer */
+	ret = (*in->str2ent)(buf, len, in->buf.result, in->buf.buffer,
+		in->buf.buflen);
+	if (ret == NSS_STR_PARSE_ERANGE) {
+		in->returnval = 0;
+		in->returnlen = 0;
+		in->erange    = 1;
+		ret = NSS_NOTFOUND;
+	} else if (ret == NSS_STR_PARSE_SUCCESS) {
+		in->returnval = in->buf.result;
+		in->returnlen =  len;
+		ret = NSS_SUCCESS;
+	}
+	in->h_errno = (int)pbuf->p_herrno;
+	return ((nss_status_t)ret);
+}
+
+/*
+ * Unpack a returned packed {set,get,end}ent arguments buffer
+ * Return: status, errnos, cookie info and results from requested operation.
+ */
+
+/*ARGSUSED*/
+nss_status_t
+nss_unpack_ent(void *buffer, size_t bufsize, nss_db_root_t *rootp,
+	    nss_db_initf_t initf, nss_getent_t *contextpp, void *args)
+{
+	nss_pheader_t		*pbuf = (nss_pheader_t *)buffer;
+	nss_XbyY_args_t		*in = (nss_XbyY_args_t *)args;
+	struct nss_getent_context *contextp = contextpp->ctx;
+	nssuint_t		*nptr;
+	nssuint_t		cookie;
+	nss_status_t		status;
+	char			*buf;
+	int			len;
+	int			ret;
+
+	if (pbuf == NULL)
+		return (-1);
+	status = pbuf->p_status;
+	/* if error - door's switch error */
+	/* extended data could contain additional information? */
+	if (status != NSS_SUCCESS)
+		return (status);
+
+	/* unpack assigned cookie from SET/GET/END request */
+	if (pbuf->key_off == 0 ||
+	    pbuf->key_len != (sizeof (nssuint_t) * 2))
+		return (NSS_NOTFOUND);
+
+	nptr = (nssuint_t *)((void *)((char *)buffer + pbuf->key_off));
+	cookie = contextp->cookie;
+	if (cookie != NSCD_NEW_COOKIE && cookie != *nptr) {
+		/* Should either be new or a match, else error */
+		return (NSS_NOTFOUND);
+	}
+	/* save away for the next ent request */
+	contextp->cookie = *nptr++;
+	contextp->seq_num = *nptr;
+
+	/* All done if no marshalling is expected {set,end}ent */
+	if (args == NULL)
+		return (NSS_SUCCESS);
+
+	/* unmarshall the data */
+	if (pbuf->data_off == 0 || pbuf->data_len == 0)
+		return (NSS_NOTFOUND);
+	buf = (char *)buffer + pbuf->data_off;
+
+	len = pbuf->data_len;
+
+	/* marshall data directly into users buffer */
+	ret = (*in->str2ent)(buf, len, in->buf.result, in->buf.buffer,
+		in->buf.buflen);
+	if (ret == NSS_STR_PARSE_ERANGE) {
+		in->returnval = 0;
+		in->returnlen = 0;
+		in->erange    = 1;
+	} else if (ret == NSS_STR_PARSE_SUCCESS) {
+		in->returnval = in->buf.result;
+		in->returnlen =  len;
+	}
+	in->h_errno = (int)pbuf->p_herrno;
+	return ((nss_status_t)ret);
+}
+
+/*
+ * Start of _nsc_{search|setent_u|getent_u|endent_u} NSCD interposition funcs
+ */
+
+nss_status_t
+_nsc_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
+	void *search_args)
+{
+	nss_pheader_t		*pbuf;
+	void			*doorptr = NULL;
+	size_t			bufsize = 0;
+	size_t			datasize = 0;
+	nss_status_t		status;
+
+	if (_nsc_proc_is_cache() > 0) {
+		/* internal nscd call - don't use the door */
+		return (NSS_TRYLOCAL);
+	}
+
+	/* standard client calls nscd code */
+	if (search_args == NULL)
+		return (NSS_NOTFOUND);
+
+	/* get the door buffer  & configured size */
+	bufsize = ((nss_XbyY_args_t *)search_args)->buf.buflen;
+	if (_nsc_getdoorbuf(&doorptr, &bufsize) != 0)
+		return (NSS_TRYLOCAL);
+	if (doorptr == NULL || bufsize == 0)
+		return (NSS_TRYLOCAL);
+
+	pbuf = (nss_pheader_t *)doorptr;
+	/* pack argument and request into door buffer */
+	pbuf->nsc_callnumber = NSCD_SEARCH;
+	/* copy relevant door request info into door buffer */
+	status = nss_pack((void *)pbuf, bufsize, rootp,
+			initf, search_fnum, search_args);
+
+	/* Packing error return error results */
+	if (status != NSS_SUCCESS)
+		return (status);
+
+	/* transfer packed switch request to nscd via door */
+	/* data_off can be used because it is header+dbd_len+key_len */
+	datasize = pbuf->data_off;
+	status = _nsc_trydoorcall_ext(&doorptr, &bufsize, &datasize);
+
+	/* If unsuccessful fallback to standard nss logic */
+	if (status != NSS_SUCCESS) {
+		/*
+		 * check if doors reallocated the memory underneath us
+		 * if they did munmap it or suffer a memory leak
+		 */
+		if (doorptr != (void *)pbuf) {
+			_nsc_resizedoorbuf(bufsize);
+			munmap((void *)doorptr, bufsize);
+		}
+		return (NSS_TRYLOCAL);
+	}
+
+	/* unpack and marshall data/errors to user structure */
+	/* set any error conditions */
+	status = nss_unpack((void *)doorptr, bufsize, rootp, initf,
+			search_fnum, search_args);
+	/*
+	 * check if doors reallocated the memory underneath us
+	 * if they did munmap it or suffer a memory leak
+	 */
+	if (doorptr != (void *)pbuf) {
+		_nsc_resizedoorbuf(bufsize);
+		munmap((void *)doorptr, bufsize);
+	}
+	return (status);
+}
+
+/*
+ * contact nscd for a cookie or to reset an existing cookie
+ * if nscd fails (NSS_TRYLOCAL) then set cookie to -1 and
+ * continue diverting to local
+ */
+nss_status_t
+_nsc_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
+	nss_getent_t *contextpp)
+{
+	nss_status_t		status = NSS_TRYLOCAL;
+	struct nss_getent_context *contextp = contextpp->ctx;
+	nss_pheader_t		*pbuf;
+	void			*doorptr = NULL;
+	size_t			bufsize = 0;
+	size_t			datasize = 0;
+
+	/* return if already in local mode */
+	if (contextp->cookie == NSCD_LOCAL_COOKIE)
+		return (NSS_TRYLOCAL);
+
+	if (_nsc_proc_is_cache() > 0) {
+		/* internal nscd call - don't try to use the door */
+		contextp->cookie = NSCD_LOCAL_COOKIE;
+		return (NSS_TRYLOCAL);
+	}
+
+	/* get the door buffer & configured size */
+	if (_nsc_getdoorbuf(&doorptr, &bufsize) != 0) {
+		contextp->cookie = NSCD_LOCAL_COOKIE;
+		return (NSS_TRYLOCAL);
+	}
+	if (doorptr == NULL || bufsize == 0) {
+		contextp->cookie = NSCD_LOCAL_COOKIE;
+		return (NSS_TRYLOCAL);
+	}
+
+	pbuf = (nss_pheader_t *)doorptr;
+	pbuf->nsc_callnumber = NSCD_SETENT;
+
+	contextp->param.cleanup = NULL;
+	(*initf)(&contextp->param);
+	if (contextp->param.name == 0) {
+		if (contextp->param.cleanup != 0)
+			(contextp->param.cleanup)(&contextp->param);
+		errno = ERANGE;			/* actually EINVAL */
+		return (NSS_ERROR);
+	}
+
+	/* pack relevant setent request info into door buffer */
+	status = nss_pack_ent((void *)pbuf, bufsize, rootp,
+			initf, contextpp);
+	if (status != NSS_SUCCESS)
+		return (status);
+
+	/* transfer packed switch request to nscd via door */
+	/* data_off can be used because it is header+dbd_len+key_len */
+	datasize = pbuf->data_off;
+	status = _nsc_trydoorcall_ext(&doorptr, &bufsize, &datasize);
+
+	/* If fallback to standard nss logic (door failure) if possible */
+	if (status != NSS_SUCCESS) {
+		if (contextp->cookie == NSCD_NEW_COOKIE) {
+			contextp->cookie = NSCD_LOCAL_COOKIE;
+			return (NSS_TRYLOCAL);
+		}
+		return (NSS_UNAVAIL);
+	}
+	/* unpack returned cookie stash it away */
+	status = nss_unpack_ent((void *)doorptr, bufsize, rootp,
+			initf, contextpp, NULL);
+	/*
+	 * check if doors reallocated the memory underneath us
+	 * if they did munmap it or suffer a memory leak
+	 */
+	if (doorptr != (void *)pbuf) {
+		_nsc_resizedoorbuf(bufsize);
+		munmap((void *)doorptr, bufsize);
+	}
+	return (status);
+}
+
+nss_status_t
+_nsc_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
+	nss_getent_t *contextpp, void *args)
+{
+	nss_status_t		status = NSS_TRYLOCAL;
+	struct nss_getent_context *contextp = contextpp->ctx;
+	nss_pheader_t		*pbuf;
+	void			*doorptr = NULL;
+	size_t			bufsize = 0;
+	size_t			datasize = 0;
+
+	/* return if already in local mode */
+	if (contextp->cookie == NSCD_LOCAL_COOKIE)
+		return (NSS_TRYLOCAL);
+
+	/* _nsc_setent_u already checked for nscd local case ... proceed */
+	if (args == NULL)
+		return (NSS_NOTFOUND);
+
+	/* get the door buffer  & configured size */
+	bufsize = ((nss_XbyY_args_t *)args)->buf.buflen;
+	if (_nsc_getdoorbuf(&doorptr, &bufsize) != 0)
+		return (NSS_UNAVAIL);
+	if (doorptr == NULL || bufsize == 0)
+		return (NSS_UNAVAIL);
+
+	pbuf = (nss_pheader_t *)doorptr;
+	pbuf->nsc_callnumber = NSCD_GETENT;
+
+	/* pack relevant setent request info into door buffer */
+	status = nss_pack_ent((void *)pbuf, bufsize, rootp,
+			initf, contextpp);
+	if (status != NSS_SUCCESS)
+		return (status);
+
+	/* transfer packed switch request to nscd via door */
+	/* data_off can be used because it is header+dbd_len+key_len */
+	datasize = pbuf->data_off;
+	status = _nsc_trydoorcall_ext(&doorptr, &bufsize, &datasize);
+
+	/* If fallback to standard nss logic (door failure) if possible */
+	if (status != NSS_SUCCESS) {
+		if (contextp->cookie == NSCD_NEW_COOKIE) {
+			contextp->cookie = NSCD_LOCAL_COOKIE;
+			return (NSS_TRYLOCAL);
+		}
+		return (NSS_UNAVAIL);
+	}
+	/* check error, unpack and process results */
+	status = nss_unpack_ent((void *)doorptr, bufsize, rootp,
+			initf, contextpp, args);
+	/*
+	 * check if doors reallocated the memory underneath us
+	 * if they did munmap it or suffer a memory leak
+	 */
+	if (doorptr != (void *)pbuf) {
+		_nsc_resizedoorbuf(bufsize);
+		munmap((void *)doorptr, bufsize);
+	}
+	return (status);
+}
+
+nss_status_t
+_nsc_endent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
+	nss_getent_t *contextpp)
+{
+	nss_status_t		status = NSS_TRYLOCAL;
+	struct nss_getent_context *contextp = contextpp->ctx;
+	nss_pheader_t		*pbuf;
+	void			*doorptr = NULL;
+	size_t			bufsize = 0;
+	size_t			datasize = 0;
+
+	/* return if already in local mode */
+	if (contextp->cookie == NSCD_LOCAL_COOKIE)
+		return (NSS_TRYLOCAL);
+
+	/* _nsc_setent_u already checked for nscd local case ... proceed */
+
+	/* get the door buffer  & configured size */
+	if (_nsc_getdoorbuf(&doorptr, &bufsize) != 0)
+		return (NSS_UNAVAIL);
+	if (doorptr == NULL || bufsize == 0)
+		return (NSS_UNAVAIL);
+
+	/* pack up a NSCD_ENDGET request passing in the cookie */
+	pbuf = (nss_pheader_t *)doorptr;
+	pbuf->nsc_callnumber = NSCD_ENDENT;
+
+	/* pack relevant setent request info into door buffer */
+	status = nss_pack_ent((void *)pbuf, bufsize, rootp,
+			initf, contextpp);
+	if (status != NSS_SUCCESS)
+		return (status);
+
+	/* transfer packed switch request to nscd via door */
+	/* data_off can be used because it is header+dbd_len+key_len */
+	datasize = pbuf->data_off;
+	(void) _nsc_trydoorcall_ext(&doorptr, &bufsize, &datasize);
+
+	/* error codes & unpacking ret values don't matter.  We're done */
+
+	/*
+	 * check if doors reallocated the memory underneath us
+	 * if they did munmap it or suffer a memory leak
+	 */
+	if (doorptr != (void *)pbuf) {
+		_nsc_resizedoorbuf(bufsize);
+		munmap((void *)doorptr, bufsize);
+	}
+
+	/* clean up initf setup */
+	if (contextp->param.cleanup != 0)
+		(contextp->param.cleanup)(&contextp->param);
+	contextp->param.cleanup = NULL;
+
+	/* clear cookie */
+	contextp->cookie = NSCD_NEW_COOKIE;
+	return (NSS_SUCCESS);
 }

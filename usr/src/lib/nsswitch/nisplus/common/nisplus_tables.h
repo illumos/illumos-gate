@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,12 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  *	nisplus_tables.h
- *
- * Copyright (c) 1988-2000 by Sun Microsystems, Inc.
- * All rights reserved.
  */
 
 #ifndef	_NISPLUS_TABLES_H
@@ -302,6 +303,30 @@ extern "C" {
 #define	EC_SET(ecp, ndx, l, v) \
 		((l) = EC_LEN(ecp, ndx), (v) = EC_VAL(ecp, ndx))
 
+#define	__NISPLUS_GETCOL_OR_EMPTY(ecp, ndx, l, v) \
+	EC_SET(ecp, ndx, l, v);\
+	if (l < 2) {\
+		(v) = "";\
+		(l) = 1;\
+	} else {\
+		l--;\
+	}
+
+#define	__NISPLUS_GETCOL_OR_RETURN(ecp, ndx, l, v) \
+	EC_SET(ecp, ndx, l, v);\
+	if (l < 2) {\
+		return (NSS_STR_PARSE_PARSE);\
+	} else {\
+		l--;\
+	}
+
+#define	__NISPLUS_GETCOL_OR_CONTINUE(ecp, ndx, l, v) \
+	EC_SET(ecp, ndx, l, v);\
+	if (l < 2) {\
+		continue;\
+	} else {\
+		l--;\
+	}
 #ifdef	__cplusplus
 }
 #endif

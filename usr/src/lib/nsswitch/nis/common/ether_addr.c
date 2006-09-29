@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,10 @@
  * CDDL HEADER END
  */
 /*
- *	nis/ether_addr.c -- "nis" backend for nsswitch "ethers" database
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ *	nis/ether_addr.c -- "nis" backend for nsswitch "ethers" database
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,7 +50,7 @@ getbyhost(be, a)
 	nis_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
 	return (_nss_nis_lookup(be, argp, 0, "ethers.byname",
 		argp->key.name, 0));
@@ -62,11 +61,11 @@ getbyether(be, a)
 	nis_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	char	etherstr[18];
-	u_char	*e = argp->key.ether;
+	uchar_t	*e = argp->key.ether;
 
-	sprintf(etherstr, "%x:%x:%x:%x:%x:%x",
+	(void) snprintf(etherstr, 18, "%x:%x:%x:%x:%x:%x",
 		*e, *(e + 1), *(e + 2), *(e + 3), *(e + 4), *(e + 5));
 	return (_nss_nis_lookup(be, argp, 0, "ethers.byaddr", etherstr, 0));
 }

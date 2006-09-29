@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,10 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 1988-1995 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
- *	files/getpwnam.c -- "files" backend for nsswitch "passwd" database
+ * files/getpwnam.c -- "files" backend for nsswitch "passwd" database
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,25 +32,60 @@
 #include <unistd.h>		/* for PF_PATH */
 #include "files_common.h"
 #include <strings.h>
+#include <stdlib.h>
 
-static u_int
-hash_pwname(nss_XbyY_args_t *argp, int keyhash)
+static uint_t
+hash_pwname(nss_XbyY_args_t *argp, int keyhash, const char *line,
+	int linelen)
 {
-	struct passwd *p = argp->returnval;
-	const char *name = keyhash ? argp->key.name : p->pw_name;
-	u_int hash = 0;
+	const char	*name;
+	int		namelen, i;
+	uint_t 		hash = 0;
 
-	while (*name != 0)
-		hash = hash * 15 + *name++;
+	if (keyhash) {
+		name = argp->key.name;
+		namelen = strlen(name);
+	} else {
+		name = line;
+		namelen = 0;
+		while (linelen-- && *line++ != ':')
+			namelen++;
+	}
 
+	for (i = 0; i < namelen; i++)
+		hash = hash * 15 + name[i];
 	return (hash);
 }
 
-static u_int
-hash_pwuid(nss_XbyY_args_t *argp, int keyhash)
+static uint_t
+hash_pwuid(nss_XbyY_args_t *argp, int keyhash, const char *line,
+	int linelen)
 {
-	struct passwd *p = argp->returnval;
-	return (keyhash ? (u_int)argp->key.uid : (u_int)p->pw_uid);
+	uint_t		id;
+	const char	*linep, *limit, *end;
+
+	linep = line;
+	limit = line + linelen;
+
+	if (keyhash)
+		return ((uint_t)argp->key.uid);
+
+	/* skip username */
+	while (linep < limit && *linep++ != ':');
+	/* skip password */
+	while (linep < limit && *linep++ != ':');
+	if (linep == limit)
+		return (UID_NOBODY);
+
+	/* uid */
+	end = linep;
+	id = (uint_t)strtol(linep, (char **)&end, 10);
+
+	/* empty uid */
+	if (linep == end)
+		return (UID_NOBODY);
+
+	return (id);
 }
 
 static files_hash_func hash_pw[2] = { hash_pwname, hash_pwuid };
@@ -65,15 +99,22 @@ static files_hash_t hashinfo = {
 };
 
 static int
-check_pwname(argp)
-	nss_XbyY_args_t		*argp;
+check_pwname(nss_XbyY_args_t *argp, const char *line, int linelen)
 {
-	struct passwd		*p = (struct passwd *)argp->returnval;
+	const char	*linep, *limit;
+	const char *keyp = argp->key.name;
+
+	linep = line;
+	limit = line + linelen;
 
 	/* +/- entries valid for compat source only */
-	if (p->pw_name != 0 && (p->pw_name[0] == '+' || p->pw_name[0] == '-'))
+	if (linelen == 0 || *line == '+' || *line == '-')
 		return (0);
-	return (strcmp(p->pw_name, argp->key.name) == 0);
+	while (*keyp && linep < limit && *keyp == *linep) {
+		keyp++;
+		linep++;
+	}
+	return (linep < limit && *keyp == '\0' && *linep == ':');
 }
 
 static nss_status_t
@@ -85,15 +126,34 @@ getbyname(be, a)
 }
 
 static int
-check_pwuid(argp)
-	nss_XbyY_args_t		*argp;
+check_pwuid(nss_XbyY_args_t *argp, const char *line, int linelen)
 {
-	struct passwd		*p = (struct passwd *)argp->returnval;
+	const char	*linep, *limit, *end;
+	uid_t		pw_uid;
+
+	linep = line;
+	limit = line + linelen;
 
 	/* +/- entries valid for compat source only */
-	if (p->pw_name != 0 && (p->pw_name[0] == '+' || p->pw_name[0] == '-'))
+	if (linelen == 0 || *line == '+' || *line == '-')
 		return (0);
-	return (p->pw_uid == argp->key.uid);
+
+	/* skip username */
+	while (linep < limit && *linep++ != ':');
+	/* skip password */
+	while (linep < limit && *linep++ != ':');
+	if (linep == limit)
+		return (0);
+
+	/* uid */
+	end = linep;
+	pw_uid = (uid_t)strtol(linep, (char **)&end, 10);
+
+	/* empty uid is not valid */
+	if (linep == end)
+		return (0);
+
+	return (pw_uid == argp->key.uid);
 }
 
 static nss_status_t

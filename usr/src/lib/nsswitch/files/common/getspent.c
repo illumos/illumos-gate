@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,10 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 1988-1995 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
- *	files/getspent.c -- "files" backend for nsswitch "shadow" database
+ * files/getspent.c -- "files" backend for nsswitch "shadow" database
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,15 +32,19 @@
 #include <strings.h>
 
 static int
-check_spnamp(argp)
-	nss_XbyY_args_t		*argp;
+check_spnamp(nss_XbyY_args_t *argp, const char *line, int linelen)
 {
-	struct spwd		*s = (struct spwd *)argp->returnval;
+	const char *linep = line;
+	const char *keyp = argp->key.name;
 
-	/* +/- entries valid in compat source only */
-	if (s->sp_namp != 0 && (s->sp_namp[0] == '+' || s->sp_namp[0] == '-'))
+	/* +/- entries valid for compat source only */
+	if (linelen == 0 || *line == '+' || *line == '-')
 		return (0);
-	return (strcmp(s->sp_namp, argp->key.name) == 0);
+	while (*keyp && linelen-- && *keyp == *linep) {
+		keyp++;
+		linep++;
+	}
+	return (linelen && *keyp == '\0' && *linep == ':');
 }
 
 static nss_status_t
@@ -49,7 +52,7 @@ getbyname(be, a)
 	files_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
 	return (_nss_files_XY_all(be, argp, 0, argp->key.name, check_spnamp));
 }

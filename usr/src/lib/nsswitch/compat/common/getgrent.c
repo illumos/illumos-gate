@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 /*
  *	getgrent.c
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * lib/nsswitch/compat/getgrent.c -- name-service-switch backend for getgrnam()
@@ -192,6 +191,7 @@ merge_grents(be, argp, fields)
 	char			*buf;
 	char			*s;
 	int			parsestat;
+	int			dlen;
 
 	/*
 	 * We're allowed to override the passwd (has anyone ever actually used
@@ -201,7 +201,8 @@ merge_grents(be, argp, fields)
 	 *
 	 * Efficiency is heartlessly abandoned in the quest for simplicity.
 	 */
-	if (fields[1] == 0 && fields[3] == 0) {
+	if (fields[1] == 0 && fields[3] == 0 &&
+			be->return_string_data != 1) {
 		/* No legal overrides, leave *argp unscathed */
 		return (NSS_STR_PARSE_SUCCESS);
 	}
@@ -216,7 +217,7 @@ merge_grents(be, argp, fields)
 		g->gr_gid);
 	s += strlen(s);
 	if (fields[3] != 0) {
-		strcpy(s, fields[3]);
+		(void) strcpy(s, fields[3]);
 		s += strlen(s);
 	} else {
 		char	**memp;
@@ -235,10 +236,31 @@ merge_grents(be, argp, fields)
 			}
 		}
 	}
-	parsestat = (*argp->str2ent)(buf, s - buf,
+
+	dlen = s - buf;
+
+	/*
+	 * if asked, return the data in /etc file format
+	 */
+	if (be->return_string_data == 1) {
+		/* reset the result ptr to the original value */
+		argp->buf.result = NULL;
+
+		if (dlen > argp->buf.buflen) {
+			parsestat = NSS_STR_PARSE_ERANGE;
+		} else {
+			(void) strncpy(argp->buf.buffer, buf, dlen);
+			argp->returnval = argp->buf.buffer;
+			argp->returnlen = dlen;
+			parsestat = NSS_SUCCESS;
+		}
+	} else {
+		parsestat = (*argp->str2ent)(buf, dlen,
 				    argp->buf.result,
 				    argp->buf.buffer,
 				    argp->buf.buflen);
+	}
+
 	free(buf);
 	return (parsestat);
 }

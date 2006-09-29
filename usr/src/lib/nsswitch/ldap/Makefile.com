@@ -62,4 +62,6 @@ include		../../Makefile.com
 
 CPPFLAGS +=	-I../../../libsldap/common
 LDLIBS +=	-lsldap -lnsl -lsocket -lldap
+LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2 
+LINTFLAGS64 +=	-erroff=E_GLOBAL_COULD_BE_STATIC2 
 DYNLIB1 =	nss_ldap.so$(VERS)

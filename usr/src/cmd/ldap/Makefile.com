@@ -95,9 +95,9 @@ lint:=          TARGET= lint
 
 # C Pre-Processor flags used by C, CC & lint
 CPPFLAGS +=	-DSUN -DSVR4 -DSOLARIS_LDAP_CMD \
-		-I ../../../lib/libldap5/include/ldap \
-		-I ../../../lib/libsldap/common \
-		-I ../../../lib/libnsl/include/rpcsvc \
+		-I $(SRC)/lib/libldap5/include/ldap \
+		-I $(SRC)/lib/libsldap/common \
+		-I $(SRC)/lib/libnsl/include/rpcsvc \
 		-DNO_LIBLCACHE -DLDAP_REFERRALS -DNET_SSL -DLDAPSSLIO \
 		-DHAVE_SASL_OPTIONS -DSOLARIS_LDAP_CMD
 LDLIBS +=	$(COMPLIB)
@@ -177,7 +177,7 @@ lintns_ldaplist:
 
 lintns_ldapaddent:
 	$(LINT.c) $(LDAPADDENTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap -lnsl \
-		>> $(LINTOUT) 2>&1
+		-lsecdb >> $(LINTOUT) 2>&1
 
 lintns_ldapclient:
 	$(LINT.c) $(LDAPCLIENTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap -lscf \

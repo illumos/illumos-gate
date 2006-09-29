@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +45,9 @@
 #include <lber.h>
 #include <ldap.h>
 #include <ctype.h>	/* tolower */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "cachemgr.h"
 #include "solaris-priv.h"
 
@@ -130,6 +132,7 @@ typedef enum {
 
 typedef struct server_info_ext {
 	char			*addr;
+	char			*hostname;
 	char			*rootDSE_data;
 	char			*errormsg;
 	info_rw_t		type;
@@ -449,6 +452,10 @@ sync_current_with_update_copy(server_info_t *info)
 		free(info->sinfo[0].addr);
 	info->sinfo[0].addr = NULL;
 
+	if (info->sinfo[0].hostname)
+		free(info->sinfo[0].hostname);
+	info->sinfo[0].hostname = NULL;
+
 	if (info->sinfo[0].rootDSE_data)
 		free(info->sinfo[0].rootDSE_data);
 	info->sinfo[0].rootDSE_data = NULL;
@@ -475,6 +482,8 @@ sync_current_with_update_copy(server_info_t *info)
 	 */
 	if (info->sinfo[1].addr)
 		info->sinfo[0].addr = strdup(info->sinfo[1].addr);
+	if (info->sinfo[1].hostname)
+		info->sinfo[0].hostname = strdup(info->sinfo[1].hostname);
 	if (info->sinfo[1].rootDSE_data)
 		info->sinfo[0].rootDSE_data =
 				strdup(info->sinfo[1].rootDSE_data);
@@ -563,7 +572,6 @@ getldap_get_rootDSE(void *arg)
 		sync_current_with_update_copy(serverInfo);
 		thr_exit((void *) -1);
 	}
-
 	ldap_set_option(ld,
 			LDAP_OPT_PROTOCOL_VERSION, &ldapVersion);
 	ldap_set_option(ld,
@@ -810,6 +818,8 @@ getldap_init_serverInfo(server_info_t **head)
 					INFO_SERVER_UP;
 		info->sinfo[1].prev_server_status =
 					INFO_SERVER_UP;
+		info->sinfo[0].hostname		= NULL;
+		info->sinfo[1].hostname		= NULL;
 		info->sinfo[0].rootDSE_data	= NULL;
 		info->sinfo[1].rootDSE_data	= NULL;
 		info->sinfo[0].errormsg 	= NULL;
@@ -846,6 +856,10 @@ getldap_destroy_serverInfo(server_info_t *head)
 			free(info->sinfo[0].addr);
 		if (info->sinfo[1].addr)
 			free(info->sinfo[1].addr);
+		if (info->sinfo[0].hostname)
+			free(info->sinfo[0].hostname);
+		if (info->sinfo[1].hostname)
+			free(info->sinfo[1].hostname);
 		if (info->sinfo[0].rootDSE_data)
 			free(info->sinfo[0].rootDSE_data);
 		if (info->sinfo[1].rootDSE_data)
@@ -954,11 +968,123 @@ getldap_set_serverInfo(server_info_t *head,
 }
 
 /*
+ * Convert an IP to a host name
+ */
+static int
+getldap_ip2hostname(char *ipaddr, char **hostname) {
+	struct in_addr	in;
+	struct in6_addr	in6;
+	struct hostent	*hp = NULL;
+	char	*start = NULL, *end = NULL, delim = '\0';
+	char	*port = NULL, *addr = NULL;
+	int	error_num = 0, len = 0;
+
+	if (ipaddr == NULL || hostname == NULL)
+		return (NS_LDAP_INVALID_PARAM);
+	*hostname = NULL;
+	if ((addr = strdup(ipaddr)) == NULL)
+		return (NS_LDAP_MEMORY);
+
+	if (addr[0] == '[') {
+		/*
+		 * Assume it's [ipv6]:port
+		 * Extract ipv6 IP
+		 */
+		start = &addr[1];
+		if ((end = strchr(addr, ']')) != NULL) {
+			*end = '\0';
+			delim = ']';
+			if (*(end + 1) == ':')
+				/* extract port */
+				port = end + 2;
+		} else {
+			return (NS_LDAP_INVALID_PARAM);
+		}
+	} else if ((end = strchr(addr, ':')) != NULL) {
+		/* assume it's ipv4:port */
+		*end = '\0';
+		delim = ':';
+		start = addr;
+		port = end + 1;
+	} else
+		/* No port */
+		start = addr;
+
+
+	if (inet_pton(AF_INET, start, &in) == 1) {
+		/* IPv4 */
+		hp = getipnodebyaddr((char *)&in,
+			sizeof (struct in_addr), AF_INET, &error_num);
+		if (hp && hp->h_name) {
+			/* hostname + '\0' */
+			len = strlen(hp->h_name) + 1;
+			if (port)
+				/* ':' + port */
+				len += strlen(port) + 1;
+			if ((*hostname = malloc(len)) == NULL) {
+				free(addr);
+				freehostent(hp);
+				return (NS_LDAP_MEMORY);
+			}
+
+			if (port)
+				(void) snprintf(*hostname, len, "%s:%s",
+						hp->h_name, port);
+			else
+				(void) strlcpy(*hostname, hp->h_name, len);
+
+			free(addr);
+			freehostent(hp);
+			return (NS_LDAP_SUCCESS);
+		} else {
+			return (NS_LDAP_NOTFOUND);
+		}
+	} else if (inet_pton(AF_INET6, start, &in6) == 1) {
+		/* IPv6 */
+		hp = getipnodebyaddr((char *)&in6,
+			sizeof (struct in6_addr), AF_INET6, &error_num);
+		if (hp && hp->h_name) {
+			/* hostname + '\0' */
+			len = strlen(hp->h_name) + 1;
+			if (port)
+				/* ':' + port */
+				len += strlen(port) + 1;
+			if ((*hostname = malloc(len)) == NULL) {
+				free(addr);
+				freehostent(hp);
+				return (NS_LDAP_MEMORY);
+			}
+
+			if (port)
+				(void) snprintf(*hostname, len, "%s:%s",
+						hp->h_name, port);
+			else
+				(void) strlcpy(*hostname, hp->h_name, len);
+
+			free(addr);
+			freehostent(hp);
+			return (NS_LDAP_SUCCESS);
+		} else {
+			return (NS_LDAP_NOTFOUND);
+		}
+	} else {
+		/*
+		 * A hostname
+		 * Return it as is
+		 */
+		if (end)
+			*end = delim;
+		*hostname = addr;
+		return (NS_LDAP_SUCCESS);
+	}
+}
+/*
  * getldap_get_serverInfo processes the GETLDAPSERVER door request passed
  * to this function from getldap_serverInfo_op().
  * input:
  *   a buffer containing an empty string (e.g., input[0]='\0';) or a string
- *   as the "input" in printf(input, "%s%s%s", req, DOORLINESEP, addr);
+ *   as the "input" in printf(input, "%s%s%s%s", req, addrtype, DOORLINESEP,
+ *   addr);
  *   where addr is the address of a server and
  *   req is one of the following:
  *   NS_CACHE_NEW:    send a new server address, addr is ignored.
@@ -966,6 +1092,10 @@ getldap_set_serverInfo(server_info_t *head,
  *   NS_CACHE_NEXT:   send the next one, keep addr on list.
  *   NS_CACHE_WRITE:  send a non-replica server, if possible, if not, same
  *                    as NS_CACHE_NEXT.
+ *   addrtype:
+ *   NS_CACHE_ADDR_IP: return server address as is, this is default.
+ *   NS_CACHE_ADDR_HOSTNAME: return server addess as FQDN format, only
+ *                           self credential case requires such format.
  * output:
  *   a buffer containing server info in the following format:
  *   serveraddress DOORLINESEP [ attr=value [DOORLINESEP attr=value ]...]
@@ -982,7 +1112,9 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 	char 		*addr	= NULL;
 	char 		*req	= NULL;
 	char 		req_new[] = NS_CACHE_NEW;
-	int		matched = FALSE, len;
+	char 		addr_type[] = NS_CACHE_ADDR_IP;
+	int		matched = FALSE, len, rc = 0;
+	char		*ret_addr = NULL;
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_get_serverInfo()...\n");
@@ -1010,8 +1142,12 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 	req = req_new;
 	if (input[0] != '\0') {
 		req = input;
+		/* Save addr type flag */
+		addr_type[0] = input[1];
 		input[strlen(NS_CACHE_NEW)] = '\0';
-		addr = input + strlen(DOORLINESEP) + strlen(NS_CACHE_NEW);
+		/* skip acion type flag, addr type flag and DOORLINESEP */
+		addr = input + strlen(DOORLINESEP) + strlen(NS_CACHE_NEW)
+			+ strlen(NS_CACHE_ADDR_IP);
 	}
 	/*
 	 * if NS_CACHE_NEW,
@@ -1122,7 +1258,34 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 	}
 
 	if (server) {
-		len = strlen(server->sinfo[0].addr) +
+		if (strcmp(addr_type, NS_CACHE_ADDR_HOSTNAME) == 0) {
+			/*
+			 * In SASL/GSSAPI case, a hostname is required for
+			 * Kerberos's service principal.
+			 * e.g.
+			 * ldap/foo.sun.com@SUN.COM
+			 */
+			if (server->sinfo[0].hostname == NULL) {
+				rc = getldap_ip2hostname(server->sinfo[0].addr,
+					&server->sinfo[0].hostname);
+				if (rc != NS_LDAP_SUCCESS) {
+					(void) mutex_unlock(&info->mutex[0]);
+					return (rc);
+				}
+				if (current_admin.debug_level >= DBG_ALL) {
+					logit("getldap_get_serverInfo: "
+						"%s is converted to %s\n",
+						server->sinfo[0].addr,
+						server->sinfo[0].hostname);
+				}
+			}
+			ret_addr = server->sinfo[0].hostname;
+
+		} else
+			ret_addr = server->sinfo[0].addr;
+
+
+		len = strlen(ret_addr) +
 			strlen(server->sinfo[0].rootDSE_data) +
 			strlen(DOORLINESEP) + 1;
 		*output = (char *)malloc(len);
@@ -1131,7 +1294,7 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 			return (NS_LDAP_MEMORY);
 		}
 		(void) snprintf(*output, len, "%s%s%s",
-			server->sinfo[0].addr, DOORLINESEP,
+			ret_addr, DOORLINESEP,
 			server->sinfo[0].rootDSE_data);
 		server->sinfo[0].info_status = INFO_STATUS_OLD;
 		(void) mutex_unlock(&info->mutex[0]);
@@ -1927,7 +2090,6 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 		} else
 			(void) getldap_get_serverInfo(serverInfo_old,
 				input, output, &server_removed);
-
 		(void) rw_unlock(&info_lock_old);
 
 		/*
@@ -2354,9 +2516,9 @@ update_from_profile()
 			logit("update_from_profile: reset profile TTL to %d"
 				"  seconds\n",
 				current_admin.ldap_stat.ldap_ttl);
-			logit("update_from_profile: expire time %d "
+			logit("update_from_profile: expire time %ld "
 				"seconds\n",
-				*ptr->paramList[NS_LDAP_EXP_P].ns_pi);
+				ptr->paramList[NS_LDAP_EXP_P].ns_tm);
 		}
 
 		/* set ptr as current_config */
@@ -2370,6 +2532,7 @@ update_from_profile()
 		rc = -1;
 	}
 	(void) rw_unlock(&ldap_lock);
+
 	return (rc);
 }
 
@@ -2416,7 +2579,8 @@ perform_update(void)
 	ns_ldap_error_t	*error;
 	struct timeval	tp;
 	char		buf[20];
-	int		rc;
+	int		rc, rc1;
+	ns_ldap_self_gssapi_config_t	config;
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("perform_update()...\n");
@@ -2450,7 +2614,7 @@ perform_update(void)
 		&error) != NS_LDAP_SUCCESS) {
 		logit("Error: __ns_ldap_setParam failed, status: %d "
 			"message: %s\n", error->status, error->message);
-		__ns_ldap_freeError(&error);
+		(void)  __ns_ldap_freeError(&error);
 		return;
 	}
 
@@ -2478,6 +2642,23 @@ perform_update(void)
 		/* statistics: previous refresh time */
 		prev_refresh_time = tp.tv_sec;
 	}
+	rc1 = __ns_ldap_self_gssapi_config(&config);
+	if (rc1 == NS_LDAP_SUCCESS) {
+		if (config != NS_LDAP_SELF_GSSAPI_CONFIG_NONE) {
+			rc1 = __ns_ldap_check_all_preq(0, 0, 0, config, &error);
+			(void)  __ns_ldap_freeError(&error);
+			if (rc1 != NS_LDAP_SUCCESS) {
+				logit("Error: Check on self credential "
+					"prerquesites failed: %d\n",
+					rc1);
+				exit(rc1);
+			}
+		}
+	} else {
+		logit("Error: Failed to get self credential configuration %d\n",
+					rc1);
+			exit(rc1);
+	}
 
 	(void) rw_rdlock(&ldap_lock);
 	if ((error = __ns_ldap_DumpConfiguration(NSCONFIGREFRESH)) != NULL) {
@@ -2498,6 +2679,7 @@ perform_update(void)
 		logit("Error: unlink failed - errno: %d\n", errno);
 	if (rename(NSCREDREFRESH, NSCREDFILE) != 0)
 		logit("Error: unlink failed - errno: %d\n", errno);
+
 	(void) rw_unlock(&ldap_lock);
 
 }

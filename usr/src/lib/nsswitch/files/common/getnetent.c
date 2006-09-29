@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,55 +19,70 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
- *	Copyright (c) 1988-1995 Sun Microsystems Inc
- *	All Rights Reserved.
- *
- *	files/getnetent.c -- "files" backend for nsswitch "networks" database
+ * files/getnetent.c -- "files" backend for nsswitch "networks" database
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include "files_common.h"
 #include <strings.h>
-
-static int
-check_name(args)
-	nss_XbyY_args_t	*args;
-{
-	struct netent	*net = (struct netent *)args->returnval;
-	const char		*name = args->key.name;
-	char			**aliasp;
-
-	if (strcmp(net->n_name, name) == 0)
-		return (1);
-	for (aliasp = net->n_aliases; *aliasp != 0; aliasp++) {
-		if (strcmp(*aliasp, name) == 0)
-			return (1);
-	}
-	return (0);
-}
+#include <ctype.h>
 
 static nss_status_t
 getbyname(be, a)
 	files_backend_ptr_t	be;
 	void		*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
-	return (_nss_files_XY_all(be, argp, 1, argp->key.name, check_name));
+	return (_nss_files_XY_all(be, argp, 1, argp->key.name,
+			_nss_files_check_name_aliases));
 }
 
 static int
-check_addr(args)
-	nss_XbyY_args_t	*args;
+check_addr(nss_XbyY_args_t *argp, const char *line, int linelen)
 {
-	struct netent	*net = (struct netent *)args->returnval;
 
-	return ((net->n_addrtype == args->key.netaddr.type) &&
-		(net->n_net == args->key.netaddr.net));
+	const char	*limit, *linep, *addrstart;
+	int		addrlen;
+	char		addrbuf[NSS_LINELEN_NETWORKS];
+	in_addr_t	linenet;
+
+	linep = line;
+	limit = line + linelen;
+
+	/* skip network name */
+	while (linep < limit && !isspace(*linep))
+		linep++;
+	/* skip the delimiting spaces */
+	while (linep < limit && isspace(*linep))
+		linep++;
+	if (linep == limit)
+		return (0);
+
+	addrstart = linep;
+	while (linep < limit && !isspace(*linep))
+		linep++;
+	addrlen = linep - addrstart;
+	if (addrlen < sizeof (addrbuf)) {
+		(void) memcpy(addrbuf, addrstart, addrlen);
+		addrbuf[addrlen] = '\0';
+		if ((linenet = inet_network(addrbuf)) ==
+						(in_addr_t)0xffffffffU)
+			return (0);
+		return (AF_INET == argp->key.netaddr.type &&
+			linenet == argp->key.netaddr.net);
+	}
+	return (0);
 }
 
 static nss_status_t
@@ -76,7 +90,7 @@ getbyaddr(be, a)
 	files_backend_ptr_t	be;
 	void		*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
 	return (_nss_files_XY_all(be, argp, 1, 0, check_addr));
 }

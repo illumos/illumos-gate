@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,12 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  *	nisplus/netmasks.c -- "nisplus" backend for nsswitch "netmasks" database
- *
- *	Copyright (c) 1996 Sun Microsystems Inc
- *	All Rights Reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,6 +36,8 @@
  * dotted internet notation.
  */
 
+#include <stdlib.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <net/if.h>
@@ -49,29 +52,27 @@ getbynet(be, a)
 	nisplus_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	return (_nss_nisplus_lookup(be, argp, NETMASK_TAG_ADDR,
 	    argp->key.name));
 }
 
 /*
- * Place the resulting struct inaddr from the nis_object structure into
- * argp->buf.result only if argp->buf.result is initialized (not NULL).
- *
+ * Convert nisplus object to files format
  * Returns NSS_STR_PARSE_{SUCCESS, ERANGE, PARSE}
  */
 /*ARGSUSED*/
 static int
-nis_object2ent(nobj, obj, argp)
-	int		nobj;
-	nis_object	*obj;
-	nss_XbyY_args_t	*argp;
+nis_object2str(nobj, obj, be, argp)
+	int			nobj;
+	nis_object		*obj;
+	nisplus_backend_ptr_t	be;
+	nss_XbyY_args_t		*argp;
 {
-	struct in_addr	*mask = (struct in_addr *)argp->buf.result;
-	char		*val;
-	struct in_addr	addr;
-	struct	entry_col *ecol;
-	int		len;
+	char			*mask;
+	int			masklen;
+	struct in_addr		addr;
+	struct entry_col	*ecol;
 
 	/*
 	 * If we got more than one nis_object, we just ignore it.
@@ -89,17 +90,22 @@ nis_object2ent(nobj, obj, argp)
 	ecol = obj->EN_data.en_cols.en_cols_val;
 
 	/* getnetmaskbynet */
-	if (mask) {
-		EC_SET(ecol, NETMASK_NDX_MASK, len, val);
-		if (len < 2)
-			return (NSS_STR_PARSE_PARSE);
-		/* addr is an IPv4 address, therefore will always be 32bits */
-		addr.s_addr = inet_addr(val);
-		if (addr.s_addr == 0xffffffffL)
-			return (NSS_STR_PARSE_PARSE);
-		mask->s_addr = addr.s_addr;
-	}
+	__NISPLUS_GETCOL_OR_RETURN(ecol, NETMASK_NDX_MASK, masklen, mask);
+	/* addr is an IPv4 address, therefore will always be 32bits */
+	addr.s_addr = inet_addr(mask);
+	if (addr.s_addr == INADDR_NONE)
+		return (NSS_STR_PARSE_PARSE);
 
+	/* exclude trailing null from length */
+	be->buflen = masklen;
+	if ((be->buffer = calloc(1, be->buflen + 1)) == NULL)
+		return (NSS_STR_PARSE_PARSE);
+	(void) strlcpy(be->buffer, mask, be->buflen + 1);
+
+#ifdef DEBUG
+	(void) fprintf(stdout, "netmasks [%s]\n", be->buffer);
+	(void) fflush(stdout);
+#endif  /* DEBUG */
 	return (NSS_STR_PARSE_SUCCESS);
 }
 
@@ -115,5 +121,5 @@ _nss_nisplus_netmasks_constr(dummy1, dummy2, dummy3)
 {
 	return (_nss_nisplus_constr(netmasks_ops,
 	    sizeof (netmasks_ops) / sizeof (netmasks_ops[0]), NETMASK_TBLNAME,
-	    nis_object2ent));
+	    nis_object2str));
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1988-1992, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	nis/gethostent.c -- "nis" backend for nsswitch "ipnodes" database
@@ -94,7 +93,7 @@ getbyaddr(be, a)
 	    argp->key.hostaddr.len  != sizeof (addr)) {
 		return (NSS_NOTFOUND);
 	}
-	memcpy(&addr, argp->key.hostaddr.addr, sizeof (addr));
+	(void) memcpy(&addr, argp->key.hostaddr.addr, sizeof (addr));
 	if (IN6_IS_ADDR_V4MAPPED(&addr)) {
 		if (inet_ntop(AF_INET, (void *) &addr.s6_addr[12],
 				(void *)buf, INET_ADDRSTRLEN) == NULL) {

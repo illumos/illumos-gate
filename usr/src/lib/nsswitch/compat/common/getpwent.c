@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,10 @@
  * CDDL HEADER END
  */
 /*
- *	getpwent.c
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ *	getpwent.c
  *
  * lib/nsswitch/compat/getpwent.c -- name-service-switch backend for getpwnam()
  *   et al that does 4.x compatibility.  It looks in /etc/passwd; if it finds
@@ -60,7 +59,7 @@
 
 static DEFINE_NSS_DB_ROOT(db_root);
 
-void
+static void
 _nss_initf_passwd_compat(p)
 	nss_db_params_t	*p;
 {
@@ -92,7 +91,7 @@ getbyname(be, a)
 	compat_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
 	return (_nss_compat_XY_all(be, argp,
 				check_pwname, NSS_DBOP_PASSWD_BYNAME));
@@ -112,7 +111,7 @@ getbyuid(be, a)
 	compat_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
 	return (_nss_compat_XY_all(be, argp,
 				check_pwuid, NSS_DBOP_PASSWD_BYUID));
@@ -129,6 +128,8 @@ merge_pwents(be, argp, fields)
 	char			*buf	= malloc(NSS_LINELEN_PASSWD);
 	char			*s;
 	int			parsestat;
+	int			len;
+	int			buflen;
 
 	if (buf == 0) {
 		return (NSS_STR_PARSE_PARSE);
@@ -142,30 +143,60 @@ merge_pwents(be, argp, fields)
 	 * That's what the SunOS 4.x code did;  who are we to question it...
 	 */
 	s = buf;
-	sprintf(s, "%s:", pw->pw_name);
-	s += strlen(s);
-	if (fields[1] != 0) {
-		strcpy(s, fields[1]);
-	} else {
-		strcpy(s, pw->pw_passwd);
-		if (pw->pw_age != 0) {
-			s += strlen(s);
+	buflen = argp->buf.buflen;
+
+	if (fields[1] != 0)
+		len = snprintf(s, buflen, "%s:%s",
+				pw->pw_name, fields[1]);
+	else {
 /* ====> Does this do the right thing? */
-			sprintf(s, ",%s", pw->pw_age);
-		}
+		if (pw->pw_age != 0 && *pw->pw_age != '\0')
+			len = snprintf(s, buflen, "%s:%s,%s",
+				pw->pw_name, pw->pw_passwd, pw->pw_age);
+		else
+			len = snprintf(s, buflen, "%s:%s",
+				pw->pw_name, pw->pw_passwd);
 	}
-	s += strlen(s);
-	sprintf(s, ":%d:%d:%s:%s:%s",
+
+	if (len > buflen)
+		return (NSS_STR_PARSE_ERANGE);
+
+	s += len;
+	buflen -= len;
+	len = snprintf(s, buflen, ":%ld:%ld:%s:%s:%s",
 		pw->pw_uid,
 		pw->pw_gid,
 		fields[4] != 0 ? fields[4] : pw->pw_gecos,
 		fields[5] != 0 ? fields[5] : pw->pw_dir,
 		fields[6] != 0 ? fields[6] : pw->pw_shell);
-	s += strlen(s);
-	parsestat = (*argp->str2ent)(buf, s - buf,
+
+	if (len > buflen)
+		return (NSS_STR_PARSE_ERANGE);
+
+	s += len;
+	len = s - buf;
+
+	/*
+	 * if asked, return the data in /etc file format
+	 */
+	if (be->return_string_data == 1) {
+		/* reset the result ptr to the original value */
+		argp->buf.result = NULL;
+
+		if (len > argp->buf.buflen) {
+			parsestat = NSS_STR_PARSE_ERANGE;
+		} else {
+			(void) strncpy(argp->buf.buffer, buf, len);
+			argp->returnval = argp->buf.buffer;
+			argp->returnlen = len;
+			parsestat = NSS_SUCCESS;
+		}
+	} else {
+		parsestat = (*argp->str2ent)(buf, len,
 				    argp->buf.result,
 				    argp->buf.buffer,
 				    argp->buf.buflen);
+	}
 	free(buf);
 	return (parsestat);
 }

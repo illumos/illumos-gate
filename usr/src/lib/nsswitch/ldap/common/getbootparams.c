@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,85 +40,83 @@ static const char *bootparams_attrs[] = {
 };
 
 /*
- * _nss_ldap_bootparams2ent is the data marshaling method for the
- * bootparams getXbyY (e.g., getbyname()) backend processes. This
- * method is called after a successful ldap search has been performed.
- * This method will parse the ldap search values into argp->buf.buffer
- * Three error conditions are expected and returned to nsswitch.
+ * _nss_ldap_bootparams2str is the data marshaling method for the
+ * bootparams bootparams_getbyname backend processes.
+ * This method is called after a successful ldap search has been performed.
+ * This method will parse the ldap search values into the file format.
  *
  * A host's bootparameters are returned on one line separated by white
- * space. Slapd stores each boot parameter as a separate entry. If more
- * than one bootparameter is available, a white space separated buffer
+ * space. The LDAP server stores each boot parameter as a separate entry.
+ * If more than one bootparameter is available, a white space separated buffer
  * must be constructed and returned.
+ *
  */
 
 static int
-_nss_ldap_bootparams2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_bootparams2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int		i, j, nss_result;
-	int		buflen = (int)0;
-	int		firstime = (int)1;
-	unsigned long	len = 0L;
-	char		*cp = (char *)NULL;
-	char		*buffer = (char *)NULL;
+	uint_t		i;
+	int		buflen = 0, len = 0;
+	int		nss_result, firsttime;
+	ns_ldap_attr_t	*bparams;
+	char		*buffer, **names;
 	ns_ldap_result_t	*result = be->result;
-	ns_ldap_attr_t	*attrptr;
 
-	buffer = argp->buf.buffer;
-	buflen = (size_t)argp->buf.buflen;
-
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
-	(void) memset(buffer, 0, buflen);
-
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_bp2ent;
-	}
-
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_bp2ent;
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
+	buflen = argp->buf.buflen;
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, buflen)) == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_bp2str;
 		}
-		if (strcasecmp(attrptr->attrname, _B_PARAMETER) == 0) {
-			for (j = 0; j < attrptr->value_count; j++) {
-				if ((attrptr->attrvalue[j] == NULL) ||
-				    (len = strlen(attrptr->attrvalue[j])) < 1) {
-					*buffer = 0;
-					nss_result = (int)NSS_STR_PARSE_PARSE;
-					goto result_bp2ent;
-				}
-				if (len > buflen) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_bp2ent;
-				}
-				if (firstime) {
-					(void) strcpy(buffer,
-					    attrptr->attrvalue[j]);
-					firstime = (int)0;
-				} else {
-					if ((cp = strrchr(buffer, '\0'))
-					    != NULL)
-						*cp = ' ';
-					(void) strcat(buffer,
-					    attrptr->attrvalue[j]);
-				}
-			}
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
+
+	nss_result = NSS_STR_PARSE_SUCCESS;
+	(void) memset(argp->buf.buffer, 0, buflen);
+
+	names = __ns_ldap_getAttr(result->entry, _B_HOSTNAME);
+	if (names == NULL || names[0] == NULL ||
+			(strlen(names[0]) < 1)) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_bp2str;
+	}
+	bparams = __ns_ldap_getAttrStruct(result->entry, _B_PARAMETER);
+	if (bparams == NULL || bparams->attrvalue == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_bp2str;
+	}
+	firsttime = 1;
+	for (i = 0; i < bparams->value_count; i++) {
+		if (bparams->attrvalue[i] == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_bp2str;
+		}
+		/*
+		 * Skip client host name. The early version of ldapaddent
+		 * adds hostname as a boot param and it should be filtered.
+		 */
+		if (strcasecmp(names[0], bparams->attrvalue[i]) != 0) {
+			if (firsttime) {
+				firsttime = 0;
+				len = snprintf(buffer, buflen, "%s",
+					bparams->attrvalue[i]);
+			} else
+				len = snprintf(buffer, buflen, " %s",
+					bparams->attrvalue[i]);
+			TEST_AND_ADJUST(len, buffer, buflen, result_bp2str);
 		}
 	}
+	/* The front end marshaller doesn't need to copy trailing nulls */
+	if (argp->buf.result != NULL)
+		be->buflen = strlen(be->buffer);
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[bootparams_getbyname.c: "
-		    "_nss_ldap_bootparams2ent]\n");
-	(void) fprintf(stdout, " bootparameter: [%s]\n", buffer);
-#endif /* DEBUG */
-
-result_bp2ent:
+result_bp2str:
 
 	(void) __ns_ldap_freeResult(&be->result);
-	return ((int)nss_result);
+	return (nss_result);
 }
 
 /*
@@ -156,7 +153,6 @@ getbyname(ldap_backend_ptr be, void *a)
 	    _F_GETBOOTPARAMBYNAME_SSD, hostname);
 	if (ret >= sizeof (userdata) || ret < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
-
 	return ((nss_status_t)_nss_ldap_lookup(be, argp,
 		_BOOTPARAMS, searchfilter, NULL,
 		_merge_SSD_filter, userdata));
@@ -183,5 +179,5 @@ _nss_ldap_bootparams_constr(const char *dummy1, const char *dummy2,
 
 	return ((nss_backend_t *)_nss_ldap_constr(bootparams_ops,
 		sizeof (bootparams_ops)/sizeof (bootparams_ops[0]),
-		_BOOTPARAMS, bootparams_attrs, _nss_ldap_bootparams2ent));
+		_BOOTPARAMS, bootparams_attrs, _nss_ldap_bootparams2str));
 }

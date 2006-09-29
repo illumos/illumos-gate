@@ -474,7 +474,7 @@ typedef enum EnumAuthType {
 	NS_LDAP_EA_SASL_DIGEST_MD5_INT		= 5,
 	NS_LDAP_EA_SASL_DIGEST_MD5_CONF		= 6,
 	NS_LDAP_EA_SASL_EXTERNAL		= 7,
-	NS_LDAP_EA_SASL_GSSAPI			= 8,	/* unsupported */
+	NS_LDAP_EA_SASL_GSSAPI			= 8,
 	NS_LDAP_EA_SASL_SPNEGO			= 9,	/* unsupported */
 	NS_LDAP_EA_TLS_NONE			= 10,
 	NS_LDAP_EA_TLS_SIMPLE			= 11,
@@ -549,9 +549,15 @@ typedef int ConnectionID;
  */
 typedef struct connection {
 	ConnectionID		connectionId;
-	boolean_t		usedBit;
+	boolean_t		usedBit;	/* true if only used by */
+						/* one thread and not shared */
+						/* by other threads */
+	boolean_t		notAvail;	/* not sharable, delete */
+						/* when shared == 0 */
+	int			shared;		/* number of threads */
+						/* using this connection */
 	char			*serverAddr;
-	ns_cred_t			*auth;
+	ns_cred_t		*auth;
 	LDAP			*ld;
 	thread_t		threadID;	/* thread ID using it */
 	struct ns_ldap_cookie	*cookieInfo;
@@ -664,6 +670,23 @@ typedef struct ns_server_info {
 } ns_server_info_t;
 
 /*
+ * sasl callback function parameters
+ */
+typedef struct ns_sasl_cb_param {
+	char	*mech;
+	char	*authid;
+	char	*authzid;
+	char	*passwd;
+	char	*realm;
+} ns_sasl_cb_param_t;
+
+/* self/sasl/gssapi variable */
+extern int sasl_gssapi_inited;
+
+/* Multiple threads per connection variable */
+extern int MTperConn;
+
+/*
  * INTERNAL GLOBAL DEFINITIONS AND FUNCTION DECLARATIONS
  */
 
@@ -748,6 +771,29 @@ ns_ldap_error_t	*__ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname);
 ns_ldap_error_t *__ns_ldap_DumpConfiguration(char *filename);
 ns_ldap_error_t	*__ns_ldap_DumpLdif(char *filename);
 int		__ns_ldap_cache_ping();
+ns_ldap_error_t *__ns_ldap_print_config(int);
+void		__ns_ldap_default_config();
+int		__ns_ldap_download(const char *, char *, char *,
+				ns_ldap_error_t **);
+int
+__ns_ldap_check_dns_preq(int foreground,
+		int mode_verbose,
+		int mode_quiet,
+		const char *fname,
+		ns_ldap_self_gssapi_config_t config,
+		ns_ldap_error_t **errpp);
+int
+__ns_ldap_check_gssapi_preq(int foreground,
+		int mode_verbose,
+		int mode_quiet,
+		ns_ldap_self_gssapi_config_t config,
+		ns_ldap_error_t **errpp);
+int
+__ns_ldap_check_all_preq(int foreground,
+		int mode_verbose,
+		int mode_quiet,
+		ns_ldap_self_gssapi_config_t config,
+		ns_ldap_error_t **errpp);
 
 /* internal un-exposed APIs */
 ns_cred_t 	*__ns_ldap_dupAuth(const ns_cred_t *authp);
@@ -803,6 +849,19 @@ int		__s_api_contain_account_usable_control_oid(char **oids);
 /* RFC 2307 section 5.6. Get a canonical name from entry */
 char		*__s_api_get_canonical_name(ns_ldap_entry_t *entry,
 			ns_ldap_attr_t *attrptr, int case_ignore);
+
+/* self/sasl/gssapi functions */
+int		__s_api_sasl_bind_callback(
+			LDAP		*ld,
+			unsigned	flags,
+			void		*defaults,
+			void		*in);
+
+int		__s_api_self_gssapi_only_get(void);
+int		__s_api_sasl_gssapi_init(void);
+
+/* Multiple threads per connection functions */
+void ns_tsd_cleanup(void *);
 
 #ifdef __cplusplus
 }

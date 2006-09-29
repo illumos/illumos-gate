@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,12 @@
  * CDDL HEADER END
  */
 /*
- *	getpwnam.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
- *
- *	nisplus/getpwnam.c -- NIS+ backend for nsswitch "passwd" database
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
+ * nisplus/getpwnam.c -- NIS+ backend for nsswitch "passwd" database
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +41,7 @@ getbynam(be, a)
 	nisplus_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
 	return (_nss_nisplus_lookup(be, argp, PW_TAG_NAME, argp->key.name));
 }
@@ -52,39 +51,32 @@ getbyuid(be, a)
 	nisplus_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	char			uidstr[12];	/* More than enough */
 
-	sprintf(uidstr, "%d", argp->key.uid);
+	(void) snprintf(uidstr, 12, "%ld", argp->key.uid);
 	return (_nss_nisplus_lookup(be, argp, PW_TAG_UID, uidstr));
 }
 
 
 /*
+ * convert nisplus object into files format
  * place the results from the nis_object structure into argp->buf.result
  * Returns NSS_STR_PARSE_{SUCCESS, ERANGE, PARSE}
- *
- * This routine does not tolerate non-numeric or empty pw_uid or pw_gid.
- * Nor empty name field.
- * It will immediately flag a PARSE error and return. Returns a
- * pointer-to-a-null in case of empty gecos, home_dir, or shell fields.
  */
 /*ARGSUSED*/
 static int
-nis_object2ent(nobj, obj, argp)
-	int		nobj;
-	nis_object	*obj;
-	nss_XbyY_args_t	*argp;
+nis_object2str(nobj, obj, be, argp)
+	int			nobj;
+	nis_object		*obj;
+	nisplus_backend_ptr_t	be;
+	nss_XbyY_args_t		*argp;
 {
-	char	*buffer, *limit, *val, *endnum, *nullstring;
-	int		buflen = argp->buf.buflen;
-	struct 	passwd *pw;
-	struct	entry_col *ecol;
-	int		len;
-
-	limit = argp->buf.buffer + buflen;
-	pw = (struct passwd *)argp->buf.result;
-	buffer = argp->buf.buffer;
+	char			*buffer, *name, *uid, *gid, *gecos;
+	char			*dir, *shell, *endnum;
+	int			buflen, namelen, uidlen, gidlen, gecoslen;
+	int			dirlen, shelllen;
+	struct entry_col	*ecol;
 
 	/*
 	 * If we got more than one nis_object, we just ignore object(s)
@@ -101,126 +93,53 @@ nis_object2ent(nobj, obj, argp)
 	}
 	ecol = obj->EN_data.en_cols.en_cols_val;
 
-	/*
-	 * pw_name: user name
-	 */
-	EC_SET(ecol, PW_NDX_NAME, len, val);
-	if (len < 2 || (*val == '\0'))
-		return (NSS_STR_PARSE_PARSE);
-	pw->pw_name = buffer;
-	buffer += len;
-	if (buffer >= limit)
-		return (NSS_STR_PARSE_ERANGE);
-	strcpy(pw->pw_name, val);
-	nullstring = (buffer - 1);
+	/* name: user name */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, PW_NDX_NAME, namelen, name);
 
-	/*
-	 * pw_uid: user id
-	 */
-	EC_SET(ecol, PW_NDX_UID, len, val);
-	if (len < 2) {
+	/* password field is 'x' */
+
+	/* uid: user id. Must be numeric */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, PW_NDX_UID, uidlen, uid);
+	(void) strtol(uid, &endnum, 10);
+	if (*endnum != 0 || uid == endnum)
 		return (NSS_STR_PARSE_PARSE);
-	} else {
-		pw->pw_uid = strtol(val, &endnum, 10);
-		if (*endnum != 0 || val == endnum) {
+
+	/* gid: primary group id. Must be numeric */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, PW_NDX_GID, gidlen, gid);
+	(void) strtol(gid, &endnum, 10);
+	if (*endnum != 0 || gid == endnum)
+		return (NSS_STR_PARSE_PARSE);
+
+	/* gecos: user's real name */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, PW_NDX_GCOS, gecoslen, gecos);
+
+	/* dir: user's home directory */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, PW_NDX_HOME, dirlen, dir);
+
+	/* shell: user's login shell */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, PW_NDX_SHELL, shelllen, shell);
+
+	buflen = namelen + uidlen + gidlen + gecoslen +
+		dirlen + shelllen + 8;
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, buflen)) == NULL)
 			return (NSS_STR_PARSE_PARSE);
-		}
-	}
-
-	/*
-	 * pw_passwd: user passwd. Do not HAVE to get this here
-	 * because the caller would do a getspnam() anyway.
-	 */
-	EC_SET(ecol, PW_NDX_PASSWD, len, val);
-	if (len < 2) {
-		/*
-		 * don't return NULL pointer, lot of stupid programs
-		 * out there.
-		 */
-		pw->pw_passwd = nullstring;
+		/* include trailing null in length */
+		be->buflen = buflen;
+		buffer = be->buffer;
 	} else {
-		pw->pw_passwd = buffer;
-		buffer += len;
-		if (buffer >= limit)
+		if (buflen > argp->buf.buflen)
 			return (NSS_STR_PARSE_ERANGE);
-		strcpy(pw->pw_passwd, val);
+		buflen = argp->buf.buflen;
+		buffer = argp->buf.buffer;
+		(void) memset(buffer, 0, buflen);
 	}
-
-	/*
-	 * pw_gid: user's primary group id.
-	 */
-	EC_SET(ecol, PW_NDX_GID, len, val);
-	if (len < 2) {
-		return (NSS_STR_PARSE_PARSE);
-	} else {
-		pw->pw_gid = strtol(val, &endnum, 10);
-		if (*endnum != 0 || val == endnum) {
-			return (NSS_STR_PARSE_PARSE);
-		}
-	}
-
-	/*
-	 * pw_gecos: user's real name.
-	 */
-	EC_SET(ecol, PW_NDX_GCOS, len, val);
-	if (len < 2) {
-		/*
-		 * don't return NULL pointer, lot of stupid programs
-		 * out there.
-		 */
-		pw->pw_gecos = nullstring;
-	} else {
-		pw->pw_gecos = buffer;
-		buffer += len;
-		if (buffer >= limit)
-			return (NSS_STR_PARSE_ERANGE);
-		strcpy(pw->pw_gecos, val);
-	}
-
-	/*
-	 * pw_dir: user's home directory
-	 */
-	EC_SET(ecol, PW_NDX_HOME, len, val);
-	if (len < 2) {
-		/*
-		 * don't return NULL pointer, lot of stupid programs
-		 * out there.
-		 */
-		pw->pw_dir = nullstring;
-	} else {
-		pw->pw_dir = buffer;
-		buffer += len;
-		if (buffer >= limit)
-			return (NSS_STR_PARSE_ERANGE);
-		strcpy(pw->pw_dir, val);
-	}
-
-	/*
-	 * pw_shell: user's login shell
-	 */
-	EC_SET(ecol, PW_NDX_SHELL, len, val);
-	if (len < 2) {
-		/*
-		 * don't return NULL pointer, lot of stupid programs
-		 * out there.
-		 */
-		pw->pw_shell = nullstring;
-	} else {
-		pw->pw_shell = buffer;
-		buffer += len;
-		if (buffer >= limit)
-			return (NSS_STR_PARSE_ERANGE);
-		strcpy(pw->pw_shell, val);
-	}
-
-	/*
-	 * pw_age and pw_comment shouldn't be used anymore, but various things
-	 *   (allegedly in.ftpd) merrily do strlen() on them anyway, so we
-	 *   keep the peace by returning a zero-length string instead of a
-	 *   null pointer.
-	 */
-	pw->pw_age = pw->pw_comment = nullstring;
-
+	(void) snprintf(buffer, buflen, "%s:x:%s:%s:%s:%s:%s",
+		name, uid, gid, gecos, dir, shell);
+#ifdef DEBUG
+	(void) fprintf(stdout, "passwd [%s]\n", buffer);
+	(void) fflush(stdout);
+#endif  /* DEBUG */
 	return (NSS_STR_PARSE_SUCCESS);
 }
 
@@ -240,5 +159,5 @@ _nss_nisplus_passwd_constr(dummy1, dummy2, dummy3)
 {
 	return (_nss_nisplus_constr(pw_ops,
 				    sizeof (pw_ops) / sizeof (pw_ops[0]),
-				    PW_TBLNAME, nis_object2ent));
+				    PW_TBLNAME, nis_object2str));
 }

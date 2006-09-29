@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,11 @@
  * CDDL HEADER END
  */
 /*
- *	getnetent.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
- *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  *	nisplus/getnetent.c -- NIS+ backend for nsswitch "net" database
  */
 
@@ -44,7 +43,7 @@ getbyname(be, a)
 	nisplus_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
 	/*
 	 * Don't have to do anything for case-insensitivity;  the NIS+ table
@@ -58,10 +57,10 @@ getbyaddr(be, a)
 	nisplus_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	char		addrstr[16];
 
-	if (nettoa((int) argp->key.netaddr.net, addrstr, 16) != 0)
+	if (nettoa((int)argp->key.netaddr.net, addrstr, 16) != 0)
 		return (NSS_UNAVAIL);   /* it's really ENOMEM */
 
 	return (_nss_nisplus_lookup(be, argp, NET_TAG_ADDR, addrstr));
@@ -69,66 +68,68 @@ getbyaddr(be, a)
 
 
 /*
- * place the results from the nis_object structure into argp->buf.result
+ * Convert nisplus object into files format
  * Returns NSS_STR_PARSE_{SUCCESS, ERANGE, PARSE}
  */
 static int
-nis_object2ent(nobj, obj, argp)
-	int		nobj;
-	nis_object	*obj;
-	nss_XbyY_args_t	*argp;
+nis_object2str(nobj, obj, be, argp)
+	int			nobj;
+	nis_object		*obj;
+	nisplus_backend_ptr_t	be;
+	nss_XbyY_args_t		*argp;
 {
-	char	*buffer, *limit, *val;
-	int		buflen = argp->buf.buflen;
-	struct 	netent *net;
-	int		len, ret;
-	struct	entry_col *ecol;
+	char			*buffer, *linep, *limit;
+	char			*cname, *addr;
+	int			buflen, cnamelen, addrlen;
+	int			stat;
+	struct	entry_col	*ecol;
 
-	limit = argp->buf.buffer + buflen;
-	net = (struct netent *)argp->buf.result;
-	buffer = argp->buf.buffer;
-
-	/*
-	 * <-----buffer + buflen -------------->
-	 * |-----------------|----------------|
-	 * | pointers vector | aliases grow   |
-	 * | for aliases     |                |
-	 * | this way ->     | <- this way    |
-	 * |-----------------|----------------|
-	 *
-	 *
-	 * ASSUME: name, aliases and number columns in NIS+ tables ARE
-	 * null terminated.
-	 *
-	 * get cname and aliases
-	 */
-
-	net->n_aliases = (char **) ROUND_UP(buffer, sizeof (char **));
-	if ((char *)net->n_aliases >= limit) {
-		return (NSS_STR_PARSE_ERANGE);
+	if (obj->zo_data.zo_type != NIS_ENTRY_OBJ ||
+		obj->EN_data.en_cols.en_cols_len < NET_COL) {
+		/* namespace/table/object is curdled */
+		return (NSS_STR_PARSE_PARSE);
 	}
-
-	net->n_name = NULL;
-
-	/*
-	 * Assume that CNAME is the first column and NAME the second.
-	 */
-	ret = netdb_aliases_from_nisobj(obj, nobj, NULL,
-		net->n_aliases, &limit, &(net->n_name), &len);
-	if (ret != NSS_STR_PARSE_SUCCESS)
-		return (ret);
-
-	/*
-	 * get network number from the first object
-	 *
-	 */
 	ecol = obj->EN_data.en_cols.en_cols_val;
-	EC_SET(ecol, NET_NDX_ADDR, len, val);
-	if (len <= 0 || ((net->n_net = inet_network(val)) == (in_addr_t)-1))
+
+	buflen = argp->buf.buflen;
+	buffer = argp->buf.buffer;
+	(void) memset(buffer, 0, buflen);
+
+	/* cname */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, NET_NDX_CNAME,
+		cnamelen, cname);
+
+	/* addr */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, NET_NDX_ADDR,
+		addrlen, addr);
+	if (inet_network(addr) == (in_addr_t)-1)
 		return (NSS_STR_PARSE_PARSE);
 
-	net->n_addrtype = AF_INET;
+	if (cnamelen + addrlen + 2  > buflen)
+		return (NSS_STR_PARSE_ERANGE);
+	(void) snprintf(buffer, buflen, "%s %s", cname, addr);
 
+	linep = buffer + cnamelen + addrlen + 1;
+	limit = buffer + buflen;
+
+	stat = nis_aliases_object2str(obj, nobj, cname, NULL, linep, limit);
+	if (stat != NSS_STR_PARSE_SUCCESS)
+		return (stat);
+
+	if (argp->buf.result != NULL) {
+		/*
+		 * Some front end marshallers may require the
+		 * files formatted data in a distinct buffer
+		 */
+		if ((be->buffer = strdup(buffer)) == NULL)
+			return (NSS_STR_PARSE_PARSE);
+		be->buflen = strlen(buffer);
+		buffer = be->buffer;
+	}
+#ifdef DEBUG
+	(void) fprintf(stdout, "networks [%s]\n", buffer);
+	(void) fflush(stdout);
+#endif  /* DEBUG */
 	return (NSS_STR_PARSE_SUCCESS);
 }
 
@@ -148,7 +149,7 @@ _nss_nisplus_networks_constr(dummy1, dummy2, dummy3)
 {
 	return (_nss_nisplus_constr(net_ops,
 				sizeof (net_ops) / sizeof (net_ops[0]),
-				NET_TBLNAME, nis_object2ent));
+				NET_TBLNAME, nis_object2str));
 }
 
 /*
@@ -159,18 +160,18 @@ _nss_nisplus_networks_constr(dummy1, dummy2, dummy3)
 static int
 nettoa(anet, buf, buflen)
 	int		anet;
-	char	*buf;
+	char		*buf;
 	int		buflen;
 {
-	char *p;
-	struct in_addr in;
-	int addr;
+	char		*p;
+	struct in_addr	in;
+	int		addr;
 
 	if (buf == 0)
 		return (1);
 	in = inet_makeaddr(anet, INADDR_ANY);
 	addr = in.s_addr;
-	(void) strncpy(buf, inet_ntoa(in), buflen);
+	(void) strlcpy(buf, inet_ntoa(in), buflen);
 	if ((IN_CLASSA_HOST & htonl(addr)) == 0) {
 		p = strchr(buf, '.');
 		if (p == NULL)

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,69 +48,58 @@ static const char *keys_attrs[] = {
 
 
 /*
- * _nss_ldap_key2ent is the data marshaling method for the publickey getXbyY
+ * _nss_ldap_key2str is the data marshaling method for the publickey getXbyY
  * (e.g., getpublickey() and getsecretkey()) backend processes. This method
  * is called after a successful ldap search has been performed. This method
- * will parse the ldap search values into "public:secret" key string =
- * argp->buf.buffer which the frontend process expects. Three error
- * conditions are expected and returned to nsswitch.
+ * will parse the ldap search values into "public:secret" file format.
+ *
+ * c3d91f44568fbbefada50d336d9bd67b16e7016f987bb607:
+ * 7675cd9b8753b5db09dabf12da759c2bd1331c927bb322861fffb54be13f55e9
+ *
+ * (All in one line)
+ *
+ * Publickey does not have a front end marshaller so db_type is set
+ * for special handling.
  */
 
 static int
-_nss_ldap_key2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_key2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
 	int		nss_result;
 	char		*keytype = (char *)argp->key.pkey.keytype;
 	int		keytypelen = strlen(keytype);
-	char		*key_start = NULL;
-	int		key_len;
-	int		buflen = (size_t)argp->buf.buflen;
-	char		*buffer = (char *)argp->buf.buffer;
-	char		*ceiling = (char *)NULL;
+	int		len;
+	int		buflen = argp->buf.buflen;
+	char		*buffer, *pkey, *skey;
 	ns_ldap_result_t	*result = be->result;
-	char		**key_array;
+	char		**pkey_array, **skey_array;
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getpublikey.c: _nss_ldap_passwd2ent]\n");
-#endif /* DEBUG */
-
-	if (!argp->buf.result) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_key2ent;
+	if (result == NULL || keytype == NULL) {
+		nss_result = NSS_STR_PARSE_ERANGE;
+		goto result_key2str;
 	}
-	ceiling = buffer + buflen;
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
-	(void) memset(buffer, 0, buflen);
-
+	nss_result = NSS_STR_PARSE_SUCCESS;
+	(void) memset(argp->buf.buffer, 0, buflen);
 	/* get the publickey */
-	key_array = __ns_ldap_getAttr(result->entry, _KEY_NISPUBLICKEY);
-	if (key_array == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_key2ent;
+	pkey_array = __ns_ldap_getAttr(result->entry, _KEY_NISPUBLICKEY);
+	if (pkey_array == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_key2str;
 	}
-	while (*key_array) {
-		if (strncasecmp(*key_array, keytype, keytypelen) == NULL)
+	while (*pkey_array) {
+		if (strncasecmp(*pkey_array, keytype, keytypelen) == NULL)
 			break;
-		key_array++;
+		pkey_array++;
 	}
-	if (*key_array == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_key2ent;
+	if (*pkey_array == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_key2str;
 	}
-
-	key_start = *(key_array) + keytypelen;
-	key_len = strlen(key_start) + 1;
-	if (buffer + key_len + 2 > ceiling) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_key2ent;
-	}
-	(void) strncpy(buffer, key_start, key_len);
-	(void) strcat(buffer, ":");
-	buffer += strlen(buffer);
+	pkey = *pkey_array + keytypelen;
 
 	/* get the secretkey */
-	key_array = __ns_ldap_getAttr(result->entry, _KEY_NISSECRETKEY);
-	if (key_array == NULL) {
+	skey_array = __ns_ldap_getAttr(result->entry, _KEY_NISSECRETKEY);
+	if (skey_array == NULL) {
 		/*
 		 * if we got this far, it's possible that the secret
 		 * key is actually missing or no permission to read it.
@@ -120,33 +108,37 @@ _nss_ldap_key2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		 * the only possibility of reaching this here is due to
 		 * missing secret key.
 		 */
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_key2ent;
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_key2str;
 	}
-	while (*key_array) {
-		if (strncasecmp(*key_array, keytype, keytypelen) == NULL)
+	while (*skey_array) {
+		if (strncasecmp(*skey_array, keytype, keytypelen) == NULL)
 			break;
-		key_array++;
+		skey_array++;
 	}
-	if (*key_array == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_key2ent;
+	if (*skey_array == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_key2str;
 	}
+	skey = *skey_array + keytypelen;
 
-	key_start = *(key_array) + keytypelen;
-	key_len = strlen(key_start);
-	if (buffer + key_len + 1 > ceiling) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_key2ent;
+	/* 2 = 1 ':' + 1 '\0' */
+	len = strlen(pkey) + strlen(skey) + 2;
+	if (len > buflen) {
+		nss_result = NSS_STR_PARSE_ERANGE;
+		goto result_key2str;
 	}
-	(void) strcat(buffer, key_start);
+	/*
+	 * publickey does not have a frontend marshaller.
+	 * copy the result to buf.buffer directly
+	 */
+	buffer = argp->buf.buffer;
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getkeys.c: _nss_ldap_key2ent]\n");
-	(void) fprintf(stdout, "\treturn: %s\n", buffer);
-#endif /* DEBUG */
+	(void) snprintf(buffer, len, "%s:%s", pkey, skey);
 
-result_key2ent:
+	be->db_type = NSS_LDAP_DB_PUBLICKEY;
+
+result_key2str:
 
 	(void) __ns_ldap_freeResult(&be->result);
 	return ((int)nss_result);
@@ -176,10 +168,6 @@ getkeys(ldap_backend_ptr be, void *a)
 	nss_status_t	rc;
 	int	ret;
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getpwnam.c: getbyname]\n");
-#endif /* DEBUG */
-
 	/*
 	 * We need to break it down to find if this is a netname for host
 	 * or user.  We'll pass the domain as is to the LDAP call.
@@ -187,6 +175,7 @@ getkeys(ldap_backend_ptr be, void *a)
 	if (_ldap_filter_name(netname, argp->key.pkey.name, sizeof (netname))
 			!= 0)
 		return ((nss_status_t)NSS_NOTFOUND);
+
 	domain = strchr(netname, '@');
 	if (!domain)
 		return ((nss_status_t)NSS_NOTFOUND);
@@ -252,11 +241,7 @@ _nss_ldap_publickey_constr(const char *dummy1, const char *dummy2,
 			const char *dummy3)
 {
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getkeys.c: _nss_ldap_keys_constr]\n");
-#endif /* DEBUG */
-
 	return ((nss_backend_t *)_nss_ldap_constr(keys_ops,
 		    sizeof (keys_ops)/sizeof (keys_ops[0]),
-		    _PUBLICKEY, keys_attrs, _nss_ldap_key2ent));
+		    _PUBLICKEY, keys_attrs, _nss_ldap_key2str));
 }

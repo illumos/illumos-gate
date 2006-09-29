@@ -22,7 +22,7 @@
 # CDDL HEADER END
 #
 #
-# idsconfig -- script to setup iDS 5.x for Native LDAP II.
+# idsconfig -- script to setup iDS 5.x/6.x for Native LDAP II.
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -69,6 +69,9 @@ The following are the supported credential levels:
   1  anonymous
   2  proxy
   3  proxy anonymous
+  4  self
+  5  self proxy
+  6  self proxy anonymous
 EOF
     ;;
     auth_method_menu) cat <<EOF
@@ -78,6 +81,7 @@ The following are the supported Authentication Methods:
   3  sasl/DIGEST-MD5
   4  tls:simple
   5  tls:sasl/DIGEST-MD5
+  6  sasl/GSSAPI
 EOF
     ;;
     srvauth_method_menu) cat <<EOF
@@ -86,6 +90,7 @@ The following are the supported Authentication Methods:
   2  sasl/DIGEST-MD5
   3  tls:simple
   4  tls:sasl/DIGEST-MD5
+  5  sasl/GSSAPI
 EOF
     ;;
     prompt_ssd_menu) cat <<EOF
@@ -931,6 +936,7 @@ init()
     DEBUG=0             # Set Debug OFF
     BACKUP=no_ldap	# backup suffix
     HOST=""		# NULL or <hostname>
+    NAWK="/usr/bin/nawk"
 
     DOM=""              # Set to NULL
     # If DNS domain (resolv.conf) exists use that, otherwise use domainname.
@@ -1015,6 +1021,11 @@ init()
 
     # Set the SSD file name after setting TMPDIR.
     SSD_FILE=${TMPDIR}/ssd_list
+
+    # GSSAPI setup
+    LDAP_KRB_REALM=""
+    LDAP_GSSAPI_PROFILE=""
+    SCHEMA_UPDATED=0
     
     export DEBUG VERB ECHO EVAL EGREP GREP STEP TMPDIR
     export IDS_SERVER IDS_PORT LDAP_ROOTDN LDAP_ROOTPWD LDAP_SERVER_LIST 
@@ -1027,7 +1038,7 @@ init()
     export NEED_SRVAUTH_PAM NEED_SRVAUTH_KEY NEED_SRVAUTH_CMD
     export LDAP_SRV_AUTHMETHOD_PAM LDAP_SRV_AUTHMETHOD_KEY LDAP_SRV_AUTHMETHOD_CMD
     export LDAP_SERV_SRCH_DES SSD_FILE
-    export GEN_CMD
+    export GEN_CMD LDAP_KRB_REALM LDAP_GSSAPI_PROFILE SCHEMA_UPDATED
 }
 
 
@@ -1127,8 +1138,8 @@ get_ids_server()
     while :
     do
 	# Prompt for server name.
-	get_ans "Enter the iPlanet Directory Server's (iDS) hostname to setup:" "$IDS_SERVER"
-	IDS_SERVER=$ANS
+	get_ans "Enter the JES Directory Server's  hostname to setup:" "$IDS_SERVER" 
+	IDS_SERVER="$ANS"
 
 	# Ping server to see if live.  If valid break out of loop.
 	ping $IDS_SERVER > /dev/null 2>&1
@@ -1159,7 +1170,6 @@ get_ids_port()
 	# Enter port number.
 	get_number "Enter the port number for iDS (h=help):" "$IDS_PORT" "port_help"
 	IDS_PORT=$ANS
-	
 	# Do a simple search to check hostname and port number.
 	# If search returns SUCCESS, break out, host and port must
 	# be valid.
@@ -1196,8 +1206,8 @@ chk_ids_version()
     IDS_VER=`cat ${TMPDIR}/checkDSver`
     IDS_MAJVER=`${ECHO} ${IDS_VER} | cut -f1 -d.`
     IDS_MINVER=`${ECHO} ${IDS_VER} | cut -f2 -d.`
-    if [ "${IDS_MAJVER}" != "5" ]; then
-	${ECHO} "ERROR: $PROG only works with iDS version 5.x, not ${IDS_VER}."
+    if [ "${IDS_MAJVER}" != "5" ] && [ "${IDS_MAJVER}" != "6" ]; then
+	${ECHO} "ERROR: $PROG only works with JES DS version 5.x and 6.x, not ${IDS_VER}."
     	exit 1
     fi
     if [ $DEBUG -eq 1 ]; then
@@ -1336,7 +1346,326 @@ get_basedn()
     done
 }
 
+get_krb_realm() {
+
+    # To upper cases
+    LDAP_KRB_REALM=`${ECHO} ${LDAP_DOMAIN} | ${NAWK} '{ print toupper($0) }'`
+    get_ans_req "Enter Kerberos Realm:" "$LDAP_KRB_REALM"
+    # To upper cases
+    LDAP_KRB_REALM=`${ECHO} ${ANS} | ${NAWK} '{ print toupper($0) }'`
+}
+
+# $1: DN
+# $2: ldif file
+add_entry_by_DN() {
+
+    ${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"${1}\" -s base \"objectclass=*\" ${VERB}"
+    if [ $? -eq 0 ]; then
+	    ${ECHO} "  ${1} already exists"
+	    return 0
+    else
+	${EVAL} "${LDAPADD} ${LDAP_ARGS} -f ${2} ${VERB}"
+	if [ $? -eq 0 ]; then
+		${ECHO} "  ${1} is added"
+	    	return 0
+	else
+		${ECHO} "  ERROR: failed to add ${1}"
+		return 1
+	fi
+    fi
+
+}
 #
+# Kerberos princiapl to DN mapping rules
+#
+# Add rules for host credentails and user credentials
+#
+add_id_mapping_rules() {
+
+    ${ECHO} "  Adding Kerberos principal to DN mapping rules..."
+
+    _C_DN="cn=GSSAPI,cn=identity mapping,cn=config"
+    ( cat << EOF
+dn: cn=GSSAPI,cn=identity mapping,cn=config
+objectClass: top
+objectClass: nsContainer
+cn: GSSAPI
+EOF
+) > ${TMPDIR}/GSSAPI_container.ldif
+
+    add_entry_by_DN "${_C_DN}" "${TMPDIR}/GSSAPI_container.ldif"
+    if [ $? -ne 0 ];
+    then
+    	${RM} ${TMPDIR}/GSSAPI_container.ldif
+	return
+    fi
+
+    _H_CN="host_auth_${LDAP_KRB_REALM}"
+    _H_DN="cn=${_H_CN}, ${_C_DN}"
+    ( cat << EOF
+dn: ${_H_DN}
+objectClass: top
+objectClass: nsContainer
+objectClass: dsIdentityMapping
+objectClass: dsPatternMatching
+cn: ${_H_CN}
+dsMatching-pattern: \${Principal}
+dsMatching-regexp: host\/(.*).${LDAP_DOMAIN}@${LDAP_KRB_REALM}
+dsSearchBaseDN: ou=hosts,${LDAP_BASEDN}
+dsSearchFilter: (&(objectClass=ipHost)(cn=\$1))
+dsSearchScope: one
+
+EOF
+) > ${TMPDIR}/${_H_CN}.ldif
+
+    add_entry_by_DN "${_H_DN}" "${TMPDIR}/${_H_CN}.ldif"
+
+    _U_CN="user_auth_${LDAP_KRB_REALM}"
+    _U_DN="cn=${_U_CN}, ${_C_DN}"
+    ( cat << EOF
+dn: ${_U_DN}
+objectClass: top
+objectClass: nsContainer
+objectClass: dsIdentityMapping
+objectClass: dsPatternMatching
+cn: ${_U_CN}
+dsMatching-pattern: \${Principal}
+dsMatching-regexp: (.*)@${LDAP_KRB_REALM}
+dsMappedDN: uid=\$1,ou=People,${LDAP_BASEDN}
+
+EOF
+) > ${TMPDIR}/${_U_CN}.ldif
+
+    add_entry_by_DN "${_U_DN}" "${TMPDIR}/${_U_CN}.ldif"
+
+}
+
+
+#
+# Modify ACL to allow root to read all the password and only self can read
+# its own password when sasl/GSSAPI bind is used
+#
+modify_userpassword_acl_for_gssapi() {
+
+    _P_DN="ou=People,${LDAP_BASEDN}"
+    _H_DN="ou=Hosts,${LDAP_BASEDN}"
+    _P_ACI="self-read-pwd"
+
+    ${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"${_P_DN}\" -s base \"objectclass=*\" > /dev/null 2>&1" 
+    if [ $? -ne 0 ]; then
+	    ${ECHO} "  ${_P_DN} does not exist"
+	# Not Found. Create a new entry
+	( cat << EOF
+dn: ${_P_DN}
+ou: People
+objectClass: top
+objectClass: organizationalUnit
+EOF
+) > ${TMPDIR}/gssapi_people.ldif
+
+	add_entry_by_DN "${_P_DN}" "${TMPDIR}/gssapi_people.ldif"
+    else 
+	${ECHO} "  ${_P_DN} already exists"
+    fi
+
+    ${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"${_P_DN}\" -s base \"objectclass=*\" aci > ${TMPDIR}/chk_gssapi_aci 2>&1"
+
+    if [ $? -eq 0 ]; then
+	    ${EVAL} "${GREP} ${_P_ACI} ${TMPDIR}/chk_gssapi_aci > /dev/null 2>&1"
+	    if [ $? -eq 0 ]; then
+		${ECHO} "  userpassword ACL ${_P_ACI} already exists."
+		return
+	    else
+		${ECHO} "  userpassword ACL ${_P_ACI} not found. Create a new one."
+	    fi
+    else
+	${ECHO} "  Error searching aci for ${_P_DN}"
+	cat ${TMPDIR}/chk_gssapi_aci
+	cleanup
+	exit 1
+    fi
+    ( cat << EOF
+dn: ${_P_DN}
+changetype: modify
+add: aci
+aci: (targetattr="userPassword")(version 3.0; acl self-read-pwd; allow (read,search) userdn="ldap:///self" and authmethod="sasl GSSAPI";)
+-
+add: aci
+aci: (targetattr="userPassword")(version 3.0; acl host-read-pwd; allow (read,search) userdn="ldap:///cn=*+ipHostNumber=*,ou=Hosts,${LDAP_BASEDN}" and authmethod="sasl GSSAPI";)
+EOF
+) > ${TMPDIR}/user_gssapi.ldif
+    LDAP_TYPE_OR_VALUE_EXISTS=20
+    ${EVAL} "${LDAPMODIFY} ${LDAP_ARGS} -f ${TMPDIR}/user_gssapi.ldif ${VERB}"
+
+    case $? in
+    0)
+	${ECHO} "  ${_P_DN} uaserpassword ACL is updated."
+	;;
+    20)
+	${ECHO} "  ${_P_DN} uaserpassword ACL already exists."
+	;;
+    *)
+	${ECHO} "  ERROR: update of userpassword ACL for ${_P_DN} failed!"
+	cleanup
+	exit 1
+	;;
+    esac
+}
+#
+# $1: objectclass or attributetyp
+# $2: name
+search_update_schema() {
+
+    ATTR="${1}es"
+
+    ${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b cn=schema -s base \"objectclass=*\" ${ATTR} | ${GREP} -i \"${2}\" ${VERB}"
+    if [ $? -ne 0 ]; then
+	${ECHO} "${1} ${2} does not exist."
+        update_schema_attr
+        update_schema_obj
+	SCHEMA_UPDATED=1
+    else
+	${ECHO} "${1} ${2} already exists. Schema has been updated"
+    fi
+}
+
+#
+# $1: 1 - interactive, 0 - no
+#
+create_gssapi_profile() {
+
+
+    if [ ${1} -eq 1 ]; then
+        echo
+        echo "You can create a sasl/GSSAPI enabled profile with default values now."
+        get_confirm "Do you want to create a sasl/GSSAPI default profile ?" "n"
+
+        if [ $? -eq 0 ]; then
+	    return
+        fi
+    fi
+
+    # Add profile container if it does not exist
+    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"ou=profile,${LDAP_BASEDN}\" -s base \"objectclass=*\" > /dev/null 2>&1"
+    if [ $? -ne 0 ]; then
+	( cat << EOF
+dn: ou=profile,${LDAP_BASEDN}
+ou: profile
+objectClass: top
+objectClass: organizationalUnit
+EOF
+) > ${TMPDIR}/profile_people.ldif
+
+        add_entry_by_DN "ou=profile,${LDAP_BASEDN}" "${TMPDIR}/profile_people.ldif"
+
+    fi
+
+    search_update_schema "objectclass" "DUAConfigProfile"
+
+    _P_NAME="gssapi_${LDAP_KRB_REALM}"
+    if [ ${1} -eq 1 ]; then
+    	_P_TMP=${LDAP_PROFILE_NAME}
+    	LDAP_PROFILE_NAME=${_P_NAME}
+   	get_profile_name
+        LDAP_GSSAPI_PROFILE=${LDAP_PROFILE_NAME}
+    	LDAP_PROFILE_NAME=${_P_TMP}
+    fi
+
+    _P_DN="cn=${LDAP_GSSAPI_PROFILE},ou=profile,${LDAP_BASEDN}"
+    if [ ${DEL_OLD_PROFILE} -eq 1 ]; then
+	    DEL_OLD_PROFILE=0
+	    ${EVAL} "${LDAPDELETE} ${LDAP_ARGS} ${_P_DN} ${VERB}"
+    fi
+
+    _SVR=`getent hosts ${IDS_SERVER} | ${NAWK} '{ print $1 }'`
+    if [ ${IDS_PORT} -ne 389 ]; then
+	    _SVR="${_SVR}:${IDS_PORT}"
+    fi
+
+    (cat << EOF
+dn: ${_P_DN}
+objectClass: top
+objectClass: DUAConfigProfile
+defaultServerList: ${_SVR}
+defaultSearchBase: ${LDAP_BASEDN}
+authenticationMethod: sasl/GSSAPI
+followReferrals: ${LDAP_FOLLOWREF}
+defaultSearchScope: ${LDAP_SEARCH_SCOPE}
+searchTimeLimit: ${LDAP_SEARCH_TIME_LIMIT}
+profileTTL: ${LDAP_PROFILE_TTL}
+cn: ${LDAP_GSSAPI_PROFILE}
+credentialLevel: self
+bindTimeLimit: ${LDAP_BIND_LIMIT}
+EOF
+) > ${TMPDIR}/gssapi_profile.ldif
+
+    add_entry_by_DN "${_P_DN}" "${TMPDIR}/gssapi_profile.ldif"
+
+}
+#
+# Set up GSSAPI if necessary
+#
+gssapi_setup() {
+
+	${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"\" -s base \"objectclass=*\" supportedSASLMechanisms | ${GREP} GSSAPI ${VERB}"
+	if [ $? -ne 0 ]; then
+		${ECHO} "  sasl/GSSAPI is not supported by this LDAP server"
+		return
+	fi
+
+	get_confirm "GSSAPI is supported. Do you want to set up gssapi:(y/n)" "n"
+	if [ $? -eq 0 ]; then
+		${ECHO}
+		${ECHO} "GSSAPI is not set up."
+		${ECHO} "sasl/GSSAPI bind may not workif it's not set up before."
+	else
+		get_krb_realm
+		add_id_mapping_rules
+		modify_userpassword_acl_for_gssapi
+		create_gssapi_profile 1
+		${ECHO}
+		${ECHO} "GSSAPI setup is done."
+	fi
+
+	cat << EOF
+
+You can continue to create a profile and
+configure the LDAP server.
+Or you can stop now.
+
+EOF
+	get_confirm "Do you want to stop:(y/n)" "n"
+	if [ $? -eq 1 ]; then
+		cleanup
+		exit
+	fi
+
+}
+gssapi_setup_auto() {
+	${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"\" -s base \"objectclass=*\" supportedSASLMechanisms | ${GREP} GSSAPI ${VERB}"
+	if [ $? -ne 0 ]; then
+		${ECHO}
+		${ECHO} "sasl/GSSAPI is not supported by this LDAP server"
+		${ECHO}
+		return
+	fi
+	if [ -z "${LDAP_KRB_REALM}" ]; then
+		${ECHO}
+		${ECHO} "LDAP_KRB_REALM is not set. Skip gssapi setup."
+		${ECHO} "sasl/GSSAPI bind won't work properly."
+		${ECHO}
+		return
+	fi
+	if [ -z "${LDAP_GSSAPI_PROFILE}" ]; then
+		${ECHO}
+		${ECHO} "LDAP_GSSAPI_PROFILE is not set. Default is gssapi_${LDAP_KRB_REALM}"
+		${ECHO}
+		LDAP_GSSAPI_PROFILE="gssapi_${LDAP_KRB_REALM}"
+	fi
+	add_id_mapping_rules
+	modify_userpassword_acl_for_gssapi
+	create_gssapi_profile 0
+}
 # get_profile_name(): Enter the profile name.
 #
 get_profile_name()
@@ -1470,8 +1799,17 @@ get_cred_level()
 	       return 2 ;;
 	    3) LDAP_CRED_LEVEL="proxy anonymous"
 	       return 3 ;;
+	    4) LDAP_CRED_LEVEL="self"
+	       SELF_GSSAPI=1
+	       return 4 ;;
+	    5) LDAP_CRED_LEVEL="self proxy"
+	       SELF_GSSAPI=1
+	       return 5 ;;
+	    6) LDAP_CRED_LEVEL="self proxy anonymous"
+	       SELF_GSSAPI=1
+	       return 6 ;;
 	    h) display_msg cred_lvl_help ;;
-	    *) ${ECHO} "Please enter 1, 2 or 3." ;;
+	    *) ${ECHO} "Please enter 1, 2, 3, 4, 5 or 6." ;;
 	esac
     done
 }
@@ -1506,10 +1844,12 @@ srvauth_menu_handler()
 		break ;;
 	    4) _AUTHMETHOD="tls:sasl/DIGEST-MD5"
 		break ;;
+	    5) _AUTHMETHOD="sasl/GSSAPI"
+		break ;;
 	    0) _AUTHMETHOD=""
 		_FIRST=1
 		break ;;
-	    *) ${ECHO} "Please enter 1-4 or 0 to reset." ;;
+	    *) ${ECHO} "Please enter 1-5 or 0 to reset." ;;
 	esac
     done
 }
@@ -1546,11 +1886,13 @@ auth_menu_handler()
 		break ;;
 	    5) _AUTHMETHOD="tls:sasl/DIGEST-MD5"
 		break ;;
+	    6) _AUTHMETHOD="sasl/GSSAPI"
+		break ;;
 	    0) _AUTHMETHOD=""
 		_FIRST=1
 		break ;;
 	    h) display_msg auth_help ;;
-	    *) ${ECHO} "Please enter 1-5, 0=reset, or h=help." ;;
+	    *) ${ECHO} "Please enter 1-6, 0=reset, or h=help." ;;
 	esac
     done
 }
@@ -2109,6 +2451,8 @@ prompt_config_info()
 
     get_basedn
 
+    gssapi_setup
+
     get_profile_name
     get_srv_list
     get_pref_srv
@@ -2153,6 +2497,7 @@ prompt_config_info()
 	NEED_SRVAUTH_CMD=$?
 	[ $NEED_SRVAUTH_CMD -eq 1 ] && get_srv_authMethod_cmd
     fi
+ 
 
     # Get Timeouts
     get_srch_time
@@ -2298,6 +2643,8 @@ LDAP_ROOTDN="$LDAP_ROOTDN"
 LDAP_ROOTPWD=$LDAP_ROOTPWD
 LDAP_DOMAIN="$LDAP_DOMAIN"
 LDAP_SUFFIX="$LDAP_SUFFIX"
+LDAP_KRB_REALM="$LDAP_KRB_REALM"
+LDAP_GSSAPI_PROFILE="$LDAP_GSSAPI_PROFILE"
 
 # Internal program variables that need to be set.
 NEED_PROXY=$NEED_PROXY
@@ -2338,7 +2685,7 @@ export LDAP_AUTHMETHOD LDAP_FOLLOWREF LDAP_SEARCH_SCOPE LDAP_SEARCH_TIME_LIMIT
 export LDAP_PREF_SRVLIST LDAP_PROFILE_TTL LDAP_CRED_LEVEL LDAP_BIND_LIMIT
 export NEED_SRVAUTH_PAM NEED_SRVAUTH_KEY NEED_SRVAUTH_CMD
 export LDAP_SRV_AUTHMETHOD_PAM LDAP_SRV_AUTHMETHOD_KEY LDAP_SRV_AUTHMETHOD_CMD
-export LDAP_SERV_SRCH_DES SSD_FILE
+export LDAP_SERV_SRCH_DES SSD_FILE LDAP_KRB_REALM LDAP_GSSAPI_PROFILE
 
 # Service Search Descriptors start here if present:
 EOF
@@ -3103,6 +3450,9 @@ add_eq_indexes()
     # Set eq indexes to add.
     _INDEXES="uidNumber ipNetworkNumber gidnumber oncrpcnumber automountKey"
 
+    if [ -z "${IDS_DATABASE}" ]; then
+	get_backend
+    fi
     # Set _EXT to use as shortcut.
     _EXT="cn=index,cn=${IDS_DATABASE},cn=ldbm database,cn=plugins,cn=config"
 
@@ -4312,6 +4662,7 @@ then
     INTERACTIVE=0      # Turns off prompts that occur later.
     validate_info      # Validate basic info in file.
     chk_ids_version    # Check iDS version for compatibility.
+    gssapi_setup_auto
 else
     # Display BACKUP warning to user.
     display_msg backup_server
@@ -4341,8 +4692,10 @@ if [ "$NEED_CRYPT" = "TRUE" ]; then
 fi
 
 # Update the schema (Attributes, Objectclass Definitions)
-update_schema_attr
-update_schema_obj
+if [ ${SCHEMA_UPDATED} -eq 0 ]; then
+        update_schema_attr
+        update_schema_obj
+fi
 
 # Add suffix together with its root entry (if needed)
 add_suffix ||

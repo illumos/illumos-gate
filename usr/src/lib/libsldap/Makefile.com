@@ -22,8 +22,9 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
+# lib/libsldap/Makefile.com
 
 LIBRARY= libsldap.a
 VERS= .1
@@ -32,7 +33,7 @@ SLDAPOBJ=	ns_common.o	ns_reads.o	ns_writes.o \
 		ns_connect.o	ns_config.o	ns_error.o \
 		ns_cache_door.o ns_getalias.o	ns_trace.o \
 		ns_init.o	ns_crypt.o	ns_confmgr.o \
-		ns_mapping.o	ns_wrapper.o
+		ns_mapping.o	ns_wrapper.o	ns_sasl.o
 
 OBJECTS=	$(SLDAPOBJ)
 
@@ -41,13 +42,14 @@ include ../../Makefile.lib
 SRCS =		$(SLDAPOBJ:%.o=../common/%.c)
 LIBS =		$(DYNLIB) $(LINTLIB)
 $(LINTLIB):= 	SRCS=../common/llib-lsldap
-LDLIBS +=	-lnsl -lldap -lc
+LDLIBS +=	-lnsl -lldap -lscf -lc
 
 SRCDIR =	../common
 
 CFLAGS +=	$(CCVERBOSE)
-LOCFLAGS +=	-D_REENTRANT -DSUNW_OPTIONS -DTHREAD_SUNOS5_LWP
-CPPFLAGS +=	-I../common -I$(SRC)/lib/libldap5/include/ldap -I/usr/include/mps $(LOCFLAGS)
+LOCFLAGS +=	-D_REENTRANT -DSUNW_OPTIONS
+CPPFLAGS +=	-I../common -I$(SRC)/lib/libldap5/include/ldap \
+		-I/usr/include/mps $(LOCFLAGS)
 LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
 

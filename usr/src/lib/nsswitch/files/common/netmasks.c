@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,10 @@
  * CDDL HEADER END
  */
 /*
- *	files/netmasks.c -- "files" backend for nsswitch "netmasks" database
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
- *	Copyright (c) 1996 Sun Microsystems Inc
- *	All Rights Reserved.
+ * files/netmasks.c -- "files" backend for nsswitch "netmasks" database
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,20 +42,45 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <nss_dbdefs.h>
+#include <ctype.h>
 
 /*
  * Validate 'files' netmasks entry. The comparison objects are in IPv4
  * internet address format.
  */
 static int
-check_addr(args)
-	nss_XbyY_args_t		*args;
+check_addr(nss_XbyY_args_t *argp, const char *line, int linelen)
 {
-	struct in_addr tmp;
+	const char	*limit, *linep, *addrstart;
+	int		addrlen;
+	char		addrbuf[NSS_LINELEN_NETMASKS];
+	struct in_addr	lineaddr, argsaddr;
 
-	tmp.s_addr = inet_addr(args->key.name);
-	return (memcmp(args->buf.buffer, (char *)&tmp,
-	    sizeof (struct in_addr)) == 0);
+	linep = line;
+	limit = line + linelen;
+
+	/* skip leading spaces */
+	while (linep < limit && isspace(*linep))
+		linep++;
+
+	addrstart = linep;
+	while (linep < limit && !isspace(*linep))
+		linep++;
+	if (linep == limit)
+		return (0);
+	addrlen = linep - addrstart;
+	if (addrlen < sizeof (addrbuf)) {
+		(void) memcpy(addrbuf, addrstart, addrlen);
+		addrbuf[addrlen] = '\0';
+		if ((lineaddr.s_addr = inet_addr(addrbuf)) ==
+						(in_addr_t)0xffffffffU)
+			return (0);
+		if ((argsaddr.s_addr = inet_addr(argp->key.name))
+				== (in_addr_t)0xffffffffU)
+			return (0);
+		return (lineaddr.s_addr == argsaddr.s_addr);
+	}
+	return (0);
 }
 
 static nss_status_t
@@ -64,15 +88,46 @@ getbynet(be, a)
 	files_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	nss_status_t		res;
 	char			tmpbuf[NSS_LINELEN_NETMASKS];
 
-	argp->buf.buffer = tmpbuf;
-	argp->buf.buflen = NSS_LINELEN_NETMASKS;
+	/*
+	 * use the buffer passed in if result is to be returned
+	 * in /etc file format
+	 */
+	if (argp->buf.result != NULL) {
+		argp->buf.buffer = tmpbuf;
+		argp->buf.buflen = NSS_LINELEN_NETMASKS;
+	}
 	res = _nss_files_XY_all(be, argp, 0, argp->key.name, check_addr);
-	argp->buf.buffer = NULL;
-	argp->buf.buflen = 0;
+	if (argp->buf.result != NULL) {
+		argp->buf.buffer = NULL;
+		argp->buf.buflen = 0;
+	} else {
+		/* the frontend expects the netmask data only */
+		if (res == NSS_SUCCESS)	 {
+			char	*m;
+			char	*s = (char *)argp->returnval;
+			int	l = 0;
+
+			m = s + argp->returnlen - 1;
+
+			/* skip trailing spaces */
+			while (s < m && isspace(*m))
+				m--;
+
+			for (; s <= m; m--) {
+				if (isspace(*m))
+					break;
+				l++;
+			}
+			m++;
+			(void) memmove(argp->returnval, m, l);
+			argp->returnlen = l;
+			*(s + l) = '\0';
+		}
+	}
 
 	return (res);
 }

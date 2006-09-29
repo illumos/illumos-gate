@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -35,6 +34,7 @@
 #include "nisplus_common.h"
 #include "nisplus_tables.h"
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <rpcsvc/nislib.h>
@@ -43,7 +43,7 @@
 #define	ORGDIR2		".org_dir."
 #define	ORGDIRLEN	7
 
-extern u_int __nis_force_hard_lookups;
+extern uint_t __nis_force_hard_lookups;
 extern int inet_pton(int, const char *, void *);
 
 static nss_status_t
@@ -58,11 +58,13 @@ switch_err(nis_res)
 	    case NIS_SUCCESS:
 	    case NIS_S_SUCCESS:
 	    case NIS_CBRESULTS:
+		errno = 0;
 		return (NSS_SUCCESS);
 
 	    case NIS_NOTFOUND:
 	    case NIS_PARTIAL:
 	    case NIS_NOSUCHNAME:
+		errno = 0;
 		return (NSS_NOTFOUND);
 
 	    case NIS_NAMEUNREACHABLE:
@@ -82,18 +84,21 @@ _nss_nisplus_list(name, extra_flags, res_p)
 	nis_result	**res_p;
 {
 	*res_p = nis_list((char *)name, NIS_LIST_COMMON | extra_flags |
-						__nis_force_hard_lookups, 0, 0);
+				__nis_force_hard_lookups, 0, 0);
 	return (switch_err(*res_p));
 }
 
-nss_status_t
+static nss_status_t
 process_val(args, be, result)
-	nss_XbyY_args_t	*args;
+	nss_XbyY_args_t		*args;
 	nisplus_backend_t	*be;
-	nis_result	*result;
+	nis_result		*result;
 {
 	nss_status_t	res;
-	int	parsestat;
+	int		parsestat;
+
+	args->returnval = NULL;
+	args->returnlen = 0;
 
 	if ((res = switch_err(result)) != NSS_SUCCESS) {
 		return (res);
@@ -101,21 +106,71 @@ process_val(args, be, result)
 	if (NIS_RES_OBJECT(result) == 0) {
 		return (NSS_NOTFOUND);
 	}
-	parsestat = (be->obj2ent)(NIS_RES_NUMOBJ(result),
-			NIS_RES_OBJECT(result), args);
+	parsestat = (be->obj2str)(NIS_RES_NUMOBJ(result),
+			NIS_RES_OBJECT(result), be, args);
+	if (parsestat != NSS_STR_PARSE_SUCCESS)
+		goto fail;
+
+	/*
+	 * If called by nscd's switch engine, the data
+	 * is available in args->buf.buffer and there is
+	 * no need to marshall it.
+	 *
+	 * Note for some dbs like ethers, the obj2str()
+	 * routine will always put the NFF data in
+	 * be->buffer because we cannot determine if
+	 * we are inside nscd or inside the application.
+	 */
+	if (args->buf.result == NULL && be->buffer == NULL) {
+		args->returnval = args->buf.buffer;
+		if (args->buf.buffer != NULL)
+			args->returnlen = strlen(args->buf.buffer);
+		return (NSS_SUCCESS);
+	}
+
+	/*
+	 * If the data is in be->buffer it needs
+	 * to be marshalled.
+	 */
+	if (args->str2ent == NULL) {
+		parsestat = NSS_STR_PARSE_PARSE;
+		goto fail;
+	}
+	parsestat = (*args->str2ent)(be->buffer,
+			be->buflen,
+			args->buf.result,
+			args->buf.buffer,
+			args->buf.buflen);
 	if (parsestat == NSS_STR_PARSE_SUCCESS) {
+		if (be->buffer != NULL) {
+			free(be->buffer);
+			be->buffer = NULL;
+			be->buflen = 0;
+		}
 		args->returnval = args->buf.result;
-		res = NSS_SUCCESS;
-	} else if (parsestat == NSS_STR_PARSE_ERANGE) {
-		args->returnval = 0;
+		if (args->buf.result != NULL)
+			args->returnlen = 1;
+		else if (args->buf.buffer != NULL) {
+			args->returnval = args->buf.buffer;
+			args->returnlen = strlen(args->buf.buffer);
+		}
+		return (NSS_SUCCESS);
+	}
+
+fail:
+	if (be->buffer != NULL) {
+		free(be->buffer);
+		be->buffer = NULL;
+		be->buflen = 0;
+	}
+	if (parsestat == NSS_STR_PARSE_ERANGE) {
 		args->erange = 1;
 		/* We won't find this otherwise, anyway */
-		res = NSS_NOTFOUND;
+		return (NSS_NOTFOUND);
 	} else if (parsestat == NSS_STR_PARSE_PARSE) {
-		args->returnval = 0;
-		res = NSS_NOTFOUND;
+		return (NSS_NOTFOUND);
 	}
-	return (res);
+	return (NSS_UNAVAIL);
 }
 
 nss_status_t
@@ -141,7 +196,7 @@ _nss_nisplus_lookup(be, argp, column_name, keyname)
 	/*
 	 * Assumes that "keyname" is a null-terminated string.
 	 */
-	sprintf(namebuf, "[%s=%s]%s", column_name, keyname,
+	(void) snprintf(namebuf, BUFSIZ, "[%s=%s]%s", column_name, keyname,
 		be->table_name);
 	r = nis_list(namebuf, NIS_LIST_COMMON | USE_DGRAM |
 					__nis_force_hard_lookups, 0, 0);
@@ -194,23 +249,23 @@ _nss_nisplus_expand_lookup(be, argp, column_name, keyname, table)
 			(directory[0] == '.' && directory[1] == '\0')) {
 			return (0);
 	}
-	sprintf(namebuf, "[%s=", column_name);
+	(void) snprintf(namebuf, sizeof (namebuf), "[%s=", column_name);
 	if (strcmp(column_name, HOST_TAG_NAME) == 0) {
 		p = strchr(keyname, '.');
 		if (p == 0) {
-			strcat(namebuf, keyname);
+			(void) strlcat(namebuf, keyname, sizeof (namebuf));
 		} else {
-			strncat(namebuf, keyname, p - keyname);
+			(void) strncat(namebuf, keyname, p - keyname);
 		}
 	} else {
-		strcat(namebuf, keyname);
+		(void) strlcat(namebuf, keyname, sizeof (namebuf));
 		p = 0;
 	}
-	strcat(namebuf, "]");
-	strcat(namebuf, table);
-	strcat(namebuf, ORGDIR1);
+	(void) strlcat(namebuf, "]", sizeof (namebuf));
+	(void) strlcat(namebuf, table, sizeof (namebuf));
+	(void) strlcat(namebuf, ORGDIR1, sizeof (namebuf));
 	if (p != 0) {
-		strcat(namebuf, p);
+		(void) strlcat(namebuf, p, sizeof (namebuf));
 	}
 	r = nis_list(namebuf, EXPAND_NAME | USE_DGRAM | NIS_LIST_COMMON |
 						__nis_force_hard_lookups, 0, 0);
@@ -222,45 +277,36 @@ _nss_nisplus_expand_lookup(be, argp, column_name, keyname, table)
 }
 
 nss_backend_t *
-_nss_nisplus_constr(ops, n_ops, tblname, obj2ent)
+_nss_nisplus_constr(ops, n_ops, tblname, obj2str)
 	nisplus_backend_op_t	ops[];
 	int			n_ops;
-	const char		*tblname;	/* (Unqualified) name of */
-						/* NIS+ table		 */
-	nisplus_obj2ent_func	obj2ent;
+	const char		*tblname; /* (Unqualified) name of NIS+ table */
+	nisplus_obj2str_func	obj2str;
 {
 	const char		*directory = nis_local_directory();
 	nisplus_backend_t	*be;
 
 #ifdef DEBUG
-fprintf(stderr, "Constructor called\n");
+	(void) fprintf(stdout, "Constructor called\n");
 #endif	/* DEBUG */
 
 	if (directory == 0 ||
 		(directory[0] == '.' && directory[1] == '\0') ||
-	    (be = (nisplus_backend_t *)malloc(sizeof (*be))) == 0) {
+		(be = (nisplus_backend_t *)calloc(1, sizeof (*be))) == 0) {
+			return (0);
+	}
+	be->ops	= ops;
+	be->n_ops = n_ops;
+	be->directory = directory;
+	if ((be->table_name = (char *)malloc
+		(strlen(tblname) + ORGDIRLEN + strlen(directory) + 3)) == 0) {
+		free(be);
 		return (0);
 	}
-	be->ops		= ops;
-	be->n_ops	= n_ops;
-
-	be->directory	= directory;
-	if ((be->table_name	= (char *)malloc
-		(strlen(tblname) + ORGDIRLEN + strlen(directory) + 3)) == 0)
-		return (0);
-	strcpy(be->table_name, tblname);
-	strcat(be->table_name, ORGDIR2);
-	strcat(be->table_name, directory);
-
-	be->obj2ent	= obj2ent;
-	be->cursor.no.n_bytes	= 0;
-	be->cursor.no.n_len	= 0;
-	be->cursor.max_len	= 0;
-
-	/* this indicates that the path_list stuff is not initialized */
-	be->path_list = 0;
-	be->table_path = 0;
-	be->path_index = 0;
+	(void) strcpy(be->table_name, tblname);
+	(void) strcat(be->table_name, ORGDIR2);
+	(void) strcat(be->table_name, directory);
+	be->obj2str = obj2str;
 	be->path_count = -1;
 
 	return ((nss_backend_t *)be);
@@ -274,9 +320,12 @@ _nss_nisplus_destr(be, dummy)
 {
 	if (be != 0) {
 		/* === Should change to invoke ops[ENDENT] ? */
-		_nss_nisplus_endent(be, 0);
+		(void) _nss_nisplus_endent(be, 0);
 		if (be->table_name != 0) {
 			free(be->table_name);
+		}
+		if (be->buffer != NULL) {
+			free(be->buffer);
 		}
 		free(be);
 	}
@@ -310,7 +359,8 @@ nis_cursor_set_next(be, from)
 			be->cursor.no.n_bytes =
 				(char *)malloc(be->cursor.max_len);
 		}
-		memcpy(be->cursor.no.n_bytes, from->n_bytes, from->n_len);
+		(void) memcpy(be->cursor.no.n_bytes, from->n_bytes,
+				from->n_len);
 	}
 	be->cursor.no.n_len = from->n_len;
 }
@@ -367,6 +417,9 @@ _nss_nisplus_setent(be, dummy)
 	nis_result *res;
 	nis_object *tobj;
 
+	be->buffer = NULL;
+	be->buflen = 0;
+	be->flag = 0;
 	if (be->path_list == 0) {
 		res = nis_lookup(be->table_name, NIS_LIST_COMMON |
 					__nis_force_hard_lookups);
@@ -393,9 +446,9 @@ _nss_nisplus_setent(be, dummy)
 			nis_freeresult(res);
 			return (NSS_UNAVAIL);
 		}
-		strcpy(table_name, tobj->zo_name);
-		strcat(table_name, ".");
-		strcat(table_name, tobj->zo_domain);
+		(void) strcpy(table_name, tobj->zo_name);
+		(void) strcat(table_name, ".");
+		(void) strcat(table_name, tobj->zo_domain);
 
 		/* save table path */
 		table_path = res->objects.objects_val[0].TA_data.ta_path;
@@ -423,7 +476,7 @@ _nss_nisplus_setent(be, dummy)
 
 		be->path_list[0] = table_name;
 		be->path_count = __nis_parse_path(be->table_path,
-				&be->path_list[1], n - 1);
+				&be->path_list[1], (int)(n - 1));
 		be->path_count++;    /* for entry at index 0 */
 	}
 	be->path_index = 0;
@@ -452,232 +505,73 @@ _nss_nisplus_endent(be, dummy)
 		free(be->path_list[0]);
 		free(be->path_list);
 	}
+	if (be->buffer != NULL) {
+		free(be->buffer);
+		be->buffer = NULL;
+		be->buflen = 0;
+	}
+	be->flag = 0;
 	be->table_path = 0;
 	be->path_list = 0;
 	be->path_index = 0;
 	be->path_count = -1;
-	be->cursor.no.n_len	= 0;
-	be->cursor.max_len	= 0;
+	be->cursor.no.n_len = 0;
+	be->cursor.max_len = 0;
 	return (NSS_SUCCESS);
 }
 
-
-/*
- * returns NSS_STR_PARSE_PARSE if no aliases found.
- *
- * Overly loaded interface. Trying to do to many things using one common
- * code. Main purpose is to extract cname and aliases from NIS+ entry object(s)
- * for netdb databases: hosts, networks, protocols, rpc and services.
- *
- * hosts have always been special. We have special case code to deal with
- * multiple addresses. cnamep is overloaded to indicate this special case,
- * when NULL, otherwise it is set to point to the cname field in the caller's
- * structure to be populated.
- *
- * services are weird since they sometimes use 1-1/2 keys, e.g. name and proto
- * or port and proto. The NIS+ services table also has an extra column. The
- * special argument, proto, when non-NULL, serves the purpose of indicating
- * that we are parsing a services entry, and have specified the protocol which
- * must be used for screening. It is also non-NULL, and set to the proto field
- * of the first NIS+ entry by nis_obj2ent(), in case of enumeration on
- * services, and getservbyname/port calls where caller used a null proto,
- * which implies the caller can accept "any" protocol with the matching
- * name/port. The proto argument is NULL for all non-services searches.
- */
 int
-netdb_aliases_from_nisobj(obj, nobj, proto, alias_list, aliaspp, cnamep, count)
-	/* IN */
-	nis_object	*obj;
-	int		nobj;
-	const	char *proto;
-	/* IN-OUT */
-	char	**alias_list;	/* beginning of the buffer and alias vector */
-	char	**aliaspp;	/* end of the buffer + 1 */
-	char	**cnamep;
-	/* OUT */
-	int	*count;	/* number of distinct aliases/address found */
-{
-	return (__netdb_aliases_from_nisobj(obj, nobj, proto, alias_list,
-		aliaspp, cnamep, count, 0));
-}
+nis_aliases_object2str(nis_object *obj, int nobj,
+		const char *cname, const char *protokey,
+		char *linep, char *limit) {
 
+	char			*p, *name, *proto;
+	int			cnamelen, namelen, protolen, protokeylen;
+	struct entry_col	*ecol;
 
-int
-__netdb_aliases_from_nisobj(obj, nobj, proto, alias_list, aliaspp, cnamep,
-		count, af_type)
-	/* IN */
-	nis_object	*obj;
-	int		nobj;
-	const	char *proto;
-	int	af_type;	/* address family for host mapping only */
-	/* IN-OUT */
-	char	**alias_list;	/* beginning of the buffer and alias vector */
-	char	**aliaspp;	/* end of the buffer + 1 */
-	char	**cnamep;
-	/* OUT */
-	int	*count;	/* number of distinct aliases/address found */
-{
-	int isaddr = (cnamep == 0);
+	cnamelen = strlen(cname);
+	protokeylen = (protokey) ? strlen(protokey) : 0;
 
-	*count = 0;
-	if ((char *)alias_list >= *aliaspp) {
-		/*
-		 * Input condition not met. We must get a contiguous
-		 * area (alias_list, *aliaspp - 1).
-		 */
-		return (NSS_STR_PARSE_PARSE);
-	}
-	for (/* */; nobj > 0; obj++, nobj--) {
-		/*
-		 * in every iteration, pull the
-		 * address/alias/cname, copy it, set and update
-		 * the pointers vector if it is not a duplicate.
-		 */
-		struct entry_col *ecol;
-		char *val;
-		int   len;
+	/*
+	 * process remaining entries
+	 */
+	for (; nobj > 0; --nobj, obj++) {
+		/* object should be non-null */
+		if (obj == NULL)
+			return (NSS_STR_PARSE_PARSE);
 
 		if (obj->zo_data.zo_type != NIS_ENTRY_OBJ ||
-		    (obj->EN_data.en_cols.en_cols_len < NETDB_COL)) {
+			obj->EN_data.en_cols.en_cols_len < NETDB_COL) {
 			/* namespace/table/object is curdled */
 			return (NSS_STR_PARSE_PARSE);
 		}
 		ecol = obj->EN_data.en_cols.en_cols_val;
 
+		if (protokey != NULL) {
+			/* skip if protocols doesn't match for services */
+			__NISPLUS_GETCOL_OR_RETURN(ecol, SERV_NDX_PROTO,
+				protolen, proto);
+			if (protolen != protokeylen ||
+				strncasecmp(proto, protokey, protolen) != 0)
+				continue;
+		}
+
+		__NISPLUS_GETCOL_OR_CONTINUE(ecol, NETDB_NDX_NAME,
+			namelen, name);
+
 		/*
-		 * ASSUMPTION: cname and name field in NIS+ tables are
-		 * null terminated and the len includes the null char.
+		 * add the "name" to the list if it doesn't
+		 * match the "cname"
 		 */
-		if (isaddr) {
-			EC_SET(ecol, HOST_NDX_ADDR, len, val);
-		} else {
-
-			if (proto) {
-				/*
-				 * indicates we screen for a desired proto
-				 * in the case of getservbyname/port()
-				 * with a non-null proto arg
-				 */
-				EC_SET(ecol, SERV_NDX_PROTO, len, val);
-				if (len < 2)
-					return (NSS_STR_PARSE_PARSE);
-				if (strcmp(proto, val) != 0)
-					continue; /* ignore this entry */
-			}
-
-			if (*cnamep == 0) {
-				/* canonical name, hasn't been set so far */
-				EC_SET(ecol, NETDB_NDX_CNAME, len, val);
-				if (len < 2)
-					return (NSS_STR_PARSE_PARSE);
-				*aliaspp -= len;
-				if (*aliaspp <=
-					(char *)&(alias_list[*count + 1])) {
-				/*
-				 * Has to be room for the pointer to
-				 * the name we're about to add, as
-				 * well as the final NULL ptr.
-				 */
-					return (NSS_STR_PARSE_ERANGE);
-				}
-				memcpy(*aliaspp, val, len);
-				*cnamep = *aliaspp;
-			}
-			EC_SET(ecol, NETDB_NDX_NAME, len, val);
-		}
-		if (len > 0) {
-			int i;
-			struct in6_addr addr6;
-			struct in_addr addr;
-
-			if (isaddr) { /* special case for host addresses */
-
-				if (af_type == AF_INET) {
-					if (inet_pton(AF_INET, val,
-							(void *) &addr) != 1)
-						continue; /* skip entry */
-				} else {
-				/*
-				 * We now allow IPv4 and IPv6 addrs in the
-				 * ipnodes table. If found, convert it to a
-				 * v4 mapped IPv6 address.
-				 */
-					if (inet_pton(AF_INET6, val,
-						(void *) &addr6) != 1) {
-						if (inet_pton(AF_INET, val,
-							(void *) &addr) != 1) {
-							continue;
-							/* skip entry */
-						} else {
-							IN6_INADDR_TO_V4MAPPED(
-							    &addr,
-							    &addr6);
-						}
-					}
-				}
-
-				/* Check for duplicate address */
-				for (i = 0; i < *count; i++) {
-					if (af_type == AF_INET) {
-						if (memcmp(alias_list[i], &addr,
-						    sizeof (struct in_addr))
-						    == 0) {
-							goto next_obj;
-						}
-					} else {
-						if (memcmp(alias_list[i],
-						    &addr6,
-						    sizeof (struct in6_addr))
-						    == 0) {
-							goto next_obj;
-						}
-					}
-				}
-				/*
-				 * Hope nobody treats an h_addr_list[i] as a
-				 * null terminated string. We are not storing
-				 * that here.
-				 */
-				if (af_type == AF_INET)
-					*aliaspp -= sizeof (struct in_addr);
-				else
-					*aliaspp -= sizeof (struct in6_addr);
-			} else {
-				/* Check for duplicate alias */
-				for (i = 0; i < *count; i++) {
-					if (strcmp(alias_list[i], val) == 0) {
-						goto next_obj;
-					}
-				}
-				*aliaspp -= len;
-			}
-			alias_list[i] = *aliaspp;
-			if (*aliaspp <= (char *)&(alias_list[i + 1])) {
-				/*
-				 * Has to be room for the pointer to
-				 * the address we're about to add, as
-				 * well as the final NULL ptr.
-				 */
+		if (cnamelen != namelen ||
+				strncmp(name, cname, namelen) != 0) {
+			p = linep + 1 + namelen;
+			if (p >= limit)
 				return (NSS_STR_PARSE_ERANGE);
-			}
-			if (isaddr) {
-				if (af_type == AF_INET)
-					memcpy(alias_list[i], (char *)&addr,
-						sizeof (struct in_addr));
-				else
-					memcpy(alias_list[i], (char *)&addr6,
-						sizeof (struct in6_addr));
-			} else {
-				memcpy(*aliaspp, val, len);
-			}
-			++(*count);
+			(void) snprintf(linep, (size_t)(limit - linep),
+					" %s", name);
+			linep = p;
 		}
-		next_obj:
-			;
 	}
-	alias_list[*count] = NULL;
-	if (*count == 0)
-		return (NSS_STR_PARSE_PARSE);
-	else
-		return (NSS_STR_PARSE_SUCCESS);
+	return (NSS_STR_PARSE_SUCCESS);
 }

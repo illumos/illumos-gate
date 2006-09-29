@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993-2000, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+/*
  *	gethostent6.c
  */
 
@@ -115,7 +115,7 @@ cloneName(struct hostent *h, int *outerr) {
 		return (0);
 	}
 
-	memcpy(name, h->h_name, len+1);
+	(void) memcpy(name, h->h_name, len+1);
 
 	*errp = 0;
 	return (name);
@@ -130,7 +130,7 @@ cloneName(struct hostent *h, int *outerr) {
  * Note: The pointers to the addresses in the moreAddrs[] array are copied,
  *       but not the IP addresses themselves.
  */
-struct in6_addr **
+static struct in6_addr **
 cloneAddrList(struct hostent *h, struct in6_addr **moreAddrs, int *outerr) {
 
 	struct in6_addr	**addrArray, *addrList;
@@ -176,10 +176,12 @@ cloneAddrList(struct hostent *h, struct in6_addr **moreAddrs, int *outerr) {
 	for (i = 0; i < addrCount; i++) {
 		addrArray[i] = addrList;
 		if (domap) {
+			/* LINTED: E_BAD_PTR_CAST_ALIGN */
 			IN6_INADDR_TO_V4MAPPED(
 			(struct in_addr *)h->h_addr_list[i], addrArray[i]);
 		} else {
-			memcpy(addrArray[i], h->h_addr_list[i], addrlen);
+			(void) memcpy(addrArray[i], h->h_addr_list[i],
+				addrlen);
 		}
 		addrList = PTROFF(addrList, addrlen);
 	}
@@ -211,7 +213,7 @@ static char **
 cloneAliasList(struct hostent *h, char **mergeAliases, int *outerr) {
 
 	char	**aliasArray, *aliasList;
-	int	i, j, k, aliasCount, mergeAliasCount = 0, realMac = 0;
+	int	i, j, aliasCount, mergeAliasCount = 0, realMac = 0;
 	int	stringSize = 0;
 	int	error, *errp;
 
@@ -259,7 +261,7 @@ cloneAliasList(struct hostent *h, char **mergeAliases, int *outerr) {
 	for (i = 0; i < aliasCount; i++) {
 		int	len = strlen(h->h_aliases[i]);
 		aliasArray[i] = aliasList;
-		memcpy(aliasArray[i], h->h_aliases[i], len+1);
+		(void) memcpy(aliasArray[i], h->h_aliases[i], len+1);
 		aliasList = PTROFF(aliasList, RNDUP(len+1));
 	}
 
@@ -275,7 +277,7 @@ cloneAliasList(struct hostent *h, char **mergeAliases, int *outerr) {
 	return (aliasArray);
 }
 
-
+/*ARGSUSED*/
 static nss_status_t
 getbyname(be, a)
 	dns_backend_ptr_t	be;
@@ -407,11 +409,23 @@ getbyname(be, a)
 		argp->h_errno = v6_h_errno;
 	}
 
-	if (he != 0) {
-		ret = ent2result(he, a, AF_INET6);
-		if (ret == NSS_STR_PARSE_SUCCESS) {
-			argp->returnval = argp->buf.result;
+	if (he != NULL) {
+		/*
+		 * if asked to return data in string,
+		 * convert the hostent structure into
+		 * string data
+		 */
+		if (argp->buf.result == NULL) {
+			ret = ent2str(he, a, AF_INET6);
+			if (ret == NSS_STR_PARSE_SUCCESS)
+				argp->returnval = argp->buf.buffer;
 		} else {
+			ret = ent2result(he, a, AF_INET6);
+			if (ret == NSS_STR_PARSE_SUCCESS)
+				argp->returnval = argp->buf.result;
+		}
+
+		if (ret != NSS_STR_PARSE_SUCCESS) {
 			argp->h_errno = HOST_NOT_FOUND;
 			if (ret == NSS_STR_PARSE_ERANGE) {
 				argp->erange = 1;
@@ -531,4 +545,23 @@ _nss_dns_ipnodes_constr(dummy1, dummy2, dummy3)
 {
 	return (_nss_dns_constr(ipnodes_ops,
 		sizeof (ipnodes_ops) / sizeof (ipnodes_ops[0])));
+}
+
+/*
+ * optional NSS2 packed backend gethostsbyipnode with ttl
+ * entry point.
+ *
+ * Returns:
+ *	NSS_SUCCESS - successful
+ *	NSS_NOTFOUND - successful but nothing found
+ *	NSS_ERROR - fallback to NSS backend lookup mode
+ * If successful, buffer will be filled with valid data
+ *
+ */
+
+/*ARGSUSED*/
+nss_status_t
+_nss_get_dns_ipnodes_name(dns_backend_ptr_t *be, void **bufp, size_t *sizep)
+{
+	return (_nss_dns_gethost_withttl(*bufp, *sizep, 1));
 }

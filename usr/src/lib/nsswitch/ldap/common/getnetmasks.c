@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,79 +46,60 @@ static const char *netmasks_attrs[] = {
 
 
 /*
- * _nss_ldap_netmasks2ent is the data marshaling method for the netmasks
- * getXbyY * (e.g., getbynet()) backend processes. This method is called
- * after a successful ldap search has been performed. This method will
- * parse the ldap search values into struct in_addr *mask = argp->buf.result
- * only if argp->buf.result is initialized (not NULL). Three error
- * conditions are expected and returned to nsswitch.
+ * _nss_ldap_netmasks2str is the data marshaling method for the netmasks
+ * getXbyY * (e.g., getnetmaskby[net|addr]()) backend processes.
+ * This method is called after a successful ldap search has been performed.
+ * This method will parse the ldap search values into the file format.
+ *
+ * getnetmaskbykey set argp->buf.buffer to NULL and argp->buf.buflen to 0
+ * and argp->buf.result to non-NULL.
+ * The front end marshaller str2add expects "netmask" only
+ *
+ * e.g.
+ *
+ * 255.255.255.0
+ *
+ *
  */
 
 static int
-_nss_ldap_netmasks2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_netmasks2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int		i, j;
-	int		nss_result;
-	unsigned long	len = 0L;
-#ifdef DEBUG
-	char		maskstr[16];
-#endif /* DEBUG */
-	struct in_addr	addr;
-	struct in_addr	*mask = (struct in_addr *)NULL;
+	int		nss_result, len;
 	ns_ldap_result_t	*result = be->result;
-	ns_ldap_attr_t	*attrptr;
+	char		*buffer, **netmask;
 
-	mask = (struct in_addr *)argp->buf.result;
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
 
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_nmks2ent;
+	nss_result = NSS_STR_PARSE_SUCCESS;
+
+	netmask = __ns_ldap_getAttr(result->entry, _N_NETMASK);
+	if (netmask == NULL || netmask[0] == NULL ||
+				(strlen(netmask[0]) < 1)) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_nmks2str;
 	}
-
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_nmks2ent;
+	/* Add a trailing null for debugging purpose */
+	len = strlen(netmask[0]) + 1;
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, len)) == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_nmks2str;
 		}
-		if (strcasecmp(attrptr->attrname, _N_NETMASK) == 0) {
-			for (j = 0;  j < attrptr->value_count; j++) {
-				if (mask == NULL)
-					continue;
-				if ((attrptr->attrvalue[j] == NULL) ||
-				    (len = strlen(attrptr->attrvalue[j])) < 1) {
-					nss_result = (int)NSS_STR_PARSE_PARSE;
-					goto result_nmks2ent;
-				}
-				/* addr a IPv4 address and 32 bits */
-				addr.s_addr = inet_addr(attrptr->attrvalue[j]);
-				if (addr.s_addr == 0xffffffffUL) {
-					nss_result = (int)NSS_STR_PARSE_PARSE;
-					goto result_nmks2ent;
-				}
-				mask->s_addr = addr.s_addr;
-#ifdef DEBUG
-				strlcpy(maskstr, attrptr->attrvalue[j],
-							sizeof (maskstr));
-#endif /* DEBUG */
-				continue;
-			}
-		}
-	}
+		be->buflen = len - 1;
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[netmasks.c: _nss_ldap_netmasks2ent]\n");
-	(void) fprintf(stdout, "       netmask: [%s]\n", maskstr);
-#endif /* DEBUG */
 
-result_nmks2ent:
+	(void) snprintf(buffer, len, "%s", netmask[0]);
+
+result_nmks2str:
 
 	(void) __ns_ldap_freeResult(&be->result);
 	return ((int)nss_result);
 }
-
 
 /*
  * getbynet gets a network mask by address. This function constructs an
@@ -142,7 +122,6 @@ getbynet(ldap_backend_ptr be, void *a)
 	if (_ldap_filter_name(netnumber, argp->key.name, sizeof (netnumber))
 			!= 0)
 		return ((nss_status_t)NSS_NOTFOUND);
-
 	ret = snprintf(searchfilter, sizeof (searchfilter),
 	    _F_GETMASKBYNET, netnumber);
 	if (ret >= sizeof (searchfilter) || ret < 0)
@@ -179,5 +158,5 @@ _nss_ldap_netmasks_constr(const char *dummy1, const char *dummy2,
 
 	return ((nss_backend_t *)_nss_ldap_constr(netmasks_ops,
 		sizeof (netmasks_ops)/sizeof (netmasks_ops[0]), _NETMASKS,
-		netmasks_attrs, _nss_ldap_netmasks2ent));
+		netmasks_attrs, _nss_ldap_netmasks2str));
 }

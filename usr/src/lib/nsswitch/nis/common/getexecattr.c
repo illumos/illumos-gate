@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +40,7 @@ extern void massage_netdb(const char **, int *);
 extern int _doexeclist(nss_XbyY_args_t *);
 extern char *_exec_wild_id(char *, const char *);
 extern void _exec_cleanup(nss_status_t, nss_XbyY_args_t *);
-
+extern char *_strtok_escape(char *, char *, char **);
 
 typedef struct __exec_nis_args {
 	int		*yp_status;
@@ -88,6 +87,43 @@ check_match(nss_XbyY_args_t *argp, int check_policy)
 	return (1);
 }
 
+/*
+ * check_match_strbuf: set up the data needed by check_match()
+ * and call it to match exec_attr data in strbuf and argp->key.attrp
+ */
+static int
+check_match_strbuf(nss_XbyY_args_t *argp, char *strbuf, int check_policy)
+{
+	char		*last = NULL;
+	char		*sep = KV_TOKEN_DELIMIT;
+	execstr_t	exec;
+	execstr_t	*execp = &exec;
+	void		*sp;
+	int		rc;
+
+	/*
+	 * Remove newline that yp_match puts at the
+	 * end of the entry it retrieves from the map.
+	 */
+	if (strbuf[argp->returnlen] == '\n') {
+		strbuf[argp->returnlen] = '\0';
+	}
+
+	execp->name = _strtok_escape(strbuf, sep, &last);
+	execp->policy = _strtok_escape(NULL, sep, &last);
+	execp->type = _strtok_escape(NULL, sep, &last);
+	execp->res1 = _strtok_escape(NULL, sep, &last);
+	execp->res2 = _strtok_escape(NULL, sep, &last);
+	execp->id = _strtok_escape(NULL, sep, &last);
+
+	sp = argp->returnval;
+	argp->returnval = execp;
+	rc = check_match(argp, check_policy);
+	argp->returnval = sp;
+	free(strbuf);
+
+	return (rc);
+}
 
 static  nss_status_t
 _exec_nis_parse(const char *instr,
@@ -98,13 +134,28 @@ _exec_nis_parse(const char *instr,
 	int		parse_stat;
 	nss_status_t	res;
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
+	char		*strbuf;
+	int		check_matched;
 
+	argp->returnval = NULL;
+	argp->returnlen = 0;
 	parse_stat = (*argp->str2ent)(instr, instr_len, argp->buf.result,
 	    argp->buf.buffer, argp->buf.buflen);
 	switch (parse_stat) {
 	case NSS_STR_PARSE_SUCCESS:
-		argp->returnval = argp->buf.result;
-		if (check_match(argp, check_policy)) {
+		argp->returnlen = instr_len;
+		/* if exec_attr file format requested */
+		if (argp->buf.result == NULL) {
+			argp->returnval = argp->buf.buffer;
+			if ((strbuf = strdup(instr)) == NULL)
+				res = NSS_UNAVAIL;
+			check_matched = check_match_strbuf(argp,
+				strbuf, check_policy);
+		} else {
+			argp->returnval = argp->buf.result;
+			check_matched = check_match(argp, check_policy);
+		}
+		if (check_matched) {
 			res = NSS_SUCCESS;
 			if (_priv_exec->search_flag == GET_ALL) {
 				if (_doexeclist(argp) == 0) {
@@ -133,6 +184,7 @@ _exec_nis_parse(const char *instr,
  * flow of key-value pairs. If it returns a non-zero value, it is not called
  * again. The functional value of yp_all is then 0.
  */
+/*ARGSUSED*/
 static int
 _exec_nis_cb(int instatus,
     char *inkey,
@@ -144,7 +196,6 @@ _exec_nis_cb(int instatus,
 	int		check_policy = 1; /* always check policy for yp_all */
 	int		stop_cb;
 	const char	*filter;
-	char		*key = NULL;
 	nss_status_t	res;
 	_exec_nis_args	*eargp = (_exec_nis_args *)indata;
 	nss_XbyY_args_t	*argp = eargp->argp;
@@ -206,7 +257,6 @@ _exec_nis_lookup(nis_backend_ptr_t be, nss_XbyY_args_t *argp, int getby_flag)
 	if (getby_flag == NSS_DBOP_EXECATTR_BYNAMEID) {
 		int		check_policy = 0;
 		int		vallen;
-		int		parse_stat;
 		char		*val;
 		char		key[MAX_INPUT];
 
@@ -330,6 +380,7 @@ getbyid(nis_backend_ptr_t be, void *a)
 {
 	nss_status_t	res;
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
+	/*LINTED*/
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 
 	res = _exec_nis_lookup(be, argp, NSS_DBOP_EXECATTR_BYID);
@@ -348,6 +399,7 @@ getbynameid(nis_backend_ptr_t be, void *a)
 {
 	nss_status_t	res;
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
+	/*LINTED*/
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 
 	res = _exec_nis_lookup(be, argp, NSS_DBOP_EXECATTR_BYNAMEID);
@@ -371,6 +423,7 @@ static nis_backend_op_t execattr_ops[] = {
 	getbynameid
 };
 
+/*ARGSUSED*/
 nss_backend_t *
 _nss_nis_exec_attr_constr(const char *dummy1,
     const char *dummy2,

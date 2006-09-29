@@ -36,20 +36,35 @@ static const char *printers = "/etc/printers.conf";
 #include <stdlib.h>
 #include <strings.h>
 
-static nss_status_t _nss_files_XY_printers(files_backend_ptr_t,
-	nss_XbyY_args_t *, const char *);
-
-
-static nss_status_t
-getent(be, a)
-	files_backend_ptr_t	be;
-	void			*a;
+static int
+check_name(nss_XbyY_args_t *argp, const char *line, int linelen)
 {
-	nss_XbyY_args_t	 *args = (nss_XbyY_args_t *)a;
 
-	return (_nss_files_XY_all(be, args, 0, 0, 0));
+	const char	*limit, *linep;
+	const char	*keyp = argp->key.name;
+	int		klen = strlen(keyp);
+
+	linep = line;
+	limit = line + linelen;
+
+	/*
+	 * find the name in the namelist a|b|c...:
+	 */
+	while (linep+klen < limit && *linep != '|' && *linep != ':') {
+		if ((strncmp(linep, keyp, klen) == 0) &&
+		    ((*(linep + klen) == '|') || (*(linep + klen) == ':'))) {
+			return (1);
+		} else {
+			while (linep < limit && *linep != '|' && *linep != ':')
+				linep++;
+			if (linep >= limit || *linep == ':')
+				return (0);
+			if (*linep == '|')
+				linep++;
+		}
+	}
+	return (0);
 }
-
 
 static nss_status_t
 getbyname(be, a)
@@ -57,119 +72,27 @@ getbyname(be, a)
 	void			*a;
 {
 	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
-	nss_status_t		res;
 
-	/* printers_getbyname() has not set/endent; rewind on each call */
-	if ((res = _nss_files_setent(be, 0)) != NSS_SUCCESS) {
-		return (res);
-	}
-	return (_nss_files_XY_printers(be, argp, argp->key.name));
+	return (_nss_files_XY_all(be, argp, 1, argp->key.name,
+			check_name));
 }
 
 static files_backend_op_t printers_ops[] = {
 	_nss_files_destr,
 	_nss_files_endent,
 	_nss_files_setent,
-	getent,
+	_nss_files_getent_rigid,
 	getbyname
 };
 
+/*ARGSUSED*/
 nss_backend_t *
 _nss_files_printers_constr(dummy1, dummy2, dummy3)
 	const char	*dummy1, *dummy2, *dummy3;
 {
 	return (_nss_files_constr(printers_ops,
-		sizeof (printers_ops) / sizeof (printers_ops[0]),
-		printers,
-		NSS_LINELEN_PRINTERS,
-		NULL));
-}
-
-/*
- * printers has the hostname as part of the data in the file, but the other
- * backends don't include it in the data passed to the backend.  For this
- * reason, we process everything here and don't bother calling the backend.
- */
-static nss_status_t
-_nss_files_XY_printers(be, args, filter)
-	files_backend_ptr_t	be;
-	nss_XbyY_args_t		*args;
-	const char		*filter;
-			/*
-			 * filter not useful here since the key
-			 * we are looking for is the first "word"
-			 * on the line and we can be fast enough.
-			 */
-{
-	nss_status_t		res;
-	int	parsestat;
-	int namelen;
-
-	if (be->buf == 0 &&
-		(be->buf = (char *)malloc(be->minbuf)) == 0) {
-		(void) _nss_files_endent(be, 0);
-		return (NSS_UNAVAIL); /* really panic, malloc failed */
-	}
-
-	res = NSS_NOTFOUND;
-	namelen = strlen(args->key.name);
-
-	while (1) {
-		char		*instr	= be->buf;
-		char		*p, *limit;
-		int		linelen;
-		int		found = 0;
-
-		/*
-		 * _nss_files_read_line does process the '\' that are used
-		 * in /etc/printers.conf for continuation and gives one long
-		 * buffer.
-		 *
-		 * linelen counts the characters up to but excluding the '\n'
-		 */
-		if ((linelen = _nss_files_read_line(be->f, instr,
-		    be->minbuf)) < 0) {
-			/* End of file */
-			args->returnval = 0;
-			args->erange    = 0;
-			break;
-		}
-		p = instr;
-
-		if (*p == '#')					/* comment */
-			continue;
-
-		/*
-		 * find the name in the namelist a|b|c...:
-		 */
-		if ((limit = strchr(instr, ':')) == NULL)	/* bad line */
-			continue;
-		while ((p < limit) && (found == 0)) {
-			if ((strncmp(p, args->key.name, namelen) == 0) &&
-			    ((*(p+namelen) == '|') || (*(p+namelen) == ':')))
-				found++;
-			else {
-				if ((p = strchr(p, '|')) == NULL)
-					p = limit;
-				else	/* skip the '|' */
-					p++;
-			}
-		}
-		if (found == 0)
-			continue;
-
-		p = instr;
-
-		if (args->buf.buflen <= linelen) {	/* not enough buffer */
-			args->erange = 1;
-			break;
-		}
-		(void) memcpy(args->buf.buffer, p, linelen);
-		args->buf.buffer[linelen] = '\0';
-		args->returnval = args->buf.result;
-		res = NSS_SUCCESS;
-		break;
-	}
-	(void) _nss_files_endent(be, 0);
-	return (res);
+			sizeof (printers_ops) / sizeof (printers_ops[0]),
+			printers,
+			NSS_LINELEN_PRINTERS,
+			NULL));
 }

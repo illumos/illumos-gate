@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,11 +43,11 @@
 #include <arpa/inet.h>
 #include <nss_dbdefs.h>
 
-static int str2addr(const char *, int, void *, char *, int);
+int str2addr(const char *, int, void *, char *, int);
 
 static DEFINE_NSS_DB_ROOT(db_root);
 
-static void
+void
 _nss_initf_netmasks(nss_db_params_t *p)
 {
 	p->name = NSS_DBNAM_NETMASKS;
@@ -59,24 +58,27 @@ _nss_initf_netmasks(nss_db_params_t *p)
  * Print a network number such as 129.144 as well as an IP address.
  * Assumes network byte order for both IP addresses and network numbers
  * (Network numbers are normally passed around in host byte order).
+ * to be MT safe, use a passed in buffer like otherget*_r APIs.
  */
 static char *
-inet_nettoa(struct in_addr in)
+inet_nettoa(struct in_addr in, char *result, int len)
 {
 	uint32_t addr = in.s_addr;
 	uchar_t *up = (uchar_t *)&addr;
-	static char result[256];
+
+	if (result == NULL)
+		return (NULL);
 
 	/* Omit leading zeros */
 	if (up[0]) {
-		(void) sprintf(result, "%d.%d.%d.%d",
+		(void) snprintf(result, len, "%d.%d.%d.%d",
 		    up[0], up[1], up[2], up[3]);
 	} else if (up[1]) {
-		(void) sprintf(result, "%d.%d.%d", up[1], up[2], up[3]);
+		(void) snprintf(result, len, "%d.%d.%d", up[1], up[2], up[3]);
 	} else if (up[2]) {
-		(void) sprintf(result, "%d.%d", up[2], up[3]);
+		(void) snprintf(result, len, "%d.%d", up[2], up[3]);
 	} else {
-		(void) sprintf(result, "%d", up[3]);
+		(void) snprintf(result, len, "%d", up[3]);
 	}
 	return (result);
 }
@@ -102,8 +104,10 @@ getnetmaskbykey(const struct in_addr addr, struct in_addr *mask)
 	 * the network address in the 'name' field as a filter to speed
 	 * up the lookup.
 	 */
+	if (inet_nettoa(addr, tmp, NSS_LINELEN_NETMASKS) == NULL)
+		return (NSS_NOTFOUND);
+
 	NSS_XbyY_INIT(&arg, mask, NULL, 0, str2addr);
-	(void) strcpy(tmp, inet_nettoa(addr));
 	arg.key.name = tmp;
 	res = nss_search(&db_root, _nss_initf_netmasks,
 			NSS_DBOP_NETMASKS_BYNET, &arg);

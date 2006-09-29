@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1993, 1998-1999 by Sun Microsystems, Inc.
- * All rights reserved.
- *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
  * Common code and structures used by name-service-switch "dns" backends.
  */
 
@@ -39,10 +39,12 @@
 #include <netdb.h>
 #include <strings.h>
 #include <thread.h>
+#include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
 #include <syslog.h>
 #include <nsswitch.h>
+#include <nss_common.h>
 #include <nss_dbdefs.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -74,12 +76,16 @@ extern mutex_t	one_lane;
 extern int _thr_sigsetmask(int, const sigset_t *, sigset_t *);
 extern int _mutex_lock(mutex_t *);
 extern int _mutex_unlock(mutex_t *);
-extern const char *inet_ntop(int, const void *, char *, size_t);
 
 extern int ent2result(struct hostent *, nss_XbyY_args_t *, int);
+extern int ent2str(struct hostent *, nss_XbyY_args_t *, int);
 
 nss_backend_t *_nss_dns_constr(dns_backend_op_t *, int);
 extern	nss_status_t _herrno2nss(int);
+
+nss_status_t _nss_dns_gethost_withttl(void *buf, size_t bufsize, int ipnode);
+nss_status_t _nss_get_dns_hosts_name(dns_backend_ptr_t *, void **, size_t *);
+nss_status_t _nss_get_dns_ipnodes_name(dns_backend_ptr_t *, void **, size_t *);
 
 #ifdef	__cplusplus
 }

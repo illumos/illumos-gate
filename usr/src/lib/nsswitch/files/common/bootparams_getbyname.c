@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,11 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
  *	files/bootparams_getbyname.c -- "files" backend for
  *	nsswitch "bootparams" database.
- *
- *	Copyright (c) 1988-1995 Sun Microsystems Inc
- *	All Rights Reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,7 +43,7 @@ getbyname(be, a)
 	files_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	nss_status_t		res;
 
 	/* bootparams_getbyname() has not set/endent; rewind on each call */
@@ -108,14 +107,14 @@ _nss_files_XY_bootparams(be, args, filter)
 		 * _nss_files_read_line does process the '\' that are used
 		 * in /etc/bootparams for continuation and gives one long
 		 * buffer.
-		 * 
+		 *
 		 * linelen counts the characters up to but excluding the '\n'
 		 */
 		if ((linelen = _nss_files_read_line(be->f, instr,
 		    be->minbuf)) < 0) {
 			/* End of file */
 			args->returnval = 0;
-			args->erange    = 0;
+			args->returnlen = 0;
 			break;
 		}
 
@@ -158,6 +157,7 @@ _nss_files_XY_bootparams(be, args, filter)
 		(void) memcpy(args->buf.buffer, p, linelen);
 		args->buf.buffer[linelen] = '\0';
 		args->returnval = args->buf.result;
+		args->returnlen = linelen;
 		res = NSS_SUCCESS;
 		break;
 	}

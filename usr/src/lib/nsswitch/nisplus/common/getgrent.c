@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,7 +71,7 @@ getbygid(be, a)
 	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	char			gidstr[12];	/* More than enough */
 
-	sprintf(gidstr, "%d", argp->key.gid);
+	(void) snprintf(gidstr, 12, "%ld", argp->key.gid);
 	return (_nss_nisplus_lookup(be, argp, GR_TAG_GID, gidstr));
 }
 
@@ -144,7 +143,8 @@ getbymember(be, a)
 	 *  dumping all of the group entries and searching from the member
 	 *  name on our own.
 	 */
-	sprintf(buf, "[members=%s],%s", argp->username, be->table_name);
+	(void) snprintf(buf, NIS_MAXNAMELEN, "[members=%s],%s",
+			argp->username, be->table_name);
 	r = __nis_list_localcb(buf, NIS_LIST_COMMON | ALL_RESULTS |
 			__nis_force_hard_lookups, gr_cback, &grdata);
 	if (r && r->status != NIS_BADATTRIBUTE) {
@@ -165,7 +165,7 @@ getbymember(be, a)
 
 
 /*
- * place the results from the nis_object structure into argp->buf.result
+ * convert the nisplus object into files format
  * Returns NSS_STR_PARSE_{SUCCESS, ERANGE, PARSE}
  *
  * This routine does not tolerate non-numeric gr_gid. It
@@ -173,21 +173,16 @@ getbymember(be, a)
  */
 /*ARGSUSED*/
 static int
-nis_object2ent(nobj, obj, argp)
-	int		nobj;
-	nis_object	*obj;
-	nss_XbyY_args_t	*argp;
+nis_object2str(nobj, obj, be, argp)
+	int			nobj;
+	nis_object		*obj;
+	nisplus_backend_ptr_t	be;
+	nss_XbyY_args_t		*argp;
 {
-	char	*buffer, *limit, *val, *endnum, *grstart;
-	int		buflen = argp->buf.buflen;
-	struct 	group *gr;
-	struct	entry_col *ecol;
-	int		len;
-	char	**memlist;
-
-	limit = argp->buf.buffer + buflen;
-	gr = (struct group *)argp->buf.result;
-	buffer = argp->buf.buffer;
+	char			*buffer, *name, *passwd, *gid, *members;
+	int			buflen, namelen, passwdlen, gidlen, memberslen;
+	char			*endnum;
+	struct entry_col	*ecol;
 
 	/*
 	 * If we got more than one nis_object, we just ignore it.
@@ -204,92 +199,44 @@ nis_object2ent(nobj, obj, argp)
 	}
 	ecol = obj->EN_data.en_cols.en_cols_val;
 
-	/*
-	 * gr_name: group name
-	 */
-	EC_SET(ecol, GR_NDX_NAME, len, val);
-	if (len < 2)
-		return (NSS_STR_PARSE_PARSE);
-	gr->gr_name = buffer;
-	buffer += len;
-	if (buffer >= limit)
-		return (NSS_STR_PARSE_ERANGE);
-	strcpy(gr->gr_name, val);
+	/* name: group name */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, GR_NDX_NAME, namelen, name);
 
 	/*
-	 * gr_passwd: group passwd
-	 *
-	 * POLICY:  The empty password ("") is gladly accepted.
+	 * passwd: group passwd
+	 * empty password ("") is gladly accepted.
 	 */
-	EC_SET(ecol, GR_NDX_PASSWD, len, val);
-	if (len == 0) {
-		len = 1;
-		val = "";
-	}
-	gr->gr_passwd = buffer;
-	buffer += len;
-	if (buffer >= limit)
-		return (NSS_STR_PARSE_ERANGE);
-	strcpy(gr->gr_passwd, val);
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, GR_NDX_PASSWD, passwdlen, passwd);
 
-	/*
-	 * gr_gid: group id
-	 */
-	EC_SET(ecol, GR_NDX_GID, len, val);
-	if (len == 0) {
+	/* gid: group id */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, GR_NDX_GID, gidlen, gid);
+	(void) strtol(gid, &endnum, 10);
+	if (*endnum != 0 || gid == endnum)
 		return (NSS_STR_PARSE_PARSE);
-	} else {
-		gr->gr_gid = strtol(val, &endnum, 10);
-		if (*endnum != 0) {
+
+	/* members: gid list */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, GR_NDX_MEM, memberslen, members);
+
+	buflen = namelen + passwdlen + gidlen + memberslen + 4;
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, buflen)) == NULL)
 			return (NSS_STR_PARSE_PARSE);
-		}
+		/* exclude the trailing null from length */
+		be->buflen = buflen - 1;
+		buffer = be->buffer;
+	} else {
+		if (buflen > argp->buf.buflen)
+			return (NSS_STR_PARSE_ERANGE);
+		buflen = argp->buf.buflen;
+		buffer = argp->buf.buffer;
+		(void) memset(buffer, 0, buflen);
 	}
-
-	/*
-	 * gr_mem: gid list
-	 *
-	 * We first copy the field that looks like "grp1,grp2,..,grpn\0"
-	 * into the buffer and advance the buffer in order to allocate
-	 * for the gr_mem vector. We work on the group members in place
-	 * in the buffer by replacing the "commas" with \0 and simulataneously
-	 * advance the vector and point to a member.
-	 *
-	 * POLICY: We happily accept a null gid list. NIS+ tables store
-	 * that as a single null character.
-	 */
-	EC_SET(ecol, GR_NDX_MEM, len, val);
-	if (len == 0) {
-		len = 1;
-		val = "";
-	}
-	grstart = buffer;
-	buffer += len;
-	if (buffer >= limit)
-		return (NSS_STR_PARSE_ERANGE);
-	strcpy(grstart, val);
-
-	gr->gr_mem = memlist = (char **)ROUND_UP(buffer, sizeof (char **));
-	limit = (char *)ROUND_DOWN(limit, sizeof (char **));
-
-	while ((char *)memlist < limit) {
-		char c;
-		char *p = grstart;
-
-		if (*p != '\0')		/* avoid empty string */
-			*memlist++ = p;
-		while ((c = *p) != '\0' && c != ',') {
-			p++;
-		}
-		if (*p == '\0') {	/* all done */
-			*memlist = 0;
-			break;
-		}
-		*p++ = '\0';
-		grstart = p;
-	}
-	if ((char *)memlist >= limit)
-		return (NSS_STR_PARSE_ERANGE);
-
+	(void) snprintf(buffer, buflen, "%s:%s:%s:%s",
+			name, passwd, gid, members);
+#ifdef DEBUG
+	(void) fprintf(stdout, "group [%s]\n", buffer);
+	(void) fflush(stdout);
+#endif  /* DEBUG */
 	return (NSS_STR_PARSE_SUCCESS);
 }
 
@@ -310,7 +257,7 @@ _nss_nisplus_group_constr(dummy1, dummy2, dummy3)
 {
 	return (_nss_nisplus_constr(gr_ops,
 				    sizeof (gr_ops) / sizeof (gr_ops[0]),
-				    GR_TBLNAME, nis_object2ent));
+				    GR_TBLNAME, nis_object2str));
 }
 
 #define	NEXT	0
@@ -404,7 +351,7 @@ netid_lookup(struct memdata *grdata, nisplus_backend_ptr_t be)
 		return (NSS_NOTFOUND);
 	}
 
-	snprintf(buf, NIS_MAXNAMELEN,
+	(void) snprintf(buf, NIS_MAXNAMELEN,
 	    "[auth_name=%d,auth_type=LOCAL],cred.%s", pw.pw_uid,
 	    nis_domain_of(be->table_name));
 
@@ -436,6 +383,7 @@ netid_lookup(struct memdata *grdata, nisplus_backend_ptr_t be)
 	}
 }
 
+/*ARGSUSED*/
 static int
 netid_cback(nis_name objname, nis_object *obj, struct memdata *g)
 {

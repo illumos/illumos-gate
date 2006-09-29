@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,181 +46,164 @@ static const char *protocols_attrs[] = {
 	(char *)NULL
 };
 
+typedef struct protocol_alias {
+	char	*protocol;
+	char	*alias;
+} protocol_alias_t;
+
+static const protocol_alias_t ip_aliases[10] = {
+	{ "ip", "IP" },
+	{ "ipip", "IP-IP" },
+	{ "ipcomp", "IPComp" },
+	{ "ipv6", "IPv6" },
+	{ "ipv6-route", "IPv6-Route" },
+	{ "ipv6-frag", "IPv6-Frag" },
+	{ "ipv6-icmp", "IPv6-ICMP" },
+	{ "ipv6-nonxt", "IPv6-NoNxt" },
+	{ "ipv6-opts", "IPv6-Opts" },
+	{ NULL, NULL }
+};
 
 /*
- * _nss_ldap_protocols2ent is the data marshaling method for the protocols
+ * When the data is imported by ldapaddent, it does not save the aliase in the
+ * "cn" that is same as the canonical name but only different in case.
+ * e.g.
+ * icmp		1	ICMP
+ *
+ * is saved as
+ *
+ * dn: cn=icmp, ...
+ * ...
+ * cn: icmp
+ * ...
+ *
+ * So it needs to replicate the canonical name as an alias of upper case.
+ * But some protocol does have different aliases.
+ *
+ * e.g.
+ * dn: cn=ospf, ...
+ * ...
+ * cn: ospf
+ * cn: OSPFIGP
+ * ...
+ *
+ * For many ip* protocols, the aliases are mixed cased. Maybe it's case
+ * insensitive. But this fucntion tries to restore the aliases to the original
+ * form as much as possible. If the alias can't be found in the aliases table,
+ * it assumes the alias is all upper case.
+ *
+ */
+static char *
+get_alias(char *protocol) {
+	int	i;
+	char	*cp;
+
+	if (strncmp(protocol, "ip", 2) == 0) {
+		for (i = 0; ip_aliases[i].protocol != NULL; i++) {
+			if (strcmp(protocol, ip_aliases[i].protocol) == 0)
+				return (ip_aliases[i].alias);
+		}
+		/*
+		 * No aliase in the table. Return an all upper case aliase
+		 */
+		for (cp = protocol; *cp; cp++)
+			*cp = toupper(*cp);
+
+		return (protocol);
+	} else {
+		/* Return an all upper case aliase */
+		for (cp = protocol; *cp; cp++)
+			*cp = toupper(*cp);
+
+		return (protocol);
+	}
+
+}
+/*
+ * _nss_ldap_protocols2str is the data marshaling method for the protocols
  * getXbyY * (e.g., getbyname(), getbynumber(), getent()) backend processes.
  * This method is called after a successful ldap search has been performed.
- * This method will parse the ldap search values into *proto = (struct
- * protoent *)argp->buf.result which the frontend process expects. Three error
- * conditions are expected and returned to nsswitch.
+ * This method will parse the ldap search values into a file format.
+ * e.g.
+ * idrp 45 IDRP
+ * or
+ * ospf 89 OSPFIGP
  */
 
 static int
-_nss_ldap_protocols2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_protocols2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int		i, j;
+	uint_t		i;
 	int		nss_result;
-	int		buflen = (int)0;
-	int		firstime = (int)1;
-	unsigned long	len = 0L;
-	char		*cp, **mp, *cname = NULL;
-	char		*buffer = (char *)NULL;
-	char		*ceiling = (char *)NULL;
-	struct protoent	*proto = (struct protoent *)NULL;
+	int		buflen = 0, len;
+	char		*cname = NULL;
+	char		*buffer = NULL, **number, *alias;
 	ns_ldap_result_t	*result = be->result;
-	ns_ldap_attr_t	*attrptr;
+	ns_ldap_attr_t	*names;
 
-	buffer = (char *)argp->buf.buffer;
-	buflen = (size_t)argp->buf.buflen;
-	if (!argp->buf.result) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_pls2ent;
-	}
-	proto = (struct protoent *)argp->buf.result;
-	ceiling = buffer + buflen;
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
 
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
+	buflen = argp->buf.buflen;
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, buflen)) == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_pls2str;
+		}
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
+
+	nss_result = NSS_STR_PARSE_SUCCESS;
 	(void) memset(argp->buf.buffer, 0, buflen);
 
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_pls2ent;
+	names = __ns_ldap_getAttrStruct(result->entry, _P_NAME);
+	if (names == NULL || names->attrvalue == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_pls2str;
 	}
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_pls2ent;
-		}
-		if (strcasecmp(attrptr->attrname, _P_NAME) == 0) {
-			for (j = 0; j < attrptr->value_count; j++) {
-				if (firstime) {
-					/* protocol name */
-					cname = __s_api_get_canonical_name(
-						result->entry, attrptr, 1);
-					if (cname == NULL ||
-						(len = strlen(cname)) < 1) {
-						nss_result =
-							NSS_STR_PARSE_PARSE;
-						goto result_pls2ent;
-					}
-					proto->p_name = buffer;
-					buffer += len + 1;
-					if (buffer >= ceiling) {
-						nss_result =
-						    (int)NSS_STR_PARSE_ERANGE;
-						goto result_pls2ent;
-					}
-					(void) strcpy(proto->p_name, cname);
-					mp = proto->p_aliases =
-						(char **)ROUND_UP(buffer,
-						sizeof (char **));
-					buffer = (char *)proto->p_aliases +
-						sizeof (char *) *
-						(attrptr->value_count + 1);
-					buffer = (char *)ROUND_UP(buffer,
-						sizeof (char **));
-					if (buffer >= ceiling) {
-						nss_result =
-						    (int)NSS_STR_PARSE_ERANGE;
-						goto result_pls2ent;
-					}
-					firstime = (int)0;
-				}
-				/* alias list */
-				if ((attrptr->attrvalue[j] == NULL) ||
-				    (len = strlen(attrptr->attrvalue[j])) < 1) {
-					nss_result = NSS_STR_PARSE_PARSE;
-					goto result_pls2ent;
-				}
-				/*
-				 * When the data is imported by ldapaddent,
-				 * it does not save the aliase in the "cn"
-				 * that is same as the canonical name but only
-				 * differnt in case.
-				 * e.g.
-				 * icmp		1	ICMP
-				 *
-				 * is saved as
-				 *
-				 * dn: cn=icmp, ...
-				 * ...
-				 * cn: icmp
-				 * ...
-				 * So it needs to replicate the canonical name
-				 * as an aliase of upper case.
-				 *
-				 * But in the case of
-				 * ospf		89 OSPFIGP
-				 * it creates a redundant aliase.
-				 * e.g.
-				 * dn: cn=icmp, ...
-				 * ...
-				 * cn: ospf
-				 * cn: OSPFIGP
-				 * ...
-				 *
-				 * getent services ospf
-				 * ==> ospf	89 ospf OSPFIGP
-				 *
-				 * Some condition check is added to handle this
-				 * scenario. Such check also works with
-				 * following scenario.
-				 * dn: cn=icmp, ...
-				 * ...
-				 * cn: icmp
-				 * cn: ICMP
-				 * ...
-				 */
-				if (strcmp(proto->p_name,
-				    attrptr->attrvalue[j]) == 0) {
-					if (attrptr->value_count > 1)
-						/* Do not replicate */
-						continue;
-					for (cp = attrptr->attrvalue[j];
-					    *cp; cp++)
-						*cp = toupper(*cp);
-				}
-				*mp = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_pls2ent;
-				}
-				(void) strcpy(*mp++, attrptr->attrvalue[j]);
-				continue;
+	/* Get the canonical name */
+	cname = __s_api_get_canonical_name(result->entry, names, 1);
+	if (cname == NULL || (len = strlen(cname)) < 1) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_pls2str;
+	}
+	number = __ns_ldap_getAttr(result->entry, _P_PROTO);
+	if (number == NULL || number[0] == NULL ||
+			(len = strlen(number[0])) < 1) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_pls2str;
+	}
+	len = snprintf(buffer, buflen,  "%s %s", cname, number[0]);
+	TEST_AND_ADJUST(len, buffer, buflen, result_pls2str);
+	/* Append aliases */
+	if (names->value_count == 1) {
+		/* create an aliase from protocol name */
+		alias = get_alias(cname);
+		len = snprintf(buffer, buflen,  " %s", alias);
+		TEST_AND_ADJUST(len, buffer, buflen, result_pls2str);
+
+	} else {
+		for (i = 0; i < names->value_count; i++) {
+			if (names->attrvalue[i] == NULL) {
+				nss_result = NSS_STR_PARSE_PARSE;
+				goto result_pls2str;
 			}
-		}
-		if (strcasecmp(attrptr->attrname, _P_PROTO) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_pls2ent;
+			/* Skip the canonical name */
+			if (strcasecmp(names->attrvalue[i], cname) != 0) {
+				len = snprintf(buffer, buflen,  " %s",
+						names->attrvalue[i]);
+				TEST_AND_ADJUST(len, buffer, buflen,
+						result_pls2str);
 			}
-			errno = 0;
-			proto->p_proto = (int)strtol(attrptr->attrvalue[0],
-					    (char **)NULL, 10);
-			if (errno != 0) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_pls2ent;
-			}
-			continue;
 		}
 	}
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getprotoent.c: _nss_ldap_protocols2ent]\n");
-	(void) fprintf(stdout, "        p_name: [%s]\n", proto->p_name);
-	if (mp != NULL) {
-		for (mp = proto->p_aliases; *mp != NULL; mp++)
-			(void) fprintf(stdout, "     p_aliases: [%s]\n", *mp);
-	}
-	(void) fprintf(stdout, "       p_proto: [%d]\n", proto->p_proto);
-#endif /* DEBUG */
+	/* The front end marshaller doesn't need to copy trailing nulls */
+	if (argp->buf.result != NULL)
+		be->buflen = strlen(be->buffer);
 
-result_pls2ent:
+result_pls2str:
 
 	(void) __ns_ldap_freeResult(&be->result);
 	return ((int)nss_result);
@@ -323,5 +305,5 @@ _nss_ldap_protocols_constr(const char *dummy1, const char *dummy2,
 
 	return ((nss_backend_t *)_nss_ldap_constr(proto_ops,
 		sizeof (proto_ops)/sizeof (proto_ops[0]), _PROTOCOLS,
-		protocols_attrs, _nss_ldap_protocols2ent));
+		protocols_attrs, _nss_ldap_protocols2str));
 }

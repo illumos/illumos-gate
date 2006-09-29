@@ -1396,7 +1396,7 @@ genent_hosts6(line, cback, udata)
 	eobj.EN_data.en_cols.en_cols_val = ecol;
 	eobj.EN_data.en_cols.en_cols_len = 4;
 
-	if (cback != NULL)
+	if (cback == NULL)
 		cback = addentry;
 
 	/*

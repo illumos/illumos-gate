@@ -33,7 +33,6 @@
  * and contains new versions of the switch low level interface.
  *
  * This is a Project Private interface.  It may change in future releases.
- *	==== ^^^^^^^^^^^^^^^ ?
  */
 
 #ifndef _NSSWITCH_PRIV_H

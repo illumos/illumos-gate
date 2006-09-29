@@ -45,7 +45,8 @@
 #define	_F_GETGRENT		"(objectClass=posixGroup)"
 #define	_F_GETHOSTENT		"(objectClass=ipHost)"
 #define	_F_GETNETENT		"(objectClass=ipNetwork)"
-#define	_F_GETPROFNAME		"(objectClass=SolarisProfAttr)"
+#define	_F_GETPROFNAME \
+"(&(objectClass=SolarisProfAttr)(!(SolarisKernelSecurityPolicy=*)))"
 #define	_F_GETPROTOENT		"(objectClass=ipProtocol)"
 #define	_F_GETPWENT		"(objectClass=posixAccount)"
 #define	_F_GETPRINTERENT	"(objectClass=sunPrinter)"
@@ -85,7 +86,7 @@ static struct gettablefilter {
 };
 
 
-nss_status_t
+static nss_status_t
 switch_err(int rc, ns_ldap_error_t *error)
 {
 	switch (rc) {
@@ -109,6 +110,7 @@ switch_err(int rc, ns_ldap_error_t *error)
 		return (NSS_UNAVAIL);
 	}
 }
+/* ARGSUSED */
 nss_status_t
 _nss_ldap_lookup(ldap_backend_ptr be, nss_XbyY_args_t *argp,
 		char *database, char *searchfilter, char *domain,
@@ -136,16 +138,79 @@ _nss_ldap_lookup(ldap_backend_ptr be, nss_XbyY_args_t *argp,
 		argp->returnval = 0;
 		rc = switch_err(rc, error);
 		(void) __ns_ldap_freeError(&error);
+
 		return (rc);
 	}
+		(void) __ns_ldap_freeError(&error);
 	/* callback function */
 	if ((callbackstat =
-		    be->ldapobj2ent(be, argp)) == NSS_STR_PARSE_SUCCESS) {
-		argp->returnval = argp->buf.result;
-		return ((nss_status_t)NSS_SUCCESS);
+		    be->ldapobj2str(be, argp)) != NSS_STR_PARSE_SUCCESS) {
+		goto error_out;
 	}
-	(void) __ns_ldap_freeResult(&be->result);
 
+	/*
+	 * publickey does not have a front end marshaller and expects
+	 * a string to be returned in NSS.
+	 * No need to convert file format -> struct.
+	 *
+	 */
+	if (be->db_type == NSS_LDAP_DB_PUBLICKEY) {
+		argp->returnval = argp->buf.buffer;
+		argp->returnlen = strlen(argp->buf.buffer);
+		be->db_type = NSS_LDAP_DB_NONE;
+		return (NSS_SUCCESS);
+	}
+	/*
+	 *  Assume the switch engine wants the returned data in the file
+	 *  format when argp->buf.result == NULL.
+	 *  The front-end marshaller str2ether(ethers) uses
+	 *  ent (argp->buf.result) and buffer (argp->buf.buffer)
+	 *  for different purpose so ethers has to be treated differently.
+	 */
+	if (argp->buf.result != NULL ||
+			be->db_type == NSS_LDAP_DB_ETHERS) {
+		/* file format -> struct */
+		if (argp->str2ent == NULL) {
+			callbackstat = NSS_STR_PARSE_PARSE;
+			goto error_out;
+		}
+
+		callbackstat = (*argp->str2ent)(be->buffer,
+					be->buflen,
+					argp->buf.result,
+					argp->buf.buffer,
+					argp->buf.buflen);
+		if (callbackstat == NSS_STR_PARSE_SUCCESS) {
+			if (be->db_type == NSS_LDAP_DB_ETHERS &&
+					argp->buf.buffer != NULL) {
+				argp->returnval = argp->buf.buffer;
+				argp->returnlen = strlen(argp->buf.buffer);
+			} else {
+				argp->returnval = argp->buf.result;
+				argp->returnlen = 1; /* irrelevant */
+			}
+			if (be->buffer != NULL) {
+				free(be->buffer);
+				be->buffer = NULL;
+				be->buflen = 0;
+				be->db_type = NSS_LDAP_DB_NONE;
+			}
+			return ((nss_status_t)NSS_SUCCESS);
+		}
+	} else {
+			/* return file format in argp->buf.buffer */
+			argp->returnval = argp->buf.buffer;
+			argp->returnlen = strlen(argp->buf.buffer);
+			return ((nss_status_t)NSS_SUCCESS);
+	}
+
+error_out:
+	if (be->buffer != NULL) {
+		free(be->buffer);
+		be->buffer = NULL;
+		be->buflen = 0;
+		be->db_type = NSS_LDAP_DB_NONE;
+	}
 	/* error */
 	if (callbackstat == NSS_STR_PARSE_PARSE) {
 		argp->returnval = 0;
@@ -163,12 +228,12 @@ _nss_ldap_lookup(ldap_backend_ptr be, nss_XbyY_args_t *argp,
 	return ((nss_status_t)NSS_UNAVAIL);
 }
 
-
 /*
  *  This function is similar to _nss_ldap_lookup except it does not
  *  do a callback.  It is only used by getnetgrent.c
  */
 
+/* ARGSUSED */
 nss_status_t
 _nss_ldap_nocb_lookup(ldap_backend_ptr be, nss_XbyY_args_t *argp,
 		char *database, char *searchfilter, char *domain,
@@ -227,6 +292,10 @@ _clean_ldap_backend(ldap_backend_ptr be)
 		free(be->toglue);
 		be->toglue = NULL;
 	}
+	if (be->buffer != NULL) {
+		free(be->buffer);
+		be->buffer = NULL;
+	}
 	free(be);
 }
 
@@ -280,6 +349,7 @@ _nss_ldap_setent(ldap_backend_ptr be, void *a)
 	be->enumcookie = NULL;
 	be->result = NULL;
 	be->services_cookie = NULL;
+	be->buffer = NULL;
 	return ((nss_status_t)NSS_SUCCESS);
 }
 
@@ -310,6 +380,10 @@ _nss_ldap_endent(ldap_backend_ptr be, void *a)
 	}
 	if (be->services_cookie != NULL) {
 		_nss_services_cookie_free((void **)&be->services_cookie);
+	}
+	if (be->buffer != NULL) {
+		free(be->buffer);
+		be->buffer = NULL;
 	}
 
 	return ((nss_status_t)NSS_SUCCESS);
@@ -353,11 +427,47 @@ next_entry:
 		(void) _nss_ldap_endent(be, a);
 		return (retcode);
 	} else {
-		if ((parsestat = be->ldapobj2ent(be, argp))
+		/* ns_ldap_entry_t -> file format */
+		if ((parsestat = be->ldapobj2str(be, argp))
 			== NSS_STR_PARSE_SUCCESS) {
-			be->result = NULL;
-			argp->returnval = argp->buf.result;
-			return ((nss_status_t)NSS_SUCCESS);
+			if (argp->buf.result != NULL) {
+				/* file format -> struct */
+				if (argp->str2ent == NULL) {
+					parsestat = NSS_STR_PARSE_PARSE;
+					goto error_out;
+				}
+				parsestat = (*argp->str2ent)(be->buffer,
+						be->buflen,
+						argp->buf.result,
+						argp->buf.buffer,
+						argp->buf.buflen);
+				if (parsestat == NSS_STR_PARSE_SUCCESS) {
+					if (be->buffer != NULL) {
+						free(be->buffer);
+						be->buffer = NULL;
+						be->buflen = 0;
+					}
+					be->result = NULL;
+					argp->returnval = argp->buf.result;
+					argp->returnlen = 1; /* irrevelant */
+					return ((nss_status_t)NSS_SUCCESS);
+				}
+			} else {
+				/*
+				 * nscd is not caching the enumerated
+				 * entries. This code path would be dormant.
+				 * Keep this path for the future references.
+				 */
+				argp->returnval = argp->buf.buffer;
+				argp->returnlen =
+					strlen(argp->buf.buffer) + 1;
+			}
+		}
+error_out:
+		if (be->buffer != NULL) {
+			free(be->buffer);
+			be->buffer = NULL;
+			be->buflen = 0;
 		}
 		be->result = NULL;
 		if (parsestat == NSS_STR_PARSE_PARSE) {
@@ -394,7 +504,7 @@ next_entry:
 
 nss_backend_t *
 _nss_ldap_constr(ldap_backend_op_t ops[], int nops, char *tablename,
-		const char **attrs, fnf ldapobj2ent)
+		const char **attrs, fnf ldapobj2str)
 {
 	ldap_backend_ptr	be;
 
@@ -402,20 +512,13 @@ _nss_ldap_constr(ldap_backend_op_t ops[], int nops, char *tablename,
 	(void) fprintf(stdout, "\n[ldap_common.c: _nss_ldap_constr]\n");
 #endif	/* DEBUG */
 
-	if ((be = (ldap_backend_ptr) malloc(sizeof (*be))) == 0)
+	if ((be = (ldap_backend_ptr) calloc(1, sizeof (*be))) == 0)
 		return (0);
 	be->ops = ops;
 	be->nops = (nss_dbop_t)nops;
 	be->tablename = (char *)strdup(tablename);
 	be->attrs = attrs;
-	be->result = NULL;
-	be->ldapobj2ent = ldapobj2ent;
-	be->setcalled = 0;
-	be->filter = NULL;
-	be->enumcookie = NULL;
-	be->netgroup_cookie = NULL;
-	be->services_cookie = NULL;
-	be->toglue = NULL;
+	be->ldapobj2str = ldapobj2str;
 
 	return ((nss_backend_t *)be);
 }
@@ -436,8 +539,8 @@ chophostdomain(char *string, char *host, char *domain)
 		return (0);
 	}
 	*dot = '\0';
-	strcpy(host, string);
-	strcpy(domain, ++dot);
+	(void) strcpy(host, string);
+	(void) strcpy(domain, ++dot);
 
 	return (0);
 }

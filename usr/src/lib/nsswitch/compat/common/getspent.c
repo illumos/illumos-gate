@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,11 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
  *	getspent.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
  *
  * lib/nsswitch/compat/getspent.c -- name-service-switch backend for getspnam()
  *   It looks in /etc/shadow; if it finds shadow entries there that begin
@@ -55,7 +55,7 @@
 
 static DEFINE_NSS_DB_ROOT(db_root);
 
-void
+static void
 _nss_initf_shadow_compat(p)
 	nss_db_params_t	*p;
 {
@@ -87,7 +87,7 @@ getbyname(be, a)
 	compat_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
 	return (_nss_compat_XY_all(be, argp, check_spnamp,
 				NSS_DBOP_SHADOW_BYNAME));
@@ -116,10 +116,12 @@ merge_spents(be, argp, fields)
 			return (NSS_STR_PARSE_ERANGE);
 		}
 		if (sp->sp_namp != argp->buf.buffer) {
-			memmove(argp->buf.buffer, sp->sp_namp, namelen);
+			(void) memmove(argp->buf.buffer,
+				sp->sp_namp, namelen);
 			sp->sp_namp = argp->buf.buffer;
 		}
-		memcpy(argp->buf.buffer + namelen, fields[1], passlen);
+		(void) memcpy(argp->buf.buffer + namelen,
+			fields[1], passlen);
 	}
 
 #define	override(field, longp)				\
@@ -142,7 +144,39 @@ merge_spents(be, argp, fields)
 	override(fields[6], &sp->sp_inact);
 	override(fields[7], &sp->sp_expire);
 	override(fields[8], &sp->sp_flag);
-	return (NSS_STR_PARSE_SUCCESS);
+
+	/*
+	 * if asked, return the data in /etc file format
+	 */
+	if (be->return_string_data == 1) {
+		int	n;
+		char	b[16];
+
+		/* reset the result ptr to the original value */
+		argp->buf.result = NULL;
+
+#define	printnum(num)	sprintf(b, "%d", num)) ? b : ""
+
+		n = snprintf(argp->buf.buffer, argp->buf.buflen,
+			"%s:%s:%s:%s:%s:%s:%s:%s:%s", sp->sp_namp,
+			(sp->sp_pwdp ? sp->sp_pwdp : ""),
+			(sp->sp_lstchg >= 0 && printnum(sp->sp_lstchg),
+			(sp->sp_min >= 0 && printnum(sp->sp_min),
+			(sp->sp_max >= 0 && printnum(sp->sp_max),
+			(sp->sp_warn > 0 && printnum(sp->sp_warn),
+			(sp->sp_inact > 0 && printnum(sp->sp_inact),
+			(sp->sp_expire > 0 && printnum(sp->sp_expire),
+			(sp->sp_flag != 0 && printnum(sp->sp_flag));
+
+		if (n > argp->buf.buflen)
+			return (NSS_STR_PARSE_ERANGE);
+		else {
+			argp->returnlen = n - 1;
+			return (NSS_SUCCESS);
+		}
+
+	} else
+		return (NSS_STR_PARSE_SUCCESS);
 }
 
 static compat_backend_op_t shadow_ops[] = {

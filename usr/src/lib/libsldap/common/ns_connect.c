@@ -38,6 +38,7 @@
 #include <nsswitch.h>
 #include <nss_dbdefs.h>
 #include "solaris-priv.h"
+#include "solaris-int.h"
 #include "ns_sldap.h"
 #include "ns_internal.h"
 #include "ns_cache_door.h"
@@ -54,8 +55,18 @@ extern int ldapssl_install_gethostbyaddr(LDAP *ld, const char *skip);
 
 static int openConnection(LDAP **, const char *, const ns_cred_t *,
 		int, ns_ldap_error_t **, int, int);
-
-static mutex_t	sessionPoolLock = DEFAULTMUTEX;
+/*
+ * sessionLock, wait4session, sessionTid
+ * are variables to synchronize the creation/retrieval of a connection.
+ * MTperCon is a flag to enable/disable multiple threads sharing the same
+ * connection.
+ * sessionPoolLock is a mutex lock for the connection pool.
+ */
+static mutex_t	sessionLock = DEFAULTMUTEX;
+static int	wait4session = 0;
+static thread_t sessionTid = 0;
+int	MTperConn = 1;
+static rwlock_t sessionPoolLock = DEFAULTRWLOCK;
 
 static Connection **sessionPool = NULL;
 static int sessionPoolSize = 0;
@@ -65,10 +76,239 @@ static mutex_t	nscdLock = DEFAULTMUTEX;
 static int	nscdChecked = 0;
 static pid_t	checkedPid = -1;
 static int	isNscd = 0;
+/*
+ * SSF values are for SASL integrity & privacy.
+ * JES DS5.2 does not support this feature but DS6 does.
+ * The values between 0 and 65535 can work with both server versions.
+ */
+#define	MAX_SASL_SSF	65535
+#define	MIN_SASL_SSF	0
 
 /* Number of hostnames to allocate memory for */
 #define	NUMTOMALLOC	32
+/*
+ * ns_mtckey is for sharing a ldap connection among multiple
+ * threads; created by ns_ldap_init() in ns_init.c
+ */
+extern thread_key_t ns_mtckey;
 
+/* Per thread LDAP error resides in thread-specific data. */
+struct ldap_error {
+	int	le_errno;
+	char	*le_matched;
+	char	*le_errmsg;
+};
+
+/* destructor */
+void
+ns_tsd_cleanup(void *key) {
+	struct ldap_error *le = (struct ldap_error *)key;
+
+	if (le == NULL)
+		return;
+	if (le->le_matched != NULL) {
+		ldap_memfree(le->le_matched);
+	}
+	if (le->le_errmsg != NULL) {
+		ldap_memfree(le->le_errmsg);
+	}
+	free(le);
+}
+
+/* Callback function for allocating a mutex */
+static void *
+ns_mutex_alloc(void)
+{
+	mutex_t *mutexp = NULL;
+
+	if ((mutexp = malloc(sizeof (mutex_t))) != NULL) {
+		if (mutex_init(mutexp, USYNC_THREAD, NULL) != 0) {
+			free(mutexp);
+			mutexp = NULL;
+		}
+	}
+	return (mutexp);
+}
+
+/* Callback function for freeing a mutex */
+static void
+ns_mutex_free(void *mutexp)
+{
+	(void) mutex_destroy((mutex_t *)mutexp);
+	free(mutexp);
+}
+
+/*
+ * Function for setting up thread-specific data
+ * where per thread LDAP error is stored
+ */
+static int
+tsd_setup()
+{
+	void	*tsd;
+	int	rc;
+
+	/* return success if TSD already set */
+	rc = thr_getspecific(ns_mtckey, &tsd);
+	if (rc == 0 && tsd != NULL)
+		return (0);
+
+	/* allocate and set TSD */
+	tsd = (void *) calloc(1, sizeof (struct ldap_error));
+	if (tsd == NULL)
+		return (-1);
+	rc = thr_setspecific(ns_mtckey, tsd);
+	if (rc != 0) { /* must be ENOMEM */
+		free(tsd);
+		return (-1);
+	}
+	return (0);
+
+
+}
+
+/* Callback function for setting the per thread LDAP error */
+/*ARGSUSED*/
+static void
+set_ld_error(int err, char *matched, char *errmsg, void *dummy)
+{
+	struct ldap_error	*le;
+
+	if (thr_getspecific(ns_mtckey, (void **)&le) != 0) {
+		syslog(LOG_ERR, "set_ld_error: thr_getspecific failed. errno"
+				" %d", errno);
+		return;
+	}
+	le->le_errno = err;
+	if (le->le_matched != NULL) {
+		ldap_memfree(le->le_matched);
+	}
+	le->le_matched = matched;
+	if (le->le_errmsg != NULL) {
+		ldap_memfree(le->le_errmsg);
+	}
+	le->le_errmsg = errmsg;
+}
+
+/* Callback function for getting the per thread LDAP error */
+/*ARGSUSED*/
+static int
+get_ld_error(char **matched, char **errmsg, void *dummy)
+{
+	struct ldap_error	*le;
+
+	if (thr_getspecific(ns_mtckey, (void **)&le) != 0) {
+		syslog(LOG_ERR, "get_ld_error: thr_getspecific failed. errno"
+				" %d", errno);
+		return (errno);
+	}
+	if (matched != NULL) {
+		*matched = le->le_matched;
+	}
+	if (errmsg != NULL) {
+		*errmsg = le->le_errmsg;
+	}
+	return (le->le_errno);
+}
+
+/* Callback function for setting per thread errno */
+static void
+set_errno(int err)
+{
+	errno = err;
+}
+
+/* Callback function for getting per thread errno */
+static int
+get_errno(void)
+{
+	return (errno);
+}
+
+/*
+ * set up to allow multiple threads to use the same ldap connection
+ */
+static int
+setup_mt_conn(LDAP *ld)
+{
+
+	struct ldap_thread_fns		tfns;
+	struct ldap_extra_thread_fns	extrafns;
+	int				rc;
+
+	/*
+	 * Set the function pointers for dealing with mutexes
+	 * and error information
+	 */
+	(void) memset(&tfns, '\0', sizeof (struct ldap_thread_fns));
+	tfns.ltf_mutex_alloc = (void *(*)(void)) ns_mutex_alloc;
+	tfns.ltf_mutex_free = (void (*)(void *)) ns_mutex_free;
+	tfns.ltf_mutex_lock = (int (*)(void *)) mutex_lock;
+	tfns.ltf_mutex_unlock = (int (*)(void *)) mutex_unlock;
+	tfns.ltf_get_errno = get_errno;
+	tfns.ltf_set_errno = set_errno;
+	tfns.ltf_get_lderrno = get_ld_error;
+	tfns.ltf_set_lderrno = set_ld_error;
+	tfns.ltf_lderrno_arg = NULL;
+
+	/*
+	 * Set up this session to use those function pointers
+	 */
+	rc = ldap_set_option(ld, LDAP_OPT_THREAD_FN_PTRS,
+		(void *) &tfns);
+	if (rc < 0) {
+		syslog(LOG_WARNING, "libsldap: ldap_set_option "
+		"(LDAP_OPT_THREAD_FN_PTRS)");
+		return (-1);
+	}
+
+	/*
+	 * Set the function pointers for working with semaphores
+	 */
+	(void) memset(&extrafns, '\0',
+		sizeof (struct ldap_extra_thread_fns));
+	extrafns.ltf_threadid_fn = (void * (*)(void))thr_self;
+	extrafns.ltf_mutex_trylock = NULL;
+	extrafns.ltf_sema_alloc = NULL;
+	extrafns.ltf_sema_free = NULL;
+	extrafns.ltf_sema_wait = NULL;
+	extrafns.ltf_sema_post = NULL;
+
+	/* Set up this session to use those function pointers */
+	rc = ldap_set_option(ld, LDAP_OPT_EXTRA_THREAD_FN_PTRS,
+		(void *) &extrafns);
+	if (rc < 0) {
+		syslog(LOG_WARNING, "libsldap: ldap_set_option "
+		"(LDAP_OPT_EXTRA_THREAD_FN_PTRS)");
+		return (-1);
+	}
+
+	return (0);
+}
+
+static void
+ns_setup_mt_conn_and_tsd(LDAP *ld) {
+	thread_t t = thr_self();
+	void *tsd;
+	/* set up to share this connection among threads */
+	if (MTperConn == 1) {
+		if (tsd_setup() == -1) {
+			syslog(LOG_ERR, "tid= %d: unable "
+				"to set up TSD\n", t);
+		} else {
+			if (setup_mt_conn(ld) == -1) {
+			/* multiple threads per connection not supported */
+				syslog(LOG_ERR, "tid= %d: multiple "
+					"threads per connection not "
+					"supported\n", t);
+				(void) thr_getspecific(ns_mtckey, &tsd);
+				ns_tsd_cleanup(tsd);
+				(void) thr_setspecific(ns_mtckey, NULL);
+				MTperConn = 0;
+			}
+		}
+	}
+}
 
 /*
  * Check /proc/PID/psinfo to see if this process is nscd
@@ -126,7 +366,7 @@ nscd_proc()
 
 static int
 __s_api_requestServer(const char *request, const char *server,
-	ns_server_info_t *ret, ns_ldap_error_t **error)
+	ns_server_info_t *ret, ns_ldap_error_t **error,  const char *addrType)
 {
 	union {
 		ldap_data_t	s_d;
@@ -142,7 +382,7 @@ __s_api_requestServer(const char *request, const char *server,
 	char		**mptr, **mptr1, **cptr, **cptr1;
 	int		mcnt, ccnt;
 	char		**servers;
-	int		rc;
+	int		rc, len;
 
 	if (ret == NULL || error == NULL) {
 		return (NS_LDAP_OP_FAILED);
@@ -157,18 +397,26 @@ __s_api_requestServer(const char *request, const char *server,
 	else
 		ireq = request;
 
-	adata = (sizeof (ldap_call_t) + strlen(ireq) +1);
+	adata = (sizeof (ldap_call_t) + strlen(ireq) + strlen(addrType) + 1);
 	if (server != NULL) {
 		adata += strlen(DOORLINESEP) + 1;
 		adata += strlen(server) + 1;
 	}
 	ndata = sizeof (space);
+	len = sizeof (space) - sizeof (space.s_d.ldap_call.ldap_callnumber);
 	space.s_d.ldap_call.ldap_callnumber = GETLDAPSERVER;
-	(void) strcpy(space.s_d.ldap_call.ldap_u.domainname, ireq);
+	if (strlcpy(space.s_d.ldap_call.ldap_u.domainname, ireq, len) >= len)
+		return (NS_LDAP_MEMORY);
+	if (strlcat(space.s_d.ldap_call.ldap_u.domainname, addrType, len) >=
+			len)
+		return (NS_LDAP_MEMORY);
 	if (server != NULL) {
-		(void) strcat(space.s_d.ldap_call.ldap_u.domainname,
-			DOORLINESEP);
-		(void) strcat(space.s_d.ldap_call.ldap_u.domainname, server);
+		if (strlcat(space.s_d.ldap_call.ldap_u.domainname,
+			DOORLINESEP, len) >= len)
+			return (NS_LDAP_MEMORY);
+		if (strlcat(space.s_d.ldap_call.ldap_u.domainname, server,
+			len) >= len)
+			return (NS_LDAP_MEMORY);
 	}
 	sptr = &space.s_d;
 
@@ -327,86 +575,120 @@ __s_api_requestServer(const char *request, const char *server,
 	return (NS_LDAP_SUCCESS);
 }
 
-#ifdef DEBUG
 
 /*
  * printCred(): prints the credential structure
  */
 static void
-printCred(FILE *fp, const ns_cred_t *cred)
+printCred(int pri, const ns_cred_t *cred)
 {
-	if (fp == NULL) {
-		(void) fprintf(fp, "printCred: fp is NULL\n");
-		return;
-	}
+	thread_t	t = thr_self();
+
 	if (cred == NULL) {
-		(void) fprintf(fp, "printCred: cred is NULL\n");
+		syslog(LOG_ERR, "tid= %d: printCred: cred is NULL\n", t);
 		return;
 	}
 
-	(void) fprintf(fp, "AuthType=%d\n", cred->auth.type);
-	(void) fprintf(fp, "TlsType=%d\n", cred->auth.tlstype);
-	(void) fprintf(fp, "SaslMech=%d\n", cred->auth.saslmech);
-	(void) fprintf(fp, "SaslOpt=%d\n", cred->auth.saslopt);
+	syslog(pri, "tid= %d: AuthType=%d", t, cred->auth.type);
+	syslog(pri, "tid= %d: TlsType=%d", t, cred->auth.tlstype);
+	syslog(pri, "tid= %d: SaslMech=%d", t, cred->auth.saslmech);
+	syslog(pri, "tid= %d: SaslOpt=%d", t, cred->auth.saslopt);
 	if (cred->hostcertpath)
-		(void) fprintf(fp, "hostCertPath=%s\n", cred->hostcertpath);
+		syslog(pri, "tid= %d: hostCertPath=%s\n",
+			t, cred->hostcertpath);
 	if (cred->cred.unix_cred.userID)
-		(void) fprintf(fp, "userID=%s\n", cred->cred.unix_cred.userID);
+		syslog(pri, "tid= %d: userID=%s\n",
+			t, cred->cred.unix_cred.userID);
 	if (cred->cred.unix_cred.passwd)
-		(void) fprintf(fp, "passwd=%s\n", cred->cred.unix_cred.passwd);
+		syslog(pri, "tid= %d: passwd=%s\n",
+			t, cred->cred.unix_cred.passwd);
 }
 
 /*
  * printConnection(): prints the connection structure
  */
 static void
-printConnection(FILE *fp, Connection *con)
+printConnection(int pri, Connection *con)
 {
-	if (fp == NULL || con == NULL)
+	thread_t	t = thr_self();
+
+	if (con == NULL)
 		return;
 
-	(void) fprintf(fp, "connectionID=%d\n", con->connectionId);
-	(void) fprintf(fp, "usedBit=%d\n", con->usedBit);
-	(void) fprintf(fp, "threadID=%d\n", con->threadID);
+	syslog(pri, "tid= %d: connectionID=%d\n", t, con->connectionId);
+	syslog(pri, "tid= %d: shared=%d\n", t, con->shared);
+	syslog(pri, "tid= %d: usedBit=%d\n", t, con->usedBit);
+	syslog(pri, "tid= %d: threadID=%d\n", t, con->threadID);
 	if (con->serverAddr) {
-		(void) fprintf(fp, "serverAddr=%s\n", con->serverAddr);
+		syslog(pri, "tid= %d: serverAddr=%s\n",
+			t, con->serverAddr);
 	}
-	printCred(fp, con->auth);
-	(void) fprintf(fp, "-----------------------------------------------\n");
-	fflush(fp);
+	printCred(pri, con->auth);
 }
 
-#endif /* DEBUG */
 
 
 /*
- * addConnection(): inserts a connection in the connection list.
- * It will also sets use bit and the thread Id for the thread
- * using the connection for the first time.
+ * addConnection(): set up a connection so that it can be shared
+ * among multiple threads and then insert the connection in the
+ * connection list.
  * Returns: -1 = failure, new Connection ID = success
+ *
+ * This function could exit with sessionLock locked. It will be
+ * be unlocked in __s_api_getConnection() when it exits without getting a
+ * connection.
  */
 static int
 addConnection(Connection *con)
 {
-	int i;
+	int i, noMTperC = 0;
+	thread_t t = thr_self();
+	struct ldap_thread_fns tfns;
+	void *tsd;
 
 	if (!con)
 		return (-1);
-#ifdef DEBUG
-	(void) fprintf(stderr, "Adding connection thrid=%d\n", con->threadID);
-#endif /* DEBUG */
-	(void) mutex_lock(&sessionPoolLock);
+
+	syslog(LOG_DEBUG, "tid= %d: Adding connection (serverAddr=%s)",
+			t, con->serverAddr);
+
+	if (MTperConn == 1) {
+		/*
+		 * Make sure ld has proper thread functions and tsd
+		 * is set up.
+		 */
+		(void) memset(&tfns, 0, sizeof (struct ldap_thread_fns));
+		/*
+		 * ldap_init sets ltf_get_lderrno and ltf_set_lderrno to NULLs.
+		 * It's supposed to be overwritten by ns_setup_mt_conn_and_tsd.
+		 */
+		if (ldap_get_option(con->ld, LDAP_OPT_THREAD_FN_PTRS,
+				(void *)&tfns) != 0 ||
+				tfns.ltf_get_lderrno != get_ld_error ||
+				tfns.ltf_set_lderrno != set_ld_error) {
+			MTperConn = 0;
+			noMTperC = 1;
+		} else {
+			if (thr_getspecific(ns_mtckey, &tsd) != 0 ||
+					tsd == NULL)
+				noMTperC = 1;
+		}
+
+	} else {
+		noMTperC = 1;
+	}
+
+	(void) rw_wrlock(&sessionPoolLock);
 	if (sessionPool == NULL) {
 		sessionPoolSize = SESSION_CACHE_INC;
 		sessionPool = calloc(sessionPoolSize,
 				sizeof (struct connection **));
 		if (!sessionPool) {
-			(void) mutex_unlock(&sessionPoolLock);
+			(void) rw_unlock(&sessionPoolLock);
 			return (-1);
 		}
-#ifdef DEBUG
-		(void) fprintf(stderr, "Initialized sessionPool\n");
-#endif /* DEBUG */
+
+		syslog(LOG_DEBUG, "tid= %d: Initialized sessionPool", t);
 	}
 	for (i = 0; (i < sessionPoolSize) && (sessionPool[i] != NULL); ++i)
 		;
@@ -417,26 +699,44 @@ addConnection(Connection *con)
 			(sessionPoolSize + SESSION_CACHE_INC) *
 			sizeof (Connection *));
 		if (!cl) {
-			(void) mutex_unlock(&sessionPoolLock);
+			(void) rw_unlock(&sessionPoolLock);
 			return (-1);
 		}
 		(void) memset(cl + sessionPoolSize, 0,
 			SESSION_CACHE_INC * sizeof (struct connection *));
 		sessionPool = cl;
 		sessionPoolSize += SESSION_CACHE_INC;
-#ifdef DEBUG
-		(void) fprintf(stderr, "Increased sessionPoolSize to: %d\n",
-				sessionPoolSize);
-#endif /* DEBUG */
+		syslog(LOG_DEBUG, "tid: %d: Increased "
+				"sessionPoolSize to: %d\n",
+				t, sessionPoolSize);
 	}
 	sessionPool[i] = con;
-	con->usedBit = B_TRUE;
-	(void) mutex_unlock(&sessionPoolLock);
+	if (noMTperC == 0)
+		con->shared++;
+	else
+		con->usedBit = B_TRUE;
+
+	(void) rw_unlock(&sessionPoolLock);
+
 	con->connectionId = i + CONID_OFFSET;
-#ifdef DEBUG
-	(void) fprintf(stderr, "Connection added [%d]\n", i);
-	printConnection(stderr, con);
-#endif /* DEBUG */
+
+	syslog(LOG_DEBUG, "tid= %d: Connection added [%d]\n",
+			t, i);
+	printConnection(LOG_DEBUG, con);
+
+	/*
+	 * A connection can be shared now, unlock
+	 * the session mutex and let other
+	 * threads try to use this connection or
+	 * get their own.
+	 */
+	if (wait4session != 0 && sessionTid == thr_self()) {
+		wait4session = 0;
+		sessionTid = 0;
+		syslog(LOG_DEBUG, "tid= %d: unlocking sessionLock\n", t);
+		(void) mutex_unlock(&sessionLock);
+	}
+
 	return (i + CONID_OFFSET);
 }
 
@@ -453,6 +753,11 @@ findConnectionById(int flags, const ns_cred_t *auth, ConnectionID cID,
 
 	if ((conp == NULL) || (auth == NULL) || cID < CONID_OFFSET)
 		return (-1);
+
+	/* if a new connection is requested, no need to continue */
+	if (flags & NS_LDAP_NEW_CONN)
+		return (-1);
+
 	*conp = NULL;
 	if (sessionPool == NULL)
 		return (-1);
@@ -460,9 +765,9 @@ findConnectionById(int flags, const ns_cred_t *auth, ConnectionID cID,
 	if (id < 0 || id >= sessionPoolSize)
 		return (-1);
 
-	(void) mutex_lock(&sessionPoolLock);
+	(void) rw_rdlock(&sessionPoolLock);
 	if (sessionPool[id] == NULL) {
-		(void) mutex_unlock(&sessionPoolLock);
+		(void) rw_unlock(&sessionPoolLock);
 		return (-1);
 	}
 	cp = sessionPool[id];
@@ -471,11 +776,12 @@ findConnectionById(int flags, const ns_cred_t *auth, ConnectionID cID,
 	 * Make sure the connection has the same type of authentication method
 	 */
 	if ((cp->usedBit) ||
+	    (cp->notAvail) ||
 	    (cp->auth->auth.type != auth->auth.type) ||
 	    (cp->auth->auth.tlstype != auth->auth.tlstype) ||
 	    (cp->auth->auth.saslmech != auth->auth.saslmech) ||
 	    (cp->auth->auth.saslopt != auth->auth.saslopt)) {
-		(void) mutex_unlock(&sessionPoolLock);
+		(void) rw_unlock(&sessionPoolLock);
 		return (-1);
 	}
 	if ((((cp->auth->auth.type == NS_LDAP_AUTH_SASL) &&
@@ -485,18 +791,19 @@ findConnectionById(int flags, const ns_cred_t *auth, ConnectionID cID,
 		((cp->auth->cred.unix_cred.userID == NULL) ||
 		(strcasecmp(cp->auth->cred.unix_cred.userID,
 		auth->cred.unix_cred.userID) != 0))) {
-		(void) mutex_unlock(&sessionPoolLock);
+		(void) rw_unlock(&sessionPoolLock);
 		return (-1);
 	}
+
 	/* An existing connection is found but it needs to be reset */
 	if (flags & NS_LDAP_NEW_CONN) {
-		(void) mutex_unlock(&sessionPoolLock);
+		(void) rw_unlock(&sessionPoolLock);
 		DropConnection(cID, 0);
 		return (-1);
 	}
 	/* found an available connection */
 	cp->usedBit = B_TRUE;
-	(void) mutex_unlock(&sessionPoolLock);
+	(void) rw_unlock(&sessionPoolLock);
 	cp->threadID = thr_self();
 	*conp = cp;
 	return (cID);
@@ -508,39 +815,111 @@ findConnectionById(int flags, const ns_cred_t *auth, ConnectionID cID,
  * If serverAddr is NULL, then find a connection to any server
  * as long as it matches the rest of the parameters.
  * Returns: -1 = failure, the Connection ID found = success.
+ *
+ * This function could exit with sessionLock locked. It will be
+ * be unlocked in addConnection() when this thread adds the connection
+ * to the pool or in __s_api_getConnection() when it exits without getting a
+ * connection.
  */
+#define	TRY_TIMES	10
 static int
-findConnection(const char *serverAddr, const ns_cred_t *auth, Connection **conp)
+findConnection(int flags, const char *serverAddr,
+	const ns_cred_t *auth, Connection **conp)
 {
 	Connection *cp;
 	int i;
+	int rc;
+	int try;
+#ifdef DEBUG
+	thread_t t = thr_self();
+#endif /* DEBUG */
 
 	if (auth == NULL || conp == NULL)
 		return (-1);
 	*conp = NULL;
 
+	/* no need to find connection if anonymous */
+	if (auth->auth.type == NS_LDAP_AUTH_NONE)
+		return (-1);
+
+	/* if a new connection is requested, no need to continue */
+	if (flags & NS_LDAP_NEW_CONN)
+		return (-1);
+
 #ifdef DEBUG
-	(void) fprintf(stderr, "Find connection\n");
-	(void) fprintf(stderr, "Looking for ....\n");
+	(void) fprintf(stderr, "tid= %d: Find connection\n", t);
+	(void) fprintf(stderr, "tid= %d: Looking for ....\n", t);
 	if (serverAddr && *serverAddr)
-		(void) fprintf(stderr, "serverAddr=%s\n", serverAddr);
+		(void) fprintf(stderr, "tid= %d: serverAddr=%s\n",
+			t, serverAddr);
 	else
-		(void) fprintf(stderr, "serverAddr=NULL\n");
+		(void) fprintf(stderr, "tid= %d: serverAddr=NULL\n", t);
 	printCred(stderr, auth);
 	fflush(stderr);
 #endif /* DEBUG */
-	if (sessionPool == NULL)
+
+	/*
+	 * If multiple threads per connection not supported,
+	 * no sessionPool means no connection
+	 */
+	(void) rw_rdlock(&sessionPoolLock);
+	if (MTperConn == 0 && sessionPool == NULL) {
+		(void) rw_unlock(&sessionPoolLock);
 		return (-1);
-	(void) mutex_lock(&sessionPoolLock);
+	}
+
+	/*
+	 * If no connection in cache, then serialize the opening
+	 * of connections. Make sure only one is being opened
+	 * at a time. Otherwise, we may end up with more
+	 * connections than we want (if multiple threads get
+	 * here at the same time)
+	 */
+	if (sessionPool == NULL) {
+		(void) rw_unlock(&sessionPoolLock);
+		(void) mutex_lock(&sessionLock);
+		if (sessionPool == NULL) {
+			wait4session = 1;
+			sessionTid = thr_self();
+#ifdef DEBUG
+			(void) fprintf(stderr, "tid= %d: get "
+				"connection ... \n", t);
+			fflush(stderr);
+#endif /* DEBUG */
+			/*
+			 * Exit with sessionLock locked. It will be
+			 * be unlocked in addConnection() when this
+			 * thread adds the connection to the pool or
+			 * in __s_api_getConnection() when it exits
+			 * without getting a connection.
+			 */
+			return (-1);
+		}
+
+#ifdef DEBUG
+		(void) fprintf(stderr, "tid= %d: session pool not empty\n", t);
+		fflush(stderr);
+#endif /* DEBUG */
+		/*
+		 * connection pool is not empty, check to see if
+		 * one can be shared.
+		 */
+		(void) mutex_unlock(&sessionLock);
+		(void) rw_rdlock(&sessionPoolLock);
+	}
+	try = 0;
+	check_again:
+
 	for (i = 0; i < sessionPoolSize; ++i) {
 		if (sessionPool[i] == NULL)
 			continue;
 		cp = sessionPool[i];
 #ifdef DEBUG
-		(void) fprintf(stderr, "checking connection [%d] ....\n", i);
+		(void) fprintf(stderr, "tid= %d: checking connection "
+			"[%d] ....\n", t, i);
 		printConnection(stderr, cp);
 #endif /* DEBUG */
-		if ((cp->usedBit) ||
+		if ((cp->usedBit) || (cp->notAvail) ||
 		    (cp->auth->auth.type != auth->auth.type) ||
 		    (cp->auth->auth.tlstype != auth->auth.tlstype) ||
 		    (cp->auth->auth.saslmech != auth->auth.saslmech) ||
@@ -560,18 +939,89 @@ findConnection(const char *serverAddr, const ns_cred_t *auth, Connection **conp)
 			    auth->cred.unix_cred.passwd) != 0))))
 				continue;
 		/* found an available connection */
-		cp->usedBit = B_TRUE;
-		(void) mutex_unlock(&sessionPoolLock);
-		cp->threadID = thr_self();
+		if (MTperConn == 0)
+			cp->usedBit = B_TRUE;
+		else {
+			/* allocate TSD for per thread ldap error */
+			rc = tsd_setup();
+
+			/* if we got TSD, this connection is shared */
+			if (rc != -1)
+				cp->shared++;
+			else if (cp->shared == 0) {
+				cp->usedBit = B_TRUE;
+				cp->threadID = thr_self();
+				(void) rw_unlock(&sessionPoolLock);
+				return (-1);
+			}
+		}
+		(void) rw_unlock(&sessionPoolLock);
+
 		*conp = cp;
 #ifdef DEBUG
-		(void) fprintf(stderr, "Connection found cID=%d\n", i);
+		(void) fprintf(stderr, "tid= %d: Connection found "
+			"cID=%d, shared =%d\n", t, i, cp->shared);
 		fflush(stderr);
 #endif /* DEBUG */
 		return (i + CONID_OFFSET);
 	}
-	(void) mutex_unlock(&sessionPoolLock);
-	return (-1);
+	(void) rw_unlock(&sessionPoolLock);
+
+	/*
+	 * If multiple threads per connection not supported,
+	 * we are done, just return -1 to tell the caller to
+	 * proceed with opening a connection
+	 */
+	if (MTperConn == 0)
+		return (-1);
+
+	/*
+	 * No connection can be shared, test to see if
+	 * one is being opened. If trylock returns
+	 * EBUSY then it is, so wait until the opening
+	 * is done and try to see if the new connection
+	 * can be shared.
+	 */
+	rc = mutex_trylock(&sessionLock);
+	if (rc == EBUSY) {
+		(void) mutex_lock(&sessionLock);
+		(void) mutex_unlock(&sessionLock);
+		(void) rw_rdlock(&sessionPoolLock);
+#ifdef DEBUG
+		(void) fprintf(stderr, "tid= %d: check session "
+			"pool again\n", t);
+		fflush(stderr);
+#endif /* DEBUG */
+		if (try < TRY_TIMES) {
+			try++;
+			goto check_again;
+		} else {
+			syslog(LOG_WARNING, "libsldap: mutex_trylock "
+				"%d times. Stop.", TRY_TIMES);
+			return (-1);
+		}
+	} else if (rc == 0) {
+		/*
+		 * No connection can be shared, none being opened,
+		 * exit with sessionLock locked to open one. The
+		 * mutex will be unlocked in addConnection() when
+		 * this thread adds the new connection to the pool
+		 * or in __s_api_getConnection() when it exits
+		 * without getting a connection.
+		 */
+		wait4session = 1;
+		sessionTid = thr_self();
+#ifdef DEBUG
+		(void) fprintf(stderr, "tid= %d: no connection found, "
+			"none being opened, get connection ...\n", t);
+		fflush(stderr);
+#endif /* DEBUG */
+		return (-1);
+	} else {
+		syslog(LOG_WARNING, "libsldap: mutex_trylock unexpected "
+			"error", rc);
+		return (-1);
+	}
 }
 
 /*
@@ -607,7 +1057,7 @@ static int
 makeConnection(Connection **conp, const char *serverAddr,
 	const ns_cred_t *auth, ConnectionID *cID, int timeoutSec,
 	ns_ldap_error_t **errorp, int fail_if_new_pwd_reqd,
-	int nopasswd_acct_mgmt, char ***badsrvrs)
+	int nopasswd_acct_mgmt, int flags, char ***badsrvrs)
 {
 	Connection *con = NULL;
 	ConnectionID id;
@@ -618,7 +1068,9 @@ makeConnection(Connection **conp, const char *serverAddr,
 	LDAP *ld = NULL;
 	int passwd_mgmt = 0;
 	int totalbad = 0; /* Number of servers contacted unsuccessfully */
-	short	memerr = 0; /* Variable for tracking memory allocation errors */
+	short	memerr = 0; /* Variable for tracking memory allocation */
+	char *serverAddrType = NULL;
+
 
 	if (conp == NULL || errorp == NULL || auth == NULL)
 		return (NS_LDAP_INVALID_PARAM);
@@ -628,10 +1080,11 @@ makeConnection(Connection **conp, const char *serverAddr,
 	sinfo.controls = NULL;
 	sinfo.saslMechanisms = NULL;
 
-	if ((id = findConnection(serverAddr, auth, &con)) != -1) {
+	if ((id = findConnection(flags, serverAddr, auth, &con)) != -1) {
 		/* connection found in cache */
 #ifdef DEBUG
-		(void) fprintf(stderr, "connection found in cache %d\n", id);
+		(void) fprintf(stderr, "tid= %d: connection found in "
+			"cache %d\n", thr_self(), id);
 		fflush(stderr);
 #endif /* DEBUG */
 		*cID = id;
@@ -639,21 +1092,26 @@ makeConnection(Connection **conp, const char *serverAddr,
 		return (NS_LDAP_SUCCESS);
 	}
 
+	if (auth->auth.saslmech == NS_LDAP_SASL_GSSAPI)
+		serverAddrType = NS_CACHE_ADDR_HOSTNAME;
+	else
+		serverAddrType = NS_CACHE_ADDR_IP;
+
 	if (serverAddr) {
-		rc = openConnection(&ld, serverAddr, auth, timeoutSec, errorp,
+		rc = __s_api_requestServer(NS_CACHE_NEW, serverAddr,
+			&sinfo, errorp, serverAddrType);
+		if (rc != NS_LDAP_SUCCESS || sinfo.server == NULL) {
+			(void) snprintf(errmsg, sizeof (errmsg),
+			gettext("makeConnection: unable to get "
+			"server information for %s"), serverAddr);
+			syslog(LOG_ERR, "libsldap: %s", errmsg);
+			return (NS_LDAP_OP_FAILED);
+		}
+		rc = openConnection(&ld, sinfo.server, auth, timeoutSec, errorp,
 				fail_if_new_pwd_reqd, passwd_mgmt);
 		if (rc == NS_LDAP_SUCCESS || rc ==
 				NS_LDAP_SUCCESS_WITH_INFO) {
 			exit_rc = rc;
-			rc = __s_api_requestServer(NS_CACHE_NEW, serverAddr,
-				&sinfo, errorp);
-			if (rc != NS_LDAP_SUCCESS || sinfo.server == NULL) {
-				(void) snprintf(errmsg, sizeof (errmsg),
-				gettext("makeConnection: unable to get "
-				"server information for %s"), serverAddr);
-				syslog(LOG_ERR, "libsldap: %s", errmsg);
-				return (NS_LDAP_OP_FAILED);
-			}
 			goto create_con;
 		} else {
 			return (rc);
@@ -666,7 +1124,8 @@ makeConnection(Connection **conp, const char *serverAddr,
 			hReq = NS_CACHE_NEW;
 		else
 			hReq = NS_CACHE_NEXT;
-		rc = __s_api_requestServer(hReq, host, &sinfo, errorp);
+		rc = __s_api_requestServer(hReq, host, &sinfo, errorp,
+				serverAddrType);
 		if ((rc != NS_LDAP_SUCCESS) || (sinfo.server == NULL) ||
 			(host && (strcasecmp(host, sinfo.server) == 0))) {
 			/* Log the error */
@@ -851,6 +1310,7 @@ create_con:
 	}
 
 	con->threadID = thr_self();
+
 	con->ld = ld;
 	if ((id = addConnection(con)) == -1) {
 		freeConnection(con);
@@ -866,7 +1326,8 @@ create_con:
 		return (NS_LDAP_MEMORY);
 	}
 #ifdef DEBUG
-	(void) fprintf(stderr, "connection added into cache %d\n", id);
+	(void) fprintf(stderr, "tid= %d: connection added into "
+		"cache %d\n", thr_self(), id);
 	fflush(stderr);
 #endif /* DEBUG */
 	*cID = id;
@@ -884,42 +1345,86 @@ _DropConnection(ConnectionID cID, int flag, int fini)
 {
 	Connection *cp;
 	int id;
-	int use_mutex = !fini;
+	int use_lock = !fini;
+#ifdef DEBUG
+	thread_t t = thr_self();
+#endif /* DEBUG */
 
 	id = cID - CONID_OFFSET;
 	if (id < 0 || id >= sessionPoolSize)
 		return;
 #ifdef DEBUG
-	(void) fprintf(stderr,
-		"Dropping connection cID=%d flag=0x%x\n", cID, flag);
+	(void) fprintf(stderr, "tid= %d: "
+		"Dropping connection cID=%d flag=0x%x, fini = %d\n",
+			t, cID, flag, fini);
 	fflush(stderr);
 #endif /* DEBUG */
-	if (use_mutex)
-		(void) mutex_lock(&sessionPoolLock);
+	if (use_lock)
+		(void) rw_wrlock(&sessionPoolLock);
 
 	cp = sessionPool[id];
 	/* sanity check before removing */
-	if (!cp || (!fini && (!cp->usedBit || cp->threadID != thr_self()))) {
-		if (use_mutex)
-			(void) mutex_unlock(&sessionPoolLock);
+	if (!cp || (!fini && !cp->shared && (!cp->usedBit ||
+		cp->threadID != thr_self()))) {
+#ifdef DEBUG
+		if (cp == NULL)
+			(void) fprintf(stderr, "tid= %d: no "
+			"need to remove (fini = %d, cp = %p)\n", t,
+			fini, cp);
+		else
+			(void) fprintf(stderr, "tid= %d: no "
+			"need to remove (fini = %d, cp = %p, shared = %d)\n",
+			t, fini, cp, cp->shared);
+		fflush(stderr);
+#endif /* DEBUG */
+		if (use_lock)
+			(void) rw_unlock(&sessionPoolLock);
 		return;
 	}
 
 	if (!fini &&
-		((flag & NS_LDAP_NEW_CONN) == 0) &&
-		((flag & NS_LDAP_KEEP_CONN) || nscd_proc())) {
+		((flag & NS_LDAP_NEW_CONN) == 0) && !cp->notAvail &&
+		((flag & NS_LDAP_KEEP_CONN) ||
+			(MTperConn == 0 && nscd_proc()) ||
+			MTperConn)) {
+#ifdef DEBUG
+		(void) fprintf(stderr, "tid= %d: keep alive (fini = %d "
+			"shared = %d)\n", t, fini, cp->shared);
+#endif /* DEBUG */
 		/* release Connection (keep alive) */
+		if (cp->shared)
+			cp->shared--;
 		cp->usedBit = B_FALSE;
 		cp->threadID = 0;	/* unmark the threadID */
-		if (use_mutex)
-			(void) mutex_unlock(&sessionPoolLock);
+		if (use_lock)
+			(void) rw_unlock(&sessionPoolLock);
 	} else {
 		/* delete Connection (disconnect) */
-		sessionPool[id] = NULL;
-		if (use_mutex)
-			(void) mutex_unlock(&sessionPoolLock);
-		(void) ldap_unbind(cp->ld);
-		freeConnection(cp);
+		if (cp->shared > 0) {
+#ifdef DEBUG
+		(void) fprintf(stderr, "tid= %d: Connection no "
+			"longer available (fini = %d, shared = %d)\n",
+			t, fini, cp->shared);
+		fflush(stderr);
+#endif /* DEBUG */
+			cp->shared--;
+			cp->notAvail = 1;
+		}
+
+		if (cp->shared <= 0) {
+#ifdef DEBUG
+			(void) fprintf(stderr, "tid= %d: unbind "
+				"(fini = %d, shared = %d)\n",
+				t, fini, cp->shared);
+			fflush(stderr);
+#endif /* DEBUG */
+			sessionPool[id] = NULL;
+			(void) ldap_unbind(cp->ld);
+			freeConnection(cp);
+		}
+
+		if (use_lock)
+			(void) rw_unlock(&sessionPoolLock);
 	}
 }
 
@@ -1189,16 +1694,17 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 	int		errnum = 0;
 	LDAPMessage	*resultMsg;
 	int		msgId;
-	int		useSSL = 0;
+	int		useSSL = 0, port = 0;
 	struct timeval	tv;
 	AuthType_t	bindType;
 	int		timeoutMilliSec = timeoutSec * 1000;
 	struct berval	cred;
 	char		*sslServerAddr;
 	char		*s1;
-	char		*errmsg;
+	char		*errmsg, *end = NULL;
 	LDAPControl	**controls;
-	int		pwd_rc;
+	int		pwd_rc, min_ssf = MIN_SASL_SSF, max_ssf = MAX_SASL_SSF;
+	ns_sasl_cb_param_t	sasl_param;
 
 	*errorp = NULL;
 	*ldp = NULL;
@@ -1246,7 +1752,8 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 		const char	*hostcertpath;
 		char		*alloc_hcp = NULL;
 #ifdef DEBUG
-		(void) fprintf(stderr, "+++TLS transport\n");
+		(void) fprintf(stderr, "tid= %d: +++TLS transport\n",
+			thr_self());
 #endif /* DEBUG */
 
 		if (prldap_set_session_option(NULL, NULL,
@@ -1324,15 +1831,40 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 		}
 	} else {
 #ifdef DEBUG
-		(void) fprintf(stderr, "+++Unsecure transport\n");
+		(void) fprintf(stderr, "tid= %d: +++Unsecure transport\n",
+				thr_self());
 #endif /* DEBUG */
-			/* Warning message IF cannot connect to host(s) */
-		if ((ld = ldap_init((char *)serverAddr, LDAP_PORT)) == NULL) {
+		port = LDAP_PORT;
+		if (auth->auth.saslmech == NS_LDAP_SASL_GSSAPI &&
+			(end = strchr(serverAddr, ':')) != NULL) {
+			/*
+			 * The IP is converted to hostname so it's a
+			 * hostname:port up to this point.
+			 *
+			 * libldap passes hostname:port to the sasl layer.
+			 * The ldap service principal is constructed as
+			 * ldap/hostname:port@REALM. Kerberos authentication
+			 * will fail. So it needs to be parsed to construct
+			 * a valid principal ldap/hostname@REALM.
+			 *
+			 * For useSSL case above, it already parses port so
+			 * no need to parse serverAddr
+			 */
+			*end = '\0';
+			port = atoi(end + 1);
+		}
+
+		/* Warning message IF cannot connect to host(s) */
+		if ((ld = ldap_init((char *)serverAddr, port)) == NULL) {
 			char *p = strerror(errno);
 			MKERROR(LOG_WARNING, *errorp, LDAP_CONNECT_ERROR,
 				strdup(p), NULL);
+			if (end)
+				*end = ':';
 			return (NS_LDAP_INTERNAL);
 		} else {
+			if (end)
+				*end = ':';
 			/* check and avoid gethostname recursion */
 			if (ldap_in_hosts_switch() > 0 &&
 				! __s_api_isipv4((char *)serverAddr) &&
@@ -1340,21 +1872,22 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 				/* host: ldap - found, attempt to recover */
 				if (ldap_set_option(ld, LDAP_X_OPT_DNS_SKIPDB,
 						    "ldap") != 0) {
-					(void) snprintf(errstr, sizeof (errstr),
-						gettext("openConnection: "
-						"unrecoverable gethostname "
-						"recursion detected "
-						"in /etc/nsswitch.conf"));
-					MKERROR(LOG_WARNING, *errorp,
-						LDAP_CONNECT_ERROR,
-						strdup(errstr), NULL);
-					(void) ldap_unbind(ld);
-					return (NS_LDAP_INTERNAL);
+				    (void) snprintf(errstr, sizeof (errstr),
+					    gettext("openConnection: "
+					    "unrecoverable gethostname "
+					    "recursion detected "
+					    "in /etc/nsswitch.conf"));
+				    MKERROR(LOG_WARNING, *errorp,
+					    LDAP_CONNECT_ERROR,
+					    strdup(errstr), NULL);
+				    (void) ldap_unbind(ld);
+				    return (NS_LDAP_INTERNAL);
 				}
 			}
 		}
 	}
 
+	ns_setup_mt_conn_and_tsd(ld);
 	(void) ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &ldapVersion);
 	(void) ldap_set_option(ld, LDAP_OPT_DEREF, &derefOption);
 	/*
@@ -1377,7 +1910,8 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 	switch (bindType) {
 	case NS_LDAP_AUTH_NONE:
 #ifdef DEBUG
-		(void) fprintf(stderr, "+++Anonymous bind\n");
+		(void) fprintf(stderr, "tid= %d: +++Anonymous bind\n",
+			thr_self());
 #endif /* DEBUG */
 		break;
 	case NS_LDAP_AUTH_SIMPLE:
@@ -1394,7 +1928,8 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 		}
 
 #ifdef DEBUG
-		(void) fprintf(stderr, "+++Simple bind\n");
+		(void) fprintf(stderr, "tid= %d: +++Simple bind\n",
+			thr_self());
 #endif /* DEBUG */
 		msgId = ldap_simple_bind(ld, binddn, passwd);
 
@@ -1462,31 +1997,35 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 
 		break;
 	case NS_LDAP_AUTH_SASL:
-		/* We don't support any sasl options yet */
-		if (auth->auth.saslopt != NS_LDAP_SASLOPT_NONE) {
+		if (auth->auth.saslopt != NS_LDAP_SASLOPT_NONE &&
+				auth->auth.saslmech != NS_LDAP_SASL_GSSAPI) {
 			(void) sprintf(errstr,
 				gettext("openConnection: SASL options are "
-				"not supported (%d)"), auth->auth.saslopt);
+				"not supported (%d) for non-GSSAPI sasl bind"),
+				auth->auth.saslopt);
 			MKERROR(LOG_WARNING, *errorp,
 				LDAP_AUTH_METHOD_NOT_SUPPORTED,
 				strdup(errstr), NULL);
 			(void) ldap_unbind(ld);
 			return (NS_LDAP_INTERNAL);
 		}
-		binddn = auth->cred.unix_cred.userID;
-		passwd = auth->cred.unix_cred.passwd;
-		if (passwd == NULL || *passwd == '\0' ||
-		    binddn == NULL || *binddn == '\0') {
-			(void) sprintf(errstr,
+		if (auth->auth.saslmech != NS_LDAP_SASL_GSSAPI) {
+			binddn = auth->cred.unix_cred.userID;
+			passwd = auth->cred.unix_cred.passwd;
+			if (passwd == NULL || *passwd == '\0' ||
+				binddn == NULL || *binddn == '\0') {
+				(void) sprintf(errstr,
 				gettext("openConnection: missing credentials "
 				"for SASL bind"));
-			MKERROR(LOG_WARNING, *errorp, LDAP_INVALID_CREDENTIALS,
-				strdup(errstr), NULL);
-			(void) ldap_unbind(ld);
-			return (NS_LDAP_INTERNAL);
+				MKERROR(LOG_WARNING, *errorp,
+					LDAP_INVALID_CREDENTIALS,
+					strdup(errstr), NULL);
+				(void) ldap_unbind(ld);
+				return (NS_LDAP_INTERNAL);
+			}
+			cred.bv_val = passwd;
+			cred.bv_len = strlen(passwd);
 		}
-		cred.bv_val = passwd;
-		cred.bv_len = strlen(passwd);
 
 		switch (auth->auth.saslmech) {
 		case NS_LDAP_SASL_CRAM_MD5:
@@ -1584,6 +2123,47 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
 
 			free(digest_md5_name);
 			break;
+		case NS_LDAP_SASL_GSSAPI:
+			if (sasl_gssapi_inited == 0) {
+				rc = __s_api_sasl_gssapi_init();
+				if (rc != NS_LDAP_SUCCESS) {
+					(void) snprintf(errstr, sizeof (errstr),
+						gettext("openConnection: "
+						"GSSAPI initialization "
+						"failed"));
+					(void) ldap_unbind(ld);
+					MKERROR(LOG_WARNING, *errorp, rc,
+						strdup(errstr), NULL);
+					return (rc);
+				}
+			}
+			(void) memset(&sasl_param, 0,
+					sizeof (ns_sasl_cb_param_t));
+			sasl_param.authid = NULL;
+			sasl_param.authzid = "";
+			(void) ldap_set_option(ld, LDAP_OPT_X_SASL_SSF_MIN,
+						(void *)&min_ssf);
+			(void) ldap_set_option(ld, LDAP_OPT_X_SASL_SSF_MAX,
+						(void *)&max_ssf);
+
+			rc = ldap_sasl_interactive_bind_s(
+				ld, NULL, "GSSAPI",
+				NULL, NULL, LDAP_SASL_INTERACTIVE,
+				__s_api_sasl_bind_callback,
+				&sasl_param);
+
+			if (rc != LDAP_SUCCESS) {
+				(void) snprintf(errstr, sizeof (errstr),
+					gettext("openConnection: "
+					"GSSAPI bind failed "
+					"- %d %s"), rc, ldap_err2string(rc));
+				(void) ldap_unbind(ld);
+				MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL,
+						strdup(errstr), NULL);
+				return (NS_LDAP_INTERNAL);
+			}
+
+			break;
 		default:
 			(void) ldap_unbind(ld);
 			(void) sprintf(errstr,
@@ -1648,12 +2228,11 @@ __s_api_getDefaultAuth(
 		return (NS_LDAP_INVALID_PARAM);
 
 	}
-
 	/*
-	 * Do not differentiate between (proxy/self) at this time, but
-	 * reject self credential levels at this time
+	 * credential level "self" can work with auth method sasl/GSSAPI only
 	 */
-	if (cLevel && *cLevel == NS_LDAP_CRED_SELF)
+	if (cLevel && *cLevel == NS_LDAP_CRED_SELF &&
+			aMethod->saslmech != NS_LDAP_SASL_GSSAPI)
 		return (NS_LDAP_INVALID_PARAM);
 
 	*authp = (ns_cred_t *)calloc(1, sizeof (ns_cred_t));
@@ -1674,7 +2253,7 @@ __s_api_getDefaultAuth(
 			    (aMethod->saslmech == NS_LDAP_SASL_CRAM_MD5)) {
 				getUid++;
 				getPasswd++;
-			} else {
+			} else if (aMethod->saslmech != NS_LDAP_SASL_GSSAPI) {
 				(void) __ns_ldap_freeCred(authp);
 				*authp = NULL;
 				return (NS_LDAP_INVALID_PARAM);
@@ -1845,7 +2424,7 @@ __s_api_getConnection(
 	int		sec = 1;
 	ns_cred_t 	*authp = NULL;
 	ns_cred_t	anon;
-	int		version = NS_LDAP_V2;
+	int		version = NS_LDAP_V2, self_gssapi_only = 0;
 	void		**paramVal = NULL;
 	char		**badSrvrs = NULL; /* List of problem hostnames */
 
@@ -1941,16 +2520,20 @@ __s_api_getConnection(
 			/* using specified auth method */
 			rc = makeConnection(&con, server, cred,
 				sessionId, timeoutSec, errorp,
-				fail_if_new_pwd_reqd, nopasswd_acct_mgmt,
-				&badSrvrs);
+				fail_if_new_pwd_reqd,
+				nopasswd_acct_mgmt, flags, &badSrvrs);
 			if (rc == NS_LDAP_SUCCESS ||
 				rc == NS_LDAP_SUCCESS_WITH_INFO) {
 				*session = con;
 				break;
 			}
 		} else {
+			self_gssapi_only = __s_api_self_gssapi_only_get();
 			/* for every cred level */
 			for (cNext = cLevel; *cNext != NULL; cNext++) {
+				if (self_gssapi_only &&
+					**cNext != NS_LDAP_CRED_SELF)
+					continue;
 				if (**cNext == NS_LDAP_CRED_ANON) {
 					/*
 					 * make connection anonymously
@@ -1964,7 +2547,8 @@ __s_api_getConnection(
 					rc = makeConnection(&con, server, &anon,
 						sessionId, timeoutSec, errorp,
 						fail_if_new_pwd_reqd,
-						nopasswd_acct_mgmt, &badSrvrs);
+						nopasswd_acct_mgmt, flags,
+						&badSrvrs);
 					if (rc == NS_LDAP_SUCCESS ||
 						rc ==
 						NS_LDAP_SUCCESS_WITH_INFO) {
@@ -1975,6 +2559,22 @@ __s_api_getConnection(
 				}
 				/* for each cred level */
 				for (aNext = aMethod; *aNext != NULL; aNext++) {
+					if (self_gssapi_only &&
+						(*aNext)->saslmech !=
+						NS_LDAP_SASL_GSSAPI)
+						continue;
+					/*
+					 * self coexists with sasl/GSSAPI only
+					 * and non-self coexists with non-gssapi
+					 * only
+					 */
+					if ((**cNext == NS_LDAP_CRED_SELF &&
+						(*aNext)->saslmech !=
+						NS_LDAP_SASL_GSSAPI) ||
+						(**cNext != NS_LDAP_CRED_SELF &&
+						(*aNext)->saslmech ==
+						NS_LDAP_SASL_GSSAPI))
+						continue;
 					/* make connection and authenticate */
 					/* with default credentials */
 					authp = NULL;
@@ -1994,7 +2594,8 @@ __s_api_getConnection(
 					rc = makeConnection(&con, server, authp,
 						sessionId, timeoutSec, errorp,
 						fail_if_new_pwd_reqd,
-						nopasswd_acct_mgmt, &badSrvrs);
+						nopasswd_acct_mgmt, flags,
+						&badSrvrs);
 					(void) __ns_ldap_freeCred(&authp);
 					if (rc == NS_LDAP_SUCCESS ||
 						rc ==
@@ -2015,6 +2616,30 @@ __s_api_getConnection(
 	}
 
 done:
+	/*
+	 * If unable to get a connection, and this is
+	 * the thread opening the shared connection,
+	 * unlock the session mutex and let other
+	 * threads try to get their own connection.
+	 */
+	if (wait4session != 0 && sessionTid == thr_self()) {
+		wait4session = 0;
+		sessionTid = 0;
+#ifdef DEBUG
+		(void) fprintf(stderr, "tid= %d: __s_api_getConnection: "
+			"unlocking sessionLock \n", thr_self());
+		fflush(stderr);
+#endif /* DEBUG */
+		(void) mutex_unlock(&sessionLock);
+	}
+	if (self_gssapi_only && rc == NS_LDAP_SUCCESS && *session == NULL) {
+		/*
+		 * self_gssapi_only is true but no self/sasl/gssapi is
+		 * configured
+		 */
+		rc = NS_LDAP_CONFIG;
+	}
+
 	(void) __ns_ldap_freeParam((void ***)&aMethod);
 	(void) __ns_ldap_freeParam((void ***)&cLevel);
 
@@ -2038,7 +2663,7 @@ _free_sessionPool()
 {
 	int id;
 
-	(void) mutex_lock(&sessionPoolLock);
+	(void) rw_wrlock(&sessionPoolLock);
 	if (sessionPool != NULL) {
 		for (id = 0; id < sessionPoolSize; id++)
 			_DropConnection(id + CONID_OFFSET, 0, 1);
@@ -2046,5 +2671,5 @@ _free_sessionPool()
 		sessionPool = NULL;
 		sessionPoolSize = 0;
 	}
-	(void) mutex_unlock(&sessionPoolLock);
+	(void) rw_unlock(&sessionPoolLock);
 }

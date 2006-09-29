@@ -36,6 +36,11 @@
 #include <ctype.h>
 #include <bsm/libbsm.h>
 #include <user_attr.h>
+#include <pwd.h>
+#include <shadow.h>
+#include <grp.h>
+#include <unistd.h>	/* for GF_PATH */
+#include <dlfcn.h>
 #include "compat_common.h"
 
 /*
@@ -43,6 +48,62 @@
  */
 
 extern int yp_get_default_domain(char **domain);
+
+/* from libc */
+extern int str2passwd(const char *instr, int lenstr, void *ent,
+		char *buffer, int buflen);
+extern int str2spwd(const char *instr, int lenstr, void *ent,
+		char *buffer, int buflen);
+extern int str2group(const char *instr, int lenstr, void *ent,
+		char *buffer, int buflen);
+
+/* from libnsl */
+extern char *_strtok_escape(char *, char *, char **);
+
+/*
+ * str2auuser_s and str2userattr_s are very simple version
+ * of the str2auuser() and str2userattr() that can be found in
+ * libnsl. They only copy the user name into the userstr_t
+ * or au_user_str_t structure (so check on user name can be
+ * performed).
+ */
+static int
+str2auuser_s(
+	const char	*instr,
+	int		lenstr,
+	void		*ent,
+	char		*buffer,
+	int		buflen)
+{
+	char		*last = NULL;
+	char		*sep = KV_TOKEN_DELIMIT;
+	au_user_str_t	*au_user = (au_user_str_t *)ent;
+
+	if (lenstr >= buflen)
+		return (NSS_STR_PARSE_ERANGE);
+	(void) strncpy(buffer, instr, buflen);
+	au_user->au_name = _strtok_escape(buffer, sep, &last);
+	return (0);
+}
+
+static int
+str2userattr_s(
+	const char	*instr,
+	int		lenstr,
+	void		*ent,
+	char		*buffer,
+	int		buflen)
+{
+	char		*last = NULL;
+	char		*sep = KV_TOKEN_DELIMIT;
+	userstr_t	*user = (userstr_t *)ent;
+
+	if (lenstr >= buflen)
+		return (NSS_STR_PARSE_ERANGE);
+	(void) strncpy(buffer, instr, buflen);
+	user->name = _strtok_escape(buffer, sep, &last);
+	return (0);
+}
 
 /*
  * Routines to manage list of "-" users for get{pw, sp, gr}ent().  Current
@@ -58,7 +119,6 @@ struct setofstrings {
 	 *	object rather than two.
 	 */
 };
-typedef struct setofstrings	*strset_t;
 
 static void
 strset_free(ssp)
@@ -88,7 +148,7 @@ strset_add(ssp, nam)
 		free(new);
 		return (B_FALSE);
 	}
-	strcpy(new->name, nam);
+	(void) strcpy(new->name, nam);
 	new->next = *ssp;
 	*ssp = new;
 	return (B_TRUE);
@@ -108,41 +168,6 @@ strset_in(ssp, nam)
 	}
 	return (B_FALSE);
 }
-
-
-struct compat_backend {
-	compat_backend_op_t	*ops;
-	int			n_ops;
-	const char		*filename;
-	FILE			*f;
-	int			minbuf;
-	char			*buf;
-	int			linelen;	/* <== Explain use, lifetime */
-
-	nss_db_initf_t		db_initf;
-	nss_db_root_t		*db_rootp;	/* Shared between instances */
-	nss_getent_t		db_context;	/* Per-instance enumeration */
-
-	compat_get_name		getnamef;
-	compat_merge_func	mergef;
-
-	/* We wouldn't need all this hokey state stuff if we */
-	/*   used another thread to implement a coroutine... */
-	enum {
-		GETENT_FILE,
-		GETENT_NETGROUP,
-		GETENT_ATTRDB,
-		GETENT_ALL,
-		GETENT_DONE
-	}			state;
-	strset_t		minuses;
-
-	int			permit_netgroups;
-	const char		*yp_domain;
-	nss_backend_t		*getnetgrent_backend;
-	char			*netgr_buffer;
-};
-
 
 /*
  * Lookup and enumeration routines for +@group and -@group.
@@ -171,15 +196,6 @@ netgr_in(compat_backend_ptr_t be, const char *group, const char *user)
 	return (innetgr(group, 0, user, be->yp_domain));
 }
 
-static boolean_t
-netgr_all_in(compat_backend_ptr_t be, const char *group)
-{
-	/*
-	 * 4.x does this;  ours not to reason why...
-	 */
-	return (netgr_in(be, group, "*"));
-}
-
 static void
 netgr_set(be, netgroup)
 	compat_backend_ptr_t	be;
@@ -202,7 +218,7 @@ netgr_set(be, netgroup)
 
 		args.netgroup	= netgroup;
 		args.iterator	= 0;
-		nss_search(&netgr_db_root, _nss_initf_netgroup,
+		(void) nss_search(&netgr_db_root, _nss_initf_netgroup,
 			NSS_DBOP_NETGROUP_SET, &args);
 		be->getnetgrent_backend = args.iterator;
 	}
@@ -270,7 +286,7 @@ do_merge(be, args, instr, linelen)
 	int			overrides;
 	const char		*p;
 	const char		*end = instr + linelen;
-	nss_status_t		res;
+	nss_status_t		res = NSS_NOTFOUND;
 
 	/*
 	 * Potential optimization:  only perform the field-splitting nonsense
@@ -292,7 +308,7 @@ do_merge(be, args, instr, linelen)
 				overrides = -1;	/* Indicates "you lose" */
 				break;
 			}
-			memcpy(s, p, len);
+			(void) memcpy(s, p, len);
 			s[len] = '\0';
 			fields[i] = s;
 			overrides++;
@@ -306,16 +322,29 @@ do_merge(be, args, instr, linelen)
 		}
 	}
 	if (overrides == 1) {
-		/* No real overrides, return (*args) intact */
-		res = NSS_SUCCESS;
-	} else if (overrides > 1) {
+		/*
+		 * return result here if /etc file format is requested
+		 */
+		if (be->return_string_data != 1) {
+			/* No real overrides, return (*args) intact */
+			res = NSS_SUCCESS;
+		} else {
+			free(fields[0]);
+			fields[0] = NULL;
+		}
+	}
+
+	if (overrides > 1 || be->return_string_data == 1) {
 		/*
 		 * The zero'th field is always nonempty (+/-...), but at least
 		 *   one other field was also nonempty, i.e. wants to override
 		 */
 		switch ((*be->mergef)(be, args, (const char **)fields)) {
 		    case NSS_STR_PARSE_SUCCESS:
-			args->returnval	= args->buf.result;
+			if (be->return_string_data != 1)
+				args->returnval	= args->buf.result;
+			else
+				args->returnval	= args->buf.buffer;
 			args->erange	= 0;
 			res = NSS_SUCCESS;
 			break;
@@ -331,7 +360,7 @@ do_merge(be, args, instr, linelen)
 			res = NSS_NOTFOUND;
 			break;
 		}
-	} else {
+	} else if (res != NSS_SUCCESS) {
 		args->returnval	= 0;
 		args->erange	= 0;
 		res = NSS_UNAVAIL;	/* ==> Right? */
@@ -383,7 +412,7 @@ _nss_compat_endent(be, dummy)
 	void			*dummy;
 {
 	if (be->f != 0) {
-		fclose(be->f);
+		(void) fclose(be->f);
 		be->f = 0;
 	}
 	if (be->buf != 0) {
@@ -412,7 +441,7 @@ _nss_compat_destr(be, dummy)
 {
 	if (be != 0) {
 		if (be->f != 0) {
-			_nss_compat_endent(be, 0);
+			(void) _nss_compat_endent(be, 0);
 		}
 		nss_delete(be->db_rootp);
 		nss_delete(&netgr_db_root);
@@ -459,6 +488,7 @@ read_line(f, buffer, buflen)
 			;
 		}
 	}
+	/*NOTREACHED*/
 }
 
 static int
@@ -493,6 +523,10 @@ _attrdb_compat_XY_all(be, argp, netdb, check, op_num)
 	int		(*func)();
 	const char	*filter = argp->key.name;
 	nss_status_t	res;
+	union {
+		au_user_str_t	au;
+		userstr_t	user;
+	} workarea;
 
 #ifdef	DEBUG
 	(void) fprintf(stdout, "\n[compat_common.c: _attrdb_compat_XY_all]\n");
@@ -502,10 +536,32 @@ _attrdb_compat_XY_all(be, argp, netdb, check, op_num)
 	    (be->buf = malloc(be->minbuf)) == 0) {
 		return (NSS_UNAVAIL);
 	}
-	if ((res = _nss_compat_setent(be, 0)) != NSS_SUCCESS) {
-		return (res);
-	}
+	if (check != NULL)
+		if ((res = _nss_compat_setent(be, 0)) != NSS_SUCCESS)
+			return (res);
+
 	res = NSS_NOTFOUND;
+
+	/*
+	 * assume a NULL buf.result pointer is an indication
+	 * that the lookup result should be returned in /etc
+	 * file format
+	 */
+	if (argp->buf.result == NULL) {
+		be->return_string_data = 1;
+
+		/*
+		 * the code executed later needs the result struct
+		 * as working area
+		 */
+		argp->buf.result = &workarea;
+
+		if (strcmp(be->filename, USERATTR_FILENAME) == 0)
+			func = str2userattr_s;
+		else
+			func = str2auuser_s;
+	} else
+			func = argp->str2ent;
 
 	/*CONSTCOND*/
 	while (1) {
@@ -560,16 +616,36 @@ _attrdb_compat_XY_all(be, argp, netdb, check, op_num)
 			}
 		}
 		argp->returnval = 0;
-		func = argp->str2ent;
 		parsestat = (*func)(instr, linelen, argp->buf.result,
 					argp->buf.buffer, argp->buf.buflen);
 		if (parsestat == NSS_STR_PARSE_SUCCESS) {
-			argp->returnval = argp->buf.result;
+				argp->returnval = argp->buf.result;
 			if (check == 0 || (*check)(argp)) {
+				int	len;
+
+				if (be->return_string_data != 1) {
+					res = NSS_SUCCESS;
+					break;
+				}
+
+				/* copy string data to result buffer */
+				argp->buf.result = NULL;
+				argp->returnval = argp->buf.buffer;
+				if ((len = strlcpy(argp->buf.buffer, instr,
+					argp->buf.buflen)) >=
+					argp->buf.buflen) {
+					argp->returnval = NULL;
+					res = NSS_NOTFOUND;
+					argp->erange = 1;
+					break;
+				}
+
+				argp->returnlen = len;
 				res = NSS_SUCCESS;
 				break;
 			}
 		} else if (parsestat == NSS_STR_PARSE_ERANGE) {
+			res = NSS_NOTFOUND;
 			argp->erange = 1;
 			break;
 		}
@@ -583,6 +659,14 @@ _attrdb_compat_XY_all(be, argp, netdb, check, op_num)
 	}
 
 	if (res != NSS_SUCCESS) {
+		/*
+		 * tell the nss_search() and nss_getent() below
+		 * if the result should be returned in the /etc
+		 * file format
+		 */
+		if (be->return_string_data == 1)
+			argp->buf.result = NULL;
+
 		if ((op_num == NSS_DBOP_USERATTR_BYNAME) ||
 		    (op_num == NSS_DBOP_AUDITUSER_BYNAME)) {
 			res = nss_search(be->db_rootp,
@@ -611,6 +695,13 @@ _nss_compat_XY_all(be, args, check, op_num)
 {
 	nss_status_t		res;
 	int			parsestat;
+	union {
+		struct passwd		pwd;
+		struct spwd		shdw;
+		struct group		grp;
+	} workarea;
+	int			(*str2ent_save)();
+
 
 	if (be->buf == 0 &&
 	    (be->buf = malloc(be->minbuf)) == 0) {
@@ -622,6 +713,30 @@ _nss_compat_XY_all(be, args, check, op_num)
 	}
 
 	res = NSS_NOTFOUND;
+
+	/*
+	 * assume a NULL buf.result pointer is an indication
+	 * that the lookup result should be returned in /etc
+	 * file format
+	 */
+	if (args->buf.result == NULL) {
+
+		be->return_string_data = 1;
+
+		/*
+		 * the code executed later needs the result struct
+		 * as working area
+		 */
+		args->buf.result = &workarea;
+
+		str2ent_save = args->str2ent;
+		if (strcmp(be->filename, PASSWD) == 0)
+			args->str2ent = str2passwd;
+		else if (strcmp(be->filename, SHADOW) == 0)
+			args->str2ent = str2spwd;
+		else
+			args->str2ent = str2group;
+	}
 
 	/*CONSTCOND*/
 	while (1) {
@@ -648,13 +763,37 @@ _nss_compat_XY_all(be, args, check, op_num)
 			if (parsestat == NSS_STR_PARSE_SUCCESS) {
 				args->returnval = args->buf.result;
 				if ((*check)(args) != 0) {
-					res = NSS_SUCCESS;
-					break;
-				}
+					int len;
+					if (be->return_string_data != 1) {
+						res = NSS_SUCCESS;
+						break;
+					}
+
+					/*
+					 * copy string data to
+					 * result buffer
+					 */
+					args->buf.result = NULL;
+					args->str2ent = str2ent_save;
+					if ((len = strlcpy(args->buf.buffer,
+						instr, args->buf.buflen)) >=
+							args->buf.buflen)
+						parsestat =
+							NSS_STR_PARSE_ERANGE;
+					else {
+						args->returnval =
+							args->buf.buffer;
+						args->returnlen = len;
+						res = NSS_SUCCESS;
+						break;
+					}
+				} else
+					continue;
+			}
 
 /* ===> Check the Dani logic here... */
 
-			} else if (parsestat == NSS_STR_PARSE_ERANGE) {
+			if (parsestat == NSS_STR_PARSE_ERANGE) {
 				args->erange = 1;
 				res = NSS_NOTFOUND;
 				break;
@@ -664,6 +803,7 @@ _nss_compat_XY_all(be, args, check, op_num)
 
 /* ==> ?? */		continue;
 		}
+
 
 		/*
 		 * Process "+", "+name", "+@netgroup", "-name" or "-@netgroup"
@@ -701,15 +841,15 @@ _nss_compat_XY_all(be, args, check, op_num)
 					continue;
 				if (instr[0] == '+') {
 					/* need to search for "+" entry */
-					nss_search(be->db_rootp, be->db_initf,
-					    op_num, args);
+					(void) nss_search(be->db_rootp,
+						be->db_initf, op_num, args);
 					if (args->returnval == 0)
 						continue;
 				}
 			} else {
 				/* search then compare */
-				nss_search(be->db_rootp, be->db_initf, op_num,
-				    args);
+				(void) nss_search(be->db_rootp,
+					be->db_initf, op_num, args);
 				if (args->returnval == 0)
 					continue;
 				if (!be->permit_netgroups ||
@@ -727,7 +867,8 @@ _nss_compat_XY_all(be, args, check, op_num)
 			if (instr[0] == '-')
 				continue;
 			/* need to search for "+" entry */
-			nss_search(be->db_rootp, be->db_initf, op_num, args);
+			(void) nss_search(be->db_rootp, be->db_initf,
+				op_num, args);
 			if (args->returnval == 0)
 				continue;
 		} else {
@@ -746,15 +887,15 @@ _nss_compat_XY_all(be, args, check, op_num)
 					continue;
 				if (instr[0] == '+') {
 					/* need to search for "+" entry */
-					nss_search(be->db_rootp, be->db_initf,
-					    op_num, args);
+					(void) nss_search(be->db_rootp,
+						be->db_initf, op_num, args);
 					if (args->returnval == 0)
 						continue;
 				}
 			} else {
 				/* search then compare */
-				nss_search(be->db_rootp, be->db_initf, op_num,
-				    args);
+				(void) nss_search(be->db_rootp,
+					be->db_initf, op_num, args);
 				if (args->returnval == 0)
 					continue;
 				if (strcmp(instr + 1, (*be->getnamef)(args))
@@ -783,6 +924,10 @@ _nss_compat_XY_all(be, args, check, op_num)
 		(void) _nss_compat_endent(be, 0);
 	}
 
+	if (be->return_string_data == 1) {
+		args->str2ent = str2ent_save;
+	}
+
 	return (res);
 }
 
@@ -794,6 +939,12 @@ _nss_compat_getent(be, a)
 	nss_XbyY_args_t		*args = (nss_XbyY_args_t *)a;
 	nss_status_t		res;
 	char			*colon = 0; /* <=== need comment re lifetime */
+	union {
+		struct passwd		pwd;
+		struct spwd		shdw;
+		struct group		grp;
+	} workarea;
+
 
 	if (be->f == 0) {
 		if ((res = _nss_compat_setent(be, 0)) != NSS_SUCCESS) {
@@ -804,6 +955,21 @@ _nss_compat_getent(be, a)
 	if (be->buf == 0 &&
 	    (be->buf = malloc(be->minbuf)) == 0) {
 		return (NSS_UNAVAIL); /* really panic, malloc failed */
+	}
+
+	/*
+	 * assume a NULL buf.result pointer is an indication
+	 * that the lookup result should be returned in /etc
+	 * file format
+	 */
+	if (args->buf.result == NULL) {
+		be->return_string_data = 1;
+
+		/*
+		 * the code executed later needs the result struct
+		 * as working area
+		 */
+		args->buf.result = &workarea;
 	}
 
 	/*CONSTCOND*/
@@ -829,6 +995,7 @@ _nss_compat_getent(be, a)
 			return (NSS_NOTFOUND);
 
 		    case GETENT_ATTRDB:
+			args->key.name = NULL;
 			res = _attrdb_compat_XY_all(be,
 			    args, 1, (compat_XY_check_func)NULL, 0);
 			return (res);
@@ -845,11 +1012,12 @@ _nss_compat_getent(be, a)
 			}
 			if (instr[0] == '-') {
 				if (instr[1] != '@') {
-					strset_add(&be->minuses, instr + 1);
+					(void) strset_add(&be->minuses,
+						instr + 1);
 				} else if (be->permit_netgroups) {
 					netgr_set(be, instr + 2);
 					while (netgr_next_u(be, &name)) {
-						strset_add(&be->minuses,
+						(void) strset_add(&be->minuses,
 							name);
 					}
 					netgr_end(be);
@@ -869,8 +1037,30 @@ _nss_compat_getent(be, a)
 							args->buf.buffer,
 							args->buf.buflen);
 				if (parsestat == NSS_STR_PARSE_SUCCESS) {
-					args->returnval = args->buf.result;
-					return (NSS_SUCCESS);
+					int	len;
+
+					if (be->return_string_data != 1) {
+						args->returnval =
+							args->buf.result;
+						return (NSS_SUCCESS);
+					}
+
+					/*
+					 * copy string data to
+					 * result buffer
+					 */
+					args->buf.result = NULL;
+					args->returnval =
+						args->buf.buffer;
+					if ((len = strlcpy(args->buf.buffer,
+						instr, args->buf.buflen)) >=
+						args->buf.buflen)
+						parsestat =
+							NSS_STR_PARSE_ERANGE;
+					else {
+						args->returnlen = len;
+						return (NSS_SUCCESS);
+					}
 				}
 				/* ==> ?? Treat ERANGE differently ?? */
 				if (parsestat == NSS_STR_PARSE_ERANGE) {
@@ -903,7 +1093,7 @@ _nss_compat_getent(be, a)
 		    case GETENT_ALL:
 			linelen = be->linelen;
 			args->returnval = 0;
-			nss_getent(be->db_rootp, be->db_initf,
+			(void) nss_getent(be->db_rootp, be->db_initf,
 				&be->db_context, args);
 			if (args->returnval == 0) {
 				/* ==> ?? Treat ERANGE differently ?? */
@@ -947,7 +1137,7 @@ _nss_compat_getent(be, a)
 			savename = args->key.name;
 			args->key.name	= name;
 			args->returnval	= 0;
-			nss_search(be->db_rootp, be->db_initf,
+			(void) nss_search(be->db_rootp, be->db_initf,
 				NSS_DBOP_next_iter, args);
 			args->key.name = savename;  /* In case anyone cares */
 		}
@@ -966,6 +1156,7 @@ _nss_compat_getent(be, a)
 		}
 		return (do_merge(be, args, instr, linelen));
 	}
+	/*NOTREACHED*/
 }
 
 /* We don't use this directly;  we just copy the bits when we want to	 */
@@ -1016,6 +1207,7 @@ _nss_compat_constr(ops, n_ops, filename, min_bufsize, rootp, initf, netgroups,
 	be->yp_domain	= 0;
 	be->getnetgrent_backend	= 0;
 	be->netgr_buffer = 0;
+	be->return_string_data = 0;
 
 	return ((nss_backend_t *)be);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1992-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -49,9 +48,9 @@ extern "C" {
  *
  * From nsswitch.conf(4):
  *
- *	    The operating system uses a number of ``databases'' of information
+ *	    The operating system uses a number of "databases" of information
  *	    about hosts, users (passwd/shadow), groups and so forth.  Data for
- *	    these can come from a variety of ``sources'':  host-names and
+ *	    these can come from a variety of "sources":  host-names and
  *	    -addresses, for example, may be found in /etc/hosts, NIS, NIS+ or
  *	    DNS.  One or more sources may be used for each database;  the
  *	    sources and their lookup order are specified in the
@@ -59,16 +58,20 @@ extern "C" {
  *
  * The implementation of this consists of:
  *
- *    -	a ``frontend'' for each database, which provides a programming
+ *    -	a "frontend" for each database, which provides a programming
  *	interface for that database [for example, the "passwd" frontend
  *	consists of getpwnam_r(), getpwuid_r(), getpwent_r(), setpwent(),
  *	endpwent(), and the old MT-unsafe routines getpwnam() and getpwuid()]
  *	and is implemented by calls to...
  *
- *    -	the common core of the switch (``switch engine'');  it determines
- *	which sources to use and invokes...
+ *    -	the common core of the switch (called the "switch" or "policy" engine);
+ *	that determines what sources to use and when to invoke them.  This
+ *	component works in conjunction with the name service switch (nscd).
+ *	Usually nscd is the policy engine for an application lookup.
  *
- *    -	A ``backend'' for each useful <database, source> pair.  Each backend
+ *    - Old style backend interfaces follow this pointer to function interface:
+ *
+ *     	A "backend" exists for useful <database, source> pairs.  Each backend
  *	consists of whatever private data it needs and a set of functions
  *	that the switch engine may invoke on behalf of the frontend
  *	[e.g. the "nis" backend for "passwd" provides routines to lookup
@@ -78,13 +81,15 @@ extern "C" {
  *	all its backends.  The switch engine knows as little as possible
  *	about these interfaces.
  *
- *	(The term ``backend'' is used ambiguously;  it may also refer to a
+ *	(The term "backend" is used ambiguously;  it may also refer to a
  *	particular instantiation of a backend, or to the set of all backends
  *	for a particular source, e.g. "the nis backend").
  *
  * This header file defines the interface between the switch engine and the
  * frontends and backends.  Interfaces between specific frontends and
  * backends are defined elsewhere;  many are in <nss_dbdefs.h>.
+ * Most of these definitions are in the form of pointer to function
+ * indicies used to call specific backend APIs.
  *
  *
  * Switch-engine outline
@@ -102,24 +107,29 @@ extern "C" {
  *
  *	(1)  getpwnam_r	fills in (getpwnam-specific) argument/result struct,
  *			calls nss_search(),
- *	(2)  nss_search	looks up configuration info, gets "passwd: files nis",
- *	(3)  nss_search	decides to try first source ("files"),
+ *	(2)  nss_search queries the name service cache for an existing
+ *			result via a call to _nsc_search().  if the cache
+ *			(nscd) has a definitive answer skip to step 7
+ *	(3)  nss_search	looks up configuration info, gets "passwd: files nis",
+ *	(4)  nss_search	decides to try first source ("files"),
  *	 (a) nss_search	locates code for <"passwd", "files"> backend,
  *	 (b) nss_search	creates instance of backend,
  *	 (c) nss_search	calls get-by-name routine in backend,
+ *			through a function pointer interface,
  *	 (d) backend	searches /etc/passwd, doesn't find the name,
  *			returns "not found" status to nss_search,
- *	(4)  nss_search	examines status and config info, decides to try
+ *	(5)  nss_search	examines status and config info, decides to try
  *			next source ("nis"),
  *	 (a) nss_search	locates code for <"passwd", "nis"> backend,
  *	 (b) nss_search	creates instance of backend,
  *	 (c) nss_search	calls get-by-name routine in backend,
+ *			through a function pointer interface,
  *	 (d) backend	searches passwd.byname, finds the desired entry,
  *			fills in the result part of the getpwnam-specific
  *			struct, returns "success" status to nss_search,
- *	(5)  nss_search	examines status and config info, decides to return
+ *	(6)  nss_search	examines status and config info, decides to return
  *			to caller,
- *	(6)  getpwnam_r	extracts result from getpwnam-specific struct,
+ *	(7)  getpwnam_r	extracts result from getpwnam-specific struct,
  *			returns to caller.
  *
  *
@@ -167,7 +177,6 @@ extern "C" {
  * give per-invocation state.
  */
 
-
 /*
  * Backend instances
  * -----------------
@@ -191,19 +200,50 @@ extern "C" {
  *	structure (the contents are opaque to the switch engine).
  * The four well-known functions ignore the (void *) pointer.
  *
- * Backend routines return one of five status codes to the switch engine:
+ * Backend routines return the following status codes to the switch engine:
+ *
  * SUCCESS, UNAVAIL, NOTFOUND, TRYAGAIN (these are the same codes that may
- * be specified in the config information;  see nsswitch.conf(4)), or
+ * be specified in the config information;  see nsswitch.conf(4))
+ *
+ * The remaining conditions/errors are internally generated and if
+ * necessary are translated, as to one of the above external errors,
+ * usually NOTFOUND or UNAVAIL.
+ *
  * NSS_NISSERVDNS_TRYAGAIN (should only be used by the NIS backend for
  * NIS server in DNS forwarding mode to indicate DNS server non-response).
+ *
+ * The policy component may return NSS_TRYLOCAL which signifies that nscd
+ * is not going to process the request, and it should be performed locally.
+ *
+ * NSS_ERROR is a catchall for internal error conditions, errno will be set
+ * to a system <errno.h> error that can help track down the problem if
+ * it is persistent.  This error is the result of some internal error
+ * condition and should not be seen during or exposed to aan application.
+ * The error may be from the application side switch component or from the
+ * nscd side switch component.
+ *
+ * NSS_ALTRETRY and NSS_ALTRESET are internal codes used by the application
+ * side policy component and nscd to direct the policy component to
+ * communicate to a per-user nscd if/when per-user authentication is enabled.
+ *
+ * NSS_NSCD_PRIV is a catchall for internal nscd errors or status
+ * conditions.  This return code is not visible to applications.  nscd
+ * may use this as a status flag and maintain additional error or status
+ * information elsewhere in other private nscd data.  This status value
+ * is for nscd private/internal use only.
  */
 
 typedef enum {
-	NSS_SUCCESS,
-	NSS_NOTFOUND,
-	NSS_UNAVAIL,
-	NSS_TRYAGAIN,
-	NSS_NISSERVDNS_TRYAGAIN
+	NSS_SUCCESS = 0,
+	NSS_NOTFOUND = 1,
+	NSS_UNAVAIL = 2,
+	NSS_TRYAGAIN = 3,
+	NSS_NISSERVDNS_TRYAGAIN = 4,
+	NSS_TRYLOCAL = 5,
+	NSS_ERROR = 6,
+	NSS_ALTRETRY = 7,
+	NSS_ALTRESET = 8,
+	NSS_NSCD_PRIV = 9
 } nss_status_t;
 
 struct nss_backend;
@@ -256,11 +296,11 @@ typedef int			nss_dbop_t;
  */
 
 #if defined(__STDC__)
-typedef	nss_backend_t * 	(*nss_backend_constr_t)(const char *db_name,
+typedef	nss_backend_t		*(*nss_backend_constr_t)(const char *db_name,
 							const char *src_name,
 /* Hook for (unimplemented) args in nsswitch.conf */	const char *cfg_args);
 #else
-typedef	nss_backend_t * 	(*nss_backend_constr_t)();
+typedef	nss_backend_t 		*(*nss_backend_constr_t)();
 #endif
 
 struct nss_backend_finder {
@@ -342,6 +382,20 @@ typedef void (*nss_db_initf_t)();
 #endif
 
 /*
+ * DBD param offsets in NSS2 nscd header.
+ * Offsets are relative to beginning of dbd section.
+ * 32 bit offsets should be sufficient, forever.
+ * 0 offset == NULL
+ * flags == nss_dbp_flags
+ */
+typedef struct nss_dbd {
+	uint32_t	o_name;
+	uint32_t	o_config_name;
+	uint32_t	o_default_config;
+	uint32_t	flags;
+} nss_dbd_t;
+
+/*
  * These structures are defined inside the implementation of the switch
  * engine;  the interface just holds pointers to them.
  */
@@ -369,22 +423,81 @@ typedef struct {
 #define	NSS_GETENT_INIT			{ 0, DEFAULTMUTEX }
 #define	DEFINE_NSS_GETENT(name)		nss_getent_t name = NSS_GETENT_INIT
 
+/*
+ * Policy Engine Configuration
+ * ---------------------------
+ *
+ * When nscd is running it can reconfigure it's internal policy engine
+ * as well as advise an application's front-end and policy engine on how
+ * respond optimally to results being returned from nscd.  This is done
+ * through the policy engine configuration interface.
+ */
+
+typedef enum {
+	NSS_CONFIG_GET,
+	NSS_CONFIG_PUT,
+	NSS_CONFIG_ADD,
+	NSS_CONFIG_DELETE,
+	NSS_CONFIG_LIST
+} nss_config_op_t;
+
+struct nss_config {
+	char		*name;
+	nss_config_op_t	cop;
+	mutex_t		*lock;
+	void		*buffer;
+	size_t		length;
+};
+typedef struct nss_config nss_config_t;
+
+
 #if defined(__STDC__)
+extern nss_status_t nss_config(nss_config_t **, int);
+
 extern nss_status_t nss_search(nss_db_root_t *, nss_db_initf_t,
 			int search_fnum, void *search_args);
 extern nss_status_t nss_getent(nss_db_root_t *, nss_db_initf_t, nss_getent_t *,
 			void *getent_args);
 extern void nss_setent(nss_db_root_t *, nss_db_initf_t, nss_getent_t *);
-
 extern void nss_endent(nss_db_root_t *, nss_db_initf_t, nss_getent_t *);
-					/* ^^ superfluous but consistent */
 extern void nss_delete(nss_db_root_t *);
+
+extern nss_status_t nss_pack(void *, size_t, nss_db_root_t *,
+			nss_db_initf_t, int, void *);
+extern nss_status_t nss_pack_ent(void *, size_t, nss_db_root_t *,
+			nss_db_initf_t, nss_getent_t *);
+extern nss_status_t nss_unpack(void *, size_t, nss_db_root_t *,
+			nss_db_initf_t, int, void *);
+extern nss_status_t nss_unpack_ent(void *, size_t, nss_db_root_t *,
+			nss_db_initf_t, nss_getent_t *, void *);
+
+extern nss_status_t _nsc_search(nss_db_root_t *, nss_db_initf_t,
+			int search_fnum, void *search_args);
+extern nss_status_t _nsc_getent_u(nss_db_root_t *, nss_db_initf_t,
+			nss_getent_t *, void *getent_args);
+extern nss_status_t _nsc_setent_u(nss_db_root_t *, nss_db_initf_t,
+			nss_getent_t *);
+extern nss_status_t _nsc_endent_u(nss_db_root_t *, nss_db_initf_t,
+			nss_getent_t *);
+
 #else
+extern nss_status_t nss_config();
+
 extern nss_status_t nss_search();
 extern nss_status_t nss_getent();
 extern void nss_setent();
 extern void nss_endent();
 extern void nss_delete();
+
+extern int nss_pack();
+extern int nss_pack_ent();
+extern int nss_unpack();
+extern int nss_unpack_ent();
+
+extern nss_status_t _nsc_search();
+extern nss_status_t _nsc_getent_u();
+extern nss_status_t _nsc_setent_u();
+extern nss_status_t _nsc_endent_u();
 #endif
 
 #ifdef	__cplusplus

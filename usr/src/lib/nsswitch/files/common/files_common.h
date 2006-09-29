@@ -45,12 +45,12 @@ extern "C" {
 typedef struct files_backend *files_backend_ptr_t;
 typedef nss_status_t	(*files_backend_op_t)(files_backend_ptr_t, void *);
 
-typedef u_int (*files_hash_func)(nss_XbyY_args_t *, int);
+typedef uint_t (*files_hash_func)(nss_XbyY_args_t *, int, const char *, int);
 
 typedef struct files_hashent {
 	struct files_hashent	*h_first;
 	struct files_hashent	*h_next;
-	u_int			h_hash;
+	uint_t			h_hash;
 } files_hashent_t;
 
 typedef struct {
@@ -92,7 +92,8 @@ struct files_backend {
  *   generic work for nss_XbyY_args_t backends (calls cstr2ent etc).
  */
 typedef nss_status_t	(*files_do_all_func_t)(const char *, int, void *args);
-typedef int		(*files_XY_check_func)(nss_XbyY_args_t *);
+typedef int		(*files_XY_check_func)(nss_XbyY_args_t *,
+						const char *, int);
 
 #if defined(__STDC__)
 extern nss_backend_t	*_nss_files_constr(files_backend_op_t	*ops,
@@ -132,6 +133,9 @@ extern nss_status_t	_nss_files_do_all();
 extern nss_status_t	_nss_files_XY_all();
 extern nss_status_t	_nss_files_XY_hash();
 #endif
+
+int	_nss_files_check_name_aliases(nss_XbyY_args_t *, const char *, int);
+int	_nss_files_check_name_colon(nss_XbyY_args_t *, const char *, int);
 
 #ifdef	__cplusplus
 }

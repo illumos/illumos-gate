@@ -76,6 +76,19 @@ extern "C" {
 	((string != NULL) && (strchr(string, '.') != NULL))
 #define	SEARCHFILTERLEN		256
 
+#define	_NO_VALUE		""
+
+#define	TEST_AND_ADJUST(len, buffer, buflen, label) \
+	    /* Use '>=' to ensure there is at least one byte left for '\0' */ \
+	    if (len >= buflen || len < 0) { \
+		nss_result = NSS_STR_PARSE_ERANGE; \
+		goto label; \
+	    } \
+	    /* Adjust pointer and available buffer length */ \
+	    buffer += len; \
+	    buflen -= len;
+
+
 /*
  * Superset the nss_backend_t abstract data type. This ADT has
  * been extended to include ldap associated data structures.
@@ -84,6 +97,12 @@ extern "C" {
 typedef struct ldap_backend *ldap_backend_ptr;
 typedef nss_status_t (*ldap_backend_op_t)(ldap_backend_ptr, void *);
 typedef int (*fnf)(ldap_backend_ptr be, nss_XbyY_args_t *argp);
+
+typedef enum {
+	NSS_LDAP_DB_NONE	= 0,
+	NSS_LDAP_DB_PUBLICKEY	= 1,
+	NSS_LDAP_DB_ETHERS	= 2
+} nss_ldap_db_type_t;
 
 struct ldap_backend {
 	ldap_backend_op_t	*ops;
@@ -94,10 +113,13 @@ struct ldap_backend {
 	int			setcalled;
 	const char		**attrs;
 	ns_ldap_result_t	*result;
-	fnf			ldapobj2ent;
+	fnf			ldapobj2str;
 	void			*netgroup_cookie;
 	void			*services_cookie;
 	char			*toglue;
+	char			*buffer;
+	int			buflen;
+	nss_ldap_db_type_t	db_type;
 };
 
 extern nss_status_t	_nss_ldap_destr(ldap_backend_ptr be, void *a);
@@ -105,7 +127,7 @@ extern nss_status_t	_nss_ldap_endent(ldap_backend_ptr be, void *a);
 extern nss_status_t	_nss_ldap_setent(ldap_backend_ptr be, void *a);
 extern nss_status_t	_nss_ldap_getent(ldap_backend_ptr be, void *a);
 nss_backend_t		*_nss_ldap_constr(ldap_backend_op_t ops[], int nops,
-			char *tablename, const char **attrs, fnf ldapobj2ent);
+			char *tablename, const char **attrs, fnf ldapobj2str);
 extern nss_status_t	_nss_ldap_nocb_lookup(ldap_backend_ptr be,
 			nss_XbyY_args_t *argp, char *database,
 			char *searchfilter, char *domain,
@@ -132,7 +154,6 @@ extern int _merge_SSD_filter(const ns_ldap_search_desc_t *desc,
 	char **realfilter, const void *userdata);
 extern int _ldap_filter_name(char *filter_name, const char *name,
 	int filter_name_size);
-extern nss_status_t switch_err(int rc, ns_ldap_error_t *error);
 
 extern void _nss_services_cookie_free(void **cookieP);
 

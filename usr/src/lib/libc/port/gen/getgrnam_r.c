@@ -48,8 +48,7 @@
 #include <sys/mman.h>
 
 extern int _getgroupsbymember(const char *, gid_t[], int, int);
-int str2group(const char *, int, void *,
-	char *, int);
+int str2group(const char *, int, void *, char *, int);
 
 static DEFINE_NSS_DB_ROOT(db_root);
 static DEFINE_NSS_GETENT(context);
@@ -66,10 +65,6 @@ _nss_initf_group(nss_db_params_t *p)
 #include <getxby_door.h>
 #include <sys/door.h>
 
-static struct group *
-process_getgr(struct group *result, char *buffer, int buflen,
-    nsc_data_t *sptr, int ndata);
-
 struct group *
 _uncached_getgrnam_r(const char *name, struct group *result, char *buffer,
     int buflen);
@@ -84,52 +79,17 @@ _uncached_getgrgid_r(gid_t gid, struct group *result, char *buffer, int buflen);
 struct group *
 _getgrnam_r(const char *name, struct group *result, char *buffer, int buflen)
 {
-	/*
-	 * allocate room on the stack for the nscd to return
-	 * group and group member information
-	 */
-	union {
-		nsc_data_t	s_d;
-		char		s_b[8192];
-	} space;
-	nsc_data_t	*sptr;
-	int		ndata;
-	int		adata;
-	struct group	*resptr = NULL;
+	nss_XbyY_args_t arg;
 
-	if ((name == (const char *)NULL) ||
-	    (strlen(name) >= (sizeof (space) - sizeof (nsc_data_t)))) {
+	if (name == (const char *)NULL) {
 		errno = ERANGE;
 		return (NULL);
 	}
-
-	ndata = sizeof (space);
-	adata = strlen(name) + sizeof (nsc_call_t) + 1;
-	space.s_d.nsc_call.nsc_callnumber = GETGRNAM;
-	(void) strcpy(space.s_d.nsc_call.nsc_u.name, name);
-	sptr = &space.s_d;
-
-	switch (_nsc_trydoorcall(&sptr, &ndata, &adata)) {
-	case SUCCESS:	/* positive cache hit */
-		break;
-	case NOTFOUND:	/* negative cache hit */
-		return (NULL);
-	default:
-		return ((struct group *)_uncached_getgrnam_r(name, result,
-		    buffer, buflen));
-	}
-
-	resptr = process_getgr(result, buffer, buflen, sptr, ndata);
-
-	/*
-	 * check to see if doors reallocated memory underneath us
-	 * if they did munmap the memory or suffer a memory leak
-	 */
-
-	if (sptr != &space.s_d)
-		munmap((void *)sptr, ndata);
-
-	return (resptr);
+	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2group);
+	arg.key.name = name;
+	(void) nss_search(&db_root, _nss_initf_group,
+			NSS_DBOP_GROUP_BYNAME, &arg);
+	return ((struct group *)NSS_XbyY_FINI(&arg));
 }
 
 /*
@@ -139,186 +99,13 @@ _getgrnam_r(const char *name, struct group *result, char *buffer, int buflen)
 struct group *
 _getgrgid_r(gid_t gid, struct group *result, char *buffer, int buflen)
 {
-	/*
-	 * allocate room on the stack for the nscd to return
-	 * group and group member information
-	 */
-	union {
-		nsc_data_t	s_d;
-		char		s_b[8192];
-	} space;
-	nsc_data_t	*sptr;
-	int		ndata;
-	int		adata;
-	struct group	*resptr = NULL;
+	nss_XbyY_args_t arg;
 
-	ndata = sizeof (space);
-	adata = sizeof (nsc_call_t) + 1;
-	space.s_d.nsc_call.nsc_callnumber = GETGRGID;
-	space.s_d.nsc_call.nsc_u.gid = gid;
-	sptr = &space.s_d;
-
-	switch (_nsc_trydoorcall(&sptr, &ndata, &adata)) {
-	case SUCCESS:	/* positive cache hit */
-		break;
-	case NOTFOUND:	/* negative cache hit */
-		return (NULL);
-	default:
-		return ((struct group *)_uncached_getgrgid_r(gid, result,
-		    buffer, buflen));
-	}
-
-	resptr = process_getgr(result, buffer, buflen, sptr, ndata);
-
-	/*
-	 * check to see if doors reallocated memory underneath us
-	 * if they did munmap the memory or suffer a memory leak
-	 */
-
-	if (sptr != &space.s_d)
-		munmap((void *)sptr, ndata);
-
-	return (resptr);
-}
-/*
- *  This routine should be rewritten - there's no reason it
- *  cannot be the same code for 32 and 64 bit w/ a bit of care.
- */
-/* ARGSUSED4 */
-static struct group *
-process_getgr(struct group *result, char *buffer, int buflen,
-    nsc_data_t *sptr, int ndata)
-{
-	int i;
-	char *fixed;
-#ifdef	_LP64
-	char	*buffer32;
-	char	**gr_mem32;
-	uptr32_t	index;
-	struct group	group64;
-#endif	/*	_LP64	*/
-
-/* align buffer on a pointer boundry 4bytes in 32bits and 8 bytes in 64bits */
-#ifdef	_LP64
-	fixed = (char *)(((uintptr_t)buffer + 7) & ~7);
-#else
-	fixed = (char *)(((uintptr_t)buffer + 3) & ~3);
-#endif	/*	_LP64	*/
-
-	if (buflen <= fixed - buffer) { /* watch out for wrap-around */
-		errno = ERANGE;
-		return (NULL);
-	}
-
-	buflen -= fixed - buffer;
-
-	buffer = fixed;
-
-#ifdef	_LP64
-	/*
-	 * this is just a rationality check; we need to make
-	 * sure that there's enough space for the gr_mem array
-	 * as well... easiest place to do that is when we copy
-	 * them in place.
-	 */
-
-	if (sptr->nsc_ret.nsc_bufferbytesused +
-		/*
-		 * ^^^ number of bytes from nscd
-		 */
-	    (sizeof (char **)) +
-		/*
-		 * ^^^ we need 8 bytes for gr_mem
-		 */
-	    (sizeof (char *) - 1) -
-		/*
-		 * ^^^ plus space for pssibly fixing aligment of gr_mem
-		 */
-	    sizeof (group32_t)
-		/*
-		 * ^^^ because we don't put this in the usr buffer
-		 */
-	    > buflen) {
-#else
-	if (sptr->nsc_ret.nsc_bufferbytesused - sizeof (struct group)
-	    > buflen) {
-#endif	/*	_LP64	*/
-		errno = ERANGE;
-		return (NULL);
-	}
-
-	if (sptr->nsc_ret.nsc_return_code != SUCCESS)
-		return (NULL);
-
-/*
- * ncsd is a 32bit application, so use 32bit data items if we are in 64bit mode
- */
-#ifdef	_LP64
-
-	(void) memcpy(buffer,
-	    (sptr->nsc_ret.nsc_u.buff + sizeof (group32_t)),
-	    (sptr->nsc_ret.nsc_bufferbytesused - sizeof (group32_t)));
-
-	group64.gr_name = (char *)(sptr->nsc_ret.nsc_u.grp.gr_name +
-				(uintptr_t)buffer);
-	group64.gr_passwd = (char *)(sptr->nsc_ret.nsc_u.grp.gr_passwd +
-				(uintptr_t)buffer);
-	group64.gr_gid = sptr->nsc_ret.nsc_u.grp.gr_gid;
-
-	group64.gr_mem = (char **)((uintptr_t)buffer +
-			sptr->nsc_ret.nsc_bufferbytesused - sizeof (group32_t));
-	group64.gr_mem = (char **)(((uintptr_t)group64.gr_mem + 7) & ~7);
-
-	gr_mem32 = (char **)(uintptr_t)sptr->nsc_ret.nsc_u.grp.gr_mem;
-	buffer32 = buffer;
-
-	for (i = 0; ; i++) {
-		index = *((uptr32_t *)
-		    ((uintptr_t)gr_mem32 + (uintptr_t)buffer32));
-
-		/*
-		 * make sure there's enough space to copy the pointer...
-		 */
-		if (&group64.gr_mem[i + 1] >
-		    (char **)((uintptr_t)buffer + buflen)) {
-			errno = ERANGE;
-			return (NULL);
-		}
-
-		if (index == 0)
-			break;
-
-		group64.gr_mem[i] = (char *)(index + buffer);
-		buffer32 += sizeof (uptr32_t);
-
-	}
-	group64.gr_mem[i] = NULL;
-
-	*result = group64;
-#else
-
-	(void) memcpy(buffer,
-	    (sptr->nsc_ret.nsc_u.buff + sizeof (struct group)),
-	    (sptr->nsc_ret.nsc_bufferbytesused - sizeof (struct group)));
-
-	sptr->nsc_ret.nsc_u.grp.gr_name += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.grp.gr_passwd += (uintptr_t)buffer;
-
-	sptr->nsc_ret.nsc_u.grp.gr_mem =
-	    (char **)((uintptr_t)sptr->nsc_ret.nsc_u.grp.gr_mem +
-		(uintptr_t)buffer);
-
-	i = 0;
-	while (sptr->nsc_ret.nsc_u.grp.gr_mem[i]) {
-		sptr->nsc_ret.nsc_u.grp.gr_mem[i] += (uintptr_t)buffer;
-		i++;
-	}
-
-	*result = sptr->nsc_ret.nsc_u.grp;
-
-#endif	/*	_LP64	*/
-
-	return (result);
+	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2group);
+	arg.key.gid = gid;
+	(void) nss_search(&db_root, _nss_initf_group,
+				NSS_DBOP_GROUP_BYGID, &arg);
+	return ((struct group *)NSS_XbyY_FINI(&arg));
 }
 
 struct group *
@@ -452,6 +239,12 @@ fgetgrent_r(FILE *f, struct group *result, char *buffer, int buflen)
  *   number of valid gids in gid_array (may be zero)
  *	or
  *   -1 (and errno set appropriately) on errors (none currently defined)
+ *
+ * NSS2 Consistency enhancements:
+ *   The "files normal" format between an application and nscd for the
+ *   NSS_DBOP_GROUP_BYMEMBER nss_search operation is defined to be a
+ *   processed array of numgids [up to maxgids] gid_t values.  gid_t
+ *   values in the array are unique.
  */
 
 static nss_status_t process_cstr(const char *, int, struct nss_groupsbymem *);
@@ -468,6 +261,10 @@ _getgroupsbymember(const char *username, gid_t gid_array[],
 	arg.gid_array	= gid_array;
 	arg.maxgids	= maxgids;
 	arg.numgids	= numgids;
+	/*
+	 * In backwards compatibility mode, use the old str2group &
+	 * process_cstr interfaces.  Ditto within nscd processing.
+	 */
 	arg.str2ent	= str2group;
 	arg.process_cstr = process_cstr;
 
@@ -504,14 +301,6 @@ _getgroupsbymember(const char *username, gid_t gid_array[],
 
 	(void) nss_search(&db_root, _nss_initf_group,
 			NSS_DBOP_GROUP_BYMEMBER, &arg);
-
-#ifdef	undef
-	/*
-	 * Only do this if there's existing code somewhere that relies on
-	 *   initgroups() doing an endgrent() -- most unlikely.
-	 */
-	endgrent();
-#endif	/* undef */
 
 	return (arg.numgids);
 }
@@ -560,8 +349,15 @@ str2group(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 	 * We copy the input string into the output buffer and
 	 * operate on it in place.
 	 */
-	(void) memcpy(buffer, instr, lenstr);
-	buffer[lenstr] = '\0';
+	if (instr != buffer) {
+		/* Overlapping buffer copies are OK */
+		(void) memmove(buffer, instr, lenstr);
+		buffer[lenstr] = '\0';
+	}
+
+	/* quick exit do not entry fill if not needed */
+	if (ent == (void *)NULL)
+		return (NSS_STR_PARSE_SUCCESS);
 
 	next = buffer;
 

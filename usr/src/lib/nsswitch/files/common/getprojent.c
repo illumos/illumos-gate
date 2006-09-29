@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,24 +28,57 @@
 #include <sys/types.h>
 #include <project.h>
 #include <string.h>
+#include <stdlib.h>
 #include "files_common.h"
 
 static uint_t
-hash_projname(nss_XbyY_args_t *argp, int keyhash) {
-	struct project *p = argp->returnval;
-	const char *name = keyhash ? argp->key.name : p->pj_name;
-	uint_t hash = 0;
+hash_projname(nss_XbyY_args_t *argp, int keyhash, const char *line,
+		int linelen) {
 
-	while (*name != 0)
-		hash = hash * 15 + *name++;
+	const char	*name;
+	int		namelen, i;
+	uint_t		hash = 0;
 
+	if (keyhash) {
+		name = argp->key.name;
+		namelen = strlen(name);
+	} else {
+		name = line;
+		namelen = 0;
+		while (linelen-- && *line++ != ':')
+			namelen++;
+	}
+
+	for (i = 0; i < namelen; i++)
+		hash = hash * 15 + name[i];
 	return (hash);
 }
 
 static uint_t
-hash_projid(nss_XbyY_args_t *argp, int keyhash) {
-	struct project *p = argp->returnval;
-	return (keyhash ? (uint_t)argp->key.projid : (uint_t)p->pj_projid);
+hash_projid(nss_XbyY_args_t *argp, int keyhash, const char *line,
+		int linelen) {
+
+	uint_t		id;
+	const char	*linep, *limit, *end;
+
+	linep = line;
+	limit = line + linelen;
+
+	if (keyhash)
+		return ((uint_t)argp->key.projid);
+
+	/* skip projname */
+	while (linep < limit && *linep++ != ':');
+	if (linep == limit)
+		return (0);
+
+	/* projid */
+	end = linep;
+	id = (uint_t)strtol(linep, (char **)&end, 10);
+	if (linep == end)
+		return (0);
+
+	return (id);
 }
 
 static files_hash_func hash_proj[2] = {
@@ -63,26 +95,35 @@ static files_hash_t hashinfo = {
 };
 
 static int
-check_projname(nss_XbyY_args_t *argp) {
-	struct project *p = argp->returnval;
+check_projid(nss_XbyY_args_t *argp, const char *line, int linelen) {
+	projid_t	projid;
+	const char	*linep, *limit, *end;
 
-	if (p->pj_name == 0)
+	linep = line;
+	limit = line + linelen;
+
+	/* skip projname */
+	while (linep < limit && *linep++ != ':');
+
+	/* empty projname not allowed */
+	if (linep == limit || linep == line + 1)
 		return (0);
-	return (strcmp(p->pj_name, argp->key.name) == 0);
-}
 
-static int
-check_projid(nss_XbyY_args_t *argp) {
-	struct project *p = argp->returnval;
+	/* projid */
+	end = linep;
+	projid = (projid_t)strtol(linep, (char **)&end, 10);
 
-	if (p->pj_name == 0)
+	/* empty projid is not valid */
+	if (linep == end)
 		return (0);
-	return (p->pj_projid == argp->key.projid);
+
+	return (projid == argp->key.projid);
 }
 
 static nss_status_t
 getbyname(files_backend_ptr_t be, void *a) {
-	return (_nss_files_XY_hash(be, a, 0, &hashinfo, 0, check_projname));
+	return (_nss_files_XY_hash(be, a, 0, &hashinfo, 0,
+			_nss_files_check_name_colon));
 }
 
 static nss_status_t

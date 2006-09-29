@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -67,18 +66,21 @@ str2profattr(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 	char		*sep = KV_TOKEN_DELIMIT;
 	profstr_t	*prof = (profstr_t *)ent;
 
-	if ((instr >= buffer && (buffer + buflen) > instr) ||
-	    (buffer >= instr && (instr + lenstr) > buffer))
-		return (NSS_STR_PARSE_PARSE);
 	if (lenstr >= buflen)
 		return (NSS_STR_PARSE_ERANGE);
-	(void) strncpy(buffer, instr, buflen);
+	if (instr != buffer)
+		(void) strncpy(buffer, instr, buflen);
+
 	/*
 	 * Remove newline that nis (yp_match) puts at the
 	 * end of the entry it retrieves from the map.
 	 */
 	if (buffer[lenstr] == '\n')
 		buffer[lenstr] = '\0';
+
+	/* quick exit do not entry fill if not needed */
+	if (ent == (void *)NULL)
+		return (NSS_STR_PARSE_SUCCESS);
 
 	prof->name = _strtok_escape(buffer, sep, &last);
 	prof->res1 = _strtok_escape(NULL, sep, &last);

@@ -124,6 +124,23 @@ static int extract_secret();
 static DEFINE_NSS_DB_ROOT(db_root);
 
 /*
+ * str2key
+ */
+/* ARGSUSED */
+static int
+str2key(const char *instr, int lenstr,
+			void *ent, char *buffer, int buflen) {
+	if (lenstr + 1 > buflen)
+		return (NSS_STR_PARSE_ERANGE);
+	/*
+	 * We copy the input string into the output buffer
+	 */
+	(void) memcpy(buffer, instr, lenstr);
+	buffer[lenstr] = '\0';
+
+	return (NSS_STR_PARSE_SUCCESS);
+}
+/*
  * These functions are the "backends" for the switch for public keys. They
  * get both the public and private keys from each of the supported name
  * services (nis, nisplus, files). They are passed the appropriate parameters
@@ -704,7 +721,7 @@ getkeys_ldap_g(
 
 	NSS_XbyY_ALLOC(&buf, 0, NSS_BUFLEN_PUBLICKEY);
 
-	NSS_XbyY_INIT(&arg, buf->result, buf->buffer, buf->buflen, NULL);
+	NSS_XbyY_INIT(&arg, buf->result, buf->buffer, buf->buflen, str2key);
 	arg.key.pkey.name = netname;
 
 	/*

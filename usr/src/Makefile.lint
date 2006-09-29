@@ -194,6 +194,7 @@ COMMON_SUBDIRS = \
 	cmd/nispasswd \
 	cmd/nl \
 	cmd/nohup \
+	cmd/nscd \
 	cmd/pagesize \
 	cmd/passwd \
 	cmd/pathchk \
@@ -377,6 +378,7 @@ COMMON_SUBDIRS = \
 	lib/mpss \
 	lib/nametoaddr \
 	lib/ncad_addr \
+	lib/nsswitch \
 	lib/pam_modules \
 	lib/passwdutil \
 	lib/pkcs11 \

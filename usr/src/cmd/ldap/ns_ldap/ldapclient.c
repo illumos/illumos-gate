@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,17 +113,10 @@
 #include <limits.h>
 #include <locale.h>
 #include <syslog.h>
-#include "../../../lib/libsldap/common/ns_sldap.h"
 #include <libscf.h>
 #include <assert.h>
-/*
- * We need ns_internal.h for the #defines of:
- *	NSCREDFILE, NSCONFIGFILE
- * and the function prototypes of:
- *	__ns_ldap_setServer(), __ns_ldap_LoadConfiguration(),
- *	__ns_ldap_DumpConfiguration(), __ns_ldap_DumpLdif()
- */
-#include "../../../lib/libsldap/common/ns_internal.h"
+#include "ns_sldap.h"
+#include "ns_internal.h"
 
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN "SUNW_OST_OSCMD"
@@ -294,7 +286,7 @@ static void clientopts_free(clientopts_t *list);
 
 extern ns_ldap_error_t *__ns_ldap_print_config(int);
 extern void __ns_ldap_default_config();
-extern int __ns_ldap_download(char *, char *, char *, ns_ldap_error_t **);
+extern int __ns_ldap_download(const char *, char *, char *, ns_ldap_error_t **);
 
 /* Function prototypes (these could be static) */
 static void usage(void);
@@ -562,9 +554,9 @@ main(int argc, char **argv)
 	if ((retcode == CLIENT_SUCCESS) ||
 			(retcode == CLIENT_ERR_FAIL) ||
 			(retcode == CLIENT_ERR_CREDENTIAL))
-		exit(retcode);
+		return (retcode);
 	else
-		exit(CLIENT_ERR_FAIL);
+		return (CLIENT_ERR_FAIL);
 }
 
 static int
@@ -597,6 +589,7 @@ static int
 client_uninit(clientopts_t *arglist)
 {
 	int retcode = CLIENT_SUCCESS;
+	ns_ldap_self_gssapi_config_t config = NS_LDAP_SELF_GSSAPI_CONFIG_NONE;
 
 	if (mode_verbose) {
 		CLIENT_FPUTS(
@@ -613,7 +606,13 @@ client_uninit(clientopts_t *arglist)
 		return (CLIENT_ERR_FAIL);
 	}
 
+	(void) __ns_ldap_self_gssapi_config(&config);
+
 	retcode = stop_services(STATE_SAVE);
+
+	if (config != NS_LDAP_SELF_GSSAPI_CONFIG_NONE)
+		(void) system("/usr/sbin/cryptoadm enable metaslot");
+
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
 			gettext("Errors stopping network services.\n"), stderr);
@@ -1451,7 +1450,7 @@ client_init(clientopts_t *arglist)
 
 	/* Get and set profile params */
 	retcode = __ns_ldap_download(
-			arglist->profileName,
+			(const char *)arglist->profileName,
 			arglist->defaultServerList,
 			nisBaseDN,
 			&errorp);
@@ -1852,11 +1851,13 @@ stop_services(int saveState)
 static int
 start_services(int flag)
 {
-	int sysret, retcode = CLIENT_SUCCESS;
+	int sysret, retcode = CLIENT_SUCCESS, rc = NS_LDAP_SUCCESS;
 	FILE *domain_fp;
 	char domainname[BUFSIZ];
 	char cmd_domain_start[BUFSIZ];
 	int domainlen;
+	ns_ldap_self_gssapi_config_t config = NS_LDAP_SELF_GSSAPI_CONFIG_NONE;
+	ns_ldap_error_t		*errorp = NULL;
 
 	if (mode_verbose) {
 		CLIENT_FPUTS(gettext("Starting network services\n"), stderr);
@@ -1894,8 +1895,8 @@ start_services(int flag)
 		if (domainname[domainlen-1] == '\n')
 			domainname[domainlen-1] = 0;
 		/* buffer size is checked above */
-		(void) sprintf(cmd_domain_start, "%s %s %s", CMD_DOMAIN_START,
-						domainname, TO_DEV_NULL);
+		(void) snprintf(cmd_domain_start, BUFSIZ, "%s %s %s",
+				CMD_DOMAIN_START, domainname, TO_DEV_NULL);
 	}
 
 	/*
@@ -1916,9 +1917,42 @@ start_services(int flag)
 			retcode = CLIENT_ERR_FAIL;
 		}
 
-		if (start_service(LDAP_FMRI, B_TRUE) != CLIENT_SUCCESS)
+		if ((rc = __ns_ldap_self_gssapi_config(&config)) !=
+			NS_LDAP_SUCCESS) {
+			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
+					"checking sasl/GSSAPI configuration\n"),
+					rc);
+			retcode = CLIENT_ERR_FAIL;
+		}
+
+		if (config != NS_LDAP_SELF_GSSAPI_CONFIG_NONE) {
+
+			rc = __ns_ldap_check_dns_preq(
+					1, mode_verbose, mode_quiet,
+					NSSWITCH_LDAP, config, &errorp);
+			if (errorp)
+				(void) __ns_ldap_freeError(&errorp);
+
+			if (rc != NS_LDAP_SUCCESS)
+				retcode = CLIENT_ERR_FAIL;
+		}
+
+		if (rc == NS_LDAP_SUCCESS &&
+			start_service(LDAP_FMRI, B_TRUE) != CLIENT_SUCCESS)
 			retcode = CLIENT_ERR_FAIL;
 
+		if (config != NS_LDAP_SELF_GSSAPI_CONFIG_NONE &&
+			rc == NS_LDAP_SUCCESS && retcode == CLIENT_SUCCESS) {
+			rc = __ns_ldap_check_gssapi_preq(
+					1, mode_verbose, mode_quiet, config,
+					&errorp);
+			if (errorp)
+				(void) __ns_ldap_freeError(&errorp);
+
+			if (rc != NS_LDAP_SUCCESS)
+				retcode = CLIENT_ERR_FAIL;
+
+		}
 		/* No YP or NIS+ after init */
 	/*
 	 * Or we can be starting services after an uninit or error
@@ -1972,6 +2006,17 @@ start_services(int flag)
 	if ((enableFlag & NSCD_ON) &&
 	    !(is_service(NSCD_FMRI, SCF_STATE_STRING_ONLINE)))
 		(void) start_service(NSCD_FMRI, B_TRUE);
+
+#if 0
+	if (flag == START_INIT && config != NS_LDAP_SELF_GSSAPI_CONFIG_NONE &&
+	    retcode == CLIENT_SUCCESS &&
+	    !(is_service(NSCD_FMRI, SCF_STATE_STRING_ONLINE))) {
+		CLIENT_FPRINTF(stderr, "start: %s\n",
+				gettext("self/sasl/GSSAPI is configured"
+					" but nscd is not online"));
+		retcode = CLIENT_ERR_FAIL;
+	}
+#endif
 
 	if ((enableFlag & SENDMAIL_ON) &&
 	    !(is_service(SENDMAIL_FMRI, SCF_STATE_STRING_ONLINE)))

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -61,11 +60,11 @@
 #include <netinet/if_ether.h>
 #include <nss_dbdefs.h>
 
-static int str2ether(const char *, int, void *, char *, int);
+int str2ether(const char *, int, void *, char *, int);
 
 static DEFINE_NSS_DB_ROOT(db_root);
 
-static void
+void
 _nss_initf_ethers(nss_db_params_t *p)
 {
 	p->name = NSS_DBNAM_ETHERS;
@@ -181,7 +180,7 @@ ether_line(
 #define	lisalnum(x)	(isdigit(x) || \
 		((x) >= 'a' && (x) <= 'z') || ((x) >= 'A' && (x) <= 'Z'))
 /* ARGSUSED */
-static int
+int
 str2ether(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 {
 	uchar_t	*ether =  (uchar_t *)ent;

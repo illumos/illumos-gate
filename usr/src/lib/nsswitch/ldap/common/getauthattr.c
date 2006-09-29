@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,170 +50,94 @@ static const char *auth_attrs[] = {
 	_AUTH_ATTRS,
 	(char *)NULL
 };
-
-
+/*
+ * _nss_ldap_auth2str is the data marshaling method for the auth_attr
+ * system call getauthattr and getauthnam.
+ * This method is called after a successful search has been performed.
+ * This method will parse the search results into the file format.
+ * e.g.
+ *
+ * solaris.:::All Solaris Authorizations::help=AllSolAuthsHeader.html
+ *
+ */
 static int
-_nss_ldap_auth2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_auth2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int			i, nss_result;
-	int			buflen = (int)0;
+	int			nss_result;
+	int			buflen = 0;
 	unsigned long		len = 0L;
-	char			*nullstring = (char *)NULL;
-	char			*buffer = (char *)NULL;
-	char			*ceiling = (char *)NULL;
-	authstr_t		*auth = (authstr_t *)NULL;
-	ns_ldap_attr_t		*attrptr;
+	char			*buffer = NULL;
 	ns_ldap_result_t	*result = be->result;
+	char			**name, **res1, **res2, **sdes, **ldes, **attr;
+	char			*res1_str, *res2_str, *sdes_str, *ldes_str;
+	char			*attr_str;
 
-	buffer = argp->buf.buffer;
-	buflen = (size_t)argp->buf.buflen;
-	if (!argp->buf.result) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_auth2ent;
-	}
-	auth = (authstr_t *)(argp->buf.result);
-	ceiling = buffer + buflen;
-	auth->name = (char *)NULL;
-	auth->res1 = (char *)NULL;
-	auth->res2 = (char *)NULL;
-	auth->short_desc = (char *)NULL;
-	auth->long_desc = (char *)NULL;
-	auth->attr = (char *)NULL;
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
+
+	buflen = argp->buf.buflen;
+	nss_result = NSS_STR_PARSE_SUCCESS;
 	(void) memset(argp->buf.buffer, 0, buflen);
 
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_auth2ent;
+	name = __ns_ldap_getAttr(result->entry, _AUTH_NAME);
+	if (name == NULL || name[0] == NULL ||
+			(strlen(name[0]) < 1)) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_auth2str;
+	}
+	res1 = __ns_ldap_getAttr(result->entry, _AUTH_RES1);
+	if (res1 == NULL || res1[0] == NULL || (strlen(res1[0]) < 1))
+		res1_str = _NO_VALUE;
+	else
+		res1_str = res1[0];
+
+	res2 = __ns_ldap_getAttr(result->entry, _AUTH_RES2);
+	if (res2 == NULL || res2[0] == NULL || (strlen(res2[0]) < 1))
+		res2_str = _NO_VALUE;
+	else
+		res2_str = res2[0];
+
+	sdes = __ns_ldap_getAttr(result->entry, _AUTH_SHORTDES);
+	if (sdes == NULL || sdes[0] == NULL || (strlen(sdes[0]) < 1))
+		sdes_str = _NO_VALUE;
+	else
+		sdes_str = sdes[0];
+
+	ldes = __ns_ldap_getAttr(result->entry, _AUTH_LONGDES);
+	if (ldes == NULL || ldes[0] == NULL || (strlen(ldes[0]) < 1))
+		ldes_str = _NO_VALUE;
+	else
+		ldes_str = ldes[0];
+
+	attr = __ns_ldap_getAttr(result->entry, _AUTH_ATTRS);
+	if (attr == NULL || attr[0] == NULL || (strlen(attr[0]) < 1))
+		attr_str = _NO_VALUE;
+	else
+		attr_str = attr[0];
+	/* 6 = 5 ':' + 1 '\0' */
+	len = strlen(name[0]) + strlen(res1_str) + strlen(res2_str) +
+		strlen(sdes_str) + strlen(ldes_str) + strlen(attr_str) + 6;
+	if (len > buflen) {
+		nss_result = NSS_STR_PARSE_ERANGE;
+		goto result_auth2str;
 	}
 
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_auth2ent;
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, len)) == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_auth2str;
 		}
-		if (strcasecmp(attrptr->attrname, _AUTH_NAME) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_auth2ent;
-			}
-			auth->name = buffer;
-			buffer += len + 1;
-			if (buffer >= ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_auth2ent;
-			}
-			(void) strcpy(auth->name, attrptr->attrvalue[0]);
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _AUTH_RES1) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				auth->res1 = nullstring;
-			} else {
-				auth->res1 = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_auth2ent;
-				}
-				(void) strcpy(auth->res1,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _AUTH_RES2) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				auth->res2 = nullstring;
-			} else {
-				auth->res2 = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_auth2ent;
-				}
-				(void) strcpy(auth->res2,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _AUTH_SHORTDES) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				auth->short_desc = nullstring;
-			} else {
-				auth->short_desc = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_auth2ent;
-				}
-				(void) strcpy(auth->short_desc,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _AUTH_LONGDES) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				auth->long_desc = nullstring;
-			} else {
-				auth->long_desc = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_auth2ent;
-				}
-				(void) strcpy(auth->long_desc,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _AUTH_ATTRS) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				auth->attr = nullstring;
-			} else {
-				auth->attr = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_auth2ent;
-				}
-				(void) strcpy(auth->attr,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
-	}
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
+	(void) snprintf(buffer, len, "%s:%s:%s:%s:%s:%s",
+			name[0], res1_str, res2_str, sdes_str,
+			ldes_str, attr_str);
+	/* The front end marshaller doesn't need the trailing null */
+	if (argp->buf.result != NULL)
+		be->buflen = strlen(be->buffer);
 
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getauthattr.c: _nss_ldap_auth2ent]\n");
-	(void) fprintf(stdout, "      auth-name: [%s]\n", auth->name);
-	if (auth->res1 != (char *)NULL) {
-		(void) fprintf(stdout, "      res1: [%s]\n", auth->res1);
-	}
-	if (auth->res2 != (char *)NULL) {
-		(void) fprintf(stdout, "      res2: [%s]\n", auth->res2);
-	}
-	if (auth->short_desc != (char *)NULL) {
-		(void) fprintf(stdout, "      short_desc: [%s]\n",
-		    auth->short_desc);
-	}
-	if (auth->long_desc != (char *)NULL) {
-		(void) fprintf(stdout, "      long_desc: [%s]\n",
-		    auth->long_desc);
-	}
-	if (auth->attr != (char *)NULL) {
-		(void) fprintf(stdout, "      attr: [%s]\n", auth->attr);
-	}
-#endif	/* DEBUG */
-
-result_auth2ent:
+result_auth2str:
 	(void) __ns_ldap_freeResult(&be->result);
 	return ((int)nss_result);
 }
@@ -228,10 +151,6 @@ getbyname(ldap_backend_ptr be, void *a)
 	char		userdata[SEARCHFILTERLEN];
 	char		name[SEARCHFILTERLEN];
 	int		ret;
-
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getauthattr.c: getbyname]\n");
-#endif	/* DEBUG */
 
 	if (_ldap_filter_name(name, argp->key.name, sizeof (name)) != 0)
 		return ((nss_status_t)NSS_NOTFOUND);
@@ -268,11 +187,7 @@ _nss_ldap_auth_attr_constr(const char *dummy1,
     const char *dummy4,
     const char *dummy5)
 {
-#ifdef	DEBUG
-	(void) fprintf(stdout,
-	    "\n[getauthattr.c: _nss_ldap_auth_attr_constr]\n");
-#endif
 	return ((nss_backend_t *)_nss_ldap_constr(authattr_ops,
 		sizeof (authattr_ops)/sizeof (authattr_ops[0]), _AUTHATTR,
-		auth_attrs, _nss_ldap_auth2ent));
+		auth_attrs, _nss_ldap_auth2str));
 }

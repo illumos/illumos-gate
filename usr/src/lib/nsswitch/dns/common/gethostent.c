@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1993, 1998-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -144,10 +143,22 @@ getbyname(be, a)
 
 	he = _gethostbyname(&argp->h_errno, argp->key.name);
 	if (he != NULL) {
-		ret = ent2result(he, a, AF_INET);
-		if (ret == NSS_STR_PARSE_SUCCESS) {
-			argp->returnval = argp->buf.result;
+		if (argp->buf.result == NULL) {
+			/*
+			 * if asked to return data in string,
+			 * convert the hostent structure into
+			 * string data
+			 */
+			ret = ent2str(he, a, AF_INET);
+			if (ret == NSS_STR_PARSE_SUCCESS)
+				argp->returnval = argp->buf.buffer;
 		} else {
+			ret = ent2result(he, a, AF_INET);
+			if (ret == NSS_STR_PARSE_SUCCESS)
+				argp->returnval = argp->buf.result;
+		}
+
+		if (ret != NSS_STR_PARSE_SUCCESS) {
 			argp->h_errno = HOST_NOT_FOUND;
 			if (ret == NSS_STR_PARSE_ERANGE) {
 				argp->erange = 1;
@@ -176,6 +187,7 @@ getbyaddr(be, a)
  * Exposing a DNS backend specific interface so that it doesn't conflict
  * with other getbyaddr() routines from other switch backends.
  */
+/*ARGSUSED*/
 nss_status_t
 __nss_dns_getbyaddr(be, a)
 	dns_backend_ptr_t	be;
@@ -195,11 +207,12 @@ __nss_dns_getbyaddr(be, a)
 
 	switch_resolver_setup(&mt_disabled, &oldmask, &old_retry);
 
+	/* LINTED: E_BAD_PTR_CAST_ALIGN */
 	if (IN6_IS_ADDR_V4MAPPED((struct in6_addr *)argp->key.hostaddr.addr)) {
 		addrp = &unmapv4;
 		addrlen = sizeof (unmapv4);
 		af = AF_INET;
-		memcpy(addrp, &argp->key.hostaddr.addr[12], addrlen);
+		(void) memcpy(addrp, &argp->key.hostaddr.addr[12], addrlen);
 	} else {
 		addrp = (void *)argp->key.hostaddr.addr;
 		addrlen = argp->key.hostaddr.len;
@@ -217,7 +230,18 @@ __nss_dns_getbyaddr(be, a)
 			if (n < MAXHOSTNAMELEN-1 && hbuf[n-1] != '.') {
 				(void) strcat(hbuf, ".");
 			}
-			ret = ent2result(he, a, argp->key.hostaddr.type);
+
+			/*
+			 * if asked to return data in string,
+			 * convert the hostent structure into
+			 * string data
+			 */
+			if (argp->buf.result == NULL)
+				ret = ent2str(he, a, argp->key.hostaddr.type);
+			else
+				ret = ent2result(he, a,
+					argp->key.hostaddr.type);
+
 			save_h_errno = argp->h_errno;
 		}
 		if (ret == NSS_STR_PARSE_SUCCESS) {
@@ -242,7 +266,12 @@ __nss_dns_getbyaddr(be, a)
 					if (memcmp(*ans, addrp,	addrlen) ==
 						0) {
 					argp->h_errno = save_h_errno;
-					argp->returnval = argp->buf.result;
+					if (argp->buf.result == NULL)
+						argp->returnval =
+							argp->buf.buffer;
+					else
+						argp->returnval =
+							argp->buf.result;
 					break;
 						}
 			} else {
@@ -259,12 +288,16 @@ __nss_dns_getbyaddr(be, a)
 				 * this go.  And return the name from byaddr.
 				 */
 				argp->h_errno = save_h_errno;
-				argp->returnval = argp->buf.result;
+				if (argp->buf.result == NULL)
+					argp->returnval = argp->buf.buffer;
+				else
+					argp->returnval = argp->buf.result;
 			}
 			/* we've been spoofed, make sure to log it. */
 			if (argp->h_errno == HOST_NOT_FOUND) {
 				if (argp->key.hostaddr.type == AF_INET)
 		syslog(LOG_NOTICE, "gethostbyaddr: %s != %s",
+		/* LINTED: E_BAD_PTR_CAST_ALIGN */
 		hbuf, inet_ntoa(*(struct in_addr *)argp->key.hostaddr.addr));
 				else
 		syslog(LOG_NOTICE, "gethostbyaddr: %s != %s",
@@ -413,4 +446,23 @@ _nss_dns_hosts_constr(dummy1, dummy2, dummy3)
 {
 	return (_nss_dns_constr(host_ops,
 		sizeof (host_ops) / sizeof (host_ops[0])));
+}
+
+/*
+ * optional NSS2 packed backend gethostsbyname with ttl
+ * entry point.
+ *
+ * Returns:
+ *	NSS_SUCCESS - successful
+ *	NSS_NOTFOUND - successful but nothing found
+ *	NSS_ERROR - fallback to NSS backend lookup mode
+ * If successful, buffer will be filled with valid data
+ *
+ */
+
+/*ARGSUSED*/
+nss_status_t
+_nss_get_dns_hosts_name(dns_backend_ptr_t *be, void **bufp, size_t *sizep)
+{
+	return (_nss_dns_gethost_withttl(*bufp, *sizep, 0));
 }

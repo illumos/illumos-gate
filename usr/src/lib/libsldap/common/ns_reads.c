@@ -2220,10 +2220,18 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 							    LDAP_ERROR;
 						}
 						if (cookie->connectionId > -1) {
-						    DropConnection(
+							/*
+							 * NS_LDAP_NEW_CONN
+							 * indicates that the
+							 * connection should
+							 * be deleted, not
+							 * kept alive
+							 */
+							DropConnection(
 							cookie->connectionId,
 							NS_LDAP_NEW_CONN);
-						    cookie->connectionId = -1;
+							cookie->connectionId =
+								-1;
 						}
 					}
 					break;
@@ -3022,7 +3030,7 @@ __ns_ldap_auth(const ns_cred_t *auth,
 	if (!auth)
 		return (NS_LDAP_INVALID_PARAM);
 
-	rc = __s_api_getConnection(NULL, flags,
+	rc = __s_api_getConnection(NULL, flags | NS_LDAP_NEW_CONN,
 			auth, &connectionId, &conp, errorp,
 			do_not_fail_if_new_pwd_reqd, nopasswd_acct_mgmt);
 	if (rc == NS_LDAP_OP_FAILED && *errorp)
@@ -3043,6 +3051,20 @@ __ns_ldap_getAttr(const ns_ldap_entry_t *entry, const char *attrname)
 	for (i = 0; i < entry->attr_count; i++) {
 		if (strcasecmp(entry->attr_pair[i]->attrname, attrname) == NULL)
 			return (entry->attr_pair[i]->attrvalue);
+	}
+	return (NULL);
+}
+
+ns_ldap_attr_t *
+__ns_ldap_getAttrStruct(const ns_ldap_entry_t *entry, const char *attrname)
+{
+	int	i;
+
+	if (entry == NULL)
+		return (NULL);
+	for (i = 0; i < entry->attr_count; i++) {
+		if (strcasecmp(entry->attr_pair[i]->attrname, attrname) == NULL)
+			return (entry->attr_pair[i]);
 	}
 	return (NULL);
 }

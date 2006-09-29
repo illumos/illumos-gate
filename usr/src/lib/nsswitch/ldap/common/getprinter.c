@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +35,9 @@ static void append_attr(char *buf, char *attr);
 #define	_F_GETPRINTERBYNAME	\
 	"(&(objectClass=sunPrinter)(|(printer-name=%s)(printer-aliases=%s)))"
 
+#define	PRINTER_PREFIX	"printer-"
+#define	SUNWPR_PREFIX	"sunwpr-"
+
 /*
  * Attributes from the following classes:
  * 	printerService
@@ -50,85 +52,82 @@ static const char **printer_attrs = NULL;
 
 
 /*
- * _nss_ldap_printers2ent is the data marshaling method for the printers
+ * _nss_ldap_printers2str is the data marshaling method for the printers
  * getXbyY backend processes. This method is called after a successful
  * ldap search has been performed. This method will parse the ldap search
  * values into argp->buf.buffer. Three error conditions are expected and
  * returned to nsswitch.
+ * In order to be compatible with old data output, the code is commented out
+ * with NSS_LDAP_PRINTERS. The NSS_LDAP_PRINTERS section is for future
+ * refrences if it's decided to fix the output format.
  */
 
 static int
-_nss_ldap_printers2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_printers2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
 	int			i, j;
 	int			nss_result;
-	int			buflen = (int)0;
-	unsigned long		len = 0L;
-	char			*cp = (char *)NULL;
-	char			*buffer = (char *)NULL;
+	int			buflen = 0, len;
+	char			*buffer = NULL;
+	char			**name, *attrname;
 	ns_ldap_attr_t		*attr;
 	ns_ldap_result_t	*result = be->result;
+#ifdef	NSS_LDAP_PRINTERS
+	int			slen, plen;
+#endif
 
-	buffer = argp->buf.buffer;
-	buflen = (size_t)argp->buf.buflen;
-	if (!argp->buf.result) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_printers2ent;
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
+
+	buflen = argp->buf.buflen;
+	if (argp->buf.result != NULL) {
+		be->buffer = calloc(1, buflen);
+		if (be->buffer == NULL)
+			return (NSS_STR_PARSE_PARSE);
+		be->buflen = buflen;
+		buffer = be->buffer;
+	} else {
+		buffer = argp->buf.buffer;
+		(void) memset(argp->buf.buffer, 0, buflen);
 	}
 
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
-	(void) memset(argp->buf.buffer, 0, buflen);
+	nss_result = NSS_STR_PARSE_SUCCESS;
 
-	/* Make sure our buffer stays NULL terminated */
-	buflen--;
-
-	attr = getattr(result, 0);
-	if (attr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_printers2ent;
-	}
+#ifdef	NSS_LDAP_PRINTERS
+	slen = strlen(SUNWPR_PREFIX);
+	plen = strlen(PRINTER_PREFIX);
+#endif
 
 	/*
-	 * Pick out the printer name.
+	 * Pick out the printer name and aliases
 	 */
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attr = getattr(result, i);
-		if (attr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_printers2ent;
-		}
-		if (strcasecmp(attr->attrname, "printer-name") == 0) {
-			len = strlen(attr->attrvalue[0]);
-			if (len < 1 || (attr->attrvalue[0] == '\0')) {
-				*buffer = 0;
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_printers2ent;
-			}
-			if (len > buflen) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_printers2ent;
-			}
-			(void) strcpy(buffer, attr->attrvalue[0]);
+	name = __ns_ldap_getAttr(result->entry, "printer-name");
+	if (name == NULL || name[0] == NULL) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_printers2str;
+	}
+	len = snprintf(buffer, buflen, "%s", name[0]);
+	TEST_AND_ADJUST(len, buffer, buflen, result_printers2str);
+
+#ifdef	NSS_LDAP_PRINTERS
+	attr = __ns_ldap_getAttrStruct(result->entry, "printer-aliases");
+	if (attr != NULL && attr->attrvalue != NULL) {
+		for (i = 0; i < attr->value_count; i++) {
+			len = snprintf(buffer, buflen, "|%s",
+					attr->attrvalue[i]);
+			TEST_AND_ADJUST(len, buffer, buflen,
+					result_printers2str);
 		}
 	}
-
-	/*
-	 * Should never happen since it is mandatory but bail if
-	 * we don't have a printer name.
-	 */
-	if (buffer[0] == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_printers2ent;
-	}
-
+#endif
 	/*
 	 * Add the rest of the attributes
 	 */
 	for (i = 0; i < result->entry->attr_count; i++) {
 		attr = getattr(result, i);
 		if (attr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_printers2ent;
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_printers2str;
 		}
 		/*
 		 * The attribute contains key=value
@@ -140,51 +139,76 @@ _nss_ldap_printers2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 				    (attr->attrvalue[j] == '\0')) {
 					*buffer = 0;
 					nss_result = (int)NSS_STR_PARSE_PARSE;
-					goto result_printers2ent;
+					goto result_printers2str;
 				}
-				len += strlen(buffer) + 1;	/* 1 for ':' */
-				if (len > buflen) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_printers2ent;
-				}
-				if ((cp = strrchr(buffer, '\0')) != NULL) {
-						*cp = ':';
-					(void) strcat(buffer,
-					    attr->attrvalue[j]);
-				}
+				len =  snprintf(buffer, buflen, ":%s",
+						attr->attrvalue[j]);
+				TEST_AND_ADJUST(len, buffer, buflen,
+						result_printers2str);
 			}
 		} else {
 			/*
-			 * Skip the printer name
+			 * Skip some attr names
 			 */
-			if (strcmp(attr->attrname, "printer-name") == 0) {
+#ifdef	NSS_LDAP_PRINTERS
+			if (strcasecmp(attr->attrname, "printer-name") == 0 ||
+				strcasecmp(attr->attrname, "dn") == 0 ||
+				strcasecmp(attr->attrname,
+					"objectclass") == 0 ||
+				strcasecmp(attr->attrname,
+					"printer-uri") == 0 ||
+				strcasecmp(attr->attrname,
+					"printer-aliases") == 0)
+#else
+			if (strcasecmp(attr->attrname, "printer-name") == 0)
+#endif
 				continue;
 			}
 			/*
-			 * Translate sun-printer-bsdaddr -> bsdaddr
+			 * Translate attr name ->key name
 			 */
-			if (strcmp(attr->attrname, "sun-printer-bsdaddr") ==
-									0) {
-				if (attr->attrname != NULL) {
-					free(attr->attrname);
-				}
-				attr->attrname = strdup("bsdaddr");
-			}
+			if (strcmp(attr->attrname, "sun-printer-bsdaddr")
+					== 0)
+				attrname = "bsdaddr";
+#ifdef	NSS_LDAP_PRINTERS
+			else if (strcmp(attr->attrname, "printer-info")
+					== 0)
+				attrname = "description";
+			else if (strcmp(attr->attrname, "sunwpr-support")
+					== 0)
+				attrname = "itopssupported";
+			else if (strncmp(attr->attrname, PRINTER_PREFIX, plen)
+					== 0)
+				attrname = attr->attrname + plen;
+			else if (strncmp(attr->attrname, SUNWPR_PREFIX, slen)
+					== 0)
+				attrname = attr->attrname + slen;
+#endif
+			else
+				attrname = attr->attrname;
 
 			/*
-			 * The attribute name is the key. The attribute
+			 * The attrname is the key. The attribute
 			 * data is the value.
 			 */
+			len = snprintf(buffer, buflen, ":%s=", attrname);
+			TEST_AND_ADJUST(len, buffer, buflen,
+					result_printers2str);
+
 			for (j = 0; j < attr->value_count; j++) {
 				int k;
 				char *kp;
 
-				len = strlen(attr->attrvalue[j]);
-				if (len < 1 ||
-				    (attr->attrvalue[j] == '\0')) {
+				if (attr->attrvalue[j] == NULL) {
 					*buffer = 0;
-					nss_result = (int)NSS_STR_PARSE_PARSE;
-					goto result_printers2ent;
+					nss_result = NSS_STR_PARSE_PARSE;
+					goto result_printers2str;
+				}
+				len = strlen(attr->attrvalue[j]);
+				if (len < 1) {
+					*buffer = 0;
+					nss_result = NSS_STR_PARSE_PARSE;
+					goto result_printers2str;
 				}
 				/*
 				 * Add extra for any colons which need to
@@ -193,38 +217,33 @@ _nss_ldap_printers2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 				k = 0;
 				for (kp = attr->attrvalue[j]; *kp != NULL; kp++)
 					if (*kp == ':')
+						/* count ':' in value */
 						k++;
-				len += strlen(buffer) + k;
+				if (j == 0)
+					/* first time */
+					len += k;
+				else
+					/* add ',' */
+					len += k + 1;
 
-				if (j == 0) {
-					len += strlen(attr->attrname) + 1;
-				}
 				if (len > buflen) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_printers2ent;
+					nss_result = NSS_STR_PARSE_ERANGE;
+					goto result_printers2str;
 				}
-				if ((cp = strrchr(buffer, '\0')) != NULL) {
-					if (j == 0) {
-						*cp = ':';
-						(void) strcat(buffer,
-						    attr->attrname);
-						(void) strcat(buffer, "=");
-					} else {
-						*cp = ',';
-					}
-					(void) append_attr(buffer,
+				if (j > 0)
+					*buffer++ = ',';
+
+				(void) append_attr(buffer,
 					    attr->attrvalue[j]);
-				}
+				buffer += strlen(attr->attrvalue[j]) + k;
+				buflen -= len;
 			}
-		}
 	}
 
-#ifdef DEBUG
-	(void) fprintf(stdout, "\n[getprinter.c: _nss_ldap_printers2ent]\n");
-	(void) fprintf(stdout, " printers: [%s]\n", buffer);
-#endif
+	if (argp->buf.result != NULL)
+		be->buflen = strlen(be->buffer);
 
-result_printers2ent:
+result_printers2str:
 	(void) __ns_ldap_freeResult(&be->result);
 	return ((int)nss_result);
 }
@@ -241,7 +260,7 @@ append_attr(char *buf, char *attr)
 		(void) strcat(buf, attr);
 		return;
 	}
-	bp = buf + strlen(buf);
+	bp = buf;
 	cp = attr;
 	while (*cp != NULL) {
 		if (*cp == ':') {
@@ -257,7 +276,7 @@ append_attr(char *buf, char *attr)
  * parameter and the getprinterbyname search filter defined. Once the
  * filter is constructed, we search for matching entries and marshal
  * the data results into argp->buf.buffer for the frontend process.
- * The function * _nss_ldap_printers2ent performs the data marshaling.
+ * The function _nss_ldap_printers2str performs the data marshaling.
  */
 
 static nss_status_t
@@ -297,12 +316,7 @@ _nss_ldap_printers_constr(const char *dummy1, const char *dummy2,
 			const char *dummy3)
 {
 
-#ifdef DEBUG
-	(void) fprintf(stdout,
-		"\n[getprinterent.c: _nss_ldap_printers_constr]\n");
-#endif
-
 	return ((nss_backend_t *)_nss_ldap_constr(printers_ops,
 		sizeof (printers_ops)/sizeof (printers_ops[0]), _PRINTERS,
-		printer_attrs, _nss_ldap_printers2ent));
+		printer_attrs, _nss_ldap_printers2str));
 }

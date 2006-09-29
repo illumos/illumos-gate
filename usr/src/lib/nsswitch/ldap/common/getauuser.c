@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,109 +44,73 @@ static const char *auuser_attrs[] = {
 	_AU_NEVER,
 	(char *)NULL
 };
-
-
+/*
+ * _nss_ldap_au2str is the data marshaling method for the audit_user
+ * system call getauusernam, getauusernam_r, getauuserent and getauuserent_r.
+ * This method is called after a successful search has been performed.
+ * This method will parse the search results into the file format.
+ * e.g.
+ *
+ * root:lo:no
+ *
+ */
 static int
-_nss_ldap_au2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_au2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int			i, nss_result;
-	int			buflen = (int)0;
+	int			nss_result;
+	int			buflen = 0;
 	unsigned long		len = 0L;
-	char			*nullstring = (char *)NULL;
-	char			*buffer = (char *)NULL;
-	char			*ceiling = (char *)NULL;
-	au_user_str_t		*au_user = (au_user_str_t *)NULL;
-	ns_ldap_attr_t		*attrptr;
+	char			*buffer = NULL;
 	ns_ldap_result_t	*result = be->result;
+	char			**name, **al, **ne, *al_str, *ne_str;
 
-	buffer = argp->buf.buffer;
-	buflen = (size_t)argp->buf.buflen;
-	if (!argp->buf.result) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_au2ent;
-	}
-	au_user = (au_user_str_t *)(argp->buf.result);
-	ceiling = buffer + buflen;
-	au_user->au_name = (char *)NULL;
-	au_user->au_always = (char *)NULL;
-	au_user->au_never = (char *)NULL;
-	nss_result = (int)NSS_STR_PARSE_SUCCESS;
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
+
+	buflen = argp->buf.buflen;
+	nss_result = NSS_STR_PARSE_SUCCESS;
 	(void) memset(argp->buf.buffer, 0, buflen);
 
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
-		nss_result = (int)NSS_STR_PARSE_PARSE;
-		goto result_au2ent;
+	name = __ns_ldap_getAttr(result->entry, _AU_NAME);
+	if (name == NULL || name[0] == NULL ||
+			(strlen(name[0]) < 1)) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_au2str;
 	}
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_au2ent;
-		}
-		if (strcasecmp(attrptr->attrname, _AU_NAME) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_au2ent;
-			}
-			au_user->au_name = buffer;
-			buffer += len + 1;
-			if (buffer >= ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_au2ent;
-			}
-			(void) strcpy(au_user->au_name, attrptr->attrvalue[0]);
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _AU_ALWAYS) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				au_user->au_always = nullstring;
-			} else {
-				au_user->au_always = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_au2ent;
-				}
-				(void) strcpy(au_user->au_always,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _AU_NEVER) == 0) {
-			if ((attrptr->attrvalue[0] == NULL) ||
-			    (len = strlen(attrptr->attrvalue[0])) < 1) {
-				au_user->au_never = nullstring;
-			} else {
-				au_user->au_never = buffer;
-				buffer += len + 1;
-				if (buffer >= ceiling) {
-					nss_result = (int)NSS_STR_PARSE_ERANGE;
-					goto result_au2ent;
-				}
-				(void) strcpy(au_user->au_never,
-				    attrptr->attrvalue[0]);
-			}
-			continue;
-		}
+	al = __ns_ldap_getAttr(result->entry, _AU_ALWAYS);
+	if (al == NULL || al[0] == NULL || (strlen(al[0]) < 1))
+		al_str = _NO_VALUE;
+	else
+		al_str = al[0];
+
+	ne = __ns_ldap_getAttr(result->entry, _AU_NEVER);
+	if (ne == NULL || ne[0] == NULL || (strlen(ne[0]) < 1))
+		ne_str = _NO_VALUE;
+	else
+		ne_str = ne[0];
+
+	/* 3 = 2 ':' + 1 '\0' */
+	len = strlen(name[0]) + strlen(al_str) + strlen(ne_str) + 3;
+	if (len > buflen) {
+		nss_result = NSS_STR_PARSE_ERANGE;
+		goto result_au2str;
 	}
 
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getauuser.c: _nss_ldap_au2ent]\n");
-	(void) fprintf(stdout, "      au_name: [%s]\n", au_user->au_name);
-	if (au_user->au_always != (char *)NULL) {
-		(void) fprintf(stdout, "      au_always: [%s]\n",
-		    au_user->au_always);
-	}
-	if (au_user->au_never != (char *)NULL) {
-		(void) fprintf(stdout, "      au_never: [%s]\n",
-		    au_user->au_never);
-	}
-#endif	/* DEBUG */
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, len)) == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_au2str;
+		}
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
+	(void) snprintf(buffer, len, "%s:%s:%s",
+			name[0], al_str, ne_str);
+	/* The front end marshaller doesn't need the trailing null */
+	if (argp->buf.result != NULL)
+		be->buflen = strlen(be->buffer);
 
-result_au2ent:
+result_au2str:
 	(void) __ns_ldap_freeResult(&be->result);
 	return ((int)nss_result);
 }
@@ -161,10 +124,6 @@ getbyname(ldap_backend_ptr be, void *a)
 	char		name[SEARCHFILTERLEN];
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
 	int		ret;
-
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getauuser.c: getbyname]\n");
-#endif	/* DEBUG */
 
 	if (_ldap_filter_name(name, argp->key.name, sizeof (name)) != 0)
 		return ((nss_status_t)NSS_NOTFOUND);
@@ -203,11 +162,7 @@ _nss_ldap_audit_user_constr(const char *dummy1,
     const char *dummy4,
     const char *dummy5)
 {
-#ifdef	DEBUG
-	(void) fprintf(stdout,
-	    "\n[getauuser.c: _nss_ldap_audit_user_constr]\n");
-#endif
 	return ((nss_backend_t *)_nss_ldap_constr(auuser_ops,
 		sizeof (auuser_ops)/sizeof (auuser_ops[0]), _AUUSER,
-		auuser_attrs, _nss_ldap_au2ent));
+		auuser_attrs, _nss_ldap_au2str));
 }

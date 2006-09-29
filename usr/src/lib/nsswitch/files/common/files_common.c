@@ -41,6 +41,7 @@
 #include <poll.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 
 /*ARGSUSED*/
 nss_status_t
@@ -69,7 +70,7 @@ _nss_files_endent(be, dummy)
 	void			*dummy;
 {
 	if (be->f != 0) {
-		fclose(be->f);
+		(void) fclose(be->f);
 		be->f = 0;
 	}
 	if (be->buf != 0) {
@@ -186,7 +187,7 @@ _nss_files_do_all(be, args, filter, func)
 
 	} while (res == NSS_NOTFOUND);
 
-	_nss_files_endent(be, 0);
+	(void) _nss_files_endent(be, 0);
 	return (res);
 }
 
@@ -208,6 +209,8 @@ _nss_files_XY_all(be, args, netdb, filter, check)
 	int	parsestat;
 	int (*func)();
 
+	if (filter != NULL && *filter == '\0')
+		return (NSS_NOTFOUND);
 	if (be->buf == 0 &&
 		(be->buf = malloc(be->minbuf)) == 0) {
 		return (NSS_UNAVAIL); /* really panic, malloc failed */
@@ -230,7 +233,7 @@ _nss_files_XY_all(be, args, netdb, filter, check)
 		    be->minbuf)) < 0) {
 			/* End of file */
 			args->returnval = 0;
-			args->erange    = 0;
+			args->returnlen = 0;
 			break;
 		}
 		if (filter != 0 && strstr(instr, filter) == 0) {
@@ -277,17 +280,21 @@ _nss_files_XY_all(be, args, netdb, filter, check)
 		}
 
 		args->returnval = 0;
+		args->returnlen = 0;
+
+		if (check != NULL && (*check)(args, instr, linelen) == 0)
+			continue;
 
 		func = args->str2ent;
 		parsestat = (*func)(instr, linelen, args->buf.result,
 					args->buf.buffer, args->buf.buflen);
 
 		if (parsestat == NSS_STR_PARSE_SUCCESS) {
-			args->returnval = args->buf.result;
-			if (check == 0 || (*check)(args)) {
-				res = NSS_SUCCESS;
-				break;
-			}
+			args->returnval = (args->buf.result != NULL)?
+					args->buf.result : args->buf.buffer;
+			args->returnlen = linelen;
+			res = NSS_SUCCESS;
+			break;
 		} else if (parsestat == NSS_STR_PARSE_ERANGE) {
 			args->erange = 1;
 			break;
@@ -339,15 +346,22 @@ _nss_files_hash_destroy(files_hash_t *fhp)
 extern void  __nss_use_files_hash(void);
 #endif /* pic */
 
+/*ARGSUSED*/
 nss_status_t
 _nss_files_XY_hash(files_backend_ptr_t be, nss_XbyY_args_t *args,
 	int netdb, files_hash_t *fhp, int hashop, files_XY_check_func check)
 {
+	/* LINTED E_FUNC_VAR_UNUSED */
 	int fd, retries, ht;
+	/* LINTED E_FUNC_VAR_UNUSED */
 	uint_t hash, line, f;
+	/* LINTED E_FUNC_VAR_UNUSED */
 	files_hashent_t *hp, *htab;
+	/* LINTED E_FUNC_VAR_UNUSED */
 	char *cp, *first, *last;
+	/* LINTED E_FUNC_VAR_UNUSED */
 	nss_XbyY_args_t xargs;
+	/* LINTED E_FUNC_VAR_UNUSED */
 	struct stat64 st;
 
 #ifndef PIC
@@ -375,26 +389,30 @@ retry:
 	    st.st_mtim.tv_nsec == fhp->fh_mtime.tv_nsec &&
 	    fhp->fh_table != NULL) {
 		htab = &fhp->fh_table[hashop * fhp->fh_size];
-		hash = fhp->fh_hash_func[hashop](args, 1);
+		hash = fhp->fh_hash_func[hashop](args, 1, NULL, 0);
 		for (hp = htab[hash % fhp->fh_size].h_first; hp != NULL;
 		    hp = hp->h_next) {
 			if (hp->h_hash != hash)
 				continue;
 			line = hp - htab;
+			if ((*check)(args, fhp->fh_line[line].l_start,
+					fhp->fh_line[line].l_len) == 0)
+				continue;
 			if ((*args->str2ent)(fhp->fh_line[line].l_start,
 			    fhp->fh_line[line].l_len, args->buf.result,
 			    args->buf.buffer, args->buf.buflen) ==
 			    NSS_STR_PARSE_SUCCESS) {
-				args->returnval = args->buf.result;
-				if ((*check)(args)) {
-					mutex_unlock(&fhp->fh_lock);
-					return (NSS_SUCCESS);
-				}
+				args->returnval = (args->buf.result)?
+					args->buf.result:args->buf.buffer;
+				args->returnlen = fhp->fh_line[line].l_len;
+				mutex_unlock(&fhp->fh_lock);
+				return (NSS_SUCCESS);
 			} else {
 				args->erange = 1;
 			}
 		}
 		args->returnval = 0;
+		args->returnlen = 0;
 		mutex_unlock(&fhp->fh_lock);
 		return (NSS_NOTFOUND);
 	}
@@ -461,14 +479,6 @@ retry:
 	if (fhp->fh_line == NULL || fhp->fh_table == NULL)
 		goto unavail;
 
-	xargs = *args;
-	xargs.buf.result = malloc(fhp->fh_resultsize + fhp->fh_bufsize);
-	if (xargs.buf.result == NULL)
-		goto unavail;
-	xargs.buf.buffer = (char *)xargs.buf.result + fhp->fh_resultsize;
-	xargs.buf.buflen = fhp->fh_bufsize;
-	xargs.returnval = xargs.buf.result;
-
 	line = 0;
 	cp = fhp->fh_file_start;
 	while (cp < fhp->fh_file_end) {
@@ -494,18 +504,14 @@ retry:
 				--last;
 			*++last = '\0';
 		}
-		if ((*xargs.str2ent)(first, last - first,
-		    xargs.buf.result, xargs.buf.buffer, xargs.buf.buflen) !=
-		    NSS_STR_PARSE_SUCCESS)
-			continue;
 		for (ht = 0; ht < fhp->fh_nhtab; ht++) {
 			hp = &fhp->fh_table[ht * fhp->fh_size + line];
-			hp->h_hash = fhp->fh_hash_func[ht](&xargs, 0);
+			hp->h_hash = fhp->fh_hash_func[ht](&xargs, 0, first,
+					last - first);
 		}
 		fhp->fh_line[line].l_start = first;
 		fhp->fh_line[line++].l_len = last - first;
 	}
-	free(xargs.buf.result);
 
 	/*
 	 * Populate the hash tables in reverse order so that the hash chains
@@ -561,13 +567,13 @@ _nss_files_destr(be, dummy)
 {
 	if (be != 0) {
 		if (be->f != 0) {
-			_nss_files_endent(be, 0);
+			(void) _nss_files_endent(be, 0);
 		}
 		if (be->hashinfo != NULL) {
-			mutex_lock(&be->hashinfo->fh_lock);
+			(void) mutex_lock(&be->hashinfo->fh_lock);
 			if (--be->hashinfo->fh_refcnt == 0)
 				_nss_files_hash_destroy(be->hashinfo);
-			mutex_unlock(&be->hashinfo->fh_lock);
+			(void) mutex_unlock(&be->hashinfo->fh_lock);
 		}
 		free(be);
 	}
@@ -596,10 +602,80 @@ _nss_files_constr(ops, n_ops, filename, min_bufsize, fhp)
 	be->hashinfo	= fhp;
 
 	if (fhp != NULL) {
-		mutex_lock(&fhp->fh_lock);
+		(void) mutex_lock(&fhp->fh_lock);
 		fhp->fh_refcnt++;
-		mutex_unlock(&fhp->fh_lock);
+		(void) mutex_unlock(&fhp->fh_lock);
 	}
 
 	return ((nss_backend_t *)be);
+}
+
+int
+_nss_files_check_name_colon(nss_XbyY_args_t *argp, const char *line,
+	int linelen)
+{
+	const char	*linep, *limit;
+	const char	*keyp = argp->key.name;
+
+	linep = line;
+	limit = line + linelen;
+	while (*keyp && linep < limit && *keyp == *linep) {
+		keyp++;
+		linep++;
+	}
+	return (linep < limit && *keyp == '\0' && *linep == ':');
+}
+
+/*
+ * This routine is used to parse lines of the form:
+ * 	name number aliases
+ * It returns 1 if the key in argp matches any one of the
+ * names in the line, otherwise 0
+ * Used by rpc, networks, protocols
+ */
+int
+_nss_files_check_name_aliases(nss_XbyY_args_t *argp, const char *line,
+	int linelen)
+{
+	const char	*limit, *linep, *keyp;
+
+	linep = line;
+	limit = line + linelen;
+	keyp = argp->key.name;
+
+	/* compare name */
+	while (*keyp && linep < limit && !isspace(*linep) && *keyp == *linep) {
+		keyp++;
+		linep++;
+	}
+	if (*keyp == '\0' && linep < limit && isspace(*linep))
+		return (1);
+	/* skip remainder of the name, if any */
+	while (linep < limit && !isspace(*linep))
+		linep++;
+	/* skip the delimiting spaces */
+	while (linep < limit && isspace(*linep))
+		linep++;
+	/* compare with the aliases */
+	while (linep < limit) {
+		/*
+		 * 1st pass: skip number
+		 * Other passes: skip remainder of the alias name, if any
+		 */
+		while (linep < limit && !isspace(*linep))
+			linep++;
+		/* skip the delimiting spaces */
+		while (linep < limit && isspace(*linep))
+			linep++;
+		/* compare with the alias name */
+		keyp = argp->key.name;
+		while (*keyp && linep < limit && !isspace(*linep) &&
+				*keyp == *linep) {
+			keyp++;
+			linep++;
+		}
+		if (*keyp == '\0' && (linep == limit || isspace(*linep)))
+			return (1);
+	}
+	return (0);
 }

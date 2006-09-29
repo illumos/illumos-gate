@@ -74,6 +74,15 @@ static struct mapping maplist[] = {
 	{NULL, NULL, NULL, NULL}
 };
 
+#define	PROF_ATTR_FILTER \
+	"(&(objectclass=SolarisProfAttr)(!(SolarisKernelSecurityPolicy=*))%s)"
+#define	TNRHTP_FILTER \
+	"(&(objectclass=ipTnetTemplate)(!(objectclass=ipTnetHost))%s)"
+#define	OC_FILTER	"objectclass=%s"
+#define	OC_FLEN		15
+#define	OC_FILTER2	"(&(objectclass=%s)%s)"
+#define	OC_FLEN2	22
+
 /* Malloc and print error message in case of failure */
 #define	MALLOC(ptr, len) \
 	if ((ptr = (char *)malloc(len)) == NULL) { \
@@ -378,6 +387,7 @@ set_filter(char **key, char *database, char **udata)
 	char		*keyfilter;
 	int		i, filterlen, udatalen;
 	int		rc, v2 = 1;
+	int		dbpf, dbtp;
 	void		**paramVal = NULL;
 	ns_ldap_error_t	*errorp = NULL;
 	short		nomem;
@@ -415,32 +425,69 @@ set_filter(char **key, char *database, char **udata)
 	 */
 	for (i = 2; maplist[i].database != NULL; i++) {
 		if (strcasecmp(database, maplist[i].database) == SAME) {
+			dbpf = 0, dbtp = 0;
+			if (strcasecmp(database, "prof_attr") == 0)
+				dbpf = 1;
+			else if (strcasecmp(database, "tnrhtp") == 0)
+				dbtp = 1;
 			if ((keyfilter = set_keys(key, maplist[i].def_type))
 							== NULL) {
-				filterlen = strlen(maplist[i].objectclass) + 13;
+				filterlen = strlen(maplist[i].objectclass);
 				udatalen = 3;
+				if (dbpf)
+					filterlen += strlen(PROF_ATTR_FILTER)
+							+ 1;
+				else if (dbtp)
+					filterlen += strlen(TNRHTP_FILTER) + 1;
+				else
+					filterlen += OC_FLEN;
+
 				MALLOC_FILTER_UDATA(filter, filterlen, userdata,
 						udatalen, nomem);
-				if (!nomem) {
+				if (nomem)
+					goto done;
+				if (dbpf)
 					(void) snprintf(filter, filterlen,
-						"objectclass=%s",
+						PROF_ATTR_FILTER, "");
+				else if (dbtp)
+					(void) snprintf(filter, filterlen,
+						TNRHTP_FILTER, "");
+				else
+					(void) snprintf(filter, filterlen,
+						OC_FILTER,
 						maplist[i].objectclass);
-					(void) snprintf(userdata, udatalen,
-							"%%s");
-				}
+
+				(void) snprintf(userdata, udatalen, "%%s");
 			} else {
 				filterlen = strlen(maplist[i].objectclass) +
-					strlen(keyfilter) + 18;
+					strlen(keyfilter);
+				if (dbpf)
+					filterlen += strlen(PROF_ATTR_FILTER)
+							+ 1;
+				else if (dbtp)
+					filterlen += strlen(TNRHTP_FILTER) + 1;
+				else
+					filterlen += OC_FLEN2;
+
 				udatalen = strlen(keyfilter) + 8;
 				MALLOC_FILTER_UDATA(filter, filterlen, userdata,
 						udatalen, nomem);
-				if (!nomem) {
+				if (nomem)
+					goto done;
+				if (dbpf)
 					(void) snprintf(filter, filterlen,
-					    "(&(objectclass=%s)%s)",
-					    maplist[i].objectclass, keyfilter);
-					(void) snprintf(userdata, udatalen,
-						"(&(%%s)%s)", keyfilter);
-				}
+						PROF_ATTR_FILTER, keyfilter);
+				else if (dbtp)
+					(void) snprintf(filter, filterlen,
+						TNRHTP_FILTER, keyfilter);
+				else
+					(void) snprintf(filter, filterlen,
+						OC_FILTER2,
+						maplist[i].objectclass,
+						keyfilter);
+
+				(void) snprintf(userdata, udatalen,
+					"(&(%%s)%s)", keyfilter);
 			}
 			goto done;
 		}

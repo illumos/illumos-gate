@@ -45,82 +45,82 @@ static const char *tnrhdb_attrs[] = {
 	NULL
 };
 
+static void
+escape_colon(char *in, char *out) {
+	int i, j;
+	for (i = 0, j = 0; in[i] != '\0'; i++) {
+		if (in[i] == ':') {
+			out[j++] = '\\';
+			out[j++] = in[i];
+		} else
+			out[j++] = in[i];
+	}
+	out[j] = '\0';
+}
+
+/*
+ * _nss_ldap_tnrhdb2str is the data marshaling method for the tnrhdb
+ * (tsol_getrhbyaddr()/tsol_getrhent()) backend processes.
+ * This method is called after a successful ldap search has been performed.
+ * This method will parse the ldap search values into the file format.
+ *
+ * e.g.
+ *
+ * 192.168.120.6:public
+ * fec0\:\:a00\:20ff\:fea0\:21f7:cipso
+ *
+ */
 static int
-_nss_ldap_tnrhdb2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_tnrhdb2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int			i, nss_result;
+	int			nss_result = NSS_STR_PARSE_SUCCESS;
 	int			len = 0;
-	int			buflen = 0;
 	char			*buffer = NULL;
-	char			*ceiling = NULL;
-	ns_ldap_attr_t		*attrptr;
+	char			**addr, **template, *addr_out;
 	ns_ldap_result_t	*result = be->result;
-	tsol_rhstr_t		*rhstrp;
+	char addr6[INET6_ADDRSTRLEN + 5]; /* 5 '\' for ':' at most */
 
-	buffer = argp->buf.buffer;
-	buflen = argp->buf.buflen;
-	if (argp->buf.result == NULL) {
-		nss_result = NSS_STR_PARSE_ERANGE;
-		goto result_tnrhdb2ent;
-	}
-	rhstrp = (tsol_rhstr_t *)(argp->buf.result);
-	rhstrp->family = 0;
-	rhstrp->address = rhstrp->template = NULL;
-	ceiling = buffer + buflen;
-	(void) memset(argp->buf.buffer, 0, buflen);
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
+
+	addr = __ns_ldap_getAttr(result->entry, _TNRHDB_ADDR);
+	if (addr == NULL || addr[0] == NULL || (strlen(addr[0]) < 1)) {
 		nss_result = NSS_STR_PARSE_PARSE;
-		goto result_tnrhdb2ent;
+		goto result_tnrhdb2str;
 	}
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
+
+	/*
+	 * Escape ':' in IPV6.
+	 * The value is stored in LDAP directory without escape charaters.
+	 */
+	if (strchr(addr[0], ':') != NULL) {
+		escape_colon(addr[0], addr6);
+		addr_out = addr6;
+	} else
+		addr_out = addr[0];
+
+	template = __ns_ldap_getAttr(result->entry, _TNRHDB_TNAME);
+	if (template == NULL || template[0] == NULL ||
+			(strlen(template[0]) < 1)) {
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_tnrhdb2str;
+	}
+	/* "addr:template" */
+	len = strlen(addr_out) + strlen(template[0]) + 2;
+
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, len)) == NULL) {
 			nss_result = NSS_STR_PARSE_PARSE;
-			goto result_tnrhdb2ent;
+			goto result_tnrhdb2str;
 		}
-		if (strcasecmp(attrptr->attrname, _TNRHDB_ADDR) == 0) {
-			len = strlen(attrptr->attrvalue[0]);
-			if (len < 1 || (attrptr->attrvalue[0] == '\0')) {
-				nss_result = NSS_STR_PARSE_PARSE;
-				goto result_tnrhdb2ent;
-			}
-			rhstrp->address = buffer;
-			buffer += len + 1;
-			if (buffer >= ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_tnrhdb2ent;
-			}
-			(void) strcpy(rhstrp->address, attrptr->attrvalue[0]);
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _TNRHDB_TNAME) == 0) {
-			len = strlen(attrptr->attrvalue[0]);
-			if (len < 1 || (attrptr->attrvalue[0] == '\0')) {
-				nss_result = NSS_STR_PARSE_PARSE;
-				goto result_tnrhdb2ent;
-			}
-			rhstrp->template = buffer;
-			buffer += len + 1;
-			if (buffer >= ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_tnrhdb2ent;
-			}
-			(void) strcpy(rhstrp->template, attrptr->attrvalue[0]);
-			continue;
-		}
-	}
-	nss_result = NSS_STR_PARSE_SUCCESS;
+		be->buflen = len - 1;
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
 
-#ifdef	DEBUG
-	(void) printf("\n[tsol_getrhent.c: _nss_ldap_tnrhdb2ent]\n");
-	(void) printf("      address: [%s]\n",
-	    rhstrp->address ? rhstrp->address : "NULL");
-	(void) printf("template: [%s]\n",
-	    rhstrp->template ? rhstrp->template : "NULL");
-#endif	/* DEBUG */
+	(void) snprintf(buffer, len, "%s:%s", addr_out, template[0]);
 
-result_tnrhdb2ent:
+result_tnrhdb2str:
 	(void) __ns_ldap_freeResult(&be->result);
 	return (nss_result);
 }
@@ -132,23 +132,31 @@ getbyaddr(ldap_backend_ptr be, void *a)
 	char		searchfilter[SEARCHFILTERLEN];
 	char		userdata[SEARCHFILTERLEN];
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
-	struct in_addr  addr;
-	char 		buf[18];
-	extern char	*inet_ntoa_r();
 
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[tsol_getrhent.c: getbyaddr]\n");
-#endif	/* DEBUG */
+	if (argp->key.hostaddr.addr == NULL ||
+		(argp->key.hostaddr.type != AF_INET &&
+		argp->key.hostaddr.type != AF_INET6))
+			return (NSS_NOTFOUND);
+	if (strchr(argp->key.hostaddr.addr, ':') != NULL) {
+		/* IPV6 */
+		if (argp->key.hostaddr.type == AF_INET)
+			return (NSS_NOTFOUND);
+	} else {
+		/* IPV4 */
+		if (argp->key.hostaddr.type == AF_INET6)
+			return (NSS_NOTFOUND);
+	}
 
-	(void) memcpy(&addr, argp->key.hostaddr.addr, sizeof (addr));
-	(void) inet_ntoa_r(addr, buf);
-
+	/*
+	 * The IPV6 addresses are saved in the directory without '\'s.
+	 * So don't need to escape colons in IPV6 addresses.
+	 */
 	if (snprintf(searchfilter, sizeof (searchfilter), _F_GETTNDBBYADDR,
-	    buf) < 0)
+	    argp->key.hostaddr.addr) < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	if (snprintf(userdata, sizeof (userdata), _F_GETTNDBBYADDR_SSD,
-	    buf) < 0)
+	    argp->key.hostaddr.addr) < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	return (_nss_ldap_lookup(be, argp, _TNRHDB, searchfilter, NULL,
@@ -173,11 +181,7 @@ _nss_ldap_tnrhdb_constr(const char *dummy1,
     const char *dummy4,
     const char *dummy5)
 {
-#ifdef	DEBUG
-	(void) fprintf(stdout,
-	    "\n[tsol_getrhent.c: _nss_ldap_tnrhdb_constr]\n");
-#endif
 	return ((nss_backend_t *)_nss_ldap_constr(tnrhdb_ops,
 		sizeof (tnrhdb_ops)/sizeof (tnrhdb_ops[0]), _TNRHDB,
-		tnrhdb_attrs, _nss_ldap_tnrhdb2ent));
+		tnrhdb_attrs, _nss_ldap_tnrhdb2str));
 }

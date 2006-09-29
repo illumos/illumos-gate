@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,10 +70,12 @@ switch_err(ypstatus, ismatch)
 {
 	switch (ypstatus) {
 	case 0:
+		errno = 0;
 		return (NSS_SUCCESS);
 
 	case YPERR_BADARGS:
 	case YPERR_KEY:
+		errno = 0;
 		return (NSS_NOTFOUND);
 
 		/*
@@ -161,7 +162,7 @@ _nss_nis_ypmatch(domain, map, key, valp, vallenp, ypstatusp)
 #if	MT_UNSAFE_YP
 	sigset_t		oldmask, newmask;
 
-	sigfillset(&newmask);
+	(void) sigfillset(&newmask);
 	_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
 	_mutex_lock(&one_lane);
 #endif
@@ -182,7 +183,8 @@ _nss_nis_ypmatch(domain, map, key, valp, vallenp, ypstatusp)
  * XXX special version of _nss_nis_ypmatch() for handling C2 (passwd.adjunct)
  * lookups when we need a reserved port.
  */
-nss_status_t
+
+static nss_status_t
 _nss_nis_ypmatch_rsvdport(domain, map, key, valp, vallenp, ypstatusp)
 	const char		*domain;
 	const char		*map;
@@ -192,12 +194,11 @@ _nss_nis_ypmatch_rsvdport(domain, map, key, valp, vallenp, ypstatusp)
 	int			*ypstatusp;
 {
 	int			ypstatus;
-	extern int yp_match_rsvdport();
 
 #if	MT_UNSAFE_YP
 	sigset_t		oldmask, newmask;
 
-	sigfillset(&newmask);
+	(void) sigfillset(&newmask);
 	_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
 	_mutex_lock(&one_lane);
 #endif
@@ -240,10 +241,13 @@ _nss_nis_lookup(be, args, netdb, map, key, ypstatusp)
 		massage_netdb((const char **)&val, &vallen);
 	}
 
+	args->returnval = NULL;
+	args->returnlen = 0;
 	parsestat = (*args->str2ent)(val, vallen,
 			args->buf.result, args->buf.buffer, args->buf.buflen);
 	if (parsestat == NSS_STR_PARSE_SUCCESS) {
 		args->returnval = args->buf.result;
+		args->returnlen = vallen;
 		res = NSS_SUCCESS;
 	} else if (parsestat == NSS_STR_PARSE_ERANGE) {
 		args->erange = 1;
@@ -282,10 +286,13 @@ _nss_nis_lookup_rsvdport(be, args, netdb, map, key, ypstatusp)
 		massage_netdb((const char **)&val, &vallen);
 	}
 
+	args->returnval = NULL;
+	args->returnlen = 0;
 	parsestat = (*args->str2ent)(val, vallen,
 			args->buf.result, args->buf.buffer, args->buf.buflen);
 	if (parsestat == NSS_STR_PARSE_SUCCESS) {
 		args->returnval = args->buf.result;
+		args->returnlen = vallen;
 		res = NSS_SUCCESS;
 	} else if (parsestat == NSS_STR_PARSE_ERANGE) {
 		args->erange = 1;
@@ -314,7 +321,7 @@ do_getent(be, args, netdb)
 #if	MT_UNSAFE_YP
 	sigset_t		oldmask, newmask;
 
-	sigfillset(&newmask);
+	(void) sigfillset(&newmask);
 	_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
 	_mutex_lock(&one_lane);
 #endif
@@ -345,10 +352,13 @@ do_getent(be, args, netdb)
 		massage_netdb((const char **)&outval, &outvallen);
 	}
 
+	args->returnval = NULL;
+	args->returnlen = 0;
 	parsestat = (*args->str2ent)(outval, outvallen,
 			args->buf.result, args->buf.buffer, args->buf.buflen);
 	if (parsestat == NSS_STR_PARSE_SUCCESS) {
 		args->returnval = args->buf.result;
+		args->returnlen = outvallen;
 		res = NSS_SUCCESS;
 	} else if (parsestat == NSS_STR_PARSE_ERANGE) {
 		args->erange = 1;
@@ -450,7 +460,7 @@ _nss_nis_do_all(be, args, filter, func)
 #if	MT_UNSAFE_YP
 	sigset_t		oldmask, newmask;
 
-	sigfillset(&newmask);
+	(void) sigfillset(&newmask);
 	_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
 	_mutex_lock(&one_lane);
 #endif
@@ -494,12 +504,15 @@ XbyY_iterator(instr, instr_len, a)
 		massage_netdb(&instr, &instr_len);
 	}
 
+	args->returnval = NULL;
+	args->returnlen = 0;
 	parsestat = (*args->str2ent)(instr, instr_len,
 			args->buf.result, args->buf.buffer, args->buf.buflen);
 	if (parsestat == NSS_STR_PARSE_SUCCESS) {
 		args->returnval = args->buf.result;
 		if ((*xydata->func)(args)) {
 			res = NSS_SUCCESS;
+			args->returnlen = instr_len;
 		} else {
 			res = NSS_NOTFOUND;
 			args->returnval = 0;
@@ -545,7 +558,7 @@ _nss_nis_destr(be, dummy)
 {
 	if (be != 0) {
 		/* === Should change to invoke ops[ENDENT] ? */
-		_nss_nis_endent(be, 0);
+		(void) _nss_nis_endent(be, 0);
 		free(be);
 	}
 	return (NSS_SUCCESS);	/* In case anyone is dumb enough to check */
@@ -565,7 +578,7 @@ _nss_nis_domain()
 	 */
 	sigset_t		oldmask, newmask;
 
-	sigfillset(&newmask);
+	(void) sigfillset(&newmask);
 	(void) _thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
 	(void) _mutex_lock(&yp_domain_lock);
 
@@ -608,4 +621,58 @@ _nss_nis_constr(ops, n_ops, enum_map)
 	be->enum_keylen	= 0;
 
 	return ((nss_backend_t *)be);
+}
+
+/*
+ * This routine is used to parse lines of the form:
+ * 	name number aliases
+ * It returns 1 if the key in argp matches any one of the
+ * names in the line, otherwise 0
+ * Used by rpc
+ */
+int
+_nss_nis_check_name_aliases(nss_XbyY_args_t *argp, const char *line,
+	int linelen)
+{
+	const char	*limit, *linep, *keyp;
+
+	linep = line;
+	limit = line + linelen;
+	keyp = argp->key.name;
+
+	/* compare name */
+	while (*keyp && linep < limit && !isspace(*linep) && *keyp == *linep) {
+		keyp++;
+		linep++;
+	}
+	if (*keyp == '\0' && linep < limit && isspace(*linep))
+		return (1);
+	/* skip remainder of the name, if any */
+	while (linep < limit && !isspace(*linep))
+		linep++;
+	/* skip the delimiting spaces */
+	while (linep < limit && isspace(*linep))
+		linep++;
+	/* compare with the aliases */
+	while (linep < limit) {
+		/*
+		 * 1st pass: skip number
+		 * Other passes: skip remainder of the alias name, if any
+		 */
+		while (linep < limit && !isspace(*linep))
+			linep++;
+		/* skip the delimiting spaces */
+		while (linep < limit && isspace(*linep))
+			linep++;
+		/* compare with the alias name */
+		keyp = argp->key.name;
+		while (*keyp && linep < limit && !isspace(*linep) &&
+				*keyp == *linep) {
+			keyp++;
+			linep++;
+		}
+		if (*keyp == '\0' && (linep == limit || isspace(*linep)))
+			return (1);
+	}
+	return (0);
 }

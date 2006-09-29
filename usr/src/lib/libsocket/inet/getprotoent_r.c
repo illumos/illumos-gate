@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1986-1992 by Sun Microsystems Inc.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,7 +31,7 @@
 #include <string.h>
 #include <nss_dbdefs.h>
 
-static int str2protoent(const char *, int, void *,
+int str2protoent(const char *, int, void *,
 		char *, int);
 
 static int proto_stayopen;
@@ -43,7 +43,7 @@ static int proto_stayopen;
 static DEFINE_NSS_DB_ROOT(db_root);
 static DEFINE_NSS_GETENT(context);
 
-static void
+void
 _nss_initf_proto(nss_db_params_t *p)
 {
 	p->name	= NSS_DBNAM_PROTOCOLS;
@@ -57,6 +57,10 @@ getprotobyname_r(const char *name, struct protoent *result,
 	nss_XbyY_args_t arg;
 	nss_status_t	res;
 
+	if (name == (const char *)NULL) {
+		errno = ERANGE;
+		return (NULL);
+	}
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2protoent);
 	arg.key.name	= name;
 	arg.stayopen	= proto_stayopen;
@@ -121,7 +125,7 @@ getprotoent_r(struct protoent *result, char *buffer, int buflen)
  * need be. instring and buffer should be separate areas. Let's not
  * fight over crumbs.
  */
-static int
+int
 str2protoent(const char *instr, int lenstr,
 	void *ent /* it is really (struct protoent *) */,
 	char *buffer, int buflen)

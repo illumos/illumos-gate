@@ -20,6 +20,7 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -56,14 +57,7 @@ if (smf_is_system_labeled); then
 fi
 
 if [ -f /etc/nscd.conf -a -f /usr/sbin/nscd ]; then
-	secure=""
-
-	if egrep -s "^(passwd|passwd_compat):.*nisplus" /etc/nsswitch.conf
-	then
-		/usr/lib/nscd_nischeck passwd || secure=" -S passwd,yes"
-	fi
-
-	/usr/sbin/nscd$secure < /dev/null > /dev/msglog 2>&1 &
+	/usr/sbin/nscd < /dev/null > /dev/msglog 2>&1 &
 else
 	echo "No /etc/nscd.conf or no /usr/sbin/nscd"
 	exit $SMF_EXIT_ERR_CONFIG

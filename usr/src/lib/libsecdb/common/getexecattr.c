@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +53,6 @@ extern char *_strdup_null(char *);
 static execattr_t *userprof(const char *, const char *, const char *, int);
 static execattr_t *get_tail(execattr_t *);
 static execattr_t *execstr2attr(execstr_t *);
-static execstr_t *process_getexec(execstr_t *, char *, int, nsc_data_t *);
 
 execattr_t *
 getexecattr()
@@ -73,26 +71,16 @@ getexecattr()
 execattr_t *
 getexecprof(const char *name, const char *type, const char *id, int search_flag)
 {
-	int		len_unique;
 	int		err = 0;
-	int		ndata = 0;
-	int		adata = 0;
 	char		unique[NSS_BUFLEN_EXECATTR];
 	char		buf[NSS_BUFLEN_EXECATTR];
 	execattr_t	*head = (execattr_t *)NULL;
 	execattr_t	*prev = (execattr_t *)NULL;
 	execstr_t	exec;
 	execstr_t	*tmp;
-	execstr_t	*resptr = (execstr_t *)NULL;
-	nsc_data_t	*sptr = (nsc_data_t *)NULL;
-	union {
-		nsc_data_t 	s_d;
-		char		s_b[NSS_BUFLEN_EXECATTR];
-	} space;
 
 	(void) memset(unique, 0, NSS_BUFLEN_EXECATTR);
 	(void) memset(&exec, 0, sizeof (execstr_t));
-	(void) memset(&space, 0, sizeof (space));
 
 	if ((search_flag != GET_ONE) && (search_flag != GET_ALL)) {
 		return ((execattr_t *)NULL);
@@ -119,55 +107,6 @@ getexecprof(const char *name, const char *type, const char *id, int search_flag)
 		endexecattr();
 		return (head);
 	}
-
-#ifdef PIC
-	/*
-	 * If the search criteria is completely specified
-	 * and we only want a single entry,
-	 * then attempt to look up the entry using the nscd.
-	 * Only commands are cached.
-	 */
-	if (name && type && (strcmp(type, KV_COMMAND) == 0) && id &&
-	    (search_flag == GET_ONE)) {
-		if (snprintf(unique, NSS_BUFLEN_EXECATTR, "%s:%s:%s",
-		    name, type, id) >= NSS_BUFLEN_EXECATTR) {
-			errno = ERANGE;
-			return ((execattr_t *)NULL);
-		}
-		len_unique = strlen(unique);
-		if ((len_unique >= (sizeof (space) - sizeof (nsc_data_t)))) {
-			errno = ERANGE;
-			return ((execattr_t *)NULL);
-		}
-		ndata = sizeof (space);
-		adata = len_unique + sizeof (nsc_call_t) + 1;
-		space.s_d.nsc_call.nsc_callnumber = GETEXECID;
-		(void) strcpy(space.s_d.nsc_call.nsc_u.name, unique);
-		sptr = &space.s_d;
-
-		switch (_nsc_trydoorcall(&sptr, &ndata, &adata)) {
-		case SUCCESS:	/* positive cache hit */
-			break;
-		case NOTFOUND:	/* negative cache hit */
-			return ((execattr_t *)NULL);
-		default:
-			resptr = _getexecprof(name, type, id, search_flag,
-			    &exec, buf, NSS_BUFLEN_EXECATTR, &err);
-			return (execstr2attr(resptr));
-		}
-		resptr = process_getexec(&exec, buf, NSS_BUFLEN_EXECATTR,
-		    sptr);
-
-		/*
-		 * check if doors reallocated the memory underneath us
-		 * if they did munmap it or suffer a memory leak
-		 */
-		if (sptr != &space.s_d)
-			(void) munmap((void *)sptr, ndata);
-
-		return (execstr2attr(resptr));
-	} /* end if (name && type && id && search_flag == GET_ONE) */
-#endif	/* PIC */
 
 	tmp = _getexecprof(name,
 	    type,
@@ -426,76 +365,6 @@ execstr2attr(execstr_t *es)
 	}
 	return (newexec);
 }
-
-
-static execstr_t *
-process_getexec(
-	execstr_t *result,
-	char *buffer,
-	int buflen,
-	nsc_data_t *sptr)
-{
-	char *fixed;
-#ifdef	_LP64
-	execstr_t exec64;
-
-	fixed = (char *)(((uintptr_t)buffer + 7) & ~7);
-#else
-	fixed = (char *)(((uintptr_t)buffer + 3) & ~3);
-#endif
-	buflen -= fixed - buffer;
-	buffer = fixed;
-
-	if (sptr->nsc_ret.nsc_return_code != SUCCESS)
-		return ((execstr_t *)NULL);
-
-#ifdef	_LP64
-	if (sptr->nsc_ret.nsc_bufferbytesused - (int)sizeof (execstr32_t)
-	    > buflen)
-#else
-	if (sptr->nsc_ret.nsc_bufferbytesused - (int)sizeof (execstr_t)
-	    > buflen)
-#endif
-	{
-		errno = ERANGE;
-		return ((execstr_t *)NULL);
-	}
-
-#ifdef	_LP64
-	(void) memcpy(buffer, (sptr->nsc_ret.nsc_u.buff + sizeof (execstr32_t)),
-	    (sptr->nsc_ret.nsc_bufferbytesused - sizeof (execstr32_t)));
-	exec64.name = (char *)(sptr->nsc_ret.nsc_u.exec.name +
-	    (uintptr_t)buffer);
-	exec64.type = (char *)(sptr->nsc_ret.nsc_u.exec.type +
-	    (uintptr_t)buffer);
-	exec64.policy = (char *)(sptr->nsc_ret.nsc_u.exec.policy +
-	    (uintptr_t)buffer);
-	exec64.res1 = (char *)(sptr->nsc_ret.nsc_u.exec.res1 +
-	    (uintptr_t)buffer);
-	exec64.res2 = (char *)(sptr->nsc_ret.nsc_u.exec.res2 +
-	    (uintptr_t)buffer);
-	exec64.id = (char *)(sptr->nsc_ret.nsc_u.exec.id +
-	    (uintptr_t)buffer);
-	exec64.attr = (char *)(sptr->nsc_ret.nsc_u.exec.attr +
-	    (uintptr_t)buffer);
-	exec64.next = (execstr_t *)NULL;
-	*result = exec64;
-#else
-	sptr->nsc_ret.nsc_u.exec.name += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.exec.type += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.exec.policy += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.exec.res1 += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.exec.res2 += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.exec.id += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.exec.attr += (uintptr_t)buffer;
-	sptr->nsc_ret.nsc_u.exec.next = (execstr_t *)NULL;
-	*result = sptr->nsc_ret.nsc_u.exec;
-	(void) memcpy(buffer, (sptr->nsc_ret.nsc_u.buff + sizeof (execstr_t)),
-	    (sptr->nsc_ret.nsc_bufferbytesused - sizeof (execstr_t)));
-#endif
-	return (result);
-}
-
 
 #ifdef DEBUG
 void

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1988-1992, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
  *	nisplus/gethostent6.c -- NIS+ backend for nsswitch "ipnodes" database
  */
 
@@ -34,9 +35,8 @@
 #include <sys/socket.h>
 #include "nisplus_common.h"
 #include "nisplus_tables.h"
+#include <arpa/inet.h>
 #include <inet/ip6.h>
-
-const char *inet_ntop(int af, const void *src, char *dst, size_t size);
 
 static nss_status_t
 getbyname(be, a)
@@ -72,7 +72,7 @@ getbyaddr(be, a)
 		return (NSS_NOTFOUND);
 	}
 
-	memcpy(&addr, argp->key.hostaddr.addr, sizeof (addr));
+	(void) memcpy(&addr, argp->key.hostaddr.addr, sizeof (addr));
 	if (IN6_IS_ADDR_V4MAPPED(&addr)) {
 		if (inet_ntop(AF_INET, (void *) &addr.s6_addr[12],
 				(void *)addrbuf, INET_ADDRSTRLEN) == NULL) {
@@ -93,75 +93,18 @@ getbyaddr(be, a)
 
 
 /*
- * place the results from the nis_object structure into argp->buf.result
  * Returns NSS_STR_PARSE_{SUCCESS, ERANGE, PARSE}
  */
 static int
-nis_object2ent(nobj, obj, argp)
-	int		nobj;
-	nis_object	*obj;
-	nss_XbyY_args_t	*argp;
+nis_object2str(nobj, obj, be, argp)
+	int			nobj;
+	nis_object		*obj;
+	nisplus_backend_ptr_t	be;
+	nss_XbyY_args_t		*argp;
 {
-	char	*buffer, *limit;
-	int		buflen = argp->buf.buflen;
-	struct 	hostent *host;
-	struct	in6_addr *addrp;
-	int		count, ret;
-
-	limit = argp->buf.buffer + buflen;
-	host = (struct hostent *)argp->buf.result;
-	buffer = argp->buf.buffer;
-
-/*
- * <--------------- buffer + buflen -------------------------------------->
- * |-----------------|-----------------|----------------|----------------|
- * | pointers vector | pointers vector | aliases grow   | addresses grow |
- * | for addresses   | for aliases     |		|		 |
- * | this way ->     | this way ->     | <- this way	|<- this way	 |
- * |-----------------|-----------------|----------------|----------------|
- * | grows in PASS 1 | grows in PASS2  | grows in PASS2 | grows in PASS 1|
- *
- *
- * ASSUME: the name and aliases columns in NIS+ tables ARE
- * null terminated.
- *
- *
- * PASS 1: get addresses
- */
-
-	addrp = (struct in6_addr *)ROUND_DOWN(limit, sizeof (*addrp));
-	host->h_addr_list = (char **)ROUND_UP(buffer, sizeof (char **));
-	if ((char *)host->h_addr_list >= limit ||
-			(char *)addrp <= (char *)host->h_addr_list) {
-		return (NSS_STR_PARSE_ERANGE);
-	}
-
-	ret = __netdb_aliases_from_nisobj(obj, nobj, NULL,
-		host->h_addr_list, (char **)&addrp, 0, &count, AF_INET6);
-	if (ret != NSS_STR_PARSE_SUCCESS)
-		return (ret);
-
-	/*
-	 * PASS 2: get cname and aliases
-	 */
-
-	host->h_aliases =  host->h_addr_list + count + 1;
-	host->h_name = NULL;
-
-	/*
-	 * Assume that CNAME is the first column and NAME the second.
-	 */
-	ret = __netdb_aliases_from_nisobj(obj, nobj, NULL,
-		host->h_aliases, (char **)&addrp, &(host->h_name), &count,
-		AF_INET6);
-	if (ret != NSS_STR_PARSE_SUCCESS)
-		return (ret);
-
-	host->h_addrtype = AF_INET6;
-	host->h_length   = IPV6_ADDR_LEN;
-
-	return (NSS_STR_PARSE_SUCCESS);
+	return (nis_hosts_object2str(nobj, obj, be, argp, AF_INET6));
 }
+
 
 static nisplus_backend_op_t ipnodes_ops[] = {
 	_nss_nisplus_destr,
@@ -179,5 +122,5 @@ _nss_nisplus_ipnodes_constr(dummy1, dummy2, dummy3)
 {
 	return (_nss_nisplus_constr(ipnodes_ops,
 		    sizeof (ipnodes_ops) / sizeof (ipnodes_ops[0]),
-				    IPNODES_TBLNAME, nis_object2ent));
+				    IPNODES_TBLNAME, nis_object2str));
 }

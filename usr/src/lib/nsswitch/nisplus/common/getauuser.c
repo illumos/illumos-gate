@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +41,6 @@
 #include <secdb.h>
 #include "nisplus_tables.h"
 
-
 static nss_status_t
 getbynam(nisplus_backend_ptr_t be, void *a)
 {
@@ -53,22 +51,18 @@ getbynam(nisplus_backend_ptr_t be, void *a)
 }
 
 /*
- * place the results from the nis_object structure into argp->buf.result
  * Returns NSS_STR_PARSE_{SUCCESS, ERANGE, PARSE}
  */
+/*ARGSUSED*/
 static int
-nis_object2auuser(int nobj, nis_object *obj, nss_XbyY_args_t *argp)
+nis_object2auuser(int nobj, nis_object *obj,
+		nisplus_backend_ptr_t be,
+		nss_XbyY_args_t *argp)
 {
-	int			len;
-	int			buflen = argp->buf.buflen;
-	char			*p, *buffer, *limit, *val, *endnum, *nullstring;
-	char			*empty = "";
-	au_user_str_t		*au_user;
+	char			*buffer, *name, *always, *never;
+	int			buflen, namelen, alwayslen, neverlen;
 	struct entry_col	*ecol;
 
-	limit = argp->buf.buffer + buflen;
-	au_user = (au_user_str_t *)argp->buf.result;
-	buffer = argp->buf.buffer;
 	/*
 	 * If we got more than one nis_object, we just ignore object(s) except
 	 * the first. Although it should never have happened.
@@ -82,51 +76,38 @@ nis_object2auuser(int nobj, nis_object *obj, nss_XbyY_args_t *argp)
 	}
 	ecol = obj->EN_data.en_cols.en_cols_val;
 
-	/*
-	 * au_user->name: user name
-	 */
-	EC_SET(ecol, AUDITUSER_NDX_NAME, len, val);
-	if (len < 1 || (*val == '\0')) {
-		val = empty;
-	}
-	au_user->au_name = buffer;
-	buffer += len;
-	if (buffer >= limit) {
-		return (NSS_STR_PARSE_ERANGE);
-	}
-	strcpy(au_user->au_name, val);
-	nullstring = (buffer - 1);
+	/* user name */
+	__NISPLUS_GETCOL_OR_RETURN(ecol, AUDITUSER_NDX_NAME,
+			namelen, name);
 
-	/*
-	 * au_user->au_always: always audited events
-	 */
-	EC_SET(ecol, AUDITUSER_NDX_ALWAYS, len, val);
-	if (len < 1 || (*val == '\0')) {
-		val = empty;
-	}
-	au_user->au_always = buffer;
-	buffer += len;
-	if (buffer >= limit) {
-		return (NSS_STR_PARSE_ERANGE);
-	}
-	strcpy(au_user->au_always, val);
-	nullstring = (buffer - 1);
+	/* always audited events */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, AUDITUSER_NDX_ALWAYS,
+			alwayslen, always);
 
-	/*
-	 * au_user->au_never: never audited events
-	 */
-	EC_SET(ecol, AUDITUSER_NDX_NEVER, len, val);
-	if (len < 1 || (*val == '\0')) {
-		val = empty;
-	}
-	au_user->au_never = buffer;
-	buffer += len;
-	if (buffer >= limit) {
-		return (NSS_STR_PARSE_ERANGE);
-	}
-	strcpy(au_user->au_never, val);
-	nullstring = (buffer - 1);
+	/* never audited events */
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, AUDITUSER_NDX_NEVER,
+			neverlen, never);
 
+	buflen = namelen + alwayslen + neverlen + 3;
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, buflen)) == NULL)
+			return (NSS_STR_PARSE_PARSE);
+		/* exclude trailing null from length */
+		be->buflen = buflen - 1;
+		buffer = be->buffer;
+	} else {
+		if (buflen > argp->buf.buflen)
+			return (NSS_STR_PARSE_ERANGE);
+		buflen = argp->buf.buflen;
+		buffer = argp->buf.buffer;
+		(void) memset(buffer, 0, buflen);
+	}
+	(void) snprintf(buffer, buflen, "%s:%s:%s",
+		name, always, never);
+#ifdef DEBUG
+	(void) fprintf(stdout, "audituser [%s]\n", buffer);
+	(void) fflush(stdout);
+#endif  /* DEBUG */
 	return (NSS_STR_PARSE_SUCCESS);
 }
 
@@ -138,6 +119,7 @@ static nisplus_backend_op_t auuser_ops[] = {
 	getbynam
 };
 
+/*ARGSUSED*/
 nss_backend_t  *
 _nss_nisplus_audit_user_constr(const char *dummy1,
     const char *dummy2,

@@ -32,6 +32,7 @@
 #define	_TNRHTP_NAME		"ipTnetTemplateName"
 #define	_TNRHTP_ATTRS		"SolarisAttrKeyValue"
 #define	_F_GETTNTPBYNAME	"(&(objectClass=ipTnetTemplate)"\
+				"(!(objectClass=ipTnetHost))" \
 				"(ipTnetTemplateName=%s))"
 #define	_F_GETTNTPBYNAME_SSD	"(&(%%s)(ipTnetTemplateName=%s))"
 
@@ -41,96 +42,62 @@ static const char *tnrhtp_attrs[] = {
 	NULL
 };
 
+/*
+ * _nss_ldap_tnrhtp2str is the data marshaling method for the tnrhtp
+ * (tsol_gettpbyaddr()/tsol_gettpent()) backend processes.
+ * This method is called after a successful ldap search has been performed.
+ * This method will parse the ldap search values into the file format.
+ *
+ * e.g.
+ *
+ * admin_low:host_type=unlabeled;def_label=[0x0000000000000000000000000000000000
+ * 0000000000000000000000000000000000];min_sl=0x00000000000000000000000000000000
+ * 000000000000000000000000000000000000;max_sl=0x7ffffffffffffffffffffffffffffff
+ * fffffffffffffffffffffffffffffffffffff;doi=0;
+ */
 static int
-_nss_ldap_tnrhtp2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_tnrhtp2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int			i, nss_result;
+	int			nss_result = NSS_STR_PARSE_SUCCESS;
 	int			len = 0;
-	int			buflen = 0;
 	char			*buffer = NULL;
-	char			*ceiling = NULL;
-	ns_ldap_attr_t		*attrptr;
+	char			**attrs, **template;
 	ns_ldap_result_t	*result = be->result;
-	tsol_tpstr_t		*tpstrp;
 
-	buffer = argp->buf.buffer;
-	buflen = argp->buf.buflen;
-	if (argp->buf.result == NULL) {
-		nss_result = (int)NSS_STR_PARSE_ERANGE;
-		goto result_tnrhtp2ent;
-	}
-	tpstrp = (tsol_tpstr_t *)(argp->buf.result);
-	tpstrp->template = tpstrp->attrs = NULL;
-	ceiling = buffer + buflen;
-	(void) memset(argp->buf.buffer, 0, buflen);
-	attrptr = getattr(result, 0);
-	if (attrptr == NULL) {
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
+
+	template = __ns_ldap_getAttr(result->entry, _TNRHTP_NAME);
+	if (template == NULL || template[0] == NULL ||
+			(strlen(template[0]) < 1)) {
 		nss_result = NSS_STR_PARSE_PARSE;
-		goto result_tnrhtp2ent;
+		goto result_tnrhtp2str;
 	}
-	for (i = 0; i < result->entry->attr_count; i++) {
-		attrptr = getattr(result, i);
-		if (attrptr == NULL) {
-			nss_result = (int)NSS_STR_PARSE_PARSE;
-			goto result_tnrhtp2ent;
-		}
-#ifdef	DEBUG
-		(void) fprintf(stdout,
-		    "\n[tsol_gettpent.c: _nss_ldap_tnrhtp2ent %d]\n", i);
-		(void) fprintf(stdout, "      entry value count %d: %s:%s\n",
-		    attrptr->value_count,
-		    attrptr->attrname ? attrptr->attrname : "NULL",
-		    attrptr->attrvalue[0] ? attrptr->attrvalue[0] : "NULL");
-#endif	/* DEBUG */
-		if (strcasecmp(attrptr->attrname, _TNRHTP_NAME) == 0) {
-			len = strlen(attrptr->attrvalue[0]);
-			if (len < 1 || (attrptr->attrvalue[0] == '\0')) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_tnrhtp2ent;
-			}
-			tpstrp->template = buffer;
-			buffer += len + 1;
-			if (buffer >= ceiling) {
-				nss_result = (int)NSS_STR_PARSE_ERANGE;
-				goto result_tnrhtp2ent;
-			}
-			(void) strcpy(tpstrp->template, attrptr->attrvalue[0]);
-			continue;
-		}
-		if (strcasecmp(attrptr->attrname, _TNRHTP_ATTRS) == 0) {
-			len = strlen(attrptr->attrvalue[0]);
-			if (len < 1 || (attrptr->attrvalue[0] == '\0')) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_tnrhtp2ent;
-			}
-			tpstrp->attrs = buffer;
-			buffer += len + 1;
-			if (buffer >= ceiling) {
-				nss_result = (int)NSS_STR_PARSE_PARSE;
-				goto result_tnrhtp2ent;
-			}
-			(void) strcpy(tpstrp->attrs, attrptr->attrvalue[0]);
-			continue;
-		}
-	}
-	if (tpstrp->attrs == NULL)
+	attrs = __ns_ldap_getAttr(result->entry, _TNRHTP_ATTRS);
+	if (attrs == NULL || attrs[0] == NULL || (strlen(attrs[0]) < 1)) {
 		nss_result = NSS_STR_PARSE_PARSE;
-	else
-		nss_result = NSS_STR_PARSE_SUCCESS;
+		goto result_tnrhtp2str;
+	}
 
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[tsol_gettpent.c: _nss_ldap_tnrhtp2ent]\n");
-	(void) fprintf(stdout, "      template: [%s]\n",
-	    tpstrp->template ? tpstrp->template : "NULL");
-	(void) fprintf(stdout, "      attrs: [%s]\n",
-	    tpstrp->attrs ? tpstrp->attrs : "NULL");
-#endif	/* DEBUG */
+	/* "template:attrs" */
+	len = strlen(template[0]) + strlen(attrs[0]) + 2;
 
-result_tnrhtp2ent:
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, len)) == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_tnrhtp2str;
+		}
+		be->buflen = len - 1;
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
+
+	(void) snprintf(buffer, len, "%s:%s", template[0], attrs[0]);
+
+result_tnrhtp2str:
 	(void) __ns_ldap_freeResult(&be->result);
 	return (nss_result);
 }
-
 
 static nss_status_t
 getbyname(ldap_backend_ptr be, void *a)
@@ -139,9 +106,8 @@ getbyname(ldap_backend_ptr be, void *a)
 	char		userdata[SEARCHFILTERLEN];
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
 
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[tsol_gettpent.c: getbyname]\n");
-#endif	/* DEBUG */
+	if (argp->key.name == NULL)
+		return (NSS_NOTFOUND);
 
 	if (snprintf(searchfilter, SEARCHFILTERLEN, _F_GETTNTPBYNAME,
 	    argp->key.name) < 0)
@@ -164,7 +130,7 @@ static ldap_backend_op_t tnrhtp_ops[] = {
 	getbyname
 };
 
-
+/* ARGSUSED */
 nss_backend_t *
 _nss_ldap_tnrhtp_constr(const char *dummy1,
     const char *dummy2,
@@ -172,11 +138,7 @@ _nss_ldap_tnrhtp_constr(const char *dummy1,
     const char *dummy4,
     const char *dummy5)
 {
-#ifdef	DEBUG
-	(void) fprintf(stdout,
-	    "\n[gettnrhtpattr.c: _nss_ldap_tnrhtp_constr]\n");
-#endif
 	return ((nss_backend_t *)_nss_ldap_constr(tnrhtp_ops,
 		sizeof (tnrhtp_ops)/sizeof (tnrhtp_ops[0]), _TNRHTP,
-		tnrhtp_attrs, _nss_ldap_tnrhtp2ent));
+		tnrhtp_attrs, _nss_ldap_tnrhtp2str));
 }

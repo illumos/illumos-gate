@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  *	nis/gethostent.c -- "nis" backend for nsswitch "hosts" database
  */
@@ -43,7 +42,7 @@ getbyname(be, a)
 	nis_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	nss_status_t	res;
 
 	const char		*s;
@@ -82,7 +81,7 @@ getbyaddr(be, a)
 	nis_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp	= (nss_XbyY_args_t *) a;
+	nss_XbyY_args_t		*argp	= (nss_XbyY_args_t *)a;
 	struct in_addr		addr;
 	char			buf[18];
 	nss_status_t	res;
@@ -95,7 +94,7 @@ getbyaddr(be, a)
 	    argp->key.hostaddr.len  != sizeof (addr)) {
 		return (NSS_NOTFOUND);
 	}
-	memcpy(&addr, argp->key.hostaddr.addr, sizeof (addr));
+	(void) memcpy(&addr, argp->key.hostaddr.addr, sizeof (addr));
 	res = _nss_nis_lookup(be, argp, 1, "hosts.byaddr",
 				inet_ntoa_r(addr, buf), 0);
 	if (res != NSS_SUCCESS)

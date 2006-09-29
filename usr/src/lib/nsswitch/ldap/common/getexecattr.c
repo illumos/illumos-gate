@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -262,29 +261,94 @@ _exec_ldap_exec2ent(ns_ldap_entry_t *entry, nss_XbyY_args_t *argp)
 
 
 /*
- * place the results from ldap object structure into argp->buf.result
+ * place the results from ldap object structure into the file format
  * returns NSS_STR_PARSE_{SUCCESS, ERANGE, PARSE}
  */
 static int
-_nss_ldap_exec2ent(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+_nss_ldap_exec2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int			status = (int)NSS_STR_PARSE_SUCCESS;
-	ns_ldap_entry_t		*entry;
+	int			status = NSS_STR_PARSE_SUCCESS;
 	ns_ldap_result_t	*result = be->result;
+	int			len;
+	char			*buffer, **name, **policy, **type;
+	char			**res1, **res2, **id, **attr;
+	char			*policy_str, *type_str, *res1_str, *res2_str;
+	char			*id_str, *attr_str;
 
-	if (!argp->buf.result) {
-		status = (int)NSS_STR_PARSE_ERANGE;
-		goto result_exec2ent;
+	if (result == NULL)
+		return (NSS_STR_PARSE_PARSE);
+
+	(void) memset(argp->buf.buffer, 0, argp->buf.buflen);
+
+	name = __ns_ldap_getAttr(result->entry, _EXEC_NAME);
+	if (name == NULL || name[0] == NULL ||
+			(strlen(name[0]) < 1)) {
+		status = NSS_STR_PARSE_PARSE;
+		goto result_exec2str;
 	}
 
-	for (entry = result->entry; entry != NULL; entry = entry->next) {
-		status = _exec_ldap_exec2ent(entry, argp);
-		if (status != NSS_STR_PARSE_SUCCESS) {
-			goto result_exec2ent;
+	policy = __ns_ldap_getAttr(result->entry, _EXEC_POLICY);
+
+	if (policy == NULL || policy[0] == NULL)
+		policy_str = _NO_VALUE;
+	else
+		policy_str = policy[0];
+
+	type = __ns_ldap_getAttr(result->entry, _EXEC_TYPE);
+	if (type == NULL || type[0] == NULL)
+		type_str = _NO_VALUE;
+	else
+		type_str = type[0];
+
+	res1 = __ns_ldap_getAttr(result->entry, _EXEC_RES1);
+	if (res1 == NULL || res1[0] == NULL)
+		res1_str = _NO_VALUE;
+	else
+		res1_str = res1[0];
+
+	res2 = __ns_ldap_getAttr(result->entry, _EXEC_RES2);
+	if (res2 == NULL || res2[0] == NULL)
+		res2_str = _NO_VALUE;
+	else
+		res2_str = res2[0];
+
+	id = __ns_ldap_getAttr(result->entry, _EXEC_ID);
+	if (id == NULL || id[0] == NULL)
+		id_str = _NO_VALUE;
+	else
+		id_str = id[0];
+
+	attr = __ns_ldap_getAttr(result->entry, _EXEC_ATTRS);
+	if (attr == NULL || attr[0] == NULL)
+		attr_str = _NO_VALUE;
+	else
+		attr_str = attr[0];
+
+	/* 7 = 6 ':' + 1 '\0' */
+	len = strlen(name[0]) + strlen(policy_str) + strlen(type_str) +
+		strlen(res1_str) + strlen(res2_str) + strlen(id_str) +
+		strlen(attr_str) + 7;
+
+	if (len > argp->buf.buflen) {
+		status = NSS_STR_PARSE_ERANGE;
+		goto  result_exec2str;
+	}
+	if (argp->buf.result != NULL) {
+		if ((be->buffer = calloc(1, len)) == NULL) {
+			status = NSS_STR_PARSE_PARSE;
+			goto result_exec2str;
 		}
-	}
+		buffer = be->buffer;
+	} else
+		buffer = argp->buf.buffer;
 
-result_exec2ent:
+	(void) snprintf(buffer, len, "%s:%s:%s:%s:%s:%s:%s",
+			name[0], policy_str, type_str, res1_str,
+			res2_str, id_str, attr_str);
+	/* The front end marshaller does not need the trailing null */
+	if (argp->buf.result != NULL)
+		be->buflen = strlen(buffer);
+result_exec2str:
 	(void) __ns_ldap_freeResult(&be->result);
 	return (status);
 }
@@ -299,10 +363,6 @@ _exec_process_val(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 	ns_ldap_entry_t		*entry;
 	ns_ldap_result_t	*result = be->result;
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
-
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getexecattr.c: _exec_process_val]\n");
-#endif	/* DEBUG */
 
 	argp->returnval = NULL;
 	attrptr = getattr(result, 0);
@@ -426,6 +486,54 @@ go_out:
 }
 
 static nss_status_t
+exec_attr_process_val(ldap_backend_ptr be, nss_XbyY_args_t *argp) {
+
+	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
+	int		stat, nss_stat = NSS_SUCCESS;
+
+	if (_priv_exec->search_flag == GET_ONE) {
+		/* ns_ldap_entry_t -> file format */
+		stat = (*be->ldapobj2str)(be, argp);
+
+		if (stat == NSS_STR_PARSE_SUCCESS) {
+			if (argp->buf.result != NULL) {
+				/* file format -> execstr_t */
+				stat = (*argp->str2ent)(be->buffer,
+					be->buflen,
+					argp->buf.result,
+					argp->buf.buffer,
+					argp->buf.buflen);
+				if (stat == NSS_STR_PARSE_SUCCESS) {
+					argp->returnval = argp->buf.result;
+					argp->returnlen = 1; /* irrelevant */
+					nss_stat = NSS_SUCCESS;
+				} else {
+					argp->returnval = NULL;
+					argp->returnlen = 0;
+					nss_stat = NSS_NOTFOUND;
+				}
+			} else {
+				/* return file format in argp->buf.buffer */
+				argp->returnval = argp->buf.buffer;
+				argp->returnlen = strlen(argp->buf.buffer);
+				nss_stat = NSS_SUCCESS;
+			}
+		} else {
+			argp->returnval = NULL;
+			argp->returnlen = 0;
+			nss_stat = NSS_NOTFOUND;
+		}
+	} else {
+		/* GET_ALL */
+		nss_stat = _exec_process_val(be, argp);
+		_exec_cleanup(nss_stat, argp);
+	}
+
+	return (nss_stat);
+
+}
+
+static nss_status_t
 getbynam(ldap_backend_ptr be, void *a)
 {
 	char		searchfilter[SEARCHFILTERLEN];
@@ -437,10 +545,6 @@ getbynam(ldap_backend_ptr be, void *a)
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 	const char	*policy = _priv_exec->policy;
 	const char	*type = _priv_exec->type;
-
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getexecattr.c: getbyname]\n");
-#endif	/* DEBUG */
 
 	if (strpbrk(policy, "*()\\") != NULL ||
 	    type != NULL && strpbrk(type, "*()\\") != NULL ||
@@ -458,31 +562,22 @@ getbynam(ldap_backend_ptr be, void *a)
 	nss_stat = _nss_ldap_nocb_lookup(be, argp, _EXECATTR,
 	    searchfilter, NULL, _merge_SSD_filter, userdata);
 
-	if (nss_stat == NSS_SUCCESS)
-		nss_stat = _exec_process_val(be, argp);
-
-	_exec_cleanup(nss_stat, argp);
+	if (nss_stat ==  NSS_SUCCESS)
+		nss_stat = exec_attr_process_val(be, argp);
 
 	return (nss_stat);
 }
 
-
 static nss_status_t
 getbyid(ldap_backend_ptr be, void *a)
 {
-	nss_status_t	nss_stat;
+	nss_status_t	nss_stat = NSS_SUCCESS;
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
-
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getexecattr.c: getbyid]\n");
-#endif	/* DEBUG */
 
 	nss_stat = get_wild(be, argp, NSS_DBOP_EXECATTR_BYID);
 
-	if (nss_stat == NSS_SUCCESS)
-		nss_stat = _exec_process_val(be, argp);
-
-	_exec_cleanup(nss_stat, argp);
+	if (nss_stat ==  NSS_SUCCESS)
+		nss_stat = exec_attr_process_val(be, argp);
 
 	return (nss_stat);
 }
@@ -494,16 +589,10 @@ getbynameid(ldap_backend_ptr be, void *a)
 	nss_status_t	nss_stat;
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
 
-#ifdef	DEBUG
-	(void) fprintf(stdout, "\n[getexecattr.c: getbynameid]\n");
-#endif	/* DEBUG */
-
 	nss_stat = get_wild(be, argp, NSS_DBOP_EXECATTR_BYNAMEID);
 
-	if (nss_stat == NSS_SUCCESS)
-		nss_stat = _exec_process_val(be, argp);
-
-	_exec_cleanup(nss_stat, argp);
+	if (nss_stat ==  NSS_SUCCESS)
+		nss_stat = exec_attr_process_val(be, argp);
 
 	return (nss_stat);
 }
@@ -536,5 +625,5 @@ _nss_ldap_exec_attr_constr(const char *dummy1,
 #endif
 	return ((nss_backend_t *)_nss_ldap_constr(execattr_ops,
 		sizeof (execattr_ops)/sizeof (execattr_ops[0]), _EXECATTR,
-		exec_attrs, _nss_ldap_exec2ent));
+		exec_attrs, _nss_ldap_exec2str));
 }

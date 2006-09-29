@@ -40,6 +40,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/types.h>
+#include <unistd.h>
 #include <errno.h>
 #include <netdb.h>		/* MAXALIASES, MAXADDRS */
 #include <limits.h>		/* LOGNAME_MAX */
@@ -209,10 +211,15 @@ extern "C" {
 #define	NSS_BUFLEN_USERATTR	((NSS_BUFLEN_ATTRDB) * 8)
 
 #define	NSS_BUFLEN_TSOL		NSS_LINELEN_TSOL
-
 #define	NSS_BUFLEN_TSOL_TP	NSS_BUFLEN_TSOL
 #define	NSS_BUFLEN_TSOL_RH	NSS_BUFLEN_TSOL
 #define	NSS_BUFLEN_TSOL_ZC	NSS_BUFLEN_TSOL
+
+/*
+ * Default cache door buffer size (2x largest buffer)
+ */
+
+#define	NSS_BUFLEN_DOOR		((NSS_BUFSIZ) * 16)
 
 /*
  * Arguments and results, passed between the frontends and backends for
@@ -220,6 +227,26 @@ extern "C" {
  * use a common format that is further described below;  other routines
  * use their own formats.
  */
+
+/*
+ * The nss_str2ent_t routine is the data marshaller for the nsswitch.
+ * it converts 'native files' format into 'entry' format as part of the
+ * return processing for a getXbyY interface.
+ *
+ * The nss_groupstr_t routine does the real work for any backend
+ * that can supply a netgroup entry as a string in /etc/group format
+ */
+#if defined(__STDC__)
+typedef int		(*nss_str2ent_t)(const char *in, int inlen,
+				void *ent, char *buf, int buflen);
+
+struct nss_groupsbymem;		/* forward definition */
+typedef nss_status_t	(*nss_groupstr_t)(const char *instr, int inlen,
+				struct nss_groupsbymem *);
+#else
+typedef int		(*nss_str2ent_t)();
+typedef nss_status_t	(*nss_groupstr_t)();
+#endif
 
 /*
  * The initgroups() function [see initgroups(3c)] needs to find all the
@@ -248,21 +275,8 @@ struct nss_groupsbymem {			/* For _getgroupsbymember() */
 	gid_t		*gid_array;
 	int		maxgids;
 	int		force_slow_way;
-	/*
-	 * The process_cstr() routine does the real work for any backend
-	 * that can supply a group entry as a string in /etc/group format
-	 */
-#if defined(__STDC__)
-	int		(*str2ent)	(const char		*instr,
-					int			instr_len,
-					void *ent, char *buffer, int buflen);
-	nss_status_t	(*process_cstr)	(const char		*instr,
-					int			instr_len,
-					struct nss_groupsbymem *);
-#else
-	int		(*str2ent)();
-	nss_status_t	(*process_cstr)();
-#endif
+	nss_str2ent_t	str2ent;
+	nss_groupstr_t	process_cstr;
 
 /* in_out: */
 	int		numgids;
@@ -305,16 +319,16 @@ struct nss_groupsbymem {			/* For _getgroupsbymember() */
  */
 
 enum nss_netgr_argn {		/* We need (machine, user, domain) triples */
-	NSS_NETGR_MACHINE,
-	NSS_NETGR_USER,
-	NSS_NETGR_DOMAIN,
-	NSS_NETGR_N
+	NSS_NETGR_MACHINE = 0,
+	NSS_NETGR_USER = 1,
+	NSS_NETGR_DOMAIN = 2,
+	NSS_NETGR_N = 3
 };
 
 enum nss_netgr_status {		/* Status from setnetgrent, multi_innetgr */
-	NSS_NETGR_FOUND,
-	NSS_NETGR_NO,
-	NSS_NETGR_NOMEM
+	NSS_NETGR_FOUND = 0,
+	NSS_NETGR_NO = 1,
+	NSS_NETGR_NOMEM = 2
 };
 
 struct nss_setnetgrent_args {
@@ -349,7 +363,6 @@ struct nss_innetgr_args {
 	enum nss_netgr_status	status;
 };
 
-
 /*
  * nss_XbyY_buf_t -- structure containing the generic arguments passwd to
  *   getXXXbyYYY_r() and getXXXent_r() routines.  The (void *) value points to
@@ -376,7 +389,7 @@ extern void		 _nss_XbyY_buf_free();
 #define	NSS_XbyY_ALLOC(bufpp, str_size, buf_size)		(\
 	(*bufpp) == 0						\
 	? (*bufpp) = _nss_XbyY_buf_alloc(str_size, buf_size)	\
-	: (*bufpp))						\
+	: (*bufpp))
 
 #define	NSS_XbyY_FREE(bufpp)	(_nss_XbyY_buf_free(*bufpp), (*bufpp) = 0)
 
@@ -406,7 +419,7 @@ extern void		 _nss_XbyY_buf_free();
  * in parsing and marshalling these into the buffer.
  */
 
-union nss_XbyY_key {	/* No tag;  backend should know what to expect */
+typedef union nss_XbyY_key {	/* No tag; backend should know what to expect */
 	uid_t		uid;
 	gid_t		gid;
 	projid_t	projid;
@@ -439,7 +452,16 @@ union nss_XbyY_key {	/* No tag;  backend should know what to expect */
 		int		flags;
 	}	ipnode;
 	void *attrp;	/* for the new attr databases */
-};
+} nss_XbyY_key_t;
+
+
+#if defined(__STDC__)
+typedef int		(*nss_key2str_t)(void *buffer, size_t buflen,
+				nss_XbyY_key_t *key, size_t *len);
+#else
+typedef int		(*nss_key2str_t)();
+#endif
+
 
 typedef struct nss_XbyY_args {
 
@@ -451,21 +473,186 @@ typedef struct nss_XbyY_args {
 			 * Used only in hosts, protocols,
 			 * networks, rpc, and services.
 			 */
-#if defined(__STDC__)
-	int		(*str2ent)	(const char		*instr,
-					int			instr_len,
-					void *ent, char *buffer, int buflen);
-#else
-	int		(*str2ent)();
-#endif
+	nss_str2ent_t	str2ent;
 	union nss_XbyY_key key;
 
 /* OUT */
 	void		*returnval;
 	int		erange;
-	int		h_errno;		/* For gethost*_r() */
-	nss_status_t	status; /* from the backend last called */
+	int		h_errno;	/* For gethost*_r() */
+	nss_status_t	status;		/* from the backend last called */
+/* NSS2 */
+	nss_key2str_t	key2str;	/* IN */
+	size_t		returnlen;	/* OUT */
+
+/* NSCD/DOOR data */
+
+/* ... buffer arena follows... */
 } nss_XbyY_args_t;
+
+
+
+/*
+ * nss/nscd v2 interface, packed buffer format
+ *
+ * A key component of the v2 name service switch is the redirection
+ * of all activity to nscd for actual processing.  In the original
+ * switch most activity took place in each application, and the nscd
+ * cache component was an add-on optional interface.
+ *
+ * The nscd v1 format was a completely private interface that
+ * implemented specific bufferiing formats on a per getXbyY API basis.
+ *
+ * The nss/nscd v2 interface uses a common header and commonalizes
+ * the buffering format as consistently as possible.  The general rule
+ * of thumb is that backends are required to assemble their results in
+ * "files based" format [IE the format used on a per result basis as
+ * returned by the files backend] and then call the standard str2ent
+ * interface.  This is the original intended design as used in the files
+ * and nis backends.
+ *
+ * The benefit of this is that the application side library can assemble
+ * a request and provide a header and a variable length result buffer via
+ * a doors API, and then the nscd side switch can assemble a a getXbyY
+ * request providing the result buffer and a str2ent function that copies
+ * but does not unpack the result.
+ *
+ * This results is returned back via the door, and unpacked using the
+ * native library side str2ent interface.
+ *
+ * Additionally, the common header allows extensibility to add new
+ * getXbyYs, putXbyYs or other maintenance APIs to/from nscd without
+ * changing the existing "old style" backend interfaces.
+ *
+ * Finally new style getXbyY, putXbyY and backend interfaces can be
+ * by adding new operation requests to the header, while old style
+ * backwards compatability.
+ */
+
+/*
+ * nss/nscd v2 callnumber definitions
+ */
+
+/*
+ * callnumbers are separated by categories, such as:
+ * application to nscd requests, nscd to nscd requests,
+ * smf to nscd requests, etc.
+ */
+
+#define	NSCDV2CATMASK	(0xFF000000)
+#define	NSCDV2CALLMASK	(0x00FFFFFF)
+
+/*
+ * nss/nscd v2 categories
+ */
+
+#define	NSCD_CALLCAT_APP	('a'<<24)
+#define	NSCD_CALLCAT_N2N	('n'<<24)
+
+/* nscd v2 app-> nscd callnumbers */
+
+#define	NSCD_SEARCH	(NSCD_CALLCAT_APP|0x01)
+#define	NSCD_SETENT	(NSCD_CALLCAT_APP|0x02)
+#define	NSCD_GETENT	(NSCD_CALLCAT_APP|0x03)
+#define	NSCD_ENDENT	(NSCD_CALLCAT_APP|0x04)
+#define	NSCD_PUT	(NSCD_CALLCAT_APP|0x05)
+#define	NSCD_GETHINTS	(NSCD_CALLCAT_APP|0x06)
+
+/* nscd v2 SETENT cookie markers */
+
+#define	NSCD_NEW_COOKIE		0
+#define	NSCD_LOCAL_COOKIE	1
+
+/* nscd v2 header revision */
+/* treated as 0xMMMMmmmm MMMM - Major Rev, mmmm - Minor Rev */
+
+#define	NSCD_HEADER_REV		0x00020000
+
+/*
+ * ptr/uint data type used to calculate shared nscd buffer struct sizes
+ * sizes/offsets are arbitrarily limited to 32 bits for 32/64 compatibility
+ * datatype is 64 bits for possible pointer storage and future use
+ */
+
+typedef uint64_t	nssuint_t;
+
+/*
+ * nscd v2 buffer layout overview
+ *
+ * The key interface to nscd moving forward is the doors interface
+ * between applications and nscd (NSCD_CALLCAT_APP), and nscd and
+ * it's children (NSCD_CALLCAT_N2N).
+ *
+ * Regardless of the interface used, the buffer layout is consistent.
+ * The General Layout is:
+ *   [nss_pheader_t][IN key][OUT data results]{extend results}
+ *
+ *   The header (nss_pheader_t) remains constant.
+ *   Keys and key layouts vary between call numbers/requests
+ *	NSCD_CALLCAT_APP use key layouts mimics/defines in nss_dbdefs.h
+ *	NSCD_CALLCAT_NSN use layouts defined by nscd headers
+ *   Data and data results vary between results
+ *	NSCD_CALLCAT_APP return "file standard format" output buffers
+ *	NSCD_CALLCAT_NSN return data defined by nscd headers
+ *   extended results are optional and vary
+ *
+ */
+
+/*
+ * nss_pheader_t -- buffer header structure that contains switch data
+ * "packed" by the client into a buffer suitable for transport over
+ * nscd's door, and that can be unpacked into a native form within
+ * nscd's switch.  Capable of packing and unpacking data ans results.
+ *
+ * NSCD_HEADER_REV: 0x00020000		16 x uint64 = (128 byte header)
+ */
+
+typedef struct {
+	uint32_t	nsc_callnumber;		/* packed buffer request */
+	uint32_t	nss_dbop;		/* old nss dbop */
+	uint32_t	p_ruid;			/* real uid */
+	uint32_t	p_euid;			/* effective uid */
+	uint32_t	p_version;		/* 0xMMMMmmmm Major/minor */
+	uint32_t	p_status;		/* nss_status_t */
+	uint32_t	p_errno;		/* errno */
+	uint32_t	p_herrno;		/* h_errno */
+	nssuint_t	libpriv;		/* reserved (for lib/client) */
+	nssuint_t	pbufsiz;		/* buffer size */
+	nssuint_t	dbd_off;		/* IN: db desc off */
+	nssuint_t	dbd_len;		/* IN: db desc len */
+	nssuint_t	key_off;		/* IN: key off */
+	nssuint_t	key_len;		/* IN: key len */
+	nssuint_t	data_off;		/* OUT: data off */
+	nssuint_t	data_len;		/* OUT: data len */
+	nssuint_t	ext_off;		/* OUT: extended results off */
+	nssuint_t	ext_len;		/* OUT: extended results len */
+	nssuint_t	nscdpriv;		/* reserved (for nscd) */
+	nssuint_t	reserved1;		/* reserved (TBD) */
+} nss_pheader_t;
+
+/*
+ * nss_pnetgr_t -- packed offset structure for holding keys used
+ * by innetgr (__multi_innetgr) key
+ * Key format is:
+ *    nss_pnetgr_t
+ *     (nssuint_t)[machine_argc] offsets to strings
+ *     (nssuint_t)[user_argc] offsets to strings
+ *     (nssuint_t)[domain_argc] offsets to strings
+ *     (nssuint_t)[groups_argc] offsets to strings
+ *     machine,user,domain,groups strings
+ */
+
+typedef struct {
+	uint32_t	machine_argc;
+	uint32_t	user_argc;
+	uint32_t	domain_argc;
+	uint32_t	groups_argc;
+	nssuint_t	machine_offv;
+	nssuint_t	user_offv;
+	nssuint_t	domain_offv;
+	nssuint_t	groups_offv;
+} nss_pnetgr_t;
+
 
 /* status returned by the str2ent parsing routines */
 #define	NSS_STR_PARSE_SUCCESS 0
@@ -478,24 +665,90 @@ typedef struct nss_XbyY_args {
 	(str)->buf.buflen = (len),			\
 	(str)->stayopen  = 0,				\
 	(str)->str2ent  = (func),			\
+	(str)->key2str  = NULL,				\
 	(str)->returnval = 0,				\
+	(str)->returnlen = 0,				\
+	(str)->erange    = 0)
+
+#define	NSS_XbyY_INIT_EXT(str, res, bufp, len, func, kfunc)	(\
+	(str)->buf.result = (res),			\
+	(str)->buf.buffer = (bufp),			\
+	(str)->buf.buflen = (len),			\
+	(str)->stayopen  = 0,				\
+	(str)->str2ent  = (func),			\
+	(str)->key2str  = (kfunc),			\
+	(str)->returnval = 0,				\
+	(str)->returnlen = 0,				\
 	(str)->erange    = 0)
 
 #define	NSS_XbyY_FINI(str)				(\
 	(str)->returnval == 0 && (str)->erange && (errno = ERANGE), \
 	(str)->returnval)
 
+#define	NSS_PACKED_CRED_CHECK(buf, ruid, euid)		(\
+	((nss_pheader_t *)(buf))->p_ruid == (ruid) && \
+	((nss_pheader_t *)(buf))->p_euid == (euid))
+
 #if defined(__STDC__)
-extern char		**_nss_netdb_aliases
-	(const char *, int, char *, int);
+extern char		**_nss_netdb_aliases(const char *, int, char *, int);
+extern nss_status_t	nss_default_key2str(void *, size_t, nss_XbyY_args_t *,
+					const char *, int, size_t *);
+extern nss_status_t	nss_packed_arg_init(void *, size_t, nss_db_root_t *,
+					nss_db_initf_t *, int *,
+					nss_XbyY_args_t *);
+extern nss_status_t	nss_packed_context_init(void *, size_t, nss_db_root_t *,
+					nss_db_initf_t *, nss_getent_t **,
+					nss_XbyY_args_t *);
+extern void		nss_packed_set_status(void *, size_t, nss_status_t,
+					nss_XbyY_args_t *);
+extern nss_status_t	nss_packed_getkey(void *, size_t, char **, int *,
+					nss_XbyY_args_t *);
 #else
 extern char		**_nss_netdb_aliases();
+extern int		nss_default_key2str();
+extern nss_status_t	nss_packed_arg_init();
+extern nss_status_t	nss_packed_context_init();
+extern void		nss_packed_set_status();
+extern nss_status_t	nss_packed_getkey();
 #endif
 
 /*
  * nss_dbop_t values for searches with various keys;  values for
  * destructor/endent/setent/getent are defined in <nss_common.h>
  */
+
+/*
+ * These are part of the "Over the wire" IE app->nscd getXbyY
+ * op for well known getXbyY's.  Cannot use NSS_DBOP_X_Y directly
+ * because NSS_DBOP_next_iter is NOT an incrementing counter value
+ * it's a starting offset into an array value.
+ */
+
+#define	NSS_DBOP_X(x)			((x)<<16)
+#define	NSS_DBOP_XY(x, y)		((x)|(y))
+
+#define	NSS_DBOP_ALIASES	NSS_DBOP_X(1)
+#define	NSS_DBOP_AUTOMOUNT	NSS_DBOP_X(2)
+#define	NSS_DBOP_BOOTPARAMS	NSS_DBOP_X(3)
+#define	NSS_DBOP_ETHERS		NSS_DBOP_X(4)
+#define	NSS_DBOP_GROUP		NSS_DBOP_X(5)
+#define	NSS_DBOP_HOSTS		NSS_DBOP_X(6)
+#define	NSS_DBOP_IPNODES	NSS_DBOP_X(7)
+#define	NSS_DBOP_NETGROUP	NSS_DBOP_X(8)
+#define	NSS_DBOP_NETMASKS	NSS_DBOP_X(9)
+#define	NSS_DBOP_NETWORKS	NSS_DBOP_X(10)
+#define	NSS_DBOP_PASSWD		NSS_DBOP_X(11)
+#define	NSS_DBOP_PRINTERS	NSS_DBOP_X(12)
+#define	NSS_DBOP_PROJECT	NSS_DBOP_X(13)
+#define	NSS_DBOP_PROTOCOLS	NSS_DBOP_X(14)
+#define	NSS_DBOP_PUBLICKEY	NSS_DBOP_X(15)
+#define	NSS_DBOP_RPC		NSS_DBOP_X(16)
+#define	NSS_DBOP_SERVICES	NSS_DBOP_X(17)
+#define	NSS_DBOP_AUDITUSER	NSS_DBOP_X(18)
+#define	NSS_DBOP_AUTHATTR	NSS_DBOP_X(19)
+#define	NSS_DBOP_EXECATTR	NSS_DBOP_X(20)
+#define	NSS_DBOP_PROFATTR	NSS_DBOP_X(21)
+#define	NSS_DBOP_USERATTR	NSS_DBOP_X(22)
 
 #define	NSS_DBOP_GROUP_BYNAME		(NSS_DBOP_next_iter)
 #define	NSS_DBOP_GROUP_BYGID		(NSS_DBOP_GROUP_BYNAME + 1)
