@@ -1747,7 +1747,7 @@ md_setdevname(
 	char			*cp, *dname = NULL, *fname;
 	char			c;
 	mdkey_t			retval = MD_KEYBAD;
-	int			shared, new = 0;
+	int			shared = -1, new = 0;
 	ddi_devid_t		devid = NULL;
 	dev_t			devt;
 	char			*mname = NULL;
@@ -1755,6 +1755,8 @@ md_setdevname(
 	lookup_dev_result_t	lookup_res;
 	mdkey_t			min_devid_key = MD_KEYWILD;
 	size_t			min_len;
+	int			use_devid = 0;
+	side_t			temp_side;
 
 	/*
 	 * Don't allow addition of new names to namespace during upgrade.
@@ -1784,12 +1786,39 @@ md_setdevname(
 		return (MD_KEYBAD);
 	}
 
+	/*
+	 * Go looking for an existing devid namespace record for this
+	 * key. We need to do this here as md_devid_found() also
+	 * requires the nm_lock.lock.
+	 */
+	if ((!imp_flag) && (setno == MD_LOCAL_SET) && (side > 0) &&
+	    (key != MD_KEYWILD)) {
+		/*
+		 * We must be adding a namespace record for a disk in a
+		 * shared metaset of some description. As we already have a
+		 * key, walk all the valid sides for the set and see if we
+		 * have a devid record present. This will be used to help
+		 * determine which namespace we add this new record into.
+		 */
+		for (temp_side = 1; temp_side < MD_MAXSIDES; temp_side++) {
+			if (md_devid_found(setno, temp_side, key) == 0) {
+				/*
+				 * We have a devid record for this key.
+				 * Assume it's safe to use devid's for the
+				 * other side records as well.
+				 */
+				use_devid = 1;
+				break;
+			}
+		}
+	}
+
 	rw_enter(&nm_lock.lock, RW_WRITER);
 
 	/*
-	 * Find our what namespace/set/side combination that is
+	 * Find out what namespace/set/side combination that is
 	 * being dealt with. If this is not done then we stand a
-	 * chance of adding in incorrect devid dealts to match
+	 * chance of adding in incorrect devid details to match
 	 * the remote side's disk information. For example:
 	 * disk c2t0d0s0 may have devt of 32,256 on this side
 	 * but 32,567 on the remote side and if this is the case
@@ -1809,6 +1838,21 @@ md_setdevname(
 		 */
 		if (key == MD_KEYWILD) {
 			thisside = side;
+		} else {
+			/*
+			 * This is not the first time through this code,
+			 * so we have already got a record in the namespace.
+			 * Check if the earlier search for this record found
+			 * a devid record or not, and set the namespace
+			 * accordingly.
+			 */
+			if (use_devid == 1) {
+				/* A devid record exists */
+				shared = NM_DEVID | NM_NOTSHARED;
+			} else {
+				/* No devid record exists for this key */
+				shared = NM_NOTSHARED;
+			}
 		}
 	} else if (setno != MD_LOCAL_SET) {
 		/* set record */
@@ -1823,18 +1867,25 @@ md_setdevname(
 	 * with later on.
 	 */
 	if (!imp_flag) {
-		devt = makedevice(ddi_name_to_major(drvnm), mnum);
-		if ((ddi_lyr_get_devid(devt, &devid) == DDI_SUCCESS) &&
-		    (ddi_lyr_get_minor_name(devt, S_IFBLK, &mname) ==
-		    DDI_SUCCESS) &&
-		    (((mddb_set_t *)md_set[setno].s_db)->s_lbp->lb_flags &
-		    MDDB_DEVID_STYLE))
-			/*
-			 * Reference the device id namespace
-			 */
-			shared = NM_DEVID | NM_NOTSHARED;
-		else
-			shared = NM_NOTSHARED;
+		/*
+		 * Only do this if we have not already set the namespace type,
+		 * otherwise we run the risk of adding a record for an invalid
+		 * minor number from a remote node.
+		 */
+		if (shared == -1) {
+			devt = makedevice(ddi_name_to_major(drvnm), mnum);
+			if ((ddi_lyr_get_devid(devt, &devid) == DDI_SUCCESS) &&
+			    (ddi_lyr_get_minor_name(devt, S_IFBLK, &mname) ==
+			    DDI_SUCCESS) &&
+			    (((mddb_set_t *)md_set[setno].s_db)->s_lbp->lb_flags
+			    & MDDB_DEVID_STYLE))
+				/*
+				 * Reference the device id namespace
+				 */
+				shared = NM_DEVID | NM_NOTSHARED;
+			else
+				shared = NM_NOTSHARED;
+		}
 	} else {
 		/* Importing diskset has devids so store in namespace */
 		devid = kmem_alloc(ddi_devid_sizeof(imp_devid), KM_SLEEP);
