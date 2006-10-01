@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -454,9 +455,9 @@ forker_monitor(
 		if ((fmri = getenv("SMF_FMRI")) != NULL) {
 			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 			(me, "entering maintenance mode ...\n");
-			smf_maintain_instance(fmri, SMF_TEMPORARY);
+			(void) smf_maintain_instance(fmri, SMF_TEMPORARY);
 		}
-		thr_exit((void *)1);
+		return ((void *)1);
 		break;
 	case 0:
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
@@ -472,9 +473,7 @@ forker_monitor(
 		break;
 	}
 
-	thr_exit((void *)0);
-
-	/*LINTED E_FUNC_HAS_NO_RETURN_STMT*/
+	return (NULL);
 }
 
 static void *
@@ -495,8 +494,7 @@ child_monitor(
 	/* return the slot used by the child */
 	return_cslot(ch);
 
-	thr_exit((void *)0);
-	/*LINTED E_FUNC_HAS_NO_RETURN_STMT*/
+	return (NULL);
 }
 
 
@@ -863,7 +861,7 @@ _nscd_proc_fork(
 		if ((fmri = getenv("SMF_FMRI")) != NULL) {
 			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 			(me, "entering maintenance mode ...\n");
-			smf_maintain_instance(fmri, SMF_TEMPORARY);
+			(void) smf_maintain_instance(fmri, SMF_TEMPORARY);
 		}
 		exit(0);
 	} else {

@@ -27,7 +27,7 @@
 # Makefile for name service cache daemon
 #
 
-PROG=	nscd
+PROG=		nscd
 NISPROG=	nscd_nischeck
 MANIFEST=	name-service-cache.xml
 SVCMETHOD=	svc-nscd
@@ -35,7 +35,7 @@ SVCMETHOD=	svc-nscd
 include ../Makefile.cmd
 
 ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
-$(ROOTMANIFEST)		:= FILEMODE= 444
+$(ROOTMANIFEST) :=	FILEMODE= 444
 
 $(ROOTMANIFESTDIR)/%: %
 		$(INS.file)
@@ -53,18 +53,17 @@ OBJS=	server.o getpw.o getgr.o gethost.o getnode.o \
 	nscd_switch.o nscd_nswparse.o nscd_initf.o nscd_selfcred.o \
 	nscd_frontend.o nscd_admin.o nscd_door.o \
 	gettnrhtp.o gettnrhdb.o
-	
-	
 
-NISOBJS=	nscd_nischeck.o  
+NISOBJS=	nscd_nischeck.o
 
 CLOBBERFILES=	nscd nscd_nischeck
 
-SRCS=	${OBJS:%.o=%.c} 
+SRCS=	${OBJS:%.o=%.c}
 
 NISSRC=	${NISOBJS:%.o=%.c}
 
-CPPFLAGS += 	-D_REENTRANT -DSUN_THREADS \
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-D_REENTRANT -DSUN_THREADS \
 		-I../../lib/libc/port/gen -I../../lib/libc/inc \
 		-I../../lib/libsldap/common
 LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
@@ -75,12 +74,12 @@ LINTFLAGS +=	-erroff=E_NAME_DEF_NOT_USED2
 # GPROF_FLAG=	-xpg
 # DEBUG_FLAG=	-g
 
-$(PROG) :=	LDLIBS += -lresolv -lnsl -lsocket -lumem -lscf -lavl -lgss
-$(NISPROG) :=	LDLIBS += -lnsl
+PROGLIBS=	$(LDLIBS) -lresolv -lnsl -lsocket -lumem -lscf -lavl -lgss
+NISPROGLIBS=	$(LDLIBS) -lnsl
 
 # install macros and rule
 #
-GROUP=	bin
+GROUP=		bin
 ROOTPROG=	${ROOTUSRSBIN}/nscd
 ROOTNISPROG=	${ROOTLIB}/nscd_nischeck
 
@@ -89,18 +88,16 @@ ROOTNISPROG=	${ROOTLIB}/nscd_nischeck
 all: $(PROG) $(NISPROG)
 
 ${PROG}: ${OBJS}
-	${LINK.c} ${OPT} -o $@ ${OBJS} ${LDLIBS}
+	${LINK.c} ${OPT} -o $@ ${OBJS} ${PROGLIBS}
 	${POST_PROCESS}
 
 ${NISPROG}: ${NISOBJS}
-	${LINK.c} ${OPT} -o $@ ${NISOBJS} ${LDLIBS}
+	${LINK.c} ${OPT} -o $@ ${NISOBJS} ${NISPROGLIBS}
 	${POST_PROCESS}
 
 lint:
-	$(LINT.c) ${SRCS}
-
-lint2:
-	 $(LINT.c) ${NISSRC}
+	$(LINT.c) ${SRCS} ${PROGLIBS}
+	$(LINT.c) ${NISSRC} ${NISPROGLIBS}
 
 cstyle:
 	${CSTYLE} ${SRCS} ${NISSRC}
@@ -118,9 +115,4 @@ ${ROOTUSRSBIN}/%: %
 ${ROOTUSRLIB}/%: %
 	${INS.file}
 
-
-
 include ../Makefile.targ
-
-
-
