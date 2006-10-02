@@ -203,8 +203,22 @@ merge_ipnodes() {
 		}
 	}
 
+	function printmergeinfo() {
+		"/usr/bin/date" | getline date;
+		printf "\n#\n# Merged entries from ipnodes" \
+			" into hosts on <%s>\n",date;
+		printf "# Backup files saved in /etc/inet/ directory:" \
+		       " hosts.premerge, ipnodes.premerge\n#\n";
+	}
+
 	function printhostsfile (i) {
 		for (i = 1; i <= linecount; i++) {
+			# Add comment about occurrence of merge.
+			if (!cadded && (lines[i, TYPE] != COMMENT_LINE)) {
+					printmergeinfo();
+					cadded = 1;
+			}
+
 			if (lines[i, TYPE] != DELETED_LINE)
 				print lines[i, LINE];
 			#
@@ -290,20 +304,10 @@ merge_ipnodes() {
 	#
 	END {
 		#
-		# Start by removing duplicate or conflicting lines.  We do this by
-		# using three given pieces of information.
-		#
-		# 1. The hosts and ipnodes back-ends do not support multiples
-		#    entries for the same address.
-		# 2. The ipnodes entries were appended to the hosts entries in the
-		#    input.
-		# 3. The nsswitch looks up entries in ipnodes before hosts, thus
-		#    prefers ipnodes entries over hosts entries.
-		#
-		# Those three pieces of information dictate the algorithm used for
-		# conflict resolution.  We look for two lines that are for the
-		# same address.  If we find such a pair, we replace the first line
-		# with the second.
+		# Start by removing duplicate lines. We look for two lines 
+		# that are for the same address and have the same hostname 
+		# information (and listed in the same order). If we find such 
+		# a pair, we delete the second line.
 		#
 		for (i = 1; i <= linecount; i++) {
 			if (lines[i, TYPE] != ENTRY_LINE)
@@ -312,31 +316,49 @@ merge_ipnodes() {
 			# Extract the address from the line
 			address = getaddress(i);
 
+			# Extract the hostnames from the line
+			namestr = getnames(i);
+			if (namestr == "")
+				continue;
 			#
 			# We keep an array of address indices.  This lets us know
-			# when we have conflicts without having to go back and
-			# search the lines array.
+			# when we have duplicates without having to go back and
+			# search the lines array. Since there can be multiple host 
+			# entries of the same address it is a two-dimensional array.
 			#
 			if (addrindex[address] == "") {
-				# We havent seen this address before
-				addrindex[address] = i;
+				# We have not seen this address before
+				addrindex[address] = 1;
+				# The second dimension stores the line number.
+				addrindex[address, 1] = i;
 			} else {
 				#
-				# We have a conflict. Just mark the
-				# prev entry as deleted i.e. a later entry in
-				# the hosts file or the ipnodes file overrides.
+				# We have a duplicate if hostname
+				# information is identical. If duplicate 
+				# just mark the second entry as deleted.
 				#
-				deleteline(addrindex[address]);
-				addrindex[address] = i;
+				for (l = 1; l <= addrindex[address]; l++) {
+					if (namestr == \
+				           getnames(addrindex[address, l])) {
+						deleteline(i);
+						break;
+					}
+				}
+				
+				#
+				# If it was not deleted as a duplicate, add this
+				# address to the index array.
+				#
+				if (l > addrindex[address]) {
+					addrindex[address]++;
+					addrindex[address, addrindex[address]] = i;
+				}
 			}
 
 			# Maintain a name cache array. This is used
 			# next to coalesce entries with same host
 			# name. Line deletions and insert lines do
 			# update the name cache.
-			namestr = getnames(i);
-			if (namestr == "")
-				continue;
 
 			num = split(namestr, names);
 			for (n = 1; n <= num; n++) {
@@ -405,7 +427,7 @@ temp_merged_file=/tmp/hosts.hostsmerged
 
 if read src dest; then
 
-	# if /etc/inet/hosts doesn't exist 
+	# if /etc/inet/hosts doesn't exist (fresh install)
 	# then same action as 'i.preserve' i.e
 	# copy default /etc/inet/hosts in place.
 
@@ -415,11 +437,22 @@ if read src dest; then
 
 	if [ -f $saved_ipnodes_file ] ; then
 
-		# Remove license header from ipnodes file 
-		/usr/bin/nawk '
-			/^ *#/ { if (pasthdr) print $0; next; }
-		       	{ pasthdr=1; print $0; }
-			' $saved_ipnodes_file > $temp_ipnodes_file 
+		# Save copies before merge
+		cp -pf $dest $BASEDIR/etc/inet/hosts.premerge
+		cp -pf $saved_ipnodes_file $BASEDIR/etc/inet/ipnodes.premerge 
+
+		# Remove redundant header lines from ipnodes file 
+		/usr/bin/sed -e '
+		/^# CDDL HEADER START$/,/^# CDDL HEADER END$/ d
+		/^# ident[ \t]*/ d
+		/^# Copyright 1999 Sun Microsystems, Inc/ d
+		/^# Use is subject to license terms/ d
+		/^# Internet host table$/ d
+		' $saved_ipnodes_file | /usr/bin/sed -e ' /^#$/ {
+		# Remove blank comment line pairs
+			$!N
+			/\n#$/ d
+		}' > $temp_ipnodes_file
 
 		merge_ipnodes $dest $temp_ipnodes_file \
 			> $temp_merged_file
