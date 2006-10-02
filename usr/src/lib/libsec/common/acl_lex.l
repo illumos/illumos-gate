@@ -71,7 +71,7 @@ int yybufpos;
  */
 
 ID	[1-9][0-9]*
-LOGNAME [\.a-z0-9A-Z\-_]+:
+LOGNAME [^:]+:
 PERM_STR [rRwWxpdDaAcCos-]+
 INHERIT_STR [fdinFS-]+
 
