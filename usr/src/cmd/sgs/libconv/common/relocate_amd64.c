@@ -52,17 +52,18 @@ static const Msg rels[R_AMD64_NUM] = {
 	MSG_R_AMD64_PC64,		MSG_R_AMD64_GOTOFF64,
 	MSG_R_AMD64_GOTPC32,		MSG_R_AMD64_GOT64,
 	MSG_R_AMD64_GOTPCREL64,		MSG_R_AMD64_GOTPC64,
-	MSG_R_AMD64_GOTPLT64,		MSG_R_AMD64_PLTOFF64
+	MSG_R_AMD64_GOTPLT64,		MSG_R_AMD64_PLTOFF64,
+	MSG_R_AMD64_SIZE32,		MSG_R_AMD64_SIZE64
 };
 
-#if	(R_AMD64_NUM != (R_AMD64_PLTOFF64 + 1))
+#if	(R_AMD64_NUM != (R_AMD64_SIZE64 + 1))
 #error	"R_AMD64_NUM has grown"
 #endif
 
 const char *
 conv_reloc_amd64_type(Word type, int fmt_flags)
 {
-	static char	string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 
 	if (type >= R_AMD64_NUM)
 		return (conv_invalid_val(string, CONV_INV_STRSIZE,

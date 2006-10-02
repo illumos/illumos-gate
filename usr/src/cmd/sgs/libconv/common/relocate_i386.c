@@ -55,17 +55,18 @@ static const Msg rels[R_386_NUM] = {
 	MSG_R_386_UNKNOWN30,		MSG_R_386_UNKNOWN31,
 	MSG_R_386_TLS_LDO_32,		MSG_R_386_UNKNOWN33,
 	MSG_R_386_UNKNOWN34,		MSG_R_386_TLS_DTPMOD32,
-	MSG_R_386_TLS_DTPOFF32,		MSG_R_386_UNKNOWN37
+	MSG_R_386_TLS_DTPOFF32,		MSG_R_386_UNKNOWN37,
+	MSG_R_386_SIZE32
 };
 
-#if	(R_386_NUM != (R_386_UNKNOWN37 + 1))
+#if	(R_386_NUM != (R_386_SIZE32 + 1))
 #error	"R_386_NUM has grown"
 #endif
 
 const char *
 conv_reloc_386_type(Word type, int fmt_flags)
 {
-	static char	string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 
 	if (type >= R_386_NUM)
 		return (conv_invalid_val(string, CONV_INV_STRSIZE,

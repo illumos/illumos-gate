@@ -79,6 +79,12 @@ extern "C" {
 #endif
 
 /*
+ * Some libconv routines require the caller to supply the buffer used by
+ * conv_invalid_val().
+ */
+typedef char Conv_inv_buf_t[CONV_INV_STRSIZE];
+
+/*
  * Flags that alter standard formatting for conversion routines.
  */
 #define	CONV_FMT_DECIMAL	0x01	/* conv_invalid_val() should print */
@@ -96,7 +102,7 @@ extern "C" {
 /*
  * Mask of CONV_FMT bits that reflect a desire to use alternate strings.
  */
-#define	CONV_FMTALTMASK (CONV_FMT_ALTDUMP|CONV_FMT_ALTFILE)
+#define	CONV_FMTALTMASK	(CONV_FMT_ALTDUMP | CONV_FMT_ALTFILE)
 
 /*
  * The expansion of bit-field data items is driven from a value descriptor and
@@ -116,7 +122,6 @@ typedef struct {
 #define	CONV_EXPN_FIELD_DEF_PREFIX_SIZE	2	/* Default is "[ " */
 #define	CONV_EXPN_FIELD_DEF_SEP_SIZE	1	/* Default is " " */
 #define	CONV_EXPN_FIELD_DEF_SUFFIX_SIZE	2	/* Default is " ]" */
-
 
 /*
  * conv_expn_field() requires a large number of inputs, many of which
@@ -145,7 +150,6 @@ typedef struct {
 	const char *suffix;	/* NULL, or string to suffix output with */
 				/*	If NULL, " ]" is used. */
 } CONV_EXPN_FIELD_ARG;
-
 
 /*
  * Define all generic interfaces.
@@ -273,7 +277,7 @@ extern	const char	*conv_reloc_386_type(Word, int);
 extern	const char	*conv_reloc_amd64_type(Word, int);
 extern	const char	*conv_reloc_SPARC_type(Word, int);
 extern	const char	*conv_sec_flags(Xword);
-extern	const char	*conv_sec_linkinfo(Word, Xword);
+extern	const char	*conv_sec_linkinfo(Word, Xword, Conv_inv_buf_t);
 extern	const char	*conv_sec_type(Half, Word, int);
 extern	const char	*conv_sym_info_bind(uchar_t, int);
 extern	const char	*conv_sym_info_type(Half, uchar_t, int);

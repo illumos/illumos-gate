@@ -35,7 +35,7 @@
 const char *
 conv_elfdata_type(Elf_Type type)
 {
-	static char		string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 	static const Msg	types[] = {
 		MSG_DATA_BYTE,		MSG_DATA_ADDR,
 		MSG_DATA_DYN,		MSG_DATA_EHDR,

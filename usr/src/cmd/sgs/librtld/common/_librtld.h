@@ -87,8 +87,9 @@ typedef struct reloc {
 extern	void	apply_reloc(void *, Reloc *, const char *, uchar_t *, Rt_map *);
 extern	void	clear_reloc(void *);
 extern	int	count_reloc(Cache *, Cache *, Rt_map *, int, Addr, Xword *,
-		    Xword *, Xword *);
+		    Xword *, Xword *, Alist *);
 extern	void	inc_reloc(void *, void *, Reloc *, uchar_t *, uchar_t *);
+extern	int	syminfo(Cache *, Alist **);
 extern	void	undo_reloc(void *, uchar_t *, uchar_t *, Reloc *);
 extern	int	update_dynamic(Cache *, Cache *, Rt_map *, int, Addr, Off,
 		    const char *, Xword, Xword, Xword, Xword, Xword);

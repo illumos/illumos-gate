@@ -267,7 +267,6 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_process_files	ld64_process_files
 #define	ld_process_flags	ld64_process_flags
 #define	ld_process_ifl		ld64_process_ifl
-#define	ld_process_open		ld64_process_open
 #define	ld_process_ordered	ld64_process_ordered
 #define	ld_process_sym_reloc	ld64_process_sym_reloc
 #define	ld_reloc_local		ld64_reloc_local
@@ -364,7 +363,6 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_process_files	ld32_process_files
 #define	ld_process_flags	ld32_process_flags
 #define	ld_process_ifl		ld32_process_ifl
-#define	ld_process_open		ld32_process_open
 #define	ld_process_ordered	ld32_process_ordered
 #define	ld_process_sym_reloc	ld32_process_sym_reloc
 #define	ld_reloc_local		ld32_reloc_local
@@ -482,8 +480,6 @@ extern uintptr_t	ld_process_files(Ofl_desc *, int, char **);
 extern uintptr_t	ld_process_flags(Ofl_desc *, int, char **);
 extern Ifl_desc		*ld_process_ifl(const char *, const char *, int, Elf *,
 			    Half, Ofl_desc *, Rej_desc *);
-extern Ifl_desc		*ld_process_open(const char *, size_t, int, Ofl_desc *,
-			    Half, Rej_desc *);
 extern uintptr_t	ld_process_ordered(Ifl_desc *, Ofl_desc *, Word, Word);
 extern uintptr_t	ld_process_sym_reloc(Ofl_desc *, Rel_desc *, Rel *,
 			    Is_desc *, const char *);

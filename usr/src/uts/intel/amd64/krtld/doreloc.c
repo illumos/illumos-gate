@@ -77,10 +77,11 @@ const Rel_entry	reloc_table[R_AMD64_NUM] = {
 /* R_AMD64_GOTPCREL64 */	{FLG_RE_NOTSUP, 0},
 /* R_AMD64_GOTPC6 */	{FLG_RE_NOTSUP, 0},
 /* R_AMD64_GOTPLT64 */	{FLG_RE_NOTSUP, 0},
-/* R_AMD64_PLTOFF64 */	{FLG_RE_NOTSUP, 0}
-
+/* R_AMD64_PLTOFF64 */	{FLG_RE_NOTSUP, 0},
+/* R_AMD64_SIZE32 */	{FLG_RE_SIZE, 4},
+/* R_AMD64_SIZE64 */	{FLG_RE_SIZE, 8}
 };
-#if	(R_AMD64_NUM != (R_AMD64_PLTOFF64 + 1))
+#if	(R_AMD64_NUM != (R_AMD64_SIZE64 + 1))
 #error	"R_AMD64_NUM has grown"
 #endif
 
@@ -123,6 +124,8 @@ const Rel_entry	reloc_table[R_AMD64_NUM] = {
  * R_AMD64_GOTPC64	29			reserved for future expansion
  * R_AMD64_GOTPLT64	30			reserved for future expansion
  * R_AMD64_PLTOFF64	31			reserved for future expansion
+ * R_AMD64_SIZE32	32	word32		Z + A
+ * R_AMD64_SIZE64	33	word64		Z + A
  *
  * Relocation calculations:
  *	A	Represents the addend used to compute the value of the
@@ -147,6 +150,9 @@ const Rel_entry	reloc_table[R_AMD64_NUM] = {
  *
  *	S	Represents the value of the symbol whose index resides
  *		in the relocation entry.
+ *
+ *	Z	the size of the symbol whose index resides in the relocation
+ *		entry
  */
 
 #define	HIBITS	0xffffffff80000000ULL

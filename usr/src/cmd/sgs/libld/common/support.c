@@ -43,17 +43,17 @@ static Support_list support[LDS_NUM] = {
 	{MSG_ORIG(MSG_SUP_VERSION),	{ 0, 0 }},	/* LDS_VERSION */
 	{MSG_ORIG(MSG_SUP_INPUT_DONE),	{ 0, 0 }},	/* LDS_INPUT_DONE */
 #if	defined(_ELF64)
-	{MSG_ORIG(MSG_SUP_START_64),	{ 0, 0 }},	/* LDS_START64 */
-	{MSG_ORIG(MSG_SUP_ATEXIT_64),	{ 0, 0 }},	/* LDS_ATEXIT64 */
-	{MSG_ORIG(MSG_SUP_FILE_64),	{ 0, 0 }},	/* LDS_FILE64 */
-	{MSG_ORIG(MSG_SUP_INP_SECTION_64), { 0, 0 }},	/* LDS_INP_SECTION64 */
-	{MSG_ORIG(MSG_SUP_SECTION_64),	{ 0, 0 }}	/* LDS_SECTION64 */
+	{MSG_ORIG(MSG_SUP_START_64),	{ 0, 0 }},	/* LDS_START */
+	{MSG_ORIG(MSG_SUP_ATEXIT_64),	{ 0, 0 }},	/* LDS_ATEXIT */
+	{MSG_ORIG(MSG_SUP_FILE_64),	{ 0, 0 }},	/* LDS_FILE */
+	{MSG_ORIG(MSG_SUP_INSEC_64),	{ 0, 0 }},	/* LDS_INSEC */
+	{MSG_ORIG(MSG_SUP_SEC_64),	{ 0, 0 }}	/* LDS_SEC */
 #else	/* Elf32 */
 	{MSG_ORIG(MSG_SUP_START),	{ 0, 0 }},	/* LDS_START */
 	{MSG_ORIG(MSG_SUP_ATEXIT),	{ 0, 0 }},	/* LDS_ATEXIT */
 	{MSG_ORIG(MSG_SUP_FILE),	{ 0, 0 }},	/* LDS_FILE */
-	{MSG_ORIG(MSG_SUP_INP_SECTION),	{ 0, 0 }},	/* LDS_INP_SECTION */
-	{MSG_ORIG(MSG_SUP_SECTION),	{ 0, 0 }}	/* LDS_SECTION */
+	{MSG_ORIG(MSG_SUP_INSEC),	{ 0, 0 }},	/* LDS_INSEC */
+	{MSG_ORIG(MSG_SUP_SEC),		{ 0, 0 }}	/* LDS_SEC */
 #endif
 };
 
@@ -65,54 +65,50 @@ static Support_list support[LDS_NUM] = {
 uintptr_t
 ld_sup_loadso(Ofl_desc *ofl, const char *obj)
 {
-	void		*handle;
-	void		(*fptr)();
+	void		*handle, (*fptr)();
 	Func_list	*flp;
-	int 		i;
-	uint_t		ver_level;
+	uint_t		interface, version = LD_SUP_VERSION1;
 
 	/*
 	 * Load the required support library.  If we are unable to load it fail
 	 * with a fatal error.
 	 */
-	if ((handle = dlopen(obj, RTLD_LAZY)) == NULL) {
+	if ((handle = dlopen(obj, (RTLD_LAZY | RTLD_FIRST))) == NULL) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SUP_NOLOAD),
 		    obj, dlerror());
 		return (S_ERROR);
 	}
 
-	ver_level = LD_SUP_VERSION1;
-	for (i = 0; i < LDS_NUM; i++) {
-		if (fptr = (void (*)())dlsym(handle, support[i].sup_name)) {
+	for (interface = 0; interface < LDS_NUM; interface++) {
+		if ((fptr = (void (*)())dlsym(handle,
+		    support[interface].sup_name)) == NULL)
+			continue;
 
-			if ((flp = libld_malloc(sizeof (Func_list))) == NULL)
+		if ((flp = libld_malloc(sizeof (Func_list))) == NULL)
+			return (S_ERROR);
+
+		flp->fl_obj = obj;
+		flp->fl_fptr = fptr;
+		DBG_CALL(Dbg_support_load(ofl->ofl_lml, obj,
+		    support[interface].sup_name));
+
+		if (interface == LDS_VERSION) {
+			DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
+			    support[LDS_VERSION].sup_name, LDS_VERSION, 0));
+
+			version = ((uint_t(*)())flp->fl_fptr)(LD_SUP_VCURRENT);
+			if ((version == LD_SUP_VNONE) ||
+			    (version > LD_SUP_VCURRENT)) {
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_SUP_BADVERSION),
+				    LD_SUP_VCURRENT, version);
+				(void) dlclose(handle);
 				return (S_ERROR);
-
-			flp->fl_obj = obj;
-			flp->fl_fptr = fptr;
-			DBG_CALL(Dbg_support_load(ofl->ofl_lml, obj,
-			    support[i].sup_name));
-
-			if (i == LDS_VERSION) {
-				DBG_CALL(Dbg_support_action(ofl->ofl_lml,
-				    flp->fl_obj, support[LDS_VERSION].sup_name,
-				    LDS_VERSION, 0));
-				ver_level = ((uint_t(*)())
-				    flp->fl_fptr)(LD_SUP_VCURRENT);
-				if ((ver_level == LD_SUP_VNONE) ||
-				    (ver_level > LD_SUP_VCURRENT)) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_SUP_BADVERSION),
-					    LD_SUP_VCURRENT, ver_level);
-					(void) dlclose(handle);
-					return (S_ERROR);
-				}
-
 			}
-			flp->fl_version = ver_level;
-			if (list_appendc(&support[i].sup_funcs, flp) == 0)
-				return (S_ERROR);
 		}
+		flp->fl_version = version;
+		if (list_appendc(&support[interface].sup_funcs, flp) == 0)
+			return (S_ERROR);
 	}
 	return (1);
 }
@@ -179,13 +175,15 @@ ld_sup_input_section(Ofl_desc *ofl, Ifl_desc *ifl, const char *sname,
 	Elf_Data	*data = NULL;
 	Shdr		*nshdr = *oshdr;
 
-	for (LIST_TRAVERSE(&support[LDS_INP_SECTION].sup_funcs, lnp, flp)) {
+	for (LIST_TRAVERSE(&support[LDS_INSEC].sup_funcs, lnp, flp)) {
 		/*
-		 * This interface was introduced in VERSION2 - so only call it
-		 * for libraries reporting support for version 2 or above.
+		 * This interface was introduced in VERSION2.  Only call this
+		 * function for libraries reporting support for version 2 or
+		 * above.
 		 */
 		if (flp->fl_version < LD_SUP_VERSION2)
 			continue;
+
 		if ((data == NULL) &&
 		    ((data = elf_getdata(scn, NULL)) == NULL)) {
 			eprintf(ofl->ofl_lml, ERR_ELF,
@@ -195,7 +193,7 @@ ld_sup_input_section(Ofl_desc *ofl, Ifl_desc *ifl, const char *sname,
 		}
 
 		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
-		    support[LDS_INP_SECTION].sup_name, LDS_INP_SECTION, sname));
+		    support[LDS_INSEC].sup_name, LDS_INSEC, sname));
 		(*flp->fl_fptr)(sname, &nshdr, ndx, data, elf, &flags);
 	}
 
@@ -219,9 +217,9 @@ ld_sup_section(Ofl_desc *ofl, const char *scn, Shdr *shdr, Word ndx,
 	Func_list	*flp;
 	Listnode	*lnp;
 
-	for (LIST_TRAVERSE(&support[LDS_SECTION].sup_funcs, lnp, flp)) {
+	for (LIST_TRAVERSE(&support[LDS_SEC].sup_funcs, lnp, flp)) {
 		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
-		    support[LDS_SECTION].sup_name, LDS_SECTION, scn));
+		    support[LDS_SEC].sup_name, LDS_SEC, scn));
 		(*flp->fl_fptr)(scn, shdr, ndx, data, elf);
 	}
 }
@@ -235,11 +233,13 @@ ld_sup_input_done(Ofl_desc *ofl)
 
 	for (LIST_TRAVERSE(&support[LDS_INPUT_DONE].sup_funcs, lnp, flp)) {
 		/*
-		 * This interface was introduced in VERSION2 - so only call it
-		 * for libraries reporting support for version 2 or above.
+		 * This interface was introduced in VERSION2.  Only call this
+		 * function for libraries reporting support for version 2 or
+		 * above.
 		 */
 		if (flp->fl_version < LD_SUP_VERSION2)
 			continue;
+
 		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
 		    support[LDS_INPUT_DONE].sup_name, LDS_INPUT_DONE, 0));
 		(*flp->fl_fptr)(&flags);

@@ -67,9 +67,8 @@ elf_obj_init(Lm_list *lml, Aliste lmco, const char *name)
 
 	ofl->ofl_dehdr = &dehdr;
 
-	ofl->ofl_flags =
-	    (FLG_OF_DYNAMIC | FLG_OF_SHAROBJ | FLG_OF_STRIP);
-	ofl->ofl_flags1 = FLG_OF1_RELDYN | FLG_OF1_TEXTOFF | FLG_OF1_MEMORY;
+	ofl->ofl_flags = (FLG_OF_DYNAMIC | FLG_OF_SHAROBJ | FLG_OF_STRIP);
+	ofl->ofl_flags1 = (FLG_OF1_RELDYN | FLG_OF1_TEXTOFF | FLG_OF1_MEMORY);
 	ofl->ofl_lml = lml;
 
 	/*
@@ -145,7 +144,7 @@ elf_obj_file(Lm_list *lml, Aliste lmco, const char *name, int fd)
 	 * Proceed to process the input file.
 	 */
 	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
-	if (ld_process_open(name, 0, fd, (Ofl_desc *)olmp->rt_priv,
+	if (ld_process_open(name, name, fd, (Ofl_desc *)olmp->rt_priv,
 	    NULL, &rej) == (Ifl_desc *)S_ERROR)
 		return (0);
 	return (olmp);

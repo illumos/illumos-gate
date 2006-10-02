@@ -33,6 +33,7 @@ SUNWprivate_1.3 {
 
 {
 	global:
+		alist_append =	FUNCTION parent;
 		elf_plt_write =	FUNCTION parent;
 		eprintf =	FUNCTION parent;
 		is_so_loaded =	FUNCTION parent;

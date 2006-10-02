@@ -90,7 +90,7 @@ static const Msg usecs_alt[SHT_HISUNW - SHT_LOSUNW + 1] = {
 const char *
 conv_sec_type(Half mach, Word sec, int fmt_flags)
 {
-	static char	string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 
 	if (sec < SHT_NUM) {
 		return (conv_map2str(string, sizeof (string), sec, fmt_flags,
@@ -169,17 +169,20 @@ conv_sec_flags(Xword flags)
 	return ((const char *)string);
 }
 
+/*
+ * conv_sec_linkinfo() is one of the few conversion routines that can be called
+ * twice for the same diagnostic (see liblddbg:Elf_Shdr()), hence the caller
+ * has to supply different string buffers.
+ */
 const char *
-conv_sec_linkinfo(Word info, Xword flags)
+conv_sec_linkinfo(Word info, Xword flags, Conv_inv_buf_t buffer)
 {
-	static	char	string[CONV_INV_STRSIZE];
-
 	if (flags & ALL_SHF_ORDER) {
 		if (info == SHN_BEFORE)
 			return (MSG_ORIG(MSG_SHN_BEFORE));
 		else if (info == SHN_AFTER)
 			return (MSG_ORIG(MSG_SHN_AFTER));
 	}
-	(void) conv_invalid_val(string, CONV_INV_STRSIZE, info, 1);
-	return ((const char *)string);
+	(void) conv_invalid_val(buffer, CONV_INV_STRSIZE, info, 1);
+	return ((const char *)buffer);
 }

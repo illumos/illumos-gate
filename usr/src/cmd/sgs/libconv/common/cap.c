@@ -98,7 +98,7 @@ conv_cap_val_sf1(Xword val, Half mach)
 const char *
 conv_cap_tag(Xword tag)
 {
-	static char		string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 	static const Msg	tags[] = {
 		MSG_CA_SUNW_NULL,	MSG_CA_SUNW_HW_1,
 		MSG_CA_SUNW_SF_1
@@ -113,7 +113,7 @@ conv_cap_tag(Xword tag)
 const char *
 conv_cap_val(Xword tag, Xword val, Half mach)
 {
-	static char	string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 
 	if (tag == CA_SUNW_HW_1)
 		return (conv_cap_val_hw1(val, mach));

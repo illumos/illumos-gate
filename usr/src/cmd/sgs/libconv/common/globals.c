@@ -198,7 +198,7 @@ conv_expn_field(CONV_EXPN_FIELD_ARG *arg)
 	 * representation of these flags to the users output buffer.
 	 */
 	if (rflags) {
-		char ibuf[CONV_INV_STRSIZE];
+		Conv_inv_buf_t ibuf;
 
 		(void) conv_invalid_val(ibuf, sizeof (ibuf), rflags, 0);
 		if (!cef_cp(arg, &state, TRUE, ibuf))

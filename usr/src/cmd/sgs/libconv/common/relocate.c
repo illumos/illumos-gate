@@ -37,7 +37,7 @@
 const char *
 conv_reloc_type(Half mach, Word type, int fmt_flags)
 {
-	static char	string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 
 	switch (mach) {
 	case EM_386:

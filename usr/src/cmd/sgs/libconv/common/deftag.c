@@ -34,7 +34,7 @@
 const char *
 conv_def_tag(Symref ref)
 {
-	static char		string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 	static const Msg	refs[] = {
 		MSG_REF_DYN_SEEN,	MSG_REF_DYN_NEED,	MSG_REF_REL_NEED
 	};

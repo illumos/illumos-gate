@@ -140,6 +140,7 @@ ld_main(int argc, char **argv)
 
 			} while ((lib = strtok_r(NULL, sep, &lasts)) != NULL);
 		}
+		DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 	}
 	if (lib_support.head) {
 		Listnode	*lnp;
@@ -151,6 +152,7 @@ ld_main(int argc, char **argv)
 			if (ld_sup_loadso(ofl, lib) == S_ERROR)
 				return (ld_exit(ofl));
 		}
+		DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 	} else {
 		if (suplib == 0) {
 			DBG_CALL(Dbg_support_req(ofl->ofl_lml,
@@ -159,6 +161,7 @@ ld_main(int argc, char **argv)
 			    S_ERROR)
 				return (ld_exit(ofl));
 		}
+		DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 	}
 
 	DBG_CALL(Dbg_ent_print(ofl->ofl_lml, ofl->ofl_dehdr->e_machine,

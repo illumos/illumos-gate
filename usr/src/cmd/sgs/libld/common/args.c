@@ -35,7 +35,7 @@
  *    OPTION			MEANING
  *
  *    -z dtrace=symbol		assigns symbol to PT_SUNWDTRACE segment,
- *    				providing scratch ares for dtrace processing.
+ *    				providing scratch area for dtrace processing.
  *
  *    -z noreloc		suppress relocation processing.  This provides
  *				a mechanism for validating kernel module symbol
@@ -176,6 +176,7 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNDEL));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNDLO));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNDU));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNLD));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNOW));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNPA));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZNV));
@@ -1480,6 +1481,7 @@ process_files_com(Ofl_desc *ofl, int argc, char **argv)
 	for (; optind < argc; optind++) {
 		int		fd;
 		Ifl_desc	*ifl;
+		char		*path;
 		Rej_desc	rej = { 0 };
 
 		/*
@@ -1497,19 +1499,19 @@ process_files_com(Ofl_desc *ofl, int argc, char **argv)
 		if (optind >= argc)
 			break;
 
-		if ((fd = open(argv[optind], O_RDONLY)) == -1) {
+		path = argv[optind];
+		if ((fd = open(path, O_RDONLY)) == -1) {
 			int err = errno;
 
 			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_SYS_OPEN), argv[optind],
-			    strerror(err));
+			    MSG_INTL(MSG_SYS_OPEN), path, strerror(err));
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			continue;
 		}
 
-		DBG_CALL(Dbg_args_files(ofl->ofl_lml, optind, argv[optind]));
+		DBG_CALL(Dbg_args_files(ofl->ofl_lml, optind, path));
 
-		ifl = ld_process_open(argv[optind], 0, fd, ofl,
+		ifl = ld_process_open(path, path, fd, ofl,
 		    (FLG_IF_CMDLINE | FLG_IF_NEEDED), &rej);
 		(void) close(fd);
 		if (ifl == (Ifl_desc *)S_ERROR)

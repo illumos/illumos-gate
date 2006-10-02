@@ -205,7 +205,7 @@ conv_dyn_feature1(Xword flags, int fmt_flags)
 const char *
 conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 {
-	static char		string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 	static const Msg	tags[DT_MAXPOSTAGS] = {
 		MSG_DYN_NULL,		MSG_DYN_NEEDED,
 		MSG_DYN_PLTRELSZ,	MSG_DYN_PLTGOT,

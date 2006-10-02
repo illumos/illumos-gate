@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 1995-2001 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * Update the symbol table entries:
  *
@@ -78,4 +78,29 @@ update_sym(Cache *cache, Cache *_cache, Addr edata, Half endx, Addr addr)
 		if (endx)
 			syms->st_shndx = endx;
 	}
+}
+
+int
+syminfo(Cache *_cache, Alist **nodirect)
+{
+	Syminfo	*info;
+	Shdr	*shdr;
+	Word	num, ndx;
+
+	shdr = _cache->c_shdr;
+	info = (Syminfo *)_cache->c_data->d_buf;
+	num = (Word)(shdr->sh_size / shdr->sh_entsize);
+
+	/*
+	 * Traverse the syminfo section recording the index of all nodirect
+	 * symbols.
+	 */
+	for (ndx = 1, info++; ndx < num; ndx++, info++) {
+		if ((info->si_flags & SYMINFO_FLG_NOEXTDIRECT) == 0)
+			continue;
+
+		if (alist_append(nodirect, &ndx, sizeof (Word), 20) == 0)
+			return (1);
+	}
+	return (0);
 }

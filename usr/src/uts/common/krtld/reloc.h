@@ -68,6 +68,8 @@ extern "C" {
 #define	FLG_RE_EXTOFFSET	0x00000800	/* extra offset required */
 #define	FLG_RE_REGISTER		0x00001000	/* relocation initializes */
 						/*    a REGISTER by OLO10 */
+#define	FLG_RE_SIZE		0x00002000	/* symbol size required */
+
 #define	FLG_RE_NOTSUP		0x00010000	/* relocation not supported */
 
 #define	FLG_RE_SEGREL		0x00040000	/* segment relative */
@@ -143,6 +145,8 @@ extern	const Rel_entry		reloc_table[];
 					FLG_RE_TLSLE) != 0)
 #define	IS_LOCALBND(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_LOCLBND) != 0)
+#define	IS_SIZE(X)		((reloc_table[(X)].re_flags &\
+					FLG_RE_SIZE) != 0)
 
 /*
  * Relocation engine.

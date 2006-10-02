@@ -76,6 +76,7 @@ SUNWprivate_1.2 {
 		 lml_main;
 		 lookup_sym;
 
+		 alist_append;		# librtld support
 		 dbg_desc;		# Diagnostic support
 		 dbg_print;
 		 eprintf;		# Error message printing

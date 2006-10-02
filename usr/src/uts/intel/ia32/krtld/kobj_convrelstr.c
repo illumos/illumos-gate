@@ -47,10 +47,11 @@ static const char	*rels[R_386_NUM] = {
 	"R_386_UNKNOWN30",		"R_386_UNKNOWN31",
 	"R_386_TLS_LDO_32",		"R_386_UNKNOWN33",
 	"R_386_UNKNOWN34",		"R_386_TLS_DTPMOD32",
-	"R_386_TLS_DTPOFF32",		"R_386_UNKNOWN37"
+	"R_386_TLS_DTPOFF32",		"R_386_UNKNOWN37",
+	"R_386_SIZE32"
 };
 
-#if	(R_386_NUM != (R_386_UNKNOWN37 + 1))
+#if	(R_386_NUM != (R_386_SIZE32 + 1))
 #error	"R_386_NUM has grown"
 #endif
 

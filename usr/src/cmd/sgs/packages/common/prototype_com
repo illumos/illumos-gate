@@ -87,6 +87,7 @@ f none $SGSDIR/usr/include/rtld_db.h=usr/include/rtld_db.h 644 root bin
 d none $SGSDIR/usr/include/sys 755 root bin
 f none $SGSDIR/usr/include/sys/elf.h=usr/include/sys/elf.h 644 root bin
 f none $SGSDIR/usr/include/sys/elf_386.h=usr/include/sys/elf_386.h 644 root bin
+f none $SGSDIR/usr/include/sys/elf_amd64.h=usr/include/sys/elf_amd64.h 644 root bin
 f none $SGSDIR/usr/include/sys/elf_SPARC.h=usr/include/sys/elf_SPARC.h 644 root bin
 f none $SGSDIR/usr/include/sys/elftypes.h=usr/include/sys/elftypes.h 644 root bin
 f none $SGSDIR/usr/include/sys/machelf.h=usr/include/sys/machelf.h 644 root bin

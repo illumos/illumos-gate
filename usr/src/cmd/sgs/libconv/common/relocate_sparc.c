@@ -79,17 +79,18 @@ static const Msg rels[R_SPARC_NUM] = {
 	MSG_R_SPARC_TLS_TPOFF32,	MSG_R_SPARC_TLS_TPOFF64,
 	MSG_R_SPARC_GOTDATA_HIX22,	MSG_R_SPARC_GOTDATA_LOX10,
 	MSG_R_SPARC_GOTDATA_OP_HIX22,	MSG_R_SPARC_GOTDATA_OP_LOX10,
-	MSG_R_SPARC_GOTDATA_OP,		MSG_R_SPARC_H34
+	MSG_R_SPARC_GOTDATA_OP,		MSG_R_SPARC_H34,
+	MSG_R_SPARC_SIZE32,		MSG_R_SPARC_SIZE64
 };
 
-#if	(R_SPARC_NUM != (R_SPARC_H34 + 1))
+#if	(R_SPARC_NUM != (R_SPARC_SIZE64 + 1))
 #error	"R_SPARC_NUM has grown"
 #endif
 
 const char *
 conv_reloc_SPARC_type(Word type, int fmt_flags)
 {
-	static char	string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 
 	if (type >= R_SPARC_NUM)
 		return (conv_invalid_val(string, CONV_INV_STRSIZE,

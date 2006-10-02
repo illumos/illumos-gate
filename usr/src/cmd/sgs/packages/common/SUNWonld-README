@@ -1131,3 +1131,7 @@ Bugid   Risk Synopsis
 4934427 runtime linker should load up static symbol names visible to
 	dladdr() (D)
 6448719 sys/elf.h could be updated with additional machine and ABI types
+6336605 link-editors need to support R_*_SIZE relocations
+	PSARC/2006/558 R_*_SIZE relocation support
+6475375 symbol search optimization to reduce rescans
+6475497 elfdump(1) is misreporting sh_link

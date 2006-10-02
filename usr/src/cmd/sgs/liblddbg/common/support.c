@@ -71,9 +71,9 @@ Dbg_support_action(Lm_list *lml, const char *obj, const char *func,
 		str = MSG_INTL(MSG_SUP_OUTFILE);
 	else if (ndx == LDS_FILE)
 		str = MSG_INTL(MSG_SUP_INFILE);
-	else if (ndx == LDS_INP_SECTION)
+	else if (ndx == LDS_INSEC)
 		str = MSG_INTL(MSG_SUP_INSEC);
-	else if (ndx == LDS_SECTION)
+	else if (ndx == LDS_SEC)
 		str = MSG_INTL(MSG_SUP_SEC);
 
 	if ((ndx == LDS_ATEXIT) || (ndx == LDS_VERSION) ||

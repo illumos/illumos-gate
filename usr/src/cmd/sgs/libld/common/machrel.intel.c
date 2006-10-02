@@ -748,6 +748,12 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				}
 				if (sdp->sd_isc->is_shdr->sh_flags & SHF_TLS)
 					value -= ofl->ofl_tlsphdr->p_vaddr;
+
+			} else if (IS_SIZE(arsp->rel_rtype)) {
+				/*
+				 * Size relocations require the symbols size.
+				 */
+				value = sdp->sd_sym->st_size;
 			} else {
 				/*
 				 * Else the value is the symbols value.
@@ -1149,7 +1155,7 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 	 * fi
 	 */
 	if ((flags & FLG_OF_SHAROBJ) && (rsp->rel_flags & FLG_REL_LOAD) &&
-	    !(IS_PC_RELATIVE(rsp->rel_rtype)) &&
+	    !(IS_PC_RELATIVE(rsp->rel_rtype)) && !(IS_SIZE(rsp->rel_rtype)) &&
 	    !(IS_GOT_BASED(rsp->rel_rtype)) &&
 	    !(rsp->rel_isdesc != NULL &&
 	    (rsp->rel_isdesc->is_shdr->sh_type == SHT_SUNW_dof)) &&

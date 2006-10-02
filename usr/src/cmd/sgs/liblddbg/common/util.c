@@ -330,8 +330,8 @@ static const Msg	tags[] = {
 void
 Dbg_util_lcinterface(Rt_map *lmp, int tag, char *val)
 {
-	const char	*str;
-	static char	string[CONV_INV_STRSIZE];
+	const char		*str;
+	static Conv_inv_buf_t	string;
 
 	if (DBG_NOTDETAIL())
 		return;
@@ -348,8 +348,8 @@ Dbg_util_lcinterface(Rt_map *lmp, int tag, char *val)
 void
 Dbg_unused_lcinterface(Rt_map *nlmp, Rt_map *olmp, int tag)
 {
-	const char	*str;
-	static char	string[CONV_INV_STRSIZE];
+	const char		*str;
+	static Conv_inv_buf_t	string;
 
 	if (DBG_NOTCLASS(DBG_C_UNUSED))
 		return;

@@ -875,8 +875,13 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					 * symbol value plus base address of
 					 * containing shared object.
 					 */
-					value = symdef->st_value;
+					if (IS_SIZE(rtype))
+						value = symdef->st_size;
+					else
+						value = symdef->st_value;
+
 					if (!(FLAGS(_lmp) & FLG_RT_FIXED) &&
+					    !(IS_SIZE(rtype)) &&
 					    (symdef->st_shndx != SHN_ABS) &&
 					    (ELF_ST_TYPE(symdef->st_info) !=
 					    STT_TLS))

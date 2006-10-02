@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,12 +65,15 @@ extern "C" {
 #define	R_AMD64_GOTPC64		29	/* reserved for future expansion */
 #define	R_AMD64_GOTPLT64	30	/* reserved for future expansion */
 #define	R_AMD64_PLTOFF64	31	/* reserved for future expansion */
-#define	R_AMD64_NUM		32
+#define	R_AMD64_SIZE32		32
+#define	R_AMD64_SIZE64		33
+#define	R_AMD64_NUM		34
 
 
 /*
- * X86_64 compatibilty fields - these are obsolete, the prefered
- * field naming are the _AMD64_ fields over the X86_64 names.
+ * The "System V Application Binary Interface, AMD64 Architecture Processor
+ * Supplement", defines relocations in terms of R_X86_64_ rather than R_AMD64_.
+ * Maintain both relocation naming conventions for compatibility.
  */
 #define	R_X86_64_NONE		R_AMD64_NONE
 #define	R_X86_64_64		R_AMD64_64
@@ -105,6 +107,8 @@ extern "C" {
 #define	R_X86_64_GOTPC64	R_AMD64_GOTPC64
 #define	R_X86_64_GOTPLT64	R_AMD64_GOTPLT64
 #define	R_X86_64_PLTOFF64	R_AMD64_PLTOFF64
+#define	R_X86_64_SIZE32		R_AMD64_SIZE32
+#define	R_X86_64_SIZE64		R_AMD64_SIZE64
 #define	R_X86_64_NUM		R_AMD64_NUM
 
 

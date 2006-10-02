@@ -1865,6 +1865,13 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 	FLAGS(nlmp) |= flags;
 
 	/*
+	 * If this is a global object, ensure the associated link-map list can
+	 * be rescanned for global, lazy dependencies.
+	 */
+	if (MODE(nlmp) & RTLD_GLOBAL)
+		LIST(nlmp)->lm_flags &= ~LML_FLG_NOPENDGLBLAZY;
+
+	/*
 	 * If we've been asked to establish a handle create one for this object.
 	 * Or, if this object has already been analyzed, but this reference
 	 * requires that the mode of the object be promoted, also create a

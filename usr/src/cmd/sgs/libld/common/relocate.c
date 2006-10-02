@@ -1577,6 +1577,20 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 		return (S_ERROR);
 	}
 
+	/*
+	 * Size relocations against section symbols are presently unsupported.
+	 * There is a question as to whether the input section size, or output
+	 * section size would be used.  Until an explicit requirement is
+	 * established for either case, we'll punt.
+	 */
+	if (IS_SIZE(rtype) &&
+	    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION)) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_UNSUPSIZE),
+		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype, 0),
+		    ifl->ifl_name, isp->is_name);
+		return (S_ERROR);
+	}
+
 	reld->rel_sym = sdp;
 	return (ld_process_sym_reloc(ofl, reld, reloc, isp, isp->is_name));
 }

@@ -175,7 +175,9 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 /* R_SPARC_GOTDATA_OP_LOX10 */	{ 0x3ff, FLG_RE_SIGN | FLG_RE_GOTOPINS |
 					FLG_RE_GOTADD, 4, 0, 13},
 /* R_SPARC_GOTDATA_OP */	{ 0x0, FLG_RE_GOTOPINS, 0, 0, 0},
-/* R_SPARC_H34 */	{0x0, FLG_RE_VERIFY, 4, 12, 22}		/* V9 */
+/* R_SPARC_H34 */	{0x0, FLG_RE_VERIFY, 4, 12, 22},	/* V9 */
+/* R_SPARC_SIZE32 */	{0x0, FLG_RE_SIZE | FLG_RE_VERIFY, 4, 0, 0},
+/* R_SPARC_SIZE64 */	{0x0, FLG_RE_SIZE | FLG_RE_VERIFY, 8, 0, 0},
 };
 
 
@@ -276,7 +278,10 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
  * R_SPARC_GOTDATA_OP_HIX22 82	T-imm22		(G >> 10) & (G >> 31)
  * R_SPARC_GOTDATA_OP_LOX10 83	T-simm13	(G & 0x3ff) |
  *						  ((G >> 31) & 0x1c00)
- * R_SPARC_H34		    84	V-imm22		(S + A) >> 12
+ * R_SPARC_GOTDATA_OP	    84  Word32		SPECIAL
+ * R_SPARC_H34		    85	V-imm22		(S + A) >> 12
+ * R_SPARC_SIZE32	    86	V-word32	Z + A
+ * R_SPARC_SIZE64	    87	V-xword64	Z + A
  *
  *	This is Figure 4-20: Relocation Types from the Draft Copy of
  * the ABI, Printed on 11/29/88.
@@ -308,6 +313,8 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
  *      P       the place of the storage unit being relocated
  *      S       the value of the symbol
  *	O	secondary addend (extra offset) in v9 r_info field
+ *	Z	the size of the symbol whose index resides in the relocation
+ *		entry
  *
  *	@dtlndx(x): Allocate two contiguous entries in the GOT table to hold
  *	   a Tls_index structure (for passing to __tls_get_addr()). The

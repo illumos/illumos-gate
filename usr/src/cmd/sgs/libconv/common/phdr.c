@@ -41,7 +41,7 @@ static const Msg uphdrs[] = {
 const char *
 conv_phdr_type(Half mach, Word type)
 {
-	static char		string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 	static const Msg	phdrs[] = {
 		MSG_PT_NULL,		MSG_PT_LOAD,		MSG_PT_DYNAMIC,
 		MSG_PT_INTERP,		MSG_PT_NOTE,		MSG_PT_SHLIB,

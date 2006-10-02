@@ -353,6 +353,7 @@ struct ofl_desc {
 					/*	section */
 #define	FLG_OF1_MEMORY	0x00200000	/* produce a memory model */
 #define	FLG_OF1_RLXREL	0x00400000	/* -z relaxreloc flag set */
+
 #define	FLG_OF1_VADDR	0x01000000	/* vaddr was explicitly set */
 #define	FLG_OF1_EXTRACT	0x02000000	/* archive member has been extracted */
 #define	FLG_OF1_RESCAN	0x04000000	/* any archives should be rescanned */
@@ -973,8 +974,8 @@ typedef enum {
 	LDS_START,
 	LDS_ATEXIT,
 	LDS_FILE,
-	LDS_INP_SECTION,
-	LDS_SECTION,
+	LDS_INSEC,
+	LDS_SEC,
 	LDS_NUM
 } Support_ndx;
 
@@ -1028,14 +1029,13 @@ typedef struct ar_desc {
 
 #define	ld_create_outfile	ld64_create_outfile
 #define	ld_ent_setup		ld64_ent_setup
-#define	ld_ofl_cleanup		ld64_ofl_cleanup
 #define	ld_init_strings		ld64_init_strings
 #define	ld_make_sections	ld64_make_sections
 #define	ld_main			ld64_main
+#define	ld_ofl_cleanup		ld64_ofl_cleanup
 #define	ld_process_open		ld64_process_open
 #define	ld_reloc_init		ld64_reloc_init
 #define	ld_reloc_process	ld64_reloc_process
-#define	ld_sym_add_u		ld64_sym_add_u
 #define	ld_sym_validate		ld64_sym_validate
 #define	ld_update_outfile	ld64_update_outfile
 
@@ -1043,14 +1043,13 @@ typedef struct ar_desc {
 
 #define	ld_create_outfile	ld32_create_outfile
 #define	ld_ent_setup		ld32_ent_setup
-#define	ld_ofl_cleanup		ld32_ofl_cleanup
 #define	ld_init_strings		ld32_init_strings
 #define	ld_make_sections	ld32_make_sections
 #define	ld_main			ld32_main
+#define	ld_ofl_cleanup		ld32_ofl_cleanup
 #define	ld_process_open		ld32_process_open
 #define	ld_reloc_init		ld32_reloc_init
 #define	ld_reloc_process	ld32_reloc_process
-#define	ld_sym_add_u		ld32_sym_add_u
 #define	ld_sym_validate		ld32_sym_validate
 #define	ld_update_outfile	ld32_update_outfile
 
@@ -1061,14 +1060,13 @@ extern int		ld64_main(int, char **);
 
 extern uintptr_t	ld_create_outfile(Ofl_desc *);
 extern uintptr_t	ld_ent_setup(Ofl_desc *, Xword);
-extern void		ld_ofl_cleanup(Ofl_desc *);
 extern uintptr_t	ld_init_strings(Ofl_desc *);
 extern uintptr_t	ld_make_sections(Ofl_desc *);
-extern Ifl_desc		*ld_process_open(const char *, size_t, int, Ofl_desc *,
-			    Half, Rej_desc *);
+extern void		ld_ofl_cleanup(Ofl_desc *);
+extern Ifl_desc		*ld_process_open(const char *, const char *, int,
+			    Ofl_desc *, Half, Rej_desc *);
 extern uintptr_t	ld_reloc_init(Ofl_desc *);
 extern uintptr_t	ld_reloc_process(Ofl_desc *);
-extern Sym_desc		*ld_sym_add_u(const char *, Ofl_desc *);
 extern uintptr_t	ld_sym_validate(Ofl_desc *);
 extern uintptr_t	ld_update_outfile(Ofl_desc *);
 

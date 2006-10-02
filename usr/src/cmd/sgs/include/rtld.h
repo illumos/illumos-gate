@@ -339,6 +339,9 @@ struct lm_list32 {
 #define	LML_FLG_OBJDELETED	0x00004000	/* object(s) deleted */
 #define	LML_FLG_OBJREEVAL	0x00008000	/* existing object(s) needs */
 						/*	tsort reevaluation */
+#define	LML_FLG_NOPENDGLBLAZY	0x00010000	/* no pending, global, lazy */
+						/*	dependencies remain */
+
 #define	LML_FLG_TRC_LDDSTUB	0x00100000	/* identify lddstub */
 #define	LML_FLG_TRC_ENABLE	0x00200000	/* tracing enabled (ldd) */
 #define	LML_FLG_TRC_WARN	0x00400000	/* print warnings for undefs */
@@ -400,6 +403,8 @@ typedef struct {
 #define	GPH_INITIAL	0x0020		/* handle is initialized */
 #define	GPH_STICKY	0x0040		/* handle is unreferenced, but should */
 					/*	not trigger object removal */
+#define	GPH_NOPENDLAZY	0x0080		/* no pending lazy dependencies */
+					/*	remain for this handle */
 
 /*
  * A group descriptor.  A group handle (Grp_hdl) refers to a group of objects,

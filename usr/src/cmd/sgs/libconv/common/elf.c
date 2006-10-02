@@ -44,7 +44,7 @@ DEFINE_conv_map2str
 const char *
 conv_ehdr_class(uchar_t class, int fmt_flags)
 {
-	static char		string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 	static const Msg	classes[] = {
 		MSG_ELFCLASSNONE, MSG_ELFCLASS32, MSG_ELFCLASS64
 	};
@@ -59,7 +59,7 @@ conv_ehdr_class(uchar_t class, int fmt_flags)
 const char *
 conv_ehdr_data(uchar_t data, int fmt_flags)
 {
-	static char		string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 	static const Msg	datas[] = {
 		MSG_ELFDATANONE, MSG_ELFDATA2LSB, MSG_ELFDATA2MSB
 	};
@@ -149,7 +149,7 @@ static const Msg machines_alt[EM_NUM] = {
 const char *
 conv_ehdr_mach(Half machine, int fmt_flags)
 {
-	static char	string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 
 	return (conv_map2str(string, sizeof (string), machine, fmt_flags,
 		ARRAY_NELTS(machines), machines, machines_alt, machines_alt));
@@ -159,7 +159,7 @@ conv_ehdr_mach(Half machine, int fmt_flags)
 const char *
 conv_ehdr_type(Half etype, int fmt_flags)
 {
-	static char		string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 	static const Msg	etypes[] = {
 		MSG_ET_NONE,		MSG_ET_REL,		MSG_ET_EXEC,
 		MSG_ET_DYN,		MSG_ET_CORE
@@ -183,7 +183,7 @@ conv_ehdr_type(Half etype, int fmt_flags)
 const char *
 conv_ehdr_vers(Word version, int fmt_flags)
 {
-	static char		string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 	static const Msg	versions[] = {
 		MSG_EV_NONE,		MSG_EV_CURRENT
 	};
@@ -257,10 +257,9 @@ conv_ehdr_flags(Half mach, Word flags)
 const char *
 conv_reject_desc(Rej_desc * rej)
 {
-	static char	string[CONV_INV_STRSIZE];
-
-	ushort_t	type = rej->rej_type;
-	uint_t		info = rej->rej_info;
+	static Conv_inv_buf_t	string;
+	ushort_t		type = rej->rej_type;
+	uint_t			info = rej->rej_info;
 
 	if (type == SGS_REJ_MACH)
 		/* LINTED */

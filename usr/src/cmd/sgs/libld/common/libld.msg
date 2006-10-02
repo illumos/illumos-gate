@@ -180,9 +180,10 @@
 @ MSG_ARG_DETAIL_ZNDEL	"\t[-z nodelete]\tmark object as non-deletable\n"
 @ MSG_ARG_DETAIL_ZNDLO	"\t[-z nodlopen]\tmark object as non-dlopen()'able\n"
 @ MSG_ARG_DETAIL_ZNDU	"\t[-z nodump]\tmark object as non-dldump()'able\n"
+@ MSG_ARG_DETAIL_ZNLD	"\t[-z noldynsym]\tdo not add a .SUNW_ldynsym section\n"
 @ MSG_ARG_DETAIL_ZNPA	"\t[-z nopartial]\texpand any partially initialized \
 			 symbols\n"
-@ MSG_ARG_DETAIL_ZNV	"\t[-z noversion]\tdon't record any version sections\n"
+@ MSG_ARG_DETAIL_ZNV	"\t[-z noversion]\tdo not record any version sections\n"
 @ MSG_ARG_DETAIL_ZNOW	"\t[-z now]\tmark object as requiring non-lazy \
 			 binding\n"
 @ MSG_ARG_DETAIL_ZO	"\t[-z origin]\tmark object as requiring $ORIGIN \
@@ -265,6 +266,8 @@
 @ MSG_REL_DISPREL1	"relocation error: %s: file %s: symbol %s: \
 			 displacement relocation applied to the symbol \
 			 %s at 0x%llx: symbol %s is a copy relocated symbol"
+@ MSG_REL_UNSUPSIZE	"relocation error: %s: file %s: section %s: \
+			 relocation against section symbol unsupported"
 
 @ MSG_REL_DISPREL2	"relocation warning: %s: file %s: symbol %s: \
 			 may contain displacement relocation"
@@ -291,6 +294,7 @@
 @ MSG_REL_SLOPCDATNAM	"relocation warning: %s: file %s: section %s: \
 			 symbol %s: relocation against discarded COMDAT \
 			 section %s redirected to file %s"
+
 #
 # TRANSLATION_NOTE
 # 	The following 7 messages are the message to print the
@@ -706,23 +710,22 @@
 @ MSG_SYM_L_START	"START_"
 @ MSG_SYM_L_START_U	"_START_"
 
-
 # Support functions
+
+@ MSG_SUP_VERSION	"ld_version"
+@ MSG_SUP_INPUT_DONE	"ld_input_done"
 
 @ MSG_SUP_START_64	"ld_start64"
 @ MSG_SUP_ATEXIT_64	"ld_atexit64"
 @ MSG_SUP_FILE_64	"ld_file64"
-@ MSG_SUP_SECTION_64	"ld_section64"
-@ MSG_SUP_INP_SECTION_64 "ld_input_section64"
-@ MSG_SUP_INPUT_DONE	"ld_input_done"
-@ MSG_SUP_VERSION	"ld_version"
+@ MSG_SUP_INSEC_64	"ld_input_section64"
+@ MSG_SUP_SEC_64	"ld_section64"
+
 @ MSG_SUP_START		"ld_start"
 @ MSG_SUP_ATEXIT	"ld_atexit"
 @ MSG_SUP_FILE		"ld_file"
-@ MSG_SUP_INP_SECTION	"ld_input_section"
-@ MSG_SUP_SECTION	"ld_section"
-
-
+@ MSG_SUP_INSEC		"ld_input_section"
+@ MSG_SUP_SEC		"ld_section"
 
 # 
 # Message previously in 'ld'

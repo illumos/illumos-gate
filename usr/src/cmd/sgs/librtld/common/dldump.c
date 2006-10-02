@@ -163,6 +163,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	char		*shstr, *_shstr, *ipath = NAME(lmp);
 	prstatus_t	*status = 0, _status;
 	Lm_list		*lml = LIST(lmp);
+	Alist		*nodirect = 0;
 
 	if (lmp == lml_main.lm_head) {
 		char	proc[16];
@@ -362,6 +363,19 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 		_icache->c_info = 0;
 
 		/*
+		 * Process any .SUNW_syminfo section.  Symbols that are tagged
+		 * as NO_DIRECT are collected, as they should not be bound to.
+		 */
+		if ((flags & ~RTLD_REL_RELATIVE) &&
+		    (shdr->sh_type == SHT_SUNW_syminfo)) {
+			if (syminfo(_icache, &nodirect)) {
+				cleanup(ielf, oelf, melf, icache, mcache,
+				    fd, opath);
+				return (1);
+			}
+		}
+
+		/*
 		 * If the section has no address it is not part of the mapped
 		 * image, and is unlikely to require any further processing.
 		 * The section header string table will be rewritten (this isn't
@@ -438,7 +452,8 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 			rel_entsize = shdr->sh_entsize;
 
 			if (count_reloc(icache, _icache, lmp, flags, addr,
-			    &rel_null_no, &rel_data_no, &rel_func_no)) {
+			    &rel_null_no, &rel_data_no, &rel_func_no,
+			    nodirect)) {
 				cleanup(ielf, oelf, melf, icache, mcache,
 				    fd, opath);
 				return (1);

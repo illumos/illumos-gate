@@ -208,10 +208,10 @@ hdl_alloc()
 Grp_hdl *
 hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 {
-	Grp_hdl		*ghp = 0, ** ghpp;
-	uint_t		hflags;
-	Alist		**alpp;
-	Aliste		off;
+	Grp_hdl	*ghp = 0, **ghpp;
+	uint_t	hflags;
+	Alist	**alpp;
+	Aliste	off;
 
 	/*
 	 * For dlopen(0) the handle is maintained as part of the link-map list,
@@ -315,7 +315,7 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 
 			if (DBG_ENABLED) {
 				Aliste		off;
-				Grp_desc *	gdp;
+				Grp_desc	*gdp;
 
 				DBG_CALL(Dbg_file_hdl_title(DBG_DEP_REINST));
 				for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp))
@@ -944,6 +944,8 @@ dlsym_handle(Grp_hdl * ghp, Slookup * slp, Rt_map ** _lmp, uint_t *binfo)
 	 * defeat some of the advantages of lazy loading (look out JVM).
 	 */
 	if (ghp->gh_flags & GPH_ZERO) {
+		Lm_list	*lml;
+
 		/*
 		 * If this symbol lookup is triggered from a dlopen(0) handle,
 		 * traverse the present link-map list looking for promiscuous
@@ -976,8 +978,12 @@ dlsym_handle(Grp_hdl * ghp, Slookup * slp, Rt_map ** _lmp, uint_t *binfo)
 		 * traversing a dynamic linked list of link-maps there's no
 		 * need for elf_lazy_find_sym() to descend the link-maps itself.
 		 */
-		if (LIST(lmp)->lm_lazy) {
-			DBG_CALL(Dbg_syms_lazy_rescan(LIST(lmp), name));
+		lml = LIST(lmp);
+		if ((lml->lm_lazy) &&
+		    ((lml->lm_flags & LML_FLG_NOPENDGLBLAZY) == 0)) {
+			int	lazy = 0;
+
+			DBG_CALL(Dbg_syms_lazy_rescan(lml, name));
 
 			sl.sl_flags |= LKUP_NODESCENT;
 
@@ -989,17 +995,30 @@ dlsym_handle(Grp_hdl * ghp, Slookup * slp, Rt_map ** _lmp, uint_t *binfo)
 				    ((FLAGS(clmp) & FLG_RT_DELETE) == 0))
 					continue;
 
+				lazy = 1;
 				sl.sl_imap = nlmp;
 				if (sym = elf_lazy_find_sym(&sl, _lmp, binfo))
 					return (sym);
 			}
+
+			/*
+			 * If no global, lazy loadable dependencies are found,
+			 * then none exist for this link-map list.  Pending lazy
+			 * loadable objects may still exist for non-local
+			 * objects that are associated with this link-map list,
+			 * which is why we entered this fallback.  Tag this
+			 * link-map list to prevent further searching for lazy
+			 * dependencies.
+			 */
+			if (lazy == 0)
+				lml->lm_flags |= LML_FLG_NOPENDGLBLAZY;
 		}
 	} else {
 		/*
 		 * Traverse the dlopen() handle for the presently loaded
 		 * link-maps.
 		 */
-		Grp_desc *	gdp;
+		Grp_desc	*gdp;
 		Aliste		off;
 
 		for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
@@ -1019,7 +1038,10 @@ dlsym_handle(Grp_hdl * ghp, Slookup * slp, Rt_map ** _lmp, uint_t *binfo)
 		 * has pending lazy dependencies, start loading them in an
 		 * attempt to exhaust the search.
 		 */
-		if (LIST(lmp)->lm_lazy) {
+		if ((LIST(lmp)->lm_lazy) &&
+		    ((ghp->gh_flags & GPH_NOPENDLAZY) == 0)) {
+			int	lazy = 0;
+
 			DBG_CALL(Dbg_syms_lazy_rescan(LIST(lmp), name));
 
 			for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
@@ -1028,10 +1050,23 @@ dlsym_handle(Grp_hdl * ghp, Slookup * slp, Rt_map ** _lmp, uint_t *binfo)
 				if (((gdp->gd_flags & GPD_AVAIL) == 0) ||
 				    (LAZY(nlmp) == 0))
 					continue;
+
+				lazy = 1;
 				sl.sl_imap = nlmp;
 				if (sym = elf_lazy_find_sym(&sl, _lmp, binfo))
 					return (sym);
 			}
+
+			/*
+			 * If no lazy loadable dependencies are found, then
+			 * none exist for this handle.  Pending lazy loadable
+			 * objects may still exist for the associated link-map
+			 * list, which is why we entered this fallback.  Tag
+			 * this handle to prevent further searching for lazy
+			 * dependencies.
+			 */
+			if (lazy == 0)
+				ghp->gh_flags |= GPH_NOPENDLAZY;
 		}
 	}
 	return ((Sym *)0);
@@ -1168,6 +1203,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		 */
 		DBG_CALL(Dbg_syms_dlsym(clmp, name, NAME(ghp->gh_ownlmp),
 		    DBG_DLSYM_DEF));
+
 		sym = LM_DLSYM(clmp)(ghp, &sl, dlmp, &binfo);
 	}
 
@@ -1216,7 +1252,7 @@ dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 	    (handle == RTLD_SELF) || (handle == RTLD_PROBE))
 		llmp = LIST(clmp)->lm_tail;
 	else {
-		Grp_hdl *	ghp = (Grp_hdl *)handle;
+		Grp_hdl	*ghp = (Grp_hdl *)handle;
 
 		if (ghp->gh_ownlmp)
 			llmp = LIST(ghp->gh_ownlmp)->lm_tail;
@@ -1592,7 +1628,7 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 	if (handle == RTLD_SELF)
 		lmp = clmp;
 	else {
-		Grp_hdl *	ghp = (Grp_hdl *)handle;
+		Grp_hdl	*ghp = (Grp_hdl *)handle;
 
 		if (!hdl_validate(ghp)) {
 			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL));

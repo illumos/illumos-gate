@@ -38,7 +38,7 @@
 const char *
 conv_sym_other(uchar_t other)
 {
-	static char		string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 	static const char	visibility[4] = {
 		'D',	/* STV_DEFAULT */
 		'I',	/* STV_INTERNAL */
@@ -63,7 +63,7 @@ conv_sym_other(uchar_t other)
 const char *
 conv_sym_info_type(Half mach, uchar_t type, int fmt_flags)
 {
-	static char		string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 	static const Msg	types[] = {
 		MSG_STT_NOTYPE,		MSG_STT_OBJECT,		MSG_STT_FUNC,
 		MSG_STT_SECTION,	MSG_STT_FILE,		MSG_STT_COMMON,
@@ -84,7 +84,7 @@ conv_sym_info_type(Half mach, uchar_t type, int fmt_flags)
 const char *
 conv_sym_info_bind(uchar_t bind, int fmt_flags)
 {
-	static char		string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 	static const Msg	binds[] = {
 		MSG_STB_LOCAL,		MSG_STB_GLOBAL,		MSG_STB_WEAK
 	};
@@ -99,7 +99,7 @@ conv_sym_info_bind(uchar_t bind, int fmt_flags)
 const char *
 conv_sym_shndx(Half shndx)
 {
-	static	char	string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 
 	switch (shndx) {
 	case SHN_UNDEF:
@@ -127,7 +127,7 @@ conv_sym_shndx(Half shndx)
 const char *
 conv_sym_value(Half mach, uchar_t type, Addr value)
 {
-	static char	string[CONV_INV_STRSIZE];
+	static Conv_inv_buf_t	string;
 
 	if (((mach == EM_SPARC) || (mach == EM_SPARC32PLUS) ||
 	    (mach == EM_SPARCV9)) && (type == STT_SPARC_REGISTER))

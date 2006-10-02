@@ -82,7 +82,8 @@ const Rel_entry	reloc_table[R_386_NUM] = {
 /* R_386_UNKNOWN34 */	{FLG_RE_NOTSUP, 0},
 /* R_386_TLS_DTPMOD32 */ {FLG_RE_NOTREL, 4},
 /* R_386_TLS_DTPOFF32 */ {FLG_RE_NOTREL, 4},
-/* R_386_UNKONWN37 */	{FLG_RE_NOTSUP, 0}
+/* R_386_UNKONWN37 */	{FLG_RE_NOTSUP, 0},
+/* R_386_SIZE32 */	{FLG_RE_SIZE | FLG_RE_VERIFY, 4}
 };
 
 /*
@@ -117,6 +118,7 @@ const Rel_entry	reloc_table[R_386_NUM] = {
  * R_386_TLS_LDO_32	32	word32		@dtpoff(S)
  * R_386_TLS_DTPMOD32	35	word32		@dtpmod(S)
  * R_386_TLS_DTPOFF32	36	word32		@dtpoff(S)
+ * R_386_SIZE32		38	word32		Z + A
  *
  * Relocations 0-10 are from Figure 4-4: Relocation Types from the
  * intel ABI.  Relocation 11 (R_386_32PLT) is from the C++ intel abi
@@ -135,6 +137,8 @@ const Rel_entry	reloc_table[R_386_NUM] = {
  *	L	the procedure linkage entry
  *	P	the place of the storage unit being relocated
  *	S	the value of the symbol
+ *	Z	the size of the symbol whose index resides in the relocation
+ *		entry
  *
  *	@dtlndx(x): Allocate two contiguous entries in the GOT table to hold
  *	   a Tls_index structure (for passing to __tls_get_addr()). The
