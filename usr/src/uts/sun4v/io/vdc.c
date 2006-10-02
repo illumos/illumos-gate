@@ -2301,7 +2301,7 @@ vdc_map_to_shared_dring(vdc_t *vdcp, int idx)
 	dep->payload.operation = ldep->operation;
 	dep->payload.addr = ldep->offset;
 	dep->payload.nbytes = ldep->nbytes;
-	dep->payload.status = -1;	/* vds will set valid value */
+	dep->payload.status = (uint32_t)-1;	/* vds will set valid value */
 	dep->payload.slice = ldep->slice;
 	dep->hdr.dstate = VIO_DESC_READY;
 	dep->hdr.ack = 1;		/* request an ACK for every message */

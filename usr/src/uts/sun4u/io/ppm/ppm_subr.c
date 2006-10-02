@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -960,7 +959,7 @@ ppm_stoi(char *ss, uint_t *val)
 	int  digit;
 
 	if ((cp = strchr(ss, '=')) == NULL)
-		return (*val = -1);
+		return (*val = (uint_t)-1);
 
 	cp++;
 	if ((*cp == '0') && (*++cp == 'x')) {
@@ -1028,7 +1027,7 @@ ppm_convert(char *symbol, uint_t *val)
 	if ((s = strchr(symbol, '=')) == NULL) {
 		cmn_err(CE_WARN, "ppm_convert: token \"%s\" syntax error in "
 		    "ppm.conf file, line(%d)", symbol,  __LINE__);
-		return (*val = -1);
+		return (*val = (uint_t)-1);
 	}
 	s++;
 
@@ -1039,7 +1038,7 @@ ppm_convert(char *symbol, uint_t *val)
 
 	cmn_err(CE_WARN, "ppm_convert: Unrecognizable token \"%s\" "
 	    "in ppm.conf file, line %d", symbol, __LINE__);
-	return (*val = -1);
+	return (*val = (uint_t)-1);
 }
 
 

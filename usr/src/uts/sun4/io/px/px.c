@@ -67,8 +67,8 @@ extern errorq_t *pci_target_queue;
 /*
  * function prototypes for hotplug routines:
  */
-static uint_t px_init_hotplug(px_t *px_p);
-static uint_t px_uninit_hotplug(dev_info_t *dip);
+static int px_init_hotplug(px_t *px_p);
+static int px_uninit_hotplug(dev_info_t *dip);
 
 /*
  * bus ops and dev ops structures:
@@ -637,7 +637,7 @@ px_pwr_teardown(dev_info_t *dip)
 	    px_msiqid_to_devino(px_p, px_p->px_pm_msiq_id),
 	    PX_INTR_STATE_DISABLE, MSG_REC, PCIE_PME_ACK_MSG);
 
-	px_p->px_pm_msiq_id = -1;
+	px_p->px_pm_msiq_id = (msiqid_t)-1;
 
 	cv_destroy(&px_p->px_l23ready_cv);
 	mutex_destroy(&px_p->px_l23ready_lock);
@@ -1345,7 +1345,7 @@ px_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	return (ret);
 }
 
-static uint_t
+static int
 px_init_hotplug(px_t *px_p)
 {
 	px_bus_range_t bus_range;
@@ -1406,7 +1406,7 @@ px_init_hotplug(px_t *px_p)
 	return (DDI_SUCCESS);
 }
 
-static uint_t
+static int
 px_uninit_hotplug(dev_info_t *dip)
 {
 	if (pcihp_uninit(dip) != DDI_SUCCESS)

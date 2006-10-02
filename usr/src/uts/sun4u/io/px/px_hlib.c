@@ -3170,7 +3170,7 @@ fail1:
 	CSR_BC(csr_base, TLU_SLOT_STATUS, PWFD);
 
 fail:
-	return (DDI_FAILURE);
+	return ((uint_t)DDI_FAILURE);
 }
 
 static uint_t
@@ -3338,7 +3338,7 @@ oberon_hpreg_put(void *cookie, off_t off, uint_t val)
 	default:
 		DBG(DBG_HP, NULL, "oberon_hpreg_put(): "
 		    "unsupported offset 0x%lx\n", off);
-		ret = DDI_FAILURE;
+		ret = (uint_t)DDI_FAILURE;
 		break;
 	}
 

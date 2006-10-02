@@ -279,7 +279,7 @@ px_pec_msg_rem_intr(px_t *px_p)
 		    pec_p->pec_corr_msg_msiq_id),
 		    PX_INTR_STATE_DISABLE, MSG_REC, PCIE_CORR_MSG);
 
-		pec_p->pec_corr_msg_msiq_id = -1;
+		pec_p->pec_corr_msg_msiq_id = (msiqid_t)-1;
 	}
 
 	if (pec_p->pec_non_fatal_msg_msiq_id >= 0) {
@@ -294,7 +294,7 @@ px_pec_msg_rem_intr(px_t *px_p)
 		    pec_p->pec_non_fatal_msg_msiq_id),
 		    PX_INTR_STATE_DISABLE, MSG_REC, PCIE_NONFATAL_MSG);
 
-		pec_p->pec_non_fatal_msg_msiq_id = -1;
+		pec_p->pec_non_fatal_msg_msiq_id = (msiqid_t)-1;
 	}
 
 	if (pec_p->pec_fatal_msg_msiq_id >= 0) {
@@ -308,6 +308,6 @@ px_pec_msg_rem_intr(px_t *px_p)
 		    pec_p->pec_fatal_msg_msiq_id),
 		    PX_INTR_STATE_DISABLE, MSG_REC, PCIE_FATAL_MSG);
 
-		pec_p->pec_fatal_msg_msiq_id = -1;
+		pec_p->pec_fatal_msg_msiq_id = (msiqid_t)-1;
 	}
 }

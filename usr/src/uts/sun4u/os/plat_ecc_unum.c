@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -549,14 +548,14 @@ plat_log_fruid_error2(int msg_type, char *unum, struct async_flt *aflt,
 		 */
 		e2d.ee2d_owning_proc = plat_make_fru_cpuid(board, maxcat, pos);
 		e2d.ee2d_jnumber = jnumber;
-		e2d.ee2d_bank_number = -1;
+		e2d.ee2d_bank_number = (uint8_t)-1;
 	} else {
 		/*
 		 * L1 Cache
 		 */
 		e2d.ee2d_owning_proc = aflt->flt_bus_id;
-		e2d.ee2d_jnumber = -1;
-		e2d.ee2d_bank_number = -1;
+		e2d.ee2d_jnumber = (uint16_t)-1;
+		e2d.ee2d_bank_number = (uint8_t)-1;
 	}
 
 	e2d.ee2d_type = (uint8_t)msg_type;
@@ -770,7 +769,7 @@ plat_log_fruid_indictment2(int msg_type, struct async_flt *aflt, char *unum)
 		i2d->ei2d_arraigned_proc = aflt->flt_inst;
 		i2d->ei2d_board_num = (uint8_t)
 		    plat_make_fru_boardnum(i2d->ei2d_arraigned_proc);
-		i2d->ei2d_jnumber = -1;
+		i2d->ei2d_jnumber = (uint16_t)-1;
 	}
 
 	i2d->ei2d_type = msg_type;
@@ -972,7 +971,7 @@ plat_blacklist(int cmd, const char *scheme, nvlist_t *fmri, const char *class)
 	if (strcmp(scheme, FM_FMRI_SCHEME_MEM) == 0) {
 		if (nvlist_lookup_string(fmri, FM_FMRI_MEM_UNUM, &unum))
 			return (EINVAL);
-		aflt.flt_inst = -1;
+		aflt.flt_inst = (uint_t)-1;
 	} else if (strcmp(scheme, FM_FMRI_SCHEME_CPU) == 0) {
 		if (nvlist_lookup_uint32(fmri, FM_FMRI_CPU_ID, &aflt.flt_inst))
 			return (EINVAL);
@@ -1008,7 +1007,7 @@ plat_blacklist(int cmd, const char *scheme, nvlist_t *fmri, const char *class)
 	aflt.flt_id = gethrtime();
 	aflt.flt_addr = -1;
 	aflt.flt_stat = -1;
-	aflt.flt_synd = -1;
+	aflt.flt_synd = (ushort_t)-1;
 
 	if (is_old_indict) {
 		if (unum && unum[0] != '\0')

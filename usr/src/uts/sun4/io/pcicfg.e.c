@@ -845,10 +845,10 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 						!= DDI_SUCCESS) {
 
 		DEBUG0("Cannot create indirect conf map property.\n");
-		return ((int)PCICFG_FAILURE);
+		return ((uint_t)PCICFG_FAILURE);
 	}
 	if (pci_config_setup(new_device, &config_handle) != DDI_SUCCESS)
-		return (PCICFG_FAILURE);
+		return ((uint_t)PCICFG_FAILURE);
 	/* check if we are PCIe device */
 	if (pcicfg_pcie_device_type(new_device, config_handle) == DDI_SUCCESS)
 		pcie_device_type = 1;

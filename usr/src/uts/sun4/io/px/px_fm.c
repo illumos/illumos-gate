@@ -421,7 +421,7 @@ px_fabric_handle_psts(px_fabric_cfgspace_t *cs) {
 
 	/* System Error == Uncorrectable Error */
 	pci_status = PCI_STAT_S_SYSERR;
-	pcie_status = -1;
+	pcie_status = (uint32_t)-1;
 	if (sts_reg & pci_status)
 		ret |= PX_FABRIC_ERR_SEV(pcie_status,
 		    px_fabric_die_ue, px_fabric_die_ue_gos);

@@ -159,35 +159,24 @@ LTAIL =	)
 
 LINT.c =	$(LINT) -c -dirout=$(LINTS_DIR) $(LINTFLAGS) $(LINT_DEFS) $(CPPFLAGS)
 
-LINTTAGS_32	=
-LINTTAGS_32	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS_32	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS_32	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS_32	+= -erroff=E_INVALID_ANNOTATION_NAME
-LINTTAGS_32	+= -erroff=E_STATIC_UNUSED
-LINTTAGS_32	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS_32	+= -erroff=E_ASSIGN_NARROW_CONV
-
-LINTTAGS_64	= $(LINTTAGS_32)
-
-# Selectively disable certain noisy lint errors
-LENIENT_LINTTAGS =
-LENIENT_LINTTAGS += -erroff=E_CONST_TRUNCATED_BY_ASSIGN
-
-# comment out next line to turn on pedantic 64-bit error checking
-LINTTAGS_64	+= $(LENIENT_LINTTAGS)
+# Please do not add new erroff directives here.  If you need to disable
+# lint warnings in your module for things that cannot be fixed in any
+# reasonable manner, please augment LINTTAGS in your module Makefile
+# instead.
+LINTTAGS	=
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 LINTFLAGS_sparc_32	= $(LINTCCMODE) -nsxmuF -errtags=yes
 LINTFLAGS_sparc_64	= $(LINTFLAGS_sparc_32) -Xarch=v9
 LINTFLAGS_i386_32	= $(LINTCCMODE) -nsxmuF -errtags=yes
 LINTFLAGS_i386_64	= $(LINTFLAGS_i386_32) -Xarch=amd64
 
-LINTTAGS_sparc_32	= $(LINTTAGS_32)
-LINTTAGS_sparc_64	= $(LINTTAGS_64)
-LINTTAGS_i386_32	= $(LINTTAGS_32)
-LINTTAGS_i386_64	= $(LINTTAGS_64)
-
-LINTFLAGS	= $(LINTFLAGS_$(MACH)_$(CLASS)) $(LINTTAGS_$(MACH)_$(CLASS))
+LINTFLAGS	= $(LINTFLAGS_$(MACH)_$(CLASS)) $(LINTTAGS)
 LINTFLAGS	+= $(C99LMODE)
 
 #

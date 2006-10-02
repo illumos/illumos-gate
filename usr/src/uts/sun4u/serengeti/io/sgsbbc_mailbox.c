@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2212,7 +2212,7 @@ sbbc_do_fast_shutdown(char *arg)
 	 * horribly, horribly wrong.
 	 */
 	/*NOTREACHED*/
-	return (DDI_FAILURE);
+	return (DDI_INTR_UNCLAIMED);
 }
 
 

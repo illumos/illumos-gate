@@ -1962,7 +1962,9 @@ scsa2usb_panic_callb(void *arg, int code)
 		scsa2usb_flush_waitQ(scsa2usbp, lun, CMD_CMPLT);
 	}
 
+#ifndef lint
 	_NOTE(COMPETING_THREADS_NOW);
+#endif
 
 	return (B_TRUE);
 }

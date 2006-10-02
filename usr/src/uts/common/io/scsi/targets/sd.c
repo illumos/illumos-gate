@@ -9216,7 +9216,9 @@ sd_unit_detach(dev_info_t *devi)
 
 	dev = sd_make_device(SD_DEVINFO(un));
 
+#ifndef lint
 	_NOTE(COMPETING_THREADS_NOW);
+#endif
 
 	mutex_enter(SD_MUTEX(un));
 

@@ -448,7 +448,9 @@ ibtl_tell_mgr(ibtl_hca_devinfo_t *hca_devp, ibt_async_handler_t async_handler,
 
 	(void) taskq_dispatch(ibtl_async_taskq, ibtl_do_mgr_async_task, mgrp,
 	    TQ_SLEEP);
+#ifndef lint
 	_NOTE(COMPETING_THREADS_NOW)
+#endif
 }
 
 /*
@@ -882,7 +884,9 @@ ibtl_async_thread(void)
 	mutex_init(&cpr_mutex, NULL, MUTEX_DRIVER, NULL);
 	CALLB_CPR_INIT(&cprinfo, &cpr_mutex, callb_generic_cpr,
 	    "ibtl_async_thread");
+#ifndef lint
 	_NOTE(COMPETING_THREADS_NOW)
+#endif
 
 	mutex_enter(&ibtl_async_mutex);
 
@@ -1143,7 +1147,9 @@ ibtl_cq_thread(void)
 	mutex_init(&cpr_mutex, NULL, MUTEX_DRIVER, NULL);
 	CALLB_CPR_INIT(&cprinfo, &cpr_mutex, callb_generic_cpr,
 	    "ibtl_cq_thread");
+#ifndef lint
 	_NOTE(COMPETING_THREADS_NOW)
+#endif
 
 	mutex_enter(&ibtl_cq_mutex);
 
@@ -1359,7 +1365,9 @@ ibtl_announce_new_hca(ibtl_hca_devinfo_t *hca_devp)
 				new_hcap->nh_clntp = clntp;
 				new_hcap->nh_hca_devp = hca_devp;
 				new_hcap->nh_code = IBT_HCA_ATTACH_EVENT;
+#ifndef lint
 				_NOTE(COMPETING_THREADS_NOW)
+#endif
 				clntp->clnt_async_cnt++;
 				hca_devp->hd_async_task_cnt++;
 
@@ -1386,7 +1394,9 @@ ibtl_announce_new_hca(ibtl_hca_devinfo_t *hca_devp)
 				new_hcap->nh_clntp = clntp;
 				new_hcap->nh_hca_devp = hca_devp;
 				new_hcap->nh_code = IBT_HCA_ATTACH_EVENT;
+#ifndef lint
 				_NOTE(COMPETING_THREADS_NOW)
+#endif
 				clntp->clnt_async_cnt++;
 				hca_devp->hd_async_task_cnt++;
 
@@ -1415,7 +1425,9 @@ ibtl_announce_new_hca(ibtl_hca_devinfo_t *hca_devp)
 				new_hcap->nh_clntp = clntp;
 				new_hcap->nh_hca_devp = hca_devp;
 				new_hcap->nh_code = IBT_HCA_ATTACH_EVENT;
+#ifndef lint
 				_NOTE(COMPETING_THREADS_NOW)
+#endif
 				clntp->clnt_async_cnt++;
 				hca_devp->hd_async_task_cnt++;
 
@@ -1685,7 +1697,9 @@ ibtl_cm_sm_notice_init_failure(ibtl_cm_sm_init_fail_t *ifail)
 		noticep->np_ibt_hdl = ibt_hdl;
 		noticep->np_sgid = *sgidp++;
 		noticep->np_code = IBT_SM_EVENT_UNAVAILABLE;
+#ifndef lint
 		_NOTE(COMPETING_THREADS_NOW)
+#endif
 		ibtl_inc_clnt_async_cnt(ibt_hdl);
 		(void) taskq_dispatch(ibtl_async_taskq,
 		    ibtl_sm_notice_task, noticep, TQ_SLEEP);
@@ -1719,7 +1733,9 @@ ibtl_cm_sm_notice_handler(ib_gid_t sgid, ibt_subnet_event_code_t code,
 		clntp = clntp->clnt_list_link;
 	}
 	mutex_exit(&ibtl_clnt_list_mutex);
+#ifndef lint
 	_NOTE(COMPETING_THREADS_NOW)
+#endif
 }
 
 /*
@@ -1732,7 +1748,9 @@ ibtl_cm_set_sm_notice_handler(ibt_clnt_hdl_t ibt_hdl,
 	_NOTE(NO_COMPETING_THREADS_NOW)
 	ibt_hdl->clnt_sm_trap_handler = sm_notice_handler;
 	ibt_hdl->clnt_sm_trap_handler_arg = private;
+#ifndef lint
 	_NOTE(COMPETING_THREADS_NOW)
+#endif
 }
 
 

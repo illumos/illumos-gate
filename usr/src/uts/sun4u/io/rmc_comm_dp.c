@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * implementation of the transport layer protocol (known as librsc protocol):
@@ -554,8 +554,8 @@ dp_send_packet(struct rmc_comm_state *rcs, uchar_t *buf)
 	int total, cur;
 
 	/* First, send out two SYNC characters. */
-	syncbuf[0] = syncbuf[1] = SYNC_CHAR;
-	rmc_comm_serdev_send(rcs, (char *)syncbuf, 2);
+	syncbuf[0] = syncbuf[1] = (char)SYNC_CHAR;
+	rmc_comm_serdev_send(rcs, syncbuf, 2);
 
 	total = dp_msgp->length;
 	buf = buf + sizeof (dp_msgp->pad);
@@ -583,9 +583,9 @@ dp_send_packet(struct rmc_comm_state *rcs, uchar_t *buf)
 		 */
 		while ((total > 0) &&
 		    ((*buf == SYNC_CHAR) || (*buf == ESC_CHAR))) {
-			syncbuf[0] = ESC_CHAR;
+			syncbuf[0] = (char)ESC_CHAR;
 			syncbuf[1] = *buf;
-			rmc_comm_serdev_send(rcs, (char *)syncbuf, 2);
+			rmc_comm_serdev_send(rcs, syncbuf, 2);
 			buf++;
 			total--;
 		}
@@ -1526,8 +1526,8 @@ rmc_comm_bp_msend(struct rmc_comm_state *rcs, bp_msg_t *bp_msg)
 	rcs->dp_state.req_resp.flags |= MSG_SENT_BP;
 
 	/* First, send out two SYNC characters. */
-	syncbuf[0] = syncbuf[1] = SYNC_CHAR;
-	rmc_comm_serdev_send(rcs, (char *)syncbuf, 2);
+	syncbuf[0] = syncbuf[1] = (char)SYNC_CHAR;
+	rmc_comm_serdev_send(rcs, syncbuf, 2);
 
 	/* Next, send the BP message. */
 	rmc_comm_serdev_send(rcs, (char *)&bp_msg->cmd,

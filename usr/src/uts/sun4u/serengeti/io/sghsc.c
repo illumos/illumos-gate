@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1491,7 +1491,7 @@ sghsc_event_handler(char *arg)
 	if (rsp_data == NULL) {
 		cmn_err(CE_WARN,
 		    ("sghsc: sghsc_event_handler argument is null\n"));
-		return (-1);
+		return (DDI_INTR_CLAIMED);
 	}
 
 	sloth = sghsc_find_sloth(rsp_data->node_id, rsp_data->board,
