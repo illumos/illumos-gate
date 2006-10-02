@@ -172,8 +172,8 @@ getent(be, a)
 	nss_status_t status;
 	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
-	return (_nss_files_XY_printer(be, argp, (files_XY_check_func)0,
-					(const char *)0));
+	return (_nss_files_XY_printer(be, argp, (const char *)0,
+					(files_XY_check_func)0));
 }
 
 static nss_status_t
