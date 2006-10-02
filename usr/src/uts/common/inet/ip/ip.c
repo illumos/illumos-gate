@@ -8536,9 +8536,20 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 			/* Have saved_mp handy, for cleanup if canput fails */
 			saved_mp = mp;
 			mp = copyb(res_mp);
-			ASSERT(mp != NULL);
+			if (mp == NULL) {
+				/* Prepare for cleanup */
+				mp = saved_mp; /* pkt */
+				ire_delete(ire); /* ire_mp */
+				ire = NULL;
+				ire_refrele(save_ire);
+				if (copy_mp != NULL) {
+					MULTIRT_DEBUG_UNTAG(copy_mp);
+					freemsg(copy_mp);
+					copy_mp = NULL;
+				}
+				break;
+			}
 			linkb(mp, ire->ire_mp);
-
 
 			/*
 			 * Fill in the source and dest addrs for the resolver.
@@ -9274,7 +9285,18 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			/* Have saved_mp handy, for cleanup if canput fails */
 			saved_mp = mp;
 			mp = copyb(res_mp);
-			ASSERT(mp != NULL);
+			if (mp == NULL) {
+				/* Prepare for cleanup */
+				mp = saved_mp; /* pkt */
+				ire_delete(ire); /* ire_mp */
+				ire = NULL;
+				if (copy_mp != NULL) {
+					MULTIRT_DEBUG_UNTAG(copy_mp);
+					freemsg(copy_mp);
+					copy_mp = NULL;
+				}
+				break;
+			}
 			linkb(mp, ire->ire_mp);
 
 			/*
