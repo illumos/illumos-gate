@@ -249,11 +249,21 @@ _fini(void)
 static uint_t
 i_vldc_cb(uint64_t event, caddr_t arg)
 {
+	int 		rv;
 	vldc_port_t	*vport = (vldc_port_t *)arg;
+	ldc_status_t	old_status;
 	short		pollevents = 0;
 
 	D1("i_vldc_cb: vldc@%d:%d callback invoked, channel=0x%lx, "
 	    "event=0x%lx\n", vport->inst, vport->number, vport->ldc_id, event);
+
+	old_status = vport->ldc_status;
+	rv = ldc_status(vport->ldc_handle, &vport->ldc_status);
+	if (rv != 0) {
+		DWARN("i_vldc_cb: vldc@%d:%d could not get ldc status, "
+		    "rv=%d\n", vport->inst, vport->number, rv);
+		return (LDC_SUCCESS);
+	}
 
 	if (event & LDC_EVT_UP) {
 		pollevents |= POLLOUT;
@@ -261,18 +271,41 @@ i_vldc_cb(uint64_t event, caddr_t arg)
 
 	} else if (event & LDC_EVT_RESET) {
 		/*
-		 * Mark the port in reset. This implies that it
-		 * cannot be used until it has been closed and
-		 * reopened.
+		 * Mark the port in reset, if it is not CLOSED and
+		 * the channel was previously in LDC_UP state. This
+		 * implies that the port cannot be used until it has
+		 * been closed and reopened.
 		 */
-		if (vport->status != VLDC_PORT_CLOSED)
+		if (vport->status != VLDC_PORT_CLOSED && old_status == LDC_UP) {
 			vport->status = VLDC_PORT_RESET;
-		return (LDC_SUCCESS);
+			vport->hanged_up = B_TRUE;
+			pollevents = POLLHUP;
+		} else {
+			rv = ldc_up(vport->ldc_handle);
+			if (rv) {
+				DWARN("i_vldc_cb: vldc@%d:%d cannot bring "
+				    "channel UP rv=%d\n", vport->inst,
+				    vport->number, rv);
+				return (LDC_SUCCESS);
+			}
+			rv = ldc_status(vport->ldc_handle, &vport->ldc_status);
+			if (rv != 0) {
+				DWARN("i_vldc_cb: vldc@%d:%d could not get "
+				    "ldc status, rv=%d\n", vport->inst,
+				    vport->number, rv);
+				return (LDC_SUCCESS);
+			}
+			if (vport->ldc_status == LDC_UP) {
+				pollevents |= POLLOUT;
+				vport->hanged_up = B_FALSE;
+			}
+		}
 
 	} else if (event & LDC_EVT_DOWN) {
 		/*
-		 * The other side went away
+		 * The other side went away - mark port in RESET state
 		 */
+		vport->status = VLDC_PORT_RESET;
 		vport->hanged_up = B_TRUE;
 		pollevents = POLLHUP;
 	}
@@ -1043,11 +1076,17 @@ vldc_set_ldc_mode(vldc_port_t *vport, vldc_t *vldcp, int channel_mode)
 	 * fail if the other end is not up yet.
 	 */
 	rv = ldc_up(vport->ldc_handle);
-
 	if (rv == ECONNREFUSED) {
 		D1("vldc_ioctl_opt_op: remote endpoint not up yet\n");
 	} else if (rv != 0) {
 		DWARN("vldc_ioctl_opt_op: ldc_up failed, rv=%d\n", rv);
+		goto error_up;
+	}
+
+	rv = ldc_status(vport->ldc_handle, &vport->ldc_status);
+	if (rv != 0) {
+		DWARN("vldc_ioctl_opt_op: vldc@%d:%d could not get ldc "
+		    "status, rv=%d\n", vport->inst, vport->number, rv);
 		goto error_up;
 	}
 
@@ -1541,9 +1580,7 @@ vldc_chpoll(dev_t dev, short events, int anyyet,  short *reventsp,
 	vldc_t *vldcp;
 	vldc_port_t *vport;
 	vldc_minor_t *vminor;
-	ldc_status_t ldc_state;
 	boolean_t haspkts;
-	int rv;
 
 	minor = getminor(dev);
 	instance = VLDCINST(minor);
@@ -1571,17 +1608,9 @@ vldc_chpoll(dev_t dev, short events, int anyyet,  short *reventsp,
 	D2("vldc_chpoll: vldc@%d:%lu polling events 0x%x\n",
 	    instance, portno, events);
 
-	rv = ldc_status(vport->ldc_handle, &ldc_state);
-	if (rv != 0) {
-		DWARN("vldc_chpoll: vldc@%d:%lu could not get ldc status, "
-		    "rv=%d\n", instance, portno, rv);
-		mutex_exit(&vminor->lock);
-		return (EBADFD);
-	}
-
 	*reventsp = 0;
 
-	if (ldc_state == LDC_UP) {
+	if (vport->ldc_status == LDC_UP) {
 		/*
 		 * Check if the receive queue is empty and if not, signal that
 		 * there is data ready to read.

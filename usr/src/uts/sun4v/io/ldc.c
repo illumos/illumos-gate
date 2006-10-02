@@ -72,6 +72,7 @@
 static int i_ldc_h2v_error(int h_error);
 static int i_ldc_txq_reconf(ldc_chan_t *ldcp);
 static int i_ldc_rxq_reconf(ldc_chan_t *ldcp, boolean_t force_reset);
+static int i_ldc_rxq_drain(ldc_chan_t *ldcp);
 static void i_ldc_reset_state(ldc_chan_t *ldcp);
 static void i_ldc_reset(ldc_chan_t *ldcp, boolean_t force_reset);
 
@@ -560,6 +561,30 @@ i_ldc_rxq_reconf(ldc_chan_t *ldcp, boolean_t force_reset)
 
 	return (0);
 }
+
+
+/*
+ * Drain the contents of the receive queue
+ */
+static int
+i_ldc_rxq_drain(ldc_chan_t *ldcp)
+{
+	int rv;
+	uint64_t rx_head, rx_tail;
+
+	ASSERT(MUTEX_HELD(&ldcp->lock));
+	rv = hv_ldc_rx_get_state(ldcp->id, &rx_head, &rx_tail,
+	    &(ldcp->link_state));
+	if (rv) {
+		cmn_err(CE_WARN, "i_ldc_rxq_drain: (0x%lx) cannot get state",
+		    ldcp->id);
+		return (EIO);
+	}
+
+	/* flush contents by setting the head = tail */
+	return (i_ldc_set_rx_head(ldcp, rx_tail));
+}
+
 
 /*
  * Reset LDC state structure and its contents
@@ -2668,10 +2693,15 @@ ldc_close(ldc_handle_t handle)
 	}
 
 	/*
-	 * Drain the Tx and Rx queues
+	 * Drain the Tx and Rx queues as we are closing the
+	 * channel. We dont care about any pending packets.
+	 * We have to also drain the queue prior to clearing
+	 * pending interrupts, otherwise the HV will trigger
+	 * an interrupt the moment the interrupt state is
+	 * cleared.
 	 */
 	(void) i_ldc_txq_reconf(ldcp);
-	(void) i_ldc_rxq_reconf(ldcp, B_TRUE);
+	(void) i_ldc_rxq_drain(ldcp);
 
 	/*
 	 * Unregister the channel with the nexus
@@ -2682,7 +2712,7 @@ ldc_close(ldc_handle_t handle)
 		mutex_exit(&ldcp->lock);
 
 		/* if any error other than EAGAIN return back */
-		if (rv != EAGAIN || retries >= LDC_MAX_RETRIES) {
+		if (rv != EAGAIN || retries >= ldc_max_retries) {
 			cmn_err(CE_WARN,
 			    "ldc_close: (0x%lx) unregister failed, %d\n",
 			    ldcp->id, rv);
@@ -2693,7 +2723,7 @@ ldc_close(ldc_handle_t handle)
 		 * As there could be pending interrupts we need
 		 * to wait and try again
 		 */
-		drv_usecwait(LDC_DELAY);
+		drv_usecwait(ldc_delay);
 		mutex_enter(&ldcp->lock);
 		mutex_enter(&ldcp->tx_lock);
 		retries++;

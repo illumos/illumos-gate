@@ -5112,6 +5112,7 @@ vgen_hwatchdog(void *arg)
 
 	mutex_enter(&ldcp->cblock);
 	ldcp->htid = 0;
+	ldcp->need_ldc_reset = B_TRUE;
 	vgen_handshake_retry(ldcp);
 	mutex_exit(&ldcp->cblock);
 }

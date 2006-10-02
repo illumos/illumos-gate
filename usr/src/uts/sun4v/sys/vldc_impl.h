@@ -102,6 +102,7 @@ typedef struct vldc_port {
 	uint64_t	ldc_id;			/* Channel number */
 	ldc_handle_t	ldc_handle;		/* Channel handle */
 	ldc_mode_t	ldc_mode;		/* Channel mode */
+	ldc_status_t	ldc_status;		/* Channel status */
 
 	boolean_t	is_stream;		/* streaming mode */
 	boolean_t	hanged_up;		/* port hanged up */

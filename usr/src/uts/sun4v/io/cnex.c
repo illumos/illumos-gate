@@ -71,6 +71,7 @@ static struct cnex_pil_map cnex_class_to_pil[] = {
 
 #define	SUN4V_REG_SPEC2CFG_HDL(x)	((x >> 32) & ~(0xfull << 28))
 
+static clock_t cnex_wait_usecs = 1000; /* wait time in usecs */
 static hrtime_t cnex_pending_tmout = 2ull * NANOSEC; /* 2 secs in nsecs */
 static void *cnex_state;
 
@@ -327,6 +328,8 @@ cnex_intr_redist(void *arg)
 
 				if ((gethrtime() - start) > cnex_pending_tmout)
 					break;
+				else
+					drv_usecwait(cnex_wait_usecs);
 
 			} while (!panicstr &&
 			    intr_state == HV_INTR_DELIVERED_STATE);
@@ -388,6 +391,8 @@ cnex_intr_redist(void *arg)
 
 				if ((gethrtime() - start) > cnex_pending_tmout)
 					break;
+				else
+					drv_usecwait(cnex_wait_usecs);
 
 			} while (!panicstr &&
 			    intr_state == HV_INTR_DELIVERED_STATE);
@@ -703,7 +708,6 @@ cnex_rem_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
 	cnex_ldc_t		*cldcp;
 	cnex_intr_t		*iinfo;
 	cnex_soft_state_t	*cnex_ssp;
-	hrtime_t 		start;
 	int			instance, istate;
 
 	/* Get device instance and structure */
@@ -758,23 +762,16 @@ cnex_rem_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
 	}
 
 	/*
-	 * Make a best effort to wait for pending interrupts
-	 * to finish. There is not much we can do if we timeout.
+	 * Check if there are pending interrupts. If interrupts are
+	 * pending return EAGAIN.
 	 */
-	start = gethrtime();
-	do {
-		rv = hvldc_intr_getstate(cnex_ssp->cfghdl, iinfo->ino, &istate);
-		if (rv) {
-			DWARN("cnex_rem_intr: ino=0x%llx, cannot get state\n",
-			    iinfo->ino);
-			mutex_exit(&cldcp->lock);
-			return (ENXIO);
-		}
-
-		if ((gethrtime() - start) > cnex_pending_tmout)
-			break;
-
-	} while (!panicstr && istate == HV_INTR_DELIVERED_STATE);
+	rv = hvldc_intr_getstate(cnex_ssp->cfghdl, iinfo->ino, &istate);
+	if (rv) {
+		DWARN("cnex_rem_intr: ino=0x%llx, cannot get state\n",
+		    iinfo->ino);
+		mutex_exit(&cldcp->lock);
+		return (ENXIO);
+	}
 
 	/* if interrupts are still pending print warning */
 	if (istate != HV_INTR_IDLE_STATE) {
