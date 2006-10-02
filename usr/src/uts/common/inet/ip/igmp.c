@@ -286,12 +286,13 @@ mld_start_timers(unsigned next)
 
 /*
  * igmp_input:
- * Return 0 if the message is OK and should be handed to "raw" receivers.
+ * Return NULL for a bad packet that is discarded here.
+ * Return mp if the message is OK and should be handed to "raw" receivers.
  * Callers of igmp_input() may need to reinitialize variables that were copied
  * from the mblk as this calls pullupmsg().
  */
 /* ARGSUSED */
-int
+mblk_t *
 igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 {
 	igmpa_t 	*igmpa;
@@ -310,8 +311,7 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 	mblklen = MBLKL(mp);
 	if (mblklen < 1 || mblklen < (iphlen = IPH_HDR_LENGTH(ipha))) {
 		++igmpstat.igps_rcv_tooshort;
-		freemsg(mp);
-		return (-1);
+		goto bad_pkt;
 	}
 	igmplen = ntohs(ipha->ipha_length) - iphlen;
 	/*
@@ -322,8 +322,7 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 		mblk_t *mp1;
 		if ((mp1 = msgpullup(mp, -1)) == NULL) {
 			++igmpstat.igps_rcv_tooshort;
-			freemsg(mp);
-			return (-1);
+			goto bad_pkt;
 		}
 		freemsg(mp);
 		mp = mp1;
@@ -335,16 +334,14 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 	 */
 	if (igmplen < IGMP_MINLEN) {
 		++igmpstat.igps_rcv_tooshort;
-		freemsg(mp);
-		return (-1);
+		goto bad_pkt;
 	}
 	/*
 	 * Validate checksum
 	 */
 	if (IP_CSUM(mp, iphlen, 0)) {
 		++igmpstat.igps_rcv_badsum;
-		freemsg(mp);
-		return (-1);
+		goto bad_pkt;
 	}
 
 	igmpa = (igmpa_t *)(&mp->b_rptr[iphlen]);
@@ -369,13 +366,10 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 			    igmplen);
 		} else {
 			++igmpstat.igps_rcv_tooshort;
-			freemsg(mp);
-			return (-1);
+			goto bad_pkt;
 		}
-		if (next == 0) {
-			freemsg(mp);
-			return (-1);
-		}
+		if (next == 0)
+			goto bad_pkt;
 
 		if (next != INFINITY)
 			igmp_start_timers(next);
@@ -405,7 +399,7 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 					    ntohl(ipif->ipif_lcl_addr));
 				}
 				mutex_exit(&ill->ill_lock);
-				return (0);
+				return (mp);
 			}
 		}
 		mutex_exit(&ill->ill_lock);
@@ -414,8 +408,7 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 		group = igmpa->igmpa_group;
 		if (!CLASSD(group)) {
 			++igmpstat.igps_rcv_badreports;
-			freemsg(mp);
-			return (-1);
+			goto bad_pkt;
 		}
 
 		/*
@@ -472,7 +465,11 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 	 * Pass all valid IGMP packets up to any process(es) listening
 	 * on a raw IGMP socket. Do not free the packet.
 	 */
-	return (0);
+	return (mp);
+
+bad_pkt:
+	freemsg(mp);
+	return (NULL);
 }
 
 static uint_t

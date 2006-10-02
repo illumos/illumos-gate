@@ -16892,7 +16892,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 			BUMP_MIB(&ip_mib, ipInDiscards);
 			return;
 		}
-		if (igmp_input(q, mp, ill)) {
+		if ((mp = igmp_input(q, mp, ill)) == NULL) {
 			/* Bad packet - discarded by igmp_input */
 			TRACE_2(TR_FAC_IP, TR_IP_RPUT_LOCL_END,
 			    "ip_rput_locl_end: q %p (%S)", q, "igmp");
@@ -16901,10 +16901,14 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 			return;
 		}
 		/*
-		 * igmp_input() may have pulled up the message so ipha needs to
-		 * be reinitialized.
+		 * igmp_input() may have returned the pulled up message.
+		 * So first_mp and ipha need to be reinitialized.
 		 */
 		ipha = (ipha_t *)mp->b_rptr;
+		if (mctl_present)
+			first_mp->b_cont = mp;
+		else
+			first_mp = mp;
 		if (ipcl_proto_search(ipha->ipha_protocol) == NULL) {
 			/* No user-level listener for IGMP packets */
 			goto drop_pkt;
@@ -23998,7 +24002,7 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 		return;
 	}
 	case IPPROTO_IGMP:
-		if (igmp_input(q, mp, ill)) {
+		if ((mp = igmp_input(q, mp, ill)) == NULL) {
 			/* Bad packet - discarded by igmp_input */
 			TRACE_2(TR_FAC_IP, TR_IP_WPUT_LOCAL_END,
 			    "ip_wput_local_end: q %p (%S)",
@@ -24008,10 +24012,14 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 			return;
 		}
 		/*
-		 * igmp_input() may have pulled up the message so ipha needs to
-		 * be reinitialized.
+		 * igmp_input() may have returned the pulled up message.
+		 * So first_mp and ipha need to be reinitialized.
 		 */
 		ipha = (ipha_t *)mp->b_rptr;
+		if (mctl_present)
+			first_mp->b_cont = mp;
+		else
+			first_mp = mp;
 		/* deliver to local raw users */
 		break;
 	case IPPROTO_ENCAP:
