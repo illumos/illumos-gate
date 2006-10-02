@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 
-/*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
