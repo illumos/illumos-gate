@@ -207,6 +207,10 @@ static int login_dev_enable = FALSE;
 /* Global to use devinfo snapshot cache */
 static int use_snapshot_cache = FALSE;
 
+/* Global for no-further-processing hash */
+static item_t **nfp_hash;
+static mutex_t  nfp_mutex = DEFAULTMUTEX;
+
 /*
  * Packaged directories - not removed even when empty.
  * The dirs must be listed in canonical form
@@ -390,6 +394,7 @@ update_drvconf(major_t major)
 		err_print(gettext("update_drvconf failed for major %d\n"),
 		    major);
 }
+
 
 static void
 load_dev_acl()
@@ -2037,7 +2042,7 @@ static void
 load_module(char *mname, char *cdir)
 {
 	_devfsadm_create_reg_t *create_reg;
-	_devfsadm_remove_reg_t *remove_reg;
+	_devfsadm_remove_reg_V1_t *remove_reg;
 	create_list_t *create_list_element;
 	create_list_t **create_list_next;
 	remove_list_t *remove_list_element;
@@ -2047,6 +2052,7 @@ load_module(char *mname, char *cdir)
 	char *dlerrstr;
 	void *dlhandle;
 	module_t *module;
+	int flags;
 	int n;
 	int i;
 
@@ -2079,7 +2085,7 @@ load_module(char *mname, char *cdir)
 	}
 
 	/* dlsym the _devfsadm_remove_reg structure */
-	if (NULL == (remove_reg = (_devfsadm_remove_reg_t *)
+	if (NULL == (remove_reg = (_devfsadm_remove_reg_V1_t *)
 	    dlsym(dlhandle, _DEVFSADM_REMOVE_REG))) {
 		vprint(MODLOAD_MID, "dlsym(%s,\n\t%s): symbol not found\n",
 			epath, _DEVFSADM_REMOVE_REG);
@@ -2220,13 +2226,17 @@ load_module(char *mname, char *cdir)
 	 *  put a ptr to each struct devfsadm_remove on "remove_head"
 	 *  list sorted by interpose_lvl.
 	 */
+	flags = 0;
 	if (remove_reg != NULL) {
+		if (remove_reg->version < DEVFSADM_V1)
+			flags |= RM_NOINTERPOSE;
 		for (i = 0; i < remove_reg->count; i++) {
 
 			remove_list_element = (remove_list_t *)
 				s_malloc(sizeof (remove_list_t));
 
 			remove_list_element->remove = &(remove_reg->tblp[i]);
+			remove_list_element->remove->flags |= flags;
 			remove_list_element->modptr = module;
 
 			for (remove_list_next = &(remove_head);
@@ -4004,6 +4014,9 @@ pre_and_post_cleanup(int flags)
 	rd.data = (void *)&cleanup_data;
 	cleanup_data.flags = flags;
 
+	(void) mutex_lock(&nfp_mutex);
+	nfphash_create();
+
 	for (rm = remove_head; rm != NULL; rm = rm->next) {
 		if ((flags & rm->remove->flags) == flags) {
 			cleanup_data.rm = rm;
@@ -4020,6 +4033,8 @@ pre_and_post_cleanup(int flags)
 			}
 		}
 	}
+	nfphash_destroy();
+	(void) mutex_unlock(&nfp_mutex);
 }
 
 /*
@@ -4044,7 +4059,7 @@ pre_and_post_cleanup(int flags)
  *
  */
 static int
-clean_ok(devfsadm_remove_t *remove)
+clean_ok(devfsadm_remove_V1_t *remove)
 {
 	int i;
 
@@ -4103,6 +4118,7 @@ hot_cleanup(char *node_path, char *minor_name, char *ev_subclass,
 	char rmlink[PATH_MAX + 1];
 	nvlist_t *nvl = NULL;
 	int skip;
+	int ret;
 
 	/*
 	 * dev links can go away as part of hot cleanup.
@@ -4119,6 +4135,9 @@ hot_cleanup(char *node_path, char *minor_name, char *ev_subclass,
 	path_len = strlen(path);
 
 	vprint(REMOVE_MID, "%spath=%s\n", fcn, path);
+
+	(void) mutex_lock(&nfp_mutex);
+	nfphash_create();
 
 	for (rm = remove_head; rm != NULL; rm = rm->next) {
 		if ((RM_HOT & rm->remove->flags) == RM_HOT) {
@@ -4137,6 +4156,14 @@ hot_cleanup(char *node_path, char *minor_name, char *ev_subclass,
 				 * the next valid link.
 				 */
 				head->nextlink = link->next;
+
+				/*
+				 * if devlink is in no-further-process hash,
+				 * skip its remove
+				 */
+				if (nfphash_lookup(link->devlink) != NULL)
+					continue;
+
 				if (minor_name)
 					skip = strcmp(link->contents, path);
 				else
@@ -4157,10 +4184,21 @@ hot_cleanup(char *node_path, char *minor_name, char *ev_subclass,
 				 */
 				(void) snprintf(rmlink, sizeof (rmlink),
 				    "%s", link->devlink);
-				(*(rm->remove->callback_fcn))(rmlink);
+				if (rm->remove->flags & RM_NOINTERPOSE) {
+					((void (*)(char *))
+					(rm->remove->callback_fcn))(rmlink);
+				} else {
+					ret = ((int (*)(char *))
+					    (rm->remove->callback_fcn))(rmlink);
+					if (ret == DEVFSADM_TERMINATE)
+						nfphash_insert(rmlink);
+				}
 			}
 		}
 	}
+
+	nfphash_destroy();
+	(void) mutex_unlock(&nfp_mutex);
 
 	/* update device allocation database */
 	if (system_labeled) {
@@ -4263,10 +4301,19 @@ static void
 matching_dev(char *devpath, void *data)
 {
 	cleanup_data_t *cleanup_data = data;
+	int norm_len = strlen(dev_dir) + strlen("/");
+	int ret;
 	char *fcn = "matching_dev: ";
 
 	vprint(RECURSEDEV_MID, "%sexamining devpath = '%s'\n", fcn,
 			devpath);
+
+	/*
+	 * If the link is in the no-further-process hash
+	 * don't do any remove operation on it.
+	 */
+	if (nfphash_lookup(devpath + norm_len) != NULL)
+		return;
 
 	if (resolve_link(devpath, NULL, NULL, NULL, 1) == TRUE) {
 		if (call_minor_init(cleanup_data->rm->modptr) ==
@@ -4274,11 +4321,24 @@ matching_dev(char *devpath, void *data)
 			return;
 		}
 
-		devpath += strlen(dev_dir) + strlen("/");
+		devpath += norm_len;
 
 		vprint(RECURSEDEV_MID, "%scalling"
 			" callback %s\n", fcn, devpath);
-		(*(cleanup_data->rm->remove->callback_fcn))(devpath);
+		if (cleanup_data->rm->remove->flags & RM_NOINTERPOSE)
+			((void (*)(char *))
+			(cleanup_data->rm->remove->callback_fcn))(devpath);
+		else {
+			ret = ((int (*)(char *))
+			    (cleanup_data->rm->remove->callback_fcn))(devpath);
+			if (ret == DEVFSADM_TERMINATE) {
+				/*
+				 * We want no further remove processing for
+				 * this link. Add it to the nfp_hash;
+				 */
+				nfphash_insert(devpath);
+			}
+		}
 	}
 }
 
@@ -8041,6 +8101,84 @@ is_blank(char *line)
 		if (!isspace(*line))
 			return (0);
 	return (1);
+}
+
+/*
+ * Functions to deal with the no-further-processing hash
+ */
+
+static void
+nfphash_create(void)
+{
+	assert(nfp_hash == NULL);
+	nfp_hash = s_zalloc(NFP_HASH_SZ * sizeof (item_t *));
+}
+
+static int
+nfphash_fcn(char *key)
+{
+	int i;
+	uint64_t sum = 0;
+
+	for (i = 0; key[i] != '\0'; i++) {
+		sum += (uchar_t)key[i];
+	}
+
+	return (sum % NFP_HASH_SZ);
+}
+
+static item_t *
+nfphash_lookup(char *key)
+{
+	int	index;
+	item_t  *ip;
+
+	index = nfphash_fcn(key);
+
+	assert(index >= 0);
+
+	for (ip = nfp_hash[index]; ip; ip = ip->i_next) {
+		if (strcmp(ip->i_key, key) == 0)
+			return (ip);
+	}
+
+	return (NULL);
+}
+
+static void
+nfphash_insert(char *key)
+{
+	item_t	*ip;
+	int	index;
+
+	index = nfphash_fcn(key);
+
+	assert(index >= 0);
+
+	ip = s_zalloc(sizeof (item_t));
+	ip->i_key = s_strdup(key);
+
+	ip->i_next = nfp_hash[index];
+	nfp_hash[index] = ip;
+}
+
+static void
+nfphash_destroy(void)
+{
+	int	i;
+	item_t	*ip;
+
+	for (i = 0; i < NFP_HASH_SZ; i++) {
+		/*LINTED*/
+		while (ip = nfp_hash[i]) {
+			nfp_hash[i] = ip->i_next;
+			free(ip->i_key);
+			free(ip);
+		}
+	}
+
+	free(nfp_hash);
+	nfp_hash = NULL;
 }
 
 static int

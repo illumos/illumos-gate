@@ -55,6 +55,7 @@ extern "C" {
 #define	ILEVEL_9 9
 
 #define	DEVFSADM_V0 0
+#define	DEVFSADM_V1 1
 
 #define	DEVFSADM_CONTINUE 0
 #define	DEVFSADM_TERMINATE 1
@@ -66,6 +67,7 @@ extern "C" {
 #define	RM_PRE 0x02
 #define	RM_POST 0x04
 #define	RM_ALWAYS 0x08
+#define	RM_NOINTERPOSE 0x10
 
 #define	TYPE_EXACT 0x01
 #define	TYPE_RE 0x02
@@ -109,8 +111,16 @@ typedef struct devfsadm_remove {
 	char    *dev_dirs_re;   /* dev dirs regex selector */
 	int	flags;		/* eg POST, PRE, HOT, ALWAYS */
 	int	interpose_lvl;	/* eg ILEVEL_0 .. ILEVEL_10 */
-	void (*callback_fcn)(char *logical_link);
+	void	(*callback_fcn)(char *);
 } devfsadm_remove_t;
+
+typedef struct devfsadm_remove_V1 {
+	char 	*device_class;	/* eg "disk", "tape", "display" */
+	char    *dev_dirs_re;   /* dev dirs regex selector */
+	int	flags;		/* eg POST, PRE, HOT, ALWAYS */
+	int	interpose_lvl;	/* eg ILEVEL_0 .. ILEVEL_10 */
+	int	(*callback_fcn)(char *);
+} devfsadm_remove_V1_t;
 
 typedef struct _devfsadm_create_reg {
 	uint_t version;
@@ -126,6 +136,12 @@ typedef struct _devfsadm_remove_reg {
 	devfsadm_remove_t *tblp;
 } _devfsadm_remove_reg_t;
 
+typedef struct _devfsadm_remove_reg_V1 {
+	uint_t version;
+	uint_t count;   /* number of node type registration */
+			/* structures */
+	devfsadm_remove_V1_t *tblp;
+} _devfsadm_remove_reg_V1_t;
 /*
  * "flags" in the devfs_enumerate structure can take the following values.
  * These values specify the substring of devfs path to be used for
@@ -166,6 +182,12 @@ typedef struct devfsadm_enumerate {
 	DEVFSADM_V0, \
 	(sizeof (tbl) / sizeof (devfsadm_remove_t)), \
 	((devfsadm_remove_t *)(tbl)) }
+
+#define	DEVFSADM_REMOVE_INIT_V1(tbl)\
+	_devfsadm_remove_reg_V1_t _devfsadm_remove_reg = {\
+	DEVFSADM_V1, \
+	(sizeof (tbl) / sizeof (devfsadm_remove_V1_t)), \
+	((devfsadm_remove_V1_t *)(tbl)) }
 
 int devfsadm_noupdate(void);
 const char *devfsadm_root_path(void);

@@ -149,6 +149,7 @@ extern "C" {
 #define	LDEV_DRV_DELIMS ", \t\n"
 #define	LDEV_DEV_DELIM ":"
 #define	LDEV_DRVLIST_NAME "driver"
+#define	NFP_HASH_SZ 256
 
 #define	TYPE_LINK 0x00
 #define	TYPE_DEVICES 0x01
@@ -284,10 +285,15 @@ struct mlist {
 };
 
 typedef struct remove_list {
-	devfsadm_remove_t *remove;
+	devfsadm_remove_V1_t *remove;
 	module_t *modptr;
 	struct remove_list *next;
 } remove_list_t;
+
+typedef struct item {
+	char *i_key;
+	struct item *i_next;
+} item_t;
 
 typedef struct cleanup_data {
 	int flags;
@@ -416,7 +422,7 @@ static void recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd);
 static void matching_dev(char *devpath, void *data);
 static int resolve_link(char *devpath, char **content_p, int *type_p,
     char **devfs_path, int dangle);
-static int clean_ok(devfsadm_remove_t *remove);
+static int clean_ok(devfsadm_remove_V1_t *remove);
 static int translate_major(dev_t old_dev, dev_t *new_dev);
 static int get_major_no(char *driver, major_t *major);
 static int load_n2m_table(char *filename);
@@ -511,6 +517,11 @@ static void reset_node_permissions(di_node_t, di_minor_t);
 static void devname_lookup_handler(void *, char *, size_t,
     door_desc_t *, uint_t);		/* /dev name lookup server */
 static int devname_kcall(int, void *);	/* syscall into the devname fs */
+static void nfphash_create(void);
+static int nfphash_fcn(char *key);
+static item_t *nfphash_lookup(char *key);
+static void nfphash_insert(char *key);
+static void nfphash_destroy(void);
 
 /* convenient short hands */
 #define	vprint		devfsadm_print
