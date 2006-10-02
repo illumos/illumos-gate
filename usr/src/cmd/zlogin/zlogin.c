@@ -114,6 +114,8 @@ static const char *pname;
 #define	DEFAULTSHELL	"/sbin/sh"
 #define	DEF_PATH	"/usr/sbin:/usr/bin"
 
+#define	ZLOGIN_BUFSIZ	8192
+
 /*
  * See canonify() below.  CANONIFY_LEN is the maximum length that a
  * "canonical" sequence will expand to (backslash, three octal digits, NUL).
@@ -620,7 +622,7 @@ static void
 doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 {
 	struct pollfd pollfds[3];
-	char ibuf[BUFSIZ];
+	char ibuf[ZLOGIN_BUFSIZ];
 	int cc, ret;
 
 	/* read from stdout of zone and write to stdout of global zone */
@@ -657,7 +659,7 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 		if (pollfds[0].revents) {
 			if (pollfds[0].revents &
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-				cc = read(stdout_fd, ibuf, BUFSIZ);
+				cc = read(stdout_fd, ibuf, ZLOGIN_BUFSIZ);
 				if (cc == -1 && (errno != EINTR || dead))
 					break;
 				if (cc == 0)	/* EOF */
@@ -673,7 +675,7 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 		if (pollfds[1].revents) {
 			if (pollfds[1].revents &
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-				cc = read(stderr_fd, ibuf, BUFSIZ);
+				cc = read(stderr_fd, ibuf, ZLOGIN_BUFSIZ);
 				if (cc == -1 && (errno != EINTR || dead))
 					break;
 				if (cc == 0)	/* EOF */
@@ -689,7 +691,7 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 		if (pollfds[2].revents) {
 			if (pollfds[2].revents &
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-				cc = read(STDIN_FILENO, ibuf, BUFSIZ);
+				cc = read(STDIN_FILENO, ibuf, ZLOGIN_BUFSIZ);
 				if (cc == -1 && (errno != EINTR || dead))
 					break;
 
@@ -740,12 +742,12 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 	    sizeof (pollfds) / sizeof (struct pollfd), 100);
 	if (pollfds[0].revents &
 	    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-		if ((cc = read(stdout_fd, ibuf, BUFSIZ)) > 0)
+		if ((cc = read(stdout_fd, ibuf, ZLOGIN_BUFSIZ)) > 0)
 			(void) write(STDOUT_FILENO, ibuf, cc);
 	}
 	if (pollfds[1].revents &
 	    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-		if ((cc = read(stderr_fd, ibuf, BUFSIZ)) > 0)
+		if ((cc = read(stderr_fd, ibuf, ZLOGIN_BUFSIZ)) > 0)
 			(void) write(STDERR_FILENO, ibuf, cc);
 	}
 }
