@@ -35,6 +35,7 @@ static const char *printers = "/etc/printers.conf";
 #include "files_common.h"
 #include <stdlib.h>
 #include <strings.h>
+#include <ctype.h>
 
 static int
 check_name(nss_XbyY_args_t *argp, const char *line, int linelen)
@@ -66,6 +67,115 @@ check_name(nss_XbyY_args_t *argp, const char *line, int linelen)
 	return (0);
 }
 
+nss_status_t
+_nss_files_XY_printer(be, args, filter, check)
+	files_backend_ptr_t	be;
+	nss_XbyY_args_t		*args;
+	const char		*filter;	/* advisory, to speed up */
+						/* string search */
+	files_XY_check_func	check;	/* NULL means one-shot, for getXXent */
+{
+	nss_status_t		res;
+	int	parsestat;
+	int (*func)();
+
+	if (filter != NULL && *filter == '\0')
+		return (NSS_NOTFOUND);
+	if (be->buf == 0 &&
+		(be->buf = malloc(be->minbuf)) == 0) {
+		return (NSS_UNAVAIL); /* really panic, malloc failed */
+	}
+
+	if (check != 0 || be->f == 0) {
+		if ((res = _nss_files_setent(be, 0)) != NSS_SUCCESS) {
+			return (res);
+		}
+	}
+
+	res = NSS_NOTFOUND;
+
+	/*CONSTCOND*/
+	while (1) {
+		char		*instr	= be->buf;
+		int		linelen;
+
+		if ((linelen = _nss_files_read_line(be->f, instr,
+		    be->minbuf)) < 0) {
+			/* End of file */
+			args->returnval = 0;
+			args->returnlen = 0;
+			break;
+		}
+
+		/* begin at the first non-blank character */
+		while (isspace(*instr)) {
+			instr++;
+			linelen--;
+		}
+
+		/* comment line, skip it. */
+		if (*instr == '#')
+			continue;
+
+		/* blank line, skip it */
+		if ((*instr == '\n') || (*instr == '\0'))
+			continue;
+
+		if (filter != 0 && strstr(instr, filter) == 0) {
+			/*
+			 * Optimization:  if the entry doesn't contain the
+			 *   filter string then it can't be the entry we want,
+			 *   so don't bother looking more closely at it.
+			 */
+			continue;
+		}
+
+		args->returnval = 0;
+		args->returnlen = 0;
+
+		if (check != NULL && (*check)(args, instr, linelen) == 0)
+			continue;
+
+		func = args->str2ent;
+		parsestat = (*func)(instr, linelen, args->buf.result,
+					args->buf.buffer, args->buf.buflen);
+
+		if (parsestat == NSS_STR_PARSE_SUCCESS) {
+			args->returnval = (args->buf.result != NULL)?
+					args->buf.result : args->buf.buffer;
+			args->returnlen = linelen;
+			res = NSS_SUCCESS;
+			break;
+		} else if (parsestat == NSS_STR_PARSE_ERANGE) {
+			args->erange = 1;
+			break;
+		} else if (parsestat == NSS_STR_PARSE_PARSE)
+			continue;
+	}
+
+	/*
+	 * stayopen is set to 0 by default in order to close the opened
+	 * file.  Some applications may break if it is set to 1.
+	 */
+	if (check != 0 && !args->stayopen) {
+		(void) _nss_files_endent(be, 0);
+	}
+
+	return (res);
+}
+
+static nss_status_t
+getent(be, a)
+	files_backend_ptr_t	be;
+	void			*a;
+{
+	nss_status_t status;
+	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
+
+	return (_nss_files_XY_printer(be, argp, (files_XY_check_func)0,
+					(const char *)0));
+}
+
 static nss_status_t
 getbyname(be, a)
 	files_backend_ptr_t	be;
@@ -73,15 +183,14 @@ getbyname(be, a)
 {
 	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
-	return (_nss_files_XY_all(be, argp, 1, argp->key.name,
-			check_name));
+	return (_nss_files_XY_printer(be, argp, argp->key.name, check_name));
 }
 
 static files_backend_op_t printers_ops[] = {
 	_nss_files_destr,
 	_nss_files_endent,
 	_nss_files_setent,
-	_nss_files_getent_rigid,
+	getent,
 	getbyname
 };
 

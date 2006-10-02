@@ -443,7 +443,6 @@ static DEFINE_NSS_DB_ROOT(db_root);
 static DEFINE_NSS_GETENT(context);
 
 static char *private_ns = NULL;
-static char initialized = 0;
 
 static void
 _nss_initf_printers(p)
@@ -459,14 +458,12 @@ _nss_initf_printers(p)
 		 */
 		p->name = NSS_DBNAM__PRINTERS;		/* "_printers" */
 		p->default_config = private_ns;
-		private_ns = NULL;
-	} else if (initialized == 0) {
+	} else {
 		/* regular behaviour */
 		p->name = NSS_DBNAM_PRINTERS;	 /* "printers" */
 		p->default_config = NSS_DEFCONF_PRINTERS;
-		initialized = 1;
 	}
-	syslog(LOG_DEBUG, "database: %s, services: %s",
+	syslog(LOG_DEBUG, "database: %s, default: %s",
 		(p->name ? p->name : "NULL"),
 		(p->default_config ? p->default_config : "NULL"));
 }
@@ -504,9 +501,9 @@ setprinterentry(int stayopen, char *ns)
 #ifdef NSS_EMULATION
 	emul_setprinterentry(stayopen);
 #elif NSS_SOLARIS
-	initialized = 0;
 	private_ns = ns;
 	nss_setent(&db_root, _nss_initf_printers, &context);
+	private_ns = NULL;
 #endif
 	return (0);
 }
@@ -518,9 +515,9 @@ endprinterentry(int i)
 #ifdef NSS_EMULATION
 	emul_endprinterentry();
 #elif NSS_SOLARIS
-	initialized = 0;
 	nss_endent(&db_root, _nss_initf_printers, &context);
 	nss_delete(&db_root);
+	private_ns = NULL;
 #endif
 	return (0);
 }
@@ -540,9 +537,11 @@ getprinterentry(char *ns)
 #elif NSS_SOLARIS
 	nss_XbyY_args_t arg;
 
+	private_ns = ns;
 	NSS_XbyY_INIT(&arg, buf, buf, sizeof (buf), str2printer);
 	res = nss_getent(&db_root, _nss_initf_printers, &context, &arg);
 	(void) NSS_XbyY_FINI(&arg);
+	private_ns = NULL;
 #endif
 
 	if (res != NSS_SUCCESS)
@@ -607,6 +606,7 @@ getprinterbyname(char *name, char *ns)
 		res = nss_search(&db_root, _nss_initf_printers,
 				NSS_DBOP_PRINTERS_BYNAME, &arg);
 		(void) NSS_XbyY_FINI(&arg);
+		private_ns = NULL;
 
 		if (res != NSS_SUCCESS)
 			buf[0] = '\0';

@@ -42,8 +42,6 @@ static DEFINE_NSS_GETENT(context);
 
 static int printers_stayopen;
 static char *private_ns = NULL;
-static char initialized = 0;
-
 
 static void
 _nss_initf_printers(p)
@@ -59,14 +57,12 @@ _nss_initf_printers(p)
 		 */
 		p->name = NSS_DBNAM__PRINTERS;		/* "_printers" */
 		p->default_config = normalize_ns_name(private_ns);
-		private_ns = NULL;
-	} else if (initialized == 0) {
+	} else {
 		/* regular behaviour */
 		p->name = NSS_DBNAM_PRINTERS;	 /* "printers" */
 		p->default_config = NSS_DEFCONF_PRINTERS;
-		/* keep reinitializing as needed was: initialized = 1; */
 	}
-	syslog(LOG_DEBUG, "database: %s, services: %s",
+	syslog(LOG_DEBUG, "database: %s, default: %s",
 		(p->name ? p->name : "NULL"),
 		(p->default_config ? p->default_config : "NULL"));
 }
@@ -102,9 +98,9 @@ int
 setprinterentry(int stayopen, char *ns)
 {
 	printers_stayopen |= stayopen;
-	initialized = 0;
 	private_ns = ns;
 	nss_setent(&db_root, _nss_initf_printers, &context);
+	private_ns = NULL;
 	return (0);
 }
 
@@ -113,9 +109,9 @@ int
 endprinterentry()
 {
 	printers_stayopen = 0;
-	initialized = 0;
 	nss_endent(&db_root, _nss_initf_printers, &context);
 	nss_delete(&db_root);
+	private_ns = NULL;
 	return (0);
 }
 
@@ -127,9 +123,12 @@ getprinterentry(char *linebuf, int linelen, char *ns)
 	nss_XbyY_args_t arg;
 	nss_status_t	res;
 
+	private_ns = ns;
 	NSS_XbyY_INIT(&arg, linebuf, linebuf, linelen, str2printer);
 	res = nss_getent(&db_root, _nss_initf_printers, &context, &arg);
 	(void) NSS_XbyY_FINI(&arg);
+	private_ns = NULL;
+
 	return (arg.status = res);
 }
 
@@ -146,5 +145,7 @@ getprinterbyname(char *name, char *linebuf, int linelen, char *ns)
 	res = nss_search(&db_root, _nss_initf_printers,
 			NSS_DBOP_PRINTERS_BYNAME, &arg);
 	(void) NSS_XbyY_FINI(&arg);
+	private_ns = NULL;
+
 	return (arg.status = res);
 }
