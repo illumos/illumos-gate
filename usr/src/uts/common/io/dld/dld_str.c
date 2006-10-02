@@ -1831,7 +1831,8 @@ dld_tx_enqueue(dld_str_t *dsp, mblk_t *mp, boolean_t head_insert)
 	mutex_exit(&dsp->ds_tx_list_lock);
 done:
 	/* Schedule service thread to drain the transmit queue */
-	qenable(q);
+	if (!head_insert)
+		qenable(q);
 }
 
 void
