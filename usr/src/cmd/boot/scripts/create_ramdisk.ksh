@@ -78,6 +78,9 @@ function cleanup
 
 function getsize
 {
+	# should we exclude amd64 binaries?
+	[ $is_amd64 -eq 0 ] && NO_AMD64="-type d -name amd64 -prune -o"
+
 	# Estimate image size and add %10 overhead for ufs stuff.
 	# Note, we can't use du here in case we're on a filesystem, e.g. zfs,
 	# in which the disk usage is less than the sum of the file sizes.
@@ -89,16 +92,16 @@ function getsize
 	# next multiple of 1024.  This mimics the behavior of ufs especially
 	# with directories.  This results in a total size that's slightly
 	# bigger than if du was called on a ufs directory.
-	total_size=$(cd "/$ALT_ROOT"; find $filelist -ls 2>/dev/null | nawk '
-	    {t += ($7 % 1024) ? (int($7 / 1024) + 1) * 1024 : $7}
-	    END {print int(t * 1.10 / 1024)}')
+	total_size=$(cd "/$ALT_ROOT"
+		find $filelist $NO_AMD64 -ls 2>/dev/null | nawk '
+			{t += ($7 % 1024) ? (int($7 / 1024) + 1) * 1024 : $7}
+			END {print int(t * 1.10 / 1024)}')
 }
 
 function create_ufs
 {
 	# should we exclude amd64 binaries?
-	[ $is_amd64 -eq 0 ] && NO_AMD64="-name amd64 -prune"
-
+	[ $is_amd64 -eq 0 ] && NO_AMD64="-type d -name amd64 -prune -o"
 
 	mkfile ${total_size}k "$rdfile"
 	lofidev=`lofiadm -a "$rdfile"`
@@ -110,7 +113,7 @@ function create_ufs
 	# do the actual copy
 	cd "/$ALT_ROOT"
 
-	find $filelist -print $NO_AMD64 2> /dev/null | \
+	find $filelist $NO_AMD64 -print 2> /dev/null | \
 	     cpio -pdum "$rdmnt" 2> /dev/null
 	umount "$rdmnt"
 	lofiadm -d "$rdfile"
@@ -174,11 +177,14 @@ function create_isofs
 #
 # get filelist
 #
-filelist=`cat "$ALT_ROOT/boot/solaris/filelist.ramdisk"`
-if [ -f "$ALT_ROOT/etc/boot/solaris/filelist.ramdisk" ]; then
-	filelistI=`cat "$ALT_ROOT/etc/boot/solaris/filelist.ramdisk"`
+files=$(ls "$ALT_ROOT/boot/solaris/filelist.ramdisk" \
+	"$ALT_ROOT/etc/boot/solaris/filelist.ramdisk" 2>/dev/null)
+if [[ -z "$files" ]]
+then
+	print -u2 "Can't find filelist.ramdisk"
+	exit 1
 fi
-filelist=`echo $filelist $filelistI | sort -u`
+filelist=$(sort -u $files)
 
 #
 # decide if cpu is amd64 capable
@@ -223,6 +229,10 @@ else
 	create_isofs
 fi
 
+# Make sure $BOOT_ARCHIVE-new created by either create_ufs or creat_isofs
+# above is flushed to the backing store before we do anything with it.
+lockfs -f "/$ALT_ROOT"
+
 # sanity check the archive before moving it into place
 # the file type check also establishes that the file exists at all
 #
@@ -250,7 +260,6 @@ if [ $? = 0 ]; then
 	exit
 fi
 
-lockfs -f "/$ALT_ROOT"
 mv "$ALT_ROOT/$BOOT_ARCHIVE-new" "$ALT_ROOT/$BOOT_ARCHIVE"
 lockfs -f "/$ALT_ROOT"
 

@@ -1,4 +1,4 @@
-#!/bin/ksh
+#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -62,13 +62,8 @@ cleanup()
 		rmdir $MNT
 	fi
 
-	if [ -f $TMR ] ; then
-		rm $TMR
-	fi
-	
-	if [ $LOFIDEV ] ; then
-		lofiadm -d $LOFIDEV
-	fi
+	lofiadm -d "$TMR" 2>/dev/null
+	rm -f "$TMR" "$TMR.gz"
 }
 
 archive_X()
@@ -88,22 +83,23 @@ archive_X()
 
 	# create the graphics and non-graphics X archive
 	#
-	cd "$MINIROOT/usr"
-	find openwin dt X11 -print 2> /dev/null |\
-	    cpio -ocmPuB 2> /dev/null | bzip2 > "$CPIO_DIR/X.cpio.bz2"
+	(
+		cd "$MINIROOT/usr"
+		find openwin dt X11 -print 2> /dev/null |\
+		    cpio -ocmPuB 2> /dev/null | bzip2 > "$CPIO_DIR/X.cpio.bz2"
 
-	find openwin/bin/mkfontdir \
-	     openwin/lib/installalias \
-	     openwin/server/lib/libfont.so.1 \
-	     openwin/server/lib/libtypesclr.so.0 \
-	         -print | cpio -ocmPuB 2> /dev/null | bzip2 > \
-	         "$CPIO_DIR/X_small.cpio.bz2"
+		find openwin/bin/mkfontdir \
+		     openwin/lib/installalias \
+		     openwin/server/lib/libfont.so.1 \
+		     openwin/server/lib/libtypesclr.so.0 \
+			 -print | cpio -ocmPuB 2> /dev/null | bzip2 > \
+			 "$CPIO_DIR/X_small.cpio.bz2"
 
-	rm -rf dt openwin X11
-	ln -s ../tmp/root/usr/dt
-	ln -s ../tmp/root/usr/openwin
-	ln -s ../tmp/root/usr/X11
-	cd ../..
+		rm -rf dt openwin X11
+		ln -s ../tmp/root/usr/dt
+		ln -s ../tmp/root/usr/openwin
+		ln -s ../tmp/root/usr/X11
+	)
 }
 
 packmedia()
@@ -117,20 +113,21 @@ packmedia()
 	mkdir -p "$MEDIA/$RELEASE/Tools/Boot"
 	mkdir -p "$MEDIA/boot"
 
-	cd "$MINIROOT"
-
 	# archive package databases to conserve memory
 	#
-	find tmp/root/var/sadm/install tmp/root/var/sadm/pkg -print | \
-	    cpio -ocmPuB 2> /dev/null | bzip2 > \
-	    "$MEDIA/$RELEASE/Tools/Boot/pkg_db.cpio.bz2"
+	(
+		cd "$MINIROOT"
+		find tmp/root/var/sadm/install tmp/root/var/sadm/pkg -print | \
+		    cpio -ocmPuB 2> /dev/null | bzip2 > \
+		    "$MEDIA/$RELEASE/Tools/Boot/pkg_db.cpio.bz2"
+	)
 
 	rm -rf "$MINIROOT/tmp/root/var/sadm/install"
 	rm -rf "$MINIROOT/tmp/root/var/sadm/pkg"
 
 	# clear out 64 bit support to conserve memory
 	#
-	if [ STRIP_AMD64 != false ] ; then
+	if [ "$STRIP_AMD64" != false ] ; then
 		find "$MINIROOT" -name amd64 -type directory | xargs rm -rf
 	fi
 
@@ -146,10 +143,12 @@ packmedia()
 		    ${MEDIA}/boot/grub/menu.lst
 	fi
 
-	cd "$MEDIA/$RELEASE/Tools/Boot"
-	ln -sf ../../../boot/x86.miniroot
-	ln -sf ../../../boot/multiboot
-	ln -sf ../../../boot/grub/pxegrub
+	(
+		cd "$MEDIA/$RELEASE/Tools/Boot"
+		ln -sf ../../../boot/x86.miniroot
+		ln -sf ../../../boot/multiboot
+		ln -sf ../../../boot/grub/pxegrub
+	)
 }
 
 unarchive_X()
@@ -168,9 +167,11 @@ unarchive_X()
 
 	# unpack X
 	#
-	cd "$UNPACKED_ROOT/usr"
-	rm -rf dt openwin X11
-	bzcat "$CPIO_DIR/X.cpio.bz2" | cpio -icdmu 2> /dev/null
+	(
+		cd "$UNPACKED_ROOT/usr"
+		rm -rf dt openwin X11
+		bzcat "$CPIO_DIR/X.cpio.bz2" | cpio -icdmu 2> /dev/null
+	)
 }
 
 unpackmedia()
@@ -185,18 +186,21 @@ unpackmedia()
 
 	# unpack package databases
 	#
-	cd "$UNPACKED_ROOT"
-	bzcat "$MEDIA/$RELEASE/Tools/Boot/pkg_db.cpio.bz2" | cpio -icdmu \
-	    2> /dev/null
+	(
+		cd "$UNPACKED_ROOT"
+		bzcat "$MEDIA/$RELEASE/Tools/Boot/pkg_db.cpio.bz2" |
+		    cpio -icdmu 2> /dev/null
+	)
 }
 
 do_unpack()
 {
 	rm -rf "$UNPACKED_ROOT"
 	mkdir -p "$UNPACKED_ROOT"
-	cd $MNT
-	find . -print | cpio -pdum "$UNPACKED_ROOT" 2> /dev/null
-	cd "$BASE"
+	(
+		cd $MNT
+		find . -print | cpio -pdum "$UNPACKED_ROOT" 2> /dev/null
+	)
 	umount $MNT
 }
 
@@ -231,7 +235,7 @@ unpack()
 	fi
 
 	rmdir $MNT
-	lofiadm -d $TMR ; LOFIDEV=""
+	lofiadm -d $TMR ; LOFIDEV=
 	rm $TMR
 }
 
@@ -270,15 +274,15 @@ pack()
 	mkdir -p $MNT
 	mount -o nologging $LOFIDEV $MNT 
 	rmdir $MNT/lost+found
-	cd "$UNPACKED_ROOT"
-	find . -print | cpio -pdum $MNT 2> /dev/null
+	(
+		cd "$UNPACKED_ROOT"
+		find . -print | cpio -pdum $MNT 2> /dev/null
+	)
 	lockfs -f $MNT
 	umount $MNT
 	rmdir $MNT
 	lofiadm -d $LOFIDEV
-	LOFIDEV=""
-
-	cd "$BASE"
+	LOFIDEV=
 
 	rm -f "$TMR.gz"
 	gzip -f "$TMR"
@@ -290,6 +294,7 @@ pack()
 #
 
 EXTRA_SPACE=0
+STRIP_AMD64=
 
 while getopts s:6 opt ; do
 	case $opt in
