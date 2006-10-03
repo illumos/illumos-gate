@@ -1135,3 +1135,4 @@ Bugid   Risk Synopsis
 	PSARC/2006/558 R_*_SIZE relocation support
 6475375 symbol search optimization to reduce rescans
 6475497 elfdump(1) is misreporting sh_link
+6477132 ld.so.1: memory leak when running set*id application

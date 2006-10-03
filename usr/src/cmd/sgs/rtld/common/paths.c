@@ -273,7 +273,7 @@ get_next_dir(Pnode ** dirlist, Rt_map * lmp, uint_t flags)
 	/*
 	 * If we got here, no more directories to search, return NULL.
 	 */
-	return ((Pnode *) NULL);
+	return (NULL);
 }
 
 
@@ -822,7 +822,7 @@ is_path_secure(const char *opath, Rt_map * clmp, uint_t info, uint_t flags)
  * or may be used to determine additional security or diagnostic processing.
  */
 Pnode *
-expand_paths(Rt_map * clmp, const char *list, uint_t orig, uint_t omit)
+expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
 {
 	char	*str, *olist = 0, *nlist = (char *)list;
 	Pnode	*pnp, *npnp, *opnp;
@@ -854,7 +854,7 @@ expand_paths(Rt_map * clmp, const char *list, uint_t orig, uint_t omit)
 				continue; /* Process next segment */
 
 			if ((str = strdup(MSG_ORIG(MSG_FMT_CWD))) == NULL)
-				return ((Pnode *)0);
+				return (NULL);
 			len = MSG_FMT_CWD_SIZE;
 
 		} else {
@@ -881,7 +881,7 @@ expand_paths(Rt_map * clmp, const char *list, uint_t orig, uint_t omit)
 			olen = len;
 			if ((tkns = expand(&str, &len, &elist, orig, omit,
 			    clmp)) == 0)
-				return ((Pnode *)0);
+				return (NULL);
 
 			if (elist != nlist) {
 				if (olist)
@@ -896,15 +896,19 @@ expand_paths(Rt_map * clmp, const char *list, uint_t orig, uint_t omit)
 		 */
 		if (rtld_flags & RT_FL_SECURE) {
 			if (is_path_secure((const char *)str, clmp, orig,
-			    tkns) == 0)
+			    tkns) == 0) {
+				free(str);
 				continue;
+			}
 		}
 
 		/*
 		 * Allocate a new Pnode for this string.
 		 */
-		if ((npnp = calloc(1, sizeof (Pnode))) == 0)
-			return ((Pnode *)0);
+		if ((npnp = calloc(1, sizeof (Pnode))) == 0) {
+			free(str);
+			return (NULL);
+		}
 		if (opnp == 0)
 			pnp = npnp;
 		else
@@ -918,8 +922,10 @@ expand_paths(Rt_map * clmp, const char *list, uint_t orig, uint_t omit)
 			 * occurred, maintain the original string for possible
 			 * diagnostic use.
 			 */
-			if ((oname = malloc(olen + 1)) == 0)
-				return ((Pnode *)0);
+			if ((oname = malloc(olen + 1)) == 0) {
+				free(str);
+				return (NULL);
+			}
 			(void) strncpy(oname, ostr, olen);
 			oname[olen] = '\0';
 			npnp->p_oname = oname;
