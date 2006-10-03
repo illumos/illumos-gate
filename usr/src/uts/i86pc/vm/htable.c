@@ -1846,12 +1846,19 @@ x86pte_set(htable_t *ht, uint_t entry, x86pte_t new, void *ptr)
 			prev = *ptep;
 			n = new;
 			/*
-			 * prevent potential data loss by preserving the MOD
-			 * bit if set in the current PTE and the pfns are the
-			 * same. For example, segmap can reissue a read-only
-			 * hat_memload on top of a dirty page.
+			 * prevent potential data loss by preserving the
+			 * MOD/REF bits if set in the current PTE, the pfns are
+			 * the same and the 'new' pte is non-zero. For example,
+			 * segmap can reissue a read-only hat_memload on top
+			 * of a dirty page.
+			 *
+			 * 'new' is required to be non-zero on a remap as at
+			 * least the valid bit should be non-zero. The 'new'
+			 * check also avoids incorrectly preserving the REF/MOD
+			 * bit when unmapping pfn 0.
 			 */
-			if (PTE_ISVALID(prev) && PTE2PFN(prev, ht->ht_level) ==
+			if (new != 0 && PTE_ISVALID(prev) &&
+			    PTE2PFN(prev, ht->ht_level) ==
 			    PTE2PFN(n, ht->ht_level)) {
 				n |= prev & (PT_REF | PT_MOD);
 			}
@@ -1868,7 +1875,8 @@ x86pte_set(htable_t *ht, uint_t entry, x86pte_t new, void *ptr)
 		for (;;) {
 			p32 = *pte32p;
 			n32 = new;
-			if (PTE_ISVALID(p32) && PTE2PFN(p32, ht->ht_level) ==
+			if (new != 0 && PTE_ISVALID(p32) &&
+			    PTE2PFN(p32, ht->ht_level) ==
 			    PTE2PFN(n32, ht->ht_level)) {
 				n32 |= p32 & (PT_REF | PT_MOD);
 			}
