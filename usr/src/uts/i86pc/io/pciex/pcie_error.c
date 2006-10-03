@@ -256,19 +256,26 @@ pcie_error_init(dev_info_t *cdip)
 		goto cleanup;
 
 	/*
-	 * Only enable these set of errors for Nvidia chipset, and disable
-	 * UR reporting for non their child devices.
+	 * Enable PCI-Express Baseline Error Handling
+	 */
+	device_ctl = pci_config_get16(cfg_hdl, cap_ptr + PCIE_DEVCTL);
+
+	/*
+	 * For Nvidia chipset, call pcie_nvidia_error_init().
+	 *
+	 * For non-Nvidia Root Ports, disable UR for all child devices by
+	 * changing the default ue mask (for AER devices) and the default
+	 * device control value (for non-AER device).
 	 */
 	if ((pci_config_get16(cfg_hdl, PCI_CONF_VENID) == NVIDIA_VENDOR_ID) &&
 	    NVIDIA_PCIE_RC_DEV_ID(pci_config_get16(cfg_hdl, PCI_CONF_DEVID)))
 		pcie_nvidia_error_init(cdip, cfg_hdl, cap_ptr, aer_ptr);
-	else if (dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT)
+	else if (dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT) {
 		pcie_expected_ue_mask |= PCIE_AER_UCE_UR;
+		pcie_device_ctrl_default &= ~PCIE_DEVCTL_UR_REPORTING_EN;
+		device_ctl &= ~PCIE_DEVCTL_UR_REPORTING_EN;
+	}
 
-	/*
-	 * Enable PCI-Express Baseline Error Handling
-	 */
-	device_ctl = pci_config_get16(cfg_hdl, cap_ptr + PCIE_DEVCTL);
 	pci_config_put16(cfg_hdl, cap_ptr + PCIE_DEVCTL,
 	    pcie_device_ctrl_default | device_ctl);
 
