@@ -60,6 +60,7 @@
  * This is a stripped-down version of strtoull, suitable only for converting
  * lowercase hexidecimal numbers that don't overflow.
  */
+#ifdef _KERNEL
 static uint64_t
 strtonum(char *str, char **nptr)
 {
@@ -85,6 +86,7 @@ strtonum(char *str, char **nptr)
 
 	return (val);
 }
+#endif
 
 /*
  * Convert a bookmark to a string.
@@ -100,6 +102,7 @@ bookmark_to_name(zbookmark_t *zb, char *buf, size_t len)
 /*
  * Convert a string to a bookmark
  */
+#ifdef _KERNEL
 static void
 name_to_bookmark(char *buf, zbookmark_t *zb)
 {
@@ -112,6 +115,7 @@ name_to_bookmark(char *buf, zbookmark_t *zb)
 	zb->zb_blkid = strtonum(buf + 1, &buf);
 	ASSERT(*buf == '\0');
 }
+#endif
 
 /*
  * Log an uncorrectable error to the persistent error log.  We add it to the

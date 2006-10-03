@@ -846,7 +846,7 @@ label_disk(char *name)
 		 * were unable to read the disk geometry.
 		 */
 		if (errno == ENOMEM)
-			no_memory();
+			zpool_no_memory();
 
 		(void) fprintf(stderr, gettext("cannot label '%s': unable to "
 		    "read disk geometry\n"), name);
@@ -1175,7 +1175,7 @@ construct_spec(int argc, char **argv)
 				child = realloc(child,
 				    children * sizeof (nvlist_t *));
 				if (child == NULL)
-					no_memory();
+					zpool_no_memory();
 				if ((nv = make_leaf_vdev(argv[c])) == NULL)
 					return (NULL);
 				child[children - 1] = nv;
@@ -1227,7 +1227,7 @@ construct_spec(int argc, char **argv)
 		toplevels++;
 		top = realloc(top, toplevels * sizeof (nvlist_t *));
 		if (top == NULL)
-			no_memory();
+			zpool_no_memory();
 		top[toplevels - 1] = nv;
 	}
 

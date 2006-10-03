@@ -1869,7 +1869,6 @@ static int
 set_callback(zfs_handle_t *zhp, void *data)
 {
 	set_cbdata_t *cbp = data;
-	int ret = 1;
 
 	if (zfs_prop_set(zhp, cbp->cb_propname, cbp->cb_value) != 0) {
 		switch (libzfs_errno(g_zfs)) {
@@ -1884,9 +1883,7 @@ set_callback(zfs_handle_t *zhp, void *data)
 		}
 		return (1);
 	}
-	ret = 0;
-error:
-	return (ret);
+	return (0);
 }
 
 static int
@@ -3014,7 +3011,7 @@ manual_unmount(int argc, char **argv)
 static int
 volcheck(zpool_handle_t *zhp, void *data)
 {
-	int isinit = (int)data;
+	boolean_t isinit = *((boolean_t *)data);
 
 	if (isinit)
 		return (zpool_create_zvol_links(zhp));
@@ -3029,7 +3026,7 @@ volcheck(zpool_handle_t *zhp, void *data)
 static int
 do_volcheck(boolean_t isinit)
 {
-	return (zpool_iter(g_zfs, volcheck, (void *)isinit) ? 1 : 0);
+	return (zpool_iter(g_zfs, volcheck, &isinit) ? 1 : 0);
 }
 
 int

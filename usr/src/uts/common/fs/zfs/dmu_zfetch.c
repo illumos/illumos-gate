@@ -55,7 +55,6 @@ static int		dmu_zfetch_find(zfetch_t *, zstream_t *, int);
 static int		dmu_zfetch_stream_insert(zfetch_t *, zstream_t *);
 static zstream_t	*dmu_zfetch_stream_reclaim(zfetch_t *);
 static void		dmu_zfetch_stream_remove(zfetch_t *, zstream_t *);
-static void		dmu_zfetch_stream_update(zfetch_t *, zstream_t *);
 static int		dmu_zfetch_streams_equal(zstream_t *, zstream_t *);
 
 /*

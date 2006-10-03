@@ -99,6 +99,27 @@ zpool_name_valid(libzfs_handle_t *hdl, boolean_t isopen, const char *pool)
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "pool name is reserved"));
 				break;
+
+			case NAME_ERR_LEADING_SLASH:
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "leading slash in name"));
+				break;
+
+			case NAME_ERR_EMPTY_COMPONENT:
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "empty component in name"));
+				break;
+
+			case NAME_ERR_TRAILING_SLASH:
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "trailing slash in name"));
+				break;
+
+			case NAME_ERR_MULTIPLE_AT:
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "multiple '@' delimiters in name"));
+				break;
+
 			}
 		}
 		return (B_FALSE);
@@ -470,7 +491,7 @@ zpool_destroy(zpool_handle_t *zhp)
 	    ZFS_TYPE_FILESYSTEM)) == NULL)
 		return (-1);
 
-	if (zpool_remove_zvol_links(zhp) != NULL)
+	if (zpool_remove_zvol_links(zhp) != 0)
 		return (-1);
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
@@ -1378,7 +1399,8 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv)
 	    &value) == 0) {
 		verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID,
 		    &value) == 0);
-		(void) snprintf(buf, sizeof (buf), "%llu", value);
+		(void) snprintf(buf, sizeof (buf), "%llu",
+		    (u_longlong_t)value);
 		path = buf;
 	} else if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0) {
 
@@ -1432,7 +1454,7 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv)
 			verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NPARITY,
 			    &value) == 0);
 			(void) snprintf(buf, sizeof (buf), "%s%llu", path,
-			    value);
+			    (u_longlong_t)value);
 			path = buf;
 		}
 	}
@@ -1473,7 +1495,7 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t ***list, size_t *nelem)
 	verify(nvlist_lookup_uint64(zhp->zpool_config, ZPOOL_CONFIG_ERRCOUNT,
 	    &count) == 0);
 	if ((zc.zc_nvlist_dst = (uintptr_t)zfs_alloc(zhp->zpool_hdl,
-	    count * sizeof (zbookmark_t))) == NULL)
+	    count * sizeof (zbookmark_t))) == (uintptr_t)NULL)
 		return (-1);
 	zc.zc_nvlist_dst_size = count;
 	(void) strcpy(zc.zc_name, zhp->zpool_name);
@@ -1484,7 +1506,7 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t ***list, size_t *nelem)
 			if (errno == ENOMEM) {
 				if ((zc.zc_nvlist_dst = (uintptr_t)
 				    zfs_alloc(zhp->zpool_hdl,
-				    zc.zc_nvlist_dst_size)) == NULL)
+				    zc.zc_nvlist_dst_size)) == (uintptr_t)NULL)
 					return (-1);
 			} else {
 				return (-1);
@@ -1574,12 +1596,14 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t ***list, size_t *nelem)
 
 					zhp->zpool_error_log[j] = nv;
 					(void) snprintf(buf, sizeof (buf),
-					    "%llx", zb[i].zb_objset);
+					    "%llx", (longlong_t)
+					    zb[i].zb_objset);
 					if (nvlist_add_string(nv,
 					    ZPOOL_ERR_DATASET, buf) != 0)
 						goto nomem;
 					(void) snprintf(buf, sizeof (buf),
-					    "%llx", zb[i].zb_object);
+					    "%llx", (longlong_t)
+					    zb[i].zb_object);
 					if (nvlist_add_string(nv,
 					    ZPOOL_ERR_OBJECT, buf) != 0)
 						goto nomem;

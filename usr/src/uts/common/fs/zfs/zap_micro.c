@@ -35,8 +35,6 @@
 #include <sys/avl.h>
 
 
-static uint64_t mzap_write_cookie(zap_t *zap, uint64_t cookie,
-    uint64_t entptr);
 static void mzap_upgrade(zap_t *zap, dmu_tx_t *tx);
 
 
@@ -62,15 +60,11 @@ zap_byteswap(void *buf, size_t size)
 
 	block_type = *(uint64_t *)buf;
 
-	switch (block_type) {
-	case ZBT_MICRO:
-	case BSWAP_64(ZBT_MICRO):
+	if (block_type == ZBT_MICRO || block_type == BSWAP_64(ZBT_MICRO)) {
 		/* ASSERT(magic == ZAP_LEAF_MAGIC); */
 		mzap_byteswap(buf, size);
-		return;
-	default:
+	} else {
 		fzap_byteswap(buf, size);
-		return;
 	}
 }
 

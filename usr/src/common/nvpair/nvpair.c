@@ -567,7 +567,7 @@ nvlist_free(nvlist_t *nvl)
 	if (!(priv->nvp_stat & NV_STAT_EMBEDDED))
 		nv_mem_free(priv, nvl, NV_ALIGN(sizeof (nvlist_t)));
 	else
-		nvl->nvl_priv = NULL;
+		nvl->nvl_priv = 0;
 
 	nv_mem_free(priv, priv, sizeof (nvpriv_t));
 }
@@ -872,6 +872,8 @@ nvlist_add_common(nvlist_t *nvl, const char *name,
 		}
 		break;
 	}
+	default:
+		break;
 	}
 
 	/* calculate sizes of the nvpair elements and the nvpair itself */
@@ -1794,7 +1796,7 @@ nvs_operation(nvstream_t *nvs, nvlist_t *nvl, size_t *buflen)
 {
 	int err;
 
-	if (nvl->nvl_priv == NULL)
+	if (nvl->nvl_priv == 0)
 		return (EFAULT);
 
 	/*

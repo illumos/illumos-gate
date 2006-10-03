@@ -302,6 +302,7 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 	vd->vdev_state = VDEV_STATE_CLOSED;
 
 	mutex_init(&vd->vdev_dtl_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&vd->vdev_stat_lock, NULL, MUTEX_DEFAULT, NULL);
 	space_map_create(&vd->vdev_dtl_map, 0, -1ULL, 0, &vd->vdev_dtl_lock);
 	space_map_create(&vd->vdev_dtl_scrub, 0, -1ULL, 0, &vd->vdev_dtl_lock);
 	txg_list_create(&vd->vdev_ms_list,
@@ -338,6 +339,7 @@ vdev_free_common(vdev_t *vd)
 	space_map_destroy(&vd->vdev_dtl_scrub);
 	mutex_exit(&vd->vdev_dtl_lock);
 	mutex_destroy(&vd->vdev_dtl_lock);
+	mutex_destroy(&vd->vdev_stat_lock);
 
 	if (vd == spa->spa_root_vdev)
 		spa->spa_root_vdev = NULL;

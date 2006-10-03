@@ -1303,6 +1303,7 @@ arc_reclaim_thread(void)
 
 			/* reset the growth delay for every reclaim */
 			growtime = lbolt + (arc_grow_retry * hz);
+			ASSERT(growtime > 0);
 
 			arc_kmem_reap_now(last_reclaim);
 
@@ -2449,6 +2450,12 @@ arc_init(void)
 	arc.evict_skip = 0;
 	arc.mutex_miss = 0;
 
+	mutex_init(&arc.anon->mtx, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&arc.mru->mtx, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&arc.mru_ghost->mtx, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&arc.mfu->mtx, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&arc.mfu_ghost->mtx, NULL, MUTEX_DEFAULT, NULL);
+
 	list_create(&arc.mru->list, sizeof (arc_buf_hdr_t),
 	    offsetof(arc_buf_hdr_t, b_arc_node));
 	list_create(&arc.mru_ghost->list, sizeof (arc_buf_hdr_t),
@@ -2490,6 +2497,12 @@ arc_fini(void)
 	list_destroy(&arc.mru_ghost->list);
 	list_destroy(&arc.mfu->list);
 	list_destroy(&arc.mfu_ghost->list);
+
+	mutex_destroy(&arc.anon->mtx);
+	mutex_destroy(&arc.mru->mtx);
+	mutex_destroy(&arc.mru_ghost->mtx);
+	mutex_destroy(&arc.mfu->mtx);
+	mutex_destroy(&arc.mfu_ghost->mtx);
 
 	buf_fini();
 }

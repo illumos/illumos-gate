@@ -276,6 +276,14 @@ spa_remove(spa_t *spa)
 	refcount_destroy(&spa->spa_refcount);
 	refcount_destroy(&spa->spa_config_lock.scl_count);
 
+	mutex_destroy(&spa->spa_sync_bplist.bpl_lock);
+	mutex_destroy(&spa->spa_config_lock.scl_lock);
+	mutex_destroy(&spa->spa_errlist_lock);
+	mutex_destroy(&spa->spa_errlog_lock);
+	mutex_destroy(&spa->spa_scrub_lock);
+	mutex_destroy(&spa->spa_config_cache_lock);
+	mutex_destroy(&spa->spa_async_lock);
+
 	kmem_free(spa, sizeof (spa_t));
 }
 

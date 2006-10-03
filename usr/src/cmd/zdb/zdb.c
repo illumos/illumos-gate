@@ -389,17 +389,19 @@ dump_spacemap(objset_t *os, space_map_obj_t *smo, space_map_t *sm)
 			(void) printf("\t\t[%4llu] %s: txg %llu, pass %llu\n",
 			    (u_longlong_t)(offset / sizeof (entry)),
 			    ddata[SM_DEBUG_ACTION_DECODE(entry)],
-			    SM_DEBUG_TXG_DECODE(entry),
-			    SM_DEBUG_SYNCPASS_DECODE(entry));
+			    (u_longlong_t)SM_DEBUG_TXG_DECODE(entry),
+			    (u_longlong_t)SM_DEBUG_SYNCPASS_DECODE(entry));
 		} else {
 			(void) printf("\t\t[%4llu]    %c  range:"
 			    " %08llx-%08llx  size: %06llx\n",
 			    (u_longlong_t)(offset / sizeof (entry)),
 			    SM_TYPE_DECODE(entry) == SM_ALLOC ? 'A' : 'F',
-			    (SM_OFFSET_DECODE(entry) << mapshift) + mapstart,
-			    (SM_OFFSET_DECODE(entry) << mapshift) + mapstart +
-			    (SM_RUN_DECODE(entry) << mapshift),
-			    (SM_RUN_DECODE(entry) << mapshift));
+			    (u_longlong_t)((SM_OFFSET_DECODE(entry) <<
+			    mapshift) + mapstart),
+			    (u_longlong_t)((SM_OFFSET_DECODE(entry) <<
+			    mapshift) + mapstart + (SM_RUN_DECODE(entry) <<
+			    mapshift)),
+			    (u_longlong_t)(SM_RUN_DECODE(entry) << mapshift));
 			if (SM_TYPE_DECODE(entry) == SM_ALLOC)
 				alloc += SM_RUN_DECODE(entry) << mapshift;
 			else
@@ -497,7 +499,7 @@ dump_dtl(vdev_t *vd, int indent)
 		    indent, "",
 		    (u_longlong_t)ss->ss_start,
 		    (u_longlong_t)ss->ss_end - 1,
-		    (u_longlong_t)ss->ss_end - ss->ss_start);
+		    (u_longlong_t)(ss->ss_end - ss->ss_start));
 	}
 
 	(void) printf("\n");
@@ -844,7 +846,7 @@ znode_path(objset_t *os, uint64_t object, char *pathbuf, size_t size)
 		object = parent;
 	}
 
-	(void) sprintf(component, "???<object#%llu>", (u_longlong_t)object);
+	(void) sprintf(component, "\?\?\?<object#%llu>", (u_longlong_t)object);
 
 	complen = strlen(component);
 	path -= complen;
@@ -1758,14 +1760,17 @@ zdb_print_blkptr(blkptr_t *bp, int flags)
 	 */
 	for (d = 0; d < BP_GET_NDVAS(bp); d++) {
 		(void) printf("\tDVA[%d]: vdev_id %lld / %llx\n", d,
-		    DVA_GET_VDEV(&dva[d]), DVA_GET_OFFSET(&dva[d]));
+		    (longlong_t)DVA_GET_VDEV(&dva[d]),
+		    (longlong_t)DVA_GET_OFFSET(&dva[d]));
 		(void) printf("\tDVA[%d]:       GANG: %-5s  GRID:  %04llx\t"
 		    "ASIZE: %llx\n", d,
 		    DVA_GET_GANG(&dva[d]) ? "TRUE" : "FALSE",
-		    DVA_GET_GRID(&dva[d]), DVA_GET_ASIZE(&dva[d]));
+		    (longlong_t)DVA_GET_GRID(&dva[d]),
+		    (longlong_t)DVA_GET_ASIZE(&dva[d]));
 		(void) printf("\tDVA[%d]: :%llu:%llx:%llx:%s%s%s%s\n", d,
-		    DVA_GET_VDEV(&dva[d]), DVA_GET_OFFSET(&dva[d]),
-		    BP_GET_PSIZE(bp),
+		    (u_longlong_t)DVA_GET_VDEV(&dva[d]),
+		    (longlong_t)DVA_GET_OFFSET(&dva[d]),
+		    (longlong_t)BP_GET_PSIZE(bp),
 		    BP_SHOULD_BYTESWAP(bp) ? "e" : "",
 		    !DVA_GET_GANG(&dva[d]) && BP_GET_LEVEL(bp) != 0 ?
 		    "d" : "",
@@ -1773,12 +1778,12 @@ zdb_print_blkptr(blkptr_t *bp, int flags)
 		    BP_GET_COMPRESS(bp) != 0 ? "d" : "");
 	}
 	(void) printf("\tLSIZE:  %-16llx\t\tPSIZE: %llx\n",
-	    BP_GET_LSIZE(bp), BP_GET_PSIZE(bp));
+	    (longlong_t)BP_GET_LSIZE(bp), (longlong_t)BP_GET_PSIZE(bp));
 	(void) printf("\tENDIAN: %6s\t\t\t\t\tTYPE:  %s\n",
 	    BP_GET_BYTEORDER(bp) ? "LITTLE" : "BIG",
 	    dmu_ot[BP_GET_TYPE(bp)].ot_name);
 	(void) printf("\tBIRTH:  %-16llx   LEVEL: %-2llu\tFILL:  %llx\n",
-	    (u_longlong_t)bp->blk_birth, BP_GET_LEVEL(bp),
+	    (u_longlong_t)bp->blk_birth, (u_longlong_t)BP_GET_LEVEL(bp),
 	    (u_longlong_t)bp->blk_fill);
 	(void) printf("\tCKFUNC: %-16s\t\tCOMP:  %s\n",
 	    zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name,
@@ -1961,7 +1966,7 @@ zdb_read_block(char *thing, spa_t **spap)
 
 	for (s = strtok(flagstr, ":"); s; s = strtok(NULL, ":")) {
 		for (i = 0; flagstr[i]; i++) {
-			int bit = flagbits[flagstr[i]];
+			int bit = flagbits[(uchar_t)flagstr[i]];
 
 			if (bit == 0) {
 				(void) printf("***Invalid flag: %c\n",

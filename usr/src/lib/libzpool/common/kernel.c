@@ -36,6 +36,7 @@
 #include <sys/spa.h>
 #include <sys/processor.h>
 
+
 /*
  * Emulation of kernel services in userland.
  */
@@ -85,7 +86,7 @@ mutex_enter(kmutex_t *mp)
 {
 	ASSERT(mp->m_owner != (void *)-1UL);
 	ASSERT(mp->m_owner != curthread);
-	(void) mutex_lock(&mp->m_lock);
+	VERIFY(mutex_lock(&mp->m_lock) == 0);
 	ASSERT(mp->m_owner == NULL);
 	mp->m_owner = curthread;
 }
@@ -108,7 +109,7 @@ mutex_exit(kmutex_t *mp)
 {
 	ASSERT(mutex_owner(mp) == curthread);
 	mp->m_owner = NULL;
-	(void) mutex_unlock(&mp->m_lock);
+	VERIFY(mutex_unlock(&mp->m_lock) == 0);
 }
 
 void *
@@ -199,13 +200,13 @@ rw_tryupgrade(krwlock_t *rwlp)
 void
 cv_init(kcondvar_t *cv, char *name, int type, void *arg)
 {
-	(void) cond_init(cv, type, NULL);
+	VERIFY(cond_init(cv, type, NULL) == 0);
 }
 
 void
 cv_destroy(kcondvar_t *cv)
 {
-	(void) cond_destroy(cv);
+	VERIFY(cond_destroy(cv) == 0);
 }
 
 void
@@ -213,7 +214,8 @@ cv_wait(kcondvar_t *cv, kmutex_t *mp)
 {
 	ASSERT(mutex_owner(mp) == curthread);
 	mp->m_owner = NULL;
-	(void) cond_wait(cv, &mp->m_lock);
+	int ret = cond_wait(cv, &mp->m_lock);
+	VERIFY(ret == 0 || ret == EINTR);
 	mp->m_owner = curthread;
 }
 
@@ -251,13 +253,13 @@ top:
 void
 cv_signal(kcondvar_t *cv)
 {
-	(void) cond_signal(cv);
+	VERIFY(cond_signal(cv) == 0);
 }
 
 void
 cv_broadcast(kcondvar_t *cv)
 {
-	(void) cond_broadcast(cv);
+	VERIFY(cond_broadcast(cv) == 0);
 }
 
 /*

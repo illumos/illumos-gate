@@ -68,15 +68,15 @@ zio_checksum_off(const void *buf, uint64_t size, zio_cksum_t *zcp)
 }
 
 zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
-	NULL,			NULL,			0, 0,	"inherit",
-	NULL,			NULL,			0, 0,	"on",
-	zio_checksum_off,	zio_checksum_off,	0, 0,	"off",
-	zio_checksum_SHA256,	zio_checksum_SHA256,	1, 1,	"label",
-	zio_checksum_SHA256,	zio_checksum_SHA256,	1, 1,	"gang_header",
-	fletcher_2_native,	fletcher_2_byteswap,	0, 1,	"zilog",
-	fletcher_2_native,	fletcher_2_byteswap,	0, 0,	"fletcher2",
-	fletcher_4_native,	fletcher_4_byteswap,	1, 0,	"fletcher4",
-	zio_checksum_SHA256,	zio_checksum_SHA256,	1, 0,	"SHA256",
+	{{NULL,			NULL},			0, 0,	"inherit"},
+	{{NULL,			NULL},			0, 0,	"on"},
+	{{zio_checksum_off,	zio_checksum_off},	0, 0,	"off"},
+	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 1,	"label"},
+	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 1,	"gang_header"},
+	{{fletcher_2_native,	fletcher_2_byteswap},	0, 1,	"zilog"},
+	{{fletcher_2_native,	fletcher_2_byteswap},	0, 0,	"fletcher2"},
+	{{fletcher_4_native,	fletcher_4_byteswap},	1, 0,	"fletcher4"},
+	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 0,	"SHA256"},
 };
 
 uint8_t

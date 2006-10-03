@@ -261,7 +261,7 @@ avl_find(avl_tree_t *tree, void *value, avl_index_t *where)
 		if (diff == 0) {
 #ifdef DEBUG
 			if (where != NULL)
-				*where = NULL;
+				*where = 0;
 #endif
 			return (AVL_NODE2DATA(node, off));
 		}

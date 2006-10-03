@@ -214,6 +214,9 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	list_create(&osi->os_downgraded_dbufs, sizeof (dmu_buf_impl_t),
 	    offsetof(dmu_buf_impl_t, db_link));
 
+	mutex_init(&osi->os_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&osi->os_obj_lock, NULL, MUTEX_DEFAULT, NULL);
+
 	osi->os_meta_dnode = dnode_special_open(osi,
 	    &osi->os_phys->os_meta_dnode, DMU_META_DNODE_OBJECT);
 
@@ -361,6 +364,8 @@ dmu_objset_evict(dsl_dataset_t *ds, void *arg)
 	zil_free(osi->os_zil);
 
 	zio_buf_free(osi->os_phys, sizeof (objset_phys_t));
+	mutex_destroy(&osi->os_lock);
+	mutex_destroy(&osi->os_obj_lock);
 	kmem_free(osi, sizeof (objset_impl_t));
 }
 

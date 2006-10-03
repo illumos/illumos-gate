@@ -323,6 +323,8 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 	 */
 	list_create(&zfsvfs->z_delete_head.z_znodes,
 	    sizeof (znode_t), offsetof(znode_t, z_list_node));
+	/* Mutex never destroyed. */
+	mutex_init(&zfsvfs->z_delete_head.z_mutex, NULL, MUTEX_DEFAULT, NULL);
 
 	return (0);
 }

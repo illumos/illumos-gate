@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +69,7 @@ nv_fixed_init(nv_alloc_t *nva, va_list valist)
 	uintptr_t lim = base + va_arg(valist, size_t);
 	nvbuf_t *nvb = (nvbuf_t *)P2ROUNDUP(base, sizeof (uintptr_t));
 
-	if (base == NULL || (uintptr_t)&nvb[1] > lim)
+	if (base == 0 || (uintptr_t)&nvb[1] > lim)
 		return (EINVAL);
 
 	nvb->nvb_buf = (uintptr_t)&nvb[0];

@@ -106,11 +106,11 @@ pool_list_get(int argc, char **argv, int *err)
 	    offsetof(zpool_node_t, zn_avlnode), zpool_compare, UU_DEFAULT);
 
 	if (zlp->zl_pool == NULL)
-		no_memory();
+		zpool_no_memory();
 
 	if ((zlp->zl_avl = uu_avl_create(zlp->zl_pool, NULL,
 	    UU_DEFAULT)) == NULL)
-		no_memory();
+		zpool_no_memory();
 
 	if (argc == 0) {
 		(void) zpool_iter(g_zfs, add_pool, zlp);

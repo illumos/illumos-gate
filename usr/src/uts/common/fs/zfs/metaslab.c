@@ -293,6 +293,7 @@ metaslab_init(metaslab_group_t *mg, space_map_obj_t *smo,
 	metaslab_t *msp;
 
 	msp = kmem_zalloc(sizeof (metaslab_t), KM_SLEEP);
+	mutex_init(&msp->ms_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	msp->ms_smo_syncing = *smo;
 
@@ -355,6 +356,7 @@ metaslab_fini(metaslab_t *msp)
 	}
 
 	mutex_exit(&msp->ms_lock);
+	mutex_destroy(&msp->ms_lock);
 
 	kmem_free(msp, sizeof (metaslab_t));
 }

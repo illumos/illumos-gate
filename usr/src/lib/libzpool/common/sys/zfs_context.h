@@ -178,7 +178,7 @@ typedef struct kthread kthread_t;
 
 #define	thread_create(stk, stksize, func, arg, len, pp, state, pri)	\
 	zk_thread_create(func, arg)
-#define	thread_exit() thr_exit(0)
+#define	thread_exit() thr_exit(NULL)
 
 extern kthread_t *zk_thread_create(void (*func)(), void *arg);
 

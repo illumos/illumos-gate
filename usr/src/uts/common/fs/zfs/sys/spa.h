@@ -61,9 +61,9 @@ struct dsl_pool;
 #define	BF64_GET(x, low, len)		BF64_DECODE(x, low, len)
 
 #define	BF32_SET(x, low, len, val)	\
-	((x) ^= BF32_ENCODE((x >> low) ^ val, low, len))
+	((x) ^= BF32_ENCODE((x >> low) ^ (val), low, len))
 #define	BF64_SET(x, low, len, val)	\
-	((x) ^= BF64_ENCODE((x >> low) ^ val, low, len))
+	((x) ^= BF64_ENCODE((x >> low) ^ (val), low, len))
 
 #define	BF32_GET_SB(x, low, len, shift, bias)	\
 	((BF32_GET(x, low, len) + (bias)) << (shift))

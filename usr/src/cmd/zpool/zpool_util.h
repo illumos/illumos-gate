@@ -40,7 +40,7 @@ extern "C" {
  */
 void *safe_malloc(size_t);
 char *safe_strdup(const char *);
-void no_memory(void);
+void zpool_no_memory(void);
 
 /*
  * Virtual device functions

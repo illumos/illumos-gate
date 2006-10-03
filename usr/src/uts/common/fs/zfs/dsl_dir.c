@@ -37,7 +37,6 @@
 #include <sys/arc.h>
 #include "zfs_namecheck.h"
 
-static uint64_t dsl_dir_space_accounted(dsl_dir_t *dd);
 static uint64_t dsl_dir_estimated_space(dsl_dir_t *dd);
 static uint64_t dsl_dir_space_available(dsl_dir_t *dd,
     dsl_dir_t *ancestor, int64_t delta, int ondiskonly);
@@ -70,6 +69,7 @@ dsl_dir_evict(dmu_buf_t *db, void *arg)
 	 * dir open.
 	 */
 	list_destroy(&dd->dd_prop_cbs);
+	mutex_destroy(&dd->dd_lock);
 	kmem_free(dd, sizeof (dsl_dir_t));
 }
 
@@ -106,6 +106,7 @@ dsl_dir_open_obj(dsl_pool_t *dp, uint64_t ddobj,
 		dd->dd_pool = dp;
 		dd->dd_phys = dbuf->db_data;
 		dd->dd_used_bytes = dd->dd_phys->dd_used_bytes;
+		mutex_init(&dd->dd_lock, NULL, MUTEX_DEFAULT, NULL);
 
 		list_create(&dd->dd_prop_cbs, sizeof (dsl_prop_cb_record_t),
 		    offsetof(dsl_prop_cb_record_t, cbr_node));
@@ -114,6 +115,7 @@ dsl_dir_open_obj(dsl_pool_t *dp, uint64_t ddobj,
 			err = dsl_dir_open_obj(dp, dd->dd_phys->dd_parent_obj,
 			    NULL, dd, &dd->dd_parent);
 			if (err) {
+				mutex_destroy(&dd->dd_lock);
 				kmem_free(dd, sizeof (dsl_dir_t));
 				dmu_buf_rele(dbuf, tag);
 				return (err);
@@ -137,6 +139,7 @@ dsl_dir_open_obj(dsl_pool_t *dp, uint64_t ddobj,
 			}
 			if (err) {
 				dsl_dir_close(dd->dd_parent, dd);
+				mutex_destroy(&dd->dd_lock);
 				kmem_free(dd, sizeof (dsl_dir_t));
 				dmu_buf_rele(dbuf, tag);
 				return (err);
@@ -150,6 +153,7 @@ dsl_dir_open_obj(dsl_pool_t *dp, uint64_t ddobj,
 		if (winner) {
 			if (dd->dd_parent)
 				dsl_dir_close(dd->dd_parent, dd);
+			mutex_destroy(&dd->dd_lock);
 			kmem_free(dd, sizeof (dsl_dir_t));
 			dd = winner;
 		} else {

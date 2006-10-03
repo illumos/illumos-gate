@@ -614,7 +614,7 @@ retry:
 
 	dmu_objset_stats(os, &zc->zc_objset_stats);
 
-	if (zc->zc_nvlist_dst != NULL &&
+	if (zc->zc_nvlist_dst != 0 &&
 	    (error = dsl_prop_get_all(os, &nv)) == 0) {
 		error = put_nvlist(zc, nv);
 		nvlist_free(nv);
@@ -1412,6 +1412,9 @@ zfsdev_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		case dataset_name:
 			if (dataset_namecheck(zc->zc_name, NULL, NULL) != 0)
 				error = EINVAL;
+			break;
+
+		case no_name:
 			break;
 		}
 	}

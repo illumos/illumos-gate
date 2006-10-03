@@ -231,6 +231,9 @@ dsl_dataset_evict(dmu_buf_t *db, void *dsv)
 	if (list_link_active(&ds->ds_synced_link))
 		list_remove(&dp->dp_synced_objsets, ds);
 
+	mutex_destroy(&ds->ds_lock);
+	mutex_destroy(&ds->ds_deadlist.bpl_lock);
+
 	kmem_free(ds, sizeof (dsl_dataset_t));
 }
 
@@ -284,6 +287,10 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 		ds->ds_object = dsobj;
 		ds->ds_phys = dbuf->db_data;
 
+		mutex_init(&ds->ds_lock, NULL, MUTEX_DEFAULT, NULL);
+		mutex_init(&ds->ds_deadlist.bpl_lock, NULL, MUTEX_DEFAULT,
+		    NULL);
+
 		err = bplist_open(&ds->ds_deadlist,
 		    mos, ds->ds_phys->ds_deadlist_obj);
 		if (err == 0) {
@@ -295,6 +302,8 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 			 * we don't really need to close the blist if we
 			 * just opened it.
 			 */
+			mutex_destroy(&ds->ds_lock);
+			mutex_destroy(&ds->ds_deadlist.bpl_lock);
 			kmem_free(ds, sizeof (dsl_dataset_t));
 			dmu_buf_rele(dbuf, tag);
 			return (err);
@@ -343,6 +352,8 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 				    DS_MODE_NONE, ds);
 			}
 			dsl_dir_close(ds->ds_dir, ds);
+			mutex_destroy(&ds->ds_lock);
+			mutex_destroy(&ds->ds_deadlist.bpl_lock);
 			kmem_free(ds, sizeof (dsl_dataset_t));
 			if (err) {
 				dmu_buf_rele(dbuf, tag);

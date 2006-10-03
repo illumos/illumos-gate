@@ -203,7 +203,8 @@ struct vdev {
 	offsetof(vdev_label_t, vl_uberblock[(n) << VDEV_UBERBLOCK_SHIFT(vd)])
 #define	VDEV_UBERBLOCK_SIZE(vd)		(1ULL << VDEV_UBERBLOCK_SHIFT(vd))
 
-#define	VDEV_BOOT_MAGIC		0x2f5b007b10c	/* ZFS boot block	*/
+/* ZFS boot block */
+#define	VDEV_BOOT_MAGIC		0x2f5b007b10cULL
 #define	VDEV_BOOT_VERSION	1		/* version number	*/
 
 typedef struct vdev_boot_header {

@@ -94,7 +94,7 @@ ldv(int len, const void *addr)
 		return (*(uint64_t *)addr);
 	}
 	ASSERT(!"bad int len");
-	return (0xFEEDFACEDEADBEEF);
+	return (0xFEEDFACEDEADBEEFULL);
 }
 
 void

@@ -1068,7 +1068,7 @@ void
 zil_init(void)
 {
 	zil_lwb_cache = kmem_cache_create("zil_lwb_cache",
-	    sizeof (struct lwb), NULL, NULL, NULL, NULL, NULL, NULL, 0);
+	    sizeof (struct lwb), 0, NULL, NULL, NULL, NULL, NULL, 0);
 }
 
 void
@@ -1089,6 +1089,8 @@ zil_alloc(objset_t *os, zil_header_t *zh_phys)
 	zilog->zl_spa = dmu_objset_spa(os);
 	zilog->zl_dmu_pool = dmu_objset_pool(os);
 	zilog->zl_destroy_txg = TXG_INITIAL - 1;
+
+	mutex_init(&zilog->zl_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	list_create(&zilog->zl_itx_list, sizeof (itx_t),
 	    offsetof(itx_t, itx_node));
@@ -1126,6 +1128,7 @@ zil_free(zilog_t *zilog)
 
 	ASSERT(list_head(&zilog->zl_itx_list) == NULL);
 	list_destroy(&zilog->zl_itx_list);
+	mutex_destroy(&zilog->zl_lock);
 
 	kmem_free(zilog, sizeof (zilog_t));
 }

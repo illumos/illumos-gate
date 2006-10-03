@@ -112,7 +112,7 @@ zio_init(void)
 
 		if (align != 0) {
 			char name[30];
-			(void) sprintf(name, "zio_buf_%lu", size);
+			(void) sprintf(name, "zio_buf_%lu", (ulong_t)size);
 			zio_buf_cache[c] = kmem_cache_create(name, size,
 			    align, NULL, NULL, NULL, NULL, NULL, KMC_NODEBUG);
 			dprintf("creating cache for size %5lx align %5lx\n",
@@ -258,6 +258,7 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	zio->io_async_stages = ZIO_ASYNC_PIPELINE_STAGES;
 	zio->io_timestamp = lbolt64;
 	zio->io_flags = flags;
+	mutex_init(&zio->io_lock, NULL, MUTEX_DEFAULT, NULL);
 	zio_push_transform(zio, data, size, size);
 
 	if (pio == NULL) {
@@ -653,7 +654,7 @@ zio_wait(zio_t *zio)
 	mutex_exit(&zio->io_lock);
 
 	error = zio->io_error;
-
+	mutex_destroy(&zio->io_lock);
 	kmem_free(zio, sizeof (zio_t));
 
 	return (error);

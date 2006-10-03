@@ -60,6 +60,7 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 	dp = kmem_zalloc(sizeof (dsl_pool_t), KM_SLEEP);
 	dp->dp_spa = spa;
 	dp->dp_meta_rootbp = *bp;
+	rw_init(&dp->dp_config_rwlock, NULL, RW_DEFAULT, NULL);
 	txg_init(dp, txg);
 
 	txg_list_create(&dp->dp_dirty_datasets,
@@ -131,6 +132,7 @@ dsl_pool_close(dsl_pool_t *dp)
 
 	arc_flush();
 	txg_fini(dp);
+	rw_destroy(&dp->dp_config_rwlock);
 	kmem_free(dp, sizeof (dsl_pool_t));
 }
 

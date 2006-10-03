@@ -38,7 +38,7 @@ extern "C" {
 
 extern int fzap_default_block_shift;
 
-#define	ZAP_MAGIC 0x2F52AB2AB
+#define	ZAP_MAGIC 0x2F52AB2ABULL
 
 #define	FZAP_BLOCK_SHIFT(zap)	((zap)->zap_f.zap_block_shift)
 
