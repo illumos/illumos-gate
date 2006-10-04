@@ -1278,7 +1278,8 @@ adt_export_session_data(const adt_session_data_t *internal,
 {
 	size_t			length = 0;
 
-	if (((adt_internal_state_t *)internal)->as_label != NULL) {
+	if ((internal != NULL) &&
+	    ((adt_internal_state_t *)internal)->as_label != NULL) {
 		length = blabel_size();
 	}
 
