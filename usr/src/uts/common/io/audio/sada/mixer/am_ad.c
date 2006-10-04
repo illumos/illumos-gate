@@ -3029,6 +3029,7 @@ am_get_audio_trad_compat(audio_state_t *statep, audio_apm_info_t *apm_infop,
 	int			i;
 	int			max_chs;
 	int			ret_val;
+	size_t			size = samples << AM_INT32_SHIFT;
 
 	ATRACE("in am_get_audio_trad_compat()", statep);
 
@@ -3101,6 +3102,29 @@ am_get_audio_trad_compat(audio_state_t *statep, audio_apm_info_t *apm_infop,
 		mutex_exit(&chptr->ch_lock);
 		ATRACE("am_get_audio_trad_compat() ch closed on us", chptr);
 		return (0);
+	}
+
+	/* make sure the buffer is big enough */
+	if (chpptr->acp_psb_size < size) {
+		ATRACE_32("am_get_audio_trad_compat() freeing buffer",
+		    chpptr->acp_psb_size);
+		if (chpptr->acp_play_samp_buf) {
+			/* free the old buffer */
+			kmem_free(chpptr->acp_play_samp_buf,
+			    chpptr->acp_psb_size);
+		}
+		chpptr->acp_play_samp_buf = kmem_alloc(size, KM_NOSLEEP);
+		if (chpptr->acp_play_samp_buf == NULL) {
+			ATRACE_32("am_get_audio_trad_compat() "
+			    "kmem_alloc() play_samp_buf failed", i);
+			audio_sup_log(AUDIO_STATE2HDL(statep), CE_WARN,
+			    "am_get_audio_trad_compat() "
+			    "sample buffer %d not allocated", i);
+			chpptr->acp_psb_size = 0;
+			mutex_exit(&chptr->ch_lock);
+			return (0);
+		}
+		chpptr->acp_psb_size = size;
 	}
 
 	ATRACE_32("am_get_audio_trad_compat() calling am_get_samples()",
@@ -3461,11 +3485,7 @@ am_get_samples(audio_ch_t *chptr, int samples, void *buf, int mode)
 	mute = info->output_muted;
 	if (mute) {
 		/* we return zeros */
-		if (mode == AM_COMPAT_MODE)
-			bytes_needed = samples << AM_INT16_SHIFT;
-		else /* mixer mode */
-			bytes_needed = samples << AM_INT32_SHIFT;
-
+		bytes_needed = samples << AM_INT32_SHIFT;
 		ATRACE("am_get_samples() bzero", buf);
 		bzero(buf, bytes_needed);
 	}
