@@ -103,6 +103,11 @@ struct nametable {
  * +----+----+-----+----+-----+---+-----+-----+----+----+----+
  * 24:22  21  20:18  17  16:11 10  9:4     3    2    1    0
  *
+ * ULRO and OVRO bits should be on upon accessing pcr unless
+ * those fields need to be updated.
+ * Turn off these bits when updating SU/SL or OVF field
+ * (during initialization, etc.).
+ *
  *
  * Performance Instrumentation Counter (PIC)
  * Four PICs are implemented in SPARC64 VI,
@@ -165,89 +170,186 @@ struct nametable {
 		<< CPC_SPARC64_VI_PCR_PICU_SHIFT);			\
 }
 
+#define	SPARC64_VI_CHK_OVF(pcr, picno)					\
+	((pcr) & (UINT64_C(1) << (CPC_SPARC64_VI_PCR_OVF_SHIFT + picno)))
+
+#define	SPARC64_VI_CLR_OVF(pcr, picno) {				\
+	pcr &= ~(UINT64_C(1) << (CPC_SPARC64_VI_PCR_OVF_SHIFT + picno)); \
+}
+
 #define	NT_END 0xFF
 
 static const uint64_t   allstopped = SPARC64_VI_PCR_PRIVPIC |
 	SPARC64_VI_PCR_ULRO | SPARC64_VI_PCR_OVRO;
 
-#define	SPARC64_VI_EVENTS_comm			\
+#define	SPARC64_VI_EVENTS_comm_0		\
 	{0x0,	"cycle_counts"},		\
-	{0x1,	"instruction_counts"},		\
+	{0x1,	"instruction_counts"}
+
+#define	SPARC64_VI_EVENTS_comm_1		\
+	{0x5,	"op_stv_wait"},			\
 	{0x8,	"load_store_instructions"},	\
 	{0x9,	"branch_instructions"},		\
 	{0xa,	"floating_instructions"},	\
 	{0xb,	"impdep2_instructions"},	\
 	{0xc,	"prefetch_instructions"}
 
+#define	SPARC64_VI_EVENTS_comm_2		\
+	{0x1a,	"active_cycle_count"}
+
 static const struct nametable SPARC64_VI_names_l0[] = {
-	SPARC64_VI_EVENTS_comm,
+	SPARC64_VI_EVENTS_comm_0,
+	SPARC64_VI_EVENTS_comm_1,
+	{0x12,	"flush_rs"},
+	{0x13,	"2iid_use"},
 	{0x16,	"trap_int_vector"},
-	{0x20,	"write_op_uTLB"},
+	{0x18,	"ts_by_sxmiss"},
+	SPARC64_VI_EVENTS_comm_2,
+	{0x1d,	"op_stv_wait_sxmiss"},
+	{0x1e,	"branch_comp_wait"},
+	{0x24,	"swpf_fail_all"},
 	{0x30,	"sx_miss_wait_pf"},
 	{0x31,	"jbus_cpi_count"},
+	{0x36,	"jbus_reqbus1_busy"},
 	{NT_END, ""}
 };
 
 static const struct nametable SPARC64_VI_names_u0[] = {
-	SPARC64_VI_EVENTS_comm,
+	SPARC64_VI_EVENTS_comm_0,
+	{0x2,	"instruction_flow_counts"},
+	{0x3,	"iwr_empty"},
+	SPARC64_VI_EVENTS_comm_1,
+	{0x12,	"rs1"},
+	{0x13,	"1iid_use"},
 	{0x16,	"trap_all"},
-	{0x20,	"write_if_uTLB"},
+	{0x18,	"thread_switch_all"},
+	SPARC64_VI_EVENTS_comm_2,
+	{0x1d,	"act_thread_suspend"},
+	{0x1e,	"cse_window_empty"},
+	{0x1f,	"inh_cmit_gpr_2write"},
+	{0x24,	"swpf_success_all"},
 	{0x30,	"sx_miss_wait_dm"},
 	{0x31,	"jbus_bi_count"},
+	{0x34,	"lost_softpf_pfp_full"},
+	{0x36,	"jbus_reqbus0_busy"},
 	{NT_END, ""}
 };
 
 static const struct nametable SPARC64_VI_names_l1[] = {
-	SPARC64_VI_EVENTS_comm,
+	SPARC64_VI_EVENTS_comm_0,
+	SPARC64_VI_EVENTS_comm_1,
+	{0x13,	"4iid_use"},
+	{0x15,	"flush_rs"},
 	{0x16,	"trap_spill"},
+	{0x18,	"ts_by_timer"},
+	SPARC64_VI_EVENTS_comm_2,
+	{0x1b,	"0iid_use"},
+	{0x1d,	"op_stv_wait_nc_pend"},
+	{0x1e,	"0endop"},
 	{0x20,	"write_op_uTLB"},
 	{0x30,	"sx_miss_count_pf"},
 	{0x31,	"jbus_cpd_count"},
+	{0x32,	"snres_64"},
+	{0x36,	"jbus_reqbus3_busy"},
 	{NT_END, ""}
 };
 
 static const struct nametable SPARC64_VI_names_u1[] = {
-	SPARC64_VI_EVENTS_comm,
+	SPARC64_VI_EVENTS_comm_0,
+	SPARC64_VI_EVENTS_comm_1,
+	{0x13,	"3iid_use"},
 	{0x16,	"trap_int_level"},
+	{0x18,	"ts_by_data_arrive"},
+	SPARC64_VI_EVENTS_comm_2,
+	{0x1b,	"op_stv_wait_nc_pend"},
+	{0x1d,	"op_stv_wait_sxmiss_ex"},
+	{0x1e,	"eu_comp_wait"},
 	{0x20,	"write_if_uTLB"},
 	{0x30,	"sx_miss_count_dm"},
 	{0x31,	"jbus_cpb_count"},
+	{0x32,	"snres_256"},
+	{0x34,	"lost_softpf_by_abort"},
+	{0x36,	"jbus_reqbus2_busy"},
 	{NT_END, ""}
 };
 
 static const struct nametable SPARC64_VI_names_l2[] = {
-	SPARC64_VI_EVENTS_comm,
+	SPARC64_VI_EVENTS_comm_0,
+	SPARC64_VI_EVENTS_comm_1,
+	{0x13,	"sync_intlk"},
 	{0x16,	"trap_trap_inst"},
+	{0x18,	"ts_by_if"},
+	SPARC64_VI_EVENTS_comm_2,
+	{0x1d,	"cse_window_empty_sp_full"},
+	{0x1e,	"fl_comp_wait"},
 	{0x20,	"op_r_iu_req_mi_go"},
 	{0x30,	"sx_read_count_pf"},
+	{0x31,	"jbus_orderbus_busy"},
+	{0x33,	"sx_miss_count_dm_if"},
+	{0x36,	"jbus_odrbus1_busy"},
 	{NT_END, ""}
 };
 
 static const struct nametable SPARC64_VI_names_u2[] = {
-	SPARC64_VI_EVENTS_comm,
+	SPARC64_VI_EVENTS_comm_0,
+	{0x2,	"instruction_flow_counts"},
+	{0x3,	"iwr_empty"},
+	SPARC64_VI_EVENTS_comm_1,
 	{0x16,	"trap_fill"},
+	{0x18,	"ts_by_intr"},
+	SPARC64_VI_EVENTS_comm_2,
+	{0x1b,	"flush_rs"},
+	{0x1d,	"cse_window_empty_sp_full"},
+	{0x1e,	"op_stv_wait_ex"},
+	{0x1f,	"3endop"},
 	{0x20,	"if_r_iu_req_mi_go"},
+	{0x24,	"swpf_lbs_hit"},
 	{0x30,	"sx_read_count_dm"},
+	{0x31,	"jbus_reqbus_busy"},
+	{0x33,	"sx_btc_count"},
+	{0x36,	"jbus_odrbus0_busy"},
 	{NT_END, ""}
 };
 
 static const struct nametable SPARC64_VI_names_l3[] = {
-	SPARC64_VI_EVENTS_comm,
+	SPARC64_VI_EVENTS_comm_0,
+	SPARC64_VI_EVENTS_comm_1,
 	{0x16,	"trap_DMMU_miss"},
+	{0x18,	"ts_by_suspend"},
+	{0x19,	"ts_by_other"},
+	SPARC64_VI_EVENTS_comm_2,
+	{0x1b,	"decall_intlk"},
+	{0x1d,	"cse_window_empty_sp_full"},
+	{0x1e,	"2endop"},
+	{0x1f,	"op_stv_wait_sxmiss"},
 	{0x20,	"op_wait_all"},
 	{0x30,	"dvp_count_pf"},
+	{0x33,	"sx_miss_count_dm_opex"},
+	{0x36,	"jbus_odrbus3_busy"},
 	{NT_END, ""}
 };
 
 static const struct nametable SPARC64_VI_names_u3[] = {
-	SPARC64_VI_EVENTS_comm,
+	SPARC64_VI_EVENTS_comm_0,
+	SPARC64_VI_EVENTS_comm_1,
+	{0x13,	"regwin_intlk"},
+	{0x15,	"rs1"},
 	{0x16,	"trap_IMMU_miss"},
+	{0x18,	"ts_by_spinloop"},
+	SPARC64_VI_EVENTS_comm_2,
+	{0x1d,	"cse_window_empty_sp_full"},
+	{0x1e,	"1endop"},
+	{0x1f,	"op_stv_wait_sxmiss_ex"},
 	{0x20,	"if_wait_all"},
 	{0x30,	"dvp_count_dm"},
+	{0x33,	"sx_miss_count_dm_opsh"},
+	{0x36,	"jbus_odrbus2_busy"},
 	{NT_END, ""}
 };
 
-#undef	SPARC64_VI_EVENTS_comm
+#undef	SPARC64_VI_EVENTS_comm_0
+#undef	SPARC64_VI_EVENTS_comm_1
+#undef	SPARC64_VI_EVENTS_comm_2
 
 static const struct nametable *SPARC64_VI_names[CPC_SPARC64_VI_NPIC] = {
 	SPARC64_VI_names_l0,
@@ -391,18 +493,12 @@ opl_pcbe_event_coverage(char *event)
 static uint64_t
 opl_pcbe_overflow_bitmap(void)
 {
-	uint64_t	pcr, overflow;
+	uint64_t	pcr;
 
 	pcr = ultra_getpcr();
 	DTRACE_PROBE1(sparc64__getpcr, uint64_t, pcr);
 
-	overflow = (pcr & SPARC64_VI_PCR_OVF) >>
-		CPC_SPARC64_VI_PCR_OVF_SHIFT;
-
-	if (overflow)
-		ultra_setpcr(pcr & ~SPARC64_VI_PCR_OVF);
-
-	return (overflow);
+	return ((pcr & SPARC64_VI_PCR_OVF) >> CPC_SPARC64_VI_PCR_OVF_SHIFT);
 }
 
 /*ARGSUSED*/
@@ -513,7 +609,8 @@ opl_pcbe_program(void *token)
 
 	/* Get PCR */
 	pcr = ultra_getpcr();
-	pcr |= (SPARC64_VI_PCR_ULRO | SPARC64_VI_PCR_OVRO);
+	pcr |= SPARC64_VI_PCR_ULRO;
+	pcr &= ~(SPARC64_VI_PCR_OVRO | SPARC64_VI_PCR_OVF);
 
 	if (pic[0]->opl_flags & CPC_COUNT_USER)
 		pcr |= SPARC64_VI_PCR_USR;
@@ -535,7 +632,8 @@ opl_pcbe_program(void *token)
 		pic[i*2]->opl_pic = (uint32_t)(curpic & PIC_MASK);
 		pic[i*2 + 1]->opl_pic = (uint32_t)(curpic >> 32);
 	}
-
+	pcr |= SPARC64_VI_PCR_OVRO;
+	ultra_setpcr(pcr);
 }
 
 static void
@@ -550,6 +648,7 @@ opl_pcbe_sample(void *token)
 {
 	uint64_t		curpic;
 	uint64_t		pcr;
+	uint64_t		overflow;
 	int64_t			diff;
 	uint64_t		*pic_data[CPC_SPARC64_VI_NPIC];
 	uint64_t		*dtmp;
@@ -589,7 +688,8 @@ opl_pcbe_sample(void *token)
 	}
 
 	pcr = ultra_getpcr();
-	pcr |= (SPARC64_VI_PCR_ULRO | SPARC64_VI_PCR_OVRO);
+	pcr &= ~SPARC64_VI_PCR_OVRO;
+	pcr |= SPARC64_VI_PCR_ULRO;
 
 	for (i = 0; i < SPARC64_VI_NUM_PIC_PAIRS; i++) {
 		SPARC64_VI_PCR_SEL_PIC(pcr, i);
@@ -601,22 +701,30 @@ opl_pcbe_sample(void *token)
 		curpic = ultra_getpic();
 		DTRACE_PROBE1(sparc64__getpic, unit64_t, curpic);
 
-		diff = (int64_t)((uint32_t)(curpic & PIC_MASK) -
-		    pic[i*2]->opl_pic);
-		if (diff < 0)
+		diff = (curpic & PIC_MASK) - (uint64_t)pic[i*2]->opl_pic;
+		overflow = SPARC64_VI_CHK_OVF(pcr, i*2);
+		if (overflow || (diff < 0)) {
+			SPARC64_VI_CLR_OVF(pcr, i*2);
+			ultra_setpcr(pcr);
 			diff += (1ll << 32);
+		}
 		*pic_data[i*2] += diff;
 
-		diff = (int64_t)((uint32_t)(curpic >> 32) -
-		    pic[i*2 + 1]->opl_pic);
-		if (diff < 0)
+		diff = (curpic >> 32) - (uint64_t)pic[i*2 + 1]->opl_pic;
+		overflow = SPARC64_VI_CHK_OVF(pcr, i*2 + 1);
+		if (overflow || (diff < 0)) {
+			SPARC64_VI_CLR_OVF(pcr, i*2 + 1);
+			ultra_setpcr(pcr);
 			diff += (1ll << 32);
+		}
 		*pic_data[i*2 + 1] += diff;
 
 		pic[i*2]->opl_pic = (uint32_t)(curpic & PIC_MASK);
 		pic[i*2 + 1]->opl_pic = (uint32_t)(curpic >> 32);
 	}
-
+	pcr = ultra_getpcr();
+	pcr |= SPARC64_VI_PCR_OVRO;
+	ultra_setpcr(pcr);
 }
 
 static void
@@ -628,7 +736,7 @@ opl_pcbe_free(void *config)
 
 static struct modlpcbe modlpcbe = {
 	&mod_pcbeops,
-	"SPARC64 VI Performance Counters v1.2",
+	"SPARC64 VI Performance Counters v%I%",
 	&opl_pcbe_ops
 };
 
