@@ -149,7 +149,7 @@ dataset_namecheck(const char *path, namecheck_err_t *why, char *what)
 		}
 
 		/* Zero-length components are not allowed */
-		if (loc == end) {
+		if (loc == end && *end != '@') {
 			if (why)
 				*why = NAME_ERR_EMPTY_COMPONENT;
 			return (-1);
