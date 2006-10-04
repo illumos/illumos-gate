@@ -290,14 +290,16 @@ disable_kef_hardware(char *provname, boolean_t rndflag, boolean_t allflag,
 	 * cryptoadm(1M) level to the "random" mechanism in kCF.
 	 */
 	if (!rndflag) {
-		(void) filter_mechlist(&infolist, RANDOM);
+		(void) filter_mechlist(&dislist, RANDOM);
 	}
 
 	/* Calculate the new disabled list */
 	if (disable_mechs(&pent, infolist, allflag, dislist) == FAILURE) {
+		free_mechlist(infolist);
 		free_entry(pent);
 		return (FAILURE);
 	}
+	free_mechlist(infolist);
 
 	/* If no mechanisms are to be disabled, return */
 	if (pent->dis_count == 0) {
