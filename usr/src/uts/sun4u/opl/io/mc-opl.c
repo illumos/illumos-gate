@@ -235,6 +235,15 @@ typedef struct {
 
 #define	MC_CNTL_SPEED_SHIFT 26
 
+/*
+ * In mirror mode, we normalized the bank idx to "even" since
+ * the HW treats them as one unit w.r.t programming.
+ * This bank index will be the "effective" bank index.
+ * All mirrored bank state info on mc_period, mc_speedup_period
+ * will be stored in the even bank structure to avoid code duplication.
+ */
+#define	MIRROR_IDX(bankidx)	(bankidx & ~1)
+
 static mc_scan_speed_t	mc_scan_speeds[MC_MAX_SPEEDS] = {
 	{0x6 << MC_CNTL_SPEED_SHIFT, 0},
 	{0x5 << MC_CNTL_SPEED_SHIFT, 32},
@@ -1434,7 +1443,9 @@ IS_CE_ONLY(uint32_t cntl, int ptrl_error)
 void
 mc_write_cntl(mc_opl_t *mcp, int bank, uint32_t value)
 {
-	if (mcp->mc_speedup_period[bank] > 0)
+	int ebank = (IS_MIRROR(mcp, bank)) ? MIRROR_IDX(bank) : bank;
+
+	if (mcp->mc_speedup_period[ebank] > 0)
 		value |= mc_max_speed;
 	else
 		value |= mcp->mc_speed;
@@ -1890,6 +1901,7 @@ mc_check_errors_func(mc_opl_t *mcp)
 	uint32_t stat, cntl;
 	int running;
 	int wrapped;
+	int ebk;
 
 	/*
 	 * scan errors.
@@ -1904,6 +1916,9 @@ mc_check_errors_func(mc_opl_t *mcp)
 			running = cntl & MAC_CNTL_PTRL_START;
 			wrapped = cntl & MAC_CNTL_PTRL_ADD_MAX;
 
+			/* Compute the effective bank idx */
+			ebk = (IS_MIRROR(mcp, i)) ? MIRROR_IDX(i) : i;
+
 			if (mc_debug_show_all || stat) {
 				MC_LOG("/LSB%d/B%d stat %x cntl %x\n",
 					mcp->mc_board_num, i,
@@ -1915,11 +1930,17 @@ mc_check_errors_func(mc_opl_t *mcp)
 			 * wrapped around in its scan.
 			 */
 			if (wrapped) {
-				mcp->mc_period[i]++;
-				MC_LOG("mc period %ld on "
-				    "/LSB%d/B%d\n", mcp->mc_period[i],
-				    mcp->mc_board_num, i);
 				MAC_CLEAR_MAX(mcp, i);
+				mcp->mc_period[ebk]++;
+				if (IS_MIRROR(mcp, i))
+				    MC_LOG("mirror mc period %ld on "
+					"/LSB%d/B%d\n", mcp->mc_period[ebk],
+					mcp->mc_board_num, i);
+				else {
+				    MC_LOG("mc period %ld on "
+					"/LSB%d/B%d\n", mcp->mc_period[ebk],
+					mcp->mc_board_num, i);
+				}
 			}
 
 			if (running) {
@@ -1950,9 +1971,9 @@ mc_check_errors_func(mc_opl_t *mcp)
 				 * to stop. We only do it if HW patrol scan
 				 * wrapped (counted as completing a 'period').
 				 */
-				if (mcp->mc_speedup_period[i] > 0) {
+				if (mcp->mc_speedup_period[ebk] > 0) {
 				    if (wrapped &&
-					(--mcp->mc_speedup_period[i] == 0)) {
+					(--mcp->mc_speedup_period[ebk] == 0)) {
 					/*
 					 * We did try to speed up.
 					 * The speed up period has expired
@@ -1960,11 +1981,19 @@ mc_check_errors_func(mc_opl_t *mcp)
 					 * The errors must be intermittent.
 					 * We have no choice but to ignore
 					 * them, reset the scan speed to normal
-					 * and clear the MI error bits.
+					 * and clear the MI error bits. For
+					 * mirror mode, we need to clear errors
+					 * on both banks.
 					 */
 					MC_LOG("Clearing MI errors\n");
 					MAC_CLEAR_ERRS(mcp, i,
 					    MAC_CNTL_MI_ERRS);
+
+					if (IS_MIRROR(mcp, i)) {
+					    MC_LOG("Clearing Mirror MI errs\n");
+					    MAC_CLEAR_ERRS(mcp, i^1,
+						MAC_CNTL_MI_ERRS);
+					}
 				    }
 				} else if (stat & MAC_STAT_MI_ERRS) {
 					/*
@@ -1977,7 +2006,7 @@ mc_check_errors_func(mc_opl_t *mcp)
 					 * location that cause the HW patrol
 					 * to stop.
 					 */
-					mcp->mc_speedup_period[i] = 2;
+					mcp->mc_speedup_period[ebk] = 2;
 					MAC_CMD(mcp, i, 0);
 				}
 			} else if (stat & (MAC_STAT_PTRL_ERRS |
@@ -1986,11 +2015,10 @@ mc_check_errors_func(mc_opl_t *mcp)
 				 * HW Patrol has stopped and we found errors.
 				 * Proceed to collect and report error info.
 				 */
-				mcp->mc_speedup_period[i] = 0;
+				mcp->mc_speedup_period[ebk] = 0;
 				rsaddr_info.mi_valid = 0;
 				rsaddr_info.mi_injectrestart = 0;
 				if (IS_MIRROR(mcp, i)) {
-				    mcp->mc_speedup_period[i^1] = 0;
 				    mc_error_handler_mir(mcp, i, &rsaddr_info);
 				} else {
 				    mc_error_handler(mcp, i, &rsaddr_info);
@@ -2003,8 +2031,13 @@ mc_check_errors_func(mc_opl_t *mcp)
 				 * HW patrol scan has apparently stopped
 				 * but no errors detected/flagged.
 				 * Restart the HW patrol just to be sure.
+				 * In mirror mode, the odd bank might have
+				 * reported errors that caused the patrol to
+				 * stop. We'll defer the restart to the odd
+				 * bank in this case.
 				 */
-				restart_patrol(mcp, i, NULL);
+				if (!IS_MIRROR(mcp, i) || (i & 0x1))
+					restart_patrol(mcp, i, NULL);
 			}
 		}
 	}
@@ -2986,6 +3019,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 
 	if (flags & MC_INJECT_FLAG_POLL) {
 		int running;
+		int ebank = (IS_MIRROR(mcp, bank)) ? MIRROR_IDX(bank) : bank;
 
 		MC_LOG("Poll patrol error\n");
 		stat = LD_MAC_REG(MAC_PTRL_STAT(mcp, bank));
@@ -2998,11 +3032,10 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 			 * HW patrol stopped and we have errors to
 			 * report. Do it.
 			 */
-			mcp->mc_speedup_period[bank] = 0;
+			mcp->mc_speedup_period[ebank] = 0;
 			rsaddr.mi_valid = 0;
 			rsaddr.mi_injectrestart = 0;
 			if (IS_MIRROR(mcp, bank)) {
-				mcp->mc_speedup_period[bank^1] = 0;
 				mc_error_handler_mir(mcp, bank, &rsaddr);
 			} else {
 				mc_error_handler(mcp, bank, &rsaddr);
@@ -3015,7 +3048,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 			 * errors but the HW patrol is still running.
 			 * Speed up the scanning
 			 */
-			mcp->mc_speedup_period[bank] = 2;
+			mcp->mc_speedup_period[ebank] = 2;
 			MAC_CMD(mcp, bank, 0);
 			restart_patrol(mcp, bank, NULL);
 		}
