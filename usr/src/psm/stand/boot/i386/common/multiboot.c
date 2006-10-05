@@ -80,7 +80,6 @@ char *console_prop = NULL;
 extern uint_t bpd_loc;
 extern char *bootfile;
 extern char *module_path;
-extern int boot_verbose;
 int is_amd64;
 
 #ifdef	BOOTAMD64
@@ -119,8 +118,10 @@ main(ulong_t magic, ulong_t addr, ulong_t header)
 	get_grub_bootargs(grub_bootstr);	/* get grub cmd options */
 	if (debug & D_MBINFO)
 		print_mbinfo();
+	setup_bootdev_props();	/* boot device related props */
 	setup_bootops();	/* 32-bit memory ops and lists */
 	init_paging();		/* turn on paging to before loading kernel */
+	mbi = NULL;		/* can't access multiboot info from now on */
 
 	if (mountroot("boot") != 0) {	/* mount the ramdisk */
 		panic("cannot mount boot archive\n");
@@ -227,6 +228,12 @@ print_mbinfo(void)
 
 	/* flags */
 	printf("flags = 0x%x\n", (unsigned)mbi->flags);
+
+	if (MB_CHECK_FLAG(mbi->flags, 9))
+		printf("boot loader: %s\n", (char *)mbi->boot_loader_name);
+
+	if (MB_CHECK_FLAG(mbi->flags, 2))
+		printf("command line: %s\n", (char *)mbi->cmdline);
 
 	/* memory range */
 	if (MB_CHECK_FLAG(mbi->flags, 0))

@@ -93,6 +93,7 @@ extern void outw(int port, uint16_t value);
 extern void outl(int port, uint32_t value);
 
 extern void pc_reset(void) __NORETURN;
+extern void efi_reset(void) __NORETURN;
 extern void reset(void) __NORETURN;
 extern int goany(void);
 

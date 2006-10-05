@@ -1434,6 +1434,10 @@ void
 pc_reset(void)
 {}
 
+void
+efi_reset(void)
+{}
+
 #else	/* __lint */
 
 	ENTRY(wait_500ms)
@@ -1533,7 +1537,9 @@ pc_reset(void)
 	/
 	/ port 0xcf9 failed also.  Last-ditch effort is to
 	/ triple-fault the CPU.
+	/ Also, use triple fault for EFI firmware
 	/
+	ENTRY(efi_reset)
 #if defined(__amd64)
 	pushq	$0x0
 	pushq	$0x0		/ IDT base of 0, limit of 0 + 2 unused bytes
@@ -1548,6 +1554,7 @@ pc_reset(void)
 	cli
 	hlt			/ Wait forever
 	/*NOTREACHED*/
+	SET_SIZE(efi_reset)
 	SET_SIZE(pc_reset)
 
 #endif	/* __lint */

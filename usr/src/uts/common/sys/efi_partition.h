@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,6 +132,10 @@ typedef struct efi_gpe_Attrs {
 			    { 0x23, 0x8f, 0x2a, 0x3d, 0xf9, 0x28 } }
 #define	EFI_DELL_RESV	{ 0x8da63339, 0x0007, 0x60c0, 0xc4, 0x36, \
 			    { 0x08, 0x3a, 0xc8, 0x23, 0x09, 0x08 } }
+#define	EFI_AAPL_HFS	{ 0x48465300, 0x0000, 0x11aa, 0xaa, 0x11, \
+			    { 0x00, 0x30, 0x65, 0x43, 0xec, 0xac } }
+#define	EFI_AAPL_UFS	{ 0x55465300, 0x0000, 0x11aa, 0xaa, 0x11, \
+			    { 0x00, 0x30, 0x65, 0x43, 0xec, 0xac } }
 
 #define	EFI_MIN_ARRAY_SIZE	(16 * 1024)
 

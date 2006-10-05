@@ -166,6 +166,20 @@ AcpiOsTerminate(void)
 ACPI_STATUS
 AcpiOsGetRootPointer(UINT32 Flags, ACPI_POINTER *Address)
 {
+	uint_t acpi_root_tab;
+
+	/*
+	 * For EFI firmware, the root pointer is defined in EFI systab.
+	 * The boot code process the table and put the physical address
+	 * in the acpi-root-tab property.
+	 */
+	acpi_root_tab = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_root_node(), 0,
+	    "acpi-root-tab", 0);
+	if (acpi_root_tab != 0) {
+		Address->PointerType = ACPI_PHYSICAL_POINTER;
+		Address->Pointer.Physical = acpi_root_tab;
+		return (AE_OK);
+	}
 	return (AcpiFindRootPointer(Flags, Address));
 }
 

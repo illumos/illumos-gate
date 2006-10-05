@@ -125,6 +125,7 @@ static int port;
 static void
 serial_init(void)
 {
+	extern int bios_free;
 	extern void mdelay();
 
 	/* initialize only once */
@@ -137,7 +138,8 @@ serial_init(void)
 	 *	is enabled, but we can't really tell without working
 	 *	through a scary Microsoft license.
 	 */
-	mdelay(2000);
+	if (!bios_free)
+		mdelay(2000);
 
 	switch (console) {
 	case CONS_TTYA:
@@ -370,18 +372,25 @@ console_init(char *bootstr)
 
 	/* both "graphics" and "text" mean "detect graphics mode" now */
 	if (cons) {
-		if (strncmp(cons, "ttya", 4) == 0)
+		if (strncmp(cons, "ttya", 4) == 0) {
 			console = CONS_TTYA;
-		else if (strncmp(cons, "ttyb", 4) == 0)
+			cons = "ttya";
+		} else if (strncmp(cons, "ttyb", 4) == 0) {
 			console = CONS_TTYB;
-		else if (strncmp(cons, "graphics", 9) == 0)
+			cons = "ttyb";
+		} else if (strncmp(cons, "graphics", 9) == 0) {
 			console = CONS_SCREEN_TEXT;
-		else if (strncmp(cons, "text", 4) == 0)
+			cons = "graphics";
+		} else if (strncmp(cons, "text", 4) == 0) {
 			console = CONS_SCREEN_TEXT;
-		else if (strncmp(cons, "screen", 6) == 0)
+			cons = "text";
+		} else if (strncmp(cons, "screen", 6) == 0) {
 			console = CONS_SCREEN_TEXT;
-		else if (strncmp(cons, "usb-serial", 10) == 0)
+			cons = "text";
+		} else if (strncmp(cons, "usb-serial", 10) == 0) {
 			console = CONS_USBSER;
+			cons = "usb-serial";
+		}
 	}
 
 	/*
@@ -395,9 +404,9 @@ console_init(char *bootstr)
 	switch (console) {
 	case CONS_TTYA:
 	case CONS_TTYB:
+	case CONS_USBSER:
 		/* leave initialization till later, when we know tty mode */
 		break;
-	case CONS_USBSER:	/* try screen for now */
 	case CONS_SCREEN_TEXT:
 	default:
 		clear_screen();
@@ -463,8 +472,8 @@ console_init2(char *inputdev, char *outputdev, char *consoledev)
 				serial_init();
 			}
 			break;
-		case CONS_USBSER:	/* see comments in _doputchar() */
-			/*FALLTHRU*/
+		case CONS_USBSER:
+			break;
 		case CONS_SCREEN_TEXT:
 			if (console_state != CONS_SCREEN_TEXT) {
 				clear_screen();
@@ -545,13 +554,11 @@ _doputchar(int c)
 		return;
 	case CONS_USBSER:
 		/*
-		 * usbser_putchar() only prints to memory buffer, so
-		 * nothing is visible.  We fall through to print to
-		 * screen as well. This continues until kernel consconfig(),
-		 * after which putchar() is no longer called.
+		 * usbser_putchar() prints to memory buffer.
+		 * The buffer is displayed after consconfig().
 		 */
 		usbser_putchar(c);
-		/*FALLTHRU*/
+		return;
 	case CONS_SCREEN_TEXT:
 		screen_putchar(c);
 		return;

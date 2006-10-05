@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -32,6 +31,9 @@
 #include <sys/salib.h>
 #include "debug.h"
 #include "multiboot.h"
+
+int efi_boot;		/* booted from EFI firmware */
+extern int bios_free;	/* firmware is not bios */
 
 extern void install_memlistptrs();
 #define	dprintf	if (debug & D_BPROP) printf
@@ -182,9 +184,7 @@ setup_bootprop(void)
 	extern char bootprop[], bootargs[];
 	extern char *bootprog;
 	extern uint64_t ramdisk_start, ramdisk_end;
-	extern multiboot_info_t *mbi;
 	char *name, *val, *cp;
-	int netboot = 0;
 	int stdout_val = 0;		/* for a dummy property */
 
 	if (verbosemode)
@@ -241,6 +241,34 @@ setup_bootprop(void)
 	(void) bsetprop(NULL, "mfg-name", "i86pc", sizeof ("i86pc"));
 	(void) bsetprop(NULL, "impl-arch-name", "i86pc", sizeof ("i86pc"));
 
+	/* dummy properties needed by Install miniroot */
+	(void) bsetprop(NULL,
+		"stdout", &stdout_val, sizeof (stdout_val));
+}
+
+void
+setup_bootdev_props(void)
+{
+	extern multiboot_info_t *mbi;
+	int netboot = 0;
+
+	if (verbosemode)
+		printf("setup boot device properties.\n");
+
+	/* If booted from EFI, setup acpi-root-tab and efi-systab */
+	if (efi_boot) {
+		(void) bsetprop(NULL, "acpi-root-tab",
+		    (char *)&mbi->acpi_root_tab,
+		    sizeof (mbi->acpi_root_tab));
+		(void) bsetprop(NULL, "efi-systab", (char *)&mbi->efi_systab,
+		    sizeof (mbi->efi_systab));
+	}
+
+	if (bios_free) {
+		(void) bsetprop(NULL, "bios-free", "tree", sizeof ("true"));
+		return;
+	}
+
 	/* figure out the boot device */
 	if (MB_CHECK_FLAG(mbi->flags, 2)) {
 		char str[3];
@@ -258,38 +286,35 @@ setup_bootprop(void)
 	 * the dhcp ack. This is not multiboot compliant and
 	 * requires special pxegrub!
 	 */
-	if (netboot) {
-		if (verbosemode)
-			printf("booting from network\n");
+	if (!netboot)
+		return;
 
-		if (mbi->drives_length == 0) {
-			if (verbosemode) {
-				printf("no network info, "
-				    "need a GRUB with Solaris enhancements\n");
-			}
-		} else {
-			struct sol_netinfo *sip =
-				(struct sol_netinfo *)mbi->drives_addr;
-			switch (sip->sn_infotype) {
-			case SN_TYPE_BOOTP:
-				(void) bsetprop(NULL, BP_BOOTP_RESPONSE,
-				    (void *)mbi->drives_addr,
-				    mbi->drives_length);
-				break;
-			case SN_TYPE_RARP:
-				setup_rarp_props(sip);
-				break;
-			default:
-				printf("invalid network info: type %d\n",
-				    sip->sn_infotype);
-				break;
-			};
+	if (verbosemode)
+		printf("booting from network\n");
+
+	if (mbi->drives_length == 0) {
+		if (verbosemode) {
+			printf("no network info, "
+			    "need a GRUB with Solaris enhancements\n");
 		}
+	} else {
+		struct sol_netinfo *sip =
+			(struct sol_netinfo *)mbi->drives_addr;
+		switch (sip->sn_infotype) {
+		case SN_TYPE_BOOTP:
+			(void) bsetprop(NULL, BP_BOOTP_RESPONSE,
+			    (void *)mbi->drives_addr,
+			    mbi->drives_length);
+			break;
+		case SN_TYPE_RARP:
+			setup_rarp_props(sip);
+			break;
+		default:
+			printf("invalid network info: type %d\n",
+			    sip->sn_infotype);
+			break;
+		};
 	}
-
-	/* dummy properties needed by Install miniroot */
-	(void) bsetprop(NULL,
-		"stdout", &stdout_val, sizeof (stdout_val));
 }
 
 #define	BUFLEN	64

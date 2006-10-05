@@ -188,6 +188,10 @@ acpica_check_bios_date(int yy, int mm, int dd)
 	char *datep;
 	int bios_year, bios_month, bios_day;
 
+	/* If firmware has no bios, skip the check */
+	if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(), 0, "bios-free"))
+		return (TRUE);
+
 	/*
 	 * PC BIOSes contain a string in the form of
 	 * "mm/dd/yy" at absolute address 0xffff5,

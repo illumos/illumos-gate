@@ -66,7 +66,9 @@ static struct uuid_to_ptag {
 	{ EFI_DELL_RAID },
 	{ EFI_DELL_SWAP },
 	{ EFI_DELL_LVM },
-	{ EFI_DELL_RESV }
+	{ EFI_DELL_RESV },
+	{ EFI_AAPL_HFS },
+	{ EFI_AAPL_UFS }
 };
 
 /*
@@ -437,9 +439,9 @@ efi_read(int fd, struct dk_gpt *vtoc)
 		return (rval);
 	}
 
-	/* partitions start in the next block */
 	/* LINTED -- always longlong aligned */
-	efi_parts = (efi_gpe_t *)(((char *)efi) + disk_info.dki_lbsize);
+	efi_parts = (efi_gpe_t *)(((char *)efi) +
+	    LE_64(efi->efi_gpt_PartitionEntryLBA) * disk_info.dki_lbsize);
 
 	/*
 	 * Assemble this into a "dk_gpt" struct for easier
@@ -583,7 +585,10 @@ check_input(struct dk_gpt *vtoc)
 			return (VT_EINVAL);
 		}
 		if (vtoc->efi_parts[i].p_tag == V_UNASSIGNED) {
-			continue;
+			if (uuid_is_null((uchar_t *)&vtoc->efi_parts[i].p_guid))
+				continue;
+			/* we have encountered an unknown uuid */
+			vtoc->efi_parts[i].p_tag = 0xff;
 		}
 		if (vtoc->efi_parts[i].p_tag == V_RESERVED) {
 			if (resv_part != -1) {
@@ -739,8 +744,21 @@ efi_write(int fd, struct dk_gpt *vtoc)
 			    UUID_LE_CONVERT(
 				efi_parts[i].efi_gpe_PartitionTypeGUID,
 				conversion_array[j].uuid);
+			    break;
 		    }
 	    }
+
+	    if (j == sizeof (conversion_array) / sizeof (struct uuid_to_ptag)) {
+		/*
+		 * If we didn't have a matching uuid match, bail here.
+		 * Don't write a label with unknown uuid.
+		 */
+		if (efi_debug)
+		    (void) fprintf(stderr, "Unknown uuid for p_tag %d\n",
+			vtoc->efi_parts[i].p_tag);
+		return (VT_EINVAL);
+	    }
+
 	    efi_parts[i].efi_gpe_StartingLBA =
 		LE_64(vtoc->efi_parts[i].p_start);
 	    efi_parts[i].efi_gpe_EndingLBA =

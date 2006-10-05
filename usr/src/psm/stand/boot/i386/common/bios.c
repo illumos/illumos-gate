@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +42,8 @@
 #define	PCI_BIOS_PRESENT	0x1
 #define	dprintf	if (debug & D_BIOS) printf
 
+int bios_free;	/* i.e. no BIOS */
+
 extern int openfile(char *, char *);
 int (*bios_doint)(int, struct int_pb *);
 
@@ -61,12 +62,26 @@ pci_check_bios(void)
 	dprintf("ic.dx = 0x%x\r\n", (int)ic.dx);
 }
 
+/* dummy bios routine when no BIOS is present */
+/*ARGSUSED*/
+static int
+bios_doint_none(int a, struct int_pb *p)
+{
+	dprintf("bios_doint_none: fail 0x%x\n", a);
+	return (PS_C);
+}
+
 void
 init_biosprog()
 {
 	int fd;
 	char *buf = (char *)0x2000;
 	ssize_t count;
+
+	if (bios_free) {
+		bios_doint = bios_doint_none;
+		return;
+	}
 
 	/* read biosint program to pfn 2 */
 	fd = openfile("biosint", NULL);

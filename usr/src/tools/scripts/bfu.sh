@@ -2117,7 +2117,7 @@ if [[ $target_isa = i386 && -f $cpiodir/i86pc.root$ZFIX ]] && \
     grep multiboot >/dev/null 2>&1 ; then
 	multiboot_archives=yes
 	prtconf -v | grep biosdev >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
+	if [ $? -ne 0 ] && [ ! -f $rootprefix/platform/i86pc/multiboot ]; then
 		echo "biosdev cannot be run on this machine."
 		echo "Transitioning from classic to multiboot requires a"
 		echo "bootconf which is compatible with biosdev."

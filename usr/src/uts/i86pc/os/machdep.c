@@ -340,6 +340,8 @@ reset(void)
 			*bios_memchk = 0x1234;	/* bios memory check disable */
 	}
 
+	if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(), 0, "efi-systab"))
+		efi_reset();
 	pc_reset();
 	/*NOTREACHED*/
 }
