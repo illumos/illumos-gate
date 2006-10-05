@@ -35,4 +35,7 @@
 	<service name='platform/sun4v/drd' version='1' type='service'>
 		<instance name='default' enabled='true'/>
 	</service>
+	<service name='platform/sun4v/efdaemon' version='1' type='service'>
+		<instance name='default' enabled='true'/>
+	</service>
 </service_bundle>

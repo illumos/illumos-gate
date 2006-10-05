@@ -69,3 +69,5 @@ s none usr/lib/efcode/sparcv9/lfc_pciex_pciex.so=lfc_upa_pci.so
 s none usr/lib/efcode/sparcv9/lfc_pciex_pci.so=lfc_upa_pci.so
 s none usr/lib/efcode/sparcv9/lfc_pci_pciex.so=lfc_upa_pci.so
 s none usr/lib/efcode/sparcv9/lfc_jupiter_pciex.so=lfc_upa_pci.so
+s none usr/lib/efcode/sparcv9/lfc_sun4v.so=lfc_upa.so
+s none usr/lib/efcode/sparcv9/lfc_sun4v_pciex.so=lfc_upa_pci.so
