@@ -168,6 +168,28 @@ static int RSA_eay_public_encrypt(int flen, const unsigned char *from,
 	unsigned char *buf=NULL;
 	BN_CTX *ctx=NULL;
 
+	if (BN_num_bits(rsa->n) > OPENSSL_RSA_MAX_MODULUS_BITS)
+		{
+		RSAerr(RSA_F_RSA_EAY_PUBLIC_ENCRYPT, RSA_R_MODULUS_TOO_LARGE);
+		return -1;
+		}
+ 
+	if (BN_ucmp(rsa->n, rsa->e) <= 0)
+		{
+		RSAerr(RSA_F_RSA_EAY_PUBLIC_ENCRYPT, RSA_R_BAD_E_VALUE);
+		return -1;
+		}
+ 
+	/* for large moduli, enforce exponent limit */
+	if (BN_num_bits(rsa->n) > OPENSSL_RSA_SMALL_MODULUS_BITS)
+		{
+		if (BN_num_bits(rsa->e) > OPENSSL_RSA_MAX_PUBEXP_BITS)
+			{
+			RSAerr(RSA_F_RSA_EAY_PUBLIC_ENCRYPT, RSA_R_BAD_E_VALUE);
+			return -1;
+			}
+		}
+	
 	if ((ctx=BN_CTX_new()) == NULL) goto err;
 	BN_CTX_start(ctx);
 	f = BN_CTX_get(ctx);
@@ -574,6 +596,28 @@ static int RSA_eay_public_decrypt(int flen, const unsigned char *from,
 	unsigned char *buf=NULL;
 	BN_CTX *ctx=NULL;
 
+	if (BN_num_bits(rsa->n) > OPENSSL_RSA_MAX_MODULUS_BITS)
+		{
+		RSAerr(RSA_F_RSA_EAY_PUBLIC_DECRYPT, RSA_R_MODULUS_TOO_LARGE);
+		return -1;
+		}
+ 
+	if (BN_ucmp(rsa->n, rsa->e) <= 0)
+		{
+		RSAerr(RSA_F_RSA_EAY_PUBLIC_DECRYPT, RSA_R_BAD_E_VALUE);
+		return -1;
+		}
+ 
+	/* for large moduli, enforce exponent limit */
+	if (BN_num_bits(rsa->n) > OPENSSL_RSA_SMALL_MODULUS_BITS)
+		{
+		if (BN_num_bits(rsa->e) > OPENSSL_RSA_MAX_PUBEXP_BITS)
+			{
+			RSAerr(RSA_F_RSA_EAY_PUBLIC_DECRYPT, RSA_R_BAD_E_VALUE);
+			return -1;
+			}
+		}
+	
 	if((ctx = BN_CTX_new()) == NULL) goto err;
 	BN_CTX_start(ctx);
 	f = BN_CTX_get(ctx);
@@ -617,15 +661,6 @@ static int RSA_eay_public_decrypt(int flen, const unsigned char *from,
 		{
 	case RSA_PKCS1_PADDING:
 		r=RSA_padding_check_PKCS1_type_1(to,num,buf,i,num);
-		/* Generally signatures should be at least 2/3 padding, though
-		   this isn't possible for really short keys and some standard
-		   signature schemes, so don't check if the unpadded data is
-		   small. */
-		if(r > 42 && 3*8*r >= BN_num_bits(rsa->n))
-			{
-			RSAerr(RSA_F_RSA_EAY_PUBLIC_DECRYPT, RSA_R_PKCS1_PADDING_TOO_SHORT);
-			goto err;
-			}
 		break;
 	case RSA_X931_PADDING:
 		r=RSA_padding_check_X931(to,num,buf,i,num);
