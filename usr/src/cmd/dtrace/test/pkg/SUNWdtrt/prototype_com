@@ -537,6 +537,7 @@ f none opt/SUNWdtrt/tst/common/funcs/tst.strstr.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/tst.strstr.d.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/tst.strtok.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/tst.strtok.d.out 0444 root bin
+f none opt/SUNWdtrt/tst/common/funcs/tst.strtok_null.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/tst.substr.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/tst.substr.d.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/tst.system.d 0444 root bin
@@ -657,6 +658,8 @@ f none opt/SUNWdtrt/tst/common/pid/tst.emptystack.d.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/pid/tst.emptystack.exe 0555 root bin
 f none opt/SUNWdtrt/tst/common/pid/tst.float.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/pid/tst.float.exe 0555 root bin
+f none opt/SUNWdtrt/tst/common/pid/tst.fork.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/pid/tst.fork.exe 0555 root bin
 f none opt/SUNWdtrt/tst/common/pid/tst.gcc.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/pid/tst.gcc.exe 0555 root bin
 f none opt/SUNWdtrt/tst/common/pid/tst.manypids.ksh 0444 root bin
@@ -836,6 +839,10 @@ f none opt/SUNWdtrt/tst/common/printf/tst.widths.d.out 0444 root bin
 f none opt/SUNWdtrt/tst/common/printf/tst.widths1.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/printf/tst.wp.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/printf/tst.wp.d.out 0444 root bin
+d none opt/SUNWdtrt/tst/common/privs 0755 root bin
+f none opt/SUNWdtrt/tst/common/privs/tst.func_access.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/privs/tst.op_access.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/privs/tst.unpriv_funcs.ksh 0444 root bin
 d none opt/SUNWdtrt/tst/common/probes 0755 root bin
 f none opt/SUNWdtrt/tst/common/probes/err.D_PDESC_ZERO.probeqtn.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/probes/err.D_PDESC_ZERO.probestar.d 0444 root bin
@@ -958,6 +965,7 @@ f none opt/SUNWdtrt/tst/common/safety/tst.cleanpath.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.copyin.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.ddi_pathname.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.dirname.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/safety/tst.execname.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.hton.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.errno.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.gid.d 0444 root bin
@@ -965,6 +973,7 @@ f none opt/SUNWdtrt/tst/common/safety/tst.index.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.msgdsize.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.msgsize.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.null.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/safety/tst.pid.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.ppid.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.progenyof.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.random.d 0444 root bin
@@ -984,6 +993,7 @@ f none opt/SUNWdtrt/tst/common/safety/tst.ustack.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.ustackdepth.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.vahole.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.violentdeath.ksh 0444 root bin
+f none opt/SUNWdtrt/tst/common/safety/tst.zonename.d 0444 root bin
 d none opt/SUNWdtrt/tst/common/scalars 0755 root bin
 f none opt/SUNWdtrt/tst/common/scalars/err.D_ARR_LOCAL.thisarray.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/scalars/err.D_DECL_CLASS.selfthis.d 0444 root bin

@@ -910,6 +910,8 @@ typedef struct dtrace_mstate {
 	int dtms_ipl;				/* cached interrupt pri lev */
 	int dtms_fltoffs;			/* faulting DIFO offset */
 	uintptr_t dtms_strtok;			/* saved strtok() pointer */
+	uint32_t dtms_access;			/* memory access rights */
+	dtrace_difo_t *dtms_difo;		/* current dif object */
 } dtrace_mstate_t;
 
 #define	DTRACE_COND_OWNER	0x1
@@ -917,6 +919,12 @@ typedef struct dtrace_mstate {
 #define	DTRACE_COND_ZONEOWNER	0x4
 
 #define	DTRACE_PROBEKEY_MAXDEPTH	8	/* max glob recursion depth */
+
+/*
+ * Access flag used by dtrace_mstate.dtms_access.
+ */
+#define	DTRACE_ACCESS_KERNEL	0x1		/* the priv to read kmem */
+
 
 /*
  * DTrace Activity
