@@ -73,23 +73,28 @@ static	char	yeschr[SCHAR_MAX + 2];
 static	char	nochr[SCHAR_MAX + 2];
 
 static char *fullpath;
-static int homedirfd;
+static int initdirfd;
 
 static void push_name(char *name, int first);
 static void pop_name(int first);
 static void force_chdir(char *);
 static void ch_dir(char *);
 static char *get_filename(char *name);
-static void chdir_home(void);
-static void check_homedir(void);
+static void chdir_init(void);
+static void check_initdir(void);
 static void cleanup(void);
 
-static char 	*cwd;		/* pathname of home dir, from getcwd() */
+static char 	*cwd;		/* pathname of init dir, from getcwd() */
 static rlim_t	maxfiles;	/* maximum number of open files */
 static int	first_dir = 1;	/* flag set when first trying to remove a dir */
 	/* flag set when can't get dev/inode of a parent dir */
 static int	parent_err = 0;
 static avl_tree_t *tree;	/* tree to keep track of nodes visited */
+	/*
+	 * flag set when an attempt to move subdirectories during execution
+	 * of rm is discovered
+	 */
+static int	bad_chdir = 0;
 
 struct dir_id {
 	dev_t	dev;
@@ -98,11 +103,13 @@ struct dir_id {
 };
 
 	/*
-	 * homedir is the first of a linked list of structures
+	 * initdir is the first of a linked list of structures
 	 * containing unique identifying device and inode numbers for
-	 * each directory, from the home dir up to the root.
+	 * each directory, from the initial dir up to the root.
+	 * current_dir is a pointer to the most recent directory pushed
+	 * on during a recursive rm() call.
 	 */
-static struct dir_id homedir;
+static struct dir_id initdir, *current_dir;
 
 int
 main(int argc, char *argv[])
@@ -173,9 +180,19 @@ main(int argc, char *argv[])
 	while (argc-- > 0) {
 		tree = NULL;
 		rm(*argv, 1);
+		while (bad_chdir) {
+			/*
+			 * If bad_chdir is set, the argument directory is not
+			 * deleted since rm does not continue with the recursion
+			 * Call rm() again on the same argument to remove it.
+			 */
+			bad_chdir = 0;
+			rm(*argv, 1);
+		}
 		argv++;
 		destroy_tree(tree);
 	}
+
 	cleanup();
 	return (errcode ? 2 : 0);
 	/* NOTREACHED */
@@ -236,13 +253,22 @@ rm(char *path, int first)
 		}
 
 		if (first_dir) {
-			check_homedir();
+			check_initdir();
+			current_dir = NULL;
 			first_dir = 0;
 		}
 
 		undir(path, first, buffer.st_dev, buffer.st_ino);
 		return;
 	}
+	/*
+	 * If 'bad_chdir' is set, rm is in an unintended directory and tries
+	 * to unlink a file whose name is contained in 'path'. Return to
+	 * the calling function without proceeding with the argument.
+	 */
+	if (bad_chdir)
+		return;
+
 	filepath = get_filename(path);
 
 	/*
@@ -543,6 +569,18 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 			rm(newpath, 0);
 
 		free(newpath);
+
+		/*
+		 * If an attempt to move files/directories during the execution
+		 * of rm is detected DO NOT proceed with the argument directory.
+		 * rm, in such a case, may have chdir() into a directory outside
+		 * the hierarchy of argument directory.
+		 */
+		if (bad_chdir) {
+			pop_name(first);
+			(void) closedir(name);
+			return;
+		}
 	}
 
 	/*
@@ -564,7 +602,7 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 
 	if (!chdir_failed) {
 		if (first)
-			chdir_home();
+			chdir_init();
 		else if (chdir("..") == -1) {
 			(void) fprintf(stderr,
 			    gettext("rm: cannot change to parent of "
@@ -651,11 +689,11 @@ mypath(dev_t dev, ino_t ino)
 	 * Check to see if this is our current directory
 	 * Indicated by return 2;
 	 */
-	if (dev == homedir.dev && ino == homedir.inode) {
+	if (dev == initdir.dev && ino == initdir.inode) {
 		return (2);
 	}
 
-	curdir = homedir.next;
+	curdir = initdir.next;
 
 	while (curdir != NULL) {
 		/*
@@ -722,6 +760,8 @@ static void
 push_name(char *name, int first)
 {
 	int	namelen;
+	struct	stat buffer;
+	struct	dir_id *newdir;
 
 	namelen = strlen(name) + 1; /* 1 for "/" */
 	if ((curlen + namelen) >= maxlen) {
@@ -735,12 +775,33 @@ push_name(char *name, int first)
 		(void) strcat(fullpath, name);
 	}
 	curlen = strlen(fullpath);
+
+	if (stat(".", &buffer) == -1) {
+		(void) fprintf(stderr,
+		    gettext("rm: cannot stat current directory: "));
+		perror("");
+		exit(2);
+	}
+	if ((newdir = malloc(sizeof (struct dir_id))) == NULL) {
+		(void) fprintf(stderr,
+		    gettext("rm: Insufficient memory.\n"));
+		cleanup();
+		exit(1);
+	}
+
+	newdir->dev = buffer.st_dev;
+	newdir->inode = buffer.st_ino;
+	newdir->next = current_dir;
+	current_dir = newdir;
 }
 
 static void
 pop_name(int first)
 {
 	char *slash;
+	struct	stat buffer;
+	struct	dir_id *remove_dir;
+
 	if (first) {
 		*fullpath = '\0';
 		return;
@@ -751,6 +812,34 @@ pop_name(int first)
 	else
 		*fullpath = '\0';
 	curlen = strlen(fullpath);
+
+	if (stat(".", &buffer) == -1) {
+		(void) fprintf(stderr,
+		    gettext("rm: cannot stat current directory: "));
+		perror("");
+		exit(2);
+	}
+
+	/*
+	 * For each pop operation, verify that the device and inode numbers
+	 * of "." match the numbers recorded before the chdir was done into
+	 * the directory. If they do not match, it is an indication of
+	 * possible malicious activity and rm has chdir to an unintended
+	 * directory
+	 */
+	if ((current_dir->inode != buffer.st_ino) || (current_dir->dev !=
+	    buffer.st_dev)) {
+		if (!bad_chdir) {
+			(void) fprintf(stderr, gettext("rm: WARNING: "
+			    "A subdirectory of %s was moved or linked to "
+			    "another directory during the execution of rm\n"),
+			    fullpath);
+		}
+		bad_chdir = 1;
+	}
+	remove_dir = current_dir;
+	current_dir = current_dir->next;
+	free(remove_dir);
 }
 
 static void
@@ -814,16 +903,16 @@ ch_dir(char *dirname)
 }
 
 static void
-chdir_home(void)
+chdir_init(void)
 {
 	/*
-	 * Go back to home dir--the dir from where rm was executed--using
+	 * Go back to init dir--the dir from where rm was executed--using
 	 * one of two methods, depending on which method works
-	 * for the given permissions of the home dir and its
+	 * for the given permissions of the init dir and its
 	 * parent directories.
 	 */
-	if (homedirfd != -1) {
-		if (fchdir(homedirfd) == -1) {
+	if (initdirfd != -1) {
+		if (fchdir(initdirfd) == -1) {
 			(void) fprintf(stderr,
 			    gettext("rm: cannot change to starting "
 			    "directory: "));
@@ -840,35 +929,35 @@ chdir_home(void)
 }
 
 /*
- * check_homedir -
+ * check_initdir -
  * is only called the first time rm tries to
  * remove a directory.  It saves the current directory, i.e.,
- * home dir, so we can go back to it after traversing elsewhere.
+ * init dir, so we can go back to it after traversing elsewhere.
  * It also saves all the device and inode numbers of each
- * dir from the home dir back to the root in a linked list, so we
+ * dir from the initial dir back to the root in a linked list, so we
  * can later check, via mypath(), if we are trying to remove our current
  * dir or an ancestor.
  */
 static void
-check_homedir(void)
+check_initdir(void)
 {
-	int	size;	/* size allocated for pathname of home dir (cwd) */
+	int	size;	/* size allocated for pathname of init dir (cwd) */
 	struct stat buffer;
 	struct dir_id *lastdir, *curdir;
 
 	/*
-	 * We need to save where we currently are (the "home dir") so
+	 * We need to save where we currently are (the "init dir") so
 	 * we can return after traversing down directories we're
 	 * removing.  Two methods are attempted:
 	 *
-	 * 1) open() the home dir so we can use the fd
+	 * 1) open() the initial dir so we can use the fd
 	 *    to fchdir() back.  This requires read permission
-	 *    on the home dir.
+	 *    on the initial dir.
 	 *
 	 * 2) getcwd() so we can chdir() to go back.  This
-	 *    requires search (x) permission on the home dir,
+	 *    requires search (x) permission on the init dir,
 	 *    and read and search permission on all parent dirs.  Also,
-	 *    getcwd() will not work if the home dir is > 341
+	 *    getcwd() will not work if the init dir is > 341
 	 *    directories deep (see open bugid 4033182 - getcwd needs
 	 *    to work for pathnames of any depth).
 	 *
@@ -877,12 +966,12 @@ check_homedir(void)
 	 *
 	 * For future enhancement, a possible 3rd option to use
 	 * would be to fork a process to remove a directory,
-	 * eliminating the need to chdir back to the home directory
-	 * and eliminating the permission restrictions on the home dir
+	 * eliminating the need to chdir back to the initial directory
+	 * and eliminating the permission restrictions on the initial dir
 	 * or its parent dirs.
 	 */
-	homedirfd = open(".", O_RDONLY);
-	if (homedirfd == -1) {
+	initdirfd = open(".", O_RDONLY);
+	if (initdirfd == -1) {
 		size = PATH_MAX;
 		while ((cwd = getcwd(NULL, size)) == NULL) {
 			if (errno == ERANGE) {
@@ -900,7 +989,7 @@ check_homedir(void)
 
 	/*
 	 * since we exit on error here, we're guaranteed to at least
-	 * have info in the first dir_id struct, homedir
+	 * have info in the first dir_id struct, initdir
 	 */
 	if (stat(".", &buffer) == -1) {
 		(void) fprintf(stderr,
@@ -908,11 +997,11 @@ check_homedir(void)
 		perror("");
 		exit(2);
 	}
-	homedir.dev = buffer.st_dev;
-	homedir.inode = buffer.st_ino;
-	homedir.next = NULL;
+	initdir.dev = buffer.st_dev;
+	initdir.inode = buffer.st_ino;
+	initdir.next = NULL;
 
-	lastdir = &homedir;
+	lastdir = &initdir;
 	/*
 	 * Starting from current working directory, walk toward the
 	 * root, looking at each directory along the way.
@@ -951,21 +1040,22 @@ check_homedir(void)
 			/* loop again to go back another level */
 		lastdir = curdir;
 	}
-		/* go back to home directory */
-	chdir_home();
+		/* go back to init directory */
+	chdir_init();
 }
 
 /*
  * cleanup the dynamically-allocated list of device numbers and inodes,
- * if any.  If homedir was never used, it is external and static so
- * it is guaranteed initialized to zero, thus homedir.next would be NULL.
+ * if any.  If initdir was never used, it is external and static so
+ * it is guaranteed initialized to zero, thus initdir.next would be NULL.
  */
 
 static void
 cleanup(void) {
+
 	struct dir_id *lastdir, *curdir;
 
-	curdir = homedir.next;
+	curdir = initdir.next;
 
 	while (curdir != NULL) {
 		lastdir = curdir;
