@@ -65,24 +65,33 @@ static int	ppb_intr_ops(dev_info_t *, dev_info_t *, ddi_intr_op_t,
 
 /*
  * ppb_support_msi: Flag that controls MSI support across P2P Bridges.
- * By default, MSI is not supported.  Special case is AMD-8132 chipset.
+ * By default, MSI is not supported except for special cases like HT
+ * bridges/tunnels that have HT MSI mapping enabled.
  *
  * However, MSI support behavior can be patched on a system by changing
  * the value of this flag as shown below:-
- *	 0 = default value, MSI is allowed only for special case (AMD-8132)
- *	 1 = MSI supported without any checks
+ *	 0 = default value, MSI is allowed by this driver for special cases
+ *	 1 = MSI supported without any checks for this driver
  *	-1 = MSI not supported at all
  */
 int ppb_support_msi = 0;
 
-#define	PCI_VENID_AMD			0x1022		/* AMD vendor-id */
-#define	PCI_DEVID_8132			0x7458		/* 8132 chipset id */
-#define	PCI_MSI_MAPPING_CAP_OFF		0xF4
-#define	PCI_MSI_MAPPING_CAP_MASK	0xFF01000F
-#define	PCI_MSI_MAPPING_ENABLE		0xA8010008
+/*
+ * Controls the usage of the Hypertransport MSI mapping capability
+ *	0 = default value, leave hardware function as it is
+ *	1 = always enable HT MSI mapping
+ *     -1 = always disable HT MSI mapping
+ */
+int ppb_support_ht_msimap = 0;
 
-extern int	(*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
-		    psm_intr_op_t, int *);
+/*
+ * masks and values for the upper 16-bits of hypertransport cap headers
+ */
+#define	PCI_CAP_HT_MSIMAP_TYPE			0xA800
+#define	PCI_CAP_HT_MSIMAP_TYPE_MASK		0xFF00
+#define	PCI_CAP_HT_MSIMAP_ENABLE		0x0001
+#define	PCI_CAP_HT_MSIMAP_ENABLE_MASK		0x0001
+
 
 struct bus_ops ppb_bus_ops = {
 	BUSO_REV,
@@ -217,6 +226,16 @@ static void	ppb_removechild(dev_info_t *);
 static int	ppb_initchild(dev_info_t *child);
 static void	ppb_save_config_regs(ppb_devstate_t *ppb_p);
 static void	ppb_restore_config_regs(ppb_devstate_t *ppb_p);
+static uint8_t	ppb_find_ht_cap(ddi_acc_handle_t cfg_hdl, uint16_t reg_mask,
+		    uint16_t reg_val);
+static boolean_t	ppb_ht_msimap_check(ddi_acc_handle_t cfg_hdl);
+static int	ppb_ht_msimap_set(ddi_acc_handle_t cfg_hdl, int cmd);
+
+/*
+ * for <cmd> in ppb_ht_msimap_set
+ */
+#define	HT_MSIMAP_ENABLE	1
+#define	HT_MSIMAP_DISABLE	0
 
 
 int
@@ -312,6 +331,14 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			ddi_soft_state_free(ppb_state, instance);
 			return (DDI_FAILURE);
 		}
+
+		if (ppb_support_ht_msimap == 1)
+			(void) ppb_ht_msimap_set(config_handle,
+			    HT_MSIMAP_ENABLE);
+		else if (ppb_support_ht_msimap == -1)
+			(void) ppb_ht_msimap_set(config_handle,
+			    HT_MSIMAP_DISABLE);
+
 		pci_config_teardown(&config_handle);
 
 		/*
@@ -688,16 +715,93 @@ ppb_restore_config_regs(ppb_devstate_t *ppb_p)
 
 
 /*
- * ppb_intr_ops
+ * returns the location of a hypertransport capability whose upper 16-bit
+ * register of the cap header matches <reg_val> after masking the register
+ * with <reg_mask>; if both <reg_mask> and <reg_val> are 0, it will return the
+ * first HT cap found
+ */
+static uint8_t
+ppb_find_ht_cap(ddi_acc_handle_t cfg_hdl, uint16_t reg_mask, uint16_t reg_val)
+{
+	uint16_t status, reg;
+	uint8_t ptr, id;
+
+	status = pci_config_get16(cfg_hdl, PCI_CONF_STAT);
+	if (status == 0xffff || !((status & PCI_STAT_CAP)))
+		return (PCI_CAP_NEXT_PTR_NULL);
+
+	ptr = pci_config_get8(cfg_hdl, PCI_CONF_CAP_PTR);
+	while (ptr != 0xFF &&
+	    ptr != PCI_CAP_NEXT_PTR_NULL &&
+	    ptr >= PCI_CAP_PTR_OFF) {
+
+		ptr &= PCI_CAP_PTR_MASK;
+		id = pci_config_get8(cfg_hdl, ptr + PCI_CAP_ID);
+
+		if (id == PCI_CAP_ID_HT) {
+			reg = pci_config_get16(cfg_hdl,
+			    ptr + PCI_CAP_ID_REGS_OFF);
+			if ((reg & reg_mask) == reg_val)
+				return (ptr);
+		}
+		ptr = pci_config_get8(cfg_hdl, ptr + PCI_CAP_NEXT_PTR);
+	}
+
+	return (PCI_CAP_NEXT_PTR_NULL);
+}
+
+
+static boolean_t
+ppb_ht_msimap_check(ddi_acc_handle_t cfg_hdl)
+{
+	uint8_t ptr;
+
+	ptr = ppb_find_ht_cap(cfg_hdl,
+	    PCI_CAP_HT_MSIMAP_TYPE_MASK | PCI_CAP_HT_MSIMAP_ENABLE_MASK,
+	    PCI_CAP_HT_MSIMAP_TYPE | PCI_CAP_HT_MSIMAP_ENABLE);
+
+	if (ptr == PCI_CAP_NEXT_PTR_NULL)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+
+static int
+ppb_ht_msimap_set(ddi_acc_handle_t cfg_hdl, int cmd)
+{
+	uint8_t ptr;
+	uint16_t reg;
+
+	ptr = ppb_find_ht_cap(cfg_hdl, PCI_CAP_HT_MSIMAP_TYPE_MASK,
+	    PCI_CAP_HT_MSIMAP_TYPE);
+	if (ptr == PCI_CAP_NEXT_PTR_NULL)
+		return (0);
+
+	reg = pci_config_get16(cfg_hdl, ptr + PCI_CAP_ID_REGS_OFF);
+	switch (cmd) {
+	case HT_MSIMAP_ENABLE:
+		reg |= PCI_CAP_HT_MSIMAP_ENABLE;
+		break;
+	case HT_MSIMAP_DISABLE:
+	default:
+		reg &= ~(uint16_t)PCI_CAP_HT_MSIMAP_ENABLE;
+	}
+
+	pci_config_put16(cfg_hdl, ptr + PCI_CAP_ID_REGS_OFF, reg);
+	return (1);
+}
+
+
+/*
+ * intercept certain interrupt services to handle special cases
  */
 static int
 ppb_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
-	ddi_acc_handle_t config_handle;
-	ddi_intr_handle_impl_t tmp_hdl;
-	uint_t msi_mapping;
-	int types = 0;
+	ddi_acc_handle_t cfg_hdl;
+	int rv = DDI_SUCCESS;
 
 	if (intr_op != DDI_INTROP_SUPPORTED_TYPES)
 		return (i_ddi_intr_ops(pdip, rdip, intr_op, hdlp, result));
@@ -709,54 +813,45 @@ ppb_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	/* Fixed interrupt is supported by default */
 	*(int *)result = DDI_INTR_TYPE_FIXED;
 
-	if (psm_intr_ops == NULL || ppb_support_msi == -1) {
-		/* MSI is not allowed */
-		DDI_INTR_NEXDBG((CE_CONT, "ppb_intr_ops: psm_intr_ops == NULL "
-		    "or MSI is not allowed\n"));
-	} else if (ppb_support_msi == 1) {
-		/* MSI is always allowed */
+	if (ppb_support_msi == -1) {
+		DDI_INTR_NEXDBG((CE_CONT,
+		    "ppb_intr_ops: MSI is not allowed\n"));
+		goto OUT;
+	}
+
+	if (ppb_support_msi == 1) {
 		DDI_INTR_NEXDBG((CE_CONT,
 		    "ppb_intr_ops: MSI is always allowed\n"));
-		if (pci_msi_get_supported_type(rdip, &types) == DDI_SUCCESS) {
-			*(int *)result |= types;
-			bzero(&tmp_hdl, sizeof (ddi_intr_handle_impl_t));
-			tmp_hdl.ih_type = *(int *)result;
-			(void) (*psm_intr_ops)(rdip, &tmp_hdl,
-			    PSM_INTR_OP_CHECK_MSI, result);
-		}
-	} else if (pci_config_setup(pdip, &config_handle) == DDI_SUCCESS) {
-		/*
-		 * ppb_support_msi == 0 i.e. by default, MSI is disabled
-		 * Check only for special case like AMD8132 which supports MSI
-		 */
-		if ((pci_config_get16(config_handle, PCI_CONF_VENID) ==
-		    PCI_VENID_AMD) && (pci_config_get16(config_handle,
-		    PCI_CONF_DEVID) == PCI_DEVID_8132)) {
-			msi_mapping = pci_config_get32(config_handle,
-					PCI_MSI_MAPPING_CAP_OFF);
-			/* make sure MSI enable bit is on */
-			if ((msi_mapping & PCI_MSI_MAPPING_CAP_MASK) ==
-				PCI_MSI_MAPPING_ENABLE) {
-				/* MSI/X is enable */
-				DDI_INTR_NEXDBG((CE_CONT, "ppb_intr_ops: "
-				    "MSI is allowed for AMD8132\n"));
-				if (pci_msi_get_supported_type(rdip, &types)
-				    == DDI_SUCCESS) {
-					*(int *)result |= types;
-					bzero(&tmp_hdl,
-					    sizeof (ddi_intr_handle_impl_t));
-					tmp_hdl.ih_type = *(int *)result;
-					(void) (*psm_intr_ops)(rdip, &tmp_hdl,
-					    PSM_INTR_OP_CHECK_MSI, result);
-				}
-			}
-		}
-		pci_config_teardown(&config_handle);
+		rv = i_ddi_intr_ops(pdip, rdip, intr_op, hdlp, result);
+		goto OUT;
 	}
+
+	if (pci_config_setup(pdip, &cfg_hdl) != DDI_SUCCESS) {
+		DDI_INTR_NEXDBG((CE_CONT,
+		    "ppb_intr_ops: pci_config_setup() failed\n"));
+		goto OUT;
+	}
+
+	/*
+	 * check for hypertransport msi mapping capability
+	 */
+	if (ppb_ht_msimap_check(cfg_hdl)) {
+		DDI_INTR_NEXDBG((CE_CONT,
+		    "ppb_intr_ops: HT MSI mapping enabled\n"));
+		rv = i_ddi_intr_ops(pdip, rdip, intr_op, hdlp, result);
+	}
+
+	/*
+	 * if we add failure conditions after pci_config_setup, move this to
+	 * OUT and use an extra flag to indicate the need to teardown cfg_hdl
+	 */
+	pci_config_teardown(&cfg_hdl);
+
+OUT:
 	DDI_INTR_NEXDBG((CE_CONT,
 	    "ppb_intr_ops: rdip 0x%p, returns supported types: 0x%x\n",
 	    (void *)rdip, *(int *)result));
-	return (DDI_SUCCESS);
+	return (rv);
 }
 
 static int
