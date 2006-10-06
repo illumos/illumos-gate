@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -319,6 +318,20 @@ void
 sfmmu_clear_utsbinfo()
 {
 	(void) hv_set_ctxnon0(0, NULL);
+}
+
+/*
+ * Invalidate machine specific TSB information, indicates all TSB memory
+ * is being freed by hat_swapout().
+ */
+void
+sfmmu_invalidate_tsbinfo(sfmmu_t *sfmmup)
+{
+	ASSERT(sfmmup->sfmmu_tsb != NULL &&
+	    sfmmup->sfmmu_tsb->tsb_flags & TSB_SWAPPED);
+
+	sfmmup->sfmmu_hvblock.hv_tsb_info_pa = (uint64_t)-1;
+	sfmmup->sfmmu_hvblock.hv_tsb_info_cnt = 0;
 }
 
 /*

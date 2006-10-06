@@ -388,6 +388,9 @@ static void	iment_add(struct ism_ment *,  struct hat *);
 static void	iment_sub(struct ism_ment *, struct hat *);
 static pgcnt_t	ism_tsb_entries(sfmmu_t *, int szc);
 extern void	sfmmu_setup_tsbinfo(sfmmu_t *);
+#ifdef sun4v
+extern void	sfmmu_invalidate_tsbinfo(sfmmu_t *);
+#endif	/* sun4v */
 extern void	sfmmu_clear_utsbinfo(void);
 
 static void	sfmmu_ctx_wrap_around(mmu_ctx_t *);
@@ -1725,6 +1728,11 @@ hat_swapout(struct hat *sfmmup)
 		 */
 		tsbinfop->tsb_tte.ll = 0;
 	}
+
+#ifdef sun4v
+	if (freelist)
+		sfmmu_invalidate_tsbinfo(sfmmup);
+#endif	/* sun4v */
 
 	/* Now we can drop the lock and free the TSB memory. */
 	sfmmu_hat_exit(hatlockp);
@@ -10538,6 +10546,9 @@ sfmmu_tsb_swapin(sfmmu_t *sfmmup, hatlock_t *hatlockp)
 		rc = sfmmu_replace_tsb(sfmmup, tsbinfop, TSB_MIN_SZCODE,
 		    hatlockp, TSB_SWAPIN | TSB_FORCEALLOC);
 		ASSERT(rc == TSB_SUCCESS);
+	} else {
+		/* update machine specific tsbinfo */
+		sfmmu_setup_tsbinfo(sfmmup);
 	}
 
 	SFMMU_FLAGS_CLEAR(sfmmup, HAT_SWAPPED|HAT_SWAPIN);
