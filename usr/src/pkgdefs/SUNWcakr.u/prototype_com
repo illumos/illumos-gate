@@ -203,6 +203,8 @@ d none platform/SUNW,Sun-Fire-V215/kernel 755 root sys
 d none platform/SUNW,Sun-Fire-V215/kernel/crypto 755 root sys
 d none platform/SUNW,Sun-Fire-V215/kernel/crypto/sparcv9 755 root sys
 s none platform/SUNW,Sun-Fire-V215/kernel/crypto/sparcv9/aes=../../../../sun4u-us3/kernel/crypto/sparcv9/aes
+d none platform/SUNW,Sun-Fire-V215/kernel/drv 755 root sys
+f none platform/SUNW,Sun-Fire-V215/kernel/drv/su.conf 644 root sys
 d none platform/SUNW,Sun-Fire-V215/kernel/misc 755 root sys
 d none platform/SUNW,Sun-Fire-V215/kernel/misc/sparcv9 755 root sys
 f none platform/SUNW,Sun-Fire-V215/kernel/misc/sparcv9/platmod 755 root sys

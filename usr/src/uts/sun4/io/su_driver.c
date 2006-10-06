@@ -30,7 +30,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- *	Serial I/O driver for 82510/8250/16450/16550AF chips.
+ *	Serial I/O driver for 82510/8250/16450/16550AF/16C554D chips.
  *	Modified as sparc keyboard/mouse driver.
  */
 #define	SU_REGISTER_FILE_NO 0
@@ -396,11 +396,11 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		/*
 		 * The quad UART ST16C554D, version D2 (made by EXAR) has an
 		 * anomaly of generating spurious interrups when the ICR is
-		 * loaded with zero. The workaround would be to read any of
-		 * status registers/SPR/ICR before such write. This anomaly
-		 * will be fixed in future versions of the chip.
+		 * loaded with zero. The workaround would be to read/write
+		 * any register with DATA1 bit set to 0 before such write.
 		 */
-		(void) INB(ICR);
+		if (asy->asy_hwtype == ASY16C554D)
+			OUTB(SPR, 0);
 
 		/* Disable further interrupts */
 		OUTB(ICR, 0);
@@ -417,6 +417,7 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	    cmn_err(CE_NOTE, "su%d: ASY%s shutdown.", instance,
 		asy->asy_hwtype == ASY82510 ? "82510" :
 		asy->asy_hwtype == ASY16550AF ? "16550AF" :
+		asy->asy_hwtype == ASY16C554D ? "16C554D" :
 		"8250");
 #endif
 	/*
@@ -427,7 +428,8 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	mutex_enter(asy->asy_excl);
 	mutex_enter(asy->asy_excl_hi);
 	/* disable interrupts, see EXAR bug */
-	(void) INB(ICR);
+	if (asy->asy_hwtype == ASY16C554D)
+		OUTB(SPR, 0);
 	OUTB(ICR, 0);
 	mutex_exit(asy->asy_excl_hi);
 	mutex_exit(asy->asy_excl);
@@ -465,6 +467,7 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	enum states { EMPTY, SOFTSTATE, REGSMAP, MUTEXES, ADDINTR,
 	    SOFTINTR, ASYINIT, KSTAT, MINORNODE };
 	enum states state = EMPTY;
+	char *hwtype;
 
 	instance = ddi_get_instance(devi);	/* find out which unit */
 
@@ -588,8 +591,17 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		}
 	}
 
+	/* check for ST16C554D chip */
+	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, devi, DDI_PROP_NOTPROM |
+	    DDI_PROP_DONTPASS, "hwtype", &hwtype)) == DDI_PROP_SUCCESS) {
+		if (strcmp(hwtype, "ST16C554D") == 0)
+			asy->asy_hwtype = ASY16C554D;
+		ddi_prop_free(hwtype);
+	}
+
 	/* disable interrupts, see EXAR bug */
-	(void) INB(ICR);
+	if (asy->asy_hwtype == ASY16C554D)
+		OUTB(SPR, 0);
 	OUTB(ICR, 0);
 	OUTB(LCR, DLAB); /* select baud rate generator */
 	/* Set the baud rate to 9600 */
@@ -1363,7 +1375,8 @@ asy_program(struct asycom *asy, int mode)
 	    CBAUDEXT | CIBAUD | CIBAUDEXT);
 
 	/* disable interrupts, see EXAR bug */
-	(void) INB(ICR);
+	if (asy->asy_hwtype == ASY16C554D)
+		OUTB(SPR, 0);
 	OUTB(ICR, 0);
 
 	ocflags = asy->asy_ocflags;

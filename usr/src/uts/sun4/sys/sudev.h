@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance  with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 /*	  All Rights Reserved 	*/
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +54,7 @@ extern "C" {
 #define	MCR		4   	/* modem control register */
 #define	LSR		5   	/* line status register */
 #define	MSR		6   	/* modem status register */
+#define	SPR		7   	/* scratchpad register for ST16C554D */
 #define	DLL		0   	/* divisor latch (lsb) */
 #define	DLH		1   	/* divisor latch (msb) */
 #define	FIFOR		ISR	/* FIFO register for 16550 */
@@ -345,6 +345,7 @@ struct asyncline {
 #define	ASY82510	0x1
 #define	ASY16550AF	0x2
 #define	ASY8250		0x3		/* 8250 or 16450 or 16550 */
+#define	ASY16C554D	0x4		/* ST16C554D */
 
 /* definitions for asy_flags field */
 #define	ASY_NEEDSOFT	0x00000001

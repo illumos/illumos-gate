@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -69,7 +69,7 @@ SEATTLE_OBJS	= seattle.o
 #
 #	Define modules.
 #
-SEATTLE_KMODS	= platmod
+SEATTLE_KMODS	= su platmod
 
 #
 #	Links to UltraSparc III crypto modules
