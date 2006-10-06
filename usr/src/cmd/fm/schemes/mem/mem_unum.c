@@ -336,10 +336,13 @@ unum_contains_bysubstr(const char *erunum, const char *eeunum)
 	    strncmp(erunum, "/SB", 3) != 0) ||
 	    (strncmp(eeunum, "/N", 2) != 0 && strncmp(eeunum, "/IO", 3) != 0 &&
 	    strncmp(eeunum, "/SB", 3) != 0)) {
-		if (ISHCUNUM(erunum) && ISHCUNUM(eeunum))
+		if (ISHCUNUM(erunum) && ISHCUNUM(eeunum)) {
 			nojnumstrip = 1;
-		else
+			erlen = strlen(erunum);
+			eelen = strlen(eeunum);
+		} else {
 			return (fmd_fmri_set_errno(EINVAL));
+		}
 	}
 
 	if (!nojnumstrip) {

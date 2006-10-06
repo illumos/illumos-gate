@@ -775,3 +775,18 @@ code  = 0111	bus	gen	1	gen		gen	lg	-
 
 panic = always
 flags = 
+
+# ---
+
+desc = DRAM Address Parity Error
+error = ereport.cpu.amd.nb.dramaddr_par
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code  = 1101	bus	obs	0	gen		mem	lg	-
+
+panic = always
+flags = 

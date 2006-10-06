@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -39,22 +38,32 @@ extern "C" {
 #endif
 
 #define	MC_UNUM_NAMLEN		192
-#define	MC_UNUM_NDIMM		8
+#define	MC_UNUM_NDIMM		2
 
 typedef struct mc_unum {
 	int unum_board;
 	int unum_chip;
 	int unum_mc;
 	int unum_cs;
+	int unum_rank;
 	uint64_t unum_offset;
 	int unum_dimms[MC_UNUM_NDIMM];
 } mc_unum_t;
 
+/*
+ * Invalid marker used in some numeric properties
+ */
+#define	MC_INVALNUM		((uint32_t)-1)
+
 #define	MC_AMD_DEV_OFFSET	24	/* node ID + offset == PCI dev num */
 
+/*
+ * /dev/mc/mc* ioctl cmds
+ */
 #define	MC_IOC			(0x4d43 << 16)
 #define	MC_IOC_SNAPSHOT_INFO	(MC_IOC | 1)
 #define	MC_IOC_SNAPSHOT		(MC_IOC | 2)
+#define	MC_IOC_ONLINESPARE_EN	(MC_IOC | 4)
 
 /*
  * Prior to requesting a copy of the snapshot, consumers are advised to request

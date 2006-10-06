@@ -149,7 +149,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		tree_free(rhs);
 
 		return (1);
-	} else if (funcname == L_confprop) {
+	} else if (funcname == L_confprop || funcname == L_confprop_defined) {
 		struct config *cp;
 		struct node *lhs;
 		char *path;
@@ -160,8 +160,8 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		else if (np->u.expr.left->u.func.s == L_asru)
 			lhs = eval_asru(np->u.expr.left->u.func.arglist);
 		else
-			out(O_DIE, "confprop: unexpected lhs type: %s",
-			    ptree_nodetype2str(np->u.expr.left->t));
+			out(O_DIE, "%s: unexpected lhs type: %s",
+			    funcname, ptree_nodetype2str(np->u.expr.left->t));
 
 		/* for now s will point to a quote [see addconfigprop()] */
 		ASSERT(np->u.expr.right->t == T_QUOTE);
@@ -171,14 +171,43 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		path = ipath2str(NULL, ipath(lhs));
 		cp = config_lookup(croot, path, 0);
 		tree_free(lhs);
-		FREE((void *)path);
-		if (cp == NULL)
-			return (0);
+		if (cp == NULL) {
+			out(O_ALTFP|O_VERB3, "%s: path %s not found",
+			    funcname, path);
+			FREE((void *)path);
+			if (funcname == L_confprop_defined) {
+				valuep->v = 0;
+				valuep->t = UINT64;
+				return (1);
+			} else {
+				return (0);
+			}
+		}
 		s = config_getprop(cp, np->u.expr.right->u.quote.s);
-		if (s == NULL)
-			return (0);
-		valuep->v = (uintptr_t)stable(s);
-		valuep->t = STRING;
+		if (s == NULL) {
+			out(O_ALTFP|O_VERB3, "%s: \"%s\" not found for path %s",
+			    funcname, np->u.expr.right->u.quote.s, path);
+			FREE((void *)path);
+			if (funcname == L_confprop_defined) {
+				valuep->v = 0;
+				valuep->t = UINT64;
+				return (1);
+			} else {
+				return (0);
+			}
+		}
+
+		if (funcname == L_confprop) {
+			valuep->v = (uintptr_t)stable(s);
+			valuep->t = STRING;
+			out(O_ALTFP|O_VERB3, "%s(\"%s\", \"%s\") = \"%s\"",
+			    funcname, path, np->u.expr.right->u.quote.s,
+			    (char *)(uintptr_t)valuep->v);
+		} else {
+			valuep->v = 1;
+			valuep->t = UINT64;
+		}
+		FREE((void *)path);
 		return (1);
 	}
 
@@ -218,7 +247,8 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 
 		if (platform_payloadprop(np, valuep)) {
 			/* platform_payloadprop() returned false */
-			out(O_ALTFP|O_VERB2, "not found.");
+			out(O_ALTFP|O_VERB, "payloadprop \"%s\" not found.",
+			    np->u.quote.s);
 			return (0);
 		} else {
 			switch (valuep->t) {
@@ -292,7 +322,8 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		if (platform_payloadprop(np, NULL)) {
 			/* platform_payloadprop() returned false */
 			valuep->v = 0;
-			out(O_ALTFP|O_VERB2, "not found.");
+			out(O_ALTFP|O_VERB2, "payloadprop_defined: \"%s\" "
+			    "not defined.", np->u.quote.s);
 		} else {
 			valuep->v = 1;
 			out(O_ALTFP|O_VERB2, "found.");
@@ -312,7 +343,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		    "payloadprop_contains(\"%s\", ",
 		    np->u.expr.left->u.quote.s);
 		ptree_name_iter(O_ALTFP|O_VERB2|O_NONL, np->u.expr.right);
-		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line, ") ");
+		out(O_ALTFP|O_VERB2|O_NONL, ") ");
 
 		/* evaluate the expression we're comparing against */
 		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
@@ -322,12 +353,28 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 			cmpval.t = UINT64;
 			cmpval.v = 0;
 		} else {
-			if (cmpval.t == UINT64)
+			switch (cmpval.t) {
+			case UNDEFINED:
+				out(O_ALTFP|O_VERB2, "(undefined type)");
+				break;
+
+			case UINT64:
 				out(O_ALTFP|O_VERB2,
 				    "(%llu) ", cmpval.v);
-			else
+				break;
+
+			case STRING:
 				out(O_ALTFP|O_VERB2,
 				    "(\"%s\") ", (char *)(uintptr_t)cmpval.v);
+				break;
+
+			case NODEPTR:
+				out(O_ALTFP|O_VERB2|O_NONL, "(");
+				ptree_name_iter(O_ALTFP|O_VERB2|O_NONL,
+				    (struct node *)(uintptr_t)(cmpval.v));
+				out(O_ALTFP|O_VERB2, ") ");
+				break;
+			}
 		}
 
 		/* get the payload values and check for a match */

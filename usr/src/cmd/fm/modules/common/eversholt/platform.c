@@ -391,12 +391,22 @@ add_prop_val(topo_hdl_t *thp, struct cfgdata *rawdata, char *propn,
 	int addlen, err;
 	char *propv, *fmristr = NULL;
 	nvlist_t *fmri;
+	uint64_t ui64;
+	char buf[32];	/* big enough for any 64-bit int */
 
 	/*
-	 * At least try to collect the protocol
-	 * properties
+	 * We can only handle properties of string type
 	 */
-	if (nvpair_type(pv_nvp) == DATA_TYPE_NVLIST) {
+	switch (nvpair_type(pv_nvp)) {
+	case DATA_TYPE_STRING:
+		(void) nvpair_value_string(pv_nvp, &propv);
+		break;
+
+	case DATA_TYPE_NVLIST:
+		/*
+		 * At least try to collect the protocol
+		 * properties
+		 */
 		(void) nvpair_value_nvlist(pv_nvp, &fmri);
 		if (topo_fmri_nvl2str(thp, fmri, &fmristr, &err) < 0) {
 			out(O_ALTFP, "cfgcollect: failed to convert fmri to "
@@ -405,10 +415,18 @@ add_prop_val(topo_hdl_t *thp, struct cfgdata *rawdata, char *propn,
 		} else {
 			propv = fmristr;
 		}
+		break;
 
-	} else if (nvpair_type(pv_nvp) == DATA_TYPE_STRING)
-		(void) nvpair_value_string(pv_nvp, &propv);
-	else {
+	case DATA_TYPE_UINT64:
+		/*
+		 * Convert uint64 to hex strings
+		 */
+		(void) nvpair_value_uint64(pv_nvp, &ui64);
+		(void) snprintf(buf, sizeof (buf), "0x%llx", ui64);
+		propv = buf;
+		break;
+
+	default:
 		return;
 	}
 
@@ -1339,33 +1357,27 @@ platform_confcall(struct node *np, struct lut **globals, struct config *croot,
 		}
 
 		/*
-		 * Loop until we run across asru-specific payload
+		 * Loop until we run across asru-specific payload.  All
+		 * payload members prefixed "asru-" will be added to the
+		 * hc-specific nvlist and removed from the original.
 		 */
-		for (nvp = nvlist_next_nvpair(Action_nvl, NULL); nvp != NULL;
-		    nvp = nvlist_next_nvpair(Action_nvl, nvp)) {
-			uint64_t ui;
-			char *us;
+		nvp = nvlist_next_nvpair(Action_nvl, NULL);
+		while (nvp != NULL) {
+			if (strncmp(nvpair_name(nvp), "asru-", 5) == 0) {
+				if (nvlist_add_nvpair(hcs, nvp) != 0) {
+					nvlist_free(hcs);
+					outfl(O_ALTFP|O_VERB, np->file,
+					    np->line, "unable to rewrite "
+					    "resource - nvlist_add_nvpair for "
+					    "'%s' failed", nvpair_name(nvp));
+					return (0);
+				}
 
-			if (strncmp(nvpair_name(nvp), "asru-", 5) != 0)
-				continue;
-
-			if (nvpair_type(nvp) == DATA_TYPE_UINT64) {
-				err = nvpair_value_uint64(nvp, &ui);
-				err |= nvlist_add_uint64(hcs, nvpair_name(nvp),
-				    ui);
-			} else if (nvpair_type(nvp) == DATA_TYPE_STRING) {
-				err = nvpair_value_string(nvp, &us);
-				err |= nvlist_add_string(hcs, nvpair_name(nvp),
-				    us);
+				(void) nvlist_remove(Action_nvl,
+				    nvpair_name(nvp), nvpair_type(nvp));
+				nvp = nvlist_next_nvpair(Action_nvl, NULL);
 			} else {
-				continue;
-			}
-
-			if (err != 0) {
-				nvlist_free(hcs);
-				outfl(O_ALTFP|O_VERB, np->file, np->line,
-				    "unable to rewrite resource");
-				return (0);
+				nvp = nvlist_next_nvpair(Action_nvl, nvp);
 			}
 		}
 
@@ -1520,7 +1532,7 @@ platform_payloadprop(struct node *np, struct evalue *valuep)
 
 	propstr = np->u.quote.s;
 	if (payloadnvp == NULL) {
-		out(O_ALTFP, "platform_payloadprop: no nvp for %s",
+		out(O_ALTFP | O_VERB2, "platform_payloadprop: no nvp for %s",
 		    propstr);
 		return (1);
 	}

@@ -40,6 +40,15 @@ OBJS = $(YOBJS) $(SRCS:%.c=%.o)
 CONF = $(MODULE:%=%.conf)
 
 #
+# A module may set DMOD and DMOD_SRCS if it has a mdb proc module.
+# DMOD, if set, must match PROG above (for mdb autoloading) so it will
+# be built in a subdirectory.
+#
+ROOTDMOD = $(DMOD:%.so=$(ROOT)/usr/lib/mdb/proc/%.so)
+DMODPROG = $(DMOD:%=dmod/%)
+DMOD_OBJS = $(DMOD_SRCS:%.c=%.o)
+
+#
 # Set ROOTPROG and ROOTCONF based on the values of MODULE, CLASS, and PLATFORMS
 # We expect these macros to be defined by the Makefile that is including us.
 #
@@ -56,6 +65,9 @@ ROOTCONF = $($(CLASS)_ROOTCONF)
 LINTFLAGS += -mu
 LINTFILES = $(SRCS:%.c=%.ln)
 
+DMODLINTTGT = $(DMOD:%=lint_dmod)
+DMODLINTFILES = $(DMOD_SRCS:%.c=%.ln)
+
 APIMAP = ../../../fmd/common/fmd_api.map
 FMRIMAP = ../../../fmd/common/fmd_fmri.map
 
@@ -63,34 +75,46 @@ CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
 CFLAGS += -G $(XREGSFLAG) 
 
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
-LDFLAGS += $(ZTEXT) $(ZCOMBRELOC) $(ZDEFS) $(ZIGNORE) -M$(APIMAP) -M$(FMRIMAP)
-LDLIBS += -lnvpair -lc
+$(PROG) := LDFLAGS += $(ZTEXT) $(ZCOMBRELOC) $(ZDEFS) $(ZIGNORE) -M$(APIMAP) -M$(FMRIMAP)
+$(PROG) := LDLIBS += -lnvpair -lc
 
-all: $(PROG)
+$(DMODPROG) := LDFLAGS += $(ZTEXT) $(ZCOMBRELOC)
+
+all: $(PROG) $(DMODPROG)
 
 .NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES)
+.PARALLEL: $(OBJS) $(LINTFILES) $(DMOD_OBJS) $(DMODLINTFILES)
 
 $(PROG): $(OBJS) $(APIMAP)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(CTFMERGE) -L VERSION -o $@ $(OBJS)
 	$(POST_PROCESS_SO)
 
+$(DMODPROG): $(DMOD_OBJS)
+	-@mkdir -p $(@D)
+	$(LINK.c) $(DMOD_OBJS) -o $@
+	$(POST_PROCESS)
+
 %.o: %.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
 clean:
-	$(RM) $(OBJS) $(LINTFILES) $(CLEANFILES)
+	$(RM) $(OBJS) $(DMOD_OBJS) $(LINTFILES) $(DMODLINTFILES) $(CLEANFILES)
 
 clobber: clean
-	$(RM) $(PROG)
+	$(RM) $(PROG) $(DMODPROG)
 
 %.ln: %.c
 	$(LINT.c) -c $<
 
-lint: $(LINTFILES)
+lint_prog: $(LINTFILES)
 	$(LINT) $(LINTFLAGS) $(LINTFILES) $(LDLIBS)
+
+lint_dmod: $(DMODLINTFILES)
+	$(LINT) $(LINTFLAGS) $(DMODLINTFILES) $(LDLIBS)
+
+lint: lint_prog $(DMODLINTTGT)
 
 install_h:
 
@@ -100,6 +124,9 @@ $(ROOTPROG): $$(@D) $(PROG)
 $(ROOTCONF): $$(@D) $(CONF)
 	$(RM) $@; $(INS) -s -m 0644 -f $(@D) $(CONF)
 
-install: $(ROOTPROG) $(ROOTCONF)
+$(ROOTDMOD): $$(@D) $(DMODPROG)
+	$(RM) $@; $(INS) -s -m 0555 -f $(@D) $(DMODPROG)
+
+install: $(ROOTPROG) $(ROOTCONF) $(ROOTDMOD)
 
 include ../../Makefile.rootdirs

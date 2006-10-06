@@ -1896,6 +1896,10 @@ istat_bump(struct node *snp, int n)
 	} else
 		stats_counter_bump(statp);
 	Istat_need_save = 1;
+
+	ipath_print(O_ALTFP|O_VERB2, ent.ename, ent.ipath);
+	out(O_ALTFP|O_VERB2, " %s to value %d", n ? "set" : "incremented",
+	    stats_counter_value(statp));
 }
 
 /*ARGSUSED*/

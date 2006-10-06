@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -38,38 +37,38 @@
 #include <mcamd_api.h>
 #include <mcamd_err.h>
 
-extern int mc_offset_to_pa(struct mcamd_hdl *, mcamd_node_t *, mcamd_node_t *,
-    uint64_t, uint64_t *);
-
 /*
  * The submitted unum must have the MC and DIMM numbers and an offset.
  * Any cs info it has will not be used - we will reconstruct cs info.
  * This is because cs is not in the topology used for diagnosis.
  */
 int
-mcamd_unumtopa(struct mcamd_hdl *hdl, mcamd_node_t *root, struct mc_unum *unump,
+mcamd_unumtopa(struct mcamd_hdl *hdl, mcamd_node_t *root, mc_unum_t *unump,
     uint64_t *pa)
 {
 	mcamd_node_t *mc, *dimm;
-	uint64_t num, hole;
+	uint64_t num, holesz;
 
 	mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "mcamd_unumtopa: chip %d "
 	    "mc %d dimm %d offset 0x%llx\n", unump->unum_chip, unump->unum_mc,
 	    unump->unum_dimms[0], unump->unum_offset);
 
 	if (!MCAMD_RC_OFFSET_VALID(unump->unum_offset)) {
-		mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "Offset invalid\n");
+		mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "mcamd_unumtopa: offset "
+		    "invalid\n");
 		return (mcamd_set_errno(hdl, EMCAMD_NOADDR));
 	}
 
 	/*
 	 * Search current config for a MC number matching the chip in the
-	 * unum.  MC property num is by chip, not MC on chip.
+	 * unum.
 	 */
 	for (mc = mcamd_mc_next(hdl, root, NULL); mc != NULL;
 	    mc = mcamd_mc_next(hdl, root, mc)) {
-		if (!mcamd_get_numprop(hdl, mc, MCAMD_PROP_NUM, &num) ||
-		    !mcamd_get_numprop(hdl, mc, MCAMD_PROP_DRAM_HOLE, &hole)) {
+		if (!mcamd_get_numprops(hdl,
+		    mc, MCAMD_PROP_NUM, &num,
+		    mc, MCAMD_PROP_DRAMHOLE_SIZE, &holesz,
+		    NULL)) {
 			mcamd_dprintf(hdl, MCAMD_DBG_ERR, "mcamd_unumtopa: "
 			    "failed to lookup num, dramhole for MC 0x%p\n", mc);
 			return (mcamd_set_errno(hdl, EMCAMD_TREEINVALID));
@@ -125,14 +124,12 @@ mcamd_unumtopa(struct mcamd_hdl *hdl, mcamd_node_t *root, struct mc_unum *unump,
 	 * If this MC has a dram address hole just below 4GB then we must
 	 * hoist all address from the hole start upwards by the hole size
 	 */
-	if (hole & MC_DC_HOLE_VALID) {
-		uint64_t hsz = (hole & MC_DC_HOLE_OFFSET_MASK) <<
-		    MC_DC_HOLE_OFFSET_LSHIFT;
-		if (*pa >= 0x100000000 - hsz)
-			*pa += hsz;
+	if (holesz != 0) {
+		if (*pa >= 0x100000000 - holesz)
+			*pa += holesz;
 		mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "mcamd_untopa: hoist "
 		    "above dram hole of size 0x%llx to get pa=0x%llx",
-		    hsz, *pa);
+		    holesz, *pa);
 	}
 
 	return (0);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -65,6 +64,7 @@ struct stats *Filecount;
 struct filestats {
 	struct filestats *next;
 	struct stats *stats;
+	struct stats *idstats;
 } *Fstats;
 
 static int Errcount;
@@ -296,6 +296,8 @@ yylex()
 
 	for (;;) {
 		while (Fp == NULL) {
+			char ibuf[80];
+
 			if (*Files == NULL)
 				return (record(EOF, NULL));
 			Fileopened = stable(*Files++);
@@ -305,7 +307,7 @@ yylex()
 			if ((Fp = popen(Tok, "r")) == NULL)
 				out(O_DIE|O_SYS, "%s", Tok);
 #else
-			Fp = eftread_fopen(Fileopened);
+			Fp = eftread_fopen(Fileopened, ibuf, sizeof (ibuf));
 #endif	/* ESC */
 			Line = 1;
 			bol = 1;
@@ -315,11 +317,24 @@ yylex()
 				static int fnum;
 				char nbuf[100];
 				struct filestats *nfs = MALLOC(sizeof (*nfs));
-				(void) sprintf(nbuf, "lex.file%d", fnum++);
+
+				(void) sprintf(nbuf, "lex.file%d", fnum);
 				nfs->stats = stats_new_string(nbuf, "", 0);
 				stats_string_set(nfs->stats, Fileopened);
+
+				if (ibuf[0] != '\0') {
+					(void) sprintf(nbuf, "lex.file%d-ident",
+					    fnum);
+					nfs->idstats =
+					    stats_new_string(nbuf, "", 0);
+					stats_string_set(nfs->idstats, ibuf);
+				} else {
+					nfs->idstats = NULL;
+				}
+
 				nfs->next = Fstats;
 				Fstats = nfs;
+				fnum++;
 			}
 		}
 
@@ -946,6 +961,8 @@ lex_free(void)
 	while (nfstats != NULL) {
 		Fstats = nfstats->next;
 		stats_delete(nfstats->stats);
+		if (nfstats->idstats != NULL)
+			stats_delete(nfstats->idstats);
 		FREE(nfstats);
 		nfstats = Fstats;
 	}

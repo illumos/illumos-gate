@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1133,7 +1132,8 @@ check_func(struct node *np)
 			    np->u.func.arglist->line,
 			    "confcall(): first argument must be a string "
 			    "(the name of the operation)");
-	} else if (np->u.func.s == L_confprop) {
+	} else if (np->u.func.s == L_confprop ||
+	    np->u.func.s == L_confprop_defined) {
 		if (np->u.func.arglist->t == T_LIST &&
 		    (np->u.func.arglist->u.expr.left->t == T_FUNC &&
 		    (np->u.func.arglist->u.expr.left->u.func.s == L_fru ||
@@ -1143,9 +1143,9 @@ check_func(struct node *np)
 		} else {
 			outfl(O_ERR, np->u.func.arglist->file,
 			    np->u.func.arglist->line,
-			    "confprop(): first argument must be a call to "
+			    "%s(): first argument must be a call to "
 			    "fru() or asru(); "
-			    "second argument must be a string");
+			    "second argument must be a string", np->u.func.s);
 		}
 	} else if (np->u.func.s == L_count) {
 		if (np->u.func.arglist->t != T_EVENT) {

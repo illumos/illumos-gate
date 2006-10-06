@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -32,6 +31,7 @@
 #include <sys/cmn_err.h>
 #include <sys/sysmacros.h>
 #include <sys/fm/protocol.h>
+#include <sys/x86_archext.h>
 
 #include "ao.h"
 
@@ -60,7 +60,7 @@ uint32_t ao_scrub_lo;			/* debug stash for system low addr */
 uint32_t ao_scrub_hi;			/* debug stash for system high addr */
 
 enum {
-	AO_SCRUB_DEFAULT,		/* retain system default values */
+	AO_SCRUB_BIOSDEFAULT,		/* retain system default values */
 	AO_SCRUB_FIXED,			/* assign ao_scrub_rate_* values */
 	AO_SCRUB_MAX			/* assign max of system and tunables */
 } ao_scrub_policy = AO_SCRUB_MAX;
@@ -102,12 +102,19 @@ ao_scrubber_max(uint32_t r1, uint32_t cfg, uint32_t mask, uint32_t shift)
  * The 'base' parameter is the DRAM Base Address for this chip and is used to
  * determine where the scrubber starts.  The 'ilen' value is the IntvlEn field
  * from the DRAM configuration indicating the node-interleaving configuration.
+ *
+ * Where chip-select sparing is available the DRAM scrub address registers
+ * must not be modified while a swap is in-progress.  This can't happen
+ * because we (the amd cpu module) take control of the online spare
+ * away from the BIOS when we perform NB configuration and we complete
+ * that operation before the memory controller driver loads.
  */
 int
-ao_scrubber_enable(void *data, uint64_t base, uint64_t ilen)
+ao_scrubber_enable(void *data, uint64_t base, uint64_t ilen, int csdiscontig)
 {
 	ao_data_t *ao = data;
 	chipid_t chipid = chip_plat_get_chipid(ao->ao_cpu);
+	uint32_t rev = cpuid_getchiprev(ao->ao_cpu);
 	uint32_t scrubctl, lo, hi;
 	int rv = 1;
 
@@ -119,7 +126,7 @@ ao_scrubber_enable(void *data, uint64_t base, uint64_t ilen)
 	scrubctl = ao_pcicfg_read(chipid, AMD_NB_FUNC, AMD_NB_REG_SCRUBCTL);
 	cas32(&ao_scrub_bios, 0, scrubctl);
 
-	if (ao_scrub_policy == AO_SCRUB_DEFAULT)
+	if (ao_scrub_policy == AO_SCRUB_BIOSDEFAULT)
 		return ((scrubctl & AMD_NB_SCRUBCTL_DRAM_MASK) != 0);
 
 	scrubctl &= ~AMD_NB_SCRUBCTL_DRAM_MASK;
@@ -166,7 +173,17 @@ ao_scrubber_enable(void *data, uint64_t base, uint64_t ilen)
 		ao_scrub_rate_dram = AMD_NB_SCRUBCTL_RATE_MAX;
 	}
 
-	if (ao_scrub_policy == AO_SCRUB_MAX) {
+	switch (ao_scrub_policy) {
+	case AO_SCRUB_FIXED:
+		/* Use the system values checked above */
+		break;
+
+	default:
+		cmn_err(CE_WARN, "Unknown ao_scrub_policy value %d - "
+		    "using default policy of AO_SCRUB_MAX", ao_scrub_policy);
+		/*FALLTHRU*/
+
+	case AO_SCRUB_MAX:
 		ao_scrub_rate_dcache =
 		    ao_scrubber_max(ao_scrub_rate_dcache, ao_scrub_bios,
 		    AMD_NB_SCRUBCTL_DC_MASK, AMD_NB_SCRUBCTL_DC_SHIFT);
@@ -178,17 +195,38 @@ ao_scrubber_enable(void *data, uint64_t base, uint64_t ilen)
 		ao_scrub_rate_dram =
 		    ao_scrubber_max(ao_scrub_rate_dram, ao_scrub_bios,
 		    AMD_NB_SCRUBCTL_DRAM_MASK, AMD_NB_SCRUBCTL_DRAM_SHIFT);
+		break;
 	}
+
+#ifdef	OPTERON_ERRATUM_99
+	/*
+	 * This erratum applies on revisions D and earlier.
+	 *
+	 * Do not enable the dram scrubber is the chip-select ranges
+	 * for the node are not contiguous.
+	 */
+	if (csdiscontig && !X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_E)) {
+		cmn_err(CE_CONT, "?Opteron DRAM scrubber disabled on revision "
+		    "%s chip because DRAM hole is present on this node",
+		    cpuid_getchiprevstr(ao->ao_cpu));
+		ao_scrub_rate_dram = 0;
+		rv = 0;
+	}
+#endif
 
 #ifdef OPTERON_ERRATUM_101
 	/*
+	 * This erratum applies on revisions D and earlier.
+	 *
 	 * If the DRAM Base Address register's IntlvEn field indicates that
 	 * node interleaving is enabled, we must disable the DRAM scrubber
 	 * and return zero to indicate that Solaris should use s/w instead.
 	 */
-	if (ilen != 0) {
-		cmn_err(CE_CONT, "?Opteron DRAM scrubber disabled because "
-		    "DRAM memory is node-interleaved");
+	if (ilen != 0 && ao_scrub_rate_dram != 0 &&
+	    !X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_E)) {
+		cmn_err(CE_CONT, "?Opteron DRAM scrubber disabled on revision "
+		    "%s chip because DRAM memory is node-interleaved",
+		    cpuid_getchiprevstr(ao->ao_cpu));
 		ao_scrub_rate_dram = 0;
 		rv = 0;
 	}

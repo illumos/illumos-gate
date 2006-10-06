@@ -34,7 +34,6 @@
 #include <sys/stat.h>
 #include <sys/modctl.h>
 #include <sys/types.h>
-#include <sys/mc.h>
 #include <sys/cpuvar.h>
 #include <sys/cmn_err.h>
 #include <sys/kmem.h>
@@ -47,16 +46,32 @@
 #include <sys/machsystm.h>
 #include <sys/x86_archext.h>
 #include <sys/cpu_module.h>
+#include <qsort.h>
+#include <sys/mc.h>
 #include <sys/mc_amd.h>
-
 #include <mcamd.h>
+#include <mcamd_dimmcfg.h>
+#include <mcamd_pcicfg.h>
 #include <mcamd_api.h>
+#include <sys/fm/cpu/AMD.h>
 
-int mc_quadranksupport = 0;	/* set to 1 for a MB with quad rank support */
+/*
+ * Of the 754/939/940 packages, only socket 940 supports quadrank registered
+ * dimms.  Unfortunately, no memory-controller register indicates the
+ * presence of quadrank dimm support or presence (i.e., in terms of number
+ * of slots per cpu, and chip-select lines per slot,  The following may be set
+ * in /etc/system to indicate the presence of quadrank support on a motherboard.
+ *
+ * There is no need to set this for F(1207) and S1g1.
+ */
+int mc_quadranksupport = 0;
 
-mc_t *mc_list;
+mc_t *mc_list, *mc_last;
 krwlock_t mc_lock;
 int mc_hold_attached = 1;
+
+#define	MAX(m, n) ((m) >= (n) ? (m) : (n))
+#define	MIN(m, n) ((m) <= (n) ? (m) : (n))
 
 static void
 mc_snapshot_destroy(mc_t *mc)
@@ -68,6 +83,7 @@ mc_snapshot_destroy(mc_t *mc)
 
 	kmem_free(mc->mc_snapshot, mc->mc_snapshotsz);
 	mc->mc_snapshot = NULL;
+	mc->mc_snapshotsz = 0;
 	mc->mc_snapshotgen++;
 }
 
@@ -87,41 +103,6 @@ mc_snapshot_update(mc_t *mc)
 }
 
 static mc_t *
-mc_lookup_func(dev_info_t *dip, int instance, mc_func_t **funcp)
-{
-	mc_t *mc;
-	int i;
-
-	ASSERT(RW_LOCK_HELD(&mc_lock));
-
-	for (mc = mc_list; mc != NULL; mc = mc->mc_next) {
-		for (i = 0; i < MC_FUNC_NUM; i++) {
-			mc_func_t *func = &mc->mc_funcs[i];
-			if ((dip != NULL && func->mcf_devi == dip) ||
-			    (dip == NULL && func->mcf_instance == instance)) {
-				if (funcp != NULL)
-					*funcp = func;
-				return (mc);
-			}
-		}
-	}
-
-	return (NULL);
-}
-
-static mc_t *
-mc_lookup_by_devi(dev_info_t *dip, mc_func_t **funcp)
-{
-	return (mc_lookup_func(dip, 0, funcp));
-}
-
-static mc_t *
-mc_lookup_by_instance(int instance, mc_func_t **funcp)
-{
-	return (mc_lookup_func(NULL, instance, funcp));
-}
-
-static mc_t *
 mc_lookup_by_chipid(int chipid)
 {
 	mc_t *mc;
@@ -136,63 +117,98 @@ mc_lookup_by_chipid(int chipid)
 	return (NULL);
 }
 
-typedef struct mc_rev_map {
-	uint_t rm_family;
-	uint_t rm_modello;
-	uint_t rm_modelhi;
-	uint_t rm_rev;
-	const char *rm_name;
-} mc_rev_map_t;
-
-static const mc_rev_map_t mc_rev_map[] = {
-	{ 0xf, 0x00, 0x0f, MC_REV_PRE_D, "B/C/CG" },
-	{ 0xf, 0x10, 0x1f, MC_REV_D_E, "D" },
-	{ 0xf, 0x20, 0x3f, MC_REV_D_E, "E" },
-	{ 0xf, 0x40, 0x5f, MC_REV_F, "F" },
-	{ 0, 0, 0, MC_REV_UNKNOWN, NULL }
-};
-
-static const mc_rev_map_t *
-mc_revision(chip_t *chp)
-{
-	int rmn = sizeof (mc_rev_map) / sizeof (mc_rev_map[0]);
-	const mc_rev_map_t *rm;
-	uint8_t family, model;
-
-	if (chp == NULL)
-		return (&mc_rev_map[rmn - 1]);
-
-	/*
-	 * For the moment, we assume that both cores in multi-core chips will
-	 * be of the same revision, so we'll confine our revision check to
-	 * the first CPU pointed to by this chip.
-	 */
-	family = cpuid_getfamily(chp->chip_cpus);
-	model = cpuid_getmodel(chp->chip_cpus);
-
-	for (rm = mc_rev_map; rm->rm_rev != MC_REV_UNKNOWN; rm++) {
-		if (family == rm->rm_family && model >= rm->rm_modello &&
-		    model <= rm->rm_modelhi)
-			break;
-	}
-
-	return (rm);
-}
-
+/*
+ * Read config register pairs into the two arrays provided on the given
+ * handle and at offsets as follows:
+ *
+ *	Index	Array r1 offset			Array r2 offset
+ *	0	r1addr				r2addr
+ *	1	r1addr + incr			r2addr + incr
+ *	2	r1addr + 2 * incr		r2addr + 2 * incr
+ *	...
+ *	n - 1	r1addr + (n - 1) * incr		r2addr + (n - 1) * incr
+ *
+ * The number of registers to read into the r1 array is r1n; the number
+ * for the r2 array is r2n.
+ */
 static void
-mc_prop_read_pair(ddi_acc_handle_t cfghdl, uint32_t *r1, off_t r1addr,
-    uint32_t *r2, off_t r2addr, int n, off_t incr)
+mc_prop_read_pair(mc_pcicfg_hdl_t cfghdl, uint32_t *r1, off_t r1addr,
+    int r1n, uint32_t *r2, off_t r2addr, int r2n, off_t incr)
 {
 	int i;
 
-	for (i = 0; i < n; i++, r1addr += incr, r2addr += incr) {
-		r1[i] = pci_config_get32(cfghdl, r1addr);
-		r2[i] = pci_config_get32(cfghdl, r2addr);
+	for (i = 0; i < MAX(r1n, r2n); i++, r1addr += incr, r2addr += incr) {
+		if (i < r1n)
+			r1[i] = mc_pcicfg_get32(cfghdl, r1addr);
+		if (i < r2n)
+			r2[i] = mc_pcicfg_get32(cfghdl, r2addr);
 	}
 }
 
+#define	NSKT	6
+
 static void
-mc_nvl_add_prop(nvlist_t *nvl, void *node, uint_t code)
+mc_nvl_add_socket(nvlist_t *nvl, mc_t *mc)
+{
+	const char *s = "Unknown";
+	int i;
+
+	static const struct {
+		uint32_t type;
+		const char *name;
+	} sktnames[NSKT] = {
+		{ X86_SOCKET_754, "Socket 754" },
+		{ X86_SOCKET_939, "Socket 939" },
+		{ X86_SOCKET_940, "Socket 940" },
+		{ X86_SOCKET_AM2, "Socket AM2" },
+		{ X86_SOCKET_F1207, "Socket F(1207)" },
+		{ X86_SOCKET_S1g1, "Socket S1g1" },
+	};
+
+	for (i = 0; i < NSKT; i++) {
+		if (mc->mc_socket == sktnames[i].type) {
+			s = sktnames[i].name;
+			break;
+		}
+	}
+
+	(void) nvlist_add_string(nvl, "socket", s);
+}
+
+static uint32_t
+mc_ecc_enabled(mc_t *mc)
+{
+	uint32_t rev = mc->mc_props.mcp_rev;
+	union mcreg_nbcfg nbcfg;
+
+	MCREG_VAL32(&nbcfg) = mc->mc_cfgregs.mcr_nbcfg;
+
+	return (MC_REV_MATCH(rev, MC_REVS_BCDE) ?
+	    MCREG_FIELD_preF(&nbcfg, EccEn) : MCREG_FIELD_revFG(&nbcfg, EccEn));
+}
+
+static uint32_t
+mc_ck_enabled(mc_t *mc)
+{
+	uint32_t rev = mc->mc_props.mcp_rev;
+	union mcreg_nbcfg nbcfg;
+
+	MCREG_VAL32(&nbcfg) = mc->mc_cfgregs.mcr_nbcfg;
+
+	return (MC_REV_MATCH(rev, MC_REVS_BCDE) ?
+	    MCREG_FIELD_preF(&nbcfg, ChipKillEccEn) :
+	    MCREG_FIELD_revFG(&nbcfg, ChipKillEccEn));
+}
+
+static void
+mc_nvl_add_ecctype(nvlist_t *nvl, mc_t *mc)
+{
+	(void) nvlist_add_string(nvl, "ecc-type", mc_ecc_enabled(mc) ?
+	    (mc_ck_enabled(mc) ? "ChipKill 128/16" : "Normal 64/8") : "None");
+}
+
+static void
+mc_nvl_add_prop(nvlist_t *nvl, void *node, mcamd_propcode_t code, int reqval)
 {
 	int valfound;
 	uint64_t value;
@@ -201,7 +217,7 @@ mc_nvl_add_prop(nvlist_t *nvl, void *node, uint_t code)
 	valfound = mcamd_get_numprop(NULL, (mcamd_node_t *)node, code, &value);
 
 	ASSERT(name != NULL && valfound);
-	if (name != NULL && valfound)
+	if (name != NULL && valfound && (!reqval || value != MC_INVALNUM))
 		(void) nvlist_add_uint64(nvl, name, value);
 }
 
@@ -215,56 +231,87 @@ mc_nvl_create(mc_t *mc)
 	int nelem, i;
 
 	(void) nvlist_alloc(&mcnvl, NV_UNIQUE_NAME, KM_SLEEP);
-	(void) nvlist_add_string(mcnvl, "revname", mc->mc_revname);
 
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_NUM);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_REV);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_BASE_ADDR);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_LIM_ADDR);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_DRAM_CONFIG);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_DRAM_HOLE);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_DRAM_ILEN);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_DRAM_ILSEL);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_CSBANKMAP);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_ACCESS_WIDTH);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_CSBANK_INTLV);
-	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_DISABLED_CS);
+	/*
+	 * Any changes to member names, types, value semantics or to
+	 * whether they are optional or required should result in
+	 * a new version number *after* an ARC case since this nvlist_t
+	 * is intended to become a contracted interface.
+	 */
+	(void) nvlist_add_uint8(mcnvl, MC_NVLIST_VERSTR, MC_NVLIST_VERS1);
+
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_NUM, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_REV, 0);
+	(void) nvlist_add_string(mcnvl, "revname", mc->mc_revname);
+	mc_nvl_add_socket(mcnvl, mc);
+	mc_nvl_add_ecctype(mcnvl, mc);
+
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_BASE_ADDR, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_LIM_ADDR, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_ILEN, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_ILSEL, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_CSINTLVFCTR, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_DRAMHOLE_SIZE, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_ACCESS_WIDTH, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_CSBANKMAPREG, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_BANKSWZL, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_MOD64MUX, 0);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_SPARECS, 1);
+	mc_nvl_add_prop(mcnvl, mc, MCAMD_PROP_BADCS, 1);
 
 	for (nelem = 0; mccs != NULL; mccs = mccs->mccs_next, nelem++) {
 		nvlist_t **csp = &cslist[nelem];
+		char csname[MCDCFG_CSNAMELEN];
 
 		(void) nvlist_alloc(csp, NV_UNIQUE_NAME, KM_SLEEP);
-		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_NUM);
-		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_BASE_ADDR);
-		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_MASK);
-		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_SIZE);
+		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_NUM, 0);
+		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_BASE_ADDR, 0);
+		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_MASK, 0);
+		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_SIZE, 0);
 
-		if (mccs->mccs_dimmnums[0] != -1)
-			mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_LODIMM);
-		if (mccs->mccs_dimmnums[1] != -1)
-			mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_UPDIMM);
+		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_CSDIMM1, 0);
+		mcdcfg_csname(mc->mc_socket, mccs->mccs_csl[0], csname,
+		    sizeof (csname));
+		(void) nvlist_add_string(*csp, "dimm1-csname", csname);
+
+		mc_nvl_add_prop(*csp, mccs, MCAMD_PROP_CSDIMM2, 1);
+		if (mccs->mccs_csl[1] != NULL) {
+			mcdcfg_csname(mc->mc_socket, mccs->mccs_csl[1], csname,
+			    sizeof (csname));
+			(void) nvlist_add_string(*csp, "dimm2-csname", csname);
+		}
 	}
 
 	(void) nvlist_add_nvlist_array(mcnvl, "cslist", cslist, nelem);
 	for (i = 0; i < nelem; i++)
 		nvlist_free(cslist[i]);
 
-	for (nelem = 0, mcd = mc->mc_props.mcp_dimmlist; mcd != NULL;
+	for (nelem = 0, mcd = mc->mc_dimmlist; mcd != NULL;
 	    mcd = mcd->mcd_next, nelem++) {
 		nvlist_t **dimmp = &dimmlist[nelem];
-		int ncs = 0;
 		uint64_t csnums[MC_CHIP_DIMMRANKMAX];
+		char csname[4][MCDCFG_CSNAMELEN];
+		char *csnamep[4];
+		int ncs = 0;
 
 		(void) nvlist_alloc(dimmp, NV_UNIQUE_NAME, KM_SLEEP);
 
-		mc_nvl_add_prop(*dimmp, mcd, MCAMD_PROP_NUM);
+		mc_nvl_add_prop(*dimmp, mcd, MCAMD_PROP_NUM, 1);
+		mc_nvl_add_prop(*dimmp, mcd, MCAMD_PROP_SIZE, 1);
 
 		for (i = 0; i < MC_CHIP_DIMMRANKMAX; i++) {
-			if (mcd->mcd_cs[i] != NULL)
-				csnums[ncs++] = mcd->mcd_cs[i]->mccs_num;
+			if (mcd->mcd_cs[i] != NULL) {
+				csnums[ncs] =
+				    mcd->mcd_cs[i]->mccs_props.csp_num;
+				mcdcfg_csname(mc->mc_socket, mcd->mcd_csl[i],
+				    csname[ncs], MCDCFG_CSNAMELEN);
+				csnamep[ncs] = csname[ncs];
+				ncs++;
+			}
 		}
 
 		(void) nvlist_add_uint64_array(*dimmp, "csnums", csnums, ncs);
+		(void) nvlist_add_string_array(*dimmp, "csnames", csnamep, ncs);
 	}
 
 	(void) nvlist_add_nvlist_array(mcnvl, "dimmlist", dimmlist, nelem);
@@ -274,195 +321,214 @@ mc_nvl_create(mc_t *mc)
 	return (mcnvl);
 }
 
+/*
+ * Link a dimm to its associated chip-selects and chip-select lines.
+ * Total the size of all ranks of this dimm.
+ */
 static void
-mc_dimm_csadd(mc_dimm_t *mcd, mc_cs_t *mccs)
+mc_dimm_csadd(mc_t *mc, mc_dimm_t *mcd, mc_cs_t *mccs, const mcdcfg_csl_t *csl)
 {
+	int factor = (mc->mc_props.mcp_accwidth == 128) ? 2 : 1;
+	uint64_t sz = 0;
 	int i;
 
+	/* Skip to first unused rank slot */
 	for (i = 0; i < MC_CHIP_DIMMRANKMAX; i++) {
 		if (mcd->mcd_cs[i] == NULL) {
 			mcd->mcd_cs[i] = mccs;
+			mcd->mcd_csl[i] = csl;
+			sz += mccs->mccs_props.csp_size / factor;
 			break;
+		} else {
+			sz += mcd->mcd_cs[i]->mccs_props.csp_size / factor;
 		}
 	}
+
 	ASSERT(i != MC_CHIP_DIMMRANKMAX);
+
+	mcd->mcd_size = sz;
 }
 
+/*
+ * Create a dimm structure and call to link it to its associated chip-selects.
+ */
 static mc_dimm_t *
-mc_dimm_create(mc_t *mc, mc_cs_t *mccs, uint_t num)
+mc_dimm_create(mc_t *mc, uint_t num)
 {
 	mc_dimm_t *mcd = kmem_zalloc(sizeof (mc_dimm_t), KM_SLEEP);
 
 	mcd->mcd_hdr.mch_type = MC_NT_DIMM;
 	mcd->mcd_mc = mc;
 	mcd->mcd_num = num;
-	mc_dimm_csadd(mcd, mccs);
 
 	return (mcd);
 }
 
 /*
- * A chip-select is associated with up to 2 dimms, and a single dimm may
- * have up to 4 associated chip-selects (in the presence of quad-rank support
- * on the motherboard).  How we number our dimms is determined by the MC
- * config.  This function may be called by multiple chip-selects for the
- * same dimm(s).
+ * The chip-select structure includes an array of dimms associated with
+ * that chip-select.  This function fills that array, and also builds
+ * the list of all dimms on this memory controller mc_dimmlist.  The
+ * caller has filled a structure with all there is to know about the
+ * associated dimm(s).
  */
 static void
-mc_cs_dimmlist_create(mc_t *mc, mc_cs_t *mccs, uint_t *dimm_nums, int ndimm)
+mc_csdimms_create(mc_t *mc, mc_cs_t *mccs, mcdcfg_rslt_t *rsltp)
 {
+	mc_dimm_t *found[MC_CHIP_DIMMPERCS];
 	mc_dimm_t *mcd;
-	mc_props_t *mcp = &mc->mc_props;
-	int i;
 	int nfound = 0;
+	int i;
 
 	/*
 	 * Has some other chip-select already created this dimm or dimms?
+	 * If so then link to the dimm(s) from the mccs_dimm array,
+	 * record their topo numbers in the csp_dimmnums array, and link
+	 * the dimm(s) to the additional chip-select.
 	 */
-	for (mcd = mcp->mcp_dimmlist; mcd != NULL; mcd = mcd->mcd_next) {
-		for (i = 0; i < ndimm; i++) {
-			if (mcd->mcd_num == dimm_nums[i]) {
-				mccs->mccs_dimm[i] = mcd;
-				mccs->mccs_dimmnums[i] = mcd->mcd_num;
-				mc_dimm_csadd(mcd, mccs);
-				nfound++;
-			}
+	for (mcd = mc->mc_dimmlist; mcd != NULL; mcd = mcd->mcd_next) {
+		for (i = 0; i < rsltp->ndimm; i++) {
+			if (mcd->mcd_num == rsltp->dimm[i].toponum)
+				found[nfound++] = mcd;
 		}
 	}
-	ASSERT(nfound == 0 || nfound == ndimm);
-	if (nfound == ndimm)
-		return;
+	ASSERT(nfound == 0 || nfound == rsltp->ndimm);
 
-	for (i = 0; i < ndimm; i++) {
-		mcd = mccs->mccs_dimm[i] =
-		    mc_dimm_create(mc, mccs, dimm_nums[i]);
+	for (i = 0; i < rsltp->ndimm; i++) {
+		if (nfound == 0) {
+			mcd = mc_dimm_create(mc, rsltp->dimm[i].toponum);
+			if (mc->mc_dimmlist == NULL)
+				mc->mc_dimmlist = mcd;
+			else
+				mc->mc_dimmlast->mcd_next = mcd;
+			mc->mc_dimmlast = mcd;
+		} else {
+			mcd = found[i];
+		}
 
-		mccs->mccs_dimmnums[i] = mcd->mcd_num;
+		mccs->mccs_dimm[i] = mcd;
+		mccs->mccs_csl[i] = rsltp->dimm[i].cslp;
+		mccs->mccs_props.csp_dimmnums[i] = mcd->mcd_num;
+		mc_dimm_csadd(mc, mcd, mccs, rsltp->dimm[i].cslp);
 
-		if (mcp->mcp_dimmlist == NULL)
-			mcp->mcp_dimmlist = mcd;
-		else
-			mcp->mcp_dimmlast->mcd_next = mcd;
-		mcp->mcp_dimmlast = mcd;
 	}
 
+	/* The rank number is constant across all constituent dimm(s) */
+	mccs->mccs_props.csp_dimmrank = rsltp->dimm[0].cslp->csl_rank;
 }
 
 /*
- * A placeholder for a future implementation that works this out from
- * smbios or SPD information.  For now we will return a value that
- * can be tuned in /etc/system, and the default will cover current Sun systems.
- */
-/*ARGSUSED*/
-static int
-mc_config_quadranksupport(mc_t *mc)
-{
-	return (mc_quadranksupport != 0);
-}
-
-/*
- * Create the DIMM structure for this MC.  There are a number of unkowns,
- * such as the number of DIMM slots for this MC, the number of chip-select
- * ranks supported for each DIMM, how the slots are labelled etc.
- *
- * SMBIOS information can help with some of this (if the bios implementation is
- * complete and accurate, which is often not the case):
- *
- * . A record is required for each SMB_TYPE_MEMDEVICE slot, whether populated
- *   or not.  The record should reference the associated SMB_TYPE_MEMARRAY,
- *   so we can figure out the number of slots for each MC.  In practice some
- *   smbios implementations attribute all slots (from multiple chips) to
- *   a single memory array.
- *
- * . SMB_TYPE_MEMDEVICEMAP records indicate how a particular SMB_TYPE_MEMDEVICE
- *   has been mapped.  Some smbios implementation produce rubbish here, or get
- *   confused when cs bank interleaving is enabled or disabled, but we can
- *   perform some validation of the information before using it.  The record
- *   information is not well suited to handling cs bank interleaving since
- *   it really only provides for a device to have a few contiguos mappings
- *   and with cs interleave we have lots of little chunks interleaved across
- *   the devices.  If we assume that the bios has followed the BKDG algorithm
- *   for setting up cs interleaving (which involves assinging contiguous
- *   and adjacent ranges to the chip selects and then swapping some
- *   base and mask hi and lo bits) then we can attempt to interpret the
- *   DEVICEMAP records as being the addresses prior to swapping address/mask
- *   bits to establish the interleave - that seems to cover at least some
- *   smbios implementations.  Even if that assumption appears good it is
- *   also not clear which MEMDEVICE records correspond to LODIMMs and which
- *   to UPDIMMs in a DIMM pair (128 bit MC mode) - we have to interpret the
- *   Device Locator and Bank Locator labels.
- *
- * We also do not know how many chip-select banks reside on individual
- * DIMMs.  For instance we cannot distinguish a system that supports 8
- * DIMMs slots per chip (one CS line each, thereby supporting only single-rank
- * DIMMs) vs a system that has just 4 slots per chip and which routes
- * 2 CS lines to each pair (thereby supporting dual rank DIMMs).  In each
- * we would discover 8 active chip-selects.
- *
- * So the task of establishing the real DIMM configuration is complex, likely
- * requiring some combination of good SMBIOS data and perhaps our own access
- * to SPD information.  Instead we opt for a canonical numbering scheme,
- * derived from the 'AMD Athlon (TM) 64 FX and AMD Opteron (TM) Processors
- * Motherboard Design Guide' (AMD publication #25180).
+ * mc_dimmlist_create is called after we have discovered all enabled
+ * (and spare or testfailed on revs F and G) chip-selects on the
+ * given memory controller.  For each chip-select we must derive
+ * the associated dimms, remembering that a chip-select csbase/csmask
+ * pair may be associated with up to 2 chip-select lines (in 128 bit mode)
+ * and that any one dimm may be associated with 1, 2, or 4 chip-selects
+ * depending on whether it is single, dual or quadrank.
  */
 static void
 mc_dimmlist_create(mc_t *mc)
 {
-	int mcmode;
+	union mcreg_dramcfg_hi *drcfghip =
+	    (union mcreg_dramcfg_hi *)(&mc->mc_cfgregs.mcr_dramcfghi);
+	mc_props_t *mcp = &mc->mc_props;
+	uint32_t rev = mcp->mcp_rev;
 	mc_cs_t *mccs;
-	int quadrank = mc_config_quadranksupport(mc);
-	uint_t dimm_nums[MC_CHIP_DIMMPERCS];
-	int ldimmno;			/* logical DIMM pair number, 0 .. 3 */
+	int r4 = 0, s4 = 0;
 
-	mcmode = mc->mc_props.mcp_dramcfg & MC_DC_DCFG_128 ? 128 : 64;
+	/*
+	 * Are we dealing with quadrank registered dimms?
+	 *
+	 * For socket 940 we can't tell and we'll assume we're not.
+	 * This can be over-ridden by the admin in /etc/system by setting
+	 * mc_quadranksupport nonzero.  A possible optimisation in systems
+	 * that export an SMBIOS table would be to count the number of
+	 * dimm slots per cpu - more than 4 would indicate no quadrank support
+	 * and 4 or fewer would indicate that if we see any of the upper
+	 * chip-selects enabled then a quadrank dimm is present.
+	 *
+	 * For socket F(1207) we can check a bit in the dram config high reg.
+	 *
+	 * Other socket types do not support registered dimms.
+	 */
+	if (mc->mc_socket == X86_SOCKET_940)
+		r4 = mc_quadranksupport != 0;
+	else if (mc->mc_socket == X86_SOCKET_F1207)
+		r4 = MCREG_FIELD_revFG(drcfghip, FourRankRDimm);
+
+	/*
+	 * Are we dealing with quadrank SO-DIMMs?  These are supported
+	 * in AM2 and S1g1 packages only, but in all rev F/G cases we
+	 * can detect their presence via a bit in the dram config high reg.
+	 */
+	if (MC_REV_MATCH(rev, MC_REVS_FG))
+		s4 = MCREG_FIELD_revFG(drcfghip, FourRankSODimm);
 
 	for (mccs = mc->mc_cslist; mccs != NULL; mccs = mccs->mccs_next) {
-		if (quadrank) {
-			/*
-			 * Quad-rank support.  We assume that any of cs#
-			 * 4/5/6/6 that we have discovered active are routed
-			 * for quad rank support as described in the MB
-			 * design guide:
-			 *	DIMM0: CS# 0, 1, 4 and 5
-			 *	DIMM1: CS# 2, 3, 6 and 7
-			 */
-			ldimmno = (mccs->mccs_num % 4) /2;
-		} else {
-			/*
-			 * DIMM0: CS# 0 and 1
-			 * DIMM1: CS# 2 and 3
-			 * DIMM2: CS# 4 and 5
-			 * DIMM3: CS# 6 and 7
-			 */
-			ldimmno = mccs->mccs_num / 2;
-		}
+		mcdcfg_rslt_t rslt;
 
-		if (mcmode == 128) {
-			/* 128-bit data width mode - dimms present in pairs */
-			dimm_nums[0] = ldimmno * 2;		/* LODIMM */
-			dimm_nums[1] = ldimmno * 2 + 1;		/* UPDIMM */
-		} else {
-			/* 64-bit data width mode - only even numbered dimms */
-			dimm_nums[0] = ldimmno * 2;		/* LODIMM */
-		}
-		mc_cs_dimmlist_create(mc, mccs, dimm_nums,
-		    mcmode == 128 ? 2 : 1);
+		if (mcdcfg_lookup(rev, mcp->mcp_mod64mux, mcp->mcp_accwidth,
+		    mccs->mccs_props.csp_num, mc->mc_socket,
+		    r4, s4, &rslt) < 0)
+			continue;
+
+		mc_csdimms_create(mc, mccs, &rslt);
 	}
 }
 
 static mc_cs_t *
-mc_cs_create(mc_t *mc, uint_t num, uint64_t base, uint64_t mask, size_t sz)
+mc_cs_create(mc_t *mc, uint_t num, uint64_t base, uint64_t mask, size_t sz,
+    int csbe, int spare, int testfail)
 {
 	mc_cs_t *mccs = kmem_zalloc(sizeof (mc_cs_t), KM_SLEEP);
+	mccs_props_t *csp = &mccs->mccs_props;
+	int i;
 
 	mccs->mccs_hdr.mch_type = MC_NT_CS;
 	mccs->mccs_mc = mc;
-	mccs->mccs_num = num;
-	mccs->mccs_base = base;
-	mccs->mccs_mask = mask;
-	mccs->mccs_size = sz;
+	csp->csp_num = num;
+	csp->csp_base = base;
+	csp->csp_mask = mask;
+	csp->csp_size = sz;
+	csp->csp_csbe = csbe;
+	csp->csp_spare = spare;
+	csp->csp_testfail = testfail;
+
+	for (i = 0; i < MC_CHIP_DIMMPERCS; i++)
+		csp->csp_dimmnums[i] = MC_INVALNUM;
+
+	if (spare)
+		mc->mc_props.mcp_sparecs = num;
 
 	return (mccs);
+}
+
+/*
+ * For any cs# of this mc marked TestFail generate an ereport with
+ * resource identifying the associated dimm(s).
+ */
+static void
+mc_report_testfails(mc_t *mc)
+{
+	mc_unum_t unum;
+	mc_cs_t *mccs;
+	int i;
+
+	for (mccs = mc->mc_cslist; mccs != NULL; mccs = mccs->mccs_next) {
+		if (mccs->mccs_props.csp_testfail) {
+			unum.unum_board = 0;
+			unum.unum_chip = mc->mc_chip->chip_id;
+			unum.unum_mc = 0;
+			unum.unum_cs = mccs->mccs_props.csp_num;
+			unum.unum_rank = mccs->mccs_props.csp_dimmrank;
+			unum.unum_offset = MCAMD_RC_INVALID_OFFSET;
+			for (i = 0; i < MC_CHIP_DIMMPERCS; i++)
+				unum.unum_dimms[i] = MC_INVALNUM;
+
+			mcamd_ereport_post(mc, FM_EREPORT_CPU_AMD_MC_TESTFAIL,
+			    &unum,
+			    FM_EREPORT_PAYLOAD_FLAGS_CPU_AMD_MC_TESTFAIL);
+		}
+	}
 }
 
 /*
@@ -478,112 +544,268 @@ mc_cs_create(mc_t *mc, uint_t num, uint64_t base, uint64_t mask, size_t sz)
  * within the [base, limit] range - this must match the pair number.
  */
 static void
-mc_mkprops_addrmap(ddi_acc_handle_t cfghdl, mc_t *mc)
+mc_mkprops_addrmap(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 {
-	uint32_t base[MC_AM_REG_NODE_NUM], lim[MC_AM_REG_NODE_NUM];
+	union mcreg_drambase base[MC_AM_REG_NODE_NUM];
+	union mcreg_dramlimit lim[MC_AM_REG_NODE_NUM];
 	mc_props_t *mcp = &mc->mc_props;
+	mc_cfgregs_t *mcr = &mc->mc_cfgregs;
+	union mcreg_dramhole hole;
 	int i;
 
-	mc_prop_read_pair(cfghdl, base, MC_AM_REG_DRAMBASE_0, lim,
-	    MC_AM_REG_DRAMLIM_0, MC_AM_REG_NODE_NUM, MC_AM_REG_DRAM_INCR);
+	mc_prop_read_pair(cfghdl,
+	    (uint32_t *)base, MC_AM_REG_DRAMBASE_0, MC_AM_REG_NODE_NUM,
+	    (uint32_t *)lim, MC_AM_REG_DRAMLIM_0, MC_AM_REG_NODE_NUM,
+	    MC_AM_REG_DRAM_INCR);
 
 	for (i = 0; i < MC_AM_REG_NODE_NUM; i++) {
 		/*
 		 * Don't create properties for empty nodes.
 		 */
-		if ((lim[i] & MC_AM_DL_DRAMLIM_MASK) == 0)
+		if (MCREG_FIELD_CMN(&lim[i], DRAMLimiti) == 0)
 			continue;
 
 		/*
-		 * Don't create properties for DIMM ranges that aren't local
-		 * to this node.
+		 * Skip all nodes but the one that matches the chip id
+		 * for the mc currently being attached.  Since the chip id
+		 * is the HT id this loop and the preceding read of all
+		 * base/limit pairs is overkill.
 		 */
-		if ((lim[i] & MC_AM_DL_DSTNODE_MASK) != mc->mc_chip->chip_id)
+		if (MCREG_FIELD_CMN(&lim[i], DstNode) !=
+		    mc->mc_chip->chip_id)
 			continue;
 
-		mcp->mcp_base = MC_AM_DB_DRAMBASE(base[i]);
-		mcp->mcp_lim = MC_AM_DL_DRAMLIM(lim[i]);
-		mcp->mcp_ilen = (base[i] & MC_AM_DB_INTLVEN_MASK) >>
-		    MC_AM_DB_INTLVEN_SHIFT;
-		mcp->mcp_ilsel = (lim[i] & MC_AM_DL_INTLVSEL_MASK) >>
-		    MC_AM_DL_INTLVSEL_SHIFT;
+		/*
+		 * Stash raw register values for this node
+		 */
+		mcr->mcr_drambase = MCREG_VAL32(&base[i]);
+		mcr->mcr_dramlimit = MCREG_VAL32(&lim[i]);
+
+		/*
+		 * Derive some "cooked" properties
+		 */
+		mcp->mcp_base = MC_DRAMBASE(&base[i]);
+		mcp->mcp_lim = MC_DRAMLIM(&lim[i]);
+		mcp->mcp_ilen = MCREG_FIELD_CMN(&base[i], IntlvEn);
+		mcp->mcp_ilsel = MCREG_FIELD_CMN(&lim[i], IntlvSel);
+
 	}
 
 	/*
 	 * The Function 1 DRAM Hole Address Register tells us which node(s)
 	 * own the DRAM space that is hoisted above 4GB, together with the
-	 * hole base and offset for this node.
+	 * hole base and offset for this node.  This was introduced in
+	 * revision E.
 	 */
-	mcp->mcp_dramhole = pci_config_get32(cfghdl, MC_AM_REG_HOLEADDR);
+	if (MC_REV_ATLEAST(mc->mc_props.mcp_rev, MC_REV_E)) {
+		MCREG_VAL32(&hole) =
+		    mc_pcicfg_get32(cfghdl, MC_AM_REG_HOLEADDR);
+		mcr->mcr_dramhole = MCREG_VAL32(&hole);
+
+		if (MCREG_FIELD_CMN(&hole, DramHoleValid)) {
+			mcp->mcp_dramhole_size = MC_DRAMHOLE_SIZE(&hole);
+		}
+	}
 }
+
+/*
+ * Read some function 3 parameters via PCI Mechanism 1 accesses (which
+ * will serialize any NB accesses).
+ */
+static void
+mc_getmiscctl(mc_t *mc)
+{
+	uint32_t rev = mc->mc_props.mcp_rev;
+	union mcreg_nbcfg nbcfg;
+	union mcreg_sparectl sparectl;
+
+	mc->mc_cfgregs.mcr_nbcfg = MCREG_VAL32(&nbcfg) =
+	    mc_pcicfg_get32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_NBCFG);
+
+	if (MC_REV_MATCH(rev, MC_REVS_FG)) {
+		mc->mc_cfgregs.mcr_sparectl = MCREG_VAL32(&sparectl) =
+		    mc_pcicfg_get32_nohdl(mc, MC_FUNC_MISCCTL,
+		    MC_CTL_REG_SPARECTL);
+
+		if (MCREG_FIELD_revFG(&sparectl, SwapDone)) {
+			mc->mc_props.mcp_badcs =
+			    MCREG_FIELD_revFG(&sparectl, BadDramCs);
+		}
+	}
+}
+
+static int
+csbasecmp(mc_cs_t **csapp, mc_cs_t **csbpp)
+{
+	uint64_t basea = (*csapp)->mccs_props.csp_base;
+	uint64_t baseb = (*csbpp)->mccs_props.csp_base;
+
+	if (basea == baseb)
+		return (0);
+	else if (basea < baseb)
+		return (-1);
+	else
+		return (1);
+}
+
+/*
+ * The following are for use in simulating TestFail for a chip-select
+ * without poking at the hardware (which tends to get upset if you do
+ * since the BIOS needs to restart to map a failed cs out).  For internal
+ * testing only!  Note that setting these does not give the full experience -
+ * the select chip-select *is* enabled and can give errors etc and the
+ * patounum logic will get confused.
+ */
+int testfail_mcnum = -1;
+int testfail_csnum = -1;
 
 /*
  * Function 2 configuration - DRAM Controller
  */
 static void
-mc_mkprops_dramctl(ddi_acc_handle_t cfghdl, mc_t *mc)
+mc_mkprops_dramctl(mc_pcicfg_hdl_t cfghdl, mc_t *mc)
 {
-	uint32_t base[MC_CHIP_NCS], mask[MC_CHIP_NCS];
-	uint64_t dramcfg;
+	union mcreg_csbase base[MC_CHIP_NCS];
+	union mcreg_csmask mask[MC_CHIP_NCS];
+	union mcreg_dramcfg_lo drcfg_lo;
+	union mcreg_dramcfg_hi drcfg_hi;
+	union mcreg_drammisc drmisc;
+	union mcreg_bankaddrmap baddrmap;
 	mc_props_t *mcp = &mc->mc_props;
-	int wide = 0;	/* 128-bit access mode? */
+	mc_cfgregs_t *mcr = &mc->mc_cfgregs;
+	int maskdivisor;
+	int wide = 0;
+	uint32_t rev = mc->mc_props.mcp_rev;
 	int i;
 	mcamd_hdl_t hdl;
 
 	mcamd_mkhdl(&hdl);	/* to call into common code */
 
 	/*
-	 * Read Function 2 DRAM Configuration High and Low registers and
-	 * weld them together into a 64-bit value.  The High component
-	 * is mostly concerned with memory clocks etc and we'll not have
+	 * Read Function 2 DRAM Configuration High and Low registers.  The High
+	 * part is mostly concerned with memory clocks etc and we'll not have
 	 * any use for that.  The Low component tells us if ECC is enabled,
 	 * if we're in 64- or 128-bit MC mode, how the upper chip-selects
 	 * are mapped, which chip-select pairs are using x4 parts, etc.
 	 */
-	dramcfg = pci_config_get32(cfghdl, MC_DC_REG_DRAMCFGLO) |
-	    ((uint64_t)pci_config_get32(cfghdl, MC_DC_REG_DRAMCFGHI) << 32);
-	wide = dramcfg & MC_DC_DCFG_128;
+	MCREG_VAL32(&drcfg_lo) = mc_pcicfg_get32(cfghdl, MC_DC_REG_DRAMCFGLO);
+	MCREG_VAL32(&drcfg_hi) = mc_pcicfg_get32(cfghdl, MC_DC_REG_DRAMCFGHI);
+	mcr->mcr_dramcfglo = MCREG_VAL32(&drcfg_lo);
+	mcr->mcr_dramcfghi = MCREG_VAL32(&drcfg_hi);
 
-	mcp->mcp_dramcfg = dramcfg;
+	/*
+	 * Note the DRAM controller width.  The 64/128 bit is in a different
+	 * bit position for revision F and G.
+	 */
+	if (MC_REV_MATCH(rev, MC_REVS_FG)) {
+		wide = MCREG_FIELD_revFG(&drcfg_lo, Width128);
+	} else {
+		wide = MCREG_FIELD_preF(&drcfg_lo, Width128);
+	}
 	mcp->mcp_accwidth = wide ? 128 : 64;
 
 	/*
-	 * Read Function 2 DRAM Bank Address Mapping.  This tells us
-	 * whether bank swizzle mode is enabled, and also encodes
-	 * the type of DIMM module in use for each chip-select pair.
+	 * Read Function 2 DRAM Controller Miscellaenous Regsiter for those
+	 * revs that support it.  This include the Mod64Mux indication on
+	 * these revs - for rev E it is in DRAM config low.
 	 */
-	mcp->mcp_csbankmap = pci_config_get32(cfghdl, MC_DC_REG_BANKADDRMAP);
+	if (MC_REV_MATCH(rev, MC_REVS_FG)) {
+		mcr->mcr_drammisc = MCREG_VAL32(&drmisc) =
+		    mc_pcicfg_get32(cfghdl, MC_DC_REG_DRAMMISC);
+		mcp->mcp_mod64mux = MCREG_FIELD_revFG(&drmisc, Mod64Mux);
+	} else if (MC_REV_MATCH(rev, MC_REV_E)) {
+		mcp->mcp_mod64mux = MCREG_FIELD_preF(&drcfg_lo, Mod64BitMux);
+	}
 
 	/*
-	 * Read Function 2 Configuration Registers for DRAM CS Base 0 thru 7
-	 * and DRAM CS Mask 0 thru 7.  The Base registers give us the
-	 * BaseAddrHi and BaseAddrLo from which the base can be constructed,
-	 * and whether this chip-select bank is enabled (CSBE).  The
-	 * Mask registers give us AddrMaskHi and AddrMaskLo from which
-	 * a full mask can be constructed.
+	 * Read Function 2 DRAM Bank Address Mapping.  This encodes the
+	 * type of DIMM module in use for each chip-select pair.
+	 * Prior ro revision F it also tells us whether BankSwizzle mode
+	 * is enabled - in rev F that has moved to dram config hi register.
 	 */
-	mc_prop_read_pair(cfghdl, base, MC_DC_REG_CSBASE_0, mask,
-	    MC_DC_REG_CSMASK_0, MC_CHIP_NCS, MC_DC_REG_CS_INCR);
+	mcp->mcp_csbankmapreg = MCREG_VAL32(&baddrmap) =
+	    mc_pcicfg_get32(cfghdl, MC_DC_REG_BANKADDRMAP);
 
 	/*
-	 * Create a cs node for each enabled chip-select
+	 * Determine whether bank swizzle mode is active.  Bank swizzling was
+	 * introduced as an option in rev E,  but the bit that indicates it
+	 * is enabled has moved in revs F/G.
+	 */
+	if (MC_REV_MATCH(rev, MC_REV_E)) {
+		mcp->mcp_bnkswzl = MCREG_FIELD_preF(&baddrmap, BankSwizzleMode);
+	} else if (MC_REV_MATCH(rev, MC_REVS_FG)) {
+		mcp->mcp_bnkswzl = MCREG_FIELD_revFG(&drcfg_hi,
+		    BankSwizzleMode);
+	}
+
+	/*
+	 * Read the DRAM CS Base and DRAM CS Mask registers.  Revisions prior
+	 * to F have an equal number of base and mask registers; revision F
+	 * has twice as many base registers as masks.
+	 */
+	maskdivisor = MC_REV_MATCH(rev, MC_REVS_FG) ? 2 : 1;
+
+	mc_prop_read_pair(cfghdl,
+	    (uint32_t *)base, MC_DC_REG_CSBASE_0, MC_CHIP_NCS,
+	    (uint32_t *)mask, MC_DC_REG_CSMASK_0, MC_CHIP_NCS / maskdivisor,
+	    MC_DC_REG_CS_INCR);
+
+	/*
+	 * Create a cs node for each enabled chip-select as well as
+	 * any appointed online spare chip-selects and for any that have
+	 * failed test.
 	 */
 	for (i = 0; i < MC_CHIP_NCS; i++) {
 		mc_cs_t *mccs;
-		uint64_t csmask;
+		uint64_t csbase, csmask;
 		size_t sz;
+		int csbe, spare, testfail;
 
-		if (!(base[i] & MC_DC_CSB_CSBE)) {
-			mcp->mcp_disabled_cs++;
-			continue;
+		if (MC_REV_MATCH(rev, MC_REVS_FG)) {
+			csbe = MCREG_FIELD_revFG(&base[i], CSEnable);
+			spare = MCREG_FIELD_revFG(&base[i], Spare);
+			testfail = MCREG_FIELD_revFG(&base[i], TestFail);
+		} else {
+			csbe = MCREG_FIELD_preF(&base[i], CSEnable);
+			spare = 0;
+			testfail = 0;
 		}
 
-		if (mcamd_cs_size(&hdl, (mcamd_node_t *)mc, i, &sz) < 0)
+		/* Testing hook */
+		if (testfail_mcnum != -1 && testfail_csnum != -1 &&
+		    mcp->mcp_num == testfail_mcnum && i == testfail_csnum) {
+			csbe = spare = 0;
+			testfail = 1;
+			cmn_err(CE_NOTE, "Pretending MC %d CS %d failed test",
+			    testfail_mcnum, testfail_csnum);
+		}
+
+		/*
+		 * If the chip-select is not enabled then skip it unless
+		 * it is a designated online spare or is marked with TestFail.
+		 */
+		if (!csbe && !(spare || testfail))
 			continue;
 
-		csmask = MC_DC_CSM_CSMASK(mask[i]);
-		mccs = mc_cs_create(mc, i, MC_DC_CSB_CSBASE(base[i]), csmask,
-		    sz);
+		/*
+		 * For an enabled or spare chip-select the Bank Address Mapping
+		 * register will be valid as will the chip-select mask.  The
+		 * base will not be valid but we'll read and store it anyway.
+		 * We will not know whether the spare is already swapped in
+		 * until MC function 3 attaches.
+		 */
+		if (csbe || spare) {
+			if (mcamd_cs_size(&hdl, (mcamd_node_t *)mc, i, &sz) < 0)
+				continue;
+			csbase = MC_CSBASE(&base[i], rev);
+			csmask = MC_CSMASK(&mask[i / maskdivisor], rev);
+		} else {
+			sz = 0;
+			csbase = csmask = 0;
+		}
+
+		mccs = mc_cs_create(mc, i, csbase, csmask, sz,
+		    csbe, spare, testfail);
 
 		if (mc->mc_cslist == NULL)
 			mc->mc_cslist = mccs;
@@ -591,45 +813,91 @@ mc_mkprops_dramctl(ddi_acc_handle_t cfghdl, mc_t *mc)
 			mc->mc_cslast->mccs_next = mccs;
 		mc->mc_cslast = mccs;
 
+		mccs->mccs_cfgregs.csr_csbase = MCREG_VAL32(&base[i]);
+		mccs->mccs_cfgregs.csr_csmask =
+		    MCREG_VAL32(&mask[i / maskdivisor]);
+
 		/*
 		 * Check for cs bank interleaving - some bits clear in the
 		 * lower mask.  All banks must/will have the same lomask bits
 		 * if cs interleaving is active.
 		 */
-		if (!mcp->mcp_csbank_intlv) {
+		if (csbe && !mcp->mcp_csintlvfctr) {
 			int bitno, ibits = 0;
-			for (bitno = MC_DC_CSM_MASKLO_LOBIT;
-			    bitno <= MC_DC_CSM_MASKLO_HIBIT; bitno++) {
+			for (bitno = MC_CSMASKLO_LOBIT(rev);
+			    bitno <= MC_CSMASKLO_HIBIT(rev); bitno++) {
 				if (!(csmask & (1 << bitno)))
 					ibits++;
 			}
-			if (ibits > 0)
-				mcp->mcp_csbank_intlv = 1 << ibits;
+			mcp->mcp_csintlvfctr = 1 << ibits;
 		}
 	}
 
 	/*
-	 * Now that we have discovered all active chip-selects we attempt
-	 * to divine the associated DIMM configuration.
+	 * If there is no chip-select interleave on this node determine
+	 * whether the chip-select ranks are contiguous or if there
+	 * is a hole.
+	 */
+	if (mcp->mcp_csintlvfctr == 1) {
+		mc_cs_t *csp[MC_CHIP_NCS];
+		mc_cs_t *mccs;
+		int ncsbe = 0;
+
+		for (mccs = mc->mc_cslist; mccs != NULL;
+		    mccs = mccs->mccs_next) {
+			if (mccs->mccs_props.csp_csbe)
+				csp[ncsbe++] = mccs;
+		}
+
+		if (ncsbe != 0) {
+			qsort((void *)csp, ncsbe, sizeof (mc_cs_t *),
+			    (int (*)(const void *, const void *))csbasecmp);
+
+			for (i = 1; i < ncsbe; i++) {
+				if (csp[i]->mccs_props.csp_base !=
+				    csp[i - 1]->mccs_props.csp_base +
+				    csp[i - 1]->mccs_props.csp_size)
+					mc->mc_csdiscontig = 1;
+			}
+		}
+	}
+
+
+	/*
+	 * Since we do not attach to MC function 3 go ahead and read some
+	 * config parameters from it now.
+	 */
+	mc_getmiscctl(mc);
+
+	/*
+	 * Now that we have discovered all enabled/spare/testfail chip-selects
+	 * we divine the associated DIMM configuration.
 	 */
 	mc_dimmlist_create(mc);
 }
 
 typedef struct mc_bind_map {
-	const char *bm_bindnm;	/* attachment binding name */
-	uint_t bm_func;		/* PCI config space function number for bind */
-	const char *bm_model;	/* value for device node model property */
-	void (*bm_mkprops)(ddi_acc_handle_t, mc_t *);
+	const char *bm_bindnm;	 /* attachment binding name */
+	enum mc_funcnum bm_func; /* PCI config space function number for bind */
+	const char *bm_model;	 /* value for device node model property */
+	void (*bm_mkprops)(mc_pcicfg_hdl_t, mc_t *);
 } mc_bind_map_t;
+
+/*
+ * Do not attach to MC function 3 - agpgart already attaches to that.
+ * Function 3 may be a good candidate for a nexus driver to fan it out
+ * into virtual devices by functionality.  We will use pci_mech1_getl
+ * to retrieve the function 3 parameters we require.
+ */
 
 static const mc_bind_map_t mc_bind_map[] = {
 	{ MC_FUNC_HTCONFIG_BINDNM, MC_FUNC_HTCONFIG,
-	"AMD Memory Controller (HT Configuration)", NULL },
+	    "AMD Memory Controller (HT Configuration)", NULL },
 	{ MC_FUNC_ADDRMAP_BINDNM, MC_FUNC_ADDRMAP,
-	"AMD Memory Controller (Address Map)", mc_mkprops_addrmap },
+	    "AMD Memory Controller (Address Map)", mc_mkprops_addrmap },
 	{ MC_FUNC_DRAMCTL_BINDNM, MC_FUNC_DRAMCTL,
-	"AMD Memory Controller (DRAM Controller & HT Trace)",
-	mc_mkprops_dramctl },
+	    "AMD Memory Controller (DRAM Controller & HT Trace)",
+	    mc_mkprops_dramctl },
 	NULL
 };
 
@@ -657,6 +925,106 @@ mc_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	return (0);
 }
 
+/*
+ * Enable swap from chip-select csnum to the spare chip-select on this
+ * memory controller (if any).
+ */
+
+int mc_swapdonetime = 30;	/* max number of seconds to wait for SwapDone */
+
+static int
+mc_onlinespare(mc_t *mc, int csnum)
+{
+	mc_props_t *mcp = &mc->mc_props;
+	union mcreg_sparectl sparectl;
+	union mcreg_scrubctl scrubctl;
+	mc_cs_t *mccs;
+	hrtime_t tmax;
+	int i = 0;
+
+	ASSERT(RW_WRITE_HELD(&mc_lock));
+
+	if (!MC_REV_MATCH(mcp->mcp_rev, MC_REVS_FG))
+		return (ENOTSUP);	/* MC rev does not offer online spare */
+	else if (mcp->mcp_sparecs == MC_INVALNUM)
+		return (ENODEV);	/* Supported, but no spare configured */
+	else if (mcp->mcp_badcs != MC_INVALNUM)
+		return (EBUSY);		/* Spare already swapped in */
+	else if (csnum == mcp->mcp_sparecs)
+		return (EINVAL);	/* Can't spare the spare! */
+
+	for (mccs = mc->mc_cslist; mccs != NULL; mccs = mccs->mccs_next) {
+		if (mccs->mccs_props.csp_num == csnum)
+			break;
+	}
+	if (mccs == NULL)
+		return (EINVAL);	/* nominated bad CS does not exist */
+
+	/*
+	 * If the DRAM Scrubber is not enabled then the swap cannot succeed.
+	 */
+	MCREG_VAL32(&scrubctl) = mc_pcicfg_get32_nohdl(mc, MC_FUNC_MISCCTL,
+	    MC_CTL_REG_SCRUBCTL);
+	if (MCREG_FIELD_CMN(&scrubctl, DramScrub) == 0)
+		return (ENODEV);	/* DRAM scrubber not enabled */
+
+	/*
+	 * Read Online Spare Comtrol Register again, just in case our
+	 * state does not reflect reality.
+	 */
+	MCREG_VAL32(&sparectl) = mc_pcicfg_get32_nohdl(mc, MC_FUNC_MISCCTL,
+	    MC_CTL_REG_SPARECTL);
+
+	if (MCREG_FIELD_revFG(&sparectl, SwapDone))
+		return (EBUSY);
+
+	/* Write to the BadDramCs field */
+	MCREG_FIELD_revFG(&sparectl, BadDramCs) = csnum;
+	mc_pcicfg_put32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_SPARECTL,
+	    MCREG_VAL32(&sparectl));
+
+	/* And request that the swap to the spare start */
+	MCREG_FIELD_revFG(&sparectl, SwapEn) = 1;
+	mc_pcicfg_put32_nohdl(mc, MC_FUNC_MISCCTL, MC_CTL_REG_SPARECTL,
+	    MCREG_VAL32(&sparectl));
+
+	/*
+	 * Poll for SwapDone - we have disabled notification by interrupt.
+	 * Swap takes "several CPU cycles, depending on the DRAM speed, but
+	 * is performed in the background" (Family 0Fh Bios Porting Guide).
+	 * We're in a slow ioctl path so there is no harm in waiting around
+	 * a bit - consumers of the ioctl must be aware that it may take
+	 * a moment.  We will poll for up to mc_swapdonetime seconds,
+	 * limiting that to 120s.
+	 *
+	 * The swap is performed by the DRAM scrubber (which must be enabled)
+	 * whose scrub rate is accelerated for the duration of the swap.
+	 * The maximum swap rate is 40.0ns per 64 bytes, so the maximum
+	 * supported cs size of 16GB would take 10.7s at that max rate
+	 * of 25000000 scrubs/second.
+	 */
+	tmax = gethrtime() + MIN(mc_swapdonetime, 120) * 1000000000ULL;
+	do {
+		if (i++ < 20)
+			delay(drv_usectohz(100000));	/* 0.1s for up to 2s */
+		else
+			delay(drv_usectohz(500000));	/* 0.5s */
+
+		MCREG_VAL32(&sparectl) = mc_pcicfg_get32_nohdl(mc,
+		    MC_FUNC_MISCCTL, MC_CTL_REG_SPARECTL);
+	} while (!MCREG_FIELD_revFG(&sparectl, SwapDone) &&
+	    gethrtime() < tmax);
+
+	if (!MCREG_FIELD_revFG(&sparectl, SwapDone))
+		return (ETIME);		/* Operation timed out */
+
+	mcp->mcp_badcs = csnum;
+	mc->mc_cfgregs.mcr_sparectl = MCREG_VAL32(&sparectl);
+	mc->mc_spareswaptime = gethrtime();
+
+	return (0);
+}
+
 /*ARGSUSED*/
 static int
 mc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
@@ -664,7 +1032,8 @@ mc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	int rc = 0;
 	mc_t *mc;
 
-	if (cmd != MC_IOC_SNAPSHOT_INFO && cmd != MC_IOC_SNAPSHOT)
+	if (cmd != MC_IOC_SNAPSHOT_INFO && cmd != MC_IOC_SNAPSHOT &&
+	    cmd != MC_IOC_ONLINESPARE_EN)
 		return (EINVAL);
 
 	rw_enter(&mc_lock, RW_READER);
@@ -674,14 +1043,14 @@ mc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		return (EINVAL);
 	}
 
-	if (mc_snapshot_update(mc) < 0) {
-		rw_exit(&mc_lock);
-		return (EIO);
-	}
-
 	switch (cmd) {
 	case MC_IOC_SNAPSHOT_INFO: {
 		mc_snapshot_info_t mcs;
+
+		if (mc_snapshot_update(mc) < 0) {
+			rw_exit(&mc_lock);
+			return (EIO);
+		}
 
 		mcs.mcs_size = mc->mc_snapshotsz;
 		mcs.mcs_gen = mc->mc_snapshotgen;
@@ -693,9 +1062,33 @@ mc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	}
 
 	case MC_IOC_SNAPSHOT:
+		if (mc_snapshot_update(mc) < 0) {
+			rw_exit(&mc_lock);
+			return (EIO);
+		}
+
 		if (ddi_copyout(mc->mc_snapshot, (void *)arg, mc->mc_snapshotsz,
 		    mode) < 0)
 			rc = EFAULT;
+		break;
+
+	case MC_IOC_ONLINESPARE_EN:
+		if (drv_priv(credp) != 0) {
+			rw_exit(&mc_lock);
+			return (EPERM);
+		}
+
+		if (!rw_tryupgrade(&mc_lock)) {
+			rw_exit(&mc_lock);
+			return (EAGAIN);
+		}
+
+		if ((rc = mc_onlinespare(mc, (int)arg)) == 0) {
+			mc_snapshot_destroy(mc);
+			nvlist_free(mc->mc_nvl);
+			mc->mc_nvl = mc_nvl_create(mc);
+		}
+
 		break;
 	}
 
@@ -780,36 +1173,51 @@ static mc_t *
 mc_create(chipid_t chipid)
 {
 	chip_t *chp = chip_lookup(chipid);
-	const mc_rev_map_t *rmp = mc_revision(chp);
 	mc_t *mc;
 
 	ASSERT(RW_WRITE_HELD(&mc_lock));
 
-	if (chp == NULL || rmp->rm_rev == MC_REV_UNKNOWN)
+	if (chp == NULL)
 		return (NULL);
 
 	mc = kmem_zalloc(sizeof (mc_t), KM_SLEEP);
 	mc->mc_hdr.mch_type = MC_NT_MC;
 	mc->mc_chip = chp;
-	mc->mc_props.mcp_rev = rmp->rm_rev;
-	mc->mc_revname = rmp->rm_name;
 	mc->mc_props.mcp_num = mc->mc_chip->chip_id;
+	mc->mc_props.mcp_sparecs = MC_INVALNUM;
+	mc->mc_props.mcp_badcs = MC_INVALNUM;
 
-	mc->mc_next = mc_list;
-	mc_list = mc;
+	/*
+	 * We can use the first cpu in the chip_cpus list since all cores
+	 * of a chip share the same revision and socket type.
+	 */
+	mc->mc_props.mcp_rev = cpuid_getchiprev(chp->chip_cpus);
+	mc->mc_revname = cpuid_getchiprevstr(chp->chip_cpus);
+	mc->mc_socket = cpuid_getsockettype(chp->chip_cpus);
+
+	if (mc_list == NULL)
+		mc_list = mc;
+	if (mc_last != NULL)
+		mc_last->mc_next = mc;
+
+	mc->mc_next = NULL;
+	mc_last = mc;
 
 	return (mc);
 }
 
+static int mc_sw_scrub_disabled = 0;
+
 static int
 mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	ddi_acc_handle_t hdl;
+	mc_pcicfg_hdl_t cfghdl;
 	const mc_bind_map_t *bm;
 	const char *bindnm;
 	char *unitstr = NULL;
+	enum mc_funcnum func;
 	long unitaddr;
-	int chipid, func, rc;
+	int chipid, rc;
 	cpu_t *cpu;
 	mc_t *mc;
 
@@ -840,13 +1248,14 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	rc = ddi_strtol(unitstr, NULL, 16, &unitaddr);
 	ASSERT(rc == 0 && unitaddr >= MC_AMD_DEV_OFFSET);
-	ddi_prop_free(unitstr);
 
 	if (rc != 0 || unitaddr < MC_AMD_DEV_OFFSET) {
 		cmn_err(CE_WARN, "failed to parse unit address %s for %s\n",
 		    unitstr, bindnm);
+		ddi_prop_free(unitstr);
 		return (DDI_FAILURE);
 	}
+	ddi_prop_free(unitstr);
 
 	chipid = unitaddr - MC_AMD_DEV_OFFSET;
 
@@ -899,17 +1308,19 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    dip, "chip-id", mc->mc_chip->chip_id);
 
 	if (bm->bm_mkprops != NULL &&
-	    pci_config_setup(dip, &hdl) == DDI_SUCCESS) {
-		bm->bm_mkprops(hdl, mc);
-		pci_config_teardown(&hdl);
+	    mc_pcicfg_setup(mc, bm->bm_func, &cfghdl) == DDI_SUCCESS) {
+		bm->bm_mkprops(cfghdl, mc);
+		mc_pcicfg_teardown(cfghdl);
 	}
 
 	/*
 	 * If this is the last node to be attached for this memory controller,
-	 * so create the minor node and set up the properties.
+	 * then create the minor node, enable scrubbers, and register with
+	 * cpu module(s) for this chip.
 	 */
 	if (func == MC_FUNC_DEVIMAP) {
 		mc_props_t *mcp = &mc->mc_props;
+		int dram_present = 0;
 
 		if (ddi_create_minor_node(dip, "mc-amd", S_IFCHR,
 		    mc->mc_chip->chip_id, "ddi_mem_ctrl", 0) != DDI_SUCCESS) {
@@ -919,31 +1330,73 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/*
 		 * Register the memory controller for every CPU of this chip.
-		 * Then attempt to enable h/w memory scrubbers for this node.
-		 * If we are successful, disable the software memory scrubber.
+		 *
+		 * If there is memory present on this node and ECC is enabled
+		 * attempt to enable h/w memory scrubbers for this node.
+		 * Note that if the generic cpu module has loaded then this
+		 * will have no effect and cmi_scrubber_enable will return
+		 * 0.  If we are successful in enabling the hardware scrubbers,
+		 * disable the software memory scrubber.
 		 */
-		mutex_enter(&cpu_lock);
+		kpreempt_disable();	/* prevent cpu list from changing */
 
 		cpu = mc->mc_chip->chip_cpus;
-
-		if (mc->mc_props.mcp_lim != mc->mc_props.mcp_base) {
-			rc = cmi_scrubber_enable(cpu, mcp->mcp_base,
-			    mcp->mcp_ilen);
-		} else {
-			rc = 0;
-		}
 
 		do {
 			mcamd_mc_register(cpu);
 			cpu = cpu->cpu_next_chip;
 		} while (cpu != mc->mc_chip->chip_cpus);
 
-		mutex_exit(&cpu_lock);
 
-		if (rc)
+		if (mc->mc_props.mcp_lim != mc->mc_props.mcp_base) {
+			/*
+			 * This node may map non-dram memory alone, so we
+			 * must check for an enabled chip-select to be
+			 * sure there is dram present.
+			 */
+			mc_cs_t *mccs;
+
+			for (mccs = mc->mc_cslist; mccs != NULL;
+			    mccs = mccs->mccs_next) {
+				if (mccs->mccs_props.csp_csbe) {
+					dram_present = 1;
+					break;
+				}
+			}
+		}
+
+		if (dram_present && !mc_ecc_enabled(mc)) {
+			/*
+			 * On a single chip system there is no point in
+			 * scrubbing if there is no ECC on the single node.
+			 * On a multichip system, necessarily Opteron using
+			 * registered ECC-capable DIMMs, if there is memory
+			 * present on a node but no ECC there then we'll assume
+			 * ECC is disabled for all nodes and we will not enable
+			 * the scrubber and wll also disable the software
+			 * memscrub thread.
+			 */
+			rc = 1;
+		} else if (!dram_present) {
+			/* No memory on this node - others decide memscrub */
+			rc = 0;
+		} else {
+			/* There is memory on this node and ECC is enabled */
+			rc = cmi_scrubber_enable(cpu, mcp->mcp_base,
+			    mcp->mcp_ilen, mc->mc_csdiscontig);
+		}
+
+		kpreempt_enable();
+
+		if (rc && !mc_sw_scrub_disabled++)
 			memscrub_disable();
+
+		mc_report_testfails(mc);
 	}
 
+	/*
+	 * Update nvlist for as far as we have gotten in attach/init.
+	 */
 	nvlist_free(mc->mc_nvl);
 	mc->mc_nvl = mc_nvl_create(mc);
 

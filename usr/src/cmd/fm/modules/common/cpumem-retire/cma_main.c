@@ -62,6 +62,12 @@ typedef struct cma_subscriber {
 static const cma_subscriber_t cma_subrs[] = {
 	{ "fault.memory.page", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    cma_page_retire },
+	{ "fault.memory.page_sb", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    cma_page_retire },
+	{ "fault.memory.page_ck", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    cma_page_retire },
+	{ "fault.memory.page_ue", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    cma_page_retire },
 	{ "fault.memory.dimm", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
 	{ "fault.memory.dimm_sb", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
@@ -70,13 +76,15 @@ static const cma_subscriber_t cma_subrs[] = {
 	    NULL },
 	{ "fault.memory.dimm_ue", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
+	{ "fault.memory.dimm_testfail", FM_FMRI_SCHEME_MEM,
+	    FM_MEM_SCHEME_VERSION, NULL },
 	{ "fault.memory.bank", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
 	{ "fault.memory.datapath", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
 
 	/*
-	 * The following ultraSPARC-T1 faults do NOT retire a cpu thread,
+	 * The following faults do NOT retire a cpu thread,
 	 * and therefore must be intercepted before
 	 * the default "fault.cpu.*" dispatch to cma_cpu_retire.
 	 */
@@ -90,6 +98,8 @@ static const cma_subscriber_t cma_subrs[] = {
 	    FM_CPU_SCHEME_VERSION, NULL },
 	{ "fault.cpu.ultraSPARC-T1.mau", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.amd.dramchannel", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
 	{ "fault.cpu.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    cma_cpu_retire },
 	{ NULL, NULL, 0, NULL }
@@ -102,6 +112,7 @@ nvl2subr(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t **asrup)
 	nvlist_t *asru;
 	char *scheme;
 	uint8_t version;
+	char *fltclass = "(unknown)";
 
 	if (nvlist_lookup_nvlist(nvl, FM_FAULT_ASRU, &asru) != 0 ||
 	    nvlist_lookup_string(asru, FM_FMRI_SCHEME, &scheme) != 0 ||
@@ -119,6 +130,9 @@ nvl2subr(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t **asrup)
 		}
 	}
 
+	(void) nvlist_lookup_string(nvl, FM_CLASS, &fltclass);
+	fmd_hdl_error(hdl, "No handling disposition for %s with asru in "
+	    "scheme \"%s\"\n", fltclass, scheme);
 	cma_stats.nop_flts.fmds_value.ui64++;
 	return (NULL);
 }
@@ -226,7 +240,7 @@ static const fmd_prop_t fmd_props[] = {
 	 * of retries on page retires, after which the case will
 	 * be closed.
 	 */
-	{ "page_retire_maxretries", FMD_TYPE_UINT32, "8" },
+	{ "page_retire_maxretries", FMD_TYPE_UINT32, "5" },
 #else
 	{ "page_retire_maxretries", FMD_TYPE_UINT32, "0" },
 #endif	/* i386 */

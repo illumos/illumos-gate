@@ -48,6 +48,11 @@ WORKAROUND_DEFS += -DOPTERON_ERRATUM_93
 WORKAROUND_DEFS += -DOPTERON_ERRATUM_95
 
 #
+# DRAM scrubber must not be enabled on a node with discontiguous cs range
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_99
+
+#
 # Compatibility Mode Branches Transfer to Illegal Address
 #
 WORKAROUND_DEFS += -DOPTERON_ERRATUM_100

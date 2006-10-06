@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -37,6 +36,8 @@
 #include <sys/sunddi.h>
 #include <sys/varargs.h>
 #include <sys/cpu_module_impl.h>
+#include <sys/fm/util.h>
+#include <sys/fm/cpu/AMD.h>
 #include <sys/fm/protocol.h>
 #include <sys/mc.h>
 
@@ -45,9 +46,9 @@
 
 int mcamd_debug = 0; /* see mcamd_api.h for MCAMD_DBG_* values */
 
-struct mc_propmap {
-	uint_t mcpm_code;
-	uint_t mcpm_offset;
+struct mc_offmap {
+	int mcom_code;
+	uint_t mcom_offset;
 };
 
 static uint_t
@@ -144,7 +145,7 @@ mcamd_cs_next(mcamd_hdl_t *hdl, mcamd_node_t *node, mcamd_node_t *last)
 
 /*
  * Iterate over all DIMMs of an MC or all DIMMs of a chip-select depending
- * on the node type of 'node'.  In the chip-select case we don not have
+ * on the node type of 'node'.  In the chip-select case we do not have
  * a linked list of associated DIMMs but an array of pointers to them.
  */
 /*ARGSUSED*/
@@ -164,7 +165,7 @@ mcamd_dimm_next(mcamd_hdl_t *hdl, mcamd_node_t *node, mcamd_node_t *last)
 		switch (nt) {
 		case MC_NT_MC:
 			mc = node2type(node, MC_NT_MC);
-			retval =  mc->mc_props.mcp_dimmlist;
+			retval =  mc->mc_dimmlist;
 			break;
 		case MC_NT_CS:
 			mccs = node2type(node, MC_NT_CS);
@@ -223,74 +224,173 @@ mcamd_dimm_mc(mcamd_hdl_t *hdl, mcamd_node_t *dnode)
  * property lookup does not have to be super-fast - we search linearly
  * down the (small) lists.
  */
-static const struct mc_propmap mcamd_mc_propmap[] = {
+static const struct mc_offmap mcamd_mc_offmap[] = {
 	{ MCAMD_PROP_NUM, MCAMD_MC_OFF_NUM },
 	{ MCAMD_PROP_REV, MCAMD_MC_OFF_REV },
 	{ MCAMD_PROP_BASE_ADDR, MCAMD_MC_OFF_BASE_ADDR },
 	{ MCAMD_PROP_LIM_ADDR, MCAMD_MC_OFF_LIM_ADDR },
-	{ MCAMD_PROP_DRAM_CONFIG, MCAMD_MC_OFF_DRAMCFG },
-	{ MCAMD_PROP_DRAM_HOLE, MCAMD_MC_OFF_DRAMHOLE },
-	{ MCAMD_PROP_DRAM_ILEN, MCAMD_MC_OFF_DRAM_ILEN },
-	{ MCAMD_PROP_DRAM_ILSEL, MCAMD_MC_OFF_DRAM_ILSEL },
-	{ MCAMD_PROP_CSBANKMAP, MCAMD_MC_OFF_CSBANKMAP },
+	{ MCAMD_PROP_ILEN, MCAMD_MC_OFF_ILEN },
+	{ MCAMD_PROP_ILSEL, MCAMD_MC_OFF_ILSEL },
+	{ MCAMD_PROP_CSINTLVFCTR, MCAMD_MC_OFF_CSINTLVFCTR },
+	{ MCAMD_PROP_DRAMHOLE_SIZE, MCAMD_MC_OFF_DRAMHOLE_SIZE },
 	{ MCAMD_PROP_ACCESS_WIDTH, MCAMD_MC_OFF_ACCWIDTH },
-	{ MCAMD_PROP_CSBANK_INTLV, MCAMD_MC_OFF_CSBANK_INTLV },
-	{ MCAMD_PROP_DISABLED_CS, MCAMD_MC_OFF_DISABLED_CS }
+	{ MCAMD_PROP_CSBANKMAPREG, MCAMD_MC_OFF_CSBANKMAPREG },
+	{ MCAMD_PROP_BANKSWZL, MCAMD_MC_OFF_BNKSWZL },
+	{ MCAMD_PROP_MOD64MUX, MCAMD_MC_OFF_MOD64MUX },
+	{ MCAMD_PROP_SPARECS, MCAMD_MC_OFF_SPARECS },
+	{ MCAMD_PROP_BADCS, MCAMD_MC_OFF_BADCS },
 };
 
-static const struct mc_propmap mcamd_cs_propmap[] = {
+static const struct mc_offmap mcamd_cs_offmap[] = {
 	{ MCAMD_PROP_NUM, MCAMD_CS_OFF_NUM },
 	{ MCAMD_PROP_BASE_ADDR, MCAMD_CS_OFF_BASE_ADDR },
 	{ MCAMD_PROP_MASK, MCAMD_CS_OFF_MASK },
 	{ MCAMD_PROP_SIZE, MCAMD_CS_OFF_SIZE },
-	{ MCAMD_PROP_LODIMM, MCAMD_CS_OFF_DIMMNUMS },
-	{ MCAMD_PROP_UPDIMM, MCAMD_CS_OFF_DIMMNUMS +
-	    MCAMD_CS_OFF_DIMMNUMS_INCR }
+	{ MCAMD_PROP_CSBE, MCAMD_CS_OFF_CSBE },
+	{ MCAMD_PROP_SPARE, MCAMD_CS_OFF_SPARE },
+	{ MCAMD_PROP_TESTFAIL, MCAMD_CS_OFF_TESTFAIL },
+	{ MCAMD_PROP_CSDIMM1, MCAMD_CS_OFF_DIMMNUMS },
+	{ MCAMD_PROP_CSDIMM2, MCAMD_CS_OFF_DIMMNUMS +
+	    MCAMD_CS_OFF_DIMMNUMS_INCR },
+	{ MCAMD_PROP_DIMMRANK, MCAMD_CS_OFF_DIMMRANK },
 };
 
-static const struct mc_propmap mcamd_dimm_propmap[] = {
+static const struct mc_offmap mcamd_dimm_offmap[] = {
 	{ MCAMD_PROP_NUM, MCAMD_DIMM_OFF_NUM },
+	{ MCAMD_PROP_SIZE, MCAMD_DIMM_OFF_SIZE },
+};
+
+struct nt_offmap {
+	const struct mc_offmap *omp;
+	int mapents;
 };
 
 /*ARGSUSED*/
-int
-mcamd_get_numprop(mcamd_hdl_t *hdl, mcamd_node_t *node, uint_t code,
-    uint64_t *valp)
+static int
+findoffset(mcamd_hdl_t *hdl, mcamd_node_t *node, struct nt_offmap *arr,
+    int code, uint_t *offset)
 {
 	int i;
 	mc_hdr_t *mch = (mc_hdr_t *)node;
 	int nt = mch->mch_type;
-	int found = 0;
-	const struct mc_propmap *pmp;
-	struct mcamd_nt_props {
-		const struct mc_propmap *props;
-		int numprops;
-	} props[] = {
-		{ mcamd_mc_propmap,	/* MC_NT_MC */
-		    sizeof (mcamd_mc_propmap) / sizeof (struct mc_propmap) },
-		{ mcamd_cs_propmap,	/* MC_NT_CS */
-		    sizeof (mcamd_cs_propmap) / sizeof (struct mc_propmap) },
-		{ mcamd_dimm_propmap,	/* MC_NT_DIMM */
-		    sizeof (mcamd_dimm_propmap) / sizeof (struct mc_propmap) },
-	};
+	const struct mc_offmap *omp;
 
-	if (mch->mch_type < MC_NT_NTYPES) {
-		for (i = 0, pmp = props[nt].props; i < props[nt].numprops;
-		    i++, pmp++) {
-			if (pmp->mcpm_code == code) {
-				found = 1;
-				break;
-			}
+	if (nt > MC_NT_NTYPES || (omp = arr[nt].omp) == NULL)
+		return (0);
+
+	for (i = 0; i < arr[nt].mapents; i++, omp++) {
+		if (omp->mcom_code == code) {
+			*offset = omp->mcom_offset;
+			return (1);
 		}
 	}
 
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+mcamd_get_numprop(mcamd_hdl_t *hdl, mcamd_node_t *node,
+    mcamd_propcode_t code, mcamd_prop_t *valp)
+{
+	int found;
+	uint_t offset;
+
+	struct nt_offmap props[] = {
+		{ mcamd_mc_offmap,	/* MC_NT_MC */
+		    sizeof (mcamd_mc_offmap) / sizeof (struct mc_offmap) },
+		{ mcamd_cs_offmap,	/* MC_NT_CS */
+		    sizeof (mcamd_cs_offmap) / sizeof (struct mc_offmap) },
+		{ mcamd_dimm_offmap,	/* MC_NT_DIMM */
+		    sizeof (mcamd_dimm_offmap) / sizeof (struct mc_offmap) }
+	};
+
+	found = findoffset(hdl, node, &props[0], code, &offset);
 	ASSERT(found);
-	if (found) {
-		*valp = *(uint64_t *)((uintptr_t)node + pmp->mcpm_offset);
-	}
+
+	if (found)
+		*valp = *(uint64_t *)((uintptr_t)node + offset);
 
 	return (found == 1);
 }
+
+int
+mcamd_get_numprops(mcamd_hdl_t *hdl, ...)
+{
+	va_list ap;
+	mcamd_node_t *node;
+	mcamd_propcode_t code;
+	mcamd_prop_t *valp;
+
+	va_start(ap, hdl);
+	while ((node = va_arg(ap, mcamd_node_t *)) != NULL) {
+		code = va_arg(ap, mcamd_propcode_t);
+		valp = va_arg(ap, mcamd_prop_t *);
+		if (!mcamd_get_numprop(hdl, node, code, valp))
+			return (0);
+	}
+	va_end(ap);
+	return (1);
+}
+
+static const struct mc_offmap mcreg_offmap[] = {
+	{ MCAMD_REG_DRAMBASE, MCAMD_MC_OFF_DRAMBASE_REG },
+	{ MCAMD_REG_DRAMLIMIT, MCAMD_MC_OFF_DRAMLIMIT_REG },
+	{ MCAMD_REG_DRAMHOLE, MCAMD_MC_OFF_DRAMHOLE_REG },
+	{ MCAMD_REG_DRAMCFGLO, MCAMD_MC_OFF_DRAMCFGLO_REG },
+	{ MCAMD_REG_DRAMCFGHI, MCAMD_MC_OFF_DRAMCFGHI_REG },
+};
+
+static const struct mc_offmap csreg_offmap[] = {
+	{ MCAMD_REG_CSBASE, MCAMD_CS_OFF_CSBASE_REG },
+	{ MCAMD_REG_CSMASK, MCAMD_CS_OFF_CSMASK_REG },
+};
+
+/*ARGSUSED*/
+int
+mcamd_get_cfgreg(struct mcamd_hdl *hdl, mcamd_node_t *node,
+    mcamd_regcode_t code, uint32_t *valp)
+{
+	int found;
+	uint_t offset;
+
+	struct nt_offmap regs[] = {
+		{ mcreg_offmap,	/* MC_NT_MC */
+		    sizeof (mcreg_offmap) / sizeof (struct mc_offmap) },
+		{ csreg_offmap,	/* MC_NT_CS */
+		    sizeof (csreg_offmap) / sizeof (struct mc_offmap) },
+		{ NULL, 0 }		/* MC_NT_DIMM */
+	};
+
+	found = findoffset(hdl, node, &regs[0], code, &offset);
+	ASSERT(found);
+
+	ASSERT(found);
+	if (found)
+		*valp = *(uint32_t *)((uintptr_t)node + offset);
+
+	return (found == 1);
+}
+
+int
+mcamd_get_cfgregs(mcamd_hdl_t *hdl, ...)
+{
+	va_list ap;
+	mcamd_node_t *node;
+	mcamd_regcode_t code;
+	uint32_t *valp;
+
+	va_start(ap, hdl);
+	while ((node = va_arg(ap, mcamd_node_t *)) != NULL) {
+		code = va_arg(ap, mcamd_regcode_t);
+		valp = va_arg(ap, uint32_t *);
+		if (!mcamd_get_cfgreg(hdl, node, code, valp))
+			return (0);
+	}
+	va_end(ap);
+	return (1);
+}
+
 
 int
 mcamd_errno(mcamd_hdl_t *mcamd)
@@ -376,7 +476,7 @@ fmri2unum(nvlist_t *nvl, mc_unum_t *unump)
 
 	bzero(unump, sizeof (mc_unum_t));
 	for (i = 0; i < MC_UNUM_NDIMM; i++)
-		unump->unum_dimms[i] = -1;
+		unump->unum_dimms[i] = MC_INVALNUM;
 
 	for (i = 0; i < npr; i++) {
 		char *hcnm, *hcid;
@@ -397,6 +497,8 @@ fmri2unum(nvlist_t *nvl, mc_unum_t *unump)
 			unump->unum_cs = (int)v;
 		else if (strcmp(hcnm, "dimm") == 0)
 			unump->unum_dimms[0] = (int)v;
+		else if (strcmp(hcnm, "rank") == 0)
+			unump->unum_rank = (int)v;
 	}
 
 	unump->unum_offset = offset;
@@ -439,4 +541,122 @@ void
 mcamd_mc_register(cpu_t *cp)
 {
 	cmi_mc_register(cp, &mcamd_mc_ops, NULL);
+}
+
+static void
+mc_ereport_dimm_resource(mc_unum_t *unump, nvlist_t *elems[], int *nump)
+{
+	int i;
+
+	for (i = 0; i < MC_UNUM_NDIMM; i++) {
+		if (unump->unum_dimms[i] == MC_INVALNUM)
+			break;
+
+		elems[(*nump)++] = fm_nvlist_create(NULL);
+		fm_fmri_hc_set(elems[i], FM_HC_SCHEME_VERSION, NULL, NULL, 5,
+		    "motherboard",  unump->unum_board,
+		    "chip", unump->unum_chip,
+		    "memory-controller", unump->unum_mc,
+		    "dimm", unump->unum_dimms[i],
+		    "rank", unump->unum_rank);
+	}
+}
+
+static void
+mc_ereport_cs_resource(mc_unum_t *unump, nvlist_t *elems[], int *nump)
+{
+	elems[0] = fm_nvlist_create(NULL);
+	fm_fmri_hc_set(elems[0], FM_HC_SCHEME_VERSION, NULL, NULL, 4,
+	    "motherboard",  unump->unum_board,
+	    "chip", unump->unum_chip,
+	    "memory-controller", unump->unum_mc,
+	    "chip-select", unump->unum_cs);
+	*nump = 1;
+}
+
+/*
+ * Create the 'resource' payload member from the unum info.  If valid
+ * dimm numbers are present in the unum info then create members
+ * identifying the dimm and rank;  otherwise if a valid chip-select
+ * number is indicated then create a member identifying the chip-select
+ * topology node.
+ */
+static void
+mc_ereport_add_resource(nvlist_t *payload, mc_unum_t *unump)
+{
+	nvlist_t *elems[MC_UNUM_NDIMM];
+	int nelems = 0;
+	int i;
+
+	if (unump->unum_dimms[0] != MC_INVALNUM)
+		mc_ereport_dimm_resource(unump, elems, &nelems);
+	else if (unump->unum_cs != MC_INVALNUM)
+		mc_ereport_cs_resource(unump, elems, &nelems);
+
+	if (nelems > 0) {
+		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_RESOURCE,
+		    DATA_TYPE_NVLIST_ARRAY, nelems, elems, NULL);
+
+		for (i = 0; i < nelems; i++)
+			fm_nvlist_destroy(elems[i], FM_NVA_FREE);
+	}
+}
+
+static void
+mc_ereport_add_payload(nvlist_t *ereport, uint64_t members, mc_unum_t *unump)
+{
+	if (members & FM_EREPORT_PAYLOAD_FLAG_RESOURCE &&
+	    unump != NULL)
+		mc_ereport_add_resource(ereport, unump);
+}
+
+static nvlist_t *
+mc_fmri_create(mc_t *mc)
+{
+	nvlist_t *nvl = fm_nvlist_create(NULL);
+
+	fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 3,
+	    "motherboard", 0,
+	    "chip", mc->mc_chip->chip_id,
+	    "memory-controller", 0);
+
+	return (nvl);
+}
+
+/*
+ * Simple ereport generator for errors detected by the memory controller.
+ * Posts an ereport of class ereport.cpu.amd.<class_sfx> with a resource nvlist
+ * derived from the given mc_unum_t.  There are no other payload members.
+ * The mc argument is used to formulate a detector and this mc should
+ * correspond with that identified in the mc_unum_t.
+ *
+ * There is no control of which members to include the the resulting ereport -
+ * it will be an ereport formed using the given class suffix, detector
+ * indicated as the memory-controller and with a resource generated by
+ * expanding the given mc_unum_t.
+ *
+ * We do not use any special nv allocator here and so this is not suitable
+ * for use during panic.  It is intended for use during MC topology
+ * discovery and other controlled circumstances.
+ */
+void
+mcamd_ereport_post(mc_t *mc, const char *class_sfx, mc_unum_t *unump,
+    uint64_t payload)
+{
+	nvlist_t *ereport, *detector;
+	char buf[FM_MAX_CLASS];
+
+	ereport = fm_nvlist_create(NULL);
+	detector = mc_fmri_create(mc);
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s.%s", FM_ERROR_CPU,
+	    "amd", class_sfx);
+	fm_ereport_set(ereport, FM_EREPORT_VERSION, buf,
+	    fm_ena_generate(gethrtime(), FM_ENA_FMT1), detector, NULL);
+	fm_nvlist_destroy(detector, FM_NVA_FREE);
+
+	mc_ereport_add_payload(ereport, payload, unump);
+
+	(void) fm_ereport_post(ereport, EVCH_TRYHARD);
+	fm_nvlist_destroy(ereport, FM_NVA_FREE);
 }

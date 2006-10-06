@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -62,55 +61,79 @@ typedef struct mcamd_node mcamd_node_t;
 struct mcamd_hdl;
 
 /*
- * If changing the properties below be sure to propogate to mcamd_misc.c
- * in common code, mcamd_subr.c in the mc-amd driver, and mcamd_prop.c
- * from libmcamd.
+ * Properties and raw register values for an mcamd_node_t are retrieved via
+ * mcamd_get_numprop(s) and mcamd_get_cfgreg(s) specifying a property or
+ * register code below.
  */
 
-#define	MCAMD_PROP_NUM			0
-#define	MCAMD_PROP_BASE_ADDR		1
-#define	MCAMD_PROP_LIM_ADDR		2
-#define	MCAMD_PROP_MASK			3
-#define	MCAMD_PROP_DRAM_ILEN		4
-#define	MCAMD_PROP_DRAM_ILSEL		5
-#define	MCAMD_PROP_DRAM_HOLE		6
-#define	MCAMD_PROP_DRAM_CONFIG		7
-#define	MCAMD_PROP_ACCESS_WIDTH		8
-#define	MCAMD_PROP_LODIMM		9
-#define	MCAMD_PROP_UPDIMM		10
-#define	MCAMD_PROP_CSBANKMAP		11
-#define	MCAMD_PROP_SIZE			12
-#define	MCAMD_PROP_CSBANK_INTLV		13
-#define	MCAMD_PROP_CS0			14 /* CS0 to CS3 must be contiguous */
-#define	MCAMD_PROP_CS1			15
-#define	MCAMD_PROP_CS2			16
-#define	MCAMD_PROP_CS3			17
-#define	MCAMD_PROP_REV			18
-#define	MCAMD_PROP_DISABLED_CS		19
+typedef uint64_t mcamd_prop_t;
+typedef uint32_t mcamd_cfgreg_t;
 
-#define	MCAMD_NUMPROPS			20
-
+typedef enum mcamd_propcode {
+	/*
+	 * Common properties
+	 */
+	MCAMD_PROP_NUM = 0x4000,
 #define	MCAMD_PROPSTR_NUM		"num"
-#define	MCAMD_PROPSTR_BASE_ADDR		"base-addr"
-#define	MCAMD_PROPSTR_LIM_ADDR		"lim-addr"
-#define	MCAMD_PROPSTR_MASK		"mask"
-#define	MCAMD_PROPSTR_DRAM_ILEN		"dram-ilen"
-#define	MCAMD_PROPSTR_DRAM_ILSEL	"dram-ilsel"
-#define	MCAMD_PROPSTR_DRAM_HOLE		"dram-hole"
-#define	MCAMD_PROPSTR_DRAM_CONFIG	"dram-config"
-#define	MCAMD_PROPSTR_ACCESS_WIDTH	"access-width"
-#define	MCAMD_PROPSTR_LODIMM		"lodimm-num"
-#define	MCAMD_PROPSTR_UPDIMM		"updimm-num"
-#define	MCAMD_PROPSTR_CSBANKMAP		"bank-mapping"
+	MCAMD_PROP_SIZE,
 #define	MCAMD_PROPSTR_SIZE		"size"
-#define	MCAMD_PROPSTR_CSBANK_INTLV	"csbank-intlv"
-#define	MCAMD_PROPSTR_CS0		"csnum0"
-#define	MCAMD_PROPSTR_CS1		"csnum1"
-#define	MCAMD_PROPSTR_CS2		"csnum2"
-#define	MCAMD_PROPSTR_CS3		"csnum3"
+	MCAMD_PROP_BASE_ADDR,
+#define	MCAMD_PROPSTR_BASE_ADDR		"base-addr"
+	/*
+	 * Memory controller properties
+	 */
+	MCAMD_PROP_REV = 0x5000,
 #define	MCAMD_PROPSTR_REV		"revision"
-#define	MCAMD_PROPSTR_DISABLED_CS	"disabled-cs"
+	MCAMD_PROP_LIM_ADDR,
+#define	MCAMD_PROPSTR_LIM_ADDR		"lim-addr"
+	MCAMD_PROP_ILEN,
+#define	MCAMD_PROPSTR_ILEN		"node-ilen"
+	MCAMD_PROP_ILSEL,
+#define	MCAMD_PROPSTR_ILSEL		"node-ilsel"
+	MCAMD_PROP_CSINTLVFCTR,
+#define	MCAMD_PROPSTR_CSINTLVFCTR	"cs-intlv-factor"
+	MCAMD_PROP_DRAMHOLE_SIZE,
+#define	MCAMD_PROPSTR_DRAMHOLE_SIZE	"dram-hole-size"
+	MCAMD_PROP_ACCESS_WIDTH,
+#define	MCAMD_PROPSTR_ACCESS_WIDTH	"access-width"
+	MCAMD_PROP_CSBANKMAPREG,
+#define	MCAMD_PROPSTR_CSBANKMAPREG	"bank-mapping"
+	MCAMD_PROP_BANKSWZL,
+#define	MCAMD_PROPSTR_BANKSWZL		"bankswizzle"
+	MCAMD_PROP_MOD64MUX,
+#define	MCAMD_PROPSTR_MOD64MUX		"mismatched-dimm-support"
+	MCAMD_PROP_SPARECS,
+#define	MCAMD_PROPSTR_SPARECS		"spare-csnum"
+	MCAMD_PROP_BADCS,
+#define	MCAMD_PROPSTR_BADCS		"bad-csnum"
+	/*
+	 * Chip-select properties
+	 */
+	MCAMD_PROP_MASK = 0x6000,
+#define	MCAMD_PROPSTR_MASK		"mask"
+	MCAMD_PROP_CSBE,
+#define	MCAMD_PROPSTR_CSBE		"cs-bank-enable"
+	MCAMD_PROP_SPARE,
+#define	MCAMD_PROPSTR_SPARE		"online-spare"
+	MCAMD_PROP_TESTFAIL,
+#define	MCAMD_PROPSTR_TESTFAIL		"failed-test"
+	MCAMD_PROP_CSDIMM1,
+#define	MCAMD_PROPSTR_CSDIMM1		"dimm1-num"
+	MCAMD_PROP_CSDIMM2,
+#define	MCAMD_PROPSTR_CSDIMM2		"dimm2-num"
+	MCAMD_PROP_DIMMRANK
+#define	MCAMD_PROPSTR_DIMMRANK		"dimm-rank"
+} mcamd_propcode_t;
 
+typedef enum mcamd_regcode {
+	MCAMD_REG_DRAMBASE = 0x7000,
+	MCAMD_REG_DRAMLIMIT,
+	MCAMD_REG_DRAMHOLE,
+	MCAMD_REG_DRAMCFGLO,
+	MCAMD_REG_DRAMCFGHI,
+	MCAMD_REG_CSBASE,
+	MCAMD_REG_CSMASK
+} mcamd_regcode_t;
 /*
  * Flags for mcamd_dprintf
  */
@@ -123,7 +146,8 @@ typedef union mcamd_dimm_offset_un mcamd_dimm_offset_un_t;
  * Offset definition.  Encode everything in a single uint64_t, allowing some
  * room for growth in numbers of rows/columns/banks in future MC revisions.
  * Some consumers will handle this as an opaque uint64 to be passed around,
- * while others will want to look inside via the union defined below.
+ * while others will want to look inside via the union defined below.  Since
+ * we must support a 32-bit kernel we structure this as two uint32_t.
  */
 
 #define	MCAMD_OFFSET_VERSION_0			0x0
@@ -170,13 +194,16 @@ union mcamd_dimm_offset_un {
 /*
  * Routines provided by the common mcamd code.
  */
-extern const char *mcamd_get_propname(uint_t);
+extern const char *mcamd_get_propname(mcamd_propcode_t);
 
 extern int mcamd_patounum(struct mcamd_hdl *, mcamd_node_t *, uint64_t,
-    uint32_t, int, struct mc_unum *);
-
-extern int mcamd_unumtopa(struct mcamd_hdl *, mcamd_node_t *, struct mc_unum *,
+    uint32_t, int, mc_unum_t *);
+extern int mcamd_unumtopa(struct mcamd_hdl *, mcamd_node_t *, mc_unum_t *,
     uint64_t *);
+extern int mc_pa_to_offset(struct mcamd_hdl *, mcamd_node_t *, mcamd_node_t *,
+    uint64_t, uint64_t *);
+extern int mc_offset_to_pa(struct mcamd_hdl *, mcamd_node_t *, mcamd_node_t *,
+    uint64_t, uint64_t *);
 
 extern int mcamd_cs_size(struct mcamd_hdl *, mcamd_node_t *, int, size_t *);
 
@@ -204,8 +231,12 @@ extern mcamd_node_t *mcamd_dimm_next(struct mcamd_hdl *, mcamd_node_t *,
 extern mcamd_node_t *mcamd_cs_mc(struct mcamd_hdl *, mcamd_node_t *);
 extern mcamd_node_t *mcamd_dimm_mc(struct mcamd_hdl *, mcamd_node_t *);
 
-extern int mcamd_get_numprop(struct mcamd_hdl *, mcamd_node_t *, uint_t,
-    uint64_t *);
+extern int mcamd_get_numprop(struct mcamd_hdl *, mcamd_node_t *,
+    mcamd_propcode_t, mcamd_prop_t *);
+extern int mcamd_get_numprops(struct mcamd_hdl *, ...);
+extern int mcamd_get_cfgreg(struct mcamd_hdl *, mcamd_node_t *,
+    mcamd_regcode_t, mcamd_cfgreg_t *);
+extern int mcamd_get_cfgregs(struct mcamd_hdl *, ...);
 
 extern int mcamd_errno(struct mcamd_hdl *);
 extern int mcamd_set_errno(struct mcamd_hdl *, int);

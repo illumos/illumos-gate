@@ -164,6 +164,12 @@ struct cpuid_info {
 #define	TM_EDX_FEATURES		2
 #define	STD_ECX_FEATURES	3
 
+	/*
+	 * Synthesized information, where known.
+	 */
+	uint32_t cpi_chiprev;		/* See X86_CHIPREV_* in x86_archext.h */
+	const char *cpi_chiprevstr;	/* May be NULL if chiprev unknown */
+	uint32_t cpi_socket;		/* Chip package/socket type */
 };
 
 
@@ -214,6 +220,126 @@ static struct cpuid_info cpuid_info0;
 
 /* A "new F6" is everything with family 6 that's not the above */
 #define	IS_NEW_F6(cpi) ((cpi->cpi_family == 6) && !IS_LEGACY_P6(cpi))
+
+/*
+ * AMD family 0xf socket types.
+ * First index is 0 for revs B thru E, 1 for F and G.
+ * Second index by (model & 0x3)
+ */
+static uint32_t amd_skts[2][4] = {
+	{
+		X86_SOCKET_754,		/* 0b00 */
+		X86_SOCKET_940,		/* 0b01 */
+		X86_SOCKET_754,		/* 0b10 */
+		X86_SOCKET_939		/* 0b11 */
+	},
+	{
+		X86_SOCKET_S1g1,	/* 0b00 */
+		X86_SOCKET_F1207,	/* 0b01 */
+		X86_SOCKET_UNKNOWN,	/* 0b10 */
+		X86_SOCKET_AM2		/* 0b11 */
+	}
+};
+
+/*
+ * Table for mapping AMD Family 0xf model/stepping combination to
+ * chip "revision" and socket type.  Only rm_family 0xf is used at the
+ * moment, but AMD family 0x10 will extend the exsiting revision names
+ * so will likely also use this table.
+ *
+ * The first member of this array that matches a given family, extended model
+ * plus model range, and stepping range will be considered a match.
+ */
+static const struct amd_rev_mapent {
+	uint_t rm_family;
+	uint_t rm_modello;
+	uint_t rm_modelhi;
+	uint_t rm_steplo;
+	uint_t rm_stephi;
+	uint32_t rm_chiprev;
+	const char *rm_chiprevstr;
+	int rm_sktidx;
+} amd_revmap[] = {
+	/*
+	 * Rev B includes model 0x4 stepping 0 and model 0x5 stepping 0 and 1.
+	 */
+	{ 0xf, 0x04, 0x04, 0x0, 0x0, X86_CHIPREV_AMD_F_REV_B, "B", 0 },
+	{ 0xf, 0x05, 0x05, 0x0, 0x1, X86_CHIPREV_AMD_F_REV_B, "B", 0 },
+	/*
+	 * Rev C0 includes model 0x4 stepping 8 and model 0x5 stepping 8
+	 */
+	{ 0xf, 0x04, 0x05, 0x8, 0x8, X86_CHIPREV_AMD_F_REV_C0, "C0", 0 },
+	/*
+	 * Rev CG is the rest of extended model 0x0 - i.e., everything
+	 * but the rev B and C0 combinations covered above.
+	 */
+	{ 0xf, 0x00, 0x0f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_CG, "CG", 0 },
+	/*
+	 * Rev D has extended model 0x1.
+	 */
+	{ 0xf, 0x10, 0x1f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_D, "D", 0 },
+	/*
+	 * Rev E has extended model 0x2.
+	 * Extended model 0x3 is unused but available to grow into.
+	 */
+	{ 0xf, 0x20, 0x3f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_E, "E", 0 },
+	/*
+	 * Rev F has extended models 0x4 and 0x5.
+	 */
+	{ 0xf, 0x40, 0x5f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_F, "F", 1 },
+	/*
+	 * Rev G has extended model 0x6.
+	 */
+	{ 0xf, 0x60, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_G, "G", 1 },
+};
+
+static void
+synth_amd_info(struct cpuid_info *cpi)
+{
+	const struct amd_rev_mapent *rmp;
+	uint_t family, model, step;
+	int i;
+
+	/*
+	 * Currently only AMD family 0xf uses these fields.
+	 */
+	if (cpi->cpi_family != 0xf)
+		return;
+
+	family = cpi->cpi_family;
+	model = cpi->cpi_model;
+	step = cpi->cpi_step;
+
+	for (i = 0, rmp = amd_revmap; i < sizeof (amd_revmap) / sizeof (*rmp);
+	    i++, rmp++) {
+		if (family == rmp->rm_family &&
+		    model >= rmp->rm_modello && model <= rmp->rm_modelhi &&
+		    step >= rmp->rm_steplo && step <= rmp->rm_stephi) {
+			cpi->cpi_chiprev = rmp->rm_chiprev;
+			cpi->cpi_chiprevstr = rmp->rm_chiprevstr;
+			cpi->cpi_socket = amd_skts[rmp->rm_sktidx][model & 0x3];
+			return;
+		}
+	}
+}
+
+static void
+synth_info(struct cpuid_info *cpi)
+{
+	cpi->cpi_chiprev = X86_CHIPREV_UNKNOWN;
+	cpi->cpi_chiprevstr = "Unknown";
+	cpi->cpi_socket = X86_SOCKET_UNKNOWN;
+
+	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_AMD:
+		synth_amd_info(cpi);
+		break;
+
+	default:
+		break;
+
+	}
+}
 
 /*
  *  Some undocumented ways of patching the results of the cpuid
@@ -811,6 +937,11 @@ cpuid_pass1(cpu_t *cpu)
 			cpi->cpi_coreid = cpi->cpi_chipid;
 		}
 	}
+
+	/*
+	 * Synthesize chip "revision" and socket type
+	 */
+	synth_info(cpi);
 
 pass1_done:
 	cpi->cpi_pass = 1;
@@ -1734,6 +1865,27 @@ cpuid_getstep(cpu_t *cpu)
 	return (cpu->cpu_m.mcpu_cpi->cpi_step);
 }
 
+uint32_t
+cpuid_getchiprev(struct cpu *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	return (cpu->cpu_m.mcpu_cpi->cpi_chiprev);
+}
+
+const char *
+cpuid_getchiprevstr(struct cpu *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	return (cpu->cpu_m.mcpu_cpi->cpi_chiprevstr);
+}
+
+uint32_t
+cpuid_getsockettype(struct cpu *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	return (cpu->cpu_m.mcpu_cpi->cpi_socket);
+}
+
 chipid_t
 chip_plat_get_chipid(cpu_t *cpu)
 {
@@ -1871,6 +2023,7 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	if (cpi->cpi_vendor != X86_VENDOR_AMD ||
 	    CPI_FAMILY(cpi) == 4 || CPI_FAMILY(cpi) == 5 ||
 	    CPI_FAMILY(cpi) == 6)
+
 		return (0);
 
 	eax = cpi->cpi_std[1].cp_eax;

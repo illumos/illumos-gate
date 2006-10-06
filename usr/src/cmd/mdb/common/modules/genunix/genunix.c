@@ -3401,7 +3401,7 @@ static const mdb_dcmd_t dcmds[] = {
 	{ NVPAIR_DCMD_NAME, NVPAIR_DCMD_USAGE, NVPAIR_DCMD_DESCR,
 		nvpair_print },
 	{ NVLIST_DCMD_NAME, NVLIST_DCMD_USAGE, NVLIST_DCMD_DESCR,
-		nvlist_print },
+		print_nvlist },
 
 	/* from rctl.c */
 	{ "rctl_dict", "?", "print systemwide default rctl definitions",

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -30,59 +29,68 @@
 #include <mcamd_rowcol_impl.h>
 
 /*
- * Convenience structures to stash MC and CS properties in.  Some of these
- * are read directly, while others are then calculated.
+ * Convenience structures to stash MC and CS properties in.
  */
-struct rcp_mc {
-	uint64_t num;		/* corresponding chip number */
-	uint64_t rev;		/* revision */
-	uint64_t width;		/* access width */
-	uint64_t base;		/* MC base address */
-	uint64_t lim;		/* MC limit address */
-	uint64_t csbnkmap;	/* chip-select bank map */
-	uint64_t intlven;	/* Node-interleave mask */
-	uint64_t intlvsel;	/* Node-interleave selection for this node */
-	uint64_t csintlvfctr;	/* chip-select interleave factor on this node */
-	int bnkswzl;		/* bank-swizzle mode - derived */
+struct mcprops {
+	mcamd_prop_t num;		/* corresponding chip number */
+	mcamd_prop_t rev;		/* revision */
+	mcamd_prop_t width;		/* access width */
+	mcamd_prop_t base;		/* MC base address */
+	mcamd_prop_t lim;		/* MC limit address */
+	mcamd_prop_t csbnkmap_reg;	/* chip-select bank map */
+	mcamd_prop_t intlven;		/* Node-intlv mask */
+	mcamd_prop_t intlvsel;		/* Node-intlv selection for this node */
+	mcamd_prop_t csintlvfctr;	/* cs intlv factor on this node */
+	mcamd_prop_t bnkswzl;		/* bank-swizzle mode */
+	mcamd_prop_t sparecs;		/* spare cs#, if any */
+	mcamd_prop_t badcs;		/* substituted cs#, if any */
 };
 
-struct rcp_cs {
-	uint64_t num;		/* chip-select number */
-	uint64_t base;		/* chip-select base address */
-	uint64_t mask;		/* chip-select mask */
+struct csprops {
+	mcamd_prop_t num;		/* chip-select number */
+	mcamd_prop_t base;		/* chip-select base address */
+	mcamd_prop_t mask;		/* chip-select mask */
+	mcamd_prop_t testfail;		/* marked testFail */
+	mcamd_prop_t dimmrank;		/* rank number on dimm(s) */
 };
 
 static int
 getmcprops(struct mcamd_hdl *hdl, mcamd_node_t *mc, const char *caller,
-    struct rcp_mc *pp)
+    struct mcprops *pp)
 {
-	if (!mcamd_get_numprop(hdl, mc, MCAMD_PROP_NUM, &pp->num) ||
-	    !mcamd_get_numprop(hdl, mc, MCAMD_PROP_REV, &pp->rev) ||
-	    !mcamd_get_numprop(hdl, mc, MCAMD_PROP_ACCESS_WIDTH, &pp->width) ||
-	    !mcamd_get_numprop(hdl, mc, MCAMD_PROP_BASE_ADDR, &pp->base) ||
-	    !mcamd_get_numprop(hdl, mc, MCAMD_PROP_LIM_ADDR, &pp->lim) ||
-	    !mcamd_get_numprop(hdl, mc, MCAMD_PROP_CSBANKMAP, &pp->csbnkmap) ||
-	    !mcamd_get_numprop(hdl, mc, MCAMD_PROP_DRAM_ILEN, &pp->intlven) ||
-	    !mcamd_get_numprop(hdl, mc, MCAMD_PROP_DRAM_ILSEL, &pp->intlvsel) ||
-	    !mcamd_get_numprop(hdl, mc, MCAMD_PROP_CSBANK_INTLV,
-	    &pp->csintlvfctr)) {
+	if (!mcamd_get_numprops(hdl,
+	    mc, MCAMD_PROP_NUM, &pp->num,
+	    mc, MCAMD_PROP_REV, &pp->rev,
+	    mc, MCAMD_PROP_ACCESS_WIDTH, &pp->width,
+	    mc, MCAMD_PROP_BASE_ADDR, &pp->base,
+	    mc, MCAMD_PROP_LIM_ADDR, &pp->lim,
+	    mc, MCAMD_PROP_CSBANKMAPREG, &pp->csbnkmap_reg,
+	    mc, MCAMD_PROP_ILEN, &pp->intlven,
+	    mc, MCAMD_PROP_ILSEL, &pp->intlvsel,
+	    mc, MCAMD_PROP_CSINTLVFCTR, &pp->csintlvfctr,
+	    mc, MCAMD_PROP_BANKSWZL, &pp->bnkswzl,
+	    mc, MCAMD_PROP_SPARECS, &pp->sparecs,
+	    mc, MCAMD_PROP_BADCS, &pp->badcs,
+	    NULL)) {
 		mcamd_dprintf(hdl, MCAMD_DBG_ERR, "%s: failed to read mc "
 		    "props for mc 0x%p\n", caller, mc);
 		return (mcamd_set_errno(hdl, EMCAMD_TREEINVALID));
 	}
-
-	pp->bnkswzl = ((pp->csbnkmap & MC_DC_BAM_CSBANK_SWIZZLE) != 0);
 
 	return (0);
 }
 
 static int
 getcsprops(struct mcamd_hdl *hdl, mcamd_node_t *cs, const char *caller,
-    struct rcp_cs *csp)
+    struct csprops *csp)
 {
-	if (!mcamd_get_numprop(hdl, cs, MCAMD_PROP_NUM, &csp->num) ||
-	    !mcamd_get_numprop(hdl, cs, MCAMD_PROP_BASE_ADDR, &csp->base) ||
-	    !mcamd_get_numprop(hdl, cs, MCAMD_PROP_MASK, &csp->mask))  {
+	if (!mcamd_get_numprops(hdl,
+	    cs, MCAMD_PROP_NUM, &csp->num,
+	    cs, MCAMD_PROP_BASE_ADDR, &csp->base,
+	    cs, MCAMD_PROP_MASK, &csp->mask,
+	    cs, MCAMD_PROP_TESTFAIL, &csp->testfail,
+	    cs, MCAMD_PROP_DIMMRANK, &csp->dimmrank,
+	    NULL))  {
 		mcamd_dprintf(hdl, MCAMD_DBG_ERR, "%s: failed to read cs "
 		    "props for cs 0x%p\n", caller, cs);
 		return (mcamd_set_errno(hdl, EMCAMD_TREEINVALID));
@@ -92,35 +100,43 @@ getcsprops(struct mcamd_hdl *hdl, mcamd_node_t *cs, const char *caller,
 }
 
 static int
-gettbls(struct mcamd_hdl *hdl, uint_t csmode, struct rcp_mc *mcpp,
-    const struct bankaddr_mode **bamp, const struct csrcb_map **rcbmp,
-    struct csintlv_desc *csid, const char *caller)
+gettbls(struct mcamd_hdl *hdl, uint_t csmode, struct mcprops *mcpp,
+    const struct rct_bnkaddrmode **bamp, const struct rct_rcbmap **rcbmp,
+    const struct rct_bnkswzlinfo **swzlp, struct rct_csintlv *csid,
+    const char *caller)
 {
-	if (bamp && (*bamp = rct_bankaddr_mode(mcpp->rev, csmode)) == NULL) {
+	uint_t rev = (uint_t)mcpp->rev;
+	int width = (int)mcpp->width;
+
+	if (bamp && (*bamp = rct_bnkaddrmode(rev, csmode)) == NULL) {
 		mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "%s: no bank address mode "
-		    "table for MC rev %d csmode %d\n", caller,
-		    (int)mcpp->rev, csmode);
+		    "table for MC rev %d csmode %d\n", caller, rev, csmode);
 		return (mcamd_set_errno(hdl, EMCAMD_NOTSUP));
 	}
 
-	if (rcbmp && (*rcbmp = rct_rcbmap(mcpp->rev, mcpp->width,
-	    csmode)) == NULL) {
+	if (rcbmp && (*rcbmp = rct_rcbmap(rev, width, csmode)) == NULL) {
 		mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "%s: no dram address map "
 		    "table for MC rev %d csmode %d\n", caller,
-		    (int)mcpp->rev, csmode);
+		    rev, csmode);
+		return (mcamd_set_errno(hdl, EMCAMD_NOTSUP));
+	}
+
+	if (swzlp && (*swzlp = rct_bnkswzlinfo(rev, width)) == NULL) {
+		mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "%s: no bank swizzling "
+		    "table for MC rev %d width %d\n", caller, rev, width);
 		return (mcamd_set_errno(hdl, EMCAMD_NOTSUP));
 	}
 
 	if (csid) {
-		if (mcpp->csintlvfctr != 0) {
-			rct_csintlv_bits(mcpp->rev, mcpp->width, csmode,
+		if (mcpp->csintlvfctr > 1) {
+			rct_csintlv_bits(rev, width, csmode,
 			    mcpp->csintlvfctr, csid);
 			if (csid->csi_factor == 0) {
 				mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "%s: "
 				    "could not work out cs interleave "
 				    "paramters for MC rev %d, width %d, "
 				    "csmode %d, factor %d\n", caller,
-				    (int)mcpp->rev, (int)mcpp->width, csmode,
+				    rev, width, csmode,
 				    (int)mcpp->csintlvfctr);
 				return (mcamd_set_errno(hdl, EMCAMD_NOTSUP));
 			}
@@ -149,8 +165,8 @@ iaddr_add(struct mcamd_hdl *hdl, uint64_t in, uint64_t add, const char *what)
  * we adopt the same convention in address reconstruction then all should work.
  */
 static uint32_t
-iaddr_to_row(struct mcamd_hdl *hdl, const struct bankaddr_mode *bamp,
-    const struct csrcb_map *rcbm, struct csintlv_desc *csid, uint64_t iaddr)
+iaddr_to_row(struct mcamd_hdl *hdl, const struct rct_bnkaddrmode *bamp,
+    const struct rct_rcbmap *rcbm, struct rct_csintlv *csid, uint64_t iaddr)
 {
 	uint32_t addr = 0;
 	int abitno, ibitno;
@@ -158,13 +174,13 @@ iaddr_to_row(struct mcamd_hdl *hdl, const struct bankaddr_mode *bamp,
 	int swapped = 0;
 
 	for (abitno = 0; abitno < nbits; abitno++) {
-		ibitno = rcbm->csrcb_rowbits[abitno];
+		ibitno = rcbm->rcb_rowbit[abitno];
 		if (MC_RC_CSI_SWAPPED_BIT(csid, ibitno)) {
 			ibitno = MC_RC_CSI_BITSWAP(csid, ibitno);
 			swapped++;
 		}
-		if (iaddr & (1 << ibitno))
-			addr |= (1 << abitno);
+		if (BITVAL(iaddr, ibitno) != 0)
+			SETBIT(addr, abitno);
 	}
 
 	mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "iaddr_to_row: iaddr 0x%llx --> "
@@ -175,8 +191,8 @@ iaddr_to_row(struct mcamd_hdl *hdl, const struct bankaddr_mode *bamp,
 
 /*ARGSUSED*/
 static uint64_t
-row_to_iaddr(struct mcamd_hdl *hdl, const struct bankaddr_mode *bamp,
-    const struct csrcb_map *rcbm, struct csintlv_desc *csid, uint32_t rowaddr)
+row_to_iaddr(struct mcamd_hdl *hdl, const struct rct_bnkaddrmode *bamp,
+    const struct rct_rcbmap *rcbm, struct rct_csintlv *csid, uint32_t rowaddr)
 {
 	uint64_t iaddr = 0;
 	int abitno, ibitno;
@@ -185,7 +201,7 @@ row_to_iaddr(struct mcamd_hdl *hdl, const struct bankaddr_mode *bamp,
 	for (abitno = 0; abitno < nbits; abitno++) {
 		if (BIT(rowaddr, abitno) == 0)
 			continue;
-		ibitno = rcbm->csrcb_rowbits[abitno];
+		ibitno = rcbm->rcb_rowbit[abitno];
 		if (MC_RC_CSI_SWAPPED_BIT(csid, ibitno)) {
 			ibitno = MC_RC_CSI_BITSWAP(csid, ibitno);
 		}
@@ -197,8 +213,8 @@ row_to_iaddr(struct mcamd_hdl *hdl, const struct bankaddr_mode *bamp,
 
 
 static uint32_t
-iaddr_to_col(struct mcamd_hdl *hdl, const struct bankaddr_mode *bamp,
-    const struct csrcb_map *rcbm, uint64_t iaddr)
+iaddr_to_col(struct mcamd_hdl *hdl, const struct rct_bnkaddrmode *bamp,
+    const struct rct_rcbmap *rcbm, uint64_t iaddr)
 {
 	uint32_t addr = 0;
 	int abitno, ibitno, bias = 0;
@@ -214,9 +230,9 @@ iaddr_to_col(struct mcamd_hdl *hdl, const struct bankaddr_mode *bamp,
 		if (abitno == MC_PC_COLADDRBIT)
 			bias = 1;
 
-		ibitno = rcbm->csrcb_colbits[abitno + bias];
+		ibitno = rcbm->rcb_colbit[abitno + bias];
 
-		if (iaddr & (1 << ibitno))
+		if (BITVAL(iaddr, ibitno) != 0)
 			SETBIT(addr, abitno);
 	}
 
@@ -228,8 +244,8 @@ iaddr_to_col(struct mcamd_hdl *hdl, const struct bankaddr_mode *bamp,
 
 /*ARGSUSED*/
 static uint64_t
-col_to_iaddr(struct mcamd_hdl *hdl, const struct bankaddr_mode *bamp,
-    const struct csrcb_map *rcbm, uint32_t coladdr)
+col_to_iaddr(struct mcamd_hdl *hdl, const struct rct_bnkaddrmode *bamp,
+    const struct rct_rcbmap *rcbm, uint32_t coladdr)
 {
 	uint64_t iaddr = 0;
 	int abitno, ibitno, bias = 0;
@@ -248,7 +264,7 @@ col_to_iaddr(struct mcamd_hdl *hdl, const struct bankaddr_mode *bamp,
 		if (abitno == MC_PC_COLADDRBIT)
 			bias = 1;
 
-		ibitno = rcbm->csrcb_colbits[abitno + bias];
+		ibitno = rcbm->rcb_colbit[abitno + bias];
 		SETBIT(iaddr, ibitno);
 	}
 
@@ -256,24 +272,38 @@ col_to_iaddr(struct mcamd_hdl *hdl, const struct bankaddr_mode *bamp,
 }
 
 /*
- * Extract bank bit arguments and xor them together.  Tables for
- * non bank-swizzling should have all but the first argument zero.
+ * Extract bank bit arguments and swizzle if requested.
  */
 static uint32_t
-iaddr_to_bank(struct mcamd_hdl *hdl, const struct csrcb_map *rcbm,
-    int bnkswzl, uint64_t iaddr)
+iaddr_to_bank(struct mcamd_hdl *hdl, const struct rct_rcbmap *rcbm,
+    const struct rct_bnkswzlinfo *swzlp, uint64_t iaddr)
 {
 	uint32_t addr = 0;
 	int abitno, ibitno, i;
-	int bnkargs = bnkswzl ? MC_RC_BANKARGS : 1;
 
-	for (abitno = 0; abitno < MC_RC_BANKBITS; abitno++) {
-		uint32_t val = 0;
-		for (i = 0; i < bnkargs; i++) {
-			ibitno = rcbm->csrcb_bankargs[abitno][i];
-			val ^= ((iaddr >> ibitno) & 0x1);
+	for (abitno = 0; abitno < rcbm->rcb_nbankbits; abitno++) {
+		uint32_t val;
+
+		/*
+		 * rcb_bankbit[abitno] tells us which iaddr bit number
+		 * will form bit abitno of the bank address
+		 */
+		ibitno = rcbm->rcb_bankbit[abitno];
+		val = BITVAL(iaddr, ibitno);
+
+		/*
+		 * If bank swizzling is in operation then xor the bit value
+		 * obtained above with other iaddr bits.
+		 */
+		if (swzlp) {
+			for (i = 0; i < MC_RC_SWZLBITS; i++) {
+				ibitno = swzlp->bswz_rowbits[abitno][i];
+				val ^= BITVAL(iaddr, ibitno);
+			}
 		}
-		addr |= (val << abitno);
+
+		if (val)
+			SETBIT(addr, abitno);
 	}
 
 	mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "iaddr_to_bank: iaddr 0x%llx --> "
@@ -292,41 +322,44 @@ iaddr_to_bank(struct mcamd_hdl *hdl, const struct csrcb_map *rcbm,
  */
 /*ARGSUSED*/
 static uint64_t
-bank_to_iaddr(struct mcamd_hdl *hdl, const struct csrcb_map *rcbm,
-    int bnkswzl, uint64_t partiaddr, uint32_t bankaddr)
+bank_to_iaddr(struct mcamd_hdl *hdl, const struct rct_rcbmap *rcbm,
+    const struct rct_bnkswzlinfo *swzlp, uint64_t partiaddr, uint32_t bankaddr)
 {
 	uint64_t iaddr = 0;
 	int abitno, pibitno, i;
 
-	for (abitno = 0; abitno < MC_RC_BANKBITS; abitno++) {
+	for (abitno = 0; abitno < rcbm->rcb_nbankbits; abitno++) {
 		uint32_t val = BITVAL(bankaddr, abitno);
-		if (bnkswzl) {
-			for (i = 1; i < MC_RC_BANKARGS; i++) {
-				pibitno = rcbm->csrcb_bankargs[abitno][i];
+		if (swzlp) {
+			for (i = 0; i < MC_RC_SWZLBITS; i++) {
+				pibitno = swzlp->bswz_rowbits[abitno][i];
 				val ^= BITVAL(partiaddr, pibitno);
 			}
 		}
 		if (val)
-			SETBIT(iaddr, rcbm->csrcb_bankargs[abitno][0]);
+			SETBIT(iaddr, rcbm->rcb_bankbit[abitno]);
 	}
 
 	return (iaddr);
 }
 
 static int
-iaddr_to_rcb(struct mcamd_hdl *hdl, uint_t csmode, struct rcp_mc *mcpp,
+iaddr_to_rcb(struct mcamd_hdl *hdl, uint_t csmode, struct mcprops *mcpp,
     uint64_t iaddr, uint32_t *rowp, uint32_t *colp, uint32_t *bankp)
 {
-	const struct bankaddr_mode *bamp;
-	const struct csrcb_map *rcbm;
-	struct csintlv_desc csi;
+	const struct rct_bnkaddrmode *bamp;
+	const struct rct_rcbmap *rcbmp;
+	const struct rct_bnkswzlinfo *swzlp = NULL;
+	struct rct_csintlv csi;
 
-	if (gettbls(hdl, csmode, mcpp, &bamp, &rcbm, &csi, "iaddr_to_rcb") < 0)
+	if (gettbls(hdl, csmode, mcpp, &bamp, &rcbmp,
+	    mcpp->bnkswzl ? &swzlp : NULL, &csi,
+	    "iaddr_to_rcb") < 0)
 		return (-1);	/* errno already set */
 
-	*rowp = iaddr_to_row(hdl, bamp, rcbm, &csi, iaddr);
-	*colp = iaddr_to_col(hdl, bamp, rcbm, iaddr);
-	*bankp = iaddr_to_bank(hdl, rcbm, mcpp->bnkswzl, iaddr);
+	*rowp = iaddr_to_row(hdl, bamp, rcbmp, &csi, iaddr);
+	*colp = iaddr_to_col(hdl, bamp, rcbmp, iaddr);
+	*bankp = iaddr_to_bank(hdl, rcbmp, swzlp, iaddr);
 
 	return (0);
 }
@@ -337,7 +370,7 @@ iaddr_to_rcb(struct mcamd_hdl *hdl, uint_t csmode, struct rcp_mc *mcpp,
  * interleave or to insert the node interleave selection bits.
  */
 static int
-iaddr_unnormalize(struct mcamd_hdl *hdl, struct rcp_mc *mcpp, uint64_t iaddr,
+iaddr_unnormalize(struct mcamd_hdl *hdl, struct mcprops *mcpp, uint64_t iaddr,
     uint64_t *rsltp)
 {
 	uint64_t dramaddr;
@@ -373,6 +406,9 @@ iaddr_unnormalize(struct mcamd_hdl *hdl, struct rcp_mc *mcpp, uint64_t iaddr,
 		 * then fill those bits with the current IntlvSel value for
 		 * this node.  The node base address must be zero if nodes
 		 * are interleaved.
+		 *
+		 * Note that the DRAM controller InputAddr is still 36 bits
+		 * 35:0 on rev F.
 		 */
 		dramaddr = (BITS(iaddr, 35, 12) << intlvbits) |
 		    (mcpp->intlvsel << 12) | BITS(iaddr, 11, 0);
@@ -392,15 +428,13 @@ iaddr_unnormalize(struct mcamd_hdl *hdl, struct rcp_mc *mcpp, uint64_t iaddr,
 
 int
 mc_pa_to_offset(struct mcamd_hdl *hdl, mcamd_node_t *mc, mcamd_node_t *cs,
-    mcamd_node_t *dimm, uint64_t iaddr, uint64_t *offsetp)
+    uint64_t iaddr, uint64_t *offsetp)
 {
 	mcamd_dimm_offset_un_t offset_un;
 	uint_t csmode;
 	uint32_t bankaddr, rowaddr, coladdr;
-	int rank;
-	mcamd_node_t *tcs;
-	struct rcp_mc mcp;
-	struct rcp_cs csp;
+	struct mcprops mcp;
+	struct csprops csp;
 
 	*offsetp = MCAMD_RC_INVALID_OFFSET;
 
@@ -408,29 +442,7 @@ mc_pa_to_offset(struct mcamd_hdl *hdl, mcamd_node_t *mc, mcamd_node_t *cs,
 	    getcsprops(hdl, cs, "mc_dimm_offset", &csp) < 0)
 		return (-1);	/* errno already set */
 
-	csmode = MC_CS_MODE(mcp.csbnkmap, csp.num);
-
-	/*
-	 * Convert chip-select number 0 .. 7 to a DIMM rank 0 .. 3.  The
-	 * rank is the index of the member of the dimm mcd_cs array which
-	 * matches cs.
-	 */
-	for (rank = 0, tcs = mcamd_cs_next(hdl, (mcamd_node_t *)dimm, NULL);
-	    tcs != NULL;
-	    rank++, tcs = mcamd_cs_next(hdl, (mcamd_node_t *)dimm, tcs)) {
-		struct rcp_cs tcsp;
-
-		if (getcsprops(hdl, tcs, "mc_dimm_offset", &tcsp) < 0)
-			return (-1);	/* errno already set */
-		if (tcsp.num == csp.num)
-			break;
-	}
-	if (rank == MC_CHIP_DIMMRANKMAX) {
-		mcamd_dprintf(hdl, MCAMD_DBG_ERR, "mcamd_dimm_offset: "
-		    "iteration over chip-selects of dimm 0x%p failed "
-		    "to match on expected csnum %d\n", dimm, (int)csp.num);
-		return (mcamd_set_errno(hdl, EMCAMD_TREEINVALID));
-	}
+	csmode = MC_CS_MODE(mcp.csbnkmap_reg, csp.num);
 
 	if (iaddr_to_rcb(hdl, csmode, &mcp, iaddr, &rowaddr,
 	    &coladdr, &bankaddr) < 0)
@@ -440,7 +452,7 @@ mc_pa_to_offset(struct mcamd_hdl *hdl, mcamd_node_t *mc, mcamd_node_t *cs,
 
 	offset_un.do_valid = 1;
 	offset_un.do_version = MCAMD_OFFSET_VERSION;
-	offset_un.do_rank = rank;
+	offset_un.do_rank = csp.dimmrank;
 	offset_un.do_row = rowaddr;
 	offset_un.do_bank = bankaddr;
 	offset_un.do_col = coladdr;
@@ -451,7 +463,7 @@ mc_pa_to_offset(struct mcamd_hdl *hdl, mcamd_node_t *mc, mcamd_node_t *cs,
 }
 
 /*
- * Given a MC and DIMM and offset (dimm rank, row, col, internal bank) we
+ * Given an MC, DIMM and offset (dimm rank, row, col, internal bank) we
  * find the corresponding chip-select for the rank and then reconstruct
  * a system address.  In the absence of serial number support it is possible
  * that we may be asked to perform this operation on a dimm which has been
@@ -468,18 +480,15 @@ mc_offset_to_pa(struct mcamd_hdl *hdl, mcamd_node_t *mc, mcamd_node_t *dimm,
 	mcamd_node_t *cs;
 	mcamd_dimm_offset_un_t off_un;
 	uint32_t rank, rowaddr, bankaddr, coladdr;
-	int i;
 	uint64_t iaddr = 0;
-	const struct bankaddr_mode *bamp;
-	const struct csrcb_map *rcbm;
-	struct csintlv_desc csi;
-	struct rcp_mc mcp;
-	struct rcp_cs csp;
+	const struct rct_bnkaddrmode *bamp;
+	const struct rct_rcbmap *rcbmp;
+	const struct rct_bnkswzlinfo *swzlp = NULL;
+	struct rct_csintlv csi;
+	struct mcprops mcp;
+	struct csprops csp;
 	uint64_t csmode;
-	int maskhi_hi = MC_DC_CSM_MASKHI_HIBIT;
-	int maskhi_lo = MC_DC_CSM_MASKHI_LOBIT;
-	int masklo_hi = MC_DC_CSM_MASKLO_HIBIT;
-	int masklo_lo = MC_DC_CSM_MASKLO_LOBIT;
+	int maskhi_hi, maskhi_lo, masklo_hi, masklo_lo;
 
 	off_un.do_offset = offset;
 	rank = off_un.do_rank;
@@ -487,65 +496,149 @@ mc_offset_to_pa(struct mcamd_hdl *hdl, mcamd_node_t *mc, mcamd_node_t *dimm,
 	rowaddr = off_un.do_row;
 	coladdr = off_un.do_col;
 
+	mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "mc_offset_to_pa: offset 0x%llx "
+	    "-> rank %d bank %d row 0x%x col 0x%x\n", offset,
+	    rank, bankaddr, rowaddr, coladdr);
+
 	if (getmcprops(hdl, mc, "mc_offset_to_pa", &mcp) < 0)
 		return (-1);	/* errno already set */
 
+	maskhi_hi = MC_CSMASKHI_HIBIT(mcp.rev);
+	maskhi_lo = MC_CSMASKHI_LOBIT(mcp.rev);
+	masklo_hi = MC_CSMASKLO_HIBIT(mcp.rev);
+	masklo_lo = MC_CSMASKLO_LOBIT(mcp.rev);
+
 	/*
-	 * Find the rank'th chip-select on this dimm.
+	 * Find the chip-select on this dimm using the given rank.
 	 */
-	i = 0;
-	cs = mcamd_cs_next(hdl, dimm, NULL);
-	while (i != rank && cs != NULL) {
-		cs = mcamd_cs_next(hdl, dimm, cs);
-		i++;
+	for (cs = mcamd_cs_next(hdl, dimm, NULL); cs != NULL;
+	    cs = mcamd_cs_next(hdl, dimm, cs)) {
+		if (getcsprops(hdl, cs, "mc_offset_to_pa", &csp) < 0)
+			return (-1);	/* errno already set */
+
+		if (csp.dimmrank == rank)
+			break;
 	}
-	if (i != rank || cs == NULL) {
+
+	if (cs == NULL) {
 		mcamd_dprintf(hdl, MCAMD_DBG_FLOW, "mc_offset_to_pa: Current "
-		    "dimm in this slot does not have an %d'th cs\n",
+		    "dimm in this slot does not have a cs using rank %d\n",
 		    rank);
 		return (mcamd_set_errno(hdl, EMCAMD_NOADDR));
 	}
 
-	if (getcsprops(hdl, cs, "mc_offset_to_pa", &csp) < 0)
-		return (-1);	/* errno already set */
+	/*
+	 * If the cs# has been substituted by the online spare then the
+	 * given unum is not actually contributing to the system address
+	 * map since all accesses to it are redirected.
+	 *
+	 * If the cs# failed BIOS test it is not in the address map.
+	 *
+	 * If the cs# is the online spare cs# then it is contributing to
+	 * the system address map only if swapped in, and the csbase etc
+	 * parameters to use must be those of the bad cs#.
+	 */
+	if (mcp.badcs != MC_INVALNUM && csp.num == mcp.badcs) {
+		return (mcamd_set_errno(hdl, EMCAMD_NOADDR));
+	} else if (csp.testfail) {
+		return (mcamd_set_errno(hdl, EMCAMD_NOADDR));
+	} else if (mcp.sparecs != MC_INVALNUM && csp.num == mcp.sparecs &&
+	    mcp.badcs != MC_INVALNUM) {
+		/*
+		 * Iterate over all cs# of this memory controller to find
+		 * the bad one - the bad cs# need not be on the same dimm
+		 * as the spare.
+		 */
+		for (cs = mcamd_cs_next(hdl, mc, NULL); cs != NULL;
+		    cs = mcamd_cs_next(hdl, mc, cs)) {
+			mcamd_prop_t csnum;
 
-	csmode = MC_CS_MODE(mcp.csbnkmap, csp.num);
+			if (!mcamd_get_numprop(hdl, cs, MCAMD_PROP_NUM,
+			    &csnum)) {
+				mcamd_dprintf(hdl, MCAMD_DBG_ERR,
+				    "mcamd_offset_to_pa: csnum lookup failed "
+				    "while looking for bad cs#");
+				return (mcamd_set_errno(hdl,
+				    EMCAMD_TREEINVALID));
+			}
+			if (csnum == mcp.badcs)
+				break;
+		}
 
-	if (gettbls(hdl, csmode, &mcp, &bamp, &rcbm, &csi,
+		if (cs == NULL) {
+			mcamd_dprintf(hdl, MCAMD_DBG_ERR, "mcamd_offset_to_pa: "
+			    "failed to find cs for bad cs#%d\n", mcp.badcs);
+				return (mcamd_set_errno(hdl,
+				    EMCAMD_TREEINVALID));
+		}
+
+		/* found bad cs - reread properties from it instead of spare */
+		if (getcsprops(hdl, cs, "mc_offset_to_pa", &csp) < 0)
+			return (-1);	/* errno already set */
+	}
+
+	csmode = MC_CS_MODE(mcp.csbnkmap_reg, csp.num);
+
+	if (gettbls(hdl, csmode, &mcp, &bamp, &rcbmp,
+	    mcp.bnkswzl ? &swzlp : NULL, &csi,
 	    "mc_offset_to_pa") < 0)
 		return (-1);	/* errno already set */
 
-	/*CONSTANTCONDITION*/
-	if (MC_DC_CSM_UNMASKED_BITS != 0) {
+	/*
+	 * If there are umaskable DRAM InputAddr bits the add those bits
+	 * to iaddr from the cs base address.
+	 */
+	if (MC_CSMASK_UNMASKABLE(mcp.rev) != 0) {
 		iaddr |= iaddr_add(hdl, iaddr,
-		    BITS(csp.base, maskhi_hi + MC_DC_CSM_UNMASKED_BITS,
+		    BITS(csp.base, maskhi_hi + MC_CSMASK_UNMASKABLE(mcp.rev),
 		    maskhi_hi + 1), "unmaskable cs basehi bits");
 	}
 
+	/*
+	 * basehi bits not meing masked pass straight through to the
+	 * iaddr.
+	 */
 	iaddr |= iaddr_add(hdl, iaddr,
 	    BITS(csp.base, maskhi_hi, maskhi_lo) &
 	    ~BITS(csp.mask, maskhi_hi, maskhi_lo),
 	    "cs basehi bits not being masked");
 
-	if (mcp.csintlvfctr != 0) {
+	/*
+	 * if cs interleaving is active then baselo address bit are being
+	 * masked - pass the rest through.
+	 */
+	if (mcp.csintlvfctr > 1) {
 		iaddr |= iaddr_add(hdl, iaddr,
 		    BITS(csp.base, masklo_hi, masklo_lo) &
 		    ~BITS(csp.mask, masklo_hi, masklo_lo),
 		    "cs baselo bits not being masked");
 	}
 
+	/*
+	 * Reconstruct iaddr bits from known row address
+	 */
 	iaddr |= iaddr_add(hdl, iaddr,
-	    row_to_iaddr(hdl, bamp, rcbm, &csi, rowaddr),
+	    row_to_iaddr(hdl, bamp, rcbmp, &csi, rowaddr),
 	    "add iaddr bits from row");
 
+	/*
+	 * Reconstruct iaddr bits from known column address
+	 */
 	iaddr |= iaddr_add(hdl, iaddr,
-	    col_to_iaddr(hdl, bamp, rcbm, coladdr),
+	    col_to_iaddr(hdl, bamp, rcbmp, coladdr),
 	    "add iaddr bits from col");
 
+	/*
+	 * Reconstruct iaddr bits from known internal banksel address
+	 */
 	iaddr |= iaddr_add(hdl, iaddr,
-	    bank_to_iaddr(hdl, rcbm, mcp.bnkswzl, iaddr, bankaddr),
+	    bank_to_iaddr(hdl, rcbmp, swzlp, iaddr, bankaddr),
 	    "add iaddr bits from bank");
 
+	/*
+	 * Move iaddr up into the range for this MC and insert any
+	 * node interleave selection bits.
+	 */
 	if (iaddr_unnormalize(hdl, &mcp, iaddr, pap) < 0)
 		return (-1);	/* errno already set */
 
@@ -556,15 +649,16 @@ int
 mcamd_cs_size(struct mcamd_hdl *hdl, mcamd_node_t *mc, int csnum, size_t *szp)
 {
 	uint_t csmode;
-	struct rcp_mc mcp;
-	const struct bankaddr_mode *bamp;
+	struct mcprops mcp;
+	const struct rct_bnkaddrmode *bamp;
 
 	if (getmcprops(hdl, mc, "mcamd_cs_size", &mcp) < 0)
 		return (-1);	/* errno already set */
 
-	csmode = MC_CS_MODE(mcp.csbnkmap, csnum);
+	csmode = MC_CS_MODE(mcp.csbnkmap_reg, csnum);
 
-	if (gettbls(hdl, csmode, &mcp, &bamp, NULL, NULL, "mcamd_cs_size") < 0)
+	if (gettbls(hdl, csmode, &mcp, &bamp, NULL, NULL, NULL,
+	    "mcamd_cs_size") < 0)
 		return (-1);	/* errno already set */
 
 	*szp = MC_CS_SIZE(bamp, mcp.width);

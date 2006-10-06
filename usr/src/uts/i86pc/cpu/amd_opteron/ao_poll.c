@@ -55,8 +55,8 @@ static uint_t ao_mca_poll_trace_always = 1;
 static uint_t ao_mca_poll_trace_always = 0;
 #endif
 
-static cyclic_id_t ao_mca_poll_cycid;
-static hrtime_t ao_mca_poll_interval = NANOSEC * 10ULL;
+cyclic_id_t ao_mca_poll_cycid;
+hrtime_t ao_mca_poll_interval = NANOSEC * 10ULL;
 
 static void
 ao_mca_poll_trace(ao_mca_t *mca, uint32_t what, uint32_t nerr)
@@ -79,13 +79,20 @@ ao_mca_poll_trace(ao_mca_t *mca, uint32_t what, uint32_t nerr)
 	if (what == AO_MPT_WHAT_CYC_ERR)
 		pt->mpt_nerr = MIN(nerr, UINT8_MAX);
 
-	pt->mpt_when = gethrtime();
+	pt->mpt_when = gethrtime_waitfree();
 	mca->ao_mca_poll_curtrace = next;
 }
 
+/*
+ * Once aos_nb_poll_lock is acquired the caller must not block.  The
+ * ao_mca_trap code also requires that once we take the aos_nb_poll_lock
+ * that we do not get preempted so that it can check whether the
+ * thread it has interrupted is the lock owner.
+ */
 static void
-ao_mca_poll_common(ao_mca_t *mca, int what)
+ao_mca_poll_common(ao_data_t *ao, int what, int pollnb)
 {
+	ao_mca_t *mca = &ao->ao_mca;
 	ao_cpu_logout_t *acl = &mca->ao_mca_logout[AO_MCA_LOGOUT_POLLER];
 	int i, n, fatal;
 
@@ -104,32 +111,88 @@ ao_mca_poll_common(ao_mca_t *mca, int what)
 		}
 	}
 
-	fatal = ao_mca_logout(acl, NULL, &n);
+	fatal = ao_mca_logout(acl, NULL, &n, !pollnb,
+	    ao->ao_shared->aos_chiprev);
 	ao_mca_poll_trace(mca, what, n);
 
 	if (fatal && cmi_panic_on_uncorrectable_error)
 		fm_panic("Unrecoverable Machine-Check Error (polled)");
 }
 
+/*
+ * Decide whether the caller should poll the NB.  The decision is made
+ * and any poll is performed under protection of the chip-wide aos_nb_poll_lock,
+ * so that assures that no two cores poll the NB at once.  To avoid the
+ * NB poll ping-ponging between different detectors we'll normally stick
+ * with the first winner.
+ */
+static int
+ao_mca_nb_pollowner(ao_data_t *ao)
+{
+	uint64_t last = ao->ao_shared->aos_nb_poll_timestamp;
+	uint64_t now = gethrtime_waitfree();
+	int rv = 0;
+
+	ASSERT(MUTEX_HELD(&ao->ao_shared->aos_nb_poll_lock));
+
+	if (now - last > 2 * ao_mca_poll_interval || last == 0) {
+		/* Nominal owner making little progress - we'll take over */
+		ao->ao_shared->aos_nb_poll_owner = CPU->cpu_id;
+		rv = 1;
+	} else if (CPU->cpu_id == ao->ao_shared->aos_nb_poll_owner) {
+		rv = 1;
+	}
+
+	if (rv == 1)
+		ao->ao_shared->aos_nb_poll_timestamp = now;
+
+	return (rv);
+}
+
+/*
+ * Wrapper called from cyclic handler or from an injector poke.
+ * In the former case we are a CYC_LOW_LEVEL handler while in the
+ * latter we're in user context so in both cases we are allowed
+ * to block.  Once we acquire the shared and adaptive aos_nb_poll_lock, however,
+ * we must not block or be preempted (see ao_mca_trap).
+ */
+static void
+ao_mca_poll_wrapper(void *arg, int what)
+{
+	ao_data_t *ao = arg;
+	int pollnb;
+
+	if (ao == NULL)
+		return;
+
+	mutex_enter(&ao->ao_mca.ao_mca_poll_lock);
+	kpreempt_disable();
+	mutex_enter(&ao->ao_shared->aos_nb_poll_lock);
+
+	if ((pollnb = ao_mca_nb_pollowner(ao)) == 0) {
+		mutex_exit(&ao->ao_shared->aos_nb_poll_lock);
+		kpreempt_enable();
+	}
+
+	ao_mca_poll_common(ao, what, pollnb);
+
+	if (pollnb) {
+		mutex_exit(&ao->ao_shared->aos_nb_poll_lock);
+		kpreempt_enable();
+	}
+	mutex_exit(&ao->ao_mca.ao_mca_poll_lock);
+}
+
 static void
 ao_mca_poll_cyclic(void *arg)
 {
-	ao_data_t *ao = arg;
-
-	if (ao != NULL && mutex_tryenter(&ao->ao_mca.ao_mca_poll_lock)) {
-		ao_mca_poll_common(&ao->ao_mca, AO_MPT_WHAT_CYC_ERR);
-		mutex_exit(&ao->ao_mca.ao_mca_poll_lock);
-	}
+	ao_mca_poll_wrapper(arg, AO_MPT_WHAT_CYC_ERR);
 }
 
 void
 ao_mca_poke(void *arg)
 {
-	ao_data_t *ao = arg;
-
-	mutex_enter(&ao->ao_mca.ao_mca_poll_lock);
-	ao_mca_poll_common(&ao->ao_mca, AO_MPT_WHAT_POKE_ERR);
-	mutex_exit(&ao->ao_mca.ao_mca_poll_lock);
+	ao_mca_poll_wrapper(arg, AO_MPT_WHAT_POKE_ERR);
 }
 
 /*ARGSUSED*/
@@ -159,13 +222,25 @@ ao_mca_poll_online(void *arg, cpu_t *cpu, cyc_handler_t *cyh, cyc_time_t *cyt)
 static void
 ao_mca_poll_offline(void *arg, cpu_t *cpu, void *cyh_arg)
 {
-	/* nothing to do here */
+	ao_data_t *ao = cpu->cpu_m.mcpu_cmidata;
+
+	/*
+	 * Any sibling core may begin to poll NB MCA registers
+	 */
+	if (cpu->cpu_id == ao->ao_shared->aos_nb_poll_owner)
+		ao->ao_shared->aos_nb_poll_timestamp = 0;
 }
 
 void
-ao_mca_poll_init(ao_mca_t *mca)
+ao_mca_poll_init(ao_data_t *ao, int donb)
 {
+	ao_mca_t *mca = &ao->ao_mca;
+
 	mutex_init(&mca->ao_mca_poll_lock, NULL, MUTEX_DRIVER, NULL);
+
+	if (donb)
+		mutex_init(&ao->ao_shared->aos_nb_poll_lock, NULL, MUTEX_DRIVER,
+		    NULL);
 
 	if (ao_mca_poll_trace_always) {
 		mca->ao_mca_poll_trace =

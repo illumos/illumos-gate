@@ -49,6 +49,12 @@
 	(cpu)->cpu_m.mcpu_cmidata
 
 /*
+ * If cleared for debugging we will not attempt to load a model-specific
+ * cpu module but will load the generic cpu module instead.
+ */
+int cmi_force_generic = 0;
+
+/*
  * If cleared for debugging, we will suppress panicking on fatal hardware
  * errors.  This should *only* be used for debugging; it use can and will
  * cause data corruption if actual hardware errors are detected by the system.
@@ -187,15 +193,18 @@ cmi_load(cpu_t *cp)
 
 	mutex_enter(&cmi_load_lock);
 
-	if ((cmi = cmi_load_module(cp)) == NULL || (
-	    (err = cmi->cmi_ops->cmi_init(cp, &data)) != 0 && err != ENOTSUP)) {
+	if (!cmi_force_generic && (
+	    ((cmi = cmi_load_module(cp)) == NULL) ||
+	    ((err = cmi->cmi_ops->cmi_init(cp, &data)) != 0 &&
+	    err != ENOTSUP))) {
 		cmn_err(CE_WARN, "CPU module %s failed to init CPU %d: err=%d",
 		    cmi ? cmi->cmi_modp->mod_modname : "<>", cp->cpu_id, err);
 		mutex_exit(&cmi_load_lock);
 		return (-1);
 	}
 
-	if (err != 0 && ((cmi = cmi_load_generic()) == NULL ||
+	if ((cmi_force_generic || err != 0) &&
+	    ((cmi = cmi_load_generic()) == NULL ||
 	    (err = cmi->cmi_ops->cmi_init(cp, &data)) != 0)) {
 		cmn_err(CE_WARN, "CPU module %s failed to init CPU %d: err=%d",
 		    cmi ? cmi->cmi_modp->mod_modname : "<>", cp->cpu_id, err);
@@ -231,6 +240,11 @@ cmi_post_init(void)
 	CMI_OPS(CPU)->cmi_post_init(CMI_DATA(CPU));
 }
 
+/*
+ * Called just once from start_other_cpus when all processors are started.
+ * This will not be called for each cpu, so the registered op must not
+ * assume it is called as such.
+ */
 void
 cmi_post_mpstartup(void)
 {
@@ -250,9 +264,10 @@ cmi_faulted_exit(cpu_t *cp)
 }
 
 int
-cmi_scrubber_enable(cpu_t *cp, uint64_t base, uint64_t ilen)
+cmi_scrubber_enable(cpu_t *cp, uint64_t base, uint64_t ilen, int cscontig)
 {
-	return (CMI_OPS(cp)->cmi_scrubber_enable(CMI_DATA(cp), base, ilen));
+	return (CMI_OPS(cp)->cmi_scrubber_enable(CMI_DATA(cp), base, ilen,
+	    cscontig));
 }
 
 void

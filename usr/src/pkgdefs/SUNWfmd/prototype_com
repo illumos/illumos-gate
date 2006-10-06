@@ -119,6 +119,7 @@ f none usr/lib/locale/C/LC_MESSAGES/PCIEX.mo 444 root bin
 d none usr/lib/mdb 755 root sys
 d none usr/lib/mdb/proc 755 root sys
 f none usr/lib/mdb/proc/fmd.so 555 root sys
+f none usr/lib/mdb/proc/eft.so 555 root sys
 d none usr/sbin 755 root bin
 f none usr/sbin/fmadm 555 root bin
 f none usr/sbin/fmdump 555 root bin

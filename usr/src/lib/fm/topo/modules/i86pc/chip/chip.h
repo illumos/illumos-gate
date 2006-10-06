@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -39,15 +38,19 @@ extern "C" {
 
 #define	CHIP_VERSION		TOPO_VERSION
 
-#define	MC_NODE_NAME	"memory-controller"
+#define	MCT_NODE_NAME	"memory-controller"
+#define	CHAN_NODE_NAME	"dram-channel"
 #define	CPU_NODE_NAME	"cpu"
 #define	CS_NODE_NAME	"chip-select"
 #define	DIMM_NODE_NAME	"dimm"
+#define	RANK_NODE_NAME	"rank"
 
 #define	CHIP_PGROUP	"chip-properties"
-#define	CS_PGROUP	"chip-select-properties"
-#define	MC_PGROUP	"memory-contoller-properties"
-#define	DIMM_PGROUP	"dimm-properties"
+#define	MCT_PGROUP	MCT_NODE_NAME "-properties"
+#define	CHAN_PGROUP	CHAN_NODE_NAME "-properties"
+#define	CS_PGROUP	CS_NODE_NAME "-properties"
+#define	DIMM_PGROUP	DIMM_NODE_NAME "-properties"
+#define	RANK_PGROUP	RANK_NODE_NAME "-properties"
 
 /*
  * CHIP_PGROUP properties

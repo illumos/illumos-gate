@@ -49,7 +49,7 @@ typedef struct cmi_ops {
 	void (*cmi_fini)(void *);
 	void (*cmi_faulted_enter)(void *);
 	void (*cmi_faulted_exit)(void *);
-	int (*cmi_scrubber_enable)(void *, uint64_t, uint64_t);
+	int (*cmi_scrubber_enable)(void *, uint64_t, uint64_t, int);
 	void (*cmi_mca_init)(void *);
 	int (*cmi_mca_trap)(void *, struct regs *);
 	int (*cmi_mca_inject)(void *, cmi_mca_regs_t *, uint_t);

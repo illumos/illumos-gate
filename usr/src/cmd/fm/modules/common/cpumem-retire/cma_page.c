@@ -273,7 +273,8 @@ page_retry(fmd_hdl_t *hdl, cma_page_t *page)
 	} else {
 		if (errno == EIO) {
 			fmd_hdl_debug(hdl, "failed to retry page 0x%llx "
-			    "retirement: page isn't scheduled for retirement\n",
+			    "retirement: page isn't scheduled for retirement"
+			    "(request made beyond page_retire limit?)\n",
 			    page->pg_addr);
 		} else {
 			fmd_hdl_debug(hdl, "failed to retry page 0x%llx "

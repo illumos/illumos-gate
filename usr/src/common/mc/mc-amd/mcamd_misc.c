@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -29,37 +28,55 @@
 
 #include <mcamd_api.h>
 
-static const char *const _mcamd_proplist[] = {
-	MCAMD_PROPSTR_NUM,
-	MCAMD_PROPSTR_BASE_ADDR,
-	MCAMD_PROPSTR_LIM_ADDR,
-	MCAMD_PROPSTR_MASK,
-	MCAMD_PROPSTR_DRAM_ILEN,
-	MCAMD_PROPSTR_DRAM_ILSEL,
-	MCAMD_PROPSTR_DRAM_HOLE,
-	MCAMD_PROPSTR_DRAM_CONFIG,
-	MCAMD_PROPSTR_ACCESS_WIDTH,
-	MCAMD_PROPSTR_LODIMM,
-	MCAMD_PROPSTR_UPDIMM,
-	MCAMD_PROPSTR_CSBANKMAP,
-	MCAMD_PROPSTR_SIZE,
-	MCAMD_PROPSTR_CSBANK_INTLV,
-	MCAMD_PROPSTR_CS0,
-	MCAMD_PROPSTR_CS1,
-	MCAMD_PROPSTR_CS2,
-	MCAMD_PROPSTR_CS3,
-	MCAMD_PROPSTR_REV,
-	MCAMD_PROPSTR_DISABLED_CS,
+static struct mcproptostr {
+	mcamd_propcode_t code;
+	const char *name;
+} _propstrings[] = {
+	/*
+	 * Common codes
+	 */
+	{ MCAMD_PROP_NUM, MCAMD_PROPSTR_NUM },
+	{ MCAMD_PROP_SIZE, MCAMD_PROPSTR_SIZE },
+	{ MCAMD_PROP_BASE_ADDR, MCAMD_PROPSTR_BASE_ADDR },
+	/*
+	 * Memory controller properties
+	 */
+	{ MCAMD_PROP_REV, MCAMD_PROPSTR_REV },
+	{ MCAMD_PROP_LIM_ADDR, MCAMD_PROPSTR_LIM_ADDR },
+	{ MCAMD_PROP_ILEN, MCAMD_PROPSTR_ILEN },
+	{ MCAMD_PROP_ILSEL, MCAMD_PROPSTR_ILSEL },
+	{ MCAMD_PROP_CSINTLVFCTR, MCAMD_PROPSTR_CSINTLVFCTR },
+	{ MCAMD_PROP_ACCESS_WIDTH, MCAMD_PROPSTR_ACCESS_WIDTH },
+	{ MCAMD_PROP_CSBANKMAPREG, MCAMD_PROPSTR_CSBANKMAPREG },
+	{ MCAMD_PROP_BANKSWZL, MCAMD_PROPSTR_BANKSWZL },
+	{ MCAMD_PROP_DRAMHOLE_SIZE, MCAMD_PROPSTR_DRAMHOLE_SIZE },
+	{ MCAMD_PROP_MOD64MUX, MCAMD_PROPSTR_MOD64MUX },
+	{ MCAMD_PROP_SPARECS, MCAMD_PROPSTR_SPARECS },
+	{ MCAMD_PROP_BADCS, MCAMD_PROPSTR_BADCS },
+	/*
+	 * Chip-select properties
+	 */
+	{ MCAMD_PROP_MASK, MCAMD_PROPSTR_MASK },
+	{ MCAMD_PROP_CSBE, MCAMD_PROPSTR_CSBE },
+	{ MCAMD_PROP_SPARE, MCAMD_PROPSTR_SPARE },
+	{ MCAMD_PROP_TESTFAIL, MCAMD_PROPSTR_TESTFAIL },
+	{ MCAMD_PROP_CSDIMM1, MCAMD_PROPSTR_CSDIMM1 },
+	{ MCAMD_PROP_CSDIMM2, MCAMD_PROPSTR_CSDIMM2 },
+	{ MCAMD_PROP_DIMMRANK, MCAMD_PROPSTR_DIMMRANK },
 };
 
-static const int _mcamd_nprop = sizeof (_mcamd_proplist) /
-    sizeof (_mcamd_proplist[0]);
+static const int _nprop = sizeof (_propstrings) /
+    sizeof (struct mcproptostr);
 
 const char *
-mcamd_get_propname(uint_t code)
+mcamd_get_propname(mcamd_propcode_t code)
 {
-	if (code < _mcamd_nprop)
-		return (_mcamd_proplist[code]);
-	else
-		return (NULL);
+	int i;
+
+	for (i = 0; i < _nprop; i++) {
+		if (_propstrings[i].code == code)
+			return (_propstrings[i].name);
+	}
+
+	return (NULL);
 }

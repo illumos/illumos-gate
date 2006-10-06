@@ -58,6 +58,7 @@ INSTALL_TARGET  = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #	Overrides and additions
 #
 CPPFLAGS	+= -I$(SRCDIR) -I$(OBJS_DIR) -I$(SRC)/common/mc/mc-amd
+CPPFLAGS	+= -I$(SRC)/common/util
 CLEANFILES	+= $(MCAMD_OFF_H)
 CLOBBERFILES	+= $(MCAMD_OFF_H)
 

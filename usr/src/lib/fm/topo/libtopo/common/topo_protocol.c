@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -39,35 +38,41 @@
 #include <libtopo.h>
 
 static int
-topo_asru_compute(topo_hdl_t *thp, const char *scheme, nvlist_t *rsrc,
-    nvlist_t **asru)
+topo_compute(tnode_t *node, nvlist_t *stub, const char *method,
+    topo_version_t version, nvlist_t *rsrc, nvlist_t **asru, int *err)
 {
-	int err;
+	int rc;
+	char *scheme;
+	topo_hdl_t *thp = node->tn_hdl;
 	tnode_t *rnode;
 
-	if ((rnode = topo_hdl_root(thp, scheme)) == NULL)
-		return (ETOPO_METHOD_NOTSUP);
+	/*
+	 * First try the originating enumerator for
+	 * a compute method.  If none is supported, try the
+	 * node's scheme-specific enumerator.
+	 */
+	if (topo_method_invoke(node, method, version, rsrc, asru, err) == 0)
+		return (0);
 
-	if (topo_method_invoke(rnode, TOPO_METH_ASRU_COMPUTE,
-	    TOPO_METH_ASRU_COMPUTE_VERSION, rsrc, asru, &err) != 0)
-		return (err);
+	if (*err != ETOPO_METHOD_NOTSUP)
+		return (-1);
 
-	return (0);
-}
+	if ((rc = nvlist_lookup_string(stub, FM_FMRI_SCHEME, &scheme)) != 0) {
+		if (rc == ENOENT) {
+			*err = ETOPO_FMRI_MALFORM;
+		} else {
+			*err = ETOPO_FMRI_NVL;
+		}
+		return (-1);
+	}
 
-static int
-topo_fru_compute(topo_hdl_t *thp, const char *scheme, nvlist_t *rsrc,
-    nvlist_t **fru)
-{
-	int err;
-	tnode_t *rnode;
+	if ((rnode = topo_hdl_root(thp, scheme)) == NULL) {
+		*err = ETOPO_METHOD_NOTSUP;
+		return (-1);
+	}
 
-	if ((rnode = topo_hdl_root(thp, scheme)) == NULL)
-		return (ETOPO_METHOD_NOTSUP);
-
-	if (topo_method_invoke(rnode, TOPO_METH_FRU_COMPUTE,
-	    TOPO_METH_FRU_COMPUTE_VERSION, rsrc, fru, &err) != 0)
-		return (err);
+	if (topo_method_invoke(rnode, method, version, rsrc, asru, err) != 0)
+		return (-1);
 
 	return (0);
 }
@@ -77,35 +82,20 @@ topo_node_asru(tnode_t *node, nvlist_t **asru, nvlist_t *priv, int *err)
 {
 	int rc;
 	nvlist_t *ap;
-	char *scheme;
 
 	if (topo_prop_get_fmri(node, TOPO_PGROUP_PROTOCOL, TOPO_PROP_ASRU, &ap,
 	    err) != 0)
 		return (-1);
 
 	if (node->tn_fflags & TOPO_ASRU_COMPUTE) {
-		if ((rc = nvlist_lookup_string(ap, FM_FMRI_SCHEME, &scheme))
-		    != 0) {
-			if (rc == ENOENT)
-				*err = ETOPO_FMRI_MALFORM;
-			else
-				*err = ETOPO_FMRI_NVL;
-			nvlist_free(ap);
-			return (-1);
-		}
-		if ((rc = topo_asru_compute(node->tn_hdl, scheme, priv, asru))
-		    != 0) {
-			nvlist_free(ap);
-			*err = rc;
-			return (-1);
-		}
+		rc = topo_compute(node, ap, TOPO_METH_ASRU_COMPUTE,
+		    TOPO_METH_ASRU_COMPUTE_VERSION, priv, asru, err);
 		nvlist_free(ap);
-		return (0);
+		return (rc);
 	} else {
 		*asru = ap;
+		return (0);
 	}
-
-	return (0);
 }
 
 int
@@ -113,36 +103,20 @@ topo_node_fru(tnode_t *node, nvlist_t **fru, nvlist_t *priv, int *err)
 {
 	int rc;
 	nvlist_t *fp;
-	char *scheme;
 
 	if (topo_prop_get_fmri(node, TOPO_PGROUP_PROTOCOL, TOPO_PROP_FRU, &fp,
 	    err) != 0)
 		return (-1);
 
 	if (node->tn_fflags & TOPO_FRU_COMPUTE) {
-		if ((rc = nvlist_lookup_string(fp, FM_FMRI_SCHEME, &scheme))
-		    != 0) {
-			if (rc == ENOENT)
-				*err = ETOPO_FMRI_MALFORM;
-			else
-				*err = ETOPO_FMRI_NVL;
-
-			nvlist_free(fp);
-			return (-1);
-		}
-		if ((rc = topo_fru_compute(node->tn_hdl, scheme, priv, fru))
-		    != 0) {
-			nvlist_free(fp);
-			*err = rc;
-			return (-1);
-		}
+		rc = topo_compute(node, fp, TOPO_METH_FRU_COMPUTE,
+		    TOPO_METH_FRU_COMPUTE_VERSION, priv, fru, err);
 		nvlist_free(fp);
-		return (0);
+		return (rc);
 	} else {
 		*fru = fp;
+		return (0);
 	}
-
-	return (0);
 }
 
 int
@@ -220,7 +194,6 @@ topo_node_fru_set(tnode_t *node, nvlist_t *fru, int flag, int *err)
 int
 topo_node_label_set(tnode_t *node, char *label, int *err)
 {
-
 	/*
 	 * Inherit FRU property from our parent if * not specified
 	 */

@@ -142,7 +142,9 @@ include $(SRC)/common/mc/mc-amd/Makefile.mcamd
 MCAMD_OBJS	+= \
 	$(MCAMD_CMN_OBJS) \
 	mcamd_drv.o \
-	mcamd_subr.o
+	mcamd_dimmcfg.o \
+	mcamd_subr.o \
+	mcamd_pcicfg.o
 
 #
 #	PCI-Express driver modules

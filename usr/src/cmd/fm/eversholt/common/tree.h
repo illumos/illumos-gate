@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -273,6 +272,7 @@ struct node *tree_iname(const char *s, const char *file, int line);
 struct node *tree_globid(const char *s, const char *file, int line);
 struct node *tree_name_append(struct node *np1, struct node *np2);
 struct node *tree_name_repairdash(struct node *np1, const char *s);
+struct node *tree_name_repairdash2(const char *s, struct node *np1);
 struct node *tree_name_iterator(struct node *np1, struct node *np2);
 struct node *tree_timeval(const char *s, const char *suffix,
     const char *file, int line);

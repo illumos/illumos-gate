@@ -24,46 +24,50 @@
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_CPU_MODULE_H
-#define	_SYS_CPU_MODULE_H
+#ifndef _MCAMD_DIMMCFG_H
+#define	_MCAMD_DIMMCFG_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-#include <sys/cpuvar.h>
-#include <sys/nvpair.h>
-#include <sys/mc.h>
+#include <sys/mc_amd.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+typedef struct mcdcfg_csl mcdcfg_csl_t;
+typedef struct mcdcfg_rslt mcdcfg_rslt_t;
 
-struct regs;
-struct cmi_mc_ops;
+/*
+ * Chip-select line representation.
+ */
+struct mcdcfg_csl {
+	uint8_t	csl_chan;	/* 0 = A, 1 = B */
+	uint8_t	csl_slot;	/* dimm slot on channel, 0/1/2/3 (pair #) */
+	uint8_t	csl_rank;	/* dimm rank in slot, 0/1/2/3 */
+};
 
-typedef struct cmi_mca_regs {
-	uint_t cmr_msrnum;
-	uint64_t cmr_msrval;
-} cmi_mca_regs_t;
+/*
+ * Results structure for mdcfg_lookup
+ */
+struct mcdcfg_rslt {
+	int	ldimm;			/* logical DIMM number */
+	int	ndimm;			/* # of associated physical dimms */
+	struct {
+		int	toponum;		/* dimm instance in topology */
+		const mcdcfg_csl_t *cslp;	/* chip-select parameters */
+	} dimm[MC_CHIP_DIMMPERCS];	/* ndimm entries are valid */
+};
 
-extern void cmi_init(void);
-extern void cmi_post_init(void);
-extern void cmi_post_mpstartup(void);
+/*
+ * Chip-select line name maximum string length
+ */
+#define	MCDCFG_CSNAMELEN 32
 
-extern void cmi_faulted_enter(struct cpu *);
-extern void cmi_faulted_exit(struct cpu *);
-extern int cmi_scrubber_enable(struct cpu *, uint64_t, uint64_t, int);
+extern int mcdcfg_lookup(uint32_t, int, int, int, uint32_t, int, int,
+    mcdcfg_rslt_t *);
+extern void mcdcfg_csname(uint32_t, const mcdcfg_csl_t *, char *, int);
 
-extern void cmi_mca_init(void);
-extern int cmi_mca_inject(cmi_mca_regs_t *, uint_t);
-extern void cmi_mca_poke(void);
-
-extern void cmi_mc_register(struct cpu *, const struct cmi_mc_ops *, void *);
-extern int cmi_mc_patounum(uint64_t, uint32_t, int, mc_unum_t *);
-extern int cmi_mc_unumtopa(mc_unum_t *, nvlist_t *, uint64_t *);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _SYS_CPU_MODULE_H */
+#endif /* _MCAMD_DIMMCFG_H */

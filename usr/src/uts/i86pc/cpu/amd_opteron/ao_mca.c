@@ -44,6 +44,7 @@
 #include <sys/mca_x86.h>
 #include <sys/mca_amd.h>
 #include <sys/mc.h>
+#include <sys/mc_amd.h>
 #include <sys/psw.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -58,37 +59,57 @@
 #include "ao.h"
 #include "ao_mca_disp.h"
 
+#define	AO_REVS_FG (X86_CHIPREV_AMD_F_REV_F | X86_CHIPREV_AMD_F_REV_G)
+
 errorq_t *ao_mca_queue;			/* machine-check ereport queue */
 int ao_mca_stack_flag = 0;		/* record stack trace in ereports */
 int ao_mca_smi_disable = 1;		/* attempt to disable SMI polling */
 
 ao_bank_regs_t ao_bank_regs[AMD_MCA_BANK_COUNT] = {
-	{ AMD_MSR_DC_STATUS, AMD_MSR_DC_ADDR },
-	{ AMD_MSR_IC_STATUS, AMD_MSR_IC_ADDR },
-	{ AMD_MSR_BU_STATUS, AMD_MSR_BU_ADDR },
-	{ AMD_MSR_LS_STATUS, AMD_MSR_LS_ADDR },
-	{ AMD_MSR_NB_STATUS, AMD_MSR_NB_ADDR }
+	{ AMD_MSR_DC_STATUS, AMD_MSR_DC_ADDR, AMD_MSR_DC_MISC },
+	{ AMD_MSR_IC_STATUS, AMD_MSR_IC_ADDR, AMD_MSR_IC_MISC },
+	{ AMD_MSR_BU_STATUS, AMD_MSR_BU_ADDR, AMD_MSR_BU_MISC },
+	{ AMD_MSR_LS_STATUS, AMD_MSR_LS_ADDR, AMD_MSR_LS_MISC },
+	{ AMD_MSR_NB_STATUS, AMD_MSR_NB_ADDR, AMD_MSR_NB_MISC }
+};
+
+struct ao_ctl_init {
+	uint32_t ctl_revmask;	/* rev(s) to which this applies */
+	uint64_t ctl_bits;	/* mca ctl reg bitmask to set */
+};
+
+/*
+ * Additional NB MCA ctl initialization for revs F and G
+ */
+static const struct ao_ctl_init ao_nb_ctl_init[] = {
+	{ AO_REVS_FG, AMD_NB_CTL_INIT_REV_FG },
+	{ X86_CHIPREV_UNKNOWN, 0 }
 };
 
 typedef struct ao_bank_cfg {
 	uint_t bank_ctl;
 	uint_t bank_ctl_mask;
-	uint64_t bank_ctl_init;
+	uint64_t bank_ctl_init_cmn;			/* Common init value */
+	const struct ao_ctl_init *bank_ctl_init_extra;	/* Extra for each rev */
+	void (*bank_misc_initfunc)(ao_data_t *, uint32_t);
 	uint_t bank_status;
 	uint_t bank_addr;
 } ao_bank_cfg_t;
 
+static void nb_mcamisc_init(ao_data_t *, uint32_t);
+
 static const ao_bank_cfg_t ao_bank_cfgs[] = {
-	{ AMD_MSR_DC_CTL, AMD_MSR_DC_MASK, AMD_DC_CTL_INIT, AMD_MSR_DC_STATUS,
-	    AMD_MSR_DC_ADDR },
-	{ AMD_MSR_IC_CTL, AMD_MSR_IC_MASK, AMD_IC_CTL_INIT, AMD_MSR_IC_STATUS,
-	    AMD_MSR_IC_ADDR },
-	{ AMD_MSR_BU_CTL, AMD_MSR_BU_MASK, AMD_BU_CTL_INIT, AMD_MSR_BU_STATUS,
-	    AMD_MSR_BU_ADDR },
-	{ AMD_MSR_LS_CTL, AMD_MSR_LS_MASK, AMD_LS_CTL_INIT, AMD_MSR_LS_STATUS,
-	    AMD_MSR_LS_ADDR },
-	{ AMD_MSR_NB_CTL, AMD_MSR_NB_MASK, AMD_NB_CTL_INIT, AMD_MSR_NB_STATUS,
-	    AMD_MSR_NB_ADDR }
+	{ AMD_MSR_DC_CTL, AMD_MSR_DC_MASK, AMD_DC_CTL_INIT_CMN,
+	    NULL, NULL, AMD_MSR_DC_STATUS, AMD_MSR_DC_ADDR },
+	{ AMD_MSR_IC_CTL, AMD_MSR_IC_MASK, AMD_IC_CTL_INIT_CMN,
+	    NULL, NULL, AMD_MSR_IC_STATUS, AMD_MSR_IC_ADDR },
+	{ AMD_MSR_BU_CTL, AMD_MSR_BU_MASK, AMD_BU_CTL_INIT_CMN,
+	    NULL, NULL, AMD_MSR_BU_STATUS, AMD_MSR_BU_ADDR },
+	{ AMD_MSR_LS_CTL, AMD_MSR_LS_MASK, AMD_LS_CTL_INIT_CMN,
+	    NULL, NULL, AMD_MSR_LS_STATUS, AMD_MSR_LS_ADDR },
+	{ AMD_MSR_NB_CTL, AMD_MSR_NB_MASK, AMD_NB_CTL_INIT_CMN,
+	    &ao_nb_ctl_init[0], nb_mcamisc_init,
+	    AMD_MSR_NB_STATUS, AMD_MSR_NB_ADDR }
 };
 
 static const ao_error_disp_t ao_disp_unknown = {
@@ -178,7 +199,8 @@ bit_strip(uint16_t *codep, uint16_t mask, uint16_t shift)
 	bit_strip(codep, AMD_ERRCODE_##name##_MASK, AMD_ERRCODE_##name##_SHIFT)
 
 static int
-ao_disp_match_one(const ao_error_disp_t *aed, uint64_t status)
+ao_disp_match_one(const ao_error_disp_t *aed, uint64_t status, uint32_t rev,
+    int bankno)
 {
 	uint16_t code = status & AMD_ERRCODE_MASK;
 	uint8_t extcode = (status & AMD_ERREXT_MASK) >> AMD_ERREXT_SHIFT;
@@ -191,8 +213,11 @@ ao_disp_match_one(const ao_error_disp_t *aed, uint64_t status)
 	 * injection has shown that multiple CE's overwriting each other shows
 	 * AMD_BANK_STAT_CECC and AMD_BANK_STAT_UECC both set to zero.  This
 	 * should be clarified in a future BKDG or by the Revision Guide.
+	 * This behaviour is fixed in revision F.
 	 */
-	if (status & AMD_BANK_STAT_OVER) {
+	if (bankno == AMD_MCA_BANK_NB &&
+	    !X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_F) &&
+	    status & AMD_BANK_STAT_OVER) {
 		stat_mask &= ~AMD_BANK_STAT_CECC;
 		stat_mask_res &= ~AMD_BANK_STAT_CECC;
 	}
@@ -227,12 +252,12 @@ ao_disp_match_one(const ao_error_disp_t *aed, uint64_t status)
 }
 
 static const ao_error_disp_t *
-ao_disp_match(uint_t bankno, uint64_t status)
+ao_disp_match(uint_t bankno, uint64_t status, uint32_t rev)
 {
 	const ao_error_disp_t *aed;
 
 	for (aed = ao_error_disp[bankno]; aed->aed_stat_mask != 0; aed++) {
-		if (ao_disp_match_one(aed, status))
+		if (ao_disp_match_one(aed, status, rev, bankno))
 			return (aed);
 	}
 
@@ -260,88 +285,299 @@ ao_pcicfg_read(uint_t chipid, uint_t func, uint_t reg)
 }
 
 /*
+ * ao_chip_once returns 1 if the caller should perform the operation for
+ * this chip, or 0 if some other core has already performed the operation.
+ */
+
+int
+ao_chip_once(ao_data_t *ao, enum ao_cfgonce_bitnum what)
+{
+	return (atomic_set_long_excl(&ao->ao_shared->aos_cfgonce, what) == 0 ?
+	    1 : 0);
+}
+
+/*
  * Setup individual bank detectors after stashing their bios settings.
+ * The 'donb' argument indicates whether this core should configured
+ * the shared NorthBridhe MSRs.
  */
 static void
-ao_bank_cfg(ao_mca_t *mca)
+ao_bank_cfg(ao_data_t *ao, uint32_t rev, int donb)
 {
-	ao_bios_cfg_t *bioscfg = &mca->ao_mca_bios_cfg;
+	ao_mca_t *mca = &ao->ao_mca;
+	struct ao_chipshared *aos = ao->ao_shared;
+	ao_bios_cfg_t *bcfg = &mca->ao_mca_bios_cfg;
 	const ao_bank_cfg_t *bankcfg = ao_bank_cfgs;
+	const struct ao_ctl_init *extrap;
+	uint64_t mcictl;
 	int i;
 
 	for (i = 0; i < AMD_MCA_BANK_COUNT; i++, bankcfg++) {
-		bioscfg->bcfg_bank_ctl[i] = rdmsr(bankcfg->bank_ctl);
-		bioscfg->bcfg_bank_mask[i] = rdmsr(bankcfg->bank_ctl_mask);
-		wrmsr(bankcfg->bank_ctl, bankcfg->bank_ctl_init);
+		if (i == AMD_MCA_BANK_NB && donb == 0) {
+			bcfg->bcfg_bank_ctl[i] = 0xbaddcafe;
+			bcfg->bcfg_bank_mask[i] = 0xbaddcafe;
+			continue;
+		} else  if (i == AMD_MCA_BANK_NB) {
+			aos->aos_bcfg_nb_ctl = rdmsr(bankcfg->bank_ctl);
+			aos->aos_bcfg_nb_mask = rdmsr(bankcfg->bank_ctl_mask);
+		} else {
+			bcfg->bcfg_bank_ctl[i] = rdmsr(bankcfg->bank_ctl);
+			bcfg->bcfg_bank_mask[i] = rdmsr(bankcfg->bank_ctl_mask);
+		}
+
+		/* Initialize MCi_CTL register for this bank */
+		mcictl = bankcfg->bank_ctl_init_cmn;
+		if ((extrap = bankcfg->bank_ctl_init_extra) != NULL) {
+			while (extrap->ctl_revmask != X86_CHIPREV_UNKNOWN) {
+				if (X86_CHIPREV_MATCH(rev, extrap->ctl_revmask))
+					mcictl |= extrap->ctl_bits;
+				extrap++;
+			}
+		}
+		wrmsr(bankcfg->bank_ctl, mcictl);
+
+		/* Initialize the MCi_MISC register for this bank */
+		if (bankcfg->bank_misc_initfunc != NULL)
+			(bankcfg->bank_misc_initfunc)(ao, rev);
 	}
 }
 
 /*
- * Bits to be added to the NorthBridge (NB) configuration register.
- * See BKDG 3.29 Section 3.6.4.2 for more information.
+ * This knob exists in case any platform has a problem with our default
+ * policy of disabling any interrupt registered in the NB MC4_MISC
+ * register.  Setting this may cause Solaris and external entities
+ * who also have an interest in this register to argue over available
+ * telemetry (so setting it is generally not recommended).
  */
-uint32_t ao_nb_cfg_add =
-    AMD_NB_CFG_NBMCATOMSTCPUEN |
-    AMD_NB_CFG_DISPCICFGCPUERRRSP |
-    AMD_NB_CFG_SYNCONUCECCEN |
-    AMD_NB_CFG_CPUECCERREN;
+int ao_nb_cfg_mc4misc_noseize = 0;
 
 /*
- * Bits to be cleared from the NorthBridge (NB) configuration register.
- * See BKDG 3.29 Section 3.6.4.2 for more information.
+ * The BIOS may have setup to receive SMI on counter overflow.  It may also
+ * have locked various fields or made them read-only.  We will clear any
+ * SMI request and leave the register locked.  We will also clear the
+ * counter and enable counting - while we don't use the counter it is nice
+ * to have it enabled for verification and debug work.
  */
-uint32_t ao_nb_cfg_remove =
-    AMD_NB_CFG_IORDDATERREN |
-    AMD_NB_CFG_SYNCONANYERREN |
-    AMD_NB_CFG_SYNCONWDOGEN |
-    AMD_NB_CFG_IOERRDIS |
-    AMD_NB_CFG_IOMSTABORTDIS |
-    AMD_NB_CFG_SYNCPKTPROPDIS |
-    AMD_NB_CFG_SYNCPKTGENDIS;
+static void
+nb_mcamisc_init(ao_data_t *ao, uint32_t rev)
+{
+	uint64_t hwcr, oldhwcr;
+	uint64_t val;
+	int locked;
+
+	if (!X86_CHIPREV_MATCH(rev, AO_REVS_FG))
+		return;
+
+	ao->ao_shared->aos_bcfg_nb_misc = val = rdmsr(AMD_MSR_NB_MISC);
+
+	if (ao_nb_cfg_mc4misc_noseize)
+		return;		/* stash BIOS value, but no changes */
+
+	locked = val & AMD_NB_MISC_LOCKED;
+
+	/*
+	 * The Valid bit tells us whether the CtrP bit is defined; if it
+	 * is the CtrP bit tells us whether an ErrCount field is present.
+	 * If not then there is nothing for us to do.
+	 */
+	if (!(val & AMD_NB_MISC_VALID) || !(val & AMD_NB_MISC_CTRP))
+		return;
+
+	if (locked) {
+		oldhwcr = rdmsr(MSR_AMD_HWCR);
+		hwcr = oldhwcr | AMD_HWCR_MCI_STATUS_WREN;
+		wrmsr(MSR_AMD_HWCR, hwcr);
+	}
+
+	val |= AMD_NB_MISC_CNTEN;		/* enable ECC error counting */
+	val &= ~AMD_NB_MISC_ERRCOUNT_MASK;	/* clear ErrCount */
+	val &= ~AMD_NB_MISC_OVRFLW;		/* clear Ovrflw */
+	val &= ~AMD_NB_MISC_INTTYPE_MASK;	/* no interrupt on overflow */
+	val |= AMD_NB_MISC_LOCKED;
+
+	wrmsr(AMD_MSR_NB_MISC, val);
+
+	if (locked)
+		wrmsr(MSR_AMD_HWCR, oldhwcr);
+}
+
+/*
+ * NorthBridge (NB) Configuration.
+ *
+ * We add and remove bits from the BIOS-configured value, rather than
+ * writing an absolute value.  The variables ao_nb_cfg_{add,remove}_cmn and
+ * ap_nb_cfg_{add,remove}_revFG are available for modification via kmdb
+ * and /etc/system.  The revision-specific adds and removes are applied
+ * after the common changes, and one write is made to the config register.
+ * These are not intended for watchdog configuration via these variables -
+ * use the watchdog policy below.
+ */
+
+/*
+ * Bits to be added to the NB configuration register - all revs.
+ */
+uint32_t ao_nb_cfg_add_cmn = AMD_NB_CFG_ADD_CMN;
+
+/*
+ * Bits to be cleared from the NB configuration register - all revs.
+ */
+uint32_t ao_nb_cfg_remove_cmn = AMD_NB_CFG_REMOVE_CMN;
+
+/*
+ * Bits to be added to the NB configuration register - revs F and G.
+ */
+uint32_t ao_nb_cfg_add_revFG = AMD_NB_CFG_ADD_REV_FG;
+
+/*
+ * Bits to be cleared from the NB configuration register - revs F and G.
+ */
+uint32_t ao_nb_cfg_remove_revFG = AMD_NB_CFG_REMOVE_REV_FG;
+
+struct ao_nb_cfg {
+	uint32_t cfg_revmask;
+	uint32_t *cfg_add_p;
+	uint32_t *cfg_remove_p;
+};
+
+static const struct ao_nb_cfg ao_cfg_extra[] = {
+	{ AO_REVS_FG, &ao_nb_cfg_add_revFG, &ao_nb_cfg_remove_revFG },
+	{ X86_CHIPREV_UNKNOWN, NULL, NULL }
+};
 
 /*
  * Bits to be used if we configure the NorthBridge (NB) Watchdog.  The watchdog
  * triggers a machine check exception when no response to an NB system access
- * occurs within a specified time interval.  If the BIOS (i.e. platform design)
- * has enabled the watchdog, we leave its rate alone.  If the BIOS has not
- * enabled the watchdog, we enable it and set the rate to one specified below.
- * To disable the watchdog, add the AMD_NB_CFG_WDOGTMRDIS bit to ao_nb_cfg_add.
+ * occurs within a specified time interval.
  */
 uint32_t ao_nb_cfg_wdog =
     AMD_NB_CFG_WDOGTMRCNTSEL_4095 |
     AMD_NB_CFG_WDOGTMRBASESEL_1MS;
 
+/*
+ * The default watchdog policy is to enable it (at the above rate) if it
+ * is disabled;  if it is enabled then we leave it enabled at the rate
+ * chosen by the BIOS.
+ */
+enum {
+	AO_NB_WDOG_LEAVEALONE,		/* Don't touch watchdog config */
+	AO_NB_WDOG_DISABLE,		/* Always disable watchdog */
+	AO_NB_WDOG_ENABLE_IF_DISABLED,	/* If disabled, enable at our rate */
+	AO_NB_WDOG_ENABLE_FORCE_RATE	/* Enable and set our rate */
+} ao_nb_watchdog_policy = AO_NB_WDOG_ENABLE_IF_DISABLED;
+
 static void
-ao_nb_cfg(ao_mca_t *mca)
+ao_nb_cfg(ao_data_t *ao, uint32_t rev)
 {
+	const struct ao_nb_cfg *nbcp = &ao_cfg_extra[0];
 	uint_t chipid = chip_plat_get_chipid(CPU);
 	uint32_t val;
-
-	if (chip_plat_get_clogid(CPU) != 0)
-		return; /* only configure NB once per CPU */
 
 	/*
 	 * Read the NorthBridge (NB) configuration register in PCI space,
 	 * modify the settings accordingly, and store the new value back.
 	 */
-	mca->ao_mca_bios_cfg.bcfg_nb_cfg = val =
+	ao->ao_shared->aos_bcfg_nb_cfg = val =
 	    ao_pcicfg_read(chipid, AMD_NB_FUNC, AMD_NB_REG_CFG);
 
-	/*
-	 * If the watchdog was disabled, enable it according to the policy
-	 * described above.  Then apply the ao_nb_cfg_[add|remove] masks.
-	 */
-	if (val & AMD_NB_CFG_WDOGTMRDIS) {
+	switch (ao_nb_watchdog_policy) {
+	case AO_NB_WDOG_LEAVEALONE:
+		break;
+
+	case AO_NB_WDOG_DISABLE:
+		val &= ~AMD_NB_CFG_WDOGTMRBASESEL_MASK;
+		val &= ~AMD_NB_CFG_WDOGTMRCNTSEL_MASK;
+		val |= AMD_NB_CFG_WDOGTMRDIS;
+		break;
+
+	default:
+		cmn_err(CE_NOTE, "ao_nb_watchdog_policy=%d unrecognised, "
+		    "using default policy", ao_nb_watchdog_policy);
+		/*FALLTHRU*/
+
+	case AO_NB_WDOG_ENABLE_IF_DISABLED:
+		if (val & AMD_NB_CFG_WDOGTMRDIS)
+			break;	/* if enabled leave rate intact */
+		/*FALLTHRU*/
+
+	case AO_NB_WDOG_ENABLE_FORCE_RATE:
 		val &= ~AMD_NB_CFG_WDOGTMRBASESEL_MASK;
 		val &= ~AMD_NB_CFG_WDOGTMRCNTSEL_MASK;
 		val &= ~AMD_NB_CFG_WDOGTMRDIS;
 		val |= ao_nb_cfg_wdog;
+		break;
 	}
 
-	val &= ~ao_nb_cfg_remove;
-	val |= ao_nb_cfg_add;
+	/*
+	 * Now apply bit adds and removes, first those common to all revs
+	 * and then the revision-specific ones.
+	 */
+	val &= ~ao_nb_cfg_remove_cmn;
+	val |= ao_nb_cfg_add_cmn;
+
+	while (nbcp->cfg_revmask != X86_CHIPREV_UNKNOWN) {
+		if (X86_CHIPREV_MATCH(rev, nbcp->cfg_revmask)) {
+			val &= ~(*nbcp->cfg_remove_p);
+			val |= *nbcp->cfg_add_p;
+		}
+		nbcp++;
+	}
 
 	ao_pcicfg_write(chipid, AMD_NB_FUNC, AMD_NB_REG_CFG, val);
+}
+
+/*
+ * This knob exists in case any platform has a problem with our default
+ * policy of disabling any interrupt registered in the online spare
+ * control register.  Setting this may cause Solaris and external entities
+ * who also have an interest in this register to argue over available
+ * telemetry (so setting it is generally not recommended).
+ */
+int ao_nb_cfg_sparectl_noseize = 0;
+
+/*
+ * Setup the online spare control register (revs F and G).  We disable
+ * any interrupt registered by the BIOS and zero all error counts.
+ */
+static void
+ao_sparectl_cfg(ao_data_t *ao)
+{
+	uint_t chipid = chip_plat_get_chipid(CPU);
+	union mcreg_sparectl sparectl;
+	int chan, cs;
+
+	ao->ao_shared->aos_bcfg_nb_sparectl = MCREG_VAL32(&sparectl) =
+	    ao_pcicfg_read(chipid, AMD_NB_FUNC, AMD_NB_REG_SPARECTL);
+
+	if (ao_nb_cfg_sparectl_noseize)
+		return;	/* stash BIOS value, but no changes */
+
+	/*
+	 * If the BIOS has requested SMI interrupt type for ECC count
+	 * overflow for a chip-select or channel force those off.
+	 */
+	MCREG_FIELD_revFG(&sparectl, EccErrInt) = 0;
+	MCREG_FIELD_revFG(&sparectl, SwapDoneInt) = 0;
+
+	/* Enable writing to the EccErrCnt field */
+	MCREG_FIELD_revFG(&sparectl, EccErrCntWrEn) = 1;
+
+	/* First write, preparing for writes to EccErrCnt */
+	ao_pcicfg_write(chipid, AMD_NB_FUNC, AMD_NB_REG_SPARECTL,
+	    MCREG_VAL32(&sparectl));
+
+	/*
+	 * Zero EccErrCnt and write this back to all chan/cs combinations.
+	 */
+	MCREG_FIELD_revFG(&sparectl, EccErrCnt) = 0;
+	for (chan = 0; chan < MC_CHIP_NDRAMCHAN; chan++) {
+		MCREG_FIELD_revFG(&sparectl, EccErrCntDramChan) = chan;
+
+		for (cs = 0; cs < MC_CHIP_NCS; cs++) {
+			MCREG_FIELD_revFG(&sparectl, EccErrCntDramCs) = cs;
+			ao_pcicfg_write(chipid, AMD_NB_FUNC,
+			    AMD_NB_REG_SPARECTL, MCREG_VAL32(&sparectl));
+		}
+	}
 }
 
 /*
@@ -353,24 +589,39 @@ ao_nb_cfg(ao_mca_t *mca)
  * The caller is expected to call fm_panic() if we return fatal (non-zero).
  */
 int
-ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np)
+ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np, int skipnb,
+    uint32_t rev)
 {
+	uint64_t mcg_status = rdmsr(IA32_MSR_MCG_STATUS);
 	int i, fatal = 0, n = 0;
 
 	acl->acl_timestamp = gethrtime_waitfree();
-	acl->acl_mcg_status = rdmsr(IA32_MSR_MCG_STATUS);
+	acl->acl_mcg_status = mcg_status;
 	acl->acl_ip = rp ? rp->r_pc : 0;
 	acl->acl_flags = 0;
 
 	/*
 	 * Iterate over the banks of machine-check registers, read the address
-	 * and status registers into the logout area, and clear them as we go.
+	 * and status registers into the logout area, and clear status as we go.
+	 * Also read the MCi_MISC register is MCi_STATUS.MISCV indicates that
+	 * there is valid info there (as it will in revisions F and G for
+	 * NorthBridge ECC errors).
 	 */
 	for (i = 0; i < AMD_MCA_BANK_COUNT; i++) {
 		ao_bank_logout_t *abl = &acl->acl_banks[i];
 
+		if (i == AMD_MCA_BANK_NB && skipnb) {
+			abl->abl_status = 0;
+			continue;
+		}
+
 		abl->abl_addr = rdmsr(ao_bank_regs[i].abr_addr);
 		abl->abl_status = rdmsr(ao_bank_regs[i].abr_status);
+
+		if (abl->abl_status & AMD_BANK_STAT_MISCV)
+			abl->abl_misc = rdmsr(ao_bank_regs[i].abr_misc);
+		else
+			abl->abl_misc = 0;
 
 		if (abl->abl_status & AMD_BANK_STAT_VALID)
 			wrmsr(ao_bank_regs[i].abr_status, 0);
@@ -386,9 +637,11 @@ ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np)
 
 	/*
 	 * Clear MCG_STATUS, indicating that machine-check trap processing is
-	 * complete.  Once we do this, another machine-check trap can occur.
+	 * complete.  Once we do this, another machine-check trap can occur
+	 * (if another occurs up to this point then the system will reset).
 	 */
-	wrmsr(IA32_MSR_MCG_STATUS, 0);
+	if (mcg_status & MCG_STATUS_MCIP)
+		wrmsr(IA32_MSR_MCG_STATUS, 0);
 
 	/*
 	 * If we took a machine-check trap, then the error is fatal if the
@@ -410,7 +663,7 @@ ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np)
 		if (!(abl->abl_status & AMD_BANK_STAT_VALID))
 			continue;
 
-		aed = ao_disp_match(i, abl->abl_status);
+		aed = ao_disp_match(i, abl->abl_status, rev);
 		if ((when = aed->aed_panic_when) != AO_AED_PANIC_NEVER) {
 			if ((when & AO_AED_PANIC_ALWAYS) ||
 			    ((when & AO_AED_PANIC_IFMCE) && rp != NULL)) {
@@ -419,16 +672,39 @@ ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np)
 		}
 
 		/*
-		 * If we are taking a machine-check exception and the overflow
-		 * bit is set or our context is corrupt, then we must die.
-		 * NOTE: This code assumes that if the overflow bit is set and
-		 * we didn't take a #mc exception (i.e. the poller found it),
-		 * then multiple correctable errors overwrote each other.
-		 * This will need to change if we eventually use the Opteron
-		 * Rev E exception mechanism for detecting correctable errors.
+		 * If we are taking a machine-check exception and our context
+		 * is corrupt, then we must die.
 		 */
-		if (rp != NULL && (abl->abl_status &
-		    (AMD_BANK_STAT_OVER | AMD_BANK_STAT_PCC)))
+		if (rp != NULL && abl->abl_status & AMD_BANK_STAT_PCC)
+			fatal++;
+
+		/*
+		 * The overflow bit is set if the bank detects an error but
+		 * the valid bit of its status register is already set
+		 * (software has not yet read and cleared it).  Enabled
+		 * (for mc# reporting) errors overwrite disabled errors,
+		 * uncorrectable errors overwrite correctable errors,
+		 * uncorrectable errors are not overwritten.
+		 *
+		 * For the NB detector bank the overflow bit will not be
+		 * set for repeated correctable errors on revisions D and
+		 * earlier; it will be set on revisions E and later.
+		 * On revision E, however, the CorrECC bit does appear
+		 * to clear in these circumstances.  Since we can enable
+		 * machine-check exception on NB correctables we need to
+		 * be careful here; we never enable mc# for correctable from
+		 * other banks.
+		 *
+		 * Our solution will be to declare a machine-check exception
+		 * fatal if the overflow bit is set except in the case of
+		 * revision F on the NB detector bank for which CorrECC
+		 * is indicated.  Machine-check exception for NB correctables
+		 * on rev E is explicitly not supported.
+		 */
+		if (rp != NULL && abl->abl_status & AMD_BANK_STAT_OVER &&
+		    !(i == AMD_MCA_BANK_NB &&
+		    X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_F) &&
+		    abl->abl_status & AMD_BANK_STAT_CECC))
 			fatal++;
 
 		/*
@@ -456,12 +732,11 @@ ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np)
 }
 
 static uint_t
-ao_ereport_synd(ao_mca_t *mca,
-    const ao_bank_logout_t *abl, uint_t *typep, int is_nb)
+ao_ereport_synd(ao_data_t *ao, const ao_bank_logout_t *abl, uint_t *typep,
+    int is_nb)
 {
 	if (is_nb) {
-		if ((mca->ao_mca_bios_cfg.bcfg_nb_cfg &
-		    AMD_NB_CFG_CHIPKILLECCEN) != 0) {
+		if (ao->ao_shared->aos_bcfg_nb_cfg & AMD_NB_CFG_CHIPKILLECCEN) {
 			*typep = AMD_SYNDTYPE_CHIPKILL;
 			return (AMD_NB_STAT_CKSYND(abl->abl_status));
 		} else {
@@ -486,11 +761,12 @@ ao_ereport_create_resource_elem(nvlist_t **nvlp, nv_alloc_t *nva,
 	(void) nvlist_add_uint64(snvl, FM_FMRI_HC_SPECIFIC_OFFSET,
 	    unump->unum_offset);
 
-	fm_fmri_hc_set(*nvlp, FM_HC_SCHEME_VERSION, NULL, snvl, 4,
+	fm_fmri_hc_set(*nvlp, FM_HC_SCHEME_VERSION, NULL, snvl, 5,
 	    "motherboard", unump->unum_board,
 	    "chip", unump->unum_chip,
 	    "memory-controller", unump->unum_mc,
-	    "dimm", unump->unum_dimms[dimmnum]);
+	    "dimm", unump->unum_dimms[dimmnum],
+	    "rank", unump->unum_rank);
 
 	fm_nvlist_destroy(snvl, nva ? FM_NVA_RETAIN : FM_NVA_FREE);
 }
@@ -504,7 +780,7 @@ ao_ereport_add_resource(nvlist_t *payload, nv_alloc_t *nva, mc_unum_t *unump)
 	int i;
 
 	for (i = 0; i < MC_UNUM_NDIMM; i++) {
-		if (unump->unum_dimms[i] == -1)
+		if (unump->unum_dimms[i] == MC_INVALNUM)
 			break;
 		ao_ereport_create_resource_elem(&elems[nelems++], nva,
 		    unump, i);
@@ -522,11 +798,10 @@ ao_ereport_add_logout(ao_data_t *ao, nvlist_t *payload, nv_alloc_t *nva,
     const ao_cpu_logout_t *acl, uint_t bankno, const ao_error_disp_t *aed)
 {
 	uint64_t members = aed->aed_ereport_members;
-	ao_mca_t *mca = &ao->ao_mca;
 	const ao_bank_logout_t *abl = &acl->acl_banks[bankno];
 	uint_t synd, syndtype;
 
-	synd = ao_ereport_synd(mca, abl, &syndtype, bankno == AMD_MCA_BANK_NB);
+	synd = ao_ereport_synd(ao, abl, &syndtype, bankno == AMD_MCA_BANK_NB);
 
 	if (members & FM_EREPORT_PAYLOAD_FLAG_BANK_STAT) {
 		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_BANK_STAT,
@@ -547,6 +822,11 @@ ao_ereport_add_logout(ao_data_t *ao, nvlist_t *payload, nv_alloc_t *nva,
 		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_ADDR_VALID,
 		    DATA_TYPE_BOOLEAN_VALUE, (abl->abl_status &
 		    AMD_BANK_STAT_ADDRV) ? B_TRUE : B_FALSE, NULL);
+	}
+
+	if (members & FM_EREPORT_PAYLOAD_FLAG_BANK_MISC) {
+		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_BANK_MISC,
+		    DATA_TYPE_UINT64, abl->abl_misc, NULL);
 	}
 
 	if (members & FM_EREPORT_PAYLOAD_FLAG_SYND) {
@@ -626,7 +906,7 @@ ao_ereport_post(const ao_cpu_logout_t *acl,
 	}
 
 	/*
-	 * Create the scheme "cpu" FMRI
+	 * Create the "hc" scheme detector FMRI identifying this cpu
 	 */
 	detector = ao_fmri_create(ao, nva);
 
@@ -670,6 +950,7 @@ void
 ao_mca_drain(void *ignored, const void *data, const errorq_elem_t *eqe)
 {
 	const ao_cpu_logout_t *acl = data;
+	uint32_t rev = acl->acl_ao->ao_shared->aos_chiprev;
 	int i;
 
 	for (i = 0; i < AMD_MCA_BANK_COUNT; i++) {
@@ -677,19 +958,63 @@ ao_mca_drain(void *ignored, const void *data, const errorq_elem_t *eqe)
 		const ao_error_disp_t *aed;
 
 		if (abl->abl_status & AMD_BANK_STAT_VALID) {
-			aed = ao_disp_match(i, abl->abl_status);
+			aed = ao_disp_match(i, abl->abl_status, rev);
 			ao_ereport_post(acl, i, aed);
 		}
 	}
 }
 
+/*
+ * Machine check interrupt handler - we jump here from mcetrap.
+ *
+ * A sibling core may attempt to poll the NorthBridge during the
+ * time we are performing the logout.  So we coordinate NB access
+ * of all cores of the same chip via a per-chip lock.  If the lock
+ * is held on a sibling core then we spin for it here; if the
+ * lock is held by the thread we have interrupted then we do
+ * not acquire the lock but can proceed safe in the knowledge that
+ * the lock owner can't actually perform any NB accesses.  This
+ * requires that threads that take the aos_nb_poll_lock do not
+ * block and that they disable preemption while they hold the lock.
+ * It also requires that the lock be adaptive since mutex_owner does
+ * not work for spin locks.
+ */
+static int ao_mca_path1, ao_mca_path2;
 int
 ao_mca_trap(void *data, struct regs *rp)
 {
 	ao_data_t *ao = data;
 	ao_mca_t *mca = &ao->ao_mca;
 	ao_cpu_logout_t *acl = &mca->ao_mca_logout[AO_MCA_LOGOUT_EXCEPTION];
-	return (ao_mca_logout(acl, rp, NULL));
+	kmutex_t *nblock = NULL;
+	int tooklock = 0;
+	int rv;
+
+	if (ao->ao_shared != NULL)
+		nblock = &ao->ao_shared->aos_nb_poll_lock;
+
+	if (nblock && !mutex_owned(nblock)) {
+		/*
+		 * The mutex is not owned by the thread we have interrupted
+		 * (since the holder may not block or be preempted once the
+		 * lock is acquired).  We will spin for this adaptive lock.
+		 */
+		++ao_mca_path1;
+		while (!mutex_tryenter(nblock)) {
+			while (mutex_owner(nblock) != NULL)
+				;
+		}
+		tooklock = 1;
+	} else {
+		++ao_mca_path2;
+	}
+
+	rv = ao_mca_logout(acl, rp, NULL, 0, ao->ao_shared->aos_chiprev);
+
+	if (tooklock)
+		mutex_exit(&ao->ao_shared->aos_nb_poll_lock);
+
+	return (rv);
 }
 
 /*ARGSUSED*/
@@ -716,9 +1041,9 @@ ao_mca_init(void *data)
 	ao_data_t *ao = data;
 	ao_mca_t *mca = &ao->ao_mca;
 	uint64_t cap;
+	uint32_t rev;
+	int donb;
 	int i;
-
-	ao_mca_poll_init(mca);
 
 	ASSERT(x86_feature & X86_MCA);
 	cap = rdmsr(IA32_MSR_MCG_CAP);
@@ -742,9 +1067,50 @@ ao_mca_init(void *data)
 	for (i = 0; i < AO_MCA_LOGOUT_NUM; i++)
 		mca->ao_mca_logout[i].acl_ao = ao;
 
-	ao_bank_cfg(mca);
-	ao_nb_cfg(mca);
+	/* LINTED: logical expression always true */
+	ASSERT(sizeof (ao_bank_cfgs) / sizeof (ao_bank_cfg_t) ==
+	    AMD_MCA_BANK_COUNT);
 
+	rev = ao->ao_shared->aos_chiprev = cpuid_getchiprev(ao->ao_cpu);
+
+	/*
+	 * Must this core perform NB MCA configuration?  This must be done
+	 * by just one core.
+	 */
+	donb = ao_chip_once(ao, AO_CFGONCE_NBMCA);
+
+	/*
+	 * Initialize poller data, but don't start polling yet.
+	 */
+	ao_mca_poll_init(ao, donb);
+
+	/*
+	 * Configure the bank MCi_CTL register to nominate which error
+	 * types for each bank will produce a machine-check (we'll poll
+	 * for others).  Correctable error types mentioned in these MCi_CTL
+	 * settings won't actually produce an exception unless an additional
+	 * (and undocumented) bit is set elsewhere - the poller must still
+	 * handle these.
+	 */
+	ao_bank_cfg(ao, rev, donb);
+
+	/*
+	 * Modify the MCA NB Configuration Register.
+	 */
+	if (donb)
+		ao_nb_cfg(ao, rev);
+
+	/*
+	 * Setup the Online Spare Control Register
+	 */
+	if (donb && X86_CHIPREV_MATCH(rev, AO_REVS_FG)) {
+		ao_sparectl_cfg(ao);
+	}
+
+	/*
+	 * Enable all error reporting banks (icache, dcache, ...).  This
+	 * enables error detection, as opposed to error reporting above.
+	 */
 	wrmsr(IA32_MSR_MCG_CTL, AMD_MCG_EN_ALL);
 
 	/*
@@ -753,8 +1119,12 @@ ao_mca_init(void *data)
 	 * to be updated.  If we interpret this state as an actual error, we
 	 * may end up indicting something that's not actually broken.
 	 */
-	for (i = 0; i < sizeof (ao_bank_cfgs) / sizeof (ao_bank_cfg_t); i++)
+	for (i = 0; i < AMD_MCA_BANK_COUNT; i++) {
+		if (!donb)
+			continue;
+
 		wrmsr(ao_bank_cfgs[i].bank_status, 0ULL);
+	}
 
 	wrmsr(IA32_MSR_MCG_STATUS, 0ULL);
 	membar_producer();

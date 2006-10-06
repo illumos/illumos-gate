@@ -50,6 +50,7 @@ typedef struct ao_data ao_data_t;
 typedef struct ao_bank_regs {
 	uint32_t abr_status;
 	uint32_t abr_addr;
+	uint32_t abr_misc;
 } ao_bank_regs_t;
 
 extern ao_bank_regs_t ao_bank_regs[AMD_MCA_BANK_COUNT];
@@ -139,6 +140,7 @@ typedef struct ao_mca_poll_trace {
 typedef struct ao_bank_logout {
 	uint64_t abl_status;		/* Saved MCi_STATUS register */
 	uint64_t abl_addr;		/* Saved MCi_ADDR register */
+	uint64_t abl_misc;		/* Saved MCi_MISC register */
 } ao_bank_logout_t;
 
 #define	AO_ACL_F_PRIV		0x1	/* #mc in kernel mode (else user) */
@@ -164,11 +166,12 @@ typedef struct ao_cpu_logout {
 
 /*
  * We store config as inherited from the BIOS to assist in troubleshooting.
+ * The NorthBridge config is stored in the chipshared structure below.
  */
 typedef struct ao_bios_cfg {
 	uint64_t bcfg_bank_ctl[AMD_MCA_BANK_COUNT];
 	uint64_t bcfg_bank_mask[AMD_MCA_BANK_COUNT];
-	uint32_t bcfg_nb_cfg;
+	uint64_t bcfg_bank_misc[AMD_MCA_BANK_COUNT];
 } ao_bios_cfg_t;
 
 /*
@@ -184,13 +187,36 @@ typedef struct ao_mca {
 } ao_mca_t;
 
 /*
+ * Per-chip state
+ */
+struct ao_chipshared {
+	uint32_t aos_chiprev;		/* Chip revision */
+	volatile ulong_t aos_cfgonce;	/* Config performed once per chip */
+	kmutex_t aos_nb_poll_lock;	/* Keep NB pollers from colliding */
+	uint64_t aos_nb_poll_timestamp;	/* Timestamp of last NB poll */
+	int aos_nb_poll_owner;		/* The cpuid of current NB poller */
+	uint64_t aos_bcfg_nb_ctl;	/* BIOS value of MC4_CTL */
+	uint64_t aos_bcfg_nb_mask;	/* BIOS value of MC4_MASK */
+	uint64_t aos_bcfg_nb_misc;	/* BIOS value of MC4_MISC */
+	uint32_t aos_bcfg_nb_cfg;	/* BIOS value of NB MCA Config */
+	uint32_t aos_bcfg_nb_sparectl;	/* BIOS value of Online Spare Control */
+};
+
+/* Bit numbers for aos_cfgonce */
+enum ao_cfgonce_bitnum {
+	AO_CFGONCE_NBMCA
+};
+
+
+/*
  * Per-CPU state
  */
 struct ao_data {
-	ao_mca_t ao_mca;		/* MCA state for this CPU */
-	cpu_t *ao_cpu;			/* link to CPU's cpu_t */
-	const cmi_mc_ops_t *ao_mc_ops;	/* memory controller ops */
-	void *ao_mc_data;		/* argument for memory controller ops */
+	ao_mca_t ao_mca;			/* MCA state for this CPU */
+	cpu_t *ao_cpu;				/* link to CPU's cpu_t */
+	const cmi_mc_ops_t *ao_mc_ops;		/* memory controller ops */
+	void *ao_mc_data;			/* argument for MC ops */
+	struct ao_chipshared *ao_shared;	/* Shared state for the chip */
 };
 
 #ifdef _KERNEL
@@ -202,17 +228,18 @@ extern const cmi_ops_t _cmi_ops;
 
 extern void ao_faulted_enter(void *);
 extern void ao_faulted_exit(void *);
-extern int ao_scrubber_enable(void *, uint64_t, uint64_t);
+extern int ao_scrubber_enable(void *, uint64_t, uint64_t, int);
 
 extern void ao_mca_post_init(void *);
 extern void ao_mca_init(void *);
 extern int ao_mca_trap(void *, struct regs *);
 extern int ao_mca_inject(void *, cmi_mca_regs_t *, uint_t);
 extern void ao_mca_poke(void *);
-extern void ao_mca_poll_init(ao_mca_t *);
+extern void ao_mca_poll_init(ao_data_t *, int);
 extern void ao_mca_poll_start(void);
 
-extern int ao_mca_logout(ao_cpu_logout_t *, struct regs *, int *);
+extern int ao_mca_logout(ao_cpu_logout_t *, struct regs *, int *, int,
+    uint32_t);
 extern void ao_mca_drain(void *, const void *, const errorq_elem_t *);
 extern nvlist_t *ao_fmri_create(ao_data_t *, nv_alloc_t *);
 
@@ -223,6 +250,8 @@ extern int ao_mc_unumtopa(ao_data_t *, mc_unum_t *, nvlist_t *, uint64_t *);
 
 extern void ao_pcicfg_write(uint_t, uint_t, uint_t, uint32_t);
 extern uint32_t ao_pcicfg_read(uint_t, uint_t, uint_t);
+
+extern int ao_chip_once(ao_data_t *, enum ao_cfgonce_bitnum);
 
 #endif /* _KERNEL */
 

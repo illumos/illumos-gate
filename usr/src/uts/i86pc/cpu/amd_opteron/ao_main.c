@@ -43,17 +43,20 @@
 
 #include "ao.h"
 
+static struct ao_chipshared *ao_shared[CHIP_MAX_CHIPS];
+
 /*
- * At present this CPU module only supports the features for Athlon64 and
- * Opteron up to and including the Rev E processor.  If we detect Rev F or
- * later, return ENOTSUP and let the generic x86 CPU module load instead.
- * Opteron Rev F is currently defined as Family 0xF Model [0x40 .. 0x5F].
+ * This cpu module supports AMD family 0xf revisions B/C/D/E/F/G.  If
+ * a family 0xf cpu beyond the rev G model limit is detected then
+ * return ENOTSUP and let the generic x86 CPU module load instead.
  */
-uint_t ao_model_limit = 0x40;
+uint_t ao_model_limit = 0x6f;
 
 static int
 ao_init(cpu_t *cp, void **datap)
 {
+	uint_t chipid = chip_plat_get_chipid(CPU);
+	struct ao_chipshared *sp, *osp;
 	ao_data_t *ao;
 	uint64_t cap;
 
@@ -69,6 +72,22 @@ ao_init(cpu_t *cp, void **datap)
 
 	ao = *datap = kmem_zalloc(sizeof (ao_data_t), KM_SLEEP);
 	ao->ao_cpu = cp;
+
+	/*
+	 * Allocate the chipshared structure if it appears not to have been
+	 * allocated already (by a sibling core).  Install the newly
+	 * allocated pointer atomically in case a sibling core beats
+	 * us to it.
+	 */
+	if ((sp = ao_shared[chipid]) == NULL) {
+		sp = kmem_zalloc(sizeof (struct ao_chipshared), KM_SLEEP);
+		osp = atomic_cas_ptr(&ao_shared[chipid], NULL, sp);
+		if (osp != NULL) {
+			kmem_free(sp, sizeof (struct ao_chipshared));
+			sp = osp;
+		}
+	}
+	ao->ao_shared = sp;
 
 	return (0);
 }

@@ -288,12 +288,92 @@ msgstr "Schedule a repair procedure to replace the affected CPU.  Use fmdump -v 
 msgid "AMD-8000-JF.type"
 msgstr "Fault"
 msgid "AMD-8000-JF.severity"
-msgstr "Major"
+msgstr "Minor"
 msgid "AMD-8000-JF.description"
-msgstr "The number of errors associated with this CPU has exceeded acceptable levels.  Refer to %s for more information."
+msgstr "(This is a misdiagnosis of a potential main memory (DIMM) fault as a CPU cache fault.  Ignore this fault and look for memory errors and faults from the DIMMS associated with this CPU.)\n  Refer to %s for more information."
 msgid "AMD-8000-JF.response"
-msgstr "An attempt will be made to remove this CPU from service."
+msgstr "A cpu has likely been offlined in response to this misdiagnosis.\n"
 msgid "AMD-8000-JF.impact"
 msgstr "Performance of this system may be affected."
 msgid "AMD-8000-JF.action"
-msgstr "Schedule a repair procedure to replace the affected CPU.  Use fmdump -v -u <EVENT_ID> to identify the module."
+msgstr "Online any CPU that was automatically offlined in response to this fault\n(use fmdump -v -u <EVENT_ID> to identify the CPU).  The fault\nshould also be repaired with fmadm repair <EVENT_ID>.\nThis misdiagnosis bug is being fixed - patch numbers for Solaris 10\nwill appear here when aavailable.\n\n"
+#
+# code: AMD-8000-KW
+# keys: fault.cpu.amd.dramchannel
+#
+msgid "AMD-8000-KW.type"
+msgstr "Fault"
+msgid "AMD-8000-KW.severity"
+msgstr "Major"
+msgid "AMD-8000-KW.description"
+msgstr "A memory channel is experiencing errors from sources outside of the memory modules (DIMMs).\n  Refer to %s for more information."
+msgid "AMD-8000-KW.response"
+msgstr "None - there is no hardware resource that the system can disable to attempt to isolate this fault.\n"
+msgid "AMD-8000-KW.impact"
+msgstr "A faulty DRAM channel could lead to large numbers of correctable errors, some uncorrectable errors which will affect system availability, and perhaps even some undetectable errors and consequent data corruption.\n"
+msgid "AMD-8000-KW.action"
+msgstr "Schedule system maintenance time as soon as possible and investigate the affected DRAM channel.  Use fmdump -v -u <EVENT_ID> to identify the channel.\n"
+#
+# code: AMD-8000-L1
+# keys: fault.memory.dimm_testfail
+#
+msgid "AMD-8000-L1.type"
+msgstr "Fault"
+msgid "AMD-8000-L1.severity"
+msgstr "Major"
+msgid "AMD-8000-L1.description"
+msgstr "The system BIOS has failed one or more ranks of this DIMM during test.\n  Refer to %s for more information."
+msgid "AMD-8000-L1.response"
+msgstr "The BIOS has not configured the affected rank(s) into the system memory\nmap.\n"
+msgid "AMD-8000-L1.impact"
+msgstr "Available system memory is substantially reduced"
+msgid "AMD-8000-L1.action"
+msgstr "Schedule a repair procedure to replace the affected memory module.  Use fmdump -v -u <EVENT_ID> to identify the module."
+#
+# code: AMD-8000-MU
+# keys: fault.memory.page_sb
+#
+msgid "AMD-8000-MU.type"
+msgstr "Fault"
+msgid "AMD-8000-MU.severity"
+msgstr "Minor"
+msgid "AMD-8000-MU.description"
+msgstr "The number of errors associated with this memory page has exceeded acceptable levels.  Refer to %s for more information."
+msgid "AMD-8000-MU.response"
+msgstr "An attempt will be made to remove this memory page from service."
+msgid "AMD-8000-MU.impact"
+msgstr "The performance of the system may be minimally impacted as a result of removing the memory page from operation."
+msgid "AMD-8000-MU.action"
+msgstr "No repair action is recommended at this time."
+#
+# code: AMD-8000-N7
+# keys: fault.memory.page_ck
+#
+msgid "AMD-8000-N7.type"
+msgstr "Fault"
+msgid "AMD-8000-N7.severity"
+msgstr "Minor"
+msgid "AMD-8000-N7.description"
+msgstr "The number of errors associated with this memory page has exceeded acceptable levels.  Refer to %s for more information."
+msgid "AMD-8000-N7.response"
+msgstr "An attempt will be made to remove this memory page from service."
+msgid "AMD-8000-N7.impact"
+msgstr "The performance of the system may be minimally impacted as a result of removing the memory page from operation."
+msgid "AMD-8000-N7.action"
+msgstr "No repair action is recommended at this time."
+#
+# code: AMD-8000-PM
+# keys: fault.memory.page_ue
+#
+msgid "AMD-8000-PM.type"
+msgstr "Fault"
+msgid "AMD-8000-PM.severity"
+msgstr "Major"
+msgid "AMD-8000-PM.description"
+msgstr "The number of errors associated with this memory page has exceeded acceptable levels.  Refer to %s for more information."
+msgid "AMD-8000-PM.response"
+msgstr "An attempt will be made to remove this memory page from service."
+msgid "AMD-8000-PM.impact"
+msgstr "The performance of the system may be minimally impacted as a result of removing the memory page from operation."
+msgid "AMD-8000-PM.action"
+msgstr "No repair action is recommended at this time."

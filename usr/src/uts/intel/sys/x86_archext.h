@@ -391,6 +391,89 @@ typedef	struct	mtrrvar {
 
 #define	X86_VENDOR_STRLEN	13	/* vendor string max len + \0 */
 
+/*
+ * Some vendor/family/model/stepping ranges are commonly grouped under
+ * a single identifying banner by the vendor.  The following encode
+ * that "revision" in a uint32_t with the 8 most significant bits
+ * identifying the vendor with X86_VENDOR_*, the next 8 identifying the
+ * family, and the remaining 16 typically forming a bitmask of revisions
+ * within that family with more significant bits indicating "later" revisions.
+ */
+
+#define	_X86_CHIPREV_VENDOR_MASK	0xff000000u
+#define	_X86_CHIPREV_VENDOR_SHIFT	24
+#define	_X86_CHIPREV_FAMILY_MASK	0x00ff0000u
+#define	_X86_CHIPREV_FAMILY_SHIFT	16
+#define	_X86_CHIPREV_REV_MASK		0x0000ffffu
+
+#define	_X86_CHIPREV_VENDOR(x) \
+	(((x) & _X86_CHIPREV_VENDOR_MASK) >> _X86_CHIPREV_VENDOR_SHIFT)
+#define	_X86_CHIPREV_FAMILY(x) \
+	(((x) & _X86_CHIPREV_FAMILY_MASK) >> _X86_CHIPREV_FAMILY_SHIFT)
+#define	_X86_CHIPREV_REV(x) \
+	((x) & _X86_CHIPREV_REV_MASK)
+
+/* True if x matches in vendor and family and if x matches the given rev mask */
+#define	X86_CHIPREV_MATCH(x, mask) \
+	(_X86_CHIPREV_VENDOR(x) == _X86_CHIPREV_VENDOR(mask) && \
+	_X86_CHIPREV_FAMILY(x) == _X86_CHIPREV_FAMILY(mask) && \
+	((_X86_CHIPREV_REV(x) & _X86_CHIPREV_REV(mask)) != 0))
+
+/* True if x matches in vendor and family and rev is at least minx */
+#define	X86_CHIPREV_ATLEAST(x, minx) \
+	(_X86_CHIPREV_VENDOR(x) == _X86_CHIPREV_VENDOR(minx) && \
+	_X86_CHIPREV_FAMILY(x) == _X86_CHIPREV_FAMILY(minx) && \
+	_X86_CHIPREV_REV(x) >= _X86_CHIPREV_REV(minx))
+
+#define	_X86_CHIPREV_MKREV(vendor, family, rev) \
+	((uint32_t)(vendor) << _X86_CHIPREV_VENDOR_SHIFT | \
+	(family) << _X86_CHIPREV_FAMILY_SHIFT | (rev))
+
+/* Revision default */
+#define	X86_CHIPREV_UNKNOWN	0x0
+
+/*
+ * Definitions for AMD Family 0xf.  Minor revisions C0 and CG are
+ * sufficiently different that we will distinguish them; in all other
+ * case we will identify the major revision.
+ */
+#define	X86_CHIPREV_AMD_F_REV_B _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0001)
+#define	X86_CHIPREV_AMD_F_REV_C0 _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0002)
+#define	X86_CHIPREV_AMD_F_REV_CG _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0004)
+#define	X86_CHIPREV_AMD_F_REV_D _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0008)
+#define	X86_CHIPREV_AMD_F_REV_E _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0010)
+#define	X86_CHIPREV_AMD_F_REV_F _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0020)
+#define	X86_CHIPREV_AMD_F_REV_G _X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0xf, 0x0040)
+
+/*
+ * Various socket/package types, extended as the need to distinguish
+ * a new type arises.  The top 8 byte identfies the vendor and the
+ * remaining 24 bits describe 24 socket types.
+ */
+
+#define	_X86_SOCKET_VENDOR_SHIFT	24
+#define	_X86_SOCKET_VENDOR(x)	((x) >> _X86_SOCKET_VENDOR_SHIFT)
+#define	_X86_SOCKET_TYPE_MASK	0x00ffffff
+#define	_X86_SOCKET_TYPE(x)		((x) & _X86_SOCKET_TYPE_MASK)
+
+#define	_X86_SOCKET_MKVAL(vendor, bitval) \
+	((uint32_t)(vendor) << _X86_SOCKET_VENDOR_SHIFT | (bitval))
+
+#define	X86_SOCKET_MATCH(s, mask) \
+	(_X86_SOCKET_VENDOR(s) == _X86_SOCKET_VENDOR(mask) && \
+	(_X86_SOCKET_TYPE(s) & _X86_SOCKET_TYPE(mask)) != 0)
+
+#define	X86_SOCKET_UNKNOWN 0x0
+	/*
+	 * AMD socket types
+	 */
+#define	X86_SOCKET_754		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000001)
+#define	X86_SOCKET_939		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000002)
+#define	X86_SOCKET_940		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000004)
+#define	X86_SOCKET_S1g1		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000008)
+#define	X86_SOCKET_AM2		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000010)
+#define	X86_SOCKET_F1207	_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x000020)
+
 #if !defined(_ASM)
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
@@ -451,6 +534,10 @@ extern uint_t cpuid_get_ncore_per_chip(struct cpu *);
 extern int cpuid_is_cmt(struct cpu *);
 extern int cpuid_syscall32_insn(struct cpu *);
 extern int getl2cacheinfo(struct cpu *, int *, int *, int *);
+
+extern uint32_t cpuid_getchiprev(struct cpu *);
+extern const char *cpuid_getchiprevstr(struct cpu *);
+extern uint32_t cpuid_getsockettype(struct cpu *);
 
 extern int cpuid_opteron_erratum(struct cpu *, uint_t);
 

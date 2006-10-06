@@ -3,9 +3,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -397,6 +396,11 @@ iterid	: ID
 			$$ = tree_name_iterator(
 			    tree_name($1.s, IT_HORIZONTAL, $1.file, $1.line),
 			    tree_name($3.s, IT_NONE, $3.file, $3.line));
+		}
+	| ID '-' iterid
+		{
+			/* hack to allow dashes in path name components */
+			$$ = tree_name_repairdash2($1.s, $3);
 		}
 	;
 

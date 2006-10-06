@@ -51,8 +51,6 @@ static int mem_unusable(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 static int mem_expand(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
-static int mem_asru(topo_mod_t *, tnode_t *, topo_version_t,
-    nvlist_t *, nvlist_t **);
 
 #define	MEM_VERSION	TOPO_VERSION
 
@@ -69,8 +67,6 @@ static const topo_method_t mem_methods[] = {
 	    TOPO_METH_UNUSABLE_VERSION, TOPO_STABILITY_INTERNAL, mem_unusable },
 	{ TOPO_METH_EXPAND, TOPO_METH_UNUSABLE_DESC,
 	    TOPO_METH_EXPAND_VERSION, TOPO_STABILITY_INTERNAL, mem_expand },
-	{ TOPO_METH_ASRU_COMPUTE, TOPO_METH_ASRU_COMPUTE_DESC,
-	    TOPO_METH_ASRU_COMPUTE_VERSION, TOPO_STABILITY_INTERNAL, mem_asru },
 	{ NULL }
 };
 
@@ -138,15 +134,21 @@ mem_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	 * PA then use that.  Otherwise just format the unum element.
 	 */
 	if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &val) == 0) {
-		format = FM_FMRI_SCHEME_MEM ":///"
-		    FM_FMRI_MEM_UNUM "=%1$s/" FM_FMRI_MEM_OFFSET "=%2$llx";
+		format = FM_FMRI_SCHEME_MEM ":///%1$s/"
+		    FM_FMRI_MEM_OFFSET "=%2$llx";
 	} else if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &val) == 0) {
-		format = FM_FMRI_SCHEME_MEM ":///"
-		    FM_FMRI_MEM_UNUM "=%1$s/" FM_FMRI_MEM_PHYSADDR "=%2$llx";
+		format = FM_FMRI_SCHEME_MEM ":///%1$s/"
+		    FM_FMRI_MEM_PHYSADDR "=%2$llx";
 	} else
-		format = FM_FMRI_SCHEME_MEM ":///" FM_FMRI_MEM_UNUM "=%1$s";
+		format = FM_FMRI_SCHEME_MEM ":///" "%1$s";
 
-	len = snprintf(NULL, 0, format, unum, val);
+	/*
+	 * If we have a well-formed unum we step over the hc:/// prefix
+	 */
+	if (strncmp(unum, "hc:///", 6) == 0)
+		unum += 6;
+
+	len = snprintf(NULL, 0, format, unum, val) + 1;
 	buf = topo_mod_zalloc(mod, len);
 
 	if (buf == NULL) {
@@ -205,48 +207,4 @@ mem_expand(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
 {
 	return (-1);
-}
-
-/*ARGSUSED*/
-static int
-mem_asru(topo_mod_t *mod, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	int err;
-	uint64_t pa = 0, offset = 0;
-	int incl_pa = 0, incl_offset = 0;
-	nvlist_t *hcsp = NULL;
-	nvlist_t *asru;
-	char *cstr;
-
-	if (nvlist_lookup_nvlist(in, FM_FMRI_HC_SPECIFIC, &hcsp) == 0) {
-		incl_pa = (nvlist_lookup_uint64(hcsp,
-		    "asru-"FM_FMRI_MEM_PHYSADDR, &pa) == 0);
-		incl_offset = (nvlist_lookup_uint64(hcsp,
-		    "asru-"FM_FMRI_MEM_OFFSET, &offset) == 0);
-	}
-
-	if (topo_fmri_nvl2str(topo_mod_handle(mod), in, &cstr, &err) < 0)
-		return (topo_mod_seterrno(mod, err));
-
-	if (topo_mod_nvalloc(mod, &asru, NV_UNIQUE_NAME) != 0) {
-		topo_mod_strfree(mod, cstr);
-		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
-	}
-	err = nvlist_add_uint8(asru, FM_VERSION, FM_MEM_SCHEME_VERSION);
-	err |= nvlist_add_string(asru, FM_FMRI_SCHEME, FM_FMRI_SCHEME_MEM);
-	err |= nvlist_add_string(asru, FM_FMRI_MEM_UNUM, cstr);
-	if (incl_pa)
-		err |= nvlist_add_uint64(asru, FM_FMRI_MEM_PHYSADDR, pa);
-	if (incl_offset)
-		err |= nvlist_add_uint64(asru, FM_FMRI_MEM_OFFSET, offset);
-	topo_mod_strfree(mod, cstr);
-	if (err != 0) {
-		nvlist_free(asru);
-		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
-	}
-
-	*out = asru;
-
-	return (0);
 }

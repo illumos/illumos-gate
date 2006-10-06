@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -610,6 +609,29 @@ tree_name_repairdash(struct node *np, const char *s)
 	len = strlen(np->u.name.last->u.name.s) + 1 + strlen(s) + 1;
 	buf = MALLOC(len);
 	(void) snprintf(buf, len, "%s-%s", np->u.name.last->u.name.s, s);
+	np->u.name.last->u.name.s = stable(buf);
+	FREE(buf);
+	return (np);
+}
+
+struct node *
+tree_name_repairdash2(const char *s, struct node *np)
+{
+	int len;
+	char *buf;
+
+	ASSERT(np != NULL && s != NULL);
+
+	if (np->t != T_NAME)
+		outfl(O_DIE, np->file, np->line,
+		    "tree_name_repairdash: internal error (np type %d)",
+		    np->t);
+
+	ASSERT(np->u.name.last != NULL);
+
+	len = strlen(np->u.name.last->u.name.s) + 1 + strlen(s) + 1;
+	buf = MALLOC(len);
+	(void) snprintf(buf, len, "%s-%s", s, np->u.name.last->u.name.s);
 	np->u.name.last->u.name.s = stable(buf);
 	FREE(buf);
 	return (np);
