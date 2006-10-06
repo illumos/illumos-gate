@@ -57,7 +57,7 @@ perform a "make clobber" to clean up old binaries
 .TP
 bringover from the identified parent gate/clone
 .TP
-perform non-debug and debug builds
+perform non-DEBUG and DEBUG builds
 .TP
 list proto area files and compare with previous list
 .TP
@@ -208,8 +208,12 @@ Default group of options for building a release (-mp)
 set the build version string to VERS, overriding VERSION
 .TP
 .B \-X
-do IA32 realmode builds (requires access to a
-properly-configured NT build machine and root permissions)
+Copies the proto area and packages from the IHV and IHV-bin gates into the
+nightly proto and package areas.  This is only available on i386.  See
+.B REALMODE ENVIRONMENT VARIABLES
+and
+.B BUILDING THE IHV WORKSPACE
+below.
 .TP
 .B \-S E | D | H
 Build the Export, Domestic, or Hybrid source product. Only Export and
@@ -344,7 +348,7 @@ set this for you.
 .RE
 .B RELEASE_BUILD
 .RS 5
-Define this to build a release with a non-debug kernel. 
+Define this to build a release with a non-DEBUG kernel. 
 Generally, let
 .I nightly
 set this for you based on its options.
@@ -463,14 +467,7 @@ The command output will be appended to the mail message and log file.
 .LP
 The following environment variables referenced by
 .I nightly
-are only required on IA32 realmode builds, enabled with option -X.
-.LP
-.B NTSERVER
-.RS 5
-The host name of the NT server to be used for realmode builds.
-It is unlikely there will be any public NT machines available,
-so you'll most likely need to set one of these up for your project's
-use if you need to build realmode.
+are only required when the -X option is used.
 .LP
 .RE
 .B IA32_IHV_WS
@@ -487,55 +484,20 @@ The IHV workspace must be fully built before starting the ON realmode build.
 .RE
 .B IA32_IHV_PKGS
 .RS 5
-Reference to the IHV workspace packages.
-The IHV workspace must be fully built before starting the ON realmode build.
+Reference to the IHV workspace packages.  If this is empty or the directory
+is non-existent, then nightly will skip copying the packages.
 .LP
 .RE
 .B IA32_IHV_BINARY_PKGS
 .RS 5
-Reference to binary-only IHV packages.  These packages must
-be available before starting the ON realmode build.
-.LP
-.RE
-.B DCB_ROOT
-.RS 5
-The DCB proto area containing all the individual realmode
-drivers used to construct the boot floppy.
-.LP
-.RE
-.B BOOTFLOPPY_ROOT
-.RS 5
-Boot floppy proto area containing the actual boot floppy image
-resulting from the build.
+Reference to binary-only IHV packages.  If this is empty or the directory
+is non-existent, then nightly will skip copying the packages.
 .LP
 .RE
 .B SPARC_RM_PKGARCHIVE
 .RS 5
 Destination for sparc realmode package SUNWrmodu.
 Yes, this sparc package really is built on x86.
-.LP
-.RE
-.B REF_PROTO_LIST_DCB
-.RS 5
-This is the reference DCB proto area to compare against
-the results of your build.  This makes it easy to see
-the changes introduced from one build to the next.
-.LP
-.RE
-.B REF_PROTO_LIST_BOOTFLOPPY
-.RS 5
-This is the reference BootFloppy proto area to compare against
-the results of your build.  This makes it easy to see
-the changes introduced from one build to the next.
-.SH REALMODE BUILDS
-.LP
-Since realmode builds are always non-DEBUG, there's no difference
-between the DEBUG & non-DEBUG versions of the realmode packages.
-All the realmode and IHV packages are installed by
-.I nightly
-in both the nightly and nightly-nd
-packages so both sets of packages are complete.
-This means both the IHV and ON builds must include non-DEBUG.
 .SH BUILDING THE IHV WORKSPACE
 .LP
 The IHV workspace can be built with
@@ -546,11 +508,8 @@ The recommended options are:
 NIGHTLY_OPTIONS="-pmWN"
 .RE
 .LP
-The NTSERVER variable must be set to provide the NT server
-to be used for the realmode part of the IHV build.  None
-of the other realmode environment variables needed for
-ON realmode builds are required to build the IHV
-workspace.
+None of the realmode environment variables needed for ON realmode builds
+are required to build the IHV workspace.
 .SH EXAMPLES
 .LP
 Start with the example file in usr/src/tools/env/developer.sh

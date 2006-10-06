@@ -615,14 +615,14 @@ dolint() {
 
 copy_ihv_proto() {
 
-	echo "\n==== Installing $IA32_IHV_ROOT  ====\n" \
+	echo "\n==== Installing IHV proto area ====\n" \
 		>> $LOGFILE
 	if [ -d "$IA32_IHV_ROOT" ]; then
 		if [ ! -d "$ROOT" ]; then
 			echo "mkdir -p $ROOT" >> $LOGFILE
 			mkdir -p $ROOT
 		fi
-		echo "cd $IA32_IHV_ROOT\n" >> $LOGFILE
+		echo "copying $IA32_IHV_ROOT to $ROOT\n" >> $LOGFILE
 		cd $IA32_IHV_ROOT
 		tar -cf - . | (cd $ROOT; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
 	else
@@ -1189,7 +1189,7 @@ POUND_SIGN="#"
 
 # we export POUND_SIGN to speed up the build process -- prevents evaluation of
 # the Makefile.master definitions.
-export o_FLAG POUND_SIGN
+export o_FLAG X_FLAG POUND_SIGN
 
 maketype="distributed"
 MAKE=dmake
@@ -1289,6 +1289,14 @@ if [ "$X_FLAG" = "y" ]; then
         fi
         if [ ! -d "$IA32_IHV_ROOT" ]; then
                 echo "$IA32_IHV_ROOT: not found"
+                args_ok=n
+        fi
+        if [ "$IA32_IHV_WS" = "" ]; then
+		echo "IA32_IHV_WS: must be set for copying ihv proto"
+		args_ok=n
+        fi
+        if [ ! -d "$IA32_IHV_WS" ]; then
+                echo "$IA32_IHV_WS: not found"
                 args_ok=n
         fi
 fi
@@ -1677,14 +1685,6 @@ if [ "$t_FLAG" = "n" ]; then
 	fi
 fi
 
-# copy ihv proto area in addition to the build itself
-
-if [ "$X_FLAG" = "y" ]; then
-
-	# Install IA32 IHV proto area
-	copy_ihv_proto
-fi
-
 echo "==== Build environment ====\n" | tee -a $mail_msg_file >> $LOGFILE
 
 # System
@@ -1881,6 +1881,13 @@ if [ "$t_FLAG" = "y" ]; then
 	build_tools ${TOOLS_PROTO}
 fi
 
+#
+# copy ihv proto area in addition to the build itself
+#
+if [ "$X_FLAG" = "y" ]; then
+	copy_ihv_proto
+fi
+
 if [ "$i_FLAG" = "y" -a "$SH_FLAG" = "y" ]; then
 	echo "\n==== NOT Building base OS-Net source ====\n" | \
 	    tee -a $LOGFILE >> $mail_msg_file
@@ -1971,6 +1978,9 @@ if [ "$build_ok" = "y" ]; then
 		if [ -f $SRC/pkgdefs/$exc ]; then
 			ELIST="-e $SRC/pkgdefs/$exc"
 		fi
+		if [ "$X_FLAG" = "y" -a -f $IA32_IHV_WS/usr/src/pkgdefs/$exc ]; then
+			ELIST="$ELIST -e $IA32_IHV_WS/usr/src/pkgdefs/$exc"
+		fi
 
 		if [ -f "$REF_PROTO_LIST" ]; then
 			$PROTOCMPTERSE \
@@ -1991,6 +2001,9 @@ if [ "$build_ok" = "y" ]; then
 				PKGDEFS_LIST="$PKGDEFS_LIST -d $d/pkgdefs"
 			fi
 		done
+		if [ "$X_FLAG" = "y" -a -d $IA32_IHV_WS/usr/src/pkgdefs ]; then
+			PKGDEFS_LIST="$PKGDEFS_LIST -d $IA32_IHV_WS/usr/src/pkgdefs"
+		fi
 
 		$PROTOCMPTERSE \
 		    "Files missing from the proto area:" \

@@ -18,12 +18,14 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
 #	Configuration variables for the runtime environment of the nightly
 # build script and other tools for construction and packaging of releases.
 # This script is sourced by 'nightly' and 'bldenv' to set up the environment
@@ -156,11 +158,6 @@ UT_NO_USAGE_TRACKING="1"; export UT_NO_USAGE_TRACKING
 #LINTDIRS="$SRC y";	export LINTDIRS
 
 #
-# NT server for realmode builds
-#
-#NTSERVER=<hostname>;			export NTSERVER
-
-#
 # Reference to IA32 IHV workspace, proto area and packages
 #
 #IA32_IHV_WS=/ws/${GATE}-ihv;				export IA32_IHV_WS
@@ -168,34 +165,16 @@ UT_NO_USAGE_TRACKING="1"; export UT_NO_USAGE_TRACKING
 #IA32_IHV_PKGS=$IA32_IHV_WS/packages/i386/nightly;	export IA32_IHV_PKGS
 
 #
-# Reference to binary-only IA32 IHV packages (for boot floppy construction)
+# Reference to binary-only IA32 IHV packages
 #
-#IA32_IHV_BINARY_PKGS=/ws/${GATE}_ihv_bin
+#IA32_IHV_BINARY_PKGS=/ws/${GATE}-ihv-bin
 #export IA32_IHV_BINARY_PKGS
-
-#
-# Boot floppy proto area
-#
-#DCB_ROOT="${CODEMGR_WS}/proto/root_dcb_${MACH}"
-#BOOTFLOPPY_ROOT="${CODEMGR_WS}/proto/root_BootFloppy_${MACH}"
-#export DCB_ROOT
-#export BOOTFLOPPY_ROOT
 
 #
 # Destination for sparc realmode package SUNWrmodu
 #
 #SPARC_RM_PKGARCHIVE="${CODEMGR_WS}/packages/sparc_realmode/nightly"
 #export SPARC_RM_PKGARCHIVE
-
-# REF_PROTO_LIST_DCB & REF_PROTO_LIST_BOOTFLOPPY
-# To compare the list of stuff in your DCB and BootFloppy proto areas
-# against. Generally this should be left alone, since you want to see
-# differences from your parent (the gate).
-#
-#REF_PROTO_LIST_DCB=$PARENT_WS/usr/src/realmode/proto_list_dcb_${MACH}
-#REF_PROTO_LIST_BOOTFLOPPY=$PARENT_WS/usr/src/realmode/proto_list_bootfloppy_${MACH}
-#export REF_PROTO_LIST_DCB
-#export REF_PROTO_LIST_BOOTFLOPPY
 
 # Set this flag to 'n' to disable the automatic validation of the dmake
 # version in use.  The default is to check it.

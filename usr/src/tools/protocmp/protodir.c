@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,12 +128,23 @@ parse_proto_line(const char *basedir, char *line, elem_list *list, short arch,
 		/*
 		 * The '=' operator is subtly different for link and non-link
 		 * entries.  For the hard or soft link case, the left hand side
-		 * exists in the proto area and is created by the package.  For
-		 * the other cases, the right hand side is in the proto area.
+		 * exists in the proto area and is created by the package.
+		 *
+		 * When the file is an editable file, it's very likely that the
+		 * right hand side is only a fragment of that file, which is
+		 * delivered by multiple packages in the consolidation.  Thus it
+		 * can't exist in the proto area, and because we can't really
+		 * know where the file's root directory is, we should skip the
+		 * file.
+		 *
+		 * For all other filetypes, assume the right hand side is in the
+		 * proto area.
 		 */
 		if (e->file_type == SYM_LINK_T || e->file_type == LINK_T) {
 			*src++ = '\0';
 			e->symsrc = strdup(src);
+		} else if (e->file_type == EDIT_T) {
+			return (0);
 		} else {
 			file = src + 1;
 		}
