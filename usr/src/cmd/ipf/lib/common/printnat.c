@@ -103,6 +103,10 @@ int opts;
 		printf(" -> %s", inet_ntoa(np->in_in[0].in4));
 		if (np->in_flags & IPN_SPLIT)
 			printf(",%s", inet_ntoa(np->in_in[1].in4));
+		if (np->in_inip == 0) {
+			bits = count4bits(np->in_inmsk);
+			printf("/%d", bits);
+		}
 		if (np->in_flags & IPN_TCPUDP) {
 			if ((np->in_flags & IPN_FIXEDDPORT) != 0)
 				printf(" port = %d", ntohs(np->in_pnext));

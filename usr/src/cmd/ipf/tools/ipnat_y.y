@@ -316,6 +316,11 @@ rhaddr:	addr				{ $$.a = $1.a; $$.m = $1.m; }
 dip:
 	hostname			{ nat->in_inip = $1.s_addr;
 					  nat->in_inmsk = 0xffffffff; }
+	| hostname '/' YY_NUMBER        { nat->in_inip = $1.s_addr;
+					  if (nat->in_inip != 0 ||
+					      ($3 != 0 && $3 != 32))
+						yyerror("Invalid mask for dip");
+					  ntomask(4, $3, &nat->in_inmsk); }
 	| hostname ',' hostname		{ nat->in_flags |= IPN_SPLIT;
 					  nat->in_inip = $1.s_addr;
 					  nat->in_inmsk = $3.s_addr; }
@@ -481,7 +486,7 @@ nummask:
 
 portstuff:
 	compare portspec		{ $$.pc = $1; $$.p1 = $2; }
-	| portspec range portspec	{ $$.pc = $2; $$.p1 = $1; $$.p1 = $3; }
+	| portspec range portspec	{ $$.pc = $2; $$.p1 = $1; $$.p2 = $3; }
 	;
 
 mapoptions:
