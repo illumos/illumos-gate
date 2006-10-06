@@ -3918,12 +3918,14 @@ ipsec_out_to_in(mblk_t *ipsec_mp)
 	ipsec_policy_t *pol;
 	ipsec_action_t *act;
 	boolean_t v4, icmp_loopback;
+	zoneid_t zoneid;
 
 	ASSERT(ipsec_mp->b_datap->db_type == M_CTL);
 
 	io = (ipsec_out_t *)ipsec_mp->b_rptr;
 
 	v4 = io->ipsec_out_v4;
+	zoneid = io->ipsec_out_zoneid;
 	icmp_loopback = io->ipsec_out_icmp_loopback;
 
 	act = io->ipsec_out_act;
@@ -3946,6 +3948,7 @@ ipsec_out_to_in(mblk_t *ipsec_mp)
 	ii->ipsec_in_frtn.free_func = ipsec_in_free;
 	ii->ipsec_in_frtn.free_arg = (char *)ii;
 	ii->ipsec_in_action = act;
+	ii->ipsec_in_zoneid = zoneid;
 
 	/*
 	 * In most of the cases, we can't look at the ipsec_out_XXX_sa
