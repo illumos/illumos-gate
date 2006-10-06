@@ -51,6 +51,7 @@ void fn_rewind(struct fn *fnp);
 int fn_getc(struct fn *fnp);
 int fn_peekc(struct fn *fnp);
 char *fn_s(struct fn *fnp);
+boolean_t fn_isgz(struct fn *fnp);
 
 /* functions that deal with lists of strings */
 struct fn_list *fn_list_new(const char * const *slist);

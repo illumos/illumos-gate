@@ -870,26 +870,6 @@ rotateto(struct fn *fnp, struct opts *opts, int n, struct fn *recentlog,
 		docmd(opts, "rotate log file", Mv, "-f",
 		    fn_s(fnp), fn_s(newfile));
 
-	/* gzip the old log file  according to -z count */
-	if (!isgz && opts_count(opts, "z")) {
-		off_t count = opts_optarg_int(opts, "z");
-
-		if (Debug)
-			(void) fprintf(stderr, "rotateto z count %lld\n",
-			    count);
-
-		if (count <= n) {
-
-			/*
-			 * Don't gzip the old log file yet -
-			 * it takes too long. Just remember that we
-			 * need to gzip.
-			 */
-			Gzipnames = lut_add(Gzipnames, fn_s(newfile), "1");
-			fn_puts(newfile, ".gz");
-		}
-	}
-
 	/* first time through, gather interesting info for caller */
 	if (n == 0)
 		fn_renew(recentlog, fn_s(newfile));
@@ -911,7 +891,7 @@ expirefiles(struct fn *fnp, struct opts *opts)
 		(void) fprintf(stderr, "expirefiles: fname <%s>\n", fname);
 
 	/* return if no potential expire conditions */
-	if (opts_count(opts, "AS") == 0 && opts_optarg_int(opts, "C") == 0)
+	if (opts_count(opts, "zAS") == 0 && opts_optarg_int(opts, "C") == 0)
 		return;
 
 	kw_init(fnp, NULL);
@@ -970,8 +950,8 @@ expirefiles(struct fn *fnp, struct opts *opts)
 	if (opts_count(opts, "S") && (size = opts_optarg_int(opts, "S")) > 0) {
 		while (fn_list_totalsize(files) > size &&
 		    ((nextfnp = fn_list_popoldest(files)) != NULL)) {
-				dorm(opts, "expire by size rule", nextfnp);
-				fn_free(nextfnp);
+			dorm(opts, "expire by size rule", nextfnp);
+			fn_free(nextfnp);
 		}
 	}
 
@@ -979,7 +959,7 @@ expirefiles(struct fn *fnp, struct opts *opts)
 	if (opts_count(opts, "A")) {
 		int mtime = (int)time(0) - (int)opts_optarg_int(opts, "A");
 
-		while ((nextfnp = fn_list_popoldest(files)) != NULL)
+		while ((nextfnp = fn_list_popoldest(files)) != NULL) {
 			if (fn_getstat(nextfnp)->st_mtime < mtime) {
 				dorm(opts, "expire by age rule", nextfnp);
 				fn_free(nextfnp);
@@ -987,6 +967,33 @@ expirefiles(struct fn *fnp, struct opts *opts)
 				fn_free(nextfnp);
 				break;
 			}
+		}
+	}
+
+	/* record old log files to be gzip'ed according to -z count */
+	if (opts_count(opts, "z")) {
+		int zcount = (int)opts_optarg_int(opts, "z");
+		int fcount = fn_list_count(files);
+
+		while (fcount > zcount &&
+		    (nextfnp = fn_list_popoldest(files)) != NULL) {
+			if (!fn_isgz(nextfnp)) {
+				/*
+				 * Don't gzip the old log file yet -
+				 * it takes too long. Just remember that we
+				 * need to gzip.
+				 */
+				if (Debug) {
+					(void) fprintf(stderr,
+					    "will compress %s count %d\n",
+					    fn_s(nextfnp), fcount);
+				}
+				Gzipnames = lut_add(Gzipnames,
+						fn_s(nextfnp), "1");
+			}
+			fn_free(nextfnp);
+			fcount--;
+		}
 	}
 
 	fn_free(template);

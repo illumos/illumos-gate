@@ -315,6 +315,23 @@ fn_s(struct fn *fnp)
 }
 
 /*
+ * fn_isgz -- return true if filename is *.gz
+ */
+boolean_t
+fn_isgz(struct fn *fnp)
+{
+	size_t	len;
+	char	*name;
+
+	name = fnp->fn_buf;
+	len = strlen(name);
+	if (len > 3 && strcmp(name + len - 3, ".gz") == 0)
+		return (B_TRUE);
+	else
+		return (B_FALSE);
+}
+
+/*
  * fn_list_new -- create a new list of filenames
  *
  * by convention, an empty list is represented by an allocated
