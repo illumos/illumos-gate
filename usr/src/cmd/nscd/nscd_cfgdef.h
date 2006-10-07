@@ -810,9 +810,9 @@ static nscd_cfg_nsw_db_data_t nscd_cfg_nsw_db_data_default = {
 	NULL,			/* nsw_config_db */
 	nscd_true,		/* enable_lookup */
 	nscd_false,		/* enable_loopback_checking */
-	10,			/* max_nsw_state_per_db */
-	5,			/* max_nsw_state_per_thread */
-	10,			/* max_getent_ctx_per_db */
+	288,			/* max_nsw_state_per_db */
+	32,			/* max_nsw_state_per_thread */
+	256,			/* max_getent_ctx_per_db */
 
 	},
 

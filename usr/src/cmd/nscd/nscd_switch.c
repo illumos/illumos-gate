@@ -1497,7 +1497,12 @@ nss_pgetent(void *buffer, size_t length)
 		" data = [ %s ]\n", *seqnump,
 		pbuf->data_len, (char *)buffer + pbuf->data_off);
 	} else {
+		/* release the resources used */
 		ctx = (nscd_getent_context_t *)contextp->ctx;
+		if (ctx != NULL) {
+			_nscd_put_getent_ctx(ctx);
+			contextp->ctx = NULL;
+		}
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "getent failed, status = %d, sequence number = %lld\n",
 			status, *seqnump);
