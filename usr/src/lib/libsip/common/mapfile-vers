@@ -1,0 +1,266 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_1.1 {
+    global:
+	sip_init_conn_object;
+	sip_clear_stale_data;
+	sip_conn_destroyed;
+	sip_stack_init;
+	sip_sendmsg;
+	sip_process_new_packet;
+	sip_sent_by_to_str;
+	sip_register_sent_by;
+	sip_unregister_sent_by;
+	sip_unregister_all_sent_by;
+	sip_guid;
+	sip_branchid;
+	sip_get_cseq;
+	sip_get_rseq;
+	sip_new_msg;
+	sip_free_msg;
+	sip_hold_msg;
+	sip_get_msg_len;
+	sip_clone_msg;
+	sip_msg_to_str;
+	sip_get_header;
+	sip_add_header;
+	sip_delete_header;
+	sip_delete_header_by_name;
+	sip_copy_header;
+	sip_copy_header_by_name;
+	sip_copy_all_headers;
+	sip_hdr_to_str;
+	sip_get_header_value;
+	sip_get_next_value;
+	sip_delete_value;
+	sip_is_param_present;
+	sip_get_param_value;
+	sip_get_params;
+	sip_add_param;
+	sip_get_trans;
+	sip_get_trans_branchid;
+	sip_get_trans_method;
+	sip_get_trans_state;
+	sip_get_trans_resp_msg;
+	sip_get_trans_orig_msg;
+	sip_get_trans_conn_obj;
+	sip_hold_trans;
+	sip_release_trans;
+	sip_create_dialog_req;
+	sip_hold_dialog;
+	sip_release_dialog;
+	sip_delete_dialog;
+	sip_get_dialog_method;
+	sip_get_dialog_state;
+	sip_get_dialog_callid;
+	sip_get_dialog_local_tag;
+	sip_get_dialog_remote_tag;
+	sip_get_dialog_local_uri;
+	sip_get_dialog_remote_uri;
+	sip_get_dialog_remote_target_uri;
+	sip_get_dialog_route_set;
+	sip_is_dialog_secure;
+	sip_get_dialog_local_cseq;
+	sip_get_dialog_remote_cseq;
+	sip_get_dialog_type;
+	sip_get_request_uri;
+	sip_get_uri_parsed;
+	sip_parse_uri;
+	sip_free_parsed_uri;
+	sip_is_sipuri;
+	sip_get_uri_scheme;
+	sip_get_uri_user;
+	sip_get_uri_password;
+	sip_get_uri_host;
+	sip_get_uri_port;
+	sip_get_uri_params;
+	sip_get_uri_headers;
+	sip_get_uri_opaque;
+	sip_get_uri_query;
+	sip_get_uri_path;
+	sip_get_uri_regname;
+	sip_is_uri_teluser;
+	sip_get_uri_errflags;
+	sip_uri_errflags_to_str;
+	sip_copy_start_line;
+	sip_delete_start_line;
+	sip_reqline_to_str;
+	sip_respline_to_str;
+	sip_add_request_line;
+	sip_add_response_line;
+	sip_msg_is_request;
+	sip_msg_is_response;
+	sip_get_request_method;
+	sip_get_request_uri_str;
+	sip_get_resp_desc;
+	sip_get_response_code;
+	sip_get_response_phrase;
+	sip_create_response;
+	sip_get_sip_version;
+	sip_create_OKack;
+	sip_add_from;
+	sip_get_from_uri_str;
+	sip_get_from_display_name;
+	sip_get_from_tag;
+	sip_add_to;
+	sip_get_to_uri_str;
+	sip_get_to_display_name;
+	sip_get_to_tag;
+	sip_add_contact;
+	sip_get_contact_uri_str;
+	sip_get_contact_display_name;
+	sip_get_num_via;
+	sip_get_branchid;
+	sip_add_via;
+	sip_add_branchid_to_via;
+	sip_get_via_sent_by_host;
+	sip_get_via_sent_by_port;
+	sip_get_via_sent_protocol_version;
+	sip_get_via_sent_protocol_name;
+	sip_get_via_sent_transport;
+	sip_add_callid;
+	sip_get_callid;
+	sip_add_cseq;
+	sip_get_callseq_num;
+	sip_get_callseq_method;
+	sip_add_maxforward;
+	sip_get_maxforward;
+	sip_get_content_length;
+	sip_add_content;
+	sip_get_content;
+	sip_add_content_type;
+	sip_get_content_type;
+	sip_get_content_sub_type;
+	sip_add_route;
+	sip_get_route_uri_str;
+	sip_get_route_display_name;
+	sip_add_record_route;
+	sip_add_allow_events;
+	sip_get_allow_events;
+	sip_add_event;
+	sip_get_event;
+	sip_add_substate;
+	sip_get_substate;
+	sip_add_accept;
+	sip_get_accept_type;
+	sip_get_accept_sub_type;
+	sip_add_accept_enc;
+	sip_get_accept_enc;
+	sip_add_accept_lang;
+	sip_get_accept_lang;
+	sip_add_alert_info;
+	sip_get_alert_info_uri;
+	sip_add_allow;
+	sip_get_allow_method;
+	sip_add_call_info;
+	sip_get_call_info_uri;
+	sip_add_content_disp;
+	sip_get_content_disp;
+	sip_add_content_enc;
+	sip_get_content_enc;
+	sip_add_content_lang;
+	sip_get_content_lang;
+	sip_add_date;
+	sip_get_date_time;
+	sip_get_date_day;
+	sip_get_date_month;
+	sip_get_date_year;
+	sip_get_date_wkday;
+	sip_get_date_timezone;
+	sip_add_error_info;
+	sip_get_error_info_uri;
+	sip_add_expires;
+	sip_get_expires;
+	sip_add_in_reply_to;
+	sip_get_in_reply_to;
+	sip_add_min_expires;
+	sip_get_min_expires;
+	sip_add_mime_version;
+	sip_get_mime_version;
+	sip_add_org;
+	sip_get_org;
+	sip_add_priority;
+	sip_get_priority;
+	sip_add_reply_to;
+	sip_get_replyto_display_name;
+	sip_get_replyto_uri_str;
+	sip_add_require;
+	sip_get_require;
+	sip_add_retry_after;
+	sip_get_retry_after_time;
+	sip_get_retry_after_cmts;
+	sip_add_server;
+	sip_get_server;
+	sip_add_subject;
+	sip_get_subject;
+	sip_add_supported;
+	sip_get_supported;
+	sip_add_tstamp;
+	sip_get_tstamp_value;
+	sip_get_tstamp_delay;
+	sip_add_unsupported;
+	sip_get_unsupported;
+	sip_add_user_agent;
+	sip_get_user_agent;
+	sip_add_warning;
+	sip_get_warning_code;
+	sip_get_warning_agent;
+	sip_get_warning_text;
+	sip_add_author;
+	sip_get_author_scheme;
+	sip_get_author_param;
+	sip_add_authen_info;
+	sip_get_authen_info;
+	sip_add_proxy_authen;
+	sip_get_proxy_authen_scheme;
+	sip_get_proxy_authen_param;
+	sip_add_proxy_author;
+	sip_get_proxy_author_scheme;
+	sip_get_proxy_author_param;
+	sip_add_proxy_require;
+	sip_get_proxy_require;
+	sip_add_www_authen;
+	sip_get_www_authen_scheme;
+	sip_get_www_authen_param;
+	sip_add_privacy;
+	sip_get_priv_value;
+	sip_add_passertedid;
+	sip_get_passertedid_display_name;
+	sip_get_passertedid_uri_str;
+	sip_add_ppreferredid;
+	sip_get_ppreferredid_display_name;
+	sip_get_ppreferredid_uri_str;
+	sip_add_rack;
+	sip_get_rack_resp_num;
+	sip_get_rack_cseq_num;
+	sip_get_rack_method;
+	sip_add_rseq;
+	sip_get_rseq_resp_num;
+    local:
+	*;
+};

@@ -278,6 +278,8 @@ s none usr/lib/sparcv9/libsecdb.so.1=../../../lib/sparcv9/libsecdb.so.1
 s none usr/lib/sparcv9/libsecdb.so=../../../lib/sparcv9/libsecdb.so.1
 s none usr/lib/sparcv9/libsendfile.so.1=../../../lib/sparcv9/libsendfile.so.1
 s none usr/lib/sparcv9/libsendfile.so=../../../lib/sparcv9/libsendfile.so.1
+f none usr/lib/sparcv9/libsip.so.1 755 root bin
+s none usr/lib/sparcv9/libsip.so=./libsip.so.1
 f none usr/lib/sparcv9/libsldap.so.1 755 root bin
 s none usr/lib/sparcv9/libsldap.so=libsldap.so.1
 f none usr/lib/sparcv9/libsmbios.so.1 755 root bin

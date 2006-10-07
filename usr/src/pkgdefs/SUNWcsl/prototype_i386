@@ -290,6 +290,8 @@ s none usr/lib/amd64/libsecdb.so.1=../../../lib/amd64/libsecdb.so.1
 s none usr/lib/amd64/libsecdb.so=../../../lib/amd64/libsecdb.so.1
 s none usr/lib/amd64/libsendfile.so.1=../../../lib/amd64/libsendfile.so.1
 s none usr/lib/amd64/libsendfile.so=../../../lib/amd64/libsendfile.so.1
+f none usr/lib/amd64/libsip.so.1 755 root bin
+s none usr/lib/amd64/libsip.so=./libsip.so.1
 s none usr/lib/amd64/libsldap.so=libsldap.so.1
 f none usr/lib/amd64/libsldap.so.1 755 root bin
 s none usr/lib/amd64/libsmbios.so=libsmbios.so.1

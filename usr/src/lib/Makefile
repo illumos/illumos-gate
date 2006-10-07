@@ -73,6 +73,7 @@ SUBDIRS += \
 	librpcsvc			\
 	libsocket		.WAIT	\
 	libsctp			\
+	libsip			\
 	libresolv			\
 	libresolv2		.WAIT	\
 	libw			.WAIT	\
@@ -347,6 +348,7 @@ HDRSUBDIRS=		\
 	libproc		\
 	librcm		\
 	libscf		\
+	libsip		\
 	libsmbios	\
 	librestart	\
 	librpcsvc	\
@@ -466,6 +468,7 @@ libsecdb:	libcmd libnsl
 libsasl:	libgss libsocket pkcs11 libmd
 sasl_plugins:	pkcs11 libgss libsocket libsasl
 libsctp:	libsocket
+libsip:		libmd5
 libsocket:	libnsl
 libldap5:	libsasl libsocket libnsl libmd
 libsldap:	libldap5 libtsol

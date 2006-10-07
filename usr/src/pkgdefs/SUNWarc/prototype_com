@@ -173,6 +173,8 @@ s none usr/lib/llib-lsecdb=../../lib/llib-lsecdb
 s none usr/lib/llib-lsecdb.ln=../../lib/llib-lsecdb.ln
 s none usr/lib/llib-lsendfile=../../lib/llib-lsendfile
 s none usr/lib/llib-lsendfile.ln=../../lib/llib-lsendfile.ln
+f none usr/lib/llib-lsip.ln 644 root bin
+f none usr/lib/llib-lsip 644 root bin
 f none usr/lib/llib-lsldap.ln 644 root bin
 f none usr/lib/llib-lsldap 644 root bin
 f none usr/lib/llib-lsmbios 644 root bin
