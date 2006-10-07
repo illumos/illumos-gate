@@ -227,12 +227,98 @@ getbyaddr(be, a)
 	return (res);
 }
 
+int _inet_aton(const char *cp, struct in_addr *addr);
+/*
+ * filter_ipv6
+ *
+ * Return - NSS_STR_PARSE_SUCCESS: An IPv4 address
+ *          NSS_STR_PARSE_PARSE: An IPv6 address or other errors
+ */
+static int
+filter_ipv6(char *instr, int lenstr) {
+	char	*p, *addrstart, *limit, c;
+	int	rc;
+	struct in_addr	addr;
+
+	p = instr;
+	limit = p + lenstr;
+
+	addrstart = p;
+
+	/* parse IP address */
+	while (p < limit && !isspace(*p)) {
+		if (*p == ':')
+			/* IPv6 */
+			return (NSS_STR_PARSE_PARSE);
+		else
+			p++;
+	}
+
+	if (p >= limit)
+		/* invalid IP */
+		return (NSS_STR_PARSE_PARSE);
+
+	/* extract IP address */
+	c = *p;
+	*p = '\0';
+	rc = _inet_aton(addrstart, &addr);
+	*p = c;
+
+	if (rc == 0)
+		/* invalid IP */
+		return (NSS_STR_PARSE_PARSE);
+	else
+		/* IPv4 */
+		return (NSS_STR_PARSE_SUCCESS);
+
+
+}
+static nss_status_t
+getent_hosts(files_backend_ptr_t be, void *a)
+{
+	nss_XbyY_args_t	*args = (nss_XbyY_args_t *)a;
+	nss_status_t	rc = NSS_SUCCESS;
+
+	if (args->buf.result != NULL) {
+		return (_nss_files_XY_all(be, args, 1, 0, 0));
+	} else {
+		/*
+		 * Called by nscd
+		 */
+		/*CONSTCOND*/
+		while (1) {
+			rc = _nss_files_XY_all(be, args, 1, 0, 0);
+			/*
+			 * NSS_NOTFOUND, end of file or other errors.
+			 */
+			if (rc != NSS_SUCCESS)
+				break;
+			/*
+			 * /etc/hosts and /etc/ipnodes are merged and
+			 * /etc/hosts can contain IPv6 addresses.
+			 * These addresses have to be filtered.
+			 */
+			if (filter_ipv6(args->returnval, args->returnlen)
+					== NSS_STR_PARSE_SUCCESS)
+				break;
+			/*
+			 * The entry is an IPv6 address or other errors.
+			 * Skip it and continue to find next one.
+			 */
+			args->returnval = NULL;
+			args->returnlen = 0;
+
+		}
+		return (rc);
+	}
+
+}
 
 static files_backend_op_t host_ops[] = {
 	_nss_files_destr,
 	_nss_files_endent,
 	_nss_files_setent,
-	_nss_files_getent_netdb,
+	getent_hosts,
 	getbyname,
 	getbyaddr,
 };

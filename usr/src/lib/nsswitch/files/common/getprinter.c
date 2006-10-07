@@ -169,7 +169,6 @@ getent(be, a)
 	files_backend_ptr_t	be;
 	void			*a;
 {
-	nss_status_t status;
 	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 
 	return (_nss_files_XY_printer(be, argp, (const char *)0,
