@@ -58,7 +58,7 @@ static char sccsid[] = "@(#)hash_page.c	8.11 (Berkeley) 11/7/95";
 
 #include <sys/types.h>
 
-#ifdef DEBUG_DB
+#ifdef DEBUG
 #include <assert.h>
 #endif
 #include <stdio.h>
@@ -82,7 +82,7 @@ static void	 putpair __P((PAGE8 *, const DBT *, const DBT *));
 static void	 swap_page_header_in __P((PAGE16 *));
 static void	 swap_page_header_out __P((PAGE16 *));
 
-#ifdef DEBUG_DB_SLOW
+#ifdef DEBUG_SLOW
 static void	 account_page(HTAB *, db_pgno_t, int);
 #endif
 
@@ -215,12 +215,12 @@ __get_item_next(hashp, cursorp, key, val, item_info)
 	DBT *key, *val;
 	ITEM_INFO *item_info;
 {
-	int stat;
+	int status;
 
-	stat = __get_item(hashp, cursorp, key, val, item_info);
+	status = __get_item(hashp, cursorp, key, val, item_info);
 	cursorp->ndx++;
 	cursorp->pgndx++;
-	return (stat);
+	return (status);
 }
 
 /*
@@ -323,7 +323,7 @@ __delpair(hashp, cursorp, item_info)
 		--ndx;
 	} else
 		pagep = cursorp->pagep;
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	assert(ADDR(pagep) == cursorp->pgno);
 #endif
 
@@ -379,7 +379,7 @@ __delpair(hashp, cursorp, item_info)
 	for (n = ndx; n < NUM_ENT(pagep) - 1; n++)
 		if (KEY_OFF(pagep, (n + 1)) != BIGPAIR) {
 			next_key = next_realkey(pagep, n);
-#ifdef DEBUG_DB
+#ifdef DEBUG
 			assert(next_key != -1);
 #endif
 			KEY_OFF(pagep, n) = KEY_OFF(pagep, (n + 1)) + delta;
@@ -413,7 +413,7 @@ __delpair(hashp, cursorp, item_info)
 			return (-1);
 		while (NEXT_PGNO(pagep) != to_find) {
 			next_pgno = NEXT_PGNO(pagep);
-#ifdef DEBUG_DB
+#ifdef DEBUG
 			assert(next_pgno != INVALID_PGNO);
 #endif
 			__put_page(hashp, pagep, A_RAW, 0);
@@ -669,7 +669,7 @@ add_bigptr(hashp, item_info, big_pgno)
 		pagep = __add_ovflpage(hashp, pagep);
 		if (!pagep)
 			return (-1);
-#ifdef DEBUG_DB
+#ifdef DEBUG
 		assert(BIGPAIRFITS(pagep));
 #endif
 	}
@@ -819,7 +819,7 @@ __new_page(hashp, addr, addr_type)
 	pagep = mpool_new(hashp->mp, &paddr, MPOOL_PAGE_REQUEST);
 	if (!pagep)
 		return (-1);
-#if DEBUG_DB_SLOW
+#if DEBUG_SLOW
 	account_page(hashp, paddr, 1);
 #endif
 
@@ -938,7 +938,7 @@ __put_page(hashp, pagep, addr_type, is_dirty)
 	PAGE16 *pagep;
 	int32_t addr_type, is_dirty;
 {
-#if DEBUG_DB_SLOW
+#if DEBUG_SLOW
 	account_page(hashp,
 	    ((BKT *)((char *)pagep - sizeof(BKT)))->pgno, -1);
 #endif
@@ -974,10 +974,10 @@ __get_page(hashp, addr, addr_type)
 	}
 	pagep = (PAGE16 *)mpool_get(hashp->mp, paddr, 0);
 
-#if DEBUG_DB_SLOW
+#if DEBUG_SLOW
 	account_page(hashp, paddr, 1);
 #endif
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	assert(ADDR(pagep) == paddr || ADDR(pagep) == 0 ||
 	    addr_type == A_BITMAP || addr_type == A_HEADER);
 #endif
@@ -1079,7 +1079,7 @@ overflow_page(hashp)
 	int32_t bit, first_page, free_bit, free_page, i, in_use_bits, j;
 	int32_t max_free, offset, splitnum;
 	u_int16_t addr;
-#ifdef DEBUG_DB2
+#ifdef DEBUG2
 	int32_t tmp1, tmp2;
 #endif
 
@@ -1158,7 +1158,7 @@ overflow_page(hashp)
 		    (int32_t)OADDR_OF(splitnum, offset), 1, free_page))
 			return (0);
 		hashp->hdr.spares[splitnum]++;
-#ifdef DEBUG_DB2
+#ifdef DEBUG2
 		free_bit = 2;
 #endif
 		offset++;
@@ -1185,7 +1185,7 @@ overflow_page(hashp)
 
 	/* Calculate address of the new overflow page */
 	addr = OADDR_OF(splitnum, offset);
-#ifdef DEBUG_DB2
+#ifdef DEBUG2
 	(void)fprintf(stderr, dgettext(TEXT_DOMAIN,
 			"OVERFLOW_PAGE: ADDR: %d BIT: %d PAGE %d\n"),
 	    addr, free_bit, free_page);
@@ -1200,7 +1200,7 @@ overflow_page(hashp)
 found:
 	bit = bit + first_free(freep[j]);
 	SETBIT(freep, bit);
-#ifdef DEBUG_DB2
+#ifdef DEBUG2
 	tmp1 = bit;
 	tmp2 = i;
 #endif
@@ -1219,7 +1219,7 @@ found:
 	if (offset >= SPLITMASK)
 		return (0);	/* Out of overflow pages */
 	addr = OADDR_OF(i, offset);
-#ifdef DEBUG_DB2
+#ifdef DEBUG2
 	(void)fprintf(stderr, dgettext(TEXT_DOMAIN,
 			"OVERFLOW_PAGE: ADDR: %d BIT: %d PAGE %d\n"),
 	    addr, tmp1, tmp2);
@@ -1233,7 +1233,7 @@ found:
 	return (addr);
 }
 
-#ifdef DEBUG_DB
+#ifdef DEBUG
 int
 bucket_to_page(hashp, n)
 	HTAB *hashp;
@@ -1260,7 +1260,7 @@ oaddr_to_page(hashp, n)
 
 	return (ret_val);
 }
-#endif /* DEBUG_DB */
+#endif /* DEBUG */
 
 static indx_t
 page_to_oaddr(hashp, pgno)
@@ -1287,7 +1287,7 @@ page_to_oaddr(hashp, pgno)
 
 	ret_val = OADDR_OF(sp + 1,
 	    pgno - ((POW2(sp + 1) - 1) + hashp->hdr.spares[sp]));
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	assert(OADDR_TO_PAGE(ret_val) == (pgno + hashp->hdr.hdrpages));
 #endif
 	return (ret_val);
@@ -1307,7 +1307,7 @@ __free_ovflpage(hashp, pagep)
 
 	addr = page_to_oaddr(hashp, ADDR(pagep));
 
-#ifdef DEBUG_DB2
+#ifdef DEBUG2
 	(void)fprintf(stderr, dgettext(TEXT_DOMAIN,
 			"Freeing %d\n"), addr);
 #endif
@@ -1320,7 +1320,7 @@ __free_ovflpage(hashp, pagep)
 	free_bit = bit_address & ((hashp->hdr.bsize << BYTE_SHIFT) - 1);
 
 	freep = fetch_bitmap(hashp, free_page);
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	/*
 	 * This had better never happen.  It means we tried to read a bitmap
 	 * that has already had overflow pages allocated off it, and we
@@ -1330,7 +1330,7 @@ __free_ovflpage(hashp, pagep)
 		assert(0);
 #endif
 	CLRBIT(freep, free_bit);
-#ifdef DEBUG_DB2
+#ifdef DEBUG2
 	(void)fprintf(stderr, dgettext(TEXT_DOMAIN,
 			"FREE_OVFLPAGE: ADDR: %d BIT: %d PAGE %d\n"),
 	    obufp->addr, free_bit, free_page);
@@ -1351,7 +1351,7 @@ fetch_bitmap(hashp, ndx)
 	return (hashp->mapp[ndx]);
 }
 
-#ifdef DEBUG_DB_SLOW
+#ifdef DEBUG_SLOW
 static void
 account_page(hashp, pgno, inout)
 	HTAB *hashp;
@@ -1391,4 +1391,4 @@ account_page(hashp, pgno, inout)
 			"Warning: pg %d has been out for %d times\n"),
 			    list[i].pgno, list[i].times);
 }
-#endif /* DEBUG_DB_SLOW */
+#endif /* DEBUG_SLOW */

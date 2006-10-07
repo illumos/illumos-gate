@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,7 @@ extern kadm5_ret_t kadm5_get_cpw_host_srv_name(krb5_context, const char *,
 extern kadm5_ret_t kadm5_init_with_password(char *, char *, char *,
 			kadm5_config_params *, krb5_ui_4, krb5_ui_4, void **);
 extern kadm5_ret_t kadm5_chpass_principal_util(void *, krb5_principal,
-			char *, char **, char *, int);
+			char *, char **, char *, unsigned int);
 
 static krb5_error_code
 krb5_get_as_key_password(

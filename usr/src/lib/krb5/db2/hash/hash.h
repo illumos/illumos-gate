@@ -1,5 +1,5 @@
 /*
- * Copyright 1997-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +103,7 @@ typedef struct htab {		/* Memory resident data structure */
 	u_int32_t (*hash) __P((const void *, size_t)); /* Hash Function */
 	int32_t	flags;		/* Flag values */
 	int32_t	fp;		/* File pointer */
-	char *fname;        	/* File path */
+	const char *fname;        	/* File path */
 	u_int8_t *bigdata_buf;	/* Temporary Buffer for BIG data */
 	u_int8_t *bigkey_buf;	/* Temporary Buffer for BIG keys */
 	u_int16_t  *split_buf;	/* Temporary buffer for splits */

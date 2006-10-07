@@ -21,12 +21,12 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /afs/athena.mit.edu/astaff/project/krbdev/.cvsroot/src/lib/kadm5/srv/svr_misc_free.c,v 1.2 1996/10/18 19:45:53 bjaspan Exp $
+ * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_misc_free.c,v 1.2 1996/10/18 19:45:53 bjaspan Exp $
  * 
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /afs/athena.mit.edu/astaff/project/krbdev/.cvsroot/src/lib/kadm5/srv/svr_misc_free.c,v 1.2 1996/10/18 19:45:53 bjaspan Exp $";
+static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_misc_free.c,v 1.2 1996/10/18 19:45:53 bjaspan Exp $";
 #endif
 #include	<kadm5/admin.h>
 #include	<stdlib.h>

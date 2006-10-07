@@ -99,19 +99,3 @@ __dbpanic(dbp)
 	dbp->seq = (int (*)())__dberr;
 	dbp->sync = (int (*)())__dberr;
 }
-
-/* global used to toggle display of debug messages */
-int g_displayDebugDB = 0;
-
-/*
- * debugging aid
- * call this function to enable/disable printing of debug messages
- * code must be compiled with DEBUG_DB
- */
-void debugDisplayDB(int onOff)
-{
-#if DEBUG_DB
-
-	g_displayDebugDB = onOff;
-#endif
-}

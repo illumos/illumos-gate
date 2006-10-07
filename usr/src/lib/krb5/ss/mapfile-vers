@@ -27,7 +27,6 @@
 
 SUNWprivate_1.1 {
     global:
-	debugDisplaySS;
 	ss_abort_subsystem;
 	ss_add_info_dir;
 	ss_add_request_table;

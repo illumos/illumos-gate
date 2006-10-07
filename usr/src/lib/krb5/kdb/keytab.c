@@ -28,6 +28,7 @@
 #include <string.h>
 
 #include "k5-int.h"
+#include "kdb_kt.h"
 
 static int
 is_xrealm_tgt(krb5_context, krb5_const_principal);
@@ -37,16 +38,21 @@ krb5_error_code krb5_ktkdb_close (krb5_context, krb5_keytab);
 krb5_error_code krb5_ktkdb_get_entry (krb5_context, krb5_keytab, krb5_const_principal,
 		   krb5_kvno, krb5_enctype, krb5_keytab_entry *);
 
-krb5_error_code krb5_ktkdb_resolve(
-    krb5_context  	  context,
-    const char		* name,
-    krb5_keytab		* id);
+static krb5_error_code
+krb5_ktkdb_get_name(krb5_context context, krb5_keytab keytab,
+		    char *name, unsigned int namelen)
+{
+    if (namelen < sizeof("KDB:"))
+	return KRB5_KT_NAME_TOOLONG;
+    strcpy(name, "KDB:");
+    return 0;
+}
 
 krb5_kt_ops krb5_kt_kdb_ops = {
     0,
     "KDB", 	/* Prefix -- this string should not appear anywhere else! */
     krb5_ktkdb_resolve,		/* resolve */
-    NULL,			/* get_name */
+    krb5_ktkdb_get_name,	/* get_name */
     krb5_ktkdb_close,		/* close */
     krb5_ktkdb_get_entry,	/* get */
     NULL,			/* start_seq_get */
@@ -125,13 +131,15 @@ krb5_ktkdb_get_entry(in_context, id, principal, kvno, enctype, entry)
     krb5_db_entry 	  db_entry;
     krb5_boolean 	  more = 0;
     int 	 	  n = 0;
-    int xrealm_tgt = is_xrealm_tgt(context, principal);
-    krb5_boolean	 similar;
+    int xrealm_tgt;
+    krb5_boolean similar;
 
     if (ktkdb_ctx)
 	context = ktkdb_ctx;
     else
 	context = in_context;
+
+    xrealm_tgt = is_xrealm_tgt(context, principal);
 
     /* Open database */
     /* krb5_db_init(context); */

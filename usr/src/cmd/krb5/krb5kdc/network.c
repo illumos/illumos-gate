@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,8 +93,7 @@ set_sa_port(struct sockaddr *addr, int port)
     }
 }
 
-static int 
-ipv6_enabled()
+static int ipv6_enabled()
 {
 #ifdef KRB5_USE_INET6
     static int result = -1;
@@ -107,9 +106,9 @@ ipv6_enabled()
 	} else
 	    result = 0;
     }
-    return (result);
+    return result;
 #else
-    return (0);
+    return 0;
 #endif
 }
 
@@ -127,7 +126,7 @@ setv6only(int sock, int value)
 }
 #endif
 
-
+
 static const char *paddr (struct sockaddr *sa)
 {
     static char buf[100];
@@ -137,7 +136,7 @@ static const char *paddr (struct sockaddr *sa)
 		    NI_NUMERICHOST|NI_NUMERICSERV))
 	strcpy(buf, "<unprintable>");
     else {
-	int len = sizeof(buf) - strlen(buf);
+	unsigned int len = sizeof(buf) - strlen(buf);
 	char *p = buf + strlen(buf);
 	if (len > 2+strlen(portbuf)) {
 	    *p++ = '.';
@@ -150,10 +149,12 @@ static const char *paddr (struct sockaddr *sa)
 
 /* KDC data.  */
 
+enum kdc_conn_type { CONN_UDP, CONN_TCP_LISTENER, CONN_TCP };
+
 /* Per-connection info.  */
 struct connection {
     int fd;
-    enum { CONN_UDP, CONN_TCP_LISTENER, CONN_TCP } type;
+    enum kdc_conn_type type;
     void (*service)(struct connection *, const char *, int);
     /* Solaris Kerberos: for auditing */
     in_port_t port; /* local port */
@@ -189,7 +190,7 @@ struct connection {
     } u;
 };
 
-
+
 #define SET(TYPE) struct { TYPE *data; int n, max; }
 
 /* Start at the top and work down -- this should allow for deletions
@@ -270,10 +271,12 @@ static krb5_error_code add_tcp_port(int port)
     return 0;
 }
 
+
 #define USE_AF AF_INET
 #define USE_TYPE SOCK_DGRAM
 #define USE_PROTO 0
 #define SOCKET_ERRNO errno
+#include "foreachaddr.h"
 
 struct socksetup {
     const char *prog;
@@ -281,7 +284,7 @@ struct socksetup {
 };
 
 static struct connection *
-add_fd (struct socksetup *data, int sock, int conntype,
+add_fd (struct socksetup *data, int sock, enum kdc_conn_type conntype,
 	void (*service)(struct connection *, const char *, int))
 {
     struct connection *newconn;
@@ -305,7 +308,6 @@ add_fd (struct socksetup *data, int sock, int conntype,
     newconn->type = conntype;
     newconn->fd = sock;
     newconn->service = service;
-
     return newconn;
 }
 
@@ -340,11 +342,8 @@ delete_fd (struct connection *xconn)
     FOREACH_ELT(connections, i, conn)
 	if (conn == xconn) {
 	    DEL(connections, i);
-	    /* Solaris kerberos: fix memory leak */
-	    free(xconn);
-	    return;
+	    break;
 	}
-
     free(xconn);
 }
 
@@ -354,7 +353,7 @@ setnbio(int sock)
     static const int one = 1;
     return ioctlsocket(sock, FIONBIO, (const void *)&one);
 }
-
+
 static int
 setnolinger(int s)
 {
@@ -478,8 +477,8 @@ setup_tcp_listener_ports(struct socksetup *data)
 	    if (add_tcp_listener_fd(data, s4) == 0)
 		close(s4);
 	    else
-		krb5_klog_syslog(LOG_INFO, "listening on fd %d: tcp %s port %d",
-				 s4, paddr((struct sockaddr *)&sin4), port);
+		krb5_klog_syslog(LOG_INFO, "listening on fd %d: tcp %s",
+				 s4, paddr((struct sockaddr *)&sin4));
 	}
 #ifdef KRB5_USE_INET6
 	if (s6 >= 0) {
@@ -490,8 +489,8 @@ setup_tcp_listener_ports(struct socksetup *data)
 		close(s6);
 		s6 = -1;
 	    } else
-		krb5_klog_syslog(LOG_INFO, "listening on fd %d: tcp %s port %d",
-				 s6, paddr((struct sockaddr *)&sin6), port);
+		krb5_klog_syslog(LOG_INFO, "listening on fd %d: tcp %s",
+				 s6, paddr((struct sockaddr *)&sin6));
 	    if (s4 < 0)
 		krb5_klog_syslog(LOG_INFO,
 				 "assuming IPv6 socket accepts IPv4");
@@ -537,6 +536,10 @@ setup_udp_port(void *P_data, struct sockaddr *addr)
     case AF_LINK:
 	return 0;
 #endif
+#ifdef AF_DLI /* Direct Link Interface - DEC Ultrix/OSF1 link layer? */
+    case AF_DLI:
+	return 0;
+#endif
     default:
 	krb5_klog_syslog (LOG_INFO,
 			  "skipping unrecognized local address family %d",
@@ -564,8 +567,8 @@ setup_udp_port(void *P_data, struct sockaddr *addr)
 	FD_SET (sock, &sstate.rfds);
 	if (sock >= sstate.max)
 	    sstate.max = sock + 1;
-	krb5_klog_syslog (LOG_INFO, "listening on fd %d: udp %s port %d", sock,
-			  paddr((struct sockaddr *)addr), port);
+	krb5_klog_syslog (LOG_INFO, "listening on fd %d: udp %s", sock,
+			  paddr((struct sockaddr *)addr));
 	if (add_udp_fd (data, sock) == 0)
 	    return 1;
     }
@@ -617,6 +620,8 @@ scan_for_newlines:
 }
 #endif
 
+/* XXX */
+extern int krb5int_debug_sendto_kdc;
 extern void (*krb5int_sendtokdc_debug_handler)(const void*, size_t);
 
 krb5_error_code
@@ -632,6 +637,7 @@ setup_network(const char *prog)
     FD_ZERO(&sstate.xfds);
     sstate.max = 0;
 
+/*    krb5int_debug_sendto_kdc = 1; */
     krb5int_sendtokdc_debug_handler = klog_handler;
 
     /* Handle each realm's ports */
@@ -732,7 +738,7 @@ static void process_packet(struct connection *conn, const char *prog,
     krb5_data *response;
     char pktbuf[MAX_DGRAM_SIZE];
     int port_fd = conn->fd;
-    
+
     response = NULL;
     saddr_len = sizeof(saddr);
     cc = recvfrom(port_fd, pktbuf, sizeof(pktbuf), 0,
@@ -755,7 +761,7 @@ static void process_packet(struct connection *conn, const char *prog,
     faddr.address = &addr;
     init_addr(&faddr, ss2sa(&saddr));
     /* this address is in net order */
-    if ((retval = dispatch(&request, &faddr, conn->port, &response))) {
+    if ((retval = dispatch(&request, &faddr, &response))) {
 	com_err(prog, retval, gettext("while dispatching (udp)"));
 	return;
     }
@@ -826,6 +832,10 @@ static void accept_tcp_connection(struct connection *conn, const char *prog,
 	    strcpy(p, tmpbuf);
 	}
     }
+#if 0
+    krb5_klog_syslog(LOG_INFO, "accepted TCP connection on socket %d from %s",
+		     s, newconn->u.tcp.addrbuf);
+#endif
 
     newconn->u.tcp.addr_s = addr_s;
     newconn->u.tcp.addrlen = addrlen;
@@ -865,6 +875,7 @@ static void accept_tcp_connection(struct connection *conn, const char *prog,
 		newconn->u.tcp.addrbuf);
 	delete_fd(newconn);
 	close(s);
+	tcp_data_counter--;
 	return;
     }
     newconn->u.tcp.offset = 0;
@@ -896,24 +907,20 @@ kill_tcp_connection(struct connection *conn)
 	    sstate.max--;
     close(conn->fd);
     conn->fd = -1;
-    tcp_data_counter--;
-    /* Solaris kerberos: fix memory leak */
     delete_fd(conn);
+    tcp_data_counter--;
 }
 
 static void
 process_tcp_connection(struct connection *conn, const char *prog, int selflags)
 {
-
     if (selflags & SSF_WRITE) {
 	ssize_t nwrote;
 	SOCKET_WRITEV_TEMP tmp;
-	krb5_error_code e;
 
 	nwrote = SOCKET_WRITEV(conn->fd, conn->u.tcp.sgp, conn->u.tcp.sgnum,
 			       tmp);
 	if (nwrote < 0) {
-	    e = SOCKET_ERRNO;
 	    goto kill_tcp_connection;
 	}
 	if (nwrote == 0)
@@ -991,11 +998,10 @@ process_tcp_connection(struct connection *conn, const char *prog, int selflags)
 	    conn->u.tcp.offset += nread;
 	    if (conn->u.tcp.offset < conn->u.tcp.msglen + 4)
 		return;
-
 	    /* have a complete message, and exactly one message */
 	    request.length = conn->u.tcp.msglen;
 	    request.data = conn->u.tcp.buffer + 4;
-	    err = dispatch(&request, &conn->u.tcp.faddr, conn->port,
+	    err = dispatch(&request, &conn->u.tcp.faddr,
 			   &conn->u.tcp.response);
 	    if (err) {
 		com_err(prog, err, gettext("while dispatching (tcp)"));
@@ -1083,6 +1089,11 @@ closedown_network(const char *prog)
 	if (conn->fd >= 0)
 	    (void) close(conn->fd);
 	DEL (connections, i);
+	/* There may also be per-connection data in the tcp structure
+	   (tcp.buffer, tcp.response) that we're not freeing here.
+	   That should only happen if we quit with a connection in
+	   progress.  */
+	free(conn);
     }
     FREE_SET_DATA(connections);
     FREE_SET_DATA(udp_port_data);

@@ -36,7 +36,7 @@ SUNW_1.1 {
 
 SUNWprivate_1.1 {
     global:
-	debugDisplayDB;
+	kdb2_bt_rseq;
 	kdb2_dbm_clearerr;
 	kdb2_dbm_close;
 	kdb2_dbm_delete;
@@ -44,10 +44,10 @@ SUNWprivate_1.1 {
 	kdb2_dbm_error;
 	kdb2_dbm_fetch;
 	kdb2_dbm_firstkey;
-	kdb2_dbminit;
 	kdb2_dbm_nextkey;
 	kdb2_dbm_open;
 	kdb2_dbm_store;
+	kdb2_dbminit;
 	kdb2_dbopen;
 	kdb2_delete;
 	kdb2_fetch;
@@ -55,16 +55,16 @@ SUNWprivate_1.1 {
 	kdb2_hcreate;
 	kdb2_hdestroy;
 	kdb2_hsearch;
+	kdb2_mpool_close;
+	kdb2_mpool_delete;
+	kdb2_mpool_filter;
+	kdb2_mpool_get;
+	kdb2_mpool_new;
+	kdb2_mpool_open;
+	kdb2_mpool_put;
+	kdb2_mpool_sync;
 	kdb2_nextkey;
 	kdb2_store;
-	mpool_close;
-	mpool_delete;
-	mpool_filter;
-	mpool_get;
-	mpool_new;
-	mpool_open;
-	mpool_put;
-	mpool_sync;
     local:
 	*;
 };

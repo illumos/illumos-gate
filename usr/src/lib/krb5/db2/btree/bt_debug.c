@@ -55,7 +55,7 @@ static char sccsid[] = "@(#)bt_debug.c	8.6 (Berkeley) 1/9/95";
 #include "db-int.h"
 #include "btree.h"
 
-#if defined(DEBUG_DB) || defined(STATISTICS)
+#if defined(DEBUG) || defined(STATISTICS)
 
 static FILE *tracefp;
 
@@ -81,7 +81,7 @@ __bt_dinit()
 }
 #endif
 
-#ifdef DEBUG_DB
+#ifdef DEBUG
 /*
  * __bt_dump --
  *	dump the tree

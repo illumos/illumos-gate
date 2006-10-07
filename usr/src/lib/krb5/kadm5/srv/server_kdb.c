@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -25,11 +25,11 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_kdb.c,v 1.2 1998/10/30 02:54:39 marc Exp $
+ * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_kdb.c,v 1.4 2003/06/13 22:30:59 tlyu Exp $
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_kdb.c,v 1.2 1998/10/30 02:54:39 marc Exp $";
+static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_kdb.c,v 1.4 2003/06/13 22:30:59 tlyu Exp $";
 #endif
 
 #include <stdio.h>
@@ -59,7 +59,10 @@ krb5_error_code kdb_init_master(kadm5_server_handle_t handle,
 {
     int		   ret = 0;
     char	   *realm;
-    krb5_keyblock  tmk;
+    krb5_boolean   from_kbd = FALSE;
+
+    if (from_keyboard)
+      from_kbd = TRUE;
 
     if (r == NULL)  {
 	if ((ret = krb5_get_default_realm(handle->context, &realm)))
@@ -73,14 +76,15 @@ krb5_error_code kdb_init_master(kadm5_server_handle_t handle,
 				       realm, NULL, &master_princ)))
 	goto done;
 
-    if (ret = krb5_db_fetch_mkey(handle->context, master_princ,
-				 handle->params.enctype,
-				from_keyboard,
-				 FALSE /* only prompt once */,
-				 handle->params.stash_file,
-				 NULL /* I'm not sure about this,
-					 but it's what the kdc does --marc */,
-				 &handle->master_keyblock))
+
+    ret = krb5_db_fetch_mkey(handle->context, master_princ,
+			     handle->params.enctype, from_kbd,
+			     FALSE /* only prompt once */,
+			     handle->params.stash_file,
+			     NULL /* I'm not sure about this,
+				     but it's what the kdc does --marc */,
+			     &handle->master_keyblock);
+    if (ret)
 	goto done;
 				 
     if ((ret = krb5_db_init(handle->context)) != KSUCCESS)
@@ -171,11 +175,10 @@ krb5_error_code kdb_init_hist(kadm5_server_handle_t handle, char *r)
 	ks[0].ks_enctype = handle->params.enctype;
 	ks[0].ks_salttype = KRB5_KDB_SALTTYPE_NORMAL;
 	ret = kadm5_create_principal_3(handle, &ent,
-				     (KADM5_PRINCIPAL |
-				       KADM5_MAX_LIFE |
-				       KADM5_ATTRIBUTES),
+				       (KADM5_PRINCIPAL | KADM5_MAX_LIFE |
+					KADM5_ATTRIBUTES),
 				       1, ks,
-				      "to-be-random");
+				       "to-be-random");
 	if (ret)
 	    goto done;
 
@@ -200,12 +203,12 @@ krb5_error_code kdb_init_hist(kadm5_server_handle_t handle, char *r)
     }
 
     ret = krb5_dbe_find_enctype(handle->context, &hist_db,
-			    handle->params.enctype, -1, -1, &key_data);
+				handle->params.enctype, -1, -1, &key_data);
     if (ret)
 	goto done;
 
     ret = krb5_dbekd_decrypt_key_data(handle->context,
-		&handle->master_keyblock, key_data, &hist_key, NULL);
+				 &handle->master_keyblock, key_data, &hist_key, NULL);
     if (ret)
 	goto done;
 
@@ -247,8 +250,9 @@ kdb_get_entry(kadm5_server_handle_t handle,
     krb5_tl_data tl_data;
     XDR xdrs;
 
-    if (ret = krb5_db_get_principal(handle->context, principal, kdb, &nprincs,
-				    &more))
+    ret = krb5_db_get_principal(handle->context, principal, kdb, &nprincs,
+				&more);
+    if (ret)
 	return(ret);
 
     if (more) {
@@ -357,11 +361,13 @@ kdb_put_entry(kadm5_server_handle_t handle,
     krb5_tl_data tl_data;
     int one;
 
-    if (ret = krb5_timeofday(handle->context, &now))
+    ret = krb5_timeofday(handle->context, &now);
+    if (ret)
 	return(ret);
 
-    if (ret = krb5_dbe_update_mod_princ_data(handle->context, kdb, now,
-					     handle->current_caller))
+    ret = krb5_dbe_update_mod_princ_data(handle->context, kdb, now,
+					 handle->current_caller);
+    if (ret)
 	return(ret);
     
     xdralloc_create(&xdrs, XDR_ENCODE); 
@@ -382,7 +388,8 @@ kdb_put_entry(kadm5_server_handle_t handle,
 
     one = 1;
 
-    if (ret = krb5_db_put_principal(handle->context, kdb, &one))
+    ret = krb5_db_put_principal(handle->context, kdb, &one);
+    if (ret)
 	return(ret);
 
     return(0);
@@ -424,9 +431,11 @@ kdb_iter_entry(kadm5_server_handle_t handle,
     id.func = iter_fct;
     id.data = data;
 
-    if (ret = krb5_db_iterate(handle->context, kdb_iter_func, &id))
+    ret = krb5_db_iterate(handle->context, kdb_iter_func, &id);
+    if (ret)
 	return(ret);
 
     return(0);
 }
+
 

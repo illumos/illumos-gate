@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,7 @@ bool_t xdr_ui_4(XDR *xdrs, krb5_ui_4 *objp)
 {
   /* Assumes that krb5_ui_4 and u_int32 are both four bytes long.
      This should not be a harmful assumption. */
-  return xdr_u_int(xdrs, (rpc_u_int32 *) objp);
+  return xdr_u_int(xdrs, (uint32_t *) objp);
 }
 
 
@@ -150,7 +150,7 @@ xdr_krb5_timestamp(XDR *xdrs, krb5_timestamp *objp)
   /* This assumes that int32 and krb5_timestamp are the same size.
      This shouldn't be a problem, since we've got a unit test which
      checks for this. */
-	if (!xdr_int(xdrs, (rpc_int32 *) objp)) {
+	if (!xdr_int(xdrs, (int32_t *) objp)) {
 		return (FALSE);
 	}
 	return (TRUE);
@@ -181,7 +181,7 @@ xdr_krb5_deltat(XDR *xdrs, krb5_deltat *objp)
   /* This assumes that int32 and krb5_deltat are the same size.
      This shouldn't be a problem, since we've got a unit test which
      checks for this. */
-	if (!xdr_int(xdrs, (rpc_int32 *) objp)) {
+	if (!xdr_int(xdrs, (int32_t *) objp)) {
 		return (FALSE);
 	}
 	return (TRUE);
@@ -193,7 +193,7 @@ xdr_krb5_flags(XDR *xdrs, krb5_flags *objp)
   /* This assumes that int32 and krb5_flags are the same size.
      This shouldn't be a problem, since we've got a unit test which
      checks for this. */
-	if (!xdr_int(xdrs, (rpc_int32 *) objp)) {
+	if (!xdr_int(xdrs, (int32_t *) objp)) {
 		return (FALSE);
 	}
 	return (TRUE);
@@ -202,7 +202,7 @@ xdr_krb5_flags(XDR *xdrs, krb5_flags *objp)
 bool_t
 xdr_krb5_ui_4(XDR *xdrs, krb5_ui_4 *objp)
 {
-	if (!xdr_u_int(xdrs, (rpc_u_int32 *) objp)) {
+	if (!xdr_u_int(xdrs, (uint32_t *) objp)) {
 		return (FALSE);
 	}
 	return (TRUE);
@@ -222,6 +222,30 @@ xdr_krb5_int16(XDR *xdrs, krb5_int16 *objp)
 
     return(TRUE);
 }
+
+/*
+ * Function: xdr_krb5_ui_2
+ *
+ * Purpose: XDR function which serves as a wrapper for xdr_u_int,
+ * to prevent compiler warnings about type clashes between u_int
+ * and krb5_ui_2.
+ */
+bool_t
+xdr_krb5_ui_2(XDR *xdrs, krb5_ui_2 *objp)
+{
+    unsigned int tmp;
+
+    tmp = (unsigned int) *objp;
+
+    if (!xdr_u_int(xdrs, &tmp))
+	return(FALSE);
+
+    *objp = (krb5_ui_2) tmp;
+
+    return(TRUE);
+}
+
+
 
 bool_t xdr_krb5_key_data_nocontents(XDR *xdrs, krb5_key_data *objp)
 {
@@ -285,7 +309,7 @@ bool_t xdr_krb5_tl_data(XDR *xdrs, krb5_tl_data **tl_data_head)
 {
      krb5_tl_data *tl, *tl2;
      bool_t more;
-     uint len;
+     unsigned int len;
 
      switch (xdrs->x_op) {
      case XDR_FREE:
@@ -346,10 +370,10 @@ bool_t xdr_krb5_tl_data(XDR *xdrs, krb5_tl_data **tl_data_head)
 bool_t
 xdr_kadm5_ret_t(XDR *xdrs, kadm5_ret_t *objp)
 {
-	rpc_u_int32 tmp;
+	uint32_t tmp;
 
 	if (xdrs->x_op == XDR_ENCODE)
-		tmp = (rpc_u_int32) *objp;
+		tmp = (uint32_t) *objp;
 
 	if (!xdr_u_int(xdrs, &tmp))
 		return (FALSE);
@@ -1021,7 +1045,7 @@ xdr_krb5_enctype(XDR *xdrs, krb5_enctype *objp)
 bool_t
 xdr_krb5_salttype(XDR *xdrs, krb5_int32 *objp)
 {
-    if (!xdr_int(xdrs, (rpc_int32 *) objp)) /* SUNWresync121 XXX */
+    if (!xdr_int(xdrs, (int32_t *) objp)) /* SUNWresync121 XXX */
 	return FALSE;
     return TRUE;
 }

@@ -76,7 +76,7 @@ POFILES = generic.po
 # override liblink
 INS.liblink=	-$(RM) $@; $(SYMLINK) $(LIBLINKS)$(VERS) $@
 
-CPPFLAGS +=	-DHAVE_CONFIG_H \
+CPPFLAGS +=	-DHAVE_CONFIG_H -DHAVE_BT_RSEQ \
 		-I$(KRB5IPROPDIR) \
 		-I$(SRC)/lib/krb5 \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include \

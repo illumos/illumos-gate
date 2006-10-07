@@ -153,7 +153,7 @@ krb5_dbe_lookup_last_pwd_change(context, entry, stamp)
 
     tl_data.tl_data_type = KRB5_TL_LAST_PWD_CHANGE;
 
-    if (code = krb5_dbe_lookup_tl_data(context, entry, &tl_data))
+    if ((code = krb5_dbe_lookup_tl_data(context, entry, &tl_data)))
 	return(code);
     
     if (tl_data.tl_data_length != 4) {
@@ -183,13 +183,13 @@ krb5_dbe_update_mod_princ_data(context, entry, mod_date, mod_princ)
     krb5_error_code 	  retval = 0;
     krb5_octet		* nextloc = 0;
     char		* unparse_mod_princ = 0;
-    int			  unparse_mod_princ_size;
+    unsigned int	unparse_mod_princ_size;
 
     if ((retval = krb5_unparse_name(context, mod_princ, 
 				    &unparse_mod_princ)))
 	return(retval);
 
-    unparse_mod_princ_size = (int) strlen(unparse_mod_princ) + 1;
+    unparse_mod_princ_size = strlen(unparse_mod_princ) + 1;
 
     if ((nextloc = (krb5_octet *) malloc(unparse_mod_princ_size + 4))
 	== NULL) {
@@ -227,7 +227,7 @@ krb5_dbe_lookup_mod_princ_data(context, entry, mod_time, mod_princ)
 
     tl_data.tl_data_type = KRB5_TL_MOD_PRINC;
 
-    if (code = krb5_dbe_lookup_tl_data(context, entry, &tl_data))
+    if ((code = krb5_dbe_lookup_tl_data(context, entry, &tl_data)))
 	return(code);
     
     if ((tl_data.tl_data_length < 5) ||
@@ -239,7 +239,7 @@ krb5_dbe_lookup_mod_princ_data(context, entry, mod_time, mod_princ)
 
     /* Mod Princ */
     if ((code = krb5_parse_name(context,
-				(krb5_const char *) (tl_data.tl_data_contents+4),
+				(const char *) (tl_data.tl_data_contents+4),
 				mod_princ)))
 	return(code);
 
@@ -277,7 +277,8 @@ krb5_encode_princ_contents(context, content, entry)
     krb5_data  		* content;
     krb5_db_entry 	* entry;
 {
-    int 		  unparse_princ_size, i, j;
+    int 		  i, j;
+    unsigned int	  unparse_princ_size;
     char 		* unparse_princ;
     char		* nextloc;
     krb5_tl_data	* tl_data;
@@ -340,7 +341,7 @@ krb5_encode_princ_contents(context, content, entry)
 
     /* 
      * Now we go through entry again, this time copying data 
-     * These first entries are always saved regaurdless of version
+     * These first entries are always saved regardless of version
      */
     nextloc = content->data;
 
@@ -429,7 +430,7 @@ krb5_encode_princ_contents(context, content, entry)
 
 	for (j = 0; j < entry->key_data[i].key_data_ver; j++) {
 	    krb5_int16 type = entry->key_data[i].key_data_type[j];
-	    krb5_int16 length = entry->key_data[i].key_data_length[j];
+	    krb5_ui_2  length = entry->key_data[i].key_data_length[j];
 
     	    krb5_kdb_encode_int16(type, nextloc);
 	    nextloc += 2;
@@ -690,7 +691,8 @@ krb5_dbe_free_contents(context, entry)
 	    	if (entry->key_data[i].key_data_length[j]) {
 		    if (entry->key_data[i].key_data_contents[j]) {
 		        memset(entry->key_data[i].key_data_contents[j], 
-			       0, entry->key_data[i].key_data_length[j]);
+			       0, 
+			       (unsigned) entry->key_data[i].key_data_length[j]);
 		    	free (entry->key_data[i].key_data_contents[j]);
 		    }
 		}
@@ -723,7 +725,7 @@ krb5_dbe_search_enctype(kcontext, dbentp, start, ktype, stype, kvno, kdatap)
     krb5_int32		kvno;
     krb5_key_data	**kdatap;
 {
-    int			i, index;
+    int			i, idx;
     int			maxkvno;
     krb5_key_data	*datap;
     krb5_error_code	ret;
@@ -762,20 +764,21 @@ krb5_dbe_search_enctype(kcontext, dbentp, start, ktype, stype, kvno, kdatap)
 	    ret = KRB5_KDB_NO_PERMITTED_KEY;
 	    continue;
 	}
+	
 
-	if (ktype >= 0) {
+	if (ktype > 0) {
 	    if ((ret = krb5_c_enctype_compare(kcontext, (krb5_enctype) ktype,
 					      dbentp->key_data[i].key_data_type[0],
 					      &similar)))
 		return(ret);
 	}
 
-	if (((ktype < 0) || similar) &&
+	if (((ktype <= 0) || similar) &&
 	    ((db_stype == stype) || (stype < 0))) {
 	    if (kvno >= 0) {
 		if (kvno == dbentp->key_data[i].key_data_kvno) {
 		    datap = &dbentp->key_data[i];
-		    index = i;
+		    idx = i;
 		    maxkvno = kvno;
 		    break;
 		}
@@ -783,7 +786,7 @@ krb5_dbe_search_enctype(kcontext, dbentp, start, ktype, stype, kvno, kdatap)
 		if (dbentp->key_data[i].key_data_kvno > maxkvno) {
 		    maxkvno = dbentp->key_data[i].key_data_kvno;
 		    datap = &dbentp->key_data[i];
-		    index = i;
+		    idx = i;
 		}
 	    }
 	}
@@ -791,7 +794,7 @@ krb5_dbe_search_enctype(kcontext, dbentp, start, ktype, stype, kvno, kdatap)
     if (maxkvno < 0)
 	return ret ? ret : KRB5_KDB_NO_MATCHING_KEY;
     *kdatap = datap;
-    *start = index+1;
+    *start = idx+1;
     return 0;
 }
 

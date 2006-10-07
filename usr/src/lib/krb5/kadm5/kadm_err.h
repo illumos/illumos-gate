@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,10 +81,22 @@
 #define KADM5_SETKEY_DUP_ENCTYPES                (43787571L)
 #define KADM5_SETV4KEY_INVAL_ENCTYPE             (43787572L)
 #define KADM5_SETKEY3_ETYPE_MISMATCH             (43787573L)
-#define KADM5_RPC_ERROR_CANTENCODEARGS           (43787574L)
-#define KADM5_RPC_ERROR_CANTDECODEARGS           (43787575L)
+#define KADM5_MISSING_KRB5_CONF_PARAMS           (43787574L)
+#define KADM5_RPC_ERROR_CANTENCODEARGS           (43787575L)
+#define KADM5_RPC_ERROR_CANTDECODEARGS           (43787576L)
 
 #define ERROR_TABLE_BASE_ovk (43787520L)
 
+extern const struct error_table et_ovk_error_table;
+
+#if !defined(_WIN32)
 /* for compatibility with older versions... */
+extern void initialize_ovk_error_table (void) /*@modifies internalState@*/;
+#else
+#define initialize_ovk_error_table()
+#endif
+
+#if !defined(_WIN32)
+#define init_ovk_err_tbl initialize_ovk_error_table
 #define ovk_err_base ERROR_TABLE_BASE_ovk
+#endif

@@ -85,13 +85,14 @@ __rec_close(dbp)
 		status = RET_ERROR;
 #endif
 
-	if (!F_ISSET(t, R_INMEM))
+	if (!F_ISSET(t, R_INMEM)) {
 		if (F_ISSET(t, R_CLOSEFP)) {
 			if (fclose(t->bt_rfp))
 				status = RET_ERROR;
 		} else
 			if (close(t->bt_rfd))
 				status = RET_ERROR;
+	}
 
 	if (__bt_close(dbp) == RET_ERROR)
 		status = RET_ERROR;

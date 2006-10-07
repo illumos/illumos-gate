@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +36,6 @@
 #include <k5-int.h>
 #include "com_err.h"
 #include <krb5.h>
-
 #ifdef KRB5_KRB4_COMPAT
 #include <kerberosIV/krb.h>
 #endif /* KRB5_KRB4_COMPAT */
@@ -48,7 +47,9 @@
 #include <libintl.h>
 #include <locale.h>
 #include <netinet/in.h>
+#if defined(HAVE_ARPA_INET_H)
 #include <arpa/inet.h>
+#endif
 #include <inet/ip.h>
 #include <inet/ip6.h>
 
@@ -58,9 +59,10 @@
 #define GET_PROGNAME(x) max(max(strrchr((x), '/'), strrchr((x), '\\')) + 1,(x))
 #endif /* _WIN32 */
 
+#ifndef _WIN32
 #include <sys/socket.h>
 #include <netdb.h>
-
+#endif
 
 extern int optind;
 
@@ -74,15 +76,13 @@ size_t timestamp_width;
 krb5_context kcontext;
 
 char * etype_string (krb5_enctype );
-void show_credential (char *,
-				krb5_context,
-				krb5_creds *);
+void show_credential (krb5_creds *);
 	
 void do_ccache (char *);
 void do_keytab (char *);
 void printtime (time_t);
 void one_addr (krb5_address *);
-void fillit (FILE *, int, int);
+void fillit (FILE *, unsigned int, int);
 void show_addr(krb5_address *a);
 
 #ifdef KRB5_KRB4_COMPAT
@@ -109,7 +109,7 @@ static int default_k4 = 1;
 static int default_k4 = 0;
 #endif /* KRB5_KRB4_COMPAT */
 
-void usage()
+static void usage()
 {
 #define KRB_AVAIL_STRING(x) ((x)?gettext("available"):gettext("not available"))
 
@@ -140,7 +140,9 @@ void usage()
 
 
 int
-main(int argc, char *argv[])
+main(argc, argv)
+    int argc;
+    char **argv;
 {
     int c;
     char *name;
@@ -260,7 +262,7 @@ main(int argc, char *argv[])
 	if (!krb5_timestamp_to_sfstring(now, tmp, 20, (char *) NULL) ||
 	    !krb5_timestamp_to_sfstring(now, tmp, sizeof(tmp), 
 					(char *) NULL))
-	    timestamp_width = strlen(tmp);
+	    timestamp_width = (int) strlen(tmp);
 	else
 	    timestamp_width = 15;
     }
@@ -321,42 +323,40 @@ void do_keytab(name)
      }
 
      if ((code = krb5_kt_get_name(kcontext, kt, buf, BUFSIZ))) {
-		com_err(progname, code,
+	  com_err(progname, code,
 			gettext("while getting keytab name"));
 	  exit(1);
      }
 
-	printf(gettext("Keytab name: %s\n"), buf);
+     printf(gettext("Keytab name: %s\n"), buf);
      
      if ((code = krb5_kt_start_seq_get(kcontext, kt, &cursor))) {
-		com_err(progname, code,
+	  com_err(progname, code,
 			gettext("while starting keytab scan"));
 	  exit(1);
      }
 
      if (show_time) {
-		printf(gettext("KVNO Timestamp"));
-		fillit(stdout, timestamp_width -
-		    sizeof (gettext("Timestamp")) + 2, (int)' ');
-		printf(gettext("Principal\n"));
-		printf("---- ");
+	  printf(gettext("KVNO Timestamp"));
+	  fillit(stdout, timestamp_width -
+	    sizeof (gettext("Timestamp")) + 2, (int)' ');
+	  printf(gettext("Principal\n"));
+	  printf("---- ");
 	  fillit(stdout, timestamp_width, (int) '-');
 	  printf(" ");
-		fillit(stdout, 78 - timestamp_width -
+	  fillit(stdout, 78 - timestamp_width -
 		    sizeof (gettext("KVNO")), (int)'-');
 	  printf("\n");
      } else {
-		printf(gettext("KVNO Principal\n"));
-		printf("---- ------------------------------"
+	  printf(gettext("KVNO Principal\n"));
+	  printf("---- ------------------------------"
 			    "--------------------------------------"
 			    "------\n");
      }
      
-	while ((code = krb5_kt_next_entry(kcontext, kt,
-					&entry, &cursor)) == 0) {
-		if (code = krb5_unparse_name(kcontext,
-					    entry.principal, &pname)) {
-			com_err(progname, code,
+     while ((code = krb5_kt_next_entry(kcontext, kt, &entry, &cursor)) == 0) {
+	  if ((code = krb5_unparse_name(kcontext, entry.principal, &pname))) {
+	       com_err(progname, code,
 				gettext("while unparsing principal name"));
 	       exit(1);
 	  }
@@ -443,7 +443,7 @@ void do_ccache(name)
 			gettext("while setting cache "
 				"flags(ticket cache %s:%s)"),
 			krb5_cc_get_type(kcontext, cache),
-                        krb5_cc_get_name(kcontext, cache));
+			krb5_cc_get_name(kcontext, cache));
 	}
 	exit(1);
     }
@@ -463,7 +463,7 @@ void do_ccache(name)
 		printf(gettext("Ticket cache: %s:%s\nDefault principal: "
 			    "%s\n\n"),
 	       krb5_cc_get_type(kcontext, cache),
-               krb5_cc_get_name(kcontext, cache), defname);
+	       krb5_cc_get_name(kcontext, cache), defname);
 		fputs(gettext("Valid starting"), stdout);
 		fillit(stdout, timestamp_width -
 		    sizeof (gettext("Valid starting")) + 3, (int)' ');
@@ -490,7 +490,7 @@ void do_ccache(name)
 		creds.times.endtime > now)
 		exit_status = 0;
 	} else {
-	    show_credential(progname, kcontext, &creds);
+	    show_credential(&creds);
 	}
 	krb5_free_cred_contents(kcontext, &creds);
     }
@@ -537,7 +537,7 @@ etype_string(enctype)
     return buf;
 }
 
-char *
+static char *
 flags_string(cred)
     register krb5_creds *cred;
 {
@@ -566,6 +566,12 @@ flags_string(cred)
 	buf[i++] = 'H';
     if (cred->ticket_flags & TKT_FLG_PRE_AUTH)
 	buf[i++] = 'A';
+    if (cred->ticket_flags & TKT_FLG_TRANSIT_POLICY_CHECKED)
+	buf[i++] = 'T';
+    if (cred->ticket_flags & TKT_FLG_OK_AS_DELEGATE)
+	buf[i++] = 'O';		/* D/d are taken.  Use short strings?  */
+    if (cred->ticket_flags & TKT_FLG_ANONYMOUS)
+	buf[i++] = 'a';
     buf[i] = '\0';
     return(buf);
 }
@@ -585,9 +591,7 @@ printtime(tv)
 }
 
 void
-show_credential(progname, kcontext, cred)
-    char 		* progname;
-    krb5_context  	  kcontext;
+show_credential(cred)
     register krb5_creds * cred;
 {
     krb5_error_code retval;
@@ -657,18 +661,22 @@ show_credential(progname, kcontext, cred)
 
     if (show_etype) {
 	retval = decode_krb5_ticket(&cred->ticket, &tkt);
-	if (retval == 0) {
-	    if (!extra_field)
-		fputs("\t",stdout);
-	    else
-		fputs(", ",stdout);
-	    printf(gettext("Etype(skey, tkt): %s, "),
-		etype_string(cred->keyblock.enctype));
-	    printf("%s ",
-		etype_string(tkt->enc_part.enctype));
+	if (retval)
+	    goto err_tkt;
+
+	if (!extra_field)
+	    fputs("\t",stdout);
+	else
+	    fputs(", ",stdout);
+	printf(gettext("Etype(skey, tkt): %s, "),
+	       etype_string(cred->keyblock.enctype));
+	printf("%s ",
+	       etype_string(tkt->enc_part.enctype));
+	extra_field++;
+
+    err_tkt:
+	if (tkt != NULL)
 	    krb5_free_ticket(kcontext, tkt);
-	    extra_field++;
-	}
     }
 
     /* if any additional info was printed, extra_field is non-zero */
@@ -762,7 +770,7 @@ void one_addr(a)
 void
 fillit(f, num, c)
     FILE		*f;
-    int			num;
+    unsigned int	num;
     int			c;
 {
     int i;
@@ -812,7 +820,8 @@ do_v4_ccache(name)
      */
 
     /* Open ticket file */
-    if (k_errno = tf_init(file, R_TKT_FIL)) {
+    k_errno = tf_init(file, R_TKT_FIL);
+    if (k_errno) {
 	fprintf(stderr, "%s: %s\n", progname, krb_get_err_text (k_errno));
 	exit(1);
     }
@@ -832,7 +841,7 @@ do_v4_ccache(name)
     }
 
     /* Open ticket file */
-    if (k_errno = tf_init(file, R_TKT_FIL)) {
+    if ((k_errno = tf_init(file, R_TKT_FIL))) {
 	fprintf(stderr, "%s: %s\n", progname, krb_get_err_text (k_errno));
 	exit(1);
     }
@@ -861,7 +870,7 @@ do_v4_ccache(name)
 	}
 	printtime(c.issue_date);
 	fputs("  ", stdout);
-	printtime(c.issue_date + ((unsigned char) c.lifetime) * 5 * 60);
+	printtime(krb_life_to_time(c.issue_date, c.lifetime));
 	printf("  %s%s%s%s%s\n",
 	       c.service, (c.instance[0] ? "." : ""), c.instance,
 	       (c.realm[0] ? "@" : ""), c.realm);

@@ -1,9 +1,7 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * lib/kdb/setup_mkey.c
+ * kadmin/passwd/kpasswd.h
  *
- * Copyright 1990 by the Massachusetts Institute of Technology.
+ * Copyright 2001 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -26,51 +24,26 @@
  * or implied warranty.
  * 
  *
- * krb5_kdb_setup_mkey()
+ * Prototypes for the kpasswd program callback functions.
  */
 
-#include "k5-int.h"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/*
- * Given a key name and a realm name, construct a principal which can be used
- * to fetch the master key from the database.
- * 
- * If the key name is NULL, the default key name will be used.
- */
 
-#define	REALM_SEP_STRING	"@"
+#ifndef __KPASSWD_H__
+#define __KPASSWD_H__
 
-krb5_error_code
-krb5_db_setup_mkey_name(context, keyname, realm, fullname, principal)
-    krb5_context context;
-    const char *keyname;
-    const char *realm;
-    char **fullname;
-    krb5_principal *principal;
-{
-    krb5_error_code retval;
-    size_t keylen;
-    size_t rlen = strlen(realm);
-    char *fname;
-    
-    if (!keyname)
-	keyname = KRB5_KDB_M_NAME;	/* XXX external? */
+int kpasswd(krb5_context context, int argc, char *argv[]);
 
-    keylen = strlen(keyname);
-	 
-    fname = malloc(keylen+rlen+strlen(REALM_SEP_STRING)+1);
-    if (!fname)
-	return ENOMEM;
+long read_old_password(krb5_context context, char *password, 
+		       unsigned int *pwsize);
 
-    strcpy(fname, keyname);
-    strcat(fname, REALM_SEP_STRING);
-    strcat(fname, realm);
+long read_new_password(void *server_handle, char *password, 
+		       unsigned int *pwsize, char *msg_ret, 
+		       int msg_len, krb5_principal princ);
 
-    if ((retval = krb5_parse_name(context, fname, principal)))
-	return retval;
-    if (fullname)
-	*fullname = fname;
-    else
-	free(fname);
-    return 0;
-}
+void display_intro_message(const char *fmt_string, const char *arg_string);
+
+#endif /* __KPASSWD_H__ */
+
+

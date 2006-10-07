@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,9 @@
 #include <com_err.h>
 #include <string.h>
 #include <stdio.h>
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 #include <locale.h>
 #include <rpc/types.h>
 #include <rpc/rpcsys.h>
@@ -77,7 +80,7 @@ int default_k4 = 0;
 #endif
 
 
-void usage()
+static void usage()
 {
 #define KRB_AVAIL_STRING(x) ((x)?gettext("available"):gettext("not available"))
 
@@ -240,7 +243,8 @@ main(argc, argv)
 		exit(1);
 	    }
 	} else {
-	    if (code = krb5_cc_default(kcontext, &cache)) {
+	    code = krb5_cc_default(kcontext, &cache);
+	    if (code) {
 		com_err(progname, code, gettext("while getting default ccache"));
 		exit(1);
 	    }

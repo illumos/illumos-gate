@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -13,9 +13,8 @@
 #ifndef _ss_h
 #define _ss_h __FILE__
 
-#include <ss/mit-sipb-copyright.h>
-#include <ss/ss_err.h>
 #include <errno.h>
+#include <ss/ss_err.h>
 
 #ifdef __STDC__
 #define __SS_CONST const
@@ -52,16 +51,24 @@ typedef struct _ss_rp_options {	/* DEFAULT VALUES */
 #define SS_OPT_DONT_SUMMARIZE	0x0002
 
 void ss_help __SS_PROTO;
+void ss_list_requests __SS_PROTO;
+void ss_quit __SS_PROTO;
 char *ss_current_request();
-char *ss_name();
-#ifdef __STDC__
+char *ss_name(int);
 void ss_error (int, long, char const *, ...);
 void ss_perror (int, long, char const *);
-#else
-void ss_error ();
-void ss_perror ();
-#endif
-void ss_abort_subsystem();
+int ss_listen (int);
+int ss_create_invocation(char *, char *, char *, ss_request_table *, int *);
+void ss_delete_invocation(int);
+void ss_add_info_dir(int , char *, int *);
+void ss_delete_info_dir(int , char *, int *);
+int ss_execute_command(int sci_idx, char **);
+void ss_abort_subsystem(int, int);
+void ss_set_prompt(int, char *);
+char *ss_get_prompt(int);
+void ss_add_request_table(int, ss_request_table *, int, int *);
+void ss_delete_request_table(int, ss_request_table *, int *);
+int ss_execute_line (int, char*);
 extern ss_request_table ss_std_requests;
 
 /* toggles the display of debugging messages */

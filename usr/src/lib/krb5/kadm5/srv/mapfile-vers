@@ -36,19 +36,12 @@ SUNW_1.1 {
 
 SUNWprivate_1.1 {
     global:
-	acl_check;
-	acl_finish;
-	acl_impose_restrictions;
-	acl_init;
+	__kadm5_get_priv;
+	_kadm5_get_kpasswd_protocol;
 	adb_policy_close;
 	adb_policy_init;
 	destroy_dict;
 	find_word;
-	free_history_entry;
-	get_either_iter;
-	get_pols_iter;
-	get_princs_iter;
-	glob_to_regexp;
 	handle_chpw;
 	hist_db;
 	hist_encblock;
@@ -59,7 +52,6 @@ SUNWprivate_1.1 {
 	kadm5_chpass_principal;
 	kadm5_chpass_principal_3;
 	kadm5_chpass_principal_util;
-	kadm5_chpass_principal_v2;
 	kadm5_create_policy;
 	kadm5_create_policy_internal;
 	kadm5_create_principal;
@@ -76,20 +68,18 @@ SUNWprivate_1.1 {
 	kadm5_get_adm_host_srv_name;
 	kadm5_get_config_params;
 	kadm5_get_cpw_host_srv_name;
-	kadm5_get_either;
 	kadm5_get_kiprop_host_srv_name;
-	_kadm5_get_kpasswd_protocol;
 	kadm5_get_master;
 	kadm5_get_policies;
 	kadm5_get_policy;
 	kadm5_get_principal;
 	kadm5_get_principals;
-	__kadm5_get_priv;
+	kadm5_get_privs;
 	kadm5_init;
 	kadm5_init_iprop;
 	kadm5_init_with_creds;
 	kadm5_init_with_password;
-	kadm5_init_with_skey;
+	kadm5_lock;
 	kadm5_modify_policy;
 	kadm5_modify_policy_internal;
 	kadm5_modify_principal;
@@ -98,6 +88,11 @@ SUNWprivate_1.1 {
 	kadm5_rename_principal;
 	kadm5_setkey_principal;
 	kadm5_setkey_principal_3;
+	kadm5_unlock;
+	kadm5int_acl_check;
+	kadm5int_acl_finish;
+	kadm5int_acl_impose_restrictions;
+	kadm5int_acl_init;kadm5_init_with_skey;
 	kdb_delete_entry;
 	kdb_free_entry;
 	kdb_get_entry;
@@ -106,6 +101,7 @@ SUNWprivate_1.1 {
 	kdb_iter_entry;
 	kdb_put_entry;
 	krb5_aprof_finish;
+	krb5_aprof_get_boolean;
 	krb5_aprof_get_deltat;
 	krb5_aprof_get_int32;
 	krb5_aprof_get_string;
@@ -149,9 +145,6 @@ SUNWprivate_1.1 {
 	osa_free_policy_ent;
 	osa_free_princ_ent;
 	passwd_check;
-	xdralloc_create;
-	xdralloc_getdata;
-	xdralloc_release;
 	xdr_chpass3_arg;
 	xdr_chpass_arg;
 	xdr_chrand3_arg;
@@ -180,14 +173,17 @@ SUNWprivate_1.1 {
 	xdr_krb5_enctype;
 	xdr_krb5_flags;
 	xdr_krb5_int16;
-	xdr_krb5_keyblock;
 	xdr_krb5_key_data;
 	xdr_krb5_key_data_nocontents;
+	xdr_krb5_key_salt_tuple;
+	xdr_krb5_keyblock;
 	xdr_krb5_kvno;
 	xdr_krb5_octet;
 	xdr_krb5_principal;
+	xdr_krb5_salttype;
 	xdr_krb5_timestamp;
 	xdr_krb5_tl_data;
+	xdr_krb5_ui_2;
 	xdr_krb5_ui_4;
 	xdr_mpol_arg;
 	xdr_mprinc_arg;
@@ -200,6 +196,9 @@ SUNWprivate_1.1 {
 	xdr_setkey3_arg;
 	xdr_setkey_arg;
 	xdr_ui_4;
+	xdralloc_create;
+	xdralloc_getdata;
+	xdralloc_release;
     local:
 	*;
 };

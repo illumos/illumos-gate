@@ -8,10 +8,7 @@
 
 #include "ss_internal.h"
 #include "copyright.h"
-
-/* global indicating if we should be printing debug messages */
-extern int g_displayDebugSS;
-
+#include <errno.h>
 
 enum parse_mode { WHITESPACE, TOKEN, QUOTED_STRING };
 
@@ -58,9 +55,7 @@ char **ss_parse (sci_idx, line_ptr, argc_ptr)
     while (1) {
 #ifdef DEBUG
 	{
-		if (g_displayDebugSS)
-			printf ("character `%c', mode %d\n",
-				*line_ptr, parse_mode);
+	    printf ("character `%c', mode %d\n", *line_ptr, parse_mode);
 	}
 #endif
 	while (parse_mode == WHITESPACE) {
@@ -130,15 +125,13 @@ char **ss_parse (sci_idx, line_ptr, argc_ptr)
 end_of_line:
     *argc_ptr = argc;
 #ifdef DEBUG
-
-	if (g_displayDebugSS)
-    	{
-		int i;
-		printf ("argc = %d\n", argc);
-		for (i = 0; i <= argc; i++)
-	    		printf ("\targv[%2d] = `%s'\n", i,
-		    		argv[i] ? argv[i] : "<NULL>");
-    	}
+    {
+	int i;
+	printf ("argc = %d\n", argc);
+	for (i = 0; i <= argc; i++)
+	    printf ("\targv[%2d] = `%s'\n", i,
+		    argv[i] ? argv[i] : "<NULL>");
+    }
 #endif
     return(argv);
 }

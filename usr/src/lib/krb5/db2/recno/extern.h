@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _KRB5_DB2_RECNO_EXTERN_H
@@ -49,6 +49,24 @@ extern "C" {
  */
 
 #include "../btree/extern.h"
+
+#define __rec_close	__kdb2_rec_close
+#define __rec_delete	__kdb2_rec_delete
+#define __rec_dleaf	__kdb2_rec_dleaf
+#define __rec_fd	__kdb2_rec_fd
+#define __rec_fmap	__kdb2_rec_fmap
+#define __rec_fout	__kdb2_rec_fout
+#define __rec_fpipe	__kdb2_rec_fpipe
+#define __rec_get	__kdb2_rec_get
+#define __rec_iput	__kdb2_rec_iput
+#define __rec_put	__kdb2_rec_put
+#define __rec_ret	__kdb2_rec_ret
+#define __rec_search	__kdb2_rec_search
+#define __rec_seq	__kdb2_rec_seq
+#define __rec_sync	__kdb2_rec_sync
+#define __rec_vmap	__kdb2_rec_vmap
+#define __rec_vout	__kdb2_rec_vout
+#define __rec_vpipe	__kdb2_rec_vpipe
 
 int	 __rec_close __P((DB *));
 int	 __rec_delete __P((const DB *, const DBT *, u_int));

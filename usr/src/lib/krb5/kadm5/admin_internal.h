@@ -21,7 +21,6 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/admin_internal.h,v 1.13.18.1 2000/05/19 22:24:14 raeburn Exp $
  */
 
 #ifndef __KADM5_ADMIN_INTERNAL_H__
@@ -82,18 +81,17 @@
  *
  * Got that?
  */
-int _kadm5_check_handle();
-
 #define _KADM5_CHECK_HANDLE(handle) \
-{ int code; if ((code = _kadm5_check_handle((void *)handle))) return code; }
+{ int ecode; if ((ecode = _kadm5_check_handle((void *)handle))) return ecode;}
 
+int         _kadm5_check_handle(void *handle);
 kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
 					 void *lhandle,
 					 krb5_principal princ,
 					 char *new_pw, 
 					 char **ret_pw,
 					 char *msg_ret,
-					 int msg_len);
+					 unsigned int msg_len);
 
 /* this is needed by the alt_prof code I stole.  The functions
    maybe shouldn't be named krb5_*, but they are. */

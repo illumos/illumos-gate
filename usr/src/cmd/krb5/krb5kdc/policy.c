@@ -33,12 +33,9 @@
 #include "kdc_util.h"
 
 int
-against_local_policy_as(request, client, server, kdc_time, status)
-register krb5_kdc_req *request;
-krb5_db_entry client;
-krb5_db_entry server;
-krb5_timestamp kdc_time;
-const char	**status;
+against_local_policy_as(register krb5_kdc_req *request, krb5_db_entry client,
+			krb5_db_entry server, krb5_timestamp kdc_time,
+			const char **status)
 {
 #if 0
      /* An AS request must include the addresses field */
@@ -55,11 +52,8 @@ const char	**status;
  * This is where local policy restrictions for the TGS should placed.
  */
 krb5_error_code
-against_local_policy_tgs(request, server, ticket, status)
-register krb5_kdc_req *request;
-krb5_db_entry server;
-krb5_ticket *ticket;
-const char **status;
+against_local_policy_tgs(register krb5_kdc_req *request, krb5_db_entry server,
+			 krb5_ticket *ticket, const char **status)
 {
 #if 0
     /*

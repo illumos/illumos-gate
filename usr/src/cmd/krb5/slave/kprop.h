@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -22,7 +22,7 @@ extern "C" {
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -36,18 +36,17 @@ extern "C" {
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  */
 
-#define	KPROP_SERVICE_NAME "host"
-#define	TGT_SERVICE_NAME "krbtgt"
-#define	KPROP_SERVICE "krb5_prop"
-#define	KPROP_CKSUMTYPE CKSUMTYPE_RSA_MD4_DES
+#define KPROP_SERVICE_NAME "host"
+#define TGT_SERVICE_NAME "krbtgt"
+#define KPROP_SERVICE "krb5_prop"
 
-#define	KPROP_PROT_VERSION "kprop5_01"
+#define KPROP_PROT_VERSION "kprop5_01"
 
-#define	KPROP_BUFSIZ 32768
+#define KPROP_BUFSIZ 32768
 
 extern krb5_address *cvtkaddr(struct sockaddr_storage *ss, krb5_address *krbap);
 

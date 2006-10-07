@@ -1,11 +1,15 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= kadmin kadmin.local
+SHFILES= k5srvutil
+CLOBBERFILES= $(SHFILES) 
+
+KRB5SBINSHFILES= $(SHFILES:%=$(KRB5SBIN)/%)
 
 COMMON_OBJS   = kadmin.o kadmin_ct.o ss_wrapper.o getdate.o keytab.o
 RMT_OBJS= $(COMMON_OBJS) kadmin_rmt.o
@@ -16,8 +20,8 @@ SRCS	= $(OBJS:.o=.c)
 include ../../../Makefile.cmd
 include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 
-POFILE = kadmin.po
-POFILES = generic.po
+POFILE = generic.po
+POFILES = kadmin.po k5srvutil.po
 
 DEFS = -DHAVE_LIBSOCKET=1 -DHAVE_LIBNSL=1 -DHAVE_UNISTD_H=1 -DHAVE_SYS_TIMEB_H=1 \
 	-DHAVE_ALLOCA_H=1 -DHAVE_FTIME=1 -DHAVE_TIMEZONE
@@ -43,7 +47,7 @@ kadmin.local:=	DEFS += -D_KADMIN_LOCAL_
 
 .KEEP_STATE:
 
-all: $(PROG)
+all: $(PROG) $(SHFILES)
 
 kadmin:	$(RMT_OBJS)
 	$(LINK.c) $(RMT_OBJS) -o $@ $(CLLIBS)
@@ -53,7 +57,11 @@ kadmin.local:	$(LOC_OBJS)
 	$(LINK.c) $(LOC_OBJS) -o $@ $(SRVLIBS)
 	$(POST_PROCESS)
 
-install: $(KRB5SBINPROG)
+$(SHFILES): $(SHFILES).sh
+	$(RM) $(SHFILES)
+	$(CP) $(SHFILES).sh $(SHFILES)
+
+install: $(KRB5SBINPROG) $(KRB5SBINSHFILES)
 
 clean:
 	$(RM) $(OBJS)
@@ -66,7 +74,7 @@ $(POFILE): $(DERIVED_FILES) .WAIT $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
 
-generic.po: FRC
+kadmin.po: FRC
 	$(RM) messages.po
 	$(XGETTEXT) $(XGETFLAGS) `$(GREP) -l gettext *.[ch]`
 	$(SED) "/^domain/d" messages.po > $@

@@ -74,10 +74,8 @@ static int num_entries = 0;
    FALSE if the caller should do the work */
 
 krb5_boolean
-kdc_check_lookaside(inpkt, from, outpkt)
-    register krb5_data *inpkt;
-    register const krb5_fulladdr *from;
-    register krb5_data **outpkt;
+kdc_check_lookaside(krb5_data *inpkt, const krb5_fulladdr *from,
+		    krb5_data **outpkt)
 {
     krb5_int32 timenow;
     register krb5_kdc_replay_ent *eptr, *last, *hold;
@@ -130,10 +128,8 @@ kdc_check_lookaside(inpkt, from, outpkt)
    already there, and can fail softly due to other weird errors. */
 
 void
-kdc_insert_lookaside(inpkt, from, outpkt)
-    register krb5_data *inpkt;
-    register const krb5_fulladdr *from;
-    register krb5_data *outpkt;
+kdc_insert_lookaside(krb5_data *inpkt, const krb5_fulladdr *from,
+		     krb5_data *outpkt)
 {
     register krb5_kdc_replay_ent *eptr;    
     krb5_int32 timenow;
@@ -173,6 +169,25 @@ kdc_insert_lookaside(inpkt, from, outpkt)
     root_ptr.next = eptr;
     num_entries++;
     return;
+}
+
+/* frees memory associated with the lookaside queue for memory profiling */
+void
+kdc_free_lookaside(krb5_context kcontext)
+{
+    register krb5_kdc_replay_ent *eptr, *last, *hold;
+    if (root_ptr.next) {
+        for (last = &root_ptr, eptr = root_ptr.next;
+	     eptr; eptr = eptr->next) {
+		krb5_free_data(kcontext, eptr->req_packet);
+		krb5_free_data(kcontext, eptr->reply_packet);
+		krb5_free_address(kcontext, eptr->addr);
+		hold = eptr;
+		last->next = eptr->next;
+		eptr = last;
+		free(hold);
+	}
+    }
 }
 
 #endif /* NOCACHE */

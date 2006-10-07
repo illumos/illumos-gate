@@ -53,11 +53,6 @@ static BKT *mpool_bkt __P((MPOOL *));
 static BKT *mpool_look __P((MPOOL *, db_pgno_t));
 static int  mpool_write __P((MPOOL *, BKT *));
 
-#if DEBUG_DB
-
-extern int g_displayDebugDB;
-#endif
-
 /*
  * mpool_open --
  *	Initialize a memory pool.
@@ -165,13 +160,10 @@ mpool_delete(mp, page)
 
 	bp = (BKT *)((char *)page - sizeof(BKT));
 
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	if (!(bp->flags & MPOOL_PINNED)) {
-		if (g_displayDebugDB) {
-			fprintf(stderr,
-				"mpool_delete: page %d not pinned\n",
-				bp->pgno);
-		}
+		(void)fprintf(stderr,
+		    "mpool_delete: page %d not pinned\n", bp->pgno);
 		abort();
 	}
 #endif
@@ -206,13 +198,10 @@ mpool_get(mp, pgno, flags)
 
 	/* Check for a page that is cached. */
 	if ((bp = mpool_look(mp, pgno)) != NULL) {
-#ifdef DEBUG_DB
+#ifdef DEBUG
 		if (!(flags & MPOOL_IGNOREPIN) && bp->flags & MPOOL_PINNED) {
-			if (g_displayDebugDB) {
-				fprintf(stderr,
-					"mpool_get: page %d already pinned\n",
-					bp->pgno);
-			}
+			(void)fprintf(stderr,
+			    "mpool_get: page %d already pinned\n", bp->pgno);
 			abort();
 		}
 #endif
@@ -240,6 +229,12 @@ mpool_get(mp, pgno, flags)
 	++mp->pageread;
 #endif
 	off = mp->pagesize * pgno;
+	if (off / mp->pagesize != pgno) {
+	    /* Run past the end of the file, or at least the part we
+	       can address without large-file support?  */
+	    errno = E2BIG;
+	    return NULL;
+	}
 	if (lseek(mp->fd, off, SEEK_SET) != off)
 		return (NULL);
 
@@ -294,13 +289,10 @@ mpool_put(mp, page, flags)
 	++mp->pageput;
 #endif
 	bp = (BKT *)((char *)page - sizeof(BKT));
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	if (!(bp->flags & MPOOL_PINNED)) {
-		if (g_displayDebugDB) {
-			fprintf(stderr,
-				"mpool_put: page %d not pinned\n",
-				bp->pgno);
-		}
+		(void)fprintf(stderr,
+		    "mpool_put: page %d not pinned\n", bp->pgno);
 		abort();
 	}
 #endif
@@ -387,7 +379,7 @@ mpool_bkt(mp)
 			head = &mp->hqh[HASHKEY(bp->pgno)];
 			CIRCLEQ_REMOVE(head, bp, hq);
 			CIRCLEQ_REMOVE(&mp->lqh, bp, q);
-#ifdef DEBUG_DB
+#ifdef DEBUG
 			{ void *spage;
 				spage = bp->page;
 				memset(bp, 0xff, sizeof(BKT) + mp->pagesize);
@@ -403,7 +395,7 @@ new:	if ((bp = (BKT *)malloc(sizeof(BKT) + mp->pagesize)) == NULL)
 #ifdef STATISTICS
 	++mp->pagealloc;
 #endif
-#if defined(DEBUG_DB) || defined(PURIFY)
+#if defined(DEBUG) || defined(PURIFY)
 	memset(bp, 0xff, sizeof(BKT) + mp->pagesize);
 #endif
 	bp->page = (char *)bp + sizeof(BKT);
@@ -432,6 +424,12 @@ mpool_write(mp, bp)
 		(mp->pgout)(mp->pgcookie, bp->pgno, bp->page);
 
 	off = mp->pagesize * bp->pgno;
+	if (off / mp->pagesize != bp->pgno) {
+	    /* Run past the end of the file, or at least the part we
+	       can address without large-file support?  */
+	    errno = E2BIG;
+	    return RET_ERROR;
+	}
 	if (lseek(mp->fd, off, SEEK_SET) != off)
 		return (RET_ERROR);
 	if (write(mp->fd, bp->page, mp->pagesize) != mp->pagesize)

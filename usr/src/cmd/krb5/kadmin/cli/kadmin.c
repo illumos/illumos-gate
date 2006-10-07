@@ -33,8 +33,8 @@
  */
 
 #include <krb5.h>
-#include <k5-int.h>
 #include <kadm5/admin.h>
+#include <krb5/adm_proto.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
@@ -56,17 +56,9 @@
 
 /* functions defined in remote/local specific files */
 extern void usage(const char *);
-extern void debugEnable(int);
 
-/* local principal helpers */
-static char *find_component(const char *, char);
-static char *trim_principal(char *);
-static char *build_admin_princ(const char *, const char *);
-
-/*
- * special struct to convert flag names for principals
- * to actual krb5_flags for a principal
- */
+/* special struct to convert flag names for principals
+   to actual krb5_flags for a principal */
 struct pflag {
     char *flagname;		/* name of flag as typed to CLI */
     int flaglen;		/* length of string (not counting -,+) */
@@ -113,19 +105,23 @@ char *getenv();
 int exit_status = 0;
 char *def_realm = NULL;
 char *whoami = NULL;
-time_t get_date();
 
 void *handle = NULL;
 krb5_context context;
 char *ccache_name = NULL;
 
-char *
-strdur(duration)
+int locked = 0;
+static char *strdur(duration)
     time_t duration;
 {
-	static char out[100];
-    int days, hours, minutes, seconds;
-    
+    static char out[50];
+    int neg, days, hours, minutes, seconds;
+
+    if (duration < 0) {
+	duration *= -1;
+	neg = 1;
+    } else
+	neg = 0;
     days = duration / (24 * 3600);
     duration %= 24 * 3600;
     hours = duration / 3600;
@@ -133,35 +129,27 @@ strdur(duration)
     minutes = duration / 60;
     duration %= 60;
     seconds = duration;
-	if (days == 1) {
-		snprintf(out, sizeof (out), gettext("%d day %02d:%02d:%02d"),
-			days, hours, minutes, seconds);
-	} else {
-		snprintf(out, sizeof (out), gettext("%d days %02d:%02d:%02d"),
-			days, hours, minutes, seconds);
-}
-	return (out);
+    snprintf(out, sizeof (out), "%s%d %s %02d:%02d:%02d", neg ? "-" : "",
+	    days, days == 1 ? gettext("day") : gettext("days"),
+	    hours, minutes, seconds);
+    return out;
 }
 
-char *
-strdate(when)
+static char *strdate(when)
     krb5_timestamp when;
 {
     struct tm *tm;
-    static char out[30];
+    static char out[40];
     
     time_t lcltim = when;
-
     tm = localtime(&lcltim);
-	strftime(out, 30, gettext("%a %b %d %H:%M:%S %Z %Y"), tm);
-	return (out);
+    strftime(out, sizeof(out), gettext("%a %b %d %H:%M:%S %Z %Y"), tm);
+    return out;
 }
 
-/*
- * this is a wrapper to go around krb5_parse_principal so we can set
- * the default realm up properly
- */
-krb5_error_code
+/* this is a wrapper to go around krb5_parse_principal so we can set
+   the default realm up properly */
+static krb5_error_code 
 kadmin_parse_name(name, principal)
     char *name;
     krb5_principal *principal;
@@ -175,14 +163,14 @@ kadmin_parse_name(name, principal)
     /* assumes def_realm is initialized! */
     fullname = (char *)malloc(strlen(name) + 1 + strlen(def_realm) + 1);
     if (fullname == NULL)
-		return (ENOMEM);
+	return ENOMEM;
     strcpy(fullname, name);
     cp = strchr(fullname, '@');
     while (cp) {
 	if (cp - fullname && *(cp - 1) != '\\')
 	    break;
 	else
-	    cp = strchr((cp + 1), '@');
+	    cp = strchr(cp + 1, '@');
     }
     if (cp == NULL) {
 	strcat(fullname, "@");
@@ -190,120 +178,114 @@ kadmin_parse_name(name, principal)
     }
     retval = krb5_parse_name(context, fullname, principal);
     free(fullname);
-    return (retval);
+    return retval;
 }
 
-char *
-kadmin_startup(argc, argv)
+char *kadmin_startup(argc, argv)
     int argc;
     char *argv[];
 {
-    extern krb5_kt_ops krb5_ktf_writable_ops;
     extern char *optarg;
     char *princstr = NULL, *keytab_name = NULL, *query = NULL;
     char *password = NULL;
-	char *kadmin_princ = NULL;
     char *luser, *canon, *cp;
-	int optchar, use_keytab = 0, debug = 0;
+    int optchar, freeprinc = 0, use_keytab = 0;
     struct passwd *pw;
     kadm5_ret_t retval;
     krb5_ccache cc;
     krb5_principal princ;
     kadm5_config_params params;
+    char *svcname = NULL;
 
     memset((char *) &params, 0, sizeof(params));
     
-    if (retval = krb5_init_context(&context)) {
-	com_err(whoami, retval,
+    retval = krb5_init_context(&context);
+    if (retval) {
+	 com_err(whoami, retval,
 		gettext("while initializing krb5 library"));
 	 exit(1);
     }
-    while ((optchar = getopt(argc, argv, "Dr:p:kq:w:d:s:mc:t:e:O")) != EOF) {
+		     
+    while ((optchar = getopt(argc, argv, "r:p:kq:w:d:s:mc:t:e:O")) != EOF) {
 	switch (optchar) {
-	case 'O':	/* Undocumented option for testing only */
-		kadmin_princ = KADM5_ADMIN_SERVICE_P;
-		break;
-	case 'D':
-		debug++;
-		break;
 	case 'r':
 	    def_realm = optarg;
 	    break;
 	case 'p':
-		princstr = strdup(optarg);
-		if (princstr == NULL) {
-			fprintf(stderr, gettext("Out of memory in %s\n"),
-				whoami);
-			exit(1);
-		}
-		break;
-	case 'c':
+	    princstr = optarg;
+	    break;
+        case 'c':
 	    ccache_name = optarg;
 	    break;
-	case 'k':
+        case 'k':
 	    use_keytab++;
 	    break;
        case 't':
 	    keytab_name = optarg;
 	    break;
-	case 'w':
+        case 'w':
 	    password = optarg;
 	    break;
 	case 'q':
 	    query = optarg;
 	    break;
-	case 'd':
+        case 'd':
 	    params.dbname = optarg;
 	    params.mask |= KADM5_CONFIG_DBNAME;
 	    break;
-	case 's':
+        case 's':
 	    params.admin_server = optarg;
 	    params.mask |= KADM5_CONFIG_ADMIN_SERVER;
 	    break;
-	case 'm':
+        case 'm':
 	    params.mkey_from_kbd = 1;
 	    params.mask |= KADM5_CONFIG_MKEY_FROM_KBD;
 	    break;
-	case 'e':
+        case 'e':
 	    retval = krb5_string_to_keysalts(optarg,
-				     ", \t", ":.-", 0,
-				     &params.keysalts,
-				     &params.num_keysalts);
+					     ", \t",
+					     ":.-",
+					     0,
+					     &params.keysalts,
+					     &params.num_keysalts);
 	    if (retval) {
-		com_err(whoami, retval,
+		 com_err(whoami, retval,
 			gettext("while parsing keysalts %s"), optarg);
-		exit(1);
+		 exit(1);
 	    }
 	    params.mask |= KADM5_CONFIG_ENCTYPES;
+	    break;
+	case 'O':	/* Undocumented option for testing only */
+		svcname = KADM5_ADMIN_SERVICE_P;
 	    break;
 	default:
 	    usage(whoami);
 	}
     }
-
-    debugEnable(debug);
-
     if ((ccache_name && use_keytab) ||
 	(keytab_name && !use_keytab))
-	usage(whoami);
+	 usage(whoami);
 
     if (def_realm == NULL && krb5_get_default_realm(context, &def_realm)) {
-	free(princstr);
+	if (freeprinc)
+	    free(princstr);
 	fprintf(stderr,
 		gettext("%s: unable to get default realm\n"), whoami);
 	exit(1);
     }
+
     params.mask |= KADM5_CONFIG_REALM;
     params.realm = def_realm;
 
-    if (kadmin_princ == NULL) {
+    if (svcname == NULL) {
 	if (kadm5_get_adm_host_srv_name(context,
-			       def_realm, &kadmin_princ)) {
+			       def_realm, &svcname)) {
 		fprintf(stderr,
 			gettext("%s: unable to get host based "
 				"service name for realm %s\n"),
 			whoami, def_realm);
-		free(princstr);
+		if (freeprinc)
+			free(princstr);
 		exit(1);
 	}
     }
@@ -313,14 +295,14 @@ kadmin_startup(argc, argv)
      * argument or the default.
      */
     if (ccache_name == NULL) {
-	 if (retval = krb5_cc_default(context, &cc)) {
+	 if ((retval = krb5_cc_default(context, &cc))) {
 	      com_err(whoami, retval,
 				gettext("while opening default "
 					"credentials cache"));
 	      exit(1);
 	 }
     } else {
-	 if (retval = krb5_cc_resolve(context, ccache_name, &cc)) {
+	 if ((retval = krb5_cc_resolve(context, ccache_name, &cc))) {
 	      com_err(whoami, retval,
 			gettext("while opening credentials cache %s"),
 			ccache_name);
@@ -329,47 +311,47 @@ kadmin_startup(argc, argv)
     }
 
     /*
-     * If no principal name is specified: If a ccache was specified and
-     * its primary principal name can be read, it is used, else if a
-     * keytab was specified, the principal name is host/hostname,
+     * If no principal name is specified: If a ccache was specified
+     * and its primary principal name can be read, it is used, else if
+     * a keytab was specified, the principal name is host/hostname,
      * otherwise append "/admin" to the primary name of the default
      * ccache, $USER, or pw_name.
      *
      * Gee, 100+ lines to figure out the client principal name.  This
      * should be compressed...
      */
-	    
+    
     if (princstr == NULL) {
 	if (ccache_name != NULL &&
 	    !krb5_cc_get_principal(context, cc, &princ)) {
-		if (retval = krb5_unparse_name(context, princ,
-				    &princstr)) {
+	     if ((retval = krb5_unparse_name(context, princ, &princstr))) {
 		  com_err(whoami, retval,
 			gettext("while canonicalizing principal name"));
-			krb5_free_principal(context, princ);
+		  krb5_free_principal(context, princ);
 		  exit(1);
-	        }
-		krb5_free_principal(context, princ);
-     } else if (use_keytab != 0) {
-	    if (retval = krb5_sname_to_principal(context, NULL,
-					  "host", KRB5_NT_SRV_HST,
-					  &princ)) {
-		com_err(whoami, retval,
-			gettext("creating host service principal"));
-		exit(1);
-	    }
-	    if (retval = krb5_unparse_name(context, princ,
-					    &princstr)) {
+	     }
+	     krb5_free_principal(context, princ);
+	     freeprinc++;
+	} else if (use_keytab != 0) {
+	     if ((retval = krb5_sname_to_principal(context, NULL,
+						   "host",
+						   KRB5_NT_SRV_HST,
+						   &princ))) {
 		  com_err(whoami, retval,
+			gettext("creating host service principal"));
+		  exit(1);
+	     }
+	     if ((retval = krb5_unparse_name(context, princ, &princstr))) {
+	          com_err(whoami, retval,
 			gettext("while canonicalizing "
 				"principal name"));
 		  krb5_free_principal(context, princ);
 		  exit(1);
 	     }
 	     krb5_free_principal(context, princ);
+	     freeprinc++;
 	} else if (!krb5_cc_get_principal(context, cc, &princ)) {
 	    char *realm = NULL;
-
 	    if (krb5_unparse_name(context, princ, &canon)) {
 		fprintf(stderr,
 			gettext("%s: unable to canonicalize "
@@ -377,53 +359,98 @@ kadmin_startup(argc, argv)
 		krb5_free_principal(context, princ);
 		exit(1);
 	    }
-	    krb5_free_principal(context, princ);
-			(void) trim_principal(canon);
-			princstr = build_admin_princ(canon, def_realm);
-	    free(canon);
-	} else if (luser = getenv("USER")) {
-		princstr = build_admin_princ(luser, def_realm);
-	} else if (pw = getpwuid(getuid())) {
-		princstr = build_admin_princ(pw->pw_name, def_realm);
-	} else {
+	    /* strip out realm of principal if it's there */
+	    realm = strchr(canon, '@');
+	    while (realm) {
+		if (realm - canon && *(realm - 1) != '\\')
+		    break;
+		else
+		    realm = strchr(realm, '@');
+	    }
+	    if (realm)
+		*realm++ = '\0';
+	    cp = strchr(canon, '/');
+	    while (cp) {
+		if (cp - canon && *(cp - 1) != '\\')
+		    break;
+		else
+		    cp = strchr(cp, '/');
+	    }
+	    if (cp != NULL)
+		*cp = '\0';
+	    princstr = (char*)malloc(strlen(canon) + 6 /* "/admin" */ +
+				     (realm ? 1 + strlen(realm) : 0) + 1);
+	    if (princstr == NULL) {
 		fprintf(stderr,
+			gettext("%s: out of memory\n"),
+			whoami);
+		exit(1);
+	    }
+	    strcpy(princstr, canon);
+	    strcat(princstr, "/admin");
+	    if (realm) {
+		strcat(princstr, "@");
+		strcat(princstr, realm);
+	    }
+	    free(canon);
+	    krb5_free_principal(context, princ);
+	    freeprinc++;
+	} else if ((luser = getenv("USER"))) {
+	    princstr = (char *) malloc(strlen(luser) + 7 /* "/admin@" */
+			      + strlen(def_realm) + 1);
+	    if (princstr == NULL) {
+		fprintf(stderr,
+			gettext("%s: out of memory\n"),
+			whoami);
+		exit(1);
+	    }
+	    strcpy(princstr, luser);
+	    strcat(princstr, "/admin");
+	    strcat(princstr, "@");
+	    strcat(princstr, def_realm);
+	    freeprinc++;
+	} else if ((pw = getpwuid(getuid()))) {
+	    princstr = (char *) malloc(strlen(pw->pw_name) + 7 /* "/admin@" */
+			      + strlen(def_realm) + 1);
+	    if (princstr == NULL) {
+		fprintf(stderr,
+			gettext("%s: out of memory\n"),
+			whoami);
+		exit(1);
+	    }
+	    strcpy(princstr, pw->pw_name);
+	    strcat(princstr, "/admin@");
+	    strcat(princstr, def_realm);
+	    freeprinc++;
+	} else {
+	    fprintf(stderr,
 			gettext("%s: unable to figure out "
 				"a principal name\n"),
-				whoami);
-		exit(1);
-	}
-    } else { /* (princstr != NULL) */
-	/* See if we need to add the default realm */
-	if (find_component(princstr, '@') == NULL) {
-		size_t len;
-
-		/*         principal     @        realm       NULL */
-		len = strlen(princstr) + 1 + strlen(def_realm) + 1;
-		princstr = realloc(princstr, len);
-		if (princstr == NULL) {
-			fprintf(stderr,
-				gettext("%s: out of memory\n"), whoami);
-			exit(1);
-	    	}
-		strcat(princstr, "@");
-		strcat(princstr, def_realm);
+		    whoami);
+	    exit(1);
 	}
     }
 
+    retval = krb5_klog_init(context, "admin_server", whoami, 0);
+    if (retval) {
+	com_err(whoami, retval, "while setting up logging");
+	exit(1);
+    }
+
     /*
-     * Initialize the kadm5 connection.  If we were given a ccache, use
-     * it.  Otherwise, use/prompt for the password.
+     * Initialize the kadm5 connection.  If we were given a ccache,
+     * use it.  Otherwise, use/prompt for the password.
      */
     if (ccache_name) {
 	 printf(gettext(
 		"Authenticating as principal %s with existing credentials.\n"),
 		princstr);
 	 retval = kadm5_init_with_creds(princstr, cc,
-			kadmin_princ,
-			&params,
-			KADM5_STRUCT_VERSION,
-			KADM5_API_VERSION_2,
-			&handle);
+					svcname, 
+					&params,
+					KADM5_STRUCT_VERSION,
+					KADM5_API_VERSION_2,
+					&handle);
     } else if (use_keytab) {
 	 if (keytab_name)
 	     printf(gettext("Authenticating as principal %s with keytab %s.\n"),
@@ -433,19 +460,20 @@ kadmin_startup(argc, argv)
 		    "Authenticating as principal %s with default keytab.\n"),
 		    princstr);
 	 retval = kadm5_init_with_skey(princstr, keytab_name,
-			kadmin_princ,
-			&params,
-			KADM5_STRUCT_VERSION,
-			KADM5_API_VERSION_2,
-			&handle);
+				       svcname, 
+				       &params,
+				       KADM5_STRUCT_VERSION,
+				       KADM5_API_VERSION_2,
+				       &handle);
     } else {
 	 printf(gettext("Authenticating as principal %s with password.\n"),
 		princstr);
 	 retval = kadm5_init_with_password(princstr, password,
-			kadmin_princ, &params,
-			KADM5_STRUCT_VERSION,
-			KADM5_API_VERSION_2,
-			&handle);
+					   svcname, 
+					   &params,
+					   KADM5_STRUCT_VERSION,
+					   KADM5_API_VERSION_2,
+					   &handle);
     }
     if (retval) {
 	    if (retval == KADM5_RPC_ERROR_CANTENCODEARGS ||
@@ -464,89 +492,47 @@ kadmin_startup(argc, argv)
 	}
 	exit(1);
     }
-    free(princstr);
+    if (freeprinc)
+	free(princstr);
 
-    if (retval = krb5_cc_close(context, cc)) {
-	com_err(whoami, retval, gettext("while closing ccache %s"),
-		ccache_name);
-	exit(1);
-    }
-    /* register the WRFILE keytab type and set it as the default */
-    if (retval = krb5_kt_register(context, &krb5_ktf_writable_ops)) {
-	 com_err(whoami, retval,
-	    gettext("while registering writable key table functions"));
+    if ((retval = krb5_cc_close(context, cc))) {
+	 com_err(whoami, retval, gettext("while closing ccache %s"),
+		 ccache_name);
 	 exit(1);
     }
-    {
-	/*
-	 * XXX krb5_defkeyname is an internal library global and
-	 * should go away
-	 */
-	 extern char *krb5_defkeyname;
 
+    /* register the WRFILE keytab type and set it as the default */
+    {
+	 /* XXX krb5_defkeyname is an internal library global and
+            should go away */
+	 extern char *krb5_defkeyname;
 	 krb5_defkeyname = DEFAULT_KEYTAB;
     }
-
+    
     if ((retval = kadm5_init_iprop(handle)) != 0) {
 	com_err(whoami, retval, gettext("while mapping update log"));
 	exit(1);
     }
 
     /* Solaris kerberos: fix memory leak */
-    if (kadmin_princ)
-	free(kadmin_princ);
+    if (svcname)
+	free(svcname);
 
-    return (query);
+    return query;
 }
 
-static char *
-find_component(const char *principal, char sep)
+int quit()
 {
-	char *p = strchr(principal, sep);
+    kadm5_ret_t retval;
 
-	for(p = strchr(principal, sep); p; p = strchr(p, sep))
-		if (p != principal && *(p - 1) != '\\')
-			break;
-	return (p);
-}
-
-static char *
-trim_principal(char *principal)
-{
-	char *p = find_component(principal, '/');
-
-	if (p == NULL) 
-		p = find_component(principal, '@');
-
-	if (p)
-		*p = '\0';
-
-	return (principal);
-}
-
-static char *
-build_admin_princ(const char *user, const char *realm)
-{
-	char *princstr;
-
-	/* Add 7 to the length for "/admin@" */
-	princstr = (char *) malloc(strlen(user) + 7 + strlen(realm) + 1);
-	if (princstr == NULL) {
-		fprintf(stderr,
-			gettext("%s: out of memory\n"),
-			whoami);
-		exit(1);
+    if (locked) {
+	retval = kadm5_unlock(handle);
+	if (retval) {
+	    com_err("quit", retval, gettext("while unlocking locked database"));
+	    return 1;
 	}
-	sprintf(princstr, "%s/admin@%s", user, realm);
-	
-	return (princstr);
-}
-
-int
-quit()
-{
-     krb5_ccache cc;
-     int retval;
+	locked = 0;
+    }
 
      kadm5_destroy(handle);
      if (ccache_name != NULL) {
@@ -554,31 +540,64 @@ quit()
 			gettext("\n\a\a\aAdministration credentials "
 				"NOT DESTROYED.\n"));
      }
+
      /* insert more random cleanup here */
+     krb5_klog_close(context);
      krb5_free_context(context);
      context = NULL;
-     return (0);
+     return 0;
 }
 
-void
-kadmin_delprinc(argc, argv)
+void kadmin_lock(argc, argv)
+    int argc;
+    char *argv[];
+{
+    kadm5_ret_t retval;
+
+    if (locked)
+	return;
+    retval = kadm5_lock(handle);
+    if (retval) {
+	com_err("lock", retval, "");
+	return;
+    }
+    locked = 1;
+}
+
+void kadmin_unlock(argc, argv)
+    int argc;
+    char *argv[];
+{
+    kadm5_ret_t retval;
+
+    if (!locked)
+	return;
+    retval = kadm5_unlock(handle);
+    if (retval) {
+	com_err("unlock", retval, "");
+	return;
+    }
+    locked = 0;
+}
+
+void kadmin_delprinc(argc, argv)
     int argc;
     char *argv[];
 {
     kadm5_ret_t retval;
     krb5_principal princ;
     char *canon;
-	char reply[32];
+    char reply[32];
     
     if (! (argc == 2 ||
-		(argc == 3 && strcmp("-force", argv[1]) == 0))) {
-		fprintf(stderr, "%s: delete_principal [-force] %s\n",
+	   (argc == 3 && !strcmp("-force", argv[1])))) {
+	fprintf(stderr, "%s: delete_principal [-force] %s\n",
 			gettext("usage"), gettext("principal"));
 	return;
     }
     retval = kadmin_parse_name(argv[argc - 1], &princ);
     if (retval) {
-		com_err("delete_principal", retval,
+	com_err("delete_principal", retval,
 			gettext("while parsing principal name"));
 	return;
     }
@@ -590,7 +609,7 @@ kadmin_delprinc(argc, argv)
 	return;
     }
     if (argc == 2) {
-		printf(gettext("Are you sure you want to delete "
+	printf(gettext("Are you sure you want to delete "
 			    "the principal \"%s\"? (yes/no): "), canon);
 	fgets(reply, sizeof (reply), stdin);
 		if (strncmp(gettext("yes\n"), reply, sizeof (reply)) &&
@@ -612,14 +631,14 @@ kadmin_delprinc(argc, argv)
 	free(canon);
 	return;
     }
-	printf(gettext("Principal \"%s\" deleted.\n"), canon);
+    printf(gettext("Principal \"%s\" deleted.\n"), canon);
 	printf(gettext("Make sure that you have removed this principal "
 			"from all ACLs before reusing.\n"));
     free(canon);
+    return;
 }
 
-void
-kadmin_cpw(argc, argv)
+void kadmin_cpw(argc, argv)
     int argc;
     char *argv[];
 {
@@ -628,7 +647,8 @@ kadmin_cpw(argc, argv)
     static char prompt1[1024], prompt2[1024];
     char *canon;
     char *pwarg = NULL;
-    int n_ks_tuple = 0, keepold = 0, randkey = 0;
+    int n_ks_tuple = 0, randkey = 0;
+    krb5_boolean keepold = FALSE;
     krb5_key_salt_tuple *ks_tuple = NULL;
     krb5_principal princ;
     int local_kadmin = 0;
@@ -654,7 +674,7 @@ kadmin_cpw(argc, argv)
 	    continue;
 	}
 	if (!strcmp("-keepold", *argv)) {
-	    keepold++;
+	    keepold = TRUE;
 	    continue;
 	}
 	if (!strcmp("-e", *argv)) {
@@ -779,6 +799,8 @@ kadmin_cpw(argc, argv)
 	free(canon);
 	krb5_free_principal(context, princ);
    usage:
+	if (ks_tuple != NULL)
+	    free(ks_tuple);
 		fprintf(stderr, "%s: change_password [-randkey] [-keepold] "
 			"[-e keysaltlist] [-pw password] %s\n",
 			gettext("usage"), gettext("principal"));
@@ -786,8 +808,9 @@ kadmin_cpw(argc, argv)
    }
 }
 
-int kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
-			    ks_tuple, n_ks_tuple, caller)
+static int 
+kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
+			ks_tuple, n_ks_tuple, caller)
     int argc;
     char *argv[];
     kadm5_principal_ent_t oprinc;
@@ -814,16 +837,16 @@ int kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
 	if (strlen(argv[i]) == 7 &&
 		    strcmp("-expire", argv[i]) == 0) {
 	    if (++i > argc - 2)
-				return (-1);
+		return -1;
 	    else {
-		date = get_date(argv[i], NULL);
+		date = get_date(argv[i]);
  		if (date == (time_t)-1) {
-					fprintf(stderr,
+		     fprintf(stderr,
 						gettext("Invalid date "
 							"specification "
 							"\"%s\".\n"),
 			     argv[i]);
-					return (-1);
+		     return -1;
  		}
 		oprinc->princ_expire_time = date;
 		*mask |= KADM5_PRINC_EXPIRE_TIME;
@@ -831,18 +854,18 @@ int kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
 	    }
 	}
 	if (strlen(argv[i]) == 9 &&
-		    strcmp("-pwexpire", argv[i]) == 0) {
+	    !strcmp("-pwexpire", argv[i])) {
 	    if (++i > argc - 2)
-				return (-1);
+		return -1;
 	    else {
-		date = get_date(argv[i], NULL);
+		date = get_date(argv[i]);
  		if (date == (time_t)-1) {
-					fprintf(stderr,
+		     fprintf(stderr,
 						gettext("Invalid date "
 							"specification "
 							"\"%s\".\n"),
 			     argv[i]);
-					return (-1);
+		     return -1;
  		}
 		oprinc->pw_expiration = date;
 		*mask |= KADM5_PW_EXPIRATION;
@@ -850,18 +873,18 @@ int kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
 	    }
 	}
 	if (strlen(argv[i]) == 8 &&
-		    strcmp("-maxlife", argv[i]) == 0) {
+	    !strcmp("-maxlife", argv[i])) {
 	    if (++i > argc - 2)
-				return (-1);
+		return -1;
 	    else {
-		date = get_date(argv[i], NULL);
+		date = get_date(argv[i]);
  		if (date == (time_t)-1) {
 					fprintf(stderr,
 						gettext("Invalid date "
 							"specification "
 							"\"%s\".\n"),
 			     argv[i]);
-					return (-1);
+		     return -1;
  		}
 				if (date <= now) {
 					fprintf(stderr,
@@ -877,18 +900,18 @@ int kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
 	    }
 	}
 	if (strlen(argv[i]) == 13 &&
-		    strcmp("-maxrenewlife", argv[i]) == 0) {
+	    !strcmp("-maxrenewlife", argv[i])) {
 	    if (++i > argc - 2)
-				return (-1);
+		return -1;
 	    else {
-		date = get_date(argv[i], NULL);
+		date = get_date(argv[i]);
  		if (date == (time_t)-1) {
 					fprintf(stderr,
 						gettext("Invalid date "
 							"specification "
 							"\"%s\".\n"),
 			     argv[i]);
-					return (-1);
+		     return -1;
  		}
 				if (date <= now) {
 					fprintf(stderr,
@@ -904,9 +927,9 @@ int kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
 	    }
 	}
 	if (strlen(argv[i]) == 5 &&
-		    strcmp("-kvno", argv[i]) == 0) {
+	    !strcmp("-kvno", argv[i])) {
 	    if (++i > argc - 2)
-				return (-1);
+		return -1;
 	    else {
 		oprinc->kvno = atoi(argv[i]);
 		*mask |= KADM5_KVNO;
@@ -914,9 +937,9 @@ int kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
 	    }
 	}
 	if (strlen(argv[i]) == 7 &&
-		    strcmp("-policy", argv[i]) == 0) {
+	    !strcmp("-policy", argv[i])) {
 	    if (++i > argc - 2)
-				return (-1);
+		return -1;
 	    else {
 		oprinc->policy = argv[i];
 		*mask |= KADM5_POLICY;
@@ -924,22 +947,22 @@ int kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
 	    }
 	}
 	if (strlen(argv[i]) == 12 &&
-		    strcmp("-clearpolicy", argv[i]) == 0) {
+	    !strcmp("-clearpolicy", argv[i])) {
 	    oprinc->policy = NULL;
 	    *mask |= KADM5_POLICY_CLR;
 	    continue;
 	}
 	if (strlen(argv[i]) == 3 &&
-		    strcmp("-pw", argv[i]) == 0) {
+	    !strcmp("-pw", argv[i])) {
 	    if (++i > argc - 2)
-				return (-1);
+		return -1;
 	    else {
 		*pass = argv[i];
 		continue;
 	    }
 	}
 	if (strlen(argv[i]) == 8 &&
-		    strcmp("-randkey", argv[i]) == 0) {
+	    !strcmp("-randkey", argv[i])) {
 	    ++*randkey;
 	    continue;
 	}
@@ -959,41 +982,40 @@ int kadmin_parse_princ_args(argc, argv, oprinc, mask, pass, randkey,
 	}
 	for (j = 0; j < sizeof (flags) / sizeof (struct pflag); j++) {
 	    if (strlen(argv[i]) == flags[j].flaglen + 1 &&
-			    strcmp(flags[j].flagname,
-				    /* strip off leading + or - */
-				    &argv[i][1]) == 0) {
-		if (flags[j].set && argv[i][0] == '-' ||
-		    !flags[j].set && argv[i][0] == '+') {
+		!strcmp(flags[j].flagname,
+			&argv[i][1] /* strip off leading + or - */)) {
+		if ((flags[j].set && argv[i][0] == '-') ||
+		    (!flags[j].set && argv[i][0] == '+')) {
 		    oprinc->attributes |= flags[j].theflag;
 		    *mask |= KADM5_ATTRIBUTES;
 		    attrib_set++;
 		    break;
-		} else if (flags[j].set && argv[i][0] == '+' ||
-			   !flags[j].set && argv[i][0] == '-') {
+		} else if ((flags[j].set && argv[i][0] == '+') ||
+			   (!flags[j].set && argv[i][0] == '-')) {
 		    oprinc->attributes &= ~flags[j].theflag;
 		    *mask |= KADM5_ATTRIBUTES;
 		    attrib_set++;
 		    break;
 		} else {
-					return (-1);
+		    return -1;
 		}
 	    }
 	}
 	if (!attrib_set)
-			return (-1);	/* nothing was parsed */
+	    return -1;		/* nothing was parsed */
     }
     if (i != argc - 1) {
-		return (-1);
+	return -1;
     }
     retval = kadmin_parse_name(argv[i], &oprinc->principal);
     if (retval) {
-		com_err(caller, retval, gettext("while parsing principal"));
-		return (-1);
+	com_err(caller, retval, gettext("while parsing principal"));
+	return -1;
     }
-	return (0);
+    return 0;
 }
 
-void
+static void 
 kadmin_addprinc_usage(func)
    char *func;
 {
@@ -1014,7 +1036,7 @@ kadmin_addprinc_usage(func)
 		"password_changing_service\n");
 }
 
-void
+static void 
 kadmin_modprinc_usage(func)
    char *func;
 {
@@ -1035,8 +1057,7 @@ kadmin_modprinc_usage(func)
 		"password_changing_service\n");
 }
 
-void
-kadmin_addprinc(argc, argv)
+void kadmin_addprinc(argc, argv)
     int argc;
     char *argv[];
 {
@@ -1100,7 +1121,8 @@ kadmin_addprinc(argc, argv)
 	      (void) kadm5_free_policy_ent(handle, &defpol);
 	 } else
 	      fprintf(stderr, gettext("WARNING: no policy specified "
-			"for %s; defaulting to no policy\n"), canon);
+			"for %s; defaulting to no policy\n"),
+		      canon);
     }
     mask &= ~KADM5_POLICY_CLR;
     
@@ -1115,11 +1137,11 @@ kadmin_addprinc(argc, argv)
     if (randkey || (mask & KADM5_ATTRIBUTES))
 	princ.attributes |= KRB5_KDB_DISALLOW_ALL_TIX;
 
-    if (randkey) {
-	pass = dummybuf;
+    if (randkey) {		
 	mask |= KADM5_ATTRIBUTES;
+	pass = dummybuf;
     } else if (pass == NULL) {
-	unsigned int i = sizeof (newpw) - 1;
+	unsigned int sz = sizeof (newpw) - 1;
 	snprintf(prompt1, sizeof (prompt1),
 		gettext("Enter password for principal \"%.900s\""),
 		canon);
@@ -1127,7 +1149,7 @@ kadmin_addprinc(argc, argv)
 		gettext("Re-enter password for principal \"%.900s\""),
 		canon);
 	retval = krb5_read_password(context, prompt1, prompt2,
-		    newpw, &i);
+				    newpw, &sz);
 	if (retval) {
 	    com_err("add_principal", retval,
 		gettext("while reading password for \"%s\"."), canon);
@@ -1158,8 +1180,7 @@ kadmin_addprinc(argc, argv)
 	    free(ks_tuple);
 	return;
     }
-
-    if (randkey) { /* more special stuff for -randkey */
+    if (randkey) {		/* more special stuff for -randkey */
 	if (ks_tuple != NULL || local_kadmin) {
 	    retval = kadm5_randkey_principal_3(handle, princ.principal,
 					       FALSE,
@@ -1219,7 +1240,6 @@ kadmin_addprinc(argc, argv)
 	    return;
 	}
     }
-
     krb5_free_principal(context, princ.principal);
 	printf(gettext("Principal \"%s\" created.\n"), canon);
     if (ks_tuple != NULL)
@@ -1227,8 +1247,7 @@ kadmin_addprinc(argc, argv)
     free(canon);
 }
 
-void
-kadmin_modprinc(argc, argv)
+void kadmin_modprinc(argc, argv)
     int argc;
     char *argv[];
 {
@@ -1251,7 +1270,7 @@ kadmin_modprinc(argc, argv)
 
     retval = kadmin_parse_name(argv[argc - 1], &kprinc);
     if (retval) {
-		com_err("modify_principal", retval,
+	com_err("modify_principal", retval,
 			gettext("while parsing principal"));
 	return;
     }
@@ -1266,7 +1285,7 @@ kadmin_modprinc(argc, argv)
 				 KADM5_PRINCIPAL_NORMAL_MASK);
     krb5_free_principal(context, kprinc);
     if (retval) {
-		com_err("modify_principal", retval,
+	com_err("modify_principal", retval,
 			gettext("while getting \"%s\"."), canon);
 	free(canon);
 	return;
@@ -1316,8 +1335,7 @@ kadmin_modprinc(argc, argv)
     free(canon);
 }
 
-void
-kadmin_getprinc(argc, argv)
+void kadmin_getprinc(argc, argv)
     int argc;
     char *argv[];
 {
@@ -1328,23 +1346,25 @@ kadmin_getprinc(argc, argv)
     int i;
     
     if (! (argc == 2 ||
-		(argc == 3 && strcmp("-terse", argv[1]) == 0))) {
+	   (argc == 3 && !strcmp("-terse", argv[1])))) {
 		fprintf(stderr, "%s: get_principal [-terse] %s\n",
 			gettext("usage"), gettext("principal"));
 	return;
     }
+
+
     memset(&dprinc, 0, sizeof(dprinc));
     memset(&princ, 0, sizeof(princ));
 
     retval = kadmin_parse_name(argv[argc - 1], &princ);
     if (retval) {
-		com_err("get_principal", retval,
+	com_err("get_principal", retval,
 			gettext("while parsing principal"));
 	return;
     }
     retval = krb5_unparse_name(context, princ, &canon);
     if (retval) {
-		com_err("get_principal", retval,
+	com_err("get_principal", retval,
 			gettext("while canonicalizing principal"));
 	krb5_free_principal(context, princ);
 	return;
@@ -1353,14 +1373,14 @@ kadmin_getprinc(argc, argv)
 				 KADM5_PRINCIPAL_NORMAL_MASK | KADM5_KEY_DATA);
     krb5_free_principal(context, princ);
     if (retval) {
-		com_err("get_principal", retval,
+	com_err("get_principal", retval,
 			gettext("while retrieving \"%s\"."), canon);
 	free(canon);
 	return;
     }
     retval = krb5_unparse_name(context, dprinc.mod_name, &modcanon);
     if (retval) {
-		com_err("get_principal", retval,
+	com_err("get_principal", retval,
 			gettext("while unparsing modname"));
 	kadm5_free_principal_ent(handle, &dprinc);
 	free(canon);
@@ -1431,7 +1451,7 @@ kadmin_getprinc(argc, argv)
 	       canon, dprinc.princ_expire_time, dprinc.last_pwd_change,
 	       dprinc.pw_expiration, dprinc.max_life, modcanon,
 	       dprinc.mod_date, dprinc.attributes, dprinc.kvno,
-		    dprinc.mkvno, dprinc.policy ?
+	       dprinc.mkvno, dprinc.policy ?
 		    dprinc.policy : gettext("[none]"),
 	       dprinc.max_renewable_life, dprinc.last_success,
 	       dprinc.last_failed, dprinc.fail_auth_count,
@@ -1449,13 +1469,12 @@ kadmin_getprinc(argc, argv)
     free(canon);
 }
 
-void
-kadmin_getprincs(argc, argv)
+void kadmin_getprincs(argc, argv)
     int argc;
     char *argv[];
 {
     krb5_error_code retval;
-    char *exp, **names;
+    char *expr, **names;
     int i, count;
 
 	FILE *output;
@@ -1464,15 +1483,15 @@ kadmin_getprincs(argc, argv)
 	sigset_t nmask, omask;
 	int waitb;
 
-    exp = NULL;
-    if (! (argc == 1 || (argc == 2 && (exp = argv[1])))) {
+    expr = NULL;
+    if (! (argc == 1 || (argc == 2 && (expr = argv[1])))) {
 		fprintf(stderr, "%s: get_principals %s\n",
 			gettext("usage"), gettext("[expression]"));
 	return;
     }
-    retval = kadm5_get_principals(handle, exp, &names, &count);
+    retval = kadm5_get_principals(handle, expr, &names, &count);
     if (retval) {
-		com_err("get_principals", retval,
+	com_err("get_principals", retval,
 			gettext("while retrieving list."));
 	return;
     }
@@ -1496,7 +1515,7 @@ kadmin_getprincs(argc, argv)
 	sigprocmask(SIG_SETMASK, &omask, (sigset_t *)0);
 
     for (i = 0; i < count; i++)
-		fprintf(output, "%s\n", names[i]);
+	 fprintf(output, "%s\n", names[i]);
 
 	fclose(output);
 
@@ -1505,7 +1524,7 @@ kadmin_getprincs(argc, argv)
     kadm5_free_name_list(handle, names, count);
 }
 
-int
+static int 
 kadmin_parse_policy_args(argc, argv, policy, mask, caller)
     int argc;
     char *argv[];
@@ -1516,24 +1535,23 @@ kadmin_parse_policy_args(argc, argv, policy, mask, caller)
     int i;
     time_t now;
     time_t date;
-    krb5_error_code retval;
 
     time(&now);
     *mask = 0;
     for (i = 1; i < argc - 1; i++) {
 	if (strlen(argv[i]) == 8 &&
-		    strcmp(argv[i], "-maxlife") == 0) {
+	    !strcmp(argv[i], "-maxlife")) {
 	    if (++i > argc -2)
-				return (-1);
+		return -1;
 	    else {
-		date = get_date(argv[i], NULL);
+		date = get_date(argv[i]);
  		if (date == (time_t)-1) {
 					fprintf(stderr,
 						gettext("Invalid date "
 							"specification "
 							"\"%s\".\n"),
 			     argv[i]);
-					return (-1);
+		     return -1;
  		}
 				if (date <= now) {
 					fprintf(stderr,
@@ -1548,18 +1566,18 @@ kadmin_parse_policy_args(argc, argv, policy, mask, caller)
 		continue;
 	    }
 	} else if (strlen(argv[i]) == 8 &&
-			strcmp(argv[i], "-minlife") == 0) {
+		   !strcmp(argv[i], "-minlife")) {
 	    if (++i > argc - 2)
-				return (-1);
+		return -1;
 	    else {
-		date = get_date(argv[i], NULL);
+		date = get_date(argv[i]);
  		if (date == (time_t)-1) {
 					fprintf(stderr,
 						gettext("Invalid date "
 							"specification "
 							"\"%s\".\n"),
 			     argv[i]);
-					return (-1);
+		     return -1;
  		}
 				if (date <= now) {
 					fprintf(stderr,
@@ -1574,43 +1592,43 @@ kadmin_parse_policy_args(argc, argv, policy, mask, caller)
 		continue;
 	    }
 	} else if (strlen(argv[i]) == 10 &&
-			strcmp(argv[i], "-minlength") == 0) {
+	    !strcmp(argv[i], "-minlength")) {
 	    if (++i > argc - 2)
-				return (-1);
+		return -1;
 	    else {
 		policy->pw_min_length = atoi(argv[i]);
 		*mask |= KADM5_PW_MIN_LENGTH;
 		continue;
 	    }
 	} else if (strlen(argv[i]) == 11 &&
-			strcmp(argv[i], "-minclasses") == 0) {
+		   !strcmp(argv[i], "-minclasses")) {
 	    if (++i > argc - 2)
-				return (-1);
+		return -1;
 	    else {
 		policy->pw_min_classes = atoi(argv[i]);
 		*mask |= KADM5_PW_MIN_CLASSES;
 		continue;
 	    }
 	} else if (strlen(argv[i]) == 8 &&
-			strcmp(argv[i], "-history") == 0) {
+		   !strcmp(argv[i], "-history")) {
 	    if (++i > argc - 2)
-				return (-1);
+		return -1;
 	    else {
 		policy->pw_history_num = atoi(argv[i]);
 		*mask |= KADM5_PW_HISTORY_NUM;
 		continue;
 	    }
 	} else
-			return (-1);
+	    return -1;
     }
     if (i != argc -1) {
-		fprintf(stderr, gettext("%s: parser lost count!\n"), caller);
-		return (-1);
+	fprintf(stderr, gettext("%s: parser lost count!\n"), caller);
+	return -1;
     } else
-		return (0);
+	return 0;
 }
 
-void
+static void 
 kadmin_addmodpol_usage(func)
    char *func;
 {
@@ -1622,8 +1640,7 @@ kadmin_addmodpol_usage(func)
 		"[-history number]\n");
 }
 
-void
-kadmin_addpol(argc, argv)
+void kadmin_addpol(argc, argv)
     int argc;
     char *argv[];
 {
@@ -1632,8 +1649,7 @@ kadmin_addpol(argc, argv)
     kadm5_policy_ent_rec policy;
 
     memset(&policy, 0, sizeof(policy));
-	if (kadmin_parse_policy_args(argc, argv,
-				    &policy, &mask, "add_policy")) {
+    if (kadmin_parse_policy_args(argc, argv, &policy, &mask, "add_policy")) {
 	 kadmin_addmodpol_usage("add_policy");
 	 return;
     } else {
@@ -1647,10 +1663,10 @@ kadmin_addpol(argc, argv)
 	    return;
 	}
     }
+    return;
 }
 
-void
-kadmin_modpol(argc, argv)
+void kadmin_modpol(argc, argv)
     int argc;
     char *argv[];
 {
@@ -1673,19 +1689,19 @@ kadmin_modpol(argc, argv)
 	    return;
 	}
     }
+    return;
 }
 
-void
-kadmin_delpol(argc, argv)
+void kadmin_delpol(argc, argv)
     int argc;
     char *argv[];
 {
     krb5_error_code retval;
-	char reply[32];
+    char reply[32];
     
     if (! (argc == 2 ||
-		(argc == 3 && strcmp("-force", argv[1]) == 0))) {
-		fprintf(stderr, "%s: delete_policy [-force] %s\n",
+	   (argc == 3 && !strcmp("-force", argv[1])))) {
+	fprintf(stderr, "%s: delete_policy [-force] %s\n",
 			gettext("usage"), gettext("policy"));
 	return;
     }
@@ -1710,10 +1726,10 @@ kadmin_delpol(argc, argv)
 		argv[argc - 1]);
 	return;
     }
+    return;
 }
 
-void
-kadmin_getpol(argc, argv)
+void kadmin_getpol(argc, argv)
     int argc;
     char *argv[];
 {
@@ -1721,7 +1737,7 @@ kadmin_getpol(argc, argv)
     kadm5_policy_ent_rec policy;
     
     if (! (argc == 2 ||
-		(argc == 3 && strcmp("-terse", argv[1]) == 0))) {
+	   (argc == 3 && !strcmp("-terse", argv[1])))) {
 		fprintf(stderr, "%s: get_policy [-terse] %s\n",
 			gettext("usage"), gettext("policy"));
 	return;
@@ -1735,45 +1751,45 @@ kadmin_getpol(argc, argv)
     }
     if (argc == 2) {
 		printf(gettext("Policy: %s\n"), policy.policy);
-		printf(gettext("Maximum password life: %d\n"),
+		printf(gettext("Maximum password life: %ld\n"),
 		    policy.pw_max_life);
-		printf(gettext("Minimum password life: %d\n"),
+		printf(gettext("Minimum password life: %ld\n"),
 		    policy.pw_min_life);
-		printf(gettext("Minimum password length: %d\n"),
+		printf(gettext("Minimum password length: %ld\n"),
 		    policy.pw_min_length);
 		printf(gettext("Minimum number of password "
-			    "character classes: %d\n"),
+			    "character classes: %ld\n"),
 	       policy.pw_min_classes);
-		printf(gettext("Number of old keys kept: %d\n"),
+		printf(gettext("Number of old keys kept: %ld\n"),
 		    policy.pw_history_num);
-		printf(gettext("Reference count: %d\n"), policy.policy_refcnt);
+		printf(gettext("Reference count: %ld\n"), policy.policy_refcnt);
     } else {
-	printf("\"%s\"\t%d\t%d\t%d\t%d\t%d\t%d\n",
+	printf("\"%s\"\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\n",
 	       policy.policy, policy.pw_max_life, policy.pw_min_life,
 	       policy.pw_min_length, policy.pw_min_classes,
 	       policy.pw_history_num, policy.policy_refcnt);
     }
     kadm5_free_policy_ent(handle, &policy);
+    return;
 }
 
-void
-kadmin_getpols(argc, argv)
+void kadmin_getpols(argc, argv)
     int argc;
     char *argv[];
 {
     krb5_error_code retval;
-    char *exp, **names;
+    char *expr, **names;
     int i, count;
 
-    exp = NULL;
-    if (! (argc == 1 || (argc == 2 && (exp = argv[1])))) {
-		fprintf(stderr, "%s: get_policies %s\n",
+    expr = NULL;
+    if (! (argc == 1 || (argc == 2 && (expr = argv[1])))) {
+	fprintf(stderr, "%s: get_policies %s\n",
 			gettext("usage"), gettext("[expression]\n"));
 	return;
     }
-    retval = kadm5_get_policies(handle, exp, &names, &count);
+    retval = kadm5_get_policies(handle, expr, &names, &count);
     if (retval) {
-		com_err("get_policies", retval,
+	com_err("get_policies", retval,
 			gettext("while retrieving list."));
 	return;
     }
@@ -1781,3 +1797,4 @@ kadmin_getpols(argc, argv)
 	 printf("%s\n", names[i]);
     kadm5_free_name_list(handle, names, count);
 }
+

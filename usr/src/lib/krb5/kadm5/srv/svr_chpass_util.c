@@ -1,5 +1,5 @@
 /*
- * Copyright 1997-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,7 @@ kadm5_ret_t kadm5_chpass_principal_util(void *server_handle,
 					char *new_pw, 
 					char **ret_pw,
 					char *msg_ret,
-					int msg_len)
+					unsigned int msg_len)
 {
   kadm5_server_handle_t handle = server_handle;
 

@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,9 +32,13 @@ static char const NL[2] = "\n";
 void
 ss_list_requests(argc, argv, sci_idx, info_ptr)
     int argc;
-    char **argv;
+    const char * const *argv;
     int sci_idx;
-    pointer info_ptr;
+#ifdef __STDC__
+    void *info_ptr;
+#else
+    char *info_ptr;
+#endif
 {
     register ss_request_entry *entry;
     register char const * const *name;
@@ -93,21 +97,22 @@ ss_list_requests(argc, argv, sci_idx, info_ptr)
             buffer[0] = '\0';
             if (entry->flags & SS_OPT_DONT_LIST)
                 continue;
+            buffer[sizeof(buffer) - 1] = '\0';
             for (name = entry->command_names; *name; name++) {
                 register int len = strlen(*name);
-                strncat(buffer, *name, len);
+                strncat(buffer, *name, sizeof(buffer) - 1 - strlen(buffer));
                 spacing += len + 2;
                 if (name[1]) {
-                    strcat(buffer, ", ");
+                    strncat(buffer, ", ", sizeof(buffer) - 1 - strlen(buffer));
                 }
             }
             if (spacing > 23) {
-                strcat(buffer, NL);
+                strncat(buffer, NL, sizeof(buffer) - 1 - strlen(buffer));
                 fputs(buffer, output);
                 spacing = 0;
                 buffer[0] = '\0';
             }
-            strncat(buffer, twentyfive_spaces, 25-spacing);
+            strncat(buffer, twentyfive_spaces, strlen(twentyfive_spaces) - spacing);
 
             /*
              * Due to libss not knowing what TEXT_DOMAIN
@@ -115,8 +120,8 @@ ss_list_requests(argc, argv, sci_idx, info_ptr)
              * messages, we know require the callers (ktutil,kadmin)
              * to L10N the messages before calling libss.
              */
-            strcat(buffer, entry->info_string);
-            strcat(buffer, NL);
+            strncat(buffer, entry->info_string, sizeof(buffer) -1 - strlen(buffer));
+            strncat(buffer, NL,  sizeof(buffer) - 1 - strlen(buffer));
             fputs(buffer, output);
         }
     }

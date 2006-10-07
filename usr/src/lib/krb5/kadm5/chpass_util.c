@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,9 @@
 
 
 #include <stdio.h>
+#ifdef HAVE_MEMORY_H
 #include <memory.h>
+#endif
 #include <time.h>
 #include <locale.h>
 
@@ -49,8 +51,7 @@ const char *chpw_error_message(kadm5_ret_t code);
 /*
  * Function: kadm5_chpass_principal_util
  *
- * Purpose: Wrapper around chpass_principal. We can read new pw,
- *          change pw and return useful messages
+ * Purpose: Wrapper around chpass_principal. We can read new pw, change pw and return useful messages
  *
  * Arguments:
  *
@@ -91,7 +92,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
 					 char *new_pw, 
 					 char **ret_pw,
 					 char *msg_ret,
-					 int msg_len)
+					 unsigned int msg_len)
 {
   int code, code2;
   unsigned int pwsize;
@@ -99,7 +100,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
   char *new_password;
   kadm5_principal_ent_rec princ_ent;
   kadm5_policy_ent_rec policy_ent;
-	krb5_chgpwd_prot passwd_protocol;
+  krb5_chgpwd_prot passwd_protocol;
 
   _KADM5_CHECK_HANDLE(server_handle);
 
@@ -113,8 +114,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
 
     if ((code = (int) krb5_init_context(&context)) == 0) {
       pwsize = sizeof(buffer);
-			code = krb5_read_password(context,
-						KADM5_PW_FIRST_PROMPT,
+      code = krb5_read_password(context, KADM5_PW_FIRST_PROMPT,
 				KADM5_PW_SECOND_PROMPT,
 				buffer, &pwsize);
       krb5_free_context(context);
@@ -184,7 +184,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
 
 #ifdef ZEROPASSWD
   if (!ret_pw)
-			memset(buffer, 0, sizeof (buffer));
+    memset(buffer, 0, sizeof(buffer)); /* in case we read a new password */
 #endif    
 
   if (code == KADM5_OK) {
@@ -194,15 +194,12 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
   }
 
   if ((code != KADM5_PASS_Q_TOOSHORT) && 
-		    (code != KADM5_PASS_REUSE) &&
-		    (code != KADM5_PASS_Q_CLASS) &&
-		    (code != KADM5_PASS_Q_DICT) &&
-		    (code != KADM5_PASS_TOOSOON)) {
+      (code != KADM5_PASS_REUSE) &&(code != KADM5_PASS_Q_CLASS) && 
+      (code != KADM5_PASS_Q_DICT) && (code != KADM5_PASS_TOOSOON)) {
     /* Can't get more info for other errors */
     sprintf(buffer, "%s %s", error_message(code), 
 	    string_text(CHPASS_UTIL_WHILE_TRYING_TO_CHANGE));
-			sprintf(msg_ret, "%s\n%s\n",
-				string_text(CHPASS_UTIL_PASSWORD_NOT_CHANGED),
+    sprintf(msg_ret, "%s\n%s\n", string_text(CHPASS_UTIL_PASSWORD_NOT_CHANGED), 
 	    buffer);
     return(code);
   }
@@ -260,8 +257,7 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
   code2 = kadm5_get_policy(lhandle, princ_ent.policy,
 			   &policy_ent);
   if (code2 != 0) {
-			sprintf(msg_ret, "%s %s\n%s %s\n\n%s\n ",
-			error_message(code2),
+    sprintf(msg_ret, "%s %s\n%s %s\n\n%s\n ", error_message(code2), 
 	    string_text(CHPASS_UTIL_GET_POLICY_INFO),
 	    error_message(code),
 	    string_text(CHPASS_UTIL_WHILE_TRYING_TO_CHANGE),
@@ -271,17 +267,16 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
   }
   
   if (code == KADM5_PASS_Q_TOOSHORT) {
-			sprintf(msg_ret,
-				string_text(CHPASS_UTIL_PASSWORD_TOO_SHORT),
+    sprintf(msg_ret, string_text(CHPASS_UTIL_PASSWORD_TOO_SHORT), 
 	    policy_ent.pw_min_length);
     (void) kadm5_free_principal_ent(lhandle, &princ_ent);
     (void) kadm5_free_policy_ent(lhandle, &policy_ent);
     return(code);
   }
 
+
   if (code == KADM5_PASS_Q_CLASS) {
-			sprintf(msg_ret,
-				string_text(CHPASS_UTIL_TOO_FEW_CLASSES),
+    sprintf(msg_ret, string_text(CHPASS_UTIL_TOO_FEW_CLASSES), 
 	    policy_ent.pw_min_classes);
     (void) kadm5_free_principal_ent(lhandle, &princ_ent);
     (void) kadm5_free_policy_ent(lhandle, &policy_ent);
@@ -292,26 +287,23 @@ kadm5_ret_t _kadm5_chpass_principal_util(void *server_handle,
     time_t until;
     char *time_string, *ptr;
 
-			until = princ_ent.last_pwd_change +
-				policy_ent.pw_min_life;
+    until = princ_ent.last_pwd_change + policy_ent.pw_min_life;
 
     time_string = ctime(&until);
-			if (*(ptr = &time_string[strlen(time_string)-1]) ==
-			    '\n')
+    if (*(ptr = &time_string[strlen(time_string)-1]) == '\n')
       *ptr = '\0';
 
-			sprintf(msg_ret,
-				string_text(CHPASS_UTIL_PASSWORD_TOO_SOON),
+    sprintf(msg_ret, string_text(CHPASS_UTIL_PASSWORD_TOO_SOON), 
 	    time_string);
     (void) kadm5_free_principal_ent(lhandle, &princ_ent);
     (void) kadm5_free_policy_ent(lhandle, &policy_ent);
     return(code);
 		} else {
+
   /* We should never get here, but just in case ... */
   sprintf(buffer, "%s %s", error_message(code), 
 	  string_text(CHPASS_UTIL_WHILE_TRYING_TO_CHANGE));
-			sprintf(msg_ret, "%s\n%s\n",
-				string_text(CHPASS_UTIL_PASSWORD_NOT_CHANGED),
+  sprintf(msg_ret, "%s\n%s\n", string_text(CHPASS_UTIL_PASSWORD_NOT_CHANGED), 
 	  buffer);
   (void) kadm5_free_principal_ent(lhandle, &princ_ent);
   (void) kadm5_free_policy_ent(lhandle, &policy_ent);

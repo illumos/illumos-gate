@@ -37,10 +37,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/kadmin/dbutil/kadm5_create.c,v 1.6 1998/10/30 02:52:37 marc Exp $";
-#endif
-
 #include "string_table.h"
 
 #include <stdio.h>
@@ -48,6 +44,8 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/kadmin/dbutil/kadm5_create.c
 #include <string.h>
 #include <kadm5/adb.h>
 #include <kadm5/admin.h>
+#include <krb5/adm_proto.h>
+
 
 #include <krb5.h>
 #include <krb5/kdb.h>
@@ -63,8 +61,10 @@ int
 add_admin_princ(void *handle, krb5_context context,
     krb5_principal principal, int attrs, int lifetime);
 
-#define	KADM5_ERR 1
-#define	KADM5_OK 0
+static int add_admin_princs(void *handle, krb5_context context, char *realm);
+
+#define ERR 1
+#define OK 0
 
 #define ADMIN_LIFETIME 60*60*3 /* 3 hours */
 #define CHANGEPW_LIFETIME 60*5 /* 5 minutes */
@@ -82,18 +82,15 @@ extern char *progname;
  * principals in the KDC database and sets their attributes
  * appropriately.
  */
-int
-kadm5_create(kadm5_config_params * params)
+int kadm5_create(kadm5_config_params *params)
 {
      int retval;
-     void *handle;
      krb5_context context;
-     FILE *f;
 
      kadm5_config_params lparams;
 
-     if (retval = krb5_init_context(&context))
-	exit(KADM5_ERR);
+     if ((retval = krb5_init_context(&context)))
+	  exit(ERR);
 
      (void) memset(&lparams, 0, sizeof (kadm5_config_params));
 
@@ -101,14 +98,15 @@ kadm5_create(kadm5_config_params * params)
       * The lock file has to exist before calling kadm5_init, but
       * params->admin_lockfile may not be set yet...
       */
-     if (retval = kadm5_get_config_params(context, NULL, NULL,
-		params, &lparams)) {
-	com_err(progname, retval, gettext(str_INITING_KCONTEXT));
-	return (1);
+     if ((retval = kadm5_get_config_params(context, NULL, NULL,
+					   params, &lparams))) {
+	com_err(progname, retval, gettext("while looking up the Kerberos configuration"));
+	  return 1;
      }
-     if (retval = osa_adb_create_policy_db(&lparams)) {
+
+     if ((retval = osa_adb_create_policy_db(&lparams))) {
 	com_err(progname, retval, gettext(str_CREATING_POLICY_DB));
-	return (1);
+	  return 1;
      }
 
      retval = kadm5_create_magic_princs(&lparams, context);
@@ -116,28 +114,33 @@ kadm5_create(kadm5_config_params * params)
      kadm5_free_config_params(context, &lparams);
      krb5_free_context(context);
 
-     return (retval);
+     return retval;
 }
 
-int
-kadm5_create_magic_princs(kadm5_config_params * params,
-			      krb5_context *context)
+int kadm5_create_magic_princs(kadm5_config_params *params,
+			      krb5_context context)
 {
      int retval;
      void *handle;
      
+     retval = krb5_klog_init(context, "admin_server", progname, 0);
+     if (retval)
+	  return retval;
      if ((retval = kadm5_init(progname, NULL, NULL, params,
 			      KADM5_STRUCT_VERSION,
 			      KADM5_API_VERSION_2,
 			      &handle))) {
-	com_err(progname, retval, gettext(str_INITING_KCONTEXT));
-	return (retval);
+	com_err(progname, retval,  gettext("while initializing the Kerberos admin interface"));
+	  return retval;
      }
+
      retval = add_admin_princs(handle, context, params->realm);
 
      kadm5_destroy(handle);
 
-     return (retval);
+     krb5_klog_close(context);
+
+     return retval;
 }
 
 /*
@@ -157,14 +160,13 @@ kadm5_create_magic_princs(kadm5_config_params * params,
  *
  * Requires: both strings are null-terminated
  */
-char *
-build_name_with_realm(char *name, char *realm)
+static char *build_name_with_realm(char *name, char *realm)
 {
      char *n;
 
      n = (char *) malloc(strlen(name) + strlen(realm) + 2);
      sprintf(n, "%s@%s", name, realm);
-     return (n);
+     return n;
 }
 
 /*
@@ -187,8 +189,7 @@ build_name_with_realm(char *name, char *realm)
  * printed.  If any of these existing principal do not have the proper
  * attributes, a warning message is printed.
  */
-int
-add_admin_princs(void *handle, krb5_context context, char *realm)
+static int add_admin_princs(void *handle, krb5_context context, char *realm)
 {
   krb5_error_code ret = 0;
 
@@ -236,7 +237,7 @@ add_admin_princs(void *handle, krb5_context context, char *realm)
 
 clean_and_exit:
 
-	return (ret);
+  return ret;
 }
 
 /*
@@ -255,8 +256,8 @@ clean_and_exit:
  *
  * Returns:
  *
- * 	KADM5_OK on success
- * 	KADM5_ERR on serious errors
+ * 	OK on success
+ * 	ERR on serious errors
  *
  * Effects:
  * 
@@ -267,8 +268,7 @@ clean_and_exit:
  * attributes attrs and max life of lifetime (if not zero).
  */
 
-int
-add_admin_princ(void *handle, krb5_context context,
+int add_admin_princ(void *handle, krb5_context context,
     krb5_principal principal, int attrs, int lifetime)
 {
      char *fullname;
@@ -278,23 +278,23 @@ add_admin_princ(void *handle, krb5_context context,
      memset(&ent, 0, sizeof(ent));
 
 	if (krb5_unparse_name(context, principal, &fullname))
-		return (KADM5_ERR);
+		return ERR;
 
      ent.principal = principal;
      ent.max_life = lifetime;
      ent.attributes = attrs | KRB5_KDB_DISALLOW_ALL_TIX;
      
-     if (ret = kadm5_create_principal(handle, &ent,
-					   (KADM5_PRINCIPAL |
-					    KADM5_MAX_LIFE |
-					    KADM5_ATTRIBUTES),
-					   "to-be-random")) {
+     ret = kadm5_create_principal(handle, &ent,
+				  (KADM5_PRINCIPAL | KADM5_MAX_LIFE |
+				   KADM5_ATTRIBUTES),
+				  "to-be-random");
+     if (ret) {
 	  if (ret != KADM5_DUP) {
 		com_err(progname, ret,
 			gettext(str_PUT_PRINC), fullname);
 	       krb5_free_principal(context, ent.principal);
 	       free(fullname);
-		return (KADM5_ERR);
+	       return ERR;
 	  }
      } else {
 	  /* only randomize key if we created the principal */
@@ -302,25 +302,26 @@ add_admin_princ(void *handle, krb5_context context,
 	if (ret) {
 		com_err(progname, ret,
 			gettext(str_RANDOM_KEY), fullname);
-		krb5_free_principal(context, ent.principal);
-		free(fullname);
-		return (KADM5_ERR);
-	}
-	ent.attributes = attrs;
-	ret = kadm5_modify_principal(handle, &ent, KADM5_ATTRIBUTES);
-	if (ret) {
-		com_err(progname, ret,
-			gettext(str_PUT_PRINC), fullname);
-		krb5_free_principal(context, ent.principal);
-		free(fullname);
-		return (KADM5_ERR);
-	}
-    }
+	       krb5_free_principal(context, ent.principal);
+	       free(fullname);
+	       return ERR;
+	  }
+	  
+	  ent.attributes = attrs;
+	  ret = kadm5_modify_principal(handle, &ent, KADM5_ATTRIBUTES);
+	  if (ret) {
+	      com_err(progname, ret,
+	       gettext(str_PUT_PRINC), fullname);
+	       krb5_free_principal(context, ent.principal);
+	       free(fullname);
+	       return ERR;
+	  }
+     }
      
-    krb5_free_principal(context, ent.principal);
-    free(fullname);
+     krb5_free_principal(context, ent.principal);
+     free(fullname);
 
-    return (KADM5_OK);
+     return OK;
 }
 
 int
@@ -334,7 +335,7 @@ add_admin_old_princ(void *handle, krb5_context context,
 	fullname = build_name_with_realm(name, realm);
 	if (ret = krb5_parse_name(context, fullname, &principal)) {
 		com_err(progname, ret, gettext(str_PARSE_NAME));
-		return (KADM5_ERR);
+		return (ERR);
 	}
 
 	return (add_admin_princ(handle, context, principal, attrs, lifetime));
@@ -352,7 +353,7 @@ add_admin_sname_princ(void *handle, krb5_context context,
 		com_err(progname, ret,
 			gettext("Could not get host based "
 				"service name for %s principal\n"), sname);
-		return (KADM5_ERR);
+		return (ERR);
 	}
 	return (add_admin_princ(handle, context, principal, attrs, lifetime));
 }

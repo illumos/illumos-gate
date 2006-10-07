@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,15 +44,16 @@
 #include <string.h>
 
 extern krb5_error_code setup_server_realm(krb5_principal);
+static krb5_int32 last_usec = 0, last_os_random = 0;
 
 krb5_error_code
-dispatch(krb5_data *pkt, const krb5_fulladdr *from, int portnum, 
-	krb5_data **response)
+dispatch(krb5_data *pkt, const krb5_fulladdr *from, krb5_data **response)
 {
 
     krb5_error_code retval;
     krb5_kdc_req *as_req;
-
+    krb5_int32 now, now_usec;
+    
     /* decode incoming packet, and dispatch */
 
 #ifndef NOCACHE
@@ -67,15 +68,37 @@ dispatch(krb5_data *pkt, const krb5_fulladdr *from, int portnum,
 	if (name == 0)
 	    name = "[unknown address type]";
 	krb5_klog_syslog(LOG_INFO,
-			 "DISPATCH: repeated (retransmitted?) request from %s port %d, resending previous response",
-			 name, portnum);
+			 "DISPATCH: repeated (retransmitted?) request from %s, resending previous response",
+			 name);
 	return 0;
+    }
+#endif
+/* SUNW14resync XXX */
+#if 0
+    retval = krb5_crypto_us_timeofday(&now, &now_usec);
+    if (retval == 0) {
+      krb5_int32 usec_difference = now_usec-last_usec;
+      krb5_data data;
+      if(last_os_random == 0)
+	last_os_random = now;
+      /* Grab random data from OS every hour*/
+      if(now-last_os_random >= 60*60) {
+	krb5_c_random_os_entropy(kdc_context, 0, NULL);
+	last_os_random = now;
+      }
+      
+      data.length = sizeof(krb5_int32);
+      data.data = (void *) &usec_difference;
+      
+      krb5_c_random_add_entropy(kdc_context,
+				KRB5_C_RANDSOURCE_TIMING, &data);
+      last_usec = now_usec;
     }
 #endif
     /* try TGS_REQ first; they are more common! */
 
     if (krb5_is_tgs_req(pkt)) {
-	retval = process_tgs_req(pkt, from, portnum, response);
+	retval = process_tgs_req(pkt, from, response);
     } else if (krb5_is_as_req(pkt)) {
 	if (!(retval = decode_krb5_as_req(pkt, &as_req))) {
 	    /*
@@ -83,11 +106,15 @@ dispatch(krb5_data *pkt, const krb5_fulladdr *from, int portnum,
 	     * pointer.
 	     */
 	    if (!(retval = setup_server_realm(as_req->server))) {
-		retval = process_as_req(as_req, from, portnum, response);
+		retval = process_as_req(as_req, from, response);
 	    }
 	    krb5_free_kdc_req(kdc_context, as_req);
 	}
     }
+#ifdef KRB5_KRB4_COMPAT
+    else if (pkt->data[0] == 4)		/* old version */
+	retval = process_v4(pkt, from, response);
+#endif
     else
 	retval = KRB5KRB_AP_ERR_MSG_TYPE;
 #ifndef NOCACHE

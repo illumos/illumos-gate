@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,7 @@
  */
 
 #ifndef __KRB5_KDC_UTIL__
-#define	__KRB5_KDC_UTIL__
+#define __KRB5_KDC_UTIL__
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -109,21 +109,24 @@ get_salt_from_key (krb5_context, krb5_principal,
 
 void limit_string (char *name);
 
+void
+ktypes2str(char *s, size_t len, int nktypes, krb5_enctype *ktype);
+
+void
+rep_etypes2str(char *s, size_t len, krb5_kdc_rep *rep);
+
 /* do_as_req.c */
 krb5_error_code process_as_req (krb5_kdc_req *,
 					  const krb5_fulladdr *,
-					  int,
 					  krb5_data ** );
 
 /* do_tgs_req.c */
 krb5_error_code process_tgs_req (krb5_data *,
 					   const krb5_fulladdr *,
-					   int, 
 					   krb5_data ** );
 /* dispatch.c */
 krb5_error_code dispatch (krb5_data *,
 				    const krb5_fulladdr *,
-				    int,
 				    krb5_data **);
 
 /* main.c */
@@ -166,13 +169,7 @@ krb5_boolean kdc_check_lookaside (krb5_data *, const krb5_fulladdr *,
 					    krb5_data **);
 void kdc_insert_lookaside (krb5_data *, const krb5_fulladdr *,
 				     krb5_data *);
-
-/* sock2p.c */
-#ifndef HAVE_INET_NTOP
-/* It's provided by sock2p.c in this case.  */
-extern const char *inet_ntop (int, const void *, char *, size_t);
-#endif
-extern void sockaddr2p (const struct sockaddr *, char *, size_t, int *);
+void kdc_free_lookaside(krb5_context);
 
 /* which way to convert key? */
 #define CONVERT_INTO_DB	0
@@ -185,8 +182,9 @@ extern void sockaddr2p (const struct sockaddr *, char *, size_t, int *);
 #ifdef KRB5_KRB4_COMPAT
 krb5_error_code process_v4 (const krb5_data *,
 				      const krb5_fulladdr *,
-				      int is_secondary,
 				      krb5_data **);
+void process_v4_mode (const char *, const char *);
+void enable_v4_crossrealm(char *);
 #else
 #define process_v4(foo,bar,quux,foobar)	KRB5KRB_AP_ERR_BADVERSION
 #endif

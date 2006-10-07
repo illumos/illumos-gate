@@ -1,5 +1,5 @@
 /*
- * Copyright 1997-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,22 +52,91 @@ extern "C" {
 
 #include <db.h>
 
-/* deal with autoconf-based stuff (db.h includes db-config.h) */
-
-#ifndef HAVE_MEMMOVE
-#define memmove my_memmove
-#endif
-
-#ifndef HAVE_MKSTEMP
-#define mkstemp my_mkstemp
-#endif
-
-#ifndef HAVE_STRERROR
-#define strerror my_strerror
-#endif
+/* deal with autoconf-based stuff */
 
 #define DB_LITTLE_ENDIAN 1234
 #define DB_BIG_ENDIAN 4321
+
+#include <stdlib.h>
+#ifdef HAVE_ENDIAN_H
+# include <endian.h>
+#endif
+#ifdef HAVE_MACHINE_ENDIAN_H
+# include <machine/endian.h>
+#endif
+#ifdef HAVE_SYS_PARAM_H
+# include <sys/param.h>
+#endif
+
+/* SUNW14resync:
+   The following code is disabled as it correctly determines the
+   endianness of the system. This would break backward compatability
+   for x86 as prior to this resync all architectures are treated
+   similarily - as big endian. See definition of "WORDS_BIGENDIAN" in
+   db-config.h.
+*/
+#if 0 
+/* Handle both BIG and LITTLE defined and BYTE_ORDER matches one, or
+   just one defined; both with and without leading underscores.
+
+   Ignore "PDP endian" machines, this code doesn't support them
+   anyways.  */
+#if !defined(LITTLE_ENDIAN) && !defined(BIG_ENDIAN) && !defined(BYTE_ORDER)
+# ifdef __LITTLE_ENDIAN__
+#  define LITTLE_ENDIAN __LITTLE_ENDIAN__
+# endif
+# ifdef __BIG_ENDIAN__
+#  define BIG_ENDIAN __BIG_ENDIAN__
+# endif
+#endif
+#if !defined(LITTLE_ENDIAN) && !defined(BIG_ENDIAN) && !defined(BYTE_ORDER)
+# ifdef _LITTLE_ENDIAN
+#  define LITTLE_ENDIAN _LITTLE_ENDIAN
+# endif
+# ifdef _BIG_ENDIAN
+#  define BIG_ENDIAN _BIG_ENDIAN
+# endif
+# ifdef _BYTE_ORDER
+#  define BYTE_ORDER _BYTE_ORDER
+# endif
+#endif
+#if !defined(LITTLE_ENDIAN) && !defined(BIG_ENDIAN) && !defined(BYTE_ORDER)
+# ifdef __LITTLE_ENDIAN
+#  define LITTLE_ENDIAN __LITTLE_ENDIAN
+# endif
+# ifdef __BIG_ENDIAN
+#  define BIG_ENDIAN __BIG_ENDIAN
+# endif
+# ifdef __BYTE_ORDER
+#  define BYTE_ORDER __BYTE_ORDER
+# endif
+#endif
+
+#if defined(_MIPSEL) && !defined(LITTLE_ENDIAN)
+# define LITTLE_ENDIAN
+#endif
+#if defined(_MIPSEB) && !defined(BIG_ENDIAN)
+# define BIG_ENDIAN
+#endif
+
+#if defined(LITTLE_ENDIAN) && defined(BIG_ENDIAN) && defined(BYTE_ORDER)
+# if LITTLE_ENDIAN == BYTE_ORDER
+#  define DB_BYTE_ORDER DB_LITTLE_ENDIAN
+# elif BIG_ENDIAN == BYTE_ORDER
+#  define DB_BYTE_ORDER DB_BIG_ENDIAN
+# else
+#  error "LITTLE_ENDIAN and BIG_ENDIAN defined, but can't determine byte order"
+# endif
+#elif defined(LITTLE_ENDIAN) && !defined(BIG_ENDIAN)
+# define DB_BYTE_ORDER DB_LITTLE_ENDIAN
+#elif defined(BIG_ENDIAN) && !defined(LITTLE_ENDIAN)
+# define DB_BYTE_ORDER DB_BIG_ENDIAN
+#else
+# error "can't determine byte order from included system headers"
+#endif
+
+#endif
+
 
 #ifdef WORDS_BIGENDIAN
 #define DB_BYTE_ORDER DB_BIG_ENDIAN
@@ -86,6 +155,13 @@ extern "C" {
 #include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#endif
+#ifdef HAVE_INTTYPES_H
+/* Tru64 5.1: int8_t is defined here, and stdint.h doesn't exist.  */
+#include <inttypes.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/param.h>
@@ -227,7 +303,6 @@ void	 __dbpanic __P((DB *dbp));
 #ifndef O_BINARY
 #define O_BINARY	0		/* Needed for Win32 compiles */
 #endif
-
 #endif /* _DB_INT_H_ */
 
 #ifdef	__cplusplus

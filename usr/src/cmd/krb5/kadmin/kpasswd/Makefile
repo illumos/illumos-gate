@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,7 +29,7 @@ CPPFLAGS += -I$(SRC)/lib/gss_mechs/mech_krb5/include \
 	-I$(SRC)/lib/krb5 \
 	-DHAVE_LIBSOCKET=1 -DHAVE_LIBNSL=1 -DHAVE_UNISTD_H=1 \
 	-DHAVE_SYS_TIMEB_H=1 -DHAVE_ALLOCA_H=1 -DHAVE_FTIME=1 \
-	-DHAVE_TIMEZONE -DUSE_KADM5_API_VERSION=1
+	-DHAVE_TIMEZONE -DUSE_KADM5_API_VERSION=2
 
 COPTFLAG += $(XESS) #-I$(KINCDIR) 
 

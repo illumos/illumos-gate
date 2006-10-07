@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -490,10 +490,7 @@ init_common (krb5_context *context, krb5_boolean secure)
 	ctx->prompt_types = 0;
 	ctx->use_conf_ktypes = 0;
 
-	/* 
-	 * Solaris Kerberos: simplifying config by hard-coding udp_pref_limit
-	 */
-	ctx->udp_pref_limit = DEFAULT_UDP_PREF_LIMIT;
+	ctx->udp_pref_limit = -1;
 
 #endif  /* !_KERNEL */
 

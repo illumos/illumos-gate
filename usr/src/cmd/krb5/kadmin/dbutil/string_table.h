@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _STRING_TABLE_H
@@ -38,8 +38,7 @@ extern "C" {
  */
 
 #ifndef _OVSEC_ADM_STRINGS_
-
-extern char *str_INITING_KCONTEXT;
+ 
 extern char *str_PARSE_NAME;
 extern char *str_HISTORY_PARSE_NAME;
 extern char *str_ADMIN_PRINC_EXISTS;
@@ -68,8 +67,8 @@ extern char *str_TOO_MANY_ADMIN_PRINC;
 extern char *str_TOO_MANY_CHANGEPW_PRINC;
 extern char *str_TOO_MANY_HIST_PRINC;
 extern char *str_WHILE_DESTROYING_ADMIN_SESSION;
-
-#endif			   /* _OVSEC_ADM_STRINGS_ */
+ 
+#endif /* _OVSEC_ADM_STRINGS_ */
 
 #ifdef	__cplusplus
 }

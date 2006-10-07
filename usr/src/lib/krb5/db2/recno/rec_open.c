@@ -70,7 +70,7 @@ __rec_open(fname, flags, mode, openinfo, dflags)
 	int rfd, sverrno;
 
 	/* Open the user's file -- if this fails, we're done. */
-	if (fname != NULL && (rfd = open(fname, flags, mode)) < 0)
+	if (fname != NULL && (rfd = open(fname, flags | O_BINARY, mode)) < 0)
 		return (NULL);
 
 	/* Create a btree in memory (backed by disk). */
@@ -87,9 +87,9 @@ __rec_open(fname, flags, mode, openinfo, dflags)
 		btopeninfo.prefix = NULL;
 		btopeninfo.lorder = openinfo->lorder;
 		dbp = __bt_open(openinfo->bfname,
-		    O_RDWR, S_IRUSR | S_IWUSR, &btopeninfo, dflags);
+		    O_RDWR | O_BINARY, S_IRUSR | S_IWUSR, &btopeninfo, dflags);
 	} else
-		dbp = __bt_open(NULL, O_RDWR, S_IRUSR | S_IWUSR, NULL, dflags);
+		dbp = __bt_open(NULL, O_RDWR | O_BINARY, S_IRUSR | S_IWUSR, NULL, dflags);
 	if (dbp == NULL)
 		goto err;
 
@@ -132,7 +132,7 @@ __rec_open(fname, flags, mode, openinfo, dflags)
 			default:
 				goto einval;
 			}
-slow:			if ((t->bt_rfp = fdopen(rfd, "r")) == NULL)
+slow:			if ((t->bt_rfp = fdopen(rfd, "rb")) == NULL)
 				goto err;
 			F_SET(t, R_CLOSEFP);
 			t->bt_irec =

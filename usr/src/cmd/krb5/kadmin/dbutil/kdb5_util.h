@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,7 @@ extern "C" {
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -47,40 +47,68 @@ extern "C" {
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  */
-
 #include <kdb/kdb_log.h>
-
-#define	MAX_HEADER	1024
-#define	REALM_SEP	'@'
-#define	REALM_SEP_STR	"@"
+#define MAX_HEADER      1024
+#define REALM_SEP	'@'
+#define REALM_SEP_STR	"@"
 
 extern char *progname;
 extern char *Err_no_database;
+extern krb5_boolean dbactive;
+extern int exit_status;
+extern krb5_context util_context;
+extern kadm5_config_params global_params;
+extern int valid_master_key;
+extern krb5_db_entry master_db;
 
-void add_key
-(char const *, char const *,
-	krb5_const_principal, const krb5_keyblock *,
-	krb5_kvno, krb5_keysalt *);
-int set_dbname_help
-    (char *, char *);
+extern void usage(void);
 
-char *kdb5_util_Init (int, char **);
+extern void add_key 
+	(char const *, char const *, 
+		   krb5_const_principal, const krb5_keyblock *, 
+		   krb5_kvno, krb5_keysalt *);
+extern int set_dbname_help
+	(char *, char *);
 
-int quit();
+extern char *kdb5_util_Init (int, char **);
 
-int check_for_match
-    (char *, int, krb5_db_entry *, int, int);
+extern int quit (void);
 
-void parse_token
-    (char *, int *, int *, char *);
+extern int check_for_match
+	(char *, int, krb5_db_entry *, int, int);
 
-int create_db_entry
-    (krb5_principal, krb5_db_entry *);
+extern void parse_token
+	(char *, int *, int *, char *);
+
+extern int create_db_entry (krb5_principal, krb5_db_entry *);
+
+extern int kadm5_create_magic_princs (kadm5_config_params *params,
+						krb5_context context);
+
+extern int process_ov_principal (char *fname, krb5_context kcontext, 
+					   FILE *filep, int verbose, 
+					   int *linenop,
+					   void *pol_db);
+
+extern void load_db (int argc, char **argv);
+extern void dump_db (int argc, char **argv);
+extern void kdb5_create (int argc, char **argv);
+extern void kdb5_destroy (int argc, char **argv);
+extern void kdb5_stash (int argc, char **argv);
+
+extern void update_ok_file (char *file_name);
+
+extern int kadm5_create (kadm5_config_params *params);
+
+void usage (void);
 
 #ifdef	__cplusplus
 }

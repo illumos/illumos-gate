@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -319,10 +319,6 @@ krb5_sendto_kdc (krb5_context context, const krb5_data *message,
     /*LINTED*/
 	   message->length, message->data, realm, *use_master, tcp_only);
 
-    /* 
-     * Solaris Kerberos: keep it simple by not supporting a udp_preference_limit
-     */
-#if 0 /************** Begin IFDEF'ed OUT *******************************/
     if (!tcp_only && context->udp_pref_limit < 0) {
 	int tmp;
 	retval = profile_get_integer(context->profile,
@@ -332,15 +328,13 @@ krb5_sendto_kdc (krb5_context context, const krb5_data *message,
 	    return retval;
 	if (tmp < 0)
 	    tmp = DEFAULT_UDP_PREF_LIMIT;
-	else if (tmp > HARD_UDP_LIMIT) {
+	else if (tmp > HARD_UDP_LIMIT)
 	    /* In the unlikely case that a *really* big value is
 	       given, let 'em use as big as we think we can
 	       support.  */
 	    tmp = HARD_UDP_LIMIT;
-	}
 	context->udp_pref_limit = tmp;
     }
-#endif /**************** END IFDEF'ed OUT *******************************/
 
     retval = (*use_master ? KRB5_KDC_UNREACH : KRB5_REALM_UNKNOWN);
 

@@ -95,7 +95,7 @@ __ovfl_get(t, p, ssz, buf, bufsz)
 	memmove(&sz, (char *)p + sizeof(db_pgno_t), sizeof(u_int32_t));
 	*ssz = sz;
 
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	if (pg == P_INVALID || sz == 0)
 		abort();
 #endif
@@ -204,7 +204,7 @@ __ovfl_delete(t, p)
 	memmove(&pg, p, sizeof(db_pgno_t));
 	memmove(&sz, (char *)p + sizeof(db_pgno_t), sizeof(u_int32_t));
 
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	if (pg == P_INVALID || sz == 0)
 		abort();
 #endif

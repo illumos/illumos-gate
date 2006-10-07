@@ -70,7 +70,7 @@ hcreate(nel)
 extern ENTRY *
 hsearch(item, action)
 	ENTRY item;
-	SEARCH_ACTION action;
+	ACTION action;
 {
 	DBT key, val;
 	int status;

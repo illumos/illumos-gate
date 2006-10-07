@@ -46,16 +46,14 @@ static char sccsid[] = "@(#)hash.c	8.12 (Berkeley) 11/7/95";
 #include <sys/stat.h>
 
 #include <errno.h>
-
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <libintl.h>
-#ifdef DEBUG_DB
+#ifdef DEBUG
 #include <assert.h>
-extern int g_displayDebugDB;
 #endif
 
 #include "db-int.h"
@@ -64,7 +62,7 @@ extern int g_displayDebugDB;
 #include "extern.h"
 
 static int32_t flush_meta __P((HTAB *));
-static int32_t hash_access __P((HTAB *, ACTION, DBT *, DBT *));
+static int32_t hash_access __P((HTAB *, ACTION, const DBT *, DBT *));
 static int32_t hash_close __P((DB *));
 static int32_t hash_delete __P((const DB *, const DBT *, u_int32_t));
 static int32_t hash_fd __P((const DB *));
@@ -76,7 +74,7 @@ static int32_t hdestroy __P((HTAB *));
 static int32_t cursor_get __P((const DB *, CURSOR *, DBT *, DBT *, \
 	u_int32_t));
 static int32_t cursor_delete __P((const DB *, CURSOR *, u_int32_t));
-static HTAB *init_hash __P((HTAB *, const char *, HASHINFO *));
+static HTAB *init_hash __P((HTAB *, const char *, const HASHINFO *));
 static int32_t init_htab __P((HTAB *, int32_t));
 #if DB_BYTE_ORDER == DB_LITTLE_ENDIAN
 static void swap_header __P((HTAB *));
@@ -140,9 +138,8 @@ __kdb2_hash_open(file, flags, mode, info, dflags)
 		}
 
 		/* store the file name so that we can unlink it later */
-		hashp->fname = (char *)file;
-#ifdef DEBUG_DB
-		if (g_displayDebugDB)
+		hashp->fname = file;
+#ifdef DEBUG
 			fprintf(stderr, dgettext(TEXT_DOMAIN,
 			"Using file name %s.\n"), file);
 #endif
@@ -171,7 +168,7 @@ __kdb2_hash_open(file, flags, mode, info, dflags)
 
 	/* Process arguments to set up hash table header. */
 	if (new_table) {
-		if (!(hashp = init_hash(hashp, file, (HASHINFO *)info)))
+		if (!(hashp = init_hash(hashp, file, info)))
 			RETURN_ERROR(errno, error1);
 	} else {
 		/* Table already exists */
@@ -257,9 +254,7 @@ __kdb2_hash_open(file, flags, mode, info, dflags)
 	dbp->sync = hash_sync;
 	dbp->type = DB_HASH;
 
-#ifdef DEBUG_DB
-	if (g_displayDebugDB) {
-
+#ifdef DEBUG
 	(void)fprintf(stderr,
 	    "%s\n%s%lx\n%s%d\n%s%d\n%s%d\n%s%d\n%s%d\n%s%x\n%s%x\n%s%d\n%s%d\n",
 	    "init_htab:",
@@ -273,7 +268,6 @@ __kdb2_hash_open(file, flags, mode, info, dflags)
 	    "HIGH MASK       ", hashp->hdr.high_mask,
 	    "LOW  MASK       ", hashp->hdr.low_mask,
 	    "NKEYS           ", hashp->hdr.nkeys);
-	}
 #endif
 #ifdef HASH_STATISTICS
 	hash_overflows = hash_accesses = hash_collisions = hash_expansions = 0;
@@ -292,7 +286,7 @@ error1:
 
 error0:
 	if (!specified_file)
-		free(hashp->fname);
+		free((void*)(hashp->fname)); /* SUNW14resync */
 	free(hashp);
 	errno = save_errno;
 	return (NULL);
@@ -336,7 +330,7 @@ static HTAB *
 init_hash(hashp, file, info)
 	HTAB *hashp;
 	const char *file;
-	HASHINFO *info;
+	const HASHINFO *info;
 {
 	struct stat statbuf;
 	int32_t nelem;
@@ -393,7 +387,6 @@ init_htab(hashp, nelem)
 	int32_t nelem;
 {
 	int32_t l2, nbuckets;
-	db_pgno_t i;
 
 	/*
 	 * Divide number of elements by the fill factor and determine a
@@ -572,9 +565,7 @@ hdestroy(hashp)
 	 * files within mpool itself.
 	 */
 	if (hashp->fname && !hashp->save_file) {
-#ifdef DEBUG_DB
-
-	if (g_displayDebugDB)
+#ifdef DEBUG
 		fprintf(stderr, dgettext(TEXT_DOMAIN,
 			"Unlinking file %s.\n"), hashp->fname);
 #endif
@@ -582,7 +573,7 @@ hdestroy(hashp)
 		chmod(hashp->fname, 0700);
 		unlink(hashp->fname);
 		/* destroy the temporary name */
-		free(hashp->fname);
+		free((void *)(hashp->fname)); /* SUNW14resync */
 	}
 	free(hashp);
 
@@ -672,7 +663,7 @@ hash_get(dbp, key, data, flag)
 		hashp->local_errno = errno = EINVAL;
 		return (ERROR);
 	}
-	return (hash_access(hashp, HASH_GET, (DBT *)key, data));
+	return (hash_access(hashp, HASH_GET, key, data));
 }
 
 static int32_t
@@ -694,7 +685,7 @@ hash_put(dbp, key, data, flag)
 		return (ERROR);
 	}
 	return (hash_access(hashp, flag == R_NOOVERWRITE ?
-		HASH_PUTNEW : HASH_PUT, (DBT *)key, (DBT *)data));
+		HASH_PUTNEW : HASH_PUT, key, (DBT *)data));
 }
 
 static int32_t
@@ -715,7 +706,7 @@ hash_delete(dbp, key, flag)
 		return (ERROR);
 	}
 
-	return (hash_access(hashp, HASH_DELETE, (DBT *)key, NULL));
+	return (hash_access(hashp, HASH_DELETE, key, NULL));
 }
 
 /*
@@ -725,7 +716,8 @@ static int32_t
 hash_access(hashp, action, key, val)
 	HTAB *hashp;
 	ACTION action;
-	DBT *key, *val;
+	const DBT *key;
+	DBT *val;
 {
 	DBT page_key, page_val;
 	CURSOR cursor;

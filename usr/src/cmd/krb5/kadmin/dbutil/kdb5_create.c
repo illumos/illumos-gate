@@ -94,8 +94,7 @@ enum ap_op {
     TGT_KEY				/* special handling for tgt key */
 };
 
-krb5_key_salt_tuple def_kslist =
-	{ENCTYPE_DES_CBC_CRC, KRB5_KDB_SALTTYPE_NORMAL};
+krb5_key_salt_tuple def_kslist = { ENCTYPE_DES_CBC_CRC, KRB5_KDB_SALTTYPE_NORMAL };
 
 struct realm_info {
     krb5_deltat max_life;
@@ -106,7 +105,6 @@ struct realm_info {
     krb5_int32 nkslist;
     krb5_key_salt_tuple *kslist;
 } rblock = { /* XXX */
-
     KRB5_KDB_MAX_LIFE,
     KRB5_KDB_MAX_RLIFE,
     KRB5_KDB_EXPIRATION,
@@ -122,10 +120,11 @@ struct iterate_args {
     krb5_db_entry	*dbentp;
 };
 
-static krb5_error_code add_principal(krb5_context,
-		krb5_principal, 
-		enum ap_op,
-		struct realm_info *,
+static krb5_error_code add_principal 
+	(krb5_context,
+	 krb5_principal,
+	 enum ap_op,
+	 struct realm_info *,
 		krb5_keyblock *);
 
 /*
@@ -151,10 +150,8 @@ krb5_data tgt_princ_entries[] = {
 krb5_data db_creator_entries[] = {
 	{0, sizeof("db_creation")-1, "db_creation"} };
 
-/*
- * XXX knows about contents of krb5_principal, and that tgt names
- * are of form TGT/REALM@REALM
- */
+/* XXX knows about contents of krb5_principal, and that tgt names
+ are of form TGT/REALM@REALM */
 krb5_principal_data tgt_princ = {
         0,					/* magic number */
 	{0, 0, 0},				/* krb5_data realm */
@@ -179,8 +176,7 @@ extern osa_adb_policy_t policy_db;
 extern kadm5_config_params global_params;
 extern krb5_context util_context;
 
-void
-kdb5_create(argc, argv)
+void kdb5_create(argc, argv)
    int argc;
    char *argv[];
 {
@@ -196,7 +192,7 @@ kdb5_create(argc, argv)
     kdb_log_context *log_ctx;
     krb5_keyblock mkey;
     krb5_data master_salt = { 0, NULL };
-
+	   
     if (strrchr(argv[0], '/'))
 	argv[0] = strrchr(argv[0], '/')+1;
 
@@ -224,41 +220,41 @@ kdb5_create(argc, argv)
     log_ctx = util_context->kdblog_context;
 
     retval = krb5_db_set_name(util_context, global_params.dbname);
-	if (!retval)
-		retval = EEXIST;
+    if (!retval) retval = EEXIST;
 
     if (retval == EEXIST || retval == EACCES || retval == EPERM) {
 	/* it exists ! */
 		com_err(argv[0], 0,
 			gettext("The database '%s' appears to already exist"),
 		global_params.dbname);
-		exit_status++;
-		return;
+	exit_status++; return;
     }
+/* SUNW14resync XXX */
+#if 0
+    printf ("Loading random data\n");
+    retval = krb5_c_random_os_entropy (util_context, 1, NULL);
+    if (retval) {
+      com_err (argv[0], retval, "Loading random data");
+      exit_status++; return;
+    }
+#endif    
     /* assemble & parse the master key name */
 
     if ((retval = krb5_db_setup_mkey_name(util_context,
 					  global_params.mkey_name,
 					  global_params.realm,  
 					  &mkey_fullname, &master_princ))) {
-		com_err(argv[0], retval,
+	com_err(argv[0], retval,
 			gettext("while setting up master key name"));
-		exit_status++;
-		return;
+	exit_status++; return;
     }
-	krb5_princ_set_realm_data(util_context,
-				&db_create_princ, global_params.realm);
-	krb5_princ_set_realm_length(util_context,
-				    &db_create_princ,
-				    strlen(global_params.realm));
-	krb5_princ_set_realm_data(util_context,
-				&tgt_princ, global_params.realm);
-	krb5_princ_set_realm_length(util_context,
-				    &tgt_princ, strlen(global_params.realm));
-	krb5_princ_component(util_context, &tgt_princ, 1)->data =
-	    global_params.realm;
-	krb5_princ_component(util_context, &tgt_princ, 1)->length =
-	    strlen(global_params.realm);
+
+    krb5_princ_set_realm_data(util_context, &db_create_princ, global_params.realm);
+    krb5_princ_set_realm_length(util_context, &db_create_princ, strlen(global_params.realm));
+    krb5_princ_set_realm_data(util_context, &tgt_princ, global_params.realm);
+    krb5_princ_set_realm_length(util_context, &tgt_princ, strlen(global_params.realm));
+    krb5_princ_component(util_context, &tgt_princ,1)->data = global_params.realm;
+    krb5_princ_component(util_context, &tgt_princ,1)->length = strlen(global_params.realm);
 
 	printf(gettext("Initializing database '%s' for realm '%s',\n"
 			"master key name '%s'\n"),
@@ -279,17 +275,15 @@ kdb5_create(argc, argv)
 				    "master key to verify"),
 			    pw_str, &pw_size);
 	if (retval) {
-		com_err(argv[0], retval,
+	    com_err(argv[0], retval,
 		    gettext("while reading master key from keyboard"));
-		exit_status++;
-		return;
+	    exit_status++; return;
 	}
 	mkey_password = pw_str;
     }
 
     pwd.data = mkey_password;
     pwd.length = strlen(mkey_password);
-
     retval = krb5_principal2salt(util_context, master_princ, &master_salt);
     if (retval) {
 	com_err(argv[0], retval,
@@ -298,8 +292,9 @@ kdb5_create(argc, argv)
 	goto cleanup;
     }
 
-    if (retval = krb5_c_string_to_key(util_context, global_params.enctype,
-			      &pwd, &master_salt, &mkey)) {
+    retval = krb5_c_string_to_key(util_context, global_params.enctype,
+				  &pwd, &master_salt, &mkey);
+    if (retval) {
 	com_err(argv[0], retval,
 	    gettext("while transforming master key from password"));
 	exit_status++;
@@ -393,10 +388,11 @@ kdb5_create(argc, argv)
      * it; delete the file below if it was not requested.  DO NOT EXIT
      * BEFORE DELETING THE KEYFILE if do_stash is not set.
      */
-    if (retval = krb5_db_store_mkey(util_context,
-				    global_params.stash_file,
-				    master_princ,
-				    &mkey)) {
+    retval = krb5_db_store_mkey(util_context,
+			    global_params.stash_file,
+			    master_princ,
+			    &mkey);
+    if (retval) {
 	com_err(argv[0], errno, gettext("while storing key"));
 	printf(gettext("Warning: couldn't stash master key.\n"));
     }
@@ -405,13 +401,11 @@ kdb5_create(argc, argv)
 	memset(pw_str, 0, pw_size);
 
     if (kadm5_create(&global_params)) {
-	if (!do_stash)
-		unlink(global_params.stash_file);
-	exit_status++;
-	goto cleanup;
+	 if (!do_stash) unlink(global_params.stash_file);
+	 exit_status++;
+	 goto cleanup;
     }
-    if (!do_stash)
-	unlink(global_params.stash_file);
+    if (!do_stash) unlink(global_params.stash_file);
 
 cleanup:
     if (pw_str) {
@@ -426,7 +420,6 @@ cleanup:
     (void) krb5_db_fini(util_context);
 
     return;
-
 }
 
 static krb5_error_code
@@ -439,7 +432,6 @@ tgt_keysalt_iterate(ksent, ptr)
     struct iterate_args	*iargs;
     krb5_keyblock	key;
     krb5_int32		ind;
-    krb5_pointer rseed;
     krb5_data	pwd;
 
     iargs = (struct iterate_args *) ptr;
@@ -453,7 +445,8 @@ tgt_keysalt_iterate(ksent, ptr)
      */
     pwd.data = mkey_password;
     pwd.length = strlen(mkey_password);
-    if (kret = krb5_c_random_seed(context, &pwd))
+    kret = krb5_c_random_seed(context, &pwd);
+    if (kret)
 	return kret;
 
     if (!(kret = krb5_dbe_create_key_data(iargs->ctx, iargs->dbentp))) {
@@ -474,11 +467,12 @@ tgt_keysalt_iterate(ksent, ptr)
 }
 
 static krb5_error_code
-add_principal(krb5_context context,
-    krb5_principal princ,
-    enum ap_op op,
-    struct realm_info *pblock,
-    krb5_keyblock *mkey)
+add_principal(context, princ, op, pblock, mkey)
+    krb5_context context;
+    krb5_principal princ;
+    enum ap_op op;
+    struct realm_info *pblock;
+    krb5_keyblock *mkey;
 {
     krb5_error_code 	  retval;
     krb5_db_entry 	  entry;
@@ -508,17 +502,17 @@ add_principal(krb5_context context,
 
     switch (op) {
     case MASTER_KEY:
-	entry.key_data = (krb5_key_data *) malloc(sizeof (krb5_key_data));
-	if (entry.key_data == NULL)
+	if ((entry.key_data=(krb5_key_data*)malloc(sizeof(krb5_key_data)))
+	    == NULL)
 	    goto error_out;
-
 	memset((char *) entry.key_data, 0, sizeof(krb5_key_data));
 	entry.n_key_data = 1;
 
 	entry.attributes |= KRB5_KDB_DISALLOW_ALL_TIX;
 	if ((retval = krb5_dbekd_encrypt_key_data(context, pblock->key,
-				  mkey, NULL, 1, entry.key_data)))
-		goto error_out;
+						  mkey, NULL,
+						  1, entry.key_data)))
+	    goto error_out;
 	break;
     case TGT_KEY:
 	iargs.ctx = context;
@@ -532,10 +526,10 @@ add_principal(krb5_context context,
 					   1,
 					   tgt_keysalt_iterate,
 					   (krb5_pointer) &iargs)))
-		return (retval);
+	    return retval;
 	break;
     case NULL_KEY:
-	return (EOPNOTSUPP);
+	return EOPNOTSUPP;
     default:
 	break;
     }
@@ -543,6 +537,6 @@ add_principal(krb5_context context,
     retval = krb5_db_put_principal(context, &entry, &nentries);
 
 error_out:;
-	krb5_dbe_free_contents(context, &entry);
-	return (retval);
+    krb5_dbe_free_contents(context, &entry);
+    return retval;
 }

@@ -57,11 +57,11 @@ extern char *progname;
 static char default_db_name[] = DEFAULT_KDB_FILE;
 
 static char *gen_dbsuffix 
-	PROTOTYPE((char *, char * ));
+	(char *, char * );
 static krb5_error_code krb5_dbm_db_start_update 
-	PROTOTYPE((krb5_context));
+	(krb5_context);
 static krb5_error_code krb5_dbm_db_end_update 
-	PROTOTYPE((krb5_context));
+	(krb5_context);
 
 krb5_error_code
 krb5_dbm_db_get_age(krb5_context, char *, time_t *);
@@ -358,10 +358,10 @@ krb5_dbm_db_set_mkey(context, db_context, key)
 }
 
 krb5_error_code
-krb5_dbm_db_get_mkey(context, eblock)
-
+krb5_dbm_db_get_mkey(context, db_context, key)
     krb5_context 	  context;
-    krb5_encrypt_block  **eblock;
+    krb5_db_context 	* db_context;
+    krb5_keyblock  **key;
 {
     krb5_db_context *db_ctx;
 
@@ -369,7 +369,7 @@ krb5_dbm_db_get_mkey(context, eblock)
 	return(KRB5_KDB_DBNOTINITED);
 
     db_ctx = context->db_context;
-    *eblock = db_ctx->db_master_key;
+    *key = db_ctx->db_master_key;
     return 0;
 
 }
@@ -618,7 +618,7 @@ krb5_dbm_db_create(context, db_name)
 /*
  * Destroy the database.  Zero's out all of the files, just to be sure.
  */
-krb5_error_code
+static krb5_error_code
 destroy_file_suffix(dbname, suffix)
 	char	*dbname;
 	char	*suffix;
@@ -1141,7 +1141,7 @@ cleanup:
 krb5_error_code
 krb5_dbm_db_iterate (context, func, func_arg)
     krb5_context context;
-    krb5_error_code (*func) PROTOTYPE((krb5_pointer, krb5_db_entry *));
+    krb5_error_code (*func) (krb5_pointer, krb5_db_entry *);
     krb5_pointer func_arg;
 {
     datum key, contents;

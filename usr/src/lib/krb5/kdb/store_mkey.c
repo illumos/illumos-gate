@@ -66,7 +66,7 @@ krb5_db_store_mkey(context, keyfile, mname, key)
     char defkeyfile[MAXPATHLEN+1];
     krb5_data *realm = krb5_princ_realm(context, mname);
 #if HAVE_UMASK
-    int oumask;
+    mode_t oumask;
 #endif
 
     if (!keyfile) {
@@ -98,7 +98,8 @@ krb5_db_store_mkey(context, keyfile, mname, key)
 	(fwrite((krb5_pointer) &key->length,
 		sizeof(key->length), 1, kf) != 1) ||
 	(fwrite((krb5_pointer) key->contents,
-		sizeof(key->contents[0]), key->length, kf) != key->length)) {
+		sizeof(key->contents[0]), (unsigned) key->length, 
+		kf) != key->length)) {
 	retval = errno;
 	(void) fclose(kf);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 1997-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,7 @@ typedef struct entry {
 
 typedef enum {
 	FIND, ENTER
-} SEARCH_ACTION;
+} ACTION;
 
 #define hcreate		kdb2_hcreate
 #define hdestroy	kdb2_hdestroy
@@ -66,7 +66,7 @@ typedef enum {
 
 int	 hcreate __P((unsigned int));
 void	 hdestroy __P((void));
-ENTRY	*hsearch __P((ENTRY, SEARCH_ACTION));
+ENTRY	*hsearch __P((ENTRY, ACTION));
 
 #ifdef	__cplusplus
 }

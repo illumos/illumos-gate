@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,7 +151,7 @@ iprop_get_updates_1(kdb_last_t *arg, struct svc_req *rqstp)
 			whoami);
 		goto out;
 	}
-	if (!acl_check(handle->context,
+	if (!kadm5int_acl_check(handle->context,
 		    name,
 		    ACL_IPROP,
 		    NULL,
@@ -271,7 +271,7 @@ iprop_full_resync_1(
 			whoami);
 		goto out;
 	}
-	if (!acl_check(handle->context,
+	if (!kadm5int_acl_check(handle->context,
 		    name,
 		    ACL_IPROP,
 		    NULL,

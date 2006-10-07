@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,9 +29,9 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /afs/athena.mit.edu/astaff/project/krbdev/.cvsroot/src/lib/kadm5/clnt/client_internal.h, v 1.1 1996/07/24 22:22:43 tlyu Exp $
- *
- * $Log: client_internal.h, v $
+ * $Header: /cvs/krbdev/krb5/src/lib/kadm5/clnt/client_internal.h,v 1.1 1996/07/24 22:22:43 tlyu Exp $
+ * 
+ * $Log: client_internal.h,v $
  * Revision 1.1  1996/07/24 22:22:43  tlyu
  * 	* Makefile.in, configure.in: break out client lib into a
  * 		subdirectory
@@ -97,31 +97,32 @@ typedef struct _kadm5_server_handle_t {
 	krb5_ui_4	magic_number;
 	krb5_ui_4	struct_version;
 	krb5_ui_4	api_version;
-	char 		*cache_name;
+	char *		cache_name;
 	int		destroy_cache;
-	CLIENT		*clnt;
+	CLIENT *	clnt;
 	krb5_context	context;
 	gss_cred_id_t	my_cred;
 	kadm5_config_params params;
 	struct _kadm5_server_handle_t *lhandle;
 } kadm5_server_handle_rec, *kadm5_server_handle_t;
 
-
-#define	CLIENT_CHECK_HANDLE(handle) \
+#define CLIENT_CHECK_HANDLE(handle) \
 { \
-kadm5_server_handle_t srvr = (kadm5_server_handle_t)handle; \
+	kadm5_server_handle_t srvr = \
+	     (kadm5_server_handle_t) handle; \
+ \
 	if (srvr->params.kpasswd_protocol == KRB5_CHGPWD_RPCSEC && ! srvr->clnt) \
-	    return (KADM5_BAD_SERVER_HANDLE); \
+	     return KADM5_BAD_SERVER_HANDLE; \
 	if (! srvr->cache_name) \
-	    return (KADM5_BAD_SERVER_HANDLE); \
+	     return KADM5_BAD_SERVER_HANDLE; \
 	if (! srvr->lhandle) \
-return (KADM5_BAD_SERVER_HANDLE); \
+	     return KADM5_BAD_SERVER_HANDLE; \
 }
 
-#define	CHECK_HANDLE(handle) \
-GENERIC_CHECK_HANDLE(handle, KADM5_OLD_LIB_API_VERSION, \
-KADM5_NEW_LIB_API_VERSION) \
-CLIENT_CHECK_HANDLE(handle)
+#define CHECK_HANDLE(handle) \
+     GENERIC_CHECK_HANDLE(handle, KADM5_OLD_LIB_API_VERSION, \
+			  KADM5_NEW_LIB_API_VERSION) \
+     CLIENT_CHECK_HANDLE(handle)
 
 #ifdef __cplusplus
 }

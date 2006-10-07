@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -15,7 +15,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -29,7 +29,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ * 
  *
  * Registration functions for keytab.
  */
@@ -46,9 +46,6 @@ struct krb5_kt_typelist {
     const krb5_kt_ops *ops;
     const struct krb5_kt_typelist *next;
 };
-static const struct krb5_kt_typelist krb5_kt_typelist_dfl = { &krb5_kt_dfl_ops, 0 };
-static const struct krb5_kt_typelist *kt_typehead = &krb5_kt_typelist_dfl;
-
 static const struct krb5_kt_typelist krb5_kt_typelist_wrfile  = {
     &krb5_ktf_writable_ops,
     0
@@ -61,11 +58,7 @@ static const struct krb5_kt_typelist krb5_kt_typelist_srvtab = {
     &krb5_kts_ops,
     &krb5_kt_typelist_file
 };
-
-/* SUNW14resync */
-/*
-static const struct krb5_kt_typelist *kt_typehead = &krb5_kt_typelist_srvtab;*/
-
+static const struct krb5_kt_typelist *kt_typehead = &krb5_kt_typelist_srvtab;
 /* Lock for protecting the type list.  */
 static k5_mutex_t kt_typehead_lock = K5_MUTEX_PARTIAL_INITIALIZER;
 

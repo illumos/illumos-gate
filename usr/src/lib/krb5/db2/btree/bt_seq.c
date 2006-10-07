@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,7 +75,7 @@ static char sccsid[] = "@(#)bt_seq.c	8.9 (Berkeley) 6/20/95";
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h> /* SUNWresync121 */
+#include <string.h>
 
 #include "db-int.h"
 #include "btree.h"
@@ -276,7 +276,7 @@ __bt_seqadv(t, ep, flags)
 {
 	CURSOR *c;
 	PAGE *h;
-	indx_t index;
+	indx_t idx;
 	db_pgno_t pg;
 	int exact, rval;
 
@@ -344,15 +344,15 @@ __bt_seqadv(t, ep, flags)
 		 */
 		if (F_ISSET(c, CURS_AFTER))
 			goto usecurrent;
-		index = c->pg.index;
-		if (++index == NEXTINDEX(h)) {
+		idx = c->pg.index;
+		if (++idx == NEXTINDEX(h)) {
 			pg = h->nextpg;
 			mpool_put(t->bt_mp, h, 0);
 			if (pg == P_INVALID)
 				return (RET_SPECIAL);
 			if ((h = mpool_get(t->bt_mp, pg, 0)) == NULL)
 				return (RET_ERROR);
-			index = 0;
+			idx = 0;
 		}
 		break;
 	case R_PREV:			/* Previous record. */
@@ -367,22 +367,22 @@ usecurrent:		F_CLR(c, CURS_AFTER | CURS_BEFORE);
 			ep->index = c->pg.index;
 			return (RET_SUCCESS);
 		}
-		index = c->pg.index;
-		if (index == 0) {
+		idx = c->pg.index;
+		if (idx == 0) {
 			pg = h->prevpg;
 			mpool_put(t->bt_mp, h, 0);
 			if (pg == P_INVALID)
 				return (RET_SPECIAL);
 			if ((h = mpool_get(t->bt_mp, pg, 0)) == NULL)
 				return (RET_ERROR);
-			index = NEXTINDEX(h) - 1;
+			idx = NEXTINDEX(h) - 1;
 		} else
-			--index;
+			--idx;
 		break;
 	}
 
 	ep->page = h;
-	ep->index = index;
+	ep->index = idx;
 	return (RET_SUCCESS);
 }
 
@@ -502,10 +502,10 @@ __bt_first(t, key, erval, exactp)
  *  index:	page index
  */
 void
-__bt_setcur(t, pgno, index)
+__bt_setcur(t, pgno, idx)
 	BTREE *t;
 	db_pgno_t pgno;
-	u_int index;
+	u_int idx;
 {
 	/* Lose any already deleted key. */
 	if (t->bt_cursor.key.data != NULL) {
@@ -517,7 +517,7 @@ __bt_setcur(t, pgno, index)
 
 	/* Update the cursor. */
 	t->bt_cursor.pg.pgno = pgno;
-	t->bt_cursor.pg.index = index;
+	t->bt_cursor.pg.index = idx;
 	F_SET(&t->bt_cursor, CURS_INIT);
 }
 

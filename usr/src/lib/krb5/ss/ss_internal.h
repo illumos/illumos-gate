@@ -15,19 +15,7 @@
 #include <stdlib.h>
 #endif
 
-#ifdef __STDC__
-
-#define PROTOTYPE(p) p
 typedef void * pointer;
-
-#else
-
-#define const
-#define volatile
-#define PROTOTYPE(p) ()
-typedef char * pointer;
-
-#endif /* not __STDC__ */
 
 #include <ss/ss.h>
 
@@ -38,13 +26,13 @@ typedef char * pointer;
 #if defined(vax)
 #define LOCAL_ALLOC(x) alloca(x)
 #define LOCAL_FREE(x)
-extern pointer alloca PROTOTYPE((unsigned));
+extern pointer alloca (unsigned);
 #else
 #if defined(__HIGHC__)	/* Barf! */
 pragma on(alloca);
 #define LOCAL_ALLOC(x) alloca(x)
 #define LOCAL_FREE(x)
-extern pointer alloca PROTOTYPE((unsigned));
+extern pointer alloca (unsigned);
 #else
 /* no alloca? */
 #define LOCAL_ALLOC(x) malloc(x)
@@ -103,23 +91,30 @@ typedef struct _ss_data {	/* init values */
      (*code_ptr=0,ss_info(sci_idx)->current_request)
 void ss_unknown_function();
 void ss_delete_info_dir();
-int ss_execute_line();
-char **ss_parse();
-ss_abbrev_info *ss_abbrev_initialize PROTOTYPE((char *, int *));
-void ss_page_stdin();
+char **ss_parse (int, char *, int *);
+ss_abbrev_info *ss_abbrev_initialize (char *, int *);
+void ss_page_stdin (void);
+int ss_pager_create (void);
+void ss_self_identify __SS_PROTO;
+void ss_subsystem_name __SS_PROTO;
+void ss_subsystem_version __SS_PROTO;
+void ss_unimplemented __SS_PROTO;
 
 extern ss_data **_ss_table;
 extern char *ss_et_msgs[];
 
 #ifndef HAVE_STDLIB_H
-extern pointer malloc PROTOTYPE((unsigned));
-extern pointer realloc PROTOTYPE((pointer, unsigned));
-extern pointer calloc PROTOTYPE((unsigned, unsigned));
+extern pointer malloc (unsigned);
+extern pointer realloc (pointer, unsigned);
+extern pointer calloc (unsigned, unsigned);
 #endif
 
-#ifdef USE_SIGPROCMASK
+#if defined(USE_SIGPROCMASK) && !defined(POSIX_SIGNALS)
 /* fake sigmask, sigblock, sigsetmask */
 #include <signal.h>
+#ifdef sigmask
+#undef sigmask
+#endif
 #define sigmask(x) (1L<<(x)-1)
 #define sigsetmask(x) sigprocmask(SIG_SETMASK,&x,NULL)
 static int _fake_sigstore;

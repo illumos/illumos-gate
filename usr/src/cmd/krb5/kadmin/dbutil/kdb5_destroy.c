@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,7 +82,6 @@
 #include <libintl.h>
 #include "kdb5_util.h"
 
-extern int errno;
 extern int exit_status;
 extern krb5_boolean dbactive;
 extern kadm5_config_params global_params;
@@ -98,9 +97,9 @@ kdb5_destroy(argc, argv)
     int optchar;
     char *dbname;
     char buf[5];
-    char dbfilename[MAXPATHLEN];
     krb5_error_code retval, retval1, retval2;
     krb5_context context;
+    int force = 0;
     char ufilename[MAX_FILENAME];
 
     krb5_init_context(&context);
@@ -110,29 +109,42 @@ kdb5_destroy(argc, argv)
 
     dbname = global_params.dbname;
 
-    printf(gettext("Deleting KDC database stored in '%s', "
-		"are you sure?\n"), dbname);
-    printf(gettext("(type 'yes' or 'y' to confirm)? "));
-
-    if (fgets(buf, sizeof (buf), stdin) == NULL) {
-	exit_status++;
-	return;
+    optind = 1;
+    while ((optchar = getopt(argc, argv, "f")) != -1) {
+	switch(optchar) {
+	case 'f':
+	    force++;
+	    break;
+	case '?':
+	default:
+	    usage();
+	    return;
+	    /*NOTREACHED*/
+	}
     }
-    if ((strncmp(buf, gettext("yes\n"),
+    if (!force) {
+	printf(gettext("Deleting KDC database stored in '%s', "
+		"are you sure?\n"), dbname);
+	printf(gettext("(type 'yes' or 'y' to confirm)? "));
+	if (fgets(buf, sizeof(buf), stdin) == NULL) {
+	    exit_status++; return;
+        }
+	if ((strncmp(buf, gettext("yes\n"),
 	 	strlen(gettext("yes\n"))) != 0) && 
 	(strncmp(buf, gettext("y\n"),
 		strlen(gettext("y\n"))) != 0)) {
 	printf(gettext("database not deleted !! '%s'...\n"),
 		dbname);
 
-	exit_status++;
-	return;
+	    exit_status++; return;
+        }
+	printf(gettext("OK, deleting database '%s'...\n"), dbname);
     }
-    printf(gettext("OK, deleting database '%s'...\n"), dbname);
-    if (retval = krb5_db_set_name(context, dbname)) {
+
+    retval = krb5_db_set_name(context, dbname);
+    if (retval) {
 	com_err(argv[0], retval, "'%s'",dbname);
-		exit_status++;
-		return;
+	exit_status++; return;
     }
     retval1 = krb5_db_destroy(context, dbname);
 
@@ -160,14 +172,12 @@ kdb5_destroy(argc, argv)
     if (retval1) {
 		com_err(argv[0], retval1,
 			gettext("deleting database '%s'"), dbname);
-		exit_status++;
-		return;
+	exit_status++; return;
     }
     if (retval2) {
 		com_err(argv[0], retval2,
 			gettext("destroying policy database"));
-		exit_status++;
-		return;
+	 exit_status++; return;
     }
 
     if (global_params.iprop_enabled) {
@@ -184,5 +194,6 @@ kdb5_destroy(argc, argv)
     }
 
     dbactive = FALSE;
-	printf(gettext("** Database '%s' destroyed.\n"), dbname);
+    printf(gettext("** Database '%s' destroyed.\n"), dbname);
+    return;
 }

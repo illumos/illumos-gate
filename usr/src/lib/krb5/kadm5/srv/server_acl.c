@@ -129,11 +129,11 @@ static const char *acl_catchall_entry = NULL;
 
 
 /*
- * acl_get_line()	- Get a line from the ACL file.
+ * kadm5int_acl_get_line() - Get a line from the ACL file.
  *			Lines ending with \ are continued on the next line
  */
 static char *
-acl_get_line(fp, lnp)
+kadm5int_acl_get_line(fp, lnp)
     FILE	*fp;
     int		*lnp;		/* caller should set to 1 before first call */
 {
@@ -190,10 +190,10 @@ acl_get_line(fp, lnp)
 }
 
 /*
- * acl_parse_line()	- Parse the contents of an ACL line.
+ * kadm5int_acl_parse_line() - Parse the contents of an ACL line.
  */
 static aent_t *
-acl_parse_line(lp)
+kadm5int_acl_parse_line(lp)
     const char *lp;
 {
     static char acle_principal[BUFSIZ];
@@ -205,7 +205,7 @@ acl_parse_line(lp)
     int		t, found, opok, nmatch;
 
     DPRINT(DEBUG_CALLS, acl_debug_level,
-	   ("* acl_parse_line(line=%20s)\n", lp));
+	   ("* kadm5int_acl_parse_line(line=%20s)\n", lp));
     /*
      * Format is still simple:
      *  entry ::= [<whitespace>] <principal> <whitespace> <opstring>
@@ -229,7 +229,7 @@ acl_parse_line(lp)
 	    for (op=acle_ops; *op; op++) {
 		char rop;
 
-		rop = (isupper(*op)) ? tolower(*op) : *op;
+		rop = (isupper((int) *op)) ? tolower((int) *op) : *op;
 		found = 0;
 		for (t=0; acl_op_table[t].ao_op; t++) {
 		    if (rop == acl_op_table[t].ao_op) {
@@ -272,7 +272,7 @@ acl_parse_line(lp)
 		char	*trailing;
 
 		trailing = &acle_restrictions[strlen(acle_restrictions)-1];
-		while ( isspace(*trailing) )
+		while ( isspace((int) *trailing) )
 		    trailing--;
 		trailing[1] = '\0';
 		acle->ae_restriction_string = strdup(acle_restrictions);
@@ -285,12 +285,12 @@ acl_parse_line(lp)
 	}
     }
     DPRINT(DEBUG_CALLS, acl_debug_level,
-	   ("X acl_parse_line() = %x\n", (long) acle));
+	   ("X kadm5int_acl_parse_line() = %x\n", (long) acle));
     return(acle);
 }
 
 /*
- * acl_parse_restrictions()	- Parse optional restrictions field
+ * kadm5int_acl_parse_restrictions() - Parse optional restrictions field
  *
  * Allowed restrictions are:
  *	[+-]flagname		(recognized by krb5_string_to_flags)
@@ -304,23 +304,22 @@ acl_parse_line(lp)
  * Returns: 0 on success, or system errors
  */
 static krb5_error_code
-acl_parse_restrictions(s, rpp)
+kadm5int_acl_parse_restrictions(s, rpp)
     char		*s;
     restriction_t	**rpp;
 {
     char		*sp, *tp, *ap;
     static const char	*delims = "\t\n\f\v\r ,";
-    krb5_error_code	ret;
     krb5_deltat		dt;
     krb5_flags		flag;
     krb5_error_code	code;
 
    DPRINT(DEBUG_CALLS, acl_debug_level,
-	   ("* acl_parse_restrictions(s=%20s, rpp=0x%08x)\n", s, (long)rpp));
+	   ("* kadm5int_acl_parse_restrictions(s=%20s, rpp=0x%08x)\n", s, (long)rpp));
 
     *rpp = (restriction_t *) NULL;
     code = 0;
-    if (s)
+    if (s) {
 	if (!(sp = strdup(s))	/* Don't munge the original */
 	    || !(*rpp = (restriction_t *) malloc(sizeof(restriction_t)))) {
 	    code = ENOMEM;
@@ -378,6 +377,7 @@ acl_parse_restrictions(s, rpp)
 		}
 	    }
 	}
+    }
     if (sp)
 	free(sp);
     if (*rpp && code) {
@@ -387,19 +387,19 @@ acl_parse_restrictions(s, rpp)
 	*rpp = (restriction_t *) NULL;
     }
     DPRINT(DEBUG_CALLS, acl_debug_level,
-	   ("X acl_parse_restrictions() = %d, mask=0x%08x\n",
+	   ("X kadm5int_acl_parse_restrictions() = %d, mask=0x%08x\n",
 	    code, (*rpp) ? (*rpp)->mask : 0));
     return code;
 }
 
 /*
- * acl_impose_restrictions()	- impose restrictions, modifying *recp, *maskp
+ * kadm5int_acl_impose_restrictions()	- impose restrictions, modifying *recp, *maskp
  *
  * Returns: 0 on success;
  *	    malloc or timeofday errors
  */
 krb5_error_code
-acl_impose_restrictions(kcontext, recp, maskp, rp)
+kadm5int_acl_impose_restrictions(kcontext, recp, maskp, rp)
      krb5_context		kcontext;
      kadm5_principal_ent_rec	*recp;
      long			*maskp;
@@ -409,7 +409,7 @@ acl_impose_restrictions(kcontext, recp, maskp, rp)
     krb5_int32		now;
 
     DPRINT(DEBUG_CALLS, acl_debug_level,
-	   ("* acl_impose_restrictions(..., *maskp=0x%08x, rp=0x%08x)\n",
+	   ("* kadm5int_acl_impose_restrictions(..., *maskp=0x%08x, rp=0x%08x)\n",
 	    *maskp, (long)rp));
     if (!rp)
 	return 0;
@@ -462,20 +462,20 @@ acl_impose_restrictions(kcontext, recp, maskp, rp)
 	*maskp |= KADM5_MAX_RLIFE;
     }
     DPRINT(DEBUG_CALLS, acl_debug_level,
-	   ("X acl_impose_restrictions() = 0, *maskp=0x%08x\n", *maskp));
+	   ("X kadm5int_acl_impose_restrictions() = 0, *maskp=0x%08x\n", *maskp));
     return 0;
 }
 
 /*
- * acl_free_entries()	- Free all ACL entries.
+ * kadm5int_acl_free_entries() - Free all ACL entries.
  */
 static void
-acl_free_entries()
+kadm5int_acl_free_entries()
 {
     aent_t	*ap;
     aent_t	*np;
 
-    DPRINT(DEBUG_CALLS, acl_debug_level, ("* acl_free_entries()\n"));
+    DPRINT(DEBUG_CALLS, acl_debug_level, ("* kadm5int_acl_free_entries()\n"));
     for (ap=acl_list_head; ap; ap = np) {
 	if (ap->ae_name)
 	    free(ap->ae_name);
@@ -497,14 +497,14 @@ acl_free_entries()
     }
     acl_list_head = acl_list_tail = (aent_t *) NULL;
     acl_inited = 0;
-    DPRINT(DEBUG_CALLS, acl_debug_level, ("X acl_free_entries()\n"));
+    DPRINT(DEBUG_CALLS, acl_debug_level, ("X kadm5int_acl_free_entries()\n"));
 }
 
 /*
- * acl_load_acl_file()	- Open and parse the ACL file.
+ * kadm5int_acl_load_acl_file()	- Open and parse the ACL file.
  */
 static int
-acl_load_acl_file()
+kadm5int_acl_load_acl_file()
 {
     FILE 	*afp;
     char 	*alinep;
@@ -512,16 +512,17 @@ acl_load_acl_file()
     int		alineno;
     int		retval = 1;
 
-    DPRINT(DEBUG_CALLS, acl_debug_level, ("* acl_load_acl_file()\n"));
+    DPRINT(DEBUG_CALLS, acl_debug_level, ("* kadm5int_acl_load_acl_file()\n"));
     /* Open the ACL file for read */
-    if (afp = fopen(acl_acl_file, "rF")) {
+    afp = fopen(acl_acl_file, "rF");
+    if (afp) {
 	alineno = 1;
 	aentpp = &acl_list_head;
 
 	/* Get a non-comment line */
-	while (alinep = acl_get_line(afp, &alineno)) {
+	while ((alinep = kadm5int_acl_get_line(afp, &alineno))) {
 	    /* Parse it */
-	    *aentpp = acl_parse_line(alinep);
+	    *aentpp = kadm5int_acl_parse_line(alinep);
 	    /* If syntax error, then fall out */
 	    if (!*aentpp) {
 		krb5_klog_syslog(LOG_ERR, ACL_SYN_ERR_MSG,
@@ -536,7 +537,8 @@ acl_load_acl_file()
 	fclose(afp);
 
 	if (acl_catchall_entry) {
-	     if (*aentpp = acl_parse_line(acl_catchall_entry)) {
+	     *aentpp = kadm5int_acl_parse_line(acl_catchall_entry);
+	     if (*aentpp) {
 		  acl_list_tail = *aentpp;
 	     }
 	     else {
@@ -551,7 +553,7 @@ acl_load_acl_file()
 	krb5_klog_syslog(LOG_ERR,  ACL_CANTOPEN_MSG,
 			 error_message(errno), acl_acl_file);
 	if (acl_catchall_entry &&
-	    (acl_list_head = acl_parse_line((char *)acl_catchall_entry))) {
+	    (acl_list_head = kadm5int_acl_parse_line((char *)acl_catchall_entry))) {
 	    acl_list_tail = acl_list_head;
 	}
 	else {
@@ -563,20 +565,20 @@ acl_load_acl_file()
     }
 
     if (!retval) {
-	acl_free_entries();
+	kadm5int_acl_free_entries();
     }
     DPRINT(DEBUG_CALLS, acl_debug_level,
-	   ("X acl_load_acl_file() = %d\n", retval));
+	   ("X kadm5int_acl_load_acl_file() = %d\n", retval));
     return(retval);
 }
 
 /*
- * acl_match_data()	- See if two data entries match.
+ * kadm5int_acl_match_data()	- See if two data entries match.
  *
  * Wildcarding is only supported for a whole component.
  */
 static krb5_boolean
-acl_match_data(e1, e2, targetflag, ws)
+kadm5int_acl_match_data(e1, e2, targetflag, ws)
     krb5_data	*e1, *e2;
     int		targetflag;
     wildstate_t	*ws;
@@ -591,7 +593,7 @@ acl_match_data(e1, e2, targetflag, ws)
 	if (ws && !targetflag) {
 	    if (ws->nwild >= 9) {
 		DPRINT(DEBUG_ACL, acl_debug_level,
-			("Too many wildcards in ACL entry %s\n", e1->data));
+		    ("Too many wildcards in ACL entry %s\n", e1->data));
 	    }
 	    else
 		ws->backref[ws->nwild++] = e2;
@@ -602,7 +604,7 @@ acl_match_data(e1, e2, targetflag, ws)
 	int	n = e1->data[1] - '1';
 	if (n >= ws->nwild) {
 	    DPRINT(DEBUG_ACL, acl_debug_level,
-		    ("Too many backrefs in ACL entry %s\n", e1->data));
+		   ("Too many backrefs in ACL entry %s\n", e1->data));
 	}
 	else if ((ws->backref[n]->length == e2->length) &&
 		 (!strncmp(ws->backref[n]->data, e2->data, e2->length)))
@@ -619,10 +621,10 @@ acl_match_data(e1, e2, targetflag, ws)
 }
 
 /*
- * acl_find_entry()	- Find a matching entry.
+ * kadm5int_acl_find_entry()	- Find a matching entry.
  */
 static aent_t *
-acl_find_entry(kcontext, principal, dest_princ)
+kadm5int_acl_find_entry(kcontext, principal, dest_princ)
     krb5_context	kcontext;
     krb5_principal	principal;
     krb5_principal	dest_princ;
@@ -633,7 +635,7 @@ acl_find_entry(kcontext, principal, dest_princ)
     int			matchgood;
     wildstate_t		state;
 
-    DPRINT(DEBUG_CALLS, acl_debug_level, ("* acl_find_entry()\n"));
+    DPRINT(DEBUG_CALLS, acl_debug_level, ("* kadm5int_acl_find_entry()\n"));
     memset((char *)&state, 0, sizeof state);
     for (entry=acl_list_head; entry; entry = entry->ae_next) {
 	if (entry->ae_name_bad)
@@ -656,12 +658,12 @@ acl_find_entry(kcontext, principal, dest_princ)
 		continue;
 	    }
 	    matchgood = 0;
-	    if (acl_match_data(&entry->ae_principal->realm,
+	    if (kadm5int_acl_match_data(&entry->ae_principal->realm,
 			       &principal->realm, 0, (wildstate_t *)0) &&
 		(entry->ae_principal->length == principal->length)) {
 		matchgood = 1;
 		for (i=0; i<principal->length; i++) {
-		    if (!acl_match_data(&entry->ae_principal->data[i],
+		    if (!kadm5int_acl_match_data(&entry->ae_principal->data[i],
 					&principal->data[i], 0, &state)) {
 			matchgood = 0;
 			break;
@@ -673,46 +675,44 @@ acl_find_entry(kcontext, principal, dest_princ)
 	    continue;
 
 	/* We've matched the principal.  If we have a target, then try it */
-	if (entry->ae_target) {
-	    if (!strcmp(entry->ae_target, "*"))
-		break;
+	if (entry->ae_target && strcmp(entry->ae_target, "*")) {
 	    if (!entry->ae_target_princ && !entry->ae_target_bad) {
 		kret = krb5_parse_name(kcontext, entry->ae_target,
 				       &entry->ae_target_princ);
 		if (kret)
 		    entry->ae_target_bad = 1;
 	    }
-	}
-	if (entry->ae_target_bad) {
-	    DPRINT(DEBUG_ACL, acl_debug_level,
-		   ("Bad target in ACL entry for %s\n", entry->ae_name));
-	    entry->ae_name_bad = 1;
-	    continue;
-	}
-	if (entry->ae_target && !dest_princ)
-	    matchgood = 0;
-	else if (entry->ae_target && entry->ae_target_princ && dest_princ) {
-	    if (acl_match_data(&entry->ae_target_princ->realm,
-			       &dest_princ->realm, 1, (wildstate_t *)0) &&
-		(entry->ae_target_princ->length == dest_princ->length)) {
-		for (i=0; i<dest_princ->length; i++) {
-		    if (!acl_match_data(&entry->ae_target_princ->data[i],
-					&dest_princ->data[i], 1, &state)) {
-			matchgood = 0;
-			break;
-		    }
-		}
+	    if (entry->ae_target_bad) {
+	        DPRINT(DEBUG_ACL, acl_debug_level,
+		       ("Bad target in ACL entry for %s\n", entry->ae_name));
+	        entry->ae_name_bad = 1;
+	        continue;
 	    }
-	    else
-		matchgood = 0;
-	}
+	    if (!dest_princ)
+	        matchgood = 0;
+	    else if (entry->ae_target_princ && dest_princ) {
+	        if (kadm5int_acl_match_data(&entry->ae_target_princ->realm,
+			           &dest_princ->realm, 1, (wildstate_t *)0) &&
+		    (entry->ae_target_princ->length == dest_princ->length)) {
+		    for (i=0; i<dest_princ->length; i++) {
+		        if (!kadm5int_acl_match_data(&entry->ae_target_princ->data[i],
+			  		    &dest_princ->data[i], 1, &state)) {
+			    matchgood = 0;
+			    break;
+		        }
+		    }
+	        }
+	        else
+		    matchgood = 0;
+	    }
+        }
 	if (!matchgood)
 	    continue;
 
 	if (entry->ae_restriction_string
 	    && !entry->ae_restriction_bad
 	    && !entry->ae_restrictions
-	    && acl_parse_restrictions(entry->ae_restriction_string,
+	    && kadm5int_acl_parse_restrictions(entry->ae_restriction_string,
 				      &entry->ae_restrictions)) {
 	    DPRINT(DEBUG_ACL, acl_debug_level,
 		   ("Bad restrictions in ACL entry for %s\n", entry->ae_name));
@@ -724,15 +724,15 @@ acl_find_entry(kcontext, principal, dest_princ)
 	}
 	break;
     }
-    DPRINT(DEBUG_CALLS, acl_debug_level, ("X acl_find_entry()=%x\n",entry));
+    DPRINT(DEBUG_CALLS, acl_debug_level, ("X kadm5int_acl_find_entry()=%x\n",entry));
     return(entry);
 }
 
 /*
- * acl_init()	- Initialize ACL context.
+ * kadm5int_acl_init()	- Initialize ACL context.
  */
 krb5_error_code
-acl_init(kcontext, debug_level, acl_file)
+kadm5int_acl_init(kcontext, debug_level, acl_file)
     krb5_context	kcontext;
     int			debug_level;
     char		*acl_file;
@@ -742,30 +742,30 @@ acl_init(kcontext, debug_level, acl_file)
     kret = 0;
     acl_debug_level = debug_level;
     DPRINT(DEBUG_CALLS, acl_debug_level,
-	   ("* acl_init(afile=%s)\n",
+	   ("* kadm5int_acl_init(afile=%s)\n",
 	    ((acl_file) ? acl_file : "(null)")));
     acl_acl_file = (acl_file) ? acl_file : (char *) KRB5_DEFAULT_ADMIN_ACL;
-    acl_inited = acl_load_acl_file();
+    acl_inited = kadm5int_acl_load_acl_file();
 
-    DPRINT(DEBUG_CALLS, acl_debug_level, ("X acl_init() = %d\n", kret));
+    DPRINT(DEBUG_CALLS, acl_debug_level, ("X kadm5int_acl_init() = %d\n", kret));
     return(kret);
 }
 
 /*
- * acl_finish	- Terminate ACL context.
+ * kadm5int_acl_finish	- Terminate ACL context.
  */
 void
-acl_finish(kcontext, debug_level)
+kadm5int_acl_finish(kcontext, debug_level)
     krb5_context	kcontext;
     int			debug_level;
 {
-    DPRINT(DEBUG_CALLS, acl_debug_level, ("* acl_finish()\n"));
-    acl_free_entries();
-    DPRINT(DEBUG_CALLS, acl_debug_level, ("X acl_finish()\n"));
+    DPRINT(DEBUG_CALLS, acl_debug_level, ("* kadm5int_acl_finish()\n"));
+    kadm5int_acl_free_entries();
+    DPRINT(DEBUG_CALLS, acl_debug_level, ("X kadm5int_acl_finish()\n"));
 }
 
 /*
- * acl_check()	- Is this operation permitted for this principal?
+ * kadm5int_acl_check()	- Is this operation permitted for this principal?
  *			this code used not to be based on gssapi.  In order
  *			to minimize porting hassles, I've put all the
  *			gssapi hair in this function.  This might not be
@@ -773,7 +773,7 @@ acl_finish(kcontext, debug_level)
  *			solution is, of course, a real authorization service.)
  */
 krb5_boolean
-acl_check(kcontext, caller, opmask, principal, restrictions)
+kadm5int_acl_check(kcontext, caller, opmask, principal, restrictions)
     krb5_context	kcontext;
     gss_name_t		caller;
     krb5_int32		opmask;
@@ -806,7 +806,9 @@ acl_check(kcontext, caller, opmask, principal, restrictions)
        return(code);
 
     retval = 0;
-    if (aentry = acl_find_entry(kcontext, caller_princ, principal)) {
+
+    aentry = kadm5int_acl_find_entry(kcontext, caller_princ, principal);
+    if (aentry) {
 	if ((aentry->ae_op_allowed & opmask) == opmask) {
 	    retval = 1;
 	    if (restrictions) {
@@ -828,8 +830,6 @@ acl_check(kcontext, caller, opmask, principal, restrictions)
 kadm5_ret_t
 kadm5_get_privs(void *server_handle, long *privs)
 {
-     kadm5_server_handle_t handle = server_handle;
-
      CHECK_HANDLE(server_handle);
 
      /* this is impossible to do with the current interface.  For now,
@@ -869,7 +869,7 @@ __kadm5_get_priv(void *server_handle, long *privs, gss_name_t client)
 	if (k_error)
 		return(retval);
 
-	if (aentry = acl_find_entry(handle->context, caller_principal,
+	if (aentry = kadm5int_acl_find_entry(handle->context, caller_principal,
 					(krb5_principal)NULL))
 		*privs = aentry->ae_op_allowed;
 	krb5_free_principal(handle->context, caller_principal);

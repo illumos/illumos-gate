@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -26,12 +26,12 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
  *
- * $Id: server_init.c,v 1.5 1997/10/13 15:03:13 epeisach Exp $
+ * $Id: server_init.c,v 1.8 2002/10/15 15:40:49 epeisach Exp $
  * $Source: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_init.c,v $
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_init.c,v 1.5 1997/10/13 15:03:13 epeisach Exp $";
+static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_init.c,v 1.8 2002/10/15 15:40:49 epeisach Exp $";
 #endif
 
 #include <stdio.h>
@@ -138,7 +138,8 @@ kadm5_ret_t kadm5_init(char *client_name, char *pass,
 	 return ENOMEM;
     memset(handle, 0, sizeof(*handle));
 
-    if (ret = (int) krb5_init_context(&(handle->context))) {
+    ret = (int) krb5_init_context(&(handle->context));
+    if (ret) {
 	 free(handle);
 	 return(ret);
     }
@@ -178,11 +179,10 @@ kadm5_ret_t kadm5_init(char *client_name, char *pass,
 	  return KADM5_BAD_SERVER_PARAMS;
      }
 
-     if (ret = kadm5_get_config_params(handle->context,
-				       (char *) NULL,
-				       (char *) NULL,
-				       params_in,
-				       &handle->params)) {
+     ret = kadm5_get_config_params(handle->context, (char *) NULL,
+				       (char *) NULL, params_in,
+				       &handle->params);
+     if (ret) {
 	  krb5_free_context(handle->context);
 	  free(handle);
 	  return(ret);
@@ -195,23 +195,26 @@ kadm5_ret_t kadm5_init(char *client_name, char *pass,
 			 KADM5_CONFIG_FLAGS | \
 			 KADM5_CONFIG_MAX_LIFE | KADM5_CONFIG_MAX_RLIFE | \
 			 KADM5_CONFIG_EXPIRATION | KADM5_CONFIG_ENCTYPES) 
+
      if ((handle->params.mask & REQUIRED_PARAMS) != REQUIRED_PARAMS) {
 	  krb5_free_context(handle->context);
 	  free(handle);
 	  return KADM5_MISSING_CONF_PARAMS;
      }
 
-    /*
-     * Set the db_name based on configuration before calling
-     * krb5_db_init, so it will get used.
-     */
-    if (ret = krb5_db_set_name(handle->context,
-				   handle->params.dbname)) {
+     /*
+      * Set the db_name based on configuration before calling
+      * krb5_db_init, so it will get used.
+      */
+
+    ret = krb5_db_set_name(handle->context, handle->params.dbname);
+    if (ret) {
 	 free(handle);
 	 return(ret);
     }
 
-    if (ret = krb5_db_init(handle->context)) {
+    ret = krb5_db_init(handle->context);
+    if (ret) {
 	 krb5_free_context(handle->context);
 	 free(handle);
 	 return(ret);
@@ -225,69 +228,73 @@ kadm5_ret_t kadm5_init(char *client_name, char *pass,
 	 return ret;
     }
 
-     if (! (handle->lhandle = malloc(sizeof(*handle)))) {
-	  krb5_db_fini(handle->context);
-	  krb5_free_context(handle->context);
-	  free(handle);
-	  return ENOMEM;
-     }
-     *handle->lhandle = *handle;
-     handle->lhandle->api_version = KADM5_API_VERSION_2;
-     handle->lhandle->struct_version = KADM5_STRUCT_VERSION;
-     handle->lhandle->lhandle = handle->lhandle;
-
-     /* can't check the handle until current_caller is set */
-    if (ret = check_handle((void *) handle)) {
+    if (! (handle->lhandle = malloc(sizeof(*handle)))) {
+	 krb5_db_fini(handle->context);
+	 krb5_free_context(handle->context);
 	 free(handle);
-	 return ret;
+	 return ENOMEM;
     }
+    *handle->lhandle = *handle;
+    handle->lhandle->api_version = KADM5_API_VERSION_2;
+    handle->lhandle->struct_version = KADM5_STRUCT_VERSION;
+    handle->lhandle->lhandle = handle->lhandle;
 
-     /*
-      * The KADM5_API_VERSION_1 spec said "If pass (or keytab) is NULL
-      * or an empty string, reads the master password from [the stash
-      * file].  Otherwise, the non-NULL password is ignored and the
-      * user is prompted for it via the tty."  However, the code was
-      * implemented the other way: when a non-NULL password was
-      * provided, the stash file was used.  This is somewhat more
-      * sensible, as then a local or remote client that provides a
-      * password does not prompt the user.  This code maintains the
-      * previous actual behavior, and not the old spec behavior,
-      * because that is how the unit tests are written.
-      *
-      * In KADM5_API_VERSION_2, this decision is controlled by
-      * params.
-      *
-      * kdb_init_master's third argument is "from_keyboard".
-      */ 
-    if (ret = kdb_init_master(handle, handle->params.realm,
-			      (handle->api_version == KADM5_API_VERSION_1 ?
-			       ((pass == NULL) || !(strlen(pass))) :
-			       ((handle->params.mask &
-				 KADM5_CONFIG_MKEY_FROM_KBD) &&
-				handle->params.mkey_from_kbd))
-			      )) {
+    /* can't check the handle until current_caller is set */
+    ret = check_handle((void *) handle);
+    if (ret) {
+        free(handle);
+	return ret;
+    }
+     
+    /*
+     * The KADM5_API_VERSION_1 spec said "If pass (or keytab) is NULL
+     * or an empty string, reads the master password from [the stash
+     * file].  Otherwise, the non-NULL password is ignored and the
+     * user is prompted for it via the tty."  However, the code was
+     * implemented the other way: when a non-NULL password was
+     * provided, the stash file was used.  This is somewhat more
+     * sensible, as then a local or remote client that provides a
+     * password does not prompt the user.  This code maintains the
+     * previous actual behavior, and not the old spec behavior,
+     * because that is how the unit tests are written.
+     *
+     * In KADM5_API_VERSION_2, this decision is controlled by
+     * params.
+     *
+     * kdb_init_master's third argument is "from_keyboard".
+     */
+    ret = kdb_init_master(handle, handle->params.realm,
+			  (handle->api_version == KADM5_API_VERSION_1 ?
+			   ((pass == NULL) || !(strlen(pass))) :
+			   ((handle->params.mask & KADM5_CONFIG_MKEY_FROM_KBD)
+			    && handle->params.mkey_from_kbd)
+			   )); 
+    if (ret) {
+        krb5_db_fini(handle->context);
+	krb5_free_context(handle->context);
+	free(handle);
+	return ret;
+    }
+    
+    ret = kdb_init_hist(handle, handle->params.realm);
+    if (ret) {
 	 krb5_db_fini(handle->context);
 	 krb5_free_context(handle->context);
 	 free(handle);
 	 return ret;
     }
 
-    if ((ret = kdb_init_hist(handle, handle->params.realm))) {
-	 krb5_db_fini(handle->context);
-	 krb5_free_context(handle->context);
-	 free(handle);
-	 return ret;
-    }
-
-    if (ret = init_dict(&handle->params)) {
-	 krb5_db_fini(handle->context);
+    ret = init_dict(&handle->params);
+    if (ret) {
+         krb5_db_fini(handle->context);
 	 krb5_free_principal(handle->context, handle->current_caller);
 	 krb5_free_context(handle->context);
 	 free(handle);
 	 return ret;
     }
     
-    if (ret = adb_policy_init(handle)) {
+    ret = adb_policy_init(handle);
+    if (ret) {
 	 krb5_db_fini(handle->context);
 	 krb5_free_principal(handle->context, handle->current_caller);
 	 krb5_free_context(handle->context);
@@ -318,6 +325,38 @@ kadm5_ret_t kadm5_destroy(void *server_handle)
     free(handle->lhandle);
     free(handle);
  
+    return KADM5_OK;
+}
+
+kadm5_ret_t kadm5_lock(void *server_handle)
+{
+    kadm5_server_handle_t handle = server_handle;
+    kadm5_ret_t ret;
+
+    CHECK_HANDLE(server_handle);
+    ret = osa_adb_open_and_lock(handle->policy_db, OSA_ADB_EXCLUSIVE);
+    if (ret)
+	return ret;
+    ret = krb5_db_lock(handle->context, KRB5_LOCKMODE_EXCLUSIVE);
+    if (ret)
+	return ret;
+
+    return KADM5_OK;
+}
+
+kadm5_ret_t kadm5_unlock(void *server_handle)
+{
+    kadm5_server_handle_t handle = server_handle;
+    kadm5_ret_t ret;
+
+    CHECK_HANDLE(server_handle);
+    ret = osa_adb_close_and_unlock(handle->policy_db);
+    if (ret)
+	return ret;
+    ret = krb5_db_unlock(handle->context);
+    if (ret)
+	return ret;
+
     return KADM5_OK;
 }
 

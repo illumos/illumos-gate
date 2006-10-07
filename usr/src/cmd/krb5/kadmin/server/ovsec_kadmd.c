@@ -22,42 +22,72 @@
  *
  */
 
-
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  */
+
+/*
+ * Copyright (C) 1998 by the FundsXpress, INC.
+ * 
+ * All rights reserved.
+ * 
+ * Export of this software from the United States of America may require
+ * a specific license from the United States Government.  It is the
+ * responsibility of any person or organization contemplating export to
+ * obtain such a license before exporting.
+ * 
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of FundsXpress. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  FundsXpress makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+ * 
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+ * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ */
+
 
 /*
  * SUNWresync121 XXX
  * Beware future resyncers, this file is much diff from MIT (1.0...)
  */
 
-#include <stdio.h>
-#include <stdio_ext.h>
-#include <signal.h>
-#include <syslog.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>	/* inet_ntoa */
-#include <netdb.h>
-#include <gssapi/gssapi.h>
-#include <rpc/rpc.h>
-#include <kadm5/admin.h>
-#include <kadm5/kadm_rpc.h>
-#include <kadm5/server_internal.h>
-#include <server_acl.h>
-#include <krb5/adm_proto.h>
-#include <string.h>
-#include <gssapi_krb5.h>
-#include <libintl.h>
-#include <locale.h>
-#include <sys/resource.h>
-#include <kdb/kdb_log.h>
+#include    <stdio.h>
+#include    <stdio_ext.h>
+#include    <signal.h>
+#include    <syslog.h>
+#include    <sys/types.h>
+#ifdef _AIX
+#include    <sys/select.h>
+#endif
+#include    <sys/time.h>
+#include    <sys/socket.h>
+#include    <unistd.h>
+#include    <netinet/in.h>
+#include    <arpa/inet.h>  /* inet_ntoa */
+#include    <gssapi/gssapi.h>
+#include    <rpc/rpc.h>
+#include    <kadm5/admin.h>
+#include    <kadm5/kadm_rpc.h>
+#include    <server_acl.h>
+#include    <krb5/adm_proto.h>
+#include    <string.h>
+#include    <kadm5/server_internal.h>
+#include    <gssapi_krb5.h>
+#include    <libintl.h>
+#include    <locale.h>
+#include    <sys/resource.h>
+#include    <kdb/kdb_log.h>
+#include    <kdb/kdb_kt.h>
 
 #include <rpc/rpcsec_gss.h>
+#include    "misc.h"
 
 #ifndef	FD_SETSIZE
 #define	FD_SETSIZE	256
@@ -66,6 +96,12 @@
 #ifndef MAX
 #define	MAX(a, b)	(((a) > (b)) ? (a) : (b))
 #endif
+
+#if defined(NEED_DAEMON_PROTO)
+extern int daemon(int, int);
+#endif
+
+
 
 static int signal_request_exit = 0;
 static int schpw;
@@ -80,6 +116,7 @@ krb5_error_code log_kt_error(char*, char*);
 static struct sigaction s_action;
 #endif /* POSIX_SIGNALS */
 
+
 #define	TIMEOUT	15
 
 typedef struct _auth_gssapi_name {
@@ -92,7 +129,7 @@ void *global_server_handle;
 
 /*
  * This is a kludge, but the server needs these constants to be
- * compatible with old clients.	They are defined in <kadm5/admin.h>,
+ * compatible with old clients.  They are defined in <kadm5/admin.h>,
  * but only if USE_KADM5_API_VERSION == 1.
  */
 #define	OVSEC_KADM_ADMIN_SERVICE_P	"ovsec_adm@admin"
@@ -113,6 +150,8 @@ extern kadm5_ret_t kiprop_get_adm_host_srv_name(
 
 static krb5_context context;  /* XXX yuck.  the signal handlers need this */
 
+static krb5_context hctx;
+
 in_port_t l_port = 0;	/* global local port num, for BSM audits */
 
 int nofork = 0; /* global; don't fork (debug mode) */
@@ -120,7 +159,7 @@ int nofork = 0; /* global; don't fork (debug mode) */
 
 /*
  * Function: usage
- *
+ * 
  * Purpose: print out the server usage message
  *
  * Arguments:
@@ -129,8 +168,7 @@ int nofork = 0; /* global; don't fork (debug mode) */
  * Modifies:
  */
 
-void
-usage()
+static void usage()
 {
 	fprintf(stderr, gettext("Usage: kadmind [-r realm] [-m] [-d] "
 	    "[-p port-number]\n"));
@@ -154,9 +192,9 @@ usage()
  * displayed on stderr, each preceeded by "GSS-API error <msg>: " and
  * followed by a newline.
  */
-static void display_status_1();
+static void display_status_1(char *, OM_uint32, int);
 
-void display_status(msg, maj_stat, min_stat)
+static void display_status(msg, maj_stat, min_stat)
      char *msg;
      OM_uint32 maj_stat;
      OM_uint32 min_stat;
@@ -366,7 +404,6 @@ set_svc_domnames(char *svcname, char **dnames,
 int
 main(int argc, char *argv[])
 {
-	void kadm_1(struct svc_req *, SVCXPRT *);
 	SVCXPRT *transp;
 	extern char *optarg;
 	extern int optind, opterr;
@@ -489,7 +526,16 @@ main(int argc, char *argv[])
 	}
 
 	krb5_klog_init(context, "admin_server", whoami, 1);
-
+    /* SUNW14resync */
+#if 0
+    krb5_klog_syslog(LOG_INFO, "Seeding random number generator");
+          ret = krb5_c_random_os_entropy(context, 1, NULL);
+	if(ret) {
+	krb5_klog_syslog(LOG_ERR, "Error getting random seed: %s, aborting",
+			     error_message(ret));
+	exit(1);
+	}
+#endif
 
 	/*
 	 * When using the Horowitz/IETF protocol for
@@ -574,8 +620,7 @@ main(int argc, char *argv[])
 		krb5_klog_close(context);
 		exit(1);
 	}
-#define	REQUIRED_PARAMS (KADM5_CONFIG_REALM | KADM5_CONFIG_ACL_FILE | \
-			KADM5_CONFIG_ADMIN_KEYTAB)
+#define	REQUIRED_PARAMS (KADM5_CONFIG_REALM | KADM5_CONFIG_ACL_FILE)
 
 	if ((params.mask & REQUIRED_PARAMS) != REQUIRED_PARAMS) {
 		krb5_klog_syslog(LOG_ERR,
@@ -584,7 +629,7 @@ main(int argc, char *argv[])
 		    (params.mask & REQUIRED_PARAMS) ^ REQUIRED_PARAMS);
 		fprintf(stderr,
 		    gettext("%s: Missing required configuration values "
-			"(%x) while initializing, aborting\n"), whoami,
+			"(%lx) while initializing, aborting\n"), whoami,
 		    (params.mask & REQUIRED_PARAMS) ^ REQUIRED_PARAMS);
 		krb5_klog_close(context);
 		exit(1);
@@ -820,7 +865,7 @@ main(int argc, char *argv[])
 					(gss_OID) nt_krb5_name_oid,
 					&gss_oldchangepw_name);
 	}
-	if (ret = acl_init(context, 0, params.acl_file)) {
+	if (ret = kadm5int_acl_init(context, 0, params.acl_file)) {
 		krb5_klog_syslog(LOG_ERR, gettext("Cannot initialize acl file: %s"),
 		    error_message(ret));
 		fprintf(stderr, gettext("%s: Cannot initialize acl file: %s\n"),

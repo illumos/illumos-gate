@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -20,27 +20,21 @@
 #include <stdio.h>
 #include <setjmp.h>
 #include <signal.h>
+#include <termios.h>
 #include <libintl.h>
 #include <sys/param.h>
-#ifdef BSD
-#include <sgtty.h>
-#endif
 
 static ss_data *current_info;
 static jmp_buf listen_jmpb;
 
 static RETSIGTYPE print_prompt()
 {
-#ifdef BSD
-    /* put input into a reasonable mode */
-    struct sgttyb ttyb;
-    if (ioctl(fileno(stdin), TIOCGETP, &ttyb) != -1) {
-	if (ttyb.sg_flags & (CBREAK|RAW)) {
-	    ttyb.sg_flags &= ~(CBREAK|RAW);
-	    (void) ioctl(0, TIOCSETP, &ttyb);
-	}
+    struct termios termbuf;
+
+    if (tcgetattr(STDIN_FILENO, &termbuf) == 0) {
+	termbuf.c_lflag |= ICANON|ISIG|ECHO;
+	tcsetattr(STDIN_FILENO, TCSANOW, &termbuf);
     }
-#endif
     (void) fputs(current_info->prompt, stdout);
     (void) fflush(stdout);
 }
@@ -59,7 +53,7 @@ int ss_listen (sci_idx)
     register ss_data *info;
     char input[BUFSIZ];
     char buffer[BUFSIZ];
-    char *end = buffer;
+    char *volatile end = buffer;
     int code;
     jmp_buf old_jmpb;
     ss_data *old_info = current_info;
@@ -175,7 +169,7 @@ void ss_abort_subsystem(sci_idx, code)
 
 void ss_quit(argc, argv, sci_idx, infop)
     int argc;
-    char **argv;
+    char const * const *argv;
     int sci_idx;
     pointer infop;
 {

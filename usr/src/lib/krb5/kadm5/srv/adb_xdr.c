@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -26,7 +26,7 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/adb_xdr.c,v 1.2 1998/02/14 02:31:34 tlyu Exp $
+ * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/adb_xdr.c,v 1.4 2001/07/25 19:03:35 epeisach Exp $
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
@@ -38,10 +38,9 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/adb_xdr.c,v 1.
 #include <rpc/rpc.h> /* SUNWresync121 XXX */
 #include "adb.h"
 #include "admin_xdr.h"
+#ifdef HAVE_MEMORY_H
 #include <memory.h>
-
-extern bool_t
-xdr_krb5_int16(XDR *xdrs, krb5_int16 *objp);
+#endif
 
 bool_t
 xdr_krb5_key_data(XDR *xdrs, krb5_key_data *objp)
@@ -56,9 +55,10 @@ xdr_krb5_key_data(XDR *xdrs, krb5_key_data *objp)
 	return(FALSE);
     if (!xdr_krb5_int16(xdrs, &objp->key_data_type[1]))
 	return(FALSE);
-    if (!xdr_krb5_int16(xdrs, &objp->key_data_length[0]))
+	/* SUNW14resync */
+    if (!xdr_krb5_ui_2(xdrs, (krb5_ui_2 *)&objp->key_data_length[0]))
 	return(FALSE);
-    if (!xdr_krb5_int16(xdrs, &objp->key_data_length[1]))
+    if (!xdr_krb5_ui_2(xdrs, (krb5_ui_2 *)&objp->key_data_length[1]))
 	return(FALSE);
 
     tmp = (unsigned int) objp->key_data_length[0];

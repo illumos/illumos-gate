@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,15 +73,17 @@ extern int getopt();
 
 #ifdef HAVE_PWD_H
 #include <pwd.h>
+static 
 char * get_name_from_os()
 {
     struct passwd *pw;
-    if (pw = getpwuid((int) getuid()))
+    if ((pw = getpwuid((int) getuid())))
 	return pw->pw_name;
     return 0;
 }
 #else /* HAVE_PWD_H */
 #ifdef _WIN32
+static
 char * get_name_from_os()
 {
     static char name[1024];
@@ -94,14 +96,13 @@ char * get_name_from_os()
     }
 }
 #else /* _WIN32 */
+static
 char * get_name_from_os()
 {
     return 0;
 }
 #endif /* _WIN32 */
 #endif /* HAVE_PWD_H */
-
-static char *progname;
 
 static char* progname_v5 = 0;
 #ifdef KRB5_KRB4_COMPAT
@@ -123,7 +124,7 @@ static int default_k4 = 0;
 static int authed_k5 = 0;
 static int authed_k4 = 0;
 
-#define KRB4_BACKUP_DEFAULT_LIFE_SECS 10*60*60 /* 10 hours */
+#define KRB4_BACKUP_DEFAULT_LIFE_SECS 24*60*60 /* 1 day */
 #define	ROOT_UNAME	"root"
 
 typedef enum { INIT_PW, INIT_KT, RENEW, VALIDATE } action_type;
@@ -236,10 +237,11 @@ struct option long_options[] = {
 /* Save the program name for the error messages */
 static char *progname;
 
-void
-usage(void)
+static void
+usage(progname)
 {
 #define USAGE_BREAK "\n\t"
+
 #ifdef GETOPT_LONG
 #define USAGE_LONG_FORWARDABLE " | --forwardable | --noforwardable"
 #define USAGE_LONG_PROXIABLE   " | --proxiable | --noproxiable"
@@ -260,7 +262,7 @@ usage(void)
 	    USAGE_BREAK_LONG
 	    "[-p | -P" USAGE_LONG_PROXIABLE "] "
 	    USAGE_BREAK_LONG
-	    "[-A" USAGE_LONG_ADDRESSES "] "
+	    "[-a | -A" USAGE_LONG_ADDRESSES "] "
 	    USAGE_BREAK
 	    "[-v] [-R] "
 	    "[-k [-t keytab_file]] "
@@ -283,12 +285,13 @@ usage(void)
 
 #ifdef KRB5_KRB4_COMPAT
 #define USAGE_OPT_FMT "%s%-50s%s\n"
-#else
-#define USAGE_OPT_FMT "%s%s\n"
-#endif
-
 #define ULINE(indent, col1, col2) \
 fprintf(stderr, USAGE_OPT_FMT, indent, col1, col2)
+#else
+#define USAGE_OPT_FMT "%s%s\n"
+#define ULINE(indent, col1, col2) \
+fprintf(stderr, USAGE_OPT_FMT, indent, col1)
+#endif
 
     ULINE("    ", "options:", "valid with Kerberos:");
     fprintf(stderr, "\t-5 Kerberos 5 (%s)\n", KRB_AVAIL_STRING(got_k5));
@@ -307,6 +310,7 @@ fprintf(stderr, USAGE_OPT_FMT, indent, col1, col2)
     ULINE("\t", gettext("-p proxiable"),                 OPTTYPE_KRB5);
     ULINE("\t", gettext("-P not proxiable"),             OPTTYPE_KRB5);
     ULINE("\t", gettext("-A do not include addresses"),  OPTTYPE_KRB5);
+    ULINE("\t", gettext("-a include addresses"),         OPTTYPE_KRB5);
     ULINE("\t", gettext("-v validate"),                  OPTTYPE_KRB5);
     ULINE("\t", gettext("-R renew"),                     OPTTYPE_BOTH);
     ULINE("\t", gettext("-k use keytab"),                OPTTYPE_BOTH);
@@ -318,11 +322,12 @@ fprintf(stderr, USAGE_OPT_FMT, indent, col1, col2)
     exit(2);
 }
 
-char *
-parse_options(argc, argv, opts)
+static char *
+parse_options(argc, argv, opts, progname)
     int argc;
     char **argv;
     struct k_opts* opts;
+    char *progname;
 {
     krb5_error_code code;
     int errflg = 0;
@@ -330,7 +335,7 @@ parse_options(argc, argv, opts)
     int use_k5 = 0;
     int i;
 
-    while ((i = GETOPT(argc, argv, "r:fpFP54AVl:s:c:kt:RS:v"))
+    while ((i = GETOPT(argc, argv, "r:fpFP54aAVl:s:c:kt:RS:v"))
 	   != -1) {
 	switch (i) {
 	case 'V':
@@ -516,7 +521,7 @@ parse_options(argc, argv, opts)
     }
 
     if (errflg) {
-	usage();
+	usage(progname);
     }
 
     got_k5 = got_k5 && use_k5;
@@ -526,7 +531,7 @@ parse_options(argc, argv, opts)
     return opts->principal_name;
 }
 
-int
+static int
 k5_begin(opts, k5, k4)
     struct k_opts* opts;
 struct k5_data* k5;
@@ -534,12 +539,12 @@ struct k4_data* k4;
 {
     char* progname = progname_v5;
     krb5_error_code code = 0;
-    char* cp;
 
     if (!got_k5)
 	return 0;
 
-    if (code = krb5_init_context(&k5->ctx)) {
+    code = krb5_init_context(&k5->ctx);
+    if (code) {
 	com_err(progname, code, gettext("while initializing Kerberos 5 library"));
 	return 0;
     }
@@ -575,21 +580,25 @@ struct k4_data* k4;
 	/* No principal name specified */
 	if (opts->action == INIT_KT) {
 	    /* Use the default host/service name */
-	    if (code = krb5_sname_to_principal(k5->ctx, NULL, NULL,
-					       KRB5_NT_SRV_HST, &k5->me)) {
-		com_err(progname, code, gettext(
-			"when creating default server principal name"));
-		return 0;
-	    }
+	  code = krb5_sname_to_principal(k5->ctx, NULL, NULL,
+					 KRB5_NT_SRV_HST, &k5->me);
+	  if (code) {
+	    com_err(progname, code, gettext(
+		    "when creating default server principal name"));
+	    return 0;
+	  }
 	} else {
-	/* Get default principal from cache if one exists */
-            if (code = krb5_cc_get_principal(k5->ctx, k5->cc, &k5->me)) {
-                char *name = get_name_from_os();
-                if (!name)
-                {
-                    fprintf(stderr, gettext("Unable to identify user\n"));
-                    return 0;
-                }
+	  /* Get default principal from cache if one exists */
+	  code = krb5_cc_get_principal(k5->ctx, k5->cc, 
+				       &k5->me);
+	  if (code)
+	    {
+	      char *name = get_name_from_os();
+	      if (!name)
+		{
+		  fprintf(stderr, gettext("Unable to identify user\n"));
+		  return 0;
+		}
                 /* use strcmp to ensure only "root" is matched */
                 if (strcmp(name, ROOT_UNAME) == 0)
                 {
@@ -599,20 +608,24 @@ struct k4_data* k4;
 				"when creating default server principal name"));
                                 return 0;
                         }
-                } else if (code = krb5_parse_name(k5->ctx, name, &k5->me)) {
-			com_err(progname, code, gettext("when parsing name %s"), 
-				name);
-			return 0;
+                } else
+	      if ((code = krb5_parse_name(k5->ctx, name, 
+					  &k5->me)))
+		{
+		  com_err(progname, code, gettext("when parsing name %s"), 
+			  name);
+		  return 0;
 		}
-            }
-        } 
+	    }
+	}
     }
-    if (code = krb5_unparse_name(k5->ctx, k5->me, &k5->name)) {
+
+    code = krb5_unparse_name(k5->ctx, k5->me, &k5->name);
+    if (code) {
 	com_err(progname, code, gettext("when unparsing name"));
 	return 0;
     }
     opts->principal_name = k5->name;
-
 
 #ifdef KRB5_KRB4_COMPAT
     if (got_k4)
@@ -630,7 +643,7 @@ struct k4_data* k4;
     return 1;
 }
 
-void
+static void
 k5_end(k5)
     struct k5_data* k5;
 {
@@ -645,7 +658,7 @@ k5_end(k5)
     memset(k5, 0, sizeof(*k5));
 }
 
-int
+static int
 k4_begin(opts, k4)
     struct k_opts* opts;
     struct k4_data* k4;
@@ -665,8 +678,9 @@ k4_begin(opts, k4)
     if (opts->principal_name)
     {
 	/* Use specified name */
-	if (k_errno = kname_parse(k4->aname, k4->inst, k4->realm, 
-				  opts->principal_name))
+        k_errno = kname_parse(k4->aname, k4->inst, k4->realm, 
+			      opts->principal_name);
+	if (k_errno)
 	{
 	    fprintf(stderr, "%s: %s\n", progname, 
 		    krb_get_err_text(k_errno));
@@ -682,8 +696,9 @@ k4_begin(opts, k4)
 	    return 0;
 	} else {
 	    /* Get default principal from cache if one exists */
-	    if (k_errno = krb_get_tf_fullname(tkt_string(), k4->aname, 
-					      k4->inst, k4->realm))
+	    k_errno = krb_get_tf_fullname(tkt_string(), k4->aname, 
+					  k4->inst, k4->realm);
+	    if (k_errno)
 	    {
 		char *name = get_name_from_os();
 		if (!name)
@@ -691,8 +706,9 @@ k4_begin(opts, k4)
 		    fprintf(stderr, "Unable to identify user\n");
 		    return 0;
 		}
-		if (k_errno = kname_parse(k4->aname, k4->inst, k4->realm,
-					  name))
+		k_errno = kname_parse(k4->aname, k4->inst, k4->realm,
+				      name);
+		if (k_errno)
 		{
 		    fprintf(stderr, "%s: %s\n", progname, 
 			    krb_get_err_text(k_errno));
@@ -733,7 +749,7 @@ k4_begin(opts, k4)
     return 1;
 }
 
-void
+static void
 k4_end(k4)
     struct k4_data* k4;
 {
@@ -745,7 +761,7 @@ static char stash_password[1024];
 static int got_password = 0;
 #endif /* KRB5_KRB4_COMPAT */
 
-krb5_error_code
+static krb5_error_code
 KRB5_CALLCONV
 kinit_prompter(
     krb5_context ctx,
@@ -771,11 +787,10 @@ kinit_prompter(
 		got_password = 1;
 #endif
 	    }
-
     return rc;
 }
 
-int
+static int
 k5_kinit(opts, k5)
     struct k_opts* opts;
     struct k5_data* k5;
@@ -905,7 +920,6 @@ k5_kinit(opts, k5)
 	    goto cleanup;
 	}
 	krb5_get_init_creds_opt_set_address_list(&options, addresses);
-	krb5_free_addresses(k5->ctx, addresses);
     }
     if (opts->no_addresses)
 	krb5_get_init_creds_opt_set_address_list(&options, NULL);
@@ -919,8 +933,6 @@ k5_kinit(opts, k5)
 	    goto cleanup;
 	}
     }
-
-
 
     switch (opts->action) {
     case INIT_PW:
@@ -982,13 +994,15 @@ k5_kinit(opts, k5)
 	opts->lifetime = my_creds.times.endtime - my_creds.times.authtime;
     }
 
-    if (code = krb5_cc_initialize(k5->ctx, k5->cc, k5->me)) {
+    code = krb5_cc_initialize(k5->ctx, k5->cc, k5->me);
+    if (code) {
 	com_err(progname, code, gettext("when initializing cache %s"),
 		opts->k5_cache_name?opts->k5_cache_name:"");
 	goto cleanup;
     }
 
-    if (code = krb5_cc_store_cred(k5->ctx, k5->cc, &my_creds)) {
+    code = krb5_cc_store_cred(k5->ctx, k5->cc, &my_creds);
+    if (code) {
 	com_err(progname, code, gettext("while storing credentials"));
 	goto cleanup;
     }
@@ -1012,7 +1026,7 @@ k5_kinit(opts, k5)
     return notix?0:1;
 }
 
-int
+static int
 k4_kinit(opts, k4, ctx)
     struct k_opts* opts;
     struct k4_data* k4;
@@ -1035,17 +1049,13 @@ k4_kinit(opts, k4, ctx)
     if (!k4->lifetime)
 	k4->lifetime = KRB4_BACKUP_DEFAULT_LIFE_SECS;
 
-    k4->lifetime /= (5 * 60);
-    if (k4->lifetime < 1)
-	k4->lifetime = 1;
-    if (k4->lifetime > 255)
-	k4->lifetime = 255;
+    k4->lifetime = krb_time_to_life(0, k4->lifetime);
 
     switch (opts->action)
     {
     case INIT_PW:
 	if (!got_password) {
-	    int pwsize = sizeof(stash_password);
+	    unsigned int pwsize = sizeof(stash_password);
 	    krb5_error_code code;
 	    char prompt[1024];
 
@@ -1074,7 +1084,7 @@ k4_kinit(opts, k4, ctx)
 	    fprintf(stderr, "%s: %s\n", progname, 
 		    krb_get_err_text(k_errno));
 	    if (authed_k5)
-		fprintf(stderr, gettext("Maybe your KDC does not support v4.  " 
+	        fprintf(stderr, gettext("Maybe your KDC does not support v4.  " 
 			"Try the -5 option next time.\n"));
 	    return 0;
 	}
@@ -1087,17 +1097,25 @@ k4_kinit(opts, k4, ctx)
 	fprintf(stderr, gettext("%s: renewal of krb4 tickets is not supported\n"),
 		progname);
 	return 0;
+#else
+    /* These cases are handled by the 524 code - this prevents the compiler 
+       warnings of not using all the enumerated types.
+    */ 
+    case INIT_KT:
+    case RENEW:
+    case VALIDATE:
+        return 0;
 #endif
     }
 #endif
     return 0;
 }
 
-char*
-getvprogname(v)
-    char *v;
+static char*
+getvprogname(v, progname)
+    char *v, *progname;
 {
-    int len = strlen(progname) + 2 + strlen(v) + 2;
+    unsigned int len = strlen(progname) + 2 + strlen(v) + 2;
     char *ret = malloc(len);
     if (ret)
 	sprintf(ret, "%s(v%s)", progname, v);
@@ -1108,7 +1126,7 @@ getvprogname(v)
 
 #ifdef HAVE_KRB524
 /* Convert krb5 tickets to krb4. */
-int try_convert524(k5)
+static int try_convert524(k5)
     struct k5_data* k5;
 {
     char * progname = progname_v524;
@@ -1127,9 +1145,6 @@ int try_convert524(k5)
       From this point on, we can goto cleanup because increds is
       initialized.
     */
-
-    /* or do this directly with krb524_convert_creds_kdc */
-    krb524_init_ets(k5->ctx);
 
     if ((code = krb5_build_principal(k5->ctx,
 				     &kpcserver, 
@@ -1217,10 +1232,10 @@ main(argc, argv)
     (void) textdomain(TEXT_DOMAIN);
 
     progname = GET_PROGNAME(argv[0]);
-    progname_v5 = getvprogname("5");
+    progname_v5 = getvprogname("5", progname);
 #ifdef KRB5_KRB4_COMPAT
-    progname_v4 = getvprogname("4");
-    progname_v524 = getvprogname("524");
+    progname_v4 = getvprogname("4", progname);
+    progname_v524 = getvprogname("524", progname);
 #endif
 
     /* Ensure we can be driven from a pipe */
@@ -1246,7 +1261,7 @@ main(argc, argv)
     memset(&k5, 0, sizeof(k5));
     memset(&k4, 0, sizeof(k4));
 
-    parse_options(argc, argv, &opts);
+    parse_options(argc, argv, &opts, progname);
 
     got_k5 = k5_begin(&opts, &k5, &k4);
     got_k4 = k4_begin(&opts, &k4);
@@ -1270,7 +1285,8 @@ main(argc, argv)
     k5_end(&k5);
     k4_end(&k4);
 
-    if ((got_k5 && !authed_k5) || (got_k4 && !authed_k4))
+    if ((got_k5 && !authed_k5) || (got_k4 && !authed_k4) ||
+	(!got_k5 && !got_k4))
 	exit(1);
     return 0;
 }

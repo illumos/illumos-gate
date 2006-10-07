@@ -62,7 +62,7 @@ static char sccsid[] = "@(#)hash_bigkey.c	8.5 (Berkeley) 11/2/95";
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef DEBUG_DB 
+#ifdef DEBUG
 #include <assert.h>
 #endif
 
@@ -245,7 +245,7 @@ __find_bigpair(hashp, cursorp, key, size)
 		}
 	}
 	__put_page(hashp, pagep, A_RAW, 0);
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	assert(ksize >= 0);
 #endif
 	if (ksize != 0) {
@@ -379,7 +379,7 @@ collect_key(hashp, pagep, len, last_page)
 	PAGE16 *next_pagep;
 	int32_t totlen, retval;
 	db_pgno_t next_pgno;
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	db_pgno_t save_addr;
 #endif
 
@@ -388,7 +388,7 @@ collect_key(hashp, pagep, len, last_page)
 		totlen = len + BIGKEYLEN(pagep);
 		if (hashp->bigkey_buf)
 			free(hashp->bigkey_buf);
-		hashp->bigkey_buf = (unsigned char *)malloc(totlen);
+		hashp->bigkey_buf = (u_int8_t *)malloc(totlen);
 		if (!hashp->bigkey_buf)
 			return (-1);
 		memcpy(hashp->bigkey_buf + len,
@@ -402,7 +402,7 @@ collect_key(hashp, pagep, len, last_page)
 	if (BIGKEYLEN(pagep) == 0) {
 		if (hashp->bigkey_buf)
 			free(hashp->bigkey_buf);
-		hashp->bigkey_buf = (unsigned char *)malloc(len);
+		hashp->bigkey_buf = (u_int8_t *)malloc(len);
 		return (hashp->bigkey_buf ? len : -1);
 	}
 	totlen = len + BIGKEYLEN(pagep);
@@ -414,12 +414,12 @@ collect_key(hashp, pagep, len, last_page)
 	next_pagep = __get_page(hashp, next_pgno, A_RAW);
 	if (!next_pagep)
 		return (-1);
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	save_addr = ADDR(pagep);
 #endif
 	retval = collect_key(hashp, next_pagep, totlen, last_page);
 
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	assert(save_addr == ADDR(pagep));
 #endif
 	memcpy(hashp->bigkey_buf + len, BIGKEY(pagep), BIGKEYLEN(pagep));
@@ -446,7 +446,7 @@ collect_data(hashp, pagep, len)
 	PAGE16 *next_pagep;
 	int32_t totlen, retval;
 	db_pgno_t next_pgno;
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	db_pgno_t save_addr;
 #endif
 
@@ -455,7 +455,7 @@ collect_data(hashp, pagep, len)
 		if (hashp->bigdata_buf)
 			free(hashp->bigdata_buf);
 		totlen = len + BIGDATALEN(pagep);
-		hashp->bigdata_buf = (unsigned char *)malloc(totlen);
+		hashp->bigdata_buf = (u_int8_t *)malloc(totlen);
 		if (!hashp->bigdata_buf)
 			return (-1);
 		memcpy(hashp->bigdata_buf + totlen - BIGDATALEN(pagep),
@@ -470,11 +470,11 @@ collect_data(hashp, pagep, len)
 	if (!next_pagep)
 		return (-1);
 
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	save_addr = ADDR(pagep);
 #endif
 	retval = collect_data(hashp, next_pagep, totlen);
-#ifdef DEBUG_DB
+#ifdef DEBUG
 	assert(save_addr == ADDR(pagep));
 #endif
 	memcpy(hashp->bigdata_buf + totlen - BIGDATALEN(pagep),

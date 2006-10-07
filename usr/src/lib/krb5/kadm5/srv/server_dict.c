@@ -21,11 +21,11 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /afs/athena.mit.edu/astaff/project/krbdev/.cvsroot/src/lib/kadm5/srv/server_dict.c,v 1.2 1996/10/18 19:45:52 bjaspan Exp $
+ * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_dict.c,v 1.7 2003/01/05 23:27:59 hartmans Exp $
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /afs/athena.mit.edu/astaff/project/krbdev/.cvsroot/src/lib/kadm5/srv/server_dict.c,v 1.2 1996/10/18 19:45:52 bjaspan Exp $";
+static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_dict.c,v 1.7 2003/01/05 23:27:59 hartmans Exp $";
 #endif
 
 #include    <sys/types.h>
@@ -33,19 +33,23 @@ static char *rcsid = "$Header: /afs/athena.mit.edu/astaff/project/krbdev/.cvsroo
 #include    <fcntl.h>
 #include    <sys/stat.h>
 #include    <unistd.h>
+#include <errno.h>
 #include    <kadm5/admin.h>
 #include    <stdlib.h>
 #include    <stdio.h>
 #include    <string.h>
+#ifdef HAVE_MEMORY_H
 #include    <memory.h>
+#endif
+#include    "adm_proto.h"
 #include    <syslog.h>
 #include    <libintl.h>
 #include    "server_internal.h"
 
 static char	    **word_list = NULL;	    /* list of word pointers */
 static char	    *word_block = NULL;	    /* actual word data */
-static int	    word_count = 0;	    /* number of words */
-extern int	    errno;
+static unsigned int word_count = 0;	    /* number of words */
+
 
 /*
  * Function: word_compare
@@ -65,7 +69,7 @@ extern int	    errno;
 static int
 word_compare(const void *s1, const void *s2)
 {
-    return (strcasecmp(*(char **)s1, *(char **)s2));
+    return (strcasecmp(*(const char **)s1, *(const char **)s2));
 }
 
 /*
@@ -75,7 +79,7 @@ word_compare(const void *s1, const void *s2)
  *
  * Arguments:
  *	    none
- *	    <return value> KADM5_OK on sucsess errno on failure;
+ *	    <return value> KADM5_OK on success errno on failure;
  * 			   (but success on ENOENT)
  *
  * Requires:
@@ -106,7 +110,7 @@ int init_dict(kadm5_config_params *params)
     if(word_list != NULL && word_block != NULL)
 	return KADM5_OK;
     if (! (params->mask & KADM5_CONFIG_DICT_FILE)) {
-	 syslog(LOG_INFO, 
+	 krb5_klog_syslog(LOG_INFO, 
 		dgettext(TEXT_DOMAIN,
 			"No dictionary file specified, continuing "
 			"without one."));
@@ -114,7 +118,7 @@ int init_dict(kadm5_config_params *params)
     }
     if ((fd = open(params->dict_file, O_RDONLY)) == -1) {
 	 if (errno == ENOENT) {
-	      syslog(LOG_ERR,
+	      krb5_klog_syslog(LOG_ERR, 
 		     dgettext(TEXT_DOMAIN,
 			"WARNING!  Cannot find dictionary file %s, "
 			     "continuing without one."), params->dict_file);

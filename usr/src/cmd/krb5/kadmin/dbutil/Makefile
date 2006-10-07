@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -9,7 +9,7 @@ PROG= kdb5_util
 
 OBJS	= kdb5_util.o \
         kdb5_create.o kadm5_create.o string_table.o kdb5_stash.o \
-        kdb5_destroy.o ovload.o dump.o
+        kdb5_destroy.o ovload.o strtok.o dump.o
 
 SRCS	= $(OBJS:.o=.c)
 

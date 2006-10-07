@@ -21,11 +21,11 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /afs/athena.mit.edu/astaff/project/krbdev/.cvsroot/src/lib/kadm5/srv/svr_iters.c,v 1.2 1996/11/07 21:43:14 bjaspan Exp $
+ * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_iters.c,v 1.6 2003/01/12 18:17:02 epeisach Exp $
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /afs/athena.mit.edu/astaff/project/krbdev/.cvsroot/src/lib/kadm5/srv/svr_iters.c,v 1.2 1996/11/07 21:43:14 bjaspan Exp $";
+static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/svr_iters.c,v 1.6 2003/01/12 18:17:02 epeisach Exp $";
 #endif
 
 #if defined(HAVE_COMPILE) && defined(HAVE_STEP)
@@ -42,7 +42,6 @@ static char *rcsid = "$Header: /afs/athena.mit.edu/astaff/project/krbdev/.cvsroo
 #include	<string.h>
 #include	<kadm5/admin.h>
 #include	"adb.h"
-#include	<dyn/dyn.h>
 #ifdef SOLARIS_REGEXPS
 #include	<regexpr.h>
 #endif
@@ -59,7 +58,9 @@ kdb_iter_entry(kadm5_server_handle_t handle,
 
 struct iter_data {
      krb5_context context;
-     DynObject matches;
+     char **names;
+     int n_names, sz_names;
+     unsigned int malloc_failed;
      char *exp;
 #ifdef SOLARIS_REGEXPS
      char *expbuf;
@@ -96,7 +97,7 @@ struct iter_data {
  *	other characters are copied
  *	regexp is anchored with ^ and $
  */
-kadm5_ret_t glob_to_regexp(char *glob, char *realm, char **regexp)
+static kadm5_ret_t glob_to_regexp(char *glob, char *realm, char **regexp)
 {
      int append_realm;
      char *p;
@@ -151,26 +152,38 @@ kadm5_ret_t glob_to_regexp(char *glob, char *realm, char **regexp)
      return KADM5_OK;
 }
 
-void get_either_iter(struct iter_data *data, char *name)
+static void get_either_iter(struct iter_data *data, char *name)
 {
-     if (
+     int match;
 #ifdef SOLARIS_REGEXPS
-	 (step(name, data->expbuf) != 0)
+     match = (step(name, data->expbuf) != 0);
 #endif
 #ifdef POSIX_REGEXPS
-	 (regexec(&data->preg, name, 0, NULL, 0) == 0)
+     match = (regexec(&data->preg, name, 0, NULL, 0) == 0);
 #endif
 #ifdef BSD_REGEXPS
-	 (re_exec(name) != 0)
+     match = (re_exec(name) != 0);
 #endif
-	 )
-     {
-	  (void) DynAdd(data->matches, &name);
+     if (match) {
+	  if (data->n_names == data->sz_names) {
+	       int new_sz = data->sz_names * 2;
+	       char **new_names = realloc(data->names,
+					  new_sz * sizeof(char *));
+	       if (new_names) {
+		    data->names = new_names;
+		    data->sz_names = new_sz;
+	       } else {
+		    data->malloc_failed = 1;
+		    free(name);
+		    return;
+	       }
+	  }
+	  data->names[data->n_names++] = name;
      } else
 	  free(name);
 }
 
-void get_pols_iter(void *data, osa_policy_ent_t entry)
+static void get_pols_iter(void *data, osa_policy_ent_t entry)
 {
      char *name;
 
@@ -179,7 +192,7 @@ void get_pols_iter(void *data, osa_policy_ent_t entry)
      get_either_iter(data, name);
 }
 
-void get_princs_iter(void *data, krb5_principal princ)
+static void get_princs_iter(void *data, krb5_principal princ)
 {
      struct iter_data *id = (struct iter_data *) data;
      char *name;
@@ -189,15 +202,18 @@ void get_princs_iter(void *data, krb5_principal princ)
      get_either_iter(data, name);
 }
 
-kadm5_ret_t kadm5_get_either(int princ,
+static kadm5_ret_t kadm5_get_either(int princ,
 				       void *server_handle,
 				       char *exp,
 				       char ***princs,
 				       int *count)
 {
      struct iter_data data;
-     char *msg, *regexp;
-     int ret;
+#ifdef BSD_REGEXPS
+     char *msg;
+#endif
+     char *regexp;
+     int i, ret;
      kadm5_server_handle_t handle = server_handle;
      
      *count = 0;
@@ -227,7 +243,11 @@ kadm5_ret_t kadm5_get_either(int princ,
 	  return EINVAL;
      }
 
-     if ((data.matches = DynCreate(sizeof(char *), -4)) == NULL) {
+     data.n_names = 0;
+     data.sz_names = 10;
+     data.malloc_failed = 0;
+     data.names = malloc(sizeof(char *) * data.sz_names);
+     if (data.names == NULL) {
 	  free(regexp);
 	  return ENOMEM;
      }
@@ -239,16 +259,21 @@ kadm5_ret_t kadm5_get_either(int princ,
 	  ret = osa_adb_iter_policy(handle->policy_db, get_pols_iter, (void *)&data);
      }
      
+     free(regexp);
+#ifdef POSIX_REGEXPS
+     regfree(&data.preg);
+#endif
+     if (ret == OSA_ADB_OK && data.malloc_failed)
+	  ret = ENOMEM;
      if (ret != OSA_ADB_OK) {
-	  free(regexp);
-	  DynDestroy(data.matches);
+	  for (i = 0; i < data.n_names; i++)
+	       free(data.names[i]);
+	  free(data.names);
 	  return ret;
      }
 
-     (*princs) = (char **) DynArray(data.matches);
-     *count = DynSize(data.matches);
-     DynRelease(data.matches);
-     free(regexp);
+     *princs = data.names;
+     *count = data.n_names;
      return KADM5_OK;
 }
 

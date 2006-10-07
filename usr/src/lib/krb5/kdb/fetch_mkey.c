@@ -174,18 +174,20 @@ krb5_db_fetch_mkey(context, mname, etype, fromkeyboard, twice, keyfile,
 	    retval = KRB5_KDB_CANTREAD_STORED;
 	    goto errout;
 	}
-	if (!key->length || key->length < 0) {
+	if (!key->length || ((int) key->length) < 0) {
 	    retval = KRB5_KDB_BADSTORED_MKEY;
 	    goto errout;
 	}
+	
 	if (!(key->contents = (krb5_octet *)malloc(key->length))) {
 	    retval = ENOMEM;
 	    goto errout;
 	}
 	if (fread((krb5_pointer) key->contents,
-		  sizeof(key->contents[0]), key->length, kf) != key->length) {
+		  sizeof(key->contents[0]), key->length, kf) 
+	    != key->length) {
 	    retval = KRB5_KDB_CANTREAD_STORED;
-	    memset(key->contents, 0, key->length);
+	    memset(key->contents, 0,  key->length);
 	    free(key->contents);
 	    key->contents = 0;
 	} else

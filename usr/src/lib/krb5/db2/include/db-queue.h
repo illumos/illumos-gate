@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _KRB5_DB2_DBQUEUE_H
@@ -46,6 +46,9 @@ extern "C" {
  *
  *	@(#)queue.h	8.3 (Berkeley) 12/13/93
  */
+
+#ifndef	_QUEUE_H_
+#define	_QUEUE_H_
 
 /*
  * This file defines three types of data structures: lists, tail queues,
@@ -253,6 +256,7 @@ struct {								\
 		(elm)->field.cqe_prev->field.cqe_next =			\
 		    (elm)->field.cqe_next;				\
 }
+#endif	/* !_QUEUE_H_ */
 
 #ifdef	__cplusplus
 }

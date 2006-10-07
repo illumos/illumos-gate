@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,8 +31,8 @@ ss_add_request_table(sci_idx, rqtbl_ptr, position, code_ptr)
 		;
 	/* size == C subscript of NULL == #elements */
 	size += 2;		/* new element, and NULL */
-	info->rqt_tables = (ssrt **)realloc((char *)info->rqt_tables,
-					    (unsigned)size*sizeof(ssrt));
+	info->rqt_tables = (ssrt **)realloc(info->rqt_tables,
+					    size*sizeof(ssrt));
 	if (info->rqt_tables == (ssrt **)NULL) {
 		*code_ptr = errno;
 		return;

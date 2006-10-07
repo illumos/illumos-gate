@@ -2,7 +2,7 @@
 /*
  * include/krb5/adm.h
  *
- * Copyright 1995 by the Massachusetts Institute of Technology.
+ * Copyright 1995,2001 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -17,7 +17,10 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  *
@@ -207,13 +210,14 @@ typedef struct __krb5_realm_params {
     krb5_timestamp	realm_expiration;
     krb5_flags		realm_flags;
     krb5_key_salt_tuple	*realm_keysalts;
+    unsigned int	realm_reject_bad_transit:1;
     unsigned int	realm_kadmind_port_valid:1;
     unsigned int	realm_enctype_valid:1;
     unsigned int	realm_max_life_valid:1;
     unsigned int	realm_max_rlife_valid:1;
     unsigned int	realm_expiration_valid:1;
     unsigned int	realm_flags_valid:1;
-    unsigned int	realm_filler:7;
+    unsigned int	realm_reject_bad_transit_valid:1;
     krb5_int32		realm_num_keysalts;
 } krb5_realm_params;
 #endif	/* KRB5_ADM_H__ */

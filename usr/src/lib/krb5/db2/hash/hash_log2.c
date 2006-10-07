@@ -41,6 +41,9 @@ static char sccsid[] = "@(#)hash_log2.c	8.4 (Berkeley) 11/7/95";
 #endif /* LIBC_SCCS and not lint */
 
 #include "db-int.h"
+#include "hash.h"
+#include "page.h"
+#include "extern.h"
 
 u_int32_t
 __kdb2_log2(num)

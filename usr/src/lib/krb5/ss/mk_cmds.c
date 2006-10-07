@@ -25,7 +25,7 @@
 static const char copyright[] =
     "Copyright 1987 by MIT Student Information Processing Board";
 
-extern pointer malloc PROTOTYPE((unsigned));
+extern pointer malloc (unsigned);
 extern char *last_token;
 extern FILE *output_file;
 
@@ -68,8 +68,9 @@ int main(argc, argv)
     p = strrchr(path, '.');
     *p = '\0';
     q = rindex(path, '/');
-    strcpy(c_file, (q) ? q + 1 : path);
-    strcat(c_file, ".c");
+    strncpy(c_file, (q) ? q + 1 : path, sizeof(c_file) - 1);
+    c_file[sizeof(c_file) - 1] = '\0';
+    strncat(c_file, ".c", sizeof(c_file) - 1 - strlen(c_file));
     *p = '.';
 
     output_file = fopen(c_file, "w+F");

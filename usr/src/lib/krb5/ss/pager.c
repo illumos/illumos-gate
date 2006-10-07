@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -16,11 +16,11 @@
 
 #include "ss_internal.h"
 #include "copyright.h"
+#include <errno.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/file.h>
 #include <signal.h>
-#include <errno.h>
 
 static char MORE[] = "more";
 extern char *_ss_pager_name;
@@ -43,7 +43,7 @@ int ss_pager_create()
 	if (pipe(filedes) != 0)
 		return(-1);
 
-	switch(fork()) {
+	switch((int) fork()) {
 	case -1:
 		return(-1);
 	case 0:
@@ -112,7 +112,7 @@ void ss_page_stdin()
 		char buf[80];
 		register int n;
 		while ((n = read(0, buf, 80)) > 0)
-			write(1, buf, n);
+			write(1, buf, (unsigned) n);
 	}
 	exit(errno);
 }

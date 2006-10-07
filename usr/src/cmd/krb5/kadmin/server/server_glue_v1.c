@@ -19,6 +19,7 @@
 
 
 #include <kadm5/admin.h>
+#include "misc.h"
 
 /*
  * In server_stubs.c, kadmind has to be able to call kadm5 functions
@@ -36,19 +37,15 @@
  * typecasts instead.
  */
 
-kadm5_ret_t
-kadm5_get_principal_v1(void *server_handle,
-		    krb5_principal principal,
-		    kadm5_principal_ent_t_v1 * ent)
+kadm5_ret_t kadm5_get_principal_v1(void *server_handle,
+				  krb5_principal principal, 
+				  kadm5_principal_ent_t_v1 *ent)
 {
-	return (kadm5_get_principal(server_handle, principal,
-				    (kadm5_principal_ent_t) ent, 0));
+     return kadm5_get_principal(server_handle, principal,(kadm5_principal_ent_t) ent, 0);
 }
 
-kadm5_ret_t
-kadm5_get_policy_v1(void *server_handle, kadm5_policy_t name,
-		    kadm5_policy_ent_t * ent)
+kadm5_ret_t kadm5_get_policy_v1(void *server_handle, kadm5_policy_t name,
+				kadm5_policy_ent_t *ent)
 {
-	return (kadm5_get_policy(server_handle, name,
-				 (kadm5_policy_ent_t) ent));
+     return kadm5_get_policy(server_handle, name,(kadm5_policy_ent_t) ent);
 }

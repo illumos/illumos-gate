@@ -40,5 +40,16 @@
 #define CHPASS_UTIL_WHILE_READING_PASSWORD       (-1492553969L)
 #define ERROR_TABLE_BASE_ovku (-1492553984L)
 
+extern const struct error_table et_ovku_error_table;
+
+#if !defined(_WIN32)
 /* for compatibility with older versions... */
+extern void initialize_ovku_error_table (void) /*@modifies internalState@*/;
+#else
+#define initialize_ovku_error_table()
+#endif
+
+#if !defined(_WIN32)
+#define init_ovku_err_tbl initialize_ovku_error_table
 #define ovku_err_base ERROR_TABLE_BASE_ovku
+#endif

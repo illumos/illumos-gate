@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -13,12 +13,11 @@
  * For copyright information, see mit-sipb-copyright.h.
  */
 
-#include <ss/mit-sipb-copyright.h>
 #include <stdio.h>
 #include "ss_internal.h"
 #include <libintl.h>
 
-#define	DECLARE(name)	void name(argc,argv,sci_idx)int argc,sci_idx;char **argv;
+#define	DECLARE(name)	void name(argc,argv,sci_idx,info_ptr)int argc,sci_idx;const char * const *argv; pointer info_ptr;
 
 /*
  * ss_self_identify -- assigned by default to the "." request
@@ -54,14 +53,4 @@ DECLARE(ss_subsystem_version)
 DECLARE(ss_unimplemented)
 {
      ss_perror(sci_idx, SS_ET_UNIMPLEMENTED, "");
-}
-
-int g_displayDebugSS = 0;
-/*
- * debug message display toggle
- */
-void
-debugDisplaySS(int onOff) {
-
-	g_displayDebugSS = onOff;
 }

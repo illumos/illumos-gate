@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -657,14 +657,16 @@ krb5_db2_db_create(context, db_name, flags)
 /*
  * Destroy the database.  Zero's out all of the files, just to be sure.
  */
-krb5_error_code
+static krb5_error_code
 destroy_file_suffix(dbname, suffix)
     char *dbname;
     char *suffix;
 {
     char *filename;
     struct stat statb;
-    int nb,fd,i,j;
+    int nb,fd;
+    unsigned int j;
+    off_t pos;
     char buf[BUFSIZ];
     char zbuf[BUFSIZ];
     int dowrite;
@@ -693,8 +695,8 @@ destroy_file_suffix(dbname, suffix)
      * we're just about to unlink it anyways.
      */
     memset(zbuf, 0, BUFSIZ);
-    i = 0;
-    while (i < statb.st_size) {
+    pos = 0;
+    while (pos < statb.st_size) {
 	dowrite = 0;
 	nb = read(fd, buf, BUFSIZ);
 	if (nb < 0) {
@@ -708,16 +710,18 @@ destroy_file_suffix(dbname, suffix)
 		break;
 	    }
 	}
+	/* For signedness */
+	j = nb;
 	if (dowrite) {
-	    lseek(fd, i, SEEK_SET);
-	    nb = write(fd, zbuf, nb);
+	    lseek(fd, pos, SEEK_SET);
+	    nb = write(fd, zbuf, j);
 	    if (nb < 0) {
 		int retval = errno;
 		free(filename);
 		return retval;
 	    }
 	}
-	i += nb;
+	pos += nb;
     }
     /* ??? Is fsync really needed?  I don't know of any non-networked
        filesystem which will discard queued writes to disk if a file
@@ -898,7 +902,7 @@ krb5_db2_db_get_principal(context, searchfor, entries, nentries, more)
     DB *db;
     DBT key, contents;
     krb5_data keydata, contdata;
-    int try, dbret;
+    int trynum, dbret;
 
     *more = FALSE;
     *nentries = 0;
@@ -907,7 +911,7 @@ krb5_db2_db_get_principal(context, searchfor, entries, nentries, more)
 	return KRB5_KDB_DBNOTINITED;
 
     db_ctx = (krb5_db2_context *) context->db_context;
-    for (try = 0; try < KRB5_DB2_MAX_RETRY; try++) {
+    for (trynum = 0; trynum < KRB5_DB2_MAX_RETRY; trynum++) {
 	if ((retval = krb5_db2_db_lock(context, KRB5_LOCKMODE_SHARED))) {
 	    if (db_ctx->db_nb_locks) 
 	    	return(retval);
@@ -916,7 +920,7 @@ krb5_db2_db_get_principal(context, searchfor, entries, nentries, more)
 	}
 	break;
     }
-    if (try == KRB5_DB2_MAX_RETRY) 
+    if (trynum == KRB5_DB2_MAX_RETRY) 
 	return KRB5_KDB_DB_INUSE;
 
     /* XXX deal with wildcard lookups */
@@ -1181,7 +1185,7 @@ krb5_db2_db_delete_principal(context, searchfor, nentries)
     for (i = 0; i < entry.n_key_data; i++) {
 	if (entry.key_data[i].key_data_length[0]) {
 	    memset((char *)entry.key_data[i].key_data_contents[0], 0, 
-		   entry.key_data[i].key_data_length[0]); 
+		   (unsigned) entry.key_data[i].key_data_length[0]); 
 	}
     }
 
@@ -1217,10 +1221,11 @@ cleanup:
 }
 
 krb5_error_code
-krb5_db2_db_iterate (context, func, func_arg)
+krb5_db2_db_iterate_ext(context, func, func_arg, backwards, recursive)
     krb5_context context;
     krb5_error_code (*func) (krb5_pointer, krb5_db_entry *);
     krb5_pointer func_arg;
+    int backwards, recursive;
 {
     krb5_db2_context *db_ctx;
     DB *db;
@@ -1229,17 +1234,36 @@ krb5_db2_db_iterate (context, func, func_arg)
     krb5_db_entry entries;
     krb5_error_code retval;
     int dbret;
-    
+    void *cookie;
+
+    cookie = NULL;
     if (!k5db2_inited(context))
 	return KRB5_KDB_DBNOTINITED;
 
     db_ctx = (krb5_db2_context *) context->db_context;
     retval = krb5_db2_db_lock(context, KRB5_LOCKMODE_SHARED);
+
     if (retval)
 	return retval;
 
     db = db_ctx->db;
-    dbret = (*db->seq)(db, &key, &contents, R_FIRST);
+    if (recursive && db->type != DB_BTREE) {
+	(void)krb5_db2_db_unlock(context);
+	return KRB5_KDB_UK_RERROR; /* Not optimal, but close enough. */
+    }
+
+    if (!recursive) {
+	dbret = (*db->seq)(db, &key, &contents,
+			   backwards ? R_LAST : R_FIRST);
+    } else {
+#ifdef HAVE_BT_RSEQ
+	dbret = bt_rseq(db, &key, &contents, &cookie,
+			backwards ? R_LAST : R_FIRST);
+#else
+	(void)krb5_db2_db_unlock(context);
+	return KRB5_KDB_UK_RERROR; /* Not optimal, but close enough. */
+#endif
+    }
     while (dbret == 0) {
 	contdata.data = contents.data;
 	contdata.length = contents.size;
@@ -1250,7 +1274,18 @@ krb5_db2_db_iterate (context, func, func_arg)
 	krb5_dbe_free_contents(context, &entries);
 	if (retval)
 	    break;
-	dbret = (*db->seq)(db, &key, &contents, R_NEXT);
+	if (!recursive) {
+	    dbret = (*db->seq)(db, &key, &contents,
+			       backwards ? R_PREV : R_NEXT);
+	} else {
+#ifdef HAVE_BT_RSEQ
+	    dbret = bt_rseq(db, &key, &contents, &cookie,
+			    backwards ? R_PREV : R_NEXT);
+#else
+	    (void)krb5_db2_db_unlock(context);
+	    return KRB5_KDB_UK_RERROR; /* Not optimal, but close enough. */
+#endif
+	}
     }
     switch (dbret) {
     case 1:
@@ -1262,6 +1297,15 @@ krb5_db2_db_iterate (context, func, func_arg)
     }
     (void) krb5_db2_db_unlock(context);
     return retval;
+}
+
+krb5_error_code
+krb5_db2_db_iterate(context, func, func_arg)
+    krb5_context context;
+    krb5_error_code (*func) (krb5_pointer, krb5_db_entry *);
+    krb5_pointer func_arg;
+{
+    return krb5_db2_db_iterate_ext(context, func, func_arg, 0, 0);
 }
 
 krb5_boolean
@@ -1407,6 +1451,7 @@ kdb5_context_internalize(kcontext, argp, buffer, lenremain)
     krb5_int32		lockcount;
     krb5_int32		lockmode;
     krb5_int32		dbnamelen;
+    krb5_boolean        nb_lock;
     char		*dbname;
 
     bp = *buffer;
@@ -1444,7 +1489,8 @@ kdb5_context_internalize(kcontext, argp, buffer, lenremain)
 			kret = krb5_db_lock(tmpctx, lockmode);
 		    if (!kret && lockmode)
 			dbctx->db_locks_held = lockcount;
-		    (void) krb5_db2_db_set_lockmode(tmpctx, nb_lockmode);
+		    nb_lock = nb_lockmode & 0xff;
+		    (void) krb5_db2_db_set_lockmode(tmpctx, nb_lock);
 		}
 		if (dbname)
 		    krb5_xfree(dbname);

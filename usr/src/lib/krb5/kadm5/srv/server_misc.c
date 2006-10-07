@@ -21,11 +21,11 @@
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
  *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_misc.c,v 1.2 1997/08/07 00:23:11 tlyu Exp $
+ * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_misc.c,v 1.4 2001/06/18 18:58:00 epeisach Exp $
  */
 
 #if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_misc.c,v 1.2 1997/08/07 00:23:11 tlyu Exp $";
+static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/server_misc.c,v 1.4 2001/06/18 18:58:00 epeisach Exp $";
 #endif
 
 #include    "k5-int.h"
@@ -61,6 +61,7 @@ adb_policy_close(kadm5_server_handle_t handle)
     return KADM5_OK;
 }
 
+#ifdef HESIOD
 /* stolen from v4sever/kadm_funcs.c */
 static char *
 reverse(str)
@@ -81,7 +82,9 @@ reverse(str)
 	
 	return(newstr);
 }
+#endif /* HESIOD */
 
+#if 0
 static int
 lower(str)
 	char	*str;
@@ -97,7 +100,9 @@ lower(str)
 	}
 	return(effect);
 }
+#endif
 
+#ifdef HESIOD
 static int
 str_check_gecos(gecos, pwstr)
 	char	*gecos;
@@ -130,6 +135,7 @@ str_check_gecos(gecos, pwstr)
 	}
 	return 0;
 }
+#endif /* HESIOD */
 
 /* some of this is stolen from gatekeeper ... */
 kadm5_ret_t
@@ -153,17 +159,17 @@ passwd_check(kadm5_server_handle_t handle,
 	    return KADM5_PASS_Q_TOOSHORT;
 	s = password;
 	while ((c = *s++)) {
-	    if (islower(c)) {
+	    if (islower((int) c)) {
 		nlower = 1;
 		continue;
 	    }
-	    else if (isupper(c)) {
+	    else if (isupper((int) c)) {
 		nupper = 1;
 		continue;
-	    } else if (isdigit(c)) {
+	    } else if (isdigit((int) c)) {
 		ndigit = 1;
 		continue;
-	    } else if (ispunct(c)) {
+	    } else if (ispunct((int) c)) {
 		npunct = 1;
 		continue;
 	    } else {
@@ -176,13 +182,12 @@ passwd_check(kadm5_server_handle_t handle,
 	if((find_word(password) == KADM5_OK))
 	    return KADM5_PASS_Q_DICT;
 	else { 
-	    char	*cp;
-	    int	c, n = krb5_princ_size(handle->context, principal);
+	    int	i, n = krb5_princ_size(handle->context, principal);
 	    cp = krb5_princ_realm(handle->context, principal)->data;
 	    if (strcasecmp(cp, password) == 0)
 		return KADM5_PASS_Q_DICT;
-	    for (c = 0; c < n ; c++) {
-		cp = krb5_princ_component(handle->context, principal, c)->data;
+	    for (i = 0; i < n ; i++) {
+		cp = krb5_princ_component(handle->context, principal, i)->data;
 		if (strcasecmp(cp, password) == 0)
 		    return KADM5_PASS_Q_DICT;
 #ifdef HESIOD

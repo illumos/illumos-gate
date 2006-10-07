@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _KRB5_DB2_MPOOL_MPOOL_H
@@ -104,6 +104,16 @@ typedef struct MPOOL {
 					   specific page number. */
 #define	MPOOL_PAGE_NEXT		0x02	/* Allocate a new page with the next
 					  page number. */
+
+#define mpool_open	kdb2_mpool_open
+#define mpool_filter	kdb2_mpool_filter
+#define mpool_new	kdb2_mpool_new
+#define mpool_get	kdb2_mpool_get
+#define mpool_delete	kdb2_mpool_delete
+#define mpool_put	kdb2_mpool_put
+#define mpool_sync	kdb2_mpool_sync
+#define mpool_close	kdb2_mpool_close
+#define mpool_stat	kdb2_mpool_stat
 
 __BEGIN_DECLS
 MPOOL	*mpool_open __P((void *, int, db_pgno_t, db_pgno_t));

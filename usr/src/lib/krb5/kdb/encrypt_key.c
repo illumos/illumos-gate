@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,7 +78,6 @@ krb5_dbekd_encrypt_key_data(context, mkey, dbkey, keysalt, keyver, key_data)
     krb5_key_data	        * key_data;
 {
     krb5_error_code 		  retval;
-    krb5_keyblock 		  tmp;
     krb5_octet			* ptr;
     size_t			  len;
     int				  i;
@@ -129,7 +128,7 @@ krb5_dbekd_encrypt_key_data(context, mkey, dbkey, keysalt, keyver, key_data)
 	if (keysalt->type > 0) {
 	    key_data->key_data_ver++;
 	    key_data->key_data_type[1] = keysalt->type;
-	    if (key_data->key_data_length[1] = keysalt->data.length) {
+	    if ((key_data->key_data_length[1] = keysalt->data.length) != 0) {
 		key_data->key_data_contents[1] =
 		    (krb5_octet *)malloc(keysalt->data.length);
 		if (key_data->key_data_contents[1] == NULL) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,116 +38,116 @@
 #define	gettext(s) s
 
 #ifndef __STDC__
-#define	const
+#define const
 #endif
 
-static char const *const ssu00001[] = {
-	"clear_list",
-	"clear",
-	(char const *) 0
+static char const * const ssu00001[] = {
+"clear_list",
+    "clear",
+    (char const *)0
 };
 extern void ktutil_clear_list __SS_PROTO;
-static char const *const ssu00002[] = {
-	"read_kt",
-	"rkt",
-	(char const *) 0
+static char const * const ssu00002[] = {
+"read_kt",
+    "rkt",
+    (char const *)0
 };
 extern void ktutil_read_v5 __SS_PROTO;
-static char const *const ssu00003[] = {
-	"read_st",
-	"rst",
-	(char const *) 0
+static char const * const ssu00003[] = {
+"read_st",
+    "rst",
+    (char const *)0
 };
 extern void ktutil_read_v4 __SS_PROTO;
-static char const *const ssu00004[] = {
-	"write_kt",
-	"wkt",
-	(char const *) 0
+static char const * const ssu00004[] = {
+"write_kt",
+    "wkt",
+    (char const *)0
 };
 extern void ktutil_write_v5 __SS_PROTO;
-static char const *const ssu00005[] = {
-	"write_st",
-	"wst",
-	(char const *) 0
+static char const * const ssu00005[] = {
+"write_st",
+    "wst",
+    (char const *)0
 };
 extern void ktutil_write_v4 __SS_PROTO;
-static char const *const ssu00006[] = {
-	"add_entry",
-	"addent",
-	(char const *) 0
+static char const * const ssu00006[] = {
+"add_entry",
+    "addent",
+    (char const *)0
 };
 extern void ktutil_add_entry __SS_PROTO;
-static char const *const ssu00007[] = {
-	"delete_entry",
-	"delent",
-	(char const *) 0
+static char const * const ssu00007[] = {
+"delete_entry",
+    "delent",
+    (char const *)0
 };
 extern void ktutil_delete_entry __SS_PROTO;
-static char const *const ssu00008[] = {
-	"list",
-	"l",
-	(char const *) 0
+static char const * const ssu00008[] = {
+"list",
+    "l",
+    (char const *)0
 };
 extern void ktutil_list __SS_PROTO;
-static char const *const ssu00009[] = {
-	"list_requests",
-	"lr",
-	"?",
-	(char const *) 0
+static char const * const ssu00009[] = {
+"list_requests",
+    "lr",
+    "?",
+    (char const *)0
 };
 extern void ss_list_requests __SS_PROTO;
-static char const *const ssu00010[] = {
-	"quit",
-	"exit",
-	"q",
-	(char const *) 0
+static char const * const ssu00010[] = {
+"quit",
+    "exit",
+    "q",
+    (char const *)0
 };
 extern void ss_quit __SS_PROTO;
 static ss_request_entry ssu00011[] = {
-	{ssu00001,
-		ktutil_clear_list,
+    { ssu00001,
+      ktutil_clear_list,
 		gettext("Clear the current keylist."),
-	0},
-	{ssu00002,
-		ktutil_read_v5,
+      0 },
+    { ssu00002,
+      ktutil_read_v5,
 		gettext("Read a krb5 keytab into the current keylist."),
-	0},
-	{ssu00003,
-		ktutil_read_v4,
+      0 },
+    { ssu00003,
+      ktutil_read_v4,
 		gettext("Read a krb4 srvtab into the current keylist."),
-	0},
-	{ssu00004,
-		ktutil_write_v5,
+      0 },
+    { ssu00004,
+      ktutil_write_v5,
 		gettext("Write the current keylist to a krb5 keytab."),
-	0},
-	{ssu00005,
-		ktutil_write_v4,
+      0 },
+    { ssu00005,
+      ktutil_write_v4,
 		gettext("Write the current keylist to a krb4 srvtab."),
-	0},
-	{ssu00006,
-		ktutil_add_entry,
+      0 },
+    { ssu00006,
+      ktutil_add_entry,
 		gettext("Add an entry to the current keylist."),
-	0},
-	{ssu00007,
-		ktutil_delete_entry,
+      0 },
+    { ssu00007,
+      ktutil_delete_entry,
 		gettext("Delete an entry from the current keylist."),
-	0},
-	{ssu00008,
-		ktutil_list,
+      0 },
+    { ssu00008,
+      ktutil_list,
 		gettext("List the current keylist."),
-	0},
-	{ssu00009,
-		ss_list_requests,
+      0 },
+    { ssu00009,
+      ss_list_requests,
 		gettext("List available requests."),
-	0},
-	{ssu00010,
-		ss_quit,
+      0 },
+    { ssu00010,
+      ss_quit,
 		gettext("Exit program."),
-	0},
-	{0, 0, 0, 0}
+      0 },
+    { 0, 0, 0, 0 }
 };
 
-ss_request_table ktutil_cmds = {2, ssu00011};
+ss_request_table ktutil_cmds = { 2, ssu00011 };
 
 #undef gettext
 

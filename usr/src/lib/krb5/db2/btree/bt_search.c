@@ -71,7 +71,7 @@ __bt_search(t, key, exactp)
 	int *exactp;
 {
 	PAGE *h;
-	indx_t base, index, lim;
+	indx_t base, idx, lim;
 	db_pgno_t pg;
 	int cmp;
 
@@ -83,7 +83,7 @@ __bt_search(t, key, exactp)
 		/* Do a binary search on the current page. */
 		t->bt_cur.page = h;
 		for (base = 0, lim = NEXTINDEX(h); lim; lim >>= 1) {
-			t->bt_cur.index = index = base + (lim >> 1);
+			t->bt_cur.index = idx = base + (lim >> 1);
 			if ((cmp = __bt_cmp(t, key, &t->bt_cur)) == 0) {
 				if (h->flags & P_BLEAF) {
 					*exactp = 1;
@@ -92,7 +92,7 @@ __bt_search(t, key, exactp)
 				goto next;
 			}
 			if (cmp > 0) {
-				base = index + 1;
+				base = idx + 1;
 				--lim;
 			}
 		}
@@ -128,10 +128,10 @@ __bt_search(t, key, exactp)
 		 * be a parent page for the key.  If a split later occurs, the
 		 * inserted page will be to the right of the saved page.
 		 */
-		index = base ? base - 1 : base;
+		idx = base ? base - 1 : base;
 
-next:		BT_PUSH(t, h->pgno, index);
-		pg = GETBINTERNAL(h, index)->pgno;
+next:		BT_PUSH(t, h->pgno, idx);
+		pg = GETBINTERNAL(h, idx)->pgno;
 		mpool_put(t->bt_mp, h, 0);
 	}
 }
@@ -159,7 +159,7 @@ __bt_snext(t, h, key, exactp)
 	BINTERNAL *bi;
 	EPG e;
 	EPGNO *parent;
-	indx_t index;
+	indx_t idx;
 	db_pgno_t pgno;
 	int level;
 
@@ -190,8 +190,8 @@ __bt_snext(t, h, key, exactp)
 
 		/* Move to the next index. */
 		if (parent->index != NEXTINDEX(h) - 1) {
-			index = parent->index + 1;
-			BT_PUSH(t, h->pgno, index);
+			idx = parent->index + 1;
+			BT_PUSH(t, h->pgno, idx);
 			break;
 		}
 		mpool_put(t->bt_mp, h, 0);
@@ -200,7 +200,7 @@ __bt_snext(t, h, key, exactp)
 	/* Restore the stack. */
 	while (level--) {
 		/* Push the next level down onto the stack. */
-		bi = GETBINTERNAL(h, index);
+		bi = GETBINTERNAL(h, idx);
 		pgno = bi->pgno;
 		BT_PUSH(t, pgno, 0);
 
@@ -210,7 +210,7 @@ __bt_snext(t, h, key, exactp)
 		/* Get the next level down. */
 		if ((h = mpool_get(t->bt_mp, pgno, 0)) == NULL)
 			return (0);
-		index = 0;
+		idx = 0;
 	}
 	mpool_put(t->bt_mp, h, 0);
 	return (1);
@@ -239,7 +239,7 @@ __bt_sprev(t, h, key, exactp)
 	BINTERNAL *bi;
 	EPG e;
 	EPGNO *parent;
-	indx_t index;
+	indx_t idx;
 	db_pgno_t pgno;
 	int level;
 
@@ -271,8 +271,8 @@ __bt_sprev(t, h, key, exactp)
 
 		/* Move to the next index. */
 		if (parent->index != 0) {
-			index = parent->index - 1;
-			BT_PUSH(t, h->pgno, index);
+			idx = parent->index - 1;
+			BT_PUSH(t, h->pgno, idx);
 			break;
 		}
 		mpool_put(t->bt_mp, h, 0);
@@ -281,7 +281,7 @@ __bt_sprev(t, h, key, exactp)
 	/* Restore the stack. */
 	while (level--) {
 		/* Push the next level down onto the stack. */
-		bi = GETBINTERNAL(h, index);
+		bi = GETBINTERNAL(h, idx);
 		pgno = bi->pgno;
 
 		/* Lose the currently pinned page. */
@@ -291,8 +291,8 @@ __bt_sprev(t, h, key, exactp)
 		if ((h = mpool_get(t->bt_mp, pgno, 0)) == NULL)
 			return (1);
 
-		index = NEXTINDEX(h) - 1;
-		BT_PUSH(t, pgno, index);
+		idx = NEXTINDEX(h) - 1;
+		BT_PUSH(t, pgno, idx);
 	}
 	mpool_put(t->bt_mp, h, 0);
 	return (1);

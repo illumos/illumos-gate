@@ -1,5 +1,5 @@
 /*
- * Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -25,21 +25,21 @@
 
 /*
  * Copyright 1993-1994 OpenVision Technologies, Inc., All Rights Reserved.
- *
- * $Header: /cvs/krbdev/krb5/src/kadmin/passwd/kpasswd.c,v 1.24 1997/02/20\
- * 06:12:57 probe Exp $
+ * 
+ * $Header: /cvs/krbdev/krb5/src/kadmin/passwd/kpasswd.c,v 1.25 2001/02/26 18:22:08 epeisach Exp $
  *
  *
  */
 
-static char rcsid[] = "$Id: kpasswd.c,v 1.24 1997/02/20 "
-                      "06:12:57 probe Exp $";
+static char rcsid[] = "$Id: kpasswd.c,v 1.25 2001/02/26 18:22:08 epeisach Exp $";
 
 #include <kadm5/admin.h>
 #include <krb5.h>
 
 #include "kpasswd_strings.h"
-#define	string_text error_message
+#define string_text error_message
+
+#include "kpasswd.h"
 
 #include <stdio.h>
 #include <pwd.h>
@@ -52,7 +52,7 @@ extern void display_intro_message();
 extern long read_old_password();
 extern long read_new_password();
 
-#define	MISC_EXIT_STATUS 6
+#define MISC_EXIT_STATUS 6
 
 /*
  * Function: kpasswd
@@ -67,7 +67,7 @@ extern long read_new_password();
  *	read_new_password (f) function to read new and change password
  *	display_intro_message (f) function to display intro message
  *	whoami		(extern) argv[0]
- *
+ *	
  * Returns:
  *                      exit status of 0 for success
  *			1 principal unknown
@@ -77,10 +77,10 @@ extern long read_new_password();
  *                      5 password not typed
  *                      6 misc error
  *                      7 incorrect usage
- *
+ *      
  * Requires:
  *	Passwords cannot be more than 255 characters long.
- *
+ *      
  * Effects:
  *
  * If argc is 2, the password for the principal specified in argv[1]
@@ -93,7 +93,7 @@ extern long read_new_password();
  * read_new_password is called to read the new password and change the
  * principal's password (presumably ovsec_kadm_chpass_principal).
  * admin system is de-initialized before the function returns.
- *
+ *      
  * Modifies:
  *
  * Changes the principal's password.
@@ -101,129 +101,113 @@ extern long read_new_password();
  */
 int
 kpasswd(context, argc, argv)
-krb5_context context;
-int argc;
-char *argv[];
+   krb5_context context;
+   int argc;
+   char *argv[];
 {
-	kadm5_ret_t code;
-	krb5_ccache ccache = NULL;
-	krb5_principal princ = 0;
-	char *princ_str;
-	struct passwd *pw = 0;
-	int pwsize;
-	char password[255];	/* I don't really like 255 */
-				/* but that's what kinit uses */
-	char msg_ret[1024], admin_realm[1024];
-	kadm5_principal_ent_rec principal_entry;
-	kadm5_policy_ent_rec policy_entry;
-	void *server_handle;
-	kadm5_config_params params;
-	char *cpw_service;
+  kadm5_ret_t code;
+  krb5_ccache ccache = NULL;
+  krb5_principal princ = 0;
+  char *princ_str;
+  struct passwd *pw = 0;
+  unsigned int pwsize;
+  char password[255];  /* I don't really like 255 but that's what kinit uses */
+  char msg_ret[1024], admin_realm[1024];
+  kadm5_principal_ent_rec principal_entry;
+  kadm5_policy_ent_rec policy_entry;
+  void *server_handle;
+  kadm5_config_params params;
+  char *cpw_service;
 
 	memset((char *)&params, 0, sizeof (params));
 	memset(&principal_entry, 0, sizeof (principal_entry));
 	memset(&policy_entry, 0, sizeof (policy_entry));
 
-	if (argc > 2) {
-		com_err(whoami, KPW_STR_USAGE, 0);
-		return (7);
-		/* NOTREACHED */
-	}
-	/*
-	 *  Get principal name to change
-	 */
+  if (argc > 2) {
+      com_err(whoami, KPW_STR_USAGE, 0);
+      return(7);
+      /*NOTREACHED*/
+    }
 
-	/*
-	 * Look on the command line first, followed by the default
-	 * credential cache, followed by defaulting to the Unix user name
-	 */
+  /************************************
+   *  Get principal name to change    * 
+   ************************************/
 
-	if (argc == 2)
-		princ_str = strdup(argv[1]);
-	else {
-		code = krb5_cc_default(context, &ccache);
-		/* If we succeed, find who is in the credential cache */
-		if (code == 0) {
-			/* Get default principal from cache if one exists */
-			code = krb5_cc_get_principal(context, ccache, &princ);
-			/*
-			 * if we got a principal, unparse it, otherwise get
-			 * out of the if with an error code
-			 */
-			(void) krb5_cc_close(context, ccache);
-			if (code == 0) {
-				code = krb5_unparse_name(context,
-							princ, &princ_str);
-				if (code != 0) {
-					com_err(whoami, code,
-						string_text(
-							KPW_STR_UNPARSE_NAME));
-					return (MISC_EXIT_STATUS);
-				}
-			}
-		}
-		/* this is a crock.. we want to compare against */
-		/*
-		 * "KRB5_CC_DOESNOTEXIST" but there is no such error code,
-		 * and
-		 */
-		/*
-		 * both the file and stdio types return FCC_NOFILE.  If
-		 * there is
-		 */
-		/* ever another ccache type (or if the error codes are ever */
-		/* fixed), this code will have to be updated. */
-		if (code && code != KRB5_FCC_NOFILE) {
-			com_err(whoami, code,
-				string_text(KPW_STR_WHILE_LOOKING_AT_CC));
-			return (MISC_EXIT_STATUS);
-		}
-		/* if either krb5_cc failed check the passwd file */
-		if (code != 0) {
-			pw = getpwuid(getuid());
-			if (pw == NULL) {
-				com_err(whoami, 0,
-				    string_text(KPW_STR_NOT_IN_PASSWD_FILE));
-				return (MISC_EXIT_STATUS);
-			}
-			princ_str = strdup(pw->pw_name);
-		}
-	}
+  /* Look on the command line first, followed by the default credential
+     cache, followed by defaulting to the Unix user name */
 
-	display_intro_message(string_text(KPW_STR_CHANGING_PW_FOR), princ_str);
-
-	/*
-	 * Need to get a krb5_principal, unless we started from with one
-	 * from the credential cache
-	 */
-
-	if (!princ) {
-		code = krb5_parse_name(context, princ_str, &princ);
-		if (code != 0) {
-			com_err(whoami, code,
-				string_text(KPW_STR_PARSE_NAME), princ_str);
-			free(princ_str);
-			return (MISC_EXIT_STATUS);
-		}
-	}
-	pwsize = sizeof (password);
-	code = read_old_password(context, password, &pwsize);
-
+  if (argc == 2)
+    princ_str = strdup(argv[1]);
+  else {
+    code = krb5_cc_default(context, &ccache);
+    /* If we succeed, find who is in the credential cache */
+    if (code == 0) {
+      /* Get default principal from cache if one exists */
+      code = krb5_cc_get_principal(context, ccache, &princ);
+      /* if we got a principal, unparse it, otherwise get out of the if
+	 with an error code */
+      (void) krb5_cc_close(context, ccache);
+      if (code == 0) {
+	code = krb5_unparse_name(context, princ, &princ_str);
 	if (code != 0) {
-		memset(password, 0, sizeof (password));
-		com_err(whoami, code,
-			string_text(KPW_STR_WHILE_READING_PASSWORD));
-		krb5_free_principal(context, princ);
-		free(princ_str);
-		return (MISC_EXIT_STATUS);
+	  com_err(whoami,  code, string_text(KPW_STR_UNPARSE_NAME));
+	  return(MISC_EXIT_STATUS);
 	}
-	if (pwsize == 0) {
-		memset(password, 0, sizeof (password));
-		com_err(whoami, 0, string_text(KPW_STR_NO_PASSWORD_READ));
-		krb5_free_principal(context, princ);
-		free(princ_str);
-		return (5);
-	}
+      }
+    }
+
+    /* this is a crock.. we want to compare against */
+    /* "KRB5_CC_DOESNOTEXIST" but there is no such error code, and */
+    /* both the file and stdio types return FCC_NOFILE.  If there is */
+    /* ever another ccache type (or if the error codes are ever */
+    /* fixed), this code will have to be updated. */
+    if (code && code != KRB5_FCC_NOFILE) {
+      com_err(whoami, code, string_text(KPW_STR_WHILE_LOOKING_AT_CC));
+      return(MISC_EXIT_STATUS);
+    }
+
+    /* if either krb5_cc failed check the passwd file */
+    if (code != 0) {
+      pw = getpwuid( getuid());
+      if (pw == NULL) {
+	com_err(whoami, 0, string_text(KPW_STR_NOT_IN_PASSWD_FILE));
+	return(MISC_EXIT_STATUS);
+      }
+      princ_str = strdup(pw->pw_name);
+    }
+  }    
+  
+  display_intro_message(string_text(KPW_STR_CHANGING_PW_FOR), princ_str);
+
+  /* Need to get a krb5_principal, unless we started from with one from
+     the credential cache */
+
+  if (! princ) {
+      code = krb5_parse_name (context, princ_str, &princ);
+      if (code != 0) {
+	  com_err(whoami, code, string_text(KPW_STR_PARSE_NAME), princ_str);
+	  free(princ_str);
+	  return(MISC_EXIT_STATUS);
+      }
+  }
+  
+  pwsize = sizeof(password);
+  code = read_old_password(context, password, &pwsize);
+
+  if (code != 0) {
+    memset(password, 0, sizeof(password));
+    com_err(whoami, code, string_text(KPW_STR_WHILE_READING_PASSWORD));
+    krb5_free_principal(context, princ);
+    free(princ_str);
+    return(MISC_EXIT_STATUS);
+  }
+  if (pwsize == 0) {
+    memset(password, 0, sizeof(password));
+    com_err(whoami, 0, string_text(KPW_STR_NO_PASSWORD_READ));
+    krb5_free_principal(context, princ);
+    free(princ_str);
+    return(5);
+  }
 
 	snprintf(admin_realm, sizeof (admin_realm),
 		krb5_princ_realm(context, princ)->data);
@@ -346,23 +330,22 @@ char *argv[];
 		}
 	} /* if protocol == KRB5_CHGPWD_RPCSEC */
 
-	pwsize = sizeof (password);
-	code = read_new_password(server_handle, password,
-			 &pwsize, msg_ret, sizeof (msg_ret), princ);
-	memset(password, 0, sizeof (password));
+  pwsize = sizeof(password);
+  code = read_new_password(server_handle, password, &pwsize, msg_ret, sizeof (msg_ret), princ);
+  memset(password, 0, sizeof(password));
 
-	if (code)
-		com_err(whoami, 0, msg_ret);
+  if (code)
+    com_err(whoami, 0, msg_ret);
 
-	krb5_free_principal(context, princ);
-	free(princ_str);
+  krb5_free_principal(context, princ);
+  free(princ_str);
 
-	(void) kadm5_destroy(server_handle);
-
-	if (code == KRB5_LIBOS_CANTREADPWD)
-		return (5);
-	else if (code)
-		return (4);
-	else
-		return (0);
+  (void) kadm5_destroy(server_handle);
+  
+  if (code == KRB5_LIBOS_CANTREADPWD)
+     return(5);
+  else if (code)
+     return(4);
+  else
+     return(0);
 }

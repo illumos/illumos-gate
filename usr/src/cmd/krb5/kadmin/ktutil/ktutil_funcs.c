@@ -5,6 +5,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+
 /*
  * kadmin/ktutil/ktutil_funcs.c
  *
@@ -69,16 +70,16 @@ krb5_error_code ktutil_free_kt_list(context, list)
  * Delete a numbered entry in a kt_list.  Takes a pointer to a kt_list
  * in case head gets deleted.
  */
-krb5_error_code ktutil_delete(context, list, index)
+krb5_error_code ktutil_delete(context, list, idx)
     krb5_context context;
     krb5_kt_list *list;
-    int index;
+    int idx;
 {
     krb5_kt_list lp, prev;
     int i;
 
     for (lp = *list, i = 1; lp; prev = lp, lp = lp->next, i++) {
-	if (i == index) {
+	if (i == idx) {
 	    if (i == 1)
 		*list = lp->next;
 	    else
@@ -117,7 +118,8 @@ krb5_error_code ktutil_add(context, list, princ_str, kvno,
     char promptstr[1024];
 
     char *cp;
-    int i, tmp, pwsize = BUFSIZ;
+    int i, tmp;
+    unsigned int pwsize = BUFSIZ;
 
     retval = krb5_parse_name(context, princ_str, &princ);
     if (retval)
@@ -211,7 +213,7 @@ krb5_error_code ktutil_add(context, list, princ_str, kvno,
 
 	i = 0;
 	for (cp = buf; *cp; cp += 2) {
-	    if (!isxdigit(cp[0]) || !isxdigit(cp[1])) {
+	    if (!isxdigit((int) cp[0]) || !isxdigit((int) cp[1])) {
 	        fprintf(stderr, "addent: %s",
 			gettext("Illegal character in key.\n"));
 		retval = 0;
@@ -296,7 +298,7 @@ krb5_error_code ktutil_read_keytab(context, name, list)
     }
     if (entry)
 	free((char *)entry);
-    if (retval)
+    if (retval) {
 	if (retval == KRB5_KT_END)
 	    retval = 0;
 	else {
@@ -305,6 +307,7 @@ krb5_error_code ktutil_read_keytab(context, name, list)
 	    if (back)
 		back->next = NULL;
 	}
+    }
     if (!*list)
 	*list = tail;
     krb5_kt_end_seq_get(context, kt, &cursor);
@@ -353,12 +356,12 @@ krb5_error_code ktutil_write_keytab(context, list, name)
  * including the null terminator.
  */
 
-int getstr(fp, s, n)
+static int getstr(fp, s, n)
     FILE *fp;
     register char *s;
     int n;
 {
-    register count = n;
+    register int count = n;
     while (fread(s, 1, 1, fp) > 0 && --count)
         if (*s++ == '\0')
             return (n - count);
@@ -512,10 +515,22 @@ krb5_error_code ktutil_write_srvtab(context, list, name)
 		lp1 = prev->next;
 	    }
 	    lp1->entry = lp->entry;
-	} else if (lp1->entry->vno < lp->entry->vno)
-	    /* Check if lp->entry is newer kvno; if so, update */
-	    lp1->entry = lp->entry;
+	} else {
+	    /* This heuristic should be roughly the same as in the
+	       keytab-reading code in libkrb5.  */
+	    int offset = 0;
+	    if (lp1->entry->vno > 240 || lp->entry->vno > 240) {
+		offset = 128;
+	    }
+#define M(X) (((X) + offset) % 256)
+	    if (M(lp1->entry->vno) < M(lp->entry->vno))
+		/* Check if lp->entry is newer kvno; if so, update */
+		lp1->entry = lp->entry;
+	}
     }
+    umask(0077); /*Changing umask for all of ktutil is OK
+		  * We don't ever write out anything that should use
+		  * default umask.*/
     fp = fopen(name, "w");
     if (!fp) {
 	retval = EIO;

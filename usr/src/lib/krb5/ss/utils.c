@@ -63,13 +63,12 @@ char * generate_rqte(func_name, info_string, cmds, options)
     var_name = generate_cmds_string(cmds);
     generate_function_definition(func_name);
     size = 6;		/* "    { " */
-    size += strlen(var_name)+7; /* "quux, " */
-    size += strlen(func_name)+7; /* "foo, " */
-    size += strlen(info_string)+9; /* "\"Info!\", " */
+    size += strlen(var_name)+8; /* "quux, " */
+    size += strlen(func_name)+8; /* "foo, " */
+    size += strlen(info_string)+8; /* "\"Info!\", " */
     sprintf(numbuf, "%d", options);
-    size += strlen(numbuf);
-    size += 4;		/* " }," + NL */
-    string = malloc(size * sizeof(char *));
+    size += strlen(numbuf)+5;		/* " }," + NL + NUL */
+    string = malloc(size);
     strcpy(string, "    { ");
     strcat(string, var_name);
     strcat(string, ",\n      ");
@@ -125,7 +124,7 @@ char *quote(string)
 	return(result);
 }
 
-#ifndef HAS_STRDUP
+#ifndef HAVE_STRDUP
 /* make duplicate of string and return pointer */
 char *strdup(s)
 	register char *s;

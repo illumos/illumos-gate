@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,8 +196,7 @@ int ss_execute_line (sci_idx, line_ptr)
     char *line_ptr;
 {
     char **argv;
-    int argc;
-    int rc;
+    int argc, ret;
 
     /* flush leading whitespace */
     while (line_ptr[0] == ' ' || line_ptr[0] == '\t')
@@ -220,9 +219,9 @@ int ss_execute_line (sci_idx, line_ptr)
         return 0;
 
     /* look it up in the request tables, execute if found */
-    rc = really_execute_command (sci_idx, argc, &argv);
+    ret = really_execute_command (sci_idx, argc, &argv);
 
     free(argv);
 
-    return (rc);
+    return(ret);
 }

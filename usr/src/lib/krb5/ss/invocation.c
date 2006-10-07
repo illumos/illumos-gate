@@ -71,7 +71,7 @@ ss_delete_invocation(sci_idx)
 
 	t = ss_info(sci_idx);
 	free(t->prompt);
-	free((char *)t->rqt_tables);
+	free(t->rqt_tables);
 	while(t->info_dirs[0] != (char *)NULL)
 		ss_delete_info_dir(sci_idx, t->info_dirs[0], &ignored_code);
 	free((char *)t->info_dirs);

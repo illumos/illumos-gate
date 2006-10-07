@@ -42,7 +42,9 @@
 
 #include <stdio.h>
 #include <netdb.h>
+#ifdef HAVE_MEMORY_H
 #include <memory.h>
+#endif
 #include <string.h>
 #include <com_err.h>
 #include <sys/types.h>
@@ -55,19 +57,22 @@
 #endif
 #include <libintl.h>
 
+#include <kadm5/admin.h>
+#include <kadm5/kadm_rpc.h>
+#include "client_internal.h"
+
 #include <syslog.h>
 #include <gssapi/gssapi.h>
 #include <gssapi_krb5.h>
 #include <gssapiP_krb5.h>
-#include <kadm5/kadm_rpc.h>
 #include <rpc/clnt.h>
-#include <kadm5/admin.h>
-#include "client_internal.h"
+
 #include <iprop_hdr.h>
 #include "iprop.h"
 
 #define	ADM_CCACHE  "/tmp/ovsec_adm.XXXXXX"
 
+static int old_auth_gssapi = 0;
 /* connection timeout to kadmind in seconds */
 #define		KADMIND_CONNECT_TIMEOUT	25
 
@@ -93,7 +98,7 @@ kadm5_ret_t kadm5_init_with_creds(char *client_name,
 				  krb5_ui_4 api_version,
 				  void **server_handle)
 {
-	return _kadm5_init_any(client_name, INIT_CREDS, NULL, ccache,
+     return _kadm5_init_any(client_name, INIT_CREDS, NULL, ccache,
 			    service_name, params,
 			    struct_version, api_version,
 			    server_handle);
@@ -107,19 +112,19 @@ kadm5_ret_t kadm5_init_with_password(char *client_name, char *pass,
 				     krb5_ui_4 api_version,
 				     void **server_handle)
 {
-	return _kadm5_init_any(client_name, INIT_PASS, pass, NULL,
+     return _kadm5_init_any(client_name, INIT_PASS, pass, NULL,
 			    service_name, params, struct_version,
 			    api_version, server_handle);
 }
 
 kadm5_ret_t kadm5_init(char *client_name, char *pass,
-			 char *service_name, 
-			 kadm5_config_params *params,
-			 krb5_ui_4 struct_version,
-			 krb5_ui_4 api_version,
-			 void **server_handle)
+		       char *service_name, 
+		       kadm5_config_params *params,
+		       krb5_ui_4 struct_version,
+		       krb5_ui_4 api_version,
+		       void **server_handle)
 {
-	return _kadm5_init_any(client_name, INIT_PASS, pass, NULL,
+     return _kadm5_init_any(client_name, INIT_PASS, pass, NULL,
 			    service_name, params, struct_version,
 			    api_version, server_handle);
 }
@@ -131,7 +136,7 @@ kadm5_ret_t kadm5_init_with_skey(char *client_name, char *keytab,
 				 krb5_ui_4 api_version,
 				 void **server_handle)
 {
-	return _kadm5_init_any(client_name, INIT_SKEY, keytab, NULL,
+     return _kadm5_init_any(client_name, INIT_SKEY, keytab, NULL,
 			    service_name, params, struct_version,
 			    api_version, server_handle);
 }
@@ -579,132 +584,132 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 				   krb5_ui_4 api_version,
 				   void **server_handle)
 {
-	int i;
-	krb5_creds	creds;
-	krb5_ccache ccache = NULL;
-	krb5_timestamp  now;
-	OM_uint32 gssstat, minor_stat;
-	kadm5_server_handle_t handle;
-	kadm5_config_params params_local;
-	int code = 0;
-	krb5_get_init_creds_opt opt;
-	gss_buffer_desc input_name;
-	krb5_error_code kret;
-	krb5_int32 starttime;
-	char *server = NULL;
-	krb5_principal serverp = NULL, clientp = NULL;
-	bool_t cpw = FALSE;
+     int i;
+     krb5_creds	creds;
+     krb5_ccache ccache = NULL;
+     krb5_timestamp  now;
+     OM_uint32 gssstat, minor_stat;
+     kadm5_server_handle_t handle;
+     kadm5_config_params params_local;
+     int code = 0;
+     krb5_get_init_creds_opt opt;
+     gss_buffer_desc input_name;
+     krb5_error_code kret;
+     krb5_int32 starttime;
+     char *server = NULL;
+     krb5_principal serverp = NULL, clientp = NULL;
+     bool_t cpw = FALSE;
 
 	ADMIN_LOGO(LOG_ERR, dgettext(TEXT_DOMAIN,
 		"entering kadm5_init_any\n"));
-	if (! server_handle) {
-		return (EINVAL);
-	}
+     if (! server_handle) {
+	 return EINVAL;
+     }
 
-	if (! (handle = malloc(sizeof(*handle)))) {
-		return (ENOMEM);
-	}
-	if (! (handle->lhandle = malloc(sizeof(*handle)))) {
-		free(handle);
-		return (ENOMEM);
-	}
+     if (! (handle = malloc(sizeof(*handle)))) {
+	  return ENOMEM;
+     }
+     if (! (handle->lhandle = malloc(sizeof(*handle)))) {
+	  free(handle);
+	  return ENOMEM;
+     }
 
-	handle->magic_number = KADM5_SERVER_HANDLE_MAGIC;
-	handle->struct_version = struct_version;
-	handle->api_version = api_version;
-	handle->clnt = 0;
-	handle->cache_name = 0;
-	handle->destroy_cache = 0;
-	*handle->lhandle = *handle;
-	handle->lhandle->api_version = KADM5_API_VERSION_2;
-	handle->lhandle->struct_version = KADM5_STRUCT_VERSION;
-	handle->lhandle->lhandle = handle->lhandle;
+     handle->magic_number = KADM5_SERVER_HANDLE_MAGIC;
+     handle->struct_version = struct_version;
+     handle->api_version = api_version;
+     handle->clnt = 0;
+     handle->cache_name = 0;
+     handle->destroy_cache = 0;
+     *handle->lhandle = *handle;
+     handle->lhandle->api_version = KADM5_API_VERSION_2;
+     handle->lhandle->struct_version = KADM5_STRUCT_VERSION;
+     handle->lhandle->lhandle = handle->lhandle;
 
-	kret = krb5_init_context(&handle->context);
+    kret = krb5_init_context(&handle->context);
 	if (kret) {
 		free(handle->lhandle);
 		free(handle);
 		return (kret);
 	}
 
-	if(service_name == NULL || client_name == NULL) {
-		krb5_free_context(handle->context);
-		free(handle->lhandle);
-		free(handle);
-		return (EINVAL);
-	}
-	memset((char *) &creds, 0, sizeof(creds));
+     if(service_name == NULL || client_name == NULL) {
+	krb5_free_context(handle->context);
+	free(handle->lhandle);
+	free(handle);
+	return EINVAL;
+     }
+     memset((char *) &creds, 0, sizeof(creds));
 
-	/*
-	 * Verify the version numbers before proceeding; we can't use
-	 * CHECK_HANDLE because not all fields are set yet.
-	 */
-	GENERIC_CHECK_HANDLE(handle, KADM5_OLD_LIB_API_VERSION,
+     /*
+      * Verify the version numbers before proceeding; we can't use
+      * CHECK_HANDLE because not all fields are set yet.
+      */
+     GENERIC_CHECK_HANDLE(handle, KADM5_OLD_LIB_API_VERSION,
 			  KADM5_NEW_LIB_API_VERSION);
-	
-	/*
-	 * Acquire relevant profile entries.  In version 2, merge values
-	 * in params_in with values from profile, based on
-	 * params_in->mask.
-	 *
-	 * In version 1, we've given a realm (which may be NULL) instead
-	 * of params_in.  So use that realm, make params_in contain an
-	 * empty mask, and behave like version 2.
-	 */
-	memset((char *) &params_local, 0, sizeof(params_local));
-	if (api_version == KADM5_API_VERSION_1) {
-		if (params_in)
-			params_local.mask = KADM5_CONFIG_REALM;
-		params_in = &params_local;
+     
+     /*
+      * Acquire relevant profile entries.  In version 2, merge values
+      * in params_in with values from profile, based on
+      * params_in->mask.
+      *
+      * In version 1, we've given a realm (which may be NULL) instead
+      * of params_in.  So use that realm, make params_in contain an
+      * empty mask, and behave like version 2.
+      */
+     memset((char *) &params_local, 0, sizeof(params_local));
+     if (api_version == KADM5_API_VERSION_1) {
+	  if (params_in)
+	       params_local.mask = KADM5_CONFIG_REALM;
+	  params_in = &params_local;
 	}
 
 #define ILLEGAL_PARAMS ( \
-	KADM5_CONFIG_ACL_FILE	| KADM5_CONFIG_ADB_LOCKFILE | \
-	KADM5_CONFIG_DBNAME	| KADM5_CONFIG_ADBNAME | \
-	KADM5_CONFIG_DICT_FILE	| KADM5_CONFIG_ADMIN_KEYTAB | \
-	KADM5_CONFIG_STASH_FILE | KADM5_CONFIG_MKEY_NAME | \
-	KADM5_CONFIG_ENCTYPE	| KADM5_CONFIG_MAX_LIFE	| \
-	KADM5_CONFIG_MAX_RLIFE	| KADM5_CONFIG_EXPIRATION | \
-	KADM5_CONFIG_FLAGS	| KADM5_CONFIG_ENCTYPES	| \
-	KADM5_CONFIG_MKEY_FROM_KBD)
+		KADM5_CONFIG_ACL_FILE	| KADM5_CONFIG_ADB_LOCKFILE | \
+		KADM5_CONFIG_DBNAME	| KADM5_CONFIG_ADBNAME | \
+		KADM5_CONFIG_DICT_FILE	| KADM5_CONFIG_ADMIN_KEYTAB | \
+			KADM5_CONFIG_STASH_FILE | KADM5_CONFIG_MKEY_NAME | \
+			KADM5_CONFIG_ENCTYPE	| KADM5_CONFIG_MAX_LIFE	| \
+			KADM5_CONFIG_MAX_RLIFE	| KADM5_CONFIG_EXPIRATION | \
+			KADM5_CONFIG_FLAGS	| KADM5_CONFIG_ENCTYPES	| \
+			KADM5_CONFIG_MKEY_FROM_KBD)
 
-	if (params_in && params_in->mask & ILLEGAL_PARAMS) {
+     if (params_in && params_in->mask & ILLEGAL_PARAMS) {
 		krb5_free_context(handle->context);
 		free(handle->lhandle);
-		free(handle);
+	  free(handle);
 		ADMIN_LOG(LOG_ERR, dgettext(TEXT_DOMAIN,
 			"bad client parameters, returning %d"),
 			KADM5_BAD_CLIENT_PARAMS);
-		return (KADM5_BAD_CLIENT_PARAMS);
-	}
+	  return KADM5_BAD_CLIENT_PARAMS;
+     }
 			
-	if ((code = kadm5_get_config_params(handle->context,
+     if ((code = kadm5_get_config_params(handle->context,
 					DEFAULT_PROFILE_PATH,
 					"KRB5_CONFIG",
 					params_in,
 					&handle->params))) {
-		krb5_free_context(handle->context);
-		free(handle->lhandle);
-		free(handle);
+	  krb5_free_context(handle->context);
+	  free(handle->lhandle);
+	  free(handle);
 		ADMIN_LOG(LOG_ERR, dgettext(TEXT_DOMAIN,
 			"failed to get config_params, return: %d\n"), code);
-		return(code);
-	}
+	  return(code);
+     }
 
 #define REQUIRED_PARAMS (KADM5_CONFIG_REALM | \
 			 KADM5_CONFIG_ADMIN_SERVER | \
 			 KADM5_CONFIG_KADMIND_PORT) 
 
-	if ((handle->params.mask & REQUIRED_PARAMS) != REQUIRED_PARAMS) {
+     if ((handle->params.mask & REQUIRED_PARAMS) != REQUIRED_PARAMS) {
 		(void) kadm5_free_config_params(handle->context,
 						&handle->params);
-		krb5_free_context(handle->context);
+	  krb5_free_context(handle->context);
 		free(handle->lhandle);
-		free(handle);
+	  free(handle);
 		ADMIN_LOGO(LOG_ERR, dgettext(TEXT_DOMAIN,
 			"missing config parameters\n"));
-		return (KADM5_MISSING_CONF_PARAMS);
-	}
+	  return KADM5_MISSING_KRB5_CONF_PARAMS;
+     }
 	
 	/*
 	 * Acquire a service ticket for service_name@realm in the name of
@@ -775,52 +780,61 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 	/* XXX temporarily fix a bug in krb5_cc_get_type */
 #undef krb5_cc_get_type
 #define krb5_cc_get_type(context, cache) ((cache)->ops->prefix)
-	
-	if (init_type == INIT_CREDS) {
-		ccache = ccache_in;
-		handle->cache_name = (char *)
-			malloc(strlen(krb5_cc_get_type(handle->context, ccache)) +
-		    	strlen(krb5_cc_get_name(handle->context, ccache)) + 2);
+     
 
-		if (handle->cache_name == NULL) {
-			code = ENOMEM;
-			goto error;
-		}
-		sprintf(handle->cache_name, "%s:%s",
-			krb5_cc_get_type(handle->context, ccache),
-			krb5_cc_get_name(handle->context, ccache));
-	} else {
-		handle->cache_name =
-			(char *) malloc(strlen(ADM_CCACHE)+strlen("FILE:")+1);
-		if (handle->cache_name == NULL) {
-			code = ENOMEM;
-			goto error;
-		}
-		sprintf(handle->cache_name, "FILE:%s", ADM_CCACHE);
-		mktemp(handle->cache_name + strlen("FILE:"));
-
-		if ((code = krb5_cc_resolve(handle->context,
-			handle->cache_name, &ccache))) 
-			goto error;
+     if (init_type == INIT_CREDS) {
+	  ccache = ccache_in;
+	  handle->cache_name = (char *)
+	       malloc(strlen(krb5_cc_get_type(handle->context, ccache)) +
+		      strlen(krb5_cc_get_name(handle->context, ccache)) + 2);
+	  if (handle->cache_name == NULL) {
+	       code = ENOMEM;
+	       goto error;
+	  }
+	  sprintf(handle->cache_name, "%s:%s",
+		  krb5_cc_get_type(handle->context, ccache),
+		  krb5_cc_get_name(handle->context, ccache));
+     } else {
+#if 0
+	  handle->cache_name =
+	       (char *) malloc(strlen(ADM_CCACHE)+strlen("FILE:")+1);
+	  if (handle->cache_name == NULL) {
+	       code = ENOMEM;
+	       goto error;
+	  }
+	  sprintf(handle->cache_name, "FILE:%s", ADM_CCACHE);
+	  mktemp(handle->cache_name + strlen("FILE:"));
+#endif
+	  {
+	      static int counter = 0;
+	      handle->cache_name = malloc(sizeof("MEMORY:kadm5_")
+					  + 3*sizeof(counter));
+	      sprintf(handle->cache_name, "MEMORY:kadm5_%u", counter++);
+	  }
+     
+	  if ((code = krb5_cc_resolve(handle->context, handle->cache_name,
+				      &ccache))) 
+	       goto error;
 	  
-		if ((code = krb5_cc_initialize (handle->context, ccache,
+	  if ((code = krb5_cc_initialize (handle->context, ccache,
 					  creds.client))) 
-			goto error;
+	       goto error;
 
-		handle->destroy_cache = 1;
-	}
-	handle->lhandle->cache_name = handle->cache_name;
+	  handle->destroy_cache = 1;
+     }
+     handle->lhandle->cache_name = handle->cache_name;
 	ADMIN_LOG(LOG_ERR, dgettext(TEXT_DOMAIN,
 		"cache created: %s\n"), handle->cache_name);
-	
-	if ((code = krb5_timeofday(handle->context, &now)))
-		goto error;
+     
+     if ((code = krb5_timeofday(handle->context, &now)))
+	  goto error;
 
-	/*
-	 * Get a ticket, use the method specified in init_type.
-	 */
-	creds.times.starttime = 0; /* start timer at KDC */
-	creds.times.endtime = 0; /* endtime will be limited by service */
+     /*
+      * Get a ticket, use the method specified in init_type.
+      */
+     
+     creds.times.starttime = 0; /* start timer at KDC */
+     creds.times.endtime = 0; /* endtime will be limited by service */
 
 	memset(&opt, 0, sizeof (opt));
 	krb5_get_init_creds_opt_init(&opt);
@@ -854,19 +868,16 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 					creds.times.starttime,
 					server, &opt);
 
-			if (pass)
-				krb5_kt_close(handle->context, kt);
-		}
-	}
+	       if (pass) krb5_kt_close(handle->context, kt);
+	  }
+     }
 
-	/* Improved error messages */
-	if (code == KRB5KRB_AP_ERR_BAD_INTEGRITY)
-		code = KADM5_BAD_PASSWORD;
+     /* Improved error messages */
+     if (code == KRB5KRB_AP_ERR_BAD_INTEGRITY) code = KADM5_BAD_PASSWORD;
+     if (code == KRB5KDC_ERR_S_PRINCIPAL_UNKNOWN)
+	  code = KADM5_SECURE_PRINC_MISSING;
 
-	if (code == KRB5KDC_ERR_S_PRINCIPAL_UNKNOWN)
-		code = KADM5_SECURE_PRINC_MISSING;
-
-	if (code != 0) {
+     if (code != 0) {
 		ADMIN_LOGO(LOG_ERR, dgettext(TEXT_DOMAIN,
 			"failed to obtain credentials cache\n"));
 		goto error;
@@ -882,8 +893,8 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 	ADMIN_LOGO(LOG_ERR, dgettext(TEXT_DOMAIN, "obtained credentials cache\n"));
 
 #ifdef ZEROPASSWD
-	if (pass != NULL)
-		memset(pass, 0, strlen(pass));
+     if (pass != NULL)
+	  memset(pass, 0, strlen(pass));
 #endif
 
 	if (init_type != INIT_PASS ||
@@ -903,19 +914,19 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 	goto cleanup;
 	
 error:
-	/*
-	* Note that it is illegal for this code to execute if "handle"
-	* has not been allocated and initialized.  I.e., don't use "goto
-	* error" before the block of code at the top of the function
-	* that allocates and initializes "handle".
-	*/
-	if (handle->cache_name)
+     /*
+      * Note that it is illegal for this code to execute if "handle"
+      * has not been allocated and initialized.  I.e., don't use "goto
+      * error" before the block of code at the top of the function
+      * that allocates and initializes "handle".
+      */
+     if (handle->cache_name)
 	 free(handle->cache_name);
-	if (handle->destroy_cache && ccache)
+     if (handle->destroy_cache && ccache)
 	 krb5_cc_destroy(handle->context, ccache);
-	if(handle->clnt && handle->clnt->cl_auth)
+     if(handle->clnt && handle->clnt->cl_auth)
 	  AUTH_DESTROY(handle->clnt->cl_auth);
-	if(handle->clnt)
+     if(handle->clnt)
 	  clnt_destroy(handle->clnt);
 	(void) kadm5_free_config_params(handle->context, &handle->params);
 
@@ -935,76 +946,91 @@ cleanup:
 	if (serverp && serverp != creds.server)
 		krb5_free_principal(handle->context, serverp);
 
-	krb5_free_cred_contents(handle->context, &creds);
+     krb5_free_cred_contents(handle->context, &creds);
 
 	/*
 	 * Dont clean up the handle if the code is OK (code==0)
 	 * because it is returned to the caller in the 'server_handle'
 	 * ptr.
 	 */
-	if (code) {
+     if (code) {
 		krb5_free_context(handle->context);
 		free(handle->lhandle);
 	  free(handle);
 	}
 
-	return (code);
+     return code;
 }
 
 kadm5_ret_t
 kadm5_destroy(void *server_handle)
 {
-	krb5_ccache	    ccache = NULL;
-	int		    code = KADM5_OK;
-	kadm5_server_handle_t	handle =
+     krb5_ccache	    ccache = NULL;
+     int		    code = KADM5_OK;
+     kadm5_server_handle_t	handle =
 	  (kadm5_server_handle_t) server_handle;
 	OM_uint32 min_stat;
 
-	CHECK_HANDLE(server_handle);
-
-	if (handle->destroy_cache && handle->cache_name) {
+     CHECK_HANDLE(server_handle);
+/* SUNW14resync:
+ * krb5_cc_resolve() will resolve a ccache with the same data that 
+ * handle->my_cred points to. If the ccache is a MEMORY ccache then 
+ * gss_release_cred() will free that data (it doesn't do this when ccache
+ * is a FILE ccache).
+ * if'ed out to avoid the double free. 
+ */
+#if 0
+     if (handle->destroy_cache && handle->cache_name) {
 	 if ((code = krb5_cc_resolve(handle->context,
 				     handle->cache_name, &ccache)) == 0) 
 	     code = krb5_cc_destroy (handle->context, ccache);
-	}
-	if (handle->cache_name)
+     }
+#endif
+     if (handle->cache_name)
 	 free(handle->cache_name);
-
-	if (handle->clnt && handle->clnt->cl_auth) {
+     if (handle->clnt && handle->clnt->cl_auth) {
 		/*
 		 * Since kadm5 doesn't use the default credentials we
 		 * must clean this up manually.
 		 */
 		if (handle->my_cred != GSS_C_NO_CREDENTIAL)
 			(void) gss_release_cred(&min_stat, &handle->my_cred);
-		AUTH_DESTROY(handle->clnt->cl_auth);
+	  AUTH_DESTROY(handle->clnt->cl_auth);
 	}
-	if (handle->clnt)
+     if (handle->clnt)
 	  clnt_destroy(handle->clnt);
-	if (handle->lhandle)
-	    free (handle->lhandle);
+     if (handle->lhandle)
+          free (handle->lhandle);
 
-	kadm5_free_config_params(handle->context, &handle->params);
-	krb5_free_context(handle->context);
+     kadm5_free_config_params(handle->context, &handle->params);
+     krb5_free_context(handle->context);
 
-	handle->magic_number = 0;
-	free(handle);
+     handle->magic_number = 0;
+     free(handle);
 
-	return (code);
+     return code;
+}
+/* not supported on client */
+kadm5_ret_t kadm5_lock(void *server_handle)
+{
+    return EINVAL;
 }
 
-/*ARGSUSED*/
-kadm5_ret_t
-kadm5_flush(void *server_handle)
+/* not supported on client */
+kadm5_ret_t kadm5_unlock(void *server_handle)
 {
-	return (KADM5_OK);
+    return EINVAL;
 }
 
-int
-_kadm5_check_handle(void *handle)
+kadm5_ret_t kadm5_flush(void *server_handle)
 {
-	CHECK_HANDLE(handle);
-	return (0);
+     return KADM5_OK;
+}
+
+int _kadm5_check_handle(void *handle)
+{
+     CHECK_HANDLE(handle);
+     return 0;
 }
 
 /*

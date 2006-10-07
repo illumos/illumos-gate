@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,7 +234,7 @@ kdb2_dbm_firstkey(db)
 	DBM *db;
 {
 	int status;
-	datum retdata, retkey;
+	datum retkey;
 
 #ifdef NEED_COPY
 	DBT k, r;
@@ -243,6 +243,8 @@ kdb2_dbm_firstkey(db)
 	retkey.dptr = k.data;
 	retkey.dsize = k.size;
 #else
+	datum retdata;
+
 	status = (db->seq)(db, (DBT *)&retkey, (DBT *)&retdata, R_FIRST);
 #endif
 	if (status)
@@ -260,7 +262,7 @@ kdb2_dbm_nextkey(db)
 	DBM *db;
 {
 	int status;
-	datum retdata, retkey;
+	datum retkey;
 
 #ifdef NEED_COPY
 	DBT k, r;
@@ -269,6 +271,8 @@ kdb2_dbm_nextkey(db)
 	retkey.dptr = k.data;
 	retkey.dsize = k.size;
 #else
+	datum retdata;
+
 	status = (db->seq)(db, (DBT *)&retkey, (DBT *)&retdata, R_NEXT);
 #endif
 	if (status)
