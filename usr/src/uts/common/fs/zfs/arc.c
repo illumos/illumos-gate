@@ -260,6 +260,7 @@ struct arc_buf_hdr {
 
 static arc_buf_t *arc_eviction_list;
 static kmutex_t arc_eviction_mtx;
+static arc_buf_hdr_t arc_eviction_hdr;
 static void arc_get_data_buf(arc_buf_t *buf);
 static void arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock);
 
@@ -728,19 +729,22 @@ arc_buf_clone(arc_buf_t *from)
 void
 arc_buf_add_ref(arc_buf_t *buf, void* tag)
 {
-	arc_buf_hdr_t *hdr = buf->b_hdr;
+	arc_buf_hdr_t *hdr;
 	kmutex_t *hash_lock;
 
 	/*
 	 * Check to see if this buffer is currently being evicted via
-	 * arc_do_user_evicts().  We can do this without holding any
-	 * locks because if we happen to obtain the header before its
-	 * cleared, we will find b_data is NULL later.
+	 * arc_do_user_evicts().
 	 */
-	if (hdr == NULL)
+	mutex_enter(&arc_eviction_mtx);
+	hdr = buf->b_hdr;
+	if (hdr == NULL) {
+		mutex_exit(&arc_eviction_mtx);
 		return;
-
+	}
 	hash_lock = HDR_LOCK(hdr);
+	mutex_exit(&arc_eviction_mtx);
+
 	mutex_enter(hash_lock);
 	if (buf->b_data == NULL) {
 		/*
@@ -822,6 +826,7 @@ arc_hdr_destroy(arc_buf_hdr_t *hdr)
 			ASSERT(buf->b_hdr != NULL);
 			arc_buf_destroy(hdr->b_buf, FALSE, FALSE);
 			hdr->b_buf = buf->b_next;
+			buf->b_hdr = &arc_eviction_hdr;
 			buf->b_next = arc_eviction_list;
 			arc_eviction_list = buf;
 			mutex_exit(&arc_eviction_mtx);
@@ -968,6 +973,7 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle)
 					mutex_enter(&arc_eviction_mtx);
 					arc_buf_destroy(buf, recycle, FALSE);
 					ab->b_buf = buf->b_next;
+					buf->b_hdr = &arc_eviction_hdr;
 					buf->b_next = arc_eviction_list;
 					arc_eviction_list = buf;
 					mutex_exit(&arc_eviction_mtx);
@@ -1989,19 +1995,23 @@ arc_set_callback(arc_buf_t *buf, arc_evict_func_t *func, void *private)
 int
 arc_buf_evict(arc_buf_t *buf)
 {
-	arc_buf_hdr_t *hdr = buf->b_hdr;
+	arc_buf_hdr_t *hdr;
 	kmutex_t *hash_lock;
 	arc_buf_t **bufp;
 
+	mutex_enter(&arc_eviction_mtx);
+	hdr = buf->b_hdr;
 	if (hdr == NULL) {
 		/*
 		 * We are in arc_do_user_evicts().
 		 */
 		ASSERT(buf->b_data == NULL);
+		mutex_exit(&arc_eviction_mtx);
 		return (0);
 	}
-
 	hash_lock = HDR_LOCK(hdr);
+	mutex_exit(&arc_eviction_mtx);
+
 	mutex_enter(hash_lock);
 
 	if (buf->b_data == NULL) {
@@ -2042,7 +2052,6 @@ arc_buf_evict(arc_buf_t *buf)
 	*bufp = buf->b_next;
 
 	ASSERT(buf->b_data != NULL);
-	buf->b_hdr = hdr;
 	arc_buf_destroy(buf, FALSE, FALSE);
 
 	if (hdr->b_datacnt == 0) {
@@ -2486,6 +2495,7 @@ arc_init(void)
 	arc_thread_exit = 0;
 	arc_eviction_list = NULL;
 	mutex_init(&arc_eviction_mtx, NULL, MUTEX_DEFAULT, NULL);
+	bzero(&arc_eviction_hdr, sizeof (arc_buf_hdr_t));
 
 	(void) thread_create(NULL, 0, arc_reclaim_thread, NULL, 0, &p0,
 	    TS_RUN, minclsyspri);
