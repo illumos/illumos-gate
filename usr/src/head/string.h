@@ -87,12 +87,12 @@ extern char *strtok_r(char *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
 	defined(__XOPEN_OR_POSIX)
 extern void *memccpy(void *_RESTRICT_KYWD, const void *_RESTRICT_KYWD,
 		int, size_t);
-extern int uucopy(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
-extern int uucopystr(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
 #endif
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+extern int uucopy(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
+extern int uucopystr(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
 extern char *strsignal(int);
 extern int ffs(int);
 extern int strcasecmp(const char *, const char *);
@@ -122,11 +122,11 @@ extern char *strtok_r();
 #if defined(__EXTENSIONS__) || !defined(_STRICT_STDC) || \
 	defined(__XOPEN_OR_POSIX)
 extern void *memccpy();
-extern int uucopy();
-extern int uucopystr();
 #endif
 
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
+extern int uucopy();
+extern int uucopystr();
 extern char *strsignal();
 extern int ffs();
 extern int strcasecmp();
