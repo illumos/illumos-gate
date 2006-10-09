@@ -149,6 +149,12 @@ static kmutex_t arc_reclaim_lock;
 static int arc_dead;
 
 /*
+ * These tunables are for performance analysis.
+ */
+uint64_t zfs_arc_max;
+uint64_t zfs_arc_min;
+
+/*
  * Note that buffers can be on one of 5 states:
  *	ARC_anon	- anonymous (discussed below)
  *	ARC_mru		- recently used, currently cached
@@ -2429,6 +2435,16 @@ arc_init(void)
 	else
 		arc.c_max = arc.c_min;
 	arc.c_max = MAX(arc.c * 6, arc.c_max);
+
+	/*
+	 * Allow the tunables to override our calculations if they are
+	 * reasonable (ie. over 64MB)
+	 */
+	if (zfs_arc_max > 64<<20 && zfs_arc_max < physmem * PAGESIZE)
+		arc.c_max = zfs_arc_max;
+	if (zfs_arc_min > 64<<20 && zfs_arc_min <= arc.c_max)
+		arc.c_min = zfs_arc_min;
+
 	arc.c = arc.c_max;
 	arc.p = (arc.c >> 1);
 

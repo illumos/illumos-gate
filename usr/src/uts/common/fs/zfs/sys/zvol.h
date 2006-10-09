@@ -35,15 +35,10 @@
 extern "C" {
 #endif
 
-typedef struct zvol_stats {
-	uint64_t	zv_volsize;
-	uint64_t	zv_volblocksize;
-} zvol_stats_t;
-
 #ifdef _KERNEL
 extern int zvol_check_volsize(uint64_t volsize, uint64_t blocksize);
 extern int zvol_check_volblocksize(uint64_t volblocksize);
-extern int zvol_get_stats(objset_t *os, zvol_stats_t *zvs);
+extern int zvol_get_stats(objset_t *os, nvlist_t *nv);
 extern void zvol_create_cb(objset_t *os, void *arg, dmu_tx_t *tx);
 extern int zvol_create_minor(const char *, dev_t);
 extern int zvol_remove_minor(const char *);

@@ -37,6 +37,13 @@
  * Virtual device vector for disks.
  */
 
+/*
+ * Tunable parameter for debugging or performance analysis.  Setting
+ * zfs_nocacheflush will cause corruption on power loss if a volatile
+ * out-of-order write cache is enabled.
+ */
+boolean_t zfs_nocacheflush = B_FALSE;
+
 extern ldi_ident_t zfs_li;
 
 typedef struct vdev_disk_buf {
@@ -254,6 +261,9 @@ vdev_disk_io_start(zio_t *zio)
 		switch (zio->io_cmd) {
 
 		case DKIOCFLUSHWRITECACHE:
+
+			if (zfs_nocacheflush)
+				break;
 
 			if (vd->vdev_nowritecache) {
 				zio->io_error = ENOTSUP;

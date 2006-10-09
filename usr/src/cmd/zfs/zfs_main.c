@@ -1977,7 +1977,7 @@ zfs_do_snapshot(int argc, char **argv)
 }
 
 /*
- * zfs send [-i <fs@snap>] <fs@snap>
+ * zfs send [-i <@snap>] <fs@snap>
  *
  * Send a backup stream to stdout.
  */
@@ -1985,14 +1985,16 @@ static int
 zfs_do_send(int argc, char **argv)
 {
 	char *fromname = NULL;
-	zfs_handle_t *zhp_from = NULL, *zhp_to;
+	char *cp;
+	zfs_handle_t *zhp;
 	int c, err;
-	char fullname[MAXPATHLEN];
 
 	/* check options */
 	while ((c = getopt(argc, argv, ":i:")) != -1) {
 		switch (c) {
 		case 'i':
+			if (fromname)
+				usage(B_FALSE);
 			fromname = optarg;
 			break;
 		case ':':
@@ -2022,44 +2024,36 @@ zfs_do_send(int argc, char **argv)
 
 	if (isatty(STDOUT_FILENO)) {
 		(void) fprintf(stderr,
-		    gettext("Error: Stream can not be written "
-			    "to a terminal.\n"
+		    gettext("Error: Stream can not be written to a terminal.\n"
 			    "You must redirect standard output.\n"));
 		return (1);
 	}
 
-	if ((zhp_to = zfs_open(g_zfs, argv[0], ZFS_TYPE_SNAPSHOT)) == NULL)
+	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_SNAPSHOT)) == NULL)
 		return (1);
 
-	if (fromname) {
-
-		/*
-		 * If fromname is an abbreviated snapshot name,
-		 * then reconstruct the name of the parent dataset
-		 */
-		if ((strchr(fromname, '@') == NULL) ||
-		    *fromname == '@') {
-			char *cp;
-			cp = strchr(argv[0], '@');
-			if (strchr(fromname, '@') == NULL)
-				*(++cp) = '\0';
-			else
-				*cp = '\0';
-			(void) strncpy(fullname, argv[0], sizeof (fullname));
-			(void) strlcat(fullname, fromname, sizeof (fullname));
-			fromname = fullname;
+	/*
+	 * If they specified the full path to the snapshot, chop off
+	 * everything except the short name of the snapshot.
+	 */
+	if (fromname && (cp = strchr(fromname, '@')) != NULL) {
+		if (cp != fromname &&
+		    strncmp(argv[0], fromname, cp - fromname + 1)) {
+			(void) fprintf(stderr,
+			    gettext("incremental source must be "
+			    "in same filesystem\n"));
+			usage(B_FALSE);
 		}
-
-		if ((zhp_from = zfs_open(g_zfs, fromname,
-		    ZFS_TYPE_SNAPSHOT)) == NULL)
-			return (1);
+		fromname = cp + 1;
+		if (strchr(fromname, '@') || strchr(fromname, '/')) {
+			(void) fprintf(stderr,
+			    gettext("invalid incremental source\n"));
+			usage(B_FALSE);
+		}
 	}
 
-	err = zfs_send(zhp_to, zhp_from);
-
-	if (zhp_from)
-		zfs_close(zhp_from);
-	zfs_close(zhp_to);
+	err = zfs_send(zhp, fromname);
+	zfs_close(zhp);
 
 	return (err != 0);
 }

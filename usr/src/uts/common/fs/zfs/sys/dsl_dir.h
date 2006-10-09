@@ -41,7 +41,7 @@ extern "C" {
 struct dsl_dataset;
 
 typedef struct dsl_dir_phys {
-	uint64_t dd_creation_time;
+	uint64_t dd_creation_time; /* not actually used */
 	uint64_t dd_head_dataset_obj;
 	uint64_t dd_parent_obj;
 	uint64_t dd_clone_parent_obj;
@@ -102,7 +102,9 @@ uint64_t dsl_dir_create_sync(dsl_dir_t *pds, const char *name, dmu_tx_t *tx);
 void dsl_dir_create_root(objset_t *mos, uint64_t *ddobjp, dmu_tx_t *tx);
 dsl_checkfunc_t dsl_dir_destroy_check;
 dsl_syncfunc_t dsl_dir_destroy_sync;
-void dsl_dir_stats(dsl_dir_t *dd, dmu_objset_stats_t *dds);
+void dsl_dir_stats(dsl_dir_t *dd, nvlist_t *nv);
+uint64_t dsl_dir_space_available(dsl_dir_t *dd,
+    dsl_dir_t *ancestor, int64_t delta, int ondiskonly);
 void dsl_dir_dirty(dsl_dir_t *dd, dmu_tx_t *tx);
 void dsl_dir_sync(dsl_dir_t *dd, dmu_tx_t *tx);
 int dsl_dir_tempreserve_space(dsl_dir_t *dd, uint64_t mem,

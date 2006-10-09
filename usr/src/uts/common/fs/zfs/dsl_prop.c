@@ -185,17 +185,6 @@ dsl_prop_get(const char *ddname, const char *propname,
 }
 
 /*
- * Return 0 on success, ENOENT if ddname is invalid, EOVERFLOW if
- * valuelen not big enough.
- */
-int
-dsl_prop_get_string(const char *ddname, const char *propname,
-    char *value, int valuelen, char *setpoint)
-{
-	return (dsl_prop_get(ddname, propname, 1, valuelen, value, setpoint));
-}
-
-/*
  * Get the current property value.  It may have changed by the time this
  * function returns, so it is NOT safe to follow up with
  * dsl_prop_register() and assume that the value has not changed in
@@ -208,13 +197,6 @@ dsl_prop_get_integer(const char *ddname, const char *propname,
     uint64_t *valuep, char *setpoint)
 {
 	return (dsl_prop_get(ddname, propname, 8, 1, valuep, setpoint));
-}
-
-int
-dsl_prop_get_ds_integer(dsl_dir_t *dd, const char *propname,
-    uint64_t *valuep, char *setpoint)
-{
-	return (dsl_prop_get_ds(dd, propname, 8, 1, valuep, setpoint));
 }
 
 /*
@@ -366,12 +348,26 @@ dsl_prop_set_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 int
+dsl_prop_set_dd(dsl_dir_t *dd, const char *propname,
+    int intsz, int numints, const void *buf)
+{
+	struct prop_set_arg psa;
+
+	psa.name = propname;
+	psa.intsz = intsz;
+	psa.numints = numints;
+	psa.buf = buf;
+
+	return (dsl_sync_task_do(dd->dd_pool,
+	    NULL, dsl_prop_set_sync, dd, &psa, 2));
+}
+
+int
 dsl_prop_set(const char *ddname, const char *propname,
     int intsz, int numints, const void *buf)
 {
 	dsl_dir_t *dd;
 	int err;
-	struct prop_set_arg psa;
 
 	/*
 	 * We must do these checks before we get to the syncfunc, since
@@ -385,16 +381,8 @@ dsl_prop_set(const char *ddname, const char *propname,
 	err = dsl_dir_open(ddname, FTAG, &dd, NULL);
 	if (err)
 		return (err);
-
-	psa.name = propname;
-	psa.intsz = intsz;
-	psa.numints = numints;
-	psa.buf = buf;
-	err = dsl_sync_task_do(dd->dd_pool,
-	    NULL, dsl_prop_set_sync, dd, &psa, 2);
-
+	err = dsl_prop_set_dd(dd, propname, intsz, numints, buf);
 	dsl_dir_close(dd, FTAG);
-
 	return (err);
 }
 
@@ -409,12 +397,6 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 	int err = 0;
 	dsl_pool_t *dp;
 	objset_t *mos;
-	zap_cursor_t zc;
-	zap_attribute_t za;
-	char setpoint[MAXNAMELEN];
-	char *tmp;
-	nvlist_t *propval;
-	zfs_prop_t prop;
 
 	if (dsl_dataset_is_snapshot(ds)) {
 		VERIFY(nvlist_alloc(nvp, NV_UNIQUE_NAME, KM_SLEEP) == 0);
@@ -428,11 +410,17 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 
 	rw_enter(&dp->dp_config_rwlock, RW_READER);
 	for (; dd != NULL; dd = dd->dd_parent) {
+		char setpoint[MAXNAMELEN];
+		zap_cursor_t zc;
+		zap_attribute_t za;
+
 		dsl_dir_name(dd, setpoint);
 
 		for (zap_cursor_init(&zc, mos, dd->dd_phys->dd_props_zapobj);
 		    (err = zap_cursor_retrieve(&zc, &za)) == 0;
 		    zap_cursor_advance(&zc)) {
+			nvlist_t *propval;
+			zfs_prop_t prop;
 			/*
 			 * Skip non-inheritable properties.
 			 */
@@ -451,7 +439,8 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 				/*
 				 * String property
 				 */
-				tmp = kmem_alloc(za.za_num_integers, KM_SLEEP);
+				char *tmp = kmem_alloc(za.za_num_integers,
+				    KM_SLEEP);
 				err = zap_lookup(mos,
 				    dd->dd_phys->dd_props_zapobj,
 				    za.za_name, 1, za.za_num_integers,
@@ -487,4 +476,26 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 	rw_exit(&dp->dp_config_rwlock);
 
 	return (err);
+}
+
+void
+dsl_prop_nvlist_add_uint64(nvlist_t *nv, zfs_prop_t prop, uint64_t value)
+{
+	nvlist_t *propval;
+
+	VERIFY(nvlist_alloc(&propval, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+	VERIFY(nvlist_add_uint64(propval, ZFS_PROP_VALUE, value) == 0);
+	VERIFY(nvlist_add_nvlist(nv, zfs_prop_to_name(prop), propval) == 0);
+	nvlist_free(propval);
+}
+
+void
+dsl_prop_nvlist_add_string(nvlist_t *nv, zfs_prop_t prop, const char *value)
+{
+	nvlist_t *propval;
+
+	VERIFY(nvlist_alloc(&propval, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+	VERIFY(nvlist_add_string(propval, ZFS_PROP_VALUE, value) == 0);
+	VERIFY(nvlist_add_nvlist(nv, zfs_prop_to_name(prop), propval) == 0);
+	nvlist_free(propval);
 }

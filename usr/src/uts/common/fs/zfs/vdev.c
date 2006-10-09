@@ -45,6 +45,15 @@
  * Virtual device management.
  */
 
+/*
+ * These tunables are for performance analysis, and override the
+ * (not-easily-turnable) vdev "knobs".
+ */
+int zfs_vdev_cache_max;
+int zfs_vdev_max_pending;
+int zfs_vdev_min_pending;
+int zfs_vdev_time_shift;
+
 static vdev_ops_t *vdev_ops_table[] = {
 	&vdev_root_ops,
 	&vdev_raidz_ops,
@@ -789,6 +798,15 @@ vdev_open(vdev_t *vd)
 		*valp = MAX(*valp, vk->vk_min);
 		*valp = MIN(*valp, vk->vk_max);
 	}
+
+	if (zfs_vdev_cache_max)
+		vd->vdev_cache.vc_max = zfs_vdev_cache_max;
+	if (zfs_vdev_max_pending)
+		vd->vdev_queue.vq_max_pending = zfs_vdev_max_pending;
+	if (zfs_vdev_min_pending)
+		vd->vdev_queue.vq_min_pending = zfs_vdev_min_pending;
+	if (zfs_vdev_time_shift)
+		vd->vdev_queue.vq_time_shift = zfs_vdev_time_shift;
 
 	if (vd->vdev_ops->vdev_op_leaf) {
 		vdev_cache_init(vd);

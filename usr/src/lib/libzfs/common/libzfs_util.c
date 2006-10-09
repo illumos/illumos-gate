@@ -502,7 +502,7 @@ int
 zcmd_alloc_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, size_t len)
 {
 	if (len == 0)
-		len = 1024;
+		len = 2048;
 	zc->zc_nvlist_dst_size = len;
 	if ((zc->zc_nvlist_dst = (uint64_t)(uintptr_t)
 	    zfs_alloc(hdl, zc->zc_nvlist_dst_size)) == NULL)
@@ -529,10 +529,7 @@ zcmd_expand_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc)
 }
 
 /*
- * Called to free the destination nvlist stored in the command structure.  This
- * is only needed if the caller must abort abnormally.  The various other
- * zcmd_*() routines will free it on failure (or on success, for
- * zcmd_read_nvlist).
+ * Called to free the src and dst nvlists stored in the command structure.
  */
 void
 zcmd_free_nvlists(zfs_cmd_t *zc)

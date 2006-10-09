@@ -789,7 +789,8 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 		 * matches the incremental source
 		 */
 		if (force) {
-			if (ds->ds_prev->ds_phys->ds_guid !=
+			if (ds->ds_prev == NULL ||
+			    ds->ds_prev->ds_phys->ds_guid !=
 			    drrb->drr_fromguid) {
 				dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
 				return (ENODEV);

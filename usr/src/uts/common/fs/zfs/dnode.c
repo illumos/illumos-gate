@@ -291,6 +291,17 @@ dnode_destroy(dnode_t *dn)
 {
 	objset_impl_t *os = dn->dn_objset;
 
+#ifdef ZFS_DEBUG
+	int i;
+
+	for (i = 0; i < TXG_SIZE; i++) {
+		ASSERT(!list_link_active(&dn->dn_dirty_link[i]));
+		ASSERT(NULL == list_head(&dn->dn_dirty_dbufs[i]));
+		ASSERT(0 == avl_numnodes(&dn->dn_ranges[i]));
+	}
+	ASSERT(NULL == list_head(&dn->dn_dbufs));
+#endif
+
 	mutex_enter(&os->os_lock);
 	list_remove(&os->os_dnodes, dn);
 	mutex_exit(&os->os_lock);
@@ -795,16 +806,6 @@ dnode_set_blksz(dnode_t *dn, uint64_t size, int ibs, dmu_tx_t *tx)
 fail:
 	rw_exit(&dn->dn_struct_rwlock);
 	return (ENOTSUP);
-}
-
-uint64_t
-dnode_max_nonzero_offset(dnode_t *dn)
-{
-	if (dn->dn_phys->dn_maxblkid == 0 &&
-	    BP_IS_HOLE(&dn->dn_phys->dn_blkptr[0]))
-		return (0);
-	else
-		return ((dn->dn_phys->dn_maxblkid+1) * dn->dn_datablksz);
 }
 
 void

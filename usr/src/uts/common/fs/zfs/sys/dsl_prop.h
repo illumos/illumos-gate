@@ -57,16 +57,18 @@ int dsl_prop_numcb(struct dsl_dataset *ds);
 
 int dsl_prop_get(const char *ddname, const char *propname,
     int intsz, int numints, void *buf, char *setpoint);
-int dsl_prop_get_string(const char *ddname, const char *propname,
-    char *value, int valuelen, char *setpoint);
 int dsl_prop_get_integer(const char *ddname, const char *propname,
-    uint64_t *valuep, char *setpoint);
-int dsl_prop_get_ds_integer(dsl_dir_t *dd, const char *propname,
     uint64_t *valuep, char *setpoint);
 int dsl_prop_get_all(objset_t *os, nvlist_t **nvp);
 
 int dsl_prop_set(const char *ddname, const char *propname,
     int intsz, int numints, const void *buf);
+int dsl_prop_set_dd(dsl_dir_t *dd, const char *propname,
+    int intsz, int numints, const void *buf);
+
+void dsl_prop_nvlist_add_uint64(nvlist_t *nv, zfs_prop_t prop, uint64_t value);
+void dsl_prop_nvlist_add_string(nvlist_t *nv,
+    zfs_prop_t prop, const char *value);
 
 #ifdef	__cplusplus
 }

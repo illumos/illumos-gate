@@ -807,12 +807,13 @@ static int
 zfs_statvfs(vfs_t *vfsp, struct statvfs64 *statp)
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
-	dmu_objset_stats_t dstats;
 	dev32_t d32;
+	uint64_t refdbytes, availbytes, usedobjs, availobjs;
 
 	ZFS_ENTER(zfsvfs);
 
-	dmu_objset_stats(zfsvfs->z_os, &dstats);
+	dmu_objset_space(zfsvfs->z_os,
+	    &refdbytes, &availbytes, &usedobjs, &availobjs);
 
 	/*
 	 * The underlying storage pool actually uses multiple block sizes.
@@ -828,9 +829,8 @@ zfs_statvfs(vfs_t *vfsp, struct statvfs64 *statp)
 	 * "fragment" size.
 	 */
 
-	statp->f_blocks =
-	    (dstats.dds_space_refd + dstats.dds_available) >> SPA_MINBLOCKSHIFT;
-	statp->f_bfree = dstats.dds_available >> SPA_MINBLOCKSHIFT;
+	statp->f_blocks = (refdbytes + availbytes) >> SPA_MINBLOCKSHIFT;
+	statp->f_bfree = availbytes >> SPA_MINBLOCKSHIFT;
 	statp->f_bavail = statp->f_bfree; /* no root reservation */
 
 	/*
@@ -841,9 +841,9 @@ zfs_statvfs(vfs_t *vfsp, struct statvfs64 *statp)
 	 * For f_ffree, report the smaller of the number of object available
 	 * and the number of blocks (each object will take at least a block).
 	 */
-	statp->f_ffree = MIN(dstats.dds_objects_avail, statp->f_bfree);
+	statp->f_ffree = MIN(availobjs, statp->f_bfree);
 	statp->f_favail = statp->f_ffree;	/* no "root reservation" */
-	statp->f_files = statp->f_ffree + dstats.dds_objects_used;
+	statp->f_files = statp->f_ffree + usedobjs;
 
 	(void) cmpldev(&d32, vfsp->vfs_dev);
 	statp->f_fsid = d32;

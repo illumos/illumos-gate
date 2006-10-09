@@ -257,8 +257,7 @@ get_stats(zfs_handle_t *zhp)
 		}
 	}
 
-	bcopy(&zc.zc_objset_stats, &zhp->zfs_dmustats,
-	    sizeof (zc.zc_objset_stats));
+	zhp->zfs_dmustats = zc.zc_objset_stats; /* structure assignment */
 
 	(void) strlcpy(zhp->zfs_root, zc.zc_value, sizeof (zhp->zfs_root));
 
@@ -273,8 +272,6 @@ get_stats(zfs_handle_t *zhp)
 	}
 
 	zcmd_free_nvlists(&zc);
-
-	zhp->zfs_volstats = zc.zc_vol_stats;
 
 	if (process_user_props(zhp) != 0)
 		return (-1);
@@ -333,7 +330,7 @@ top:
 
 		(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 
-		if (zhp->zfs_type == ZFS_TYPE_VOLUME) {
+		if (zhp->zfs_dmustats.dds_type == DMU_OST_ZVOL) {
 			(void) zvol_remove_link(hdl, zhp->zfs_name);
 			zc.zc_objset_type = DMU_OST_ZVOL;
 		} else {
@@ -358,6 +355,13 @@ top:
 	 * We've managed to open the dataset and gather statistics.  Determine
 	 * the high-level type.
 	 */
+	if (zhp->zfs_dmustats.dds_type == DMU_OST_ZVOL)
+		zhp->zfs_head_type = ZFS_TYPE_VOLUME;
+	else if (zhp->zfs_dmustats.dds_type == DMU_OST_ZFS)
+		zhp->zfs_head_type = ZFS_TYPE_FILESYSTEM;
+	else
+		abort();
+
 	if (zhp->zfs_dmustats.dds_is_snapshot)
 		zhp->zfs_type = ZFS_TYPE_SNAPSHOT;
 	else if (zhp->zfs_dmustats.dds_type == DMU_OST_ZVOL)
@@ -1235,10 +1239,11 @@ getprop_uint64(zfs_handle_t *zhp, zfs_prop_t prop, char **source)
 	nvlist_t *nv;
 	uint64_t value;
 
+	*source = NULL;
 	if (nvlist_lookup_nvlist(zhp->zfs_props,
 	    zfs_prop_to_name(prop), &nv) == 0) {
 		verify(nvlist_lookup_uint64(nv, ZFS_PROP_VALUE, &value) == 0);
-		verify(nvlist_lookup_string(nv, ZFS_PROP_SOURCE, source) == 0);
+		(void) nvlist_lookup_string(nv, ZFS_PROP_SOURCE, source);
 	} else {
 		value = zfs_prop_default_numeric(prop);
 		*source = "";
@@ -1253,10 +1258,11 @@ getprop_string(zfs_handle_t *zhp, zfs_prop_t prop, char **source)
 	nvlist_t *nv;
 	char *value;
 
+	*source = NULL;
 	if (nvlist_lookup_nvlist(zhp->zfs_props,
 	    zfs_prop_to_name(prop), &nv) == 0) {
 		verify(nvlist_lookup_string(nv, ZFS_PROP_VALUE, &value) == 0);
-		verify(nvlist_lookup_string(nv, ZFS_PROP_SOURCE, source) == 0);
+		(void) nvlist_lookup_string(nv, ZFS_PROP_SOURCE, source);
 	} else {
 		if ((value = (char *)zfs_prop_default_string(prop)) == NULL)
 			value = "";
@@ -1330,10 +1336,6 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 		}
 		break;
 
-	case ZFS_PROP_AVAILABLE:
-		*val = zhp->zfs_dmustats.dds_available;
-		break;
-
 	case ZFS_PROP_DEVICES:
 		*val = getprop_uint64(zhp, prop, source);
 
@@ -1365,6 +1367,14 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 	case ZFS_PROP_RECORDSIZE:
 	case ZFS_PROP_COMPRESSION:
 	case ZFS_PROP_ZONED:
+	case ZFS_PROP_CREATION:
+	case ZFS_PROP_COMPRESSRATIO:
+	case ZFS_PROP_REFERENCED:
+	case ZFS_PROP_USED:
+	case ZFS_PROP_CREATETXG:
+	case ZFS_PROP_AVAILABLE:
+	case ZFS_PROP_VOLSIZE:
+	case ZFS_PROP_VOLBLOCKSIZE:
 		*val = getprop_uint64(zhp, prop, source);
 		break;
 
@@ -1382,46 +1392,13 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 		}
 		break;
 
-	case ZFS_PROP_CREATION:
-		*val = zhp->zfs_dmustats.dds_creation_time;
-		break;
-
 	case ZFS_PROP_QUOTA:
-		if (zhp->zfs_dmustats.dds_quota == 0)
-			*source = "";	/* default */
-		else
-			*source = zhp->zfs_name;
-		*val = zhp->zfs_dmustats.dds_quota;
-		break;
-
 	case ZFS_PROP_RESERVATION:
-		if (zhp->zfs_dmustats.dds_reserved == 0)
+		*val = getprop_uint64(zhp, prop, source);
+		if (*val == 0)
 			*source = "";	/* default */
 		else
 			*source = zhp->zfs_name;
-		*val = zhp->zfs_dmustats.dds_reserved;
-		break;
-
-	case ZFS_PROP_COMPRESSRATIO:
-		/*
-		 * Using physical space and logical space, calculate the
-		 * compression ratio.  We return the number as a multiple of
-		 * 100, so '2.5x' would be returned as 250.
-		 */
-		if (zhp->zfs_dmustats.dds_compressed_bytes == 0)
-			*val = 100ULL;
-		else
-			*val =
-			    (zhp->zfs_dmustats.dds_uncompressed_bytes * 100 /
-			    zhp->zfs_dmustats.dds_compressed_bytes);
-		break;
-
-	case ZFS_PROP_REFERENCED:
-		/*
-		 * 'referenced' refers to the amount of physical space
-		 * referenced (possibly shared) by this object.
-		 */
-		*val = zhp->zfs_dmustats.dds_space_refd;
 		break;
 
 	case ZFS_PROP_SETUID:
@@ -1436,22 +1413,6 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 			if (src)
 				*src = ZFS_SRC_TEMPORARY;
 		}
-		break;
-
-	case ZFS_PROP_VOLSIZE:
-		*val = zhp->zfs_volstats.zv_volsize;
-		break;
-
-	case ZFS_PROP_VOLBLOCKSIZE:
-		*val = zhp->zfs_volstats.zv_volblocksize;
-		break;
-
-	case ZFS_PROP_USED:
-		*val = zhp->zfs_dmustats.dds_space_used;
-		break;
-
-	case ZFS_PROP_CREATETXG:
-		*val = zhp->zfs_dmustats.dds_creation_txg;
 		break;
 
 	case ZFS_PROP_MOUNTED:
@@ -1577,17 +1538,15 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		 * this into a string unless 'literal' is specified.
 		 */
 		{
-			time_t time = (time_t)
-			    zhp->zfs_dmustats.dds_creation_time;
+			val = getprop_uint64(zhp, prop, &source);
+			time_t time = (time_t)val;
 			struct tm t;
 
 			if (literal ||
 			    localtime_r(&time, &t) == NULL ||
 			    strftime(propbuf, proplen, "%a %b %e %k:%M %Y",
 			    &t) == 0)
-				(void) snprintf(propbuf, proplen, "%llu",
-				    (u_longlong_t)
-				    zhp->zfs_dmustats.dds_creation_time);
+				(void) snprintf(propbuf, proplen, "%llu", val);
 		}
 		break;
 
@@ -1637,7 +1596,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		break;
 
 	case ZFS_PROP_ORIGIN:
-		(void) strlcpy(propbuf, zhp->zfs_dmustats.dds_clone_of,
+		(void) strlcpy(propbuf, getprop_string(zhp, prop, &source),
 		    proplen);
 		/*
 		 * If there is no parent at all, return failure to indicate that
@@ -2561,27 +2520,23 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
  * Dumps a backup of tosnap, incremental from fromsnap if it isn't NULL.
  */
 int
-zfs_send(zfs_handle_t *zhp_to, zfs_handle_t *zhp_from)
+zfs_send(zfs_handle_t *zhp, const char *fromsnap)
 {
 	zfs_cmd_t zc = { 0 };
 	int ret;
 	char errbuf[1024];
-	libzfs_handle_t *hdl = zhp_to->zfs_hdl;
+	libzfs_handle_t *hdl = zhp->zfs_hdl;
 
 	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
-	    "cannot send '%s'"), zhp_to->zfs_name);
+	    "cannot send '%s'"), zhp->zfs_name);
 
 	/* do the ioctl() */
-	(void) strlcpy(zc.zc_name, zhp_to->zfs_name, sizeof (zc.zc_name));
-	if (zhp_from) {
-		(void) strlcpy(zc.zc_value, zhp_from->zfs_name,
-		    sizeof (zc.zc_name));
-	} else {
-		zc.zc_value[0] = '\0';
-	}
+	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
+	if (fromsnap)
+		(void) strlcpy(zc.zc_value, fromsnap, sizeof (zc.zc_name));
 	zc.zc_cookie = STDOUT_FILENO;
 
-	ret = ioctl(zhp_to->zfs_hdl->libzfs_fd, ZFS_IOC_SENDBACKUP, &zc);
+	ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_SENDBACKUP, &zc);
 	if (ret != 0) {
 		switch (errno) {
 
@@ -2613,6 +2568,73 @@ zfs_send(zfs_handle_t *zhp_to, zfs_handle_t *zhp_from)
 }
 
 /*
+ * Create ancestors of 'target', but not target itself, and not
+ * ancestors whose names are shorter than prefixlen.  Die if
+ * prefixlen-ancestor does not exist.
+ */
+static int
+create_parents(libzfs_handle_t *hdl, char *target, int prefixlen)
+{
+	zfs_handle_t *h;
+	char *cp;
+
+	/* make sure prefix exists */
+	cp = strchr(target + prefixlen, '/');
+	*cp = '\0';
+	h = zfs_open(hdl, target, ZFS_TYPE_FILESYSTEM);
+	*cp = '/';
+	if (h == NULL)
+		return (-1);
+	zfs_close(h);
+
+	/*
+	 * Attempt to create, mount, and share any ancestor filesystems,
+	 * up to the prefixlen-long one.
+	 */
+	for (cp = target + prefixlen + 1;
+	    cp = strchr(cp, '/'); *cp = '/', cp++) {
+		const char *opname;
+
+		*cp = '\0';
+
+		h = make_dataset_handle(hdl, target);
+		if (h) {
+			/* it already exists, nothing to do here */
+			zfs_close(h);
+			continue;
+		}
+
+		opname = dgettext(TEXT_DOMAIN, "create");
+		if (zfs_create(hdl, target, ZFS_TYPE_FILESYSTEM,
+		    NULL) != 0)
+			goto ancestorerr;
+
+		opname = dgettext(TEXT_DOMAIN, "open");
+		h = zfs_open(hdl, target, ZFS_TYPE_FILESYSTEM);
+		if (h == NULL)
+			goto ancestorerr;
+
+		opname = dgettext(TEXT_DOMAIN, "mount");
+		if (zfs_mount(h, NULL, 0) != 0)
+			goto ancestorerr;
+
+		opname = dgettext(TEXT_DOMAIN, "share");
+		if (zfs_share(h) != 0)
+			goto ancestorerr;
+
+		zfs_close(h);
+
+		continue;
+ancestorerr:
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "failed to %s ancestor '%s'"), opname, target);
+		return (-1);
+	}
+
+	return (0);
+}
+
+/*
  * Restores a backup of tosnap from stdin.
  */
 int
@@ -2621,23 +2643,18 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 {
 	zfs_cmd_t zc = { 0 };
 	time_t begin_time;
-	int ioctl_err, err, bytes, size;
+	int ioctl_err, err, bytes, size, choplen;
 	char *cp;
 	dmu_replay_record_t drr;
 	struct drr_begin *drrb = &zc.zc_begin_record;
 	char errbuf[1024];
 	prop_changelist_t *clp;
+	char chopprefix[ZFS_MAXNAMELEN];
 
 	begin_time = time(NULL);
 
 	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
 	    "cannot receive"));
-
-	/* trim off snapname, if any */
-	(void) strlcpy(zc.zc_name, tosnap, sizeof (zc.zc_name));
-	cp = strchr(zc.zc_name, '@');
-	if (cp)
-		*cp = '\0';
 
 	/* read in the BEGIN record */
 	cp = (char *)&drr;
@@ -2671,44 +2688,59 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 		return (zfs_error(hdl, EZFS_BADSTREAM, errbuf));
 	}
 
+	if (strchr(drr.drr_u.drr_begin.drr_toname, '@') == NULL) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "invalid "
+			    "stream (bad snapshot name)"));
+		return (zfs_error(hdl, EZFS_BADSTREAM, errbuf));
+	}
 	/*
-	 * Determine name of destination snapshot.
+	 * Determine how much of the snapshot name stored in the stream
+	 * we are going to tack on to the name they specified on the
+	 * command line, and how much we are going to chop off.
+	 *
+	 * If they specified a snapshot, chop the entire name stored in
+	 * the stream.
 	 */
-	(void) strlcpy(zc.zc_value, tosnap, sizeof (zc.zc_value));
+	(void) strcpy(chopprefix, drr.drr_u.drr_begin.drr_toname);
 	if (isprefix) {
-		if (strchr(tosnap, '@') != NULL) {
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "destination must be a filesystem"));
-			return (zfs_error(hdl, EZFS_BADTYPE, errbuf));
+		/*
+		 * They specified a fs with -d, we want to tack on
+		 * everything but the pool name stored in the stream
+		 */
+		if (strchr(tosnap, '@')) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "invalid "
+			    "argument - snapshot not allowed with -d"));
+			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 		}
-
-		cp = strchr(drr.drr_u.drr_begin.drr_toname, '/');
+		cp = strchr(chopprefix, '/');
 		if (cp == NULL)
-			cp = drr.drr_u.drr_begin.drr_toname;
-		else
-			cp++;
-
-		(void) strcat(zc.zc_value, "/");
-		(void) strcat(zc.zc_value, cp);
+			cp = strchr(chopprefix, '@');
+		*cp = '\0';
 	} else if (strchr(tosnap, '@') == NULL) {
 		/*
-		 * they specified just a filesystem; tack on the
-		 * snapname from the backup.
+		 * If they specified a filesystem without -d, we want to
+		 * tack on everything after the fs specified in the
+		 * first name from the stream.
 		 */
-		cp = strchr(drr.drr_u.drr_begin.drr_toname, '@');
-		if (cp == NULL || strlen(tosnap) + strlen(cp) >= MAXNAMELEN)
-			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
-		(void) strcat(zc.zc_value, cp);
-	}
-
-	if (drrb->drr_fromguid) {
-		zfs_handle_t *h;
-		/* incremental backup stream */
-
-		/* do the ioctl to the containing fs */
-		(void) strlcpy(zc.zc_name, zc.zc_value, sizeof (zc.zc_name));
-		cp = strchr(zc.zc_name, '@');
+		cp = strchr(chopprefix, '@');
 		*cp = '\0';
+	}
+	choplen = strlen(chopprefix);
+
+	/*
+	 * Determine name of destination snapshot, store in zc_value.
+	 */
+	(void) strcpy(zc.zc_value, tosnap);
+	(void) strncat(zc.zc_value, drr.drr_u.drr_begin.drr_toname+choplen,
+	    sizeof (zc.zc_value));
+
+	(void) strcpy(zc.zc_name, zc.zc_value);
+	if (drrb->drr_fromguid) {
+		/* incremental backup stream */
+		zfs_handle_t *h;
+
+		/* do the recvbackup ioctl to the containing fs */
+		*strchr(zc.zc_name, '@') = '\0';
 
 		/* make sure destination fs exists */
 		h = zfs_open(hdl, zc.zc_name,
@@ -2737,87 +2769,32 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 	} else {
 		/* full backup stream */
 
-		(void) strlcpy(zc.zc_name, zc.zc_value, sizeof (zc.zc_name));
-
-		/* make sure they aren't trying to receive into the root */
-		if (strchr(zc.zc_name, '/') == NULL) {
-			cp = strchr(zc.zc_name, '@');
-			if (cp)
-				*cp = '\0';
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "destination '%s' already exists"), zc.zc_name);
-			return (zfs_error(hdl, EZFS_EXISTS, errbuf));
-		}
-
-		if (isprefix) {
-			zfs_handle_t *h;
-
-			/* make sure prefix exists */
-			h = zfs_open(hdl, tosnap, ZFS_TYPE_FILESYSTEM);
-			if (h == NULL)
-				return (-1);
-			zfs_close(h);
-
-			/* create any necessary ancestors up to prefix */
-			zc.zc_objset_type = DMU_OST_ZFS;
-
-			/*
-			 * zc.zc_name is now the full name of the snap
-			 * we're restoring into.  Attempt to create,
-			 * mount, and share any ancestor filesystems, up
-			 * to the one that was named.
-			 */
-			for (cp = zc.zc_name + strlen(tosnap) + 1;
-			    cp = strchr(cp, '/'); *cp = '/', cp++) {
-				const char *opname;
-				*cp = '\0';
-
-				opname = dgettext(TEXT_DOMAIN, "create");
-				if (zfs_create(hdl, zc.zc_name,
-				    ZFS_TYPE_FILESYSTEM, NULL) != 0) {
-					if (errno == EEXIST)
-						continue;
-					goto ancestorerr;
-				}
-
-				opname = dgettext(TEXT_DOMAIN, "open");
-				h = zfs_open(hdl, zc.zc_name,
-				    ZFS_TYPE_FILESYSTEM);
-				if (h == NULL)
-					goto ancestorerr;
-
-				opname = dgettext(TEXT_DOMAIN, "mount");
-				if (zfs_mount(h, NULL, 0) != 0)
-					goto ancestorerr;
-
-				opname = dgettext(TEXT_DOMAIN, "share");
-				if (zfs_share(h) != 0)
-					goto ancestorerr;
-
-				zfs_close(h);
-
-				continue;
-ancestorerr:
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "failed to %s ancestor '%s'"), opname,
-				    zc.zc_name);
-				return (zfs_error(hdl, EZFS_BADRESTORE,
-				    errbuf));
-			}
-		}
-
 		/* Make sure destination fs does not exist */
-		cp = strchr(zc.zc_name, '@');
-		*cp = '\0';
+		*strchr(zc.zc_name, '@') = '\0';
 		if (ioctl(hdl->libzfs_fd, ZFS_IOC_OBJSET_STATS, &zc) == 0) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "destination '%s' exists"), zc.zc_name);
 			return (zfs_error(hdl, EZFS_EXISTS, errbuf));
 		}
 
+		if (strchr(zc.zc_name, '/') == NULL) {
+			/*
+			 * they're trying to do a recv into a
+			 * nonexistant topmost filesystem.
+			 */
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "destination does not exist"), zc.zc_name);
+			return (zfs_error(hdl, EZFS_EXISTS, errbuf));
+		}
+
 		/* Do the recvbackup ioctl to the fs's parent. */
-		cp = strrchr(zc.zc_name, '/');
-		*cp = '\0';
+		*strrchr(zc.zc_name, '/') = '\0';
+
+		if (isprefix && (err = create_parents(hdl,
+		    zc.zc_value, strlen(tosnap))) != 0) {
+			return (zfs_error(hdl, EZFS_BADRESTORE, errbuf));
+		}
+
 	}
 
 	zc.zc_cookie = STDIN_FILENO;

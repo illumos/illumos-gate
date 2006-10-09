@@ -659,10 +659,10 @@ abuf_find(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	GElf_Sym sym;
 	int i;
 	const char *syms[] = {
-		"ARC_mru_top",
-		"ARC_mru_bot",
-		"ARC_mfu_top",
-		"ARC_mfu_bot",
+		"ARC_mru",
+		"ARC_mru_ghost",
+		"ARC_mfu",
+		"ARC_mfu_ghost",
 	};
 
 	if (argc != 2)

@@ -56,6 +56,7 @@
 #include <sys/sdt.h>
 #include <sys/fs/zfs.h>
 #include <sys/zfs_ctldir.h>
+#include <sys/zvol.h>
 
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"
@@ -612,16 +613,16 @@ retry:
 		return (error);
 	}
 
-	dmu_objset_stats(os, &zc->zc_objset_stats);
+	dmu_objset_fast_stat(os, &zc->zc_objset_stats);
 
 	if (zc->zc_nvlist_dst != 0 &&
 	    (error = dsl_prop_get_all(os, &nv)) == 0) {
+		dmu_objset_stats(os, nv);
+		if (dmu_objset_type(os) == DMU_OST_ZVOL)
+			VERIFY(zvol_get_stats(os, nv) == 0);
 		error = put_nvlist(zc, nv);
 		nvlist_free(nv);
 	}
-
-	if (!error && zc->zc_objset_stats.dds_type == DMU_OST_ZVOL)
-		error = zvol_get_stats(os, &zc->zc_vol_stats);
 
 	spa_altroot(dmu_objset_spa(os), zc->zc_value, sizeof (zc->zc_value));
 
@@ -738,7 +739,6 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 	zfs_prop_t prop;
 	uint64_t intval;
 	char *strval;
-	const char *unused;
 
 	elem = NULL;
 	while ((elem = nvlist_next_nvpair(nvl, elem)) != NULL) {
@@ -839,6 +839,8 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 				    strval)) != 0)
 					return (error);
 			} else if (nvpair_type(elem) == DATA_TYPE_UINT64) {
+				const char *unused;
+
 				VERIFY(nvpair_value_uint64(elem, &intval) == 0);
 
 				switch (zfs_prop_get_type(prop)) {
@@ -1156,6 +1158,7 @@ zfs_ioc_recvbackup(zfs_cmd_t *zc)
 {
 	file_t *fp;
 	int error, fd;
+	offset_t new_off;
 
 	fd = zc->zc_cookie;
 	fp = getf(fd);
@@ -1164,6 +1167,11 @@ zfs_ioc_recvbackup(zfs_cmd_t *zc)
 	error = dmu_recvbackup(zc->zc_value, &zc->zc_begin_record,
 	    &zc->zc_cookie, (boolean_t)zc->zc_guid, fp->f_vnode,
 	    fp->f_offset);
+
+	new_off = fp->f_offset + zc->zc_cookie;
+	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &new_off) == 0)
+		fp->f_offset = new_off;
+
 	releasef(fd);
 	return (error);
 }
@@ -1182,7 +1190,15 @@ zfs_ioc_sendbackup(zfs_cmd_t *zc)
 		return (error);
 
 	if (zc->zc_value[0] != '\0') {
-		error = dmu_objset_open(zc->zc_value, DMU_OST_ANY,
+		char buf[MAXPATHLEN];
+		char *cp;
+
+		(void) strncpy(buf, zc->zc_name, sizeof (buf));
+		cp = strchr(buf, '@');
+		if (cp)
+			*(cp+1) = 0;
+		(void) strncat(buf, zc->zc_value, sizeof (buf));
+		error = dmu_objset_open(buf, DMU_OST_ANY,
 		    DS_MODE_STANDARD | DS_MODE_READONLY, &fromsnap);
 		if (error) {
 			dmu_objset_close(tosnap);

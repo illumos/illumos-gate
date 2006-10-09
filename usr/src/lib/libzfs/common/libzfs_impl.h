@@ -58,9 +58,9 @@ struct libzfs_handle {
 struct zfs_handle {
 	libzfs_handle_t *zfs_hdl;
 	char zfs_name[ZFS_MAXNAMELEN];
-	zfs_type_t zfs_type;
+	zfs_type_t zfs_type; /* type including snapshot */
+	zfs_type_t zfs_head_type; /* type excluding snapshot */
 	dmu_objset_stats_t zfs_dmustats;
-	zvol_stats_t zfs_volstats;
 	nvlist_t *zfs_props;
 	nvlist_t *zfs_user_props;
 	boolean_t zfs_mntcheck;
@@ -72,7 +72,7 @@ struct zfs_handle {
  * This is different from checking zfs_type, because it will also catch
  * snapshots of volumes.
  */
-#define	ZFS_IS_VOLUME(zhp) ((zhp)->zfs_volstats.zv_volblocksize != 0)
+#define	ZFS_IS_VOLUME(zhp) ((zhp)->zfs_head_type == ZFS_TYPE_VOLUME)
 
 struct zpool_handle {
 	libzfs_handle_t *zpool_hdl;

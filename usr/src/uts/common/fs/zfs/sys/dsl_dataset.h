@@ -151,8 +151,12 @@ int dsl_dataset_block_freeable(dsl_dataset_t *ds, uint64_t blk_birth);
 uint64_t dsl_dataset_prev_snap_txg(dsl_dataset_t *ds);
 
 void dsl_dataset_dirty(dsl_dataset_t *ds, dmu_tx_t *tx);
-void dsl_dataset_stats(dsl_dataset_t *os, dmu_objset_stats_t *dds);
-struct dsl_pool *dsl_dataset_pool(dsl_dataset_t *ds);
+void dsl_dataset_stats(dsl_dataset_t *os, nvlist_t *nv);
+void dsl_dataset_fast_stat(dsl_dataset_t *ds, dmu_objset_stats_t *stat);
+void dsl_dataset_space(dsl_dataset_t *ds,
+    uint64_t *refdbytesp, uint64_t *availbytesp,
+    uint64_t *usedobjsp, uint64_t *availobjsp);
+uint64_t dsl_dataset_fsid_guid(dsl_dataset_t *ds);
 
 void dsl_dataset_create_root(struct dsl_pool *dp, uint64_t *ddobjp,
     dmu_tx_t *tx);

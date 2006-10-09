@@ -97,7 +97,11 @@ int dmu_objset_create(const char *name, dmu_objset_type_t type,
 int dmu_objset_destroy(const char *name);
 int dmu_objset_rollback(const char *name);
 int dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive);
-void dmu_objset_stats(objset_t *os, dmu_objset_stats_t *dds);
+void dmu_objset_stats(objset_t *os, nvlist_t *nv);
+void dmu_objset_fast_stat(objset_t *os, dmu_objset_stats_t *stat);
+void dmu_objset_space(objset_t *os, uint64_t *refdbytesp, uint64_t *availbytesp,
+    uint64_t *usedobjsp, uint64_t *availobjsp);
+uint64_t dmu_objset_fsid_guid(objset_t *os);
 int dmu_objset_find(char *name, int func(char *, void *), void *arg,
     int flags);
 void dmu_objset_byteswap(void *buf, size_t size);

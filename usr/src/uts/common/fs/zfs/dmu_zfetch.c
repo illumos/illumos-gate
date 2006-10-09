@@ -37,6 +37,8 @@
  * until we can get this working the way we want it to.
  */
 
+int zfs_prefetch_disable;
+
 /* max # of streams per zfetch */
 uint32_t	zfetch_max_streams = 8;
 /* min time before stream reclaim */
@@ -578,10 +580,12 @@ dmu_zfetch(zfetch_t *zf, uint64_t offset, uint64_t size, int prefetched)
 	unsigned int	blkshft;
 	uint64_t	blksz;
 
-	/* files that aren't ln2 blocksz are only one block -- nothing to do */
-	if (!zf->zf_dnode->dn_datablkshift) {
+	if (zfs_prefetch_disable)
 		return;
-	}
+
+	/* files that aren't ln2 blocksz are only one block -- nothing to do */
+	if (!zf->zf_dnode->dn_datablkshift)
+		return;
 
 	/* convert offset and size, into blockid and nblocks */
 	blkshft = zf->zf_dnode->dn_datablkshift;

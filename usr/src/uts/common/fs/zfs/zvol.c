@@ -151,20 +151,25 @@ zvol_readonly_changed_cb(void *arg, uint64_t newval)
 }
 
 int
-zvol_get_stats(objset_t *os, zvol_stats_t *zvs)
+zvol_get_stats(objset_t *os, nvlist_t *nv)
 {
 	int error;
 	dmu_object_info_t doi;
+	uint64_t val;
 
-	error = zap_lookup(os, ZVOL_ZAP_OBJ, "size", 8, 1, &zvs->zv_volsize);
 
+	error = zap_lookup(os, ZVOL_ZAP_OBJ, "size", 8, 1, &val);
 	if (error)
 		return (error);
 
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_VOLSIZE, val);
+
 	error = dmu_object_info(os, ZVOL_OBJ, &doi);
 
-	if (error == 0)
-		zvs->zv_volblocksize = doi.doi_data_block_size;
+	if (error == 0) {
+		dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_VOLBLOCKSIZE,
+		    doi.doi_data_block_size);
+	}
 
 	return (error);
 }
@@ -786,7 +791,8 @@ zvol_strategy(buf_t *bp)
 		return (0);
 	}
 
-	if (zv->zv_readonly && !(bp->b_flags & B_READ)) {
+	if ((zv->zv_readonly || (zv->zv_mode & DS_MODE_READONLY)) &&
+	    !(bp->b_flags & B_READ)) {
 		bioerror(bp, EROFS);
 		biodone(bp);
 		return (0);

@@ -895,9 +895,8 @@ zio_write_compress(zio_t *zio)
 	if (bp->blk_birth == zio->io_txg && BP_GET_PSIZE(bp) == csize &&
 	    pass > zio_sync_pass.zp_rewrite) {
 		ASSERT(csize != 0);
-		ASSERT3U(BP_GET_COMPRESS(bp), ==, compress);
-		ASSERT3U(BP_GET_LSIZE(bp), ==, lsize);
-
+		BP_SET_LSIZE(bp, lsize);
+		BP_SET_COMPRESS(bp, compress);
 		zio->io_pipeline = ZIO_REWRITE_PIPELINE;
 	} else {
 		if (bp->blk_birth == zio->io_txg) {

@@ -38,8 +38,6 @@
 #include "zfs_namecheck.h"
 
 static uint64_t dsl_dir_estimated_space(dsl_dir_t *dd);
-static uint64_t dsl_dir_space_available(dsl_dir_t *dd,
-    dsl_dir_t *ancestor, int64_t delta, int ondiskonly);
 static void dsl_dir_set_reservation_sync(void *arg1, void *arg2, dmu_tx_t *tx);
 
 
@@ -493,32 +491,36 @@ dsl_dir_create_root(objset_t *mos, uint64_t *ddobjp, dmu_tx_t *tx)
 }
 
 void
-dsl_dir_stats(dsl_dir_t *dd, dmu_objset_stats_t *dds)
+dsl_dir_stats(dsl_dir_t *dd, nvlist_t *nv)
 {
-	bzero(dds, sizeof (dmu_objset_stats_t));
-
-	dds->dds_available = dsl_dir_space_available(dd, NULL, 0, TRUE);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_AVAILABLE,
+	    dsl_dir_space_available(dd, NULL, 0, TRUE));
 
 	mutex_enter(&dd->dd_lock);
-	dds->dds_space_used = dd->dd_used_bytes;
-	dds->dds_compressed_bytes = dd->dd_phys->dd_compressed_bytes;
-	dds->dds_uncompressed_bytes = dd->dd_phys->dd_uncompressed_bytes;
-	dds->dds_quota = dd->dd_phys->dd_quota;
-	dds->dds_reserved = dd->dd_phys->dd_reserved;
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_USED, dd->dd_used_bytes);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_QUOTA,
+	    dd->dd_phys->dd_quota);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_RESERVATION,
+	    dd->dd_phys->dd_reserved);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_COMPRESSRATIO,
+	    dd->dd_phys->dd_compressed_bytes == 0 ? 100 :
+	    (dd->dd_phys->dd_uncompressed_bytes * 100 /
+	    dd->dd_phys->dd_compressed_bytes));
 	mutex_exit(&dd->dd_lock);
-
-	dds->dds_creation_time = dd->dd_phys->dd_creation_time;
 
 	if (dd->dd_phys->dd_clone_parent_obj) {
 		dsl_dataset_t *ds;
+		char buf[MAXNAMELEN];
 
 		rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
 		VERIFY(0 == dsl_dataset_open_obj(dd->dd_pool,
 		    dd->dd_phys->dd_clone_parent_obj,
 		    NULL, DS_MODE_NONE, FTAG, &ds));
-		dsl_dataset_name(ds, dds->dds_clone_of);
+		dsl_dataset_name(ds, buf);
 		dsl_dataset_close(ds, DS_MODE_NONE, FTAG);
 		rw_exit(&dd->dd_pool->dp_config_rwlock);
+
+		dsl_prop_nvlist_add_string(nv, ZFS_PROP_ORIGIN, buf);
 	}
 }
 
@@ -584,7 +586,7 @@ dsl_dir_estimated_space(dsl_dir_t *dd)
  * to it?  If ondiskonly is set, we're only interested in what's
  * on-disk, not estimated pending changes.
  */
-static uint64_t
+uint64_t
 dsl_dir_space_available(dsl_dir_t *dd,
     dsl_dir_t *ancestor, int64_t delta, int ondiskonly)
 {

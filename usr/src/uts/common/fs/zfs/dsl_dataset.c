@@ -181,6 +181,8 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx)
 uint64_t
 dsl_dataset_prev_snap_txg(dsl_dataset_t *ds)
 {
+	uint64_t trysnap = 0;
+
 	if (ds == NULL)
 		return (0);
 	/*
@@ -193,7 +195,10 @@ dsl_dataset_prev_snap_txg(dsl_dataset_t *ds)
 	 * snapshot, because we could set the sync task in the quiescing
 	 * phase.  So this should only be used as a guess.
 	 */
-	return (MAX(ds->ds_phys->ds_prev_snap_txg, ds->ds_trysnap_txg));
+	if (ds->ds_trysnap_txg >
+	    spa_last_synced_txg(ds->ds_dir->dd_pool->dp_spa))
+		trysnap = ds->ds_trysnap_txg;
+	return (MAX(ds->ds_phys->ds_prev_snap_txg, trysnap));
 }
 
 int
@@ -858,7 +863,9 @@ dsl_dataset_dirty(dsl_dataset_t *ds, dmu_tx_t *tx)
 		return;
 
 	ASSERT(ds->ds_user_ptr != NULL);
-	ASSERT(ds->ds_phys->ds_next_snap_obj == 0);
+
+	if (ds->ds_phys->ds_next_snap_obj != 0)
+		panic("dirtying snapshot!");
 
 	dp = ds->ds_dir->dd_pool;
 
@@ -1410,45 +1417,70 @@ dsl_dataset_sync(dsl_dataset_t *ds, dmu_tx_t *tx)
 }
 
 void
-dsl_dataset_stats(dsl_dataset_t *ds, dmu_objset_stats_t *dds)
+dsl_dataset_stats(dsl_dataset_t *ds, nvlist_t *nv)
 {
-	/* fill in properties crap */
-	dsl_dir_stats(ds->ds_dir, dds);
+	dsl_dir_stats(ds->ds_dir, nv);
 
-	if (ds->ds_phys->ds_num_children != 0) {
-		dds->dds_is_snapshot = TRUE;
-		dds->dds_num_clones = ds->ds_phys->ds_num_children - 1;
-	}
-
-	dds->dds_inconsistent = ds->ds_phys->ds_flags & DS_FLAG_INCONSISTENT;
-	dds->dds_last_txg = ds->ds_phys->ds_bp.blk_birth;
-
-	dds->dds_objects_used = ds->ds_phys->ds_bp.blk_fill;
-	dds->dds_objects_avail = DN_MAX_OBJECT - dds->dds_objects_used;
-
-	/* We override the dataset's creation time... they should be the same */
-	dds->dds_creation_time = ds->ds_phys->ds_creation_time;
-	dds->dds_creation_txg = ds->ds_phys->ds_creation_txg;
-	dds->dds_space_refd = ds->ds_phys->ds_used_bytes;
-	dds->dds_fsid_guid = ds->ds_phys->ds_fsid_guid;
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_CREATION,
+	    ds->ds_phys->ds_creation_time);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_CREATETXG,
+	    ds->ds_phys->ds_creation_txg);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_REFERENCED,
+	    ds->ds_phys->ds_used_bytes);
 
 	if (ds->ds_phys->ds_next_snap_obj) {
 		/*
 		 * This is a snapshot; override the dd's space used with
-		 * our unique space
+		 * our unique space and compression ratio.
 		 */
-		dds->dds_space_used = ds->ds_phys->ds_unique_bytes;
-		dds->dds_compressed_bytes =
-		    ds->ds_phys->ds_compressed_bytes;
-		dds->dds_uncompressed_bytes =
-		    ds->ds_phys->ds_uncompressed_bytes;
+		dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_USED,
+		    ds->ds_phys->ds_unique_bytes);
+		dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_COMPRESSRATIO,
+		    ds->ds_phys->ds_compressed_bytes == 0 ? 100 :
+		    (ds->ds_phys->ds_uncompressed_bytes * 100 /
+		    ds->ds_phys->ds_compressed_bytes));
 	}
 }
 
-dsl_pool_t *
-dsl_dataset_pool(dsl_dataset_t *ds)
+void
+dsl_dataset_fast_stat(dsl_dataset_t *ds, dmu_objset_stats_t *stat)
 {
-	return (ds->ds_dir->dd_pool);
+	stat->dds_creation_txg = ds->ds_phys->ds_creation_txg;
+	stat->dds_inconsistent = ds->ds_phys->ds_flags & DS_FLAG_INCONSISTENT;
+	if (ds->ds_phys->ds_next_snap_obj) {
+		stat->dds_is_snapshot = B_TRUE;
+		stat->dds_num_clones = ds->ds_phys->ds_num_children - 1;
+	}
+
+	/* clone origin is really a dsl_dir thing... */
+	if (ds->ds_dir->dd_phys->dd_clone_parent_obj) {
+		dsl_dataset_t *ods;
+
+		rw_enter(&ds->ds_dir->dd_pool->dp_config_rwlock, RW_READER);
+		VERIFY(0 == dsl_dataset_open_obj(ds->ds_dir->dd_pool,
+		    ds->ds_dir->dd_phys->dd_clone_parent_obj,
+		    NULL, DS_MODE_NONE, FTAG, &ods));
+		dsl_dataset_name(ods, stat->dds_clone_of);
+		dsl_dataset_close(ods, DS_MODE_NONE, FTAG);
+		rw_exit(&ds->ds_dir->dd_pool->dp_config_rwlock);
+	}
+}
+
+uint64_t
+dsl_dataset_fsid_guid(dsl_dataset_t *ds)
+{
+	return (ds->ds_phys->ds_fsid_guid);
+}
+
+void
+dsl_dataset_space(dsl_dataset_t *ds,
+    uint64_t *refdbytesp, uint64_t *availbytesp,
+    uint64_t *usedobjsp, uint64_t *availobjsp)
+{
+	*refdbytesp = ds->ds_phys->ds_used_bytes;
+	*availbytesp = dsl_dir_space_available(ds->ds_dir, NULL, 0, TRUE);
+	*usedobjsp = ds->ds_phys->ds_bp.blk_fill;
+	*availobjsp = DN_MAX_OBJECT - *usedobjsp;
 }
 
 /* ARGSUSED */

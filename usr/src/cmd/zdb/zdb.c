@@ -1047,6 +1047,7 @@ dump_dir(objset_t *os)
 {
 	dmu_objset_stats_t dds;
 	uint64_t object, object_count;
+	uint64_t refdbytes, usedobjs, scratch;
 	char numbuf[8];
 	char blkbuf[BP_SPRINTF_LEN];
 	char osname[MAXNAMELEN];
@@ -1055,22 +1056,23 @@ dump_dir(objset_t *os)
 	int print_header = 1;
 	int i, error;
 
-	dmu_objset_stats(os, &dds);
+	dmu_objset_fast_stat(os, &dds);
 
 	if (dds.dds_type < DMU_OST_NUMTYPES)
 		type = objset_types[dds.dds_type];
 
 	if (dds.dds_type == DMU_OST_META) {
 		dds.dds_creation_txg = TXG_INITIAL;
-		dds.dds_last_txg = os->os->os_rootbp.blk_birth;
-		dds.dds_objects_used = os->os->os_rootbp.blk_fill;
-		dds.dds_space_refd =
+		usedobjs = os->os->os_rootbp.blk_fill;
+		refdbytes =
 		    os->os->os_spa->spa_dsl_pool->dp_mos_dir->dd_used_bytes;
+	} else {
+		dmu_objset_space(os, &refdbytes, &scratch, &usedobjs, &scratch);
 	}
 
-	ASSERT3U(dds.dds_objects_used, ==, os->os->os_rootbp.blk_fill);
+	ASSERT3U(usedobjs, ==, os->os->os_rootbp.blk_fill);
 
-	nicenum(dds.dds_space_refd, numbuf);
+	nicenum(refdbytes, numbuf);
 
 	if (verbosity >= 4) {
 		(void) strcpy(blkbuf, ", rootbp ");
@@ -1082,14 +1084,11 @@ dump_dir(objset_t *os)
 
 	dmu_objset_name(os, osname);
 
-	(void) printf("Dataset %s [%s], ID %llu, cr_txg %llu, last_txg %llu, "
+	(void) printf("Dataset %s [%s], ID %llu, cr_txg %llu, "
 	    "%s, %llu objects%s\n",
 	    osname, type, (u_longlong_t)dmu_objset_id(os),
 	    (u_longlong_t)dds.dds_creation_txg,
-	    (u_longlong_t)dds.dds_last_txg,
-	    numbuf,
-	    (u_longlong_t)dds.dds_objects_used,
-	    blkbuf);
+	    numbuf, (u_longlong_t)usedobjs, blkbuf);
 
 	dump_intent_log(dmu_objset_zil(os));
 
@@ -1117,7 +1116,7 @@ dump_dir(objset_t *os)
 		object_count++;
 	}
 
-	ASSERT3U(object_count, ==, dds.dds_objects_used);
+	ASSERT3U(object_count, ==, usedobjs);
 
 	(void) printf("\n");
 
