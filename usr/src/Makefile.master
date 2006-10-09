@@ -100,13 +100,18 @@ INTEL_BLD=      $(INTEL_BLD_1:i386=)
 STRIP_COMMENTS=	$(INTERNAL_RELEASE_BUILD)
 
 # set __GNUC= in the environment to build 32-bit with the gcc compiler.
-# The default is to use the Sun Studio 10 compiler for all processor types.
+# The default is to use the Sun Studio compiler for all processor types.
 __GNUC=		$(POUND_SIGN)
 
 # set __GNUC64= in the environment to build 64-bit with the gcc compiler.
-# The default is to use the Sun Studio 10 compiler by using the __GNUC
-# setting.
+# Inherit the __GNUC value by default, and if that is set to $(POUND_SIGN)
+# then this means use the Sun Studio compiler.
 __GNUC64=	$(__GNUC)
+
+# set __SSNEXT= in the enviroment to build with the 'next' release of
+# the Sun Studio compiler. This will cause command line options specific
+# to the 'next' version of the Sun Studio compiler to be used.
+__SSNEXT=	$(POUND_SIGN)
 
 # CLOSED is the root of the tree that contains source which isn't released
 # as open source
@@ -328,6 +333,7 @@ sparc_STAND_FLAGS=	-_gcc=-ffreestanding
 sparcv9_STAND_FLAGS=	-_gcc=-ffreestanding
 i386_STAND_FLAGS=	-_gcc=-ffreestanding
 amd64_STAND_FLAGS=	-Wu,-xmodel=kernel
+$(__SSNEXT)amd64_STAND_FLAGS=	-xmodel=kernel
 
 SAVEARGS=		-Wu,-save_args
 amd64_STAND_FLAGS	+= $(SAVEARGS)

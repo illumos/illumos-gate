@@ -225,6 +225,7 @@
  * -Wl,<arg>			pass-thru
  * -W{m,0,2,h,i,u>		error/ignore
  * -Wu,-xmodel=kernel		-ffreestanding -mcmodel=kernel -mno-red-zone
+ * -xmodel=kernel		-ffreestanding -mcmodel=kernel -mno-red-zone
  * -Wu,-save_args		-msave-args
  * -w				pass-thru
  * -Xa				-std=iso9899:199409 or -ansi
@@ -1178,6 +1179,18 @@ do_gcc(cw_ictx_t *ctx)
 					break;
 				error(arg);
 				break;
+#if defined(__x86)
+			case 'm':
+				if (strcmp(arg, "-xmodel=kernel") == 0) {
+					newae(ctx->i_ae, "-ffreestanding");
+					newae(ctx->i_ae, "-mno-red-zone");
+					model = "-mcmodel=kernel";
+					nolibc = 1;
+					break;
+				}
+				error(arg);
+				break;
+#endif	/* __x86 */
 			case 'M':
 				if (strcmp(arg, "-xM") == 0) {
 					newae(ctx->i_ae, "-M");
