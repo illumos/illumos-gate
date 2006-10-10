@@ -73,7 +73,7 @@ pwuid_compar(const void *n1, const void *n2) {
 
 static uint_t
 pwuid_gethash(nss_XbyY_key_t *key, int htsize) {
-	return (key->uid % htsize);
+	return ((uint_t)key->uid % htsize);
 }
 
 static void
