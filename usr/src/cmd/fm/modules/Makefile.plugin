@@ -80,7 +80,7 @@ LDFLAGS += $(ZTEXT) $(ZCOMBRELOC) $(ZIGNORE)
 $(PROG) := LDFLAGS += $(ZDEFS) -M$(APIMAP) -M$(FMRIMAP)
 $(PROG) := LDLIBS += -lnvpair -lc
 
-$(DMOD_PROG) := LDFLAGS += $(ZNODEFS)
+$(DMODPROG) := LDFLAGS += $(ZNODEFS)
 
 all: $(PROG) $(DMODPROG)
 
