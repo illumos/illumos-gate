@@ -33,13 +33,6 @@
 extern "C" {
 #endif
 
-#define	_XPG4_2
-#define	__EXTENSIONS__
-
-#ifndef	DEBUG
-#define	NDEBUG	1
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
