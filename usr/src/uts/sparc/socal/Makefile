@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,9 @@
 #
 # CDDL HEADER END
 #
-#
-# uts/sparc/socal/Makefile
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -39,8 +36,7 @@
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSCLOSED = ../..
-UTSBASE	  = ../../../../src/uts
+UTSBASE	  = ../..
 
 #
 #	Define the module and object file sets.
@@ -53,7 +49,7 @@ ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 #
 #	Include common rules.
 #
-include $(UTSCLOSED)/sparc/Makefile.sparc
+include $(UTSBASE)/sparc/Makefile.sparc
 
 #
 #	Define targets
@@ -91,7 +87,7 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSCLOSED)/sparc/Makefile.targ
+include $(UTSBASE)/sparc/Makefile.targ
 
 browser:	$(BINARY)
 
