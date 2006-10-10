@@ -1609,8 +1609,10 @@ ire_round_robin(irb_t *irb_ptr, zoneid_t zoneid, ire_ftable_args_t *margs)
 
 	rw_enter(&irb_ptr->irb_lock, RW_WRITER);
 	ire_origin = irb_ptr->irb_rr_origin;
-	if (ire_origin != NULL)
+	if (ire_origin != NULL) {
 		ire_origin = ire_origin->ire_next;
+		IRE_FIND_NEXT_ORIGIN(ire_origin);
+	}
 
 	if (ire_origin == NULL) {
 		/*
@@ -1618,10 +1620,14 @@ ire_round_robin(irb_t *irb_ptr, zoneid_t zoneid, ire_ftable_args_t *margs)
 		 * of list.
 		 */
 		ire_origin = irb_ptr->irb_ire;
+		IRE_FIND_NEXT_ORIGIN(ire_origin);
 	}
 	irb_ptr->irb_rr_origin = ire_origin;
 	IRB_REFHOLD_LOCKED(irb_ptr);
 	rw_exit(&irb_ptr->irb_lock);
+
+	DTRACE_PROBE2(ire__rr__origin, (irb_t *), irb_ptr,
+	    (ire_t *), ire_origin);
 
 	/*
 	 * Round-robin the routers list looking for a route that

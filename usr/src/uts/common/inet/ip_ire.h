@@ -151,6 +151,18 @@ extern "C" {
 	NCE_REFRELE(nce);			\
 }
 
+/*
+ * find the next ire_t entry in the ire_next chain starting at ire
+ * that is not CONDEMNED.  ire is set to NULL if we reach the end of the list.
+ * Caller must hold the ire_bucket lock.
+ */
+
+#define	IRE_FIND_NEXT_ORIGIN(ire) {					\
+	while ((ire) != NULL && ((ire)->ire_marks & IRE_MARK_CONDEMNED))\
+		(ire) = (ire)->ire_next;				\
+}
+
+
 /* Structure for ire_cache_count() */
 typedef struct {
 	int	icc_total;	/* Total number of IRE_CACHE */

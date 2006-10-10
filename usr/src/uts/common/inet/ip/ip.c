@@ -28446,7 +28446,7 @@ next_mp:
 		 * holds a ref on the ire until ARP is completed.
 		 */
 
-		ire_arpresolve(ire, ire->ire_ipif->ipif_ill);
+		ire_arpresolve(ire, ire_to_ill(ire));
 		return (LOOKUP_IN_PROGRESS);
 	default:
 		ASSERT(0);

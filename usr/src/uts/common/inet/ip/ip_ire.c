@@ -699,12 +699,19 @@ ip_ire_delete(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 					goto done;
 				}
 
+				DTRACE_PROBE1(ip__ire__del__origin,
+				    (ire_t *), gw_ire);
 
 				/* Skip past the potentially bad gateway */
 				if (ire->ire_gateway_addr ==
-				    gw_ire->ire_gateway_addr)
-					irb->irb_rr_origin = gw_ire->ire_next;
+				    gw_ire->ire_gateway_addr) {
+					ire_t *next = gw_ire->ire_next;
 
+					DTRACE_PROBE2(ip__ire__del,
+					    (ire_t *), gw_ire, (irb_t *), irb);
+					IRE_FIND_NEXT_ORIGIN(next);
+					irb->irb_rr_origin = next;
+				}
 				rw_exit(&irb->irb_lock);
 			}
 		}
