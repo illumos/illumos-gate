@@ -2324,6 +2324,7 @@ cpu_async_log_err(void *flt, errorq_elem_t *eqep)
 	ch_async_flt_t *ch_flt = (ch_async_flt_t *)flt;
 	struct async_flt *aflt = (struct async_flt *)flt;
 	uint64_t errors;
+	extern void memscrub_induced_error(void);
 
 	switch (ch_flt->flt_type) {
 	case CPU_INV_AFSR:
@@ -2385,7 +2386,12 @@ cpu_async_log_err(void *flt, errorq_elem_t *eqep)
 				    drv_usectohz((clock_t)cpu_ceen_delay_secs
 						 * MICROSEC));
 			    }
-			    return (0);
+				/*
+				 * Inform memscrubber - scrubbing induced
+				 * CE on a retired page.
+				 */
+				memscrub_induced_error();
+				return (0);
 			}
 		}
 
@@ -2444,6 +2450,11 @@ cpu_async_log_err(void *flt, errorq_elem_t *eqep)
 			if (page_retire_check(aflt->flt_addr, NULL) == 0) {
 				/* Zero the address to clear the error */
 				softcall(ecc_page_zero, (void *)aflt->flt_addr);
+				/*
+				 * Inform memscrubber - scrubbing induced
+				 * UE on a retired page.
+				 */
+				memscrub_induced_error();
 				return (0);
 			}
 		}

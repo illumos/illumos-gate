@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,6 +150,7 @@ typedef uint64_t ms_paddr_t;
 int memscrub_add_span(pfn_t pfn, pgcnt_t pages);
 int memscrub_delete_span(pfn_t pfn, pgcnt_t pages);
 int memscrub_init(void);
+void memscrub_induced_error(void);
 
 /*
  * Global Data:
@@ -240,6 +240,35 @@ static kmutex_t memscrub_lock;
  */
 static void memscrub_init_mem_config(void);
 static void memscrub_uninit_mem_config(void);
+
+/*
+ * Linked list of memscrub aware spans having retired pages.
+ * Currently enabled only on sun4u USIII-based platforms.
+ */
+typedef struct memscrub_page_retire_span {
+	ms_paddr_t				address;
+	struct memscrub_page_retire_span	*next;
+} memscrub_page_retire_span_t;
+
+static memscrub_page_retire_span_t *memscrub_page_retire_span_list = NULL;
+
+static void memscrub_page_retire_span_add(ms_paddr_t);
+static void memscrub_page_retire_span_delete(ms_paddr_t);
+static int memscrub_page_retire_span_search(ms_paddr_t);
+static void memscrub_page_retire_span_list_update(void);
+
+/*
+ * add_to_page_retire_list: Set by cpu_async_log_err() routine
+ * by calling memscrub_induced_error() when CE/UE occurs on a retired
+ * page due to memscrub reading.  Cleared by memscrub after updating
+ * global page retire span list.  Piggybacking on protection of
+ * memscrub_lock, which is held during set and clear.
+ * Note: When cpu_async_log_err() calls memscrub_induced_error(), it is running
+ * on softint context, which gets fired on a cpu memscrub thread currently
+ * running.  Memscrub thread has affinity set during memscrub_read(), hence
+ * migration to new cpu not expected.
+ */
+static int add_to_page_retire_list = 0;
 
 /*
  * Keep track of some interesting statistics
@@ -1013,6 +1042,8 @@ memscrub_scan(uint_t blks, ms_paddr_t src)
 	ms_paddr_t	pa;
 	caddr_t		va;
 	on_trap_data_t	otd;
+	int		scan_mmu_pagesize = 0;
+	int		retired_pages = 0;
 
 	extern void memscrub_read(caddr_t src, uint_t blks);
 
@@ -1020,6 +1051,17 @@ memscrub_scan(uint_t blks, ms_paddr_t src)
 
 	pgsread = 0;
 	pa = src;
+
+	if (memscrub_page_retire_span_list != NULL) {
+		if (memscrub_page_retire_span_search(src)) {
+			/* retired pages in current span */
+			scan_mmu_pagesize = 1;
+		}
+	}
+
+#ifdef MEMSCRUB_DEBUG
+	cmn_err(CE_NOTE, "scan_mmu_pagesize = %d\n" scan_mmu_pagesize);
+#endif /* MEMSCRUB_DEBUG */
 
 	while (blks != 0) {
 		/* Ensure the PA is properly aligned */
@@ -1080,7 +1122,7 @@ memscrub_scan(uint_t blks, ms_paddr_t src)
 		 * maintain a count of such faults caught.
 		 */
 
-		if (!on_trap(&otd, OT_DATA_EC)) {
+		if (!scan_mmu_pagesize && !on_trap(&otd, OT_DATA_EC)) {
 			memscrub_read(va, bpp);
 			/*
 			 * Check if CEs require logging
@@ -1100,12 +1142,22 @@ memscrub_scan(uint_t blks, ms_paddr_t src)
 			 * read at a larger page size.
 			 * This is to ensure we continue to
 			 * scan the rest of the span.
+			 * OR scanning MMU_PAGESIZE granularity to avoid
+			 * reading retired pages memory when scan_mmu_pagesize
+			 * is set.
 			 */
-			if (psz > MMU_PAGESIZE) {
+			if (psz > MMU_PAGESIZE || scan_mmu_pagesize) {
 			    caddr_t vaddr = va;
 			    ms_paddr_t paddr = pa;
 			    int tmp = 0;
 			    for (; tmp < bpp; tmp += MEMSCRUB_BPP) {
+				/* Don't scrub retired pages */
+				if (page_retire_check(paddr, NULL) == 0) {
+					vaddr += MMU_PAGESIZE;
+					paddr += MMU_PAGESIZE;
+					retired_pages++;
+					continue;
+				}
 				thread_affinity_set(curthread, CPU_CURRENT);
 				if (!on_trap(&otd, OT_DATA_EC)) {
 				    memscrub_read(vaddr, MEMSCRUB_BPP);
@@ -1128,9 +1180,147 @@ memscrub_scan(uint_t blks, ms_paddr_t src)
 		pa += psz;
 		pgsread++;
 	}
+
+	/*
+	 * If just finished scrubbing MMU_PAGESIZE at a time, but no retired
+	 * pages found so delete span from global list.
+	 */
+	if (scan_mmu_pagesize && retired_pages == 0)
+		memscrub_page_retire_span_delete(src);
+
+	/*
+	 * Encountered CE/UE on a retired page during memscrub read of current
+	 * span.  Adding span to global list to enable avoid reading further.
+	 */
+	if (add_to_page_retire_list) {
+		if (!memscrub_page_retire_span_search(src))
+			memscrub_page_retire_span_add(src);
+		add_to_page_retire_list = 0;
+	}
+
 	if (memscrub_verbose) {
 		cmn_err(CE_NOTE, "Memory scrubber read 0x%x pages starting "
 		    "at 0x%" PRIx64, pgsread, src);
+	}
+}
+
+/*
+ * Called by cpu_async_log_err() when memscrub read causes
+ * CE/UE on a retired page.
+ */
+void
+memscrub_induced_error(void)
+{
+	add_to_page_retire_list = 1;
+}
+
+
+/*
+ * Called by memscrub_scan().
+ * pa: physical address of span with CE/UE, add to global list.
+ */
+static void
+memscrub_page_retire_span_add(ms_paddr_t pa)
+{
+	memscrub_page_retire_span_t *new_span;
+
+	new_span = (memscrub_page_retire_span_t *)
+	    kmem_zalloc(sizeof (memscrub_page_retire_span_t), KM_NOSLEEP);
+
+	if (new_span == NULL) {
+#ifdef MEMSCRUB_DEBUG
+		cmn_err(CE_NOTE, "failed to allocate new span - span with"
+		    " retired page/s not tracked.\n");
+#endif /* MEMSCRUB_DEBUG */
+		return;
+	}
+
+	new_span->address = pa;
+	new_span->next = memscrub_page_retire_span_list;
+	memscrub_page_retire_span_list = new_span;
+}
+
+/*
+ * Called by memscrub_scan().
+ * pa: physical address of span to be removed from global list.
+ */
+static void
+memscrub_page_retire_span_delete(ms_paddr_t pa)
+{
+	memscrub_page_retire_span_t *prev_span, *next_span;
+
+	prev_span = memscrub_page_retire_span_list;
+	next_span = memscrub_page_retire_span_list->next;
+
+	if (pa == prev_span->address) {
+		memscrub_page_retire_span_list = next_span;
+		kmem_free(prev_span, sizeof (memscrub_page_retire_span_t));
+		return;
+	}
+
+	while (next_span) {
+		if (pa == next_span->address) {
+			prev_span->next = next_span->next;
+			kmem_free(next_span,
+			    sizeof (memscrub_page_retire_span_t));
+			return;
+		}
+		prev_span = next_span;
+		next_span = next_span->next;
+	}
+}
+
+/*
+ * Called by memscrub_scan().
+ * pa: physical address of span to be searched in global list.
+ */
+static int
+memscrub_page_retire_span_search(ms_paddr_t pa)
+{
+	memscrub_page_retire_span_t *next_span = memscrub_page_retire_span_list;
+
+	while (next_span) {
+		if (pa == next_span->address)
+			return (1);
+		next_span = next_span->next;
+	}
+	return (0);
+}
+
+/*
+ * Called from new_memscrub() as a result of memory delete.
+ * Using page_numtopp_nolock() to determine if we have valid PA.
+ */
+static void
+memscrub_page_retire_span_list_update(void)
+{
+	memscrub_page_retire_span_t *prev, *cur, *next;
+
+	if (memscrub_page_retire_span_list == NULL)
+		return;
+
+	prev = cur = memscrub_page_retire_span_list;
+	next = cur->next;
+
+	while (cur) {
+		if (page_numtopp_nolock(mmu_btop(cur->address)) == NULL) {
+			if (cur == memscrub_page_retire_span_list) {
+				memscrub_page_retire_span_list = next;
+				kmem_free(cur,
+				    sizeof (memscrub_page_retire_span_t));
+				prev = cur = memscrub_page_retire_span_list;
+			} else {
+				prev->next = cur->next;
+				kmem_free(cur,
+				    sizeof (memscrub_page_retire_span_t));
+				cur = next;
+			}
+		} else {
+			prev = cur;
+			cur = next;
+		}
+		if (cur != NULL)
+			next = cur->next;
 	}
 }
 
@@ -1141,7 +1331,7 @@ memscrub_scan(uint_t blks, ms_paddr_t src)
  */
 
 static int
-new_memscrub()
+new_memscrub(int update_page_retire_list)
 {
 	struct memlist *src, *list, *old_list;
 	uint_t npgs;
@@ -1172,6 +1362,10 @@ new_memscrub()
 	memscrub_phys_pages = npgs;
 	old_list = memscrub_memlist;
 	memscrub_memlist = list;
+
+	if (update_page_retire_list)
+		memscrub_page_retire_span_list_update();
+
 	mutex_exit(&memscrub_lock);
 
 	while (old_list) {
@@ -1181,6 +1375,7 @@ new_memscrub()
 		old_list = old_list->next;
 		kmem_free(el, sizeof (struct memlist));
 	}
+
 	return (0);
 }
 
@@ -1203,7 +1398,7 @@ memscrub_mem_config_post_add(
 	/*
 	 * "Don't care" if we are not scrubbing new memory.
 	 */
-	(void) new_memscrub();
+	(void) new_memscrub(0);		/* retain page retire list */
 
 	/* Restore the pause setting. */
 	atomic_add_32(&pause_memscrub, -1);
@@ -1239,7 +1434,7 @@ memscrub_mem_config_post_del(
 	/*
 	 * Must stop scrubbing deleted memory as it may be disconnected.
 	 */
-	if (new_memscrub()) {
+	if (new_memscrub(1)) {	/* update page retire list */
 		disable_memscrub = 1;
 	}
 
