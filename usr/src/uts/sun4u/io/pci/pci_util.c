@@ -159,8 +159,6 @@ pci_reloc_reg(dev_info_t *dip, dev_info_t *rdip, pci_t *pci_p,
 	int assign_len, assign_entries, i;
 	pci_regspec_t *assign_p;
 	register uint32_t phys_hi = rp->pci_phys_hi;
-	register uint32_t mask = PCI_REG_ADDR_M | PCI_CONF_ADDR_MASK;
-	register uint32_t phys_addr = phys_hi & mask;
 
 	DEBUG5(DBG_MAP | DBG_CONT, dip, "\tpci_reloc_reg fr: %x.%x.%x %x.%x\n",
 		rp->pci_phys_hi, rp->pci_phys_mid, rp->pci_phys_low,
@@ -182,8 +180,20 @@ pci_reloc_reg(dev_info_t *dip, dev_info_t *rdip, pci_t *pci_p,
 
 	assign_entries = assign_len / sizeof (pci_regspec_t);
 	for (i = 0; i < assign_entries; i++, assign_p++) {
-		if ((assign_p->pci_phys_hi & mask) == phys_addr) {
+		uint32_t space_type = phys_hi & PCI_REG_ADDR_M;
+		uint32_t assign_type = assign_p->pci_phys_hi & PCI_REG_ADDR_M;
+		uint32_t assign_addr = PCI_REG_BDFR_G(assign_p->pci_phys_hi);
+
+		if (PCI_REG_BDFR_G(phys_hi) != assign_addr)
+			continue;
+		if (space_type == assign_type) { /* exact match */
 			rp->pci_phys_low += assign_p->pci_phys_low;
+			break;
+		}
+		if (space_type == PCI_ADDR_MEM64 &&
+		    assign_type == PCI_ADDR_MEM32) {
+			rp->pci_phys_low += assign_p->pci_phys_low;
+			rp->pci_phys_hi ^= PCI_ADDR_MEM64 ^ PCI_ADDR_MEM32;
 			break;
 		}
 	}
