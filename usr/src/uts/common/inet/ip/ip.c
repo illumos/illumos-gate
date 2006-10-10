@@ -14972,8 +14972,8 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 			    CUR_OP, B_FALSE);
 			return;
 		case DL_ENABMULTI_REQ:
-			if (ill->ill_dlpi_multicast_state == IDMS_INPROGRESS)
-				ill->ill_dlpi_multicast_state = IDMS_OK;
+			if (ill->ill_dlpi_multicast_state == IDS_INPROGRESS)
+				ill->ill_dlpi_multicast_state = IDS_OK;
 			break;
 
 		}
@@ -15119,9 +15119,9 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		case DL_ENABMULTI_REQ:
 			ip1dbg(("DL_ERROR_ACK to enabmulti\n"));
 
-			if (ill->ill_dlpi_multicast_state == IDMS_INPROGRESS)
-				ill->ill_dlpi_multicast_state = IDMS_FAILED;
-			if (ill->ill_dlpi_multicast_state == IDMS_FAILED) {
+			if (ill->ill_dlpi_multicast_state == IDS_INPROGRESS)
+				ill->ill_dlpi_multicast_state = IDS_FAILED;
+			if (ill->ill_dlpi_multicast_state == IDS_FAILED) {
 				ipif_t *ipif;
 
 				log = B_FALSE;
@@ -15156,7 +15156,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			ip1dbg(("ip_rput_dlpi_writer: got DL_ERROR_ACK for "
 			    "DL_CAPABILITY/CONTROL REQ\n"));
 			ill_dlpi_done(ill, dlea->dl_error_primitive);
-			ill->ill_capab_state = IDMS_FAILED;
+			ill->ill_dlpi_capab_state = IDS_FAILED;
 			freemsg(mp);
 			return;
 		}
@@ -15203,10 +15203,10 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		 * Check if the ACK is due to renegotiation case since we
 		 * will need to send a new CAPABILITY_REQ later.
 		 */
-		if (ill->ill_capab_state == IDMS_RENEG) {
+		if (ill->ill_dlpi_capab_state == IDS_RENEG) {
 			/* This is the ack for a renogiation case */
 			reneg_flag = B_TRUE;
-			ill->ill_capab_state = IDMS_UNKNOWN;
+			ill->ill_dlpi_capab_state = IDS_UNKNOWN;
 		}
 		ill_capability_ack(ill, mp);
 		if (reneg_flag)
@@ -15622,12 +15622,12 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * port got added or went away.
 			 *
 			 * We reset the capabilities and set the
-			 * state to IDMS_RENG so that when the ack
+			 * state to IDS_RENG so that when the ack
 			 * comes back, we can start the
 			 * renegotiation process.
 			 */
 			ill_capability_reset(ill);
-			ill->ill_capab_state = IDMS_RENEG;
+			ill->ill_dlpi_capab_state = IDS_RENEG;
 			break;
 		default:
 			ip0dbg(("ip_rput_dlpi_writer: unknown notification "
@@ -15976,8 +15976,8 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * fastpath probing.
 			 */
 			mutex_enter(&ill->ill_lock);
-			if (ill->ill_dlpi_fastpath_state == IDMS_INPROGRESS) {
-				ill->ill_dlpi_fastpath_state = IDMS_FAILED;
+			if (ill->ill_dlpi_fastpath_state == IDS_INPROGRESS) {
+				ill->ill_dlpi_fastpath_state = IDS_FAILED;
 				mutex_exit(&ill->ill_lock);
 				ill_fastpath_nack(ill);
 				ip1dbg(("ip_rput: DLPI fastpath off on "

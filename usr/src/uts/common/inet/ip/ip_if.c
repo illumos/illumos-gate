@@ -1699,8 +1699,8 @@ ill_fastpath_ack(ill_t *ill, mblk_t *mp)
 	 * If this was the first attempt turn on the fastpath probing.
 	 */
 	mutex_enter(&ill->ill_lock);
-	if (ill->ill_dlpi_fastpath_state == IDMS_INPROGRESS)
-		ill->ill_dlpi_fastpath_state = IDMS_OK;
+	if (ill->ill_dlpi_fastpath_state == IDS_INPROGRESS)
+		ill->ill_dlpi_fastpath_state = IDS_OK;
 	mutex_exit(&ill->ill_lock);
 
 	/* Free the M_IOCACK mblk, hold on to the data */
@@ -1771,16 +1771,16 @@ ill_fastpath_probe(ill_t *ill, mblk_t *dlur_mp)
 
 	mutex_enter(&ill->ill_lock);
 	switch (ill->ill_dlpi_fastpath_state) {
-	case IDMS_FAILED:
+	case IDS_FAILED:
 		/*
 		 * Driver NAKed the first fastpath ioctl - assume it doesn't
 		 * support it.
 		 */
 		mutex_exit(&ill->ill_lock);
 		return (ENOTSUP);
-	case IDMS_UNKNOWN:
+	case IDS_UNKNOWN:
 		/* This is the first probe */
-		ill->ill_dlpi_fastpath_state = IDMS_INPROGRESS;
+		ill->ill_dlpi_fastpath_state = IDS_INPROGRESS;
 		break;
 	default:
 		break;
@@ -1810,11 +1810,11 @@ ill_capability_probe(ill_t *ill)
 	 * Do so only if negotiation is enabled, capabilities are unknown,
 	 * and a capability negotiation is not already in progress.
 	 */
-	if (ill->ill_capab_state != IDMS_UNKNOWN &&
-	    ill->ill_capab_state != IDMS_RENEG)
+	if (ill->ill_dlpi_capab_state != IDS_UNKNOWN &&
+	    ill->ill_dlpi_capab_state != IDS_RENEG)
 		return;
 
-	ill->ill_capab_state = IDMS_INPROGRESS;
+	ill->ill_dlpi_capab_state = IDS_INPROGRESS;
 	ip1dbg(("ill_capability_probe: starting capability negotiation\n"));
 	ill_capability_proto(ill, DL_CAPABILITY_REQ, NULL);
 }
@@ -1834,9 +1834,9 @@ ill_capability_reset(ill_t *ill)
 	 * also handle the case where the driver doesn't send us back
 	 * a DL_CAPABILITY_ACK in response, since the "probe" routine
 	 * requires the state to be in UNKNOWN anyway.  In any case, all
-	 * features are turned off until the state reaches IDMS_OK.
+	 * features are turned off until the state reaches IDS_OK.
 	 */
-	ill->ill_capab_state = IDMS_UNKNOWN;
+	ill->ill_dlpi_capab_state = IDS_UNKNOWN;
 
 	/*
 	 * Disable sub-capabilities and request a list of sub-capability
@@ -2634,7 +2634,7 @@ ill_capability_dispatch(ill_t *ill, mblk_t *mp, dl_capability_sub_t *subp,
 	 * instructed the driver to disable its advertised capabilities,
 	 * so there's no point in accepting any response at this moment.
 	 */
-	if (ill->ill_capab_state == IDMS_UNKNOWN)
+	if (ill->ill_dlpi_capab_state == IDS_UNKNOWN)
 		return;
 
 	/*
@@ -3445,8 +3445,8 @@ ill_capability_ack(ill_t *ill, mblk_t *mp)
 	dl_capability_ack_t *capp;
 	dl_capability_sub_t *subp, *endp;
 
-	if (ill->ill_capab_state == IDMS_INPROGRESS)
-		ill->ill_capab_state = IDMS_OK;
+	if (ill->ill_dlpi_capab_state == IDS_INPROGRESS)
+		ill->ill_dlpi_capab_state = IDS_OK;
 
 	capp = (dl_capability_ack_t *)mp->b_rptr;
 
@@ -17661,12 +17661,18 @@ ill_dl_down(ill_t *ill)
 {
 	/*
 	 * The ill is down; unbind but stay attached since we're still
-	 * associated with a PPA.
+	 * associated with a PPA. If we have negotiated DLPI capabilites
+	 * with the data link service provider (IDS_OK) then reset them.
+	 * The interval between unbinding and rebinding is potentially
+	 * unbounded hence we cannot assume things will be the same.
+	 * The DLPI capabilities will be probed again when the data link
+	 * is brought up.
 	 */
 	mblk_t	*mp = ill->ill_unbind_mp;
 
-	ill->ill_unbind_mp = NULL;
 	ip1dbg(("ill_dl_down(%s)\n", ill->ill_name));
+
+	ill->ill_unbind_mp = NULL;
 	if (mp != NULL) {
 		ip1dbg(("ill_dl_down: %s (%u) for %s\n",
 		    dlpi_prim_str(*(int *)mp->b_rptr), *(int *)mp->b_rptr,
@@ -17674,6 +17680,8 @@ ill_dl_down(ill_t *ill)
 		mutex_enter(&ill->ill_lock);
 		ill->ill_state_flags |= ILL_DL_UNBIND_IN_PROGRESS;
 		mutex_exit(&ill->ill_lock);
+		if (ill->ill_dlpi_capab_state == IDS_OK)
+			ill_capability_reset(ill);
 		ill_dlpi_send(ill, mp);
 	}
 

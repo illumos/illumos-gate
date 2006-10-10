@@ -1845,13 +1845,13 @@ typedef struct ill_s {
 	uint_t	ill_frag_free_num_pkts;	 /* num of fragmented packets to free */
 	clock_t	ill_last_frag_clean_time; /* time when frag's were pruned */
 	int	ill_type;		/* From <net/if_types.h> */
-	uint_t	ill_dlpi_multicast_state;	/* See below IDMS_* */
-	uint_t	ill_dlpi_fastpath_state;	/* See below IDMS_* */
+	uint_t	ill_dlpi_multicast_state;	/* See below IDS_* */
+	uint_t	ill_dlpi_fastpath_state;	/* See below IDS_* */
 
 	/*
 	 * Capabilities related fields.
 	 */
-	uint_t  ill_capab_state;	/* State of capability query, IDMS_* */
+	uint_t  ill_dlpi_capab_state;	/* State of capability query, IDS_* */
 	uint64_t ill_capabilities;	/* Enabled capabilities, ILL_CAPAB_* */
 	ill_mdt_capab_t	*ill_mdt_capab;	/* Multidata Transmit capabilities */
 	ill_ipsec_capab_t *ill_ipsec_capab_ah;	/* IPsec AH capabilities */
@@ -2135,12 +2135,13 @@ typedef struct ipmx_s {
  * State for detecting if a driver supports certain features.
  * Support for DL_ENABMULTI_REQ uses ill_dlpi_multicast_state.
  * Support for DLPI M_DATA fastpath uses ill_dlpi_fastpath_state.
+ * Support for DL_CAPABILITY_REQ uses ill_dlpi_capab_state.
  */
-#define	IDMS_UNKNOWN	0	/* No DL_ENABMULTI_REQ sent */
-#define	IDMS_INPROGRESS	1	/* Sent DL_ENABMULTI_REQ */
-#define	IDMS_OK		2	/* DL_ENABMULTI_REQ ok */
-#define	IDMS_FAILED	3	/* DL_ENABMULTI_REQ failed */
-#define	IDMS_RENEG	4	/* Driver asked for a renegotiation */
+#define	IDS_UNKNOWN	0	/* No DLPI request sent */
+#define	IDS_INPROGRESS	1	/* DLPI request sent */
+#define	IDS_OK		2	/* DLPI request completed successfully */
+#define	IDS_FAILED	3	/* DLPI request failed */
+#define	IDS_RENEG	4	/* Driver asked for a renegotiation */
 
 /* Named Dispatch Parameter Management Structure */
 typedef struct ipparam_s {

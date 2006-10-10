@@ -1376,8 +1376,8 @@ ip_wput_ctl(queue_t *q, mblk_t *mp_orig)
 	switch (((union DL_primitives *)mp->b_rptr)->dl_primitive) {
 	case DL_ENABMULTI_REQ:
 		/* Track the state if this is the first enabmulti */
-		if (ill->ill_dlpi_multicast_state == IDMS_UNKNOWN)
-			ill->ill_dlpi_multicast_state = IDMS_INPROGRESS;
+		if (ill->ill_dlpi_multicast_state == IDS_UNKNOWN)
+			ill->ill_dlpi_multicast_state = IDS_INPROGRESS;
 		ip1dbg(("ip_wput_ctl: ENABMULTI\n"));
 		break;
 	case DL_DISABMULTI_REQ:

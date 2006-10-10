@@ -202,7 +202,7 @@ soft_ring_stop_workers(soft_ring_t **ringp_set, int cnt)
 	int 		i;
 	soft_ring_t	*ringp;
 	timeout_id_t 	tid;
-	kt_did_t	t_did;
+	kt_did_t	t_did = 0;
 
 	for (i = 0; i < cnt; i++) {
 		ringp = ringp_set[i];

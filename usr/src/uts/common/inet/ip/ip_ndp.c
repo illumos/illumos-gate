@@ -1336,8 +1336,8 @@ ndp_mcastreq(ill_t *ill, const in6_addr_t *addr, uint32_t hw_addr_len,
 	switch (((union DL_primitives *)mp->b_rptr)->dl_primitive) {
 	case DL_ENABMULTI_REQ:
 		/* Track the state if this is the first enabmulti */
-		if (ill->ill_dlpi_multicast_state == IDMS_UNKNOWN)
-			ill->ill_dlpi_multicast_state = IDMS_INPROGRESS;
+		if (ill->ill_dlpi_multicast_state == IDS_UNKNOWN)
+			ill->ill_dlpi_multicast_state = IDS_INPROGRESS;
 		ip1dbg(("ndp_mcastreq: ENABMULTI\n"));
 		break;
 	case DL_DISABMULTI_REQ:
