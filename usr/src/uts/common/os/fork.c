@@ -887,6 +887,12 @@ getproc(proc_t **cpp, int kernel)
 	mutex_init(&cp->p_maplock, NULL, MUTEX_DEFAULT, NULL);
 	cp->p_stat = SIDL;
 	cp->p_mstart = gethrtime();
+	/*
+	 * p_zone must be set before we call pid_allocate since the process
+	 * will be visible after that and code such as prfind_zone will
+	 * look at the p_zone field.
+	 */
+	cp->p_zone = pp->p_zone;
 
 	if ((newpid = pid_allocate(cp, PID_ALLOC_PROC)) == -1) {
 		if (nproc == v.v_proc) {
@@ -935,7 +941,6 @@ getproc(proc_t **cpp, int kernel)
 	sess_hold(pp);
 	cp->p_exec = pp->p_exec;
 	cp->p_execdir = pp->p_execdir;
-	cp->p_zone = pp->p_zone;
 	cp->p_brand = pp->p_brand;
 	if (PROC_IS_BRANDED(pp))
 		BROP(pp)->b_copy_procdata(cp, pp);
