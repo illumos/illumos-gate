@@ -3245,6 +3245,7 @@ dca_init(const char *name, struct dca_off *dcp)
 
 
 #define	DAEMON_STARTUP_TIME	1 /* 1 second. This may need to be adjusted */
+#define	DEVNAME_CHECK_FILE	"/etc/devname_check_RDONLY"
 
 static void
 daemon_call(const char *root, struct dca_off *dcp)
@@ -3253,15 +3254,27 @@ daemon_call(const char *root, struct dca_off *dcp)
 	int		fd, door_error;
 	sigset_t	oset, nset;
 	char		synch_door[PATH_MAX];
-	struct statvfs	svf;
+	struct stat	sb;
 	char		*prefix;
+	int		rofd;
 
 	/*
-	 * If readonly root, assume we are in install
+	 * If /etc/dev missing and readonly root, assume we are in install.
+	 * Don't use statvfs() since it doesn't always report the truth.
 	 */
-	prefix =
-	    (statvfs("/etc/dev", &svf) == 0 && (svf.f_flag & ST_RDONLY)) ?
-		"/tmp" : (char *)root;
+	rofd = -1;
+	if (stat("/etc/dev", &sb) == -1 &&
+	    (rofd = open(DEVNAME_CHECK_FILE,
+	    O_WRONLY|O_CREAT|O_TRUNC, 0644)) == -1 && errno == EROFS)
+		prefix = "/tmp";
+	else {
+		if (rofd != -1) {
+			(void) close(rofd);
+			(void) unlink(DEVNAME_CHECK_FILE);
+		}
+		prefix = (char *)root;
+	}
+
 	(void) snprintf(synch_door, sizeof (synch_door),
 	    "%s/etc/dev/%s", prefix, DEVFSADM_SYNCH_DOOR);
 
