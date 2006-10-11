@@ -775,6 +775,7 @@ static void	tcp_close_output(void *arg, mblk_t *mp, void *arg2);
 void		tcp_output(void *arg, mblk_t *mp, void *arg2);
 static void	tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2);
 static void	tcp_timer_handler(void *arg, mblk_t *mp, void *arg2);
+static void	tcp_linger_interrupted(void *arg, mblk_t *mp, void *arg2);
 
 
 /* Prototype for TCP functions */
@@ -3945,6 +3946,8 @@ tcp_close(queue_t *q, int flags)
 	tcp_t		*tcp = connp->conn_tcp;
 	mblk_t 		*mp = &tcp->tcp_closemp;
 	boolean_t	conn_ioctl_cleanup_reqd = B_FALSE;
+	boolean_t	linger_interrupted = B_FALSE;
+	mblk_t		*bp;
 
 	ASSERT(WR(q)->q_next == NULL);
 	ASSERT(connp->conn_ref >= 2);
@@ -3970,10 +3973,31 @@ tcp_close(queue_t *q, int flags)
 	    tcp_close_output, connp, SQTAG_IP_TCP_CLOSE);
 
 	mutex_enter(&tcp->tcp_closelock);
-
-	while (!tcp->tcp_closed)
-		cv_wait(&tcp->tcp_closecv, &tcp->tcp_closelock);
+	while (!tcp->tcp_closed) {
+		if (!cv_wait_sig(&tcp->tcp_closecv, &tcp->tcp_closelock)) {
+			/*
+			 * We got interrupted. Check if we are lingering,
+			 * if yes, post a message to stop and wait until
+			 * tcp_closed is set. If we aren't lingering,
+			 * just go back around.
+			 */
+			if (tcp->tcp_linger &&
+			    tcp->tcp_lingertime > 0 &&
+			    !linger_interrupted) {
+				mutex_exit(&tcp->tcp_closelock);
+				/* Entering squeue, bump ref count. */
+				CONN_INC_REF(connp);
+				bp = allocb_wait(0, BPRI_HI, STR_NOSIG, NULL);
+				squeue_enter(connp->conn_sqp, bp,
+				    tcp_linger_interrupted, connp,
+				    SQTAG_IP_TCP_CLOSE);
+				linger_interrupted = B_TRUE;
+				mutex_enter(&tcp->tcp_closelock);
+			}
+		}
+	}
 	mutex_exit(&tcp->tcp_closelock);
+
 	/*
 	 * In the case of listener streams that have eagers in the q or q0
 	 * we wait for the eagers to drop their reference to us. tcp_rq and
@@ -4032,6 +4056,25 @@ tcpclose_accept(queue_t *q)
 	return (0);
 }
 
+/*
+ * Called by tcp_close() routine via squeue when lingering is
+ * interrupted by a signal.
+ */
+
+/* ARGSUSED */
+static void
+tcp_linger_interrupted(void *arg, mblk_t *mp, void *arg2)
+{
+	conn_t	*connp = (conn_t *)arg;
+	tcp_t	*tcp = connp->conn_tcp;
+
+	freeb(mp);
+	if (tcp->tcp_linger_tid != 0 &&
+	    TCP_TIMER_CANCEL(tcp, tcp->tcp_linger_tid) >= 0) {
+		tcp_stop_lingering(tcp);
+		tcp->tcp_client_errno = EINTR;
+	}
+}
 
 /*
  * Called by streams close routine via squeues when our client blows off her
