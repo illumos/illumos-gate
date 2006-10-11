@@ -31,6 +31,8 @@
 
 #include "meta_set_prv.h"
 #include <sys/lvm/md_crc.h>
+#include <strings.h>
+#include <sys/bitmap.h>
 
 extern	char	*blkname(char *);
 
@@ -517,6 +519,9 @@ meta_set_take(
 	int			unrslv_replicated = 0;
 	mddrivenamelist_t	*dnlp = NULL;
 	int			retake_flag = 0;
+	unsigned long 		node_active[BT_BITOUL(MD_MAXSIDES)];
+
+	bzero(node_active, sizeof (unsigned long) * BT_BITOUL(MD_MAXSIDES));
 
 	if ((flags & TAKE_USETAG) || (flags & TAKE_USEIT)) {
 		if (flags & TAKE_USETAG) {
@@ -1004,9 +1009,17 @@ meta_set_take(
 				continue;
 
 			if (clnt_lock_set(sd->sd_nodes[i], sp, ep)) {
+				/*
+				 * Ignore any RPC errors on a force
+				 * take. The set will have been taken
+				 * above and we still need to continue.
+				 */
+				if (flags & TAKE_FORCE)
+					continue;
 				rval = -1;
 				goto out;
 			}
+			BT_SET(node_active, i);
 		}
 		rb_level = 4;	/* level 4 */
 
@@ -1015,6 +1028,14 @@ meta_set_take(
 			for (i = 0; i < MD_MAXSIDES; i++) {
 				/* Skip empty slots */
 				if (sd->sd_nodes[i][0] == '\0')
+					continue;
+
+				/*
+				 * Only update those nodes that
+				 * are active (ie those that the
+				 * set is locked on).
+				 */
+				if (!BT_TEST(node_active, i))
 					continue;
 
 				if (clnt_upd_sr_flags(sd->sd_nodes[i],
@@ -1030,6 +1051,10 @@ meta_set_take(
 
 			/* Unlocked of this side is done later */
 			if (strcmp(mynode(), sd->sd_nodes[i]) == 0)
+				continue;
+
+			/* no point calling dead nodes */
+			if (!BT_TEST(node_active, i))
 				continue;
 
 			if (clnt_unlock_set(sd->sd_nodes[i], cl_sk, &xep)) {
@@ -1102,6 +1127,10 @@ out:
 			if (strcmp(mynode(), sd->sd_nodes[i]) == 0)
 				continue;
 
+			/* no point calling dead nodes */
+			if (!BT_TEST(node_active, i))
+				continue;
+
 			if (clnt_unlock_set(sd->sd_nodes[i], cl_sk, &xep)) {
 				if (rval == 0)
 					(void) mdstealerror(ep, &xep);
@@ -1131,6 +1160,10 @@ rollback:
 				if (sd->sd_nodes[i][0] == '\0')
 					continue;
 
+				/* no point calling dead nodes */
+				if (!BT_TEST(node_active, i))
+					continue;
+
 				if (clnt_upd_sr_flags(sd->sd_nodes[i], sp,
 				    (sd->sd_flags & ~MD_SR_MB_DEVID), &xep))
 					mdclrerror(&xep);
@@ -1145,6 +1178,10 @@ rollback:
 
 			/* We will unlocked this side below */
 			if (strcmp(mynode(), sd->sd_nodes[i]) == 0)
+				continue;
+
+			/* no point calling dead nodes */
+			if (!BT_TEST(node_active, i))
 				continue;
 
 			if (clnt_unlock_set(sd->sd_nodes[i], cl_sk, &xep))
