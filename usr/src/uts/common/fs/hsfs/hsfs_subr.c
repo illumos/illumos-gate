@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,8 +21,8 @@
 /*
  * Miscellaneous support subroutines for High Sierra filesystem
  *
- * Copyright (c) 1990,2000,2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -77,29 +76,44 @@ struct hsfs_error {
 	uchar_t	n_printf_args;	/* if err_text printf-like, # addtl args */
 } hsfs_error[] = {
 	/* HSFS_ERR_TRAILING_JUNK */
-	"hsfs: Warning: the file system mounted on %s\n"
+	"hsfs: Warning: the file system mounted on %s "
 		"does not conform to the ISO-9660 specification:",
-	" trailing blanks or null characters in file or directory name.\n",
+	"trailing blanks or null characters in file or directory name.\n",
 	1, 0,
 	/* HSFS_ERR_LOWER_CASE_NM */
-	"hsfs: Warning: the file system mounted on %s\n"
-		"does not conform to the ISO-9660 specification: ",
-	" lower case characters in file or directory name.\n",
+	"hsfs: Warning: the file system mounted on %s "
+		"does not conform to the ISO-9660 specification:",
+	"lower case characters in file or directory name.\n",
 	1, 0,
 	/* HSFS_ERR_BAD_ROOT_DIR */
-	"hsfs: Warning: the file system mounted on %s\n"
+	"hsfs: Warning: the file system mounted on %s "
 		"does not conform to the ISO-9660 specification:",
-	" invalid root directory.\n",
+	"invalid root directory.\n",
 	0,  0,
 	/* HSFS_ERR_UNSUP_TYPE */
-	"hsfs: Warning: the file system mounted on %s\n"
+	"hsfs: Warning: the file system mounted on %s "
 		"contains a file or directory with an unsupported type:",
 	" 0x%x.\n",
 	1, 1,
 	/* HSFS_ERR_BAD_FILE_LEN */
-	"hsfs: Warning: file system mounted on %s \n"
+	"hsfs: Warning: file system mounted on %s "
 		"does not conform to the ISO-9660 specification:",
-	"file len greater than max allowed\n",
+	"file name length greater than max allowed\n",
+	1, 0,
+	/* HSFS_ERR_BAD_JOLIET_FILE_LEN */
+	"hsfs: Warning: file system mounted on %s "
+		"does not conform to the Joliet specification:",
+	"file name length greater than max allowed\n",
+	1, 0,
+	/* HSFS_ERR_TRUNC_JOLIET_FILE_LEN */
+	"hsfs: Warning: file system mounted on %s "
+		"does not conform to the Joliet specification:",
+	"file name length greater than MAXNAMELEN (truncated)\n",
+	1, 0,
+	/* HSFS_ERR_BAD_DIR_ENTRY */
+	"hsfs: Warning: file system mounted on %s "
+		"has inconsistent data:",
+	"invalid directory or file name length (ignored)\n",
 	1, 0,
 };
 

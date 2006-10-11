@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,13 +105,17 @@ static int strict_iso9660_ordering = 0;
 
 static void hs_hsnode_cache_reclaim(void *unused);
 static void hs_addfreeb(struct hsfs *fsp, struct hsnode *hp);
-static int nmcmp(char *a, char *b, int len, int is_rrip);
 static enum dirblock_result process_dirblock(struct fbuf *fbp, uint_t *offset,
 	uint_t last_offset, char *nm, int nmlen, struct hsfs *fsp,
 	struct hsnode *dhp, struct vnode *dvp, struct vnode **vpp,
-	int *error, int is_rrip);
+	int *error);
 static int strip_trailing(struct hsfs *fsp, char *nm, int len);
+static int hs_namelen(struct hsfs *fsp, char *nm, int len);
 static int uppercase_cp(char *from, char *to, int size);
+static void hs_log_bogus_joliet_warning(void);
+static int hs_iso_copy(char *from, char *to, int size);
+static int32_t hs_ucs2_2_utf8(uint16_t c_16, uint8_t *s_8);
+static int hs_utf8_trunc(uint8_t *str, int len);
 
 /*
  * hs_access
@@ -186,6 +189,15 @@ hs_init_hsnode_cache(void)
 	hsnode_cache = kmem_cache_create("hsfs_hsnode_cache",
 	    sizeof (struct hsnode), 0, NULL,
 	    NULL, hs_hsnode_cache_reclaim, NULL, NULL, 0);
+}
+
+/*
+ * Destroy the cache of free hsnodes.
+ */
+void
+hs_fini_hsnode_cache(void)
+{
+	kmem_cache_destroy(hsnode_cache);
 }
 
 /*
@@ -678,7 +690,8 @@ hs_remakenode(uint_t lbn, uint_t off, struct vfs *vfsp,
 	}
 
 	dirp = (uchar_t *)secbp->b_un.b_addr;
-	error = hs_parsedir(fsp, &dirp[off], &hd, (char *)NULL, (int *)NULL);
+	error = hs_parsedir(fsp, &dirp[off], &hd, (char *)NULL, (int *)NULL,
+						HS_SECTOR_SIZE - off);
 	if (!error) {
 		*vpp = hs_makenode(&hd, lbn, off, vfsp);
 		if (*vpp == NULL)
@@ -732,11 +745,19 @@ hs_dirlook(
 
 	dhp = VTOH(dvp);
 	fsp = VFS_TO_HSFS(dvp->v_vfsp);
+	is_rrip = IS_RRIP_IMPLEMENTED(fsp);
+
+	/*
+	 * name == "^A" is illegal for ISO-9660 and Joliet as '..' is '\1' on
+	 * disk. It is no problem for Rock Ridge as RR uses '.' and '..'.
+	 * XXX It could be OK for Joliet also (because namelen == 1 is
+	 * XXX impossible for UCS-2) but then we need a better compare algorith.
+	 */
+	if (!is_rrip && *name == '\1' && namlen == 1)
+		return (EINVAL);
 
 	cmpname_size = (int)(fsp->hsfs_namemax + 1);
 	cmpname = kmem_alloc((size_t)cmpname_size, KM_SLEEP);
-
-	is_rrip = IS_RRIP_IMPLEMENTED(fsp);
 
 	if (namlen >= cmpname_size)
 		namlen = cmpname_size - 1;
@@ -756,7 +777,12 @@ hs_dirlook(
 			name[namlen-1] == '.' &&
 				CAN_TRUNCATE_DOT(name, namlen))
 			name[--namlen] = '\0';
-		cmpnamelen = hs_uppercase_copy(name, cmpname, namlen);
+		if (fsp->hsfs_vol_type == HS_VOL_TYPE_ISO_V2 ||
+		    fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET) {
+			cmpnamelen = hs_iso_copy(name, cmpname, namlen);
+		} else {
+			cmpnamelen = hs_uppercase_copy(name, cmpname, namlen);
+		}
 	}
 
 	/* make sure dirent is filled up with all info */
@@ -787,8 +813,7 @@ tryagain:
 		last_offset = (offset & MAXBMASK) + fbp->fb_count;
 
 		switch (process_dirblock(fbp, &offset, last_offset,
-		    cmpname, cmpnamelen, fsp, dhp, dvp, vpp, &error,
-		    is_rrip)) {
+		    cmpname, cmpnamelen, fsp, dhp, dvp, vpp, &error)) {
 		case FOUND_ENTRY:
 			/* found an entry, either correct or not */
 			goto done;
@@ -854,10 +879,12 @@ hs_parsedir(
 	uchar_t			*dirp,
 	struct hs_direntry	*hdp,
 	char			*dnp,
-	int			*dnlen)
+	int			*dnlen,
+	int			last_offset)
 {
 	char	*on_disk_name;
 	int	on_disk_namelen;
+	int	on_disk_dirlen;
 	uchar_t	flags;
 	int	namelen;
 	int	error;
@@ -896,7 +923,10 @@ hs_parsedir(
 		hdp->uid = fsp -> hsfs_vol.vol_uid;
 		hdp->gid = fsp -> hsfs_vol.vol_gid;
 		hdp->mode = hdp-> mode | (fsp -> hsfs_vol.vol_prot & 0777);
-	} else if (fsp->hsfs_vol_type == HS_VOL_TYPE_ISO) {
+	} else if ((fsp->hsfs_vol_type == HS_VOL_TYPE_ISO) ||
+		    (fsp->hsfs_vol_type == HS_VOL_TYPE_ISO_V2) ||
+		    (fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET)) {
+
 		flags = IDE_FLAGS(dirp);
 		hs_parse_dirdate(IDE_cdate(dirp), &hdp->cdate);
 		hs_parse_dirdate(IDE_cdate(dirp), &hdp->adate);
@@ -989,14 +1019,54 @@ hs_parsedir(
 	 */
 	on_disk_name = (char *)HDE_name(dirp);
 	on_disk_namelen = (int)HDE_NAME_LEN(dirp);
+	on_disk_dirlen = (int)HDE_DIR_LEN(dirp);
 
-	if (on_disk_namelen > ISO_FILE_NAMELEN) {
-		hs_log_bogus_disk_warning(fsp, HSFS_ERR_BAD_FILE_LEN, 0);
-		on_disk_namelen = ISO_FILE_NAMELEN;
+	if (on_disk_dirlen < HDE_ROOT_DIR_REC_SIZE ||
+	    ((on_disk_dirlen > last_offset) ||
+	    ((HDE_FDESIZE + on_disk_namelen) > on_disk_dirlen))) {
+			hs_log_bogus_disk_warning(fsp,
+			    HSFS_ERR_BAD_DIR_ENTRY, 0);
+		return (EINVAL);
 	}
+
+	if (on_disk_namelen > fsp->hsfs_namelen &&
+	    hs_namelen(fsp, on_disk_name, on_disk_namelen) >
+							fsp->hsfs_namelen) {
+		hs_log_bogus_disk_warning(fsp,
+				fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET ?
+				HSFS_ERR_BAD_JOLIET_FILE_LEN :
+				HSFS_ERR_BAD_FILE_LEN,
+				0);
+	}
+	if (on_disk_namelen > ISO_NAMELEN_V2_MAX)
+		on_disk_namelen = fsp->hsfs_namemax;	/* Paranoia */
+
 	if (dnp != NULL) {
-		namelen = hs_namecopy(on_disk_name, dnp, on_disk_namelen,
-		    fsp->hsfs_flags);
+		if (fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET) {
+			namelen = hs_jnamecopy(on_disk_name, dnp,
+							on_disk_namelen,
+							fsp->hsfs_namemax,
+							fsp->hsfs_flags);
+			/*
+			 * A negative return value means that the file name
+			 * has been truncated to fsp->hsfs_namemax.
+			 */
+			if (namelen < 0) {
+				namelen = -namelen;
+				hs_log_bogus_disk_warning(fsp,
+					HSFS_ERR_TRUNC_JOLIET_FILE_LEN,
+					0);
+			}
+		} else {
+			/*
+			 * HS_VOL_TYPE_ISO && HS_VOL_TYPE_ISO_V2
+			 */
+			namelen = hs_namecopy(on_disk_name, dnp,
+							on_disk_namelen,
+							fsp->hsfs_flags);
+		}
+		if (namelen == 0)
+			return (EINVAL);
 		if ((fsp->hsfs_flags & HSFSMNT_NOTRAILDOT) &&
 		    dnp[ namelen-1 ] == '.' && CAN_TRUNCATE_DOT(dnp, namelen))
 			dnp[ --namelen ] = '\0';
@@ -1014,6 +1084,8 @@ hs_parsedir(
  * Parse a file/directory name into UNIX form.
  * Delete trailing blanks, upper-to-lower case, add NULL terminator.
  * Returns the (possibly new) length.
+ *
+ * Called from hsfs_readdir() via hs_parsedir()
  */
 int
 hs_namecopy(char *from, char *to, int size, ulong_t flags)
@@ -1022,6 +1094,8 @@ hs_namecopy(char *from, char *to, int size, ulong_t flags)
 	uchar_t c;
 	int lastspace;
 	int maplc;
+	int trailspace;
+	int version;
 
 	/* special handling for '.' and '..' */
 	if (size == 1) {
@@ -1038,11 +1112,13 @@ hs_namecopy(char *from, char *to, int size, ulong_t flags)
 	}
 
 	maplc = (flags & HSFSMNT_NOMAPLCASE) == 0;
+	trailspace = (flags & HSFSMNT_NOTRAILSPACE) == 0;
+	version = (flags & HSFSMNT_NOVERSION) == 0;
 	for (i = 0, lastspace = -1; i < size; i++) {
 		c = from[i];
-		if (c == ';')
+		if (c == ';' && version)
 			break;
-		if (c <= ' ') {
+		if (c <= ' ' && !trailspace) {
 			if (lastspace == -1)
 				lastspace = i;
 		} else
@@ -1058,8 +1134,77 @@ hs_namecopy(char *from, char *to, int size, ulong_t flags)
 }
 
 /*
+ * hs_jnamecopy
+ *
+ * This is the Joliet variant of hs_namecopy()
+ *
+ * Parse a UCS-2 Joliet file/directory name into UNIX form.
+ * Add NULL terminator.
+ * Returns the new length.
+ *
+ * Called from hsfs_readdir() via hs_parsedir()
+ */
+int
+hs_jnamecopy(char *from, char *to, int size, int maxsize, ulong_t flags)
+{
+	uint_t i;
+	uint_t len;
+	uint16_t c;
+	int	amt;
+	int	version;
+
+	/* special handling for '.' and '..' */
+	if (size == 1) {
+		if (*from == '\0') {
+			*to++ = '.';
+			*to = '\0';
+			return (1);
+		} else if (*from == '\1') {
+			*to++ = '.';
+			*to++ = '.';
+			*to = '\0';
+			return (2);
+		}
+	}
+
+	version = (flags & HSFSMNT_NOVERSION) == 0;
+	for (i = 0, len = 0; i < size; i++) {
+		c = (from[i++] & 0xFF) << 8;
+		c |= from[i] & 0xFF;
+		if (c == ';' && version)
+			break;
+
+		if (len > (maxsize-3)) {
+			if (c < 0x80)
+				amt = 1;
+			else if (c < 0x800)
+				amt = 2;
+			else
+				amt = 3;
+			if ((len+amt) > maxsize) {
+				to[len] = '\0';
+				return (-len);
+			}
+		}
+		amt = hs_ucs2_2_utf8(c, (uint8_t *)&to[len]);
+		if (amt == 0) {
+			hs_log_bogus_joliet_warning(); /* should never happen */
+			return (0);
+		}
+		len += amt;
+	}
+	to[len] = '\0';
+	return (len);
+}
+
+/*
  * map a filename to upper case;
  * return 1 if found lowercase character
+ *
+ * Called from process_dirblock()
+ * via hsfs_lookup() -> hs_dirlook() -> process_dirblock()
+ * to create an intermedia name from on disk file names for
+ * comparing names.
  */
 static int
 uppercase_cp(char *from, char *to, int size)
@@ -1080,11 +1225,69 @@ uppercase_cp(char *from, char *to, int size)
 }
 
 /*
+ * This is the Joliet variant of uppercase_cp()
+ *
+ * map a UCS-2 filename to UTF-8;
+ * return new length
+ *
+ * Called from process_dirblock()
+ * via hsfs_lookup() -> hs_dirlook() -> process_dirblock()
+ * to create an intermedia name from on disk file names for
+ * comparing names.
+ */
+int
+hs_joliet_cp(char *from, char *to, int size)
+{
+	uint_t		i;
+	uint16_t	c;
+	int		len = 0;
+	int		amt;
+
+	/* special handling for '\0' and '\1' */
+	if (size == 1) {
+		*to = *from;
+		return (1);
+	}
+	for (i = 0; i < size; i += 2) {
+		c = (*from++ & 0xFF) << 8;
+		c |= *from++ & 0xFF;
+
+		amt = hs_ucs2_2_utf8(c, (uint8_t *)to);
+		if (amt == 0) {
+			hs_log_bogus_joliet_warning(); /* should never happen */
+			return (0);
+		}
+
+		to  += amt;
+		len += amt;
+	}
+	return (len);
+}
+
+static void
+hs_log_bogus_joliet_warning(void)
+{
+	static int	warned = 0;
+
+	if (warned)
+		return;
+	warned = 1;
+	cmn_err(CE_CONT, "hsfs: Warning: "
+		"file name contains bad UCS-2 chacarter\n");
+}
+
+
+/*
  * hs_uppercase_copy
  *
- * Convert a UNIX-style name into its HSFS equivalent.
+ * Convert a UNIX-style name into its HSFS equivalent
+ * replacing '.' and '..' with '\0' and '\1'.
  * Map to upper case.
  * Returns the (possibly new) length.
+ *
+ * Called from hs_dirlook() and rrip_namecopy()
+ * to create an intermediate name from the callers name from hsfs_lookup()
+ * XXX Is the call from rrip_namecopy() OK?
  */
 int
 hs_uppercase_copy(char *from, char *to, int size)
@@ -1106,6 +1309,41 @@ hs_uppercase_copy(char *from, char *to, int size)
 		c = *from++;
 		if ((c >= 'a') && (c <= 'z'))
 			c = c - 'a' + 'A';
+		*to++ = c;
+	}
+	return (size);
+}
+
+/*
+ * hs_iso_copy
+ *
+ * This is the Joliet/ISO-9660:1999 variant of hs_uppercase_copy()
+ *
+ * Convert a UTF-8 UNIX-style name into its UTF-8 Joliet/ISO equivalent
+ * replacing '.' and '..' with '\0' and '\1'.
+ * Returns the (possibly new) length.
+ *
+ * Called from hs_dirlook()
+ * to create an intermediate name from the callers name from hsfs_lookup()
+ */
+static int
+hs_iso_copy(char *from, char *to, int size)
+{
+	uint_t i;
+	uchar_t c;
+
+	/* special handling for '.' and '..' */
+
+	if (size == 1 && *from == '.') {
+		*to = '\0';
+		return (1);
+	} else if (size == 2 && *from == '.' && *(from+1) == '.') {
+		*to = '\1';
+		return (1);
+	}
+
+	for (i = 0; i < size; i++) {
+		c = *from++;
 		*to++ = c;
 	}
 	return (size);
@@ -1145,7 +1383,8 @@ hs_filldirent(struct vnode *vp, struct hs_direntry *hdp)
 		cmn_err(CE_NOTE, "hsfs_filldirent: dirent not match");
 		/* keep on going */
 	}
-	(void) hs_parsedir(fsp, &secp[secoff], hdp, (char *)NULL, (int *)NULL);
+	(void) hs_parsedir(fsp, &secp[secoff], hdp, (char *)NULL,
+				(int *)NULL, HS_SECTOR_SIZE - secoff);
 
 end:
 	brelse(secbp);
@@ -1166,8 +1405,7 @@ process_dirblock(
 	struct hsnode	*dhp,
 	struct vnode	*dvp,
 	struct vnode	**vpp,
-	int		*error,		/* return value: errno */
-	int		is_rrip)	/* 1 if rock ridge is implemented */
+	int		*error)		/* return value: errno */
 {
 	uchar_t		*blkp = (uchar_t *)fbp->fb_addr; /* dir block */
 	char		*dname;		/* name in directory entry */
@@ -1177,19 +1415,24 @@ process_dirblock(
 	uchar_t		*dirp;	/* the directory entry */
 	int		res;
 	int		parsedir_res;
+	int		is_rrip;
 	size_t		rrip_name_size;
 	int		rr_namelen = 0;
 	char		*rrip_name_str = NULL;
 	char		*rrip_tmp_name = NULL;
 	enum dirblock_result err = 0;
 	int 		did_fbrelse = 0;
-	char		uppercase_name[ISO_FILE_NAMELEN];
+	char		uppercase_name[JOLIET_NAMELEN_MAX*3 + 1]; /* 331 */
 
 #define	PD_return(retval)	\
 	{ err = retval; goto do_ret; }		/* return after cleanup */
 #define	rel_offset(offset)	\
 	((offset) & MAXBOFFSET)			/* index into cur blk */
+#define	RESTORE_NM(tmp, orig)	\
+	if (is_rrip && *(tmp) != '\0') \
+		(void) strcpy((orig), (tmp))
 
+	is_rrip = IS_RRIP_IMPLEMENTED(fsp);
 	if (is_rrip) {
 		rrip_name_size = RRIP_FILE_NAMELEN + 1;
 		rrip_name_str = kmem_alloc(rrip_name_size, KM_SLEEP);
@@ -1249,15 +1492,24 @@ process_dirblock(
 		dirp = &blkp[rel_offset(*offset)];
 		dname = (char *)HDE_name(dirp);
 		dnamelen = (int)((uchar_t)HDE_NAME_LEN(dirp));
+		/*
+		 * If the directory entry extends beyond the end of the
+		 * block, it must be invalid. Skip it.
+		 */
 		if (dnamelen > hdlen - HDE_FDESIZE) {
 			hs_log_bogus_disk_warning(fsp,
-			    HSFS_ERR_BAD_FILE_LEN, 0);
+			    HSFS_ERR_BAD_DIR_ENTRY, 0);
 			goto skip_rec;
-		} else if (dnamelen > ISO_FILE_NAMELEN) {
+		} else if (dnamelen > fsp->hsfs_namelen &&
+			hs_namelen(fsp, dname, dnamelen) > fsp->hsfs_namelen) {
 			hs_log_bogus_disk_warning(fsp,
-			    HSFS_ERR_BAD_FILE_LEN, 0);
-			dnamelen = ISO_FILE_NAMELEN;
+				fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET ?
+				HSFS_ERR_BAD_JOLIET_FILE_LEN :
+				HSFS_ERR_BAD_FILE_LEN,
+				0);
 		}
+		if (dnamelen > ISO_NAMELEN_V2_MAX)
+			dnamelen = fsp->hsfs_namemax;	/* Paranoia */
 
 		/*
 		 * If the rock ridge is implemented, then we copy the name
@@ -1285,28 +1537,51 @@ process_dirblock(
 		if (!is_rrip || rr_namelen == -1) {
 			/* use iso name instead */
 
-			int i;
+			int i = -1;
 			/*
 			 * make sure that we get rid of ';' in the dname of
 			 * an iso direntry, as we should have no knowledge
 			 * of file versions.
+			 *
+			 * XXX This is done the wrong way: it does not take
+			 * XXX care of the fact that the version string is
+			 * XXX a decimal number in the range 1 to 32767.
 			 */
-
-			for (i = dnamelen - 1;
-			    (dname[i] != ';') && (i > 0);
-			    i--)
-				continue;
-
-			if (dname[i] == ';')
+			if ((fsp->hsfs_flags & HSFSMNT_NOVERSION) == 0) {
+				if (fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET) {
+					for (i = dnamelen - 1; i > 0; i -= 2) {
+						if (dname[i] == ';' &&
+						    dname[i-1] == '\0') {
+							--i;
+							break;
+						}
+					}
+				} else {
+					for (i = dnamelen - 1; i > 0; i--) {
+						if (dname[i] == ';')
+							break;
+					}
+				}
+			}
+			if (i > 0) {
 				dnamelen = i;
-			else
+			} else if (fsp->hsfs_vol_type != HS_VOL_TYPE_ISO_V2 &&
+				    fsp->hsfs_vol_type != HS_VOL_TYPE_JOLIET) {
 				dnamelen = strip_trailing(fsp, dname, dnamelen);
+			}
 
-			ASSERT(dnamelen <= ISO_FILE_NAMELEN);
+			ASSERT(dnamelen < sizeof (uppercase_name));
 
-			if (uppercase_cp(dname, uppercase_name, dnamelen))
+			if (fsp->hsfs_vol_type == HS_VOL_TYPE_ISO_V2) {
+				(void) strncpy(uppercase_name, dname, dnamelen);
+			} else if (fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET) {
+				dnamelen = hs_joliet_cp(dname, uppercase_name,
+								dnamelen);
+			} else if (uppercase_cp(dname, uppercase_name,
+								dnamelen)) {
 				hs_log_bogus_disk_warning(fsp,
 				    HSFS_ERR_LOWER_CASE_NM, 0);
+			}
 			dname = uppercase_name;
 			if (!is_rrip &&
 			    (fsp->hsfs_flags & HSFSMNT_NOTRAILDOT) &&
@@ -1330,10 +1605,11 @@ process_dirblock(
 		if (*nm != *dname || nmlen != dnamelen)
 			goto skip_rec;
 
-		if ((res = nmcmp(dname, nm, nmlen, is_rrip)) == 0) {
+		if ((res = bcmp(dname, nm, nmlen)) == 0) {
 			/* name matches */
 			parsedir_res = hs_parsedir(fsp, dirp, &hd,
-			    (char *)NULL, (int *)NULL);
+			    (char *)NULL, (int *)NULL,
+					last_offset - rel_offset(*offset));
 			if (!parsedir_res) {
 				uint_t lbn;	/* logical block number */
 
@@ -1389,27 +1665,7 @@ do_ret:
 		fbrelse(fbp, S_READ);
 	return (err);
 #undef PD_return
-}
-
-
-/*
- * Compare the names, returning < 0 if a < b,
- * 0 if a == b, and > 0 if a > b.
- */
-static int
-nmcmp(char *a, char *b, int len, int is_rrip)
-{
-	while (len--) {
-		if (*a == *b) {
-			b++; a++;
-		} else {
-			/* if file version, stop */
-			if (! is_rrip && ((*a == ';') && (*b == '\0')))
-				return (0);
-			return ((uchar_t)*b - (uchar_t)*a);
-		}
-	}
-	return (0);
+#undef RESTORE_NM
 }
 
 /*
@@ -1434,4 +1690,111 @@ strip_trailing(struct hsfs *fsp, char *nm, int len)
 		hs_log_bogus_disk_warning(fsp, HSFS_ERR_TRAILING_JUNK, 0);
 
 	return ((int)(c - nm + 1));
+}
+
+static int
+hs_namelen(struct hsfs *fsp, char *nm, int len)
+{
+	char	*p = nm + len;
+
+	if (fsp->hsfs_vol_type == HS_VOL_TYPE_ISO_V2) {
+		return (len);
+	} else if (fsp->hsfs_vol_type == HS_VOL_TYPE_JOLIET) {
+		uint16_t c;
+
+		while (--p > &nm[1]) {
+			c = *p;
+			c |= *--p * 256;
+			if (c == ';')
+				return (p - nm);
+			if (c < '0' || c > '9') {
+				p++;
+				return (p - nm);
+			}
+		}
+	} else {
+		char	c;
+
+		while (--p > nm) {
+			c = *p;
+			if (c == ';')
+				return (p - nm);
+			if (c < '0' || c > '9') {
+				p++;
+				return (p - nm);
+			}
+		}
+	}
+	return (len);
+}
+
+/*
+ * Take a UCS-2 character and convert
+ * it into a utf8 character.
+ * A 0 will be returned if the conversion fails
+ *
+ * See http://www.cl.cam.ac.uk/~mgk25/unicode.html#utf-8
+ *
+ * The code has been taken from udfs/udf_subr.c
+ */
+static uint8_t hs_first_byte_mark[7] =
+			{ 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
+static int32_t
+hs_ucs2_2_utf8(uint16_t c_16, uint8_t *s_8)
+{
+	int32_t nc;
+	uint32_t c_32;
+	uint32_t byte_mask = 0xBF;
+	uint32_t byte_mark = 0x80;
+
+	/*
+	 * Convert the 16-bit character to a 32-bit character
+	 */
+	c_32 = c_16;
+
+	/*
+	 * By here the 16-bit character is converted
+	 * to a 32-bit wide character
+	 */
+	if (c_32 < 0x80) {
+		nc = 1;
+	} else if (c_32 < 0x800) {
+		nc = 2;
+	} else if (c_32 < 0x10000) {
+		nc = 3;
+	} else if (c_32 < 0x200000) {
+		nc = 4;
+	} else if (c_32 < 0x4000000) {
+		nc = 5;
+	} else if (c_32 <= 0x7FFFFFFF) {	/* avoid signed overflow */
+		nc = 6;
+	} else {
+		nc = 0;
+	}
+	s_8 += nc;
+	switch (nc) {
+		case 6 :
+			*(--s_8) = (c_32 | byte_mark)  & byte_mask;
+			c_32 >>= 6;
+			/* FALLTHROUGH */
+		case 5 :
+			*(--s_8) = (c_32 | byte_mark)  & byte_mask;
+			c_32 >>= 6;
+			/* FALLTHROUGH */
+		case 4 :
+			*(--s_8) = (c_32 | byte_mark)  & byte_mask;
+			c_32 >>= 6;
+			/* FALLTHROUGH */
+		case 3 :
+			*(--s_8) = (c_32 | byte_mark)  & byte_mask;
+			c_32 >>= 6;
+			/* FALLTHROUGH */
+		case 2 :
+			*(--s_8) = (c_32 | byte_mark)  & byte_mask;
+			c_32 >>= 6;
+			/* FALLTHROUGH */
+		case 1 :
+			*(--s_8) = c_32 | hs_first_byte_mark[nc];
+	}
+	return (nc);
 }

@@ -20,8 +20,9 @@
  */
 /*
  * System Use Sharing protocol subroutines for High Sierra filesystem
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -423,7 +424,8 @@ hs_check_root_dirent(struct vnode *vp, struct hs_direntry *hdp)
 	} else
 		goto end;
 
-	(void) hs_parsedir(fsp, root_ptr, hdp, (char *)NULL, (int *)NULL);
+	(void) hs_parsedir(fsp, root_ptr, hdp, (char *)NULL, (int *)NULL,
+					HS_SECTOR_SIZE - secoff);
 
 	/*
 	 * If we did not get at least 1 extension, let's assume ISO and

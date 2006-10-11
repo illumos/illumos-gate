@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,7 +91,8 @@ enum iso_voldesc_type {
 };
 #define	ISO_ID_STRING	"CD001"		/* ISO_std_id field */
 #define	ISO_ID_STRLEN	5		/* ISO_std_id field length */
-#define	ISO_ID_VER	1		/* ISO_std_ver field */
+#define	ISO_ID_VER	1		/* ISO_std_ver field ISO-9660:1988 */
+#define	ISO_ID_VER2	2		/* ISO_std_ver field ISO-9660:1999 */
 #define	ISO_FILE_STRUCT_ID_VER	1	/* ISO_file structure version  field */
 #define	ISO_SYS_ID_STRLEN	32
 #define	ISO_VOL_ID_STRLEN	32
@@ -113,6 +114,7 @@ enum iso_voldesc_type {
 #define	ISO_sys_id(x)		(&((uchar_t *)x)[8])
 #define	ISO_vol_id(x)		(&((uchar_t *)x)[40])
 #define	ISO_vol_size(x)		(&((uchar_t *)x)[80])
+#define	ISO_svd_esc(x)		(&((uchar_t *)x)[88])	/* Supplemental VD */
 #define	ISO_set_size(x)		(&((uchar_t *)x)[120])
 #define	ISO_set_seq(x)		(&((uchar_t *)x)[124])
 #define	ISO_blk_size(x)		(&((uchar_t *)x)[128])
@@ -244,9 +246,26 @@ enum iso_voldesc_type {
 #define	IDE_REGULAR_FILE(x)	(((x) & IDE_PROHIBITED) == 0)
 #define	IDE_REGULAR_DIR(x)	(((x) & IDE_PROHIBITED) == IDE_DIRECTORY)
 
+/*
+ * A ISO filename is: "ABCDE.EEE;1" -> <filename> '.' <ext> ';' <version #>
+ *
+ * The ISO-9660:1988 (Version 1) maximum needed string length is:
+ *	30 chars (filename + ext)
+ * +	 2 chars ('.' + ';')
+ * +	   strlen("32767")
+ * +	   null byte
+ * ================================
+ * =	38 chars
+ *
+ * ISO_DIR_NAMELEN counts 30 chars + '.'
+ */
 #define	ISO_DIR_NAMELEN		31	/* max length of a directory name */
 #define	ISO_FILE_NAMELEN	31	/* max length of a filename, */
 					/* excluding ";" and version num */
+#define	ISO_NAMELEN_V2		207	/* ISOv2: 254 - 33 - 14 (XA Record) */
+#define	ISO_NAMELEN_V2_MAX	221	/* max length, ignorig ISOv2 */
+#define	JOLIET_NAMELEN		64	/* Joliet file name length (spec) */
+#define	JOLIET_NAMELEN_MAX	110	/* max Joliet file name length  */
 
 /* Path table enry */
 /* fix size of path table entry */

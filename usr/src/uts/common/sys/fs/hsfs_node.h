@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,8 +20,9 @@
  */
 /*
  * High Sierra filesystem structure definitions
- * Copyright 2004 Sun Microsystems, Inc.
- * All rights reserved.
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,7 +156,8 @@ struct	hs_volume {
  * There is one of these for each mounted High Sierra filesystem.
  */
 enum hs_vol_type {
-	HS_VOL_TYPE_HS = 0, HS_VOL_TYPE_ISO = 1
+	HS_VOL_TYPE_HS = 0, HS_VOL_TYPE_ISO = 1, HS_VOL_TYPE_ISO_V2 = 2,
+	HS_VOL_TYPE_JOLIET = 3
 };
 #define	HSFS_MAGIC 0x03095500
 struct hsfs {
@@ -165,7 +166,7 @@ struct hsfs {
 	struct vfs	*hsfs_vfs;	/* vfs for this fs */
 	struct vnode	*hsfs_rootvp;	/* vnode for root of filesystem */
 	struct vnode	*hsfs_devvp;	/* device mounted on */
-	enum hs_vol_type hsfs_vol_type; /* 0 hsfs 1 iso 2 hsfs+sun 3 iso+sun */
+	enum hs_vol_type hsfs_vol_type; /* see above */
 	struct hs_volume hsfs_vol;	/* File Structure Volume Descriptor */
 	struct ptable	*hsfs_ptbl;	/* pointer to incore Path Table */
 	int		hsfs_ptbl_size;	/* size of incore path table */
@@ -174,6 +175,7 @@ struct hsfs {
 	ulong_t		hsfs_ext_impl;	/* ext. information bits */
 	ushort_t	hsfs_sua_off;	/* the SUA offset */
 	ushort_t	hsfs_namemax;	/* maximum file name length */
+	ushort_t	hsfs_namelen;	/* "official" max. file name length */
 	ulong_t		hsfs_err_flags;	/* ways in which fs is non-conformant */
 	char		*hsfs_fsmnt;	/* name mounted on */
 	ulong_t		hsfs_flags;	/* hsfs-specific mount flags */
@@ -190,11 +192,14 @@ struct hsfs {
  * Also serves as index into hsfs_error[], so must be
  * kept in sync with that data structure.
  */
-#define	HSFS_ERR_TRAILING_JUNK	0
-#define	HSFS_ERR_LOWER_CASE_NM	1
-#define	HSFS_ERR_BAD_ROOT_DIR	2
-#define	HSFS_ERR_UNSUP_TYPE	3
-#define	HSFS_ERR_BAD_FILE_LEN	4
+#define	HSFS_ERR_TRAILING_JUNK		0
+#define	HSFS_ERR_LOWER_CASE_NM		1
+#define	HSFS_ERR_BAD_ROOT_DIR		2
+#define	HSFS_ERR_UNSUP_TYPE		3
+#define	HSFS_ERR_BAD_FILE_LEN		4
+#define	HSFS_ERR_BAD_JOLIET_FILE_LEN	5
+#define	HSFS_ERR_TRUNC_JOLIET_FILE_LEN	6
+#define	HSFS_ERR_BAD_DIR_ENTRY		7
 
 #define	HSFS_HAVE_LOWER_CASE(fsp) \
 	((fsp)->hsfs_err_flags & (1 << HSFS_ERR_LOWER_CASE_NM))

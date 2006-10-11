@@ -445,7 +445,8 @@ hsfs_readdir(
 			 * XXX - maybe hs_parsedir() will detect EXISTENCE bit
 			 */
 			if (!hs_parsedir(fsp, &blkp[rel_offset(offset)],
-				&hd, dname, &dnamelen)) {
+				&hd, dname, &dnamelen,
+					last_offset - rel_offset(offset))) {
 				/*
 				 * Determine if there is enough room
 				 */
@@ -1301,6 +1302,34 @@ hsfs_frlock(
 	return (fs_frlock(vp, cmd, bfp, flag, offset, flk_cbp, cr));
 }
 
+/* ARGSUSED */
+static int
+hsfs_pathconf(struct vnode *vp, int cmd, ulong_t *valp, struct cred *cr)
+{
+	struct hsfs	*fsp;
+
+	int		error = 0;
+
+	switch (cmd) {
+
+	case _PC_NAME_MAX:
+		fsp = VFS_TO_HSFS(vp->v_vfsp);
+		*valp = fsp->hsfs_namemax;
+		break;
+
+	case _PC_FILESIZEBITS:
+		*valp = 33;	/* Without multi extent support: 4 GB - 2k */
+		break;
+
+	default:
+		error = fs_pathconf(vp, cmd, valp, cr);
+	}
+
+	return (error);
+}
+
+
+
 const fs_operation_def_t hsfs_vnodeops_template[] = {
 	VOPNAME_OPEN, hsfs_open,
 	VOPNAME_CLOSE, hsfs_close,
@@ -1320,6 +1349,7 @@ const fs_operation_def_t hsfs_vnodeops_template[] = {
 	VOPNAME_MAP, (fs_generic_func_p) hsfs_map,
 	VOPNAME_ADDMAP, (fs_generic_func_p) hsfs_addmap,
 	VOPNAME_DELMAP, hsfs_delmap,
+	VOPNAME_PATHCONF, hsfs_pathconf,
 	NULL, NULL
 };
 

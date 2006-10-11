@@ -69,6 +69,8 @@
 #include <sys/cmn_err.h>
 #include <sys/bootconf.h>
 
+#include <sys/sdt.h>
+
 /*
  * These are needed for the CDROMREADOFFSET Code
  */
@@ -90,6 +92,11 @@
 #define	HOPT_TRAILDOT	"traildot"
 #define	HOPT_NRR	"nrr"
 #define	HOPT_RR		"rr"
+#define	HOPT_JOLIET	"joliet"
+#define	HOPT_NOJOLIET	"nojoliet"
+#define	HOPT_JOLIETLONG	"jolietlong"
+#define	HOPT_VERS2	"vers2"
+#define	HOPT_NOVERS2	"novers2"
 #define	HOPT_RO		MNTOPT_RO
 
 static char *global_cancel[] = { HOPT_NOGLOBAL, NULL };
@@ -99,6 +106,10 @@ static char *nomapl_cancel[] = { HOPT_MAPLCASE, NULL };
 static char *ro_cancel[] = { MNTOPT_RW, NULL };
 static char *rr_cancel[] = { HOPT_NRR, NULL };
 static char *nrr_cancel[] = { HOPT_RR, NULL };
+static char *joliet_cancel[] = { HOPT_NOJOLIET, NULL };
+static char *nojoliet_cancel[] = { HOPT_JOLIET, NULL };
+static char *vers2_cancel[] = { HOPT_NOVERS2, NULL };
+static char *novers2_cancel[] = { HOPT_VERS2, NULL };
 static char *trail_cancel[] = { HOPT_NOTRAILDOT, NULL };
 static char *notrail_cancel[] = { HOPT_TRAILDOT, NULL };
 
@@ -110,8 +121,14 @@ static mntopt_t hsfs_options[] = {
 	{ HOPT_RO, ro_cancel, NULL, MO_DEFAULT, NULL },
 	{ HOPT_RR, rr_cancel, NULL, MO_DEFAULT, NULL },
 	{ HOPT_NRR, nrr_cancel, NULL, 0, NULL },
+	{ HOPT_JOLIET, joliet_cancel, NULL, 0, NULL },
+	{ HOPT_NOJOLIET, nojoliet_cancel, NULL, 0, NULL },
+	{ HOPT_JOLIETLONG, NULL, NULL, 0, NULL },
+	{ HOPT_VERS2, vers2_cancel, NULL, 0, NULL },
+	{ HOPT_NOVERS2, novers2_cancel, NULL, 0, NULL },
 	{ HOPT_TRAILDOT, trail_cancel, NULL, MO_DEFAULT, NULL },
 	{ HOPT_NOTRAILDOT, notrail_cancel, NULL, 0, NULL },
+	{ "sector", NULL, "0", MO_HASVALUE, NULL},
 };
 
 static mntopts_t hsfs_proto_opttbl = {
@@ -119,6 +136,7 @@ static mntopts_t hsfs_proto_opttbl = {
 	hsfs_options
 };
 
+static int hsfsfstype;
 static int hsfsinit(int, char *);
 
 static vfsdef_t vfw = {
@@ -140,15 +158,33 @@ static struct modlinkage modlinkage = {
 char _depends_on[] = "fs/specfs";
 
 int
-_init()
+_init(void)
 {
 	return (mod_install(&modlinkage));
 }
 
 int
-_fini()
+_fini(void)
 {
-	return (EBUSY);
+	int	error;
+
+	error = mod_remove(&modlinkage);
+
+	DTRACE_PROBE1(mod_remove, int, error);
+
+	if (error)
+		return (error);
+
+	mutex_destroy(&hs_mounttab_lock);
+
+	/*
+	 * Tear down the operations vectors
+	 */
+	(void) vfs_freevfsops_by_type(hsfsfstype);
+	vn_freevnodeops(hsfs_vnodeops);
+
+	hs_fini_hsnode_cache();
+	return (0);
 }
 
 int
@@ -177,20 +213,22 @@ static int hsfs_mountroot(struct vfs *, enum whymountroot);
 
 static int hs_mountfs(struct vfs *vfsp, dev_t dev, char *path,
 	mode_t mode, int flags, struct cred *cr, int isroot);
+static int hs_getrootvp(struct vfs *vfsp, struct hsfs *fsp, size_t pathsize);
 static int hs_findhsvol(struct hsfs *fsp, struct vnode *vp,
 	struct hs_volume *hvp);
 static int hs_parsehsvol(struct hsfs *fsp, uchar_t *volp,
 	struct hs_volume *hvp);
 static int hs_findisovol(struct hsfs *fsp, struct vnode *vp,
-	struct hs_volume *hvp);
+	struct hs_volume *hvp,
+	struct hs_volume *svp,
+	struct hs_volume *jvp);
+static int hs_joliet_level(uchar_t *volp);
 static int hs_parseisovol(struct hsfs *fsp, uchar_t *volp,
 	struct hs_volume *hvp);
-static void hs_copylabel(struct hs_volume *, unsigned char *);
+static void hs_copylabel(struct hs_volume *, unsigned char *, int);
 static int hs_getmdev(struct vfs *, char *fspec, int flags, dev_t *pdev,
 	mode_t *mode, cred_t *cr);
 static int hs_findvoldesc(dev_t rdev, int desc_sec);
-
-static int hsfsfstype;
 
 static int
 hsfsinit(int fstype, char *name)
@@ -271,6 +309,12 @@ hsfs_mount(struct vfs *vfsp, struct vnode *mvp,
 	    flags |= HSFSMNT_NOTRAILDOT;
 	if (vfs_optionisset(vfsp, HOPT_NRR, NULL))
 	    flags |= HSFSMNT_NORRIP;
+	if (vfs_optionisset(vfsp, HOPT_NOJOLIET, NULL))
+	    flags |= HSFSMNT_NOJOLIET;
+	if (vfs_optionisset(vfsp, HOPT_JOLIETLONG, NULL))
+	    flags |= HSFSMNT_JOLIETLONG;
+	if (vfs_optionisset(vfsp, HOPT_NOVERS2, NULL))
+	    flags |= HSFSMNT_NOVERS2;
 
 	error = pn_get(uap->dir, (uap->flags & MS_SYSSPACE) ?
 	    UIO_SYSSPACE : UIO_USERSPACE, &dpn);
@@ -516,7 +560,39 @@ hs_mountfs(
 	int		error;
 	struct timeval	tv;
 	int		fsid;
-	int		use_rrip = (mount_flags & HSFSMNT_NORRIP) == 0;
+	int		use_rrip;
+	int		use_vers2;
+	int		use_joliet;
+	int		has_rrip = 0;
+	int		has_vers2 = 0;
+	int		has_joliet = 0;
+	int		force_rrip_off;
+	int		force_vers2_off;
+	int		force_joliet_off;
+	size_t		pathbufsz = strlen(path) + 1;
+	int		redo_rootvp;
+
+	struct hs_volume *svp;		/* Supplemental VD for ISO-9660:1999 */
+	struct hs_volume *jvp;		/* Joliet VD */
+
+	/*
+	 * The rules for which extension will be used are:
+	 * 1. No specific mount options given:
+	 *	- use rrip if available
+	 *	- use ISO9660:1999 if available
+	 *	- use joliet if available.
+	 * 2. rrip/ISO9660:1999/joliet explicitly disabled via mount option:
+	 *	- use next "lower" extension
+	 * 3. joliet/ISO9660:1999/rrip explicitly requested via mount option:
+	 *	- disable rrip support even if available
+	 *	- disable IOS9660:1999 support even if available
+	 *
+	 * We need to adjust these flags as we discover the extensions
+	 * present. See below. These are just the starting values.
+	 */
+	use_rrip = (mount_flags & HSFSMNT_NORRIP) == 0;
+	use_vers2 = (mount_flags & HSFSMNT_NOVERS2) == 0;
+	use_joliet = (mount_flags & HSFSMNT_NOJOLIET) == 0;
 
 	/*
 	 * Open the device
@@ -561,23 +637,42 @@ hs_mountfs(
 	 * Init a new hsfs structure.
 	 */
 	fsp = kmem_zalloc(sizeof (*fsp), KM_SLEEP);
+	svp = kmem_zalloc(sizeof (*svp), KM_SLEEP);
+	jvp = kmem_zalloc(sizeof (*jvp), KM_SLEEP);
 
 	/* hardwire perms, uid, gid */
 	fsp->hsfs_vol.vol_uid = hsfs_default_uid;
 	fsp->hsfs_vol.vol_gid =  hsfs_default_gid;
 	fsp->hsfs_vol.vol_prot = hsfs_default_mode;
+	svp->vol_uid = hsfs_default_uid;
+	svp->vol_gid =  hsfs_default_gid;
+	svp->vol_prot = hsfs_default_mode;
+	jvp->vol_uid = hsfs_default_uid;
+	jvp->vol_gid =  hsfs_default_gid;
+	jvp->vol_prot = hsfs_default_mode;
 
 	/*
 	 * Look for a Standard File Structure Volume Descriptor,
 	 * of which there must be at least one.
 	 * If found, check for volume size consistency.
+	 *
+	 * If svp->lbn_size is != 0, we did find a ISO-9660:1999 SVD
+	 * If jvp->lbn_size is != 0, we did find a Joliet SVD.
 	 */
-	error = hs_findisovol(fsp, devvp, &fsp->hsfs_vol);
+	fsp->hsfs_namemax = ISO_FILE_NAMELEN;
+	fsp->hsfs_namelen = ISO_FILE_NAMELEN;
+	error = hs_findisovol(fsp, devvp, &fsp->hsfs_vol, svp, jvp);
 	if (error == EINVAL) /* no iso 9660 - try high sierra ... */
 		error = hs_findhsvol(fsp, devvp, &fsp->hsfs_vol);
 
 	if (error)
 		goto cleanup;
+
+	DTRACE_PROBE4(findvol,
+	    struct hsfs *, fsp,
+	    struct hs_volume *, &fsp->hsfs_vol,
+	    struct hs_volume *, svp,
+	    struct hs_volume *, jvp);
 
 	/*
 	 * Generate a file system ID from the CD-ROM,
@@ -608,8 +703,8 @@ hs_mountfs(
 
 	fsp->hsfs_devvp = devvp;
 	fsp->hsfs_vfs = vfsp;
-	fsp->hsfs_fsmnt = kmem_alloc(strlen(path) + 1, KM_SLEEP);
-	(void) strcpy(fsp->hsfs_fsmnt, path);
+	fsp->hsfs_fsmnt = kmem_alloc(pathbufsz, KM_SLEEP);
+	(void) strlcpy(fsp->hsfs_fsmnt, path, pathbufsz);
 
 	mutex_init(&fsp->hsfs_free_lock, NULL, MUTEX_DEFAULT, NULL);
 	rw_init(&fsp->hsfs_hash_lock, NULL, RW_DEFAULT, NULL);
@@ -621,30 +716,105 @@ hs_mountfs(
 	vfsp->vfs_fsid.val[0] = fsid;
 	vfsp->vfs_fsid.val[1] =  hsfsfstype;
 
+	if (!hs_getrootvp(vfsp, fsp, pathbufsz)) {
+		DTRACE_PROBE1(rootvp__failed, struct hsfs *, fsp);
+		error = EINVAL;
+		goto cleanup;
+	}
+	DTRACE_PROBE1(rootvp, struct hsfs *, fsp);
+
 	/*
-	 * If the root directory does not appear to be
-	 * valid, use what it points to as "." instead.
-	 * Some Defense Mapping Agency disks are non-conformant
-	 * in this way.
+	 * Attempt to discover a RR extension.
 	 */
-	if (!hsfs_valid_dir(&fsp->hsfs_vol.root_dir)) {
-		hs_log_bogus_disk_warning(fsp, HSFS_ERR_BAD_ROOT_DIR, 0);
-		if (hs_remakenode(fsp->hsfs_vol.root_dir.ext_lbn,
-			    (uint_t)0, vfsp, &fsp->hsfs_rootvp)) {
-			error = EINVAL;
-			hs_mounttab = hs_mounttab->hsfs_next;
-			mutex_destroy(&fsp->hsfs_free_lock);
-			rw_destroy(&fsp->hsfs_hash_lock);
-			kmem_free(fsp->hsfs_fsmnt, strlen(path) + 1);
-			mutex_exit(&hs_mounttab_lock);
-			goto cleanup;
-		}
-	} else {
-		fsp->hsfs_rootvp = hs_makenode(&fsp->hsfs_vol.root_dir,
-			fsp->hsfs_vol.root_dir.ext_lbn, 0, vfsp);
+	if (use_rrip) {
+		hp = VTOH(fsp->hsfs_rootvp);
+		hs_check_root_dirent(fsp->hsfs_rootvp, &(hp->hs_dirent));
 	}
 
-	/* mark vnode as VROOT */
+	has_rrip = IS_RRIP_IMPLEMENTED(fsp);
+	has_vers2 = (svp->lbn_size != 0);
+	has_joliet = (jvp->lbn_size != 0);
+
+	DTRACE_PROBE4(voltype__suggested, struct hsfs *, fsp,
+	    int, use_rrip, int, use_vers2, int, use_joliet);
+
+	DTRACE_PROBE4(voltype__actual, struct hsfs *, fsp,
+	    int, has_rrip, int, has_vers2, int, has_joliet);
+
+	DTRACE_PROBE4(findvol,
+	    struct hsfs *, fsp,
+	    struct hs_volume *, &fsp->hsfs_vol,
+	    struct hs_volume *, svp,
+	    struct hs_volume *, jvp);
+
+	force_rrip_off = !use_rrip ||
+	    (vfs_optionisset(vfsp, HOPT_JOLIET, NULL) && has_joliet) ||
+	    (vfs_optionisset(vfsp, HOPT_VERS2, NULL) && has_vers2);
+
+	force_vers2_off = !use_vers2 ||
+	    (vfs_optionisset(vfsp, HOPT_JOLIET, NULL) && has_joliet);
+
+	force_joliet_off = !use_joliet;
+
+	DTRACE_PROBE4(voltype__force_off, struct hsfs *, fsp,
+	    int, force_rrip_off, int, force_vers2_off, int, force_joliet_off);
+
+	/*
+	 * At the moment, we have references of all three possible
+	 * extensions (RR, ISO9660:1999/v2 and Joliet) if present.
+	 *
+	 * The "active" volume descriptor is RRIP (or ISO9660:1988).
+	 * We now switch to the user-requested one.
+	 */
+	redo_rootvp = 0;
+
+	if (force_rrip_off || !has_rrip) {
+		if (has_vers2 && !force_vers2_off) {
+			VN_RELE(fsp->hsfs_rootvp);
+			bcopy(svp, &fsp->hsfs_vol, sizeof (struct hs_volume));
+			fsp->hsfs_vol_type = HS_VOL_TYPE_ISO_V2;
+			vfsp->vfs_bsize = fsp->hsfs_vol.lbn_size;
+			redo_rootvp = 1;
+			has_joliet = 0;
+		} else if (has_joliet && !force_joliet_off) {
+			VN_RELE(fsp->hsfs_rootvp);
+			bcopy(jvp, &fsp->hsfs_vol, sizeof (struct hs_volume));
+			fsp->hsfs_vol_type = HS_VOL_TYPE_JOLIET;
+			vfsp->vfs_bsize = fsp->hsfs_vol.lbn_size;
+			redo_rootvp = 1;
+			has_vers2 = 0;
+		}
+	}
+
+	if (redo_rootvp) {
+		/*
+		 * Make sure not to use Rock Ridge.
+		 */
+		UNSET_IMPL_BIT(fsp, RRIP_BIT);
+		UNSET_SUSP_BIT(fsp);
+		has_rrip = 0;
+
+		if (!hs_getrootvp(vfsp, fsp, pathbufsz)) {
+			DTRACE_PROBE1(rootvp__failed, struct hsfs *, fsp);
+			error = EINVAL;
+			goto cleanup;
+		}
+		DTRACE_PROBE1(rootvp, struct hsfs *, fsp);
+	}
+	if (IS_RRIP_IMPLEMENTED(fsp)) {
+		has_vers2 = 0;
+		has_joliet = 0;
+	}
+	if (force_vers2_off)
+		has_vers2 = 0;
+	if (force_joliet_off)
+		has_joliet = 0;
+	DTRACE_PROBE4(voltype__taken, struct hsfs *, fsp,
+	    int, has_rrip, int, has_vers2, int, has_joliet);
+
+	/*
+	 * mark root node as VROOT
+	 */
 	fsp->hsfs_rootvp->v_flag |= VROOT;
 
 	/* Here we take care of some special case stuff for mountroot */
@@ -653,26 +823,72 @@ hs_mountfs(
 		rootvp = fsp->hsfs_rootvp;
 	}
 
-	/* XXX - ignore the path table for now */
-	fsp->hsfs_ptbl = NULL;
-	hp = VTOH(fsp->hsfs_rootvp);
-	hp->hs_ptbl_idx = NULL;
-
-	if (use_rrip)
-		hs_check_root_dirent(fsp->hsfs_rootvp, &(hp->hs_dirent));
-
-	fsp->hsfs_namemax = IS_RRIP_IMPLEMENTED(fsp)
-					? RRIP_FILE_NAMELEN
-					: ISO_FILE_NAMELEN;
-	/*
-	 * if RRIP, don't copy NOMAPLCASE or NOTRAILDOT to hsfs_flags
-	 */
-	if (IS_RRIP_IMPLEMENTED(fsp))
+	if (IS_RRIP_IMPLEMENTED(fsp)) {
+		/*
+		 * if RRIP, don't copy NOMAPLCASE or NOTRAILDOT to hsfs_flags
+		 */
 		mount_flags &= ~(HSFSMNT_NOMAPLCASE | HSFSMNT_NOTRAILDOT);
+
+		fsp->hsfs_namemax = RRIP_FILE_NAMELEN;
+		fsp->hsfs_namelen = RRIP_FILE_NAMELEN;
+
+		ASSERT(vfs_optionisset(vfsp, HOPT_RR, NULL));
+		vfs_clearmntopt(vfsp, HOPT_VERS2);
+		vfs_clearmntopt(vfsp, HOPT_JOLIET);
+
+	} else switch (fsp->hsfs_vol_type) {
+
+	case HS_VOL_TYPE_HS:
+	case HS_VOL_TYPE_ISO:
+	default:
+		/*
+		 * if iso v1, don't allow trailing spaces in iso file names
+		 */
+		mount_flags |= HSFSMNT_NOTRAILSPACE;
+		fsp->hsfs_namemax = ISO_NAMELEN_V2_MAX;
+		fsp->hsfs_namelen = ISO_FILE_NAMELEN;
+		vfs_clearmntopt(vfsp, HOPT_RR);
+		vfs_clearmntopt(vfsp, HOPT_VERS2);
+		vfs_clearmntopt(vfsp, HOPT_JOLIET);
+		break;
+
+	case HS_VOL_TYPE_ISO_V2:
+		/*
+		 * if iso v2, don't copy NOTRAILDOT to hsfs_flags
+		 */
+		mount_flags &= ~HSFSMNT_NOTRAILDOT;
+		mount_flags |= HSFSMNT_NOMAPLCASE | HSFSMNT_NOVERSION;
+		fsp->hsfs_namemax = ISO_NAMELEN_V2_MAX;
+		fsp->hsfs_namelen = ISO_NAMELEN_V2;
+		vfs_setmntopt(vfsp, HOPT_VERS2, NULL, 0);
+		vfs_clearmntopt(vfsp, HOPT_RR);
+		vfs_clearmntopt(vfsp, HOPT_JOLIET);
+		break;
+
+	case HS_VOL_TYPE_JOLIET:
+		/*
+		 * if Joliet, don't copy NOMAPLCASE or NOTRAILDOT to hsfs_flags
+		 */
+		mount_flags &= ~(HSFSMNT_NOMAPLCASE | HSFSMNT_NOTRAILDOT);
+		mount_flags |= HSFSMNT_NOMAPLCASE;
+		if (mount_flags & HSFSMNT_JOLIETLONG)
+			fsp->hsfs_namemax = JOLIET_NAMELEN_MAX*3; /* UTF-8 */
+		else
+			fsp->hsfs_namemax = MAXNAMELEN-1;
+		fsp->hsfs_namelen = JOLIET_NAMELEN*2;
+		vfs_setmntopt(vfsp, HOPT_JOLIET, NULL, 0);
+		vfs_clearmntopt(vfsp, HOPT_RR);
+		vfs_clearmntopt(vfsp, HOPT_VERS2);
+		break;
+	}
 
 	fsp->hsfs_flags = mount_flags;
 
-	/* set the magic word */
+	DTRACE_PROBE1(mount__done, struct hsfs *, fsp);
+
+	/*
+	 * set the magic word
+	 */
 	fsp->hsfs_magic = HSFS_MAGIC;
 	mutex_exit(&hs_mounttab_lock);
 
@@ -683,7 +899,54 @@ cleanup:
 	VN_RELE(devvp);
 	if (fsp)
 		kmem_free(fsp, sizeof (*fsp));
+	if (svp)
+		kmem_free(svp, sizeof (*svp));
+	if (jvp)
+		kmem_free(jvp, sizeof (*jvp));
 	return (error);
+}
+
+/*
+ * Get the rootvp associated with fsp->hsfs_vol
+ */
+static int
+hs_getrootvp(
+	struct vfs	*vfsp,
+	struct hsfs	*fsp,
+	size_t		pathsize)
+{
+	struct hsnode	*hp;
+
+	ASSERT(pathsize == strlen(fsp->hsfs_fsmnt) + 1);
+
+	/*
+	 * If the root directory does not appear to be
+	 * valid, use what it points to as "." instead.
+	 * Some Defense Mapping Agency disks are non-conformant
+	 * in this way.
+	 */
+	if (!hsfs_valid_dir(&fsp->hsfs_vol.root_dir)) {
+		hs_log_bogus_disk_warning(fsp, HSFS_ERR_BAD_ROOT_DIR, 0);
+		if (hs_remakenode(fsp->hsfs_vol.root_dir.ext_lbn,
+			    (uint_t)0, vfsp, &fsp->hsfs_rootvp)) {
+			hs_mounttab = hs_mounttab->hsfs_next;
+			mutex_destroy(&fsp->hsfs_free_lock);
+			rw_destroy(&fsp->hsfs_hash_lock);
+			kmem_free(fsp->hsfs_fsmnt, pathsize);
+			mutex_exit(&hs_mounttab_lock);
+			return (0);
+		}
+	} else {
+		fsp->hsfs_rootvp = hs_makenode(&fsp->hsfs_vol.root_dir,
+			fsp->hsfs_vol.root_dir.ext_lbn, 0, vfsp);
+	}
+
+	/* XXX - ignore the path table for now */
+	fsp->hsfs_ptbl = NULL;
+	hp = VTOH(fsp->hsfs_rootvp);
+	hp->hs_ptbl_idx = NULL;
+
+	return (1);
 }
 
 /*
@@ -789,7 +1052,7 @@ hs_parsehsvol(struct hsfs *fsp, uchar_t *volp, struct hs_volume *hvp)
 #else
 	hvp->ptbl_lbn = HSV_PTBL_MAN_MS(volp);
 #endif
-	hs_copylabel(hvp, HSV_VOL_ID(volp));
+	hs_copylabel(hvp, HSV_VOL_ID(volp), 0);
 
 	/*
 	 * Make sure that lbn_size is a power of two and otherwise valid.
@@ -801,7 +1064,7 @@ hs_parsehsvol(struct hsfs *fsp, uchar_t *volp, struct hs_volume *hvp)
 		return (EINVAL);
 	}
 	return (hs_parsedir(fsp, HSV_ROOT_DIR(volp), &hvp->root_dir,
-			(char *)NULL, (int *)NULL));
+			(char *)NULL, (int *)NULL, HDE_ROOT_DIR_REC_SIZE));
 }
 
 /*
@@ -810,11 +1073,16 @@ hs_parsehsvol(struct hsfs *fsp, uchar_t *volp, struct hs_volume *hvp)
  * Locate the Primary Volume Descriptor
  * parse it into an hs_volume structure.
  *
- * XXX - Supplementary, Partition not yet done
+ * XXX - Partition not yet done
+ *
+ * Except for fsp->hsfs_vol_type, no fsp member may be modified.
+ * fsp->hsfs_vol is modified indirectly via the *hvp argument.
  */
 static int
 hs_findisovol(struct hsfs *fsp, struct vnode *vp,
-    struct hs_volume *hvp)
+    struct hs_volume *hvp,
+    struct hs_volume *svp,
+    struct hs_volume *jvp)
 {
 	struct buf *secbp;
 	int i;
@@ -822,6 +1090,8 @@ hs_findisovol(struct hsfs *fsp, struct vnode *vp,
 	int error;
 	uint_t secno;
 	int foundpvd = 0;
+	int foundsvd = 0;
+	int foundjvd = 0;
 
 	secno = hs_findvoldesc(vp->v_rdev, ISO_VOLDESC_SEC);
 	secbp = bread(vp->v_rdev, secno * 4, ISO_SECTOR_SIZE);
@@ -839,11 +1109,11 @@ hs_findisovol(struct hsfs *fsp, struct vnode *vp,
 		for (i = 0; i < ISO_ID_STRLEN; i++)
 			if (ISO_STD_ID(volp)[i] != ISO_ID_STRING[i])
 				goto cantfind;
-		if (ISO_STD_VER(volp) != ISO_ID_VER)
-			goto cantfind;
 		switch (ISO_DESC_TYPE(volp)) {
 		case ISO_VD_PVD:
 			/* Standard File Structure */
+			if (ISO_STD_VER(volp) != ISO_ID_VER)
+				goto cantfind;
 			if (foundpvd != 1) {
 				fsp->hsfs_vol_type = HS_VOL_TYPE_ISO;
 				if (error = hs_parseisovol(fsp, volp, hvp)) {
@@ -855,6 +1125,23 @@ hs_findisovol(struct hsfs *fsp, struct vnode *vp,
 			break;
 		case ISO_VD_SVD:
 			/* Supplementary Volume Descriptor */
+			if (ISO_STD_VER(volp) == ISO_ID_VER2 &&
+			    foundsvd != 1) {
+				fsp->hsfs_vol_type = HS_VOL_TYPE_ISO;
+				if (error = hs_parseisovol(fsp, volp, svp)) {
+					brelse(secbp);
+					return (error);
+				}
+				foundsvd = 1;
+			}
+			if (hs_joliet_level(volp) >= 1 && foundjvd != 1) {
+				fsp->hsfs_vol_type = HS_VOL_TYPE_ISO;
+				if (error = hs_parseisovol(fsp, volp, jvp)) {
+					brelse(secbp);
+					return (error);
+				}
+				foundjvd = 1;
+			}
 			break;
 		case ISO_VD_BOOT:
 			break;
@@ -886,6 +1173,31 @@ cantfind:
 	brelse(secbp);
 	return (EINVAL);
 }
+
+/*
+ * Return 0 if no Joliet is found
+ * else return Joliet Level 1..3
+ */
+static int
+hs_joliet_level(uchar_t *volp)
+{
+	if (ISO_std_ver(volp)[0] == ISO_ID_VER &&
+	    ISO_svd_esc(volp)[0] == '%' &&
+	    ISO_svd_esc(volp)[1] == '/') {
+
+		switch (ISO_svd_esc(volp)[2]) {
+
+		case '@':
+			return (1);
+		case 'C':
+			return (2);
+		case 'E':
+			return (3);
+		}
+	}
+	return (0);
+}
+
 /*
  * hs_parseisovol
  *
@@ -917,7 +1229,7 @@ hs_parseisovol(struct hsfs *fsp, uchar_t *volp, struct hs_volume *hvp)
 #else
 	hvp->ptbl_lbn = ISO_PTBL_MAN_MS(volp);
 #endif
-	hs_copylabel(hvp, ISO_VOL_ID(volp));
+	hs_copylabel(hvp, ISO_VOL_ID(volp), hs_joliet_level(volp) >= 1);
 
 	/*
 	 * Make sure that lbn_size is a power of two and otherwise valid.
@@ -929,7 +1241,7 @@ hs_parseisovol(struct hsfs *fsp, uchar_t *volp, struct hs_volume *hvp)
 		return (EINVAL);
 	}
 	return (hs_parsedir(fsp, ISO_ROOT_DIR(volp), &hvp->root_dir,
-			(char *)NULL, (int *)NULL));
+			(char *)NULL, (int *)NULL, IDE_ROOT_DIR_REC_SIZE));
 }
 
 /*
@@ -995,8 +1307,19 @@ hs_getmdev(struct vfs *vfsp, char *fspec, int flags, dev_t *pdev, mode_t *mode,
 }
 
 static void
-hs_copylabel(struct hs_volume *hvp, unsigned char *label)
+hs_copylabel(struct hs_volume *hvp, unsigned char *label, int isjoliet)
 {
+	char	lbuf[64];	/* hs_joliet_cp() creates 48 bytes at most */
+
+	if (isjoliet) {
+		/*
+		 * hs_joliet_cp() will output 16..48 bytes.
+		 * We need to clear 'lbuf' to avoid junk chars past byte 15.
+		 */
+		bzero(lbuf, sizeof (lbuf));
+		hs_joliet_cp((char *)label, lbuf, 32);
+		label = (unsigned char *)lbuf;
+	}
 	/* cdrom volid is at most 32 bytes */
 	bcopy(label, hvp->vol_id, 32);
 	hvp->vol_id[31] = NULL;

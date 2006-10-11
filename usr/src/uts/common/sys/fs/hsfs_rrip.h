@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,8 +20,10 @@
  */
 /*
  * ISO 9660 RRIP extension filesystem specifications
- * Copyright (c) 1991,1997-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FS_HSFS_RRIP_H
@@ -39,9 +40,14 @@ extern "C" {
  * This is not a good place for them; we should probably have a file
  * named hsfs_mount.h for such stuff.
  */
-#define	HSFSMNT_NORRIP		0x1
-#define	HSFSMNT_NOTRAILDOT	0x2
-#define	HSFSMNT_NOMAPLCASE	0x4
+#define	HSFSMNT_NORRIP		0x1	/* -nrr option found		 */
+#define	HSFSMNT_NOTRAILDOT	0x2	/* ignore trailing '.'		 */
+#define	HSFSMNT_NOMAPLCASE	0x4	/* do not map filenames to lcase */
+#define	HSFSMNT_NOTRAILSPACE	0x8	/* no trailing space in iso 9660 */
+#define	HSFSMNT_NOVERSION	0x10	/* no version info in iso 9660 */
+#define	HSFSMNT_NOJOLIET	0x20	/* ignore Joliet even if present */
+#define	HSFSMNT_JOLIETLONG	0x40	/* do not truncate Joliet filenames */
+#define	HSFSMNT_NOVERS2		0x80	/* ignore ISO-9660:1999		 */
 
 /*
  * XXX: The following flag was used in the past to instruct the kernel to
@@ -185,9 +191,6 @@ FOR CONTACT INFORMATION."
 /*
  *  "NM" alternate name and "SL" symbolic link macros...
  */
-
-#define	RESTORE_NM(tmp, orig)	if (is_rrip && *(tmp) != '\0') \
-					(void) strcpy((orig), (tmp))
 
 #define	SYM_LINK_LEN(x)		(strlen(x) + 1)
 #define	RRIP_NAME_LEN_BASE	5

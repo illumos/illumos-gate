@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,8 +20,10 @@
  */
 /*
  * High Sierra filesystem internal routine definitions.
- * Copyright 1989,1990,1993,1997-1998,2000-2003 Sun Microsystems, Inc.
- * All rights reserved.  Use is subject to license terms.
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FS_HSFS_IMPL_H
@@ -57,9 +58,12 @@ extern struct vnode *hs_findhash(ino64_t nodeid, struct vfs *vfsp);
 extern void hs_freenode(vnode_t *vp, struct hsfs *fsp, int nopage);
 /* parse a directory entry */
 extern int hs_parsedir(struct hsfs *fsp, uchar_t *dirp,
-	struct hs_direntry *hdp, char *dnp, int *dnlen);
+	struct hs_direntry *hdp, char *dnp, int *dnlen, int last_offset);
 /* convert d-characters */
 extern int hs_namecopy(char *from, char *to, int size, ulong_t flags);
+extern int hs_jnamecopy(char *from, char *to, int size, int maxsize,
+	ulong_t flags);
+extern int hs_joliet_cp(char *from, char *to, int size);
 /* destroy the incore hnode table */
 extern void hs_filldirent(struct vnode *vp, struct hs_direntry *hdp);
 /* check vnode protection */
@@ -74,6 +78,7 @@ extern void hs_log_bogus_disk_warning(struct hsfs *fsp, int errtype,
 	uint_t data);
 extern int hsfs_valid_dir(struct hs_direntry *hd);
 extern void hs_init_hsnode_cache(void);
+extern void hs_fini_hsnode_cache(void);
 
 /*
  * Global data structures
