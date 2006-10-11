@@ -9,7 +9,7 @@
  */
 
 /*
- * Copyright 1994-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 1994-2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -707,6 +707,20 @@ store(from, lmtprcpts)
 }
 
 static void
+handle_error(err_num, bouncequota, path)
+	int err_num;
+	bool bouncequota;
+	char *path;
+{
+#ifdef EDQUOT
+	if (err_num == EDQUOT && bouncequota) {
+		mailerr("552 5.2.2", "%s: %s", path, sm_errstring(err_num));
+	} else
+#endif /* EDQUOT */
+		mailerr("450 4.2.0", "%s: %s", path, sm_errstring(err_num));
+}
+
+static void
 deliver(hfd, bfd, name, bouncequota)
 	int hfd;
 	int bfd;
@@ -843,7 +857,7 @@ tryagain:
 		goto err1;
 	}
 	if ((write(mbfd, unix_from_line, ulen)) != ulen) {
-		mailerr("450 4.2.0", "temporary file: %s", strerror(errno));
+		handle_error(errno, bouncequota, path);
 		goto err2;
 	}
 
@@ -856,17 +870,11 @@ tryagain:
 		for (off = 0; off < nr; nr -= nw, off += nw)
 			if ((nw = write(mbfd, buf + off, nr)) < 0)
 			{
-#ifdef EDQUOT
-				if (errno == EDQUOT && bouncequota)
-					mailerr("552 5.2.2", "%s: %s",
-						path, sm_errstring(errno));
-#endif /* EDQUOT */
-				mailerr("450 4.2.0", "%s: %s",
-					path, sm_errstring(errno));
+				handle_error(errno, bouncequota, path);
 				goto err2;
 			}
 	if (nr < 0) {
-		mailerr("450 4.2.0", "temporary file: %s", strerror(errno));
+		handle_error(errno, bouncequota, path);
 		goto err2;
 	}
 
@@ -879,7 +887,7 @@ tryagain:
 	    content_length);
 	len = strlen(buf);
 	if (write(mbfd, buf, len) != len) {
-		mailerr("450 4.2.0", "temporary file: %s", strerror(errno));
+		handle_error(errno, bouncequota, path);
 		goto err2;
 	}
 
@@ -891,8 +899,7 @@ tryagain:
 	while ((nr = read(bfd, buf, sizeof (buf))) > 0) {
 		for (off = 0; off < nr; nr -= nw, off += nw)
 			if ((nw = write(mbfd, buf + off, nr)) < 0) {
-				mailerr("450 4.2.0", "temporary file: %s",
-					strerror(errno));
+				handle_error(errno, bouncequota, path);
 				goto err2;
 			}
 		if (sigterm_caught) {
@@ -901,13 +908,13 @@ tryagain:
 		}
 	}
 	if (nr < 0) {
-		mailerr("450 4.2.0", "temporary file: %s", strerror(errno));
+		handle_error(errno, bouncequota, path);
 		goto err2;
 	}
 
 	/* Flush to disk, don't wait for update. */
 	if (fsync(mbfd)) {
-		mailerr("450 4.2.0", "temporary file: %s", strerror(errno));
+		handle_error(errno, bouncequota, path);
 err2:		if (mbfd >= 0)
 			(void)ftruncate(mbfd, curoff);
 err1:		(void)close(mbfd);
@@ -933,13 +940,7 @@ err0:		mailunlock();
 	/* Close and check -- NFS doesn't write until the close. */
 	if (close(mbfd))
 	{
-#ifdef EDQUOT
-		if (errno == EDQUOT && bouncequota)
-			mailerr("552 5.2.2", "%s: %s", path,
-			    sm_errstring(errno));
-		else
-#endif /* EDQUOT */
-		mailerr("450 4.2.0", "%s: %s", path, sm_errstring(errno));
+		handle_error(errno, bouncequota, path);
 		mbfd = open(path, O_WRONLY, 0);
 		if (mbfd < 0 ||
 		    cursize == 0
