@@ -1317,7 +1317,7 @@ hs_copylabel(struct hs_volume *hvp, unsigned char *label, int isjoliet)
 		 * We need to clear 'lbuf' to avoid junk chars past byte 15.
 		 */
 		bzero(lbuf, sizeof (lbuf));
-		hs_joliet_cp((char *)label, lbuf, 32);
+		(void)hs_joliet_cp((char *)label, lbuf, 32);
 		label = (unsigned char *)lbuf;
 	}
 	/* cdrom volid is at most 32 bytes */
