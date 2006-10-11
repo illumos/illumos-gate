@@ -61,7 +61,8 @@ CMN_DRM_SRC	= $(UTSBASE)/common/io/drm
 
 #
 #	dependency
-LDFLAGS	+=      -dy -Nmisc/drm -Nmisc/agpmaster -Nmisc/gfx_private -Nmisc/pci_autoconfig
+LDFLAGS	+= -dy -Nmisc/drm -Nmisc/agpmaster -Nmisc/gfx_private \
+	   -Nmisc/pci_autoconfig
 
 #
 #	Include common rules.
@@ -103,7 +104,7 @@ $(I915_DRV_O):	$(DRM_PCIIDS_H)
 $(I915_DRV_C):	$(DRM_PCIIDS_H)
 
 $(DRM_PCIIDS_H):	$(DRM_PCIIDS_TXT)
-	$(CREATE_SUNOS_PCI_LISTS_SH) $(DRM_PCIIDS_TXT) > $@
+	/bin/sh $(CREATE_SUNOS_PCI_LISTS_SH) $(DRM_PCIIDS_TXT) > $@
 
 #
 #	Include common targets.
