@@ -1983,13 +1983,45 @@ if [ "$build_ok" = "y" ]; then
 		fi
 
 		if [ -f "$REF_PROTO_LIST" ]; then
+			# For builds that copy the IHV proto area (-X), add the
+			# IHV proto list to the reference list if the reference
+			# was built without -X.
+			#
+			# For builds that don't copy the IHV proto area, add the
+			# IHV proto list to the build's proto list if the
+			# reference was built with -X.
+			#
+			# Use the presence of the first file entry of the cached
+			# IHV proto list in the reference list to determine
+			# whether it was build with -X or not.
+			IHV_REF_PROTO_LIST=$SRC/pkgdefs/etc/proto_list_ihv_$MACH 
+			grepfor=$(nawk '$1 == "f" { print $2; exit }' \
+				$IHV_REF_PROTO_LIST 2> /dev/null)
+			if [ $? = 0 -a -n "$grepfor" ]; then
+				if [ "$X_FLAG" = "y" ]; then
+					grep -w "$grepfor" \
+						$REF_PROTO_LIST > /dev/null
+					if [ ! "$?" = "0" ]; then
+						REF_IHV_PROTO="-d $IHV_REF_PROTO_LIST"
+					fi
+				else
+					grep -w "$grepfor" \
+						$REF_PROTO_LIST > /dev/null
+					if [ "$?" = "0" ]; then
+						IHV_PROTO_LIST="$IHV_REF_PROTO_LIST"
+					fi
+				fi
+			fi
+
 			$PROTOCMPTERSE \
 			  "Files in yesterday's proto area, but not today's:" \
 			  "Files in today's proto area, but not yesterday's:" \
 			  "Files that changed between yesterday and today:" \
 			  ${ELIST} \
 			  -d $REF_PROTO_LIST \
+			  $REF_IHV_PROTO \
 			  $ATLOG/proto_list_${MACH} \
+			  $IHV_PROTO_LIST \
 				>> $mail_msg_file
 		fi
 		# Compare the build's proto list with current package
