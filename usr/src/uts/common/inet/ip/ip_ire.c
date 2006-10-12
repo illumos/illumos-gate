@@ -2486,7 +2486,9 @@ ire_to_ill(const ire_t *ire)
 	 *    condition may not hold during that period since the ires
 	 *    are added one at a time. Thus one of the pair could have been
 	 *    added and the other not yet added.
-	 * 3) For all others return the ones pointed by ire_ipif->ipif_ill.
+	 * 3) For many other IREs (e.g., IRE_LOCAL), ire_rfq indicates the ill.
+	 * 4) For all others return the ones pointed by ire_ipif->ipif_ill.
+	 *    That handles IRE_LOOPBACK.
 	 */
 
 	if (ire->ire_type == IRE_CACHE) {
@@ -2505,6 +2507,8 @@ ire_to_ill(const ire_t *ire)
 				ill = (ill_t *)ire_next->ire_stq->q_ptr;
 			}
 		}
+	} else if (ire->ire_rfq != NULL) {
+		ill = ire->ire_rfq->q_ptr;
 	} else if (ire->ire_ipif != NULL) {
 		ill = ire->ire_ipif->ipif_ill;
 	}
@@ -4830,14 +4834,14 @@ ire_local_same_ill_group(ire_t *ire_local, ire_t *xmit_ire)
 	ill_t		*recv_ill, *xmit_ill;
 	ill_group_t	*recv_group, *xmit_group;
 
-	ASSERT(ire_local->ire_type == IRE_LOCAL);
-	ASSERT(ire_local->ire_rfq != NULL);
-	ASSERT(xmit_ire->ire_type & (IRE_CACHE|IRE_BROADCAST|IRE_INTERFACE));
-	ASSERT(xmit_ire->ire_stq != NULL);
-	ASSERT(xmit_ire->ire_ipif != NULL);
+	ASSERT(ire_local->ire_type & (IRE_LOCAL|IRE_LOOPBACK));
+	ASSERT(xmit_ire->ire_type & (IRE_CACHETABLE));
 
-	recv_ill = ire_local->ire_rfq->q_ptr;
-	xmit_ill = xmit_ire->ire_stq->q_ptr;
+	recv_ill = ire_to_ill(ire_local);
+	xmit_ill = ire_to_ill(xmit_ire);
+
+	ASSERT(recv_ill != NULL);
+	ASSERT(xmit_ill != NULL);
 
 	if (recv_ill == xmit_ill)
 		return (B_TRUE);
