@@ -212,7 +212,6 @@ static void		i_mdi_log_sysevent(dev_info_t *, char *, char *);
 /*
  * Internal mdi_pathinfo node functions
  */
-static int		i_mdi_pi_kstat_create(mdi_pathinfo_t *);
 static void		i_mdi_pi_kstat_destroy(mdi_pathinfo_t *);
 
 static mdi_vhci_t	*i_mdi_vhci_class2vhci(char *);
@@ -3486,10 +3485,9 @@ state_change_exit:
 int
 mdi_pi_online(mdi_pathinfo_t *pip, int flags)
 {
-	mdi_client_t *ct = MDI_PI(pip)->pi_client;
-	dev_info_t *cdip;
+	mdi_client_t	*ct = MDI_PI(pip)->pi_client;
 	int		client_held = 0;
-	int rv;
+	int		rv;
 
 	ASSERT(ct != NULL);
 	rv = i_mdi_pi_state_change(pip, MDI_PATHINFO_STATE_ONLINE, flags);
@@ -3517,27 +3515,6 @@ mdi_pi_online(mdi_pathinfo_t *pip, int flags)
 		MDI_CLIENT_UNLOCK(ct);
 	}
 
-	/*
-	 * Create the per-path (pathinfo) IO and error kstats which
-	 * are reported via iostat(1m).
-	 *
-	 * Defer creating the per-path kstats if device is not yet
-	 * attached;  the names of the kstats are constructed in part
-	 * using the devices instance number which is assigned during
-	 * process of attaching the client device.
-	 *
-	 * The framework post_attach handler, mdi_post_attach(), is
-	 * is responsible for initializing the client's pathinfo list
-	 * once successfully attached.
-	 */
-	cdip = ct->ct_dip;
-	ASSERT(cdip);
-	if (cdip == NULL || !i_ddi_devi_attached(cdip))
-		return (rv);
-
-	MDI_CLIENT_LOCK(ct);
-	rv = i_mdi_pi_kstat_create(pip);
-	MDI_CLIENT_UNLOCK(ct);
 	return (rv);
 }
 
@@ -4882,7 +4859,7 @@ mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
 {
 	mdi_phci_t	*ph;
 	mdi_client_t	*ct;
-	mdi_pathinfo_t	*pip;
+	mdi_vhci_t	*vh;
 
 	if (MDI_PHCI(dip)) {
 		ph = i_devi_get_phci(dip);
@@ -4940,18 +4917,13 @@ mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
 			}
 
 			/*
-			 * Client device has successfully attached.
-			 * Create kstats for any pathinfo structures
-			 * initially associated with this client.
+			 * Client device has successfully attached, inform
+			 * the vhci.
 			 */
-			for (pip = ct->ct_path_head; pip != NULL;
-			    pip = (mdi_pathinfo_t *)
-			    MDI_PI(pip)->pi_client_link) {
-				if (!MDI_PI_IS_OFFLINE(pip)) {
-					(void) i_mdi_pi_kstat_create(pip);
-					i_mdi_report_path_state(ct, pip);
-				}
-			}
+			vh = ct->ct_vhci;
+			if (vh->vh_ops->vo_client_attached)
+				(*vh->vh_ops->vo_client_attached)(dip);
+
 			MDI_CLIENT_SET_ATTACH(ct);
 			break;
 
@@ -5247,67 +5219,36 @@ i_mdi_client_post_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, int error)
 	MDI_CLIENT_UNLOCK(ct);
 }
 
+int
+mdi_pi_kstat_exists(mdi_pathinfo_t *pip)
+{
+	return (MDI_PI(pip)->pi_kstats ? 1 : 0);
+}
+
 /*
  * create and install per-path (client - pHCI) statistics
  * I/O stats supported: nread, nwritten, reads, and writes
  * Error stats - hard errors, soft errors, & transport errors
  */
-static int
-i_mdi_pi_kstat_create(mdi_pathinfo_t *pip)
+int
+mdi_pi_kstat_create(mdi_pathinfo_t *pip, char *ksname)
 {
-
-	dev_info_t *client = MDI_PI(pip)->pi_client->ct_dip;
-	dev_info_t *ppath = MDI_PI(pip)->pi_phci->ph_dip;
-	char ksname[KSTAT_STRLEN];
-	mdi_pathinfo_t *cpip;
-	const char *err_postfix = ",err";
-	kstat_t	*kiosp, *kerrsp;
-	struct pi_errs	*nsp;
-	struct mdi_pi_kstats *mdi_statp;
-
-	ASSERT(client != NULL && ppath != NULL);
-
-	ASSERT(MDI_CLIENT_LOCKED(MDI_PI(pip)->pi_client));
+	kstat_t			*kiosp, *kerrsp;
+	struct pi_errs		*nsp;
+	struct mdi_pi_kstats	*mdi_statp;
 
 	if (MDI_PI(pip)->pi_kstats != NULL)
 		return (MDI_SUCCESS);
 
-	for (cpip = MDI_PI(pip)->pi_client->ct_path_head; cpip != NULL;
-	    cpip = (mdi_pathinfo_t *)(MDI_PI(cpip)->pi_client_link)) {
-		if ((cpip == pip) || MDI_PI_IS_OFFLINE(pip))
-			continue;
-		/*
-		 * We have found a different path with same parent
-		 * kstats for a given client-pHCI are common
-		 */
-		if ((MDI_PI(cpip)->pi_phci->ph_dip == ppath) &&
-		    (MDI_PI(cpip)->pi_kstats != NULL)) {
-			MDI_PI(cpip)->pi_kstats->pi_kstat_ref++;
-			MDI_PI(pip)->pi_kstats = MDI_PI(cpip)->pi_kstats;
-			return (MDI_SUCCESS);
-		}
-	}
-
-	/*
-	 * stats are named as follows: TGTx.HBAy, e.g. "ssd0.fp0"
-	 * clamp length of name against max length of error kstat name
-	 */
-	if (snprintf(ksname, KSTAT_STRLEN, "%s%d.%s%d",
-	    ddi_driver_name(client), ddi_get_instance(client),
-	    ddi_driver_name(ppath), ddi_get_instance(ppath)) >
-	    (KSTAT_STRLEN - strlen(err_postfix))) {
-		return (MDI_FAILURE);
-	}
 	if ((kiosp = kstat_create("mdi", 0, ksname, "iopath",
-	    KSTAT_TYPE_IO, 1, 0)) == NULL) {
+	    KSTAT_TYPE_IO, 1, KSTAT_FLAG_PERSISTENT)) == NULL) {
 		return (MDI_FAILURE);
 	}
 
-	(void) strcat(ksname, err_postfix);
+	(void) strcat(ksname, ",err");
 	kerrsp = kstat_create("mdi", 0, ksname, "iopath_errors",
 	    KSTAT_TYPE_NAMED,
 	    sizeof (struct pi_errs) / sizeof (kstat_named_t), 0);
-
 	if (kerrsp == NULL) {
 		kstat_delete(kiosp);
 		return (MDI_FAILURE);
@@ -5351,6 +5292,8 @@ i_mdi_pi_kstat_destroy(mdi_pathinfo_t *pip)
 
 	struct mdi_pi_kstats *mdi_statp;
 
+	if (MDI_PI(pip)->pi_kstats == NULL)
+		return;
 	if ((mdi_statp = MDI_PI(pip)->pi_kstats) == NULL)
 		return;
 

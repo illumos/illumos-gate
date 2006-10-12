@@ -54,12 +54,13 @@
 #define	DISK_EXTENDED		0x0004
 #define	DISK_ERRORS		0x0008
 #define	DISK_EXTENDED_ERRORS	0x0010
-#define	DISK_IOPATH		0x0020
-#define	DISK_NORMAL		(DISK_OLD | DISK_NEW)
+#define	DISK_IOPATH_LI		0x0020	/* LunInitiator */
+#define	DISK_IOPATH_LTI		0x0040	/* LunTargetInitiator */
 
+#define	DISK_NORMAL		(DISK_OLD | DISK_NEW)
 #define	DISK_IO_MASK		(DISK_OLD | DISK_NEW | DISK_EXTENDED)
 #define	DISK_ERROR_MASK		(DISK_ERRORS | DISK_EXTENDED_ERRORS)
-#define	PRINT_VERTICAL		(DISK_ERROR_MASK | DISK_EXTENDED | DISK_IOPATH)
+#define	PRINT_VERTICAL		(DISK_ERROR_MASK | DISK_EXTENDED)
 
 #define	REPRINT 19
 
@@ -114,7 +115,7 @@ static	uint_t	hdr_out;
  */
 static	uint_t	do_tty;			/* show tty info (-t) */
 static	uint_t	do_disk;		/* show disk info per selected */
-					/* format (-d, -D, -e, -E, -x -X) */
+					/* format (-d, -D, -e, -E, -x -X -Y) */
 static	uint_t	do_cpu;			/* show cpu info (-c) */
 static	uint_t	do_interval;		/* do intervals (-I) */
 static	int	do_partitions;		/* per-partition stats (-p) */
@@ -146,8 +147,11 @@ static  uint_t	show_mountpts;		/* show mount points */
 static	int 	interval;		/* interval (seconds) to output */
 static	int 	iter;			/* iterations from command line */
 
-#define	SMALL_SCRATCH_BUFLEN	64
-#define	DISPLAYED_NAME_FORMAT "%-9.9s"
+#define	SMALL_SCRATCH_BUFLEN	MAXNAMELEN
+
+static int	iodevs_nl;		/* name field width */
+#define	IODEVS_NL_MIN		6	/* not too thin for "device" */
+#define	IODEVS_NL_MAX		24	/* but keep full width under 80 */
 
 static	char	disk_header[132];
 static	uint_t 	dh_len;			/* disk header length for centering */
@@ -155,8 +159,8 @@ static  int 	lineout;		/* data waiting to be printed? */
 
 static struct snapshot *newss;
 static struct snapshot *oldss;
-static	double	getime;		/* elapsed time */
-static	double	percent;	/* 100 / etime */
+static	double	getime;			/* elapsed time */
+static	double	percent;		/* 100 / etime */
 
 /*
  * List of functions to be called which will construct the desired output
@@ -164,7 +168,6 @@ static	double	percent;	/* 100 / etime */
 static format_t	*formatter_list;
 static format_t *formatter_end;
 
-static uint64_t	hrtime_delta(hrtime_t, hrtime_t);
 static u_longlong_t	ull_delta(u_longlong_t, u_longlong_t);
 static uint_t 	u32_delta(uint_t, uint_t);
 static void setup(void (*nfunc)(void));
@@ -205,7 +208,6 @@ main(int argc, char **argv)
 	int iiter;
 
 	do_args(argc, argv);
-	do_format();
 
 	/*
 	 * iostat historically showed CPU changes, even though
@@ -218,9 +220,13 @@ main(int argc, char **argv)
 
 	if (do_disk && !do_partitions_only)
 		df.if_allowed_types |= IODEV_DISK;
-	if (do_disk & DISK_IOPATH) {
-		df.if_allowed_types |= IODEV_IOPATH;
-		types |= SNAP_IOPATHS;
+	if (do_disk & DISK_IOPATH_LI) {
+		df.if_allowed_types |= IODEV_IOPATH_LTI;
+		types |= SNAP_IOPATHS_LI;
+	}
+	if (do_disk & DISK_IOPATH_LTI) {
+		df.if_allowed_types |= IODEV_IOPATH_LTI;
+		types |= SNAP_IOPATHS_LTI;
 	}
 	if (do_disk & DISK_ERROR_MASK)
 		types |= SNAP_IODEV_ERRORS;
@@ -232,7 +238,7 @@ main(int argc, char **argv)
 		types |= SNAP_IODEV_DEVID;
 	if (do_controller) {
 		if (!(do_disk & PRINT_VERTICAL) ||
-			(do_disk & DISK_EXTENDED_ERRORS))
+		    (do_disk & DISK_EXTENDED_ERRORS))
 			fail(0, "-C can only be used with -e or -x.");
 		types |= SNAP_CONTROLLERS;
 		df.if_allowed_types |= IODEV_CONTROLLER;
@@ -254,6 +260,15 @@ main(int argc, char **argv)
 
 	kc = open_kstat();
 	newss = acquire_snapshot(kc, types, &df);
+
+	/* compute width of "device" field */
+	iodevs_nl = newss->s_iodevs_is_name_maxlen;
+	iodevs_nl = (iodevs_nl < IODEVS_NL_MIN) ?
+	    IODEVS_NL_MIN : iodevs_nl;
+	iodevs_nl = (iodevs_nl > IODEVS_NL_MAX) ?
+	    IODEVS_NL_MAX : iodevs_nl;
+
+	do_format();
 
 	iiter = iter;
 	do {
@@ -290,6 +305,12 @@ main(int argc, char **argv)
 		free_snapshot(oldss);
 		oldss = newss;
 		newss = acquire_snapshot(kc, types, &df);
+		iodevs_nl = (newss->s_iodevs_is_name_maxlen > iodevs_nl) ?
+		    newss->s_iodevs_is_name_maxlen : iodevs_nl;
+		iodevs_nl = (iodevs_nl < IODEVS_NL_MIN) ?
+		    IODEVS_NL_MIN : iodevs_nl;
+		iodevs_nl = (iodevs_nl > IODEVS_NL_MAX) ?
+		    IODEVS_NL_MAX : iodevs_nl;
 
 		if (!suppress_state)
 			snapshot_report_changes(oldss, newss);
@@ -305,7 +326,7 @@ main(int argc, char **argv)
 	free_snapshot(oldss);
 	free_snapshot(newss);
 	(void) kstat_close(kc);
-
+	free(df.if_names);
 	return (0);
 }
 
@@ -337,7 +358,9 @@ show_disk_name(void *v1, void *v2, void *data)
 	if (dev == NULL)
 		return;
 
-	name = dev->is_pretty ? dev->is_pretty : dev->is_name;
+	name = do_conversions ? dev->is_pretty : dev->is_name;
+	name = name ? name : dev->is_name;
+
 	if (!do_raw) {
 		uint_t width;
 
@@ -561,7 +584,8 @@ show_disk(void *v1, void *v2, void *data)
 		break;
 	}
 
-	disk_name = new->is_pretty ? new->is_pretty : new->is_name;
+	disk_name = do_conversions ? new->is_pretty : new->is_name;
+	disk_name = disk_name ? disk_name : new->is_name;
 
 	/*
 	 * Only do if we want IO stats - Avoids errors traveling this
@@ -576,8 +600,18 @@ show_disk(void *v1, void *v2, void *data)
 			    new->is_snaptime);
 		}
 
-		if (new->is_type == IODEV_CONTROLLER && new->is_nr_children)
-			t_delta /= new->is_nr_children;
+		if (new->is_nr_children) {
+			if (new->is_type == IODEV_CONTROLLER) {
+				t_delta /= new->is_nr_children;
+			} else if ((new->is_type == IODEV_IOPATH_LT) ||
+			    (new->is_type == IODEV_IOPATH_LI)) {
+				/* synthetic path */
+				if (!old) {
+					t_delta = new->is_crtime;
+				}
+				t_delta /= new->is_nr_children;
+			}
+		}
 
 		hr_etime = (double)t_delta;
 		if (hr_etime == 0.0)
@@ -724,11 +758,12 @@ show_disk(void *v1, void *v2, void *data)
 	if (do_disk & (DISK_EXTENDED | DISK_ERRORS)) {
 		if ((!do_conversions) && ((suppress_zero == 0) ||
 		    ((do_disk & DISK_EXTENDED) == 0))) {
-			if (do_raw == 0)
-				push_out(DISPLAYED_NAME_FORMAT,
-				    disk_name);
-			else
+			if (do_raw == 0) {
+				push_out("%-*.*s",
+				    iodevs_nl, iodevs_nl, disk_name);
+			} else {
 				push_out(disk_name);
+			}
 		}
 	}
 
@@ -751,14 +786,15 @@ show_disk(void *v1, void *v2, void *data)
 		if (suppress_zero) {
 			if (fzero(rps) && fzero(wps) && fzero(krps) &&
 			    fzero(kwps) && fzero(avw) && fzero(avr) &&
-			    fzero(serv) && fzero(w_pct) && fzero(r_pct))
+			    fzero(serv) && fzero(w_pct) && fzero(r_pct)) {
 				doit = 0;
-			else if (do_conversions == 0) {
-				if (do_raw == 0)
-					push_out(DISPLAYED_NAME_FORMAT,
-					    disk_name);
-				else
+			} else if (do_conversions == 0) {
+				if (do_raw == 0) {
+					push_out("%-*.*s",
+					    iodevs_nl, iodevs_nl, disk_name);
+				} else {
 					push_out(disk_name);
+				}
 			}
 		}
 		if (doit) {
@@ -886,7 +922,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: iostat [-cCdDeEiImMnpPrstxXz] "
+	    "Usage: iostat [-cCdDeEiImMnpPrstxXYz] "
 	    " [-l n] [-T d|u] [disk ...] [interval [count]]\n"
 	    "\t\t-c: 	report percentage of time system has spent\n"
 	    "\t\t\tin user/system/wait/idle mode\n"
@@ -915,6 +951,7 @@ usage(void)
 	    "\t\t-t: 	display chars read/written to terminals\n"
 	    "\t\t-x: 	display extended disk statistics\n"
 	    "\t\t-X: 	display I/O path statistics\n"
+	    "\t\t-Y: 	display I/O path (I/T/L) statistics\n"
 	    "\t\t-z: 	Suppress entries with all zero values\n");
 	exit(1);
 }
@@ -927,15 +964,15 @@ show_disk_errors(void *v1, void *v2, void *d)
 	kstat_named_t *knp;
 	size_t  col;
 	int	i, len;
-	char	*dev_name = disk->is_name;
+	char	*dev_name;
 
 	if (disk->is_errors.ks_ndata == 0)
 		return;
 	if (disk->is_type == IODEV_CONTROLLER)
 		return;
 
-	if (disk->is_pretty)
-		dev_name = disk->is_pretty;
+	dev_name = do_conversions ? disk->is_pretty : disk->is_name;
+	dev_name = dev_name ? dev_name : disk->is_name;
 
 	len = strlen(dev_name);
 	if (len > 20)
@@ -1013,7 +1050,7 @@ do_args(int argc, char **argv)
 	extern char 	*optarg;
 	extern int 	optind;
 
-	while ((c = getopt(argc, argv, "tdDxXCciIpPnmMeEszrT:l:")) != EOF)
+	while ((c = getopt(argc, argv, "tdDxXYCciIpPnmMeEszrT:l:")) != EOF)
 		switch (c) {
 		case 't':
 			do_tty++;
@@ -1028,7 +1065,16 @@ do_args(int argc, char **argv)
 			do_disk |= DISK_EXTENDED;
 			break;
 		case 'X':
-			do_disk |= DISK_IOPATH;
+			if (do_disk & DISK_IOPATH_LTI)
+				errflg++;	/* -Y already used */
+			else
+				do_disk |= DISK_IOPATH_LI;
+			break;
+		case 'Y':
+			if (do_disk & DISK_IOPATH_LI)
+				errflg++;	/* -X already used */
+			else
+				do_disk |= DISK_IOPATH_LTI;
 			break;
 		case 'C':
 			do_controller++;
@@ -1100,9 +1146,18 @@ do_args(int argc, char **argv)
 	if (errflg) {
 		usage();
 	}
+
 	/* if no output classes explicity specified, use defaults */
 	if (do_tty == 0 && do_disk == 0 && do_cpu == 0)
 		do_tty = do_cpu = 1, do_disk = DISK_OLD;
+
+	/*
+	 * multi-path options (-X, -Y) without a specific vertical
+	 * output format (-x, -e, -E) imply extended -x format
+	 */
+	if ((do_disk & (DISK_IOPATH_LI | DISK_IOPATH_LTI)) &&
+	    !(do_disk & PRINT_VERTICAL))
+		do_disk |= DISK_EXTENDED;
 
 	/*
 	 * If conflicting options take the preferred
@@ -1113,12 +1168,6 @@ do_args(int argc, char **argv)
 		do_disk &= ~DISK_NORMAL;
 	if ((do_disk & DISK_NORMAL) && (do_disk & DISK_ERROR_MASK))
 		do_disk &= ~DISK_ERROR_MASK;
-
-	/*
-	 * I/O path stats are only available with extended (-x) stats
-	 */
-	if ((do_disk & DISK_IOPATH) && !(do_disk & DISK_EXTENDED))
-		do_disk &= ~DISK_IOPATH;
 
 	/* nfs, tape, always shown */
 	df.if_allowed_types = IODEV_NFS | IODEV_TAPE;
@@ -1150,11 +1199,14 @@ do_args(int argc, char **argv)
 		 * "Note:  disks  explicitly  requested
 		 * are not subject to this disk limit"
 		 */
-		if (count > df.if_max_iodevs)
+		if ((count > df.if_max_iodevs) ||
+		    (count && (df.if_max_iodevs == UNLIMITED_IODEVS)))
 			df.if_max_iodevs = count;
+
 		df.if_names = safe_alloc(count * sizeof (char *));
 		(void) memset(df.if_names, 0, count * sizeof (char *));
 
+		df.if_nr_names = 0;
 		while (optind < argc && !isdigit(argv[optind][0]))
 			df.if_names[df.if_nr_names++] = argv[optind++];
 	}
@@ -1219,20 +1271,29 @@ do_format(void)
 			    fstr, ch, ch);
 			break;
 		case DISK_EXTENDED:
+			/* This is -x option */
 			if (!do_conversions) {
-				if (do_raw == 0)
-					fstr = "device       r/%c    w/%c   "
+				/* without -n option */
+				if (do_raw == 0) {
+					/* without -r option */
+					(void) snprintf(disk_header,
+					    sizeof (disk_header),
+					    "%-*.*s    r/%c    w/%c   "
 					    "%cr/%c   %cw/%c wait actv  "
-					    "svc_t  %%%%w  %%%%b %s";
-				else
-					fstr = "device,r/%c,w/%c,%cr/%c,%cw/%c,"
-						"wait,actv,svc_t,%%%%w,"
-						"%%%%b,%s";
-				(void) snprintf(disk_header,
-				    sizeof (disk_header),
-				    fstr, ch, ch, iosz, ch, iosz,
-				    ch, header);
+					    "svc_t  %%%%w  %%%%b %s",
+					    iodevs_nl, iodevs_nl, "device",
+					    ch, ch, iosz, ch, iosz, ch, header);
+				} else {
+					/* with -r option */
+					(void) snprintf(disk_header,
+					    sizeof (disk_header),
+					    "device,r/%c,w/%c,%cr/%c,%cw/%c,"
+					    "wait,actv,svc_t,%%%%w,"
+					    "%%%%b,%s",
+					    ch, ch, iosz, ch, iosz, ch, header);
+				}
 			} else {
+				/* with -n option */
 				if (do_raw == 0) {
 					fstr = "    r/%c    w/%c   %cr/%c   "
 					    "%cw/%c wait actv wsvc_t asvc_t  "
@@ -1255,15 +1316,14 @@ do_format(void)
 	/* do DISK_ERRORS header (already added above for DISK_EXTENDED) */
 	if ((do_disk & DISK_ERRORS) &&
 	    ((do_disk & DISK_IO_MASK) != DISK_EXTENDED)) {
-		char *sep;
-
 		if (!do_conversions) {
-			if (do_raw == 0) {
-				sep = "     ";
-			} else
-				sep = ",";
-			(void) snprintf(disk_header, sizeof (disk_header),
-			    "%s%s%s", "device", sep, header);
+			if (do_raw == 0)
+				(void) snprintf(disk_header,
+				    sizeof (disk_header), "%-*.*s  %s",
+				    iodevs_nl, iodevs_nl, "device", header);
+			else
+				(void) snprintf(disk_header,
+				    sizeof (disk_header), "device,%s", header);
 		} else {
 			if (do_raw == 0) {
 				(void) snprintf(disk_header,
@@ -1644,63 +1704,6 @@ ull_delta(u_longlong_t old, u_longlong_t new)
 		return (new - old);
 	else
 		return ((UINT64_MAX - old) + new + 1);
-}
-
-/*
- * Return the number of ticks delta between two hrtime_t
- * values. Attempt to cater for various kinds of overflow
- * in hrtime_t - no matter how improbable.
- */
-uint64_t
-hrtime_delta(hrtime_t old, hrtime_t new)
-{
-	uint64_t del;
-
-	if ((new >= old) && (old >= 0L))
-		return (new - old);
-	else {
-		/*
-		 * We've overflowed the positive portion of an
-		 * hrtime_t.
-		 */
-		if (new < 0L) {
-			/*
-			 * The new value is negative. Handle the
-			 * case where the old value is positive or
-			 * negative.
-			 */
-			uint64_t n1;
-			uint64_t o1;
-
-			n1 = -new;
-			if (old > 0L)
-				return (n1 - old);
-			else {
-				o1 = -old;
-				del = n1 - o1;
-				return (del);
-			}
-		} else {
-			/*
-			 * Either we've just gone from being negative
-			 * to positive *or* the last entry was positive
-			 * and the new entry is also positive but *less*
-			 * than the old entry. This implies we waited
-			 * quite a few days on a very fast system between
-			 * iostat displays.
-			 */
-			if (old < 0L) {
-				uint64_t o2;
-
-				o2 = -old;
-				del = UINT64_MAX - o2;
-			} else {
-				del = UINT64_MAX - old;
-			}
-			del += new;
-			return (del);
-		}
-	}
 }
 
 /*

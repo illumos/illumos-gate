@@ -36,13 +36,10 @@ extern "C" {
  * Description of each device identified
  */
 typedef struct list_of_disks {
-	char	*dtype;		/* device type: sd, ssd, md, st, etc. */
-	int	dnum;		/* device number */
+	char	*ks_name;	/* untranslated kstat name */
 	char	*dsk;		/* in form of cNtNdN */
 	char	*dname;		/* in form of /dev/dsk/cNtNdN */
 	char	*devidstr;	/* in form of "id1,sd@XXXX" */
-	uint_t	flags;		/* see SLICES_OK and PARTITIONS_OK above */
-	uint_t	seen;		/* Used for diffing disk lists */
 	struct list_of_disks *next;	/* link to next one */
 } disk_list_t;
 
@@ -56,15 +53,6 @@ typedef struct mnt_info {
 	uint_t minor;
 	struct mnt_info *next;
 } mnt_t;
-
-/*
- * The following are used to control treatment of kstat names
- * which fall beyond the number of disk partitions allowed on
- * the particular ISA. PARTITIONS_OK is set only on an Intel
- * system.
- */
-#define	SLICES_OK	1
-#define	PARTITIONS_OK	2
 
 void do_mnttab(void);
 mnt_t *lookup_mntent_byname(char *);

@@ -742,6 +742,8 @@ typedef struct sv_switch_to_cntlr_iocdata {
 #define	SCSI_VHCI_PATH_ENABLE			(SCSI_VHCI_CTL_SUB_CMD + 0x0D)
 #define	SCSI_VHCI_MPAPI				(SCSI_VHCI_CTL_SUB_CMD + 0x0E)
 
+#define	SCSI_VHCI_GET_TARGET_LONGNAME		(SCSI_VHCI_CTL_SUB_CMD + 0x0F)
+
 #ifdef	__cplusplus
 }
 #endif

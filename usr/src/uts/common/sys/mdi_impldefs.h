@@ -238,6 +238,9 @@ typedef struct mdi_vhci_ops {
 
 	/* Client path failover callback */
 	int	(*vo_failover)(dev_info_t *vdip, dev_info_t *cdip, int flags);
+
+	/* Client attached callback */
+	void	(*vo_client_attached)(dev_info_t *cdip);
 } mdi_vhci_ops_t;
 
 /*
@@ -1178,8 +1181,10 @@ int mdi_failover(dev_info_t *, dev_info_t *, int);
 #define	MDI_FAILOVER_ASYNC	2	/* Asyncronous Failover		*/
 
 /*
- * mdi_pathinfo node state change functions.
+ * mdi_pathinfo node kstat functions.
  */
+int mdi_pi_kstat_exists(mdi_pathinfo_t *);
+int mdi_pi_kstat_create(mdi_pathinfo_t *pip, char *ks_name);
 void mdi_pi_kstat_iosupdate(mdi_pathinfo_t *, struct buf *);
 
 /*

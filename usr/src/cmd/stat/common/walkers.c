@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,7 +168,8 @@ snapshot_walk(enum snapshot_types type, struct snapshot *old,
 
 	case SNAP_CONTROLLERS:
 	case SNAP_IODEVS:
-	case SNAP_IOPATHS:
+	case SNAP_IOPATHS_LI:
+	case SNAP_IOPATHS_LTI:
 		changed = iodev_walk(old ? old->s_iodevs : NULL,
 		    new->s_iodevs, cb, data);
 		break;
@@ -266,7 +266,9 @@ iodev_changed(struct iodev_snapshot *iodev, int added)
 		name = iodev->is_pretty;
 
 	switch (iodev->is_type) {
-	case IODEV_IOPATH:
+	case IODEV_IOPATH_LT:
+	case IODEV_IOPATH_LI:
+	case IODEV_IOPATH_LTI:
 		(void) printf("<<multi-path %s: %s>>\n",
 		    added ? "added" : "removed", name);
 		break;
@@ -372,7 +374,8 @@ snapshot_has_changed(struct snapshot *old, struct snapshot *new)
 {
 	int ret = 0;
 	int cpu_mask = SNAP_CPUS | SNAP_PSETS | SNAP_SYSTEM;
-	int iodev_mask = SNAP_CONTROLLERS | SNAP_IODEVS | SNAP_IOPATHS;
+	int iodev_mask = SNAP_CONTROLLERS | SNAP_IODEVS |
+			SNAP_IOPATHS_LI | SNAP_IOPATHS_LTI;
 
 	if (old == NULL)
 		return (1);

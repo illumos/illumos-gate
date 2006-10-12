@@ -78,9 +78,11 @@ parent_iodev_type(enum iodev_type type)
 {
 	switch (type) {
 		case IODEV_CONTROLLER: return (0);
+		case IODEV_IOPATH_LT: return (0);
+		case IODEV_IOPATH_LI: return (0);
 		case IODEV_NFS: return (0);
 		case IODEV_TAPE: return (0);
-		case IODEV_IOPATH: return (IODEV_DISK);
+		case IODEV_IOPATH_LTI: return (IODEV_DISK);
 		case IODEV_DISK: return (IODEV_CONTROLLER);
 		case IODEV_PARTITION: return (IODEV_DISK);
 	}
@@ -221,6 +223,13 @@ disk_or_partition(enum iodev_type type)
 	return (type == IODEV_DISK || type == IODEV_PARTITION);
 }
 
+static int
+disk_or_partition_or_iopath(enum iodev_type type)
+{
+	return (type == IODEV_DISK || type == IODEV_PARTITION ||
+	    type == IODEV_IOPATH_LTI);
+}
+
 static void
 insert_iodev(struct snapshot *ss, struct iodev_snapshot *iodev)
 {
@@ -238,30 +247,60 @@ insert_iodev(struct snapshot *ss, struct iodev_snapshot *iodev)
 	insert_into(list, iodev);
 }
 
+/* return 1 if dev passes filter */
 static int
 iodev_match(struct iodev_snapshot *dev, struct iodev_filter *df)
 {
-	size_t i;
-	int is_floppy = (strncmp(dev->is_name, "fd", 2) == 0);
+	int	is_floppy = (strncmp(dev->is_name, "fd", 2) == 0);
+	char	*isn, *ispn, *ifn;
+	char	*path;
+	int	ifnl;
+	size_t	i;
 
 	/* no filter, pass */
 	if (df == NULL)
-		return (1);
+		return (1);		/* pass */
 
 	/* no filtered names, pass if not floppy and skipped */
 	if (df->if_nr_names == NULL)
 		return (!(df->if_skip_floppy && is_floppy));
 
+	isn = dev->is_name;
+	ispn = dev->is_pretty;
 	for (i = 0; i < df->if_nr_names; i++) {
-		if (strcmp(dev->is_name, df->if_names[i]) == 0)
-			return (1);
-		if (dev->is_pretty != NULL &&
-		    strcmp(dev->is_pretty, df->if_names[i]) == 0)
-			return (1);
+		ifn = df->if_names[i];
+		ifnl = strlen(ifn);
+		path = strchr(ifn, '.');
+
+		if ((strcmp(isn, ifn) == 0) ||
+		    (ispn && (strcmp(ispn, ifn) == 0)))
+			return (1);	/* pass */
+
+		/* if filter is a path allow partial match */
+		if (path &&
+		    ((strncmp(isn, ifn, ifnl) == 0) ||
+		    (ispn && (strncmp(ispn, ifn, ifnl) == 0))))
+			return (1);	/* pass */
 	}
 
-	/* not found in specified names, fail match */
-	return (0);
+	return (0);			/* fail */
+}
+
+/* return 1 if path is an mpxio path associated with dev */
+static int
+iodev_path_match(struct iodev_snapshot *dev, struct iodev_snapshot *path)
+{
+	char	*dn, *pn;
+	int	dnl;
+
+	dn = dev->is_name;
+	pn = path->is_name;
+	dnl = strlen(dn);
+
+	if ((strncmp(pn, dn, dnl) == 0) && (pn[dnl] == '.'))
+		return (1);			/* yes */
+
+	return (0);				/* no */
 }
 
 /* select which I/O devices to collect stats for */
@@ -269,40 +308,72 @@ static void
 choose_iodevs(struct snapshot *ss, struct iodev_snapshot *iodevs,
     struct iodev_filter *df)
 {
-	struct iodev_snapshot *pos = iodevs;
-	int nr_iodevs = df ? df->if_max_iodevs : UNLIMITED_IODEVS;
+	struct iodev_snapshot	*pos, *ppos, *tmp, *ptmp;
+	int			nr_iodevs;
+	int			nr_iodevs_orig;
+
+	nr_iodevs = df ? df->if_max_iodevs : UNLIMITED_IODEVS;
+	nr_iodevs_orig = nr_iodevs;
 
 	if (nr_iodevs == UNLIMITED_IODEVS)
 		nr_iodevs = INT_MAX;
 
+	/* add the full matches */
+	pos = iodevs;
 	while (pos && nr_iodevs) {
-		struct iodev_snapshot *tmp = pos;
+		tmp = pos;
 		pos = pos->is_next;
 
 		if (!iodev_match(tmp, df))
-			continue;
+			continue;	/* failed full match */
 
 		list_del(&iodevs, tmp);
 		insert_iodev(ss, tmp);
 
-		--nr_iodevs;
+		/*
+		 * Add all mpxio paths associated with match above. Added
+		 * paths don't count against nr_iodevs.
+		 */
+		if (strchr(tmp->is_name, '.') == NULL) {
+		ppos = iodevs;
+		while (ppos) {
+			ptmp = ppos;
+			ppos = ppos->is_next;
+
+			if (!iodev_path_match(tmp, ptmp))
+				continue;	/* not an mpxio path */
+
+			list_del(&iodevs, ptmp);
+			insert_iodev(ss, ptmp);
+			if (pos == ptmp)
+				pos = ppos;
+		}
+		}
+
+		nr_iodevs--;
 	}
 
-	pos = iodevs;
+	/*
+	 * If we had a filter, and *nothing* passed the filter then we
+	 * don't want to fill the  remaining slots - it is just confusing
+	 * if we don that, it makes it look like the filter code is broken.
+	 */
+	if ((df->if_nr_names == NULL) || (nr_iodevs != nr_iodevs_orig)) {
+		/* now insert any iodevs into the remaining slots */
+		pos = iodevs;
+		while (pos && nr_iodevs) {
+			tmp = pos;
+			pos = pos->is_next;
 
-	/* now insert any iodevs into the remaining slots */
-	while (pos && nr_iodevs) {
-		struct iodev_snapshot *tmp = pos;
-		pos = pos->is_next;
+			if (df && df->if_skip_floppy &&
+				strncmp(tmp->is_name, "fd", 2) == 0)
+				continue;
 
-		if (df && df->if_skip_floppy &&
-			strncmp(tmp->is_name, "fd", 2) == 0)
-			continue;
+			list_del(&iodevs, tmp);
+			insert_iodev(ss, tmp);
 
-		list_del(&iodevs, tmp);
-		insert_iodev(ss, tmp);
-
-		--nr_iodevs;
+			--nr_iodevs;
+		}
 	}
 
 	/* clear the unwanted ones */
@@ -454,7 +525,7 @@ get_ids(struct iodev_snapshot *iodev, const char *pretty)
 			iodev->is_id.id = disk;
 			(void) strlcpy(iodev->is_id.tid, target, KSTAT_STRLEN);
 			iodev->is_parent_id.id = ctr;
-		} else if (iodev->is_type == IODEV_IOPATH) {
+		} else if (iodev->is_type == IODEV_IOPATH_LTI) {
 			iodev->is_parent_id.id = disk;
 			(void) strlcpy(iodev->is_parent_id.tid,
 				target, KSTAT_STRLEN);
@@ -464,65 +535,12 @@ get_ids(struct iodev_snapshot *iodev, const char *pretty)
 	free(target);
 }
 
-static char *
-get_slice(int partition, disk_list_t *dl)
-{
-	char *tmpbuf;
-	size_t tmplen;
-
-	if (!(dl->flags & SLICES_OK))
-		return (NULL);
-	if (partition < 0 || partition >= NDKMAP)
-		return (NULL);
-
-	/* space for 's', and integer < NDKMAP (16) */
-	tmplen = strlen(dl->dsk) + strlen("sXX") + 1;
-	tmpbuf = safe_alloc(tmplen);
-
-	/*
-	 * This is a regular slice. Create the name and
-	 * copy it for use by the calling routine.
-	 */
-	(void) snprintf(tmpbuf, tmplen, "%ss%d", dl->dsk, partition);
-	return (tmpbuf);
-}
-
-static char *
-get_intel_partition(int partition, disk_list_t *dl)
-{
-	char *tmpbuf;
-	size_t tmplen;
-
-	if (partition <= 0 || !(dl->flags & PARTITIONS_OK))
-		return (NULL);
-
-	/*
-	 * See if it falls in the range of allowable partitions. The
-	 * fdisk partitions show up after the traditional slices so we
-	 * determine which partition we're in and return that.
-	 * The NUMPART + 1 is not a mistake. There are currently
-	 * FD_NUMPART + 1 partitions that show up in the device directory.
-	 */
-	partition -= NDKMAP;
-	if (partition < 0 || partition >= (FD_NUMPART + 1))
-		return (NULL);
-
-	/* space for 'p', and integer < NDKMAP (16) */
-	tmplen = strlen(dl->dsk) + strlen("pXX") + 1;
-	tmpbuf = safe_alloc(tmplen);
-
-	(void) snprintf(tmpbuf, tmplen, "%sp%d", dl->dsk, partition);
-	return (tmpbuf);
-}
-
 static void
 get_pretty_name(enum snapshot_types types, struct iodev_snapshot *iodev,
 	kstat_ctl_t *kc)
 {
-	disk_list_t *dl;
-	char *pretty = NULL;
-	char *tmp;
-	int partition;
+	disk_list_t	*dl;
+	char		*pretty = NULL;
 
 	if (iodev->is_type == IODEV_NFS) {
 		if (!(types & SNAP_IODEV_PRETTY))
@@ -532,26 +550,7 @@ get_pretty_name(enum snapshot_types types, struct iodev_snapshot *iodev,
 		return;
 	}
 
-	if (iodev->is_type == IODEV_IOPATH) {
-		char buf[KSTAT_STRLEN];
-		size_t len;
-
-		tmp = iodev->is_name;
-		while (*tmp && *tmp != '.')
-			tmp++;
-		if (!*tmp)
-			return;
-		(void) strlcpy(buf, iodev->is_name, 1 + tmp - iodev->is_name);
-		dl = lookup_ks_name(buf, (types & SNAP_IODEV_DEVID) ? 1 : 0);
-		if (dl == NULL || dl->dsk == NULL)
-			return;
-		len = strlen(dl->dsk) + strlen(tmp) + 1;
-		pretty = safe_alloc(len);
-		(void) strlcpy(pretty, dl->dsk, len);
-		(void) strlcat(pretty, tmp, len);
-		goto out;
-	}
-
+	/* lookup/translate the kstat name */
 	dl = lookup_ks_name(iodev->is_name, (types & SNAP_IODEV_DEVID) ? 1 : 0);
 	if (dl == NULL)
 		return;
@@ -567,35 +566,13 @@ get_pretty_name(enum snapshot_types types, struct iodev_snapshot *iodev,
 	if (dl->devidstr)
 		iodev->is_devid = safe_strdup(dl->devidstr);
 
-	/* look for a possible partition number */
-	tmp = iodev->is_name;
-	while (*tmp && *tmp != ',')
-		tmp++;
-	if (*tmp != ',')
-		goto out;
-
-	tmp++;
-	partition = (int)(*tmp - 'a');
-
-	if (iodev->is_type == IODEV_PARTITION) {
-		char *part;
-		if ((part = get_slice(partition, dl)) == NULL)
-			part = get_intel_partition(partition, dl);
-		if (part != NULL) {
-			free(pretty);
-			pretty = part;
-		}
-	}
-
-out:
 	get_ids(iodev, pretty);
 
-	/* only fill in the pretty name if specifically asked for */
-	if (types & SNAP_IODEV_PRETTY) {
-		iodev->is_pretty = pretty;
-	} else {
-		free(pretty);
-	}
+	/*
+	 * we fill in pretty name wether it is asked for or not because
+	 * it could be used in a filter by match_iodevs.
+	 */
+	iodev->is_pretty = pretty;
 }
 
 static enum iodev_type
@@ -608,51 +585,344 @@ get_iodev_type(kstat_t *ksp)
 	if (strcmp(ksp->ks_class, "nfs") == 0)
 		return (IODEV_NFS);
 	if (strcmp(ksp->ks_class, "iopath") == 0)
-		return (IODEV_IOPATH);
+		return (IODEV_IOPATH_LTI);
 	if (strcmp(ksp->ks_class, "tape") == 0)
 		return (IODEV_TAPE);
 	return (IODEV_UNKNOWN);
 }
 
+/* get the lun/target/initiator from the name, return 1 on success */
+static int
+get_lti(char *s,
+	char *lname, int *l, char *tname, int *t, char *iname, int *i)
+{
+	int  num = 0;
+
+	num = sscanf(s, "%[a-z]%d%*[.]%[a-z]%d%*[.]%[a-z]%d", lname, l,
+	    tname, t, iname, i);
+	return ((num == 6) ? 1 : 0);
+}
+
+
+/* get the lun, target, and initiator name and instance */
+static void
+get_path_info(struct iodev_snapshot *io, char *mod, int *type, int *inst,
+    char *name, size_t size)
+{
+
+	/*
+	 * If it is iopath or ssd then pad the name with i/t/l so we can sort
+	 * by alpha order and set type for IOPATH to DISK since we want to
+	 * have it grouped with its ssd parent. The lun can be 5 digits,
+	 * the target can be 4 digits, and the initiator can be 3 digits and
+	 * the padding is done appropriately for string comparisons.
+	 */
+	if (disk_or_partition_or_iopath(io->is_type)) {
+		int i1, t1, l1;
+		char tname[KSTAT_STRLEN], iname[KSTAT_STRLEN];
+		char *ptr, lname[KSTAT_STRLEN];
+
+		i1 = t1 = l1 = 0;
+		(void) get_lti(io->is_name, lname, &l1, tname, &t1, iname, &i1);
+		*type = io->is_type;
+		if (io->is_type == IODEV_DISK) {
+			(void) snprintf(name, size, "%s%05d", lname, l1);
+		} else if (io->is_type == IODEV_PARTITION) {
+			ptr = strchr(io->is_name, ',');
+			(void) snprintf(name, size, "%s%05d%s", lname, l1, ptr);
+		} else {
+			(void) snprintf(name, size, "%s%05d.%s%04d.%s%03d",
+			    lname, l1, tname, t1, iname, i1);
+			/* set to disk so we sort with disks */
+			*type = IODEV_DISK;
+		}
+		(void) strcpy(mod, lname);
+		*inst = l1;
+	} else {
+		(void) strcpy(mod, io->is_module);
+		(void) strcpy(name, io->is_name);
+		*type = io->is_type;
+		*inst = io->is_instance;
+	}
+}
+
 int
 iodev_cmp(struct iodev_snapshot *io1, struct iodev_snapshot *io2)
 {
-	/* neutral sort order between disk and part */
-	if (!disk_or_partition(io1->is_type) ||
-		!disk_or_partition(io2->is_type)) {
-		if (io1->is_type < io2->is_type)
+	int	type1, type2;
+	int	inst1, inst2;
+	char	name1[KSTAT_STRLEN], name2[KSTAT_STRLEN];
+	char	mod1[KSTAT_STRLEN], mod2[KSTAT_STRLEN];
+
+	get_path_info(io1, mod1, &type1, &inst1, name1, sizeof (name1));
+	get_path_info(io2, mod2, &type2, &inst2, name2, sizeof (name2));
+	if ((!disk_or_partition(type1)) ||
+	    (!disk_or_partition(type2))) {
+		/* neutral sort order between disk and part */
+		if (type1 < type2) {
 			return (-1);
-		if (io1->is_type > io2->is_type)
+		}
+		if (type1 > type2) {
 			return (1);
+		}
 	}
 
 	/* controller doesn't have ksp */
 	if (io1->is_ksp && io2->is_ksp) {
-		if (strcmp(io1->is_module, io2->is_module) != 0)
-			return (strcmp(io1->is_module, io2->is_module));
-		if (io1->is_instance < io2->is_instance)
+		if (strcmp(mod1, mod2) != 0) {
+			return (strcmp(mod1, mod2));
+		}
+		if (inst1 < inst2) {
 			return (-1);
-		if (io1->is_instance > io2->is_instance)
+		}
+		if (inst1 > inst2) {
 			return (1);
+		}
 	} else {
-		if (io1->is_id.id < io2->is_id.id)
+		if (io1->is_id.id < io2->is_id.id) {
 			return (-1);
-		if (io1->is_id.id > io2->is_id.id)
+		}
+		if (io1->is_id.id > io2->is_id.id) {
 			return (1);
+		}
 	}
 
-	return (strcmp(io1->is_name, io2->is_name));
+	return (strcmp(name1, name2));
+}
+
+/* update the target reads and writes */
+static void
+update_target(struct iodev_snapshot *tgt, struct iodev_snapshot *path)
+{
+	tgt->is_stats.reads += path->is_stats.reads;
+	tgt->is_stats.writes += path->is_stats.writes;
+	tgt->is_stats.nread += path->is_stats.nread;
+	tgt->is_stats.nwritten += path->is_stats.nwritten;
+	tgt->is_stats.wcnt += path->is_stats.wcnt;
+	tgt->is_stats.rcnt += path->is_stats.rcnt;
+
+	/*
+	 * Stash the t_delta in the crtime for use in show_disk
+	 * NOTE: this can't be done in show_disk because the
+	 * itl entry is removed for the old format
+	 */
+	tgt->is_crtime += hrtime_delta(path->is_crtime, path->is_snaptime);
+	tgt->is_snaptime += path->is_snaptime;
+	tgt->is_nr_children += 1;
+}
+
+/*
+ * Create a new synthetic device entry of the specified type. The supported
+ * synthetic types are IODEV_IOPATH_LT and IODEV_IOPATH_LI.
+ */
+static struct iodev_snapshot *
+make_extended_device(int type, struct iodev_snapshot *old)
+{
+	struct iodev_snapshot	*tptr = NULL;
+	char			*ptr;
+	int			lun, tgt, initiator;
+	char			lun_name[KSTAT_STRLEN];
+	char			tgt_name[KSTAT_STRLEN];
+	char			initiator_name[KSTAT_STRLEN];
+
+	if (old == NULL)
+		return (NULL);
+	if (get_lti(old->is_name,
+	    lun_name, &lun, tgt_name, &tgt, initiator_name, &initiator) != 1) {
+		return (NULL);
+	}
+	tptr = safe_alloc(sizeof (*old));
+	bzero(tptr, sizeof (*old));
+	if (old->is_pretty != NULL) {
+		tptr->is_pretty = safe_alloc(strlen(old->is_pretty) + 1);
+		(void) strcpy(tptr->is_pretty, old->is_pretty);
+	}
+	bcopy(&old->is_parent_id, &tptr->is_parent_id,
+	sizeof (old->is_parent_id));
+
+	tptr->is_type = type;
+
+	if (type == IODEV_IOPATH_LT) {
+		/* make new synthetic entry that is the LT */
+		/* set the id to the target id */
+		tptr->is_id.id = tgt;
+		(void) snprintf(tptr->is_id.tid, sizeof (tptr->is_id.tid),
+		    "%s%d", tgt_name, tgt);
+		(void) snprintf(tptr->is_name, sizeof (tptr->is_name),
+		    "%s%d.%s%d", lun_name, lun, tgt_name, tgt);
+
+		if (old->is_pretty) {
+			ptr = strrchr(tptr->is_pretty, '.');
+			if (ptr)
+				*ptr = '\0';
+		}
+	} else if (type == IODEV_IOPATH_LI) {
+		/* make new synthetic entry that is the LI */
+		/* set the id to the initiator number */
+		tptr->is_id.id = initiator;
+		(void) snprintf(tptr->is_id.tid, sizeof (tptr->is_id.tid),
+		    "%s%d", initiator_name, initiator);
+		(void) snprintf(tptr->is_name, sizeof (tptr->is_name),
+		    "%s%d.%s%d", lun_name, lun, initiator_name, initiator);
+
+		if (old->is_pretty) {
+			ptr = strchr(tptr->is_pretty, '.');
+			if (ptr)
+				(void) snprintf(ptr + 1,
+				    strlen(tptr->is_pretty) + 1,
+				    "%s%d", initiator_name, initiator);
+		}
+	}
+	return (tptr);
+}
+
+/*
+ * This is to get the original -X LI format (e.g. ssd1.fp0). When an LTI kstat
+ * is found - traverse the children looking for the same initiator and sum
+ * them up. Add an LI entry and delete all of the LTI entries with the same
+ * initiator.
+ */
+static int
+create_li_delete_lti(struct snapshot *ss, struct iodev_snapshot *list)
+{
+	struct iodev_snapshot	*pos, *entry, *parent;
+	int			lun, tgt, initiator;
+	char			lun_name[KSTAT_STRLEN];
+	char			tgt_name[KSTAT_STRLEN];
+	char			initiator_name[KSTAT_STRLEN];
+	int			err;
+
+	for (entry = list; entry; entry = entry->is_next) {
+		if ((err = create_li_delete_lti(ss, entry->is_children)) != 0)
+			return (err);
+
+		if (entry->is_type == IODEV_IOPATH_LTI) {
+			parent = find_parent(ss, entry);
+			if (get_lti(entry->is_name, lun_name, &lun,
+			    tgt_name, &tgt, initiator_name, &initiator) != 1) {
+				return (1);
+			}
+
+			pos = (parent == NULL) ? NULL : parent->is_children;
+			for (; pos; pos = pos->is_next) {
+				if (pos->is_id.id != -1 &&
+				    pos->is_id.id == initiator &&
+				    pos->is_type == IODEV_IOPATH_LI) {
+					/* found the same initiator */
+					update_target(pos, entry);
+					list_del(&parent->is_children, entry);
+					free_iodev(entry);
+					parent->is_nr_children--;
+					entry = pos;
+					break;
+				}
+			}
+
+			if (!pos) {
+				/* make the first LI entry */
+				pos = make_extended_device(
+				    IODEV_IOPATH_LI, entry);
+				update_target(pos, entry);
+
+				if (parent) {
+					insert_before(&parent->is_children,
+					    entry, pos);
+					list_del(&parent->is_children, entry);
+					free_iodev(entry);
+				} else {
+					insert_before(&ss->s_iodevs, entry,
+					    pos);
+					list_del(&ss->s_iodevs, entry);
+					free_iodev(entry);
+				}
+				entry = pos;
+			}
+		}
+	}
+	return (0);
+}
+
+/*
+ * We have the LTI kstat, now add an entry for the LT that sums up all of
+ * the LTI's with the same target(t).
+ */
+static int
+create_lt(struct snapshot *ss, struct iodev_snapshot *list)
+{
+	struct iodev_snapshot	*entry, *parent, *pos;
+	int			lun, tgt, initiator;
+	char			lun_name[KSTAT_STRLEN];
+	char			tgt_name[KSTAT_STRLEN];
+	char			initiator_name[KSTAT_STRLEN];
+	int			err;
+
+	for (entry = list; entry; entry = entry->is_next) {
+		if ((err = create_lt(ss, entry->is_children)) != 0)
+			return (err);
+
+		if (entry->is_type == IODEV_IOPATH_LTI) {
+			parent = find_parent(ss, entry);
+			if (get_lti(entry->is_name, lun_name, &lun,
+			    tgt_name, &tgt, initiator_name, &initiator) != 1) {
+				return (1);
+			}
+
+			pos = (parent == NULL) ? NULL : parent->is_children;
+			for (; pos; pos = pos->is_next) {
+				if (pos->is_id.id != -1 &&
+				    pos->is_id.id == tgt &&
+				    pos->is_type == IODEV_IOPATH_LT) {
+					/* found the same target */
+					update_target(pos, entry);
+					break;
+				}
+			}
+
+			if (!pos) {
+				pos = make_extended_device(
+				    IODEV_IOPATH_LT, entry);
+				update_target(pos, entry);
+
+				if (parent) {
+					insert_before(&parent->is_children,
+					    entry, pos);
+					parent->is_nr_children++;
+				} else {
+					insert_before(&ss->s_iodevs,
+					    entry, pos);
+				}
+			}
+		}
+	}
+	return (0);
+}
+
+/* Find the longest is_name field to aid formatting of output */
+static int
+iodevs_is_name_maxlen(struct iodev_snapshot *list)
+{
+	struct iodev_snapshot	*entry;
+	int			max = 0, cmax, len;
+
+	for (entry = list; entry; entry = entry->is_next) {
+		cmax = iodevs_is_name_maxlen(entry->is_children);
+		max = (cmax > max) ? cmax : max;
+		len = strlen(entry->is_name);
+		max = (len > max) ? len : max;
+	}
+	return (max);
 }
 
 int
 acquire_iodevs(struct snapshot *ss, kstat_ctl_t *kc, struct iodev_filter *df)
 {
-	kstat_t *ksp;
-	int err = 0;
-	struct iodev_snapshot *pos;
-	struct iodev_snapshot *list = NULL;
+	kstat_t	*ksp;
+	struct	iodev_snapshot *pos;
+	struct	iodev_snapshot *list = NULL;
+	int	err = 0;
 
 	ss->s_nr_iodevs = 0;
+	ss->s_iodevs_is_name_maxlen = 0;
 
 	/*
 	 * Call cleanup_iodevs_snapshot() so that a cache miss in
@@ -709,6 +979,28 @@ acquire_iodevs(struct snapshot *ss, kstat_ctl_t *kc, struct iodev_filter *df)
 
 	if ((err = acquire_iodev_stats(ss->s_iodevs, kc)) != 0)
 		goto out;
+
+	if (ss->s_types & SNAP_IOPATHS_LTI) {
+		/*
+		 * -Y: kstats are LTI, need to create a synthetic LT
+		 * for -Y output.
+		 */
+		if ((err = create_lt(ss, ss->s_iodevs)) != 0) {
+			return (err);
+		}
+	}
+	if (ss->s_types & SNAP_IOPATHS_LI) {
+		/*
+		 * -X: kstats are LTI, need to create a synthetic LI and
+		 * delete the LTI for -X output
+		 */
+		if ((err = create_li_delete_lti(ss, ss->s_iodevs)) != 0) {
+			return (err);
+		}
+	}
+
+	/* determine width of longest is_name */
+	ss->s_iodevs_is_name_maxlen = iodevs_is_name_maxlen(ss->s_iodevs);
 
 	err = 0;
 out:

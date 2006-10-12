@@ -74,14 +74,16 @@ enum snapshot_types {
 	SNAP_IODEVS		= 1 << 5,
 	/* disk controller aggregates */
 	SNAP_CONTROLLERS	= 1 << 6,
-	/* mpxio (multipath) paths */
-	SNAP_IOPATHS		= 1 << 7,
+	/* mpxio L I (multipath) paths: -X: Lun,LunInitiator */
+	SNAP_IOPATHS_LI		= 1 << 7,
+	/* mpxio LTI (multipath) paths: -Y: Lun,LunTarget,LunTargetInitiator */
+	SNAP_IOPATHS_LTI	= 1 << 8,
 	/* disk error stats */
-	SNAP_IODEV_ERRORS	= 1 << 8,
+	SNAP_IODEV_ERRORS	= 1 << 9,
 	/* pretty names for iodevs */
-	SNAP_IODEV_PRETTY	= 1 << 9,
+	SNAP_IODEV_PRETTY	= 1 << 10,
 	/* devid for iodevs */
-	SNAP_IODEV_DEVID	= 1 << 10
+	SNAP_IODEV_DEVID	= 1 << 11
 };
 
 struct cpu_snapshot {
@@ -131,8 +133,10 @@ enum iodev_type {
 	IODEV_PARTITION		= 1 << 2,
 	IODEV_TAPE		= 1 << 3,
 	IODEV_NFS		= 1 << 4,
-	IODEV_IOPATH		= 1 << 5,
-	IODEV_UNKNOWN		= 1 << 6
+	IODEV_IOPATH_LT		= 1 << 5,	/* synthetic LunTarget */
+	IODEV_IOPATH_LI		= 1 << 6,	/* synthetic LunInitiator */
+	IODEV_IOPATH_LTI	= 1 << 7,	/* LunTgtInitiator (pathinfo) */
+	IODEV_UNKNOWN		= 1 << 8
 };
 
 /* identify a disk, partition, etc. */
@@ -152,6 +156,7 @@ struct iodev_id {
 struct iodev_snapshot {
 	/* original kstat name */
 	char is_name[KSTAT_STRLEN];
+	/* type of kstat */
 	enum iodev_type is_type;
 	/* ID if meaningful */
 	struct iodev_id is_id;
@@ -210,6 +215,7 @@ struct snapshot {
 	struct intr_snapshot *s_intrs;
 	size_t s_nr_iodevs;
 	struct iodev_snapshot *s_iodevs;
+	size_t s_iodevs_is_name_maxlen;
 	struct sys_snapshot s_sys;
 	struct biostats s_biostats;
 	struct flushmeter s_flushes;
@@ -236,6 +242,9 @@ int kstat_copy(const kstat_t *src, kstat_t *dst);
  * new - old, or if old is NULL, return new.
  */
 uint64_t kstat_delta(kstat_t *old, kstat_t *new, char *name);
+
+/* Return the number of ticks delta between two hrtime_t values. */
+uint64_t hrtime_delta(hrtime_t old, hrtime_t new);
 
 /*
  * Add the integer-valued stats from "src" to the

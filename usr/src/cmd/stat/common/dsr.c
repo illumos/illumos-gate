@@ -49,29 +49,37 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <errno.h>
 #include <devid.h>
+#include <sys/scsi/adapters/scsi_vhci.h>
 
 #include "dsr.h"
 #include "statcommon.h"
 
-/* disk/tape info */
-static di_node_t	di_root;	/* for devid */
-static di_dim_t		di_dim;		/* for /dev names */
+/* where we get kstat name translation information from */
+static di_node_t	di_root;	/* from di_init: for devid */
+static di_dim_t		di_dim;		/* from di_dim_init: for /dev names */
+static int		scsi_vhci_fd = -1; /* from scsi_vhci: for mpxio path */
+
+/* disk/tape/misc info */
 typedef struct {
 	char		*minor_name;
 	int		minor_isdisk;
 } minor_match_t;
 static minor_match_t	mm_disk = {"a", 1};
 static minor_match_t	mm_tape	= {"", 0};
+static minor_match_t	mm_misc	= {"0", 0};
 static char		md_minor_name[MAXPATHLEN];
 static minor_match_t	mm_md	= {md_minor_name, 0};
-static minor_match_t	*mma_disk_tape[]	= {&mm_disk, &mm_tape, NULL};
+static minor_match_t	*mma_disk_tape_misc[]	=
+			    {&mm_disk, &mm_tape, &mm_misc, NULL};
 static minor_match_t	*mma_md[]		= {&mm_md, NULL};
 static char *mdsetno2name(int setno);
 #define	DISKLIST_MOD	256		/* ^2 instunit mod hash */
 static disk_list_t	*disklist[DISKLIST_MOD];
+
 
 /* nfs info */
 extern kstat_ctl_t	*kc;
@@ -108,8 +116,8 @@ cleanup_iodevs_snapshot()
  * name is the same as public name: the caller will just use kstat name.
  */
 static int
-drvinstunit2dev(char *driver, int instunit,
-    char **devpathp, char **adevpathp, char **devidp, int *isdiskp)
+drvinstunitpart2dev(char *driver, int instunit, char *part,
+    char **devpathp, char **adevpathp, char **devidp)
 {
 	int		instance;
 	minor_match_t	**mma;
@@ -123,7 +131,6 @@ drvinstunit2dev(char *driver, int instunit,
 	char		*devicespath;
 	di_node_t	node;
 
-
 	/* setup "no result" return values */
 	if (devpathp)
 		*devpathp = NULL;
@@ -131,8 +138,6 @@ drvinstunit2dev(char *driver, int instunit,
 		*adevpathp = NULL;
 	if (devidp)
 		*devidp = NULL;
-	if (isdiskp)
-		*isdiskp = 0;
 
 	/* take <driver><instance><minor_name> snapshot if not established */
 	if (di_dim == NULL) {
@@ -173,14 +178,18 @@ drvinstunit2dev(char *driver, int instunit,
 		    "%d,%d,blk", mdsetno, instunit);
 	} else {
 		instance = instunit;
-		mma = mma_disk_tape;		/* disk/tape minors */
+		mma = mma_disk_tape_misc;	/* disk/tape/misc minors */
 	}
 
-	/* Try to find a minor_match that works */
-	for (mm = *mma++; mm; mm = *mma++)  {
-		if ((devpath = di_dim_path_dev(di_dim,
-		    driver, instance, mm->minor_name)) != NULL)
-			break;
+	if (part) {
+		devpath = di_dim_path_dev(di_dim, driver, instance, part);
+	} else  {
+		/* Try to find a minor_match that works */
+		for (mm = *mma++; mm; mm = *mma++)  {
+			if ((devpath = di_dim_path_dev(di_dim,
+			    driver, instance, mm->minor_name)) != NULL)
+				break;
+		}
 	}
 	if (devpath == NULL)
 		return (0);
@@ -193,10 +202,11 @@ drvinstunit2dev(char *driver, int instunit,
 		*devpathp = safe_strdup(devpath);
 
 	if (adevpathp) {		/* abbreviated devpath */
-		if (mm->minor_isdisk) {
+		if ((part == NULL) && mm->minor_isdisk) {
 			/*
-			 * For disks we return the last component (with
-			 * trailing "s#" or "p#" stripped  off for disks).
+			 * For disk kstats without a partition we return the
+			 * last component with trailing "s#" or "p#" stripped
+			 * off (i.e. partition/slice information is removed).
 			 * For example for devpath of "/dev/dsk/c0t0d0s0" the
 			 * abbreviated devpath would be "c0t0d0".
 			 */
@@ -249,7 +259,7 @@ drvinstunit2dev(char *driver, int instunit,
 	}
 
 	if (devidp) {			/* lookup the devid */
-		/* take snapshots if not established */
+		/* take snapshot if not established */
 		if (di_root == DI_NODE_NIL) {
 			di_root = di_init("/", DINFOCACHE);
 		}
@@ -270,17 +280,58 @@ drvinstunit2dev(char *driver, int instunit,
 		}
 	}
 
-	if (isdiskp)
-		*isdiskp = mm->minor_isdisk;
-
 	free(devpath);
 	return (1);				/* success */
 }
 
 /*
- * Find/create a disk_list entry for "<driver><instunit>" given a kstat name.
- * The basic format of a kstat name is "<driver><instunit>,<partition>". The
- * <instunit> is a base10 number, and the ",<partition>" part is optional.
+ * Do <pid> to 'target-port' translation
+ */
+static int
+drvpid2port(uint_t pid, char **target_portp)
+{
+	sv_iocdata_t	ioc;
+	char		target_port[MAXNAMELEN];
+
+	/* setup "no result" return values */
+	*target_portp = NULL;
+
+	/* open scsi_vhci if not already done */
+	if (scsi_vhci_fd == -1) {
+		scsi_vhci_fd = open("/devices/scsi_vhci:devctl", O_RDONLY);
+		if (scsi_vhci_fd == -1)
+			return (0);		/* failure */
+	}
+
+	/*
+	 * Perform ioctl for <pid> -> 'target-port' translation.
+	 *
+	 * NOTE: it is legimite for this ioctl to fail for transports
+	 * that use mpxio, but don't set a 'target-port' pathinfo property.
+	 * On failure we return the the "<pid>" as the target port string.
+	 */
+	bzero(&ioc, sizeof (sv_iocdata_t));
+	ioc.buf_elem = pid;
+	ioc.addr = target_port;
+	if (ioctl(scsi_vhci_fd, SCSI_VHCI_GET_TARGET_LONGNAME, &ioc) < 0) {
+		(void) snprintf(target_port, sizeof (target_port), "%d", pid);
+	}
+
+	*target_portp = safe_strdup(target_port);
+	return (1);				/* success */
+}
+
+/*
+ * Find/create a disk_list entry for given a kstat name.
+ * The basic format of a kstat name is
+ *
+ *	"<driver><instunit>.<pid>.<phci-driver><instance>,<partition>".
+ *
+ * The <instunit> is a decimal number. The ".<pid>.<phci-driver><instance>",
+ * which describes mpxio path stat information, and ",<partition>" parts are
+ * optional. The <pid> consists of the letter 't' followed by a decimal number.
+ * When available, we use the <pid> to find the 'target-port' via ioctls to
+ * the scsi_vhci driver.
  *
  * NOTE: In the case of non-local metadevices, the format of "<driver>" in
  * a kstat name is acutally "<setno>/md".
@@ -288,75 +339,122 @@ drvinstunit2dev(char *driver, int instunit,
 disk_list_t *
 lookup_ks_name(char *ks_name, int want_devid)
 {
+	char		*pidp;		/* ".<pid>... */
+	char		*part;		/* ",partition... */
+	char		*initiator;	/* ".<phci-driver>... */
 	char		*p;
 	int		len;
-	char		driver[MAXNAMELEN];
+	char		driver[KSTAT_STRLEN];
 	int		instunit;
 	disk_list_t	**dlhp;		/* disklist head */
 	disk_list_t	*entry;
-	char		*devpath;
+	char		*devpath = NULL;
 	char		*adevpath = NULL;
 	char		*devid = NULL;
-	int		isdisk;
+	int		pid;
+	char		*target_port = NULL;
+	char		portform[MAXPATHLEN];
 
-	/*
-	 * Extract <driver> and <instunit> from kstat name.
-	 * Filter out illegal forms (like all digits).
-	 */
+	/* Filter out illegal forms (like all digits). */
 	if ((ks_name == NULL) || (*ks_name == 0) ||
 	    (strspn(ks_name, "0123456789") == strlen(ks_name)))
-		return (NULL);
-	p = strrchr(ks_name, ',');		/* start of ",partition" */
+		goto fail;
+
+	/* parse ks_name to create new entry */
+	pidp = strchr(ks_name, '.');		/* start of ".<pid>" */
+	initiator = strrchr(ks_name, '.');	/* start of ".<pHCI-driver>" */
+	if (pidp && (pidp == initiator))	/* can't have same start */
+		goto fail;
+
+	part = strchr(ks_name, ',');		/* start of ",<partition>" */
+	p = strchr(ks_name, ':');		/* start of ":<partition>" */
+	if (part && p)
+		goto fail;			/* can't have both */
+	if (p)
+		part = p;
+	if (part && pidp)
+		goto fail;			/* <pid> and partition: bad */
+
+	p = part ? part : pidp;
 	if (p == NULL)
 		p = &ks_name[strlen(ks_name) - 1];	/* last char */
 	else
-		p--;				/* before ",partition" */
+		p--;				/* before ',' or '.' */
 
 	while ((p >= ks_name) && isdigit(*p))
 		p--;				/* backwards over digits */
 	p++;					/* start of instunit */
-	if ((*p == '\0') || (*p == ','))
-		return (NULL);			/* no <instunit> */
+	if ((*p == '\0') || (*p == ',') || (*p == '.') || (*p == ':'))
+		goto fail;			/* no <instunit> */
 	len = p - ks_name;
 	(void) strncpy(driver, ks_name, len);
 	driver[len] = '\0';
 	instunit = atoi(p);
+	if (part)
+		part++;				/* skip ',' */
 
-	/* hash and search for existing disklist entry */
+	/* hash by instunit and search for existing entry */
 	dlhp = &disklist[instunit & (DISKLIST_MOD - 1)];
 	for (entry = *dlhp; entry; entry = entry->next) {
-		if ((strcmp(entry->dtype, driver) == 0) &&
-		    (entry->dnum == instunit)) {
+		if (strcmp(entry->ks_name, ks_name) == 0) {
 			return (entry);
 		}
 	}
 
-	/* not found, try to get dev information */
-	if (drvinstunit2dev(driver, instunit, &devpath, &adevpath,
-	    want_devid ? &devid : NULL, &isdisk) == 0) {
-		return (NULL);
+	/* not found, translate kstat_name components and create new entry */
+
+	/* translate kstat_name dev information */
+	if (drvinstunitpart2dev(driver, instunit, part,
+	    &devpath, &adevpath, want_devid ? &devid : NULL) == 0) {
+		goto fail;
 	}
 
-	/* and make a new disklist entry ... */
+	/* parse and translate path information */
+	if (pidp) {
+		/* parse path information: ".t#.<phci-driver><instance>" */
+		pidp++;				/* skip '.' */
+		initiator++;			/* skip '.' */
+		if ((*pidp != 't') || !isdigit(pidp[1]))
+			goto fail;		/* not ".t#" */
+		pid = atoi(&pidp[1]);
+
+		/* translate <pid> to 'target-port' */
+		if (drvpid2port(pid, &target_port) == 0)
+			goto fail;
+
+		/* Establish 'target-port' form. */
+		(void) snprintf(portform, sizeof (portform),
+		    "%s.t%s.%s", adevpath, target_port, initiator);
+		free(target_port);
+		free(adevpath);
+		adevpath = strdup(portform);
+	}
+
+	/* make a new entry ... */
 	entry = safe_alloc(sizeof (disk_list_t));
-	entry->dtype = safe_strdup(driver);
-	entry->dnum = instunit;
+	entry->ks_name = safe_strdup(ks_name);
 	entry->dname = devpath;
 	entry->dsk = adevpath;
 	entry->devidstr = devid;
-	entry->flags = 0;
-	if (isdisk) {
-		entry->flags |= SLICES_OK;
-#if defined(__i386)
-		entry->flags |= PARTITIONS_OK;
-#endif
-	}
-	entry->seen = 0;
 
-	/* add new entry to head of instunit hashed list */
+#ifdef	DEBUG
+	(void) printf("lookup_ks_name:    new: %s	%s\n",
+	    ks_name, entry->dsk ? entry->dsk : "NULL");
+#endif	/* DEBUG */
+
+	/* add new entry to head of hashed list */
 	entry->next = *dlhp;
 	*dlhp = entry;
 	return (entry);
+
+fail:
+	free(devpath);
+	free(adevpath);
+	free(devid);
+#ifdef	DEBUG
+	(void) printf("lookup_ks_name: failed: %s\n", ks_name);
+#endif	/* DEBUG */
+	return (NULL);
 }
 
 /*
