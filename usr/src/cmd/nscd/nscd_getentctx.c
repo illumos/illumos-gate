@@ -295,6 +295,7 @@ _nscd_create_getent_ctx(
 
 	gnctx->dbi = params->dbi;
 	gnctx->cookie = _nscd_get_cookie();
+	gnctx->pid = -1;
 
 	if (_nscd_get_nsw_state(&db_root, params) != NSCD_SUCCESS) {
 		free(gnctx);
@@ -576,6 +577,8 @@ reclaim_getent_ctx(void *arg)
 	/*CONSTCOND*/
 	while (1) {
 
+		(void) sleep(60);
+
 		(void) rw_rdlock(&getent_ctxDB_rwlock);
 
 		for (ep = _nscd_walk_db(getent_ctxDB, &cookie); ep != NULL;
@@ -623,8 +626,6 @@ reclaim_getent_ctx(void *arg)
 			gctx = c;
 		}
 		first = last = NULL;
-
-		(void) sleep(60);
 	}
 	/*NOTREACHED*/
 	/*LINTED E_FUNC_HAS_NO_RETURN_STMT*/
