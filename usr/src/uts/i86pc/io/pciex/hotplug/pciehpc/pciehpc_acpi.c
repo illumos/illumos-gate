@@ -21,7 +21,7 @@
  */
 
 /*
- *  Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -655,10 +655,12 @@ pciehpc_acpi_power_on_slot(pciehpc_t *ctrl_p)
 
 	pciehpc_get_slot_state(ctrl_p);
 
-	if (ctrl_p->slot.slot_state != HPC_SLOT_CONNECTED)
+	if (ctrl_p->slot.slot_state != HPC_SLOT_CONNECTED) {
 		cmn_err(CE_WARN, "failed to power on the slot #%d"
 			"(dev_state 0x%x, ACPI_STATUS 0x%x)\n",
 			ctrl_p->slot.slotNum, dev_state, status);
+		return (AE_ERROR);
+	}
 
 	return (status);
 }
@@ -690,10 +692,12 @@ pciehpc_acpi_power_off_slot(pciehpc_t *ctrl_p)
 
 	pciehpc_get_slot_state(ctrl_p);
 
-	if (ctrl_p->slot.slot_state == HPC_SLOT_CONNECTED)
+	if (ctrl_p->slot.slot_state == HPC_SLOT_CONNECTED) {
 		cmn_err(CE_WARN, "failed to power OFF the slot #%d"
 			"(dev_state 0x%x, ACPI_STATUS 0x%x)\n",
 			ctrl_p->slot.slotNum, dev_state, status);
+		return (AE_ERROR);
+	}
 
 	return (status);
 }
