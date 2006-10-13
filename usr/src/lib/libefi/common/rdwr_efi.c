@@ -372,10 +372,11 @@ efi_read(int fd, struct dk_gpt *vtoc)
 	if ((dk_ioc.dki_data = calloc(label_len, 1)) == NULL)
 		return (VT_ERROR);
 
-	dk_ioc.dki_length = label_len;
+	dk_ioc.dki_length = disk_info.dki_lbsize;
 	user_length = vtoc->efi_nparts;
 	efi = dk_ioc.dki_data;
 	if (md_flag) {
+		dk_ioc.dki_length = label_len;
 		if (efi_ioctl(fd, DKIOCGETEFI, &dk_ioc) == -1) {
 			switch (errno) {
 			case EIO:
@@ -433,6 +434,11 @@ efi_read(int fd, struct dk_gpt *vtoc)
 				rval = efi_ioctl(fd, DKIOCGETEFI, &dk_ioc);
 			}
 		}
+	} else {
+		dk_ioc.dki_lba = LE_64(efi->efi_gpt_PartitionEntryLBA);
+		dk_ioc.dki_data++;
+		dk_ioc.dki_length = label_len - disk_info.dki_lbsize;
+		rval = efi_ioctl(fd, DKIOCGETEFI, &dk_ioc);
 	}
 	if (rval < 0) {
 		free(efi);
@@ -440,8 +446,7 @@ efi_read(int fd, struct dk_gpt *vtoc)
 	}
 
 	/* LINTED -- always longlong aligned */
-	efi_parts = (efi_gpe_t *)(((char *)efi) +
-	    LE_64(efi->efi_gpt_PartitionEntryLBA) * disk_info.dki_lbsize);
+	efi_parts = (efi_gpe_t *)(((char *)efi) + disk_info.dki_lbsize);
 
 	/*
 	 * Assemble this into a "dk_gpt" struct for easier
