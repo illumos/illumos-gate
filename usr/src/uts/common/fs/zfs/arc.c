@@ -934,10 +934,10 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle)
 {
 	arc_state_t *evicted_state;
 	uint64_t bytes_evicted = 0, skipped = 0, missed = 0;
-	arc_buf_hdr_t *ab, *ab_prev;
+	arc_buf_hdr_t *ab, *ab_prev = NULL;
 	kmutex_t *hash_lock;
 	boolean_t have_lock;
-	void *steal = NULL;
+	void *stolen = NULL;
 
 	ASSERT(state == arc.mru || state == arc.mfu);
 
@@ -955,7 +955,9 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle)
 			skipped++;
 			continue;
 		}
-		if (recycle && (ab->b_size != bytes || ab->b_datacnt > 1))
+		/* "lookahead" for better eviction candidate */
+		if (recycle && ab->b_size != bytes &&
+		    ab_prev && ab_prev->b_size == bytes)
 			continue;
 		hash_lock = HDR_LOCK(ab);
 		have_lock = MUTEX_HELD(hash_lock);
@@ -966,19 +968,23 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle)
 				arc_buf_t *buf = ab->b_buf;
 				if (buf->b_data) {
 					bytes_evicted += ab->b_size;
-					if (recycle)
-						steal = buf->b_data;
+					if (recycle && ab->b_size == bytes) {
+						stolen = buf->b_data;
+						recycle = FALSE;
+					}
 				}
 				if (buf->b_efunc) {
 					mutex_enter(&arc_eviction_mtx);
-					arc_buf_destroy(buf, recycle, FALSE);
+					arc_buf_destroy(buf,
+					    buf->b_data == stolen, FALSE);
 					ab->b_buf = buf->b_next;
 					buf->b_hdr = &arc_eviction_hdr;
 					buf->b_next = arc_eviction_list;
 					arc_eviction_list = buf;
 					mutex_exit(&arc_eviction_mtx);
 				} else {
-					arc_buf_destroy(buf, recycle, TRUE);
+					arc_buf_destroy(buf,
+					    buf->b_data == stolen, TRUE);
 				}
 			}
 			ASSERT(ab->b_datacnt == 0);
@@ -1005,7 +1011,7 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle)
 		atomic_add_64(&arc.evict_skip, skipped);
 	if (missed)
 		atomic_add_64(&arc.mutex_miss, missed);
-	return (steal);
+	return (stolen);
 }
 
 /*
@@ -1470,12 +1476,9 @@ arc_get_data_buf(arc_buf_t *buf)
 		state =  (mfu_space > arc.mfu->size) ? arc.mru : arc.mfu;
 	}
 	if ((buf->b_data = arc_evict(state, size, TRUE)) == NULL) {
-		(void) arc_evict(state, size, FALSE);
 		buf->b_data = zio_buf_alloc(size);
 		atomic_add_64(&arc.size, size);
 		atomic_add_64(&arc.recycle_miss, 1);
-		if (arc.size > arc.c)
-			arc_adjust();
 	}
 	ASSERT(buf->b_data != NULL);
 out:
