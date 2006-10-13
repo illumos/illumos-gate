@@ -9,7 +9,7 @@
  *
  **************************************************************************/
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef DEVINFO_H
 #define DEVINFO_H

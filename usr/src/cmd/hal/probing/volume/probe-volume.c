@@ -9,7 +9,7 @@
  *
  **************************************************************************/
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
 #  include <config.h>

@@ -9,7 +9,7 @@
  *
  **************************************************************************/
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef HOTPLUG_H
 #define HOTPLUG_H
