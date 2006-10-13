@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -250,6 +249,12 @@ _clnt_vc_create_timed(int fd, struct netbuf *svcaddr, rpcprog_t prog,
 	}
 	ct->ct_addr.buf = NULL;
 
+	/*
+	 * The only use of vctbl_lock is for serializing the creation of
+	 * vctbl. Once created the lock needs to be released so we don't
+	 * hold it across the set_up_connection() call and end up with a
+	 * bunch of threads stuck waiting for the mutex.
+	 */
 	sig_mutex_lock(&vctbl_lock);
 
 	if ((vctbl == NULL) && ((vctbl = rpc_fd_init()) == NULL)) {
@@ -259,6 +264,8 @@ _clnt_vc_create_timed(int fd, struct netbuf *svcaddr, rpcprog_t prog,
 		sig_mutex_unlock(&vctbl_lock);
 		goto err;
 	}
+
+	sig_mutex_unlock(&vctbl_lock);
 
 	ct->ct_io_mode = RPC_CL_BLOCKING;
 	ct->ct_blocking_mode = RPC_CL_BLOCKING_FLUSH;
@@ -276,16 +283,13 @@ _clnt_vc_create_timed(int fd, struct netbuf *svcaddr, rpcprog_t prog,
 		rpc_createerr.cf_stat = RPC_SYSTEMERROR;
 		rpc_createerr.cf_error.re_terrno = errno;
 		rpc_createerr.cf_error.re_errno = 0;
-		sig_mutex_unlock(&vctbl_lock);
 		goto err;
 	}
 	ct->ct_is_blocking = flag & O_NONBLOCK ? FALSE : TRUE;
 
 	if (set_up_connection(fd, svcaddr, ct, tp) == FALSE) {
-		sig_mutex_unlock(&vctbl_lock);
 		goto err;
 	}
-	sig_mutex_unlock(&vctbl_lock);
 
 	/*
 	 * Set up other members of private data struct

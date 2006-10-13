@@ -90,13 +90,6 @@ extern int _autofssys(int, void *);
 
 #define	CTIME_BUF_LEN 26
 
-/*
- * XXX - this limit was imposed due to resource problems - even though
- * we can and do try and set the rlimit to be able to handle more threads,
- * fopen() doesn't allow more than 256 fp's.
- */
-#define	MAXTHREADS 64
-
 #define	RESOURCE_FACTOR 8
 #ifdef DEBUG
 #define	AUTOFS_DOOR	"/var/run/autofs_door"
@@ -208,6 +201,19 @@ main(argc, argv)
 	 * we don't initialize the stack of files used in file service
 	 */
 	(void) ns_setup(NULL, NULL);
+
+	/*
+	 * we're using doors and its thread management now so we need to
+	 * make sure we have more than the default of 256 file descriptors
+	 * available.
+	 */
+	rlset.rlim_cur = RLIM_INFINITY;
+	rlset.rlim_max = RLIM_INFINITY;
+	if (setrlimit(RLIMIT_NOFILE, &rlset) == -1)
+		syslog(LOG_ERR, "setrlimit failed for %s: %s", AUTOMOUNTD,
+		    strerror(errno));
+
+	(void) enable_extended_FILE_stdio(-1, -1);
 
 	/*
 	 * establish our lock on the lock file and write our pid to it.
