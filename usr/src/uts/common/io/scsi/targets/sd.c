@@ -4657,6 +4657,17 @@ no_solaris_partition:
 #endif
 	}
 
+	/*
+	 * For VTOC labeled disk, create and set the partition stats
+	 * at attach time, update the stats according to dynamic
+	 * partition changes during running time.
+	 */
+	if (label_error == 0 && un->un_f_pkstats_enabled) {
+		sd_set_pstats(un);
+		SD_TRACE(SD_LOG_IO_PARTITION, un, "sd_validate_geometry: "
+		    "un:0x%p pstats created and set, or updated\n", un);
+	}
+
 	return (label_error);
 }
 
@@ -5625,6 +5636,17 @@ sd_use_efi(struct sd_lun *un, int path_flag)
 	bzero(&un->un_vtoc, sizeof (struct dk_vtoc));
 
 	kmem_free(buf, EFI_MIN_ARRAY_SIZE);
+
+	/*
+	 * For EFI labeled disk, create and set the partition stats
+	 * at attach time, update the stats according to dynamic
+	 * partition changes during running time.
+	 */
+	if (un->un_f_pkstats_enabled) {
+		sd_set_pstats(un);
+		SD_TRACE(SD_LOG_IO_PARTITION, un, "sd_use_efi: "
+		    "un:0x%p pstats created and set, or updated\n", un);
+	}
 	return (0);
 
 done_err:
@@ -8458,9 +8480,12 @@ sd_unit_attach(dev_info_t *devi)
 	 * Note: This is a critical sequence that needs to be maintained:
 	 *	1) Instantiate the kstats here, before any routines using the
 	 *	   iopath (i.e. sd_send_scsi_cmd).
-	 *	2) Initialize the error stats (sd_set_errstats) and partition
-	 *	   stats (sd_set_pstats), following sd_validate_geometry(),
-	 *	   sd_register_devid(), and sd_cache_control().
+	 *	2) Instantiate and initialize the partition stats
+	 *	   (sd_set_pstats) in sd_use_efi() and sd_validate_geometry(),
+	 *	   see detailed comments there.
+	 *	3) Initialize the error stats (sd_set_errstats), following
+	 *	   sd_validate_geometry(),sd_register_devid(),
+	 *	   and sd_cache_control().
 	 */
 
 	un->un_stats = kstat_create(sd_label, instance,
@@ -8963,16 +8988,13 @@ sd_unit_attach(dev_info_t *devi)
 	 * Note: This is a critical sequence that needs to be maintained:
 	 *	1) Instantiate the kstats before any routines using the iopath
 	 *	   (i.e. sd_send_scsi_cmd).
-	 *	2) Initialize the error stats (sd_set_errstats) and partition
-	 *	   stats (sd_set_pstats)here, following sd_validate_geometry(),
-	 *	   sd_register_devid(), and sd_cache_control().
+	 *	2) Instantiate and initialize the partition stats
+	 *	   (sd_set_pstats) in sd_use_efi() and sd_validate_geometry(),
+	 *	   see detailed comments there.
+	 *	3) Initialize the error stats (sd_set_errstats), following
+	 *	   sd_validate_geometry(),sd_register_devid(),
+	 *	   and sd_cache_control().
 	 */
-	if (un->un_f_pkstats_enabled) {
-		sd_set_pstats(un);
-		SD_TRACE(SD_LOG_ATTACH_DETACH, un,
-		    "sd_unit_attach: un:0x%p pstats created and set\n", un);
-	}
-
 	sd_set_errstats(un);
 	SD_TRACE(SD_LOG_ATTACH_DETACH, un,
 	    "sd_unit_attach: un:0x%p errstats set\n", un);
