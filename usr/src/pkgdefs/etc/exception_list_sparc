@@ -571,6 +571,7 @@ usr/lib/krb5/libkadm5srv.so		sparc
 usr/lib/krb5/libkadm5srv.so.1		sparc
 usr/lib/krb5/libkdb.so			sparc
 usr/lib/krb5/libkdb.so.1		sparc
+usr/sbin/k5srvutil			sparc
 usr/sbin/kadmin.local			sparc
 usr/sbin/kadmin				sparc
 usr/sbin/kclient			sparc
