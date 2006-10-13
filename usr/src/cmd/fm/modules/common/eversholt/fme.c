@@ -515,6 +515,24 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	fmep->fmcase = inprogress;
 	fmep->hdl = hdl;
 
+	if (fmd_buf_size(hdl, inprogress, WOBUF_POSTD) == 0) {
+		out(O_ALTFP, "restart_fme: no saved posted status");
+		Undiag_reason = UD_MISSINGINFO;
+		goto badcase;
+	} else {
+		fmd_buf_read(hdl, inprogress, WOBUF_POSTD,
+		    (void *)&fmep->posted_suspects,
+		    sizeof (fmep->posted_suspects));
+	}
+
+	/*
+	 * ignore solved or closed cases
+	 */
+	if (fmep->posted_suspects ||
+	    fmd_case_solved(fmep->hdl, fmep->fmcase) ||
+	    fmd_case_closed(fmep->hdl, fmep->fmcase))
+		goto badcase;
+
 	if (fmd_buf_size(hdl, inprogress, WOBUF_CFGLEN) != sizeof (size_t)) {
 		out(O_ALTFP, "restart_fme: No config data");
 		Undiag_reason = UD_MISSINGINFO;
@@ -569,16 +587,6 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 		    sizeof (fmep->pull));
 	}
 
-	if (fmd_buf_size(hdl, inprogress, WOBUF_POSTD) == 0) {
-		out(O_ALTFP, "restart_fme: no saved posted status");
-		Undiag_reason = UD_MISSINGINFO;
-		goto badcase;
-	} else {
-		fmd_buf_read(hdl, inprogress, WOBUF_POSTD,
-		    (void *)&fmep->posted_suspects,
-		    sizeof (fmep->posted_suspects));
-	}
-
 	if (fmd_buf_size(hdl, inprogress, WOBUF_ID) == 0) {
 		out(O_ALTFP, "restart_fme: no saved id");
 		Undiag_reason = UD_MISSINGINFO;
@@ -604,16 +612,8 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 
 	Open_fme_count++;
 
-	/*
-	 * ignore solved or closed cases
-	 */
-	if (fmep->posted_suspects ||
-	    fmd_case_solved(fmep->hdl, fmep->fmcase) ||
-	    fmd_case_closed(fmep->hdl, fmep->fmcase))
-		return;
-
 	/* give the diagnosis algorithm a shot at the new FME state */
-	fme_eval(fmep, NULL);
+	fme_eval(fmep, fmep->e0r);
 	return;
 
 badcase:
@@ -635,13 +635,13 @@ badcase:
 	Undiagablecaselist = bad;
 	bad->fmcase = inprogress;
 
-	out(O_ALTFP, "[case %s (unable to restart), ",
+	out(O_ALTFP|O_NONL, "[case %s (unable to restart), ",
 	    fmd_case_uuid(hdl, bad->fmcase));
 
 	if (fmd_case_solved(hdl, bad->fmcase)) {
-		out(O_ALTFP, "already solved, ");
+		out(O_ALTFP|O_NONL, "already solved, ");
 	} else {
-		out(O_ALTFP, "solving, ");
+		out(O_ALTFP|O_NONL, "solving, ");
 		defect = fmd_nvl_create_fault(hdl, UNDIAGNOSABLE_DEFECT, 100,
 		    NULL, NULL, NULL);
 		if (Undiag_reason != NULL)
@@ -682,8 +682,10 @@ destroy_fme(struct fme *f)
 	stats_delete(f->Marrowcount);
 	stats_delete(f->diags);
 
-	itree_free(f->eventtree);
-	config_free(f->cfgdata);
+	if (f->eventtree != NULL)
+		itree_free(f->eventtree);
+	if (f->cfgdata != NULL)
+		config_free(f->cfgdata);
 	lut_free(f->globals, globals_destructor, NULL);
 	FREE(f);
 }
@@ -758,8 +760,10 @@ fme_print(int flags, struct fme *fmep)
 		itree_pevent_brief(flags|O_NONL, ep);
 	}
 	out(flags, NULL);
-	out(flags|O_VERB2, "\t        Tree:");
-	itree_ptree(flags|O_VERB2, fmep->eventtree);
+	if (fmep->eventtree != NULL) {
+		out(flags|O_VERB2, "\t        Tree:");
+		itree_ptree(flags|O_VERB2, fmep->eventtree);
+	}
 }
 
 static struct node *
@@ -2465,8 +2469,6 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 			fmd_timer_remove(fmep->hdl, fmep->timer);
 			fmep->wull = 0;
 		}
-		lut_walk(fmep->eventtree, (lut_cb)clear_arrows,
-		    (void *)fmep);
 		break;
 
 	case FME_WAIT:
@@ -2507,7 +2509,14 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 			fmd_case_close(fmep->hdl, fmep->fmcase);
 		}
 	}
-	itree_prune(fmep->eventtree);
+	if (fmep->posted_suspects == 1) {
+		itree_free(fmep->eventtree);
+		fmep->eventtree = NULL;
+		config_free(fmep->cfgdata);
+		fmep->cfgdata = NULL;
+	} else {
+		itree_prune(fmep->eventtree);
+	}
 }
 
 static void indent(void);

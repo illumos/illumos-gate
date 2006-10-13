@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -82,6 +81,10 @@ static struct sysev_stats {
 	{ "eagain", FMD_TYPE_UINT64, "events retried due to low memory" },
 };
 
+static pthread_cond_t sysev_replay_cv = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t sysev_replay_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int sysev_replay_wait = 1;
+
 /*
  * Receive an event from the SysEvent channel and post it to our transport.
  * Under extreme low-memory situations where we cannot event unpack the event,
@@ -97,6 +100,11 @@ sysev_recv(sysevent_t *sep, void *arg)
 	fmd_xprt_t *xp = arg;
 	nvlist_t *nvl;
 	hrtime_t hrt;
+
+	(void) pthread_mutex_lock(&sysev_replay_mutex);
+	while (sysev_replay_wait)
+		(void) pthread_cond_wait(&sysev_replay_cv, &sysev_replay_mutex);
+	(void) pthread_mutex_unlock(&sysev_replay_mutex);
 
 	if (strcmp(sysevent_get_class_name(sep), EC_FM) != 0) {
 		fmd_hdl_error(sysev_hdl, "discarding event 0x%llx: unexpected"
@@ -161,7 +169,7 @@ sysev_replay(fmd_hdl_t *hdl, id_t id, void *arg)
 		if ((fd = open("/dev/dump", O_RDONLY)) == -1) {
 			fmd_hdl_error(hdl, "failed to open /dev/dump "
 			    "to locate dump device for event replay");
-			return;
+			goto done;
 		}
 
 		dumpdev = alloca(PATH_MAX);
@@ -173,12 +181,12 @@ sysev_replay(fmd_hdl_t *hdl, id_t id, void *arg)
 				fmd_hdl_error(hdl, "failed to obtain "
 				    "path to dump device for event replay");
 			}
-			return;
+			goto done;
 		}
 	}
 
 	if (strcmp(dumpdev, "/dev/null") == 0)
-		return; /* return silently and skip replay for /dev/null */
+		goto done; /* return silently and skip replay for /dev/null */
 
 	/*
 	 * Open the appropriate device and then determine the offset of the
@@ -187,7 +195,7 @@ sysev_replay(fmd_hdl_t *hdl, id_t id, void *arg)
 	if ((fd = open64(dumpdev, O_RDWR | O_DSYNC)) == -1) {
 		fmd_hdl_error(hdl, "failed to open dump transport %s "
 		    "(pending events will not be replayed)", dumpdev);
-		return;
+		goto done;
 	}
 
 	off = DUMP_OFFSET + DUMP_LOGSIZE + DUMP_ERPTSIZE;
@@ -197,7 +205,7 @@ sysev_replay(fmd_hdl_t *hdl, id_t id, void *arg)
 		fmd_hdl_error(hdl, "failed to seek dump transport %s "
 		    "(pending events will not be replayed)", dumpdev);
 		(void) close(fd);
-		return;
+		goto done;
 	}
 
 	/*
@@ -332,6 +340,11 @@ next:
 	}
 
 	(void) close(fd);
+done:
+	(void) pthread_mutex_lock(&sysev_replay_mutex);
+	sysev_replay_wait = 0;
+	(void) pthread_cond_broadcast(&sysev_replay_cv);
+	(void) pthread_mutex_unlock(&sysev_replay_mutex);
 }
 
 static const fmd_prop_t sysev_props[] = {
