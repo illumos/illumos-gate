@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -98,7 +97,6 @@ typedef struct disk {
 	char		*device_id;	/* string encoded device id */
 	ddi_devid_t	devid;		/* decoded device id */
 	char		*kernel_name;	/* handles drives w/ no devlinks */
-	char		*volm_path;
 	char		*product_id;
 	char		*vendor_id;
 	controller_t	**controllers;
@@ -111,7 +109,6 @@ typedef struct disk {
 	int		rpm;
 	int		wide;
 	int		cd_rom;
-	int		volm_path_set;
 } disk_t;
 
 typedef struct descriptor {
@@ -196,7 +193,6 @@ descriptor_t	*media_get_descriptor_by_name(char *name, int *errp);
 char		*media_get_name(descriptor_t *desc);
 nvlist_t	*media_get_attributes(descriptor_t *desc, int *errp);
 nvlist_t	*media_get_stats(descriptor_t *desc, int stat_type, int *errp);
-int		media_get_volm_path(disk_t *diskp, char *mediapath, int size);
 int		media_make_descriptors();
 int		media_read_info(int fd, struct dk_minfo *minfo);
 int		media_read_name(disk_t *dp, char *mname, int size);

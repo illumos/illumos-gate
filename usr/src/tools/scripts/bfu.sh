@@ -163,7 +163,6 @@ all_zones_files="
 	etc/user_attr
 	etc/uucp/[A-Z]*
 	etc/vfstab
-	etc/vold.conf
 	var/spool/cron/crontabs/*
 	var/yp/Makefile
 	var/yp/aliases
@@ -325,6 +324,7 @@ superfluous_local_zone_files="
 	lib/svc/method/svc-dscp
 	lib/svc/method/svc-dumpadm
 	lib/svc/method/svc-intrd
+	lib/svc/method/svc-hal
 	lib/svc/method/svc-mdmonitor
 	lib/svc/method/svc-metainit
 	lib/svc/method/svc-metasync
@@ -332,6 +332,7 @@ superfluous_local_zone_files="
 	lib/svc/method/svc-poold
 	lib/svc/method/svc-pools
 	lib/svc/method/svc-power
+	lib/svc/method/svc-rmvolmgr
 	lib/svc/method/svc-scheduler
 	lib/svc/method/svc-sckmd
 	lib/svc/method/svc-syseventd
@@ -392,6 +393,7 @@ superfluous_local_zone_files="
 	var/svc/manifest/system/cvc.xml
 	var/svc/manifest/system/dumpadm.xml
 	var/svc/manifest/system/fmd.xml
+	var/svc/manifest/system/hal.xml
 	var/svc/manifest/system/intrd.xml
 	var/svc/manifest/system/mdmonitor.xml
 	var/svc/manifest/system/metainit.xml
@@ -403,6 +405,7 @@ superfluous_local_zone_files="
 	var/svc/manifest/system/scheduler.xml
 	var/svc/manifest/system/sysevent.xml
 	var/svc/manifest/system/zones.xml
+	var/svc/manifest/system/filesystem/rmvolmgr.xml
 "
 
 #
@@ -908,6 +911,7 @@ smf_obsolete_rc_files="
 	etc/init.d/sysid.sys
 	etc/init.d/syslog
 	etc/init.d/utmpd
+	etc/init.d/volmgt
 	etc/init.d/xntpd
 	etc/init.d/zones
 	etc/rc0.d/K00ANNOUNCE
@@ -1066,6 +1070,7 @@ smf_obsolete_rc_files="
 smf_obsolete_manifests="
 	var/svc/manifest/network/tftp.xml
 	var/svc/manifest/network/lp.xml
+	var/svc/manifest/system/filesystem/volfs.xml
 "
 
 # smf services whose manifests have been renamed
@@ -1077,6 +1082,7 @@ smf_renamed_manifests="
 # Obsolete smf methods
 smf_obsolete_methods="
 	lib/svc/method/print-server
+	lib/svc/method/svc-volfs
 "
 
 smf_cleanup () {
@@ -1133,13 +1139,18 @@ smf_handle_new_services () {
 		    $rootprefix/var/svc/profile/upgrade
 	fi
 	if [[ $zone = global &&
-	    ! -f $rootprefix/var/svc/profile/system/filesystem/volfs.xml ]]; then
-		echo /usr/sbin/svcadm enable system/filesystem/volfs >> \
+	    ! -f $rootprefix/var/svc/manifest/system/scheduler.xml ]]; then
+		echo /usr/sbin/svcadm enable system/scheduler >> \
 		    $rootprefix/var/svc/profile/upgrade
 	fi
 	if [[ $zone = global &&
-	    ! -f $rootprefix/var/svc/manifest/system/scheduler.xml ]]; then
-		echo /usr/sbin/svcadm enable system/scheduler >> \
+	    ! -f $rootprefix/var/svc/manifest/system/hal.xml ]]; then
+		echo /usr/sbin/svcadm enable system/hal >> \
+		    $rootprefix/var/svc/profile/upgrade
+	fi
+	if [[ $zone = global &&
+	    ! -f $rootprefix/var/svc/manifest/system/filesystem/rmvolmgr.xml ]]; then
+		echo /usr/sbin/svcadm enable system/filesystem/rmvolmgr >> \
 		    $rootprefix/var/svc/profile/upgrade
 	fi
 }
@@ -2112,6 +2123,11 @@ if ifconfig -a | egrep '^ce' >/dev/null 2>/dev/null; then
 	fi
 fi
 
+update_script="/ws/onnv-gate/public/bin/update_dbus"
+if [ ! -x /usr/lib/dbus-daemon ]; then
+	fail "Run $update_script to update D-Bus."
+fi
+
 if [[ $target_isa = i386 && -f $cpiodir/i86pc.root$ZFIX ]] && \
     $ZCAT $cpiodir/i86pc.root$ZFIX | cpio -it 2>/dev/null | \
     grep multiboot >/dev/null 2>&1 ; then
@@ -2989,6 +3005,31 @@ remove_eof_dmi() {
 	rm -f $rootprefix/etc/rc2.d/K07dmi
 	rm -f $rootprefix/etc/rcS.d/K07dmi
 	rm -f $rootprefix/etc/rc3.d/S77dmi
+}
+
+#
+# Remove vold
+#
+remove_eof_vold()
+{
+	printf 'Removing vold... '
+
+	rm -rf $usr/lib/vold
+	rm -rf $usr/lib/rmmount
+	rm -f $usr/lib/fs/hsfs/ident_hsfs.so.1
+	rm -f $usr/lib/fs/pcfs/ident_pcfs.so.1
+	rm -f $usr/lib/fs/udfs/ident_udfs.so.1
+	rm -f $usr/lib/fs/ufs/ident_ufs.so.1
+	rm -f $usr/sbin/vold
+	rm -f $usr/kernel/drv/vol
+	rm -f $usr/kernel/drv/amd64/vol
+	rm -f $usr/kernel/drv/sparcv9/vol
+	rm -f $usr/include/rmmount.h
+	rm -f $usr/include/vol.h
+	rm -f $rootprefix/etc/vold.conf
+	rm -f $rootprefix/etc/rmmount.conf
+
+	printf '\n'
 }
 
 remove_properties() {
@@ -5080,6 +5121,13 @@ mondo_loop() {
 		/tmp/nssw.$$
 	cp /tmp/nssw.$$ $rootprefix/bfu.child/etc/nsswitch.conf
 	rm -f /tmp/nssw.$$
+
+	#
+	# Remove vold
+	#
+	if [ -f $rootprefix/etc/vold.conf -o -d $usr/lib/vold ]; then
+		remove_eof_vold
+	fi
 
 	#
 	# Remove SUNWcoff package

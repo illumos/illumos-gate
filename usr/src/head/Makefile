@@ -142,7 +142,6 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	resolv.h	\
 	rje.h		\
 	rtld_db.h	\
-	rmmount.h	\
 	sac.h		\
 	sched.h		\
 	schedctl.h	\

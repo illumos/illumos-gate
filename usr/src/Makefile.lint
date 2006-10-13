@@ -112,6 +112,7 @@ COMMON_SUBDIRS = \
 	cmd/dumpadm \
 	cmd/dumpcs \
 	cmd/echo \
+	cmd/eject \
 	cmd/emul64ioctl \
 	cmd/env \
 	cmd/expand \

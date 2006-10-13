@@ -126,6 +126,9 @@ f none usr/include/grp.h 644 root bin
 d none usr/include/gssapi 0755 root bin
 f none usr/include/gssapi/gssapi.h 0644 root bin
 f none usr/include/gssapi/gssapi_ext.h 0644 root bin
+d none usr/include/hal 755 root bin
+f none usr/include/hal/libhal.h 644 root bin
+f none usr/include/hal/libhal-storage.h 644 root bin
 f none usr/include/iconv.h 644 root bin
 f none usr/include/ieeefp.h 644 root bin
 d none usr/include/inet 755 root bin
@@ -188,6 +191,8 @@ f none usr/include/libgen.h 644 root bin
 f none usr/include/libintl.h 644 root bin
 f none usr/include/libnvpair.h 644 root bin
 f none usr/include/libipp.h 644 root bin
+d none usr/include/libpolkit 755 root bin
+f none usr/include/libpolkit/libpolkit.h 644 root bin
 f none usr/include/librcm.h 644 root bin
 f none usr/include/libscf.h 0644 root bin
 f none usr/include/libscf_priv.h 0644 root bin
@@ -337,7 +342,6 @@ f none usr/include/regexp.h 644 root bin
 f none usr/include/regexpr.h 644 root bin
 f none usr/include/resolv.h 644 root bin
 f none usr/include/rje.h 644 root bin
-f none usr/include/rmmount.h 644 root bin
 d none usr/include/iso 755 root bin
 s none usr/include/iso/assert_iso.h=../assert.h
 f none usr/include/iso/ctype_c99.h 644 root bin
@@ -1171,7 +1175,6 @@ f none usr/include/sys/vmmeter.h 644 root bin
 f none usr/include/sys/vmparam.h 644 root bin
 f none usr/include/sys/vmsystm.h 644 root bin
 f none usr/include/sys/vnode.h 644 root bin
-f none usr/include/sys/vol.h 644 root bin
 f none usr/include/sys/vtoc.h 644 root bin
 f none usr/include/sys/vtrace.h 644 root bin
 f none usr/include/sys/vuid_event.h 644 root bin

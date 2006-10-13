@@ -51,7 +51,6 @@ f none usr/lib/fs/udfs/fsck 555 root bin
 f none usr/lib/fs/udfs/fsdb 555 root bin
 f none usr/lib/fs/udfs/fstyp.so.1 555 root bin
 l none usr/lib/fs/udfs/fstyp=../../../sbin/fstyp
-f none usr/lib/fs/udfs/ident_udfs.so.1 555 root bin
 f none usr/lib/fs/udfs/labelit 555 root bin
 f none usr/lib/fs/udfs/mkfs 555 root bin
 f none usr/lib/fs/udfs/mount 555 root bin

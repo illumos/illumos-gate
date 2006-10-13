@@ -221,6 +221,8 @@ SUBDIRS += \
 	libzfs_jni	\
 	libmapid	\
 	brand		\
+	policykit	\
+	hal		\
 	$($(MACH)_SUBDIRS)
 
 sparc_SUBDIRS= .WAIT	\
@@ -372,6 +374,8 @@ HDRSUBDIRS=		\
 	libzfs		\
 	libzfs_jni	\
 	libzoneinfo	\
+	hal		\
+	policykit	\
 	lvm		\
 	openssl		\
 	pkcs11		\

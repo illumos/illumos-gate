@@ -87,6 +87,7 @@ setdevaccess(char *dev, uid_t uid, gid_t gid, mode_t mode,
 {
 	int err = 0, local_errno;
 	char errstring[MAX_LINELEN];
+	struct stat st;
 
 	if (chown(dev, uid, gid) == -1) {
 		if (errno == ENOENT)	/* no such file */
@@ -95,17 +96,22 @@ setdevaccess(char *dev, uid_t uid, gid_t gid, mode_t mode,
 		local_errno = errno;
 	}
 
-	while (fdetach(dev) == 0) {
-		if (chown(dev, uid, gid) == -1) {
-			err = -1;
-			local_errno = errno;
+	/*
+	 * don't fdetach block devices, as it will unmount them
+	 */
+	if (!((stat(dev, &st) == 0) && ((st.st_mode & S_IFMT) == S_IFBLK))) {
+		while (fdetach(dev) == 0) {
+			if (chown(dev, uid, gid) == -1) {
+				err = -1;
+				local_errno = errno;
+			}
 		}
-	}
-	if (err && errmsg) {
-		(void) snprintf(errstring, MAX_LINELEN,
-		    "failed to chown device %s: %s\n",
-		    dev, strerror(local_errno));
-		(*errmsg)(errstring);
+		if (err && errmsg) {
+			(void) snprintf(errstring, MAX_LINELEN,
+			    "failed to chown device %s: %s\n",
+			    dev, strerror(local_errno));
+			(*errmsg)(errstring);
+		}
 	}
 
 	/*

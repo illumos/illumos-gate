@@ -198,7 +198,10 @@ COMMON_SUBDIRS= \
 	SUNWgssc  \
 	SUNWgss	\
 	SUNWgssk \
+	SUNWhal \
+	SUNWhalr \
 	SUNWhea  \
+	SUNWhwdata \
 	SUNWib \
 	SUNWibhca \
 	SUNWiotu  \
@@ -267,6 +270,7 @@ COMMON_SUBDIRS= \
 	SUNWpcu	\
 	SUNWpd    \
 	SUNWphx \
+	SUNWpolkit \
 	PHXext \
 	SUNWperl584core \
 	SUNWperl584usr \
@@ -299,6 +303,8 @@ COMMON_SUBDIRS= \
 	SUNWrcmdr \
 	SUNWrcmds \
 	SUNWrge \
+	SUNWrmvolmgr \
+	SUNWrmvolmgrr \
 	SUNWrmwbr \
 	SUNWrmwbu \
 	SUNWroute \
@@ -316,6 +322,8 @@ COMMON_SUBDIRS= \
 	SUNWslpr \
 	SUNWslpu \
 	SUNWsmapi  \
+	SUNWsmedia \
+	SUNWsmediar \
 	SUNWsn1rint \
 	SUNWsn1uint \
 	SUNWsndmr  \
@@ -348,8 +356,6 @@ COMMON_SUBDIRS= \
 	SUNWusb \
 	SUNWusbs \
 	SUNWusbu \
-	SUNWvolr  \
-	SUNWvolu  \
 	SUNWxcu4  \
 	SUNWwlanr  \
 	SUNWwlanu  \

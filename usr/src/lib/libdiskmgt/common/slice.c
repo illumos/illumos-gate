@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -73,17 +72,9 @@ static int	desc_ok(descriptor_t *dp);
 static void	dsk2rdsk(char *dsk, char *rdsk, int size);
 static int	get_attrs(descriptor_t *dp, int fd,  nvlist_t *attrs);
 static descriptor_t **get_fixed_assocs(descriptor_t *desc, int *errp);
-static descriptor_t **get_removable_assocs(descriptor_t *desc, char *volm_path,
-		    int *errp);
 static int	get_slice_num(slice_t *devp);
 static int	match_fixed_name(disk_t *dp, char *name, int *errp);
-static int	match_removable_name(disk_t *dp, char *name, int *errp);
 static int	make_fixed_descriptors(disk_t *dp);
-static int	make_removable_descriptors(disk_t *dp);
-static int	make_volm_dir_descriptors(disk_t *dp, int fd,
-		    char *volm_path);
-static int	num_removable_slices(int fd, struct stat *bufp,
-		    char *volm_path);
 
 descriptor_t **
 slice_get_assoc_descriptors(descriptor_t *desc, dm_desc_type_t type,
@@ -114,35 +105,13 @@ slice_get_assoc_descriptors(descriptor_t *desc, dm_desc_type_t type,
 descriptor_t **
 slice_get_assocs(descriptor_t *desc, int *errp)
 {
-	int		under_volm = 0;
-	char		volm_path[MAXPATHLEN];
-
 	/* Just check the first drive name. */
 	if (desc->p.disk->aliases == NULL) {
 	    *errp = 0;
 	    return (libdiskmgt_empty_desc_array(errp));
 	}
 
-	if (desc->p.disk->removable) {
-	    if ((under_volm = media_get_volm_path(desc->p.disk, volm_path,
-		sizeof (volm_path)))) {
-		if (volm_path[0] == 0) {
-		    /* no media */
-		    *errp = 0;
-		    return (libdiskmgt_empty_desc_array(errp));
-		}
-	    }
-	}
-
-	if (desc->p.disk->removable) {
-	    if (under_volm) {
-		return (get_removable_assocs(desc, volm_path, errp));
-	    } else {
-		return (get_fixed_assocs(desc, errp));
-	    }
-	} else {
-	    return (get_fixed_assocs(desc, errp));
-	}
+	return (get_fixed_assocs(desc, errp));
 }
 
 nvlist_t *
@@ -188,24 +157,21 @@ slice_get_descriptor_by_name(char *name, int *errp)
 	disk_t		*dp;
 
 	for (dp = cache_get_disklist(); dp != NULL; dp = dp->next) {
-	    if (dp->removable) {
-		found = match_removable_name(dp, name, errp);
-	    } else {
 		found = match_fixed_name(dp, name, errp);
-	    }
 
-	    if (found) {
-		char	mname[MAXPATHLEN];
+		if (found) {
+			char	mname[MAXPATHLEN];
 
-		if (*errp != 0) {
-		    return (NULL);
+			if (*errp != 0) {
+			    return (NULL);
+			}
+
+			mname[0] = 0;
+			(void) media_read_name(dp, mname, sizeof (mname));
+
+			return (cache_get_desc(DM_SLICE, dp, name, mname,
+			    errp));
 		}
-
-		mname[0] = 0;
-		(void) media_read_name(dp, mname, sizeof (mname));
-
-		return (cache_get_desc(DM_SLICE, dp, name, mname, errp));
-	    }
 	}
 
 	*errp = ENODEV;
@@ -310,11 +276,7 @@ slice_make_descriptors()
 	while (dp != NULL) {
 	    int	error;
 
-	    if (dp->removable) {
-		error = make_removable_descriptors(dp);
-	    } else {
-		error = make_fixed_descriptors(dp);
-	    }
+	    error = make_fixed_descriptors(dp);
 	    if (error != 0) {
 		return (error);
 	    }
@@ -750,140 +712,6 @@ get_fixed_assocs(descriptor_t *desc, int *errp)
 	return (slices);
 }
 
-/*
- * Called for loaded removable media under volume management control.
- */
-static descriptor_t **
-get_removable_assocs(descriptor_t *desc, char *volm_path, int *errp)
-{
-	int		pos;
-	int		fd;
-	int		cnt;
-	struct stat	buf;
-	descriptor_t	**slices;
-	char		*media_name = NULL;
-	char		devpath[MAXPATHLEN];
-
-	/* get the media name from the descriptor */
-	if (desc->type == DM_MEDIA) {
-		media_name = desc->name;
-	} else {
-		/* must be a DM_PARTITION */
-		media_name = desc->secondary_name;
-	}
-
-	/*
-	 * For removable media under volm control the volm_path will
-	 * either be a device (if the media is made up of a single slice) or
-	 * a directory (if the media has multiple slices) with the slices
-	 * as devices contained in the directory.
-	 */
-
-	if ((fd = open(volm_path, O_RDONLY|O_NDELAY)) < 0 ||
-	    fstat(fd, &buf) != 0) {
-		*errp = ENODEV;
-		return (NULL);
-	}
-
-	cnt = num_removable_slices(fd, &buf, volm_path);
-
-	/* allocate the array for the descriptors */
-	slices = calloc(cnt + 1, sizeof (descriptor_t *));
-	if (slices == NULL) {
-		*errp = ENOMEM;
-		return (NULL);
-	}
-
-	slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
-
-	pos = 0;
-	*errp = 0;
-	if (S_ISCHR(buf.st_mode)) {
-		struct dk_minfo	minfo;
-
-		/* Make sure media has readable label */
-		if (media_read_info(fd, &minfo)) {
-			int		status;
-			int		data_format = FMT_UNKNOWN;
-			struct vtoc	vtoc;
-			struct dk_gpt	*efip;
-
-			if ((status = read_vtoc(fd, &vtoc)) >= 0) {
-				data_format = FMT_VTOC;
-			} else if (status == VT_ENOTSUP &&
-			    efi_alloc_and_read(fd, &efip) >= 0) {
-				data_format = FMT_EFI;
-			}
-
-			if (data_format != FMT_UNKNOWN) {
-			    /* has a readable label */
-				slices[pos++] =
-				    cache_get_desc(DM_SLICE, desc->p.disk,
-				    devpath, media_name, errp);
-			}
-		}
-		(void) close(fd);
-	} else if (S_ISDIR(buf.st_mode)) {
-		DIR		*dirp;
-		struct dirent	*dentp;
-
-		/* rewind, num_removable_slices already traversed */
-		(void) lseek(fd, 0, SEEK_SET);
-
-		if ((dirp = fdopendir(fd)) == NULL) {
-			*errp = errno;
-			(void) close(fd);
-			return (NULL);
-		}
-
-		while ((dentp = readdir(dirp)) != NULL) {
-			int	dfd;
-			int	is_dev = 0;
-			char	slice_path[MAXPATHLEN];
-
-			if (libdiskmgt_str_eq(".", dentp->d_name) ||
-			    libdiskmgt_str_eq("..", dentp->d_name)) {
-				continue;
-			}
-
-			(void) snprintf(slice_path, sizeof (slice_path),
-			    "%s/%s", devpath, dentp->d_name);
-
-			if ((dfd = open(slice_path, O_RDONLY|O_NDELAY)) >= 0) {
-				struct stat	buf;
-
-				if (fstat(dfd, &buf) == 0 &&
-				    S_ISCHR(buf.st_mode)) {
-					is_dev = 1;
-				}
-				(void) close(dfd);
-			}
-
-			if (!is_dev) {
-				continue;
-			}
-
-			slices[pos++] = cache_get_desc(DM_SLICE, desc->p.disk,
-			    slice_path, media_name, errp);
-			if (*errp != 0) {
-				break;
-			}
-		}
-		(void) closedir(dirp);
-	} else {
-		(void) close(fd);
-	}
-
-	slices[pos] = NULL;
-
-	if (*errp != 0) {
-		cache_free_descriptors(slices);
-		return (NULL);
-	}
-
-	return (slices);
-}
-
 static int
 get_slice_num(slice_t *devp)
 {
@@ -974,141 +802,6 @@ make_fixed_descriptors(disk_t *dp)
 	if (data_format == FMT_EFI) {
 	    efi_free(efip);
 	}
-
-	return (error);
-}
-
-/*
- * For removable media under volm control we have to do some special handling.
- * We don't use the vtoc and /dev/dsk devpaths, since the slices are named
- * under the /vol fs.
- */
-static int
-make_removable_descriptors(disk_t *dp)
-{
-	char		volm_path[MAXPATHLEN];
-	int		error;
-	int		fd;
-
-	/*
-	 * If this removable drive is not under volm control, just use
-	 * normal handling.
-	 */
-	if (!media_get_volm_path(dp, volm_path, sizeof (volm_path))) {
-	    return (make_fixed_descriptors(dp));
-	}
-
-	if (volm_path[0] == 0) {
-	    /* no media */
-	    return (0);
-	}
-
-	/*
-	 * For removable media under volm control the rmmedia_devapth will
-	 * either be a device (if the media is made up of a single slice) or
-	 * a directory (if the media has multiple slices) with the slices
-	 * as devices contained in the directory.
-	 */
-	error = 0;
-	if ((fd = open(volm_path, O_RDONLY|O_NDELAY)) >= 0) {
-	    struct stat	buf;
-
-	    if (fstat(fd, &buf) == 0) {
-		if (S_ISCHR(buf.st_mode)) {
-		    int			status;
-		    int			data_format = FMT_UNKNOWN;
-		    struct dk_minfo	minfo;
-		    int			error;
-		    struct vtoc		vtoc;
-		    struct dk_gpt	*efip;
-		    char		devpath[MAXPATHLEN];
-
-		    /* Make sure media has readable label */
-		    if (!media_read_info(fd, &minfo)) {
-			/* no media */
-			return (0);
-		    }
-
-		    if ((status = read_vtoc(fd, &vtoc)) >= 0) {
-			data_format = FMT_VTOC;
-		    } else if (status == VT_ENOTSUP &&
-			efi_alloc_and_read(fd, &efip) >= 0) {
-			data_format = FMT_EFI;
-		    }
-
-		    if (data_format == FMT_UNKNOWN) {
-			/* no readable label */
-			return (0);
-		    }
-
-		    slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
-		    /* The media name is the volm_path in this case. */
-		    cache_load_desc(DM_SLICE, dp, devpath, volm_path, &error);
-
-		} else if (S_ISDIR(buf.st_mode)) {
-		    /* each device file in the dir represents a slice */
-		    error = make_volm_dir_descriptors(dp, fd, volm_path);
-		}
-	    }
-	    (void) close(fd);
-	}
-
-	return (error);
-}
-
-/*
- * This handles removable media with slices under volume management control.
- * In this case we have a dir which is the media name and each slice on the
- * media is a device file in this dir.
- */
-static int
-make_volm_dir_descriptors(disk_t *dp, int dirfd, char *volm_path)
-{
-	int		error;
-	DIR		*dirp;
-	struct dirent	*dentp;
-	char		devpath[MAXPATHLEN];
-
-	dirfd = dup(dirfd);
-	if (dirfd < 0)
-		return (0);
-	if ((dirp = fdopendir(dirfd)) == NULL) {
-		(void) close(dirfd);
-		return (0);
-	}
-
-	slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
-
-	error = 0;
-	while ((dentp = readdir(dirp)) != NULL) {
-		int	fd;
-		char	slice_path[MAXPATHLEN];
-
-		if (libdiskmgt_str_eq(".", dentp->d_name) ||
-		    libdiskmgt_str_eq("..", dentp->d_name)) {
-			continue;
-		}
-
-		(void) snprintf(slice_path, sizeof (slice_path), "%s/%s",
-		    devpath, dentp->d_name);
-
-		if ((fd = open(slice_path, O_RDONLY|O_NDELAY)) >= 0) {
-			struct stat	buf;
-
-			/* The media name is the volm_path in this case. */
-			if (fstat(fd, &buf) == 0 && S_ISCHR(buf.st_mode)) {
-				cache_load_desc(DM_SLICE, dp, slice_path,
-				    volm_path, &error);
-				if (error != 0) {
-					(void) close(fd);
-					break;
-				}
-			}
-
-			(void) close(fd);
-		}
-	}
-	(void) closedir(dirp);
 
 	return (error);
 }
@@ -1205,162 +898,4 @@ match_fixed_name(disk_t *diskp, char *name, int *errp)
 
 	*errp = ENODEV;
 	return (1);
-}
-
-static int
-match_removable_name(disk_t *diskp, char *name, int *errp)
-{
-	char		volm_path[MAXPATHLEN];
-	int		found;
-	int		fd;
-	struct stat	buf;
-
-	/*
-	 * If this removable drive is not under volm control, just use
-	 * normal handling.
-	 */
-	if (!media_get_volm_path(diskp, volm_path, sizeof (volm_path))) {
-	    return (match_fixed_name(diskp, name, errp));
-	}
-
-	if (volm_path[0] == 0) {
-	    /* no media */
-	    *errp = 0;
-	    return (0);
-	}
-
-	/*
-	 * For removable media under volm control the rmmedia_devapth will
-	 * either be a device (if the media is made up of a single slice) or
-	 * a directory (if the media has multiple slices) with the slices
-	 * as devices contained in the directory.
-	 */
-
-	*errp = 0;
-
-	if ((fd = open(volm_path, O_RDONLY|O_NDELAY)) == -1 ||
-	    fstat(fd, &buf) != 0) {
-		return (0);
-	}
-
-	found = 0;
-
-	if (S_ISCHR(buf.st_mode)) {
-		char	devpath[MAXPATHLEN];
-
-		slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
-		if (libdiskmgt_str_eq(name, devpath)) {
-			found = 1;
-		}
-		(void) close(fd);
-		return (found);
-	} else if (S_ISDIR(buf.st_mode)) {
-		/* each device file in the dir represents a slice */
-		DIR		*dirp;
-		struct dirent	*dentp;
-		char		devpath[MAXPATHLEN];
-
-		if ((dirp = fdopendir(fd)) == NULL) {
-			(void) close(fd);
-			return (0);
-		}
-
-		slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
-
-		while ((dentp = readdir(dirp)) != NULL) {
-			char	slice_path[MAXPATHLEN];
-
-			if (libdiskmgt_str_eq(".", dentp->d_name) ||
-			    libdiskmgt_str_eq("..", dentp->d_name)) {
-				continue;
-			}
-
-			(void) snprintf(slice_path, sizeof (slice_path),
-			    "%s/%s", devpath, dentp->d_name);
-
-			if (libdiskmgt_str_eq(name, slice_path)) {
-				/* found name, check device */
-				int	dfd;
-				int	is_dev = 0;
-
-				dfd = open(slice_path, O_RDONLY|O_NDELAY);
-				if (dfd >= 0) {
-					struct stat	buf;
-
-					if (fstat(dfd, &buf) == 0 &&
-					    S_ISCHR(buf.st_mode)) {
-						is_dev = 1;
-					}
-					(void) close(dfd);
-				}
-
-				/* we found the name */
-				found = 1;
-
-				if (!is_dev) {
-					*errp = ENODEV;
-				}
-
-				break;
-			}
-		}
-		(void) closedir(dirp);
-	} else {
-		(void) close(fd);
-	}
-
-	return (found);
-}
-
-static int
-num_removable_slices(int fd, struct stat *bufp, char *volm_path)
-{
-	int cnt = 0;
-
-	if (S_ISCHR(bufp->st_mode))
-		return (1);
-
-	if (S_ISDIR(bufp->st_mode)) {
-		/* each device file in the dir represents a slice */
-		DIR		*dirp;
-		struct dirent	*dentp;
-		char		devpath[MAXPATHLEN];
-
-		fd = dup(fd);
-
-		if (fd < 0)
-			return (0);
-
-		if ((dirp = fdopendir(fd)) == NULL) {
-			(void) close(fd);
-			return (0);
-		}
-
-		slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
-
-		while ((dentp = readdir(dirp)) != NULL) {
-			int	dfd;
-			char	slice_path[MAXPATHLEN];
-
-			if (libdiskmgt_str_eq(".", dentp->d_name) ||
-			    libdiskmgt_str_eq("..", dentp->d_name)) {
-				continue;
-			}
-
-			(void) snprintf(slice_path, sizeof (slice_path),
-			    "%s/%s", devpath, dentp->d_name);
-
-			if ((dfd = open(slice_path, O_RDONLY|O_NDELAY)) >= 0) {
-				struct stat	buf;
-
-				if (fstat(dfd, &buf) == 0 &&
-				    S_ISCHR(buf.st_mode)) {
-					cnt++;
-				}
-				(void) close(dfd);
-			}
-		}
-		(void) closedir(dirp);
-	}
-	return (cnt);
 }

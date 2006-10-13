@@ -28,8 +28,7 @@
 LIBRARY= libvolmgt.a
 VERS=.1
 
-OBJECTS= volattr.o volutil.o volprivate.o volname.o volmgt_fsi.o \
-	volmgt_fsidbi.o volmgt_on_private.o
+OBJECTS= volmgt.o volprivate.o volmgt_on_private.o
 
 # include library definitions
 include ../../Makefile.lib

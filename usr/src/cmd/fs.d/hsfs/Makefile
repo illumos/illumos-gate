@@ -28,7 +28,7 @@
 #  whose executable reside in $(INSDIR1) and $(INSDIR2).
 #
 
-SUBDIR1=        fstyp labelit ident
+SUBDIR1=        fstyp labelit
 SUBDIR2=        mount
 SUBDIRS=        $(SUBDIR1) $(SUBDIR2)
 

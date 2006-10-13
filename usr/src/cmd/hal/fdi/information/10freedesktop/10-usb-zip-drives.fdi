@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<deviceinfo version="0.2">
+  <device>
+
+    <!-- USB Zip Drives -->
+    <match key="storage.bus" string="usb">
+      <match key="storage.drive_type" string="disk">
+	<match key="storage.vendor" string="IOMEGA">
+          <match key="storage.model" contains_ncase="ZIP">
+            <merge key="storage.drive_type" type="string">zip</merge>
+            <merge key="storage.requires_eject" type="bool">true</merge>
+          </match>
+	</match>
+      </match>
+    </match>
+
+  </device>
+</deviceinfo>

@@ -73,6 +73,50 @@ static struct translation X_admin_authenticate = {
 	&XX_admin_authenticate[0],
 	&XX_admin_authenticate[0]
 };
+static struct entry XX_attach[6] = {
+	{AUT_SUBJECT,	1,	NULL,	&(XX_attach[1]),
+		0,	0,	0,	NULL},
+	{AUT_UAUTH,	1,	&adr1[0],	&(XX_attach[2]),
+		0,	1,	0,	NULL},
+	{AUT_PATH,	1,	&adr1[0],	&(XX_attach[3]),
+		0,	1,	0,	NULL},
+	{AUT_PATH,	1,	&adr1[0],	&(XX_attach[4]),
+		0,	1,	0,	NULL},
+	{AUT_TEXT,	1,	&adr1[0],	&(XX_attach[5]),
+		0,	0,	0,	NULL},
+	{AUT_RETURN,	1,	NULL,	NULL,
+		0,	0,	0,	NULL}
+};
+static struct translation X_attach = {
+	0,
+	ADT_attach,
+	AUE_attach,
+	6,
+	&XX_attach[0],
+	&XX_attach[0]
+};
+static struct entry XX_detach[6] = {
+	{AUT_SUBJECT,	1,	NULL,	&(XX_detach[1]),
+		0,	0,	0,	NULL},
+	{AUT_UAUTH,	1,	&adr1[0],	&(XX_detach[2]),
+		0,	1,	0,	NULL},
+	{AUT_PATH,	1,	&adr1[0],	&(XX_detach[3]),
+		0,	1,	0,	NULL},
+	{AUT_PATH,	1,	&adr1[0],	&(XX_detach[4]),
+		0,	1,	0,	NULL},
+	{AUT_TEXT,	1,	&adr1[0],	&(XX_detach[5]),
+		0,	0,	0,	NULL},
+	{AUT_RETURN,	1,	NULL,	NULL,
+		0,	0,	0,	NULL}
+};
+static struct translation X_detach = {
+	0,
+	ADT_detach,
+	AUE_detach,
+	6,
+	&XX_detach[0],
+	&XX_detach[0]
+};
 static struct entry XX_filesystem_add[7] = {
 	{AUT_SUBJECT,	1,	NULL,	&(XX_filesystem_add[1]),
 		0,	0,	0,	NULL},
@@ -373,6 +417,46 @@ static struct translation X_passwd = {
 	&XX_passwd[0],
 	&XX_passwd[0]
 };
+static struct entry XX_pool_export[5] = {
+	{AUT_SUBJECT,	1,	NULL,	&(XX_pool_export[1]),
+		0,	0,	0,	NULL},
+	{AUT_UAUTH,	1,	&adr1[0],	&(XX_pool_export[2]),
+		0,	1,	0,	NULL},
+	{AUT_TEXT,	1,	&adr1[0],	&(XX_pool_export[3]),
+		0,	1,	0,	NULL},
+	{AUT_PATH,	1,	&adr1[0],	&(XX_pool_export[4]),
+		0,	1,	0,	NULL},
+	{AUT_RETURN,	1,	NULL,	NULL,
+		0,	0,	0,	NULL}
+};
+static struct translation X_pool_export = {
+	0,
+	ADT_pool_export,
+	AUE_pool_export,
+	5,
+	&XX_pool_export[0],
+	&XX_pool_export[0]
+};
+static struct entry XX_pool_import[5] = {
+	{AUT_SUBJECT,	1,	NULL,	&(XX_pool_import[1]),
+		0,	0,	0,	NULL},
+	{AUT_UAUTH,	1,	&adr1[0],	&(XX_pool_import[2]),
+		0,	1,	0,	NULL},
+	{AUT_TEXT,	1,	&adr1[0],	&(XX_pool_import[3]),
+		0,	1,	0,	NULL},
+	{AUT_PATH,	1,	&adr1[0],	&(XX_pool_import[4]),
+		0,	1,	0,	NULL},
+	{AUT_RETURN,	1,	NULL,	NULL,
+		0,	0,	0,	NULL}
+};
+static struct translation X_pool_import = {
+	0,
+	ADT_pool_import,
+	AUE_pool_import,
+	5,
+	&XX_pool_import[0],
+	&XX_pool_import[0]
+};
 static struct entry XX_printer_add[7] = {
 	{AUT_SUBJECT,	1,	NULL,	&(XX_printer_add[1]),
 		0,	0,	0,	NULL},
@@ -470,6 +554,26 @@ static struct translation X_prof_cmd = {
 	8,
 	&XX_prof_cmd[0],
 	&XX_prof_cmd[0]
+};
+static struct entry XX_remove[5] = {
+	{AUT_SUBJECT,	1,	NULL,	&(XX_remove[1]),
+		0,	0,	0,	NULL},
+	{AUT_UAUTH,	1,	&adr1[0],	&(XX_remove[2]),
+		0,	1,	0,	NULL},
+	{AUT_PATH,	1,	&adr1[0],	&(XX_remove[3]),
+		0,	0,	0,	NULL},
+	{AUT_PATH,	1,	&adr1[0],	&(XX_remove[4]),
+		0,	1,	0,	NULL},
+	{AUT_RETURN,	1,	NULL,	NULL,
+		0,	0,	0,	NULL}
+};
+static struct translation X_remove = {
+	0,
+	ADT_remove,
+	AUE_remove,
+	5,
+	&XX_remove[0],
+	&XX_remove[0]
 };
 static struct entry XX_rlogin[3] = {
 	{AUT_SUBJECT,	1,	NULL,	&(XX_rlogin[1]),
@@ -875,8 +979,10 @@ static struct translation X_zone_state = {
 	&XX_zone_state[0],
 	&XX_zone_state[0]
 };
-struct translation *xlate_table[42] = {
+struct translation *xlate_table[47] = {
 	&X_admin_authenticate,
+	&X_attach,
+	&X_detach,
 	&X_filesystem_add,
 	&X_filesystem_delete,
 	&X_filesystem_modify,
@@ -892,10 +998,13 @@ struct translation *xlate_table[42] = {
 	&X_network_modify,
 	&X_newgrp_login,
 	&X_passwd,
+	&X_pool_export,
+	&X_pool_import,
 	&X_printer_add,
 	&X_printer_delete,
 	&X_printer_modify,
 	&X_prof_cmd,
+	&X_remove,
 	&X_rlogin,
 	&X_role_login,
 	&X_role_logout,

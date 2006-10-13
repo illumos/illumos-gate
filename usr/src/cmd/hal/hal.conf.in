@@ -1,0 +1,67 @@
+<!DOCTYPE busconfig PUBLIC
+ "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+
+  <!-- This configuration file specifies the required security policies
+       for the HAL to work. -->
+
+  <!-- Only root or user @HAL_USER@ can own the HAL service -->
+  <policy user="@HAL_USER@">
+    <allow own="org.freedesktop.Hal"/>
+  </policy>
+  <policy user="root">
+    <allow own="org.freedesktop.Hal"/>
+  </policy>
+
+  <!-- Allow anyone to invoke methods on the Manager and Device interfaces -->
+  <policy context="default">
+    <allow send_interface="org.freedesktop.Hal.Manager"/>
+    <allow send_interface="org.freedesktop.Hal.Device"/>
+    <allow receive_interface="org.freedesktop.Hal.Manager"
+           receive_sender="org.freedesktop.Hal"/>
+    <allow receive_interface="org.freedesktop.Hal.Device"
+           receive_sender="org.freedesktop.Hal"/>
+
+    <allow send_interface="org.freedesktop.Hal.Device.SystemPowerManagement"/>
+    <allow send_interface="org.freedesktop.Hal.Device.LaptopPanel"/>
+    <allow send_interface="org.freedesktop.Hal.Device.Volume"/>
+    <allow send_interface="org.freedesktop.Hal.Device.Volume.Crypto"/>
+    <allow receive_interface="org.freedesktop.Hal.Device.SystemPowerManagement"
+	   receive_sender="org.freedesktop.Hal"/>
+    <allow receive_interface="org.freedesktop.Hal.Device.LaptopPanel"
+	   receive_sender="org.freedesktop.Hal"/>
+    <allow receive_interface="org.freedesktop.Hal.Device.Volume"
+	   receive_sender="org.freedesktop.Hal"/>
+    <allow receive_interface="org.freedesktop.Hal.Device.Volume.Crypto"
+	   receive_sender="org.freedesktop.Hal"/>
+  </policy>
+
+  <!-- Default policy for the exported interfaces -->
+  <policy context="default">
+    <deny send_interface="org.freedesktop.Hal.Device.SystemPowerManagement"/>
+    <deny send_interface="org.freedesktop.Hal.Device.VideoAdapterPM"/>
+    <deny send_interface="org.freedesktop.Hal.Device.LaptopPanel"/>
+    <deny send_interface="org.freedesktop.Hal.Device.Volume"/>
+    <deny send_interface="org.freedesktop.Hal.Device.Volume.Crypto"/>
+  </policy>
+
+  <!-- This will not work if pam_console support is not enabled -->
+  <policy at_console="true">
+    <allow send_interface="org.freedesktop.Hal.Device.SystemPowerManagement"/>
+    <allow send_interface="org.freedesktop.Hal.Device.LaptopPanel"/>
+    <allow send_interface="org.freedesktop.Hal.Device.Volume"/>
+    <allow send_interface="org.freedesktop.Hal.Device.Volume.Crypto"/>
+  </policy>
+
+  <!-- You can change this to a more suitable user, or make per-group -->
+  <policy user="0">
+    <allow send_interface="org.freedesktop.Hal.Device.SystemPowerManagement"/>
+    <allow send_interface="org.freedesktop.Hal.Device.VideoAdapterPM"/>
+    <allow send_interface="org.freedesktop.Hal.Device.LaptopPanel"/>
+    <allow send_interface="org.freedesktop.Hal.Device.Volume"/>
+    <allow send_interface="org.freedesktop.Hal.Device.Volume.Crypto"/>
+  </policy>
+
+</busconfig>
+

@@ -37,7 +37,7 @@ include ../../Makefile.lib
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-ldevinfo -ladm -ldevid -lkstat -lsysevent \
-		-lvolmgt -lnvpair -lefi -lc
+		-lnvpair -lefi -lc
 LDFLAGS	+= 	-R/opt/VRTSvxvm/lib
 
 SRCDIR =	../common

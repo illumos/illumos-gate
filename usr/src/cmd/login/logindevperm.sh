@@ -62,6 +62,10 @@ cat <<EOM
 /dev/console	0600	/dev/sound/*		# audio devices
 /dev/console	0600	/dev/fbs/*		# frame buffers
 /dev/console	0600	/dev/dri/*		# dri devices
+/dev/console	0400	/dev/removable-media/dsk/*	# removable media
+/dev/console	0400	/dev/removable-media/rdsk/*	# removable media
+/dev/console	0400	/dev/hotpluggable/dsk/*		# hotpluggable storage
+/dev/console	0400	/dev/hotpluggable/rdsk/*	# hotpluggable storage
 EOM
 
 case "$MACH" in

@@ -50,7 +50,6 @@ PROG=		\
 	slpd		\
 	sysetup		\
 	uucp		\
-	volmgt		\
 	$($(MACH)_PROG)
 
 

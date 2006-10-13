@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -977,15 +976,6 @@ create_disk(char *deviceid, char *kernel_name, struct search_args *args)
 		/* not a "CD-ROM" or Floppy */
 
 	    diskp->removable = get_prop(REMOVABLE_PROP, args->node);
-	    if (diskp->removable == -1) {
-		/*
-		 * This is a workaround. Hotpluggable devices don't export
-		 * a "removable-media" property, but they are treated as
-		 * removable media devices by vold to implement automount.
-		 * Once vold is EOL'ed, it should be removed.
-		 */
-		diskp->removable = get_prop(HOTPLUGGABLE_PROP, args->node);
-	    }
 
 	    if (diskp->removable == -1) {
 		diskp->removable = 0;
@@ -1026,8 +1016,6 @@ create_disk(char *deviceid, char *kernel_name, struct search_args *args)
 		diskp->drv_type = DM_DT_FIXED;
 	    }
 	}
-	diskp->volm_path_set = 0;
-	diskp->volm_path = NULL;
 
 	diskp->next = args->disk_listp;
 	args->disk_listp = diskp;

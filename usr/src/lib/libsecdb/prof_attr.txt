@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,11 +39,12 @@ Device Management:::Control Access to Removable Media:auths=solaris.device.*;hel
 Printer Management:::Manage printers, daemons, spooling:help=RtPrntAdmin.html
 Cron Management:::Manage at and cron jobs:auths=solaris.jobs.*,solaris.smf.manage.cron;help=RtCronMngmnt.html
 Log Management:::Manage log files:help=RtLogMngmnt.html
-Basic Solaris User:::Automatically assigned rights:auths=solaris.profmgr.read,solaris.jobs.user,solaris.mail.mailq;profiles=All;help=RtDefault.html
+Basic Solaris User:::Automatically assigned rights:auths=solaris.profmgr.read,solaris.jobs.user,solaris.mail.mailq,solaris.device.mount.removable;profiles=All;help=RtDefault.html
 Device Security:::Manage devices and Volume Manager:auths=solaris.device.*;help=RtDeviceSecurity.html
 DHCP Management:::Manage the DHCP service:auths=solaris.dhcpmgr.*;help=RtDHCPMngmnt.html
 File System Management:::Manage, mount, share file systems:auths=solaris.smf.manage.autofs;help=RtFileSysMngmnt.html
 File System Security:::Manage file system security attributes:help=RtFileSysSecurity.html
+HAL Management:::Manage HAL SMF service:auths=solaris.smf.manage.hal;help=RtHALMngmnt.html
 Mail Management:::Manage sendmail & queues:auths=solaris.smf.manage.sendmail;help=RtMailMngmnt.html
 Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log;help=RtMaintAndRepair.html
 Media Backup:::Backup files and file systems:help=RtMediaBkup.html
@@ -57,6 +58,7 @@ Name Service Security:::Security related name service scripts/commands:help=RtNa
 Object Access Management:::Change ownership and permission on files:help=RtObAccessMngmnt.html
 Process Management:::Manage current processes and processors:auths=solaris.smf.manage.cron,solaris.smf.manage.power;help=RtProcManagement.html
 Rights Delegation:::Delegate ability to assign rights to users and roles:auths=solaris.role.delegate,solaris.profmgr.delegate,solaris.grant;help=RtRightsDelegate.html
+Rmvolmgr Management:::Manage Removable Volume Manager SMF service:auths=solaris.smf.manage.rmvolmgr;help=RtRmvolmgrMngmnt.html
 Service Management:::Manage services:auths=solaris.smf.manage,solaris.smf.modify
 Service Operator:::Administer services:auths=solaris.smf.manage,solaris.smf.modify.framework
 Software Installation:::Add application software to the system:help=RtSoftwareInstall.html

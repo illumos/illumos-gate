@@ -98,18 +98,8 @@ cat >> ${ROOT}/var/svc/profile/upgrade <<SVC_UPGRADE
 /usr/sbin/svcadm disable system/auditd 
 SVC_UPGRADE
 
-# restore volume manager startup on next boot using the
-# previous state saved by bsmconv.sh
-state="enable"
-if [ -f ${ROOT}/etc/security/spool/vold.state ]; then 
-	prev_state=`cat ${ROOT}/etc/security/spool/vold.state`
-	if [ ${prev_state} != "online" ]; then
-		state="disable"
-	fi
-fi
-cat >> ${ROOT}/var/svc/profile/upgrade <<SVC_UPGRADE
-svcadm ${state} svc:/system/filesystem/volfs:default
-SVC_UPGRADE
+# Restore default policy for removable and hotpluggable volumes
+rm -f ${ROOT}/etc/hal/fdi/policy/30user/90-solaris-device-allocation.fdi
 
 # Turn off auditing in the loadable module
 

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<deviceinfo version="0.2">
+  <device>
+    <!-- lofi is only used for testing -->
+    <match key="info.solaris.driver" string="lofi">
+      <merge key="info.ignore" type="bool">true</merge>
+    </match>
+  </device>
+</deviceinfo>

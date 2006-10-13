@@ -39,7 +39,6 @@ devinfo 88
 lockstat 89
 kstat 90
 llc1 91
-vol 93
 cpc 95
 sysmsg 97
 vgatext 99

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<deviceinfo version="0.2">
+
+  <device>
+
+    <!-- Handle broken CD/DVD burner which reports from capabilities. 
+	 Taken from nautilus-cd-burner-2.12. (fd.o Bug #3036) -->
+      <match key="storage.model" string="IOMEGA - CDRW9602EXT-B">
+        <merge key="storage.cdrom.cdr" type="bool">true</merge>
+        <merge key="storage.cdrom.cdrw" type="bool">true</merge>
+        <merge key="storage.cdrom.dvdr" type="bool">false</merge>
+        <merge key="storage.cdrom.dvdram" type="bool">false</merge>
+      </match>
+      <match key="storage.model" string="SONY - CD-R   CDU948S">
+        <merge key="storage.cdrom.cdr" type="bool">true</merge>
+        <merge key="storage.cdrom.cdrw" type="bool">false</merge>
+        <merge key="storage.cdrom.dvdr" type="bool">false</merge>
+        <merge key="storage.cdrom.dvdram" type="bool">false</merge>
+      </match>
+      
+    <!-- Handle TEAC CD-R55S, taken from :
+         http://lists.freedesktop.org/archives/hal/2005-November/003925.html -->
+      <match key="storage.vendor" string="TEAC">
+        <match key="storage.model" string="CD-R55S">
+          <merge key="storage.cdrom.cdr" type="bool">true</merge>
+        </match>
+      </match>
+
+  </device>
+</deviceinfo>

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995-1997 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,77 +41,8 @@
 #include	<sys/types.h>
 #include	<sys/stat.h>
 #include	<sys/param.h>
-#include	<sys/vol.h>
-#ifdef	DEBUG
 #include	<sys/varargs.h>
-#endif
 #include	"volmgt_private.h"
-
-
-
-/*
- * We have been passed a path which (presumably) is a volume.
- * We look through the directory until we find a name which is
- * a character device.
- */
-char *
-getrawpart0(char *path)
-{
-	DIR		*dirp = NULL;
-	struct dirent64	*dp;
-	static char	fname[MAXPATHLEN+1];
-	struct stat64	sb;
-	char		*res;
-	int		len;
-
-
-
-	/* open the directory */
-	if ((dirp = opendir(path)) == NULL) {
-		res = NULL;
-		goto dun;
-	}
-
-	/* get length of directory part */
-	len = strlen(path);
-
-	/* scan the directory */
-	while (dp = readdir64(dirp)) {
-
-		/* skip "." and ".." */
-		if (strcmp(dp->d_name, ".") == 0) {
-			continue;
-		}
-		if (strcmp(dp->d_name, "..") == 0) {
-			continue;
-		}
-
-		/* ensure we have room for this name */
-		if ((len + strlen(dp->d_name) + 1) > MAXPATHLEN) {
-			/* XXX: just give up? */
-			continue;
-		}
-
-		/* create a pathname for this device */
-		(void) concat_paths(fname, path, dp->d_name, NULL);
-		if (stat64(fname, &sb) < 0) {
-			continue;		/* this shouldn't happen */
-		}
-		/* check for a char-spcl device */
-		if (S_ISCHR(sb.st_mode)) {
-			res = strdup(fname);
-			goto dun;
-		}
-	}
-
-	/* raw part not found */
-	res = NULL;
-dun:
-	if (dirp != NULL) {
-		(void) closedir(dirp);
-	}
-	return (res);
-}
 
 
 /*
@@ -234,72 +164,6 @@ dun:
 #endif
 	return (res);
 }
-
-
-/*
- * volctl_name -- return name of volctl device
- */
-const char *
-volctl_name(void)
-{
-	static char	dev_name[] = "/dev/" VOLCTLNAME;
-
-	return (dev_name);
-}
-
-
-/*
- * concat_paths -- create a pathname from two (or three) components
- *
- * truncate the result if it is too large
- *
- * assume that res has a defined length of MAXPATHLEN+1
- *
- * ("head" and "tail" are required, but "tail2" is optional)
- */
-char *
-concat_paths(char *res, char *head, char *tail, char *tail2)
-{
-	int	head_len = strlen(head);
-	int	len_avail = MAXPATHLEN;
-
-
-
-	/* put in as much of the head as will fit */
-	(void) strncpy(res, head, len_avail);
-	len_avail -= head_len;
-
-	/* see if there is room to proceed */
-	if (len_avail > 0) {
-		char	*cp = res + head_len;
-
-		/* there is room to append a slash */
-		*cp++ = '/';
-		len_avail--;
-
-		/* see if there is room to proceed */
-		if (len_avail > 0) {
-			int	tail_len = strlen(tail);
-
-			/* there is room to append the tail */
-			(void) strncpy(cp, tail, len_avail);
-			cp += tail_len;
-			len_avail -= tail_len;
-
-			/* see if there is room to proceed */
-			if ((len_avail > 0) && (tail2 != NULL)) {
-
-				/* there is room to add tail2 (and need) */
-				(void) strncpy(cp, tail2, len_avail);
-			}
-		}
-	}
-
-	/* null terminate result (just in case) and return */
-	res[MAXPATHLEN] = NULLC;
-	return (res);
-}
-
 
 
 #ifdef	DEBUG

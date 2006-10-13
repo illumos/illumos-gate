@@ -737,8 +737,114 @@ Use is subject to license terms.
 	</entry>
     </event>
 
+    <event id="AUE_generic_mountable" type="generic" omit="always">
+	<!--
+
+	User device mounting related functions
+
+	-->
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="mount_point">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="device">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="options">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_attach" instance_of="AUE_generic_mountable"
+	header="0" idNo="42" omit="JNI">
+    </event>
+    <event id="AUE_detach" instance_of="AUE_generic_mountable"
+	header="0" idNo="43" omit="JNI">
+    </event>
+    <event id="AUE_remove" header="0" idNo="44" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="mount_point">
+	    <internal token="path"/>
+	    <external opt="optional" type="char *"/>
+	</entry>
+	<entry id="device">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_pool_import" header="0" idNo="45" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="pool">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="device">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+    <event id="AUE_pool_export" header="0" idNo="46" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="pool">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="device">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
 <!-- add new everts here with the next higher idNo -->
-<!-- Highest idNo is 41, so next is 42, then fix this comment -->
+<!-- Highest idNo is 46, so next is 47, then fix this comment -->
 <!-- end of C Only events -->
 
 

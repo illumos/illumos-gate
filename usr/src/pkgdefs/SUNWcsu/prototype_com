@@ -110,7 +110,7 @@ f none usr/bin/echo 555 root bin
 f none usr/bin/ed 555 root bin
 f none usr/bin/edit 555 root bin
 f none usr/bin/egrep 555 root bin
-f none usr/bin/eject 4555 root bin
+f none usr/bin/eject 555 root bin
 l none usr/bin/encrypt=../../usr/bin/decrypt
 f none usr/bin/env 555 root bin
 l none usr/bin/ex=../../usr/bin/edit
@@ -389,7 +389,6 @@ f none usr/lib/fs/fd/mount 555 root bin
 d none usr/lib/fs/hsfs 755 root sys
 f none usr/lib/fs/hsfs/fstyp.so.1 555 root bin
 l none usr/lib/fs/hsfs/fstyp=../../../sbin/fstyp
-f none usr/lib/fs/hsfs/ident_hsfs.so.1 555 root bin
 f none usr/lib/fs/hsfs/labelit 555 root bin
 s none usr/lib/fs/hsfs/mount=../../../../etc/fs/hsfs/mount
 d none usr/lib/fs/lofs 755 root sys
@@ -415,7 +414,6 @@ f none usr/lib/fs/ufs/fsirand 555 root bin
 f none usr/lib/fs/ufs/fssnap 555 root bin
 f none usr/lib/fs/ufs/fstyp.so.1 555 root bin
 l none usr/lib/fs/ufs/fstyp=../../../sbin/fstyp
-f none usr/lib/fs/ufs/ident_ufs.so.1 555 root bin
 f none usr/lib/fs/ufs/labelit 555 root bin
 f none usr/lib/fs/ufs/lockfs 555 root bin
 f none usr/lib/fs/ufs/mkfs 555 root bin

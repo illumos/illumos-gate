@@ -63,12 +63,11 @@ i i.group
 i i.etcrpc
 i i.etcprofile
 i i.mailxrc
-i i.voldconf
-i i.rmmconf
 i i.initd
 i i.locallogin
 i i.localprofile
 i i.logadmconf
+i i.logindevperm
 i i.fstypes
 i i.pamconf
 i i.services
@@ -190,7 +189,7 @@ s none etc/lib/libdl.so.1=../../lib/libdl.so.1
 s none etc/lib/nss_files.so.1=../../lib/nss_files.so.1
 s none etc/log=../var/adm/log
 e logadmconf etc/logadm.conf 644 root sys
-e preserve etc/logindevperm 644 root sys
+e logindevperm etc/logindevperm 644 root sys
 f none etc/magic 444 root bin
 d none etc/mail 755 root mail
 e mailxrc etc/mail/mailx.rc 644 root bin
@@ -523,5 +522,3 @@ f none var/svc/profile/ns_none.xml 0444 root sys
 f none var/svc/profile/platform_none.xml 0444 root sys
 f none var/svc/profile/prophist.SUNWcsr 0444 root sys
 d none var/tmp 1777 root sys
-e rmmconf etc/rmmount.conf 444 root bin
-e voldconf etc/vold.conf 444 root bin

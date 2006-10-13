@@ -113,15 +113,25 @@ then
 	printf "${form}\n" $PROG
 fi
 
-# Disable volume manager from running on reboot.
-cat >> ${ROOT}/var/svc/profile/upgrade <<SVC_UPGRADE
-svcadm disable svc:/system/filesystem/volfs:default
-SVC_UPGRADE
-
-# store the current state of volfs service for restoring later
-# in bsmunconv.sh
-svcs -o state -H svc:/system/filesystem/volfs:default > \
-			${ROOT}/etc/security/spool/vold.state
+# Prevent automount of removable and hotpluggable volumes
+# by forcing volume.ignore HAL property on all such volumes.
+if [ -d ${ROOT}/etc/hal/fdi ] ; then
+	cat > ${ROOT}/etc/hal/fdi/policy/30user/90-solaris-device-allocation.fdi <<FDI
+<?xml version="1.0" encoding="UTF-8"?>
+<deviceinfo version="0.2">
+  <device>
+    <match key="info.capabilities" contains="volume">
+      <match key="@block.storage_device:storage.removable" bool="true">
+        <merge key="volume.ignore" type="bool">true</merge>
+      </match>
+      <match key="@block.storage_device:storage.hotpluggable" bool="true">
+        <merge key="volume.ignore" type="bool">true</merge>
+      </match>
+    </match>
+  </device>
+</deviceinfo>
+FDI
+fi
 
 # Turn on auditing in the loadable module
 

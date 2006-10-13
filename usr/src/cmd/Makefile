@@ -139,6 +139,7 @@ COMMON_SUBDIRS=		\
 	ed		\
 	eeprom		\
 	egrep		\
+	eject		\
 	emul64ioctl	\
 	enhance		\
 	env		\
@@ -183,10 +184,12 @@ COMMON_SUBDIRS=		\
 	groups		\
 	grpck		\
 	gss		\
+	hal		\
 	halt		\
 	head		\
 	hostid		\
 	hostname	\
+	hwdata		\
 	id		\
 	infocmp		\
 	init		\
@@ -278,6 +281,7 @@ COMMON_SUBDIRS=		\
 	pgrep		\
 	picl		\
 	plimit		\
+	policykit	\
 	pools		\
 	power		\
 	ppgsz		\
@@ -314,7 +318,9 @@ COMMON_SUBDIRS=		\
 	rm		\
 	rmdir		\
 	rmformat	\
+	rmmount		\
 	rmt		\
+	rmvolmgr	\
 	roles		\
 	rpcbind		\
 	rpcgen		\
@@ -391,7 +397,8 @@ COMMON_SUBDIRS=		\
 	valtools	\
 	vgrind		\
 	vi		\
-	volmgt		\
+	volcheck	\
+	volrmmount	\
 	w		\
 	wall		\
 	wbem		\
@@ -530,6 +537,7 @@ MSGSUBDIRS=		\
 	du		\
 	dumpcs		\
 	ed		\
+	eject		\
 	env		\
 	eqn		\
 	expand		\
@@ -621,6 +629,8 @@ MSGSUBDIRS=		\
 	rm		\
 	rmdir		\
 	rmformat	\
+	rmmount		\
+	rmvolmgr	\
 	scadm		\
 	script		\
 	sdiff		\
@@ -658,7 +668,8 @@ MSGSUBDIRS=		\
 	valtools	\
 	vgrind		\
 	vi		\
-	volmgt		\
+	volcheck	\
+	volrmmount	\
 	w		\
 	wbem		\
 	wc		\

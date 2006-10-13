@@ -34,7 +34,7 @@
 #
 
 
-SUBDIR1=	clri edquota ff fsck fsckall fsdb fsirand fstyp ident \
+SUBDIR1=	clri edquota ff fsck fsckall fsdb fsirand fstyp \
 		labelit lockfs ncheck quot quota quotacheck quotaon \
 		repquota tunefs
 SUBDIR2= 	df fssnap mkfs mount newfs volcopy

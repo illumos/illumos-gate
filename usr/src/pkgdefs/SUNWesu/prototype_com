@@ -146,7 +146,6 @@ f none usr/lib/adb/adbsub.o 644 root sys
 f none usr/lib/diff3prog 555 root bin
 d none usr/lib/fs 755 root sys
 d none usr/lib/fs/pcfs 755 root sys
-f none usr/lib/fs/pcfs/ident_pcfs.so.1 555 root bin
 f none usr/lib/fs/pcfs/mount 555 root bin
 f none usr/lib/fs/pcfs/fstyp.so.1 555 root bin
 l none usr/lib/fs/pcfs/fstyp=../../../sbin/fstyp

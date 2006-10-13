@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -626,99 +625,12 @@ drive_make_descriptors()
 
 /*
  * This function opens the disk generically (any slice).
- *
- * Opening the disk could fail because the disk is managed by the volume
- * manager.  Handle this if that is the case.  Note that the media APIs don't
- * always return a device.  If the media has slices (e.g. a solaris install
- * CD-ROM) then media_findname(volname) returns a directory with per slice
- * devices underneath.  We need to open one of those devices in this case.
  */
 int
 drive_open_disk(disk_t *diskp, char *opath, int len)
 {
-	char	rmmedia_devpath[MAXPATHLEN];
-
-	if (diskp->removable && media_get_volm_path(diskp, rmmedia_devpath,
-	    sizeof (rmmedia_devpath))) {
-
-	    int		fd;
-	    struct stat	buf;
-
-	    if (rmmedia_devpath[0] == 0) {
-		/* removable but no media */
-		return (-1);
-	    }
-
-	    if ((fd = open(rmmedia_devpath, O_RDONLY|O_NDELAY)) < 0) {
-		return (-1);
-	    }
-
-	    if (fstat(fd, &buf) != 0) {
-		(void) close(fd);
-		return (-1);
-	    }
-
-	    if (S_ISCHR(buf.st_mode)) {
-		/* opened, is device, so done */
-		if (opath != NULL) {
-		    (void) strlcpy(opath, rmmedia_devpath, len);
-		}
-		return (fd);
-
-	    } else if (S_ISDIR(buf.st_mode)) {
-		/* disk w/ slices so handle the directory */
-		DIR		*dirp;
-		struct dirent	*dentp;
-		int		dfd;
-
-		/* each device file in the dir represents a slice */
-
-		if ((dirp = fdopendir(fd)) == NULL) {
-		    (void) close(fd);
-		    return (-1);
-		}
-
-		while ((dentp = readdir(dirp)) != NULL) {
-		    char	slice_path[MAXPATHLEN];
-
-		    if (libdiskmgt_str_eq(".", dentp->d_name) ||
-			libdiskmgt_str_eq("..", dentp->d_name)) {
-			continue;
-		    }
-
-		    (void) snprintf(slice_path, sizeof (slice_path), "%s/%s",
-			rmmedia_devpath, dentp->d_name);
-
-		    if ((dfd = open(slice_path, O_RDONLY|O_NDELAY)) < 0) {
-			continue;
-		    }
-
-		    if (fstat(dfd, &buf) == 0 && S_ISCHR(buf.st_mode)) {
-			/* opened, is device, so done */
-			(void) closedir(dirp);
-			if (opath != NULL) {
-			    (void) strlcpy(opath, slice_path, len);
-			}
-			return (dfd);
-		    }
-
-		    /* not a device, keep looking */
-		    (void) close(dfd);
-		}
-
-		/* did not find a device under the rmmedia_path */
-		(void) closedir(dirp);
-		return (-1);
-	    }
-
-	    /* didn't find a device under volume management control */
-	    (void) close(fd);
-	    return (-1);
-	}
-
 	/*
-	 * Not removable media under volume management control so just open the
-	 * first devpath.
+	 * Just open the first devpath.
 	 */
 	if (diskp->aliases != NULL && diskp->aliases->devpaths != NULL) {
 	    if (opath != NULL) {

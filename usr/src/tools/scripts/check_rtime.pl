@@ -111,8 +111,6 @@ $SkipTextrelFiles = qr{ ^(?:
 $SkipUndefDirs = qr{
 	usr/lib/inet/ppp/ |		# pppd plugins have callbacks
 	usr/lib/libp/ |			# libc.so.1 requires _mcount
-	usr/lib/vold/ |			# vold dependencies have callbacks
-	usr/lib/rmmount |		# rmmount actions have callbacks
 	/lib/mdb/ |			# mdb modules have callbacks
 	/lib/fm/fmd/plugins/ |		# fmd modules have callbacks
 	/lib/fm/fmd/schemes/ |		# fmd schemes have callbacks
@@ -157,8 +155,6 @@ $SkipUnusedFiles = qr{ ^(?:
 	devlinks |			#  "  "
 	drvconfig |			#  "  "
 	ntptrace |			# on intel doesn't need libmd5
-	rmmount |			# 4418770, volmgt dependency is required
-					#	to compensate for SunPCi.
 	ocfserv |			# libsched unreference by libjvm,
 	poold |				#	see 4952319. 
 	libc\.so\.1\.9 |		# 4lib/libc versions have private

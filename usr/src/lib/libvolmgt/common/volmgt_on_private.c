@@ -50,7 +50,6 @@
 #include	<sys/param.h>
 #include	<sys/wait.h>
 #include	<sys/mnttab.h>
-#include	<sys/vol.h>
 #include	"volmgt_private.h"
 
 
@@ -84,60 +83,25 @@ _dev_mounted(char *path)
 	int		ret_val = 0;
 
 
-
-#ifdef	DEBUG
-	denter("_dev_mounted(%s): entering\n", path);
-#endif
-
 	/* ensure we have the block spcl pathname */
 	if ((cn = (char *)volmgt_getfullrawname(path)) == NULL) {
-#ifdef	DEBUG
-		dprintf("_dev_mounted: volmgt_getfullrawname failed\n");
-#endif
 		goto dun;
 	}
 
-#ifdef	DEBUG_OPEN
-	dprintf("_dev_mounted: fopen()ing \"%s\"\n", MNTTAB);
-#endif
 	if ((fp = fopen(MNTTAB, "rF")) == NULL) {
 		/* mtab is gone... let him go */
-#ifdef	DEBUG
-		perror(MNTTAB);
-#endif
 		goto dun;
 	}
 
-#ifdef	DEBUG_OPEN
-	dprintf("_dev_mounted: open()ing \"%s\"\n", cn);
-#endif
 	if ((fd = open(cn, O_RDONLY|O_NDELAY)) < 0) {
-#ifdef	DEBUG
-		dprintf("_dev_mounted: can't open \"%s\" (%d)\n", cn, errno);
-#endif
 		goto dun;
 	}
 
-#ifdef	DEBUG_STAT
-	dprintf("_dev_mounted: fstat()ing \"%s\"\n", cn);
-#endif
 	if (fstat64(fd, &sb) < 0) {
-#ifdef	DEBUG
-		dprintf("_dev_mounted: stat of \"%s\" failed (%d)\n", cn,
-		    errno);
-#endif
 		goto dun;
 	}
 
-#ifdef	DEBUG_IOCTL
-	dprintf("_dev_mounted: ioctl(%s, DKIOCINFO)\n", cn);
-#endif
 	if (ioctl(fd, DKIOCINFO, &info) != 0) {
-#ifdef	DEBUG
-		dprintf(
-		    "_dev_mounted: ioctl(DKIOCINFO) on \"%s\" failed (%d)\n",
-		    cn, errno);
-#endif
 		goto dun;
 	}
 
@@ -155,10 +119,6 @@ dun:
 	if (fd >= 0) {
 		(void) close(fd);
 	}
-#ifdef	DEBUG
-	dexit("_dev_mounted: returning %s\n",
-	    ret_val ? "TRUE" : "FALSE");
-#endif
 	return (ret_val);
 }
 
@@ -187,14 +147,8 @@ _dev_unmount(char *path)
 	int		volume_is_not_managed;
 	char		*pathbuf, *absname;
 
-#ifdef	DEBUG
-	denter("_dev_unmount(%s): entering\n", path);
-#endif
 
 	if ((bn = (char *)volmgt_getfullblkname(path)) == NULL) {
-#ifdef	DEBUG
-		dprintf("_dev_unmount: volmgt_getfullblkname failed\n");
-#endif
 		goto dun;
 	}
 
@@ -298,9 +252,6 @@ _dev_unmount(char *path)
 
 dun:
 
-#ifdef	DEBUG
-	dexit("_dev_unmount: returning %s\n", ret_val ? "TRUE" : "FALSE");
-#endif
 	return (ret_val);
 }
 
@@ -351,30 +302,14 @@ vol_getmntdev(FILE *fp, struct mnttab *mp, dev_t dev, struct dk_cinfo *ip)
 		}
 
 		/* open the device */
-#ifdef	DEBUG_OPEN
-		dprintf("vol_getmntdev: open()ing \"%s\"\n", cn);
-#endif
 		if ((fd = open(cn, O_RDONLY|O_NDELAY)) < 0) {
 			/* if we can't open it *assume* it's not a match */
-#ifdef	DEBUG
-			dprintf(
-			    "vol_getmntdev: open of \"%s\" (%s) failed (%d)\n",
-			    cn, mp->mnt_fstype, errno);
-#endif
 			free(cn);
 			continue;
 		}
 
 		/* stat the device */
-#ifdef	DEBUG_STAT
-		dprintf("vol_getmntdev: fstat()ing \"%s\"\n", cn);
-#endif
 		if (fstat64(fd, &sb) < 0) {
-#ifdef	DEBUG
-			dprintf(
-			    "vol_getmntdev: stat of \"%s\" (%s) failed (%d)\n",
-			    cn, mp->mnt_fstype, errno);
-#endif
 			free(cn);
 			(void) close(fd);
 			continue;	/* ain't there: can't be a match */
@@ -382,11 +317,6 @@ vol_getmntdev(FILE *fp, struct mnttab *mp, dev_t dev, struct dk_cinfo *ip)
 
 		/* ensure we have a spcl device (a double check) */
 		if (!S_ISBLK(sb.st_mode) && !S_ISCHR(sb.st_mode)) {
-#ifdef	DEBUG
-			dprintf(
-		"vol_getmntdev: \"%s\" not a blk- or chr-spcl device\n",
-			    cn);
-#endif
 			free(cn);
 			(void) close(fd);
 			continue;
@@ -413,16 +343,8 @@ vol_getmntdev(FILE *fp, struct mnttab *mp, dev_t dev, struct dk_cinfo *ip)
 			continue;
 		}
 
-#ifdef	DEBUG_IOCTL
-		dprintf("vol_getmntdev: ioctl(%s, DKIOCINFO)\n", cn);
-#endif
 		/* one last check -- for diff. slices of the same dev/unit */
 		if (ioctl(fd, DKIOCINFO, &dkinfo) < 0) {
-#ifdef	DEBUG
-			dprintf(
-		"vol_getmntdev: ioctl(DKIOCINFO) of \"%s\" failed (%d)\n",
-			    cn, errno);
-#endif
 			free(cn);
 			(void) close(fd);
 			continue;
@@ -446,10 +368,6 @@ vol_getmntdev(FILE *fp, struct mnttab *mp, dev_t dev, struct dk_cinfo *ip)
 		/* go around again */
 	}
 
-#ifdef	DEBUG
-	dexit("vol_getmntdev: returning %d (%s)\n", ret_val,
-	    ret_val == 1 ? "SUCCESS" : "FAILURE");
-#endif
 	return (ret_val);
 }
 
@@ -501,21 +419,8 @@ get_media_info(char *path, char **mtypep, int *mnump, char **spclp)
 	struct mnttab	mnt;
 	int		ret_val = FALSE;
 
-
-
-#ifdef	DEBUG
-	denter("get_media_info(%s): entering\n", path);
-#endif
-
-#ifdef	DEBUG_OPEN
-	dprintf("get_media_info: fopen()ing \"%s\"\n", MNTTAB);
-#endif
 	if ((fp = fopen(MNTTAB, "rF")) == NULL) {
 		/* mtab is gone... let him go */
-#ifdef	DEBUG
-		dprintf("get_media_info: can't open \"%s\" (%d)\n", MNTTAB,
-		    errno);
-#endif
 		goto dun;
 	}
 
@@ -527,36 +432,15 @@ get_media_info(char *path, char **mtypep, int *mnump, char **spclp)
 		goto dun;
 	}
 
-#ifdef	DEBUG_OPEN
-	dprintf("get_media_info: open()ing \"%s\"\n", cn);
-#endif
 	if ((fd = open(cn, O_RDONLY|O_NDELAY)) < 0) {
-#ifdef	DEBUG
-		dprintf("get_media_info(): can't open \"%s\" (%d)\n", cn,
-		    errno);
-#endif
 		goto dun;
 	}
 
-#ifdef	DEBUG_STAT
-	dprintf("get_media_info: fstat()ing \"%s\"\n", cn);
-#endif
 	if (fstat64(fd, &sb) < 0) {
-#ifdef	DEBUG
-		dprintf("get_media_info: can't stat \"%s\" (%d)\n", cn, errno);
-#endif
 		goto dun;
 	}
 
-#ifdef	DEBUG_IOCTL
-	dprintf("get_media_info: ioctl(%s, DKIOCINFO)\n", cn);
-#endif
 	if (ioctl(fd, DKIOCINFO, &info) != 0) {
-#ifdef	DEBUG
-		dprintf(
-		    "get_media_info: ioctl(DKIOCINFO) on \"%s\" failed (%d)\n",
-		    cn, errno);
-#endif
 		goto dun;
 	}
 
@@ -589,20 +473,10 @@ get_media_info(char *path, char **mtypep, int *mnump, char **spclp)
 		/* get the first part of the mount point (e.g. "floppy") */
 		cp = mnt.mnt_mountp;
 		if (*cp++ != '/') {
-#ifdef	DEBUG
-			dprintf(
-	"get_media_info warning: no leading '/' in mount point \"%s\"\n",
-			    mnt.mnt_mountp);
-#endif
 			goto dun;
 		}
 		mtype = cp;
 		if ((cp = strchr(mtype, '/')) == NULL) {
-#ifdef	DEBUG
-			dprintf(
-		"get_media_info warning: no 2nd '/' in mount point \"%s\"\n",
-			    mnt.mnt_mountp);
-#endif
 			goto dun;
 		}
 		*cp++ = NULLC;
@@ -613,11 +487,6 @@ get_media_info(char *path, char **mtypep, int *mnump, char **spclp)
 
 		/* scan for the symlink that points to our volname */
 		if ((dirp = opendir(mnt_dir)) == NULL) {
-#ifdef	DEBUG
-			dprintf(
-		"get_media_info warning: can't open directory \"%s\"\n",
-			    mnt_dir);
-#endif
 			goto dun;
 		}
 		mtype_len = strlen(mtype);
@@ -634,9 +503,6 @@ get_media_info(char *path, char **mtypep, int *mnump, char **spclp)
 
 			(void) sprintf(lpath, "%s/%s", mnt_dir,
 			    dp->d_name);
-#ifdef	DEBUG_STAT
-			dprintf("get_media_info: lstat()ing \"%s\"\n", lpath);
-#endif
 			if (lstat64(lpath, &sb) < 0) {
 				continue;	/* what? */
 			}
@@ -713,10 +579,6 @@ call_unmount_prog(int mi_gotten, int use_rmm, char *mtype, int mnum,
 #endif
 	/* create a child to unmount the path */
 	if ((pid = fork()) < 0) {
-#ifdef	DEBUG
-		dprintf("error in call_unmount_prog: fork failed (errno %d)\n",
-		    errno);
-#endif
 		goto dun;
 	}
 
@@ -775,9 +637,6 @@ call_unmount_prog(int mi_gotten, int use_rmm, char *mtype, int mnum,
 			    mi_gotten ? spcl : bn,
 			    NULL);
 		}
-#ifdef	DEBUG
-		dprintf("call_unmount_prog: exec failed (errno %d)\n", errno);
-#endif
 		exit(-1);
 		/*NOTREACHED*/
 	}
@@ -792,8 +651,5 @@ call_unmount_prog(int mi_gotten, int use_rmm, char *mtype, int mnum,
 	}
 
 dun:
-#ifdef	DEBUG
-	dexit("call_unmount_prog: returning %s\n", ret_val ? "TRUE" : "FALSE");
-#endif
 	return (ret_val);
 }

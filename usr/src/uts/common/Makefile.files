@@ -562,8 +562,6 @@ MM_OBJS +=	mem.o
 
 OPTIONS_OBJS += options.o
 
-VOL_OBJS +=	vol.o
-
 WINLOCK_OBJS +=	winlockio.o
 
 PM_OBJS +=	pm.o

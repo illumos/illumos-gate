@@ -83,6 +83,20 @@ ROOT.SYS= \
 	/etc/fs/nfs  \
 	/etc/fs/zfs \
 	/etc/ftpd  \
+	/etc/hal \
+	/etc/hal/fdi \
+	/etc/hal/fdi/information \
+	/etc/hal/fdi/information/10freedesktop \
+	/etc/hal/fdi/information/20thirdparty \
+	/etc/hal/fdi/information/30user \
+	/etc/hal/fdi/policy \
+	/etc/hal/fdi/policy/10osvendor \
+	/etc/hal/fdi/policy/20thirdparty \
+	/etc/hal/fdi/policy/30user \
+	/etc/hal/fdi/preprobe \
+	/etc/hal/fdi/preprobe/10osvendor \
+	/etc/hal/fdi/preprobe/20thirdparty \
+	/etc/hal/fdi/preprobe/30user \
 	/etc/iscsi \
 	/etc/rpcsec	\
 	/etc/security	\
@@ -181,6 +195,8 @@ sparc_ROOT.BIN= \
 
 ROOT.BIN= \
 	$($(MACH)_ROOT.BIN) \
+	/etc/dbus-1 \
+	/etc/dbus-1/system.d \
 	/etc/saf \
 	/etc/sma \
 	/etc/sma/snmp \
@@ -207,8 +223,10 @@ ROOT.BIN= \
 	/usr/include/sys/crypto \
 	/usr/include/fm \
 	/usr/include/gssapi \
+	/usr/include/hal \
 	/usr/include/kerberosv5 \
 	/usr/include/libmilter \
+	/usr/include/libpolkit \
 	/usr/include/sasl \
 	/usr/include/tsol \
 	/usr/include/security \
@@ -236,6 +254,7 @@ ROOT.BIN= \
 	$(XROOT.BIN) \
 	/usr/lib/fm    \
 	/usr/lib/gss    \
+	/usr/lib/hal \
 	/usr/lib/krb5 \
 	/usr/lib/link_audit \
 	/usr/lib/libp \
@@ -339,6 +358,7 @@ ROOT.SYS2= \
 	/usr/lib/nfs \
 	/usr/net \
 	/usr/net/servers \
+	/usr/share/hwdata \
 	/usr/share/lib \
 	/usr/share/lib/xml \
 	/usr/share/lib/xml/dtd \

@@ -93,6 +93,8 @@ enum	adt_login_text {
 	ADT_LOGIN_ANON_USER		/* No anonymous */
 };
 #define	ADT_admin_authenticate	3
+#define	ADT_attach		42
+#define	ADT_detach		43
 #define	ADT_filesystem_add	4
 #define	ADT_filesystem_delete	5
 #define	ADT_filesystem_modify	6
@@ -108,10 +110,13 @@ enum	adt_login_text {
 #define	ADT_network_modify	9
 #define	ADT_newgrp_login	41
 #define	ADT_passwd		27
+#define	ADT_pool_export		46
+#define	ADT_pool_import		45
 #define	ADT_printer_add		10
 #define	ADT_printer_delete	11
 #define	ADT_printer_modify	12
 #define	ADT_prof_cmd		24
+#define	ADT_remove		44
 #define	ADT_rlogin		28
 #define	ADT_role_login		13
 #define	ADT_role_logout		40
@@ -139,6 +144,22 @@ struct adt_admin_authenticate {	/* ADT_admin_authenticate */
 	enum adt_login_text	message;	/*  optional  */
 };
 typedef struct adt_admin_authenticate adt_admin_authenticate_t;
+
+struct adt_attach {	/* ADT_attach */
+	char 	*auth_used;	/* required */
+	char 	*mount_point;	/* required */
+	char 	*device;	/* required */
+	char 	*options;	/* optional */
+};
+typedef struct adt_attach adt_attach_t;
+
+struct adt_detach {	/* ADT_detach */
+	char 	*auth_used;	/* required */
+	char 	*mount_point;	/* required */
+	char 	*device;	/* required */
+	char 	*options;	/* optional */
+};
+typedef struct adt_detach adt_detach_t;
 
 struct adt_filesystem_add {	/* ADT_filesystem_add */
 	char 	*object_name;	/* required */
@@ -248,6 +269,20 @@ struct adt_passwd {	/* ADT_passwd */
 };
 typedef struct adt_passwd adt_passwd_t;
 
+struct adt_pool_export {	/* ADT_pool_export */
+	char 	*auth_used;	/* required */
+	char 	*pool;	/* required */
+	char 	*device;	/* required */
+};
+typedef struct adt_pool_export adt_pool_export_t;
+
+struct adt_pool_import {	/* ADT_pool_import */
+	char 	*auth_used;	/* required */
+	char 	*pool;	/* required */
+	char 	*device;	/* required */
+};
+typedef struct adt_pool_import adt_pool_import_t;
+
 struct adt_printer_add {	/* ADT_printer_add */
 	char 	*object_name;	/* required */
 	char 	*domain;	/* optional */
@@ -293,6 +328,13 @@ struct adt_prof_cmd {	/* ADT_prof_cmd */
 	priv_set_t	*inherit_set;	/* optional */
 };
 typedef struct adt_prof_cmd adt_prof_cmd_t;
+
+struct adt_remove {	/* ADT_remove */
+	char 	*auth_used;	/* required */
+	char 	*mount_point;	/* optional */
+	char 	*device;	/* required */
+};
+typedef struct adt_remove adt_remove_t;
 
 struct adt_rlogin {	/* ADT_rlogin */
 	enum adt_login_text	message;	/*  optional  */
@@ -439,6 +481,8 @@ typedef struct adt_zone_state adt_zone_state_t;
 
 union adt_event_data {
 		adt_admin_authenticate_t	adt_admin_authenticate;
+		adt_attach_t	adt_attach;
+		adt_detach_t	adt_detach;
 		adt_filesystem_add_t	adt_filesystem_add;
 		adt_filesystem_delete_t	adt_filesystem_delete;
 		adt_filesystem_modify_t	adt_filesystem_modify;
@@ -454,10 +498,13 @@ union adt_event_data {
 		adt_network_modify_t	adt_network_modify;
 		adt_newgrp_login_t	adt_newgrp_login;
 		adt_passwd_t	adt_passwd;
+		adt_pool_export_t	adt_pool_export;
+		adt_pool_import_t	adt_pool_import;
 		adt_printer_add_t	adt_printer_add;
 		adt_printer_delete_t	adt_printer_delete;
 		adt_printer_modify_t	adt_printer_modify;
 		adt_prof_cmd_t	adt_prof_cmd;
+		adt_remove_t	adt_remove;
 		adt_rlogin_t	adt_rlogin;
 		adt_role_login_t	adt_role_login;
 		adt_role_logout_t	adt_role_logout;

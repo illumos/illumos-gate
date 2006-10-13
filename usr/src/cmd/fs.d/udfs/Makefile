@@ -26,7 +26,7 @@
 #
 
 SUBDIR1=	fstyp
-SUBDIR2=	fsck fsdb ident labelit mkfs mount
+SUBDIR2=	fsck fsdb labelit mkfs mount
 SUBDIRS=	$(SUBDIR1) $(SUBDIR2)
 
 all:=		TARGET= all

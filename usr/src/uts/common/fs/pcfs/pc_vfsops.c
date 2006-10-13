@@ -58,7 +58,6 @@
 #include <sys/fs/pc_node.h>
 #include <fs/fs_subr.h>
 #include <sys/modctl.h>
-#include <sys/vol.h>
 #include <sys/dkio.h>
 #include <sys/open.h>
 #include <sys/mntent.h>
@@ -299,8 +298,6 @@ pcfs_mount(
 	int fattype;
 	int spnlen;
 	int wantbootpart = 0;
-	struct vioc_info info;
-	int rval;		/* set but not used */
 	minor_t	minor;
 	int oflag, aflag;
 
@@ -553,15 +550,6 @@ pcfs_mount(
 	fsp->pcfs_ldrv = dos_ldrive;
 	fsp->pcfs_dosstart = dosstart;
 	mutex_init(&fsp->pcfs_lock, NULL, MUTEX_DEFAULT, NULL);
-
-	/* set the "nocheck" flag if volmgt is managing this volume */
-	info.vii_pathlen = 0;
-	info.vii_devpath = 0;
-	error = cdev_ioctl(fsp->pcfs_xdev, VOLIOCINFO, (intptr_t)&info,
-	    FKIOCTL|FREAD, kcred, &rval);
-	if (error == 0) {
-		fsp->pcfs_flags |= PCFS_NOCHK;
-	}
 
 	if (vfs_optionisset(vfsp, MNTOPT_PCFS_HIDDEN, NULL))
 		fsp->pcfs_flags |= PCFS_HIDDEN;

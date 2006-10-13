@@ -21583,18 +21583,7 @@ skip_ready_valid:
 
 	case DKIOCREMOVABLE:
 		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCREMOVABLE\n");
-		/*
-		 * At present, vold only does automount for removable-media
-		 * devices, in order not to break current applications, we
-		 * still let hopluggable devices pretend to be removable media
-		 * devices for vold. In the near future, once vold is EOL'ed,
-		 * we should remove this workaround.
-		 */
-		if (un->un_f_has_removable_media || un->un_f_is_hotpluggable) {
-			i = 1;
-		} else {
-			i = 0;
-		}
+		i = un->un_f_has_removable_media ? 1 : 0;
 		if (ddi_copyout(&i, (void *)arg, sizeof (int), flag) != 0) {
 			err = EFAULT;
 		} else {
@@ -21604,11 +21593,7 @@ skip_ready_valid:
 
 	case DKIOCHOTPLUGGABLE:
 		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCHOTPLUGGABLE\n");
-		if (un->un_f_is_hotpluggable) {
-			i = 1;
-		} else {
-			i = 0;
-		}
+		i = un->un_f_is_hotpluggable ? 1 : 0;
 		if (ddi_copyout(&i, (void *)arg, sizeof (int), flag) != 0) {
 			err = EFAULT;
 		} else {
@@ -31234,25 +31219,14 @@ sd_faultinjection(struct scsi_pkt *pktp)
  *     -----------------------------------------------------------
  *
  *
- * 6. Automatic mount & unmount (i.e. vold)
+ * 6. Automatic mount & unmount
  *
  *     Sd(7d) driver provides DKIOCREMOVABLE ioctl. This ioctl is used to query
  *     if a device is removable media device. It return 1 for removable media
  *     devices, and 0 for others.
  *
- *     Vold treats a device as removable one only if DKIOREMOVABLE returns 1.
- *     And it does automounting only for removable media devices. In order to
- *     preserve users' experience and let vold continue to do automounting for
- *     USB disk devices, DKIOCREMOVABLE ioctl still returns 1 for USB/1394 disk
- *     devices.
- *
- *      ------------------------------------------------------
- *       removable media    hotpluggable   |  automatic mount
- *      ------------------------------------------------------
- *             false          false        |   No
- *             false          true         |   Yes
- *             true             x          |   Yes
- *      ------------------------------------------------------
+ *     The automatic mounting subsystem should distinguish between the types
+ *     of devices and apply automounting policies to each.
  *
  *
  * 7. fdisk partition management
@@ -31437,7 +31411,7 @@ sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
 	if (un->un_sd->sd_inq->inq_rmb) {
 		/*
 		 * The media of this device is removable. And for this kind
-		 * of devices, it is possible to change medium after openning
+		 * of devices, it is possible to change medium after opening
 		 * devices. Thus we should support this operation.
 		 */
 		un->un_f_has_removable_media = TRUE;
@@ -31589,8 +31563,9 @@ sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
 #endif
 
 		/*
-		 * Temporarily, let hotpluggable devices pretend to be
-		 * removable-media devices for vold.
+		 * Have to watch hotpluggable devices as well, since
+		 * that's the only way for userland applications to
+		 * detect hot removal while device is busy/mounted.
 		 */
 		un->un_f_monitor_media_state = TRUE;
 

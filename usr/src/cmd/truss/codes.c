@@ -69,7 +69,6 @@
 #include <sys/kstat.h>
 #include <sys/audio.h>
 #include <sys/mixer.h>
-#include <sys/vol.h>
 #include <sys/cpc_impl.h>
 #include <sys/devpoll.h>
 #include <sys/strredir.h>
@@ -447,30 +446,6 @@ const struct ioc {
 	    NULL },
 	{ (uint_t)AUDIO_MIXERCTL_SET_MODE,	"AUDIO_MIXERCTL_SET_MODE",
 	    NULL },
-	/* volume management (control ioctls) */
-	{ (uint_t)VOLIOCMAP,	"VOLIOCMAP",	NULL },
-	{ (uint_t)VOLIOCUNMAP,	"VOLIOCUNMAP",	NULL },
-	{ (uint_t)VOLIOCEVENT,	"VOLIOCEVENT",	NULL },
-	{ (uint_t)VOLIOCEJECT,	"VOLIOCEJECT",	NULL },
-	{ (uint_t)VOLIOCDGATTR,	"VOLIOCDGATTR",	NULL },
-	{ (uint_t)VOLIOCDSATTR,	"VOLIOCDSATTR",	NULL },
-	{ (uint_t)VOLIOCDCHECK,	"VOLIOCDCHECK",	NULL },
-	{ (uint_t)VOLIOCDINUSE,	"VOLIOCDINUSE",	NULL},
-	{ (uint_t)VOLIOCDAEMON,	"VOLIOCDAEMON",	NULL },
-	{ (uint_t)VOLIOCFLAGS,	"VOLIOCFLAGS",	NULL },
-	{ (uint_t)VOLIOCDROOT,	"VOLIOCDROOT",	NULL },
-	{ (uint_t)VOLIOCDSYMNAME, "VOLIOCDSYMNAME",	NULL },
-	{ (uint_t)VOLIOCDSYMDEV, "VOLIOCDSYMDEV",	NULL },
-	/* volume management (user ioctls) */
-	{ (uint_t)VOLIOCINUSE,	"VOLIOCINUSE",	NULL },
-	{ (uint_t)VOLIOCCHECK,	"VOLIOCCHECK",	NULL },
-	{ (uint_t)VOLIOCCANCEL,	"VOLIOCCANCEL",	NULL },
-	{ (uint_t)VOLIOCINFO,	"VOLIOCINFO",	NULL },
-	{ (uint_t)VOLIOCSATTR,	"VOLIOCSATTR",	NULL },
-	{ (uint_t)VOLIOCGATTR,	"VOLIOCGATTR",	NULL },
-	{ (uint_t)VOLIOCROOT,	"VOLIOCROOT",	NULL },
-	{ (uint_t)VOLIOCSYMNAME, "VOLIOCSYMNAME",	NULL },
-	{ (uint_t)VOLIOCSYMDEV,	"VOLIOCSYMDEV",	NULL },
 	/* STREAMS redirection ioctls */
 	{ (uint_t)SRIOCSREDIR,		"SRIOCSREDIR",	NULL },
 	{ (uint_t)SRIOCISREDIR,		"SRIOCISREDIR",	NULL },

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +37,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/vtoc.h>
-#include <volmgt.h>
 #include <sys/efi_partition.h>
 
 #include "libdiskmgt.h"
@@ -51,7 +49,7 @@
 static descriptor_t	**apply_filter(descriptor_t **media, int filter[],
 			    int *errp);
 static int		get_attrs(disk_t *dp, int fd, nvlist_t *attrs);
-static int		get_non_volm_name(disk_t *dp, char *mname, int size);
+static int		get_rmm_name(disk_t *dp, char *mname, int size);
 static int		get_media_type(uint_t media_type);
 static int		desc_ok(descriptor_t *dp);
 
@@ -215,90 +213,6 @@ media_get_stats(descriptor_t *dp, int stat_type, int *errp)
 	return (NULL);
 }
 
-/*
- * Get the removable media volume manager devpath for the disk.  This is the
- * name we need to open that will work with vold.
- * Return 1 if under volm control, 0 if not under volm control.
- * The string in mediapath will be empty if the drive is under volm control
- * but there is no media loaded.
- */
-int
-media_get_volm_path(disk_t *diskp, char *mediapath, int size)
-{
-	char	vname[MAXPATHLEN];
-	char	*volname;
-	char	*media_name;
-
-	if (!diskp->removable || !volmgt_running()) {
-	    return (0);
-	}
-
-	/*
-	 * The volume manager is running, so we have to check if this removable
-	 * drive is under volm control or not.
-	 */
-
-	/*
-	 * We must check if this drive is under volume management control and
-	 * what devpath to use.
-	 * Note that we have to do this every time for drives that are not
-	 * under the control of the volume manager, since the volume manager
-	 * might have taken control since the last time we checked.
-	 */
-	if (diskp->volm_path_set == 0) {
-	    alias_t	*ap;
-	    slice_t	*dp;
-
-	    if ((ap = diskp->aliases) == NULL) {
-		return (0);
-	    }
-
-	    /* Check each devpath to see if it is under volm control. */
-	    dp = ap->devpaths;
-	    while (dp != NULL) {
-		slice_rdsk2dsk(dp->devpath, vname, sizeof (vname));
-		if (volmgt_inuse(vname)) {
-		    break;
-		}
-
-		dp = dp->next;
-	    }
-
-	    if (dp != NULL) {
-		/* Volume manager is managing the devpath that dp points to. */
-		diskp->volm_path = dp->devpath;
-		diskp->volm_path_set = 1;
-	    }
-	}
-
-	if (diskp->volm_path_set == 0) {
-	    /* The volume manager is not managing any of the devpaths. */
-	    return (0);
-	}
-
-	if (dm_debug > 1) {
-	    (void) fprintf(stderr, "INFO: chk vol: %s\n", diskp->volm_path);
-	}
-
-	slice_rdsk2dsk(diskp->volm_path, vname, sizeof (vname));
-	volname = volmgt_symname(vname);
-	if (volname == NULL) {
-	    mediapath[0] = 0;
-	    return (1);
-	}
-
-	media_name = media_findname(volname);
-	free(volname);
-	if (media_name == NULL) {
-	    mediapath[0] = 0;
-	    return (1);
-	}
-
-	(void) strlcpy(mediapath, media_name, size);
-	free(media_name);
-	return (1);
-}
-
 int
 media_make_descriptors()
 {
@@ -357,9 +271,6 @@ media_read_info(int fd, struct dk_minfo *minfo)
 int
 media_read_name(disk_t *dp, char *mname, int size)
 {
-	int	under_volm;
-	char	rmmedia_devpath[MAXPATHLEN];
-
 	mname[0] = 0;
 
 	if (!dp->removable) {
@@ -371,24 +282,7 @@ media_read_name(disk_t *dp, char *mname, int size)
 	}
 
 	/* This is a removable media drive. */
-
-	/* Get 1 if under volm control, 0 if not */
-	under_volm = media_get_volm_path(dp, rmmedia_devpath,
-	    sizeof (rmmedia_devpath));
-
-	if (under_volm) {
-	    /* under volm control */
-	    if (rmmedia_devpath[0] == 0) {
-		/* no media */
-		return (0);
-	    }
-	    (void) strlcpy(mname, rmmedia_devpath, size);
-	    return (1);
-
-	} else {
-	    /* not under volm control */
-	    return (get_non_volm_name(dp, mname, size));
-	}
+	return (get_rmm_name(dp, mname, size));
 }
 
 static descriptor_t **
@@ -636,10 +530,10 @@ get_media_type(uint_t media_type)
 }
 
 /*
- * This function handles removable media not under volume management.
+ * This function handles removable media.
  */
 static int
-get_non_volm_name(disk_t *dp, char *mname, int size)
+get_rmm_name(disk_t *dp, char *mname, int size)
 {
 	int		loaded;
 	int		fd;

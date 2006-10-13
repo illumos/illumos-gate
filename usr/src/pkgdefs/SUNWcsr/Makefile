@@ -46,6 +46,7 @@ DATAFILES += \
 	i.locallogin	\
 	i.localprofile	\
 	i.logadmconf	\
+	i.logindevperm	\
 	i.mailxrc	\
 	i.manifest	\
 	r.manifest	\
@@ -61,15 +62,13 @@ DATAFILES += \
 	r.rbac		\
 	i.renamenew	\
 	i.renameold	\
-	i.rmmconf	\
 	i.services	\
 	i.shadow	\
 	i.syslogconf	\
 	i.tiservices	\
 	i.ttydefs	\
 	i.ttysrch	\
-	i.vfstab	\
-	i.voldconf
+	i.vfstab
 
 CHKINSTALLSRC=checkinstall.initd
 

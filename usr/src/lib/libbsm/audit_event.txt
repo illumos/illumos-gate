@@ -423,6 +423,11 @@
 6227:AUE_zlogin:login - zlogin:lo
 6228:AUE_su_logout:su logout:lo
 6229:AUE_role_logout:role logout:lo
+6230:AUE_attach:attach device:ot
+6231:AUE_detach:detach device:ot
+6232:AUE_remove:remove/eject device:ot
+6233:AUE_pool_import:import device into pool:ot
+6234:AUE_pool_export:export device from pool:ot
 #
 # Trusted Extensions events:
 #

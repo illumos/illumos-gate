@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,7 +87,6 @@ static int opt_projid(char, char *);
 static int opt_taskid(char, char *);
 static int opt_zoneid(char, char *);
 static int opt_ctid(char, char *);
-static int opt_V(char, char *);
 
 static const char *g_procdir = "/proc";	/* Default procfs mount point */
 static const char *g_delim = "\n";	/* Default output delimiter */
@@ -117,7 +115,7 @@ static optdesc_t g_optdtab[] = {
 	{ 0, 0, 0, 0 },					/* 'S' */
 	{ OPT_FUNC | OPT_CRIT, 0, opt_taskid, 0 },	/* -T taskid */
 	{ OPT_FUNC | OPT_CRIT, 0, opt_uid, 0 },		/* -U uid */
-	{ OPT_FUNC | OPT_CRIT, 0, opt_V, 0 },		/* -V */
+	{ 0, 0, 0, 0 },					/* 'V' */
 	{ 0, 0, 0, 0 },					/* 'W' */
 	{ 0, 0, 0, 0 },					/* 'X' */
 	{ 0, 0, 0, 0 },					/* 'Y' */
@@ -166,8 +164,8 @@ Usage: %s [-signal] [-fnovx] [-P ppidlist] [-g pgrplist] [-s sidlist]\n\
 	[-u euidlist] [-U uidlist] [-G gidlist] [-J projidlist]\n\
 	[-T taskidlist] [-t termlist] [-z zonelist] [-c ctidlist] [pattern]\n";
 
-static const char PGREP_OPTS[] = "flnovVxc:d:D:u:U:G:P:g:s:t:z:J:T:";
-static const char PKILL_OPTS[] = "fnovVxc:D:u:U:G:P:g:s:t:z:J:T:";
+static const char PGREP_OPTS[] = "flnovxc:d:D:u:U:G:P:g:s:t:z:J:T:";
+static const char PKILL_OPTS[] = "fnovxc:D:u:U:G:P:g:s:t:z:J:T:";
 
 static const char LSEP[] = ",\t ";	/* Argument list delimiter chars */
 
@@ -581,16 +579,6 @@ static int
 opt_ctid(char c, char *arg)
 {
 	return (parse_ids(&g_psexp.ps_ctids, arg, 10, c, getctid()));
-}
-
-/*ARGSUSED*/
-static int
-opt_V(char c, char *arg)
-{
-	idtab_append(&g_psexp.ps_ruids, 0);
-	g_flags |= F_EXACT_MATCH;
-	g_psexp.ps_pat = "vold";
-	return (0);
 }
 
 static void

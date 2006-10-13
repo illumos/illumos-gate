@@ -106,7 +106,6 @@
 #include <sys/debug.h>
 #include <sys/vnode.h>
 #include <sys/lofi.h>
-#include <sys/vol.h>
 #include <sys/fcntl.h>
 #include <sys/pathname.h>
 #include <sys/filio.h>
@@ -1092,10 +1091,6 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 
 	/* these are for faking out utilities like newfs */
 	switch (cmd) {
-	case VOLIOCINFO:
-		/* pcfs does this to see if it needs to set PCFS_NOCHK */
-		/* 0 means it should set it */
-		return (0);
 	case DKIOCGVTOC:
 		switch (ddi_model_convert_from(flag & FMODELS)) {
 		case DDI_MODEL_ILP32: {

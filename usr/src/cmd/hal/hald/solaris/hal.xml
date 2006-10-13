@@ -1,0 +1,89 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+	Use is subject to license terms.
+
+        Licensed under the Academic Free License version 2.1
+
+	ident	"%Z%%M%	%I%	%E% SMI"
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+
+	Service manifest for HAL.
+-->
+
+<service_bundle type='manifest' name='SUNWhalr:hal'>
+
+<service
+	name='system/hal'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance />
+
+	<dependency name='usr'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+
+	<dependency
+		name='devices'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/device/local' />
+	</dependency>
+
+	<dependency name='dbus'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/dbus' />
+	</dependency>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/svc-hal start'
+		timeout_seconds='600'>
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='30' />
+
+	<property_group name='startd' type='framework'>
+		<!-- sub-process core dumps shouldn't restart session -->
+		<propval name='ignore_error' type='astring'
+		    value='core,signal' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			Hardware Abstraction Layer daemon
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='hal' section='1M' manpath='/usr/man' />
+		</documentation>
+	</template>
+
+</service>
+
+</service_bundle>

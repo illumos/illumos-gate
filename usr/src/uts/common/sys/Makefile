@@ -542,7 +542,6 @@ CHKHDRS=			\
 	vmmeter.h		\
 	vmsystm.h		\
 	vnode.h			\
-	vol.h			\
 	vtoc.h			\
 	vtrace.h		\
 	vuid_event.h		\

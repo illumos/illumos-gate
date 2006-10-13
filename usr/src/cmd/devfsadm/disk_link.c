@@ -206,12 +206,14 @@ static void
 disk_common(di_minor_t minor, di_node_t node, char *disk, int flags)
 {
 	char l_path[PATH_MAX + 1];
+	char sec_path[PATH_MAX + 1];
 	char stale_re[DISK_SUBPATH_MAX];
 	char *dir;
 	char slice[4];
 	char *mn;
 	char *ctrl;
 	char *nt = NULL;
+	int *int_prop;
 	int  nflags = 0;
 
 	if (strstr(mn = di_minor_name(minor), ",raw")) {
@@ -270,6 +272,19 @@ disk_common(di_minor_t minor, di_node_t node, char *disk, int flags)
 	}
 
 	(void) devfsadm_mklink(l_path, node, minor, nflags);
+
+	/* secondary links for removable and hotpluggable devices */
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "removable-media",
+	    &int_prop) >= 0) {
+		(void) strcpy(sec_path, "removable-media/");
+		(void) strcat(sec_path, l_path);
+		(void) devfsadm_secondary_link(sec_path, l_path, 0);
+	} else if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "hotpluggable",
+	    &int_prop) >= 0) {
+		(void) strcpy(sec_path, "hotpluggable/");
+		(void) strcat(sec_path, l_path);
+		(void) devfsadm_secondary_link(sec_path, l_path, 0);
+	}
 
 	if ((flags & RM_STALE) == RM_STALE) {
 		(void) strcpy(stale_re, "^");

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,7 +80,6 @@
 #include <sys/cmn_err.h>
 #include <sys/stat.h>
 #include <sys/file.h>
-#include <sys/vol.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/ramdisk.h>
@@ -1251,10 +1249,6 @@ rd_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	 * These are for faking out utilities like newfs.
 	 */
 	switch (cmd) {
-	case VOLIOCINFO:
-		/* pcfs does this to see if it needs to set PCFS_NOCHK */
-		/* 0 means it should set it */
-		return (0);
 	case DKIOCGVTOC:
 		switch (ddi_model_convert_from(mode & FMODELS)) {
 		case DDI_MODEL_ILP32: {
