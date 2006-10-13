@@ -510,6 +510,8 @@ getsym(struct ps_prochandle *P, uintptr_t addr, char *buf, size_t size,
 		(void) snprintf(buf, size, "%#lx", addr);
 		return (0);
 	}
+	if (info.prs_object == NULL)
+		info.prs_object = "<unknown>";
 
 	if (info.prs_lmid != LM_ID_BASE) {
 		len = snprintf(buf, size, "LM%lu`", info.prs_lmid);

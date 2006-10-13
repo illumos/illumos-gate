@@ -91,6 +91,83 @@ addr_cmp(const void *aa, const void *bb)
 }
 
 /*
+ * This function creates a list of addresses for a load object's sections.
+ * The list is in ascending address order and alternates start address
+ * then end address for each section we're interested in. The function
+ * returns a pointer to the list, which must be freed by the caller.
+ */
+static uintptr_t *
+get_saddrs(struct ps_prochandle *P, uintptr_t ehdr_start, uint_t *n)
+{
+	uintptr_t a, addr, *addrs, last = 0;
+	uint_t i, naddrs = 0, unordered = 0;
+
+	if (P->status.pr_dmodel == PR_MODEL_ILP32) {
+		Elf32_Ehdr ehdr;
+		Elf32_Phdr phdr;
+		uint_t phnum;
+
+		if (read_ehdr32(P, &ehdr, &phnum, ehdr_start) != 0)
+			return (NULL);
+
+		addrs = malloc(sizeof (uintptr_t) * phnum * 2);
+		a = ehdr_start + ehdr.e_phoff;
+		for (i = 0; i < phnum; i++, a += ehdr.e_phentsize) {
+			if (Pread(P, &phdr, sizeof (phdr), a) !=
+			    sizeof (phdr)) {
+				free(addrs);
+				return (NULL);
+			}
+			if (phdr.p_type != PT_LOAD || phdr.p_memsz == 0)
+				continue;
+
+			addr = phdr.p_vaddr;
+			if (ehdr.e_type == ET_DYN)
+				addr += ehdr_start;
+			if (last > addr)
+				unordered = 1;
+			addrs[naddrs++] = addr;
+			addrs[naddrs++] = last = addr + phdr.p_memsz - 1;
+		}
+#ifdef _LP64
+	} else {
+		Elf64_Ehdr ehdr;
+		Elf64_Phdr phdr;
+		uint_t phnum;
+
+		if (read_ehdr64(P, &ehdr, &phnum, ehdr_start) != 0)
+			return (NULL);
+
+		addrs = malloc(sizeof (uintptr_t) * phnum * 2);
+		a = ehdr_start + ehdr.e_phoff;
+		for (i = 0; i < phnum; i++, a += ehdr.e_phentsize) {
+			if (Pread(P, &phdr, sizeof (phdr), a) !=
+			    sizeof (phdr)) {
+				free(addrs);
+				return (NULL);
+			}
+			if (phdr.p_type != PT_LOAD || phdr.p_memsz == 0)
+				continue;
+
+			addr = phdr.p_vaddr;
+			if (ehdr.e_type == ET_DYN)
+				addr += ehdr_start;
+			if (last > addr)
+				unordered = 1;
+			addrs[naddrs++] = addr;
+			addrs[naddrs++] = last = addr + phdr.p_memsz - 1;
+		}
+#endif
+	}
+
+	if (unordered)
+		qsort(addrs, naddrs, sizeof (uintptr_t), addr_cmp);
+
+	*n = naddrs;
+	return (addrs);
+}
+
+/*
  * Allocation function for a new file_info_t
  */
 static file_info_t *
@@ -98,8 +175,8 @@ file_info_new(struct ps_prochandle *P, map_info_t *mptr)
 {
 	file_info_t *fptr;
 	map_info_t *mp;
-	uintptr_t a, addr, *addrs, last = 0;
-	uint_t i, j, naddrs = 0, unordered = 0;
+	uintptr_t addr;
+	uint_t i, j;
 
 	if ((fptr = calloc(1, sizeof (file_info_t))) == NULL)
 		return (NULL);
@@ -113,74 +190,20 @@ file_info_new(struct ps_prochandle *P, map_info_t *mptr)
 
 	/*
 	 * To figure out which map_info_t instances correspond to the mappings
-	 * for this load object, we look at the in-memory ELF image in the
-	 * base mapping (usually the program text). We examine the program
-	 * headers to find the addresses at the beginning and end of each
-	 * section and store them in a list which we then sort. Finally, we
+	 * for this load object we try to obtain the start and end address
+	 * for each section of our in-memory ELF image. If successful, we
 	 * walk down the list of addresses and the list of map_info_t
 	 * instances in lock step to correctly find the mappings that
 	 * correspond to this load object.
 	 */
-	if (P->status.pr_dmodel == PR_MODEL_ILP32) {
-		Elf32_Ehdr ehdr;
-		Elf32_Phdr phdr;
-		uint_t phnum;
-
-		if (read_ehdr32(P, &ehdr, &phnum, mptr->map_pmap.pr_vaddr) != 0)
-			return (fptr);
-
-		addrs = malloc(sizeof (uintptr_t) * phnum * 2);
-		a = mptr->map_pmap.pr_vaddr + ehdr.e_phoff;
-		for (i = 0; i < phnum; i++, a += ehdr.e_phentsize) {
-			if (Pread(P, &phdr, sizeof (phdr), a) != sizeof (phdr))
-				goto out;
-			if (phdr.p_type != PT_LOAD || phdr.p_memsz == 0)
-				continue;
-
-			addr = phdr.p_vaddr;
-			if (ehdr.e_type == ET_DYN)
-				addr += mptr->map_pmap.pr_vaddr;
-			if (last > addr)
-				unordered = 1;
-			addrs[naddrs++] = addr;
-			addrs[naddrs++] = last = addr + phdr.p_memsz - 1;
-		}
-#ifdef _LP64
-	} else {
-		Elf64_Ehdr ehdr;
-		Elf64_Phdr phdr;
-		uint_t phnum;
-
-		if (read_ehdr64(P, &ehdr, &phnum, mptr->map_pmap.pr_vaddr) != 0)
-			return (fptr);
-
-		addrs = malloc(sizeof (uintptr_t) * phnum * 2);
-		a = mptr->map_pmap.pr_vaddr + ehdr.e_phoff;
-		for (i = 0; i < phnum; i++, a += ehdr.e_phentsize) {
-			if (Pread(P, &phdr, sizeof (phdr), a) != sizeof (phdr))
-				goto out;
-			if (phdr.p_type != PT_LOAD || phdr.p_memsz == 0)
-				continue;
-
-			addr = phdr.p_vaddr;
-			if (ehdr.e_type == ET_DYN)
-				addr += mptr->map_pmap.pr_vaddr;
-			if (last > addr)
-				unordered = 1;
-			addrs[naddrs++] = addr;
-			addrs[naddrs++] = last = addr + phdr.p_memsz - 1;
-		}
-#endif
-	}
-
-	if (unordered)
-		qsort(addrs, naddrs, sizeof (uintptr_t), addr_cmp);
-
+	if ((fptr->file_saddrs = get_saddrs(P, mptr->map_pmap.pr_vaddr,
+	    &fptr->file_nsaddrs)) == NULL)
+		return (fptr);
 
 	i = j = 0;
 	mp = P->mappings;
-	while (j < P->map_count && i < naddrs) {
-		addr = addrs[i];
+	while (j < P->map_count && i < fptr->file_nsaddrs) {
+		addr = fptr->file_saddrs[i];
 		if (addr >= mp->map_pmap.pr_vaddr &&
 		    addr < mp->map_pmap.pr_vaddr + mp->map_pmap.pr_size &&
 		    mp->map_file == NULL) {
@@ -196,8 +219,6 @@ file_info_new(struct ps_prochandle *P, map_info_t *mptr)
 		}
 	}
 
-out:
-	free(addrs);
 	return (fptr);
 }
 
@@ -241,6 +262,8 @@ file_info_free(struct ps_prochandle *P, file_info_t *fptr)
 			ctf_close(fptr->file_ctfp);
 			free(fptr->file_ctf_buf);
 		}
+		if (fptr->file_saddrs)
+			free(fptr->file_saddrs);
 		free(fptr);
 		P->num_files--;
 	}
@@ -873,6 +896,56 @@ Pgetauxvec(struct ps_prochandle *P)
 }
 
 /*
+ * Return 1 if the given mapping corresponds to the given file_info_t's
+ * load object; return 0 otherwise.
+ */
+static int
+is_mapping_in_file(struct ps_prochandle *P, map_info_t *mptr, file_info_t *fptr)
+{
+	prmap_t *pmap = &mptr->map_pmap;
+	rd_loadobj_t *lop = fptr->file_lo;
+	uint_t i;
+
+	/*
+	 * We can get for free the start address of the text and data
+	 * sections of the load object. Start by seeing if the mapping
+	 * encloses either of these.
+	 */
+	if ((pmap->pr_vaddr <= lop->rl_base &&
+	    lop->rl_base < pmap->pr_vaddr + pmap->pr_size) ||
+	    (pmap->pr_vaddr <= lop->rl_data_base &&
+	    lop->rl_data_base < pmap->pr_vaddr + pmap->pr_size))
+		return (1);
+
+	/*
+	 * It's still possible that this mapping correponds to the load
+	 * object. Consider the example of a mapping whose start and end
+	 * addresses correspond to those of the load object's text section.
+	 * If the mapping splits, e.g. as a result of a segment demotion,
+	 * then although both mappings are still backed by the same section,
+	 * only one will be seen to enclose that section's start address.
+	 * Thus, to be rigorous, we ask not whether this mapping encloses
+	 * the start of a section, but whether there exists a section that
+	 * encloses the start of this mapping.
+	 *
+	 * If we don't already have the section addresses, and we successfully
+	 * get them, then we cache them in case we come here again.
+	 */
+	if (fptr->file_saddrs == NULL &&
+	    (fptr->file_saddrs = get_saddrs(P,
+	    fptr->file_map->map_pmap.pr_vaddr, &fptr->file_nsaddrs)) == NULL)
+		return (0);
+	for (i = 0; i < fptr->file_nsaddrs; i += 2) {
+		/* Does this section enclose the start of the mapping? */
+		if (fptr->file_saddrs[i] <= pmap->pr_vaddr &&
+		    fptr->file_saddrs[i + 1] > pmap->pr_vaddr)
+			return (1);
+	}
+
+	return (0);
+}
+
+/*
  * Find or build the symbol table for the given mapping.
  */
 static file_info_t *
@@ -880,7 +953,6 @@ build_map_symtab(struct ps_prochandle *P, map_info_t *mptr)
 {
 	prmap_t *pmap = &mptr->map_pmap;
 	file_info_t *fptr;
-	rd_loadobj_t *lop;
 	uint_t i;
 
 	if ((fptr = mptr->map_file) != NULL) {
@@ -898,11 +970,7 @@ build_map_symtab(struct ps_prochandle *P, map_info_t *mptr)
 	for (i = 0, fptr = list_next(&P->file_head); i < P->num_files;
 	    i++, fptr = list_next(fptr)) {
 		if (strcmp(fptr->file_pname, pmap->pr_mapname) == 0 &&
-		    (lop = fptr->file_lo) != NULL &&
-		    ((pmap->pr_vaddr <= lop->rl_base &&
-		    lop->rl_base < pmap->pr_vaddr + pmap->pr_size) ||
-		    (pmap->pr_vaddr <= lop->rl_data_base &&
-		    lop->rl_data_base < pmap->pr_vaddr + pmap->pr_size))) {
+		    fptr->file_lo && is_mapping_in_file(P, mptr, fptr)) {
 			mptr->map_file = fptr;
 			fptr->file_ref++;
 			Pbuild_file_symtab(P, fptr);

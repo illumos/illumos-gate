@@ -94,6 +94,8 @@ typedef struct file_info {	/* symbol information for a mapped file */
 	ctf_file_t *file_ctfp;	/* CTF container for this file */
 	char	*file_shstrs;	/* section header string table */
 	size_t	file_shstrsz;	/* section header string table size */
+	uintptr_t *file_saddrs; /* section header addresses */
+	uint_t  file_nsaddrs;   /* number of section header addresses */
 } file_info_t;
 
 typedef struct map_info {	/* description of an address space mapping */
