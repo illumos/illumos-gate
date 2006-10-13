@@ -2124,7 +2124,7 @@ if ifconfig -a | egrep '^ce' >/dev/null 2>/dev/null; then
 fi
 
 update_script="/ws/onnv-gate/public/bin/update_dbus"
-if [ ! -x /usr/lib/dbus-daemon ]; then
+if [ ! -x $usr/lib/dbus-daemon ]; then
 	fail "Run $update_script to update D-Bus."
 fi
 
