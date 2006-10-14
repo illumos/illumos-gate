@@ -47,6 +47,7 @@ BEGIN
 tick-1
 {
 	bcopy((void *)&`kmem_flags, ptr, sizeof (int));
+	exit(0);
 }
 
 ERROR

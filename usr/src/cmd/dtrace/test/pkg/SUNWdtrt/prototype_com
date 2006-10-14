@@ -493,6 +493,7 @@ f none opt/SUNWdtrt/tst/common/funcs/err.D_PROTO_LEN.stopbadarg.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/err.D_STRINGOF_TYPE.badstringof.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/err.D_VAR_UNDEF.badvar.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/err.badalloca.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/funcs/err.badalloca2.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/err.badbcopy.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/err.badbcopy1.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/funcs/err.badbcopy2.d 0444 root bin
@@ -963,6 +964,7 @@ f none opt/SUNWdtrt/tst/common/safety/tst.basename.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.caller.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.cleanpath.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.copyin.d 0444 root bin
+f none opt/SUNWdtrt/tst/common/safety/tst.copyin2.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.ddi_pathname.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.dirname.d 0444 root bin
 f none opt/SUNWdtrt/tst/common/safety/tst.execname.d 0444 root bin

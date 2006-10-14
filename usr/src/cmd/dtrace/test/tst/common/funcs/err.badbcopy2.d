@@ -44,7 +44,7 @@ BEGIN
 	/* Attempt to copy to non-scratch memory */
 
 	bcopy((void *)&`kmem_flags, ptr, sizeof (int));
-	exit(1);
+	exit(0);
 }
 
 ERROR

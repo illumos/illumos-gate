@@ -46,7 +46,7 @@ BEGIN
 	/* Attempt a copy from scratch memory to a kernel address */
 
 	bcopy(ptr, (void *)&`kmem_flags, sizeof (int));
-	exit(1);
+	exit(0);
 }
 
 ERROR

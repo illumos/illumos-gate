@@ -41,7 +41,7 @@ BEGIN
 {
 	/* Attempt to copy to a NULL address */
 	bcopy((void *)&`kmem_flags, (void *)NULL, sizeof (int));
-	exit(1);
+	exit(0);
 }
 
 ERROR

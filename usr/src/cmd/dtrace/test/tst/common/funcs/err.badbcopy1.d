@@ -45,7 +45,7 @@ BEGIN
 
 	/* Attempt to bcopy to scratch memory that isn't allocated */
 	bcopy((void *)&`kmem_flags, ptr, sizeof (int));
-	exit(1);
+	exit(0);
 }
 
 ERROR

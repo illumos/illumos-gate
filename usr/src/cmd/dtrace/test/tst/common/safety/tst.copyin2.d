@@ -26,15 +26,42 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma D option quiet
+/*
+ * Test that there is no value of 'size' which can be passed to copyin
+ * to cause mischief.  The somewhat odd order of operations ensures
+ * that we test both size = 0 and size = 0xfff...fff
+ */
+#include <sys/types.h>
 
-BEGIN
+
+#if defined(_LP64)
+#define MAX_BITS 63
+size_t size;
+#else
+#define MAX_BITS 31
+size_t size;
+#endif
+
+syscall:::
+/pid == $pid/
 {
-	bcopy("bad news", alloca(1), -1);
+	printf("size = 0x%lx\n", (ulong_t)size);
+}
+
+syscall:::
+/pid == $pid/
+{
+	tracemem(copyin(curthread->t_procp->p_user.u_envp, size), 10);
+}
+
+syscall:::
+/pid == $pid && size > (1 << MAX_BITS)/
+{
 	exit(0);
 }
 
-ERROR
+syscall:::
+/pid == $pid/
 {
-	exit(1);
+	size = (size << 1ULL) | 1ULL;
 }

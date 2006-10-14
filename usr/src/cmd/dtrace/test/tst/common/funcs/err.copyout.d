@@ -34,6 +34,7 @@
  *
  */
 
+#pragma D option destructive
 
 BEGIN
 {
@@ -42,3 +43,7 @@ BEGIN
 	exit(0);
 }
 
+ERROR
+{
+	exit(1);
+}

@@ -30,7 +30,7 @@ BEGIN
 {
 	chill(200);
 	chill(((hrtime_t)1 << 63) - 1);
-	exit(1);
+	exit(0);
 }
 
 ERROR

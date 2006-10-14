@@ -24,13 +24,22 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma	ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma D option quiet
+
+/*
+ * ASSERTION:
+ *	alloca() cannot be used to "unconsume" scratch space memory by
+ *	accepting a negative offset.
+ *
+ * SECTION: Actions and Subroutines/alloca()
+ *
+ */
 
 BEGIN
 {
-	bcopy("bad news", alloca(1), -1);
+	ptr = alloca(10);
+	ptr = alloca(0xffffffffffffffff);
 	exit(0);
 }
 

@@ -44,7 +44,7 @@ BEGIN
 
 	/* Attempt to copy from a NULL address */
 	bcopy((void *)NULL, ptr, sizeof (int));
-	exit(1);
+	exit(0);
 }
 
 ERROR

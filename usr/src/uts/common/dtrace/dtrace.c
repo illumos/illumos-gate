@@ -354,12 +354,25 @@ static kmutex_t dtrace_errlock;
 
 /*
  * Test whether a range of memory starting at testaddr of size testsz falls
- * within the range of memory described by addr, sz, taking care to avoid
- * problems with overflow and underflow of the unsigned quantities.
+ * within the range of memory described by addr, sz.  We take care to avoid
+ * problems with overflow and underflow of the unsigned quantities, and
+ * disallow all negative sizes.  Ranges of size 0 are allowed.
  */
 #define	DTRACE_INRANGE(testaddr, testsz, baseaddr, basesz) \
 	((testaddr) - (baseaddr) < (basesz) && \
-	(testaddr) + (testsz) - (baseaddr) <= (basesz))
+	(testaddr) + (testsz) - (baseaddr) <= (basesz) && \
+	(testaddr) + (testsz) >= (testaddr))
+
+/*
+ * Test whether alloc_sz bytes will fit in the scratch region.  We isolate
+ * alloc_sz on the righthand side of the comparison in order to avoid overflow
+ * or underflow in the comparison with it.  This is simpler than the INRANGE
+ * check above, because we know that the dtms_scratch_ptr is valid in the
+ * range.  Allocations of size zero are allowed.
+ */
+#define	DTRACE_INSCRATCH(mstate, alloc_sz) \
+	((mstate)->dtms_scratch_base + (mstate)->dtms_scratch_size - \
+	(mstate)->dtms_scratch_ptr >= (alloc_sz))
 
 #define	DTRACE_LOADFUNC(bits)						\
 /*CSTYLED*/								\
@@ -2932,8 +2945,13 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		 * probes will not activate in user contexts to which the
 		 * enabling user does not have permissions.
 		 */
-		if (mstate->dtms_scratch_ptr + scratch_size >
-		    mstate->dtms_scratch_base + mstate->dtms_scratch_size) {
+
+		/*
+		 * Rounding up the user allocation size could have overflowed
+		 * a large, bogus allocation (like -1ULL) to 0.
+		 */
+		if (scratch_size < size ||
+		    !DTRACE_INSCRATCH(mstate, scratch_size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOSCRATCH);
 			regs[rd] = NULL;
 			break;
@@ -2983,8 +3001,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		 * probes will not activate in user contexts to which the
 		 * enabling user does not have permissions.
 		 */
-		if (mstate->dtms_scratch_ptr + size >
-		    mstate->dtms_scratch_base + mstate->dtms_scratch_size) {
+		if (!DTRACE_INSCRATCH(mstate, size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOSCRATCH);
 			regs[rd] = NULL;
 			break;
@@ -3330,8 +3347,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 			break;
 		}
 
-		if (mstate->dtms_scratch_ptr + size >
-		    mstate->dtms_scratch_base + mstate->dtms_scratch_size) {
+		if (!DTRACE_INSCRATCH(mstate, size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOSCRATCH);
 			regs[rd] = NULL;
 			break;
@@ -3440,8 +3456,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		if (nargs <= 2)
 			remaining = (int64_t)size;
 
-		if (mstate->dtms_scratch_ptr + size >
-		    mstate->dtms_scratch_base + mstate->dtms_scratch_size) {
+		if (!DTRACE_INSCRATCH(mstate, size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOSCRATCH);
 			regs[rd] = NULL;
 			break;
@@ -3516,8 +3531,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 			regs[rd] = NULL;
 		}
 
-		if (size == 0 || mstate->dtms_scratch_ptr + size >
-		    mstate->dtms_scratch_base + mstate->dtms_scratch_size) {
+		if (!DTRACE_INSCRATCH(mstate, size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOSCRATCH);
 			regs[rd] = NULL;
 			break;
@@ -3697,8 +3711,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 			break;
 		}
 
-		if (mstate->dtms_scratch_ptr + size >
-		    mstate->dtms_scratch_base + mstate->dtms_scratch_size) {
+		if (!DTRACE_INSCRATCH(mstate, size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOSCRATCH);
 			regs[rd] = NULL;
 			break;
@@ -3742,8 +3755,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		uint64_t size = 22;	/* enough room for 2^64 in decimal */
 		char *end = (char *)mstate->dtms_scratch_ptr + size - 1;
 
-		if (mstate->dtms_scratch_ptr + size >
-		    mstate->dtms_scratch_base + mstate->dtms_scratch_size) {
+		if (!DTRACE_INSCRATCH(mstate, size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOSCRATCH);
 			regs[rd] = NULL;
 			break;
@@ -3807,8 +3819,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 			break;
 		}
 
-		if (mstate->dtms_scratch_ptr + size >
-		    mstate->dtms_scratch_base + mstate->dtms_scratch_size) {
+		if (!DTRACE_INSCRATCH(mstate, size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOSCRATCH);
 			regs[rd] = NULL;
 			break;
@@ -3936,8 +3947,7 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 			break;
 		}
 
-		if (mstate->dtms_scratch_ptr + size >
-		    mstate->dtms_scratch_base + mstate->dtms_scratch_size) {
+		if (!DTRACE_INSCRATCH(mstate, size)) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOSCRATCH);
 			regs[rd] = NULL;
 			break;
@@ -4731,17 +4741,21 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 			uintptr_t ptr = P2ROUNDUP(mstate->dtms_scratch_ptr, 8);
 			size_t size = ptr - mstate->dtms_scratch_ptr + regs[r1];
 
-			if (mstate->dtms_scratch_ptr + size >
-			    mstate->dtms_scratch_base +
-			    mstate->dtms_scratch_size) {
+			/*
+			 * Rounding up the user allocation size could have
+			 * overflowed large, bogus allocations (like -1ULL) to
+			 * 0.
+			 */
+			if (size < regs[r1] ||
+			    !DTRACE_INSCRATCH(mstate, size)) {
 				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOSCRATCH);
 				regs[rd] = NULL;
-			} else {
-				dtrace_bzero((void *)
-				    mstate->dtms_scratch_ptr, size);
-				mstate->dtms_scratch_ptr += size;
-				regs[rd] = ptr;
+				break;
 			}
+
+			dtrace_bzero((void *) mstate->dtms_scratch_ptr, size);
+			mstate->dtms_scratch_ptr += size;
+			regs[rd] = ptr;
 			break;
 		}
 
@@ -5019,8 +5033,7 @@ dtrace_action_ustack(dtrace_mstate_t *mstate, dtrace_state_t *state,
 	size = (uintptr_t)fps - mstate->dtms_scratch_ptr +
 	    (nframes * sizeof (uint64_t));
 
-	if (mstate->dtms_scratch_ptr + size >
-	    mstate->dtms_scratch_base + mstate->dtms_scratch_size) {
+	if (!DTRACE_INSCRATCH(mstate, size)) {
 		/*
 		 * Not enough room for our frame pointers -- need to indicate
 		 * that we ran out of scratch space.

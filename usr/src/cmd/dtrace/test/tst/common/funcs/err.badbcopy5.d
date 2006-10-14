@@ -46,7 +46,7 @@ BEGIN
 
 	/* Attempt to copy from a invalid address */
 	bcopy(badptr, ptr, sizeof (int));
-	exit(1);
+	exit(0);
 }
 
 ERROR
