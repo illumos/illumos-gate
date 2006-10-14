@@ -133,8 +133,8 @@ s none usr/lib/sparcv9/libbsm.so.1=../../../lib/sparcv9/libbsm.so.1
 s none usr/lib/sparcv9/libbsm.so=../../../lib/sparcv9/libbsm.so.1
 f none usr/lib/sparcv9/libcfgadm.so.1 755 root bin
 s none usr/lib/sparcv9/libcfgadm.so=libcfgadm.so.1
-s none usr/lib/sparcv9/libcmd.so.1=../../../lib/sparcv9/libcmd.so.1
-s none usr/lib/sparcv9/libcmd.so=../../../lib/sparcv9/libcmd.so.1
+f none usr/lib/sparcv9/libcmd.so.1 755 root bin
+s none usr/lib/sparcv9/libcmd.so=libcmd.so.1
 s none usr/lib/sparcv9/libcmdutils.so.1=../../../lib/sparcv9/libcmdutils.so.1
 f none usr/lib/sparcv9/libcrle.so.1 755 root bin
 f none usr/lib/sparcv9/libcryptoutil.so.1 755 root bin

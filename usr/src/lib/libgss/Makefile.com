@@ -83,7 +83,7 @@ include ../../Makefile.lib
 LIBS =	$(DYNLIB) $(LINTLIB)
 
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
-LDLIBS += 	-lc -lcmd
+LDLIBS += 	-lc
 
 CPPFLAGS += 	-I$(GSSCRED_DIR) -I$(SRC)/uts/common/gssapi/include \
 		-DHAVE_STDLIB_H

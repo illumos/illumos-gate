@@ -17,8 +17,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-
-
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -139,7 +137,6 @@ $(NSLPROG)		:=	LDLIBS += -lnsl
 $(AUDITPROG)		:=	LDLIBS += -lbsm
 $(PAMPROG)		:=	LDLIBS += -lpam
 $(RPCSVCPROG)		:=	LDLIBS += -lrpcsvc
-$(CMDPROG)		:=	LDLIBS += -lcmd
 $(K5PROGS)		:=	LDFLAGS += $(ZLAZYLOAD) $(KRUNPATH) \
 				-L$(ROOT)$(KLIBDIR_DO) -L$(ROOT)$(KLIBDIR_GL)
 $(K5PROGS)		:=	K5LIBS=  -lmech_krb5

@@ -110,7 +110,7 @@ SUNW_network_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -llaadm
 SUNW_ip_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil
 SUNW_ip_anon_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil
 
-LDLIBS += -lgen -lelf -lcmd -lrcm -lnvpair -ldevinfo -lnsl -lsocket
+LDLIBS += -lgen -lelf -lrcm -lnvpair -ldevinfo -lnsl -lsocket
 
 SRCS = $(RCM_SRC) $(COMMON_MOD_SRC)
 

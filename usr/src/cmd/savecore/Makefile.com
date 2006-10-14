@@ -31,7 +31,6 @@ OBJS= savecore.o compress.o
 
 include ../../Makefile.cmd
 
-LDLIBS += -lcmd
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 CPPFLAGS += -D_LARGEFILE64_SOURCE=1

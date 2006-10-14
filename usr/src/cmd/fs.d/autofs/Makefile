@@ -85,10 +85,9 @@ POFILE= autofs.po
 GREP= egrep
 SED= sed
 
-$(AUTO) := 	LDLIBS += -lnsl -lsldap -lcmd
+$(AUTO) := 	LDLIBS += -lnsl -lsldap
 $(MOUNT):=	LDLIBS += -lnsl
-$(TYPEPROG) :=	LDLIBS += -lrpcsvc -lsocket -lnsl -lsldap -lcmd \
-		-lkstat
+$(TYPEPROG) :=	LDLIBS += -lrpcsvc -lsocket -lnsl -lsldap -lkstat
 $(TYPEPROG) :=	LDFLAGS += -R/usr/lib/fs/$(FSTYPE)
 
 CFLAGS +=	$(CCVERBOSE) -D_FILE_OFFSET_BITS=64

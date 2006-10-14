@@ -394,6 +394,7 @@ PORTGEN=			\
 	csetlen.o		\
 	ctime.o			\
 	ctime_r.o		\
+	deflt.o			\
 	directio.o		\
 	dirname.o		\
 	div.o			\

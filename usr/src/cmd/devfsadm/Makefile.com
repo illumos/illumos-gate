@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -124,7 +123,7 @@ LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
 
 LAZYLIBS =	$(ZLAZYLOAD) -lzonecfg -lbrand -lbsm $(ZNOLAZYLOAD)
 lint := LAZYLIBS = -lzonecfg -lbrand -lbsm
-LDLIBS += -ldevinfo -lgen -lsysevent -lnvpair -lcmd -ldoor $(LAZYLIBS) -lnsl
+LDLIBS += -ldevinfo -lgen -lsysevent -lnvpair -ldoor $(LAZYLIBS) -lnsl
 
 SRCS = $(DEVFSADM_SRC) $(LINK_SRCS)
 OBJS = $(DEVFSADM_OBJ) $(LINK_OBJS)

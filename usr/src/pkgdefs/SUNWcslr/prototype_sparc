@@ -66,8 +66,6 @@ s none lib/sparcv9/libc.so=libc.so.1
 f none lib/sparcv9/libc.so.1 755 root bin
 s none lib/sparcv9/libc_db.so=libc_db.so.1
 f none lib/sparcv9/libc_db.so.1 755 root bin
-s none lib/sparcv9/libcmd.so=libcmd.so.1
-f none lib/sparcv9/libcmd.so.1 755 root bin
 s none lib/sparcv9/libcontract.so=libcontract.so.1
 f none lib/sparcv9/libcontract.so.1 755 root bin
 f none lib/sparcv9/libcmdutils.so.1 755 root bin

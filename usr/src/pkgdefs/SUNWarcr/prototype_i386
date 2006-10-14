@@ -56,7 +56,6 @@ f none lib/amd64/llib-laio.ln 644 root  bin
 f none lib/amd64/llib-lbsm.ln 644 root bin
 f none lib/amd64/llib-lc.ln 644 root bin
 f none lib/amd64/llib-lc_db.ln 644 root bin
-f none lib/amd64/llib-lcmd.ln 644 root bin
 f none lib/amd64/llib-lcontract.ln 644 root bin
 f none lib/amd64/llib-lctf.ln 644 root bin
 f none lib/amd64/llib-lcurses 644 root bin

@@ -49,7 +49,7 @@ $(ROOTSLINK32):	$(ROOTLIBDIR)
 SRCDIR	=	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-LDLIBS	+=	-lresolv -lcmd -lc
+LDLIBS	+=	-lresolv -lc
 
 CFLAGS	+=	$(CCVERBOSE)
 CPPFLAGS+=	-I$(SRCDIR) -D_REENTRANT

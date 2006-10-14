@@ -6151,6 +6151,18 @@ mondo_loop() {
 		from_new_aggrconf=0
 	fi
 
+	# Remove libcmd from $root/lib.  It has moved back to $usr/lib.
+	rm -f $root/lib/libcmd.so
+	rm -f $root/lib/libcmd.so.1
+	rm -f $root/lib/amd64/libcmd.so
+	rm -f $root/lib/amd64/libcmd.so.1
+	rm -f $root/lib/sparcv9/libcmd.so
+	rm -f $root/lib/sparcv9/libcmd.so.1
+	rm -f $root/lib/llib-lcmd
+	rm -f $root/lib/llib-lcmd.ln
+	rm -f $root/lib/amd64/llib-lcmd.ln
+	rm -f $root/lib/sparcv9/llib-lcmd.ln
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then

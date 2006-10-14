@@ -31,7 +31,7 @@ ATTMK=		$(TYPEPROG)
 
 include		../../Makefile.fstype
 
-LDLIBS +=	-lnsl -lcmd -lnvpair
+LDLIBS +=	-lnsl -lnvpair
 
 LOCAL=		nfsd.o
 OBJS=		$(LOCAL) nfs_tbind.o thrpool.o

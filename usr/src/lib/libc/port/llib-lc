@@ -33,6 +33,7 @@
 #include <alloca.h>
 #include <atomic.h>
 #include <ctype.h>
+#include <deflt.h>
 #include <dirent.h>
 #include <dlfcn.h>
 #include <door.h>

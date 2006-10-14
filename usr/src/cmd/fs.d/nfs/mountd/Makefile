@@ -24,6 +24,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
 FSTYPE	  =	nfs
 TYPEPROG  =	mountd
 ATTMK	  =	$(TYPEPROG)
@@ -35,7 +36,7 @@ LOCAL	  =	mountd.o netgroup.o rmtab.o nfsauth.o \
 		nfsauth_xdr.o exportlist.o hashset.o
 OBJS	  = 	$(LOCAL) $(COMMON)
 SRCS	  =	$(LOCAL:%.o=%.c) $(FSLIBSRC) ../lib/nfs_sec.c ../lib/sharetab.c
-LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -lcmd -ldoor
+LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -ldoor
 CPPFLAGS +=	-D_REENTRANT
 
 $(TYPEPROG):	$(OBJS)

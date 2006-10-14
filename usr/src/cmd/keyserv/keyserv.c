@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1401,7 +1402,7 @@ defaults(void)
 		 */
 		flags = defcntl(DC_GETFLAGS, 0);
 		TURNOFF(flags, DC_CASE);
-		defcntl(DC_SETFLAGS, flags);
+		(void) defcntl(DC_SETFLAGS, flags);
 
 		if ((ptr = defread("ENABLE_NOBODY_KEYS=")) != NULL) {
 			if (strcasecmp(ptr, "NO") == 0) {

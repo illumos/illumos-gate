@@ -27,9 +27,9 @@
 
 SUNWprivate_1.1 {
     global:
-	defcntl;
-	defopen;
-	defread;
+	defcntl = FUNCTION FILTER libc.so.1;
+	defopen = FUNCTION FILTER libc.so.1;
+	defread = FUNCTION FILTER libc.so.1;
     local:
 	*;
 };

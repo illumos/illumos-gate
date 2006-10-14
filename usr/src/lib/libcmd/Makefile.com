@@ -27,16 +27,13 @@
 
 LIBRARY =	libcmd.a
 VERS =		.1
-OBJECTS =	deflt.o
+OBJECTS =	placeholder.o
 
 include ../../Makefile.lib
 
-# install this library in the root filesystem
-include ../../Makefile.rootfs
-
 LIBS =		$(DYNLIB) $(LINTLIB)
 
-LDLIBS +=	-lc $(ZNODELETE)
+#LDLIBS +=	-lc
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

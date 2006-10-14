@@ -67,7 +67,6 @@ SUBDIRS += \
 	libmd5				\
 	librsm				\
 	libmp			.WAIT	\
-	libcmd			\
 	libnsl			\
 	libsecdb		.WAIT	\
 	librpcsvc			\
@@ -94,6 +93,7 @@ SUBDIRS += \
 	libpthread	.WAIT	\
 	libslp		\
 	libbsdmalloc	\
+	libcmd		\
 	libdoor		\
 	libdevinfo	\
 	libdladm	\
@@ -464,11 +464,11 @@ $(CLOSED_BUILD)$(CLOSED)/lib/libelfsign: \
 			$(CLOSED)/lib/libike libcryptoutil pkcs11
 libinetcfg:	libnsl libsocket libdevinfo
 libnsl:		libmd5 libscf
-libmapid:	libresolv libcmd
+libmapid:	libresolv
 libmacadm:	libdevinfo
 libuuid:	libsocket
 libinetutil:	libsocket
-libsecdb:	libcmd libnsl
+libsecdb:	libnsl
 libsasl:	libgss libsocket pkcs11 libmd
 sasl_plugins:	pkcs11 libgss libsocket libsasl
 libsctp:	libsocket

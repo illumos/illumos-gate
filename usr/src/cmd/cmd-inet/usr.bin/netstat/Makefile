@@ -17,14 +17,12 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-
-
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright (c) 1990 Mentat Inc.
 #
@@ -46,7 +44,7 @@ SRCS=		$(LOCALSRCS) $(COMMONSRCS)
 CPPFLAGS += -DNDEBUG -I$(CMDINETCOMMONDIR)
 LAZYLIBS = $(ZLAZYLOAD) -ltsnet -ltsol $(ZNOLAZYLOAD)
 lint := LAZYLIBS = -ltsnet -ltsol
-LDLIBS += -ldhcpagent -lcmd -lsocket -lnsl -lkstat $(LAZYLIBS)
+LDLIBS += -ldhcpagent -lsocket -lnsl -lkstat $(LAZYLIBS)
 
 .KEEP_STATE:
 

@@ -822,8 +822,6 @@ $(ROOT)/usr/lib/libc.so.1:=		REALPATH=../../lib/libc.so.1
 $(ROOT)/usr/lib/libc.so:=		REALPATH=../../lib/libc.so.1
 $(ROOT)/usr/lib/libc_db.so.1:=		REALPATH=../../lib/libc_db.so.1
 $(ROOT)/usr/lib/libc_db.so:=		REALPATH=../../lib/libc_db.so.1
-$(ROOT)/usr/lib/libcmd.so.1:=		REALPATH=../../lib/libcmd.so.1
-$(ROOT)/usr/lib/libcmd.so:=		REALPATH=../../lib/libcmd.so.1
 $(ROOT)/usr/lib/libcmdutils.so.1:=	REALPATH=../../lib/libcmdutils.so.1
 $(ROOT)/usr/lib/libcmdutils.so:=	REALPATH=../../lib/libcmdutils.so.1
 $(ROOT)/usr/lib/libcontract.so.1:=	REALPATH=../../lib/libcontract.so.1
@@ -940,8 +938,6 @@ $(ROOT)/usr/lib/llib-lbsm.ln:=		REALPATH=../../lib/llib-lbsm.ln
 $(ROOT)/usr/lib/llib-lbsm:=		REALPATH=../../lib/llib-lbsm
 $(ROOT)/usr/lib/llib-lc.ln:=		REALPATH=../../lib/llib-lc.ln
 $(ROOT)/usr/lib/llib-lc:=		REALPATH=../../lib/llib-lc
-$(ROOT)/usr/lib/llib-lcmd.ln:=		REALPATH=../../lib/llib-lcmd.ln
-$(ROOT)/usr/lib/llib-lcmd:=		REALPATH=../../lib/llib-lcmd
 $(ROOT)/usr/lib/llib-lcmdutils.ln:=	REALPATH=../../lib/llib-lcmdutils.ln
 $(ROOT)/usr/lib/llib-lcmdutils:=	REALPATH=../../lib/llib-lcmdutils
 $(ROOT)/usr/lib/llib-lcontract.ln:=	REALPATH=../../lib/llib-lcontract.ln
@@ -1073,10 +1069,6 @@ $(ROOT)/usr/lib/$(MACH64)/libc_db.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libc_db.so.1
 $(ROOT)/usr/lib/$(MACH64)/libc_db.so:= \
 	REALPATH=../../../lib/$(MACH64)/libc_db.so.1
-$(ROOT)/usr/lib/$(MACH64)/libcmd.so.1:= \
-	REALPATH=../../../lib/$(MACH64)/libcmd.so.1
-$(ROOT)/usr/lib/$(MACH64)/libcmd.so:= \
-	REALPATH=../../../lib/$(MACH64)/libcmd.so.1
 $(ROOT)/usr/lib/$(MACH64)/libcmdutils.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libcmdutils.so.1
 $(ROOT)/usr/lib/$(MACH64)/libcmdutils.so:= \
@@ -1279,8 +1271,6 @@ $(ROOT)/usr/lib/$(MACH64)/llib-lbsm.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lbsm.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lc.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lc.ln
-$(ROOT)/usr/lib/$(MACH64)/llib-lcmd.ln:= \
-	REALPATH=../../../lib/$(MACH64)/llib-lcmd.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lcmdutils.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lcmdutils.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lcontract.ln:= \
@@ -1410,8 +1400,6 @@ SYM.USRLIB= \
 	/usr/lib/libc.so.1 \
 	/usr/lib/libc_db.so \
 	/usr/lib/libc_db.so.1 \
-	/usr/lib/libcmd.so \
-	/usr/lib/libcmd.so.1 \
 	/usr/lib/libcmdutils.so \
 	/usr/lib/libcmdutils.so.1 \
 	/usr/lib/libcontract.so \
@@ -1528,8 +1516,6 @@ SYM.USRLIB= \
 	/usr/lib/llib-lbsm.ln \
 	/usr/lib/llib-lc \
 	/usr/lib/llib-lc.ln \
-	/usr/lib/llib-lcmd \
-	/usr/lib/llib-lcmd.ln \
 	/usr/lib/llib-lcmdutils \
 	/usr/lib/llib-lcmdutils.ln \
 	/usr/lib/llib-lcontract \
@@ -1654,8 +1640,6 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libc.so.1 \
 	/usr/lib/$(MACH64)/libc_db.so \
 	/usr/lib/$(MACH64)/libc_db.so.1 \
-	/usr/lib/$(MACH64)/libcmd.so \
-	/usr/lib/$(MACH64)/libcmd.so.1 \
 	/usr/lib/$(MACH64)/libcmdutils.so \
 	/usr/lib/$(MACH64)/libcmdutils.so.1 \
 	/usr/lib/$(MACH64)/libcontract.so \
@@ -1757,7 +1741,6 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-lavl.ln \
 	/usr/lib/$(MACH64)/llib-lbsm.ln \
 	/usr/lib/$(MACH64)/llib-lc.ln \
-	/usr/lib/$(MACH64)/llib-lcmd.ln \
 	/usr/lib/$(MACH64)/llib-lcmdutils.ln \
 	/usr/lib/$(MACH64)/llib-lcontract.ln \
 	/usr/lib/$(MACH64)/llib-lctf.ln \

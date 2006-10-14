@@ -1441,6 +1441,12 @@ SUNWprivate_1.1 {
 	_decimal_to_extended;
 	_decimal_to_quadruple;
 	_decimal_to_single;
+	defcntl;
+	_defcntl;
+	defopen;
+	_defopen;
+	defread;
+	_defread;
 	_delete;
 	_dgettext;
 	_door_bind;

@@ -267,6 +267,9 @@ extern "C" {
 #define	decimal_to_extended	_decimal_to_extended
 #define	decimal_to_quadruple	_decimal_to_quadruple
 #define	decimal_to_single	_decimal_to_single
+#define	defcntl			_defcntl
+#define	defopen			_defopen
+#define	defread			_defread
 #define	dgettext		_dgettext
 #define	dirname			_dirname
 #define	dladdr1			_dladdr1

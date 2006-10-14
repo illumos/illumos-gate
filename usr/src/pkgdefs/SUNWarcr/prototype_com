@@ -56,8 +56,6 @@ f none lib/llib-lc 644 root bin
 f none lib/llib-lc.ln 644 root bin
 f none lib/llib-lc_db 644 root bin
 f none lib/llib-lc_db.ln 644 root bin
-f none lib/llib-lcmd 644 root bin
-f none lib/llib-lcmd.ln 644 root bin
 f none lib/llib-lcontract 644 root bin
 f none lib/llib-lcontract.ln 644 root bin
 f none lib/llib-lctf 644 root bin

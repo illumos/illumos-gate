@@ -32,74 +32,60 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/* LINTLIBRARY */
+#pragma weak defopen = _defopen
+#pragma weak defread = _defread
+#pragma weak defcntl = _defcntl
 
-#include "c_synonyms.h"
+#include "synonyms.h"
+#include "libc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <deflt.h>
 #include <sys/types.h>
 #include <string.h>
 #include <ctype.h>
-#include <limits.h>
-#include <thread.h>
-#include <synch.h>
-#include <libintl.h>
 #include <unistd.h>
-
-#pragma init(deflt_init)
+#include "tsd.h"
 
 #define	TSTBITS(flags, mask)	(((flags) & (mask)) == (mask))
 
 static void strip_quotes(char *);
 
-static  thread_key_t thr_key;
-
 struct thr_data {
 	int  Dcflags;	/* [re-]initialized on each call to defopen() */
 	FILE *fp;
-	char buf[PATH_MAX];
+	char *buf;
 };
 
+#define	BUFFERSIZE	1024
+
 /*
- * destructor for per-thread data, registered with thr_keycreate()
+ * destructor for per-thread data, registered with tsdalloc()
  */
 static void
 free_thr_data(void *arg)
 {
 	struct thr_data *thr_data = (struct thr_data *)arg;
 
-	if (thr_data->fp)
-		fclose(thr_data->fp);
-	free(thr_data);
-}
-
-/*
- * _init routine for this library. Set up per-thread-data-key
- */
-static void
-deflt_init(void)
-{
-	(void) thr_keycreate(&thr_key, free_thr_data);
+	if (thr_data->fp) {
+		(void) fclose(thr_data->fp);
+		thr_data->fp = NULL;
+	}
+	if (thr_data->buf) {
+		lfree(thr_data->buf, BUFFERSIZE);
+		thr_data->buf = NULL;
+	}
 }
 
 /*
  * get the per-thread-data-item for the calling thread
  */
 static struct thr_data *
-_get_thr_data(void)
+get_thr_data(void)
 {
-	struct thr_data *thr_data = NULL;
+	struct thr_data *thr_data =
+	    tsdalloc(_T_DEFREAD, sizeof (*thr_data), free_thr_data);
 
-	(void) thr_getspecific(thr_key, (void *)&thr_data);
-	if (thr_data == NULL) {
-		thr_data = malloc(sizeof (struct thr_data));
-		if (thr_data != NULL) {
-			thr_data->fp = NULL;
-			thr_data->Dcflags = DC_STD;
-			thr_setspecific(thr_key, thr_data);
-		}
-	}
 	return (thr_data);
 }
 
@@ -121,21 +107,35 @@ _get_thr_data(void)
 int
 defopen(char *fn)
 {
-	struct thr_data *thr_data = _get_thr_data();
+	struct thr_data *thr_data = get_thr_data();
 
 	if (thr_data == NULL)
 		return (-1);
 
-	if (thr_data->fp != NULL)
+	if (thr_data->fp != NULL) {
 		(void) fclose(thr_data->fp);
-
-	if (fn == NULL) {
 		thr_data->fp = NULL;
-		return (0);
 	}
+
+	if (fn == NULL)
+		return (0);
 
 	if ((thr_data->fp = fopen(fn, "rF")) == NULL)
 		return (-1);
+
+	/*
+	 * We allocate the big buffer only if the fopen() succeeds.
+	 * Notice that we deallocate the buffer only when the thread exits.
+	 * There are misguided applications that assume that data returned
+	 * by defread() continues to exist after defopen(NULL) is called.
+	 */
+	if (thr_data->buf == NULL &&
+	    (thr_data->buf = lmalloc(BUFFERSIZE)) == NULL) {
+		(void) fclose(thr_data->fp);
+		thr_data->fp = NULL;
+		return (-1);
+	}
+
 	thr_data->Dcflags = DC_STD;
 
 	return (0);
@@ -163,15 +163,12 @@ defopen(char *fn)
 char *
 defread(char *cp)
 {
-	struct thr_data *thr_data = _get_thr_data();
+	struct thr_data *thr_data = get_thr_data();
 	int (*compare)(const char *, const char *, size_t);
 	char *buf_tmp, *ret_ptr = NULL;
 	size_t off, patlen;
 
-	if (thr_data == NULL)
-		return (NULL);
-
-	if (thr_data->fp == NULL)
+	if (thr_data == NULL || thr_data->fp == NULL)
 		return (NULL);
 
 	compare = TSTBITS(thr_data->Dcflags, DC_CASE) ? strncmp : strncasecmp;
@@ -180,7 +177,7 @@ defread(char *cp)
 	if (!TSTBITS(thr_data->Dcflags, DC_NOREWIND))
 		rewind(thr_data->fp);
 
-	while (fgets(thr_data->buf, sizeof (thr_data->buf), thr_data->fp)) {
+	while (fgets(thr_data->buf, BUFFERSIZE, thr_data->fp)) {
 		for (buf_tmp = thr_data->buf; *buf_tmp == ' '; buf_tmp++)
 			;
 		off = strlen(buf_tmp) - 1;
@@ -224,7 +221,7 @@ defread(char *cp)
 int
 defcntl(int cmd, int newflags)
 {
-	struct thr_data *thr_data = _get_thr_data();
+	struct thr_data *thr_data = get_thr_data();
 	int  oldflags;
 
 	if (thr_data == NULL)

@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -75,7 +76,7 @@ finger :=	CFLAGS += $(CCVERBOSE)
 # Enable large file support for reading the lastlog file.
 finger :=	CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
-finger :=		LDLIBS += -lnsl -lcurses -lcmd -lsocket
+finger :=		LDLIBS += -lnsl -lcurses -lsocket
 rcp lint-rcp :=		LDLIBS += -lsocket -lsec -lsendfile
 rdate lint-rdate:=	LDLIBS += -lsocket
 rlogin lint-rlogin :=	LDLIBS += -lnsl -lsocket

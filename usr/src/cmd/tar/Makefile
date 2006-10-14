@@ -17,8 +17,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-
-
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -33,12 +31,12 @@ DEFAULTFILES= tar.dfl
 
 include ../Makefile.cmd
 
-CPPFLAGS += -D_FILE_OFFSET_BITS=64 -I../../lib/libcmd/inc
+CPPFLAGS += -D_FILE_OFFSET_BITS=64
 DCFILE= $(PROG).dc
 
 LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
 lint := LAZYLIBS = -ltsol
-LDLIBS += -lcmd -lsec $(LAZYLIBS)
+LDLIBS += -lsec $(LAZYLIBS)
 
 CFLAGS += $(CCVERBOSE)
 

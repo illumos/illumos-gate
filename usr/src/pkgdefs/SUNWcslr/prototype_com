@@ -58,8 +58,6 @@ s none lib/libbsm.so=libbsm.so.1
 s none lib/libc.so=libc.so.1
 f none lib/libc_db.so.1 755 root bin
 s none lib/libc_db.so=libc_db.so.1
-f none lib/libcmd.so.1 755 root bin
-s none lib/libcmd.so=libcmd.so.1
 f none lib/libcmdutils.so.1 755 root bin
 f none lib/libcontract.so.1 755 root bin
 s none lib/libcontract.so=libcontract.so.1

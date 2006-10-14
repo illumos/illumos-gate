@@ -84,8 +84,8 @@ s none usr/lib/libc_db.so=../../lib/libc_db.so.1
 s none usr/lib/libc_db.so.1=../../lib/libc_db.so.1
 s none usr/lib/libcfgadm.so=./libcfgadm.so.1
 f none usr/lib/libcfgadm.so.1 755 root bin
-s none usr/lib/libcmd.so=../../lib/libcmd.so.1
-s none usr/lib/libcmd.so.1=../../lib/libcmd.so.1
+s none usr/lib/libcmd.so=libcmd.so.1
+f none usr/lib/libcmd.so.1 755 root bin
 s none usr/lib/libcmdutils.so.1=../../lib/libcmdutils.so.1
 s none usr/lib/libcontract.so=../../lib/libcontract.so.1
 s none usr/lib/libcontract.so.1=../../lib/libcontract.so.1

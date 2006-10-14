@@ -88,8 +88,7 @@ df.o := CFLAGS += $(iBCS2FLAG)
 
 CPPFLAGS += -D_LARGEFILE64_SOURCE
 %.xpg4.o := CPPFLAGS += -DXPG4
-$(XPG4) df ff fsck mount volcopy := LDLIBS += -lcmd
-$(SPPROG) :=	LDLIBS += -lcmd -lkstat
+$(SPPROG) :=	LDLIBS += -lkstat
 
 $(ROOTETCMNTTAB) := FILEMODE = 444
 $(ROOTETCMNTTAB) := OWNER = root

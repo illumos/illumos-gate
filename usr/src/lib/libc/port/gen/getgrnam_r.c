@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -38,6 +39,7 @@
 #include <sys/types.h>
 #include <grp.h>
 #include <memory.h>
+#include <deflt.h>
 #include <nsswitch.h>
 #include <nss_dbdefs.h>
 #include <stdio.h>
@@ -254,8 +256,6 @@ _getgroupsbymember(const char *username, gid_t gid_array[],
     int maxgids, int numgids)
 {
 	struct nss_groupsbymem	arg;
-	char defval[BUFSIZ];
-	FILE *defl;
 
 	arg.username	= username;
 	arg.gid_array	= gid_array;
@@ -282,21 +282,10 @@ _getgroupsbymember(const char *username, gid_t gid_array[],
 	 */
 	arg.force_slow_way = 1;
 
-	/*
-	 * The "easy" way to do /etc/default/nss is to use the defread()
-	 * stuff from libcmd, but since we are in libc we don't want to
-	 * link ourselfs against libcmd, so instead we just do it by hand
-	 */
-
-	if ((defl = fopen(__NSW_DEFAULT_FILE, "rF")) != NULL) {
-		while (fgets(defval, sizeof (defval), defl) != NULL) {
-			if (strncmp(USE_NETID_STR, defval,
-			    sizeof (USE_NETID_STR) - 1) == 0) {
-				arg.force_slow_way = 0;
-				break;
-			}
-		}
-		(void) fclose(defl);
+	if (defopen(__NSW_DEFAULT_FILE) == 0) {
+		if (defread(USE_NETID_STR) != NULL)
+			arg.force_slow_way = 0;
+		(void) defopen(NULL);
 	}
 
 	(void) nss_search(&db_root, _nss_initf_group,

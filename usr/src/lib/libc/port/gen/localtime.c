@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -110,6 +110,7 @@
 #include <synch.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <deflt.h>
 #include <sys/stat.h>
 
 /* JAN_01_1902 cast to (int) - negative number of seconds from 1970 */
@@ -1987,96 +1988,34 @@ getrule(const char *strp, rule_t *rulep, int compat_flag)
 /*
  * Returns default value for TZ as specified in /etc/default/init file, if
  * a default value for TZ is provided there.
- *
- * To strip quotes:  if a '"', or '\''is found, then transfer the following
- * bytes forward, and overwrite the double or single quote.  The tzS
- * pointer is used to keep track of the location in the buffer, to which bytes
- * pointed to by tzq, will be transferred.  Then, the <value> string
- * should be NULL terminated.  If no '"' or '\'' characters were encountered,
- * tzS will be NULL, so tzq should already be NULL-terminated.
- * However, if '"' or '\'' characters were encountered, then tzS will
- * be non-NULL, and *tzS should be set to the NULL character.
  */
 static char *
 get_default_tz(void)
 {
-	char	*tz;
-	int	in;
+	char	*tz = NULL;
+	uchar_t	*tzp, *tzq;
+	int	flags;
 
-	tz = NULL;
-	in = open(TIMEZONE, O_RDONLY);
-	if (in != -1) {
-		int	eof = 0;
-		char	tzFilebuf[BUFSIZ+1];
-		char	*p, *q;
-		size_t	bufsize;
+	if (defopen(TIMEZONE) == 0) {
+		flags = defcntl(DC_GETFLAGS, 0);
+		TURNON(flags, DC_STRIP_QUOTES);
+		(void) defcntl(DC_SETFLAGS, flags);
 
-		p = q = tzFilebuf;
-		bufsize = BUFSIZ;
-		for (;;) {
-			char	*lineE, *nextp;
-			size_t	mlen;
-			int	r;
-
-			if (eof == 0) {
-				r = read(in, q, bufsize);
-				if (r <= 0)
-					break;
-				if (r < bufsize)
-					eof = 1;
-				*(q + r) = '\0';
-			}
-
-			if ((lineE = strchr(p, '\n')) == NULL) {
-				/* line too long */
-				break;
-			}
-			*lineE = '\0';
-
-			if (strncmp(TZSTRING, p, sizeof (TZSTRING) - 1) == 0) {
-				unsigned char	*tzp, *tzq, *tzS;
-
-				tzp = (unsigned char *)p +
-				    sizeof (TZSTRING) - 1;
-				while (isspace(*tzp))
-					tzp++;
-				tzq = tzp;
-				tzS = NULL;
-				while (isspace(*tzq) == 0 &&
-				    *tzq != ';' &&
-				    *tzq != '#' &&
-				    *tzq != '\0') {
-					if (*tzq == '"' ||
-					    *tzq == '\'') {
-						if (tzS == NULL) {
-							tzS = tzq;
-						}
-					} else {
-						if (tzS != NULL) {
-							*tzS = *tzq;
-							tzS++;
-						}
-					}
-					tzq++;
-				}
-				if (tzS != NULL)
-					*tzS = '\0';
-				else
-					*tzq = '\0';
+		if ((tzp = (uchar_t *)defread(TZSTRING)) != NULL) {
+			while (isspace(*tzp))
+				tzp++;
+			tzq = tzp;
+			while (!isspace(*tzq) &&
+			    *tzq != ';' &&
+			    *tzq != '#' &&
+			    *tzq != '\0')
+				tzq++;
+			*tzq = '\0';
+			if (*tzp != '\0')
 				tz = strdup((char *)tzp);
-				break;
-			}
-			nextp = lineE + 1;
-			if (eof == 0) {
-				mlen = (q + r) - nextp;
-				(void) memmove(p, nextp, mlen);
-				q = p + mlen;
-				bufsize = BUFSIZ - mlen;
-			} else {
-				p = nextp;
-			}
 		}
-		(void) close(in);
+
+		(void) defopen(NULL);
 	}
 	return (tz);
 }

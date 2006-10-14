@@ -19,9 +19,6 @@
  * CDDL HEADER END
  */
 
-/* LINTLIBRARY */
-/* PROTOLIB1 */
-
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -30,10 +27,14 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * The def*() functions are the historical contents of libcmd.
- * They have been moved to libc and libcmd contains only filter
- * symbols for them, redirecting to libc.
+ * This is a placeholder file, containing nothing.
+ * It is here because the build of a library is structured such that
+ * at least one compilable file is required and that file must not be
+ * totally empty (else it draws an "empty compilation unit" warning).
+ * This is why the include of <stdio.h> appears below.
+ *
+ * This file should be deleted or renamed to something useful
+ * when the ksh93 project is integrated into libcmd.
  */
-int defopen(char *fn);
-char *defread(char *cp);
-int defcntl(int cmd, int newflags);
+
+#include <stdio.h>

@@ -80,8 +80,8 @@ s none usr/lib/llib-lbsm=../../lib/llib-lbsm
 s none usr/lib/llib-lbsm.ln=../../lib/llib-lbsm.ln
 s none usr/lib/llib-lc=../../lib/llib-lc
 s none usr/lib/llib-lc.ln=../../lib/llib-lc.ln
-s none usr/lib/llib-lcmd=../../lib/llib-lcmd
-s none usr/lib/llib-lcmd.ln=../../lib/llib-lcmd.ln
+f none usr/lib/llib-lcmd 644 root bin
+f none usr/lib/llib-lcmd.ln 644 root bin
 f none usr/lib/llib-lcrypt 644 root bin
 f none usr/lib/llib-lcrypt.ln 644 root bin
 f none usr/lib/llib-lcfgadm 644 root bin

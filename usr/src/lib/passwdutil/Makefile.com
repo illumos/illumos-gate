@@ -58,7 +58,7 @@ LIBNAME=	passwdutil
 
 LIBS=		$(DYNLIB) $(LINTLIB)
 $(LINTLIB) :=	SRCS= $(SRCDIR)/$(LINTSRC)
-LDLIBS		+= -lcmd -lsldap -lnsl -lc
+LDLIBS		+= -lsldap -lnsl -lc
 
 CPPFLAGS	+= -DENABLE_SUNOS_AGING -D_REENTRANT \
 		   -I$(SRC)/lib/libsldap/common -I$(SRC)/lib/libnsl/include

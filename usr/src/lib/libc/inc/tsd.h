@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -59,6 +60,7 @@ typedef enum {
 	_T_GRBUF,
 	_T_SPBUF,
 	_T_DOORBUF,
+	_T_DEFREAD,
 	_T_NUM_ENTRIES		/* this *must* be the last member */
 } __tsd_item_t;
 

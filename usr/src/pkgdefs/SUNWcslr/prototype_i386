@@ -63,8 +63,6 @@ s none lib/amd64/libc.so=libc.so.1
 f none lib/amd64/libc.so.1 755 root bin
 s none lib/amd64/libc_db.so=libc_db.so.1
 f none lib/amd64/libc_db.so.1 755 root bin
-s none lib/amd64/libcmd.so=libcmd.so.1
-f none lib/amd64/libcmd.so.1 755 root bin
 f none lib/amd64/libcmdutils.so.1 755 root bin
 s none lib/amd64/libcontract.so=libcontract.so.1
 f none lib/amd64/libcontract.so.1 755 root bin

@@ -142,7 +142,7 @@ CPPFLAGS += -I$(SRC)/cmd/ypcmd
 
 LIBS = $(DYNLIB)
 ZDEFS=
-LDLIBS += -lnsl -lldap -lcmd -lc
+LDLIBS += -lnsl -lldap -lc
 
 all :=		TARGET= all
 clean :=	TARGET= clean
