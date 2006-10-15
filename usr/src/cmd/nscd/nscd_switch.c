@@ -437,6 +437,65 @@ try_local(
 }
 
 static nscd_rc_t
+get_gss_func(void **func_p)
+{
+	char		*me = "get_gss_func";
+	static void	*handle = NULL;
+	static mutex_t	func_lock = DEFAULTMUTEX;
+	void		*sym;
+	char		*func_name = "gss_inquire_cred";
+	static void	*func = NULL;
+
+	if (handle != NULL && func_p != NULL && func != NULL) {
+		(void) memcpy(func_p, &func, sizeof (void *));
+		return (NSCD_SUCCESS);
+	}
+
+	(void) mutex_lock(&func_lock);
+
+	/* close the handle if requested */
+	if (func_p == NULL) {
+		if (handle != NULL) {
+			(void) dlclose(handle);
+			func = NULL;
+		}
+		(void) mutex_unlock(&func_lock);
+		return (NSCD_SUCCESS);
+	}
+
+	if (handle != NULL && func != NULL) {
+		(void) memcpy(func_p, &func, sizeof (void *));
+		(void) mutex_unlock(&func_lock);
+		return (NSCD_SUCCESS);
+	}
+
+	if (handle == NULL) {
+		handle = dlopen("libgss.so.1", RTLD_LAZY);
+		if (handle == NULL) {
+			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
+				NSCD_LOG_LEVEL_ERROR)
+			(me, "unable to dlopen libgss.so.1\n");
+			(void) mutex_unlock(&func_lock);
+			return (NSCD_CFG_DLOPEN_ERROR);
+		}
+	}
+
+	if ((sym = dlsym(handle, func_name)) == NULL) {
+
+		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_ERROR)
+		(me, "unable to find symbol %s\n", func_name);
+		(void) mutex_unlock(&func_lock);
+		return (NSCD_CFG_DLSYM_ERROR);
+	} else {
+		(void) memcpy(func_p, &sym, sizeof (void *));
+		(void) memcpy(&func, &sym, sizeof (void *));
+	}
+
+	(void) mutex_unlock(&func_lock);
+	return (NSCD_SUCCESS);
+}
+
+static nscd_rc_t
 get_dns_funcs(int dnsi, void **func_p)
 {
 	char		*me = "get_dns_funcs";
@@ -523,7 +582,6 @@ set_fallback_flag(char *srcname, nss_status_t rc)
 {
 	char	*me = "set_fallback_flag";
 	if (strcmp(srcname, "ldap") == 0 && rc == NSS_NOTFOUND) {
-
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "NSS_NOTFOUND (ldap): fallback to main nscd "
 		"may be needed\n");
@@ -1234,16 +1292,21 @@ nss_psearch(void *buffer, size_t length)
 	 * nscd get a chance to process the lookup
 	 */
 	if (swret.fallback == 1 && status == NSS_NOTFOUND) {
-		OM_uint32 stat;
+		OM_uint32	(*func)();
+		OM_uint32	stat;
+		nscd_rc_t	rc;
 
-		if (gss_inquire_cred(&stat, GSS_C_NO_CREDENTIAL,
-			NULL, NULL, NULL, NULL) != GSS_S_COMPLETE) {
+		rc = get_gss_func((void **)&func);
+		if (rc == NSCD_SUCCESS) {
+			if (func(&stat, GSS_C_NO_CREDENTIAL,
+				NULL, NULL, NULL, NULL) != GSS_S_COMPLETE) {
 
-			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-				NSCD_LOG_LEVEL_DEBUG)
+				_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
+					NSCD_LOG_LEVEL_DEBUG)
 			(me, "NSS_ALTRETRY: fallback to main nscd needed\n");
 
-			status = NSS_ALTRETRY;
+				status = NSS_ALTRETRY;
+			}
 		}
 	}
 
@@ -1362,15 +1425,20 @@ nss_psetent(void *buffer, size_t length, pid_t pid)
 	 * setent call
 	 */
 	if (_whoami == NSCD_CHILD) {
-		OM_uint32 stat;
+		OM_uint32	(*func)();
+		OM_uint32	stat;
+		nscd_rc_t	rc;
 
-		if (gss_inquire_cred(&stat, GSS_C_NO_CREDENTIAL,
-			NULL, NULL, NULL, NULL) != GSS_S_COMPLETE) {
+		rc = get_gss_func((void **)&func);
+		if (rc == NSCD_SUCCESS) {
+			if (func(&stat, GSS_C_NO_CREDENTIAL,
+				NULL, NULL, NULL, NULL) != GSS_S_COMPLETE) {
 
-			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-				NSCD_LOG_LEVEL_DEBUG)
+				_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
+					NSCD_LOG_LEVEL_DEBUG)
 			(me, "NSS_TRYLOCAL: fallback to caller process\n");
-			NSCD_RETURN_STATUS(pbuf, NSS_TRYLOCAL, 0);
+				NSCD_RETURN_STATUS(pbuf, NSS_TRYLOCAL, 0);
+			}
 		}
 	}
 

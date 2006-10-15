@@ -87,12 +87,19 @@ nis_object2str(nobj, obj, be, argp)
 	char			*buffer, *linep, *limit;
 	char			*cname, *port, *proto, *endnum;
 	int			buflen, cnamelen, portlen, protolen;
-	const char		*protokey;
-	int			protokeylen, stat;
+	const char		*protokey = NULL;
+	int			protokeylen = 0, stat;
 	struct	entry_col	*ecol;
 
-	protokey = argp->key.serv.proto;
-	protokeylen = (protokey) ? strlen(protokey) : 0;
+	/*
+	 * For getent request, we don't want to set protokey
+	 * and protokeylen, since argp->key.serv.proto won't
+	 * be initialized.
+	 */
+	if (be->table_path == NULL) {
+		protokey = argp->key.serv.proto;
+		protokeylen = (protokey) ? strlen(protokey) : 0;
+	}
 
 	for (; nobj > 0; obj++, nobj--) {
 		if (obj->zo_data.zo_type != NIS_ENTRY_OBJ ||

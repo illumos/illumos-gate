@@ -287,28 +287,6 @@ _nss_dns_constr(dns_backend_op_t ops[], int n_ops)
  *	nsswitch lookup format.
  */
 
-struct tsd_priv {
-	struct __res_state *statp;	/* dns state block */
-	union msg {
-		uchar_t	buf[NS_MAXMSG];	/* max legal DNS answer size */
-		HEADER	h;
-	} resbuf;
-	char aliases[NS_MAXMSG];	/* set of aliases */
-};
-
-static void ghttlcleanup(void *ptr)
-{
-	struct tsd_priv	*priv = (struct tsd_priv *)ptr;
-
-	if (priv) {
-		if (priv->statp != NULL) {
-			res_nclose(priv->statp);
-			free((void *)priv->statp);
-		}
-		free(ptr);
-	}
-}
-
 nss_status_t
 _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 {
@@ -321,10 +299,12 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	size_t		bsize, blen;
 	char		*bptr;
 	/* resolver query variables */
-	static mutex_t		keylock;
-	static thread_key_t	key;
-	static int		once_per_keyname = 0;
-	struct tsd_priv		*tsd = NULL;
+	struct __res_state stat, *statp;	/* dns state block */
+	union msg {
+		uchar_t	buf[NS_MAXMSG];		/* max legal DNS answer size */
+		HEADER	h;
+	} resbuf;
+	char aliases[NS_MAXMSG];		/* set of aliases */
 	const char	*name;
 	int		qtype;
 	/* answer parsing variables */
@@ -348,29 +328,12 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	char		*ap, *apc;
 	int		hlen, alen, iplen, len;
 
-	if (!once_per_keyname) {
-		(void) mutex_lock(&keylock);
-		if (!once_per_keyname) {
-			(void) thr_keycreate(&key, ghttlcleanup);
-			once_per_keyname++;
-		}
-		(void) mutex_unlock(&keylock);
-	}
-	(void) thr_getspecific(key, (void **)&tsd);
-	if (tsd == NULL) {
-		tsd = (struct tsd_priv *)calloc(1, sizeof (struct tsd_priv));
-		(void) thr_setspecific(key, (void *)tsd);
-		(void) thr_getspecific(key, (void **)&tsd);
-		tsd->statp = (struct __res_state *)
-				calloc(1, sizeof (struct __res_state));
-		if (tsd->statp == NULL)
-			return (NSS_ERROR);
-		if (res_ninit(tsd->statp) == -1) {
-			free(tsd->statp);
-			return (NSS_ERROR);
-		}
-	}
-	ap = apc = (char *)tsd->aliases;
+	statp = &stat;
+	(void) memset(statp, '\0', sizeof (struct __res_state));
+	if (res_ninit(statp) == -1)
+		return (NSS_ERROR);
+
+	ap = apc = (char *)aliases;
 	alen = 0;
 	ttl = (nssuint_t)0xFFFFFFF;		/* start w/max, find smaller */
 
@@ -380,13 +343,16 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	blen = 0;
 	sret = nss_packed_getkey(buffer, bufsize, &dbname, &dbop, &arg);
 	if (sret != NSS_SUCCESS) {
+		res_nclose(statp);
 		return (NSS_ERROR);
 	}
 
 	if (ipnode) {
 		/* initially only handle the simple cases */
-		if (arg.key.ipnode.flags != 0)
+		if (arg.key.ipnode.flags != 0) {
+			res_nclose(statp);
 			return (NSS_ERROR);
+		}
 		name = arg.key.ipnode.name;
 		if (arg.key.ipnode.af_family == AF_INET6)
 			qtype = T_AAAA;
@@ -396,42 +362,50 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 		name = arg.key.name;
 		qtype = T_A;
 	}
-	ret = res_nsearch(tsd->statp, name, C_IN, qtype,
-				tsd->resbuf.buf, NS_MAXMSG);
+	ret = res_nsearch(statp, name, C_IN, qtype, resbuf.buf, NS_MAXMSG);
 	if (ret == -1) {
-		if (tsd->statp->res_h_errno == HOST_NOT_FOUND) {
+		if (statp->res_h_errno == HOST_NOT_FOUND) {
 			pbuf->p_herrno = HOST_NOT_FOUND;
 			pbuf->p_status = NSS_NOTFOUND;
 			pbuf->data_len = 0;
+			res_nclose(statp);
 			return (NSS_NOTFOUND);
 		}
 		/* else lookup error - handle in general code */
+		res_nclose(statp);
 		return (NSS_ERROR);
 	}
 
-	cp = tsd->resbuf.buf;
-	hp = (HEADER *)&tsd->resbuf.h;
+	cp = resbuf.buf;
+	hp = (HEADER *)&resbuf.h;
 	bom = cp;
 	eom = cp + ret;
 
 	ancount = ntohs(hp->ancount);
 	qdcount = ntohs(hp->qdcount);
 	cp += HFIXEDSZ;
-	if (qdcount != 1)
+	if (qdcount != 1) {
+		res_nclose(statp);
 		return (NSS_ERROR);
+	}
 	n = dn_expand(bom, eom, cp, host, MAXHOSTNAMELEN);
 	if (n < 0) {
+		res_nclose(statp);
 		return (NSS_ERROR);
 	} else
 		hlen = strlen(host);
 	cp += n + QFIXEDSZ;
-	if (cp > eom)
+	if (cp > eom) {
+		res_nclose(statp);
 		return (NSS_ERROR);
+	}
 	while (ancount-- > 0 && cp < eom && blen < bsize) {
 		n = dn_expand(bom, eom, cp, ans, MAXHOSTNAMELEN);
 		if (n > 0) {
-			if (strncasecmp(host, ans, hlen) != 0)
+			if (strncasecmp(host, ans, hlen) != 0) {
+				res_nclose(statp);
 				return (NSS_ERROR);	/* spoof? */
+			}
 		}
 		cp += n;
 		/* bounds check */
@@ -485,8 +459,10 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 		}
 		af = (type == T_A ? AF_INET : AF_INET6);
 		np = inet_ntop(af, (void *)cp, nbuf, INET6_ADDRSTRLEN);
-		if (np == NULL)
+		if (np == NULL) {
+			res_nclose(statp);
 			return (NSS_ERROR);
+		}
 		cp += n;
 		/* append IP host aliases to results */
 		iplen = strlen(np);
@@ -526,5 +502,6 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	pbuf->data_len = blen;
 	pttl = (nssuint_t *)((void *)((char *)pbuf + pbuf->ext_off));
 	*pttl = ttl;
+	res_nclose(statp);
 	return (NSS_SUCCESS);
 }

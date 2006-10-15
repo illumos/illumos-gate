@@ -511,6 +511,7 @@ __nss_files_XY_hostbyname(be, args, filter, type)
 							ap, alen);
 						buffer += alen;
 						buflen -= alen;
+						args->returnlen += alen;
 						alias_end += alen;
 					}
 
@@ -541,11 +542,10 @@ __nss_files_XY_hostbyname(be, args, filter, type)
 				buffer += cplen;
 				*buffer = '\0';
 				buflen -= cplen;
+				args->returnlen += cplen;
 				if (alias_end == NULL)
 					alias_end = buffer;
 			}
-
-			args->returnlen += linelen;
 
 			/*
 			 * If this is the first one, save the canonical

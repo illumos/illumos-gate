@@ -74,7 +74,7 @@ LINTFLAGS +=	-erroff=E_NAME_DEF_NOT_USED2
 # GPROF_FLAG=	-xpg
 # DEBUG_FLAG=	-g
 
-PROGLIBS=	$(LDLIBS) -lresolv -lnsl -lsocket -lumem -lscf -lavl -lgss
+PROGLIBS=	$(LDLIBS) -lresolv -lnsl -lsocket -lumem -lscf -lavl
 NISPROGLIBS=	$(LDLIBS) -lnsl
 
 # install macros and rule
