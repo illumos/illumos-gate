@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -188,6 +187,23 @@ uscsi(int fd, struct uscsi_cmd *scmd)
 				(void) sleep(3);
 				total_retries++;
 				continue;
+			}
+
+			if ((SENSE_KEY(rqbuf) == 5) &&
+			    (device_type == DVD_PLUS ||
+			    device_type == DVD_PLUS_W)) {
+				if (scmd->uscsi_cdb[0] == MODE_SELECT_10_CMD &&
+				    ASC(rqbuf) == 0x26) {
+					ret = 1;
+					break;
+				}
+
+				if (scmd->uscsi_cdb[0] == REZERO_UNIT_CMD &&
+				    ASC(rqbuf) == 0x20) {
+					ret = 1;
+					break;
+				}
+
 			}
 			/*
 			 * Blank Sense, we don't know what the error is or if
