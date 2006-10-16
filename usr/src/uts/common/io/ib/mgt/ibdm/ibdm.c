@@ -896,6 +896,7 @@ static void
 ibdm_handle_hca_detach(ib_guid_t hca_guid)
 {
 	ibdm_hca_list_t		*head, *prev = NULL;
+	size_t			len;
 	ibdm_dp_gidinfo_t	*gidinfo;
 
 	IBTF_DPRINTF_L4("ibdm",
@@ -940,6 +941,11 @@ ibdm_handle_hca_detach(ib_guid_t hca_guid)
 					    head->hl_next;
 				else
 					prev->hl_next = head->hl_next;
+
+				len = sizeof (ibdm_hca_list_t) +
+				    (head->hl_nports *
+				    sizeof (ibdm_port_attr_t));
+				kmem_free(head, len);
 
 				break;
 			}
@@ -4292,7 +4298,8 @@ ibdm_dup_hca_attr(ibdm_hca_list_t *in_hca)
 void
 ibdm_ibnex_free_hca_list(ibdm_hca_list_t *hca_list)
 {
-	int			ii, len;
+	int			ii;
+	size_t			len;
 	ibdm_hca_list_t 	*temp;
 	ibdm_port_attr_t	*port;
 
@@ -5980,13 +5987,26 @@ ibdm_reset_all_dgids(ibmf_saa_handle_t port_sa_hdl)
 			IBTF_DPRINTF_L4(ibdm_string, "\tevent_hdlr "
 			    "checking gidinfo %p", gid_info);
 
-			if (gid_info->gl_nodeguid != 0 &&
-			    gid_info->gl_sa_hdl == port_sa_hdl) {
+			if (gid_info->gl_sa_hdl == port_sa_hdl) {
 				IBTF_DPRINTF_L3(ibdm_string,
 				    "\tevent_hdlr: down HCA port hdl "
 				    "matches gid %p", gid_info);
 
-				ibdm_reset_gidinfo(gid_info);
+				/*
+				 * The non-DM GIDs can come back
+				 * with a new subnet prefix, when
+				 * the HCA port commes up again. To
+				 * avoid issues, delete non-DM
+				 * capable GIDs, if the gid was
+				 * discovered using the HCA port
+				 * going down. This is ensured by
+				 * setting gl_disconnected to 1.
+				 */
+				if (gid_info->gl_nodeguid != 0)
+					gid_info->gl_disconnected = 1;
+				else
+					ibdm_reset_gidinfo(gid_info);
+
 				if (gid_info->gl_disconnected) {
 					IBTF_DPRINTF_L3(ibdm_string,
 					    "\tevent_hdlr: deleting"
@@ -6121,7 +6141,8 @@ ibdm_delete_gidinfo(ibdm_dp_gidinfo_t *gidinfo)
 	 * != NULL, if gidinfo is the list.
 	 */
 	if (gidinfo->gl_prev != NULL ||
-	    gidinfo->gl_next != NULL)
+	    gidinfo->gl_next != NULL ||
+	    ibdm.ibdm_dp_gidlist_head == gidinfo)
 		in_gidlist = 1;
 
 	ioc_list = ibdm_update_ioc_gidlist(gidinfo, 0);
@@ -6137,6 +6158,11 @@ ibdm_delete_gidinfo(ibdm_dp_gidinfo_t *gidinfo)
 		(void) ibdm_free_iou_info(gidinfo);
 		mutex_exit(&gidinfo->gl_mutex);
 	}
+
+	/* Delete gl_hca_list */
+	mutex_exit(&ibdm.ibdm_mutex);
+	ibdm_delete_glhca_list(gidinfo);
+	mutex_enter(&ibdm.ibdm_mutex);
 
 	if (in_gidlist) {
 		if (gidinfo->gl_prev != NULL)
