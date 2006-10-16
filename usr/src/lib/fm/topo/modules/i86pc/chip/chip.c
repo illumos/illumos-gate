@@ -276,23 +276,23 @@ cpu_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int chipid,
 	kstat_named_t *k;
 	nvlist_t *fmri, *asru;
 	tnode_t *cnode;
-	int i, err, nerr = 0;
-	int coreid, cpuid;
+	int err, nerr = 0;
+	int clogid, cpuid;
 
 	if (topo_node_range_create(mod, pnode, name, 0,
 	    chip->chip_ncpustats) < 0)
 		return (-1);
 
-	for (i = 0; i <= chip->chip_ncpustats; i++) {
-		if (chip->chip_cpustats[i] == NULL)
+	for (cpuid = 0; cpuid <= chip->chip_ncpustats; cpuid++) {
+		if (chip->chip_cpustats[cpuid] == NULL)
 			continue;
 
 		/*
 		 * The chip_id in the cpu_info kstat numbers the individual
 		 * chips from 0 to #chips - 1.
 		 */
-		if ((k = kstat_data_lookup(chip->chip_cpustats[i], "chip_id"))
-		    == NULL) {
+		if ((k = kstat_data_lookup(chip->chip_cpustats[cpuid],
+		    "chip_id")) == NULL) {
 			whinge(mod, &nerr, "cpu_create: chip_id lookup via "
 			    "kstats failed\n");
 			continue;
@@ -302,36 +302,30 @@ cpu_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int chipid,
 			continue;	/* not an error */
 
 		/*
-		 * The clog_id in the cpu_info kstat numbers the processor
-		 * cores of a single chip from 0 to #chips - 1.
+		 * The clog_id in the cpu_info kstat numbers the virtual
+		 * processors of a single chip;  these may be separate
+		 * processor cores, or they may be hardware threads/strands
+		 * of individual cores.
+		 *
+		 * The core_id in the cpu_info kstat tells us which cpus
+		 * share the same core - i.e., are hardware strands of the
+		 * same core.  This enumerator does not distinguish stranded
+		 * cores so core_id is unused.
 		 */
-		if ((k = kstat_data_lookup(chip->chip_cpustats[i], "clog_id"))
-		    == NULL) {
+		if ((k = kstat_data_lookup(chip->chip_cpustats[cpuid],
+		    "clog_id")) == NULL) {
 			whinge(mod, &nerr, "cpu_create: clog_id lookup via "
 			    "kstats failed\n");
 			continue;
 		}
-		coreid = k->value.l;
+		clogid = k->value.l;
 
-		if (mkrsrc(mod, pnode, name, coreid, &fmri) != 0) {
+		if (mkrsrc(mod, pnode, name, clogid, &fmri) != 0) {
 			whinge(mod, &nerr, "cpu_create: mkrsrc failed\n");
 			continue;
 		}
 
-		/*
-		 * The core_id in the cpu_info kstat corresponds to the
-		 * processor id used in psradm etc - ie cpuid as used
-		 * in a cpu scheme fmri.  I'm not making this up!
-		 */
-		if ((k = kstat_data_lookup(chip->chip_cpustats[i], "core_id"))
-		    == NULL) {
-			whinge(mod, &nerr, "cpu_create: core_id lookup via "
-			    "kstats failed\n");
-			continue;
-		}
-		cpuid = k->value.l;
-
-		if ((cnode = topo_node_bind(mod, pnode, name, cpuid, fmri,
+		if ((cnode = topo_node_bind(mod, pnode, name, clogid, fmri,
 		    NULL)) == NULL) {
 			whinge(mod, &nerr, "cpu_create: node bind failed\n");
 			nvlist_free(fmri);
@@ -908,11 +902,12 @@ chip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	    sizeof (ulong_t))) == NULL)
 		return (topo_mod_seterrno(mod, EMOD_NOMEM));
 
-	for (i = min; i <= MAX(max, chip->chip_ncpustats); i++) {
-
-		if (i < min || i > max)
-			break;
-
+	/*
+	 * Read in all cpu_info kstats, for all chip ids.  The ks_instance
+	 * argument to kstat_lookup is the logical cpu_id - we will use this
+	 * in cpu_create.
+	 */
+	for (i = 0; i <= chip->chip_ncpustats; i++) {
 		if ((ksp = kstat_lookup(chip->chip_kc, "cpu_info", i, NULL)) ==
 		    NULL || kstat_read(chip->chip_kc, ksp, NULL) < 0)
 			continue;
