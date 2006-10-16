@@ -125,7 +125,7 @@ closedbins: FRC $(ROOTDIRS)
 		fi; \
 		$(ECHO) "Copying closed binaries from $$ON_CLOSED_BINS"; \
 		(cd $$ON_CLOSED_BINS/root_$(MACH); tar cf - .) | \
-		    (cd $(ROOT); tar xBf -); \
+		    (cd $(ROOT); tar xBpf -); \
 	fi
 
 $(SUBDIRS) head ucbhead pkgdefs: FRC
