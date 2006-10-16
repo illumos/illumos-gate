@@ -38,6 +38,7 @@
 #include <unistd.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zio.h>
+#include <strings.h>
 
 #include "zfs_namecheck.h"
 #include "libzfs_impl.h"
@@ -1663,4 +1664,178 @@ zpool_upgrade(zpool_handle_t *zhp)
 		    zhp->zpool_name));
 
 	return (0);
+}
+
+/*
+ * Log command history.
+ *
+ * 'pool' is B_TRUE if we are logging a command for 'zpool'; B_FALSE
+ * otherwise ('zfs').  'pool_create' is B_TRUE if we are logging the creation
+ * of the pool; B_FALSE otherwise.  'path' is the pathanme containing the
+ * poolname.  'argc' and 'argv' are used to construct the command string.
+ */
+void
+zpool_log_history(libzfs_handle_t *hdl, int argc, char **argv, const char *path,
+    boolean_t pool, boolean_t pool_create)
+{
+	char cmd_buf[HIS_MAX_RECORD_LEN];
+	char *dspath;
+	zfs_cmd_t zc = { 0 };
+	int i;
+
+	/* construct the command string */
+	(void) strcpy(cmd_buf, pool ? "zpool" : "zfs");
+	for (i = 0; i < argc; i++) {
+		if (strlen(cmd_buf) + 1 + strlen(argv[i]) > HIS_MAX_RECORD_LEN)
+			break;
+		(void) strcat(cmd_buf, " ");
+		(void) strcat(cmd_buf, argv[i]);
+	}
+
+	/* figure out the poolname */
+	dspath = strpbrk(path, "/@");
+	if (dspath == NULL) {
+		(void) strcpy(zc.zc_name, path);
+	} else {
+		(void) strncpy(zc.zc_name, path, dspath - path);
+		zc.zc_name[dspath-path] = '\0';
+	}
+
+	zc.zc_history = (uint64_t)(uintptr_t)cmd_buf;
+	zc.zc_history_len = strlen(cmd_buf);
+
+	/* overloading zc_history_offset */
+	zc.zc_history_offset = pool_create;
+
+	(void) ioctl(hdl->libzfs_fd, ZFS_IOC_POOL_LOG_HISTORY, &zc);
+}
+
+/*
+ * Perform ioctl to get some command history of a pool.
+ *
+ * 'buf' is the buffer to fill up to 'len' bytes.  'off' is the
+ * logical offset of the history buffer to start reading from.
+ *
+ * Upon return, 'off' is the next logical offset to read from and
+ * 'len' is the actual amount of bytes read into 'buf'.
+ */
+static int
+get_history(zpool_handle_t *zhp, char *buf, uint64_t *off, uint64_t *len)
+{
+	zfs_cmd_t zc = { 0 };
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
+
+	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+
+	zc.zc_history = (uint64_t)(uintptr_t)buf;
+	zc.zc_history_len = *len;
+	zc.zc_history_offset = *off;
+
+	if (ioctl(hdl->libzfs_fd, ZFS_IOC_POOL_GET_HISTORY, &zc) != 0) {
+		switch (errno) {
+		case EPERM:
+			return (zfs_error(hdl, EZFS_PERM, dgettext(TEXT_DOMAIN,
+			    "cannot show history for pool '%s'"),
+			    zhp->zpool_name));
+		case ENOENT:
+			return (zfs_error(hdl, EZFS_NOHISTORY,
+			    dgettext(TEXT_DOMAIN, "cannot get history for pool "
+			    "'%s'"), zhp->zpool_name));
+		default:
+			return (zpool_standard_error(hdl, errno,
+			    dgettext(TEXT_DOMAIN,
+			    "cannot get history for '%s'"), zhp->zpool_name));
+		}
+	}
+
+	*len = zc.zc_history_len;
+	*off = zc.zc_history_offset;
+
+	return (0);
+}
+
+/*
+ * Process the buffer of nvlists, unpacking and storing each nvlist record
+ * into 'records'.  'leftover' is set to the number of bytes that weren't
+ * processed as there wasn't a complete record.
+ */
+static int
+zpool_history_unpack(char *buf, uint64_t bytes_read, uint64_t *leftover,
+    nvlist_t ***records, uint_t *numrecords)
+{
+	uint64_t reclen;
+	nvlist_t *nv;
+	int i;
+
+	while (bytes_read > sizeof (reclen)) {
+
+		/* get length of packed record (stored as little endian) */
+		for (i = 0, reclen = 0; i < sizeof (reclen); i++)
+			reclen += (uint64_t)(((uchar_t *)buf)[i]) << (8*i);
+
+		if (bytes_read < sizeof (reclen) + reclen)
+			break;
+
+		/* unpack record */
+		if (nvlist_unpack(buf + sizeof (reclen), reclen, &nv, 0) != 0)
+			return (ENOMEM);
+		bytes_read -= sizeof (reclen) + reclen;
+		buf += sizeof (reclen) + reclen;
+
+		/* add record to nvlist array */
+		(*numrecords)++;
+		if (ISP2(*numrecords + 1)) {
+			*records = realloc(*records,
+			    *numrecords * 2 * sizeof (nvlist_t *));
+		}
+		(*records)[*numrecords - 1] = nv;
+	}
+
+	*leftover = bytes_read;
+	return (0);
+}
+
+#define	HIS_BUF_LEN	(128*1024)
+
+/*
+ * Retrieve the command history of a pool.
+ */
+int
+zpool_get_history(zpool_handle_t *zhp, nvlist_t **nvhisp)
+{
+	char buf[HIS_BUF_LEN];
+	uint64_t off = 0;
+	nvlist_t **records = NULL;
+	uint_t numrecords = 0;
+	int err, i;
+
+	do {
+		uint64_t bytes_read = sizeof (buf);
+		uint64_t leftover;
+
+		if ((err = get_history(zhp, buf, &off, &bytes_read)) != 0)
+			break;
+
+		/* if nothing else was read in, we're at EOF, just return */
+		if (!bytes_read)
+			break;
+
+		if ((err = zpool_history_unpack(buf, bytes_read,
+		    &leftover, &records, &numrecords)) != 0)
+			break;
+		off -= leftover;
+
+		/* CONSTCOND */
+	} while (1);
+
+	if (!err) {
+		verify(nvlist_alloc(nvhisp, NV_UNIQUE_NAME, 0) == 0);
+		verify(nvlist_add_nvlist_array(*nvhisp, ZPOOL_HIST_RECORD,
+		    records, numrecords) == 0);
+	}
+	for (i = 0; i < numrecords; i++)
+		nvlist_free(records[i]);
+	free(records);
+
+	return (err);
 }

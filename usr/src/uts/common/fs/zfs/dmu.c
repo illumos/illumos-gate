@@ -76,6 +76,8 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	byteswap_uint64_array,	FALSE,	"other uint64[]"	},
 	{	zap_byteswap,		TRUE,	"other ZAP"		},
 	{	zap_byteswap,		TRUE,	"persistent error log"	},
+	{	byteswap_uint8_array,	TRUE,	"SPA history"		},
+	{	byteswap_uint64_array,	TRUE,	"SPA history offsets"	},
 };
 
 int

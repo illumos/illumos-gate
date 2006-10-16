@@ -56,6 +56,14 @@ typedef struct spa_error_entry {
 	avl_node_t	se_avl;
 } spa_error_entry_t;
 
+typedef struct spa_history_phys {
+	uint64_t sh_pool_create_len;	/* ending offset of zpool create */
+	uint64_t sh_phys_max_off;	/* physical EOF */
+	uint64_t sh_bof;		/* logical BOF */
+	uint64_t sh_eof;		/* logical EOF */
+	uint64_t sh_records_lost;	/* num of records overwritten */
+} spa_history_phys_t;
+
 struct spa {
 	/*
 	 * Fields protected by spa_namespace_lock.
@@ -128,6 +136,8 @@ struct spa {
 	avl_tree_t	spa_errlist_last;	/* last error list */
 	avl_tree_t	spa_errlist_scrub;	/* scrub error list */
 	uint64_t	spa_deflate;		/* should we deflate? */
+	uint64_t	spa_history;		/* history object */
+	kmutex_t	spa_history_lock;	/* history lock */
 	/*
 	 * spa_refcnt must be the last element because it changes size based on
 	 * compilation options.  In order for the MDB module to function

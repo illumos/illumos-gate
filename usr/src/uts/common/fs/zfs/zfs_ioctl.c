@@ -434,11 +434,13 @@ zfs_ioc_pool_scrub(zfs_cmd_t *zc)
 	spa_t *spa;
 	int error;
 
-	error = spa_open(zc->zc_name, &spa, FTAG);
-	if (error == 0) {
-		error = spa_scrub(spa, zc->zc_cookie, B_FALSE);
-		spa_close(spa, FTAG);
-	}
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+		return (error);
+
+	error = spa_scrub(spa, zc->zc_cookie, B_FALSE);
+
+	spa_close(spa, FTAG);
+
 	return (error);
 }
 
@@ -462,11 +464,73 @@ zfs_ioc_pool_upgrade(zfs_cmd_t *zc)
 	spa_t *spa;
 	int error;
 
-	error = spa_open(zc->zc_name, &spa, FTAG);
-	if (error == 0) {
-		spa_upgrade(spa);
-		spa_close(spa, FTAG);
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+		return (error);
+
+	spa_upgrade(spa);
+
+	spa_close(spa, FTAG);
+
+	return (error);
+}
+
+static int
+zfs_ioc_pool_get_history(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	char *hist_buf;
+	uint64_t size;
+	int error;
+
+	if ((size = zc->zc_history_len) == 0)
+		return (EINVAL);
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+		return (error);
+
+	hist_buf = kmem_alloc(size, KM_SLEEP);
+	if ((error = spa_history_get(spa, &zc->zc_history_offset,
+	    &zc->zc_history_len, hist_buf)) == 0) {
+		error = xcopyout(hist_buf, (char *)(uintptr_t)zc->zc_history,
+		    zc->zc_history_len);
 	}
+
+	spa_close(spa, FTAG);
+	kmem_free(hist_buf, size);
+	return (error);
+}
+
+static int
+zfs_ioc_pool_log_history(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	char *history_str = NULL;
+	size_t size;
+	int error;
+
+	size = zc->zc_history_len;
+	if (size == 0 || size > HIS_MAX_RECORD_LEN)
+		return (EINVAL);
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+		return (error);
+
+	/* add one for the NULL delimiter */
+	size++;
+	history_str = kmem_alloc(size, KM_SLEEP);
+	if ((error = xcopyin((void *)(uintptr_t)zc->zc_history, history_str,
+	    size)) != 0) {
+		spa_close(spa, FTAG);
+		kmem_free(history_str, size);
+		return (error);
+	}
+	history_str[size - 1] = '\0';
+
+	error = spa_history_log(spa, history_str, zc->zc_history_offset);
+
+	spa_close(spa, FTAG);
+	kmem_free(history_str, size);
+
 	return (error);
 }
 
@@ -510,8 +574,7 @@ zfs_ioc_vdev_online(zfs_cmd_t *zc)
 	spa_t *spa;
 	int error;
 
-	error = spa_open(zc->zc_name, &spa, FTAG);
-	if (error != 0)
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 	error = vdev_online(spa, zc->zc_guid);
 	spa_close(spa, FTAG);
@@ -525,8 +588,7 @@ zfs_ioc_vdev_offline(zfs_cmd_t *zc)
 	int istmp = zc->zc_cookie;
 	int error;
 
-	error = spa_open(zc->zc_name, &spa, FTAG);
-	if (error != 0)
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 	error = vdev_offline(spa, zc->zc_guid, istmp);
 	spa_close(spa, FTAG);
@@ -541,8 +603,7 @@ zfs_ioc_vdev_attach(zfs_cmd_t *zc)
 	nvlist_t *config;
 	int error;
 
-	error = spa_open(zc->zc_name, &spa, FTAG);
-	if (error != 0)
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
 	if ((error = get_nvlist(zc, &config)) == 0) {
@@ -560,8 +621,7 @@ zfs_ioc_vdev_detach(zfs_cmd_t *zc)
 	spa_t *spa;
 	int error;
 
-	error = spa_open(zc->zc_name, &spa, FTAG);
-	if (error != 0)
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
 	error = spa_vdev_detach(spa, zc->zc_guid, B_FALSE);
@@ -583,7 +643,6 @@ zfs_ioc_vdev_setpath(zfs_cmd_t *zc)
 		return (error);
 
 	error = spa_vdev_setpath(spa, guid, path);
-
 	spa_close(spa, FTAG);
 	return (error);
 }
@@ -1358,6 +1417,8 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_pool_scrub,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_pool_freeze,		zfs_secpolicy_config,	no_name },
 	{ zfs_ioc_pool_upgrade,		zfs_secpolicy_config,	pool_name },
+	{ zfs_ioc_pool_get_history,	zfs_secpolicy_config,	pool_name },
+	{ zfs_ioc_pool_log_history,	zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_add,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_remove,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_online,		zfs_secpolicy_config,	pool_name },

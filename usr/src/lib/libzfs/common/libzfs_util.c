@@ -148,6 +148,8 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "invalid vdev configuration"));
 	case EZFS_RECURSIVE:
 		return (dgettext(TEXT_DOMAIN, "recursive dataset dependency"));
+	case EZFS_NOHISTORY:
+		return (dgettext(TEXT_DOMAIN, "no history available"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:

@@ -427,6 +427,13 @@ extern vdev_t *spa_lookup_by_guid(spa_t *spa, uint64_t guid);
 extern boolean_t spa_has_spare(spa_t *, uint64_t guid);
 extern uint64_t bp_get_dasize(spa_t *spa, const blkptr_t *bp);
 
+/* history logging */
+extern void spa_history_create_obj(spa_t *spa, dmu_tx_t *tx);
+extern int spa_history_get(spa_t *spa, uint64_t *offset, uint64_t *len_read,
+    char *his_buf);
+extern int spa_history_log(spa_t *spa, const char *his_buf,
+    uint64_t pool_create);
+
 /* error handling */
 struct zbookmark;
 struct zio;

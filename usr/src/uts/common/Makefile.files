@@ -893,6 +893,7 @@ ZFS_COMMON_OBJS +=		\
 	spa.o			\
 	spa_config.o		\
 	spa_errlog.o		\
+	spa_history.o		\
 	spa_misc.o		\
 	space_map.o		\
 	txg.o			\

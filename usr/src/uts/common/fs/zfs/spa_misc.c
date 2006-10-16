@@ -283,6 +283,7 @@ spa_remove(spa_t *spa)
 	mutex_destroy(&spa->spa_scrub_lock);
 	mutex_destroy(&spa->spa_config_cache_lock);
 	mutex_destroy(&spa->spa_async_lock);
+	mutex_destroy(&spa->spa_history_lock);
 
 	kmem_free(spa, sizeof (spa_t));
 }

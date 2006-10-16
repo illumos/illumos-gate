@@ -90,6 +90,7 @@ enum {
 	EZFS_ISSPARE,		/* device is a hot spare */
 	EZFS_INVALCONFIG,	/* invalid vdev configuration */
 	EZFS_RECURSIVE,		/* recursive dependency */
+	EZFS_NOHISTORY,		/* no history object */
 	EZFS_UNKNOWN		/* unknown error */
 };
 
@@ -218,6 +219,9 @@ extern nvlist_t *zpool_find_import(libzfs_handle_t *, int, char **);
  */
 extern char *zpool_vdev_name(libzfs_handle_t *, zpool_handle_t *, nvlist_t *);
 extern int zpool_upgrade(zpool_handle_t *);
+extern int zpool_get_history(zpool_handle_t *, nvlist_t **);
+extern void zpool_log_history(libzfs_handle_t *, int, char **, const char *,
+    boolean_t, boolean_t);
 
 /*
  * Basic handle manipulations.  These functions do not create or destroy the

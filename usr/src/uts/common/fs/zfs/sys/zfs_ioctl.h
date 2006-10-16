@@ -127,6 +127,9 @@ typedef struct zfs_cmd {
 	uint64_t	zc_cred;
 	uint64_t	zc_dev;
 	uint64_t	zc_objset_type;
+	uint64_t	zc_history;	/* really (char *) */
+	uint64_t	zc_history_len;
+	uint64_t	zc_history_offset;
 	dmu_objset_stats_t zc_objset_stats;
 	struct drr_begin zc_begin_record;
 	zinject_record_t zc_inject_record;

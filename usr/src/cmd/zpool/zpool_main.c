@@ -73,6 +73,8 @@ static int zpool_do_export(int, char **);
 
 static int zpool_do_upgrade(int, char **);
 
+static int zpool_do_history(int, char **);
+
 /*
  * These libumem hooks provide a reasonable set of defaults for the allocator's
  * debugging facilities.
@@ -97,6 +99,7 @@ typedef enum {
 	HELP_DESTROY,
 	HELP_DETACH,
 	HELP_EXPORT,
+	HELP_HISTORY,
 	HELP_IMPORT,
 	HELP_IOSTAT,
 	HELP_LIST,
@@ -148,7 +151,9 @@ static zpool_command_t command_table[] = {
 	{ NULL },
 	{ "import",	zpool_do_import,	HELP_IMPORT		},
 	{ "export",	zpool_do_export,	HELP_EXPORT		},
-	{ "upgrade",	zpool_do_upgrade,	HELP_UPGRADE		}
+	{ "upgrade",	zpool_do_upgrade,	HELP_UPGRADE		},
+	{ NULL },
+	{ "history",	zpool_do_history,	HELP_HISTORY		}
 };
 
 #define	NCOMMAND	(sizeof (command_table) / sizeof (command_table[0]))
@@ -174,6 +179,8 @@ get_usage(zpool_help_t idx) {
 		return (gettext("\tdetach <pool> <device>\n"));
 	case HELP_EXPORT:
 		return (gettext("\texport [-f] <pool> ...\n"));
+	case HELP_HISTORY:
+		return (gettext("\thistory [<pool>]\n"));
 	case HELP_IMPORT:
 		return (gettext("\timport [-d dir] [-D]\n"
 		    "\timport [-d dir] [-D] [-f] [-o opts] [-R root] -a\n"
@@ -433,6 +440,10 @@ zpool_do_add(int argc, char **argv)
 		ret = 0;
 	} else {
 		ret = (zpool_add(zhp, nvroot) != 0);
+		if (!ret) {
+			zpool_log_history(g_zfs, argc + 1 + optind,
+			    argv - 1 - optind, poolname, B_TRUE, B_FALSE);
+		}
 	}
 
 	nvlist_free(nvroot);
@@ -474,6 +485,10 @@ zpool_do_remove(int argc, char **argv)
 		return (1);
 
 	ret = (zpool_vdev_remove(zhp, argv[1]) != 0);
+	if (!ret) {
+		zpool_log_history(g_zfs, ++argc, --argv, poolname, B_TRUE,
+		    B_FALSE);
+	}
 
 	return (ret);
 }
@@ -666,6 +681,8 @@ zpool_do_create(int argc, char **argv)
 					ret = zfs_share(pool);
 				zfs_close(pool);
 			}
+			zpool_log_history(g_zfs, argc + optind, argv - optind,
+			    poolname, B_TRUE, B_TRUE);
 		} else if (libzfs_errno(g_zfs) == EZFS_INVALIDNAME) {
 			(void) fprintf(stderr, gettext("pool name may have "
 			    "been omitted\n"));
@@ -738,6 +755,9 @@ zpool_do_destroy(int argc, char **argv)
 		return (1);
 	}
 
+	zpool_log_history(g_zfs, argc + optind, argv - optind, pool, B_TRUE,
+	    B_FALSE);
+
 	ret = (zpool_destroy(zhp) != 0);
 
 	zpool_close(zhp);
@@ -797,6 +817,9 @@ zpool_do_export(int argc, char **argv)
 			zpool_close(zhp);
 			continue;
 		}
+
+		zpool_log_history(g_zfs, argc + optind, argv - optind, argv[i],
+		    B_TRUE, B_FALSE);
 
 		if (zpool_export(zhp) != 0)
 			ret = 1;
@@ -1076,7 +1099,7 @@ show_import(nvlist_t *config)
  */
 static int
 do_import(nvlist_t *config, const char *newname, const char *mntopts,
-    const char *altroot, int force)
+    const char *altroot, int force, int argc, char **argv)
 {
 	zpool_handle_t *zhp;
 	char *name;
@@ -1106,6 +1129,8 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 
 	if (newname != NULL)
 		name = (char *)newname;
+
+	zpool_log_history(g_zfs, argc, argv, name, B_TRUE, B_FALSE);
 
 	verify((zhp = zpool_open(g_zfs, name)) != NULL);
 
@@ -1291,7 +1316,8 @@ zpool_do_import(int argc, char **argv)
 
 			if (do_all)
 				err |= do_import(config, NULL, mntopts,
-				    altroot, do_force);
+				    altroot, do_force, argc + optind,
+				    argv - optind);
 			else
 				show_import(config);
 		} else if (searchname != NULL) {
@@ -1339,7 +1365,8 @@ zpool_do_import(int argc, char **argv)
 			err = B_TRUE;
 		} else {
 			err |= do_import(found_config, argc == 1 ? NULL :
-			    argv[1], mntopts, altroot, do_force);
+			    argv[1], mntopts, altroot, do_force, argc + optind,
+			    argv - optind);
 		}
 	}
 
@@ -1993,6 +2020,8 @@ zpool_do_attach_or_replace(int argc, char **argv, int replacing)
 	zpool_handle_t *zhp;
 	nvlist_t *config;
 	int ret;
+	int log_argc;
+	char **log_argv;
 
 	/* check options */
 	while ((c = getopt(argc, argv, "f")) != -1) {
@@ -2007,6 +2036,8 @@ zpool_do_attach_or_replace(int argc, char **argv, int replacing)
 		}
 	}
 
+	log_argc = argc;
+	log_argv = argv;
 	argc -= optind;
 	argv += optind;
 
@@ -2063,6 +2094,11 @@ zpool_do_attach_or_replace(int argc, char **argv, int replacing)
 	}
 
 	ret = zpool_vdev_attach(zhp, old_disk, new_disk, nvroot, replacing);
+
+	if (!ret) {
+		zpool_log_history(g_zfs, log_argc, log_argv, poolname, B_TRUE,
+		    B_FALSE);
+	}
 
 	nvlist_free(nvroot);
 	zpool_close(zhp);
@@ -2153,6 +2189,10 @@ zpool_do_detach(int argc, char **argv)
 
 	ret = zpool_vdev_detach(zhp, path);
 
+	if (!ret) {
+		zpool_log_history(g_zfs, argc + optind, argv - optind, poolname,
+		    B_TRUE, B_FALSE);
+	}
 	zpool_close(zhp);
 
 	return (ret);
@@ -2206,6 +2246,10 @@ zpool_do_online(int argc, char **argv)
 		else
 			ret = 1;
 
+	if (!ret) {
+		zpool_log_history(g_zfs, argc + optind, argv - optind, poolname,
+		    B_TRUE, B_FALSE);
+	}
 	zpool_close(zhp);
 
 	return (ret);
@@ -2270,6 +2314,10 @@ zpool_do_offline(int argc, char **argv)
 		else
 			ret = 1;
 
+	if (!ret) {
+		zpool_log_history(g_zfs, argc + optind, argv - optind, poolname,
+		    B_TRUE, B_FALSE);
+	}
 	zpool_close(zhp);
 
 	return (ret);
@@ -2306,6 +2354,8 @@ zpool_do_clear(int argc, char **argv)
 	if (zpool_clear(zhp, device) != 0)
 		ret = 1;
 
+	if (!ret)
+		zpool_log_history(g_zfs, argc, argv, pool, B_TRUE, B_FALSE);
 	zpool_close(zhp);
 
 	return (ret);
@@ -2313,12 +2363,15 @@ zpool_do_clear(int argc, char **argv)
 
 typedef struct scrub_cbdata {
 	int	cb_type;
+	int	cb_argc;
+	char	**cb_argv;
 } scrub_cbdata_t;
 
 int
 scrub_callback(zpool_handle_t *zhp, void *data)
 {
 	scrub_cbdata_t *cb = data;
+	int err;
 
 	/*
 	 * Ignore faulted pools.
@@ -2329,7 +2382,14 @@ scrub_callback(zpool_handle_t *zhp, void *data)
 		return (1);
 	}
 
-	return (zpool_scrub(zhp, cb->cb_type) != 0);
+	err = zpool_scrub(zhp, cb->cb_type);
+
+	if (!err) {
+		zpool_log_history(g_zfs, cb->cb_argc, cb->cb_argv,
+		    zpool_get_name(zhp), B_TRUE, B_FALSE);
+	}
+
+	return (err != 0);
 }
 
 /*
@@ -2358,6 +2418,8 @@ zpool_do_scrub(int argc, char **argv)
 		}
 	}
 
+	cb.cb_argc = argc;
+	cb.cb_argv = argv;
 	argc -= optind;
 	argv += optind;
 
@@ -2936,6 +2998,8 @@ typedef struct upgrade_cbdata {
 	int	cb_all;
 	int	cb_first;
 	int	cb_newer;
+	int	cb_argc;
+	char	**cb_argv;
 } upgrade_cbdata_t;
 
 static int
@@ -2968,9 +3032,13 @@ upgrade_cb(zpool_handle_t *zhp, void *arg)
 		} else {
 			cbp->cb_first = B_FALSE;
 			ret = zpool_upgrade(zhp);
-			if (ret == 0)
+			if (!ret) {
+				zpool_log_history(g_zfs, cbp->cb_argc,
+				    cbp->cb_argv, zpool_get_name(zhp), B_TRUE,
+				    B_FALSE);
 				(void) printf(gettext("Successfully upgraded "
 				    "'%s'\n"), zpool_get_name(zhp));
+			}
 		}
 	} else if (cbp->cb_newer && version > ZFS_VERSION) {
 		assert(!cbp->cb_all);
@@ -2994,11 +3062,12 @@ upgrade_cb(zpool_handle_t *zhp, void *arg)
 
 /* ARGSUSED */
 static int
-upgrade_one(zpool_handle_t *zhp, void *unused)
+upgrade_one(zpool_handle_t *zhp, void *data)
 {
 	nvlist_t *config;
 	uint64_t version;
 	int ret;
+	upgrade_cbdata_t *cbp = data;
 
 	config = zpool_get_config(zhp, NULL);
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
@@ -3011,10 +3080,14 @@ upgrade_one(zpool_handle_t *zhp, void *unused)
 	}
 
 	ret = zpool_upgrade(zhp);
-	if (ret == 0)
+
+	if (!ret) {
+		zpool_log_history(g_zfs, cbp->cb_argc, cbp->cb_argv,
+		    zpool_get_name(zhp), B_TRUE, B_FALSE);
 		(void) printf(gettext("Successfully upgraded '%s' "
 		    "from version %llu to version %llu\n"), zpool_get_name(zhp),
 		    (u_longlong_t)version, (u_longlong_t)ZFS_VERSION);
+	}
 
 	return (ret != 0);
 }
@@ -3052,6 +3125,8 @@ zpool_do_upgrade(int argc, char **argv)
 		}
 	}
 
+	cb.cb_argc = argc;
+	cb.cb_argv = argv;
 	argc -= optind;
 	argv += optind;
 
@@ -3116,7 +3191,73 @@ zpool_do_upgrade(int argc, char **argv)
 				    "their associated\nfeatures.\n"));
 		}
 	} else {
-		ret = for_each_pool(argc, argv, B_FALSE, upgrade_one, NULL);
+		ret = for_each_pool(argc, argv, B_FALSE, upgrade_one, &cb);
+	}
+
+	return (ret);
+}
+
+/*
+ * Print out the command history for a specific pool.
+ */
+static int
+get_history_one(zpool_handle_t *zhp, void *data)
+{
+	nvlist_t *nvhis;
+	nvlist_t **records;
+	uint_t numrecords;
+	char *cmdstr;
+	uint64_t dst_time;
+	time_t tsec;
+	struct tm t;
+	char tbuf[30];
+	int ret, i;
+
+	*(boolean_t *)data = B_FALSE;
+
+	(void) printf(gettext("History for '%s':\n"), zpool_get_name(zhp));
+
+	if ((ret = zpool_get_history(zhp, &nvhis)) != 0)
+		return (ret);
+
+	verify(nvlist_lookup_nvlist_array(nvhis, ZPOOL_HIST_RECORD,
+	    &records, &numrecords) == 0);
+	for (i = 0; i < numrecords; i++) {
+		if (nvlist_lookup_uint64(records[i], ZPOOL_HIST_TIME,
+		    &dst_time) == 0) {
+			verify(nvlist_lookup_string(records[i], ZPOOL_HIST_CMD,
+			    &cmdstr) == 0);
+			tsec = dst_time;
+			(void) localtime_r(&tsec, &t);
+			(void) strftime(tbuf, sizeof (tbuf), "%F.%T", &t);
+			(void) printf("%s %s\n", tbuf, cmdstr);
+		}
+	}
+	(void) printf("\n");
+	nvlist_free(nvhis);
+
+	return (ret);
+}
+
+/*
+ * zpool history <pool>
+ *
+ * Displays the history of commands that modified pools.
+ */
+int
+zpool_do_history(int argc, char **argv)
+{
+	boolean_t first = B_TRUE;
+	int ret;
+
+	argc -= optind;
+	argv += optind;
+
+	ret = for_each_pool(argc, argv, B_FALSE, get_history_one, &first);
+
+	if (argc == 0 && first == B_TRUE) {
+		(void) printf(gettext("no pools available\n"));
+		return (0);
 	}
 
 	return (ret);

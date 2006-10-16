@@ -327,6 +327,8 @@ typedef enum zfs_ioc {
 	ZFS_IOC_POOL_SCRUB,
 	ZFS_IOC_POOL_FREEZE,
 	ZFS_IOC_POOL_UPGRADE,
+	ZFS_IOC_POOL_GET_HISTORY,
+	ZFS_IOC_POOL_LOG_HISTORY,
 	ZFS_IOC_VDEV_ADD,
 	ZFS_IOC_VDEV_REMOVE,
 	ZFS_IOC_VDEV_ONLINE,
@@ -373,6 +375,16 @@ typedef enum {
 #define	ZPOOL_ERR_DATASET	"dataset"
 #define	ZPOOL_ERR_OBJECT	"object"
 #define	ZPOOL_ERR_RANGE		"range"
+
+#define	HIS_MAX_RECORD_LEN	(MAXPATHLEN + MAXPATHLEN + 1)
+
+/*
+ * The following are names used in the nvlist describing
+ * the pool's history log.
+ */
+#define	ZPOOL_HIST_RECORD	"history record"
+#define	ZPOOL_HIST_TIME		"history time"
+#define	ZPOOL_HIST_CMD		"history command"
 
 #ifdef	__cplusplus
 }

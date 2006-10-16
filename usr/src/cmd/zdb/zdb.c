@@ -933,6 +933,8 @@ static object_viewer_t *object_viewer[DMU_OT_NUMTYPES] = {
 	dump_uint64,		/* other uint64[]		*/
 	dump_zap,		/* other ZAP			*/
 	dump_zap,		/* persistent error log		*/
+	dump_uint8,		/* SPA history			*/
+	dump_uint64,		/* SPA history offsets		*/
 };
 
 static void

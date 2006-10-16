@@ -131,6 +131,7 @@ spa_activate(spa_t *spa)
 	mutex_init(&spa->spa_errlist_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_config_lock.scl_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_sync_bplist.bpl_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_history_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	list_create(&spa->spa_dirty_list, sizeof (vdev_t),
 	    offsetof(vdev_t, vdev_dirty_node));
@@ -590,6 +591,20 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	error = zap_lookup(spa->spa_meta_objset,
 	    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_ERRLOG_SCRUB,
 	    sizeof (uint64_t), 1, &spa->spa_errlog_scrub);
+	if (error != 0 && error != ENOENT) {
+		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_CORRUPT_DATA);
+		error = EIO;
+		goto out;
+	}
+
+	/*
+	 * Load the history object.  If we have an older pool, this
+	 * will not be present.
+	 */
+	error = zap_lookup(spa->spa_meta_objset,
+	    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_HISTORY,
+	    sizeof (uint64_t), 1, &spa->spa_history);
 	if (error != 0 && error != ENOENT) {
 		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
 		    VDEV_AUX_CORRUPT_DATA);
@@ -1105,6 +1120,11 @@ spa_create(const char *pool, nvlist_t *nvroot, const char *altroot)
 	    sizeof (uint64_t), 1, &spa->spa_sync_bplist_obj, tx) != 0) {
 		cmn_err(CE_PANIC, "failed to add bplist");
 	}
+
+	/*
+	 * Create the pool's history object.
+	 */
+	spa_history_create_obj(spa, tx);
 
 	dmu_tx_commit(tx);
 
@@ -2714,6 +2734,7 @@ spa_sync_spares(spa_t *spa, dmu_tx_t *tx)
 	}
 
 	spa_sync_nvlist(spa, spa->spa_spares_object, nvroot, tx);
+	nvlist_free(nvroot);
 
 	spa->spa_sync_spares = B_FALSE;
 }

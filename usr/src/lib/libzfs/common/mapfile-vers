@@ -101,6 +101,7 @@ SUNWprivate_1.1 {
 	zpool_get_errlog;
 	zpool_get_guid;
 	zpool_get_handle;
+	zpool_get_history;
 	zpool_get_name;
 	zpool_get_root;
 	zpool_get_space_total;
@@ -112,6 +113,7 @@ SUNWprivate_1.1 {
 	zpool_import_status;
 	zpool_in_use;
 	zpool_iter;
+	zpool_log_history;
 	zpool_mount_datasets;
 	zpool_open;
 	zpool_open_canfail;
