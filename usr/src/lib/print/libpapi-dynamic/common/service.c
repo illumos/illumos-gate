@@ -182,6 +182,9 @@ service_connect(service_t *svc, char *name)
 	if (svc->so_handle != NULL) {
 		papi_status_t (*f)();
 
+		if (svc->svc_handle != NULL)	/* already connected? */
+			return (PAPI_OK);
+
 		f = (papi_status_t (*)())psm_sym(svc, "papiServiceCreate");
 
 		if (f != NULL) {
