@@ -1,6 +1,6 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-# @(#)factory	7.3
+# @(#)factory	8.1
 
 # For companies who don't want to put time zone specification in
 # their installation procedures.  When users run date, they'll get the message.
