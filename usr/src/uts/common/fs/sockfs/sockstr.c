@@ -1975,6 +1975,10 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 	case T_EXDATA_IND: {
 		mblk_t		*mctl, *mdata;
+		mblk_t *lbp;
+		union T_primitives *tprp;
+		struct stdata   *stp;
+		queue_t *qp;
 
 		if (MBLKL(mp) < sizeof (struct T_exdata_ind)) {
 			zcmn_err(getzoneid(), CE_WARN,
@@ -2018,6 +2022,58 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		so_oob_sig(so, 0, allmsgsigs, pollwakeups);
 		mctl = so_oob_exdata(so, mctl, allmsgsigs, pollwakeups);
 		mdata = so_oob_data(so, mdata, allmsgsigs, pollwakeups);
+
+		stp = vp->v_stream;
+		ASSERT(stp != NULL);
+		qp = _RD(stp->sd_wrq);
+
+		mutex_enter(QLOCK(qp));
+		lbp = qp->q_last;
+
+		/*
+		 * We want to avoid queueing up a string of T_EXDATA_IND
+		 * messages with no intervening data messages at the stream
+		 * head. These messages contribute to the total message
+		 * count. Eventually this can lead to STREAMS flow contol
+		 * and also cause TCP to advertise a zero window condition
+		 * to the peer. This can happen in the degenerate case where
+		 * the sender and receiver exchange only OOB data. The sender
+		 * only sends messages with MSG_OOB flag and the receiver
+		 * receives only MSG_OOB messages and does not use SO_OOBINLINE.
+		 * An example of this scenario has been reported in applications
+		 * that use OOB data to exchange heart beats. Flow control
+		 * relief will never happen if the application only reads OOB
+		 * data which is done directly by sorecvoob() and the
+		 * T_EXDATA_IND messages at the streamhead won't be consumed.
+		 * Note that there is no correctness issue in compressing the
+		 * string of T_EXDATA_IND messages into a single T_EXDATA_IND
+		 * message. A single read that does not specify MSG_OOB will
+		 * read across all the marks in a loop in sotpi_recvmsg().
+		 * Each mark is individually distinguishable only if the
+		 * T_EXDATA_IND messages are separated by data messages.
+		 */
+		if ((qp->q_first != NULL) && (DB_TYPE(lbp) == M_PROTO)) {
+			tprp = (union T_primitives *)lbp->b_rptr;
+			if ((tprp->type == T_EXDATA_IND) &&
+			    !(so->so_options & SO_OOBINLINE)) {
+
+				/*
+				 * free the new M_PROTO message
+				 */
+				freemsg(mctl);
+
+				/*
+				 * adjust the OOB count and OOB	signal count
+				 * just incremented for the new OOB data.
+				 */
+				so->so_oobcnt--;
+				so->so_oobsigcnt--;
+				mutex_exit(QLOCK(qp));
+				mutex_exit(&so->so_lock);
+				return (NULL);
+			}
+		}
+		mutex_exit(QLOCK(qp));
 
 		/*
 		 * Pass the T_EXDATA_IND and the M_DATA back separately
