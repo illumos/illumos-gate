@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,18 +153,9 @@ C_Verify(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 
 	rv = soft_verify(session_p, pData, ulDataLen, pSignature,
 	    ulSignatureLen);
-	/*
-	 * Always terminate the active verify operation.
-	 * Application needs to call C_VerifyInit again for next
-	 * verify operation.
-	 */
-	(void) pthread_mutex_lock(&session_p->session_mutex);
-	session_p->verify.flags = 0;
-	lock_held = B_TRUE;
-	SES_REFRELE(session_p, lock_held);
-	return (rv);
 
 clean_exit:
+	/* Clear context, free key, and release session counter */
 	soft_sign_verify_cleanup(session_p, B_FALSE, B_FALSE);
 	return (rv);
 }
@@ -223,10 +213,7 @@ C_VerifyUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 	}
 
 clean_exit:
-	/*
-	 * After an error occurred, terminate the current verify
-	 * operation by resetting the active and update flags.
-	 */
+	/* After error, clear context, free key, & release session counter */
 	soft_sign_verify_cleanup(session_p, B_FALSE, B_FALSE);
 
 	return (rv);
@@ -268,12 +255,8 @@ C_VerifyFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 	rv = soft_verify_final(session_p, pSignature, ulSignatureLen);
 
 clean_exit:
-	/* Always terminate the active verify operation */
-	(void) pthread_mutex_lock(&session_p->session_mutex);
-	session_p->verify.flags = 0;
-	lock_held = B_TRUE;
-	SES_REFRELE(session_p, lock_held);
-
+	/* Clear contexts, free key, and release session counter */
+	soft_sign_verify_cleanup(session_p, B_FALSE, B_FALSE);
 	return (rv);
 }
 
@@ -396,20 +379,7 @@ C_VerifyRecover(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 	}
 
 clean_exit:
-	(void) pthread_mutex_lock(&session_p->session_mutex);
-	lock_held = B_TRUE;
-	session_p->verify.flags = 0;
-	/*
-	 * Free the active context right here. We don't need to call
-	 * soft_sign_verify_cleanup() because this function is only
-	 * applicable to CKM_RSA_PKCS and CKM_RSA_X_509 that only has
-	 * one active context.
-	 */
-	if (session_p->verify.context != NULL) {
-		free(session_p->verify.context);
-		session_p->verify.context = NULL;
-	}
-	SES_REFRELE(session_p, lock_held);
-
+	/* Clear context, free key, and release session counter */
+	soft_sign_verify_cleanup(session_p, B_FALSE, B_FALSE);
 	return (rv);
 }

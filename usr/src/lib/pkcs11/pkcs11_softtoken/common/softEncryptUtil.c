@@ -868,7 +868,18 @@ soft_crypt_cleanup(soft_session_t *session_p, boolean_t encrypt,
 
 	case CKM_RSA_X_509:
 	case CKM_RSA_PKCS:
+	{
+		soft_rsa_ctx_t *rsa_ctx =
+		    (soft_rsa_ctx_t *)active_op->context;
+
+		if (rsa_ctx != NULL)
+			if (rsa_ctx->key != NULL) {
+				soft_cleanup_object(rsa_ctx->key);
+				free(rsa_ctx->key);
+			}
+
 		break;
+	}
 
 	} /* switch */
 

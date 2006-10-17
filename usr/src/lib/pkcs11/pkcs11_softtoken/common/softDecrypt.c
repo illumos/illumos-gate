@@ -181,20 +181,9 @@ C_Decrypt(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pEncryptedData,
 		return (rv);
 	}
 
-	/*
-	 * Normal exit.
-	 * Terminates the active encrypt operation.
-	 * Application needs to call C_EncryptInit again for next
-	 * encrypt operation.
-	 */
-	(void) pthread_mutex_lock(&session_p->session_mutex);
-	session_p->decrypt.flags = 0;
-	lock_held = B_TRUE;
-	SES_REFRELE(session_p, lock_held);
-	return (rv);
-
 clean_exit:
-	soft_crypt_cleanup(session_p, B_FALSE, lock_held);
+	/* Clear context, free key, and release session counter */
+	soft_crypt_cleanup(session_p, B_FALSE, B_FALSE);
 
 	return (rv);
 }

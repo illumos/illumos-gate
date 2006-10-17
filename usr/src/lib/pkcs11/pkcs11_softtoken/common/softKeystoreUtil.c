@@ -3030,7 +3030,7 @@ soft_keystore_init(int desired_state)
 			else {
 				soft_slot.keystore_load_status =
 				    KEYSTORE_UNAVAILABLE;
-				cryptoerror(LOG_ERR,
+				cryptoerror(LOG_DEBUG,
 				    "pkcs11_softtoken: "
 				    "Cannot create keystore.");
 				break;
@@ -3044,8 +3044,8 @@ soft_keystore_init(int desired_state)
 		if (soft_keystore_get_version(&soft_slot.ks_version, B_FALSE)
 		    != 0) {
 			soft_slot.keystore_load_status = KEYSTORE_UNAVAILABLE;
-			cryptoerror(LOG_ERR,
-			    "pkcs11_softtoken: Keystore version failure.");
+			cryptoerror(LOG_DEBUG,
+			    "pkcs11_softtoken: Keystore access failed.");
 			break;
 		}
 
@@ -3060,7 +3060,7 @@ soft_keystore_init(int desired_state)
 		    != CKR_OK) {
 			(void) soft_destroy_token_session();
 			soft_slot.keystore_load_status = KEYSTORE_UNAVAILABLE;
-			cryptoerror(LOG_ERR,
+			cryptoerror(LOG_DEBUG,
 			    "pkcs11_softtoken: Cannot initialize keystore.");
 			break;
 		}

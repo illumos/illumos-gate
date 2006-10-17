@@ -1,5 +1,25 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -264,13 +284,13 @@ soft_blowfish_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 				    (ulDataLen - remain), remain);
 
 			soft_blowfish_ctx->remain_len = remain;
+			return (CKR_OK);
 		}
 
-		return (CKR_OK);
+	} else {
+		*pulEncryptedLen = 0;
+		rv = CKR_FUNCTION_FAILED;
 	}
-
-	*pulEncryptedLen = 0;
-	rv = CKR_FUNCTION_FAILED;
 
 cleanup:
 	(void) pthread_mutex_lock(&session_p->session_mutex);
@@ -321,7 +341,7 @@ soft_blowfish_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 		}
 
 		/*
-		 * If application asks for the length of the putput buffer
+		 * If application asks for the length of the output buffer
 		 * to hold the plaintext?
 		 */
 		if (pData == NULL) {

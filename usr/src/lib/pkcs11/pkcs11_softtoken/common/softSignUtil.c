@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -437,19 +436,46 @@ soft_sign_verify_cleanup(soft_session_t *session_p, boolean_t sign,
 	case CKM_SHA256_RSA_PKCS:
 	case CKM_SHA384_RSA_PKCS:
 	case CKM_SHA512_RSA_PKCS:
+		if (session_p->digest.context != NULL) {
+			free(session_p->digest.context);
+			session_p->digest.context = NULL;
+			session_p->digest.flags = 0;
+		}
+		/* FALLTHRU */
+
+	case CKM_RSA_PKCS:
+	case CKM_RSA_X_509:
+	{
+		soft_rsa_ctx_t *rsa_ctx =
+		    (soft_rsa_ctx_t *)active_op->context;
+
+		if (rsa_ctx != NULL && rsa_ctx->key != NULL) {
+			soft_cleanup_object(rsa_ctx->key);
+			free(rsa_ctx->key);
+		}
+		break;
+
+	}
 	case CKM_DSA_SHA1:
 		if (session_p->digest.context != NULL) {
 			free(session_p->digest.context);
 			session_p->digest.context = NULL;
 			session_p->digest.flags = 0;
 		}
-		break;
 
-	case CKM_RSA_PKCS:
-	case CKM_RSA_X_509:
+		/* FALLTHRU */
 	case CKM_DSA:
+	{
+		soft_dsa_ctx_t *dsa_ctx =
+		    (soft_dsa_ctx_t *)active_op->context;
+
+		if (dsa_ctx != NULL && dsa_ctx->key != NULL) {
+			soft_cleanup_object(dsa_ctx->key);
+			free(dsa_ctx->key);
+		}
 		break;
 
+	}
 	case CKM_SSL3_MD5_MAC:
 	case CKM_SSL3_SHA1_MAC:
 	case CKM_MD5_HMAC_GENERAL:
