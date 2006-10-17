@@ -237,7 +237,7 @@ px_msiq_intr(caddr_t arg)
 	msiqtail_t	curr_tail_index;
 	msgcode_t	msg_code;
 	px_ih_t		*ih_p;
-	int		i, ret;
+	int		i, j, ret;
 	ushort_t	msiq_recs2process;
 
 	DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: msiq_id =%x ino=%x pil=%x "
@@ -305,11 +305,11 @@ px_msiq_intr(caddr_t arg)
 		 * Scan through px_ih_t linked list, searching for the
 		 * right px_ih_t, matching MSIQ record data.
 		 */
-		for (i = 0, ih_p = ino_p->ino_ih_start;
-		    ih_p && (i < ino_p->ino_ih_size) &&
+		for (j = 0, ih_p = ino_p->ino_ih_start;
+		    ih_p && (j < ino_p->ino_ih_size) &&
 		    ((ih_p->ih_msg_code != msg_code) ||
 		    (ih_p->ih_rec_type != msiq_rec_p->msiq_rec_type));
-		    ih_p = ih_p->ih_next, i++);
+		    ih_p = ih_p->ih_next, j++);
 
 		if ((ih_p->ih_msg_code == msg_code) &&
 		    (ih_p->ih_rec_type == msiq_rec_p->msiq_rec_type)) {
