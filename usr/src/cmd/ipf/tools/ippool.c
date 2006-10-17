@@ -215,7 +215,7 @@ char *argv[];
 	bzero((char *)&iph, sizeof(iph));
 	bzero((char *)&pool, sizeof(pool));
 
-	while ((c = getopt(argc, argv, "dm:no:RSt:v")) != -1)
+	while ((c = getopt(argc, argv, "dm:no:RS:t:v")) != -1)
 		switch (c)
 		{
 		case 'd' :

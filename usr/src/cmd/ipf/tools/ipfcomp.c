@@ -2,7 +2,13 @@
  * Copyright (C) 1993-2001 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed";
 static const char rcsid[] = "@(#)$Id: ipfcomp.c,v 1.24.2.2 2004/04/28 10:34:44 darrenr Exp $";
@@ -159,9 +165,17 @@ frentry_t *fr;
 	int i;
 
 	f = (frentry_t *)malloc(sizeof(*f));
+	if (f == NULL) {
+		fprintf(stderr, "out of memory\n");
+		exit(1);
+	}
 	bcopy((char *)fr, (char *)f, sizeof(*fr));
 	if (fr->fr_ipf) {
 		f->fr_ipf = (fripf_t *)malloc(sizeof(*f->fr_ipf));
+		if (f->fr_ipf == NULL) {
+			fprintf(stderr, "out of memory\n");
+			exit(1);
+		}
 		bcopy((char *)fr->fr_ipf, (char *)f->fr_ipf,
 		      sizeof(*fr->fr_ipf));
 	}
@@ -174,6 +188,10 @@ frentry_t *fr;
 
 	if (g == NULL) {
 		g = (frgroup_t *)calloc(1, sizeof(*g));
+		if (g == NULL) {
+			fprintf(stderr, "out of memory\n");
+			exit(1);
+		}
 		g->fg_next = groups;
 		groups = g;
 		g->fg_head = f;
@@ -214,6 +232,10 @@ static u_long ipf%s_rule_data_%s_%u[] = {\n",
 				break;
 		if (g == NULL) {
 			g = (frgroup_t *)calloc(1, sizeof(*g));
+			if (g == NULL) {
+				fprintf(stderr, "out of memory\n");
+				exit(1);
+			}
 			g->fg_next = groups;
 			groups = g;
 			g->fg_head = f;
@@ -931,8 +953,13 @@ u_int incount, outcount;
 			fr->fr_flags & FR_INQUE ? "in" : "out",
 			fr->fr_group, num);
 	}
-	if (n == NULL)
+	if (n == NULL) { 
 		n = (mc_t *)malloc(sizeof(*n) * FRC_MAX);
+		if (n == NULL) {
+			fprintf(stderr, "out of memory\n");
+			exit(1);
+		}
+	}
 	bcopy((char *)m, (char *)n, sizeof(*n) * FRC_MAX);
 	sin = in;
 }
@@ -944,8 +971,13 @@ int dir;
 	static mc_t *m = NULL;
 	frgroup_t *g;
 
-	if (m == NULL)
+	if (m == NULL) { 
 		m = (mc_t *)calloc(1, sizeof(*m) * FRC_MAX);
+		if (m == NULL) { 
+			fprintf(stderr, "out of memory\n"); 
+			exit(1); 
+		} 
+	} 
 
 	for (g = groups; g != NULL; g = g->fg_next) {
 		if ((dir == 0) && ((g->fg_flags & FR_INQUE) != 0))

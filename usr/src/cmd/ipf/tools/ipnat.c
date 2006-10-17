@@ -94,7 +94,7 @@ int	opts;
 void usage(name)
 char *name;
 {
-	fprintf(stderr, "Usage: %s [-CFhlnrRsv] [-f filename]\n", name);
+	fprintf(stderr, "Usage: %s [-CdFhlnrRsv] [-f filename]\n", name);
 	exit(1);
 }
 
