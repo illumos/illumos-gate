@@ -300,6 +300,7 @@ typedef struct kcf_prov_mech_desc {
 
 
 #define	KCF_CPU_PAD (128 - sizeof (crypto_mech_name_t) - \
+    sizeof (crypto_mech_type_t) - \
     sizeof (kmutex_t) - 2 * sizeof (kcf_prov_mech_desc_t *) - \
     sizeof (int) - sizeof (uint32_t) - sizeof (size_t))
 
@@ -309,6 +310,7 @@ typedef struct kcf_prov_mech_desc {
  */
 typedef	struct kcf_mech_entry {
 	crypto_mech_name_t	me_name;	/* mechanism name */
+	crypto_mech_type_t	me_mechid;	/* Internal id for mechanism */
 	kmutex_t		me_mutex;	/* access protection	*/
 	kcf_prov_mech_desc_t	*me_hw_prov_chain;  /* list of HW providers */
 	kcf_prov_mech_desc_t	*me_sw_prov;    /* SW provider */

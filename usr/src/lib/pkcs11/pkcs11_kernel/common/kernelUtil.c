@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,6 +151,43 @@ crypto2pkcs11_error_number(uint_t n)
 	return (error_number_table[n]);
 }
 
+#define	MECH_HASH(type)	(((uintptr_t)type) % KMECH_HASHTABLE_SIZE)
+/*
+ * Serialize writes to the hash table. We don't need a per bucket lock as
+ * there are only a few writes and we don't need the lock for reads.
+ */
+static pthread_mutex_t mechhash_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static CK_RV
+kmech_hash_insert(CK_MECHANISM_TYPE type, crypto_mech_type_t kmech)
+{
+	uint_t h;
+	kmh_elem_t *elem, *cur;
+
+	elem = malloc(sizeof (kmh_elem_t));
+	if (elem == NULL)
+		return (CKR_HOST_MEMORY);
+
+	h = MECH_HASH(type);
+	elem->type = type;
+	elem->kmech = kmech;
+
+	(void) pthread_mutex_lock(&mechhash_mutex);
+	for (cur = kernel_mechhash[h]; cur != NULL; cur = cur->knext) {
+		if (type == cur->type) {
+			/* Some other thread beat us to it. */
+			(void) pthread_mutex_unlock(&mechhash_mutex);
+			free(elem);
+			return (CKR_OK);
+		}
+	}
+	elem->knext = kernel_mechhash[h];
+	kernel_mechhash[h] = elem;
+	(void) pthread_mutex_unlock(&mechhash_mutex);
+
+	return (CKR_OK);
+}
+
 CK_RV
 kernel_mech(CK_MECHANISM_TYPE type, crypto_mech_type_t *k_number)
 {
@@ -159,6 +195,20 @@ kernel_mech(CK_MECHANISM_TYPE type, crypto_mech_type_t *k_number)
 	char *string;
 	CK_RV rv;
 	int r;
+	kmh_elem_t *elem;
+	uint_t h;
+
+	/*
+	 * Search for an existing entry. No need to lock since we are
+	 * just a reader and we never free the entries in the hash table.
+	 */
+	h = MECH_HASH(type);
+	for (elem = kernel_mechhash[h]; elem != NULL; elem = elem->knext) {
+		if (type == elem->type) {
+			*k_number = elem->kmech;
+			return (CKR_OK);
+		}
+	}
 
 	string = pkcs11_mech2str(type);
 	if (string == NULL)
@@ -183,8 +233,11 @@ kernel_mech(CK_MECHANISM_TYPE type, crypto_mech_type_t *k_number)
 		}
 	}
 
-	if (rv == CKR_OK)
+	if (rv == CKR_OK) {
 		*k_number = get_number.pn_internal_number;
+		/* Add this to the hash table */
+		(void) kmech_hash_insert(type, *k_number);
+	}
 
 	free(string);
 	return (rv);

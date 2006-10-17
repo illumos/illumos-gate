@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,6 +120,7 @@ static pthread_mutex_t globalmutex = PTHREAD_MUTEX_INITIALIZER;
 
 ses_to_be_freed_list_t ses_delay_freed;
 object_to_be_freed_list_t obj_delay_freed;
+kmh_elem_t **kernel_mechhash;	/* Hash table for kCF mech numbers */
 
 static void finalize_common();
 static void cleanup_library();
@@ -129,7 +129,6 @@ static void kernel_fini();
 CK_RV
 C_Initialize(CK_VOID_PTR pInitArgs)
 {
-
 	int initialize_pid;
 	boolean_t supplied_ok;
 	CK_RV rv = CKR_OK;
@@ -211,9 +210,18 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 	/* Mark kernel_fd "close on exec" */
 	(void) fcntl(kernel_fd, F_SETFD, FD_CLOEXEC);
 
+	/* Create the hash table */
+	kernel_mechhash = calloc(KMECH_HASHTABLE_SIZE, sizeof (void *));
+	if (kernel_mechhash == NULL) {
+		(void) close(kernel_fd);
+		(void) pthread_mutex_unlock(&globalmutex);
+		return (CKR_HOST_MEMORY);
+	}
+
 	/* Initialize the slot table */
 	rv = kernel_slottable_init();
 	if (rv != CKR_OK) {
+		free(kernel_mechhash);
 		(void) close(kernel_fd);
 		(void) pthread_mutex_unlock(&globalmutex);
 		return (rv);
@@ -286,6 +294,7 @@ static void
 finalize_common() {
 
 	int i;
+	kmh_elem_t *elem, *next;
 	kernel_object_t *delay_free_obj, *tmpo;
 	kernel_session_t *delay_free_ses, *tmps;
 
@@ -306,6 +315,18 @@ finalize_common() {
 	if (kernel_fd >= 0) {
 		(void) close(kernel_fd);
 	}
+
+	/* Walk the hash table and free all entries */
+	for (i = 0; i < KMECH_HASHTABLE_SIZE; i++) {
+		elem = kernel_mechhash[i];
+		while (elem != NULL) {
+			next = elem->knext;
+			free(elem);
+			elem = next;
+		}
+	}
+
+	free(kernel_mechhash);
 
 	kernel_fd = -1;
 	kernel_initialized = B_FALSE;

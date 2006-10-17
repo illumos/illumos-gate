@@ -823,8 +823,11 @@ get_mechanism_number(dev_t dev, caddr_t arg, int mode, int *rval)
 		return (EFAULT);
 	}
 
-	/* get mechanism number from the core module */
-	number = crypto_mech2id_common(mechanism_name, B_TRUE);
+	/*
+	 * Get mechanism number from kcf. We set the load_module
+	 * flag to false since we use only hardware providers.
+	 */
+	number = crypto_mech2id_common(mechanism_name, B_FALSE);
 	kmem_free(mechanism_name, len);
 	if (number == CRYPTO_MECH_INVALID) {
 		rv = CRYPTO_ARGUMENTS_BAD;
