@@ -4212,13 +4212,6 @@ dprov_copyin_mechanism(crypto_provider_handle_t provider,
 	kmech->cm_param_len = 0;
 
 	switch (kmech->cm_type) {
-	case AES_ECB_MECH_INFO_TYPE:
-	case BLOWFISH_ECB_MECH_INFO_TYPE:
-	case DES_ECB_MECH_INFO_TYPE:
-	case DES3_ECB_MECH_INFO_TYPE:
-		rv = CRYPTO_SUCCESS;
-		goto out;
-
 	case DES_CBC_MECH_INFO_TYPE:
 	case DES3_CBC_MECH_INFO_TYPE:
 		expected_param_len = DES_BLOCK_LEN;
@@ -4237,19 +4230,9 @@ dprov_copyin_mechanism(crypto_provider_handle_t provider,
 		rv = copyin_aes_ctr_mech(umech, kmech, &error, mode);
 		goto out;
 
-	case RC4_MECH_INFO_TYPE:
-	case RSA_PKCS_MECH_INFO_TYPE:
-	case RSA_X_509_MECH_INFO_TYPE:
-	case MD5_RSA_PKCS_MECH_INFO_TYPE:
-	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
-	case SHA256_RSA_PKCS_MECH_INFO_TYPE:
-	case SHA384_RSA_PKCS_MECH_INFO_TYPE:
-	case SHA512_RSA_PKCS_MECH_INFO_TYPE:
-		rv = CRYPTO_SUCCESS;
-		goto out;
-
 	default:
-		rv = CRYPTO_MECHANISM_INVALID;
+		/* nothing to do - mechanism has no parameters */
+		rv = CRYPTO_SUCCESS;
 		goto out;
 	}
 
