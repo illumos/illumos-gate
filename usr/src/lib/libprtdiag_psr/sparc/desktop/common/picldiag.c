@@ -99,6 +99,7 @@
 #define	OBP_PROP_REVISION_ID		"revision-id"
 #define	OBP_PROP_VERSION_NUM		"version#"
 #define	OBP_PROP_MODREV_NUM		"module-revision#"
+#define	OBP_PROP_FIREREV_NUM		"fire-revision#"
 #define	OBP_PROP_BOARD_TYPE		"board_type"
 #define	OBP_PROP_ECACHE_SIZE		"ecache-size"
 #define	OBP_PROP_IMPLEMENTATION		"implementation#"
@@ -3274,15 +3275,20 @@ asicrev_callback(picl_nodehdl_t nodeh, void *arg)
 	int		err;
 
 	/*
-	 * Fire based platforms use "module-revision#" in place of "version#",
-	 * so we need to look for this property if we don't find "version#"
+	 * Fire based platforms use "fire-revision#" or "module-revision#"
+	 * (depending on post/pre Fire 2.0) instead of "version#", so we
+	 * need to check for these if we don't find "version#"
 	 */
 	version = picldiag_get_uint_propval(nodeh, OBP_PROP_VERSION_NUM, &err);
 	if (err == PICL_PROPNOTFOUND) {
-		version = picldiag_get_uint_propval(nodeh, OBP_PROP_MODREV_NUM,
+		version = picldiag_get_uint_propval(nodeh, OBP_PROP_FIREREV_NUM,
 		    &err);
-		if (err == PICL_PROPNOTFOUND)
-			return (PICL_WALK_CONTINUE);
+		if (err == PICL_PROPNOTFOUND) {
+			version = picldiag_get_uint_propval(nodeh,
+			    OBP_PROP_MODREV_NUM, &err);
+			if (err == PICL_PROPNOTFOUND)
+				return (PICL_WALK_CONTINUE);
+		}
 	}
 	if (err != PICL_SUCCESS)
 		return (err);

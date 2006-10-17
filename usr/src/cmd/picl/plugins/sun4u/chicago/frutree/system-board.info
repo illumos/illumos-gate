@@ -249,19 +249,99 @@ REFPROP _fru_parent /frutree/chassis/MB/system-board
 /*
  * _fru_parent PCI devices
  */
-_class:/PLATFORM_CLASS/pciex@1f,700000/picl?DeviceID=0
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,2
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,3
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,4
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,5
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,6
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
+_class:/PLATFORM_CLASS/pciex@1f,700000/picl@0,7
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
 
-_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl?DeviceID=0
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,2
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,3
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,4
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,5
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,6
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl@0,7
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
 
-_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl?DeviceID=0
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,2
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,3
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,4
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,5
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,6
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl@0,7
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
 
-_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl?DeviceID=1
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,2
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,3
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,4
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,5
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,6
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@1,7
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
 
-_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl?DeviceID=2
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,0
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,1
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,2
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,3
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,4
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,5
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,6
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl@2,7
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
 
 /*
