@@ -75,7 +75,7 @@ switch (errorno) {
 				"changed too recently.\nPlease wait until %s "
 				"before you change it.\nIf you need to change "
 				"your password before then, "
-				"contact your system"
+				"contact your system "
 				"security administrator.\n"));
 	case 13:
 		return (dgettext(TEXT_DOMAIN,

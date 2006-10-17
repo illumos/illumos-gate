@@ -68,13 +68,12 @@ char *appdef[] = { "appdefaults", "kinit", NULL };
 
 #define	krb_realm (*(realmdef + 1))
 
-int	attempt_krb5_auth(void *, krb5_module_data_t *, char *, char **,
-			boolean_t);
+int	attempt_krb5_auth(krb5_module_data_t *, char *, char **, boolean_t);
 void	krb5_cleanup(pam_handle_t *, void *, int);
 
 extern errcode_t profile_get_options_boolean();
 extern errcode_t profile_get_options_string();
-extern int krb5_verifypw(pam_handle_t *, char *, char *, boolean_t, int);
+extern int krb5_verifypw(char *, char *, int);
 extern krb5_error_code krb5_verify_init_creds(krb5_context,
 		krb5_creds *, krb5_principal, krb5_keytab, krb5_ccache *,
 		krb5_verify_init_creds_opt *);
@@ -247,7 +246,7 @@ pam_sm_authenticate(
 
 	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **)&password);
 
-	result = attempt_krb5_auth(pamh, kmd, user, &password, 1);
+	result = attempt_krb5_auth(kmd, user, &password, 1);
 
 out:
 	if (kmd) {
@@ -300,7 +299,6 @@ out:
 
 int
 attempt_krb5_auth(
-	void		*pamh,
 	krb5_module_data_t	*kmd,
 	char		*user,
 	char		**krb5_pass,
@@ -606,13 +604,12 @@ attempt_krb5_auth(
 			 * Request a tik for changepw service
 			 * and it will tell us if pw is good or not.
 			 */
-			code = krb5_verifypw(pamh, kuser, *krb5_pass,
-					    0, kmd->debug);
+			code = krb5_verifypw(kuser, *krb5_pass, kmd->debug);
 
 			if (kmd->debug)
 				syslog(LOG_DEBUG,
 				    "PAM-KRB5 (auth): attempt_krb5_auth: "
-				    "verifypw %s", error_message(code));
+				    "verifypw %d", code);
 
 			if (code == 0) {
 				/* pw is good, set age status for acct_mgmt */

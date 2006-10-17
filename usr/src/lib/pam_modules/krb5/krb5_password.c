@@ -42,15 +42,10 @@
 #include "utils.h"
 #include "krb5_repository.h"
 
-#define	MISC_EXIT_STATUS 6
-#define	DONT_DISP_POLICY	0
-#define	DISP_POLICY		1
-
-extern int attempt_krb5_auth(void *, krb5_module_data_t *, char *, char **,
+extern int attempt_krb5_auth(krb5_module_data_t *, char *, char **,
 			boolean_t);
-extern int krb5_verifypw(pam_handle_t *, char *, char *, boolean_t, int);
+extern int krb5_verifypw(char *, char *, int);
 
-static char *get_passwd(pam_handle_t *, char *);
 static void display_msg(pam_handle_t *, int, char *);
 static void display_msgs(pam_handle_t *, int, int,
 		char msgs[][PAM_MAX_MSG_SIZE]);
@@ -129,7 +124,7 @@ get_set_creds(
 	 * pwchange verified user sufficiently, so don't request strict
 	 * tgt verification (will cause rcache perm issues possibly anyways)
 	 */
-	login_result = attempt_krb5_auth(pamh, kmd, user, &newpass, 0);
+	login_result = attempt_krb5_auth(kmd, user, &newpass, 0);
 	if (debug)
 		syslog(LOG_DEBUG,
 		    "PAM-KRB5 (password): get_set_creds: login_result= %d",
@@ -162,16 +157,13 @@ pam_sm_chauthtok(
 {
 
 	char			*user;
-	int			err, result = PAM_AUTH_ERR;
-	char			*newpass = NULL, *vnewpass = NULL;
+	int			err, result = PAM_AUTHTOK_ERR;
+	char			*newpass = NULL;
 	char			*oldpass = NULL;
 	int			i;
 	int			debug = 0;
 	uid_t			pw_uid;
 	krb5_module_data_t	*kmd = NULL;
-	char			*pam_service;
-	int			promptforold = 0;
-	int			promptfornew = 0;
 	pam_repository_t	*rep_data = NULL;
 
 	for (i = 0; i < argc; i++) {
@@ -189,7 +181,8 @@ pam_sm_chauthtok(
 		    "PAM-KRB5 (password): start: flags = %x",
 		    flags);
 
-	err = pam_get_item(pamh, PAM_REPOSITORY, (void **)&rep_data);
+	(void) pam_get_item(pamh, PAM_REPOSITORY, (void **)&rep_data);
+
 	if (rep_data != NULL) {
 		if (strcmp(rep_data->type, KRB5_REPOSITORY_NAME) != 0) {
 			if (debug)
@@ -238,31 +231,17 @@ pam_sm_chauthtok(
 			return (PAM_IGNORE);
 	}
 
-	err = pam_get_item(pamh, PAM_SERVICE, (void **)&pam_service);
-	if (err != PAM_SUCCESS) {
-		syslog(LOG_ERR,
-		    "PAM-KRB5 (password): error getting SERVICE");
-		return (PAM_SYSTEM_ERR);
-	}
-
-	err = pam_get_item(pamh, PAM_USER, (void **)&user);
-	if (err != PAM_SUCCESS) {
-		syslog(LOG_ERR,
-		    "PAM-KRB5 (password): error getting USER");
-		return (PAM_SYSTEM_ERR);
-	}
+	(void) pam_get_item(pamh, PAM_USER, (void **)&user);
 
 	if (user == NULL || user == '\0') {
-		syslog(LOG_ERR,
-		    "PAM-KRB5 (password): username is empty");
-		return (PAM_SYSTEM_ERR);
+		syslog(LOG_ERR, "PAM-KRB5 (password): username is empty");
+		return (PAM_USER_UNKNOWN);
 	}
 
 	if (!get_pw_uid(user, &pw_uid)) {
 		syslog(LOG_ERR,
-		    "PAM-KRB5 (password): can't get uid for %s",
-		    user);
-		return (PAM_AUTHTOK_ERR);
+		    "PAM-KRB5 (password): can't get uid for %s", user);
+		return (PAM_USER_UNKNOWN);
 	}
 
 	/*
@@ -279,186 +258,50 @@ pam_sm_chauthtok(
 		goto out;
 	}
 
-	if ((err = pam_get_item(pamh, PAM_AUTHTOK,
-				(void **) &newpass)) < 0)
-		return (err);
+	(void) pam_get_item(pamh, PAM_AUTHTOK, (void **)&newpass);
 
-	if ((err = pam_get_item(pamh, PAM_OLDAUTHTOK,
-				(void **) &oldpass)) < 0)
-		return (err);
+	if (newpass == NULL)
+		return (PAM_SYSTEM_ERR);
 
-	if (!newpass && !oldpass) {
-		promptforold = 1;
-		promptfornew = 1;
-	} else {
-		/*
-		 * OLDAUTHTOK not set, we're probably the first password
-		 * module but the AUTHTOK is probably set from an auth mod
-		 */
-		if (newpass && !oldpass) {
-			oldpass = newpass;
-			newpass = NULL;
-			promptfornew = 1;
-		}
+	(void) pam_get_item(pamh, PAM_OLDAUTHTOK, (void **)&oldpass);
 
-		result = krb5_verifypw(pamh, user, oldpass,
-				    DONT_DISP_POLICY, debug);
-		if (debug)
-			syslog(LOG_DEBUG,
-			    "PAM-KRB5 (password): verifypw first %d",
-			    result);
-		/*
-		 * If this fails and is not bad passwd, then it might
-		 * be a non-rpcsec_gss KDC so drop thru.
-		 *
-		 * (note in S9 change pw should work on non-rpcsec_gss KDCs
-		 *  such as MIT & MS)
-		 */
-		if (result != 0)
-			promptforold = 1;
-	}
+	if (oldpass == NULL)
+		return (PAM_SYSTEM_ERR);
 
-	if (promptforold) {
+	result = krb5_verifypw(user, oldpass, debug);
+	if (debug)
+		syslog(LOG_DEBUG, "PAM-KRB5 (password): verifypw %d", result);
 
-		oldpass = get_passwd(pamh,
-				    dgettext(TEXT_DOMAIN,
-					    "Old Kerberos password: "));
-
-		if (oldpass == NULL || oldpass[0] == '\0') {
-			/* Need a password to proceed */
-			display_msg(pamh, PAM_ERROR_MSG,
-				    dgettext(TEXT_DOMAIN,
-					    "Need the old password"
-					    " to proceed \n"));
-			free(oldpass);
-			return (PAM_AUTHTOK_ERR);
-		}
-
-		result = krb5_verifypw(pamh, user, oldpass,
-				    DISP_POLICY, debug);
-		if (debug)
-			syslog(LOG_DEBUG,
-			    "PAM-KRB5 (password): verifypw prforold %d",
-			    result);
-		/*
-		 * If it's a bad password, we are done.
-		 * Else, continue and try the pwch with oldpass.
-		 */
-		if (result == 2) {
-			display_msg(pamh, PAM_ERROR_MSG,
-				    dgettext(TEXT_DOMAIN,
-					    "Old Kerberos"
-					    " password incorrect\n"));
-			(void) memset(oldpass, 0, strlen(oldpass));
-			free(oldpass);
-			return (PAM_AUTHTOK_ERR);
-		}
-	}
-
-	if (promptfornew) {
-		newpass = get_passwd(pamh, dgettext(TEXT_DOMAIN,
-			"New Kerberos password: "));
-
-		if (newpass == NULL || newpass[0] == '\0') {
-			/* Need a password to proceed */
-			display_msg(pamh, PAM_ERROR_MSG,
-			    dgettext(TEXT_DOMAIN,
-			    "Need a password to proceed \n"));
-			result = PAM_AUTHTOK_ERR;
-			goto out;
-		}
-
-		vnewpass = get_passwd(pamh,
-				dgettext(TEXT_DOMAIN,
-			"Re-enter new Kerberos password: "));
-
-		if (vnewpass == NULL || vnewpass[0] == '\0') {
-			/* Need a password to proceed */
-			display_msg(pamh, PAM_ERROR_MSG,
-			    dgettext(TEXT_DOMAIN,
-				"Need a password to proceed \n"));
-			result = PAM_AUTHTOK_ERR;
-			goto out;
-		}
-
-		if (strcmp(newpass, vnewpass)) {
-			display_msg(pamh, PAM_ERROR_MSG,
-			    dgettext(TEXT_DOMAIN,
-				"Passwords do not match \n"));
-			result = PAM_AUTHTOK_ERR;
-			goto out;
-		}
+	/*
+	 * If it's a bad password or general failure, we are done.
+	 */
+	if (result != 0) {
+		if (result == 2)
+			display_msg(pamh, PAM_ERROR_MSG, dgettext(TEXT_DOMAIN,
+				"Old Kerberos password incorrect\n"));
+		return (PAM_AUTHTOK_ERR);
 	}
 
 	result = krb5_changepw(pamh, user, oldpass, newpass, debug);
 	if (result == PAM_SUCCESS) {
-		display_msg(pamh, PAM_TEXT_INFO,
-			    dgettext(TEXT_DOMAIN,
-				    "Kerberos password "
-				    "successfully changed\n"));
+		display_msg(pamh, PAM_TEXT_INFO, dgettext(TEXT_DOMAIN,
+		    "Kerberos password successfully changed\n"));
 
 		get_set_creds(pamh, kmd, user, newpass, debug);
-
-		(void) pam_set_item(pamh, PAM_AUTHTOK, newpass);
-		(void) pam_set_item(pamh, PAM_OLDAUTHTOK, oldpass);
 	}
 
 out:
-	if (promptforold && oldpass) {
-		(void) memset(oldpass, 0, strlen(oldpass));
-		free(oldpass);
-	}
-	if (newpass) {
-		(void) memset(newpass, 0, strlen(newpass));
-		free(newpass);
-	}
-
-	if (vnewpass) {
-		(void) memset(vnewpass, 0, strlen(vnewpass));
-		free(vnewpass);
-	}
-
 	if (debug)
-		syslog(LOG_DEBUG,
-		    "PAM-KRB5 (password): out: returns %d",
+		syslog(LOG_DEBUG, "PAM-KRB5 (password): out: returns %d",
 		    result);
 
 	return (result);
 }
 
-
-int
-pam_sm_get_authtokattr(
-	/*ARGSUSED*/
-	pam_handle_t		*pamh,
-	char			***ga_getattr,
-	int			repository,
-	const char		*nisdomain,
-	int			argc,
-	const char		**argv)
-{
-	return (PAM_SUCCESS);
-}
-
-int
-pam_sm_set_authtokattr(
-	/*ARGSUSED*/
-	pam_handle_t		*pamh,
-	const char 		**pam_setattr,
-	int			repository,
-	const char		*nisdomain,
-	int			argc,
-	const char		**argv)
-{
-	return (PAM_SUCCESS);
-}
-
 int
 krb5_verifypw(
-	pam_handle_t *pamh,
 	char 	*princ_str,
 	char	*old_password,
-	boolean_t disp_flag,
 	int debug)
 {
 	kadm5_ret_t		code;
@@ -466,17 +309,11 @@ krb5_verifypw(
 	char 			admin_realm[1024];
 	char			kprinc[2*MAXHOSTNAMELEN];
 	char			*cpw_service;
-	kadm5_principal_ent_rec principal_entry;
-	kadm5_policy_ent_rec	 policy_entry;
 	void 			*server_handle;
 	krb5_context		context;
 	kadm5_config_params	params;
-#define	MSG_ROWS		5
-	char			msgs[MSG_ROWS][PAM_MAX_MSG_SIZE];
 
 	(void) memset((char *)&params, 0, sizeof (params));
-	(void) memset(&principal_entry, 0, sizeof (principal_entry));
-	(void) memset(&policy_entry, 0, sizeof (policy_entry));
 
 	if (code = krb5_init_context(&context)) {
 		return (6);
@@ -491,9 +328,8 @@ krb5_verifypw(
 
 	code = krb5_parse_name(context, kprinc, &princ);
 
-	if (code != 0) {
-		return (MISC_EXIT_STATUS);
-	}
+	if (code != 0)
+		return (6);
 
 	if (strlen(old_password) == 0) {
 		krb5_free_principal(context, princ);
@@ -514,6 +350,7 @@ krb5_verifypw(
 			"PAM-KRB5 (password): unable to get host based "
 			"service name for realm %s\n"),
 			admin_realm);
+		krb5_free_principal(context, princ);
 		return (3);
 	}
 
@@ -529,87 +366,6 @@ krb5_verifypw(
 		return ((code == KADM5_BAD_PASSWORD) ? 2 : 3);
 	}
 
-	if (disp_flag &&
-	    _kadm5_get_kpasswd_protocol(server_handle) == KRB5_CHGPWD_RPCSEC) {
-		/*
-		 * Note: copy of this exists in login
-		 * (kverify.c/get_verified_in_tkt).
-		 */
-
-		code = kadm5_get_principal(server_handle, princ,
-						&principal_entry,
-						KADM5_PRINCIPAL_NORMAL_MASK);
-		if (code != 0) {
-			krb5_free_principal(context, princ);
-			(void) kadm5_destroy(server_handle);
-			return ((code == KADM5_UNK_PRINC) ? 1 :
-				MISC_EXIT_STATUS);
-		}
-
-		if ((principal_entry.aux_attributes & KADM5_POLICY) != 0) {
-			code = kadm5_get_policy(server_handle,
-						principal_entry.policy,
-						&policy_entry);
-			if (code != 0) {
-				/*
-				 * doesn't matter which error comes back,
-				 * there's no nice recovery or need to
-				 * differentiate to the user
-				 */
-				(void) kadm5_free_principal_ent(server_handle,
-							&principal_entry);
-				krb5_free_principal(context, princ);
-				(void) kadm5_destroy(server_handle);
-				return (MISC_EXIT_STATUS);
-			}
-
-			(void) snprintf(msgs[0], PAM_MAX_MSG_SIZE,
-				dgettext(TEXT_DOMAIN, "POLICY_EXPLANATION:"));
-			(void) snprintf(msgs[1], PAM_MAX_MSG_SIZE,
-				dgettext(TEXT_DOMAIN,
-					"Principal string is %s"), princ_str);
-			(void) snprintf(msgs[2], PAM_MAX_MSG_SIZE,
-				dgettext(TEXT_DOMAIN, "Policy Name is  %s"),
-				principal_entry.policy);
-			(void) snprintf(msgs[3], PAM_MAX_MSG_SIZE,
-				dgettext(TEXT_DOMAIN,
-					"Minimum password length is %d"),
-					policy_entry.pw_min_length);
-			(void) snprintf(msgs[4], PAM_MAX_MSG_SIZE,
-				dgettext(TEXT_DOMAIN,
-					"Minimum password classes is %d"),
-					policy_entry.pw_min_classes);
-			display_msgs(pamh, PAM_TEXT_INFO, MSG_ROWS, msgs);
-
-			if (code = kadm5_free_principal_ent(server_handle,
-							    &principal_entry)) {
-				(void) kadm5_free_policy_ent(server_handle,
-							&policy_entry);
-				krb5_free_principal(context, princ);
-				(void) kadm5_destroy(server_handle);
-				return (MISC_EXIT_STATUS);
-			}
-			if (code = kadm5_free_policy_ent(server_handle,
-							&policy_entry)) {
-				krb5_free_principal(context, princ);
-
-				(void) kadm5_destroy(server_handle);
-				return (MISC_EXIT_STATUS);
-			}
-		} else {
-			/*
-			 * kpasswd *COULD* output something here to encourage
-			 * the choice of good passwords, in the absence of
-			 * an enforced policy.
-			 */
-			if (code = kadm5_free_principal_ent(server_handle,
-							    &principal_entry)) {
-				krb5_free_principal(context, princ);
-				(void) kadm5_destroy(server_handle);
-				return (MISC_EXIT_STATUS);
-			}
-		}
-	}
 	krb5_free_principal(context, princ);
 
 	(void) kadm5_destroy(server_handle);
@@ -630,13 +386,7 @@ krb5_verifypw(
  *
  * Returns:
  *                      exit status of PAM_SUCCESS for success
- *			1 principal unknown
- *			2 old password wrong
- *			3 cannot initialize admin server session
- *			4 new passwd mismatch or error trying to change pw
- *                      5 password not typed
- *                      6 misc error
- *                      7 incorrect usage
+ *			else returns PAM failure
  *
  * Requires:
  *	Passwords cannot be more than 255 characters long.
@@ -659,19 +409,14 @@ krb5_changepw(
 	char 			msg_ret[1024], admin_realm[1024];
 	char			kprinc[2*MAXHOSTNAMELEN];
 	char			*cpw_service;
-	kadm5_principal_ent_rec principal_entry;
-	kadm5_policy_ent_rec	policy_entry;
 	void 			*server_handle;
 	krb5_context		context;
 	kadm5_config_params	params;
 
 	(void) memset((char *)&params, 0, sizeof (params));
-	(void) memset(&principal_entry, 0, sizeof (principal_entry));
-	(void) memset(&policy_entry, 0, sizeof (policy_entry));
 
-	if (code = krb5_init_context(&context)) {
-		return (6);
-	}
+	if (krb5_init_context(&context) != 0)
+		return (PAM_SYSTEM_ERR);
 
 	if ((code = get_kmd_kuser(context, (const char *)princ_str, kprinc,
 		2*MAXHOSTNAMELEN)) != 0) {
@@ -681,14 +426,12 @@ krb5_changepw(
 	/* Need to get a krb5_principal struct */
 
 	code = krb5_parse_name(context, kprinc, &princ);
-
-	if (code != 0) {
-		return (MISC_EXIT_STATUS);
-	}
+	if (code != 0)
+		return (PAM_SYSTEM_ERR);
 
 	if (strlen(old_password) == 0) {
 		krb5_free_principal(context, princ);
-		return (5);
+		return (PAM_AUTHTOK_ERR);
 	}
 
 	(void) snprintf(admin_realm, sizeof (admin_realm), "%s",
@@ -703,7 +446,7 @@ krb5_changepw(
 				"PAM-KRB5 (password):unable to get host based "
 				"service name for realm %s\n"),
 			admin_realm);
-		return (3);
+		return (PAM_SYSTEM_ERR);
 	}
 
 	code = kadm5_init_with_password(kprinc, old_password, cpw_service,
@@ -716,7 +459,8 @@ krb5_changepw(
 			    "PAM-KRB5 (password): changepw: "
 			    "init_with_pw failed:  (%s)", error_message(code));
 		krb5_free_principal(context, princ);
-		return ((code == KADM5_BAD_PASSWORD) ? 2 : 3);
+		return ((code == KADM5_BAD_PASSWORD) ?
+			PAM_AUTHTOK_ERR : PAM_SYSTEM_ERR);
 	}
 
 	code = kadm5_chpass_principal_util(server_handle, princ,
@@ -744,31 +488,11 @@ krb5_changepw(
 		syslog(LOG_DEBUG,
 		    "PAM-KRB5 (password): changepw: end %d", code);
 
-	if (code == KRB5_LIBOS_CANTREADPWD)
-		return (5);
-	else if (code)
-		return (4);
-	else
-		return (PAM_SUCCESS);
+	if (code != 0)
+		return (PAM_AUTHTOK_ERR);
+
+	return (PAM_SUCCESS);
 }
-
-static char *
-get_passwd(
-	pam_handle_t *pamh,
-	char *prompt)
-{
-	int		err;
-	char		*p;
-
-	err = __pam_get_authtok(pamh, PAM_PROMPT, 0, prompt, &p);
-
-	if (err != PAM_SUCCESS) {
-		return (NULL);
-	}
-
-	return (p);
-}
-
 
 static void
 display_msgs(pam_handle_t *pamh,

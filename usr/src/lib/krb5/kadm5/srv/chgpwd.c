@@ -66,6 +66,7 @@ process_chpw_request(krb5_context context, void *server_handle,
 	krb5_error krberror;
 	int numresult;
 	char strresult[1024];
+	char *clientstr;
 
 	ret = 0;
 	rep->length = 0;
@@ -340,6 +341,13 @@ process_chpw_request(krb5_context context, void *server_handle,
 		goto chpwfail;
 	}
 
+	ret = krb5_unparse_name(context, ticket->enc_part2->client, &clientstr);
+	if (ret) {
+		numresult = KRB5_KPASSWD_HARDERROR;
+		(void) strcpy(strresult, "Failed decrypting request");
+		goto chpwfail;
+	}
+
 	/*
 	 * Change the password
 	 */
@@ -348,6 +356,7 @@ process_chpw_request(krb5_context context, void *server_handle,
 		numresult = KRB5_KPASSWD_HARDERROR;
 		(void) strlcpy(strresult, "Malloc failed for ptr",
 			sizeof (strresult));
+		krb5_free_unparsed_name(context, clientstr);
 		goto chpwfail;
 	}
 	(void) memcpy(ptr, clear.data, clear.length);
@@ -357,6 +366,7 @@ process_chpw_request(krb5_context context, void *server_handle,
 						ticket->enc_part2->client,
 						ptr, NULL, strresult,
 						sizeof (strresult));
+
 	/*
 	 * Zap the password
 	 */
@@ -368,6 +378,11 @@ process_chpw_request(krb5_context context, void *server_handle,
 	}
 	free(ptr);
 	clear.length = 0;
+
+	krb5_klog_syslog(LOG_NOTICE, "chpw request from %s for %s: %s",
+		inet_ntoa(((struct sockaddr_in *)&remote_addr)->sin_addr),
+		clientstr, ret ? error_message(ret) : "success");
+	krb5_free_unparsed_name(context, clientstr);
 
 	if (ret) {
 		if ((ret != KADM5_PASS_Q_TOOSHORT) &&
@@ -404,6 +419,13 @@ chpwfail:
 			sizeof (strresult));
 	}
 
+	ptr = clear.data;
+
+	*ptr++ = (numresult>>8) & 0xff;
+	*ptr++ = numresult & 0xff;
+
+	(void) memcpy(ptr, strresult, strlen(strresult));
+
 	cipher.length = 0;
 
 	if (ap_rep.length) {
@@ -423,12 +445,6 @@ chpwfail:
 			}
 		}
 	}
-
-	ptr = clear.data;
-	*ptr++ = (numresult>>8) & 0xff;
-	*ptr++ = numresult & 0xff;
-
-	(void) memcpy(ptr, strresult, strlen(strresult));
 
 	/*
 	 * If no KRB-PRIV was constructed, then we need a KRB-ERROR.
