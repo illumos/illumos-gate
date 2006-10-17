@@ -337,7 +337,7 @@ main (int argc, char *argv[])
 	dbus_bool_t should_probe_for_fs;
 	char *partition_scheme = NULL;
 	dbus_uint64_t partition_start = 0;
-	dbus_uint64_t partition_number = 0;
+	int partition_number = 0;
 	struct vtoc vtoc;
 	dk_gpt_t *gpt;
 	struct dk_minfo mi;
