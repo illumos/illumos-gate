@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -956,7 +955,7 @@ doclear(void)
 static int lastcmd, lastp;
 static off_t lastarg;
 static int lastcolon;
-char shell_line[132];
+char shell_line[PATH_MAX];
 
 /*
 ** Read a command and do it. A command consists of an optional integer
@@ -1671,11 +1670,11 @@ ttyin(char buf[], register int nmax, char pchar)
 static int
 expand(char *outbuf, char *inbuf)
 {
-    register char *in_str;
-    register char *out_str;
-    register char ch;
-    char temp[200];
-    int changed = 0;
+	char *in_str;
+	char *out_str;
+	char ch;
+	char temp[PATH_MAX];
+	int changed = 0;
 
     in_str = inbuf;
     out_str = temp;
@@ -1683,7 +1682,9 @@ expand(char *outbuf, char *inbuf)
         switch (ch) {
         case '%':
             if (!no_intty) {
-                strcpy (out_str, fnames[fnum]);
+		if (strlcpy(out_str, fnames[fnum], sizeof (temp))
+		    >= sizeof (temp))
+			error(gettext("Command too long"));
                 out_str += strlen (fnames[fnum]);
                 changed++;
             }
@@ -1693,7 +1694,8 @@ expand(char *outbuf, char *inbuf)
         case '!':
             if (!shellp)
                 error (gettext("No previous command to substitute for"));
-            strcpy (out_str, shell_line);
+	    if (strlcpy(out_str, shell_line, sizeof (temp)) >= sizeof (temp))
+		error(gettext("Command too long"));
             out_str += strlen (shell_line);
             changed++;
             break;
@@ -1706,7 +1708,8 @@ expand(char *outbuf, char *inbuf)
             *out_str++ = ch;
         }
     *out_str++ = '\0';
-    strcpy (outbuf, temp);
+	if (strlcpy(outbuf, temp, sizeof (shell_line)) >= sizeof (shell_line))
+		error(gettext("Command too long"));
     return (changed);
 }
 
