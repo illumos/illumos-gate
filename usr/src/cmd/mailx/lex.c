@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
+/*	All Rights Reserved   */
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -65,7 +64,7 @@ static void		setmsize(int sz);
  * mbox and so forth.
  */
 
-int 
+int
 setfile(char *name, int isedit)
 {
 	FILE *ibuf;
@@ -86,16 +85,16 @@ setfile(char *name, int isedit)
 		goto doret;
 	}
 	if ((ibuf = fopen(name, "r")) == NULL) {
-		extern int errno; 
+		extern int errno;
 		int sverrno = errno;
-		int filethere = (access(name,0) == 0);
+		int filethere = (access(name, 0) == 0);
 		errno = sverrno;
 		if (exitflg)
 			goto doexit;	/* no mail, return error */
 		if (isedit || filethere)
 			perror(name);
 		else if (!Hflag) {
-			char *f = strrchr(name,'/');
+			char *f = strrchr(name, '/');
 			if (f == NOSTR)
 				fprintf(stderr, gettext("No mail.\n"));
 			else
@@ -116,7 +115,7 @@ name);
 				fprintf(stderr,
 				    gettext("%s: not a regular file\n"), name);
 		else if (!Hflag) {
-			if (strrchr(name,'/') == NOSTR)
+			if (strrchr(name, '/') == NOSTR)
 				fprintf(stderr, gettext("No mail.\n"));
 			else
 				fprintf(stderr, gettext("No mail for %s\n"),
@@ -126,7 +125,11 @@ strrchr(name, '/') + 1);
 		goto doret;
 	}
 
-	fgets(fortest, sizeof fortest, ibuf);
+	if (fgets(fortest, sizeof (fortest), ibuf) == NULL) {
+		perror(gettext("mailx: Unable to read from mail file"));
+		goto doexit;
+	}
+
 	fseek(ibuf, (long)(BUFSIZ+1), 0);	/* flush input buffer */
 	fseek(ibuf, 0L, 0);
 	if (strncmp(fortest, "Forward to ", 11) == 0) {
@@ -170,11 +173,11 @@ fortest+11);
 		fclose(itf);
 		fclose(otf);
 		free(message);
-		space=0;
+		space = 0;
 	}
 	readonly = 0;
 	if (!isedit && issysmbox && !Hflag)
-		readonly = Passeren()==-1;
+		readonly = Passeren() == -1;
 	lock(ibuf, "r", 1);
 	fstat(fileno(ibuf), &stbuf);
 	utimep->actime = stbuf.st_atime;
@@ -215,12 +218,12 @@ fortest+11);
 	sawcom = 0;
 	rc = 0;
 
-    doret:
+doret:
 	if (!isedit && issysmbox)
 		unlockmail();
-	return(rc);
+	return (rc);
 
-    doexit:
+doexit:
 	if (!isedit && issysmbox)
 		unlockmail();
 	exit(exrc ? exrc : rpterr);
@@ -240,14 +243,14 @@ Passeren(void)
 	char *home;
 
 	if ((home = getenv("HOME")) == NULL)
-		return 0;
-	snprintf(semfn, sizeof (semfn), "%s%s", home, "/.Maillock"); 
+		return (0);
+	snprintf(semfn, sizeof (semfn), "%s%s", home, "/.Maillock");
 	if ((semfp = fopen(semfn, "w")) == NULL) {
 		fprintf(stderr,
 	    gettext("WARNING: Can't open mail lock file (%s).\n"), semfn);
 		fprintf(stderr,
 	    gettext("\t Assuming you are not already reading mail.\n"));
-		return 0;
+		return (0);
 	}
 	if (lock(semfp, "w", 0) < 0) {
 		if (errno == ENOLCK) {
@@ -255,7 +258,7 @@ Passeren(void)
 gettext("WARNING: Unable to acquire mail lock, no record locks available.\n"));
 			fprintf(stderr,
 		    gettext("\t Assuming you are not already reading mail.\n"));
-			return 0;
+			return (0);
 		}
 		fprintf(stderr,
 		    gettext("WARNING: You are already reading mail.\n"));
@@ -263,12 +266,12 @@ gettext("WARNING: Unable to acquire mail lock, no record locks available.\n"));
 		    gettext("\t This instance of mail is read only.\n"));
 		fclose(semfp);
 		semfp = NULL;
-		return -1;
+		return (-1);
 	}
-	return 0;
+	return (0);
 }
 
-void 
+void
 Verhogen(void)
 {
 	if (semfp != NULL) {
@@ -285,7 +288,7 @@ Verhogen(void)
 static int	*msgvec;
 static int	shudprompt;
 
-void 
+void
 commands(void)
 {
 	int eofloop;
@@ -317,17 +320,17 @@ commands(void)
 		eofloop = 0;
 top:
 		if ((shudprompt = (intty && !sourcing)) != 0) {
-			if (prompt==NOSTR) {
+			if (prompt == NOSTR) {
 				if ((int)value("bsdcompat"))
 					prompt = "& ";
 				else
-				        prompt = "";
+					prompt = "";
 			}
 #ifdef SIGCONT
 			sigset(SIGCONT, contin);
 #endif
 			if (intty && value("autoinc") &&
-			    stat(editfile, &minfo) >=0 &&
+			    stat(editfile, &minfo) >= 0 &&
 			    minfo.st_size > mailsize) {
 				int OmsgCount, i;
 
@@ -336,7 +339,7 @@ top:
 				holdsigs();
 				if (!edit && issysmbox)
 					lockmail();
-				if ((ibuf = fopen(editfile, "r")) == NULL ) {
+				if ((ibuf = fopen(editfile, "r")) == NULL) {
 					fprintf(stderr,
 					    gettext("Can't reopen %s\n"),
 					    editfile);
@@ -366,7 +369,7 @@ top:
 						    msgCount-OmsgCount);
 					if (value("header") != NOSTR)
 						for (i = OmsgCount+1;
-						     i <= msgCount; i++) {
+						    i <= msgCount; i++) {
 							printhead(i);
 							sreset();
 						}
@@ -427,13 +430,13 @@ top:
 			}
 			return;
 		}
-		strncat(linebuf, line, n);	
+		strncat(linebuf, line, n);
 #ifdef SIGCONT
 		sigset(SIGCONT, SIG_DFL);
 #endif
 		if (execute(linebuf, 0))
 			return;
-more:		;
+more:;
 	}
 }
 
@@ -444,7 +447,7 @@ more:		;
  * Contxt is non-zero if called while composing mail.
  */
 
-int 
+int
 execute(char linebuf[], int contxt)
 {
 	char word[LINESIZE];
@@ -483,19 +486,19 @@ execute(char linebuf[], int contxt)
 	 */
 
 	if (sourcing && equal(word, ""))
-		return(0);
+		return (0);
 	com = lex(word);
 	if (com == NONE) {
 		fprintf(stderr, gettext("Unknown command: \"%s\"\n"), word);
 		if (loading) {
 			cond = CANY;
-			return(1);
+			return (1);
 		}
 		if (sourcing) {
 			cond = CANY;
 			unstack();
 		}
-		return(0);
+		return (0);
 	}
 
 	/*
@@ -506,7 +509,7 @@ execute(char linebuf[], int contxt)
 	if ((com->c_argtype & F) == 0)
 		if (cond == CRCV && !rcvmode || cond == CSEND && rcvmode ||
 		    cond == CTTY && !intty || cond == CNOTTY && intty)
-			return(0);
+			return (0);
 
 	/*
 	 * Special case so that quit causes a return to
@@ -517,11 +520,11 @@ execute(char linebuf[], int contxt)
 	if (com->c_func == (int (*)(void *))edstop) {
 		if (sourcing) {
 			if (loading)
-				return(1);
+				return (1);
 			unstack();
-			return(0);
+			return (0);
 		}
-		return(1);
+		return (1);
 	}
 
 	/*
@@ -536,10 +539,10 @@ execute(char linebuf[], int contxt)
 		    gettext("May not execute \"%s\" while sending\n"),
 		    com->c_name);
 		if (loading)
-			return(1);
+			return (1);
 		if (sourcing)
 			unstack();
-		return(0);
+		return (0);
 	}
 	if (sourcing && com->c_argtype & I) {
 		fprintf(stderr,
@@ -547,24 +550,24 @@ execute(char linebuf[], int contxt)
 		    com->c_name);
 		rpterr = 1;
 		if (loading)
-			return(1);
+			return (1);
 		unstack();
-		return(0);
+		return (0);
 	}
 	if (readonly && com->c_argtype & W) {
 		fprintf(stderr, gettext(
 		    "May not execute \"%s\" -- message file is read only\n"),
 		    com->c_name);
 		if (loading)
-			return(1);
+			return (1);
 		if (sourcing)
 			unstack();
-		return(0);
+		return (0);
 	}
 	if (contxt && com->c_argtype & R) {
 		fprintf(stderr, gettext("Cannot recursively invoke \"%s\"\n"),
 		    com->c_name);
-		return(0);
+		return (0);
 	}
 	e = 1;
 	switch (com->c_argtype & ~(F|P|I|M|T|W|R)) {
@@ -576,7 +579,7 @@ execute(char linebuf[], int contxt)
 		if (msgvec == 0) {
 			fprintf(stderr,
 			    gettext("Illegal use of \"message list\"\n"));
-			return(-1);
+			return (-1);
 		}
 		if ((c = getmsglist(cp, msgvec, com->c_msgflag)) < 0)
 			break;
@@ -597,15 +600,16 @@ execute(char linebuf[], int contxt)
 
 	case NDMLIST:
 		/*
-		 * A message list with no defaults, but no error
-		 * if none exist.
+		 * A message operand with no defaults, but no error
+		 * if none exists. There will be an error if the
+		 * msgvec pointer is of zero value.
 		 */
 		if (msgvec == 0) {
 			fprintf(stderr,
-			    gettext("Illegal use of \"message list\"\n"));
-			return(-1);
+			    gettext("Illegal use of \"message operand\"\n"));
+			return (-1);
 		}
-		if (getmsglist(cp, msgvec, com->c_msgflag) < 0)
+		if (getmessage(cp, msgvec, com->c_msgflag) < 0)
 			break;
 		e = (*com->c_func)(msgvec);
 		break;
@@ -625,7 +629,7 @@ execute(char linebuf[], int contxt)
 		 * A vector of strings, in shell style.
 		 */
 		if ((c = getrawlist(cp, arglist,
-				sizeof arglist / sizeof *arglist)) < 0)
+				sizeof (arglist) / sizeof (*arglist))) < 0)
 			break;
 		if (c < com->c_minargs) {
 			fprintf(stderr,
@@ -660,11 +664,11 @@ execute(char linebuf[], int contxt)
 	 */
 
 	if (e && loading)
-		return(1);
+		return (1);
 	if (e && sourcing)
 		unstack();
 	if (com->c_func == (int (*)(void *))edstop)
-		return(1);
+		return (1);
 	if (value("autoprint") != NOSTR && com->c_argtype & P)
 		if ((dot->m_flag & MDELETED) == 0) {
 			muvec[0] = dot - &message[0] + 1;
@@ -673,14 +677,14 @@ execute(char linebuf[], int contxt)
 		}
 	if (!sourcing && (com->c_argtype & T) == 0)
 		sawcom = 1;
-	return(0);
+	return (0);
 }
 
 #ifdef SIGCONT
 /*
  * When we wake up after ^Z, reprint the prompt.
  */
-static void 
+static void
 #ifdef	__cplusplus
 contin(int)
 #else
@@ -697,7 +701,7 @@ contin(int s)
 /*
  * Branch here on hangup signal and simulate quit.
  */
-void 
+void
 #ifdef	__cplusplus
 hangup(int)
 #else
@@ -707,9 +711,9 @@ hangup(int s)
 {
 
 	holdsigs();
-# ifdef OLD_BSD_SIGS
+#ifdef OLD_BSD_SIGS
 	sigignore(SIGHUP);
-# endif
+#endif
 	if (edit) {
 		if (setjmp(srbuf))
 			exit(rpterr);
@@ -730,11 +734,11 @@ hangup(int s)
  * lists to message list functions.
  */
 
-static void 
+static void
 setmsize(int sz)
 {
 
-	if (msgvec != (int *) 0)
+	if (msgvec != (int *)0)
 		free(msgvec);
 	if (sz < 1)
 		sz = 1; /* need at least one cell for terminating 0 */
@@ -755,14 +759,14 @@ lex(char word[])
 
 	for (cp = &cmdtab[0]; cp->c_name != NOSTR; cp++)
 		if (isprefix(word, cp->c_name))
-			return(cp);
-	return(NONE);
+			return (cp);
+	return (NONE);
 }
 
 /*
  * Determine if as1 is a valid prefix of as2.
  */
-static int 
+static int
 isprefix(char *as1, char *as2)
 {
 	register char *s1, *s2;
@@ -771,8 +775,8 @@ isprefix(char *as1, char *as2)
 	s2 = as2;
 	while (*s1++ == *s2)
 		if (*s2++ == '\0')
-			return(1);
-	return(*--s1 == '\0');
+			return (1);
+	return (*--s1 == '\0');
 }
 
 /*
@@ -787,7 +791,7 @@ isprefix(char *as1, char *as2)
 
 static int	inithdr;		/* am printing startup headers */
 
-void 
+void
 stop(int s)
 {
 	register NODE *head;
@@ -798,7 +802,7 @@ stop(int s)
 	inithdr = 0;
 	while (sourcing)
 		unstack();
-	getuserid((char *) 0);
+	(void) getuserid((char *)0);
 	for (head = fplist; head != (NODE *)NULL; head = head->next) {
 		if (head->fp == stdin || head->fp == stdout)
 			continue;
@@ -822,9 +826,9 @@ stop(int s)
 	if (s) {
 		fprintf(stderr, gettext("Interrupt\n"));
 		fflush(stderr);
-# ifdef OLD_BSD_SIGS
+#ifdef OLD_BSD_SIGS
 		sigrelse(s);
-# endif
+#endif
 	}
 	longjmp(srbuf, 1);
 }
@@ -836,13 +840,13 @@ stop(int s)
 
 #define	GREETING	"%s  Type ? for help.\n"
 
-void 
+void
 announce(void)
 {
 	int vec[2], mdot;
 	extern const char *const version;
 
-	if (!Hflag && value("quiet")==NOSTR)
+	if (!Hflag && value("quiet") == NOSTR)
 		printf(gettext(GREETING), version);
 	mdot = newfileinfo(1);
 	vec[0] = mdot;
@@ -859,7 +863,7 @@ announce(void)
  * Announce information about the file we are editing.
  * Return a likely place to set dot.
  */
-int 
+int
 newfileinfo(int start)
 {
 	register struct message *mp;
@@ -867,7 +871,7 @@ newfileinfo(int start)
 	char fname[BUFSIZ], zname[BUFSIZ], *ename;
 
 	if (Hflag)
-		return(1);		/* fake it--return message 1 */
+		return (1);		/* fake it--return message 1 */
 	for (mp = &message[start - 1]; mp < &message[msgCount]; mp++)
 		if ((mp->m_flag & (MNEW|MREAD)) == MNEW)
 			break;
@@ -890,7 +894,7 @@ newfileinfo(int start)
 		if (mp->m_flag & MSAVED)
 			s++;
 	}
-	ename=origname;
+	ename = origname;
 	if (getfold(fname) >= 0) {
 		nstrcat(fname, sizeof (fname), "/");
 		if (strncmp(fname, editfile, strlen(fname)) == 0) {
@@ -915,14 +919,14 @@ newfileinfo(int start)
 	if (readonly)
 		printf(gettext(" [Read only]"));
 	printf("\n");
-	return(mdot);
+	return (mdot);
 }
 
 /*
  * Print the current version number.
  */
 
-int 
+int
 #ifdef	__cplusplus
 pversion(char *)
 #else
@@ -931,13 +935,13 @@ pversion(char *s)
 #endif
 {
 	printf("%s\n", version);
-	return(0);
+	return (0);
 }
 
 /*
  * Load a file of user definitions.
  */
-void 
+void
 load(char *name)
 {
 	register FILE *in, *oldin;
@@ -962,7 +966,7 @@ load(char *name)
  * system mailbox, this probably ought to as well.
  */
 
-int 
+int
 inc(void)
 {
 	FILE *ibuf;
@@ -972,7 +976,7 @@ inc(void)
 
 	if (edit) {
 		fprintf(stderr, gettext("Not in system mailbox\n"));
-		return(-1);
+		return (-1);
 	}
 	if (((ibuf = fopen(mailname, "r")) == NULL) ||
 	    (fstat(fileno(ibuf), &stbuf) < 0) || stbuf.st_size == 0L ||
@@ -984,7 +988,7 @@ inc(void)
 			    strrchr(mailname, '/')+1);
 		if (ibuf != NULL)
 			fclose(ibuf);
-		return(-1);
+		return (-1);
 	}
 
 	fseek(otf, 0L, 2);
@@ -1002,5 +1006,5 @@ inc(void)
 	mdot = newfileinfo(firstnewmsg);
 	dot = &message[mdot - 1];
 	sawcom = 0;
-	return(0);
+	return (0);
 }

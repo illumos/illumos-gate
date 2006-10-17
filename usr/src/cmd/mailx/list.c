@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright (c) 1985-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+/* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
+/* All Rights Reserved   */
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -37,7 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "rcv.h"
@@ -63,27 +61,75 @@ static int	sender(char *str, int mesg);
 static void	unmark(int mesg);
 
 /*
+ * Process message operand list.
+ * Convert the user string of message numbers and
+ * store the numbers into vector.
+ *
+ * Returns the count of messages picked up or -1 on error.
+ */
+int
+getmessage(char *buf, int *vector, int flags)
+{
+	register int *ip;
+	register struct message *mp;
+	int i, firstmsg = -1;
+
+	if (markall(buf, flags) < 0)
+		return (-1);
+	ip = vector;
+
+	/*
+	 * Check for first message number and make sure it is
+	 * at the beginning of the vector.
+	 */
+	i = 0;
+	while (any(buf[i], " \t"))
+		i++;
+
+	if (isdigit(buf[i])) {
+		firstmsg = buf[i] - '0';
+		*ip++ = firstmsg;
+	}
+
+	/*
+	 * Add marked messages to vector and skip first
+	 * message number because it is already at the
+	 * beginning of the vector
+	 */
+	for (mp = &message[0]; mp < &message[msgCount]; mp++) {
+		if (firstmsg == mp - &message[0] + 1)
+			continue;
+		if (mp->m_flag & MMARK)
+			*ip++ = mp - &message[0] + 1;
+	}
+	*ip = NULL;
+	return (ip - vector);
+}
+
+/*
+ * Process msglist operand list.
  * Convert the user string of message numbers and
  * store the numbers into vector.
  *
  * Returns the count of messages picked up or -1 on error.
  */
 
-int 
+int
 getmsglist(char *buf, int *vector, int flags)
 {
 	register int *ip;
 	register struct message *mp;
 
 	if (markall(buf, flags) < 0)
-		return(-1);
+		return (-1);
 	ip = vector;
 	for (mp = &message[0]; mp < &message[msgCount]; mp++)
 		if (mp->m_flag & MMARK)
 			*ip++ = mp - &message[0] + 1;
 	*ip = NULL;
-	return(ip - vector);
+	return (ip - vector);
 }
+
 
 /*
  * Mark all messages that the user wanted from the command
@@ -122,7 +168,7 @@ static struct coltab {
 
 static	int	lastcolmod;
 
-static int 
+static int
 markall(char buf[], int f)
 {
 	register char **np;
@@ -148,13 +194,13 @@ markall(char buf[], int f)
 number:
 			if (star) {
 				printf(gettext("No numbers mixed with *\n"));
-				return(-1);
+				return (-1);
 			}
 			mc++;
 			other++;
 			if (beg != 0) {
 				if (check(lexnumber, f))
-					return(-1);
+					return (-1);
 				for (i = beg; i <= lexnumber; i++)
 					if ((message[i-1].m_flag&MDELETED) == f)
 						mark(i);
@@ -163,7 +209,7 @@ number:
 			}
 			beg = lexnumber;
 			if (check(beg, f))
-				return(-1);
+				return (-1);
 			tok = scan(&bufp);
 			if (tok != TDASH) {
 				regret(tok);
@@ -176,7 +222,7 @@ number:
 			if (beg != 0) {
 				printf(gettext(
 				    "Non-numeric second argument\n"));
-				return(-1);
+				return (-1);
 			}
 			other++;
 			if (lexstring[0] == ':') {
@@ -185,7 +231,7 @@ number:
 					printf(gettext(
 					    "Unknown colon modifier \"%s\"\n"),
 					    lexstring);
-					return(-1);
+					return (-1);
 				}
 				colmod |= colresult;
 			}
@@ -200,14 +246,14 @@ number:
 		case TDOT:
 			lexnumber = metamess(lexstring[0], f);
 			if (lexnumber == -1)
-				return(-1);
+				return (-1);
 			goto number;
 
 		case TSTAR:
 			if (other) {
 				printf(gettext(
 				    "Can't mix \"*\" with anything\n"));
-				return(-1);
+				return (-1);
 			}
 			star++;
 			break;
@@ -225,9 +271,9 @@ number:
 			}
 		if (mc == 0) {
 			printf(gettext("No applicable messages\n"));
-			return(-1);
+			return (-1);
 		}
-		return(0);
+		return (0);
 	}
 
 	/*
@@ -254,8 +300,7 @@ number:
 						mc++;
 						break;
 					}
-				}
-				else {
+				} else {
 					if (sender(*np, i)) {
 						mc++;
 						break;
@@ -281,7 +326,7 @@ namelist[0]);
 			for (np = &namelist[1]; *np != NOSTR; np++)
 				printf(", %s", *np);
 			printf("}\n");
-			return(-1);
+			return (-1);
 		}
 	}
 
@@ -313,47 +358,47 @@ namelist[0]);
 				if (colp->co_bit & colmod)
 					printf(" :%c", colp->co_char);
 			printf("\n");
-			return(-1);
+			return (-1);
 		}
 	}
-	return(0);
+	return (0);
 }
 
 /*
  * Turn the character after a colon modifier into a bit
  * value.
  */
-static int 
+static int
 evalcol(int col)
 {
 	register struct coltab *colp;
 
 	if (col == 0)
-		return(lastcolmod);
+		return (lastcolmod);
 	for (colp = &coltab[0]; colp->co_char; colp++)
 		if (colp->co_char == col)
-			return(colp->co_bit);
-	return(0);
+			return (colp->co_bit);
+	return (0);
 }
 
 /*
  * Check the passed message number for legality and proper flags.
  */
-static int 
+static int
 check(int mesg, int f)
 {
 	register struct message *mp;
 
 	if (mesg < 1 || mesg > msgCount) {
 		printf(gettext("%d: Invalid message number\n"), mesg);
-		return(-1);
+		return (-1);
 	}
 	mp = &message[mesg-1];
 	if ((mp->m_flag & MDELETED) != f) {
 		printf(gettext("%d: Inappropriate message\n"), mesg);
-		return(-1);
+		return (-1);
 	}
-	return(0);
+	return (0);
 }
 
 /*
@@ -361,7 +406,7 @@ check(int mesg, int f)
  * for a RAWLIST.
  */
 
-int 
+int
 getrawlist(char line[], char **argv, int argc)
 {
 	register char **ap, *cp, *cp2;
@@ -379,7 +424,7 @@ getrawlist(char line[], char **argv, int argc)
 		while (*cp != '\0') {
 			if (quotec) {
 				if (*cp == quotec) {
-					quotec=0;
+					quotec = 0;
 					cp++;
 				} else
 					*cp2++ = *cp++;
@@ -390,7 +435,7 @@ getrawlist(char line[], char **argv, int argc)
 						cp++;
 					} else {
 						printf(gettext(
-						  "Trailing \\; ignoring\n"));
+						    "Trailing \\; ignoring\n"));
 						break;
 					}
 				}
@@ -406,14 +451,14 @@ getrawlist(char line[], char **argv, int argc)
 		if (cp2 == linebuf)
 			break;
 		if (ap >= last) {
-			printf(gettext(
-			  "Too many elements in the list; excess discarded\n"));
+			printf(gettext("Too many elements in the list;"
+			    " excess discarded\n"));
 			break;
 		}
 		*ap++ = savestr(linebuf);
 	}
 	*ap = NOSTR;
-	return(ap-argv);
+	return (ap-argv);
 }
 
 /*
@@ -438,7 +483,7 @@ static struct lex {
 	0,	0
 };
 
-static int 
+static int
 scan(char **sp)
 {
 	register char *cp, *cp2;
@@ -449,7 +494,7 @@ scan(char **sp)
 	if (regretp >= 0) {
 		copy(stringstack[regretp], lexstring);
 		lexnumber = numberstack[regretp];
-		return(regretstack[regretp--]);
+		return (regretstack[regretp--]);
 	}
 	cp = *sp;
 	cp2 = lexstring;
@@ -469,7 +514,7 @@ scan(char **sp)
 
 	if (c == '\0') {
 		*sp = --cp;
-		return(TEOL);
+		return (TEOL);
 	}
 
 	/*
@@ -487,7 +532,7 @@ scan(char **sp)
 		}
 		*cp2 = '\0';
 		*sp = --cp;
-		return(TNUMBER);
+		return (TNUMBER);
 	}
 
 	/*
@@ -500,7 +545,7 @@ scan(char **sp)
 			lexstring[0] = c;
 			lexstring[1] = '\0';
 			*sp = cp;
-			return(lp->l_token);
+			return (lp->l_token);
 		}
 
 	/*
@@ -539,14 +584,14 @@ scan(char **sp)
 		fprintf(stderr, gettext("Missing %c\n"), quotec);
 	*sp = --cp;
 	*cp2 = '\0';
-	return(TSTRING);
+	return (TSTRING);
 }
 
 /*
  * Unscan the named token by pushing it onto the regret stack.
  */
 
-static void 
+static void
 regret(int token)
 {
 	if (++regretp >= REGDEP)
@@ -561,7 +606,7 @@ regret(int token)
  * Reset all the scanner global variables.
  */
 
-static void 
+static void
 scaninit(void)
 {
 	regretp = -1;
@@ -572,7 +617,7 @@ scaninit(void)
  * its message number.
  */
 
-int 
+int
 first(int f, int m)
 {
 	register int mesg;
@@ -583,23 +628,23 @@ first(int f, int m)
 	m &= MDELETED;
 	for (mp = dot; mp < &message[msgCount]; mp++) {
 		if ((mp->m_flag & m) == f)
-			return(mesg);
+			return (mesg);
 		mesg++;
 	}
 	mesg = dot - &message[0];
 	for (mp = dot-1; mp >= &message[0]; mp--) {
 		if ((mp->m_flag & m) == f)
-			return(mesg);
+			return (mesg);
 		mesg--;
 	}
-	return(NULL);
+	return (NULL);
 }
 
 /*
  * See if the passed name sent the passed message number.  Return true
  * if so.
  */
-static int 
+static int
 sender(char *str, int mesg)
 {
 	return (samebody(str, skin(nameof(&message[mesg-1])), TRUE));
@@ -615,7 +660,7 @@ sender(char *str, int mesg)
 
 static char lastscan[128];
 
-static int 
+static int
 matchsubj(char *str, int mesg)
 {
 	register struct message *mp;
@@ -635,24 +680,24 @@ matchsubj(char *str, int mesg)
 	cp = str;
 	cp2 = hfield("subject", mp, addone);
 	if (cp2 == NOSTR)
-		return(0);
+		return (0);
 	backup = cp2;
 	while (*cp2) {
 		if (*cp == 0)
-			return(1);
+			return (1);
 		if (toupper(*cp++) != toupper(*cp2++)) {
 			cp2 = ++backup;
 			cp = str;
 		}
 	}
-	return(*cp == 0);
+	return (*cp == 0);
 }
 
 /*
  * Mark the named message by setting its mark bit.
  */
 
-static void 
+static void
 mark(int mesg)
 {
 	register int i;
@@ -667,7 +712,7 @@ mark(int mesg)
  * Unmark the named message.
  */
 
-static void 
+static void
 unmark(int mesg)
 {
 	register int i;
@@ -681,7 +726,7 @@ unmark(int mesg)
 /*
  * Return the message number corresponding to the passed meta character.
  */
-static int 
+static int
 metamess(int meta, int f)
 {
 	register int c, m;
@@ -695,9 +740,9 @@ metamess(int meta, int f)
 		 */
 		for (mp = &message[0]; mp < &message[msgCount]; mp++)
 			if ((mp->m_flag & MDELETED) == f)
-				return(mp - &message[0] + 1);
+				return (mp - &message[0] + 1);
 		printf(gettext("No applicable messages\n"));
-		return(-1);
+		return (-1);
 
 	case '+':
 		/*
@@ -705,9 +750,9 @@ metamess(int meta, int f)
 		 */
 		for (mp = dot + 1; mp < &message[msgCount]; mp++)
 			if ((mp->m_flag & MDELETED) == f)
-				return(mp - &message[0] + 1);
+				return (mp - &message[0] + 1);
 		printf(gettext("Referencing beyond last message\n"));
-		return(-1);
+		return (-1);
 
 	case '-':
 		/*
@@ -715,9 +760,9 @@ metamess(int meta, int f)
 		 */
 		for (mp = dot - 1; mp >= &message[0]; mp--)
 			if ((mp->m_flag & MDELETED) == f)
-				return(mp - &message[0] + 1);
+				return (mp - &message[0] + 1);
 		printf(gettext("Referencing before first message\n"));
-		return(-1);
+		return (-1);
 
 	case '$':
 		/*
@@ -725,23 +770,23 @@ metamess(int meta, int f)
 		 */
 		for (mp = &message[msgCount-1]; mp >= &message[0]; mp--)
 			if ((mp->m_flag & MDELETED) == f)
-				return(mp - &message[0] + 1);
+				return (mp - &message[0] + 1);
 		printf(gettext("No applicable messages\n"));
-		return(-1);
+		return (-1);
 
 	case '.':
-		/* 
+		/*
 		 * Current message.
 		 */
 		m = dot - &message[0] + 1;
 		if ((dot->m_flag & MDELETED) != f) {
 			printf(gettext("%d: Inappropriate message\n"), m);
-			return(-1);
+			return (-1);
 		}
-		return(m);
+		return (m);
 
 	default:
 		printf(gettext("Unknown metachar (%c)\n"), c);
-		return(-1);
+		return (-1);
 	}
 }

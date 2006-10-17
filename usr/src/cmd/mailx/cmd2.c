@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,59 +66,35 @@ static int	retshow(void);
 #define	S_NOIGNORE	8		/* don't do ignore processing */
 
 /*
- * If any arguments were given, go to the next applicable argument
- * following dot, otherwise, go to the next applicable message.
- * If given as first command with no arguments, print first message.
+ * If any arguments were given, print the first message
+ * identified by the first argument. If no arguments are given,
+ * print the next applicable message after dot.
  */
 
-int 
+int
 next(int *msgvec)
 {
 	register struct message *mp;
-	register int *ip, *ip2;
-	int list[2], mdot;
+	int list[2];
 
 	if (*msgvec != NULL) {
-
-		/*
-		 * If some messages were supplied, find the 
-		 * first applicable one following dot using
-		 * wrap around.
-		 */
-
-		mdot = dot - &message[0] + 1;
-
-		/*
-		 * Find the first message in the supplied
-		 * message list which follows dot.
-		 */
-
-		for (ip = msgvec; *ip != NULL; ip++)
-			if (*ip > mdot)
-				break;
-		if (*ip == NULL)
-			ip = msgvec;
-		ip2 = ip;
-		do {
-			mp = &message[*ip2 - 1];
-			if ((mp->m_flag & MDELETED) == 0) {
-				dot = mp;
-				goto hitit;
-			}
-			if (*ip2 != NULL)
-				ip2++;
-			if (*ip2 == NULL)
-				ip2 = msgvec;
-		} while (ip2 != ip);
-		printf(gettext("No messages applicable\n"));
-		return(1);
+		if (*msgvec < 0) {
+			printf((gettext("Negative message given\n")));
+			return (1);
+		}
+		mp = &message[*msgvec - 1];
+		if ((mp->m_flag & MDELETED) == 0) {
+			dot = mp;
+			goto hitit;
+		}
+		printf(gettext("No applicable message\n"));
+		return (1);
 	}
 
 	/*
 	 * If this is the first command, select message 1.
 	 * Note that this must exist for us to get here at all.
 	 */
-
 	if (!sawcom)
 		goto hitit;
 
@@ -127,93 +102,91 @@ next(int *msgvec)
 	 * Just find the next good message after dot, no
 	 * wraparound.
 	 */
-
 	for (mp = dot+1; mp < &message[msgCount]; mp++)
 		if ((mp->m_flag & (MDELETED|MSAVED)) == 0)
 			break;
 	if (mp >= &message[msgCount]) {
 		printf(gettext("At EOF\n"));
-		return(0);
+		return (0);
 	}
 	dot = mp;
 hitit:
 	/*
 	 * Print dot.
 	 */
-
 	list[0] = dot - &message[0] + 1;
 	list[1] = NULL;
-	return(type(list));
+	return (type(list));
 }
 
 /*
  * Save a message in a file.  Mark the message as saved
  * so we can discard when the user quits.
  */
-int 
+int
 save(char str[])
 {
-	return(save1(str, S_MARK));
+	return (save1(str, S_MARK));
 }
 
 /*
  * Copy a message to a file without affected its saved-ness
  */
-int 
+int
 copycmd(char str[])
 {
-	return(save1(str, 0));
+	return (save1(str, 0));
 }
 
 /*
  * Save/copy the indicated messages at the end of the passed file name.
  * If mark is true, mark the message "saved."
  */
-static int 
+static int
 save1(char str[], int mark)
 {
 	char *file, *cmd;
 	int f, *msgvec;
 
 	cmd = mark ? "save" : "copy";
-	msgvec = (int *) salloc((msgCount + 2) * sizeof *msgvec);
+	msgvec = (int *)salloc((msgCount + 2) * sizeof (*msgvec));
 	if ((file = snarf(str, &f, 0)) == NOSTR)
 		file = Getf("MBOX");
-	if (f==-1)
-		return(1);
+	if (f == -1)
+		return (1);
 	if (!f) {
 		*msgvec = first(0, MMNORM);
 		if (*msgvec == NULL) {
 			printf(gettext("No messages to %s.\n"), cmd);
-			return(1);
+			return (1);
 		}
 		msgvec[1] = NULL;
 	}
 	if (f && getmsglist(str, msgvec, 0) < 0)
-		return(1);
+		return (1);
 	if ((file = expand(file)) == NOSTR)
-		return(1);
+		return (1);
 	savemsglist(file, msgvec, mark | S_SAVING);
-	return(0);
+	return (0);
 }
 
-int 
+int
 Save(int *msgvec)
 {
-	return(Save1(msgvec, S_MARK));
+	return (Save1(msgvec, S_MARK));
 }
 
-int 
+int
 Copy(int *msgvec)
 {
-	return(Save1(msgvec, 0));
+	return (Save1(msgvec, 0));
 }
 
 /*
  * save/copy the indicated messages at the end of a file named
  * by the sender of the first message in the msglist.
  */
-static int 
+static int
 Save1(int *msgvec, int mark)
 {
 	register char *from;
@@ -227,49 +200,49 @@ Save1(int *msgvec, int mark)
 	getrecf(from, recfile, 1, sizeof (recfile));
 	if (*recfile != '\0')
 		savemsglist(safeexpand(recfile), msgvec, mark | S_SAVING);
-	return(0);
+	return (0);
 }
 
-int 
+int
 sput(char str[])
 {
-	return(put1(str, 0));
+	return (put1(str, 0));
 }
 
-int 
+int
 Sput(char str[])
 {
-	return(put1(str, S_NOIGNORE));
+	return (put1(str, S_NOIGNORE));
 }
 
 /*
  * Put the indicated messages at the end of the passed file name.
  */
-static int 
+static int
 put1(char str[], int doign)
 {
 	char *file;
 	int f, *msgvec;
 
-	msgvec = (int *) salloc((msgCount + 2) * sizeof *msgvec);
+	msgvec = (int *)salloc((msgCount + 2) * sizeof (*msgvec));
 	if ((file = snarf(str, &f, 0)) == NOSTR)
 		file = Getf("MBOX");
-	if (f==-1)
-		return(1);
+	if (f == -1)
+		return (1);
 	if (!f) {
 		*msgvec = first(0, MMNORM);
 		if (*msgvec == NULL) {
 			printf(gettext("No messages to put.\n"));
-			return(1);
+			return (1);
 		}
 		msgvec[1] = NULL;
 	}
 	if (f && getmsglist(str, msgvec, 0) < 0)
-		return(1);
+		return (1);
 	if ((file = expand(file)) == NOSTR)
-		return(1);
+		return (1);
 	savemsglist(file, msgvec, doign);
-	return(0);
+	return (0);
 }
 
 /*
@@ -285,7 +258,7 @@ static	int wr_inlines;			/* count of lines read */
 static	long wr_maxlines;		/* total lines in message */
 static	int wr_inhead;			/* in header of message */
 
-static void 
+static void
 savemsglist(char *file, int *msgvec, int flag)
 {
 	register int *ip, mesg;
@@ -358,7 +331,7 @@ svputs(const char *line, FILE *obuf)
 {
 	wr_linecount++;
 	wr_charcount += strlen(line);
-	return(fputs(line, obuf));
+	return (fputs(line, obuf));
 }
 
 static int
@@ -374,13 +347,13 @@ wrputs(const char *line, FILE *obuf)
 	if (wr_inhead) {
 		if (strcmp(line, "\n") == 0)
 			wr_inhead = 0;
-		return(0);
+		return (0);
 	}
 	if (wr_inlines >= wr_maxlines && strcmp(line, "\n") == 0)
-		return(0);
+		return (0);
 	wr_linecount++;
 	wr_charcount += strlen(line);
-	return(fputs(line, obuf));
+	return (fputs(line, obuf));
 }
 
 /*
@@ -388,31 +361,31 @@ wrputs(const char *line, FILE *obuf)
  * file name, minus header and trailing blank line.
  */
 
-int 
+int
 swrite(char str[])
 {
 	register char *file;
 	int f, *msgvec;
 
-	msgvec = (int *) salloc((msgCount + 2) * sizeof *msgvec);
+	msgvec = (int *)salloc((msgCount + 2) * sizeof (*msgvec));
 	if ((file = snarf(str, &f, 1)) == NOSTR)
-		return(1);
-	if (f==-1)
-		return(1);
+		return (1);
+	if (f == -1)
+		return (1);
 	if ((file = expand(file)) == NOSTR)
-		return(1);
+		return (1);
 	if (!f) {
 		*msgvec = first(0, MMNORM);
 		if (*msgvec == NULL) {
 			printf(gettext("No messages to write.\n"));
-			return(1);
+			return (1);
 		}
 		msgvec[1] = NULL;
 	}
 	if (f && getmsglist(str, msgvec, 0) < 0)
-		return(1);
+		return (1);
 	savemsglist(file, msgvec, S_MARK|S_NOHEADER);
-	return(0);
+	return (0);
 }
 
 /*
@@ -445,12 +418,12 @@ snarf(char linebuf[], int *flag, int erf)
 	char *line_beg;			/* beginning of line, after */
 					/* leading whitespace */
 
-	/* 
+	/*
 	 * Skip leading whitespace.
 	 */
 	for (line_beg = linebuf;
-	     *line_beg && any(*line_beg, " \t");
-	     line_beg++) {
+	*line_beg && any(*line_beg, " \t");
+		line_beg++) {
 		/* empty body */
 	}
 	if (!*line_beg) {
@@ -458,13 +431,15 @@ snarf(char linebuf[], int *flag, int erf)
 			printf(gettext("No file specified\n."));
 		}
 		*flag = 0;
-		return(NOSTR);
+		return (NOSTR);
 	}
 	/*
 	 * Process line from left-to-right, 1 char at a time.
 	 */
-	for (pc_type = SN_DELIM, tok_beg = tok_end = NOSTR, p = line_beg;
-	     *p != '\0'; ) {
+	pc_type = SN_DELIM;
+	tok_beg = tok_end = NOSTR;
+	p = line_beg;
+	while (*p != '\0') {
 		if (any(*p, " \t")) {
 			/* This character is a DELIMITER */
 			if (pc_type & (SN_TOKEN|SN_QUOTE)) {
@@ -482,17 +457,17 @@ snarf(char linebuf[], int *flag, int erf)
 			}
 			/* Search for the matching QUOTE character */
 			for (tok_beg = p, tok_end = NOSTR, p++;
-			     *p != '\0' && *p != qc;
-			     p++) {
+			    *p != '\0' && *p != qc;
+				p++) {
 				if (*p == '\\' && *(p+1) == qc) {
 					p++;
 				}
 			}
 			if (*p == '\0') {
 				printf(gettext("Syntax error: missing "
-					       "%c.\n"), qc);
+				    "%c.\n"), qc);
 				*flag = -1;
-				return(NOSTR);
+				return (NOSTR);
 			}
 			tok_end = p;
 			pc_type = SN_QUOTE;
@@ -506,15 +481,15 @@ snarf(char linebuf[], int *flag, int erf)
 				}
 			} else {
 				printf(gettext("improper quotes"
-					       " at \"%s\".\n"), p);
+				    " at \"%s\".\n"), p);
 				*flag = -1;
-				return(NOSTR);
+				return (NOSTR);
 			}
 			if (*p == '\\' && *++p == '\0') {
 				printf(gettext("\'\\\' at "
-					       "end of line.\n"));
+				    "end of line.\n"));
 				*flag = -1;
-				return(NOSTR);
+				return (NOSTR);
 			}
 			pc_type = SN_TOKEN;
 			p++;
@@ -531,13 +506,13 @@ snarf(char linebuf[], int *flag, int erf)
 			*flag = 1;
 		}
 		tok_end[1] = '\0';
-		return(tok_beg);
+		return (tok_beg);
 	} else {
 		if (erf) {
 			printf(gettext("No file specified\n."));
 		}
 		*flag = 0;
-		return(NOSTR);
+		return (NOSTR);
 	}
 }
 
@@ -545,7 +520,7 @@ snarf(char linebuf[], int *flag, int erf)
  * Delete messages, then type the new dot.
  */
 
-int 
+int
 deltype(int msgvec[])
 {
 	int list[2];
@@ -558,14 +533,13 @@ deltype(int msgvec[])
 		if (list[0] > lastdot) {
 			touch(list[0]);
 			list[1] = NULL;
-			return(type(list));
+			return (type(list));
 		}
 		printf(gettext("At EOF\n"));
-		return(0);
-	}
-	else {
+		return (0);
+	} else {
 		printf(gettext("No more messages\n"));
-		return(0);
+		return (0);
 	}
 }
 
@@ -573,7 +547,7 @@ deltype(int msgvec[])
  * Delete the indicated messages.
  * Set dot to some nice place afterwards.
  */
-int 
+int
 delm(int *msgvec)
 {
 	register struct message *mp;
@@ -594,11 +568,10 @@ delm(int *msgvec)
 		last = first(0, MDELETED);
 		if (last != NULL) {
 			dot = &message[last-1];
-			return(0);
-		}
-		else {
+			return (0);
+		} else {
 			dot = &message[0];
-			return(-1);
+			return (-1);
 		}
 	}
 
@@ -606,13 +579,13 @@ delm(int *msgvec)
 	 * Following can't happen -- it keeps lint happy
 	 */
 
-	return(-1);
+	return (-1);
 }
 
 /*
  * Undelete the indicated messages.
  */
-int 
+int
 undelete(int *msgvec)
 {
 	register struct message *mp;
@@ -621,20 +594,20 @@ undelete(int *msgvec)
 	for (ip = msgvec; ip-msgvec < msgCount; ip++) {
 		mesg = *ip;
 		if (mesg == 0)
-			return(0);
+			return (0);
 		touch(mesg);
 		mp = &message[mesg-1];
 		dot = mp;
 		mp->m_flag &= ~MDELETED;
 	}
-	return(0);
+	return (0);
 }
 
 /*
  * Add the given header fields to the retained list.
  * If no arguments, print the current list of retained fields.
  */
-int 
+int
 retfield(char *list[])
 {
 	char field[BUFSIZ];
@@ -643,7 +616,7 @@ retfield(char *list[])
 	char **ap;
 
 	if (argcount(list) == 0)
-		return(retshow());
+		return (retshow());
 	for (ap = list; *ap != 0; ap++) {
 		istrcpy(field, sizeof (field), *ap);
 
@@ -664,13 +637,13 @@ retfield(char *list[])
 		retain[h] = igp;
 		nretained++;
 	}
-	return(0);
+	return (0);
 }
 
 /*
  * Print out all currently retained fields.
  */
-static int 
+static int
 retshow(void)
 {
 	register int h, count;
@@ -683,9 +656,9 @@ retshow(void)
 			count++;
 	if (count == 0) {
 		printf(gettext("No fields currently being retained.\n"));
-		return(0);
+		return (0);
 	}
-	ring = (char **) salloc((count + 1) * sizeof (char *));
+	ring = (char **)salloc((count + 1) * sizeof (char *));
 	ap = ring;
 	for (h = 0; h < HSHSIZE; h++)
 		for (igp = retain[h]; igp != 0; igp = igp->i_link)
@@ -694,13 +667,13 @@ retshow(void)
 	qsort(ring, count, sizeof (char *), igcomp);
 	for (ap = ring; *ap != 0; ap++)
 		printf("%s\n", *ap);
-	return(0);
+	return (0);
 }
 
 /*
  * Remove a list of fields from the retain list.
  */
-int 
+int
 unretfield(char *list[])
 {
 	char **ap, field[BUFSIZ];
@@ -713,7 +686,7 @@ unretfield(char *list[])
 			while (ig1) {
 				free(ig1->i_field);
 				ig2 = ig1->i_link;
-				free((char *) ig1);
+				free((char *)ig1);
 				ig1 = ig2;
 				count++;
 			}
@@ -723,7 +696,7 @@ unretfield(char *list[])
 			printf(gettext(
 			    "No fields currently being retained.\n"));
 		nretained = 0;
-		return 0;
+		return (0);
 	}
 	for (ap = list; *ap; ap++) {
 		istrcpy(field, sizeof (field), *ap);
@@ -735,19 +708,19 @@ unretfield(char *list[])
 				else
 					ig2->i_link = ig1->i_link;
 				free(ig1->i_field);
-				free((char *) ig1);
+				free((char *)ig1);
 				nretained--;
 				break;
 			}
 	}
-	return 0;
+	return (0);
 }
 
 /*
  * Add the given header fields to the ignored list.
  * If no arguments, print the current list of ignored fields.
  */
-int 
+int
 igfield(char *list[])
 {
 	char field[BUFSIZ];
@@ -756,7 +729,7 @@ igfield(char *list[])
 	char **ap;
 
 	if (argcount(list) == 0)
-		return(igshow());
+		return (igshow());
 	for (ap = list; *ap != 0; ap++) {
 		if (isign(*ap, 0))
 			continue;
@@ -775,13 +748,13 @@ igfield(char *list[])
 		igp->i_link = ignore[h];
 		ignore[h] = igp;
 	}
-	return(0);
+	return (0);
 }
 
 /*
  * Print out all currently ignored fields.
  */
-static int 
+static int
 igshow(void)
 {
 	register int h, count;
@@ -794,33 +767,33 @@ igshow(void)
 			count++;
 	if (count == 0) {
 		printf(gettext("No fields currently being ignored.\n"));
-		return(0);
+		return (0);
 	}
-	ring = (char **) salloc((count + 1) * sizeof (char *));
+	ring = (char **)salloc((count + 1) * sizeof (char *));
 	ap = ring;
 	for (h = 0; h < HSHSIZE; h++)
 		for (igp = ignore[h]; igp != 0; igp = igp->i_link)
 			*ap++ = igp->i_field;
 	*ap = 0;
-	qsort((char *) ring, (unsigned) count, sizeof (char *), igcomp);
+	qsort((char *)ring, (unsigned)count, sizeof (char *), igcomp);
 	for (ap = ring; *ap != 0; ap++)
 		printf("%s\n", *ap);
-	return(0);
+	return (0);
 }
 
 /*
  * Compare two names for sorting ignored field list.
  */
-static int 
+static int
 igcomp(const void *l, const void *r)
 {
-	return(strcmp(*(char **)l, *(char **)r));
+	return (strcmp(*(char **)l, *(char **)r));
 }
 
 /*
  * Remove a list of fields from the ignore list.
  */
-int 
+int
 unigfield(char *list[])
 {
 	char **ap, field[BUFSIZ];
@@ -833,7 +806,7 @@ unigfield(char *list[])
 			while (ig1) {
 				free(ig1->i_field);
 				ig2 = ig1->i_link;
-				free((char *) ig1);
+				free((char *)ig1);
 				ig1 = ig2;
 				count++;
 			}
@@ -841,7 +814,7 @@ unigfield(char *list[])
 		}
 		if (count == 0)
 			printf(gettext("No fields currently being ignored.\n"));
-		return 0;
+		return (0);
 	}
 	for (ap = list; *ap; ap++) {
 		istrcpy(field, sizeof (field), *ap);
@@ -853,9 +826,9 @@ unigfield(char *list[])
 				else
 					ig2->i_link = ig1->i_link;
 				free(ig1->i_field);
-				free((char *) ig1);
+				free((char *)ig1);
 				break;
 			}
 	}
-	return 0;
+	return (0);
 }

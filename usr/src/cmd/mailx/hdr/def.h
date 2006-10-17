@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
- * All Rights Reserved
- *
- *
- * Copyright (c) 1985-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
+/*	All Rights Reserved   */
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -60,10 +59,10 @@ extern "C" {
 #include <ctype.h>
 #include <errno.h>
 #ifndef preSVr4
-# include <unistd.h>
-# include <stdlib.h>
-# include <ulimit.h>
-# include <wait.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <ulimit.h>
+#include <wait.h>
 #endif
 #ifdef VMUNIX
 #include <sys/wait.h>
@@ -82,16 +81,21 @@ extern "C" {
 #define	HSHSIZE		59		/* Hash size for aliases and vars */
 #define	HDRFIELDS	3		/* Number of header fields */
 #define	LINESIZE	5120		/* max readable line width */
-#define	STRINGSIZE	((unsigned) 128)/* Dynamic allocation units */
+#define	STRINGSIZE	((unsigned)128) /* Dynamic allocation units */
 #define	MAXARGC		1024		/* Maximum list of raw strings */
-#define	NOSTR		((char *) 0)	/* Nill string pointer */
-#define	NOSTRPTR	((char **) 0)	/* Nill pointer to string pointer */
-#define	NOINTPTR	((int *) 0)	/* Nill pointer */
+#define	NOSTR		((char *)0)	/* Nill string pointer */
+#define	NOSTRPTR	((char **)0)	/* Nill pointer to string pointer */
+#define	NOINTPTR	((int *)0)	/* Nill pointer */
 #define	MAXEXP		25		/* Maximum expansion of aliases */
 
-#define	equal(a, b)	(strcmp(a,b)==0)/* A nice function to string compare */
-#define fopen(s,t)	my_fopen(s,t)	/* Keep a list of all opened files */
-#define fclose(s)	my_fclose(s)	/* delete closed file from the list*/
+/* A nice function to string compare */
+#define	equal(a, b)	(strcmp(a, b) == 0)
+
+/* Keep a list of all opened files */
+#define	fopen(s, t)	my_fopen(s, t)
+
+/* Delete closed file from the list */
+#define	fclose(s)	my_fclose(s)
 
 struct message {
 	off_t	m_offset;		/* offset in block of message */
@@ -127,31 +131,32 @@ typedef struct fplst {
 
 #define	H_AFWDCNT	1		/* "Auto-Forward-Count:"  */
 #define	H_AFWDFROM	2		/* "Auto-Forwarded-From:" */
-#define	H_CLEN		3		/* "Content-Length:"      */
-#define	H_CTYPE		4		/* "Content-Type:"        */
-#define	H_DATE		5		/* "Date:" 		  */
-#define	H_DEFOPTS	6		/* "Default-Options:" 	  */
-#define	H_EOH		7		/* "End-of-Header:" 	  */
-#define	H_FROM		8		/* "From " 		  */
-#define	H_FROM1		9		/* ">From " 		  */
-#define	H_FROM2		10		/* "From: " 		  */
-#define	H_MTSID		11		/* "MTS-Message-ID:" 	  */
-#define	H_MTYPE		12		/* "Message-Type:" 	  */
-#define	H_MVERS		13		/* "Message-Version:" 	  */
-#define	H_MSVC		14		/* "Message-Service:" 	  */
-#define	H_RECEIVED	15		/* "Received:"	 	  */
-#define	H_RVERS		16		/* "Report-Version:" 	  */
-#define	H_STATUS	17		/* "Status:"		  */
-#define	H_SUBJ		18		/* "Subject:" 		  */
-#define	H_TO		19		/* "To:" 		  */
-#define	H_TCOPY		20		/* ">To:" 		  */
+#define	H_CLEN		3		/* "Content-Length:"	*/
+#define	H_CTYPE		4		/* "Content-Type:"	*/
+#define	H_DATE		5		/* "Date:"		*/
+#define	H_DEFOPTS	6		/* "Default-Options:"	*/
+#define	H_EOH		7		/* "End-of-Header:"	*/
+#define	H_FROM		8		/* "From "		*/
+#define	H_FROM1		9		/* ">From "		*/
+#define	H_FROM2		10		/* "From: "		*/
+#define	H_MTSID		11		/* "MTS-Message-ID:"	*/
+#define	H_MTYPE		12		/* "Message-Type:"	*/
+#define	H_MVERS		13		/* "Message-Version:"	*/
+#define	H_MSVC		14		/* "Message-Service:"	*/
+#define	H_RECEIVED	15		/* "Received:"		*/
+#define	H_RVERS		16		/* "Report-Version:"	*/
+#define	H_STATUS	17		/* "Status:"		*/
+#define	H_SUBJ		18		/* "Subject:"		*/
+#define	H_TO		19		/* "To:"		*/
+#define	H_TCOPY		20		/* ">To:"		*/
 #define	H_TROPTS	21		/* "Transport-Options:"   */
 #define	H_UAID		22		/* "UA-Content-ID:"	  */
-#define	H_DAFWDFROM	23		/* Hold A-F-F when sending Del. Notf. */
-#define	H_DTCOPY	24		/* Hold ">To:" when sending Del. Notf.*/
-#define	H_DRECEIVED	25		/* Hold Rcvd: when sending Del. Notf.*/
-#define H_CONT		26		/* Continuation of previous line */
-#define H_NAMEVALUE	27		/* unrecognized "name: value" hdr line*/
+
+#define	H_DAFWDFROM	23	/* Hold A-F-F when sending Del. Notf. */
+#define	H_DTCOPY	24	/* Hold ">To:" when sending Del. Notf. */
+#define	H_DRECEIVED	25	/* Hold Rcvd: when sending Del. Notf. */
+#define	H_CONT		26	/* Continuation of previous line */
+#define	H_NAMEVALUE	27	/* unrecognized "name: value" hdr line */
 
 /*
  * Format of the command description table.
@@ -194,8 +199,8 @@ struct cmd {
  * Oft-used mask values
  */
 
-#define	MMNORM		(MDELETED|MSAVED)/* Look at both save and delete bits */
-#define	MMNDEL		MDELETED	/* Look only at deleted bit */
+#define	MMNORM	(MDELETED|MSAVED) /* Look at both save and delete bits */
+#define	MMNDEL	MDELETED	/* Look only at deleted bit */
 
 /*
  * Structure used to return a break down of a head
@@ -214,7 +219,7 @@ struct headline {
 #define	GBCC	8		/* And also the Bcc: line */
 #define	GDEFOPT	16		/* And the Default-Options: lines */
 #define	GNL	32		/* Print blank line after */
-#define GOTHER	64		/* Other header lines */
+#define	GOTHER	64		/* Other header lines */
 #define	GMASK	(GTO|GSUBJECT|GCC|GBCC|GDEFOPT|GNL|GOTHER)
 				/* Mask of all header lines */
 #define	GDEL	128		/* Entity removed from list */
@@ -272,22 +277,22 @@ struct grouphead {
 	struct	mgroup *g_list;		/* Users in group. */
 };
 
-#define	NIL	((struct name *) 0)	/* The nil pointer for namelists */
-#define	NONE	((struct cmd *) 0)	/* The nil pointer to command tab */
-#define	NOVAR	((struct var *) 0)	/* The nil pointer to variables */
-#define	NOGRP	((struct grouphead *) 0)/* The nil grouphead pointer */
-#define	NOGE	((struct mgroup *) 0)	/* The nil group pointer */
-#define	NOFP	((struct fplst *) 0)	/* The nil file pointer */
+#define	NIL	((struct name *)0)	/* The nil pointer for namelists */
+#define	NONE	((struct cmd *)0)	/* The nil pointer to command tab */
+#define	NOVAR	((struct var *)0)	/* The nil pointer to variables */
+#define	NOGRP	((struct grouphead *)0) /* The nil grouphead pointer */
+#define	NOGE	((struct mgroup *)0)	/* The nil group pointer */
+#define	NOFP	((struct fplst *)0)	/* The nil file pointer */
 
-#define TRUE	1
-#define FALSE	0
+#define	TRUE	1
+#define	FALSE	0
 
-#define DEADPERM	0600		/* permissions of dead.letter */
-#define TEMPPERM	0600		/* permissions of temp files */
-#define MBOXPERM	0600		/* permissions of ~/mbox */
+#define	DEADPERM	0600		/* permissions of dead.letter */
+#define	TEMPPERM	0600		/* permissions of temp files */
+#define	MBOXPERM	0600		/* permissions of ~/mbox */
 
 #ifndef	MFMODE
-# define MFMODE		0600		/* create mode for `/var/mail' files */
+#define	MFMODE		0600		/* create mode for `/var/mail' files */
 #endif
 
 /*
@@ -304,7 +309,7 @@ struct utimbuf {
 	time_t	modtime;
 };
 #else
-#  include	<utime.h>
+#include	<utime.h>
 #endif
 
 /*
@@ -322,7 +327,7 @@ struct utimbuf {
 #define	TSTAR		7		/* A "*" */
 #define	TOPEN		8		/* An '(' */
 #define	TCLOSE		9		/* A ')' */
-#define TPLUS		10		/* A '+' */
+#define	TPLUS		10		/* A '+' */
 
 #define	REGDEP		2		/* Maximum regret depth. */
 #define	STRINGLEN	1024		/* Maximum length of string token */
@@ -381,7 +386,7 @@ struct utimbuf {
  * useful just before closing an old file that was opened
  * for read/write.
  */
-#define trunc(stream)	ftruncate(fileno(stream), (long) ftell(stream))
+#define	trunc(stream)	ftruncate(fileno(stream), (long)ftell(stream))
 
 /*
  * The pointers for the string allocation routines,
@@ -468,100 +473,105 @@ extern int		followup(int *msgvec);
 extern int		from(int *msgvec);
 extern off_t		fsize(FILE *iob);
 extern int		getfold(char *name);
-extern int		gethfield(register FILE *f, char linebuf[], register long rem);
-extern int		getline(char *line, int size, FILE *f, int *hasnulls);
-extern int		getmsglist(char *buf, int *vector, int flags);
-extern int		getname(uid_t uid, char namebuf[]);
-extern int		getrawlist(char line[], char **argv, int argc);
-extern void		getrecf(char *buf, char *recfile, int useauthor, int sz_recfile);
-extern uid_t		getuserid(char name[]);
-extern int		grabh(register struct header *hp, int gflags, int subjtop);
-extern int		group(char **argv);
-extern void		hangup(int);
-extern int		hash(char name[]);
-extern char		*hcontents(char hfield[]);
-extern int		headerp(register char *line);
-extern int		headers(int *msgvec);
-extern int		help(void);
-extern char		*helppath(char *file);
-extern char		*hfield(char field[], struct message *mp, char *(*add)(char *, char *));
-extern void		holdsigs(void);
-extern int		icequal(register char *s1, register char *s2);
-extern int		ifcmd(char **argv);
-extern int		igfield(char *list[]);
-extern int		inc(void);
-extern void		inithost(void);
-extern int		isdir(char name[]);
-extern int		ishead(char linebuf[]);
-extern int		ishfield(char linebuf[], char field[]);
-extern int		ishost(char *sys, char *rest);
-extern int		isign(char *field, int saving);
-extern void		istrcpy(char *dest, int dstsize, char *src);
-extern void		lcwrite(char *fn, FILE *fi, FILE *fo, int addnl);
-extern void		load(char *name);
-extern int		loadmsg(char str[]);
-extern int		lock(FILE *fp, char *mode, int blk);
-extern void		lockmail(void);
-extern int		mail(char **people);
-extern void		mail1(struct header *hp, int use_to, char *orig_to);
-extern void		mapf(register struct name *np, char *from);
-extern int		mboxit(int msgvec[]);
-extern void		mechk(struct name *names);
-extern int		member(register char *realfield, register struct ignore **table);
-extern int		messize(int *msgvec);
-extern void		minit(void);
-extern int		more(int *msgvec);
-extern long		msend(struct message *mailp, FILE *obuf, int flag, int (*fp)(const char *, FILE *));
-extern int		my_fclose(register FILE *iop);
-extern FILE		*my_fopen(char *file, char *mode);
-extern char		*nameof(register struct message *mp);
-extern char		*netmap(char name[], char from[]);
-extern int		newfileinfo(int start);
-extern int		next(int *msgvec);
-extern int		npclose(FILE *ptr);
-extern FILE		*npopen(char *cmd, char *mode);
-extern char		*nstrcpy(char *dst, int dstsize, char *src);
-extern char		*nstrcat(char *dst, int dstsize, char *src);
-extern int		null(char *e);
-extern int		outof(struct name *names, FILE *fo);
+extern int	gethfield(register FILE *f, char linebuf[], register long rem);
+extern int	getline(char *line, int size, FILE *f, int *hasnulls);
+extern int	getmessage(char *buf, int *vector, int flags);
+extern int	getmsglist(char *buf, int *vector, int flags);
+extern int	getname(uid_t uid, char namebuf[]);
+extern int	getrawlist(char line[], char **argv, int argc);
+extern void	getrecf(char *buf, char *recfile,
+		    int useauthor, int sz_recfile);
+extern uid_t	getuserid(char name[]);
+extern int	grabh(register struct header *hp, int gflags, int subjtop);
+extern int	group(char **argv);
+extern void	hangup(int);
+extern int	hash(char name[]);
+extern char	*hcontents(char hfield[]);
+extern int	headerp(register char *line);
+extern int	headers(int *msgvec);
+extern int	help(void);
+extern char	*helppath(char *file);
+extern char	*hfield(char field[], struct message *mp,
+		    char *(*add)(char *, char *));
+extern void	holdsigs(void);
+extern int	icequal(register char *s1, register char *s2);
+extern int	ifcmd(char **argv);
+extern int	igfield(char *list[]);
+extern int	inc(void);
+extern void	inithost(void);
+extern int	isdir(char name[]);
+extern int	ishead(char linebuf[]);
+extern int	ishfield(char linebuf[], char field[]);
+extern int	ishost(char *sys, char *rest);
+extern int	isign(char *field, int saving);
+extern void	istrcpy(char *dest, int dstsize, char *src);
+extern void	lcwrite(char *fn, FILE *fi, FILE *fo, int addnl);
+extern void	load(char *name);
+extern int	loadmsg(char str[]);
+extern int	lock(FILE *fp, char *mode, int blk);
+extern void	lockmail(void);
+extern int	mail(char **people);
+extern void	mail1(struct header *hp, int use_to, char *orig_to);
+extern void	mapf(register struct name *np, char *from);
+extern int	mboxit(int msgvec[]);
+extern void	mechk(struct name *names);
+extern int	member(register char *realfield,
+		    register struct ignore **table);
+extern int	messize(int *msgvec);
+extern void	minit(void);
+extern int	more(int *msgvec);
+extern long	msend(struct message *mailp, FILE *obuf,
+		    int flag, int (*fp)(const char *, FILE *));
+extern int	my_fclose(register FILE *iop);
+extern FILE	*my_fopen(char *file, char *mode);
+extern char	*nameof(register struct message *mp);
+extern char	*netmap(char name[], char from[]);
+extern int	newfileinfo(int start);
+extern int	next(int *msgvec);
+extern int	npclose(FILE *ptr);
+extern FILE	*npopen(char *cmd, char *mode);
+extern char	*nstrcpy(char *dst, int dstsize, char *src);
+extern char	*nstrcat(char *dst, int dstsize, char *src);
+extern int	null(char *e);
+extern int	outof(struct name *names, FILE *fo);
 extern struct name	*outpre(struct name *to);
-extern void		panic(char *str);
-extern void		parse(char line[], struct headline *hl, char pbuf[]);
-extern int		pcmdlist(void);
-extern int		pdot(void);
-extern int		preserve(int *msgvec);
-extern void		printgroup(char name[]);
-extern void		printhead(int mesg);
-extern int		puthead(struct header *hp, FILE *fo, int w, long clen);
-extern int		pversion(char *e);
-extern void		quit(int noremove);
-extern int		readline(FILE *ibuf, char *linebuf);
-extern void		receipt(struct message *mp);
-extern void		relsesigs(void);
-extern int		removefile(char name[]);
-extern int		replyall(int *msgvec);
-extern int		replysender(int *msgvec);
-extern int		respond(int *msgvec);
-extern int		retfield(char *list[]);
-extern int		rexit(int e);
-extern char		*safeexpand(char name[]);
-extern void		*salloc(unsigned size);
-extern void		*srealloc(void *optr, unsigned size);
-extern int		samebody(register char *user, register char *addr,
-			    int fuzzy);
-extern int		save(char str[]);
-extern void		savedead(int s);
-extern char		*savestr(char *str);
-extern int		schdir(char *str);
-extern int		screensize(void);
-extern int		scroll(char arg[]);
-extern int		sendm(char *str);
-extern int		set(char **arglist);
-extern void		setclen(register struct message *mp);
-extern int		setfile(char *name, int isedit);
-extern FILE		*setinput(register struct message *mp);
-extern void		setptr(register FILE *ibuf);
-extern int		shell(char *str);
+extern void	panic(char *str);
+extern void	parse(char line[], struct headline *hl, char pbuf[]);
+extern int	pcmdlist(void);
+extern int	pdot(void);
+extern int	preserve(int *msgvec);
+extern void	printgroup(char name[]);
+extern void	printhead(int mesg);
+extern int	puthead(struct header *hp, FILE *fo, int w, long clen);
+extern int	pversion(char *e);
+extern void	quit(int noremove);
+extern int	readline(FILE *ibuf, char *linebuf);
+extern void	receipt(struct message *mp);
+extern void	relsesigs(void);
+extern int	removefile(char name[]);
+extern int	replyall(int *msgvec);
+extern int	replysender(int *msgvec);
+extern int	respond(int *msgvec);
+extern int	retfield(char *list[]);
+extern int	rexit(int e);
+extern char	*safeexpand(char name[]);
+extern void	*salloc(unsigned size);
+extern void	*srealloc(void *optr, unsigned size);
+extern int	samebody(register char *user, register char *addr,
+		    int fuzzy);
+extern int	save(char str[]);
+extern void	savedead(int s);
+extern char	*savestr(char *str);
+extern int	schdir(char *str);
+extern int	screensize(void);
+extern int	scroll(char arg[]);
+extern int	sendm(char *str);
+extern int	set(char **arglist);
+extern void	setclen(register struct message *mp);
+extern int	setfile(char *name, int isedit);
+extern FILE	*setinput(register struct message *mp);
+extern void	setptr(register FILE *ibuf);
+extern int	shell(char *str);
 #ifndef sigchild
 extern void		sigchild(void);
 #endif
