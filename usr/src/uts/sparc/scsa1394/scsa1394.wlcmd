@@ -120,6 +120,8 @@ add	sbp2_ses::s_status_cb targets scsa1394_sbp2_status_cb
 
 ignore  sd.c:sd_scsi_probe_cache_fini
 ignore  sd.c:sd_scsi_probe_cache_init
+ignore	sd.c:sd_scsi_target_lun_fini
+ignore	sd.c:sd_scsi_target_lun_init
 root    sd.c:sd_taskq_create
 root    sd.c:sd_taskq_delete
 

@@ -185,6 +185,8 @@ add	scsi_hba_tran::tran_bus_power targets warlock_dummy
 
 ignore  sd.c:sd_scsi_probe_cache_fini
 ignore  sd.c:sd_scsi_probe_cache_init
+ignore	sd.c:sd_scsi_target_lun_fini
+ignore	sd.c:sd_scsi_target_lun_init
 root    sd.c:sd_taskq_create
 root    sd.c:sd_taskq_delete 
 
