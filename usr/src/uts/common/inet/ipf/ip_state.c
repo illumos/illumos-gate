@@ -831,24 +831,29 @@ u_int flags;
 	if ((fin->fin_flx & FI_OOW) && !(fin->fin_tcpf & TH_SYN))
 		return NULL;
 
-	fr = fin->fin_fr;
-	if ((fr->fr_statemax == 0) && (ips_num == fr_statemax)) {
-		ATOMIC_INCL(ips_stats.iss_max);
-		fr_state_doflush = 1;
-		return NULL;
-	}
-
 	/*
 	 * If a "keep state" rule has reached the maximum number of references
 	 * to it, then schedule an automatic flush in case we can clear out
-	 * some "dead old wood".
+	 * some "dead old wood".  Note that because the lock isn't held on
+	 * fr it is possible that we could overflow.  The cost of overflowing
+	 * is being ignored here as the number by which it can overflow is
+	 * a product of the number of simultaneous threads that could be
+	 * executing in here, so a limit of 100 won't result in 200, but could
+	 * result in 101 or 102.
 	 */
-	if ((fr != NULL) && (fr->fr_statemax != 0) &&
-	    (fr->fr_statecnt >= fr->fr_statemax)) {
-		MUTEX_EXIT(&fr->fr_lock);
-		ATOMIC_INCL(ips_stats.iss_maxref);
-		fr_state_doflush = 1;
-		return NULL;
+	fr = fin->fin_fr;
+	if (fr != NULL) {
+		if ((ips_num == fr_statemax) && (fr->fr_statemax == 0)) {
+			ATOMIC_INCL(ips_stats.iss_max);
+			fr_state_doflush = 1;
+			return NULL;
+		}
+		if ((fr->fr_statemax != 0) &&
+		    (fr->fr_statecnt >= fr->fr_statemax)) {
+			ATOMIC_INCL(ips_stats.iss_maxref);
+			fr_state_doflush = 1;
+			return NULL;
+		}
 	}
 
 	pass = (fr == NULL) ? 0 : fr->fr_flags;
