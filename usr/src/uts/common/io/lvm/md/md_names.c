@@ -2083,6 +2083,18 @@ md_setdevname(
 			} else {
 				min_devid_key = did_n->min_devid_key;
 				min_len = (size_t)did_n->min_namlen;
+				/*
+				 * Need to save the min_name as well because
+				 * if the alloc_entry() needs to expand the
+				 * record then it will free the existing
+				 * record (which will free any references
+				 * to information within it ie did_n->min_name)
+				 */
+				if (mname != NULL) {
+					kmem_free(mname, strlen(mname) + 1);
+				}
+				mname = kmem_alloc(min_len, KM_SLEEP);
+				(void) strcpy(mname, did_n->min_name);
 			}
 		} else {
 
@@ -2146,7 +2158,7 @@ add_devid:
 				cmn_err(CE_NOTE,
 				    "addname: failed to add to record");
 			}
-			(void) strcpy(new_did_n->min_name, did_n->min_name);
+			(void) strcpy(new_did_n->min_name, mname);
 			new_did_n->min_namlen = (ushort_t)min_len;
 		} else {
 
