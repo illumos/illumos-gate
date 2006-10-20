@@ -43,6 +43,9 @@ lx_fork(void)
 {
 	int ret = fork1();
 
+	if (ret == 0 && lx_is_rpm)
+		sleep(lx_rpm_delay);
+
 	return (ret == -1 ? -errno : ret);
 }
 

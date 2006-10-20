@@ -51,6 +51,7 @@
 #include <fcntl.h>
 #include <synch.h>
 #include <libelf.h>
+#include <libgen.h>
 #include <pthread.h>
 #include <utime.h>
 #include <dirent.h>
@@ -169,6 +170,8 @@ static struct lx_sysent sysents[LINUX_MAX_SYSCALL + 1];
 static uintptr_t stack_bottom;
 
 int lx_install = 0;		/* install mode enabled if non-zero */
+boolean_t lx_is_rpm = B_FALSE;
+int lx_rpm_delay = 1;
 int lx_strict = 0;		/* "strict" mode enabled if non-zero */
 int lx_verbose = 0;		/* verbose mode enabled if non-zero */
 int lx_debug_enabled = 0;	/* debugging output enabled if non-zero */
@@ -692,6 +695,24 @@ lx_init(int argc, char *argv[], char *envp[])
 	lx_debug("executing linux process: %s", argv[0]);
 	lx_debug("branding myself and setting handler to 0x%p",
 	    (void *)lx_handler_table);
+
+	/*
+	 * The version of rpm that ships with CentOS/RHEL 3.x has a race
+	 * condition in it.  If it creates a child process to run a
+	 * post-install script, and that child process completes too
+	 * quickly, it will disappear before the parent notices.  This
+	 * causes the parent to hang forever waiting for the already dead
+	 * child to die.  I'm sure there's a Lazarus joke buried in here
+	 * somewhere.
+	 *
+	 * Anyway, as a workaround, we make every child of an 'rpm' process
+	 * sleep for 1 second, giving the parent a chance to enter its
+	 * wait-for-the-child-to-die loop.  Thay may be the hackiest trick
+	 * in all of our Linux emulation code - and that's saying
+	 * something.
+	 */
+	if (strcmp("rpm", basename(argv[0])) == NULL)
+		lx_is_rpm = B_TRUE;
 
 	reg.lxbr_version = LX_VERSION;
 	reg.lxbr_handler = (void *)&lx_handler_table;
