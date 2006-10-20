@@ -164,6 +164,9 @@ extern  ill_t	*ill_lookup_on_ifindex(uint_t, boolean_t, queue_t *, mblk_t *,
     ipsq_func_t, int *);
 extern	ill_t	*ill_lookup_on_name(char *, boolean_t,
     boolean_t, queue_t *, mblk_t *, ipsq_func_t, int *, boolean_t *);
+extern uint_t	ill_get_next_ifindex(uint_t, boolean_t);
+extern uint_t	ill_get_ifindex_by_name(char *);
+extern ill_t	*ill_get_first(boolean_t isv6);
 extern	void	ill_ipif_cache_delete(ire_t *, char *);
 extern	void	ill_delete(ill_t *);
 extern	void	ill_delete_tail(ill_t *);
@@ -205,6 +208,7 @@ extern int	ill_up_ipifs(ill_t *, queue_t *, mblk_t *);
 extern	boolean_t ill_is_probeonly(ill_t *);
 
 extern	char	*ipif_get_name(const ipif_t *, char *, int);
+extern	ipif_t	*ipif_getby_indexes(uint_t, uint_t, boolean_t);
 extern	void	ipif_init(void);
 extern	ipif_t	*ipif_lookup_addr(ipaddr_t, ill_t *, zoneid_t, queue_t *,
     mblk_t *, ipsq_func_t, int *);

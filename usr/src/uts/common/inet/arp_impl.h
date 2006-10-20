@@ -72,7 +72,11 @@ typedef struct arl_s {
 			arl_closing : 1,	/* stream is closing */
 			arl_notifies : 1,	/* handles DL_NOTE_LINK */
 			arl_link_up : 1;	/* DL_NOTE status */
+	uint32_t	arl_index;		/* instance number */
 } arl_t;
+
+extern arl_t		*arl_g_head; 		/* ARL chain head */
+extern krwlock_t	arl_g_lock;
 
 #define	ARL_F_NOARP	0x01
 
@@ -112,6 +116,74 @@ typedef struct ace_s {
 	clock_t		ace_xmit_interval;
 	int		ace_xmit_count;
 } ace_t;
+
+/* 
+ * Hooks structures used inside of arp
+ */
+extern hook_event_token_t	arp_physical_in;
+extern hook_event_token_t	arp_physical_out;
+extern hook_event_token_t	arpnicevents;
+
+extern hook_event_t	arp_physical_in_event;
+extern hook_event_t	arp_physical_out_event;
+extern hook_event_t	arp_nic_events;
+
+#define ARPHOOK_INTERESTED_PHYSICAL_IN	\
+	(arp_physical_in_event.he_interested)
+#define ARPHOOK_INTERESTED_PHYSICAL_OUT	\
+	(arp_physical_out_event.he_interested)
+
+#define ARP_HOOK_IN(_hook, _event, _ilp, _hdr, _fm, _m)	\
+								\
+	if ((_hook).he_interested) {                       	\
+		hook_pkt_event_t info;                          \
+								\
+		info.hpe_ifp = _ilp;                       	\
+		info.hpe_ofp = 0;                       	\
+		info.hpe_hdr = _hdr;                            \
+		info.hpe_mp = &(_fm);                           \
+		info.hpe_mb = _m;                               \
+		if (hook_run(_event, (hook_data_t)&info) != 0) {\
+			if (_fm != NULL) {                      \
+				freemsg(_fm);                   \
+				_fm = NULL;                     \
+			}                                       \
+			_hdr = NULL;                            \
+			_m = NULL;                              \
+		} else {                                        \
+			_hdr = info.hpe_hdr;                    \
+			_m = info.hpe_mb;                       \
+		}                                               \
+	}
+
+#define ARP_HOOK_OUT(_hook, _event, _olp, _hdr, _fm, _m)	\
+								\
+	if ((_hook).he_interested) {                       	\
+		hook_pkt_event_t info;                          \
+								\
+		info.hpe_ifp = 0;                       	\
+		info.hpe_ofp = _olp;                       	\
+		info.hpe_hdr = _hdr;                            \
+		info.hpe_mp = &(_fm);                           \
+		info.hpe_mb = _m;                               \
+		if (hook_run(_event,                            \
+		    (hook_data_t)&info) != 0) {                 \
+			if (_fm != NULL) {                      \
+				freemsg(_fm);                   \
+				_fm = NULL;                     \
+			}                                       \
+			_hdr = NULL;                            \
+			_m = NULL;                              \
+		} else {                                        \
+			_hdr = info.hpe_hdr;                    \
+			_m = info.hpe_mb;                       \
+		}                                               \
+	}
+
+extern void	arp_hook_init();
+extern void	arp_hook_destroy();
+extern void	arp_net_init();
+extern void	arp_net_destroy();
 
 #endif	/* _KERNEL */
 

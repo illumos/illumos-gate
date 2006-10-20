@@ -526,9 +526,8 @@ ndp_inactive(nce_t *nce)
 
 			mp = *mpp;
 			*mpp = mp->b_next;
-			mp->b_next = NULL;
-			mp->b_prev = NULL;
-			freemsg(mp);
+
+			inet_freemsg(mp);
 		}
 	} while (mpp++ != &nce->nce_last_mp_to_free);
 
@@ -551,7 +550,8 @@ ndp_inactive(nce_t *nce)
 		mutex_exit(&ill->ill_lock);
 	}
 	mutex_destroy(&nce->nce_lock);
-	freeb(nce->nce_mp);
+	if (nce->nce_mp != NULL)
+		inet_freemsg(nce->nce_mp);
 }
 
 /*
@@ -836,26 +836,31 @@ ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 		nce->nce_qd_mp = NULL;
 		mutex_exit(&nce->nce_lock);
 		while (mp != NULL) {
-			mblk_t *nxt_mp;
+			mblk_t *nxt_mp, *data_mp;
 
 			nxt_mp = mp->b_next;
 			mp->b_next = NULL;
-			if (mp->b_prev != NULL) {
+
+			if (mp->b_datap->db_type == M_CTL)
+				data_mp = mp->b_cont;
+			else
+				data_mp = mp;
+			if (data_mp->b_prev != NULL) {
 				ill_t   *inbound_ill;
 				queue_t *fwdq = NULL;
 				uint_t ifindex;
 
-				ifindex = (uint_t)(uintptr_t)mp->b_prev;
+				ifindex = (uint_t)(uintptr_t)data_mp->b_prev;
 				inbound_ill = ill_lookup_on_ifindex(ifindex,
 				    B_TRUE, NULL, NULL, NULL, NULL);
 				if (inbound_ill == NULL) {
-					mp->b_prev = NULL;
+					data_mp->b_prev = NULL;
 					freemsg(mp);
 					return;
 				} else {
 					fwdq = inbound_ill->ill_rq;
 				}
-				mp->b_prev = NULL;
+				data_mp->b_prev = NULL;
 				/*
 				 * Send a forwarded packet back into ip_rput_v6
 				 * just as in ire_send_v6().
@@ -867,7 +872,9 @@ ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 					 * Forwarded packets hop count will
 					 * get decremented in ip_rput_data_v6
 					 */
-					put(fwdq, mp);
+					if (data_mp != mp)
+						freeb(mp);
+					put(fwdq, data_mp);
 				} else {
 					/*
 					 * Send locally originated packets back

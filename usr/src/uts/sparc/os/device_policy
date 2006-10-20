@@ -90,5 +90,4 @@ aggr:ctl	read_priv_set=sys_net_config	write_priv_set=sys_net_config
 # IP Filter
 #
 ipf             read_priv_set=sys_net_config    write_priv_set=sys_net_config
-pfil            read_priv_set=net_rawaccess     write_priv_set=net_rawaccess
 

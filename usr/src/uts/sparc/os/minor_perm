@@ -136,7 +136,6 @@ ramdisk:ctl 0644 root sys
 cryptoadm:cryptoadm 0644 root sys
 crypto:crypto 0666 root sys
 ipf:* 0666 root sys
-pfil:* 0666 root sys
 bl:* 0666 root sys
 sctp:* 0666 root sys
 sctp6:* 0666 root sys

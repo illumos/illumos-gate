@@ -366,6 +366,7 @@ extern int	ip_hdr_complete_v6(ip6_t *, zoneid_t);
 extern boolean_t	ip_hdr_length_nexthdr_v6(mblk_t *, ip6_t *,
     uint16_t *, uint8_t **);
 extern int	ip_hdr_length_v6(mblk_t *, ip6_t *);
+extern int	ip_check_v6_mblk(mblk_t *, ill_t *);
 extern uint32_t	ip_massage_options_v6(ip6_t *, ip6_rthdr_t *);
 extern void	ip_wput_frag_v6(mblk_t *, ire_t *, uint_t, conn_t *, int, int);
 extern void 	ip_wput_ipsec_out_v6(queue_t *, mblk_t *, ip6_t *, ill_t *,
@@ -378,6 +379,7 @@ extern void	ip_wput_md_v6(queue_t *, mblk_t *, conn_t *);
 extern void	ip_output_v6(void *, mblk_t *, void *, int);
 extern void	ip_xmit_v6(mblk_t *, ire_t *, uint_t, conn_t *, int,
     struct ipsec_out_s *);
+extern void	ip_rput_v6(queue_t *, mblk_t *);
 extern void	ip_rput_data_v6(queue_t *, ill_t *, mblk_t *, ip6_t *,
     uint_t, mblk_t *, mblk_t *);
 extern void	mld_input(queue_t *, mblk_t *, ill_t *);

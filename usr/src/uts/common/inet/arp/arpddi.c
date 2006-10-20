@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -30,8 +29,10 @@
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/modctl.h>
+#include <sys/ksynch.h>
 #include <inet/common.h>
 #include <inet/ip.h>
+#include <inet/arp_impl.h>
 
 #define	INET_NAME	"arp"
 #define	INET_MODDESC	"ARP STREAMS module %I%"
@@ -41,23 +42,56 @@
 #define	INET_DEVMTFLAGS	IP_DEVMTFLAGS	/* since as a driver we're ip */
 #define	INET_MODMTFLAGS	(D_MP | D_MTPERMOD)
 
+static void	arp_ddi_destroy();
+static void	arp_ddi_init();
+
 #include "../inetddi.c"
 
 int
 _init(void)
 {
+	int error;
+
+	arp_ddi_init();
 	INET_BECOME_IP();
-	return (mod_install(&modlinkage));
+
+	error = mod_install(&modlinkage);
+	if (error != 0)
+		arp_ddi_destroy();
+	return error;
 }
 
 int
 _fini(void)
 {
-	return (mod_remove(&modlinkage));
+	int error;
+
+	error = mod_remove(&modlinkage);
+	if (error == 0)
+		arp_ddi_destroy();
+	return error;
 }
 
 int
 _info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
+}
+
+
+static void
+arp_ddi_init()
+{
+	rw_init(&arl_g_lock, "ARP ARl lock", RW_DRIVER, NULL);
+	arp_net_init();
+	arp_hook_init();
+}
+
+
+static void
+arp_ddi_destroy()
+{
+	arp_hook_destroy();
+	arp_net_destroy();
+	rw_destroy(&arl_g_lock);
 }

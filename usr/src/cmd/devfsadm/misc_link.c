@@ -110,7 +110,7 @@ static devfsadm_create_t misc_cbt[] = {
 	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name
 	},
 	{ "pseudo", "ddi_pseudo",
-	    "(^pfil$)|(^ipf$)|(^ipnat$)|(^ipstate$)|(^ipauth$)|"
+	    "(^ipf$)|(^ipnat$)|(^ipstate$)|(^ipauth$)|"
 	    "(^ipsync$)|(^ipscan$)|(^iplookup$)",
 	    TYPE_EXACT | DRV_RE, ILEVEL_0, minor_name,
 	},

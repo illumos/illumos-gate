@@ -139,6 +139,7 @@ f none usr/include/inet/ip_if.h 644 root bin
 f none usr/include/inet/ip_ire.h 644 root bin
 f none usr/include/inet/ip_ftable.h 644 root bin
 f none usr/include/inet/ip_multi.h 644 root bin
+f none usr/include/inet/ip_netinfo.h 644 root bin
 f none usr/include/inet/ip_rts.h 644 root bin
 f none usr/include/inet/ip6.h 644 root bin
 f none usr/include/inet/ip6_asp.h 644 root bin
@@ -750,6 +751,9 @@ f none usr/include/sys/fstyp.h 644 root bin
 f none usr/include/sys/ftrace.h 644 root bin
 f none usr/include/sys/gfs.h 644 root bin
 f none usr/include/sys/hdio.h 644 root bin
+f none usr/include/sys/hook.h 644 root bin
+f none usr/include/sys/hook_event.h 644 root bin
+f none usr/include/sys/hook_impl.h 644 root bin
 f none usr/include/sys/hwconf.h 644 root bin
 f none usr/include/sys/ia.h 644 root bin
 f none usr/include/sys/iapriocntl.h 644 root bin
@@ -892,6 +896,7 @@ f none usr/include/sys/netconfig.h 644 root bin
 f none usr/include/sys/nexusdefs.h 644 root bin
 f none usr/include/sys/ndifm.h 644 root bin
 f none usr/include/sys/ndi_impldefs.h 644 root bin
+f none usr/include/sys/neti.h 644 root bin
 f none usr/include/sys/note.h 644 root bin
 f none usr/include/sys/nvpair.h 644 root bin
 f none usr/include/sys/nvpair_impl.h 644 root bin
@@ -960,6 +965,7 @@ f none usr/include/sys/psw.h 644 root bin
 f none usr/include/sys/ptem.h 644 root bin
 f none usr/include/sys/ptms.h 644 root bin
 f none usr/include/sys/ptyvar.h 644 root bin
+f none usr/include/sys/queue.h 644 root bin
 f none usr/include/sys/raidioctl.h 644 root bin
 f none usr/include/sys/ramdisk.h 644 root bin
 f none usr/include/sys/random.h 644 root bin

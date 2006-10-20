@@ -246,6 +246,9 @@ CHKHDRS=			\
 	gld.h			\
 	gldpriv.h		\
 	hdio.h			\
+	hook.h			\
+	hook_event.h		\
+	hook_impl.h		\
 	hwconf.h		\
 	ia.h			\
 	iapriocntl.h		\
@@ -339,6 +342,7 @@ CHKHDRS=			\
 	ndifm.h		\
 	ndi_impldefs.h		\
 	netconfig.h		\
+	neti.h			\
 	nexusdefs.h		\
 	note.h			\
 	nvpair.h                \
@@ -353,6 +357,7 @@ CHKHDRS=			\
 	pathconf.h		\
 	pathname.h		\
 	pattr.h			\
+	queue.h			\
 	serializer.h		\
 	pbio.h			\
 	pccard.h		\

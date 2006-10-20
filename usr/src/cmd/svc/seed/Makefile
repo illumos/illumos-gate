@@ -75,8 +75,7 @@ GLOBAL_ZONE_DESCRIPTIONS = \
 	../milestone/multi-user-server.xml \
 	../../cmd-inet/usr.lib/inetd/inetd-upgrade.xml \
 	../../utmpd/utmp.xml \
-	../../lvm/util/metainit.xml \
-	../../ipf/svc/pfil.xml
+	../../lvm/util/metainit.xml
 
 #
 # Additional manifests for a Solaris zone

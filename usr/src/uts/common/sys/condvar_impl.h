@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1991-1997 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SYS_CONDVAR_IMPL_H
@@ -55,6 +55,52 @@ typedef struct _condvar_impl {
 #define	CV_HAS_WAITERS(cvp)	(((condvar_impl_t *)(cvp))->cv_waiters != 0)
 
 #endif	/* _ASM */
+
+
+typedef	struct	cvwaitlock_s	{
+	kmutex_t	cvw_lock;
+	kcondvar_t	cvw_waiter;
+	int		cvw_refcnt;
+} cvwaitlock_t;
+
+
+#define	CVW_INIT(_c)		{				\
+	mutex_init(&(_c)->cvw_lock, NULL, MUTEX_DRIVER, NULL);	\
+	cv_init(&(_c)->cvw_waiter, NULL, CV_DRIVER, NULL);	\
+	(_c)->cvw_refcnt = 0;					\
+}
+
+#define	CVW_ENTER_READ(_c)	{				\
+	mutex_enter(&(_c)->cvw_lock);				\
+	while ((_c)->cvw_refcnt < 0)				\
+		cv_wait(&((_c)->cvw_waiter), &(_c)->cvw_lock);	\
+	(_c)->cvw_refcnt++;					\
+	mutex_exit(&(_c)->cvw_lock);				\
+}
+
+#define	CVW_ENTER_WRITE(_c)	{				\
+	mutex_enter(&(_c)->cvw_lock);				\
+	while ((_c)->cvw_refcnt != 0)				\
+		cv_wait(&((_c)->cvw_waiter), &(_c)->cvw_lock);	\
+	(_c)->cvw_refcnt = -1;					\
+	mutex_exit(&(_c)->cvw_lock);				\
+}
+
+#define	CVW_EXIT_READ(_c)	{			\
+	mutex_enter(&(_c)->cvw_lock);			\
+	ASSERT((_c)->cvw_refcnt > 0);			\
+	if ((--((_c)->cvw_refcnt)) == 0)		\
+		cv_broadcast(&(_c)->cvw_waiter);	\
+	mutex_exit(&(_c)->cvw_lock);			\
+}
+
+#define	CVW_EXIT_WRITE(_c)	{			\
+	mutex_enter(&(_c)->cvw_lock);			\
+	ASSERT((_c)->cvw_refcnt == -1);			\
+	(_c)->cvw_refcnt = 0;				\
+	cv_broadcast(&(_c)->cvw_waiter);		\
+	mutex_exit(&(_c)->cvw_lock);			\
+}
 
 #ifdef	__cplusplus
 }

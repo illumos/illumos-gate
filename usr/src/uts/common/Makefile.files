@@ -430,7 +430,7 @@ TOKENMT_OBJS +=	tokenmt.o tokenmtddi.o
 
 TSWTCL_OBJS +=	tswtcl.o tswtclddi.o
 
-ARP_OBJS +=	arpddi.o arp.o
+ARP_OBJS +=	arpddi.o arp.o arp_netinfo.o
 
 ICMP_OBJS +=	icmpddi.o icmp.o icmp_opt_data.o
 
@@ -447,7 +447,7 @@ IP_SCTP_OBJS =	sctp_crc32.o sctp.o sctp_opt_data.o sctp_output.o \
 		sctp_param.o sctp_shutdown.o sctp_common.o \
 		sctp_timer.o sctp_heartbeat.o sctp_hash.o \
 		sctp_ioc.o sctp_bind.o sctp_notify.o sctp_asconf.o \
-		sctp_addr.o tn_ipopt.o tnet.o
+		sctp_addr.o tn_ipopt.o tnet.o ip_netinfo.o
 
 IP_OBJS +=	igmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o ip6_rts.o \
 		ip_cksum.o ip_if.o ip_ire.o ip_listutils.o ip_mroute.o \
@@ -460,6 +460,10 @@ IP_OBJS +=	igmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o ip6_rts.o \
 		$(IP_SCTP_OBJS)
 
 IP6_OBJS +=	ip6ddi.o
+
+HOOK_OBJS +=	hook.o
+
+NETI_OBJS +=	neti.o
 
 KEYSOCK_OBJS +=	keysockddi.o keysock.o keysock_opt_data.o
 
@@ -956,7 +960,7 @@ LDTERM_OBJS +=	ldterm.o uwidth.o
 
 PCKT_OBJS +=	pckt.o
 
-PFMOD_OBJS	+=	pfmod.o
+PFMOD_OBJS +=	pfmod.o
 
 PTEM_OBJS +=	ptem.o
 
@@ -1242,10 +1246,8 @@ PHX_OBJS += phx.o
 
 IPF_OBJS += ip_fil_solaris.o fil.o solaris.o ip_state.o ip_frag.o ip_nat.o \
 	    ip_proxy.o ip_auth.o ip_pool.o ip_htable.o ip_lookup.o \
-	    ip_log.o
+	    ip_log.o misc.o
  
-PFIL_OBJS +=  pfil.o qif.o pfildrv.o pfilstream.o pkt.o misc.o ndd.o
-
 IBD_OBJS +=	ibd.o
 
 VNI_OBJS += vni.o

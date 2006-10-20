@@ -1,4 +1,24 @@
 #
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -28,16 +48,13 @@ i i.preserve
 #
 d none etc 755 root sys
 d none etc/ipf 755 root sys
-e preserve etc/ipf/pfil.ap 644 root sys
 e preserve etc/ipf/ipf.conf 644 root sys
 d none lib 755 root bin
 d none lib/svc 0755 root bin
 d none lib/svc/method 0755 root bin
 f none lib/svc/method/ipfilter 0555 root bin
-f none lib/svc/method/pfil 0555 root bin
 d none kernel 755 root sys
 d none kernel/drv 755 root sys
-f none kernel/drv/pfil.conf 644 root sys
 d none kernel/strmod 755 root sys
 d none var 755 root sys
 d none var/db 755 root sys
@@ -45,5 +62,4 @@ d none var/db/ipf 755 root sys
 d none var/svc 755 root sys
 d none var/svc/manifest 755 root sys
 d none var/svc/manifest/network 755 root sys
-f manifest var/svc/manifest/network/pfil.xml 444 root sys
 f manifest var/svc/manifest/network/ipfilter.xml 444 root sys

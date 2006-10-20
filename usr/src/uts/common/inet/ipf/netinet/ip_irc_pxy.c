@@ -369,7 +369,7 @@ nat_t *nat;
 		sum2 -= sum1;
 		sum2 = (sum2 & 0xffff) + (sum2 >> 16);
 
-		fix_outcksum(fin, &ip->ip_sum, sum2);
+		fix_outcksum(&ip->ip_sum, sum2);
 #endif
 		ip->ip_len += inc;
 	}

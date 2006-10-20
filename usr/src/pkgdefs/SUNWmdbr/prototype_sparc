@@ -35,6 +35,8 @@ f none kernel/kmdb/sparcv9/crypto 555 root sys
 f none kernel/kmdb/sparcv9/genunix 555 root sys
 f none kernel/kmdb/sparcv9/intr 555 root sys
 f none kernel/kmdb/sparcv9/ip 555 root sys
+f none kernel/kmdb/sparcv9/hook 555 root sys
+f none kernel/kmdb/sparcv9/neti 555 root sys
 f none kernel/kmdb/sparcv9/ipc 555 root sys
 f none kernel/kmdb/sparcv9/ipp 555 root sys
 f none kernel/kmdb/sparcv9/isp 555 root sys

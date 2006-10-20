@@ -568,6 +568,9 @@ extern void 	*tcp_get_conn(void *arg);
 extern void	tcp_time_wait_collector(void *arg);
 extern int	tcp_snmp_get(queue_t *, mblk_t *);
 extern int	tcp_snmp_set(queue_t *, int, int, uchar_t *, int len);
+extern mblk_t	*tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send,
+		    int32_t *offset, mblk_t **end_mp, uint32_t seq,
+		    boolean_t sendall, uint32_t *seg_len, boolean_t rexmit);
 /*
  * The TCP Fanout structure.
  * The hash tables and their linkage (tcp_*_hash_next, tcp_ptp*hn) are

@@ -107,7 +107,6 @@ IP Filter Management:solaris:cmd:::/usr/sbin/ipmon:privs=sys_net_config
 IP Filter Management:solaris:cmd:::/usr/sbin/ipfstat:privs=sys_net_config;gid=sys
 IP Filter Management:solaris:cmd:::/usr/sbin/ipnat:privs=sys_net_config;gid=sys
 IP Filter Management:solaris:cmd:::/usr/sbin/ippool:privs=sys_net_config;gid=sys
-IP Filter Management:solaris:cmd:::/usr/sbin/pfild:uid=0
 Kerberos Server Management:solaris:cmd:::/usr/lib/krb5/krb5kdc:uid=0
 Kerberos Server Management:solaris:cmd:::/usr/lib/krb5/kadmind:uid=0
 Kerberos Server Management:solaris:cmd:::/usr/lib/krb5/kprop:euid=0;privs=none

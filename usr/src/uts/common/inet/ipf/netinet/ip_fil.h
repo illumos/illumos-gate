@@ -61,6 +61,7 @@
 # define	SIOCIPFGET	_IOWR('r', 88, struct ipfobj)
 # define	SIOCIPFSET	_IOWR('r', 89, struct ipfobj)
 # define	SIOCIPFL6	_IOWR('r', 90, int)
+# define	SIOCIPFLP	_IOWR('r', 91, int)
 #else
 # define	SIOCADAFR	_IOW(r, 60, struct ipfobj)
 # define	SIOCRMAFR	_IOW(r, 61, struct ipfobj)
@@ -93,6 +94,7 @@
 # define	SIOCIPFGET	_IOWR(r, 88, struct ipfobj)
 # define	SIOCIPFSET	_IOWR(r, 89, struct ipfobj)
 # define	SIOCIPFL6	_IOWR(r, 90, int)
+# define	SIOCIPFLP	_IOWR(r, 91, int)
 #endif
 #define	SIOCADDFR	SIOCADAFR
 #define	SIOCDELFR	SIOCRMAFR
@@ -1147,6 +1149,14 @@ typedef	struct	ipftune	{
 
 
 /*
+ * sync commands
+ */
+#define	IPFSYNC_RESYNC	0
+#define	IPFSYNC_NEWIFP	1
+#define	IPFSYNC_OLDIFP	2
+
+
+/*
 ** HPUX Port
 */
 #ifdef __hpux
@@ -1352,7 +1362,7 @@ extern	int		fr_addipftune __P((ipftuneable_t *));
 extern	int		fr_delipftune __P((ipftuneable_t *));
 
 extern	int	frflush __P((minor_t, int, int));
-extern	void	frsync __P((void *));
+extern	void	frsync __P((int, int, void *, char *));
 extern	frgroup_t *fr_addgroup __P((char *, void *, u_32_t, minor_t, int));
 extern	int	fr_derefrule __P((frentry_t **));
 extern	void	fr_delgroup __P((char *, minor_t, int));

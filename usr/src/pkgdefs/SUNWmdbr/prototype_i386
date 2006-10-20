@@ -34,6 +34,8 @@ f none kernel/kmdb/amd64/cpc 555 root sys
 f none kernel/kmdb/amd64/crypto 555 root sys
 f none kernel/kmdb/amd64/genunix 555 root sys
 f none kernel/kmdb/amd64/ip 555 root sys
+f none kernel/kmdb/amd64/hook 555 root sys
+f none kernel/kmdb/amd64/neti 555 root sys
 f none kernel/kmdb/amd64/ipc 555 root sys
 f none kernel/kmdb/amd64/ipp 555 root sys
 f none kernel/kmdb/amd64/krtld 555 root sys
@@ -59,6 +61,8 @@ f none kernel/kmdb/cpc 555 root sys
 f none kernel/kmdb/crypto 555 root sys
 f none kernel/kmdb/genunix 555 root sys
 f none kernel/kmdb/ip 555 root sys
+f none kernel/kmdb/hook 555 root sys
+f none kernel/kmdb/neti 555 root sys
 f none kernel/kmdb/ipc 555 root sys
 f none kernel/kmdb/ipp 555 root sys
 f none kernel/kmdb/krtld 555 root sys

@@ -10,17 +10,19 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ipf.h"
-#include "qif.h"
 #include "kmem.h"
 
 /*
  * Given a pointer to an interface in the kernel, return a pointer to a
  * string which is the interface name.
+ *
+ * The same code is used to run in two different environments: in ipfstat
+ * and in ipftest.  In ipftest, kmemcpy is wrapper for bcopy but in ipfstat,
+ * it is used as an interface to libkvm.
  */
 char *getifname(ptr)
 struct ifnet *ptr;
 {
-#if SOLARIS || defined(__hpux)
 # if SOLARIS
 #  include <sys/mutex.h>
 #  include <sys/condvar.h>
@@ -28,23 +30,6 @@ struct ifnet *ptr;
 # ifdef __hpux
 #  include "compat.h"
 # endif
-	char *ifname;
-	qif_t qif;
-
-	if ((void *)ptr == (void *)-1)
-		return "!";
-	if (ptr == NULL)
-		return "-";
-
-	if (kmemcpy((char *)&qif, (u_long)ptr, sizeof(qif)) == -1)
-		return "X";
-	ifname = strdup(qif.qf_name);
-	if ((ifname != NULL) && (*ifname == '\0')) {
-		free(ifname);
-		return "!";
-	}
-	return ifname;
-#else
 # if defined(NetBSD) && (NetBSD >= 199905) && (NetBSD < 1991011) || \
     defined(__OpenBSD__) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
@@ -53,6 +38,11 @@ struct ifnet *ptr;
 	int len;
 # endif
 	struct ifnet netif;
+
+# ifdef SOLARIS_PFHOOKS
+	if ((opts & OPT_DONOTHING) == 0)
+		return "@";
+# endif
 
 	if ((void *)ptr == (void *)-1)
 		return "!";
@@ -80,5 +70,4 @@ struct ifnet *ptr;
 	sprintf(buf + strlen(buf), "%d", netif.if_unit % 10000);
 	return strdup(buf);
 # endif
-#endif
 }

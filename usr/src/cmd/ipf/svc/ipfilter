@@ -1,5 +1,25 @@
 #!/sbin/sh
 #
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -22,7 +42,6 @@ if [ -f $PIDFILE ] ; then
 else
 	pid=`pgrep ipmon`
 fi
-pfildpid=`pgrep pfild`
 
 logmsg()
 {
@@ -30,31 +49,9 @@ logmsg()
 	echo "$1" >&2
 }
 
-checkpfil()
-{
-	if [ $PFILCHECKED = yes ] ; then
-		return
-	fi
-	/usr/sbin/ndd /dev/pfil \? 2>&1 > /dev/null
-	if [ $? -ne 0 ] ; then
-		logmsg "pfil not available to support ipfilter"
-		exit $SMF_EXIT_ERR_CONFIG
-	fi
-	realnic=`/sbin/ifconfig -a modlist 2>/dev/null | grep -c pfil`
-	if [ $realnic -eq 0 ] ; then
-		logmsg "pfil not plumbed on any network interfaces."
-		logmsg "No network traffic will be filtered."
-		logmsg "See ipfilter(5) for more information."
-		exit $SMF_EXIT_ERR_CONFIG
-	fi
-	PFILCHECKED=yes
-}
-
-
 load_ipf() {
 	bad=0
 	if [ -r ${IPFILCONF} ]; then
-		checkpfil
 		ipf -IFa -f ${IPFILCONF} >/dev/null
 		if [ $? != 0 ]; then
 			echo "$0: load of ${IPFILCONF} into alternate set failed"
@@ -62,7 +59,6 @@ load_ipf() {
 		fi
 	fi
 	if [ -r ${IP6FILCONF} ]; then
-		checkpfil
 		ipf -6IFa -f ${IP6FILCONF} >/dev/null
 		if [ $? != 0 ]; then
 			echo "$0: load of ${IPFILCONF} into alternate set failed"
@@ -81,7 +77,6 @@ load_ipf() {
 
 load_ipnat() {
 	if [ -r ${IPNATCONF} ]; then
-		checkpfil
 		ipnat -CF -f ${IPNATCONF} >/dev/null
 		if [ $? != 0 ]; then
 			echo "$0: load of ${IPNATCONF} failed"
@@ -98,7 +93,6 @@ load_ipnat() {
 
 load_ippool() {
 	if [ -r ${IPPOOLCONF} ]; then
-		checkpfil
 		ippool -F >/dev/null
 		ippool -f ${IPPOOLCONF} >/dev/null
 		if [ $? != 0 ]; then
@@ -116,9 +110,7 @@ load_ippool() {
 case "$1" in
 	start)
 		[ ! -f ${IPFILCONF} ] && exit 0
-		[ -n "$pfildpid" ] && kill -TERM $pfildpid 2>/dev/null
 		[ -n "$pid" ] && kill -TERM $pid 2>/dev/null
-		/usr/sbin/pfild >/dev/null
 		if load_ippool && load_ipf && load_ipnat ; then
 			/usr/sbin/ipmon -Ds
 		else
@@ -127,7 +119,6 @@ case "$1" in
 		;;
 
 	stop)
-		[ -n "$pfildpid" ] && kill -TERM $pfildpid
 		[ -n "$pid" ] && kill -TERM $pid
 		;;
 

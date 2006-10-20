@@ -3,17 +3,22 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 #ifndef __hpux
 #pragma ident "@(#)$Id: misc.c,v 1.12 2003/11/29 07:11:03 darrenr Exp $"
 #else
 struct uio;
 #endif
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <sys/systm.h>
 #include <sys/types.h>
 #include <sys/stream.h>
-
-#include "compat.h"
+#include <sys/ddi.h>
 
 #ifdef	__hpux
 # define	BCOPY(a,b,c)	bcopy((caddr_t)a, (caddr_t)b, c)
@@ -32,11 +37,11 @@ char *buf;
 	mblk_t *m;
 
 	for (m = min; (m != NULL) && (len > 0); m = m->b_cont) {
-		if (MTYPE(m) != M_DATA)
+		if (m->b_datap->db_type != M_DATA)
 			continue;
 		s = m->b_rptr;
 		mlen = m->b_wptr - s;
-		olen = MIN(off, mlen);
+		olen = min(off, mlen);
 		if ((olen == mlen) || (olen < off)) {
 			off -= olen;
 			continue;
@@ -45,7 +50,7 @@ char *buf;
 			s += olen;
 			mlen -= olen;
 		}
-		clen = MIN(mlen, len);
+		clen = min(mlen, len);
 		BCOPY(s, bp, clen);
 		len -= clen;
 		bp += clen;
@@ -64,12 +69,12 @@ char *buf;
 
 	for (m = min, mp = NULL; (m != NULL) && (len > 0); m = m->b_cont) {
 		mp = m;
-		if (MTYPE(m) != M_DATA)
+		if (m->b_datap->db_type != M_DATA)
 			continue;
 
 		s = m->b_rptr;
 		mlen = m->b_wptr - s;
-		olen = MIN(off, mlen);
+		olen = min(off, mlen);
 		if ((olen == mlen) || (olen < off)) {
 			off -= olen;
 			continue;
@@ -78,7 +83,7 @@ char *buf;
 			s += olen;
 			mlen -= olen;
 		}
-		clen = MIN(mlen, len);
+		clen = min(mlen, len);
 		BCOPY(bp, s, clen);
 		len -= clen;
 		bp += clen;
@@ -90,7 +95,7 @@ char *buf;
 			if (mlen > 0) {
 				if (mlen > len)
 					mlen = len;
-				bcopy((char *)bp, (char *)mp->b_wptr, mlen);
+				BCOPY(bp, mp->b_wptr, mlen);
 				bp += mlen;
 				len -= mlen;
 				mp->b_wptr += mlen;
@@ -106,7 +111,7 @@ char *buf;
 		if (len > 0) {
 			m = allocb(len, BPRI_MED);
 			if (m != NULL) {
-				bcopy((char *)bp, (char *)m->b_wptr, len);
+				BCOPY(bp, m->b_wptr, len);
 				m->b_band = mp->b_band;
 				m->b_wptr += len;
 				linkb(mp, m);

@@ -30,6 +30,8 @@
 #include <sys/stropts.h>
 #include <sys/stream.h>
 #include <sys/dlpi.h>
+#include <sys/hook.h>
+#include <sys/hook_event.h>
 #include <inet/led.h>
 #include <inet/common.h>
 #include <inet/mi.h>

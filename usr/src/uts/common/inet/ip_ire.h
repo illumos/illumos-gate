@@ -380,9 +380,6 @@ extern void	ire_fastpath_list_dispatch(ill_t *,
     boolean_t (*)(ire_t *, void *), void *);
 extern void	ire_fastpath_list_delete(ill_t *, ire_t *);
 
-extern mblk_t *ip_nexthop_route(const struct sockaddr *, char *);
-extern mblk_t *ip_nexthop(const struct sockaddr *, const char *);
-
 extern ire_t	*ire_get_next_bcast_ire(ire_t *, ire_t *);
 extern ire_t	*ire_get_next_default_ire(ire_t *, ire_t *);
 

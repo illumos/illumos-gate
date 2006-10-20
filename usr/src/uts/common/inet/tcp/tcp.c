@@ -45,6 +45,7 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
 #include <sys/xti_inet.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
+#include <sys/sdt.h>
 #include <sys/vtrace.h>
 #include <sys/kmem.h>
 #include <sys/ethernet.h>
@@ -95,6 +96,7 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
 #include <inet/ip_ftable.h>
 #include <inet/ip_if.h>
 #include <inet/ipp_common.h>
+#include <inet/ip_netinfo.h>
 #include <sys/squeue.h>
 #include <inet/kssl/ksslapi.h>
 #include <sys/tsol/label.h>
@@ -222,6 +224,13 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
  * only exception is tcp_xmit_listeners_reset() which is called
  * directly from IP and needs to policy check to see if TH_RST
  * can be sent out.
+ *
+ * PFHooks notes :
+ *
+ * For mdt case, one meta buffer contains multiple packets. Mblks for every
+ * packet are assembled and passed to the hooks. When packets are blocked,
+ * or boundary of any packet is changed, the mdt processing is stopped, and
+ * packets of the meta buffer are send to the IP path one by one.
  */
 
 extern major_t TCP6_MAJ;
@@ -919,9 +928,6 @@ static void	tcp_fill_header(tcp_t *tcp, uchar_t *rptr, clock_t now,
 		    int num_sack_blk);
 static void	tcp_wsrv(queue_t *q);
 static int	tcp_xmit_end(tcp_t *tcp);
-static mblk_t	*tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send,
-		    int32_t *offset, mblk_t **end_mp, uint32_t seq,
-		    boolean_t sendall, uint32_t *seg_len, boolean_t rexmit);
 static void	tcp_ack_timer(void *arg);
 static mblk_t	*tcp_ack_mp(tcp_t *tcp);
 static void	tcp_xmit_early_reset(char *str, mblk_t *mp,
@@ -18482,9 +18488,17 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		 * depending on the availability of transmit resources at
 		 * the media layer.
 		 */
-		IP_DLS_ILL_TX(ill, mp);
+		IP_DLS_ILL_TX(ill, ipha, mp);
 	} else {
-		putnext(ire->ire_stq, mp);
+		ill_t *out_ill = (ill_t *)ire->ire_stq->q_ptr;
+		DTRACE_PROBE4(ip4__physical__out__start,
+		    ill_t *, NULL, ill_t *, out_ill,
+		    ipha_t *, ipha, mblk_t *, mp);
+		FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,
+		    MSG_FWCOOKED_OUT, NULL, out_ill, ipha, mp, mp);
+		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+		if (mp != NULL)
+			putnext(ire->ire_stq, mp);
 	}
 	IRE_REFRELE(ire);
 }
@@ -19099,6 +19113,7 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	int		pbuf_idx, pbuf_idx_nxt;
 	int		seg_len, len, spill, af;
 	boolean_t	add_buffer, zcopy, clusterwide;
+	boolean_t	buf_trunked = B_FALSE;
 	boolean_t	rconfirm = B_FALSE;
 	boolean_t	done = B_FALSE;
 	uint32_t	cksum;
@@ -19112,6 +19127,8 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	uint16_t	*up;
 	int		err;
 	conn_t		*connp;
+	mblk_t		*mp, *mp1, *fw_mp_head = NULL;
+	uchar_t		*pld_start;
 
 #ifdef	_BIG_ENDIAN
 #define	IPVER(ip6h)	((((uint32_t *)ip6h)[0] >> 28) & 0x7)
@@ -20056,6 +20073,117 @@ legacy_send_no_md:
 				}
 			}
 
+			if (af == AF_INET && HOOKS4_INTERESTED_PHYSICAL_OUT||
+			    af == AF_INET6 && HOOKS6_INTERESTED_PHYSICAL_OUT) {
+				/* build header(IP/TCP) mblk for this segment */
+				if ((mp = dupb(md_hbuf)) == NULL)
+					goto legacy_send;
+
+				mp->b_rptr = pkt_info->hdr_rptr;
+				mp->b_wptr = pkt_info->hdr_wptr;
+
+				/* build payload mblk for this segment */
+				if ((mp1 = dupb(*xmit_tail)) == NULL) {
+					freemsg(mp);
+					goto legacy_send;
+				}
+				mp1->b_wptr = md_pbuf->b_rptr + cur_pld_off;
+				mp1->b_rptr = mp1->b_wptr -
+				    tcp->tcp_last_sent_len;
+				linkb(mp, mp1);
+
+				pld_start = mp1->b_rptr;
+
+				if (af == AF_INET) {
+					DTRACE_PROBE4(
+					    ip4__physical__out__start,
+					    ill_t *, NULL,
+					    ill_t *, ill,
+					    ipha_t *, ipha,
+					    mblk_t *, mp);
+					FW_HOOKS(ip4_physical_out_event,
+					    ipv4firewall_physical_out,
+					    MSG_FWCOOKED_OUT, NULL, ill, ipha,
+					    mp, mp);
+					DTRACE_PROBE1(
+					    ip4__physical__out__end,
+					    mblk_t *, mp);
+				} else {
+					DTRACE_PROBE4(
+					    ip6__physical__out_start,
+					    ill_t *, NULL,
+					    ill_t *, ill,
+					    ip6_t *, ip6h,
+					    mblk_t *, mp);
+					FW_HOOKS6(ip6_physical_out_event,
+					    ipv6firewall_physical_out,
+					    MSG_FWCOOKED_OUT, NULL, ill, ip6h,
+					    mp, mp);
+					DTRACE_PROBE1(
+					    ip6__physical__out__end,
+					    mblk_t *, mp);
+				}
+
+				if (buf_trunked && mp != NULL) {
+					/*
+					 * Need to pass it to normal path.
+					 */
+					CALL_IP_WPUT(tcp->tcp_connp, q, mp);
+				} else if (mp == NULL ||
+				    mp->b_rptr != pkt_info->hdr_rptr ||
+				    mp->b_wptr != pkt_info->hdr_wptr ||
+				    (mp1 = mp->b_cont) == NULL ||
+				    mp1->b_rptr != pld_start ||
+				    mp1->b_wptr != pld_start +
+				    tcp->tcp_last_sent_len ||
+				    mp1->b_cont != NULL) {
+					/*
+					 * Need to pass all packets of this
+					 * buffer to normal path, either when
+					 * packet is blocked, or when boundary
+					 * of header buffer or payload buffer
+					 * has been changed by FW_HOOKS[6].
+					 */
+					buf_trunked = B_TRUE;
+					if (md_mp_head != NULL) {
+						err = (intptr_t)rmvb(md_mp_head,
+						    md_mp);
+						if (err == 0)
+							md_mp_head = NULL;
+					}
+
+					/* send down what we've got so far */
+					if (md_mp_head != NULL) {
+						tcp_multisend_data(tcp, ire,
+						    ill, md_mp_head, obsegs,
+						    obbytes, &rconfirm);
+					}
+					md_mp_head = NULL;
+
+					if (mp != NULL)
+						CALL_IP_WPUT(tcp->tcp_connp,
+						    q, mp);
+
+					mp1 = fw_mp_head;
+					do {
+						mp = mp1;
+						mp1 = mp1->b_next;
+						mp->b_next = NULL;
+						mp->b_prev = NULL;
+						CALL_IP_WPUT(tcp->tcp_connp,
+						    q, mp);
+					} while (mp1 != NULL);
+
+					fw_mp_head = NULL;
+				} else {
+					if (fw_mp_head == NULL)
+						fw_mp_head = mp;
+					else
+						fw_mp_head->b_prev->b_next = mp;
+					fw_mp_head->b_prev = mp;
+				}
+			}
+
 			/* advance header offset */
 			cur_hdr_off += hdr_frag_sz;
 
@@ -20098,12 +20226,26 @@ legacy_send_no_md:
 			*tail_unsent = (int)MBLKL(*xmit_tail);
 			add_buffer = B_TRUE;
 		}
+
+		while (fw_mp_head) {
+			mp = fw_mp_head;
+			fw_mp_head = fw_mp_head->b_next;
+			mp->b_prev = mp->b_next = NULL;
+			freemsg(mp);
+		}
+		if (buf_trunked) {
+			TCP_STAT(tcp_mdt_discarded);
+			freeb(md_mp);
+			buf_trunked = B_FALSE;
+		}
 	} while (!done && *usable > 0 && num_burst_seg > 0 &&
 	    (tcp_mdt_chain || max_pld > 0));
 
-	/* send everything down */
-	tcp_multisend_data(tcp, ire, ill, md_mp_head, obsegs, obbytes,
-	    &rconfirm);
+	if (md_mp_head != NULL) {
+		/* send everything down */
+		tcp_multisend_data(tcp, ire, ill, md_mp_head, obsegs, obbytes,
+		    &rconfirm);
+	}
 
 #undef PREP_NEW_MULTIDATA
 #undef PREP_NEW_PBUF
@@ -21926,7 +22068,7 @@ tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len, zoneid_t zoneid)
  * be adjusted by *offset.  And after dupb(), the offset and the ending mblk
  * of the original mblk chain will be returned in *offset and *end_mp.
  */
-static mblk_t *
+mblk_t *
 tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
     mblk_t **end_mp, uint32_t seq, boolean_t sendall, uint32_t *seg_len,
     boolean_t rexmit)

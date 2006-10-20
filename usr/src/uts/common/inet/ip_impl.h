@@ -41,6 +41,8 @@ extern "C" {
 
 #ifdef _KERNEL
 
+#include <sys/sdt.h>
+
 #define	IP_MOD_ID		5701
 
 #ifdef	_BIG_ENDIAN
@@ -480,13 +482,20 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
  * Macro that hands off one or more messages directly to DLD
  * when the interface is marked with ILL_CAPAB_POLL.
  */
-#define	IP_DLS_ILL_TX(ill, mp) {					\
-	ill_dls_capab_t *ill_dls = ill->ill_dls_capab;		\
+#define	IP_DLS_ILL_TX(ill, ipha, mp) {					\
+	ill_dls_capab_t *ill_dls = ill->ill_dls_capab;			\
 	ASSERT(ILL_DLS_CAPABLE(ill));					\
 	ASSERT(ill_dls != NULL);					\
 	ASSERT(ill_dls->ill_tx != NULL);				\
-	ASSERT(ill_dls->ill_tx_handle != NULL);			\
-	ill_dls->ill_tx(ill_dls->ill_tx_handle, mp);			\
+	ASSERT(ill_dls->ill_tx_handle != NULL);				\
+	DTRACE_PROBE4(ip4__physical__out__start,			\
+	    ill_t *, NULL, ill_t *, ill,				\
+	    ipha_t *, ipha, mblk_t *, mp);				\
+	FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,	\
+	    MSG_FWCOOKED_OUT, NULL, ill, ipha, mp, mp);			\
+	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);		\
+	if (mp != NULL)							\
+		ill_dls->ill_tx(ill_dls->ill_tx_handle, mp);		\
 }
 
 extern int	ip_wput_frag_mdt_min;

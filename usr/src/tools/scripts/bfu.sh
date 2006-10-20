@@ -316,7 +316,6 @@ superfluous_local_zone_files="
 	lib/libmeta.so
 	lib/libmeta.so.1
 	lib/svc/method/ipfilter
-	lib/svc/method/pfil
 	lib/svc/method/sf880dr
 	lib/svc/method/svc-cvcd
 	lib/svc/method/svc-dcs
@@ -377,7 +376,6 @@ superfluous_local_zone_files="
 	var/db/ipf
 	var/log/pool
 	var/svc/manifest/network/ipfilter.xml
-	var/svc/manifest/network/pfil.xml
 	var/svc/manifest/network/rpc/mdcomm.xml
 	var/svc/manifest/network/rpc/meta.xml
 	var/svc/manifest/network/rpc/metamed.xml
@@ -893,7 +891,6 @@ smf_obsolete_rc_files="
 	etc/init.d/nodename
 	etc/init.d/nscd
 	etc/init.d/perf
-	etc/init.d/pfil
 	etc/init.d/picld
 	etc/init.d/power
 	etc/init.d/rcapd
@@ -1052,7 +1049,6 @@ smf_obsolete_rc_files="
 	etc/rcS.d/K43inet
 	etc/rcS.d/K99libc.mount
 	etc/rcS.d/S10cvc
-	etc/rcS.d/S10pfil
 	etc/rcS.d/S28network.sh
 	etc/rcS.d/S29nodename.sh
 	etc/rcS.d/S30rootusr.sh
@@ -1071,6 +1067,7 @@ smf_obsolete_manifests="
 	var/svc/manifest/network/tftp.xml
 	var/svc/manifest/network/lp.xml
 	var/svc/manifest/system/filesystem/volfs.xml
+	var/svc/manifest/network/pfil.xml
 "
 
 # smf services whose manifests have been renamed
@@ -1083,6 +1080,7 @@ smf_renamed_manifests="
 smf_obsolete_methods="
 	lib/svc/method/print-server
 	lib/svc/method/svc-volfs
+	lib/svc/method/pfil
 "
 
 smf_cleanup () {
@@ -1706,45 +1704,30 @@ EOFA
 	fi
 
 	# If we're in the global zone, and using an alternate root, see if
-	# we are in an smf root.  If so, import pfil and name-service-cache.
-	# If we're not bfu'ing an alternate root, and we're post-smf,
-	# import pfil and name-service-cache.  This is to get pfil and
-	# name-service-cache(with correct dependencies) in the repository
-	# before reboot.  If we're bfu'ing from pre-smf, this isn't an
-	# issue, as pfil is in the seed repository, and name-service-cache
-	# will be installed with correct dependencies.
+	# we are in an smf root.  If so, import name-service-cache. If we're
+	# not bfu'ing an alternate root, and we're post-smf, import
+	# name-service-cache.  This is to get name-service-cache(with correct
+	# dependencies) in the repository before reboot.  If we're bfu'ing
+	# from pre-smf, this isn't an issue, as name-service-cache will be
+	# installed with correct dependencies.
 	if [[ $zone = global &&
-	    -f $rootprefix/var/svc/manifest/network/pfil.xml ]]; then
+	    -f $rootprefix/var/svc/manifest/system/name-service-cache.xml ]];
+	    then
 		if [[ -n $rootprefix ]]; then
 			if [ -x /usr/sbin/svccfg ]; then
 			SVCCFG_REPOSITORY=$rootprefix/etc/svc/repository.db
 			/usr/sbin/svccfg import \
-			    $rootprefix/var/svc/manifest/network/pfil.xml
-			/usr/sbin/svccfg import \
 		    $rootprefix/var/svc/manifest/system/name-service-cache.xml
 			else
-			echo "Warning: This system does not have SMF, so I"
-			echo "cannot ensure the pre-import of pfil and"
-			echo "name-service-cache.  If ipfilter or name-service-"
-			echo "cache do not work, reboot your alternate root to"
-			echo "fix it."
+			echo "Warning: This system does not have SMF, so I "
+			echo "cannot ensure the pre-import of "
+			echo "name-service-cache.  If name-service-cache does "
+			echo "not work, reboot your alternate root to fix it."
 			fi
 		elif [ -x /tmp/bfubin/svccfg ]; then
 			/tmp/bfubin/svccfg import \
-			    /var/svc/manifest/network/pfil.xml
-			/tmp/bfubin/svccfg import \
 			    /var/svc/manifest/system/name-service-cache.xml
 		fi
-	fi
-
-	# Remove pfil from the non-global repository.
-	if [[ $zone != global ]]; then
-		cat >> $rootprefix/var/svc/profile/upgrade << EOF
-		svcprop -q -p start/exec network/pfil
-		if [[ \$? = 0 ]]; then
-			/usr/sbin/svccfg delete -f network/pfil
-		fi
-EOF
 	fi
 
 	# If we're in the global zone, and using an alternate root, see if
@@ -5991,6 +5974,13 @@ mondo_loop() {
 	rm -f $root/kernel/drv/amd64/spwr
 	rm -f $root/platform/i86pc/kernel/drv/amd64/bscv
 	rm -f $root/platform/i86pc/kernel/drv/amd64/bscbus
+
+	# Remove obsolete pfil modules, binaries, and configuration files
+	rm -f $root/kernel/drv/pfil
+	rm -f $root/kernel/drv/pfil.conf
+	rm -f $root/kernel/drv/sparcv9/pfil
+	rm -f $root/kernel/drv/amd64/pfil
+	rm -f $root/usr/sbin/pfild
 
 	# Remove obsolete atomic_prim.h file.
 	rm -f $usr/include/v9/sys/atomic_prim.h

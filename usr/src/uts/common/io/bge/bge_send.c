@@ -409,23 +409,12 @@ bge_send(bge_t *bgep, mblk_t *mp)
 
 	if (ehp->ether_tpid == htons(ETHERTYPE_VLAN)) {
 		if (MBLKL(mp) < sizeof (struct ether_vlan_header)) {
-			uint32_t pflags;
-
-			/*
-			 * Need to preserve checksum flags across pullup.
-			 */
-			hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL,
-			    NULL, &pflags);
-
 			if (!pullupmsg(mp,
 			    sizeof (struct ether_vlan_header))) {
 				BGE_DEBUG(("bge_send: pullup failure"));
 				bgep->resched_needed = B_TRUE;
 				return (B_FALSE);
 			}
-
-			(void) hcksum_assoc(mp, NULL, NULL, NULL, NULL, NULL,
-			    NULL, pflags, KM_NOSLEEP);
 		}
 
 		ehp = (struct ether_vlan_header *)mp->b_rptr;

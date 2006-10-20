@@ -177,6 +177,7 @@ static  int             set_ipv6_addr = 0;
 
 %token	IPFY_PRI_EMERG IPFY_PRI_ALERT IPFY_PRI_CRIT IPFY_PRI_ERR IPFY_PRI_WARN
 %token	IPFY_PRI_NOTICE IPFY_PRI_INFO IPFY_PRI_DEBUG
+%token	IPFY_SET_LOOPBACK IPFY_SET
 %%
 file:	line
 	| assign
@@ -194,6 +195,7 @@ line:	xx rule		{ while ((fr = frtop) != NULL) {
 			  resetlexer();
 			}
 	| YY_COMMENT
+	| set
 	;
 
 xx:	{ newrule(); }
@@ -208,6 +210,28 @@ assign:	YY_STR assigning YY_STR ';'	{ set_variable($1, $3);
 
 assigning:
 	'='				{ yyvarnext = 1; }
+	;
+
+set:
+	IPFY_SET IPFY_SET_LOOPBACK YY_STR ';'
+			{
+			  int data;
+			  if (frold != NULL) {
+				yyerror("ipf rules before \"set\"");
+				return 0;
+			  }
+			  if (!strcmp($3, "true"))
+				data = 1;
+			  else if (!strcmp($3, "false"))
+				data = 0;
+			  else {
+				yyerror("invalid argument for ipf_loopback");
+				return 0;
+			  }
+			  if (((opts & OPT_DONOTHING) == 0) &&
+			      (ioctl(ipffd, SIOCIPFLP, &data) == -1))
+				perror("ioctl(SIOCIPFLP)");
+			}
 	;
 
 rule:	inrule eol
@@ -1560,6 +1584,7 @@ static	struct	wordtab ipfwords[95] = {
 	{ "icmp-type",			IPFY_ICMPTYPE },
 	{ "in",				IPFY_IN },
 	{ "in-via",			IPFY_INVIA },
+	{ "intercept_loopback",		IPFY_SET_LOOPBACK },
 	{ "ipopt",			IPFY_IPOPTS },
 	{ "ipopts",			IPFY_IPOPTS },
 	{ "keep",			IPFY_KEEP },
@@ -1600,6 +1625,7 @@ static	struct	wordtab ipfwords[95] = {
 	{ "route-to",			IPFY_ROUTETO },
 	{ "sec-class",			IPFY_SECCLASS },
 	{ "set-tag",			IPFY_SETTAG },
+	{ "set",			IPFY_SET },
 	{ "skip",			IPFY_SKIP },
 	{ "short",			IPFY_SHORT },
 	{ "state",			IPFY_STATE },

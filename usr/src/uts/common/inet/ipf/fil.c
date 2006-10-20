@@ -184,6 +184,9 @@ u_long	fr_frouteok[2] = {0, 0};
 u_long	fr_userifqs = 0;
 u_long	fr_badcoalesces[2] = {0, 0};
 u_char	ipf_iss_secret[32];
+#if SOLARIS2 >= 10
+int	ipf_loopback = 0;
+#endif
 #if defined(IPFILTER_DEFAULT_BLOCK)
 int	fr_pass = FR_BLOCK|FR_NOMATCH;
 #else
@@ -241,7 +244,9 @@ static	INLINE int	fr_updateipid __P((fr_info_t *));
 static	int		fr_grpmapinit __P((frentry_t *fr));
 static	INLINE void	*fr_resolvelookup __P((u_int, u_int, lookupfunc_t *));
 #endif
-static	void		frsynclist __P((frentry_t *, void *));
+static	void		frsynclist __P((int, int, void *, char *, frentry_t *));
+static	void		*fr_ifsync __P((int, int, char *, char *,
+					void *, void *));
 static	ipftuneable_t	*fr_findtunebyname __P((const char *));
 static	ipftuneable_t	*fr_findtunebycookie __P((void *, void **));
 
@@ -2367,8 +2372,8 @@ int out;
 	bzero((char *)fin, sizeof(*fin));
 
 # ifdef MENTAT
-	if (qpi->qpi_flags & QF_GROUP)
-		fin->fin_flx |= FI_MBCAST;
+	if (qpi->qpi_flags & QPI_NOCKSUM)
+		fin->fin_flx |= FI_NOCKSUM;
 	m = qpi->qpi_m;
 	fin->fin_qfm = m;
 	fin->fin_qpi = qpi;
@@ -3611,10 +3616,63 @@ u_32_t *msk;
 
 
 /* ------------------------------------------------------------------------ */
+/* Function:    fr_ifsync                                                   */
+/* Returns:     void *    - new interface identifier                        */
+/* Parameters:  action(I)  - type of synchronisation to do                  */
+/*              v(I)       - IP version being sync'd (v4 or v6)             */
+/*              newifp(I)  - interface identifier being introduced/removed  */
+/*              oldifp(I)  - interface identifier in a filter rule          */
+/*              newname(I) - name associated with oldifp interface          */
+/*              oldname(I) - name associated with newifp interface          */
+/*                                                                          */
+/* This function returns what the new value for "oldifp" should be for its  */
+/* caller.  In some cases it will not change, in some it will.              */
+/* action == IPFSYNC_RESYNC                                                 */
+/*   a new value for oldifp will always be looked up, according to oldname, */
+/*   the values of newname and newifp are ignored.                          */
+/* action == IPFSYNC_NEWIFP                                                 */
+/*   if oldname matches newname then we are doing a sync for the matching   */
+/*   interface, so we return newifp to be used in place of oldifp.  If the  */
+/*   the names don't match, just return oldifp.                             */
+/* action == IPFSYNC_OLDIFP                                                 */
+/*   if oldifp matches newifp then we are are doing a sync to remove any    */
+/*   references to oldifp, so we return "-1".                               */
+/* ------------------------------------------------------------------------ */
+static void *fr_ifsync(action, v, newname, oldname, newifp, oldifp)
+int action, v;
+char *newname, *oldname;
+void *newifp, *oldifp;
+{
+	void *rval = oldifp;
+
+	switch (action)
+	{
+	case IPFSYNC_RESYNC :
+		if (oldname[0] != '\0') {
+			rval = fr_resolvenic(oldname, v);
+		}
+		break;
+	case IPFSYNC_NEWIFP :
+		if (!strncmp(newname, oldname, LIFNAMSIZ))
+			rval = newifp;
+		break;
+	case IPFSYNC_OLDIFP :
+		if (newifp == oldifp)
+			rval = (void *)-1;
+		break;
+	}
+
+	return rval;
+}
+
+
+/* ------------------------------------------------------------------------ */
 /* Function:    frsynclist                                                  */
 /* Returns:     void                                                        */
-/* Parameters:  fr(I)  - start of filter list to sync interface names for   */
-/*              ifp(I) - interface pointer for limiting sync lookups        */
+/* Parameters:  action(I) - type of synchronisation to do                   */
+/*              v(I)      - IP version being sync'd (v4 or v6)              */
+/*              ifp(I)    - interface identifier associated with action     */
+/*              name(I)   - name associated with ifp parameter              */
 /* Write Locks: ipf_mutex                                                   */
 /*                                                                          */
 /* Walk through a list of filter rules and resolve any interface names into */
@@ -3622,15 +3680,19 @@ u_32_t *msk;
 /* used in the rule.  The interface pointer is used to limit the lookups to */
 /* a specific set of matching names if it is non-NULL.                      */
 /* ------------------------------------------------------------------------ */
-static void frsynclist(fr, ifp)
-frentry_t *fr;
+static void frsynclist(action, v, ifp, ifname, fr)
+int action, v;
 void *ifp;
+char *ifname;
+frentry_t *fr;
 {
 	frdest_t *fdp;
-	int v, i;
+	int rv, i;
 
 	for (; fr; fr = fr->fr_next) {
-		v = fr->fr_v;
+		rv = fr->fr_v;
+		if (v != 0 && v != rv)
+			continue;
 
 		/*
 		 * Lookup all the interface names that are part of the rule.
@@ -3638,40 +3700,39 @@ void *ifp;
 		for (i = 0; i < 4; i++) {
 			if ((ifp != NULL) && (fr->fr_ifas[i] != ifp))
 				continue;
-			fr->fr_ifas[i] = fr_resolvenic(fr->fr_ifnames[i], v);
+			fr->fr_ifas[i] = fr_ifsync(action, rv, ifname,
+						   fr->fr_ifnames[i],
+						   ifp, fr->fr_ifas[i]);
 		}
+
+		fdp = &fr->fr_tifs[0];
+		fdp->fd_ifp = fr_ifsync(action, rv, ifname, fdp->fd_ifname,
+					   ifp, fdp->fd_ifp);
+
+		fdp = &fr->fr_tifs[1];
+		fdp->fd_ifp = fr_ifsync(action, rv, ifname, fdp->fd_ifname,
+					   ifp, fdp->fd_ifp);
+
+		fdp = &fr->fr_dif;
+		fdp->fd_ifp = fr_ifsync(action, rv, ifname, fdp->fd_ifname,
+					   ifp, fdp->fd_ifp);
+
+		if (action != IPFSYNC_RESYNC)
+			return;
 
 		if (fr->fr_type == FR_T_IPF) {
 			if (fr->fr_satype != FRI_NORMAL &&
 			    fr->fr_satype != FRI_LOOKUP) {
-				(void)fr_ifpaddr(v, fr->fr_satype,
+				(void)fr_ifpaddr(rv, fr->fr_satype,
 						 fr->fr_ifas[fr->fr_sifpidx],
 						 &fr->fr_src, &fr->fr_smsk);
 			}
 			if (fr->fr_datype != FRI_NORMAL &&
 			    fr->fr_datype != FRI_LOOKUP) {
-				(void)fr_ifpaddr(v, fr->fr_datype,
+				(void)fr_ifpaddr(rv, fr->fr_datype,
 						 fr->fr_ifas[fr->fr_difpidx],
 						 &fr->fr_dst, &fr->fr_dmsk);
 			}
-		}
-
-		fdp = &fr->fr_tifs[0];
-		if ((ifp == NULL) || (fdp->fd_ifp == ifp))
-			fr_resolvedest(fdp, v);
-
-		fdp = &fr->fr_tifs[1];
-		if ((ifp == NULL) || (fdp->fd_ifp == ifp))
-			fr_resolvedest(fdp, v);
-
-		fdp = &fr->fr_dif;
-		if ((ifp == NULL) || (fdp->fd_ifp == ifp)) {
-			fr_resolvedest(fdp, v);
-
-			fr->fr_flags &= ~FR_DUP;
-			if ((fdp->fd_ifp != (void *)-1) &&
-			    (fdp->fd_ifp != NULL))
-				fr->fr_flags |= FR_DUP;
 		}
 
 #ifdef	IPFILTER_LOOKUP
@@ -3696,40 +3757,45 @@ void *ifp;
 /* ------------------------------------------------------------------------ */
 /* Function:    frsync                                                      */
 /* Returns:     void                                                        */
-/* Parameters:  Nil                                                         */
+/* Parameters:  action(I) - type of synchronisation to do                   */
+/*              v(I)      - IP version being sync'd (v4 or v6)              */
+/*              ifp(I)    - interface identifier associated with action     */
+/*              name(I)   - name associated with ifp parameter              */
 /*                                                                          */
 /* frsync() is called when we suspect that the interface list or            */
 /* information about interfaces (like IP#) has changed.  Go through all     */
 /* filter rules, NAT entries and the state table and check if anything      */
 /* needs to be changed/updated.                                             */
+/* With the filtering hooks added to Solaris, we needed to change the manner*/
+/* in which this was done to support three different types of sync:         */
+/* - complete resync of all interface name/identifiers                      */
+/* - new interface being announced with its name and identifier             */
+/* - interface removal being announced by only its identifier               */
 /* ------------------------------------------------------------------------ */
-void frsync(ifp)
+void frsync(action, v, ifp, name)
+int action, v;
 void *ifp;
+char *name;
 {
 	int i;
 
-# if !SOLARIS
-	fr_natsync(ifp);
-	fr_statesync(ifp);
-# endif
-
 	WRITE_ENTER(&ipf_mutex);
-	frsynclist(ipacct[0][fr_active], ifp);
-	frsynclist(ipacct[1][fr_active], ifp);
-	frsynclist(ipfilter[0][fr_active], ifp);
-	frsynclist(ipfilter[1][fr_active], ifp);
-	frsynclist(ipacct6[0][fr_active], ifp);
-	frsynclist(ipacct6[1][fr_active], ifp);
-	frsynclist(ipfilter6[0][fr_active], ifp);
-	frsynclist(ipfilter6[1][fr_active], ifp);
+	frsynclist(action, v, ifp, name, ipacct[0][fr_active]);
+	frsynclist(action, v, ifp, name, ipacct[1][fr_active]);
+	frsynclist(action, v, ifp, name, ipfilter[0][fr_active]);
+	frsynclist(action, v, ifp, name, ipfilter[1][fr_active]);
+	frsynclist(action, v, ifp, name, ipacct6[0][fr_active]);
+	frsynclist(action, v, ifp, name, ipacct6[1][fr_active]);
+	frsynclist(action, v, ifp, name, ipfilter6[0][fr_active]);
+	frsynclist(action, v, ifp, name, ipfilter6[1][fr_active]);
 
 	for (i = 0; i < IPL_LOGSIZE; i++) {
 		frgroup_t *g;
 
 		for (g = ipfgroups[i][0]; g != NULL; g = g->fg_next)
-			frsynclist(g->fg_start, ifp);
+			frsynclist(action, v, ifp, name, g->fg_start);
 		for (g = ipfgroups[i][1]; g != NULL; g = g->fg_next)
-			frsynclist(g->fg_start, ifp);
+			frsynclist(action, v, ifp, name, g->fg_start);
 	}
 	RWLOCK_EXIT(&ipf_mutex);
 }
@@ -4292,7 +4358,7 @@ caddr_t data;
 	/*
 	 * Lookup all the interface names that are part of the rule.
 	 */
-	frsynclist(fp, NULL);
+	frsynclist(0, 0, NULL, NULL, fp);
 	fp->fr_statecnt = 0;
 
 	/*
@@ -5549,6 +5615,14 @@ fr_info_t *fin;
 	udphdr_t *udp;
 	int dosum;
 
+#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
+	net_data_t net_data_p;
+	if (fin->fin_v == 4)
+		net_data_p = ipf_ipv4;
+	else
+		net_data_p = ipf_ipv6;
+#endif
+
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
 		return 0;
 
@@ -5565,10 +5639,12 @@ fr_info_t *fin;
 	dosum = 0;
 	sum = 0;
 
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
-	if (dohwcksum && ((*fin->fin_mp)->b_ick_flag == ICK_VALID)) {
-		hdrsum = 0;
-		sum = 0;
+#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
+	ASSERT(fin->fin_m != NULL);
+	if (NET_IS_HCK_L4_FULL(net_data_p, fin->fin_m) ||
+	    NET_IS_HCK_L4_PART(net_data_p, fin->fin_m)) {
+			hdrsum = 0;
+			sum = 0;
 	} else {
 #endif
 		switch (fin->fin_p)
@@ -5602,7 +5678,7 @@ fr_info_t *fin;
 		if (dosum)
 			sum = fr_cksum(fin->fin_m, fin->fin_ip,
 				       fin->fin_p, fin->fin_dp);
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
+#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
 	}
 #endif
 #if !defined(_KERNEL)
@@ -5817,6 +5893,10 @@ ipftuneable_t ipf_tuneables[] = {
 			sizeof(fr_icmpminfragmtu),	0 },
 	{ { &fr_pass },		"fr_pass",		0,	0xffffffff,
 			sizeof(fr_pass),		0 },
+#if SOLARIS2 >= 10
+	{ { &ipf_loopback},	"ipf_loopback",		0,	1,
+			sizeof(ipf_loopback),		IPFT_WRDISABLED },
+#endif
 	/* state */
 	{ { &fr_tcpidletimeout }, "fr_tcpidletimeout",	1,	0x7fffffff,
 			sizeof(fr_tcpidletimeout),	IPFT_WRDISABLED },
@@ -6338,17 +6418,13 @@ void fr_resolvedest(fdp, v)
 frdest_t *fdp;
 int v;
 {
-	void *ifp;
+	fdp->fd_ifp = NULL;
 
-	ifp = NULL;
-	v = v;		/* LINT */
-
-	if (*fdp->fd_ifname != '\0') {
-		ifp = GETIFP(fdp->fd_ifname, v);
-		if (ifp == NULL)
-			ifp = (void *)-1;
+  	if (*fdp->fd_ifname != '\0') {
+ 		fdp->fd_ifp = GETIFP(fdp->fd_ifname, v);
+		if (fdp->fd_ifp == NULL)
+			fdp->fd_ifp = (void *)-1;
 	}
-	fdp->fd_ifp = ifp;
 }
 #endif /* _KERNEL */
 

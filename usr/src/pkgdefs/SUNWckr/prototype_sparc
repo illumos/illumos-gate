@@ -168,6 +168,7 @@ l none kernel/misc/sparcv9/des=../../../kernel/crypto/sparcv9/des
 f none kernel/misc/sparcv9/dls 755 root sys
 f none kernel/misc/sparcv9/fssnap_if 755 root sys
 f none kernel/misc/sparcv9/gld 755 root sys
+f none kernel/misc/sparcv9/hook 755 root sys
 f none kernel/misc/sparcv9/hpcsvc 755 root sys
 f none kernel/misc/sparcv9/ipc 755 root sys
 f none kernel/misc/sparcv9/kbtrans 755 root sys
@@ -175,6 +176,7 @@ f none kernel/misc/sparcv9/kcf 755 root sys
 f none kernel/misc/sparcv9/krtld 755 root sys
 f none kernel/misc/sparcv9/mac 755 root sys
 l none kernel/misc/sparcv9/md5=../../../kernel/crypto/sparcv9/md5
+f none kernel/misc/sparcv9/neti 755 root sys
 f none kernel/misc/sparcv9/pcie 755 root sys
 f none kernel/misc/sparcv9/pcihp 755 root sys
 f none kernel/misc/sparcv9/pciehpc 755 root sys

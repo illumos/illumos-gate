@@ -60,6 +60,7 @@ static const char rcsid[] = "@(#)$Id: ip_fil_solaris.c,v 2.62.2.19 2005/07/13 21
 #include <inet/ip_ire.h>
 
 #include <sys/md5.h>
+#include <sys/neti.h>
 
 extern	int	fr_flags, fr_active;
 #if SOLARIS2 >= 7
@@ -67,9 +68,36 @@ timeout_id_t	fr_timer_id;
 #else
 int	fr_timer_id;
 #endif
+#if SOLARIS2 >= 10
+extern	int	ipf_loopback;
+#endif
 
 
+static	int	fr_setipfloopback __P((int));
 static	int	fr_send_ip __P((fr_info_t *fin, mblk_t *m, mblk_t **mp));
+static	int	ipf_nic_event_v4 __P((hook_event_token_t, hook_data_t));
+static	int	ipf_nic_event_v6 __P((hook_event_token_t, hook_data_t));
+static	int	ipf_hook_out __P((hook_event_token_t, hook_data_t));
+static	int	ipf_hook_in __P((hook_event_token_t, hook_data_t));
+static	int	ipf_hook_loop_out __P((hook_event_token_t, hook_data_t));
+static	int	ipf_hook_loop_in __P((hook_event_token_t, hook_data_t));
+static	int	ipf_hook __P((hook_data_t, int, int));
+
+static	hook_t	ipfhook_in;
+static	hook_t	ipfhook_out;
+static	hook_t	ipfhook_nicevents;
+
+/* flags to indicate whether hooks are registered. */
+static	boolean_t	hook4_physical_in	= B_FALSE;
+static	boolean_t	hook4_physical_out	= B_FALSE;
+static	boolean_t	hook4_nic_events	= B_FALSE;
+static	boolean_t	hook4_loopback_in	= B_FALSE;
+static	boolean_t	hook4_loopback_out	= B_FALSE;
+static	boolean_t	hook6_physical_in	= B_FALSE;
+static	boolean_t	hook6_physical_out	= B_FALSE;
+static	boolean_t	hook6_nic_events	= B_FALSE;
+static	boolean_t	hook6_loopback_in	= B_FALSE;
+static	boolean_t	hook6_loopback_out	= B_FALSE;
 
 ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
@@ -93,6 +121,10 @@ u_long		*ip_ttl_ptr = NULL;
 u_long		*ip_mtudisc = NULL;
 u_long		*ip_forwarding = NULL;
 #endif
+#endif
+#if SOLARIS2 >= 10
+extern net_data_t ipf_ipv4;
+extern net_data_t ipf_ipv6;
 #endif
 int		ipf_locks_done = 0;
 
@@ -125,10 +157,79 @@ int ipldetach()
 	}
 #endif
 
+	/*
+	 * This lock needs to be dropped around the net_unregister_hook calls
+	 * because we can deadlock here with:
+	 * W(ipf_global)->R(hook_family)->W(hei_lock) (this code path) vs
+	 * R(hook_family)->R(hei_lock)->R(ipf_global) (active hook running)
+	 */
+	RWLOCK_EXIT(&ipf_global);
+
+	/*
+	 * Remove IPv6 Hooks
+	 */
+	if (ipf_ipv6 != NULL) {
+		if (hook6_physical_in) {
+			hook6_physical_in = (net_unregister_hook(ipf_ipv6,
+			    NH_PHYSICAL_IN, &ipfhook_in) != 0);
+		}
+		if (hook6_physical_out) {
+			hook6_physical_out = (net_unregister_hook(ipf_ipv6,
+			    NH_PHYSICAL_OUT, &ipfhook_out) != 0);
+		}
+		if (hook6_nic_events) {
+			hook6_nic_events = (net_unregister_hook(ipf_ipv6,
+			    NH_NIC_EVENTS, &ipfhook_nicevents) != 0);
+		}
+		if (hook6_loopback_in) {
+			hook6_loopback_in = (net_unregister_hook(ipf_ipv6,
+			    NH_LOOPBACK_IN, &ipfhook_in) != 0);
+		}
+		if (hook6_loopback_out) {
+			hook6_loopback_out = (net_unregister_hook(ipf_ipv6,
+			    NH_LOOPBACK_OUT, &ipfhook_out) != 0);
+		}
+
+		if (net_release(ipf_ipv6) != 0)
+			goto detach_failed;
+		ipf_ipv6 = NULL;
+        }
+
+	/*
+	 * Remove IPv4 Hooks
+	 */
+	if (ipf_ipv4 != NULL) {
+		if (hook4_physical_in) {
+			hook4_physical_in = (net_unregister_hook(ipf_ipv4,
+			    NH_PHYSICAL_IN, &ipfhook_in) != 0);
+		}
+		if (hook4_physical_out) {
+			hook4_physical_out = (net_unregister_hook(ipf_ipv4,
+			    NH_PHYSICAL_OUT, &ipfhook_out) != 0);
+		}
+		if (hook4_nic_events) {
+			hook4_nic_events = (net_unregister_hook(ipf_ipv4,
+			    NH_NIC_EVENTS, &ipfhook_nicevents) != 0);
+		}
+		if (hook4_loopback_in) {
+			hook4_loopback_in = (net_unregister_hook(ipf_ipv4,
+			    NH_LOOPBACK_IN, &ipfhook_in) != 0);
+		}
+		if (hook4_loopback_out) {
+			hook4_loopback_out = (net_unregister_hook(ipf_ipv4,
+			    NH_LOOPBACK_OUT, &ipfhook_out) != 0);
+		}
+
+		if (net_release(ipf_ipv4) != 0)
+			goto detach_failed;
+		ipf_ipv4 = NULL;
+	}
+
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "ipldetach()\n");
 #endif
 
+	WRITE_ENTER(&ipf_global);
 	fr_deinitialise();
 
 	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
@@ -140,7 +241,18 @@ int ipldetach()
 		RW_DESTROY(&ipf_ipidfrag);
 		ipf_locks_done = 0;
 	}
+
+	if (hook4_physical_in || hook4_physical_out || hook4_nic_events ||
+	    hook4_loopback_in || hook4_loopback_out || hook6_nic_events ||
+	    hook6_physical_in || hook6_physical_out || hook6_loopback_in ||
+	    hook6_loopback_out)
+		return -1;
+
 	return 0;
+
+detach_failed:
+	WRITE_ENTER(&ipf_global);
+	return -1;
 }
 
 
@@ -164,6 +276,101 @@ int iplattach __P((void))
 
 	if (fr_initialise() < 0)
 		return -1;
+
+	HOOK_INIT(&ipfhook_nicevents, ipf_nic_event_v4,
+		  "ipfilter_hook_nicevents");
+	HOOK_INIT(&ipfhook_in, ipf_hook_in, "ipfilter_hook_in");
+	HOOK_INIT(&ipfhook_out, ipf_hook_out, "ipfilter_hook_out");
+
+	/*
+	 * If we hold this lock over all of the net_register_hook calls, we
+	 * can cause a deadlock to occur with the following lock ordering:
+	 * W(ipf_global)->R(hook_family)->W(hei_lock) (this code path) vs
+	 * R(hook_family)->R(hei_lock)->R(ipf_global) (packet path)
+	 */
+	RWLOCK_EXIT(&ipf_global);
+
+	/*
+	 * Add IPv4 hooks
+	 */
+	ipf_ipv4 = net_lookup(NHF_INET);
+	if (ipf_ipv4 == NULL)
+		goto hookup_failed;
+
+	hook4_nic_events = (net_register_hook(ipf_ipv4, NH_NIC_EVENTS,
+	    &ipfhook_nicevents) == 0);
+	if (!hook4_nic_events)
+		goto hookup_failed;
+
+	ipfhook_in.h_func = ipf_hook_in;
+	hook4_physical_in = (net_register_hook(ipf_ipv4, NH_PHYSICAL_IN,
+	    &ipfhook_in) == 0);
+	if (!hook4_physical_in)
+		goto hookup_failed;
+
+	ipfhook_in.h_func = ipf_hook_out;
+	hook4_physical_out = (net_register_hook(ipf_ipv4, NH_PHYSICAL_OUT,
+	    &ipfhook_out) == 0);
+	if (!hook4_physical_out)
+		goto hookup_failed;
+
+	if (ipf_loopback) {
+		ipfhook_in.h_func = ipf_hook_loop_in;
+		hook4_loopback_in = (net_register_hook(ipf_ipv4,
+		    NH_LOOPBACK_IN, &ipfhook_in) == 0);
+		if (!hook4_loopback_in)
+			goto hookup_failed;
+
+		ipfhook_in.h_func = ipf_hook_loop_out;
+		hook4_loopback_out = (net_register_hook(ipf_ipv4,
+		    NH_LOOPBACK_OUT, &ipfhook_out) == 0);
+		if (!hook4_loopback_out)
+			goto hookup_failed;
+	}
+	/*
+	 * Add IPv6 hooks
+	 */
+	ipf_ipv6 = net_lookup(NHF_INET6);
+	if (ipf_ipv6 == NULL)
+		goto hookup_failed;
+
+	HOOK_INIT(&ipfhook_nicevents, ipf_nic_event_v6,
+		  "ipfilter_hook_nicevents");
+	hook6_nic_events = (net_register_hook(ipf_ipv6, NH_NIC_EVENTS,
+	    &ipfhook_nicevents) == 0);
+	if (!hook6_nic_events)
+		goto hookup_failed;
+
+	ipfhook_in.h_func = ipf_hook_in;
+	hook6_physical_in = (net_register_hook(ipf_ipv6, NH_PHYSICAL_IN,
+	    &ipfhook_in) == 0);
+	if (!hook6_physical_in)
+		goto hookup_failed;
+
+	ipfhook_in.h_func = ipf_hook_out;
+	hook6_physical_out = (net_register_hook(ipf_ipv6, NH_PHYSICAL_OUT,
+	    &ipfhook_out) == 0);
+	if (!hook6_physical_out)
+		goto hookup_failed;
+
+	if (ipf_loopback) {
+		ipfhook_in.h_func = ipf_hook_loop_in;
+		hook6_loopback_in = (net_register_hook(ipf_ipv6,
+		    NH_LOOPBACK_IN, &ipfhook_in) == 0);
+		if (!hook6_loopback_in)
+			goto hookup_failed;
+
+		ipfhook_in.h_func = ipf_hook_loop_out;
+		hook6_loopback_out = (net_register_hook(ipf_ipv6,
+		    NH_LOOPBACK_OUT, &ipfhook_out) == 0);
+		if (!hook6_loopback_out)
+			goto hookup_failed;
+	}
+
+	/*
+	 * Reacquire ipf_global, now it is safe.
+	 */
+	WRITE_ENTER(&ipf_global);
 
 /* Do not use private interface ip_params_arr[] in Solaris 10 */
 #if SOLARIS2 < 10
@@ -217,6 +424,64 @@ int iplattach __P((void))
 
 #endif
 
+	return 0;
+hookup_failed:
+	WRITE_ENTER(&ipf_global);
+	return -1;
+}
+
+static	int	fr_setipfloopback(set)
+int set;
+{
+	if (ipf_ipv4 == NULL || ipf_ipv6 == NULL)
+		return EFAULT;
+
+	if (set && !ipf_loopback) {
+		ipf_loopback = 1;
+
+		hook4_loopback_in = (net_register_hook(ipf_ipv4,
+		    NH_LOOPBACK_IN, &ipfhook_in) == 0);
+		if (!hook4_loopback_in)
+			return EINVAL;
+
+		hook4_loopback_out = (net_register_hook(ipf_ipv4,
+		    NH_LOOPBACK_OUT, &ipfhook_out) == 0);
+		if (!hook4_loopback_out)
+			return EINVAL;
+
+		hook6_loopback_in = (net_register_hook(ipf_ipv6,
+		    NH_LOOPBACK_IN, &ipfhook_in) == 0);
+		if (!hook6_loopback_in)
+			return EINVAL;
+
+		hook6_loopback_out = (net_register_hook(ipf_ipv6,
+		    NH_LOOPBACK_OUT, &ipfhook_out) == 0);
+		if (!hook6_loopback_out)
+			return EINVAL;
+
+	} else if (!set && ipf_loopback) {
+		ipf_loopback = 0;
+
+		hook4_loopback_in = (net_unregister_hook(ipf_ipv4,
+		    NH_LOOPBACK_IN, &ipfhook_in) != 0);
+		if (hook4_loopback_in)
+			return EBUSY;
+
+		hook4_loopback_out = (net_unregister_hook(ipf_ipv4,
+		    NH_LOOPBACK_OUT, &ipfhook_out) != 0);
+		if (hook4_loopback_out)
+			return EBUSY;
+
+		hook6_loopback_in = (net_unregister_hook(ipf_ipv6,
+		    NH_LOOPBACK_IN, &ipfhook_in) != 0);
+		if (hook6_loopback_in)
+			return EBUSY;
+
+		hook6_loopback_out = (net_unregister_hook(ipf_ipv6,
+		    NH_LOOPBACK_OUT, &ipfhook_out) != 0);
+		if (hook6_loopback_out)
+			return EBUSY;
+	}
 	return 0;
 }
 
@@ -318,6 +583,14 @@ int *rp;
 			if (error != 0)
 				error = EFAULT;
 		}
+		break;
+	case SIOCIPFLP :
+		error = COPYIN((caddr_t)data, (caddr_t)&tmp,
+			       sizeof(tmp));
+		if (error != 0)
+			error = EFAULT;
+		else
+			error = fr_setipfloopback(tmp);
 		break;
 	case SIOCGETFF :
 		error = COPYOUT((caddr_t)&fr_flags, (caddr_t)data,
@@ -435,7 +708,12 @@ int *rp;
 		else {
 			RWLOCK_EXIT(&ipf_global);
 			WRITE_ENTER(&ipf_global);
-			error = ipfsync();
+
+			frsync(IPFSYNC_RESYNC, 0, NULL, NULL);
+			fr_natifpsync(IPFSYNC_RESYNC, NULL, NULL);
+			fr_nataddrsync(NULL, NULL);
+			fr_statesync(IPFSYNC_RESYNC, 0, NULL, NULL);
+			error = 0;
 		}
 		break;
 	case SIOCGFRST :
@@ -461,25 +739,24 @@ int *rp;
 }
 
 
-void	*get_unit(name, v)
-char	*name;
-int	v;
+phy_if_t	get_unit(name, v)
+char		*name;
+int    		v;
 {
-	qif_t *qf;
-	int sap;
+	phy_if_t phy;
+	net_data_t nif;
+ 
+  	if (v == 4)
+ 		nif = ipf_ipv4;
+  	else if (v == 6)
+ 		nif = ipf_ipv6;
+  	else
+ 		return 0;
+  
+ 	phy = net_phylookup(nif, name);
 
-	if (v == 4)
-		sap = 0x0800;
-	else if (v == 6)
-		sap = 0x86dd;
-	else
-		return NULL;
-	rw_enter(&pfil_rw, RW_READER);
-	qf = qif_iflookup(name, sap);
-	rw_exit(&pfil_rw);
-	return qf;
+ 	return (phy);
 }
-
 
 /*
  * routines below for saving IP headers to buffer
@@ -675,7 +952,6 @@ mblk_t *m, **mpp;
 {
 	qpktinfo_t qpi, *qpip;
 	fr_info_t fnew;
-	qif_t *qif;
 	ip_t *ip;
 	int i, hlen;
 
@@ -698,8 +974,8 @@ mblk_t *m, **mpp;
 		fnew.fin_v = 4;
 #if SOLARIS2 >= 10
 		ip->ip_ttl = 255;
-
-		ip->ip_off = htons(IP_DF);
+		if (net_getpmtuenabled(ipf_ipv4) == 1)
+			ip->ip_off = htons(IP_DF);
 #else
 		if (ip_ttl_ptr != NULL)
 			ip->ip_ttl = (u_char)(*ip_ttl_ptr);
@@ -724,17 +1000,8 @@ mblk_t *m, **mpp;
 	}
 
 	qpip = fin->fin_qpi;
-	qpi.qpi_q = qpip->qpi_q;
 	qpi.qpi_off = 0;
-	qpi.qpi_name = qpip->qpi_name;
-	qif = qpip->qpi_real;
-	qpi.qpi_real = qif;
-	qpi.qpi_ill = qif->qf_ill;
-	qpi.qpi_hl = qif->qf_hl;
-	qpi.qpi_ppa = qif->qf_ppa;
-	qpi.qpi_num = qif->qf_num;
-	qpi.qpi_flags = qif->qf_flags;
-	qpi.qpi_max_frag = qif->qf_max_frag;
+	qpi.qpi_ill = qpip->qpi_ill;
 	qpi.qpi_m = m;
 	qpi.qpi_data = ip;
 	fnew.fin_qpi = &qpi;
@@ -761,6 +1028,7 @@ int dst;
 	struct icmp *icmp;
 	qpktinfo_t *qpi;
 	int hlen, code;
+	phy_if_t phy;
 	u_short sz;
 #ifdef	USE_INET6
 	mblk_t *mb;
@@ -830,11 +1098,10 @@ int dst;
 	icmp = (struct icmp *)(m->b_rptr + hlen);
 	icmp->icmp_type = type & 0xff;
 	icmp->icmp_code = code & 0xff;
-#ifdef	icmp_nextmtu
-	if (type == ICMP_UNREACH && (qpi->qpi_max_frag != 0) &&
+	phy = (phy_if_t)qpi->qpi_ill; 
+	if (type == ICMP_UNREACH && (phy != 0) && 
 	    fin->fin_icode == ICMP_UNREACH_NEEDFRAG)
-		icmp->icmp_nextmtu = htons(qpi->qpi_max_frag);
-#endif
+		icmp->icmp_nextmtu = net_getmtu(ipf_ipv4, phy,0 );
 
 #ifdef	USE_INET6
 	if (fin->fin_v == 6) {
@@ -842,8 +1109,8 @@ int dst;
 		int csz;
 
 		if (dst == 0) {
-			if (fr_ifpaddr(6, FRI_NORMAL, qpi->qpi_real,
-				       (struct in_addr *)&dst6, NULL) == -1) {
+			if (fr_ifpaddr(6, FRI_NORMAL, (void *)phy,
+				       (void *)&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
 			}
@@ -870,13 +1137,14 @@ int dst;
 		ip->ip_tos = fin->fin_ip->ip_tos;
 		ip->ip_len = (u_short)sz;
 		if (dst == 0) {
-			if (fr_ifpaddr(4, FRI_NORMAL, qpi->qpi_real,
-				       &dst4, NULL) == -1) {
+			if (fr_ifpaddr(4, FRI_NORMAL, (void *)phy,
+				       (void *)&dst4, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
 			}
-		} else
+		} else {
 			dst4 = fin->fin_dst;
+		}
 		ip->ip_src = dst4;
 		ip->ip_dst = fin->fin_src;
 		bcopy((char *)fin->fin_ip, (char *)&icmp->icmp_ip,
@@ -896,7 +1164,6 @@ int dst;
 	return fr_send_ip(fin, m, &m);
 }
 
-#ifdef IRE_ILL_CN
 #include <sys/time.h>
 #include <sys/varargs.h>
 
@@ -940,120 +1207,68 @@ static void rate_limit_message(int rate, const char *message, ...)
 #endif
 	}
 }
-#endif
 
 /*
  * return the first IP Address associated with an interface
  */
 /*ARGSUSED*/
-int fr_ifpaddr(v, atype, qifptr, inp, inpmask)
+int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
 int v, atype;
-void *qifptr;
-struct in_addr *inp, *inpmask;
+void *ifptr;
+struct in_addr  *inp, *inpmask;
 {
-#ifdef	USE_INET6
-	struct sockaddr_in6 sin6, mask6;
-#endif
-	struct sockaddr_in sin, mask;
-	qif_t *qif;
+	struct sockaddr_in6 v6addr[2];
+	struct sockaddr_in v4addr[2];
+	net_ifaddr_t type[2];
+	net_data_t net_data;
+	phy_if_t phyif;
+	void *array;
 
-#ifdef	USE_INET6
-#ifdef IRE_ILL_CN
-	s_ill_t *ill;
-#endif
-#endif
-	if ((qifptr == NULL) || (qifptr == (void *)-1))
+	switch (v)
+	{
+	case 4:
+		net_data = ipf_ipv4;
+		array = v4addr;
+		break;
+	case 6:
+		net_data = ipf_ipv6;
+		array = v6addr;
+		break;
+	default:
+		net_data = NULL;
+		break;
+	}
+
+	if (net_data == NULL)
 		return -1;
 
-	qif = qifptr;
-
-#ifdef	USE_INET6
-#ifdef IRE_ILL_CN
-	ill = qif->qf_ill;
-#endif
-#endif
-
-#ifdef	USE_INET6
-	if (v == 6) {
-#ifndef	IRE_ILL_CN
-		in6_addr_t *inp6;
-		ipif_t *ipif;
-		ill_t *ill;
-
-		ill = qif->qf_ill;
-
-		/*
-		 * First is always link local.
-		 */
-		for (ipif = ill->ill_ipif; ipif; ipif = ipif->ipif_next) {
-			inp6 = &ipif->ipif_v6lcl_addr;
-			if (!IN6_IS_ADDR_LINKLOCAL(inp6) &&
-			    !IN6_IS_ADDR_LOOPBACK(inp6))
-				break;
-		}
-		if (ipif == NULL)
-			return -1;
-
-		mask6.sin6_addr = ipif->ipif_v6net_mask;
-		if (atype == FRI_BROADCAST)
-			sin6.sin6_addr = ipif->ipif_v6brd_addr;
-		else if (atype == FRI_PEERADDR)
-			sin6.sin6_addr = ipif->ipif_v6pp_dst_addr;
-		else
-			sin6.sin6_addr = *inp6;
-#else /* IRE_ILL_CN */
-		if (IN6_IS_ADDR_UNSPECIFIED(&ill->netmask.in6.sin6_addr) ||
-		    IN6_IS_ADDR_UNSPECIFIED(&ill->localaddr.in6.sin6_addr)) {
-			rate_limit_message(NULLADDR_RATE_LIMIT,
-			   "Check pfild is running: IP#/netmask is 0 on %s.\n",
-			   ill->ill_name);
-			return -1;
-		}
-		mask6 = ill->netmask.in6;
-		if (atype == FRI_BROADCAST)
-			sin6 = ill->broadaddr.in6;
-		else if (atype == FRI_PEERADDR)
-			sin6 = ill->dstaddr.in6;
-		else
-			sin6 = ill->localaddr.in6;
-#endif /* IRE_ILL_CN */
-		return fr_ifpfillv6addr(atype, &sin6, &mask6, inp, inpmask);
-	}
-#endif
-
-#ifndef	IRE_ILL_CN
+	phyif = (phy_if_t)ifptr;
 
 	switch (atype)
 	{
-	case FRI_BROADCAST :
-		sin.sin_addr.s_addr = QF_V4_BROADCAST(qif);
-		break;
 	case FRI_PEERADDR :
-		sin.sin_addr.s_addr = QF_V4_PEERADDR(qif);
+		type[0] = NA_PEER;
 		break;
-	default :
-		sin.sin_addr.s_addr = QF_V4_ADDR(qif);
-		break;
-	}
-	mask.sin_addr.s_addr = QF_V4_NETMASK(qif);
 
-#else
-	if (ill->netmask.in.sin_addr.s_addr == 0 ||
-		ill->localaddr.in.sin_addr.s_addr == 0) {
-		rate_limit_message(NULLADDR_RATE_LIMIT,
-			"Check pfild is running: IP#/netmask is 0 on %s.\n",
-			ill->ill_name);
-		return -1;
+	case FRI_BROADCAST :
+		type[0] = NA_BROADCAST;
+		break;
+
+	default :
+		type[0] = NA_ADDRESS;
+		break;
 	}
-	mask = ill->netmask.in;
-	if (atype == FRI_BROADCAST)
-		sin = ill->broadaddr.in;
-	else if (atype == FRI_PEERADDR)
-		sin = ill->dstaddr.in;
-	else
-		sin = ill->localaddr.in;
-#endif /* IRE_ILL_CN */
-	return fr_ifpfillv4addr(atype, &sin, &mask, inp, inpmask);
+
+	type[1] = NA_NETMASK;
+
+	if (net_getlifaddr(net_data, phyif, 0, 2, type, array) < 0)
+		return -1;
+
+	if (v == 6) {
+		return fr_ifpfillv6addr(atype, &v6addr[0], &v6addr[1],
+					inp, inpmask);
+	}
+	return fr_ifpfillv4addr(atype, &v4addr[0], &v4addr[1], inp, inpmask);
 }
 
 
@@ -1154,42 +1369,6 @@ fr_info_t *fin;
 #endif /* USE_INET6 */
 
 
-/*
- * Function:    fr_verifysrc
- * Returns:     int (really boolean)
- * Parameters:  fin - packet information
- *
- * Check whether the packet has a valid source address for the interface on
- * which the packet arrived, implementing the "fr_chksrc" feature.
- * Returns true iff the packet's source address is valid.
- * Pre-Solaris 10, we call into the routing code to make the determination.
- * On Solaris 10 and later, we have a valid address set from pfild to check
- * against.
- */
-int fr_verifysrc(fin)
-fr_info_t *fin;
-{
-	ire_t *dir;
-	int result;
-
-#if SOLARIS2 >= 6
-	dir = ire_route_lookup(fin->fin_saddr, 0xffffffff, 0, 0, NULL,
-			       NULL, NULL, NULL, MATCH_IRE_DSTONLY|
-				MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
-#else
-	dir = ire_lookup(fin->fin_saddr);
-#endif
-
-	if (!dir)
-		return 0;
-	result = (ire_to_ill(dir) == fin->fin_ifp);
-#if SOLARIS2 >= 8
-	ire_refrele(dir);
-#endif
-	return result;
-}
-
-
 #if (SOLARIS2 < 7)
 void fr_slowtimer()
 #else
@@ -1223,330 +1402,6 @@ void fr_slowtimer __P((void *ptr))
 }
 
 
-/*
- * Function:  fr_fastroute
- * Returns:    0: success;
- *            -1: failed
- * Parameters:
- *    mb: the message block where ip head starts
- *    mpp: the pointer to the pointer of the orignal
- *            packet message
- *    fin: packet information
- *    fdp: destination interface information
- *    if it is NULL, no interface information provided.
- *
- * This function is for fastroute/to/dup-to rules. It calls
- * pfil_make_lay2_packet to search route, make lay-2 header
- * ,and identify output queue for the IP packet.
- * The destination address depends on the following conditions:
- * 1: for fastroute rule, fdp is passed in as NULL, so the
- *    destination address is the IP Packet's destination address
- * 2: for to/dup-to rule, if an ip address is specified after
- *    the interface name, this address is the as destination
- *    address. Otherwise IP Packet's destination address is used
- */
-int fr_fastroute(mb, mpp, fin, fdp)
-mblk_t *mb, **mpp;
-fr_info_t *fin;
-frdest_t *fdp;
-{
-	struct in_addr dst;
-#ifndef IRE_ILL_CN
-	size_t hlen = 0;
-	ill_t *ifp;
-	ire_t *dir;
-	u_char *s;
-	frdest_t fd;
-#ifdef	USE_INET6
-	ip6_t *ip6 = (ip6_t *)fin->fin_ip;
-#endif
-#else
-	void *target = NULL;
-	char *ifname = NULL;
-#endif
-	queue_t *q = NULL;
-	mblk_t *mp = NULL;
-	qpktinfo_t *qpi;
-	frentry_t *fr;
-	qif_t *qif;
-	ip_t *ip;
-#ifndef	sparc
-	u_short __iplen, __ipoff;
-#endif
-#ifdef	USE_INET6
-	struct in6_addr dst6;
-#endif
-#ifndef IRE_ILL_CN
-	dir = NULL;
-#endif
-	fr = fin->fin_fr;
-	ip = fin->fin_ip;
-	qpi = fin->fin_qpi;
-
-	/*
-	 * If this is a duplicate mblk then we want ip to point at that
-	 * data, not the original, if and only if it is already pointing at
-	 * the current mblk data.
-	 * Otherwise, If it's not a duplicate, and we're not already pointing
-	 * at the current mblk data, then we want to ensure that the data
-	 * points at ip.
-	 */
-	if (ip == (ip_t *)qpi->qpi_m->b_rptr && qpi->qpi_m != mb)
-		ip = (ip_t *)mb->b_rptr;
-	else if (qpi->qpi_m == mb && ip != (ip_t *)qpi->qpi_m->b_rptr) {
-		qpi->qpi_m->b_rptr = (u_char *)ip;
-		qpi->qpi_off = 0;
-	}
-
-	/*
-	 * If there is another M_PROTO, we don't want it
-	 */
-	if (*mpp != mb) {
-		mp = unlinkb(*mpp);
-		freeb(*mpp);
-		*mpp = mp;
-	}
-
-	/*
-	 * If the fdp is NULL then there is no set route for this packet.
-	 */
-	if (fdp == NULL) {
-		qif = fin->fin_ifp;
-#ifndef IRE_ILL_CN
-		switch (fin->fin_v)
-		{
-		case 4 :
-			fd.fd_ip = ip->ip_dst;
-			break;
-#ifdef USE_INET6
-		case 6 :
-			fd.fd_ip6.in6 = ip6->ip6_dst;
-			break;
-#endif
-		}
-		fdp = &fd;
-#endif
-	} else {
-		qif = fdp->fd_ifp;
-
-		if (qif == NULL || qif == (void *)-1)
-			goto bad_fastroute;
-	}
-
-	/*
-	 * In case we're here due to "to <if>" being used with
-	 * "keep state", check that we're going in the correct
-	 * direction.
-	 */
-	if ((fr != NULL) && (fin->fin_rev != 0)) {
-		if ((qif != NULL) && (fdp == &fr->fr_tif))
-			return -1;
-		dst.s_addr = fin->fin_fi.fi_daddr;
-	} else {
-		if (fin->fin_v == 4) {
-			if (fdp && fdp->fd_ip.s_addr != 0) {
-				dst = fdp->fd_ip;
-#ifdef IRE_ILL_CN
-				target = &dst;
-#endif
-			} else
-				dst.s_addr = fin->fin_fi.fi_daddr;
-		}
-#ifdef USE_INET6
-		else if (fin->fin_v == 6) {
-			if (fdp && IP6_NOTZERO(&fdp->fd_ip)) {
-				dst6 = fdp->fd_ip6.in6;
-#ifdef IRE_ILL_CN
-				target = &dst6;
-#endif
-			} else
-				dst6 = fin->fin_dst6;
-		}
-#endif
-		else
-			goto bad_fastroute;
-	}
-
-#ifndef IRE_ILL_CN
-#if SOLARIS2 >= 6
-	if (fin->fin_v == 4) {
-		dir = ire_route_lookup(dst.s_addr, 0xffffffff, 0, 0, NULL,
-					NULL, NULL, MATCH_IRE_DSTONLY|
-					MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
-	}
-# ifdef	USE_INET6
-	else if (fin->fin_v == 6) {
-		dir = ire_route_lookup_v6(&ip6->ip6_dst, NULL, 0, 0,
-					NULL, NULL, NULL, MATCH_IRE_DSTONLY|
-					MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
-	}
-# endif
-#else
-	dir = ire_lookup(dst.s_addr);
-#endif
-#if SOLARIS2 < 8
-	if (dir != NULL)
-		if (dir->ire_ll_hdr_mp == NULL || dir->ire_ll_hdr_length == 0)
-			dir = NULL;
-
-#elif (SOLARIS2 >= 8) && (SOLARIS2 <= 10)
-	if (dir != NULL) {
-		if (dir->ire_fp_mp == NULL || dir->ire_dlureq_mp == NULL) {
-			ire_refrele(dir);
-			dir = NULL;
-		}
-	}
-#else
-
-	if (dir != NULL)
-		if (dir->ire_nce && dir->ire_nce->nce_state != ND_REACHABLE) {
-			ire_refrele(dir);
-			dir = NULL;
-		}
-#endif
-#else	/* IRE_ILL_CN */
-	if (fdp && fdp->fd_ifname[0] != 0)
-		ifname = fdp->fd_ifname;
-
-	DB_CKSUMFLAGS(mb) = 0;	/* disable hardware checksum */
-	mp = pfil_make_dl_packet(mb, ip, target, ifname, &q);
-	if (mp == NULL)
-	{
-		goto bad_fastroute;
-	}
-	mb = mp;
-#endif	/* IRE_ILL_CN */
-
-#ifdef IRE_ILL_CN
-	if (mp != NULL) {
-#else
-	if (dir != NULL) {
-#if SOLARIS2 < 8
-		mp = dir->ire_ll_hdr_mp;
-		hlen = dir->ire_ll_hdr_length;
-#elif (SOLARIS2 >= 8) && (SOLARIS2 <= 10)
-		mp = dir->ire_fp_mp;
-		hlen = mp ? mp->b_wptr - mp->b_rptr : 0;
-		if (mp == NULL)
-			mp = dir->ire_dlureq_mp;
-#else
-		mp = dir->ire_nce->nce_fp_mp;
-		hlen = mp ? mp->b_wptr - mp->b_rptr : 0;
-		if (mp == NULL)
-			mp = dir->ire_nce->nce_res_mp;
-#endif
-#endif
-		if (fin->fin_out == 0) {
-			void *saveqif;
-			u_32_t pass;
-
-			saveqif = fin->fin_ifp;
-			fin->fin_ifp = qif;
-			fin->fin_out = 1;
-			(void)fr_acctpkt(fin, &pass);
-			fin->fin_fr = NULL;
-			if (!fr || !(fr->fr_flags & FR_RETMASK))
-				(void) fr_checkstate(fin, &pass);
-
-			switch (fr_checknatout(fin, NULL))
-			{
-			/* FALLTHROUGH */
-			case 0 :
-			case 1 :
-				break;
-			case -1 :
-				goto bad_fastroute;
-			}
-
-			fin->fin_out = 0;
-			fin->fin_ifp = saveqif;
-		}
-#ifndef sparc
-		if (fin->fin_v == 4) {
-			__iplen = (u_short)ip->ip_len,
-			__ipoff = (u_short)ip->ip_off;
-
-			ip->ip_len = htons(__iplen);
-			ip->ip_off = htons(__ipoff);
-		}
-#endif
-#ifndef IRE_ILL_CN
-		ifp = qif->qf_ill;
-
-		if (mp != NULL) {
-			s = mb->b_rptr;
-			if (
-#if (SOLARIS2 >= 6) && defined(ICK_M_CTL_MAGIC)
-			    (dohwcksum &&
-			     ifp->ill_ick.ick_magic == ICK_M_CTL_MAGIC) ||
-#endif
-			    (hlen && (s - mb->b_datap->db_base) >= hlen)) {
-				s -= hlen;
-				mb->b_rptr = (u_char *)s;
-				bcopy((char *)mp->b_rptr, (char *)s, hlen);
-			} else {
-				mblk_t *mp2;
-
-				mp2 = copyb(mp);
-				if (mp2 == NULL)
-					goto bad_fastroute;
-				linkb(mp2, mb);
-				mb = mp2;
-			}
-		}
-		*mpp = mb;
-
-		if (dir->ire_stq != NULL)
-			q = dir->ire_stq;
-		else if (dir->ire_rfq != NULL)
-			q = WR(dir->ire_rfq);
-		if (q != NULL)
-			q = q->q_next;
-		if (q != NULL) {
-			RWLOCK_EXIT(&ipf_global);
-#if (SOLARIS2 >= 6) && defined(ICK_M_CTL_MAGIC)
-			if ((fin->fin_p == IPPROTO_TCP) && dohwcksum &&
-			    (ifp->ill_ick.ick_magic == ICK_M_CTL_MAGIC)) {
-				tcphdr_t *tcp;
-				u_32_t t;
-
-				tcp = (tcphdr_t *)((char *)ip + fin->fin_hlen);
-				t = ip->ip_src.s_addr;
-				t += ip->ip_dst.s_addr;
-				t += 30;
-				t = (t & 0xffff) + (t >> 16);
-				tcp->th_sum = t & 0xffff;
-			}
-#endif
-			putnext(q, mb);
-			ATOMIC_INCL(fr_frouteok[0]);
-#if SOLARIS2 >= 8
-			ire_refrele(dir);
-#endif
-			READ_ENTER(&ipf_global);
-			return 0;
-		}
-#else	/* IRE_ILL_CN */
-		mb->b_queue = q;
-		*mpp = mb;
-		pfil_send_dl_packet(q, mb);
-		ATOMIC_INCL(fr_frouteok[0]);
-		return 0;
-#endif	/* IRE_ILL_CN */
-	}
-bad_fastroute:
-#ifndef IRE_ILL_CN
-#if SOLARIS2 >= 8
-	if (dir != NULL)
-		ire_refrele(dir);
-#endif
-#endif
-	freemsg(mb);
-	ATOMIC_INCL(fr_frouteok[1]);
-	return -1;
-}
-
-
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_pullup                                                   */
 /* Returns:     NULL == pullup failed, else pointer to protocol header      */
@@ -1571,7 +1426,7 @@ int len;
 {
 	qpktinfo_t *qpi = fin->fin_qpi;
 	int out = fin->fin_out, dpoff, ipoff;
-	mb_t *m = min;
+	mb_t *m = min, *m1, *m2;
 	char *ip;
 
 	if (m == NULL)
@@ -1605,6 +1460,22 @@ int len;
 					inc = 0;
 			}
 		}
+
+		/*
+		 * XXX This is here as a work around for a bug with DEBUG
+		 * XXX Solaris kernels.  The problem is b_prev is used by IP
+		 * XXX code as a way to stash the phyint_index for a packet,
+		 * XXX this doesn't get reset by IP but freeb does an ASSERT()
+		 * XXX for both of these to be NULL.  See 6442390.
+		 */
+		m1 = m;
+		m2 = m->b_prev;
+
+		do {
+			m1->b_next = NULL;
+			m1->b_prev = NULL;
+			m1 = m1->b_cont;
+		} while (m1);
 		if (pullupmsg(m, len + ipoff + inc) == 0) {
 			ATOMIC_INCL(frstats[out].fr_pull[1]);
 			FREE_MB_T(*fin->fin_mp);
@@ -1615,6 +1486,7 @@ int len;
 			qpi->qpi_data = NULL;
 			return NULL;
 		}
+		m->b_prev = m2;
 		m->b_rptr += inc;
 		fin->fin_m = m;
 		ip = MTOD(m, char *) + ipoff;
@@ -1629,4 +1501,411 @@ int len;
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;
 	return ip;
+}
+
+
+/*
+ * Function:	fr_verifysrc
+ * Returns:	int (really boolean)
+ * Parameters:	fin - packet information
+ *
+ * Check whether the packet has a valid source address for the interface on
+ * which the packet arrived, implementing the "fr_chksrc" feature.
+ * Returns true iff the packet's source address is valid.
+ */
+int fr_verifysrc(fin)
+fr_info_t *fin;
+{
+	net_data_t net_data_p;
+	phy_if_t phy_ifdata_routeto;
+	struct sockaddr	sin;
+
+	if (fin->fin_v == 4) { 
+		net_data_p = ipf_ipv4;
+	} else if (fin->fin_v == 6) { 
+		net_data_p = ipf_ipv6;
+	} else { 
+		return (0); 
+	}
+
+	/* Get the index corresponding to the if name */
+	sin.sa_family = (fin->fin_v == 4) ? AF_INET : AF_INET6;
+	bcopy(&fin->fin_saddr, &sin.sa_data, sizeof (struct in_addr));
+	phy_ifdata_routeto = net_routeto(net_data_p, &sin);
+
+	return (((phy_if_t)fin->fin_ifp == phy_ifdata_routeto) ? 1 : 0); 
+}
+
+
+/*
+ * Function:	fr_fastroute
+ * Returns:	 0: success;
+ *		-1: failed
+ * Parameters:
+ *	mb: the message block where ip head starts
+ *	mpp: the pointer to the pointer of the orignal
+ *		packet message
+ *	fin: packet information
+ *	fdp: destination interface information
+ *	if it is NULL, no interface information provided.
+ *
+ * This function is for fastroute/to/dup-to rules. It calls
+ * pfil_make_lay2_packet to search route, make lay-2 header
+ * ,and identify output queue for the IP packet.
+ * The destination address depends on the following conditions:
+ * 1: for fastroute rule, fdp is passed in as NULL, so the
+ *	destination address is the IP Packet's destination address
+ * 2: for to/dup-to rule, if an ip address is specified after
+ *	the interface name, this address is the as destination
+ *	address. Otherwise IP Packet's destination address is used
+ */
+int fr_fastroute(mb, mpp, fin, fdp)
+mblk_t *mb, **mpp;
+fr_info_t *fin;
+frdest_t *fdp;
+{
+        net_data_t net_data_p;
+	net_inject_t inj_data;
+	mblk_t *mp = NULL;
+	frentry_t *fr = fin->fin_fr;
+	qpktinfo_t *qpi;
+	ip_t *ip;
+
+	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
+	struct sockaddr *sinp;
+#ifndef	sparc
+	u_short __iplen, __ipoff;
+#endif
+
+	if (fin->fin_v == 4) {
+		net_data_p = ipf_ipv4;
+	} else if (fin->fin_v == 6) {
+		net_data_p = ipf_ipv6;
+	} else {
+		return (-1);
+	}
+
+	ip = fin->fin_ip;
+	qpi = fin->fin_qpi;
+
+	/*
+	 * If this is a duplicate mblk then we want ip to point at that
+	 * data, not the original, if and only if it is already pointing at
+	 * the current mblk data.
+	 *
+	 * Otherwise, if it's not a duplicate, and we're not already pointing
+	 * at the current mblk data, then we want to ensure that the data
+	 * points at ip.
+	 */
+
+	if ((ip == (ip_t *)qpi->qpi_m->b_rptr) && (qpi->qpi_m != mb)) {
+		ip = (ip_t *)mb->b_rptr;
+	} else if ((qpi->qpi_m == mb) && (ip != (ip_t *)qpi->qpi_m->b_rptr)) {
+		qpi->qpi_m->b_rptr = (uchar_t *)ip;
+		qpi->qpi_off = 0;
+	}
+
+	/*
+	 * If there is another M_PROTO, we don't want it
+	 */
+	if (*mpp != mb) {
+		mp = unlinkb(*mpp);
+		freeb(*mpp);
+		*mpp = mp;
+	}
+
+	sinp = (struct sockaddr *)&inj_data.ni_addr;
+	sin = (struct sockaddr_in *)sinp;
+	sin6 = (struct sockaddr_in6 *)sinp;
+	bzero((char *)&inj_data.ni_addr, sizeof (inj_data.ni_addr));
+	inj_data.ni_addr.ss_family = (fin->fin_v == 4) ? AF_INET : AF_INET6;
+	inj_data.ni_packet = mb;
+
+	/*
+	 * In case we're here due to "to <if>" being used with
+	 * "keep state", check that we're going in the correct
+	 * direction.
+	 */
+	if (fdp != NULL) {
+		if ((fr != NULL) && (fdp->fd_ifp != NULL) &&
+			(fin->fin_rev != 0) && (fdp == &fr->fr_tif))
+			goto bad_fastroute;
+		inj_data.ni_physical = (phy_if_t)fdp->fd_ifp;
+		if (fin->fin_v == 4) {
+			sin->sin_addr = fdp->fd_ip;
+		} else {
+			sin6->sin6_addr = fdp->fd_ip6.in6;
+		}
+	} else {
+		if (fin->fin_v == 4) {
+			sin->sin_addr = ip->ip_dst;
+		} else {
+			sin6->sin6_addr = ((ip6_t *)ip)->ip6_dst;
+		}
+		inj_data.ni_physical = net_routeto(net_data_p, sinp);
+	}
+
+	/* disable hardware checksum */
+	DB_CKSUMFLAGS(mb) = 0;
+
+	*mpp = mb;
+
+	if (fin->fin_out == 0) {
+		void *saveifp;
+		u_32_t pass;
+
+		saveifp = fin->fin_ifp;
+		fin->fin_ifp = (void *)inj_data.ni_physical;
+		fin->fin_out = 1;
+		(void) fr_acctpkt(fin, &pass);
+		fin->fin_fr = NULL;
+		if (!fr || !(fr->fr_flags & FR_RETMASK))
+			(void) fr_checkstate(fin, &pass);
+		switch (fr_checknatout(fin, NULL))
+		{
+		/* FALLTHROUGH */
+		case 0 :
+		case 1 :
+			break;
+		case -1 :
+			goto bad_fastroute;
+		}
+		fin->fin_out = 0;
+		fin->fin_ifp = saveifp;
+
+		if (fin->fin_nat != NULL)
+			fr_natderef((nat_t **)&fin->fin_nat);
+	}
+#ifndef	sparc
+	if (fin->fin_v == 4) {
+		__iplen = (u_short)ip->ip_len,
+		__ipoff = (u_short)ip->ip_off;
+
+		ip->ip_len = htons(__iplen);
+		ip->ip_off = htons(__ipoff);
+	}
+#endif
+
+	if (net_data_p) {
+		if (net_inject(net_data_p, NI_DIRECT_OUT, &inj_data) < 0) {
+			return (-1);
+		}
+	}
+
+	fr_frouteok[0]++;
+	return 0;
+bad_fastroute:
+	freemsg(mb);
+	fr_frouteok[1]++;
+	return -1;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_hook_out                                                */
+/* Returns:     int - 0 == packet ok, else problem, free packet if not done */
+/* Parameters:  event(I)     - pointer to event                             */
+/*              info(I)      - pointer to hook information for firewalling  */
+/*                                                                          */
+/* Calling ipf_hook.                                                        */
+/* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
+int ipf_hook_out(hook_event_token_t token, hook_data_t info)
+{
+	return ipf_hook(info, 1, 0);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_hook_in                                                 */
+/* Returns:     int - 0 == packet ok, else problem, free packet if not done */
+/* Parameters:  event(I)     - pointer to event                             */
+/*              info(I)      - pointer to hook information for firewalling  */
+/*                                                                          */
+/* Calling ipf_hook.                                                        */
+/* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
+int ipf_hook_in(hook_event_token_t token, hook_data_t info)
+{
+	return ipf_hook(info, 0, 0);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_hook_loop_out                                           */
+/* Returns:     int - 0 == packet ok, else problem, free packet if not done */
+/* Parameters:  event(I)     - pointer to event                             */
+/*              info(I)      - pointer to hook information for firewalling  */
+/*                                                                          */
+/* Calling ipf_hook.                                                        */
+/* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
+int ipf_hook_loop_out(hook_event_token_t token, hook_data_t info)
+{
+	return ipf_hook(info, 1, 1);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_hook_loop_in                                            */
+/* Returns:     int - 0 == packet ok, else problem, free packet if not done */
+/* Parameters:  event(I)     - pointer to event                             */
+/*              info(I)      - pointer to hook information for firewalling  */
+/*                                                                          */
+/* Calling ipf_hook.                                                        */
+/* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
+int ipf_hook_loop_in(hook_event_token_t token, hook_data_t info)
+{
+	return ipf_hook(info, 0, 1);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_hook                                                    */
+/* Returns:     int - 0 == packet ok, else problem, free packet if not done */
+/* Parameters:  info(I)      - pointer to hook information for firewalling  */
+/*              out(I)       - whether packet is going in or out            */
+/*              loopback(I)  - whether packet is a loopback packet or not   */
+/*                                                                          */
+/* Stepping stone function between the IP mainline and IPFilter.  Extracts  */
+/* parameters out of the info structure and forms them up to be useful for  */
+/* calling ipfilter.                                                        */
+/* ------------------------------------------------------------------------ */
+int ipf_hook(hook_data_t info, int out, int loopback)
+{
+	hook_pkt_event_t *fw;
+	int rval, v, hlen;
+	qpktinfo_t qpi;
+	u_short swap;
+	phy_if_t phy; 
+	ip_t *ip;
+
+	fw = (hook_pkt_event_t *)info;
+
+	ASSERT(fw != NULL);
+	phy = (out == 0) ? fw->hpe_ifp : fw->hpe_ofp;
+
+	ip = fw->hpe_hdr;
+	v = ip->ip_v;
+	if (v == IPV4_VERSION) {
+		swap = ntohs(ip->ip_len);
+		ip->ip_len = swap;
+		swap = ntohs(ip->ip_off);
+		ip->ip_off = swap;
+
+		hlen = IPH_HDR_LENGTH(ip);
+	} else
+		hlen = sizeof (ip6_t);
+
+	bzero(&qpi, sizeof (qpktinfo_t));
+
+	qpi.qpi_m = fw->hpe_mb;
+	qpi.qpi_data = fw->hpe_hdr;
+	qpi.qpi_off = (char *)qpi.qpi_data - (char *)fw->hpe_mb->b_rptr;
+	qpi.qpi_ill = (void *)phy;
+	if (loopback)
+		qpi.qpi_flags = QPI_NOCKSUM;
+	else
+		qpi.qpi_flags = 0;
+
+	rval = fr_check(fw->hpe_hdr, hlen, qpi.qpi_ill, out, &qpi, fw->hpe_mp);
+
+	/* For fastroute cases, fr_check returns 0 with mp set to NULL */
+	if (rval == 0 && *(fw->hpe_mp) == NULL)
+		rval = 1;
+
+	/* Notify IP the packet mblk_t and IP header pointers. */	
+	fw->hpe_mb = qpi.qpi_m;
+	fw->hpe_hdr = qpi.qpi_data;
+	if ((rval == 0) && (v == IPV4_VERSION)) {
+		ip = qpi.qpi_data;
+		swap = ntohs(ip->ip_len);
+		ip->ip_len = swap;
+		swap = ntohs(ip->ip_off);
+		ip->ip_off = swap;
+	}
+	return rval;
+
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nic_event_v4                                            */
+/* Returns:     int - 0 == no problems encountered                          */
+/* Parameters:  event(I)     - pointer to event                             */
+/*              info(I)      - pointer to information about a NIC event     */
+/*                                                                          */
+/* Function to receive asynchronous NIC events from IP                      */
+/* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
+int ipf_nic_event_v4(hook_event_token_t event, hook_data_t info)
+{
+	struct sockaddr_in *sin;
+	hook_nic_event_t *hn;
+
+	hn = (hook_nic_event_t *)info;
+
+	switch (hn->hne_event)
+	{
+	case NE_PLUMB :
+		frsync(IPFSYNC_NEWIFP, 4, (void *)hn->hne_nic, hn->hne_data);
+		fr_natifpsync(IPFSYNC_NEWIFP, (void *)hn->hne_nic,
+			      hn->hne_data);
+		fr_statesync(IPFSYNC_NEWIFP, 4, (void *)hn->hne_nic,
+			     hn->hne_data);
+		break;
+
+	case NE_UNPLUMB :
+		frsync(IPFSYNC_OLDIFP, 4, (void *)hn->hne_nic, NULL);
+		fr_natifpsync(IPFSYNC_OLDIFP, (void *)hn->hne_nic, NULL);
+		fr_statesync(IPFSYNC_OLDIFP, 4, (void *)hn->hne_nic, NULL);
+		break;
+
+	case NE_ADDRESS_CHANGE :
+		sin = hn->hne_data;
+		fr_nataddrsync((void *)hn->hne_nic, &sin->sin_addr);
+		break;
+
+	default :
+		break;
+	}
+
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nic_event_v6                                            */
+/* Returns:     int - 0 == no problems encountered                          */
+/* Parameters:  event(I)     - pointer to event                             */
+/*              info(I)      - pointer to information about a NIC event     */
+/*                                                                          */
+/* Function to receive asynchronous NIC events from IP                      */
+/* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
+int ipf_nic_event_v6(hook_event_token_t event, hook_data_t info)
+{
+	hook_nic_event_t *hn;
+
+	hn = (hook_nic_event_t *)info;
+
+	switch (hn->hne_event)
+	{
+	case NE_PLUMB :
+		frsync(IPFSYNC_NEWIFP, 6, (void *)hn->hne_nic, hn->hne_data);
+		fr_statesync(IPFSYNC_NEWIFP, 6, (void *)hn->hne_nic,
+			     hn->hne_data);
+		break;
+
+	case NE_UNPLUMB :
+		frsync(IPFSYNC_OLDIFP, 6, (void *)hn->hne_nic, NULL);
+		fr_statesync(IPFSYNC_OLDIFP, 6, (void *)hn->hne_nic, NULL);
+		break;
+
+	case NE_ADDRESS_CHANGE :
+		break;
+	default :
+		break;
+	}
+
+	return 0;
 }

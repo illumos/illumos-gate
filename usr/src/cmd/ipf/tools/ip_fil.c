@@ -410,7 +410,7 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			frsync(NULL);
+			frsync(IPFSYNC_RESYNC, IPFSYNC_RESYNC, NULL, NULL);
 		}
 		break;
 	default :
@@ -455,7 +455,7 @@ void *ifp;
 			f->fr_ifa = (void *)-1;
 #endif
 	RWLOCK_EXIT(&ipf_mutex);
-	fr_natsync(ifp);
+	fr_natifpsync(IPFSYNC_OLDIFP, ifp, NULL);
 }
 
 
@@ -614,7 +614,7 @@ int v;
 		*addr++ = '\0';
 
 	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
-		COPYIFNAME(ifp, ifname);
+		COPYIFNAME(ifp, ifname, 0);
 		if (!strcmp(name, ifname)) {
 			if (addr != NULL)
 				fr_setifpaddr(ifp, addr);
@@ -781,8 +781,10 @@ int dst;
 }
 
 
-void frsync(ifp)
-void *ifp;
+void frsync(command, version, nic, data)
+int command, version;
+void *nic;
+char *data;
 {
 	return;
 }

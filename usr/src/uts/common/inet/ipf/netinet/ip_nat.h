@@ -79,7 +79,6 @@
 #ifndef	APR_LABELLEN
 #define	APR_LABELLEN	16
 #endif
-#define	NAT_HW_CKSUM	0x80000000
 
 #define	DEF_NAT_AGE	1200     /* 10 minutes (600 seconds) */
 
@@ -428,7 +427,8 @@ extern	u_int	ipf_hostmap_sz;
 extern	u_int	fr_nat_maxbucket;
 extern	u_int	fr_nat_maxbucket_reset;
 extern	int	fr_nat_lock;
-extern	void	fr_natsync __P((void *));
+extern	void	fr_nataddrsync __P((void *, struct in_addr *));
+extern	void	fr_natifpsync __P((int, void *, char *));
 extern	u_long	fr_defnatage;
 extern	u_long	fr_defnaticmpage;
 extern	u_long	fr_defnatipage;
@@ -468,8 +468,8 @@ extern	int	fr_natin __P((fr_info_t *, nat_t *, int, u_32_t));
 extern	void	fr_natunload __P((void));
 extern	void	fr_natexpire __P((void));
 extern	void	nat_log __P((struct nat *, u_int));
-extern	void	fix_incksum __P((fr_info_t *, u_short *, u_32_t));
-extern	void	fix_outcksum __P((fr_info_t *, u_short *, u_32_t));
+extern	void	fix_incksum __P((u_short *, u_32_t));
+extern	void	fix_outcksum __P((u_short *, u_32_t));
 extern	void	fr_natderef __P((nat_t **));
 extern	u_short	*nat_proto __P((fr_info_t *, nat_t *, u_int));
 extern	void	nat_update __P((fr_info_t *, nat_t *, ipnat_t *));

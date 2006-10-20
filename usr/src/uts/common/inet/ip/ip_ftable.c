@@ -1293,6 +1293,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 
 		ire = ire_route_lookup(dst, 0, 0, 0, supplied_ipif,
 		    &sire, zoneid, MBLK_GETLABEL(mp), match_flags);
+		ipif_refrele(supplied_ipif);
 		ill_refrele(ill);
 	}
 
@@ -1325,7 +1326,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		goto discard;
 	}
 
-	ASSERT(ire->ire_nce != NULL);
+	ASSERT(ire->ire_type != IRE_CACHE || ire->ire_nce != NULL);
 	/*
 	 * If needed, we will create the ire cache entry for the
 	 * nexthop, resolve its link-layer address and then send

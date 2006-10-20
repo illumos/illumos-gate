@@ -393,8 +393,8 @@ typedef	struct	bcache {
 /*
  * db_flags values (all implementation private!)
  */
-#define	DBLK_REFMIN	0x01		/* min refcnt stored in low bit */
-#define	DBLK_COOKED	0x02		/* message has been processed once */
+#define	DBLK_REFMIN		0x01	/* min refcnt stored in low bit */
+#define	DBLK_COOKED		0x02	/* message has been processed once */
 
 /*
  * db_struioflag values:

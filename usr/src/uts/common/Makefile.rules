@@ -370,9 +370,8 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/tcp/%.c
 	$(CTFCONVERT_O)
 
 
-IPFFLAGS=-I $(UTSBASE)/common/inet/pfil
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/ipf/%.c
-	$(COMPILE.c) $(IPFFLAGS) -o $@ $<
+	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/net/patricia/%.c

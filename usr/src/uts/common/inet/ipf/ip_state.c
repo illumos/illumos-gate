@@ -1092,15 +1092,15 @@ u_int flags;
 
 		if (((ifp = fr->fr_ifas[1]) != NULL) &&
 		    (ifp != (void *)-1)) {
-			COPYIFNAME(ifp, is->is_ifname[(out << 1) + 1]);
+			COPYIFNAME(ifp, is->is_ifname[(out << 1) + 1], fr->fr_v);
 		}
 		if (((ifp = fr->fr_ifas[2]) != NULL) &&
 		    (ifp != (void *)-1)) {
-			COPYIFNAME(ifp, is->is_ifname[(1 - out) << 1]);
+			COPYIFNAME(ifp, is->is_ifname[(1 - out) << 1], fr->fr_v);
 		}
 		if (((ifp = fr->fr_ifas[3]) != NULL) &&
 		    (ifp != (void *)-1)) {
-			COPYIFNAME(ifp, is->is_ifname[((1 - out) << 1) + 1]);
+			COPYIFNAME(ifp, is->is_ifname[((1 - out) << 1) + 1], fr->fr_v);
 		}
 	} else {
 		pass = fr_flags;
@@ -1109,7 +1109,7 @@ u_int flags;
 
 	is->is_ifp[out << 1] = fin->fin_ifp;
 	if (fin->fin_ifp != NULL) {
-		COPYIFNAME(fin->fin_ifp, is->is_ifname[out << 1]);
+		COPYIFNAME(fin->fin_ifp, is->is_ifname[out << 1], fr->fr_v);
 	}
 
 	/*
@@ -1864,7 +1864,7 @@ u_32_t cmask;
 	if (is->is_ifp[idx] == NULL &&
 	    (*is->is_ifname[idx] == '\0' || *is->is_ifname[idx] == '*')) {
 		is->is_ifp[idx] = ifp;
-		COPYIFNAME(ifp, is->is_ifname[idx]);
+		COPYIFNAME(ifp, is->is_ifname[idx], fin->fin_v);
 	}
 	fin->fin_rev = rev;
 	return is;
@@ -2610,7 +2610,7 @@ ipstate_t *is;
 			seq = ntohl(tcp->th_seq);
 			seq += is->is_isninc[0];
 			tcp->th_seq = htonl(seq);
-			fix_outcksum(fin, &tcp->th_sum, is->is_sumd[0]);
+			fix_outcksum(&tcp->th_sum, is->is_sumd[0]);
 		}
 	}
 	if ((is->is_flags & IS_ISNACK) != 0) {
@@ -2618,7 +2618,7 @@ ipstate_t *is;
 			seq = ntohl(tcp->th_seq);
 			seq += is->is_isninc[1];
 			tcp->th_seq = htonl(seq);
-			fix_outcksum(fin, &tcp->th_sum, is->is_sumd[1]);
+			fix_outcksum(&tcp->th_sum, is->is_sumd[1]);
 		}
 	}
 }
@@ -2648,7 +2648,7 @@ ipstate_t *is;
 			ack = ntohl(tcp->th_ack);
 			ack -= is->is_isninc[0];
 			tcp->th_ack = htonl(ack);
-			fix_incksum(fin, &tcp->th_sum, is->is_sumd[0]);
+			fix_incksum(&tcp->th_sum, is->is_sumd[0]);
 		}
 	}
 	if ((is->is_flags & IS_ISNACK) != 0) {
@@ -2656,7 +2656,7 @@ ipstate_t *is;
 			ack = ntohl(tcp->th_ack);
 			ack -= is->is_isninc[1];
 			tcp->th_ack = htonl(ack);
-			fix_incksum(fin, &tcp->th_sum, is->is_sumd[1]);
+			fix_incksum(&tcp->th_sum, is->is_sumd[1]);
 		}
 	}
 }
@@ -2665,7 +2665,10 @@ ipstate_t *is;
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_statesync                                                */
 /* Returns:     Nil                                                         */
-/* Parameters:  ifp(I) - pointer to interface                               */
+/* Parameters:  action(I) - type of synchronisation to do                   */
+/*              v(I)      - IP version being sync'd (v4 or v6)              */
+/*              ifp(I)    - interface identifier associated with action     */
+/*              name(I)   - name associated with ifp parameter              */
 /*                                                                          */
 /* Walk through all state entries and if an interface pointer match is      */
 /* found then look it up again, based on its name in case the pointer has   */
@@ -2674,8 +2677,10 @@ ipstate_t *is;
 /* If ifp is passed in as being non-null then we are only doing updates for */
 /* existing, matching, uses of it.                                          */
 /* ------------------------------------------------------------------------ */
-void fr_statesync(ifp)
+void fr_statesync(action, v, ifp, name)
+int action, v;
 void *ifp;
+char *name;
 {
 	ipstate_t *is;
 	int i;
@@ -2690,15 +2695,48 @@ void *ifp;
 		return;
 	}
 
-	for (is = ips_list; is; is = is->is_next) {
-		/*
-		 * Look up all the interface names in the state entry.
-		 */
-		for (i = 0; i < 4; i++) {
-			if (ifp == NULL || ifp == is->is_ifp[i])
+	switch (action)
+	{
+	case IPFSYNC_RESYNC :
+		for (is = ips_list; is; is = is->is_next) {
+			if (v != 0 && is->is_v != v)
+				continue;
+			/*
+			 * Look up all the interface names in the state entry.
+			 */
+			for (i = 0; i < 4; i++) {
 				is->is_ifp[i] = fr_resolvenic(is->is_ifname[i],
 							      is->is_v);
+			}
 		}
+		break;
+	case IPFSYNC_NEWIFP :
+		for (is = ips_list; is; is = is->is_next) {
+			if (v != 0 && is->is_v != v)
+				continue;
+			/*
+			 * Look up all the interface names in the state entry.
+			 */
+			for (i = 0; i < 4; i++) {
+				if (!strncmp(is->is_ifname[i], name,
+					     sizeof(is->is_ifname[i])))
+					is->is_ifp[i] = ifp;
+			}
+		}
+		break;
+	case IPFSYNC_OLDIFP :
+		for (is = ips_list; is; is = is->is_next) {
+			if (v != 0 && is->is_v != v)
+				continue;
+			/*
+			 * Look up all the interface names in the state entry.
+			 */
+			for (i = 0; i < 4; i++) {
+				if (is->is_ifp[i] == ifp)
+					is->is_ifp[i] = (void *)-1;
+			}
+		}
+		break;
 	}
 	RWLOCK_EXIT(&ipf_state);
 }

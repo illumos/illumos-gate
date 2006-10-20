@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1378,6 +1377,7 @@ pullupmsg(mblk_t *mp, ssize_t len)
 	mblk_t *bp, *b_cont;
 	dblk_t *dbp;
 	ssize_t n;
+	uint32_t start, stuff, end, value, flags;
 
 	ASSERT(mp->b_datap->db_ref > 0);
 	ASSERT(mp->b_next == NULL && mp->b_prev == NULL);
@@ -1421,6 +1421,13 @@ pullupmsg(mblk_t *mp, ssize_t len)
 	bp->b_datap->db_mblk = bp;
 	mp->b_rptr = mp->b_wptr = dbp->db_base;
 
+	/*
+	 * Need to preserve checksum information by copying them
+	 * to mp which heads the pulluped message.
+	 */
+	hcksum_retrieve(bp, NULL, NULL, &start, &stuff, &end, &value, &flags);
+	(void) hcksum_assoc(mp, NULL, NULL, start, stuff, end, value, flags, 0);
+
 	do {
 		ASSERT(bp->b_datap->db_ref > 0);
 		ASSERT(bp->b_wptr >= bp->b_rptr);
@@ -1453,6 +1460,7 @@ msgpullup(mblk_t *mp, ssize_t len)
 	mblk_t	*newmp;
 	ssize_t	totlen;
 	ssize_t	n;
+	uint32_t start, stuff, end, value, flags;
 
 	/*
 	 * We won't handle Multidata message, since it contains
@@ -1480,6 +1488,14 @@ msgpullup(mblk_t *mp, ssize_t len)
 
 	newmp->b_flag = mp->b_flag;
 	newmp->b_band = mp->b_band;
+
+	/*
+	 * Need to preserve checksum information by copying them
+	 * to newmp which heads the pulluped message.
+	 */
+	hcksum_retrieve(mp, NULL, NULL, &start, &stuff, &end, &value, &flags);
+	(void) hcksum_assoc(newmp, NULL, NULL, start, stuff, end,
+	    value, flags, 0);
 
 	while (len > 0) {
 		n = mp->b_wptr - mp->b_rptr;

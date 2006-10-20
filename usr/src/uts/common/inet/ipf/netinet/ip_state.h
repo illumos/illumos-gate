@@ -248,7 +248,7 @@ extern	int	fr_stateinit __P((void));
 extern	ipstate_t *fr_addstate __P((fr_info_t *, ipstate_t **, u_int));
 extern	frentry_t *fr_checkstate __P((struct fr_info *, u_32_t *));
 extern	ipstate_t *fr_stlookup __P((fr_info_t *, tcphdr_t *, ipftq_t **));
-extern	void	fr_statesync __P((void *));
+extern	void	fr_statesync __P((int, int, void *, char *));
 extern	void	fr_timeoutstate __P((void));
 extern	int	fr_tcp_age __P((struct ipftqent *, struct fr_info *,
 				struct ipftq *, int));

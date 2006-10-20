@@ -81,6 +81,7 @@
 #include <inet/ip_impl.h>
 #include <inet/tun.h>
 #include <inet/sctp_ip.h>
+#include <inet/ip_netinfo.h>
 
 #include <net/pfkeyv2.h>
 #include <inet/ipsec_info.h>
@@ -4207,16 +4208,35 @@ ill_delete_interface_type(ill_if_t *interface)
 	mi_free(interface);
 }
 
+/* Defined in ip_netinfo.c */
+extern ddi_taskq_t	*eventq_queue_nic;
+
 /*
  * remove ill from the global list.
  */
 static void
 ill_glist_delete(ill_t *ill)
 {
+	char *nicname;
+	size_t nicnamelen;
+	hook_nic_event_t *info;
+
 	if (ill == NULL)
 		return;
 
 	rw_enter(&ill_g_lock, RW_WRITER);
+
+	if (ill->ill_name != NULL) {
+		nicname = kmem_alloc(ill->ill_name_length, KM_NOSLEEP);
+		if (nicname != NULL) {
+			bcopy(ill->ill_name, nicname, ill->ill_name_length);
+			nicnamelen = ill->ill_name_length;
+		}
+	} else {
+		nicname = NULL;
+		nicnamelen = 0;
+	}
+
 	/*
 	 * If the ill was never inserted into the AVL tree
 	 * we skip the if branch.
@@ -4243,7 +4263,56 @@ ill_glist_delete(ill_t *ill)
 		ill->ill_name[0] = '\0';
 		ill->ill_ppa = UINT_MAX;
 	}
+
+	/*
+	 * Run the unplumb hook after the NIC has disappeared from being
+	 * visible so that attempts to revalidate its existance will fail.
+	 *
+	 * This needs to be run inside the ill_g_lock perimeter to ensure
+	 * that the ordering of delivered events to listeners matches the
+	 * order of them in the kernel.
+	 */
+	if ((info = ill->ill_nic_event_info) != NULL) {
+		if (info->hne_event != NE_DOWN) {
+			ip2dbg(("ill_glist_delete: unexpected nic event %d "
+			    "attached for %s\n", info->hne_event,
+			    ill->ill_name));
+			if (info->hne_data != NULL)
+				kmem_free(info->hne_data, info->hne_datalen);
+			kmem_free(info, sizeof (hook_nic_event_t));
+		} else {
+			if (ddi_taskq_dispatch(eventq_queue_nic,
+			    ip_ne_queue_func, (void *)info, DDI_SLEEP)
+			    == DDI_FAILURE) {
+				ip2dbg(("ill_glist_delete: ddi_taskq_dispatch "
+				    "failed\n"));
+				if (info->hne_data != NULL)
+					kmem_free(info->hne_data,
+					    info->hne_datalen);
+				kmem_free(info, sizeof (hook_nic_event_t));
+			}
+		}
+	}
+
+	info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
+	if (info != NULL) {
+		info->hne_nic = ill->ill_phyint->phyint_ifindex;
+		info->hne_lif = 0;
+		info->hne_event = NE_UNPLUMB;
+		info->hne_data = nicname;
+		info->hne_datalen = nicnamelen;
+		info->hne_family = ill->ill_isv6 ? ipv6 : ipv4;
+	} else {
+		ip2dbg(("ill_glist_delete: could not attach UNPLUMB nic event "
+		    "information for %s (ENOMEM)\n", ill->ill_name));
+		if (nicname != NULL)
+			kmem_free(nicname, nicnamelen);
+	}
+
+	ill->ill_nic_event_info = info;
+
 	ill_phyint_free(ill);
+
 	rw_exit(&ill_g_lock);
 }
 
@@ -4994,6 +5063,88 @@ ill_lookup_on_ifindex(uint_t index, boolean_t isv6, queue_t *q, mblk_t *mp,
 		*err = ENXIO;
 	return (NULL);
 }
+
+/*
+ * Return the ifindex next in sequence after the passed in ifindex.
+ * If there is no next ifindex for the given protocol, return 0.
+ */
+uint_t
+ill_get_next_ifindex(uint_t index, boolean_t isv6)
+{
+	phyint_t *phyi;
+	phyint_t *phyi_initial;
+	uint_t   ifindex;
+
+	rw_enter(&ill_g_lock, RW_READER);
+
+	if (index == 0) {
+		phyi = avl_first(&phyint_g_list.phyint_list_avl_by_index);
+	} else {
+		phyi = phyi_initial = avl_find(
+		    &phyint_g_list.phyint_list_avl_by_index,
+		    (void *) &index, NULL);
+	}
+
+	for (; phyi != NULL;
+	    phyi = avl_walk(&phyint_g_list.phyint_list_avl_by_index,
+	    phyi, AVL_AFTER)) {
+		/*
+		 * If we're not returning the first interface in the tree
+		 * and we still haven't moved past the phyint_t that
+		 * corresponds to index, avl_walk needs to be called again
+		 */
+		if (!((index != 0) && (phyi == phyi_initial))) {
+			if (isv6) {
+				if ((phyi->phyint_illv6) &&
+				    ILL_CAN_LOOKUP(phyi->phyint_illv6) &&
+				    (phyi->phyint_illv6->ill_isv6 == 1))
+					break;
+			} else {
+				if ((phyi->phyint_illv4) &&
+				    ILL_CAN_LOOKUP(phyi->phyint_illv4) &&
+				    (phyi->phyint_illv4->ill_isv6 == 0))
+					break;
+			}
+		}
+	}
+
+	rw_exit(&ill_g_lock);
+
+	if (phyi != NULL)
+		ifindex = phyi->phyint_ifindex;
+	else
+		ifindex = 0;
+
+	return (ifindex);
+}
+
+
+/*
+ * Return the ifindex for the named interface.
+ * If there is no next ifindex for the interface, return 0.
+ */
+uint_t
+ill_get_ifindex_by_name(char *name)
+{
+	phyint_t	*phyi;
+	avl_index_t	where = 0;
+	uint_t		ifindex;
+
+	rw_enter(&ill_g_lock, RW_READER);
+
+	if ((phyi = avl_find(&phyint_g_list.phyint_list_avl_by_name,
+	    name, &where)) == NULL) {
+		rw_exit(&ill_g_lock);
+		return (0);
+	}
+
+	ifindex = phyi->phyint_ifindex;
+
+	rw_exit(&ill_g_lock);
+
+	return (ifindex);
+}
+
 
 /*
  * Obtain a reference to the ill. The ill_refcnt is a dynamic refcnt
@@ -10821,10 +10972,12 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	in6_addr_t v6addr;
 	ipaddr_t addr;
 	sin6_t	*sin6;
+	int	sinlen;
 	int	err = 0;
 	ill_t	*ill = ipif->ipif_ill;
 	boolean_t need_dl_down;
 	boolean_t need_arp_down;
+	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
 
 	ip1dbg(("ip_sioctl_addr_tail(%s:%u %p)\n",
 	    ill->ill_name, ipif->ipif_id, (void *)ipif));
@@ -10838,9 +10991,11 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	if (ipif->ipif_isv6) {
 		sin6 = (sin6_t *)sin;
 		v6addr = sin6->sin6_addr;
+		sinlen = sizeof (struct sockaddr_in6);
 	} else {
 		addr = sin->sin_addr.s_addr;
 		IN6_IPADDR_TO_V4MAPPED(addr, &v6addr);
+		sinlen = sizeof (struct sockaddr_in);
 	}
 	mutex_enter(&ill->ill_lock);
 	ipif->ipif_v6lcl_addr = v6addr;
@@ -10897,7 +11052,53 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	}
 
 	ipif_set_default(ipif);
-	mutex_exit(&ill->ill_lock);
+
+	/*
+	 * When publishing an interface address change event, we only notify
+	 * the event listeners of the new address.  It is assumed that if they
+	 * actively care about the addresses assigned that they will have
+	 * already discovered the previous address assigned (if there was one.)
+	 *
+	 * Don't attach nic event message for SIOCLIFADDIF ioctl.
+	 */
+	if (iocp->ioc_cmd != SIOCLIFADDIF) {
+		hook_nic_event_t *info;
+		if ((info = ipif->ipif_ill->ill_nic_event_info) != NULL) {
+			ip2dbg(("ip_sioctl_addr_tail: unexpected nic event %d "
+			    "attached for %s\n", info->hne_event,
+			    ill->ill_name));
+			if (info->hne_data != NULL)
+				kmem_free(info->hne_data, info->hne_datalen);
+			kmem_free(info, sizeof (hook_nic_event_t));
+		}
+
+		info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
+		if (info != NULL) {
+			info->hne_nic =
+			    ipif->ipif_ill->ill_phyint->phyint_ifindex;
+			info->hne_lif = MAP_IPIF_ID(ipif->ipif_id);
+			info->hne_event = NE_ADDRESS_CHANGE;
+			info->hne_family = ipif->ipif_isv6 ? ipv6 : ipv4;
+			info->hne_data = kmem_alloc(sinlen, KM_NOSLEEP);
+			if (info->hne_data != NULL) {
+				info->hne_datalen = sinlen;
+				bcopy(sin, info->hne_data, sinlen);
+			} else {
+				ip2dbg(("ip_sioctl_addr_tail: could not attach "
+				    "address information for ADDRESS_CHANGE nic"
+				    " event of %s (ENOMEM)\n",
+				    ipif->ipif_ill->ill_name));
+				kmem_free(info, sizeof (hook_nic_event_t));
+			}
+		} else
+			ip2dbg(("ip_sioctl_addr_tail: could not attach "
+			    "ADDRESS_CHANGE nic event information for %s "
+			    "(ENOMEM)\n", ipif->ipif_ill->ill_name));
+
+		ipif->ipif_ill->ill_nic_event_info = info;
+	}
+
+	mutex_exit(&ipif->ipif_ill->ill_lock);
 
 	if (need_up) {
 		/*
@@ -17669,6 +17870,7 @@ ill_dl_down(ill_t *ill)
 	 * is brought up.
 	 */
 	mblk_t	*mp = ill->ill_unbind_mp;
+	hook_nic_event_t *info;
 
 	ip1dbg(("ill_dl_down(%s)\n", ill->ill_name));
 
@@ -17695,7 +17897,31 @@ ill_dl_down(ill_t *ill)
 	ill_leave_multicast(ill);
 
 	mutex_enter(&ill->ill_lock);
+
 	ill->ill_dl_up = 0;
+
+	if ((info = ill->ill_nic_event_info) != NULL) {
+		ip2dbg(("ill_dl_down:unexpected nic event %d attached for %s\n",
+		    info->hne_event, ill->ill_name));
+		if (info->hne_data != NULL)
+			kmem_free(info->hne_data, info->hne_datalen);
+		kmem_free(info, sizeof (hook_nic_event_t));
+	}
+
+	info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
+	if (info != NULL) {
+		info->hne_nic = ill->ill_phyint->phyint_ifindex;
+		info->hne_lif = 0;
+		info->hne_event = NE_DOWN;
+		info->hne_data = NULL;
+		info->hne_datalen = 0;
+		info->hne_family = ill->ill_isv6 ? ipv6 : ipv4;
+	} else
+		ip2dbg(("ill_dl_down: could not attach DOWN nic event "
+		    "information for %s (ENOMEM)\n", ill->ill_name));
+
+	ill->ill_nic_event_info = info;
+
 	mutex_exit(&ill->ill_lock);
 }
 
@@ -19746,8 +19972,8 @@ ipif_up_done(ipif_t *ipif)
 	rw_enter(&ill_g_lock, RW_READER);
 	mutex_enter(&ip_addr_avail_lock);
 	/* Mark it up, and increment counters. */
-	ill->ill_ipif_up_count++;
 	ipif->ipif_flags |= IPIF_UP;
+	ill->ill_ipif_up_count++;
 	err = ip_addr_availability_check(ipif);
 	mutex_exit(&ip_addr_avail_lock);
 	rw_exit(&ill_g_lock);
@@ -22110,6 +22336,57 @@ ill_phyint_reinit(ill_t *ill)
 		    ill->ill_phyint->phyint_ifindex;
 	}
 
+	/*
+	 * Generate an event within the hooks framework to indicate that
+	 * a new interface has just been added to IP.  For this event to
+	 * be generated, the network interface must, at least, have an
+	 * ifindex assigned to it.
+	 *
+	 * This needs to be run inside the ill_g_lock perimeter to ensure
+	 * that the ordering of delivered events to listeners matches the
+	 * order of them in the kernel.
+	 *
+	 * This function could be called from ill_lookup_on_name. In that case
+	 * the interface is loopback "lo", which will not generate a NIC event.
+	 */
+	if (ill->ill_name_length <= 2 ||
+	    ill->ill_name[0] != 'l' || ill->ill_name[1] != 'o') {
+		hook_nic_event_t *info;
+		if ((info = ill->ill_nic_event_info) != NULL) {
+			ip2dbg(("ill_phyint_reinit: unexpected nic event %d "
+			    "attached for %s\n", info->hne_event,
+			    ill->ill_name));
+			if (info->hne_data != NULL)
+				kmem_free(info->hne_data, info->hne_datalen);
+			kmem_free(info, sizeof (hook_nic_event_t));
+		}
+
+		info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
+		if (info != NULL) {
+			info->hne_nic = ill->ill_phyint->phyint_ifindex;
+			info->hne_lif = 0;
+			info->hne_event = NE_PLUMB;
+			info->hne_family = ill->ill_isv6 ? ipv6 : ipv4;
+			info->hne_data = kmem_alloc(ill->ill_name_length,
+			    KM_NOSLEEP);
+			if (info->hne_data != NULL) {
+				info->hne_datalen = ill->ill_name_length;
+				bcopy(ill->ill_name, info->hne_data,
+				    info->hne_datalen);
+			} else {
+				ip2dbg(("ill_phyint_reinit: could not attach "
+				    "ill_name information for PLUMB nic event "
+				    "of %s (ENOMEM)\n", ill->ill_name));
+				kmem_free(info, sizeof (hook_nic_event_t));
+			}
+		} else
+			ip2dbg(("ill_phyint_reinit: could not attach PLUMB nic "
+			    "event information for %s (ENOMEM)\n",
+			    ill->ill_name));
+
+		ill->ill_nic_event_info = info;
+	}
+
 	RELEASE_ILL_LOCKS(ill, ill_other);
 	mutex_exit(&phyi->phyint_lock);
 }
@@ -23598,4 +23875,41 @@ ill_is_probeonly(ill_t *ill)
 		return (B_TRUE);
 
 	return (B_FALSE);
+}
+
+/*
+ * Return a pointer to an ipif_t given a combination of (ill_idx,ipif_id)
+ * If a pointer to an ipif_t is returned then the caller will need to do
+ * an ill_refrele().
+ */
+ipif_t *
+ipif_getby_indexes(uint_t ifindex, uint_t lifidx, boolean_t isv6)
+{
+	ipif_t *ipif;
+	ill_t *ill;
+
+	ill = ill_lookup_on_ifindex(ifindex, isv6, NULL, NULL, NULL, NULL);
+
+	if (ill == NULL)
+		return (NULL);
+
+	mutex_enter(&ill->ill_lock);
+	if (ill->ill_state_flags & ILL_CONDEMNED) {
+		mutex_exit(&ill->ill_lock);
+		ill_refrele(ill);
+		return (NULL);
+	}
+
+	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
+		if (!IPIF_CAN_LOOKUP(ipif))
+			continue;
+		if (lifidx == ipif->ipif_id) {
+			ipif_refhold_locked(ipif);
+			break;
+		}
+	}
+
+	mutex_exit(&ill->ill_lock);
+	ill_refrele(ill);
+	return (ipif);
 }

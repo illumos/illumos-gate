@@ -202,6 +202,28 @@ struct ip6_ext {
 };
 # endif /* SOLARIS2 >= 8 */
 
+# ifdef FW_HOOKS
+
+#  define	SOLARIS_PFHOOKS	1
+
+typedef	struct	qpktinfo	{
+	/* data that changes per-packet */
+	void		*qpi_ill;	/* COPIED */
+	mblk_t		*qpi_m;
+	void		*qpi_data;	/* where layer 3 header starts */
+	size_t		qpi_off;
+	int		qpi_flags;
+} qpktinfo_t;
+
+#define	QPI_NOCKSUM	0x01
+
+extern net_data_t ipf_ipv4;
+extern net_data_t ipf_ipv6;
+
+extern void mb_copydata __P((mblk_t *, size_t , size_t, char *));
+extern void mb_copyback __P((mblk_t *, size_t , size_t, char *));
+# endif
+
 # if SOLARIS2 >= 6
 #  include <sys/atomic.h>
 typedef	uint32_t	u_32_t;
@@ -213,8 +235,6 @@ typedef unsigned int	u_32_t;
 # ifdef _KERNEL
 #  define	KRWLOCK_T		krwlock_t
 #  define	KMUTEX_T		kmutex_t
-#  include "qif.h"
-#  include "pfil.h"
 #  if SOLARIS2 >= 6
 #   if SOLARIS2 == 6
 #    define	ATOMIC_INCL(x)		atomic_add_long((uint32_t*)&(x), 1)
@@ -269,16 +289,12 @@ typedef unsigned int	u_32_t;
 #  define	KMALLOC(a,b)	(a) = (b)kmem_alloc(sizeof(*(a)), KM_NOSLEEP)
 #  define	KMALLOCS(a,b,c)	(a) = (b)kmem_alloc((c), KM_NOSLEEP)
 #  define	GET_MINOR(x)	getminor(x)
-extern	void	*get_unit __P((char *, int));
-#  define	GETIFP(n, v)	get_unit(n, v)
-#  define	IFNAME(x)	((qif_t *)x)->qf_name
-#  define	COPYIFNAME(x, b) \
-				(void) strncpy(b, ((qif_t *)x)->qf_name, \
-					       LIFNAMSIZ)
-#ifdef	IRE_ILL_CN
-extern kmutex_t s_ill_g_head_lock;
-extern struct s_ill_s *s_ill_g_head;	/* ILL List Head */
-#endif /* IRE_ILL_CN */
+extern	phy_if_t	get_unit __P((char *, int));
+#  define	GETIFP(n, v)	(void *)get_unit(n, v)
+#  define	IFNAME(x)	((ill_t *)x)->ill_name
+#  define	COPYIFNAME(x, b, v)	(void) net_getifname(((v) == 4) ? \
+					    ipf_ipv4 : ipf_ipv6, \
+					    (phy_if_t)(x), (b), sizeof(b))
 #  define	GETKTIME(x)	uniqtime((struct timeval *)x)
 #  define	MSGDSIZE(x)	msgdsize(x)
 #  define	M_LEN(x)	((x)->b_wptr - (x)->b_rptr)
@@ -287,7 +303,7 @@ extern struct s_ill_s *s_ill_g_head;	/* ILL List Head */
 #  define	MTYPE(m)	((m)->b_datap->db_type)
 #  define	FREE_MB_T(m)	freemsg(m)
 #  define	m_next		b_cont
-#  define	CACHE_HASH(x)	(((qpktinfo_t *)(x)->fin_qpi)->qpi_num & 7)
+#  define	CACHE_HASH(x)	(((phy_if_t)(x)->fin_ifp) & 7)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; cmn_err(CE_PANIC, "ipf_panic"); }
 typedef mblk_t mb_t;
 # endif /* _KERNEL */
@@ -446,9 +462,9 @@ typedef	struct	iplog_select_s {
 extern	void	*get_unit __P((char *, int));
 #  define	GETIFP(n, v)	get_unit(n, v)
 #  define	IFNAME(x, b)	((ill_t *)x)->ill_name
-#  define	COPYIFNAME(x, b) \
-				(void) strncpy(b, ((qif_t *)x)->qf_name, \
-					       LIFNAMSIZ)
+#  define	COPYIFNAME(x, b, v) \
+				strncpy(b, ((ifinfo_t *)x)->ifi_name, \
+					LIFNAMSIZ)
 #  define	UIOMOVE(a,b,c,d)	uiomove((caddr_t)a,b,c,d)
 #  define	SLEEP(id, n)	{ lock_t *_l = get_sleep_lock((caddr_t)id); \
 				  sleep(id, PZERO+1); \
@@ -472,7 +488,7 @@ extern	void	*get_unit __P((char *, int));
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 typedef mblk_t mb_t;
 
-#  define	CACHE_HASH(x)	(((qpktinfo_t *)(x)->fin_qpi)->qpi_num & 7)
+#  define	CACHE_HASH(x)	(((phy_if_t)(x)->fin_ifp) & 7)
 
 #  include "qif.h"
 #  include "pfil.h"
@@ -759,7 +775,7 @@ typedef struct mbuf mb_t;
 # endif /* _KERNEL */
 # if (NetBSD <= 1991011) && (NetBSD >= 199606)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_xname
-#  define	COPYIFNAME(x, b) \
+#  define	COPYIFNAME(x, b, v) \
 				(void) strncpy(b, \
 					       ((struct ifnet *)x)->if_xname, \
 					       LIFNAMSIZ)
@@ -980,7 +996,7 @@ typedef struct mbuf mb_t;
 # endif /* _KERNEL */
 # if (OpenBSD >= 199603)
 #  define	IFNAME(x, b)	((struct ifnet *)x)->if_xname
-#  define	COPYIFNAME(x, b) \
+#  define	COPYIFNAME(x, b, v) \
 				(void) strncpy(b, \
 					       ((struct ifnet *)x)->if_xname, \
 					       LIFNAMSIZ)
@@ -1500,6 +1516,15 @@ extern void eMrwlock_read_enter __P((eMrwlock_t *, char *, int));
 extern void eMrwlock_write_enter __P((eMrwlock_t *, char *, int));
 extern void eMrwlock_downgrade __P((eMrwlock_t *, char *, int));
 
+#undef NET_IS_HCK_L3_FULL
+#define	NET_IS_HCK_L3_FULL(n, x) (0)
+#undef NET_IS_HCK_L3_PART
+#define	NET_IS_HCK_L3_PART(n, x) (0)
+#undef NET_IS_HCK_L4_FULL
+#define	NET_IS_HCK_L4_FULL(n, x) (0)
+#undef NET_IS_HCK_L4_PART
+#define	NET_IS_HCK_L4_PART(n, x) (0)
+
 #endif
 
 #define	MAX_IPV4HDR	((0xf << 2) + sizeof(struct icmp) + sizeof(ip_t) + 8)
@@ -1638,7 +1663,7 @@ MALLOC_DECLARE(M_IPFILTER);
 #ifndef	COPYIFNAME
 # define	NEED_FRGETIFNAME
 extern	char	*fr_getifname __P((struct ifnet *, char *));
-# define	COPYIFNAME(x, b) \
+# define	COPYIFNAME(x, b, v) \
 				fr_getifname((struct ifnet *)x, b)
 #endif
 

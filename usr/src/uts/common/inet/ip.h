@@ -43,6 +43,10 @@ extern "C" {
 #include <net/if.h>
 #include <netinet/ip.h>
 #include <netinet/igmp.h>
+#include <sys/neti.h>
+#include <sys/hook.h>
+#include <sys/hook_event.h>
+#include <sys/hook_impl.h>
 
 #ifdef _KERNEL
 #include <netinet/ip6.h>
@@ -1832,6 +1836,11 @@ typedef struct ill_s {
 	int	ill_ip_muxid;		/* muxid returned from plink for ip */
 
 	/*
+	 * NIC event information attached, to be used by nic event hooks.
+	 */
+	hook_nic_event_t	*ill_nic_event_info;
+
+	/*
 	 * Used for IP frag reassembly throttling on a per ILL basis.
 	 *
 	 * Note: frag_count is approximate, its added to and subtracted from
@@ -2917,6 +2926,145 @@ extern timeout_id_t	mld_slowtimeout_id;
 extern uint_t	loopback_packets;
 
 /*
+ * Hooks structures used inside of ip
+ */
+extern hook_event_token_t	ipv4firewall_physical_in;
+extern hook_event_token_t	ipv4firewall_physical_out;
+extern hook_event_token_t	ipv4firewall_forwarding;
+extern hook_event_token_t	ipv4firewall_loopback_in;
+extern hook_event_token_t	ipv4firewall_loopback_out;
+extern hook_event_token_t	ipv4nicevents;
+
+extern hook_event_token_t	ipv6firewall_physical_in;
+extern hook_event_token_t	ipv6firewall_physical_out;
+extern hook_event_token_t	ipv6firewall_forwarding;
+extern hook_event_token_t	ipv6firewall_loopback_in;
+extern hook_event_token_t	ipv6firewall_loopback_out;
+extern hook_event_token_t	ipv6nicevents;
+
+extern hook_event_t	ip4_physical_in_event;
+extern hook_event_t	ip4_physical_out_event;
+extern hook_event_t	ip4_forwarding_event;
+extern hook_event_t	ip4_loopback_in_event;
+extern hook_event_t	ip4_loopback_out_event;
+extern hook_event_t	ip4_nic_events;
+
+extern hook_event_t	ip6_physical_in_event;
+extern hook_event_t	ip6_physical_out_event;
+extern hook_event_t	ip6_forwarding_event;
+extern hook_event_t	ip6_loopback_in_event;
+extern hook_event_t	ip6_loopback_out_event;
+extern hook_event_t	ip6_nic_events;
+
+#define	HOOKS4_INTERESTED_PHYSICAL_IN	\
+	(ip4_physical_in_event.he_interested)
+#define	HOOKS6_INTERESTED_PHYSICAL_IN	\
+	(ip6_physical_in_event.he_interested)
+#define	HOOKS4_INTERESTED_PHYSICAL_OUT	\
+	(ip4_physical_out_event.he_interested)
+#define	HOOKS6_INTERESTED_PHYSICAL_OUT	\
+	(ip6_physical_out_event.he_interested)
+#define	HOOKS4_INTERESTED_FORWARDING	\
+	(ip4_forwarding_event.he_interested)
+#define	HOOKS6_INTERESTED_FORWARDING	\
+	(ip6_forwarding_event.he_interested)
+#define	HOOKS4_INTERESTED_LOOPBACK_IN	\
+	(ip4_loopback_in_event.he_interested)
+#define	HOOKS6_INTERESTED_LOOPBACK_IN	\
+	(ip6_loopback_in_event.he_interested)
+#define	HOOKS4_INTERESTED_LOOPBACK_OUT	\
+	(ip4_loopback_out_event.he_interested)
+#define	HOOKS6_INTERESTED_LOOPBACK_OUT	\
+	(ip6_loopback_out_event.he_interested)
+
+/*
+ * Hooks marcos used inside of ip
+ */
+#define	IPHA_VHL	ipha_version_and_hdr_length
+
+#define	FW_HOOKS(_hook, _event, _flag, _ilp, _olp, _iph, _fm, _m)	\
+									\
+	if ((_hook).he_interested) {	\
+		hook_pkt_event_t info;					\
+									\
+		_NOTE(CONSTCOND)					\
+		ASSERT((_ilp != NULL) || (_olp != NULL));		\
+									\
+		_NOTE(CONSTCOND)					\
+		if ((_ilp != NULL) &&					\
+		    (((ill_t *)(_ilp))->ill_phyint != NULL))		\
+			info.hpe_ifp = (phy_if_t)((ill_t *)		\
+			    (_ilp))->ill_phyint->phyint_ifindex;	\
+		else							\
+			info.hpe_ifp = 0;				\
+									\
+		_NOTE(CONSTCOND)					\
+		if ((_olp != NULL) &&					\
+		    (((ill_t *)(_olp))->ill_phyint != NULL))		\
+			info.hpe_ofp = (phy_if_t)((ill_t *)		\
+			    (_olp))->ill_phyint->phyint_ifindex;	\
+		else							\
+			info.hpe_ofp = 0;				\
+		info.hpe_hdr = _iph;					\
+		info.hpe_mp = &(_fm);					\
+		info.hpe_mb = _m;					\
+		if (hook_run(_event, (hook_data_t)&info) != 0) {	\
+			ip2dbg(("%s hook dropped mblk chain %p hdr %p\n",\
+			    (_hook).he_name, (void *)_fm, (void *)_m));	\
+			if (_fm != NULL) {				\
+				freemsg(_fm);				\
+				_fm = NULL;				\
+			}						\
+			_iph = NULL;					\
+			_m = NULL;					\
+		} else {						\
+			_iph = info.hpe_hdr;				\
+			_m = info.hpe_mb;				\
+		}							\
+	}
+
+#define	FW_HOOKS6(_hook, _event, _flag, _ilp, _olp, _iph, _fm, _m)	\
+									\
+	if ((_hook).he_interested) {	\
+		hook_pkt_event_t info;					\
+									\
+		_NOTE(CONSTCOND)					\
+		ASSERT((_ilp != NULL) || (_olp != NULL));		\
+									\
+		_NOTE(CONSTCOND)					\
+		if ((_ilp != NULL) &&					\
+		    (((ill_t *)(_ilp))->ill_phyint != NULL))		\
+			info.hpe_ifp = (phy_if_t)((ill_t *)		\
+			    (_ilp))->ill_phyint->phyint_ifindex;	\
+		else							\
+			info.hpe_ifp = 0;				\
+									\
+		_NOTE(CONSTCOND)					\
+		if ((_olp != NULL) &&					\
+		    (((ill_t *)(_olp))->ill_phyint != NULL))		\
+			info.hpe_ofp = (phy_if_t)((ill_t *)		\
+			    (_olp))->ill_phyint->phyint_ifindex;	\
+		else							\
+			info.hpe_ofp = 0;				\
+		info.hpe_hdr = _iph;					\
+		info.hpe_mp = &(_fm);					\
+		info.hpe_mb = _m;					\
+		if (hook_run(_event, (hook_data_t)&info) != 0) {	\
+			ip2dbg(("%s hook dropped mblk chain %p hdr %p\n",\
+			    (_hook).he_name, (void *)_fm, (void *)_m));	\
+			if (_fm != NULL) {				\
+				freemsg(_fm);				\
+				_fm = NULL;				\
+			}						\
+			_iph = NULL;					\
+			_m = NULL;					\
+		} else {						\
+			_iph = info.hpe_hdr;				\
+			_m = info.hpe_mb;				\
+		}							\
+	}
+
+/*
  * Network byte order macros
  */
 #ifdef	_BIG_ENDIAN
@@ -3048,6 +3196,9 @@ extern struct qinit rinit_tcp6;
 extern struct qinit winit_tcp;
 extern struct qinit rinit_acceptor_tcp;
 extern struct qinit winit_acceptor_tcp;
+
+extern net_data_t ipv4;
+extern net_data_t ipv6;
 
 extern void	conn_drain_insert(conn_t *connp);
 extern	int	conn_ipsec_length(conn_t *connp);

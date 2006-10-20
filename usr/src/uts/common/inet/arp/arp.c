@@ -41,6 +41,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/cmn_err.h>
+#include <sys/sdt.h>
 #include <sys/vtrace.h>
 #include <sys/strsun.h>
 #include <sys/policy.h>
@@ -48,6 +49,7 @@
 #include <sys/zone.h>
 #include <sys/random.h>
 #include <sys/sdt.h>
+#include <sys/hook_event.h>
 
 #include <inet/common.h>
 #include <inet/optcom.h>
@@ -304,7 +306,17 @@ struct streamtab arpinfo = {
 
 static void	*ar_g_head;	/* AR Instance Data List Head */
 static caddr_t	ar_g_nd;	/* AR Named Dispatch Head */
-static arl_t	*arl_g_head;	/* ARL List Head */
+
+/*
+ * With the introduction of netinfo (neti kernel module), it is now possible
+ * to access data structures in the ARP module without the code being
+ * executed in the context of the IP module, thus there is no locking being
+ * enforced through the use of STREAMS.
+ *
+ *
+ */
+krwlock_t	arl_g_lock;
+arl_t		*arl_g_head;	/* ARL List Head */
 
 /*
  * TODO: we need a better mechanism to set the ARP hardware type since
@@ -325,6 +337,9 @@ static ar_m_t	ar_m_tbl[] = {
 static ace_t	*ar_ce_hash_tbl[ARP_HASH_SIZE];
 
 static ace_t	*ar_ce_mask_entries;	/* proto_mask not all ones */
+
+static uint32_t	arp_index_counter = 1;
+static uint32_t	arp_counter_wrapped = 0;
 
 /*
  * Note that all routines which need to queue the message for later
@@ -953,17 +968,20 @@ static int
 ar_close(queue_t *q)
 {
 	ar_t	*ar = (ar_t *)q->q_ptr;
+	char	name[LIFNAMSIZ];
 	arl_t	*arl;
 	arl_t	**arlp;
 	cred_t	*cr;
 	arc_t	*arc;
 	mblk_t	*mp1;
+	int	index;
 
 	TRACE_1(TR_FAC_ARP, TR_ARP_CLOSE,
 	    "arp_close: q %p", q);
 
 	arl = ar->ar_arl;
 	if (arl == NULL) {
+		index = 0;
 		/*
 		 * If this is the <ARP-IP-Driver> stream send down
 		 * a closing message to IP and wait for IP to send
@@ -992,6 +1010,8 @@ ar_close(queue_t *q)
 		 */
 		ar_ll_cleanup_arl_queue(q);
 	} else {
+		index = arl->arl_index;
+		(void) strcpy(name, arl->arl_name);
 		arl->arl_closing = 1;
 		while (arl->arl_queue != NULL)
 			qwait(arl->arl_rq);
@@ -1010,16 +1030,19 @@ ar_close(queue_t *q)
 		ar_ce_walk(ar_ce_delete_per_arl, arl);
 		/* Free any messages waiting for a bind_ack */
 		/* Get the arl out of the chain. */
-		for (arlp = &arl_g_head; arlp[0]; arlp = &arlp[0]->arl_next) {
-			if (arlp[0] == arl) {
-				arlp[0] = arl->arl_next;
+		rw_enter(&arl_g_lock, RW_WRITER);
+		for (arlp = &arl_g_head; *arlp; arlp = &(*arlp)->arl_next) {
+			if (*arlp == arl) {
+				*arlp = arl->arl_next;
 				break;
 			}
 		}
 
 		ASSERT(arl->arl_dlpi_deferred == NULL);
-		mi_free((char *)arl);
 		ar->ar_arl = NULL;
+		rw_exit(&arl_g_lock);
+
+		mi_free((char *)arl);
 	}
 	/* Let's break the association between an ARL and IP instance */
 	if (ar->ar_arl_ip_assoc != NULL) {
@@ -1034,6 +1057,17 @@ ar_close(queue_t *q)
 	ar_cleanup();
 	qprocsoff(q);
 	crfree(cr);
+
+	if (index != 0) {
+		hook_nic_event_t info;
+
+		info.hne_nic = index;
+		info.hne_lif = 0;
+		info.hne_event = NE_UNPLUMB;
+		info.hne_data = name;
+		info.hne_datalen = strlen(name);
+		(void) hook_run(arpnicevents, (hook_data_t)&info);
+	}
 	return (0);
 }
 
@@ -2116,8 +2150,9 @@ ar_ll_lookup_by_name(const char *name)
 	arl_t	*arl;
 
 	for (arl = arl_g_head; arl; arl = arl->arl_next) {
-		if (strcmp(arl->arl_name, name) == 0)
+		if (strcmp(arl->arl_name, name) == 0) {
 			return (arl);
+		}
 	}
 	return (NULL);
 }
@@ -2158,6 +2193,43 @@ ar_ll_init(ar_t *ar, mblk_t *mp)
 	arl->arl_link_up = B_TRUE;
 
 	ar->ar_arl = arl;
+
+	/*
+	 * If/when ARP gets pushed into the IP module then this code to make
+	 * a number uniquely identify an ARP instance can be removed and the
+	 * ifindex from IP used.  Rather than try and reinvent or copy the
+	 * code used by IP for the purpose of allocating an index number
+	 * (and trying to keep the number small), just allocate it in an
+	 * ever increasing manner.  This index number isn't ever exposed to
+	 * users directly, its only use is for providing the pfhooks interface
+	 * with a number it can use to uniquely identify an interface in time.
+	 *
+	 * Using a 32bit counter, over 136 plumbs would need to be done every
+	 * second of every day (non-leap year) for it to wrap around and the
+	 * for() loop below to kick in as a performance concern.
+	 */
+	if (arp_counter_wrapped) {
+		arl_t *as;
+
+		do {
+			for (as = arl_g_head; as != NULL; as = as->arl_next)
+				if (as->arl_index == arp_index_counter) {
+					arp_index_counter++;
+					if (arp_index_counter == 0) {
+						arp_counter_wrapped++;
+						arp_index_counter = 1;
+					}
+					break;
+			}
+		} while (as != NULL);
+	} else {
+		arl->arl_index = arp_index_counter;
+	}
+	arp_index_counter++;
+	if (arp_index_counter == 0) {
+		arp_counter_wrapped++;
+		arp_index_counter = 1;
+	}
 }
 
 /*
@@ -2527,6 +2599,7 @@ ar_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		ar_cleanup();
 		return (err);
 	}
+
 	/*
 	 * We are D_MTPERMOD so it is safe to do qprocson before
 	 * the instance data has been initialized.
@@ -3137,6 +3210,18 @@ ar_rput(queue_t *q, mblk_t *mp)
 	 * We should check here, but don't.
 	 */
 	DTRACE_PROBE2(rput_normal, arl_t *, arl, arh_t *, arh);
+
+	DTRACE_PROBE3(arp__physical__in__start,
+	    arl_t *, arl, arh_t *, arh, mblk_t *, mp);
+    
+	ARP_HOOK_IN(arp_physical_in_event, arp_physical_in,
+		    arl->arl_index, arh, mp, mp1);
+
+	DTRACE_PROBE1(arp__physical__in__end, mblk_t *, mp);
+
+	if (mp == NULL)
+		return;
+
 	proto = (uint32_t)BE16_TO_U16(arh->arh_proto);
 	src_haddr = (uchar_t *)arh;
 	src_haddr = &src_haddr[ARH_FIXED_LEN];
@@ -3511,6 +3596,7 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 	arl_t *old_arl;
 	mblk_t *ioccpy;
 	struct iocblk *iocp;
+	hook_nic_event_t info;
 
 	if (ar->ar_on_ill_stream) {
 		/*
@@ -3572,7 +3658,23 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 
 	/* The ppa is sent down by ifconfig */
 	arl->arl_ppa = lifr->lifr_ppa;
+
+	/* 
+	 * A network device is not considered to be fully plumb'd until
+	 * its name has been set using SIOCSLIFNAME.  Once it has 
+	 * been set, it cannot be set again (see code above), so there
+	 * is currently no danger in this function causing two NE_PLUMB
+	 * events without an intervening NE_UNPLUMB.
+	 */
+	info.hne_nic = arl->arl_index;
+	info.hne_lif = 0;
+	info.hne_event = NE_PLUMB;
+	info.hne_data = arl->arl_name;
+	info.hne_datalen = strlen(arl->arl_name);
+	(void) hook_run(arpnicevents, (hook_data_t)&info);
+
 	/* Chain in the new arl. */
+	rw_enter(&arl_g_lock, RW_WRITER);
 	arl->arl_next = arl_g_head;
 	arl_g_head = arl;
 	DTRACE_PROBE1(slifname_set, arl_t *, arl);
@@ -3588,6 +3690,8 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 	iocp->ioc_count = msgsize(ioccpy->b_cont);
 	ioccpy->b_wptr = (uchar_t *)(iocp + 1);
 	putnext(arl->arl_wq, ioccpy);
+	rw_exit(&arl_g_lock);
+
 	return (0);
 }
 
@@ -3648,8 +3752,11 @@ ar_set_ppa(queue_t *q, mblk_t *mp_orig)
 	arl->arl_ppa = ppa;
 	DTRACE_PROBE1(setppa_done, arl_t *, arl);
 	/* Chain in the new arl. */
+	rw_enter(&arl_g_lock, RW_WRITER);
 	arl->arl_next = arl_g_head;
 	arl_g_head = arl;
+	rw_exit(&arl_g_lock);
+
 	return (0);
 }
 
@@ -4355,6 +4462,18 @@ ar_xmit(arl_t *arl, uint32_t operation, uint32_t proto, uint32_t plen,
 	bcopy(paddr2, cp, plen);
 	cp += plen;
 	mp->b_cont->b_wptr = cp;
+
+	DTRACE_PROBE3(arp__physical__out__start,
+	    arl_t *, arl, arh_t *, arh, mblk_t *, mp);
+
+	ARP_HOOK_OUT(arp_physical_out_event, arp_physical_out,
+	    arl->arl_index, arh, mp, mp->b_cont);
+
+	DTRACE_PROBE1(arp__physical__out__end, mblk_t *, mp);
+
+	if (mp == NULL)
+		return;
+
 	/* Ship it out. */
 	if (canputnext(arl->arl_wq))
 		putnext(arl->arl_wq, mp);

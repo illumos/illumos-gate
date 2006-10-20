@@ -159,6 +159,7 @@ l none kernel/misc/des=../../kernel/crypto/des
 f none kernel/misc/dls 755 root sys
 f none kernel/misc/fssnap_if 755 root sys
 f none kernel/misc/gld 755 root sys
+f none kernel/misc/hook 755 root sys
 f none kernel/misc/hpcsvc 755 root sys
 f none kernel/misc/i2o_msg 755 root sys
 f none kernel/misc/ipc 755 root sys
@@ -168,6 +169,7 @@ f none kernel/misc/kmdbmod 755 root sys
 f none kernel/misc/krtld 755 root sys
 f none kernel/misc/mac 755 root sys
 l none kernel/misc/md5=../../kernel/crypto/md5
+f none kernel/misc/neti 755 root sys
 f none kernel/misc/pcicfg 755 root sys
 f none kernel/misc/pcihp 755 root sys
 f none kernel/misc/pcmcia 755 root sys
@@ -333,6 +335,7 @@ l none kernel/misc/amd64/des=../../../kernel/crypto/amd64/des
 f none kernel/misc/amd64/dls 755 root sys
 f none kernel/misc/amd64/fssnap_if 755 root sys
 f none kernel/misc/amd64/gld 755 root sys
+f none kernel/misc/amd64/hook 755 root sys
 f none kernel/misc/amd64/hpcsvc 755 root sys
 f none kernel/misc/amd64/ipc 755 root sys
 f none kernel/misc/amd64/kbtrans 755 root sys
@@ -341,6 +344,7 @@ f none kernel/misc/amd64/kmdbmod 755 root sys
 f none kernel/misc/amd64/krtld 755 root sys
 f none kernel/misc/amd64/mac 755 root sys
 l none kernel/misc/amd64/md5=../../../kernel/crypto/amd64/md5
+f none kernel/misc/amd64/neti 755 root sys
 f none kernel/misc/amd64/pcicfg 755 root sys
 f none kernel/misc/amd64/pcihp 755 root sys
 f none kernel/misc/amd64/pcmcia 755 root sys

@@ -51,6 +51,7 @@
 #include <sys/systm.h>
 #include <sys/param.h>
 #include <sys/kmem.h>
+#include <sys/sdt.h>
 #include <sys/socket.h>
 #include <sys/vtrace.h>
 #include <sys/isa_defs.h>
@@ -99,6 +100,7 @@
 #include <sys/iphada.h>
 #include <inet/tun.h>
 #include <inet/ipdrop.h>
+#include <inet/ip_netinfo.h>
 
 #include <sys/ethernet.h>
 #include <net/if_types.h>
@@ -115,6 +117,7 @@
 #include <inet/sctp_ip.h>
 #include <inet/sctp/sctp_impl.h>
 #include <inet/udp_impl.h>
+#include <sys/sunddi.h>
 
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
@@ -1468,6 +1471,9 @@ nv_t	*ire_nv_tbl = ire_nv_arr;
 
 /* Defined in ip_if.c, protect the list of IPsec capable ills */
 extern krwlock_t ipsec_capab_ills_lock;
+
+/* Defined in ip_netinfo.c */
+extern ddi_taskq_t	*eventq_queue_nic;
 
 /* Packet dropper for IP IPsec processing failures */
 ipdropper_t ip_dropper;
@@ -5338,6 +5344,7 @@ ip_modclose(ill_t *ill)
 	ipsq_t	*ipsq;
 	ipif_t	*ipif;
 	queue_t	*q = ill->ill_rq;
+	hook_nic_event_t *info;
 
 	/*
 	 * Forcibly enter the ipsq after some delay. This is to take
@@ -5435,6 +5442,21 @@ ip_modclose(ill_t *ill)
 	 */
 	if (ill->ill_credp != NULL)
 		crfree(ill->ill_credp);
+
+	/*
+	 * Unhook the nic event message from the ill and enqueue it into the nic
+	 * event taskq.
+	 */
+	if ((info = ill->ill_nic_event_info) != NULL) {
+		if (ddi_taskq_dispatch(eventq_queue_nic, ip_ne_queue_func,
+		    (void *)info, DDI_SLEEP) == DDI_FAILURE) {
+			ip2dbg(("ip_ioctl_finish:ddi_taskq_dispatch failed\n"));
+			if (info->hne_data != NULL)
+				kmem_free(info->hne_data, info->hne_datalen);
+			kmem_free(info, sizeof (hook_nic_event_t));
+		}
+		ill->ill_nic_event_info = NULL;
+	}
 
 	mi_close_free((IDP)ill);
 	q->q_ptr = WR(q)->q_ptr = NULL;
@@ -5701,6 +5723,10 @@ ip_csum_hdr(ipha_t *ipha)
 void
 ip_ddi_destroy(void)
 {
+	ipv4_hook_destroy();
+	ipv6_hook_destroy();
+	ip_net_destroy();
+
 	tnet_fini();
 	tcp_ddi_destroy();
 	sctp_ddi_destroy();
@@ -5794,6 +5820,10 @@ ip_ddi_init(void)
 	icmp_kstat_init();
 	ipsec_loader_start();
 	tnet_init();
+
+	ip_net_init();
+	ipv4_hook_init();
+	ipv6_hook_init();
 }
 
 /*
@@ -7200,6 +7230,7 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 	mblk_t		*first_mp;
 	uint32_t	ill_index;
 	ipxmit_state_t	pktxmit_state;
+	ill_t		*out_ill;
 
 	ASSERT(ire != NULL);
 	ASSERT(ire->ire_ipif->ipif_net_type == IRE_IF_NORESOLVER);
@@ -7259,6 +7290,26 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 	ill_index = ire->ire_ipif->ipif_ill->ill_phyint->phyint_ifindex;
 
 	/*
+	 * This location is chosen for the placement of the forwarding hook
+	 * because at this point we know that we have a path out for the
+	 * packet but haven't yet applied any logic (such as fragmenting)
+	 * that happen as part of transmitting the packet out.
+	 */
+	out_ill = ire->ire_ipif->ipif_ill;
+
+	DTRACE_PROBE4(ip4__forwarding__start,
+	    ill_t *, in_ill, ill_t *, out_ill, ipha_t *, ipha, mblk_t *, mp);
+
+	FW_HOOKS(ip4_forwarding_event, ipv4firewall_forwarding,
+	    MSG_FWCOOKED_FORWARD, in_ill, out_ill, ipha, mp, mp);
+
+	DTRACE_PROBE1(ip4__forwarding__end, mblk_t *, mp);
+
+	if (mp == NULL)
+		return;
+	pkt_len = ntohs(ipha->ipha_length);
+
+	/*
 	 * ip_mrtun_forward is only used by foreign agent to reverse
 	 * tunnel the incoming packet. So it does not do any option
 	 * processing for source routing.
@@ -7301,6 +7352,14 @@ ip_mrtun_forward(ire_t *ire, ill_t *in_ill, mblk_t *mp)
 	ip2dbg(("ip_mrtun_forward: ire type (%d)\n", ire->ire_type));
 
 	ASSERT(ire->ire_ipif != NULL);
+
+	DTRACE_PROBE4(ip4__physical__out__start, ill_t *, NULL,
+	    ill_t *, ire->ire_ipif->ipif_ill, ipha_t *, ipha, mblk_t *, mp);
+	FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,
+	    MSG_FWCOOKED_OUT, NULL, out_ill, ipha, mp, mp);
+	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+	if (mp == NULL)
+		return;
 
 	/* Now send the packet to the tunnel interface */
 	mp->b_prev = SET_BPREV_FLAG(IPP_FWD_OUT);
@@ -13523,14 +13582,6 @@ ip_rput_notforus(queue_t **qp, mblk_t *mp, ire_t *ire, ill_t *ill)
 	return (B_FALSE);
 }
 
-#define	SEND_PKT(ire, mp)			\
-{						\
-	UPDATE_IB_PKT_COUNT(ire);		\
-	(ire)->ire_last_used_time = lbolt;	\
-	BUMP_MIB(&ip_mib, ipForwDatagrams);	\
-	putnext((ire)->ire_stq, mp);		\
-}
-
 ire_t *
 ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 {
@@ -13616,6 +13667,17 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 		return (ire);
 	}
 
+	DTRACE_PROBE4(ip4__forwarding__start,
+	    ill_t *, ill, ill_t *, stq_ill, ipha_t *, ipha, mblk_t *, mp);
+
+	FW_HOOKS(ip4_forwarding_event, ipv4firewall_forwarding,
+	    MSG_FWCOOKED_FORWARD, ill, stq_ill, ipha, mp, mp);
+
+	DTRACE_PROBE1(ip4__forwarding__end, mblk_t *, mp);
+
+	if (mp == NULL)
+		goto drop;
+
 	mp->b_datap->db_struioun.cksum.flags = 0;
 	/* Adjust the checksum to reflect the ttl decrement. */
 	sum = (int)ipha->ipha_hdr_checksum + IP_HDR_CSUM_TTL_ADJUST;
@@ -13632,9 +13694,25 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	    MBLKL(ire->ire_nce->nce_fp_mp) : 0;
 
 	if (hlen != 0 || ire->ire_nce->nce_res_mp != NULL) {
-		mp = ip_wput_attach_llhdr(mp, ire, 0, 0);
+		mblk_t *mpip = mp;
+
+		mp = ip_wput_attach_llhdr(mpip, ire, 0, 0);
 		if (mp != NULL) {
-			SEND_PKT(ire, mp);
+			DTRACE_PROBE4(ip4__physical__out__start,
+			    ill_t *, NULL, ill_t *, stq_ill,
+			    ipha_t *, ipha, mblk_t *, mp);
+			FW_HOOKS(ip4_physical_out_event,
+			    ipv4firewall_physical_out, MSG_FWCOOKED_OUT, NULL,
+			    stq_ill, ipha, mp, mpip);
+			DTRACE_PROBE1(ip4__physical__out__end, mblk_t *,
+			    mp);
+			if (mp == NULL)
+				goto drop;
+
+			UPDATE_IB_PKT_COUNT(ire);
+			ire->ire_last_used_time = lbolt;
+			BUMP_MIB(&ip_mib, ipForwDatagrams);
+			putnext(ire->ire_stq, mp);
 			return (ire);
 		}
 	}
@@ -14492,6 +14570,30 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			}
 		}
 
+		/*
+		 * The event for packets being received from a 'physical'
+		 * interface is placed before validation of the source and/or
+		 * destination address as being local so that packets such as
+		 * these that are found on the network can be observed via
+		 * this interface.  The checks prior to this have all been
+		 * to do with validating the sanity of the packet - length
+		 * fields vs data in the buffer, buffer size, etc, otherwise
+		 * uninteresting packet flaws that will always lead to them
+		 * being discarded.
+		 */
+		DTRACE_PROBE4(ip4__physical__in__start,
+		    ill_t *, ill, ill_t *, NULL,
+		    ipha_t *, ipha, mblk_t *, first_mp);
+
+		FW_HOOKS(ip4_physical_in_event, ipv4firewall_physical_in,
+		    MSG_FWCOOKED_IN, ill, NULL, ipha, first_mp, mp);
+
+		DTRACE_PROBE1(ip4__physical__in__end, mblk_t *, first_mp);
+
+		if (first_mp == NULL) {
+			continue;
+		}
+
 		/* Obtain the dst of the current packet */
 		dst = ipha->ipha_dst;
 
@@ -14503,6 +14605,26 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			freemsg(mp);
 			continue;
 		}
+
+		/*
+		 * The event for packets being received from a 'physical'
+		 * interface is placed after validation of the source and/or
+		 * destination address as being local so that packets can be
+		 * redirected to loopback addresses using ipnat.
+		 */
+		DTRACE_PROBE4(ip4__physical__in__start,
+		    ill_t *, ill, ill_t *, NULL,
+		    ipha_t *, ipha, mblk_t *, first_mp);
+
+		FW_HOOKS(ip4_physical_in_event, ipv4firewall_physical_in,
+		    MSG_FWCOOKED_IN, ill, NULL, ipha, first_mp, mp);
+
+		DTRACE_PROBE1(ip4__physical__in__end, mblk_t *, first_mp);
+
+		if (first_mp == NULL) {
+			continue;
+		}
+		dst = ipha->ipha_dst;
 
 		/*
 		 * Attach any necessary label information to
@@ -15007,6 +15129,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	boolean_t	success;
 	boolean_t	ioctl_aborted = B_FALSE;
 	boolean_t	log = B_TRUE;
+	hook_nic_event_t	*info;
 
 	ip1dbg(("ip_rput_dlpi_writer .."));
 	ill = (ill_t *)q->q_ptr;
@@ -15247,7 +15370,33 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		ip1dbg(("ip_rput_dlpi: bind_ack %s\n", ill->ill_name));
 
 		mutex_enter(&ill->ill_lock);
+
 		ill->ill_dl_up = 1;
+
+		if ((info = ill->ill_nic_event_info) != NULL) {
+			ip2dbg(("ip_rput_dlpi_writer: unexpected nic event %d "
+			    "attached for %s\n", info->hne_event,
+			    ill->ill_name));
+			if (info->hne_data != NULL)
+				kmem_free(info->hne_data, info->hne_datalen);
+			kmem_free(info, sizeof (hook_nic_event_t));
+		}
+
+		info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
+		if (info != NULL) {
+			info->hne_nic = ill->ill_phyint->phyint_ifindex;
+			info->hne_lif = 0;
+			info->hne_event = NE_UP;
+			info->hne_data = NULL;
+			info->hne_datalen = 0;
+			info->hne_family = ill->ill_isv6 ? ipv6 : ipv4;
+		} else
+			ip2dbg(("ip_rput_dlpi_writer: could not attach UP nic "
+			    "event information for %s (ENOMEM)\n",
+			    ill->ill_name));
+
+		ill->ill_nic_event_info = info;
+
 		mutex_exit(&ill->ill_lock);
 
 		/*
@@ -16068,6 +16217,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 #define	rptr	((uchar_t *)ipha)
 	uint32_t	max_frag;
 	uint32_t	ill_index;
+	ill_t		*out_ill;
 
 	/* Get the ill_index of the incoming ILL */
 	ill_index = (in_ill != NULL) ? in_ill->ill_phyint->phyint_ifindex : 0;
@@ -16122,6 +16272,20 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 	/* Get the ill_index of the outgoing ILL */
 	ill_index = ire->ire_ipif->ipif_ill->ill_phyint->phyint_ifindex;
 
+	out_ill = ire->ire_ipif->ipif_ill;
+
+	DTRACE_PROBE4(ip4__forwarding__start,
+	    ill_t *, in_ill, ill_t *, out_ill, ipha_t *, ipha, mblk_t *, mp);
+
+	FW_HOOKS(ip4_forwarding_event, ipv4firewall_forwarding,
+	    MSG_FWCOOKED_FORWARD, in_ill, out_ill, ipha, mp, mp);
+
+	DTRACE_PROBE1(ip4__forwarding__end, mblk_t *, mp);
+
+	if (mp == NULL)
+		return;
+	pkt_len = ntohs(ipha->ipha_length);
+
 	if (is_system_labeled()) {
 		mblk_t *mp1;
 
@@ -16174,6 +16338,15 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 		ip2dbg(("ip_rput_forward:sent to ip_wput_frag\n"));
 		return;
 	}
+
+	DTRACE_PROBE4(ip4__physical__out__start, ill_t *, NULL,
+	    ill_t *, ire->ire_ipif->ipif_ill, ipha_t *, ipha, mblk_t *, mp);
+	FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,
+	    MSG_FWCOOKED_OUT, NULL, out_ill, ipha, mp, mp);
+	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+	if (mp == NULL)
+		return;
+
 	mp->b_prev = (mblk_t *)IPP_FWD_OUT;
 	ip1dbg(("ip_rput_forward: Calling ip_xmit_v4\n"));
 	(void) ip_xmit_v4(mp, ire, NULL, B_FALSE);
@@ -21242,6 +21415,7 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller,
 	ill_t		*conn_outgoing_ill = NULL;
 	ill_t		*ire_ill;
 	ill_t		*ire1_ill;
+	ill_t		*out_ill;
 	uint32_t 	ill_index = 0;
 	boolean_t	multirt_send = B_FALSE;
 	int		err;
@@ -21772,6 +21946,16 @@ another:;
 				multirt_send = B_FALSE;
 			}
 		}
+
+		DTRACE_PROBE4(ip4__physical__out__start, ill_t *, NULL,
+		    ill_t *, ire->ire_ipif->ipif_ill, ipha_t *, ipha,
+		    mblk_t *, mp);
+		FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,
+		    MSG_FWCOOKED_OUT, NULL, ire->ire_ipif->ipif_ill, ipha, mp, mp);
+		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+		if (mp == NULL)
+			goto release_ire_and_ill;
+
 		mp->b_prev = SET_BPREV_FLAG(IPP_LOCAL_OUT);
 		DTRACE_PROBE2(ip__xmit__1, mblk_t *, mp, ire_t *, ire);
 		pktxmit_state = ip_xmit_v4(mp, ire, NULL, B_TRUE);
@@ -21779,6 +21963,7 @@ another:;
 		    (pktxmit_state == LLHDR_RESLV_FAILED)) {
 			ip2dbg(("ip_wput_ire: ip_xmit_v4 failed"
 			    "- packet dropped\n"));
+release_ire_and_ill:
 			ire_refrele(ire);
 			if (next_mp != NULL) {
 				freemsg(next_mp);
@@ -22347,6 +22532,20 @@ broadcast:
 					}
 				}
 
+				out_ill = ire->ire_ipif->ipif_ill;
+				DTRACE_PROBE4(ip4__physical__out__start,
+				    ill_t *, NULL,
+				    ill_t *, out_ill,
+				    ipha_t *, ipha, mblk_t *, mp);
+				FW_HOOKS(ip4_physical_out_event,
+				    ipv4firewall_physical_out,
+				    MSG_FWCOOKED_OUT, NULL, out_ill,
+				    ipha, mp, mp);
+				DTRACE_PROBE1(ip4__physical__out__end,
+				    mblk_t *, mp);
+				if (mp == NULL)
+					goto release_ire_and_ill_2;
+
 				ASSERT(ipsec_len == 0);
 				mp->b_prev =
 				    SET_BPREV_FLAG(IPP_LOCAL_OUT);
@@ -22356,6 +22555,7 @@ broadcast:
 				    NULL, B_TRUE);
 				if ((pktxmit_state == SEND_FAILED) ||
 				    (pktxmit_state == LLHDR_RESLV_FAILED)) {
+release_ire_and_ill_2:
 					if (next_mp) {
 						freemsg(next_mp);
 						ire_refrele(ire1);
@@ -22510,18 +22710,54 @@ broadcast:
 		ire->ire_last_used_time = lbolt;
 		ASSERT(ire->ire_ipif != NULL);
 		if (!next_mp) {
+			/*
+			 * Is there an "in" and "out" for traffic local
+			 * to a host (loopback)?  The code in Solaris doesn't
+			 * explicitly draw a line in its code for in vs out,
+			 * so we've had to draw a line in the sand: ip_wput_ire
+			 * is considered to be the "output" side and
+			 * ip_wput_local to be the "input" side.
+			 */
+			out_ill = ire->ire_ipif->ipif_ill;
+
+			DTRACE_PROBE4(ip4__loopback__out__start,
+			    ill_t *, NULL, ill_t *, out_ill,
+			    ipha_t *, ipha, mblk_t *, first_mp);
+
+			FW_HOOKS(ip4_loopback_out_event,
+			    ipv4firewall_loopback_out, MSG_FWCOOKED_OUT,
+			    NULL, out_ill, ipha, first_mp, mp);
+
+			DTRACE_PROBE1(ip4__loopback__out_end,
+			    mblk_t *, first_mp);
+
 			TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
 			    "ip_wput_ire_end: q %p (%S)",
 			    q, "local address");
-			ip_wput_local(q, ire->ire_ipif->ipif_ill, ipha,
-			    first_mp, ire, 0, ire->ire_zoneid);
+
+			if (first_mp != NULL)
+				ip_wput_local(q, out_ill, ipha,
+				    first_mp, ire, 0, ire->ire_zoneid);
 			ire_refrele(ire);
 			if (conn_outgoing_ill != NULL)
 				ill_refrele(conn_outgoing_ill);
 			return;
 		}
-		ip_wput_local(q, ire->ire_ipif->ipif_ill, ipha, first_mp,
-		    ire, 0, ire->ire_zoneid);
+
+		out_ill = ire->ire_ipif->ipif_ill;
+
+		DTRACE_PROBE4(ip4__loopback__out__start,
+		    ill_t *, NULL, ill_t *, out_ill,
+		    ipha_t *, ipha, mblk_t *, first_mp);
+
+		FW_HOOKS(ip4_loopback_out_event, ipv4firewall_loopback_out,
+		    MSG_FWCOOKED_OUT, NULL, out_ill, ipha, first_mp, mp);
+
+		DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, first_mp);
+
+		if (first_mp != NULL)
+			ip_wput_local(q, out_ill, ipha,
+			    first_mp, ire, 0, ire->ire_zoneid);
 	}
 next:
 	/*
@@ -23072,13 +23308,14 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	ipha_t		*ipha;
 	int		ip_data_end;
 	int		len;
-	mblk_t		*mp = mp_orig;
+	mblk_t		*mp = mp_orig, *mp1;
 	int		offset;
 	queue_t		*q;
 	uint32_t	v_hlen_tos_len;
 	mblk_t		*first_mp;
 	boolean_t	mctl_present;
 	ill_t		*ill;
+	ill_t		*out_ill;
 	mblk_t		*xmit_mp;
 	mblk_t		*carve_mp;
 	ire_t		*ire1 = NULL;
@@ -23440,13 +23677,27 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		UNLOCK_IRE_FP_MP(ire);
 		q = ire->ire_stq;
 		BUMP_MIB(&ip_mib, ipFragCreates);
-		putnext(q, xmit_mp);
-		if (pkt_type != OB_PKT) {
-			/*
-			 * Update the packet count of trailing
-			 * RTF_MULTIRT ires.
-			 */
-			UPDATE_OB_PKT_COUNT(ire);
+
+		out_ill = (ill_t *)q->q_ptr;
+
+		DTRACE_PROBE4(ip4__physical__out__start,
+		    ill_t *, NULL, ill_t *, out_ill,
+		    ipha_t *, ipha, mblk_t *, xmit_mp);
+
+		FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,
+		    MSG_FWCOOKED_OUT, NULL, out_ill, ipha, xmit_mp, mp);
+
+		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, xmit_mp);
+
+		if (xmit_mp != NULL) {
+			putnext(q, xmit_mp);
+			if (pkt_type != OB_PKT) {
+				/*
+				 * Update the packet count of trailing
+				 * RTF_MULTIRT ires.
+				 */
+				UPDATE_OB_PKT_COUNT(ire);
+			}
 		}
 
 		if (multirt_send) {
@@ -23709,14 +23960,36 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 			}
 			UNLOCK_IRE_FP_MP(ire);
 			BUMP_MIB(&ip_mib, ipFragCreates);
-			putnext(q, xmit_mp);
 
-			if (pkt_type != OB_PKT) {
-				/*
-				 * Update the packet count of trailing
-				 * RTF_MULTIRT ires.
-				 */
-				UPDATE_OB_PKT_COUNT(ire);
+			mp1 = mp;
+			out_ill = (ill_t *)q->q_ptr;
+
+			DTRACE_PROBE4(ip4__physical__out__start,
+			    ill_t *, NULL, ill_t *, out_ill,
+			    ipha_t *, ipha, mblk_t *, xmit_mp);
+
+			FW_HOOKS(ip4_physical_out_event,
+			    ipv4firewall_physical_out, MSG_FWCOOKED_OUT,
+			    NULL, out_ill, ipha, xmit_mp, mp);
+
+			DTRACE_PROBE1(ip4__physical__out__end,
+			    mblk_t *, xmit_mp);
+
+			if (mp != mp1 && hdr_mp == mp1)
+				hdr_mp = mp;
+			if (mp != mp1 && mp_orig == mp1)
+				mp_orig = mp;
+
+			if (xmit_mp != NULL) {
+				putnext(q, xmit_mp);
+
+				if (pkt_type != OB_PKT) {
+					/*
+					 * Update the packet count of trailing
+					 * RTF_MULTIRT ires.
+					 */
+					UPDATE_OB_PKT_COUNT(ire);
+				}
 			}
 
 			/* All done if we just consumed the hdr_mp. */
@@ -23900,6 +24173,18 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 	} else {
 		mctl_present = B_FALSE;
 	}
+
+	DTRACE_PROBE4(ip4__loopback__in__start,
+	    ill_t *, ill, ill_t *, NULL,
+	    ipha_t *, ipha, mblk_t *, first_mp);
+
+	FW_HOOKS(ip4_loopback_in_event, ipv4firewall_loopback_in,
+	    MSG_FWCOOKED_IN, ill, NULL, ipha, first_mp, mp);
+
+	DTRACE_PROBE1(ip4__loopback__in__end, mblk_t *, first_mp);
+
+	if (first_mp == NULL)
+		return;
 
 	loopback_packets++;
 
@@ -24447,6 +24732,7 @@ ip_wput_ipsec_out_v6(queue_t *q, mblk_t *ipsec_mp, ip6_t *ip6h, ill_t *ill,
 	zoneid_t zoneid;
 	boolean_t ill_need_rele = B_FALSE;
 	boolean_t ire_need_rele = B_FALSE;
+	ill_t *out_ill;
 
 	mp = ipsec_mp->b_cont;
 	io = (ipsec_out_t *)ipsec_mp->b_rptr;
@@ -24605,8 +24891,23 @@ send:
 	/* Local delivery */
 	if (ire->ire_stq == NULL) {
 		ASSERT(q != NULL);
-		ip_wput_local_v6(RD(q), ire->ire_ipif->ipif_ill, ip6h, ipsec_mp,
-		    ire, 0);
+
+		/* PFHooks: LOOPBACK_OUT */
+		out_ill = ire->ire_ipif->ipif_ill;
+
+		DTRACE_PROBE4(ip6__loopback__out__start,
+		    ill_t *, NULL, ill_t *, out_ill,
+		    ip6_t *, ip6h, mblk_t *, ipsec_mp);
+
+		FW_HOOKS6(ip6_loopback_out_event, ipv6firewall_loopback_out,
+		    MSG_FWCOOKED_OUT, NULL, out_ill, ip6h,
+		    ipsec_mp, mp);
+
+		DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, ipsec_mp);
+
+		if (ipsec_mp != NULL)
+			ip_wput_local_v6(RD(q), out_ill,
+			    ip6h, ipsec_mp, ire, 0);
 		if (ire_need_rele)
 			ire_refrele(ire);
 		return;
@@ -24734,6 +25035,7 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 	uint32_t cksum;
 	uint16_t *up;
 	ipxmit_state_t	pktxmit_state;
+	ill_t	*out_ill;
 #ifdef	_BIG_ENDIAN
 #define	LENGTH	(v_hlen_tos_len & 0xFFFF)
 #else
@@ -24950,8 +25252,22 @@ send:
 		ire->ire_last_used_time = lbolt;
 		if (ipha->ipha_src == 0)
 			ipha->ipha_src = ire->ire_src_addr;
-		ip_wput_local(RD(q), ire->ire_ipif->ipif_ill, ipha, ipsec_mp,
-		    ire, 0, zoneid);
+
+		/* PFHooks: LOOPBACK_OUT */
+		out_ill = ire->ire_ipif->ipif_ill;
+
+		DTRACE_PROBE4(ip4__loopback__out__start,
+		    ill_t *, NULL, ill_t *, out_ill,
+		    ipha_t *, ipha, mblk_t *, ipsec_mp);
+
+		FW_HOOKS(ip4_loopback_out_event, ipv4firewall_loopback_out,
+		    MSG_FWCOOKED_OUT, NULL, out_ill, ipha, ipsec_mp, mp);
+
+		DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, ipsec_mp);
+
+		if (ipsec_mp != NULL)
+			ip_wput_local(RD(q), out_ill,
+			    ipha, ipsec_mp, ire, 0, zoneid);
 		if (ire_need_rele)
 			ire_refrele(ire);
 		goto done;
@@ -25154,6 +25470,15 @@ send:
 			(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE);
 			goto drop_pkt;
 		}
+
+		DTRACE_PROBE4(ip4__physical__out__start, ill_t *, NULL,
+		    ill_t *, ire->ire_ipif->ipif_ill, ipha_t *, ipha,
+		    mblk_t *, mp);
+		FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,
+		    MSG_FWCOOKED_OUT, NULL, out_ill, ipha, mp, mp);
+		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+		if (mp == NULL)
+			goto drop_pkt;
 
 		ip1dbg(("ip_wput_ipsec_out: calling ip_xmit_v4\n"));
 		pktxmit_state = ip_xmit_v4(mp, ire,
@@ -25947,6 +26272,7 @@ ip_ioctl_finish(queue_t *q, mblk_t *mp, int err, int mode,
     ipif_t *ipif, ipsq_t *ipsq)
 {
 	conn_t	*connp = NULL;
+	hook_nic_event_t *info;
 
 	if (err == EINPROGRESS)
 		return;
@@ -25986,6 +26312,26 @@ ip_ioctl_finish(queue_t *q, mblk_t *mp, int err, int mode,
 	if (ipif != NULL) {
 		mutex_enter(&(ipif)->ipif_ill->ill_lock);
 		ipif->ipif_state_flags &= ~IPIF_CHANGING;
+
+		/*
+		 * Unhook the nic event message from the ill and enqueue it into
+		 * the nic event taskq.
+		 */
+		if ((info = ipif->ipif_ill->ill_nic_event_info) != NULL) {
+			if (ddi_taskq_dispatch(eventq_queue_nic,
+			    ip_ne_queue_func, (void *)info, DDI_SLEEP)
+			    == DDI_FAILURE) {
+				ip2dbg(("ip_ioctl_finish: ddi_taskq_dispatch"
+				    "failed\n"));
+				if (info->hne_data != NULL)
+					kmem_free(info->hne_data,
+					    info->hne_datalen);
+				kmem_free(info, sizeof (hook_nic_event_t));
+			}
+
+			ipif->ipif_ill->ill_nic_event_info = NULL;
+		}
+
 		mutex_exit(&(ipif)->ipif_ill->ill_lock);
 	}
 
@@ -28305,9 +28651,10 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 	nce_t		*arpce;
 	queue_t		*q;
 	int		ill_index;
-	mblk_t		*nxt_mp;
+	mblk_t		*nxt_mp, *first_mp;
 	boolean_t	xmit_drop = B_FALSE;
 	ip_proc_t	proc;
+	ill_t		*out_ill;
 
 	arpce = ire->ire_nce;
 	ASSERT(arpce != NULL);
@@ -28343,10 +28690,11 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 			mp->b_prev = NULL;
 
 			/* set up ill index for outbound qos processing */
-			ill_index =
-			    ire->ire_ipif->ipif_ill->ill_phyint->phyint_ifindex;
-			mp = ip_wput_attach_llhdr(mp, ire, proc, ill_index);
-			if (mp == NULL) {
+			out_ill = ire->ire_ipif->ipif_ill;
+			ill_index = out_ill->ill_phyint->phyint_ifindex;
+			first_mp = ip_wput_attach_llhdr(mp, ire, proc,
+			    ill_index);
+			if (first_mp == NULL) {
 				xmit_drop = B_TRUE;
 				if (proc == IPP_FWD_OUT) {
 					BUMP_MIB(&ip_mib, ipInDiscards);
@@ -28366,28 +28714,20 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 				}
 				ire->ire_last_used_time = lbolt;
 
-				if (flow_ctl_enabled) {
-					/*
-					 * We are here from ip_wout_ire
-					 * which has already done canput
-					 * check and has enabled flow
-					 * control, so skip the canputnext
-					 * check.
-					 */
-					putnext(q, mp);
-					goto next_mp;
-				}
-				if (canputnext(q))  {
+				if (flow_ctl_enabled || canputnext(q))  {
 					if (proc == IPP_FWD_OUT) {
 						BUMP_MIB(&ip_mib,
 						    ipForwDatagrams);
 					}
-					putnext(q, mp);
+
+					if (mp == NULL)
+						goto next_mp;
+					putnext(q, first_mp);
 				} else {
 					BUMP_MIB(&ip_mib,
 					    ipOutDiscards);
 					xmit_drop = B_TRUE;
-					freemsg(mp);
+					freemsg(first_mp);
 				}
 			} else {
 				/*

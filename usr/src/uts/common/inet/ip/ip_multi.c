@@ -33,6 +33,7 @@
 #include <sys/strsun.h>
 #include <sys/ddi.h>
 #include <sys/cmn_err.h>
+#include <sys/sdt.h>
 #include <sys/zone.h>
 
 #include <sys/param.h>
@@ -1181,6 +1182,7 @@ ip_multicast_loopback(queue_t *q, ill_t *ill, mblk_t *mp_orig, int fanout_flags,
 {
 	mblk_t	*mp;
 	mblk_t	*ipsec_mp;
+	ipha_t	*iph;
 
 	if (DB_TYPE(mp_orig) == M_DATA &&
 	    ((ipha_t *)mp_orig->b_rptr)->ipha_protocol == IPPROTO_UDP) {
@@ -1217,8 +1219,21 @@ ip_multicast_loopback(queue_t *q, ill_t *ill, mblk_t *mp_orig, int fanout_flags,
 	} else {
 		ipsec_mp = mp;
 	}
-	ip_wput_local(q, ill, (ipha_t *)mp->b_rptr, ipsec_mp, NULL,
-	    fanout_flags, zoneid);
+
+	iph = (ipha_t *)mp->b_rptr;
+
+	DTRACE_PROBE4(ip4__loopback__out__start,
+	    ill_t *, NULL, ill_t *, ill,
+	    ipha_t *, iph, mblk_t *, ipsec_mp);
+
+	FW_HOOKS(ip4_loopback_out_event, ipv4firewall_loopback_out,
+	    MSG_FWCOOKED_OUT, NULL, ill, iph, ipsec_mp, mp);
+
+	DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, ipsec_mp);
+
+	if (ipsec_mp != NULL)
+		ip_wput_local(q, ill, iph, ipsec_mp, NULL,
+		    fanout_flags, zoneid);
 }
 
 static area_t	ip_aresq_template = {

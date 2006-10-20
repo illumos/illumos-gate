@@ -3,6 +3,14 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
 # undef _KERNEL
@@ -49,6 +57,7 @@ struct file;
 # endif
 # include <sys/stream.h>
 # include <sys/kmem.h>
+# include <sys/neti.h>
 #endif
 #if (_BSDI_VERSION >= 199802) || (__FreeBSD_version >= 400000)
 # include <sys/queue.h>
@@ -141,6 +150,10 @@ frauthent_t	*fae_list = NULL;
 frentry_t	*ipauth = NULL,
 		*fr_authlist = NULL;
 
+#if SOLARIS2 >= 10
+extern net_data_t ipf_ipv4;
+extern net_data_t ipf_ipv6;
+#endif
 
 int fr_authinit()
 {
@@ -341,7 +354,6 @@ fr_info_t *fin;
 #if SOLARIS && defined(_KERNEL)
 	m->b_rptr -= qpi->qpi_off;
 	fr_authpkts[i] = *(mblk_t **)fin->fin_mp;
-	fra->fra_q = qpi->qpi_q;	/* The queue can disappear! */
 	cv_signal(&ipfauthwait);
 #else
 # if defined(BSD) && !defined(sparc) && (BSD >= 199306)
@@ -371,6 +383,9 @@ int mode;
 	frauth_t auth, *au = &auth, *fra;
 	int i, error = 0, len;
 	char *t;
+	net_data_t net_data_p;
+	net_inject_t inj_data;
+	int ret;
 
 	switch (cmd)
 	{
@@ -498,10 +513,33 @@ fr_authioctlloop:
 		fra->fra_pass = au->fra_pass;
 		fr_authpkts[i] = NULL;
 		RWLOCK_EXIT(&ipf_auth);
+
 #ifdef	_KERNEL
+		if (fra->fra_info.fin_v == 4) { 
+			net_data_p = ipf_ipv4;
+		} else if (fra->fra_info.fin_v == 6) { 
+			net_data_p = ipf_ipv6;
+		} else { 
+			return (-1); 
+		}
+
+		/*
+		 * We're putting the packet back on the same interface
+		 * queue that it was originally seen on so that it can
+		 * progress through the system properly, with the result
+		 * of the auth check done.
+		 */
+		inj_data.ni_physical = (phy_if_t)fra->fra_info.fin_ifp;
+
 		if ((m != NULL) && (au->fra_info.fin_out != 0)) {
 # ifdef MENTAT
-			error = !putq(fra->fra_q, m);
+			inj_data.ni_packet = m;
+			ret = net_inject(net_data_p, NI_QUEUE_OUT, &inj_data);
+
+			if (ret < 0)
+				fr_authstats.fas_sendfail++;
+			else
+				fr_authstats.fas_sendok++;
 # else /* MENTAT */
 #  if defined(linux) || defined(AIX)
 #  else
@@ -513,15 +551,16 @@ fr_authioctlloop:
 #   else
 			error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL);
 #   endif
-#  endif /* Linux */
-# endif /* MENTAT */
 			if (error != 0)
 				fr_authstats.fas_sendfail++;
 			else
 				fr_authstats.fas_sendok++;
+#  endif /* Linux */
+# endif /* MENTAT */
 		} else if (m) {
 # ifdef MENTAT
-			error = !putq(fra->fra_q, m);
+			inj_data.ni_packet = m;
+			ret = net_inject(net_data_p, NI_QUEUE_IN, &inj_data);
 # else /* MENTAT */
 #  if defined(linux) || defined(AIX)
 #  else

@@ -42,8 +42,11 @@
 #include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
+#include <sys/sdt.h>
 #include <sys/kobj.h>
 #include <sys/zone.h>
+#include <sys/neti.h>
+#include <sys/hook.h>
 
 #include <sys/kmem.h>
 #include <sys/systm.h>
@@ -273,7 +276,7 @@ static void	ip_wput_ire_v6(queue_t *, mblk_t *, ire_t *, int, int,
     conn_t *, int, int, int, zoneid_t);
 static boolean_t ip_ulp_cando_pkt2big(int);
 
-static void ip_rput_v6(queue_t *, mblk_t *);
+void ip_rput_v6(queue_t *, mblk_t *);
 static void ip_wput_v6(queue_t *, mblk_t *);
 
 /*
@@ -6692,7 +6695,10 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 		    B_FALSE, B_FALSE, GLOBAL_ZONEID);
 		return;
 	}
-	ip_rput_data_v6(q, ill, mp, ip6h, flags, hada_mp, dl_mp);
+	if (ip_check_v6_mblk(mp, ill) == 0) {
+		ip6h = (ip6_t *)mp->b_rptr;
+		ip_rput_data_v6(q, ill, mp, ip6h, flags, hada_mp, dl_mp);
+	}
 	return;
 hada_drop:
 	/* IPsec kstats: bean counter? */
@@ -6703,7 +6709,7 @@ hada_drop:
 /*
  * Read side put procedure for IPv6 module.
  */
-static void
+void
 ip_rput_v6(queue_t *q, mblk_t *mp)
 {
 	mblk_t		*first_mp;
@@ -6901,17 +6907,23 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		mp = first_mp->b_cont;
 	}
 
+	if (ip_check_v6_mblk(mp, ill) == -1)
+		return;
+
 	ip6h = (ip6_t *)mp->b_rptr;
 
-	/* check for alignment and full IPv6 header */
-	if (!OK_32PTR((uchar_t *)ip6h) ||
-	    (mp->b_wptr - (uchar_t *)ip6h) < IPV6_HDR_LEN) {
-		if (!pullupmsg(mp, IPV6_HDR_LEN)) {
-			ip1dbg(("ip_rput_v6: pullupmsg failed\n"));
-			goto discard;
-		}
-		ip6h = (ip6_t *)mp->b_rptr;
-	}
+	DTRACE_PROBE4(ip6__physical__in__start,
+	    ill_t *, ill, ill_t *, NULL,
+	    ip6_t *, ip6h, mblk_t *, first_mp);
+
+	FW_HOOKS6(ip6_physical_in_event, ipv6firewall_physical_in,
+	    MSG_FWCOOKED_IN, ill, NULL, ip6h, first_mp, mp);
+
+	DTRACE_PROBE1(ip6__physical__in__end, mblk_t *, first_mp);
+
+	if (first_mp == NULL) 
+		return;
+
 	if ((ip6h->ip6_vcf & IPV6_VERS_AND_FLOW_MASK) ==
 	    IPV6_DEFAULT_VERS_AND_FLOW) {
 		/*
@@ -7137,6 +7149,62 @@ ipsec_early_ah_v6(queue_t *q, mblk_t *first_mp, boolean_t mctl_present,
 }
 
 /*
+ * Validate the IPv6 mblk for alignment.
+ */
+int
+ip_check_v6_mblk(mblk_t *mp, ill_t *ill)
+{
+	int pkt_len, ip6_len;
+	ip6_t *ip6h = (ip6_t *)mp->b_rptr;
+
+	/* check for alignment and full IPv6 header */
+	if (!OK_32PTR((uchar_t *)ip6h) ||
+	    (mp->b_wptr - (uchar_t *)ip6h) < IPV6_HDR_LEN) {
+		if (!pullupmsg(mp, IPV6_HDR_LEN)) {
+			BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
+			ip1dbg(("ip_rput_v6: pullupmsg failed\n"));
+			freemsg(mp);
+			return (-1);
+		}
+		ip6h = (ip6_t *)mp->b_rptr;
+	}
+
+	ASSERT(OK_32PTR((uchar_t *)ip6h) &&
+	    (mp->b_wptr - (uchar_t *)ip6h) >= IPV6_HDR_LEN);
+
+	if (mp->b_cont == NULL)
+		pkt_len = mp->b_wptr - mp->b_rptr;
+	else
+		pkt_len = msgdsize(mp);
+	ip6_len = ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN;
+
+	/*
+	 * Check for bogus (too short packet) and packet which
+	 * was padded by the link layer.
+	 */
+	if (ip6_len != pkt_len) {
+		ssize_t diff;
+
+		if (ip6_len > pkt_len) {
+			ip1dbg(("ip_rput_data_v6: packet too short %d %d\n",
+			    ip6_len, pkt_len));
+			BUMP_MIB(ill->ill_ip6_mib, ipv6InTruncatedPkts);
+			freemsg(mp);
+			return (-1);
+		}
+		diff = (ssize_t)(pkt_len - ip6_len);
+
+		if (!adjmsg(mp, -diff)) {
+			ip1dbg(("ip_rput_data_v6: adjmsg failed\n"));
+			BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
+			freemsg(mp);
+			return (-1);
+		}
+	}
+	return (0);
+}
+
+/*
  * ip_rput_data_v6 -- received IPv6 packets in M_DATA messages show up here.
  * ip_rput_v6 has already verified alignment, the min length, the version,
  * and db_ref = 1.
@@ -7157,6 +7225,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	ire_t		*ire = NULL;
 	queue_t		*rq;
 	ill_t		*ill = inill;
+	ill_t		*outill;
 	ipif_t		*ipif;
 	uint8_t		*whereptr;
 	uint8_t		nexthdr;
@@ -7201,41 +7270,9 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 		ASSERT(mp->b_datap->db_type != M_CTL);
 	}
 
-	ASSERT(OK_32PTR((uchar_t *)ip6h) &&
-	    (mp->b_wptr - (uchar_t *)ip6h) >= IPV6_HDR_LEN);
-
-	if (mp->b_cont == NULL)
-		pkt_len = mp->b_wptr - mp->b_rptr;
-	else
-		pkt_len = msgdsize(mp);
+	ip6h = (ip6_t *)mp->b_rptr;
 	ip6_len = ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN;
-
-	/*
-	 * Check for bogus (too short packet) and packet which
-	 * was padded by the link layer.
-	 */
-	if (ip6_len != pkt_len) {
-		ssize_t diff;
-
-		if (ip6_len > pkt_len) {
-			ip1dbg(("ip_rput_data_v6: packet too short %d %lu\n",
-			    ip6_len, pkt_len));
-			BUMP_MIB(ill->ill_ip6_mib, ipv6InTruncatedPkts);
-			freemsg(hada_mp);
-			freemsg(first_mp);
-			return;
-		}
-		diff = (ssize_t)(pkt_len - ip6_len);
-
-		if (!adjmsg(mp, -diff)) {
-			ip1dbg(("ip_rput_data_v6: adjmsg failed\n"));
-			BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
-			freemsg(hada_mp);
-			freemsg(first_mp);
-			return;
-		}
-		pkt_len -= diff;
-	}
+	pkt_len = ip6_len;
 
 	if (ILL_HCKSUM_CAPABLE(ill) && !mctl_present && dohwcksum)
 		hck_flags = DB_CKSUMFLAGS(mp);
@@ -7593,10 +7630,24 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 forward:
 		/* Hoplimit verified above */
 		ip6h->ip6_hops--;
-		UPDATE_IB_PKT_COUNT(ire);
-		ire->ire_last_used_time = lbolt;
-		BUMP_MIB(ill->ill_ip6_mib, ipv6OutForwDatagrams);
-		ip_xmit_v6(mp, ire, 0, NULL, B_FALSE, NULL);
+
+		outill = ire->ire_ipif->ipif_ill;
+
+		DTRACE_PROBE4(ip6__forwarding__start,
+		    ill_t *, inill, ill_t *, outill,
+		    ip6_t *, ip6h, mblk_t *, mp);
+
+		FW_HOOKS6(ip6_forwarding_event, ipv6firewall_forwarding,
+		    MSG_FWCOOKED_FORWARD, inill, outill, ip6h, mp, mp);
+
+		DTRACE_PROBE1(ip6__forwarding__end, mblk_t *, mp);
+
+		if (mp != NULL) {
+			UPDATE_IB_PKT_COUNT(ire);
+			ire->ire_last_used_time = lbolt;
+			BUMP_MIB(ill->ill_ip6_mib, ipv6OutForwDatagrams);
+			ip_xmit_v6(mp, ire, 0, NULL, B_FALSE, NULL);
+		}
 		IRE_REFRELE(ire);
 		return;
 	}
@@ -10544,6 +10595,20 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 	}
 
 
+	DTRACE_PROBE4(ip6__loopback__in__start,
+	    ill_t *, ill, ill_t *, NULL,
+	    ip6_t *, ip6h, mblk_t *, first_mp);
+
+	FW_HOOKS6(ip6_loopback_in_event, ipv6firewall_loopback_in,
+	    MSG_FWCOOKED_IN, ill, NULL, ip6h, first_mp, mp);
+
+	DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, first_mp);
+
+	if (first_mp == NULL)
+		return;
+
+	nexthdr = ip6h->ip6_nxt;
+
 	UPDATE_OB_PKT_COUNT(ire);
 	ire->ire_last_used_time = lbolt;
 
@@ -10909,20 +10974,45 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 				nmp = ip_copymsg(first_mp);
 				if (nmp != NULL) {
 					ip6_t	*nip6h;
+					mblk_t	*mp_ip6h;
 
 					if (mctl_present) {
 						nip6h = (ip6_t *)
 						    nmp->b_cont->b_rptr;
+						mp_ip6h = nmp->b_cont;
 					} else {
 						nip6h = (ip6_t *)nmp->b_rptr;
+						mp_ip6h = nmp;
 					}
-					/*
-					 * Deliver locally and to every local
-					 * zone, except the sending zone when
-					 * IPV6_MULTICAST_LOOP is disabled.
-					 */
-					ip_wput_local_v6(RD(q), ill, nip6h, nmp,
-					    ire, fanout_flags);
+
+					DTRACE_PROBE4(
+					    ip6__loopback__out__start,
+					    ill_t *, NULL,
+					    ill_t *, ill,
+					    ip6_t *, nip6h,
+					    mblk_t *, nmp);
+
+					FW_HOOKS6(ip6_loopback_out_event,
+					    ipv6firewall_loopback_out,
+					    MSG_FWCOOKED_OUT, NULL, ill,
+					    nip6h, nmp, mp_ip6h);
+
+					DTRACE_PROBE1(
+					    ip6__loopback__out__end,
+					    mblk_t *, nmp);
+
+					if (nmp != NULL) {
+						/*
+						 * Deliver locally and to
+						 * every local zone, except
+						 * the sending zone when
+						 * IPV6_MULTICAST_LOOP is
+						 * disabled.
+						 */
+						ip_wput_local_v6(RD(q), ill,
+						    nip6h, nmp,
+						    ire, fanout_flags);
+					}
 				} else {
 					BUMP_MIB(mibptr, ipv6OutDiscards);
 					ip1dbg(("ip_wput_ire_v6: "
@@ -11336,7 +11426,14 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 		ASSERT(mp == first_mp);
 		ip_xmit_v6(mp, ire, reachable, connp, caller, NULL);
 	} else {
-		ip_wput_local_v6(RD(q), ill, ip6h, first_mp, ire, 0);
+		DTRACE_PROBE4(ip6__loopback__out__start,
+		    ill_t *, NULL, ill_t *, ill,
+		    ip6_t *, ip6h, mblk_t *, first_mp);
+		FW_HOOKS6(ip6_loopback_out_event, ipv6firewall_loopback_out,
+		    MSG_FWCOOKED_OUT, NULL, ill, ip6h, first_mp, mp);
+		DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, first_mp);
+		if (first_mp != NULL)
+			ip_wput_local_v6(RD(q), ill, ip6h, first_mp, ire, 0);
 	}
 }
 
@@ -11871,6 +11968,7 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 	mblk_t		*mp1;
 	nce_t		*nce = ire->ire_nce;
 	ill_t		*ill;
+	ill_t		*out_ill;
 	uint64_t	delta;
 	ip6_t		*ip6h;
 	queue_t		*stq = ire->ire_stq;
@@ -11994,7 +12092,7 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 		}
 
 		do {
-			boolean_t	qos_done = B_FALSE;
+			mblk_t *mp_ip6h;
 
 			if (multirt_send) {
 				irb_t *irb;
@@ -12055,6 +12153,23 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 			ill_index =
 			    ((ill_t *)stq->q_ptr)->ill_phyint->phyint_ifindex;
 
+			/* Initiate IPPF processing */
+			if (IP6_OUT_IPP(flags)) {
+				ip_process(IPP_LOCAL_OUT, &mp, ill_index);
+				if (mp == NULL) {
+					BUMP_MIB(ill->ill_ip6_mib,
+					    ipv6OutDiscards);
+					if (next_mp != NULL)
+						freemsg(next_mp);
+					if (ire != save_ire) {
+						ire_refrele(ire);
+					}
+					return;
+				}
+				ip6h = (ip6_t *)mp->b_rptr;
+			}
+			mp_ip6h = mp;
+
 			/*
 			 * Check for fastpath, we need to hold nce_lock to
 			 * prevent fastpath update from chaining nce_fp_mp.
@@ -12066,39 +12181,6 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 				uint32_t hlen;
 				uchar_t	*rptr;
 
-				/* Initiate IPPF processing */
-				if (IP6_OUT_IPP(flags)) {
-					/*
-					 * We have to release the nce lock since
-					 * IPPF components use
-					 * ill_lookup_on_ifindex(),
-					 * which takes the ill_g_lock and the
-					 * ill_lock locks.
-					 */
-					mutex_exit(&nce->nce_lock);
-					ip_process(IPP_LOCAL_OUT, &mp,
-					    ill_index);
-					if (mp == NULL) {
-						BUMP_MIB(
-						    ill->ill_ip6_mib,
-						    ipv6OutDiscards);
-						if (next_mp != NULL)
-							freemsg(next_mp);
-						if (ire != save_ire) {
-							ire_refrele(ire);
-						}
-						return;
-					}
-					mutex_enter(&nce->nce_lock);
-					if ((mp1 = nce->nce_fp_mp) == NULL) {
-						/*
-						 * Probably disappeared during
-						 * IPQoS processing.
-						 */
-						qos_done = B_TRUE;
-						goto prepend_unitdata;
-					}
-				}
 				hlen = MBLKL(mp1);
 				rptr = mp->b_rptr - hlen;
 				/*
@@ -12107,8 +12189,8 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 				 */
 				if (rptr < mp->b_datap->db_base) {
 					mp1 = copyb(mp1);
+					mutex_exit(&nce->nce_lock);
 					if (mp1 == NULL) {
-						mutex_exit(&nce->nce_lock);
 						BUMP_MIB(ill->ill_ip6_mib,
 						    ipv6OutDiscards);
 						freemsg(mp);
@@ -12131,15 +12213,15 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 					 * header
 					 */
 					bcopy(mp1->b_rptr, rptr, hlen);
+					mutex_exit(&nce->nce_lock);
 				}
-
-				mutex_exit(&nce->nce_lock);
-
 			} else {
-		prepend_unitdata:
-				mutex_exit(&nce->nce_lock);
+				/*
+				 * Get the DL_UNITDATA_REQ.
+				 */
 				mp1 = nce->nce_res_mp;
 				if (mp1 == NULL) {
+					mutex_exit(&nce->nce_lock);
 					ip1dbg(("ip_xmit_v6: No resolution "
 					    "block ire = %p\n", (void *)ire));
 					freemsg(mp);
@@ -12154,6 +12236,7 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 				 * Prepend the DL_UNITDATA_REQ.
 				 */
 				mp1 = copyb(mp1);
+				mutex_exit(&nce->nce_lock);
 				if (mp1 == NULL) {
 					BUMP_MIB(ill->ill_ip6_mib,
 					    ipv6OutDiscards);
@@ -12166,24 +12249,47 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 					return;
 				}
 				mp1->b_cont = mp;
+
+				/* Get the priority marking, if any */
+				mp1->b_band = mp->b_band;
 				mp = mp1;
-				/*
-				 * Initiate IPPF processing, if it is
-				 * already done, bypass.
-				 */
-				if (!qos_done && IP6_OUT_IPP(flags)) {
-					ip_process(IPP_LOCAL_OUT, &mp,
-					    ill_index);
-					if (mp == NULL) {
-						BUMP_MIB(ill->ill_ip6_mib,
-						    ipv6OutDiscards);
-						if (next_mp != NULL)
-							freemsg(next_mp);
-						if (ire != save_ire) {
-							ire_refrele(ire);
-						}
-						return;
+			}
+
+			out_ill = (ill_t *)stq->q_ptr;
+
+			DTRACE_PROBE4(ip6__physical__out__start,
+			    ill_t *, NULL, ill_t *, out_ill,
+			    ip6_t *, ip6h, mblk_t *, mp);
+
+			FW_HOOKS6(ip6_physical_out_event,
+			    ipv6firewall_physical_out, MSG_FWCOOKED_OUT,
+			    NULL, out_ill, ip6h, mp, mp_ip6h);
+
+			DTRACE_PROBE1(ip6__physical__out__end, mblk_t *, mp);
+
+			if (mp == NULL) {
+				if (multirt_send) {
+					ASSERT(ire1 != NULL);
+					if (ire != save_ire) {
+						ire_refrele(ire);
 					}
+					/*
+					 * Proceed with the next RTF_MULTIRT
+					 * ire, also set up the send-to queue
+					 * accordingly.
+					 */
+					ire = ire1;
+					ire1 = NULL;
+					stq = ire->ire_stq;
+					nce = ire->ire_nce;
+					ill = ire_to_ill(ire);
+					mp = next_mp;
+					next_mp = NULL;
+					continue;
+				} else {
+					ASSERT(next_mp == NULL);
+					ASSERT(ire1 == NULL);
+					break;
 				}
 			}
 

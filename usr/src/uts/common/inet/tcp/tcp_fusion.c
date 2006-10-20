@@ -30,6 +30,7 @@
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <sys/debug.h>
+#include <sys/sdt.h>
 #include <sys/cmn_err.h>
 #include <sys/tihdr.h>
 
@@ -463,6 +464,14 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	uint_t max_unread;
 	boolean_t flow_stopped;
 	boolean_t urgent = (DB_TYPE(mp) != M_DATA);
+	mblk_t *mp1 = mp;
+	ill_t *ilp, *olp;
+	ipha_t *ipha;
+	ip6_t *ip6h;
+	tcph_t *tcph;
+	uint_t ip_hdr_len;
+	uint32_t seq;
+	uint32_t recv_size = send_size;
 
 	ASSERT(tcp->tcp_fused);
 	ASSERT(peer_tcp != NULL && peer_tcp->tcp_loopback_peer == tcp);
@@ -476,8 +485,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	if (TCP_LOOPBACK_IP(tcp) || TCP_LOOPBACK_IP(peer_tcp) ||
 	    IPP_ENABLED(IPP_LOCAL_OUT|IPP_LOCAL_IN)) {
 		TCP_STAT(tcp_fusion_aborted);
-		tcp_unfuse(tcp);
-		return (B_FALSE);
+		goto unfuse;
 	}
 
 	if (send_size == 0) {
@@ -500,6 +508,93 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		 */
 		TCP_FUSE_SYNCSTR_PLUG_DRAIN(peer_tcp);
 		tcp_fuse_output_urg(tcp, mp);
+
+		mp1 = mp->b_cont;
+	}
+
+	if (tcp->tcp_ipversion == IPV4_VERSION &&
+	    (HOOKS4_INTERESTED_LOOPBACK_IN ||
+	    HOOKS4_INTERESTED_LOOPBACK_OUT) ||
+	    tcp->tcp_ipversion == IPV6_VERSION &&
+	    (HOOKS6_INTERESTED_LOOPBACK_IN ||
+	    HOOKS6_INTERESTED_LOOPBACK_OUT)) {
+		/*
+		 * Build ip and tcp header to satisfy FW_HOOKS.
+		 * We only build it when any hook is present.
+		 */
+		if ((mp1 = tcp_xmit_mp(tcp, mp1, tcp->tcp_mss, NULL, NULL,
+		    tcp->tcp_snxt, B_TRUE, NULL, B_FALSE)) == NULL)
+			/* If tcp_xmit_mp fails, use regular path */
+			goto unfuse;
+
+		ASSERT(peer_tcp->tcp_connp->conn_ire_cache->ire_ipif != NULL);
+		olp = peer_tcp->tcp_connp->conn_ire_cache->ire_ipif->ipif_ill;
+		/* PFHooks: LOOPBACK_OUT */
+		if (tcp->tcp_ipversion == IPV4_VERSION) {
+			ipha = (ipha_t *)mp1->b_rptr;
+
+			DTRACE_PROBE4(ip4__loopback__out__start,
+			    ill_t *, NULL, ill_t *, olp,
+			    ipha_t *, ipha, mblk_t *, mp1);
+			FW_HOOKS(ip4_loopback_out_event,
+			    ipv4firewall_loopback_out, MSG_FWCOOKED_OUT, NULL,
+			    olp, ipha, mp1, mp1);
+			DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, mp1);
+		} else {
+			ip6h = (ip6_t *)mp1->b_rptr;
+
+			DTRACE_PROBE4(ip6__loopback__out__start,
+			    ill_t *, NULL, ill_t *, olp,
+			    ip6_t *, ip6h, mblk_t *, mp1);
+			FW_HOOKS6(ip6_loopback_out_event,
+			    ipv6firewall_loopback_out, MSG_FWCOOKED_OUT, NULL,
+			    olp, ip6h, mp1, mp1);
+			DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, mp1);
+		}
+		if (mp1 == NULL)
+			goto unfuse;
+
+
+		/* PFHooks: LOOPBACK_IN */
+		ASSERT(tcp->tcp_connp->conn_ire_cache->ire_ipif != NULL);
+		ilp = tcp->tcp_connp->conn_ire_cache->ire_ipif->ipif_ill;
+
+		if (tcp->tcp_ipversion == IPV4_VERSION) {
+			DTRACE_PROBE4(ip4__loopback__in__start,
+			    ill_t *, ilp, ill_t *, NULL,
+			    ipha_t *, ipha, mblk_t *, mp1);
+			FW_HOOKS(ip4_loopback_in_event,
+			    ipv4firewall_loopback_in, MSG_FWCOOKED_IN, ilp,
+			    NULL, ipha, mp1, mp1);
+			DTRACE_PROBE1(ip4__loopback__in__end, mblk_t *, mp1);
+			if (mp1 == NULL)
+				goto unfuse;
+
+			ip_hdr_len = IPH_HDR_LENGTH(ipha);
+		} else {
+			DTRACE_PROBE4(ip6__loopback__in__start,
+			    ill_t *, ilp, ill_t *, NULL,
+			    ip6_t *, ip6h, mblk_t *, mp1);
+			FW_HOOKS6(ip6_loopback_in_event,
+			    ipv6firewall_loopback_in, MSG_FWCOOKED_IN, ilp,
+			    NULL, ip6h, mp1, mp1);
+			DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, mp1);
+			if (mp1 == NULL)
+				goto unfuse;
+
+			ip_hdr_len = ip_hdr_length_v6(mp1, ip6h);
+		}
+
+		/* Data length might be changed by FW_HOOKS */
+		tcph = (tcph_t *)&mp1->b_rptr[ip_hdr_len];
+		seq = ABE32_TO_U32(tcph->th_seq);
+		recv_size += seq - tcp->tcp_snxt;
+
+		/*
+		 * The message duplicated by tcp_xmit_mp is freed.
+		 * Note: the original message passed in remains unchanged.
+		 */
+		freemsg(mp1);
 	}
 
 	mutex_enter(&peer_tcp->tcp_fuse_lock);
@@ -528,10 +623,10 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	 * Enqueue data into the peer's receive list; we may or may not
 	 * drain the contents depending on the conditions below.
 	 */
-	tcp_rcv_enqueue(peer_tcp, mp, send_size);
+	tcp_rcv_enqueue(peer_tcp, mp, recv_size);
 
 	/* In case it wrapped around and also to keep it constant */
-	peer_tcp->tcp_rwnd += send_size;
+	peer_tcp->tcp_rwnd += recv_size;
 
 	/*
 	 * Exercise flow-control when needed; we will get back-enabled
@@ -574,7 +669,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	/* Need to adjust the following SNMP MIB-related variables */
 	tcp->tcp_snxt += send_size;
 	tcp->tcp_suna = tcp->tcp_snxt;
-	peer_tcp->tcp_rnxt += send_size;
+	peer_tcp->tcp_rnxt += recv_size;
 	peer_tcp->tcp_rack = peer_tcp->tcp_rnxt;
 
 	BUMP_MIB(&tcp_mib, tcpOutDataSegs);
@@ -620,6 +715,9 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		}
 	}
 	return (B_TRUE);
+unfuse:
+	tcp_unfuse(tcp);
+	return (B_FALSE);
 }
 
 /*

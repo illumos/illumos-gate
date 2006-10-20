@@ -53,6 +53,8 @@ f none usr/lib/mdb/kvm/amd64/cpc.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/crypto.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/genunix.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/ip.so 555 root sys
+f none usr/lib/mdb/kvm/amd64/hook.so 555 root sys
+f none usr/lib/mdb/kvm/amd64/neti.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/ipc.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/ipp.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/krtld.so 555 root sys
@@ -78,6 +80,8 @@ f none usr/lib/mdb/kvm/cpc.so 555 root sys
 f none usr/lib/mdb/kvm/crypto.so 555 root sys
 f none usr/lib/mdb/kvm/genunix.so 555 root sys
 f none usr/lib/mdb/kvm/ip.so 555 root sys
+f none usr/lib/mdb/kvm/hook.so 555 root sys
+f none usr/lib/mdb/kvm/neti.so 555 root sys
 f none usr/lib/mdb/kvm/ipc.so 555 root sys
 f none usr/lib/mdb/kvm/ipp.so 555 root sys
 f none usr/lib/mdb/kvm/krtld.so 555 root sys

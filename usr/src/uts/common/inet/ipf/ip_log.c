@@ -254,15 +254,16 @@ u_int flags;
 	ipflog_t ipfl;
 	u_char p;
 	mb_t *m;
-# if (SOLARIS || defined(__hpux)) && defined(_KERNEL)
-#  ifndef IRE_ILL_CN
+# if SOLARIS && defined(_KERNEL)
+	net_data_t nif;
+	void *ifp;
+# else
+#  if defined(__hpux) && defined(_KERNEL)
 	qif_t *ifp;
 #  else
-	s_ill_t *ifp;
-#  endif /* IRE_ILL_CN */
-# else
 	struct ifnet *ifp;
-# endif /* SOLARIS || __hpux */
+#  endif
+# endif /* SOLARIS */
 
 	ipfl.fl_nattag.ipt_num[0] = 0;
 	m = fin->fin_m;
@@ -328,27 +329,42 @@ u_int flags;
 	 * Get the interface number and name to which this packet is
 	 * currently associated.
 	 */
-# if (SOLARIS || defined(__hpux)) && defined(_KERNEL)
+# if SOLARIS && defined(_KERNEL)
+	ipfl.fl_unit = (u_int)0;
+	nif = NULL;
+	if (fin->fin_fi.fi_v == 4)
+		nif = ipf_ipv4;
+	else if (fin->fin_fi.fi_v == 6)
+		nif = ipf_ipv6;
+	if (nif != NULL) {
+		if (net_getifname(nif, (phy_if_t)ifp,
+		    ipfl.fl_ifname, sizeof(ipfl.fl_ifname)) != 0)
+			return (-1);
+	}
+
+# else
+#  if defined(__hpux) && defined(_KERNEL)
 	ipfl.fl_unit = (u_int)0;
 	(void) strncpy(ipfl.fl_ifname, IFNAME(ifp), sizeof(ipfl.fl_ifname));
-# else
-#  if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199603)) || \
-      (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
-      (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
-	COPYIFNAME(ifp, ipfl.fl_ifname);
 #  else
+#   if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199603)) || \
+       (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
+       (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
+	COPYIFNAME(ifp, ipfl.fl_ifname);
+#   else
 	ipfl.fl_unit = (u_int)ifp->if_unit;
-#   if defined(_KERNEL)
+#    if defined(_KERNEL)
 	if ((ipfl.fl_ifname[0] = ifp->if_name[0]))
 		if ((ipfl.fl_ifname[1] = ifp->if_name[1]))
 			if ((ipfl.fl_ifname[2] = ifp->if_name[2]))
 				ipfl.fl_ifname[3] = ifp->if_name[3];
-#   else
+#    else
 	(void) strncpy(ipfl.fl_ifname, IFNAME(ifp), sizeof(ipfl.fl_ifname));
 	ipfl.fl_ifname[sizeof(ipfl.fl_ifname) - 1] = '\0';
+#    endif
 #   endif
-#  endif
-# endif /* __hpux || SOLARIS */
+#  endif /* __hpux */
+# endif /* SOLARIS */
 	mlen = fin->fin_plen - hlen;
 	if (!ipl_logall) {
 		mlen = (flags & FR_LOGBODY) ? MIN(mlen, 128) : 0;
@@ -617,25 +633,29 @@ struct uio *uio;
 		 */
 		iplt[unit] = ipl->ipl_next;
 		iplused[unit] -= dlen;
+		if (iplt[unit] == NULL) {
+			iplh[unit] = &iplt[unit];
+			ipll[unit] = NULL;
+		}
 		MUTEX_EXIT(&ipl_mutex);
 		SPL_X(s);
 		error = UIOMOVE((caddr_t)ipl, dlen, UIO_READ, uio);
 		if (error) {
 			SPL_NET(s);
 			MUTEX_ENTER(&ipl_mutex);
+			iplused[unit] += dlen;
 			ipl->ipl_next = iplt[unit];
 			iplt[unit] = ipl;
-			iplused[unit] += dlen;
+			ipll[unit] = ipl;
+			if (iplh[unit] == &iplt[unit]) {
+				*iplh[unit] = ipl;
+				iplh[unit] = &ipl->ipl_next;
+			}
 			break;
 		}
 		MUTEX_ENTER(&ipl_mutex);
 		KFREES((caddr_t)ipl, dlen);
 		SPL_NET(s);
-	}
-	if (!iplt[unit]) {
-		iplused[unit] = 0;
-		iplh[unit] = &iplt[unit];
-		ipll[unit] = NULL;
 	}
 
 	MUTEX_EXIT(&ipl_mutex);

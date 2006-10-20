@@ -25,7 +25,6 @@
 #include <sys/stat.h>
 #include <sys/cred.h>
 #include <sys/dditypes.h>
-#include <sys/stream.h>
 #include <sys/poll.h>
 #include <sys/autoconf.h>
 #include <sys/byteorder.h>
@@ -34,6 +33,8 @@
 #include <sys/stropts.h>
 #include <sys/kstat.h>
 #include <sys/sockio.h>
+#include <sys/neti.h>
+#include <sys/hook.h>
 #include <net/if.h>
 #if SOLARIS2 >= 6
 # include <net/if_types.h>
@@ -59,7 +60,6 @@
 #include "netinet/ip_auth.h"
 #include "netinet/ip_state.h"
 
-
 extern	struct	filterstats	frstats[];
 extern	int	fr_running;
 extern	int	fr_flags;
@@ -74,7 +74,6 @@ static	int	ipf_identify __P((dev_info_t *));
 #endif
 static	int	ipf_attach __P((dev_info_t *, ddi_attach_cmd_t));
 static	int	ipf_detach __P((dev_info_t *, ddi_detach_cmd_t));
-static	int	fr_qifsync __P((ip_t *, int, void *, int, void *, mblk_t **));
 static	int	ipf_property_update __P((dev_info_t *));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
@@ -223,6 +222,9 @@ static const filter_kstats_t ipf_kstat_tmp = {
 	{ "ip upd. fail",		KSTAT_DATA_ULONG }
 };
 
+net_data_t ipf_ipv4;
+net_data_t ipf_ipv6;
+
 kstat_t		*ipf_kstatp[2] = {NULL, NULL};
 static int	ipf_kstat_update(kstat_t *ksp, int rwflag);
 
@@ -312,7 +314,9 @@ int _init()
 	int ipfinst;
 
 	ipf_kstat_init();
+
 	ipfinst = mod_install(&modlink1);
+	
 	if (ipfinst != 0)
 		ipf_kstat_fini();
 #ifdef	IPFDEBUG
@@ -332,6 +336,7 @@ int _fini(void)
 #endif
 	if (ipfinst == 0)
 		ipf_kstat_fini();
+
 	return ipfinst;
 }
 
@@ -374,12 +379,6 @@ ddi_attach_cmd_t cmd;
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_attach(%x,%x)", dip, cmd);
 #endif
-
-	if ((pfilinterface != PFIL_INTERFACE) || (PFIL_INTERFACE < 2000000)) {
-		cmn_err(CE_NOTE, "pfilinterface(%d) != %d\n", pfilinterface,
-			PFIL_INTERFACE);
-		return EINVAL;
-	}
 
 	switch (cmd)
 	{
@@ -427,18 +426,6 @@ ddi_attach_cmd_t cmd;
 			goto attach_failed;
 		}
 
-		if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
-			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
-				"pfil_add_hook");
-#ifdef USE_INET6
-		if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
-			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
-				"pfil_add_hook");
-#endif
-		if (pfil_add_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
-			cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
-				"pfil_add_hook");
-
 		fr_timer_id = timeout(fr_slowtimer, NULL,
 				      drv_usectohz(500000));
 
@@ -481,7 +468,7 @@ ddi_detach_cmd_t cmd;
 		if (fr_refcnt != 0)
 			return DDI_FAILURE;
 
-		if (fr_running == -2 || fr_running == 0)
+		if (fr_running == -2)
 			break;
 		/*
 		 * Make sure we're the only one's modifying things.  With
@@ -492,19 +479,15 @@ ddi_detach_cmd_t cmd;
 			RWLOCK_EXIT(&ipf_global);
 			return DDI_FAILURE;
 		}
+		/*
+		 * Make sure there is no active filter rule.
+		 */
+		if (ipfilter[0][fr_active] || ipfilter[1][fr_active] ||
+		    ipfilter6[0][fr_active] || ipfilter6[1][fr_active]) {
+		    RWLOCK_EXIT(&ipf_global);
+			return DDI_FAILURE;
+		}
 		fr_running = -2;
-
-		if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
-			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
-				"pfil_remove_hook");
-#ifdef USE_INET6
-		if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
-			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
-				"pfil_add_hook");
-#endif
-		if (pfil_remove_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
-			cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
-				"pfil_remove_hook");
 
 		RWLOCK_EXIT(&ipf_global);
 
@@ -573,41 +556,6 @@ void *arg, **result;
 		break;
 	}
 	return (error);
-}
-
-
-/*
- * look for bad consistancies between the list of interfaces the filter knows
- * about and those which are currently configured.
- */
-/*ARGSUSED*/
-static int fr_qifsync(ip, hlen, il, out, qif, mp)
-ip_t *ip;
-int hlen;
-void *il;
-int out;
-void *qif;
-mblk_t **mp;
-{
-
-	frsync(qif);
-	/*
-	 * Resync. any NAT `connections' using this interface and its IP #.
-	 */
-	fr_natsync(qif);
-	fr_statesync(qif);
-	return 0;
-}
-
-
-/*
- * look for bad consistancies between the list of interfaces the filter knows
- * about and those which are currently configured.
- */
-int ipfsync()
-{
-	frsync(NULL);
-	return 0;
 }
 
 

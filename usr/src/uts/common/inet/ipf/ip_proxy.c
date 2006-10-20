@@ -462,10 +462,8 @@ int appr_check(fin, nat)
 fr_info_t *fin;
 nat_t *nat;
 {
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
-# if defined(ICK_VALID)
+#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
 	mb_t *m;
-# endif
 	int dosum = 1;
 #endif
 	tcphdr_t *tcp = NULL;
@@ -477,6 +475,13 @@ nat_t *nat;
 	int err;
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi)
 	u_32_t s1, s2, sd;
+#endif
+#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
+	net_data_t net_data_p;
+	if (fin->fin_v == 4)
+		net_data_p = ipf_ipv4;
+	else
+		net_data_p = ipf_ipv6;
 #endif
 
 	if (fin->fin_flx & FI_BAD) {
@@ -564,15 +569,17 @@ nat_t *nat;
 		 * If err != 0 then the data size of the packet has changed
 		 * so we need to recalculate the header checksums for the
 		 * packet.
+		 * inbound packets always need to be adjusted.
 		 */
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi)
-		if (err != 0) {
+		if (err != 0 && (!fin->fin_out ||
+	    	    !NET_IS_HCK_L3_FULL(net_data_p, fin->fin_m))) {
 			short adjlen = err & 0xffff;
 
 			s1 = LONG_SUM(ip->ip_len - adjlen);
 			s2 = LONG_SUM(ip->ip_len);
 			CALC_SUMD(s1, s2, sd);
-			fix_outcksum(fin, &ip->ip_sum, sd);
+			fix_outcksum(&ip->ip_sum, sd);
 		}
 #endif
 
@@ -588,7 +595,9 @@ nat_t *nat;
 		if (tcp != NULL) {
 			err = appr_fixseqack(fin, ip, aps, APR_INC(err));
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
-			if (dosum)
+			if (!fin->fin_out ||
+			    !NET_IS_HCK_L4_FULL(net_data_p, fin->fin_m) &&
+			    !NET_IS_HCK_L4_PART(net_data_p, fin->fin_m))
 				tcp->th_sum = fr_cksum(fin->fin_qfm, ip,
 						       IPPROTO_TCP, tcp);
 #else
@@ -597,7 +606,9 @@ nat_t *nat;
 #endif
 		} else if ((udp != NULL) && (udp->uh_sum != 0)) {
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
-			if (dosum)
+			if (!fin->fin_out ||
+			    !NET_IS_HCK_L4_FULL(net_data_p, fin->fin_m) &&
+			    !NET_IS_HCK_L4_PART(net_data_p, fin->fin_m))
 				udp->uh_sum = fr_cksum(fin->fin_qfm, ip,
 						       IPPROTO_UDP, udp);
 #else
