@@ -29,7 +29,7 @@
 # before spawning a shell for doing a release-style builds interactively
 # and incrementally.
 #
-USAGE='Usage: bldenv [-fdt] [ -S E|D|H ] <env_file> [ command ]
+USAGE='Usage: bldenv [-fdt] [ -S E|D|H|O ] <env_file> [ command ]
 
 Where:
 	-c	Force the use of csh - ignore $SHELL
@@ -40,6 +40,7 @@ Where:
 		E - build exportable source
 		D - build domestic source (exportable + crypt)
 		H - build hybrid source (binaries + deleted source)
+		O - simulate OpenSolaris build
 '
 
 c_FLAG=n
@@ -50,6 +51,37 @@ t_FLAG=n
 SE_FLAG=n
 SH_FLAG=n
 SD_FLAG=n
+SO_FLAG=n
+
+is_source_build() {
+	[ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o \
+	    "$SH_FLAG" = "y" -o "$SO_FLAG" = "y" ]
+	return $?
+}
+
+#
+# single function for setting -S flag and doing error checking.
+# usage: set_S_flag <type>
+# where <type> is the source build type ("E", "D", ...).
+#
+set_S_flag() {
+	if is_source_build; then
+		echo "Can only build one source variant at a time."
+		exit 1
+	fi
+	if [ "$1" = "E" ]; then
+		SE_FLAG=y
+	elif [ "$1" = "D" ]; then
+		SD_FLAG=y
+	elif [ "$1" = "H" ]; then
+		SH_FLAG=y
+	elif [ "$1" = "O" ]; then
+		SO_FLAG=y
+	else
+		echo "$USAGE"
+		exit 1
+	fi
+}
 
 OPTIND=1
 SUFFIX="-nd"
@@ -66,20 +98,7 @@ do
 	  t )	t_FLAG=y
 		;;
 	  S )
-		if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
-			echo "Can only build one source variant at a time."
-			exit 1
-		fi
-		if [ "${OPTARG}" = "E" ]; then
-			SE_FLAG=y
-		elif [ "${OPTARG}" = "D" ]; then
-			SD_FLAG=y
-		elif [ "${OPTARG}" = "H" ]; then
-			SH_FLAG=y
-		else
-			echo "$USAGE"
-			exit 1
-		fi
+		set_S_flag $OPTARG
 		;;
 	  \?)	echo "$USAGE"
 		exit 1
@@ -135,16 +154,11 @@ else
 fi
 shift
 
-#MACH=`uname -p`
+# contents of stdenv.sh inserted after next line:
+# STDENV_START
+# STDENV_END
 
-if [ -z "$CLOSED_IS_PRESENT" ]; then
-	if [ -d $SRC/../closed ]; then
-		CLOSED_IS_PRESENT="yes"
-	else
-		CLOSED_IS_PRESENT="no"
-	fi
-	export CLOSED_IS_PRESENT
-fi
+#MACH=`uname -p`
 
 # must match the getopts in nightly.sh
 OPTIND=1
@@ -155,20 +169,7 @@ do
 	  t )	t_FLAG=y
 		;;
 	  S )
-		if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
-			echo "Can only build one source variant at a time."
-			exit 1
-		fi
-		if [ "${OPTARG}" = "E" ]; then
-			SE_FLAG=y
-		elif [ "${OPTARG}" = "D" ]; then
-			SD_FLAG=y
-		elif [ "${OPTARG}" = "H" ]; then
-			SH_FLAG=y
-		else
-			echo "$USAGE"
-			exit 1
-		fi
+		set_S_flag $OPTARG
 		;;
 	  o)	o_FLAG=y
 		;;
@@ -196,24 +197,6 @@ fi
 CPIODIR=${CPIODIR}${SUFFIX}
 PKGARCHIVE=${PKGARCHIVE}${SUFFIX}
 
-if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" ]; then
-        if [ -z "${EXPORT_SRC}" ]; then
-                echo "EXPORT_SRC must be set for a source build."
-                exit 1
-        fi
-        if [ -z "${CRYPT_SRC}" ]; then
-                echo "CRYPT_SRC must be set for a source build."
-                exit 1
-        fi
-fi
-
-if [ "$SH_FLAG" = "y" ]; then
-        if [ -z "${EXPORT_SRC}" ]; then
-                echo "EXPORT_SRC must be set for a source build."
-                exit 1
-        fi
-fi
- 
 # Append source version
 if [ "$SE_FLAG" = "y" ]; then
         VERSION="${VERSION}:EXPORT"
@@ -230,12 +213,32 @@ if [ "$SH_FLAG" = "y" ]; then
 	SRC=${EXPORT_SRC}/usr/src
 fi
  
+if [ "$SO_FLAG" = "y" ]; then
+        VERSION="${VERSION}:OPEN_ONLY"
+	SRC=${OPEN_SRCDIR}/usr/src
+fi
+ 
 # 	Set PATH for a build
 PATH="/opt/onbld/bin:/opt/onbld/bin/${MACH}:/opt/SUNWspro/bin:/usr/ccs/bin:/usr/bin:/usr/sbin:/usr/ucb:/usr/etc:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
 if [ "${SUNWSPRO}" != "" ]; then 
 	PATH="${SUNWSPRO}/bin:$PATH" 
 	export PATH 
 fi 
+
+if [[ "$SO_FLAG" = "y" && "$CLOSED_IS_PRESENT" = "yes" ]]; then
+	echo "CLOSED_IS_PRESENT is 'no' (because of '-S O')"
+	CLOSED_IS_PRESENT=no
+	export CLOSED_IS_PRESENT
+fi
+
+if [ -z "$CLOSED_IS_PRESENT" ]; then
+	if [ -d $SRC/../closed ]; then
+		CLOSED_IS_PRESENT="yes"
+	else
+		CLOSED_IS_PRESENT="no"
+	fi
+	export CLOSED_IS_PRESENT
+fi
 
 TOOLS=${SRC}/tools
 TOOLS_PROTO=${TOOLS}/proto

@@ -79,6 +79,7 @@ f none opt/onbld/bin/makebfu 555 root bin
 f none opt/onbld/bin/make_pkg_db 555 root bin
 f none opt/onbld/bin/mkacr 555 root bin
 f none opt/onbld/bin/mkbfu 555 root bin
+f none opt/onbld/bin/mkclosed 555 root bin
 f none opt/onbld/bin/nightly 555 root bin
 f none opt/onbld/bin/protocmp.terse 555 root bin
 f none opt/onbld/bin/sccscheck 555 root bin

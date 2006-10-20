@@ -20,7 +20,7 @@
 .\" "
 .\" "Copyright 2006 Sun Microsystems, Inc.  All rights reserved."
 .\" "Use is subject to license terms."
-.TH nightly 1 "23 June 2006"
+.TH nightly 1 "12 Oct 2006"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
@@ -53,34 +53,49 @@ all these things are desired:
 .LP
 .RS
 .TP
+\(bu
 perform a "make clobber" to clean up old binaries
 .TP
+\(bu
 bringover from the identified parent gate/clone
 .TP
+\(bu
 perform non-DEBUG and DEBUG builds
 .TP
+\(bu
 list proto area files and compare with previous list
 .TP
+\(bu
 copy updated proto area to parent
 .TP
+\(bu
 list shared lib interface and compare with previous list
 .TP
+\(bu
 perform a "make lint" of the kernel and report errors
 .TP
+\(bu
 perform a "make check" to report hdrchk/cstyle errors
 .TP
+\(bu
 report the presence of any core files
 .TP
+\(bu
 check the ELF runtime attributes of all dynamic objects
 .TP
+\(bu
 check for unreferenced files
 .TP
+\(bu
 report on which proto area objects have changed (since the last build)
 .TP
+\(bu
 report the total build time
 .TP
+\(bu
 save a detailed log file for reference
 .TP
+\(bu
 mail the user a summary of the completed build
 .RE
 .LP
@@ -202,6 +217,22 @@ Integration engineer default group of options (-ampu)
 Default group of options for building a release (-mp)
 
 .LP
+.B Source Build options
+.TP 10
+.B \-S E | D | H
+Build the Export, Domestic, or Hybrid source product. Only Export and
+Domestic are truly buildable at this time.
+.TP 10
+.B \-S O
+Simulate an OpenSolaris build on a full tree.  This can be used by
+internal developers to ensure that they haven't broken the build for
+external developers.
+.LP
+Source build options only make sense for a full internal tree (open
+and closed source).  Only one source build option can be specified at
+a time.
+
+.LP
 .B Miscellaneous options
 .TP 10
 .B \-V VERS
@@ -214,10 +245,6 @@ nightly proto and package areas.  This is only available on i386.  See
 and
 .B BUILDING THE IHV WORKSPACE
 below.
-.TP
-.B \-S E | D | H
-Build the Export, Domestic, or Hybrid source product. Only Export and
-Domestic are truly buildable at this time.
 
 .LP
 .SH ENVIRONMENT VARIABLES
@@ -436,6 +463,22 @@ modified with 'make EXPORT_SRC'
 CRYPT_SRC is similar to EXPORT_SRC, but after 'make CRYPT_SRC' the files in
 xmod/cry_files are saved. They are dropped on the exportable source to create
 the domestic build
+.RE
+.LP
+.B OPEN_SRCDIR
+.RS 5
+The open source tree is copied to this directory when simulating an
+OpenSolaris build (\fB\-S O\fR).  It defaults to $CODEMGR_WS/open_src.
+.RE
+.LP
+.B ON_CLOSED_BINS
+.RS 5
+OpenSolaris builds do not contain the closed source tree.  Instead,
+the developer downloads a closed binaries tree and unpacks it.  
+.B ON_CLOSED_BINS
+tells nightly
+where to find these closed binaries, so that it can add them into the
+build.
 .RE
 .LP
 .B CHECK_PATHS

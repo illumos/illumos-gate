@@ -108,11 +108,10 @@ normal_build() {
 	# DEBUG build ends
 }
 
+#
+# usage: filelist DESTDIR PATTERN
+#
 filelist() {
-	if  [ $# -ne 2 ]; then
-		echo "usage: filelist DESTDIR PATTERN"
-		exit 1;
-	fi
 	DEST=$1
 	PATTERN=$2
 	cd ${DEST}
@@ -121,7 +120,7 @@ filelist() {
 	if [ ! -f ${OBJFILES} ]; then
 		return;
 	fi
-	for i in `grep -v '^#' ${ORIG_SRC}/xmod/obj_files | \
+	for i in `grep -v '^#' ${OBJFILES} | \
 	    grep ${PATTERN} | cut -d: -f2 | tr -d ' \t'`
 	do
 		# wildcard expansion
@@ -152,12 +151,8 @@ save_binaries() {
 }
 
 # delete files
+# usage: hybridize_files DESTDIR MAKE_TARGET
 hybridize_files() {
-	if  [ $# -ne 2 ]; then
-		echo "usage: hybridize_files DESTDIR MAKE_TARGET"
-		exit 1;
-	fi
-
 	DEST=$1
 	MAKETARG=$2
 
@@ -179,12 +174,8 @@ hybridize_files() {
 }
 
 # restore binaries into the proper source tree.
+# usage: restore_binaries DESTDIR MAKE_TARGET
 restore_binaries() {
-	if  [ $# -ne 2 ]; then
-		echo "usage: restore_binaries DESTDIR MAKE_TARGET"
-		exit 1;
-	fi
-
 	DEST=$1
 	MAKETARG=$2
 
@@ -196,12 +187,8 @@ restore_binaries() {
 }
 
 # rename files we save binaries of
+# usage: rename_files DESTDIR MAKE_TARGET
 rename_files() {
-	if  [ $# -ne 2 ]; then
-		echo "usage: rename_files DESTDIR MAKE_TARGET"
-		exit 1;
-	fi
-
 	DEST=$1
 	MAKETARG=$2
 	echo "\n==== Renaming source files in ${MAKETARG} at `date` ====\n" | \
@@ -214,20 +201,17 @@ rename_files() {
 	done
 }
 
-# function to create the export/crypt source tree
-# usage: clone_source CODEMGR_WS DESTDIR MAKE_TARGET
-
-clone_source() {
-
-	if  [ $# -ne 3 ]; then
-		echo "usage: clone_source CODEMGR_WS DESTDIR MAKE_TARGET"
-		exit 1;
-	fi
+#
+# Copy some or all of the source tree.
+# usage: copy_source CODEMGR_WS DESTDIR LABEL SRCROOT
+#
+copy_source() {
 	WS=$1
 	DEST=$2
-	MAKETARG=$3
+	label=$3
+	srcroot=$4
 
-	echo "\n==== Creating ${DEST} source from ${WS} (${MAKETARG}) ====\n" | \
+	echo "\n==== Creating ${DEST} source from ${WS} ($label) ====\n" | \
 	    tee -a $mail_msg_file >> $LOGFILE
 
 	echo "cleaning out ${DEST}." >> $LOGFILE
@@ -237,11 +221,24 @@ clone_source() {
 	cd ${WS}
 
 	echo "creating ${DEST}." >> $LOGFILE
-	find usr -name 's\.*' -a -type f -print | \
+	find $srcroot -name 's\.*' -a -type f -print | \
 	    sed -e 's,SCCS\/s.,,' | \
 	    grep -v '/\.del-*' | \
 	    cpio -pd ${DEST} >>$LOGFILE 2>&1
+}
 
+#
+# function to create (but not build) the export/crypt source tree.
+# usage: set_up_source_build CODEMGR_WS DESTDIR MAKE_TARGET
+# Sets SRC to the modified source tree, for use by the caller when it
+# builds the tree.
+#
+set_up_source_build() {
+	WS=$1
+	DEST=$2
+	MAKETARG=$3
+
+	copy_source $WS $DEST $MAKETARG usr
 	SRC=${DEST}/usr/src
 
 	cd $SRC
@@ -312,12 +309,6 @@ clone_source() {
 # usage: build LABEL SUFFIX
 
 build() {
-
-	if  [ $# -ne 2 ]; then
-		echo "usage: build LABEL SUFFIX"
-		exit 1;
-	fi
-
 	LABEL=$1
 	SUFFIX=$2
 	INSTALLOG=install${SUFFIX}-${MACH}
@@ -518,25 +509,16 @@ build() {
 	fi
 }
 
+# Usage: dolint /dir y|n
+# Arg. 2 is a flag to turn on/off the lint diff output
 dolint() {
-
-	#
-	# Arg. 2 is a flag to turn on/off the lint diff output
-	#
-	dl_usage="Usage: dolint /dir y|n"
-
-	if [ $# -ne 2 ]; then
-		echo $dl_usage
-		exit 1
-	fi
-
 	if [ ! -d "$1" ]; then
-		echo $dl_usage
+		echo "dolint error: $1 is not a directory"
 		exit 1
 	fi
 
 	if [ "$2" != "y" -a "$2" != "n" ]; then
-		echo $dl_usage
+		echo "dolint internal error: $2 should be 'y' or 'n'"
 		exit 1
 	fi
 
@@ -631,14 +613,8 @@ copy_ihv_proto() {
 }
 
 # Install IHV packages in PKGARCHIVE
-
+# usage: copy_ihv_pkgs LABEL SUFFIX
 copy_ihv_pkgs() {
-
-	if  [ $# -ne 2 ]; then
-		echo "usage: copy_ihv_pkgs LABEL SUFFIX"
-		exit 1;
-	fi
-
 	LABEL=$1
 	SUFFIX=$2
 	# always use non-DEBUG IHV packages
@@ -666,13 +642,8 @@ copy_ihv_pkgs() {
 	fi
 }
 
+# usage: build_tools DESTROOT
 build_tools() {
-
-	if  [ $# -ne 1 ]; then
-		echo "usage: build_tools DESTROOT"
-		exit 1;
-	fi
-
 	DESTROOT=$1
 
 	INSTALLOG=install-${MACH}
@@ -789,7 +760,7 @@ if [ "$TEAMWARE" = "" ]; then
 	export TEAMWARE
 fi
 
-USAGE='Usage: nightly [-in] [-V VERS ] [ -S E|D|H ] <env_file>
+USAGE='Usage: nightly [-in] [-V VERS ] [ -S E|D|H|O ] <env_file>
 
 Where:
 	-i	Fast incremental options (no clobber, lint, check)
@@ -799,6 +770,7 @@ Where:
 		E - build exportable source
 		D - build domestic source (exportable + crypt)
 		H - build hybrid source (binaries + deleted source)
+		O - build (only) open source
 
 	<env_file>  file in Bourne shell syntax that sets and exports
 	variables that configure the operation of this script and many of
@@ -839,6 +811,7 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 		E - build exportable source
 		D - build domestic source (exportable + crypt)
 		H - build hybrid source (binaries + deleted source)
+		O - build (only) open source
 '
 #
 #	-x	less public handling of xmod source for the source product
@@ -876,14 +849,46 @@ W_FLAG=n
 SE_FLAG=n
 SD_FLAG=n
 SH_FLAG=n
+SO_FLAG=n
 X_FLAG=n
 #
 XMOD_OPT=
 #
 build_ok=y
+
+is_source_build() {
+	[ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o \
+	    "$SH_FLAG" = "y" -o "$SO_FLAG" = "y" ]
+	return $?
+}
+
 #
 # examine arguments
 #
+
+#
+# single function for setting -S flag and doing error checking.
+# usage: set_S_flag <type>
+# where <type> is the source build type ("E", "D", ...).
+#
+set_S_flag() {
+	if is_source_build; then
+		echo "Can only build one source variant at a time."
+		exit 1
+	fi
+	if [ "$1" = "E" ]; then
+		SE_FLAG=y
+	elif [ "$1" = "D" ]; then
+		SD_FLAG=y
+	elif [ "$1" = "H" ]; then
+		SH_FLAG=y
+	elif [ "$1" = "O" ]; then
+		SO_FLAG=y
+	else
+		echo "$USAGE"
+		exit 1
+	fi
+}
 
 OPTIND=1
 while getopts inV:S:t FLAG
@@ -897,20 +902,7 @@ do
 		V_ARG="$OPTARG"
 		;;
 	  S )
-		if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
-			echo "Can only build one source variant at a time."
-			exit 1
-		fi
-		if [ "${OPTARG}" = "E" ]; then
-			SE_FLAG=y
-		elif [ "${OPTARG}" = "D" ]; then
-			SD_FLAG=y
-		elif [ "${OPTARG}" = "H" ]; then
-			SH_FLAG=y
-		else
-			echo "$USAGE"
-			exit 1
-		fi
+		set_S_flag $OPTARG
 		;;
 	  t )	t_FLAG=y
 		;;
@@ -993,6 +985,10 @@ else
 		exit 1
 	fi
 fi
+
+# contents of stdenv.sh inserted after next line:
+# STDENV_START
+# STDENV_END
 
 #
 # place ourselves in a new task, respecting BUILD_PROJECT if set.
@@ -1114,20 +1110,7 @@ do
 	  W )	W_FLAG=y
 		;;
 	  S )
-		if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
-			echo "Can only build one source variant at a time."
-			exit 1
-		fi
-		if [ "${OPTARG}" = "E" ]; then
-			SE_FLAG=y
-		elif [ "${OPTARG}" = "D" ]; then
-			SD_FLAG=y
-		elif [ "${OPTARG}" = "H" ]; then
-			SH_FLAG=y
-		else
-			echo "$USAGE"
-			exit 1
-		fi
+		set_S_flag $OPTARG
 		;;
 	  X )	# now that we no longer need realmode builds, just
 		# copy IHV packages.  only meaningful on x86.
@@ -1254,24 +1237,6 @@ if [ -z "${ROOT}" ]; then
 	exit 1
 fi
 
-if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" ]; then
-        if [ -z "${EXPORT_SRC}" ]; then
-		echo "EXPORT_SRC must be set for a source build."
-		exit 1
-	fi
-        if [ -z "${CRYPT_SRC}" ]; then
-		echo "CRYPT_SRC must be set for a source build."
-		exit 1
-	fi
-fi
-
-if [ "$SH_FLAG" = "y" ]; then
-        if [ -z "${EXPORT_SRC}" ]; then
-		echo "EXPORT_SRC must be set for a source build."
-		exit 1
-	fi
-fi
-
 #
 # if -V flag was given, reset VERSION to V_ARG
 #
@@ -1312,6 +1277,10 @@ fi
 
 if [ "$SH_FLAG" = "y" ]; then
 	VERSION="${VERSION}:MODIFIED_SOURCE_PRODUCT"
+fi
+
+if [ "$SO_FLAG" = "y" ]; then
+	VERSION="${VERSION}:OPEN_ONLY"
 fi
 
 TMPDIR="/tmp/nightly.tmpdir.$$"
@@ -1595,7 +1564,7 @@ if [ "$T_FLAG" = "y" ]; then
 	obsolete_build TRACE | tee -a $mail_msg_file >> $LOGFILE
 fi
 
-if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
+if is_source_build; then
 	if [ "$i_FLAG" = "y" -o "$i_CMD_LINE_FLAG" = "y" ]; then
 		echo "WARNING: the -S flags do not support incremental" \
 		    "builds; forcing clobber\n" | tee -a $mail_msg_file >> $LOGFILE
@@ -1898,6 +1867,10 @@ fi
 ORIG_SRC=$SRC
 BINARCHIVE=${CODEMGR_WS}/bin-${MACH}.cpio.Z
 
+#
+# For the "open" build, we don't mung any source files, so skip this
+# step. 
+#
 if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
 	save_binaries
 
@@ -1917,13 +1890,13 @@ EOF
 fi
 
 if [ "$SD_FLAG" = "y" ]; then
-	clone_source ${CODEMGR_WS} ${CRYPT_SRC} CRYPT_SRC
+	set_up_source_build ${CODEMGR_WS} ${CRYPT_SRC} CRYPT_SRC
 fi
 
 # EXPORT_SRC comes after CRYPT_SRC since a domestic build will need
 # $SRC pointing to the export_source usr/src.
 if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
-	clone_source ${CODEMGR_WS} ${EXPORT_SRC} EXPORT_SRC
+	set_up_source_build ${CODEMGR_WS} ${EXPORT_SRC} EXPORT_SRC
 fi
 
 if [ "$SD_FLAG" = "y" ]; then
@@ -1943,7 +1916,28 @@ if [ "$SD_FLAG" = "y" ]; then
 
 fi
 
-if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
+if [ "$SO_FLAG" = "y" ]; then
+	#
+	# Copy the open sources into their own tree, set up the closed
+	# binaries, and set up the environment.
+	#
+	copy_source $CODEMGR_WS $OPEN_SRCDIR OPEN_SOURCE usr/src
+	SRC=$OPEN_SRCDIR/usr/src
+
+	# Try not to clobber any user-provided closed binaries.
+	export ON_CLOSED_BINS=$CODEMGR_WS/closed$$
+	echo "\n==== Copying skeleton closed binaries to $ON_CLOSED_BINS ====\n" | \
+	    tee -a $mail_msg_file >> $LOGFILE
+	mkclosed $MACH $CODEMGR_WS/proto $ON_CLOSED_BINS >>$LOGFILE 2>&1
+	if [ $? -ne 0 ]; then
+		build_ok=n
+		echo "Aborting (couldn't create closed binaries)." |
+			tee -a $mail_msg_file >> $LOGFILE
+	fi
+	CLOSED_IS_PRESENT=no
+fi
+
+if is_source_build && [ $build_ok = y ] ; then
 	# remove proto area here, since we don't clobber
 	rm -rf "$ROOT"
 	if [ "$t_FLAG" = "y" ]; then
@@ -1952,13 +1946,21 @@ if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
 		unset EXTRA_OPTIONS
 		unset EXTRA_CFLAGS
 		ORIG_TOOLS=$TOOLS
-		TOOLS=${EXPORT_SRC}/usr/src/tools
-		build_tools ${EXPORT_SRC}/usr/src/tools/proto
+		#
+		# SRC was set earlier to point to the source build
+		# source tree (e.g., $EXPORT_SRC).
+		#
+		TOOLS=${SRC}/tools
+		build_tools ${SRC}/tools/proto
 		TOOLS=$ORIG_TOOLS
 	fi
 
 	export EXPORT_RELEASE_BUILD ; EXPORT_RELEASE_BUILD=#
 	normal_build
+fi
+
+if [[ "$SO_FLAG" = "y" && "$build_ok" = "y" ]]; then
+	rm -rf $ON_CLOSED_BINS
 fi
 
 if [ "$build_ok" = "y" ]; then

@@ -44,6 +44,7 @@ SHFILES= \
 	makebfu \
 	mkacr \
 	mkbfu \
+	mkclosed \
 	nightly \
 	protocmp.terse \
 	sccscheck \
@@ -112,6 +113,16 @@ install: all .WAIT $(ROOTONBLDSHFILES) $(ROOTONBLDPERLFILES) \
 
 clean:
 	$(RM) $(CLEANFILES)
+
+bldenv: bldenv.sh stdenv.sh
+	$(RM) $@
+	sed -e '/# STDENV_START/ r stdenv.sh' bldenv.sh > bldenv
+	$(CHMOD) +x $@ 
+
+nightly: nightly.sh stdenv.sh
+	$(RM) $@
+	sed -e '/# STDENV_START/ r stdenv.sh' nightly.sh > nightly
+	$(CHMOD) +x $@ 
 
 cddlchk.1: cddlchk.pl
 	/usr/perl5/bin/pod2man --center='User Commands' --name=cddlchk \

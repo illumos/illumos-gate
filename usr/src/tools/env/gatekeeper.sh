@@ -113,16 +113,6 @@ ROOT="$CODEMGR_WS/proto/root_${MACH}";	export ROOT
 SRC="$CODEMGR_WS/usr/src";         	export SRC
 VERSION="$GATE";			export VERSION
 
-# the source product has no SCCS history, and is modified to remove source
-# that cannot be shipped. EXPORT_SRC is where the clear files are copied, then
-# modified with 'make EXPORT_SRC'.
-EXPORT_SRC="$CODEMGR_WS/export_src";    export EXPORT_SRC
-
-# CRYPT_SRC is similar to EXPORT_SRC, but after 'make CRYPT_SRC' the files in
-# xmod/cry_files are saved. They are dropped on the exportable source to create
-# the domestic build.
-CRYPT_SRC="$CODEMGR_WS/crypt_src";      export CRYPT_SRC
-
 #
 # the RELEASE and RELEASE_DATE variables are set in Makefile.master;
 # there might be special reasons to override them here, but that
