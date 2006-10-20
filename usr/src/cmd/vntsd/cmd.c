@@ -108,9 +108,14 @@ genbrk(vntsd_client_t *clientp)
  * in the group queue.
  */
 static int
-console_forward(void)
+console_forward(vntsd_client_t *clientp)
 {
-	return (VNTSD_STATUS_MOV_CONS_FORWARD);
+	/* forward when there are mutiple consoles in the group */
+	if (clientp->cons->group->num_cons > 1)
+		return (VNTSD_STATUS_MOV_CONS_FORWARD);
+
+	return (VNTSD_STATUS_CONTINUE);
+
 }
 
 /*
@@ -118,9 +123,14 @@ console_forward(void)
  * console in the group queue.
  */
 static int
-console_backward(void)
+console_backward(vntsd_client_t *clientp)
 {
-	return (VNTSD_STATUS_MOV_CONS_BACKWARD);
+	/* backward when there are mutiple consoles in the group */
+	if (clientp->cons->group->num_cons > 1)
+		return (VNTSD_STATUS_MOV_CONS_BACKWARD);
+
+	return (VNTSD_STATUS_CONTINUE);
+
 }
 
 /* acquire_write() - acquire write access to a console. */
