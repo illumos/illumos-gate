@@ -398,6 +398,11 @@ cpu_impl_async_log_err(void *flt, errorq_elem_t *eqep)
 		cpu_async_log_tlb_parity_err(flt);
 		return (CH_ASYNC_LOG_DONE);
 
+	/* report the error and continue */
+	case CPU_L3_ADDR_PE:
+		cpu_log_err(aflt);
+		return (CH_ASYNC_LOG_DONE);
+
 	default:
 		return (CH_ASYNC_LOG_UNKNOWN);
 	}

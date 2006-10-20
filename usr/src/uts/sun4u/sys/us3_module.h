@@ -293,10 +293,11 @@ extern "C" {
 			C_AFSR_EXT_FECC_ERRS | C_AFSR_EXT_CECC_ERRS | \
 			C_AFSR_EXT_ASYNC_ERRS | C_AFSR_L3_MECC)
 
-/* Panther AFSR_EXT bits due to L3 cache data errors */
+/* Panther AFSR_EXT bits for errors to report a L3 cache data resource */
 #define	C_AFSR_EXT_L3_DATA_ERRS	(C_AFSR_L3_WDU | C_AFSR_L3_WDC | \
 			C_AFSR_L3_CPU | C_AFSR_L3_CPC | C_AFSR_L3_UCU | \
-			C_AFSR_L3_UCC | C_AFSR_L3_EDU | C_AFSR_L3_EDC)
+			C_AFSR_L3_UCC | C_AFSR_L3_EDU | C_AFSR_L3_EDC | \
+			C_AFSR_L3_MECC)
 
 /* Panther AFSR_EXT bits with a valid ESYND field */
 #define	C_AFSR_EXT_ESYND_ERRS	(C_AFSR_L3_UCU | C_AFSR_L3_UCC | \
