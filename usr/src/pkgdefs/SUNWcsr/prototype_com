@@ -195,7 +195,7 @@ d none etc/mail 755 root mail
 e mailxrc etc/mail/mailx.rc 644 root bin
 s none etc/mkfs=../usr/sbin/mkfs
 s none etc/mknod=../usr/sbin/mknod
-v none etc/mnttab 444 root root
+v preserve etc/mnttab 444 root root
 v none etc/motd 644 root sys
 s none etc/mount=../sbin/mount
 s none etc/mountall=../sbin/mountall
