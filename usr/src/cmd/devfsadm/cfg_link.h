@@ -42,7 +42,8 @@ extern "C" {
 #define	PCI_CFG_LINK_RE		"^cfg/[:alnum:]$"
 #define	IB_CFG_LINK_RE		"^cfg/(hca[0-9A-F]+)$"
 #define	SATA_CFG_LINK_RE	"^cfg/((sata[0-9]+)/([0-9]+)([.]([0-9])+)*)$"
-#define	PCI_CFG_PATH_LINK_RE	"^cfg/(.*pcie.*)$"
+#define	PCI_CFG_PATH_LINK_RE	\
+	"^cfg/(.*(pci[0-9]|pcie[0-9]|Slot[0-9]|\\<pci\\>|\\<pcie\\>).*)$"
 
 #define	CFG_DIRNAME		"cfg"
 
@@ -61,6 +62,7 @@ extern "C" {
 #define	AP_PATH_IOB_SEP		"."
 #define	VENDID_SUN		0x108e
 #define	APNODE_DEFNAME		0x1
+#define	PCIDEV_NIL		((minor_t)-1)
 
 /* converts size in bits to a mask covering those bit positions */
 #define	SIZE2MASK(s)		((1 << (s)) - 1)

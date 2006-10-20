@@ -336,14 +336,12 @@ pci_cfg_devpath(di_node_t node, di_minor_t minor)
 
 	path = di_devfs_path(node);
 	minor_nm = di_minor_name(minor);
-	buflen = snprintf(NULL, 0, "%s:%s", path, minor_nm);
+	buflen = snprintf(NULL, 0, "%s:%s", path, minor_nm) + 1;
 
 	bufp = malloc(sizeof (char) * buflen);
-	if (bufp == NULL)
-		goto OUT;
-	(void) snprintf(bufp, buflen, "%s:%s", path, minor_nm);
+	if (bufp != NULL)
+		(void) snprintf(bufp, buflen, "%s:%s", path, minor_nm);
 
-OUT:
 	di_devfs_path_free(path);
 	return (bufp);
 }
@@ -580,6 +578,9 @@ pci_cfg_iob_name(di_minor_t minor, di_node_t node, di_prom_handle_t ph,
 }
 
 
+/*
+ * returns the pci device number for <node> if found, else returns PCIDEV_NIL
+ */
 static minor_t
 pci_cfg_pcidev(di_node_t node, di_prom_handle_t ph)
 {
@@ -724,6 +725,12 @@ pci_cfg_ap_path(di_minor_t minor, di_node_t node, di_prom_handle_t ph,
 		 * the current node is on
 		 */
 		pci_dev = pci_cfg_pcidev(curnode, ph);
+		if (pci_dev == PCIDEV_NIL) {
+			dprint(("%s: cannot obtain pci device number "
+			    "for %s%d\n", fnm, DRVINST(node)));
+			*pathptr = '\0';
+			goto OUT;
+		}
 	} while ((curnode = di_parent_node(curnode)) != DI_NODE_NIL);
 
 	pathbuf[sizeof (pathbuf) - 1] = '\0';
@@ -1017,7 +1024,7 @@ pci_cfg_creat_cb(di_minor_t pci_minor, di_node_t pci_node)
 	char *fullpath = NULL;
 	char *pathinfo = NULL;
 	char *devpath = NULL;
-	int rv, fd;
+	int rv, fd = -1;
 	size_t sz;
 	di_prom_handle_t ph;
 	di_node_t node;
@@ -1114,6 +1121,8 @@ pci_cfg_creat_cb(di_minor_t pci_minor, di_node_t pci_node)
 	}
 
 OUT:
+	if (fd >= 0)
+		di_dli_close(fd);
 	if (fullpath != NULL)
 		free(fullpath);
 	if (pathinfo != NULL)
