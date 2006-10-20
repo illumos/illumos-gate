@@ -32,6 +32,7 @@
 #include <sys/cpu_sgnblk_defs.h>
 #include <sys/mdesc.h>
 #include <sys/mach_descrip.h>
+#include <sys/ldoms.h>
 
 /*
  * Useful for disabling MP bring-up for an MP capable kernel
@@ -221,4 +222,23 @@ mp_cpu_configure(int cpuid)
 	setup_cpu_common(cpuid);
 
 	return (0);
+}
+
+/*
+ * Platform-specific actions to be taken when all cpus are running
+ * in the OS.
+ */
+void
+cpu_mp_init(void)
+{
+	extern void recalc_xc_timeouts();
+	extern int cif_cpu_mp_ready;
+
+	/* N.B. This must happen after xc_init() has run. */
+	recalc_xc_timeouts();
+
+	if (!(domaining_capabilities & DOMAINING_ENABLED))
+		return;
+
+	cif_cpu_mp_ready = 1;
 }

@@ -1143,3 +1143,158 @@ xt_sync(cpuset_t cpuset)
 out:
 	kpreempt_enable();
 }
+
+/*
+ * Recalculate the values of the cross-call timeout variables based
+ * on the value of the 'inter-cpu-latency' property of the platform node.
+ * The property sets the number of nanosec to wait for a cross-call
+ * to be acknowledged.  Other timeout variables are derived from it.
+ *
+ * N.B. This implementation is aware of the internals of xc_init()
+ * and updates many of the same variables.
+ */
+void
+recalc_xc_timeouts(void)
+{
+	typedef union {
+		uint64_t whole;
+		struct {
+			uint_t high;
+			uint_t low;
+		} half;
+	} u_number;
+
+	/* See x_call.c for descriptions of these extern variables. */
+	extern uint64_t xc_tick_limit_scale;
+	extern uint64_t xc_mondo_time_limit;
+	extern uint64_t xc_func_time_limit;
+	extern uint64_t xc_scale;
+	extern uint64_t xc_mondo_multiplier;
+	extern uint_t   nsec_shift;
+
+	/* Temp versions of the target variables */
+	uint64_t tick_limit;
+	uint64_t tick_jump_limit;
+	uint64_t mondo_time_limit;
+	uint64_t func_time_limit;
+	uint64_t scale;
+
+	uint64_t latency;	/* nanoseconds */
+	uint64_t maxfreq;
+	uint64_t tick_limit_save = xc_tick_limit;
+	uint_t   tick_scale;
+	uint64_t top;
+	uint64_t bottom;
+	u_number tk;
+
+	md_t *mdp;
+	int nrnode;
+	mde_cookie_t *platlist;
+
+	/*
+	 * Look up the 'inter-cpu-latency' (optional) property in the
+	 * platform node of the MD.  The units are nanoseconds.
+	 */
+	if ((mdp = md_get_handle()) == NULL) {
+		cmn_err(CE_WARN, "recalc_xc_timeouts: "
+		    "Unable to initialize machine description");
+		return;
+	}
+
+	nrnode = md_alloc_scan_dag(mdp,
+	    md_root_node(mdp), "platform", "fwd", &platlist);
+
+	ASSERT(nrnode == 1);
+	if (nrnode < 1) {
+		cmn_err(CE_WARN, "recalc_xc_timeouts: platform node missing");
+		return;
+	}
+
+	if (md_get_prop_val(mdp, platlist[0],
+	    "inter-cpu-latency", &latency) == -1)
+		return;
+
+	/*
+	 * clock.h defines an assembly-language macro
+	 * (NATIVE_TIME_TO_NSEC_SCALE) to convert from %stick
+	 * units to nanoseconds.  Since the inter-cpu-latency
+	 * units are nanoseconds and the xc_* variables require
+	 * %stick units, we need the inverse of that function.
+	 * The trick is to perform the calculation without
+	 * floating point, but also without integer truncation
+	 * or overflow.  To understand the calculation below,
+	 * please read the discussion of the macro in clock.h.
+	 * Since this new code will be invoked infrequently,
+	 * we can afford to implement it in C.
+	 *
+	 * tick_scale is the reciprocal of nsec_scale which is
+	 * calculated at startup in setcpudelay().  The calc
+	 * of tick_limit parallels that of NATIVE_TIME_TO_NSEC_SCALE
+	 * except we use tick_scale instead of nsec_scale and
+	 * C instead of assembler.
+	 */
+	tick_scale = (uint_t)(((u_longlong_t)sys_tick_freq
+	    << (32 - nsec_shift)) / NANOSEC);
+
+	tk.whole = latency;
+	top = ((uint64_t)tk.half.high << 4) * tick_scale;
+	bottom = (((uint64_t)tk.half.low << 4) * (uint64_t)tick_scale) >> 32;
+	tick_limit = top + bottom;
+
+
+	/*
+	 * xc_init() calculated 'maxfreq' by looking at all the cpus,
+	 * and used it to derive some of the timeout variables that we
+	 * recalculate below.  We can back into the original value by
+	 * using the inverse of one of those calculations.
+	 */
+	maxfreq = xc_mondo_time_limit / xc_scale;
+
+	/*
+	 * Don't allow the new timeout (xc_tick_limit) to fall below
+	 * the system tick frequency (stick).  Allowing the timeout
+	 * to be set more tightly than this empirically determined
+	 * value may cause panics.
+	 */
+	tick_limit = tick_limit < sys_tick_freq ? sys_tick_freq : tick_limit;
+
+	tick_jump_limit = tick_limit / 32;
+	tick_limit *= xc_tick_limit_scale;
+
+	/*
+	 * Recalculate xc_scale since it is used in a callback function
+	 * (xc_func_timeout_adj) to adjust two of the timeouts dynamically.
+	 * Make the change in xc_scale proportional to the change in
+	 * xc_tick_limit.
+	 */
+	scale = (xc_scale * tick_limit + sys_tick_freq / 2) / tick_limit_save;
+	if (scale == 0)
+		scale = 1;
+
+	mondo_time_limit = maxfreq * scale;
+	func_time_limit = mondo_time_limit * xc_mondo_multiplier;
+
+	/*
+	 * Don't modify the timeouts if nothing has changed.  Else,
+	 * stuff the variables with the freshly calculated (temp)
+	 * variables.  This minimizes the window where the set of
+	 * values could be inconsistent.
+	 */
+	if (tick_limit != xc_tick_limit) {
+		xc_tick_limit = tick_limit;
+		xc_tick_jump_limit = tick_jump_limit;
+		xc_scale = scale;
+		xc_mondo_time_limit = mondo_time_limit;
+		xc_func_time_limit = func_time_limit;
+		/*
+		 * Force the new values to be used for future cross
+		 * calls.  This is necessary only when we increase
+		 * the timeouts.
+		 */
+		if (tick_limit > tick_limit_save) {
+			cpuset_t cpuset = cpu_ready_set;
+
+			xt_sync(cpuset);
+		}
+	}
+}

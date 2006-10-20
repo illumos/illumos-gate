@@ -219,6 +219,7 @@ ps_md_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 {
 	extern int mach_descrip_update(void);
 	extern void mdeg_notify_clients(void);
+	extern void recalc_xc_timeouts(void);
 
 	ds_svc_hdl_t		 ds_handle;
 	platsvc_md_update_req_t	 *msg = buf;
@@ -245,6 +246,8 @@ ps_md_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 		cmn_err(CE_WARN, "MD reload failed\n");
 		return;
 	}
+
+	recalc_xc_timeouts();
 
 	/*
 	 * notify registered clients that MD has

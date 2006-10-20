@@ -61,8 +61,9 @@ unset_idle_cpu(int cpun)
  * Stop a CPU based on its cpuid, using the cpu_stop hypervisor call.
  * Since this requires that the hypervisor force a remote CPU to stop,
  * the assumption is made that this should take roughly the same amount
- * of time as a CPU mondo. Consequently, the mondo timeout is used to
- * determine when to give up waiting for the CPU to stop.
+ * of time as a executing a cross-call.  Consequently, the xcall
+ * timeout is used to determine when to give up waiting for the CPU to
+ * stop.
  *
  * Attempts to stop a CPU already in the stopped or error state will
  * silently succeed. Zero is returned on success and a non-negative
@@ -77,7 +78,7 @@ stopcpu_bycpuid(int cpuid)
 	uint64_t	major = 0;
 	uint64_t	minor = 0;
 	uint64_t	cpu_stop_time_limit;
-	extern uint64_t	xc_mondo_time_limit;
+	extern uint64_t	xc_func_time_limit;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
@@ -109,7 +110,7 @@ stopcpu_bycpuid(int cpuid)
 		return (ENOTSUP);
 
 	/* use the mondo timeout if it has been initialized */
-	cpu_stop_time_limit = xc_mondo_time_limit;
+	cpu_stop_time_limit = xc_func_time_limit;
 
 	/*
 	 * If called early in boot before the mondo time limit

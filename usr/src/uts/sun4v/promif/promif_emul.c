@@ -312,18 +312,4 @@ cache_prom_data(void)
 	promif_io_init();
 }
 
-
-/*
- * Platform-specific actions to be taken when all cpus are running
- * in the OS.
- */
-void
-cpu_mp_init(void)
-{
-	if (!(domaining_capabilities & DOMAINING_ENABLED))
-		return;
-
-	cif_cpu_mp_ready = 1;
-}
-
 #endif	/* _KMDB */

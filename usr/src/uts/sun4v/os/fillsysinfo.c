@@ -652,7 +652,7 @@ get_q_sizes(md_t *mdp, mde_cookie_t cpu_node_cookie)
 
 	ASSERT(nrnode == 1);
 
-	(void) md_get_prop_val(mdp, platlist[0], "max-vcpus", &ncpus);
+	(void) md_get_prop_val(mdp, platlist[0], "max-cpus", &ncpus);
 	max_qsize = ncpus * CPU_MONDO_Q_MULTIPLIER;
 
 	md_free_scan_dag(mdp, &platlist);
@@ -779,7 +779,8 @@ init_md_broken(md_t *mdp, mde_cookie_t *cpulist)
 	nrnode = md_alloc_scan_dag(mdp, rootnode, "platform", "fwd",
 	    &platlist);
 
-	ASSERT(nrnode == 1);
+	if (nrnode < 1)
+		cmn_err(CE_PANIC, "init_md_broken: platform node missing");
 
 	if (md_get_prop_data(mdp, cpulist[0],
 	    "compatible", (uint8_t **)&namebuf, &namelen)) {
