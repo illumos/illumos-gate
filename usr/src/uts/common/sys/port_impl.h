@@ -117,6 +117,7 @@ typedef struct port_queue {
 #define	PORTQ_POLLIN	   0x08 /* events available in the event queue */
 #define	PORTQ_POLLOUT	   0x10 /* space available for new events */
 #define	PORTQ_BLOCKED	   0x20 /* port is blocked by port_getn() */
+#define	PORTQ_POLLWK_PEND  0x40 /* pollwakeup is pending, blocks port close */
 
 #define	VTOEP(v)  ((struct port *)(v->v_data))
 #define	EPTOV(ep) ((struct vnode *)(ep)->port_vnode)

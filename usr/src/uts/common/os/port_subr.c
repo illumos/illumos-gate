@@ -83,6 +83,52 @@ port_unblock(port_queue_t *portq)
 }
 
 /*
+ * Called from pollwakeup(PORT_SOURCE_FD source) to determine
+ * if the port's fd needs to be notified of poll events. If yes,
+ * we mark the port indicating that pollwakeup() is referring
+ * it so that the port_t does not disappear.  pollwakeup()
+ * calls port_pollwkdone() after notifying. In port_pollwkdone(),
+ * we clear the hold on the port_t (clear PORTQ_POLLWK_PEND).
+ */
+int
+port_pollwkup(port_t *pp)
+{
+	int events = 0;
+	port_queue_t *portq;
+	portq = &pp->port_queue;
+	mutex_enter(&portq->portq_mutex);
+
+	/*
+	 * Normally, we should not have a situation where PORTQ_POLLIN
+	 * and PORTQ_POLLWK_PEND are set at the same time, but it is
+	 * possible. So, in pollwakeup() we ensure that no new fd's get
+	 * added to the pollhead between the time it notifies poll events
+	 * and calls poll_wkupdone() where we clear the PORTQ_POLLWK_PEND flag.
+	 */
+	if (portq->portq_flags & PORTQ_POLLIN &&
+	    !(portq->portq_flags & PORTQ_POLLWK_PEND)) {
+		portq->portq_flags &= ~PORTQ_POLLIN;
+		portq->portq_flags |= PORTQ_POLLWK_PEND;
+		events = POLLIN;
+	}
+	mutex_exit(&portq->portq_mutex);
+	return (events);
+}
+
+void
+port_pollwkdone(port_t *pp)
+{
+	port_queue_t *portq;
+	portq = &pp->port_queue;
+	ASSERT(portq->portq_flags & PORTQ_POLLWK_PEND);
+	mutex_enter(&portq->portq_mutex);
+	portq->portq_flags &= ~PORTQ_POLLWK_PEND;
+	cv_signal(&pp->port_cv);
+	mutex_exit(&portq->portq_mutex);
+}
+
+
+/*
  * The port_send_event() function is used by all event sources to submit
  * trigerred events to a port. All the data  required for the event management
  * is already stored in the port_kevent_t structure.
@@ -104,7 +150,7 @@ port_send_event(port_kevent_t *pkevp)
 
 	if (pkevp->portkev_flags & PORT_KEV_DONEQ) {
 		/* Event already in the port queue */
-		if (pkevp->portkev_flags & PORT_ALLOC_CACHED) {
+		if (pkevp->portkev_source == PORT_SOURCE_FD) {
 			mutex_exit(&pkevp->portkev_lock);
 		}
 		mutex_exit(&portq->portq_mutex);
@@ -122,7 +168,7 @@ port_send_event(port_kevent_t *pkevp)
 	portq->portq_flags &= ~PORTQ_WAIT_EVENTS;
 	pkevp->portkev_flags |= PORT_KEV_DONEQ;		/* event enqueued */
 
-	if (pkevp->portkev_flags & PORT_ALLOC_CACHED) {
+	if (pkevp->portkev_source == PORT_SOURCE_FD) {
 		mutex_exit(&pkevp->portkev_lock);
 	}
 
@@ -143,7 +189,15 @@ port_send_event(port_kevent_t *pkevp)
 			cv_signal(&portq->portq_thread->portget_cv);
 	}
 
-	if (portq->portq_flags & PORTQ_POLLIN) {
+	/*
+	 * If some thread is polling the port's fd, then notify it.
+	 * For PORT_SOURCE_FD source, we don't need to call pollwakeup()
+	 * here as it will result in a recursive call(PORT_SOURCE_FD source
+	 * is pollwakeup()). Therefore pollwakeup() itself will  notify the
+	 * ports if being polled.
+	 */
+	if (pkevp->portkev_source != PORT_SOURCE_FD &&
+				portq->portq_flags & PORTQ_POLLIN) {
 		portq->portq_flags &= ~PORTQ_POLLIN;
 		mutex_exit(&portq->portq_mutex);
 		pollwakeup(&pkevp->portkev_port->port_pollhd, POLLIN);

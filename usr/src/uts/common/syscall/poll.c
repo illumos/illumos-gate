@@ -54,7 +54,7 @@
 #include <sys/bitmap.h>
 #include <sys/kstat.h>
 #include <sys/rctl.h>
-#include <sys/port_kernel.h>
+#include <sys/port_impl.h>
 #include <sys/schedctl.h>
 
 #define	NPHLOCKS	64	/* Number of locks; must be power of 2 */
@@ -758,19 +758,15 @@ pollwakeup(pollhead_t *php, short events_arg)
 {
 	polldat_t	*pdp;
 	int		events = (ushort_t)events_arg;
+	struct plist {
+		port_t *pp;
+		int	pevents;
+		struct plist *next;
+		};
+	struct plist *plhead = NULL, *pltail = NULL;
 
 retry:
 	PH_ENTER(php);
-
-	/*
-	 * About half of all pollwakeups don't do anything, because the
-	 * pollhead list is empty (i.e, nobody is interested in the event).
-	 * For this common case, we can optimize out locking overhead.
-	 */
-	if (php->ph_list == NULL) {
-		PH_EXIT(php);
-		return;
-	}
 
 	for (pdp = php->ph_list; pdp; pdp = pdp->pd_next) {
 		if ((pdp->pd_events & events) ||
@@ -784,19 +780,45 @@ retry:
 				 * Object (fd) is associated with an event port,
 				 * => send event notification to the port.
 				 */
-				ASSERT(pkevp->portkev_flags
-				    & PORT_ALLOC_CACHED);
+				ASSERT(pkevp->portkev_source == PORT_SOURCE_FD);
 				mutex_enter(&pkevp->portkev_lock);
 				if (pkevp->portkev_flags & PORT_KEV_VALID) {
+					int pevents;
+
 					pkevp->portkev_flags &= ~PORT_KEV_VALID;
 					pkevp->portkev_events |= events &
 					    (pdp->pd_events | POLLHUP |
 					    POLLERR);
 					/*
 					 * portkev_lock mutex will be released
-					 * by port_send_event()
+					 * by port_send_event().
 					 */
-					port_send_event(pdp->pd_portev);
+					port_send_event(pkevp);
+
+					/*
+					 * If we have some thread polling the
+					 * port's fd, add it to the list. They
+					 * will be notified later.
+					 * The port_pollwkup() will flag the
+					 * port_t so that it will not disappear
+					 * till port_pollwkdone() is called.
+					 */
+					pevents =
+					    port_pollwkup(pkevp->portkev_port);
+					if (pevents) {
+						struct plist *t;
+						t = kmem_zalloc(
+							sizeof (struct plist),
+							    KM_SLEEP);
+						t->pp = pkevp->portkev_port;
+						t->pevents = pevents;
+						if (plhead == NULL) {
+							plhead = t;
+						} else {
+							pltail->next = t;
+						}
+						pltail = t;
+					}
 				} else {
 					mutex_exit(&pkevp->portkev_lock);
 				}
@@ -855,7 +877,35 @@ retry:
 			}
 		}
 	}
+
+
+	/*
+	 * Event ports - If this php is of the port on the list,
+	 * call port_pollwkdone() to release it. The port_pollwkdone()
+	 * needs to be called before dropping the PH lock so that any new
+	 * thread attempting to poll this port are blocked. There can be
+	 * only one thread here in pollwakeup notifying this port's fd.
+	 */
+	if (plhead != NULL && &plhead->pp->port_pollhd == php) {
+		struct plist *t;
+		port_pollwkdone(plhead->pp);
+		t = plhead;
+		plhead = plhead->next;
+		kmem_free(t, sizeof (struct plist));
+	}
 	PH_EXIT(php);
+
+	/*
+	 * Event ports - Notify threads polling the event port's fd.
+	 * This is normally done in port_send_event() where it calls
+	 * pollwakeup() on the port. But, for PORT_SOURCE_FD source alone,
+	 * we do it here in pollwakeup() to avoid a recursive call.
+	 */
+	if (plhead != NULL) {
+		php = &plhead->pp->port_pollhd;
+		events = plhead->pevents;
+		goto retry;
+	}
 }
 
 /*

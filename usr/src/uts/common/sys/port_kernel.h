@@ -138,6 +138,8 @@ int	port_dissociate_ksource(int, int, struct port_source *);
 
 /* event management */
 int	port_alloc_event(int, int, int, port_kevent_t **);
+int	port_pollwkup(struct port *);
+void	port_pollwkdone(struct port *);
 void	port_send_event(port_kevent_t *);
 void	port_free_event(port_kevent_t *);
 void	port_init_event(port_kevent_t *, uintptr_t, void *,

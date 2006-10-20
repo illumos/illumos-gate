@@ -120,6 +120,14 @@ port_close_events(port_queue_t *portq)
 		port_free_event_local(pkevp, 0);
 		mutex_enter(&portq->portq_mutex);
 	}
+
+	/*
+	 * Wait for any thread in pollwakeup(), accessing this port to
+	 * finish.
+	 */
+	while (portq->portq_flags & PORTQ_POLLWK_PEND) {
+		cv_wait(&portq->portq_closecv, &portq->portq_mutex);
+	}
 	mutex_exit(&portq->portq_mutex);
 }
 
