@@ -48,7 +48,7 @@ scsi_ifsetcap(struct scsi_address *ap, char *cap, int value, int whom)
 	int cidx;
 
 	rval = (*A_TO_TRAN(ap)->tran_setcap)(ap, cap, value, whom);
-	if (rval == 0) {
+	if (rval == 1) {
 		cidx = scsi_hba_lookup_capstr(cap);
 		if (cidx == SCSI_CAP_SECTOR_SIZE) {
 			/*

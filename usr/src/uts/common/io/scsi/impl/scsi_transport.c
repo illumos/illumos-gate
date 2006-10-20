@@ -79,8 +79,7 @@ scsi_consistent_comp(struct scsi_pkt *pkt)
 
 	pkt->pkt_comp = pcw->pcw_orig_comp;
 	scsi_sync_pkt(pkt);
-	if (pkt->pkt_comp)
-		(*pkt->pkt_comp)(pkt);
+	(*pkt->pkt_comp)(pkt);
 }
 
 /*
@@ -102,6 +101,7 @@ scsi_transport(struct scsi_pkt *pkt)
 
 	/* determine if we need to sync the data on the HBA's behalf */
 	if ((pkt->pkt_dma_flags & DDI_DMA_CONSISTENT) &&
+	    ((pkt->pkt_comp) != NULL) &&
 	    ((P_TO_TRAN(pkt)->tran_setup_pkt) != NULL)) {
 		struct scsi_pkt_cache_wrapper *pcw =
 			(struct scsi_pkt_cache_wrapper *)pkt;
