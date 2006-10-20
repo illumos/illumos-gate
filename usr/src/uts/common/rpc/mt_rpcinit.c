@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,7 +72,7 @@ rpcstat_zone_init_common(zoneid_t zoneid, const char *module, const char *name,
  */
 	ks_data = kmem_alloc(template_size, KM_SLEEP);
 	bcopy(template, ks_data, template_size);
-	if ((ksp = kstat_create_zone((char *)module, 0, (char *)name, "rpc",
+	if ((ksp = kstat_create_zone(module, 0, name, "rpc",
 	    KSTAT_TYPE_NAMED, template_size / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_WRITABLE, zoneid)) != NULL) {
 		ksp->ks_data = ks_data;
@@ -85,7 +84,7 @@ rpcstat_zone_init_common(zoneid_t zoneid, const char *module, const char *name,
 void
 rpcstat_zone_fini_common(zoneid_t zoneid, const char *module, const char *name)
 {
-	kstat_delete_byname_zone((char *)module, 0, (char *)name, zoneid);
+	kstat_delete_byname_zone(module, 0, name, zoneid);
 }
 
 static void *

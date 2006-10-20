@@ -1,7 +1,7 @@
 /*
  * sppp.c - Solaris STREAMS PPP multiplexing pseudo-driver
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -286,12 +286,12 @@ sppp_create_ppa(uint32_t ppa_id)
 	knt = (kstat_named_t *)ksp->ks_data;
 	for (cpp = kstats_names; cpp < kstats_names + Dim(kstats_names);
 	    cpp++) {
-		kstat_named_init(knt, (char *)*cpp, KSTAT_DATA_UINT32);
+		kstat_named_init(knt, *cpp, KSTAT_DATA_UINT32);
 		knt++;
 	}
 	for (cpp = kstats64_names; cpp < kstats64_names + Dim(kstats64_names);
 	    cpp++) {
-		kstat_named_init(knt, (char *)*cpp, KSTAT_DATA_UINT64);
+		kstat_named_init(knt, *cpp, KSTAT_DATA_UINT64);
 		knt++;
 	}
 	ksp->ks_update = sppp_kstat_update;

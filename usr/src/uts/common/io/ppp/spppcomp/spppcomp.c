@@ -1,7 +1,7 @@
 /*
  * spppcomp.c - STREAMS module for kernel-level compression and CCP support.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -1132,13 +1132,13 @@ spppcomp_mctl(queue_t *q, mblk_t *mp)
 			knt = (kstat_named_t *)ksp->ks_data;
 			for (cpp = kstats_names;
 			    cpp < kstats_names + Dim(kstats_names); cpp++) {
-				kstat_named_init(knt, (char *)*cpp,
+				kstat_named_init(knt, *cpp,
 				    KSTAT_DATA_UINT32);
 				knt++;
 			}
 			for (cpp = kstats64_names;
 			    cpp < kstats64_names + Dim(kstats64_names); cpp++) {
-				kstat_named_init(knt, (char *)*cpp,
+				kstat_named_init(knt, *cpp,
 				    KSTAT_DATA_UINT64);
 				knt++;
 			}

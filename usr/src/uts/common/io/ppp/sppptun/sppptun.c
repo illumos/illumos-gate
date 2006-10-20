@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -455,11 +455,11 @@ kstat_setup(kstat_named_t *knt, const char **names, int nstat,
 	int i;
 
 	for (i = 0; i < nstat; i++) {
-		kstat_set_string(knt[i].name, (char *)names[i]);
+		kstat_set_string(knt[i].name, names[i]);
 		knt[i].data_type = KSTAT_DATA_UINT64;
 	}
 	(void) sprintf(unitname, "%s%d", modname, unitnum);
-	ksp = kstat_create((char *)modname, unitnum, unitname, "net",
+	ksp = kstat_create(modname, unitnum, unitname, "net",
 	    KSTAT_TYPE_NAMED, nstat, KSTAT_FLAG_VIRTUAL);
 	if (ksp != NULL) {
 		ksp->ks_data = (void *)knt;

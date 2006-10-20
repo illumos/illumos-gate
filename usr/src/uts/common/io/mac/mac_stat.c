@@ -154,8 +154,8 @@ mac_stat_create(mac_impl_t *mip)
 	uint_t		count;
 
 	count = MAC_MOD_NKSTAT + MAC_NKSTAT + mip->mi_type->mt_statcount;
-	ksp = kstat_create((char *)mip->mi_drvname, mip->mi_instance,
-	    MAC_KSTAT_NAME, MAC_KSTAT_CLASS, KSTAT_TYPE_NAMED, count, 0);
+	ksp = kstat_create(mip->mi_drvname, mip->mi_instance, MAC_KSTAT_NAME,
+	    MAC_KSTAT_CLASS, KSTAT_TYPE_NAMED, count, 0);
 	if (ksp == NULL)
 		return;
 

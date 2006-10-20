@@ -413,7 +413,7 @@ kstat_hold_bykid(kid_t kid, zoneid_t zoneid)
 }
 
 kstat_t *
-kstat_hold_byname(char *ks_module, int ks_instance, char *ks_name,
+kstat_hold_byname(const char *ks_module, int ks_instance, const char *ks_name,
     zoneid_t ks_zoneid)
 {
 	ekstat_t e;
@@ -608,14 +608,14 @@ kstat_named_setstr(kstat_named_t *knp, const char *src)
 }
 
 void
-kstat_set_string(char *dst, char *src)
+kstat_set_string(char *dst, const char *src)
 {
 	bzero(dst, KSTAT_STRLEN);
 	(void) strncpy(dst, src, KSTAT_STRLEN - 1);
 }
 
 void
-kstat_named_init(kstat_named_t *knp, char *name, uchar_t data_type)
+kstat_named_init(kstat_named_t *knp, const char *name, uchar_t data_type)
 {
 	kstat_set_string(knp->name, name);
 	knp->data_type = data_type;
@@ -625,7 +625,7 @@ kstat_named_init(kstat_named_t *knp, char *name, uchar_t data_type)
 }
 
 void
-kstat_timer_init(kstat_timer_t *ktp, char *name)
+kstat_timer_init(kstat_timer_t *ktp, const char *name)
 {
 	kstat_set_string(ktp->name, name);
 }
@@ -917,8 +917,8 @@ system_pages_kstat_update(kstat_t *ksp, int rw)
 }
 
 kstat_t *
-kstat_create(char *ks_module, int ks_instance, char *ks_name, char *ks_class,
-    uchar_t ks_type, uint_t ks_ndata, uchar_t ks_flags)
+kstat_create(const char *ks_module, int ks_instance, const char *ks_name,
+    const char *ks_class, uchar_t ks_type, uint_t ks_ndata, uchar_t ks_flags)
 {
 	return (kstat_create_zone(ks_module, ks_instance, ks_name, ks_class,
 		    ks_type, ks_ndata, ks_flags, ALL_ZONES));
@@ -931,8 +931,8 @@ kstat_create(char *ks_module, int ks_instance, char *ks_name, char *ks_class,
  * kstat driver until kstat_install().
  */
 kstat_t *
-kstat_create_zone(char *ks_module, int ks_instance, char *ks_name,
-    char *ks_class, uchar_t ks_type, uint_t ks_ndata, uchar_t ks_flags,
+kstat_create_zone(const char *ks_module, int ks_instance, const char *ks_name,
+    const char *ks_class, uchar_t ks_type, uint_t ks_ndata, uchar_t ks_flags,
     zoneid_t ks_zoneid)
 {
 	size_t ks_data_size;
@@ -1277,8 +1277,8 @@ kstat_delete(kstat_t *ksp)
 }
 
 void
-kstat_delete_byname_zone(char *ks_module, int ks_instance, char *ks_name,
-    zoneid_t ks_zoneid)
+kstat_delete_byname_zone(const char *ks_module, int ks_instance,
+    const char *ks_name, zoneid_t ks_zoneid)
 {
 	kstat_t *ksp;
 
@@ -1290,7 +1290,7 @@ kstat_delete_byname_zone(char *ks_module, int ks_instance, char *ks_name,
 }
 
 void
-kstat_delete_byname(char *ks_module, int ks_instance, char *ks_name)
+kstat_delete_byname(const char *ks_module, int ks_instance, const char *ks_name)
 {
 	kstat_delete_byname_zone(ks_module, ks_instance, ks_name, ALL_ZONES);
 }

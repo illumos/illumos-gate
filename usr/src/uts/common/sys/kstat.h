@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -783,18 +782,18 @@ extern void	kstat_init(void);	/* initialize kstat framework */
  * thus making it seem like you were never gone.
  */
 
-extern kstat_t *kstat_create(char *, int, char *, char *, uchar_t,
-    uint_t, uchar_t);
-extern kstat_t *kstat_create_zone(char *, int, char *, char *, uchar_t,
-    uint_t, uchar_t, zoneid_t);
+extern kstat_t *kstat_create(const char *, int, const char *, const char *,
+    uchar_t, uint_t, uchar_t);
+extern kstat_t *kstat_create_zone(const char *, int, const char *,
+    const char *, uchar_t, uint_t, uchar_t, zoneid_t);
 extern void kstat_install(kstat_t *);
 extern void kstat_delete(kstat_t *);
 extern void kstat_named_setstr(kstat_named_t *knp, const char *src);
-extern void kstat_set_string(char *, char *);
-extern void kstat_delete_byname(char *, int, char *);
-extern void kstat_delete_byname_zone(char *, int, char *, zoneid_t);
-extern void kstat_named_init(kstat_named_t *, char *, uchar_t);
-extern void kstat_timer_init(kstat_timer_t *, char *);
+extern void kstat_set_string(char *, const char *);
+extern void kstat_delete_byname(const char *, int, const char *);
+extern void kstat_delete_byname_zone(const char *, int, const char *, zoneid_t);
+extern void kstat_named_init(kstat_named_t *, const char *, uchar_t);
+extern void kstat_timer_init(kstat_timer_t *, const char *);
 extern void kstat_waitq_enter(kstat_io_t *);
 extern void kstat_waitq_exit(kstat_io_t *);
 extern void kstat_runq_enter(kstat_io_t *);
@@ -809,7 +808,7 @@ extern void kstat_zone_remove(kstat_t *, zoneid_t);
 extern int kstat_zone_find(kstat_t *, zoneid_t);
 
 extern kstat_t *kstat_hold_bykid(kid_t kid, zoneid_t);
-extern kstat_t *kstat_hold_byname(char *, int, char *, zoneid_t);
+extern kstat_t *kstat_hold_byname(const char *, int, const char *, zoneid_t);
 extern void kstat_rele(kstat_t *);
 
 #endif	/* defined(_KERNEL) */
