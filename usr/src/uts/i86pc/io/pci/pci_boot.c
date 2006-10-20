@@ -356,6 +356,62 @@ pci_renumber_root_busses(void)
 	}
 }
 
+static void
+remove_resource_range(struct memlist **list, int *ranges, int range_count)
+{
+	struct range {
+		uint32_t base;
+		uint32_t len;
+	};
+	int index;
+
+	ASSERT(*list != NULL);
+
+	for (index = 0; index < range_count; index++) {
+		(void) memlist_remove(list,
+		    (uint64_t)((struct range *)ranges)[index].base,
+		    (uint64_t)((struct range *)ranges)[index].len);
+	}
+}
+
+static void
+remove_used_resources()
+{
+	dev_info_t *used;
+	int	*narray;
+	uint_t	ncount;
+	int	status;
+	int	bus;
+
+	used = ddi_find_devinfo("used-resources", -1, 0);
+	if (used == NULL) {
+		printf("pci_boot did not find used-resources\n");
+		return;
+	}
+
+	status = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, used,
+	    DDI_PROP_DONTPASS, "io-space", &narray, &ncount);
+	if (status == DDI_PROP_SUCCESS) {
+		for (bus = 0; bus <= pci_bios_nbus; bus++)
+			if (pci_bus_res[bus].io_ports != NULL)
+				remove_resource_range(
+				    &pci_bus_res[bus].io_ports,
+				    narray, ncount / 2);
+		ddi_prop_free(narray);
+	}
+
+	status = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, used,
+	    DDI_PROP_DONTPASS, "device-memory", &narray, &ncount);
+	if (status == DDI_PROP_SUCCESS) {
+		for (bus = 0; bus <= pci_bios_nbus; bus++)
+			if (pci_bus_res[bus].mem_space != NULL)
+				remove_resource_range(
+				    &pci_bus_res[bus].mem_space,
+				    narray, ncount / 2);
+		ddi_prop_free(narray);
+	}
+}
+
 void
 pci_reprogram(void)
 {
@@ -385,6 +441,9 @@ pci_reprogram(void)
 		}
 		ddi_prop_free(onoff);
 	}
+
+	/* remove used-resources from PCI resource maps */
+	remove_used_resources();
 
 	for (i = 0; i <= pci_bios_nbus; i++) {
 		/* configure devices not configured by bios */
@@ -435,14 +494,15 @@ create_root_bus_dip(uchar_t bus)
 	/*
 	 * Special treatment of bus 0:
 	 * If no resource from MPSPEC/HRT, copy pcimem from boot
-	 * and make io space the entire range. There is no difference
-	 * between prefetchable memory or not.
+	 * and make I/O space the entire range starting at 0x100. There
+	 * is no difference between prefetchable memory or not.
 	 */
 	if (pci_bus_res[0].mem_space == NULL)
 		pci_bus_res[0].mem_space =
 		    memlist_dup(bootops->boot_mem->pcimem);
+	/* Exclude 0x00 to 0xff of the I/O space, used by all PCs */
 	if (pci_bus_res[0].io_ports == NULL)
-		memlist_insert(&pci_bus_res[0].io_ports, 0, 0x10000);
+		memlist_insert(&pci_bus_res[0].io_ports, 0x100, 0xff00);
 }
 
 /*
