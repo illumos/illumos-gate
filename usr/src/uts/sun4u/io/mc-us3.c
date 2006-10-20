@@ -117,7 +117,6 @@ static mc_dlist_t *device_head, *device_tail;
 
 static kmutex_t	mcmutex;
 static kmutex_t	mcdatamutex;
-static int mc_is_open = 0;
 
 static krwlock_t mcdimmsids_rw;
 
@@ -462,32 +461,19 @@ mc_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 static int
 mc_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 {
-	int status = 0;
 
 	/* verify that otyp is appropriate */
 	if (otyp != OTYP_CHR) {
 		return (EINVAL);
 	}
 
-	mutex_enter(&mcmutex);
-	if (mc_is_open) {
-		status = EBUSY;
-		goto bad;
-	}
-	mc_is_open = 1;
-bad:
-	mutex_exit(&mcmutex);
-	return (status);
+	return (0);
 }
 
 /* ARGSUSED */
 static int
 mc_close(dev_t devp, int flag, int otyp, cred_t *credp)
 {
-	mutex_enter(&mcmutex);
-	mc_is_open = 0;
-	mutex_exit(&mcmutex);
-
 	return (0);
 }
 
