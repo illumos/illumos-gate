@@ -400,7 +400,7 @@ struct hat {
 	uint_t		sfmmu_ismhat:1;	/* hat is dummy ism hatid */
 	uint_t		sfmmu_ctxflushed:1;	/* ctx has been flushed */
 	uchar_t		sfmmu_rmstat;	/* refmod stats refcnt */
-	uchar_t		sfmmu_clrstart;	/* start color bin for page coloring */
+	ushort_t	sfmmu_clrstart;	/* start color bin for page coloring */
 	ushort_t	sfmmu_clrbin;	/* per as phys page coloring bin */
 	ushort_t	sfmmu_flags;	/* flags */
 	struct tsb_info	*sfmmu_tsb;	/* list of per as tsbs */

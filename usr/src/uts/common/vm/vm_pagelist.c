@@ -79,7 +79,16 @@ char		vm_cpu_data0[VM_CPU_DATA_PADSIZE];
  * from the local mnode in favor of acquiring the 'correct' page color from
  * a demoted large page or from a remote mnode.
  */
-int	colorequiv;
+uint_t	colorequiv;
+
+/*
+ * color equivalency mask for each page size.
+ * Mask is computed based on cpu L2$ way sizes and colorequiv global.
+ * High 4 bits determine the number of high order bits of the color to ignore.
+ * Low 4 bits determines number of low order bits of color to ignore (it's only
+ * relevant for hashed index based page coloring).
+ */
+uchar_t colorequivszc[MMU_PAGE_SIZES];
 
 /*
  * if set, specifies the percentage of large pages that are free from within
@@ -127,7 +136,7 @@ int pg_contig_disable;
 int pg_lpgcreate_nocage = LPGCREATE;
 
 /*
- * page_freelist_fill pfn flag to signify no hi pfn requirement.
+ * page_freelist_split pfn flag to signify no hi pfn requirement.
  */
 #define	PFNNULL		0
 
@@ -141,17 +150,18 @@ int pg_lpgcreate_nocage = LPGCREATE;
  */
 #define	PC_NO_COLOR	(-1)
 
+/* mtype value for page_promote to use when mtype does not matter */
+#define	PC_MTYPE_ANY	(-1)
+
 /*
  * page counters candidates info
  * See page_ctrs_cands comment below for more details.
  * fields are as follows:
  *	pcc_pages_free:		# pages which freelist coalesce can create
- *	pcc_color_free_len:	number of elements in pcc_color_free array
  *	pcc_color_free:		pointer to page free counts per color
  */
 typedef struct pcc_info {
 	pgcnt_t	pcc_pages_free;
-	int	pcc_color_free_len;
 	pgcnt_t	*pcc_color_free;
 } pcc_info_t;
 
@@ -162,36 +172,33 @@ typedef struct pcc_info {
  * page_freelist_coalesce() searches page_counters only if an appropriate
  * element of page_ctrs_cands array is greater than 0.
  *
- * An extra dimension is used for page_ctrs_cands to spread the elements
- * over a few e$ cache lines to avoid serialization during the array
- * updates.
+ * page_ctrs_cands is indexed by mutex (i), region (r), mnode (m), mrange (g)
  */
-#pragma	align 64(page_ctrs_cands)
-
-static pcc_info_t *page_ctrs_cands[NPC_MUTEX][MMU_PAGE_SIZES];
+pcc_info_t **page_ctrs_cands[NPC_MUTEX][MMU_PAGE_SIZES];
 
 /*
  * Return in val the total number of free pages which can be created
- * for the given mnode (m) and region size (r)
+ * for the given mnode (m), mrange (g), and region size (r)
  */
-#define	PGCTRS_CANDS_GETVALUE(m, r, val) {				\
+#define	PGCTRS_CANDS_GETVALUE(m, g, r, val) {				\
 	int i;								\
 	val = 0;							\
 	for (i = 0; i < NPC_MUTEX; i++) {				\
-	    val += page_ctrs_cands[i][(r)][(m)].pcc_pages_free;		\
+	    val += page_ctrs_cands[i][(r)][(m)][(g)].pcc_pages_free;	\
 	}								\
 }
 
 /*
  * Return in val the total number of free pages which can be created
- * for the given mnode (m), region size (r), and color (c)
+ * for the given mnode (m), mrange (g), region size (r), and color (c)
  */
-#define	PGCTRS_CANDS_GETVALUECOLOR(m, r, c, val) {			\
+#define	PGCTRS_CANDS_GETVALUECOLOR(m, g, r, c, val) {			\
 	int i;								\
 	val = 0;							\
-	ASSERT((c) < page_ctrs_cands[0][(r)][(m)].pcc_color_free_len);	\
+	ASSERT((c) < PAGE_GET_PAGECOLORS(r));				\
 	for (i = 0; i < NPC_MUTEX; i++) {				\
-	    val += page_ctrs_cands[i][(r)][(m)].pcc_color_free[(c)];	\
+	    val +=							\
+		page_ctrs_cands[i][(r)][(m)][(g)].pcc_color_free[(c)];	\
 	}								\
 }
 
@@ -205,8 +212,11 @@ static pcc_info_t *page_ctrs_cands[NPC_MUTEX][MMU_PAGE_SIZES];
 static kmutex_t	*ctr_mutex[NPC_MUTEX];
 
 #define	PP_CTR_LOCK_INDX(pp)						\
-	(((pp)->p_pagenum >>					\
+	(((pp)->p_pagenum >>						\
 	    (PAGE_BSZS_SHIFT(mmu_page_sizes - 1))) & (NPC_MUTEX - 1))
+
+#define	INVALID_COLOR 0xffffffff
+#define	INVALID_MASK  0xffffffff
 
 /*
  * Local functions prototypes.
@@ -215,19 +225,15 @@ static kmutex_t	*ctr_mutex[NPC_MUTEX];
 void page_ctr_add(int, int, page_t *, int);
 void page_ctr_add_internal(int, int, page_t *, int);
 void page_ctr_sub(int, int, page_t *, int);
-uint_t  page_convert_color(uchar_t, uchar_t, uint_t);
+void page_ctr_sub_internal(int, int, page_t *, int);
 void page_freelist_lock(int);
 void page_freelist_unlock(int);
-page_t *page_promote(int, pfn_t, uchar_t, int);
+page_t *page_promote(int, pfn_t, uchar_t, int, int);
 page_t *page_demote(int, pfn_t, uchar_t, uchar_t, int, int);
-page_t *page_freelist_fill(uchar_t, int, int, int, pfn_t);
+page_t *page_freelist_split(uchar_t,
+    uint_t, int, int, pfn_t, page_list_walker_t *);
 page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 static int page_trylock_cons(page_t *pp, se_t se);
-
-#define	PNUM_SIZE(szc)							\
-	(hw_page_array[(szc)].hp_size >> hw_page_array[0].hp_shift)
-#define	PNUM_SHIFT(szc)							\
-	(hw_page_array[(szc)].hp_shift - hw_page_array[0].hp_shift)
 
 /*
  * The page_counters array below is used to keep track of free contiguous
@@ -272,7 +278,6 @@ static int page_trylock_cons(page_t *pp, se_t se);
  *	hpm_entries:	entries in hpm_counters
  *	hpm_shift:	shift for pnum/array index conv
  *	hpm_base:	PFN mapped to counter index 0
- *	hpm_color_current_len:	# of elements in hpm_color_current "array" below
  *	hpm_color_current:	last index in counter array for this color at
  *				which we successfully created a large page
  */
@@ -281,14 +286,20 @@ typedef struct hw_page_map {
 	size_t		hpm_entries;
 	int		hpm_shift;
 	pfn_t		hpm_base;
-	size_t		hpm_color_current_len;
-	size_t 		*hpm_color_current;
+	size_t		*hpm_color_current[MAX_MNODE_MRANGES];
 } hw_page_map_t;
 
 /*
  * Element zero is not used, but is allocated for convenience.
  */
 static hw_page_map_t *page_counters[MMU_PAGE_SIZES];
+
+/*
+ * Cached value of MNODE_RANGE_CNT(mnode).
+ * This is a function call in x86.
+ */
+static int mnode_nranges[MAX_MEM_NODES];
+static int mnode_maxmrange[MAX_MEM_NODES];
 
 /*
  * The following macros are convenient ways to get access to the individual
@@ -310,14 +321,12 @@ static hw_page_map_t *page_counters[MMU_PAGE_SIZES];
 #define	PAGE_COUNTERS_BASE(mnode, rg_szc) 			\
 	(page_counters[(rg_szc)][(mnode)].hpm_base)
 
-#define	PAGE_COUNTERS_CURRENT_COLOR_LEN(mnode, rg_szc)		\
-	(page_counters[(rg_szc)][(mnode)].hpm_color_current_len)
+#define	PAGE_COUNTERS_CURRENT_COLOR_ARRAY(mnode, rg_szc, g)		\
+	(page_counters[(rg_szc)][(mnode)].hpm_color_current[(g)])
 
-#define	PAGE_COUNTERS_CURRENT_COLOR_ARRAY(mnode, rg_szc)	\
-	(page_counters[(rg_szc)][(mnode)].hpm_color_current)
-
-#define	PAGE_COUNTERS_CURRENT_COLOR(mnode, rg_szc, color)	\
-	(page_counters[(rg_szc)][(mnode)].hpm_color_current[(color)])
+#define	PAGE_COUNTERS_CURRENT_COLOR(mnode, rg_szc, color, mrange)	\
+	(page_counters[(rg_szc)][(mnode)].				\
+	hpm_color_current[(mrange)][(color)])
 
 #define	PNUM_TO_IDX(mnode, rg_szc, pnum)			\
 	(((pnum) - PAGE_COUNTERS_BASE((mnode), (rg_szc))) >>	\
@@ -464,14 +473,32 @@ page_get_shift(uint_t szc)
 {
 	if (szc >= mmu_page_sizes)
 		panic("page_get_shift: out of range %d", szc);
-	return (hw_page_array[szc].hp_shift);
+	return (PAGE_GET_SHIFT(szc));
 }
 
 uint_t
 page_get_pagecolors(uint_t szc)
 {
-	ASSERT(page_colors != 0);
-	return (MAX(page_colors >> PAGE_BSZS_SHIFT(szc), 1));
+	if (szc >= mmu_page_sizes)
+		panic("page_get_pagecolors: out of range %d", szc);
+	return (PAGE_GET_PAGECOLORS(szc));
+}
+
+/*
+ * this assigns the desired equivalent color after a split
+ */
+uint_t
+page_correct_color(uchar_t szc, uchar_t nszc, uint_t color,
+    uint_t ncolor, uint_t ceq_mask)
+{
+	ASSERT(nszc > szc);
+	ASSERT(szc < mmu_page_sizes);
+	ASSERT(color < PAGE_GET_PAGECOLORS(szc));
+	ASSERT(ncolor < PAGE_GET_PAGECOLORS(nszc));
+
+	color &= ceq_mask;
+	ncolor <<= PAGE_GET_COLOR_SHIFT(szc, nszc);
+	return (color | (ncolor & ~ceq_mask));
 }
 
 /*
@@ -484,6 +511,7 @@ page_ctrs_sz(void)
 {
 	int	r;		/* region size */
 	int	mnode;
+	int	nranges;
 	uint_t	ctrs_sz = 0;
 	int 	i;
 	pgcnt_t colors_per_szc[MMU_PAGE_SIZES];
@@ -493,10 +521,8 @@ page_ctrs_sz(void)
 	 * page size in order to allocate memory for any color specific
 	 * arrays.
 	 */
-	colors_per_szc[0] = page_colors;
-	for (i = 1; i < mmu_page_sizes; i++) {
-		colors_per_szc[i] =
-		    page_convert_color(0, i, page_colors - 1) + 1;
+	for (i = 0; i < mmu_page_sizes; i++) {
+		colors_per_szc[i] = PAGE_GET_PAGECOLORS(i);
 	}
 
 	for (mnode = 0; mnode < max_mem_nodes; mnode++) {
@@ -507,6 +533,10 @@ page_ctrs_sz(void)
 
 		if (mem_node_config[mnode].exists == 0)
 			continue;
+
+		nranges = MNODE_RANGE_CNT(mnode);
+		mnode_nranges[mnode] = nranges;
+		mnode_maxmrange[mnode] = MNODE_MAX_MRANGE(mnode);
 
 		/*
 		 * determine size needed for page counter arrays with
@@ -527,18 +557,31 @@ page_ctrs_sz(void)
 			    sizeof (hpmctr_t *));
 
 			/* add in space for hpm_color_current */
-			ctrs_sz += (colors_per_szc[r] *
-			    sizeof (size_t));
+			ctrs_sz += sizeof (size_t) *
+			    colors_per_szc[r] * nranges;
 		}
 	}
 
 	for (r = 1; r < mmu_page_sizes; r++) {
 		ctrs_sz += (max_mem_nodes * sizeof (hw_page_map_t));
+	}
 
-		/* add in space for page_ctrs_cands */
-		ctrs_sz += NPC_MUTEX * max_mem_nodes * (sizeof (pcc_info_t));
-		ctrs_sz += NPC_MUTEX * max_mem_nodes * colors_per_szc[r] *
-		    sizeof (pgcnt_t);
+	/* add in space for page_ctrs_cands and pcc_color_free */
+	ctrs_sz += sizeof (pcc_info_t *) * max_mem_nodes *
+	    mmu_page_sizes * NPC_MUTEX;
+
+	for (mnode = 0; mnode < max_mem_nodes; mnode++) {
+
+		if (mem_node_config[mnode].exists == 0)
+			continue;
+
+		nranges = mnode_nranges[mnode];
+		ctrs_sz += sizeof (pcc_info_t) * nranges *
+		    mmu_page_sizes * NPC_MUTEX;
+		for (r = 1; r < mmu_page_sizes; r++) {
+			ctrs_sz += sizeof (pgcnt_t) * nranges *
+			    colors_per_szc[r] * NPC_MUTEX;
+		}
 	}
 
 	/* ctr_mutex */
@@ -559,6 +602,7 @@ caddr_t
 page_ctrs_alloc(caddr_t alloc_base)
 {
 	int	mnode;
+	int	mrange, nranges;
 	int	r;		/* region size */
 	int	i;
 	pgcnt_t colors_per_szc[MMU_PAGE_SIZES];
@@ -568,10 +612,8 @@ page_ctrs_alloc(caddr_t alloc_base)
 	 * page size in order to allocate memory for any color specific
 	 * arrays.
 	 */
-	colors_per_szc[0] = page_colors;
-	for (i = 1; i < mmu_page_sizes; i++) {
-		colors_per_szc[i] =
-		    page_convert_color(0, i, page_colors - 1) + 1;
+	for (i = 0; i < mmu_page_sizes; i++) {
+		colors_per_szc[i] = PAGE_GET_PAGECOLORS(i);
 	}
 
 	for (r = 1; r < mmu_page_sizes; r++) {
@@ -579,25 +621,32 @@ page_ctrs_alloc(caddr_t alloc_base)
 		alloc_base += (max_mem_nodes * sizeof (hw_page_map_t));
 	}
 
-	/* page_ctrs_cands */
-	for (r = 1; r < mmu_page_sizes; r++) {
-		for (i = 0; i < NPC_MUTEX; i++) {
-			page_ctrs_cands[i][r] = (pcc_info_t *)alloc_base;
-			alloc_base += max_mem_nodes * (sizeof (pcc_info_t));
+	/* page_ctrs_cands and pcc_color_free array */
+	for (i = 0; i < NPC_MUTEX; i++) {
+		for (r = 1; r < mmu_page_sizes; r++) {
 
-		}
-	}
+			page_ctrs_cands[i][r] = (pcc_info_t **)alloc_base;
+			alloc_base += sizeof (pcc_info_t *) * max_mem_nodes;
 
-	/* page_ctrs_cands pcc_color_free array */
-	for (r = 1; r < mmu_page_sizes; r++) {
-		for (i = 0; i < NPC_MUTEX; i++) {
 			for (mnode = 0; mnode < max_mem_nodes; mnode++) {
-				page_ctrs_cands[i][r][mnode].pcc_color_free_len
-				    = colors_per_szc[r];
-				page_ctrs_cands[i][r][mnode].pcc_color_free =
-				    (pgcnt_t *)alloc_base;
-				alloc_base += colors_per_szc[r] *
-				    sizeof (pgcnt_t);
+				pcc_info_t *pi;
+
+				if (mem_node_config[mnode].exists == 0)
+					continue;
+
+				nranges = mnode_nranges[mnode];
+
+				pi = (pcc_info_t *)alloc_base;
+				alloc_base += sizeof (pcc_info_t) * nranges;
+				page_ctrs_cands[i][r][mnode] = pi;
+
+				for (mrange = 0; mrange < nranges; mrange++) {
+					pi->pcc_color_free =
+					    (pgcnt_t *)alloc_base;
+					alloc_base += sizeof (pgcnt_t) *
+					    colors_per_szc[r];
+					pi++;
+				}
 			}
 		}
 	}
@@ -617,6 +666,7 @@ page_ctrs_alloc(caddr_t alloc_base)
 		pfn_t	r_base;
 		pgcnt_t r_align;
 		int	r_shift;
+		int	nranges = mnode_nranges[mnode];
 
 		if (mem_node_config[mnode].exists == 0)
 			continue;
@@ -638,13 +688,26 @@ page_ctrs_alloc(caddr_t alloc_base)
 			PAGE_COUNTERS_SHIFT(mnode, r) = r_shift;
 			PAGE_COUNTERS_ENTRIES(mnode, r) = r_pgcnt;
 			PAGE_COUNTERS_BASE(mnode, r) = r_base;
-			PAGE_COUNTERS_CURRENT_COLOR_LEN(mnode, r) =
-			    colors_per_szc[r];
-			PAGE_COUNTERS_CURRENT_COLOR_ARRAY(mnode, r) =
-			    (size_t *)alloc_base;
-			alloc_base += (sizeof (size_t) * colors_per_szc[r]);
+			for (mrange = 0; mrange < nranges; mrange++) {
+				PAGE_COUNTERS_CURRENT_COLOR_ARRAY(mnode,
+				    r, mrange) = (size_t *)alloc_base;
+				alloc_base += sizeof (size_t) *
+				    colors_per_szc[r];
+			}
 			for (i = 0; i < colors_per_szc[r]; i++) {
-				PAGE_COUNTERS_CURRENT_COLOR(mnode, r, i) = i;
+				uint_t color_mask = colors_per_szc[r] - 1;
+				pfn_t  pfnum = r_base;
+				size_t idx;
+				int mrange;
+
+				PAGE_NEXT_PFN_FOR_COLOR(pfnum, r, i,
+				    color_mask, color_mask);
+				idx = PNUM_TO_IDX(mnode, r, pfnum);
+				idx = (idx >= r_pgcnt) ? 0 : idx;
+				for (mrange = 0; mrange < nranges; mrange++) {
+					PAGE_COUNTERS_CURRENT_COLOR(mnode,
+					    r, i, mrange) = idx;
+				}
 			}
 			PAGE_COUNTERS_COUNTERS(mnode, r) =
 			    (hpmctr_t *)alloc_base;
@@ -724,12 +787,16 @@ page_ctr_add_internal(int mnode, int mtype, page_t *pp, int flags)
 		ASSERT(idx < PAGE_COUNTERS_ENTRIES(mnode, r));
 		ASSERT(PAGE_COUNTERS(mnode, r, idx) < FULL_REGION_CNT(r));
 
-		if (++PAGE_COUNTERS(mnode, r, idx) != FULL_REGION_CNT(r))
+		if (++PAGE_COUNTERS(mnode, r, idx) != FULL_REGION_CNT(r)) {
 			break;
+		} else {
+			int root_mtype = PP_2_MTYPE(PP_GROUPLEADER(pp, r));
+			pcc_info_t *cand = &page_ctrs_cands[lckidx][r][mnode]
+			    [MTYPE_2_MRANGE(mnode, root_mtype)];
 
-		page_ctrs_cands[lckidx][r][mnode].pcc_pages_free++;
-		page_ctrs_cands[lckidx][r][mnode].
-		    pcc_color_free[PP_2_BIN_SZC(pp, r)]++;
+			cand->pcc_pages_free++;
+			cand->pcc_color_free[PP_2_BIN_SZC(pp, r)]++;
+		}
 		r++;
 	}
 }
@@ -746,10 +813,9 @@ page_ctr_add(int mnode, int mtype, page_t *pp, int flags)
 }
 
 void
-page_ctr_sub(int mnode, int mtype, page_t *pp, int flags)
+page_ctr_sub_internal(int mnode, int mtype, page_t *pp, int flags)
 {
 	int		lckidx;
-	kmutex_t	*lock;
 	ssize_t		r;	/* region size */
 	ssize_t		idx;
 	pfn_t		pfnum;
@@ -769,14 +835,12 @@ page_ctr_sub(int mnode, int mtype, page_t *pp, int flags)
 	r = pp->p_szc + 1;
 	pfnum = pp->p_pagenum;
 	lckidx = PP_CTR_LOCK_INDX(pp);
-	lock = &ctr_mutex[lckidx][mnode];
 
 	/*
 	 * Decrement the count of free pages for the current
 	 * region. Continue looping up in region size decrementing
 	 * count if the preceeding region was full.
 	 */
-	mutex_enter(lock);
 	while (r < mmu_page_sizes) {
 		idx = PNUM_TO_IDX(mnode, r, pfnum);
 
@@ -785,16 +849,29 @@ page_ctr_sub(int mnode, int mtype, page_t *pp, int flags)
 
 		if (--PAGE_COUNTERS(mnode, r, idx) != FULL_REGION_CNT(r) - 1) {
 			break;
-		}
-		ASSERT(page_ctrs_cands[lckidx][r][mnode].pcc_pages_free != 0);
-		ASSERT(page_ctrs_cands[lckidx][r][mnode].
-		    pcc_color_free[PP_2_BIN_SZC(pp, r)] != 0);
+		} else {
+			int root_mtype = PP_2_MTYPE(PP_GROUPLEADER(pp, r));
+			pcc_info_t *cand = &page_ctrs_cands[lckidx][r][mnode]
+			    [MTYPE_2_MRANGE(mnode, root_mtype)];
 
-		page_ctrs_cands[lckidx][r][mnode].pcc_pages_free--;
-		page_ctrs_cands[lckidx][r][mnode].
-		    pcc_color_free[PP_2_BIN_SZC(pp, r)]--;
+			ASSERT(cand->pcc_pages_free != 0);
+			ASSERT(cand->pcc_color_free[PP_2_BIN_SZC(pp, r)] != 0);
+
+			cand->pcc_pages_free--;
+			cand->pcc_color_free[PP_2_BIN_SZC(pp, r)]--;
+		}
 		r++;
 	}
+}
+
+void
+page_ctr_sub(int mnode, int mtype, page_t *pp, int flags)
+{
+	int		lckidx = PP_CTR_LOCK_INDX(pp);
+	kmutex_t	*lock = &ctr_mutex[lckidx][mnode];
+
+	mutex_enter(lock);
+	page_ctr_sub_internal(mnode, mtype, pp, flags);
 	mutex_exit(lock);
 }
 
@@ -802,6 +879,11 @@ page_ctr_sub(int mnode, int mtype, page_t *pp, int flags)
  * Adjust page counters following a memory attach, since typically the
  * size of the array needs to change, and the PFN to counter index
  * mapping needs to change.
+ *
+ * It is possible this mnode did not exist at startup. In that case
+ * allocate pcc_info_t and pcc_color_free arrays. Also, allow for nranges
+ * to change (a theoretical possibility on x86), which means pcc_color_free
+ * arrays must be extended.
  */
 uint_t
 page_ctrs_adjust(int mnode)
@@ -815,23 +897,38 @@ page_ctrs_adjust(int mnode)
 	size_t	old_npgs;
 	hpmctr_t *ctr_cache[MMU_PAGE_SIZES];
 	size_t	size_cache[MMU_PAGE_SIZES];
-	size_t	*color_cache[MMU_PAGE_SIZES];
-	size_t	*old_color_array;
+	size_t	*color_cache[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
+	size_t	*old_color_array[MAX_MNODE_MRANGES];
 	pgcnt_t	colors_per_szc[MMU_PAGE_SIZES];
+	pcc_info_t **cands_cache;
+	pcc_info_t *old_pi, *pi;
+	pgcnt_t *pgcntp;
+	int nr, old_nranges, mrange, nranges = MNODE_RANGE_CNT(mnode);
+	int cands_cache_nranges;
+	int old_maxmrange, new_maxmrange;
+	int rc = 0;
 
 	newbase = mem_node_config[mnode].physbase & ~PC_BASE_ALIGN_MASK;
 	npgs = roundup(mem_node_config[mnode].physmax,
 	    PC_BASE_ALIGN) - newbase;
+
+	cands_cache = kmem_zalloc(sizeof (pcc_info_t *) * NPC_MUTEX *
+	    MMU_PAGE_SIZES, KM_NOSLEEP);
+	if (cands_cache == NULL)
+		return (ENOMEM);
+
+	/* prepare to free non-null pointers on the way out */
+	cands_cache_nranges = nranges;
+	bzero(ctr_cache, sizeof (ctr_cache));
+	bzero(color_cache, sizeof (color_cache));
 
 	/*
 	 * We need to determine how many page colors there are for each
 	 * page size in order to allocate memory for any color specific
 	 * arrays.
 	 */
-	colors_per_szc[0] = page_colors;
-	for (r = 1; r < mmu_page_sizes; r++) {
-		colors_per_szc[r] =
-		    page_convert_color(0, r, page_colors - 1) + 1;
+	for (r = 0; r < mmu_page_sizes; r++) {
+		colors_per_szc[r] = PAGE_GET_PAGECOLORS(r);
 	}
 
 	/*
@@ -842,18 +939,15 @@ page_ctrs_adjust(int mnode)
 	 */
 	for (r = 1; r < mmu_page_sizes; r++) {
 		pcsz = npgs >> PAGE_BSZS_SHIFT(r);
-
+		size_cache[r] = pcsz;
 		ctr_cache[r] = kmem_zalloc(pcsz *
 		    sizeof (hpmctr_t), KM_NOSLEEP);
 		if (ctr_cache[r] == NULL) {
-			while (--r >= 1) {
-				kmem_free(ctr_cache[r],
-				    size_cache[r] * sizeof (hpmctr_t));
-			}
-			return (ENOMEM);
+			rc = ENOMEM;
+			goto cleanup;
 		}
-		size_cache[r] = pcsz;
 	}
+
 	/*
 	 * Preallocate all of the new color current arrays as we can't
 	 * hold the page_ctrs_rwlock as a writer and allocate memory.
@@ -861,18 +955,41 @@ page_ctrs_adjust(int mnode)
 	 * and return failure.
 	 */
 	for (r = 1; r < mmu_page_sizes; r++) {
-		color_cache[r] = kmem_zalloc(sizeof (size_t) *
-		    colors_per_szc[r], KM_NOSLEEP);
-		if (color_cache[r] == NULL) {
-			while (--r >= 1) {
-				kmem_free(color_cache[r],
-				    colors_per_szc[r] * sizeof (size_t));
+		for (mrange = 0; mrange < nranges; mrange++) {
+			color_cache[r][mrange] = kmem_zalloc(sizeof (size_t) *
+			    colors_per_szc[r], KM_NOSLEEP);
+			if (color_cache[r][mrange] == NULL) {
+				rc = ENOMEM;
+				goto cleanup;
 			}
-			for (r = 1; r < mmu_page_sizes; r++) {
-				kmem_free(ctr_cache[r],
-				    size_cache[r] * sizeof (hpmctr_t));
+		}
+	}
+
+	/*
+	 * Preallocate all of the new pcc_info_t arrays as we can't
+	 * hold the page_ctrs_rwlock as a writer and allocate memory.
+	 * If we can't allocate all of the arrays, undo our work so far
+	 * and return failure.
+	 */
+	for (r = 1; r < mmu_page_sizes; r++) {
+		for (i = 0; i < NPC_MUTEX; i++) {
+			pi = kmem_zalloc(nranges * sizeof (pcc_info_t),
+			    KM_NOSLEEP);
+			if (pi == NULL) {
+				rc = ENOMEM;
+				goto cleanup;
 			}
-			return (ENOMEM);
+			cands_cache[i * MMU_PAGE_SIZES + r] = pi;
+
+			for (mrange = 0; mrange < nranges; mrange++, pi++) {
+				pgcntp = kmem_zalloc(colors_per_szc[r] *
+				    sizeof (pgcnt_t), KM_NOSLEEP);
+				if (pgcntp == NULL) {
+					rc = ENOMEM;
+					goto cleanup;
+				}
+				pi->pcc_color_free = pgcntp;
+			}
 		}
 	}
 
@@ -882,13 +999,25 @@ page_ctrs_adjust(int mnode)
 	 */
 	rw_enter(&page_ctrs_rwlock[mnode], RW_WRITER);
 	page_freelist_lock(mnode);
+
+	old_nranges = mnode_nranges[mnode];
+	cands_cache_nranges = old_nranges;
+	mnode_nranges[mnode] = nranges;
+	old_maxmrange = mnode_maxmrange[mnode];
+	mnode_maxmrange[mnode] = MNODE_MAX_MRANGE(mnode);
+	new_maxmrange = mnode_maxmrange[mnode];
+
 	for (r = 1; r < mmu_page_sizes; r++) {
 		PAGE_COUNTERS_SHIFT(mnode, r) = PAGE_BSZS_SHIFT(r);
 		old_ctr = PAGE_COUNTERS_COUNTERS(mnode, r);
 		old_csz = PAGE_COUNTERS_ENTRIES(mnode, r);
 		oldbase = PAGE_COUNTERS_BASE(mnode, r);
 		old_npgs = old_csz << PAGE_COUNTERS_SHIFT(mnode, r);
-		old_color_array = PAGE_COUNTERS_CURRENT_COLOR_ARRAY(mnode, r);
+		for (mrange = 0; mrange < MAX_MNODE_MRANGES; mrange++) {
+			old_color_array[mrange] =
+			    PAGE_COUNTERS_CURRENT_COLOR_ARRAY(mnode,
+				r, mrange);
+		}
 
 		pcsz = npgs >> PAGE_COUNTERS_SHIFT(mnode, r);
 		new_ctr = ctr_cache[r];
@@ -919,15 +1048,28 @@ page_ctrs_adjust(int mnode)
 		PAGE_COUNTERS_COUNTERS(mnode, r) = new_ctr;
 		PAGE_COUNTERS_ENTRIES(mnode, r) = pcsz;
 		PAGE_COUNTERS_BASE(mnode, r) = newbase;
-		PAGE_COUNTERS_CURRENT_COLOR_LEN(mnode, r) = colors_per_szc[r];
-		PAGE_COUNTERS_CURRENT_COLOR_ARRAY(mnode, r) = color_cache[r];
-		color_cache[r] = NULL;
+		for (mrange = 0; mrange < MAX_MNODE_MRANGES; mrange++) {
+			PAGE_COUNTERS_CURRENT_COLOR_ARRAY(mnode, r, mrange) =
+			    color_cache[r][mrange];
+			color_cache[r][mrange] = NULL;
+		}
 		/*
 		 * for now, just reset on these events as it's probably
 		 * not worthwhile to try and optimize this.
 		 */
 		for (i = 0; i < colors_per_szc[r]; i++) {
-			PAGE_COUNTERS_CURRENT_COLOR(mnode, r, i) = i;
+			uint_t color_mask = colors_per_szc[r] - 1;
+			pfn_t  pfnum = newbase;
+			size_t idx;
+
+			PAGE_NEXT_PFN_FOR_COLOR(pfnum, r, i, color_mask,
+			    color_mask);
+			idx = PNUM_TO_IDX(mnode, r, pfnum);
+			idx = (idx < pcsz) ? idx : 0;
+			for (mrange = 0; mrange < nranges; mrange++) {
+				PAGE_COUNTERS_CURRENT_COLOR(mnode,
+				    r, i, mrange) = idx;
+			}
 		}
 
 		/* cache info for freeing out of the critical path */
@@ -936,9 +1078,12 @@ page_ctrs_adjust(int mnode)
 			ctr_cache[r] = old_ctr;
 			size_cache[r] = old_csz;
 		}
-		if ((caddr_t)old_color_array >= kernelheap &&
-		    (caddr_t)old_color_array < ekernelheap) {
-			color_cache[r] = old_color_array;
+		for (mrange = 0; mrange < MAX_MNODE_MRANGES; mrange++) {
+			size_t *tmp = old_color_array[mrange];
+			if ((caddr_t)tmp >= kernelheap &&
+			    (caddr_t)tmp < ekernelheap) {
+				color_cache[r][mrange] = tmp;
+			}
 		}
 		/*
 		 * Verify that PNUM_TO_IDX and IDX_TO_PNUM
@@ -950,6 +1095,39 @@ page_ctrs_adjust(int mnode)
 		    (IDX_TO_PNUM(mnode, r, 0))) == 0);
 		ASSERT(IDX_TO_PNUM(mnode, r,
 		    (PNUM_TO_IDX(mnode, r, newbase))) == newbase);
+
+		/* pcc_info_t and pcc_color_free */
+		for (i = 0; i < NPC_MUTEX; i++) {
+			pcc_info_t *epi;
+			pcc_info_t *eold_pi;
+
+			pi = cands_cache[i * MMU_PAGE_SIZES + r];
+			old_pi = page_ctrs_cands[i][r][mnode];
+			page_ctrs_cands[i][r][mnode] = pi;
+			cands_cache[i * MMU_PAGE_SIZES + r] = old_pi;
+
+			/* preserve old pcc_color_free values, if any */
+			if (old_pi == NULL)
+				continue;
+
+			/*
+			 * when/if x86 does DR, must account for
+			 * possible change in range index when
+			 * preserving pcc_info
+			 */
+			epi = &pi[nranges];
+			eold_pi = &old_pi[old_nranges];
+			if (new_maxmrange > old_maxmrange) {
+				pi += new_maxmrange - old_maxmrange;
+			} else if (new_maxmrange < old_maxmrange) {
+				old_pi += old_maxmrange - new_maxmrange;
+			}
+			for (; pi < epi && old_pi < eold_pi; pi++, old_pi++) {
+				pcc_info_t tmp = *pi;
+				*pi = *old_pi;
+				*old_pi = tmp;
+			}
+		}
 	}
 	page_freelist_unlock(mnode);
 	rw_exit(&page_ctrs_rwlock[mnode]);
@@ -957,37 +1135,50 @@ page_ctrs_adjust(int mnode)
 	/*
 	 * Now that we have dropped the write lock, it is safe to free all
 	 * of the memory we have cached above.
+	 * We come thru here to free memory when pre-alloc fails, and also to
+	 * free old pointers which were recorded while locked.
 	 */
+cleanup:
 	for (r = 1; r < mmu_page_sizes; r++) {
 		if (ctr_cache[r] != NULL) {
 			kmem_free(ctr_cache[r],
 			    size_cache[r] * sizeof (hpmctr_t));
 		}
-		if (color_cache[r] != NULL) {
-			kmem_free(color_cache[r],
-			    colors_per_szc[r] * sizeof (size_t));
+		for (mrange = 0; mrange < MAX_MNODE_MRANGES; mrange++) {
+			if (color_cache[r][mrange] != NULL) {
+				kmem_free(color_cache[r][mrange],
+				    colors_per_szc[r] * sizeof (size_t));
+			}
+		}
+		for (i = 0; i < NPC_MUTEX; i++) {
+			pi = cands_cache[i * MMU_PAGE_SIZES + r];
+			if (pi == NULL)
+				continue;
+			nr = cands_cache_nranges;
+			for (mrange = 0; mrange < nr; mrange++, pi++) {
+				pgcntp = pi->pcc_color_free;
+				if (pgcntp == NULL)
+					continue;
+				if ((caddr_t)pgcntp >= kernelheap &&
+				    (caddr_t)pgcntp < ekernelheap) {
+					kmem_free(pgcntp,
+					    colors_per_szc[r] *
+					    sizeof (pgcnt_t));
+				}
+			}
+			pi = cands_cache[i * MMU_PAGE_SIZES + r];
+			if ((caddr_t)pi >= kernelheap &&
+			    (caddr_t)pi < ekernelheap) {
+				kmem_free(pi, nr * sizeof (pcc_info_t));
+			}
 		}
 	}
-	return (0);
+
+	kmem_free(cands_cache,
+	    sizeof (pcc_info_t *) * NPC_MUTEX * MMU_PAGE_SIZES);
+	return (rc);
 }
 
-/*
- * color contains a valid color index or bin for cur_szc
- */
-uint_t
-page_convert_color(uchar_t cur_szc, uchar_t new_szc, uint_t color)
-{
-	uint_t shift;
-
-	if (cur_szc > new_szc) {
-		shift = page_get_shift(cur_szc) - page_get_shift(new_szc);
-		return (color << shift);
-	} else if (cur_szc < new_szc) {
-		shift = page_get_shift(new_szc) - page_get_shift(cur_szc);
-		return (color >> shift);
-	}
-	return (color);
-}
 
 #ifdef DEBUG
 
@@ -1129,7 +1320,7 @@ page_list_add(page_t *pp, int flags)
 			*ppp = (*ppp)->p_next;
 		/*
 		 * Add counters before releasing pcm mutex to avoid a race with
-		 * page_freelist_coalesce and page_freelist_fill.
+		 * page_freelist_coalesce and page_freelist_split.
 		 */
 		page_ctr_add(mnode, mtype, pp, flags);
 		mutex_exit(pcm);
@@ -1201,8 +1392,10 @@ page_list_noreloc_startup(page_t *pp)
 		pp->p_next->p_prev = pp->p_prev;
 	}
 
-	/* LINTED */
-	PLCNT_DECR(pp, mnode, mtype, 0, flags);
+	/*
+	 * Decrement page counters
+	 */
+	page_ctr_sub_internal(mnode, mtype, pp, flags);
 
 	/*
 	 * Set no reloc for cage initted pages.
@@ -1234,8 +1427,10 @@ page_list_noreloc_startup(page_t *pp)
 		pp->p_prev->p_next = pp;
 	}
 
-	/* LINTED */
-	PLCNT_INCR(pp, mnode, mtype, 0, flags);
+	/*
+	 * Increment page counters
+	 */
+	page_ctr_add_internal(mnode, mtype, pp, flags);
 
 	/*
 	 * Update cage freemem counter
@@ -1579,7 +1774,7 @@ page_promote_size(page_t *pp, uint_t cur_szc)
 
 	idx = PNUM_TO_IDX(mnode, new_szc, pfn);
 	if (PAGE_COUNTERS(mnode, new_szc, idx) == full)
-		(void) page_promote(mnode, pfn, new_szc, PC_FREE);
+		(void) page_promote(mnode, pfn, new_szc, PC_FREE, PC_MTYPE_ANY);
 
 	page_freelist_unlock(mnode);
 }
@@ -1640,15 +1835,13 @@ static uint_t page_promote_noreloc_err;
  *	have done so far. Again this is rare.
  */
 page_t *
-page_promote(int mnode, pfn_t pfnum, uchar_t new_szc, int flags)
+page_promote(int mnode, pfn_t pfnum, uchar_t new_szc, int flags, int mtype)
 {
 	page_t		*pp, *pplist, *tpp, *start_pp;
 	pgcnt_t		new_npgs, npgs;
 	uint_t		bin;
 	pgcnt_t		tmpnpgs, pages_left;
-	uint_t		mtype;
 	uint_t		noreloc;
-	uint_t 		i;
 	int 		which_list;
 	ulong_t		index;
 	kmutex_t	*phm;
@@ -1670,17 +1863,19 @@ page_promote(int mnode, pfn_t pfnum, uchar_t new_szc, int flags)
 	new_npgs = page_get_pagecnt(new_szc);
 	ASSERT(IS_P2ALIGNED(pfnum, new_npgs));
 
+	/* don't return page of the wrong mtype */
+	if (mtype != PC_MTYPE_ANY && mtype != PP_2_MTYPE(start_pp))
+			return (NULL);
+
 	/*
 	 * Loop through smaller pages to confirm that all pages
 	 * give the same result for PP_ISNORELOC().
 	 * We can check this reliably here as the protocol for setting
 	 * P_NORELOC requires pages to be taken off the free list first.
 	 */
-	for (i = 0, pp = start_pp; i < new_npgs; i++, pp++) {
-		if (pp == start_pp) {
-			/* First page, set requirement. */
-			noreloc = PP_ISNORELOC(pp);
-		} else if (noreloc != PP_ISNORELOC(pp)) {
+	noreloc = PP_ISNORELOC(start_pp);
+	for (pp = start_pp + new_npgs; --pp > start_pp; ) {
+		if (noreloc != PP_ISNORELOC(pp)) {
 			page_promote_noreloc_err++;
 			page_promote_err++;
 			return (NULL);
@@ -1921,63 +2116,155 @@ int mpss_coalesce_disable = 0;
 /*
  * Coalesce free pages into a page of the given szc and color if possible.
  * Return the pointer to the page created, otherwise, return NULL.
+ *
+ * If pfnhi is non-zero, search for large page with pfn range less than pfnhi.
  */
-static page_t *
-page_freelist_coalesce(int mnode, uchar_t szc, int color)
+page_t *
+page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
+    int mtype, pfn_t pfnhi)
 {
-	int 	r;		/* region size */
-	int 	idx, full, i;
-	pfn_t	pfnum;
-	size_t	len;
-	size_t	buckets_to_check;
-	pgcnt_t	cands;
+	int 	r = szc;		/* region size */
+	int	mrange;
+	uint_t 	full, bin, color_mask, wrap = 0;
+	pfn_t	pfnum, lo, hi;
+	size_t	len, idx, idx0;
+	pgcnt_t	cands = 0, szcpgcnt = page_get_pagecnt(szc);
 	page_t	*ret_pp;
-	int	color_stride;
-
-	VM_STAT_ADD(vmm_vmstats.page_ctrs_coalesce);
+#if defined(__sparc)
+	pfn_t pfnum0, nlo, nhi;
+#endif
 
 	if (mpss_coalesce_disable) {
+		ASSERT(szc < MMU_PAGE_SIZES);
+		VM_STAT_ADD(vmm_vmstats.page_ctrs_coalesce[szc][0]);
 		return (NULL);
 	}
 
-	r = szc;
-	PGCTRS_CANDS_GETVALUECOLOR(mnode, r, color, cands);
-	if (cands == 0) {
-		VM_STAT_ADD(vmm_vmstats.page_ctrs_cands_skip);
-		return (NULL);
-	}
-	full = FULL_REGION_CNT(r);
-	color_stride = (szc) ? page_convert_color(0, szc, page_colors - 1) + 1 :
-	    page_colors;
+	ASSERT(szc < mmu_page_sizes);
+	color_mask = PAGE_GET_PAGECOLORS(szc) - 1;
+	ASSERT(ceq_mask <= color_mask);
+	ASSERT(color <= color_mask);
+	color &= ceq_mask;
 
 	/* Prevent page_counters dynamic memory from being freed */
 	rw_enter(&page_ctrs_rwlock[mnode], RW_READER);
-	len  = PAGE_COUNTERS_ENTRIES(mnode, r);
-	buckets_to_check = len / color_stride;
-	idx = PAGE_COUNTERS_CURRENT_COLOR(mnode, r, color);
-	ASSERT((idx % color_stride) == color);
-	idx += color_stride;
-	if (idx >= len)
-		idx = color;
-	for (i = 0; i < buckets_to_check; i++) {
-		if (PAGE_COUNTERS(mnode, r, idx) == full) {
-			pfnum = IDX_TO_PNUM(mnode, r, idx);
-			ASSERT(pfnum >= mem_node_config[mnode].physbase &&
-			    pfnum < mem_node_config[mnode].physmax);
-			/*
-			 * RFE: For performance maybe we can do something less
-			 *	brutal than locking the entire freelist. So far
-			 * 	this doesn't seem to be a performance problem?
-			 */
-			page_freelist_lock(mnode);
-			if (PAGE_COUNTERS(mnode, r, idx) != full) {
-				VM_STAT_ADD(vmm_vmstats.page_ctrs_changed);
-				goto skip_this_one;
+
+	mrange = MTYPE_2_MRANGE(mnode, mtype);
+	ASSERT(mrange < mnode_nranges[mnode]);
+	VM_STAT_ADD(vmm_vmstats.page_ctrs_coalesce[r][mrange]);
+
+	/* get pfn range for mtype */
+	len = PAGE_COUNTERS_ENTRIES(mnode, r);
+#if defined(__sparc)
+	lo = PAGE_COUNTERS_BASE(mnode, r);
+	hi = IDX_TO_PNUM(mnode, r, len);
+#else
+	MNODETYPE_2_PFN(mnode, mtype, lo, hi);
+	hi++;
+#endif
+
+	/* use lower limit if given */
+	if (pfnhi != PFNNULL && pfnhi < hi)
+		hi = pfnhi;
+
+	/* round to szcpgcnt boundaries */
+	lo = P2ROUNDUP(lo, szcpgcnt);
+	hi = hi & ~(szcpgcnt - 1);
+
+	/* set lo to the closest pfn of the right color */
+	if ((PFN_2_COLOR(lo, szc) ^ color) & ceq_mask) {
+		PAGE_NEXT_PFN_FOR_COLOR(lo, szc, color, ceq_mask, color_mask);
+	}
+
+	if (hi <= lo) {
+		rw_exit(&page_ctrs_rwlock[mnode]);
+		return (NULL);
+	}
+
+	full = FULL_REGION_CNT(r);
+
+	/* calculate the number of page candidates and initial search index */
+	bin = color;
+	idx0 = (size_t)(-1);
+	do {
+		pgcnt_t acand;
+
+		PGCTRS_CANDS_GETVALUECOLOR(mnode, mrange, r, bin, acand);
+		if (acand) {
+			idx = PAGE_COUNTERS_CURRENT_COLOR(mnode,
+			    r, bin, mrange);
+			idx0 = MIN(idx0, idx);
+			cands += acand;
+		}
+		bin = ADD_MASKED(bin, 1, ceq_mask, color_mask);
+	} while (bin != color);
+
+	if (cands == 0) {
+		VM_STAT_ADD(vmm_vmstats.page_ctrs_cands_skip[r][mrange]);
+		rw_exit(&page_ctrs_rwlock[mnode]);
+		return (NULL);
+	}
+
+	pfnum = IDX_TO_PNUM(mnode, r, idx0);
+	if (pfnum < lo || pfnum >= hi) {
+		pfnum = lo;
+	} else if ((PFN_2_COLOR(pfnum, szc) ^ color) & ceq_mask) {
+		/* pfnum has invalid color get the closest correct pfn */
+		PAGE_NEXT_PFN_FOR_COLOR(pfnum, szc, color, ceq_mask,
+		    color_mask);
+		pfnum = (pfnum >= hi) ? lo : pfnum;
+	}
+
+	/* set starting index */
+	idx0 = PNUM_TO_IDX(mnode, r, pfnum);
+	ASSERT(idx0 < len);
+
+#if defined(__sparc)
+	pfnum0 = pfnum;		/* page corresponding to idx0 */
+	nhi = 0;		/* search kcage ranges */
+#endif
+
+	for (idx = idx0; wrap == 0 || (idx < idx0 && wrap < 2); ) {
+
+#if defined(__sparc)
+		/*
+		 * Find lowest intersection of kcage ranges and mnode.
+		 * MTYPE_NORELOC means look in the cage, otherwise outside.
+		 */
+		if (nhi <= pfnum) {
+			if (kcage_next_range(mtype == MTYPE_NORELOC, pfnum,
+			    (wrap == 0 ? hi : pfnum0), &nlo, &nhi))
+				goto wrapit;
+
+			/* jump to the next page in the range */
+			if (pfnum < nlo) {
+				pfnum = P2ROUNDUP(nlo, szcpgcnt);
+				idx = PNUM_TO_IDX(mnode, r, pfnum);
+				if (idx >= len || pfnum >= hi)
+					goto wrapit;
+				if ((PFN_2_COLOR(pfnum, szc) ^ color) &
+				    ceq_mask)
+					goto next;
 			}
-			ret_pp = page_promote(mnode, pfnum, r, PC_ALLOC);
+		}
+#endif
+
+		if (PAGE_COUNTERS(mnode, r, idx) != full)
+			goto next;
+
+		/*
+		 * RFE: For performance maybe we can do something less
+		 *	brutal than locking the entire freelist. So far
+		 * 	this doesn't seem to be a performance problem?
+		 */
+		page_freelist_lock(mnode);
+		if (PAGE_COUNTERS(mnode, r, idx) == full) {
+			ret_pp =
+			    page_promote(mnode, pfnum, r, PC_ALLOC, mtype);
 			if (ret_pp != NULL) {
-				PAGE_COUNTERS_CURRENT_COLOR(mnode, r, color) =
-				    idx;
+				VM_STAT_ADD(vmm_vmstats.pfc_coalok[r][mrange]);
+				PAGE_COUNTERS_CURRENT_COLOR(mnode, r,
+				    PFN_2_COLOR(pfnum, szc), mrange) = idx;
 				page_freelist_unlock(mnode);
 				rw_exit(&page_ctrs_rwlock[mnode]);
 #if defined(__sparc)
@@ -1990,30 +2277,43 @@ page_freelist_coalesce(int mnode, uchar_t szc, int color)
 #endif
 				return (ret_pp);
 			}
-skip_this_one:
-			page_freelist_unlock(mnode);
-			/*
-			 * No point looking for another page if we've
-			 * already tried all of the ones that
-			 * page_ctr_cands indicated.  Stash off where we left
-			 * off.
-			 * Note: this is not exact since we don't hold the
-			 * page_freelist_locks before we initially get the
-			 * value of cands for performance reasons, but should
-			 * be a decent approximation.
-			 */
-			if (--cands == 0) {
-				PAGE_COUNTERS_CURRENT_COLOR(mnode, r, color) =
-				    idx;
-				break;
-			}
+		} else {
+			VM_STAT_ADD(vmm_vmstats.page_ctrs_changed[r][mrange]);
 		}
-		idx += color_stride;
-		if (idx >= len)
-			idx = color;
+
+		page_freelist_unlock(mnode);
+		/*
+		 * No point looking for another page if we've
+		 * already tried all of the ones that
+		 * page_ctr_cands indicated.  Stash off where we left
+		 * off.
+		 * Note: this is not exact since we don't hold the
+		 * page_freelist_locks before we initially get the
+		 * value of cands for performance reasons, but should
+		 * be a decent approximation.
+		 */
+		if (--cands == 0) {
+			PAGE_COUNTERS_CURRENT_COLOR(mnode, r, color, mrange) =
+			    idx;
+			break;
+		}
+next:
+		PAGE_NEXT_PFN_FOR_COLOR(pfnum, szc, color, ceq_mask,
+			    color_mask);
+		idx = PNUM_TO_IDX(mnode, r, pfnum);
+		if (idx >= len || pfnum >= hi) {
+wrapit:
+			pfnum = lo;
+			idx = PNUM_TO_IDX(mnode, r, pfnum);
+			wrap++;
+#if defined(__sparc)
+			nhi = 0;	/* search kcage ranges */
+#endif
+		}
 	}
+
 	rw_exit(&page_ctrs_rwlock[mnode]);
-	VM_STAT_ADD(vmm_vmstats.page_ctrs_failed);
+	VM_STAT_ADD(vmm_vmstats.page_ctrs_failed[r][mrange]);
 	return (NULL);
 }
 
@@ -2043,9 +2343,14 @@ page_freelist_coalesce_all(int mnode)
 	rw_enter(&page_ctrs_rwlock[mnode], RW_READER);
 	page_freelist_lock(mnode);
 	for (r = mmu_page_sizes - 1; r > 0; r--) {
-		pgcnt_t cands;
+		pgcnt_t cands = 0;
+		int mrange, nranges = mnode_nranges[mnode];
 
-		PGCTRS_CANDS_GETVALUE(mnode, r, cands);
+		for (mrange = 0; mrange < nranges; mrange++) {
+			PGCTRS_CANDS_GETVALUE(mnode, mrange, r, cands);
+			if (cands != 0)
+				break;
+		}
 		if (cands == 0) {
 			VM_STAT_ADD(vmm_vmstats.page_ctrs_cands_skip_all);
 			continue;
@@ -2061,7 +2366,8 @@ page_freelist_coalesce_all(int mnode)
 				    mem_node_config[mnode].physbase &&
 				    pfnum <
 				    mem_node_config[mnode].physmax);
-				(void) page_promote(mnode, pfnum, r, PC_FREE);
+				(void) page_promote(mnode,
+				    pfnum, r, PC_FREE, PC_MTYPE_ANY);
 			}
 		}
 	}
@@ -2088,26 +2394,37 @@ page_freelist_coalesce_all(int mnode)
  *
  * If pfnhi is non-zero, search for large page with pfn range less than pfnhi.
  */
+
 page_t *
-page_freelist_fill(uchar_t szc, int color, int mnode, int mtype, pfn_t pfnhi)
+page_freelist_split(uchar_t szc, uint_t color, int mnode, int mtype,
+    pfn_t pfnhi, page_list_walker_t *plw)
 {
 	uchar_t nszc = szc + 1;
-	int 	bin;
+	uint_t 	bin, sbin, bin_prev;
 	page_t	*pp, *firstpp;
 	page_t	*ret_pp = NULL;
+	uint_t  color_mask;
 
-	ASSERT(szc < mmu_page_sizes);
+	if (nszc == mmu_page_sizes)
+		return (NULL);
 
-	VM_STAT_ADD(vmm_vmstats.pff_req[szc]);
+	ASSERT(nszc < mmu_page_sizes);
+	color_mask = PAGE_GET_PAGECOLORS(nszc) - 1;
+	bin = sbin = PAGE_GET_NSZ_COLOR(szc, color);
+	bin_prev = (plw->plw_bin_split_prev == color) ? INVALID_COLOR :
+	    PAGE_GET_NSZ_COLOR(szc, plw->plw_bin_split_prev);
+
+	VM_STAT_ADD(vmm_vmstats.pfs_req[szc]);
 	/*
-	 * First try to break up a larger page to fill
-	 * current size freelist.
+	 * First try to break up a larger page to fill current size freelist.
 	 */
-	while (nszc < mmu_page_sizes) {
+	while (plw->plw_bins[nszc] != 0) {
+
+		ASSERT(nszc < mmu_page_sizes);
+
 		/*
 		 * If page found then demote it.
 		 */
-		bin = page_convert_color(szc, nszc, color);
 		if (PAGE_FREELISTS(mnode, nszc, bin, mtype)) {
 			page_freelist_lock(mnode);
 			firstpp = pp = PAGE_FREELISTS(mnode, nszc, bin, mtype);
@@ -2126,10 +2443,13 @@ page_freelist_fill(uchar_t szc, int color, int mnode, int mtype, pfn_t pfnhi)
 				} while (pp->p_pagenum >= pfnhi);
 			}
 			if (pp) {
+				uint_t ccolor = page_correct_color(szc, nszc,
+				    color, bin, plw->plw_ceq_mask[szc]);
+
 				ASSERT(pp->p_szc == nszc);
-				VM_STAT_ADD(vmm_vmstats.pff_demote[nszc]);
+				VM_STAT_ADD(vmm_vmstats.pfs_demote[nszc]);
 				ret_pp = page_demote(mnode, pp->p_pagenum,
-				    pp->p_szc, szc, color, PC_ALLOC);
+				    pp->p_szc, szc, ccolor, PC_ALLOC);
 				if (ret_pp) {
 					page_freelist_unlock(mnode);
 #if defined(__sparc)
@@ -2146,19 +2466,36 @@ page_freelist_fill(uchar_t szc, int color, int mnode, int mtype, pfn_t pfnhi)
 			}
 			page_freelist_unlock(mnode);
 		}
-		nszc++;
-	}
 
-	/*
-	 * Ok that didn't work. Time to coalesce.
-	 */
-	if (szc != 0) {
-		ret_pp = page_freelist_coalesce(mnode, szc, color);
-		VM_STAT_COND_ADD(ret_pp, vmm_vmstats.pff_coalok[szc]);
+		/* loop through next size bins */
+		bin = ADD_MASKED(bin, 1, plw->plw_ceq_mask[nszc], color_mask);
+		plw->plw_bins[nszc]--;
+
+		if (bin == sbin) {
+			uchar_t nnszc = nszc + 1;
+
+			/* we are done with this page size - check next */
+			if (plw->plw_bins[nnszc] == 0)
+				/* we have already checked next size bins */
+				break;
+
+			bin = sbin = PAGE_GET_NSZ_COLOR(nszc, bin);
+			if (bin_prev != INVALID_COLOR) {
+				bin_prev = PAGE_GET_NSZ_COLOR(nszc, bin_prev);
+				if (!((bin ^ bin_prev) &
+				    plw->plw_ceq_mask[nnszc]))
+					break;
+			}
+			ASSERT(nnszc < mmu_page_sizes);
+			color_mask = PAGE_GET_PAGECOLORS(nnszc) - 1;
+			nszc = nnszc;
+			ASSERT(nszc < mmu_page_sizes);
+		}
 	}
 
 	return (ret_pp);
 }
+
 
 /*
  * Helper routine used only by the freelist code to lock
@@ -2206,80 +2543,256 @@ page_trylock_cons(page_t *pp, se_t se)
 	return (1);
 }
 
+/*
+ * init context for walking page lists
+ * Called when a page of the given szc in unavailable. Sets markers
+ * for the beginning of the search to detect when search has
+ * completed a full cycle. Sets flags for splitting larger pages
+ * and coalescing smaller pages. Page walking procedes until a page
+ * of the desired equivalent color is found.
+ */
+void
+page_list_walk_init(uchar_t szc, uint_t flags, uint_t bin, int can_split,
+    int use_ceq, page_list_walker_t *plw)
+{
+	uint_t  nszc, ceq_mask, colors;
+	uchar_t ceq = use_ceq ? colorequivszc[szc] : 0;
+
+	ASSERT(szc < mmu_page_sizes);
+	colors = PAGE_GET_PAGECOLORS(szc);
+
+	plw->plw_colors = colors;
+	plw->plw_color_mask = colors - 1;
+	plw->plw_bin_marker = plw->plw_bin0 = bin;
+	plw->plw_bin_split_prev = bin;
+	plw->plw_bin_step = (szc == 0) ? vac_colors : 1;
+
+	/*
+	 * if vac aliasing is possible make sure lower order color
+	 * bits are never ignored
+	 */
+	if (vac_colors > 1)
+		ceq &= 0xf0;
+
+	/*
+	 * calculate the number of non-equivalent colors and
+	 * color equivalency mask
+	 */
+	plw->plw_ceq_dif = colors >> ((ceq >> 4) + (ceq & 0xf));
+	ASSERT(szc > 0 || plw->plw_ceq_dif >= vac_colors);
+	ASSERT(plw->plw_ceq_dif > 0);
+	plw->plw_ceq_mask[szc] = (plw->plw_ceq_dif - 1) << (ceq & 0xf);
+
+	if (flags & PG_MATCH_COLOR) {
+		if (cpu_page_colors <  0) {
+			/*
+			 * this is a heterogeneous machine with different CPUs
+			 * having different size e$ (not supported for ni2/rock
+			 */
+			uint_t cpucolors = CPUSETSIZE() >> PAGE_GET_SHIFT(szc);
+			cpucolors = MAX(cpucolors, 1);
+			ceq_mask = plw->plw_color_mask & (cpucolors - 1);
+			plw->plw_ceq_mask[szc] =
+			    MIN(ceq_mask, plw->plw_ceq_mask[szc]);
+		}
+		plw->plw_ceq_dif = 1;
+	}
+
+	/* we can split pages in the freelist, but not the cachelist */
+	if (can_split) {
+	    plw->plw_do_split = (szc + 1 < mmu_page_sizes) ? 1 : 0;
+
+	    /* calculate next sizes color masks and number of free list bins */
+	    for (nszc = szc + 1; nszc < mmu_page_sizes; nszc++, szc++) {
+		plw->plw_ceq_mask[nszc] = PAGE_GET_NSZ_MASK(szc,
+		    plw->plw_ceq_mask[szc]);
+		plw->plw_bins[nszc] = PAGE_GET_PAGECOLORS(nszc);
+	    }
+	    plw->plw_ceq_mask[nszc] = INVALID_MASK;
+	    plw->plw_bins[nszc] = 0;
+
+	} else {
+	    ASSERT(szc == 0);
+	    plw->plw_do_split = 0;
+	    plw->plw_bins[1] = 0;
+	    plw->plw_ceq_mask[1] = INVALID_MASK;
+	}
+}
+
+/*
+ * set mark to flag where next split should occur
+ */
+#define	PAGE_SET_NEXT_SPLIT_MARKER(szc, nszc, bin, plw) {		     \
+	uint_t bin_nsz = PAGE_GET_NSZ_COLOR(szc, bin);			     \
+	uint_t bin0_nsz = PAGE_GET_NSZ_COLOR(szc, plw->plw_bin0);	     \
+	uint_t neq_mask = ~plw->plw_ceq_mask[nszc] & plw->plw_color_mask;    \
+	plw->plw_split_next =						     \
+		INC_MASKED(bin_nsz, neq_mask, plw->plw_color_mask);	     \
+	if (!((plw->plw_split_next ^ bin0_nsz) & plw->plw_ceq_mask[nszc])) { \
+		plw->plw_split_next =					     \
+		INC_MASKED(plw->plw_split_next,				     \
+		    neq_mask, plw->plw_color_mask);			     \
+	}								     \
+}
+
+uint_t
+page_list_walk_next_bin(uchar_t szc, uint_t bin, page_list_walker_t *plw)
+{
+	uint_t  neq_mask = ~plw->plw_ceq_mask[szc] & plw->plw_color_mask;
+	uint_t  bin0_nsz, nbin_nsz, nbin0, nbin;
+	uchar_t nszc = szc + 1;
+
+	nbin = ADD_MASKED(bin,
+	    plw->plw_bin_step, neq_mask, plw->plw_color_mask);
+
+	if (plw->plw_do_split) {
+		plw->plw_bin_split_prev = bin;
+		PAGE_SET_NEXT_SPLIT_MARKER(szc, nszc, bin, plw);
+		plw->plw_do_split = 0;
+	}
+
+	if (szc == 0) {
+		if (plw->plw_count != 0 || plw->plw_ceq_dif == vac_colors) {
+			if (nbin == plw->plw_bin0 &&
+			    (vac_colors == 1 || nbin != plw->plw_bin_marker)) {
+				nbin = ADD_MASKED(nbin, plw->plw_bin_step,
+				    neq_mask, plw->plw_color_mask);
+				plw->plw_bin_split_prev = plw->plw_bin0;
+			}
+
+			if (vac_colors > 1 && nbin == plw->plw_bin_marker) {
+				plw->plw_bin_marker =
+				    nbin = INC_MASKED(nbin, neq_mask,
+					plw->plw_color_mask);
+				plw->plw_bin_split_prev = plw->plw_bin0;
+				/*
+				 * large pages all have the same vac color
+				 * so by now we should be done with next
+				 * size page splitting process
+				 */
+				ASSERT(plw->plw_bins[1] == 0);
+				plw->plw_do_split = 0;
+				return (nbin);
+			}
+
+		} else {
+			uint_t bin_jump = (vac_colors == 1) ?
+			    (BIN_STEP & ~3) - (plw->plw_bin0 & 3) : BIN_STEP;
+
+			bin_jump &= ~(vac_colors - 1);
+
+			nbin0 = ADD_MASKED(plw->plw_bin0, bin_jump, neq_mask,
+			    plw->plw_color_mask);
+
+			if ((nbin0 ^ plw->plw_bin0) & plw->plw_ceq_mask[szc]) {
+
+				plw->plw_bin_marker = nbin = nbin0;
+
+				if (plw->plw_bins[nszc] != 0) {
+					/*
+					 * check if next page size bin is the
+					 * same as the next page size bin for
+					 * bin0
+					 */
+					nbin_nsz = PAGE_GET_NSZ_COLOR(szc,
+					    nbin);
+					bin0_nsz = PAGE_GET_NSZ_COLOR(szc,
+					    plw->plw_bin0);
+
+					if ((bin0_nsz ^ nbin_nsz) &
+					    plw->plw_ceq_mask[nszc])
+						plw->plw_do_split = 1;
+				}
+				return (nbin);
+			}
+		}
+	}
+
+	if (plw->plw_bins[nszc] != 0) {
+	    nbin_nsz = PAGE_GET_NSZ_COLOR(szc, nbin);
+	    if (!((plw->plw_split_next ^ nbin_nsz) &
+		plw->plw_ceq_mask[nszc]))
+		plw->plw_do_split = 1;
+	}
+
+	return (nbin);
+}
+
 page_t *
 page_get_mnode_freelist(int mnode, uint_t bin, int mtype, uchar_t szc,
     uint_t flags)
 {
-	kmutex_t	*pcm;
-	int		i, fill_tried, fill_marker;
-	page_t		*pp, *first_pp;
-	uint_t		bin_marker;
-	int		colors, cpucolors;
-	uchar_t		nszc;
-	uint_t		nszc_color_shift;
-	int		nwaybins = 0, nwaycnt;
+	kmutex_t		*pcm;
+	page_t			*pp, *first_pp;
+	uint_t			sbin;
+	int			plw_initialized;
+	page_list_walker_t	plw;
 
 	ASSERT(szc < mmu_page_sizes);
 
 	VM_STAT_ADD(vmm_vmstats.pgmf_alloc[szc]);
 
 	MTYPE_START(mnode, mtype, flags);
-	if (mtype < 0) {	/* mnode foes not have memory in mtype range */
+	if (mtype < 0) {	/* mnode does not have memory in mtype range */
 		VM_STAT_ADD(vmm_vmstats.pgmf_allocempty[szc]);
 		return (NULL);
 	}
+try_again:
 
-	/*
-	 * Set how many physical colors for this page size.
-	 */
-	colors = (szc) ? page_convert_color(0, szc, page_colors - 1) + 1 :
-	    page_colors;
-
-	nszc = MIN(szc + 1, mmu_page_sizes - 1);
-	nszc_color_shift = page_get_shift(nszc) - page_get_shift(szc);
-
-	/* cpu_page_colors is non-zero if a page color may be in > 1 bin */
-	cpucolors = cpu_page_colors;
-
-	/*
-	 * adjust cpucolors to possibly check additional 'equivalent' bins
-	 * to try to minimize fragmentation of large pages by delaying calls
-	 * to page_freelist_fill.
-	 */
-	if (colorequiv > 1) {
-		int equivcolors = colors / colorequiv;
-
-		if (equivcolors && (cpucolors == 0 || equivcolors < cpucolors))
-			cpucolors = equivcolors;
-	}
-
-	ASSERT(colors <= page_colors);
-	ASSERT(colors);
-	ASSERT((colors & (colors - 1)) == 0);
-
-	ASSERT(bin < colors);
+	plw_initialized = 0;
+	plw.plw_ceq_dif = 1;
 
 	/*
 	 * Only hold one freelist lock at a time, that way we
 	 * can start anywhere and not have to worry about lock
 	 * ordering.
 	 */
-big_try_again:
-	fill_tried = 0;
-	nwaycnt = 0;
-	for (i = 0; i <= colors; i++) {
-try_again:
-		ASSERT(bin < colors);
-		if (PAGE_FREELISTS(mnode, szc, bin, mtype)) {
+	for (plw.plw_count = 0;
+	    plw.plw_count < plw.plw_ceq_dif; plw.plw_count++) {
+		sbin = bin;
+		do {
+			if (!PAGE_FREELISTS(mnode, szc, bin, mtype))
+				goto bin_empty_1;
+
 			pcm = PC_BIN_MUTEX(mnode, bin, PG_FREE_LIST);
 			mutex_enter(pcm);
 			pp = PAGE_FREELISTS(mnode, szc, bin, mtype);
-			if (pp != NULL) {
-				/*
-				 * These were set before the page
-				 * was put on the free list,
-				 * they must still be set.
-				 */
+			if (pp == NULL)
+				goto bin_empty_0;
+
+			/*
+			 * These were set before the page
+			 * was put on the free list,
+			 * they must still be set.
+			 */
+			ASSERT(PP_ISFREE(pp));
+			ASSERT(PP_ISAGED(pp));
+			ASSERT(pp->p_vnode == NULL);
+			ASSERT(pp->p_hash == NULL);
+			ASSERT(pp->p_offset == (u_offset_t)-1);
+			ASSERT(pp->p_szc == szc);
+			ASSERT(PFN_2_MEM_NODE(pp->p_pagenum) == mnode);
+
+			/*
+			 * Walk down the hash chain.
+			 * 8k pages are linked on p_next
+			 * and p_prev fields. Large pages
+			 * are a contiguous group of
+			 * constituent pages linked together
+			 * on their p_next and p_prev fields.
+			 * The large pages are linked together
+			 * on the hash chain using p_vpnext
+			 * p_vpprev of the base constituent
+			 * page of each large page.
+			 */
+			first_pp = pp;
+			while (!page_trylock_cons(pp, SE_EXCL)) {
+				if (szc == 0) {
+					pp = pp->p_next;
+				} else {
+					pp = pp->p_vpnext;
+				}
+
 				ASSERT(PP_ISFREE(pp));
 				ASSERT(PP_ISAGED(pp));
 				ASSERT(pp->p_vnode == NULL);
@@ -2288,187 +2801,88 @@ try_again:
 				ASSERT(pp->p_szc == szc);
 				ASSERT(PFN_2_MEM_NODE(pp->p_pagenum) == mnode);
 
-				/*
-				 * Walk down the hash chain.
-				 * 8k pages are linked on p_next
-				 * and p_prev fields. Large pages
-				 * are a contiguous group of
-				 * constituent pages linked together
-				 * on their p_next and p_prev fields.
-				 * The large pages are linked together
-				 * on the hash chain using p_vpnext
-				 * p_vpprev of the base constituent
-				 * page of each large page.
-				 */
-				first_pp = pp;
-				while (!page_trylock_cons(pp, SE_EXCL)) {
-					if (szc == 0) {
-						pp = pp->p_next;
-					} else {
-						pp = pp->p_vpnext;
-					}
+				if (pp == first_pp)
+					goto bin_empty_0;
+			}
 
-					ASSERT(PP_ISFREE(pp));
-					ASSERT(PP_ISAGED(pp));
-					ASSERT(pp->p_vnode == NULL);
-					ASSERT(pp->p_hash == NULL);
-					ASSERT(pp->p_offset == (u_offset_t)-1);
-					ASSERT(pp->p_szc == szc);
-					ASSERT(PFN_2_MEM_NODE(pp->p_pagenum) ==
-							mnode);
+			ASSERT(pp != NULL);
+			ASSERT(mtype == PP_2_MTYPE(pp));
+			ASSERT(pp->p_szc == szc);
+			if (szc == 0) {
+				page_sub(&PAGE_FREELISTS(mnode,
+				    szc, bin, mtype), pp);
+			} else {
+				page_vpsub(&PAGE_FREELISTS(mnode,
+				    szc, bin, mtype), pp);
+				CHK_LPG(pp, szc);
+			}
+			page_ctr_sub(mnode, mtype, pp, PG_FREE_LIST);
 
-					if (pp == first_pp) {
-						pp = NULL;
-						break;
-					}
-				}
-
-				if (pp) {
-					ASSERT(mtype == PP_2_MTYPE(pp));
-					ASSERT(pp->p_szc == szc);
-					if (szc == 0) {
-						page_sub(&PAGE_FREELISTS(mnode,
-						    szc, bin, mtype), pp);
-					} else {
-						page_vpsub(&PAGE_FREELISTS(
-						    mnode, szc, bin, mtype),
-						    pp);
-						CHK_LPG(pp, szc);
-					}
-					page_ctr_sub(mnode, mtype, pp,
-					    PG_FREE_LIST);
-
-					if ((PP_ISFREE(pp) == 0) ||
-					    (PP_ISAGED(pp) == 0))
-						panic("free page is not. pp %p",
-						    (void *)pp);
-					mutex_exit(pcm);
+			if ((PP_ISFREE(pp) == 0) || (PP_ISAGED(pp) == 0))
+				panic("free page is not. pp %p", (void *)pp);
+			mutex_exit(pcm);
 
 #if defined(__sparc)
-					ASSERT(!kcage_on || PP_ISNORELOC(pp) ||
-					    (flags & PG_NORELOC) == 0);
+			ASSERT(!kcage_on || PP_ISNORELOC(pp) ||
+			    (flags & PG_NORELOC) == 0);
 
-					if (PP_ISNORELOC(pp)) {
-						pgcnt_t	npgs;
-
-						npgs = page_get_pagecnt(szc);
-						kcage_freemem_sub(npgs);
-					}
+			if (PP_ISNORELOC(pp))
+				kcage_freemem_sub(page_get_pagecnt(szc));
 #endif
-					VM_STAT_ADD(vmm_vmstats.
-					    pgmf_allocok[szc]);
-					return (pp);
-				}
-			}
+			VM_STAT_ADD(vmm_vmstats.pgmf_allocok[szc]);
+			return (pp);
+
+bin_empty_0:
 			mutex_exit(pcm);
-		}
+bin_empty_1:
+			if (plw_initialized == 0) {
+				page_list_walk_init(szc, flags, bin, 1, 1,
+				    &plw);
+				plw_initialized = 1;
+				ASSERT(plw.plw_colors <=
+				    PAGE_GET_PAGECOLORS(szc));
+				ASSERT(plw.plw_colors > 0);
+				ASSERT((plw.plw_colors &
+				    (plw.plw_colors - 1)) == 0);
+				ASSERT(bin < plw.plw_colors);
+				ASSERT(plw.plw_ceq_mask[szc] < plw.plw_colors);
+			}
+			/* calculate the next bin with equivalent color */
+			bin = ADD_MASKED(bin, plw.plw_bin_step,
+			    plw.plw_ceq_mask[szc], plw.plw_color_mask);
+		} while (sbin != bin);
 
 		/*
-		 * Wow! The initial bin is empty.
-		 * If specific color is needed, check if page color may be
-		 * in other bins. cpucolors is:
-		 *   0	if the colors for this cpu is equal to page_colors.
-		 *	This means that pages with a particular color are in a
-		 *	single bin.
-		 *  -1	if colors of cpus (cheetah+) are heterogenous. Need to
-		 *	first determine the colors for the current cpu.
-		 *  >0	colors of all cpus are homogenous and < page_colors
-		 */
-
-		if ((flags & PG_MATCH_COLOR) && (cpucolors != 0)) {
-			if (!nwaybins) {
-				/*
-				 * cpucolors is negative if ecache setsizes
-				 * are heterogenous. determine colors for this
-				 * particular cpu.
-				 */
-				if (cpucolors < 0) {
-					cpucolors = CPUSETSIZE() / MMU_PAGESIZE;
-					ASSERT(cpucolors > 0);
-					nwaybins = colors / cpucolors;
-				} else {
-					nwaybins = colors / cpucolors;
-					ASSERT(szc > 0 || nwaybins > 1);
-				}
-				if (nwaybins < 2)
-					cpucolors = 0;
-			}
-
-			if (cpucolors && (nwaycnt + 1 <= nwaybins)) {
-				nwaycnt++;
-				bin = (bin + (colors / nwaybins)) &
-				    (colors - 1);
-				if (nwaycnt < nwaybins) {
-					goto try_again;
-				}
-			}
-			/* back to initial color if fall-thru */
-		}
-
-		/*
-		 * color bins are all empty if color match. Try and satisfy
-		 * the request by breaking up or coalescing pages from
-		 * a different size freelist of the correct color that
-		 * satisfies the ORIGINAL color requested. If that
-		 * fails then try pages of the same size but different
-		 * colors assuming we are not called with
+		 * color bins are all empty if color match. Try and
+		 * satisfy the request by breaking up or coalescing
+		 * pages from a different size freelist of the correct
+		 * color that satisfies the ORIGINAL color requested.
+		 * If that fails then try pages of the same size but
+		 * different colors assuming we are not called with
 		 * PG_MATCH_COLOR.
 		 */
-		if (!fill_tried) {
-			fill_tried = 1;
-			fill_marker = bin >> nszc_color_shift;
-			pp = page_freelist_fill(szc, bin, mnode, mtype,
-			    PFNNULL);
-			if (pp != NULL) {
-				return (pp);
-			}
-		}
+		if (plw.plw_do_split &&
+		    (pp = page_freelist_split(szc, bin, mnode,
+			mtype, PFNNULL, &plw)) != NULL)
+		    return (pp);
 
-		if (flags & PG_MATCH_COLOR)
-			break;
+		if (szc > 0 && (pp = page_freelist_coalesce(mnode, szc,
+		    bin, plw.plw_ceq_mask[szc], mtype, PFNNULL)) !=  NULL)
+			return (pp);
 
-		/*
-		 * Select next color bin to try.
-		 */
-		if (szc == 0) {
-			/*
-			 * PAGESIZE page case.
-			 */
-			if (i == 0) {
-				bin = (bin + BIN_STEP) & page_colors_mask;
-				bin_marker = bin;
-			} else {
-				bin = (bin + vac_colors) & page_colors_mask;
-				if (bin == bin_marker) {
-					bin = (bin + 1) & page_colors_mask;
-					bin_marker = bin;
-				}
-			}
-		} else {
-			/*
-			 * Large page case.
-			 */
-			bin = (bin + 1) & (colors - 1);
-		}
-		/*
-		 * If bin advanced to the next color bin of the
-		 * next larger pagesize, there is a chance the fill
-		 * could succeed.
-		 */
-		if (fill_marker != (bin >> nszc_color_shift))
-			fill_tried = 0;
+		if (plw.plw_ceq_dif > 1)
+			bin = page_list_walk_next_bin(szc, bin, &plw);
 	}
 
 	/* if allowed, cycle through additional mtypes */
 	MTYPE_NEXT(mnode, mtype, flags);
 	if (mtype >= 0)
-		goto big_try_again;
+		goto try_again;
 
 	VM_STAT_ADD(vmm_vmstats.pgmf_allocfailed[szc]);
 
 	return (NULL);
 }
-
 
 /*
  * Returns the count of free pages for 'pp' with size code 'szc'.
@@ -2785,13 +3199,13 @@ trimkcage(struct memseg *mseg, pfn_t *lo, pfn_t *hi, pfn_t pfnlo, pfn_t pfnhi)
 }
 
 /*
- * called from page_get_contig_pages to search 'pfnlo' thru 'pfnhi' to "claim" a
+ * called from page_get_contig_pages to search 'pfnlo' thru 'pfnhi' to claim a
  * page with size code 'szc'. Claiming such a page requires acquiring
  * exclusive locks on all constituent pages (page_trylock_contig_pages),
  * relocating pages in use and concatenating these constituent pages into a
  * large page.
  *
- * The page lists do not have such a large page and page_freelist_fill has
+ * The page lists do not have such a large page and page_freelist_split has
  * already failed to demote larger pages and/or coalesce smaller free pages.
  *
  * 'flags' may specify PG_COLOR_MATCH which would limit the search of large
@@ -2810,7 +3224,9 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 	pgcnt_t szcpgmask = szcpgcnt - 1;
 	pfn_t	randpfn;
 	page_t *pp, *randpp, *endpp;
-	uint_t colors;
+	uint_t colors, ceq_mask;
+	/* LINTED : set but not used in function */
+	uint_t color_mask;
 	pfn_t hi, lo;
 	uint_t skip;
 
@@ -2821,10 +3237,22 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 
 	ASSERT(szc < mmu_page_sizes);
 
-	colors = (szc) ? page_convert_color(0, szc, page_colors - 1) + 1 :
-	    page_colors;
+	colors = PAGE_GET_PAGECOLORS(szc);
+	color_mask = colors - 1;
+	if ((colors > 1) && (flags & PG_MATCH_COLOR)) {
+		uchar_t ceq = colorequivszc[szc];
+		uint_t  ceq_dif = colors >> ((ceq >> 4) + (ceq & 0xf));
+
+		ASSERT(ceq_dif > 0);
+		ceq_mask = (ceq_dif - 1) << (ceq & 0xf);
+	} else {
+		ceq_mask = 0;
+	}
 
 	ASSERT(bin < colors);
+
+	/* clear "non-significant" color bits */
+	bin &= ceq_mask;
 
 	/*
 	 * trim the pfn range to search based on pfnflag. pfnflag is set
@@ -2889,38 +3317,25 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 		 * set lo to point to the pfn for the desired bin. Large
 		 * page sizes may only have a single page color
 		 */
-		if ((colors > 1) && (flags & PG_MATCH_COLOR)) {
-			uint_t	lobin;
-
-			/*
-			 * factor in colorequiv to check additional
-			 * 'equivalent' bins.
-			 */
-			if (colorequiv > 1 && colors > colorequiv)
-				colors = colors / colorequiv;
-
-			/* determine bin that lo currently points to */
-			lobin = (lo & ((szcpgcnt * colors) - 1)) / szcpgcnt;
-
-			/*
-			 * set lo to point at appropriate color and set skip
-			 * to arrive at the next szc page of the same color.
-			 */
-			lo += ((bin - lobin) & (colors - 1)) * szcpgcnt;
-
-			skip = colors * szcpgcnt;
-		} else {
-			/* check all pages starting from lo */
-			skip = szcpgcnt;
+		skip = szcpgcnt;
+		if (ceq_mask > 0) {
+			/* set lo to point at appropriate color */
+			PAGE_NEXT_PFN_FOR_COLOR(lo, szc, bin, ceq_mask,
+			    color_mask);
+			if (hi <= lo)
+				/* mseg cannot satisfy color request */
+				continue;
 		}
-		if (hi <= lo)
-			/* mseg cannot satisfy color request */
-			continue;
 
 		/* randomly choose a point between lo and hi to begin search */
 
 		randpfn = (pfn_t)GETTICK();
 		randpfn = ((randpfn % (hi - lo)) + lo) & ~(skip - 1);
+		if (ceq_mask) {
+			PAGE_NEXT_PFN_FOR_COLOR(randpfn, szc, bin, ceq_mask,
+			    color_mask);
+			randpfn = (randpfn >= hi) ? lo : randpfn;
+		}
 		randpp = mseg->pages + (randpfn - mseg->pages_base);
 
 		ASSERT(randpp->p_pagenum == randpfn);
@@ -2932,9 +3347,8 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 
 		do {
 			ASSERT(!(pp->p_pagenum & szcpgmask));
-			ASSERT((flags & PG_MATCH_COLOR) == 0 ||
-			    colorequiv > 1 ||
-			    PP_2_BIN(pp) == bin);
+			ASSERT(((PP_2_BIN(pp) ^ bin) & ceq_mask) == 0);
+
 			if (page_trylock_contig_pages(mnode, pp, szc, flags)) {
 				/* pages unlocked by page_claim on failure */
 				if (page_claim_contig_pages(pp, szc, flags)) {
@@ -2943,7 +3357,15 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 				}
 			}
 
-			pp += skip;
+			if (ceq_mask == 0) {
+				pp += skip;
+			} else {
+				pfn_t pfn = pp->p_pagenum;
+
+				PAGE_NEXT_PFN_FOR_COLOR(pfn, szc, bin,
+				    ceq_mask, color_mask);
+				pp = mseg->pages + (pfn - mseg->pages_base);
+			}
 			if (pp >= endpp) {
 				/* start from the beginning */
 				pp = mseg->pages + (lo - mseg->pages_base);
@@ -3095,11 +3517,9 @@ page_get_freelist(struct vnode *vp, u_offset_t off, struct seg *seg,
 	VM_STAT_ADD(vmm_vmstats.pgf_alloc[szc]);
 
 	/* LINTED */
-	AS_2_BIN(as, seg, vp, vaddr, bin);
+	AS_2_BIN(as, seg, vp, vaddr, bin, szc);
 
-	/* bin is for base pagesize color - convert if larger pagesize. */
-	if (szc)
-		bin = page_convert_color(0, szc, bin);
+	ASSERT(bin < PAGE_GET_PAGECOLORS(szc));
 
 	/*
 	 * Try to get a local page first, but try remote if we can't
@@ -3229,9 +3649,9 @@ page_get_cachelist(struct vnode *vp, u_offset_t off, struct seg *seg,
 	}
 
 	/* LINTED */
-	AS_2_BIN(as, seg, vp, vaddr, bin);
+	AS_2_BIN(as, seg, vp, vaddr, bin, 0);
 
-	ASSERT(bin <= page_colors_mask);
+	ASSERT(bin < PAGE_GET_PAGECOLORS(0));
 
 	/* LINTED */
 	MTYPE_INIT(mtype, vp, vaddr, flags, MMU_PAGESIZE);
@@ -3294,13 +3714,11 @@ page_get_cachelist(struct vnode *vp, u_offset_t off, struct seg *seg,
 page_t *
 page_get_mnode_cachelist(uint_t bin, uint_t flags, int mnode, int mtype)
 {
-	kmutex_t	*pcm;
-	int		i;
-	page_t		*pp;
-	page_t		*first_pp;
-	uint_t		bin_marker;
-	int		nwaybins, nwaycnt;
-	int		cpucolors;
+	kmutex_t		*pcm;
+	page_t			*pp, *first_pp;
+	uint_t			sbin;
+	int			plw_initialized;
+	page_list_walker_t	plw;
 
 	VM_STAT_ADD(vmm_vmstats.pgmc_alloc);
 
@@ -3311,19 +3729,10 @@ page_get_mnode_cachelist(uint_t bin, uint_t flags, int mnode, int mtype)
 		return (NULL);
 	}
 
-	nwaybins = 0;
-	cpucolors = cpu_page_colors;
-	/*
-	 * adjust cpucolors to possibly check additional 'equivalent' bins
-	 * to try to minimize fragmentation of large pages by delaying calls
-	 * to page_freelist_fill.
-	 */
-	if (colorequiv > 1) {
-		int equivcolors = page_colors / colorequiv;
+try_again:
 
-		if (equivcolors && (cpucolors == 0 || equivcolors < cpucolors))
-			cpucolors = equivcolors;
-	}
+	plw_initialized = 0;
+	plw.plw_ceq_dif = 1;
 
 	/*
 	 * Only hold one cachelist lock at a time, that way we
@@ -3331,128 +3740,96 @@ page_get_mnode_cachelist(uint_t bin, uint_t flags, int mnode, int mtype)
 	 * ordering.
 	 */
 
-big_try_again:
-	nwaycnt = 0;
-	for (i = 0; i <= page_colors; i++) {
-		if (PAGE_CACHELISTS(mnode, bin, mtype)) {
+	for (plw.plw_count = 0;
+	    plw.plw_count < plw.plw_ceq_dif; plw.plw_count++) {
+		sbin = bin;
+		do {
+
+			if (!PAGE_CACHELISTS(mnode, bin, mtype))
+				goto bin_empty_1;
 			pcm = PC_BIN_MUTEX(mnode, bin, PG_CACHE_LIST);
 			mutex_enter(pcm);
 			pp = PAGE_CACHELISTS(mnode, bin, mtype);
-			if (pp != NULL) {
-				first_pp = pp;
+			if (pp == NULL)
+				goto bin_empty_0;
+
+			first_pp = pp;
+			ASSERT(pp->p_vnode);
+			ASSERT(PP_ISAGED(pp) == 0);
+			ASSERT(pp->p_szc == 0);
+			ASSERT(PFN_2_MEM_NODE(pp->p_pagenum) == mnode);
+			while (!page_trylock(pp, SE_EXCL)) {
+				pp = pp->p_next;
+				ASSERT(pp->p_szc == 0);
+				if (pp == first_pp) {
+					/*
+					 * We have searched the complete list!
+					 * And all of them (might only be one)
+					 * are locked. This can happen since
+					 * these pages can also be found via
+					 * the hash list. When found via the
+					 * hash list, they are locked first,
+					 * then removed. We give up to let the
+					 * other thread run.
+					 */
+					pp = NULL;
+					break;
+				}
+				ASSERT(pp->p_vnode);
+				ASSERT(PP_ISFREE(pp));
+				ASSERT(PP_ISAGED(pp) == 0);
+				ASSERT(PFN_2_MEM_NODE(pp->p_pagenum) ==
+				    mnode);
+			}
+
+			if (pp) {
+				page_t	**ppp;
+				/*
+				 * Found and locked a page.
+				 * Pull it off the list.
+				 */
+				ASSERT(mtype == PP_2_MTYPE(pp));
+				ppp = &PAGE_CACHELISTS(mnode, bin, mtype);
+				page_sub(ppp, pp);
+				/*
+				 * Subtract counters before releasing pcm mutex
+				 * to avoid a race with page_freelist_coalesce
+				 * and page_freelist_split.
+				 */
+				page_ctr_sub(mnode, mtype, pp, PG_CACHE_LIST);
+				mutex_exit(pcm);
 				ASSERT(pp->p_vnode);
 				ASSERT(PP_ISAGED(pp) == 0);
-				ASSERT(pp->p_szc == 0);
-				ASSERT(PFN_2_MEM_NODE(pp->p_pagenum) == mnode);
-				while (!page_trylock(pp, SE_EXCL)) {
-					pp = pp->p_next;
-					ASSERT(pp->p_szc == 0);
-					if (pp == first_pp) {
-						/*
-						 * We have searched the
-						 * complete list!
-						 * And all of them (might
-						 * only be one) are locked.
-						 * This can happen since
-						 * these pages can also be
-						 * found via the hash list.
-						 * When found via the hash
-						 * list, they are locked
-						 * first, then removed.
-						 * We give up to let the
-						 * other thread run.
-						 */
-						pp = NULL;
-						break;
-					}
-					ASSERT(pp->p_vnode);
-					ASSERT(PP_ISFREE(pp));
-					ASSERT(PP_ISAGED(pp) == 0);
-					ASSERT(PFN_2_MEM_NODE(pp->p_pagenum) ==
-							mnode);
-				}
-
-				if (pp) {
-					page_t	**ppp;
-					/*
-					 * Found and locked a page.
-					 * Pull it off the list.
-					 */
-					ASSERT(mtype == PP_2_MTYPE(pp));
-					ppp = &PAGE_CACHELISTS(mnode, bin,
-					    mtype);
-					page_sub(ppp, pp);
-					/*
-					 * Subtract counters before releasing
-					 * pcm mutex to avoid a race with
-					 * page_freelist_coalesce and
-					 * page_freelist_fill.
-					 */
-					page_ctr_sub(mnode, mtype, pp,
-					    PG_CACHE_LIST);
-					mutex_exit(pcm);
-					ASSERT(pp->p_vnode);
-					ASSERT(PP_ISAGED(pp) == 0);
 #if defined(__sparc)
-					ASSERT(!kcage_on ||
-					    (flags & PG_NORELOC) == 0 ||
-					    PP_ISNORELOC(pp));
-					if (PP_ISNORELOC(pp)) {
-						kcage_freemem_sub(1);
-					}
+				ASSERT(!kcage_on ||
+				    (flags & PG_NORELOC) == 0 ||
+				    PP_ISNORELOC(pp));
+				if (PP_ISNORELOC(pp)) {
+					kcage_freemem_sub(1);
+				}
 #endif
-					VM_STAT_ADD(vmm_vmstats.
-					    pgmc_allocok);
-					return (pp);
-				}
+				VM_STAT_ADD(vmm_vmstats. pgmc_allocok);
+				return (pp);
 			}
+bin_empty_0:
 			mutex_exit(pcm);
-		}
-
-		/*
-		 * Wow! The initial bin is empty or no page in the bin could
-		 * be locked.
-		 *
-		 * If specific color is needed, check if page color may be in
-		 * other bins.
-		 */
-		if ((flags & PG_MATCH_COLOR) && (cpucolors != 0)) {
-			if (!nwaybins) {
-				if (cpucolors < 0) {
-					cpucolors = CPUSETSIZE() / MMU_PAGESIZE;
-					ASSERT(cpucolors > 0);
-					nwaybins = page_colors / cpucolors;
-					if (nwaybins < 2)
-						cpucolors = 0;
-				} else {
-					nwaybins = page_colors / cpucolors;
-					ASSERT(nwaybins > 1);
-				}
+bin_empty_1:
+			if (plw_initialized == 0) {
+				page_list_walk_init(0, flags, bin, 0, 1, &plw);
+				plw_initialized = 1;
 			}
+			/* calculate the next bin with equivalent color */
+			bin = ADD_MASKED(bin, plw.plw_bin_step,
+			    plw.plw_ceq_mask[0], plw.plw_color_mask);
+		} while (sbin != bin);
 
-			if (++nwaycnt >= nwaybins) {
-				break;
-			}
-			bin = (bin + (page_colors / nwaybins)) &
-			    page_colors_mask;
-			continue;
-		}
-
-		if (i == 0) {
-			bin = (bin + BIN_STEP) & page_colors_mask;
-			bin_marker = bin;
-		} else {
-			bin = (bin + vac_colors) & page_colors_mask;
-			if (bin == bin_marker) {
-				bin = (bin + 1) & page_colors_mask;
-				bin_marker = bin;
-			}
-		}
+		if (plw.plw_ceq_dif > 1)
+			bin = page_list_walk_next_bin(0, bin, &plw);
 	}
 
 	MTYPE_NEXT(mnode, mtype, flags);
 	if (mtype >= 0)
-		goto big_try_again;
+		goto try_again;
 
 	VM_STAT_ADD(vmm_vmstats.pgmc_allocfailed);
 	return (NULL);

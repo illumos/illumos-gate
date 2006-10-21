@@ -47,6 +47,7 @@
 #include <vm/vm_dep.h>
 #include <sys/mem_config.h>
 #include <sys/lgrp.h>
+#include <sys/rwlock.h>
 
 extern pri_t maxclsyspri;
 
@@ -205,7 +206,7 @@ static kcondvar_t kcage_cageout_cv;	/* cageout thread naps here */
 static int kcage_cageout_ready;		/* nonzero when cageout thread ready */
 kthread_id_t kcage_cageout_thread;	/* to aid debugging */
 
-static kmutex_t kcage_range_mutex;	/* proctects kcage_glist elements */
+static krwlock_t kcage_range_rwlock;	/* protects kcage_glist elements */
 
 /*
  * Cage expansion happens within a range.
@@ -272,28 +273,26 @@ pgcnt_t	kcage_pagets;
  * kcage_set_thresholds()
  */
 
-int
-kcage_range_trylock(void)
-{
-	return (mutex_tryenter(&kcage_range_mutex));
-}
-
+/*
+ * Called outside of this file to add/remove from the list,
+ * therefore, it takes a writer lock
+ */
 void
 kcage_range_lock(void)
 {
-	mutex_enter(&kcage_range_mutex);
+	rw_enter(&kcage_range_rwlock, RW_WRITER);
 }
 
 void
 kcage_range_unlock(void)
 {
-	mutex_exit(&kcage_range_mutex);
+	rw_exit(&kcage_range_rwlock);
 }
 
 int
 kcage_range_islocked(void)
 {
-	return (MUTEX_HELD(&kcage_range_mutex));
+	return (rw_lock_held(&kcage_range_rwlock));
 }
 
 /*
@@ -316,6 +315,80 @@ kcage_current_pfn(pfn_t *pfncur)
 	*pfncur = lp->curr;
 
 	return (lp->decr);
+}
+
+/*
+ * Called from vm_pagelist.c during coalesce to find kernel cage regions
+ * within an mnode. Looks for the lowest range between lo and hi.
+ *
+ * Kernel cage memory is defined between kcage_glist and kcage_current_glist.
+ * Non-cage memory is defined between kcage_current_glist and list end.
+ *
+ * If incage is set, returns the lowest kcage range. Otherwise returns lowest
+ * non-cage range.
+ *
+ * Returns zero on success and nlo, nhi:
+ * 	lo <= nlo < nhi <= hi
+ * Returns non-zero if no overlapping range is found.
+ */
+int
+kcage_next_range(int incage, pfn_t lo, pfn_t hi,
+    pfn_t *nlo, pfn_t *nhi)
+{
+	struct kcage_glist *lp;
+	pfn_t tlo = hi;
+	pfn_t thi = hi;
+
+	ASSERT(lo <= hi);
+
+	/*
+	 * Reader lock protects the list, but kcage_get_pfn
+	 * running concurrently may advance kcage_current_glist
+	 * and also update kcage_current_glist->curr. Page
+	 * coalesce can handle this race condition.
+	 */
+	rw_enter(&kcage_range_rwlock, RW_READER);
+
+	for (lp = incage ? kcage_glist : kcage_current_glist;
+		lp != NULL; lp = lp->next) {
+
+		pfn_t klo, khi;
+
+		/* find the range limits in this element */
+		if ((incage && lp->decr) || (!incage && !lp->decr)) {
+			klo = lp->curr;
+			khi = lp->lim;
+		} else {
+			klo = lp->base;
+			khi = lp->curr;
+		}
+
+		/* handle overlap */
+		if (klo < tlo && klo < khi && lo < khi && klo < hi) {
+			tlo = MAX(lo, klo);
+			thi = MIN(hi, khi);
+			if (tlo == lo)
+				break;
+		}
+
+		/* check end of kcage */
+		if (incage && lp == kcage_current_glist) {
+			break;
+		}
+	}
+
+	rw_exit(&kcage_range_rwlock);
+
+	/* return non-zero if no overlapping range found */
+	if (tlo == thi)
+		return (1);
+
+	ASSERT(lo <= tlo && tlo < thi && thi <= hi);
+
+	/* return overlapping range */
+	*nlo = tlo;
+	*nhi = thi;
+	return (0);
 }
 
 int
@@ -1296,10 +1369,10 @@ kcage_expand()
 	}
 
 	/*
-	 * Try to get the range list lock. If the lock is already
+	 * Try to get the range list reader lock. If the lock is already
 	 * held, then don't get stuck here waiting for it.
 	 */
-	if (!kcage_range_trylock())
+	if (!rw_tryenter(&kcage_range_rwlock, RW_READER))
 		return (0);
 
 	KCAGE_STAT_INCR(ke_calls);
@@ -1335,7 +1408,7 @@ kcage_expand()
 
 		/*
 		 * NORELOC is only set at boot-time or by this routine
-		 * under the kcage_range_mutex lock which is currently
+		 * under the kcage_range_rwlock lock which is currently
 		 * held. This means we can do a fast check here before
 		 * locking the page in kcage_assimilate_page.
 		 */

@@ -83,7 +83,7 @@
 #include <sys/memnode.h>
 #include <sys/stack.h>
 
-uint_t vac_colors = 0;
+uint_t vac_colors = 1;
 
 int largepagesupport = 0;
 extern uint_t page_create_new;
@@ -953,16 +953,12 @@ int		mnoderangecnt;
 int		mtype4g;
 
 int
-mnode_range_cnt()
+mnode_range_cnt(int mnode)
 {
 	int	mri;
 	int	mnrcnt = 0;
-	int	mnode;
 
-	for (mnode = 0; mnode < max_mem_nodes; mnode++) {
-		if (mem_node_config[mnode].exists == 0)
-			continue;
-
+	if (mem_node_config[mnode].exists != 0) {
 		mri = nranges - 1;
 
 		/* find the memranges index below contained in mnode range */
@@ -983,6 +979,7 @@ mnode_range_cnt()
 				break;
 		}
 	}
+	ASSERT(mnrcnt <= MAX_MNODE_MRANGES);
 	return (mnrcnt);
 }
 
@@ -1128,15 +1125,6 @@ page_coloring_init(uint_t l2_sz, int l2_linesz, int l2_assoc)
 	if (i == 0)
 		physmax4g = 1;
 
-	/*
-	 * setup pagesize for generic page layer
-	 */
-	for (i = 0; i <= mmu.max_page_level; ++i) {
-		hw_page_array[i].hp_size = LEVEL_SIZE(i);
-		hw_page_array[i].hp_shift = LEVEL_SHIFT(i);
-		hw_page_array[i].hp_pgcnt = LEVEL_SIZE(i) >> LEVEL_SHIFT(0);
-	}
-
 	ASSERT(ISP2(l2_sz));
 	ASSERT(ISP2(l2_linesz));
 	ASSERT(l2_sz > MMU_PAGESIZE);
@@ -1164,8 +1152,62 @@ page_coloring_init(uint_t l2_sz, int l2_linesz, int l2_assoc)
 	ASSERT(ISP2(CPUSETSIZE()));
 	page_coloring_shift = lowbit(CPUSETSIZE());
 
+	/* initialize number of colors per page size */
+	for (i = 0; i <= mmu.max_page_level; i++) {
+		hw_page_array[i].hp_size = LEVEL_SIZE(i);
+		hw_page_array[i].hp_shift = LEVEL_SHIFT(i);
+		hw_page_array[i].hp_pgcnt = LEVEL_SIZE(i) >> LEVEL_SHIFT(0);
+		hw_page_array[i].hp_colors = (page_colors_mask >>
+		    (hw_page_array[i].hp_shift - hw_page_array[0].hp_shift))
+		    + 1;
+	}
+
+	/*
+	 * The value of cpu_page_colors determines if additional color bins
+	 * need to be checked for a particular color in the page_get routines.
+	 */
+	if (cpu_page_colors != 0) {
+
+		int a = lowbit(page_colors) - lowbit(cpu_page_colors);
+		ASSERT(a > 0);
+		ASSERT(a < 16);
+
+		for (i = 0; i <= mmu.max_page_level; i++) {
+			if ((colors = hw_page_array[i].hp_colors) <= 1) {
+				colorequivszc[i] = 0;
+				continue;
+			}
+			while ((colors >> a) == 0)
+				a--;
+			ASSERT(a >= 0);
+
+			/* higher 4 bits encodes color equiv mask */
+			colorequivszc[i] = (a << 4);
+		}
+	}
+
+	/* factor in colorequiv to check additional 'equivalent' bins. */
+	if (colorequiv > 1) {
+
+		int a = lowbit(colorequiv) - 1;
+		if (a > 15)
+			a = 15;
+
+		for (i = 0; i <= mmu.max_page_level; i++) {
+			if ((colors = hw_page_array[i].hp_colors) <= 1) {
+				continue;
+			}
+			while ((colors >> a) == 0)
+				a--;
+			if ((a << 4) > colorequivszc[i]) {
+				colorequivszc[i] = (a << 4);
+			}
+		}
+	}
+
 	/* size for mnoderanges */
-	mnoderangecnt = mnode_range_cnt();
+	for (mnoderangecnt = 0, i = 0; i < max_mem_nodes; i++)
+		mnoderangecnt += mnode_range_cnt(i);
 	colorsz = mnoderangecnt * sizeof (mnoderange_t);
 
 	/* size for fpc_mutex and cpc_mutex */
@@ -1255,20 +1297,21 @@ page_t *
 page_get_mnode_anylist(ulong_t origbin, uchar_t szc, uint_t flags,
     int mnode, int mtype, ddi_dma_attr_t *dma_attr)
 {
-	kmutex_t	*pcm;
-	int		i;
-	page_t		*pp;
-	page_t		*first_pp;
-	uint64_t	pgaddr;
-	ulong_t		bin;
-	int		mtypestart;
+	kmutex_t		*pcm;
+	int			i;
+	page_t			*pp;
+	page_t			*first_pp;
+	uint64_t		pgaddr;
+	ulong_t			bin;
+	int			mtypestart;
+	int			plw_initialized;
+	page_list_walker_t	plw;
 
 	VM_STAT_ADD(pga_vmstats.pgma_alloc);
 
 	ASSERT((flags & PG_MATCH_COLOR) == 0);
 	ASSERT(szc == 0);
 	ASSERT(dma_attr != NULL);
-
 
 	MTYPE_START(mnode, mtype, flags);
 	if (mtype < 0) {
@@ -1285,8 +1328,11 @@ page_get_mnode_anylist(ulong_t origbin, uchar_t szc, uint_t flags,
 	 * because of BIN_STEP skip
 	 */
 	do {
-		i = 0;
-		while (i <= page_colors) {
+		plw_initialized = 0;
+
+		for (plw.plw_count = 0;
+		    plw.plw_count < page_colors; plw.plw_count++) {
+
 			if (PAGE_FREELISTS(mnode, szc, bin, mtype) == NULL)
 				goto nextfreebin;
 
@@ -1348,16 +1394,24 @@ page_get_mnode_anylist(ulong_t origbin, uchar_t szc, uint_t flags,
 			}
 			mutex_exit(pcm);
 nextfreebin:
-			pp = page_freelist_fill(szc, bin, mnode, mtype,
-			    mmu_btop(dma_attr->dma_attr_addr_hi + 1));
-			if (pp)
-				return (pp);
+			if (plw_initialized == 0) {
+				page_list_walk_init(szc, 0, bin, 1, 0, &plw);
+				ASSERT(plw.plw_ceq_dif == page_colors);
+				plw_initialized = 1;
+			}
 
-			/* try next bin */
-			bin += (i == 0) ? BIN_STEP : 1;
-			bin &= page_colors_mask;
-			i++;
+			if (plw.plw_do_split) {
+				pp = page_freelist_split(szc, bin, mnode,
+				    mtype,
+				    mmu_btop(dma_attr->dma_attr_addr_hi + 1),
+				    &plw);
+				if (pp != NULL)
+					return (pp);
+			}
+
+			bin = page_list_walk_next_bin(szc, bin, &plw);
 		}
+
 		MTYPE_NEXT(mnode, mtype, flags);
 	} while (mtype >= 0);
 
@@ -1475,7 +1529,7 @@ page_get_anylist(struct vnode *vp, u_offset_t off, struct as *as, caddr_t vaddr,
 		lgrp = lgrp_home_lgrp();
 
 	/* LINTED */
-	AS_2_BIN(as, seg, vp, vaddr, bin);
+	AS_2_BIN(as, seg, vp, vaddr, bin, 0);
 
 	/*
 	 * Only hold one freelist or cachelist lock at a time, that way we

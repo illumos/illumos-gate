@@ -801,13 +801,16 @@ void add_physmem_cb(page_t *, pfn_t);	/* callback for page_t part */
 typedef struct {
 	size_t	hp_size;
 	uint_t	hp_shift;
+	uint_t  hp_colors;
 	pgcnt_t	hp_pgcnt;	/* base pagesize cnt */
 } hw_pagesize_t;
 
 extern hw_pagesize_t	hw_page_array[];
-extern uint_t		page_colors, page_colors_mask;
 extern uint_t		page_coloring_shift;
+extern uint_t		page_colors_mask;
 extern int		cpu_page_colors;
+extern uint_t		colorequiv;
+extern uchar_t		colorequivszc[];
 
 uint_t	page_num_pagesizes(void);
 uint_t	page_num_user_pagesizes(void);
@@ -818,10 +821,30 @@ uint_t	page_get_shift(uint_t);
 int	page_szc(size_t);
 int	page_szc_user_filtered(size_t);
 
-
 /* page_get_replacement page flags */
 #define	PGR_SAMESZC	0x1	/* only look for page size same as orig */
 #define	PGR_NORELOC	0x2	/* allocate a P_NORELOC page */
+
+/*
+ * macros for "masked arithmetic"
+ * The purpose is to step through all combinations of a set of bits while
+ * keeping some other bits fixed. Fixed bits need not be contiguous. The
+ * variable bits need not be contiguous either, or even right aligned. The
+ * trick is to set all fixed bits to 1, then increment, then restore the
+ * fixed bits. If incrementing causes a carry from a low bit position, the
+ * carry propagates thru the fixed bits, because they are temporarily set to 1.
+ *	v is the value
+ *	i is the increment
+ *	eq_mask defines the fixed bits
+ *	mask limits the size of the result
+ */
+#define	ADD_MASKED(v, i, eq_mask, mask) \
+	(((((v) | (eq_mask)) + (i)) & (mask) & ~(eq_mask)) | ((v) & (eq_mask)))
+
+/*
+ * convenience macro which increments by 1
+ */
+#define	INC_MASKED(v, eq_mask, mask) ADD_MASKED(v, 1, eq_mask, mask)
 
 #endif	/* _KERNEL */
 
@@ -1038,7 +1061,6 @@ extern uint64_t memsegspa;		/* memsegs as physical address */
 
 void build_pfn_hash();
 extern struct memseg *page_numtomemseg_nolock(pfn_t pfnum);
-
 
 #ifdef	__cplusplus
 }

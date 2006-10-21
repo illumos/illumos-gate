@@ -233,8 +233,18 @@ extern int		pfn_2_mtype(pfn_t);
 extern int		mtype_func(int, int, uint_t);
 extern void		mtype_modify_max(pfn_t, long);
 extern int		mnode_pgcnt(int);
+extern int		mnode_range_cnt(int);
 
 #define	NUM_MEM_RANGES	4		/* memory range types */
+
+/*
+ * candidate counters in vm_pagelist.c are indexed by color and range
+ */
+#define	MAX_MNODE_MRANGES	NUM_MEM_RANGES
+#define	MNODE_RANGE_CNT(mnode)	mnode_range_cnt(mnode)
+#define	MNODE_MAX_MRANGE(mnode)	(memrange_num(mem_node_config[mnode].physbase))
+#define	MTYPE_2_MRANGE(mnode, mtype)	\
+	(mnode_maxmrange[mnode] - mnoderanges[mtype].mnr_memrange)
 
 /*
  * Per page size free lists. Allocated dynamically.
@@ -274,10 +284,51 @@ extern kmutex_t	*cpc_mutex[NPC_MUTEX];
 extern page_t *page_get_mnode_freelist(int, uint_t, int, uchar_t, uint_t);
 extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 
-/* Find the bin for the given page if it was of size szc */
-#define	PP_2_BIN_SZC(pp, szc)						\
-	(((pp->p_pagenum) & page_colors_mask) >>			\
+#define	PAGE_GET_COLOR_SHIFT(szc, nszc)                          \
+	    (hw_page_array[(nszc)].hp_shift - hw_page_array[(szc)].hp_shift)
+
+#define	PFN_2_COLOR(pfn, szc)						\
+	(((pfn) & page_colors_mask) >>			                \
 	(hw_page_array[szc].hp_shift - hw_page_array[0].hp_shift))
+
+#define	PNUM_SIZE(szc)							\
+	(hw_page_array[(szc)].hp_pgcnt)
+#define	PNUM_SHIFT(szc)							\
+	(hw_page_array[(szc)].hp_shift - hw_page_array[0].hp_shift)
+#define	PAGE_GET_SHIFT(szc)						\
+	(hw_page_array[(szc)].hp_shift)
+#define	PAGE_GET_PAGECOLORS(szc)					\
+	(hw_page_array[(szc)].hp_colors)
+
+/*
+ * This macro calculates the next sequential pfn with the specified
+ * color using color equivalency mask
+ */
+#define	PAGE_NEXT_PFN_FOR_COLOR(pfn, szc, color, ceq_mask, color_mask)        \
+	ASSERT(((color) & ~(ceq_mask)) == 0);                                 \
+	{								      \
+		uint_t	pfn_shift = PAGE_BSZS_SHIFT(szc);                     \
+		pfn_t	spfn = pfn >> pfn_shift;                              \
+		pfn_t	stride = (ceq_mask) + 1;                              \
+		ASSERT((((ceq_mask) + 1) & (ceq_mask)) == 0);                 \
+		if (((spfn ^ (color)) & (ceq_mask)) == 0) {                   \
+			pfn += stride << pfn_shift;                           \
+		} else {                                                      \
+			pfn = (spfn & ~(pfn_t)(ceq_mask)) | (color);          \
+			pfn = (pfn > spfn ? pfn : pfn + stride) << pfn_shift; \
+		}                                                             \
+	}
+
+/* get the color equivalency mask for the next szc */
+#define	PAGE_GET_NSZ_MASK(szc, mask)                                         \
+	((mask) >> (PAGE_GET_SHIFT((szc) + 1) - PAGE_GET_SHIFT(szc)))
+
+/* get the color of the next szc */
+#define	PAGE_GET_NSZ_COLOR(szc, color)                                       \
+	((color) >> (PAGE_GET_SHIFT((szc) + 1) - PAGE_GET_SHIFT(szc)))
+
+/* Find the bin for the given page if it was of size szc */
+#define	PP_2_BIN_SZC(pp, szc)	(PFN_2_COLOR(pp->p_pagenum, szc))
 
 #define	PP_2_BIN(pp)		(PP_2_BIN_SZC(pp, pp->p_szc))
 
@@ -287,6 +338,33 @@ extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 
 #define	SZCPAGES(szc)		(1 << PAGE_BSZS_SHIFT(szc))
 #define	PFN_BASE(pfnum, szc)	(pfnum & ~(SZCPAGES(szc) - 1))
+
+/*
+ * this structure is used for walking free page lists
+ * controls when to split large pages into smaller pages,
+ * and when to coalesce smaller pages into larger pages
+ */
+typedef struct page_list_walker {
+	uint_t	plw_colors;		/* num of colors for szc */
+	uint_t  plw_color_mask;		/* colors-1 */
+	uint_t	plw_bin_step;		/* next bin: 1 or 2 */
+	uint_t  plw_count;		/* loop count */
+	uint_t	plw_bin0;		/* starting bin */
+	uint_t  plw_bin_marker;		/* bin after initial jump */
+	uint_t  plw_bin_split_prev;	/* last bin we tried to split */
+	uint_t  plw_do_split;		/* set if OK to split */
+	uint_t  plw_split_next;		/* next bin to split */
+	uint_t	plw_ceq_dif;		/* number of different color groups */
+					/* to check */
+	uint_t	plw_ceq_mask[MMU_PAGE_SIZES + 1]; /* color equiv mask */
+	uint_t	plw_bins[MMU_PAGE_SIZES + 1];	/* num of bins */
+} page_list_walker_t;
+
+void	page_list_walk_init(uchar_t szc, uint_t flags, uint_t bin,
+    int can_split, int use_ceq, page_list_walker_t *plw);
+
+uint_t	page_list_walk_next_bin(uchar_t szc, uint_t bin,
+    page_list_walker_t *plw);
 
 extern struct cpu	cpus[];
 #define	CPU0		cpus
@@ -494,9 +572,10 @@ extern int	l2cache_sz, l2cache_linesz, l2cache_assoc;
  * hash as and addr to get a bin.
  */
 
-#define	AS_2_BIN(as, seg, vp, addr, bin)				\
-	bin = ((((uintptr_t)(addr) >> PAGESHIFT) + ((uintptr_t)(as) >> 4)) \
-	    & page_colors_mask)
+#define	AS_2_BIN(as, seg, vp, addr, bin, szc)				    \
+	bin = (((((uintptr_t)(addr) >> PAGESHIFT) + ((uintptr_t)(as) >> 4)) \
+	    & page_colors_mask) >>					    \
+	    (hw_page_array[szc].hp_shift - hw_page_array[0].hp_shift))
 
 /*
  * cpu private vm data - accessed thru CPU->cpu_vm_data
@@ -575,19 +654,23 @@ struct vmm_vmstats_str {
 	ulong_t	plsub_cache;
 	ulong_t	plsubpages_szcbig;
 	ulong_t	plsubpages_szc0;
-	ulong_t	pff_req[MMU_PAGE_SIZES];	/* page_freelist_fill */
-	ulong_t	pff_demote[MMU_PAGE_SIZES];
-	ulong_t	pff_coalok[MMU_PAGE_SIZES];
+	ulong_t	pfs_req[MMU_PAGE_SIZES];	/* page_freelist_split */
+	ulong_t	pfs_demote[MMU_PAGE_SIZES];
+	ulong_t	pfc_coalok[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
 	ulong_t	ppr_reloc[MMU_PAGE_SIZES];	/* page_relocate */
 	ulong_t ppr_relocnoroot[MMU_PAGE_SIZES];
 	ulong_t ppr_reloc_replnoroot[MMU_PAGE_SIZES];
 	ulong_t ppr_relocnolock[MMU_PAGE_SIZES];
 	ulong_t ppr_relocnomem[MMU_PAGE_SIZES];
 	ulong_t ppr_relocok[MMU_PAGE_SIZES];
-	ulong_t page_ctrs_coalesce;	/* page coalesce counter */
-	ulong_t page_ctrs_cands_skip;	/* candidates useful */
-	ulong_t page_ctrs_changed;	/* ctrs changed after locking */
-	ulong_t page_ctrs_failed;	/* page_freelist_coalesce failed */
+	/* page coalesce counter */
+	ulong_t page_ctrs_coalesce[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
+	/* candidates useful */
+	ulong_t page_ctrs_cands_skip[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
+	/* ctrs changed after locking */
+	ulong_t page_ctrs_changed[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
+	/* page_freelist_coalesce failed */
+	ulong_t page_ctrs_failed[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
 	ulong_t page_ctrs_coalesce_all;	/* page coalesce all counter */
 	ulong_t page_ctrs_cands_skip_all; /* candidates useful for all func */
 	ulong_t	restrict4gcnt;
@@ -600,7 +683,10 @@ extern struct vmm_vmstats_str vmm_vmstats;
 extern size_t page_ctrs_sz(void);
 extern caddr_t page_ctrs_alloc(caddr_t);
 extern void page_ctr_sub(int, int, page_t *, int);
-extern page_t *page_freelist_fill(uchar_t, int, int, int, pfn_t);
+extern page_t *page_freelist_split(uchar_t,
+    uint_t, int, int, pfn_t, page_list_walker_t *);
+extern page_t *page_freelist_coalesce(int, uchar_t, uint_t, uint_t, int,
+    pfn_t);
 extern uint_t page_get_pagecolors(uint_t);
 
 #ifdef	__cplusplus

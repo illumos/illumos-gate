@@ -47,6 +47,7 @@
 #include <sys/mem_config.h>
 #include <sys/mem_cage.h>
 #include <vm/vm_dep.h>
+#include <vm/page.h>
 #include <sys/platform_module.h>
 
 /*
@@ -75,6 +76,10 @@ extern uint_t page_coloring_shift;
 int cpu_page_colors;
 uint_t vac_colors = 0;
 uint_t vac_colors_mask = 0;
+
+/* cpu specific coloring initialization */
+extern void page_coloring_init_cpu();
+#pragma weak page_coloring_init_cpu
 
 /*
  * get the ecache setsize for the current cpu.
@@ -864,9 +869,6 @@ map_shm_pgszcvec(caddr_t addr, size_t size, uintptr_t off)
 	return (szcvec);
 }
 
-#define	PNUM_SIZE(size_code)						\
-	(hw_page_array[size_code].hp_size >> hw_page_array[0].hp_shift)
-
 /*
  * Anchored in the table below are counters used to keep track
  * of free contiguous physical memory. Each element of the table contains
@@ -924,7 +926,7 @@ alloc_page_freelists(int mnode, caddr_t alloc_base, int alloc_align)
 	 */
 	for (mtype = 0; mtype < MAX_MEM_TYPES; mtype++) {
 		page_cachelists[mtype][mnode] = (page_t **)alloc_base;
-		alloc_base += (sizeof (page_t *) * page_colors);
+		alloc_base += (sizeof (page_t *) * page_get_pagecolors(0));
 		/*
 		 * Allocate freelists bins for all
 		 * supported page sizes.
@@ -1009,7 +1011,7 @@ ndata_alloc_page_freelists(struct memlist *ndata, int mnode)
 	 * Calculate the size needed by alloc_page_freelists().
 	 */
 	for (mtype = 0; mtype < MAX_MEM_TYPES; mtype++) {
-		alloc_sz += sizeof (page_t *) * page_colors;
+		alloc_sz += sizeof (page_t *) * page_get_pagecolors(0);
 
 		for (szc = 0; szc < mmu_page_sizes; szc++)
 			alloc_sz += sizeof (page_t *) *
@@ -1044,7 +1046,7 @@ get_color_start(struct as *as)
 
 	if (consistent_coloring == 2 || color_start_random) {
 		return ((uint_t)(((gettick()) << (vac_shift - MMU_PAGESHIFT)) &
-		    page_colors_mask));
+		    (hw_page_array[0].hp_colors - 1)));
 	}
 
 	do {
@@ -1066,10 +1068,13 @@ get_color_start(struct as *as)
 void
 page_coloring_init()
 {
-	int	a;
+	int	a, i;
+	uint_t colors;
 
 	if (do_pg_coloring == 0) {
 		page_colors = 1;
+		for (i = 0; i < mmu_page_sizes; i++)
+			hw_page_array[i].hp_colors = 1;
 		return;
 	}
 
@@ -1082,6 +1087,22 @@ page_coloring_init()
 	page_colors = ecache_setsize / MMU_PAGESIZE;
 	page_colors_mask = page_colors - 1;
 
+	vac_colors = vac_size / MMU_PAGESIZE;
+	vac_colors_mask = vac_colors -1;
+
+	page_coloring_shift = 0;
+	a = ecache_setsize;
+	while (a >>= 1) {
+		page_coloring_shift++;
+	}
+
+	/* initialize number of colors per page size */
+	for (i = 0; i < mmu_page_sizes; i++) {
+		hw_page_array[i].hp_colors = (page_colors_mask >>
+		    (hw_page_array[i].hp_shift - hw_page_array[0].hp_shift))
+		    + 1;
+	}
+
 	/*
 	 * initialize cpu_page_colors if ecache setsizes are homogenous.
 	 * cpu_page_colors set to -1 during DR operation or during startup
@@ -1090,16 +1111,50 @@ page_coloring_init()
 	 * The value of cpu_page_colors determines if additional color bins
 	 * need to be checked for a particular color in the page_get routines.
 	 */
-	if ((cpu_page_colors == 0) && (cpu_setsize < ecache_setsize))
+	if ((cpu_page_colors == 0) && (cpu_setsize < ecache_setsize)) {
+
 		cpu_page_colors = cpu_setsize / MMU_PAGESIZE;
+		a = lowbit(page_colors) - lowbit(cpu_page_colors);
+		ASSERT(a > 0);
+		ASSERT(a < 16);
 
-	vac_colors = vac_size / MMU_PAGESIZE;
-	vac_colors_mask = vac_colors -1;
+		for (i = 0; i < mmu_page_sizes; i++) {
+			if ((colors = hw_page_array[i].hp_colors) <= 1) {
+				colorequivszc[i] = 0;
+				continue;
+			}
+			while ((colors >> a) == 0)
+				a--;
+			ASSERT(a >= 0);
 
-	page_coloring_shift = 0;
-	a = ecache_setsize;
-	while (a >>= 1) {
-		page_coloring_shift++;
+			/* higher 4 bits encodes color equiv mask */
+			colorequivszc[i] = (a << 4);
+		}
+	}
+
+	/* factor in colorequiv to check additional 'equivalent' bins. */
+	if (colorequiv > 1 && &page_coloring_init_cpu == NULL) {
+
+		a = lowbit(colorequiv) - 1;
+
+		if (a > 15)
+			a = 15;
+
+		for (i = 0; i < mmu_page_sizes; i++) {
+			if ((colors = hw_page_array[i].hp_colors) <= 1) {
+				continue;
+			}
+			while ((colors >> a) == 0)
+				a--;
+			if ((a << 4) > colorequivszc[i]) {
+				colorequivszc[i] = (a << 4);
+			}
+		}
+	}
+
+	/* do cpu specific color initialization */
+	if (&page_coloring_init_cpu) {
+		page_coloring_init_cpu();
 	}
 }
 

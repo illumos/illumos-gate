@@ -55,7 +55,6 @@ extern "C" {
 	mtype = (flags & PG_NORELOC) ? MTYPE_NORELOC : MTYPE_RELOC;
 
 /* mtype init for page_get_replacement_page */
-
 #define	MTYPE_PGR_INIT(mtype, flags, pp, mnode, pgcnt)			\
 	mtype = (flags & PG_NORELOC) ? MTYPE_NORELOC : MTYPE_RELOC;
 
@@ -63,6 +62,14 @@ extern "C" {
 	ASSERT(mtype != MTYPE_NORELOC);					\
 	pfnlo = mem_node_config[mnode].physbase;			\
 	pfnhi = mem_node_config[mnode].physmax;
+
+/*
+ * candidate counters in vm_pagelist.c are indexed by color and range
+ */
+#define	MAX_MNODE_MRANGES		MAX_MEM_TYPES
+#define	MNODE_RANGE_CNT(mnode)		MAX_MNODE_MRANGES
+#define	MNODE_MAX_MRANGE(mnode)		(MAX_MEM_TYPES - 1)
+#define	MTYPE_2_MRANGE(mnode, mtype)	(mtype)
 
 /*
  * Internal PG_ flags.
@@ -99,10 +106,83 @@ extern page_t ***page_cachelists[MAX_MEM_TYPES];
 extern kmutex_t	*fpc_mutex[NPC_MUTEX];
 extern kmutex_t	*cpc_mutex[NPC_MUTEX];
 
+/*
+ * cpu specific color conversion functions
+ */
+extern uint_t page_get_nsz_color_mask_cpu(uchar_t, uint_t);
+#pragma weak page_get_nsz_color_mask_cpu
+
+extern uint_t page_get_nsz_color_cpu(uchar_t, uint_t);
+#pragma weak page_get_nsz_color_cpu
+
+extern uint_t page_get_color_shift_cpu(uchar_t, uchar_t);
+#pragma weak page_get_color_shift_cpu
+
+extern pfn_t page_next_pfn_for_color_cpu(pfn_t,
+    uchar_t, uint_t, uint_t, uint_t);
+#pragma weak page_next_pfn_for_color_cpu
+
+extern uint_t  page_pfn_2_color_cpu(pfn_t, uchar_t);
+#pragma weak page_pfn_2_color_cpu
+
+#define	PAGE_GET_COLOR_SHIFT(szc, nszc)				\
+	((&page_get_color_shift_cpu != NULL) ?			\
+	    page_get_color_shift_cpu(szc, nszc) :		\
+	    (hw_page_array[(nszc)].hp_shift -			\
+		hw_page_array[(szc)].hp_shift))
+
+#define	PFN_2_COLOR(pfn, szc)					\
+	((&page_pfn_2_color_cpu != NULL) ?			\
+	    page_pfn_2_color_cpu(pfn, szc) :			\
+	    ((pfn & (hw_page_array[0].hp_colors - 1)) >>	\
+		(hw_page_array[szc].hp_shift -			\
+		    hw_page_array[0].hp_shift)))
+
+#define	PNUM_SIZE(szc)							\
+	(hw_page_array[(szc)].hp_pgcnt)
+#define	PNUM_SHIFT(szc)							\
+	(hw_page_array[(szc)].hp_shift - hw_page_array[0].hp_shift)
+#define	PAGE_GET_SHIFT(szc)						\
+	(hw_page_array[(szc)].hp_shift)
+#define	PAGE_GET_PAGECOLORS(szc)					\
+	(hw_page_array[(szc)].hp_colors)
+
+/*
+ * This macro calculates the next sequential pfn with the specified
+ * color using color equivalency mask
+ */
+#define	PAGE_NEXT_PFN_FOR_COLOR(pfn, szc, color, ceq_mask, color_mask)        \
+	ASSERT(((color) & ~(ceq_mask)) == 0);                                 \
+	if (&page_next_pfn_for_color_cpu == NULL) {                           \
+		uint_t	pfn_shift = PAGE_BSZS_SHIFT(szc);                     \
+		pfn_t	spfn = pfn >> pfn_shift;                              \
+		pfn_t	stride = (ceq_mask) + 1;                              \
+		ASSERT((((ceq_mask) + 1) & (ceq_mask)) == 0);                 \
+		if (((spfn ^ (color)) & (ceq_mask)) == 0) {                   \
+			pfn += stride << pfn_shift;                           \
+		} else {                                                      \
+			pfn = (spfn & ~(pfn_t)(ceq_mask)) | (color);          \
+			pfn = (pfn > spfn ? pfn : pfn + stride) << pfn_shift; \
+		}                                                             \
+	} else {                                                              \
+		pfn = page_next_pfn_for_color_cpu(pfn, szc, color,	      \
+		    ceq_mask, color_mask);                                    \
+	}
+
+/* get the color equivalency mask for the next szc */
+#define	PAGE_GET_NSZ_MASK(szc, mask)                                         \
+	((&page_get_nsz_color_mask_cpu == NULL) ?                            \
+	    ((mask) >> (PAGE_GET_SHIFT((szc) + 1) - PAGE_GET_SHIFT(szc))) :  \
+	    page_get_nsz_color_mask_cpu(szc, mask))
+
+/* get the color of the next szc */
+#define	PAGE_GET_NSZ_COLOR(szc, color)                                       \
+	((&page_get_nsz_color_cpu == NULL) ?                                 \
+	    ((color) >> (PAGE_GET_SHIFT((szc) + 1) - PAGE_GET_SHIFT(szc))) : \
+	    page_get_nsz_color_cpu(szc, color))
+
 /* Find the bin for the given page if it was of size szc */
-#define	PP_2_BIN_SZC(pp, szc)                                           \
-	(((pp->p_pagenum) & page_colors_mask) >>                        \
-	(hw_page_array[szc].hp_shift - hw_page_array[0].hp_shift))
+#define	PP_2_BIN_SZC(pp, szc)	(PFN_2_COLOR(pp->p_pagenum, szc))
 
 #define	PP_2_BIN(pp)		(PP_2_BIN_SZC(pp, pp->p_szc))
 
@@ -116,6 +196,30 @@ extern kmutex_t	*cpc_mutex[NPC_MUTEX];
 #define	CPC_MUTEX(mnode, i)	(&cpc_mutex[i][mnode])
 
 #define	PFN_BASE(pfnum, szc)	(pfnum & ~((1 << PAGE_BSZS_SHIFT(szc)) - 1))
+
+/*
+ * this structure is used for walking free page lists
+ * controls when to split large pages into smaller pages,
+ * and when to coalesce smaller pages into larger pages
+ */
+typedef struct page_list_walker {
+	uint_t	plw_colors;		/* num of colors for szc */
+	uint_t  plw_color_mask;		/* colors-1 */
+	uint_t	plw_bin_step;		/* next bin: 1 or 2 */
+	uint_t  plw_count;		/* loop count */
+	uint_t	plw_bin0;		/* starting bin */
+	uint_t  plw_bin_marker;		/* bin after initial jump */
+	uint_t  plw_bin_split_prev;	/* last bin we tried to split */
+	uint_t  plw_do_split;		/* set if OK to split */
+	uint_t  plw_split_next;		/* next bin to split */
+	uint_t	plw_ceq_dif;		/* number of different color groups */
+					/* to check */
+	uint_t	plw_ceq_mask[MMU_PAGE_SIZES + 1]; /* color equiv mask */
+	uint_t	plw_bins[MMU_PAGE_SIZES + 1];	/* num of bins */
+} page_list_walker_t;
+
+void	page_list_walk_init(uchar_t szc, uint_t flags, uint_t bin,
+    int can_split, int use_ceq, page_list_walker_t *plw);
 
 typedef	char	hpmctr_t;
 
@@ -147,7 +251,7 @@ typedef	struct {
 
 #define	PLCNT_SZ(ctrs_sz) {						\
 	int	szc;							\
-	for (szc = 0; szc <= mmu_page_sizes; szc++) {			\
+	for (szc = 0; szc < mmu_page_sizes; szc++) {			\
 		int	colors = page_get_pagecolors(szc);		\
 		ctrs_sz += (max_mem_nodes * MAX_MEM_TYPES *		\
 		    colors * sizeof (pgcnt_t));				\
@@ -285,6 +389,7 @@ extern plcnt_t	plcnt;
  * get the ecache setsize for the current cpu.
  */
 #define	CPUSETSIZE()	(cpunodes[CPU->cpu_id].ecache_setsize)
+#define	CPUASSOC()	(cpunodes[CPU->cpu_id].ecache_associativity)
 
 extern struct cpu	cpu0;
 #define	CPU0		&cpu0
@@ -337,7 +442,7 @@ extern pgcnt_t auto_lpg_min_physmem;
  * 1 virtual=paddr
  * 2 bin hopping
  */
-#define	AS_2_BIN(as, seg, vp, addr, bin)				\
+#define	AS_2_BIN(as, seg, vp, addr, bin, szc)				\
 switch (consistent_coloring) {						\
 	default:                                                        \
 		cmn_err(CE_WARN,					\
@@ -346,41 +451,53 @@ switch (consistent_coloring) {						\
 	case 0: {                                                       \
 		uint32_t ndx, new;					\
 		int slew = 0;						\
+		pfn_t pfn;                                              \
                                                                         \
 		if (vp != NULL && IS_SWAPVP(vp) &&			\
-			seg->s_ops == &segvn_ops)			\
+		    seg->s_ops == &segvn_ops)				\
 			slew = as_color_bin(as);			\
                                                                         \
-		bin = (((uintptr_t)addr >> MMU_PAGESHIFT) +		\
+		pfn = ((uintptr_t)addr >> MMU_PAGESHIFT) +		\
 			(((uintptr_t)addr >> page_coloring_shift) <<	\
-			(vac_shift - MMU_PAGESHIFT)) + slew) &		\
-			page_colors_mask;				\
-                                                                        \
+			(vac_shift - MMU_PAGESHIFT));			\
+		if ((szc) == 0 ||					\
+		    (szc == 1 && &page_pfn_2_color_cpu == NULL &&	\
+		    CPUASSOC() > PNUM_SIZE(1))) {			\
+			pfn += slew;					\
+			bin = PFN_2_COLOR(pfn, szc);			\
+		} else {						\
+			bin = PFN_2_COLOR(pfn, szc);			\
+			bin += slew >> (vac_shift - MMU_PAGESHIFT);	\
+			bin &= hw_page_array[(szc)].hp_colors - 1;	\
+		}							\
 		break;                                                  \
 	}                                                               \
 	case 1:                                                         \
-		bin = ((uintptr_t)addr >> MMU_PAGESHIFT) &		\
-			page_colors_mask;				\
+		bin = PFN_2_COLOR(((uintptr_t)addr >> MMU_PAGESHIFT),   \
+					szc);	                        \
 		break;                                                  \
 	case 2: {                                                       \
 		int cnt = as_color_bin(as);				\
+		uint_t color_mask = page_get_pagecolors(0) - 1;		\
+                                                                        \
 		/* make sure physical color aligns with vac color */	\
 		while ((cnt & vac_colors_mask) !=			\
 		    addr_to_vcolor(addr)) {				\
 			cnt++;						\
 		}                                                       \
-		bin = cnt = cnt & page_colors_mask;			\
+		bin = cnt = cnt & color_mask;			        \
+		bin >>= PAGE_GET_COLOR_SHIFT(0, szc);                   \
 		/* update per as page coloring fields */		\
-		cnt = (cnt + 1) & page_colors_mask;			\
-		if (cnt == (as_color_start(as) & page_colors_mask)) {	\
+		cnt = (cnt + 1) & color_mask;			        \
+		if (cnt == (as_color_start(as) & color_mask)) {	        \
 			cnt = as_color_start(as) = as_color_start(as) + \
 				PGCLR_LOOPFACTOR;			\
 		}                                                       \
-		as_color_bin(as) = cnt & page_colors_mask;		\
+		as_color_bin(as) = cnt & color_mask;		        \
 		break;                                                  \
 	}								\
 }									\
-	ASSERT(bin <= page_colors_mask);
+	ASSERT(bin < page_get_pagecolors(szc));
 
 /*
  * cpu private vm data - accessed thru CPU->cpu_vm_data
@@ -488,9 +605,9 @@ struct vmm_vmstats_str {
 	ulong_t	plsub_cache;
 	ulong_t	plsubpages_szcbig;
 	ulong_t	plsubpages_szc0;
-	ulong_t	pff_req[MMU_PAGE_SIZES];	/* page_freelist_fill */
-	ulong_t	pff_demote[MMU_PAGE_SIZES];
-	ulong_t	pff_coalok[MMU_PAGE_SIZES];
+	ulong_t	pfs_req[MMU_PAGE_SIZES];	/* page_freelist_split */
+	ulong_t	pfs_demote[MMU_PAGE_SIZES];
+	ulong_t	pfc_coalok[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
 	ulong_t ppr_reloc[MMU_PAGE_SIZES];	/* page_relocate */
 	ulong_t ppr_relocok[MMU_PAGE_SIZES];
 	ulong_t ppr_relocnoroot[MMU_PAGE_SIZES];
@@ -498,10 +615,14 @@ struct vmm_vmstats_str {
 	ulong_t ppr_relocnolock[MMU_PAGE_SIZES];
 	ulong_t ppr_relocnomem[MMU_PAGE_SIZES];
 	ulong_t ppr_krelocfail[MMU_PAGE_SIZES];
-	ulong_t	page_ctrs_coalesce;	/* page coalesce counter */
-	ulong_t	page_ctrs_cands_skip;	/* candidates useful */
-	ulong_t	page_ctrs_changed;	/* ctrs changed after locking */
-	ulong_t	page_ctrs_failed;	/* page_freelist_coalesce failed */
+	/* page coalesce counter */
+	ulong_t	page_ctrs_coalesce[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
+	/* candidates useful */
+	ulong_t	page_ctrs_cands_skip[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
+	/* ctrs changed after locking */
+	ulong_t	page_ctrs_changed[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
+	/* page_freelist_coalesce failed */
+	ulong_t	page_ctrs_failed[MMU_PAGE_SIZES][MAX_MNODE_MRANGES];
 	ulong_t	page_ctrs_coalesce_all;	/* page coalesce all counter */
 	ulong_t	page_ctrs_cands_skip_all; /* candidates useful for all func */
 };
