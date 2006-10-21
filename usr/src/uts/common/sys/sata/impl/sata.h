@@ -162,6 +162,8 @@ struct sata_cport_info {
 	} 			cport_devp;
 						/* lbolt value at link lost */
 	clock_t			cport_link_lost_time;
+						/* lbolt value @ dev attached */
+	clock_t			cport_dev_attach_time;
 
 	struct sata_port_stats	cport_stats;	/* Port statistics */
 };
@@ -286,6 +288,8 @@ struct sata_pmport_info {
 
 						/* lbolt value at link lost */
 	clock_t		pmport_link_lost_time;
+						/* lbolt value @ dev attached */
+	clock_t		pmport_dev_attach_time;
 
 	struct sata_port_stats	pmport_stats;	/* Port statistics */
 };
@@ -368,8 +372,12 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
 #define	SATA_EVNT_DAEMON_TERM_TIMEOUT	100000	/* 100 ms */
 #define	SATA_EVNT_DAEMON_TERM_WAIT	60000000 /* 60 s */
 #define	SATA_EVNT_LINK_LOST_TIMEOUT	1000000	/* 1 s */
+#define	SATA_DEV_IDENTIFY_TIMEOUT	60000000 /* 60 s */
+#define	SATA_DEV_IDENTIFY_RETRY_DELAY	10000	/* 10 ms */
 
-#define	SATA_DEVICE_IDENTIFY_RETRY	2
+/* DEVICE IDENTIFY and device initialization retry delay */
+#define	SATA_DEV_IDENTIFY_RETRY		1
+#define	SATA_DEV_IDENTIFY_NORETRY	0
 
 /*
  * sata_scsi's hba_open_flag: field indicating open devctl instance.
