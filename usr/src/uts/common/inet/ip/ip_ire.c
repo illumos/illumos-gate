@@ -4835,7 +4835,7 @@ ire_local_same_ill_group(ire_t *ire_local, ire_t *xmit_ire)
 	ill_group_t	*recv_group, *xmit_group;
 
 	ASSERT(ire_local->ire_type & (IRE_LOCAL|IRE_LOOPBACK));
-	ASSERT(xmit_ire->ire_type & (IRE_CACHETABLE));
+	ASSERT(xmit_ire->ire_type & (IRE_CACHETABLE|IRE_INTERFACE));
 
 	recv_ill = ire_to_ill(ire_local);
 	xmit_ill = ire_to_ill(xmit_ire);
@@ -4857,6 +4857,8 @@ ire_local_same_ill_group(ire_t *ire_local, ire_t *xmit_ire)
 
 /*
  * Check if the IRE_LOCAL uses the same ill (group) as another route would use.
+ * If there is no alternate route, or the alternate is a REJECT or BLACKHOLE,
+ * then we don't allow this IRE_LOCAL to be used.
  */
 boolean_t
 ire_local_ok_across_zones(ire_t *ire_local, zoneid_t zoneid, void *addr,
@@ -4880,6 +4882,10 @@ ire_local_ok_across_zones(ire_t *ire_local, zoneid_t zoneid, void *addr,
 	if (alt_ire == NULL)
 		return (B_FALSE);
 
+	if (alt_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
+		ire_refrele(alt_ire);
+		return (B_FALSE);
+	}
 	rval = ire_local_same_ill_group(ire_local, alt_ire);
 
 	ire_refrele(alt_ire);
