@@ -396,7 +396,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
 		} else {
 			rval = fork1();
 			if (rval == 0 && lx_is_rpm)
-				sleep(lx_rpm_delay);
+				(void) sleep(lx_rpm_delay);
 		}
 
 		if (rval > 0 && (flags & LX_CLONE_PARENT_SETTID))
