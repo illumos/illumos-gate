@@ -58,7 +58,7 @@ _init(void)
 	error = mod_install(&modlinkage);
 	if (error != 0)
 		arp_ddi_destroy();
-	return error;
+	return (error);
 }
 
 int
@@ -69,7 +69,7 @@ _fini(void)
 	error = mod_remove(&modlinkage);
 	if (error == 0)
 		arp_ddi_destroy();
-	return error;
+	return (error);
 }
 
 int

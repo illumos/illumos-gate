@@ -3213,7 +3213,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 
 	DTRACE_PROBE3(arp__physical__in__start,
 	    arl_t *, arl, arh_t *, arh, mblk_t *, mp);
-    
+
 	ARP_HOOK_IN(arp_physical_in_event, arp_physical_in,
 		    arl->arl_index, arh, mp, mp1);
 
@@ -3659,9 +3659,9 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 	/* The ppa is sent down by ifconfig */
 	arl->arl_ppa = lifr->lifr_ppa;
 
-	/* 
+	/*
 	 * A network device is not considered to be fully plumb'd until
-	 * its name has been set using SIOCSLIFNAME.  Once it has 
+	 * its name has been set using SIOCSLIFNAME.  Once it has
 	 * been set, it cannot be set again (see code above), so there
 	 * is currently no danger in this function causing two NE_PLUMB
 	 * events without an intervening NE_UNPLUMB.

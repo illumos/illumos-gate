@@ -6921,7 +6921,7 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 
 	DTRACE_PROBE1(ip6__physical__in__end, mblk_t *, first_mp);
 
-	if (first_mp == NULL) 
+	if (first_mp == NULL)
 		return;
 
 	if ((ip6h->ip6_vcf & IPV6_VERS_AND_FLOW_MASK) ==

@@ -21951,7 +21951,8 @@ another:;
 		    ill_t *, ire->ire_ipif->ipif_ill, ipha_t *, ipha,
 		    mblk_t *, mp);
 		FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,
-		    MSG_FWCOOKED_OUT, NULL, ire->ire_ipif->ipif_ill, ipha, mp, mp);
+		    MSG_FWCOOKED_OUT, NULL, ire->ire_ipif->ipif_ill,
+		    ipha, mp, mp);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 		if (mp == NULL)
 			goto release_ire_and_ill;

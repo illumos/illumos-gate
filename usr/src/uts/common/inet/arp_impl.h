@@ -117,7 +117,7 @@ typedef struct ace_s {
 	int		ace_xmit_count;
 } ace_t;
 
-/* 
+/*
  * Hooks structures used inside of arp
  */
 extern hook_event_token_t	arp_physical_in;
@@ -128,12 +128,12 @@ extern hook_event_t	arp_physical_in_event;
 extern hook_event_t	arp_physical_out_event;
 extern hook_event_t	arp_nic_events;
 
-#define ARPHOOK_INTERESTED_PHYSICAL_IN	\
+#define	ARPHOOK_INTERESTED_PHYSICAL_IN	\
 	(arp_physical_in_event.he_interested)
-#define ARPHOOK_INTERESTED_PHYSICAL_OUT	\
+#define	ARPHOOK_INTERESTED_PHYSICAL_OUT	\
 	(arp_physical_out_event.he_interested)
 
-#define ARP_HOOK_IN(_hook, _event, _ilp, _hdr, _fm, _m)	\
+#define	ARP_HOOK_IN(_hook, _event, _ilp, _hdr, _fm, _m)	\
 								\
 	if ((_hook).he_interested) {                       	\
 		hook_pkt_event_t info;                          \
@@ -156,7 +156,7 @@ extern hook_event_t	arp_nic_events;
 		}                                               \
 	}
 
-#define ARP_HOOK_OUT(_hook, _event, _olp, _hdr, _fm, _m)	\
+#define	ARP_HOOK_OUT(_hook, _event, _olp, _hdr, _fm, _m)	\
 								\
 	if ((_hook).he_interested) {                       	\
 		hook_pkt_event_t info;                          \
