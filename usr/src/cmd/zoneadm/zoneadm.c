@@ -2279,6 +2279,14 @@ verify_fs_special(struct zone_fstab *fstab)
 {
 	struct stat st;
 
+	/*
+	 * This validation is really intended for standard zone administration.
+	 * If we are in a mini-root or some other upgrade situation where
+	 * we are using the scratch zone, just by-pass this.
+	 */
+	if (zonecfg_in_alt_root())
+		return (Z_OK);
+
 	if (strcmp(fstab->zone_fs_type, MNTTYPE_ZFS) == 0)
 		return (verify_fs_zfs(fstab));
 
