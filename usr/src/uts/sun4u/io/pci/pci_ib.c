@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -339,6 +338,7 @@ ib_intr_dist_all(void *arg, int32_t weight_max, int32_t weight)
 	ib_t *ib_p = (ib_t *)arg;
 	pci_t *pci_p = ib_p->ib_pci_p;
 	ib_ino_info_t *ino_p;
+	ib_ino_pil_t *ipil_p;
 	ih_t *ih_lst;
 	int32_t dweight;
 	int i;
@@ -357,7 +357,8 @@ ib_intr_dist_all(void *arg, int32_t weight_max, int32_t weight)
 
 	/* Perform special processing for first call of a redistribution. */
 	if (weight == weight_max) {
-		for (ino_p = ib_p->ib_ino_lst; ino_p; ino_p = ino_p->ino_next) {
+		for (ino_p = ib_p->ib_ino_lst; ino_p;
+		    ino_p = ino_p->ino_next_p) {
 
 			/*
 			 * Clear ino_established of each ino on first call.
@@ -375,17 +376,23 @@ ib_intr_dist_all(void *arg, int32_t weight_max, int32_t weight)
 			 * i_ddi_set_intr_weight()).
 			 */
 			ino_p->ino_intr_weight = 0;
-			for (i = 0, ih_lst = ino_p->ino_ih_head;
-			    i < ino_p->ino_ih_size;
-			    i++, ih_lst = ih_lst->ih_next) {
-				dweight = i_ddi_get_intr_weight(ih_lst->ih_dip);
-				if (dweight > 0)
-					ino_p->ino_intr_weight += dweight;
+
+			for (ipil_p = ino_p->ino_ipil_p; ipil_p;
+			    ipil_p = ipil_p->ipil_next_p) {
+				for (i = 0, ih_lst = ipil_p->ipil_ih_head;
+				    i < ipil_p->ipil_ih_size; i++,
+				    ih_lst = ih_lst->ih_next) {
+					dweight = i_ddi_get_intr_weight
+					    (ih_lst->ih_dip);
+					if (dweight > 0)
+						ino_p->ino_intr_weight +=
+						    dweight;
+				}
 			}
 		}
 	}
 
-	for (ino_p = ib_p->ib_ino_lst; ino_p; ino_p = ino_p->ino_next) {
+	for (ino_p = ib_p->ib_ino_lst; ino_p; ino_p = ino_p->ino_next_p) {
 		uint32_t orig_cpuid;
 
 		/*
@@ -407,33 +414,38 @@ ib_intr_dist_all(void *arg, int32_t weight_max, int32_t weight)
 			ino_p->ino_established = 1;
 
 			/* Add device weight of ino devinfos to targeted cpu. */
-			for (i = 0, ih_lst = ino_p->ino_ih_head;
-			    i < ino_p->ino_ih_size;
-			    i++, ih_lst = ih_lst->ih_next) {
+			for (ipil_p = ino_p->ino_ipil_p; ipil_p;
+			    ipil_p = ipil_p->ipil_next_p) {
+				for (i = 0, ih_lst = ipil_p->ipil_ih_head;
+				    i < ipil_p->ipil_ih_size; i++,
+				    ih_lst = ih_lst->ih_next) {
 
-				dweight = i_ddi_get_intr_weight(ih_lst->ih_dip);
-				intr_dist_cpuid_add_device_weight(
-				    ino_p->ino_cpuid, ih_lst->ih_dip, dweight);
+					dweight = i_ddi_get_intr_weight(
+					    ih_lst->ih_dip);
+					intr_dist_cpuid_add_device_weight(
+					    ino_p->ino_cpuid, ih_lst->ih_dip,
+					    dweight);
 
-				/*
-				 * different cpus may have different clock
-				 * speeds. to account for this, whenever an
-				 * interrupt is moved to a new CPU, we
-				 * convert the accumulated ticks into nsec,
-				 * based upon the clock rate of the prior
-				 * CPU.
-				 *
-				 * It is possible that the prior CPU no longer
-				 * exists. In this case, fall back to using
-				 * this CPU's clock rate.
-				 *
-				 * Note that the value in ih_ticks has already
-				 * been corrected for any power savings mode
-				 * which might have been in effect.
-				 */
-
-				ib_cpu_ticks_to_ih_nsec(ib_p, ih_lst,
-				    orig_cpuid);
+					/*
+					 * Different cpus may have different
+					 * clock speeds. to account for this,
+					 * whenever an interrupt is moved to a
+					 * new CPU, we convert the accumulated
+					 * ticks into nsec, based upon the clock
+					 * rate of the prior CPU.
+					 *
+					 * It is possible that the prior CPU no
+					 * longer exists. In this case, fall
+					 * back to using this CPU's clock rate.
+					 *
+					 * Note that the value in ih_ticks has
+					 * already been corrected for any power
+					 * savings mode which might have been
+					 * in effect.
+					 */
+					ib_cpu_ticks_to_ih_nsec(ib_p, ih_lst,
+					    orig_cpuid);
+				}
 			}
 
 			/* program the hardware */
@@ -478,7 +490,7 @@ ib_suspend(ib_t *ib_p)
 
 	/* save ino_lst interrupts' mapping registers content */
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
-	for (ip = ib_p->ib_ino_lst; ip; ip = ip->ino_next)
+	for (ip = ib_p->ib_ino_lst; ip; ip = ip->ino_next_p)
 		ip->ino_map_reg_save = *ip->ino_map_reg;
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
 
@@ -496,7 +508,7 @@ ib_resume(ib_t *ib_p)
 
 	/* restore ino_lst interrupts' mapping registers content */
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
-	for (ip = ib_p->ib_ino_lst; ip; ip = ip->ino_next) {
+	for (ip = ib_p->ib_ino_lst; ip; ip = ip->ino_next_p) {
 		IB_INO_INTR_CLEAR(ip->ino_clr_reg);	 /* set intr to idle */
 		*ip->ino_map_reg = ip->ino_map_reg_save; /* restore IMR */
 	}
@@ -518,50 +530,92 @@ ib_locate_ino(ib_t *ib_p, ib_ino_t ino_num)
 	ib_ino_info_t *ino_p = ib_p->ib_ino_lst;
 	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
 
-	for (; ino_p && ino_p->ino_ino != ino_num; ino_p = ino_p->ino_next);
+	for (; ino_p && ino_p->ino_ino != ino_num; ino_p = ino_p->ino_next_p);
 	return (ino_p);
 }
 
 #define	IB_INO_TO_SLOT(ino) (IB_IS_OBIO_INO(ino) ? 0xff : ((ino) & 0x1f) >> 2)
 
-ib_ino_info_t *
-ib_new_ino(ib_t *ib_p, ib_ino_t ino_num, ih_t *ih_p)
+ib_ino_pil_t *
+ib_new_ino_pil(ib_t *ib_p, ib_ino_t ino_num, uint_t pil, ih_t *ih_p)
 {
-	ib_ino_info_t *ino_p = kmem_alloc(sizeof (ib_ino_info_t), KM_SLEEP);
-	ino_p->ino_ino = ino_num;
-	ino_p->ino_slot_no = IB_INO_TO_SLOT(ino_num);
-	ino_p->ino_ib_p = ib_p;
-	ino_p->ino_clr_reg = ib_clear_intr_reg_addr(ib_p, ino_num);
-	ino_p->ino_map_reg = ib_intr_map_reg_addr(ib_p, ino_num);
-	ino_p->ino_unclaimed = 0;
+	ib_ino_pil_t	*ipil_p = kmem_zalloc(sizeof (ib_ino_pil_t), KM_SLEEP);
+	ib_ino_info_t	*ino_p;
 
-	/*
-	 * cannot disable interrupt since we might share slot
-	 * IB_INO_INTR_OFF(ino_p->ino_map_reg);
-	 */
+	if ((ino_p = ib_locate_ino(ib_p, ino_num)) == NULL) {
+		ino_p = kmem_zalloc(sizeof (ib_ino_info_t), KM_SLEEP);
+
+		ino_p->ino_next_p = ib_p->ib_ino_lst;
+		ib_p->ib_ino_lst = ino_p;
+
+		ino_p->ino_ino = ino_num;
+		ino_p->ino_slot_no = IB_INO_TO_SLOT(ino_num);
+		ino_p->ino_ib_p = ib_p;
+		ino_p->ino_clr_reg = ib_clear_intr_reg_addr(ib_p, ino_num);
+		ino_p->ino_map_reg = ib_intr_map_reg_addr(ib_p, ino_num);
+		ino_p->ino_unclaimed_intrs = 0;
+		ino_p->ino_lopil = pil;
+	}
 
 	ih_p->ih_next = ih_p;
-	ino_p->ino_ih_head = ih_p;
-	ino_p->ino_ih_tail = ih_p;
-	ino_p->ino_ih_start = ih_p;
-	ino_p->ino_ih_size = 1;
+	ipil_p->ipil_pil = pil;
+	ipil_p->ipil_ih_head = ih_p;
+	ipil_p->ipil_ih_tail = ih_p;
+	ipil_p->ipil_ih_start = ih_p;
+	ipil_p->ipil_ih_size = 1;
+	ipil_p->ipil_ino_p = ino_p;
 
-	ino_p->ino_next = ib_p->ib_ino_lst;
-	ib_p->ib_ino_lst = ino_p;
-	return (ino_p);
+	ipil_p->ipil_next_p = ino_p->ino_ipil_p;
+	ino_p->ino_ipil_p = ipil_p;
+	ino_p->ino_ipil_size++;
+
+	if (ino_p->ino_lopil > pil)
+		ino_p->ino_lopil = pil;
+
+	return (ipil_p);
 }
 
-/* the ino_p is retrieved by previous call to ib_locate_ino() */
 void
-ib_delete_ino(ib_t *ib_p, ib_ino_info_t *ino_p)
+ib_delete_ino_pil(ib_t *ib_p, ib_ino_pil_t *ipil_p)
 {
-	ib_ino_info_t *list = ib_p->ib_ino_lst;
+	ib_ino_info_t	*ino_p = ipil_p->ipil_ino_p;
+	ib_ino_pil_t	*prev, *next;
+	ushort_t	pil = ipil_p->ipil_pil;
+
 	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
-	if (list == ino_p)
-		ib_p->ib_ino_lst = list->ino_next;
+
+	if (ino_p->ino_ipil_p == ipil_p)
+		ino_p->ino_ipil_p = ipil_p->ipil_next_p;
 	else {
-		for (; list->ino_next != ino_p; list = list->ino_next);
-		list->ino_next = ino_p->ino_next;
+		for (prev = next = ino_p->ino_ipil_p; next != ipil_p;
+		    prev = next, next = next->ipil_next_p);
+
+		if (prev)
+			prev->ipil_next_p = ipil_p->ipil_next_p;
+	}
+
+	kmem_free(ipil_p, sizeof (ib_ino_pil_t));
+
+	if (ino_p->ino_lopil == pil) {
+		for (pil = 0, next = ino_p->ino_ipil_p; next;
+		    next = next->ipil_next_p) {
+			if (pil > next->ipil_pil)
+				pil = next->ipil_pil;
+		}
+
+		ino_p->ino_lopil = pil;
+	}
+
+	if (--ino_p->ino_ipil_size)
+		return;
+
+	if (ib_p->ib_ino_lst == ino_p)
+		ib_p->ib_ino_lst = ino_p->ino_next_p;
+	else {
+		ib_ino_info_t	*list = ib_p->ib_ino_lst;
+
+		for (; list->ino_next_p != ino_p; list = list->ino_next_p);
+		list->ino_next_p = ino_p->ino_next_p;
 	}
 }
 
@@ -569,18 +623,34 @@ ib_delete_ino(ib_t *ib_p, ib_ino_info_t *ino_p)
 void
 ib_free_ino_all(ib_t *ib_p)
 {
-	ib_ino_info_t *tmp = ib_p->ib_ino_lst;
+	ib_ino_info_t *ino_p = ib_p->ib_ino_lst;
 	ib_ino_info_t *next = NULL;
-	while (tmp) {
-		next = tmp->ino_next;
-		kmem_free(tmp, sizeof (ib_ino_info_t));
-		tmp = next;
+
+	while (ino_p) {
+		next = ino_p->ino_next_p;
+		kmem_free(ino_p, sizeof (ib_ino_info_t));
+		ino_p = next;
 	}
 }
 
-void
-ib_ino_add_intr(pci_t *pci_p, ib_ino_info_t *ino_p, ih_t *ih_p)
+/*
+ * Locate ib_ino_pil_t structure on ino_p->ino_ipil_p according to ino#
+ * returns NULL if not found.
+ */
+ib_ino_pil_t *
+ib_ino_locate_ipil(ib_ino_info_t *ino_p, uint_t pil)
 {
+	ib_ino_pil_t	*ipil_p = ino_p->ino_ipil_p;
+
+	for (; ipil_p && ipil_p->ipil_pil != pil; ipil_p = ipil_p->ipil_next_p);
+
+	return (ipil_p);
+}
+
+void
+ib_ino_add_intr(pci_t *pci_p, ib_ino_pil_t *ipil_p, ih_t *ih_p)
+{
+	ib_ino_info_t *ino_p = ipil_p->ipil_ino_p;
 	ib_ino_t ino = ino_p->ino_ino;
 	ib_t *ib_p = ino_p->ino_ib_p;
 	volatile uint64_t *state_reg = IB_INO_INTR_STATE_REG(ib_p, ino);
@@ -602,7 +672,7 @@ ib_ino_add_intr(pci_t *pci_p, ib_ino_info_t *ino_p, ih_t *ih_p)
 	 * jabbering.
 	 */
 	start_time = gethrtime();
-	while ((ino_p->ino_unclaimed <= pci_unclaimed_intr_max) &&
+	while ((ino_p->ino_unclaimed_intrs <= pci_unclaimed_intr_max) &&
 		IB_INO_INTR_PENDING(state_reg, ino) && !panicstr) {
 		if (gethrtime() - start_time > pci_intrpend_timeout) {
 			pbm_t *pbm_p = pci_p->pci_pbm_p;
@@ -613,26 +683,26 @@ ib_ino_add_intr(pci_t *pci_p, ib_ino_info_t *ino_p, ih_t *ih_p)
 		}
 	}
 
-	/* link up pci_ispec_t portion of the ppd */
-	ih_p->ih_next = ino_p->ino_ih_head;
-	ino_p->ino_ih_tail->ih_next = ih_p;
-	ino_p->ino_ih_tail = ih_p;
+	/* link up ih_t */
+	ih_p->ih_next = ipil_p->ipil_ih_head;
+	ipil_p->ipil_ih_tail->ih_next = ih_p;
+	ipil_p->ipil_ih_tail = ih_p;
 
-	ino_p->ino_ih_start = ino_p->ino_ih_head;
-	ino_p->ino_ih_size++;
+	ipil_p->ipil_ih_start = ipil_p->ipil_ih_head;
+	ipil_p->ipil_ih_size++;
 
 	/*
 	 * if the interrupt was previously blocked (left in pending state)
 	 * because of jabber we need to clear the pending state in case the
 	 * jabber has gone away.
 	 */
-	if (ino_p->ino_unclaimed > pci_unclaimed_intr_max) {
+	if (ino_p->ino_unclaimed_intrs > pci_unclaimed_intr_max) {
 		cmn_err(CE_WARN,
 		    "%s%d: ib_ino_add_intr: ino 0x%x has been unblocked",
 		    ddi_driver_name(pci_p->pci_dip),
 		    ddi_get_instance(pci_p->pci_dip),
 		    ino_p->ino_ino);
-		ino_p->ino_unclaimed = 0;
+		ino_p->ino_unclaimed_intrs = 0;
 		IB_INO_INTR_CLEAR(ino_p->ino_clr_reg);
 	}
 
@@ -649,11 +719,12 @@ ib_ino_add_intr(pci_t *pci_p, ib_ino_info_t *ino_p, ih_t *ih_p)
  * to turn it back on.
  */
 void
-ib_ino_rem_intr(pci_t *pci_p, ib_ino_info_t *ino_p, ih_t *ih_p)
+ib_ino_rem_intr(pci_t *pci_p, ib_ino_pil_t *ipil_p, ih_t *ih_p)
 {
+	ib_ino_info_t *ino_p = ipil_p->ipil_ino_p;
 	int i;
 	ib_ino_t ino = ino_p->ino_ino;
-	ih_t *ih_lst = ino_p->ino_ih_head;
+	ih_t *ih_lst = ipil_p->ipil_ih_head;
 	volatile uint64_t *state_reg =
 		IB_INO_INTR_STATE_REG(ino_p->ino_ib_p, ino);
 	hrtime_t start_time;
@@ -672,7 +743,7 @@ ib_ino_rem_intr(pci_t *pci_p, ib_ino_info_t *ino_p, ih_t *ih_p)
 	 * jabbering.
 	 */
 	start_time = gethrtime();
-	while ((ino_p->ino_unclaimed <= pci_unclaimed_intr_max) &&
+	while ((ino_p->ino_unclaimed_intrs <= pci_unclaimed_intr_max) &&
 		IB_INO_INTR_PENDING(state_reg, ino) && !panicstr) {
 		if (gethrtime() - start_time > pci_intrpend_timeout) {
 			pbm_t *pbm_p = pci_p->pci_pbm_p;
@@ -683,7 +754,7 @@ ib_ino_rem_intr(pci_t *pci_p, ib_ino_info_t *ino_p, ih_t *ih_p)
 		}
 	}
 
-	if (ino_p->ino_ih_size == 1) {
+	if (ipil_p->ipil_ih_size == 1) {
 		if (ih_lst != ih_p)
 			goto not_found;
 		/* no need to set head/tail as ino_p will be freed */
@@ -695,37 +766,37 @@ ib_ino_rem_intr(pci_t *pci_p, ib_ino_info_t *ino_p, ih_t *ih_p)
 	 * because of jabber we need to clear the pending state in case the
 	 * jabber has gone away.
 	 */
-	if (ino_p->ino_unclaimed > pci_unclaimed_intr_max) {
+	if (ino_p->ino_unclaimed_intrs > pci_unclaimed_intr_max) {
 		cmn_err(CE_WARN,
 		    "%s%d: ib_ino_rem_intr: ino 0x%x has been unblocked",
 		    ddi_driver_name(pci_p->pci_dip),
 		    ddi_get_instance(pci_p->pci_dip),
 		    ino_p->ino_ino);
-		ino_p->ino_unclaimed = 0;
+		ino_p->ino_unclaimed_intrs = 0;
 		IB_INO_INTR_CLEAR(ino_p->ino_clr_reg);
 	}
 
 	/* search the link list for ih_p */
 	for (i = 0;
-		(i < ino_p->ino_ih_size) && (ih_lst->ih_next != ih_p);
+		(i < ipil_p->ipil_ih_size) && (ih_lst->ih_next != ih_p);
 		i++, ih_lst = ih_lst->ih_next);
 	if (ih_lst->ih_next != ih_p)
 		goto not_found;
 
 	/* remove ih_p from the link list and maintain the head/tail */
 	ih_lst->ih_next = ih_p->ih_next;
-	if (ino_p->ino_ih_head == ih_p)
-		ino_p->ino_ih_head = ih_p->ih_next;
-	if (ino_p->ino_ih_tail == ih_p)
-		ino_p->ino_ih_tail = ih_lst;
-	ino_p->ino_ih_start = ino_p->ino_ih_head;
+	if (ipil_p->ipil_ih_head == ih_p)
+		ipil_p->ipil_ih_head = ih_p->ih_next;
+	if (ipil_p->ipil_ih_tail == ih_p)
+		ipil_p->ipil_ih_tail = ih_lst;
+	ipil_p->ipil_ih_start = ipil_p->ipil_ih_head;
 reset:
 	if (ih_p->ih_config_handle)
 		pci_config_teardown(&ih_p->ih_config_handle);
 	if (ih_p->ih_ksp != NULL)
 		kstat_delete(ih_p->ih_ksp);
 	kmem_free(ih_p, sizeof (ih_t));
-	ino_p->ino_ih_size--;
+	ipil_p->ipil_ih_size--;
 
 	return;
 not_found:
@@ -734,15 +805,16 @@ not_found:
 }
 
 ih_t *
-ib_ino_locate_intr(ib_ino_info_t *ino_p, dev_info_t *rdip, uint32_t inum)
+ib_intr_locate_ih(ib_ino_pil_t *ipil_p, dev_info_t *rdip, uint32_t inum)
 {
-	ih_t *ih_lst = ino_p->ino_ih_head;
+	ih_t *ih_p = ipil_p->ipil_ih_head;
 	int i;
-	for (i = 0; i < ino_p->ino_ih_size; i++, ih_lst = ih_lst->ih_next) {
-		if (ih_lst->ih_dip == rdip &&
-		    ih_lst->ih_inum == inum)
-			return (ih_lst);
+
+	for (i = 0; i < ipil_p->ipil_ih_size; i++, ih_p = ih_p->ih_next) {
+		if (ih_p->ih_dip == rdip && ih_p->ih_inum == inum)
+			return (ih_p);
 	}
+
 	return ((ih_t *)NULL);
 }
 
@@ -776,6 +848,7 @@ ib_update_intr_state(pci_t *pci_p, dev_info_t *rdip,
 {
 	ib_t		*ib_p = pci_p->pci_ib_p;
 	ib_ino_info_t	*ino_p;
+	ib_ino_pil_t	*ipil_p;
 	ib_mondo_t	mondo;
 	ih_t		*ih_p;
 	int		ret = DDI_FAILURE;
@@ -801,8 +874,9 @@ ib_update_intr_state(pci_t *pci_p, dev_info_t *rdip,
 		return (ret);
 	}
 
-	if (ino_p = ib_locate_ino(ib_p, IB_MONDO_TO_INO(mondo))) {
-		if (ih_p = ib_ino_locate_intr(ino_p, rdip, hdlp->ih_inum)) {
+	ino_p = ib_locate_ino(ib_p, IB_MONDO_TO_INO(mondo));
+	if (ino_p && (ipil_p = ib_ino_locate_ipil(ino_p, hdlp->ih_pri))) {
+		if (ih_p = ib_intr_locate_ih(ipil_p, rdip, hdlp->ih_inum)) {
 			ih_p->ih_intr_state = new_intr_state;
 			ret = DDI_SUCCESS;
 		}
@@ -824,25 +898,32 @@ uint8_t
 ib_get_ino_devs(
 	ib_t *ib_p, uint32_t ino, uint8_t *devs_ret, pcitool_intr_dev_t *devs)
 {
-	ib_ino_info_t *ino_p;
-	ih_t *ih_p;
-	uint32_t num_devs = 0;
-	int i;
+	ib_ino_info_t	*ino_p;
+	ib_ino_pil_t	*ipil_p;
+	ih_t		*ih_p;
+	uint32_t	num_devs = 0;
+	int		i, j;
 
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 	ino_p = ib_locate_ino(ib_p, ino);
 	if (ino_p != NULL) {
-		num_devs = ino_p->ino_ih_size;
-		for (i = 0, ih_p = ino_p->ino_ih_head;
-		    ((i < ino_p->ino_ih_size) && (i < *devs_ret));
-		    i++, ih_p = ih_p->ih_next) {
-			(void) strncpy(devs[i].driver_name,
-			    ddi_driver_name(ih_p->ih_dip), MAXMODCONFNAME-1);
-			devs[i].driver_name[MAXMODCONFNAME] = '\0';
-			(void) ddi_pathname(ih_p->ih_dip, devs[i].path);
-			devs[i].dev_inst = ddi_get_instance(ih_p->ih_dip);
+		for (j = 0, ipil_p = ino_p->ino_ipil_p; ipil_p;
+		    ipil_p = ipil_p->ipil_next_p) {
+			num_devs += ipil_p->ipil_ih_size;
+
+			for (i = 0, ih_p = ipil_p->ipil_ih_head;
+			    ((i < ipil_p->ipil_ih_size) && (i < *devs_ret));
+			    i++, j++, ih_p = ih_p->ih_next) {
+				(void) strncpy(devs[i].driver_name,
+				    ddi_driver_name(ih_p->ih_dip),
+				    MAXMODCONFNAME-1);
+				devs[i].driver_name[MAXMODCONFNAME] = '\0';
+				(void) ddi_pathname(ih_p->ih_dip, devs[i].path);
+				devs[i].dev_inst =
+				    ddi_get_instance(ih_p->ih_dip);
+			}
 		}
-		*devs_ret = i;
+		*devs_ret = j;
 	}
 
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
@@ -853,7 +934,10 @@ ib_get_ino_devs(
 void ib_log_new_cpu(ib_t *ib_p, uint32_t old_cpu_id, uint32_t new_cpu_id,
 	uint32_t ino)
 {
-	ib_ino_info_t *ino_p;
+	ib_ino_info_t	*ino_p;
+	ib_ino_pil_t	*ipil_p;
+	ih_t		*ih_p;
+	int		i;
 
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
@@ -864,8 +948,19 @@ void ib_log_new_cpu(ib_t *ib_p, uint32_t old_cpu_id, uint32_t new_cpu_id,
 		/* Log in OS data structures the new CPU. */
 		ino_p->ino_cpuid = new_cpu_id;
 
-		/* Account for any residual time to be logged for old cpu. */
-		ib_cpu_ticks_to_ih_nsec(ib_p, ino_p->ino_ih_head, old_cpu_id);
+		for (ipil_p = ino_p->ino_ipil_p; ipil_p;
+		    ipil_p = ipil_p->ipil_next_p) {
+			for (i = 0, ih_p = ipil_p->ipil_ih_head;
+			    (i < ipil_p->ipil_ih_size);
+			    i++, ih_p = ih_p->ih_next) {
+				/*
+				 * Account for any residual time
+				 * to be logged for old cpu.
+				 */
+				ib_cpu_ticks_to_ih_nsec(ib_p,
+				    ipil_p->ipil_ih_head, old_cpu_id);
+			}
+		}
 	}
 
 	mutex_exit(&ib_p->ib_ino_lst_mutex);

@@ -1007,7 +1007,7 @@ pil14_interrupt(int level)
 	wrpr	%g0, %g1, %pstate		! Disable vec interrupts
 
 	sethi	%hi(cbe_level14_inum), %o1
-	ld	[%o1 + %lo(cbe_level14_inum)], %o1
+	ldx	[%o1 + %lo(cbe_level14_inum)], %o1
 	call	intr_enqueue_req ! preserves %o5 and %g5
 	mov	PIL_14, %o0
 

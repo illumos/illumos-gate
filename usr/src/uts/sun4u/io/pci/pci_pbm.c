@@ -159,8 +159,8 @@ pbm_register_intr(pbm_t *pbm_p)
 	mondo = IB_INO_TO_MONDO(pci_p->pci_ib_p, pci_p->pci_inos[CBNINTR_PBM]);
 	mondo = CB_MONDO_TO_XMONDO(pci_p->pci_cb_p, mondo);
 
-	VERIFY(add_ivintr(mondo, pci_pil[CBNINTR_PBM], pbm_error_intr,
-	    (caddr_t)pci_p, NULL) == 0);
+	VERIFY(add_ivintr(mondo, pci_pil[CBNINTR_PBM], (intrfunc)pbm_error_intr,
+	    (caddr_t)pci_p, NULL, NULL) == 0);
 
 	pbm_p->pbm_iblock_cookie = (void *)(uintptr_t)pci_pil[CBNINTR_PBM];
 
@@ -199,7 +199,7 @@ pbm_destroy(pci_t *pci_p)
 	intr_dist_rem(pbm_intr_dist, pbm_p);
 	pci_pbm_rem_intr(pci_p);
 	ib_intr_disable(ib_p, pci_p->pci_inos[CBNINTR_PBM], IB_INTR_WAIT);
-	rem_ivintr(mondo, NULL);
+	VERIFY(rem_ivintr(mondo, pci_pil[CBNINTR_PBM]) == 0);
 
 	/*
 	 * Remove the error disable function.

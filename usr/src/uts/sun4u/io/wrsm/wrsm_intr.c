@@ -1179,7 +1179,7 @@ drainer_init(wrsm_intr_drainer_t *drainer)
 
 	drainer->drainer_inum =
 		add_softintr(PIL_6, (softintrfunc)drainer_handler,
-		    (caddr_t)drainer);
+		    (caddr_t)drainer, SOFTINT_ST);
 	if (drainer->drainer_inum == 0) {
 		DPRINTF(INTRERR, (CE_WARN, "add_softintr() failed"));
 		return (EAGAIN);
@@ -1203,7 +1203,7 @@ static void
 drainer_fini(wrsm_intr_drainer_t *drainer)
 {
 	DTRC("drainer_fini");
-	rem_softintr(drainer->drainer_inum);
+	(void) rem_softintr(drainer->drainer_inum);
 }
 
 /* Returns the old psl pointer, atomically setting new psl to empty */

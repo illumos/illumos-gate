@@ -165,16 +165,16 @@ intr_px_walk_step(mdb_walk_state_t *wsp)
 static void
 intr_pci_print_items(mdb_walk_state_t *wsp)
 {
-	ib_t			pci_ib;
-	ib_ino_info_t		*ib_ino_lst;
-	ib_ino_info_t		list;
+	ib_t			ib;
+	ib_ino_info_t		ino;
+	ib_ino_pil_t		ipil;
 	ih_t			ih;
 	int			count;
 	char			name[MODMAXNAMELEN + 1];
-	struct dev_info		devinfo;
+	struct dev_info		dev;
 	intr_info_t		info;
 
-	if (mdb_vread(&pci_ib, sizeof (ib_t),
+	if (mdb_vread(&ib, sizeof (ib_t),
 	    (uintptr_t)wsp->walk_addr) == -1) {
 		mdb_warn("intr: failed to read pci interrupt block "
 		    "structure\n");
@@ -182,159 +182,188 @@ intr_pci_print_items(mdb_walk_state_t *wsp)
 	}
 
 	/* Read in ib_ino_info_t structure at address */
-	ib_ino_lst = pci_ib.ib_ino_lst;
-	if (mdb_vread(&list, sizeof (ib_ino_info_t),
-	    (uintptr_t)ib_ino_lst) == -1) {
+	if (mdb_vread(&ino, sizeof (ib_ino_info_t),
+	    (uintptr_t)ib.ib_ino_lst) == -1) {
 		/* Nothing here to read from */
 		return;
 	}
 
 	do {
-		if (mdb_vread(&ih, sizeof (ih_t),
-		    (uintptr_t)list.ino_ih_start) == -1) {
-			mdb_warn("intr: failed to read pci interrupt entry "
-			    "structure\n");
+		if (mdb_vread(&ipil, sizeof (ib_ino_pil_t),
+		    (uintptr_t)ino.ino_ipil_p) == -1) {
+			mdb_warn("intr: failed to read pci interrupt "
+			    "ib_ino_pil_t structure\n");
 			return;
 		}
 
-		count = 0;
-
 		do {
-			bzero((void *)&info, sizeof (intr_info_t));
-
-			if (list.ino_ih_size > 1) {
-				info.shared = 1;
-			}
-
-			(void) mdb_devinfo2driver((uintptr_t)ih.ih_dip,
-			    name, sizeof (name));
-
-			(void) mdb_ddi_pathname((uintptr_t)ih.ih_dip,
-			    info.pathname, sizeof (info.pathname));
-
-			/* Get instance */
-			if (mdb_vread(&devinfo, sizeof (struct dev_info),
-			    (uintptr_t)ih.ih_dip) == -1) {
-				mdb_warn("intr: failed to read DIP "
-				    "structure\n");
+			if (mdb_vread(&ih, sizeof (ih_t),
+			    (uintptr_t)ipil.ipil_ih_start) == -1) {
+				mdb_warn("intr: failed to read pci interrupt "
+				    "ih_t structure\n");
 				return;
 			}
 
-			/* Make sure the name doesn't over run */
-			(void) mdb_snprintf(info.driver_name,
-			    sizeof (info.driver_name), "%s", name);
+			count = 0;
 
-			info.instance = devinfo.devi_instance;
-			info.inum = ih.ih_inum;
-			info.intr_type = DDI_INTR_TYPE_FIXED;
-			info.num = 0;
-			info.intr_state = ih.ih_intr_state;
-			info.ino_ino = list.ino_ino;
-			info.mondo = list.ino_mondo;
-			info.pil = list.ino_pil;
-			info.cpuid = list.ino_cpuid;
+			do {
+				bzero((void *)&info, sizeof (intr_info_t));
 
-			intr_print_elements(info);
-			count++;
+				if ((ino.ino_ipil_size > 1) ||
+				    (ipil.ipil_ih_size > 1)) {
+					info.shared = 1;
+				}
 
-			(void) mdb_vread(&ih, sizeof (ih_t),
-			    (uintptr_t)ih.ih_next);
+				(void) mdb_devinfo2driver((uintptr_t)ih.ih_dip,
+				    name, sizeof (name));
 
-		} while (count < list.ino_ih_size);
+				(void) mdb_ddi_pathname((uintptr_t)ih.ih_dip,
+				    info.pathname, sizeof (info.pathname));
 
-	} while (mdb_vread(&list, sizeof (ib_ino_info_t),
-	    (uintptr_t)list.ino_next) != -1);
+				/* Get instance */
+				if (mdb_vread(&dev, sizeof (struct dev_info),
+				    (uintptr_t)ih.ih_dip) == -1) {
+					mdb_warn("intr: failed to read DIP "
+					    "structure\n");
+					return;
+				}
+
+				/* Make sure the name doesn't over run */
+				(void) mdb_snprintf(info.driver_name,
+				    sizeof (info.driver_name), "%s", name);
+
+				info.instance = dev.devi_instance;
+				info.inum = ih.ih_inum;
+				info.intr_type = DDI_INTR_TYPE_FIXED;
+				info.num = 0;
+				info.intr_state = ih.ih_intr_state;
+				info.ino_ino = ino.ino_ino;
+				info.mondo = ino.ino_mondo;
+				info.pil = ipil.ipil_pil;
+				info.cpuid = ino.ino_cpuid;
+
+				intr_print_elements(info);
+				count++;
+
+				(void) mdb_vread(&ih, sizeof (ih_t),
+				    (uintptr_t)ih.ih_next);
+
+			} while (count < ipil.ipil_ih_size);
+
+		} while (mdb_vread(&ipil, sizeof (ib_ino_pil_t),
+		    (uintptr_t)ipil.ipil_next_p) != -1);
+
+	} while (mdb_vread(&ino, sizeof (ib_ino_info_t),
+	    (uintptr_t)ino.ino_next_p) != -1);
 }
 
 static void
 intr_px_print_items(mdb_walk_state_t *wsp)
 {
-	px_ib_t			px_ib;
-	px_ib_ino_info_t	*px_ib_ino_lst;
-	px_ib_ino_info_t	px_list;
-	px_ih_t			px_ih;
-	int			count;
-	char			name[MODMAXNAMELEN + 1];
-	struct dev_info		devinfo;
-	intr_info_t		info;
-	devinfo_intr_t		intr_p;
+	px_ib_t		ib;
+	px_ino_t	ino;
+	px_ino_pil_t	ipil;
+	px_ih_t		ih;
+	int		count;
+	char		name[MODMAXNAMELEN + 1];
+	struct dev_info	dev;
+	intr_info_t	info;
+	devinfo_intr_t	intr_p;
 
-	if (mdb_vread(&px_ib, sizeof (px_ib_t), wsp->walk_addr) == -1) {
+	if (mdb_vread(&ib, sizeof (px_ib_t), wsp->walk_addr) == -1) {
 		mdb_warn("intr: failed to read px interrupt block "
 		    "structure\n");
 		return;
 	}
 
-	/* Read in px_ib_ino_info_t structure at address */
-	px_ib_ino_lst = px_ib.ib_ino_lst;
-	if (mdb_vread(&px_list, sizeof (px_ib_ino_info_t),
-	    (uintptr_t)px_ib_ino_lst) == -1) {
+	/* Read in px_ino_t structure at address */
+	if (mdb_vread(&ino, sizeof (px_ino_t),
+	    (uintptr_t)ib.ib_ino_lst) == -1) {
 		/* Nothing here to read from */
 		return;
 	}
 
 	do {
-		if (mdb_vread(&px_ih, sizeof (px_ih_t),
-		    (uintptr_t)px_list.ino_ih_start) == -1) {
-			mdb_warn("intr: failed to read px interrupt entry "
-			    "structure\n");
+		if (mdb_vread(&ipil, sizeof (px_ino_pil_t),
+		    (uintptr_t)ino.ino_ipil_p) == -1) {
+			mdb_warn("intr: failed to read px interrupt "
+			    "px_ino_pil_t structure\n");
 			return;
 		}
 
-		count = 0;
-
 		do {
-			bzero((void *)&info, sizeof (intr_info_t));
-
-			if (px_list.ino_ih_size > 1) {
-				info.shared = 1;
-			}
-
-			(void) mdb_devinfo2driver((uintptr_t)px_ih.ih_dip,
-			    name, sizeof (name));
-
-			(void) mdb_ddi_pathname((uintptr_t)px_ih.ih_dip,
-			    info.pathname, sizeof (info.pathname));
-
-			/* Get instance */
-			if (mdb_vread(&devinfo, sizeof (struct dev_info),
-			    (uintptr_t)px_ih.ih_dip) == -1) {
-				mdb_warn("intr: failed to read DIP "
-				    "structure\n");
+			if (mdb_vread(&ih, sizeof (px_ih_t),
+			    (uintptr_t)ipil.ipil_ih_start) == -1) {
+				mdb_warn("intr: failed to read px interrupt "
+				    "px_ih_t structure\n");
 				return;
 			}
 
-			/* Make sure the name doesn't over run */
-			(void) mdb_snprintf(info.driver_name,
-			    sizeof (info.driver_name), "%s", name);
+			count = 0;
 
-			info.instance = devinfo.devi_instance;
-			info.inum = px_ih.ih_inum;
+			do {
+				bzero((void *)&info, sizeof (intr_info_t));
 
-			/* Read the type used, keep PCIe messages separate */
-			(void) mdb_vread(&intr_p, sizeof (devinfo_intr_t),
-			    (uintptr_t)devinfo.devi_intr_p);
-			if (px_ih.ih_rec_type != MSG_REC) {
-				info.intr_type = intr_p.devi_intr_curr_type;
-			}
+				(void) mdb_devinfo2driver((uintptr_t)ih.ih_dip,
+				    name, sizeof (name));
 
-			info.num = px_ih.ih_msg_code;
-			info.intr_state = px_ih.ih_intr_state;
-			info.ino_ino = px_list.ino_ino;
-			info.mondo = px_list.ino_sysino;
-			info.pil = px_list.ino_pil;
-			info.cpuid = px_list.ino_cpuid;
+				(void) mdb_ddi_pathname((uintptr_t)ih.ih_dip,
+				    info.pathname, sizeof (info.pathname));
 
-			intr_print_elements(info);
-			count++;
+				/* Get instance */
+				if (mdb_vread(&dev, sizeof (struct dev_info),
+				    (uintptr_t)ih.ih_dip) == -1) {
+					mdb_warn("intr: failed to read DIP "
+					    "structure\n");
+					return;
+				}
 
-			(void) mdb_vread(&px_ih, sizeof (ih_t),
-			    (uintptr_t)px_ih.ih_next);
+				/* Make sure the name doesn't over run */
+				(void) mdb_snprintf(info.driver_name,
+				    sizeof (info.driver_name), "%s", name);
 
-		} while (count < px_list.ino_ih_size);
+				info.instance = dev.devi_instance;
+				info.inum = ih.ih_inum;
 
-	} while (mdb_vread(&px_list, sizeof (px_ib_ino_info_t),
-	    (uintptr_t)px_list.ino_next) != -1);
+				/*
+				 * Read the type used, keep PCIe messages
+				 * separate.
+				 */
+				(void) mdb_vread(&intr_p,
+				    sizeof (devinfo_intr_t),
+				    (uintptr_t)dev.devi_intr_p);
+
+				if (ih.ih_rec_type != MSG_REC) {
+					info.intr_type =
+					    intr_p.devi_intr_curr_type;
+				}
+
+				if ((info.intr_type == DDI_INTR_TYPE_FIXED) &&
+				    ((ino.ino_ipil_size > 1) ||
+				    (ipil.ipil_ih_size > 1))) {
+					info.shared = 1;
+				}
+
+				info.num = ih.ih_msg_code;
+				info.intr_state = ih.ih_intr_state;
+				info.ino_ino = ino.ino_ino;
+				info.mondo = ino.ino_sysino;
+				info.pil = ipil.ipil_pil;
+				info.cpuid = ino.ino_cpuid;
+
+				intr_print_elements(info);
+				count++;
+
+				(void) mdb_vread(&ih, sizeof (px_ih_t),
+				    (uintptr_t)ih.ih_next);
+
+			} while (count < ipil.ipil_ih_size);
+
+		} while (mdb_vread(&ipil, sizeof (px_ino_pil_t),
+		    (uintptr_t)ipil.ipil_next_p) != -1);
+
+	} while (mdb_vread(&ino, sizeof (px_ino_t),
+	    (uintptr_t)ino.ino_next_p) != -1);
 }
 
 static char *

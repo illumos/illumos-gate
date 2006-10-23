@@ -717,7 +717,9 @@ startup_init(void)
 static u_longlong_t *boot_physinstalled, *boot_physavail, *boot_virtavail;
 static size_t boot_physinstalled_len, boot_physavail_len, boot_virtavail_len;
 
-#define	IVSIZE	((MAXIVNUM + 1) * sizeof (struct intr_vector))
+#define	IVSIZE	((MAXIVNUM * sizeof (intr_vec_t *)) + \
+		(MAX_RSVD_IV * sizeof (intr_vec_t)) + \
+		(MAX_RSVD_IVX * sizeof (intr_vecx_t)))
 
 /*
  * As OBP takes up some RAM when the system boots, pages will already be "lost"
@@ -896,12 +898,6 @@ startup_memlist(void)
 	 */
 	if (ndata_alloc_tsbs(&ndata, npages) != 0)
 		cmn_err(CE_PANIC, "no more nucleus memory after tsbs alloc");
-
-	/*
-	 * Allocate cpus structs from the nucleus data area.
-	 */
-	if (ndata_alloc_cpus(&ndata) != 0)
-		cmn_err(CE_PANIC, "no more nucleus memory after cpu alloc");
 
 	/*
 	 * Allocate dmv dispatch table from the nucleus data area.
@@ -1388,12 +1384,13 @@ startup_memlist(void)
 	}
 
 	/*
-	 * Allocate space for the interrupt vector table.
+	 * Allocate space for the interrupt vector table and also for the
+	 * reserved interrupt vector data structures.
 	 */
-	memspace = (caddr_t)BOP_ALLOC(bootops, (caddr_t)intr_vector,
+	memspace = (caddr_t)BOP_ALLOC(bootops, (caddr_t)intr_vec_table,
 	    IVSIZE, MMU_PAGESIZE);
-	if (memspace != (caddr_t)intr_vector)
-		panic("interrupt table allocation failure");
+	if (memspace != (caddr_t)intr_vec_table)
+		panic("interrupt vector table allocation failure");
 
 	/*
 	 * The memory lists from boot are allocated from the heap arena
@@ -1523,14 +1520,15 @@ startup_memlist(void)
 	bp_init(shm_alignment, HAT_STRICTORDER);
 
 	/*
-	 * Reserve space for panicbuf and intr_vector from the 32-bit heap
+	 * Reserve space for panicbuf, intr_vec_table and reserved interrupt
+	 * vector data structures from the 32-bit heap.
 	 */
 	(void) vmem_xalloc(heap32_arena, PANICBUFSIZE, PAGESIZE, 0, 0,
 	    panicbuf, panicbuf + PANICBUFSIZE,
 	    VM_NOSLEEP | VM_BESTFIT | VM_PANIC);
 
 	(void) vmem_xalloc(heap32_arena, IVSIZE, PAGESIZE, 0, 0,
-	    intr_vector, (caddr_t)intr_vector + IVSIZE,
+	    intr_vec_table, (caddr_t)intr_vec_table + IVSIZE,
 	    VM_NOSLEEP | VM_BESTFIT | VM_PANIC);
 
 	mem_config_init();

@@ -37,9 +37,14 @@ extern "C" {
  */
 struct px_msiq {
 	msiqid_t	msiq_id;	/* MSIQ ID */
-	uint_t		msiq_state;	/* MSIQ alloc state */
-	msiqhead_t	msiq_curr_head_idx; /* MSIQ current head */
+	ushort_t	msiq_state;	/* MSIQ alloc state */
+	ushort_t	msiq_refcnt;	/* # of MSIQ users */
 	msiqhead_t	*msiq_base_p;	/* MSIQ base pointer */
+
+	/* Fields accessed under interrupt context */
+	msiqhead_t	msiq_curr_head_index; /* MSIQ Curr head index */
+	msiqhead_t	msiq_new_head_index; /* MSIQ new head index */
+	ushort_t	msiq_recs2process; /* # of MSIQ records to process */
 };
 
 #define	MSIQ_STATE_FREE		0x1

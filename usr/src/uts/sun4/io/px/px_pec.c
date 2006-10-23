@@ -188,9 +188,10 @@ px_pec_msg_add_intr(px_t *px_p)
 	px_lib_msg_setmsiq(dip, PCIE_CORR_MSG, pec_p->pec_corr_msg_msiq_id);
 	px_lib_msg_setvalid(dip, PCIE_CORR_MSG, PCIE_MSG_VALID);
 
-	if ((ret = px_ib_update_intr_state(px_p, px_p->px_dip,
-	    hdl.ih_inum, px_msiqid_to_devino(px_p, pec_p->pec_corr_msg_msiq_id),
-	    PX_INTR_STATE_ENABLE, MSG_REC, PCIE_CORR_MSG)) != DDI_SUCCESS) {
+	if ((ret = px_ib_update_intr_state(px_p, px_p->px_dip, hdl.ih_inum,
+	    px_msiqid_to_devino(px_p, pec_p->pec_corr_msg_msiq_id),
+	    PX_ERR_LOW_PIL, PX_INTR_STATE_ENABLE, MSG_REC,
+	    PCIE_CORR_MSG)) != DDI_SUCCESS) {
 		DBG(DBG_MSG, px_p->px_dip,
 		    "PCIE_CORR_MSG update interrupt state failed\n");
 		return (DDI_FAILURE);
@@ -211,9 +212,9 @@ px_pec_msg_add_intr(px_t *px_p)
 	    pec_p->pec_non_fatal_msg_msiq_id);
 	px_lib_msg_setvalid(dip, PCIE_NONFATAL_MSG, PCIE_MSG_VALID);
 
-	if ((ret = px_ib_update_intr_state(px_p, px_p->px_dip,
-	    hdl.ih_inum, px_msiqid_to_devino(px_p,
-	    pec_p->pec_non_fatal_msg_msiq_id), PX_INTR_STATE_ENABLE, MSG_REC,
+	if ((ret = px_ib_update_intr_state(px_p, px_p->px_dip, hdl.ih_inum,
+	    px_msiqid_to_devino(px_p, pec_p->pec_non_fatal_msg_msiq_id),
+	    PX_ERR_PIL, PX_INTR_STATE_ENABLE, MSG_REC,
 	    PCIE_NONFATAL_MSG)) != DDI_SUCCESS) {
 		DBG(DBG_MSG, px_p->px_dip,
 		    "PCIE_NONFATAL_MSG update interrupt state failed\n");
@@ -234,10 +235,9 @@ px_pec_msg_add_intr(px_t *px_p)
 	px_lib_msg_setmsiq(dip, PCIE_FATAL_MSG, pec_p->pec_fatal_msg_msiq_id);
 	px_lib_msg_setvalid(dip, PCIE_FATAL_MSG, PCIE_MSG_VALID);
 
-	if ((ret = px_ib_update_intr_state(px_p, px_p->px_dip,
-	    hdl.ih_inum, px_msiqid_to_devino(px_p,
-	    pec_p->pec_fatal_msg_msiq_id), PX_INTR_STATE_ENABLE, MSG_REC,
-	    PCIE_FATAL_MSG)) != DDI_SUCCESS) {
+	if ((ret = px_ib_update_intr_state(px_p, px_p->px_dip, hdl.ih_inum,
+	    px_msiqid_to_devino(px_p, pec_p->pec_fatal_msg_msiq_id), PX_ERR_PIL,
+	    PX_INTR_STATE_ENABLE, MSG_REC, PCIE_FATAL_MSG)) != DDI_SUCCESS) {
 		DBG(DBG_MSG, px_p->px_dip,
 		    "PCIE_FATAL_MSG update interrupt state failed\n");
 		return (DDI_FAILURE);
@@ -274,10 +274,10 @@ px_pec_msg_rem_intr(px_t *px_p)
 		(void) px_rem_msiq_intr(dip, dip, &hdl, MSG_REC,
 		    PCIE_CORR_MSG, pec_p->pec_corr_msg_msiq_id);
 
-		(void) px_ib_update_intr_state(px_p, px_p->px_dip,
-		    hdl.ih_inum, px_msiqid_to_devino(px_p,
-		    pec_p->pec_corr_msg_msiq_id),
-		    PX_INTR_STATE_DISABLE, MSG_REC, PCIE_CORR_MSG);
+		(void) px_ib_update_intr_state(px_p, px_p->px_dip, hdl.ih_inum,
+		    px_msiqid_to_devino(px_p, pec_p->pec_corr_msg_msiq_id),
+		    PX_ERR_LOW_PIL, PX_INTR_STATE_DISABLE, MSG_REC,
+		    PCIE_CORR_MSG);
 
 		pec_p->pec_corr_msg_msiq_id = (msiqid_t)-1;
 	}
@@ -289,10 +289,10 @@ px_pec_msg_rem_intr(px_t *px_p)
 		(void) px_rem_msiq_intr(dip, dip, &hdl, MSG_REC,
 		    PCIE_NONFATAL_MSG, pec_p->pec_non_fatal_msg_msiq_id);
 
-		(void) px_ib_update_intr_state(px_p, px_p->px_dip,
-		    hdl.ih_inum, px_msiqid_to_devino(px_p,
-		    pec_p->pec_non_fatal_msg_msiq_id),
-		    PX_INTR_STATE_DISABLE, MSG_REC, PCIE_NONFATAL_MSG);
+		(void) px_ib_update_intr_state(px_p, px_p->px_dip, hdl.ih_inum,
+		    px_msiqid_to_devino(px_p, pec_p->pec_non_fatal_msg_msiq_id),
+		    PX_ERR_PIL, PX_INTR_STATE_DISABLE, MSG_REC,
+		    PCIE_NONFATAL_MSG);
 
 		pec_p->pec_non_fatal_msg_msiq_id = (msiqid_t)-1;
 	}
@@ -303,10 +303,9 @@ px_pec_msg_rem_intr(px_t *px_p)
 		(void) px_rem_msiq_intr(dip, dip, &hdl, MSG_REC,
 		    PCIE_FATAL_MSG, pec_p->pec_fatal_msg_msiq_id);
 
-		(void) px_ib_update_intr_state(px_p, px_p->px_dip,
-		    hdl.ih_inum, px_msiqid_to_devino(px_p,
-		    pec_p->pec_fatal_msg_msiq_id),
-		    PX_INTR_STATE_DISABLE, MSG_REC, PCIE_FATAL_MSG);
+		(void) px_ib_update_intr_state(px_p, px_p->px_dip, hdl.ih_inum,
+		    px_msiqid_to_devino(px_p, pec_p->pec_fatal_msg_msiq_id),
+		    PX_ERR_PIL, PX_INTR_STATE_DISABLE, MSG_REC, PCIE_FATAL_MSG);
 
 		pec_p->pec_fatal_msg_msiq_id = (msiqid_t)-1;
 	}

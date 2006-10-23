@@ -112,10 +112,8 @@ struct	machcpu {
 	u_longlong_t	tmp1;		/* per-cpu tmps */
 	u_longlong_t	tmp2;		/*  used in trap processing */
 
-	struct intr_req intr_pool[INTR_PENDING_MAX];	/* intr pool */
-	struct intr_req *intr_head[PIL_LEVELS];		/* intr que heads */
-	struct intr_req *intr_tail[PIL_LEVELS];		/* intr que tails */
-	int		intr_pool_added;		/* add'l intr pool */
+	struct intr_vec	*intr_head[PIL_LEVELS];	/* intr queue heads per pil */
+	struct intr_vec	*intr_tail[PIL_LEVELS];	/* intr queue tails per pil */
 	boolean_t	poke_cpu_outstanding;
 	/*
 	 * The cpu module allocates a private data structure for the

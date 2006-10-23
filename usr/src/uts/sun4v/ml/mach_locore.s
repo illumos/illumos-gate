@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +34,7 @@
 
 #include <sys/asm_linkage.h>
 #include <sys/intreg.h>
+#include <sys/ivintr.h>
 #include <sys/mmu.h>
 #include <sys/machpcb.h>
 #include <sys/machtrap.h>
@@ -86,18 +86,19 @@ panicbuf = SYSBASE32 + PAGESIZE		! address of panic buffer
 	.size	panicbuf, PANICBUFSIZE
 
 /*
- * Absolute external symbol - intr_vector.
+ * Absolute external symbol - intr_vec_table.
  *
  * With new bus structures supporting a larger number of interrupt
- * numbers, the interrupt vector table, intr_vector[], has been
+ * numbers, the interrupt vector table, intr_vec_table[] has been
  * moved out of kernel nucleus and allocated after panicbuf.
  */
-	.global intr_vector
+	.global intr_vec_table
 
-intr_vector = SYSBASE32 + PAGESIZE + PANICBUFSIZE ! address of interrupt table
+intr_vec_table = SYSBASE32 + PAGESIZE + PANICBUFSIZE ! address of interrupt table
 
-	.type	intr_vector, #object
-	.size	intr_vector, MAXIVNUM * INTR_VECTOR_SIZE
+	.type	intr_vec_table, #object
+	.size	intr_vec_table, MAXIVNUM * CPTRSIZE + MAX_RSVD_IV * IV_SIZE + MAX_RSVD_IVX * (IV_SIZE + CPTRSIZE * (NCPU - 1))
+
 /*
  * The thread 0 stack. This must be the first thing in the data
  * segment (other than an sccs string) so that we don't stomp

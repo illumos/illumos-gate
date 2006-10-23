@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +29,7 @@
  * Interrupt Vector Table Configuration
  */
 
+#include <sys/types.h>
 #include <sys/cpuvar.h>
 #include <sys/ivintr.h>
 #include <sys/intreg.h>
@@ -37,195 +37,306 @@
 #include <sys/privregs.h>
 #include <sys/sunddi.h>
 
-
 /*
- * fill in an interrupt vector entry
+ * Allocate an Interrupt Vector Table and some interrupt vector data structures
+ * for the reserved pool as part of the startup code. First try to allocate an
+ * interrupt vector data structure from the reserved pool, otherwise allocate it
+ * using kmem cache method.
  */
-#define	fill_intr(a, b, c, d, e) \
-	a->iv_pil = b; a->iv_pending = 0; \
-	a->iv_arg = d; a->iv_handler = c; a->iv_payload_buf = e;
+static	kmutex_t intr_vec_mutex;	/* Protect interrupt vector table */
 
 /*
- * create a null interrupt handler entry used for returned values
- * only - never on intr_vector[]
+ * Global softint linked list - used by softint mdb dcmd.
  */
-#define	nullify_intr(v)		fill_intr(v, 0, NULL, NULL, NULL)
+static	kmutex_t softint_mutex;		/* Protect global softint linked list */
+intr_vec_t	*softint_list = NULL;
+
+/* Reserved pool for interrupt allocation */
+intr_vec_t	*intr_vec_pool = NULL;	/* For HW and single target SW intrs */
+intr_vecx_t	*intr_vecx_pool = NULL;	/* For multi target SW intrs */
+
+/* Kmem cache handle for interrupt allocation */
+kmem_cache_t	*intr_vec_cache = NULL;	/* For HW and single target SW intrs */
 
 /*
- * replace an intr_vector[] entry with a default set of values
- * this is done instead of nulling the entry, so the handler and
- * pil are always valid for the assembler code
- */
-#define	empty_intr(v)		fill_intr((v), PIL_MAX, nohandler, \
-						(void *)(v), NULL)
-
-/*
- * test whether an intr_vector[] entry points to our default handler
- */
-#define	intr_is_empty(v)		((v)->iv_handler == nohandler)
-
-extern uint_t swinum_base;
-extern uint_t maxswinum;
-extern kmutex_t soft_iv_lock;
-int ignore_invalid_vecintr = 0;
-uint64_t invalid_vecintr_count = 0;
-
-/*
- * default (non-)handler for otherwise unhandled interrupts
- */
-uint_t
-nohandler(caddr_t ivptr)
-{
-	if (!ignore_invalid_vecintr) {
-		ASSERT((struct intr_vector *)ivptr - intr_vector < MAXIVNUM);
-		return (DDI_INTR_UNCLAIMED);
-	} else {
-		invalid_vecintr_count++;
-		return (DDI_INTR_CLAIMED);
-	}
-}
-
-/*
- * initialization - fill the entire table with default values
+ * init_ivintr() - Initialize an Interrupt Vector Table.
  */
 void
-init_ivintr(void)
+init_ivintr()
 {
-	struct intr_vector *inump;
-	int i;
+	mutex_init(&intr_vec_mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&softint_mutex, NULL, MUTEX_DRIVER, NULL);
 
-	for (inump = intr_vector, i = 0; i <= MAXIVNUM; ++inump, ++i) {
-		empty_intr(inump);
+	/*
+	 * Initialize the reserved interrupt vector data structure pools
+	 * used for hardware and software interrupts.
+	 */
+	intr_vec_pool = (intr_vec_t *)((caddr_t)intr_vec_table +
+	    (MAXIVNUM * sizeof (intr_vec_t *)));
+	intr_vecx_pool = (intr_vecx_t *)((caddr_t)intr_vec_pool +
+	    (MAX_RSVD_IV * sizeof (intr_vec_t)));
+
+	bzero(intr_vec_table, MAXIVNUM * sizeof (intr_vec_t *));
+	bzero(intr_vec_pool, MAX_RSVD_IV * sizeof (intr_vec_t));
+	bzero(intr_vecx_pool, MAX_RSVD_IVX * sizeof (intr_vecx_t));
+}
+
+/*
+ * fini_ivintr() - Uninitialize an Interrupt Vector Table.
+ */
+void
+fini_ivintr()
+{
+	if (intr_vec_cache)
+		kmem_cache_destroy(intr_vec_cache);
+
+	mutex_destroy(&intr_vec_mutex);
+	mutex_destroy(&softint_mutex);
+}
+
+/*
+ * iv_alloc() - Allocate an interrupt vector data structure.
+ *
+ * This function allocates an interrupt vector data structure for hardware
+ * and single or multi target software interrupts either from the reserved
+ * pool or using kmem cache method.
+ */
+static intr_vec_t *
+iv_alloc(softint_type_t type)
+{
+	intr_vec_t	*iv_p;
+	int		i, count;
+
+	count = (type == SOFTINT_MT) ? MAX_RSVD_IVX : MAX_RSVD_IV;
+
+	/*
+	 * First try to allocate an interrupt vector data structure from the
+	 * reserved pool, otherwise allocate it using kmem_cache_alloc().
+	 */
+	for (i = 0; i < count; i++) {
+		iv_p = (type == SOFTINT_MT) ?
+		    (intr_vec_t *)&intr_vecx_pool[i] : &intr_vec_pool[i];
+
+		if (iv_p->iv_pil == 0)
+			break;
+	}
+
+	if (i < count)
+		return (iv_p);
+
+	if (type == SOFTINT_MT)
+		cmn_err(CE_PANIC, "iv_alloc: exceeded number of multi "
+		    "target software interrupts, %d", MAX_RSVD_IVX);
+
+	/*
+	 * If the interrupt vector data structure reserved pool is already
+	 * exhausted, then allocate an interrupt vector data structure using
+	 * kmem_cache_alloc(), but only for the hardware and single software
+	 * interrupts. Create a kmem cache for the interrupt allocation,
+	 * if it is not already available.
+	 */
+	if (intr_vec_cache == NULL)
+		intr_vec_cache = kmem_cache_create("intr_vec_cache",
+		    sizeof (intr_vec_t), 64, NULL, NULL, NULL, NULL, NULL, 0);
+
+	iv_p = kmem_cache_alloc(intr_vec_cache, KM_SLEEP);
+	bzero(iv_p, sizeof (intr_vec_t));
+
+	iv_p->iv_flags =  IV_CACHE_ALLOC;
+	return (iv_p);
+}
+
+/*
+ * iv_free() - Free an interrupt vector data structure.
+ */
+static void
+iv_free(intr_vec_t *iv_p)
+{
+	if (iv_p->iv_flags & IV_CACHE_ALLOC) {
+		ASSERT(!(iv_p->iv_flags & IV_SOFTINT_MT));
+		kmem_cache_free(intr_vec_cache, iv_p);
+	} else {
+		(iv_p->iv_flags & IV_SOFTINT_MT) ?
+		    bzero(iv_p, sizeof (intr_vecx_t)) :
+		    bzero(iv_p, sizeof (intr_vec_t));
 	}
 }
 
 /*
- * add_ivintr() - add an interrupt handler to the system
- *	This routine is not protected by the lock; it's the caller's
- *	responsibility to make sure <source>_INR.INT_EN = 0
- *	and <source>_ISM != PENDING before the routine is called.
+ * add_ivintr() - Add an interrupt handler to the system
  */
 int
 add_ivintr(uint_t inum, uint_t pil, intrfunc intr_handler,
-    caddr_t intr_arg, caddr_t intr_payload)
+    caddr_t intr_arg1, caddr_t intr_arg2, caddr_t intr_payload)
 {
-	struct intr_vector *inump;
+	intr_vec_t	*iv_p, *new_iv_p;
 
 	if (inum >= MAXIVNUM || pil > PIL_MAX)
 		return (EINVAL);
 
 	ASSERT((uintptr_t)intr_handler > KERNELBASE);
+
 	/* Make sure the payload buffer address is 64 bit aligned */
 	VERIFY(((uint64_t)intr_payload & 0x7) == 0);
 
-	inump = &intr_vector[inum];
+	new_iv_p = iv_alloc(SOFTINT_ST);
+	mutex_enter(&intr_vec_mutex);
 
-	if (inump->iv_handler != nohandler)
-		return (EINVAL);
+	for (iv_p = (intr_vec_t *)intr_vec_table[inum];
+	    iv_p; iv_p = iv_p->iv_vec_next) {
+		if (iv_p->iv_pil == pil) {
+			mutex_exit(&intr_vec_mutex);
+			iv_free(new_iv_p);
+			return (EINVAL);
+		}
+	}
 
-	fill_intr(inump, (ushort_t)pil, intr_handler, intr_arg, intr_payload);
+	ASSERT(iv_p == NULL);
+
+	new_iv_p->iv_handler = intr_handler;
+	new_iv_p->iv_arg1 = intr_arg1;
+	new_iv_p->iv_arg2 = intr_arg2;
+	new_iv_p->iv_payload_buf = intr_payload;
+	new_iv_p->iv_pil = (ushort_t)pil;
+	new_iv_p->iv_inum = inum;
+
+	new_iv_p->iv_vec_next = (intr_vec_t *)intr_vec_table[inum];
+	intr_vec_table[inum] = (uint64_t)new_iv_p;
+
+	mutex_exit(&intr_vec_mutex);
 	return (0);
 }
 
 /*
- * rem_ivintr() - remove an interrupt handler from intr_vector[]
- *	This routine is not protected by the lock; it's the caller's
- *	responsibility to make sure <source>_INR.INT_EN = 0
- *	and <source>_ISM != PENDING before the routine is called.
+ * rem_ivintr() - Remove an interrupt handler from the system
  */
-void
-rem_ivintr(uint_t inum, struct intr_vector *iv_return)
+int
+rem_ivintr(uint_t inum, uint_t pil)
 {
-	struct intr_vector *inump;
+	intr_vec_t	*iv_p, *prev_iv_p;
 
-	ASSERT(inum != NULL && inum < MAXIVNUM);
+	if (inum >= MAXIVNUM || pil > PIL_MAX)
+		return (EINVAL);
 
-	inump = &intr_vector[inum];
+	mutex_enter(&intr_vec_mutex);
 
-	if (iv_return) {
-		if (intr_is_empty(inump)) {
-			nullify_intr(iv_return);
-		} else {
-			/*
-			 * the caller requires the current entry to be
-			 * returned
-			 */
-			fill_intr(iv_return, inump->iv_pil,
-			    inump->iv_handler, inump->iv_arg,
-			    inump->iv_payload_buf);
-		}
+	for (iv_p = prev_iv_p = (intr_vec_t *)intr_vec_table[inum];
+	    iv_p; prev_iv_p = iv_p, iv_p = iv_p->iv_vec_next)
+		if (iv_p->iv_pil == pil)
+			break;
+
+	if (iv_p == NULL) {
+		mutex_exit(&intr_vec_mutex);
+		return (EIO);
 	}
 
-	/*
-	 * empty the current entry
-	 */
-	empty_intr(inump);
+	ASSERT(iv_p->iv_pil_next == NULL);
+
+	if (prev_iv_p == iv_p)
+		intr_vec_table[inum] = (uint64_t)iv_p->iv_vec_next;
+	else
+		prev_iv_p->iv_vec_next = iv_p->iv_vec_next;
+
+	mutex_exit(&intr_vec_mutex);
+
+	iv_free(iv_p);
+	return (0);
 }
 
 /*
  * add_softintr() - add a software interrupt handler to the system
  */
-uint_t
-add_softintr(uint_t pil, softintrfunc intr_handler, caddr_t intr_arg)
+uint64_t
+add_softintr(uint_t pil, softintrfunc intr_handler, caddr_t intr_arg1,
+    softint_type_t type)
 {
-	struct intr_vector *inump;
-	register uint_t i;
+	intr_vec_t	*iv_p;
 
-	mutex_enter(&soft_iv_lock);
+	if (pil > PIL_MAX)
+		return (NULL);
 
-	for (i = swinum_base; i < maxswinum; i++) {
-		inump = &intr_vector[i];
-		if (intr_is_empty(inump))
-			break;
-	}
+	iv_p = iv_alloc(type);
 
-	if (!intr_is_empty(inump)) {
-		cmn_err(CE_PANIC, "add_softintr: exceeded %d handlers",
-			maxswinum - swinum_base);
-	}
+	iv_p->iv_handler = (intrfunc)intr_handler;
+	iv_p->iv_arg1 = intr_arg1;
+	iv_p->iv_pil = (ushort_t)pil;
+	if (type == SOFTINT_MT)
+		iv_p->iv_flags |=  IV_SOFTINT_MT;
 
-	VERIFY(add_ivintr(i, pil, (intrfunc)intr_handler,
-	    intr_arg, NULL) == 0);
+	mutex_enter(&softint_mutex);
+	if (softint_list)
+		iv_p->iv_vec_next = softint_list;
+	softint_list = iv_p;
+	mutex_exit(&softint_mutex);
 
-	mutex_exit(&soft_iv_lock);
-
-	return (i);
+	return ((uint64_t)iv_p);
 }
 
 /*
  * rem_softintr() - remove a software interrupt handler from the system
  */
-void
-rem_softintr(uint_t inum)
+int
+rem_softintr(uint64_t softint_id)
 {
-	ASSERT(swinum_base <= inum && inum < MAXIVNUM);
+	intr_vec_t	*iv_p = (intr_vec_t *)softint_id;
 
-	mutex_enter(&soft_iv_lock);
-	rem_ivintr(inum, NULL);
-	mutex_exit(&soft_iv_lock);
+	ASSERT(iv_p != NULL);
+
+	if (iv_p->iv_flags & IV_SOFTINT_PEND)
+		return (EIO);
+
+	ASSERT(iv_p->iv_pil_next == NULL);
+
+	mutex_enter(&softint_mutex);
+	if (softint_list == iv_p) {
+		softint_list = iv_p->iv_vec_next;
+	} else {
+		intr_vec_t	*list = softint_list;
+
+		while (list && (list->iv_vec_next != iv_p))
+			list = list->iv_vec_next;
+
+		list->iv_vec_next = iv_p->iv_vec_next;
+	}
+	mutex_exit(&softint_mutex);
+
+	iv_free(iv_p);
+	return (0);
 }
 
+/*
+ * update_softint_arg2() - Update softint arg2.
+ *
+ * NOTE: Do not grab any mutex in this function since it may get called
+ *	 from the high-level interrupt context.
+ */
 int
-update_softint_arg2(uint_t intr_id, caddr_t arg2)
+update_softint_arg2(uint64_t softint_id, caddr_t intr_arg2)
 {
-	struct intr_vector *inump = &intr_vector[intr_id];
+	intr_vec_t	*iv_p = (intr_vec_t *)softint_id;
 
-	if (inump->iv_pending)
-		return (DDI_EPENDING);
+	ASSERT(iv_p != NULL);
 
-	inump->iv_softint_arg2 = arg2;
+	if (iv_p->iv_flags & IV_SOFTINT_PEND)
+		return (EIO);
 
-	return (DDI_SUCCESS);
+	iv_p->iv_arg2 = intr_arg2;
+	return (0);
 }
 
+/*
+ * update_softint_pri() - Update softint priority.
+ */
 int
-update_softint_pri(uint_t intr_id, int pri)
+update_softint_pri(uint64_t softint_id, uint_t pil)
 {
-	struct intr_vector *inump = &intr_vector[intr_id];
+	intr_vec_t	*iv_p = (intr_vec_t *)softint_id;
 
-	mutex_enter(&soft_iv_lock);
-	inump->iv_pil = pri;
-	mutex_exit(&soft_iv_lock);
+	ASSERT(iv_p != NULL);
 
-	return (DDI_SUCCESS);
+	if (pil > PIL_MAX)
+		return (EINVAL);
+
+	iv_p->iv_pil = pil;
+	return (0);
 }

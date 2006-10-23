@@ -166,17 +166,17 @@ vec_interrupt_resume:
 	!	%g1 - temp
 	!
         ! We don't bother to verify that the received inum is valid (it should
-        ! be < MAXIVNUM) since setsoftint_tl1 will do that for us.
+        ! be < MAXIVNUM) since setvecint_tl1 will do that for us.
         !
 	! clear BUSY bit
 	!
 	stxa	%g0, [%g0]ASI_INTR_RECEIVE_STATUS
 	membar	#Sync
 
-	! setsoftint_tl1 will do all the work, and finish with a retry
+	! setvecint_tl1 will do all the work, and finish with a retry
 	!
-	ba,pt	%xcc, setsoftint_tl1
-	  mov	%g5, %g1		! setsoftint_tl1 expects inum in %g1
+	ba,pt	%xcc, setvecint_tl1
+	mov	%g5, %g1		! setvecint_tl1 expects inum in %g1
 
 	/* Never Reached */
 	SET_SIZE(vec_interrupt)

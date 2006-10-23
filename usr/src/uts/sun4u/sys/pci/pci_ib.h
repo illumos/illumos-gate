@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +38,7 @@ extern "C" {
 typedef uint8_t ib_ino_t;
 typedef uint16_t ib_mondo_t;
 typedef struct ib_ino_info ib_ino_info_t;
+typedef struct ib_ino_pil ib_ino_pil_t;
 typedef uint8_t device_num_t;
 typedef uint8_t interrupt_t;
 
@@ -99,7 +99,8 @@ struct ib {
 #define	PCI_IGN_BITS	5			/* IGN#s are 5 bits long */
 
 /*
- * The following structure represents an interrupt entry for an INO.
+ * ih structure: one per every consumer of each ino and pil pair with interrupt
+ * registered.
  */
 typedef struct ih {
 	dev_info_t *ih_dip;		/* devinfo structure */
@@ -112,8 +113,8 @@ typedef struct ih {
 	struct ih *ih_next;		/* next entry in list */
 	uint64_t ih_ticks;		/* ticks spent in this handler */
 	uint64_t ih_nsec;		/* nsec spent in this handler */
-	kstat_t *ih_ksp;
-	struct ib_ino_info *ih_ino_p;	/* only for use by kstat */
+	kstat_t *ih_ksp;		/* pointer to kstat information */
+	ib_ino_pil_t *ih_ipil_p;	/* only for use by kstat */
 } ih_t;
 
 /* Only used for fixed or legacy interrupts */
@@ -121,27 +122,39 @@ typedef struct ih {
 #define	PCI_INTR_STATE_ENABLE	1	/* enabled */
 
 /*
- * ino structure : one per each psycho slot ino with interrupt registered
+ * ino_pil structure: one per each ino and pil pair with interrupt registered
+ */
+struct ib_ino_pil {
+	ushort_t ipil_pil;		/* PIL for this ino */
+	ushort_t ipil_ih_size;		/* size of ih_t list */
+	ih_t *ipil_ih_head;		/* ih_t list head */
+	ih_t *ipil_ih_tail;		/* ih_t list tail */
+	ih_t *ipil_ih_start;		/* starting point in ih_t list  */
+	ib_ino_info_t *ipil_ino_p;	/* pointer to ib_ino_info_t */
+	ib_ino_pil_t *ipil_next_p;	/* pointer to next ib_ino_pil_t */
+};
+
+/*
+ * ino structure: one per each ino with interrupt registered
  */
 struct ib_ino_info {
 	ib_ino_t ino_ino;		/* INO number - 8 bit */
+	uint64_t ino_mondo;		/* store mondo number */
 	uint8_t ino_slot_no;		/* PCI slot number 0-8 */
-	uint16_t ino_ih_size;		/* size of the pci intrspec list */
-	struct ib_ino_info *ino_next;
-	ih_t *ino_ih_head;		/* intr spec (part of ppd) list head */
-	ih_t *ino_ih_tail;		/* intr spec (part of ppd) list tail */
-	ih_t *ino_ih_start;		/* starting point in intr spec list  */
 	ib_t *ino_ib_p;			/* link back to interrupt block state */
 	volatile uint64_t *ino_clr_reg;	/* ino interrupt clear register */
 	volatile uint64_t *ino_map_reg;	/* ino interrupt mapping register */
 	uint64_t ino_map_reg_save;	/* = *ino_map_reg if saved */
-	uint32_t ino_pil;		/* PIL for this ino */
-	volatile uint_t ino_unclaimed;	/* number of unclaimed interrupts */
+	volatile uint_t ino_unclaimed_intrs; /* number of unclaimed intrs */
 	clock_t ino_spurintr_begin;	/* begin time of spurious intr series */
 	int ino_established;		/* ino has been associated with a cpu */
 	uint32_t ino_cpuid;		/* cpu that ino is targeting */
 	int32_t ino_intr_weight;	/* intr weight of devices sharing ino */
-	uint64_t ino_mondo;		/* store mondo number */
+	ushort_t ino_ipil_size;		/* number of ib_ino_pil_t sharing ino */
+	ushort_t ino_lopil;		/* lowest PIL sharing ino */
+	ushort_t ino_claimed;		/* pil bit masks, who claimed intr */
+	ib_ino_pil_t *ino_ipil_p;	/* pointer to first ib_ino_pil_t */
+	ib_ino_info_t *ino_next_p;	/* pointer to next ib_ino_info_t */
 };
 
 #define	IB_INTR_WAIT	1		/* wait for interrupt completion */
@@ -192,34 +205,36 @@ extern void ib_suspend(ib_t *ib_p);
 extern void ib_resume(ib_t *ib_p);
 
 extern ib_ino_info_t *ib_locate_ino(ib_t *ib_p, ib_ino_t ino_num);
-extern ib_ino_info_t *ib_new_ino(ib_t *ib_p, ib_ino_t ino_num, ih_t *ih_p);
-extern void ib_delete_ino(ib_t *ib_p, ib_ino_info_t *ino_p);
+extern ib_ino_pil_t *ib_new_ino_pil(ib_t *ib_p, ib_ino_t ino_num, uint_t pil,
+    ih_t *ih_p);
+extern void ib_delete_ino_pil(ib_t *ib_p, ib_ino_pil_t *ipil_p);
 extern void ib_free_ino_all(ib_t *ib_p);
-extern int ib_update_intr_state(pci_t *pci_p, dev_info_t *rdip,
-    ddi_intr_handle_impl_t *hdlp, uint_t new_intr_state);
-extern void ib_ino_add_intr(pci_t *pci_p, ib_ino_info_t *ino_p, ih_t *ih_p);
-extern void ib_ino_rem_intr(pci_t *pci_p, ib_ino_info_t *ino_p, ih_t *ih_p);
-extern ih_t *ib_ino_locate_intr(ib_ino_info_t *ino_p, dev_info_t *dip,
+extern ib_ino_pil_t *ib_ino_locate_ipil(ib_ino_info_t *ino_p, uint_t pil);
+extern void ib_ino_add_intr(pci_t *pci_p, ib_ino_pil_t *ipil_p, ih_t *ih_p);
+extern void ib_ino_rem_intr(pci_t *pci_p, ib_ino_pil_t *ipil_p, ih_t *ih_p);
+extern ih_t *ib_intr_locate_ih(ib_ino_pil_t *ipil_p, dev_info_t *dip,
     uint32_t inum);
 extern ih_t *ib_alloc_ih(dev_info_t *dip, uint32_t inum,
     uint_t (*int_handler)(caddr_t int_handler_arg1, caddr_t int_handler_arg2),
     caddr_t int_handler_arg1, caddr_t int_handler_arg2);
 extern void ib_free_ih(ih_t *ih_p);
+extern int ib_update_intr_state(pci_t *pci_p, dev_info_t *rdip,
+    ddi_intr_handle_impl_t *hdlp, uint_t new_intr_state);
 extern void ib_ino_map_reg_share(ib_t *ib_p, ib_ino_t ino,
-	ib_ino_info_t *ino_p);
+    ib_ino_info_t *ino_p);
 extern int ib_ino_map_reg_unshare(ib_t *ib_p, ib_ino_t ino,
-	ib_ino_info_t *ino_p);
+    ib_ino_info_t *ino_p);
 extern uint32_t ib_register_intr(ib_t *ib_p, ib_mondo_t mondo, uint_t pil,
-	uint_t (*handler)(caddr_t arg), caddr_t arg);
+    uint_t (*handler)(caddr_t arg), caddr_t arg);
 extern void ib_unregister_intr(ib_mondo_t mondo);
 extern void ib_intr_dist_nintr(ib_t *ib_p, ib_ino_t ino,
-	volatile uint64_t *imr_p);
+    volatile uint64_t *imr_p);
 extern void ib_intr_dist_all(void *arg, int32_t max_weight, int32_t weight);
 extern void ib_cpu_ticks_to_ih_nsec(ib_t *ib_p, ih_t *ih_p, uint32_t cpu_id);
 extern uint8_t ib_get_ino_devs(ib_t *ib_p, uint32_t ino, uint8_t *devs_ret,
-	pcitool_intr_dev_t *devs);
+    pcitool_intr_dev_t *devs);
 extern void ib_log_new_cpu(ib_t *ib_p, uint32_t old_cpu_id, uint32_t new_cpu_id,
-	uint32_t ino);
+    uint32_t ino);
 
 extern int pci_pil[];
 

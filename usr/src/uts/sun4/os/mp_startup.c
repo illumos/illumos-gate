@@ -78,23 +78,6 @@ static void	slave_startup(void);
  */
 #define	CPU_WAKEUP_GRACE_MSEC 1000
 
-/*
- * MP configurations may reserve additional interrupt request entries.
- * intr_add_{div,max} can be modified to tune memory usage.
- */
-
-uint_t	intr_add_div = 1;			/* 1=worst case memory usage */
-size_t	intr_add_max = 0;
-
-/* intr_add_{pools,head,tail} calculated based on intr_add_{div,max} */
-
-size_t	intr_add_pools = 0;			/* additional pools per cpu */
-struct intr_req	*intr_add_head = (struct intr_req *)NULL;
-#ifdef	DEBUG
-struct intr_req	*intr_add_tail = (struct intr_req *)NULL;
-#endif	/* DEBUG */
-
-
 #ifdef	TRAPTRACE
 /*
  * This function bop allocs traptrace buffers for all cpus
@@ -410,7 +393,6 @@ setup_cpu_common(int cpuid)
 	/*
 	 * Initialize the interrupt threads for this CPU
 	 */
-	init_intr_pool(cp);
 	cpu_intr_alloc(cp, NINTR_THREADS);
 
 	/*
@@ -470,11 +452,6 @@ cleanup_cpu_common(int cpuid)
 	 * Remove CPU from list of available CPUs.
 	 */
 	cpu_del_unit(cpuid);
-
-	/*
-	 * Clean up the interrupt pool.
-	 */
-	cleanup_intr_pool(cp);
 
 	/*
 	 * Clean any machine specific interrupt states.
@@ -664,68 +641,6 @@ slave_startup(void)
 	cmn_err(CE_PANIC, "slave_startup: cannot return");
 	/*NOTREACHED*/
 }
-
-/*
- * 4163850 changes the allocation method for cpu structs. cpu structs
- * are dynamically allocated. This routine now determines if additional
- * per-cpu intr_req entries need to be allocated.
- */
-int
-ndata_alloc_cpus(struct memlist *ndata)
-{
-	size_t real_sz;
-	extern int niobus;
-
-	if (niobus > 1) {
-
-		/*
-		 * Allocate additional intr_req entries if we have more than
-		 * one io bus.  The memory to allocate is calculated from four
-		 * variables: niobus, max_ncpus, intr_add_div, and intr_add_max.
-		 * Allocate multiple of INTR_POOL_SIZE bytes (512).  Each cpu
-		 * already reserves 512 bytes in its machcpu structure, so the
-		 * worst case is (512 * (niobus - 1) * max_ncpus) add'l bytes.
-		 *
-		 * While niobus and max_ncpus reflect the h/w, the following
-		 * may be tuned (before boot):
-		 *
-		 *	intr_add_div -	divisor for scaling the number of
-		 *			additional intr_req entries. use '1'
-		 *			for worst case memory, '2' for half,
-		 *			etc.
-		 *
-		 *   intr_add_max - upper limit on bytes of memory to reserve
-		 */
-
-		real_sz = INTR_POOL_SIZE * (niobus - 1) * max_ncpus;
-
-		/* tune memory usage by applying divisor and maximum */
-
-		if (intr_add_max == 0)
-			intr_add_max = max_ncpus * INTR_POOL_SIZE;
-		real_sz = MIN(intr_add_max, real_sz / MAX(intr_add_div, 1));
-
-		/* round down to multiple of (max_ncpus * INTR_POOL_SIZE) */
-
-		intr_add_pools = real_sz / (max_ncpus * INTR_POOL_SIZE);
-		real_sz = intr_add_pools * (max_ncpus * INTR_POOL_SIZE);
-
-		/* actually reserve the space */
-
-		intr_add_head = ndata_alloc(ndata, real_sz, ecache_alignsize);
-		if (intr_add_head == NULL)
-			return (-1);
-
-		PRM_DEBUG(intr_add_head);
-#ifdef	DEBUG
-		intr_add_tail = (struct intr_req *)
-		    ((uintptr_t)intr_add_head + real_sz);
-#endif	/* DEBUG */
-	}
-
-	return (0);
-}
-
 
 extern struct cpu	*cpu[NCPU];	/* pointers to all CPUs */
 

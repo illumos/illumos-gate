@@ -2724,7 +2724,7 @@ cache_scrubreq_tl1(uint64_t inum, uint64_t index)
  * cache_scrubreq_tl1 is the crosstrap handler called on offlined cpus via a 
  * crosstrap.  It atomically increments the outstanding request counter and,
  * if there was not already an outstanding request, branches to setsoftint_tl1
- * to enqueue an intr_req for the given inum.
+ * to enqueue an intr_vec for the given inum.
  */
 
 	! Register usage:
@@ -2749,7 +2749,7 @@ cache_scrubreq_tl1(uint64_t inum, uint64_t index)
 	! increment - we're at tl1
 	!
 	add	%g2, 0x1, %g3
-	brnz,pn	%g2, 1f			! no need to enqueue more intr_req
+	brnz,pn	%g2, 1f			! no need to enqueue more intr_vec
 	  st	%g3, [%g4]		! delay - store incremented counter
 	ASM_JMP(%g6, setsoftint_tl1)
 	! not reached

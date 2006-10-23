@@ -71,44 +71,50 @@
  * on this ino is blocked by not idling the interrupt state machine.
  */
 static int
-px_spurintr(px_ib_ino_info_t *ino_p)
+px_spurintr(px_ino_pil_t *ipil_p)
 {
-	px_ih_t	*ih_p = ino_p->ino_ih_start;
-	px_t	*px_p = ino_p->ino_ib_p->ib_px_p;
-	char	*err_fmt_str;
-	int	i;
+	px_ino_t	*ino_p = ipil_p->ipil_ino_p;
+	px_ih_t		*ih_p = ipil_p->ipil_ih_start;
+	px_t		*px_p = ino_p->ino_ib_p->ib_px_p;
+	char		*err_fmt_str;
+	boolean_t	blocked = B_FALSE;
+	int		i;
 
-	if (ino_p->ino_unclaimed > px_unclaimed_intr_max)
+	if (ino_p->ino_unclaimed_intrs > px_unclaimed_intr_max)
 		return (DDI_INTR_CLAIMED);
 
-	if (!ino_p->ino_unclaimed)
+	if (!ino_p->ino_unclaimed_intrs)
 		ino_p->ino_spurintr_begin = ddi_get_lbolt();
 
-	ino_p->ino_unclaimed++;
+	ino_p->ino_unclaimed_intrs++;
 
-	if (ino_p->ino_unclaimed <= px_unclaimed_intr_max)
+	if (ino_p->ino_unclaimed_intrs <= px_unclaimed_intr_max)
 		goto clear;
 
 	if (drv_hztousec(ddi_get_lbolt() - ino_p->ino_spurintr_begin)
 	    > px_spurintr_duration) {
-		ino_p->ino_unclaimed = 0;
+		ino_p->ino_unclaimed_intrs = 0;
 		goto clear;
 	}
 	err_fmt_str = "%s%d: ino 0x%x blocked";
+	blocked = B_TRUE;
 	goto warn;
 clear:
-	/* Clear the pending state */
-	if (px_lib_intr_setstate(px_p->px_dip, ino_p->ino_sysino,
-	    INTR_IDLE_STATE) != DDI_SUCCESS)
-		return (DDI_INTR_UNCLAIMED);
-
 	err_fmt_str = "!%s%d: spurious interrupt from ino 0x%x";
 warn:
 	cmn_err(CE_WARN, err_fmt_str, NAMEINST(px_p->px_dip), ino_p->ino_ino);
-	for (i = 0; i < ino_p->ino_ih_size; i++, ih_p = ih_p->ih_next)
+	for (i = 0; i < ipil_p->ipil_ih_size; i++, ih_p = ih_p->ih_next)
 		cmn_err(CE_CONT, "!%s-%d#%x ", NAMEINST(ih_p->ih_dip),
 		    ih_p->ih_inum);
 	cmn_err(CE_CONT, "!\n");
+
+	/* Clear the pending state */
+	if (blocked == B_FALSE) {
+		if (px_lib_intr_setstate(px_p->px_dip, ino_p->ino_sysino,
+		    INTR_IDLE_STATE) != DDI_SUCCESS)
+			return (DDI_INTR_UNCLAIMED);
+	}
+
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -136,18 +142,20 @@ extern uint64_t intr_get_time(void);
 uint_t
 px_intx_intr(caddr_t arg)
 {
-	px_ib_ino_info_t *ino_p = (px_ib_ino_info_t *)arg;
+	px_ino_pil_t	*ipil_p = (px_ino_pil_t *)arg;
+	px_ino_t	*ino_p = ipil_p->ipil_ino_p;
 	px_t		*px_p = ino_p->ino_ib_p->ib_px_p;
-	px_ih_t		*ih_p = ino_p->ino_ih_start;
-	uint_t		result = 0, r;
+	px_ih_t		*ih_p = ipil_p->ipil_ih_start;
+	ushort_t	pil = ipil_p->ipil_pil;
+	uint_t		result = 0, r = DDI_INTR_UNCLAIMED;
 	int		i;
 
 	DBG(DBG_INTX_INTR, px_p->px_dip, "px_intx_intr:"
 	    "ino=%x sysino=%llx pil=%x ih_size=%x ih_lst=%x\n",
-	    ino_p->ino_ino, ino_p->ino_sysino, ino_p->ino_pil,
-	    ino_p->ino_ih_size, ino_p->ino_ih_head);
+	    ino_p->ino_ino, ino_p->ino_sysino, ipil_p->ipil_pil,
+	    ipil_p->ipil_ih_size, ipil_p->ipil_ih_head);
 
-	for (i = 0; i < ino_p->ino_ih_size; i++, ih_p = ih_p->ih_next) {
+	for (i = 0; i < ipil_p->ipil_ih_size; i++, ih_p = ih_p->ih_next) {
 		dev_info_t *dip = ih_p->ih_dip;
 		uint_t (*handler)() = ih_p->ih_handler;
 		caddr_t arg1 = ih_p->ih_handler_arg1;
@@ -177,7 +185,7 @@ px_intx_intr(caddr_t arg)
 		 * using atomic ops.
 		 */
 
-		if (ino_p->ino_pil <= LOCK_LEVEL)
+		if (pil <= LOCK_LEVEL)
 			atomic_add_64(&ih_p->ih_ticks, intr_get_time());
 
 		DTRACE_PROBE4(interrupt__complete, dev_info_t, dip,
@@ -191,13 +199,23 @@ px_intx_intr(caddr_t arg)
 			break;
 	}
 
-	if (!result && px_unclaimed_intr_block)
-		return (px_spurintr(ino_p));
+	if (result)
+		ino_p->ino_claimed |= (1 << pil);
 
-	ino_p->ino_unclaimed = 0;
+	/* Interrupt can only be cleared after all pil levels are handled */
+	if (pil != ino_p->ino_lopil)
+		return (DDI_INTR_CLAIMED);
+
+	if (!ino_p->ino_claimed) {
+		if (px_unclaimed_intr_block)
+			return (px_spurintr(ipil_p));
+	}
+
+	ino_p->ino_unclaimed_intrs = 0;
+	ino_p->ino_claimed = 0;
 
 	/* Clear the pending state */
-	if (px_lib_intr_setstate(ino_p->ino_ib_p->ib_px_p->px_dip,
+	if (px_lib_intr_setstate(px_p->px_dip,
 	    ino_p->ino_sysino, INTR_IDLE_STATE) != DDI_SUCCESS)
 		return (DDI_INTR_UNCLAIMED);
 
@@ -226,46 +244,64 @@ px_intx_intr(caddr_t arg)
 uint_t
 px_msiq_intr(caddr_t arg)
 {
-	px_ib_ino_info_t	*ino_p = (px_ib_ino_info_t *)arg;
+	px_ino_pil_t	*ipil_p = (px_ino_pil_t *)arg;
+	px_ino_t	*ino_p = ipil_p->ipil_ino_p;
 	px_t		*px_p = ino_p->ino_ib_p->ib_px_p;
 	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
 	px_msiq_t	*msiq_p = ino_p->ino_msiq_p;
 	dev_info_t	*dip = px_p->px_dip;
+	ushort_t	pil = ipil_p->ipil_pil;
 	msiq_rec_t	msiq_rec, *msiq_rec_p = &msiq_rec;
-	msiqhead_t	new_head_index = msiq_p->msiq_curr_head_idx;
 	msiqhead_t	*curr_head_p;
 	msiqtail_t	curr_tail_index;
 	msgcode_t	msg_code;
 	px_ih_t		*ih_p;
-	int		i, j, ret;
-	ushort_t	msiq_recs2process;
+	uint_t		ret = DDI_INTR_UNCLAIMED;
+	int		i, j;
 
 	DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: msiq_id =%x ino=%x pil=%x "
 	    "ih_size=%x ih_lst=%x\n", msiq_p->msiq_id, ino_p->ino_ino,
-	    ino_p->ino_pil, ino_p->ino_ih_size, ino_p->ino_ih_head);
+	    ipil_p->ipil_pil, ipil_p->ipil_ih_size, ipil_p->ipil_ih_head);
 
-	/* Read current MSIQ tail index */
-	px_lib_msiq_gettail(dip, msiq_p->msiq_id, &curr_tail_index);
+	/*
+	 * The px_msiq_intr() handles multiple interrupt priorities and it
+	 * will set msiq->msiq_rec2process to the number of MSIQ records to
+	 * process while handling the highest priority interrupt. Subsequent
+	 * lower priority interrupts will just process any unprocessed MSIQ
+	 * records or will just return immediately.
+	 */
+	if (msiq_p->msiq_recs2process == 0) {
+		/* Read current MSIQ tail index */
+		px_lib_msiq_gettail(dip, msiq_p->msiq_id, &curr_tail_index);
+		msiq_p->msiq_new_head_index = msiq_p->msiq_curr_head_index;
 
-	if (curr_tail_index < new_head_index)
-		curr_tail_index += msiq_state_p->msiq_rec_cnt;
+		if (curr_tail_index < msiq_p->msiq_curr_head_index)
+			curr_tail_index += msiq_state_p->msiq_rec_cnt;
+
+		msiq_p->msiq_recs2process = curr_tail_index -
+		    msiq_p->msiq_curr_head_index;
+	}
+
+	DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: curr_head %x new_head %x "
+	    "rec2process %x\n", msiq_p->msiq_curr_head_index,
+	    msiq_p->msiq_new_head_index, msiq_p->msiq_recs2process);
+
+	/* If all MSIQ records are already processed, just return immediately */
+	if ((msiq_p->msiq_new_head_index - msiq_p->msiq_curr_head_index)
+	    == msiq_p->msiq_recs2process)
+		goto intr_done;
+
+	curr_head_p = (msiqhead_t *)((caddr_t)msiq_p->msiq_base_p +
+	    (msiq_p->msiq_curr_head_index * sizeof (msiq_rec_t)));
 
 	/*
 	 * Calculate the number of recs to process by taking the difference
 	 * between the head and tail pointers. For all records we always
 	 * verify that we have a valid record type before we do any processing.
-	 * If triggered, we should always have at least 1 valid record.
+	 * If triggered, we should always have at least one valid record.
 	 */
-	msiq_recs2process = curr_tail_index - new_head_index;
-
-	DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: curr_head %x "
-	    "rec2process %x\n", new_head_index, msiq_recs2process);
-
-	curr_head_p = (msiqhead_t *)((caddr_t)msiq_p->msiq_base_p +
-	    new_head_index * sizeof (msiq_rec_t));
-
-	for (i = 0; i < msiq_recs2process; i++) {
-		/* Read MSIQ record */
+	for (i = 0; i < msiq_p->msiq_recs2process; i++) {
+		/* Read next MSIQ record */
 		px_lib_get_msiq_rec(dip, curr_head_p, msiq_rec_p);
 
 		DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: MSIQ RECORD, "
@@ -273,7 +309,7 @@ px_msiq_intr(caddr_t arg)
 		    msiq_rec_p->msiq_rec_type, msiq_rec_p->msiq_rec_rid);
 
 		if (!msiq_rec_p->msiq_rec_type)
-			break;
+			goto next_rec;
 
 		/* Check MSIQ record type */
 		switch (msiq_rec_p->msiq_rec_type) {
@@ -298,6 +334,7 @@ px_msiq_intr(caddr_t arg)
 			    "record type is not supported",
 			    ddi_driver_name(dip), ddi_get_instance(dip),
 			    msiq_rec_p->msiq_rec_type);
+
 			goto next_rec;
 		}
 
@@ -305,8 +342,8 @@ px_msiq_intr(caddr_t arg)
 		 * Scan through px_ih_t linked list, searching for the
 		 * right px_ih_t, matching MSIQ record data.
 		 */
-		for (j = 0, ih_p = ino_p->ino_ih_start;
-		    ih_p && (j < ino_p->ino_ih_size) &&
+		for (j = 0, ih_p = ipil_p->ipil_ih_start;
+		    ih_p && (j < ipil_p->ipil_ih_size) &&
 		    ((ih_p->ih_msg_code != msg_code) ||
 		    (ih_p->ih_rec_type != msiq_rec_p->msiq_rec_type));
 		    ih_p = ih_p->ih_next, j++);
@@ -345,13 +382,14 @@ px_msiq_intr(caddr_t arg)
 			 * ib_intr_dist_all() by using atomic ops.
 			 */
 
-			if (ino_p->ino_pil <= LOCK_LEVEL)
+			if (pil <= LOCK_LEVEL)
 				atomic_add_64(&ih_p->ih_ticks, intr_get_time());
 
 			DTRACE_PROBE4(interrupt__complete, dev_info_t, dip,
 			    void *, handler, caddr_t, arg1, int, ret);
 
-			new_head_index++;
+			msiq_p->msiq_new_head_index++;
+			px_lib_clr_msiq_rec(dip, curr_head_p);
 		} else {
 			DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr:"
 			    "No matching MSIQ record found\n");
@@ -363,28 +401,41 @@ next_rec:
 
 		/* Check for overflow condition */
 		if (curr_head_p >= (msiqhead_t *)((caddr_t)msiq_p->msiq_base_p
-		    + msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t)))
+		    + (msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t))))
 			curr_head_p = (msiqhead_t *)msiq_p->msiq_base_p;
-
-		/* Zero out msiq_rec_type field */
-		msiq_rec_p->msiq_rec_type = 0;
 	}
 
-	DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: # of MSIQ recs processed %x\n",
-	    (new_head_index - msiq_p->msiq_curr_head_idx));
+	DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: No of MSIQ recs processed %x\n",
+	    (msiq_p->msiq_new_head_index - msiq_p->msiq_curr_head_index));
 
-	if (new_head_index <= msiq_p->msiq_curr_head_idx) {
-		if (px_unclaimed_intr_block) {
-			return (px_spurintr(ino_p));
-		}
+	DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: curr_head %x new_head %x "
+	    "rec2process %x\n", msiq_p->msiq_curr_head_index,
+	    msiq_p->msiq_new_head_index, msiq_p->msiq_recs2process);
+
+	/* ino_claimed used just for debugging purpose */
+	if (ret)
+		ino_p->ino_claimed |= (1 << pil);
+
+intr_done:
+	/* Interrupt can only be cleared after all pil levels are handled */
+	if (pil != ino_p->ino_lopil)
+		return (DDI_INTR_CLAIMED);
+
+	if (msiq_p->msiq_new_head_index <= msiq_p->msiq_curr_head_index)  {
+		if (px_unclaimed_intr_block)
+			return (px_spurintr(ipil_p));
 	}
 
 	/*  Update MSIQ head index with no of MSIQ records processed */
-	if (new_head_index >= msiq_state_p->msiq_rec_cnt)
-		new_head_index -= msiq_state_p->msiq_rec_cnt;
+	if (msiq_p->msiq_new_head_index >= msiq_state_p->msiq_rec_cnt)
+		msiq_p->msiq_new_head_index -= msiq_state_p->msiq_rec_cnt;
 
-	msiq_p->msiq_curr_head_idx = new_head_index;
-	px_lib_msiq_sethead(dip, msiq_p->msiq_id, new_head_index);
+	msiq_p->msiq_curr_head_index = msiq_p->msiq_new_head_index;
+	px_lib_msiq_sethead(dip, msiq_p->msiq_id, msiq_p->msiq_new_head_index);
+
+	msiq_p->msiq_new_head_index = 0;
+	msiq_p->msiq_recs2process = 0;
+	ino_p->ino_claimed = 0;
 
 	/* Clear the pending state */
 	if (px_lib_intr_setstate(dip, ino_p->ino_sysino,
@@ -576,11 +627,11 @@ px_intx_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		break;
 	case DDI_INTROP_ENABLE:
 		ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
-		    hdlp->ih_vector, PX_INTR_STATE_ENABLE, 0, 0);
+		    hdlp->ih_vector, hdlp->ih_pri, PX_INTR_STATE_ENABLE, 0, 0);
 		break;
 	case DDI_INTROP_DISABLE:
 		ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
-		    hdlp->ih_vector, PX_INTR_STATE_DISABLE, 0, 0);
+		    hdlp->ih_vector, hdlp->ih_pri, PX_INTR_STATE_DISABLE, 0, 0);
 		break;
 	case DDI_INTROP_SETMASK:
 		ret = pci_intx_set_mask(rdip);
@@ -788,8 +839,8 @@ msi_free:
 			return (ret);
 
 		ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
-		    px_msiqid_to_devino(px_p, msiq_id), PX_INTR_STATE_ENABLE,
-		    msiq_rec_type, msi_num);
+		    px_msiqid_to_devino(px_p, msiq_id), hdlp->ih_pri,
+		    PX_INTR_STATE_ENABLE, msiq_rec_type, msi_num);
 
 		break;
 	case DDI_INTROP_DISABLE:
@@ -812,7 +863,8 @@ msi_free:
 
 		ret = px_ib_update_intr_state(px_p, rdip,
 		    hdlp->ih_inum, px_msiqid_to_devino(px_p, msiq_id),
-		    PX_INTR_STATE_DISABLE, msiq_rec_type, msi_num);
+		    hdlp->ih_pri, PX_INTR_STATE_DISABLE, msiq_rec_type,
+		    msi_num);
 
 		break;
 	case DDI_INTROP_BLOCKENABLE:
@@ -835,8 +887,8 @@ msi_free:
 
 			if ((ret = px_ib_update_intr_state(px_p, rdip,
 			    hdlp->ih_inum + i, px_msiqid_to_devino(px_p,
-			    msiq_id), PX_INTR_STATE_ENABLE, msiq_rec_type,
-			    msi_num)) != DDI_SUCCESS)
+			    msiq_id), hdlp->ih_pri, PX_INTR_STATE_ENABLE,
+			    msiq_rec_type, msi_num)) != DDI_SUCCESS)
 				return (ret);
 		}
 
@@ -861,8 +913,8 @@ msi_free:
 
 			if ((ret = px_ib_update_intr_state(px_p, rdip,
 			    hdlp->ih_inum + i, px_msiqid_to_devino(px_p,
-			    msiq_id), PX_INTR_STATE_DISABLE, msiq_rec_type,
-			    msi_num)) != DDI_SUCCESS)
+			    msiq_id), hdlp->ih_pri, PX_INTR_STATE_DISABLE,
+			    msiq_rec_type, msi_num)) != DDI_SUCCESS)
 				return (ret);
 		}
 
@@ -924,12 +976,13 @@ px_ks_update(kstat_t *ksp, int rw)
 {
 	px_ih_t *ih_p = ksp->ks_private;
 	int maxlen = sizeof (pxintr_ks_template.pxintr_ks_name.value.c);
-	px_ib_t *ib_p = ih_p->ih_ino_p->ino_ib_p;
-	px_t *px_p = ib_p->ib_px_p;
+	px_ino_pil_t *ipil_p = ih_p->ih_ipil_p;
+	px_ino_t *ino_p = ipil_p->ipil_ino_p;
+	px_t *px_p = ino_p->ino_ib_p->ib_px_p;
 	devino_t ino;
 	sysino_t sysino;
 
-	ino = ih_p->ih_ino_p->ino_ino;
+	ino = ino_p->ino_ino;
 	(void) px_lib_intr_devino_to_sysino(px_p->px_dip, ino, &sysino);
 
 	(void) snprintf(pxintr_ks_template.pxintr_ks_name.value.c, maxlen,
@@ -945,13 +998,11 @@ px_ks_update(kstat_t *ksp, int rw)
 
 		(void) strcpy(pxintr_ks_template.pxintr_ks_type.value.c,
 		    (ih_p->ih_rec_type == 0) ? "fixed" : "msi");
-		pxintr_ks_template.pxintr_ks_cpu.value.ui64 =
-		    ih_p->ih_ino_p->ino_cpuid;
-		pxintr_ks_template.pxintr_ks_pil.value.ui64 =
-		    ih_p->ih_ino_p->ino_pil;
+		pxintr_ks_template.pxintr_ks_cpu.value.ui64 = ino_p->ino_cpuid;
+		pxintr_ks_template.pxintr_ks_pil.value.ui64 = ipil_p->ipil_pil;
 		pxintr_ks_template.pxintr_ks_time.value.ui64 = ih_p->ih_nsec +
 		    (uint64_t)tick2ns((hrtime_t)ih_p->ih_ticks,
-			ih_p->ih_ino_p->ino_cpuid);
+		    ino_p->ino_cpuid);
 		pxintr_ks_template.pxintr_ks_ino.value.ui64 = ino;
 		pxintr_ks_template.pxintr_ks_cookie.value.ui64 = sysino;
 	} else {
@@ -1007,7 +1058,8 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 	px_ib_t		*ib_p = px_p->px_ib_p;
 	devino_t	ino;
 	px_ih_t		*ih_p;
-	px_ib_ino_info_t *ino_p;
+	px_ino_t	*ino_p;
+	px_ino_pil_t	*ipil_p, *ipil_list;
 	int32_t		weight;
 	int		ret = DDI_SUCCESS;
 
@@ -1023,11 +1075,14 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
-	if (ino_p = px_ib_locate_ino(ib_p, ino)) {	/* sharing ino */
-		uint32_t intr_index = hdlp->ih_inum;
-		if (px_ib_ino_locate_intr(ino_p, rdip, intr_index, 0, 0)) {
+	ino_p = px_ib_locate_ino(ib_p, ino);
+	ipil_list = ino_p ? ino_p->ino_ipil_p : NULL;
+
+	/* Sharing ino */
+	if (ino_p && (ipil_p = px_ib_ino_locate_ipil(ino_p, hdlp->ih_pri))) {
+		if (px_ib_intr_locate_ih(ipil_p, rdip, hdlp->ih_inum, 0, 0)) {
 			DBG(DBG_A_INTX, dip, "px_add_intx_intr: "
-			    "dup intr #%d\n", intr_index);
+			    "dup intr #%d\n", hdlp->ih_inum);
 
 			ret = DDI_FAILURE;
 			goto fail1;
@@ -1036,51 +1091,57 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 		/* Save mondo value in hdlp */
 		hdlp->ih_vector = ino_p->ino_sysino;
 
-		if ((ret = px_ib_ino_add_intr(px_p, ino_p, ih_p))
-		    != DDI_SUCCESS)
+		if ((ret = px_ib_ino_add_intr(px_p, ipil_p,
+		    ih_p)) != DDI_SUCCESS)
 			goto fail1;
-	} else {
-		ino_p = px_ib_new_ino(ib_p, ino, ih_p);
 
-		if (hdlp->ih_pri == 0)
-			hdlp->ih_pri = px_class_to_pil(rdip);
+		goto ino_done;
+	}
 
-		/* Save mondo value in hdlp */
-		hdlp->ih_vector = ino_p->ino_sysino;
+	if (hdlp->ih_pri == 0)
+		hdlp->ih_pri = px_class_to_pil(rdip);
 
-		DBG(DBG_A_INTX, dip, "px_add_intx_intr: pil=0x%x mondo=0x%x\n",
-		    hdlp->ih_pri, hdlp->ih_vector);
+	ipil_p = px_ib_new_ino_pil(ib_p, ino, hdlp->ih_pri, ih_p);
+	ino_p = ipil_p->ipil_ino_p;
 
-		DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp,
-		    (ddi_intr_handler_t *)px_intx_intr, (caddr_t)ino_p, NULL);
+	/* Save mondo value in hdlp */
+	hdlp->ih_vector = ino_p->ino_sysino;
 
-		ret = i_ddi_add_ivintr(hdlp);
+	DBG(DBG_A_INTX, dip, "px_add_intx_intr: pil=0x%x mondo=0x%x\n",
+	    hdlp->ih_pri, hdlp->ih_vector);
 
-		/*
-		 * Restore original interrupt handler
-		 * and arguments in interrupt handle.
-		 */
-		DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp, ih_p->ih_handler,
-		    ih_p->ih_handler_arg1, ih_p->ih_handler_arg2);
+	DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp,
+	    (ddi_intr_handler_t *)px_intx_intr, (caddr_t)ipil_p, NULL);
 
-		if (ret != DDI_SUCCESS)
-			goto fail2;
+	ret = i_ddi_add_ivintr(hdlp);
 
-		/* Save the pil for this ino */
-		ino_p->ino_pil = hdlp->ih_pri;
+	/*
+	 * Restore original interrupt handler
+	 * and arguments in interrupt handle.
+	 */
+	DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp, ih_p->ih_handler,
+	    ih_p->ih_handler_arg1, ih_p->ih_handler_arg2);
 
-		/* select cpu, saving it for sharing and removal */
+	if (ret != DDI_SUCCESS)
+		goto fail2;
+
+	/* Save the pil for this ino */
+	ipil_p->ipil_pil = hdlp->ih_pri;
+
+	/* Select cpu, saving it for sharing and removal */
+	if (ipil_list == NULL) {
 		ino_p->ino_cpuid = intr_dist_cpuid();
 
 		/* Enable interrupt */
 		px_ib_intr_enable(px_p, ino_p->ino_cpuid, ino);
 	}
 
-	/* add weight to the cpu that we are already targeting */
+ino_done:
+	/* Add weight to the cpu that we are already targeting */
 	weight = px_class_to_intr_weight(rdip);
 	intr_dist_cpuid_add_device_weight(ino_p->ino_cpuid, rdip, weight);
 
-	ih_p->ih_ino_p = ino_p;
+	ih_p->ih_ipil_p = ipil_p;
 	px_create_intr_kstats(ih_p);
 	if (ih_p->ih_ksp)
 		kstat_install(ih_p->ih_ksp);
@@ -1091,7 +1152,7 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 
 	return (ret);
 fail2:
-	px_ib_delete_ino(ib_p, ino_p);
+	px_ib_delete_ino_pil(ib_p, ipil_p);
 fail1:
 	if (ih_p->ih_config_handle)
 		pci_config_teardown(&ih_p->ih_config_handle);
@@ -1119,7 +1180,8 @@ px_rem_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 	px_ib_t		*ib_p = px_p->px_ib_p;
 	devino_t	ino;
 	cpuid_t		curr_cpu;
-	px_ib_ino_info_t	*ino_p;
+	px_ino_t	*ino_p;
+	px_ino_pil_t	*ipil_p;
 	px_ih_t		*ih_p;
 	int		ret = DDI_SUCCESS;
 
@@ -1131,19 +1193,20 @@ px_rem_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
 	ino_p = px_ib_locate_ino(ib_p, ino);
-	ih_p = px_ib_ino_locate_intr(ino_p, rdip, hdlp->ih_inum, 0, 0);
+	ipil_p = px_ib_ino_locate_ipil(ino_p, hdlp->ih_pri);
+	ih_p = px_ib_intr_locate_ih(ipil_p, rdip, hdlp->ih_inum, 0, 0);
 
 	/* Get the current cpu */
 	if ((ret = px_lib_intr_gettarget(px_p->px_dip, ino_p->ino_sysino,
 	    &curr_cpu)) != DDI_SUCCESS)
 		goto fail;
 
-	if ((ret = px_ib_ino_rem_intr(px_p, ino_p, ih_p)) != DDI_SUCCESS)
+	if ((ret = px_ib_ino_rem_intr(px_p, ipil_p, ih_p)) != DDI_SUCCESS)
 		goto fail;
 
 	intr_dist_cpuid_rem_device_weight(ino_p->ino_cpuid, rdip);
 
-	if (ino_p->ino_ih_size == 0) {
+	if (ipil_p->ipil_ih_size == 0) {
 		if ((ret = px_lib_intr_setstate(px_p->px_dip, ino_p->ino_sysino,
 		    INTR_DELIVERED_STATE)) != DDI_SUCCESS)
 			goto fail;
@@ -1151,11 +1214,14 @@ px_rem_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 		hdlp->ih_vector = ino_p->ino_sysino;
 		i_ddi_rem_ivintr(hdlp);
 
-		px_ib_delete_ino(ib_p, ino_p);
-		kmem_free(ino_p, sizeof (px_ib_ino_info_t));
+		px_ib_delete_ino_pil(ib_p, ipil_p);
+	}
+
+	if (ino_p->ino_ipil_size == 0) {
+		kmem_free(ino_p, sizeof (px_ino_t));
 	} else {
 		/* Re-enable interrupt only if mapping regsiter still shared */
-		PX_INTR_ENABLE(px_p->px_dip, ino_p->ino_sysino, curr_cpu);
+		PX_INTR_ENABLE(px_p->px_dip, hdlp->ih_vector, curr_cpu);
 	}
 
 fail:
@@ -1178,7 +1244,8 @@ px_add_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 	px_msiq_state_t	*msiq_state_p = &ib_p->ib_msiq_state;
 	devino_t	ino;
 	px_ih_t		*ih_p;
-	px_ib_ino_info_t	*ino_p;
+	px_ino_t	*ino_p;
+	px_ino_pil_t	*ipil_p, *ipil_list;
 	int32_t		weight;
 	int		ret = DDI_SUCCESS;
 
@@ -1199,69 +1266,81 @@ px_add_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
-	if (ino_p = px_ib_locate_ino(ib_p, ino)) {	/* sharing ino */
-		uint32_t intr_index = hdlp->ih_inum;
-		if (px_ib_ino_locate_intr(ino_p, rdip,
-		    intr_index, rec_type, msg_code)) {
+	ino_p = px_ib_locate_ino(ib_p, ino);
+	ipil_list = ino_p ? ino_p->ino_ipil_p : NULL;
+
+	/* Sharing ino */
+	if (ino_p && (ipil_p = px_ib_ino_locate_ipil(ino_p, hdlp->ih_pri))) {
+		if (px_ib_intr_locate_ih(ipil_p, rdip,
+		    hdlp->ih_inum, rec_type, msg_code)) {
 			DBG(DBG_MSIQ, dip, "px_add_msiq_intr: "
-			    "dup intr #%d\n", intr_index);
+			    "dup intr #%d\n", hdlp->ih_inum);
 
 			ret = DDI_FAILURE;
 			goto fail1;
 		}
 
-		if ((ret = px_ib_ino_add_intr(px_p, ino_p, ih_p))
-		    != DDI_SUCCESS)
-			goto fail1;
-	} else {
-		ino_p = px_ib_new_ino(ib_p, ino, ih_p);
-
-		ino_p->ino_msiq_p = msiq_state_p->msiq_p +
-		    (*msiq_id_p - msiq_state_p->msiq_1st_msiq_id);
-
-		if (hdlp->ih_pri == 0)
-			hdlp->ih_pri = px_class_to_pil(rdip);
-
 		/* Save mondo value in hdlp */
 		hdlp->ih_vector = ino_p->ino_sysino;
 
-		DBG(DBG_MSIQ, dip, "px_add_msiq_intr: pil=0x%x mondo=0x%x\n",
-		    hdlp->ih_pri, hdlp->ih_vector);
+		if ((ret = px_ib_ino_add_intr(px_p, ipil_p,
+		    ih_p)) != DDI_SUCCESS)
+			goto fail1;
 
-		DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp,
-		    (ddi_intr_handler_t *)px_msiq_intr, (caddr_t)ino_p, NULL);
+		goto ino_done;
+	}
 
-		ret = i_ddi_add_ivintr(hdlp);
+	if (hdlp->ih_pri == 0)
+		hdlp->ih_pri = px_class_to_pil(rdip);
 
-		/*
-		 * Restore original interrupt handler
-		 * and arguments in interrupt handle.
-		 */
-		DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp, ih_p->ih_handler,
-		    ih_p->ih_handler_arg1, ih_p->ih_handler_arg2);
+	ipil_p = px_ib_new_ino_pil(ib_p, ino, hdlp->ih_pri, ih_p);
+	ino_p = ipil_p->ipil_ino_p;
 
-		if (ret != DDI_SUCCESS)
-			goto fail2;
+	ino_p->ino_msiq_p = msiq_state_p->msiq_p +
+	    (*msiq_id_p - msiq_state_p->msiq_1st_msiq_id);
 
-		/* Save the pil for this ino */
-		ino_p->ino_pil = hdlp->ih_pri;
+	/* Save mondo value in hdlp */
+	hdlp->ih_vector = ino_p->ino_sysino;
+
+	DBG(DBG_MSIQ, dip, "px_add_msiq_intr: pil=0x%x mondo=0x%x\n",
+	    hdlp->ih_pri, hdlp->ih_vector);
+
+	DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp,
+	    (ddi_intr_handler_t *)px_msiq_intr, (caddr_t)ipil_p, NULL);
+
+	ret = i_ddi_add_ivintr(hdlp);
+
+	/*
+	 * Restore original interrupt handler
+	 * and arguments in interrupt handle.
+	 */
+	DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp, ih_p->ih_handler,
+	    ih_p->ih_handler_arg1, ih_p->ih_handler_arg2);
+
+	if (ret != DDI_SUCCESS)
+		goto fail2;
+
+	/* Save the pil for this ino */
+	ipil_p->ipil_pil = hdlp->ih_pri;
+
+	/* Select cpu, saving it for sharing and removal */
+	if (ipil_list == NULL) {
+		ino_p->ino_cpuid = intr_dist_cpuid();
 
 		/* Enable MSIQ */
 		px_lib_msiq_setstate(dip, *msiq_id_p, PCI_MSIQ_STATE_IDLE);
 		px_lib_msiq_setvalid(dip, *msiq_id_p, PCI_MSIQ_VALID);
 
-		/* select cpu, saving it for sharing and removal */
-		ino_p->ino_cpuid = intr_dist_cpuid();
-
 		/* Enable interrupt */
-		px_ib_intr_enable(px_p, ino_p->ino_cpuid, ino_p->ino_ino);
+		px_ib_intr_enable(px_p, ino_p->ino_cpuid, ino);
 	}
 
-	/* add weight to the cpu that we are already targeting */
+ino_done:
+	/* Add weight to the cpu that we are already targeting */
 	weight = px_class_to_intr_weight(rdip);
 	intr_dist_cpuid_add_device_weight(ino_p->ino_cpuid, rdip, weight);
 
-	ih_p->ih_ino_p = ino_p;
+	ih_p->ih_ipil_p = ipil_p;
 	px_create_intr_kstats(ih_p);
 	if (ih_p->ih_ksp)
 		kstat_install(ih_p->ih_ksp);
@@ -1272,7 +1351,7 @@ px_add_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 
 	return (ret);
 fail2:
-	px_ib_delete_ino(ib_p, ino_p);
+	px_ib_delete_ino_pil(ib_p, ipil_p);
 fail1:
 	if (ih_p->ih_config_handle)
 		pci_config_teardown(&ih_p->ih_config_handle);
@@ -1300,7 +1379,8 @@ px_rem_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 	px_ib_t		*ib_p = px_p->px_ib_p;
 	devino_t	ino = px_msiqid_to_devino(px_p, msiq_id);
 	cpuid_t		curr_cpu;
-	px_ib_ino_info_t *ino_p;
+	px_ino_t	*ino_p;
+	px_ino_pil_t	*ipil_p;
 	px_ih_t		*ih_p;
 	int		ret = DDI_SUCCESS;
 
@@ -1310,37 +1390,42 @@ px_rem_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
 	ino_p = px_ib_locate_ino(ib_p, ino);
-	ih_p = px_ib_ino_locate_intr(ino_p, rdip, hdlp->ih_inum,
-	    rec_type, msg_code);
+	ipil_p = px_ib_ino_locate_ipil(ino_p, hdlp->ih_pri);
+	ih_p = px_ib_intr_locate_ih(ipil_p, rdip, hdlp->ih_inum, rec_type,
+	    msg_code);
 
 	/* Get the current cpu */
 	if ((ret = px_lib_intr_gettarget(px_p->px_dip, ino_p->ino_sysino,
 	    &curr_cpu)) != DDI_SUCCESS)
 		goto fail;
 
-	if ((ret = px_ib_ino_rem_intr(px_p, ino_p, ih_p)) != DDI_SUCCESS)
+	if ((ret = px_ib_ino_rem_intr(px_p, ipil_p, ih_p)) != DDI_SUCCESS)
 		goto fail;
 
 	intr_dist_cpuid_rem_device_weight(ino_p->ino_cpuid, rdip);
 
-	if (ino_p->ino_ih_size == 0) {
+	if (ipil_p->ipil_ih_size == 0) {
 		if ((ret = px_lib_intr_setstate(px_p->px_dip, ino_p->ino_sysino,
 		    INTR_DELIVERED_STATE)) != DDI_SUCCESS)
 			goto fail;
 
-		px_lib_msiq_setvalid(dip, px_devino_to_msiqid(px_p, ino),
-		    PCI_MSIQ_INVALID);
-
 		hdlp->ih_vector = ino_p->ino_sysino;
 		i_ddi_rem_ivintr(hdlp);
 
-		px_ib_delete_ino(ib_p, ino_p);
+		px_ib_delete_ino_pil(ib_p, ipil_p);
+
+		if (ino_p->ino_ipil_size == 0)
+			px_lib_msiq_setvalid(dip,
+			    px_devino_to_msiqid(px_p, ino), PCI_MSIQ_INVALID);
 
 		(void) px_msiq_free(px_p, msiq_id);
-		kmem_free(ino_p, sizeof (px_ib_ino_info_t));
+	}
+
+	if (ino_p->ino_ipil_size == 0) {
+		kmem_free(ino_p, sizeof (px_ino_t));
 	} else {
 		/* Re-enable interrupt only if mapping regsiter still shared */
-		PX_INTR_ENABLE(px_p->px_dip, ino_p->ino_sysino, curr_cpu);
+		PX_INTR_ENABLE(px_p->px_dip, hdlp->ih_vector, curr_cpu);
 	}
 
 fail:

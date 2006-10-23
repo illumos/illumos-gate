@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -199,7 +198,7 @@ dev_mondo(void)
 
 	!
 	! We verify that inum is valid ( < MAXVNUM). If it is greater
-	! than MAXVNUM, we let setsoftint_tl1 take care of it.
+	! than MAXVNUM, we let setvecint_tl1 take care of it.
 	!
 	set	MAXIVNUM, %g4
 	cmp	%g5, %g4
@@ -209,10 +208,12 @@ dev_mondo(void)
 	!
 	!	Copy 64-byte payload to the *iv_payload if it is not NULL
 	!
-	set	intr_vector, %g1
-	sll	%g5, INTR_VECTOR_SHIFT, %g7
-	add	%g1, %g7, %g1			! %g1 = &intr_vector[inum]
-	ldx	[%g1 + IV_PAYLOAD_BUF], %g1	! %g1 = iv_payload_buf
+	set	intr_vec_table, %g1		! %g1 = intr_vec_table
+	sll	%g5, CPTRSHIFT, %g7		! %g7 = offset to inum entry
+						!       in the intr_vec_table
+	add	%g1, %g7, %g7			! %g7 = &intr_vec_table[inum]
+	ldn	[%g7], %g1			! %g1 = ptr to intr_vec_t (iv)
+	ldx	[%g1 + IV_PAYLOAD_BUF], %g1	! %g1 = iv->iv_payload_buf
 	brz,a,pt	%g1, 1f			! if it is NULL
 	ldx	[%g2 + MCPU_DEV_Q_SIZE], %g4	! queue size - delay slot
 
@@ -280,10 +281,10 @@ dev_mondo(void)
 #endif /* TRAPTRACE */
 
 	!
-	! setsoftint_tl1 will do all the work, and finish with a retry
+	! setvecint_tl1 will do all the work, and finish with a retry
 	!
-	ba,pt	%xcc, setsoftint_tl1
-	mov	%g5, %g1		! setsoftint_tl1 expects inum in %g1
+	ba,pt	%xcc, setvecint_tl1
+	mov	%g5, %g1		! setvecint_tl1 expects inum in %g1
 
 0:	retry 
 

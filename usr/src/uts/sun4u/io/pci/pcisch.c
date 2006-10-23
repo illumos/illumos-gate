@@ -38,9 +38,8 @@
 #include <sys/kmem.h>
 #include <sys/sysmacros.h>
 #include <sys/async.h>
-#include <sys/ivintr.h>
 #include <sys/systm.h>
-#include <sys/intr.h>
+#include <sys/ivintr.h>
 #include <sys/machsystm.h>	/* lddphys() */
 #include <sys/machsystm.h>	/* lddphys, intr_dist_add */
 #include <sys/iommutsb.h>
@@ -614,7 +613,7 @@ ib_ino_map_reg_share(ib_t *ib_p, ib_ino_t ino, ib_ino_info_t *ino_p)
 int
 ib_ino_map_reg_unshare(ib_t *ib_p, ib_ino_t ino, ib_ino_info_t *ino_p)
 {
-	return (ino_p->ino_ih_size);
+	return (ino_p->ino_ipil_size);
 }
 
 void
@@ -661,7 +660,7 @@ pci_cb_teardown(pci_t *pci_p)
 	mondo = CB_MONDO_TO_XMONDO(pci_p->pci_cb_p, mondo);
 
 	cb_disable_nintr(cb_p, CBNINTR_BUS_ERROR, IB_INTR_WAIT);
-	rem_ivintr(mondo, NULL);
+	VERIFY(rem_ivintr(mondo, pci_pil[CBNINTR_BUS_ERROR]) == 0);
 }
 
 int
@@ -677,7 +676,8 @@ cb_register_intr(pci_t *pci_p)
 	mondo = CB_MONDO_TO_XMONDO(pci_p->pci_cb_p, mondo);
 
 	VERIFY(add_ivintr(mondo, pci_pil[CBNINTR_BUS_ERROR],
-	    cb_buserr_intr, (caddr_t)pci_p->pci_cb_p, NULL) == 0);
+	    (intrfunc)cb_buserr_intr, (caddr_t)pci_p->pci_cb_p,
+	    NULL, NULL) == 0);
 
 	return (PCI_ATTACH_RETCODE(PCI_CB_OBJ, PCI_OBJ_INTR_ADD, DDI_SUCCESS));
 }
@@ -1113,8 +1113,6 @@ pci_cb_setup(pci_t *pci_p)
 			tm_mtlb_gc = 1;
 
 		if (PCI_CHIP_ID(pci_p) <= TOMATILLO_VER_23) {
-			extern int ignore_invalid_vecintr;
-			ignore_invalid_vecintr = 1;
 			tomatillo_store_store_wrka = 1;
 			tomatillo_disallow_bypass = 1;
 			if (pci_spurintr_msgs == PCI_SPURINTR_MSG_DEFAULT)
@@ -3388,10 +3386,11 @@ pci_tom_nbintr_op(pci_t *pci_p, uint32_t inum, intrfunc f, caddr_t arg,
 
 	switch (flag) {
 	case PCI_OBJ_INTR_ADD:
-		VERIFY(add_ivintr(mondo, pci_pil[inum], f, arg, NULL) == 0);
+		VERIFY(add_ivintr(mondo, pci_pil[inum], f,
+		    arg, NULL, NULL) == 0);
 		break;
 	case PCI_OBJ_INTR_REMOVE:
-		rem_ivintr(mondo, NULL);
+		VERIFY(rem_ivintr(mondo, pci_pil[inum]) == 0);
 		break;
 	default:
 		ret = DDI_FAILURE;
@@ -3411,14 +3410,14 @@ pci_ecc_add_intr(pci_t *pci_p, int inum, ecc_intr_info_t *eii_p)
 	    pci_p->pci_inos[inum]);
 	mondo = CB_MONDO_TO_XMONDO(pci_p->pci_cb_p, mondo);
 
-	VERIFY(add_ivintr(mondo, pci_pil[inum], ecc_intr,
-	    (caddr_t)eii_p, NULL) == 0);
+	VERIFY(add_ivintr(mondo, pci_pil[inum], (intrfunc)ecc_intr,
+	    (caddr_t)eii_p, NULL, NULL) == 0);
 
 	if (CHIP_TYPE(pci_p) != PCI_CHIP_TOMATILLO)
 		return (PCI_ATTACH_RETCODE(PCI_ECC_OBJ, PCI_OBJ_INTR_ADD,
 		    DDI_SUCCESS));
 
-	r = pci_tom_nbintr_op(pci_p, inum, ecc_intr,
+	r = pci_tom_nbintr_op(pci_p, inum, (intrfunc)ecc_intr,
 	    (caddr_t)eii_p, PCI_OBJ_INTR_ADD);
 	return (PCI_ATTACH_RETCODE(PCI_ECC_OBJ, PCI_OBJ_INTR_ADD, r));
 }
@@ -3432,10 +3431,10 @@ pci_ecc_rem_intr(pci_t *pci_p, int inum, ecc_intr_info_t *eii_p)
 	    pci_p->pci_inos[inum]);
 	mondo = CB_MONDO_TO_XMONDO(pci_p->pci_cb_p, mondo);
 
-	rem_ivintr(mondo, NULL);
+	VERIFY(rem_ivintr(mondo, pci_pil[inum]) == 0);
 
 	if (CHIP_TYPE(pci_p) == PCI_CHIP_TOMATILLO)
-		pci_tom_nbintr_op(pci_p, inum, ecc_intr,
+		pci_tom_nbintr_op(pci_p, inum, (intrfunc)ecc_intr,
 			(caddr_t)eii_p, PCI_OBJ_INTR_REMOVE);
 }
 
@@ -3459,7 +3458,8 @@ pci_pbm_add_intr(pci_t *pci_p)
 	mondo = CB_MONDO_TO_XMONDO(pci_p->pci_cb_p, mondo);
 
 	VERIFY(add_ivintr(mondo, pci_pil[CBNINTR_CDMA],
-	    pci_pbm_cdma_intr, (caddr_t)pci_p->pci_pbm_p, NULL) == 0);
+	    (intrfunc)pci_pbm_cdma_intr, (caddr_t)pci_p->pci_pbm_p,
+	    NULL, NULL) == 0);
 
 	return (DDI_SUCCESS);
 }
@@ -3474,7 +3474,7 @@ pci_pbm_rem_intr(pci_t *pci_p)
 	mondo = CB_MONDO_TO_XMONDO(pci_p->pci_cb_p, mondo);
 
 	ib_intr_disable(ib_p, pci_p->pci_inos[CBNINTR_CDMA], IB_INTR_NOWAIT);
-	rem_ivintr(mondo, NULL);
+	VERIFY(rem_ivintr(mondo, pci_pil[CBNINTR_CDMA]) == 0);
 }
 
 void

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -740,7 +739,7 @@ int
 zuluvm_alloc_device(dev_info_t *devi, void *arg, zuluvm_info_t *devp,
     caddr_t mmu, caddr_t imr)
 {
-	uint_t intr_num;
+	uint64_t intr_num;
 	zuluvm_state_t *zdev;
 	int error = ZULUVM_SUCCESS;
 
@@ -779,7 +778,8 @@ zuluvm_alloc_device(dev_info_t *devi, void *arg, zuluvm_info_t *devp,
 	    (void *)zdev));
 	intr_dist_add(zuluvm_retarget_intr, (void *)zdev);
 	zuluvm_do_retarget(zdev);
-	intr_num = add_softintr(ZULUVM_PIL, zuluvm_softintr, (caddr_t)zdev);
+	intr_num = add_softintr(ZULUVM_PIL, zuluvm_softintr,
+	    (caddr_t)zdev, SOFTINT_ST);
 	zdev->zvm.intr_num = intr_num;
 	*devp = (caddr_t)zdev;
 	ZULUVM_UNLOCK;
@@ -810,7 +810,7 @@ zuluvm_free_device(zuluvm_info_t devp)
 		return (ZULUVM_NO_DEV);
 	}
 	(void) dmv_rem_intr(zdev->zvm.dmv_intr);
-	rem_softintr(zdev->zvm.intr_num);
+	(void) rem_softintr(zdev->zvm.intr_num);
 	intr_dist_rem(zuluvm_retarget_intr, (void *)zdev);
 	zdev->zvm.arg = NULL;
 	ZULUVM_UNLOCK;

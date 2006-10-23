@@ -207,9 +207,6 @@ extern int kcpc_hw_load_pcbe(void);
  */
 struct cpu;
 extern struct cpu cpu0;
-extern size_t intr_add_pools;
-extern struct intr_req *intr_add_head;
-extern struct intr_req *intr_add_tail;
 extern struct scb *set_tbr(struct scb *);
 
 extern uint_t disable_vec_intr(void);
@@ -232,11 +229,11 @@ extern void intr_redist_all_cpus(void);
 extern void intr_redist_all_cpus_shutdown(void);
 
 extern void send_dirint(int, int);
-extern void setsoftint(uint_t);
+extern void setsoftint(uint64_t);
 extern void setsoftint_tl1(uint64_t, uint64_t);
 extern void siron(void);
-extern void intr_enqueue_req(uint_t pil, uint32_t inum);
-extern void intr_dequeue_req(uint_t pil, uint32_t inum);
+extern void intr_enqueue_req(uint_t pil, uint64_t inum);
+extern void intr_dequeue_req(uint_t pil, uint64_t inum);
 extern void wr_clr_softint(uint_t);
 
 /*
@@ -248,7 +245,7 @@ extern void tickcmpr_set(uint64_t);
 extern void tickcmpr_reset(void);
 extern void tickcmpr_disable(void);
 extern int tickcmpr_disabled(void);
-extern uint32_t cbe_level14_inum;
+extern uint64_t cbe_level14_inum;
 
 /*
  * contiguous memory
@@ -286,7 +283,6 @@ extern size_t ndata_spare(struct memlist *, size_t, size_t);
 extern caddr_t get_mmfsa_scratchpad(void);
 extern void set_mmfsa_scratchpad(caddr_t);
 extern int ndata_alloc_mmfsa(struct memlist *);
-extern int ndata_alloc_cpus(struct memlist *);
 extern int ndata_alloc_page_freelists(struct memlist *, int);
 extern int ndata_alloc_dmv(struct memlist *);
 extern int ndata_alloc_tsbs(struct memlist *, pgcnt_t);

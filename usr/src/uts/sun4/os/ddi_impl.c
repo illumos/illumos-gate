@@ -780,12 +780,6 @@ done:
 int
 i_ddi_add_ivintr(ddi_intr_handle_impl_t *hdlp)
 {
-	/* Sanity check the entry we're about to add */
-	if (GET_IVINTR(hdlp->ih_vector)) {
-		cmn_err(CE_WARN, "mondo 0x%x in use", hdlp->ih_vector);
-		return (DDI_FAILURE);
-	}
-
 	/*
 	 * If the PIL was set and is valid use it, otherwise
 	 * default it to 1
@@ -794,7 +788,8 @@ i_ddi_add_ivintr(ddi_intr_handle_impl_t *hdlp)
 		hdlp->ih_pri = 1;
 
 	VERIFY(add_ivintr(hdlp->ih_vector, hdlp->ih_pri,
-	    (intrfunc)hdlp->ih_cb_func, hdlp->ih_cb_arg1, NULL) == 0);
+	    (intrfunc)hdlp->ih_cb_func, hdlp->ih_cb_arg1,
+	    hdlp->ih_cb_arg2, NULL) == 0);
 
 	return (DDI_SUCCESS);
 }
@@ -806,7 +801,7 @@ i_ddi_add_ivintr(ddi_intr_handle_impl_t *hdlp)
 void
 i_ddi_rem_ivintr(ddi_intr_handle_impl_t *hdlp)
 {
-	rem_ivintr(hdlp->ih_vector, NULL);
+	VERIFY(rem_ivintr(hdlp->ih_vector, hdlp->ih_pri) == 0);
 }
 
 /*
@@ -902,77 +897,65 @@ i_ddi_get_intx_nintrs(dev_info_t *dip)
 }
 
 /*
- * i_ddi_add_softint - allocate and add a soft interrupt to the system
+ * i_ddi_add_softint - allocate and add a software interrupt.
+ *
+ * NOTE: All software interrupts that are registered through DDI
+ *	 should be triggered only on a single target or CPU.
  */
 int
 i_ddi_add_softint(ddi_softint_hdl_impl_t *hdlp)
 {
-	uint_t		rval;
-
-	if ((rval = add_softintr(hdlp->ih_pri, hdlp->ih_cb_func,
-	    hdlp->ih_cb_arg1)) == 0) {
-
+	if ((hdlp->ih_private = (void *)add_softintr(hdlp->ih_pri,
+	    hdlp->ih_cb_func, hdlp->ih_cb_arg1, SOFTINT_ST)) == NULL)
 		return (DDI_FAILURE);
-	}
-
-	/* use uintptr_t to suppress the gcc warning */
-	hdlp->ih_private = (void *)(uintptr_t)rval;
 
 	return (DDI_SUCCESS);
 }
 
+/*
+ * i_ddi_remove_softint - remove and free a software interrupt.
+ */
 void
 i_ddi_remove_softint(ddi_softint_hdl_impl_t *hdlp)
 {
-	uint_t		intr_id;
-
-	/* disable */
 	ASSERT(hdlp->ih_private != NULL);
 
-	/* use uintptr_t to suppress the gcc warning */
-	intr_id = (uint_t)(uintptr_t)hdlp->ih_private;
-
-	rem_softintr(intr_id);
-	hdlp->ih_private = NULL;
+	if (rem_softintr((uint64_t)hdlp->ih_private) == 0)
+		hdlp->ih_private = NULL;
 }
 
+/*
+ * i_ddi_trigger_softint - trigger a software interrupt.
+ */
 int
 i_ddi_trigger_softint(ddi_softint_hdl_impl_t *hdlp, void *arg2)
 {
-	uint_t		intr_id;
-	int		ret;
+	int	ret;
 
-	ASSERT(hdlp != NULL);
 	ASSERT(hdlp->ih_private != NULL);
 
-	/* use uintptr_t to suppress the gcc warning */
-	intr_id = (uint_t)(uintptr_t)hdlp->ih_private;
+	/* Update the second argument for the software interrupt */
+	if ((ret = update_softint_arg2((uint64_t)hdlp->ih_private, arg2)) == 0)
+		setsoftint((uint64_t)hdlp->ih_private);
 
-	/* update the vector table for the 2nd arg */
-	ret = update_softint_arg2(intr_id, arg2);
-	if (ret == DDI_SUCCESS)
-		setsoftint(intr_id);
-
-	return (ret);
+	return (ret ? DDI_EPENDING : DDI_SUCCESS);
 }
 
+/*
+ * i_ddi_set_softint_pri - change software interrupt priority.
+ */
 /* ARGSUSED */
 int
 i_ddi_set_softint_pri(ddi_softint_hdl_impl_t *hdlp, uint_t old_pri)
 {
-	uint_t		intr_id;
-	int		ret;
+	int	ret;
 
-	ASSERT(hdlp != NULL);
 	ASSERT(hdlp->ih_private != NULL);
 
-	/* use uintptr_t to suppress the gcc warning */
-	intr_id = (uint_t)(uintptr_t)hdlp->ih_private;
+	/* Update the interrupt priority for the software interrupt */
+	ret = update_softint_pri((uint64_t)hdlp->ih_private, hdlp->ih_pri);
 
-	/* update the vector table for the new priority */
-	ret = update_softint_pri(intr_id, hdlp->ih_pri);
-
-	return (ret);
+	return (ret ? DDI_FAILURE : DDI_SUCCESS);
 }
 
 /*ARGSUSED*/

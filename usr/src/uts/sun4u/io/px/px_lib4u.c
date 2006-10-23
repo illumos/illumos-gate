@@ -976,9 +976,21 @@ px_lib_get_msiq_rec(dev_info_t *dip, msiqhead_t *msiq_head_p,
 	msiq_rec_p->msiq_rec_rid = eq_rec_p->eq_rec_rid;
 	msiq_rec_p->msiq_rec_msi_addr = ((eq_rec_p->eq_rec_addr1 << 16) |
 	    (eq_rec_p->eq_rec_addr0 << 2));
+}
 
-	/* Zero out eq_rec_fmt_type field */
-	eq_rec_p->eq_rec_fmt_type = 0;
+/*ARGSUSED*/
+void
+px_lib_clr_msiq_rec(dev_info_t *dip, msiqhead_t *msiq_head_p)
+{
+	eq_rec_t	*eq_rec_p = (eq_rec_t *)msiq_head_p;
+
+	DBG(DBG_LIB_MSIQ, dip, "px_lib_clr_msiq_rec: dip 0x%p eq_rec_p 0x%p\n",
+	    dip, eq_rec_p);
+
+	if (eq_rec_p->eq_rec_fmt_type) {
+		/* Zero out eq_rec_fmt_type field */
+		eq_rec_p->eq_rec_fmt_type = 0;
+	}
 }
 
 /*
@@ -1976,7 +1988,8 @@ px_err_add_intr(px_fault_t *px_fault_p)
 	px_t		*px_p = DIP_TO_STATE(dip);
 
 	VERIFY(add_ivintr(px_fault_p->px_fh_sysino, PX_ERR_PIL,
-		px_fault_p->px_err_func, (caddr_t)px_fault_p, NULL) == 0);
+	    (intrfunc)px_fault_p->px_err_func, (caddr_t)px_fault_p,
+	    NULL, NULL) == 0);
 
 	px_ib_intr_enable(px_p, intr_dist_cpuid(), px_fault_p->px_intr_ino);
 
@@ -1992,7 +2005,7 @@ px_err_rem_intr(px_fault_t *px_fault_p)
 	px_ib_intr_disable(px_p->px_ib_p, px_fault_p->px_intr_ino,
 		IB_INTR_WAIT);
 
-	rem_ivintr(px_fault_p->px_fh_sysino, NULL);
+	VERIFY(rem_ivintr(px_fault_p->px_fh_sysino, PX_ERR_PIL) == 0);
 }
 
 /*
@@ -2027,7 +2040,7 @@ px_cb_add_intr(px_fault_t *fault_p)
 	mutex_enter(&cb_p->cb_mutex);
 
 	VERIFY(add_ivintr(fault_p->px_fh_sysino, PX_ERR_PIL,
-	    cb_p->px_cb_func, (caddr_t)cb_p, NULL) == 0);
+	    (intrfunc)cb_p->px_cb_func, (caddr_t)cb_p, NULL, NULL) == 0);
 
 	if (cb_p->pxl == NULL) {
 
@@ -2118,7 +2131,7 @@ px_cb_rem_intr(px_fault_t *fault_p)
 		}
 	}
 
-	rem_ivintr(fault_p->px_fh_sysino, NULL);
+	VERIFY(rem_ivintr(fault_p->px_fh_sysino, PX_ERR_PIL) == 0);
 	pxu_p->px_cb_p = NULL;
 	cb_p->attachcnt--;
 	if (cb_p->pxl) {
@@ -2247,7 +2260,7 @@ px_cpr_callb(void *arg, int code)
 	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
 	caddr_t		csr_base;
 	devino_t	ce_ino, nf_ino, f_ino;
-	px_ib_ino_info_t	*ce_ino_p, *nf_ino_p, *f_ino_p;
+	px_ino_t	*ce_ino_p, *nf_ino_p, *f_ino_p;
 	uint64_t	imu_log_enable, imu_intr_enable;
 	uint64_t	imu_log_mask, imu_intr_mask;
 
@@ -2427,7 +2440,7 @@ px_lib_hotplug_init(dev_info_t *dip, void *arg)
 		}
 
 		VERIFY(add_ivintr(sysino, PX_PCIEHP_PIL,
-		    (intrfunc)px_hp_intr, (caddr_t)px_p, NULL) == 0);
+		    (intrfunc)px_hp_intr, (caddr_t)px_p, NULL, NULL) == 0);
 	}
 
 	return (ret);
@@ -2451,7 +2464,7 @@ px_lib_hotplug_uninit(dev_info_t *dip)
 			return;
 		}
 
-		rem_ivintr(sysino, NULL);
+		VERIFY(rem_ivintr(sysino, PX_PCIEHP_PIL) == 0);
 	}
 }
 

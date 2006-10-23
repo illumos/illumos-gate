@@ -75,7 +75,7 @@ int	aft_testfatal = 0;	/* force all AFTs to panic immediately */
  * Used for vbsc hostshutdown (power-off buton)
  */
 int	err_shutdown_triggered = 0;	/* only once */
-uint_t	err_shutdown_inum = 0;		/* used to pull the trigger */
+uint64_t err_shutdown_inum = 0;	/* used to pull the trigger */
 
 /*
  * Defined in bus_func.c but initialised in error_init
@@ -711,7 +711,7 @@ error_init(void)
 	 * Setup interrupt handler for power-off button.
 	 */
 	err_shutdown_inum = add_softintr(PIL_9,
-	    (softintrfunc)err_shutdown_softintr, NULL);
+	    (softintrfunc)err_shutdown_softintr, NULL, SOFTINT_ST);
 
 	/*
 	 * Initialize the busfunc list mutex.  This must be a PIL_15 spin lock

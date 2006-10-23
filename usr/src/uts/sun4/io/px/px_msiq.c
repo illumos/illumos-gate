@@ -87,6 +87,7 @@ px_msiq_attach(px_t *px_p)
 	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
 		msiq_state_p->msiq_p[i].msiq_id =
 		    msiq_state_p->msiq_1st_msiq_id + i;
+		msiq_state_p->msiq_p[i].msiq_refcnt = 0;
 		msiq_state_p->msiq_p[i].msiq_state = MSIQ_STATE_FREE;
 
 		msiq_state_p->msiq_p[i].msiq_base_p = (msiqhead_t *)
@@ -121,17 +122,20 @@ px_msiq_detach(px_t *px_p)
 }
 
 /*
- * px_msiq_resume()
+ * px_msiq_detach()
  */
 void
 px_msiq_resume(px_t *px_p)
 {
-	px_msiq_state_t *msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
+	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
 	int		i;
 
-	for (i = 0; i < msiq_state_p->msiq_cnt; i++)
+	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
 		(void) px_lib_msiq_gethead(px_p->px_dip, i,
-		    &msiq_state_p->msiq_p[i].msiq_curr_head_idx);
+		    &msiq_state_p->msiq_p[i].msiq_curr_head_index);
+		msiq_state_p->msiq_p[i].msiq_new_head_index = 0;
+		msiq_state_p->msiq_p[i].msiq_recs2process = 0;
+	}
 }
 
 /*
@@ -163,6 +167,7 @@ px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type, msiqid_t *msiq_id_p)
 	for (i = first_msiq_id; i < (first_msiq_id + msiq_cnt); i++) {
 		if (msiq_state_p->msiq_p[i].msiq_state == MSIQ_STATE_FREE) {
 			msiq_state_p->msiq_p[i].msiq_state = MSIQ_STATE_INUSE;
+			msiq_state_p->msiq_p[i].msiq_refcnt = 1;
 			break;
 		}
 	}
@@ -171,8 +176,10 @@ px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type, msiqid_t *msiq_id_p)
 	 * There are no free MSIQ.
 	 * Use next available MSIQ.
 	 */
-	if (i >= (first_msiq_id + msiq_cnt))
+	if (i >= (first_msiq_id + msiq_cnt)) {
 		i = *next_msiq_index;
+		msiq_state_p->msiq_p[i].msiq_refcnt++;
+	}
 
 	*msiq_id_p = msiq_state_p->msiq_p[i].msiq_id;
 	DBG(DBG_MSIQ, px_p->px_dip,
@@ -194,27 +201,23 @@ int
 px_msiq_free(px_t *px_p, msiqid_t msiq_id)
 {
 	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
-	int		i, ret = DDI_SUCCESS;
 
 	DBG(DBG_MSIQ, px_p->px_dip, "px_msiq_free: msiq_id 0x%x", msiq_id);
 
 	mutex_enter(&msiq_state_p->msiq_mutex);
 
-	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
-		if (msiq_state_p->msiq_p[i].msiq_id == msiq_id) {
-			msiq_state_p->msiq_p[i].msiq_state = MSIQ_STATE_FREE;
-			break;
-		}
-	}
-
-	if (i >= msiq_state_p->msiq_cnt) {
+	if ((msiq_id < msiq_state_p->msiq_1st_msiq_id) || (msiq_id >=
+	    (msiq_state_p->msiq_1st_msiq_id + msiq_state_p->msiq_cnt))) {
 		DBG(DBG_MSIQ, px_p->px_dip,
 		    "px_msiq_free: Invalid msiq_id 0x%x", msiq_id);
-		ret = DDI_FAILURE;
+		return (DDI_FAILURE);
 	}
 
+	if (--msiq_state_p->msiq_p[msiq_id].msiq_refcnt == 0)
+		msiq_state_p->msiq_p[msiq_id].msiq_state = MSIQ_STATE_FREE;
+
 	mutex_exit(&msiq_state_p->msiq_mutex);
-	return (ret);
+	return (DDI_SUCCESS);
 }
 
 /*

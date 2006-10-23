@@ -89,7 +89,7 @@ extern void clear_watchdog_on_exit(void);
 #define	FORCE_ABORT_SEQ_INTERVAL ((hrtime_t)15 * NANOSEC)
 
 static kmutex_t	abort_seq_lock;
-static uint_t	abort_seq_inum;		/* abort seq softintr # */
+static uint64_t	abort_seq_inum;		/* abort seq softintr # */
 static hrtime_t	abort_seq_tstamp;	/* hrtime of last abort seq */
 static size_t	abort_seq_msglen;	/* abort seq message length */
 static char	abort_seq_msgbuf[ABORT_SEQ_MSGBUFSZ];
@@ -136,7 +136,7 @@ abort_sequence_init(void)
 	abort_seq_tstamp = 0LL;
 	if (abort_seq_inum == 0)
 		abort_seq_inum = add_softintr(LOCK_LEVEL,
-		    (softintrfunc)abort_seq_softintr, NULL);
+		    (softintrfunc)abort_seq_softintr, NULL, SOFTINT_ST);
 }
 
 /*

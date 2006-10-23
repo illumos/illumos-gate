@@ -661,7 +661,7 @@ get_q_sizes(md_t *mdp, mde_cookie_t cpu_node_cookie)
 	    "q-cpu-mondo-#bits", DEFAULT_CPU_Q_ENTRIES, max_qsize);
 
 	dev_q_entries = get_single_q_size(mdp, cpu_node_cookie,
-	    "q-dev-mondo-#bits", DEFAULT_DEV_Q_ENTRIES, SOFTIVNUM);
+	    "q-dev-mondo-#bits", DEFAULT_DEV_Q_ENTRIES, MAXIVNUM);
 
 	cpu_rq_entries = get_single_q_size(mdp, cpu_node_cookie,
 	    "q-resumable-#bits", CPU_RQ_ENTRIES, MAX_CPU_RQ_ENTRIES);

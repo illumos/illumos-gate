@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +48,7 @@
 #include <sys/modctl.h>
 #include <sys/sdt.h>
 
-uint32_t		cpc_level15_inum;	/* used in interrupt.s */
+uint64_t		cpc_level15_inum;	/* used in interrupt.s */
 int			cpc_has_overflow_intr;	/* set in cheetah.c */
 
 extern kcpc_ctx_t *kcpc_overflow_intr(caddr_t arg, uint64_t bitmap);
@@ -63,7 +62,7 @@ kcpc_hw_init(void)
 {
 	if (cpc_has_overflow_intr) {
 		cpc_level15_inum = add_softintr(PIL_15,
-		    kcpc_hw_overflow_intr, NULL);
+		    kcpc_hw_overflow_intr, NULL, SOFTINT_MT);
 	}
 
 	/*

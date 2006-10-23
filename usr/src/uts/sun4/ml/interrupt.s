@@ -38,12 +38,11 @@
 #include <sys/machthread.h>
 #include <sys/machcpuvar.h>
 #include <sys/intreg.h>
+#include <sys/ivintr.h>
 
 #ifdef TRAPTRACE
 #include <sys/traptrace.h>
 #endif /* TRAPTRACE */
-
-
 
 #if defined(lint)
 
@@ -64,138 +63,84 @@ pil_interrupt(int level)
 	!
 	! Register usage
 	!	%g1 - cpu
-	!	%g3 - intr_req
+	!	%g2 - pointer to intr_vec_t (iv)
 	!	%g4 - pil
-	!	%g2, %g5, %g6 - temps
+	!	%g3, %g5, %g6, %g7 - temps
 	!
-	! grab the 1st intr_req off the list
-	! if the list is empty, clear %clear_softint
+	! Grab the first or list head intr_vec_t off the intr_head[pil]
+	! and panic immediately if list head is NULL. Otherwise, update
+	! intr_head[pil] to next intr_vec_t on the list and clear softint
+	! %clear_softint, if next intr_vec_t is NULL.
 	!
-	CPU_ADDR(%g1, %g5)
+	CPU_ADDR(%g1, %g5)		! %g1 = cpu
 	!
 	ALTENTRY(pil_interrupt_common)
-	sll	%g4, CPTRSHIFT, %g5
-	add	%g1, INTR_HEAD, %g6	! intr_head[0]
-	add	%g6, %g5, %g6		! intr_head[pil]
-	ldn	[%g6], %g3		! g3 = intr_req
-
-#ifndef DEBUG
-	brnz,pt	%g3, 5f
+	sll	%g4, CPTRSHIFT, %g5	! %g5 = offset to the pil entry
+	add	%g1, INTR_HEAD, %g6	! %g6 = &cpu->m_cpu.intr_head
+	add	%g6, %g5, %g6		! %g6 = &cpu->m_cpu.intr_head[pil]
+	ldn	[%g6], %g2		! %g2 = cpu->m_cpu.intr_head[pil]
+	brnz,pt	%g2, 0f			! check list head (iv) is NULL
 	nop
-#else
-	!
-	! Verify the address of intr_req; it should be within the
-	! address range of intr_pool and intr_head
-	! or the address range of intr_add_head and intr_add_tail.
-	! The range of intr_add_head and intr_add_tail is subdivided
-	! by cpu, but the subdivision is not verified here.
-	!
-	! Registers passed to sys_trap()
-	!	%g1 - no_intr_req
-	!	%g2 - intr_req
-	!	%g3 - %pil
-	!	%g4 - current pil
-	!
-	add	%g1, INTR_POOL, %g2
-	cmp	%g3, %g2
-	blu,pn	%xcc, 8f
-	nop
-	add	%g1, INTR_HEAD, %g2
-	cmp	%g2, %g3
-	bgeu,pt	%xcc, 5f
-	nop
-8:
-	sethi	%hi(intr_add_head), %g2
-	ldn	[%g2 + %lo(intr_add_head)], %g2
-	brz,pn	%g2, 4f			! intr_add_head can be NULL
-	cmp	%g3, %g2
-	blu,pn	%xcc, 4f
-	nop
-	sethi	%hi(intr_add_tail), %g2
-	ldn	[%g2 + %lo(intr_add_tail)], %g2
-	cmp	%g2, %g3
-	bgeu,pt	%xcc, 5f
-	nop
-4:
-#endif /* DEBUG */
-#ifdef TRAPTRACE
-	TRACE_PTR(%g5, %g2)
-	GET_TRACE_TICK(%g2)
-	stxa	%g2, [%g5 + TRAP_ENT_TICK]%asi
-	TRACE_SAVE_TL_GL_REGS(%g5, %g2)
-	mov	0xbad, %g2
-	stha	%g2, [%g5 + TRAP_ENT_TT]%asi
-	rdpr	%tpc, %g2
-	stna	%g2, [%g5 + TRAP_ENT_TPC]%asi
-	rdpr	%tstate, %g2
-	stxa	%g2, [%g5 + TRAP_ENT_TSTATE]%asi
-	stna	%g0, [%g5 + TRAP_ENT_SP]%asi
-	stna	%g1, [%g5 + TRAP_ENT_TR]%asi
-	rd	SOFTINT, %g2
-	stna	%g2, [%g5 + TRAP_ENT_F1]%asi
-	stna	%g3, [%g5 + TRAP_ENT_F2]%asi
-	stna	%g4, [%g5 + TRAP_ENT_F3]%asi
-	stna	%g6, [%g5 + TRAP_ENT_F4]%asi
-	TRACE_NEXT(%g5, %g2, %g1)
-#endif /* TRAPTRACE */
-	ba	ptl1_panic
-	mov	PTL1_BAD_INTR_REQ, %g1
-5:	
-	ldn	[%g3 + INTR_NEXT], %g2	! 2nd entry
-	brnz,pn	%g2, 1f			! branch if list not empty
-	stn	%g2, [%g6]
-	add	%g1, INTR_TAIL, %g6	! intr_tail[0]
-	stn	%g0, [%g5 + %g6]	! update intr_tail[pil]
-	mov	1, %g5
-	sll	%g5, %g4, %g5
-	wr	%g5, CLEAR_SOFTINT
+	ba	ptl1_panic		! panic, list head (iv) is NULL
+	mov	PTL1_BAD_INTR_VEC, %g1
+0:
+	lduh	[%g2 + IV_FLAGS], %g7	! %g7 = iv->iv_flags
+	and	%g7, IV_SOFTINT_MT, %g3 ! %g3 = iv->iv_flags & IV_SOFTINT_MT
+	brz,pt	%g3, 1f			! check for multi target softint
+	add	%g2, IV_PIL_NEXT, %g7	! g7% = &iv->iv_pil_next
+	ld	[%g1 + CPU_ID], %g3	! for multi target softint, use cpuid
+	sll	%g3, CPTRSHIFT, %g3	! convert cpuid to offset address
+	add	%g7, %g3, %g7		! %g5 = &iv->iv_xpil_next[cpuid]
 1:
-	!
-	! put intr_req on free list
-	!	%g2 - inumber
-	!
-	ldn	[%g1 + INTR_HEAD], %g5	! current head of free list
-	lduw	[%g3 + INTR_NUMBER], %g2
-	stn	%g3, [%g1 + INTR_HEAD]
-	stn	%g5, [%g3 + INTR_NEXT]
+	ldn	[%g7], %g3		! %g3 = next intr_vec_t
+	brnz,pn	%g3, 2f			! branch if next intr_vec_t non NULL
+	stn	%g3, [%g6]		! update cpu->m_cpu.intr_head[pil]
+	add	%g1, INTR_TAIL, %g6	! %g6 =  &cpu->m_cpu.intr_tail
+	stn	%g0, [%g5 + %g6]	! clear cpu->m_cpu.intr_tail[pil]
+	mov	1, %g5			! %g5 = 1
+	sll	%g5, %g4, %g5		! %g5 = 1 << pil
+	wr	%g5, CLEAR_SOFTINT	! clear interrupt on this pil
+2:
 #ifdef TRAPTRACE
 	TRACE_PTR(%g5, %g6)
 	GET_TRACE_TICK(%g6)
-	stxa	%g6, [%g5 + TRAP_ENT_TICK]%asi
+	stxa	%g6, [%g5 + TRAP_ENT_TICK]%asi	! trap_tick = %tick
 	TRACE_SAVE_TL_GL_REGS(%g5, %g6)
 	rdpr	%tt, %g6
-	stha	%g6, [%g5 + TRAP_ENT_TT]%asi
+	stha	%g6, [%g5 + TRAP_ENT_TT]%asi	! trap_type = %tt
 	rdpr	%tpc, %g6
-	stna	%g6, [%g5 + TRAP_ENT_TPC]%asi
+	stna	%g6, [%g5 + TRAP_ENT_TPC]%asi	! trap_pc = %tpc
 	rdpr	%tstate, %g6
-	stxa	%g6, [%g5 + TRAP_ENT_TSTATE]%asi
-	stna	%sp, [%g5 + TRAP_ENT_SP]%asi
-	stna	%g3, [%g5 + TRAP_ENT_TR]%asi
-	stna	%g2, [%g5 + TRAP_ENT_F1]%asi
+	stxa	%g6, [%g5 + TRAP_ENT_TSTATE]%asi ! trap_tstate = %tstate
+	stna	%sp, [%g5 + TRAP_ENT_SP]%asi	! trap_sp = %sp
+	stna	%g2, [%g5 + TRAP_ENT_TR]%asi	! trap_tr = first intr_vec
+	stna	%g3, [%g5 + TRAP_ENT_F1]%asi	! trap_f1 = next intr_vec
 	sll	%g4, CPTRSHIFT, %g3
 	add	%g1, INTR_HEAD, %g6
-	ldn	[%g6 + %g3], %g6		! intr_head[pil]
-	stna	%g6, [%g5 + TRAP_ENT_F2]%asi
+	ldn	[%g6 + %g3], %g6		! %g6=cpu->m_cpu.intr_head[pil]
+	stna	%g6, [%g5 + TRAP_ENT_F2]%asi	! trap_f2 = intr_head[pil]
 	add	%g1, INTR_TAIL, %g6
-	ldn	[%g6 + %g3], %g6		! intr_tail[pil]
-	stna	%g4, [%g5 + TRAP_ENT_F3]%asi
-	stna	%g6, [%g5 + TRAP_ENT_F4]%asi
+	ldn	[%g6 + %g3], %g6		! %g6=cpu->m_cpu.intr_tail[pil]
+	stna	%g6, [%g5 + TRAP_ENT_F3]%asi	! trap_f3 = intr_tail[pil]
+	stna	%g4, [%g5 + TRAP_ENT_F4]%asi	! trap_f4 = pil
 	TRACE_NEXT(%g5, %g6, %g3)
 #endif /* TRAPTRACE */
 	!
-	! clear the iv_pending flag for this inum
+	! clear the iv_pending flag for this interrupt request
 	! 
-	set	intr_vector, %g5;
-	sll	%g2, INTR_VECTOR_SHIFT, %g6;
-	add	%g5, %g6, %g5;			! &intr_vector[inum]
-	sth	%g0, [%g5 + IV_PENDING]
+	lduh	[%g2 + IV_FLAGS], %g3		! %g3 = iv->iv_flags
+	andn	%g3, IV_SOFTINT_PEND, %g3	! %g3 = !(iv->iv_flags & PEND)
+	sth	%g3, [%g2 + IV_FLAGS]		! clear IV_SOFTINT_PEND flag
+	stn	%g0, [%g7]			! clear iv->iv_pil_next or
+						!       iv->iv_pil_xnext
 
 	!
 	! Prepare for sys_trap()
 	!
 	! Registers passed to sys_trap()
 	!	%g1 - interrupt handler at TL==0
-	!	%g2 - inumber
+	!	%g2 - pointer to current intr_vec_t (iv),
+	!	      job queue for intr_thread or current_thread
 	!	%g3 - pil
 	!	%g4 - initial pil for handler
 	!
@@ -203,16 +148,16 @@ pil_interrupt(int level)
 	! intr_thread starts at DISP_LEVEL to prevent preemption
 	! current_thread starts at PIL_MAX to protect cpu_intr_actv
 	!
-	mov	%g4, %g3
+	mov	%g4, %g3		! %g3 = %g4, pil
 	cmp	%g4, LOCK_LEVEL
-	bg,a,pt	%xcc, 4f		! branch if pil > LOCK_LEVEL
-	mov	PIL_MAX, %g4
-	sethi	%hi(intr_thread), %g1
-	mov	DISP_LEVEL, %g4
+	bg,a,pt	%xcc, 3f		! branch if pil > LOCK_LEVEL
+	mov	PIL_MAX, %g4		! %g4 = PIL_MAX (15)
+	sethi	%hi(intr_thread), %g1	! %g1 = intr_thread
+	mov	DISP_LEVEL, %g4		! %g4 = DISP_LEVEL (11)
 	ba,pt	%xcc, sys_trap
 	or	%g1, %lo(intr_thread), %g1
-4:
-	sethi	%hi(current_thread), %g1
+3:
+	sethi	%hi(current_thread), %g1 ! %g1 = current_thread
 	ba,pt	%xcc, sys_trap
 	or	%g1, %lo(current_thread), %g1
 	SET_SIZE(pil_interrupt_common)
@@ -224,24 +169,22 @@ pil_interrupt(int level)
 #ifndef	lint
 _spurious:
 	.asciz	"!interrupt 0x%x at level %d not serviced"
-	
+
 /*
  * SERVE_INTR_PRE is called once, just before the first invocation
  * of SERVE_INTR.
  *
  * Registers on entry:
  *
- * inum, cpu, regs: may be out-registers
+ * iv_p, cpu, regs: may be out-registers
  * ls1, ls2: local scratch registers
  * os1, os2, os3: scratch registers, may be out
  */
 
-#define SERVE_INTR_PRE(inum, cpu, ls1, ls2, os1, os2, os3, regs)	\
-	set	intr_vector, ls1;					\
-	sll	inum, INTR_VECTOR_SHIFT, os1;				\
-	add	ls1, os1, ls1;						\
-	SERVE_INTR_TRACE(inum, os1, os2, os3, regs);			\
-	mov	inum, ls2;
+#define SERVE_INTR_PRE(iv_p, cpu, ls1, ls2, os1, os2, os3, regs)	\
+	mov	iv_p, ls1;						\
+	mov	iv_p, ls2;						\
+	SERVE_INTR_TRACE(iv_p, os1, os2, os3, regs);
 
 /*
  * SERVE_INTR is called immediately after either SERVE_INTR_PRE or
@@ -260,15 +203,15 @@ _spurious:
  * Registers on return from SERVE_INTR:
  *
  * ls1 - the pil just processed
- * ls2 - the inum just processed
+ * ls2 - the pointer to intr_vec_t (iv) just processed
  * os3 - if set, another interrupt needs to be processed
  * cpu, ls1, os3 - must be preserved if os3 is set
  */
 
 #define	SERVE_INTR(os5, cpu, ls1, ls2, os1, os2, os3, os4)		\
 	ldn	[ls1 + IV_HANDLER], os2;				\
-	ldn	[ls1 + IV_ARG], %o0;					\
-	ldn	[ls1 + IV_SOFTINT_ARG2], %o1;					\
+	ldn	[ls1 + IV_ARG1], %o0;					\
+	ldn	[ls1 + IV_ARG2], %o1;					\
 	call	os2;							\
 	lduh	[ls1 + IV_PIL], ls1;					\
 	brnz,pt	%o0, 2f;						\
@@ -301,25 +244,29 @@ _spurious:
 	add	cpu, INTR_HEAD, os1;					\
 	rdpr	%pstate, ls2;						\
 	wrpr	ls2, PSTATE_IE, %pstate;				\
-	ldn 	[os3 + INTR_NEXT], os2;					\
-	brnz,pn	os2, 4f;						\
-	stn	os2, [os1 + os4];					\
+	lduh	[os3 + IV_FLAGS], os2;					\
+	and	os2, IV_SOFTINT_MT, os2;				\
+	brz,pt	os2, 4f;						\
+	add	os3, IV_PIL_NEXT, os2;					\
+	ld	[cpu + CPU_ID], os5;					\
+	sll	os5, CPTRSHIFT, os5;					\
+	add	os2, os5, os2;						\
+4:	ldn	[os2], os5;						\
+	brnz,pn	os5, 5f;						\
+	stn	os5, [os1 + os4];					\
 	add	cpu, INTR_TAIL, os1;					\
 	stn	%g0, [os1 + os4];					\
 	mov	1, os1;							\
 	sll	os1, ls1, os1;						\
 	wr	os1, CLEAR_SOFTINT;					\
-4:	ldn	[cpu + INTR_HEAD], os1;					\
-	ld 	[os3 + INTR_NUMBER], os5;				\
-	stn	os3, [cpu + INTR_HEAD];					\
-	stn	os1, [os3 + INTR_NEXT];					\
-	set	intr_vector, ls1;					\
-	sll	os5, INTR_VECTOR_SHIFT, os1;				\
-	add	ls1, os1, ls1;						\
-	sth	%g0, [ls1 + IV_PENDING];				\
+5:	lduh	[os3 + IV_FLAGS], ls1;                                  \
+	andn	ls1, IV_SOFTINT_PEND, ls1;				\
+	sth	ls1, [os3 + IV_FLAGS];				        \
+	stn	%g0, [os2];						\
 	wrpr	%g0, ls2, %pstate;					\
-	SERVE_INTR_TRACE2(os5, os1, os2, os3, os4);			\
-	mov	os5, ls2;
+	mov	os3, ls1;						\
+	mov	os3, ls2;						\
+	SERVE_INTR_TRACE2(os5, os1, os2, os3, os4);
 		
 #ifdef TRAPTRACE
 /*
@@ -391,7 +338,7 @@ _spurious:
 
 /*ARGSUSED*/
 void
-intr_thread(struct regs *regs, uint_t inumber, uint_t pil)
+intr_thread(struct regs *regs, uint64_t iv_p, uint_t pil)
 {}
 
 #else	/* lint */
@@ -402,7 +349,7 @@ intr_thread(struct regs *regs, uint_t inumber, uint_t pil)
  * Handle an interrupt in a new thread.
  *	Entry:
  *		%o0       = pointer to regs structure
- *		%o1       = inumber
+ *		%o1       = pointer to current intr_vec_t (iv) to be processed
  *		%o2       = pil
  *		%sp       = on current thread's kernel stack
  *		%o7       = return linkage to trap code
@@ -614,7 +561,7 @@ intr_thread(struct regs *regs, uint_t inumber, uint_t pil)
 0:
 	SERVE_INTR(%o1, %o2, %l1, %l3, %o4, %o5, %o3, %o0)
 	!
-	! If %o3 is set, we must call serve_intr_post, and both %l1 and %o3
+	! If %o3 is set, we must call serve_intr_next, and both %l1 and %o3
 	! must be preserved. %l1 holds our pil, %l3 holds our inum.
 	!
 	! Note: %l1 is the pil level we're processing, but we may have a
@@ -758,7 +705,7 @@ intr_thread(struct regs *regs, uint_t inumber, uint_t pil)
 	wrpr	%g0, DISP_LEVEL, %pil		! up from cpu_base_spl
 1:
 	!
-	! Do we need to call serve_intr_post and do this again?
+	! Do we need to call serve_intr_next and do this again?
 	!
 	brz,a,pt %o3, 0f
 	ld	[%o2 + CPU_INTR_ACTV], %o5	! delay annulled
@@ -963,7 +910,7 @@ intr_thread_t_intr_start_zero:
  * Handle an interrupt in the current thread
  *	Entry:
  *		%o0       = pointer to regs structure
- *		%o1       = inumber
+ *		%o1       = pointer to current intr_vec_t (iv) to be processed
  *		%o2       = pil
  *		%sp       = on current thread's kernel stack
  *		%o7       = return linkage to trap code
@@ -983,7 +930,7 @@ intr_thread_t_intr_start_zero:
  */
 /* ARGSUSED */
 void
-current_thread(struct regs *regs, uint_t inumber, uint_t pil)
+current_thread(struct regs *regs, uint64_t iv_p, uint_t pil)
 {}
 
 #else	/* lint */
@@ -1222,7 +1169,7 @@ current_thread(struct regs *regs, uint_t inumber, uint_t pil)
 	nop
 
 	sethi	%hi(cpc_level15_inum), %o1
-	ld	[%o1 + %lo(cpc_level15_inum)], %o1 ! arg for intr_enqueue_req
+	ldx	[%o1 + %lo(cpc_level15_inum)], %o1 ! arg for intr_enqueue_req
 	brz	%o1, 3f
 	nop
 
@@ -1552,7 +1499,7 @@ cbe_level14(void)
 
 /* ARGSUSED */
 void
-setsoftint(uint_t inum)
+setsoftint(uint64_t iv_p)
 {}
 
 #else	/* lint */
@@ -1563,76 +1510,167 @@ setsoftint(uint_t inum)
 	andn	%l5, PSTATE_IE, %l1
 	wrpr	%l1, %pstate		! disable interrupt
 	!
-	! Fetch data from intr_vector[] table according to the inum.
-	!
-	! We have an interrupt number.
-	! Put the request on the cpu's softint list,
-	! and set %set_softint.
+	! We have a pointer to an interrupt vector data structure.
+	! Put the request on the cpu's softint priority list and
+	! set %set_softint.
 	!
 	! Register usage
-	!	%i0 - inumber
+	! 	%i0 - pointer to intr_vec_t (iv)
 	!	%l2 - requested pil
-	!	%l3 - intr_req
-	!	%l4 - *cpu
-	!	%l1, %l6 - temps
+	!	%l4 - cpu
+	!	%l5 - pstate
+	!	%l1, %l3, %l6 - temps
 	!
-	! check if a softint is pending for this inum already
-	! if one is pending, don't bother queuing another
+	! check if a softint is pending for this softint, 
+	! if one is pending, don't bother queuing another.
 	!
-	set	intr_vector, %l1
-	sll	%i0, INTR_VECTOR_SHIFT, %l6
-	add	%l1, %l6, %l1			! %l1 = &intr_vector[inum]
-	lduh	[%l1 + IV_PENDING], %l6
-	brnz,pn	%l6, 4f				! branch, if pending
-	or	%g0, 1, %l2
-	sth	%l2, [%l1 + IV_PENDING]		! intr_vector[inum].pend = 1
+	lduh	[%i0 + IV_FLAGS], %l1	! %l1 = iv->iv_flags
+	and	%l1, IV_SOFTINT_PEND, %l6 ! %l6 = iv->iv_flags & IV_SOFTINT_PEND
+	brnz,pn	%l6, 4f			! branch if softint is already pending
+	or	%l1, IV_SOFTINT_PEND, %l2
+	sth	%l2, [%i0 + IV_FLAGS]	! Set IV_SOFTINT_PEND flag
+
+	CPU_ADDR(%l4, %l2)		! %l4 = cpu
+	lduh	[%i0 + IV_PIL], %l2	! %l2 = iv->iv_pil
+
 	!
-	! allocate an intr_req from the free list
+	! Insert intr_vec_t (iv) to appropriate cpu's softint priority list
 	!
-	CPU_ADDR(%l4, %l2)
-	ldn	[%l4 + INTR_HEAD], %l3
-	lduh	[%l1 + IV_PIL], %l2
+	sll	%l2, CPTRSHIFT, %l0	! %l0 = offset to pil entry
+	add	%l4, INTR_TAIL, %l6	! %l6 = &cpu->m_cpu.intr_tail
+	ldn	[%l6 + %l0], %l1	! %l1 = cpu->m_cpu.intr_tail[pil]
+					!       current tail (ct)
+	brz,pt	%l1, 2f			! branch if current tail is NULL
+	stn	%i0, [%l6 + %l0]	! make intr_vec_t (iv) as new tail
 	!
-	! fixup free list
+	! there's pending intr_vec_t already
 	!
-	ldn	[%l3 + INTR_NEXT], %l6
-	stn	%l6, [%l4 + INTR_HEAD]
+	lduh	[%l1 + IV_FLAGS], %l6	! %l6 = ct->iv_flags
+	and	%l6, IV_SOFTINT_MT, %l6	! %l6 = ct->iv_flags & IV_SOFTINT_MT
+	brz,pt	%l6, 1f			! check for Multi target softint flag
+	add	%l1, IV_PIL_NEXT, %l3	! %l3 = &ct->iv_pil_next
+	ld	[%l4 + CPU_ID], %l6	! for multi target softint, use cpuid
+	sll	%l6, CPTRSHIFT, %l6	! calculate offset address from cpuid
+	add	%l3, %l6, %l3		! %l3 =  &ct->iv_xpil_next[cpuid]
+1:
 	!
-	! fill up intr_req
-	!
-	st	%i0, [%l3 + INTR_NUMBER]
-	stn	%g0, [%l3 + INTR_NEXT]
-	!
-	! move intr_req to appropriate list
-	!
-	sll	%l2, CPTRSHIFT, %l0
-	add	%l4, INTR_TAIL, %l6
-	ldn	[%l6 + %l0], %l1	! current tail
-	brz,pt	%l1, 2f			! branch if list empty
-	stn	%l3, [%l6 + %l0]	! make intr_req new tail
-	!
-	! there's pending intr_req already
+	! update old tail
 	!
 	ba,pt	%xcc, 3f
-	stn	%l3, [%l1 + INTR_NEXT]	! update old tail
+	stn	%i0, [%l3]		! [%l3] = iv, set pil_next field
 2:
 	!
-	! no pending intr_req; make intr_req new head
+	! no pending intr_vec_t; make intr_vec_t as new head
 	!
-	add	%l4, INTR_HEAD, %l6
-	stn	%l3, [%l6 + %l0]
+	add	%l4, INTR_HEAD, %l6	! %l6 = &cpu->m_cpu.intr_head[pil]
+	stn	%i0, [%l6 + %l0]	! cpu->m_cpu.intr_head[pil] = iv
 3:
 	!
 	! Write %set_softint with (1<<pil) to cause a "pil" level trap
 	!
-	mov	1, %l1
-	sll	%l1, %l2, %l1
-	wr	%l1, SET_SOFTINT
+	mov	1, %l1			! %l1 = 1
+	sll	%l1, %l2, %l1		! %l1 = 1 << pil
+	wr	%l1, SET_SOFTINT	! trigger required pil softint
 4:
-	wrpr	%g0, %l5, %pstate
+	wrpr	%g0, %l5, %pstate	! %pstate = saved %pstate (in %l5)
 	ret
 	restore
 	SET_SIZE(setsoftint)
+	
+#endif	/* lint */
+
+#if defined(lint)
+
+/*ARGSUSED*/
+void
+setsoftint_tl1(uint64_t iv_p, uint64_t dummy)
+{}
+
+#else	/* lint */
+
+	!
+	! Register usage
+	!	Arguments:
+	! 	%g1 - Pointer to intr_vec_t (iv)
+	!
+	!	Internal:
+	!	%g2 - pil
+	!	%g4 - cpu
+	!	%g3,%g5-g7 - temps
+	!
+	ENTRY_NP(setsoftint_tl1)
+	!
+	! We have a pointer to an interrupt vector data structure.
+	! Put the request on the cpu's softint priority list and
+	! set %set_softint.
+	!
+	CPU_ADDR(%g4, %g2)		! %g4 = cpu
+	lduh	[%g1 + IV_PIL], %g2	! %g2 = iv->iv_pil
+
+	!
+	! Insert intr_vec_t (iv) to appropriate cpu's softint priority list
+	!
+	sll	%g2, CPTRSHIFT, %g7	! %g7 = offset to pil entry
+	add	%g4, INTR_TAIL, %g6	! %g6 = &cpu->m_cpu.intr_tail
+	ldn	[%g6 + %g7], %g5	! %g5 = cpu->m_cpu.intr_tail[pil]
+					!       current tail (ct)
+	brz,pt	%g5, 1f			! branch if current tail is NULL
+	stn	%g1, [%g6 + %g7]	! make intr_rec_t (iv) as new tail
+	!
+	! there's pending intr_vec_t already
+	!
+	lduh	[%g5 + IV_FLAGS], %g6	! %g6 = ct->iv_flags
+	and	%g6, IV_SOFTINT_MT, %g6	! %g6 = ct->iv_flags & IV_SOFTINT_MT
+	brz,pt	%g6, 0f			! check for Multi target softint flag
+	add	%g5, IV_PIL_NEXT, %g3	! %g3 = &ct->iv_pil_next
+	ld	[%g4 + CPU_ID], %g6	! for multi target softint, use cpuid
+	sll	%g6, CPTRSHIFT, %g6	! calculate offset address from cpuid
+	add	%g3, %g6, %g3		! %g3 = &ct->iv_xpil_next[cpuid]
+0:
+	!
+	! update old tail
+	!
+	ba,pt	%xcc, 2f
+	stn	%g1, [%g3]		! [%g3] = iv, set pil_next field
+1:
+	!
+	! no pending intr_vec_t; make intr_vec_t as new head
+	!
+	add	%g4, INTR_HEAD, %g6	! %g6 = &cpu->m_cpu.intr_head[pil]
+	stn	%g1, [%g6 + %g7]	! cpu->m_cpu.intr_head[pil] = iv
+2:
+#ifdef TRAPTRACE
+	TRACE_PTR(%g5, %g6)
+	GET_TRACE_TICK(%g6)
+	stxa	%g6, [%g5 + TRAP_ENT_TICK]%asi	! trap_tick = %tick
+	TRACE_SAVE_TL_GL_REGS(%g5, %g6)
+	rdpr	%tt, %g6
+	stha	%g6, [%g5 + TRAP_ENT_TT]%asi	! trap_type = %tt
+	rdpr	%tpc, %g6
+	stna	%g6, [%g5 + TRAP_ENT_TPC]%asi	! trap_pc = %tpc
+	rdpr	%tstate, %g6
+	stxa	%g6, [%g5 + TRAP_ENT_TSTATE]%asi ! trap_tstate = %tstate
+	stna	%sp, [%g5 + TRAP_ENT_SP]%asi	! trap_sp = %sp
+	stna	%g1, [%g5 + TRAP_ENT_TR]%asi	! trap_tr = iv
+	ldn	[%g1 + IV_PIL_NEXT], %g6	! 
+	stna	%g6, [%g5 + TRAP_ENT_F1]%asi	! trap_f1 = iv->iv_pil_next
+	add	%g4, INTR_HEAD, %g6
+	ldn	[%g6 + %g7], %g6		! %g6=cpu->m_cpu.intr_head[pil]
+	stna	%g6, [%g5 + TRAP_ENT_F2]%asi	! trap_f2 = intr_head[pil]
+	add	%g4, INTR_TAIL, %g6
+	ldn	[%g6 + %g7], %g6		! %g6=cpu->m_cpu.intr_tail[pil]
+	stna	%g6, [%g5 + TRAP_ENT_F3]%asi	! trap_f3 = intr_tail[pil]
+	stna	%g2, [%g5 + TRAP_ENT_F4]%asi	! trap_f4 = pil
+	TRACE_NEXT(%g5, %g6, %g3)
+#endif /* TRAPTRACE */
+	!
+	! Write %set_softint with (1<<pil) to cause a "pil" level trap
+	!
+	mov	1, %g5			! %g5 = 1
+	sll	%g5, %g2, %g5		! %g5 = 1 << pil
+	wr	%g5, SET_SOFTINT	! trigger required pil softint
+	retry
+	SET_SIZE(setsoftint_tl1)
 
 #endif	/* lint */
 
@@ -1640,24 +1678,24 @@ setsoftint(uint_t inum)
 
 /*ARGSUSED*/
 void
-setsoftint_tl1(uint64_t inum, uint64_t dummy)
+setvecint_tl1(uint64_t inum, uint64_t dummy)
 {}
 
 #else	/* lint */
 
 	!
 	! Register usage
+	!	Arguments:
+	! 	%g1 - inumber
 	!
-	! Arguments:
-	! %g1 - inumber
+	!	Internal:
+	! 	%g1 - softint pil mask
+	!	%g2 - pil of intr_vec_t
+	!	%g3 - pointer to current intr_vec_t (iv)
+	!	%g4 - cpu
+	!	%g5, %g6,%g7 - temps
 	!
-	! Internal:
-	! %g2 - requested pil
-	! %g3 - intr_req
-	! %g4 - cpu pointer
-	! %g5,%g6,%g7 - temps
-	!
-	ENTRY_NP(setsoftint_tl1)
+	ENTRY_NP(setvecint_tl1)
 	!
 	! Verify the inumber received (should be inum < MAXIVNUM).
 	!
@@ -1665,109 +1703,108 @@ setsoftint_tl1(uint64_t inum, uint64_t dummy)
 	cmp	%g1, %g2
 	bgeu,pn	%xcc, .no_ivintr
 	clr	%g2			! expected in .no_ivintr
-	!
-	! Fetch data from intr_vector[] table according to the inum.
-	!
-	! We have an interrupt number. Put the request on the cpu's softint
-	! list, and set %set_softint.
-	!
-	set	intr_vector, %g5
-	sll	%g1, INTR_VECTOR_SHIFT, %g6
-	add	%g5, %g6, %g5			! %g5 = &intr_vector[inum]
 
 	!
-	! allocate an intr_req from the free list
+	! Fetch data from intr_vec_table according to the inum.
 	!
-	CPU_ADDR(%g4, %g2)
-	ldn	[%g4 + INTR_HEAD], %g3
+	! We have an interrupt number. Fetch the interrupt vector requests
+	! from the interrupt vector table for a given interrupt number and
+	! insert them into cpu's softint priority lists and set %set_softint.
+	!
+	set	intr_vec_table, %g5	! %g5 = intr_vec_table
+	sll	%g1, CPTRSHIFT, %g6	! %g6 = offset to inum entry in table
+	add	%g5, %g6, %g5		! %g5 = &intr_vec_table[inum]
+	ldn	[%g5], %g3		! %g3 = pointer to first entry of
+					!       intr_vec_t list
 
-	! load the pil so it can be used by .no_intr_pool/.no_ivintr
-	lduh	[%g5 + IV_PIL], %g2
-
-	! Verify that the free list is not exhausted.
-	brz,pn	%g3, .no_intr_pool
-	nop
-
-	! Verify the intr_vector[] entry according to the inumber.
-	! The iv_pil field should not be zero.  This used to be
-	! guarded by DEBUG but broken drivers can cause spurious
-	! tick interrupts when the softint register is programmed
-	! with 1 << 0 at the end of this routine.  Now we always
-	! check for an invalid pil.
-	brz,pn	%g2, .no_ivintr
+	! Verify the first intr_vec_t pointer for a given inum and it should
+	! not be NULL. This used to be guarded by DEBUG but broken drivers can
+	! cause spurious tick interrupts when the softint register is programmed
+	! with 1 << 0 at the end of this routine. Now we always check for a
+	! valid intr_vec_t pointer.
+	brz,pn	%g3, .no_ivintr
 	nop
 
 	!
-	! fixup free list
+	! Traverse the intr_vec_t link list, put each item on to corresponding
+	! CPU softint priority queue, and compose the final softint pil mask.
 	!
-	ldn	[%g3 + INTR_NEXT], %g6
-	stn	%g6, [%g4 + INTR_HEAD]
-
+	! At this point:
+	!	%g3 = intr_vec_table[inum]
 	!
-	! fill in intr_req
+	CPU_ADDR(%g4, %g2)		! %g4 = cpu
+	mov	%g0, %g1		! %g1 = 0, initialize pil mask to 0
+0:
 	!
-	st	%g1, [%g3 + INTR_NUMBER]
-	stn	%g0, [%g3 + INTR_NEXT]
+	! Insert next intr_vec_t (iv) to appropriate cpu's softint priority list
 	!
-	! move intr_req to appropriate list
+	! At this point:
+	!	%g1 = softint pil mask
+	!	%g3 = pointer to next intr_vec_t (iv)
+	!	%g4 = cpu 
+	! 
+	lduh	[%g3 + IV_PIL], %g2	! %g2 = iv->iv_pil
+	sll	%g2, CPTRSHIFT, %g7	! %g7 = offset to pil entry
+	add	%g4, INTR_TAIL, %g6	! %g6 = &cpu->m_cpu.intr_tail
+	ldn	[%g6 + %g7], %g5	! %g5 = cpu->m_cpu.intr_tail[pil]
+					! 	current tail (ct)
+	brz,pt	%g5, 2f			! branch if current tail is NULL
+	stn	%g3, [%g6 + %g7]	! make intr_vec_t (iv) as new tail
+					! cpu->m_cpu.intr_tail[pil] = iv
 	!
-	sll	%g2, CPTRSHIFT, %g7
-	add	%g4, INTR_TAIL, %g6
-	ldn	[%g6 + %g7], %g5	! current tail
-	brz,pt	%g5, 2f			! branch if list empty
-	stn	%g3, [%g6 + %g7]	! make intr_req new tail
+	! there's pending intr_vec_t already
 	!
-	! there's pending intr_req already
+	lduh	[%g5 + IV_FLAGS], %g6	! %g6 = ct->iv_flags
+	and	%g6, IV_SOFTINT_MT, %g6	! %g6 = ct->iv_flags & IV_SOFTINT_MT
+	brz,pt	%g6, 1f			! check for Multi target softint flag
+	add	%g5, IV_PIL_NEXT, %g5	! %g5 = &ct->iv_pil_next
+	ld	[%g4 + CPU_ID], %g6	! for multi target softint, use cpuid
+	sll	%g6, CPTRSHIFT, %g6	! calculate offset address from cpuid
+	add	%g5, %g6, %g5		! %g5 = &ct->iv_xpil_next[cpuid]
+1:
+	!
+	! update old tail
 	!
 	ba,pt	%xcc, 3f
-	stn	%g3, [%g5 + INTR_NEXT]	! update old tail
+	stn	%g3, [%g5]		! [%g5] = iv, set pil_next field
 2:
 	!
-	! no pending intr_req; make intr_req new head
+	! no pending intr_vec_t; make intr_vec_t as new head
 	!
-	add	%g4, INTR_HEAD, %g6
-	stn	%g3, [%g6 + %g7]
+	add	%g4, INTR_HEAD, %g6	!  %g6 = &cpu->m_cpu.intr_head[pil]
+	stn	%g3, [%g6 + %g7]	!  cpu->m_cpu.intr_head[pil] = iv
 3:
 #ifdef TRAPTRACE
-	TRACE_PTR(%g1, %g6)
+	TRACE_PTR(%g5, %g6)
 	GET_TRACE_TICK(%g6)
-	stxa	%g6, [%g1 + TRAP_ENT_TICK]%asi
-	TRACE_SAVE_TL_GL_REGS(%g1, %g6)
+	stxa	%g6, [%g5 + TRAP_ENT_TICK]%asi	! trap_tick = %tick
+	TRACE_SAVE_TL_GL_REGS(%g5, %g6)
 	rdpr	%tt, %g6
-	stha	%g6, [%g1 + TRAP_ENT_TT]%asi
+	stha	%g6, [%g5 + TRAP_ENT_TT]%asi	! trap_type = %tt`
 	rdpr	%tpc, %g6
-	stna	%g6, [%g1 + TRAP_ENT_TPC]%asi
+	stna	%g6, [%g5 + TRAP_ENT_TPC]%asi	! trap_pc = %tpc
 	rdpr	%tstate, %g6
-	stxa	%g6, [%g1 + TRAP_ENT_TSTATE]%asi
-	stna	%sp, [%g1 + TRAP_ENT_SP]%asi
-	ld	[%g3 + INTR_NUMBER], %g6
-	stna	%g6, [%g1 + TRAP_ENT_TR]%asi
+	stxa	%g6, [%g5 + TRAP_ENT_TSTATE]%asi ! trap_tstate = %tstate
+	stna	%sp, [%g5 + TRAP_ENT_SP]%asi	! trap_sp = %sp
+	stna	%g3, [%g5 + TRAP_ENT_TR]%asi	! trap_tr = iv
+	stna	%g1, [%g5 + TRAP_ENT_F1]%asi	! trap_f1 = pil mask
 	add	%g4, INTR_HEAD, %g6
-	ldn	[%g6 + %g7], %g6		! intr_head[pil]
-	stna	%g6, [%g1 + TRAP_ENT_F1]%asi
+	ldn	[%g6 + %g7], %g6		! %g6=cpu->m_cpu.intr_head[pil]
+	stna	%g6, [%g5 + TRAP_ENT_F2]%asi	! trap_f2 = intr_head[pil]
 	add	%g4, INTR_TAIL, %g6
-	ldn	[%g6 + %g7], %g6		! intr_tail[pil]
-	stna	%g6, [%g1 + TRAP_ENT_F2]%asi
-	stna	%g2, [%g1 + TRAP_ENT_F3]%asi	! pil
-	stna	%g3, [%g1 + TRAP_ENT_F4]%asi	! intr_req
-	TRACE_NEXT(%g1, %g6, %g5)
+	ldn	[%g6 + %g7], %g6		! %g6=cpu->m_cpu.intr_tail[pil]
+	stna	%g6, [%g5 + TRAP_ENT_F3]%asi	! trap_f3 = intr_tail[pil]
+	stna	%g2, [%g5 + TRAP_ENT_F4]%asi	! trap_f4 = pil
+	TRACE_NEXT(%g5, %g6, %g7)
 #endif /* TRAPTRACE */
-	!
-	! Write %set_softint with (1<<pil) to cause a "pil" level trap
-	!
-	mov	1, %g5
-	sll	%g5, %g2, %g5
-	wr	%g5, SET_SOFTINT
-4:
+	mov	1, %g6			! %g6 = 1
+	sll	%g6, %g2, %g6		! %g6 = 1 << pil
+	or	%g1, %g6, %g1		! %g1 |= (1 << pil), pil mask
+	ldn	[%g3 + IV_VEC_NEXT], %g3 ! %g3 = pointer to next intr_vec_t (iv)
+	brnz,pn	%g3, 0b			! iv->iv_vec_next is non NULL, goto 0b
+	nop
+	wr	%g1, SET_SOFTINT	! triggered one or more pil softints
 	retry
-
-.no_intr_pool:
-	! no_intr_pool: rp, inum (%g1), pil (%g2)
-	mov	%g2, %g3
-	mov	%g1, %g2
-	set	no_intr_pool, %g1
-	ba,pt	%xcc, sys_trap
-	mov	PIL_15, %g4
 
 .no_ivintr:
 	! no_ivintr: arguments: rp, inum (%g1), pil (%g2 == 0)
@@ -1776,7 +1813,7 @@ setsoftint_tl1(uint64_t inum, uint64_t dummy)
 	set	no_ivintr, %g1
 	ba,pt	%xcc, sys_trap
 	mov	PIL_15, %g4
-	SET_SIZE(setsoftint_tl1)
+	SET_SIZE(setvecint_tl1)
 
 #endif	/* lint */
 
@@ -1800,7 +1837,7 @@ wr_clr_softint(uint_t value)
 
 /*ARGSUSED*/
 void
-intr_enqueue_req(uint_t pil, uint32_t inum)
+intr_enqueue_req(uint_t pil, uint64_t inum)
 {}
 
 #else   /* lint */
@@ -1809,37 +1846,46 @@ intr_enqueue_req(uint_t pil, uint32_t inum)
  * intr_enqueue_req
  *
  * %o0 - pil
- * %o1 - inum
+ * %o1 - pointer to intr_vec_t (iv)
  * %o5 - preserved
  * %g5 - preserved
  */
 	ENTRY_NP(intr_enqueue_req)
-	! get intr_req free list
-	CPU_ADDR(%g4, %g1)
-	ldn	[%g4 + INTR_HEAD], %g3  
+	!
+	CPU_ADDR(%g4, %g1)		! %g4 = cpu
 
-	! take intr_req from free list
-	ldn	[%g3 + INTR_NEXT], %g6
-	stn	%g6, [%g4 + INTR_HEAD]
+	!
+	! Insert intr_vec_t (iv) to appropriate cpu's softint priority list
+	!
+	sll	%o0, CPTRSHIFT, %o0	! %o0 = offset to pil entry
+	add	%g4, INTR_TAIL, %g6	! %g6 = &cpu->m_cpu.intr_tail
+	ldn	[%o0 + %g6], %g1	! %g1 = cpu->m_cpu.intr_tail[pil]
+					!       current tail (ct)
+	brz,pt	%g1, 2f			! branch if current tail is NULL
+	stn	%o1, [%g6 + %o0]	! make intr_vec_t (iv) as new tail
 
-	! fill up intr_req
-	st	%o1, [%g3 + INTR_NUMBER]
-	stn	%g0, [%g3 + INTR_NEXT]
-
-	! add intr_req to proper pil list
-	sll	%o0, CPTRSHIFT, %o0
-	add	%g4, INTR_TAIL, %g6
-	ldn	[%o0 + %g6], %g1	! current tail
-	brz,pt	%g1, 2f			! branch if list is empty
-	stn	%g3, [%g6 + %o0]	! make intr_req the new tail
-
-	! an intr_req was already queued so update old tail
+	!
+	! there's pending intr_vec_t already
+	!
+	lduh	[%g1 + IV_FLAGS], %g6	! %g6 = ct->iv_flags
+	and	%g6, IV_SOFTINT_MT, %g6	! %g6 = ct->iv_flags & IV_SOFTINT_MT
+	brz,pt	%g6, 1f			! check for Multi target softint flag
+	add	%g1, IV_PIL_NEXT, %g3	! %g3 = &ct->iv_pil_next
+	ld	[%g4 + CPU_ID], %g6	! for multi target softint, use cpuid
+	sll	%g6, CPTRSHIFT, %g6	! calculate offset address from cpuid
+	add	%g3, %g6, %g3		! %g3 = &ct->iv_xpil_next[cpuid]
+1:
+	!
+	! update old tail
+	!
 	ba,pt	%xcc, 3f
-	stn	%g3, [%g1 + INTR_NEXT]
+	stn	%o1, [%g3]		! {%g5] = iv, set pil_next field
 2:
-	! no intr_req's queued so make intr_req the new head
-	add	%g4, INTR_HEAD, %g6
-	stn	%g3, [%g6 + %o0]
+	!
+	! no intr_vec_t's queued so make intr_vec_t as new head
+	!
+	add	%g4, INTR_HEAD, %g6	! %g6 = &cpu->m_cpu.intr_head[pil]
+	stn	%o1, [%g6 + %o0]	! cpu->m_cpu.intr_head[pil] = iv
 3:
 	retl
 	nop
@@ -2165,16 +2211,4 @@ intr_get_time_not_intr:
 intr_get_time_no_start_time:
 	.asciz	"intr_get_time(): t_intr_start == 0"
 #endif /* DEBUG */
-#endif  /* lint */
-
-
-#if !defined(lint)
-
-/*
- * Check shift value used for computing array offsets
- */ 
-#if INTR_VECTOR_SIZE != (1 << INTR_VECTOR_SHIFT)
-#error "INTR_VECTOR_SIZE has changed"
-#endif
-
 #endif  /* lint */

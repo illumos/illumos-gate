@@ -278,16 +278,16 @@ px_lib_intr_settarget(dev_info_t *dip, sysino_t sysino, cpuid_t cpuid)
 int
 px_lib_intr_reset(dev_info_t *dip)
 {
-	px_t			*px_p = DIP_TO_STATE(dip);
-	px_ib_t			*ib_p = px_p->px_ib_p;
-	px_ib_ino_info_t	*ino_p;
+	px_t		*px_p = DIP_TO_STATE(dip);
+	px_ib_t		*ib_p = px_p->px_ib_p;
+	px_ino_t	*ino_p;
 
 	DBG(DBG_LIB_INT, dip, "px_lib_intr_reset: dip 0x%p\n", dip);
 
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
 	/* Reset all Interrupts */
-	for (ino_p = ib_p->ib_ino_lst; ino_p; ino_p = ino_p->ino_next) {
+	for (ino_p = ib_p->ib_ino_lst; ino_p; ino_p = ino_p->ino_next_p) {
 		if (px_lib_intr_setstate(dip, ino_p->ino_sysino,
 		    INTR_IDLE_STATE) != DDI_SUCCESS)
 			return (BF_FATAL);
@@ -782,10 +782,23 @@ px_lib_get_msiq_rec(dev_info_t *dip, msiqhead_t *msiq_head_p,
 
 	DBG(DBG_LIB_MSIQ, dip, "px_lib_get_msiq_rec: dip 0x%p\n", dip);
 
-	if (!curr_msiq_rec_p->msiq_rec_type)
+	if (!curr_msiq_rec_p->msiq_rec_type) {
+		/* Set msiq_rec_type to zero */
+		msiq_rec_p->msiq_rec_type = 0;
+
 		return;
+	}
 
 	*msiq_rec_p = *curr_msiq_rec_p;
+}
+
+/*ARGSUSED*/
+void
+px_lib_clr_msiq_rec(dev_info_t *dip, msiqhead_t *msiq_head_p)
+{
+	msiq_rec_t	*curr_msiq_rec_p = (msiq_rec_t *)msiq_head_p;
+
+	DBG(DBG_LIB_MSIQ, dip, "px_lib_clr_msiq_rec: dip 0x%p\n", dip);
 
 	/* Zero out msiq_rec_type field */
 	curr_msiq_rec_p->msiq_rec_type  = 0;
@@ -1737,27 +1750,21 @@ done:
 int
 px_err_add_intr(px_fault_t *px_fault_p)
 {
-	int	ret;
 	px_t	*px_p = DIP_TO_STATE(px_fault_p->px_fh_dip);
 
 	DBG(DBG_LIB_INT, px_p->px_dip,
 	    "px_err_add_intr: calling add_ivintr");
-	ret = add_ivintr(px_fault_p->px_fh_sysino, PX_ERR_PIL,
-	    px_fault_p->px_err_func, (caddr_t)px_fault_p,
-	    (caddr_t)&px_fault_p->px_intr_payload[0]);
 
-	if (ret != DDI_SUCCESS) {
-		DBG(DBG_LIB_INT, px_p->px_dip,
-		"add_ivintr returns %d, faultp: %p", ret, px_fault_p);
+	VERIFY(add_ivintr(px_fault_p->px_fh_sysino, PX_ERR_PIL,
+	    (intrfunc)px_fault_p->px_err_func, (caddr_t)px_fault_p, NULL,
+	    (caddr_t)&px_fault_p->px_intr_payload[0]) == 0);
 
-		return (ret);
-	}
 	DBG(DBG_LIB_INT, px_p->px_dip,
 	    "px_err_add_intr: ib_intr_enable ");
 
 	px_ib_intr_enable(px_p, intr_dist_cpuid(), px_fault_p->px_intr_ino);
 
-	return (ret);
+	return (DDI_SUCCESS);
 }
 
 /* remove interrupt vector */
@@ -1769,7 +1776,7 @@ px_err_rem_intr(px_fault_t *px_fault_p)
 	px_ib_intr_disable(px_p->px_ib_p, px_fault_p->px_intr_ino,
 	    IB_INTR_WAIT);
 
-	rem_ivintr(px_fault_p->px_fh_sysino, NULL);
+	VERIFY(rem_ivintr(px_fault_p->px_fh_sysino, PX_ERR_PIL) == 0);
 }
 
 int

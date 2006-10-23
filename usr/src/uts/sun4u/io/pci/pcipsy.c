@@ -38,10 +38,9 @@
 #include <sys/kmem.h>
 #include <sys/sysmacros.h>
 #include <sys/async.h>
-#include <sys/ivintr.h>
 #include <sys/systm.h>
 #include <sys/intreg.h>		/* UPAID_TO_IGN() */
-#include <sys/intr.h>
+#include <sys/ivintr.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/machsystm.h>
@@ -466,7 +465,7 @@ ib_ino_map_reg_unshare(ib_t *ib_p, ib_ino_t ino, ib_ino_info_t *ino_p)
 	ASSERT(IB_IS_OBIO_INO(ino) || ino_p->ino_slot_no < 8);
 
 	if (IB_IS_OBIO_INO(ino))
-		return (ino_p->ino_ih_size);
+		return (ino_p->ino_ipil_size);
 	else
 		return (--ib_p->ib_map_reg_counters[ino_p->ino_slot_no]);
 }
@@ -556,12 +555,12 @@ done:
  * cpu.  Otherwise a new cpu is selected by intr_dist_cpuid().
  *
  * The devinfo node we are trying to associate a cpu with is
- * ino_p->ino_ih_head->ih_dip.
+ * ino_p->ino_ipil_p->ipil_ih_head->ih_dip.
  */
 uint32_t
 pci_intr_dist_cpuid(ib_t *ib_p, ib_ino_info_t *ino_p)
 {
-	dev_info_t	*rdip = ino_p->ino_ih_head->ih_dip;
+	dev_info_t	*rdip = ino_p->ino_ipil_p->ipil_ih_head->ih_dip;
 	dev_info_t	*prdip = ddi_get_parent(rdip);
 	ib_ino_info_t	*sino_p;
 	dev_info_t	*sdip;
@@ -613,13 +612,13 @@ pci_intr_dist_cpuid(ib_t *ib_p, ib_ino_info_t *ino_p)
 	 * to an ino that matches one of the slot use strings.
 	 */
 	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
-	for (sino_p = ib_p->ib_ino_lst; sino_p; sino_p = sino_p->ino_next) {
+	for (sino_p = ib_p->ib_ino_lst; sino_p; sino_p = sino_p->ino_next_p) {
 		/* skip self and non-established */
 		if ((sino_p == ino_p) || (sino_p->ino_established == 0))
 			continue;
 
 		/* skip non-siblings */
-		sdip = sino_p->ino_ih_head->ih_dip;
+		sdip = sino_p->ino_ipil_p->ipil_ih_head->ih_dip;
 		psdip = ddi_get_parent(sdip);
 		if (psdip != prdip)
 			continue;
@@ -705,7 +704,7 @@ pci_cb_teardown(pci_t *pci_p)
 		mondo = CB_MONDO_TO_XMONDO(pci_p->pci_cb_p, mondo);
 
 		cb_disable_nintr(cb_p, CBNINTR_THERMAL, IB_INTR_WAIT);
-		rem_ivintr(mondo, NULL);
+		VERIFY(rem_ivintr(mondo, pci_pil[CBNINTR_THERMAL]) == 0);
 	}
 #ifdef _STARFIRE
 	pc_ittrans_uninit(cb_p->cb_ittrans_cookie);
@@ -725,7 +724,8 @@ cb_register_intr(pci_t *pci_p)
 	mondo = CB_MONDO_TO_XMONDO(pci_p->pci_cb_p, mondo);
 
 	VERIFY(add_ivintr(mondo, pci_pil[CBNINTR_THERMAL],
-	    cb_thermal_intr, (caddr_t)pci_p->pci_cb_p, NULL) == 0);
+	    (intrfunc)cb_thermal_intr, (caddr_t)pci_p->pci_cb_p,
+	    NULL, NULL) == 0);
 
 	return (PCI_ATTACH_RETCODE(PCI_CB_OBJ, PCI_OBJ_INTR_ADD, DDI_SUCCESS));
 }
@@ -760,7 +760,7 @@ cb_remove_xintr(pci_t *pci_p, dev_info_t *dip, dev_info_t *rdip,
 		return (DDI_FAILURE);
 
 	cb_disable_nintr(pci_p->pci_cb_p, CBNINTR_THERMAL, IB_INTR_WAIT);
-	rem_ivintr(mondo, NULL);
+	VERIFY(rem_ivintr(mondo, pci_pil[CBNINTR_THERMAL]) == 0);
 
 	DEBUG1(DBG_R_INTX, dip, "remove xintr %x\n", ino);
 	return (DDI_SUCCESS);
@@ -775,8 +775,8 @@ pci_ecc_add_intr(pci_t *pci_p, int inum, ecc_intr_info_t *eii_p)
 	    pci_p->pci_inos[inum]);
 	mondo = CB_MONDO_TO_XMONDO(pci_p->pci_cb_p, mondo);
 
-	VERIFY(add_ivintr(mondo, pci_pil[inum], ecc_intr,
-	    (caddr_t)eii_p, NULL) == 0);
+	VERIFY(add_ivintr(mondo, pci_pil[inum], (intrfunc)ecc_intr,
+	    (caddr_t)eii_p, NULL, NULL) == 0);
 
 	return (PCI_ATTACH_RETCODE(PCI_ECC_OBJ, PCI_OBJ_INTR_ADD, DDI_SUCCESS));
 }
@@ -790,7 +790,7 @@ pci_ecc_rem_intr(pci_t *pci_p, int inum, ecc_intr_info_t *eii_p)
 	    pci_p->pci_inos[inum]);
 	mondo = CB_MONDO_TO_XMONDO(pci_p->pci_cb_p, mondo);
 
-	rem_ivintr(mondo, NULL);
+	VERIFY(rem_ivintr(mondo, pci_pil[inum]) == 0);
 }
 
 static int pbm_has_pass_1_cheerio(pci_t *pci_p);
@@ -2019,7 +2019,7 @@ pci_thermal_rem_intr(dev_info_t *rdip, uint_t inum)
 		DEBUG2(DBG_ATTACH, rdip, "pci_thermal_rem_intr unregistered "
 		    "for dip=%s%d:", ddi_driver_name(rdip),
 		    ddi_get_instance(rdip));
-		rem_ivintr(pci_mondo, NULL);
+		VERIFY(rem_ivintr(pci_mondo, pci_pil[CBNINTR_THERMAL]) == 0);
 	}
 }
 

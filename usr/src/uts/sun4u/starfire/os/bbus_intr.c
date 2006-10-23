@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +45,7 @@ extern struct cpu *SIGBCPU;
 extern	void power_down(const char *);
 
 uint_t bbus_intr_inum;
-uint_t bbus_poll_inum;
+uint64_t bbus_poll_inum;
 
 /*
  * Support for sgnblk polling.
@@ -307,7 +306,8 @@ register_bbus_intr()
 	 * An interrupt handler is added for this inum.
 	 */
 	bbus_intr_inum = UPAID_TO_IGN(cpu0.cpu_id) * MAX_INO;
-	VERIFY(add_ivintr(bbus_intr_inum, PIL_13, bbus_intr, 0, 0) == 0);
+	VERIFY(add_ivintr(bbus_intr_inum, PIL_13, (intrfunc)bbus_intr,
+	    NULL, NULL, NULL) == 0);
 
 
 	/*
@@ -334,7 +334,7 @@ register_bbus_intr()
 	 * to handle it. Allocate the inum for the level
 	 * 13 intr here.
 	 */
-	bbus_poll_inum = add_softintr(PIL_13, bbus_poll, 0);
+	bbus_poll_inum = add_softintr(PIL_13, bbus_poll, 0, SOFTINT_ST);
 }
 
 static void

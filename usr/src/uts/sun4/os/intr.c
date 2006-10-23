@@ -46,7 +46,6 @@
 
 #include <sys/cpu_sgnblk_defs.h>
 
-kmutex_t soft_iv_lock;	/* protect software interrupt vector table */
 /* Global locks which protect the interrupt distribution lists */
 static kmutex_t intr_dist_lock;
 static kmutex_t intr_dist_cpu_lock;
@@ -55,10 +54,10 @@ static kmutex_t intr_dist_cpu_lock;
 static struct intr_dist *intr_dist_head = NULL;
 static struct intr_dist *intr_dist_whead = NULL;
 
-uint_t swinum_base;
-uint_t maxswinum;
-uint_t siron_inum;
-uint_t poke_cpu_inum;
+uint64_t siron_inum;
+uint64_t poke_cpu_inum;
+uint_t poke_cpu_intr(caddr_t arg1, caddr_t arg2);
+
 /*
  * Note:-
  * siron_pending was originally created to prevent a resource over consumption
@@ -87,19 +86,21 @@ int32_t intr_dist_weight_maxmax = 1000;
 int intr_dist_weight_maxfactor = 2;
 #define	INTR_DEBUG(args) if (intr_dist_debug) cmn_err args
 
-static void sw_ivintr_init(cpu_t *);
-
 /*
- * intr_init() - interrupt initialization
- *	Initialize the system's software interrupt vector table and
- *	CPU's interrupt free list
+ * intr_init() - Interrupt initialization
+ *	Initialize the system's interrupt vector table.
  */
 void
 intr_init(cpu_t *cp)
 {
+	extern uint_t softlevel1();
+
 	init_ivintr();
-	sw_ivintr_init(cp);
-	init_intr_pool(cp);
+	REGISTER_BBUS_INTR();
+
+	siron_inum = add_softintr(PIL_1, softlevel1, 0, SOFTINT_ST);
+	poke_cpu_inum = add_softintr(PIL_13, poke_cpu_intr, 0, SOFTINT_MT);
+	cp->cpu_m.poke_cpu_outstanding = B_FALSE;
 
 	mutex_init(&intr_dist_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&intr_dist_cpu_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -107,8 +108,8 @@ intr_init(cpu_t *cp)
 	/*
 	 * A soft interrupt may have been requested prior to the initialization
 	 * of soft interrupts.  Soft interrupts can't be dispatched until after
-	 * init_intr_pool, so we have to wait until now before we can dispatch
-	 * the pending soft interrupt (if any).
+	 * init_intr(), so we have to wait until now before we can dispatch the
+	 * pending soft interrupt (if any).
 	 */
 	if (siron_pending) {
 		siron_pending = 0;
@@ -119,7 +120,6 @@ intr_init(cpu_t *cp)
 /*
  * poke_cpu_intr - fall through when poke_cpu calls
  */
-
 /* ARGSUSED */
 uint_t
 poke_cpu_intr(caddr_t arg1, caddr_t arg2)
@@ -128,124 +128,6 @@ poke_cpu_intr(caddr_t arg1, caddr_t arg2)
 	membar_stld_stst();
 	return (1);
 }
-
-/*
- * sw_ivintr_init() - software interrupt vector initialization
- *	called after CPU is active
- *	the software interrupt vector table is part of the intr_vector[]
- */
-static void
-sw_ivintr_init(cpu_t *cp)
-{
-	extern uint_t softlevel1();
-
-	mutex_init(&soft_iv_lock, NULL, MUTEX_DEFAULT, NULL);
-
-	swinum_base = SOFTIVNUM;
-
-	/*
-	 * the maximum software interrupt == MAX_SOFT_INO
-	 */
-	maxswinum = swinum_base + MAX_SOFT_INO;
-
-	REGISTER_BBUS_INTR();
-
-	siron_inum = add_softintr(PIL_1, softlevel1, 0);
-	poke_cpu_inum = add_softintr(PIL_13, poke_cpu_intr, 0);
-	cp->cpu_m.poke_cpu_outstanding = B_FALSE;
-}
-
-cpuset_t intr_add_pools_inuse;
-
-/*
- * cleanup_intr_pool()
- *	Free up the extra intr request pool for this cpu.
- */
-void
-cleanup_intr_pool(cpu_t *cp)
-{
-	extern struct intr_req *intr_add_head;
-	int poolno;
-	struct intr_req *pool;
-
-	poolno = cp->cpu_m.intr_pool_added;
-	if (poolno >= 0) {
-		cp->cpu_m.intr_pool_added = -1;
-		pool = (poolno * INTR_PENDING_MAX * intr_add_pools) +
-
-			intr_add_head;	/* not byte arithmetic */
-		bzero(pool, INTR_PENDING_MAX * intr_add_pools *
-		    sizeof (struct intr_req));
-
-		CPUSET_DEL(intr_add_pools_inuse, poolno);
-	}
-}
-
-/*
- * init_intr_pool()
- *	initialize the intr request pool for the cpu
- * 	should be called for each cpu
- */
-void
-init_intr_pool(cpu_t *cp)
-{
-	extern struct intr_req *intr_add_head;
-#ifdef	DEBUG
-	extern struct intr_req *intr_add_tail;
-#endif	/* DEBUG */
-	int i, pool;
-
-	cp->cpu_m.intr_pool_added = -1;
-
-	for (i = 0; i < INTR_PENDING_MAX-1; i++) {
-		cp->cpu_m.intr_pool[i].intr_next =
-		    &cp->cpu_m.intr_pool[i+1];
-	}
-	cp->cpu_m.intr_pool[INTR_PENDING_MAX-1].intr_next = NULL;
-
-	cp->cpu_m.intr_head[0] = &cp->cpu_m.intr_pool[0];
-	cp->cpu_m.intr_tail[0] = &cp->cpu_m.intr_pool[INTR_PENDING_MAX-1];
-
-	if (intr_add_pools != 0) {
-
-		/*
-		 * If additional interrupt pools have been allocated,
-		 * initialize those too and add them to the free list.
-		 */
-
-		struct intr_req *trace;
-
-		for (pool = 0; pool < max_ncpus; pool++) {
-			if (!(CPU_IN_SET(intr_add_pools_inuse, pool)))
-			    break;
-		}
-		if (pool >= max_ncpus) {
-			/*
-			 * XXX - intr pools are alloc'd, just not as
-			 * much as we would like.
-			 */
-			cmn_err(CE_WARN, "Failed to alloc all requested intr "
-			    "pools for cpu%d", cp->cpu_id);
-			return;
-		}
-		CPUSET_ADD(intr_add_pools_inuse, pool);
-		cp->cpu_m.intr_pool_added = pool;
-
-		trace = (pool * INTR_PENDING_MAX * intr_add_pools) +
-			intr_add_head;	/* not byte arithmetic */
-
-		cp->cpu_m.intr_pool[INTR_PENDING_MAX-1].intr_next = trace;
-
-		for (i = 1; i < intr_add_pools * INTR_PENDING_MAX; i++, trace++)
-			trace->intr_next = trace + 1;
-		trace->intr_next = NULL;
-
-		ASSERT(trace >= intr_add_head && trace <= intr_add_tail);
-
-		cp->cpu_m.intr_tail[0] = trace;
-	}
-}
-
 
 /*
  * siron - primitive for sun/os/softint.c
@@ -261,9 +143,9 @@ siron(void)
 
 /*
  * no_ivintr()
- * 	called by vec_interrupt() through sys_trap()
+ * 	called by setvecint_tl1() through sys_trap()
  *	vector interrupt received but not valid or not
- *	registered in intr_vector[]
+ *	registered in intr_vec_table
  *	considered as a spurious mondo interrupt
  */
 /* ARGSUSED */
@@ -273,74 +155,51 @@ no_ivintr(struct regs *rp, int inum, int pil)
 	cmn_err(CE_WARN, "invalid vector intr: number 0x%x, pil 0x%x",
 	    inum, pil);
 
-
 #ifdef DEBUG_VEC_INTR
 	prom_enter_mon();
 #endif /* DEBUG_VEC_INTR */
 }
 
-/*
- * no_intr_pool()
- * 	called by vec_interrupt() through sys_trap()
- *	vector interrupt received but no intr_req entries
- */
-/* ARGSUSED */
 void
-no_intr_pool(struct regs *rp, int inum, int pil)
+intr_dequeue_req(uint_t pil, uint64_t inum)
 {
-#ifdef DEBUG_VEC_INTR
-	cmn_err(CE_WARN, "intr_req pool empty: num 0x%x, pil 0x%x",
-		inum, pil);
-	prom_enter_mon();
-#else
-	cmn_err(CE_PANIC, "intr_req pool empty: num 0x%x, pil 0x%x",
-		inum, pil);
-#endif /* DEBUG_VEC_INTR */
-}
-
-void
-intr_dequeue_req(uint_t pil, uint32_t inum)
-{
-	struct intr_req *ir, *prev;
-	struct machcpu *mcpu;
-	uint32_t clr;
-	extern uint_t getpstate(void);
+	intr_vec_t	*iv, *next, *prev;
+	struct machcpu	*mcpu;
+	uint32_t	clr;
+	processorid_t	cpu_id;
+	extern uint_t	getpstate(void);
 
 	ASSERT((getpstate() & PSTATE_IE) == 0);
 
 	mcpu = &CPU->cpu_m;
+	cpu_id = CPU->cpu_id;
+
+	iv = (intr_vec_t *)inum;
+	prev = NULL;
+	next = mcpu->intr_head[pil];
 
 	/* Find a matching entry in the list */
-	prev = NULL;
-	ir = mcpu->intr_head[pil];
-	while (ir != NULL) {
-		if (ir->intr_number == inum)
+	while (next != NULL) {
+		if (next == iv)
 			break;
-		prev = ir;
-		ir = ir->intr_next;
+		prev = next;
+		next = IV_GET_PIL_NEXT(next, cpu_id);
 	}
-	if (ir != NULL) {
-		/*
-		 * Remove entry from list
-		 */
+
+	if (next != NULL) {
+		intr_vec_t	*next_iv = IV_GET_PIL_NEXT(next, cpu_id);
+
+		/* Remove entry from list */
 		if (prev != NULL)
-			prev->intr_next = ir->intr_next;	/* non-head */
+			IV_SET_PIL_NEXT(prev, cpu_id, next_iv); /* non-head */
 		else
-			mcpu->intr_head[pil] = ir->intr_next;	/* head */
+			mcpu->intr_head[pil] = next_iv; /* head */
 
-		if (ir->intr_next == NULL)
-			mcpu->intr_tail[pil] = prev;		/* tail */
-
-		/*
-		 * Place on free list
-		 */
-		ir->intr_next = mcpu->intr_head[0];
-		mcpu->intr_head[0] = ir;
+		if (next_iv == NULL)
+			mcpu->intr_tail[pil] = prev; /* tail */
 	}
 
-	/*
-	 * clear pending interrupts at this level if the list is empty
-	 */
+	/* Clear pending interrupts at this level if the list is empty */
 	if (mcpu->intr_head[pil] == NULL) {
 		clr = 1 << pil;
 		if (pil == PIL_14)

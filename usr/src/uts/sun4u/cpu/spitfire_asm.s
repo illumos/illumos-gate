@@ -1896,7 +1896,7 @@ ecache_scrubreq_tl1(uint64_t inum, uint64_t dummy)
  * ecache_scrubreq_tl1 is the crosstrap handler called at ecache_calls_a_sec Hz
  * from the clock CPU.  It atomically increments the outstanding request
  * counter and, if there was not already an outstanding request,
- * branches to setsoftint_tl1 to enqueue an intr_req for the given inum.
+ * branches to setsoftint_tl1 to enqueue an intr_vec for the given inum.
  */
 
 	! Register usage:
@@ -1919,9 +1919,9 @@ ecache_scrubreq_tl1(uint64_t inum, uint64_t dummy)
 	! increment - we're at tl1
 	!
 	add	%g2, 0x1, %g3
-	brnz,pn	%g2, 1f			! no need to enqueue more intr_req
+	brnz,pn	%g2, 1f			! no need to enqueue more intr_vec
 	  st	%g3, [%g4]		! delay - store incremented counter
-	jmp	%g6			! setsoftint_tl1(%g1) - queue intr_req
+	jmp	%g6			! setsoftint_tl1(%g1) - queue intr_vec
 	  nop
 	! not reached
 1:

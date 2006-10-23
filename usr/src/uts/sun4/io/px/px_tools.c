@@ -184,7 +184,7 @@ pxtool_get_intr(dev_info_t *dip, void *arg, int mode)
 	if (intr_valid_state == INTR_VALID) {
 
 		/*
-		 * The following looks up the px_ib_ino_info and returns
+		 * The following looks up the px_ino and returns
 		 * info of devices mapped to this ino.
 		 */
 		iget->num_devs = pxtool_ib_get_ino_devs(

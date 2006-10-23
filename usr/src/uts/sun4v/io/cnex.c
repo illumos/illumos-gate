@@ -604,8 +604,8 @@ cnex_add_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype,
 	}
 
 	/* add interrupt to solaris ivec table */
-	VERIFY(add_ivintr(iinfo->icookie, pil, cnex_intr_wrapper,
-		(caddr_t)iinfo, NULL) == 0);
+	VERIFY(add_ivintr(iinfo->icookie, pil, (intrfunc)cnex_intr_wrapper,
+	    (caddr_t)iinfo, NULL, NULL) == 0);
 
 	/* set the cookie in the HV */
 	rv = hvldc_intr_setcookie(cnex_ssp->cfghdl, iinfo->ino, iinfo->icookie);
@@ -638,7 +638,7 @@ cnex_add_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype,
 	return (0);
 
 hv_error:
-	(void) rem_ivintr(iinfo->icookie, NULL);
+	(void) rem_ivintr(iinfo->icookie, pil);
 	mutex_exit(&cldcp->lock);
 	return (ENXIO);
 }
@@ -704,7 +704,7 @@ cnex_unreg_chan(dev_info_t *dip, uint64_t id)
 static int
 cnex_rem_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
 {
-	int			rv;
+	int			rv, idx, pil;
 	cnex_ldc_t		*cldcp;
 	cnex_intr_t		*iinfo;
 	cnex_soft_state_t	*cnex_ssp;
@@ -781,8 +781,16 @@ cnex_rem_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
 		return (EAGAIN);
 	}
 
+	/* Pick a PIL on the basis of the channel's devclass */
+	for (idx = 0, pil = PIL_3; idx < CNEX_MAX_DEVS; idx++) {
+		if (cldcp->devclass == cnex_class_to_pil[idx].devclass) {
+			pil = cnex_class_to_pil[idx].pil;
+			break;
+		}
+	}
+
 	/* remove interrupt */
-	rem_ivintr(iinfo->icookie, NULL);
+	(void) rem_ivintr(iinfo->icookie, pil);
 
 	/* clear interrupt info */
 	bzero(iinfo, sizeof (*iinfo));

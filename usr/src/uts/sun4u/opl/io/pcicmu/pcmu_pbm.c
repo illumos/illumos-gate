@@ -118,8 +118,8 @@ pcmu_pbm_register_intr(pcmu_pbm_t *pcbm_p)
 	mondo = PCMU_IB_INO_TO_MONDO(pcmu_p->pcmu_ib_p,
 	    pcmu_p->pcmu_inos[CBNINTR_PBM]);
 
-	VERIFY(add_ivintr(mondo, pcmu_pil[CBNINTR_PBM], pcmu_pbm_error_intr,
-			(caddr_t)pcmu_p, NULL) == 0);
+	VERIFY(add_ivintr(mondo, pcmu_pil[CBNINTR_PBM],
+	    (intrfunc)pcmu_pbm_error_intr, (caddr_t)pcmu_p, NULL, NULL) == 0);
 
 	pcbm_p->pcbm_iblock_cookie = (void *)(uintptr_t)pcmu_pil[CBNINTR_PBM];
 
@@ -157,7 +157,8 @@ pcmu_pbm_destroy(pcmu_t *pcmu_p)
 	intr_dist_rem(pcmu_pbm_intr_dist, pcbm_p);
 	pcmu_ib_intr_disable(pib_p,
 	    pcmu_p->pcmu_inos[CBNINTR_PBM], PCMU_IB_INTR_WAIT);
-	rem_ivintr(mondo, NULL);
+
+	VERIFY(rem_ivintr(mondo, pcmu_pil[CBNINTR_PBM]) == 0);
 
 	/*
 	 * Remove the error disable function.

@@ -33,24 +33,13 @@ extern "C" {
 #endif
 
 /*
- * Each cpu allocates an interrupt request pool with the size of
- * INTR_PENDING_MAX entries.
- * XXX this number needs to be tuned
- */
-#define	INTR_PENDING_MAX	64
-#define	INTR_POOL_SIZE		(sizeof (struct intr_req) * INTR_PENDING_MAX)
-
-/*
- * Each cpu allocates two arrays, intr_head[] and intr_tail[], with the size of
- * PIL_LEVELS each.
- *
- * The entry 0 of the arrays are the head and the tail of the interrupt
- * request free list.
+ * Each cpu allocates two arrays, intr_head[] and intr_tail[], with the
+ * size of PIL_LEVELS each. The entry 0 of these arrays are reserved.
  *
  * The entries 1-15 of the arrays are the head and the tail of interrupt
  * level 1-15 request queues.
  */
-#define	PIL_LEVELS	16	/* 0    : for the interrupt request free list */
+#define	PIL_LEVELS	16	/* 0	: reserved */
 				/* 1-15 : for the pil level 1-15 */
 
 #define	PIL_1	1
@@ -70,36 +59,8 @@ extern "C" {
 #define	PIL_15	15
 
 #ifndef _ASM
-extern uint_t poke_cpu_inum;
-extern size_t intr_add_max;
-extern uint_t intr_add_div;
-extern size_t intr_add_pools;
-extern struct intr_req *intr_add_head;
-extern struct intr_req *intr_add_tail;
+extern uint64_t poke_cpu_inum;
 extern void intr_init(struct cpu *);
-extern void init_intr_pool(struct cpu *);
-extern void cleanup_intr_pool(struct cpu *);
-
-/*
- * interrupt request entry
- *
- *    - each cpu has an interrupt request free list formed thru
- *      init_intr_pool(); intr_head[0] and intr_tail[0] are the head
- *      and tail of the free list
- *
- *    - always get a free intr_req from the intr_head[0] and
- *      return a served intr_req to intr_tail[0]
- *
- *    - when vec_interrupt() is called, an interrupt request queue is built
- *      according to the pil level, intr_head[pil] points to the first
- *      interrupt request entry and intr_tail[pil] points to the last one
- *
- */
-struct intr_req {
-	uint_t 		intr_number;
-	struct intr_req *intr_next;
-};
-
 #endif	/* !_ASM */
 
 #ifdef	__cplusplus

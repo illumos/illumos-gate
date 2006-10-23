@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -47,8 +46,8 @@ uint_t x_dstat[NCPU][XC_LOOP_EXIT+1];
 uint_t x_rstat[NCPU][4];
 #endif /* TRAPTRACE */
 
-static int xc_serv_inum;	/* software interrupt number for xc_serv() */
-static int xc_loop_inum;	/* software interrupt number for xc_loop() */
+static uint64_t xc_serv_inum;	/* software interrupt number for xc_serv() */
+static uint64_t xc_loop_inum;	/* software interrupt number for xc_loop() */
 kmutex_t xc_sys_mutex;		/* protect xcall session and xc_mbox */
 int xc_spl_enter[NCPU];		/* protect sending x-call */
 static int xc_holder = -1; /* the cpu who initiates xc_attention, 0 is valid */
@@ -135,8 +134,10 @@ xc_init(void)
 	}
 #endif /* TRAPTRACE */
 
-	xc_serv_inum = add_softintr(XCALL_PIL, (softintrfunc)xc_serv, 0);
-	xc_loop_inum = add_softintr(XCALL_PIL, (softintrfunc)xc_loop, 0);
+	xc_serv_inum = add_softintr(XCALL_PIL, (softintrfunc)xc_serv, 0,
+	    SOFTINT_MT);
+	xc_loop_inum = add_softintr(XCALL_PIL, (softintrfunc)xc_loop, 0,
+	    SOFTINT_MT);
 
 	/*
 	 * Initialize the calibrated tick limit for send_mondo.

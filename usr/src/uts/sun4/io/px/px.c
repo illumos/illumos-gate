@@ -35,7 +35,6 @@
 #include <sys/kmem.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
-#include <sys/hotplug/pci/pcihp.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_subrdefs.h>
 #include <sys/spl.h>
@@ -590,7 +589,7 @@ px_pwr_setup(dev_info_t *dip)
 	px_lib_msg_setvalid(dip, PCIE_PME_ACK_MSG, PCIE_MSG_VALID);
 
 	if (px_ib_update_intr_state(px_p, px_p->px_dip, hdl.ih_inum,
-	    px_msiqid_to_devino(px_p, px_p->px_pm_msiq_id),
+	    px_msiqid_to_devino(px_p, px_p->px_pm_msiq_id), px_pwr_pil,
 	    PX_INTR_STATE_ENABLE, MSG_REC, PCIE_PME_ACK_MSG) != DDI_SUCCESS) {
 		DBG(DBG_PWR, dip, "px_pwr_setup: PME_TO_ACK update interrupt"
 		    " state failed\n");
@@ -634,7 +633,7 @@ px_pwr_teardown(dev_info_t *dip)
 	    px_p->px_pm_msiq_id);
 
 	(void) px_ib_update_intr_state(px_p, px_p->px_dip, hdl.ih_inum,
-	    px_msiqid_to_devino(px_p, px_p->px_pm_msiq_id),
+	    px_msiqid_to_devino(px_p, px_p->px_pm_msiq_id), px_pwr_pil,
 	    PX_INTR_STATE_DISABLE, MSG_REC, PCIE_PME_ACK_MSG);
 
 	px_p->px_pm_msiq_id = (msiqid_t)-1;

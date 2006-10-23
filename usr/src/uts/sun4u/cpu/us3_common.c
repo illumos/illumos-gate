@@ -5561,7 +5561,7 @@ struct scrub_info {
 	int		*csi_enable;	/* scrubber enable flag */
 	int		csi_freq;	/* scrubber calls per second */
 	int		csi_index;	/* index to chsm_outstanding[] */
-	uint_t		csi_inum;	/* scrubber interrupt number */
+	uint64_t	csi_inum;	/* scrubber interrupt number */
 	cyclic_id_t	csi_omni_cyc_id;	/* omni cyclic ID */
 	cyclic_id_t	csi_offline_cyc_id;	/* offline cyclic ID */
 	char		csi_name[3];	/* cache name for this scrub entry */
@@ -5658,17 +5658,17 @@ cpu_init_cache_scrub(void)
 	 */
 	cache_scrub_info[CACHE_SCRUBBER_INFO_E].csi_inum =
 	    add_softintr(ecache_scrub_pil, scrub_ecache_line_intr,
-	    (caddr_t)&cache_scrub_info[CACHE_SCRUBBER_INFO_E]);
+	    (caddr_t)&cache_scrub_info[CACHE_SCRUBBER_INFO_E], SOFTINT_MT);
 	cache_scrub_info[CACHE_SCRUBBER_INFO_E].csi_freq = ecache_calls_a_sec;
 
 	cache_scrub_info[CACHE_SCRUBBER_INFO_D].csi_inum =
 	    add_softintr(dcache_scrub_pil, scrub_dcache_line_intr,
-	    (caddr_t)&cache_scrub_info[CACHE_SCRUBBER_INFO_D]);
+	    (caddr_t)&cache_scrub_info[CACHE_SCRUBBER_INFO_D], SOFTINT_MT);
 	cache_scrub_info[CACHE_SCRUBBER_INFO_D].csi_freq = dcache_calls_a_sec;
 
 	cache_scrub_info[CACHE_SCRUBBER_INFO_I].csi_inum =
 	    add_softintr(icache_scrub_pil, scrub_icache_line_intr,
-	    (caddr_t)&cache_scrub_info[CACHE_SCRUBBER_INFO_I]);
+	    (caddr_t)&cache_scrub_info[CACHE_SCRUBBER_INFO_I], SOFTINT_MT);
 	cache_scrub_info[CACHE_SCRUBBER_INFO_I].csi_freq = icache_calls_a_sec;
 
 	/*

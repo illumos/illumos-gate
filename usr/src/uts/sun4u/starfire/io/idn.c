@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2224,7 +2223,7 @@ idn_sigbhandler_create()
 	    idn_sigbhandler_thread, &sbp, sizeof (sbp), &p0,
 	    TS_RUN, minclsyspri);
 	sbp->sb_inum = add_softintr((uint_t)idn_sigbpil,
-	    idn_sigbhandler_wakeup, 0);
+	    idn_sigbhandler_wakeup, 0, SOFTINT_ST);
 }
 
 static void
@@ -2235,7 +2234,7 @@ idn_sigbhandler_kill()
 
 		sbp = &idn.sigbintr;
 		if (sbp->sb_inum != 0)
-			rem_softintr(sbp->sb_inum);
+			(void) rem_softintr(sbp->sb_inum);
 		sbp->sb_inum = 0;
 		sbp->sb_busy = IDNSIGB_DIE;
 		cv_signal(&sbp->sb_cv);
@@ -4828,7 +4827,8 @@ idn_init_handler()
 	}
 
 	idn.intr.dmv_inum = STARFIRE_DMV_IDN_BASE;
-	idn.intr.soft_inum = add_softintr((uint_t)idn_pil, idn_handler, 0);
+	idn.intr.soft_inum = add_softintr((uint_t)idn_pil, idn_handler, 0,
+	    SOFTINT_ST);
 	idn_dmv_data->idn_soft_inum = idn.intr.soft_inum;
 	/*
 	 * Make sure everything is out there before
@@ -4853,7 +4853,7 @@ idn_deinit_handler()
 		return;
 
 	(void) dmv_rem_intr(idn.intr.dmv_inum);
-	rem_softintr(idn.intr.soft_inum);
+	(void) rem_softintr(idn.intr.soft_inum);
 	kmem_free(idn.intr.dmv_data, idn.intr.dmv_data_len);
 	idn.intr.dmv_data = NULL;
 }
@@ -4886,7 +4886,7 @@ idn_handler(caddr_t unused, caddr_t unused2)
 	 * want to clear this flag at the end because it leaves
 	 * a window where an interrupt could get lost (unless it's
 	 * pushed by a subsequent interrupt).  The objective in
-	 * doing this is to prevent exhausting a cpu's intr_req
+	 * doing this is to prevent exhausting a cpu's intr_vec
 	 * structures with interrupts of the same pil level.
 	 */
 	lock_clear(&idn_dmv_data->idn_dmv_cpu[cpuid].idn_dmv_active);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,38 +32,92 @@
 extern "C" {
 #endif
 
-typedef uint_t (*intrfunc)(caddr_t);
-typedef uint_t (*softintrfunc)(caddr_t, caddr_t);
+/* Software interrupt and other bit flags */
+#define	IV_SOFTINT_PEND	0x1	/* Software interrupt is pending */
+#define	IV_SOFTINT_MT	0x2	/* Multi target software interrupt */
+#define	IV_CACHE_ALLOC	0x4	/* Allocated using kmem_cache_alloc() */
 
 /*
- * Interrupt Vector Table Entry
+ * Reserve some interrupt vector data structures for the hardware and software
+ * interrupts.
  *
- *	The interrupt vector table is dynamically allocated during
- *	startup. An interrupt number is an index to the interrupt
- *	vector table representing unique interrupt source to the system.
+ * NOTE: Need two single target software interrupts per cpu for cyclics.
  */
-struct intr_vector {
-	intrfunc	iv_handler;	/* interrupt handler */
-	caddr_t		iv_arg;		/* interrupt argument */
-	ushort_t	iv_pil;		/* interrupt request level */
-	ushort_t	iv_pending;	/* pending softint flag */
-	caddr_t		iv_payload_buf;	/* pointer to 64-byte mondo payload */
-	caddr_t		iv_softint_arg2; /* softint argument #2 */
-	void		*iv_pad[3];	/* makes structure power-of-2 size */
+#define	MAX_RSVD_IV	((NCPU * 2) + 256) /* HW and Single target SW intrs */
+#define	MAX_RSVD_IVX	32		/* Multi target software intrs */
+
+#ifndef _ASM
+
+typedef	uint_t (*intrfunc)(caddr_t, caddr_t);
+typedef	uint_t (*softintrfunc)(caddr_t, caddr_t);
+typedef	struct intr_vec intr_vec_t;
+typedef	struct intr_vecx intr_vecx_t;
+
+/* Software interrupt type */
+typedef enum softint_type {
+	SOFTINT_ST 	= (ushort_t)0,	/* Single target */
+	SOFTINT_MT	= (ushort_t)1	/* Multi target */
+} softint_type_t;
+
+/*
+ * Interrupt Vector Structure.
+ *
+ * Interrupt vector structure is allocated either from the reserved pool or
+ * dynamically using kmem cache method. For the hardware interrupts, one per
+ * vector with unique pil basis, i.e, interrupts sharing the same ino and the
+ * same pil do share the same structure.
+ *
+ * Used by Hardware and Single target Software interrupts.
+ */
+struct intr_vec {
+	ushort_t	iv_inum;	/* MDB: interrupt mondo number */
+	ushort_t	iv_pil;		/* Interrupt priority level */
+	ushort_t	iv_flags;	/* SW interrupt and other bit flags */
+	uint8_t		iv_pad[10];	/* Align on cache line boundary */
+
+	intrfunc	iv_handler;	/* ISR */
+	caddr_t		iv_arg1;	/* ISR arg1 */
+	caddr_t		iv_arg2;	/* ISR arg2 */
+	caddr_t		iv_payload_buf;	/* Sun4v: mondo payload, epkt */
+
+	intr_vec_t	*iv_vec_next;	/* Per vector list */
+	intr_vec_t	*iv_pil_next;	/* Per PIL list */
 };
 
-extern struct intr_vector intr_vector[];
+/*
+ * Extended version of Interrupt Vector Structure.
+ *
+ * Used by Multi target Software interrupts.
+ */
+struct intr_vecx {
+	intr_vec_t	iv_vec;		/* CPU0 uses iv_pil_next */
+	intr_vec_t	*iv_pil_xnext[NCPU -1]; /* For CPU1 through N-1 */
+};
 
-extern uint_t nohandler(caddr_t);
-extern void init_ivintr(void);
-extern int add_ivintr(uint_t, uint_t, intrfunc, caddr_t, caddr_t);
-extern void rem_ivintr(uint_t, struct intr_vector *);
-#define	GET_IVINTR(inum)  (intr_vector[inum].iv_handler != nohandler)
+#define	IV_GET_PIL_NEXT(iv_p, cpu_id) \
+	(((iv_p->iv_flags & IV_SOFTINT_MT) && (cpu_id != 0)) ? \
+	((intr_vecx_t *)iv_p)->iv_pil_xnext[cpu_id - 1] : iv_p->iv_pil_next)
+#define	IV_SET_PIL_NEXT(iv_p, cpu_id, next) \
+	(((iv_p->iv_flags & IV_SOFTINT_MT) && (cpu_id != 0)) ? \
+	(((intr_vecx_t *)iv_p)->iv_pil_xnext[cpu_id - 1] = next) : \
+	(iv_p->iv_pil_next = next))
 
-extern uint_t add_softintr(uint_t, softintrfunc, caddr_t);
-extern void rem_softintr(uint_t);
-extern int update_softint_arg2(uint_t, caddr_t);
-extern int update_softint_pri(uint_t, int);
+extern  uint64_t intr_vec_table[];
+
+extern	void init_ivintr(void);
+extern	void fini_ivintr(void);
+
+extern	int add_ivintr(uint_t inum, uint_t pil, intrfunc intr_handler,
+	caddr_t intr_arg1, caddr_t intr_arg2, caddr_t intr_payload);
+extern	int rem_ivintr(uint_t inum, uint_t pil);
+
+extern	uint64_t add_softintr(uint_t pil, softintrfunc intr_handler,
+	caddr_t intr_arg1, softint_type_t type);
+extern	int rem_softintr(uint64_t softint_id);
+extern	int update_softint_arg2(uint64_t softint_id, caddr_t intr_arg2);
+extern	int update_softint_pri(uint64_t softint_id, uint_t pil);
+
+#endif	/* !_ASM */
 
 #ifdef	__cplusplus
 }

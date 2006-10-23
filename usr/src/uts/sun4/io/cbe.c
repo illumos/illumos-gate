@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +40,7 @@
 #include <sys/cyclic.h>
 #include <sys/cyclic_impl.h>
 
-uint32_t cbe_level14_inum;
+uint64_t cbe_level14_inum;
 cyclic_id_t cbe_hres_cyclic;
 
 static hrtime_t cbe_hrtime_max;
@@ -196,11 +195,11 @@ cbe_configure(cpu_t *cpu)
 	 * may have disjoint soft interrupts on different CPUs posted
 	 * simultaneously, we allocate a new set of inums for each CPU.
 	 */
-	new_data->cbe_level10_inum =
-	    add_softintr(PIL_10, (softintrfunc)cbe_level10, 0);
+	new_data->cbe_level10_inum = add_softintr(PIL_10,
+	    (softintrfunc)cbe_level10, 0, SOFTINT_ST);
 
-	new_data->cbe_level1_inum =
-	    add_softintr(PIL_1, (softintrfunc)cbe_level1, 0);
+	new_data->cbe_level1_inum = add_softintr(PIL_1,
+	    (softintrfunc)cbe_level1, 0, SOFTINT_ST);
 
 	return (new_data);
 }
@@ -210,8 +209,8 @@ cbe_unconfigure(cyb_arg_t arg)
 {
 	cbe_data_t *data = (cbe_data_t *)arg;
 
-	rem_softintr(data->cbe_level10_inum);
-	rem_softintr(data->cbe_level1_inum);
+	(void) rem_softintr(data->cbe_level10_inum);
+	(void) rem_softintr(data->cbe_level1_inum);
 
 	kmem_free(data, sizeof (cbe_data_t));
 }
@@ -279,8 +278,8 @@ cbe_init(void)
 		cbe_resume		/* cyb_resume */
 	};
 
-	cbe_level14_inum =
-	    add_softintr(CBE_HIGH_PIL, (softintrfunc)cbe_level14, 0);
+	cbe_level14_inum = add_softintr(CBE_HIGH_PIL,
+	    (softintrfunc)cbe_level14, 0, SOFTINT_MT);
 	cbe_hrtime_max = gethrtime_max();
 
 	/*

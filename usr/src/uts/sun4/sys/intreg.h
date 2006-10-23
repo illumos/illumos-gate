@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,17 +36,9 @@ extern "C" {
 
 #define	INO_SIZE	6		/* Interrupt Number Offset bit size */
 #define	INR_SIZE	(IGN_SIZE + INO_SIZE)	/* Interrupt Number bit size */
-#define	MAX_IGN		(1 << IGN_SIZE) /* max Interrupt Group Number size */
-#define	MAX_INO		(1 << INO_SIZE) /* max Interrupt Number per group */
-
-/*
- * MAX_SOFT_INO: Need two softints per cpu for cyclics plus some for
- * miscellaneous system use.
- */
-#define	MAX_SOFT_INO	((NCPU * 2) + 192)
-
-#define	SOFTIVNUM	(MAX_IGN * MAX_INO)
-#define	MAXIVNUM	(MAX_IGN * MAX_INO + MAX_SOFT_INO)
+#define	MAX_IGN		(1 << IGN_SIZE) /* Max Interrupt Group Number size */
+#define	MAX_INO		(1 << INO_SIZE) /* Max Interrupt Number per group */
+#define	MAXIVNUM	(MAX_IGN * MAX_INO) /* Max hardware intrs allowed */
 
 /*
  * Interrupt State Machine

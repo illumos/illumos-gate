@@ -3426,7 +3426,7 @@ volatile int ec_timeout_calls = 1;	/* timeout calls */
 /*
  * Interrupt number and pil for ecache scrubber cross-trap calls.
  */
-static uint_t ecache_scrub_inum;
+static uint64_t ecache_scrub_inum;
 uint_t ecache_scrub_pil = PIL_9;
 
 /*
@@ -3709,7 +3709,7 @@ cpu_init_cache_scrub(void)
 	 * Register softint for ecache scrubbing.
 	 */
 	ecache_scrub_inum = add_softintr(ecache_scrub_pil,
-	    scrub_ecache_line_intr, NULL);
+	    scrub_ecache_line_intr, NULL, SOFTINT_MT);
 
 	/*
 	 * kick off the scrubbing using realtime timeout

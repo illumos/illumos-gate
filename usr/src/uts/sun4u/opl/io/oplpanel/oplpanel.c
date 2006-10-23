@@ -64,7 +64,7 @@ static int	panel_close(dev_t, int, int, cred_t *);
 static char	*panel_name = "oplpanel";
 int		panel_enable = 1;	/* enable or disable */
 
-extern uint32_t		cpc_level15_inum;	/* in cpc_subr.c */
+extern uint64_t	cpc_level15_inum;	/* in cpc_subr.c */
 
 struct panel_state {
 	dev_info_t		*dip;

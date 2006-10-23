@@ -39,6 +39,7 @@
 
 #include <sys/traptrace.h>
 #include <sys/machparam.h>
+#include <sys/intreg.h>
 #include <sys/ivintr.h>
 #include <sys/mutex_impl.h>
 
@@ -347,7 +348,6 @@ static const char *const ttdescr[] = {
 static const size_t ttndescr = sizeof (ttdescr) / sizeof (ttdescr[0]);
 
 static GElf_Sym iv_sym;
-static GElf_Sym iv_nohandler_sym;
 
 /*
  * Persistent data (shouldn't change).
@@ -1336,80 +1336,162 @@ xc_mbox(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-typedef struct softint_walk_data {
-	struct intr_vector *sw_table;
-	uintptr_t sw_base;
-	size_t sw_ndx;
-	size_t sw_size;
-} softint_walk_data_t;
+typedef struct vecint_walk_data {
+	intr_vec_t **vec_table;
+	uintptr_t vec_base;
+	size_t vec_idx;
+	size_t vec_size;
+} vecint_walk_data_t;
+
+int
+vecint_walk_init(mdb_walk_state_t *wsp)
+{
+	vecint_walk_data_t	*vecint;
+
+	if (wsp->walk_addr != NULL) {
+		mdb_warn("vecint walk only supports global walks\n");
+		return (WALK_ERR);
+	}
+
+	vecint = mdb_zalloc(sizeof (vecint_walk_data_t), UM_SLEEP);
+
+	vecint->vec_size = MAXIVNUM * sizeof (intr_vec_t *);
+	vecint->vec_base = (uintptr_t)iv_sym.st_value;
+	vecint->vec_table = mdb_zalloc(vecint->vec_size, UM_SLEEP);
+
+	if (mdb_vread(vecint->vec_table, vecint->vec_size,
+	    vecint->vec_base) == -1) {
+		mdb_warn("couldn't read intr_vec_table");
+		mdb_free(vecint->vec_table, vecint->vec_size);
+		mdb_free(vecint, sizeof (vecint_walk_data_t));
+		return (WALK_ERR);
+	}
+
+	wsp->walk_data = vecint;
+	return (WALK_NEXT);
+}
+
+int
+vecint_walk_step(mdb_walk_state_t *wsp)
+{
+	vecint_walk_data_t	*vecint = (vecint_walk_data_t *)wsp->walk_data;
+	size_t			max = vecint->vec_size / sizeof (intr_vec_t *);
+	intr_vec_t		iv;
+	int			status;
+
+	if (wsp->walk_addr == NULL) {
+		while ((vecint->vec_idx < max) && ((wsp->walk_addr =
+		    (uintptr_t)vecint->vec_table[vecint->vec_idx++]) == NULL))
+			continue;
+	}
+
+	if (wsp->walk_addr == NULL)
+		return (WALK_DONE);
+
+	status = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
+	    wsp->walk_cbdata);
+
+	if (mdb_vread(&iv, sizeof (intr_vec_t),
+	    (uintptr_t)wsp->walk_addr) == -1) {
+		mdb_warn("failed to read iv_p %p\n", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)iv.iv_vec_next;
+	return (status);
+}
+
+void
+vecint_walk_fini(mdb_walk_state_t *wsp)
+{
+	vecint_walk_data_t	*vecint = wsp->walk_data;
+
+	mdb_free(vecint->vec_table, vecint->vec_size);
+	mdb_free(vecint, sizeof (vecint_walk_data_t));
+}
+
+int
+vecint_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	intr_vec_t	iv;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (mdb_walk_dcmd("vecint", "vecint", argc, argv) == -1) {
+			mdb_warn("can't walk vecint");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
+
+	if (DCMD_HDRSPEC(flags)) {
+		mdb_printf("%4s %?s %4s %?s %?s %s\n", "INUM", "ADDR",
+		    "PIL", "ARG1", "ARG2", "HANDLER");
+	}
+
+	if (mdb_vread(&iv, sizeof (iv), addr) == -1) {
+		mdb_warn("couldn't read intr_vec_table at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("%4x %?p %4d %?p %?p %a\n", iv.iv_inum, addr,
+	    iv.iv_pil, iv.iv_arg1, iv.iv_arg2, iv.iv_handler);
+
+	return (DCMD_OK);
+}
 
 int
 softint_walk_init(mdb_walk_state_t *wsp)
 {
-	softint_walk_data_t *sw;
+	intr_vec_t	*list;
 
 	if (wsp->walk_addr != NULL) {
 		mdb_warn("softint walk only supports global walks\n");
 		return (WALK_ERR);
 	}
 
-	/*
-	 * If this fails, we'll just end up printing all the entries.
-	 */
-	if (mdb_lookup_by_name("nohandler", &iv_nohandler_sym) == -1)
-		mdb_warn("couldn't find iv nohandler");
-
-	sw = mdb_zalloc(sizeof (softint_walk_data_t), UM_SLEEP);
-
-	sw->sw_size = iv_sym.st_size;
-	sw->sw_base = (uintptr_t)iv_sym.st_value;
-	sw->sw_table = mdb_zalloc(sw->sw_size, UM_SLEEP);
-
-	if (mdb_vread(sw->sw_table, sw->sw_size, sw->sw_base) == -1) {
-		mdb_warn("couldn't read intr_vector table");
-		mdb_free(sw->sw_table, sw->sw_size);
-		mdb_free(sw, sizeof (softint_walk_data_t));
+	/* Read global softint linked list pointer */
+	if (mdb_readvar(&list, "softint_list") == -1) {
+		mdb_warn("failed to read the global softint_list pointer\n");
 		return (WALK_ERR);
 	}
 
-	wsp->walk_data = sw;
+	wsp->walk_addr = (uintptr_t)list;
 	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+void
+softint_walk_fini(mdb_walk_state_t *wsp)
+{
+	/* Nothing to do here */
 }
 
 int
 softint_walk_step(mdb_walk_state_t *wsp)
 {
-	softint_walk_data_t *sw = (softint_walk_data_t *)wsp->walk_data;
-	size_t max = sw->sw_size / sizeof (struct intr_vector);
+	intr_vec_t		iv;
+	int			status;
 
-	while (sw->sw_ndx < max) {
-		struct intr_vector *iv = &(sw->sw_table[sw->sw_ndx++]);
+	if (wsp->walk_addr == NULL)
+		return (WALK_DONE);
 
-		if (iv->iv_handler == (intrfunc)iv_nohandler_sym.st_value)
-			continue;
+	status = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
+	    wsp->walk_cbdata);
 
-		return (wsp->walk_callback((uintptr_t)iv -
-		    (uintptr_t)sw->sw_table + sw->sw_base, iv,
-		    wsp->walk_cbdata));
+	if (mdb_vread(&iv, sizeof (intr_vec_t),
+	    (uintptr_t)wsp->walk_addr) == -1) {
+		mdb_warn("failed to read iv_p %p\n", wsp->walk_addr);
+		return (WALK_ERR);
 	}
 
-	return (WALK_DONE);
-}
-
-void
-softint_walk_fini(mdb_walk_state_t *wsp)
-{
-	softint_walk_data_t *sw = wsp->walk_data;
-
-	mdb_free(sw->sw_table, sw->sw_size);
-	mdb_free(sw, sizeof (softint_walk_data_t));
+	wsp->walk_addr = (uintptr_t)iv.iv_vec_next;
+	return (status);
 }
 
 int
 softint_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	int inum;
-	struct intr_vector iv;
+	intr_vec_t	iv;
 
 	if (!(flags & DCMD_ADDRSPEC)) {
 		if (mdb_walk_dcmd("softint", "softint", argc, argv) == -1) {
@@ -1419,21 +1501,20 @@ softint_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
-	inum = (int)((addr - (uintptr_t)iv_sym.st_value) /
-	    sizeof (struct intr_vector));
-
 	if (DCMD_HDRSPEC(flags)) {
-		mdb_printf("%4s %?s %4s %4s %?s %s\n", "INUM", "ADDR", "PEND",
-		    "PIL", "ARG", "HANDLER");
+		mdb_printf("%?s %4s %4s %4s %?s %?s %s\n", "ADDR", "TYPE",
+		    "PEND", "PIL", "ARG1", "ARG2", "HANDLER");
 	}
 
 	if (mdb_vread(&iv, sizeof (iv), addr) == -1) {
-		mdb_warn("couldn't read intr_vector at %p", addr);
+		mdb_warn("couldn't read softint at %p", addr);
 		return (DCMD_ERR);
 	}
 
-	mdb_printf("%4d %0?p %4d %4d %?p %?p %a\n", inum, addr, iv.iv_pending,
-	    iv.iv_pil, iv.iv_arg, iv.iv_softint_arg2, iv.iv_handler);
+	mdb_printf("%?p %4s %4d %4d %?p %?p %a\n", addr,
+	    (iv.iv_flags & IV_SOFTINT_MT) ? "M" : "S",
+	    iv.iv_flags & IV_SOFTINT_PEND, iv.iv_pil,
+	    iv.iv_arg1, iv.iv_arg2, iv.iv_handler);
 
 	return (DCMD_OK);
 }
@@ -1513,7 +1594,10 @@ static const mdb_dcmd_t dcmds[] = {
 #endif
 	{ "xc_mbox", "?", "dump xcall mboxes", xc_mbox },
 	{ "xctrace", NULL, "dump xcall trace buffer", xctrace },
-	{ "softint", NULL, "dumps interrupt vector table", softint_dcmd },
+	{ "vecint", NULL, "display a registered hardware interrupt",
+	    vecint_dcmd },
+	{ "softint", NULL, "display a registered software interrupt",
+	    softint_dcmd },
 	{ "whatis", ":[-abv]", "given an address, return information", whatis },
 	{ "sfmmu_vtop", ":[[-v] -a as]", "print virtual to physical mapping",
 	    sfmmu_vtop },
@@ -1536,7 +1620,9 @@ static const mdb_walker_t walkers[] = {
 #endif
 	{ "xc_mbox", "walks the cross call mail boxes",
 		xc_mbox_walk_init, xc_mbox_walk_step, xc_mbox_walk_fini },
-	{ "softint", "walks the interrupt vector table",
+	{ "vecint", "walk the list of registered hardware interrupts",
+		vecint_walk_init, vecint_walk_step, vecint_walk_fini },
+	{ "softint", "walk the list of registered software interrupts",
 		softint_walk_init, softint_walk_step, softint_walk_fini },
 	{ "memseg", "walk the memseg structures",
 		memseg_walk_init, memseg_walk_step, memseg_walk_fini },
@@ -1548,8 +1634,8 @@ static const mdb_modinfo_t modinfo = { MDB_API_VERSION, dcmds, walkers };
 const mdb_modinfo_t *
 _mdb_init(void)
 {
-	if (mdb_lookup_by_name("intr_vector", &iv_sym) == -1) {
-		mdb_warn("couldn't find intr_vector");
+	if (mdb_lookup_by_name("intr_vec_table", &iv_sym) == -1) {
+		mdb_warn("couldn't find intr_vec_table");
 		return (NULL);
 	}
 

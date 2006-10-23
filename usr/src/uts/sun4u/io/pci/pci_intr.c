@@ -220,27 +220,28 @@ map_pcidev_cfg_reg(dev_info_t *dip, dev_info_t *rdip, ddi_acc_handle_t *hdl_p)
  * on this ino is blocked by not idling the interrupt state machine.
  */
 static int
-pci_spurintr(ib_ino_info_t *ino_p) {
-	int i;
-	ih_t *ih_p = ino_p->ino_ih_start;
-	pci_t *pci_p = ino_p->ino_ib_p->ib_pci_p;
-	char *err_fmt_str;
-	boolean_t blocked = B_FALSE;
+pci_spurintr(ib_ino_pil_t *ipil_p) {
+	ib_ino_info_t	*ino_p = ipil_p->ipil_ino_p;
+	ih_t		*ih_p = ipil_p->ipil_ih_start;
+	pci_t		*pci_p = ino_p->ino_ib_p->ib_pci_p;
+	char		*err_fmt_str;
+	boolean_t	blocked = B_FALSE;
+	int		i;
 
-	if (ino_p->ino_unclaimed > pci_unclaimed_intr_max)
+	if (ino_p->ino_unclaimed_intrs > pci_unclaimed_intr_max)
 		return (DDI_INTR_CLAIMED);
 
-	if (!ino_p->ino_unclaimed)
+	if (!ino_p->ino_unclaimed_intrs)
 		ino_p->ino_spurintr_begin = ddi_get_lbolt();
 
-	ino_p->ino_unclaimed++;
+	ino_p->ino_unclaimed_intrs++;
 
-	if (ino_p->ino_unclaimed <= pci_unclaimed_intr_max)
+	if (ino_p->ino_unclaimed_intrs <= pci_unclaimed_intr_max)
 		goto clear;
 
 	if (drv_hztousec(ddi_get_lbolt() - ino_p->ino_spurintr_begin)
 	    > pci_spurintr_duration) {
-		ino_p->ino_unclaimed = 0;
+		ino_p->ino_unclaimed_intrs = 0;
 		goto clear;
 	}
 	err_fmt_str = "%s%d: ino 0x%x blocked";
@@ -256,7 +257,7 @@ clear:
 	err_fmt_str = "!%s%d: spurious interrupt from ino 0x%x";
 warn:
 	cmn_err(CE_WARN, err_fmt_str, NAMEINST(pci_p->pci_dip), ino_p->ino_ino);
-	for (i = 0; i < ino_p->ino_ih_size; i++, ih_p = ih_p->ih_next)
+	for (i = 0; i < ipil_p->ipil_ih_size; i++, ih_p = ih_p->ih_next)
 		cmn_err(CE_CONT, "!%s-%d#%x ", NAMEINST(ih_p->ih_dip),
 		    ih_p->ih_inum);
 	cmn_err(CE_CONT, "!\n");
@@ -290,14 +291,15 @@ extern uint64_t intr_get_time(void);
 uint_t
 pci_intr_wrapper(caddr_t arg)
 {
-	ib_ino_info_t *ino_p = (ib_ino_info_t *)arg;
-	uint_t result = 0, r;
-	pci_t *pci_p = ino_p->ino_ib_p->ib_pci_p;
-	pbm_t *pbm_p = pci_p->pci_pbm_p;
-	ih_t *ih_p = ino_p->ino_ih_start;
-	int i;
+	ib_ino_pil_t	*ipil_p = (ib_ino_pil_t *)arg;
+	ib_ino_info_t	*ino_p = ipil_p->ipil_ino_p;
+	uint_t		result = 0, r = DDI_INTR_UNCLAIMED;
+	pci_t		*pci_p = ino_p->ino_ib_p->ib_pci_p;
+	pbm_t		*pbm_p = pci_p->pci_pbm_p;
+	ih_t		*ih_p = ipil_p->ipil_ih_start;
+	int		i;
 
-	for (i = 0; i < ino_p->ino_ih_size; i++, ih_p = ih_p->ih_next) {
+	for (i = 0; i < ipil_p->ipil_ih_size; i++, ih_p = ih_p->ih_next) {
 		dev_info_t *dip = ih_p->ih_dip;
 		uint_t (*handler)() = ih_p->ih_handler;
 		caddr_t arg1 = ih_p->ih_handler_arg1;
@@ -329,7 +331,7 @@ pci_intr_wrapper(caddr_t arg)
 		 * using atomic ops.
 		 */
 
-		if (ino_p->ino_pil <= LOCK_LEVEL)
+		if (ipil_p->ipil_pil <= LOCK_LEVEL)
 			atomic_add_64(&ih_p->ih_ticks, intr_get_time());
 
 		DTRACE_PROBE4(interrupt__complete, dev_info_t, dip,
@@ -343,11 +345,21 @@ pci_intr_wrapper(caddr_t arg)
 			break;
 	}
 
-	if (!result)
-		return (pci_spurintr(ino_p));
+	if (result)
+		ino_p->ino_claimed |= (1 << ipil_p->ipil_pil);
 
-	ino_p->ino_unclaimed = 0;
-	IB_INO_INTR_CLEAR(ino_p->ino_clr_reg);  /* clear the pending state */
+	/* Interrupt can only be cleared after all pil levels are handled */
+	if (ipil_p->ipil_pil != ino_p->ino_lopil)
+		return (DDI_INTR_CLAIMED);
+
+	if (!ino_p->ino_claimed)
+		return (pci_spurintr(ipil_p));
+
+	ino_p->ino_unclaimed_intrs = 0;
+	ino_p->ino_claimed = 0;
+
+	/* Clear the pending state */
+	IB_INO_INTR_CLEAR(ino_p->ino_clr_reg);
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -525,13 +537,15 @@ kmutex_t pciintr_ks_template_lock;
 int
 pci_ks_update(kstat_t *ksp, int rw)
 {
-	ih_t *ih_p = ksp->ks_private;
-	int maxlen = sizeof (pciintr_ks_template.pciintr_ks_name.value.c);
-	ib_t *ib_p = ih_p->ih_ino_p->ino_ib_p;
-	pci_t *pci_p = ib_p->ib_pci_p;
-	ib_ino_t ino;
+	ih_t		*ih_p = ksp->ks_private;
+	int	maxlen = sizeof (pciintr_ks_template.pciintr_ks_name.value.c);
+	ib_ino_pil_t	*ipil_p = ih_p->ih_ipil_p;
+	ib_ino_info_t	*ino_p = ipil_p->ipil_ino_p;
+	ib_t		*ib_p = ino_p->ino_ib_p;
+	pci_t		*pci_p = ib_p->ib_pci_p;
+	ib_ino_t	ino;
 
-	ino = ih_p->ih_ino_p->ino_ino;
+	ino = ino_p->ino_ino;
 
 	(void) snprintf(pciintr_ks_template.pciintr_ks_name.value.c, maxlen,
 	    "%s%d", ddi_driver_name(ih_p->ih_dip),
@@ -546,12 +560,12 @@ pci_ks_update(kstat_t *ksp, int rw)
 		(void) strcpy(pciintr_ks_template.pciintr_ks_type.value.c,
 		    "fixed");
 		pciintr_ks_template.pciintr_ks_cpu.value.ui64 =
-		    ih_p->ih_ino_p->ino_cpuid;
+		    ino_p->ino_cpuid;
 		pciintr_ks_template.pciintr_ks_pil.value.ui64 =
-		    ih_p->ih_ino_p->ino_pil;
+		    ipil_p->ipil_pil;
 		pciintr_ks_template.pciintr_ks_time.value.ui64 = ih_p->ih_nsec +
 		    (uint64_t)tick2ns((hrtime_t)ih_p->ih_ticks,
-			ih_p->ih_ino_p->ino_cpuid);
+		    ino_p->ino_cpuid);
 		pciintr_ks_template.pciintr_ks_ino.value.ui64 = ino;
 		pciintr_ks_template.pciintr_ks_cookie.value.ui64 =
 			IB_INO_TO_MONDO(ib_p, ino);
@@ -571,16 +585,17 @@ pci_ks_update(kstat_t *ksp, int rw)
 int
 pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 {
-	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
-	ib_t *ib_p = pci_p->pci_ib_p;
-	cb_t *cb_p = pci_p->pci_cb_p;
-	ih_t *ih_p;
-	ib_ino_t ino;
-	ib_ino_info_t *ino_p;		/* pulse interrupts have no ino */
-	ib_mondo_t mondo;
-	uint32_t cpu_id;
-	int ret;
-	int32_t weight;
+	pci_t		*pci_p = get_pci_soft_state(ddi_get_instance(dip));
+	ib_t		*ib_p = pci_p->pci_ib_p;
+	cb_t		*cb_p = pci_p->pci_cb_p;
+	ih_t		*ih_p;
+	ib_ino_t	ino;
+	ib_ino_info_t	*ino_p;	/* pulse interrupts have no ino */
+	ib_ino_pil_t	*ipil_p, *ipil_list;
+	ib_mondo_t	mondo;
+	uint32_t	cpu_id;
+	int		ret;
+	int32_t		weight;
 
 	ino = IB_MONDO_TO_INO(hdlp->ih_vector);
 
@@ -632,10 +647,14 @@ pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 	if (map_pcidev_cfg_reg(dip, rdip, &ih_p->ih_config_handle))
 		goto fail2;
 
-	if (ino_p = ib_locate_ino(ib_p, ino)) {		/* sharing ino */
-		uint32_t intr_index = hdlp->ih_inum;
-		if (ib_ino_locate_intr(ino_p, rdip, intr_index)) {
-			DEBUG1(DBG_A_INTX, dip, "dup intr #%d\n", intr_index);
+	ino_p = ib_locate_ino(ib_p, ino);
+	ipil_list = ino_p ? ino_p->ino_ipil_p:NULL;
+
+	/* Sharing ino */
+	if (ino_p && (ipil_p = ib_ino_locate_ipil(ino_p, hdlp->ih_pri))) {
+		if (ib_intr_locate_ih(ipil_p, rdip, hdlp->ih_inum)) {
+			DEBUG1(DBG_A_INTX, dip, "dup intr #%d\n",
+			    hdlp->ih_inum);
 			goto fail3;
 		}
 
@@ -644,14 +663,15 @@ pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 		weight = pci_class_to_intr_weight(rdip);
 		intr_dist_cpuid_add_device_weight(cpu_id, rdip, weight);
 
-		ib_ino_add_intr(pci_p, ino_p, ih_p);
+		ib_ino_add_intr(pci_p, ipil_p, ih_p);
 		goto ino_done;
 	}
 
-	ino_p = ib_new_ino(ib_p, ino, ih_p);
-
 	if (hdlp->ih_pri == 0)
 		hdlp->ih_pri = pci_class_to_pil(rdip);
+
+	ipil_p = ib_new_ino_pil(ib_p, ino, hdlp->ih_pri, ih_p);
+	ino_p = ipil_p->ipil_ino_p;
 
 	hdlp->ih_vector = CB_MONDO_TO_XMONDO(cb_p, mondo);
 
@@ -662,7 +682,7 @@ pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 	    hdlp->ih_pri, hdlp->ih_vector);
 
 	DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp,
-	    (ddi_intr_handler_t *)pci_intr_wrapper, (caddr_t)ino_p, NULL);
+	    (ddi_intr_handler_t *)pci_intr_wrapper, (caddr_t)ipil_p, NULL);
 
 	ret = i_ddi_add_ivintr(hdlp);
 
@@ -677,14 +697,18 @@ pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 		goto fail4;
 
 	/* Save the pil for this ino */
-	ino_p->ino_pil = hdlp->ih_pri;
+	ipil_p->ipil_pil = hdlp->ih_pri;
 
 	/* clear and enable interrupt */
 	IB_INO_INTR_CLEAR(ino_p->ino_clr_reg);
 
-	/* select cpu and compute weight, saving both for sharing and removal */
-	cpu_id = pci_intr_dist_cpuid(ib_p, ino_p);
-	ino_p->ino_cpuid = cpu_id;
+	/*
+	 * Select cpu and compute weight, saving both for sharing and removal.
+	 */
+	if (ipil_list == NULL)
+		ino_p->ino_cpuid = pci_intr_dist_cpuid(ib_p, ino_p);
+
+	cpu_id = ino_p->ino_cpuid;
 	ino_p->ino_established = 1;
 	weight = pci_class_to_intr_weight(rdip);
 	intr_dist_cpuid_add_device_weight(cpu_id, rdip, weight);
@@ -693,10 +717,12 @@ pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 	cpu_id = pc_translate_tgtid(cb_p->cb_ittrans_cookie, cpu_id,
 		IB_GET_MAPREG_INO(ino));
 #endif /* _STARFIRE */
-	*ino_p->ino_map_reg = ib_get_map_reg(mondo, cpu_id);
-	*ino_p->ino_map_reg;
+	if (!ipil_list) {
+		*ino_p->ino_map_reg = ib_get_map_reg(mondo, cpu_id);
+		*ino_p->ino_map_reg;
+	}
 ino_done:
-	ih_p->ih_ino_p = ino_p;
+	ih_p->ih_ipil_p = ipil_p;
 	ih_p->ih_ksp = kstat_create("pci_intrs",
 	    atomic_inc_32_nv(&pciintr_ks_instance), "config", "interrupts",
 	    KSTAT_TYPE_NAMED,
@@ -717,7 +743,7 @@ done:
 		hdlp->ih_vector, hdlp->ih_pri);
 	return (DDI_SUCCESS);
 fail4:
-	ib_delete_ino(ib_p, ino_p);
+	ib_delete_ino_pil(ib_p, ipil_p);
 fail3:
 	if (ih_p->ih_config_handle)
 		pci_config_teardown(&ih_p->ih_config_handle);
@@ -733,13 +759,14 @@ fail1:
 int
 pci_remove_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 {
-	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
-	ib_t *ib_p = pci_p->pci_ib_p;
-	cb_t *cb_p = pci_p->pci_cb_p;
-	ib_ino_t ino;
-	ib_mondo_t mondo;
-	ib_ino_info_t *ino_p;	/* non-pulse only */
-	ih_t *ih_p;		/* non-pulse only */
+	pci_t		*pci_p = get_pci_soft_state(ddi_get_instance(dip));
+	ib_t		*ib_p = pci_p->pci_ib_p;
+	cb_t		*cb_p = pci_p->pci_cb_p;
+	ib_ino_t	ino;
+	ib_mondo_t	mondo;
+	ib_ino_info_t	*ino_p;	/* non-pulse only */
+	ib_ino_pil_t	*ipil_p; /* non-pulse only */
+	ih_t		*ih_p;	/* non-pulse only */
 
 	ino = IB_MONDO_TO_INO(hdlp->ih_vector);
 
@@ -798,27 +825,26 @@ pci_remove_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 		return (r);
 	}
 
-	ih_p = ib_ino_locate_intr(ino_p, rdip, hdlp->ih_inum);
-	ib_ino_rem_intr(pci_p, ino_p, ih_p);
+	ipil_p = ib_ino_locate_ipil(ino_p, hdlp->ih_pri);
+	ih_p = ib_intr_locate_ih(ipil_p, rdip, hdlp->ih_inum);
+	ib_ino_rem_intr(pci_p, ipil_p, ih_p);
 	intr_dist_cpuid_rem_device_weight(ino_p->ino_cpuid, rdip);
-	if (ino_p->ino_ih_size == 0) {
+	if (ipil_p->ipil_ih_size == 0) {
 		IB_INO_INTR_PEND(ib_clear_intr_reg_addr(ib_p, ino));
 		hdlp->ih_vector = CB_MONDO_TO_XMONDO(cb_p, mondo);
-		if (hdlp->ih_pri == 0)
-			hdlp->ih_pri = pci_class_to_pil(rdip);
 
 		i_ddi_rem_ivintr(hdlp);
-		ib_delete_ino(ib_p, ino_p);
+		ib_delete_ino_pil(ib_p, ipil_p);
 	}
 
 	/* re-enable interrupt only if mapping register still shared */
-	if (ib_ino_map_reg_unshare(ib_p, ino, ino_p)) {
+	if (ib_ino_map_reg_unshare(ib_p, ino, ino_p) || ino_p->ino_ipil_size) {
 		IB_INO_INTR_ON(ino_p->ino_map_reg);
 		*ino_p->ino_map_reg;
 	}
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
 
-	if (ino_p->ino_ih_size == 0)
+	if (ino_p->ino_ipil_size == 0)
 		kmem_free(ino_p, sizeof (ib_ino_info_t));
 
 	DEBUG1(DBG_R_INTX, dip, "success! mondo=%x\n", mondo);

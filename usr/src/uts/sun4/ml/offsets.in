@@ -369,7 +369,6 @@ cpu	CPUSIZE
 	cpu_m.pil_high_start		CPU_PIL_HIGH_START
 	cpu_m.intr_tail			INTR_TAIL
 	cpu_m.intr_head			INTR_HEAD
-	cpu_m.intr_pool			INTR_POOL
 	cpu_m.tl1_hdlr			CPU_TL1_HDLR
 	cpu_m.intrcnt			CPU_INTRCNT
 	cpu_m.tmp1			CPU_TMP1
@@ -403,21 +402,21 @@ lgrp_ld		LGRP_LD_SIZE
 	lpl_ncpu
 	lpl_lgrpid
 
-intr_vector INTR_VECTOR_SIZE INTR_VECTOR_SHIFT
-	iv_handler
-	iv_arg
+intr_vec IV_SIZE
+	iv_inum
 	iv_pil
-	iv_pending
+	iv_flags
+	iv_pad
+	iv_handler
+	iv_arg1
+	iv_arg2
 	iv_payload_buf
-	iv_softint_arg2
+	iv_vec_next
+	iv_pil_next
 
 dmv_disp DMV_DISP_SIZE DMV_DISP_SHIFT
 	dmv_func
 	dmv_arg
-
-intr_req	INTR_SIZE
-	intr_number
-	intr_next
 
 spin_mutex SM_SIZE
 	m_spinlock

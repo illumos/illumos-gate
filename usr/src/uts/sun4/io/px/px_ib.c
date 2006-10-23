@@ -73,7 +73,7 @@ px_ib_attach(px_t *px_p)
 	ib_p = kmem_zalloc(sizeof (px_ib_t), KM_SLEEP);
 	px_p->px_ib_p = ib_p;
 	ib_p->ib_px_p = px_p;
-	ib_p->ib_ino_lst = (px_ib_ino_info_t *)NULL;
+	ib_p->ib_ino_lst = (px_ino_t *)NULL;
 
 	mutex_init(&ib_p->ib_intr_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&ib_p->ib_ino_lst_mutex, NULL, MUTEX_DRIVER, NULL);
@@ -293,7 +293,8 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 	px_ib_t		*ib_p = (px_ib_t *)arg;
 	px_t		*px_p = ib_p->ib_px_p;
 	dev_info_t	*dip = px_p->px_dip;
-	px_ib_ino_info_t *ino_p;
+	px_ino_t	*ino_p;
+	px_ino_pil_t	*ipil_p;
 	px_ih_t		*ih_lst;
 	int32_t		dweight = 0;
 	int		i;
@@ -311,7 +312,7 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 	/* Redistribute device interrupts */
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
-	for (ino_p = ib_p->ib_ino_lst; ino_p; ino_p = ino_p->ino_next) {
+	for (ino_p = ib_p->ib_ino_lst; ino_p; ino_p = ino_p->ino_next_p) {
 		uint32_t orig_cpuid;
 
 		/*
@@ -321,12 +322,18 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 		 */
 		if (weight == weight_max) {
 			ino_p->ino_intr_weight = 0;
-			for (i = 0, ih_lst = ino_p->ino_ih_head;
-			    i < ino_p->ino_ih_size;
-			    i++, ih_lst = ih_lst->ih_next) {
-				dweight = i_ddi_get_intr_weight(ih_lst->ih_dip);
-				if (dweight > 0)
-					ino_p->ino_intr_weight += dweight;
+
+			for (ipil_p = ino_p->ino_ipil_p; ipil_p;
+			    ipil_p = ipil_p->ipil_next_p) {
+				for (i = 0, ih_lst = ipil_p->ipil_ih_head;
+				    i < ipil_p->ipil_ih_size; i++,
+				    ih_lst = ih_lst->ih_next) {
+					dweight = i_ddi_get_intr_weight(
+					    ih_lst->ih_dip);
+					if (dweight > 0)
+						ino_p->ino_intr_weight +=
+						    dweight;
+				}
 			}
 		}
 
@@ -349,32 +356,38 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 			ino_p->ino_cpuid = intr_dist_cpuid();
 
 			/* Add device weight to targeted cpu. */
-			for (i = 0, ih_lst = ino_p->ino_ih_head;
-			    i < ino_p->ino_ih_size;
-			    i++, ih_lst = ih_lst->ih_next) {
+			for (ipil_p = ino_p->ino_ipil_p; ipil_p;
+			    ipil_p = ipil_p->ipil_next_p) {
+				for (i = 0, ih_lst = ipil_p->ipil_ih_head;
+				    i < ipil_p->ipil_ih_size; i++,
+				    ih_lst = ih_lst->ih_next) {
 
-				dweight = i_ddi_get_intr_weight(ih_lst->ih_dip);
-				intr_dist_cpuid_add_device_weight(
-				    ino_p->ino_cpuid, ih_lst->ih_dip, dweight);
+					dweight = i_ddi_get_intr_weight(
+					    ih_lst->ih_dip);
+					intr_dist_cpuid_add_device_weight(
+					    ino_p->ino_cpuid, ih_lst->ih_dip,
+					    dweight);
 
-				/*
-				 * Different cpus may have different clock
-				 * speeds. to account for this, whenever an
-				 * interrupt is moved to a new CPU, we
-				 * convert the accumulated ticks into nsec,
-				 * based upon the clock rate of the prior
-				 * CPU.
-				 *
-				 * It is possible that the prior CPU no longer
-				 * exists. In this case, fall back to using
-				 * this CPU's clock rate.
-				 *
-				 * Note that the value in ih_ticks has already
-				 * been corrected for any power savings mode
-				 * which might have been in effect.
-				 */
-				px_ib_cpu_ticks_to_ih_nsec(ib_p, ih_lst,
-				    orig_cpuid);
+					/*
+					 * Different cpus may have different
+					 * clock speeds. to account for this,
+					 * whenever an interrupt is moved to a
+					 * new CPU, we convert the accumulated
+					 * ticks into nsec, based upon the clock
+					 * rate of the prior CPU.
+					 *
+					 * It is possible that the prior CPU no
+					 * longer exists. In this case, fall
+					 * back to using this CPU's clock rate.
+					 *
+					 * Note that the value in ih_ticks has
+					 * already been corrected for any power
+					 * savings mode which might have been
+					 * in effect.
+					 */
+					px_ib_cpu_ticks_to_ih_nsec(ib_p, ih_lst,
+					    orig_cpuid);
+				}
 			}
 
 			/* enable interrupt on new targeted cpu */
@@ -407,68 +420,105 @@ px_ib_intr_reset(void *arg)
 }
 
 /*
- * Locate ino_info structure on ib_p->ib_ino_lst according to ino#
+ * Locate px_ino_t structure on ib_p->ib_ino_lst according to ino#
  * returns NULL if not found.
  */
-px_ib_ino_info_t *
+px_ino_t *
 px_ib_locate_ino(px_ib_t *ib_p, devino_t ino_num)
 {
-	px_ib_ino_info_t	*ino_p = ib_p->ib_ino_lst;
+	px_ino_t	*ino_p = ib_p->ib_ino_lst;
 
 	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
 
-	for (; ino_p && ino_p->ino_ino != ino_num; ino_p = ino_p->ino_next);
+	for (; ino_p && ino_p->ino_ino != ino_num; ino_p = ino_p->ino_next_p);
 
 	return (ino_p);
 }
 
-px_ib_ino_info_t *
-px_ib_new_ino(px_ib_t *ib_p, devino_t ino_num, px_ih_t *ih_p)
+px_ino_pil_t *
+px_ib_new_ino_pil(px_ib_t *ib_p, devino_t ino_num, uint_t pil, px_ih_t *ih_p)
 {
-	px_ib_ino_info_t	*ino_p = kmem_alloc(sizeof (px_ib_ino_info_t),
-	    KM_SLEEP);
-	sysino_t	sysino;
+	px_ino_pil_t	*ipil_p = kmem_zalloc(sizeof (px_ino_pil_t), KM_SLEEP);
+	px_ino_t	*ino_p;
 
-	ino_p->ino_ino = ino_num;
-	ino_p->ino_ib_p = ib_p;
-	ino_p->ino_unclaimed = 0;
+	if ((ino_p = px_ib_locate_ino(ib_p, ino_num)) == NULL) {
+		sysino_t	sysino;
 
-	if (px_lib_intr_devino_to_sysino(ib_p->ib_px_p->px_dip, ino_p->ino_ino,
-	    &sysino) != DDI_SUCCESS)
-		return (NULL);
+		if (px_lib_intr_devino_to_sysino(ib_p->ib_px_p->px_dip,
+		    ino_num, &sysino) != DDI_SUCCESS)
+			return (NULL);
 
-	ino_p->ino_sysino = sysino;
+		ino_p = kmem_zalloc(sizeof (px_ino_t), KM_SLEEP);
 
-	/*
-	 * Cannot disable interrupt since we might share slot
-	 */
+		ino_p->ino_next_p = ib_p->ib_ino_lst;
+		ib_p->ib_ino_lst = ino_p;
+
+		ino_p->ino_ino = ino_num;
+		ino_p->ino_sysino = sysino;
+		ino_p->ino_ib_p = ib_p;
+		ino_p->ino_unclaimed_intrs = 0;
+		ino_p->ino_lopil = pil;
+	}
+
 	ih_p->ih_next = ih_p;
-	ino_p->ino_ih_head = ih_p;
-	ino_p->ino_ih_tail = ih_p;
-	ino_p->ino_ih_start = ih_p;
-	ino_p->ino_ih_size = 1;
+	ipil_p->ipil_pil = pil;
+	ipil_p->ipil_ih_head = ih_p;
+	ipil_p->ipil_ih_tail = ih_p;
+	ipil_p->ipil_ih_start = ih_p;
+	ipil_p->ipil_ih_size = 1;
+	ipil_p->ipil_ino_p = ino_p;
 
-	ino_p->ino_next = ib_p->ib_ino_lst;
-	ib_p->ib_ino_lst = ino_p;
+	ipil_p->ipil_next_p = ino_p->ino_ipil_p;
+	ino_p->ino_ipil_p = ipil_p;
+	ino_p->ino_ipil_size++;
 
-	return (ino_p);
+	if (ino_p->ino_lopil > pil)
+		ino_p->ino_lopil = pil;
+
+	return (ipil_p);
 }
 
-/*
- * The ino_p is retrieved by previous call to px_ib_locate_ino().
- */
 void
-px_ib_delete_ino(px_ib_t *ib_p, px_ib_ino_info_t *ino_p)
+px_ib_delete_ino_pil(px_ib_t *ib_p, px_ino_pil_t *ipil_p)
 {
-	px_ib_ino_info_t	*list = ib_p->ib_ino_lst;
+	px_ino_t	*ino_p = ipil_p->ipil_ino_p;
+	ushort_t	pil = ipil_p->ipil_pil;
+	px_ino_pil_t	*prev, *next;
 
 	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
 
-	if (list == ino_p)
-		ib_p->ib_ino_lst = list->ino_next;
+	if (ino_p->ino_ipil_p == ipil_p)
+		ino_p->ino_ipil_p = ipil_p->ipil_next_p;
 	else {
-		for (; list->ino_next != ino_p; list = list->ino_next);
-		list->ino_next = ino_p->ino_next;
+		for (prev = next = ino_p->ino_ipil_p; next != ipil_p;
+		    prev = next, next = next->ipil_next_p);
+
+		if (prev)
+			prev->ipil_next_p = ipil_p->ipil_next_p;
+	}
+
+	kmem_free(ipil_p, sizeof (px_ino_pil_t));
+
+	if (ino_p->ino_lopil == pil) {
+		for (pil = 0, next = ino_p->ino_ipil_p; next;
+		    next = next->ipil_next_p) {
+			if (pil > next->ipil_pil)
+				pil = next->ipil_pil;
+		}
+
+		ino_p->ino_lopil = pil;
+	}
+
+	if (--ino_p->ino_ipil_size)
+		return;
+
+	if (ib_p->ib_ino_lst == ino_p)
+		ib_p->ib_ino_lst = ino_p->ino_next_p;
+	else {
+		px_ino_t	*list = ib_p->ib_ino_lst;
+
+		for (; list->ino_next_p != ino_p; list = list->ino_next_p);
+		list->ino_next_p = ino_p->ino_next_p;
 	}
 }
 
@@ -478,19 +528,34 @@ px_ib_delete_ino(px_ib_t *ib_p, px_ib_ino_info_t *ino_p)
 void
 px_ib_free_ino_all(px_ib_t *ib_p)
 {
-	px_ib_ino_info_t	*tmp = ib_p->ib_ino_lst;
-	px_ib_ino_info_t	*next = NULL;
+	px_ino_t	*ino_p = ib_p->ib_ino_lst;
+	px_ino_t	*next = NULL;
 
-	while (tmp) {
-		next = tmp->ino_next;
-		kmem_free(tmp, sizeof (px_ib_ino_info_t));
-		tmp = next;
+	while (ino_p) {
+		next = ino_p->ino_next_p;
+		kmem_free(ino_p, sizeof (px_ino_t));
+		ino_p = next;
 	}
 }
 
-int
-px_ib_ino_add_intr(px_t *px_p, px_ib_ino_info_t *ino_p, px_ih_t *ih_p)
+/*
+ * Locate px_ino_pil_t structure on ino_p->ino_ipil_p according to ino#
+ * returns NULL if not found.
+ */
+px_ino_pil_t *
+px_ib_ino_locate_ipil(px_ino_t *ino_p, uint_t pil)
 {
+	px_ino_pil_t	*ipil_p = ino_p->ino_ipil_p;
+
+	for (; ipil_p && ipil_p->ipil_pil != pil; ipil_p = ipil_p->ipil_next_p);
+
+	return (ipil_p);
+}
+
+int
+px_ib_ino_add_intr(px_t *px_p, px_ino_pil_t *ipil_p, px_ih_t *ih_p)
+{
+	px_ino_t	*ino_p = ipil_p->ipil_ino_p;
 	px_ib_t		*ib_p = ino_p->ino_ib_p;
 	devino_t	ino = ino_p->ino_ino;
 	sysino_t	sysino = ino_p->ino_sysino;
@@ -531,6 +596,20 @@ px_ib_ino_add_intr(px_t *px_p, px_ib_ino_info_t *ino_p, px_ih_t *ih_p)
 		}
 	}
 
+	/*
+	 * If the interrupt was previously blocked (left in pending state)
+	 * because of jabber we need to clear the pending state in case the
+	 * jabber has gone away.
+	 */
+	if (ino_p->ino_unclaimed_intrs > px_unclaimed_intr_max) {
+		cmn_err(CE_WARN,
+		    "%s%d: px_ib_ino_add_intr: ino 0x%x has been unblocked",
+		    ddi_driver_name(dip), ddi_get_instance(dip), ino);
+
+		ino_p->ino_unclaimed_intrs = 0;
+		ret = px_lib_intr_setstate(dip, sysino, INTR_IDLE_STATE);
+	}
+
 	if (ret != DDI_SUCCESS) {
 		DBG(DBG_IB, dip, "px_ib_ino_add_intr: failed, "
 		    "ino 0x%x sysino 0x%x\n", ino, sysino);
@@ -538,33 +617,13 @@ px_ib_ino_add_intr(px_t *px_p, px_ib_ino_info_t *ino_p, px_ih_t *ih_p)
 		return (ret);
 	}
 
-	/* Link up px_ispec_t portion of the ppd */
-	ih_p->ih_next = ino_p->ino_ih_head;
-	ino_p->ino_ih_tail->ih_next = ih_p;
-	ino_p->ino_ih_tail = ih_p;
+	/* Link up px_ih_t */
+	ih_p->ih_next = ipil_p->ipil_ih_head;
+	ipil_p->ipil_ih_tail->ih_next = ih_p;
+	ipil_p->ipil_ih_tail = ih_p;
 
-	ino_p->ino_ih_start = ino_p->ino_ih_head;
-	ino_p->ino_ih_size++;
-
-	/*
-	 * If the interrupt was previously blocked (left in pending state)
-	 * because of jabber we need to clear the pending state in case the
-	 * jabber has gone away.
-	 */
-	if (ino_p->ino_unclaimed > px_unclaimed_intr_max) {
-		cmn_err(CE_WARN,
-		    "%s%d: px_ib_ino_add_intr: ino 0x%x has been unblocked",
-		    ddi_driver_name(dip), ddi_get_instance(dip), ino);
-
-		ino_p->ino_unclaimed = 0;
-		if ((ret = px_lib_intr_setstate(dip, sysino,
-		    INTR_IDLE_STATE)) != DDI_SUCCESS) {
-			DBG(DBG_IB, px_p->px_dip,
-			    "px_ib_ino_add_intr px_intr_setstate failed\n");
-
-			return (ret);
-		}
-	}
+	ipil_p->ipil_ih_start = ipil_p->ipil_ih_head;
+	ipil_p->ipil_ih_size++;
 
 	/* Re-enable interrupt */
 	PX_INTR_ENABLE(dip, sysino, curr_cpu);
@@ -573,19 +632,20 @@ px_ib_ino_add_intr(px_t *px_p, px_ib_ino_info_t *ino_p, px_ih_t *ih_p)
 }
 
 /*
- * Removes px_ispec_t from the ino's link list.
+ * Removes px_ih_t from the ino's link list.
  * uses hardware mutex to lock out interrupt threads.
  * Side effects: interrupt belongs to that ino is turned off on return.
  * if we are sharing PX slot with other inos, the caller needs
  * to turn it back on.
  */
 int
-px_ib_ino_rem_intr(px_t *px_p, px_ib_ino_info_t *ino_p, px_ih_t *ih_p)
+px_ib_ino_rem_intr(px_t *px_p, px_ino_pil_t *ipil_p, px_ih_t *ih_p)
 {
+	px_ino_t	*ino_p = ipil_p->ipil_ino_p;
 	devino_t	ino = ino_p->ino_ino;
 	sysino_t	sysino = ino_p->ino_sysino;
 	dev_info_t	*dip = px_p->px_dip;
-	px_ih_t		*ih_lst = ino_p->ino_ih_head;
+	px_ih_t		*ih_lst = ipil_p->ipil_ih_head;
 	hrtime_t	start_time;
 	intr_state_t	intr_state;
 	int		i, ret = DDI_SUCCESS;
@@ -598,7 +658,7 @@ px_ib_ino_rem_intr(px_t *px_p, px_ib_ino_info_t *ino_p, px_ih_t *ih_p)
 	/* Disable the interrupt */
 	PX_INTR_DISABLE(px_p->px_dip, sysino);
 
-	if (ino_p->ino_ih_size == 1) {
+	if (ipil_p->ipil_ih_size == 1) {
 		if (ih_lst != ih_p)
 			goto not_found;
 
@@ -621,6 +681,20 @@ px_ib_ino_rem_intr(px_t *px_p, px_ib_ino_info_t *ino_p, px_ih_t *ih_p)
 		}
 	}
 
+	/*
+	 * If the interrupt was previously blocked (left in pending state)
+	 * because of jabber we need to clear the pending state in case the
+	 * jabber has gone away.
+	 */
+	if (ino_p->ino_unclaimed_intrs > px_unclaimed_intr_max) {
+		cmn_err(CE_WARN, "%s%d: px_ib_ino_rem_intr: "
+		    "ino 0x%x has been unblocked",
+		    ddi_driver_name(dip), ddi_get_instance(dip), ino);
+
+		ino_p->ino_unclaimed_intrs = 0;
+		ret = px_lib_intr_setstate(dip, sysino, INTR_IDLE_STATE);
+	}
+
 	if (ret != DDI_SUCCESS) {
 		DBG(DBG_IB, dip, "px_ib_ino_rem_intr: failed, "
 		    "ino 0x%x sysino 0x%x\n", ino, sysino);
@@ -628,28 +702,8 @@ px_ib_ino_rem_intr(px_t *px_p, px_ib_ino_info_t *ino_p, px_ih_t *ih_p)
 		return (ret);
 	}
 
-	/*
-	 * If the interrupt was previously blocked (left in pending state)
-	 * because of jabber we need to clear the pending state in case the
-	 * jabber has gone away.
-	 */
-	if (ino_p->ino_unclaimed > px_unclaimed_intr_max) {
-		cmn_err(CE_WARN, "%s%d: px_ib_ino_rem_intr: "
-		    "ino 0x%x has been unblocked",
-		    ddi_driver_name(dip), ddi_get_instance(dip), ino);
-
-		ino_p->ino_unclaimed = 0;
-		if ((ret = px_lib_intr_setstate(dip, sysino,
-		    INTR_IDLE_STATE)) != DDI_SUCCESS) {
-			DBG(DBG_IB, px_p->px_dip,
-			    "px_ib_ino_rem_intr px_intr_setstate failed\n");
-
-			return (ret);
-		}
-	}
-
 	/* Search the link list for ih_p */
-	for (i = 0; (i < ino_p->ino_ih_size) &&
+	for (i = 0; (i < ipil_p->ipil_ih_size) &&
 	    (ih_lst->ih_next != ih_p); i++, ih_lst = ih_lst->ih_next);
 
 	if (ih_lst->ih_next != ih_p)
@@ -658,12 +712,12 @@ px_ib_ino_rem_intr(px_t *px_p, px_ib_ino_info_t *ino_p, px_ih_t *ih_p)
 	/* Remove ih_p from the link list and maintain the head/tail */
 	ih_lst->ih_next = ih_p->ih_next;
 
-	if (ino_p->ino_ih_head == ih_p)
-		ino_p->ino_ih_head = ih_p->ih_next;
-	if (ino_p->ino_ih_tail == ih_p)
-		ino_p->ino_ih_tail = ih_lst;
+	if (ipil_p->ipil_ih_head == ih_p)
+		ipil_p->ipil_ih_head = ih_p->ih_next;
+	if (ipil_p->ipil_ih_tail == ih_p)
+		ipil_p->ipil_ih_tail = ih_lst;
 
-	ino_p->ino_ih_start = ino_p->ino_ih_head;
+	ipil_p->ipil_ih_start = ipil_p->ipil_ih_head;
 
 reset:
 	if (ih_p->ih_config_handle)
@@ -672,7 +726,7 @@ reset:
 		kstat_delete(ih_p->ih_ksp);
 
 	kmem_free(ih_p, sizeof (px_ih_t));
-	ino_p->ino_ih_size--;
+	ipil_p->ipil_ih_size--;
 
 	return (ret);
 
@@ -684,17 +738,17 @@ not_found:
 }
 
 px_ih_t *
-px_ib_ino_locate_intr(px_ib_ino_info_t *ino_p, dev_info_t *rdip,
+px_ib_intr_locate_ih(px_ino_pil_t *ipil_p, dev_info_t *rdip,
     uint32_t inum, msiq_rec_type_t rec_type, msgcode_t msg_code)
 {
-	px_ih_t	*ih_lst = ino_p->ino_ih_head;
+	px_ih_t	*ih_p = ipil_p->ipil_ih_head;
 	int	i;
 
-	for (i = 0; i < ino_p->ino_ih_size; i++, ih_lst = ih_lst->ih_next) {
-		if ((ih_lst->ih_dip == rdip) && (ih_lst->ih_inum == inum) &&
-		    (ih_lst->ih_rec_type == rec_type) &&
-		    (ih_lst->ih_msg_code == msg_code))
-			return (ih_lst);
+	for (i = 0; i < ipil_p->ipil_ih_size; i++, ih_p = ih_p->ih_next) {
+		if ((ih_p->ih_dip == rdip) && (ih_p->ih_inum == inum) &&
+		    (ih_p->ih_rec_type == rec_type) &&
+		    (ih_p->ih_msg_code == msg_code))
+			return (ih_p);
 	}
 
 	return ((px_ih_t *)NULL);
@@ -727,22 +781,25 @@ px_ib_alloc_ih(dev_info_t *rdip, uint32_t inum,
 
 int
 px_ib_update_intr_state(px_t *px_p, dev_info_t *rdip,
-    uint_t inum, devino_t ino, uint_t new_intr_state,
-    msiq_rec_type_t rec_type, msgcode_t msg_code)
+    uint_t inum, devino_t ino, uint_t pil,
+    uint_t new_intr_state, msiq_rec_type_t rec_type,
+    msgcode_t msg_code)
 {
 	px_ib_t		*ib_p = px_p->px_ib_p;
-	px_ib_ino_info_t *ino_p;
+	px_ino_t	*ino_p;
+	px_ino_pil_t	*ipil_p;
 	px_ih_t		*ih_p;
 	int		ret = DDI_FAILURE;
 
-	DBG(DBG_IB, px_p->px_dip, "ib_update_intr_state: %s%d "
-	    "inum %x devino %x state %x\n", ddi_driver_name(rdip),
-	    ddi_get_instance(rdip), inum, ino, new_intr_state);
+	DBG(DBG_IB, px_p->px_dip, "px_ib_update_intr_state: %s%d "
+	    "inum %x devino %x pil %x state %x\n", ddi_driver_name(rdip),
+	    ddi_get_instance(rdip), inum, ino, pil, new_intr_state);
 
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
-	if (ino_p = px_ib_locate_ino(ib_p, ino)) {
-		if (ih_p = px_ib_ino_locate_intr(ino_p, rdip, inum, rec_type,
+	ino_p = px_ib_locate_ino(ib_p, ino);
+	if (ino_p && (ipil_p = px_ib_ino_locate_ipil(ino_p, pil))) {
+		if (ih_p = px_ib_intr_locate_ih(ipil_p, rdip, inum, rec_type,
 		    msg_code)) {
 			ih_p->ih_intr_state = new_intr_state;
 			ret = DDI_SUCCESS;
@@ -779,27 +836,32 @@ uint8_t
 pxtool_ib_get_ino_devs(
     px_t *px_p, uint32_t ino, uint8_t *devs_ret, pcitool_intr_dev_t *devs)
 {
-	px_ib_t *ib_p = px_p->px_ib_p;
-	px_ib_ino_info_t *ino_p;
-	px_ih_t *ih_p;
-	uint32_t num_devs = 0;
-	char pathname[MAXPATHLEN];
-	int i;
+	px_ib_t		*ib_p = px_p->px_ib_p;
+	px_ino_t	*ino_p;
+	px_ino_pil_t	*ipil_p;
+	px_ih_t 	*ih_p;
+	uint32_t 	num_devs = 0;
+	char		pathname[MAXPATHLEN];
+	int		i, j;
 
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 	ino_p = px_ib_locate_ino(ib_p, ino);
 	if (ino_p != NULL) {
-		num_devs = ino_p->ino_ih_size;
-		for (i = 0, ih_p = ino_p->ino_ih_head;
-		    ((i < ino_p->ino_ih_size) && (i < *devs_ret));
-		    i++, ih_p = ih_p->ih_next) {
-			(void) ddi_pathname(ih_p->ih_dip, pathname);
-			px_fill_in_intr_devs(&devs[i],
-			    (char *)ddi_driver_name(ih_p->ih_dip),  pathname,
-			    ddi_get_instance(ih_p->ih_dip));
-		}
-		*devs_ret = i;
+		for (j = 0, ipil_p = ino_p->ino_ipil_p; ipil_p;
+		    ipil_p = ipil_p->ipil_next_p) {
+			num_devs += ipil_p->ipil_ih_size;
 
+			for (i = 0, ih_p = ipil_p->ipil_ih_head;
+			    ((i < ipil_p->ipil_ih_size) && (i < *devs_ret));
+			    i++, j++, ih_p = ih_p->ih_next) {
+				(void) ddi_pathname(ih_p->ih_dip, pathname);
+				px_fill_in_intr_devs(&devs[i],
+				    (char *)ddi_driver_name(ih_p->ih_dip),
+				    pathname, ddi_get_instance(ih_p->ih_dip));
+			}
+		}
+
+		*devs_ret = j;
 	} else if (*devs_ret > 0) {
 		(void) ddi_pathname(px_p->px_dip, pathname);
 		strcat(pathname, " (Internal)");
@@ -819,20 +881,32 @@ void
 px_ib_log_new_cpu(px_ib_t *ib_p, uint32_t old_cpu_id, uint32_t new_cpu_id,
     uint32_t ino)
 {
-	px_ib_ino_info_t *ino_p;
+	px_ino_t	*ino_p;
+	px_ino_pil_t	*ipil_p;
+	px_ih_t 	*ih_p;
+	int		i;
 
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
 	/* Log in OS data structures the new CPU. */
-	ino_p = px_ib_locate_ino(ib_p, ino);
-	if (ino_p != NULL) {
+	if (ino_p = px_ib_locate_ino(ib_p, ino)) {
 
 		/* Log in OS data structures the new CPU. */
 		ino_p->ino_cpuid = new_cpu_id;
 
-		/* Account for any residual time to be logged for old cpu. */
-		px_ib_cpu_ticks_to_ih_nsec(ib_p, ino_p->ino_ih_head,
-		    old_cpu_id);
+		for (ipil_p = ino_p->ino_ipil_p; ipil_p;
+		    ipil_p = ipil_p->ipil_next_p) {
+			for (i = 0, ih_p = ipil_p->ipil_ih_head;
+			    (i < ipil_p->ipil_ih_size);
+			    i++, ih_p = ih_p->ih_next) {
+				/*
+				 * Account for any residual time
+				 * to be logged for old cpu.
+				 */
+				px_ib_cpu_ticks_to_ih_nsec(ib_p,
+				    ih_p, old_cpu_id);
+			}
+		}
 	}
 
 	mutex_exit(&ib_p->ib_ino_lst_mutex);

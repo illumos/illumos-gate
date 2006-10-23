@@ -427,9 +427,9 @@ ptl1_panic_handler(ptl1_state_t *pstate)
 		"kernel trap handler state",	/* PTL1_BAD_TRAP */
 		"floating point trap",		/* PTL1_BAD_FPTRAP */
 #ifdef	DEBUG
-		"pointer to intr_req",		/* PTL1_BAD_INTR_REQ */
+		"pointer to intr_vec",		/* PTL1_BAD_INTR_VEC */
 #else
-		"unknown trap",			/* PTL1_BAD_INTR_REQ */
+		"unknown trap",			/* PTL1_BAD_INTR_VEC */
 #endif
 #ifdef	TRAPTRACE
 		"TRACE_PTR state",		/* PTL1_BAD_TRACE_PTR */
