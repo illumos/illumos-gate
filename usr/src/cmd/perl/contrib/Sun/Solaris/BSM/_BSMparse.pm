@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -127,7 +126,7 @@ sub readAttr {
 			if (/^\s*skipClass\s*=\s*(.*)/i) {
 				my $class = $1;
 				# don't skip what you're searching for
-				next if (lc ($classFilter) eq lc ($class));
+				next if (index(lc($classFilter),lc($class)) > -1);
 				$skipClass{$1} = 1;
 				next;
 			}
@@ -247,9 +246,16 @@ sub readEvent {
 
 	my $count = 0;
 
+	unless (defined $obj->{'class'} && (scalar keys %{$obj->{'class'}} > 1)) {
+		$obj->readClass();
+	}
+
+	my @classFilterMasks = ();
 	my $classFilter = $obj->{'classFilter'};
 	if ($classFilter) {
-		$classFilter = qr/^$classFilter$/i;
+		foreach (split(',', $classFilter)) {
+			push @classFilterMasks, $obj->{'class'}{$_};
+		}
 	}
 	# ignore customer-supplied audit events (id > 32767)
 
@@ -277,8 +283,19 @@ $label is duplicated in the event file (line $.)
 				} if ($event{$label});
 			}
 			next unless ($obj->filterLabel($label));
+			my $mask = 0;
 			if ($classFilter) {
-				next unless ($class =~ $classFilter);
+				foreach (split(/\s*,\s*/, $class)) {
+					$mask |= $obj->{'class'}{$_};
+				}
+				my $skip = 0;
+				foreach my $filterMask (@classFilterMasks) {
+					unless ($mask & $filterMask) {
+						$skip = 1;
+						last;
+					}
+				}
+				next if $skip;
 			}
 			if ($obj->{'idFilter'}) {
 				next unless ($obj->{'idFilter'} == $id);
@@ -383,6 +400,7 @@ sub readControl {
 			my @class = split(/\s*,\s*/, $class);
 
 			foreach $class (@class) {
+				$class =~ s/^[-+^]+//;
 				unless (defined ($class{$class})) {
 					$errors .=
 					    sprintf("$invalidClass\n",
@@ -462,13 +480,12 @@ sub readUser {
 			$cError++;
 			next;
 		}
-		$never = '' unless defined $never;
 		my $verify = $always . ',' . $never;
-		$verify =~ s/[^+]//;
 		my @class = split(/\s*,\s*/, $verify);
 		my $thisClass;
 
 		foreach $thisClass (@class) {
+			$thisClass =~ s/^[-+^]+//;
 			unless (defined $class{$thisClass}) {
 				$error .= sprintf("$invalidErr\n", $thisClass,
 				    $_);
