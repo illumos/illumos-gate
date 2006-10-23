@@ -3137,7 +3137,7 @@ ibt_register_ar(ibt_clnt_hdl_t ibt_hdl, ibt_ar_t *arp)
 
 	/* assume success, so these might be needed */
 	hdlp = kmem_alloc(sizeof (*hdlp), KM_SLEEP);
-	new = kmem_alloc(sizeof (*new), KM_SLEEP);
+	new = kmem_zalloc(sizeof (*new), KM_SLEEP);
 
 	mutex_enter(&ibcm_svc_info_lock);
 	/* search for existing GID/pkey (there can be at most 1) */
