@@ -885,7 +885,7 @@ vpm_map_pages(
 		}
 		vml[0].vs_addr = NULL;
 		vml[0].vs_data = NULL;
-		return (FC_MAKE_ERR(error));
+		return (error);
 	}
 
 	/*
