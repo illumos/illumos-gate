@@ -330,12 +330,13 @@ main(int argc, char **argv)
 	int	c;
 	int	i;
 	int	pgerrflg = 0;	/* err flg: non-numeric arg w/p & g options */
-	size_t	size;
+	size_t	size, len;
 	DIR	*dirp;
 	struct dirent *dentp;
 	pid_t	maxpid;
 	pid_t	id;
 	int	ret;
+	char	loc_stime_str[32];
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -364,6 +365,18 @@ main(int argc, char **argv)
 
 	fname[F_PID].width = fname[F_PPID].width = pidwidth;
 	fname[F_PGID].width = fname[F_SID].width = pidwidth;
+
+	/*
+	 * TRANSLATION_NOTE
+	 * Specify the printf format with width and precision for
+	 * the STIME field.
+	 */
+	len = snprintf(loc_stime_str, sizeof (loc_stime_str),
+	    dcgettext(NULL, "%8.8s", LC_TIME), "STIME");
+	if (len >= sizeof (loc_stime_str))
+		len = sizeof (loc_stime_str) - 1;
+
+	fname[F_STIME].width = fname[F_STIME].minwidth = len;
 
 	while ((c = getopt(argc, argv, "jlfceAadLPyZHh:t:p:g:u:U:G:n:s:o:z:"))
 	    != EOF)
@@ -802,7 +815,7 @@ main(int argc, char **argv)
 				(void) printf("     ADDR     SZ    WCHAN");
 		}
 		if (fflg)
-			(void) printf("    STIME");
+			(void) printf(" %s", loc_stime_str);
 		if (Hflg)
 			(void) printf(" LGRP");
 		if (Lflg)
@@ -1401,10 +1414,11 @@ prcom(psinfo_t *psinfo, char *ttyp)
 			(void) printf("        ?");
 	}
 	if (fflg) {						/* STIME */
+		int width = fname[F_STIME].width;
 		if (Lflg)
-			prtime(psinfo->pr_lwp.pr_start, 9, 1);
+			prtime(psinfo->pr_lwp.pr_start, width + 1, 1);
 		else
-			prtime(psinfo->pr_start, 9, 1);
+			prtime(psinfo->pr_start, width + 1, 1);
 	}
 
 	if (Hflg) {
@@ -2033,13 +2047,31 @@ prtime(timestruc_t st, int width, int old)
 	if (st.tv_nsec > 500000000)
 		starttime++;
 	if ((now.tv_sec - starttime) >= 24*60*60) {
-		(void) strftime(sttim, sizeof (sttim), old? \
-		    "%b %d" : "%b_%d", localtime(&starttime));
-		sttim[7] = '\0';
+		(void) strftime(sttim, sizeof (sttim), old?
+		/*
+		 * TRANSLATION_NOTE
+		 * This time format is used by STIME field when -f option
+		 * is specified.  Used for processes that begun more than
+		 * 24 hours.
+		 */
+		    dcgettext(NULL, "%b %d", LC_TIME) :
+		/*
+		 * TRANSLATION_NOTE
+		 * This time format is used by STIME field when -o option
+		 * is specified.  Used for processes that begun more than
+		 * 24 hours.
+		 */
+		    dcgettext(NULL, "%b_%d", LC_TIME), localtime(&starttime));
 	} else {
-		(void) strftime(sttim, sizeof (sttim), \
-		    "%H:%M:%S", localtime(&starttime));
-		sttim[8] = '\0';
+		/*
+		 * TRANSLATION_NOTE
+		 * This time format is used by STIME field when -f or -o option
+		 * is specified.  Used for processes that begun less than
+		 * 24 hours.
+		 */
+		(void) strftime(sttim, sizeof (sttim),
+		    dcgettext(NULL, "%H:%M:%S", LC_TIME),
+		    localtime(&starttime));
 	}
 	(void) printf("%*.*s", width, width, sttim);
 }
@@ -2115,8 +2147,10 @@ przom(psinfo_t *psinfo)
 		else					/* ADDR SZ WCHAN */
 			(void) printf(" %8s %6d %8s", "-", 0, "-");
 	}
-	if (fflg)
-		(void) printf(" %8.8s", "-");			/* STIME */
+	if (fflg) {
+		int width = fname[F_STIME].width;
+		(void) printf(" %*.*s", width, width, "-"); 	/* STIME */
+	}
 	(void) printf(" %-8.14s", "?");				/* TTY */
 
 	tm = psinfo->pr_time.tv_sec;

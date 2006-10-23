@@ -723,6 +723,7 @@ DCSUBDIRS=		\
 	diff		\
 	ls		\
 	pr		\
+	ps		\
 	tar		\
 	w		\
 	who		\
