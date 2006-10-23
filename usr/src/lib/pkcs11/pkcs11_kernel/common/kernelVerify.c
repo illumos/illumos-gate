@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,11 +135,11 @@ C_VerifyInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		rv = crypto2pkcs11_error_number(verify_init.vi_return_value);
 	}
 
-	/* free the memory allocated for sign_init.si_key */
+	/* free the memory allocated for verify_init.vi_key */
 	if (key_p->is_lib_obj) {
 		if (key_p->class == CKO_SECRET_KEY) {
 			free(verify_init.vi_key.ck_data);
-		} else if (key_p->key_type == CKK_RSA) {
+		} else {
 			free_key_attributes(&verify_init.vi_key);
 		}
 	}
