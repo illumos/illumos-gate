@@ -158,15 +158,30 @@ pc_getnode(
 			vp->v_flag = VROOT;
 			blkno = offset = 0;
 			if (IS_FAT32(fsp)) {
-				pcp->pc_size = pc_fileclsize(fsp,
-				    fsp->pcfs_rdirstart) * fsp->pcfs_clsize;
+				pc_cluster32_t ncl = 0;
+
+				scluster = fsp->pcfs_rdirstart;
+				if (pc_fileclsize(fsp, scluster, &ncl)) {
+					PC_DPRINTF1(2, "cluster chain "
+					    "corruption, scluster=%d\n",
+					    scluster);
+					pcp->pc_flags |= PC_INVAL;
+				}
+				pcp->pc_size = fsp->pcfs_clsize * ncl;
 			} else {
 				pcp->pc_size =
 				    fsp->pcfs_rdirsec * fsp->pcfs_secsize;
 			}
-		} else
-			pcp->pc_size = pc_fileclsize(fsp, scluster) *
-			    fsp->pcfs_clsize;
+		} else {
+			pc_cluster32_t ncl = 0;
+
+			if (pc_fileclsize(fsp, scluster, &ncl)) {
+				PC_DPRINTF1(2, "cluster chain corruption, "
+				    "scluster=%d\n", scluster);
+				pcp->pc_flags |= PC_INVAL;
+			}
+			pcp->pc_size = fsp->pcfs_clsize * ncl;
+		}
 	} else {
 		vn_setops(vp, pcfs_fvnodeops);
 		vp->v_type = VREG;
@@ -258,7 +273,13 @@ retry:
 
 	remque(pcp);
 	rw_exit(&pcnodes_lock);
-	if ((vp->v_type == VREG) && !(pcp->pc_flags & PC_INVAL)) {
+	/*
+	 * XXX - old code had a check for !(pcp->pc_flags & PC_INVAL)
+	 * here. Seems superfluous/incorrect, but then earlier on PC_INVAL
+	 * was never set anywhere in PCFS. Now it is, and we _have_ to drop
+	 * the file reference here. Else, we'd screw up umount/modunload.
+	 */
+	if ((vp->v_type == VREG)) {
 		fsp->pcfs_frefs--;
 	}
 	fsp->pcfs_nrefs--;
@@ -306,7 +327,7 @@ pc_mark_acc(struct pcnode *pcp)
 
 	if (PCTOV(pcp)->v_type == VREG) {
 		gethrestime(&now);
-		if (pc_tvtopct(&now, &pcp->pc_entry.pcd_mtime))
+		if (pc_tvtopct(&now, &pt))
 			PC_DPRINTF1(2, "pc_mark_acc failed timestamp "
 			    "conversion, curtime = %lld\n",
 			    (long long)now.tv_sec);
@@ -358,13 +379,18 @@ pc_truncate(struct pcnode *pcp, uint_t length)
 			error = pc_balloc(pcp, (daddr_t)(llcn - 1), 1, &bno);
 		}
 		if (error) {
+			pc_cluster32_t ncl = 0;
 			PC_DPRINTF1(2, "pc_truncate: error=%d\n", error);
 			/*
 			 * probably ran out disk space;
 			 * determine current file size
 			 */
-			pcp->pc_size = fsp->pcfs_clsize *
-			    pc_fileclsize(fsp, pcp->pc_scluster);
+			if (pc_fileclsize(fsp, pcp->pc_scluster, &ncl)) {
+				PC_DPRINTF1(2, "cluster chain corruption, "
+				    "scluster=%d\n", pcp->pc_scluster);
+				pcp->pc_flags |= PC_INVAL;
+			}
+			pcp->pc_size = fsp->pcfs_clsize * ncl;
 		} else
 			pcp->pc_size = length;
 
@@ -702,8 +728,8 @@ pc_diskchanged(struct pcfs *fsp)
 					vn_free(vp);
 				}
 				kmem_free(pcp, sizeof (struct pcnode));
-				fsp->pcfs_frefs --;
-				fsp->pcfs_nrefs --;
+				fsp->pcfs_frefs--;
+				fsp->pcfs_nrefs--;
 				VFS_RELE(vfsp);
 			}
 		}

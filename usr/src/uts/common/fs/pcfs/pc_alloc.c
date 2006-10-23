@@ -498,13 +498,17 @@ pc_alloccluster(
 int
 pc_fileclsize(
 	struct pcfs *fsp,
-	pc_cluster32_t strtcluster)
+	pc_cluster32_t startcl, pc_cluster32_t *ncl)
 {
 	int count = 0;
 
-	while (pc_validcl(fsp, strtcluster)) {
-		count++;
-		strtcluster = pc_getcluster(fsp, strtcluster);
+	*ncl = 0;
+	for (count = 0; pc_validcl(fsp, startcl);
+	    startcl = pc_getcluster(fsp, startcl)) {
+		if (count++ >= fsp->pcfs_ncluster)
+			return (EIO);
 	}
-	return (count);
+	*ncl = (pc_cluster32_t)count;
+
+	return (0);
 }

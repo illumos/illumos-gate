@@ -156,7 +156,7 @@ extern struct mod_ops mod_fsops;
 
 static struct modlfs modlfs = {
 	&mod_fsops,
-	"PC filesystem v%I%",
+	"PC filesystem v1.100",
 	&vfw
 };
 
@@ -290,14 +290,12 @@ pcfs_mount(
 	daddr_t dosstart;
 	dev_t pseudodev;
 	dev_t xdev;
-	char *spnp;
+	char *c;
 	char *data = uap->dataptr;
 	int datalen = uap->datalen;
 	int dos_ldrive = 0;
 	int error;
 	int fattype;
-	int spnlen;
-	int wantbootpart = 0;
 	minor_t	minor;
 	int oflag, aflag;
 
@@ -367,61 +365,71 @@ pcfs_mount(
 	if (error =
 	    lookupname(special.pn_path, UIO_SYSSPACE, FOLLOW, NULLVPP, &bvp)) {
 		/*
-		 * look for suffix to special
-		 * which indicates a request to mount the solaris boot
-		 * partition, or a DOS logical drive on the hard disk
+		 * Split the pathname string at the last ':' separator.
+		 * If there's no ':' in the device name, or the ':' is the
+		 * last character in the string, the name is invalid and
+		 * the error from the previous lookup will be returned.
 		 */
-		spnlen = special.pn_pathlen;
+		c = strrchr(special.pn_path, ':');
+		if (c == NULL || strlen(c) == 0)
+			goto devlookup_done;
 
-		if (spnlen > 5) {
-			spnp = special.pn_path + spnlen - 5;
-			if (*spnp++ == ':' && *spnp++ == 'b' &&
-			    *spnp++ == 'o' && *spnp++ == 'o' &&
-			    *spnp++ == 't') {
+		*c++ = '\0';
+
+		/*
+		 * PCFS partition name suffixes can be:
+		 *	- "boot" to indicate the X86BOOT partition
+		 *	- a drive letter [c-z] for the "DOS logical drive"
+		 *	- a drive number 1..24 for the "DOS logical drive"
+		 */
+		if (strcasecmp(c, "boot") == 0) {
+			/*
+			 * The Solaris boot partition is requested.
+			 */
+			dos_ldrive = BOOT_PARTITION_DRIVE;
+		} else if (strspn(c, "0123456789") == strlen(c)) {
+			/*
+			 * All digits - parse the partition number.
+			 */
+			long drvnum = 0;
+
+			if ((error = ddi_strtol(c, NULL, 10, &drvnum)) == 0) {
 				/*
-				 * Looks as if they want to mount
-				 * the Solaris boot partition
+				 * A number alright - in the allowed range ?
 				 */
-				wantbootpart = 1;
-				dos_ldrive = BOOT_PARTITION_DRIVE;
-				spnp = special.pn_path + spnlen - 5;
-				*spnp = '\0';
-				error = lookupname(special.pn_path,
-				    UIO_SYSSPACE, FOLLOW, NULLVPP, &bvp);
+				if (drvnum > 24 || drvnum == 0)
+					error = EINVAL;
 			}
+			if (error)
+				goto devlookup_done;
+			dos_ldrive = (int)drvnum;
+		} else if (strlen(c) == 1) {
+			/*
+			 * A single trailing character - is it [c-zC-Z] ?
+			 */
+			*c = tolower(*c);
+			if (*c < 'c' || *c > 'z') {
+				error = EINVAL;
+				goto devlookup_done;
+			}
+			dos_ldrive = 1 + *c - 'c';
+		} else {
+			/*
+			 * Can't parse this - pass through previous error.
+			 */
+			goto devlookup_done;
 		}
 
-		if (!wantbootpart) {
-			spnp = special.pn_path + spnlen - 1;
-			if (spnlen > 2 && *spnp >= 'c' && *spnp <= 'z') {
-				spnlen--;
-				dos_ldrive = *spnp-- - 'c' + 1;
-			} else if (spnlen > 2 && *spnp >= '0' && *spnp <= '9') {
-				spnlen--;
-				dos_ldrive = *spnp-- - '0';
-				if (spnlen > 2 && *spnp >= '0' &&
-				    *spnp <= '9') {
-					spnlen--;
-					dos_ldrive += 10 * (*spnp-- - '0');
-				}
-			}
-			if (spnlen > 1 && dos_ldrive && dos_ldrive <= 24 &&
-			    *spnp == ':') {
-				/*
-				 * remove suffix so that we have a real
-				 * device name
-				 */
-				*spnp = '\0';
-				error = lookupname(special.pn_path,
-				    UIO_SYSSPACE, FOLLOW, NULLVPP, &bvp);
-			}
-		}
-		if (error) {
-			pn_free(&special);
-			return (error);
-		}
+		ASSERT(dos_ldrive > 0);
+
+		error = lookupname(special.pn_path, UIO_SYSSPACE, FOLLOW,
+		    NULLVPP, &bvp);
 	}
+devlookup_done:
 	pn_free(&special);
+	if (error)
+		return (error);
+
 	if (bvp->v_type != VBLK) {
 		VN_RELE(bvp);
 		return (ENOTBLK);
@@ -449,8 +457,11 @@ pcfs_mount(
 		return (ENXIO);
 	}
 	/*
-	 * Ensure that this device (or logical drive) isn't already mounted,
-	 * unless this is a REMOUNT request
+	 * Ensure that this logical drive isn't already mounted, unless
+	 * this is a REMOUNT request.
+	 * Note: The framework will perform this check if the "...:c"
+	 * PCFS-style "logical drive" syntax has not been used and an
+	 * actually existing physical device is backing this filesystem.
 	 */
 	if (dos_ldrive) {
 		mutex_enter(&pcfslock);
@@ -891,7 +902,7 @@ noLogicalDrive(int requested)
  *	contains the BPB for that drive).
  */
 static int
-findTheDrive(dev_t dev, int askedFor, int *error, buf_t **bp,
+findTheDrive(dev_t dev, int ldrive, buf_t **bp,
     daddr_t *startSector, uchar_t *sysid)
 {
 	struct ipart dosp[FD_NUMPART];	/* incore fdisk partition structure */
@@ -921,10 +932,30 @@ findTheDrive(dev_t dev, int askedFor, int *error, buf_t **bp,
 	int numExtraDrives = 0;
 
 	/*
+	 * "ldrive == 0" should never happen, as this is a request to
+	 * mount the physical device (and ignore partitioning). The code
+	 * in pcfs_mount() should have made sure that a logical drive number
+	 * is at least 1, meaning we're looking for drive "C:". It is not
+	 * safe (and a bug in the callers of this function) to request logical
+	 * drive number 0; we could ASSERT() but a graceful EIO is a more
+	 * polite way.
+	 */
+	if (ldrive == 0) {
+		cmn_err(CE_NOTE, "!pcfs: request for logical partition zero");
+		noLogicalDrive(ldrive);
+		return (EIO);
+	}
+
+	/*
 	 *  Copy from disk block into memory aligned structure for fdisk usage.
 	 */
 	dosp_ptr = (struct mboot *)(*bp)->b_un.b_addr;
 	bcopy(dosp_ptr->parts, dosp, sizeof (struct ipart) * FD_NUMPART);
+
+	if (ltohs(dosp_ptr->signature) != MBB_MAGIC) {
+		cmn_err(CE_NOTE, "!pcfs: MBR partition table signature err");
+		return (EINVAL);
+	}
 
 	/*
 	 * Get a summary of what is in the Master FDISK table.
@@ -968,21 +999,20 @@ findTheDrive(dev_t dev, int askedFor, int *error, buf_t **bp,
 		}
 	}
 
-	if (askedFor == BOOT_PARTITION_DRIVE) {
+	if (ldrive == BOOT_PARTITION_DRIVE) {
 		if (bootPart < 0) {
-			noLogicalDrive(askedFor);
-			*error = EINVAL;
-			return (0);
+			noLogicalDrive(ldrive);
+			return (EINVAL);
 		}
 		*sysid = dosp[bootPart].systid;
 		*startSector = ltohi(dosp[bootPart].relsect);
-		return (1);
+		return (0);
 	}
 
-	if (askedFor == PRIMARY_DOS_DRIVE && primaryPart >= 0) {
+	if (ldrive == PRIMARY_DOS_DRIVE && primaryPart >= 0) {
 		*sysid = dosp[primaryPart].systid;
 		*startSector = ltohi(dosp[primaryPart].relsect);
-		return (1);
+		return (0);
 	}
 
 	/*
@@ -992,9 +1022,8 @@ findTheDrive(dev_t dev, int askedFor, int *error, buf_t **bp,
 	 */
 	if ((extendedPart < 0) && (numExtraDrives == 0)) {
 		cmn_err(CE_NOTE, "!pcfs: no extended dos partition");
-		noLogicalDrive(askedFor);
-		*error = EINVAL;
-		return (0);
+		noLogicalDrive(ldrive);
+		return (EINVAL);
 	}
 
 	if (extendedPart >= 0) {
@@ -1017,16 +1046,14 @@ findTheDrive(dev_t dev, int askedFor, int *error, buf_t **bp,
 			*bp = bread(dev, diskblk, PC_SAFESECSIZE);
 			if ((*bp)->b_flags & B_ERROR) {
 				PC_DPRINTF0(1, "pc_getfattype: read error\n");
-				*error = EIO;
-				return (0);
+				return (EIO);
 			}
 			lastseek = diskblk;
 			dosp_ptr = (struct mboot *)(*bp)->b_un.b_addr;
 			if (ltohs(dosp_ptr->signature) != MBB_MAGIC) {
 				cmn_err(CE_NOTE, "!pcfs: "
 				    "extended partition signature err");
-				*error = EINVAL;
-				return (0);
+				return (EINVAL);
 			}
 			bcopy(dosp_ptr->parts, dosp,
 			    sizeof (struct ipart) * FD_NUMPART);
@@ -1041,7 +1068,6 @@ findTheDrive(dev_t dev, int askedFor, int *error, buf_t **bp,
 			for (i = 0; i < FD_NUMPART; i++) {
 				if (isDosDrive(dosp[i].systid)) {
 					extndDrives[numDrives++] = i;
-					continue;
 				} else if (isDosExtended(dosp[i].systid)) {
 					if (diskblk != lastseek) {
 						/*
@@ -1052,22 +1078,21 @@ findTheDrive(dev_t dev, int askedFor, int *error, buf_t **bp,
 						    "!pcfs: ignoring unexpected"
 						    " additional extended"
 						    " partition");
-						continue;
+					} else {
+						diskblk = xstartsect +
+						    ltohi(dosp[i].relsect);
 					}
-					diskblk = xstartsect +
-					    ltohi(dosp[i].relsect);
-					continue;
 				}
 			}
-		} while (askedFor > logicalDriveCount + numDrives);
+		} while (ldrive > logicalDriveCount + numDrives);
 
-		if (askedFor <= logicalDriveCount + numDrives) {
+		if (ldrive <= logicalDriveCount + numDrives) {
 			/*
 			 * The number of logical drives we've found thus
 			 * far is enough to get us to the one we were
 			 * searching for.
 			 */
-			driveIndex = logicalDriveCount + numDrives - askedFor;
+			driveIndex = logicalDriveCount + numDrives - ldrive;
 			*sysid = dosp[extndDrives[driveIndex]].systid;
 			*startSector =
 			    ltohi(dosp[extndDrives[driveIndex]].relsect) +
@@ -1075,10 +1100,9 @@ findTheDrive(dev_t dev, int askedFor, int *error, buf_t **bp,
 			if (*startSector > (xstartsect + xnumsect)) {
 				cmn_err(CE_NOTE, "!pcfs: extended partition "
 				    "values bad");
-				*error = EINVAL;
-				return (0);
+				return (EINVAL);
 			}
-			return (1);
+			return (0);
 		} else {
 			/*
 			 * We ran out of extended dos partition
@@ -1092,8 +1116,7 @@ findTheDrive(dev_t dev, int askedFor, int *error, buf_t **bp,
 			*bp = bread(dev, (daddr_t)0, PC_SAFESECSIZE);
 			if ((*bp)->b_flags & B_ERROR) {
 				PC_DPRINTF0(1, "pc_getfattype: read error\n");
-				*error = EIO;
-				return (0);
+				return (EIO);
 			}
 			dosp_ptr = (struct mboot *)(*bp)->b_un.b_addr;
 			bcopy(dosp_ptr->parts, dosp,
@@ -1104,19 +1127,19 @@ findTheDrive(dev_t dev, int askedFor, int *error, buf_t **bp,
 	 *  Still haven't found the drive, is it an extra
 	 *  drive defined in the main FDISK table?
 	 */
-	if (askedFor <= logicalDriveCount + numExtraDrives) {
-		driveIndex = logicalDriveCount + numExtraDrives - askedFor;
+	if (ldrive <= logicalDriveCount + numExtraDrives) {
+		driveIndex = logicalDriveCount + numExtraDrives - ldrive;
+		ASSERT(driveIndex < MIN(numExtraDrives, FD_NUMPART));
 		*sysid = dosp[extraDrives[driveIndex]].systid;
 		*startSector = ltohi(dosp[extraDrives[driveIndex]].relsect);
-		return (1);
+		return (0);
 	}
 	/*
 	 *  Still haven't found the drive, and there is
 	 *  nowhere else to look.
 	 */
-	noLogicalDrive(askedFor);
-	*error = EINVAL;
-	return (0);
+	noLogicalDrive(ldrive);
+	return (EINVAL);
 }
 
 /*
@@ -1340,13 +1363,14 @@ secondaryBPBChecks(uchar_t *cp)
  * If that all is good, calculate the number of clusters and
  * do some final verification steps.
  *
- * If all is well, return success (1) and set the fattypep
- * value to the correct FAT value.
+ * If all is well, return success (1) and set the fattypep value to the
+ * correct FAT value if the caller provided a pointer to store it in.
  */
 static int
 isBPB(uchar_t *cp, int *fattypep)
 {
 	struct bootsec *bpb = (struct bootsec *)cp;
+	int type;
 
 	uint_t numclusters;		/* number of clusters in file area */
 	ushort_t secsize = (int)ltohs(bpb->bps[0]);
@@ -1393,10 +1417,10 @@ isBPB(uchar_t *cp, int *fattypep)
 	 */
 	numclusters = bpb_to_numclusters(cp);
 
-	*fattypep = fattype(numclusters);
+	type = fattype(numclusters);
 
 	/* Do some final sanity checks for each specific type of FAT */
-	switch (*fattypep) {
+	switch (type) {
 		case 0: /* FAT12 */
 		case PCFS_FAT16:
 			if (!check_bpb_fat16((struct bootsec *)cp))
@@ -1407,13 +1431,17 @@ isBPB(uchar_t *cp, int *fattypep)
 				return (0);
 			break;
 		default: /* not sure yet */
-			*fattypep = secondaryBPBChecks(cp);
-			if (*fattypep == -1) {
+			type = secondaryBPBChecks(cp);
+			if (type == -1) {
 				/* Still nothing, give it up. */
 				return (0);
 			}
 			break;
 	}
+
+	if (fattypep)
+		*fattypep = type;
+
 	PC_DPRINTF0(5, "isBPB: BPB passes verification tests");
 	return (1);
 }
@@ -1436,62 +1464,65 @@ pc_getfattype(
 	daddr_t *strtsectp,
 	int *fattypep)
 {
-	uchar_t *cp;			/* for searching out FAT string */
 	buf_t *bp = NULL;		/* Disk buffer pointer */
-	int rval = 0;
+	int err = 0;
 	uchar_t sysid = 0;		/* System ID character */
 	dev_t	dev = devvp->v_rdev;
 
-	*strtsectp = (daddr_t)0;
 
 	/*
 	 * Open the device so we can check out the BPB or FDISK table,
 	 * then read in the sector.
 	 */
 	PC_DPRINTF2(5, "pc_getfattype: dev=%x  ldrive=%x  ", (int)dev, ldrive);
-	if (rval = VOP_OPEN(&devvp, FREAD, CRED())) {
-		PC_DPRINTF1(1, "pc_getfattype: open error=%d\n", rval);
-		return (rval);
+	if (err = VOP_OPEN(&devvp, FREAD, CRED())) {
+		PC_DPRINTF1(1, "pc_getfattype: open error=%d\n", err);
+		return (err);
 	}
 
 	/*
-	 *  Read block 0 from device
+	 * Unpartitioned media (floppies and some removeable devices)
+	 * don't have a partition table, the FAT BPB is at disk block 0.
+	 * Start out by reading block 0.
 	 */
-	bp = bread(dev, (daddr_t)0, PC_SAFESECSIZE);
+	*strtsectp = (daddr_t)0;
+	bp = bread(dev, *strtsectp, PC_SAFESECSIZE);
+
 	if (bp->b_flags & B_ERROR) {
-		PC_DPRINTF0(1, "pc_getfattype: read error\n");
-		rval = EIO;
+		PC_DPRINTF2(1, "pc_getfattype: read error on "
+		    "device %d, disk LBA %d\n", (int)dev, (int)*strtsectp);
+		err = EIO;
 		goto out;
 	}
 
-	cp = (uchar_t *)bp->b_un.b_addr;
-
 	/*
-	 * If the first block is not a valid BPB, look for the
-	 * through the FDISK table.
+	 * If a logical drive number is requested, parse the partition table
+	 * and attempt to locate it. Otherwise, proceed immediately to the
+	 * BPB check. findTheDrive(), if successful, returns the disk block
+	 * number where the requested partition starts in "strtsecp".
 	 */
-	if (!isBPB(cp, fattypep)) {
-		/* find the partition table and get 512 bytes from it. */
+	if (ldrive != 0) {
 		PC_DPRINTF0(5, "pc_getfattype: using FDISK table to find BPB");
 
-		if (findTheDrive(dev, ldrive, &rval, &bp,
-			strtsectp, &sysid) == 0)
+		if (err = findTheDrive(dev, ldrive, &bp, strtsectp, &sysid))
 			goto out;
 
 		brelse(bp);
 		bp = bread(dev, *strtsectp, PC_SAFESECSIZE);
 		if (bp->b_flags & B_ERROR) {
-			PC_DPRINTF0(1, "pc_getfattype: read error\n");
-			rval = EIO;
+			PC_DPRINTF2(1, "pc_getfattype: read error on "
+			    "device %d, disk LBA %d\n",
+			    (int)dev, (int)*strtsectp);
+			err = EIO;
 			goto out;
 		}
-		cp = (uchar_t *)bp->b_un.b_addr;
+	}
 
-		/* If this one is still no good, give it up. */
-		if (!isBPB(cp, fattypep)) {
-			rval = EIO;
-			goto out;
-		}
+	if (!isBPB((uchar_t *)bp->b_un.b_addr, fattypep)) {
+		PC_DPRINTF2(1, "pc_getfattype: No FAT BPB on device %d, "
+		    "disk LBA %d\n", (int)dev, (int)*strtsectp);
+		err = EIO;
+		goto out;
 	}
 
 out:
@@ -1501,7 +1532,7 @@ out:
 	if (bp != NULL)
 		brelse(bp);
 	(void) VOP_CLOSE(devvp, FREAD, 1, (offset_t)0, CRED());
-	return (rval);
+	return (err);
 }
 
 
@@ -1564,8 +1595,11 @@ pc_getfat(struct pcfs *fsp)
 	 * Get boot parameter block and check it for validity
 	 */
 	tp = bread(fsp->pcfs_xdev, fsp->pcfs_dosstart, PC_SAFESECSIZE);
-	if (tp->b_flags & (B_ERROR | B_STALE)) {
-		PC_DPRINTF0(1, "pc_getfat: boot block error\n");
+	if ((tp->b_flags & (B_ERROR | B_STALE)) ||
+	    !isBPB((uchar_t *)tp->b_un.b_addr, NULL)) {
+		PC_DPRINTF2(1, "pc_getfat: boot block error on device %d, "
+		    "disk LBA %d\n",
+		    (int)fsp->pcfs_xdev, (int)fsp->pcfs_dosstart);
 		flags = tp->b_flags & B_ERROR;
 		error = EIO;
 		goto out;

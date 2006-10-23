@@ -213,7 +213,7 @@ pcfs_read(
 	error = pc_lockfs(fsp, 0, 0);
 	if (error)
 		return (error);
-	if ((pcp = VTOPC(vp)) == NULL) {
+	if ((pcp = VTOPC(vp)) == NULL || pcp->pc_flags & PC_INVAL) {
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
@@ -248,7 +248,7 @@ pcfs_write(
 	error = pc_lockfs(fsp, 0, 0);
 	if (error)
 		return (error);
-	if ((pcp = VTOPC(vp)) == NULL) {
+	if ((pcp = VTOPC(vp)) == NULL || pcp->pc_flags & PC_INVAL) {
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
@@ -417,10 +417,32 @@ rwpcp(
 				pcp->pc_flags |= PC_CHG;
 
 				if (error) {
-					/* figure out new file size */
-					pcp->pc_size = fsp->pcfs_clsize *
-					    pc_fileclsize(fsp,
-						pcp->pc_scluster);
+					pc_cluster32_t ncl;
+					int nerror;
+
+					/*
+					 * figure out new file size from
+					 * cluster chain length. If this
+					 * is detected to loop, the chain
+					 * is corrupted and we'd better
+					 * keep our fingers off that file.
+					 */
+					nerror = pc_fileclsize(fsp,
+					    pcp->pc_scluster, &ncl);
+					if (nerror) {
+						PC_DPRINTF1(2,
+						    "cluster chain "
+						    "corruption, "
+						    "scluster=%d\n",
+						    pcp->pc_scluster);
+						pcp->pc_size = 0;
+						pcp->pc_flags |= PC_INVAL;
+						error = nerror;
+						(void) segmap_release(segkmap,
+						    base, 0);
+						break;
+					}
+					pcp->pc_size = fsp->pcfs_clsize * ncl;
 
 					if (error == ENOSPC &&
 					    (pcp->pc_size - uio->uio_loffset)
@@ -528,6 +550,12 @@ pcfs_getattr(
 	error = pc_lockfs(fsp, 0, 0);
 	if (error)
 		return (error);
+
+	/*
+	 * Note that we don't check for "invalid node" (PC_INVAL) here
+	 * only in order to make stat() succeed. We allow no I/O on such
+	 * a node, but do allow to check for its existance.
+	 */
 	if ((pcp = VTOPC(vp)) == NULL) {
 		pc_unlockfs(fsp);
 		return (EIO);
@@ -666,7 +694,7 @@ pcfs_setattr(
 	error = pc_lockfs(fsp, 0, 0);
 	if (error)
 		return (error);
-	if ((pcp = VTOPC(vp)) == NULL) {
+	if ((pcp = VTOPC(vp)) == NULL || pcp->pc_flags & PC_INVAL) {
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
@@ -781,7 +809,7 @@ pcfs_access(
 
 	fsp = VFSTOPCFS(vp->v_vfsp);
 
-	if ((pcp = VTOPC(vp)) == NULL)
+	if ((pcp = VTOPC(vp)) == NULL || pcp->pc_flags & PC_INVAL)
 		return (EIO);
 	if ((mode & VWRITE) && (pcp->pc_entry.pcd_attr & PCA_RDONLY))
 		return (EACCES);
@@ -816,7 +844,7 @@ pcfs_fsync(
 	error = pc_lockfs(fsp, 0, 0);
 	if (error)
 		return (error);
-	if ((pcp = VTOPC(vp)) == NULL) {
+	if ((pcp = VTOPC(vp)) == NULL || pcp->pc_flags & PC_INVAL) {
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
@@ -874,13 +902,17 @@ pcfs_inactive(
 	/*
 	 * Check again to confirm that no intervening I/O error
 	 * with a subsequent pc_diskchanged() call has released
-	 * the pcnode.  If it has then release the vnode as above.
+	 * the pcnode. If it has then release the vnode as above.
 	 */
-	if ((pcp = VTOPC(vp)) == NULL) {
+	pcp = VTOPC(vp);
+	if (pcp == NULL || pcp->pc_flags & PC_INVAL) {
 		if (vn_has_cached_data(vp))
 			(void) pvn_vplist_dirty(vp, (u_offset_t)0,
 			    pcfs_putapage, B_INVAL | B_TRUNC,
 			    (struct cred *)NULL);
+	}
+
+	if (pcp == NULL) {
 		vn_free(vp);
 	} else {
 		pc_rele(pcp);
@@ -920,7 +952,7 @@ pcfs_lookup(
 	error = pc_lockfs(fsp, 0, 0);
 	if (error)
 		return (error);
-	if (VTOPC(dvp) == NULL) {
+	if (VTOPC(dvp) == NULL || VTOPC(dvp)->pc_flags & PC_INVAL) {
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
@@ -975,7 +1007,7 @@ pcfs_create(
 	error = pc_lockfs(fsp, 0, 0);
 	if (error)
 		return (error);
-	if (VTOPC(dvp) == NULL) {
+	if (VTOPC(dvp) == NULL || VTOPC(dvp)->pc_flags & PC_INVAL) {
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
@@ -1049,7 +1081,7 @@ pcfs_remove(
 	error = pc_lockfs(fsp, 0, 0);
 	if (error)
 		return (error);
-	if ((pcp = VTOPC(vp)) == NULL) {
+	if ((pcp = VTOPC(vp)) == NULL || pcp->pc_flags & PC_INVAL) {
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
@@ -1086,9 +1118,6 @@ pcfs_rename(
 	fsp = VFSTOPCFS(sdvp->v_vfsp);
 	if (error = pc_verify(fsp))
 		return (error);
-	if (((dp = VTOPC(sdvp)) == NULL) || ((tdp = VTOPC(tdvp)) == NULL)) {
-		return (EIO);
-	}
 
 	/*
 	 * make sure we can muck with this directory.
@@ -1100,7 +1129,8 @@ pcfs_rename(
 	error = pc_lockfs(fsp, 0, 0);
 	if (error)
 		return (error);
-	if ((VTOPC(sdvp) == NULL) || (VTOPC(tdvp) == NULL)) {
+	if (((dp = VTOPC(sdvp)) == NULL) || ((tdp = VTOPC(tdvp)) == NULL) ||
+	    (dp->pc_flags & PC_INVAL) || (tdp->pc_flags & PC_INVAL)) {
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
@@ -1128,7 +1158,7 @@ pcfs_mkdir(
 	error = pc_lockfs(fsp, 0, 0);
 	if (error)
 		return (error);
-	if (VTOPC(dvp) == NULL) {
+	if (VTOPC(dvp) == NULL || VTOPC(dvp)->pc_flags & PC_INVAL) {
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
@@ -1170,7 +1200,7 @@ pcfs_rmdir(
 	if (error = pc_lockfs(fsp, 0, 0))
 		return (error);
 
-	if ((pcp = VTOPC(dvp)) == NULL) {
+	if ((pcp = VTOPC(dvp)) == NULL || pcp->pc_flags & PC_INVAL) {
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
@@ -1230,7 +1260,7 @@ pcfs_readdir(
 	error = pc_lockfs(fsp, 0, 0);
 	if (error)
 		return (error);
-	if ((pcp = VTOPC(dvp)) == NULL) {
+	if ((pcp = VTOPC(dvp)) == NULL || pcp->pc_flags & PC_INVAL) {
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
@@ -1358,7 +1388,7 @@ pcfs_getapage(
 	PC_DPRINTF3(5, "pcfs_getapage: vp=%p off=%lld len=%lu\n",
 	    (void *)vp, off, len);
 
-	if ((pcp = VTOPC(vp)) == NULL)
+	if ((pcp = VTOPC(vp)) == NULL || pcp->pc_flags & PC_INVAL)
 		return (EIO);
 	devvp = fsp->pcfs_devvp;
 
@@ -1558,6 +1588,8 @@ pcfs_putpage(
 		PC_DPRINTF1(3, "pcfs_putpage NULL vp=0x%p\n", (void *)vp);
 		return (EIO);
 	}
+	if (pcp->pc_flags & PC_INVAL)
+		return (EIO);
 
 	if (curproc == proc_pageout) {
 		/*
@@ -2341,7 +2373,7 @@ pcfs_fid(struct vnode *vp, struct fid *fidp)
 	error = pc_lockfs(fsp, 0, 0);
 	if (error)
 		return (error);
-	if ((pcp = VTOPC(vp)) == NULL) {
+	if ((pcp = VTOPC(vp)) == NULL || pcp->pc_flags & PC_INVAL) {
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
