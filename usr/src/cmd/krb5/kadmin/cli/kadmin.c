@@ -365,7 +365,7 @@ char *kadmin_startup(argc, argv)
 		if (realm - canon && *(realm - 1) != '\\')
 		    break;
 		else
-		    realm = strchr(realm, '@');
+		    realm = strchr(realm + 1, '@');
 	    }
 	    if (realm)
 		*realm++ = '\0';
@@ -374,7 +374,7 @@ char *kadmin_startup(argc, argv)
 		if (cp - canon && *(cp - 1) != '\\')
 		    break;
 		else
-		    cp = strchr(cp, '/');
+		    cp = strchr(cp + 1, '/');
 	    }
 	    if (cp != NULL)
 		*cp = '\0';

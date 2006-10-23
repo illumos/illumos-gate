@@ -410,6 +410,7 @@ krb5_error_code kadm5_get_config_params(context, kdcprofile, kdcenv,
 	char dns_host[MAX_DNS_NAMELEN];
 	unsigned short dns_portno;
 	krb5_data dns_realm;
+	memset((char *)&dns_realm, 0, sizeof (dns_realm));
 #endif /* KRB5_DNS_LOOKUP */
 
     memset((char *) &params, 0, sizeof(params));
