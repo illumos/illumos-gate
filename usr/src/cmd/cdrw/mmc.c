@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -671,6 +670,38 @@ read_format_capacity(int fd, uint_t *bsize)
 
 	return (filesize);
 }
+
+/*
+ * Used to reset the device. Since, sd(7D) requires a
+ * command to be issued when resetting a device we will
+ * issue an innocuous command. The command chosen for this
+ * purpose is the TEST UNIT READY (TUR) command. We also do
+ * not care about the sucess of the TUR so we will not return
+ * a value.
+ */
+void
+reset_dev(int fd)
+{
+	struct uscsi_cmd *scmd;
+
+	/*
+	 * Since a TUR has SCSI operation code of 0, we
+	 * can make use of the fact that get_uscsi_cmd()
+	 * initializes a CDB to all zeros to generate
+	 * the TUR command.
+	 */
+	scmd = get_uscsi_cmd();
+
+	/* Tell sd(7D) to do a silent reset of the device. */
+	scmd->uscsi_flags = USCSI_SILENT | USCSI_RESET;
+
+	scmd->uscsi_timeout = DEFAULT_SCSI_TIMEOUT;
+	scmd->uscsi_cdblen = 6;
+
+	/* Issue the TUR command. */
+	uscsi_error = uscsi(fd, scmd);
+}
+
 
 /*
  * Function:    ftr_supported

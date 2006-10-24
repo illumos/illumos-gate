@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -97,6 +96,7 @@ int flush_cache(int fd);
 int set_reservation(int fd, ulong_t size);
 int format_media(int fd);
 uint32_t read_format_capacity(int fd, uint_t *bsize);
+void reset_dev(int fd);
 
 int uscsi_error;		/* used for debugging failed uscsi */
 

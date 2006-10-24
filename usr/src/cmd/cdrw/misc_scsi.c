@@ -572,6 +572,19 @@ eject_media(cd_device *dev)
 	if (vol_running) {
 		/* If there is a media, try using DKIOCEJECT 1st */
 		if (check_device(dev, CHECK_NO_MEDIA) == 0) {
+			/*
+			 * The check_device() call will issue
+			 * a TEST UNIT READY (TUR) and retry many
+			 * times when a DVD-R is present. The DKIOCEJECT
+			 * ioctl will subsequently fail causing us to
+			 * issue the LOAD/UNLOAD SCSI command to the device
+			 * with out ejecting the media. Insted of letting
+			 * this happen, issue a reset to the device before
+			 * issuing the DKIOCEJCET ioctl.
+			 */
+			if (device_type == DVD_MINUS)
+				reset_dev(dev->d_fd);
+
 			if (ioctl(dev->d_fd, DKIOCEJECT, 0) == 0) {
 				return (1);
 			}
