@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -193,12 +194,9 @@ __nss_dns_getbyaddr(be, a)
 	dns_backend_ptr_t	be;
 	void			*a;
 {
-	size_t	n;
-	struct hostent	*he, *he2;
+	struct hostent	*he;
 	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
-	int		ret, save_h_errno, mt_disabled;
-	char		**ans, hbuf[MAXHOSTNAMELEN];
-	char		dst[INET6_ADDRSTRLEN];
+	int		ret, mt_disabled;
 	struct in_addr	unmapv4;
 	sigset_t	oldmask;
 	int		af, addrlen;
@@ -221,94 +219,24 @@ __nss_dns_getbyaddr(be, a)
 	he = _gethostbyaddr(&argp->h_errno, addrp, addrlen, af);
 
 	if (he != NULL) {
-		if (strlen(he->h_name) >= MAXHOSTNAMELEN)
-			ret = NSS_STR_PARSE_ERANGE;
-		else {
-			/* save a copy of the (alleged) hostname */
-			(void) strcpy(hbuf, he->h_name);
-			n = strlen(hbuf);
-			if (n < MAXHOSTNAMELEN-1 && hbuf[n-1] != '.') {
-				(void) strcat(hbuf, ".");
-			}
+		/*
+		 * if asked to return data in string, convert
+		 * the hostent structure into string data
+		 */
+		if (argp->buf.result == NULL)
+			ret = ent2str(he, a, argp->key.hostaddr.type);
+		else
+			ret = ent2result(he, a, argp->key.hostaddr.type);
 
-			/*
-			 * if asked to return data in string,
-			 * convert the hostent structure into
-			 * string data
-			 */
-			if (argp->buf.result == NULL)
-				ret = ent2str(he, a, argp->key.hostaddr.type);
-			else
-				ret = ent2result(he, a,
-					argp->key.hostaddr.type);
-
-			save_h_errno = argp->h_errno;
-		}
 		if (ret == NSS_STR_PARSE_SUCCESS) {
-			/*
-			 * check to make sure by doing a forward query
-			 * We use _gethostbyname() to avoid the stack, and
-			 * then we throw the result from argp->h_errno away,
-			 * becase we don't care.  And besides you want the
-			 * return code from _gethostbyaddr() anyway.
-			 */
-
-			if (af == AF_INET)
-				he2 = _gethostbyname(&argp->h_errno, hbuf);
+			if (argp->buf.result == NULL)
+				argp->returnval = argp->buf.buffer;
 			else
-				he2 = _nss_dns_gethostbyname2(&argp->h_errno,
-					hbuf);
-			if (he2 != (struct hostent *)NULL) {
-
-				/* until we prove name and addr match */
-				argp->h_errno = HOST_NOT_FOUND;
-				for (ans = he2->h_addr_list; *ans; ans++)
-					if (memcmp(*ans, addrp,	addrlen) ==
-						0) {
-					argp->h_errno = save_h_errno;
-					if (argp->buf.result == NULL)
-						argp->returnval =
-							argp->buf.buffer;
-					else
-						argp->returnval =
-							argp->buf.result;
-					break;
-						}
-			} else {
-
-				/*
-				 * What to do if _gethostbyname() fails ???
-				 * We assume they are doing something stupid
-				 * like registering addresses but not names
-				 * (some people actually think that provides
-				 * some "security", through obscurity).  So for
-				 * these poor lost souls, because we can't
-				 * PROVE spoofing and because we did try (and
-				 * we don't want a bug filed on this), we let
-				 * this go.  And return the name from byaddr.
-				 */
-				argp->h_errno = save_h_errno;
-				if (argp->buf.result == NULL)
-					argp->returnval = argp->buf.buffer;
-				else
-					argp->returnval = argp->buf.result;
-			}
-			/* we've been spoofed, make sure to log it. */
-			if (argp->h_errno == HOST_NOT_FOUND) {
-				if (argp->key.hostaddr.type == AF_INET)
-		syslog(LOG_NOTICE, "gethostbyaddr: %s != %s",
-		/* LINTED: E_BAD_PTR_CAST_ALIGN */
-		hbuf, inet_ntoa(*(struct in_addr *)argp->key.hostaddr.addr));
-				else
-		syslog(LOG_NOTICE, "gethostbyaddr: %s != %s",
-		hbuf, inet_ntop(AF_INET6, (void *) argp->key.hostaddr.addr,
-		dst, sizeof (dst)));
-			}
+				argp->returnval = argp->buf.result;
 		} else {
 			argp->h_errno = HOST_NOT_FOUND;
-			if (ret == NSS_STR_PARSE_ERANGE) {
+			if (ret == NSS_STR_PARSE_ERANGE)
 				argp->erange = 1;
-			}
 		}
 	}
 
