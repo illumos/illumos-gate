@@ -681,3 +681,37 @@ Dbg_file_skip(Lm_list *lml, const char *oname, const char *nname)
 	else
 		dbg_print(lml, MSG_INTL(MSG_FIL_SKIP_2), nname);
 }
+
+void
+Dbg_file_modified(Lm_list *lml, const char *obj, const char *oname,
+    const char *nname, int ofd, int nfd, Elf *oelf, Elf *nelf)
+{
+	const char	*str;
+
+	if (DBG_NOTCLASS(DBG_C_FILES | DBG_C_SUPPORT))
+		return;
+	if (DBG_NOTDETAIL())
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_MODIFIED), oname, obj);
+
+	if (nname != oname)
+		dbg_print(lml, MSG_INTL(MSG_FIL_NAMECHANGE), nname);
+	if (nfd != ofd) {
+		if (nfd == -1)
+			str = MSG_INTL(MSG_FIL_IGNORE);
+		else
+			str = MSG_ORIG(MSG_STR_EMPTY);
+		dbg_print(lml, MSG_INTL(MSG_FIL_FDCHANGE), ofd, nfd, str);
+	}
+	if (nelf != oelf) {
+		if (nelf == 0)
+			str = MSG_INTL(MSG_FIL_IGNORE);
+		else
+			str = MSG_ORIG(MSG_STR_EMPTY);
+		dbg_print(lml, MSG_INTL(MSG_FIL_ELFCHANGE), EC_NATPTR(oelf),
+		    EC_NATPTR(nelf), str);
+	}
+	Dbg_util_nl(lml, DBG_NL_STD);
+}

@@ -69,7 +69,7 @@ Dbg_support_action(Lm_list *lml, const char *obj, const char *func,
 
 	if (ndx == LDS_START)
 		str = MSG_INTL(MSG_SUP_OUTFILE);
-	else if (ndx == LDS_FILE)
+	else if ((ndx == LDS_OPEN) || (ndx == LDS_FILE))
 		str = MSG_INTL(MSG_SUP_INFILE);
 	else if (ndx == LDS_INSEC)
 		str = MSG_INTL(MSG_SUP_INSEC);

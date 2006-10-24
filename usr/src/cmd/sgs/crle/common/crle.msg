@@ -1,7 +1,4 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,6 +18,11 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
 
 
@@ -38,24 +40,43 @@
 			 [-i name] [-I name] [-l dir] [-o dir ] [-s dir] \
 			 [-t ELF|AOUT] [-u] [-v]\n\
 			 \t[-64]\t\tprocess 64-bit objects\n\
-			 \t[-a name]\tadd an alternative name\n\
-			 \t[-A name]\tadd an optional alternative name\n\
+			 \t[-a name]\tdefine an alternative object name\n\
+			 \t[-A name]\tdefine an optional alternative object \
+			  name\n\
 			 \t[-c conf]\tspecify configuration file\n\
-			 \t[-e env]\tadd a replaceable environment variable\n\
-			 \t[-E env]\tadd an permanent environment variable\n\
+			 \t[-e env]\tdefine a replaceable environment \
+			  variable\n\
+			 \t[-E env]\tdefine a permanent environment variable\n\
 			 \t[-f flags]\tspecify flags for -G and -I\n\
-			 \t[-g name]\tadd group name\n\
-			 \t[-G name]\tadd group name and create \
+			 \t[-g name]\tdefine a group object name\n\
+			 \t[-G name]\tdefine a group object name and create \
 			  alternatives\n\
-			 \t[-i name]\tadd individual name\n\
-			 \t[-I name]\tadd individual name and create \
-			  alternative\n\
-			 \t[-l dir]\tadd default search directory\n\
+			 \t[-i name]\tdefine an individual object name\n\
+			 \t[-I name]\tdefine an individual object name and \
+			  create an\n\
+			 \t\t\talternative\n\
+			 \t[-l dir]\tdefine a default search directory\n\
 			 \t[-o dir]\tuse directory for alternative objects\n\
-			 \t[-s dir]\tadd trusted search directory\n\
+			 \t[-s dir]\tdefine a  trusted search directory\n\
 			 \t[-t ELF|AOUT]\ttoggle object type for -l and -s\n\
 			 \t[-u]\t\tupdate existing configuration file\n\
-			 \t[-v]\t\tprovide verbose processing information\n"
+			 \t[-v]\t\tprovide verbose processing information\n\
+			 \n\
+			 \tNote: without the -u option, the information \
+			  defined by the options\n\
+			 \tto crle() result in the replacement of any existing \
+			  configuration\n\
+			 \tfile, or default search paths.  With the -u option, \
+			  the information\n\
+			 \tdefined by the options to crle() is appended to any \
+			  existing\n\
+			 \tconfiguration file, or default search paths.\n\
+			 \n\
+			 \tSet the environment variable LD_NOCONFIG=yes to \
+			  disable the processing\n\
+			 \tof any configuration file information.  \
+			  See ld.so.1(1).\n"
+
 
 @ MSG_ARG_ILLEGAL	"%s: option %s has illegal argument `%s'\n"
 @ MSG_ARG_MULT		"%s: argument %s specified multiple times\n"
@@ -68,14 +89,14 @@
 @ MSG_ARG_UPDATE	"%s: %s: version [%d] of configuration file provides \
 			 limited update (-u) and command-line regeneration \
 			 capabilities: best effort in effect\n"
-@ MSG_ARG_UPDATEVER	"%s: %s: file version [%d] newer than crle version \
-			[%d]. Unable to update\n"
-@ MSG_ARG_PRINTVER	"%s: %s: file version [%d] newer than crle version \
+@ MSG_ARG_UPDATEVER	"%s: %s: file version [%d] newer than crle() version \
+			[%d].  Unable to update\n"
+@ MSG_ARG_PRINTVER	"%s: %s: file version [%d] newer than crle() version \
 			[%d]. Displayed information may be incomplete\n"
 @ MSG_ARG_CLASS		"%s: %s: 32-bit file is incompatible with -64 \
 			 option\n"
 @ MSG_ARG_WRONGARCH	"%s: %s: %s %s file is incompatible with \
-			%s %s version of crle\n"
+			%s %s version of crle()\n"
 
 @ MSG_WARN_ENV		"%s: warning: %.*s: environment variable \
 			 multiply-defined, first definition taken\n"

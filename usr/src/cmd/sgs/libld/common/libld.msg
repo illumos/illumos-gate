@@ -717,12 +717,14 @@
 
 @ MSG_SUP_START_64	"ld_start64"
 @ MSG_SUP_ATEXIT_64	"ld_atexit64"
+@ MSG_SUP_OPEN_64	"ld_open64"
 @ MSG_SUP_FILE_64	"ld_file64"
 @ MSG_SUP_INSEC_64	"ld_input_section64"
 @ MSG_SUP_SEC_64	"ld_section64"
 
 @ MSG_SUP_START		"ld_start"
 @ MSG_SUP_ATEXIT	"ld_atexit"
+@ MSG_SUP_OPEN		"ld_open"
 @ MSG_SUP_FILE		"ld_file"
 @ MSG_SUP_INSEC		"ld_input_section"
 @ MSG_SUP_SEC		"ld_section"

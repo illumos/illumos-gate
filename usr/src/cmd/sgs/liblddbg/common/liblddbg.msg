@@ -435,6 +435,12 @@
 @ MSG_FIL_CONFIG_ERR_5	"incompatible ELF class, byte order, or machine \
 			 architecture"
 
+@ MSG_FIL_MODIFIED	"file=%s; open modified by support library: %s"
+@ MSG_FIL_NAMECHANGE	"    name changed to: %s"
+@ MSG_FIL_FDCHANGE	"    file descriptor changed from: %d to: %d %s"
+@ MSG_FIL_ELFCHANGE	"    ELF descriptor changed from: 0x%llx to: 0x%llx %s"
+@ MSG_FIL_IGNORE	" (file will be ignored)"
+
 @ MSG_CNTL_TITLE	"control list processing complete: moving lmco 0x%llx \
 			 to lmco 0x%llx"
 
@@ -522,9 +528,10 @@
 
 # Section header messages
 
-@ MSG_SHD_MODIFIED	"section=%s; section header modified by support library"
-@ MSG_SHD_ORIG		" original:"
-@ MSG_SHD_NEW		" new:"
+@ MSG_SHD_MODIFIED	"section=%s; section header modified by support \
+			 library: %s"
+@ MSG_SHD_ORIG		"  original:"
+@ MSG_SHD_NEW		"  new:"
 
 # Section messages
 

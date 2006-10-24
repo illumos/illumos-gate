@@ -402,6 +402,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 					ofl->ofl_flags |= FLG_OF_FATAL;
 					return (0);
 				}
+
 				if ((arelf = elf_begin(fd, ELF_C_READ,
 				    adp->ad_elf)) == NULL) {
 					eprintf(ofl->ofl_lml, ERR_ELF,
@@ -430,6 +431,17 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 					return (S_ERROR);
 				(void) snprintf(arpath, len,
 				    MSG_ORIG(MSG_FMT_ARMEM), name, arname);
+
+				/*
+				 * Determine whether the support library wishes
+				 * to process this open.  See comments in
+				 * ld_process_open().
+				 */
+				ld_sup_open(ofl, (const char **)&arpath,
+				    (const char **)&arname, &fd,
+				    (FLG_IF_EXTRACT | FLG_IF_NEEDED),
+				    &arelf, adp->ad_elf, arsym->as_off,
+				    elf_kind(arelf));
 			}
 
 			/*
@@ -484,7 +496,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			DBG_CALL(Dbg_syms_ar_resolve(ofl->ofl_lml, ndx, arsym,
 			    arname, allexrt));
 			if ((err = (uintptr_t)ld_process_ifl(arpath, NULL, fd,
-			    arelf, FLG_IF_EXTRACT | FLG_IF_NEEDED, ofl,
+			    arelf, (FLG_IF_EXTRACT | FLG_IF_NEEDED), ofl,
 			    &_rej)) == S_ERROR)
 				return (S_ERROR);
 

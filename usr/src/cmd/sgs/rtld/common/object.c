@@ -144,7 +144,7 @@ elf_obj_file(Lm_list *lml, Aliste lmco, const char *name, int fd)
 	 * Proceed to process the input file.
 	 */
 	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
-	if (ld_process_open(name, name, fd, (Ofl_desc *)olmp->rt_priv,
+	if (ld_process_open(name, name, &fd, (Ofl_desc *)olmp->rt_priv,
 	    NULL, &rej) == (Ifl_desc *)S_ERROR)
 		return (0);
 	return (olmp);

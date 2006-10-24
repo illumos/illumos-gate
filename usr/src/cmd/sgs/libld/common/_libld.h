@@ -284,6 +284,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_sort_seg_list	ld64_sort_seg_list
 #define	ld_sunwmove_preprocess	ld64_sunwmove_preprocess
 #define	ld_sup_atexit		ld64_sup_atexit
+#define	ld_sup_open		ld64_sup_open
 #define	ld_sup_file		ld64_sup_file
 #define	ld_sup_loadso		ld64_sup_loadso
 #define	ld_sup_input_done	ld64_sup_input_done
@@ -380,6 +381,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_sort_seg_list	ld32_sort_seg_list
 #define	ld_sunwmove_preprocess	ld32_sunwmove_preprocess
 #define	ld_sup_atexit		ld32_sup_atexit
+#define	ld_sup_open		ld32_sup_open
 #define	ld_sup_file		ld32_sup_file
 #define	ld_sup_loadso		ld32_sup_loadso
 #define	ld_sup_input_done	ld32_sup_input_done
@@ -503,6 +505,9 @@ extern uintptr_t	ld_sort_ordered(Ofl_desc *);
 extern uintptr_t	ld_sort_seg_list(Ofl_desc *);
 extern uintptr_t	ld_sunwmove_preprocess(Ofl_desc *);
 extern void		ld_sup_atexit(Ofl_desc *, int);
+extern void		ld_sup_open(Ofl_desc *, const char **, const char **,
+			    int *, int, Elf **, Elf *ref, size_t,
+			    const Elf_Kind);
 extern void		ld_sup_file(Ofl_desc *, const char *, const Elf_Kind,
 			    int flags, Elf *);
 extern uintptr_t	ld_sup_loadso(Ofl_desc *, const char *);

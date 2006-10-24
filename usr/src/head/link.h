@@ -46,18 +46,23 @@ extern "C" {
  */
 #ifdef __STDC__
 extern uint_t	ld_version(uint_t);
+extern void	ld_input_done(uint_t *);
+
 extern void	ld_start(const char *, const Elf32_Half, const char *);
 extern void	ld_atexit(int);
+extern void	ld_open(const char **, const char **, int *, int, Elf **,
+			Elf *, size_t, const Elf_Kind);
 extern void	ld_file(const char *, const Elf_Kind, int, Elf *);
 extern void	ld_input_section(const char *, Elf32_Shdr **, Elf32_Word,
 			Elf_Data *, Elf *, uint_t *);
-extern void	ld_input_done(uint_t *);
 extern void	ld_section(const char *, Elf32_Shdr *, Elf32_Word,
 			Elf_Data *, Elf *);
 
 #if defined(_LP64) || defined(_LONGLONG_TYPE)
 extern void	ld_start64(const char *, const Elf64_Half, const char *);
 extern void	ld_atexit64(int);
+extern void	ld_open64(const char **, const char **, int *, int, Elf **,
+			Elf *, size_t, const Elf_Kind);
 extern void	ld_file64(const char *, const Elf_Kind, int, Elf *);
 extern void	ld_input_section64(const char *, Elf64_Shdr **, Elf64_Word,
 			Elf_Data *, Elf *, uint_t *);
@@ -67,39 +72,46 @@ extern void	ld_section64(const char *, Elf64_Shdr *, Elf64_Word,
 #endif /* (defined(_LP64) || defined(_LONGLONG_TYPE) */
 #else
 extern void	ld_version();
+extern void	ld_input_done();
+
 extern void	ld_start();
 extern void	ld_atexit();
+extern void	ld_open();
 extern void	ld_file();
 extern void	ld_input_section();
-extern void	ld_input_done();
 extern void	ld_section();
 
 #if defined(_LP64) || defined(_LONGLONG_TYPE)
 extern void	ld_start64();
 extern void	ld_atexit64();
+extern void	ld_open64();
 extern void	ld_file64();
+extern void	ld_input_section64();
 extern void	ld_section64();
 
 #endif /* (defined(_LP64) || defined(_LONGLONG_TYPE) */
 #endif /* __STDC__ */
 
 /*
- * ld_version() version values
+ * ld_version() version values.
  */
 #define	LD_SUP_VNONE	0
 #define	LD_SUP_VERSION1	1
 #define	LD_SUP_VERSION2	2
-#define	LD_SUP_VCURRENT	LD_SUP_VERSION2
-
+#define	LD_SUP_VERSION3	3
+#define	LD_SUP_VCURRENT	LD_SUP_VERSION3
 
 /*
- * flags passed to ld support calls
+ * Flags passed to ld support calls.
  */
 #define	LD_SUP_DERIVED		0x1	/* derived filename */
 #define	LD_SUP_INHERITED	0x2	/* file inherited from .so DT_NEEDED */
 #define	LD_SUP_EXTRACTED	0x4	/* file extracted from archive */
 #endif
 
+/*
+ * Runtime link-map identifiers.
+ */
 #define	LM_ID_BASE		0x00
 #define	LM_ID_LDSO		0x01
 #define	LM_ID_BRAND		0x02	/* marks branded objs in rd_loadobj_t */
@@ -109,9 +121,8 @@ extern void	ld_section64();
 
 #define	LM_ID_NEWLM		0xff	/* create a new link-map */
 
-
 /*
- * Run-Time Link-Edit Auditing
+ * Runtime Link-Edit Auditing.
  */
 #define	LAV_NONE		0
 #define	LAV_VERSION1		1

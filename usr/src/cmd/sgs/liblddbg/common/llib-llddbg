@@ -129,6 +129,10 @@ void	Dbg32_file_ldso(Rt_map *, char **, auxv_t *, const char *, Aliste);
 void	Dbg64_file_ldso(Rt_map *, char **, auxv_t *, const char *, Aliste);
 void	Dbg32_file_mode_promote(Rt_map *, int);
 void	Dbg64_file_mode_promote(Rt_map *, int);
+void	Dbg32_file_modified(Lm_list *, const char *, const char *, const char *,
+	    int, int, Elf *, Elf *);
+void	Dbg64_file_modified(Lm_list *, const char *, const char *, const char *,
+	    int, int, Elf *, Elf *);
 void	Dbg32_file_needed(Rt_map *, const char *);
 void	Dbg64_file_needed(Rt_map *, const char *);
 void	Dbg32_file_output(Ofl_desc *);
@@ -297,8 +301,10 @@ void	Dbg64_seg_os(Ofl_desc *, Os_desc *, int);
 void    Dbg32_seg_title(Lm_list *);
 void    Dbg64_seg_title(Lm_list *);
 
-void	Dbg32_shdr_modified(Lm_list *, Half, Shdr *, Shdr *, const char *);
-void	Dbg64_shdr_modified(Lm_list *, Half, Shdr *, Shdr *, const char *);
+void	Dbg32_shdr_modified(Lm_list *, const char *, Half, Shdr *, Shdr *,
+	    const char *);
+void	Dbg64_shdr_modified(Lm_list *, const char *, Half, Shdr *, Shdr *,
+	    const char *);
 
 void	Dbg32_statistics_ar(Ofl_desc *);
 void	Dbg64_statistics_ar(Ofl_desc *);

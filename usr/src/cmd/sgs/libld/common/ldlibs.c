@@ -203,9 +203,10 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 				return ((Ifl_desc *)S_ERROR);
 			(void) strcpy(_path, path);
 
-			ifl = ld_process_open(_path, &_path[dlen], fd, ofl,
+			ifl = ld_process_open(_path, &_path[dlen], &fd, ofl,
 			    FLG_IF_NEEDED, rej);
-			(void) close(fd);
+			if (fd != -1)
+				(void) close(fd);
 			return (ifl);
 
 		} else if (errno != ENOENT) {
@@ -232,9 +233,10 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 			return ((Ifl_desc *)S_ERROR);
 		(void) strcpy(_path, path);
 
-		ifl = ld_process_open(_path, &_path[dlen], fd, ofl,
+		ifl = ld_process_open(_path, &_path[dlen], &fd, ofl,
 		    FLG_IF_NEEDED, rej);
-		(void) close(fd);
+		if (fd != -1)
+			(void) close(fd);
 		return (ifl);
 
 	} else if (errno != ENOENT) {

@@ -1136,3 +1136,10 @@ Bugid   Risk Synopsis
 6475375 symbol search optimization to reduce rescans
 6475497 elfdump(1) is misreporting sh_link
 6477132 ld.so.1: memory leak when running set*id application
+6479848 Enhancements to the linker support interface needed. (D)
+	PSARC/2006/595 link-editor support library interface - ld_open()
+6482058 lari(1) could be faster, and handle per-symbol filters better
+6482974 defining virtual address of text segment can result in an invalid data
+	segment
+6476734 crle(1m) "-l" as described fails system, crle cores trying to fix
+	/a/var/ld/ld.config in failsafe

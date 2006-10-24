@@ -2058,18 +2058,39 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
  * archive (see libs.c: ld_process_archive()).
  */
 Ifl_desc *
-ld_process_open(const char *path, const char *file, int fd, Ofl_desc *ofl,
+ld_process_open(const char *opath, const char *ofile, int *fd, Ofl_desc *ofl,
     Half flags, Rej_desc *rej)
 {
-	Elf	*elf;
+	Elf		*elf;
+	const char	*npath = opath;
+	const char	*nfile = ofile;
 
-	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
-		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN), path);
+	if ((elf = elf_begin(*fd, ELF_C_READ, NULL)) == NULL) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN), npath);
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 
-	return (ld_process_ifl(path, file, fd, elf, flags, ofl, rej));
+	/*
+	 * Determine whether the support library wishes to process this open.
+	 * The support library may return:
+	 *   .	a different ELF descriptor (in which case they should have
+	 *	closed the original)
+	 *   .	a different file descriptor (in which case they should have
+	 *	closed the original)
+	 *   .	a different path and file name (presumably associated with
+	 *	a different file descriptor)
+	 *
+	 * A file descriptor of -1, or and ELF descriptor of zero indicates
+	 * the file should be ignored.
+	 */
+	ld_sup_open(ofl, &npath, &nfile, fd, flags, &elf, NULL, 0,
+	    elf_kind(elf));
+
+	if ((*fd == -1) || (elf == NULL))
+		return (0);
+
+	return (ld_process_ifl(npath, nfile, *fd, elf, flags, ofl, rej));
 }
 
 /*
@@ -2121,8 +2142,9 @@ process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
 		if ((_path = libld_malloc(strlen(path) + 1)) == 0)
 			return ((Ifl_desc *)S_ERROR);
 		(void) strcpy(_path, path);
-		ifl = ld_process_open(_path, &_path[dlen], fd, ofl, NULL, rej);
-		(void) close(fd);
+		ifl = ld_process_open(_path, &_path[dlen], &fd, ofl, NULL, rej);
+		if (fd != -1)
+			(void) close(fd);
 		return (ifl);
 	}
 }
@@ -2197,9 +2219,10 @@ ld_finish_libs(Ofl_desc *ofl)
 			} else {
 				Rej_desc	_rej = { 0 };
 
-				ifl = ld_process_open(file, ++slash, fd, ofl,
+				ifl = ld_process_open(file, ++slash, &fd, ofl,
 				    NULL, &_rej);
-				(void) close(fd);
+				if (fd != -1)
+					(void) close(fd);
 
 				if (ifl == (Ifl_desc *)S_ERROR) {
 					return (S_ERROR);

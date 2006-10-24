@@ -30,18 +30,20 @@
 #
 
 # Define all global variables (required for strict)
-use vars  qw($Prog $DestDir $ObjRef $ObjFlag $ObjSize $TmpDir $LddArgs);
-use vars  qw($Glob $Intp $Cpyr $Prot $Extn $Self $Filt $Dirc $Plta $User $Func);
-use vars  qw($Objt $UndefSym $IgnSyms $Rtld $MultSyms $CrtSyms $GlobWeak);
-use vars  qw($DbgSeed %opt %Symbols %Objects %Versioned %DemSyms);
-use vars  qw($Platform $Nodi $Osft $Oaft $Ssft $Saft $Msft);
+use vars  qw($Prog $DestDir $ObjRef $ObjFlag $ObjSize $TmpDir $LddArgs $SymFlag);
+use vars  qw($Glob $Intp $Dirc $Cpyr $Prot $Extn $Self $Gfte $Plta $User $Func);
+use vars  qw($Sfte $Afte $Objt $Nodi $Osft $Oaft $Ssft $Saft $Msft);
+use vars  qw($Rtld $GlobWeak $MultSyms $CrtSyms $Platform $DbgSeed %opt);
+
+# Global arrays that must be cleared for multi input file use.
+use vars  qw(%Symbols %Objects %Versioned %DemSyms %ObjFltrs %SymFltes);
 
 use strict;
 
 use Getopt::Std;
 use File::Basename;
 
-# Pattern match to skip objects.
+# Pattern match to skip the runtime linker.
 $Rtld = qr{
 	/lib/ld\.so\.1 |
 	/usr/lib/ld\.so\.1 |
@@ -83,27 +85,17 @@ $CrtSyms = qr{ ^(?:
 	 )$
 }x;
 
-# Pattern match to remove undefined, NOTY and versioning symbols.
-$UndefSym = qr{ ^(?:
-	UNDEF
-	)$
-}x;
-
-$IgnSyms = qr{ ^(?:
-	NOTY |
-	ABS
-	)$
-}x;
-
 # Symbol flags.
 $Glob = 0x00001;	# symbol is global
+$Sfte = 0x00002;	# symbol is a filtee backing a standard filter
+$Afte = 0x00004;	# symbol is a filtee backing a auxiliary filter
+$Gfte = 0x00008;	# symbol bound as a filtee
 $Intp = 0x00010;	# symbol originates for explicit interposer
 $Dirc = 0x00020;	# symbol bound to directly
 $Cpyr = 0x00040;	# symbol bound to copy-relocation reference
 $Prot = 0x00080;	# symbol is protected (symbolic)
 $Extn = 0x00100;	# symbol has been bound to from an external reference
 $Self = 0x00200;	# symbol has been bound to from the same object
-$Filt = 0x00400;	# symbol bound to a filtee
 $Plta = 0x00800;	# symbol bound to executables plt address
 $User = 0x01000;	# symbol binding originates from user (dlsym) request
 $Func = 0x02000;	# symbol is of type function
@@ -113,7 +105,7 @@ $Nodi = 0x08000;	# symbol prohibits direct binding
 $Osft = 0x10000;	# symbol is an standard object filter
 $Oaft = 0x20000;	# symbol is an auxiliary object filter
 $Ssft = 0x40000;	# symbol is a per-symbol standard filter
-$Saft = 0x80000;	# symbol is a per-symbol auxilary filter
+$Saft = 0x80000;	# symbol is a per-symbol auxiliary filter
 $Msft = 0xf0000;	# filter mask
 
 # Offsets into $Symbols{$SymName}{$Obj} array.
@@ -121,6 +113,8 @@ $ObjRef =	0;
 $ObjFlag =	1;
 $ObjSize =	2;
 
+# Offset into $SymFltr{$SymName}{$Filtee} array.
+$SymFlag = 	0;
 
 # Establish locale
 use POSIX qw(locale_h);
@@ -146,7 +140,7 @@ sub inappropriate {
 	}
 }
 
-# Cleanup any temporary files on interruption
+# Cleanup any temporary files on interruption.
 sub Cleanup {
 	my ($Sig) = @_;
 
@@ -172,8 +166,7 @@ if ((getopts('abCDd:imosv', \%opt) == 0) || ($#ARGV < 0)) {
 	print STDERR
 	    gettext("\t[-a]     print diagnostics for all symbols\n");
 	print STDERR
-	    gettext("\t[-b]     print diagnostics for multiple-bound " .
-		"symbols\n");
+	    gettext("\t[-b]     limit diagnostics to bound symbols\n");
 	print STDERR
 	    gettext("\t[-C]     print demangled symbol names also\n");
 	print STDERR
@@ -185,7 +178,7 @@ if ((getopts('abCDd:imosv', \%opt) == 0) || ($#ARGV < 0)) {
 	print STDERR
 	    gettext("\t[-m]     create mapfiles for interface requirements\n");
 	print STDERR
-	    gettext("\t[-o]     print overhead information\n");
+	    gettext("\t[-o]     limit diagnostics to overhead information\n");
 	print STDERR
 	    gettext("\t[-s]     save bindings information created by ldd(1)\n");
 	print STDERR
@@ -358,7 +351,7 @@ sub ProcDir {
 				next;
 			}
 
-			# If we're decending into a platform directory, ignore
+			# If we're descending into a platform directory, ignore
 			# any inappropriate platform specific files.  These
 			# files can have dependencies that in turn bring in the
 			# appropriate platform specific file, resulting in more
@@ -524,51 +517,15 @@ sub ProcBindings {
 		%Symbols = ();
 		%Objects = ();
 		%Versioned = ();
+		%DemSyms = ();
+		%ObjFltrs = ();
+		%SymFltes = ();
 	}
 
 	# As debugging output can be significant, read a line at a time.
 	open($FileHandle, "<$DbgFile");
 	while (defined(my $Line = <$FileHandle>)) {
 		chomp($Line);
-
-		# If we find a relationship between a filter and filtee, save
-		# it, we'll come back to this once we've gathered everybodies
-		# symbols.
-		if ($Line =~ /;  filtered by /) {
-			my ($Filtee) = $Line;
-			my ($Filter) = $Line;
-
-			# Separate the filter and filtee names, ignore the
-			# runtime linker.
-			$Filtee =~ s/^.*: file=(.*);  filtered by .*/$1/;
-			if ($Filtee =~ $Rtld) {
-				next;
-			}
-			$Filter =~ s/^.*;  filtered by //;
-			$Filtees{$Filtee}{$Filter} = 1;
-			next;
-		}
-
-		# If we find a configuration alternative, determine whether it
-		# is for one of our filtees, and if so record it.
-		if ($Line =~ / configuration alternate found:/) {
-			my ($Orig) = $Line;
-			my ($Altr) = $Line;
-
-			# Separate the original and alternative names.
-			$Orig =~ s/^.*: file=(.*)  .*$/$1/;
-			$Altr =~ s/^.* configuration alternate found: (.*)$/$1/;
-
-			for my $Filtee (keys(%Filtees)) {
-				if ($Filtee ne $Orig) {
-					next;
-				}
-				for my $Filter (keys(%{$Filtees{$Filtee}})) {
-					$Filtees{$Altr}{$Filter} = 1;
-				}
-			}
-			next;
-		}
 
 		# Collect the symbols from any file analyzed.
 		if ($Line =~ /^.*: file=(.*);  analyzing .*/) {
@@ -602,7 +559,7 @@ sub ProcBindings {
 			# of the reference, "(0x1234...)", but in the case of a
 			# user lookup it's the string "(dlsym)".  If we don't
 			# find this offset information we've been given a debug
-			# file that didn't user the "datail" token, in which case
+			# file that didn't use the "detail" token, in which case
 			# we're not getting all the information we need.
 			if ($Fields[$Offset] =~ /^\((.*)\)/) {
 				if ($1 eq 'dlsym') {
@@ -680,8 +637,8 @@ sub ProcBindings {
 				$Objects{$DstFile}{$SymName} |= $Cpyr;
 			}
 			if ($BndInfo =~ /filtee/) {
-				$Symbols{$SymName}{$DstFile}[$ObjFlag] |= $Filt;
-				$Objects{$DstFile}{$SymName} |= $Filt;
+				$Symbols{$SymName}{$DstFile}[$ObjFlag] |= $Gfte;
+				$Objects{$DstFile}{$SymName} |= $Gfte;
 			}
 			if ($BndInfo =~ /interpose/) {
 				$Symbols{$SymName}{$DstFile}[$ObjFlag] |= $Intp;
@@ -699,40 +656,107 @@ sub ProcBindings {
 	}
 	close($FileHandle);
 
-	# Now that we've processed all objects, complete any auxiliary filtee
-	# tagging.  For each filtee, determine which of the symbols it exports
-	# are also defined in its filters.  If a filtee is bound to, the
+	# Now that we've processed all objects, traverse the set of object
+	# filters that have been captured from parsing any FILTER and AUXILIARY
+	# dynamic tags.  For each filtee, determine which of the symbols it
+	# exports are also defined in the filter.  If a filter is bound to, the
 	# runtime linkers diagnostics will indicate a filtee binding.  However,
 	# some of the filtee symbols may not be bound to, so here we mark them
 	# all so as to remove them from any interesting output.
-	for my $Filtee (keys(%Filtees)) {
+	for my $Filter (keys(%ObjFltrs)) {
 
-		# Standard filters aren't captured at all, as nothing can bind
-		# to them.
-		if (!exists($Objects{$Filtee})) {
-			next;
-		}
+		# Determine the filtees that are associated with this filter.
+		for my $Filtee (keys(%{$ObjFltrs{$Filter}})) {
+			my ($FileName);
 
-		# Determine what symbols this filtee offers.
-		foreach my $SymName (keys(%{$Objects{$Filtee}})) {
+			# Reduce the filtee to a simple file name.  Then, try
+			# and associate this simple file name with the objects
+			# that have been processed.  These objects are typically
+			# recorded with a full path name.
+			chomp($FileName = `basename $Filtee`);
+			for my $Obj (keys(%Objects)) {
+				if ($Obj =~ /\/$FileName$/) {
+					$Filtee = $Obj;
+					last;
+				}
+			}
 
-			# Ignore the usual reserved stuff.
-			if (!$opt{a} && (($SymName =~ $MultSyms) ||
-			    ($SymName =~ $CrtSyms))) {
+			if (!exists($Objects{$Filtee})) {
 				next;
 			}
 
-			# Determine whether this symbol exists in our filter.
-			for my $Filter (keys(%{$Filtees{$Filtee}})) {
+			# Traverse the symbols of the filtee (these are
+			# typically a smaller set than the filter) and if the
+			# symbol is defined by the filter tag the symbol as a
+			# filtee.
+			for my $SymName (keys(%{$Objects{$Filtee}})) {
+				my ($OFlag, $FFlag);
+
+				# Ignore the usual stuff.
+				if (($SymName =~ $MultSyms) ||
+				    ($SymName =~ $CrtSyms)) {
+					next;
+				}
+
 				if (!$Symbols{$SymName}{$Filter}) {
 					next;
 				}
-				if (!($Symbols{$SymName}{$Filter}[$ObjFlag] &
-				    $Msft)) {
-					next;
+
+				# Determine the type of filter.
+				$OFlag = $Symbols{$SymName}{$Filter}[$ObjFlag];
+
+				# Specifically identify the type of filtee we
+				# have and remove any generic filtee flag.
+				if ($OFlag & ($Osft | $Ssft)) {
+					$FFlag = $Sfte;
+				} else {
+					$FFlag = $Afte;
 				}
-				$Symbols{$SymName}{$Filtee}[$ObjFlag] |= $Filt;
+
+				$Symbols{$SymName}{$Filtee}[$ObjFlag] |= $FFlag;
+				$Symbols{$SymName}{$Filtee}[$ObjFlag] &= ~$Gfte;
 			}
+		}
+	}
+
+	# Traverse the set of per-symbol filters making sure we've tagged any
+	# associated filtee symbols, as we did above for object filters.
+	for my $Filtee (keys(%SymFltes)) {
+		my ($FullPath) = $Filtee;
+		my ($FileName);
+
+		# Reduce the filtee to a simple file name.  Then, try and
+		# associate this simple file name with the objects that have
+		# been processed.  These objects are typically recorded with a
+		# full path name.
+		chomp($FileName = `basename $Filtee`);
+		for my $Obj (keys(%Objects)) {
+			if ($Obj =~ /\/$FileName$/) {
+				$FullPath = $Obj;
+				last;
+			}
+		}
+
+		if (!exists($Objects{$FullPath})) {
+			next;
+		}
+
+		for my $SymName (keys(%{$SymFltes{$Filtee}})) {
+			my ($OFlag, $FFlag);
+
+			# Determine the type of filter.
+			$OFlag = $SymFltes{$Filtee}{$SymName}[$SymFlag];
+
+			# Specifically identify the type of filtee we have and
+			# remove any generic filtee flag.
+			if ($OFlag & $Ssft) {
+				$FFlag = $Sfte;
+			} else {
+				$FFlag = $Afte;
+			}
+
+			$Symbols{$SymName}{$FullPath}[$ObjFlag] |= $FFlag;
+			$Symbols{$SymName}{$FullPath}[$ObjFlag] &= ~$Gfte;
 		}
 	}
 
@@ -777,7 +801,7 @@ sub ProcBindings {
 				# symbols that have been bound to from an
 				# external object, or must be global to enable
 				# a binding to an interposing definition.
-				# Skip bindings to ourself as these are
+				# Skip bindings to ourself, as these are
 				# candidates for demoting to local.
 				if (!($Flag & ($Extn | $Intp))) {
 					next;
@@ -880,11 +904,14 @@ sub ProcBindings {
 				# If we haven't been asked for all symbols, only
 				# print those reserved symbols that have been
 				# bound to, as the number of reserved symbols
-				# can be quite excessive.
+				# can be quite excessive.  Also, remove any
+				# standard filters, as nothing can bind to these
+				# symbols anyway.
 				if (!$opt{a} && ((($SymName =~ $MultSyms) &&
 				    (($Flag & ($Extn | $Self)) == 0)) ||
 				    (($SymName =~ $CrtSyms) && (($Flag &
-				    ($Extn | $Self | $Prot)) == 0)))) {
+				    ($Extn | $Self | $Prot)) == 0)) ||
+				    ($Flag & ($Ssft | $Osft)))) {
 					next;
 				}
 
@@ -925,7 +952,7 @@ sub ProcBindings {
 					$Str = $Str . 'C';
 				}
 				# Is this symbol part of filtee.
-				if ($Flag & $Filt) {
+				if ($Flag & ($Sfte | $Afte | $Gfte)) {
 					$Str = $Str . 'F';
 				}
 				# Is this symbol protected (in which case there
@@ -947,7 +974,7 @@ sub ProcBindings {
 				if ($Flag & $Msft) {
 					$Str = $Str . 'R';
 				}
-				# Does this definition explicity define no
+				# Does this definition explicitly define no
 				# direct binding.
 				if ($Flag & $Nodi) {
 					$Str = $Str . 'N';
@@ -995,15 +1022,18 @@ sub Interesting
 {
 	my ($SymName) = @_;
 	my ($ObjCnt, $GFlags, $BndCnt, $FltCnt, $NodiCnt, $RdirCnt, $ExRef);
+	my ($TotCnt);
 
 	# Scan all definitions of this symbol, thus determining the definition
 	# count, the number of filters, redirections, executable references
 	# (copy-relocations, or plt addresses), no-direct bindings, and the
 	# number of definitions that have been bound to.
 	$ObjCnt = $GFlags = $BndCnt = $FltCnt =
-		$NodiCnt = $RdirCnt = $ExRef = 0;
+	    $NodiCnt = $RdirCnt = $ExRef = $TotCnt = 0;
 	foreach my $Obj (keys(%{$Symbols{$SymName}})) {
 		my ($Flag) = $Symbols{$SymName}{$Obj}[$ObjFlag];
+
+		$TotCnt++;
 
 		# Ignore standard filters when determining the symbol count, as
 		# a standard filter can never be bound to.
@@ -1011,8 +1041,14 @@ sub Interesting
 			$ObjCnt++;
 		}
 
+		# If we're only looking at interesting objects, then standard
+		# filters are ignored, so suppress any standard filtee tagging.
+		if (!$opt{a}) {
+			$Flag = $Symbols{$SymName}{$Obj}[$ObjFlag] &= ~$Sfte;
+		}
+
 		$GFlags |= $Flag;
-		if ($Flag & $Filt) {
+		if ($Flag & ($Sfte | $Afte | $Gfte)) {
 			$FltCnt++;
 		}
 		if ($Flag & $Nodi) {
@@ -1044,7 +1080,7 @@ sub Interesting
 	# If we want all symbols, return the count.  If we want all bound
 	# symbols, return the count provided it is non-zero.
 	if ($opt{a} && (!$opt{b} || ($BndCnt > 0))) {
-		return $ObjCnt;
+		return $TotCnt;
 	}
 
 	# Single instance symbol definitions aren't very interesting.
@@ -1117,13 +1153,18 @@ sub Interesting
 # object has been versioned.
 sub GetAllSymbols {
 	my ($Obj) = @_;
-	my (@Elfd, @Elfs, @Elfr, $Type, $Exec, $FileHandle);
+	my ($Type, $FileHandle);
 	my (%AddrToName, %NameToAddr);
+	my ($Exec) = 0;
 	my ($Vers) = 0;
 	my ($Symb) = 0;
 	my ($Copy) = 0;
 	my ($Interpose) = 0;
 	my ($Fltr) = 0;
+	my ($Ehdr) = 0;
+	my ($Dyn) = 0;
+	my ($Rel) = 0;
+	my ($Info) = 0;
 
 	# Determine whether we've already retrieved this object's symbols.
 	# Also, ignore the runtime linker, it's on a separate link-map, and
@@ -1139,76 +1180,135 @@ sub GetAllSymbols {
 		return;
 	}
 
-	# Get the dynamic information.
-	@Elfd = split(/\n/, `LC_ALL=C elfdump -d '$Obj' 2> /dev/null`);
-
-	# If there's no information, it's possible we've been given a debug
-	# output file and are processing it from a location from which the
-	# dependencies specified in the debug file aren't accessible.
-	if (!@Elfd) {
-		printf STDERR gettext("%s: %s: unable to process ELF file\n"),
-		    $Prog, $Obj;
-
-		# Add the file to our list, so that we don't create the same
-		# message again.  Processing should continue so that we can
-		# flush out as many error messages as possible.
-		$Objects{$Obj}{"DoesNotExist"} = 0;
-		return;
-	}
-
-	# If we're processing a filter there's no need to save any symbols, as
-	# no bindings will occur to this object.
+	# Get as much ELF information as we can from elfdump(1).  A second
+	# invocation of elfdump(1) is required to obtain the symbol table, whose
+	# processing can be affected by states determined during this pass.
 	#
-	# Determine whether we've got a symbolicly bound object.  With newer
-	# linkers all symbols will be marked as protected ("P"), but with older
-	# linkers this state could only be intuited from the symbolic dynamic
-	# tag.
-	foreach my $Line (@Elfd) {
+	# The information required:
+	#	-e	ELF header provides the file type
+	#	-d	dynamic information provides filter names 
+	#	-r	relocations provide for copy relocations
+	#	-y	symbol information section provide pre-symbol filters
+	#		and direct binding information
+	#
+	# As this information can be quite large, process the elfdump(1) output
+	# through a pipe.
+	open($FileHandle, "LC_ALL=C elfdump -edry '$Obj' 2> /dev/null |");
+
+	while (defined(my $Line = <$FileHandle>)) {
 		my (@Fields);
-		@Fields = split(' ', $Line);
 
-		# Determine if the FILTER tag is set.
-		if ($#Fields == 3) {
-			if ($Fields[1] eq "FILTER") {
-				$Fltr |= $Osft;
+		chomp($Line);
+
+		# Each collection of data is preceded with a title that
+		# starts in column 0.  Items of data all have some form of
+		# indentation.
+		if ($Line =~ /^[A-Z]/) {
+			if ($Line =~ /^ELF Header/) {
+				$Ehdr = 1;
+				$Dyn = $Rel = $Info = 0;
+			} elsif ($Line =~ /^Dynamic Section:/) {
+				$Dyn = 1;
+				$Ehdr = $Rel = $Info = 0;
+			} elsif ($Line =~ /^Relocation Section:/) {
+				$Rel = 1;
+				$Ehdr = $Dyn = $Info = 0;
+			} elsif ($Line =~ /^Syminfo Section:/) {
+				$Info = 1;
+				$Ehdr = $Dyn = $Rel = 0;
+			} else {
+				$Ehdr = $Dyn = $Rel = $Info = 0;
+			}
+			next;
+		}
+
+		# Inspect the ELF header.
+		if ($Ehdr eq 1) {
+			# Determine the ELF file type from the e_type element.
+			if ($Line =~ /e_type:/) {
+				if ($Line =~ /ET_EXEC/) {
+					$Exec = 1;
+				}
+
+				# There's nothing of interest left in the ELF
+				# header, so skip processing other entries.
+				$Ehdr = 0;
 				next;
 			}
-			if ($Fields[1] eq "AUXILIARY") {
-				$Fltr |= $Oaft;
+		}
+
+		# Inspect the .dynamic section.
+		if ($Dyn eq 1) {
+			@Fields = split(' ', $Line);
+
+			# Determine if the FILTER or AUXILIARY tag is set.
+			if ($#Fields == 3) {
+				my ($Flte) = 0;
+
+				if ($Fields[1] eq 'FILTER') {
+					$Fltr |= $Osft;
+					$Flte = 1;
+				}
+				elsif ($Fields[1] eq 'AUXILIARY') {
+					$Fltr |= $Oaft;
+					$Flte = 1;
+				}
+				if ($Flte eq 1) {
+					my (@Filtees) = split(':', $Fields[3]);
+
+					for my $Filtee (@Filtees) {
+						if ($Filtee =~ $Rtld) {
+							next;
+						}
+						$ObjFltrs{$Obj}{$Filtee} = 1;
+					}
+				}
+				next;
+			}
+
+			# We're only interested in the FLAGS entry.
+			if (($#Fields < 4) || ($Fields[1] !~ /^FLAGS/)) {
+				next;
+			}
+
+			# Determine whether we've got a symbolicly bound object.
+			# With newer link-editors, all symbols will be marked as
+			# protected ("P"), but with older link-editors this
+			# state could only be inferred from the symbolic dynamic
+			# tag.
+			if (($Fields[1] eq 'FLAGS') &&
+			    ($Line =~ / SYMBOLIC /)) {
+				$Symb = 1;
+				next;
+			}
+
+			# Determine whether this object is an interposer.
+			if (($Fields[1] eq 'FLAGS_1') &&
+			    ($Line =~ / INTERPOSE /)) {
+				$Interpose = 1;
 				next;
 			}
 			next;
 		}
 
-		# We're only interested in the FLAGS entry.
-		if (($#Fields < 4) || ($Fields[1] !~ "^FLAGS")) {
-			next;
-		}
-		if (($Fields[1] eq "FLAGS") && ($Line =~ " SYMBOLIC ")) {
-			$Symb = 1;
-			next;
-		}
-		if (($Fields[1] eq "FLAGS_1") && ($Line =~ " INTERPOSE ")) {
-			$Interpose = 1;
-		}
-	}
+		# Inspect the relocation information.  As we're only looking
+		# for copy relocations, this processing is only necessary for
+		# executables.
+		if ($Rel eq 1) {
+			my ($SymName);
 
-	# If this file is a dynamic executable, determine if this object has
-	# any copy relocations so that any associated bindings can be labeled
-	# more meaningfully.
-	$Type = `LC_ALL=C file '$Obj'`;
-	if ($Type =~ /executable/) {
-		$Exec = 1;
-		# Obtain any copy relocations.
-		@Elfr = split(/\n/, `LC_ALL=C elfdump -r '$Obj' 2>&1`);
-
-		foreach my $Rel (@Elfr) {
-			my ($SymName, @Fields);
-
-			if ($Rel !~ / R_[A-Z0-9]+_COPY /) {
+			if ($Exec eq 0) {
+				$Rel = 0;
 				next;
 			}
-			@Fields = split(' ', $Rel);
+
+			# Obtain any copy relocations.
+			if ($Line !~ / R_[A-Z0-9]+_COPY /) {
+				next;
+			}
+
+			@Fields = split(' ', $Line);
+
 			# Intel relocation records don't contain an addend,
 			# where as every other supported platform does.
 			if ($Fields[0] eq 'R_386_COPY') {
@@ -1221,48 +1321,114 @@ sub GetAllSymbols {
 			$Objects{$Obj}{$SymName} |= $Cpyr;
 			$Copy = 1;
 		}
-	} else {
-		$Exec = 0;
+
+		# Inspect the .SUNW_syminfo section.
+		if ($Info eq 1) {
+			my ($SymName);
+			my ($Flags) = 0;
+
+			@Fields = split(' ', $Line);
+
+			# Binding attributes are in the second column.
+			if ($#Fields < 1) {
+				next;
+			}
+			if ($Fields[1] =~ /N/) {
+				$Flags |= $Nodi;
+			}
+			if ($Fields[1] =~ /F/) {
+				$Flags |= $Ssft;
+			}
+			if ($Fields[1] =~ /A/) {
+				$Flags |= $Saft;
+			}
+
+			# Determine the symbol name based upon the number of
+			# fields.
+			if ($Flags) {
+				$SymName = $Fields[$#Fields];
+				$Symbols{$SymName}{$Obj}[$ObjFlag] |= $Flags;
+				$Objects{$Obj}{$SymName} |= $Flags;
+			}
+
+			# If this is a filter, we need to tag the associated
+			# filtee symbol.  However, the filtee might not have
+			# been processed yet, so save this information for later.
+			$Flags &= ~$Nodi;
+			if ($Flags) {
+				my ($Filtee) = $Fields[$#Fields - 1];
+
+				if ($Filtee =~ $Rtld) {
+					next;
+				}
+				$SymFltes{$Filtee}{$SymName}[$SymFlag] = $Flags;
+			}
+		}
 	}
 
-	# Obtain the dynamic symbol table for this object.  Symbol tables can
-	# be quite large, so open the elfump command through a pipe.
+	close($FileHandle);
+
+	# If there's no expected information, it's possible we've been given a
+	# debug output file and are processing the file from a location from
+	# which the dependencies specified in the debug file aren't accessible.
+	if ($Dyn eq 0) {
+		printf STDERR gettext("%s: %s: unable to process ELF file\n"),
+		    $Prog, $Obj;
+
+		# Add the file to our list, so that we don't create the same
+		# message again.  Processing should continue so that we can
+		# flush out as many error messages as possible.
+		$Objects{$Obj}{"DoesNotExist"} = 0;
+		return;
+	}
+
+	# Process elfdump(1) once more to obtain the .dynsym symbol table.
 	open($FileHandle, "LC_ALL=C elfdump -sN.dynsym '$Obj' 2> /dev/null |");
 
-	# Now process all symbols.
 	while (defined(my $Line = <$FileHandle>)) {
 		chomp($Line);
 
 		my (@Fields) = split(' ', $Line);
 		my ($Flags);
 
-		# We're only interested in defined non-reserved symbol entries.
-		# Note, ABS and NOTY symbols of non-zero size have been known to
-		# occur, so capture them.
+		# We're only interested in defined symbol entries.  Unless
+		# we've been asked for all symbols, ignore any ABS or NOTY
+		# symbols.  The former are typically reserved symbols or
+		# versioning names.  The latter are labels that are not bound
+		# to.  Note, ABS and NOTY symbols of non-zero size have been
+		# known to occur, so capture them.
 		if (($#Fields < 8) || ($Fields[4] !~ $GlobWeak) ||
-		    ($Fields[7] =~ $UndefSym) || (!$opt{a} &&
-		    ($Fields[7] =~ $IgnSyms) && (oct($Fields[2]) eq 0))) {
+		    ($Fields[7] eq 'UNDEF') ||
+		    (!$opt{a} && (oct($Fields[2]) eq 0) &&
+		    ((($Fields[7] eq 'ABS') && ($Fields[3] eq 'OBJT')) ||
+		    ($Fields[3] eq 'NOTY')))) {
 			next;
 		}
 
-		# If we're found copy relocations, save the address and names
-		# of any OBJT definitions, together with the copy symbol.
-		if ($Copy && ($Fields[3] eq 'OBJT')) {
+		# If we're found copy relocations, save the address of all OBJT
+		# definitions, together with the copy symbol.  These definitions
+		# are used to determine whether the copy symbol has any aliases
+		# (ie. __iob and _iob).
+		if (($Copy eq 1) && ($Fields[3] eq 'OBJT')) {
 			push(@{$AddrToName{$Fields[1]}}, $Fields[8]);
-		}
-		if (($Symbols{$Fields[8]}{$Obj}) &&
-		    ($Symbols{$Fields[8]}{$Obj}[$ObjFlag] & $Cpyr)) {
-			$NameToAddr{$Fields[8]} = $Fields[1];
+
+			if (($Symbols{$Fields[8]}{$Obj}) &&
+			    ($Symbols{$Fields[8]}{$Obj}[$ObjFlag] & $Cpyr)) {
+				$NameToAddr{$Fields[8]} = $Fields[1];
+			}
 		}
 
-		# If the symbol visibility is protected, this is an internal
-		# symbolic binding (NOTE, an INTERNAL visibility for a global
-		# symbol is invalid, but for a while ld(1) was setting this
-		# attribute mistakenly for protected).
-		# If this is a dynamic executable, mark its symbols as protected
-		# (they can't be interposed on any more than symbols defined
-		# protected within shared objects).
+		# Identify this symbol as global, and associate it with any
+		# object filtering.
 		$Flags = $Glob | $Fltr;
+
+		# If the symbol visibility is protected, this is an internal
+		# symbolic binding.  Note, an INTERNAL visibility for a global
+		# symbol is invalid, but for a while ld(1) was setting this
+		# attribute mistakenly for protected.  If this is a dynamic
+		# executable, mark its symbols as protected.  These symbols
+		# can't be interposed on any more than symbols defined as
+		# protected within shared objects).
 		if (($Fields[5] =~ /^[IP]$/) || $Symb || $Exec) {
 			$Flags |= $Prot;
 		}
@@ -1273,8 +1439,8 @@ sub GetAllSymbols {
 		}
 
 		# Identify the symbol as a function or data type, and for the
-		# latter, capture the symbol size.  Ignore the standard
-		# symbolic labels, as we don't want to type them.
+		# latter, capture the symbol size.  Ignore the standard symbolic
+		# labels, as we don't want to type them.
 		if ($Fields[8] !~ $MultSyms) {
 			if ($Fields[3] =~ /^FUNC$/) {
 				$Flags |= $Func;
@@ -1303,41 +1469,8 @@ sub GetAllSymbols {
 	}
 	close($FileHandle);
 
-	# Obtain any symbol information table for this object.  Symbol tables can
-	# be quite large, so open the elfump command through a pipe.
-	open($FileHandle, "LC_ALL=C elfdump -y '$Obj' 2> /dev/null |");
-
-	# Now process all symbols.
-	while (defined(my $Line = <$FileHandle>)) {
-		chomp($Line);
-
-		my (@Fields) = split(' ', $Line);
-		my ($Flags) = 0;
-
-		# Binding attributes are in the second column.
-		if ($#Fields < 1) {
-			next;
-		}
-		if ($Fields[1] =~ /N/) {
-			$Flags |= $Nodi
-		}
-		if ($Fields[1] =~ /F/) {
-			$Flags |= $Ssft;
-		}
-		if ($Fields[1] =~ /A/) {
-			$Flags |= $Saft;
-		}
-
-		# Determine the symbol name based upon the number of fields.
-		if ($Flags && $Symbols{$Fields[$#Fields]}{$Obj}) {
-			$Symbols{$Fields[$#Fields]}{$Obj}[$ObjFlag] |= $Flags;
-			$Objects{$Obj}{$Fields[$#Fields]} |= $Flags;
-		}
-	}
-	close($FileHandle);
-
-	# If this symbol has already been marked as a copy-relocation reference,
-	# see if this symbol has any aliases, which should also be marked.
+	# Process any copy relocation symbols to see if the copy symbol has any
+	# aliases, which should also be marked as copy relocations.
 	if ($Copy) {
 		foreach my $SymName (keys(%NameToAddr)) {
 			my ($Addr) = $NameToAddr{$SymName};

@@ -228,6 +228,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_file_lazyload	Dbg64_file_lazyload
 #define	Dbg_file_ldso		Dbg64_file_ldso
 #define	Dbg_file_mode_promote	Dbg64_file_mode_promote
+#define	Dbg_file_modified	Dbg64_file_modified
 #define	Dbg_file_needed		Dbg64_file_needed
 #define	Dbg_file_output		Dbg64_file_output
 #define	Dbg_file_preload	Dbg64_file_preload
@@ -422,6 +423,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_file_lazyload	Dbg32_file_lazyload
 #define	Dbg_file_ldso		Dbg32_file_ldso
 #define	Dbg_file_mode_promote	Dbg32_file_mode_promote
+#define	Dbg_file_modified	Dbg32_file_modified
 #define	Dbg_file_needed		Dbg32_file_needed
 #define	Dbg_file_output		Dbg32_file_output
 #define	Dbg_file_preload	Dbg32_file_preload
@@ -640,6 +642,8 @@ extern	void	Dbg_file_lazyload(Rt_map *, const char *, const char *);
 extern	void	Dbg_file_ldso(Rt_map *, char **, auxv_t *, const char *,
 		    Aliste);
 extern	void	Dbg_file_mode_promote(Rt_map *, int);
+extern	void	Dbg_file_modified(Lm_list *, const char *, const char *,
+		    const char *, int, int, Elf *, Elf *);
 extern	void	Dbg_file_needed(Rt_map *, const char *);
 extern	void	Dbg_file_output(Ofl_desc *);
 extern	void	Dbg_file_preload(Lm_list *, const char *);
@@ -728,7 +732,7 @@ extern	void	Dbg_seg_list(Lm_list *, Half, List *);
 extern	void	Dbg_seg_os(Ofl_desc *, Os_desc *, int);
 extern	void	Dbg_seg_title(Lm_list *);
 
-extern	void	Dbg_shdr_modified(Lm_list *, Half, Shdr *, Shdr *,
+extern	void	Dbg_shdr_modified(Lm_list *, const char *, Half, Shdr *, Shdr *,
 		    const char *);
 
 extern	void	Dbg_statistics_ar(Ofl_desc *);

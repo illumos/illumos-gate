@@ -1511,9 +1511,10 @@ process_files_com(Ofl_desc *ofl, int argc, char **argv)
 
 		DBG_CALL(Dbg_args_files(ofl->ofl_lml, optind, path));
 
-		ifl = ld_process_open(path, path, fd, ofl,
+		ifl = ld_process_open(path, path, &fd, ofl,
 		    (FLG_IF_CMDLINE | FLG_IF_NEEDED), &rej);
-		(void) close(fd);
+		if (fd != -1)
+			(void) close(fd);
 		if (ifl == (Ifl_desc *)S_ERROR)
 			return (S_ERROR);
 

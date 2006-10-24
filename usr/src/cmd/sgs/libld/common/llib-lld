@@ -50,10 +50,10 @@ uintptr_t	ld64_make_sections(Ofl_desc *);
 void		ld32_ofl_cleanup(Ofl_desc *);
 void		ld64_ofl_cleanup(Ofl_desc *);
 
-Ifl_desc	*ld32_process_open(const char *, const char *, int, Ofl_desc *,
-		    Elf32_Half, Rej_desc *);
-Ifl_desc	*ld64_process_open(const char *, const char *, int, Ofl_desc *,
-		    Elf64_Half, Rej_desc *);
+Ifl_desc	*ld32_process_open(const char *, const char *, int *,
+		    Ofl_desc *, Elf32_Half, Rej_desc *);
+Ifl_desc	*ld64_process_open(const char *, const char *, int *,
+		    Ofl_desc *, Elf64_Half, Rej_desc *);
 
 uintptr_t	ld32_reloc_init(Ofl_desc *);
 uintptr_t	ld64_reloc_init(Ofl_desc *);

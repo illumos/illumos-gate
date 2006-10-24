@@ -45,12 +45,14 @@ static Support_list support[LDS_NUM] = {
 #if	defined(_ELF64)
 	{MSG_ORIG(MSG_SUP_START_64),	{ 0, 0 }},	/* LDS_START */
 	{MSG_ORIG(MSG_SUP_ATEXIT_64),	{ 0, 0 }},	/* LDS_ATEXIT */
+	{MSG_ORIG(MSG_SUP_OPEN_64),	{ 0, 0 }},	/* LDS_OPEN */
 	{MSG_ORIG(MSG_SUP_FILE_64),	{ 0, 0 }},	/* LDS_FILE */
 	{MSG_ORIG(MSG_SUP_INSEC_64),	{ 0, 0 }},	/* LDS_INSEC */
 	{MSG_ORIG(MSG_SUP_SEC_64),	{ 0, 0 }}	/* LDS_SEC */
 #else	/* Elf32 */
 	{MSG_ORIG(MSG_SUP_START),	{ 0, 0 }},	/* LDS_START */
 	{MSG_ORIG(MSG_SUP_ATEXIT),	{ 0, 0 }},	/* LDS_ATEXIT */
+	{MSG_ORIG(MSG_SUP_OPEN),	{ 0, 0 }},	/* LDS_OPEN */
 	{MSG_ORIG(MSG_SUP_FILE),	{ 0, 0 }},	/* LDS_FILE */
 	{MSG_ORIG(MSG_SUP_INSEC),	{ 0, 0 }},	/* LDS_INSEC */
 	{MSG_ORIG(MSG_SUP_SEC),		{ 0, 0 }}	/* LDS_SEC */
@@ -143,6 +145,68 @@ ld_sup_atexit(Ofl_desc *ofl, int ecode)
 }
 
 void
+ld_sup_open(Ofl_desc *ofl, const char **opath, const char **ofile, int *ofd,
+    int flags, Elf **oelf, Elf *ref, size_t off, const Elf_Kind ekind)
+{
+	Func_list	*flp;
+	Listnode	*lnp;
+	const char	*npath = *opath;
+	const char	*nfile = *ofile;
+	Elf		*nelf = *oelf;
+	int		nfd = *ofd;
+
+	for (LIST_TRAVERSE(&support[LDS_OPEN].sup_funcs, lnp, flp)) {
+		int	_flags = 0;
+
+		/*
+		 * This interface was introduced in VERSION3.  Only call this
+		 * function for libraries reporting support for version 3 or
+		 * above.
+		 */
+		if (flp->fl_version < LD_SUP_VERSION3)
+			continue;
+
+		if (!(flags & FLG_IF_CMDLINE))
+			_flags |= LD_SUP_DERIVED;
+		if (!(flags & FLG_IF_NEEDED))
+			_flags |= LD_SUP_INHERITED;
+		if (flags & FLG_IF_EXTRACT)
+			_flags |= LD_SUP_EXTRACTED;
+
+		/*
+		 * If the present object is an extracted archive member, make
+		 * sure the archive offset is reset so that the caller can
+		 * obtain an ELF descriptor to the same member (an elf_begin()
+		 * moves the offset to the next member).
+		 */
+		if (flags & FLG_IF_EXTRACT)
+			(void) elf_rand(ref, off);
+
+		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
+		    support[LDS_OPEN].sup_name, LDS_OPEN, *opath));
+		(*flp->fl_fptr)(&npath, &nfile, &nfd, _flags, &nelf, ref, off,
+		    ekind);
+	}
+
+	/*
+	 * If the file descriptor, ELF descriptor, or file names have been
+	 * modified, then diagnose the differences and return the new data.
+	 * As a basic test, make sure the support library hasn't nulled out
+	 * data ld(1) will try and dereference.
+	 */
+	if ((npath != *opath) || (nfd != *ofd) || (nelf != *oelf)) {
+		Dbg_file_modified(ofl->ofl_lml, flp->fl_obj, *opath, npath,
+		    *ofd, nfd, *oelf, nelf);
+		if (npath)
+			*opath = npath;
+		if (nfile)
+			*ofile = nfile;
+		*ofd = nfd;
+		*oelf = nelf;
+	}
+}
+
+void
 ld_sup_file(Ofl_desc *ofl, const char *ifile, const Elf_Kind ekind, int flags,
     Elf *elf)
 {
@@ -203,8 +267,8 @@ ld_sup_input_section(Ofl_desc *ofl, Ifl_desc *ifl, const char *sname,
 	 * return the new section header.
 	 */
 	if (nshdr != *oshdr) {
-		Dbg_shdr_modified(ofl->ofl_lml, ifl->ifl_ehdr->e_machine,
-		    *oshdr, nshdr, sname);
+		Dbg_shdr_modified(ofl->ofl_lml, flp->fl_obj,
+		    ifl->ifl_ehdr->e_machine, *oshdr, nshdr, sname);
 		*oshdr = nshdr;
 	}
 	return (0);

@@ -3200,8 +3200,8 @@ ld_update_outfile(Ofl_desc *ofl)
 		/*
 		 * Adjust the address offset and p_align if needed.
 		 */
-		if (!((ofl->ofl_flags1 & FLG_OF1_VADDR) ||
-			(ofl->ofl_dtflags_1 & DF_1_NOHDR))) {
+		if (((sgp->sg_flags & FLG_SG_VADDR) == 0) &&
+		    ((ofl->ofl_dtflags_1 & DF_1_NOHDR) == 0)) {
 			if (phdr->p_align != 0)
 				vaddr += phdr->p_offset % phdr->p_align;
 			else

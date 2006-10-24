@@ -973,6 +973,7 @@ typedef enum {
 	LDS_INPUT_DONE,
 	LDS_START,
 	LDS_ATEXIT,
+	LDS_OPEN,
 	LDS_FILE,
 	LDS_INSEC,
 	LDS_SEC,
@@ -1063,7 +1064,7 @@ extern uintptr_t	ld_ent_setup(Ofl_desc *, Xword);
 extern uintptr_t	ld_init_strings(Ofl_desc *);
 extern uintptr_t	ld_make_sections(Ofl_desc *);
 extern void		ld_ofl_cleanup(Ofl_desc *);
-extern Ifl_desc		*ld_process_open(const char *, const char *, int,
+extern Ifl_desc		*ld_process_open(const char *, const char *, int *,
 			    Ofl_desc *, Half, Rej_desc *);
 extern uintptr_t	ld_reloc_init(Ofl_desc *);
 extern uintptr_t	ld_reloc_process(Ofl_desc *);

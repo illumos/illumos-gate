@@ -48,16 +48,16 @@ Elf_shdr(Lm_list *lml, Half mach, Shdr *shdr)
 }
 
 void
-Dbg_shdr_modified(Lm_list *lml, Half mach, Shdr *oshdr, Shdr *nshdr,
-    const char *name)
+Dbg_shdr_modified(Lm_list *lml, const char *obj, Half mach, Shdr *oshdr,
+    Shdr *nshdr, const char *name)
 {
-	if (DBG_NOTCLASS(DBG_C_SECTIONS))
+	if (DBG_NOTCLASS(DBG_C_SECTIONS | DBG_C_SUPPORT))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_SHD_MODIFIED), name);
+	dbg_print(lml, MSG_INTL(MSG_SHD_MODIFIED), name, obj);
 
 	dbg_print(lml, MSG_INTL(MSG_SHD_ORIG));
 	Elf_shdr(lml, mach, oshdr);
