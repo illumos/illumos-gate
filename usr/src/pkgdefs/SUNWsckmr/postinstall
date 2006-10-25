@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -89,6 +88,38 @@ remove_ipsecinit_entry()
 	fi
 }
 
+#
+# Perform extra activities if the installation is an Upgrade
+# and not an initial installation.
+#
+upgradeExtras()
+{
+
+# Enable the sckmd service on the
+# system if it is a SUNW,Sun-Fire-15000 machine.
+cat >> $BASEDIR/var/svc/profile/upgrade << \_ENABLE_SCKMD
+
+#
+# Enable sckmd if running on a SUNW,Sun-Fire-15000 platform
+#
+if [ `/sbin/uname -i` = "SUNW,Sun-Fire-15000" ]; then
+	/usr/sbin/svcadm enable svc:/platform/sun4u/sckmd:default
+fi
+
+_ENABLE_SCKMD
+}
+
+#
+# The temporary file will be created by the preinstall script
+# if the sckmd service is being installed for the first time by
+# means of an upgrade. If the temporary file does not exist,
+# it is not necessary to take any action.
+#
+TMPFILE=$BASEDIR/tmp/sckmd.tmp
+if [ -f $TMPFILE ]; then
+	upgradeExtras
+	rm -f $TMPFILE
+fi
 
 #
 # Remove all of our default policies

@@ -41,6 +41,7 @@ i depend
 i i.manifest
 i r.manifest
 i postinstall
+i preinstall
 i preremove
 
 #
