@@ -314,7 +314,8 @@ zio_read(zio_t *pio, spa_t *spa, blkptr_t *bp, void *data,
 	ASSERT3U(size, ==, BP_GET_LSIZE(bp));
 
 	zio = zio_create(pio, spa, bp->blk_birth, bp, data, size, done, private,
-	    ZIO_TYPE_READ, priority, flags, ZIO_STAGE_OPEN, ZIO_READ_PIPELINE);
+	    ZIO_TYPE_READ, priority, flags | ZIO_FLAG_USER,
+	    ZIO_STAGE_OPEN, ZIO_READ_PIPELINE);
 	zio->io_bookmark = *zb;
 
 	zio->io_logical = zio;
@@ -358,7 +359,7 @@ zio_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
 	    compress < ZIO_COMPRESS_FUNCTIONS);
 
 	zio = zio_create(pio, spa, txg, bp, data, size, done, private,
-	    ZIO_TYPE_WRITE, priority, flags,
+	    ZIO_TYPE_WRITE, priority, flags | ZIO_FLAG_USER,
 	    ZIO_STAGE_OPEN, ZIO_WRITE_PIPELINE);
 
 	zio->io_bookmark = *zb;
@@ -395,7 +396,7 @@ zio_rewrite(zio_t *pio, spa_t *spa, int checksum,
 	zio_t *zio;
 
 	zio = zio_create(pio, spa, txg, bp, data, size, done, private,
-	    ZIO_TYPE_WRITE, priority, flags,
+	    ZIO_TYPE_WRITE, priority, flags | ZIO_FLAG_USER,
 	    ZIO_STAGE_OPEN, ZIO_REWRITE_PIPELINE);
 
 	zio->io_bookmark = *zb;
@@ -445,7 +446,7 @@ zio_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	}
 
 	zio = zio_create(pio, spa, txg, bp, NULL, 0, done, private,
-	    ZIO_TYPE_FREE, ZIO_PRIORITY_FREE, 0,
+	    ZIO_TYPE_FREE, ZIO_PRIORITY_FREE, ZIO_FLAG_USER,
 	    ZIO_STAGE_OPEN, ZIO_FREE_PIPELINE);
 
 	zio->io_bp = &zio->io_bp_copy;

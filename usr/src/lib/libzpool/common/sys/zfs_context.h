@@ -169,6 +169,11 @@ _NOTE(CONSTCOND) } while (0)
 #define	DTRACE_PROBE3(a, b, c, d, e, f, g)	((void)0)
 #endif	/* DTRACE_PROBE3 */
 
+#ifdef DTRACE_PROBE4
+#undef	DTRACE_PROBE4
+#define	DTRACE_PROBE4(a, b, c, d, e, f, g, h, i)	((void)0)
+#endif	/* DTRACE_PROBE4 */
+
 /*
  * Threads
  */

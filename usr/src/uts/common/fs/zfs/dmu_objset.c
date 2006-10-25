@@ -687,7 +687,12 @@ dmu_objset_sync_dnodes(objset_impl_t *os, list_t *list, dmu_tx_t *tx)
 			}
 			dn = next;
 		}
+
+		DTRACE_PROBE1(wait__begin, zio_t *, zio);
 		err = zio_wait(zio);
+		DTRACE_PROBE4(wait__end, zio_t *, zio,
+		    uint64_t, tx->tx_txg, objset_impl_t *, os, int, level);
+
 		ASSERT(err == 0);
 	}
 }
