@@ -3103,14 +3103,27 @@ apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
 	APIC_HEADER	*hp;
 	MADT_INTERRUPT_OVERRIDE	*isop;
 	apic_irq_t *airqp;
+	int is_pciex = 0;
+	int is_pci = 0;
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_introp_xlate: dip=0x%p name=%s "
 	    "type=%d irqno=0x%x\n", (void *)dip, ddi_get_name(dip), type,
 	    irqno));
 
+	dev_len = sizeof (dev_type);
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, ddi_get_parent(dip),
+	    DDI_PROP_DONTPASS, "device_type", (caddr_t)dev_type,
+	    &dev_len) == DDI_PROP_SUCCESS) {
+		is_pci = (strcmp(dev_type, "pci") == 0);
+		is_pciex = (strcmp(dev_type, "pciex") == 0);
+	}
+
 	if (DDI_INTR_IS_MSI_OR_MSIX(type)) {
-		if ((airqp = apic_find_irq(dip, ispec, type)) != NULL)
+		if ((airqp = apic_find_irq(dip, ispec, type)) != NULL) {
+			airqp->airq_iflag.bustype =
+			    is_pciex ? BUS_PCIE : BUS_PCI;
 			return (apic_vector_to_irq[airqp->airq_vector]);
+		}
 		return (apic_setup_irq_table(dip, irqno, NULL, ispec,
 		    NULL, type));
 	}
@@ -3141,15 +3154,7 @@ apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
 	if ((dip == NULL) || (!apic_irq_translate && !apic_enable_acpi))
 		goto nonpci;
 
-	dev_len = sizeof (dev_type);
-	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, ddi_get_parent(dip),
-	    DDI_PROP_DONTPASS, "device_type", (caddr_t)dev_type,
-	    &dev_len) != DDI_PROP_SUCCESS) {
-		goto nonpci;
-	}
-
-	if ((strcmp(dev_type, "pci") == 0) ||
-	    (strcmp(dev_type, "pciex") == 0)) {
+	if (is_pci || is_pciex) {
 		/* pci device */
 		if (acpica_get_bdf(dip, &busid, &devid, NULL) != 0)
 			goto nonpci;
@@ -3165,7 +3170,7 @@ apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
 			    ipin, &pci_irq, &intr_flag) != ACPI_PSM_SUCCESS)
 				goto nonpci;
 
-			intr_flag.bustype = BUS_PCI;
+			intr_flag.bustype = is_pciex ? BUS_PCIE : BUS_PCI;
 			if ((newirq = apic_setup_irq_table(dip, pci_irq, NULL,
 			    ispec, &intr_flag, type)) == -1)
 				goto nonpci;
@@ -3800,7 +3805,8 @@ struct mps_bus_info {
 	"MPSA ", BUS_MPSA,
 	"NUBUS ", BUS_NUBUS,
 	"TC ", BUS_TC,
-	"VME ", BUS_VME
+	"VME ", BUS_VME,
+	"PCI-E ", BUS_PCIE
 };
 
 static int

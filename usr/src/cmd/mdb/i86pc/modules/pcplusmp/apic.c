@@ -40,7 +40,7 @@ static char *businfo_array[] = {
 	"ISA",
 	"MBI",
 	"MBII",
-	" ",
+	"PCIe",
 	"MPI",
 	"MPSA",
 	"NUBUS",
