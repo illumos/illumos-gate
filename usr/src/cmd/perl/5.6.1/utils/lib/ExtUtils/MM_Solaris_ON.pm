@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,6 +52,12 @@ sub constants
 
 	# Find all the ENVCPPFLAGS[1-n] environment variables
 	my (%inc_seen, @newincs, %proto_seen, @protos);
+
+	# Prepopulate @protos with $ENV{ROOT} if it is set
+	if (defined ($ENV{ROOT})) {
+		push(@protos, $ENV{ROOT});
+	}
+
 	foreach my $ip (map({ /^ENVCPPFLAGS\d+$/ ? split(' ', $ENV{$_}) : () }
 	    keys(%ENV))) {
 		# Ignore everything except '-I' flags

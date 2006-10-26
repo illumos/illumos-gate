@@ -88,6 +88,12 @@ sub constants
 
 	# Find all the ENVCPPFLAGS[1-n] environment variables
 	my (%inc_seen, @newincs, %proto_seen, @protos);
+
+	# Prepopulate @protos with $ENV{ROOT} if it is set
+	if (defined ($ENV{ROOT})) {
+	        push(@protos, $ENV{ROOT});
+	}
+
 	foreach my $ip (map({ /^ENVCPPFLAGS\d+$/ ? split(' ', $ENV{$_}) : () }
 	    sort(keys(%ENV)))) {
 		# Ignore everything except '-I' flags.
