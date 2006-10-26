@@ -787,6 +787,8 @@ msgsnap(int msqid, caddr_t buf, size_t bufsz, long msgtyp)
 	return (0);
 }
 
+#define	MSG_PREALLOC_LIMIT 8192
+
 /*
  * msgsnd system call.
  */
@@ -794,7 +796,7 @@ static int
 msgsnd(int msqid, struct ipcmsgbuf *msgp, size_t msgsz, int msgflg)
 {
 	kmsqid_t	*qp;
-	kmutex_t	*lock;
+	kmutex_t	*lock = NULL;
 	struct msg	*mp = NULL;
 	long		type;
 	int		error = 0;
@@ -817,8 +819,37 @@ msgsnd(int msqid, struct ipcmsgbuf *msgp, size_t msgsz, int msgflg)
 	if (type < 1)
 		return (set_errno(EINVAL));
 
-	if ((lock = ipc_lookup(msq_svc, msqid, (kipc_perm_t **)&qp)) == NULL)
-		return (set_errno(EINVAL));
+	/*
+	 * We want the value here large enough that most of the
+	 * the message operations will use the "lockless" path,
+	 * but small enough that a user can not reserve large
+	 * chunks of kernel memory unless they have a valid
+	 * reason to.
+	 */
+	if (msgsz <= MSG_PREALLOC_LIMIT) {
+		/*
+		 * We are small enough that we can afford to do the
+		 * allocation now.  This saves dropping the lock
+		 * and then reacquiring the lock.
+		 */
+		mp = kmem_zalloc(sizeof (struct msg), KM_SLEEP);
+		mp->msg_copycnt = 1;
+		mp->msg_size = msgsz;
+		if (msgsz) {
+			mp->msg_addr = kmem_alloc(msgsz, KM_SLEEP);
+			if (copyin(STRUCT_FADDR(umsgp, mtext),
+			    mp->msg_addr, msgsz) == -1) {
+				error = EFAULT;
+				goto msgsnd_out;
+			}
+		}
+	}
+
+	if ((lock = ipc_lookup(msq_svc, msqid, (kipc_perm_t **)&qp)) == NULL) {
+		error = EINVAL;
+		goto msgsnd_out;
+	}
+
 	ipc_hold(msq_svc, (kipc_perm_t *)qp);
 
 	if (msgsz > qp->msg_qbytes) {
@@ -863,12 +894,13 @@ top:
 		int failure;
 
 		mutex_exit(lock);
+		ASSERT(msgsz > 0);
 		mp = kmem_zalloc(sizeof (struct msg), KM_SLEEP);
-		mp->msg_addr = kmem_zalloc(msgsz, KM_SLEEP);
+		mp->msg_addr = kmem_alloc(msgsz, KM_SLEEP);
 		mp->msg_size = msgsz;
 		mp->msg_copycnt = 1;
 
-		failure = msgsz && (copyin(STRUCT_FADDR(umsgp, mtext),
+		failure = (copyin(STRUCT_FADDR(umsgp, mtext),
 		    mp->msg_addr, msgsz) == -1);
 		lock = ipc_lock(msq_svc, qp->msg_perm.ipc_id);
 		if (IPC_FREE(&qp->msg_perm)) {
@@ -904,7 +936,8 @@ top:
 		cv_broadcast(&qp->msg_rcv_cv[0]);
 
 msgsnd_out:
-	ipc_rele(msq_svc, (kipc_perm_t *)qp);	/* drops lock */
+	if (lock)
+		ipc_rele(msq_svc, (kipc_perm_t *)qp);	/* drops lock */
 
 	if (error) {
 		if (mp)
