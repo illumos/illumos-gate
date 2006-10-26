@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -50,7 +49,6 @@
  *		- We change over to using our IDT.
  *		- We load the default LDT into the hardware LDT register.
  *		- We load the default TSS into the hardware task register.
- *		- call ap_mlsetup(void) 
  *		- call mp_startup(void) indirectly through the T_PC
  *
  */
@@ -309,7 +307,6 @@ kernel_cs_code:
 	/*
 	 * Complete the rest of the setup and call mp_startup().
 	 */
-	call	*ap_mlsetup
 	movq	%gs:CPU_THREAD, %rax	/* get thread ptr */
 	call	*T_PC(%rax)		/* call mp_startup */
 	/* not reached */
@@ -557,7 +554,6 @@ kernel_cs_code:
 	/*
 	 * Complete the rest of the setup and call mp_startup().
 	 */
-	call	*ap_mlsetup
 	movq	%gs:CPU_THREAD, %rax	/* get thread ptr */
 	call	*T_PC(%rax)		/* call mp_startup */
 	/* not reached */
@@ -648,7 +644,6 @@ kernel_cs_code:
 	 * that's how our page tables are set up.
 	 */
 	call	*set_nxe_func
-	call	*ap_mlsetup
 	movl	%gs:CPU_THREAD, %eax	/* get thread ptr */
 	call	*T_PC(%eax)		/* call mp_startup */
 	/* not reached */
@@ -731,7 +726,6 @@ kernel_cs_code:
 	 * that's how our page tables are set up.
 	 */
 	call	*set_nxe_func
-	call	*ap_mlsetup
 	mov	%gs:CPU_THREAD, %eax	/* get thread ptr */
 	call	*T_PC(%eax)		/* call mp_startup */
 	/* not reached */

@@ -1081,7 +1081,7 @@ mp_cpu_unconfigure(int cpuid)
 
 /*
  * Startup function for 'other' CPUs (besides boot cpu).
- * Called from real_mode_start (after *ap_mlsetup).
+ * Called from real_mode_start.
  *
  * WARNING: until CPU_READY is set, mp_startup and routines called by
  * mp_startup should not call routines (e.g. kmem_free) that could call
@@ -1092,6 +1092,15 @@ mp_startup(void)
 {
 	struct cpu *cp = CPU;
 	uint_t new_x86_feature;
+
+	/*
+	 * Once this was done from assembly, but it's safer here; if
+	 * it blocks, we need to be able to swtch() to and from, and
+	 * since we get here by calling t_pc, we need to do that call
+	 * before swtch() overwrites it.
+	 */
+
+	(void) (*ap_mlsetup)();
 
 	new_x86_feature = cpuid_pass1(cp);
 
