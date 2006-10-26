@@ -456,13 +456,16 @@ lgrp_affinity_get(lgrp_affinity_args_t *ap)
 
 /*
  * Find lgroup for which this thread has most affinity in specified partition
+ * starting from home lgroup unless specified starting lgroup is preferred
  */
 lpl_t *
-lgrp_affinity_best(kthread_t *t, struct cpupart *cpupart, lgrp_id_t start)
+lgrp_affinity_best(kthread_t *t, struct cpupart *cpupart, lgrp_id_t start,
+    boolean_t prefer_start)
 {
 	lgrp_affinity_t	*affs;
 	lgrp_affinity_t	best_aff;
 	lpl_t		*best_lpl;
+	lgrp_id_t	finish;
 	lgrp_id_t	home;
 	lgrp_id_t	lgrpid;
 	lpl_t		*lpl;
@@ -484,34 +487,42 @@ lgrp_affinity_best(kthread_t *t, struct cpupart *cpupart, lgrp_id_t start)
 		cpu_t	*cp;
 
 		/*
-		 * See whether thread has more affinity for root lgroup
-		 * than lgroup containing CPU
+		 * Find which lpl has most affinity among leaf lpl directly
+		 * containing CPU and its ancestor lpls
 		 */
 		cp = cpu[t->t_bind_cpu];
-		lpl = cp->cpu_lpl;
-		lgrpid = LGRP_ROOTID;
-		if (affs[lgrpid] > affs[lpl->lpl_lgrpid])
-			return (&cpupart->cp_lgrploads[lgrpid]);
-		return (lpl);
+
+		best_lpl = lpl = cp->cpu_lpl;
+		best_aff = affs[best_lpl->lpl_lgrpid];
+		while (lpl->lpl_parent != NULL) {
+			lpl = lpl->lpl_parent;
+			lgrpid = lpl->lpl_lgrpid;
+			if (affs[lgrpid] > best_aff) {
+				best_lpl = lpl;
+				best_aff = affs[lgrpid];
+			}
+		}
+		return (best_lpl);
 	}
 
 	/*
-	 * Start searching at given lgroup
+	 * Start searching from home lgroup unless given starting lgroup is
+	 * preferred or home lgroup isn't in given pset.  Use root lgroup as
+	 * starting point if both home and starting lgroups aren't in given
+	 * pset.
 	 */
 	ASSERT(start >= 0 && start <= lgrp_alloc_max);
-	lgrpid = start;
-
-	/*
-	 * Use starting lgroup given above as best first
-	 */
 	home = t->t_lpl->lpl_lgrpid;
-	if (LGRP_CPUS_IN_PART(lgrpid, cpupart))
-		best_lpl = &cpupart->cp_lgrploads[lgrpid];
+	if (!prefer_start && LGRP_CPUS_IN_PART(home, cpupart))
+		lgrpid = home;
+	else if (start != LGRP_NONE && LGRP_CPUS_IN_PART(start, cpupart))
+		lgrpid = start;
 	else
-		best_lpl = &cpupart->cp_lgrploads[home];
+		lgrpid = LGRP_ROOTID;
 
-	best_aff = affs[best_lpl->lpl_lgrpid];
-
+	best_lpl = &cpupart->cp_lgrploads[lgrpid];
+	best_aff = affs[lgrpid];
+	finish = lgrpid;
 	do {
 		/*
 		 * Skip any lgroups that don't have CPU resources
@@ -535,7 +546,7 @@ lgrp_affinity_best(kthread_t *t, struct cpupart *cpupart, lgrp_id_t start)
 		if (++lgrpid > lgrp_alloc_max)
 			lgrpid = 0;	/* wrap the search */
 
-	} while (lgrpid != start);
+	} while (lgrpid != finish);
 
 	/*
 	 * No lgroup (in this pset) with any affinity
@@ -596,7 +607,7 @@ lgrp_affinity_set_thread(kthread_t *t, lgrp_id_t lgrp, lgrp_affinity_t aff,
 	 * Find lgroup for which thread has most affinity,
 	 * starting with lgroup for which affinity being set
 	 */
-	best_lpl = lgrp_affinity_best(t, t->t_cpupart, lgrp);
+	best_lpl = lgrp_affinity_best(t, t->t_cpupart, lgrp, B_TRUE);
 
 	/*
 	 * Rehome if found lgroup with more affinity than home or lgroup for

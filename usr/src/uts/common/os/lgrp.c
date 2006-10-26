@@ -212,8 +212,6 @@ static void	lgrp_cpu_init(struct cpu *);
 static void	lgrp_cpu_fini(struct cpu *, lgrp_id_t);
 static lgrp_t	*lgrp_cpu_to_lgrp(struct cpu *);
 
-static void	lgrp_latency_change(u_longlong_t, u_longlong_t);
-
 /*
  * lgroup memory event handlers
  */
@@ -491,6 +489,30 @@ lgrp_main_mp_init(void)
 }
 
 /*
+ * Change latency of lgroup with specified lgroup platform handle (if one is
+ * given) or change all lgroups with old latency to new latency
+ */
+void
+lgrp_latency_change(lgrp_handle_t hand, u_longlong_t oldtime,
+    u_longlong_t newtime)
+{
+	lgrp_t		*lgrp;
+	int		i;
+
+	for (i = 0; i <= lgrp_alloc_max; i++) {
+		lgrp = lgrp_table[i];
+
+		if (!LGRP_EXISTS(lgrp))
+			continue;
+
+		if ((hand == LGRP_NULL_HANDLE &&
+		    lgrp->lgrp_latency == oldtime) ||
+		    (hand != LGRP_NULL_HANDLE && lgrp->lgrp_plathand == hand))
+			lgrp->lgrp_latency = (int)newtime;
+	}
+}
+
+/*
  * Handle lgroup (re)configuration events (eg. addition of CPU, etc.)
  */
 void
@@ -613,10 +635,19 @@ lgrp_config(lgrp_config_flag_t event, uintptr_t resource, uintptr_t where)
 
 		break;
 	/*
-	 * Initiated by platform latency probing code
+	 * Update any lgroups with old latency to new latency
 	 */
-	case LGRP_CONFIG_LATENCY_CHANGE:
-		lgrp_latency_change((u_longlong_t)resource,
+	case LGRP_CONFIG_LAT_CHANGE_ALL:
+		lgrp_latency_change(LGRP_NULL_HANDLE, (u_longlong_t)resource,
+		    (u_longlong_t)where);
+
+		break;
+	/*
+	 * Update lgroup with specified lgroup platform handle to have
+	 * new latency
+	 */
+	case LGRP_CONFIG_LAT_CHANGE:
+		lgrp_latency_change((lgrp_handle_t)resource, 0,
 		    (u_longlong_t)where);
 
 		break;
@@ -1824,20 +1855,6 @@ lgrp_query_load(processorid_t id, lgrp_load_t *lp)
 	mutex_exit(&cpu_lock);
 
 	return (0);
-}
-
-void
-lgrp_latency_change(u_longlong_t oldtime, u_longlong_t newtime)
-{
-	lgrp_t		*lgrp;
-	int		i;
-
-	for (i = 0; i <= lgrp_alloc_max; i++) {
-		lgrp = lgrp_table[i];
-
-		if (LGRP_EXISTS(lgrp) && (lgrp->lgrp_latency == oldtime))
-			lgrp->lgrp_latency = (int)newtime;
-	}
 }
 
 /*
@@ -3090,7 +3107,7 @@ lgrp_choose(kthread_t *t, cpupart_t *cpupart)
 	 *	 thread_lock() being held and/or CPUs paused)
 	 */
 	if (t->t_lgrp_affinity) {
-		lpl = lgrp_affinity_best(t, cpupart, lgrpid_start);
+		lpl = lgrp_affinity_best(t, cpupart, lgrpid_start, B_FALSE);
 		if (lpl != NULL)
 			return (lpl);
 	}

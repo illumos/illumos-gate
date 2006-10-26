@@ -298,7 +298,8 @@ typedef enum lgrp_config_flag {
 	LGRP_CONFIG_MEM_RENAME,
 	LGRP_CONFIG_GEN_UPDATE,
 	LGRP_CONFIG_FLATTEN,
-	LGRP_CONFIG_LATENCY_CHANGE
+	LGRP_CONFIG_LAT_CHANGE_ALL,
+	LGRP_CONFIG_LAT_CHANGE
 } lgrp_config_flag_t;
 
 /*
@@ -553,7 +554,8 @@ int	lgrp_query_load(processorid_t, lgrp_load_t *);
 /*
  * lgroup thread placement
  */
-lpl_t	*lgrp_affinity_best(kthread_t *, struct cpupart *, lgrp_id_t);
+lpl_t	*lgrp_affinity_best(kthread_t *, struct cpupart *, lgrp_id_t,
+    boolean_t);
 void	lgrp_affinity_init(lgrp_affinity_t **);
 void	lgrp_affinity_free(lgrp_affinity_t **);
 lpl_t	*lgrp_choose(kthread_t *t, struct cpupart *);

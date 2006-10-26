@@ -652,7 +652,7 @@ lgrp_plat_latency_adjust(void)
 	u_longlong_t			t;
 	u_longlong_t			t1;
 	u_longlong_t			t2;
-	const lgrp_config_flag_t	cflag = LGRP_CONFIG_LATENCY_CHANGE;
+	const lgrp_config_flag_t	cflag = LGRP_CONFIG_LAT_CHANGE_ALL;
 	int				lat_corrected[MAX_NODES][MAX_NODES];
 
 	/*
@@ -832,7 +832,7 @@ lgrp_plat_latency_adjust(void)
 			/*
 			 * Make local latencies be minimum
 			 */
-			lgrp_config(cflag, local, min);
+			lgrp_config(LGRP_CONFIG_LAT_CHANGE, i, min);
 			lgrp_plat_probe_times[i][i] = min;
 		}
 	}

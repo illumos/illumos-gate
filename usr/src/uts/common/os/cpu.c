@@ -2472,7 +2472,8 @@ cpu_bind_thread(kthread_id_t tp, processorid_t bind, processorid_t *obind,
 			 * lgroup if no affinities set
 			 */
 			if (tp->t_lgrp_affinity)
-				lpl = lgrp_affinity_best(tp, tp->t_cpupart, 0);
+				lpl = lgrp_affinity_best(tp, tp->t_cpupart,
+				    LGRP_NONE, B_FALSE);
 			else
 				lpl = cp->cpu_lpl;
 
