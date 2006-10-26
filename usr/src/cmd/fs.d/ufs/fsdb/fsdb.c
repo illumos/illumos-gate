@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5074,10 +5074,6 @@ log_display_header(void)
 		printf("\t  [%d] lbno 0x%08x pbno 0x%08x nbno 0x%08x\n",
 		    x, log_eb->extents[x].lbno, log_eb->extents[x].pbno,
 		    log_eb->extents[x].nbno);
-	for (x = 0; x < log_eb->nextents; x++)
-		printf("\t  [%d] lbno 0x%08x pbno 0x%08x nbno 0x%08x\n",
-		    x, log_eb->extents[x].lbno, log_eb->extents[x].pbno,
-		    log_eb->extents[x].nbno);
 	printf("\nOn Disk Info\n\tbol_lof    : 0x%08x\n\teol_lof    : 0x%08x\n",
 	    log_odi->od_bol_lof, log_odi->od_eol_lof);
 	printf("\tlog_size   : 0x%08x\n",
@@ -5104,6 +5100,13 @@ log_lodb(u_offset_t off, diskaddr_t *pblk)
 {
 	uint32_t	lblk = (uint32_t)btodb(off);
 	int	x;
+
+	if (!log_get_header_info())
+		/*
+		 * No need to display anything here. The previous routine
+		 * has already done so.
+		 */
+		return;
 
 	for (x = 0; x < log_eb->nextents; x++)
 		if ((lblk >= log_eb->extents[x].lbno) &&
