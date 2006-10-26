@@ -153,6 +153,13 @@ struct as {
 	    (((as)->a_userlimit > (caddr_t)UINT32_MAX) ? 1 : 0)
 
 /*
+ * Flags for as_map/as_map_ansegs
+ */
+#define	AS_MAP_NO_LPOOB		((uint_t)-1)
+#define	AS_MAP_HEAP		((uint_t)-2)
+#define	AS_MAP_STACK		((uint_t)-3)
+
+/*
  * The as_callback is the basic structure which supports the ability to
  * inform clients of specific events pertaining to address space management.
  * A user calls as_add_callback to register an address space callback
@@ -274,6 +281,7 @@ void	as_pagereclaim(struct as *as, struct page **pp, caddr_t addr,
 		size_t size, enum seg_rw rw);
 int	as_setpagesize(struct as *as, caddr_t addr, size_t size, uint_t szc,
 		boolean_t wait);
+int	as_set_default_lpsize(struct as *as, caddr_t addr, size_t size);
 void	as_setwatch(struct as *as);
 void	as_clearwatch(struct as *as);
 int	as_getmemid(struct as *, caddr_t, memid_t *);

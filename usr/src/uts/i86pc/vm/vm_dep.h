@@ -569,6 +569,29 @@ extern int	l2cache_sz, l2cache_linesz, l2cache_assoc;
 #define	PGI_MT_RANGE	(PGI_MT_RANGE0 | PGI_MT_RANGE16M | PGI_MT_RANGE4G)
 
 /*
+ * Maximum and default values for user heap, stack, private and shared
+ * anonymous memory, and user text and initialized data.
+ * Used by map_pgsz*() routines.
+ */
+extern size_t max_uheap_lpsize;
+extern size_t default_uheap_lpsize;
+extern size_t max_ustack_lpsize;
+extern size_t default_ustack_lpsize;
+extern size_t max_privmap_lpsize;
+extern size_t max_uidata_lpsize;
+extern size_t max_utext_lpsize;
+extern size_t max_shm_lpsize;
+extern size_t mcntl0_lpsize;
+
+/*
+ * Sanity control. Don't use large pages regardless of user
+ * settings if there's less than priv or shm_lpg_min_physmem memory installed.
+ * The units for this variable are 8K pages.
+ */
+extern pgcnt_t privm_lpg_min_physmem;
+extern pgcnt_t shm_lpg_min_physmem;
+
+/*
  * hash as and addr to get a bin.
  */
 

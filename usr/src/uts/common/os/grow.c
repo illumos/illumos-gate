@@ -60,7 +60,6 @@
 
 int use_brk_lpg = 1;
 int use_stk_lpg = 1;
-int use_zmap_lpg = 1;
 
 static int brk_lpg(caddr_t nva);
 static int grow_lpg(caddr_t sp);
@@ -96,12 +95,11 @@ brk_lpg(caddr_t nva)
 {
 	struct proc *p = curproc;
 	size_t pgsz, len;
-	caddr_t addr;
+	caddr_t addr, brkend;
 	caddr_t bssbase = p->p_bssbase;
 	caddr_t brkbase = p->p_brkbase;
 	int oszc, szc;
 	int err;
-	int remap = 0;
 
 	oszc = p->p_brkpageszc;
 
@@ -115,7 +113,7 @@ brk_lpg(caddr_t nva)
 
 	len = nva - bssbase;
 
-	pgsz = map_pgsz(MAPPGSZ_HEAP, p, bssbase, len, &remap);
+	pgsz = map_pgsz(MAPPGSZ_HEAP, p, bssbase, len, 0);
 	szc = page_szc(pgsz);
 
 	/*
@@ -133,28 +131,6 @@ brk_lpg(caddr_t nva)
 		return (err);
 	}
 
-	if (remap == 0) {
-		/*
-		 * Map from the current brk end up to the new page size
-		 * alignment using the current page size.
-		 */
-		addr = brkbase + p->p_brksize;
-		addr = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
-		if (addr < nva) {
-			err = brk_internal(addr, oszc);
-			/*
-			 * In failure case, try again if oszc is not base page
-			 * size, then return err.
-			 */
-			if (err != 0) {
-				if (oszc != 0) {
-					err = brk_internal(nva, 0);
-				}
-				return (err);
-			}
-		}
-	}
-
 	err = brk_internal(nva, szc);
 	/* If using szc failed, map with base page size and return. */
 	if (err != 0) {
@@ -164,16 +140,18 @@ brk_lpg(caddr_t nva)
 		return (err);
 	}
 
-	if (remap != 0) {
-		/*
-		 * Round up brk base to a large page boundary and remap
-		 * anything in the segment already faulted in beyond that
-		 * point.
-		 */
-		addr = (caddr_t)P2ROUNDUP((uintptr_t)p->p_bssbase, pgsz);
-		len = (brkbase + p->p_brksize) - addr;
-		/* advisory, so ignore errors */
+	/*
+	 * Round up brk base to a large page boundary and remap
+	 * anything in the segment already faulted in beyond that
+	 * point.
+	 */
+	addr = (caddr_t)P2ROUNDUP((uintptr_t)p->p_bssbase, pgsz);
+	brkend = brkbase + p->p_brksize;
+	len = brkend - addr;
+	/* Check that len is not negative. Update page size code for heap. */
+	if (addr >= p->p_bssbase && brkend > addr && IS_P2ALIGNED(len, pgsz)) {
 		(void) as_setpagesize(p->p_as, addr, len, szc, B_FALSE);
+		p->p_brkpageszc = szc;
 	}
 
 	ASSERT(err == 0);
@@ -272,8 +250,26 @@ brk_internal(caddr_t nva, uint_t brkszc)
 
 		/*
 		 * Add new zfod mapping to extend UNIX data segment
+		 * AS_MAP_NO_LPOOB means use 0, and don't reapply OOB policies
+		 * via map_pgszcvec(). Use AS_MAP_HEAP to get intermediate
+		 * page sizes if ova is not aligned to szc's pgsz.
 		 */
-		crargs.szc = szc;
+		if (szc > 0) {
+			caddr_t rbss;
+
+			rbss = (caddr_t)P2ROUNDUP((uintptr_t)p->p_bssbase,
+			    pgsz);
+			if (IS_P2ALIGNED(p->p_bssbase, pgsz) || ova > rbss) {
+				crargs.szc = p->p_brkpageszc ? p->p_brkpageszc :
+				    AS_MAP_NO_LPOOB;
+			} else if (ova == rbss) {
+				crargs.szc = szc;
+			} else {
+				crargs.szc = AS_MAP_HEAP;
+			}
+		} else {
+			crargs.szc = AS_MAP_NO_LPOOB;
+		}
 		crargs.lgrp_mem_policy_flags = LGRP_MP_FLAG_EXTEND_UP;
 		error = as_map(as, ova, (size_t)(nva - ova), segvn_create,
 		    &crargs);
@@ -288,7 +284,6 @@ brk_internal(caddr_t nva, uint_t brkszc)
 		(void) as_unmap(as, nva, (size_t)(ova - nva));
 	}
 	p->p_brksize = size;
-	p->p_brkpageszc = szc;
 	return (0);
 }
 
@@ -300,6 +295,9 @@ int
 grow(caddr_t sp)
 {
 	struct proc *p = curproc;
+	struct as *as = p->p_as;
+	size_t oldsize = p->p_stksize;
+	size_t newsize;
 	int err;
 
 	/*
@@ -307,13 +305,24 @@ grow(caddr_t sp)
 	 * This also serves as the lock protecting p_stksize
 	 * and p_stkpageszc.
 	 */
-	as_rangelock(p->p_as);
+	as_rangelock(as);
 	if (use_stk_lpg && (p->p_flag & SAUTOLPG) != 0) {
 		err = grow_lpg(sp);
 	} else {
 		err = grow_internal(sp, p->p_stkpageszc);
 	}
-	as_rangeunlock(p->p_as);
+	as_rangeunlock(as);
+
+	if (err == 0 && (newsize = p->p_stksize) > oldsize) {
+		ASSERT(IS_P2ALIGNED(oldsize, PAGESIZE));
+		ASSERT(IS_P2ALIGNED(newsize, PAGESIZE));
+		/*
+		 * Set up translations so the process doesn't have to fault in
+		 * the stack pages we just gave it.
+		 */
+		(void) as_fault(as->a_hat, as, p->p_usrstack - newsize,
+		    newsize - oldsize, F_INVAL, S_WRITE);
+	}
 	return ((err == 0 ? 1 : 0));
 }
 
@@ -328,15 +337,15 @@ grow_lpg(caddr_t sp)
 	struct proc *p = curproc;
 	size_t pgsz;
 	size_t len, newsize;
-	caddr_t addr, oldsp;
+	caddr_t addr, saddr;
+	caddr_t growend;
 	int oszc, szc;
 	int err;
-	int remap = 0;
 
 	newsize = p->p_usrstack - sp;
 
 	oszc = p->p_stkpageszc;
-	pgsz = map_pgsz(MAPPGSZ_STK, p, sp, newsize, &remap);
+	pgsz = map_pgsz(MAPPGSZ_STK, p, sp, newsize, 0);
 	szc = page_szc(pgsz);
 
 	/*
@@ -357,30 +366,8 @@ grow_lpg(caddr_t sp)
 
 	/*
 	 * We've grown sufficiently to switch to a new page size.
-	 * If we're not going to remap the whole segment with the new
-	 * page size, split the grow into two operations: map to the new
-	 * page size alignment boundary with the existing page size, then
-	 * map the rest with the new page size.
+	 * So we are going to remap the whole segment with the new page size.
 	 */
-	err = 0;
-	if (remap == 0) {
-		oldsp = p->p_usrstack - p->p_stksize;
-		addr = (caddr_t)P2ALIGN((uintptr_t)oldsp, pgsz);
-		if (addr > sp) {
-			err = grow_internal(addr, oszc);
-			/*
-			 * In this case, grow with oszc failed, so grow all the
-			 * way to sp with base page size.
-			 */
-			if (err != 0) {
-				if (oszc != 0) {
-					err = grow_internal(sp, 0);
-				}
-				return (err);
-			}
-		}
-	}
-
 	err = grow_internal(sp, szc);
 	/* The grow with szc failed, so fall back to base page size. */
 	if (err != 0) {
@@ -390,21 +377,20 @@ grow_lpg(caddr_t sp)
 		return (err);
 	}
 
-	if (remap) {
-		/*
-		 * Round up stack pointer to a large page boundary and remap
-		 * any pgsz pages in the segment already faulted in beyond that
-		 * point.
-		 */
-		addr = p->p_usrstack - p->p_stksize;
-		addr = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
-		len = (caddr_t)P2ALIGN((uintptr_t)p->p_usrstack, pgsz) - addr;
-		/* advisory, so ignore errors */
+	/*
+	 * Round up stack pointer to a large page boundary and remap
+	 * any pgsz pages in the segment already faulted in beyond that
+	 * point.
+	 */
+	saddr = p->p_usrstack - p->p_stksize;
+	addr = (caddr_t)P2ROUNDUP((uintptr_t)saddr, pgsz);
+	growend = (caddr_t)P2ALIGN((uintptr_t)p->p_usrstack, pgsz);
+	len = growend - addr;
+	/* Check that len is not negative. Update page size code for stack. */
+	if (addr >= saddr && growend > addr && IS_P2ALIGNED(len, pgsz)) {
 		(void) as_setpagesize(p->p_as, addr, len, szc, B_FALSE);
+		p->p_stkpageszc = szc;
 	}
-
-	/* Update page size code for stack. */
-	p->p_stkpageszc = szc;
 
 	ASSERT(err == 0);
 	return (err);		/* should always be 0 */
@@ -418,8 +404,7 @@ int
 grow_internal(caddr_t sp, uint_t growszc)
 {
 	struct proc *p = curproc;
-	struct as *as = p->p_as;
-	size_t newsize = p->p_usrstack - sp;
+	size_t newsize;
 	size_t oldsize;
 	int    error;
 	size_t pgsz;
@@ -427,6 +412,7 @@ grow_internal(caddr_t sp, uint_t growszc)
 	struct segvn_crargs crargs = SEGVN_ZFOD_ARGS(PROT_ZFOD, PROT_ALL);
 
 	ASSERT(sp < p->p_usrstack);
+	sp = (caddr_t)P2ALIGN((uintptr_t)sp, PAGESIZE);
 
 	/*
 	 * grow to growszc alignment but use current p->p_stkpageszc for
@@ -437,7 +423,7 @@ grow_internal(caddr_t sp, uint_t growszc)
 	if ((szc = growszc) != 0) {
 		pgsz = page_get_pagesize(szc);
 		ASSERT(pgsz > PAGESIZE);
-		newsize = P2ROUNDUP(newsize, pgsz);
+		newsize = p->p_usrstack - (caddr_t)P2ALIGN((uintptr_t)sp, pgsz);
 		if (newsize > (size_t)p->p_stk_ctl) {
 			szc = 0;
 			pgsz = PAGESIZE;
@@ -445,6 +431,7 @@ grow_internal(caddr_t sp, uint_t growszc)
 		}
 	} else {
 		pgsz = PAGESIZE;
+		newsize = p->p_usrstack - sp;
 	}
 
 	if (newsize > (size_t)p->p_stk_ctl) {
@@ -455,7 +442,6 @@ grow_internal(caddr_t sp, uint_t growszc)
 	}
 
 	oldsize = p->p_stksize;
-	newsize = P2ROUNDUP(newsize, pgsz);
 	ASSERT(P2PHASE(oldsize, PAGESIZE) == 0);
 
 	if (newsize <= oldsize) {	/* prevent the stack from shrinking */
@@ -466,13 +452,31 @@ grow_internal(caddr_t sp, uint_t growszc)
 		crargs.prot &= ~PROT_EXEC;
 	}
 	/*
-	 * extend stack with the p_stkpageszc. growszc is different than
-	 * p_stkpageszc only on a memcntl to increase the stack pagesize.
+	 * extend stack with the proposed new growszc, which is different
+	 * than p_stkpageszc only on a memcntl to increase the stack pagesize.
+	 * AS_MAP_NO_LPOOB means use 0, and don't reapply OOB policies via
+	 * map_pgszcvec(). Use AS_MAP_STACK to get intermediate page sizes
+	 * if not aligned to szc's pgsz.
 	 */
-	crargs.szc = p->p_stkpageszc;
+	if (szc > 0) {
+		caddr_t oldsp = p->p_usrstack - oldsize;
+		caddr_t austk = (caddr_t)P2ALIGN((uintptr_t)p->p_usrstack,
+		    pgsz);
+
+		if (IS_P2ALIGNED(p->p_usrstack, pgsz) || oldsp < austk) {
+			crargs.szc = p->p_stkpageszc ? p->p_stkpageszc :
+			    AS_MAP_NO_LPOOB;
+		} else if (oldsp == austk) {
+			crargs.szc = szc;
+		} else {
+			crargs.szc = AS_MAP_STACK;
+		}
+	} else {
+		crargs.szc = AS_MAP_NO_LPOOB;
+	}
 	crargs.lgrp_mem_policy_flags = LGRP_MP_FLAG_EXTEND_DOWN;
 
-	if ((error = as_map(as, p->p_usrstack - newsize, newsize - oldsize,
+	if ((error = as_map(p->p_as, p->p_usrstack - newsize, newsize - oldsize,
 	    segvn_create, &crargs)) != 0) {
 		if (error == EAGAIN) {
 			cmn_err(CE_WARN, "Sorry, no swap space to grow stack "
@@ -481,15 +485,6 @@ grow_internal(caddr_t sp, uint_t growszc)
 		return (error);
 	}
 	p->p_stksize = newsize;
-
-
-	/*
-	 * Set up translations so the process doesn't have to fault in
-	 * the stack pages we just gave it.
-	 */
-	(void) as_fault(as->a_hat, as,
-	    p->p_usrstack - newsize, newsize - oldsize, F_INVAL, S_WRITE);
-
 	return (0);
 }
 
@@ -500,13 +495,7 @@ static int
 zmap(struct as *as, caddr_t *addrp, size_t len, uint_t uprot, int flags,
     offset_t pos)
 {
-	struct segvn_crargs a, b;
-	struct proc *p = curproc;
-	int err;
-	size_t pgsz;
-	size_t l0, l1, l2, l3, l4; /* 0th through 5th chunks */
-	caddr_t ruaddr, ruaddr0; /* rounded up addresses */
-	extern size_t auto_lpg_va_default;
+	struct segvn_crargs vn_a;
 
 	if (((PROT_ALL & uprot) != uprot))
 		return (EACCES);
@@ -549,130 +538,18 @@ zmap(struct as *as, caddr_t *addrp, size_t len, uint_t uprot, int flags,
 	 * Use the seg_vn segment driver; passing in the NULL amp
 	 * gives the desired "cloning" effect.
 	 */
-	a.vp = NULL;
-	a.offset = 0;
-	a.type = flags & MAP_TYPE;
-	a.prot = uprot;
-	a.maxprot = PROT_ALL;
-	a.flags = flags & ~MAP_TYPE;
-	a.cred = CRED();
-	a.amp = NULL;
-	a.szc = 0;
-	a.lgrp_mem_policy_flags = 0;
+	vn_a.vp = NULL;
+	vn_a.offset = 0;
+	vn_a.type = flags & MAP_TYPE;
+	vn_a.prot = uprot;
+	vn_a.maxprot = PROT_ALL;
+	vn_a.flags = flags & ~MAP_TYPE;
+	vn_a.cred = CRED();
+	vn_a.amp = NULL;
+	vn_a.szc = 0;
+	vn_a.lgrp_mem_policy_flags = 0;
 
-	/*
-	 * Call arch-specific map_pgsz routine to pick best page size to map
-	 * this segment, and break the mapping up into parts if required.
-	 *
-	 * The parts work like this:
-	 *
-	 * addr		---------
-	 *		|	| l0
-	 *		---------
-	 *		|	| l1
-	 *		---------
-	 *		|	| l2
-	 *		---------
-	 *		|	| l3
-	 *		---------
-	 *		|	| l4
-	 *		---------
-	 * addr+len
-	 *
-	 * Starting from the middle, l2 is the number of bytes mapped by the
-	 * selected large page.  l1 and l3 are mapped by auto_lpg_va_default
-	 * page size pages, and l0 and l4 are mapped by base page size pages.
-	 * If auto_lpg_va_default is the base page size, then l0 == l4 == 0.
-	 * If the requested address or length are aligned to the selected large
-	 * page size, l1 or l3 may also be 0.
-	 */
-	if (use_zmap_lpg && a.type == MAP_PRIVATE) {
-
-		pgsz = map_pgsz(MAPPGSZ_VA, p, *addrp, len, NULL);
-		if (pgsz <= PAGESIZE || len < pgsz) {
-			return (as_map(as, *addrp, len, segvn_create, &a));
-		}
-
-		ruaddr = (caddr_t)P2ROUNDUP((uintptr_t)*addrp, pgsz);
-		if (auto_lpg_va_default != MMU_PAGESIZE) {
-			ruaddr0 = (caddr_t)P2ROUNDUP((uintptr_t)*addrp,
-			    auto_lpg_va_default);
-			l0 = ruaddr0 - *addrp;
-		} else {
-			l0 = 0;
-			ruaddr0 = *addrp;
-		}
-		l1 = ruaddr - ruaddr0;
-		l3 = P2PHASE(len - l0 - l1, pgsz);
-		if (auto_lpg_va_default == MMU_PAGESIZE) {
-			l4 = 0;
-		} else {
-			l4 = P2PHASE(l3, auto_lpg_va_default);
-			l3 -= l4;
-		}
-		l2 = len - l0 - l1 - l3 - l4;
-
-		if (l0) {
-			b = a;
-			err = as_map(as, *addrp, l0, segvn_create, &b);
-			if (err) {
-				return (err);
-			}
-		}
-
-		if (l1) {
-			b = a;
-			b.szc = page_szc(auto_lpg_va_default);
-			err = as_map(as, ruaddr0, l1, segvn_create, &b);
-			if (err) {
-				goto error1;
-			}
-		}
-
-		if (l2) {
-			b = a;
-			b.szc = page_szc(pgsz);
-			err = as_map(as, ruaddr, l2, segvn_create, &b);
-			if (err) {
-				goto error2;
-			}
-		}
-
-		if (l3) {
-			b = a;
-			b.szc = page_szc(auto_lpg_va_default);
-			err = as_map(as, ruaddr + l2, l3, segvn_create, &b);
-			if (err) {
-				goto error3;
-			}
-		}
-		if (l4) {
-			err = as_map(as, ruaddr + l2 + l3, l4, segvn_create,
-			    &a);
-			if (err) {
-error3:
-				if (l3) {
-					(void) as_unmap(as, ruaddr + l2, l3);
-				}
-error2:
-				if (l2) {
-					(void) as_unmap(as, ruaddr, l2);
-				}
-error1:
-				if (l1) {
-					(void) as_unmap(as, ruaddr0, l1);
-				}
-				if (l0) {
-					(void) as_unmap(as, *addrp, l0);
-				}
-				return (err);
-			}
-		}
-
-		return (0);
-	}
-
-	return (as_map(as, *addrp, len, segvn_create, &a));
+	return (as_map(as, *addrp, len, segvn_create, &vn_a));
 }
 
 static int

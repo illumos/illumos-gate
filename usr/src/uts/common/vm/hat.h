@@ -345,7 +345,7 @@ void	hat_setstat(struct as *, caddr_t, size_t, uint_t);
  *			hat layer data structures.  This flag forces hat layer
  *			to tap its reserves in order to prevent infinite
  *			recursion.
- *	HAT_LOAD_AUTOLPG Get MMU specific disable_auto_large_pages
+ *	HAT_LOAD_TEXT	A flag to hat_memload() to indicate loading text pages.
  */
 
 /*
@@ -362,7 +362,15 @@ void	hat_setstat(struct as *, caddr_t, size_t, uint_t);
 #define	HAT_RELOAD_SHARE	0x100
 #define	HAT_NO_KALLOC		0x200
 #define	HAT_LOAD_TEXT		0x400
-#define	HAT_LOAD_AUTOLPG	0x800
+
+/*
+ * Flags for initializing disable_*large_pages.
+ *
+ *	HAT_AUTO_TEXT	Get MMU specific disable_auto_text_large_pages
+ *	HAT_AUTO_DATA	Get MMU specific disable_auto_data_large_pages
+ */
+#define	HAT_AUTO_TEXT		0x800
+#define	HAT_AUTO_DATA		0x1000
 
 /*
  * Attributes for hat_memload/hat_devload/hat_*attr

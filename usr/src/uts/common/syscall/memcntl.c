@@ -199,30 +199,35 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 				else
 					type = MAPPGSZ_STK;
 
-				pgsz = map_pgsz(type, p, 0, 0, NULL);
+				pgsz = map_pgsz(type, p, 0, 0, 1);
 			}
 		} else {
+			/*
+			 * addr and len must be valid for range specified.
+			 */
+			if (valid_usr_range(addr, len, 0, as,
+			    as->a_userlimit) != RANGE_OKAY) {
+				return (set_errno(ENOMEM));
+			}
 			/*
 			 * Note that we don't disable automatic large page
 			 * selection for anon segments based on use of
 			 * memcntl().
 			 */
 			if (pgsz == 0) {
-				pgsz = map_pgsz(MAPPGSZ_VA, p, addr, len,
-				    NULL);
+				error = as_set_default_lpsize(as, addr, len);
+				if (error) {
+					(void) set_errno(error);
+				}
+				return (error);
 			}
 
 			/*
 			 * addr and len must be prefered page size aligned
-			 * and valid for range specified.
 			 */
 			if (!IS_P2ALIGNED(addr, pgsz) ||
 			    !IS_P2ALIGNED(len, pgsz)) {
 				return (set_errno(EINVAL));
-			}
-			if (valid_usr_range(addr, len, 0, as,
-			    as->a_userlimit) != RANGE_OKAY) {
-				return (set_errno(ENOMEM));
 			}
 		}
 
@@ -257,10 +262,17 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 					return (set_errno(error));
 				}
 			}
+			/*
+			 * It is possible for brk_internal to silently fail to
+			 * promote the heap size, so don't panic or ASSERT.
+			 */
+			if (!IS_P2ALIGNED(p->p_brkbase + p->p_brksize, pgsz)) {
+				as_rangeunlock(as);
+				return (set_errno(ENOMEM));
+			}
 			oszc = p->p_brkpageszc;
 			p->p_brkpageszc = szc;
 
-			ASSERT(IS_P2ALIGNED(p->p_brkbase + p->p_brksize, pgsz));
 			addr = (caddr_t)P2ROUNDUP((uintptr_t)p->p_bssbase,
 			    pgsz);
 			len = (p->p_brkbase + p->p_brksize) - addr;
@@ -292,17 +304,24 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 			}
 
 			if (szc > p->p_stkpageszc) {
-				error = grow_internal(p->p_usrstack
-				    - p->p_stksize, szc);
+				error = grow_internal(p->p_usrstack -
+				    p->p_stksize, szc);
 				if (error) {
 					as_rangeunlock(as);
 					return (set_errno(error));
 				}
 			}
+			/*
+			 * It is possible for grow_internal to silently fail to
+			 * promote the stack size, so don't panic or ASSERT.
+			 */
+			if (!IS_P2ALIGNED(p->p_usrstack - p->p_stksize, pgsz)) {
+				as_rangeunlock(as);
+				return (set_errno(ENOMEM));
+			}
 			oszc = p->p_stkpageszc;
 			p->p_stkpageszc = szc;
 
-			ASSERT(IS_P2ALIGNED(p->p_usrstack, pgsz));
 			addr = p->p_usrstack - p->p_stksize;
 			len = p->p_stksize;
 

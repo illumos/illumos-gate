@@ -34,6 +34,7 @@
 #include <sys/elf_SPARC.h>
 #include <vm/hat_sfmmu.h>
 #include <vm/page.h>
+#include <vm/vm_dep.h>
 #include <sys/cpuvar.h>
 #include <sys/spitregs.h>
 #include <sys/async.h>
@@ -431,9 +432,6 @@ cpu_setup(void)
 #if defined(SF_ERRATA_57)
 	extern caddr_t errata57_limit;
 #endif
-	extern int disable_text_largepages;
-	extern int disable_initdata_largepages;
-
 	cache |= (CACHE_VAC | CACHE_PTAG | CACHE_IOCOHERENT);
 
 	at_flags = EF_SPARC_32PLUS | EF_SPARC_SUN_US1;
@@ -514,14 +512,10 @@ cpu_setup(void)
 #endif
 
 	/*
-	 * Allow only 8K, 64K and 4M pages for text by default.
-	 * Allow only 8K and 64K page for initialized data segments by
-	 * default.
+	 * Disable text by default.
+	 * Note that the other defaults are set in sun4u/vm/mach_vm_dep.c.
 	 */
-	disable_text_largepages = (1 << TTE512K) | (1 << TTE32M) |
-	    (1 << TTE256M);
-	disable_initdata_largepages = (1 << TTE512K) | (1 << TTE4M) |
-	    (1 << TTE32M) | (1 << TTE256M);
+	max_utext_lpsize = MMU_PAGESIZE;
 }
 
 static int
@@ -4488,27 +4482,6 @@ cpu_faulted_enter(struct cpu *cp)
 void
 cpu_faulted_exit(struct cpu *cp)
 {
-}
-
-static int mmu_disable_ism_large_pages = ((1 << TTE512K) |
-	(1 << TTE32M) | (1 << TTE256M));
-static int mmu_disable_large_pages = ((1 << TTE32M) | (1 << TTE256M));
-
-/*
- * The function returns the US_II mmu-specific values for the
- * hat's disable_large_pages and disable_ism_large_pages variables.
- */
-int
-mmu_large_pages_disabled(uint_t flag)
-{
-	int pages_disable = 0;
-
-	if (flag == HAT_LOAD) {
-		pages_disable = mmu_disable_large_pages;
-	} else if (flag == HAT_LOAD_SHARE) {
-		pages_disable = mmu_disable_ism_large_pages;
-	}
-	return (pages_disable);
 }
 
 /*ARGSUSED*/

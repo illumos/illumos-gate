@@ -69,6 +69,11 @@
 #endif	/* CHEETAHPLUS_ERRATUM_25 */
 
 /*
+ * Note that 'Cheetah PRM' refers to:
+ *   SPARC V9 JPS1 Implementation Supplement: Sun UltraSPARC-III
+ */
+
+/*
  * Setup trap handlers.
  */
 void
@@ -122,10 +127,6 @@ cpu_fiximp(pnode_t dnode)
 		"ecache-associativity", &ecache_associativity, CH_ECACHE_NWAY
 	};
 
-	extern int exec_lpg_disable, use_brk_lpg, use_stk_lpg, use_zmap_lpg;
-	extern size_t max_shm_lpsize;
-
-
 	for (i = 0; i < sizeof (prop) / sizeof (prop[0]); i++)
 		*prop[i].var = getintprop(dnode, prop[i].name, prop[i].defval);
 
@@ -143,11 +144,12 @@ cpu_fiximp(pnode_t dnode)
 	/*
 	 * Cheetah's large page support has problems with large numbers of
 	 * large pages, so just disable large pages out-of-the-box.
+	 * Note that the other defaults are set in sun4u/vm/mach_vm_dep.c.
 	 */
-	exec_lpg_disable = 1;
-	use_brk_lpg = 0;
-	use_stk_lpg = 0;
-	use_zmap_lpg = 0;
+	max_uheap_lpsize = MMU_PAGESIZE;
+	max_ustack_lpsize = MMU_PAGESIZE;
+	max_privmap_lpsize = MMU_PAGESIZE;
+	max_utext_lpsize = MMU_PAGESIZE;
 	max_shm_lpsize = MMU_PAGESIZE;
 }
 

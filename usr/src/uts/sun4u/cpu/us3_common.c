@@ -475,8 +475,6 @@ cpu_setup(void)
 	extern int at_flags;
 	extern int disable_delay_tlb_flush, delay_tlb_flush;
 	extern int cpc_has_overflow_intr;
-	extern int disable_text_largepages;
-	extern int use_text_pgsz4m;
 
 	/*
 	 * Setup chip-specific trap handlers.
@@ -572,16 +570,6 @@ cpu_setup(void)
 	 * Declare that this architecture/cpu combination does fpRAS.
 	 */
 	fpras_implemented = 1;
-
-	/*
-	 * Enable 4M pages to be used for mapping user text by default.  Don't
-	 * use large pages for initialized data segments since we may not know
-	 * at exec() time what should be the preferred large page size for DTLB
-	 * programming.
-	 */
-	use_text_pgsz4m = 1;
-	disable_text_largepages = (1 << TTE64K) | (1 << TTE512K) |
-	    (1 << TTE32M) | (1 << TTE256M);
 
 	/*
 	 * Setup CE lookup table

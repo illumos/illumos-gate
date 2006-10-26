@@ -1475,8 +1475,7 @@ startup_vm(void)
 	extern void hat_kern_setup(void);
 	pgcnt_t pages_left;
 
-	extern int exec_lpg_disable, use_brk_lpg, use_stk_lpg, use_zmap_lpg;
-	extern pgcnt_t auto_lpg_min_physmem;
+	extern int use_brk_lpg, use_stk_lpg;
 
 	PRM_POINT("startup_vm() starting...");
 
@@ -1729,11 +1728,21 @@ startup_vm(void)
 	 * disable automatic large pages for small memory systems or
 	 * when the disable flag is set.
 	 */
-	if (physmem < auto_lpg_min_physmem || auto_lpg_disable) {
-		exec_lpg_disable = 1;
+	if (!auto_lpg_disable && mmu.max_page_level > 0) {
+		max_uheap_lpsize = LEVEL_SIZE(1);
+		max_ustack_lpsize = LEVEL_SIZE(1);
+		max_privmap_lpsize = LEVEL_SIZE(1);
+		max_uidata_lpsize = LEVEL_SIZE(1);
+		max_utext_lpsize = LEVEL_SIZE(1);
+		max_shm_lpsize = LEVEL_SIZE(1);
+	}
+	if (physmem < privm_lpg_min_physmem || mmu.max_page_level == 0 ||
+	    auto_lpg_disable) {
 		use_brk_lpg = 0;
 		use_stk_lpg = 0;
-		use_zmap_lpg = 0;
+	}
+	if (mmu.max_page_level > 0) {
+		mcntl0_lpsize = LEVEL_SIZE(1);
 	}
 
 	PRM_POINT("Calling hat_init_finish()...");

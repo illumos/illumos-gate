@@ -341,8 +341,7 @@ shmat(int shmid, caddr_t uaddr, int uflags, uintptr_t *rvp)
 		 * [D]ISM segment, then use the previously selected page size.
 		 */
 		if (!isspt(sp)) {
-			share_size = map_pgsz(MAPPGSZ_ISM,
-			    pp, addr, size, NULL);
+			share_size = map_pgsz(MAPPGSZ_ISM, pp, addr, size, 0);
 			if (share_size == 0) {
 				as_rangeunlock(as);
 				error = EINVAL;

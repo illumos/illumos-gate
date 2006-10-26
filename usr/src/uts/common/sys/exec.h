@@ -101,8 +101,6 @@ typedef struct uarg {
 	size_t	from_ptrsize;
 	size_t	ncargs;
 	struct execsw *execswp;
-	uint_t	stkpageszc;
-	uint_t	brkpageszc;
 	uintptr_t entry;
 	uintptr_t thrptr;
 	char	*emulator;

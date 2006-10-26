@@ -137,16 +137,18 @@ typedef struct	segvn_data {
 #define	SEGVN_ZFOD_ARGS(prot, max)	\
 	{ NULL, NULL, 0, MAP_PRIVATE, prot, max, 0, NULL, 0, 0 }
 
-#define	AS_MAP_VNSEGS_USELPGS(crfp, argsp)				\
+#define	AS_MAP_CHECK_VNODE_LPOOB(crfp, argsp)				\
 	((crfp) == (int (*)())segvn_create &&				\
 	(((struct segvn_crargs *)(argsp))->flags &			\
 	    (MAP_TEXT | MAP_INITDATA)) &&				\
-	((struct segvn_crargs *)(argsp))->vp != NULL &&			\
-	((struct segvn_crargs *)(argsp))->amp == NULL)
+	((struct segvn_crargs *)(argsp))->szc == 0 &&			\
+	((struct segvn_crargs *)(argsp))->vp != NULL)
 
-#define	AS_MAP_SHAMP(crfp, argsp)					\
+#define	AS_MAP_CHECK_ANON_LPOOB(crfp, argsp)				\
 	((crfp) == (int (*)())segvn_create &&				\
-	((struct segvn_crargs *)(argsp))->type == MAP_SHARED &&		\
+	(((struct segvn_crargs *)(argsp))->szc == 0 ||			\
+	((struct segvn_crargs *)(argsp))->szc == AS_MAP_HEAP ||		\
+	((struct segvn_crargs *)(argsp))->szc == AS_MAP_STACK) &&	\
 	((struct segvn_crargs *)(argsp))->vp == NULL)
 
 extern void	segvn_init(void);

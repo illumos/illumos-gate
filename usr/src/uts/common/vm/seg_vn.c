@@ -395,7 +395,7 @@ segvn_create(struct seg *seg, void *argsp)
 		a->flags &= ~MAP_NORESERVE;
 
 	if (a->szc != 0) {
-		if (segvn_lpg_disable != 0 ||
+		if (segvn_lpg_disable != 0 || (a->szc == AS_MAP_NO_LPOOB) ||
 		    (a->amp != NULL && a->type == MAP_PRIVATE) ||
 		    (a->flags & MAP_NORESERVE) || seg->s_as == &kas) {
 			a->szc = 0;
@@ -5270,8 +5270,9 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 				err = segvn_demote_range(seg, addr, len,
 				    SDR_END, 0);
 			} else {
-				uint_t szcvec = map_shm_pgszcvec(seg->s_base,
-				    pgsz, (uintptr_t)seg->s_base);
+				uint_t szcvec = map_pgszcvec(seg->s_base,
+				    pgsz, (uintptr_t)seg->s_base,
+				    (svd->flags & MAP_TEXT), MAPPGSZC_SHM, 0);
 				err = segvn_demote_range(seg, addr, len,
 				    SDR_END, szcvec);
 			}
@@ -6267,7 +6268,8 @@ segvn_gettype(struct seg *seg, caddr_t addr)
 
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
 
-	return (svd->type | (svd->flags & MAP_NORESERVE));
+	return (svd->type | (svd->flags & (MAP_NORESERVE | MAP_TEXT |
+	    MAP_INITDATA)));
 }
 
 /*ARGSUSED*/

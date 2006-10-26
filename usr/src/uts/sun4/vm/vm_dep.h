@@ -423,18 +423,33 @@ extern int vac_size;
 extern int vac_shift;
 
 /*
- * Auto large page selection support variables. Some CPU
- * implementations may differ from the defaults and will need
- * to change these.
+ * Maximum and default values for user heap, stack, private and shared
+ * anonymous memory, and user text and initialized data.
+ *
+ * Initial values are defined in architecture specific mach_vm_dep.c file.
+ * Used by map_pgsz*() routines.
  */
-extern int auto_lpg_tlb_threshold;
-extern int auto_lpg_minszc;
-extern int auto_lpg_maxszc;
-extern size_t auto_lpg_heap_default;
-extern size_t auto_lpg_stack_default;
-extern size_t auto_lpg_va_default;
-extern size_t auto_lpg_remap_threshold;
-extern pgcnt_t auto_lpg_min_physmem;
+extern size_t max_uheap_lpsize;
+extern size_t default_uheap_lpsize;
+extern size_t max_ustack_lpsize;
+extern size_t default_ustack_lpsize;
+extern size_t max_privmap_lpsize;
+extern size_t max_uidata_lpsize;
+extern size_t max_utext_lpsize;
+extern size_t max_shm_lpsize;
+
+/*
+ * For adjusting the default lpsize, for DTLB-limited page sizes.
+ */
+extern void adjust_data_maxlpsize(size_t ismpagesize);
+
+/*
+ * Sanity control. Don't use large pages regardless of user
+ * settings if there's less than priv or shm_lpg_min_physmem memory installed.
+ * The units for this variable are 8K pages.
+ */
+extern pgcnt_t privm_lpg_min_physmem;
+extern pgcnt_t shm_lpg_min_physmem;
 
 /*
  * AS_2_BIN macro controls the page coloring policy.

@@ -1573,8 +1573,10 @@ static int
 as_map_vnsegs(struct as *as, caddr_t addr, size_t size,
     int (*crfp)(), struct segvn_crargs *vn_a, int *segcreated)
 {
-	int text = vn_a->flags & MAP_TEXT;
-	uint_t szcvec = map_execseg_pgszcvec(text, addr, size);
+	uint_t mapflags = vn_a->flags & (MAP_TEXT | MAP_INITDATA);
+	int type = (vn_a->type == MAP_SHARED) ? MAPPGSZC_SHM : MAPPGSZC_PRIVM;
+	uint_t szcvec = map_pgszcvec(addr, size, (uintptr_t)addr, mapflags,
+	    type, 0);
 	int error;
 	struct seg *seg;
 	struct vattr va;
@@ -1616,7 +1618,8 @@ again:
 		save_size = size;
 		size = va.va_size - (vn_a->offset & PAGEMASK);
 		size = P2ROUNDUP_TYPED(size, PAGESIZE, size_t);
-		szcvec = map_execseg_pgszcvec(text, addr, size);
+		szcvec = map_pgszcvec(addr, size, (uintptr_t)addr, mapflags,
+		    type, 0);
 		if (szcvec <= 1) {
 			size = save_size;
 			goto again;
@@ -1637,14 +1640,32 @@ again:
 	return (0);
 }
 
+/*
+ * as_map_ansegs: shared or private anonymous memory.  Note that the flags
+ * passed to map_pgszvec cannot be MAP_INITDATA, for anon.
+ */
 static int
-as_map_sham(struct as *as, caddr_t addr, size_t size,
+as_map_ansegs(struct as *as, caddr_t addr, size_t size,
     int (*crfp)(), struct segvn_crargs *vn_a, int *segcreated)
 {
-	uint_t szcvec = map_shm_pgszcvec(addr, size,
-	    vn_a->amp == NULL ? (uintptr_t)addr :
-		(uintptr_t)P2ROUNDUP(vn_a->offset, PAGESIZE));
+	uint_t szcvec;
+	uchar_t type;
 
+	ASSERT(vn_a->type == MAP_SHARED || vn_a->type == MAP_PRIVATE);
+	if (vn_a->type == MAP_SHARED) {
+		type = MAPPGSZC_SHM;
+	} else if (vn_a->type == MAP_PRIVATE) {
+		if (vn_a->szc == AS_MAP_HEAP) {
+			type = MAPPGSZC_HEAP;
+		} else if (vn_a->szc == AS_MAP_STACK) {
+			type = MAPPGSZC_STACK;
+		} else {
+			type = MAPPGSZC_PRIVM;
+		}
+	}
+	szcvec = map_pgszcvec(addr, size, vn_a->amp == NULL ?
+	    (uintptr_t)addr : (uintptr_t)P2ROUNDUP(vn_a->offset, PAGESIZE),
+	    (vn_a->flags & MAP_TEXT), type, 0);
 	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
 	ASSERT(IS_P2ALIGNED(addr, PAGESIZE));
 	ASSERT(IS_P2ALIGNED(size, PAGESIZE));
@@ -1669,6 +1690,7 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 	caddr_t raddr;			/* rounded down addr */
 	size_t rsize;			/* rounded up size */
 	int error;
+	int unmap = 0;
 	struct proc *p = curproc;
 
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
@@ -1695,15 +1717,19 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 		return (ENOMEM);
 	}
 
-	if (AS_MAP_VNSEGS_USELPGS(crfp, argsp) || AS_MAP_SHAMP(crfp, argsp)) {
-		int unmap = 0;
-		if (AS_MAP_SHAMP(crfp, argsp)) {
-			error = as_map_sham(as, raddr, rsize, crfp,
-			    (struct segvn_crargs *)argsp, &unmap);
-		} else {
-			error = as_map_vnsegs(as, raddr, rsize, crfp,
-			    (struct segvn_crargs *)argsp, &unmap);
+	if (AS_MAP_CHECK_VNODE_LPOOB(crfp, argsp)) {
+		error = as_map_vnsegs(as, raddr, rsize, crfp,
+		    (struct segvn_crargs *)argsp, &unmap);
+		if (error != 0) {
+			AS_LOCK_EXIT(as, &as->a_lock);
+			if (unmap) {
+				(void) as_unmap(as, addr, size);
+			}
+			return (error);
 		}
+	} else if (AS_MAP_CHECK_ANON_LPOOB(crfp, argsp)) {
+		error = as_map_ansegs(as, raddr, rsize, crfp,
+		    (struct segvn_crargs *)argsp, &unmap);
 		if (error != 0) {
 			AS_LOCK_EXIT(as, &as->a_lock);
 			if (unmap) {
@@ -2735,6 +2761,377 @@ setpgsz_top:
 			break;
 		}
 	}
+	as_setwatch(as);
+	AS_LOCK_EXIT(as, &as->a_lock);
+	return (error);
+}
+
+/*
+ * as_iset3_default_lpsize() just calls SEGOP_SETPAGESIZE() on all segments
+ * in its chunk where s_szc is less than the szc we want to set.
+ */
+static int
+as_iset3_default_lpsize(struct as *as, caddr_t raddr, size_t rsize, uint_t szc,
+    int *retry)
+{
+	struct seg *seg;
+	size_t ssize;
+	int error;
+
+	seg = as_segat(as, raddr);
+	if (seg == NULL) {
+		panic("as_iset3_default_lpsize: no seg");
+	}
+
+	for (; rsize != 0; rsize -= ssize, raddr += ssize) {
+		if (raddr >= seg->s_base + seg->s_size) {
+			seg = AS_SEGNEXT(as, seg);
+			if (seg == NULL || raddr != seg->s_base) {
+				panic("as_iset3_default_lpsize: as changed");
+			}
+		}
+		if ((raddr + rsize) > (seg->s_base + seg->s_size)) {
+			ssize = seg->s_base + seg->s_size - raddr;
+		} else {
+			ssize = rsize;
+		}
+
+		if (szc > seg->s_szc) {
+			error = SEGOP_SETPAGESIZE(seg, raddr, ssize, szc);
+			/* Only retry on EINVAL segments that have no vnode. */
+			if (error == EINVAL) {
+				vnode_t *vp = NULL;
+				if ((SEGOP_GETTYPE(seg, raddr) & MAP_SHARED) &&
+				    (SEGOP_GETVP(seg, raddr, &vp) != 0 ||
+				    vp == NULL)) {
+					*retry = 1;
+				} else {
+					*retry = 0;
+				}
+			}
+			if (error) {
+				return (error);
+			}
+		}
+	}
+	return (0);
+}
+
+/*
+ * as_iset2_default_lpsize() calls as_iset3_default_lpsize() to set the
+ * pagesize on each segment in its range, but if any fails with EINVAL,
+ * then it reduces the pagesizes to the next size in the bitmap and
+ * retries as_iset3_default_lpsize(). The reason why the code retries
+ * smaller allowed sizes on EINVAL is because (a) the anon offset may not
+ * match the bigger sizes, and (b) it's hard to get this offset (to begin
+ * with) to pass to map_pgszcvec().
+ */
+static int
+as_iset2_default_lpsize(struct as *as, caddr_t addr, size_t size, uint_t szc,
+    uint_t szcvec)
+{
+	int error;
+	int retry;
+
+	for (;;) {
+		error = as_iset3_default_lpsize(as, addr, size, szc, &retry);
+		if (error == EINVAL && retry) {
+			szcvec &= ~(1 << szc);
+			if (szcvec <= 1) {
+				return (EINVAL);
+			}
+			szc = highbit(szcvec) - 1;
+		} else {
+			return (error);
+		}
+	}
+}
+
+/*
+ * as_iset1_default_lpsize() breaks its chunk into areas where existing
+ * segments have a smaller szc than we want to set. For each such area,
+ * it calls as_iset2_default_lpsize()
+ */
+static int
+as_iset1_default_lpsize(struct as *as, caddr_t raddr, size_t rsize, uint_t szc,
+    uint_t szcvec)
+{
+	struct seg *seg;
+	size_t ssize;
+	caddr_t setaddr = raddr;
+	size_t setsize = 0;
+	int set;
+	int error;
+
+	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+
+	seg = as_segat(as, raddr);
+	if (seg == NULL) {
+		panic("as_iset1_default_lpsize: no seg");
+	}
+	if (seg->s_szc < szc) {
+		set = 1;
+	} else {
+		set = 0;
+	}
+
+	for (; rsize != 0; rsize -= ssize, raddr += ssize, setsize += ssize) {
+		if (raddr >= seg->s_base + seg->s_size) {
+			seg = AS_SEGNEXT(as, seg);
+			if (seg == NULL || raddr != seg->s_base) {
+				panic("as_iset1_default_lpsize: as changed");
+			}
+			if (seg->s_szc >= szc && set) {
+				ASSERT(setsize != 0);
+				error = as_iset2_default_lpsize(as,
+				    setaddr, setsize, szc, szcvec);
+				if (error) {
+					return (error);
+				}
+				set = 0;
+			} else if (seg->s_szc < szc && !set) {
+				setaddr = raddr;
+				setsize = 0;
+				set = 1;
+			}
+		}
+		if ((raddr + rsize) > (seg->s_base + seg->s_size)) {
+			ssize = seg->s_base + seg->s_size - raddr;
+		} else {
+			ssize = rsize;
+		}
+	}
+	error = 0;
+	if (set) {
+		ASSERT(setsize != 0);
+		error = as_iset2_default_lpsize(as, setaddr, setsize,
+		    szc, szcvec);
+	}
+	return (error);
+}
+
+/*
+ * as_iset_default_lpsize() breaks its chunk according to the size code bitmap
+ * returned by map_pgszcvec() (similar to as_map_segvn_segs()), and passes each
+ * chunk to as_iset1_default_lpsize().
+ */
+static int
+as_iset_default_lpsize(struct as *as, caddr_t addr, size_t size, int flags,
+    int type)
+{
+	int rtype = (type & MAP_SHARED) ? MAPPGSZC_SHM : MAPPGSZC_PRIVM;
+	uint_t szcvec = map_pgszcvec(addr, size, (uintptr_t)addr,
+					flags, rtype, 1);
+	uint_t szc;
+	uint_t nszc;
+	int error;
+	caddr_t a;
+	caddr_t eaddr;
+	size_t segsize;
+	size_t pgsz;
+	uint_t save_szcvec;
+
+	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
+	ASSERT(IS_P2ALIGNED(addr, PAGESIZE));
+	ASSERT(IS_P2ALIGNED(size, PAGESIZE));
+
+	szcvec &= ~1;
+	if (szcvec <= 1) {	/* skip if base page size */
+		return (0);
+	}
+
+	/* Get the pagesize of the first larger page size. */
+	szc = lowbit(szcvec) - 1;
+	pgsz = page_get_pagesize(szc);
+	eaddr = addr + size;
+	addr = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
+	eaddr = (caddr_t)P2ALIGN((uintptr_t)eaddr, pgsz);
+
+	save_szcvec = szcvec;
+	szcvec >>= (szc + 1);
+	nszc = szc;
+	while (szcvec) {
+		if ((szcvec & 0x1) == 0) {
+			nszc++;
+			szcvec >>= 1;
+			continue;
+		}
+		nszc++;
+		pgsz = page_get_pagesize(nszc);
+		a = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
+		if (a != addr) {
+			ASSERT(szc > 0);
+			ASSERT(a < eaddr);
+			segsize = a - addr;
+			error = as_iset1_default_lpsize(as, addr, segsize, szc,
+			    save_szcvec);
+			if (error) {
+				return (error);
+			}
+			addr = a;
+		}
+		szc = nszc;
+		szcvec >>= 1;
+	}
+
+	ASSERT(addr < eaddr);
+	szcvec = save_szcvec;
+	while (szcvec) {
+		a = (caddr_t)P2ALIGN((uintptr_t)eaddr, pgsz);
+		ASSERT(a >= addr);
+		if (a != addr) {
+			ASSERT(szc > 0);
+			segsize = a - addr;
+			error = as_iset1_default_lpsize(as, addr, segsize, szc,
+			    save_szcvec);
+			if (error) {
+				return (error);
+			}
+			addr = a;
+		}
+		szcvec &= ~(1 << szc);
+		if (szcvec) {
+			szc = highbit(szcvec) - 1;
+			pgsz = page_get_pagesize(szc);
+		}
+	}
+	ASSERT(addr == eaddr);
+
+	return (0);
+}
+
+/*
+ * Set the default large page size for the range. Called via memcntl with
+ * page size set to 0. as_set_default_lpsize breaks the range down into
+ * chunks with the same type/flags, ignores-non segvn segments, and passes
+ * each chunk to as_iset_default_lpsize().
+ */
+int
+as_set_default_lpsize(struct as *as, caddr_t addr, size_t size)
+{
+	struct seg *seg;
+	caddr_t raddr;
+	size_t rsize;
+	size_t ssize;
+	int rtype, rflags;
+	int stype, sflags;
+	int error;
+	caddr_t	setaddr;
+	size_t setsize;
+	int segvn;
+
+	if (size == 0)
+		return (0);
+
+	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+again:
+	error = 0;
+
+	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
+	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
+	    (size_t)raddr;
+
+	if (raddr + rsize < raddr) {		/* check for wraparound */
+		AS_LOCK_EXIT(as, &as->a_lock);
+		return (ENOMEM);
+	}
+	as_clearwatchprot(as, raddr, rsize);
+	seg = as_segat(as, raddr);
+	if (seg == NULL) {
+		as_setwatch(as);
+		AS_LOCK_EXIT(as, &as->a_lock);
+		return (ENOMEM);
+	}
+	if (seg->s_ops == &segvn_ops) {
+		rtype = SEGOP_GETTYPE(seg, addr);
+		rflags = rtype & (MAP_TEXT | MAP_INITDATA);
+		rtype = rtype & (MAP_SHARED | MAP_PRIVATE);
+		segvn = 1;
+	} else {
+		segvn = 0;
+	}
+	setaddr = raddr;
+	setsize = 0;
+
+	for (; rsize != 0; rsize -= ssize, raddr += ssize, setsize += ssize) {
+		if (raddr >= (seg->s_base + seg->s_size)) {
+			seg = AS_SEGNEXT(as, seg);
+			if (seg == NULL || raddr != seg->s_base) {
+				error = ENOMEM;
+				break;
+			}
+			if (seg->s_ops == &segvn_ops) {
+				stype = SEGOP_GETTYPE(seg, raddr);
+				sflags = stype & (MAP_TEXT | MAP_INITDATA);
+				stype &= (MAP_SHARED | MAP_PRIVATE);
+				if (segvn && (rflags != sflags ||
+				    rtype != stype)) {
+					/*
+					 * The next segment is also segvn but
+					 * has different flags and/or type.
+					 */
+					ASSERT(setsize != 0);
+					error = as_iset_default_lpsize(as,
+					    setaddr, setsize, rflags, rtype);
+					if (error) {
+						break;
+					}
+					rflags = sflags;
+					rtype = stype;
+					setaddr = raddr;
+					setsize = 0;
+				} else if (!segvn) {
+					rflags = sflags;
+					rtype = stype;
+					setaddr = raddr;
+					setsize = 0;
+					segvn = 1;
+				}
+			} else if (segvn) {
+				/* The next segment is not segvn. */
+				ASSERT(setsize != 0);
+				error = as_iset_default_lpsize(as,
+				    setaddr, setsize, rflags, rtype);
+				if (error) {
+					break;
+				}
+				segvn = 0;
+			}
+		}
+		if ((raddr + rsize) > (seg->s_base + seg->s_size)) {
+			ssize = seg->s_base + seg->s_size - raddr;
+		} else {
+			ssize = rsize;
+		}
+	}
+	if (error == 0 && segvn) {
+		/* The last chunk when rsize == 0. */
+		ASSERT(setsize != 0);
+		error = as_iset_default_lpsize(as, setaddr, setsize,
+		    rflags, rtype);
+	}
+
+	if (error == IE_RETRY) {
+		goto again;
+	} else if (error == IE_NOMEM) {
+		error = EAGAIN;
+	} else if (error == ENOTSUP) {
+		error = EINVAL;
+	} else if (error == EAGAIN) {
+		mutex_enter(&as->a_contents);
+		if (AS_ISUNMAPWAIT(as) == 0) {
+			cv_broadcast(&as->a_cv);
+		}
+		AS_SETUNMAPWAIT(as);
+		AS_LOCK_EXIT(as, &as->a_lock);
+		while (AS_ISUNMAPWAIT(as)) {
+			cv_wait(&as->a_cv, &as->a_contents);
+		}
+		mutex_exit(&as->a_contents);
+		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+		goto again;
+	}
+
 	as_setwatch(as);
 	AS_LOCK_EXIT(as, &as->a_lock);
 	return (error);

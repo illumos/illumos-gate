@@ -55,6 +55,7 @@
 #include <sys/exec.h>
 #include <sys/exechdr.h>
 #include <sys/debug.h>
+#include <sys/vmsystm.h>
 
 #include <vm/hat.h>
 #include <vm/as.h>
@@ -122,39 +123,80 @@ uint_t mmu_page_sizes;
 /* How many page sizes the users can see */
 uint_t mmu_exported_page_sizes;
 
-size_t auto_lpg_va_default = MMU_PAGESIZE; /* used by zmap() */
 /*
  * Number of pages in 1 GB.  Don't enable automatic large pages if we have
  * fewer than this many pages.
  */
-pgcnt_t auto_lpg_min_physmem = 1 << (30 - MMU_PAGESHIFT);
+pgcnt_t shm_lpg_min_physmem = 1 << (30 - MMU_PAGESHIFT);
+pgcnt_t privm_lpg_min_physmem = 1 << (30 - MMU_PAGESHIFT);
+
+/*
+ * Maximum and default segment size tunables for user private
+ * and shared anon memory, and user text and initialized data.
+ * These can be patched via /etc/system to allow large pages
+ * to be used for mapping application private and shared anon memory.
+ */
+size_t mcntl0_lpsize = MMU_PAGESIZE;
+size_t max_uheap_lpsize = MMU_PAGESIZE;
+size_t default_uheap_lpsize = MMU_PAGESIZE;
+size_t max_ustack_lpsize = MMU_PAGESIZE;
+size_t default_ustack_lpsize = MMU_PAGESIZE;
+size_t max_privmap_lpsize = MMU_PAGESIZE;
+size_t max_uidata_lpsize = MMU_PAGESIZE;
+size_t max_utext_lpsize = MMU_PAGESIZE;
+size_t max_shm_lpsize = MMU_PAGESIZE;
 
 /*
  * Return the optimum page size for a given mapping
  */
 /*ARGSUSED*/
 size_t
-map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int *remap)
+map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int memcntl)
 {
-	level_t l;
+	level_t l = 0;
+	size_t pgsz = MMU_PAGESIZE;
+	size_t max_lpsize;
+	uint_t mszc;
 
-	if (remap)
-		*remap = 0;
+	ASSERT(maptype != MAPPGSZ_VA);
+
+	if (maptype != MAPPGSZ_ISM && physmem < privm_lpg_min_physmem) {
+		return (MMU_PAGESIZE);
+	}
 
 	switch (maptype) {
-
-	case MAPPGSZ_STK:
 	case MAPPGSZ_HEAP:
-	case MAPPGSZ_VA:
+	case MAPPGSZ_STK:
+		max_lpsize = memcntl ? mcntl0_lpsize : (maptype ==
+		    MAPPGSZ_HEAP ? max_uheap_lpsize : max_ustack_lpsize);
+		if (max_lpsize == MMU_PAGESIZE) {
+			return (MMU_PAGESIZE);
+		}
+		if (len == 0) {
+			len = (maptype == MAPPGSZ_HEAP) ? p->p_brkbase +
+			    p->p_brksize - p->p_bssbase : p->p_stksize;
+		}
+		len = (maptype == MAPPGSZ_HEAP) ? MAX(len,
+		    default_uheap_lpsize) : MAX(len, default_ustack_lpsize);
+
 		/*
 		 * use the pages size that best fits len
 		 */
 		for (l = mmu.max_page_level; l > 0; --l) {
-			if (len < LEVEL_SIZE(l))
+			if (LEVEL_SIZE(l) > max_lpsize || len < LEVEL_SIZE(l)) {
 				continue;
+			} else {
+				pgsz = LEVEL_SIZE(l);
+			}
 			break;
 		}
-		return (LEVEL_SIZE(l));
+
+		mszc = (maptype == MAPPGSZ_HEAP ? p->p_brkpageszc :
+		    p->p_stkpageszc);
+		if (addr == 0 && (pgsz < hw_page_array[mszc].hp_size)) {
+			pgsz = hw_page_array[mszc].hp_size;
+		}
+		return (pgsz);
 
 	/*
 	 * for ISM use the 1st large page size.
@@ -164,65 +206,96 @@ map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int *remap)
 			return (MMU_PAGESIZE);
 		return (LEVEL_SIZE(1));
 	}
-	return (0);
+	return (pgsz);
 }
 
-/*
- * This can be patched via /etc/system to allow large pages
- * to be used for mapping application and libraries text segments.
- */
-int	use_text_largepages = 0;
-int	use_shm_largepages = 0;
+static uint_t
+map_szcvec(caddr_t addr, size_t size, uintptr_t off, size_t max_lpsize,
+    size_t min_physmem)
+{
+	caddr_t eaddr = addr + size;
+	uint_t szcvec = 0;
+	caddr_t raddr;
+	caddr_t readdr;
+	size_t	pgsz;
+	int i;
+
+	if (physmem < min_physmem || max_lpsize <= MMU_PAGESIZE) {
+		return (0);
+	}
+
+	for (i = mmu_page_sizes - 1; i > 0; i--) {
+		pgsz = page_get_pagesize(i);
+		if (pgsz > max_lpsize) {
+			continue;
+		}
+		raddr = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
+		readdr = (caddr_t)P2ALIGN((uintptr_t)eaddr, pgsz);
+		if (raddr < addr || raddr >= readdr) {
+			continue;
+		}
+		if (P2PHASE((uintptr_t)addr ^ off, pgsz)) {
+			continue;
+		}
+		/*
+		 * Set szcvec to the remaining page sizes.
+		 */
+		szcvec = ((1 << (i + 1)) - 1) & ~1;
+		break;
+	}
+	return (szcvec);
+}
 
 /*
  * Return a bit vector of large page size codes that
  * can be used to map [addr, addr + len) region.
  */
-
 /*ARGSUSED*/
 uint_t
-map_execseg_pgszcvec(int text, caddr_t addr, size_t len)
+map_pgszcvec(caddr_t addr, size_t size, uintptr_t off, int flags, int type,
+    int memcntl)
 {
-	size_t	pgsz;
-	caddr_t a;
+	size_t max_lpsize = mcntl0_lpsize;
 
-	if (!text || !use_text_largepages ||
-	    mmu.max_page_level == 0)
+	if (mmu.max_page_level == 0)
 		return (0);
 
-	pgsz = LEVEL_SIZE(1);
-	a = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
-	if (a < addr || a >= addr + len) {
-		return (0);
-	}
-	len -= (a - addr);
-	if (len < pgsz) {
-		return (0);
-	}
-	return (1 << 1);
-}
+	if (flags & MAP_TEXT) {
+	    if (!memcntl)
+		max_lpsize = max_utext_lpsize;
+	    return (map_szcvec(addr, size, off, max_lpsize,
+		    shm_lpg_min_physmem));
 
-uint_t
-map_shm_pgszcvec(caddr_t addr, size_t len, uintptr_t off)
-{
-	size_t	pgsz;
-	caddr_t a;
+	} else if (flags & MAP_INITDATA) {
+	    if (!memcntl)
+		max_lpsize = max_uidata_lpsize;
+	    return (map_szcvec(addr, size, off, max_lpsize,
+		    privm_lpg_min_physmem));
 
-	if (!use_shm_largepages || mmu.max_page_level == 0) {
-		return (0);
-	}
+	} else if (type == MAPPGSZC_SHM) {
+	    if (!memcntl)
+		max_lpsize = max_shm_lpsize;
+	    return (map_szcvec(addr, size, off, max_lpsize,
+		    shm_lpg_min_physmem));
 
-	pgsz = LEVEL_SIZE(1);
-	a = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
-	if (a < addr || a >= addr + len ||
-	    P2PHASE((uintptr_t)addr ^ off, pgsz)) {
-		return (0);
+	} else if (type == MAPPGSZC_HEAP) {
+	    if (!memcntl)
+		max_lpsize = max_uheap_lpsize;
+	    return (map_szcvec(addr, size, off, max_lpsize,
+		    privm_lpg_min_physmem));
+
+	} else if (type == MAPPGSZC_STACK) {
+	    if (!memcntl)
+		max_lpsize = max_ustack_lpsize;
+	    return (map_szcvec(addr, size, off, max_lpsize,
+		    privm_lpg_min_physmem));
+
+	} else {
+	    if (!memcntl)
+		max_lpsize = max_privmap_lpsize;
+	    return (map_szcvec(addr, size, off, max_lpsize,
+		    privm_lpg_min_physmem));
 	}
-	len -= (a - addr);
-	if (len < pgsz) {
-		return (0);
-	}
-	return (1 << 1);
 }
 
 /*

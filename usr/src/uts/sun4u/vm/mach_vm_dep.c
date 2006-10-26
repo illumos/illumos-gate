@@ -95,55 +95,42 @@ hw_pagesize_t hw_page_array[] = {
 };
 
 /*
- * use_text_pgsz64k, use_initdata_pgsz64k and use_text_pgsz4m
- * can be set in platform or CPU specific code but user can change the
- * default values via /etc/system.
+ * use_text_pgsz64k and use_text_pgsz512k allow the user to turn on these
+ * additional text page sizes for USIII-IV+ and OPL by changing the default
+ * values via /etc/system.
  */
-
-int	use_text_pgsz64k = 0;
-int	use_text_pgsz4m = 0;
-int	use_initdata_pgsz64k = 0;
+int	use_text_pgsz64K = 0;
+int	use_text_pgsz512K = 0;
 
 /*
- * disable_text_largepages and disable_initdata_largepages bitmaks are set in
- * platform or CPU specific code to disable page sizes that should not be
- * used. These variables normally shouldn't be changed via /etc/system. A
- * particular page size for text or inititialized data will be used by default
- * if both one of use_* variables is set to 1 AND this page size is not
- * disabled in the corresponding disable_* bitmask variable.
+ * Maximum and default segment size tunables for user heap, stack, private
+ * and shared anonymous memory, and user text and initialized data.
  */
+size_t max_uheap_lpsize = MMU_PAGESIZE4M;
+size_t default_uheap_lpsize = MMU_PAGESIZE;
+size_t max_ustack_lpsize = MMU_PAGESIZE4M;
+size_t default_ustack_lpsize = MMU_PAGESIZE;
+size_t max_privmap_lpsize = MMU_PAGESIZE4M;
+size_t max_uidata_lpsize = MMU_PAGESIZE;
+size_t max_utext_lpsize = MMU_PAGESIZE4M;
+size_t max_shm_lpsize = MMU_PAGESIZE4M;
 
-int disable_text_largepages = (1 << TTE4M) | (1 << TTE64K);
-int disable_initdata_largepages = (1 << TTE64K);
-
-/*
- * Minimum segment size tunables before 64K or 4M large pages
- * should be used to map it.
- */
-size_t text_pgsz64k_minsize = MMU_PAGESIZE64K;
-size_t text_pgsz4m_minsize = MMU_PAGESIZE4M;
-size_t initdata_pgsz64k_minsize = MMU_PAGESIZE64K;
-
-size_t max_shm_lpsize = ULONG_MAX;
-
-/*
- * Platforms with smaller or larger TLBs may wish to change this.  Most
- * sun4u platforms can hold 1024 8K entries by default and most processes
- * are observed to be < 6MB on these machines, so we decide to move up
- * here to give ourselves some wiggle room for other, smaller segments.
- */
-int auto_lpg_tlb_threshold = 768;
-int auto_lpg_minszc = TTE4M;
-int auto_lpg_maxszc = TTE4M;
-size_t auto_lpg_heap_default = MMU_PAGESIZE;
-size_t auto_lpg_stack_default = MMU_PAGESIZE;
-size_t auto_lpg_va_default = MMU_PAGESIZE;
-size_t auto_lpg_remap_threshold = 0;
-/*
- * Number of pages in 1 GB.  Don't enable automatic large pages if we have
- * fewer than this many pages.
- */
-pgcnt_t auto_lpg_min_physmem = 1 << (30 - MMU_PAGESHIFT);
+void
+adjust_data_maxlpsize(size_t ismpagesize)
+{
+	if (max_uheap_lpsize == MMU_PAGESIZE4M) {
+		max_uheap_lpsize = ismpagesize;
+	}
+	if (max_ustack_lpsize == MMU_PAGESIZE4M) {
+		max_ustack_lpsize = ismpagesize;
+	}
+	if (max_privmap_lpsize == MMU_PAGESIZE4M) {
+		max_privmap_lpsize = ismpagesize;
+	}
+	if (max_shm_lpsize == MMU_PAGESIZE4M) {
+		max_shm_lpsize = ismpagesize;
+	}
+}
 
 /*
  * map_addr_proc() is the routine called when the system is to

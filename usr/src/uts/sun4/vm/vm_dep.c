@@ -97,8 +97,6 @@ plcnt_t		plcnt;		/* page list count */
 caddr_t errata57_limit;
 #endif
 
-extern int disable_auto_large_pages;	/* used by map_pgsz*() routines */
-
 extern void page_relocate_hash(page_t *, page_t *);
 
 /*
@@ -467,89 +465,56 @@ getexinfo(
 	}
 }
 
-#define	MAP_PGSZ_COMMON(pgsz, n, upper, lower, len)	\
-	for ((n) = (upper); (n) > (lower); (n)--) {		\
-		if (disable_auto_large_pages & (1 << (n)))		\
-			continue;				\
-		if (hw_page_array[(n)].hp_size <= (len)) {	\
-			(pgsz) = hw_page_array[(n)].hp_size;	\
-			break;					\
-		}						\
-	}
-
-
-/*ARGSUSED*/
-static size_t
-map_pgszva(struct proc *p, caddr_t addr, size_t len)
+/*
+ * Return non 0 value if the address may cause a VAC alias with KPM mappings.
+ * KPM selects an address such that it's equal offset modulo shm_alignment and
+ * assumes it can't be in VAC conflict with any larger than PAGESIZE mapping.
+ */
+int
+map_addr_vacalign_check(caddr_t addr, u_offset_t off)
 {
-	size_t		pgsz = MMU_PAGESIZE;
-	int		n, upper;
-
-	/*
-	 * Select the best fit page size within the constraints of
-	 * auto_lpg_{min,max}szc.
-	 *
-	 * Note that we also take the heap size into account when
-	 * deciding if we've crossed the threshold at which we should
-	 * increase the page size.  This isn't perfect since the heap
-	 * may not have reached its full size yet, but it's better than
-	 * not considering it at all.
-	 */
-	len += p->p_brksize;
-	if (ptob(auto_lpg_tlb_threshold) <= len) {
-
-		upper = MIN(mmu_page_sizes - 1, auto_lpg_maxszc);
-
-		/*
-		 * Use auto_lpg_minszc - 1 as the limit so we never drop
-		 * below auto_lpg_minszc.  We don't have a size code to refer
-		 * to like we have for bss and stack, so we assume 0.
-		 * auto_lpg_minszc should always be >= 0.  Using
-		 * auto_lpg_minszc cuts off the loop.
-		 */
-		MAP_PGSZ_COMMON(pgsz, n, upper, auto_lpg_minszc - 1, len);
+	if (vac) {
+		return (((uintptr_t)addr ^ off) & shm_alignment - 1);
+	} else {
+		return (0);
 	}
-
-	return (pgsz);
 }
+
+/*
+ * Sanity control. Don't use large pages regardless of user
+ * settings if there's less than priv or shm_lpg_min_physmem memory installed.
+ * The units for this variable is 8K pages.
+ */
+pgcnt_t shm_lpg_min_physmem = 131072;			/* 1GB */
+pgcnt_t privm_lpg_min_physmem = 131072;			/* 1GB */
 
 static size_t
 map_pgszheap(struct proc *p, caddr_t addr, size_t len)
 {
-	size_t		pgsz;
-	int		n, upper, lower;
+	size_t		pgsz = MMU_PAGESIZE;
+	int		szc;
 
 	/*
 	 * If len is zero, retrieve from proc and don't demote the page size.
+	 * Use atleast the default pagesize.
 	 */
 	if (len == 0) {
-		len = p->p_brksize;
+		len = p->p_brkbase + p->p_brksize - p->p_bssbase;
+	}
+	len = MAX(len, default_uheap_lpsize);
+
+	for (szc = mmu_page_sizes - 1; szc >= 0; szc--) {
+		pgsz = hw_page_array[szc].hp_size;
+		if ((disable_auto_data_large_pages & (1 << szc)) ||
+		    pgsz > max_uheap_lpsize)
+			continue;
+		if (len >= pgsz) {
+			break;
+		}
 	}
 
 	/*
-	 * Still zero?  Then we don't have a heap yet, so pick the default
-	 * heap size.
-	 */
-	if (len == 0) {
-		pgsz = auto_lpg_heap_default;
-	} else {
-		pgsz = hw_page_array[p->p_brkpageszc].hp_size;
-	}
-
-	if ((pgsz * auto_lpg_tlb_threshold) <= len) {
-		/*
-		 * We're past the threshold, so select the best fit
-		 * page size within the constraints of
-		 * auto_lpg_{min,max}szc and the minimum required
-		 * alignment.
-		 */
-		upper = MIN(mmu_page_sizes - 1, auto_lpg_maxszc);
-		lower = MAX(auto_lpg_minszc - 1, p->p_brkpageszc);
-		MAP_PGSZ_COMMON(pgsz, n, upper, lower, len);
-	}
-
-	/*
-	 * If addr == 0 we were called by memcntl() or exec_args() when the
+	 * If addr == 0 we were called by memcntl() when the
 	 * size code is 0.  Don't set pgsz less than current size.
 	 */
 	if (addr == 0 && (pgsz < hw_page_array[p->p_brkpageszc].hp_size)) {
@@ -562,36 +527,26 @@ map_pgszheap(struct proc *p, caddr_t addr, size_t len)
 static size_t
 map_pgszstk(struct proc *p, caddr_t addr, size_t len)
 {
-	size_t		pgsz;
-	int		n, upper, lower;
+	size_t		pgsz = MMU_PAGESIZE;
+	int		szc;
 
 	/*
 	 * If len is zero, retrieve from proc and don't demote the page size.
+	 * Use atleast the default pagesize.
 	 */
 	if (len == 0) {
 		len = p->p_stksize;
 	}
+	len = MAX(len, default_ustack_lpsize);
 
-	/*
-	 * Still zero?  Then we don't have a heap yet, so pick the default
-	 * stack size.
-	 */
-	if (len == 0) {
-		pgsz = auto_lpg_stack_default;
-	} else {
-		pgsz = hw_page_array[p->p_stkpageszc].hp_size;
-	}
-
-	if ((pgsz * auto_lpg_tlb_threshold) <= len) {
-		/*
-		 * We're past the threshold, so select the best fit
-		 * page size within the constraints of
-		 * auto_lpg_{min,max}szc and the minimum required
-		 * alignment.
-		 */
-		upper = MIN(mmu_page_sizes - 1, auto_lpg_maxszc);
-		lower = MAX(auto_lpg_minszc - 1, p->p_brkpageszc);
-		MAP_PGSZ_COMMON(pgsz, n, upper, lower, len);
+	for (szc = mmu_page_sizes - 1; szc >= 0; szc--) {
+		pgsz = hw_page_array[szc].hp_size;
+		if ((disable_auto_data_large_pages & (1 << szc)) ||
+		    pgsz > max_ustack_lpsize)
+			continue;
+		if (len >= pgsz) {
+			break;
+		}
 	}
 
 	/*
@@ -610,7 +565,6 @@ map_pgszism(caddr_t addr, size_t len)
 {
 	uint_t szc;
 	size_t pgsz;
-	extern int disable_ism_large_pages;
 
 	for (szc = mmu_page_sizes - 1; szc >= TTE4M; szc--) {
 		if (disable_ism_large_pages & (1 << szc))
@@ -620,234 +574,69 @@ map_pgszism(caddr_t addr, size_t len)
 		if ((len >= pgsz) && IS_P2ALIGNED(addr, pgsz))
 			return (pgsz);
 	}
+
 	return (DEFAULT_ISM_PAGESIZE);
 }
 
 /*
  * Suggest a page size to be used to map a segment of type maptype and length
  * len.  Returns a page size (not a size code).
- * If remap is non-NULL, fill in a value suggesting whether or not to remap
- * this segment.
  */
+/* ARGSUSED */
 size_t
-map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int *remap)
+map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int memcntl)
 {
-	size_t	pgsz = 0;
+	size_t	pgsz = MMU_PAGESIZE;
 
-	if (remap != NULL)
-		*remap = (len > auto_lpg_remap_threshold);
+	ASSERT(maptype != MAPPGSZ_VA);
+
+	if (maptype != MAPPGSZ_ISM && physmem < privm_lpg_min_physmem) {
+		return (MMU_PAGESIZE);
+	}
 
 	switch (maptype) {
 	case MAPPGSZ_ISM:
 		pgsz = map_pgszism(addr, len);
 		break;
 
-	case MAPPGSZ_VA:
-		pgsz = map_pgszva(p, addr, len);
-		break;
-
 	case MAPPGSZ_STK:
-		pgsz = map_pgszstk(p, addr, len);
+		if (max_ustack_lpsize > MMU_PAGESIZE) {
+			pgsz = map_pgszstk(p, addr, len);
+		}
 		break;
 
 	case MAPPGSZ_HEAP:
-		pgsz = map_pgszheap(p, addr, len);
+		if (max_uheap_lpsize > MMU_PAGESIZE) {
+			pgsz = map_pgszheap(p, addr, len);
+		}
 		break;
 	}
 	return (pgsz);
 }
 
-/*
- * Return non 0 value if the address may cause a VAC alias with KPM mappings.
- * KPM selects an address such that it's equal offset modulo shm_alignment and
- * assumes it can't be in VAC conflict with any larger than PAGESIZE mapping.
- */
-int
-map_addr_vacalign_check(caddr_t addr, u_offset_t off)
-{
-	if (vac) {
-		return (((uintptr_t)addr ^ off) & shm_alignment - 1);
-	} else {
-		return (0);
-	}
-}
-
-/*
- * use_text_pgsz64k, use_initdata_pgsz64k and use_text_pgsz4m
- * can be set in platform or CPU specific code but user can change the
- * default values via /etc/system.
- *
- * Initial values are defined in architecture specific mach_vm_dep.c file.
- */
-extern int use_text_pgsz64k;
-extern int use_text_pgsz4m;
-extern int use_initdata_pgsz64k;
-
-/*
- * disable_text_largepages and disable_initdata_largepages bitmaks are set in
- * platform or CPU specific code to disable page sizes that should not be
- * used. These variables normally shouldn't be changed via /etc/system. A
- * particular page size for text or inititialized data will be used by default
- * if both one of use_* variables is set to 1 AND this page size is not
- * disabled in the corresponding disable_* bitmask variable.
- *
- * Initial values are defined in architecture specific mach_vm_dep.c file.
- */
-extern int disable_text_largepages;
-extern int disable_initdata_largepages;
-
-/*
- * Minimum segment size tunables before 64K or 4M large pages
- * should be used to map it.
- *
- * Initial values are defined in architecture specific mach_vm_dep.c file.
- */
-extern size_t text_pgsz64k_minsize;
-extern size_t text_pgsz4m_minsize;
-extern size_t initdata_pgsz64k_minsize;
-
-/*
- * Sanity control. Don't use large pages regardless of user
- * settings if there's less than execseg_lpg_min_physmem memory installed.
- * The units for this variable is 8K pages.
- */
-pgcnt_t execseg_lpg_min_physmem = 131072;		/* 1GB */
-
-extern int disable_shm_large_pages;
-pgcnt_t shm_lpg_min_physmem = 131072;			/* 1GB */
-extern size_t max_shm_lpsize;
-
 
 /* assumes TTE8K...TTE4M == szc */
 
 static uint_t
-map_text_pgsz4m(caddr_t addr, size_t len)
-{
-	caddr_t a;
-
-	if (len < text_pgsz4m_minsize) {
-		return (0);
-	}
-
-	a = (caddr_t)P2ROUNDUP_TYPED(addr, MMU_PAGESIZE4M, uintptr_t);
-	if (a < addr || a >= addr + len) {
-		return (0);
-	}
-	len -= (a - addr);
-	if (len < MMU_PAGESIZE4M) {
-		return (0);
-	}
-
-	return (1 << TTE4M);
-}
-
-static uint_t
-map_text_pgsz64k(caddr_t addr, size_t len)
-{
-	caddr_t a;
-	size_t svlen = len;
-
-	if (len < text_pgsz64k_minsize) {
-		return (0);
-	}
-
-	a = (caddr_t)P2ROUNDUP_TYPED(addr, MMU_PAGESIZE64K, uintptr_t);
-	if (a < addr || a >= addr + len) {
-		return (0);
-	}
-	len -= (a - addr);
-	if (len < MMU_PAGESIZE64K) {
-		return (0);
-	}
-	if (!use_text_pgsz4m ||
-	    disable_text_largepages & (1 << TTE4M)) {
-		return (1 << TTE64K);
-	}
-	if (svlen < text_pgsz4m_minsize) {
-		return (1 << TTE64K);
-	}
-	addr = a;
-	a = (caddr_t)P2ROUNDUP_TYPED(addr, MMU_PAGESIZE4M, uintptr_t);
-	if (a < addr || a >= addr + len) {
-		return (1 << TTE64K);
-	}
-	len -= (a - addr);
-	if (len < MMU_PAGESIZE4M) {
-		return (1 << TTE64K);
-	}
-	return ((1 << TTE4M) | (1 << TTE64K));
-}
-
-static uint_t
-map_initdata_pgsz64k(caddr_t addr, size_t len)
-{
-	caddr_t a;
-
-	if (len < initdata_pgsz64k_minsize) {
-		return (0);
-	}
-
-	a = (caddr_t)P2ROUNDUP_TYPED(addr, MMU_PAGESIZE64K, uintptr_t);
-	if (a < addr || a >= addr + len) {
-		return (0);
-	}
-	len -= (a - addr);
-	if (len < MMU_PAGESIZE64K) {
-		return (0);
-	}
-	return (1 << TTE64K);
-}
-
-/*
- * Return a bit vector of large page size codes that
- * can be used to map [addr, addr + len) region.
- */
-uint_t
-map_execseg_pgszcvec(int text, caddr_t addr, size_t len)
-{
-	uint_t ret = 0;
-
-	if (physmem < execseg_lpg_min_physmem) {
-		return (0);
-	}
-
-	if (text) {
-		if (use_text_pgsz64k &&
-		    !(disable_text_largepages & (1 << TTE64K))) {
-			ret = map_text_pgsz64k(addr, len);
-		} else if (use_text_pgsz4m &&
-		    !(disable_text_largepages & (1 << TTE4M))) {
-			ret = map_text_pgsz4m(addr, len);
-		}
-	} else if (use_initdata_pgsz64k &&
-	    !(disable_initdata_largepages & (1 << TTE64K))) {
-		ret = map_initdata_pgsz64k(addr, len);
-	}
-
-	return (ret);
-}
-
-uint_t
-map_shm_pgszcvec(caddr_t addr, size_t size, uintptr_t off)
+map_szcvec(caddr_t addr, size_t size, uintptr_t off, int disable_lpgs,
+    size_t max_lpsize, size_t min_physmem)
 {
 	caddr_t eaddr = addr + size;
 	uint_t szcvec = 0;
-	int i;
 	caddr_t raddr;
 	caddr_t readdr;
 	size_t pgsz;
+	int i;
 
-	if (physmem < shm_lpg_min_physmem || mmu_page_sizes <= 1 ||
-	    max_shm_lpsize <= MMU_PAGESIZE) {
+	if (physmem < min_physmem || max_lpsize <= MMU_PAGESIZE) {
 		return (0);
 	}
-
 	for (i = mmu_page_sizes - 1; i > 0; i--) {
-		if (disable_shm_large_pages & (1 << i)) {
+		if (disable_lpgs & (1 << i)) {
 			continue;
 		}
 		pgsz = page_get_pagesize(i);
-		if (pgsz > max_shm_lpsize) {
+		if (pgsz > max_lpsize) {
 			continue;
 		}
 		raddr = (caddr_t)P2ROUNDUP((uintptr_t)addr, pgsz);
@@ -862,11 +651,46 @@ map_shm_pgszcvec(caddr_t addr, size_t size, uintptr_t off)
 		/*
 		 * And or in the remaining enabled page sizes.
 		 */
-		szcvec |= P2PHASE(~disable_shm_large_pages, (1 << i));
+		szcvec |= P2PHASE(~disable_lpgs, (1 << i));
 		szcvec &= ~1; /* no need to return 8K pagesize */
 		break;
 	}
 	return (szcvec);
+}
+
+/*
+ * Return a bit vector of large page size codes that
+ * can be used to map [addr, addr + len) region.
+ */
+/* ARGSUSED */
+uint_t
+map_pgszcvec(caddr_t addr, size_t size, uintptr_t off, int flags, int type,
+    int memcntl)
+{
+	if (flags & MAP_TEXT) {
+	    return (map_szcvec(addr, size, off, disable_auto_text_large_pages,
+		    max_utext_lpsize, shm_lpg_min_physmem));
+
+	} else if (flags & MAP_INITDATA) {
+	    return (map_szcvec(addr, size, off, disable_auto_data_large_pages,
+		    max_uidata_lpsize, privm_lpg_min_physmem));
+
+	} else if (type == MAPPGSZC_SHM) {
+	    return (map_szcvec(addr, size, off, disable_auto_data_large_pages,
+		    max_shm_lpsize, shm_lpg_min_physmem));
+
+	} else if (type == MAPPGSZC_HEAP) {
+	    return (map_szcvec(addr, size, off, disable_auto_data_large_pages,
+		    max_uheap_lpsize, privm_lpg_min_physmem));
+
+	} else if (type == MAPPGSZC_STACK) {
+	    return (map_szcvec(addr, size, off, disable_auto_data_large_pages,
+		    max_ustack_lpsize, privm_lpg_min_physmem));
+
+	} else {
+	    return (map_szcvec(addr, size, off, disable_auto_data_large_pages,
+		    max_privmap_lpsize, privm_lpg_min_physmem));
+	}
 }
 
 /*
@@ -1240,7 +1064,6 @@ get_segkmem_lpsize(size_t lpsize)
 	size_t memtotal = physmem * PAGESIZE;
 	size_t mmusz;
 	uint_t szc;
-	extern int disable_large_pages;
 
 	if (memtotal < segkmem_lpminphysmem)
 		return (PAGESIZE);

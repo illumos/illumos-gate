@@ -226,6 +226,7 @@ aoutexec(vnode_t *vp, struct execa *uap, struct uarg *args,
 	    edp.ux_bsize, edp.ux_doffset, dataprot, pagedata, 0))
 		goto done;
 
+	exenv.ex_bssbase = (caddr_t)edp.ux_datorg;
 	exenv.ex_brkbase = (caddr_t)edp.ux_datorg;
 	exenv.ex_brksize = edp.ux_dsize + edp.ux_bsize;
 	exenv.ex_magic = edp.ux_mag;

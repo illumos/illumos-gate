@@ -105,6 +105,14 @@ extern pgcnt_t	pages_before_pager; /* XXX */
 #define	MAPPGSZ_HEAP	0x04
 #define	MAPPGSZ_ISM	0x08
 
+/*
+ * Flags for map_pgszcvec
+ */
+#define	MAPPGSZC_SHM	0x01
+#define	MAPPGSZC_PRIVM	0x02
+#define	MAPPGSZC_STACK	0x04
+#define	MAPPGSZC_HEAP	0x08
+
 struct as;
 struct page;
 struct anon;
@@ -118,10 +126,10 @@ extern	int valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen,
 		int dir);
 extern	int valid_usr_range(caddr_t, size_t, uint_t, struct as *, caddr_t);
 extern	int useracc(void *, size_t, int);
-extern	size_t map_pgsz(int maptype, struct proc *p, caddr_t addr,
-		size_t len, int *remap);
-extern	uint_t map_execseg_pgszcvec(int, caddr_t, size_t);
-extern	uint_t map_shm_pgszcvec(caddr_t, size_t, uintptr_t);
+extern	size_t map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len,
+    int memcntl);
+extern	uint_t map_pgszcvec(caddr_t addr, size_t size, uintptr_t off, int flags,
+    int type, int memcntl);
 extern	void map_addr(caddr_t *addrp, size_t len, offset_t off, int vacalign,
     uint_t flags);
 extern	int map_addr_vacalign_check(caddr_t, u_offset_t);

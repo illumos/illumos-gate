@@ -494,8 +494,6 @@ cpu_setup(void)
 	extern int at_flags;
 	extern int disable_delay_tlb_flush, delay_tlb_flush;
 	extern int cpc_has_overflow_intr;
-	extern int disable_text_largepages;
-	extern int use_text_pgsz4m;
 	uint64_t cpu0_log;
 	extern	 uint64_t opl_cpu0_err_log;
 
@@ -590,16 +588,6 @@ cpu_setup(void)
 	 * fpRAS.
 	 */
 	fpras_implemented = 0;
-
-	/*
-	 * Enable 4M pages to be used for mapping user text by default.  Don't
-	 * use large pages for initialized data segments since we may not know
-	 * at exec() time what should be the preferred large page size for DTLB
-	 * programming.
-	 */
-	use_text_pgsz4m = 1;
-	disable_text_largepages = (1 << TTE64K) | (1 << TTE512K) |
-	    (1 << TTE32M) | (1 << TTE256M);
 }
 
 /*
@@ -700,11 +688,14 @@ send_one_mondo(int cpuid)
  *
  */
 int init_mmu_page_sizes = 0;
-static int mmu_disable_ism_large_pages = ((1 << TTE64K) |
+
+static uint_t mmu_disable_large_pages = 0;
+static uint_t mmu_disable_ism_large_pages = ((1 << TTE64K) |
 	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
-static int mmu_disable_auto_large_pages = ((1 << TTE64K) |
+static uint_t mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
 	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
-static int mmu_disable_large_pages = 0;
+static uint_t mmu_disable_auto_text_large_pages = ((1 << TTE64K) |
+	(1 << TTE512K));
 
 /*
  * Re-initialize mmu_page_sizes and friends, for SPARC64-VI mmu support.
@@ -721,7 +712,6 @@ mmu_init_mmu_page_sizes(int32_t not_used)
 		mmu_page_sizes = MMU_PAGE_SIZES;
 		mmu_hashcnt = MAX_HASHCNT;
 		mmu_ism_pagesize = DEFAULT_ISM_PAGESIZE;
-		auto_lpg_maxszc = TTE4M;
 		mmu_exported_pagesize_mask = (1 << TTE8K) |
 		    (1 << TTE64K) | (1 << TTE512K) | (1 << TTE4M) |
 		    (1 << TTE32M) | (1 << TTE256M);
@@ -747,19 +737,30 @@ static uint64_t ttecnt_threshold[MMU_PAGE_SIZES] = {
 /*
  * The function returns the mmu-specific values for the
  * hat's disable_large_pages, disable_ism_large_pages, and
- * disable_auto_large_pages variables.
+ * disable_auto_data_large_pages and
+ * disable_text_data_large_pages variables.
  */
-int
+uint_t
 mmu_large_pages_disabled(uint_t flag)
 {
-	int pages_disable = 0;
+	uint_t pages_disable = 0;
+	extern int use_text_pgsz64K;
+	extern int use_text_pgsz512K;
 
 	if (flag == HAT_LOAD) {
 		pages_disable =  mmu_disable_large_pages;
 	} else if (flag == HAT_LOAD_SHARE) {
 		pages_disable = mmu_disable_ism_large_pages;
-	} else if (flag == HAT_LOAD_AUTOLPG) {
-		pages_disable = mmu_disable_auto_large_pages;
+	} else if (flag == HAT_AUTO_DATA) {
+		pages_disable = mmu_disable_auto_data_large_pages;
+	} else if (flag == HAT_AUTO_TEXT) {
+		pages_disable = mmu_disable_auto_text_large_pages;
+		if (use_text_pgsz512K) {
+			pages_disable &= ~(1 << TTE512K);
+		}
+		if (use_text_pgsz64K) {
+			pages_disable &= ~(1 << TTE64K);
+		}
 	}
 	return (pages_disable);
 }
@@ -779,23 +780,22 @@ mmu_init_large_pages(size_t ism_pagesize)
 	case MMU_PAGESIZE4M:
 		mmu_disable_ism_large_pages = ((1 << TTE64K) |
 		    (1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
-		mmu_disable_auto_large_pages = ((1 << TTE64K) |
+		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
 		    (1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
-		auto_lpg_maxszc = TTE4M;
 		break;
 	case MMU_PAGESIZE32M:
 		mmu_disable_ism_large_pages = ((1 << TTE64K) |
 		    (1 << TTE512K) | (1 << TTE256M));
-		mmu_disable_auto_large_pages = ((1 << TTE64K) |
+		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
 		    (1 << TTE512K) | (1 << TTE4M) | (1 << TTE256M));
-		auto_lpg_maxszc = TTE32M;
+		adjust_data_maxlpsize(ism_pagesize);
 		break;
 	case MMU_PAGESIZE256M:
 		mmu_disable_ism_large_pages = ((1 << TTE64K) |
 		    (1 << TTE512K) | (1 << TTE32M));
-		mmu_disable_auto_large_pages = ((1 << TTE64K) |
+		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
 		    (1 << TTE512K) | (1 << TTE4M) | (1 << TTE32M));
-		auto_lpg_maxszc = TTE256M;
+		adjust_data_maxlpsize(ism_pagesize);
 		break;
 	default:
 		cmn_err(CE_WARN, "Unrecognized mmu_ism_pagesize value 0x%lx",

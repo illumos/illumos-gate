@@ -42,60 +42,58 @@
 #include <sys/panic.h>
 
 /*
- * Note that 'Cheetah PRM' refers to:
- *   SPARC V9 JPS1 Implementation Supplement: Sun UltraSPARC-III
- */
-
-/*
  * pan_disable_ism_large_pages and pan_disable_large_pages are the Panther-
  * specific versions of disable_ism_large_pages and disable_large_pages,
  * and feed back into those two hat variables at hat initialization time,
  * for Panther-only systems.
  *
- * chpjag_disable_ism_large_pages is the Ch/Jaguar-specific version of
- * disable_ism_large_pages. Ditto for chjag_disable_large_pages.
+ * chpjag_disable_large_pages is the Ch/Jaguar-specific version of
+ * disable_large_pages. Ditto for pan_disable_large_pages.
+ * Note that the Panther and Ch/Jaguar ITLB do not support 32M/256M pages.
  */
 static int panther_only = 0;
 
-static int pan_disable_ism_large_pages = ((1 << TTE64K) |
-	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
-static int pan_disable_large_pages = (1 << TTE256M);
-static int pan_disable_auto_large_pages =  ((1 << TTE64K) |
-	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
+static uint_t pan_disable_large_pages = (1 << TTE256M);
+static uint_t chjag_disable_large_pages = ((1 << TTE32M) | (1 << TTE256M));
 
-static int chjag_disable_ism_large_pages = ((1 << TTE64K) |
+static uint_t mmu_disable_ism_large_pages = ((1 << TTE64K) |
 	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
-static int chjag_disable_large_pages = ((1 << TTE32M) | (1 << TTE256M));
-static int chjag_disable_auto_large_pages = ((1 << TTE64K) |
+static uint_t mmu_disable_auto_data_large_pages =  ((1 << TTE64K) |
+	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
+static uint_t mmu_disable_auto_text_large_pages =  ((1 << TTE64K) |
 	(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 
 /*
- * The function returns the USIII-IV mmu-specific values for the
+ * The function returns the USIII+(i)-IV+ mmu-specific values for the
  * hat's disable_large_pages and disable_ism_large_pages variables.
  * Currently the hat's disable_large_pages and disable_ism_large_pages
  * already contain the generic sparc 4 page size info, and the return
  * values are or'd with those values.
  */
-int
+uint_t
 mmu_large_pages_disabled(uint_t flag)
 {
-	int pages_disable = 0;
+	uint_t pages_disable = 0;
+	extern int use_text_pgsz64K;
+	extern int use_text_pgsz512K;
 
-	if (panther_only) {
-		if (flag == HAT_LOAD) {
+	if (flag == HAT_LOAD) {
+		if (panther_only) {
 			pages_disable = pan_disable_large_pages;
-		} else if (flag == HAT_LOAD_SHARE) {
-			pages_disable = pan_disable_ism_large_pages;
-		} else if (flag == HAT_LOAD_AUTOLPG) {
-			pages_disable = pan_disable_auto_large_pages;
-		}
-	} else {
-		if (flag == HAT_LOAD) {
+		} else {
 			pages_disable = chjag_disable_large_pages;
-		} else if (flag == HAT_LOAD_SHARE) {
-			pages_disable = chjag_disable_ism_large_pages;
-		} else if (flag == HAT_LOAD_AUTOLPG) {
-			pages_disable = chjag_disable_auto_large_pages;
+		}
+	} else if (flag == HAT_LOAD_SHARE) {
+		pages_disable = mmu_disable_ism_large_pages;
+	} else if (flag == HAT_AUTO_DATA) {
+		pages_disable = mmu_disable_auto_data_large_pages;
+	} else if (flag == HAT_AUTO_TEXT) {
+		pages_disable = mmu_disable_auto_text_large_pages;
+		if (use_text_pgsz512K) {
+			pages_disable &= ~(1 << TTE512K);
+		}
+		if (use_text_pgsz64K) {
+			pages_disable &= ~(1 << TTE64K);
 		}
 	}
 	return (pages_disable);
@@ -141,7 +139,7 @@ int init_mmu_page_sizes = 0;
  * since it would be bad form to panic due
  * to a user typo.
  *
- * The function re-initializes the pan_disable_ism_large_pages and
+ * The function re-initializes the disable_ism_large_pages and
  * pan_disable_large_pages variables, which are closely related.
  * Aka, if 32M is the desired [D]ISM page sizes, then 256M cannot be allowed
  * for non-ISM large page usage, or DTLB conflict will occur. Please see the
@@ -151,37 +149,37 @@ void
 mmu_init_large_pages(size_t ism_pagesize)
 {
 	if (cpu_impl_dual_pgsz == 0) {	/* disable_dual_pgsz flag */
-		pan_disable_ism_large_pages = ((1 << TTE64K) |
-			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 		pan_disable_large_pages = ((1 << TTE32M) | (1 << TTE256M));
-		auto_lpg_maxszc = TTE4M;
+		mmu_disable_ism_large_pages = ((1 << TTE64K) |
+			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
+		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
+			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 		return;
 	}
 
 	switch (ism_pagesize) {
 	case MMU_PAGESIZE4M:
-		pan_disable_ism_large_pages = ((1 << TTE64K) |
-			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 		pan_disable_large_pages = (1 << TTE256M);
-		pan_disable_auto_large_pages = ((1 << TTE64K) |
+		mmu_disable_ism_large_pages = ((1 << TTE64K) |
 			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
-		auto_lpg_maxszc = TTE4M;
+		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
+			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 		break;
 	case MMU_PAGESIZE32M:
-		pan_disable_ism_large_pages = ((1 << TTE64K) |
-			(1 << TTE512K) | (1 << TTE256M));
 		pan_disable_large_pages = (1 << TTE256M);
-		pan_disable_auto_large_pages = ((1 << TTE64K) |
+		mmu_disable_ism_large_pages = ((1 << TTE64K) |
+			(1 << TTE512K) | (1 << TTE256M));
+		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
 			(1 << TTE512K) | (1 << TTE4M) | (1 << TTE256M));
-		auto_lpg_maxszc = TTE32M;
+		adjust_data_maxlpsize(ism_pagesize);
 		break;
 	case MMU_PAGESIZE256M:
-		pan_disable_ism_large_pages = ((1 << TTE64K) |
-			(1 << TTE512K) | (1 << TTE32M));
 		pan_disable_large_pages = (1 << TTE32M);
-		pan_disable_auto_large_pages = ((1 << TTE64K) |
+		mmu_disable_ism_large_pages = ((1 << TTE64K) |
+			(1 << TTE512K) | (1 << TTE32M));
+		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
 			(1 << TTE512K) | (1 << TTE4M) | (1 << TTE32M));
-		auto_lpg_maxszc = TTE256M;
+		adjust_data_maxlpsize(ism_pagesize);
 		break;
 	default:
 		cmn_err(CE_WARN, "Unrecognized mmu_ism_pagesize value 0x%lx",
@@ -211,7 +209,6 @@ mmu_init_mmu_page_sizes(int cinfo)
 			    (1 << TTE32M) | (1 << TTE256M);
 			panther_dtlb_restrictions = 1;
 			panther_only = 1;
-			auto_lpg_maxszc = TTE4M;
 		} else if (npanther > 0) {
 			panther_dtlb_restrictions = 1;
 		}

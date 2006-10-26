@@ -1096,6 +1096,7 @@ mapelfexec(
 	off_t offset;
 	int hsize = ehdr->e_phentsize;
 	caddr_t mintmp = (caddr_t)-1;
+	extern int use_brk_lpg;
 
 	if (ehdr->e_type == ET_DYN) {
 		/*
@@ -1145,47 +1146,41 @@ mapelfexec(
 				page = 0;
 			}
 
+			/*
+			 * Set the heap pagesize for OOB when the bss size
+			 * is known and use_brk_lpg is not 0.
+			 */
+			if (brksize != NULL && use_brk_lpg &&
+			    zfodsz != 0 && phdr == dataphdrp &&
+			    (prot & PROT_WRITE)) {
+				size_t tlen = P2NPHASE((uintptr_t)addr +
+				    phdr->p_filesz, PAGESIZE);
+
+				if (zfodsz > tlen) {
+					curproc->p_brkpageszc =
+					    page_szc(map_pgsz(MAPPGSZ_HEAP,
+						curproc, addr + phdr->p_filesz +
+						tlen, zfodsz - tlen, 0));
+				}
+			}
+
 			if (curproc->p_brkpageszc != 0 && phdr == dataphdrp &&
 			    (prot & PROT_WRITE)) {
-				/*
-				 * segvn only uses large pages for segments
-				 * that have the requested large page size
-				 * aligned base and size. To insure the part
-				 * of bss that starts at heap large page size
-				 * boundary gets mapped by large pages create
-				 * 2 bss segvn segments which is accomplished
-				 * by calling execmap twice. First execmap
-				 * will create the bss segvn segment that is
-				 * before the large page boundary and it will
-				 * be mapped with base pages. If bss start is
-				 * already large page aligned only 1 bss
-				 * segment will be created. The second bss
-				 * segment's size is large page size aligned
-				 * so that segvn uses large pages for that
-				 * segment and it also makes the heap that
-				 * starts right after bss to start at large
-				 * page boundary.
-				 */
 				uint_t	szc = curproc->p_brkpageszc;
 				size_t pgsz = page_get_pagesize(szc);
-				caddr_t zaddr = addr + phdr->p_filesz;
-				size_t zlen = P2NPHASE((uintptr_t)zaddr, pgsz);
+				caddr_t ebss = addr + phdr->p_memsz;
+				size_t extra_zfodsz;
 
 				ASSERT(pgsz > PAGESIZE);
 
+				extra_zfodsz = P2NPHASE((uintptr_t)ebss, pgsz);
+
 				if (error = execmap(vp, addr, phdr->p_filesz,
-				    zlen, phdr->p_offset, prot, page, szc))
+				    zfodsz + extra_zfodsz, phdr->p_offset,
+				    prot, page, szc))
 					goto bad;
-				if (zfodsz > zlen) {
-					zfodsz -= zlen;
-					zaddr += zlen;
-					zlen = P2ROUNDUP(zfodsz, pgsz);
-					if (error = execmap(vp, zaddr, 0, zlen,
-					    phdr->p_offset, prot, page, szc))
-						goto bad;
-				}
 				if (brksize != NULL)
-					*brksize = zlen - zfodsz;
+					*brksize = extra_zfodsz;
 			} else {
 				if (error = execmap(vp, addr, phdr->p_filesz,
 				    zfodsz, phdr->p_offset, prot, page, 0))

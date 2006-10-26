@@ -139,14 +139,21 @@ int	sfmmu_allow_nc_trans = 0;
 #define	LARGE_PAGES_OFF		0x1
 
 /*
- * WARNING: 512K pages MUST be disabled for ISM/DISM. If not
- * a process would page fault indefinitely if it tried to
- * access a 512K page.
+ * The disable_large_pages and disable_ism_large_pages variables control
+ * hat_memload_array and the page sizes to be used by ISM and the kernel.
+ *
+ * The disable_auto_data_large_pages and disable_auto_text_large_pages variables
+ * are only used to control which OOB pages to use at upper VM segment creation
+ * time, and are set in hat_init_pagesizes and used in the map_pgsz* routines.
+ * Their values may come from platform or CPU specific code to disable page
+ * sizes that should not be used.
+ *
+ * WARNING: 512K pages are currently not supported for ISM/DISM.
  */
-int	disable_ism_large_pages = (1 << TTE512K);
-int	disable_large_pages = 0;
-int	disable_auto_large_pages = 0;
-int	disable_shm_large_pages = 0;
+uint_t	disable_large_pages = 0;
+uint_t	disable_ism_large_pages = (1 << TTE512K);
+uint_t	disable_auto_data_large_pages = 0;
+uint_t	disable_auto_text_large_pages = 0;
 
 /*
  * Private sfmmu data structures for hat management
@@ -891,17 +898,12 @@ hat_init_pagesizes()
 
 	mmu_exported_page_sizes = 0;
 	for (i = TTE8K; i < max_mmu_page_sizes; i++) {
-		extern int	disable_text_largepages;
-		extern int	disable_initdata_largepages;
 
 		szc_2_userszc[i] = (uint_t)-1;
 		userszc_2_szc[i] = (uint_t)-1;
 
 		if ((mmu_exported_pagesize_mask & (1 << i)) == 0) {
 			disable_large_pages |= (1 << i);
-			disable_ism_large_pages |= (1 << i);
-			disable_text_largepages |= (1 << i);
-			disable_initdata_largepages |= (1 << i);
 		} else {
 			szc_2_userszc[i] = mmu_exported_page_sizes;
 			userszc_2_szc[mmu_exported_page_sizes] = i;
@@ -909,7 +911,9 @@ hat_init_pagesizes()
 		}
 	}
 
-	disable_auto_large_pages = disable_large_pages;
+	disable_ism_large_pages |= disable_large_pages;
+	disable_auto_data_large_pages = disable_large_pages;
+	disable_auto_text_large_pages = disable_large_pages;
 
 	/*
 	 * Initialize mmu-specific large page sizes.
@@ -918,11 +922,11 @@ hat_init_pagesizes()
 		disable_large_pages |= mmu_large_pages_disabled(HAT_LOAD);
 		disable_ism_large_pages |=
 		    mmu_large_pages_disabled(HAT_LOAD_SHARE);
-		disable_auto_large_pages |=
-		    mmu_large_pages_disabled(HAT_LOAD_AUTOLPG);
+		disable_auto_data_large_pages |=
+		    mmu_large_pages_disabled(HAT_AUTO_DATA);
+		disable_auto_text_large_pages |=
+		    mmu_large_pages_disabled(HAT_AUTO_TEXT);
 	}
-
-	disable_shm_large_pages = disable_auto_large_pages;
 }
 
 /*
@@ -1993,7 +1997,7 @@ hat_memload_array(struct hat *hat, caddr_t addr, size_t len,
 	pgcnt_t	numpg, npgs;
 	tte_t tte;
 	page_t *pp;
-	int large_pages_disable;
+	uint_t large_pages_disable;
 
 	ASSERT(!((uintptr_t)addr & MMU_PAGEOFFSET));
 

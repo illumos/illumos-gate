@@ -1878,7 +1878,7 @@ startup_vm(void)
 	pgcnt_t	max_phys_segkp;
 	int	mnode;
 
-	extern int exec_lpg_disable, use_brk_lpg, use_stk_lpg, use_zmap_lpg;
+	extern int use_brk_lpg, use_stk_lpg;
 
 	/*
 	 * get prom's mappings, create hments for them and switch
@@ -1974,12 +1974,12 @@ startup_vm(void)
 	avmem = (uint64_t)freemem << PAGESHIFT;
 	cmn_err(CE_CONT, "?avail mem = %lld\n", (unsigned long long)avmem);
 
-	/* For small memory systems disable automatic large pages. */
-	if (physmem < auto_lpg_min_physmem) {
-		exec_lpg_disable = 1;
+	/*
+	 * For small memory systems disable automatic large pages.
+	 */
+	if (physmem < privm_lpg_min_physmem) {
 		use_brk_lpg = 0;
 		use_stk_lpg = 0;
-		use_zmap_lpg = 0;
 	}
 
 	/*

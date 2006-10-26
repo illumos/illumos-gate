@@ -89,7 +89,6 @@ uint_t auxv_hwcap = 0;	/* auxv AT_SUN_HWCAP value; determined on the fly */
 uint_t auxv_hwcap32 = 0;	/* 32-bit version of auxv_hwcap */
 #endif
 
-int exec_lpg_disable = 0;
 #define	PSUIDFLAGS		(SNOCD|SUGID)
 
 /*
@@ -1114,7 +1113,23 @@ execmap(struct vnode *vp, caddr_t addr, size_t len, size_t zfodlen,
 				error = ENOMEM;
 				goto bad;
 			}
-			crargs.szc = szc;
+			if (szc > 0) {
+				/*
+				 * ASSERT alignment because the mapelfexec()
+				 * caller for the szc > 0 case extended zfod
+				 * so it's end is pgsz aligned.
+				 */
+				size_t pgsz = page_get_pagesize(szc);
+				ASSERT(IS_P2ALIGNED(zfodbase + zfodlen, pgsz));
+
+				if (IS_P2ALIGNED(zfodbase, pgsz)) {
+					crargs.szc = szc;
+				} else {
+					crargs.szc = AS_MAP_HEAP;
+				}
+			} else {
+				crargs.szc = AS_MAP_NO_LPOOB;
+			}
 			if (error = as_map(p->p_as, (caddr_t)zfodbase,
 			    zfodlen, segvn_create, &crargs))
 				goto bad;
@@ -1555,11 +1570,6 @@ stk_copyout(uarg_t *args, char *usrstack, void **auxvpp, user_t *up)
 	return (0);
 }
 
-#ifdef DEBUG
-int mpss_brkpgszsel = 0;
-int mpss_stkpgszsel = 0;
-#endif
-
 /*
  * Initialize a new user stack with the specified arguments and environment.
  * The initial user stack layout is as follows:
@@ -1614,6 +1624,7 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	rctl_entity_p_t e;
 
 	struct as *as;
+	extern int use_stk_lpg;
 
 	args->from_model = p->p_model;
 	if (p->p_model == DATAMODEL_NATIVE) {
@@ -1751,7 +1762,9 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 
 	p->p_brkbase = NULL;
 	p->p_brksize = 0;
+	p->p_brkpageszc = 0;
 	p->p_stksize = 0;
+	p->p_stkpageszc = 0;
 	p->p_model = args->to_model;
 	p->p_usrstack = usrstack;
 	p->p_stkprot = args->stk_prot;
@@ -1766,51 +1779,14 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	e.rcep_t = RCENTITY_PROCESS;
 	rctl_set_reset(p->p_rctls, p, &e);
 
-	if (exec_lpg_disable == 0) {
-#ifdef DEBUG
-		uint_t pgsizes = page_num_pagesizes();
-		uint_t szc;
-#endif
-		p->p_brkpageszc = args->brkpageszc;
-		p->p_stkpageszc = args->stkpageszc;
-
-		if (p->p_brkpageszc == 0) {
-			p->p_brkpageszc = page_szc(map_pgsz(MAPPGSZ_HEAP,
-			    p, 0, 0, NULL));
-		}
-		if (p->p_stkpageszc == 0) {
-			p->p_stkpageszc = page_szc(map_pgsz(MAPPGSZ_STK,
-			    p, 0, 0, NULL));
-		}
-
-#ifdef DEBUG
-		if (mpss_brkpgszsel != 0) {
-			if (mpss_brkpgszsel == -1) {
-				szc = ((uint_t)gethrtime() >> 8) % pgsizes;
-			} else {
-				szc = mpss_brkpgszsel % pgsizes;
-			}
-			p->p_brkpageszc = szc;
-		}
-
-		if (mpss_stkpgszsel != 0) {
-			if (mpss_stkpgszsel == -1) {
-				szc = ((uint_t)gethrtime() >> 7) % pgsizes;
-			} else {
-				szc = mpss_stkpgszsel % pgsizes;
-			}
-			p->p_stkpageszc = szc;
-		}
-
-#endif
-		mutex_enter(&p->p_lock);
-		p->p_flag |= SAUTOLPG;	/* kernel controls page sizes */
-		mutex_exit(&p->p_lock);
-
-	} else {
-		p->p_brkpageszc = 0;
-		p->p_stkpageszc = 0;
+	/* Too early to call map_pgsz for the heap */
+	if (use_stk_lpg) {
+		p->p_stkpageszc = page_szc(map_pgsz(MAPPGSZ_STK, p, 0, 0, 0));
 	}
+
+	mutex_enter(&p->p_lock);
+	p->p_flag |= SAUTOLPG;	/* kernel controls page sizes */
+	mutex_exit(&p->p_lock);
 
 	exec_set_sp(size);
 

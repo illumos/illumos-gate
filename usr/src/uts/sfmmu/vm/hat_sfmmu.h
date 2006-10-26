@@ -1782,7 +1782,7 @@ extern struct hme_blk *sfmmu_hmetohblk(struct sf_hment *);
 #pragma weak mmu_set_ctx_page_sizes
 #pragma weak mmu_check_page_sizes
 
-extern int mmu_large_pages_disabled(uint_t);
+extern uint_t mmu_large_pages_disabled(uint_t);
 extern void mmu_set_ctx_page_sizes(sfmmu_t *);
 extern void mmu_check_page_sizes(sfmmu_t *, uint64_t *);
 
@@ -1821,6 +1821,11 @@ extern caddr_t		utsb4m_vabase;
 #endif /* sun4v */
 extern vmem_t		*kmem_tsb_default_arena[];
 extern int		tsb_lgrp_affinity;
+
+extern uint_t		disable_large_pages;
+extern uint_t		disable_ism_large_pages;
+extern uint_t		disable_auto_data_large_pages;
+extern uint_t		disable_auto_text_large_pages;
 
 /* kpm externals */
 extern pfn_t		sfmmu_kpm_vatopfn(caddr_t);
