@@ -365,9 +365,10 @@ remove_resource_range(struct memlist **list, int *ranges, int range_count)
 	};
 	int index;
 
-	ASSERT(*list != NULL);
-
 	for (index = 0; index < range_count; index++) {
+		/* all done if list is or has become empty */
+		if (*list == NULL)
+			break;
 		(void) memlist_remove(list,
 		    (uint64_t)((struct range *)ranges)[index].base,
 		    (uint64_t)((struct range *)ranges)[index].len);
@@ -384,19 +385,15 @@ remove_used_resources()
 	int	bus;
 
 	used = ddi_find_devinfo("used-resources", -1, 0);
-	if (used == NULL) {
-		printf("pci_boot did not find used-resources\n");
+	if (used == NULL)
 		return;
-	}
 
 	status = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, used,
 	    DDI_PROP_DONTPASS, "io-space", &narray, &ncount);
 	if (status == DDI_PROP_SUCCESS) {
 		for (bus = 0; bus <= pci_bios_nbus; bus++)
-			if (pci_bus_res[bus].io_ports != NULL)
-				remove_resource_range(
-				    &pci_bus_res[bus].io_ports,
-				    narray, ncount / 2);
+			remove_resource_range(&pci_bus_res[bus].io_ports,
+			    narray, ncount / 2);
 		ddi_prop_free(narray);
 	}
 
@@ -404,9 +401,7 @@ remove_used_resources()
 	    DDI_PROP_DONTPASS, "device-memory", &narray, &ncount);
 	if (status == DDI_PROP_SUCCESS) {
 		for (bus = 0; bus <= pci_bios_nbus; bus++)
-			if (pci_bus_res[bus].mem_space != NULL)
-				remove_resource_range(
-				    &pci_bus_res[bus].mem_space,
+			remove_resource_range(&pci_bus_res[bus].mem_space,
 				    narray, ncount / 2);
 		ddi_prop_free(narray);
 	}
