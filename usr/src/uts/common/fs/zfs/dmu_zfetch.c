@@ -37,7 +37,7 @@
  * until we can get this working the way we want it to.
  */
 
-int zfs_prefetch_disable;
+int zfs_prefetch_disable = 0;
 
 /* max # of streams per zfetch */
 uint32_t	zfetch_max_streams = 8;

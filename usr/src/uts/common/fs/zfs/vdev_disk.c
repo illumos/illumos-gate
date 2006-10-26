@@ -37,13 +37,6 @@
  * Virtual device vector for disks.
  */
 
-/*
- * Tunable parameter for debugging or performance analysis.  Setting
- * zfs_nocacheflush will cause corruption on power loss if a volatile
- * out-of-order write cache is enabled.
- */
-boolean_t zfs_nocacheflush = B_FALSE;
-
 extern ldi_ident_t zfs_li;
 
 typedef struct vdev_disk_buf {

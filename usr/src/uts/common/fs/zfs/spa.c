@@ -55,6 +55,8 @@
 #include <sys/fs/zfs.h>
 #include <sys/callb.h>
 
+int zio_taskq_threads = 8;
+
 /*
  * ==========================================================================
  * SPA state manipulation (open/create/destroy/import/export)
@@ -115,10 +117,10 @@ spa_activate(spa_t *spa)
 
 	for (t = 0; t < ZIO_TYPES; t++) {
 		spa->spa_zio_issue_taskq[t] = taskq_create("spa_zio_issue",
-		    8, maxclsyspri, 50, INT_MAX,
+		    zio_taskq_threads, maxclsyspri, 50, INT_MAX,
 		    TASKQ_PREPOPULATE);
 		spa->spa_zio_intr_taskq[t] = taskq_create("spa_zio_intr",
-		    8, maxclsyspri, 50, INT_MAX,
+		    zio_taskq_threads, maxclsyspri, 50, INT_MAX,
 		    TASKQ_PREPOPULATE);
 	}
 

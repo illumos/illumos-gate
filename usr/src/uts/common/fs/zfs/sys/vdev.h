@@ -38,6 +38,8 @@
 extern "C" {
 #endif
 
+extern boolean_t zfs_nocacheflush;
+
 /*
  * Vdev knobs.
  */

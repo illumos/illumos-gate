@@ -40,6 +40,7 @@ zio_compress_info_t zio_compress_table[ZIO_COMPRESS_FUNCTIONS] = {
 	{NULL,			NULL,			"on"},
 	{NULL,			NULL,			"uncompressed"},
 	{lzjb_compress,		lzjb_decompress,	"lzjb"},
+	{NULL,			NULL,			"empty"},
 };
 
 uint8_t
@@ -69,7 +70,7 @@ zio_compress_data(int cpfunc, void *src, uint64_t srcsize, void **destp,
 	uint_t allzero;
 
 	ASSERT((uint_t)cpfunc < ZIO_COMPRESS_FUNCTIONS);
-	ASSERT(ci->ci_compress != NULL);
+	ASSERT((uint_t)cpfunc == ZIO_COMPRESS_EMPTY || ci->ci_compress != NULL);
 
 	/*
 	 * If the data is all zeroes, we don't even need to allocate
@@ -90,6 +91,9 @@ zio_compress_data(int cpfunc, void *src, uint64_t srcsize, void **destp,
 		*destbufsizep = 0;
 		return (1);
 	}
+
+	if (cpfunc == ZIO_COMPRESS_EMPTY)
+		return (0);
 
 	/* Compress at least 12.5% */
 	destbufsize = P2ALIGN(srcsize - (srcsize >> 3), SPA_MINBLOCKSIZE);

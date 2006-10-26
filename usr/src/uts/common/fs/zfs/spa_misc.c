@@ -173,7 +173,7 @@ static avl_tree_t spa_namespace_avl;
 kmutex_t spa_namespace_lock;
 static kcondvar_t spa_namespace_cv;
 static int spa_active_count;
-static int spa_max_replication_override = SPA_DVAS_PER_BP;
+int spa_max_replication_override = SPA_DVAS_PER_BP;
 
 static avl_tree_t spa_spare_avl;
 static kmutex_t spa_spare_lock;

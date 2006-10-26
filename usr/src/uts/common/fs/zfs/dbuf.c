@@ -41,6 +41,8 @@ static void dbuf_destroy(dmu_buf_impl_t *db);
 static int dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
 static arc_done_func_t dbuf_write_done;
 
+int zfs_mdcomp_disable = 0;
+
 /*
  * Global data structures and functions for the dbuf cache.
  */
@@ -2030,7 +2032,10 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 		 * that specializes in arrays of bps.
 		 */
 		checksum = ZIO_CHECKSUM_FLETCHER_4;
-		compress = ZIO_COMPRESS_LZJB;
+		if (zfs_mdcomp_disable)
+			compress = ZIO_COMPRESS_EMPTY;
+		else
+			compress = ZIO_COMPRESS_LZJB;
 	} else {
 		/*
 		 * Allow dnode settings to override objset settings,

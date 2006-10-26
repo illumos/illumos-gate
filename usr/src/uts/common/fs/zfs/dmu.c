@@ -292,6 +292,9 @@ dmu_prefetch(objset_t *os, uint64_t object, uint64_t offset, uint64_t len)
 	uint64_t blkid;
 	int nblks, i, err;
 
+	if (zfs_prefetch_disable)
+		return;
+
 	if (len == 0) {  /* they're interested in the bonus buffer */
 		dn = os->os->os_meta_dnode;
 

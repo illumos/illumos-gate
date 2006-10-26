@@ -427,6 +427,8 @@ int dmu_write_uio(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 int dmu_write_pages(objset_t *os, uint64_t object, uint64_t offset,
     uint64_t size, struct page *pp, dmu_tx_t *tx);
 
+extern int zfs_prefetch_disable;
+
 /*
  * Asynchronously try to read in the data.
  */

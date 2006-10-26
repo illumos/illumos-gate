@@ -64,10 +64,16 @@
  */
 
 /*
- * These global ZIL switches affect all pools
+ * This global ZIL switch affects all pools
  */
 int zil_disable = 0;	/* disable intent logging */
-int zil_noflush = 0;	/* don't flush write cache buffers on disks */
+
+/*
+ * Tunable parameter for debugging or performance analysis.  Setting
+ * zfs_nocacheflush will cause corruption on power loss if a volatile
+ * out-of-order write cache is enabled.
+ */
+boolean_t zfs_nocacheflush = B_FALSE;
 
 static kmem_cache_t *zil_lwb_cache;
 
@@ -490,7 +496,7 @@ zil_add_vdev(zilog_t *zilog, uint64_t vdev)
 {
 	zil_vdev_t *zv;
 
-	if (zil_noflush)
+	if (zfs_nocacheflush)
 		return;
 
 	ASSERT(MUTEX_HELD(&zilog->zl_lock));
@@ -508,7 +514,7 @@ zil_flush_vdevs(zilog_t *zilog)
 	spa_t *spa;
 	uint64_t vdev;
 
-	if (zil_noflush)
+	if (zfs_nocacheflush)
 		return;
 
 	ASSERT(MUTEX_HELD(&zilog->zl_lock));
