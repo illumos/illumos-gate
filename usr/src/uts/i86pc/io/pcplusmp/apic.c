@@ -472,7 +472,10 @@ static	uint_t last_count_read = 0;
 static	lock_t	apic_gethrtime_lock;
 volatile int	apic_hrtime_stamp = 0;
 volatile hrtime_t apic_nsec_since_boot = 0;
-static uint_t apic_hertz_count, apic_nsec_per_tick;
+static uint_t apic_hertz_count;
+
+uint64_t apic_ticks_per_SFnsecs;	/* # of ticks in SF nsecs */
+
 static hrtime_t apic_nsec_max;
 
 static	hrtime_t	apic_last_hrtime = 0;
@@ -639,6 +642,7 @@ static	struct {
 /* Patchable global variables. */
 int		apic_kmdb_on_nmi = 0;		/* 0 - no, 1 - yes enter kmdb */
 int		apic_debug_mps_id = 0;		/* 1 - print MPS ID strings */
+uint32_t	apic_divide_reg_init = 0;	/* 0 - divide by 2 */
 
 /*
  * ACPI definitions
@@ -2229,7 +2233,7 @@ gethrtime_again:
 
 	elapsed_ticks = apic_hertz_count - countval;
 
-	curr_timeval = elapsed_ticks * apic_nsec_per_tick;
+	curr_timeval = APIC_TICKS_TO_NSECS(elapsed_ticks);
 	temp = apic_nsec_since_boot + curr_timeval;
 
 	if (apic_hrtime_stamp != old_hrtime_stamp) {	/* got an interrupt */
@@ -2595,6 +2599,7 @@ apic_post_cpu_start()
 		}
 	}
 
+	apicadr[APIC_DIVIDE_REG] = apic_divide_reg_init;
 	return (PSM_SUCCESS);
 }
 
@@ -2656,6 +2661,7 @@ apic_getclkirq(int ipl)
 	    apic_clkvect));
 	return (irq);
 }
+
 
 /*
  * Return the number of APIC clock ticks elapsed for 8245 to decrement
@@ -2731,53 +2737,44 @@ apic_clkinit(int hertz)
 {
 
 	uint_t		apic_ticks = 0;
-	uint_t		pit_time;
+	uint_t		pit_ticks;
 	int		ret;
 	uint16_t	pit_ticks_adj;
 	static int	firsttime = 1;
 
 	if (firsttime) {
-		/* first time calibrate */
+		/* first time calibrate on CPU0 only */
 
-		apicadr[APIC_DIVIDE_REG] = 0x0;
-		apicadr[APIC_INIT_COUNT] = APIC_MAXVAL;
-
-		/* set periodic interrupt based on CLKIN */
-		apicadr[APIC_LOCAL_TIMER] =
-		    (apic_clkvect + APIC_BASE_VECT) | AV_TIME;
-		tenmicrosec();
-
+		apicadr[APIC_DIVIDE_REG] = apic_divide_reg_init;
+		apicadr[APIC_INIT_COUNT] = APIC_MAXVAL;	/* start counting */
 		apic_ticks = apic_calibrate(apicadr, &pit_ticks_adj);
 
-		apicadr[APIC_LOCAL_TIMER] =
-		    (apic_clkvect + APIC_BASE_VECT) | AV_MASK;
-		/*
-		 * pit time is the amount of real time (in nanoseconds ) it took
-		 * the 8254 to decrement (APIC_TIME_COUNT + pit_ticks_adj) ticks
-		 */
-		pit_time = ((longlong_t)(APIC_TIME_COUNT +
-		    pit_ticks_adj) * NANOSEC) / PIT_HZ;
+		/* total number of PIT ticks corresponding to apic_ticks */
+		pit_ticks = APIC_TIME_COUNT + pit_ticks_adj;
 
 		/*
 		 * Determine the number of nanoseconds per APIC clock tick
 		 * and then determine how many APIC ticks to interrupt at the
 		 * desired frequency
+		 * apic_ticks / (pitticks / PIT_HZ) = apic_ticks_per_s
+		 * (apic_ticks * PIT_HZ) / pitticks = apic_ticks_per_s
+		 * apic_ticks_per_ns = (apic_ticks * PIT_HZ) / (pitticks * 10^9)
+		 * apic_ticks_per_SFns =
+		 *   (SF * apic_ticks * PIT_HZ) / (pitticks * 10^9)
 		 */
-		apic_nsec_per_tick = pit_time / apic_ticks;
-		if (apic_nsec_per_tick == 0)
-			apic_nsec_per_tick = 1;
+		apic_ticks_per_SFnsecs =
+		    ((SF * apic_ticks * PIT_HZ) /
+		    ((uint64_t)pit_ticks * NANOSEC));
 
 		/* the interval timer initial count is 32 bit max */
-		apic_nsec_max = (hrtime_t)apic_nsec_per_tick * APIC_MAXVAL;
+		apic_nsec_max = APIC_TICKS_TO_NSECS(APIC_MAXVAL);
 		firsttime = 0;
 	}
 
 	if (hertz != 0) {
 		/* periodic */
 		apic_nsec_per_intr = NANOSEC / hertz;
-		apic_hertz_count = (longlong_t)apic_nsec_per_intr /
-		    apic_nsec_per_tick;
-		apic_sample_factor_redistribution = hertz + 1;
+		apic_hertz_count = APIC_NSECS_TO_TICKS(apic_nsec_per_intr);
 	}
 
 	apic_int_busy_mark = (apic_int_busy_mark *
@@ -2792,7 +2789,7 @@ apic_clkinit(int hertz)
 		if (!apic_oneshot_enable)
 			return (0);
 		apic_oneshot = 1;
-		ret = (int)apic_nsec_per_tick;
+		ret = (int)APIC_TICKS_TO_NSECS(1);
 	} else {
 		/* program the local APIC to interrupt at the given frequency */
 		apicadr[APIC_INIT_COUNT] = apic_hertz_count;
@@ -4862,6 +4859,7 @@ apic_timer_reprogram(hrtime_t time)
 {
 	hrtime_t now;
 	uint_t ticks;
+	int64_t	delta;
 
 	/*
 	 * We should be called from high PIL context (CBE_HIGH_PIL),
@@ -4870,19 +4868,20 @@ apic_timer_reprogram(hrtime_t time)
 
 	if (!apic_oneshot) {
 		/* time is the interval for periodic mode */
-		ticks = (uint_t)((time) / apic_nsec_per_tick);
+		ticks = APIC_NSECS_TO_TICKS(time);
 	} else {
 		/* one shot mode */
 
 		now = gethrtime();
+		delta = time - now;
 
-		if (time <= now) {
+		if (delta <= 0) {
 			/*
 			 * requested to generate an interrupt in the past
 			 * generate an interrupt as soon as possible
 			 */
 			ticks = apic_min_timer_ticks;
-		} else if ((time - now) > apic_nsec_max) {
+		} else if (delta > apic_nsec_max) {
 			/*
 			 * requested to generate an interrupt at a time
 			 * further than what we are capable of. Set to max
@@ -4894,9 +4893,9 @@ apic_timer_reprogram(hrtime_t time)
 			cmn_err(CE_CONT, "apic_timer_reprogram, request at"
 			    "  %lld  too far in future, current time"
 			    "  %lld \n", time, now);
-#endif	/* DEBUG */
+#endif
 		} else
-			ticks = (uint_t)((time - now) / apic_nsec_per_tick);
+			ticks = APIC_NSECS_TO_TICKS(delta);
 	}
 
 	if (ticks < apic_min_timer_ticks)

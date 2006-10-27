@@ -553,6 +553,19 @@ typedef struct {
 #define	PSMGI_INTRBY_IRQ	0x8000	/* IRQ passed.  no xlate needed */
 #define	PSMGI_INTRBY_FLAGS	0x8000	/* Mask for this flag */
 
+/*
+ * Use scaled-fixed-point arithmetic to calculate apic ticks.
+ * Round when dividing (by adding half of divisor to dividend)
+ * for one extra bit of precision.
+ */
+
+#define	SF	(1ULL<<20)		/* Scaling Factor: scale by 2^20 */
+#define	APIC_TICKS_TO_NSECS(ticks)	((((int64_t)(ticks) * SF) + \
+					apic_ticks_per_SFnsecs / 2) / \
+					apic_ticks_per_SFnsecs);
+#define	APIC_NSECS_TO_TICKS(nsecs)	(((int64_t)(nsecs) * \
+					apic_ticks_per_SFnsecs + (SF/2)) / SF)
+
 #ifdef	__cplusplus
 }
 #endif
