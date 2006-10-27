@@ -131,101 +131,121 @@ typedef struct _opt_event {
 
 #define	EV_END {NULL, 0, 0}
 
-static opt_event_t opt_events[] = {
-	{ "FP_dispatched_fpu_ops",				0x0, 0x1F },
-	{ "FP_cycles_no_fpu_ops_retired",			0x1, 0x0 },
-	{ "FP_dispatched_fpu_ops_ff",				0x2, 0x0 },
-	{ "LS_seg_reg_load",					0x20, 0x7F },
-	{ "LS_uarch_resync_self_modify",			0x21, 0x0 },
-	{ "LS_uarch_resync_snoop",				0x22, 0x0 },
-	{ "LS_buffer_2_full",					0x23, 0x0 },
-	{ "LS_locked_operation",				0x24, 0x7 },
-	{ "LS_uarch_late_cancel_op",				0x25, 0x0 },
-	{ "LS_retired_cflush",					0x26, 0x0 },
-	{ "LS_retired_cpuid",					0x27, 0x0 },
-	{ "DC_access",						0x40, 0x0 },
-	{ "DC_miss",						0x41, 0x0 },
-	{ "DC_refill_from_L2",					0x42, 0x1F },
-	{ "DC_refill_from_system",				0x43, 0x1F },
-	{ "DC_copyback",					0x44, 0x1F },
-	{ "DC_dtlb_L1_miss_L2_hit",				0x45, 0x0 },
-	{ "DC_dtlb_L1_miss_L2_miss",				0x46, 0x0 },
-	{ "DC_misaligned_data_ref",				0x47, 0x0 },
-	{ "DC_uarch_late_cancel_access",			0x48, 0x0 },
-	{ "DC_uarch_early_cancel_access",			0x49, 0x0 },
-	{ "DC_1bit_ecc_error_found",				0x4A, 0x3 },
-	{ "DC_dispatched_prefetch_instr",			0x4B, 0x7 },
-	{ "DC_dcache_accesses_by_locks",			0x4C, 0x3 },
-	{ "BU_memory_requests",					0x65, 0x83},
-	{ "BU_data_prefetch",					0x67, 0x3 },
-	{ "BU_system_read_responses",				0x6C, 0x7 },
-	{ "BU_quadwords_written_to_system",			0x6D, 0x1 },
-	{ "BU_cpu_clk_unhalted",				0x76, 0x0 },
-	{ "BU_internal_L2_req",					0x7D, 0x1F },
-	{ "BU_fill_req_missed_L2",				0x7E, 0x7 },
-	{ "BU_fill_into_L2",					0x7F, 0x3 },
-	{ "IC_fetch",						0x80, 0x0 },
-	{ "IC_miss",						0x81, 0x0 },
-	{ "IC_refill_from_L2",					0x82, 0x0 },
-	{ "IC_refill_from_system",				0x83, 0x0 },
-	{ "IC_itlb_L1_miss_L2_hit",				0x84, 0x0 },
-	{ "IC_itlb_L1_miss_L2_miss",				0x85, 0x0 },
-	{ "IC_uarch_resync_snoop",				0x86, 0x0 },
-	{ "IC_instr_fetch_stall",				0x87, 0x0 },
-	{ "IC_return_stack_hit",				0x88, 0x0 },
-	{ "IC_return_stack_overflow",				0x89, 0x0 },
-	{ "FR_retired_x86_instr_w_excp_intr",			0xC0, 0x0 },
-	{ "FR_retired_uops",					0xC1, 0x0 },
-	{ "FR_retired_branches_w_excp_intr",			0xC2, 0x0 },
-	{ "FR_retired_branches_mispred",			0xC3, 0x0 },
-	{ "FR_retired_taken_branches",				0xC4, 0x0 },
-	{ "FR_retired_taken_branches_mispred",			0xC5, 0x0 },
-	{ "FR_retired_far_ctl_transfer",			0xC6, 0x0 },
-	{ "FR_retired_resyncs",					0xC7, 0x0 },
-	{ "FR_retired_near_rets",				0xC8, 0x0 },
-	{ "FR_retired_near_rets_mispred",			0xC9, 0x0 },
-	{ "FR_retired_taken_branches_mispred_addr_miscomp",	0xCA, 0x0 },
-	{ "FR_retired_fpu_instr",				0xCB, 0xF },
-	{ "FR_retired_fastpath_double_op_instr",		0xCC, 0x7 },
-	{ "FR_intr_masked_cycles",				0xCD, 0x0 },
-	{ "FR_intr_masked_while_pending_cycles",		0xCE, 0x0 },
-	{ "FR_taken_hardware_intrs",				0xCF, 0x0 },
-	{ "FR_nothing_to_dispatch",				0xD0, 0x0 },
-	{ "FR_dispatch_stalls",					0xD1, 0x0 },
-	{ "FR_dispatch_stall_branch_abort_to_retire",		0xD2, 0x0 },
-	{ "FR_dispatch_stall_serialization",			0xD3, 0x0 },
-	{ "FR_dispatch_stall_segment_load",			0xD4, 0x0 },
-	{ "FR_dispatch_stall_reorder_buffer_full",		0xD5, 0x0 },
-	{ "FR_dispatch_stall_resv_stations_full",		0xD6, 0x0 },
-	{ "FR_dispatch_stall_fpu_full",				0xD7, 0x0 },
-	{ "FR_dispatch_stall_ls_full",				0xD8, 0x0 },
-	{ "FR_dispatch_stall_waiting_all_quiet",		0xD9, 0x0 },
-	{ "FR_dispatch_stall_far_ctl_trsfr_resync_branch_pend",	0xDA, 0x0 },
-	{ "FR_fpu_exception",					0xDB, 0xF },
-	{ "FR_num_brkpts_dr0",					0xDC, 0x0 },
-	{ "FR_num_brkpts_dr1",					0xDD, 0x0 },
-	{ "FR_num_brkpts_dr2",					0xDE, 0x0 },
-	{ "FR_num_brkpts_dr3",					0xDF, 0x0 },
-	{ "NB_mem_ctrlr_page_access",				0xE0, 0x7 },
-	{ "NB_mem_ctrlr_page_table_overflow",			0xE1, 0x0 },
-	{ "NB_mem_ctrlr_dram_cmd_slots_missed",			0xE2, 0x0 },
-	{ "NB_mem_ctrlr_turnaround",				0xE3, 0x7 },
-	{ "NB_mem_ctrlr_bypass_counter_saturation",		0xE4, 0xF },
-	{ "NB_sized_blocks_Rev_D",				0xE5, 0x3C},
-	{ "NB_ECC_errors",					0xE8, 0x80},
-	{ "NB_cpu_io_to_mem_io_Rev_E",				0xE9, 0xFF},
-	{ "NB_cache_block_commands_Rev_E",			0xEA, 0x3D},
-	{ "NB_sized_commands",					0xEB, 0x7F },
-	{ "NB_probe_result",					0xEC, 0x7F},
-	{ "NB_gart_events",					0xEE, 0x7 },
-	{ "NB_ht_bus0_bandwidth",				0xF6, 0xF },
-	{ "NB_ht_bus1_bandwidth",				0xF7, 0xF },
-	{ "NB_ht_bus2_bandwidth",				0xF8, 0xF },
+#define	OPT_cmn_events							\
+	{ "FP_dispatched_fpu_ops",			0x0, 0x1F },	\
+	{ "FP_cycles_no_fpu_ops_retired",		0x1, 0x0 },	\
+	{ "FP_dispatched_fpu_ops_ff",			0x2, 0x0 },	\
+	{ "LS_seg_reg_load",				0x20, 0x7F },	\
+	{ "LS_uarch_resync_self_modify",		0x21, 0x0 },	\
+	{ "LS_uarch_resync_snoop",			0x22, 0x0 },	\
+	{ "LS_buffer_2_full",				0x23, 0x0 },	\
+	{ "LS_locked_operation",			0x24, 0x7 },	\
+	{ "LS_retired_cflush",				0x26, 0x0 },	\
+	{ "LS_retired_cpuid",				0x27, 0x0 },	\
+	{ "DC_access",					0x40, 0x0 },	\
+	{ "DC_miss",					0x41, 0x0 },	\
+	{ "DC_refill_from_L2",				0x42, 0x1F },	\
+	{ "DC_refill_from_system",			0x43, 0x1F },	\
+	{ "DC_copyback",				0x44, 0x1F },	\
+	{ "DC_dtlb_L1_miss_L2_hit",			0x45, 0x0 },	\
+	{ "DC_dtlb_L1_miss_L2_miss",			0x46, 0x0 },	\
+	{ "DC_misaligned_data_ref",			0x47, 0x0 },	\
+	{ "DC_uarch_late_cancel_access",		0x48, 0x0 },	\
+	{ "DC_uarch_early_cancel_access",		0x49, 0x0 },	\
+	{ "DC_1bit_ecc_error_found",			0x4A, 0x3 },	\
+	{ "DC_dispatched_prefetch_instr",		0x4B, 0x7 },	\
+	{ "DC_dcache_accesses_by_locks",		0x4C, 0x2 },	\
+	{ "BU_memory_requests",				0x65, 0x83},	\
+	{ "BU_data_prefetch",				0x67, 0x3 },	\
+	{ "BU_system_read_responses",			0x6C, 0x7 },	\
+	{ "BU_quadwords_written_to_system",		0x6D, 0x1 },	\
+	{ "BU_cpu_clk_unhalted",			0x76, 0x0 },	\
+	{ "BU_internal_L2_req",				0x7D, 0x1F },	\
+	{ "BU_fill_req_missed_L2",			0x7E, 0x7 },	\
+	{ "BU_fill_into_L2",				0x7F, 0x1 },	\
+	{ "IC_fetch",					0x80, 0x0 },	\
+	{ "IC_miss",					0x81, 0x0 },	\
+	{ "IC_refill_from_L2",				0x82, 0x0 },	\
+	{ "IC_refill_from_system",			0x83, 0x0 },	\
+	{ "IC_itlb_L1_miss_L2_hit",			0x84, 0x0 },	\
+	{ "IC_itlb_L1_miss_L2_miss",			0x85, 0x0 },	\
+	{ "IC_uarch_resync_snoop",			0x86, 0x0 },	\
+	{ "IC_instr_fetch_stall",			0x87, 0x0 },	\
+	{ "IC_return_stack_hit",			0x88, 0x0 },	\
+	{ "IC_return_stack_overflow",			0x89, 0x0 },	\
+	{ "FR_retired_x86_instr_w_excp_intr",		0xC0, 0x0 },	\
+	{ "FR_retired_uops",				0xC1, 0x0 },	\
+	{ "FR_retired_branches_w_excp_intr",		0xC2, 0x0 },	\
+	{ "FR_retired_branches_mispred",		0xC3, 0x0 },	\
+	{ "FR_retired_taken_branches",			0xC4, 0x0 },	\
+	{ "FR_retired_taken_branches_mispred",		0xC5, 0x0 },	\
+	{ "FR_retired_far_ctl_transfer",		0xC6, 0x0 },	\
+	{ "FR_retired_resyncs",				0xC7, 0x0 },	\
+	{ "FR_retired_near_rets",			0xC8, 0x0 },	\
+	{ "FR_retired_near_rets_mispred",		0xC9, 0x0 },	\
+	{ "FR_retired_taken_branches_mispred_addr_miscop",	0xCA, 0x0 },\
+	{ "FR_retired_fpu_instr",			0xCB, 0xF },	\
+	{ "FR_retired_fastpath_double_op_instr",	0xCC, 0x7 },	\
+	{ "FR_intr_masked_cycles",			0xCD, 0x0 },	\
+	{ "FR_intr_masked_while_pending_cycles",	0xCE, 0x0 },	\
+	{ "FR_taken_hardware_intrs",			0xCF, 0x0 },	\
+	{ "FR_nothing_to_dispatch",			0xD0, 0x0 },	\
+	{ "FR_dispatch_stalls",				0xD1, 0x0 },	\
+	{ "FR_dispatch_stall_branch_abort_to_retire",	0xD2, 0x0 },	\
+	{ "FR_dispatch_stall_serialization",		0xD3, 0x0 },	\
+	{ "FR_dispatch_stall_segment_load",		0xD4, 0x0 },	\
+	{ "FR_dispatch_stall_reorder_buffer_full",	0xD5, 0x0 },	\
+	{ "FR_dispatch_stall_resv_stations_full",	0xD6, 0x0 },	\
+	{ "FR_dispatch_stall_fpu_full",			0xD7, 0x0 },	\
+	{ "FR_dispatch_stall_ls_full",			0xD8, 0x0 },	\
+	{ "FR_dispatch_stall_waiting_all_quiet",	0xD9, 0x0 },	\
+	{ "FR_dispatch_stall_far_ctl_trsfr_resync_branc_pend",	0xDA, 0x0 },\
+	{ "FR_fpu_exception",				0xDB, 0xF },	\
+	{ "FR_num_brkpts_dr0",				0xDC, 0x0 },	\
+	{ "FR_num_brkpts_dr1",				0xDD, 0x0 },	\
+	{ "FR_num_brkpts_dr2",				0xDE, 0x0 },	\
+	{ "FR_num_brkpts_dr3",				0xDF, 0x0 },	\
+	{ "NB_mem_ctrlr_page_access",			0xE0, 0x7 },	\
+	{ "NB_mem_ctrlr_page_table_overflow",		0xE1, 0x0 },	\
+	{ "NB_mem_ctrlr_turnaround",			0xE3, 0x7 },	\
+	{ "NB_mem_ctrlr_bypass_counter_saturation",	0xE4, 0xF },	\
+	{ "NB_ECC_errors",				0xE8, 0x80},	\
+	{ "NB_sized_commands",				0xEB, 0x7F },	\
+	{ "NB_probe_result",				0xEC, 0x7F},	\
+	{ "NB_gart_events",				0xEE, 0x7 },	\
+	{ "NB_ht_bus0_bandwidth",			0xF6, 0xF },	\
+	{ "NB_ht_bus1_bandwidth",			0xF7, 0xF },	\
+	{ "NB_ht_bus2_bandwidth",			0xF8, 0xF }
+
+#define	OPT_RevD_events							\
+	{ "NB_sized_blocks",				0xE5, 0x3C }
+
+#define	OPT_RevE_events							\
+	{ "NB_cpu_io_to_mem_io",			0xE9, 0xFF},	\
+	{ "NB_cache_block_commands",			0xEA, 0x3D}
+
+
+static opt_event_t opt_events_cmn[] = {
+	OPT_cmn_events,
+	EV_END
+};
+
+static opt_event_t opt_events_rev_D[] = {
+	OPT_cmn_events,
+	OPT_RevD_events,
+	EV_END
+};
+
+static opt_event_t opt_events_rev_E[] = {
+	OPT_cmn_events,
+	OPT_RevD_events,
+	OPT_RevE_events,
 	EV_END
 };
 
 static char	*evlist;
 static size_t	evlist_sz;
+static opt_event_t *opt_events;
 
 #define	BITS(v, u, l)   \
 	(((v) >> (l)) & ((1 << (1 + (u) - (l))) - 1))
@@ -236,6 +256,7 @@ static int
 opt_pcbe_init(void)
 {
 	opt_event_t		*evp;
+	uint32_t		rev;
 
 	/*
 	 * Make sure this really _is_ an Opteron or Athlon 64 system. The kernel
@@ -245,6 +266,26 @@ opt_pcbe_init(void)
 	if (cpuid_getvendor(CPU) != X86_VENDOR_AMD ||
 	    cpuid_getfamily(CPU) != OPTERON_FAMILY)
 		return (-1);
+
+	/*
+	 * Figure out processor revision here and assign appropriate
+	 * event configuration.
+	 */
+
+	rev = cpuid_getchiprev(CPU);
+
+	if (!X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_D)) {
+		opt_events = opt_events_cmn;
+	} else if X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_D) {
+		opt_events = opt_events_rev_D;
+	} else if (X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_E) ||
+		X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_F) ||
+		X86_CHIPREV_MATCH(rev, X86_CHIPREV_AMD_F_REV_G)) {
+		    opt_events = opt_events_rev_E;
+	};
+
+	if (opt_events == NULL)
+		opt_events = opt_events_cmn;
 
 	/*
 	 * Construct event list.
