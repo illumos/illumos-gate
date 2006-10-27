@@ -222,11 +222,13 @@ extern int pciehpc_debug;
 #define	PCIEHPC_INTR_PRI	1
 
 #if	defined(__sparc)
-#define	PCIEHPC_ENABLE_ERRORS(arg)	pciehpc_enable_errors(arg)
-#define	PCIEHPC_DISABLE_ERRORS(arg)	pciehpc_disable_errors(arg)
+#define	PCIE_ENABLE_ERRORS(arg1,arg2)	\
+		pcie_enable_errors(arg1,arg2);	\
+		(void) pcie_enable_ce(arg1,arg2)
+#define	PCIE_DISABLE_ERRORS(arg1,arg2)	pcie_disable_errors(arg1,arg2)
 #else
-#define	PCIEHPC_ENABLE_ERRORS(arg)
-#define	PCIEHPC_DISABLE_ERRORS(arg)
+#define	PCIE_ENABLE_ERRORS(arg1,arg2)	pcie_error_enable(arg1,arg2)
+#define	PCIE_DISABLE_ERRORS(arg1,arg2)	pcie_error_disable(arg1,arg2)
 #endif
 
 #ifdef	__cplusplus

@@ -46,6 +46,8 @@ extern "C" {
 
 int		pcie_error_init(dev_info_t *cdip);
 void		pcie_error_fini(dev_info_t *cdip);
+int		pcie_error_enable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl);
+void		pcie_error_disable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl);
 
 #ifdef	__cplusplus
 }

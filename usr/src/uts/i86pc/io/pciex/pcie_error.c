@@ -156,26 +156,56 @@ int
 pcie_error_init(dev_info_t *cdip)
 {
 	ddi_acc_handle_t	cfg_hdl;
-	uint8_t			header_type;
-	uint8_t			bcr;
-	uint16_t		command_reg, status_reg;
-	uint16_t		cap_ptr = 0;
-	uint16_t		aer_ptr = 0;
-	uint16_t		device_ctl;
-	uint16_t		dev_type = 0;
-	uint32_t		aer_reg;
-	uint32_t		uce_mask = pcie_aer_uce_mask;
-	boolean_t		empty_io_range = B_FALSE;
-	boolean_t		empty_mem_range = B_FALSE;
+	int status;
+
+	if (pci_config_setup(cdip, &cfg_hdl) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	status = pcie_error_enable(cdip, cfg_hdl);
+
+	pci_config_teardown(&cfg_hdl);
+	return (status);
+}
+
+/*
+ * PCI-Express CK8-04 child device de-initialization.
+ */
+void
+pcie_error_fini(dev_info_t *cdip)
+{
+	ddi_acc_handle_t	cfg_hdl;
+
+	if (pci_config_setup(cdip, &cfg_hdl) != DDI_SUCCESS)
+		return;
+
+	pcie_error_disable(cdip, cfg_hdl);
+
+	pci_config_teardown(&cfg_hdl);
+}
+
+/*
+ * Enable generic pci-express interrupts and error handling.
+ */
+int
+pcie_error_enable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
+{
+	uint8_t		header_type;
+	uint8_t		bcr;
+	uint16_t	command_reg, status_reg;
+	uint16_t	cap_ptr = 0;
+	uint16_t	aer_ptr = 0;
+	uint16_t	device_ctl;
+	uint16_t	dev_type = 0;
+	uint32_t	aer_reg;
+	uint32_t	uce_mask = pcie_aer_uce_mask;
+	boolean_t	empty_io_range = B_FALSE;
+	boolean_t	empty_mem_range = B_FALSE;
 
 	/*
 	 * flag to turn this off
 	 */
 	if (pcie_error_disable_flag)
 		return (DDI_SUCCESS);
-
-	if (pci_config_setup(cdip, &cfg_hdl) != DDI_SUCCESS)
-		return (DDI_FAILURE);
 
 	/* Determine the configuration header type */
 	header_type = pci_config_get8(cfg_hdl, PCI_CONF_HEADER);
@@ -253,7 +283,7 @@ pcie_error_init(dev_info_t *cdip)
 
 	/* No PCIe; just return */
 	if (cap_ptr == PCI_CAP_NEXT_PTR_NULL)
-		goto cleanup;
+		return (DDI_SUCCESS);
 
 	/*
 	 * Enable PCI-Express Baseline Error Handling
@@ -287,11 +317,11 @@ pcie_error_init(dev_info_t *cdip)
 	 * Enable PCI-Express Advanced Error Handling if Exists
 	 */
 	if (aer_ptr == PCIE_EXT_CAP_NEXT_PTR_NULL)
-		goto cleanup;
+		return (DDI_SUCCESS);
 
 
 	if (pcie_aer_disable_flag)
-		goto cleanup;
+		return (DDI_SUCCESS);
 
 	/* Disable PTLP/ECRC (or mask these two) for Switches */
 	if (dev_type == PCIE_PCIECAP_DEV_TYPE_UP ||
@@ -324,7 +354,7 @@ pcie_error_init(dev_info_t *cdip)
 	 * Enable Secondary Uncorrectable errors if this is a bridge
 	 */
 	if (!(dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI))
-		goto cleanup;
+		return (DDI_SUCCESS);
 
 	/* Set Secondary Uncorrectable error severity */
 	aer_reg = pci_config_get32(cfg_hdl, aer_ptr + PCIE_AER_SUCE_SERV);
@@ -344,8 +374,6 @@ pcie_error_init(dev_info_t *cdip)
 	    ddi_driver_name(cdip), aer_reg,
 	    pci_config_get32(cfg_hdl, aer_ptr + PCIE_AER_SUCE_MASK));
 
-cleanup:
-	pci_config_teardown(&cfg_hdl);
 	return (DDI_SUCCESS);
 }
 
@@ -419,23 +447,18 @@ pcie_nvidia_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,
 }
 
 /*
- * PCI-Express CK8-04 child device de-initialization.
- * This function disables generic pci-express interrupts and error handling.
+ * Disable generic pci-express interrupts and error handling.
  */
 void
-pcie_error_fini(dev_info_t *cdip)
+pcie_error_disable(dev_info_t *cdip, ddi_acc_handle_t cfg_hdl)
 {
-	ddi_acc_handle_t	cfg_hdl;
-	uint16_t		cap_ptr, aer_ptr;
-	uint16_t		dev_type;
-	uint8_t			header_type;
-	uint8_t			bcr;
-	uint16_t		command_reg, status_reg;
+	uint16_t	cap_ptr, aer_ptr;
+	uint16_t	dev_type;
+	uint8_t		header_type;
+	uint8_t		bcr;
+	uint16_t	command_reg, status_reg;
 
 	if (pcie_error_disable_flag)
-		return;
-
-	if (pci_config_setup(cdip, &cfg_hdl) != DDI_SUCCESS)
 		return;
 
 	/* Determine the configuration header type */
@@ -469,7 +492,7 @@ pcie_error_fini(dev_info_t *cdip)
 
 	cap_ptr = pcie_error_find_cap_reg(cfg_hdl, PCI_CAP_ID_PCI_E);
 	if (cap_ptr == PCI_CAP_NEXT_PTR_NULL)
-		goto error_fini_exit;
+		return;
 
 	/* Disable PCI-Express Baseline Error Handling */
 	pci_config_put16(cfg_hdl, cap_ptr + PCIE_DEVCTL, 0x0);
@@ -485,7 +508,7 @@ pcie_error_fini(dev_info_t *cdip)
 		pcie_nvidia_error_fini(cfg_hdl, cap_ptr, aer_ptr);
 
 	if (aer_ptr == PCIE_EXT_CAP_NEXT_PTR_NULL)
-		goto error_fini_exit;
+		return;
 
 	/* Disable AER bits */
 	if (!pcie_aer_disable_flag) {
@@ -501,14 +524,11 @@ pcie_error_fini(dev_info_t *cdip)
 		dev_type = pci_config_get16(cfg_hdl, cap_ptr + PCIE_PCIECAP) &
 		    PCIE_PCIECAP_DEV_TYPE_MASK;
 		if (!(dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI))
-			goto error_fini_exit;
+			return;
 
 		pci_config_put32(cfg_hdl, aer_ptr + PCIE_AER_SUCE_MASK,
 		    PCIE_AER_SUCE_BITS);
 	}
-
-error_fini_exit:
-	pci_config_teardown(&cfg_hdl);
 }
 
 
