@@ -43,19 +43,21 @@ i i.preserve
 #
 # SUNWcar.v
 #
+d none etc 755 root sys
+d none etc/flash 755 root sys
+d none etc/flash/postcreation 700 root sys
+d none etc/flash/precreation 700 root sys
+f none etc/flash/precreation/caplib 500 root sys
+d none etc/flash/preexit 700 root sys
 d none platform 755 root sys
 d none platform/sun4v 755 root sys
 d none platform/sun4v/lib 755 root bin
-v none platform/sun4v/lib/libc_psr.so.1 644 root bin
 d none platform/sun4v/lib/libc_psr 755 root bin
-d none platform/sun4v/lib/sparcv9 755 root bin
-v none platform/sun4v/lib/sparcv9/libc_psr.so.1 644 root bin
-d none platform/sun4v/lib/sparcv9/libc_psr 755 root bin
+v none platform/sun4v/lib/libc_psr.so.1 644 root bin
+f none platform/sun4v/lib/libc_psr/libc_psr_hwcap1.so.1 644 root bin
 f none platform/sun4v/lib/libmd_psr.so.1 755 root bin
+d none platform/sun4v/lib/sparcv9 755 root bin
+d none platform/sun4v/lib/sparcv9/libc_psr 755 root bin
+v none platform/sun4v/lib/sparcv9/libc_psr.so.1 644 root bin
+f none platform/sun4v/lib/sparcv9/libc_psr/libc_psr_hwcap1.so.1 644 root bin
 f none platform/sun4v/lib/sparcv9/libmd_psr.so.1 755 root bin
-d none etc 755 root sys
-d none etc/flash 755 root sys
-d none etc/flash/precreation 700 root sys
-d none etc/flash/preexit 700 root sys
-d none etc/flash/postcreation 700 root sys
-f none etc/flash/precreation/caplib 500 root sys
