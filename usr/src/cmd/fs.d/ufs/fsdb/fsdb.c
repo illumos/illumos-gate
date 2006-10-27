@@ -5106,7 +5106,7 @@ log_lodb(u_offset_t off, diskaddr_t *pblk)
 		 * No need to display anything here. The previous routine
 		 * has already done so.
 		 */
-		return;
+		return (0);
 
 	for (x = 0; x < log_eb->nextents; x++)
 		if ((lblk >= log_eb->extents[x].lbno) &&
