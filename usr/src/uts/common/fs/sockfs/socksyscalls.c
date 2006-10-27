@@ -2251,7 +2251,7 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 			snfi->snfi_frtn.free_arg = (caddr_t)snfi;
 			snfi->snfi_base = base;
 			snfi->snfi_mapoff = mapoff;
-			mp1 = desballoca((uchar_t *)base + mapoff,
+			mp1 = esballoca((uchar_t *)base + mapoff,
 			    iosize1, BPRI_HI, &snfi->snfi_frtn);
 
 			if (mp1 == NULL) {
