@@ -734,6 +734,8 @@ void	page_io_unlock(page_t *);
 int	page_io_trylock(page_t *);
 int	page_iolock_assert(page_t *);
 void	page_iolock_init(page_t *);
+void	page_io_wait(page_t *);
+int	page_io_locked(page_t *);
 pgcnt_t	page_busy(int);
 void	page_lock_init(void);
 ulong_t	page_share_cnt(page_t *);

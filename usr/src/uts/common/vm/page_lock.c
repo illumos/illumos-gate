@@ -773,7 +773,7 @@ page_io_unlock(page_t *pp)
 
 	pio = PAGE_IO_MUTEX(pp);
 	mutex_enter(pio);
-	cv_signal(&pp->p_io_cv);
+	cv_broadcast(&pp->p_io_cv);
 	pp->p_iolock_state &= ~PAGE_IO_INUSE;
 	mutex_exit(pio);
 }
@@ -804,13 +804,38 @@ page_io_trylock(page_t *pp)
 }
 
 /*
+ * Wait until the i/o lock is not held.
+ */
+void
+page_io_wait(page_t *pp)
+{
+	kmutex_t *pio;
+
+	pio = PAGE_IO_MUTEX(pp);
+	mutex_enter(pio);
+	while (pp->p_iolock_state & PAGE_IO_INUSE) {
+		cv_wait(&(pp->p_io_cv), pio);
+	}
+	mutex_exit(pio);
+}
+
+/*
+ * Returns 1 on success, 0 on failure.
+ */
+int
+page_io_locked(page_t *pp)
+{
+	return (pp->p_iolock_state & PAGE_IO_INUSE);
+}
+
+/*
  * Assert that the i/o lock on a page is held.
  * Returns 1 on success, 0 on failure.
  */
 int
 page_iolock_assert(page_t *pp)
 {
-	return (pp->p_iolock_state & PAGE_IO_INUSE);
+	return (page_io_locked(pp));
 }
 
 /*

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -378,6 +377,7 @@ pvn_write_done(page_t *plist, int flags)
 	struct cpu *cpup;
 	struct vnode *vp = NULL;	/* for probe */
 	uint_t ppattr;
+	kmutex_t *vphm = NULL;
 
 	ASSERT((flags & B_READ) == 0);
 
@@ -400,6 +400,20 @@ pvn_write_done(page_t *plist, int flags)
 		/* Kernel probe support */
 		if (vp == NULL)
 			vp = pp->p_vnode;
+
+		if (IS_VMODSORT(vp)) {
+			/*
+			 * Move page to the top of the v_page list.
+			 * Skip pages modified during IO.
+			 */
+			vphm = page_vnode_mutex(vp);
+			mutex_enter(vphm);
+			if ((pp->p_vpnext != pp) && !hat_ismod(pp)) {
+				page_vpsub(&vp->v_pages, pp);
+				page_vpadd(&vp->v_pages, pp);
+			}
+			mutex_exit(vphm);
+		}
 
 		if (flags & B_ERROR) {
 			/*
@@ -842,35 +856,48 @@ pvn_vplist_dirty(
 		 * modified pages are visited first.
 		 */
 		if (IS_VMODSORT(vp) &&
-		    !(flags & (B_INVAL | B_FREE | B_TRUNC)) &&
-		    !hat_ismod(pp)) {
+		    !(flags & (B_INVAL | B_FREE | B_TRUNC))) {
+			if (!hat_ismod(pp) && !page_io_locked(pp)) {
 #ifdef  DEBUG
-			/*
-			 * For debug kernels examine what should be all the
-			 * remaining clean pages, asserting that they are
-			 * not modified.
-			 */
-			page_t	*chk = pp;
-			int	attr;
+				/*
+				 * For debug kernels examine what should be
+				 * all the remaining clean pages, asserting
+				 * that they are not modified.
+				 */
+				page_t	*chk = pp;
+				int	attr;
 
-			page_vpsub(&vp->v_pages, mark);
-			page_vpadd(where_to_move, mark);
-			do {
-				chk = chk->p_vpprev;
-				ASSERT(chk != end);
-				if (chk == mark)
-					continue;
-				attr = hat_page_getattr(chk, P_MOD | P_REF);
-				if ((attr & P_MOD) == 0)
-					continue;
-				panic("v_pages list not all clean: "
-				    "page_t*=%p vnode=%p off=%lx "
-				    "attr=0x%x last clean page_t*=%p\n",
-				    (void *)chk, (void *)chk->p_vnode,
-				    (long)chk->p_offset, attr, (void *)pp);
-			} while (chk != vp->v_pages);
+				page_vpsub(&vp->v_pages, mark);
+				page_vpadd(where_to_move, mark);
+				do {
+					chk = chk->p_vpprev;
+					ASSERT(chk != end);
+					if (chk == mark)
+						continue;
+					attr = hat_page_getattr(chk, P_MOD |
+					    P_REF);
+					if ((attr & P_MOD) == 0)
+						continue;
+					panic("v_pages list not all clean: "
+					    "page_t*=%p vnode=%p off=%lx "
+					    "attr=0x%x last clean page_t*=%p\n",
+					    (void *)chk, (void *)chk->p_vnode,
+					    (long)chk->p_offset, attr,
+					    (void *)pp);
+				} while (chk != vp->v_pages);
 #endif
-			break;
+				break;
+			} else if (!(flags & B_ASYNC) && !hat_ismod(pp)) {
+				/*
+				 * Couldn't get io lock, wait until IO is done.
+				 * Block only for sync IO since we don't want
+				 * to block async IO.
+				 */
+				mutex_exit(vphm);
+				page_io_wait(pp);
+				mutex_enter(vphm);
+				continue;
+			}
 		}
 
 		/*
