@@ -7139,11 +7139,6 @@ ip_rt_delete(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 				type = IRE_PREFIX;
 			ire = ire_ftable_lookup(dst_addr, mask, gw_addr, type,
 			    ipif_arg, NULL, ALL_ZONES, 0, NULL, match_flags);
-			if (ire == NULL && type == IRE_HOST) {
-				ire = ire_ftable_lookup(dst_addr, mask, gw_addr,
-				    IRE_HOST_REDIRECT, ipif_arg, NULL,
-				    ALL_ZONES, 0, NULL, match_flags);
-			}
 		}
 	}
 
@@ -19219,7 +19214,7 @@ ipif_recover_ire(ipif_t *ipif)
 		 * ip_rt_add(), it was created either using ipif->ipif_net_type
 		 * in the case of a traditional interface route, or as one of
 		 * the IRE_OFFSUBNET types (with the exception of
-		 * IRE_HOST_REDIRECT which is created by icmp_redirect() and
+		 * IRE_HOST types ire which is created by icmp_redirect() and
 		 * which we don't need to save or recover).  In the case where
 		 * ipif->ipif_net_type was IRE_LOOPBACK, ip_rt_add() will update
 		 * the ire_type to IRE_IF_NORESOLVER before calling ire_add()

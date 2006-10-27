@@ -596,7 +596,7 @@ typedef struct ip_m_s {
 #define	IRE_IF_RESOLVER		0x0080	/* Route entry for local interface */
 					/* net with resolver. */
 #define	IRE_HOST		0x0100	/* Host route entry */
-#define	IRE_HOST_REDIRECT	0x0200	/* Host route entry from redirects */
+#define	IRE_HOST_REDIRECT	0x0200	/* only used for T_SVR4_OPTMGMT_REQ */
 
 /*
  * IRE_MIPRTUN is only set on the ires in the ip_mrtun_table.
@@ -605,8 +605,7 @@ typedef struct ip_m_s {
 #define	IRE_MIPRTUN		0x0400	/* Reverse tunnel route entry */
 
 #define	IRE_INTERFACE		(IRE_IF_NORESOLVER | IRE_IF_RESOLVER)
-#define	IRE_OFFSUBNET		(IRE_DEFAULT | IRE_PREFIX | IRE_HOST | \
-				IRE_HOST_REDIRECT)
+#define	IRE_OFFSUBNET		(IRE_DEFAULT | IRE_PREFIX | IRE_HOST)
 #define	IRE_CACHETABLE		(IRE_CACHE | IRE_BROADCAST | IRE_LOCAL | \
 				IRE_LOOPBACK)
 #define	IRE_FORWARDTABLE	(IRE_INTERFACE | IRE_OFFSUBNET)

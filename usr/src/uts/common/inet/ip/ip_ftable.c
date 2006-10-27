@@ -556,7 +556,7 @@ ire_lookup_multi(ipaddr_t group, zoneid_t zoneid)
 void
 ire_del_host_redir(ire_t *ire, char *gateway)
 {
-	if ((ire->ire_type & IRE_HOST_REDIRECT) &&
+	if ((ire->ire_flags & RTF_DYNAMIC) &&
 	    (ire->ire_gateway_addr == *(ipaddr_t *)gateway))
 		ire_delete(ire);
 }

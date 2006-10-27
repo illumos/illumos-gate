@@ -1463,7 +1463,6 @@ static nv_t	ire_nv_arr[] = {
 	{ IRE_IF_NORESOLVER, "IF_NORESOL" },
 	{ IRE_IF_RESOLVER, "IF_RESOLV" },
 	{ IRE_HOST, "HOST" },
-	{ IRE_HOST_REDIRECT, "HOST_REDIRECT" },
 	{ 0 }
 };
 
@@ -3269,7 +3268,7 @@ icmp_redirect(mblk_t *mp)
 		NULL,					/* Fast Path header */
 		NULL,					/* no rfq */
 		NULL,					/* no stq */
-		IRE_HOST_REDIRECT,
+		IRE_HOST,
 		NULL,
 		NULL,
 		NULL,
@@ -3299,14 +3298,15 @@ icmp_redirect(mblk_t *mp)
 	}
 
 	/*
-	 * Delete any existing IRE_HOST_REDIRECT for this destination.
+	 * Delete any existing IRE_HOST type redirect ires for this destination.
 	 * This together with the added IRE has the effect of
 	 * modifying an existing redirect.
 	 */
-	prev_ire = ire_ftable_lookup(dst, 0, src, IRE_HOST_REDIRECT, NULL, NULL,
+	prev_ire = ire_ftable_lookup(dst, 0, src, IRE_HOST, NULL, NULL,
 	    ALL_ZONES, 0, NULL, (MATCH_IRE_GW | MATCH_IRE_TYPE));
-	if (prev_ire) {
-		ire_delete(prev_ire);
+	if (prev_ire != NULL) {
+		if (prev_ire ->ire_flags & RTF_DYNAMIC)
+			ire_delete(prev_ire);
 		ire_refrele(prev_ire);
 	}
 
@@ -8098,8 +8098,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 		 *
 		 * 3) The IRE sire will point to the prefix that is the
 		 *    longest  matching route for the destination. These
-		 *    prefix types include IRE_DEFAULT, IRE_PREFIX, IRE_HOST,
-		 *    and IRE_HOST_REDIRECT.
+		 *    prefix types include IRE_DEFAULT, IRE_PREFIX, IRE_HOST.
 		 *
 		 *    The newly created IRE_CACHE entry for the off-subnet
 		 *    destination is tied to both the prefix route and the
@@ -18834,11 +18833,17 @@ ip_snmp_get2_v4(ire_t *ire, iproutedata_t *ird)
 		llmp = NULL;
 	re->ipRouteInfo.re_ref		= ire->ire_refcnt;
 	re->ipRouteInfo.re_src_addr	= ire->ire_src_addr;
-	re->ipRouteInfo.re_ire_type	= ire->ire_type;
 	re->ipRouteInfo.re_obpkt	= ire->ire_ob_pkt_count;
 	re->ipRouteInfo.re_ibpkt	= ire->ire_ib_pkt_count;
 	re->ipRouteInfo.re_flags	= ire->ire_flags;
 	re->ipRouteInfo.re_in_ill.o_length = 0;
+
+	if (ire->ire_flags & RTF_DYNAMIC) {
+		re->ipRouteInfo.re_ire_type	= IRE_HOST_REDIRECT;
+	} else {
+		re->ipRouteInfo.re_ire_type	= ire->ire_type;
+	}
+
 	if (ire->ire_in_ill != NULL) {
 		re->ipRouteInfo.re_in_ill.o_length =
 		    ire->ire_in_ill->ill_name_length == 0 ? 0 :
@@ -19034,11 +19039,16 @@ ip_snmp_get2_v6_route(ire_t *ire, iproutedata_t *ird)
 	re->ipv6RouteInfo.re_frag_flag	= ire->ire_frag_flag;
 	re->ipv6RouteInfo.re_rtt	= ire->ire_uinfo.iulp_rtt;
 	re->ipv6RouteInfo.re_src_addr	= ire->ire_src_addr_v6;
-	re->ipv6RouteInfo.re_ire_type	= ire->ire_type;
 	re->ipv6RouteInfo.re_obpkt	= ire->ire_ob_pkt_count;
 	re->ipv6RouteInfo.re_ibpkt	= ire->ire_ib_pkt_count;
 	re->ipv6RouteInfo.re_ref	= ire->ire_refcnt;
 	re->ipv6RouteInfo.re_flags	= ire->ire_flags;
+
+	if (ire->ire_flags & RTF_DYNAMIC) {
+		re->ipv6RouteInfo.re_ire_type	= IRE_HOST_REDIRECT;
+	} else {
+		re->ipv6RouteInfo.re_ire_type	= ire->ire_type;
+	}
 
 	if (!snmp_append_data2(ird->ird_route.lp_head, &ird->ird_route.lp_tail,
 	    (char *)re, (int)sizeof (*re))) {

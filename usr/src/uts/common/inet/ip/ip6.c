@@ -253,7 +253,6 @@ static void	icmp_inbound_too_big_v6(queue_t *, mblk_t *, ill_t *ill,
 static void	icmp_pkt_v6(queue_t *, mblk_t *, void *, size_t,
     const in6_addr_t *, boolean_t, zoneid_t);
 static void	icmp_redirect_v6(queue_t *, mblk_t *, ill_t *ill);
-static boolean_t	icmp_redirect_ok_v6(ill_t *ill, mblk_t *mp);
 static int	ip_bind_connected_v6(conn_t *, mblk_t *, in6_addr_t *,
     uint16_t, const in6_addr_t *, ip6_pkt_t *, uint16_t,
     boolean_t, boolean_t, boolean_t, boolean_t);
@@ -633,8 +632,7 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, uint_t hdr_length,
 		 */
 		if (mctl_present)
 			freeb(first_mp);
-		if (!pullupmsg(mp, -1) ||
-		    !icmp_redirect_ok_v6(ill, mp)) {
+		if (!pullupmsg(mp, -1)) {
 			BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
 			break;
 		}
@@ -1213,67 +1211,7 @@ drop_pkt:
 }
 
 /*
- * Validate the incoming redirect message,  if valid redirect
- * processing is done later.  This is separated from the actual
- * redirect processing to avoid becoming single threaded when not
- * necessary. (i.e invalid packet)
- * Assumes that any AH or ESP headers have already been removed.
- * The mp has already been pulled up.
- */
-boolean_t
-icmp_redirect_ok_v6(ill_t *ill, mblk_t *mp)
-{
-	ip6_t		*ip6h = (ip6_t *)mp->b_rptr;
-	nd_redirect_t	*rd;
-	ire_t		*ire;
-	uint16_t	len;
-	uint16_t	hdr_length;
-
-	ASSERT(mp->b_cont == NULL);
-	if (ip6h->ip6_nxt != IPPROTO_ICMPV6)
-		hdr_length = ip_hdr_length_v6(mp, ip6h);
-	else
-		hdr_length = IPV6_HDR_LEN;
-	rd = (nd_redirect_t *)&mp->b_rptr[hdr_length];
-	len = mp->b_wptr - mp->b_rptr -  hdr_length;
-	if (!IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_src) ||
-	    (ip6h->ip6_hops != IPV6_MAX_HOPS) ||
-	    (rd->nd_rd_code != 0) ||
-	    (len < sizeof (nd_redirect_t)) ||
-	    (IN6_IS_ADDR_V4MAPPED(&rd->nd_rd_dst)) ||
-	    (IN6_IS_ADDR_MULTICAST(&rd->nd_rd_dst))) {
-		return (B_FALSE);
-	}
-	if (!(IN6_IS_ADDR_LINKLOCAL(&rd->nd_rd_target) ||
-	    IN6_ARE_ADDR_EQUAL(&rd->nd_rd_target, &rd->nd_rd_dst))) {
-		return (B_FALSE);
-	}
-
-	/*
-	 * Verify that the IP source address of the redirect is
-	 * the same as the current first-hop router for the specified
-	 * ICMP destination address.  Just to be cautious, this test
-	 * will be done again before we add the redirect, in case
-	 * router goes away between now and then.
-	 */
-	ire = ire_route_lookup_v6(&rd->nd_rd_dst, 0,
-	    &ip6h->ip6_src, 0, ill->ill_ipif, NULL, ALL_ZONES, NULL,
-	    MATCH_IRE_GW | MATCH_IRE_ILL_GROUP);
-	if (ire == NULL)
-		return (B_FALSE);
-	ire_refrele(ire);
-	if (len > sizeof (nd_redirect_t)) {
-		if (!ndp_verify_optlen((nd_opt_hdr_t *)&rd[1],
-		    len - sizeof (nd_redirect_t)))
-			return (B_FALSE);
-	}
-	return (B_TRUE);
-}
-
-/*
  * Process received IPv6 ICMP Redirect messages.
- * Assumes that the icmp packet has already been verfied to be
- * valid, aligned and in a single mblk all done in icmp_redirect_ok_v6().
  */
 /* ARGSUSED */
 static void
@@ -1292,6 +1230,7 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 	int		err = 0;
 	boolean_t	redirect_to_router = B_FALSE;
 	int		len;
+	int		optlen;
 	iulp_t		ulp_info = { 0 };
 	ill_t		*prev_ire_ill;
 	ipif_t		*ipif;
@@ -1303,26 +1242,64 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		hdr_length = IPV6_HDR_LEN;
 
 	rd = (nd_redirect_t *)&mp->b_rptr[hdr_length];
+	len = mp->b_wptr - mp->b_rptr -  hdr_length;
 	src = &ip6h->ip6_src;
 	dst = &rd->nd_rd_dst;
 	gateway = &rd->nd_rd_target;
+
+	/* Verify if it is a valid redirect */
+	if (!IN6_IS_ADDR_LINKLOCAL(src) ||
+	    (ip6h->ip6_hops != IPV6_MAX_HOPS) ||
+	    (rd->nd_rd_code != 0) ||
+	    (len < sizeof (nd_redirect_t)) ||
+	    (IN6_IS_ADDR_V4MAPPED(dst)) ||
+	    (IN6_IS_ADDR_MULTICAST(dst))) {
+		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
+		freemsg(mp);
+		return;
+	}
+
+	if (!(IN6_IS_ADDR_LINKLOCAL(gateway) ||
+	    IN6_ARE_ADDR_EQUAL(gateway, dst))) {
+		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
+		freemsg(mp);
+		return;
+	}
+
+	if (len > sizeof (nd_redirect_t)) {
+		if (!ndp_verify_optlen((nd_opt_hdr_t *)&rd[1],
+		    len - sizeof (nd_redirect_t))) {
+			BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
+			freemsg(mp);
+			return;
+		}
+	}
+
 	if (!IN6_ARE_ADDR_EQUAL(gateway, dst)) {
 		redirect_to_router = B_TRUE;
 		nce_flags |= NCE_F_ISROUTER;
 	}
-	/*
-	 * Make sure we had a route for the dest in question and that
-	 * route was pointing to the old gateway (the source of the
-	 * redirect packet.)
-	 */
+
+	/* ipif will be refreleased afterwards */
 	ipif = ipif_get_next_ipif(NULL, ill);
 	if (ipif == NULL) {
 		freemsg(mp);
 		return;
 	}
+
+	/*
+	 * Verify that the IP source address of the redirect is
+	 * the same as the current first-hop router for the specified
+	 * ICMP destination address.
+	 * Also, Make sure we had a route for the dest in question and
+	 * that route was pointing to the old gateway (the source of the
+	 * redirect packet.)
+	 */
+
 	prev_ire = ire_route_lookup_v6(dst, 0, src, 0, ipif, NULL,
-	    ALL_ZONES, NULL, MATCH_IRE_GW | MATCH_IRE_ILL_GROUP);
-	ipif_refrele(ipif);
+	    ALL_ZONES, NULL, MATCH_IRE_GW | MATCH_IRE_ILL_GROUP |
+	    MATCH_IRE_DEFAULT);
+
 	/*
 	 * Check that
 	 *	the redirect was not from ourselves
@@ -1331,6 +1308,7 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 	if (prev_ire == NULL ||
 	    prev_ire->ire_type == IRE_LOCAL) {
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
+		ipif_refrele(ipif);
 		goto fail_redirect;
 	}
 	prev_ire_ill = ire_to_ill(prev_ire);
@@ -1378,9 +1356,9 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		}
 	}
 
-	len = mp->b_wptr - mp->b_rptr -  hdr_length - sizeof (nd_redirect_t);
+	optlen = mp->b_wptr - mp->b_rptr -  hdr_length - sizeof (nd_redirect_t);
 	opt = (nd_opt_hdr_t *)&rd[1];
-	opt = ndp_get_option(opt, len, ND_OPT_TARGET_LINKADDR);
+	opt = ndp_get_option(opt, optlen, ND_OPT_TARGET_LINKADDR);
 	if (opt != NULL) {
 		err = ndp_lookup_then_add(ill,
 		    (uchar_t *)&opt[1],		/* Link layer address */
@@ -1408,6 +1386,7 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		default:
 			ip1dbg(("icmp_redirect_v6: NCE create failed %d\n",
 			    err));
+			ipif_refrele(ipif);
 			goto fail_redirect;
 		}
 	}
@@ -1428,7 +1407,7 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		    NULL,			/* Fast Path header */
 		    NULL, 			/* no rfq */
 		    NULL,			/* no stq */
-		    IRE_HOST_REDIRECT,
+		    IRE_HOST,
 		    NULL,
 		    prev_ire->ire_ipif,
 		    NULL,
@@ -1439,10 +1418,13 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		    NULL,
 		    NULL);
 	} else {
+		queue_t *stq;
+
+		stq = (ipif->ipif_net_type == IRE_IF_RESOLVER)
+		    ? ipif->ipif_rq : ipif->ipif_wq;
+
 		/*
-		 * Just create an on link entry, may or may not be a router
-		 * If there is no link layer address option ire_add() won't
-		 * add this.
+		 * Just create an on link entry, i.e. interface route.
 		 */
 		ire = ire_create_v6(
 		    dst,				/* gateway == dst */
@@ -1451,28 +1433,26 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		    &ipv6_all_zeros,			/* gateway addr */
 		    &prev_ire->ire_max_frag,		/* max frag */
 		    NULL,				/* Fast Path header */
-		    prev_ire->ire_rfq,			/* ire rfq */
-		    prev_ire->ire_stq,			/* ire stq */
-		    IRE_CACHE,
+		    NULL,				/* ire rfq */
+		    stq,				/* ire stq */
+		    ipif->ipif_net_type,		/* IF_[NO]RESOLVER */
 		    NULL,
 		    prev_ire->ire_ipif,
 		    &ipv6_all_ones,
 		    0,
 		    0,
-		    0,
+		    (RTF_DYNAMIC | RTF_HOST),
 		    &ulp_info,
 		    NULL,
 		    NULL);
 	}
+
+	/* Release reference from earlier ipif_get_next_ipif() */
+	ipif_refrele(ipif);
+
 	if (ire == NULL)
 		goto fail_redirect;
 
-	/*
-	 * XXX If there is no nce i.e there is no target link layer address
-	 * option with the redirect message, ire_add will fail. In that
-	 * case we never add the IRE_CACHE/IRE_HOST_REDIRECT. We need
-	 * to fix this.
-	 */
 	if (ire_add(&ire, NULL, NULL, NULL, B_FALSE) == 0) {
 
 		/* tell routing sockets that we received a redirect */
@@ -1484,18 +1464,19 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_AUTHOR));
 
 		/*
-		 * Delete any existing IRE_HOST_REDIRECT for this destination.
+		 * Delete any existing IRE_HOST type ires for this destination.
 		 * This together with the added IRE has the effect of
 		 * modifying an existing redirect.
 		 */
-		redir_ire = ire_ftable_lookup_v6(dst, 0, src, IRE_HOST_REDIRECT,
+		redir_ire = ire_ftable_lookup_v6(dst, 0, src, IRE_HOST,
 		    ire->ire_ipif, NULL, ALL_ZONES, 0, NULL,
 		    (MATCH_IRE_GW | MATCH_IRE_TYPE | MATCH_IRE_ILL_GROUP));
 
 		ire_refrele(ire);		/* Held in ire_add_v6 */
 
 		if (redir_ire != NULL) {
-			ire_delete(redir_ire);
+			if (redir_ire->ire_flags & RTF_DYNAMIC)
+				ire_delete(redir_ire);
 			ire_refrele(redir_ire);
 		}
 	}
@@ -4835,8 +4816,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 		 *
 		 * 3) The IRE sire will point to the prefix that is the longest
 		 *    matching route for the destination. These prefix types
-		 *    include IRE_DEFAULT, IRE_PREFIX, IRE_HOST, and
-		 *    IRE_HOST_REDIRECT.
+		 *    include IRE_DEFAULT, IRE_PREFIX, IRE_HOST.
 		 *
 		 *    The newly created IRE_CACHE entry for the off-subnet
 		 *    destination is tied to both the prefix route and the

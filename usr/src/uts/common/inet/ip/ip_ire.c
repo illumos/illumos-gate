@@ -738,12 +738,16 @@ done:
 		ire_delete(ire);
 		ire_refrele(ire);
 	}
-	/* Also look for an IRE_HOST_REDIRECT and remove it if present */
-	ire = ire_route_lookup(addr, 0, 0, IRE_HOST_REDIRECT, NULL, NULL,
+	/*
+	 * Also look for an IRE_HOST type redirect ire and
+	 * remove it if present.
+	 */
+	ire = ire_route_lookup(addr, 0, 0, IRE_HOST, NULL, NULL,
 	    ALL_ZONES, NULL, MATCH_IRE_TYPE);
 
 	/* Nail it. */
-	if (ire) {
+	if (ire != NULL) {
+	    if (ire->ire_flags & RTF_DYNAMIC) {
 		if (!routing_sock_info) {
 			ip_rts_change(RTM_LOSING, ire->ire_addr,
 			    ire->ire_gateway_addr, ire->ire_mask,
@@ -751,7 +755,8 @@ done:
 			    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFA));
 		}
 		ire_delete(ire);
-		ire_refrele(ire);
+	    }
+	    ire_refrele(ire);
 	}
 	return (0);
 }
@@ -2089,7 +2094,7 @@ ire_expire(ire_t *ire, char *arg)
 	ill_t	*stq_ill;
 
 	if ((flush_flags & FLUSH_REDIRECT_TIME) &&
-	    ire->ire_type == IRE_HOST_REDIRECT) {
+	    (ire->ire_flags & RTF_DYNAMIC)) {
 		/* Make sure we delete the corresponding IRE_CACHE */
 		ip1dbg(("ire_expire: all redirects\n"));
 		ip_rts_rtmsg(RTM_DELETE, ire, 0);
@@ -3315,7 +3320,7 @@ ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func,
 /*
  * Add an initialized IRE to an appropriate table based on ire_type.
  *
- * The forward table contains IRE_PREFIX/IRE_HOST/IRE_HOST_REDIRECT
+ * The forward table contains IRE_PREFIX/IRE_HOST and
  * IRE_IF_RESOLVER/IRE_IF_NORESOLVER and IRE_DEFAULT.
  *
  * The cache table contains IRE_BROADCAST/IRE_LOCAL/IRE_LOOPBACK
@@ -3355,11 +3360,6 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 		ire->ire_masklen = IP_ABITS;
 		if ((ire->ire_flags & RTF_SETSRC) == 0)
 			ire->ire_src_addr = 0;
-		break;
-	case IRE_HOST_REDIRECT:
-		ire->ire_mask = IP_HOST_MASK;
-		ire->ire_masklen = IP_ABITS;
-		ire->ire_src_addr = 0;
 		break;
 	case IRE_CACHE:
 	case IRE_BROADCAST:
@@ -4385,15 +4385,16 @@ end:
 }
 
 /*
- * ire_walk routine to delete all IRE_CACHE/IRE_HOST_REDIRECT entries
- * that have a given gateway address.
+ * ire_walk routine to delete all IRE_CACHE/IRE_HOST types redirect
+ * entries that have a given gateway address.
  */
 void
 ire_delete_cache_gw(ire_t *ire, char *cp)
 {
 	ipaddr_t	gw_addr;
 
-	if (!(ire->ire_type & (IRE_CACHE|IRE_HOST_REDIRECT)))
+	if (!(ire->ire_type & IRE_CACHE) &&
+	    !(ire->ire_flags & RTF_DYNAMIC))
 		return;
 
 	bcopy(cp, &gw_addr, sizeof (gw_addr));

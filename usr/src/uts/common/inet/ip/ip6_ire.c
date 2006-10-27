@@ -582,7 +582,7 @@ ip_plen_to_mask_v6(uint_t plen, in6_addr_t *bitmask)
  * Add a fully initialized IRE to an appropriate
  * table based on ire_type.
  *
- * The forward table contains IRE_PREFIX/IRE_HOST/IRE_HOST_REDIRECT
+ * The forward table contains IRE_PREFIX/IRE_HOST/IRE_HOST and
  * IRE_IF_RESOLVER/IRE_IF_NORESOLVER and IRE_DEFAULT.
  *
  * The cache table contains IRE_BROADCAST/IRE_LOCAL/IRE_LOOPBACK
@@ -616,11 +616,6 @@ ire_add_v6(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 		ire->ire_masklen = IPV6_ABITS;
 		if ((ire->ire_flags & RTF_SETSRC) == 0)
 			ire->ire_src_addr_v6 = ipv6_all_zeros;
-		break;
-	case IRE_HOST_REDIRECT:
-		ire->ire_mask_v6 = ipv6_all_ones;
-		ire->ire_masklen = IPV6_ABITS;
-		ire->ire_src_addr_v6 = ipv6_all_zeros;
 		break;
 	case IRE_CACHE:
 	case IRE_LOCAL:
@@ -1114,7 +1109,7 @@ ire_delete_host_redirects_v6(const in6_addr_t *gateway)
 		irb = &irb_ptr[i];
 		IRB_REFHOLD(irb);
 		for (ire = irb->irb_ire; ire != NULL; ire = ire->ire_next) {
-			if (ire->ire_type != IRE_HOST_REDIRECT)
+			if (!(ire->ire_flags & RTF_DYNAMIC))
 				continue;
 			mutex_enter(&ire->ire_lock);
 			gw_addr_v6 = ire->ire_gateway_addr_v6;
@@ -1196,7 +1191,7 @@ ire_delete_v6(ire_t *ire)
 }
 
 /*
- * ire_walk routine to delete all IRE_CACHE and IRE_HOST_REDIRECT
+ * ire_walk routine to delete all IRE_CACHE and IRE_HOST type redirect
  * entries.
  */
 /*ARGSUSED1*/
@@ -1206,7 +1201,8 @@ ire_delete_cache_v6(ire_t *ire, char *arg)
 	char    addrstr1[INET6_ADDRSTRLEN];
 	char    addrstr2[INET6_ADDRSTRLEN];
 
-	if (ire->ire_type & (IRE_CACHE | IRE_HOST_REDIRECT)) {
+	if ((ire->ire_type & IRE_CACHE) ||
+	    (ire->ire_flags & RTF_DYNAMIC)) {
 		ip1dbg(("ire_delete_cache_v6: deleted %s type %d through %s\n",
 		    inet_ntop(AF_INET6, &ire->ire_addr_v6,
 			addrstr1, sizeof (addrstr1)),
@@ -1219,7 +1215,7 @@ ire_delete_cache_v6(ire_t *ire, char *arg)
 }
 
 /*
- * ire_walk routine to delete all IRE_CACHE/IRE_HOST_REDIRECT entries
+ * ire_walk routine to delete all IRE_CACHE/IRE_HOST type redirect entries
  * that have a given gateway address.
  */
 void
@@ -1230,7 +1226,8 @@ ire_delete_cache_gw_v6(ire_t *ire, char *addr)
 	char		buf2[INET6_ADDRSTRLEN];
 	in6_addr_t	ire_gw_addr_v6;
 
-	if (!(ire->ire_type & (IRE_CACHE|IRE_HOST_REDIRECT)))
+	if (!(ire->ire_type & IRE_CACHE) &&
+	    !(ire->ire_flags & RTF_DYNAMIC))
 		return;
 
 	mutex_enter(&ire->ire_lock);

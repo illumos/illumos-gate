@@ -983,11 +983,6 @@ ip_rt_delete_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 			type = IRE_PREFIX;
 		ire = ire_ftable_lookup_v6(dst_addr, mask, gw_addr, type,
 		    ipif_arg, NULL, ALL_ZONES, 0, NULL, match_flags);
-		if (ire == NULL && type == IRE_HOST) {
-			ire = ire_ftable_lookup_v6(dst_addr, mask, gw_addr,
-			    IRE_HOST_REDIRECT, ipif_arg, NULL, ALL_ZONES, 0,
-			    NULL, match_flags);
-		}
 	}
 
 	if (ipif_refheld) {
@@ -1549,7 +1544,7 @@ ipif_recover_ire_v6(ipif_t *ipif)
 		 * ip_rt_add_v6(), it was created either using
 		 * ipif->ipif_net_type in the case of a traditional interface
 		 * route, or as one of the IRE_OFFSUBNET types (with the
-		 * exception of IRE_HOST_REDIRECT which is created by
+		 * exception of IRE_HOST type redirect ire which is created by
 		 * icmp_redirect_v6() and which we don't need to save or
 		 * recover).  In the case where ipif->ipif_net_type was
 		 * IRE_LOOPBACK, ip_rt_add_v6() will update the ire_type to
