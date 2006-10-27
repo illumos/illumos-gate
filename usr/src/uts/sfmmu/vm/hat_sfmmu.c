@@ -7018,35 +7018,24 @@ void
 hat_page_clrattr(page_t *pp, uint_t flag)
 {
 	vnode_t		*vp = pp->p_vnode;
-	kmutex_t	*vphm = NULL;
 	kmutex_t	*pmtx;
 
 	ASSERT(!(flag & ~(P_MOD | P_REF | P_RO)));
 
-	/*
-	 * For vnode with a sorted v_pages list, we need to change
-	 * the attributes and the v_pages list together under page_vnode_mutex.
-	 */
-	if ((flag & P_MOD) != 0 && vp != NULL && IS_VMODSORT(vp)) {
-		vphm = page_vnode_mutex(vp);
-		mutex_enter(vphm);
-	}
-
 	pmtx = sfmmu_page_enter(pp);
+
+	/*
+	 * Caller is expected to hold page's io lock for VMODSORT to work
+	 * correctly with pvn_vplist_dirty() and pvn_getdirty() when mod
+	 * bit is cleared.
+	 * We don't have assert to avoid tripping some existing third party
+	 * code. The dirty page is moved back to top of the v_page list
+	 * after IO is done in pvn_write_done().
+	 */
 	pp->p_nrm &= ~flag;
 	sfmmu_page_exit(pmtx);
 
-	if (vphm != NULL) {
-		/*
-		 * Some File Systems examine v_pages for NULL w/o
-		 * grabbing the vphm mutex. Must not let it become NULL when
-		 * pp is the only page on the list.
-		 */
-		if (pp->p_vpnext != pp) {
-			page_vpsub(&vp->v_pages, pp);
-			page_vpadd(&vp->v_pages, pp);
-		}
-		mutex_exit(vphm);
+	if ((flag & P_MOD) != 0 && vp != NULL && IS_VMODSORT(vp)) {
 
 		/*
 		 * VMODSORT works by removing write permissions and getting
@@ -7057,7 +7046,6 @@ hat_page_clrattr(page_t *pp, uint_t flag)
 		hat_page_clrwrt(pp);
 	}
 }
-
 
 uint_t
 hat_page_getattr(page_t *pp, uint_t flag)
