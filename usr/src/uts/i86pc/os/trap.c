@@ -961,8 +961,6 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		break;
 
 	case T_SGLSTP: /* single step/hw breakpoint exception */
-		if (tudebug && tudebugbpt)
-			showregs(type, rp, (caddr_t)0);
 
 		/* Now evaluate how we got here */
 		if (lwp != NULL && (lwp->lwp_pcb.pcb_drstat & DR_SINGLESTEP)) {
@@ -1002,6 +1000,11 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 				singlestep_twiddle = 1;
 			}
 #endif
+			else {
+				/* not on sysenter/syscall; uregs available */
+				if (tudebug && tudebugbpt)
+					showregs(type, rp, (caddr_t)0);
+			}
 			if (singlestep_twiddle) {
 				rp->r_ps &= ~PS_T; /* turn off trace */
 				lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
