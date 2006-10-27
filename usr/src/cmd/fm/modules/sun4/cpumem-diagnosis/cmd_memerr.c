@@ -333,15 +333,6 @@ cmd_ue_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		return (CMD_EVD_UNUSED);
 	}
 
-	if (synd_status != AFLT_STAT_VALID) {
-		fmd_hdl_debug(hdl, "cmd_ue_common: syndrome not valid\n");
-		return (CMD_EVD_UNUSED);
-	}
-
-	if (cmd_mem_synd_check(hdl, afar, afar_status, synd, synd_status,
-	    cpu) == CMD_EVD_UNUSED)
-		return (CMD_EVD_UNUSED);
-
 	/*
 	 * The following code applies only to sun4u, because sun4u does
 	 * not poison data in L2 cache resulting from the fetch of a
@@ -365,6 +356,15 @@ cmd_ue_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		cmd_cpu_uec_add(hdl, cpu, afar);
 	}
 #endif /* sun4u */
+
+	if (synd_status != AFLT_STAT_VALID) {
+		fmd_hdl_debug(hdl, "cmd_ue_common: syndrome not valid\n");
+		return (CMD_EVD_UNUSED);
+	}
+
+	if (cmd_mem_synd_check(hdl, afar, afar_status, synd, synd_status,
+	    cpu) == CMD_EVD_UNUSED)
+		return (CMD_EVD_UNUSED);
 
 	if (afar_status != AFLT_STAT_VALID)
 		return (CMD_EVD_UNUSED);
