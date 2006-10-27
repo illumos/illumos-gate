@@ -692,6 +692,7 @@ sections_to_skip = [ ".SUNW_signature",
 		     ".rela.plt",
 		     ".line",
 		     ".note",
+		     ".compcom",
 		     ]
 
 sections_preferred = [ ".rodata.str1.8",
