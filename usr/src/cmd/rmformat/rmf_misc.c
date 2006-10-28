@@ -1156,7 +1156,9 @@ find_device(int defer, char *tmpstr)
 	struct dirent *dirent;
 	char sdev[PATH_MAX], dev[PATH_MAX], *pname;
 	device_t *t_dev;
-	int removable, device_type;
+	int removable = 0;
+	int device_type = 0;
+	int hotpluggable = 0;
 	struct dk_minfo mediainfo;
 	static int found = 0;
 
@@ -1255,8 +1257,10 @@ find_device(int defer, char *tmpstr)
 					device_type = mediainfo.dki_media_type;
 			}
 
-			if (!ioctl(t_dev->d_fd, DKIOCREMOVABLE, &removable)) {
-				if (removable) {
+			if (!ioctl(t_dev->d_fd, DKIOCREMOVABLE, &removable) &&
+			    !ioctl(t_dev->d_fd, DKIOCHOTPLUGGABLE,
+			    &hotpluggable)) {
+				if (removable || hotpluggable) {
 					removable_found++;
 					pname = get_physical_name(sdev);
 					if (sn) {
