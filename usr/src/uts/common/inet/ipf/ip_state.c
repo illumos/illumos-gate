@@ -300,7 +300,6 @@ void fr_stateunload()
 	ipftq_t *ifq, *ifqnext;
 	ipstate_t *is;
 
-	WRITE_ENTER(&ipf_state);
 	while ((is = ips_list) != NULL)
 		fr_delstate(is, 0);
 
@@ -344,8 +343,6 @@ void fr_stateunload()
 		KFREES(ips_stats.iss_bucketlen, fr_statesize * sizeof(u_long));
 		ips_stats.iss_bucketlen = NULL;
 	}
-
-	RWLOCK_EXIT(&ipf_state);
 
 	if (fr_state_maxbucket_reset == 1)
 		fr_state_maxbucket = 0;

@@ -2443,6 +2443,7 @@ int out;
 		ip6 = (ip6_t *)ip;
 		fin->fin_plen = ntohs(ip6->ip6_plen);
 		if (fin->fin_plen == 0) {
+			READ_ENTER(&ipf_mutex);
 			pass = FR_BLOCK|FR_NOMATCH;
 			goto filtered;
 		}

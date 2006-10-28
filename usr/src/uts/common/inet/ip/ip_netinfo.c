@@ -178,7 +178,6 @@ net_data_t		ipv6 = NULL;
 void
 ip_net_init()
 {
-
 	ipv4 = net_register(&ipv4info);
 	ASSERT(ipv4 != NULL);
 
@@ -213,14 +212,12 @@ ip_net_init()
 	}
 }
 
-
 /*
  * Unregister IPv4 and IPv6 functions and inject queues
  */
 void
 ip_net_destroy()
 {
-
 	if (eventq_queue_nic != NULL) {
 		ddi_taskq_destroy(eventq_queue_nic);
 		eventq_queue_nic = NULL;
@@ -247,14 +244,12 @@ ip_net_destroy()
 	}
 }
 
-
 /*
  * Initialize IPv4 hooks family the event
  */
 void
 ipv4_hook_init()
 {
-
 	HOOK_FAMILY_INIT(&ipv4root, Hn_IPV4);
 	if (net_register_family(ipv4, &ipv4root) != 0) {
 		cmn_err(CE_NOTE, "ipv4_hook_init: "
@@ -310,7 +305,6 @@ ipv4_hook_init()
 	}
 }
 
-
 void
 ipv4_hook_destroy()
 {
@@ -346,7 +340,6 @@ ipv4_hook_destroy()
 
 	(void) net_unregister_family(ipv4, &ipv4root);
 }
-
 
 /*
  * Initialize IPv6 hooks family and event
@@ -410,7 +403,6 @@ ipv6_hook_init()
 	}
 }
 
-
 void
 ipv6_hook_destroy()
 {
@@ -447,17 +439,14 @@ ipv6_hook_destroy()
 	(void) net_unregister_family(ipv6, &ipv6root);
 }
 
-
 /*
  * Determine the name of an IPv4 interface
  */
 static int
 ip_getifname(phy_if_t phy_ifdata, char *buffer, const size_t buflen)
 {
-
 	return (ip_getifname_impl(phy_ifdata, buffer, buflen, B_FALSE));
 }
-
 
 /*
  * Determine the name of an IPv6 interface
@@ -465,10 +454,8 @@ ip_getifname(phy_if_t phy_ifdata, char *buffer, const size_t buflen)
 static int
 ipv6_getifname(phy_if_t phy_ifdata, char *buffer, const size_t buflen)
 {
-
 	return (ip_getifname_impl(phy_ifdata, buffer, buflen, B_TRUE));
 }
-
 
 /*
  * Shared implementation to determine the name of a given network interface
@@ -498,17 +485,14 @@ ip_getifname_impl(phy_if_t phy_ifdata,
 
 }
 
-
 /*
  * Determine the MTU of an IPv4 network interface
  */
 static int
 ip_getmtu(phy_if_t phy_ifdata, lif_if_t ifdata)
 {
-
 	return (ip_getmtu_impl(phy_ifdata, ifdata, B_FALSE));
 }
-
 
 /*
  * Determine the MTU of an IPv6 network interface
@@ -516,10 +500,8 @@ ip_getmtu(phy_if_t phy_ifdata, lif_if_t ifdata)
 static int
 ipv6_getmtu(phy_if_t phy_ifdata, lif_if_t ifdata)
 {
-
 	return (ip_getmtu_impl(phy_ifdata, ifdata, B_TRUE));
 }
-
 
 /*
  * Shared implementation to determine the MTU of a network interface
@@ -555,17 +537,14 @@ ip_getmtu_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6)
 	return (mtu);
 }
 
-
 /*
  * Determine if path MTU discovery is enabled for IP
  */
 static int
 ip_getpmtuenabled(void)
 {
-
 	return (ip_path_mtu_discovery);
 }
-
 
 /*
  * Get next interface from the current list of IPv4 physical network interfaces
@@ -573,10 +552,8 @@ ip_getpmtuenabled(void)
 static phy_if_t
 ip_phygetnext(phy_if_t phy_ifdata)
 {
-
 	return (ill_get_next_ifindex(phy_ifdata, B_FALSE));
 }
-
 
 /*
  * Get next interface from the current list of IPv6 physical network interfaces
@@ -584,10 +561,8 @@ ip_phygetnext(phy_if_t phy_ifdata)
 static phy_if_t
 ipv6_phygetnext(phy_if_t phy_ifdata)
 {
-
 	return (ill_get_next_ifindex(phy_ifdata, B_TRUE));
 }
-
 
 /*
  * Determine if a network interface name exists for IPv4
@@ -595,11 +570,9 @@ ipv6_phygetnext(phy_if_t phy_ifdata)
 static phy_if_t
 ip_phylookup(const char *name)
 {
-
 	return (ip_phylookup_impl(name, B_FALSE));
 
 }
-
 
 /*
  * Determine if a network interface name exists for IPv6
@@ -607,10 +580,8 @@ ip_phylookup(const char *name)
 static phy_if_t
 ipv6_phylookup(const char *name)
 {
-
 	return (ip_phylookup_impl(name, B_TRUE));
 }
-
 
 /*
  * Implement looking up an ill_t based on the name supplied and matching
@@ -636,17 +607,14 @@ ip_phylookup_impl(const char *name, boolean_t isv6)
 	return (phy);
 }
 
-
 /*
  * Get next interface from the current list of IPv4 logical network interfaces
  */
 static lif_if_t
 ip_lifgetnext(phy_if_t phy_ifdata, lif_if_t ifdata)
 {
-
 	return (ip_lifgetnext_impl(phy_ifdata, ifdata, B_FALSE));
 }
-
 
 /*
  * Get next interface from the current list of IPv6 logical network interfaces
@@ -654,10 +622,8 @@ ip_lifgetnext(phy_if_t phy_ifdata, lif_if_t ifdata)
 static lif_if_t
 ipv6_lifgetnext(phy_if_t phy_ifdata, lif_if_t ifdata)
 {
-
 	return (ip_lifgetnext_impl(phy_ifdata, ifdata, B_TRUE));
 }
-
 
 /*
  * Shared implementation to get next interface from the current list of
@@ -718,14 +684,12 @@ ip_lifgetnext_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6)
 	return (MAP_IPIF_ID(newidx));
 }
 
-
 /*
  * Inject an IPv4 packet to or from an interface
  */
 static int
 ip_inject(inject_t style, net_inject_t *packet)
 {
-
 	return (ip_inject_impl(style, packet, B_FALSE));
 }
 
@@ -736,10 +700,8 @@ ip_inject(inject_t style, net_inject_t *packet)
 static int
 ipv6_inject(inject_t style, net_inject_t *packet)
 {
-
 	return (ip_inject_impl(style, packet, B_TRUE));
 }
-
 
 /*
  * Shared implementation to inject a packet to or from an interface
@@ -912,14 +874,12 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6)
 	return (0);
 }
 
-
 /*
  * Find the interface used for traffic to a given IPv4 address
  */
 static phy_if_t
 ip_routeto(struct sockaddr *address)
 {
-
 	ASSERT(address != NULL);
 
 	if (address->sa_family != AF_INET)
@@ -927,14 +887,12 @@ ip_routeto(struct sockaddr *address)
 	return (ip_routeto_impl(address));
 }
 
-
 /*
  * Find the interface used for traffic to a given IPv6 address
  */
 static phy_if_t
 ipv6_routeto(struct sockaddr *address)
 {
-
 	ASSERT(address != NULL);
 
 	if (address->sa_family != AF_INET6)
@@ -979,7 +937,6 @@ ip_routeto_impl(struct sockaddr *address)
 	return (phy_if);
 }
 
-
 /*
  * Determine if checksumming is being used for the given packet.
  *
@@ -1009,7 +966,6 @@ ip_ispartialchecksum(mblk_t *mp)
 
 	return (ret);
 }
-
 
 /*
  * Return true or false, indicating whether the network and transport
@@ -1064,7 +1020,6 @@ ip_isvalidchecksum(mblk_t *mp)
 	return (ret);
 }
 
-
 /*
  * Unsupported with IPv6
  */
@@ -1072,7 +1027,6 @@ ip_isvalidchecksum(mblk_t *mp)
 static int
 ipv6_isvalidchecksum(mblk_t *mp)
 {
-
 	return (-1);
 }
 
@@ -1083,11 +1037,9 @@ static int
 ip_getlifaddr(phy_if_t phy_ifdata, lif_if_t ifdata, size_t nelem,
 	net_ifaddr_t type[], void *storage)
 {
-
 	return (ip_getlifaddr_impl(AF_INET, phy_ifdata, ifdata,
 	    nelem, type, storage));
 }
-
 
 /*
  * Determine the network addresses for an IPv6 interface
@@ -1096,11 +1048,9 @@ static int
 ipv6_getlifaddr(phy_if_t phy_ifdata, lif_if_t ifdata, size_t nelem,
 		net_ifaddr_t type[], void *storage)
 {
-
 	return (ip_getlifaddr_impl(AF_INET6, phy_ifdata, ifdata,
 	    nelem, type, storage));
 }
-
 
 /*
  * Shared implementation to determine the network addresses for an interface
@@ -1216,7 +1166,6 @@ ip_getifaddr_type(sa_family_t family, ipif_t *ill_ipif,
 	return (1);
 }
 
-
 /*
  * Deliver packet up into the kernel, immitating its reception by a
  * network interface.
@@ -1224,10 +1173,8 @@ ip_getifaddr_type(sa_family_t family, ipif_t *ill_ipif,
 static void
 ip_ni_queue_in_func(void *inject)
 {
-
 	ip_ni_queue_func_impl(inject, B_FALSE);
 }
-
 
 /*
  * Deliver out of the kernel, as if it were being sent via a
@@ -1236,10 +1183,8 @@ ip_ni_queue_in_func(void *inject)
 static void
 ip_ni_queue_out_func(void *inject)
 {
-
 	ip_ni_queue_func_impl(inject, B_TRUE);
 }
-
 
 /*
  * Shared implementation for inject via ip_output and ip_input
@@ -1308,7 +1253,6 @@ ip_ni_queue_func_impl(injection_t *inject,  boolean_t out)
 void
 ip_ne_queue_func(void *arg)
 {
-
 	hook_event_int_t *hr;
 	hook_nic_event_t *info = (hook_nic_event_t *)arg;
 

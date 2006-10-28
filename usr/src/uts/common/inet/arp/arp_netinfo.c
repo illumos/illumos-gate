@@ -93,7 +93,6 @@ net_data_t		arp = NULL;
 void
 arp_net_init()
 {
-
 	arp = net_register(&arp_netinfo);
 	ASSERT(arp != NULL);
 }
@@ -104,7 +103,6 @@ arp_net_init()
 void
 arp_net_destroy()
 {
-
 	(void) net_unregister(arp);
 }
 
@@ -114,7 +112,6 @@ arp_net_destroy()
 void
 arp_hook_init()
 {
-
 	HOOK_FAMILY_INIT(&arproot, Hn_ARP);
 	if (net_register_family(arp, &arproot) != 0) {
 		cmn_err(CE_NOTE, "arp_hook_init: "
@@ -143,7 +140,6 @@ arp_hook_init()
 	}
 }
 
-
 void
 arp_hook_destroy()
 {
@@ -164,7 +160,6 @@ arp_hook_destroy()
 
 	(void) net_unregister_family(arp, &arproot);
 }
-
 
 /*
  * Determine the name of the lower level interface
@@ -189,7 +184,6 @@ arp_getifname(phy_if_t phy_ifdata, char *buffer, const size_t buflen)
 	return (1);
 }
 
-
 /*
  * Unsupported with ARP.
  */
@@ -197,10 +191,8 @@ arp_getifname(phy_if_t phy_ifdata, char *buffer, const size_t buflen)
 int
 arp_getmtu(phy_if_t phy_ifdata, lif_if_t ifdata)
 {
-
 	return (-1);
 }
-
 
 /*
  * Unsupported with ARP.
@@ -209,10 +201,8 @@ arp_getmtu(phy_if_t phy_ifdata, lif_if_t ifdata)
 int
 arp_getpmtuenabled(void)
 {
-
 	return (-1);
 }
-
 
 /*
  * Unsupported with ARP.
@@ -222,10 +212,8 @@ int
 arp_getlifaddr(phy_if_t phy_ifdata, lif_if_t ifdata, size_t nelem,
 	net_ifaddr_t type[], void *storage)
 {
-
 	return (-1);
 }
-
 
 /*
  * Determine the instance number of the next lower level interface
@@ -255,7 +243,6 @@ arp_phygetnext(phy_if_t phy_ifdata)
 	return (index);
 }
 
-
 /*
  * Given a network interface name, find its ARP layer instance number.
  */
@@ -282,7 +269,6 @@ arp_phylookup(const char *name)
 
 }
 
-
 /*
  * Unsupported with ARP.
  */
@@ -290,9 +276,8 @@ arp_phylookup(const char *name)
 lif_if_t
 arp_lifgetnext(phy_if_t ifp, lif_if_t lif)
 {
-	return (lif_if_t)(-1);
+	return ((lif_if_t)-1);
 }
-
 
 /*
  * Unsupported with ARP.
@@ -304,7 +289,6 @@ arp_inject(inject_t injection, net_inject_t *neti)
 	return (-1);
 }
 
-
 /*
  * Unsupported with ARP.
  */
@@ -312,9 +296,8 @@ arp_inject(inject_t injection, net_inject_t *neti)
 phy_if_t
 arp_routeto(struct sockaddr *addr)
 {
-	return (phy_if_t)(-1);
+	return ((phy_if_t)-1);
 }
-
 
 /*
  * Unsupported with ARP.
@@ -325,7 +308,6 @@ arp_ispartialchecksum(mblk_t *mb)
 {
 	return (-1);
 }
-
 
 /*
  * Unsupported with ARP.

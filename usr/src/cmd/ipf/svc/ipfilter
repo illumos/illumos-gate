@@ -36,7 +36,7 @@ IPNATCONF=/etc/ipf/ipnat.conf
 IPPOOLCONF=/etc/ipf/ippool.conf
 PFILCHECKED=no
 
-id=`/usr/sbin/modinfo 2>&1 | awk '/ipf/ { print $1 } ' - 2>/dev/null`
+ipfid=`/usr/sbin/modinfo 2>&1 | awk '/ipf/ { print $1 } ' - 2>/dev/null`
 if [ -f $PIDFILE ] ; then
 	pid=`cat $PIDFILE 2>/dev/null`
 else
@@ -109,7 +109,8 @@ load_ippool() {
 
 case "$1" in
 	start)
-		[ ! -f ${IPFILCONF} ] && exit 0
+		[ ! -f ${IPFILCONF} -a ! -f ${IPNATCONF} ] && exit 0
+		ipf -E
 		[ -n "$pid" ] && kill -TERM $pid 2>/dev/null
 		if load_ippool && load_ipf && load_ipnat ; then
 			/usr/sbin/ipmon -Ds
@@ -120,6 +121,8 @@ case "$1" in
 
 	stop)
 		[ -n "$pid" ] && kill -TERM $pid
+		ipf -D
+		[ -n "$ipfid" ] && modunload -i $ipfid
 		;;
 
 	pause)

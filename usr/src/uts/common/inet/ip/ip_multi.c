@@ -1226,8 +1226,8 @@ ip_multicast_loopback(queue_t *q, ill_t *ill, mblk_t *mp_orig, int fanout_flags,
 	    ill_t *, NULL, ill_t *, ill,
 	    ipha_t *, iph, mblk_t *, ipsec_mp);
 
-	FW_HOOKS(ip4_loopback_out_event, ipv4firewall_loopback_out,
-	    MSG_FWCOOKED_OUT, NULL, ill, iph, ipsec_mp, mp);
+	FW_HOOKS(ip4_loopback_out_event, ipv4firewall_loopback_out, NULL, ill,
+	    iph, ipsec_mp, mp);
 
 	DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, ipsec_mp);
 

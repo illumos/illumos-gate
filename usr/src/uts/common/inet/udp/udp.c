@@ -6729,7 +6729,7 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 		    ill_t *, NULL, ill_t *, ill,
 		    ipha_t *, ipha, mblk_t *, mp);
 		FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,
-		    MSG_FWCOOKED_OUT, NULL, ill, ipha, mp, mp);
+		    NULL, ill, ipha, mp, mp);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 		if (mp != NULL)
 			putnext(ire->ire_stq, mp);

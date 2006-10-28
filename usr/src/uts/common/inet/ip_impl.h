@@ -492,7 +492,7 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 	    ill_t *, NULL, ill_t *, ill,				\
 	    ipha_t *, ipha, mblk_t *, mp);				\
 	FW_HOOKS(ip4_physical_out_event, ipv4firewall_physical_out,	\
-	    MSG_FWCOOKED_OUT, NULL, ill, ipha, mp, mp);			\
+	    NULL, ill, ipha, mp, mp);					\
 	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);		\
 	if (mp != NULL)							\
 		ill_dls->ill_tx(ill_dls->ill_tx_handle, mp);		\

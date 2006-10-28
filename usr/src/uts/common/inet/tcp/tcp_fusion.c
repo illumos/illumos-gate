@@ -537,8 +537,8 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			    ill_t *, NULL, ill_t *, olp,
 			    ipha_t *, ipha, mblk_t *, mp1);
 			FW_HOOKS(ip4_loopback_out_event,
-			    ipv4firewall_loopback_out, MSG_FWCOOKED_OUT, NULL,
-			    olp, ipha, mp1, mp1);
+			    ipv4firewall_loopback_out,
+			    NULL, olp, ipha, mp1, mp1);
 			DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, mp1);
 		} else {
 			ip6h = (ip6_t *)mp1->b_rptr;
@@ -547,8 +547,8 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			    ill_t *, NULL, ill_t *, olp,
 			    ip6_t *, ip6h, mblk_t *, mp1);
 			FW_HOOKS6(ip6_loopback_out_event,
-			    ipv6firewall_loopback_out, MSG_FWCOOKED_OUT, NULL,
-			    olp, ip6h, mp1, mp1);
+			    ipv6firewall_loopback_out,
+			    NULL, olp, ip6h, mp1, mp1);
 			DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, mp1);
 		}
 		if (mp1 == NULL)
@@ -564,8 +564,8 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			    ill_t *, ilp, ill_t *, NULL,
 			    ipha_t *, ipha, mblk_t *, mp1);
 			FW_HOOKS(ip4_loopback_in_event,
-			    ipv4firewall_loopback_in, MSG_FWCOOKED_IN, ilp,
-			    NULL, ipha, mp1, mp1);
+			    ipv4firewall_loopback_in,
+			    ilp, NULL, ipha, mp1, mp1);
 			DTRACE_PROBE1(ip4__loopback__in__end, mblk_t *, mp1);
 			if (mp1 == NULL)
 				goto unfuse;
@@ -576,8 +576,8 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			    ill_t *, ilp, ill_t *, NULL,
 			    ip6_t *, ip6h, mblk_t *, mp1);
 			FW_HOOKS6(ip6_loopback_in_event,
-			    ipv6firewall_loopback_in, MSG_FWCOOKED_IN, ilp,
-			    NULL, ip6h, mp1, mp1);
+			    ipv6firewall_loopback_in,
+			    ilp, NULL, ip6h, mp1, mp1);
 			DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, mp1);
 			if (mp1 == NULL)
 				goto unfuse;

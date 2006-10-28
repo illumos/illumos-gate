@@ -2981,7 +2981,7 @@ extern hook_event_t	ip6_nic_events;
  */
 #define	IPHA_VHL	ipha_version_and_hdr_length
 
-#define	FW_HOOKS(_hook, _event, _flag, _ilp, _olp, _iph, _fm, _m)	\
+#define	FW_HOOKS(_hook, _event, _ilp, _olp, _iph, _fm, _m)	\
 									\
 	if ((_hook).he_interested) {	\
 		hook_pkt_event_t info;					\
@@ -3022,7 +3022,7 @@ extern hook_event_t	ip6_nic_events;
 		}							\
 	}
 
-#define	FW_HOOKS6(_hook, _event, _flag, _ilp, _olp, _iph, _fm, _m)	\
+#define	FW_HOOKS6(_hook, _event, _ilp, _olp, _iph, _fm, _m)	\
 									\
 	if ((_hook).he_interested) {	\
 		hook_pkt_event_t info;					\

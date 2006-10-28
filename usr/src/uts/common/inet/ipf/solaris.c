@@ -421,15 +421,9 @@ ddi_attach_cmd_t cmd;
 		 * Lock people out while we set things up.
 		 */
 		WRITE_ENTER(&ipf_global);
-		if ((fr_running != 0) || (iplattach() == -1)) {
-			RWLOCK_EXIT(&ipf_global);
-			goto attach_failed;
-		}
 
 		fr_timer_id = timeout(fr_slowtimer, NULL,
 				      drv_usectohz(500000));
-
-		fr_running = 1;
 
 		RWLOCK_EXIT(&ipf_global);
 
@@ -468,14 +462,12 @@ ddi_detach_cmd_t cmd;
 		if (fr_refcnt != 0)
 			return DDI_FAILURE;
 
-		if (fr_running == -2)
-			break;
 		/*
 		 * Make sure we're the only one's modifying things.  With
 		 * this lock others should just fall out of the loop.
 		 */
 		WRITE_ENTER(&ipf_global);
-		if (fr_running <= 0) {
+		if (fr_running == -2) {
 			RWLOCK_EXIT(&ipf_global);
 			return DDI_FAILURE;
 		}
@@ -484,7 +476,7 @@ ddi_detach_cmd_t cmd;
 		 */
 		if (ipfilter[0][fr_active] || ipfilter[1][fr_active] ||
 		    ipfilter6[0][fr_active] || ipfilter6[1][fr_active]) {
-		    RWLOCK_EXIT(&ipf_global);
+			RWLOCK_EXIT(&ipf_global);
 			return DDI_FAILURE;
 		}
 		fr_running = -2;
@@ -507,6 +499,7 @@ ddi_detach_cmd_t cmd;
 		ddi_remove_minor_node(dip, NULL);
 		if (i > 0) {
 			cmn_err(CE_CONT, "IP Filter: still attached (%d)\n", i);
+			fr_running = -1;
 			return DDI_FAILURE;
 		}
 
@@ -525,6 +518,7 @@ ddi_detach_cmd_t cmd;
 		break;
 	}
 	cmn_err(CE_NOTE, "IP Filter: failed to detach\n");
+	fr_running = -1;
 	return DDI_FAILURE;
 }
 

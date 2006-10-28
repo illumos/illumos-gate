@@ -6897,7 +6897,7 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 	    ip6_t *, ip6h, mblk_t *, first_mp);
 
 	FW_HOOKS6(ip6_physical_in_event, ipv6firewall_physical_in,
-	    MSG_FWCOOKED_IN, ill, NULL, ip6h, first_mp, mp);
+	    ill, NULL, ip6h, first_mp, mp);
 
 	DTRACE_PROBE1(ip6__physical__in__end, mblk_t *, first_mp);
 
@@ -7618,7 +7618,7 @@ forward:
 		    ip6_t *, ip6h, mblk_t *, mp);
 
 		FW_HOOKS6(ip6_forwarding_event, ipv6firewall_forwarding,
-		    MSG_FWCOOKED_FORWARD, inill, outill, ip6h, mp, mp);
+		    inill, outill, ip6h, mp, mp);
 
 		DTRACE_PROBE1(ip6__forwarding__end, mblk_t *, mp);
 
@@ -10580,7 +10580,7 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 	    ip6_t *, ip6h, mblk_t *, first_mp);
 
 	FW_HOOKS6(ip6_loopback_in_event, ipv6firewall_loopback_in,
-	    MSG_FWCOOKED_IN, ill, NULL, ip6h, first_mp, mp);
+	    ill, NULL, ip6h, first_mp, mp);
 
 	DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, first_mp);
 
@@ -10974,8 +10974,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 
 					FW_HOOKS6(ip6_loopback_out_event,
 					    ipv6firewall_loopback_out,
-					    MSG_FWCOOKED_OUT, NULL, ill,
-					    nip6h, nmp, mp_ip6h);
+					    NULL, ill, nip6h, nmp, mp_ip6h);
 
 					DTRACE_PROBE1(
 					    ip6__loopback__out__end,
@@ -11410,7 +11409,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 		    ill_t *, NULL, ill_t *, ill,
 		    ip6_t *, ip6h, mblk_t *, first_mp);
 		FW_HOOKS6(ip6_loopback_out_event, ipv6firewall_loopback_out,
-		    MSG_FWCOOKED_OUT, NULL, ill, ip6h, first_mp, mp);
+		    NULL, ill, ip6h, first_mp, mp);
 		DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, first_mp);
 		if (first_mp != NULL)
 			ip_wput_local_v6(RD(q), ill, ip6h, first_mp, ire, 0);
@@ -12242,7 +12241,7 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 			    ip6_t *, ip6h, mblk_t *, mp);
 
 			FW_HOOKS6(ip6_physical_out_event,
-			    ipv6firewall_physical_out, MSG_FWCOOKED_OUT,
+			    ipv6firewall_physical_out,
 			    NULL, out_ill, ip6h, mp, mp_ip6h);
 
 			DTRACE_PROBE1(ip6__physical__out__end, mblk_t *, mp);

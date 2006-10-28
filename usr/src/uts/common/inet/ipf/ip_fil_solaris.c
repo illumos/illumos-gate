@@ -812,6 +812,10 @@ cred_t *cp;
 # ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplread(%x,%x,%x)\n", dev, uio, cp);
 # endif
+
+	if (fr_running < 1)
+		return EIO;
+
 # ifdef	IPFILTER_SYNC
 	if (getminor(dev) == IPL_LOGSYNC)
 		return ipfsync_read(uio);
@@ -836,6 +840,10 @@ cred_t *cp;
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
 #endif
+
+	if (fr_running < 1)
+		return EIO;
+
 #ifdef	IPFILTER_SYNC
 	if (getminor(dev) == IPL_LOGSYNC)
 		return ipfsync_write(uio);
@@ -1428,6 +1436,7 @@ int len;
 	int out = fin->fin_out, dpoff, ipoff;
 	mb_t *m = min, *m1, *m2;
 	char *ip;
+	uint32_t start, stuff, end, value, flags;
 
 	if (m == NULL)
 		return NULL;
@@ -1476,6 +1485,14 @@ int len;
 			m1->b_prev = NULL;
 			m1 = m1->b_cont;
 		} while (m1);
+
+		/*
+		 * Need to preserve checksum information by copying them
+		 * to newmp which heads the pulluped message.
+		 */
+		hcksum_retrieve(m, NULL, NULL, &start, &stuff, &end,
+		    &value, &flags);
+
 		if (pullupmsg(m, len + ipoff + inc) == 0) {
 			ATOMIC_INCL(frstats[out].fr_pull[1]);
 			FREE_MB_T(*fin->fin_mp);
@@ -1486,6 +1503,10 @@ int len;
 			qpi->qpi_data = NULL;
 			return NULL;
 		}
+
+		(void) hcksum_assoc(m, NULL, NULL, start, stuff, end,
+		    value, flags, 0);
+
 		m->b_prev = m2;
 		m->b_rptr += inc;
 		fin->fin_m = m;
