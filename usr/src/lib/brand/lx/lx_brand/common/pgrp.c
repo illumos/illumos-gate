@@ -91,10 +91,15 @@ lx_setpgid(uintptr_t p1, uintptr_t p2)
 	if (pid < 0)
 		return (-ESRCH);
 
+	if (pgid < 0)
+		return (-EINVAL);
+
 	if ((ret = lx_lpid_to_spid(pid, &spid)) < 0)
 		return (ret);
 
-	if ((ret = lx_lpid_to_spid(pgid, &spgid)) < 0)
+	if (pgid == 0)
+		spgid = spid;
+	else if ((ret = lx_lpid_to_spid(pgid, &spgid)) < 0)
 		return (ret);
 
 	ret = setpgid(spid, spgid);
