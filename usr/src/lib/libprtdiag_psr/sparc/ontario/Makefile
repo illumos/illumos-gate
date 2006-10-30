@@ -28,9 +28,19 @@
 
 UTSBASE   = ../../../../uts
 
-PLATFORM_OBJECTS= ontario.o erie.o pelton.o
+PLATFORM_OBJECTS= ontario.o erie.o pelton.o stpaul.o
 
 include ../Makefile.com
+
+#
+# links in /usr/platform
+#
+LINKED_PLATFORMS	= SUNW,Sun-Blade-T6300
+
+LINKED_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%)
+LINKED_LIB_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib)
+LINKED_PRTDIAG_DIRS	= \
+	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/libprtdiag_psr.so.1)
 
 #
 # Override the PSR_MACH variable to use sun4v libraries

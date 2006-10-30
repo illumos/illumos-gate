@@ -817,6 +817,7 @@ lib/sparcv9/libc_i18n.a				sparc
 # libpcp.  libpcp contains interfaces which are all private.
 # Only the shared object is shipped.
 #
+usr/platform/SUNW,Sun-Blade-T6300/lib/llib-lpcp.ln	sparc
 usr/platform/SUNW,Sun-Fire-T200/lib/llib-lpcp.ln	sparc
 usr/platform/SUNW,Netra-CP3060/lib/llib-lpcp.ln		sparc
 usr/platform/sun4v/lib/llib-lpcp.ln			sparc

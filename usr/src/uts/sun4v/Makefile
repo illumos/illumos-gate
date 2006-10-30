@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,6 +31,7 @@
 UTSBASE = ..
 
 include Makefile.sun4v
+include Makefile.stpaul
 
 #
 #	The following are SPARC specific (rather than sun4v) specific modules
@@ -180,7 +180,9 @@ install_platforms:	$(ROOT_PSM_DIR) $(USR_PSM_DIR) \
 			$(ROOT_PLAT_DIRS) $(USR_PLAT_DIRS) \
 			$(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%) \
 			$(USR_DESKTOP_DIR) $(USR_DESKTOP_INC_DIR) \
-			$(USR_DESKTOP_SBIN_DIR) $(USR_DESKTOP_LIB_DIR)
+			$(USR_DESKTOP_SBIN_DIR) $(USR_DESKTOP_LIB_DIR) \
+			$(USR_STPAUL_DIR) $(USR_STPAUL_SBIN_DIR) \
+			$(USR_STPAUL_LIB_DIR)
 
 #
 # rules for making include, sbin, lib dirs/links in
@@ -191,6 +193,15 @@ $(USR_DESKTOP_INC_DIR):		$(USR_DESKTOP_DIR)
 
 $(USR_DESKTOP_SBIN_DIR):	$(USR_DESKTOP_DIR)
 	$(INS.slink5)
+
+$(USR_STPAUL_DIR):		$(USR_SUN4V_PLAT_DIR)
+	-$(INS.dir.root.sys)
+
+$(USR_STPAUL_SBIN_DIR):		$(USR_STPAUL_DIR)
+	$(INS.slink5)
+
+$(USR_STPAUL_LIB_DIR):		$(USR_STPAUL_DIR)
+	-$(INS.dir.root.bin)
 
 $(USR_DESKTOP_LIB_DIR):		$(USR_DESKTOP_DIR)
 	-$(INS.dir.root.bin)

@@ -37,7 +37,9 @@ PLATFORM_OBJECTS= libpcp.o pcp_utils.o
 #
 PLATFORM=sun4v
 LINKED_PLATFORMS = SUNW,Sun-Fire-T200 \
-		SUNW,Netra-CP3060
+		SUNW,Netra-CP3060 \
+		SUNW,Sun-Blade-T6300
+
 
 include ../Makefile.com
 

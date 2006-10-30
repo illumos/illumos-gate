@@ -157,3 +157,8 @@ d none usr/platform/SUNW,Sun-Fire-T200/lib 755 root bin
 d none usr/platform/SUNW,Sun-Fire-T200/lib/fm 755 root bin
 d none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo 755 root bin
 f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/hc-topology.xml 444 root bin
+d none usr/platform/SUNW,Sun-Blade-T6300 755 root sys
+d none usr/platform/SUNW,Sun-Blade-T6300/lib 755 root bin
+d none usr/platform/SUNW,Sun-Blade-T6300/lib/fm 755 root bin
+d none usr/platform/SUNW,Sun-Blade-T6300/lib/fm/topo 755 root bin
+f none usr/platform/SUNW,Sun-Blade-T6300/lib/fm/topo/hc-topology.xml 444 root bin

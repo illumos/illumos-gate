@@ -24,36 +24,11 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-#
-# This required package information file describes characteristics of the
-# package, such as package abbreviation, full package name, package version,
-# and package architecture.
-#
-PKG="SUNWkvmt200"
-NAME="Core Architecture, sun4v-based platforms (Kvm)"
-ARCH="sparc.sun4v"
-VERSION="ONVERS,REV=0.0.0"
-SUNW_PRODNAME="SunOS"
-SUNW_PRODVERS="RELEASE/VERSION"
-SUNW_PKGTYPE="kvm"
-MAXINST="1000"
-CATEGORY="system"
-DESC="core software for a specific hardware platform group"
-VENDOR="Sun Microsystems, Inc."
-HOTLINE="Please contact your local service provider"
-EMAIL=""
-CLASSES="none"
-BASEDIR=/
-SUNW_PKGVERS="1.0"
-SUNW_PKG_ALLZONES="true"
-SUNW_PKG_HOLLOW="false"
-SUNW_PKG_THISZONE="false"
-#VSTOCK="<reserved by Release Engineering for package part #>"
-#ISTATES="<developer defined>"
-#RSTATES='<developer defined>'
-#ULIMIT="<developer defined>"
-#ORDER="<developer defined>"
-#PSTAMP="<developer defined>"
-#INTONLY="<developer defined>"
+PLATFORMS = SUNW,Sun-Blade-T6300
+CLASS = platform
+DTDFILE = 
+TOPOFILE = hc-topology.xml
+SRCDIR = ../SUNW,Sun-Blade-T6300
+
+include ../Makefile.file

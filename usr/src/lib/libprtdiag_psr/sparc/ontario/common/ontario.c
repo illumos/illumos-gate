@@ -54,6 +54,7 @@
 #include "ontario.h"
 #include "erie.h"
 #include "pelton.h"
+#include "stpaul.h"
 
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN	"SYS_TEST"
@@ -326,6 +327,10 @@ sun4v_display_pci(picl_nodehdl_t plafh)
 		strlen(PELTON_PLATFORM))) == 0) {
 		(void) picl_walk_tree_by_class(plafh, "pciex",
 		    "pciex", pelton_pci_callback);
+	} else if ((strncmp(platbuf, STPAUL_PLATFORM,
+		strlen(STPAUL_PLATFORM))) == 0) {
+		(void) picl_walk_tree_by_class(plafh, "pciex",
+		    "pciex", stpaul_pci_callback);
 	} else {
 		(void) picl_walk_tree_by_class(plafh, "pciex", "pciex",
 		    erie_pci_callback);
@@ -527,6 +532,16 @@ sun4v_display_hw_revisions(Prom_node *root, picl_nodehdl_t plafh)
 		    "network", pelton_hw_rev_callback);
 		(void) picl_walk_tree_by_class(plafh, "scsi-2", "scsi-2",
 		    pelton_hw_rev_callback);
+	} else if ((strncmp(platbuf, STPAUL_PLATFORM,
+	    strlen(STPAUL_PLATFORM))) == 0) {
+		(void) picl_walk_tree_by_class(plafh, "pciex",
+		    "pciex", stpaul_hw_rev_callback);
+		(void) picl_walk_tree_by_class(plafh, "pci",
+		    "pci", stpaul_hw_rev_callback);
+		(void) picl_walk_tree_by_class(plafh, "network",
+		    "network", stpaul_hw_rev_callback);
+		(void) picl_walk_tree_by_class(plafh, "scsi-2", "scsi-2",
+		    stpaul_hw_rev_callback);
 	} else {
 		(void) picl_walk_tree_by_class(plafh, "pciex", "pciex",
 		    erie_hw_rev_callback);

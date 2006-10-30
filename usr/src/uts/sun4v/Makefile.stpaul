@@ -18,23 +18,22 @@
 #
 # CDDL HEADER END
 #
-
 #
+# uts/sun4v/stpaul/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	Global definitions for sun4v stpaul implementation specific modules.
+#
 
-sparc_SUBDIRS =	sun4u \
-		sun4v \
-		SUNW,Sun-Fire \
-		SUNW,Sun-Fire-T200 \
-		SUNW,Sun-Fire-15000 \
-		SUNW,SPARC-Enterprise \
-		SUNW,Sun-Blade-T6300
+#
+#	Define directories.
+#
 
-i386_SUBDIRS = i86pc
+USR_SUN4V_PLAT_DIR	= $(USR_PLAT_DIR)/$(PLATFORM)
+USR_STPAUL_DIR		= $(USR_PLAT_DIR)/SUNW,Sun-Blade-T6300
+USR_STPAUL_SBIN_DIR	= $(USR_STPAUL_DIR)/sbin
+USR_STPAUL_LIB_DIR	= $(USR_STPAUL_DIR)/lib
 
-SUBDIRS = $($(MACH)_SUBDIRS)
-
-include ../../Makefile.subdirs

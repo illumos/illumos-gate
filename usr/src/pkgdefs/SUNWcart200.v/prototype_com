@@ -18,10 +18,11 @@
 #
 # CDDL HEADER END
 #
+
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -59,3 +60,4 @@ s none platform/SUNW,Netra-T2000=SUNW,Sun-Fire-T200
 s none platform/SUNW,Netra-CP3060/lib=../sun4v/lib
 s none platform/SUNW,SPARC-Enterprise-T2000=SUNW,Sun-Fire-T200
 s none platform/SUNW,SPARC-Enterprise-T1000=sun4v
+s none platform/SUNW,Sun-Blade-T6300=sun4v
