@@ -126,7 +126,7 @@ _nscd_cfg_switch_notify(
 	 * cookie contains data for the switch policy config
 	 */
 	if (cookie != NULL) {
-		rc = _nscd_create_sw_struct(nswdb->index, nswdb->name,
+		rc = _nscd_create_sw_struct(nswdb->index, -1, nswdb->name,
 			ck->cfgstr, ck->cfg, NULL);
 		if (rc != NSCD_SUCCESS) {
 			(void) __nsw_freeconfig_v1(ck->cfg);

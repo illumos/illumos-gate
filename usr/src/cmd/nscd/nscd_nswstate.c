@@ -321,7 +321,7 @@ _get_nsw_state_int(
 	 * used by the switch engine and the new nsw state
 	 */
 	if (params->p.flags & NSS_USE_DEFAULT_CONFIG) {
-		rc = _nscd_create_sw_struct(dbi, (char *)params->p.name,
+		rc = _nscd_create_sw_struct(dbi, -1, (char *)params->p.name,
 			(char *)params->p.default_config, NULL, params);
 		if (rc != NSCD_SUCCESS)
 			return (rc);
@@ -348,6 +348,8 @@ _get_nsw_state_int(
 		nscd_nsw_config_t	**nswcfg1;
 		int			i = params->compati;
 
+		dbi = i;
+
 		nswcfg = (nscd_nsw_config_t **)_nscd_get(
 			(nscd_acc_data_t *)nscd_nsw_config[i]);
 
@@ -367,8 +369,9 @@ _get_nsw_state_int(
 				return (NSCD_CREATE_NSW_STATE_FAILED);
 			}
 
-			rc = _nscd_create_sw_struct(i, params->p.name,
-				(*nswcfg1)->nsw_cfg_str, NULL, params);
+			rc = _nscd_create_sw_struct(i, params->cfgdbi,
+				params->p.name, (*nswcfg1)->nsw_cfg_str,
+				NULL, params);
 			_nscd_release((nscd_acc_data_t *)nswcfg1);
 			if (rc != NSCD_SUCCESS)
 				return (rc);
@@ -692,8 +695,10 @@ _nscd_put_nsw_state_thread(
 nscd_rc_t
 _nscd_init_nsw_state_base(
 	int			dbi,
+	int			compat_basei,
 	int			lock)
 {
+	int			cfgdbi;
 	nscd_nsw_state_base_t	*base = NULL;
 	char			*me = "_nscd_init_nsw_state_base";
 
@@ -722,8 +727,13 @@ _nscd_init_nsw_state_base(
 	 * initialize and activate the new nss_nsw_state base
 	 */
 	base->dbi = dbi;
-	base->nsw_state.max = NSCD_SW_CFG(dbi).max_nsw_state_per_db;
-	base->nsw_state_thr.max = NSCD_SW_CFG(dbi).max_nsw_state_per_thread;
+	if (compat_basei != -1)
+		cfgdbi = compat_basei;
+	else
+		cfgdbi = dbi;
+
+	base->nsw_state.max = NSCD_SW_CFG(cfgdbi).max_nsw_state_per_db;
+	base->nsw_state_thr.max = NSCD_SW_CFG(cfgdbi).max_nsw_state_per_thread;
 
 	nscd_nsw_state_base[dbi] = (nscd_nsw_state_base_t *)_nscd_set(
 		(nscd_acc_data_t *)nscd_nsw_state_base[dbi],
@@ -746,7 +756,7 @@ _nscd_init_all_nsw_state_base()
 
 	for (i = 0; i < NSCD_NUM_DB; i++) {
 
-		rc = _nscd_init_nsw_state_base(i, 0);
+		rc = _nscd_init_nsw_state_base(i, -1, 0);
 
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_NSW_STATE | NSCD_LOG_CONFIG,

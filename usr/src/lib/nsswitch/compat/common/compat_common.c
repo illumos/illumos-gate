@@ -445,6 +445,7 @@ _nss_compat_destr(be, dummy)
 		}
 		nss_delete(be->db_rootp);
 		nss_delete(&netgr_db_root);
+		free(be->workarea);
 		free(be);
 	}
 	return (NSS_SUCCESS);	/* In case anyone is dumb enough to check */
@@ -523,10 +524,6 @@ _attrdb_compat_XY_all(be, argp, netdb, check, op_num)
 	int		(*func)();
 	const char	*filter = argp->key.name;
 	nss_status_t	res;
-	union {
-		au_user_str_t	au;
-		userstr_t	user;
-	} workarea;
 
 #ifdef	DEBUG
 	(void) fprintf(stdout, "\n[compat_common.c: _attrdb_compat_XY_all]\n");
@@ -554,14 +551,10 @@ _attrdb_compat_XY_all(be, argp, netdb, check, op_num)
 		 * the code executed later needs the result struct
 		 * as working area
 		 */
-		argp->buf.result = &workarea;
-
-		if (strcmp(be->filename, USERATTR_FILENAME) == 0)
-			func = str2userattr_s;
-		else
-			func = str2auuser_s;
+		argp->buf.result = be->workarea;
+		func = be->str2ent_alt;
 	} else
-			func = argp->str2ent;
+		func = argp->str2ent;
 
 	/*CONSTCOND*/
 	while (1) {
@@ -695,12 +688,6 @@ _nss_compat_XY_all(be, args, check, op_num)
 {
 	nss_status_t		res;
 	int			parsestat;
-	union {
-		struct passwd		pwd;
-		struct spwd		shdw;
-		struct group		grp;
-	} workarea;
-	int			(*str2ent_save)();
 
 
 	if (be->buf == 0 &&
@@ -727,15 +714,10 @@ _nss_compat_XY_all(be, args, check, op_num)
 		 * the code executed later needs the result struct
 		 * as working area
 		 */
-		args->buf.result = &workarea;
+		args->buf.result = be->workarea;
 
-		str2ent_save = args->str2ent;
-		if (strcmp(be->filename, PASSWD) == 0)
-			args->str2ent = str2passwd;
-		else if (strcmp(be->filename, SHADOW) == 0)
-			args->str2ent = str2spwd;
-		else
-			args->str2ent = str2group;
+		be->str2ent_save = args->str2ent;
+		args->str2ent = be->str2ent_alt;
 	}
 
 	/*CONSTCOND*/
@@ -774,7 +756,7 @@ _nss_compat_XY_all(be, args, check, op_num)
 					 * result buffer
 					 */
 					args->buf.result = NULL;
-					args->str2ent = str2ent_save;
+					args->str2ent = be->str2ent_save;
 					if ((len = strlcpy(args->buf.buffer,
 						instr, args->buf.buflen)) >=
 							args->buf.buflen)
@@ -925,7 +907,7 @@ _nss_compat_XY_all(be, args, check, op_num)
 	}
 
 	if (be->return_string_data == 1) {
-		args->str2ent = str2ent_save;
+		args->str2ent = be->str2ent_save;
 	}
 
 	return (res);
@@ -939,12 +921,6 @@ _nss_compat_getent(be, a)
 	nss_XbyY_args_t		*args = (nss_XbyY_args_t *)a;
 	nss_status_t		res;
 	char			*colon = 0; /* <=== need comment re lifetime */
-	union {
-		struct passwd		pwd;
-		struct spwd		shdw;
-		struct group		grp;
-	} workarea;
-
 
 	if (be->f == 0) {
 		if ((res = _nss_compat_setent(be, 0)) != NSS_SUCCESS) {
@@ -969,7 +945,7 @@ _nss_compat_getent(be, a)
 		 * the code executed later needs the result struct
 		 * as working area
 		 */
-		args->buf.result = &workarea;
+		args->buf.result = be->workarea;
 	}
 
 	/*CONSTCOND*/
@@ -1076,6 +1052,7 @@ _nss_compat_getent(be, a)
 					&be->db_context);
 				be->state = GETENT_ALL;
 				be->linelen = linelen;
+
 				continue;
 			} else if (instr[1] == '@') {
 				/* "+@netgroup" */
@@ -1093,6 +1070,11 @@ _nss_compat_getent(be, a)
 		    case GETENT_ALL:
 			linelen = be->linelen;
 			args->returnval = 0;
+			if (be->return_string_data == 1) {
+				be->str2ent_save = args->str2ent;
+				args->str2ent = be->str2ent_alt;
+			}
+
 			(void) nss_getent(be->db_rootp, be->db_initf,
 				&be->db_context, args);
 			if (args->returnval == 0) {
@@ -1100,12 +1082,15 @@ _nss_compat_getent(be, a)
 				nss_endent(be->db_rootp, be->db_initf,
 					&be->db_context);
 				be->state = GETENT_FILE;
+				if (be->return_string_data == 1)
+					args->str2ent = be->str2ent_save;
 				continue;
 			}
-			if (strset_in(&be->minuses, (*be->getnamef)(args))) {
+			if (strset_in(&be->minuses, (*be->getnamef)(args)))
 				continue;
-			}
 			name = 0; /* tell code below we've done the lookup */
+			if (be->return_string_data == 1)
+				args->str2ent = be->str2ent_save;
 			break;
 
 		    case GETENT_NETGROUP:
@@ -1137,8 +1122,16 @@ _nss_compat_getent(be, a)
 			savename = args->key.name;
 			args->key.name	= name;
 			args->returnval	= 0;
+			if (be->return_string_data == 1) {
+				be->str2ent_save = args->str2ent;
+				args->str2ent = be->str2ent_alt;
+			}
+
 			(void) nss_search(be->db_rootp, be->db_initf,
 				NSS_DBOP_next_iter, args);
+
+			if (be->return_string_data == 1)
+				args->str2ent = be->str2ent_save;
 			args->key.name = savename;  /* In case anyone cares */
 		}
 		/*
@@ -1195,11 +1188,27 @@ _nss_compat_constr(ops, n_ops, filename, min_bufsize, rootp, initf, netgroups,
 	be->getnamef	= getname_func;
 	be->mergef	= merge_func;
 
-	if ((strcmp(be->filename, USERATTR_FILENAME) == 0) ||
-	    (strcmp(be->filename, AUDITUSER_FILENAME) == 0))
+	be->state = GETENT_FILE;    /* i.e. do Automatic setent(); */
+	if (strcmp(be->filename, USERATTR_FILENAME) == 0) {
 		be->state = GETENT_ATTRDB;
-	else
-		be->state = GETENT_FILE;    /* i.e. do Automatic setent(); */
+		be->str2ent_alt = str2userattr_s;
+		be->workarea = calloc(1, sizeof (userstr_t));
+	} else if (strcmp(be->filename, AUDITUSER_FILENAME) == 0) {
+		be->state = GETENT_ATTRDB;
+		be->str2ent_alt = str2auuser_s;
+		be->workarea = calloc(1, sizeof (au_user_str_t));
+	} else if (strcmp(be->filename, PASSWD) == 0) {
+		be->str2ent_alt = str2passwd;
+		be->workarea = calloc(1, sizeof (struct passwd));
+	} else if (strcmp(be->filename, SHADOW) == 0) {
+		be->str2ent_alt = str2spwd;
+		be->workarea = calloc(1, sizeof (struct spwd));
+	} else { /* group */
+		be->str2ent_alt = str2group;
+		be->workarea = calloc(1, sizeof (struct group));
+	}
+	if (be->workarea == NULL)
+		return (NULL);
 
 	be->minuses	= 0;
 

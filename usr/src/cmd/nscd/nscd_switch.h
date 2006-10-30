@@ -271,6 +271,7 @@ _nscd_init_all_nsw_state_base();
 nscd_rc_t
 _nscd_init_nsw_state_base(
 	int			dbi,
+	int			compat_basei,
 	int			lock);
 
 nscd_rc_t
@@ -320,6 +321,7 @@ _nscd_is_getent_ctx(
 nscd_rc_t
 _nscd_create_sw_struct(
 	int			dbi,
+	int			compat_basei,
 	const char		*dbn,
 	const char		*cfgstr,
 	void			*swcfgv1,

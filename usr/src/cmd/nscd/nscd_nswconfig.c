@@ -245,6 +245,7 @@ _nscd_populate_nsw_backend_info_db(int srci)
 nscd_rc_t
 _nscd_create_sw_struct(
 	int				dbi,
+	int				compat_basei,
 	const char			*dbn,
 	const char			*cfgstr,
 	void				*swcfgv1,
@@ -440,7 +441,8 @@ _nscd_create_sw_struct(
 	/*
 	 * also create a new nsw state base
 	 */
-	if ((rc = _nscd_init_nsw_state_base(dbi, 1)) != NSCD_SUCCESS) {
+	if ((rc = _nscd_init_nsw_state_base(dbi, compat_basei, 1)) !=
+		NSCD_SUCCESS) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "unable to initialize a nsw state base(%d)\n", dbi);
 		goto error_exit;

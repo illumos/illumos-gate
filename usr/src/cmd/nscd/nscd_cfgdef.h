@@ -138,7 +138,7 @@ nscd_cfg_id_t _nscd_cfg_smf_services[] = {
 	{	0,	"svc:/system/name-service-cache:default"},
 	{	1,	"svc:/network/ldap/client:default"	},
 	{	2,	"svc:/network/nis/client:default"	},
-	{	3,	"svc:/network/rpc/nisplus:default"	},
+	{	3,	"svc:/network/rpc/bind:default"		},
 	{	-1,	NULL					}
 };
 

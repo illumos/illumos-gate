@@ -93,6 +93,9 @@ struct compat_backend {
 	nss_backend_t		*getnetgrent_backend;
 	char			*netgr_buffer;
 	int			return_string_data;
+	int			(*str2ent_save)();
+	int			(*str2ent_alt)();
+	void			*workarea;
 };
 
 #if defined(__STDC__)

@@ -1851,9 +1851,10 @@ getxy_keepalive(nsc_ctx_t *ctx, nsc_db_t *nscdb, int keep, int interval)
 			 * for positive cache, in addition to the packed
 			 * header size, allocate twice the size of the
 			 * existing result (in case the result grows
-			 * larger)
+			 * larger) plus 2K (for the file/compat backend to
+			 * process a possible large entry in the /etc files)
 			 */
-			bufsiz = phdr->data_off + 2 * phdr->data_len;
+			bufsiz = phdr->data_off + 2 * phdr->data_len + 2048;
 		else
 			/*
 			 * for negative cache, allocate 8K buffer to
