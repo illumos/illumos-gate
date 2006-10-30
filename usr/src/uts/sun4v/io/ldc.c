@@ -621,7 +621,7 @@ i_ldc_reset_state(ldc_chan_t *ldcp)
 static void
 i_ldc_reset(ldc_chan_t *ldcp, boolean_t force_reset)
 {
-	DWARN(ldcp->id, "i_ldc_reset: (0x%llx) channel reset\n", ldcp->id);
+	D1(ldcp->id, "i_ldc_reset: (0x%llx) channel reset\n", ldcp->id);
 
 	ASSERT(MUTEX_HELD(&ldcp->lock));
 	ASSERT(MUTEX_HELD(&ldcp->tx_lock));
@@ -732,8 +732,7 @@ i_ldc_get_tx_tail(ldc_chan_t *ldcp, uint64_t *tail)
 		return (EIO);
 	}
 	if (ldcp->link_state == LDC_CHANNEL_DOWN) {
-		DWARN(DBG_ALL_LDCS,
-		    "i_ldc_get_tx_tail: (0x%llx) channel not ready\n",
+		D1(ldcp->id, "i_ldc_get_tx_tail: (0x%llx) channel not ready\n",
 		    ldcp->id);
 		return (ECONNRESET);
 	}
@@ -1039,8 +1038,7 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 			ldcp->tstate |= TS_VER_DONE;
 		}
 
-		DWARN(DBG_ALL_LDCS,
-		    "(0x%llx) Got ACK, Agreed on version v%u.%u\n",
+		D1(ldcp->id, "(0x%llx) Got ACK, Agreed on version v%u.%u\n",
 		    ldcp->id, rcvd_ver->major, rcvd_ver->minor);
 
 		/* initiate RTS-RTR-RDX handshake */
@@ -1346,8 +1344,9 @@ i_ldc_process_RTR(ldc_chan_t *ldcp, ldc_msg_t *msg)
 		/* check mode */
 		if (ldcp->mode != (ldc_mode_t)msg->env) {
 			DWARN(ldcp->id,
-			    "i_ldc_process_RTR: (0x%llx) mode mismatch\n",
-			    ldcp->id);
+			    "i_ldc_process_RTR: (0x%llx) mode mismatch, "
+			    "expecting 0x%x, got 0x%x\n",
+			    ldcp->id, ldcp->mode, (ldc_mode_t)msg->env);
 			/*
 			 * send NACK in response to MODE message
 			 * get the current tail for the response
@@ -1407,7 +1406,7 @@ i_ldc_process_RTR(ldc_chan_t *ldcp, ldc_msg_t *msg)
 	if ((ldcp->tstate & TS_IN_RESET) == 0)
 		ldcp->status = LDC_UP;
 
-	DWARN(DBG_ALL_LDCS, "(0x%llx) Handshake Complete\n", ldcp->id);
+	D1(ldcp->id, "(0x%llx) Handshake Complete\n", ldcp->id);
 
 	return (0);
 }
@@ -1919,6 +1918,7 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 		 */
 
 		if (link_state != ldcp->link_state) {
+
 			switch (ldcp->link_state) {
 			case LDC_CHANNEL_DOWN:
 				D1(ldcp->id, "i_ldc_rx_hdlr: channel "
@@ -2597,7 +2597,7 @@ ldc_open(ldc_handle_t handle)
 	ldcssp->channels_open++;
 	mutex_exit(&ldcssp->lock);
 
-	DWARN(ldcp->id,
+	D1(ldcp->id,
 	    "ldc_open: (0x%llx) channel (0x%p) open for use "
 	    "(tstate=0x%x, status=0x%x)\n",
 	    ldcp->id, ldcp, ldcp->tstate, ldcp->status);
@@ -2912,7 +2912,7 @@ ldc_up(ldc_handle_t handle)
 		 */
 		if ((tstate & TS_IN_RESET) &&
 		    ldcp->rx_intr_state == LDC_INTR_PEND) {
-			DWARN(ldcp->id,
+			D1(ldcp->id,
 			    "ldc_up: (0x%llx) channel has pending data, "
 			    "clearing interrupt\n", ldcp->id);
 			i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
@@ -2943,7 +2943,7 @@ ldc_up(ldc_handle_t handle)
 	/* get the current tail for the LDC msg */
 	rv = i_ldc_get_tx_tail(ldcp, &tx_tail);
 	if (rv) {
-		DWARN(ldcp->id, "ldc_up: (0x%llx) cannot initiate handshake\n",
+		D1(ldcp->id, "ldc_up: (0x%llx) cannot initiate handshake\n",
 		    ldcp->id);
 		mutex_exit(&ldcp->tx_lock);
 		mutex_exit(&ldcp->lock);
@@ -3024,7 +3024,7 @@ ldc_status(ldc_handle_t handle, ldc_status_t *status)
 
 	*status = ((ldc_chan_t *)handle)->status;
 
-	DWARN(ldcp->id,
+	D1(ldcp->id,
 	    "ldc_status: (0x%llx) returned status %d\n", ldcp->id, *status);
 	return (0);
 }
@@ -3181,8 +3181,14 @@ ldc_read(ldc_handle_t handle, caddr_t bufp, size_t *sizep)
 	 */
 	rv = hv_ldc_rx_get_state(ldcp->id, &rx_head, &rx_tail,
 	    &ldcp->link_state);
-
-	ASSERT(rv == 0);
+	if (rv != 0) {
+		cmn_err(CE_WARN, "ldc_read: (0x%lx) unable to read queue ptrs",
+		    ldcp->id);
+		mutex_enter(&ldcp->tx_lock);
+		i_ldc_reset(ldcp, B_TRUE);
+		mutex_exit(&ldcp->tx_lock);
+		return (ECONNRESET);
+	}
 
 	if (exit_val == 0) {
 		if (ldcp->link_state == LDC_CHANNEL_DOWN ||
@@ -4017,7 +4023,7 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 			return (ECONNRESET);
 		}
 
-		DWARN(ldcp->id, "hv_tx_set_tail returns 0x%x (head 0x%x, "
+		D1(ldcp->id, "hv_tx_set_tail returns 0x%x (head 0x%x, "
 			"old tail 0x%x, new tail 0x%x, qsize=0x%x)\n",
 			rv, ldcp->tx_head, ldcp->tx_tail, tx_tail,
 			(ldcp->tx_q_entries << LDC_PACKET_SHIFT));
@@ -4025,7 +4031,7 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 		rv2 = hv_ldc_tx_get_state(ldcp->id,
 		    &tx_head, &tx_tail, &ldcp->link_state);
 
-		DWARN(ldcp->id, "hv_ldc_tx_get_state returns 0x%x "
+		D1(ldcp->id, "hv_ldc_tx_get_state returns 0x%x "
 			"(head 0x%x, tail 0x%x state 0x%x)\n",
 			rv2, tx_head, tx_tail, ldcp->link_state);
 
@@ -5567,7 +5573,7 @@ i_ldc_mem_acquire_release(ldc_mem_handle_t mhandle, uint8_t direction,
 		    &copy_size, memseg->cookies, memseg->ncookies,
 		    direction);
 		if (err || copy_size != size) {
-			cmn_err(CE_WARN,
+			DWARN(ldcp->id,
 			    "i_ldc_mem_acquire_release: copy failed\n");
 			mutex_exit(&mhdl->lock);
 			return (err);

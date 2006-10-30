@@ -495,11 +495,8 @@ vd_reset_if_needed(vd_t *vd)
 	/* Allocate the staging buffer */
 	vd->vio_msgp = kmem_alloc(vd->max_msglen, KM_SLEEP);
 
-	status = ldc_status(vd->ldc_handle, &vd->ldc_state);
-	if (vd->reset_ldc && vd->ldc_state != LDC_UP) {
-		PR0("calling ldc_up\n");
-		(void) ldc_up(vd->ldc_handle);
-	}
+	PR0("calling ldc_up\n");
+	(void) ldc_up(vd->ldc_handle);
 
 	vd->reset_state	= B_FALSE;
 	vd->reset_ldc	= B_FALSE;

@@ -213,7 +213,7 @@ static struct dev_ops cnex_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"sun4v channel-devices nexus driver v%I%",
+	"sun4v channel-devices nexus %I%",
 	&cnex_ops,
 };
 
@@ -424,7 +424,9 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 	int		listsz, num_nodes, num_channels;
 	md_t		*mdp = NULL;
 	mde_cookie_t	rootnode, *listp = NULL;
-	uint64_t	tmp_id, rxino, txino;
+	uint64_t	tmp_id;
+	uint64_t	rxino = (uint64_t)-1;
+	uint64_t	txino = (uint64_t)-1;
 	cnex_soft_state_t *cnex_ssp;
 	int		status, instance;
 
@@ -504,6 +506,16 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 	}
 	kmem_free(listp, listsz);
 	(void) md_fini_handle(mdp);
+
+	/*
+	 * check to see if we looped through the list of channel IDs without
+	 * matching one (i.e. an 'ino' has not been initialised).
+	 */
+	if ((rxino == -1) || (txino == -1)) {
+		DERR("cnex_reg_chan: no ID matching '%llx' in MD\n", id);
+		mutex_exit(&cnex_ssp->clist_lock);
+		return (ENOENT);
+	}
 
 	/* Allocate a new channel structure */
 	cldcp = kmem_zalloc(sizeof (*cldcp), KM_SLEEP);
@@ -677,7 +689,7 @@ cnex_unreg_chan(dev_info_t *dip, uint64_t id)
 	}
 
 	if (cldcp->tx.hdlr || cldcp->rx.hdlr) {
-		DWARN("cnex_unreg_chan: handlers still exist\n");
+		DWARN("cnex_unreg_chan: handlers still exist: chan %lx\n", id);
 		mutex_exit(&cnex_ssp->clist_lock);
 		return (ENXIO);
 	}

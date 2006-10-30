@@ -160,6 +160,13 @@ static struct modlinkage ml = {
 uint32_t vldc_max_mtu = VLDC_MAX_MTU;
 uint64_t vldc_max_cookie = VLDC_MAX_COOKIE;
 
+/*
+ * when calls to LDC return EWOULDBLOCK or EAGAIN the operation is retried
+ * up to 'vldc_retries' times with a wait of 'vldc_delay' microseconds
+ * between each retry.
+ */
+static clock_t	vldc_delay = 100;
+static int	vldc_retries = 3;
 
 #ifdef DEBUG
 
@@ -254,14 +261,21 @@ i_vldc_cb(uint64_t event, caddr_t arg)
 	ldc_status_t	old_status;
 	short		pollevents = 0;
 
+	ASSERT(vport != NULL);
+	ASSERT(vport->minorp != NULL);
+
 	D1("i_vldc_cb: vldc@%d:%d callback invoked, channel=0x%lx, "
 	    "event=0x%lx\n", vport->inst, vport->number, vport->ldc_id, event);
+
+	/* ensure the port can't be destroyed while we are handling the cb */
+	mutex_enter(&vport->minorp->lock);
 
 	old_status = vport->ldc_status;
 	rv = ldc_status(vport->ldc_handle, &vport->ldc_status);
 	if (rv != 0) {
 		DWARN("i_vldc_cb: vldc@%d:%d could not get ldc status, "
 		    "rv=%d\n", vport->inst, vport->number, rv);
+		mutex_exit(&vport->minorp->lock);
 		return (LDC_SUCCESS);
 	}
 
@@ -286,6 +300,7 @@ i_vldc_cb(uint64_t event, caddr_t arg)
 				DWARN("i_vldc_cb: vldc@%d:%d cannot bring "
 				    "channel UP rv=%d\n", vport->inst,
 				    vport->number, rv);
+				mutex_exit(&vport->minorp->lock);
 				return (LDC_SUCCESS);
 			}
 			rv = ldc_status(vport->ldc_handle, &vport->ldc_status);
@@ -293,6 +308,7 @@ i_vldc_cb(uint64_t event, caddr_t arg)
 				DWARN("i_vldc_cb: vldc@%d:%d could not get "
 				    "ldc status, rv=%d\n", vport->inst,
 				    vport->number, rv);
+				mutex_exit(&vport->minorp->lock);
 				return (LDC_SUCCESS);
 			}
 			if (vport->ldc_status == LDC_UP) {
@@ -312,6 +328,8 @@ i_vldc_cb(uint64_t event, caddr_t arg)
 
 	if (event & LDC_EVT_READ)
 		pollevents |= POLLIN;
+
+	mutex_exit(&vport->minorp->lock);
 
 	if (pollevents != 0) {
 		D1("i_vldc_cb: port@%d pollwakeup=0x%x\n",
@@ -564,6 +582,8 @@ i_vldc_add_port(vldc_t *vldcp, md_t *mdp, mde_cookie_t node)
 	boolean_t	new_minor;
 	int		rv;
 
+	ASSERT(MUTEX_HELD(&vldcp->lock));
+
 	/* read in the port's id property */
 	if (md_get_prop_val(mdp, node, "id", &portno)) {
 		cmn_err(CE_NOTE, "?i_vldc_add_port: node 0x%lx of added "
@@ -627,7 +647,12 @@ i_vldc_add_port(vldc_t *vldcp, md_t *mdp, mde_cookie_t node)
 		new_minor = B_TRUE;
 	}
 
-	ASSERT(vldcp->minor_tbl[minor_idx].portno == VLDC_INVALID_PORTNO);
+	if (vldcp->minor_tbl[minor_idx].portno != VLDC_INVALID_PORTNO) {
+		cmn_err(CE_NOTE, "?i_vldc_add_port: trying to add a port (%lu)"
+		    " which has a minor number in use by port (%u)",
+		    portno, vldcp->minor_tbl[minor_idx].portno);
+		return (MDEG_FAILURE);
+	}
 
 	vldc_inst = ddi_get_instance(vldcp->dip);
 
@@ -676,6 +701,9 @@ i_vldc_remove_port(vldc_t *vldcp, uint_t portno)
 	vldc_port_t *vport;
 	vldc_minor_t *vminor;
 
+	ASSERT(vldcp != NULL);
+	ASSERT(MUTEX_HELD(&vldcp->lock));
+
 	vport = &(vldcp->port[portno]);
 	vminor = vport->minorp;
 	if (vminor == NULL) {
@@ -717,26 +745,52 @@ i_vldc_remove_port(vldc_t *vldcp, uint_t portno)
 	return (MDEG_SUCCESS);
 }
 
-/* close a ldc channel */
+/*
+ * Close and destroy the ldc channel associated with the port 'vport'
+ *
+ * NOTE It may not be possible close and destroy the channel if resources
+ *	are still in use so the fucntion may exit before all the teardown
+ *	operations are completed and would have to be called again by the
+ *	vldc framework.
+ *
+ *	This function needs to be able to handle the case where it is called
+ *	more than once and has to pick up from where it left off.
+ */
 static int
 i_vldc_ldc_close(vldc_port_t *vport)
 {
-	int rv = 0;
-	int err;
+	int retries = 0;	/* count of number of retries attempted */
+	int err = 0;
 
-	err = ldc_close(vport->ldc_handle);
-	if (err != 0)
-		rv = err;
+	ASSERT(MUTEX_HELD(&vport->minorp->lock));
+
+	while ((err = ldc_close(vport->ldc_handle)) == EAGAIN) {
+		drv_usecwait(vldc_delay);
+		if (++retries > vldc_retries)
+			break;
+	}
+	/*
+	 * If ldc_close() succeeded or if the channel was already closed[*]
+	 * (possibly by a previously unsuccessful call to this function)
+	 * we keep going and try to teardown the rest of the LDC state,
+	 * otherwise we bail out.
+	 *
+	 * [*] indicated by ldc_close() returning a value of EFAULT
+	 */
+	if ((err != 0) && (err != EFAULT))
+		return (err);
+
 	err = ldc_unreg_callback(vport->ldc_handle);
-	if ((err != 0) && (rv != 0))
-		rv = err;
+	if (err != 0)
+		return (err);
+
 	err = ldc_fini(vport->ldc_handle);
-	if ((err != 0) && (rv != 0))
-		rv = err;
+	if (err != 0)
+		return (err);
 
 	vport->status = VLDC_PORT_OPEN;
 
-	return (rv);
+	return (0);
 }
 
 /* close a vldc port */
@@ -763,7 +817,18 @@ i_vldc_close_port(vldc_t *vldcp, uint_t portno)
 	case VLDC_PORT_READY:
 	case VLDC_PORT_RESET:
 		rv = i_vldc_ldc_close(vport);
+		if (rv != 0)
+			return (rv);
 		break;
+
+	case VLDC_PORT_OPEN:
+		break;
+
+	default:
+		DWARN("i_vldc_close_port: port %d in an unexpected "
+		    "state (%d)\n", portno, vport->status);
+		ASSERT(0);	/* fail quickly to help diagnosis */
+		return (EINVAL);
 	}
 
 	ASSERT(vport->status == VLDC_PORT_OPEN);
@@ -1376,7 +1441,6 @@ vldc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	switch (cmd) {
 
 	case VLDC_IOCTL_OPT_OP:
-
 		rv = i_vldc_ioctl_opt_op(vport, vldcp, (void *)arg,  mode);
 		break;
 
@@ -1399,7 +1463,6 @@ vldc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		break;
 
 	default:
-
 		DWARN("vldc_ioctl: vldc@%d:%lu unknown cmd=0x%x\n",
 		    instance, portno, cmd);
 		rv = EINVAL;
