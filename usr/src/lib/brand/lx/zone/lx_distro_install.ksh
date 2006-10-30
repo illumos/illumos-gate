@@ -38,22 +38,16 @@
 # The desktop cluster will be installed by default.
 #
 
-#
 # Restrict executables to /bin, /usr/bin and /usr/sbin
-#
 PATH=/bin:/usr/bin:/usr/sbin
 export PATH
 
 
-#
 # Setup i18n output
-#
 TEXTDOMAIN="SUNW_OST_OSCMD"
 export TEXTDOMAIN
 
-#
 # Log passed arguments to file descriptor 2
-#
 log()
 {
 	[[ -n $logfile ]] && echo "$@" >&2
@@ -72,36 +66,49 @@ screenlog()
 	[[ -n $logfile ]] && printf "$fmt\n" "$@" >&2
 }
 
-#
 # Print and log provided text if the shell variable "verbose_mode" is set
-#
 verbose()
 {
 	[[ -n $verbose_mode ]] && echo "$@"
 	[[ -n $logfile ]] && [[ -n $verbose_mode ]] && echo "$@" >&2
 }
 
-no_space=$(gettext "Not enough free space available in '%s'")
-mb_req=$(gettext "(%s MB required, %s MB available)")
+#
+# Print to the screen if the shell variable "verbose_mode" is set, but always
+# send the output to the log.
+#
+verboselog()
+{
+	[[ -n $verbose_mode ]] && echo "$@"
+	[[ -n $logfile ]] && echo "$@" >&2
+}
+
 bad_rpmdir=$(gettext "'%s' is not a valid RPM directory!")
+
+mb_req=$(gettext "(%s MB required, %s MB available)")
+no_space=$(gettext "Not enough free space available in '%s'")
 
 inst_clust=$(gettext "Installing cluster '%s'")
 unknown_clust=$(gettext "ERROR: Unknown cluster name: '%s'")
 
-wrong_disk=\
-$(gettext "Incorrect disk inserted (found %s, wanted %s), ejecting...")
+unknown_media=$(gettext "Unknown or unreadable media loaded in %s")
 
+eject_fail=$(gettext "Attempt to eject '%s' failed.")
+
+lofi_failed=$(gettext "Attempt to add '%s' as lofi device FAILED.")
 lofs_failed=$(gettext "Attempt to lofs mount '%s' on '%s' FAILED.")
-symlink_failed=$(gettext "Attempt to symbolically link '%s' to '%s' FAILED.")
 
-mini_discfail=$(gettext "Install of zone '%s' miniroot from disc %s FAILED.")
-mini_isofail=$(gettext "Install of zone '%s' miniroot from ISO '%s' FAILED.")
+media_spec=$(gettext "the provided media (%s)")
 
+distro_mediafail=\
+$(gettext "Attempt to determine Linux distribution from\n  %s FAILED.")
+
+mini_bootfail=$(gettext "Attempt to boot miniroot for zone '%s' FAILED.")
+mini_copyfail=$(gettext "Attempt to copy miniroot for zone '%s' FAILED.")
 mini_initfail=$(gettext "Attempt to initialize miniroot for zone '%s' FAILED.")
 mini_instfail=$(gettext "Attempt to install miniroot for zone '%s' FAILED.")
+mini_mediafail=$(gettext "Install of zone '%s' miniroot from\n  %s FAILED.")
 mini_rpmfail=$(gettext "Miniroot install of RPM '%s' FAILED.")
-mini_copyfail=$(gettext "Attempt to copy miniroot for zone '%s' FAILED.")
-mini_bootfail=$(gettext "Attempt to boot miniroot for zone '%s' FAILED.")
 mini_setfail=$(gettext "Attempt to setup miniroot for zone '%s' FAILED.")
 
 mini_mntfsfail=\
@@ -110,55 +117,82 @@ $(gettext "Attempt to mount miniroot filesystems for zone '%s' FAILED.")
 rpm_initfail=\
 $(gettext "Attempt to initialize RPM database for zone '%s' FAILED.")
 
+symlink_failed=$(gettext "Attempt to symbolically link '%s' to '%s' FAILED.")
+
+discinfo_nofile=$(gettext "ERROR: Discinfo file '%s' not found!")
+discinfo_notreadable=$(gettext "ERROR: Discinfo file '%s': not readable!")
+discinfo_wrongarch=\
+$(gettext "ERROR: '%s': disc architecture is '%s'; install requires 'i386'!")
+
+wrong_serial=$(gettext "Incorrect serial number found on provided %s.")
+wrong_ser_expect=$(gettext "  (found #%s, expected #%s)")
+
+wrong_cd=$(gettext "Incorrect CD inserted (found %s, wanted %s)")
+
 zone_initrootfail=\
 $(gettext "Attempt to initialize root filesystem for zone '%s' FAILED.")
 
-zone_discfail=$(gettext "Install of zone '%s' from disc %s FAILED.")
-zone_isofail=$(gettext "Install of zone '%s' from ISO '%s' FAILED.")
-zone_instfail=$(gettext "Install of zone '%s' from '%s' FAILED '%s'.")
 zone_haltfail=$(gettext "Unable to halt zone '%s'!")
+zone_instfail=$(gettext "Install of zone '%s' from '%s' FAILED '%s'.")
+zone_mediafail=$(gettext "Install of zone '%s' from\n  %s FAILED.")
 
 zone_rootfail=\
 $(gettext "ERROR: The specified zone root directory '%s' could not be created.")
-
 zone_rootsub=\
 $(gettext "ERROR: The specified zone root subdirectory '%s' does not exist.")
 
-mk_mntfail=$(gettext "Could not create the mount directory '%s'")
 iso_mntfail=$(gettext "Unable to mount ISO image '%s' within zone '%s'")
 iso_umntfail=$(gettext "Unable to unmount ISO image '%s' from within zone '%s'")
+mk_mntfail=$(gettext "Could not create the mount directory '%s'")
 mountfail=$(gettext "Mount of '%s' on '%s' FAILED.")
 
 insert_discmsg=\
-$(gettext "Please insert disc %s in the removable media drive and press")
+$(gettext "Please insert %s, or a\n  %s DVD in the removable media")
 
-install_discmsg=$(gettext "Installing zone '%s' from disc %s.")
-install_isomsg=$(gettext "Installing zone '%s' from ISO image %s.")
-install_ndiscs=$(gettext "You will need discs 1 - %s to fully install ")
+mount_proper_iso1=$(gettext "Please mount the ISO for %s or a")
+mount_proper_iso2=$(gettext "%s DVD on device '%s'")
 
-expand_nrpms=$(gettext "Attempting to expand %s RPM names...")
+silent_nodisc=$(gettext "ERROR: Cannot install from CDs in silent mode.")
+silent_nolofi=\
+$(gettext "ERROR: Cannot install from lofi-based CD ISOs in silent mode.")
 
+install_msg=$(gettext "Installing zone '%s' from\n  %s.")
+install_ndiscs=\
+$(gettext "You will need CDs 1 - %s (or the equivalent DVD) to")
+install_nisos=\
+$(gettext "You will need ISO images representing CDs 1 - %s (or the equivalent")
+
+locate_npkgs=$(gettext "Attempting to locate %s packages...")
+
+install_one_rpm=$(gettext "Installing 1 %spackage.")
 install_nrpms_few=\
-$(gettext "Installing %s RPM packages; this may take a few minutes...")
+$(gettext "Installing %s %spackages; this may take a few minutes...")
 install_nrpms_several=\
-$(gettext "Installing %s RPM packages; this may take several minutes...")
+$(gettext "Installing %s %spackages; this may take several minutes...")
+
+install_longwait=\
+$(gettext "NOTE: There may be a long delay before you see further output.")
 
 install_defmkfail=$(gettext "Could not create the temporary directory '%s'")
-install_defcpfail=$(gettext "Could not make local copy of deferred RPM '%s'")
-install_zonefail=$(gettext "Attempt to install zone '%s' FAILED.")
+install_defcpfail=$(gettext "Could not make a local copy of deferred RPM '%s'")
 install_dist=$(gettext "Installing distribution '%s'...")
+install_zonefail=$(gettext "Attempt to install zone '%s' FAILED.")
 
 log_wrfail=$(gettext "Error: cannot write to log file '%s'.")
 
 no_distropath=$(gettext "ERROR: Distribution path '%s' doesn't exist.")
 
-initinstall_zonefail=$(gettext "Initial installation of zone '%s' FAILED.")
+install_done=$(gettext "Installation of %s to zone\n  '%s' completed %s.")
+install_failed=$(gettext "Installation of %s to zone\n  '%s' FAILED %s.")
 
-install_abort=$(gettext "Installation aborted %s")
-install_done=$(gettext "Initial installation of zone '%s' complete %s")
+eject_final_msg=\
+$(gettext "Would you like the system to eject the %sinstall %s when")
+eject_final_prompt=$(gettext "installation of '%s' is complete? (%s)")
+eject_final_status=$(gettext "The %sinstall %s %s be ejected.")
 
 #
-# Get the device underlying a specified mounted file system
+# Get the device underlying a specified mounted file system and return it in
+# the shell variable "mount_dev"
 #
 # Returns 0 on success, 1 on failure.
 #
@@ -178,7 +212,8 @@ get_mountdev()
 }
 
 #
-# Get the directory name a specified device is mounted as
+# Get the directory name a specified device is mounted as and return it in
+# the shell variable "mount_dir"
 #
 # Returns 0 on success, 1 on failre.
 #
@@ -187,6 +222,8 @@ get_mountdir()
 	typeset mount_dev="$1"
 	typeset dir
 	unset mount_dir
+
+	[[ -b "$mount_dev" ]] || return 1  
 
 	dir="`{ df -k "$mount_dev" | egrep "^/" ; } 2>/dev/null`" || return 1
 	mount_dir=$(echo $dir | awk -e '{print $6}' 2>/dev/null)
@@ -211,7 +248,7 @@ check_mbfree()
 	#
 	# Return free space in partition containing passed argument in MB
 	#
-	typeset mbfree=`( df -k "$dir" 2>/dev/null | \
+	typeset mbfree=`( LC_ALL=C df -k "$dir" 2>/dev/null | \
 	    egrep -v Filesystem | awk -e '{print $4}' ) 2>/dev/null` || return 1
 
 	((mbfree /= 1024))
@@ -224,19 +261,19 @@ check_mbfree()
 }
 
 #
-# Expand passed RPM names to their appropriate filenames in the passed RPM
-# directory.
+# Find packages by attempting to expand passed RPM names to their full filenames
+# in the passed RPM directory.
 #
 # Arguments:
 #
-#	Argument 1:  Mounted CD-ROM/ISO directory
-#	Arguments [2 - n]: RPM names to process
+#	Argument 1:  Path to mounted install media
+#	Arguments [2 - n]:  RPM names to process
 #
-# The expanded RPM names are returned in the shell array "rpm_names."
+# The expanded filenames are returned in the shell array "rpm_names."
 #
 # For example:
 #
-#	expand_rpm_names /mnt/iso dev kernel tetex redhat-menus
+#	find_packages /mnt/iso dev kernel tetex redhat-menus
 #
 # would return something like:
 #
@@ -247,12 +284,12 @@ check_mbfree()
 #
 # The routine returns 0 on success, 1 on an error.
 #
-expand_rpm_names()
+find_packages()
 {
 	typeset found=0
 	typeset left=0
 
-	typeset rpmdir="$1/$distro_rpmdir"
+	typeset rpmdir="$1/$rd_rpmdir"
 	typeset curdir=${PWD:=$(pwd)}
 
 	typeset arch
@@ -283,7 +320,7 @@ expand_rpm_names()
 		    grep "^compatible archs")
 
 		[[ $? -eq 0 ]] &&
-		    archs=$(echo $procinfo | sed -e 's/^compatible archs : //')
+		    archs=$(echo $procinfo | sed 's/^compatible archs : //')
 
 		[[ -n $archs ]] &&
 		    log "RPM-reported compatible architectures: $archs"
@@ -294,25 +331,22 @@ expand_rpm_names()
 	# failed for some reason, so make some reasonable assumptions.
 	#
 	if [[ -z $archs ]]; then
-		procinfo=$(psrinfo -vp | grep family)
+		procinfo=$(LC_ALL=C psrinfo -vp | grep family)
 
-		if echo "$procinfo" | egrep -s "AuthenticAMD"; then
+		if [[ $procinfo = *AuthenticAMD* ]]; then
 			#
 			# Check for AMD athlon compatibility.  The decision to
 			# have athlon files checked for before i686 files is
 			# what Linux does.
 			#
-			if echo "$procinfo" | egrep -s "family 6" ||
-			    echo "$procinfo" | egrep -s "family 15"; then
+			[[ $procinfo = *" family 6 "* ||
+			    $procinfo = *" family 15 "* ]] &&
 				archs="athlon i686"
-			fi
-		elif echo "$procinfo" | egrep -s "GenuineIntel"; then
+		elif [[ "$procinfo" = *GenuineIntel* ]]; then
 			#
 			# Check for i686 compatibility
 			#
-			if echo "$procinfo" | egrep -s "family 15"; then
-				archs="i686"
-			fi
+			[[ "$procinfo" = *" family 15 "* ]] && archs="i686"
 		fi
 
 		archs="$archs i586 i486 i386 noarch"
@@ -320,18 +354,18 @@ expand_rpm_names()
 		log "Derived compatible architectures: $archs"
 	fi
 
-	verbose "RPM source directory: \"$rpmdir\""
-	log "RPM source directory: \"$rpmdir\""
+	verboselog "RPM source directory:\n  \"$rpmdir\"\n"
 
 	if [[ $# -eq 1 ]]; then
-		screenlog "$(gettext 'Attempting to expand 1 RPM name')"
+		msg=$(gettext "Attempting to locate 1 package...")
+		screenlog "$msg"
 	else
-		screenlog "$expand_nrpms" "$#"
+		screenlog "$locate_npkgs" "$#"
 	fi
 
 	for rpm in "$@"; do
 		#
-		# Search for the appropriate RPM package, using the compatible
+		# Search for the appropriate RPM, using the compatible
 		# architecture list contained in "archs" to look for the best
 		# match.
 		#
@@ -372,7 +406,7 @@ expand_rpm_names()
 	done
 
 	cd "$curdir"
-	log "\"$rpmdir\": matched $found of $# RPM names."
+	log "\"$rpmdir\": matched $found of $# packages."
 	log "\"$rpmdir\": $left RPMs remaining."
 	return 0
 }
@@ -408,7 +442,8 @@ build_rpm_list()
 	done
 
 	if [ $cnt -gt 1 ]; then
-		screenlog "$(gettext 'Too many install clusters specified')"
+		msg=$(gettext "Too many install clusters specified")
+		screenlog "$msg"
 		exit $ZONE_SUBPROC_USAGE
 	fi
 
@@ -434,7 +469,7 @@ build_rpm_list()
 # by one to rpm2cpio(1).
 #
 # Usage:
-#    install_miniroot <mounted media dir> <RPMS to install>
+#    install_miniroot <mounted media dir> <names of RPMS to install>
 #      
 #
 install_miniroot()
@@ -444,11 +479,28 @@ install_miniroot()
 
 	shift
 
-        for rpm in "$@"; do
-		verbose "Installing RPM \"$rpm\" to miniroot at" \
-			"\n    \"$zoneroot\"..."
+	#
+	# There's a quirk in our version of ksh that sometimes resets the
+	# trap handler for the shell.  Since RPM operations will be the
+	# longest part of any given install, make sure that an interrupt while
+	# the command is running will bring the miniroot down and clean up
+	# the interrupted install.
+	#
+	trap trap_cleanup INT
 
-		rpm2cpio "$mediadir/$distro_rpmdir/$rpm" | \
+	if [[ $# -eq 1 ]]; then
+		msg=$(gettext "Installing %s miniroot package...")
+	else
+		msg=$(gettext "Installing %s miniroot packages...")
+	fi
+
+	screenlog "\n$msg" "$#"
+
+        for rpm in "$@"; do
+		verboselog "\nInstalling \"$rpm\" to miniroot at\n" \
+			"  \"$zoneroot\"..."
+
+		rpm2cpio "$mediadir/$rd_rpmdir/$rpm" | \
 		    ( cd "$rootdir" && cpio -idu ) 1>&2
 
 		if [[ $? -ne 0 ]]; then
@@ -457,6 +509,7 @@ install_miniroot()
 		fi
         done
 
+	screenlog ""
 	return 0
 }
 
@@ -465,7 +518,7 @@ install_miniroot()
 # install from this image to RPM running on the zone via zlogin(1).
 #
 # Usage:
-#    install_zone <root dir> <mounted ISO/CD dir> [<RPMS to install>]
+#    install_zone <path to mounted install media> [<names of RPMS to install>]
 #
 # If the caller doesn't supply a list of RPMs to install, we install any
 # we previously stashed away in the deferred RPMs directory.
@@ -473,20 +526,23 @@ install_miniroot()
 install_zone()
 {
 	#
-	# convert media directory to zone-relative path
+	# Convert the passed install media pathname to a zone-relative path
+	# by stripping $rootpath from the head of the path.
 	#
-	typeset zonerpmdir=${1##$rootdir}/$distro_rpmdir
-	typeset defdir=$rootdir/var/lx_install/deferred_rpms
-	typeset rpmdir=$2
+	typeset zonerpmdir="${1##$rootdir}/$rd_rpmdir"
+
+	typeset defdir="$rootdir/var/lx_install/deferred_rpms"
+	typeset mounted_root="$1"
 	typeset rpmopts="-i"
 
-	typeset rpmerr
+	typeset defer
 	typeset deferred_found
 	typeset install_rpms
+	typeset nrpms
+	typeset rpm
+	typeset rpmerr
 
-	shift; shift
-
-	[[ -n $verbose_mode ]] && rpmopts="-ivh"
+	shift
 
 	#
 	# If the caller provided a list of RPMs, determine which of them
@@ -499,13 +555,19 @@ install_zone()
 				screenlog "$install_defmkfail" "$mntdir"
 				return 1
 			fi
-			expand_rpm_names $rpmdir $deferred_rpms
+
+			msg=$(gettext "Checking for deferred packages...")
+			screenlog "$msg"
+
+			find_packages "$mounted_root" $deferred_rpms
 			deferred_found="${rpms_found[@]}"
+			numdeferred=${#rpms_found[@]}
 		else
 			deferred_found=""
 		fi
 
 		install_rpms="$@"
+		nrpms=$#
 
 		#
 		# If this distro has any deferred RPMs, we want to simply
@@ -514,28 +576,39 @@ install_zone()
 		# this pass.
 		#
 		for rpm in $deferred_found; do
-			if echo $install_rpms | grep $rpm > /dev/null; then
-				verbose "deferring installation of" $rpm
+			if echo "$install_rpms" | egrep -s "$rpm"; then
+				verboselog "Deferring installation of \"$rpm\""
+
+				#
+				# Remove the RPM from the install_rpms list
+				# and append it to the deferred_saved array
+				#
 				install_rpms=`echo " $install_rpms " | \
 				    sed "s/ $rpm / /g"`
-				deferred_saved="$deferred_saved $rpm"
-				if ! cp $rpmdir/$distro_rpmdir/$rpm $defdir; then
+				deferred_saved[${#deferred_saved[@]}]="$rpm"
+
+				if ! cp "$mounted_root/$rd_rpmdir/$rpm" \
+				    "$defdir"; then
 					screenlog "$install_defcpfail" "$rpm"
 					return 1
 				fi
 			fi
 		done
+		[[ -n $deferred_found ]] & verbose ""
 	elif [[ -z $deferred_saved ]]; then
 		# There are no deferred RPMs to install, so we're done.
 		return 0
 	else
+		# Install the RPMs listed in the deferred_saved array
 		install_rpms=${deferred_saved[@]}
+		nrpms=${#deferred_saved[@]}
 		zonerpmdir=/var/lx_install/deferred_rpms
+		defer="deferred "
 	fi
 
 	#
 	# There's a quirk in our version of ksh that sometimes resets the
-	# trap handler for the shell.  Since the rpm command will be the
+	# trap handler for the shell.  Since RPM operations will be the
 	# longest part of any given install, make sure that an interrupt while
 	# the command is running will bring the miniroot down and clean up
 	# the interrupted install.
@@ -545,24 +618,52 @@ install_zone()
 	#
 	# Print a message depending on how many RPMS we have to install.
 	#
-	# Ten RPMS seems like a reasonable boundary between when an install may
-	# take a "few" or "several" minutes.
+	# 25 RPMS seems like a reasonable boundary between when an install may
+	# take a "few" or "several" minutes; this may be tuned if needed.
 	#
-	if [[ $# -eq 0 ]]; then
-		screenlog "$(gettext 'Installing the deferred RPMs.')"
-	elif [[ $# -eq 1 ]]; then
-		screenlog "$(gettext 'Installing 1 RPM package.')"
-	elif [[ $# -lt 10 ]]; then
-		screenlog "$install_nrpms_few" "$#"
+	screenlog ""
+
+	if [[ $nrpms -eq 1 ]]; then
+		screenlog "$install_one_rpm" "$defer"
+	elif [[ $nrpms -lt 25 ]]; then
+		screenlog "$install_nrpms_few" "$nrpms" "$defer"
 	else
-		screenlog "$install_nrpms_several" "$#"
+		screenlog "$install_nrpms_several" "$nrpms" "$defer"
+
+		#
+		# For installs of over 600 packages or so, it can take rpm a
+		# really, REALLY long time to output anything, even when
+		# running in verbose mode.
+		#
+		# For example, when doing an "all" install from a DVD or DVD
+		# ISO, depending on the speed of the optical drive and the
+		# speed of the machine's CPU(s), it may be up to TEN MINUTES or
+		# MORE before rpm prints out its "Processing..." message even
+		# though it is, in fact, processing the entire package list,
+		# checking for dependencies (something it is unfortunately
+		# entirely silent about.)
+		#
+		# Since the user might otherwise think the install was hung
+		# when running in verbose mode, warn them that it could be
+		# quite a while before they see any further output from the
+		# installer.
+		#
+		#
+		[[ $nrpms -gt 600 ]] && verbose "$install_longwait"
 	fi
 
 	log ""
 	log "Installing: $install_rpms"
 	log ""
+	log "NOTE:  Any messages appearing below prefixed with \"warning:\""
+	log "       and/or that do not cause the installer to abort the"
+	log "       installation process may safely be ignored."
+	log ""
 
 	echo
+
+	# If verbose mode is selected, run rpm in verbose mode as well.
+	[[ -n $verbose_mode ]] && rpmopts="-ivh"
 
 	#
 	# LX_INSTALL must be defined when running this command in order to
@@ -577,12 +678,15 @@ install_zone()
 
 	if [[ $rpmerr -ne 0 ]]; then
 		log ""
-		log "Zone RPM install exited, code $rpmerr"
+		log "Zone rpm install command exited abnormally, code $rpmerr"
 		log ""
 
 		screenlog "$zone_instfail" "$zonename" "$zonerpmdir" "$rpmerr"
 		return 1
 	fi
+
+	log ""
+	log "$nrpms package(s) installed."
 
 	return 0
 }
@@ -610,6 +714,7 @@ umount_list()
 }
 
 #
+#
 # Set up lofi mounts required for chroot(1M) to work on a new root directory
 # located in /a within a zone.
 #
@@ -627,10 +732,10 @@ newroot_lofimnt()
 	# $zoneroot/dev gets lofs mounted on /native/dev read/write to allow
 	# the use of native devices.
 	#
-	mount -F lofs -o ro /lib "$rootdir/a/native/lib" || return 1
+	mount -F lofs -r /lib "$rootdir/a/native/lib" || return 1
 	newroot_mounted="$rootdir/a/native/lib"
 
-	if ! mount -F lofs -o ro /usr "$rootdir/a/native/usr"; then
+	if ! mount -F lofs -r /usr "$rootdir/a/native/usr"; then
 		umount "$rootdir/a/native/lib"
 		unset newroot_mounted
 		return 1
@@ -656,7 +761,7 @@ newroot_lofimnt()
 	#
 	for dev in "$zoneroot"/root/dev/*
 	do
-		if [[ "$dev" == "$zoneroot/root/dev/*" ]]; then
+		if [[ "$dev" = "$zoneroot/root/dev/*" ]]; then
 			log "ERROR: No files found in $zoneroot/root/dev"
 			umount_list $newroot_mounted
 			return 1
@@ -672,7 +777,7 @@ newroot_lofimnt()
 		# mount it from the device directory into the target directory.
 		#
 		if [[ -h $dev ]]; then
-			typeset source=$(LC_ALL=C; file -h "$dev")
+			typeset source=$(LC_ALL=C file -h "$dev")
 
 			#
 			# Remove extraneous text from the output of file(1) so
@@ -742,9 +847,14 @@ replace_miniroot()
 	mv -f "$rootdir" "$zoneroot/oldroot" || return 1
 	mv -f "$zoneroot/a" "$rootdir" || return 1
 
-	screenlog \
-	    "$(gettext \
-	    'Completing install processing; this may take a few minutes')"
+	#
+	# After the directory munging above, we've moved the new copy of the
+	# logfile atop the logfile we WERE writing to, so if we don't reopen
+	# the logfile here the shell will continue writing to the old logfile's
+	# inode, meaning we would lose all log information from this point on.
+	#
+	[[ -n $logfile ]] && exec 2>>"$logfile"
+
 	rm -rf "$zoneroot/oldroot"
 
 	#
@@ -783,7 +893,8 @@ setup_miniroot()
 	#
 	chmod 0700 "$zoneroot"
 
-	screenlog "$(gettext 'Booting zone miniroot...')"
+	msg=$(gettext "Booting zone miniroot...")
+	screenlog "$msg"
 
 	if ! zoneadm -z "$zonename" boot -f; then
 		screenlog "$mini_bootfail" "$zonename"
@@ -794,7 +905,7 @@ setup_miniroot()
 
 	#
 	# Now that the miniroot is booted, unset the compatible architecture
-	# list that expand_rpm_names was using for the miniroot so that it will
+	# list that find_packages was using for the miniroot so that it will
 	# get the list from rpm for the full install.
 	#
 	unset archs
@@ -821,7 +932,8 @@ setup_miniroot()
 		return 1
 	fi
 
-	screenlog "$(gettext 'Miniroot zone setup complete.')"
+	msg=$(gettext "Miniroot zone setup complete.")
+	screenlog "$msg"
 	return 0
 }
 
@@ -834,16 +946,18 @@ finish_install()
 	# newly installed zone will still boot even if the commands fail.
 	#
 	typeset file
+
 	typeset defdir=$rootdir/var/lx_install/deferred_rpms
+
+	msg=$(gettext "Completing installation; this may take a few minutes.")
+	screenlog "$msg"
 
 	if [[ -d $defdir ]]; then
 		rm -f $defdir/*.rpm
 		rmdir $defdir
 	fi
 
-	#
 	# Run ldconfig in the new root
-	#
 	zlogin "$zonename" /usr/sbin/chroot /a \
 	    /sbin/ldconfig -f /etc/ld.so.conf
 
@@ -870,6 +984,8 @@ finish_install()
 
 	replace_miniroot
 
+	rmdir -ps "$media_mntdir"
+
 	if ! "$cwd/lx_init_zone" "$rootdir" "$logfile"; then
 		screenlog "$zone_initrootfail" "$zonename"
 		return 1
@@ -894,8 +1010,8 @@ copy_miniroot()
 	[[ -d "$zoneroot/a" ]] ||
 		{ mkdir -p "$zoneroot/a" || return 1 ; }
 
-	screenlog \
-	    "$(gettext 'Duplicating miniroot; this may take a few minutes...')"
+	msg=$(gettext "Duplicating miniroot; this may take a few minutes...")
+	screenlog "$msg"
 
 	#
 	# Duplicate the miniroot to /a, but don't copy over any /etc/rc.d or
@@ -911,16 +1027,17 @@ copy_miniroot()
 }
 
 #
-# Read the first four lines of the .discinfo file from the root of the passed
+# Read the first six lines of the  .discinfo file from the root of the passed
 # disc directory (which should either be a mounted disc or ISO file.)
 #
-# The first four lines of the .discinfo file will be used to set appropriate
-# shell variables on success:
+# The read lines will be used to set appropriate shell variables on success:
 #
 #     rd_line[0]:  Disc Set Serial Number (sets rd_serial)
 #     rd_line[1]:  Distribution Release Name (sets rd_release)
 #     rd_line[2]:  Distribution Architecture (sets rd_arch)
-#     rd_line[3]:  Disc Number in Distribution (sets rd_discnum)
+#     rd_line[3]:  Disc Number$[s] in Distribution (sets rd_cdnum)
+#     rd_line[4]:  "base" directory for disc (currently unused)
+#     rd_line[5]:  RPM directory for disc (sets rd_rpmdir)
 #
 # Returns 0 on success, 1 on failure.
 #
@@ -928,20 +1045,33 @@ read_discinfo()
 {
         typeset rd_file="$1/.discinfo"
 
-	verbose "read discinfo file \"$rd_file\""
-
-        #
-        # If the .discinfo file doesn't exist or isn't readable, return 1
-        #
-        [[ ! -f "$rd_file" || ! -r "$rd_file" ]] && return 1
-
-	typeset rd_line
-
 	unset rd_arch
-	unset rd_discnum
+	unset rd_cdnum
+	unset rd_disctype
 	unset rd_release
+	unset rd_rpmdir
 	unset rd_serial
 
+	#
+	# If more than one argument was passed to read_discinfo, the second
+	# is a flag meaning that we should NOT print a warning message if
+	# we don't find a .discinfo file, as this is just a test to see if
+	# a distribution ISO is already mounted on the passed mount point.
+	#
+	if [[ ! -f "$rd_file" ]]; then
+		[[ $# -eq 1 ]] &&
+		    screenlog "$discinfo_nofile" "$rd_file"
+		return 1
+	fi
+
+	verbose "Attempting to read \"$rd_file\"..."
+
+        if [[ ! -r "$rd_file" ]]; then
+		screenlog "$discinfo_notreadable" "$rd_file"
+		return 1
+	fi
+
+	typeset rd_line
         typeset linenum=0
 
 	while read -r rd_line[$linenum]; do
@@ -949,25 +1079,37 @@ read_discinfo()
                 # If .discinfo architecture isn't "i386," fail here as
 		# we only support i386 distros at this time.
                 #
-                [[ $linenum = 2 ]] && [[ "${rd_line[2]}" != "i386" ]] &&
-		    return 1
+                if [[ $linenum = 2 && "${rd_line[2]}" != "i386" ]]; then
+			screenlog "$discinfo_wrongarch" "$rd_file" \
+			    "${rd_line[2]}"
+			return 1
+		fi
 
                 #
-                # We've successfully read the first four lines of .discinfo
+                # We've successfully read the first six lines of .discinfo
 		# into $rd_line, so do the appropriate shell variable munging.
                 #
-                if ((linenum == 3)); then
+                if ((linenum == 5)); then
 			rd_serial=${rd_line[0]}
 			rd_release=${rd_line[1]}
 
-			#
 			# CentOS names their releases "final"
-			#
-			[[ "$rd_release" = "final" ]] &&
-			    rd_release="CentOS [Disc Set $rd_serial]"
+			[[ "$rd_release" = "final" ]] && rd_release="CentOS"
 
-			rd_arch=${rd_line[2]}
-			rd_discnum=${rd_line[3]}
+			#
+			# Line four of the .discinfo file contains either a
+			# single disc number for a CD or a comma delimited list
+			# representing the CDs contained on a particular DVD.
+			#
+			rd_cdnum=${rd_line[3]}
+
+			if [[ "$rd_cdnum" = *,* ]]; then
+				rd_disctype="DVD"
+			else
+				rd_disctype="CD"
+			fi
+
+			rd_rpmdir=${rd_line[5]}
 			return 0
 		fi
 
@@ -975,27 +1117,30 @@ read_discinfo()
         done < "$rd_file"
 
         #
-        # The file didn't have at least four lines, so indicate the read
+        # The file didn't have at least six lines, so indicate that parsing
 	# failed.
         #
         return 1
 }
 
 #
-# Mount a disc as reprsented by the passed device name
+# Mount install media within the zone.
 #
-# The disc will be mounted at $zoneroot/root/disc, either via a loopback
-# mount (if vold is active) or directly (if vold is not active.)
+# The media will be mounted at $zoneroot/root/media, either via a loopback
+# mount (if it's a managed removable disc) or directly (if the media is an ISO
+# file or if the specified filename is a block device.)
 #
 # Returns 0 on success, 1 on failure, 2 if no disc was available
 #
-mount_removable_disc()
+mount_install_media()
 {
 	typeset device="$1"
 	typeset mount_err
-	mntdir="$rootdir/disc"
 
-	removable=0
+	unset removable
+	unset zone_mounted
+
+	[[ -z $mntdir ]] && return 1
 
 	[[ -d $mntdir ]] || if ! mkdir -p $mntdir; then
 		screenlog "$mk_mntfail" "$mntdir"
@@ -1003,30 +1148,72 @@ mount_removable_disc()
 		return 1
 	fi
 
-	if [[ "$vold_present" = "1" ]]; then
+	if [[ "$install_media" = "disc" && "$managed_removable" = "1" ]]; then
 		#
-		# allow vold to handle disc mounting
+		# The removable disc device is an automatically managed one,
+		# so just wait for the device mounter to notice a disc has been
+		# inserted into the drive and for the disc to appear at the
+		# mount point.
 		#
-		# Have volcheck check for the appropriate disc every two
-		# seconds for ten seconds.
-		#
-		typeset mount_timeout=10
 		typeset mount_interval=2
+		typeset mount_timeout=10
+		typeset mount_timer=0
 
-		volcheck -i $mount_interval -t $mount_timeout \
-		    "$device" > /dev/null 2>&1
-		
-		[[ -d "$device" ]] || return 2
+		typeset nickname=`basename $device`
 
-		mount -F lofs -o ro "$device" "$mntdir"
+		eject -q "$nickname" > /dev/null 2>&1 || return 2
+		removable="$nickname"
+
+		#
+		# Double check that the device was mounted.  If it wasn't, that
+		# usually means the disc in the drive isn't in a format we can
+		# read or the physical disc is unreadable in some way.
+		#
+		# The mount_timer loop is needed because the "eject -q" above
+		# may report a disc is available before the mounter associated
+		# with the drive actually gets around to mounting the device,
+		# so we need to give it a chance to do so.  The mount_interval
+		# allows us to short-circuit the timer loop as soon as the
+		# device is mounted.
+		#
+		while ((mount_timer < mount_timeout)); do
+			[[ -d "$device" ]] && break
+
+			sleep $mount_interval
+			((mount_timer += mount_interval))
+		done
+
+		if [[ ! -d "$device" ]]; then
+			screenlog "\n$unknown_media" "$device"
+			return 2
+		fi
+
+		mount -F lofs -r "$device" "$mntdir"
 		mount_err=$?
 	else
 		#
-		# Attempt to mount the disc manually
+		# Attempt to mount the media manually.
 		#
-		mount -F hsfs -o ro "$device" "$mntdir" 
-		mount_err=$?
+		# First, make sure the passed device name really IS a device.
+		#
+		[[ -b "$device" ]] || return 2
 
+		#
+		# Now check to see if the device is already mounted and lofi
+		# mount the existing mount point into the zone if it is.
+		#
+		if get_mountdir "$device"; then
+			mount -F lofs -r "$mount_dir" "$mntdir"
+			mount_err=$?
+		else
+			[[ "$install_media" = "disc" ]] && removable="$device"
+
+			# It wasn't mounted, so go ahead and try to do so.
+			mount -F hsfs -r "$device" "$mntdir" 
+			mount_err=$?
+		fi
+
+		# A mount_err of 33 means no suitable media was found
 		((mount_err == 33)) && return 2
 	fi
 
@@ -1036,111 +1223,251 @@ mount_removable_disc()
 		return 1
 	fi
 
-	verbose "Mount of \"$device\" on \"$mntdir\" succeeded!"
-	removable=1
+	zone_mounted="$mntdir"
+	verbose "Mount of \"$device\" on \"$mntdir\" succeeded."
 	return 0
 }
 
-#
 # Eject the disc mounted on the passed directory name
+eject_removable_disc()
+{
+	screenlog ""
+	verbose "  (Attempting to eject '$removable'... \c"
+
+	if [[ -n $zone_mounted ]]; then
+		umount "$zone_mounted"
+		unset zone_mounted
+	fi
+
+	if ! eject "$removable"; then
+		verbose "failed.)\n"
+		screenlog "$eject_fail" "$removable"
+
+		msg=$(gettext "Please eject the disc manually.")
+		screenlog "$msg"
+	else
+		verbose "done.)\n"
+	fi
+
+	unset removable
+}
+
+#
+# Ask for the user to provide a disc or ISO.
 #
 # Returns 0 on success, 1 on failure.
 #
-eject_removable_disc()
+prompt_for_media()
 {
-	[[ "$removable" != "1" ]] && return 1
+	# No prompting is allowed in silent mode.
+	if [[ -n $silent_mode ]]; then
+		log "$silent_err_msg"
+		return 1
+	fi
 
-	typeset mount_dir="$1"
+	if [[ "$1" != "" ]]; then
+		msg="$release_name, CD $1"
+	else
+		typeset disc=$(gettext "disc")
+
+		msg=$(gettext "any")
+		msg="$msg $release_name $disc"
+	fi
+
+	if [[ "$install_media" = "disc" ]]; then
+		screenlog "$insert_discmsg" "$msg" "$release_name"
+
+		msg=$(gettext "drive and press <RETURN>.")
+		screenlog "  $msg"
+
+		[[ -n $removable ]] && eject_removable_disc
+	else
+		if [[ -n $zone_mounted ]]; then
+			umount "$mntdir"
+			unset zone_mounted
+		fi
+
+		#
+		# This is only be printed in the case of a user
+		# specifying a device name as an install medium.
+		# This is handy for testing the installer or if the user
+		# has ISOs stored in some strange way that somehow
+		# breaks the "install from ISO" mechanism, as ISOs
+		# can be manually added using lofiadm(1M) command and
+		# the resulting lofi device name passed to the
+		# installer.
+		#
+		screenlog "$mount_proper_iso1" "$msg"
+		screenlog "  $mount_proper_iso2" "$release_name" "$mntdev"
+
+		msg=$(gettext "and press <RETURN>.")
+		screenlog "  $msg"
+	fi
+
+	read && return 0
 	
-	get_mountdev "$mount_dir" || return 1
-
-	umount "$mount_dir" > /dev/null 2>&1 && unset mntdir
-	eject -p "$mount_dev" || return 1
-
-	return 0
+	return 1
 }
 
 #
-# Get a particular disc of a multi-disc set.
+# Get a particular CD of a multi-disc set.
 #
 # This basically works by doing the following:
 #
 #     1) Mount the disc
-#     2) Read the disc's .discinfo file to see which disc it is
-#     3) If it's not the desired disc, eject it and ask the user to insert the
-#        disc we wanted.
+#     2) Read the disc's .discinfo file to see which CD it is or represents
+#     3) If it doesn't contain the desired CD, ask the user for a disc
+#	 containing the CD we wanted.
 #
 # Returns 0 on success, 1 on failure.
 #
-get_discnum()
+get_cd()
 {
 	typeset mntdev="$1"
-	typeset discnum="$2"
+
+	typeset cdnum
+	typeset discname
 	typeset enter
 	typeset mount_err
+	typeset prompted
+
+
+	if [[ $# -eq 2 ]]; then
+		# Caller specified a particular CD to look for
+		cdnum="$2"
+		discname="$release_name, CD $cdnum"
+	else
+		# Caller wanted any disc
+		discname="a $release_name disc"
+	fi
+
+	verboselog "\nChecking for $discname on device"
+	verboselog "  \"$mntdev\"\n"
 
 	while :; do
-		while :; do
-			mount_removable_disc "$mntdev"
+		# Check to see if a distro disc is already mounted
+		mntdir="$media_mntdir"
+
+		unset rd_disctype
+		if ! read_discinfo "$mntdir" "test"; then
+			mount_install_media "$mntdev"
 			mount_err=$?
 
-			if ((mount_err == 2)); then
-				screenlog "$insert_discmsg" $discnum
-				screenlog "$(gettext '<ENTER>')"
-				read enter && continue
+			#
+			# If the mount succeeded, continue on in the main
+			# script
+			#
+			if ((mount_err == 0)); then
+				read_discinfo "$mntdir"
+			elif ((mount_err == 2)); then
+				# No medium was found, so prompt for one.
+				prompt_for_media "$cdnum" && prompted=1 continue
+
+				unset mntdir
+				return 1
+			else
+				# mount failed
+				unset mntdir
 				return 1
 			fi
+		fi
 
-			((mount_err == 0)) && break;
+		if [[ -n $distro_serial && 
+		    "$rd_serial" != "$distro_serial" ]]; then
+			screenlog "$wrong_serial" "$install_disctype"
+			screenlog "  $wrong_ser_expect" "$rd_serial" \
+			    "$distro_serial"
 
+			#
+			# If we're installing from ISOs, don't prompt the user
+			# if the wrong serial number is present, as there's
+			# nothing they can do about it.
+			#
+			[[ "$install_media" = "ISO" ]] && return 1
+
+			prompt_for_media "$cdnum" && continue
+
+			umount "$mntdir"
+			unset zone_mountdir
 			return 1
-		done
+		fi
 
 		#
-		# Make sure that the mounted disc is disc $discnum.
+		# Make sure that the mounted media is CD $cdnum.
 		#
 		# If it is, return to the caller, otherwise eject the
 		# disc and try again. 
 		#
-		read_discinfo "$mntdir"
+		if [[ "$rd_disctype" = "CD" ]]; then
+			verboselog "Found CD #$rd_cdnum," \
+			    "Serial #$rd_serial"
+			verboselog "Release Name \"$rd_release\"\n"
 
-		verbose "\nRemovable Disc \"$1\": Serial \"$rd_serial\""
-		verbose "  Release \"$rd_release\" Disc #$rd_discnum\n"
+			# If we didn't care which CD it was, return success
+			[[ "$cdnum" = "" ]] && return 0
 
-		[[ "$rd_discnum" = "$discnum" ]] && return 0
+			# Return if the CD number read is a match
+			[[ "$rd_cdnum" = "$cdnum" ]] && return 0
+		else
+			verboselog "\nFound DVD (representing CDs" \
+			    "$rd_cdnum), Serial #$rd_serial"
+			verboselog "Release Name \"$rd_release\"\n"
 
-		screenlog "$wrong_disk" "$rd_discnum" "$discnum"
-		eject_removable_disc "$mntdir" || return 1
+			# If we didn't care which CD it was, return success
+			[[ "$cdnum" = "" ]] && return 0
 
-		screenlog "$insert_discmsg" $discnum
-		screenlog "$(gettext '<ENTER>')"
-		read enter || return 1
+			#
+			# Since a DVD represents multiple CDs, make sure the
+			# DVD inserted represents the CD we want.
+			#
+			{ echo "$rd_cdnum," | egrep -s "$cdnum," ; } &&
+			    return 0
+		fi
+
+		if [[ -n $prompted ]]; then
+			if [[ "$rd_disctype" = "CD" ]]; then
+				screenlog "$wrong_cd" "$rd_cdnum" "$cdnum"
+			else
+				msg=$(gettext "Incorrect DVD inserted.")
+				screenlog "$msg"
+
+				log "(DVD represented CDs $rd_cdnum," \
+				    " wanted CD $cdnum)"
+			fi
+		fi
+
+		#
+		# If we're installing from ISOs, don't prompt the user if the
+		# wrong CD is mounted, as there's nothing they can do about it.
+		#
+		[[ "$install_media" = "ISO" ]] && return 1
+
+		prompt_for_media "$cdnum" && prompted=1 && continue
+
+		umount "$mntdir"
+		unset zone_mountdir
+		return 1
 	done
 }
 
 #
-# Find out which distro the mounted disc belongs to
+# Find out which distro the mounted disc belongs to by comparing the
+# mounted disc's serial number against those contained in the various
+# distro files.
 #
-# Do this by cycling through the distro directory and reading each distro
-# file in turn looking for:
+# When a match is found, the shell variable "distro_file" will be set to
+# the name of the matching file.  Since that will have been the last file
+# sourced by the shell, there's no need for the caller to do it again; the
+# variable is only set in case it's of some use later.
 #
-#     1) The number of discs in a distribution
-#     2) The serial number of the distribution
-#     3) The name of the distribution
-#
-# Based on this, we can determine based on the ISO files available which
-# distributions, if any, we have a complete set of files to support.
-#
-# The function returns the supported isos in the array "iso_names."
+# Returns 0 on success, 1 on failure.
 #
 get_disc_distro()
 {
 	typeset distro
 	typeset distro_files="$(echo $distro_dir/*.distro)"
 
-	unset distro_ndiscs
 	unset distro_file
-	unset release
 	
 	[[ "$distro_files" = "$distro_dir/*.distro" ]] && return 1
 
@@ -1154,8 +1481,9 @@ get_disc_distro()
 		[[ "$rd_serial" != "$distro_serial" ]] && continue
 
 		distro_file="$distro"
-		distro_ndiscs="$rd_ndiscs"
-		release="$rd_release"
+		release_name="$rd_release $distro_version"
+		distro_ncds=${#distro_cdorder[@]}
+
 		return 0
 	done
 
@@ -1163,218 +1491,219 @@ get_disc_distro()
 }
 
 #
-# Install a zone from discs
+# Iterate through the install media to install the miniroot and full zone
 #
-# Depends on the following variables:
+# The install media may be physical discs, a lofi mounted ISO file, or
+# iso files located in a directory specified by the user.
 #
-#     $distro_ndiscs: Number of discs needed to fully install the distribution
+# All installations, regardless of media type, use a CD as their basic media
+# unit.  DVDs or ISOs representing DVDs actually contain multiple "CDs" of
+# installation packages.
 #
-# returns 0 on success, 1 on failure
+# The variable "distro_ncds," as set elsewhere, represents the number
+# of CDs required to install the distribution.  Whether the installation
+# actually requires multiple physical discs or ISOs depends upon their content.
 #
-install_from_discs()
+# Returns 0 on success, 1 on failure.
+#
+iterate_media()
 {
-	typeset status=0
-	typeset discnum=1
-	typeset mountdev="$1"
-	typeset discorder
-	typeset retval
+	typeset cdnum=1
+	typeset cds
+	typeset disc_rpms
+	typeset err_media
+	typeset err_msg
+	typeset install_type="$1"
+	typeset ldevs
+	typeset mountdev
 
-	#
-	# Ask for the first disc.
-	#
-	# We don't know which distro this may be yet, so we can't ask for
-	# the first disc in the install order, so we'll just have to ask for
-	# disc 1.
-	#
-	if ! get_discnum "$mountdev" "$discnum"; then
-		screenlog "$mini_discfail" "$zonename" "1"
-		return 1
+	shift
+
+	if [[ "$install_type" = "miniroot" ]]; then
+		typeset i
+
+		disc_rpms=$distro_miniroot_rpms
+		err_msg="$mini_mediafail"
+
+		# For miniroot installs, ask for CDs in numerical order
+		cds[0]="zero_pad"
+
+		for i in ${distro_cdorder[@]}; do
+			cds[$cdnum]=$cdnum
+			((cdnum += 1))
+		done
+
+		cdnum=1
+	else
+		disc_rpms=$distro_rpms
+		err_msg="$zone_mediafail"
+
+		#
+		# For full zone installs, ask for CDs in the order RPM needs
+		# to find the packages.
+		#
+		set -A cds "zero_pad" ${distro_cdorder[@]}
 	fi
 
-	if ! get_disc_distro "$mntdir"; then
-		screenlog \
-		    "$(gettext 'Unable to find a supported Linux release on')"
-		screenlog "$(gettext 'the media in the removable media drive.')"
-		echo
-		umount "$mntdir" > /dev/null 2>&1
-		return 1
+	if [[ "$install_media" = "ISO" ]]; then
+		set -A ldevs "zero_pad" "$@"
+	else
+		mountdev="$1"
+		err_media="$release_name, CD ${cds[$cdnum]} (or DVD)"
 	fi
 
-	. "$distro_file" > /dev/null
+	unset rpms_left_save
 
-	check_mbfree $zoneroot $distro_mb_required || return 1
+	while ((cdnum <= distro_ncds)); do
+		[[ -z ${cds[$cdnum]} ]] && ((cdnum += 1)) && continue
 
-	build_rpm_list $install_packages
+		if [[ "$install_media" = "ISO" ]]; then
+			typeset isonum="${cds[$cdnum]}"
 
-	echo
-	screenlog "$install_ndiscs" "$distro_ndiscs"
-	echo "\"$rd_release\"\n"
+			#
+			# If this routine was called with a single ISO device
+			# name, it must be a DVD, so refer to that one lofi
+			# device (and associated ISO pathname)
+			#
+			[[ $# -eq 1 ]] && isonum=1
 
-	#
-	# Calculate the proper order for the install discs.
-	#
-	# distro_discorder is an array that indicates each disc's place
-	# in the overall installation process.  An array of [4 1 2 3]
-	# means that "Disk 1" is the 4th disk to be installed, "Disk
-	# 2" is the 1st disk to be installed, and so on.
-	#
-	# Here we are converting that array into one that lists the
-	# CDs in the order in which they should be installed, such that a
-	# distro_discorder array of [4 1 2 3] would be converted into
-	# a discorder array of [2 3 4 1].
-	#
-	while ((discnum <= distro_ndiscs)); do
-		discorder[${distro_discorder[$discnum - 1]}]=$discnum
-		((discnum += 1))
-	done
+			err_media="ISO \"${iso_pathnames[$isonum]}\""
+			mountdev="${ldevs[$isonum]}"
+		fi
 
-	#
-	# If the disc that was read above isn't the first disc in the install
-	# order, eject it and ask for the appropriate disc.
-	#
-	if [[ "${discorder[1]}" != "$rd_discnum" ]]; then
-		eject_removable_disc "$mntdir"
-		if ! get_discnum "$mountdev" "${discorder[1]}"; then
-			screenlog "$mini_discfail" "$zonename" "${discorder[1]}"
+		#
+		# If the disc needed in the install order isn't the one in
+		# the drive, ask for the correct one.
+		#
+		if ! get_cd "$mountdev" "${cds[$cdnum]}"; then
+			screenlog "$err_msg" "$zonename" "$err_media"
 			return 1
 		fi
-	fi
 
-	zone_mounted="$mntdir"
-
-	log "Installing zone miniroot."
-	screenlog "$(gettext 'Installing zone miniroot.')"
-
-	discnum=1
-	while ((discnum <= distro_ndiscs)); do
-		expand_rpm_names "$mntdir" $distro_miniroot_rpms
-		# Save a copy of $rpms_left.  Other functions clobber it.
-		rpms_left_save="${rpms_left[@]}"
-
-		retval=0
-
-		if [[ -n $rpms_found ]]; then
-			verbose "Installing miniroot from disc" \
-			    "${discorder[$discnum]}..."
-
-			if ! install_miniroot "$mntdir" "${rpms_found[@]}"; then
-				screenlog "$mini_discfail" "$zonename" \
-				    "$rd_discnum"
-				return 1
+		#
+		# We now know the actual type of media being used, so
+		# modify the "err_media" string accordingly.
+		#
+		if [[ "$install_media" = "disc" ]]; then
+			if [["$rd_disctype" = "DVD" ]]; then
+				err_media="$release_name DVD"
+			else
+				err_media="$release_name, CD ${cds[$cdnum]}"
 			fi
 		fi
 
+		find_packages "$mntdir" $disc_rpms
+
 		#
-		# If this is the first disc in the install order and we're
-		# done installing the miniroot, just exit the loop without
-		# ejecting the disk as we'll need it again to start the actual
-		# install.
+		# Save a copy of $rpms_left.  Other functions clobber it.
 		#
-		if [[ "$discnum" = "1" && -z $rpms_left_save ]]; then
-			umount "$mntdir"
-			unset zone_mounted
-			break
+		rpms_left_save="${rpms_left[@]}"
+
+		if [[ -n $rpms_found ]]; then
+			if [[ "$install_type" = "miniroot" ]]; then
+				verboselog "\nInstalling miniroot from"
+				verboselog "  $err_media...\n" 
+
+				if ! install_miniroot "$mntdir" \
+				    "${rpms_found[@]}"; then
+					screenlog "$err_msg" "$zonename" \
+						"$err_media"
+					return 1
+				fi
+			else
+				screenlog "\n$install_msg\n" "$zonename" \
+				    "$err_media"
+
+				if ! install_zone "$mntdir" \
+				    ${rpms_found[@]}; then
+					screenlog "$err_msg" "$zonename" \
+					    "$err_media"
+					return 1
+				fi
+			fi
+
+			#
+			# Mark installation from this CD (or ISO representing
+			# this CD) as completed.
+			#
+			if [[ "$rd_disctype" = "CD" ]]; then
+				unset cds[$cdnum]
+			fi
 		fi
 
-		eject_removable_disc "$mntdir"
-		unset zone_mounted
+		# A DVD install takes a single disc, so stop iterating
+		[[ "$rd_disctype" = "DVD" ]] && break
 
+		# If there are no RPMs left, we're done.
 		[[ -z $rpms_left_save ]] && break
 
-		distro_miniroot_rpms="${rpms_left_save[@]}"
-		((discnum += 1))
+		disc_rpms="${rpms_left_save[@]}"
+		((cdnum += 1))
 
-		if ! get_discnum "$mountdev" "${discorder[$discnum]}"; then
-			screenlog "$mini_discfail" "$zonename" \
-			    "${discorder[$discnum]}"
-			return 1
+		if [[ "$install_media" != "ISO" ]]; then
+			#
+			# modify the err_media variable to reflect the next
+			# CD in the sequence
+			#
+			err_media="$release_name, CD ${cds[$cdnum]}"
+		else
+			# Unmount the last used ISO if appropriate
+			if [[ -n $zone_mounted ]]; then
+				umount "$zone_mounted"
+				unset zone_mounted
+			fi
 		fi
-
-		zone_mounted="$mntdir"
 	done
 
 	if [[ -n $rpms_left_save ]]; then
-		log ""
-		log "Unable to locate some packages on install media:\n" \
-		    "  ${rpms_left_save[@]}"
-		log ""
-		screenlog "$mini_instfail" "$zonename"
+		log "\nERROR: Unable to locate some needed packages:\n" \
+		    "  ${rpms_left_save[@]}\n"
+		screenlog "$err_msg" "$zonename"
+		if [[ -n $zone_mounted ]]; then
+			umount "$zone_mounted"
+			unset zone_mounted
+		fi
 		return 1
 	fi
+
+	if [[ -n $zone_mounted ]]; then
+		umount "$zone_mounted"
+		unset zone_mounted
+	fi
+
+	return 0
+}
+
+#
+# Install a zone from installation media
+#
+# Returns 0 on success, 1 on failure
+#
+install_from_media()
+{
+	msg=$(gettext "Installing miniroot for zone '%s'.")
+	screenlog "$msg" "$zonename"
+
+	iterate_media "miniroot" $@ || return 1
 
 	if ! setup_miniroot; then
 		screenlog "$mini_setfail" "$zonename"
 		return 1
 	fi
 
-	discnum=1
-	while ((discnum <= distro_ndiscs)); do
-		#
-		# If the disc needed in the install order isn't the one in
-		# the drive, eject it and ask for the correct one.
-		#
-		if [[ "${discorder[$discnum]}" != "$rd_discnum" ]]; then
-			eject_removable_disc "$mntdir"
-			if ! get_discnum "$mountdev" \
-			    "${discorder[$discnum]}"; then
-				screenlog "$mini_discfail" "$zonename" \
-				    "${discorder[$discnum]}"
-				return 1
-			fi
-		fi
+	msg=$(gettext "Performing full install for zone '%s'.")
 
-		zone_mounted="$mntdir"
+	screenlog "\n$msg" "$zonename"
 
-		expand_rpm_names "$rootdir/disc" $distro_rpms
-		# Save a copy of $rpms_left.  Other functions clobber it.
-		rpms_left_save="${rpms_left[@]}"
+	iterate_media "full" $@ || return 1
 
-		retval=0
-
-		if [[ -n $rpms_found ]]; then
-			log ""
-			echo
-			screenlog "$install_discmsg" "$zonename" \
-			    "$rd_discnum"
-
-			if ! install_zone "$mntdir" "$rootdir/disc" \
-			    ${rpms_found[@]}; then
-				screenlog "$zone_discfail" "$zonename" \
-				    "$rd_discnum"
-				retval=1
-			fi
-		fi
-
-		eject_removable_disc "$zone_mounted"
-		unset zone_mounted
-
-		#
-		# Return non-zero now if the install_zone above failed.
-		#
-		[[ $retval -ne 0 ]] && return $retval
-
-		#
-		# No more RPMs means we're done!
-		#
-		[[ -z $rpms_left_save ]] && break
-
-		distro_rpms="${rpms_left_save[@]}"
-		((discnum += 1))
-	done
-
+	#
+	# Attempt to install deferred RPMS, if any
+	#
 	if [[ -n $deferred_rpms ]]; then
-		if ! install_zone "$mntdir" "$rootdir/disc"; then
+		if ! install_zone ""; then
 			return 1
 		fi
-	fi
-
-	if [[ -n $rpms_left_save ]]; then
-		log ""
-		log "Unable to locate some packages on install media:\n" \
-		    "  ${rpms_left_save[@]}"
-		log ""
-		screenlog "$install_zonefail" "$zonename"
-		return 1
 	fi
 
 	finish_install
@@ -1394,89 +1723,170 @@ install_from_discs()
 # Based on this, we can determine based on the ISO files available which
 # distributions, if any, we have a complete set of files to support.
 #
-# The function returns the supported isos in the array "iso_names."
+# The function returns the supported isos in the array "iso_set."
 #
-get_iso_distros()
+validate_iso_distros()
 {
+	typeset cd
+	typeset disctype
 	typeset index
+	typeset iso
 	typeset iso_names
-	typeset iso_release
+	typeset ncds
+	typeset release_name
 	typeset serial
 
 	typeset distro_files="$(echo $distro_dir/*.distro)"
+	typeset nisos=${#iso_filename[@]}
 
-	ndistros=0
-
-	unset iso_set
 	unset distro_file
-	unset distro_ndiscs
 	unset release
+	unset iso_set
 
-	[[ "$distro_files" = "$distro_dir/*.distro" ]] && return
-
-	set -A iso_files "$@"
+	if [[ "$distro_files" = "$distro_dir/*.distro" ]]; then
+		msg=$(gettext "Unable to find any distro files!")
+		screenlog "$msg"
+		return
+	fi
 
 	for distro in $distro_files; do
+		#
+		# We're done if we've already processed all available ISO files
+		# or if there were none in the first place.
+		#
+		((${#iso_filename[@]} == 0)) && break
+
 		[[ ! -f $distro ]] && continue
 
 		. "$distro" > /dev/null
+		ncds=${#distro_cdorder[@]}
+
+		unset iso_names
+
+		verbose "\nChecking ISOs against distro file \"$distro\"..."
 
 		index=0
-		unset iso_names
-		verbose "Checking for distro \"$distro\"..."
-		
-		for iso in "${iso_files[@]}"; do
-			[[ -z "$iso" ]] && continue
 
-			verbose "Checking iso file mounted at \"$iso\"..."
-
-			if [[ ! -d "$iso" || ! -r "$iso" ]]; then
-				unset iso_files[$index]
+		while ((index < nisos)); do
+			if [[ -z ${iso_filename[$index]} ]]; then
+				((index += 1))
 				continue
 			fi
 
-			read_discinfo "$iso" || continue
+			iso="${iso_filename[$index]}"
 
-			verbose "  ISO \"$iso\": Serial \"$rd_serial\""
-			verbose "    Release \"$rd_release\" Disc $rd_discnum"
+			verbose "  ISO \"$iso\":"
+			verbose "    Serial #${iso_serial[$index]}"
+			verbose "    Release Name \"${iso_release[$index]}"
+
+			if [[ "${iso_disctype[$index]}" = "CD" ]]; then
+				disctype="CD"
+				cd="${iso_cdnum[$index]}"
+			else
+				disctype="DVD, representing CDs"
+				cd=0
+			fi
+
+			verbose "    $disctype ${iso_cdnum[$index]}"
 
 			if [[ -z "$serial" ]]; then
-				[[ "$rd_serial" != "$distro_serial" ]] &&
-				    continue
+				#
+				# No ISO has matched this distro yet.
+				#
+				if [[ "${iso_serial[$index]}" != \
+				    "$distro_serial" ]]; then
+					((index += 1))
+					continue
+				fi
 
-				discnum=${distro_discorder[$rd_discnum - 1]}
-				verbose "Added ISO \"$iso\" as disc $discnum"
-				iso_names[$discnum]="$iso"
-				iso_release="$rd_release"
-				serial="$rd_serial"
-				unset iso_files[$index]
-				((index += 1))
+				serial="${iso_serial[$index]}"
+				release_name="${iso_release[$index]}"
 			else
-				[[ "$rd_serial" != "$serial" ]] && continue
+				#
+				# If the serial number doesn't match that for
+				# this distro, check other ISOs
+				#
+				if [[ "${iso_serial[$index]}" != \
+				    "$serial" ]]; then
+					((index += 1))
+					continue
+				fi
 
-				discnum=${distro_discorder[$rd_discnum - 1]}
-				verbose "Added ISO \"$iso\" as disc $discnum"
-				iso_names[$discnum]="$iso"
-				unset iso_files[$index]
-				((index += 1))
 			fi
+
+			iso_names[$cd]="$iso"
+
+			verbose "\n  Set \"$iso\""
+			verbose "    as $release_name $distro_version" \
+			    "$disctype ${iso_cdnum[$index]}\n"
+
+			#
+			# Once we've matched a particular distro, don't check
+			# this ISO to see if it's part of any other.
+			#
+			unset iso_filename[$index]
+
+			#
+			# A DVD-based distro consists of one and ONLY one disc,
+			# so exit the loop now.
+			#
+			[[ "${iso_disctype[$index]}" = "DVD" ]] && break
+
+			#
+			# If we've found all the CDs that comprise this distro,
+			# we're done looking.
+			#
+			[[ ${#iso_names[@]} -eq $ncds ]] && break
+
+			#
+			# Otherwise, increment the index counter and
+			# look for other CDs comprising the current distro.
+			#
+			((index += 1))
 		done
 
-		[[ ${#iso_names[@]} -ne $distro_ndiscs ]] && continue
+		#
+		# Check to see if we have ISOs representing all the CDs the
+		# distro needs for installation.  If we don't, don't mark this
+		# as an available distro.
+		#
+		if [[ "$disctype" = DVD* ]]; then
+			typeset dvd_discs=",${iso_cdnum[$index]}"
 
-		distro_file[$ndistros]="$distro"
-		distro_ndiscs[$ndistros]="$rd_ndiscs"
-		iso_set[$ndistros]="${iso_names[@]}"
-		release[$ndistros]="$iso_release"
+			cd=1 
+			while ((cd <= ncds)); do
+				dvd_discs=`echo "$dvd_discs" | \
+				    sed "s/,$cd//"`
+				((cd += 1))
+			done
 
-		((ndistros += 1))
-		((${#iso_files[@]} == 0)) && break
+			#
+			# If any CDs are left in $dvd_discs, the DVD was
+			# missing them so this DVD can't be used to install
+			# this distro.
+			#
+			[[ -n $dvd_discs ]] && continue
+		else
+			[[ ${#iso_names[@]} -ne $ncds ]] && continue
+		fi
+		
+		release_name="$release_name $distro_version"
+
+		#
+		# Append the new distro to the distro_file, release and iso_set
+		# arrays.
+		#
+		distro_file[${#distro_file[@]}]="$distro"
+		release[${#release[@]}]="$release_name"
+		iso_set[${#iso_set[@]}]="${iso_names[@]}"
+
+		verboselog "Distro \"$release_name\" found.\n"
 	done
 }
 
 #
 # Do a lofi add for the passed filename and set lofi_dev to the lofi
-# device name (e.g. "/dev/lofi/1".)
+# device name lofiadm created for it (e.g. "/dev/lofi/1".)
 #
 # If the passed filename already has a lofi device name, simply set lofi_dir
 # to the existing device name.
@@ -1489,6 +1899,8 @@ lofi_add()
 
 	lofi_dev=$(lofiadm "$filename" 2>/dev/null) && return 0
 	lofi_dev=$(lofiadm -a "$filename" 2>/dev/null) && return 0
+
+	screenlog "$lofi_failed" "$filename"
 	return 1
 }
 
@@ -1499,10 +1911,16 @@ lofi_add()
 #
 lofi_del()
 {
-	typeset lofi_device="$1"
+	typeset dev="$1"
 
-	lofiadm -d "$lofi_device" 2>/dev/null
-	return $?
+	[[ "$dev" != /dev/lofi/* ]] && return 1
+
+	if lofiadm -d "$dev" 2>/dev/null; then
+		[[ -n $lofi_dev ]] && unset lofi_dev
+		return 0
+	fi
+
+	return 1 
 }
 
 #
@@ -1515,9 +1933,8 @@ lofi_del()
 #
 lofi_mount()
 {
-	typeset created=0
 	typeset lofidev="$1"
-	typeset mntroot="$2"
+	typeset mntpoint="$2"
 
 	#
 	# Check to see if the lofi device is already mounted and return
@@ -1525,21 +1942,26 @@ lofi_mount()
 	#
 	get_mountdir "$lofidev" && { mntdir="$mount_dir" ; return 0 ; }
 
-	mntdir="$mntroot/iso.`/usr/bin/basename $1`"
-	if [[ ! -d  "$mntdir" ]]; then
-		mkdir -p "$mntdir" || return 1
-		created=1
+	unset mntdir
+	if [[ ! -d  "$mntpoint" ]]; then
+		if ! mkdir -p "$mntpoint"; then
+			log "Could not create mountpoint \"$mntpoint\"!\n"
+			return 1
+		fi
+		lofi_created="$mntpoint"
 	fi
 
 	verbose "Attempting mount of device \"$lofidev\""
-	verbose "     on directory \"$mntdir\"... \c"
+	verbose "  on directory \"$mntpoint\"... \c"
 
-	if ! mount -F hsfs -o ro "$lofidev" "$mntdir" 2>/dev/null; then
+	if ! mount -F hsfs -r "$lofidev" "$mntpoint" 2>/dev/null; then
 		verbose "FAILED."
-		((created == 1)) && rmdir -ps "$mntdir"
+		[[ -n $lofi_created ]] && rmdir -ps "$lofi_created" &&
+		    unset lofi_created
 		return 1
 	fi
 
+	mntdir="$mntpoint"
 	verbose "succeeded."
 	return 0
 }
@@ -1562,7 +1984,7 @@ lofi_umount()
 
 	verbose "Unmounting device \"$mntdev\"... \c"
 
-        if ! umount "$mntdev" >/dev/null 2>&1 ; then
+        if ! umount "$mntdev" ; then
 		verbose "FAILED."
 		return 1
 	fi
@@ -1571,166 +1993,42 @@ lofi_umount()
 	return 0
 }
 
-#
-# Install a zone from mounted ISO files
-#
-# Argument: Array index of distribution to install
-#
-# Depends on the following variables:
-#
-#     $iso_set[arg]:  List of ISOs required to fully install the
-#		      distribution
-#
-install_from_isos()
+# Scan the passed list of ISOs.
+scan_isos()
 {
-	typeset distro=$1
-	typeset isonum=1
-
-	set ${iso_set[$distro]}		# set passed args array
-
-	log "Installing zone miniroot."
-	screenlog "$(gettext 'Installing zone miniroot.')"
-
-	while ((isonum <= ${distro_ndiscs[$distro]})); do
-		verbose "Installing miniroot from ISO image $isonum (of" \
-		    "${distro_ndiscs[$distro]})"
-
-		ldir="${lofi_mntdir[$isonum]}"
-		expand_rpm_names "$ldir" $distro_miniroot_rpms
-		# Save a copy of $rpms_left.  Other functions clobber it.
-		rpms_left_save="${rpms_left[@]}"
-
-		if [[ -n $rpms_found ]]; then
-			if ! install_miniroot "$ldir" "${rpms_found[@]}"; then
-				screenlog "$mini_isofail" "$zonename" "$ldir"
-				return 1
-			fi
-		fi
-
-		[[ -z $rpms_left_save ]] && break
-
-		distro_miniroot_rpms="${rpms_left_save[@]}"
-		((isonum += 1))
-	done
-
-	if [[ -n $rpms_left_save ]]; then
-		log ""
-		log "Unable to locate some packages on ISO images:\n" \
-		    "  ${rpms_left_save[@]}"
-		log ""
-		screenlog "$mini_instfail" "$zonename"
-		return 1
-	fi
-
-	if ! setup_miniroot; then
-		screenlog "$mini_setfail" "$zonename"
-		return 1
-	fi
-
-	[[ -d "$rootdir/iso" ]] || mkdir -m 0700 "$rootdir/iso"
-
-	if [[ ! -d "$rootdir/iso" ]]; then
-		screenlog "$mk_mntfail" "$rootdir/iso"
-		screenlog "FAILED."
-		return 1
-	fi
-
-	isonum=1
-	for iso in ${iso_set[$distro]}; do
-		echo
-		screenlog "$install_isomsg" "$zonename" "$isonum"
-
-		if ! mount -F lofs -o ro "$iso" "$rootdir/iso"; then
-			typeset name="${iso_filename[$isonum]}"
-			screenlog "iso_mntfail" "$name" "$zonename"
-			return 1
-		fi
-
-		zone_mounted="$rootdir/iso"
-
-		expand_rpm_names "$rootdir/iso" $distro_rpms
-		# Save a copy of $rpms_left.  Other functions clobber it.
-		rpms_left_save="${rpms_left[@]}"
-
-		if [[ -n $rpms_found ]]; then
-			if ! install_zone "$rootdir/iso" "$rootdir/iso" \
-			    ${rpms_found[@]}; then
-				screenlog "$zone_isofail" "$zonename" "$iso"
-				umount "$rootdir/iso"
-				return 1
-			fi
-		fi
-
-		if ! umount "$rootdir/iso"; then
-			screenlog "$iso_umntfail" "$name" "$zonename"
-			return 1
-		fi
-
-		unset zone_mounted
-
-		[[ -z $rpms_left_save ]] && break
-
-		distro_rpms="${rpms_left_save[@]}"
-		((isonum += 1))
-	done
-
-	if [[ -n $deferred_rpms ]]; then
-		if ! install_zone "$mntdir" "$rootdir/disc"; then
-			return 1
-		fi
-	fi
-
-	if [[ -n $rpms_left_save ]]; then
-		log ""
-		log "Unable to locate some packages on ISO images:\n" \
-		    "  ${rpms_left_save[@]}"
-		log ""
-		screenlog "$install_zonefail" "$zonename"
-		return 1
-	fi
-
-	finish_install
-	return $?
-}
-
-#
-# Mount the passed list of ISOs.
-#
-mount_isos()
-{
-	typeset count=1
 	typeset iso
-	typeset mntroot=$1
+	typeset index=0
 
+	unset iso_serial
+	unset iso_release
+	unset iso_cdnum
+	unset iso_disctype
 	unset iso_filename
-	unset lofi_devs
-	unset lofi_mntdir
 
-	shift
 	for iso in "$@"; do
 		verbose "Checking possible ISO\n  \"$iso\"..."
+
 		if lofi_add "$iso"; then
-			verbose "    added as lofi device \"$lofi_dev\""
-			if lofi_mount "$lofi_dev" "$mntroot"; then
-				iso_filename[$count]="$iso"
-				lofi_devs[$count]="$lofi_dev"
-				lofi_mntdir[$count]="$mntdir"
-				((count += 1))
+			verbose "  added as lofi device \"$lofi_dev\""
+			if lofi_mount "$lofi_dev" "/tmp/lxiso"; then
+				if read_discinfo "$mntdir"; then
+					iso_serial[$index]="$rd_serial"
+					iso_release[$index]="$rd_release"
+					iso_cdnum[$index]="$rd_cdnum"
+					iso_disctype[$index]="$rd_disctype"
+					iso_filename[$index]="$iso"
+					((index += 1))
+				fi
+				lofi_umount "$lofi_dev"
 			else
-				lofi_del "$lofi_dev"
+				verbose "  not a usable ISO image."
+				log "Unable to mount \"$lofi_dev\" (\"$iso\")"
 			fi
+
+			lofi_del "$lofi_dev"
 		else
-			verbose "    not a valid ISO image."
+			verbose "  not a valid ISO image."
 		fi
-	done
-}
-
-umount_isos()
-{
-	typeset dev
-
-	for dev in "$@"; do
-		lofi_umount "$dev" && lofi_del "$dev"
 	done
 }
 
@@ -1750,15 +2048,15 @@ select_distro()
 		if [[ -n $silent_mode ]]; then
 			log "ERROR: multiple distrubutions present in ISO" \
 				"directory but silent install"
-			log "       mode specified.  Distros available:"
+			log "  mode specified.  Distros available:"
 			for dist in "$@"; do
-				log "        $dist"
+				log "    \"$dist\""
 			done
 			return 1
 		fi
 
 		PS3="Select a distribution to install: "
-		select $dist in "$@"; do
+		select dist in "$@"; do
 			[[ -z $distro ]] && continue
 			screenlog "$install_dist" "$dist"
 			ndistro=$((REPLY - 1))
@@ -1779,6 +2077,106 @@ select_distro()
 }
 
 #
+# Install a zone from discs or manually lofi-mounted ISOs.
+#
+# Return 0 on success, 1 on failure
+#
+do_disc_install()
+{
+	typeset path="$1"
+
+	typeset eject_final="N"
+	typeset install_status
+
+	#
+	# Get a disc, it doesn't matter which one.
+	#
+	# We don't know which distro this may be yet, so we can't yet
+	# ask for the first disc in the install order.
+	#
+	if ! get_cd "$path"; then
+		if [[ -z $silent_mode ]]; then
+			typeset distro_disc=\
+			    $(gettext "a supported Linux distribution disc")
+
+			screenlog "\n$distro_mediafail" "$distro_disc ($path)"
+		fi
+		return 1
+	fi
+
+	if [[ -n $silent_mode && "$rd_disctype" = "CD" ]]; then
+		log "$silent_err_msg"
+		return 1
+	fi
+
+	if ! get_disc_distro "$mntdir"; then
+		msg=$(gettext "Unable to find a supported Linux release on")
+		screenlog "$msg"
+		screenlog "  $media_spec" "$path"
+		umount "$mntdir" > /dev/null 2>&1
+		return 1
+	fi
+
+	check_mbfree $zoneroot $distro_mb_required || return 1
+	build_rpm_list $install_packages
+
+	echo
+
+	if [[ "$install_media" = "disc" ]]; then
+		#
+		# If we're in interactive mode, ask the user if they want the
+		# disc ejected when the installation is complete.
+		#
+		# Silent mode installs will require the user to manually run
+		# eject(1).
+		#
+		if [[ -n $removable && -z $silent_mode ]]; then
+			typeset ans
+			typeset disc
+			typeset status
+			typeset which=""
+
+			disc="$rd_disctype"
+			[[ "$disc" = "CD" ]] && which=$(gettext "final ")
+
+			#
+			# Ask the user if they want the install disc ejected
+			# when the installation is complete.  Any answer but
+			# "n" or "N" is taken to mean yes, eject it.
+			#
+			eject_final="Y"
+			status=$(gettext "WILL")
+
+			screenlog "$eject_final_msg" "$which" "$disc"
+			screenlog "  $eject_final_prompt" "$zonename" "[y]/n"
+
+			read ans && [[ "$ans" = [Nn]* ]] && eject_final="N" &&
+			    status=$(gettext "will NOT")
+
+			screenlog "\n$eject_final_status\n" "$which" "$disc" \
+			    "$status"
+		fi
+
+		screenlog "$install_ndiscs" "$distro_ncds"
+
+		msg=$(gettext "install %s.")
+		screenlog "$msg" "$release_name"
+	else
+		screenlog "$install_nisos" "$distro_ncds"
+
+		msg=$(gettext "DVD) to install %s.")
+		screenlog "$msg" "$release_name"
+	fi
+
+	install_from_media "$path"
+	install_status=$?
+
+	[[ "$eject_final" = "Y" ]] && eject_removable_disc
+
+	return $install_status
+}
+
+#
 # Install a zone using the list of ISO files passed as arguments to this
 # function.
 #
@@ -1786,74 +2184,122 @@ select_distro()
 #
 do_iso_install()
 {
-	typeset status=0
+	typeset install_status
+	typeset iso_path
+	typeset ldev
 
-	mount_isos "/tmp/lxisos" "$@"
-	if [[ -z ${lofi_mntdir[@]} ]]; then
-		log "No valid ISO images available or mountable."
-		screenlog \
-		    "$(gettext 'No valid ISO images available or mountable.')"
-		[[ -n ${lofi_devs[@]} ]] && umount_isos "${lofi_devs[@]}"
+	scan_isos "$@"
+
+	if [[ -z ${iso_filename[@]} ]]; then
+		msg=$(gettext "No valid ISO images available or mountable.")
+		screenlog "$msg"
 		return 1
 	fi
 	
-	get_iso_distros "${lofi_mntdir[@]}"
+	validate_iso_distros
 
 	if [[ -z ${release[@]} ]]; then
-		log "No valid Linux distributions found."
-		screenlog "$(gettext 'No valid Linux distributions found.')"
-		[[ -n ${lofi_devs[@]} ]] && umount_isos "${lofi_devs[@]}"
+		msg=$(gettext "No supported Linux distributions found.")
+		screenlog "$msg"
 		return 1
 	fi
 
 	select_distro "${release[@]}" || return 1
 
 	. ${distro_file[$ndistro]} > /dev/null
+	distro_ncds=${#distro_cdorder[@]}
 
 	check_mbfree $zoneroot $distro_mb_required || return 1
-
 	build_rpm_list $install_packages
 
-	install_from_isos $ndistro
-	status=$?
+	unset lofi_devs
 
-	umount_isos "${lofi_devs[@]}"
+	verboselog ""
+	for iso_path in ${iso_set[$ndistro]}; do
+		if ! lofi_add "$iso_path"; then
+			for ldev in $lofi_devs; do
+				lofi_del "$ldev"
+			done
+			return 1
+		fi
 
-	return $status
+		verboselog "Added \"$iso_path\""
+		verboselog "  as \"$lofi_dev\""
+		lofi_devs="$lofi_devs $lofi_dev"
+	done
+
+	release_name="${release[$ndistro]}"
+
+	set -A iso_pathnames "zero_pad" ${iso_set[$ndistro]}
+	install_from_media $lofi_devs
+	install_status=$?
+
+	for ldev in $lofi_devs; do
+		lofi_del "$ldev"
+	done
+
+	unset lofi_devs
+	return $install_status
 }
 
-#
 # Clean up on interrupt
-#
 trap_cleanup()
 {
 	cd "$cwd"
 
-	screenlog "$(gettext 'Interrupt received.')"
+	msg=$(gettext "Interrupt received, cleaning up partial install...")
+	screenlog "$msg"
 
 	[[ -n $miniroot_booted ]] && zoneadm -z "$zonename" halt &&
 	    unset miniroot_booted && unset newroot_mounted
 
-	if [[ -n $zone_mounted ]]; then
-		if [[ "$removable" = "1" ]]; then
-			eject_removable_disc "$zone_mounted"
-		else
-			umount "$zone_mounted" > /dev/null 2>&1
-		fi
-
-		unset zone_mounted
-	fi
+	#
+	# OK, why a sync here?  Because certain commands may have written data
+	# to mounted file systems before the interrupt, and given just the right
+	# timing there may be buffered data not yet sent to the disk or the
+	# system may still be writing data to the disk.  Either way, the umount
+	# will then fail because the system will still see the mounted
+	# filesystems as busy.
+	#
+	sync
 
 	if [[ -n $newroot_mounted ]]; then
 		umount_list $newroot_mounted
 		unset newroot_mounted
 	fi
 
-	[[ -n $mntdir ]] && umount "$mntdir" && unset mntdir
+	if [[ -n $zone_mounted ]]; then
+		umount "$zone_mounted"
+		unset zone_mounted
+	fi
 
-        [[ ${#lofi_devs[@]} -ne 0 ]] && umount_isos "${lofi_devs[@]}"
+	#
+	# Normally, this isn't needed but there is a window where mntdir is set
+	# before zone_mounted, so account for that case.
+	#
+	if [[ -n $mntdir ]]; then
+		umount "$mntdir"
+		unset mntdir
+	fi
 
-	screenlog "$(gettext 'Installation aborted.')"
+	[[ -n $lofi_dev ]] && lofi_del "$lofi_dev"
+
+	if [[ -n $lofi_devs ]]; then
+		typeset ldev
+
+		for ldev in $lofi_devs
+		do
+			lofi_del "$ldev"
+		done
+
+		unset lofi_devs
+	fi
+
+	[[ -n $lofi_created ]] && rmdir -ps "$lofi_created" &&
+	    unset lofi_created
+
+	msg=$(gettext "Installation aborted.")
+	screenlog "$msg"
 	exit $ZONE_SUBPROC_FATAL
 }
 
@@ -1863,15 +2309,17 @@ trap_cleanup()
 cwd=$(dirname "$0")
 distro_dir="$cwd/distros"
 
+unset deferred_saved
 unset distro_path
 unset logfile
+unset msg
 unset newroot_mounted
+unset silent_err_msg
 unset silent_mode
 unset verbose_mode
 unset zone_mounted
 unset zoneroot
 unset zonename
-unset deferred_saved
 
 #
 # Exit values used by the script, as #defined in <sys/zone.h>
@@ -1928,23 +2376,23 @@ install_packages="$@"
 [[ -n $silent_mode ]] && exec 1>/dev/null
 
 if [[ -z $zonename ]]; then
-	screenlog \
-	    "$(gettext 'ERROR:  Cannot install - no zone name was specified')"
+	msg=$(gettext "ERROR:  Cannot install - no zone name was specified")
+	screenlog "$msg"
 	echo
 	exit $ZONE_SUBPROC_NOTCOMPLETE
 fi
 
 if [[ -z $zoneroot ]]; then
-	screenlog \
-	    "$(gettext 'ERROR:  Cannot install - no zone root directory was')"
-	screenlog "$(gettext 'specified')"
+	msg=$(gettext "ERROR:  Cannot install - no zone root directory was")
+	screenlog "$msg"
+
+	msg=$(gettext "specified.")
+	screenlog "  $msg"
 	echo
 	exit $ZONE_SUBPROC_NOTCOMPLETE
 fi
 
-#
 # Make sure the specified zone root directory exists
-#
 [[ -d "$zoneroot" ]] || mkdir -m 0700 -p "$zoneroot"
 
 if [[ ! -d "$zoneroot" ]]; then
@@ -1955,9 +2403,7 @@ fi
 
 rootdir="$zoneroot/root"
 
-#
 # Make sure the specified zone root subdirectory exists
-#
 [[ -d "$rootdir" ]] || mkdir -p "$rootdir"
 
 if [[ ! -d "$rootdir" ]]; then
@@ -1966,9 +2412,9 @@ if [[ ! -d "$rootdir" ]]; then
 	exit $ZONE_SUBPROC_NOTCOMPLETE
 fi
 
-#
+media_mntdir="$rootdir/media"
+
 # Redirect stderr to the log file if it is specified and is writable
-#
 if [[ -n $logfile ]]; then
 	if ! echo "\nInstallation started `date`" >> "$logfile" \
 	    2>/dev/null; then
@@ -1984,44 +2430,40 @@ fi
 
 distro_path=${distro_path:=$default_distro_path}
 
-#
 # From this point on, call trap_cleanup() on interrupt (^C)
-#
 trap trap_cleanup INT
 
 verbose "Installing zone \"$zonename\" at root \"$zoneroot\""
+release_name="supported Linux distribution"
 
 #
-# If the distribution path starts with "/cdrom/" assume the install will be
-# done from discs, otherwise assume the path is a directory containing ISO
-# images.
+# Based on the pathname, attempt to determine whether this will be a disc or
+# lofi-based install or one using ISOs.
 #
-if [[ "$distro_path" = /cdrom/* || "$distro_path" = /dev/dsk/* ]]; then
-	if [[ -n $silent_mode ]]; then
-		screenlog "$(gettext \
-		    'ERROR: Cannot install from discs in silent mode.')"
-		echo
-		return 1
+if [[ "$distro_path" = /cdrom/* || "$distro_path" = /media/* ||
+    "$distro_path" = /dev/dsk/* || "$distro_path" = /dev/lofi/* ]]; then
+	if [[ "$distro_path" = /dev/lofi/* ]]; then
+		silent_err_msg="$silent_nolofi"
+		install_media="lofi"
+	else
+		silent_err_msg="$silent_nodisc"
+		install_media="disc"
 	fi
 
-	vold_present=0
-
-	pgrep vold > /dev/null 2>&1 && vold_present=1
-
-	if [[ $vold_present -eq 1 && ! -d /cdrom ]]; then
-		screenlog "$(gettext 'ERROR: This system does not contain a')"
-		screenlog "$(gettext 'removable disc device and no ISO source')"
-		screenlog "$(gettext 'directory was specified.')"
-		echo
-		exit $ZONE_SUBPROC_NOTCOMPLETE
+	if [[ "$distro_path" = /cdrom/* || "$distro_path" = /media/* ]]; then
+		managed_removable=1
+	else
+		managed_removable=0
 	fi
 
 	log "Installing zone \"$zonename\" at root \"$zoneroot\""
-	verbose "  Attempting disc-based install via path:"
-	verbose "    \"$distro_path\""
-	install_from_discs $distro_path
+	verboselog "  Attempting ${install_media}-based install via:"
+	verboselog "    \"$distro_path\""
+
+	do_disc_install "$distro_path"
 else
 	typeset dir_start
+	typeset dir_file
 
 	dir_start=$(dirname "$distro_path" | cut -c 1)
 
@@ -2034,10 +2476,27 @@ else
 	fi
 
 	log "Installing zone \"$zonename\" at root \"$zoneroot\""
-	verbose "  Attempting ISO-based install from directory:"
-	verbose "    \"$distro_path\""
+	verboselog "  Attempting ISO-based install from directory:"
+	verboselog "    \"$distro_path\""
 
-	iso_files=$(find $distro_path -type f -print)
+	unset iso_files
+
+	for dir_file in $distro_path/*; do
+		#
+		# Skip this file if it's not a regular file or isn't readable
+		#
+		[[ ! -f $dir_file || ! -r $dir_file ]] && continue
+
+		#
+		# If it's an hsfs file, it's an ISO, so add it to the possible
+		# distro ISO list
+		#
+		filetype=`LC_ALL=C fstyp $dir_file 2>/dev/null` &&
+		    [[ "$filetype" = "hsfs" ]] &&
+		    iso_files="$iso_files $dir_file"
+	done
+
+	install_media="ISO"
 	do_iso_install $iso_files
 fi
 
@@ -2048,12 +2507,7 @@ if [[ $? -ne 0 ]]; then
 	    unset miniroot_booted && unset newroot_mounted
 
 	if [[ -n $zone_mounted ]]; then
-		if [[ "$removable" = "1" ]]; then
-			eject_removable_disc "$zone_mounted"
-		else
-			umount "$zone_mounted" > /dev/null 2>&1
-		fi
-
+		umount "$zone_mounted"
 		unset zone_mounted
 	fi
 
@@ -2062,10 +2516,10 @@ if [[ $? -ne 0 ]]; then
 		unset newroot_mounted
 	fi
 
-	log "Initial installation of zone \"$zonename\" at root \"$zoneroot\"" \
-	    "FAILED."
+	screenlog "\n$install_failed\n" "$release_name" "$zonename" "`date`"
 
-	screenlog "$(gettext 'Cleaning up after failed install.')"
+	msg=$(gettext "Cleaning up after failed install...")
+	screenlog "$msg"
 
 	#
 	# The extra checks are some basic paranoia due to the potentially
@@ -2074,13 +2528,9 @@ if [[ $? -ne 0 ]]; then
 	#
 	[[ -d "$zoneroot/a" ]] && rm -rf "$zoneroot/a"
 
-	screenlog "$initinstall_zonefail" "$zonename"
-	screenlog "$install_abort" "`date`"
-
 	exit $ZONE_SUBPROC_FATAL
 fi
 
-log ""
-screenlog "$install_done" "$zonename" "`date`"
+screenlog "$install_done" "$release_name" "$zonename" "`date`"
 
 exit $ZONE_SUBPROC_OK

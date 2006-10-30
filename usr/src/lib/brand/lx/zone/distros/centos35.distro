@@ -25,19 +25,18 @@
 #
 
 #
-# Install information for the Centos 3.5 distribution disc set:
+# Install information for the CentOS 3.5 distribution disc set:
 #
 #	+ Serial number (as found in the disc set's .discinfo file)
-#	+ Number of discs required to hold the entire distribution
+#	+ Version Name
+#	+ Order CDs holding the distribution must be installed in
 #	+ MB of disk space required to hold a full install of the distribution
-#	+ Pathname of actual RPM files within a mounted disc
 #
 distro_serial=1118161135.08
-distro_ndiscs=3
-set -A distro_discorder 1 2 3
+distro_version="3.5"
+set -A distro_cdorder 1 2 3
 
 distro_mb_required=500
-distro_rpmdir=RedHat/RPMS
 
 unset distro_miniroot_rpms
 unset distro_base_rpms

@@ -153,6 +153,7 @@ common_core_rpms="GConf2 \
 	glibc-headers \
 	glibc-kernheaders \
 	gmp \
+	gnupg \
 	grep \
 	groff \
 	gtk+ \
@@ -577,7 +578,6 @@ common_desktop_rpms="$common_server_rpms \
 	gnome-utils \
 	gnome-vfs2-extras \
 	gnomemeeting \
-	gnupg \
 	gphoto2 \
 	gsl \
 	gstreamer \

@@ -376,7 +376,7 @@ if ! egrep -s "Disabled by lx brand" etc/inittab; then
 
 	tmpfile=/tmp/inittab.$$
 
-	sed -e  's/^[1-6x]:/# Disabled by lx brand: &/
+	sed 's/^[1-6]:/# Disabled by lx brand: &/
 	    s/^id:5:initdefault:/id:3:initdefault: # Modified by lx brand: &/' \
 	    etc/inittab > $tmpfile
 
@@ -484,7 +484,7 @@ if [[ -a etc/sysconfig/syslog ]]; then
 
 	tmpfile=/tmp/lx_sc.syslog.$$
 
-	sed -e 's@\(SYSLOGD_OPTIONS="-m 0\)"@\1 -p /var/run/syslog"@' \
+	sed 's@\(SYSLOGD_OPTIONS="-m 0\)"@\1 -p /var/run/syslog"@' \
 	    etc/sysconfig/syslog > $tmpfile
 
 	#
@@ -556,18 +556,13 @@ unsupported_services="
 	iptables 
 	ip6tables 
 	iscsi 
-	saslauthd 
 	psacct 
-	xfs 
 	gpm 
 	irda 
 	smartd 
 	rawdevices 
 	netdump 
-	snmpd 
-	snmptrapd 
 	hpoj 
-	netfs 
 	mdmonitor 
 	mdmpd 
 	irqbalance 
@@ -650,7 +645,7 @@ if ! egrep -s "Disabled by lx brand" etc/rc.d/rc.sysinit; then
 
 	tmpfile=/tmp/lx_rc.sysinit.$$
 
-	sed -e  's@^/sbin/hwclock@# Disabled by lx brand: &@
+	sed 's@^/sbin/hwclock@# Disabled by lx brand: &@
 	    s@^HOSTTYPE=@HOSTTYPE=\"s390\" # Spoofed for lx brand: &@
 	    s@/bin/dmesg -n@: # Disabled by lx brand: &@
 	    s@^dmesg -s@# Disabled by lx brand: &@
@@ -694,5 +689,5 @@ fi
 log ""
 log "System configuration modifications complete `date`"
 log ""
-i18n_echo "System configuration modifications complete!"
+i18n_echo "System configuration modifications complete."
 exit 0

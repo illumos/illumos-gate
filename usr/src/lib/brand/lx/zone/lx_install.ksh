@@ -26,21 +26,15 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-#
 # Restrict executables to /bin, /usr/bin and /usr/sfw/bin
-#
 PATH=/bin:/usr/bin:/usr/sfw/bin
 export PATH
 
-#
 # Setup i18n output
-#
 TEXTDOMAIN="SUNW_OST_OSCMD"
 export TEXTDOMAIN
 
-#
 # Log passed arguments to file descriptor 2
-#
 log()
 {
 	[[ -n $logfile ]] && echo "$@" >&2
@@ -59,9 +53,7 @@ screenlog()
 	[[ -n $logfile ]] && printf "$fmt\n" "$@" >&2
 }
 
-#
 # Print and log provided text if the shell variable "verbose_mode" is set
-#
 verbose()
 {
 	[[ -n $verbose_mode ]] && echo "$@"
@@ -73,17 +65,17 @@ cmd_not_exec=$(gettext "Required command '%s' not executable!")
 zone_initfail=$(gettext "Attempt to initialize zone '%s' FAILED.")
 path_abs=$(gettext "Pathname specified to -d '%s' must be absolute.")
 
-usage_iso=$(gettext "ISO images located in the directory %s")
-
 cmd_h=$(gettext "%s -z <zone name> %s -h")
 cmd_full=\
-$(gettext "%s -z <zone name> %s [-v | -s] [-d <archive dir>] [<cluster> ... ]")
+$(gettext "%s -z <zone name> %s [-v | -s] [-d <dir>|<device>] [<cluster> ... ]")
 
 both_modes=$(gettext "%s: error: cannot select both silent and verbose modes")
 
-not_found=$(gettext "'%s': file not found.")
-unknown_type=$(gettext "'%s': unknown type of file.")
-wrong_type=$(gettext "'%s': wrong type of file.")
+not_found=$(gettext "%s: error: file or directory not found.")
+
+wrong_type=\
+$(gettext "%s: error: must be a gzip, bzip2, .Z or uncompressed tar archive.")
+
 not_readable=$(gettext "Cannot read file '%s'")
 
 no_install=$(gettext "Could not create install directory '%s'")
@@ -92,32 +84,31 @@ no_log=$(gettext "Could not create log directory '%s'")
 install_zone=$(gettext "Installing zone '%s' at root directory '%s'")
 install_from=$(gettext "from archive '%s'")
 
-install_fail=$(gettext "Installation for zone '%s' FAILED.")
-see_log=$(gettext "See the log file '%s' for details.")
+install_fail=$(gettext "Installation of zone '%s' FAILED.")
+see_log=$(gettext "See the log file:\n  '%s'\nfor details.")
 
+install_abort=$(gettext "Installation of zone '%s' aborted.")
 install_good=$(gettext "Installation of zone '%s' completed successfully.")
 
-#
 # Check if commands passed in exist and are executable.
-#
 check_cmd()
 {
 	for cmd in "$@"; do
 		if [[ ! -f $cmd ]]; then
 			screenlog "$cmd_not_found" "$cmd"
+			screenlog "$install_abort" "$zonename"
 			exit $ZONE_SUBPROC_NOTCOMPLETE
 		fi
 
 		if [[ ! -x $cmd ]]; then
 			screenlog "$cmd_not_exec" "$cmd"
+			screenlog "$install_abort" "$zonename"
 			exit $ZONE_SUBPROC_NOTCOMPLETE
 		fi
 	done
 }
 
-#
 # Post process as tarball-installed zone for use by BrandZ.
-#
 init_tarzone()
 {
 	typeset rootdir="$1"
@@ -128,73 +119,119 @@ init_tarzone()
         fi
 }
 
+# Clean up on interrupt
+trap_cleanup()
+{
+	msg=$(gettext "Installation cancelled due to interrupt.")
+
+	screenlog "$msg"
+	exit $int_code
+}
+
 #
-# Output a usage message
+# Output the usage message.
+#
+# This is done this way due to limitations in the way gettext strings are
+# extracted from shell scripts and processed.  Use of this somewhat awkward
+# syntax allows us to produce longer lines of text than otherwise would be
+# possible without wrapping lines across more than one line of code.
 #
 usage()
 {
+	int_code=$ZONE_SUBPROC_USAGE
+
 	echo $(gettext "Usage:")
-	screenlog "$cmd_h" "zoneadm" "install"
-	screenlog "$cmd_full" "zoneadm" "install"
+	printf "  $cmd_h\n" "zoneadm" "install"
+	printf "  $cmd_full\n" "zoneadm" "install"
+
 	echo
-	echo $(gettext "Linux archives can be in one of several forms:")
+
+	echo $(gettext "The installer will attempt to use the default system") \
+	    $(gettext "removable disc device if <archive dir> is not") \
+	    $(gettext "specified.") | fmt -80
+
 	echo
-	echo $(gettext "    + A compressed tar archive")
-	echo $(gettext "    + A set of CD-ROM or DVD discs")
-	echo $(gettext "    + A group of ISO images")
+
+	echo $(gettext "<cluster> specifies which package cluster you wish") \
+	    $(gettext "to install.") | fmt -80
+
 	echo
-	echo $(gettext "The install will attempt to use the default system")
-	echo $(gettext "removable disc device if <archive dir> is not")
-	echo $(gettext "specified.")
-	echo
-	echo $(gettext "<cluster> specifies which package cluster you wish")
-	echo $(gettext "to install.  The desktop cluster will be installed")
-	echo $(gettext "by default.")
+	echo $(gettext "The 'desktop' cluster will be installed by default.")
 	echo
 	echo $(gettext "The available clusters are:")
-	echo "    core"
-	echo "    server"
-	echo "    desktop"
-	echo "    development"
-	echo "    all"
+	echo "    + core"
+	echo "    + server"
+	echo "    + desktop"
+	echo "    + development"
+	echo "    + all"
 	echo
-	echo $(gettext "Each cluster includes all of the clusters preceding")
-	echo $(gettext "it.  So, 'server' includes 'core', 'desktop' includes")
-	echo $(gettext "'core' and 'server', and so on.")
+
+	echo $(gettext "Each cluster includes all of the clusters preceding") \
+	    $(gettext "it, so the 'server' cluster includes the 'core'") \
+	    $(gettext "cluster, the 'desktop' cluster includes the 'core'") \
+	    $(gettext "and 'server' clusters, and so on.") | fmt -80
+
 	echo
 	echo $(gettext "Examples")
 	echo "========"
-	echo $(gettext "Example 1:  Install a base Linux system from CD-ROM")
-	echo $(gettext "discs using the system default removable disc device:")
+
+	echo $(gettext "Example 1: Install a base Linux system from CDs or a") \
+	    $(gettext "DVD using the system default removable disc device:") |
+	    fmt -80
+
 	echo
 	echo "    # zoneadm -z myzone install"
 	echo
-	echo $(gettext "Example 2:  Install the server packages from CD-ROM")
-	echo $(gettext "via an alternative removable disc device:")
+
+	echo $(gettext "Example 2: Install the 'server' cluster from CDs or") \
+	    $(gettext "a DVD via an alternative removable disc device:") |
+	    fmt -80
+
 	echo
-	echo "    # zoneadm -z myzone install -d /cdrom/cdrom0 server"
+	echo "    # zoneadm -z myzone install -d /cdrom/cdrom1 server"
 	echo
-	echo $(gettext "Example 3:  Install the entire Linux environment from")
-	screenlog "$usage_iso" "/export/images/centos_3.5/isos"
+
+	echo $(gettext "Example 3: Install the desktop Linux environment") \
+	    $(gettext "from an ISO image made available as '/dev/lofi/1' by") \
+	    $(gettext "use of lofiadm(1M):") | fmt -80
+
 	echo
-	echo "    # zoneadm -z myzone install -d" \
-	    "/export/images/centos_3.5/isos all"
+	echo "    # zoneadm -z myzone install -d /dev/lofi/1 desktop"
 	echo
-	echo $(gettext "Example 4:  Install from a compressed tar archive of")
-	echo $(gettext "an existing Linux installation (a tar ball) with")
-	echo $(gettext "verbose output regarding the progress of the")
-	echo $(gettext "installation")
+
+	echo $(gettext "Example 4: Install the entire Linux environment from") \
+	    $(gettext "ISO images located in the directory") \
+	    "'/export/centos_3.8/isos':" | fmt -80
+
 	echo
-	echo "    # zoneadm -z myzone install -d /tmp/linux_full.tar.gz -v"
+	echo "    # zoneadm -z myzone install -d /export/centos_3.8/isos all"
 	echo
-	echo $(gettext "Example 5:  Install from a compressed tar archive of")
-	echo $(gettext "an existing Linux installation (a tar ball) with")
-	echo $(gettext "NO output regarding the progress of the installation")
-	echo $(gettext "(silent mode.)  Note that silent mode is only")
-	echo $(gettext "recommended for use by shell scripts and programs.")
+
+	echo $(gettext "Example 5: Install from a compressed tar archive of") \
+	    $(gettext "an existing Linux installation (a tar ball) with") \
+	    $(gettext "verbose output regarding the progress of the") \
+	    $(gettext "installation:") | fmt -80
+
+	echo
+	echo "    # zoneadm -z myzone install -v -d /tmp/linux_full.tar.gz"
+	echo
+
+	echo $(gettext "Example 6: Install from a compressed tar archive of") \
+	    $(gettext "an existing Linux installation (a tar ball) with NO") \
+	    $(gettext "output regarding the progress of the installation") \
+	    $(gettext "(silent mode.)") | fmt -80
+
+	echo
+
+	echo $(gettext "NOTE: Silent mode is only recommended for use by") \
+	    $(gettext "shell scripts and other non-interactive programs:") |
+	    fmt -80
+
 	echo
 	echo "    # zoneadm -z myzone install -d /tmp/linux_full.tar.gz -s"
 	echo
+
+	exit $int_code
 }
 
 #
@@ -231,13 +268,15 @@ ZONE_SUBPROC_NOTCOMPLETE=254
 ZONE_SUBPROC_FATAL=255
 
 #
-# If we weren't passed at least two arguments, exit now.
+# Exit code to return if install is interrupted or exit code is otherwise
+# unspecified.
 #
-if [[ $# -lt 2 ]]; then
-	usage
+int_code=$ZONE_SUBPROC_USAGE
 
-	exit $ZONE_SUBPROC_USAGE
-fi
+trap trap_cleanup INT
+
+# If we weren't passed at least two arguments, exit now.
+[[ $# -lt 2 ]] && usage
 
 #
 # This script is always started with a full path so we can extract the
@@ -255,57 +294,90 @@ shift; shift	# remove zonename and zoneroot from arguments array
 unset gtaropts
 unset install_opts
 unset install_src
+unset msg
 unset silent_mode
 unset verbose_mode
 
 while getopts "d:hsvX" opt
 do
 	case "$opt" in
-		h) 	usage; exit $ZONE_SUBPROC_USAGE ;;
+		h) 	usage;;
 		s)	silent_mode=1;;
 		v)	verbose_mode=1;;
 		d) 	install_src="$OPTARG" ;;
 		X)	install_opts="$install_opts -x" ;;
-		*)	usage ; exit $ZONE_SUBPROC_USAGE ;;
+		*)	usage;;
 	esac
 done
 shift OPTIND-1
 
-#
+# Providing more than one passed argument generates a usage message
+if [[ $# -gt 1 ]]; then
+	msg=$(gettext "ERROR: Too many arguments provided:")
+
+	screenlog "$msg"
+	screenlog "  \"%s\"" "$@"
+	screenlog ""
+	usage
+fi
+
+# Validate any free-form arguments
+if [[ $# -eq 1 && "$1" != "core" && "$1" != "server" && "$1" != "desktop" &&
+    "$1" != "development" && "$1" != "all" ]]; then
+	msg=$(gettext "ERROR: Unknown cluster name specified: %s")
+
+	screenlog "$msg" "\"$1\""
+	screenlog ""
+	usage
+fi
+
 # The install can't be both verbose AND silent...
-#
 if [[ -n $silent_mode && -n $verbose_mode ]]; then
 	screenlog "$both_modes" "zoneadm install"
-	exit $ZONE_SUBPROC_NOTCOMPLETE
+	exit $int_code
 fi
+
 
 if [[ -n $install_src ]]; then
 	#
 	# Validate $install_src.
 	#
 	# If install_src is a directory, assume it contains ISO images to
-	# install from, otherwise treat the argument as if it points to a
-	# tar ball file.
+	# install from, otherwise treat the argument as if it points to a tar
+	# ball file.
 	#
 	if [[ "`echo $install_src | cut -c 1`" != "/" ]]; then
 		screenlog "$path_abs" "$install_src"
-		exit $ZONE_SUBPROC_NOTCOMPLETE
+		exit $int_code
 	fi
 
 	if [[ ! -a "$install_src" ]]; then
 		screenlog "$not_found" "$install_src"
-		exit $ZONE_SUBPROC_NOTCOMPLETE
+		screenlog "$install_abort" "$zonename"
+		exit $int_code
 	fi
 
 	if [[ ! -r "$install_src" ]]; then
 		screenlog "$not_readable" "$install_src"
-		exit $ZONE_SUBPROC_NOTCOMPLETE
+		screenlog "$install_abort" "$zonename"
+		exit $int_code
 	fi
 
-	if [[ ! -d "$install_src" ]]; then
+	#
+	# If install_src is a block device, a directory, a possible device
+	# created via lofiadm(1M), or the directory used by a standard volume
+	# management daemon, pass it on to the secondary install script.
+	#
+	# Otherwise, validate the passed filename to prepare for a tar ball
+	# install.
+	#
+	if [[ ! -b "$install_src" && ! -d "$install_src" &&
+	    "$install_src" != /dev/lofi/* && "$install_src" != /cdrom/* &&
+	    "$install_src" != /media/* ]]; then
 		if [[ ! -f "$install_src" ]]; then
 			screenlog "$wrong_type" "$install_src"
-			exit $ZONE_SUBPROC_NOTCOMPLETE
+			screenlog "$install_abort" "$zonename"
+			exit $int_code
 		fi
 
 		filetype=`{ LC_ALL=C; file $install_src | 
@@ -326,8 +398,9 @@ if [[ -n $install_src ]]; then
 			    "uncompressed (\"tar\") archive."
 			gtaropts="-x"
 		else
-			screenlog "$unknown_type" "$install_src"
-			exit $ZONE_SUBPROC_NOTCOMPLETE
+			screenlog "$wrong_type" "$install_src"
+			screenlog "$install_abort" "$zonename"
+			exit $int_code
 		fi
 	fi
 fi
@@ -355,11 +428,19 @@ fi
 
 [[ -n $gtaropts ]] && gtaropts="${gtaropts}f"
 
+#
+# From here on out, an unspecified exit or interrupt should exit with
+# ZONE_SUBPROC_NOTCOMPLETE, meaning a user will need to do an uninstall before
+# attempting another install, as we've modified the directories we were going
+# to install to in some way.
+#
+int_code=$ZONE_SUBPROC_NOTCOMPLETE
+
 if [[ ! -d "$install_root" ]]
 then
 	if ! mkdir -p "$install_root" 2>/dev/null; then
 		screenlog "$no_install" "$install_root"
-		exit $ZONE_SUBPROC_NOTCOMPLETE
+		exit $int_code
 	fi
 fi
 
@@ -367,7 +448,7 @@ if [[ ! -d "$logdir" ]]
 then
 	if ! mkdir -p "$logdir" 2>/dev/null; then
 		screenlog "$no_log" "$logdir"
-		exit $ZONE_SUBPROC_NOTCOMPLETE
+		exit $int_code
 	fi
 fi
 
@@ -390,38 +471,60 @@ if [[ -n $gtaropts ]]; then
 	    $branddir/lx_init_zone "$install_root" "$logfile" &&
 	    init_tarzone "$install_root" )
 
-	res=$?
+	#
+	# Emit the same code from here whether we're interrupted or exiting
+	# normally.
+	#
+	int_code=$?
+
+	if [[ $int_code -eq ZONE_SUBPROC_OK ]]; then
+		log "Tar install completed for zone '$zonename' `date`."
+	else
+		log "Tar install failed for zone \"$zonename\" `date`."
+
+	fi
 else
 	check_cmd $branddir/lx_distro_install
 
 	$branddir/lx_distro_install -z "$zonename" -r "$zoneroot" \
 	    -d "$install_src" -l "$logfile" $install_opts "$@"
 
-	res=$?
+	#
+	# Emit the same code from here whether we're interrupted or exiting
+	# normally.
+	#
+	int_code=$?
 
-	if [ $res -eq $ZONE_SUBPROC_USAGE ]; then
-		usage
-		exit $ZONE_SUBPROC_USAGE
-	fi
+	[[ $int_code -eq $ZONE_SUBPROC_USAGE ]] && usage
 fi
 
-if [[ $res -ne $ZONE_SUBPROC_OK ]]; then
-	log "Installation failed for zone \"$zonename\" `/usr/bin/date`"
-
+if [[ $int_code -ne $ZONE_SUBPROC_OK ]]; then
+	screenlog ""
 	screenlog "$install_fail" "$zonename"
+	screenlog ""
 
 	#
 	# Only make a reference to the log file if one will exist after
 	# zoneadm exits.
 	#
-	[[ $res -ne $ZONE_SUBPROC_NOTCOMPLETE ]] &&
+	[[ $int_code -ne $ZONE_SUBPROC_NOTCOMPLETE ]] &&
 	    screenlog "$see_log" "$logfile"
 
-	exit $res
+	exit $int_code
 fi
 
-log "Installation complete for zone \"$zonename\" `date`"
+#
+# After the install completes, we've likely moved a new copy of the logfile into
+# place atop the logfile we WERE writing to, so if we don't reopen the logfile
+# here the shell will continue writing to the old logfile's inode, meaning we
+# would lose all log information from this point on.
+#
+exec 2>>"$logfile"
+
+screenlog ""
 screenlog "$install_good" "$zonename"
+screenlog ""
+
 echo $(gettext "Details saved to log file:")
 echo "    \"$logfile\""
 echo
