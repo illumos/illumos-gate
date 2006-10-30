@@ -1775,6 +1775,17 @@ use_new_conn:
 			 */
 			if ((cm_entry->x_state_flags & (X_DEAD|X_THREAD)) ==
 			    X_DEAD) {
+				mutex_enter(&cm_entry->x_lock);
+				if (cm_entry->x_ref != 0) {
+					/*
+					 * Currently in use.
+					 * Cleanup later.
+					 */
+					cmp = &cm_entry->x_next;
+					mutex_exit(&cm_entry->x_lock);
+					continue;
+				}
+				mutex_exit(&cm_entry->x_lock);
 				*cmp = cm_entry->x_next;
 				mutex_exit(&connmgr_lock);
 				connmgr_close(cm_entry);
