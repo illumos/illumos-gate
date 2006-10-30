@@ -498,7 +498,19 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 		return (Z_ERR);
 	}
 	zent->zstate_str = zone_state_str(zent->zstate_num);
-	if (zone_get_brand(zent->zname, zent->zbrand,
+
+	/*
+	 * A zone's brand is only available in the .xml file describing it,
+	 * which is only visible to the global zone.  This causes
+	 * zone_get_brand() to fail when called from within a non-global
+	 * zone.  Fortunately we only do this on labeled systems, where we
+	 * know all zones are native.
+	 */
+	if (getzoneid() != GLOBAL_ZONEID) {
+		assert(is_system_labeled() != 0);
+		(void) strlcpy(zent->zbrand, NATIVE_BRAND_NAME,
+		    sizeof (zent->zbrand));
+	} else if (zone_get_brand(zent->zname, zent->zbrand,
 	    sizeof (zent->zbrand)) != Z_OK) {
 		zperror2(zent->zname, gettext("could not get brand name"));
 		return (Z_ERR);

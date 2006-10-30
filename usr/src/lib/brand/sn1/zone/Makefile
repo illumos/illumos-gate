@@ -40,7 +40,7 @@ lint:
 clean:
 	-$(RM) $(PROGS)
 
-install: $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
+install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
 
 clobber: clean
 	-$(RM) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
