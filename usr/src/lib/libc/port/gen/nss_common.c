@@ -1816,6 +1816,7 @@ nss_unpack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
 	int			len;
 	int			ret;
 	int			i;
+	int			fmt_type;
 	gid_t			*gidp;
 	nssuint_t		*uptr;
 	struct nss_groupsbymem	*arg;
@@ -1824,12 +1825,25 @@ nss_unpack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
 	if (pbuf == NULL || in == NULL)
 		return (-1);
 	status = pbuf->p_status;
+	/* Identify odd cases */
+	pdbd = (nss_dbd_t *)((void *)((char *)buffer + pbuf->dbd_off));
+	dbn = (char *)pdbd + pdbd->o_name;
+	fmt_type = 0; /* nss_XbyY_args_t */
+	if (search_fnum == NSS_DBOP_GROUP_BYMEMBER &&
+		strcmp(dbn, NSS_DBNAM_GROUP) == 0)
+		fmt_type = 1; /* struct nss_groupsbymem */
+	else if (search_fnum == NSS_DBOP_NETGROUP_IN &&
+		strcmp(dbn, NSS_DBNAM_NETGROUP) == 0)
+		fmt_type = 2; /* struct nss_innetgr_args */
+
 	/* if error - door's switch error */
 	/* extended data could contain additional information? */
 	if (status != NSS_SUCCESS) {
-		in->h_errno = (int)pbuf->p_herrno;
-		if (pbuf->p_errno == ERANGE)
-			in->erange = 1;
+		if (fmt_type == 0) {
+			in->h_errno = (int)pbuf->p_herrno;
+			if (pbuf->p_errno == ERANGE)
+				in->erange = 1;
+		}
 		return (status);
 	}
 
@@ -1840,37 +1854,30 @@ nss_unpack(void *buffer, size_t bufsize, nss_db_root_t *rootp,
 	len = pbuf->data_len;
 
 	/* sidestep odd cases */
-	pdbd = (nss_dbd_t *)((void *)((char *)buffer + pbuf->dbd_off));
-	dbn = (char *)pdbd + pdbd->o_name;
-	if (search_fnum == NSS_DBOP_GROUP_BYMEMBER) {
-		if (strcmp(dbn, NSS_DBNAM_GROUP) == 0) {
-			arg = (struct nss_groupsbymem *)in;
-			/* copy returned gid array from returned nscd buffer */
-			i = len / sizeof (nssuint_t);
-			/* not enough buffer */
-			if (i > arg->maxgids) {
-				i = arg->maxgids;
-			}
-			arg->numgids = i;
-			gidp = arg->gid_array;
-			uptr = (nssuint_t *)((void *)buf);
-			while (--i >= 0)
-				*gidp++ = (gid_t)*uptr++;
-			return (NSS_SUCCESS);
+	if (fmt_type == 1) {
+		arg = (struct nss_groupsbymem *)in;
+		/* copy returned gid array from returned nscd buffer */
+		i = len / sizeof (nssuint_t);
+		/* not enough buffer */
+		if (i > arg->maxgids) {
+			i = arg->maxgids;
 		}
+		arg->numgids = i;
+		gidp = arg->gid_array;
+		uptr = (nssuint_t *)((void *)buf);
+		while (--i >= 0)
+			*gidp++ = (gid_t)*uptr++;
+		return (NSS_SUCCESS);
 	}
-	if (search_fnum == NSS_DBOP_NETGROUP_IN) {
-		if (strcmp(dbn, NSS_DBNAM_NETGROUP) == 0) {
-			struct nss_innetgr_args *arg =
-				(struct nss_innetgr_args *)in;
+	if (fmt_type == 2) {
+		struct nss_innetgr_args *arg = (struct nss_innetgr_args *)in;
 
-			if (pbuf->p_status == NSS_SUCCESS) {
-				arg->status = NSS_NETGR_FOUND;
-				return (NSS_SUCCESS);
-			} else {
-				arg->status = NSS_NETGR_NO;
-				return (NSS_NOTFOUND);
-			}
+		if (pbuf->p_status == NSS_SUCCESS) {
+			arg->status = NSS_NETGR_FOUND;
+			return (NSS_SUCCESS);
+		} else {
+			arg->status = NSS_NETGR_NO;
+			return (NSS_NOTFOUND);
 		}
 	}
 

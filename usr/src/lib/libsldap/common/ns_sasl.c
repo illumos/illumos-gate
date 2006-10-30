@@ -147,11 +147,26 @@ __ns_ldap_self_gssapi_config(ns_ldap_self_gssapi_config_t *config) {
 	ns_auth_t	**aMethod = NULL, **aNext = NULL;
 	int		**cLevel = NULL, **cNext = NULL, rc;
 	ns_ldap_error_t	*errp = NULL;
+	FILE		*fp;
 
 	if (config == NULL)
 		return (NS_LDAP_INVALID_PARAM);
 	else
 		*config = NS_LDAP_SELF_GSSAPI_CONFIG_NONE;
+
+	/*
+	 * If config files don't exist, return NS_LDAP_CONFIG.
+	 * It's the same return code __ns_ldap_getParam
+	 * returns in the same situation.
+	 */
+	if ((fp = fopen(NSCONFIGFILE, "rF")) == NULL)
+		return (NS_LDAP_CONFIG);
+	else
+		(void) fclose(fp);
+	if ((fp = fopen(NSCREDFILE, "rF")) == NULL)
+		return (NS_LDAP_CONFIG);
+	else
+		(void) fclose(fp);
 
 	/* Get the credential level list */
 	if ((rc = __ns_ldap_getParam(NS_LDAP_CREDENTIAL_LEVEL_P,
