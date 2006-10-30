@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,8 @@
 #include <krb5_repository.h>
 #include <com_err.h>
 #include <kcmd.h>
+
+#include <addr_match.h>
 
 #ifndef NCARGS
 #define	NCARGS	5120
@@ -459,7 +461,7 @@ doit(int f, struct sockaddr_storage *fromp, char **renvp)
 	int fromplen;
 	int homedir_len, shell_len, username_len, tz_len;
 	int no_name;
-	int bad_port;
+	boolean_t bad_port;
 	int netf = 0;
 
 	(void) signal(SIGINT, SIG_DFL);
@@ -492,9 +494,23 @@ doit(int f, struct sockaddr_storage *fromp, char **renvp)
 		exit(1);
 	}
 
+	if (fromp->ss_family == AF_INET6) {
+		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+			struct in_addr ipv4_addr;
+
+			IN6_V4MAPPED_TO_INADDR(&sin6->sin6_addr, &ipv4_addr);
+			(void) inet_ntop(AF_INET, &ipv4_addr, abuf,
+			    sizeof (abuf));
+		} else {
+			(void) inet_ntop(AF_INET6, &sin6->sin6_addr, abuf,
+			    sizeof (abuf));
+		}
+	} else if (fromp->ss_family == AF_INET) {
+		(void) inet_ntop(AF_INET, &sin->sin_addr, abuf, sizeof (abuf));
+	}
+
 	sin_len = sizeof (struct sockaddr_in);
-	if (getsockname(f, (struct sockaddr *)&localaddr,
-			&sin_len) < 0) {
+	if (getsockname(f, (struct sockaddr *)&localaddr, &sin_len) < 0) {
 		perror("getsockname");
 		exit(1);
 	}
@@ -504,49 +520,38 @@ doit(int f, struct sockaddr_storage *fromp, char **renvp)
 	bad_port = (port >= IPPORT_RESERVED ||
 		port < (uint_t)(IPPORT_RESERVED/2));
 
+	/* Get the name of the client side host to use later */
 	no_name = (getnameinfo((const struct sockaddr *) fromp, fromplen,
 		hostname, sizeof (hostname), NULL, 0, 0) != 0);
 
-	/* Get the name of the client side host to use later */
-	if (no_name == 1 || bad_port == 1) {
-		if (no_name != 0) {
-			/*
-			 * If the '-U' option was given on the cmd line,
-			 * we must be able to lookup the hostname
-			 */
-			if (resolve_hostname) {
-				syslog(LOG_ERR, "rshd: Couldn't resolve your "
-					"address into a host name.\r\n Please "
-					"contact your net administrator");
-				exit(1);
-			} else {
-				/*
-				 * If there is no host name available and the
-				 * -U option hasnt been used on the cmd line,
-				 * use the IP address to identify the
-				 * host in the pam call below.
-				 */
-				(void) strncpy(hostname, abuf,
-						sizeof (hostname));
-			}
-		}
+	if (bad_port || no_name != 0) {
+		/*
+		 * If there is no host name available then use the
+		 * IP address to identify the host in the PAM call
+		 * below.  Do the same if a bad port was used, to
+		 * prevent untrustworthy authentication.
+		 */
+		(void) strlcpy(hostname, abuf, sizeof (hostname));
+	}
 
-		if (fromp->ss_family == AF_INET6) {
-			if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-				struct in_addr ipv4_addr;
-
-				IN6_V4MAPPED_TO_INADDR(&sin6->sin6_addr,
-				    &ipv4_addr);
-				(void) inet_ntop(AF_INET, &ipv4_addr, abuf,
-					    sizeof (abuf));
-			} else {
-				(void) inet_ntop(AF_INET6, &sin6->sin6_addr,
-					    abuf, sizeof (abuf));
-			}
-		} else if (fromp->ss_family == AF_INET) {
-			(void) inet_ntop(AF_INET, &sin->sin_addr,
-				    abuf, sizeof (abuf));
+	if (no_name != 0) {
+		/*
+		 * If the '-U' option was given on the cmd line,
+		 * we must be able to lookup the hostname
+		 */
+		if (resolve_hostname) {
+			syslog(LOG_ERR, "rshd: Couldn't resolve your "
+			    "address into a host name.\r\n Please "
+			    "contact your net administrator");
+			exit(1);
 		}
+	} else {
+		/*
+		 * Even if getnameinfo() succeeded, we still have to check
+		 * for spoofing.
+		 */
+		check_address("rshd", fromp, sin, sin6, abuf, hostname,
+		    sizeof (hostname));
 	}
 
 	if (!krb5auth_flag && bad_port) {

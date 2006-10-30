@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,7 @@
 #include <krb5_repository.h>
 #include <sys/cryptmod.h>
 #include <bsm/adt.h>
+#include <addr_match.h>
 
 #define	KRB5_RECVAUTH_V5 5
 #define	UT_NAMESIZE	sizeof (((struct utmpx *)0)->ut_name)
@@ -995,6 +996,15 @@ doit(int f,
 		/* If no host name, use IP address for name later on. */
 		if (no_name)
 			(void) strlcpy(hostname, abuf, sizeof (hostname));
+	}
+
+	if (!no_name) {
+		/*
+		 * Even if getnameinfo() succeeded, we still have to check
+		 * for spoofing.
+		 */
+		check_address("rlogind", fromp, sin, sin6, rhost_addra,
+		    hostname, sizeof (hostname));
 	}
 
 	if (bad_port) {
