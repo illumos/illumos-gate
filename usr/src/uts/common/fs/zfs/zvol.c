@@ -909,8 +909,6 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 	struct dk_cinfo dkc;
 	struct dk_minfo dkm;
 	dk_efi_t efi;
-	efi_gpt_t gpt;
-	efi_gpe_t gpe;
 	struct uuid uuid = EFI_RESERVED;
 	uint32_t crc;
 	int error = 0;
@@ -952,46 +950,76 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 			mutex_exit(&zvol_state_lock);
 			return (EFAULT);
 		}
-
-		bzero(&gpt, sizeof (gpt));
-		bzero(&gpe, sizeof (gpe));
-
 		efi.dki_data = (void *)(uintptr_t)efi.dki_data_64;
 
-		if (efi.dki_length < sizeof (gpt) + sizeof (gpe)) {
+		/*
+		 * Some clients may attempt to request a PMBR for the
+		 * zvol.  Currently this interface will return ENOTTY to
+		 * such requests.  These requests could be supported by
+		 * adding a check for lba == 0 and consing up an appropriate
+		 * RMBR.
+		 */
+		if (efi.dki_lba == 1) {
+			efi_gpt_t gpt;
+			efi_gpe_t gpe;
+
+			bzero(&gpt, sizeof (gpt));
+			bzero(&gpe, sizeof (gpe));
+
+			if (efi.dki_length < sizeof (gpt)) {
+				mutex_exit(&zvol_state_lock);
+				return (EINVAL);
+			}
+
+			gpt.efi_gpt_Signature = LE_64(EFI_SIGNATURE);
+			gpt.efi_gpt_Revision = LE_32(EFI_VERSION_CURRENT);
+			gpt.efi_gpt_HeaderSize = LE_32(sizeof (gpt));
+			gpt.efi_gpt_FirstUsableLBA = LE_64(34ULL);
+			gpt.efi_gpt_LastUsableLBA =
+			    LE_64((zv->zv_volsize >> zv->zv_min_bs) - 1);
+			gpt.efi_gpt_NumberOfPartitionEntries = LE_32(1);
+			gpt.efi_gpt_PartitionEntryLBA = LE_32(2);
+			gpt.efi_gpt_SizeOfPartitionEntry = LE_32(sizeof (gpe));
+
+			UUID_LE_CONVERT(gpe.efi_gpe_PartitionTypeGUID, uuid);
+			gpe.efi_gpe_StartingLBA = gpt.efi_gpt_FirstUsableLBA;
+			gpe.efi_gpe_EndingLBA = gpt.efi_gpt_LastUsableLBA;
+
+			CRC32(crc, &gpe, sizeof (gpe), -1U, crc32_table);
+			gpt.efi_gpt_PartitionEntryArrayCRC32 = LE_32(~crc);
+
+			CRC32(crc, &gpt, sizeof (gpt), -1U, crc32_table);
+			gpt.efi_gpt_HeaderCRC32 = LE_32(~crc);
+
 			mutex_exit(&zvol_state_lock);
-			return (EINVAL);
+			if (ddi_copyout(&gpt, efi.dki_data, sizeof (gpt), flag))
+				error = EFAULT;
+		} else if (efi.dki_lba == 2) {
+			efi_gpe_t gpe;
+
+			bzero(&gpe, sizeof (gpe));
+
+			if (efi.dki_length < sizeof (gpe)) {
+				mutex_exit(&zvol_state_lock);
+				return (EINVAL);
+			}
+
+			UUID_LE_CONVERT(gpe.efi_gpe_PartitionTypeGUID, uuid);
+			gpe.efi_gpe_StartingLBA = LE_64(34ULL);
+			gpe.efi_gpe_EndingLBA =
+			    LE_64((zv->zv_volsize >> zv->zv_min_bs) - 1);
+
+			mutex_exit(&zvol_state_lock);
+			if (ddi_copyout(&gpe, efi.dki_data, sizeof (gpe), flag))
+				error = EFAULT;
+		} else {
+			mutex_exit(&zvol_state_lock);
+			error = EINVAL;
 		}
-
-		efi.dki_length = sizeof (gpt) + sizeof (gpe);
-
-		gpt.efi_gpt_Signature = LE_64(EFI_SIGNATURE);
-		gpt.efi_gpt_Revision = LE_32(EFI_VERSION_CURRENT);
-		gpt.efi_gpt_HeaderSize = LE_32(sizeof (gpt));
-		gpt.efi_gpt_FirstUsableLBA = LE_64(0ULL);
-		gpt.efi_gpt_LastUsableLBA =
-		    LE_64((zv->zv_volsize >> zv->zv_min_bs) - 1);
-		gpt.efi_gpt_NumberOfPartitionEntries = LE_32(1);
-		gpt.efi_gpt_SizeOfPartitionEntry = LE_32(sizeof (gpe));
-
-		UUID_LE_CONVERT(gpe.efi_gpe_PartitionTypeGUID, uuid);
-		gpe.efi_gpe_StartingLBA = gpt.efi_gpt_FirstUsableLBA;
-		gpe.efi_gpe_EndingLBA = gpt.efi_gpt_LastUsableLBA;
-
-		CRC32(crc, &gpe, sizeof (gpe), -1U, crc32_table);
-		gpt.efi_gpt_PartitionEntryArrayCRC32 = LE_32(~crc);
-
-		CRC32(crc, &gpt, sizeof (gpt), -1U, crc32_table);
-		gpt.efi_gpt_HeaderCRC32 = LE_32(~crc);
-
-		mutex_exit(&zvol_state_lock);
-		if (ddi_copyout(&gpt, efi.dki_data, sizeof (gpt), flag) ||
-		    ddi_copyout(&gpe, efi.dki_data + 1, sizeof (gpe), flag))
-			error = EFAULT;
 		return (error);
 
 	default:
-		error = ENOTSUP;
+		error = ENOTTY;
 		break;
 
 	}
