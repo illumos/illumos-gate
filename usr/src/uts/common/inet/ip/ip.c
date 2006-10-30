@@ -13647,7 +13647,8 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	 * If either of the follwoing case is true, we take
 	 * the slowpath
 	 *	o forwarding is not enabled
-	 *	o IPMP is enabled
+	 *	o incoming and outgoing interface are the same, or the same
+	 *	  IPMP group
 	 *	o corresponding ire is in incomplete state
 	 *	o packet needs fragmentation
 	 *
@@ -13656,7 +13657,9 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	 */
 	stq_ill = (ill_t *)ire->ire_stq->q_ptr;
 	if (!(stq_ill->ill_flags & ILLF_ROUTER) ||
-	    !(ill->ill_flags & ILLF_ROUTER) || SAME_IPMP_GROUP(ill, stq_ill) ||
+	    !(ill->ill_flags & ILLF_ROUTER) ||
+	    (ill == stq_ill) ||
+	    (ill->ill_group != NULL && ill->ill_group == stq_ill->ill_group) ||
 	    (ire->ire_nce == NULL) ||
 	    (ire->ire_nce->nce_state != ND_REACHABLE) ||
 	    (ntohs(ipha->ipha_length) > ire->ire_max_frag) ||
@@ -13732,6 +13735,7 @@ drop:
  * either the ire lacks the link-layer address, or the packet needs
  * further processing(eg. fragmentation), before transmission.
  */
+
 static void
 ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
     ill_t *ill, boolean_t ll_multicast)
@@ -13749,6 +13753,14 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 	if (ll_multicast != 0)
 		goto drop_pkt;
 
+	/*
+	 * check if ipha_src is a broadcast address. Note that this
+	 * check is redundant when we get here from ip_fast_forward()
+	 * which has already done this check. However, since we can
+	 * also get here from ip_rput_process_broadcast() or, for
+	 * for the slow path through ip_fast_forward(), we perform
+	 * the check again for code-reusability
+	 */
 	src_ire = ire_ctable_lookup(ipha->ipha_src, 0, IRE_BROADCAST, NULL,
 	    ALL_ZONES, NULL, MATCH_IRE_TYPE);
 	if (src_ire != NULL || ntohl(ipha->ipha_dst) == INADDR_ANY ||
@@ -13758,6 +13770,7 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 		BUMP_MIB(&ip_mib, ipForwProhibits);
 		ip2dbg(("ip_rput_process_forward: Received packet with"
 		    " bad src/dst address on %s\n", ill->ill_name));
+		goto drop_pkt;
 	}
 
 	ill_group = ill->ill_group;
@@ -13807,13 +13820,14 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 		 * on the same logical subnet it is going back out on.
 		 * If so, we should be able to send it a redirect.
 		 * Avoid sending a redirect if the destination
-		 * is directly connected (gw_addr == 0),
-		 * or if the packet was source routed out this
-		 * interface.
+		 * is directly connected (i.e., ipha_dst is the same
+		 * as ire_gateway_addr or the ire_addr of the
+		 * nexthop IRE_CACHE ), or if the packet was source
+		 * routed out this interface.
 		 */
-		ipaddr_t src;
+		ipaddr_t src, nhop;
 		mblk_t	*mp1;
-		ire_t	*src_ire = NULL;
+		ire_t	*nhop_ire = NULL;
 
 		/*
 		 * Check whether ire_rfq and q are from the same ill
@@ -13822,15 +13836,44 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 		 */
 		if ((ire->ire_rfq == q ||
 		    (ill_group != NULL && ill_group == ire_group)) &&
-		    (ire->ire_gateway_addr != 0) &&
 		    !ip_source_routed(ipha)) {
 
-			src = ipha->ipha_src;
-			src_ire = ire_ftable_lookup(src, 0, 0,
-			    IRE_INTERFACE, ire->ire_ipif, NULL, ALL_ZONES,
-			    0, NULL, MATCH_IRE_IPIF | MATCH_IRE_TYPE);
+			nhop = (ire->ire_gateway_addr != 0 ?
+			    ire->ire_gateway_addr : ire->ire_addr);
 
-			if (src_ire != NULL) {
+			if (ipha->ipha_dst == nhop) {
+				/*
+				 * We avoid sending a redirect if the
+				 * destination is directly connected
+				 * because it is possible that multiple
+				 * IP subnets may have been configured on
+				 * the link, and the source may not
+				 * be on the same subnet as ip destination,
+				 * even though they are on the same
+				 * physical link.
+				 */
+				goto sendit;
+			}
+
+			src = ipha->ipha_src;
+
+			/*
+			 * We look up the interface ire for the nexthop,
+			 * to see if ipha_src is in the same subnet
+			 * as the nexthop.
+			 *
+			 * Note that, if, in the future, IRE_CACHE entries
+			 * are obsoleted,  this lookup will not be needed,
+			 * as the ire passed to this function will be the
+			 * same as the nhop_ire computed below.
+			 */
+			nhop_ire = ire_ftable_lookup(nhop, 0, 0,
+			    IRE_INTERFACE, NULL, NULL, ALL_ZONES,
+			    0, NULL, MATCH_IRE_TYPE);
+
+			if (nhop_ire != NULL &&
+			    (src & nhop_ire->ire_mask) ==
+			    (nhop & nhop_ire->ire_mask)) {
 				/*
 				 * The source is directly connected.
 				 * Just copy the ip header (which is
@@ -13838,14 +13881,13 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 				 */
 				mp1 = copyb(mp);
 				if (mp1 != NULL) {
-					icmp_send_redirect(WR(q), mp1,
-					    ire->ire_gateway_addr);
+					icmp_send_redirect(WR(q), mp1, nhop);
 				}
-				ire_refrele(src_ire);
+				ire_refrele(nhop_ire);
 			}
 		}
 	}
-
+sendit:
 	dev_q = ire->ire_stq->q_next;
 	if ((dev_q->q_next || dev_q->q_first) && !canput(dev_q)) {
 		BUMP_MIB(&ip_mib, ipInDiscards);
@@ -13857,7 +13899,7 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 	return;
 
 drop_pkt:
-	ip2dbg(("ip_rput_forward: drop pkt\n"));
+	ip2dbg(("ip_rput_process_forward: drop pkt\n"));
 	freemsg(mp);
 }
 

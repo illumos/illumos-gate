@@ -2126,10 +2126,6 @@ extern int ip_misc_ioctl_count;
 	(ill)->ill_move_peer = NULL;			\
 	peer_ill->ill_move_peer = NULL;			\
 }
-/* The 2 ill's are same or belong to the same IPMP group */
-#define	SAME_IPMP_GROUP(ill_1, ill_2)			\
-	(((ill_1)->ill_group != NULL) &&		\
-	    ((ill_1)->ill_group == (ill_2)->ill_group))
 
 /* Passed down by ARP to IP during I_PLINK/I_PUNLINK */
 typedef struct ipmx_s {
