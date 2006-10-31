@@ -279,7 +279,8 @@ disk_common(di_minor_t minor, di_node_t node, char *disk, int flags)
 		(void) strcpy(sec_path, "removable-media/");
 		(void) strcat(sec_path, l_path);
 		(void) devfsadm_secondary_link(sec_path, l_path, 0);
-	} else if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "hotpluggable",
+	}
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "hotpluggable",
 	    &int_prop) >= 0) {
 		(void) strcpy(sec_path, "hotpluggable/");
 		(void) strcat(sec_path, l_path);

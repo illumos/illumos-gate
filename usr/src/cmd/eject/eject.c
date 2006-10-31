@@ -107,7 +107,7 @@ int
 main(int argc, char **argv)
 {
 	int		c;
-	const char	*opts = "dqflnpt";
+	const char	*opts = "dqflt";
 	int		excode;
 	int		res;
 	boolean_t	err_seen = B_FALSE;
@@ -142,10 +142,6 @@ main(int argc, char **argv)
 			break;
 		case 'f':
 			force_eject = B_TRUE;
-			break;
-		case 'n':
-		case 'p':
-			/* obsolete options, just ignore */
 			break;
 		case 't':
 			do_closetray = B_TRUE;
@@ -221,19 +217,20 @@ work(char *arg, char *rmmount_opt)
 
 			if (execl("/usr/bin/rmmount", "eject",
 			    arg1, arg2, 0) < 0) {
-				perror("execl");
-				exit(1);
+				excode = 99;
 			} else {
 				exit(0);
 			}
-		}
-		/* parent */
-		if (waitpid(pid, &status, 0) != pid) {
-			excode = 1;
-		} else if (WIFEXITED(status) && (WEXITSTATUS(status) != 0)) {
-			excode = WEXITSTATUS(status);
 		} else {
-			excode = 0;
+			/* parent */
+			if (waitpid(pid, &status, 0) != pid) {
+				excode = 1;
+			} else if (WIFEXITED(status) &&
+			    (WEXITSTATUS(status) != 0)) {
+				excode = WEXITSTATUS(status);
+			} else {
+				excode = 0;
+			}
 		}
 	}
 
@@ -242,6 +239,8 @@ work(char *arg, char *rmmount_opt)
 	 * fallback to direct in that case
 	 */
 	if (is_direct || (excode == 99)) {
+		excode = EJECT_OK;
+
 		if (arg == NULL) {
 			arg = "floppy";
 		}

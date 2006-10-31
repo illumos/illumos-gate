@@ -839,6 +839,7 @@ rmm_action(LibHalContext *hal_ctx, const char *name, action_t action,
 	dprintf("rmm_action %s %s\n", name, action_strings[action]);
 
 	if (aap == NULL) {
+		bzero(&aa_local, sizeof (aa_local));
 		aap = &aa_local;
 	}
 
@@ -933,7 +934,7 @@ rmm_rescan(LibHalContext *hal_ctx, const char *name, boolean_t query)
 	char		**nicks = NULL;
 	boolean_t	do_free_udis = FALSE;
 	int		i;
-	int		ret = 0;
+	boolean_t	ret = B_FALSE;
 
 	dprintf("rmm_rescan %s\n", name != NULL ? name : "all");
 
@@ -982,11 +983,15 @@ rmm_rescan(LibHalContext *hal_ctx, const char *name, boolean_t query)
 			continue;
 		}
 		if (query) {
-			printf(gettext("%s is%s available\n"),
-			    name ? name : nickname,
-			    libhal_device_get_property_bool(hal_ctx, udis[i],
-			    "storage.removable.media_available", NULL) ?
-			    "" : " not");
+			ret = libhal_device_get_property_bool(hal_ctx, udis[i],
+			    "storage.removable.media_available", NULL);
+			if (ret) {
+				printf(gettext("%s is available\n"),
+				    name ? name : nickname);
+			} else {
+				printf(gettext("%s is not available\n"),
+				    name ? name : nickname);
+			}
 		}
 		libhal_free_string_array(nicks);
 	}

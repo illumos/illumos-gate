@@ -64,7 +64,7 @@
 #define MOUNT_TYPE_OPT	"-t"
 #elif sun
 #define MOUNT		"/sbin/mount"
-#define MOUNT_OPTIONS	"noexec,nosuid"
+#define MOUNT_OPTIONS	"nosuid"
 #define MOUNT_TYPE_OPT	"-F"
 #else
 #define MOUNT		"/bin/mount"

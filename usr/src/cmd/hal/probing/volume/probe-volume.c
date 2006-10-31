@@ -34,6 +34,8 @@
 #include <libfstyp.h>
 #include <sys/vtoc.h>
 #include <sys/efi_partition.h>
+#include <sys/fs/hsfs_spec.h>
+#include <sys/fs/hsfs_isospec.h>
 #include <priv.h>
 
 #include <libhal.h>
@@ -118,7 +120,100 @@ set_fstyp_properties (LibHalContext *ctx, const char *udi, const char *fstype, n
 	my_dbus_error_free (&error);
 }
 
-dbus_bool_t
+/*
+ * hsfs/iso9660 contents detection: Video DVD, Video CD, etc.
+ */
+static void
+hsfs_contents(int fd, off_t probe_offset, LibHalContext *ctx, const char *udi)
+{
+	size_t	secsz = ISO_SECTOR_SIZE;
+	uchar_t	buf[ISO_SECTOR_SIZE];
+	int	ptbl_lbn, ptbl_size;
+	int	off, reloff, readoff;
+	uchar_t	*p;
+	char	*name;
+	int	name_len;
+	int	ipe_len;
+	DBusError error;
+
+	/*
+	 * find 1st Primary Volume Descriptor
+	 */
+	readoff = probe_offset + ISO_VOLDESC_SEC * secsz;
+	if (pread (fd, buf, secsz, readoff) != secsz) {
+		return;
+	}
+	while (ISO_DESC_TYPE (buf) != ISO_VD_PVD) {
+		if (ISO_DESC_TYPE (buf) == ISO_VD_EOV) {
+			return;
+		}
+		readoff += secsz;
+		if (pread (fd, buf, secsz, readoff) != secsz) {
+			return;
+		}
+	}
+
+	/*
+	 * PVD contains size and offset of the LSB/MSB path table
+	 */
+	ptbl_size = ISO_PTBL_SIZE (buf);
+#if defined(_LITTLE_ENDIAN)
+        ptbl_lbn = ISO_PTBL_MAN_LS (buf);
+#else
+        ptbl_lbn = ISO_PTBL_MAN_MS (buf);
+#endif
+
+	/*
+	 * Look through path table entries
+	 */
+	readoff = probe_offset + ptbl_lbn * secsz;
+	if (pread (fd, buf, secsz, readoff) != secsz) {
+		return;
+	}
+	dbus_error_init (&error);
+
+	for (off = reloff = 0;
+	    off < ptbl_size;
+	    off += ipe_len, reloff += ipe_len) {
+
+		/* load sectors on demand */
+		if (reloff >= secsz) {
+			readoff += secsz;
+			if (pread (fd, buf, secsz, readoff) != secsz) {
+				break;
+			}
+			reloff -= secsz;
+		}
+
+		p = buf + reloff;
+		name_len = IPE_NAME_LEN(p);
+		ipe_len = IPE_FPESIZE + name_len + (name_len % 2);
+
+		/* only interested in root directories */
+		if (IPE_PARENT_NO (p) != 1) {
+			continue;
+		}
+		if ((name_len < 2) || (name_len > IDE_MAX_NAME_LEN)) {
+			continue;
+		}
+
+		name = (char *)IPE_NAME (p);
+		if (strncasecmp (name, "VIDEO_TS", min (8, name_len)) == 0) {
+			libhal_device_set_property_bool (ctx, udi,
+			    "volume.disc.is_videodvd", TRUE, &error);
+		} else if (strncasecmp (name, "VCD", min (3, name_len)) == 0) {
+			libhal_device_set_property_bool (ctx, udi,
+			    "volume.disc.is_vcd", TRUE, &error);
+		} else if (strncasecmp (name, "SVCD", min (4, name_len)) == 0) {
+			libhal_device_set_property_bool (ctx, udi,
+			    "volume.disc.is_svcd", TRUE, &error);
+		}
+	}
+
+	my_dbus_error_free (&error);
+}
+
+static dbus_bool_t
 probe_disc (int fd, LibHalContext *ctx, const char *udi, dbus_bool_t *should_probe_for_fs)
 {
 	DBusError error;
@@ -254,6 +349,10 @@ probe_disc (int fd, LibHalContext *ctx, const char *udi, dbus_bool_t *should_pro
 	libhal_changeset_set_property_bool (cs, "volume.disc.is_rewritable", is_rewritable);
 	libhal_changeset_set_property_uint64 (cs, "volume.disc.capacity", capacity);
 
+	libhal_changeset_set_property_bool (cs, "volume.disc.is_videodvd", FALSE);
+	libhal_changeset_set_property_bool (cs, "volume.disc.is_vcd", FALSE);
+	libhal_changeset_set_property_bool (cs, "volume.disc.is_svcd", FALSE);
+
 	libhal_device_commit_changeset (ctx, cs, &error);
 	libhal_device_free_changeset (cs);
 
@@ -266,7 +365,7 @@ out:
 	return (TRUE);
 }
 
-void
+static void
 drop_privileges ()
 {
 	priv_set_t *pPrivSet = NULL;
@@ -546,6 +645,11 @@ skip_part:
 		}
 	}
 	set_fstyp_properties (ctx, udi, fstype, fsattr);
+
+	if (strcmp (fstype, "hsfs") == 0) {
+		hsfs_contents (fd, probe_offset, ctx, udi);
+	}
+
 	fstyp_fini(fstyp_handle);
 
 skip_fs:

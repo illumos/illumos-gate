@@ -255,10 +255,10 @@ run_request_run (run_request *r, DBusConnection *con, DBusMessage *msg, GPid *ou
 
 	program_exists = find_program(r->argv);
 
-	if (program_exists)
+	if (program_exists) {
 		program_dir = g_path_get_dirname (r->argv[0]);
-
-	printf("  full path is '%s', program_dir is '%s'\n", r->argv[0], program_dir);
+		printf("  full path is '%s', program_dir is '%s'\n", r->argv[0], program_dir);
+	}
 
 	if (!program_exists ||
 		!g_spawn_async_with_pipes(program_dir, r->argv, r->environment,
