@@ -280,7 +280,8 @@ physpath_to_devlink(const char *basedir, const char *node_path,
 	buf = malloc(PATH_MAX);
 	real_path = malloc(PATH_MAX);
 
-	deplen = pathconf(basedir, _PC_NAME_MAX) +
+	deplen = pathconf(basedir, _PC_NAME_MAX);
+	deplen = (deplen <= 0 ? MAXNAMELEN : deplen) +
 	    sizeof (struct dirent);
 	dep = (struct dirent *)malloc(deplen);
 
@@ -1185,7 +1186,8 @@ sata_make_dyncomp(const char *ap_id, char **dyncomp)
 		 * struct dirent includes one byte (the terminator)
 		 * so we don't add 1 to the calculation here.
 		 */
-		deplen = pathconf(devpath, _PC_NAME_MAX) +
+		deplen = pathconf(devpath, _PC_NAME_MAX);
+		deplen = ((deplen <= 0) ? MAXNAMELEN : deplen) +
 		    sizeof (struct dirent);
 		dep = (struct dirent *)malloc(deplen);
 		if (dep == NULL)

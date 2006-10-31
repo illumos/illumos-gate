@@ -567,7 +567,9 @@ find_physical_disk_node(char *physpath, int pathbuflen, int portnum,
 	 * in the devfs filesystem.  The NUL byte is accounted-for in the
 	 * 1 byte already allocated as part of d_name in the dirent structure.
 	 */
-	dentlen = sizeof (struct dirent) + pathconf(physpath, _PC_NAME_MAX);
+	dentlen = pathconf(physpath, _PC_NAME_MAX);
+	dentlen = ((dentlen <= 0) ? MAXNAMELEN : dentlen) +
+	    sizeof (struct dirent);
 	dent = topo_mod_alloc(mod, dentlen);
 
 	errno = 0;
@@ -622,7 +624,9 @@ sata_maximum_port(char *dpath, topo_mod_t *mod)
 	 * in the devfs filesystem.  The NUL byte is accounted-for in the
 	 * 1 byte already allocated as part of d_name in the dirent structure.
 	 */
-	dentlen = sizeof (struct dirent) + pathconf(devpath, _PC_NAME_MAX);
+	dentlen = pathconf(devpath, _PC_NAME_MAX);
+	dentlen = ((dentlen <= 0) ? MAXNAMELEN : dentlen) +
+	    sizeof (struct dirent);
 	dent = topo_mod_alloc(mod, dentlen);
 
 	/*
