@@ -1094,6 +1094,19 @@ mp_startup(void)
 	uint_t new_x86_feature;
 
 	/*
+	 * We need to get TSC on this proc synced (i.e., any delta
+	 * from cpu0 accounted for) as soon as we can, because many
+	 * many things use gethrtime/pc_gethrestime, including
+	 * interrupts, cmn_err, etc.
+	 */
+
+	/* Let cpu0 continue into tsc_sync_master() */
+	CPUSET_ATOMIC_ADD(procset, cp->cpu_id);
+
+	if (tsc_gethrtime_enable)
+		tsc_sync_slave();
+
+	/*
 	 * Once this was done from assembly, but it's safer here; if
 	 * it blocks, we need to be able to swtch() to and from, and
 	 * since we get here by calling t_pc, we need to do that call
@@ -1155,11 +1168,6 @@ mp_startup(void)
 	(void) cpuid_pass4(cp);
 
 	init_cpu_info(cp);
-
-	CPUSET_ATOMIC_ADD(procset, cp->cpu_id);
-
-	if (tsc_gethrtime_enable)
-		tsc_sync_slave();
 
 	mutex_enter(&cpu_lock);
 	/*
