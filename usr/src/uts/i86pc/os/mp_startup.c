@@ -1190,6 +1190,16 @@ mp_startup(void)
 
 	mutex_exit(&cpu_lock);
 
+	/*
+	 * Enable preemption here so that contention for any locks acquired
+	 * later in mp_startup may be preempted if the thread owning those
+	 * locks is continously executing on other CPUs (for example, this
+	 * CPU must be preemptible to allow other CPUs to pause it during their
+	 * startup phases).  It's safe to enable preemption here because the
+	 * CPU state is pretty-much fully constructed.
+	 */
+	curthread->t_preempt = 0;
+
 	add_cpunode2devtree(cp->cpu_id, cp->cpu_m.mcpu_cpi);
 
 	/* The base spl should still be at LOCK LEVEL here */
