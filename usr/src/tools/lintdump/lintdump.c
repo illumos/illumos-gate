@@ -64,7 +64,7 @@ static void usage(void);
 static void indent(void);
 static void unindent(void);
 static void print_lintlib(const char *, FILE *, FLENS *);
-static void print_pass(FILE *);
+static void print_pass(const char *, FILE *);
 static void print_atype(ATYPE *, int, ATYPE *, const char *);
 static void print_mods(const char *, ATYPE *, int, ATYPE *, uint_t);
 static void getstr(FILE *, char *, size_t);
@@ -168,7 +168,7 @@ print_lintlib(const char *lnname, FILE *fp, FLENS *hp)
 		if (justpass < 0 || justpass == pass) {
 			infohdr("SECTION", "PASS%u: %lu bytes\n", pass,
 			    psizes[pass]);
-			print_pass(fp);
+			print_pass(lnname, fp);
 		}
 		passoff += psizes[pass];
 		(void) fseek(fp, passoff, SEEK_SET);
@@ -179,7 +179,7 @@ print_lintlib(const char *lnname, FILE *fp, FLENS *hp)
  * Print out a PASS section of a lint library.
  */
 static void
-print_pass(FILE *fp)
+print_pass(const char *lnname, FILE *fp)
 {
 	union rec	rec;
 	int		nargs;
@@ -190,7 +190,7 @@ print_pass(FILE *fp)
 
 	for (;;) {
 		if (fread(&rec, sizeof (rec), 1, fp) != 1)
-			die("unexpected end of data stream\n");
+			die("%s: unexpected end of file\n", lnname);
 
 		line = rec.l;
 		if (line.decflag & LND)		/* end-of-pass marker */
@@ -227,7 +227,7 @@ print_pass(FILE *fp)
 				die("cannot allocate argument information");
 
 			if (fread(args, sizeof (atype), nargs, fp) != nargs)
-				die("unexpected end of data stream\n");
+				die("%s: unexpected end of file\n", lnname);
 
 			print_atype(&line.type, line.nargs, args, name);
 			free(args);
@@ -269,9 +269,10 @@ print_pass(FILE *fp)
 
 			indent();
 			for (; nargs > 0; nargs--) {
-				if (fread(&atype, sizeof (atype), 1, fp) != 1)
-					die("unexpected end of data stream\n");
-
+				if (fread(&atype, sizeof (atype), 1, fp) != 1) {
+					die("%s: unexpected end of file\n",
+					    lnname);
+				}
 				getstr(fp, name, sizeof (name));
 				print_atype(&atype, 0, NULL, name);
 				info(";\n");
@@ -281,7 +282,7 @@ print_pass(FILE *fp)
 			continue;
 		}
 
-		warn("unknown record type 0%o\n", line.decflag);
+		warn("%s: unknown record type 0%o\n", lnname, line.decflag);
 	}
 }
 
