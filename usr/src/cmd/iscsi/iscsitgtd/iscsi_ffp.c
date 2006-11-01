@@ -42,6 +42,7 @@
 #include <utility.h>
 #include <netinet/in.h>
 #include <inttypes.h>
+#include <sys/socket.h>
 #include <sys/iscsi_protocol.h>
 
 #include "iscsi_ffp.h"
@@ -68,8 +69,7 @@ iscsi_full_feature(iscsi_conn_t *c)
 	int		cc,
 			ahslen;
 
-	if ((cc = read_retry(c->c_fd, (char *)&h,
-	    sizeof (h))) != sizeof (h)) {
+	if ((cc = recv(c->c_fd, &h, sizeof (h), MSG_WAITALL)) != sizeof (h)) {
 		if (errno == ECONNRESET) {
 			(void) snprintf(debug, sizeof (debug),
 			    "CON%x  full_feature -- initiator reset socket",
@@ -91,7 +91,7 @@ iscsi_full_feature(iscsi_conn_t *c)
 	if ((ahslen = (h.hlength * sizeof (uint32_t))) != 0) {
 		if ((ahs = malloc(ahslen)) == NULL)
 			return (False);
-		if (read_retry(c->c_fd, ahs, ahslen) != ahslen) {
+		if (recv(c->c_fd, ahs, ahslen, MSG_WAITALL) != ahslen) {
 			(void) snprintf(debug, sizeof (debug),
 			    "CON%x  Failed to read in AHS", c->c_num);
 			queue_str(c->c_mgmtq, Q_CONN_ERRS, msg_log, debug);
@@ -103,8 +103,8 @@ iscsi_full_feature(iscsi_conn_t *c)
 		uint32_t	crc_actual,
 				crc_calculated;
 
-		(void) read_retry(c->c_fd, (char *)&crc_actual,
-		    sizeof (crc_actual));
+		(void) recv(c->c_fd, (char *)&crc_actual,
+		    sizeof (crc_actual), MSG_WAITALL);
 		crc_calculated = iscsi_crc32c((void *)&h, sizeof (h));
 		if (ahslen)
 			crc_calculated = iscsi_crc32c_continued(ahs,
@@ -778,15 +778,15 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 		cmd->c_data_alloc = True;
 	}
 
-	if ((cc = read_retry(c->c_fd, cmd->c_data, dlen)) != dlen) {
+	if ((cc = recv(c->c_fd, cmd->c_data, dlen, MSG_WAITALL)) != dlen) {
 		if (errno == ECONNRESET) {
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 			    "CON%x  dataout_delayed -- "
 			    "initiator reset socket", c->c_num);
 		} else {
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-			    "CON%x  read_retry(got-%d, expect-%d), "
-			    "errno=%d", c->c_num, cc, dlen, errno);
+			    "CON%x  recv(got-%d, expect-%d), errno=%d",
+			    c->c_num, cc, dlen, errno);
 		}
 
 		(void) pthread_mutex_lock(&c->c_mutex);
@@ -800,7 +800,7 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 	    (dlen & (ISCSI_PAD_WORD_LEN - 1))) & (ISCSI_PAD_WORD_LEN - 1));
 
 	if (pad_len) {
-		if (read_retry(c->c_fd, pad_buf, pad_len) != pad_len) {
+		if (recv(c->c_fd, pad_buf, pad_len, MSG_WAITALL) != pad_len) {
 			if (errno == ECONNRESET) {
 				queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 				    "CON%x  dataout_delayed -- "
@@ -820,8 +820,8 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 	}
 
 	if (c->c_data_digest == True) {
-		if (read_retry(c->c_fd, (char *)&crc_actual,
-		    sizeof (crc_actual)) != sizeof (crc_actual)) {
+		if (recv(c->c_fd, (char *)&crc_actual, sizeof (crc_actual),
+		    MSG_WAITALL) != sizeof (crc_actual)) {
 			if (errno == ECONNRESET) {
 				queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 				    "CON%x  dataout_delayed -- "
@@ -914,14 +914,14 @@ dataout_callback(t10_cmd_t *t, char *data, size_t *xfer)
 		return;
 	}
 
-	if ((cc = read_retry(c->c_fd, data, dlen)) != dlen) {
+	if ((cc = recv(c->c_fd, data, dlen, MSG_WAITALL)) != dlen) {
 		if (errno == ECONNRESET) {
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 			    "CON%x  data_callback -- initiator reset socket",
 			    c->c_num);
 		} else {
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-			    "CON%x  read_retry(got-%d, expect-%d) errno=%d",
+			    "CON%x  recv(got-%d, expect-%d) errno=%d",
 			    c->c_num, cc, dlen, errno);
 		}
 
@@ -930,8 +930,7 @@ dataout_callback(t10_cmd_t *t, char *data, size_t *xfer)
 	}
 
 	if (pad_len) {
-		if (read_retry(c->c_fd, pad_buf, pad_len)
-		    != pad_len) {
+		if (recv(c->c_fd, pad_buf, pad_len, MSG_WAITALL) != pad_len) {
 			if (errno == ECONNRESET) {
 				queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 				    "CON%x  data_callback -- "

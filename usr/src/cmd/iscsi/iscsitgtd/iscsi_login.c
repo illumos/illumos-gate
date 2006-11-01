@@ -142,7 +142,6 @@ iscsi_handle_login_pkt(iscsi_conn_t *c)
 				text_length	= 0,
 				keytype		= 0,
 				transit		= 0,
-				tpgt,
 				rc		= 0;
 	auth_action_t		auth_action	= LOGIN_DROP;
 	xml_node_t		*tnode		= NULL;
@@ -615,15 +614,6 @@ more_text:
 			 */
 			c->c_max_burst_len = MIN(c->c_max_burst_len,
 			    c->c_max_recv_data);
-			/*
-			 * XXX Need to get this information passed up
-			 * to the SAM-3 layer so that the SCSI TPG stuff
-			 * works again.
-			 */
-			tpgt = find_main_tpgt(&(c->c_target_sockaddr));
-			if (tpgt == 0)
-				tpgt = T10_DEFAULT_TPG;
-			c->c_tpgt = tpgt;
 		}
 	}
 

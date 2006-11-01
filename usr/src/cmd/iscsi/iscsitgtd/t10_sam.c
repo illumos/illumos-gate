@@ -345,10 +345,10 @@ t10_cmd_create(t10_targ_handle_t t, int lun_number, uint8_t *cdb,
 	if (t == NULL)
 		goto error;
 
-	if ((cmd = (t10_cmd_t *)calloc(1, sizeof (t10_cmd_t))) == NULL)
+	if ((cmd = calloc(1, sizeof (t10_cmd_t))) == NULL)
 		goto error;
 
-	if ((cmd->c_cdb = (uint8_t *)malloc(cdb_len)) == NULL)
+	if ((cmd->c_cdb = malloc(cdb_len)) == NULL)
 		goto error;
 
 	cmd->c_trans_id	= trans_id;
@@ -366,10 +366,12 @@ t10_cmd_create(t10_targ_handle_t t, int lun_number, uint8_t *cdb,
 	return (True);
 
 error:
-	cmd->c_state = T10_Cmd_Errored;
-	if (cmd->c_cdb) {
-		free(cmd->c_cdb);
-		cmd->c_cdb = NULL;
+	if (cmd) {
+		cmd->c_state = T10_Cmd_Errored;
+		if (cmd->c_cdb) {
+			free(cmd->c_cdb);
+			cmd->c_cdb = NULL;
+		}
 	}
 
 	/*
@@ -814,7 +816,7 @@ trans_send_datain(t10_cmd_t *cmd, char *data, size_t data_len, size_t offset,
 		if ((c = calloc(1, sizeof (*c))) == NULL)
 			return (False);
 		bcopy(cmd, c, sizeof (*c));
-		if ((c->c_cdb = (uint8_t *)malloc(c->c_cdb_len)) == NULL) {
+		if ((c->c_cdb = malloc(c->c_cdb_len)) == NULL) {
 			free(c);
 			return (False);
 		}
@@ -1596,6 +1598,8 @@ lu_runner(void *v)
 				free(lu->l_guid);
 				free(lu);
 				queue_message_free(m);
+				queue_message_set(mgmtq, 0, msg_pthread_join,
+				    (void *)(uintptr_t)pthread_self());
 				pthread_exit(NULL);
 			}
 			(void) pthread_mutex_unlock(&lu->l_common_mutex);

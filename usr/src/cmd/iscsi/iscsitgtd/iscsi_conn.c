@@ -217,6 +217,7 @@ conn_process(void *v)
 
 	c->c_dataq	= queue_alloc();
 	c->c_maxcmdsn	= CMD_MAXOUTSTANDING;
+
 	if (sema_init(&c->c_datain, 0, USYNC_THREAD, NULL) != 0) {
 		port_conn_remove(c);
 		free(c);
@@ -414,6 +415,8 @@ conn_process(void *v)
 
 	util_title(c->c_mgmtq, Q_CONN_LOGIN, c->c_num, "End Receiver");
 
+	queue_message_set(c->c_mgmtq, 0, msg_pthread_join,
+	    (void *)(uintptr_t)pthread_self());
 	/*
 	 * Remove this connection from linked list of current connections.
 	 * This will also free the connection queue. Must not hold the
@@ -559,7 +562,8 @@ iscsi_conn_data_in(t10_cmd_t *t)
 	 * the initiator to indicate if it can handle out-of-order
 	 * PDUs.
 	 */
-	if (cmd->c_offset_in != T10_DATA_OFFSET(t)) {
+	if ((c->c_data_pdu_in_order == True) &&
+	    (cmd->c_offset_in != T10_DATA_OFFSET(t))) {
 		iscsi_cmd_delayed_store(cmd, t);
 		(void) pthread_mutex_unlock(&c->c_mutex);
 		return;

@@ -66,48 +66,6 @@ util_init()
 
 /*
  * []----
- * | read_retry -- read data into buffer
- * |
- * | There have been problems on Solaris when reads from a socket
- * | fail to return the expected amount of data. It seems to occur
- * | around 2KB, but nothing reproduciable. By issuing multiple reads
- * | and adjusting the buffer pointer we can get around this problem.
- * | The suspection at this point is an interaction with threads, sockets,
- * | and large iSCSI transfers.
- * []----
- */
-int
-read_retry(int fd, char *buf, int count)
-{
-#define	SMALLER_READS
-#ifdef SMALLER_READS
-	int	cc,
-		min,
-		total = 0;
-
-	while (count) {
-		min = MIN(count, 512);
-		cc = read(fd, buf, min);
-		if (cc == -1) {
-			if ((errno == EAGAIN) || (errno == 0))
-				continue;
-			else
-				return (-1);
-		}
-		if (cc == 0)
-			break;
-		buf += cc;
-		count -= cc;
-		total += cc;
-	}
-	return (total);
-#else
-	return (read(fd, buf, count));
-#endif
-}
-
-/*
- * []----
  * | check_access -- see if the requesting initiator is in the ACL
  * |
  * | Optionally will also check to see if this initiator requires
@@ -294,57 +252,6 @@ add_target_address(iscsi_conn_t *c, char **text, int *text_length,
 	}
 }
 
-#ifdef notused
-/*
- * []----
- * | create_tpgt_list -- create XML list of tpgt's for target
- * |
- * | Caller must free the data returned. The incoming tname is the
- * | iSCSI node name (we normally use the IQN form).
- * []----
- */
-char *
-create_tpgt_list(char *tname)
-{
-	char		*buf		= NULL,
-			*p;
-	xml_node_t	*tnode		= NULL,
-			*tpgtlist	= NULL,
-			*tpgt		= NULL;
-
-	while ((tnode = xml_node_next(targets_config, XML_ELEMENT_TARG,
-	    tnode)) != NULL) {
-		if (xml_find_value_str(tnode, XML_ELEMENT_INAME, &p) ==
-		    False) {
-			continue;
-		}
-		if (strcmp(tname, p) != 0) {
-			free(p);
-			continue;
-		} else
-			free(p);
-		if ((tpgtlist = xml_node_next(tnode, XML_ELEMENT_TPGTLIST,
-		    NULL)) == NULL) {
-
-			/*
-			 * No TPGT list available so just return a NULL.
-			 * This is not an error.
-			 */
-			return (NULL);
-		}
-
-		buf_add_tag(&buf, XML_ELEMENT_TPGTLIST, Tag_Start);
-		while ((tpgt = xml_node_next(tpgtlist, XML_ELEMENT_TPGT,
-		    tpgt)) != NULL) {
-			xml_add_tag(&buf, XML_ELEMENT_TPGT, tpgt->x_value);
-		}
-		buf_add_tag(&buf, XML_ELEMENT_TPGTLIST, Tag_End);
-		return (buf);
-	}
-	return (NULL);
-}
-#endif
-
 /*
  * []----
  * | add_targets -- add TargetName and TargetAddress to text argument
@@ -383,87 +290,6 @@ add_targets(iscsi_conn_t *c, char **text, int *text_length)
 	}
 	return (rval);
 }
-
-#ifdef notused
-/*
- * []----
- * | add_target_alias -- Add TargetAlias property if available.
- * []----
- */
-Boolean_t
-add_target_alias(iscsi_conn_t *c, char **text, int *text_length)
-{
-	xml_node_t	*targ		= NULL;
-	char		*targ_name	= NULL,
-			*alias_name	= NULL;
-	Boolean_t	rval		= True;
-
-	/*
-	 * Most discovery sessions don't have a target name which is
-	 * what they're looking for in the first place.
-	 */
-	if (c->c_sess->s_type == SessionDiscovery)
-		return (True);
-
-	while ((targ = xml_node_next(targets_config, XML_ELEMENT_TARG,
-	    targ)) != NULL) {
-
-		/*
-		 * This is a hard error. Since we use node-name quite often
-		 * up to this point in time if this fails either we've run
-		 * out of memory or there's a memory corruption problem.
-		 */
-		if (xml_find_value_str(targ, XML_ELEMENT_INAME, &targ_name) ==
-		    False)
-			return (False);
-
-		if (strcmp(targ_name, c->c_sess->s_t_name) == 0) {
-			if (xml_find_value_str(targ, XML_ELEMENT_ALIAS,
-			    &alias_name) == True) {
-
-				/*
-				 * Target name matches and we've got an alias.
-				 */
-				rval = add_text(text, text_length,
-				    ISCSI_TARGET_ALIAS, alias_name);
-				queue_prt(c->c_mgmtq, Q_CONN_LOGIN,
-				    "CON%x    %-24s = %s", c->c_num,
-				    ISCSI_TARGET_ALIAS, alias_name);
-				break;
-			} else if (xml_find_value_str(targ, XML_ELEMENT_TARG,
-			    &alias_name) == True) {
-
-				/*
-				 * If we don't have a user settable alias
-				 * then use the local name the administrator
-				 * setup.
-				 */
-				rval = add_text(text, text_length,
-				    ISCSI_TARGET_ALIAS, alias_name);
-				queue_prt(c->c_mgmtq, Q_CONN_LOGIN,
-				    "CON%x    %-24s = %s", c->c_num,
-				    ISCSI_TARGET_ALIAS, alias_name);
-				break;
-			}
-		}
-
-		/*
-		 * We don't have to worry about freeing alias_name because
-		 * it will only be set if we found a match and had an alias
-		 * in which case we'd never get here.
-		 */
-		free(targ_name);
-		targ_name = NULL;
-	}
-
-	if (targ_name)
-		free(targ_name);
-	if (alias_name)
-		free(alias_name);
-
-	return (rval);
-}
-#endif
 
 /*
  * []----
@@ -649,24 +475,62 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 		 * At this point, 'cur_pair' points at the name and 'n'
 		 * points at the value.
 		 */
+
+		/*
+		 * []--------------------------------------------------[]
+		 * | The order of parameters processed matches the	|
+		 * | the RFC in section 12.				|
+		 * []--------------------------------------------------[]
+		 */
+		/*
+		 * 12.1 -- HeaderDigest
+		 * Negotiated
+		 */
 		if (strcmp("HeaderDigest", cur_pair) == 0) {
 
 			rval = parse_digest_vals(&c->c_header_digest,
 			    cur_pair, n, text, text_length);
 
+		/*
+		 * 12.1 -- DataDigest
+		 * Negotiated
+		 */
 		} else if (strcmp("DataDigest", cur_pair) == 0) {
 
 			rval = parse_digest_vals(&c->c_data_digest, cur_pair,
 			    n, text, text_length);
 
-		} else if (strcmp("InitiatorName", cur_pair) == 0) {
+		/*
+		 * 12.2 -- MaxConnections
+		 * Negotiated
+		 */
+		} else if (strcmp("MaxConnections", cur_pair) == 0) {
 
-			send_named_msg(c, msg_initiator_name, n);
+			/* ---- To be fixed ---- */
+			c->c_max_connections = 1;
+			(void) snprintf(param_rsp, sizeof (param_rsp),
+			    "%d", c->c_max_connections);
+			rval = add_text(text, text_length,
+			    cur_pair, param_rsp);
 
-		} else if (strcmp("InitiatorAlias", cur_pair) == 0) {
+		/*
+		 * 12.3 -- SendTargets
+		 * Declarative
+		 */
+		} else if (strcmp("SendTargets", cur_pair) == 0) {
 
-			send_named_msg(c, msg_initiator_alias, n);
+			if ((c->c_sess->s_type != SessionDiscovery) &&
+			    (strcmp("All", n) == 0)) {
+				rval = add_text(text, text_length, cur_pair,
+				    "Irrelevant");
+			} else {
+				rval = add_targets(c, text, text_length);
+			}
 
+		/*
+		 * 12.4 -- TargetName
+		 * Declarative
+		 */
 		} else if (strcmp("TargetName", cur_pair) == 0) {
 
 			send_named_msg(c, msg_target_name, n);
@@ -694,57 +558,43 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 				    "TargetPortalGroupTag", param_buf);
 			}
 
-		} else if (strcmp("SessionType", cur_pair) == 0) {
+		/*
+		 * 12.5 -- IntiatorName
+		 * Declarative
+		 */
+		} else if (strcmp("InitiatorName", cur_pair) == 0) {
 
-			c->c_sess->s_type = strcmp(n, "Discovery") == 0 ?
-			    SessionDiscovery : SessionNormal;
+			send_named_msg(c, msg_initiator_name, n);
 
-		} else if (strcmp("SendTargets", cur_pair) == 0) {
+		/* ---- Section 12.6 is handled within TargetName ---- */
 
-			if ((c->c_sess->s_type != SessionDiscovery) &&
-			    (strcmp("All", n) == 0)) {
-				rval = add_text(text, text_length, cur_pair,
-				    "Irrelevant");
-			} else {
-				rval = add_targets(c, text, text_length);
-			}
+		/*
+		 * 12.7 -- InitiatorAlias
+		 * Declarative
+		 */
+		} else if (strcmp("InitiatorAlias", cur_pair) == 0) {
 
-		} else if (strcmp("MaxRecvDataSegmentLength", cur_pair) == 0) {
+			send_named_msg(c, msg_initiator_alias, n);
 
-			c->c_max_recv_data = strtol(n, NULL, 0);
-			rval = add_text(text, text_length, cur_pair, n);
+		/*
+		 * Sections 12.8 (TargetAddress) and 12.9
+		 * (TargetPortalGroupTag) are handled during the SendTargets
+		 * processing.
+		 */
 
-		} else if (strcmp("DefaultTime2Wait", cur_pair) == 0) {
-
-			c->c_default_time_2_wait = strtol(n, NULL, 0);
-
-		} else if (strcmp("DefaultTime2Retain", cur_pair) == 0) {
-
-			c->c_default_time_2_retain = strtol(n, NULL, 0);
-
-		} else if (strcmp("ErrorRecoveryLevel", cur_pair) == 0) {
-
-			c->c_erl = 0;
-			(void) snprintf(param_rsp, sizeof (param_rsp),
-			    "%d", c->c_erl);
-			rval = add_text(text, text_length,
-			    cur_pair, param_rsp);
-
-		} else if (strcmp("IFMarker", cur_pair) == 0) {
-
-			c->c_ifmarker = False;
-			rval = add_text(text, text_length, cur_pair, "No");
-
-		} else if (strcmp("OFMarker", cur_pair) == 0) {
-
-			c->c_ofmarker = False;
-			rval = add_text(text, text_length, cur_pair, "No");
-
+		/*
+		 * 12.10 -- IntialR2T
+		 * Negotiated
+		 */
 		} else if (strcmp("InitialR2T", cur_pair) == 0) {
 
 			c->c_initialR2T = True;
 			rval = add_text(text, text_length, cur_pair, "Yes");
 
+		/*
+		 * 12.11 -- ImmediateData
+		 * Negotiated
+		 */
 		} else if (strcmp("ImmediateData", cur_pair) == 0) {
 
 			/*
@@ -752,16 +602,34 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 			 * a problem just echo back what the initiator
 			 * sends. If the initiator decides to violate
 			 * the spec by sending immediate data even though
-			 * they've disabled it, it's there problem and
+			 * they've disabled it, it's their problem and
 			 * we'll deal with the data.
 			 */
 			c->c_immediate_data = strcmp(n, "No") ? True : False;
 			rval = add_text(text, text_length, cur_pair, n);
 
+		/*
+		 * 12.12 -- MaxRecvDataSegmentLength
+		 * Declarative
+		 */
+		} else if (strcmp("MaxRecvDataSegmentLength", cur_pair) == 0) {
+
+			c->c_max_recv_data = strtol(n, NULL, 0);
+			rval = add_text(text, text_length, cur_pair, n);
+
+		/*
+		 * 12.13 -- MaxBurstLength
+		 * Negotiated
+		 */
 		} else if (strcmp("MaxBurstLength", cur_pair) == 0) {
 
 			c->c_max_burst_len = strtol(n, NULL, 0);
+			rval = add_text(text, text_length, cur_pair, n);
 
+		/*
+		 * 12.14 -- FirstBurstLength
+		 * Negotiated
+		 */
 		} else if (strcmp("FirstBurstLength", cur_pair) == 0) {
 
 			/*
@@ -771,7 +639,30 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 			 * but there's no real need to do so.
 			 */
 			c->c_first_burst_len = strtol(n, NULL, 0);
+			rval = add_text(text, text_length, cur_pair, n);
 
+		/*
+		 * 12.15 DefaultTime2Wait
+		 * Negotiated
+		 */
+		} else if (strcmp("DefaultTime2Wait", cur_pair) == 0) {
+
+			c->c_default_time_2_wait = strtol(n, NULL, 0);
+			rval = add_text(text, text_length, cur_pair, n);
+
+		/*
+		 * 12.16 -- DefaultTime2Retain
+		 * Negotiated
+		 */
+		} else if (strcmp("DefaultTime2Retain", cur_pair) == 0) {
+
+			c->c_default_time_2_retain = strtol(n, NULL, 0);
+			rval = add_text(text, text_length, cur_pair, n);
+
+		/*
+		 * 12.17 -- MaxOutstandingR2T
+		 * Negotiated
+		 */
 		} else if (strcmp("MaxOutstandingR2T", cur_pair) == 0) {
 
 			/*
@@ -779,16 +670,12 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 			 * one R2T packet.
 			 */
 			c->c_max_outstanding_r2t = strtol(n, NULL, 0);
+			rval = add_text(text, text_length, cur_pair, n);
 
-		} else if (strcmp("MaxConnections", cur_pair) == 0) {
-
-			/* ---- To be fixed ---- */
-			c->c_max_connections = 1;
-			(void) snprintf(param_rsp, sizeof (param_rsp),
-			    "%d", c->c_max_connections);
-			rval = add_text(text, text_length,
-			    cur_pair, param_rsp);
-
+		/*
+		 * 12.18 -- DataPDUInOder
+		 * Negotiated
+		 */
 		} else if (strcmp("DataPDUInOrder", cur_pair) == 0) {
 
 			/*
@@ -804,6 +691,10 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 			    True : False;
 			rval = add_text(text, text_length, cur_pair, n);
 
+		/*
+		 * 12.19 -- DataSequenceInOrder
+		 * Negotiated
+		 */
 		} else if (strcmp("DataSequenceInOrder", cur_pair) == 0) {
 
 			/*
@@ -811,10 +702,50 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 			 * PDU sequence numbers be in order. The check
 			 * now is only done as a prelude to supporting
 			 * MC/S and guaranteeing the order of incoming
-			 * packetss on different connections.
+			 * packets on different connections.
 			 */
 			c->c_data_sequence_in_order = True;
 			rval = add_text(text, text_length, cur_pair, "Yes");
+
+		/*
+		 * 12.20 -- ErrorRecoveryLevel
+		 * Negotiated
+		 */
+		} else if (strcmp("ErrorRecoveryLevel", cur_pair) == 0) {
+
+			c->c_erl = 0;
+			(void) snprintf(param_rsp, sizeof (param_rsp),
+			    "%d", c->c_erl);
+			rval = add_text(text, text_length,
+			    cur_pair, param_rsp);
+
+		/*
+		 * 12.21 -- SessionType
+		 * Declarative
+		 */
+		} else if (strcmp("SessionType", cur_pair) == 0) {
+
+			c->c_sess->s_type = strcmp(n, "Discovery") == 0 ?
+			    SessionDiscovery : SessionNormal;
+
+
+		/*
+		 * Appendix A 3.1 -- IFMarker
+		 * Negotiated
+		 */
+		} else if (strcmp("IFMarker", cur_pair) == 0) {
+
+			c->c_ifmarker = False;
+			rval = add_text(text, text_length, cur_pair, "No");
+
+		/*
+		 * Appendix A 3.1 -- OFMarker
+		 * Negotiated
+		 */
+		} else if (strcmp("OFMarker", cur_pair) == 0) {
+
+			c->c_ofmarker = False;
+			rval = add_text(text, text_length, cur_pair, "No");
 
 		} else if ((strcmp("AuthMethod", cur_pair) == 0) ||
 		    (strcmp("CHAP_A", cur_pair) == 0) ||
@@ -823,8 +754,8 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 		    (strcmp("CHAP_N", cur_pair) == 0) ||
 		    (strcmp("CHAP_R", cur_pair) == 0)) {
 
-			rval = add_text(&(c->auth_text), &(c->auth_text_length),
-					    cur_pair, n);
+			rval = add_text(&(c->auth_text), &c->auth_text_length,
+			    cur_pair, n);
 
 		} else {
 
@@ -884,11 +815,11 @@ connection_parameters_default(iscsi_conn_t *c)
  * []----
  * | find_main_tpgt -- Looks up the IP address and finds a match TPGT
  * |
- * | If no, TPGT for this address exists the routine returns 0 which
+ * | If no TPGT for this address exists the routine returns 0 which
  * | is an illegal TPGT value.
  * []----
  */
-int
+static int
 find_main_tpgt(struct sockaddr_storage *pst)
 {
 	char		ip_addr[16];
@@ -935,9 +866,18 @@ find_main_tpgt(struct sockaddr_storage *pst)
 		}
 	}
 
-	return (1);
+	return (0);
 }
 
+/*
+ * convert_to_tpgt -- return a TPGT based on the target address
+ *
+ * If a target doesn't have a TPGT list then just return the default
+ * value of 1. Otherwise determine which TPGT the target address is
+ * part of and find that TPGT value in the list of TPGTs this target
+ * is willing to expose. If the TPGT value is not found in the list
+ * return zero which will break the connection.
+ */
 static int
 convert_to_tpgt(iscsi_conn_t *c, xml_node_t *targ)
 {
@@ -947,18 +887,18 @@ convert_to_tpgt(iscsi_conn_t *c, xml_node_t *targ)
 			pos_tpgt;
 
 	/*
-	 * If we don't find our IP in the general configuration list
-	 * we'll use the default value which is 1 according to RFC3720.
-	 */
-	addr_tpgt = find_main_tpgt(&(c->c_target_sockaddr));
-
-	/*
 	 * If this target doesn't have a list of target portal group tags
 	 * just return the default which is 1.
 	 */
 	list = xml_node_next(targ, XML_ELEMENT_TPGTLIST, NULL);
 	if (list == NULL)
-		return (addr_tpgt);
+		return (1);
+
+	/*
+	 * If we don't find our IP in the general configuration list
+	 * we'll use the default value which is 1 according to RFC3720.
+	 */
+	addr_tpgt = find_main_tpgt(&(c->c_target_sockaddr));
 
 	while ((tpgt = xml_node_next(list, XML_ELEMENT_TPGT, tpgt)) != NULL) {
 		(void) xml_find_value_int(tpgt, XML_ELEMENT_TPGT, &pos_tpgt);

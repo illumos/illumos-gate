@@ -169,6 +169,13 @@ typedef enum {
 	 * ---------------- Debug/Management type messages ----------------
 	 */
 	/*
+	 * When a thread shutdowns someone must call pthread_join else
+	 * the thread will remain in a zombie state taking up some
+	 * amount of memory.
+	 */
+	msg_pthread_join,
+
+	/*
 	 * Requests from and replys to the management host will be done using
 	 * these messages.
 	 */

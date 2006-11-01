@@ -273,6 +273,8 @@ sess_from_t10(void *v)
 		}
 		queue_message_free(m);
 	}
+	queue_message_set(s->s_mgmtq, 0, msg_pthread_join,
+	    (void *)(uintptr_t)pthread_self());
 	queue_free(s->s_t10q, NULL);
 	util_title(s->s_mgmtq, Q_SESS_LOGIN, s->s_num, "End Session");
 	free(s);
@@ -421,6 +423,9 @@ sess_process(void *v)
 				queue_message_set(s->s_t10q, 0,
 				    msg_shutdown_rsp, 0);
 				process = False;
+				queue_message_set(s->s_mgmtq, 0,
+				    msg_pthread_join,
+				    (void *)(uintptr_t)pthread_self());
 			} else {
 
 				/*

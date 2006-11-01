@@ -516,6 +516,8 @@ logout_cleanup(void *v)
 	queue_free(m.m_q, NULL);
 	free(targ);
 
+	queue_message_set(mgmtq, 0, msg_pthread_join,
+	    (void *)(uintptr_t)pthread_self());
 	return ((void *)0);
 }
 
@@ -636,6 +638,8 @@ empty_garbage(void *v)
 	(void) sleep(g->g_timo);
 	free(g->g_buf);
 	free(g);
+	queue_message_set(mgmtq, 0, msg_pthread_join,
+	    (void *)(uintptr_t)pthread_self());
 	return (NULL);
 }
 
@@ -815,6 +819,7 @@ main(int argc, char **argv)
 	mgmt_request_t		*mgmt;
 	struct sigaction	act;
 	struct rlimit		rl;
+	void			*thr_status;
 
 	door_name	= ISCSI_TARGET_MGMT_DOOR;
 
@@ -928,6 +933,16 @@ main(int argc, char **argv)
 		msg = queue_message_get(q);
 
 		switch (msg->msg_type) {
+		case msg_pthread_join:
+			(void) pthread_join((pthread_t)(uintptr_t)msg->msg_data,
+			    &thr_status);
+			if (thr_status != 0)
+				queue_prt(q, Q_GEN_ERRS,
+				    "Thread %d exit with %d",
+				    msg->msg_data, thr_status);
+			msg->msg_data = NULL;
+			break;
+
 		case msg_log:
 			if ((p = strchr(msg->msg_data, '\n')) != NULL)
 				*p = '\0';

@@ -76,7 +76,6 @@ Boolean_t update_config_main(char **msg);
 Boolean_t add_target_alias(iscsi_conn_t *c, char **text, int *test_length);
 Boolean_t validate_version(xml_node_t *node, int *maj, int *min);
 char *create_tpgt_list(char *tname);
-int find_main_tpgt(struct sockaddr_storage *pst);
 Boolean_t check_access(xml_node_t *targ, char *initiator_name,
     Boolean_t req_chap);
 xml_node_t *find_target_node(char *targ_name);
