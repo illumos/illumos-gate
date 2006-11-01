@@ -290,15 +290,7 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 		 * downward.
 		 */
 		if (pgcmd & MHA_MAPSIZE_STACK) {
-			/*
-			 * Some boxes (x86) have a top of stack that
-			 * is not large page aligned. Since stacks are
-			 * usually small we'll just return and do nothing
-			 * for theses cases. Prefeered page size is advisory
-			 * so no need to return an error.
-			 */
-			if (szc == p->p_stkpageszc ||
-			    !IS_P2ALIGNED(p->p_usrstack, pgsz)) {
+			if (szc == p->p_stkpageszc) {
 				as_rangeunlock(as);
 				return (0);
 			}
@@ -323,15 +315,13 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 			p->p_stkpageszc = szc;
 
 			addr = p->p_usrstack - p->p_stksize;
-			len = p->p_stksize;
+			len = P2ALIGN(p->p_stksize, pgsz);
 
 			/*
-			 * Perhaps nothing to promote, we wrapped around
-			 * or grow did not not grow the stack to a large
-			 * page boundary.
+			 * Perhaps nothing to promote.
 			 */
-			if (!IS_P2ALIGNED(len, pgsz) || len == 0 ||
-			    addr >= p->p_usrstack || (addr + len) < addr) {
+			if (len == 0 || addr >= p->p_usrstack ||
+			    (addr + len) < addr) {
 				as_rangeunlock(as);
 				return (0);
 			}
