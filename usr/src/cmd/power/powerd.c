@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -109,7 +108,9 @@ static int		autoshutdown_en;
 static int		do_idlecheck;
 static int		got_sighup;
 static int		estar_v2_prop;
+#ifdef sparc
 static int		estar_v3_prop;
+#endif
 static int		log_power_cycles_error = 0;
 static int		log_system_board_date_error = 0;
 static int		log_no_autoshutdown_warning = 0;
@@ -139,7 +140,7 @@ static void check_idleness(time_t *, hrtime_t *);
 static int last_system_activity(hrtime_t *);
 static int run_idlecheck(void);
 static void set_alarm(time_t);
-static int poweroff(char *, char **);
+static int poweroff(const char *, char **);
 static int is_ok2shutdown(time_t *);
 static int get_prom(int, prom_node_t, char *, char *, size_t);
 static void power_button_monitor(void *);
@@ -153,9 +154,9 @@ static void *attach_devices(void *);
 #endif
 
 
-/* VARARGS0 */
+/* PRINTFLIKE1 */
 static void
-logerror(char *fmt, ...)
+logerror(const char *fmt, ...)
 {
 	va_list args;
 
@@ -217,7 +218,7 @@ main(int argc, char *argv[])
 
 	pm_fd = open(PM, O_RDWR);
 	if (pm_fd == -1) {
-		(void) sprintf(errmsg, "%s: %s", prog, PM);
+		(void) snprintf(errmsg, sizeof (errmsg), "%s: %s", prog, PM);
 		perror(errmsg);
 		exit(EXIT_FAILURE);
 	}
@@ -234,7 +235,7 @@ main(int argc, char *argv[])
 	}
 
 	if ((info = (pwr_info_t *)malloc(sizeof (pwr_info_t))) == NULL) {
-		(void) sprintf(errmsg, "%s: malloc", prog);
+		(void) snprintf(errmsg, sizeof (errmsg), "%s: malloc", prog);
 		perror(errmsg);
 		exit(EXIT_FAILURE);
 	}
@@ -720,7 +721,7 @@ is_ok2shutdown(time_t *now)
 	/*
 	 * Allow 10% of power_cycle_limit as free cycles.
 	 */
-	free_cycles = power_cycle_limit * 0.1;
+	free_cycles = power_cycle_limit / 10;
 
 	power_cycles = atoi(power_cycles_st);
 	if (power_cycles < 0)
@@ -758,8 +759,8 @@ is_ok2shutdown(time_t *now)
 	 * need to spread (power_cycle_limit - free_cycles) over the entire
 	 * 7-year life span instead of (lifetime - date free_cycles ended).
 	 */
-	scaled_cycles = ((float)life_passed / (float)LIFETIME_SECS) *
-				(power_cycle_limit - free_cycles);
+	scaled_cycles = (int)(((float)life_passed / (float)LIFETIME_SECS) *
+				(power_cycle_limit - free_cycles));
 
 	if (no_power_cycles)
 		goto ckdone;
@@ -912,7 +913,7 @@ set_alarm(time_t now)
 }
 
 static int
-poweroff(char *msg, char **cmd_argv)
+poweroff(const char *msg, char **cmd_argv)
 {
 	struct stat	statbuf;
 	pid_t		pid, child;
@@ -1193,14 +1194,14 @@ static int
 open_pidfile(char *me)
 {
 	int fd;
-	char *e1 = "%s: Cannot open pid file for read: ";
-	char *e2 = "%s: Cannot unlink obsolete pid file: ";
-	char *e3 = "%s: Cannot open /proc for pid %ld: ";
-	char *e4 = "%s: Cannot read /proc for pid %ld: ";
-	char *e5 = "%s: Another instance (pid %ld) is trying to exit"
+	const char *e1 = "%s: Cannot open pid file for read: ";
+	const char *e2 = "%s: Cannot unlink obsolete pid file: ";
+	const char *e3 = "%s: Cannot open /proc for pid %ld: ";
+	const char *e4 = "%s: Cannot read /proc for pid %ld: ";
+	const char *e5 = "%s: Another instance (pid %ld) is trying to exit"
 			"and may be hung.  Please contact sysadmin.\n";
-	char *e6 = "%s: Another daemon is running\n";
-	char *e7 = "%s: Cannot create pid file: ";
+	const char *e6 = "%s: Another daemon is running\n";
+	const char *e7 = "%s: Cannot create pid file: ";
 
 again:
 	if ((fd = open(pidpath, O_CREAT | O_EXCL | O_WRONLY, 0444)) == -1) {

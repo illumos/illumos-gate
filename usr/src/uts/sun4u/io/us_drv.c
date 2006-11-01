@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -264,6 +263,13 @@ us_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		if (us_pm_comp_create(usdsp) != DDI_SUCCESS) {
+			us_pm_free(usdsp);
+			ddi_soft_state_free(us_state, instance);
+			return (DDI_FAILURE);
+		}
+
+		if (ddi_prop_update_string(DDI_DEV_T_NONE,
+		    usdsp->dip, "pm-class", "CPU") != DDI_PROP_SUCCESS) {
 			us_pm_free(usdsp);
 			ddi_soft_state_free(us_state, instance);
 			return (DDI_FAILURE);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,7 +90,12 @@ typedef enum {
 	PM_ADD_DEPENDENT,	/* replaces PM_ADD_DEP */
 	PM_GET_TIME_IDLE,	/* replaces PM_IDLE_TIME */
 	PM_GET_DEFAULT_SYSTEM_THRESHOLD,
-	PM_ADD_DEPENDENT_PROPERTY
+	PM_ADD_DEPENDENT_PROPERTY,
+	PM_START_CPUPM,
+	PM_STOP_CPUPM,
+	PM_GET_CPU_THRESHOLD,
+	PM_SET_CPU_THRESHOLD,
+	PM_GET_CPUPM_STATE
 } pm_cmds;
 
 /*
@@ -220,7 +224,11 @@ typedef enum {
 	PM_DEVICE_THRESHOLD,
 	PM_COMPONENT_THRESHOLD,
 	PM_OLD_THRESHOLD,
-	PM_DIRECTLY_MANAGED
+	PM_DIRECTLY_MANAGED,
+	PM_CPU_THRESHOLD,
+	PM_CPU_PM_ENABLED,
+	PM_CPU_PM_DISABLED,
+	PM_CPU_PM_NOTSET
 } pm_states;
 
 

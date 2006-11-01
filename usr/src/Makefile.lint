@@ -207,6 +207,7 @@ COMMON_SUBDIRS = \
 	cmd/picl/prtpicl \
 	cmd/plockstat \
 	cmd/pools \
+	cmd/power \
 	cmd/ppgsz \
 	cmd/praudit \
 	cmd/prctl \

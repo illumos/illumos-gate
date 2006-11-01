@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -589,6 +588,7 @@ static void
 fail(char *fmt, ...)
 {
 	char new_fmt[256];
+	const char *fmtptr = new_fmt;
 	va_list	args;
 	size_t len;
 
@@ -597,7 +597,7 @@ fail(char *fmt, ...)
 	if (snprintf(new_fmt, len, "powerd: %s", fmt) > len)
 		syslog(LOG_ERR, "powerd: syslog message too large");
 	else
-		vsyslog(LOG_ERR, new_fmt, args);
+		vsyslog(LOG_ERR, fmtptr, args);
 	va_end(args);
 
 	thr_exit((void *) 0);

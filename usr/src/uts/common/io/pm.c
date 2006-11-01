@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,6 +71,10 @@
 extern kmutex_t	pm_scan_lock;	/* protects autopm_enable, pm_scans_disabled */
 extern kmutex_t	pm_clone_lock;	/* protects pm_clones array */
 extern int	autopm_enabled;
+extern pm_cpupm_t cpupm;
+extern int	pm_default_idle_threshold;
+extern int	pm_system_idle_threshold;
+extern int	pm_cpu_idle_threshold;
 extern kcondvar_t pm_clones_cv[PM_MAX_CLONE];
 extern uint_t	pm_poll_cnt[PM_MAX_CLONE];
 
@@ -422,6 +425,12 @@ static struct pm_cmd_info pmci[] = {
 	{PM_GET_TIME_IDLE, "PM_GET_TIME_IDLE", 1, PM_REQ, INWHO, DIP, NODEP},
 	{PM_ADD_DEPENDENT_PROPERTY, "PM_ADD_DEPENDENT_PROPERTY", 1, PM_REQ,
 	    INWHO | INDATASTRING, NODIP, DEP, SU},
+	{PM_START_CPUPM, "PM_START_CPUPM", 1, NOSTRUCT, 0, 0, 0, SU},
+	{PM_STOP_CPUPM, "PM_STOP_CPUPM", 1, NOSTRUCT, 0, 0, 0, SU},
+	{PM_GET_CPU_THRESHOLD, "PM_GET_CPU_THRESHOLD", 1, NOSTRUCT},
+	{PM_SET_CPU_THRESHOLD, "PM_SET_CPU_THRESHOLD", 1, NOSTRUCT,
+	    0, 0, 0, SU},
+	{PM_GET_CPUPM_STATE, "PM_GET_CPUPM_STATE", 1, NOSTRUCT},
 	{0, NULL}
 };
 
@@ -455,22 +464,36 @@ pm_decode_cmd(int cmd)
 int
 pm_start_pm_walk(dev_info_t *dip, void *arg)
 {
-	char *cmdstr = pm_decode_cmd(*((int *)arg));
+	int cmd = *((int *)arg);
+	char *cmdstr = pm_decode_cmd(cmd);
 
 	if (!PM_GET_PM_INFO(dip) || PM_ISBC(dip))
 		return (DDI_WALK_CONTINUE);
 
-	/*
-	 * Construct per dip scan taskq
-	 */
-	mutex_enter(&pm_scan_lock);
-	if (autopm_enabled)
-		pm_scan_init(dip);
-	mutex_exit(&pm_scan_lock);
+	switch (cmd) {
+	case PM_START_CPUPM:
+		if (!PM_ISCPU(dip))
+			return (DDI_WALK_CONTINUE);
+		mutex_enter(&pm_scan_lock);
+		if (!PM_CPUPM_DISABLED)
+			pm_scan_init(dip);
+		mutex_exit(&pm_scan_lock);
+		break;
+	case PM_START_PM:
+		mutex_enter(&pm_scan_lock);
+		if (PM_ISCPU(dip) && PM_CPUPM_DISABLED) {
+			mutex_exit(&pm_scan_lock);
+			return (DDI_WALK_CONTINUE);
+		}
+		if (autopm_enabled)
+			pm_scan_init(dip);
+		mutex_exit(&pm_scan_lock);
+		break;
+	}
 
 	/*
 	 * Start doing pm on device: ensure pm_scan data structure initiated,
-	 * no need to gurantee a successful scan run.
+	 * no need to guarantee a successful scan run.
 	 */
 	PMD(PMD_SCAN | PMD_IOCTL, ("ioctl: %s: scan %s@%s(%s#%d)\n", cmdstr,
 	    PM_DEVICE(dip)))
@@ -486,10 +509,32 @@ int
 pm_stop_pm_walk(dev_info_t *dip, void *arg)
 {
 	pm_info_t *info = PM_GET_PM_INFO(dip);
-	char *cmdstr = pm_decode_cmd(*((int *)arg));
+	int cmd = *((int *)arg);
+	char *cmdstr = pm_decode_cmd(cmd);
 
 	if (!info)
 		return (DDI_WALK_CONTINUE);
+
+	switch (cmd) {
+	case PM_STOP_PM:
+		/*
+		 * If CPU devices are being managed independently, then don't
+		 * stop them as part of PM_STOP_PM. Only stop them as part of
+		 * PM_STOP_CPUPM and PM_RESET_PM.
+		 */
+		if (PM_ISCPU(dip) && PM_CPUPM_ENABLED)
+			return (DDI_WALK_CONTINUE);
+		break;
+	case PM_STOP_CPUPM:
+		/*
+		 * If stopping CPU devices and this device is not marked
+		 * as a CPU device, then skip.
+		 */
+		if (!PM_ISCPU(dip))
+			return (DDI_WALK_CONTINUE);
+		break;
+	}
+
 	/*
 	 * Stop the current scan, and then bring it back to normal power.
 	 */
@@ -693,33 +738,49 @@ pm_discard_entries(int clone)
 	mutex_exit(&pm_clone_lock);
 }
 
-int
-pm_set_sys_threshold(dev_info_t *dip, void *arg)
+
+static void
+pm_set_idle_threshold(dev_info_t *dip, int thresh, int flag)
 {
-	int pm_system_idle_threshold = *((int *)arg);
-	pm_info_t *info = PM_GET_PM_INFO(dip);
-	int	processed = 0;
-
-	if (!info)
-		return (DDI_WALK_CONTINUE);
-
 	if (!PM_ISBC(dip) && !PM_ISDIRECT(dip)) {
 		switch (DEVI(dip)->devi_pm_flags & PMC_THRESH_ALL) {
 		case PMC_DEF_THRESH:
-			PMD(PMD_IOCTL, ("ioctl: set_sys_threshold: set "
+		case PMC_CPU_THRESH:
+			PMD(PMD_IOCTL, ("ioctl: set_idle_threshold: set "
 			    "%s@%s(%s#%d) default thresh to 0t%d\n",
-			    PM_DEVICE(dip), pm_system_idle_threshold))
-			pm_set_device_threshold(dip, pm_system_idle_threshold,
-			    PMC_DEF_THRESH);
-			processed++;
+			    PM_DEVICE(dip), thresh))
+			pm_set_device_threshold(dip, thresh, flag);
 			break;
 		default:
 			break;
 		}
 	}
+}
 
-	if (processed && autopm_enabled)
+static int
+pm_set_idle_thresh_walk(dev_info_t *dip, void *arg)
+{
+	int cmd = *((int *)arg);
+
+	if (!PM_GET_PM_INFO(dip))
+		return (DDI_WALK_CONTINUE);
+
+	switch (cmd) {
+	case PM_SET_SYSTEM_THRESHOLD:
+		if (DEVI(dip)->devi_pm_flags & PMC_CPU_THRESH)
+			break;
+		pm_set_idle_threshold(dip, pm_system_idle_threshold,
+		    PMC_DEF_THRESH);
 		pm_rescan(dip);
+		break;
+	case PM_SET_CPU_THRESHOLD:
+		if (!PM_ISCPU(dip))
+			break;
+		pm_set_idle_threshold(dip, pm_cpu_idle_threshold,
+		    PMC_CPU_THRESH);
+		pm_rescan(dip);
+		break;
+	}
 
 	return (DDI_WALK_CONTINUE);
 }
@@ -846,8 +907,6 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 	pm_state_change_t		*pscp;
 	pm_state_change_t		psc;
 	size_t		copysize;
-	extern int	pm_default_idle_threshold;
-	extern int	pm_system_idle_threshold;
 	extern void	pm_record_thresh(pm_thresh_rec_t *);
 	psce_t		*pm_psc_clone_to_direct(int);
 	psce_t		*pm_psc_clone_to_interest(int);
@@ -1555,8 +1614,12 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 				break;
 			}
 			pm_unrecord_threshold(req.physpath);
-			pm_set_device_threshold(dip, pm_system_idle_threshold,
-			    PMC_DEF_THRESH);
+			if (DEVI(dip)->devi_pm_flags & PMC_CPU_THRESH)
+				pm_set_device_threshold(dip,
+				    pm_cpu_idle_threshold, PMC_CPU_THRESH);
+			else
+				pm_set_device_threshold(dip,
+				    pm_system_idle_threshold, PMC_DEF_THRESH);
 			ret = 0;
 			break;
 		}
@@ -2089,6 +2152,9 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			case PMC_COMP_THRESH:
 				*rval_p = PM_COMPONENT_THRESHOLD;
 				break;
+			case PMC_CPU_THRESH:
+				*rval_p = PM_CPU_THRESHOLD;
+				break;
 			default:
 				if (PM_ISBC(dip)) {
 					*rval_p = PM_OLD_THRESHOLD;
@@ -2419,15 +2485,20 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 	case NOSTRUCT:
 		switch (cmd) {
 		case PM_START_PM:
+		case PM_START_CPUPM:
 			mutex_enter(&pm_scan_lock);
-			if (autopm_enabled) {
+			if ((cmd == PM_START_PM && autopm_enabled) ||
+			    (cmd == PM_START_CPUPM && PM_CPUPM_ENABLED)) {
 				mutex_exit(&pm_scan_lock);
 				PMD(PMD_ERROR, ("ioctl: %s: EBUSY\n",
 				    cmdstr))
 				ret = EBUSY;
 				break;
 			}
-			autopm_enabled = 1;
+			if (cmd == PM_START_PM)
+			    autopm_enabled = 1;
+			else
+			    cpupm = PM_CPUPM_ENABLE;
 			mutex_exit(&pm_scan_lock);
 			ddi_walk_devs(ddi_root_node(), pm_start_pm_walk, &cmd);
 			ret = 0;
@@ -2435,30 +2506,41 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 
 		case PM_RESET_PM:
 		case PM_STOP_PM:
+		case PM_STOP_CPUPM:
 		{
 			extern void pm_discard_thresholds(void);
 
 			mutex_enter(&pm_scan_lock);
-			if (!autopm_enabled && cmd != PM_RESET_PM) {
+			if ((cmd == PM_STOP_PM && !autopm_enabled) ||
+			    (cmd == PM_STOP_CPUPM && PM_CPUPM_DISABLED)) {
 				mutex_exit(&pm_scan_lock);
 				PMD(PMD_ERROR, ("ioctl: %s: EINVAL\n",
 				    cmdstr))
 				ret = EINVAL;
 				break;
 			}
-			autopm_enabled = 0;
+			if (cmd == PM_STOP_PM)
+			    autopm_enabled = 0;
+			else if (cmd == PM_STOP_CPUPM)
+			    cpupm = PM_CPUPM_DISABLE;
+			else {
+			    autopm_enabled = 0;
+			    cpupm = PM_CPUPM_NOTSET;
+			}
 			mutex_exit(&pm_scan_lock);
+
 			/*
 			 * bring devices to full power level, stop scan
 			 */
 			ddi_walk_devs(ddi_root_node(), pm_stop_pm_walk, &cmd);
 			ret = 0;
-			if (cmd == PM_STOP_PM)
+			if (cmd == PM_STOP_PM || cmd == PM_STOP_CPUPM)
 				break;
 			/*
 			 * Now do only PM_RESET_PM stuff.
 			 */
 			pm_system_idle_threshold = pm_default_idle_threshold;
+			pm_cpu_idle_threshold = 0;
 			pm_discard_thresholds();
 			pm_all_to_default_thresholds();
 			pm_dispatch_to_dep_thread(PM_DEP_WK_REMOVE_DEP,
@@ -2476,7 +2558,13 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			ret = 0;
 			break;
 
+		case PM_GET_CPU_THRESHOLD:
+			*rval_p = pm_cpu_idle_threshold;
+			ret = 0;
+			break;
+
 		case PM_SET_SYSTEM_THRESHOLD:
+		case PM_SET_CPU_THRESHOLD:
 			if ((int)arg < 0) {
 				PMD(PMD_ERROR, ("ioctl: %s: arg 0x%x < 0"
 				    "--EINVAL\n", cmdstr, (int)arg))
@@ -2485,9 +2573,14 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			}
 			PMD(PMD_IOCTL, ("ioctl: %s: 0x%x 0t%d\n", cmdstr,
 			    (int)arg, (int)arg))
-			pm_system_idle_threshold = (int)arg;
-			ddi_walk_devs(ddi_root_node(), pm_set_sys_threshold,
-			    (void *) &pm_system_idle_threshold);
+			if (cmd == PM_SET_SYSTEM_THRESHOLD)
+				pm_system_idle_threshold = (int)arg;
+			else {
+				pm_cpu_idle_threshold = (int)arg;
+			}
+			ddi_walk_devs(ddi_root_node(), pm_set_idle_thresh_walk,
+				    (void *) &cmd);
+
 			ret = 0;
 			break;
 
@@ -2507,9 +2600,18 @@ pm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 			}
 			ret = 0;
 			break;
+
+		case PM_GET_CPUPM_STATE:
+			if (PM_CPUPM_ENABLED)
+				*rval_p = PM_CPU_PM_ENABLED;
+			else if (PM_CPUPM_DISABLED)
+				*rval_p = PM_CPU_PM_DISABLED;
+			else
+				*rval_p = PM_CPU_PM_NOTSET;
+			ret = 0;
+			break;
 		}
 		break;
-
 
 	default:
 		/*

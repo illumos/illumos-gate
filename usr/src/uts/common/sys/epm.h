@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,9 +80,11 @@ int e_new_pm_props(dev_info_t *);
 #define	PMC_CONSOLE_FB		0x10000	/* console framebuffer */
 #define	PMC_NOINVOL_DONE	0x20000 /* processed by pm_noinvol_specd() */
 #define	PMC_DRIVER_REMOVED	0x40000 /* driver is removed	*/
+#define	PMC_CPU_DEVICE		0x80000 /* device is a power manageable CPU */
+#define	PMC_CPU_THRESH		0x100000 /* cpu threshold set */
 
 #define	PMC_THRESH_ALL	(PMC_DEF_THRESH | PMC_DEV_THRESH | \
-    PMC_COMP_THRESH | PMC_NEXDEF_THRESH)
+    PMC_COMP_THRESH | PMC_NEXDEF_THRESH | PMC_CPU_THRESH)
 #define	PMC_THRESH_NONE	~(PMC_THRESH_ALL)
 
 /* Flags for the component */
@@ -216,6 +217,13 @@ typedef enum pm_canblock
 	PM_CANBLOCK_FAIL,	/* don't wait, fail request */
 	PM_CANBLOCK_BYPASS	/* don't wait, ignore controlling process */
 } pm_canblock_t;
+
+typedef enum pm_cpupm
+{
+	PM_CPUPM_NOTSET,	/* no specific treatment of CPU devices */
+	PM_CPUPM_ENABLE,	/* power manage CPU devices */
+	PM_CPUPM_DISABLE	/* do not power manage CPU devices */
+} pm_cpupm_t;
 
 /*
  * The power request struct uses for the DDI_CTLOPS_POWER busctl.
@@ -545,6 +553,29 @@ typedef struct pm_thresh_rec {
  * Returns true if we have skipped a dependency bringup on this dip.
  */
 #define	PM_SKBU(dip) (DEVI(dip)->devi_pm_flags & PMC_SKIP_BRINGUP)
+
+/*
+ * Returns true if device specified by dip is a power manageable CPU.
+ */
+#define	PM_ISCPU(dip) (DEVI(dip)->devi_pm_flags & PMC_CPU_DEVICE)
+
+/*
+ * Returns true if cpupm is enabled.
+ */
+#define	PM_CPUPM_ENABLED (cpupm == PM_CPUPM_ENABLE)
+
+/*
+ * Returns true if is disabled.
+ */
+#define	PM_CPUPM_DISABLED (cpupm == PM_CPUPM_DISABLE)
+
+/*
+ * If (autopm is enabled and
+ *      (CPUs are not disabled, or it isn't a cpu)) OR
+ *    (CPUs are enabled and it is one)
+ */
+#define	PM_SCANABLE(dip) ((autopm_enabled && \
+(!PM_CPUPM_DISABLED || !PM_ISCPU(dip))) || (PM_CPUPM_ENABLED && PM_ISCPU(dip)))
 
 #define	PM_NOT_ALL_LOWEST	0x0	/* not all components are at lowest */
 #define	PM_ALL_LOWEST		0x1	/* all components are at lowest lvl */

@@ -61,10 +61,14 @@
  * readable strings (currently unused) for each component name and power state.
  * Devices which export pm-components(9P) are automatically power managed
  * whenever autopm is enabled (via PM_START_PM ioctl issued by pmconfig(1M)
- * after parsing power.conf(4)).
- * For these devices, all components are considered independent of each other,
- * and it is up to the driver to decide when a transition requires saving or
- * restoring hardware state.
+ * after parsing power.conf(4)). The exception to this rule is that power
+ * manageable CPU devices may be automatically managed independently of autopm
+ * by either enabling or disabling (via PM_START_CPUPM and PM_STOP_CPUPM
+ * ioctls) cpupm. If the CPU devices are not managed independently, then they
+ * are managed by autopm. In either case, for automatically power managed
+ * devices, all components are considered independent of each other, and it is
+ * up to the driver to decide when a transition requires saving or restoring
+ * hardware state.
  *
  * Each device component also has a threshold time associated with each power
  * transition (see power.conf(4)), and a busy/idle state maintained by the
@@ -78,8 +82,9 @@
  *    -set threshold values (defaults if none provided by pmconfig)
  *    -set dependencies among devices
  *    -enable/disable autopm
- *    -turn down idle components based on thresholds (if autopm is enabled)
- *     (aka scanning)
+ *    -enable/disable cpupm
+ *    -turn down idle components based on thresholds (if autopm or cpupm is
+ *     enabled) (aka scanning)
  *    -maintain power states based on dependencies among devices
  *    -upon request, or when the frame buffer powers off, attempt to turn off
  *     all components that are idle or become idle over the next (10 sec)
@@ -99,9 +104,10 @@
  *  property
  *
  * Scanning:
- * Whenever autopm is enabled, the framework attempts to bring each component
- * of each device to its lowest power based on the threshold of idleness
- * associated with each transition and the busy/idle state of the component.
+ * Whenever autopm or cpupm  is enabled, the framework attempts to bring each
+ * component of each managed device to its lowest power based on the threshold
+ * of idleness associated with each transition and the busy/idle state of the
+ * component.
  *
  * The actual work of this is done by pm_scan_dev(), which cycles through each
  * component of a device, checking its idleness against its current threshold,
@@ -177,8 +183,8 @@
  *
  * pm_scan_lock:
  *		It protects the timeout id of the scan thread, and the value
- *		of autopm_enabled.  This lock is not held concurrently with
- *		any other PM locks.
+ *		of autopm_enabled and cpupm.  This lock is not held
+ *		concurrently with any other PM locks.
  *
  * pm_clone_lock:	Protects the clone list and count of poll events
  *		pending for the pm driver.
@@ -326,6 +332,13 @@ pm_dep_wk_t	*pm_dep_thread_tail = NULL;
 int		autopm_enabled;
 
 /*
+ * cpupm is turned on and off, by the PM_START_CPUPM and PM_STOP_CPUPM ioctls,
+ * to define the power management behavior of CPU devices separate from
+ * autopm. Protected by pm_scan_lock.
+ */
+pm_cpupm_t	cpupm = PM_CPUPM_NOTSET;
+
+/*
  * This flag is true while processes are stopped for a checkpoint/resume.
  * Controlling processes of direct pm'd devices are not available to
  * participate in power level changes, so we bypass them when this is set.
@@ -379,6 +392,8 @@ kmutex_t pm_remdrv_lock;
 
 int pm_default_idle_threshold = PM_DEFAULT_SYS_IDLENESS;
 int pm_system_idle_threshold;
+int pm_cpu_idle_threshold;
+
 /*
  * By default nexus has 0 threshold, and depends on its children to keep it up
  */
@@ -521,6 +536,7 @@ pm_cpr_callb(void *arg, int code)
 {
 	_NOTE(ARGUNUSED(arg))
 	static int auto_save;
+	static pm_cpupm_t cpupm_save;
 	static int pm_reset_timestamps(dev_info_t *, void *);
 
 	switch (code) {
@@ -535,12 +551,15 @@ pm_cpr_callb(void *arg, int code)
 		pm_scans_disabled = 1;
 		auto_save = autopm_enabled;
 		autopm_enabled = 0;
+		cpupm_save = cpupm;
+		cpupm = PM_CPUPM_NOTSET;
 		mutex_exit(&pm_scan_lock);
 		ddi_walk_devs(ddi_root_node(), pm_scan_stop_walk, NULL);
 		break;
 
 	case CB_CODE_CPR_RESUME:
 		ASSERT(!autopm_enabled);
+		ASSERT(cpupm == PM_CPUPM_NOTSET);
 		ASSERT(pm_scans_disabled);
 		pm_scans_disabled = 0;
 		/*
@@ -553,6 +572,7 @@ pm_cpr_callb(void *arg, int code)
 		ddi_walk_devs(ddi_root_node(), pm_reset_timestamps, NULL);
 
 		autopm_enabled = auto_save;
+		cpupm = cpupm_save;
 		/*
 		 * If there is any auto-pm device, get the scanning
 		 * going. Otherwise don't bother.
@@ -598,6 +618,7 @@ pm_init(void)
 
 	pm_comps_notlowest = 0;
 	pm_system_idle_threshold = pm_default_idle_threshold;
+	pm_cpu_idle_threshold = 0;
 
 	pm_cpr_cb_id = callb_add(pm_cpr_callb, (void *)NULL,
 	    CB_CL_CPR_PM, "pm_cpr");
@@ -628,10 +649,10 @@ pm_init(void)
 }
 
 /*
- * pm_scan_init - create pm scan data structure.  Called (if autopm enabled)
- * when device becomes power managed or after a failed detach and when autopm
- * is started via PM_START_PM ioctl, and after a CPR resume to get all the
- * devices scanning again.
+ * pm_scan_init - create pm scan data structure.  Called (if autopm or cpupm
+ * enabled) when device becomes power managed or after a failed detach and
+ * when autopm is started via PM_START_PM or PM_START_CPUPM ioctls, and after
+ * a CPR resume to get all the devices scanning again.
  */
 void
 pm_scan_init(dev_info_t *dip)
@@ -873,7 +894,7 @@ pm_rescan(void *arg)
 	PM_LOCK_DIP(dip);
 	info = PM_GET_PM_INFO(dip);
 	scanp = PM_GET_PM_SCAN(dip);
-	if (pm_scans_disabled || !autopm_enabled || !info || !scanp ||
+	if (pm_scans_disabled || !PM_SCANABLE(dip) || !info || !scanp ||
 	    (scanp->ps_scan_flags & PM_SCAN_STOP)) {
 		PM_UNLOCK_DIP(dip);
 		return;
@@ -955,7 +976,7 @@ pm_scan(void *arg)
 	scanp = PM_GET_PM_SCAN(dip);
 	ASSERT(scanp && PM_GET_PM_INFO(dip));
 
-	if (pm_scans_disabled || !autopm_enabled ||
+	if (pm_scans_disabled || !PM_SCANABLE(dip) ||
 	    (scanp->ps_scan_flags & PM_SCAN_STOP)) {
 		scanp->ps_scan_flags &= ~(PM_SCAN_AGAIN | PM_SCAN_DISPATCHED);
 		PM_UNLOCK_DIP(dip);
@@ -1130,15 +1151,16 @@ pm_scan_dev(dev_info_t *dip)
 	    PM_KUC(dip)))
 
 	/* no scan under the following conditions */
-	if (pm_scans_disabled || !autopm_enabled ||
+	if (pm_scans_disabled || !PM_SCANABLE(dip) ||
 	    (scanp->ps_scan_flags & PM_SCAN_STOP) ||
 	    (PM_KUC(dip) != 0) ||
 	    PM_ISDIRECT(dip) || pm_noinvol(dip)) {
 		PM_UNLOCK_DIP(dip);
 		PMD(PMD_SCAN, ("%s: [END, %s@%s(%s#%d)] no scan, "
-		    "scan_disabled(%d), apm_enabled(%d), kuc(%d), "
-		    "%s directpm, %s pm_noinvol\n", pmf, PM_DEVICE(dip),
-		    pm_scans_disabled, autopm_enabled, PM_KUC(dip),
+		    "scan_disabled(%d), apm_enabled(%d), cpupm(%d), "
+		    "kuc(%d), %s directpm, %s pm_noinvol\n",
+		    pmf, PM_DEVICE(dip), pm_scans_disabled, autopm_enabled,
+		    cpupm, PM_KUC(dip),
 		    PM_ISDIRECT(dip) ? "is" : "is not",
 		    pm_noinvol(dip) ? "is" : "is not"))
 		return (LONG_MAX);
@@ -2461,9 +2483,12 @@ pm_lower_power(dev_info_t *dip, int comp, int level)
 	 * If we don't care about saving power, or we're treating this node
 	 * specially, then this is a no-op
 	 */
-	if (!autopm_enabled || pm_noinvol(dip)) {
-		PMD(PMD_FAIL, ("%s: %s@%s(%s#%d) %s%s\n", pmf, PM_DEVICE(dip),
+	if (!PM_SCANABLE(dip) || pm_noinvol(dip)) {
+		PMD(PMD_FAIL, ("%s: %s@%s(%s#%d) %s%s%s%s\n",
+		    pmf, PM_DEVICE(dip),
 		    !autopm_enabled ? "!autopm_enabled " : "",
+		    !PM_CPUPM_ENABLED ? "!cpupm_enabled " : "",
+		    PM_CPUPM_DISABLED ? "cpupm_disabled " : "",
 		    pm_noinvol(dip) ? "pm_noinvol()" : ""))
 		return (DDI_SUCCESS);
 	}
@@ -3258,7 +3283,7 @@ pm_detach_failed(dev_info_t *dip)
 	}
 	if (!PM_ISBC(dip)) {
 		mutex_enter(&pm_scan_lock);
-		if (autopm_enabled)
+		if (PM_SCANABLE(dip))
 			pm_scan_init(dip);
 		mutex_exit(&pm_scan_lock);
 		pm_rescan(dip);
@@ -3387,8 +3412,12 @@ pm_premanage(dev_info_t *dip, int style)
 			ASSERT(PM_CP(dip, i)->pmc_cur_pwr == 0);
 			e_pm_set_cur_pwr(dip, PM_CP(dip, i), PM_LEVEL_UNKNOWN);
 		}
-		pm_set_device_threshold(dip, pm_system_idle_threshold,
-		    PMC_DEF_THRESH);
+		if (DEVI(dip)->devi_pm_flags & PMC_CPU_THRESH)
+			pm_set_device_threshold(dip, pm_cpu_idle_threshold,
+			    PMC_CPU_THRESH);
+		else
+			pm_set_device_threshold(dip, pm_system_idle_threshold,
+			    PMC_DEF_THRESH);
 		kmem_free(compp, cmpts * sizeof (pm_comp_t));
 	}
 	return (DDI_SUCCESS);
@@ -3448,7 +3477,7 @@ e_pm_manage(dev_info_t *dip, int style)
 
 	if (!PM_ISBC(dip)) {
 		mutex_enter(&pm_scan_lock);
-		if (autopm_enabled) {
+		if (PM_SCANABLE(dip)) {
 			pm_scan_init(dip);
 			mutex_exit(&pm_scan_lock);
 			pm_rescan(dip);
@@ -3508,6 +3537,8 @@ cur_threshold(dev_info_t *dip, int comp)
 		int thresh;
 		if (DEVI(dip)->devi_pm_flags & PMC_NEXDEF_THRESH)
 			thresh = pm_default_nexus_threshold;
+		else if (DEVI(dip)->devi_pm_flags & PMC_CPU_THRESH)
+			thresh = pm_cpu_idle_threshold;
 		else
 			thresh = pm_system_idle_threshold;
 		return (thresh);
@@ -4634,6 +4665,20 @@ e_pm_props(dev_info_t *dip)
 	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, propflag,
 	    "no-involuntary-power-cycles"))
 		flags |= PMC_NO_INVOL;
+	/*
+	 * Is the device a CPU device?
+	 */
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, propflag, "pm-class",
+	    (caddr_t)&pp, &len) == DDI_PROP_SUCCESS) {
+		if (strcmp(pp, "CPU") == 0) {
+			flags |= PMC_CPU_DEVICE;
+		} else {
+			cmn_err(CE_NOTE, "!device %s@%s has unrecognized "
+			    "%s property value '%s'", PM_NAME(dip),
+			PM_ADDR(dip), "pm-class", pp);
+		}
+		kmem_free(pp, len);
+	}
 	/* devfs single threads us */
 	DEVI(dip)->devi_pm_flags |= flags;
 }
@@ -5912,7 +5957,7 @@ pm_apply_recorded_thresh(dev_info_t *dip, pm_thresh_rec_t *rp)
 		    pmf, PM_DEVICE(dip), ep->pte_thresh[0]))
 		PM_UNLOCK_DIP(dip);
 		pm_set_device_threshold(dip, ep->pte_thresh[0], PMC_DEV_THRESH);
-		if (autopm_enabled)
+		if (PM_SCANABLE(dip))
 			pm_rescan(dip);
 		return;
 	}
@@ -5930,7 +5975,7 @@ pm_apply_recorded_thresh(dev_info_t *dip, pm_thresh_rec_t *rp)
 	DEVI(dip)->devi_pm_flags |= PMC_COMP_THRESH;
 	PM_UNLOCK_DIP(dip);
 
-	if (autopm_enabled)
+	if (PM_SCANABLE(dip))
 		pm_rescan(dip);
 }
 
