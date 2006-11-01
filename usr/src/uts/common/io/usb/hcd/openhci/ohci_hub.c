@@ -823,7 +823,7 @@ ohci_handle_port_enable(
 		}
 	} else {
 		/* See if the port enable is already off */
-		if (!(port_status & HCR_PORT_PES)) {
+		if (port_status & HCR_PORT_PES) {
 			/* disable the port by writing CCS bit */
 			Set_OpReg(hcr_rh_portstatus[port], HCR_PORT_CCS);
 		}
