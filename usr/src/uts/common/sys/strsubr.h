@@ -168,6 +168,11 @@ typedef struct ciputctrl_str {
 
 /*
  * Header for a stream: interface to rest of system.
+ *
+ * NOTE: While this is a consolidation-private structure, some unbundled and
+ *       third-party products inappropriately make use of some of the fields.
+ *       As such, please take care to not gratuitously change any offsets of
+ *       existing members.
  */
 typedef struct stdata {
 	struct queue	*sd_wrq;	/* write queue */
@@ -178,10 +183,8 @@ typedef struct stdata {
 	uint_t		sd_iocid;	/* ioctl id */
 	struct pid	*sd_sidp;	/* controlling session info */
 	struct pid	*sd_pgidp;	/* controlling process group info */
-	ushort_t	sd_unused;	/* UNUSED, retained for binary */
-					/* compatibility */
-	ushort_t	sd_wroff;	/* write offset */
 	ushort_t	sd_tail;	/* reserved space in written mblks */
+	ushort_t	sd_wroff;	/* write offset */
 	int		sd_rerror;	/* error to return on read ops */
 	int		sd_werror;	/* error to return on write ops */
 	int		sd_pushcnt;	/* number of pushes done on stream */
