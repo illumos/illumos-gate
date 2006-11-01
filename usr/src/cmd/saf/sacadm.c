@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,10 +35,12 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sac.h>
+#include <spawn.h>
 #include "misc.h"
 #include "structs.h"
 #include "adm.h"
@@ -66,6 +67,7 @@ void	checkresp();
 void	single_print();
 void	catch();
 void	usage();
+static	int invoke_rm(char *);
 
 # define START		0x1	/* -s seen */
 # define KILL		0x2	/* -k seen */
@@ -454,6 +456,7 @@ char *comment;
 	char buf[SIZE];		/* scratch buffer */
 	char fname[SIZE];	/* scratch buffer for building names */
 	register int i;		/* scratch variable */
+	int retval = 0;		/* return value from invoke_rm() function */
 
 	fp = fopen(SACTAB, "r");
 	if (fp == NULL) {
@@ -488,10 +491,14 @@ char *comment;
 				error(buf);
 			}
 			/* note: this removes the directory too */
-			(void) sprintf(buf, "rm -rf %s", fname);
-			if (system(buf) < 0) {
+			if ((retval = invoke_rm(fname)) != 0) {
 				Saferrno = E_SYSERR;
-				(void) sprintf(buf, "could not remove files under <%s>", fname);
+				if (snprintf(buf, sizeof (buf),
+				    "could not remove files under <%s>",
+				    fname) >= sizeof (buf)) {
+					snprintf(buf, sizeof (buf),
+					    "tag too long");
+				}
 				error(buf);
 			}
 		}
@@ -570,7 +577,12 @@ char *comment;
  * isolate the command name, but remember it since strtok() trashes it
  */
 
-	(void) strcpy(buf, command);
+	if (strlcpy(buf, command, sizeof (buf)) >= sizeof (buf)) {
+		Saferrno = E_SYSERR;
+		cleandirs(tag);
+		error("command string too long");
+	}
+
 	(void) strtok(command, " \t");
 
 /*
@@ -644,12 +656,16 @@ char *tag;
 	char buf[SIZE];		/* scratch buffer */
 
 	/* note: this removes the directory too, first zap /etc/saf/<tag> */
-	(void) sprintf(buf, "rm -rf %s/%s", HOME, tag);
-	(void) system(buf);
+	if (snprintf(buf, sizeof (buf), "%s/%s", HOME, tag) >= sizeof (buf))
+		(void) fprintf(stderr, "tag too long\n");
+	else
+		(void) invoke_rm(buf);
 
 	/* now remove /var/saf/<tag> */
-	(void) sprintf(buf, "%s/%s", ALTHOME, tag);
-	(void) rmdir(buf);
+	if (snprintf(buf, sizeof (buf), "%s/%s", ALTHOME, tag) >= sizeof (buf))
+		(void) fprintf(stderr, "tag too long\n");
+	else
+		(void) rmdir(buf);
 }
 
 
@@ -1252,4 +1268,28 @@ sac_home()
 		(void) close(fd);
 		return(FALSE);
 	}
+}
+
+/*
+ * invoke_rm - deletes the argument directory and all its files/subdirectories
+ */
+static int
+invoke_rm(char *fname)
+{
+	pid_t cpid;		/* process ID of the child process */
+	int cstatus;		/* status of child process */
+	char *argvec[4];
+
+	argvec[0] = "rm";
+	argvec[1] = "-rf";
+	argvec[2] = fname;
+	argvec[3] = NULL;
+
+	if (posix_spawn(&cpid, "/usr/bin/rm", NULL, NULL,
+	    (char *const *)argvec, NULL))
+		return (-1);
+	if (waitpid(cpid, &cstatus, 0) == -1)
+		return (-1);
+
+	return ((WIFEXITED(cstatus) == 0) ? 99 : WEXITSTATUS(cstatus));
 }
