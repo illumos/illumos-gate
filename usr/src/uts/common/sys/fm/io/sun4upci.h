@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,8 +94,8 @@ extern "C" {
 #define	SAFARI_SSM_DIS			"saf.smm-dis"
 #define	SAFARI_BAD_CMD_PCIA		"saf.bca"
 #define	SAFARI_BAD_CMD_PCIB		"saf.bcb"
-#define	SAFARI_PAR_ERR_INT_PCIB		"saf.para"
-#define	SAFARI_PAR_ERR_INT_PCIA		"saf.parb"
+#define	SAFARI_PAR_ERR_INT_PCIB		"saf.parb"
+#define	SAFARI_PAR_ERR_INT_PCIA		"saf.para"
 #define	SAFARI_PAR_ERR_INT_SAF		"saf.pars"
 #define	SAFARI_PLL_ERR_PCIB		"saf.pllb"
 #define	SAFARI_PLL_ERR_PCIA		"saf.plla"

@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <exacct.h>
 
 #include <fmd_subr.h>
+#include <fmd_conf.h>
 #include <fmd_error.h>
 #include <fmd_thread.h>
 #include <fmd_protocol.h>
@@ -199,8 +200,15 @@ fmd_verror(int err, const char *format, va_list ap)
 	if (tp != NULL)
 		tp->thr_errdepth--;
 
-	if (err == EFMD_EXIT)
+	if (err == EFMD_EXIT) {
+		int core = 0;
+
+		(void) fmd_conf_getprop(fmd.d_conf, "core", &core);
+		if (core)
+			fmd_panic("forcing core dump at user request\n");
+
 		exit(FMD_EXIT_ERROR);
+	}
 }
 
 /*PRINTFLIKE2*/
