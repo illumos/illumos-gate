@@ -3439,6 +3439,8 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
 		/* Synchronous execution */
 		spx->txlt_sata_pkt->satapkt_op_mode = SATA_OPMODE_SYNCH |
 		    SATA_OPMODE_POLLING;
+		spx->txlt_sata_pkt->satapkt_cmd.satacmd_flags.
+		    sata_ignore_dev_reset = ddi_in_panic();
 	} else {
 		/* Asynchronous execution */
 		spx->txlt_sata_pkt->satapkt_op_mode = SATA_OPMODE_ASYNCH |
