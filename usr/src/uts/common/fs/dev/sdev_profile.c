@@ -281,8 +281,9 @@ prof_lookup_globaldev(struct sdev_node *dir, struct sdev_node *gdir,
 	/*
 	 * Found the entry in global /dev, figure out attributes
 	 * by looking at backing store. Call into devfs for default.
+	 * Note, mapped device is persisted under the new name
 	 */
-	prof_getattr(dir, name, gdv, &vattr, &avp, NULL);
+	prof_getattr(dir, rename, gdv, &vattr, &avp, NULL);
 
 	if (gdv->v_type != VDIR) {
 		VN_RELE(gdv);
