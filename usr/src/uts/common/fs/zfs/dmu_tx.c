@@ -478,7 +478,7 @@ dmu_tx_hold_free(dmu_tx_t *tx, uint64_t object, uint64_t off, uint64_t len)
 		    NULL, NULL, ZIO_FLAG_CANFAIL);
 		for (i = start; i <= end; i++) {
 			uint64_t ibyte = i << shift;
-			err = dnode_next_offset(dn, FALSE, &ibyte, 2, 1);
+			err = dnode_next_offset(dn, FALSE, &ibyte, 2, 1, 0);
 			i = ibyte >> shift;
 			if (err == ESRCH)
 				break;

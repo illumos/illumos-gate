@@ -742,8 +742,8 @@ dsl_dataset_destroy(const char *name)
 	 * remove the objects in open context, so that we won't
 	 * have too much to do in syncing context.
 	 */
-	for (obj = 0; err == 0;
-	    err = dmu_object_next(os, &obj, FALSE)) {
+	for (obj = 0; err == 0; err = dmu_object_next(os, &obj, FALSE,
+	    ds->ds_phys->ds_prev_snap_txg)) {
 		dmu_tx_t *tx = dmu_tx_create(os);
 		dmu_tx_hold_free(tx, obj, 0, DMU_OBJECT_END);
 		dmu_tx_hold_bonus(tx, obj);

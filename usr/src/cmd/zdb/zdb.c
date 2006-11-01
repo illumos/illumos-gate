@@ -1020,12 +1020,12 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 
 		for (;;) {
 			error = dnode_next_offset(dn, B_FALSE, &start, minlvl,
-			    blkfill);
+			    blkfill, 0);
 			if (error)
 				break;
 			end = start;
 			error = dnode_next_offset(dn, B_TRUE, &end, minlvl,
-			    blkfill);
+			    blkfill, 0);
 			nicenum(end - start, segsize);
 			(void) printf("\t\tsegment [%016llx, %016llx)"
 			    " size %5s\n", (u_longlong_t)start,
@@ -1113,7 +1113,7 @@ dump_dir(objset_t *os)
 	object_count = 1;
 
 	object = 0;
-	while ((error = dmu_object_next(os, &object, B_FALSE)) == 0) {
+	while ((error = dmu_object_next(os, &object, B_FALSE, 0)) == 0) {
 		dump_object(os, object, verbosity, &print_header);
 		object_count++;
 	}

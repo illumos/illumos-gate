@@ -853,7 +853,7 @@ dmu_offset_next(objset_t *os, uint64_t object, boolean_t hole, uint64_t *off)
 			return (err);
 	}
 
-	err = dnode_next_offset(dn, hole, off, 1, 1);
+	err = dnode_next_offset(dn, hole, off, 1, 1, 0);
 	dnode_rele(dn, FTAG);
 
 	return (err);

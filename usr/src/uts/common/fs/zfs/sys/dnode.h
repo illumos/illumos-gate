@@ -221,7 +221,7 @@ uint64_t dnode_block_freed(dnode_t *dn, uint64_t blkid);
 void dnode_init(void);
 void dnode_fini(void);
 int dnode_next_offset(dnode_t *dn, boolean_t hole, uint64_t *off, int minlvl,
-    uint64_t blkfill);
+    uint64_t blkfill, uint64_t txg);
 int dnode_evict_dbufs(dnode_t *dn, int try);
 
 #ifdef ZFS_DEBUG

@@ -54,7 +54,7 @@ dmu_object_alloc(objset_t *os, dmu_object_type_t ot, int blocksize,
 		if (P2PHASE(object, L2_dnode_count) == 0) {
 			uint64_t offset = restarted ? object << DNODE_SHIFT : 0;
 			int error = dnode_next_offset(osi->os_meta_dnode,
-			    B_TRUE, &offset, 2, DNODES_PER_BLOCK >> 2);
+			    B_TRUE, &offset, 2, DNODES_PER_BLOCK >> 2, 0);
 			restarted = B_TRUE;
 			if (error == 0)
 				object = offset >> DNODE_SHIFT;
@@ -72,7 +72,7 @@ dmu_object_alloc(objset_t *os, dmu_object_type_t ot, int blocksize,
 		if (dn)
 			break;
 
-		if (dmu_object_next(os, &object, B_TRUE) == 0)
+		if (dmu_object_next(os, &object, B_TRUE, 0) == 0)
 			osi->os_obj_next = object - 1;
 	}
 
@@ -146,13 +146,13 @@ dmu_object_free(objset_t *os, uint64_t object, dmu_tx_t *tx)
 }
 
 int
-dmu_object_next(objset_t *os, uint64_t *objectp, boolean_t hole)
+dmu_object_next(objset_t *os, uint64_t *objectp, boolean_t hole, uint64_t txg)
 {
 	uint64_t offset = (*objectp + 1) << DNODE_SHIFT;
 	int error;
 
 	error = dnode_next_offset(os->os->os_meta_dnode,
-	    hole, &offset, 0, DNODES_PER_BLOCK);
+	    hole, &offset, 0, DNODES_PER_BLOCK, txg);
 
 	*objectp = offset >> DNODE_SHIFT;
 

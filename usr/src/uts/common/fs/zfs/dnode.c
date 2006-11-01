@@ -1177,7 +1177,7 @@ dnode_willuse_space(dnode_t *dn, int64_t space, dmu_tx_t *tx)
 
 static int
 dnode_next_offset_level(dnode_t *dn, boolean_t hole, uint64_t *offset,
-	int lvl, uint64_t blkfill)
+	int lvl, uint64_t blkfill, uint64_t txg)
 {
 	dmu_buf_impl_t *db = NULL;
 	void *data = NULL;
@@ -1209,13 +1209,25 @@ dnode_next_offset_level(dnode_t *dn, boolean_t hole, uint64_t *offset,
 		data = db->db.db_data;
 	}
 
-	if (lvl == 0) {
+	if (db && txg &&
+	    (db->db_blkptr == NULL || db->db_blkptr->blk_birth <= txg)) {
+		error = ESRCH;
+	} else if (lvl == 0) {
 		dnode_phys_t *dnp = data;
 		span = DNODE_SHIFT;
 		ASSERT(dn->dn_type == DMU_OT_DNODE);
 
 		for (i = (*offset >> span) & (blkfill - 1); i < blkfill; i++) {
-			if (!dnp[i].dn_type == hole)
+			boolean_t newcontents = B_TRUE;
+			if (txg) {
+				int j;
+				newcontents = B_FALSE;
+				for (j = 0; j < dnp[i].dn_nblkptr; j++) {
+					if (dnp[i].dn_blkptr[j].blk_birth > txg)
+						newcontents = B_TRUE;
+				}
+			}
+			if (!dnp[i].dn_type == hole && newcontents)
 				break;
 			*offset += 1ULL << span;
 		}
@@ -1235,7 +1247,8 @@ dnode_next_offset_level(dnode_t *dn, boolean_t hole, uint64_t *offset,
 		for (i = (*offset >> span) & ((1ULL << epbs) - 1);
 		    i < epb; i++) {
 			if (bp[i].blk_fill >= minfill &&
-			    bp[i].blk_fill <= maxfill)
+			    bp[i].blk_fill <= maxfill &&
+			    bp[i].blk_birth > txg)
 				break;
 			*offset += 1ULL << span;
 		}
@@ -1255,23 +1268,26 @@ dnode_next_offset_level(dnode_t *dn, boolean_t hole, uint64_t *offset,
  * in an L0 data block; this value is 1 for normal objects,
  * DNODES_PER_BLOCK for the meta dnode, and some fraction of
  * DNODES_PER_BLOCK when searching for sparse regions thereof.
+ *
  * Examples:
  *
- * dnode_next_offset(dn, hole, offset, 1, 1);
+ * dnode_next_offset(dn, hole, offset, 1, 1, 0);
  *	Finds the next hole/data in a file.
  *	Used in dmu_offset_next().
  *
- * dnode_next_offset(mdn, hole, offset, 0, DNODES_PER_BLOCK);
+ * dnode_next_offset(mdn, hole, offset, 0, DNODES_PER_BLOCK, txg);
  *	Finds the next free/allocated dnode an objset's meta-dnode.
+ *	Only finds objects that have new contents since txg (ie.
+ *	bonus buffer changes and content removal are ignored).
  *	Used in dmu_object_next().
  *
- * dnode_next_offset(mdn, TRUE, offset, 2, DNODES_PER_BLOCK >> 2);
+ * dnode_next_offset(mdn, TRUE, offset, 2, DNODES_PER_BLOCK >> 2, 0);
  *	Finds the next L2 meta-dnode bp that's at most 1/4 full.
  *	Used in dmu_object_alloc().
  */
 int
 dnode_next_offset(dnode_t *dn, boolean_t hole, uint64_t *offset,
-    int minlvl, uint64_t blkfill)
+    int minlvl, uint64_t blkfill, uint64_t txg)
 {
 	int lvl, maxlvl;
 	int error = 0;
@@ -1298,13 +1314,16 @@ dnode_next_offset(dnode_t *dn, boolean_t hole, uint64_t *offset,
 	maxlvl = dn->dn_phys->dn_nlevels;
 
 	for (lvl = minlvl; lvl <= maxlvl; lvl++) {
-		error = dnode_next_offset_level(dn, hole, offset, lvl, blkfill);
+		error = dnode_next_offset_level(dn,
+		    hole, offset, lvl, blkfill, txg);
 		if (error != ESRCH)
 			break;
 	}
 
-	while (--lvl >= minlvl && error == 0)
-		error = dnode_next_offset_level(dn, hole, offset, lvl, blkfill);
+	while (--lvl >= minlvl && error == 0) {
+		error = dnode_next_offset_level(dn,
+		    hole, offset, lvl, blkfill, txg);
+	}
 
 	rw_exit(&dn->dn_struct_rwlock);
 

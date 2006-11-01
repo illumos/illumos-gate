@@ -238,13 +238,15 @@ int dmu_object_free(objset_t *os, uint64_t object, dmu_tx_t *tx);
  * Find the next allocated or free object.
  *
  * The objectp parameter is in-out.  It will be updated to be the next
- * object which is allocated.
+ * object which is allocated.  Ignore objects which have not been
+ * modified since txg.
  *
  * XXX Can only be called on a objset with no dirty data.
  *
  * Returns 0 on success, or ENOENT if there are no more objects.
  */
-int dmu_object_next(objset_t *os, uint64_t *objectp, boolean_t hole);
+int dmu_object_next(objset_t *os, uint64_t *objectp,
+    boolean_t hole, uint64_t txg);
 
 /*
  * Set the data blocksize for an object.
