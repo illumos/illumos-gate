@@ -531,6 +531,7 @@ MSGSUBDIRS=		\
 	dd		\
 	deroff		\
 	devfsadm	\
+	dfs.cmds	\
 	diff		\
 	diffmk		\
 	dladm		\

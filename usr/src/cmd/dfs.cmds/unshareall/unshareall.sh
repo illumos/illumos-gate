@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,8 @@
 #
 # CDDL HEADER END
 #
-#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
-#	  All Rights Reserved
-
+#	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+#	Use is subject to license terms.
 
 #ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
 # unshareall  -- unshare resources
@@ -52,14 +50,11 @@ fi
 if [ "$fsys" ]		# for each file system ...
 then
 	fsys=`echo $fsys|tr ',' ' '`
+	for i in $fsys
+	do
+		/usr/sbin/sharemgr stop -P $fsys -a
+	done
 else			# for every file system ...
-	fsys=`sed 's/^\([^# 	]*\).*/\1/' /etc/dfs/fstypes`
+	/usr/sbin/sharemgr stop -a
 fi
 
-for i in $fsys
-do
-	for path in `sed -n "s/^\([^ 	]*\)[ 	]*[^ 	]*[ 	]*${i}.*/\1/p" /etc/dfs/sharetab`
-	do
-		/usr/sbin/unshare -F $i $path
-	done
-done

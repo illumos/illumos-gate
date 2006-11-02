@@ -40,26 +40,15 @@ case "$1" in
 		exit $SMF_EXIT_OK
 	fi
 
-	# Share any ZFS filesystems marked for sharing.  The environment
-	# variable prevents share(1M) from checking whether each filesystem
-	# is in use, an O(n^2) operation with no purpose at this time
-
-	if [ -x /usr/sbin/zfs ]; then
-		SHARE_NOINUSE_CHECK=1; export SHARE_NOINUSE_CHECK
-		/usr/sbin/zfs share -a
-		unset SHARE_NOINUSE_CHECK
-	fi
-
-	# If /etc/dfs/dfstab exists and has non-blank or non-commented-out
-	# lines, then run shareall to export them.
+	# Share all file systems enabled for sharing. sharemgr understands
+	# regular shares and ZFS shares and will handle both. Technically,
+	# the shares would have been started long before getting here since
+	# nfsd has a dependency on them.
 
 	startnfsd=0
-	if [ -f /etc/dfs/dfstab ] && /usr/bin/egrep -v '^[	 ]*(#|$)' \
-	    /etc/dfs/dfstab >/dev/null 2>&1; then
 
-		/usr/sbin/shareall -F nfs
-	fi
-
+	# restart stopped shares from the repository
+	/usr/sbin/sharemgr start -P nfs -a
 
 	# Start up mountd and nfsd if anything is exported.
 
@@ -70,15 +59,6 @@ case "$1" in
 	# When the system comes up umask is not set; so set the mode now
 
 	[ -f /etc/dfs/sharetab ] && /usr/bin/chmod 644 /etc/dfs/sharetab
-
-	# Start nfslogd if /etc/nfs/nfslogtab exists and is not empty
-	# This means that either we just shared new filesystems with
-	# logging enabled, or they were shared in the previous session
-	# and their working buffers haven't been processed yet.
-
-	if [ -s /etc/nfs/nfslogtab ]; then
-		/usr/lib/nfs/nfslogd &
-	fi
 
 	# Options for nfsd are now set in /etc/default/nfs
 	if [ $startnfsd -ne 0 ]; then
@@ -93,23 +73,15 @@ case "$1" in
 	;;
 
 'refresh')
-	/usr/sbin/shareall -F nfs
+	/usr/sbin/sharemgr start -P nfs -a
 	;;
 
 'stop')
 	/usr/bin/pkill -x -u 0,1 -z $zone '(nfsd|mountd)'
 
-	# Unshare shared ZFS filesystems.
+	# Unshare all shared file systems using NFS
 
-	if [ -x /usr/sbin/zfs ]; then
-		/usr/sbin/zfs unshare -a
-	fi
-
-	# Unshare remaining shared filesystems.
-
-	if /usr/bin/grep -s nfs /etc/dfs/sharetab >/dev/null; then
-		/usr/sbin/unshareall -F nfs
-	fi
+	/usr/sbin/sharemgr stop -P nfs -a
 
 	#
 	# Wait up to 10 seconds for nfslogd to gracefully handle SIGHUP

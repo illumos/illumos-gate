@@ -19,32 +19,34 @@
 # CDDL HEADER END
 #
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-##
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/dfs.cmds/Makefile
+DEFAULTFILES = 
 
-SUBDIRS=	general dfshares shareall unshareall sharemgr sharectl
-MSGSUBDIRS=	sharectl sharemgr
+include ../../Makefile.cmd
 
-include ../Makefile.cmd
+#
+# One for each ISA.
+#
+SUBDIRS =	$(MACH)
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET = _msg
+all	:=	TARGET= all
+install	:=	TARGET= install
+clean	:=	TARGET= clean
+clobber	:=	TARGET= clobber
+_msg	:=	TARGET= _msg
+lint	:=	TARGET= lint
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all clean clobber lint _msg:	$(SUBDIRS)
 
-$(SUBDIRS): FRC
+install: $(SUBDIRS) $(ROOTETCDEFAULTFILES)
+
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
-
-_msg:	$(MSGSUBDIRS)
 
 FRC:

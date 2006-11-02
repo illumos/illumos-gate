@@ -165,6 +165,7 @@ ROOT.SYS= \
 	/var/svc/manifest/network/nis \
 	/var/svc/manifest/network/rpc \
 	/var/svc/manifest/network/security \
+	/var/svc/manifest/network/shares \
 	/var/svc/manifest/network/ssl \
 	/var/svc/manifest/application \
 	/var/svc/manifest/application/management \

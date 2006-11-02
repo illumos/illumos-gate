@@ -198,6 +198,7 @@ f none usr/include/librcm.h 644 root bin
 f none usr/include/libscf.h 0644 root bin
 f none usr/include/libscf_priv.h 0644 root bin
 f none usr/include/libsysevent.h 644 root bin
+f none usr/include/libshare.h 644 root bin
 f none usr/include/libsysevent_impl.h 644 root bin
 f none usr/include/libsvm.h 644 root bin
 f none usr/include/libtsnet.h 644 root bin

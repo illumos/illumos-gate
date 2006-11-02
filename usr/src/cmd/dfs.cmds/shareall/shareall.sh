@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
 #
 # CDDL HEADER END
 #
-#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
-#	  All Rights Reserved
+#	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+#	Use is subject to license terms.
 
 
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,17 +59,21 @@ fi
 
 if [ "$fsys" ]		# for each file system ...
 then
-	while read line				# get complete lines
-	do
-		echo $line
-	done < $infile |
-
-	`egrep "^[^#]*[ 	][ 	]*-F[ 	]*(\`echo $fsys|tr ',' '|'\`)" |
-	/sbin/sh`
-
-	fsys_file=/etc/dfs/fstypes
-	if [ -f $fsys_file ]    		# get default file system type
+	if [ "$infile" = "/etc/dfs/dfstab" ]
 	then
+	    /usr/sbin/sharemgr start -P $fsys -a
+	else
+	    while read line				# get complete lines
+	    do
+		echo $line
+	    done < $infile |
+
+	    `egrep "^[^#]*[ 	][ 	]*-F[ 	]*(\`echo $fsys|tr ',' '|'\`)" |
+	    /sbin/sh`
+
+	    fsys_file=/etc/dfs/fstypes
+	    if [ -f $fsys_file ]    		# get default file system type
+	    then
 		def_fs=`egrep '^[^#]' $fsys_file | awk '{print $1; exit}'`
 		if [ "$def_fs" = "$fsys" ]      # if default is what we want ...
 		then            		# for every file system ...
@@ -82,9 +85,15 @@ then
 			# not a comment and no -F option
 			`egrep -v "(^[#]|-F)" | /sbin/sh`
 		fi
-	else
+	    else
 		echo "shareall: can't open $fsys_file"
+	    fi
 	fi
 else			# for every file system ...
-	cat $infile|/sbin/sh
+	if [ "$infile" = "/etc/dfs/dfstab" ]
+	then
+	    /usr/sbin/sharemgr start -a
+	else
+	    cat $infile|/sbin/sh
+	fi
 fi

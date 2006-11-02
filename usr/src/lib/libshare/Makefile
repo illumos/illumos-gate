@@ -19,32 +19,50 @@
 # CDDL HEADER END
 #
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-##
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/dfs.cmds/Makefile
 
-SUBDIRS=	general dfshares shareall unshareall sharemgr sharectl
-MSGSUBDIRS=	sharectl sharemgr
+include ../../Makefile.master
 
-include ../Makefile.cmd
+include ../Makefile.lib
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET = _msg
+HDRS =		libshare.h
+HDRDIR =	common
+SUBDIRS =	$(MACH)
+ROOTHDRDIR=     $(ROOT)/usr/include
+ROOTHDRS=       $(HDRS:%=$(ROOTHDRDIR)/%)
+
+MSGFILES=	common/libshare.c common/libsharecore.c common/scfutil.c \
+		common/parser.c common/libshare_zfs.c
+POFILE=		libshare.po
+
+all :=		TARGET = all
+clean :=	TARGET = clean
+clobber	:=	TARGET = clobber
+install	:=	TARGET = install
+lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all clean clobber install lint: $(SUBDIRS)
+
+install_h:	$(ROOTHDRS)
+
+check:		$(CHECKHDRS)
+
+$(POFILE):	$(MSGFILES)
+	$(BUILDPO.msgfiles)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
-_msg:	$(MSGSUBDIRS)
+_msg:	$(MSGDOMAINPOFILE)
+
 
 FRC:
+
+include ../Makefile.targ
+include ../../Makefile.msg.targ

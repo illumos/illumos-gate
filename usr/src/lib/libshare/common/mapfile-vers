@@ -1,0 +1,110 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNWprivate_1.1 {
+    global:
+	sa_get_optionset;
+	sa_create_property;
+	sa_get_property;
+	sa_create_security;
+	sa_update_legacy;
+	sa_get_group_attr;
+	sa_free_share_description;
+	sa_remove_group;
+	sa_add_property;
+	sa_get_sub_group;
+	sa_get_next_optionset;
+	sa_update_property;
+	sa_destroy_security;
+	sa_update_sharetab;
+	sa_create_protocol_properties;
+	sa_get_group;
+	sa_get_security;
+	sa_get_protocol_property;
+	sa_add_share;
+	sa_valid_group_name;
+	sa_get_optionset_attr;
+	sa_remove_property;
+	sa_set_security_attr;
+	sa_delete_sharetab;
+	sa_format_free;
+	sa_add_protocol_property;
+	sa_check_path;
+	sa_free_derived_optionset;
+	sa_is_security;
+	sa_get_protocols;
+	sa_get_parent_group;
+	sa_set_optionset_attr;
+	sa_commit_properties;
+	sa_parse_legacy_options;
+	sa_zfs_is_shared;
+	sa_get_derived_optionset;
+	sa_move_share;
+	sa_group_is_zfs;
+	sa_update_config;
+	sa_get_share_attr;
+	sa_create_optionset;
+	sa_valid_property;
+	sa_proto_legacy_format;
+	sa_proto_valid_space;
+	sa_proto_space_alias;
+	sa_get_next_protocol_property;
+	sa_remove_share;
+	sa_is_share;
+	sa_get_share_description;
+	sa_get_share;
+	sa_get_next_group;
+	sa_set_share_attr;
+	sa_destroy_optionset;
+	sa_get_derived_security;
+	sa_proto_get_properties;
+	sa_get_all_security_types;
+	sa_get_resource;
+	sa_set_share_description;
+	sa_set_group_attr;
+	sa_disable_share;
+	sa_get_next_property;
+	sa_get_next_security;
+	sa_get_protocol_status;
+	sa_init;
+	sa_find_share;
+	sa_set_protocol_property;
+	sa_fini;
+	sa_errorstr;
+	sa_get_next_share;
+	sa_free_attr_string;
+	sa_get_property_attr;
+	sa_get_security_attr;
+	sa_delete_legacy;
+	sa_free_derived_security;
+	sa_enable_share;
+	sa_create_group;
+	sa_valid_protocol;
+    local:
+	*;
+};
+

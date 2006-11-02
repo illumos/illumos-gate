@@ -32,11 +32,11 @@
 
 include $(SRC)/Makefile.master
 
-SUBDIR1=	exportfs nfsd rquotad unshare \
+SUBDIR1=	exportfs nfsd rquotad \
 		statd nfsstat mountd dfshares \
-		nfsfind nfs4cbd
+		nfsfind nfs4cbd share
 SUBDIR2=	clear_locks umount showmount \
-		share mount dfmounts nfslog nfsmapid
+		mount dfmounts nfslog nfsmapid
 
 SUBDIR3=	etc svc
 SUBDIRS=	$(SUBDIR1) $(SUBDIR2) $(SUBDIR3)

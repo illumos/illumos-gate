@@ -361,6 +361,7 @@ COMMON_SUBDIRS = \
 	lib/libsecdb \
 	lib/libsendfile \
 	lib/libsip \
+	lib/libshare \
 	lib/libsldap \
 	lib/libslp \
 	lib/libsmbios \

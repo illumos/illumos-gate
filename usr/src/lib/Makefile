@@ -223,6 +223,7 @@ SUBDIRS += \
 	brand		\
 	policykit	\
 	hal		\
+	libshare	\
 	$($(MACH)_SUBDIRS)
 
 sparc_SUBDIRS= .WAIT	\
@@ -276,6 +277,7 @@ MSGSUBDIRS=		\
 	libsasl		\
 	libldap5	\
 	libsecdb	\
+	libshare	\
 	libsldap	\
 	libslp		\
 	libsmedia	\
@@ -385,6 +387,7 @@ HDRSUBDIRS=		\
 	udapl		\
 	libmapid	\
 	libkrb5		\
+	libshare	\
 	$($(MACH)_HDRSUBDIRS)
 
 $(CLOSED_BUILD)HDRSUBDIRS += \
@@ -500,6 +503,7 @@ libzfs_jni:	libdiskmgt libnvpair libzfs
 libzpool:	libavl libumem libnvpair
 libsec:		libavl
 brand:		libc libsocket
+libshare:	libscf libzfs libuuid libfsmgt libsecdb
 
 #
 # The reason this rule checks for the existence of the

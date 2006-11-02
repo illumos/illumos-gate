@@ -822,7 +822,6 @@ s none usr/sbin/routeadm=../../sbin/routeadm
 f none usr/sbin/rpcbind 555 root bin
 f none usr/sbin/sacadm 4755 root sys
 f none usr/sbin/setmnt 555 root bin
-f none usr/sbin/share 555 root bin
 f none usr/sbin/shareall 555 root bin
 f none usr/sbin/shutdown 755 root sys
 f none usr/sbin/smbios 555 root bin
@@ -852,7 +851,12 @@ s none usr/sbin/ufsrestore=../lib/fs/ufs/ufsrestore
 s none usr/sbin/umount=../../sbin/umount
 f none usr/sbin/umountall 555 root sys
 f none usr/sbin/unlink 555 root bin
-f none usr/sbin/unshare 555 root bin
+f none usr/sbin/sharectl 555 root bin
+f none usr/sbin/sharemgr 555 root bin
+f none usr/lib/libshare.so.1 755 root bin
+s none usr/lib/libshare.so=./libshare.so.1
+l none usr/sbin/share=../../usr/sbin/sharemgr
+l none usr/sbin/unshare=../../usr/sbin/sharemgr
 f none usr/sbin/unshareall 555 root bin
 l none usr/sbin/update_drv=../../usr/lib/isaexec
 f none usr/sbin/useradd 555 root sys

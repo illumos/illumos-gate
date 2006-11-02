@@ -19,32 +19,74 @@
 # CDDL HEADER END
 #
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-##
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/dfs.cmds/Makefile
 
-SUBDIRS=	general dfshares shareall unshareall sharemgr sharectl
-MSGSUBDIRS=	sharectl sharemgr
+include ../../../Makefile.cmd
 
-include ../Makefile.cmd
+COMMON = ..
+
+PROG=		sharectl
+
+SHARECTL_MOD	= sharectl
+
+SHARECTL_SRC	= $(SHARECTL_MOD:%=$(COMMON)/%.c) shareutil.c
+
+SHARECTL_OBJ	= $(SHARECTL_MOD:%=%.o) shareutil.o
+
+
+MYCPPFLAGS = 	-I.. -I../../sharemgr
+CPPFLAGS += $(MYCPPFLAGS)
+LDLIBS += -lshare -lumem
+
+SRCS = $(SHARECTL_SRC)
+OBJS = $(SHARECTL_OBJ)
+MODS = $(SHARECTL_MOD)
+
+CLOBBERFILES = $(MODS)
+
+POFILES = $(SHARECTL_SRC:.c=.po)
+POFILE  = sharectl.po
 
 all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 lint :=		TARGET= lint
-_msg :=		TARGET = _msg
+_msg:=		TARGET= catalog
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all: $(MODS)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+catalog: $(POFILE)
 
-_msg:	$(MSGSUBDIRS)
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTUSRSBINPROG)
+
+lint:	$(SHARECTL_MOD).ln $(SHARECTL_SRC:.c=.ln)
+
+clean:
+	$(RM) $(OBJS)
+
+%.ln: FRC
+	$(LINT.c) $(SHARECTL_SRC) $(LDLIBS)
+
+include ../../../Makefile.targ
+
+$(POFILE):      $(POFILES)
+	$(RM) $@; cat $(POFILES) > $@
+
+%.o: $(COMMON)/%.c
+	$(COMPILE.c) -o $@ $<
+
+shareutil.c: ../../sharemgr/shareutil.c
+	$(CP) -f ../../sharemgr/shareutil.c shareutil.c
 
 FRC:

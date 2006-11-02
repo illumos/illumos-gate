@@ -42,7 +42,7 @@ Log Management:::Manage log files:help=RtLogMngmnt.html
 Basic Solaris User:::Automatically assigned rights:auths=solaris.profmgr.read,solaris.jobs.user,solaris.mail.mailq,solaris.device.mount.removable;profiles=All;help=RtDefault.html
 Device Security:::Manage devices and Volume Manager:auths=solaris.device.*;help=RtDeviceSecurity.html
 DHCP Management:::Manage the DHCP service:auths=solaris.dhcpmgr.*;help=RtDHCPMngmnt.html
-File System Management:::Manage, mount, share file systems:auths=solaris.smf.manage.autofs;help=RtFileSysMngmnt.html
+File System Management:::Manage, mount, share file systems:auths=solaris.smf.manage.autofs,solaris.smf.manage.shares.*,solaris.smf.value.shares.*;help=RtFileSysMngmnt.html
 File System Security:::Manage file system security attributes:help=RtFileSysSecurity.html
 HAL Management:::Manage HAL SMF service:auths=solaris.smf.manage.hal;help=RtHALMngmnt.html
 Mail Management:::Manage sendmail & queues:auths=solaris.smf.manage.sendmail;help=RtMailMngmnt.html
