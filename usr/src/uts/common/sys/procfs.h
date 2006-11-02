@@ -331,9 +331,6 @@ typedef struct prmap {
 
 /*
  * HAT memory-map interface.  /proc/<pid>/xmap
- *
- * The xmap structure is a Sun private interface. The existence, semantics
- * and contents of the xmap structure are subject to arbitrary change.
  */
 typedef struct prxmap {
 	uintptr_t pr_vaddr;	/* virtual address of mapping */
@@ -345,11 +342,16 @@ typedef struct prxmap {
 	int	pr_shmid;	/* SysV shmid, -1 if not SysV shared memory */
 	dev_t	pr_dev;	/* st_dev from stat64() of mapped object, or PRNODEV */
 	uint64_t pr_ino; /* st_ino from stat64() of mapped object, if any */
-	ulong_t	pr_rss; 	/* pages of resident memory */
-	ulong_t	pr_anon;	/* pages of resident anonymous memory */
-	ulong_t	pr_locked;	/* pages of locked memory */
-	int	pr_hatpagesize;	/* pagesize of the hat mapping */
-	ulong_t	pr_filler[8];	/* filler for future expansion */
+	size_t	pr_rss; 	/* pages of resident memory */
+	size_t	pr_anon;	/* pages of resident anonymous memory */
+	size_t	pr_locked;	/* pages of locked memory */
+	size_t	pr_pad;		/* currently unused */
+	uint64_t pr_hatpagesize; /* pagesize of the hat mapping */
+#ifdef	_ILP32
+	ulong_t	pr_filler[6];	/* filler for future expansion */
+#else
+	ulong_t pr_filler[7];	/* filler for future expansion */
+#endif
 } prxmap_t;
 
 
@@ -696,9 +698,6 @@ typedef struct prmap32 {
 
 /*
  * _ILP32 HAT memory-map interface.  /proc/<pid>/xmap
- *
- * The xmap structure is a Sun private interface. The existence, semantics
- * and contents of the xmap structure are subject to arbitrary change.
  */
 typedef struct prxmap32 {
 	caddr32_t pr_vaddr;	/* virtual address of mapping */
@@ -713,8 +712,9 @@ typedef struct prxmap32 {
 	uint32_t pr_rss;	/* pages of resident memory */
 	uint32_t pr_anon;	/* pages of resident anonymous memory */
 	uint32_t pr_locked;	/* pages of locked memory */
-	int	pr_hatpagesize;	/* pagesize of the hat mapping */
-	uint32_t pr_filler[7];	/* filler for future expansion */
+	uint32_t pr_pad;	/* currently unused */
+	uint64_t pr_hatpagesize; /* pagesize of the hat mapping */
+	uint32_t pr_filler[6];	/* filler for future expansion */
 } prxmap32_t;
 
 /*
