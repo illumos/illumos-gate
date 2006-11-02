@@ -48,7 +48,7 @@
  */
 #define	JMP	\
 	pushl	$_CONST(. - lx_handler_table); \
-	jmp	lx_handler_notrace;	\
+	jmp	lx_handler;	\
 	.align	16;	
 
 #define	JMP4	JMP; JMP; JMP; JMP
@@ -57,12 +57,12 @@
 #define JMP256	JMP64; JMP64; JMP64; JMP64
 
 /*
- * Alternate jump table which turns on lx_traceflag before emulating the
- * system call.
+ * Alternate jump table that turns on lx_traceflag before proceeding with
+ * the normal emulation routine.
  */
 #define	TJMP	\
 	pushl	$_CONST(. - lx_handler_trace_table); \
-	jmp	lx_handler;	\
+	jmp	lx_handler_trace;	\
 	.align	16;	
 
 #define	TJMP4	TJMP; TJMP; TJMP; TJMP
@@ -135,14 +135,21 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	JMP16
 	SET_SIZE(lx_handler_table)
 
-	ENTRY_NP(lx_handler)
+	ENTRY_NP(lx_handler_trace)
 	pushl	%esi
 	PIC_SETUP(%esi)
 	movl	lx_traceflag@GOT(%esi), %esi
 	movl	$1, (%esi)
 	popl	%esi
+	/*
+	 * While we could just fall through to lx_handler(), we "tail-call" it
+	 * instead to make ourselves a little more comprehensible to trace
+	 * tools.
+	 */
+	jmp	lx_handler
+	SET_SIZE(lx_handler_trace)
 	
-	ALTENTRY(lx_handler_notrace)
+	ALTENTRY(lx_handler)
 	/*
 	 * %ebp isn't always going to be a frame pointer on Linux, but when
 	 * it is, saving it here lets us have a coherent stack backtrace.
@@ -173,19 +180,15 @@ lx_sigreturn_tolibc(uintptr_t sp)
 	movl	%ebx, LXR_EBX(%esp)
 	movl	%edx, LXR_EDX(%esp)
 	movl	%ecx, LXR_ECX(%esp)
-
 	movl	%eax, LXR_EIP(%esp)
 
 	/*
-	 * We enter this routine part-way into the table above, and make a
-	 * call to lx_handler -- this both redirects control and pushes the
-	 * address where we entered the table onto the stack. That position
-	 * indicates the system call number while %eax holds what would
-	 * normally be the return address. We replace the value on the stack
-	 * with the return address and use the value to compute the system
-	 * call number.
-	 * 
-	 *	sysnum = (trampoline_address - lx_handler_table) / 16
+	 * The kernel drops us into the middle of one of the tables above
+	 * that then pushes that table offset onto the stack, and calls into
+	 * lx_handler. That offset indicates the system call number while
+	 * %eax holds the return address for the system call. We replace the
+	 * value on the stack with the return address, and use the value to
+	 * compute the system call number by dividing by the table entry size.
 	 */
 	xchgl	CPTRSIZE(%ebp), %eax
 	shrl	$4, %eax
