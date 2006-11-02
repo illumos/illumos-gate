@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +59,7 @@ extern "C" {
 
 #define	ETM_PROTO_V1 (1)
 #define	ETM_PROTO_V2 (2)
+#define	ETM_PROTO_V3 (3)
 
 /*
  * Design_Note:	Protocol V2 uses the same headers and constants as V1.
@@ -74,11 +74,16 @@ extern "C" {
  */
 
 /*
- * Design_Note:	Care should be taken for any future V3 protocol, particularly
- *		if the size of the protocol preamble shrinks vs the V1/V2 size,
- *		so that if ETM is implemented to receive each message header
- *		as a whole, it won't pend indefinitely when sent a [tiny] V3
- *		message.
+ * Design_Note: Protocol V3 introduces a new message type for
+ * syslog alerting.  It uses the same protocols and preambles.
+ */
+
+/*
+ * Design_Note:	Care should be taken for any future V4 protocol, particularly
+ *		if the size of the protocol preamble shrinks vs the current
+ *		size, so that if ETM is implemented to receive each message
+ *		header as a whole, it won't pend indefinitely when sent a
+ *		[tiny] V4 message.
  */
 
 /*
@@ -91,9 +96,10 @@ typedef enum {
 	ETM_MSG_TYPE_FMA_EVENT,		/* pp_msg_type: FMA event */
 	ETM_MSG_TYPE_CONTROL,		/* pp_msg_type: ETM control */
 	ETM_MSG_TYPE_RESPONSE,		/* pp_msg_type: ETM response */
+	ETM_MSG_TYPE_ALERT,		/* pp_msg_type: Syslog alert */
 	ETM_MSG_TYPE_TOO_BIG		/* range check place holder */
 
-} etm_proto_v1_msg_type_t;	/* 8-bit pp_msg_type ETM message types */
+} etm_proto_v3_msg_type_t;	/* 8-bit pp_msg_type ETM message types */
 
 #define	ETM_PROTO_V1_TIMEOUT_NONE	((uint32_t)(-1))
 #define	ETM_PROTO_V1_TIMEOUT_FOREVER	((uint32_t)(-2))
@@ -118,6 +124,20 @@ typedef struct etm_proto_v1_ev_hdr {
 	/* uint8_t ev_bodies[];		contig packed FMA events */
 
 } etm_proto_v1_ev_hdr_t;	/* header for FMA_EVENT msgs */
+
+/*
+ * V3 addition: Syslog Alert.  Uses the same protocol preamble as V1/V2
+ */
+
+typedef struct etm_proto_v3_sa_hdr {
+
+	etm_proto_v1_pp_t	sa_pp;		/* protocol preamble */
+	uint32_t		sa_priority;	/* priority for syslog */
+	uint32_t		sa_len;		/* message string length */
+
+	/* uint8_t sa_message[];		contig message string */
+
+} etm_proto_v3_sa_hdr_t;	/* header for ALERT msgs */
 
 typedef enum {
 

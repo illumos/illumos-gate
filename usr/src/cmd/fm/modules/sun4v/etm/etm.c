@@ -42,6 +42,8 @@
 #include <netinet/in.h>
 #include <fm/fmd_api.h>
 #include <sys/fm/ldom.h>
+#include <sys/strlog.h>
+#include <sys/syslog.h>
 
 #include "etm_xport_api.h"
 #include "etm_etm_proto.h"
@@ -86,11 +88,15 @@ static const fmd_prop_t fmd_props[] = {
 	{ ETM_PROP_NM_XPORT_ADDRS,	FMD_TYPE_STRING, "" },
 	{ ETM_PROP_NM_DEBUG_LVL,	FMD_TYPE_INT32, "0" },
 	{ ETM_PROP_NM_DEBUG_MAX_EV_CNT,	FMD_TYPE_INT32, "-1" },
+	{ ETM_PROP_NM_CONSOLE,		FMD_TYPE_BOOL, "false" },
+	{ ETM_PROP_NM_SYSLOGD,		FMD_TYPE_BOOL, "true" },
+	{ ETM_PROP_NM_FACILITY,		FMD_TYPE_STRING, "LOG_DAEMON" },
 	{ NULL, 0, NULL }
 };
 
+
 static const fmd_hdl_info_t fmd_info = {
-	"FMA Event Transport Module", "1.0", &fmd_ops, fmd_props
+	"FMA Event Transport Module", "1.1", &fmd_ops, fmd_props
 };
 
 /*
@@ -161,15 +167,40 @@ etm_xid_posted_ev = 0;	/* xid of last FMA_EVENT msg/event posted OK to FMD */
 static uint8_t
 etm_resp_ver = ETM_PROTO_V1; /* proto ver [negotiated] for msg sends */
 
+static log_ctl_t syslog_ctl;	/* log(7D) meta-data for each msg */
+static int syslog_facility;	/* log(7D) facility (part of priority) */
+static int syslog_logfd = -1;	/* log(7D) file descriptor */
+static int syslog_msgfd = -1;	/* sysmsg(7D) file descriptor */
+static int syslog_file = 0;	/* log to syslog_logfd */
+static int syslog_cons = 0;	/* log to syslog_msgfd */
+
+static const struct facility {
+	const char *fac_name;
+	int fac_value;
+} syslog_facs[] = {
+	{ "LOG_DAEMON", LOG_DAEMON },
+	{ "LOG_LOCAL0", LOG_LOCAL0 },
+	{ "LOG_LOCAL1", LOG_LOCAL1 },
+	{ "LOG_LOCAL2", LOG_LOCAL2 },
+	{ "LOG_LOCAL3", LOG_LOCAL3 },
+	{ "LOG_LOCAL4", LOG_LOCAL4 },
+	{ "LOG_LOCAL5", LOG_LOCAL5 },
+	{ "LOG_LOCAL6", LOG_LOCAL6 },
+	{ "LOG_LOCAL7", LOG_LOCAL7 },
+	{ NULL, 0 }
+};
+
 static struct stats {
 
 	/* ETM msg counters */
 
 	fmd_stat_t etm_rd_hdr_fmaevent;
 	fmd_stat_t etm_rd_hdr_control;
+	fmd_stat_t etm_rd_hdr_alert;
 	fmd_stat_t etm_rd_hdr_response;
 	fmd_stat_t etm_rd_body_fmaevent;
 	fmd_stat_t etm_rd_body_control;
+	fmd_stat_t etm_rd_body_alert;
 	fmd_stat_t etm_rd_body_response;
 	fmd_stat_t etm_wr_hdr_fmaevent;
 	fmd_stat_t etm_wr_hdr_control;
@@ -243,6 +274,10 @@ static struct stats {
 	fmd_stat_t etm_fmd_init_badargs;
 	fmd_stat_t etm_fmd_fini_badargs;
 
+	/* Alert logging errors */
+	fmd_stat_t etm_log_err;
+	fmd_stat_t etm_msg_err;
+
 } etm_stats = {
 
 	/* ETM msg counters */
@@ -251,12 +286,16 @@ static struct stats {
 		"ETM fmaevent msg headers rcvd from xport" },
 	{ "etm_rd_hdr_control", FMD_TYPE_UINT64,
 		"ETM control msg headers rcvd from xport" },
+	{ "etm_rd_hdr_alert", FMD_TYPE_UINT64,
+		"ETM alert msg headers rcvd from xport" },
 	{ "etm_rd_hdr_response", FMD_TYPE_UINT64,
 		"ETM response msg headers rcvd from xport" },
 	{ "etm_rd_body_fmaevent", FMD_TYPE_UINT64,
 		"ETM fmaevent msg bodies rcvd from xport" },
 	{ "etm_rd_body_control", FMD_TYPE_UINT64,
 		"ETM control msg bodies rcvd from xport" },
+	{ "etm_rd_body_alert", FMD_TYPE_UINT64,
+		"ETM alert msg bodies rcvd from xport" },
 	{ "etm_rd_body_response", FMD_TYPE_UINT64,
 		"ETM response msg bodies rcvd from xport" },
 	{ "etm_wr_hdr_fmaevent", FMD_TYPE_UINT64,
@@ -373,7 +412,13 @@ static struct stats {
 	{ "etm_fmd_init_badargs", FMD_TYPE_UINT64,
 		"bad arguments from fmd_init entry point" },
 	{ "etm_fmd_fini_badargs", FMD_TYPE_UINT64,
-		"bad arguments from fmd_fini entry point" }
+		"bad arguments from fmd_fini entry point" },
+
+	/* Alert logging errors */
+	{ "etm_log_err", FMD_TYPE_UINT64,
+		"failed to log message to log(7D)" },
+	{ "etm_msg_err", FMD_TYPE_UINT64,
+		"failed to log message to sysmsg(7D)" }
 };
 
 /*
@@ -739,6 +784,7 @@ etm_hdr_read(fmd_hdl_t *hdl, etm_xport_conn_t conn, size_t *szp)
 	etm_proto_v1_ev_hdr_t	*ev_hdrp;	/* for FMA_EVENT msg */
 	etm_proto_v1_ctl_hdr_t	*ctl_hdrp;	/* for CONTROL msg */
 	etm_proto_v1_resp_hdr_t *resp_hdrp;	/* for RESPONSE msg */
+	etm_proto_v3_sa_hdr_t	*sa_hdrp;	/* for ALERT msg */
 	uint32_t		*lenp;		/* ptr to FMA event length */
 	ssize_t			i, n;		/* gen use */
 	uint8_t	misc_buf[ETM_MISC_BUF_SZ];	/* for var sized hdrs */
@@ -778,7 +824,7 @@ etm_hdr_read(fmd_hdl_t *hdl, etm_xport_conn_t conn, size_t *szp)
 	/* sanity check the header as best we can */
 
 	if ((pp.pp_proto_ver < ETM_PROTO_V1) ||
-	    (pp.pp_proto_ver > ETM_PROTO_V2)) {
+	    (pp.pp_proto_ver > ETM_PROTO_V3)) {
 		fmd_hdl_error(hdl, "error: bad proto ver %d\n",
 					(int)pp.pp_proto_ver);
 		errno = EPROTO;
@@ -900,7 +946,37 @@ etm_hdr_read(fmd_hdl_t *hdl, etm_xport_conn_t conn, size_t *szp)
 
 		etm_stats.etm_rd_hdr_response.fmds_value.ui64++;
 
-	} /* whether we have FMA_EVENT, CONTROL, RESPONSE msg */
+	} else if (pp.pp_msg_type == ETM_MSG_TYPE_ALERT) {
+
+		sa_hdrp = (void*)&misc_buf[0];
+		hdr_sz = sizeof (*sa_hdrp);
+		(void) memcpy(&sa_hdrp->sa_pp, &pp, sizeof (pp));
+
+		/* sanity check the header's protocol version */
+
+		if (sa_hdrp->sa_pp.pp_proto_ver != ETM_PROTO_V3) {
+			errno = EPROTO;
+			etm_stats.etm_ver_bad.fmds_value.ui64++;
+			return (NULL);
+		}
+
+		/* get the priority and length */
+
+		if ((n = etm_io_op(hdl, "bad io read on sa priority+len",
+					conn, &sa_hdrp->sa_priority,
+					sizeof (sa_hdrp->sa_priority) +
+					sizeof (sa_hdrp->sa_len),
+					ETM_IO_OP_RD)) < 0) {
+			errno = (-n);
+			return (NULL);
+		}
+
+		sa_hdrp->sa_priority = ntohl(sa_hdrp->sa_priority);
+		sa_hdrp->sa_len = ntohl(sa_hdrp->sa_len);
+
+		etm_stats.etm_rd_hdr_alert.fmds_value.ui64++;
+
+	} /* whether we have FMA_EVENT, ALERT, CONTROL, or RESPONSE msg */
 
 	/*
 	 * choose a header size that allows hdr reuse for RESPONSE msgs,
@@ -1030,6 +1106,81 @@ etm_post_to_fmd(fmd_hdl_t *hdl, nvlist_t *evp)
 } /* etm_post_to_fmd() */
 
 /*
+ * Ideally we would just use syslog(3C) for outputting our messages.
+ * Unfortunately, as this module is running within the FMA daemon context,
+ * that would create the situation where this module's openlog() would
+ * have the monopoly on syslog(3C) for the daemon and all its modules.
+ * To avoid that situation, this module uses the same logic as the
+ * syslog-msgs FM module to directly call into the log(7D) and sysmsg(7D)
+ * devices for syslog and console.
+ */
+
+static int
+etm_post_to_syslog(fmd_hdl_t *hdl, uint32_t priority, uint32_t body_sz,
+							uint8_t *body_buf)
+{
+	char		*sysmessage;	/* Formatted message */
+	size_t		formatlen;	/* maximum length of sysmessage */
+	struct strbuf	ctl, dat;	/* structs pushed to the logfd */
+	uint32_t	msgid;		/* syslog message ID number */
+
+	if ((syslog_file == 0) && (syslog_cons == 0)) {
+		return (0);
+	}
+
+	if (etm_debug_lvl >= 2) {
+		etm_show_time(hdl, "ante syslog post");
+	}
+
+	formatlen = body_sz + 64; /* +64 for prefix strings added below */
+	sysmessage = fmd_hdl_zalloc(hdl, formatlen, FMD_SLEEP);
+
+	if (syslog_file) {
+		STRLOG_MAKE_MSGID(body_buf, msgid);
+		(void) snprintf(sysmessage, formatlen,
+		    "SC Alert: [ID %u FACILITY_AND_PRIORITY] %s", msgid,
+		    body_buf);
+
+		syslog_ctl.pri = syslog_facility | priority;
+
+		ctl.buf = (void *)&syslog_ctl;
+		ctl.len = sizeof (syslog_ctl);
+
+		dat.buf = sysmessage;
+		dat.len = strlen(sysmessage) + 1;
+
+		if (putmsg(syslog_logfd, &ctl, &dat, 0) != 0) {
+			fmd_hdl_debug(hdl, "putmsg failed: %s\n",
+			    strerror(errno));
+			etm_stats.etm_log_err.fmds_value.ui64++;
+		}
+	}
+
+	if (syslog_cons) {
+		(void) snprintf(sysmessage, formatlen,
+		    "SC Alert: %s\r\n", body_buf);
+
+		dat.buf = sysmessage;
+		dat.len = strlen(sysmessage) + 1;
+
+		if (write(syslog_msgfd, dat.buf, dat.len) != dat.len) {
+			fmd_hdl_debug(hdl, "write failed: %s\n",
+			    strerror(errno));
+			etm_stats.etm_msg_err.fmds_value.ui64++;
+		}
+	}
+
+	fmd_hdl_free(hdl, sysmessage, formatlen);
+
+	if (etm_debug_lvl >= 2) {
+		etm_show_time(hdl, "post syslog post");
+	}
+
+	return (0);
+}
+
+
+/*
  * etm_req_ver_negot - send an ETM control message to the other end requesting
  *			that the ETM protocol version be negotiated/set
  */
@@ -1048,7 +1199,7 @@ etm_req_ver_negot(fmd_hdl_t *hdl)
 	/* populate an ETM control msg to send */
 
 	hdr_sz = sizeof (*ctl_hdrp);
-	body_sz = (2 + 1);		/* version bytes plus null byte */
+	body_sz = (3 + 1);		/* version bytes plus null byte */
 
 	ctl_hdrp = fmd_hdl_zalloc(hdl, hdr_sz + body_sz, FMD_SLEEP);
 
@@ -1065,6 +1216,7 @@ etm_req_ver_negot(fmd_hdl_t *hdl)
 
 	body_buf = (void*)&ctl_hdrp->ctl_len;
 	body_buf += sizeof (ctl_hdrp->ctl_len);
+	*body_buf++ = ETM_PROTO_V3;
 	*body_buf++ = ETM_PROTO_V2;
 	*body_buf++ = ETM_PROTO_V1;
 	*body_buf++ = '\0';
@@ -1153,6 +1305,7 @@ etm_maybe_send_response(fmd_hdl_t *hdl, etm_xport_conn_t conn,
 	} /* if a nop */
 
 	if ((orig_msg_type != ETM_MSG_TYPE_FMA_EVENT) &&
+	    (orig_msg_type != ETM_MSG_TYPE_ALERT) &&
 	    (orig_msg_type != ETM_MSG_TYPE_CONTROL)) {
 		return (-EINVAL);
 	} /* if inappropriate hdr for a response msg */
@@ -1170,7 +1323,9 @@ etm_maybe_send_response(fmd_hdl_t *hdl, etm_xport_conn_t conn,
 	if ((orig_msg_type == ETM_MSG_TYPE_CONTROL) &&
 	    (ppp->pp_sub_type == ETM_CTL_SEL_VER_NEGOT_REQ)) {
 		resp_body[0] = ETM_PROTO_V2;
-		resp_hdrp->resp_len = 1;
+		resp_body[1] = ETM_PROTO_V3;
+		resp_body[2] = 0;
+		resp_hdrp->resp_len = 3;
 	} /* if should send our/negotiated proto ver in resp body */
 
 	/* respond with the proto ver that was negotiated */
@@ -1244,6 +1399,7 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 	etm_proto_v1_ev_hdr_t	*ev_hdrp;	/* for FMA_EVENT msg */
 	etm_proto_v1_ctl_hdr_t	*ctl_hdrp;	/* for CONTROL msg */
 	etm_proto_v1_resp_hdr_t *resp_hdrp;	/* for RESPONSE msg */
+	etm_proto_v3_sa_hdr_t	*sa_hdrp;	/* for ALERT msg */
 	int32_t			resp_code;	/* response code */
 	size_t			hdr_sz;		/* sizeof header */
 	uint8_t			*body_buf;	/* msg body buffer */
@@ -1262,6 +1418,7 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 	ev_hdrp = NULL;
 	ctl_hdrp = NULL;
 	resp_hdrp = NULL;
+	sa_hdrp = NULL;
 	body_buf = NULL;
 	class = NULL;
 	evp = NULL;
@@ -1403,7 +1560,8 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 
 			for (i = 0; i < body_sz; i++) {
 				if ((body_buf[i] == ETM_PROTO_V1) ||
-				    (body_buf[i] == ETM_PROTO_V2)) {
+				    (body_buf[i] == ETM_PROTO_V2) ||
+				    (body_buf[i] == ETM_PROTO_V3)) {
 					break;
 				}
 			}
@@ -1453,14 +1611,39 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 
 		if (resp_hdrp->resp_pp.pp_xid == etm_xid_ver_negot) {
 			if ((body_buf[0] < ETM_PROTO_V1) ||
-			    (body_buf[0] > ETM_PROTO_V2)) {
+			    (body_buf[0] > ETM_PROTO_V3)) {
 				etm_stats.etm_ver_bad.fmds_value.ui64++;
 				goto func_ret;
 			}
 			etm_resp_ver = body_buf[0];
 		} /* if have resp to last req to negotiate proto ver */
 
-	} /* whether we have a FMA_EVENT, CONTROL, or RESPONSE msg */
+	} else if (ev_hdrp->ev_pp.pp_msg_type == ETM_MSG_TYPE_ALERT) {
+
+		sa_hdrp = (void*)ev_hdrp;
+
+		fmd_hdl_debug(hdl, "info: rcvd ALERT msg from xport\n");
+		if (etm_debug_lvl >= 1) {
+			fmd_hdl_debug(hdl, "info: sa sel %d xid 0x%x\n",
+					(int)sa_hdrp->sa_pp.pp_sub_type,
+					sa_hdrp->sa_pp.pp_xid);
+		}
+
+		body_sz = sa_hdrp->sa_len;
+		body_buf = fmd_hdl_zalloc(hdl, body_sz, FMD_SLEEP);
+
+		if ((n = etm_io_op(hdl, "bad io read on sa body",
+					conn, body_buf, body_sz,
+					ETM_IO_OP_RD)) < 0) {
+			goto func_ret;
+		}
+
+		etm_stats.etm_rd_body_alert.fmds_value.ui64++;
+
+		resp_code = etm_post_to_syslog(hdl, sa_hdrp->sa_priority,
+		    body_sz, body_buf);
+		(void) etm_maybe_send_response(hdl, conn, sa_hdrp, resp_code);
+	} /* whether we have a FMA_EVENT, CONTROL, RESPONSE or ALERT msg */
 
 func_ret:
 
@@ -1562,7 +1745,9 @@ _fmd_init(fmd_hdl_t *hdl)
 {
 	struct timeval		tmv;		/* timeval */
 	ssize_t			n;		/* gen use */
-	ldom_hdl_t		*lhp;
+	ldom_hdl_t		*lhp;		/* ldom pointer */
+	const struct facility	*fp;		/* syslog facility matching */
+	char			*facname;	/* syslog facility property */
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0) {
 		return; /* invalid data in configuration file */
@@ -1620,10 +1805,53 @@ _fmd_init(fmd_hdl_t *hdl)
 		return;
 	}
 
+	/*
+	 * Cache any properties we use every time we receive an alert.
+	 */
+	syslog_file = fmd_prop_get_int32(hdl, ETM_PROP_NM_SYSLOGD);
+	syslog_cons = fmd_prop_get_int32(hdl, ETM_PROP_NM_CONSOLE);
+
+	if (syslog_file && (syslog_logfd = open("/dev/conslog",
+	    O_WRONLY | O_NOCTTY)) == -1) {
+		fmd_hdl_error(hdl, "error: failed to open /dev/conslog");
+		syslog_file = 0;
+	}
+
+	if (syslog_cons && (syslog_msgfd = open("/dev/sysmsg",
+	    O_WRONLY | O_NOCTTY)) == -1) {
+		fmd_hdl_error(hdl, "error: failed to open /dev/sysmsg");
+		syslog_cons = 0;
+	}
+
+	if (syslog_file) {
+		/*
+		 * Look up the value of the "facility" property and use it to
+		 * determine * what syslog LOG_* facility value we use to
+		 * fill in our log_ctl_t.
+		 */
+		facname = fmd_prop_get_string(hdl, ETM_PROP_NM_FACILITY);
+
+		for (fp = syslog_facs; fp->fac_name != NULL; fp++) {
+			if (strcmp(fp->fac_name, facname) == 0)
+				break;
+		}
+
+		if (fp->fac_name == NULL) {
+			fmd_hdl_error(hdl, "error: invalid 'facility'"
+			    " setting: %s\n", facname);
+			syslog_file = 0;
+		} else {
+			syslog_facility = fp->fac_value;
+			syslog_ctl.flags = SL_CONSOLE | SL_LOGONLY;
+		}
+
+		fmd_prop_free_string(hdl, facname);
+	}
+
 	etm_svr_tid = fmd_thr_create(hdl, etm_server, hdl);
 
 	/*
-	 * Wait a second for the receiving is ready before start handshaking
+	 * Wait a second for the receiver to be ready before start handshaking
 	 * with the SP.
 	 */
 	(void) etm_sleep(ETM_SLEEP_QUIK);
@@ -1784,6 +2012,13 @@ _fmd_fini(fmd_hdl_t *hdl)
 	}
 	if (etm_fmd_xprt != NULL) {
 		fmd_xprt_close(hdl, etm_fmd_xprt);
+	}
+
+	if (syslog_logfd != -1) {
+		(void) close(syslog_logfd);
+	}
+	if (syslog_msgfd != -1) {
+		(void) close(syslog_msgfd);
 	}
 
 	fmd_hdl_debug(hdl, "info: module finalized ok\n");

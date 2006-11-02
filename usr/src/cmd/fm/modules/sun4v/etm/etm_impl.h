@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +87,10 @@ extern "C" {
 
 #define	ETM_PROP_NM_DEBUG_LVL		"etm_debug_lvl"
 #define	ETM_PROP_NM_DEBUG_MAX_EV_CNT	"etm_debug_max_ev_cnt"
+
+#define	ETM_PROP_NM_CONSOLE		"etm_alert_console"
+#define	ETM_PROP_NM_SYSLOGD		"etm_alert_syslog"
+#define	ETM_PROP_NM_FACILITY		"etm_alert_facility"
 
 /*
  * --------------------------------- prolog ----------------------------------
