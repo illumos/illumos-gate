@@ -929,6 +929,7 @@ static void solaris_config_file (void)
 	static char hexdigit[] = "0123456789ABCDEF";
 	char *c = menufile;
 	int i;
+	int err;
 
 	/* if config_file is from DHCP option 150, keep the setting */
 	if (grub_strcmp(config_file, "/boot/grub/menu.lst") != 0)
@@ -944,9 +945,12 @@ static void solaris_config_file (void)
 	}
 	*c = 0;
 
-	/* If the file exists, make it the default. Else, fallback
-	 * to what it was.
+	/*
+	 * If the file exists, make it the default. Else, fallback
+	 * to what it was.  Make sure we don't change errnum in the
+	 * process.
 	 */
+	err = errnum;
 	if (grub_open(menufile)) {
 		grub_strcpy(config_file, menufile);
 		grub_close();
@@ -957,6 +961,7 @@ static void solaris_config_file (void)
 			++cp;
 	  	grub_memmove (config_file, cp, strlen(cp) + 1);
 	}
+	errnum = err;
 }
 
 static struct builtin builtin_dhcp =
