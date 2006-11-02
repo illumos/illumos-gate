@@ -408,7 +408,7 @@ dtrace_load##bits(uintptr_t addr)					\
 	rval = *((volatile uint##bits##_t *)addr);			\
 	*flags &= ~CPU_DTRACE_NOFAULT;					\
 									\
-	return (rval);							\
+	return (!(*flags & CPU_DTRACE_FAULT) ? rval : 0);		\
 }
 
 #ifdef _LP64
