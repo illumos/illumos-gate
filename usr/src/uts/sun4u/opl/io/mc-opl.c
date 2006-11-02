@@ -223,6 +223,8 @@ static char *mc_ff_dimm_unum_table[2 * OPL_MAX_DIMMS] = {
 #define	INDEX_TO_BANK(i)			(((i) & 0x1C) >> 2)
 #define	INDEX_TO_SLOT(i)			((i) & 0x03)
 
+#define	SLOT_TO_CS(slot)	((slot & 0x3) >> 1)
+
 /* Isolation unit size is 64 MB */
 #define	MC_ISOLATION_BSIZE	(64 * 1024 * 1024)
 
@@ -790,6 +792,7 @@ pa_to_maddr(mc_opl_t *mcp, uint64_t pa, mc_addr_t *maddr)
 	pa_offset = pa - mcp->mc_start_address;
 
 	maddr->ma_bd = mcp->mc_board_num;
+	maddr->ma_phys_bd = mcp->mc_phys_board_num;
 	maddr->ma_bank = pa_to_bank(mcp, pa_offset);
 	maddr->ma_dimm_addr = pa_to_dimm(mcp, pa_offset);
 	MC_LOG("pa %lx -> mcaddr /LSB%d/B%d/%x\n",
@@ -815,16 +818,16 @@ pa_to_maddr(mc_opl_t *mcp, uint64_t pa, mc_addr_t *maddr)
  *	Z = 'A' or 'B'
  */
 int
-mc_set_mem_unum(char *buf, int buflen, int lsb, int bank,
+mc_set_mem_unum(char *buf, int buflen, int sb, int bank,
     uint32_t mf_type, uint32_t d_slot)
 {
 	char *dimmnm;
 	char memb_num;
-	int sb;
+	int cs;
 	int i;
+	int j;
 
-	if ((sb = mc_opl_get_physical_board(lsb)) < 0)
-		return (ENODEV);
+	cs = SLOT_TO_CS(d_slot);
 
 	if (plat_model == MODEL_DC) {
 		if (mf_type == FLT_TYPE_PERMANENT_CE) {
@@ -834,16 +837,15 @@ mc_set_mem_unum(char *buf, int buflen, int lsb, int bank,
 			    model_names[plat_model].unit_name, sb, dimmnm);
 		} else {
 			i = BD_BK_SLOT_TO_INDEX(0, bank, 0);
-			snprintf(buf, buflen, "/%s%02d/MEM%s MEM%s MEM%s MEM%s",
+			j = (cs == 0) ?  i : i + 2;
+			snprintf(buf, buflen, "/%s%02d/MEM%s MEM%s",
 			    model_names[plat_model].unit_name, sb,
-			    mc_dc_dimm_unum_table[i],
-			    mc_dc_dimm_unum_table[i + 1],
-			    mc_dc_dimm_unum_table[i + 2],
-			    mc_dc_dimm_unum_table[i + 3]);
+			    mc_dc_dimm_unum_table[j],
+			    mc_dc_dimm_unum_table[j + 1]);
 		}
 	} else {
-		i = BD_BK_SLOT_TO_INDEX(sb, bank, d_slot);
 		if (mf_type == FLT_TYPE_PERMANENT_CE) {
+			i = BD_BK_SLOT_TO_INDEX(sb, bank, d_slot);
 			dimmnm = mc_ff_dimm_unum_table[i];
 			memb_num = dimmnm[0];
 			snprintf(buf, buflen, "/%s/%s%c/MEM%s",
@@ -852,15 +854,14 @@ mc_set_mem_unum(char *buf, int buflen, int lsb, int bank,
 			    memb_num, &dimmnm[1]);
 		} else {
 			i = BD_BK_SLOT_TO_INDEX(sb, bank, 0);
+			j = (cs == 0) ?  i : i + 2;
 			memb_num = mc_ff_dimm_unum_table[i][0],
 			snprintf(buf, buflen,
-			    "/%s/%s%c/MEM%s MEM%s MEM%s MEM%s",
+			    "/%s/%s%c/MEM%s MEM%s",
 			    model_names[plat_model].unit_name,
 			    model_names[plat_model].mem_name, memb_num,
-			    &mc_ff_dimm_unum_table[i][1],
-			    &mc_ff_dimm_unum_table[i + 1][1],
-			    &mc_ff_dimm_unum_table[i + 2][1],
-			    &mc_ff_dimm_unum_table[i + 3][1]);
+			    &mc_ff_dimm_unum_table[j][1],
+			    &mc_ff_dimm_unum_table[j + 1][1]);
 		}
 	}
 	return (0);
@@ -1002,8 +1003,8 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 		flt_stat = mc_aflt->mflt_stat[i];
 		bank = flt_stat->mf_flt_maddr.ma_bank;
 		ret =  mc_set_mem_unum(p + strlen(p), blen,
-			flt_stat->mf_flt_maddr.ma_bd, bank, flt_stat->mf_type,
-			flt_stat->mf_dimm_slot);
+			flt_stat->mf_flt_maddr.ma_phys_bd, bank,
+			flt_stat->mf_type, flt_stat->mf_dimm_slot);
 
 		if (ret != 0) {
 			cmn_err(CE_WARN,
@@ -1024,7 +1025,7 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 
 		if (ret == 0) {
 			ret = mc_set_mem_sid(mc_aflt->mflt_mcp, s + strlen(s),
-			    blen, flt_stat->mf_flt_maddr.ma_bd, bank,
+			    blen, flt_stat->mf_flt_maddr.ma_phys_bd, bank,
 			    flt_stat->mf_type, flt_stat->mf_dimm_slot);
 
 		}
@@ -1460,6 +1461,7 @@ mc_read_ptrl_reg(mc_opl_t *mcp, int bank, mc_flt_stat_t *flt_stat)
 	flt_stat->mf_err_add = LD_MAC_REG(MAC_PTRL_ERR_ADD(mcp, bank));
 	flt_stat->mf_err_log = LD_MAC_REG(MAC_PTRL_ERR_LOG(mcp, bank));
 	flt_stat->mf_flt_maddr.ma_bd = mcp->mc_board_num;
+	flt_stat->mf_flt_maddr.ma_phys_bd = mcp->mc_phys_board_num;
 	flt_stat->mf_flt_maddr.ma_bank = bank;
 	flt_stat->mf_flt_maddr.ma_dimm_addr = flt_stat->mf_err_add;
 }
@@ -1489,6 +1491,7 @@ mc_read_mi_reg(mc_opl_t *mcp, int bank, mc_flt_stat_t *flt_stat)
 
 	flt_stat->mf_cntl = status;
 	flt_stat->mf_flt_maddr.ma_bd = mcp->mc_board_num;
+	flt_stat->mf_flt_maddr.ma_phys_bd = mcp->mc_phys_board_num;
 	flt_stat->mf_flt_maddr.ma_bank = bank;
 	flt_stat->mf_flt_maddr.ma_dimm_addr = flt_stat->mf_err_add;
 }
@@ -2349,6 +2352,15 @@ mc_board_add(mc_opl_t *mcp)
 		cmn_err(CE_WARN, "Cannot get cs-status. err=%d\n", cc);
 		return (DDI_FAILURE);
 	}
+	/* get the physical board number for a given logical board number */
+	mcp->mc_phys_board_num = mc_opl_get_physical_board(mcp->mc_board_num);
+
+	if (mcp->mc_phys_board_num < 0) {
+		if (len > 0)
+			kmem_free(macaddr, len);
+		cmn_err(CE_WARN, "Unable to obtain the physical board number");
+		return (DDI_FAILURE);
+	}
 
 	mutex_init(&mcp->mc_lock, NULL, MUTEX_DRIVER, NULL);
 
@@ -2649,8 +2661,10 @@ mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
 	int *lenp)
 {
 	int i;
+	int j;
 	int sb;
 	int bank;
+	int cs;
 	mc_opl_t *mcp;
 	char memb_num;
 
@@ -2669,7 +2683,8 @@ mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
 	}
 
 	bank = pa_to_bank(mcp, flt_addr - mcp->mc_start_address);
-	sb = mc_opl_get_physical_board(mcp->mc_board_num);
+	sb = mcp->mc_phys_board_num;
+	cs = pa_to_cs(mcp, flt_addr - mcp->mc_start_address);
 
 	if (sb == -1) {
 		mutex_exit(&mcmutex);
@@ -2678,21 +2693,20 @@ mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
 
 	if (plat_model == MODEL_DC) {
 		i = BD_BK_SLOT_TO_INDEX(0, bank, 0);
-		snprintf(buf, buflen, "/%s%02d/MEM%s MEM%s MEM%s MEM%s",
+		j = (cs == 0) ? i : i + 2;
+		snprintf(buf, buflen, "/%s%02d/MEM%s MEM%s",
 		    model_names[plat_model].unit_name, sb,
-		    mc_dc_dimm_unum_table[i], mc_dc_dimm_unum_table[i + 1],
-		    mc_dc_dimm_unum_table[i + 2], mc_dc_dimm_unum_table[i + 3]);
+		    mc_dc_dimm_unum_table[j],
+		    mc_dc_dimm_unum_table[j + 1]);
 	} else {
 		i = BD_BK_SLOT_TO_INDEX(sb, bank, 0);
+		j = (cs == 0) ? i : i + 2;
 		memb_num = mc_ff_dimm_unum_table[i][0];
-		snprintf(buf, buflen, "/%s/%s%c/MEM%s MEM%s MEM%s MEM%s",
+		snprintf(buf, buflen, "/%s/%s%c/MEM%s MEM%s",
 		    model_names[plat_model].unit_name,
 		    model_names[plat_model].mem_name, memb_num,
-		    &mc_ff_dimm_unum_table[i][1],
-
-		    &mc_ff_dimm_unum_table[i + 1][1],
-		    &mc_ff_dimm_unum_table[i + 2][1],
-		    &mc_ff_dimm_unum_table[i + 3][1]);
+		    &mc_ff_dimm_unum_table[j][1],
+		    &mc_ff_dimm_unum_table[j + 1][1]);
 	}
 	if (lenp) {
 		*lenp = strlen(buf);
@@ -3186,26 +3200,22 @@ mc_get_mem_sid_dimm(mc_opl_t *mcp, char *dname, char *buf,
 }
 
 int
-mc_set_mem_sid(mc_opl_t *mcp, char *buf, int buflen, int lsb,
+mc_set_mem_sid(mc_opl_t *mcp, char *buf, int buflen, int sb,
     int bank, uint32_t mf_type, uint32_t d_slot)
 {
-	int	sb;
 	int	lenp = buflen;
 	int	id;
 	int	ret;
 	char	*dimmnm;
 
-	if ((sb = mc_opl_get_physical_board(lsb)) < 0) {
-		return (ENODEV);
-	}
-
 	if (mf_type == FLT_TYPE_PERMANENT_CE) {
 		if (plat_model == MODEL_DC) {
 			id = BD_BK_SLOT_TO_INDEX(0, bank, d_slot);
+			dimmnm = mc_dc_dimm_unum_table[id];
 		} else {
 			id = BD_BK_SLOT_TO_INDEX(sb, bank, d_slot);
+			dimmnm = mc_ff_dimm_unum_table[id];
 		}
-		dimmnm = mc_dc_dimm_unum_table[id];
 		if ((ret = mc_get_mem_sid_dimm(mcp, dimmnm, buf, buflen,
 		    &lenp)) != 0) {
 			return (ret);
@@ -3247,9 +3257,12 @@ mc_get_mem_sid(char *unum, char *buf, int buflen, int *lenp)
 		if ((mcp = mc_instances[i]) == NULL)
 			continue;
 		mutex_enter(&mcp->mc_lock);
-		if (mcp->mc_board_num == board) {
-			ret = mc_get_mem_sid_dimm(mcp, dname, buf,
-			    buflen, lenp);
+		if (mcp->mc_phys_board_num != board) {
+			mutex_exit(&mcp->mc_lock);
+			continue;
+		}
+		ret = mc_get_mem_sid_dimm(mcp, dname, buf, buflen, lenp);
+		if (ret == 0) {
 			mutex_exit(&mcp->mc_lock);
 			break;
 		}
@@ -3357,7 +3370,7 @@ mc_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *paddr)
 		if ((mcp = mc_instances[i]) == NULL)
 			continue;
 		mutex_enter(&mcp->mc_lock);
-		if (mcp->mc_board_num != board) {
+		if (mcp->mc_phys_board_num != board) {
 			mutex_exit(&mcp->mc_lock);
 			continue;
 		}
@@ -3368,7 +3381,7 @@ mc_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *paddr)
 			MC_LOG("mc_get_mem_addr: dname_to_bankslot failed\n");
 			ret = ENODEV;
 		} else {
-			maddr.ma_bd = board;
+			maddr.ma_bd = mcp->mc_board_num;
 			maddr.ma_bank =  bank;
 			maddr.ma_dimm_addr = offset;
 			ret = mcaddr_to_pa(mcp, &maddr, paddr);
@@ -3377,6 +3390,8 @@ mc_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *paddr)
 				    "mcaddr_to_pa failed\n");
 				ret = ENODEV;
 			}
+			mutex_exit(&mcp->mc_lock);
+			break;
 		}
 		mutex_exit(&mcp->mc_lock);
 	}

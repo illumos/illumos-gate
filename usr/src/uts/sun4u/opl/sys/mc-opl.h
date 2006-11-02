@@ -100,6 +100,7 @@ typedef struct mc_opl_state {
 #define	MC_DRIVER_SUSPENDED	0x4	/* DDI_SUSPEND */
 #define	MC_MEMORYLESS		0x8
 	uint32_t mc_board_num;		/* board# */
+	uint32_t mc_phys_board_num;	/* physical board# */
 	uint64_t mc_start_address;	/* sb-mem-ranges */
 	uint64_t mc_size;
 	struct mc_bank {
@@ -130,6 +131,7 @@ typedef struct mc_opl_state {
 				& BANK_MIRROR_MODE)
 typedef struct mc_addr {
 	int ma_bd;		/* board number */
+	int ma_phys_bd;	/* phyiscal board number */
 	int ma_bank;		/* bank number */
 	uint32_t ma_dimm_addr;	/* DIMM address (same format as ERR_ADD) */
 } mc_addr_t;
