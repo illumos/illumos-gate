@@ -47,6 +47,10 @@
  * the DSCP interface should be up when ETM loads.
  */
 
+exs_conn_t Acc;				/* Connection for accepting/listening */
+pthread_t Acc_tid;			/* Thread ID for accepting conns */
+int Acc_quit;				/* Signal to quit the acceptor thread */
+int Acc_destroy;			/* Destroy accept/listen thread? */
 exs_hdl_t *Exh_head = NULL;		/* Head of ex_hdl_t list */
 pthread_mutex_t	List_lock = PTHREAD_MUTEX_INITIALIZER;
 					/* Protects linked list of ex_hdl_t */
@@ -75,7 +79,6 @@ exs_hdl_alloc(fmd_hdl_t *hdl, char *endpoint_id,
 
 	hp->h_endpt_id = fmd_hdl_strdup(hdl, endpoint_id, FMD_SLEEP);
 	hp->h_dom = dom;
-	hp->h_accept.c_sd = EXS_SD_FREE;
 	hp->h_client.c_sd = EXS_SD_FREE;
 	hp->h_server.c_sd = EXS_SD_FREE;
 	hp->h_tid = EXS_TID_FREE;
@@ -153,7 +156,8 @@ exs_get_id(fmd_hdl_t *hdl, char *endpoint_id, int *dom_id)
 		return (0);
 	} else {
 		if ((ptr = strstr(endpoint_id, EXS_DOMAIN_PREFIX)) == NULL) {
-			fmd_hdl_error(hdl, "xport - %s not found in %s\n",
+			fmd_hdl_error(hdl, "Property parsing error : %s not "
+			    "found in %s. Check event-transport.conf\n",
 			    EXS_DOMAIN_PREFIX, endpoint_id);
 			return (1);
 		}
@@ -161,9 +165,10 @@ exs_get_id(fmd_hdl_t *hdl, char *endpoint_id, int *dom_id)
 		ptr += EXS_DOMAIN_PREFIX_LEN;
 
 		if ((sscanf(ptr, "%d", dom_id)) != 1) {
-			fmd_hdl_error(hdl, "xport - no integer found in %s\n",
+			fmd_hdl_error(hdl, "Property parsing error : no "
+			    "integer found in %s. Check event-transport.conf\n",
 			    endpoint_id);
-			return (1);
+			return (2);
 		}
 	}
 
@@ -184,23 +189,22 @@ exs_prep_client(exs_hdl_t *hp)
 	if ((rv = dscpAddr(hp->h_dom, DSCP_ADDR_REMOTE,
 	    (struct sockaddr *)&hp->h_client.c_saddr,
 	    &hp->h_client.c_len)) != DSCP_OK) {
-		fmd_hdl_error(hp->h_hdl, "xport - dscpAddr on client socket "
+		fmd_hdl_debug(hp->h_hdl, "dscpAddr on the client socket "
 		    "failed for %s : rv = %d\n", hp->h_endpt_id, rv);
 		return (1);
 	}
 
 	if ((hp->h_client.c_sd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		fmd_hdl_error(hp->h_hdl, "xport - client socket create failed "
+		fmd_hdl_error(hp->h_hdl, "Failed to create the client socket "
 		    "for %s",  hp->h_endpt_id);
 		return (2);
 	}
 
 	if (setsockopt(hp->h_client.c_sd, SOL_SOCKET, SO_REUSEADDR,
 	    &optval, sizeof (optval))) {
-		fmd_hdl_error(hp->h_hdl, "xport - set REUSEADDR failed on "
+		fmd_hdl_error(hp->h_hdl, "Failed to set REUSEADDR on the "
 		    "client socket for %s", hp->h_endpt_id);
-		(void) close(hp->h_client.c_sd);
-		hp->h_client.c_sd = EXS_SD_FREE;
+		EXS_CLOSE_CLR(hp->h_client);
 		return (3);
 	}
 
@@ -217,20 +221,23 @@ exs_prep_client(exs_hdl_t *hp)
 	ling.l_linger = 0;
 	if (setsockopt(hp->h_client.c_sd, SOL_SOCKET, SO_LINGER, &ling,
 	    sizeof (ling))) {
-		fmd_hdl_error(hp->h_hdl, "xport - set SO_LINGER failed on "
+		fmd_hdl_error(hp->h_hdl, "Failed to set SO_LINGER on the "
 		    "client socket for %s", hp->h_endpt_id);
-		(void) close(hp->h_client.c_sd);
-		hp->h_client.c_sd = EXS_SD_FREE;
+		EXS_CLOSE_CLR(hp->h_client);
 		return (4);
 	}
 
 	/* Bind the socket to the local IP address of the DSCP link */
 	if ((rv = dscpBind(hp->h_dom, hp->h_client.c_sd,
 	    EXS_CLIENT_PORT)) != DSCP_OK) {
-		fmd_hdl_error(hp->h_hdl, "xport - dscpBind on client socket "
-		    "failed for %s : rv = %d\n", hp->h_endpt_id, rv);
-		(void) close(hp->h_client.c_sd);
-		hp->h_client.c_sd = EXS_SD_FREE;
+		if (rv == DSCP_ERROR_DOWN) {
+			fmd_hdl_debug(hp->h_hdl, "xport - dscp link for %s "
+			    "is down", hp->h_endpt_id);
+		} else {
+			fmd_hdl_error(hp->h_hdl, "dscpBind on the client "
+			    "socket failed : rv = %d\n", rv);
+		}
+		EXS_CLOSE_CLR(hp->h_client);
 		return (5);
 	}
 
@@ -238,137 +245,13 @@ exs_prep_client(exs_hdl_t *hp)
 
 	/* Set IPsec security policy for this socket */
 	if ((rv = dscpSecure(hp->h_dom, hp->h_client.c_sd)) != DSCP_OK) {
-		fmd_hdl_error(hp->h_hdl, "xport - dscpSecure on client socket "
+		fmd_hdl_error(hp->h_hdl, "dscpSecure on the client socket "
 		    "failed for %s : rv = %d\n", hp->h_endpt_id, rv);
-		(void) close(hp->h_client.c_sd);
-		hp->h_client.c_sd = EXS_SD_FREE;
+		EXS_CLOSE_CLR(hp->h_client);
 		return (6);
 	}
 
 	return (0);
-}
-
-/*
- * Prepare to accept a connection.
- * Return 0 for success, nonzero for failure.
- */
-int
-exs_prep_accept(exs_hdl_t *hp)
-{
-
-	int flags, optval = 1;
-	int rv;
-
-	if ((hp->h_accept.c_sd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		fmd_hdl_error(hp->h_hdl, "xport - accept socket create failed "
-		    "for %s", hp->h_endpt_id);
-		return (1);
-	}
-
-	if (setsockopt(hp->h_accept.c_sd, SOL_SOCKET, SO_REUSEADDR,
-	    &optval, sizeof (optval))) {
-		fmd_hdl_error(hp->h_hdl, "xport - set REUSEADDR failed for %s",
-		    hp->h_endpt_id);
-		(void) close(hp->h_accept.c_sd);
-		hp->h_accept.c_sd = EXS_SD_FREE;
-		return (2);
-	}
-
-	/* Bind the socket to the local IP address of the DSCP link */
-	if ((rv = dscpBind(hp->h_dom, hp->h_accept.c_sd,
-	    EXS_SERVER_PORT)) != DSCP_OK) {
-		fmd_hdl_error(hp->h_hdl, "xport - dscpBind on accept socket "
-		    "failed for %s : rv = %d\n", hp->h_endpt_id, rv);
-		(void) close(hp->h_accept.c_sd);
-		hp->h_accept.c_sd = EXS_SD_FREE;
-		return (3);
-	}
-
-	/* Activate IPsec security policy for this socket */
-	if ((rv = dscpSecure(hp->h_dom, hp->h_accept.c_sd)) != DSCP_OK) {
-		fmd_hdl_error(hp->h_hdl, "xport - dscpSecure on accept socket "
-		    "failed for %s : rv = %d\n", hp->h_endpt_id, rv);
-		(void) close(hp->h_accept.c_sd);
-		hp->h_accept.c_sd = EXS_SD_FREE;
-		return (4);
-	}
-
-	if ((listen(hp->h_accept.c_sd, EXS_NUM_SOCKS)) == -1) {
-		fmd_hdl_debug(hp->h_hdl, "xport - listen on accept socket "
-		    "failed for %s", hp->h_endpt_id);
-		(void) close(hp->h_accept.c_sd);
-		hp->h_accept.c_sd = EXS_SD_FREE;
-		return (5);
-	}
-
-	flags = fcntl(hp->h_accept.c_sd, F_GETFL, 0);
-	(void) fcntl(hp->h_accept.c_sd, F_SETFL, flags | O_NONBLOCK);
-
-	return (0);
-}
-
-/*
- * Notify ETM that incoming data is available on server connection.
- */
-static void
-exs_recv(exs_hdl_t *hp)
-{
-	if (hp->h_cb_func(hp->h_hdl, &hp->h_server, ETM_CBFLAG_RECV,
-	    hp->h_cb_func_arg)) {
-		/* Any non-zero return means to close the connection */
-		(void) close(hp->h_server.c_sd);
-		hp->h_server.c_sd = EXS_SD_FREE;
-	}
-}
-
-/*
- * Accept a new incoming connection.
- */
-static void
-exs_accept(exs_hdl_t *hp)
-{
-	int new_sd, dom, flags, rv;
-	struct sockaddr_in new_saddr;
-	socklen_t new_len = sizeof (struct sockaddr);
-
-	if ((new_sd = accept(hp->h_accept.c_sd, (struct sockaddr *)&new_saddr,
-	    &new_len)) != -1) {
-		/* Translate saddr to domain id */
-		if ((rv = dscpIdent((struct sockaddr *)&new_saddr, (int)new_len,
-		    &dom)) != DSCP_OK) {
-			fmd_hdl_error(hp->h_hdl, "xport - dscpIdent failed "
-			    "for %s : rv = %d\n", hp->h_endpt_id, rv);
-			return;
-		}
-
-		if (hp->h_dom != dom) {
-			fmd_hdl_debug(hp->h_hdl, "xport - domain id (%d) does "
-			    "not match dscpIdent (%d)", hp->h_dom, dom);
-			return;
-		}
-
-		/* Authenticate this connection request */
-		if ((rv = dscpAuth(dom, (struct sockaddr *)&new_saddr,
-		    (int)new_len)) != DSCP_OK) {
-			fmd_hdl_error(hp->h_hdl, "xport - dscpAuth failed "
-			    "for %s : rv = %d\n", hp->h_endpt_id, rv);
-			return;
-		}
-
-		if (hp->h_server.c_sd != EXS_SD_FREE) {
-			(void) close(hp->h_server.c_sd);
-			hp->h_server.c_sd = EXS_SD_FREE;
-		}
-
-		/* Set the socket to be non-blocking */
-		flags = fcntl(new_sd, F_GETFL, 0);
-		(void) fcntl(new_sd, F_SETFL, flags | O_NONBLOCK);
-
-		hp->h_server.c_sd = new_sd;
-
-	} else {
-		fmd_hdl_debug(hp->h_hdl, "xport - accept failed");
-	}
 }
 
 /*
@@ -379,56 +262,216 @@ void
 exs_server(void *arg)
 {
 	exs_hdl_t *hp = (exs_hdl_t *)arg;
-	struct pollfd pfd[2];
-	nfds_t nfds;
+	struct pollfd pfd;
 
 	while (!hp->h_quit) {
-		pfd[0].events = POLLIN;
-		pfd[0].revents = 0;
-		pfd[0].fd = hp->h_accept.c_sd;
-		pfd[1].events = POLLIN;
-		pfd[1].revents = 0;
-		pfd[1].fd = hp->h_server.c_sd;
+		pfd.events = POLLIN;
+		pfd.revents = 0;
+		pfd.fd = hp->h_server.c_sd;
 
-		nfds = (hp->h_server.c_sd != EXS_SD_FREE ? 2 : 1);
-
-		if (poll(pfd, nfds, -1) <= 0)
+		if (poll(&pfd, 1, -1) <= 0)
 			continue; /* loop around and check h_quit */
 
-		if (pfd[0].revents & (POLLHUP | POLLERR)) {
-			fmd_hdl_debug(hp->h_hdl, "xport - poll hangup/err for "
-			    "%s accept socket", hp->h_endpt_id);
-			hp->h_destroy++;
-			break;
-		}
-
-		if (pfd[1].revents & (POLLHUP | POLLERR)) {
+		if (pfd.revents & (POLLHUP | POLLERR)) {
 			fmd_hdl_debug(hp->h_hdl, "xport - poll hangup/err for "
 			    "%s server socket", hp->h_endpt_id);
-
-			if (hp->h_server.c_sd != EXS_SD_FREE) {
-				(void) close(hp->h_server.c_sd);
-				hp->h_server.c_sd = EXS_SD_FREE;
-			}
-
-			continue;
+			EXS_CLOSE_CLR(hp->h_server);
+			hp->h_destroy++;
+			break;	/* thread exits */
 		}
 
-		if (pfd[0].revents & POLLIN)
-			exs_accept(hp);
-
-		if (pfd[1].revents & POLLIN)
-			exs_recv(hp);
+		if (pfd.revents & POLLIN) {
+			/* Notify ETM that incoming data is available */
+			if (hp->h_cb_func(hp->h_hdl, &hp->h_server,
+			    ETM_CBFLAG_RECV, hp->h_cb_func_arg)) {
+				/*
+				 * For any non-zero return, close the
+				 * connection and exit the thread.
+				 */
+				EXS_CLOSE_CLR(hp->h_server);
+				hp->h_destroy++;
+				break;	/* thread exits */
+			}
+		}
 	}
 
 	fmd_hdl_debug(hp->h_hdl, "xport - exiting server thread for %s",
 	    hp->h_endpt_id);
+}
 
-	if (hp->h_accept.c_sd != EXS_SD_FREE)
-		(void) close(hp->h_accept.c_sd);
+/*
+ * Accept a new incoming connection.
+ */
+static void
+exs_accept(fmd_hdl_t *hdl)
+{
+	int new_sd, dom, flags, rv;
+	struct sockaddr_in new_saddr;
+	socklen_t new_len = sizeof (struct sockaddr);
+	exs_hdl_t *hp;
 
-	if (hp->h_server.c_sd != EXS_SD_FREE)
-		(void) close(hp->h_server.c_sd);
+	if ((new_sd = accept(Acc.c_sd, (struct sockaddr *)&new_saddr,
+	    &new_len)) != -1) {
+		/* Translate saddr to domain id */
+		if ((rv = dscpIdent((struct sockaddr *)&new_saddr, (int)new_len,
+		    &dom)) != DSCP_OK) {
+			fmd_hdl_error(hdl, "dscpIdent failed : rv = %d\n", rv);
+			(void) close(new_sd);
+			return;
+		}
+
+		/* Find the exs_hdl_t for the domain trying to connect */
+		(void) pthread_mutex_lock(&List_lock);
+		for (hp = Exh_head; hp; hp = hp->h_next) {
+			if (hp->h_dom == dom)
+				break;
+		}
+		(void) pthread_mutex_unlock(&List_lock);
+
+		if (hp == NULL) {
+			fmd_hdl_error(hdl, "Not configured to accept a "
+			    "connection from domain %d. Check "
+			    "event-transport.conf\n", dom);
+			(void) close(new_sd);
+			return;
+		}
+
+		/* Authenticate this connection request */
+		if ((rv = dscpAuth(dom, (struct sockaddr *)&new_saddr,
+		    (int)new_len)) != DSCP_OK) {
+			fmd_hdl_error(hdl, "dscpAuth failed for %s : rv = %d ",
+			    " Possible spoofing attack\n", hp->h_endpt_id, rv);
+			(void) close(new_sd);
+			return;
+		}
+
+		if (hp->h_tid != EXS_TID_FREE) {
+			hp->h_quit = 1;
+			fmd_thr_signal(hp->h_hdl, hp->h_tid);
+			fmd_thr_destroy(hp->h_hdl, hp->h_tid);
+			hp->h_destroy = 0;
+			hp->h_quit = 0;
+		}
+
+		if (hp->h_server.c_sd != EXS_SD_FREE)
+			EXS_CLOSE_CLR(hp->h_server);
+
+		/* Set the socket to be non-blocking */
+		flags = fcntl(new_sd, F_GETFL, 0);
+		(void) fcntl(new_sd, F_SETFL, flags | O_NONBLOCK);
+
+		hp->h_server.c_sd = new_sd;
+
+		hp->h_tid = fmd_thr_create(hdl, exs_server, hp);
+
+	} else {
+		fmd_hdl_error(hp->h_hdl, "Failed to accept() a new connection");
+	}
+}
+
+/*
+ * Listen for and accept incoming connections.
+ * There is only one such thread.
+ */
+void
+exs_listen(void *arg)
+{
+	fmd_hdl_t *hdl = (fmd_hdl_t *)arg;
+	struct pollfd pfd;
+
+	while (!Acc_quit) {
+		pfd.events = POLLIN;
+		pfd.revents = 0;
+		pfd.fd = Acc.c_sd;
+
+		if (poll(&pfd, 1, -1) <= 0)
+			continue; /* loop around and check Acc_quit */
+
+		if (pfd.revents & (POLLHUP | POLLERR)) {
+			fmd_hdl_debug(hdl, "xport - poll hangup/err on "
+			    "accept socket");
+			EXS_CLOSE_CLR(Acc);
+			Acc_destroy++;
+			break;	/* thread exits */
+		}
+
+		if (pfd.revents & POLLIN)
+			exs_accept(hdl);
+	}
+
+	fmd_hdl_debug(hdl, "xport - exiting accept-listen thread");
+}
+
+/*
+ * Prepare to accept a connection.
+ * Return 0 for success, nonzero for failure.
+ */
+void
+exs_prep_accept(fmd_hdl_t *hdl, int dom)
+{
+	int flags, optval = 1;
+	int rv;
+
+	if (Acc.c_sd != EXS_SD_FREE)
+		return;	/* nothing to do */
+
+	if (Acc_destroy) {
+		fmd_thr_destroy(hdl, Acc_tid);
+		Acc_tid = EXS_TID_FREE;
+	}
+
+	/* Check to see if the DSCP interface is configured */
+	if ((rv = dscpAddr(dom, DSCP_ADDR_LOCAL,
+	    (struct sockaddr *)&Acc.c_saddr, &Acc.c_len)) != DSCP_OK) {
+		fmd_hdl_debug(hdl, "xport - dscpAddr on the accept socket "
+		    "failed for domain %d : rv = %d", dom, rv);
+		return;
+	}
+
+	if ((Acc.c_sd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+		fmd_hdl_error(hdl, "Failed to create the accept socket");
+		return;
+	}
+
+	if (setsockopt(Acc.c_sd, SOL_SOCKET, SO_REUSEADDR, &optval,
+	    sizeof (optval))) {
+		fmd_hdl_error(hdl, "Failed to set REUSEADDR for the accept "
+		    "socket");
+		EXS_CLOSE_CLR(Acc);
+		return;
+	}
+
+	/* Bind the socket to the local IP address of the DSCP link */
+	if ((rv = dscpBind(dom, Acc.c_sd, EXS_SERVER_PORT)) != DSCP_OK) {
+		if (rv == DSCP_ERROR_DOWN) {
+			fmd_hdl_debug(hdl, "xport - dscp link for domain %d "
+			    "is down", dom);
+		} else {
+			fmd_hdl_error(hdl, "dscpBind on the accept socket "
+			    "failed : rv = %d\n", rv);
+		}
+		EXS_CLOSE_CLR(Acc);
+		return;
+	}
+
+	/* Activate IPsec security policy for this socket */
+	if ((rv = dscpSecure(dom, Acc.c_sd)) != DSCP_OK) {
+		fmd_hdl_error(hdl, "dscpSecure on the accept socket failed : "
+		    "rv = %d\n", dom, rv);
+		EXS_CLOSE_CLR(Acc);
+		return;
+	}
+
+	if ((listen(Acc.c_sd, EXS_NUM_SOCKS)) == -1) {
+		fmd_hdl_debug(hdl, "Failed to listen() for connections");
+		EXS_CLOSE_CLR(Acc);
+		return;
+	}
+
+	flags = fcntl(Acc.c_sd, F_GETFL, 0);
+	(void) fcntl(Acc.c_sd, F_SETFL, flags | O_NONBLOCK);
+
+	Acc_tid = fmd_thr_create(hdl, exs_listen, hdl);
 }
 
 /*
@@ -450,7 +493,7 @@ etm_xport_init(fmd_hdl_t *hdl, char *endpoint_id,
 	exs_hdl_t *hp, *curr;
 	int dom;
 
-	if ((exs_get_id(hdl, endpoint_id, &dom)) == -1)
+	if (exs_get_id(hdl, endpoint_id, &dom))
 		return (NULL);
 
 	(void) pthread_mutex_lock(&List_lock);
@@ -468,6 +511,12 @@ etm_xport_init(fmd_hdl_t *hdl, char *endpoint_id,
 	if (Exh_head == NULL) {
 		/* Do one-time initializations */
 		exs_filter_init(hdl);
+
+		/* Initialize the accept/listen vars */
+		Acc.c_sd = EXS_SD_FREE;
+		Acc_tid = EXS_TID_FREE;
+		Acc_destroy = 0;
+		Acc_quit = 0;
 	}
 
 	hp = exs_hdl_alloc(hdl, endpoint_id, cb_func, cb_func_arg, dom);
@@ -476,11 +525,9 @@ etm_xport_init(fmd_hdl_t *hdl, char *endpoint_id,
 	hp->h_next = Exh_head;
 	Exh_head = hp;
 
-	if (exs_prep_accept(hp) == 0)
-		/* A server thread is created for every endpoint */
-		hp->h_tid = fmd_thr_create(hdl, exs_server, hp);
-
 	(void) pthread_mutex_unlock(&List_lock);
+
+	exs_prep_accept(hdl, dom);
 
 	return ((etm_xport_hdl_t)hp);
 }
@@ -493,9 +540,11 @@ int
 etm_xport_fini(fmd_hdl_t *hdl, etm_xport_hdl_t tlhdl)
 {
 	exs_hdl_t *hp = (exs_hdl_t *)tlhdl;
-	exs_hdl_t *xp, **ppx = &Exh_head;
+	exs_hdl_t *xp, **ppx;
 
 	(void) pthread_mutex_lock(&List_lock);
+
+	ppx = &Exh_head;
 
 	for (xp = *ppx; xp; xp = xp->h_next) {
 		if (xp != hp)
@@ -519,7 +568,9 @@ etm_xport_fini(fmd_hdl_t *hdl, etm_xport_hdl_t tlhdl)
 		fmd_thr_destroy(hdl, hp->h_tid);
 	}
 
-	/* Socket descr for h_accept and h_server are closed in exs_server */
+	if (hp->h_server.c_sd != EXS_SD_FREE)
+		(void) close(hp->h_server.c_sd);
+
 	if (hp->h_client.c_sd != EXS_SD_FREE)
 		(void) close(hp->h_client.c_sd);
 
@@ -529,6 +580,16 @@ etm_xport_fini(fmd_hdl_t *hdl, etm_xport_hdl_t tlhdl)
 	if (Exh_head == NULL) {
 		/* Undo one-time initializations */
 		exs_filter_fini(hdl);
+
+		/* Destroy the accept/listen thread */
+		if (Acc_tid != EXS_TID_FREE) {
+			Acc_quit = 1;
+			fmd_thr_signal(hdl, Acc_tid);
+			fmd_thr_destroy(hdl, Acc_tid);
+		}
+
+		if (Acc.c_sd != EXS_SD_FREE)
+			EXS_CLOSE_CLR(Acc);
 	}
 
 	(void) pthread_mutex_unlock(&List_lock);
@@ -552,11 +613,6 @@ etm_xport_open(fmd_hdl_t *hdl, etm_xport_hdl_t tlhdl)
 		hp->h_destroy = 0;
 	}
 
-	if (hp->h_tid == EXS_TID_FREE) {
-		if (exs_prep_accept(hp) == 0)
-			hp->h_tid = fmd_thr_create(hdl, exs_server, hp);
-	}
-
 	if (hp->h_client.c_sd == EXS_SD_FREE) {
 		if (exs_prep_client(hp) != 0)
 			return (NULL);
@@ -570,10 +626,9 @@ etm_xport_open(fmd_hdl_t *hdl, etm_xport_hdl_t tlhdl)
 	    (struct sockaddr *)&hp->h_client.c_saddr,
 	    hp->h_client.c_len)) == -1) {
 		if (errno != EINPROGRESS) {
-			fmd_hdl_error(hdl, "xport - failed server connect : %s",
+			fmd_hdl_debug(hdl, "xport - failed to connect to %s",
 			    hp->h_endpt_id);
-			(void) close(hp->h_client.c_sd);
-			hp->h_client.c_sd = EXS_SD_FREE;
+			EXS_CLOSE_CLR(hp->h_client);
 			return (NULL);
 		}
 	}

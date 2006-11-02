@@ -65,7 +65,6 @@ typedef struct etm_xport_sock_conn {
 
 /* Transport instance handle */
 typedef struct etm_xport_sock_hdl {
-	exs_conn_t h_accept;		/* Accepting connection handle */
 	exs_conn_t h_client;		/* Sending connection handle */
 	exs_conn_t h_server;		/* Receiving connection handle */
 	pthread_t h_tid;		/* Thread ID of server thread */
@@ -83,13 +82,15 @@ typedef struct etm_xport_sock_hdl {
 #define	EXS_SERVER_PORT 24		/* Port number for server */
 #define	EXS_SERVER_ADDR in6addr_any	/* Address for server */
 #define	EXS_CLIENT_PORT 12		/* Port number for client */
-#define	EXS_NUM_SOCKS 5			/* Length of socket queue */
+#define	EXS_NUM_SOCKS 24		/* Length of socket queue */
 #define	EXS_SD_FREE -1			/* Socket descr value when unset */
 #define	EXS_TID_FREE 0			/* Thread ID value when unset */
 #define	EXS_DOMAIN_PREFIX "dom"		/* Domain auth prefix in FMRI string */
 #define	EXS_DOMAIN_PREFIX_LEN 3		/* Length of domain prefix */
 #define	EXS_SP_PREFIX "sp"		/* SP auth prefix in FMRI string */
 #define	EXS_IO_SLEEP_DIV 100		/* Divisor for I/O sleeptime */
+
+#define	EXS_CLOSE_CLR(x) { (void) close(x.c_sd); x.c_sd = EXS_SD_FREE; }
 
 #ifdef __cplusplus
 }

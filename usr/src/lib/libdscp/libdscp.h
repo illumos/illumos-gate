@@ -45,7 +45,8 @@ typedef enum {
 	DSCP_ERROR_INVALID,	/* Invalid Arguments */
 	DSCP_ERROR_NOENT,	/* Lookup Failure From dscpIdent() */
 	DSCP_ERROR_DB,		/* Error Reading Database */
-	DSCP_ERROR_REJECT	/* Rejection From dscpAuth() */
+	DSCP_ERROR_REJECT,	/* Rejection From dscpAuth() */
+	DSCP_ERROR_DOWN		/* DSCP Interface down */
 } dscp_err_t;
 
 /*

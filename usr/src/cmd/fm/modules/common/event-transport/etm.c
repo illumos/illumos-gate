@@ -447,6 +447,27 @@ etm_handle_startup(fmd_hdl_t *hdl, etm_epmap_t *mp)
 }
 
 /*
+ * Open a connection to the peer, send a SHUTDOWN message,
+ * and close the connection.
+ */
+static void
+etm_send_shutdown(fmd_hdl_t *hdl, etm_epmap_t *mp)
+{
+	size_t hdrlen = ETM_HDRLEN;
+	char hbuf[ETM_HDRLEN];
+
+	if ((mp->epm_oconn = etm_xport_open(hdl, mp->epm_tlhdl)) == NULL)
+		return;
+
+	hdrlen = etm_create_hdr(hbuf, mp->epm_ver, ETM_HDR_SHUTDOWN, 0);
+
+	(void) etm_xport_write(hdl, mp->epm_oconn, Rw_timeout, hbuf, hdrlen);
+
+	(void) etm_xport_close(hdl, mp->epm_oconn);
+	mp->epm_oconn = NULL;
+}
+
+/*
  * Alloc a nvlist and add a string for the endpoint.
  * Return zero for success, non-zero for failure.
  */
@@ -858,6 +879,7 @@ etm_cb_func(fmd_hdl_t *hdl, etm_xport_conn_t conn, etm_cb_flag_t flag,
 	case ETM_CBFLAG_REINIT:
 		(void) pthread_mutex_lock(&mp->epm_lock);
 		etm_reinit(hdl, mp);
+		etm_send_shutdown(hdl, mp);
 		(void) pthread_mutex_unlock(&mp->epm_lock);
 		/*
 		 * Return ECANCELED so the transport layer will close the
@@ -906,11 +928,15 @@ etm_init_epmap(fmd_hdl_t *hdl, char *epname, int flags)
 		return;
 	}
 
+	(void) pthread_mutex_lock(&newmap->epm_lock);
+
 	if ((newmap->epm_tlhdl = etm_xport_init(hdl, newmap->epm_ep_str,
 	    etm_cb_func, newmap)) == NULL) {
 		fmd_hdl_debug(hdl, "failed to init tlhdl for %s\n",
 		    newmap->epm_ep_str);
 		etm_free_ep_nvl(hdl, newmap);
+		(void) pthread_mutex_unlock(&newmap->epm_lock);
+		(void) pthread_mutex_destroy(&newmap->epm_lock);
 		fmd_hdl_strfree(hdl, newmap->epm_ep_str);
 		fmd_hdl_free(hdl, newmap, sizeof (etm_epmap_t));
 		return;
@@ -933,11 +959,19 @@ etm_init_epmap(fmd_hdl_t *hdl, char *epname, int flags)
 			    NULL, Reconn_interval);
 			newmap->epm_timer_in_use = 1;
 		}
+	} else {
+		/*
+		 * We may be restarting after a crash.  If so, the client
+		 * may be unaware of this.
+		 */
+		etm_send_shutdown(hdl, newmap);
 	}
 
 	/* Add this transport instance handle to the list */
 	newmap->epm_next = Epmap_head;
 	Epmap_head = newmap;
+
+	(void) pthread_mutex_unlock(&newmap->epm_lock);
 
 	INCRSTAT(Etm_stats.peer_count.fmds_value.ui64);
 }
