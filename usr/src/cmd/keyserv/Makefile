@@ -75,8 +75,6 @@ $(ROOTKEYSERVDFLT) :=				OWNER=		root
 $(ROOTKEYSERVDFLT) :=				GROUP=		sys
 $(ROOTKEYSERVDFLT) :=				FILEMODE=	444
 
-$(ROOTMANIFEST) :=				FILEMODE=	444
-
 CPPFLAGS += -I. -I$(SRC)/lib/libnsl/include -I$(SRC)/lib/libsldap/common \
 		-D_REENTRANT
 

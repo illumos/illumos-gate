@@ -43,8 +43,6 @@ clean :=		TARGET= clean
 clobber :=		TARGET= clobber
 lint :=			TARGET= lint
 
-$(ROOTMANIFEST) :=	FILEMODE = 444
-
 .KEEP_STATE:
 
 all lint clean clobber: $(SUBDIRS)
@@ -57,3 +55,5 @@ $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+include ../Makefile.targ

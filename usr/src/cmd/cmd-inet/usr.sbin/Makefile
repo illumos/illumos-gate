@@ -33,7 +33,7 @@ XMODPROG=	wanbootutil
 # EXPORT DELETE END
 
 PROG=		6to4relay arp gettable if_mpadm ikeadm ikecert \
-		in.comsat in.fingerd in.rarpd in.rdisc in.rexecd in.rlogind \
+		in.comsat in.fingerd in.rarpd in.rexecd in.rlogind \
 		in.rshd in.rwhod in.telnetd in.tftpd in.tnamed ipaddrsel \
 		ipsecalgs ipsecconf ipseckey ndd $(SYNCPROG) $(DHCPPROG) \
 		$(XMODPROG)
@@ -41,18 +41,18 @@ PROG=		6to4relay arp gettable if_mpadm ikeadm ikecert \
 MANIFEST=	rarp.xml telnet.xml comsat.xml finger.xml \
 		login.xml shell.xml rexec.xml tname.xml
 
-ROOTFS_PROG=	hostconfig route routeadm soconfig
-SBINLINKS=	hostconfig route routeadm
+ROOTFS_PROG=	hostconfig route soconfig
+SBINLINKS=	hostconfig route
 
 RPCSVCPROG=	hostconfig
 AUDITPROG=	in.rexecd in.rlogind in.rshd in.telnetd
 PAMPROG=	in.rexecd in.rlogind in.rshd in.telnetd
 SOCKETPROG=	6to4relay arp gettable hostconfig if_mpadm in.comsat \
-		in.fingerd in.rarpd in.rdisc in.rexecd in.rlogind in.rshd \
+		in.fingerd in.rarpd in.rexecd in.rlogind in.rshd \
 		in.rwhod in.telnetd in.tftpd in.tnamed ipaddrsel \
-		ipsecalgs ipsecconf ipseckey route routeadm
+		ipsecalgs ipsecconf ipseckey route
 NSLPROG=	6to4relay arp gettable hostconfig ikeadm in.comsat in.rarpd \
-		in.rdisc in.rexecd in.rlogind in.rshd in.rwhod in.telnetd \
+		in.rexecd in.rlogind in.rshd in.rwhod in.telnetd \
 		in.tftpd in.tnamed ipaddrsel ipsecalgs ipsecconf ipseckey route
 CMDPROG=	in.telnetd
 IPSECUTILPROG=	ikeadm ipsecalgs ipsecconf ipseckey
@@ -67,27 +67,28 @@ K5RLOGINOBJS=	in.rlogind.o
 K5RSHDOBJS=	in.rshd.o
 SRCS=		$(PROGSRCS) $(OTHERSRC)
 
-SUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed \
+SUBDIRS=	bootconfchk htable ifconfig in.ftpd in.rdisc in.routed \
 		in.talkd inetadm inetconv ipqosconf kssl/kssladm \
-		kssl/ksslcfg  mipagentconfig mipagentstat ping snoop \
-		sppptun traceroute wificonfig
+		kssl/ksslcfg  mipagentconfig mipagentstat ping routeadm \
+		snoop sppptun traceroute wificonfig
 
 MSGSUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed in.talkd \
 		inetadm inetconv ipqosconf kssl/ksslcfg mipagentconfig \
-		mipagentstat sppptun snoop wificonfig
+		mipagentstat routeadm sppptun snoop wificonfig
 
 # As programs get lint-clean, add them here and to the 'lint' target.
 # Eventually this hack should go away, and all in PROG should be
 # lint-clean.
 LINTCLEAN=	6to4relay arp ikeadm in.rlogind in.rshd in.telnetd in.tftpd \
-		ipaddrsel ipsecalgs ipseckey ipsecconf route routeadm \
+		ipaddrsel ipsecalgs ipseckey ipsecconf route \
 		in.rarpd if_mpadm $(SYNCPROG)
 # Likewise, as subdirs get lint-clean, add them here.  Once
 # they're all clean, replace the dependency of the lint target
 # with SUBDIRS.  Also (sigh) deal with the commented-out build lines
 # for the lint rule.
-LINTSUBDIRS=	bootconfchk in.routed in.talkd inetadm inetconv ipqosconf \
-		mipagentstat ping sppptun traceroute wificonfig
+LINTSUBDIRS=	bootconfchk in.rdisc in.routed in.talkd inetadm inetconv \
+		ipqosconf mipagentstat ping routeadm sppptun traceroute \
+		wificonfig
 # And as programs are verified not to attempt to write into constants,
 # -xstrconst should be used to ensure they stay that way.
 CONSTCLEAN=	ikeadm
@@ -108,7 +109,7 @@ SRCS+=		$(COMMONSRCS)
 # Message catalog
 #
 POFILES=	6to4relay.po if_mpadm.po ikeadm.po in.comsat.po ipaddrsel.po \
-		ipsecalgs.po ipsecconf.po ipseckey.po route.po routeadm.po
+		ipsecalgs.po ipsecconf.po ipseckey.po route.po
 POFILE=		usr.sbin.po
 
 all:=		TARGET= all
@@ -121,7 +122,7 @@ _msg:=		TARGET= _msg
 CLOBBERFILES +=	$(ROOTFS_PROG) $(PROG)
 CLEANFILES += $(COMMONOBJS) $(K5RLOGINOBJS) $(K5RSHDOBJS) $(TFTPDOBJS)
 
-CPPFLAGS +=	-DSYSV -DBSD_COMP -I$(CMDINETCOMMONDIR) -I.
+CPPFLAGS +=	-DSYSV -DBSD_COMP -I$(CMDINETCOMMONDIR) -I
 
 include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 K5LIBS=
@@ -247,7 +248,6 @@ lint: $(LINTSUBDIRS)
 	$(LINT.c) ipseckey.c $(LDLIBS) -lsocket -lnsl -lipsecutil
 	$(LINT.c) ikeadm.c $(LDLIBS) -lnsl -lipsecutil
 	$(LINT.c) route.c $(LDLIBS) -lsocket -lnsl -ltsnet
-	$(LINT.c) routeadm.c $(LDLIBS) -lsocket
 	$(LINT.c) syncinit.c $(LDLIBS) -ldlpi
 	$(LINT.c) syncloop.c $(LDLIBS) -ldlpi
 	$(LINT.c) syncstat.c $(LDLIBS) -ldlpi

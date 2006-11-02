@@ -28,15 +28,11 @@
 
 PROG=		zoneadm
 MANIFEST=	zones.xml
+SVCMETHOD=	svc-zones
 
 include ../Makefile.cmd
 
-ROOTMETHOD=		$(ROOTLIBSVCMETHOD)/svc-zones
 ROOTMANIFESTDIR=        $(ROOTSVCSYSTEM)
-$(ROOTMANIFEST)         := FILEMODE= 444
-
-$(ROOTMANIFESTDIR)/%: %
-	$(INS.file)
 
 OBJS= zoneadm.o sw_cmp.o zfs.o
 SRCS = $(OBJS:.o=.c)
@@ -53,7 +49,7 @@ $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTUSRSBINPROG) $(ROOTMANIFEST) $(ROOTMETHOD)
+install: all $(ROOTUSRSBINPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 check:	$(PROG).c $(CHKMANIFEST)
 	$(CSTYLE) -pP $(SRCS:%=%)
@@ -63,6 +59,7 @@ $(POFILE): $(POFILES)
 	$(CAT) $(POFILES) > $@
 
 clean:
+	$(RM) $(OBJS) $(POFILES)
 
 lint:	lint_SRCS
 

@@ -236,10 +236,12 @@ f none usr/lib/help/auths/locale/SmfModifyHeader.html 444 root bin
 f none usr/lib/help/auths/locale/SmfModifyMethod.html 444 root bin
 f none usr/lib/help/auths/locale/SmfNscdStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfPowerStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfRoutingStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSendmailStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSshStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSyslogStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueHeader.html 444 root bin
+f none usr/lib/help/auths/locale/SmfValueRouting.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkHeader.html 444 root bin
 f none usr/lib/help/auths/locale/WifiConfig.html 444 root bin
 f none usr/lib/help/auths/locale/WifiWep.html 444 root bin

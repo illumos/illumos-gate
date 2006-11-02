@@ -800,12 +800,17 @@ MANIFEST_SUBDIRS=			\
 	cmd-inet/usr.lib/in.dhcpd	\
 	cmd-inet/usr.lib/in.discardd	\
 	cmd-inet/usr.lib/in.echod	\
+	cmd-inet/usr.lib/in.ndpd	\
+	cmd-inet/usr.lib/in.ripngd	\
 	cmd-inet/usr.lib/in.timed	\
 	cmd-inet/usr.lib/inetd		\
 	cmd-inet/usr.lib/slpd		\
 	cmd-inet/usr.sbin		\
 	cmd-inet/usr.sbin/in.ftpd	\
+	cmd-inet/usr.sbin/in.rdisc	\
+	cmd-inet/usr.sbin/in.routed	\
 	cmd-inet/usr.sbin/in.talkd	\
+	cmd-inet/usr.sbin/routeadm	\
 	dcs/sparc/sun4u			\
 	fs.d/autofs			\
 	fs.d/cachefs			\

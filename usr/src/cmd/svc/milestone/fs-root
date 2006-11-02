@@ -257,8 +257,6 @@ fi
 #
 /usr/sbin/devfsadm -I -P
 
-[ -f /etc/.dynamic_routing ] && /usr/bin/rm -f /etc/.dynamic_routing
-
 libc_mount
 libc_psr_mount
 

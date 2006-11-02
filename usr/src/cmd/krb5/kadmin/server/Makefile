@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -7,7 +7,7 @@
 
 PROG= kadmind
 MANIFEST=	kadmin.xml
-ROOTMETHOD=	$(ROOTLIBSVCMETHOD)/svc-kdc.master
+SVCMETHOD=	svc-kdc.master
 
 OBJS	= kadm_rpc_svc.o server_stubs.o ovsec_kadmd.o misc.o server_glue_v1.o \
           ipropd_svc.o
@@ -69,9 +69,8 @@ iprop_xdr.c:	iprop.h $(KRB5IPROPDIR)/iprop.x
 $(OBJS): iprop.h
 
 $(KRB5LIBPROG):=	FILEMODE = 0500
-$(ROOTMANIFEST):=	FILEMODE = 0444
 
-install: $(KRB5LIBPROG) $(ROOTMETHOD) $(ROOTMANIFEST)
+install: $(KRB5LIBPROG) $(ROOTSVCMETHOD) $(ROOTMANIFEST)
 
 check:	$(CHKMANIFEST)
 

@@ -31,20 +31,11 @@ SVCMETHOD=	ipfilter
 include $(SRC)/cmd/Makefile.cmd
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
-$(ROOTMANIFEST)		:= FILEMODE= 444
 
-include $(SRC)/cmd/Makefile.targ
-
-all: $(OBJS)
-
-$(ROOTMANIFESTDIR)/%: %
-		$(INS.file)
-
-clean:
-		$(RM) $(OBJS)
-
-lint:		$(SRCS) lint_SRCS
+all clean lint:
 
 install:	$(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 check:		$(CHKMANIFEST)
+
+include $(SRC)/cmd/Makefile.targ

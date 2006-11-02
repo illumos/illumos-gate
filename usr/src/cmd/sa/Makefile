@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma	ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,12 +27,12 @@
 # cmd/sa/Makefile
 #
 
+MANIFEST =	sar.xml
+SVCMETHOD =	svc-sar
+
 include ../Makefile.cmd
 
-MANIFEST =	sar.xml
-
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
-ROOTMETHOD =	$(ROOTLIBSVCMETHOD)/svc-sar
 
 GREP=		grep
 
@@ -97,7 +96,6 @@ $(ROOTBIN)/$(TIMEX)	:= GROUP = sys
 # $(ROOTUSRSBIN)/$(SADP) 	:= GROUP = sys
 $(LIBSAD)/$(SADC) 	:= FILEMODE = 0555
 $(LIBSAD)/$(SADC) 	:= GROUP = bin
-$(ROOTMANIFEST)		:= FILEMODE = 0444
 
 .KEEP_STATE:
 
@@ -111,20 +109,12 @@ $(SADC):	$(SADC_OBJECTS)
 	$(LINK.c) -o $@ $(SADC_OBJECTS) $(LDLIBS)
 	$(POST_PROCESS)
 
-$(ROOTSVCSYSTEM)/perf.xml := OWNER = root
-$(ROOTSVCSYSTEM)/perf.xml := GROUP = sys
-$(ROOTSVCSYSTEM)/perf.xml := FILEMODE = 0444
-
-$(ROOTLIBSVCMETHOD)/svc-perf := OWNER = root
-$(ROOTLIBSVCMETHOD)/svc-perf := GROUP = bin
-$(ROOTLIBSVCMETHOD)/svc-perf := FILEMODE = 0555
-
 # The edit of SYSCRONTAB must be done unconditionally because of the
 # creation of this file by a different component (Adm) and the possible
 # backdating.
 install:	all $(ROOTPROG) $(ROOTUSBINPROG)     \
 		$(ROOTINITSHELL)  $(ROOTLIBSHELL) $(ROOTSYMLINKS) \
-		$(ROOTMANIFEST) $(ROOTMETHOD) $(ROOTLIBPROG)
+		$(ROOTMANIFEST) $(ROOTSVCMETHOD) $(ROOTLIBPROG)
 	@if [ -f $(SYSCRONTAB) ]; \
 	then \
 		if $(GREP) "sa1" $(SYSCRONTAB) >/dev/null 2>&1 ; then :; \

@@ -46,16 +46,11 @@ ROOTMANIFESTDIR = $(ROOTSVCPLATFORMSUN4U)
 CPPFLAGS += -I$(SRC)/uts/sun4u/opl
 LDLIBS64 += -lsysevent -lnvpair -lcfgadm -ldevinfo
 
-FILEMODE = 0755
-OWNER = root
-GROUP = sys
-
-$(ROOTMANIFEST) :=      FILEMODE = 0444
-$(ROOTSVCMETHOD) :=     FILEMODE = 0555
-
 PSMPROG = $(USR_PSM_LIB64_DIR)/$(PROG)
 
-
+$(PSMPROG) :=	FILEMODE = 0755
+$(PSMPROG) :=	OWNER = root
+$(PSMPROG) :=	GROUP = sys
 
 .KEEP_STATE:
 
@@ -70,7 +65,7 @@ install: all $(PSMPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 check:	$(CHKMANIFEST)
 
 clean:
-	$(RM) $(PROG) $(OBJS)
+	$(RM) $(OBJS)
 
 lint:	lint_SRCS
 

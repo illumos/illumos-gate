@@ -1,13 +1,15 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2000,2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 include ../Makefile.com
 
-DATAFILES= depend
+DATAFILES=	i.manifest \
+		r.manifest \
+		depend
 
 .KEEP_STATE:
 
@@ -16,4 +18,3 @@ all: $(FILES) copyright
 install: all pkg
 
 include ../Makefile.targ
-

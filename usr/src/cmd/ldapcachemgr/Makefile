@@ -42,7 +42,6 @@ ROOTLDAPLIB=	$(ROOT)/usr/lib/ldap
 ROOTLDAPPROG=	$(PROG:%=$(ROOTLDAPLIB)/%)
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKLDAP)
-$(ROOTMANIFEST)		:= FILEMODE= 444
 
 OBJS=	cachemgr.o cachemgr_getldap.o cachemgr_parse.o
 

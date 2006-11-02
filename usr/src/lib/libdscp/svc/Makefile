@@ -36,7 +36,6 @@ include ../../../cmd/Makefile.cmd
 
 # definitions for installing the manifest
 ROOTMANIFESTDIR	=	$(ROOTSVCPLATFORMSUN4U)
-$(ROOTMANIFEST)	:=	FILEMODE = 0444
 
 # definitions for installing the PPP options
 OPTIONS =		dscp.ppp.options
@@ -54,3 +53,5 @@ all clean clobber lint:
 install: $(ROOTMANIFEST) $(ROOTSVCMETHOD) $(ROOTOPTIONS)
 
 check: $(CHKMANIFEST)
+
+include ../../../cmd/Makefile.targ

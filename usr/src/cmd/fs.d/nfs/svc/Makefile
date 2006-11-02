@@ -32,17 +32,13 @@ SVCMETHOD=	nfs-server nfs-client nlockmgr
 include $(SRC)/cmd/Makefile.cmd
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKNFS)
-$(ROOTMANIFEST)		:= FILEMODE= 444
 
-$(ROOTMANIFESTDIR)/%: %
-		$(INS.file)
+all lint:
 
 install:	$(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 clean:
 	$(RM) $(OBJS)
-
-all lint:
 
 check:		$(CHKMANIFEST)
 

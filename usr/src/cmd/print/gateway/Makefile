@@ -27,14 +27,12 @@
 # server/gateway/adaptor/Makefile
 #
 
-include 	../Makefile.sp
-
 MANIFEST=		rfc1179.xml cleanup.xml
-ROOTMANIFESTDIR=	$(ROOTSVCAPPLICATIONPRINT)
-$(ROOTMANIFEST)		:= FILEMODE= 444
+SVCMETHOD=		print-cleanup
 
-ROOTMETHOD=				$(ROOTLIBSVCMETHOD)/print-cleanup
-$(ROOTLIBSVCMETHOD)/print-cleanup	:=	FILEMODE=555
+include		../Makefile.sp
+
+ROOTMANIFESTDIR=	$(ROOTSVCAPPLICATIONPRINT)
 
 ROOTLIBPRINT=		$(ROOTLIB)/print
 $(ROOTLIBPRINT)		:=	OWNER=root
@@ -50,6 +48,8 @@ INLPDPROG=		in.lpd
 INLPDSRCS= 		main.c adaptor.c
 INLPDOBJS=		$(INLPDSRCS:.c=.o)
 $(INLPDPROG)		:=	LDLIBS +=	-lsocket -lnsl $(LIBNPRT)
+
+PROG=		$(PRINTDPROG) $(INLPDPROG)
 
 SUBDIRS=	translators
 
@@ -76,7 +76,7 @@ ROOTLIBPRINTPROG=	$(PRINTDPROG:%=$(ROOTLIBPRINT)/%) \
 			$(INLPDPROG:%=$(ROOTLIBPRINT)/%)
 
 install:	all $(ROOTLIBPRINTPROG) $(SUBDIRS) $(ROOTMANIFEST) \
-		$(ROOTMETHOD) $(ROOTLIBPRINT)
+		$(ROOTSVCMETHOD) $(ROOTLIBPRINT)
 
 check:	$(CHKMANIFEST)
 
@@ -90,8 +90,10 @@ lint:
 		$(LINT.c) $(PRINTDSRCS) $(LDLIBS)
 		$(LINT.c) $(INLPDSRCS) $(LDLIBS)
 
-clean clobber:	$(SUBDIRS)
+clean:		$(SUBDIRS)
 		$(RM) $(PRINTDOBJS) $(INLPDOBJS)
+
+clobber:	clean $(SUBDIRS)
 
 _msg:
 		@echo "Messages are made in usr/src/cmd/print"
@@ -101,17 +103,4 @@ $(SUBDIRS):	FRC
 
 FRC:
 
-
-
-# 
-# PRINTSYMLINK=	$(ROOTLIB)/print/printd
-# 
-# FILEMODE=	04511
-# OWNER=		root
-# 
-# CPPFLAGS +=	-I$(NPRTINC)
-# LDLIBS +=	$(LIBNPRT)
-# 
-# install:	all $(ROOTBIN) $(ROOTLIB)/print $(ROOTBINPROG) \
-# 		$(ROOTUSRBINSYMLINK) $(ROOTUSRUCBSYMLINK) $(PRINTSYMLINK) \
-# 		$(ROOTMANIFEST) $(ROOTMETHOD)
+include		$(SRC)/cmd/Makefile.targ

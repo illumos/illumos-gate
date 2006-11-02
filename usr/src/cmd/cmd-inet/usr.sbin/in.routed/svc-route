@@ -1,0 +1,112 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/routing_include.sh
+
+smf_is_globalzone || exit $SMF_EXIT_OK
+
+daemon_args=`get_daemon_args $SMF_FMRI`
+options="AdghmnqsStvVzT:F:P:"
+
+#
+# Handle upgrade - routing/daemon-args property must be mapped to properties
+# in routeadm property group.  Note that the SMF-incompatible -t option is not
+# supported, since it requires that in.routed run in the foreground.
+#
+if [ -n "$daemon_args" ]; then
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "A" ignore_auth false true
+	set_daemon_ordered_multivalue_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "F" minimize_routes
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "g" offer_default_route true false
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "h" advertise_host_routes false true
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "m" advertise_host_routes_primary true false
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "n" install_routes false true
+	set_daemon_ordered_multivalue_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "P" parameters
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "q" supply_routes false true
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "s" supply_routes true 
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "S" default_routes_only true false
+	set_daemon_value_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "T" log_file
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "v" debug true false
+	set_daemon_boolean_property "$SMF_FMRI" "$daemon_args" \
+	    "$options" "z" debug true
+	clear_daemon_args $SMF_FMRI
+fi
+
+#
+# Assemble arguments to daemon from properties
+#
+args="`get_daemon_option_from_boolean_property $SMF_FMRI ignore_auth \
+	A false`"
+args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
+	offer_default_route g true`"
+args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
+	advertise_host_routes h false`"
+args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
+	advertise_host_routes_primary m true`"
+args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
+	install_routes n false`"
+args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
+	supply_routes q false`"
+# We only use -s option when there are multiple network interfaces.
+numv4ifs=`/usr/sbin/ifconfig -a4u | \
+	/usr/bin/nawk '($1 == "inet" && $2 != "127.0.0.1") { print $2 }' | \
+	/usr/bin/wc -l`
+if [ "$numv4ifs" -gt 1 ]; then
+	args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
+		supply_routes s true`"
+fi
+args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
+	default_routes_only S true`"
+args="$args`get_daemon_option_from_boolean_property $SMF_FMRI \
+	debug z true`"
+if [ -n "$args" ]; then
+	args="-${args}"
+fi
+args="$args `get_daemon_ordered_multivalue_option_from_property $SMF_FMRI \
+	minimize_routes F`"
+args="$args `get_daemon_ordered_multivalue_option_from_property \
+	$SMF_FMRI parameters P`"
+args="$args `get_daemon_option_from_property $SMF_FMRI \
+	log_file T`"
+
+/usr/sbin/in.routed $args
+
+[ "$?" = 0 ] || exit $SMF_EXIT_ERR_FATAL
+
+exit "$SMF_EXIT_OK"

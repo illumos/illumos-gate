@@ -30,13 +30,13 @@ SRCS =	cmd.c common.c console.c listen.c queue.c read.c vntsd.c vntsdvcc.c \
         write.c	
 OBJS = $(SRCS:.c=.o)
 
+MANIFEST = vntsd.xml
+SVCMETHOD = svc-vntsd
+
 include ../Makefile.cmd
 
 POFILES = $(SRCS:.c=.po)
 POFILE = $(PROG)_msg.po
-
-MANIFEST = vntsd.xml
-SVCMETHOD = svc-vntsd
 
 CFLAGS += $(CCVERBOSE)
 
@@ -44,8 +44,6 @@ LDLIBS += -lsocket -lnsl
 
 ROOTCMDDIR =	$(ROOTLIB)/ldoms
 ROOTMANIFESTDIR = $(ROOTSVCPLATFORMSUN4V)
-$(ROOTMANIFEST) := FILEMODE = 0444
-
 
 .KEEP_STATE:
 

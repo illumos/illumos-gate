@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -34,7 +33,7 @@
 
 PROG= mdmonitord
 MANIFEST= mdmonitor.xml
-METHOD= svc-mdmonitor
+SVCMETHOD= svc-mdmonitor
 
 include ../../Makefile.cmd
 include ../Makefile.lvm
@@ -43,31 +42,25 @@ SUBDIRS=	$(MACH)
 
 SRCS=	probedev.c md_monitord.c
 
-CLOBBERFILES += $(METHOD)
+CLOBBERFILES += $(SVCMETHOD)
 
 #
-# i18n: For catalog we need to put messages from $(SRCS) and $(METHOD).sh into
-# "`basename $PWD`p.po" = md_monitordp.po = $(POFILE) (that's what ../Makefile
-# expects).  We'll use $(BUILDPO.pofiles) to build $(POFILE) from $(MDPO) and
-# $(METHODPO), and we'll use $(BUILDPO.msgfiles) to build $(MDPO) from
-# $(SRCS).  The catch is that $(BUILDPO.msgfiles) is defined to produce
-# $(POFILE).  Fortunately we can conditionally define POFILE = MDPO when
-# building MDPO.  make complains when this conditional definition is before we
-# include Makefile.msg.targ, so it must lie at the end.
+# i18n: For catalog we need to put messages from $(SRCS) and $(SVCMETHOD).sh
+# into "`basename $PWD`p.po" = md_monitordp.po = $(POFILE) (that's what
+# ../Makefile expects).  We'll use $(BUILDPO.pofiles) to build $(POFILE) from
+# $(MDPO) and $(SVCMETHODPO), and we'll use $(BUILDPO.msgfiles) to build
+# $(MDPO) from $(SRCS).  The catch is that $(BUILDPO.msgfiles) is defined to
+# produce $(POFILE).  Fortunately we can conditionally define POFILE = MDPO
+# when building MDPO.  make complains when this conditional definition is
+# before we include Makefile.msg.targ, so it must lie at the end.
 #
 MSGFILES= $(SRCS:%.c=%.i)
 MDPO= $(PROG:%=%.po)
-METHODPO= $(METHOD:%=%.po)
-POFILES= $(MDPO) $(METHODPO)
+SVCMETHODPO= $(SVCMETHOD:%=%.po)
+POFILES= $(MDPO) $(SVCMETHODPO)
 POFILE= md_monitordp.po
 
 ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
-$(ROOTMANIFEST):= 	FILEMODE = 444
-
-ROOTMETHOD=		$(ROOTLIBSVCMETHOD)/$(METHOD)
-$(ROOTMETHOD) := OWNER = root
-$(ROOTMETHOD) := GROUP = bin
-$(ROOTMETHOD) := FILEMODE = 0555
 
 all     :=      TARGET = all
 install :=      TARGET = install
@@ -92,10 +85,7 @@ check:	$(CHKMANIFEST)
 clean: $(SUBDIRS)
 	$(RM) $(MSGFILES)
 
-install:	$(SUBDIRS) $(ROOTMANIFEST) $(ROOTMETHOD)
-	-$(RM)  $(ROOTPROG)
-
-$(ROOTMETHOD): $(METHOD)
+install:	$(SUBDIRS) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

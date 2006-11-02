@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Makefile for volume management files that go in /etc and /var/svc
@@ -27,6 +26,9 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/volmgt/etc/Makefile
+
+MANIFEST = 	volfs.xml
+SVCMETHOD =	svc-volfs
 
 include ../../Makefile.cmd
 
@@ -43,11 +45,7 @@ $(ROOTETC)/rmmount.conf := FILEMODE = 0444
 $(ROOTETC)/vold.conf := OWNER = root
 $(ROOTETC)/rmmount.conf := OWNER = root
 
-MANIFEST = 		volfs.xml
 ROOTMANIFESTDIR = 	$(ROOTSVCSYSTEMFILESYSTEM)
-ROOTMETHOD= 		$(ROOTLIBSVCMETHOD)/svc-volfs
-$(ROOTMANIFEST) := 	FILEMODE = 0444
-$(ROOTLIBSVCMETHOD)/svc-volfs := FILEMODE=555
 
 .KEEP_STATE:
 
@@ -57,10 +55,12 @@ lint:
 
 cstyle:
 
-install: all $(ROOTETCFILES) $(ROOTMANIFEST) $(ROOTMETHOD)
+install: all $(ROOTETCFILES) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 check: $(CHKMANIFEST)
 
 clean:     
 
 clobber: clean
+
+include ../../Makefile.targ

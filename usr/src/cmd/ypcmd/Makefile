@@ -32,7 +32,7 @@ NETYPPROG = ypbind ypxfr yppush udpublickey mkalias \
 		ypxfr_1perday ypxfr_1perhour ypxfr_2perday \
 		ypstart ypstop
 NIS2LDAPPROG = ypxfrd ypserv ypxfr
-METHOD = yp
+SVCMETHOD = yp
 PROG=	$(BINPROG) $(SBINPROG) $(NETYPPROG) $(NIS2LDAPPROG) $(METHOD)
 
 MANIFEST = server.xml client.xml xfr.xml
@@ -40,7 +40,6 @@ MANIFEST = server.xml client.xml xfr.xml
 include ../Makefile.cmd
 
 ROOTMANIFESTDIR = $(ROOTSVCNETWORKNIS)
-ROOTMETHOD = $(ROOTLIBSVCMETHOD)/$(METHOD)
 
 # installed directories
 NETSVC = $(ROOTLIB)/netsvc
@@ -61,7 +60,6 @@ ypset :=	LDLIBS += -lnsl
 
 $(ROOTVAR_YP)/aliases :=	GROUP=bin
 $(ROOTVAR_YP)/aliases :=	FILEMODE=555
-$(ROOTMANIFEST) :=		FILEMODE = 0444
 
 YPFILES = Makefile aliases nicknames updaters
 ETCFILES =  publickey
@@ -256,7 +254,7 @@ stdhosts: $(STDHOSTSOBJ)
 
 install: all $(PROG) $(ROOTDIRS) $(ROOTETCFILE) $(ROOTYPFILES) $(IBINPROG) \
 	$(ISBINPROG) $(INETYPPROG) $(INIS2LDAPPROG) $(SUBDIRS) $(ROOTMANIFEST) \
-	$(ROOTMETHOD)
+	$(ROOTSVCMETHOD)
 
 $(ROOTDIRS):
 	$(INS.dir)
@@ -299,6 +297,7 @@ clean:	$(SUBDIRS)
 	$(RM) $(OBJS) $(CLEANFILES)
 
 clobber: clean $(SUBDIRS)
-	$(RM) $(PROG)
 
 FRC:
+
+include ../Makefile.targ

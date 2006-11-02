@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -10,7 +10,7 @@ PROG2=kpropd
 PROG3=kprop_script
 PROG=$(PROG1) $(PROG2) $(PROG3)
 MANIFEST=	krb5_prop.xml
-ROOTMETHOD=	$(ROOTLIBSVCMETHOD)/svc-kdc.slave
+SVCMETHOD=	svc-kdc.slave
 
 OBJS	= \
 	kprop.o\
@@ -44,7 +44,6 @@ include ../../Makefile.cmd
 include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKSECURITY)
-$(ROOTMANIFEST)		:= FILEMODE= 444
 
 TEXT_DOMAIN = SUNW_OST_OSCMD
 POFILE = kprop.po
@@ -89,7 +88,7 @@ iprop_xdr.c:	iprop.h $(KRB5IPROPDIR)/iprop.x
 $(KRB5LIB)/$(PROG3): $(PROG3)
 $(OBJS): iprop.h
 
-install: $(KRB5LIBPROG) $(ROOTMETHOD) $(ROOTMANIFEST)
+install: $(KRB5LIBPROG) $(ROOTSVCMETHOD) $(ROOTMANIFEST)
 
 check:	$(CHKMANIFEST)
 

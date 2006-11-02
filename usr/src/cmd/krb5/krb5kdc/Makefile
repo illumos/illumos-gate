@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -7,7 +7,7 @@
 
 PROG= krb5kdc
 MANIFEST=	krb5kdc.xml
-ROOTMETHOD=	$(ROOTLIBSVCMETHOD)/svc-kdc
+SVCMETHOD=	svc-kdc
 
 OBJS	= \
 	dispatch.o\
@@ -63,9 +63,8 @@ $(PROG):       $(OBJS)
 	$(POST_PROCESS)
 
 $(KRB5LIBPROG):=	FILEMODE = 500
-$(ROOTMANIFEST):=	FILEMODE = 444
 
-install: $(KRB5LIBPROG) $(ROOTMETHOD) $(ROOTMANIFEST)
+install: $(KRB5LIBPROG) $(ROOTSVCMETHOD) $(ROOTMANIFEST)
 
 check:	$(CHKMANIFEST)
 

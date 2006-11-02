@@ -17,7 +17,12 @@ POFILEOBJS=	$(ROUTEDOBJS) $(RTQUERYOBJS)
 PROG=		$(ROUTEDPROG) $(RTQUERYPROG)
 SRCS=		$(ROUTEDSRCS) $(RTQUERYSRCS)
 
-include         ../../../Makefile.cmd
+MANIFEST=		route.xml
+SVCMETHOD=		svc-route
+
+include		../../../Makefile.cmd
+
+ROOTMANIFESTDIR=	$(ROOTSVCNETWORKROUTING)
 
 #
 # in.routed uses ancillary data features available through
@@ -74,7 +79,9 @@ lint:
 	$(LINT.c) $(ROUTEDSRCS) $(LDLIBS)
 	$(LINT.c) $(RTQUERYSRCS) $(LDLIBS)
 
-install:	all $(ROOTUSRSBINPROG) $(MANTARGET)
+install:	all $(ROOTUSRSBINPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+check:		$(CHKMANIFEST)
 
 clean:
 	$(RM) $(CLEAN_FILES)

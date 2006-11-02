@@ -27,19 +27,16 @@
 
 PROG= utmpd
 DEFAULTFILES= utmpd.dfl
+MANIFEST= utmp.xml
+SVCMETHOD= svc-utmpd
 
 include ../Makefile.cmd
 
-MANIFEST = utmp.xml
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
-SVCMETHOD = svc-utmpd
 
 FILEMODE = 555
 OWNER = root
 GROUP = bin
-
-$(ROOTMANIFEST) := FILEMODE = 444
-$(ROOTMANIFEST) := GROUP = sys
 
 .KEEP_STATE:
 

@@ -90,12 +90,14 @@ solaris.smf.manage.cron:::Manage Cron Service States::help=SmfCronStates.html
 solaris.smf.manage.hal:::Manage HAL Service States::help=SmfHALStates.html
 solaris.smf.manage.name-service-cache:::Manage Name Service Cache Daemon Service States::help=SmfNscdStates.html
 solaris.smf.manage.power:::Manage Power Management Service States::help=SmfPowerStates.html
+solaris.smf.manage.routing:::Manage Routing Service States::help=SmfRoutingStates.html
 solaris.smf.manage.rmvolmgr:::Manage Rmvolmgr Service States::help=SmfRmvolmgrStates.html
 solaris.smf.manage.rpc.bind:::Manage RPC Program number mapper::help=SmfRPCBind.html
 solaris.smf.manage.sendmail:::Manage Sendmail Service States::help=SmfSendmailStates.html
 solaris.smf.manage.ssh:::Manage Secure Shell Service States::help=SmfSshStates.html
 solaris.smf.manage.system-log:::Manage Syslog Service States::help=SmfSyslogStates.html
 solaris.smf.value.:::Change Values of SMF Service Properties::help=SmfValueHeader.html
+solaris.smf.value.routing:::Change Values of SMF Routing Properties::help=SmfValueRouting.html
 #
 solaris.system.:::Machine Administration::help=SysHeader.html
 solaris.system.date:::Set Date & Time::help=SysDate.html

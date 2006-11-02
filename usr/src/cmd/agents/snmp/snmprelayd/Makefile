@@ -31,6 +31,9 @@ include ../../Makefile.vars
 # OPTIONAL_INCLUDE_FILE:sh = /bin/sh ../../misc.sh ../../../cmd/Makefile.cmd
 # include $(OPTIONAL_INCLUDE_FILE)
 
+MANIFEST = snmpdx.xml
+SVCMETHOD = svc-snmpdx
+
 include $(SRC)/cmd/Makefile.cmd
 
 #
@@ -142,16 +145,11 @@ PARSER= $(PARSER_HOME)/$(BIN)/mibcodegen
 # all
 #
 
-MANIFEST = snmpdx.xml
 ROOTMANIFESTDIR = $(ROOTSVCAPPLICATIONMANAGEMENT)
-SVCMETHOD = svc-snmpdx
 
-$(ROOTMANIFEST) := FILEMODE = 0444
-$(ROOTSVCMETHOD) := FILEMODE = 0555
-
-FILEMODE = 0644
+$(CONFRULE) := FILEMODE = 0644
 $(CONFLOC)/snmpdx.acl := FILEMODE = 0600
-GROUP = sys
+$(CONFRULE) := GROUP = sys
 
 CLOBBERFILES= y.tab.c
 

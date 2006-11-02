@@ -76,10 +76,12 @@ HTMLENTS = \
 	SmfModifyMethod.html \
 	SmfNscdStates.html \
 	SmfPowerStates.html \
+	SmfRoutingStates.html \
 	SmfSendmailStates.html \
 	SmfSshStates.html \
 	SmfSyslogStates.html \
 	SmfValueHeader.html \
+	SmfValueRouting.html \
 	NetworkHeader.html \
 	WifiConfig.html \
 	WifiWep.html

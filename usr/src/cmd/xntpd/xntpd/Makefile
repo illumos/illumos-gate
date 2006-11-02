@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -7,17 +7,11 @@
 
 PROG=		xntpd
 MANIFEST=	ntp.xml
-
-all: $(PROG)
+SVCMETHOD=	xntp
 
 include ../../Makefile.cmd
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
-ROOTMETHOD=		$(ROOTLIBSVCMETHOD)/xntp
-$(ROOTMANIFEST)		:= FILEMODE= 444
-
-$(ROOTMANIFESTDIR)/%: %
-			$(INS.file)
 
 include ../Makefile.cmd
 
@@ -27,9 +21,11 @@ include ../Makefile.cmd
 
 CLOBBERFILES = $(ROOTINETLIBPROG)
 
+all:	$(PROG)
+
 check:	$(CHKMANIFEST)
 
-install: all $(ROOTINETLIBPROG) $(ROOTMANIFEST) $(ROOTMETHOD)
+install: all $(ROOTINETLIBPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 lint:
 # lint:	lint_PROG

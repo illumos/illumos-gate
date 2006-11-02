@@ -47,14 +47,12 @@ SUNW_NO_MPATHD=; export SUNW_NO_MPATHD
 # default IP forwarding behavior.  This will be the setting for
 # interfaces that don't modify the per-interface setting with the
 # router or -router ifconfig command in their /etc/hostname.<intf>
-# files.  The -F option tells routeadm to only update the forwarding
-# configuration for the system, and not dynamic routing.  We don't
-# want routing daemons started until later in the boot process (see
-# the net-init method for that).
+# files.  Due to their dependency on this service, the IP forwarding services
+# will run at this point (though routing daemons will not run until later
+# in the boot process) and set forwarding flags.
 #
-/sbin/routeadm -u -F
 
-# IPv4 loopback
+# ipV4 loopback
 /sbin/ifconfig lo0 plumb 127.0.0.1 up
 
 # Configure the v6 loopback if any IPv6 interfaces are configured.

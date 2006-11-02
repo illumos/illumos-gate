@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -25,7 +25,6 @@ include ../../Makefile.cmd
 include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKSECURITY)
-$(ROOTMANIFEST)		:= FILEMODE= 444
 
 POFILE = $(PROG).po
 POFILES = generic.po

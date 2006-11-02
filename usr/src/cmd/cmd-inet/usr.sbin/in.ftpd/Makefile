@@ -1,15 +1,16 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
+PROG=		in.ftpd ftpcount ftpshut ftprestart privatepw
+SCRIPTS=	ftpaddhost ftpconfig
+MANIFEST=	ftp.xml
+
 include		../../../Makefile.cmd
 
-PROG=		in.ftpd ftpcount ftpshut ftprestart privatepw
-MANIFEST=	ftp.xml
-SCRIPTS=	ftpaddhost ftpconfig
 COMMON_OBJS=	COPYRIGHT.o vers.o
 FTPD_OBJS=	$(COMMON_OBJS) ftpd.o ftpcmd.o glob.o logwtmp.o popen.o \
 		access.o extensions.o realpath.o acl.o private.o \
@@ -35,7 +36,6 @@ ROOTFTPCOUNT=	$(ROOTUSRSBIN)/ftpcount
 ROOTFTPWHO=	$(ROOTUSRSBIN)/ftpwho
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
-$(ROOTMANIFEST)		:= FILEMODE= 444
 
 # I18n
 POFILE=		in.ftpd_all.po

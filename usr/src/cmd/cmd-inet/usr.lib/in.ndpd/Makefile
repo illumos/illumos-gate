@@ -29,8 +29,12 @@
 PROG=		in.ndpd
 OBJS=		config.o main.o ndp.o tables.o trace.o
 SRCS=		$(OBJS:%.o=%.c)
+SVCMETHOD=	svc-ndp
+MANIFEST=	ndp.xml
 
 include		../../../Makefile.cmd
+
+ROOTMANIFESTDIR=	$(ROOTSVCNETWORKROUTING)
 
 # in.ndpd uses the ancillary data feature which is available only through
 # UNIX 98 standards version of Socket interface. This interface is supposed to
@@ -66,7 +70,9 @@ $(PROG): $(OBJS)
 
 include		../Makefile.lib
 
-install: all $(ROOTLIBINETPROG)
+install: all $(ROOTLIBINETPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+check:	$(CHKMANIFEST)
 
 clean:
 	$(RM) $(OBJS)

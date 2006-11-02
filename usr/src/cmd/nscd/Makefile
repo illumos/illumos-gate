@@ -35,10 +35,6 @@ SVCMETHOD=	svc-nscd
 include ../Makefile.cmd
 
 ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
-$(ROOTMANIFEST) :=	FILEMODE= 444
-
-$(ROOTMANIFESTDIR)/%: %
-		$(INS.file)
 
 OBJS=	server.o getpw.o getgr.o gethost.o getnode.o \
 	getether.o getrpc.o getproto.o getnet.o \

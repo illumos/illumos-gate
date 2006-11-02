@@ -32,10 +32,9 @@ PROG=		lpsched
 include		../../Makefile.lp
 
 MANIFEST=	server.xml
+SVCMETHOD=	print-svc
 
 ROOTMANIFESTDIR=	$(ROOTSVCAPPLICATIONPRINT)
-ROOTMETHOD=		$(ROOTLIBSVCMETHOD)/print-svc
-$(ROOTMANIFEST)		:= FILEMODE= 444
 
 PURIFYOPTS      = -logfile=/tmp/errs.%p
 PURIFY          = purify $(PURIFYOPTS)
@@ -120,7 +119,7 @@ $(PROG).pure:	$(OBJS) $(LPLIBS)
 		$(PURIFY) $(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-install:	all $(ROOTLIBLPLOCLPROG) $(ROOTMANIFEST) $(ROOTMETHOD)
+install:	all $(ROOTLIBLPLOCLPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 
 check:	$(CHKMANIFEST)
@@ -129,15 +128,13 @@ check:	$(CHKMANIFEST)
 clean:
 		$(RM) $(OBJS)
 
-clobber:	clean
-		-$(RM) $(PROG) $(CLOBBERFILES)
-
 strip:
 		$(STRIP) $(PROG)
 
-lint:
-		$(LINT.c) $(SRCS) $(LDLIBS)
+lint:		lint_SRCS
 
 include		../Makefile.msg
 
 FRC:
+
+include		../../../Makefile.targ
