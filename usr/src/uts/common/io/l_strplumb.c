@@ -254,8 +254,8 @@ kstr_autopush(int op, major_t *maj, minor_t *min, minor_t *lastmin,
 		error = ldi_ioctl(lh, SAD_GAP, (intptr_t)&push,
 		    FKIOCTL, kcred, &rval);
 		if (error) {
-			printf("kstr_autopush: ioctl failed, error %d\n",
-			    error);
+			printf("kstr_autopush: "
+			    "ioctl(GET_AUTOPUSH) failed, error %d\n", error);
 			(void) ldi_close(lh, FREAD|FWRITE, kcred);
 			return (error);
 		}
@@ -300,8 +300,8 @@ kstr_autopush(int op, major_t *maj, minor_t *min, minor_t *lastmin,
 		error = ldi_ioctl(lh, SAD_SAP, (intptr_t)&push,
 		    FKIOCTL, kcred, &rval);
 		if (error) {
-			printf("kstr_autopush: ioctl failed, error %d\n",
-			    error);
+			printf("kstr_autopush: "
+			    "ioctl(CLR_AUTOPUSH) failed, error %d\n", error);
 		}
 		(void) ldi_close(lh, FREAD|FWRITE, kcred);
 		return (error);
@@ -339,8 +339,8 @@ kstr_autopush(int op, major_t *maj, minor_t *min, minor_t *lastmin,
 		error = ldi_ioctl(lh, SAD_SAP, (intptr_t)&push,
 		    FKIOCTL, kcred, &rval);
 		if (error) {
-			printf("kstr_autopush: ioctl failed, error %d\n",
-			    error);
+			printf("kstr_autopush: "
+			    "ioctl(SET_AUTOPUSH) failed, error %d\n", error);
 		}
 		(void) ldi_close(lh, FREAD|FWRITE, kcred);
 		return (error);

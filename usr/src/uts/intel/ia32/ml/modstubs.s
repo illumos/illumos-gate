@@ -972,13 +972,6 @@ fcnname/**/_info:							\
 	END_MODULE(rpcsec_gss);
 #endif
 
-#ifndef SAD_MODULE
-	MODULE(sad,drv);
-	STUB(sad, sadinit, 0);
-	STUB(sad, ap_free, 0);
-	END_MODULE(sad);
-#endif
-
 /*
  * Stubs for PCI configurator module (misc/pcicfg).
  */

@@ -157,7 +157,6 @@ struct qinit fifo_stwdata = { NULL, strwsrv, NULL, NULL, NULL, &fifowm_info };
 
 extern kmutex_t	strresources;	/* protects global resources */
 extern kmutex_t muxifier;	/* single-threads multiplexor creation */
-kmutex_t sad_lock;		/* protects sad drivers autopush */
 
 static boolean_t msghasdata(mblk_t *bp);
 #define	msgnodata(bp) (!msghasdata(bp))
@@ -471,48 +470,21 @@ ckreturn:
 	}
 
 	/*
-	 * check for autopush
+	 * check for modules that need to be autopushed
 	 */
-	mutex_enter(&sad_lock);
-	ap = strphash(getemajor(*devp));
-#define	DEVT(ap)	makedevice(ap->ap_major, ap->ap_minor)
-#define	DEVLT(ap)	makedevice(ap->ap_major, ap->ap_lastminor)
-
-	while (ap) {
-		if (ap->ap_major == (getemajor(*devp))) {
-			if (ap->ap_type == SAP_ALL)
-				break;
-			else if ((ap->ap_type == SAP_ONE) &&
-			    (getminor(DEVT(ap)) == getminor(*devp)))
-				break;
-			else if (ap->ap_type == SAP_RANGE &&
-			    getminor(*devp) >= getminor(DEVT(ap)) &&
-			    getminor(*devp) <= getminor(DEVLT(ap)))
-				break;
-		}
-		ap = ap->ap_nextp;
-	}
-	if (ap == NULL) {
-		mutex_exit(&sad_lock);
+	if ((ap = sad_ap_find_by_dev(*devp)) == NULL)
 		goto opendone;
-	}
-	ap->ap_cnt++;
-	mutex_exit(&sad_lock);
 	for (s = 0; s < ap->ap_npush; s++) {
 		error = push_mod(qp, &dummydev, stp, ap->ap_list[s],
 		    ap->ap_anchor, crp);
 		if (error != 0)
 			break;
 	}
-	mutex_enter(&sad_lock);
-	if (--(ap->ap_cnt) <= 0)
-		ap_free(ap);
-	mutex_exit(&sad_lock);
+	sad_ap_rele(ap);
 
 	/*
 	 * let specfs know that open failed part way through
 	 */
-
 	if (error) {
 		mutex_enter(&stp->sd_lock);
 		stp->sd_flag |= STREOPENFAIL;

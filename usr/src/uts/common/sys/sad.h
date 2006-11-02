@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997-1999, 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +33,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
 
 #include <sys/types.h>
+#include <sys/modhash.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -179,8 +179,6 @@ struct saddev {
  * Module Autopush Cache
  */
 struct autopush {
-	struct autopush	*ap_nextp;		/* next on list */
-	int		 ap_flags;		/* see below */
 	struct apcommon  ap_common;		/* see above */
 	char		 ap_list[MAXAPUSH][FMNAMESZ + 1];
 						/* list of modules to push */
@@ -203,24 +201,10 @@ struct autopush {
 #define	ap_npush	ap_common.apc_npush
 #define	ap_anchor	ap_data.apd_anchor
 
-/*
- * autopush flag values
- */
-#define	APFREE	0x00	/* free */
-#define	APUSED	0x01	/* used */
-#define	APHASH	0x02	/* on hash list */
-
-/*
- * hash function for cache
- */
-#define	strphash(maj)	strpcache[(((int)maj)&strpmask)]
-
 extern struct saddev	*saddev;	/* sad device array */
 extern int		sadcnt;		/* number of elements in saddev */
-extern struct autopush	*autopush;	/* autopush data array */
-extern int		nautopush;	/* number of elements in autopush */
-extern struct autopush **strpcache;	/* autopush hash list */
-extern int		strpmask;	/* used in hash function */
+
+extern kmutex_t		sad_lock;	/* protects sad ap data store */
 
 /*
  * function prototypes
@@ -236,8 +220,27 @@ void audit_fdsend(int, struct file *, int);
 void audit_fdrecv(int, struct file *);
 #endif
 
-extern void ap_free(struct autopush *);
 extern void sad_initspace(void);
+
+/*
+ * The following interfaces do not care about sad_lock.
+ */
+extern struct autopush *sad_ap_alloc(void);
+extern int sad_apc_verify(struct apcommon *);
+extern int sad_ap_verify(struct autopush *);
+
+/*
+ * The following interfaces attempt to acquire sad_lock.
+ */
+extern void sad_ap_rele(struct autopush *);
+extern struct autopush *sad_ap_find_by_dev(dev_t);
+
+/*
+ * The following interfaces require sad_lock to be held when invoked.
+ */
+extern void sad_ap_insert(struct autopush *);
+extern void sad_ap_remove(struct autopush *);
+extern struct autopush *sad_ap_find(struct apcommon *);
 
 #endif /* _KERNEL */
 

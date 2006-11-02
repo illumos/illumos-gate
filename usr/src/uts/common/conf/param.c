@@ -185,7 +185,6 @@ extern void strinit(void);
 extern void flk_init(void);
 extern void ftrace_init(void);
 extern void softcall_init(void);
-extern void sadinit(void);
 extern void ttyinit(void);
 extern void schedctl_init(void);
 extern void deadman_init(void);
@@ -203,7 +202,6 @@ void	(*init_tbl[])(void) = {
 	strinit,
 	serializer_init,
 	softcall_init,
-	sadinit,
 	ttyinit,
 	as_init,
 	pvn_init,

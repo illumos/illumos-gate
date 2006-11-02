@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +53,7 @@
 #include <sys/systm.h>
 #include <sys/modctl.h>
 #include <sys/priv_names.h>
+#include <sys/sysmacros.h>
 
 static int sadopen(queue_t *, dev_t *, int, int, cred_t *);
 static int sadclose(queue_t *, int, cred_t *);
@@ -62,15 +62,11 @@ static int sadwput(queue_t *qp, mblk_t *mp);
 static int sad_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int sad_attach(dev_info_t *, ddi_attach_cmd_t);
 
-static struct autopush *ap_alloc(), *ap_hfind();
-static void ap_hadd(), ap_hrmv();
 static void apush_ioctl(), apush_iocdata();
 static void vml_ioctl(), vml_iocdata();
 static int valid_major(major_t);
 
-extern kmutex_t sad_lock;
 static dev_info_t *sad_dip;		/* private copy of devinfo pointer */
-static struct autopush *strpfreep;	/* autopush freelist */
 
 static struct module_info sad_minfo = {
 	0x7361, "sad", 0, INFPSZ, 0, 0
@@ -89,7 +85,7 @@ struct streamtab sadinfo = {
 };
 
 DDI_DEFINE_STREAM_OPS(sad_ops, nulldev, nulldev, sad_attach,
-    nodev, nodev, sad_info, D_NEW | D_MTPERQ | D_MP, &sadinfo);
+    nodev, nodev, sad_info, D_MTPERQ | D_MP, &sadinfo);
 
 /*
  * Module linkage information for the kernel.
@@ -126,12 +122,17 @@ _info(struct modinfo *modinfop)
 static int
 sad_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
+	int instance = ddi_get_instance(devi);
+
 	if (cmd != DDI_ATTACH)
+		return (DDI_FAILURE);
+
+	ASSERT(instance == 0);
+	if (instance != 0)
 		return (DDI_FAILURE);
 
 	if (ddi_create_minor_node(devi, "user", S_IFCHR,
 	    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
-		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
 	}
 	if (ddi_create_priv_minor_node(devi, "admin", S_IFCHR,
@@ -169,30 +170,6 @@ sad_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	return (error);
 }
 
-
-/*
- * sadinit() -
- * Initialize autopush freelist.
- */
-void
-sadinit()
-{
-	struct autopush *ap;
-	int i;
-
-	/*
-	 * build the autopush freelist.
-	 */
-	strpfreep = autopush;
-	ap = autopush;
-	for (i = 1; i < nautopush; i++) {
-		ap->ap_nextp = &autopush[i];
-		ap->ap_flags = APFREE;
-		ap = ap->ap_nextp;
-	}
-	ap->ap_nextp = NULL;
-	ap->ap_flags = APFREE;
-}
 
 /*
  * sadopen() -
@@ -401,168 +378,170 @@ apush_iocdata(
 	int i, ret;
 	struct copyresp *csp;
 	struct strapush *sap;
-	struct autopush *ap;
+	struct autopush *ap, *ap_tmp;
 	struct saddev *sadp;
 	uint_t size;
+	dev_t dev;
 
 	csp = (struct copyresp *)mp->b_rptr;
 	if (csp->cp_rval) {	/* if there was an error */
 		freemsg(mp);
 		return;
 	}
-	if (mp->b_cont)
-		/* sap needed only if mp->b_cont is set */
+	if (mp->b_cont) {
+		/*
+		 * sap needed only if mp->b_cont is set.  first figure out
+		 * the size of the sap structure and then prepare caller
+		 * supplied data for access with miocpullup().
+		 */
+		size = sizeof (struct strapush);
+		if (SAD_VER(csp->cp_cmd) == 0)
+			size -= sizeof (struct apdata);
+		if ((ret = miocpullup(mp, size)) != 0) {
+			miocnak(qp, mp, 0, ret);
+			return;
+		}
 		sap = (struct strapush *)mp->b_cont->b_rptr;
+		dev = makedevice(sap->sap_major, sap->sap_minor);
+	}
 	switch (SAD_CMD(csp->cp_cmd)) {
 	case SAD_CMD(SAD_SAP):
-		switch ((long)csp->cp_private) {
-		case GETSTRUCT:
-			switch (sap->sap_cmd) {
-			case SAP_ONE:
-			case SAP_RANGE:
-			case SAP_ALL:
-				if ((sap->sap_npush == 0) ||
-				    (sap->sap_npush > MAXAPUSH) ||
-				    (sap->sap_npush > nstrpush)) {
 
-					/* invalid number of modules to push */
-
-					miocnak(qp, mp, 0, EINVAL);
-					break;
-				}
-				if (ret = valid_major(sap->sap_major)) {
-					miocnak(qp, mp, 0, ret);
-					break;
-				}
-				if ((sap->sap_cmd == SAP_RANGE) &&
-				    (sap->sap_lastminor <= sap->sap_minor)) {
-
-					/* bad range */
-
-					miocnak(qp, mp, 0, ERANGE);
-					break;
-				}
-
-				/*
-				 * Validate that the specified list of
-				 * modules exist.
-				 */
-				for (i = 0; i < sap->sap_npush; i++) {
-					sap->sap_list[i][FMNAMESZ] = '\0';
-					if (fmodsw_find(sap->sap_list[i],
-					    FMODSW_LOAD) == NULL) {
-						miocnak(qp, mp, 0, EINVAL);
-						return;
-					}
-				}
-
-				mutex_enter(&sad_lock);
-				if (ap_hfind(sap->sap_major, sap->sap_minor,
-				    sap->sap_lastminor, sap->sap_cmd)) {
-					mutex_exit(&sad_lock);
-
-					/* already configured */
-
-					miocnak(qp, mp, 0, EEXIST);
-					break;
-				}
-				if ((ap = ap_alloc()) == NULL) {
-					mutex_exit(&sad_lock);
-
-					/* no autopush structures */
-
-					miocnak(qp, mp, 0, ENOSR);
-					break;
-				}
-				ap->ap_cnt++;
-				ap->ap_common = sap->sap_common;
-				if (SAD_VER(csp->cp_cmd) > 0)
-					ap->ap_anchor = sap->sap_anchor;
-				else
-					ap->ap_anchor = 0;
-				for (i = 0; i < ap->ap_npush; i++)
-					(void) strcpy(ap->ap_list[i],
-					    sap->sap_list[i]);
-				ap_hadd(ap);
-				mutex_exit(&sad_lock);
-				miocack(qp, mp, 0, 0);
-				break;
-
-			case SAP_CLEAR:
-				if (ret = valid_major(sap->sap_major)) {
-					miocnak(qp, mp, 0, ret);
-					break;
-				}
-				mutex_enter(&sad_lock);
-				if ((ap = ap_hfind(sap->sap_major,
-				    sap->sap_minor, sap->sap_lastminor,
-				    sap->sap_cmd)) == NULL) {
-					mutex_exit(&sad_lock);
-
-					/* not configured */
-
-					miocnak(qp, mp, 0, ENODEV);
-					break;
-				}
-				if ((ap->ap_type == SAP_RANGE) &&
-				    (sap->sap_minor != ap->ap_minor)) {
-					mutex_exit(&sad_lock);
-
-					/* starting minors do not match */
-
-					miocnak(qp, mp, 0, ERANGE);
-					break;
-				}
-				if ((ap->ap_type == SAP_ALL) &&
-				    (sap->sap_minor != 0)) {
-					mutex_exit(&sad_lock);
-
-					/* SAP_ALL must have minor == 0 */
-
-					miocnak(qp, mp, 0, EINVAL);
-					break;
-				}
-				ap_hrmv(ap);
-				if (--(ap->ap_cnt) <= 0)
-					ap_free(ap);
-				mutex_exit(&sad_lock);
-				miocack(qp, mp, 0, 0);
-				break;
-
-			default:
-				miocnak(qp, mp, 0, EINVAL);
-				break;
-			} /* switch (sap_cmd) */
-			break;
-
-		default:
+		/* currently we only support one SAD_SAP command */
+		if (((long)csp->cp_private) != GETSTRUCT) {
 			cmn_err(CE_WARN,
 			    "apush_iocdata: cp_private bad in SAD_SAP: %p",
 			    (void *)csp->cp_private);
-			freemsg(mp);
-			break;
-		} /* switch (cp_private) */
-		break;
+			miocnak(qp, mp, 0, EINVAL);
+			return;
+		}
+
+		switch (sap->sap_cmd) {
+		default:
+			miocnak(qp, mp, 0, EINVAL);
+			return;
+		case SAP_ONE:
+		case SAP_RANGE:
+		case SAP_ALL:
+			/* allocate and initialize a new config */
+			ap = sad_ap_alloc();
+			ap->ap_common = sap->sap_common;
+			if (SAD_VER(csp->cp_cmd) > 0)
+				ap->ap_anchor = sap->sap_anchor;
+			for (i = 0; i < MIN(sap->sap_npush, MAXAPUSH); i++)
+				(void) strncpy(ap->ap_list[i],
+				    sap->sap_list[i], FMNAMESZ);
+
+			/* sanity check the request */
+			if (((ret = sad_ap_verify(ap)) != 0) ||
+			    ((ret = valid_major(ap->ap_major)) != 0)) {
+				sad_ap_rele(ap);
+				miocnak(qp, mp, 0, ret);
+				return;
+			}
+
+			/* check for overlapping configs */
+			mutex_enter(&sad_lock);
+			if ((ap_tmp = sad_ap_find(&ap->ap_common)) != NULL) {
+				/* already configured */
+				mutex_exit(&sad_lock);
+				sad_ap_rele(ap_tmp);
+				sad_ap_rele(ap);
+				miocnak(qp, mp, 0, EEXIST);
+				return;
+			}
+
+			/* add the new config to our hash */
+			sad_ap_insert(ap);
+			mutex_exit(&sad_lock);
+			miocack(qp, mp, 0, 0);
+			return;
+
+		case SAP_CLEAR:
+			/* sanity check the request */
+			if (ret = valid_major(sap->sap_major)) {
+				miocnak(qp, mp, 0, ret);
+				return;
+			}
+
+			/* search for a matching config */
+			if ((ap = sad_ap_find_by_dev(dev)) == NULL) {
+				/* no config found */
+				miocnak(qp, mp, 0, ENODEV);
+				return;
+			}
+
+			/*
+			 * If we matched a SAP_RANGE config
+			 * the minor passed in must match the
+			 * beginning of the range exactly.
+			 */
+			if ((ap->ap_type == SAP_RANGE) &&
+			    (ap->ap_minor != sap->sap_minor)) {
+				sad_ap_rele(ap);
+				miocnak(qp, mp, 0, ERANGE);
+				return;
+			}
+
+			/*
+			 * If we matched a SAP_ALL config
+			 * the minor passed in must be 0.
+			 */
+			if ((ap->ap_type == SAP_ALL) &&
+			    (sap->sap_minor != 0)) {
+				sad_ap_rele(ap);
+				miocnak(qp, mp, 0, EINVAL);
+				return;
+			}
+
+			/*
+			 * make sure someone else hasn't already
+			 * removed this config from the hash.
+			 */
+			mutex_enter(&sad_lock);
+			ap_tmp = sad_ap_find(&ap->ap_common);
+			if (ap_tmp != ap) {
+				mutex_exit(&sad_lock);
+				sad_ap_rele(ap_tmp);
+				sad_ap_rele(ap);
+				miocnak(qp, mp, 0, ENODEV);
+				return;
+			} else
+
+			/* remove the config from the hash and return */
+			sad_ap_remove(ap);
+			mutex_exit(&sad_lock);
+
+			/*
+			 * Release thrice, once for sad_ap_find_by_dev(),
+			 * once for sad_ap_find(), and once to free.
+			 */
+			sad_ap_rele(ap);
+			sad_ap_rele(ap);
+			sad_ap_rele(ap);
+			miocack(qp, mp, 0, 0);
+			return;
+		} /* switch (sap_cmd) */
+		/*NOTREACHED*/
 
 	case SAD_CMD(SAD_GAP):
 		switch ((long)csp->cp_private) {
 
-		case GETSTRUCT: {
+		case GETSTRUCT:
+			/* sanity check the request */
 			if (ret = valid_major(sap->sap_major)) {
 				miocnak(qp, mp, 0, ret);
-				break;
+				return;
 			}
-			mutex_enter(&sad_lock);
-			if ((ap = ap_hfind(sap->sap_major, sap->sap_minor,
-			    sap->sap_lastminor, SAP_ONE)) == NULL) {
-				mutex_exit(&sad_lock);
 
-				/* not configured */
-
+			/* search for a matching config */
+			if ((ap = sad_ap_find_by_dev(dev)) == NULL) {
+				/* no config found */
 				miocnak(qp, mp, 0, ENODEV);
-				break;
+				return;
 			}
 
+			/* copy out the contents of the config */
 			sap->sap_common = ap->ap_common;
 			if (SAD_VER(csp->cp_cmd) > 0)
 				sap->sap_anchor = ap->ap_anchor;
@@ -570,8 +549,11 @@ apush_iocdata(
 				(void) strcpy(sap->sap_list[i], ap->ap_list[i]);
 			for (; i < MAXAPUSH; i++)
 				bzero(sap->sap_list[i], FMNAMESZ + 1);
-			mutex_exit(&sad_lock);
 
+			/* release our hold on the config */
+			sad_ap_rele(ap);
+
+			/* copyout the results */
 			if (SAD_VER(csp->cp_cmd) == 1)
 				size = STRAPUSH_V1_LEN;
 			else
@@ -581,177 +563,24 @@ apush_iocdata(
 			mcopyout(mp, (void *)GETRESULT, size, sadp->sa_addr,
 			    NULL);
 			qreply(qp, mp);
-			break;
-			}
+			return;
 		case GETRESULT:
 			miocack(qp, mp, 0, 0);
-			break;
+			return;
 
 		default:
 			cmn_err(CE_WARN,
 			    "apush_iocdata: cp_private bad case SAD_GAP: %p",
 			    (void *)csp->cp_private);
 			freemsg(mp);
-			break;
+			return;
 		} /* switch (cp_private) */
-		break;
-
+		/*NOTREACHED*/
 	default:	/* can't happen */
 		ASSERT(0);
 		freemsg(mp);
-		break;
+		return;
 	} /* switch (cp_cmd) */
-}
-
-/*
- * ap_alloc() -
- * Allocate an autopush structure.
- */
-static struct autopush *
-ap_alloc(void)
-{
-	struct autopush *ap;
-
-	ASSERT(MUTEX_HELD(&sad_lock));
-	if (strpfreep == NULL)
-		return (NULL);
-	ap = strpfreep;
-	if (ap->ap_flags != APFREE)
-		cmn_err(CE_PANIC, "ap_alloc: autopush struct not free: %d",
-		    ap->ap_flags);
-	strpfreep = strpfreep->ap_nextp;
-	ap->ap_nextp = NULL;
-	ap->ap_flags = APUSED;
-	return (ap);
-}
-
-/*
- * ap_free() -
- * Give an autopush structure back to the freelist.
- */
-void
-ap_free(struct autopush *ap)
-{
-	ASSERT(MUTEX_HELD(&sad_lock));
-	if (!(ap->ap_flags & APUSED))
-		cmn_err(CE_PANIC, "ap_free: autopush struct not used: %d",
-		    ap->ap_flags);
-	if (ap->ap_flags & APHASH)
-		cmn_err(CE_PANIC, "ap_free: autopush struct not hashed: %d",
-		    ap->ap_flags);
-	ap->ap_flags = APFREE;
-	ap->ap_nextp = strpfreep;
-	strpfreep = ap;
-}
-
-/*
- * ap_hadd() -
- * Add an autopush structure to the hash list.
- */
-static void
-ap_hadd(struct autopush *ap)
-{
-	ASSERT(MUTEX_HELD(&sad_lock));
-	if (!(ap->ap_flags & APUSED))
-		cmn_err(CE_PANIC, "ap_hadd: autopush struct not used: %d",
-		    ap->ap_flags);
-	if (ap->ap_flags & APHASH)
-		cmn_err(CE_PANIC, "ap_hadd: autopush struct not hashed: %d",
-		    ap->ap_flags);
-	ap->ap_nextp = strphash(ap->ap_major);
-	strphash(ap->ap_major) = ap;
-	ap->ap_flags |= APHASH;
-}
-
-/*
- * ap_hrmv() -
- * Remove an autopush structure from the hash list.
- */
-static void
-ap_hrmv(struct autopush *ap)
-{
-	struct autopush *hap;
-	struct autopush *prevp = NULL;
-
-	ASSERT(MUTEX_HELD(&sad_lock));
-	if (!(ap->ap_flags & APUSED))
-		cmn_err(CE_PANIC, "ap_hrmv: autopush struct not used: %d",
-		    ap->ap_flags);
-	if (!(ap->ap_flags & APHASH))
-		cmn_err(CE_PANIC, "ap_hrmv: autopush struct not hashed: %d",
-		    ap->ap_flags);
-
-	hap = strphash(ap->ap_major);
-	while (hap) {
-		if (ap == hap) {
-			hap->ap_flags &= ~APHASH;
-			if (prevp)
-				prevp->ap_nextp = hap->ap_nextp;
-			else
-				strphash(ap->ap_major) = hap->ap_nextp;
-			return;
-		} /* if */
-		prevp = hap;
-		hap = hap->ap_nextp;
-	} /* while */
-}
-
-/*
- * ap_hfind() -
- * Look for an autopush structure in the hash list
- * based on major, minor, lastminor, and command.
- */
-static struct autopush *
-ap_hfind(
-	major_t maj,	/* major device number */
-	minor_t minor,	/* minor device number */
-	minor_t last,	/* last minor device number (SAP_RANGE only) */
-	uint_t cmd)	/* who is asking */
-{
-	struct autopush *ap;
-
-	ASSERT(MUTEX_HELD(&sad_lock));
-	ap = strphash(maj);
-	while (ap) {
-		if (ap->ap_major == maj) {
-			if (cmd == SAP_ALL)
-				break;
-			switch (ap->ap_type) {
-			case SAP_ALL:
-				break;
-
-			case SAP_ONE:
-				if (ap->ap_minor == minor)
-					break;
-				if ((cmd == SAP_RANGE) &&
-				    (ap->ap_minor >= minor) &&
-				    (ap->ap_minor <= last))
-					break;
-				ap = ap->ap_nextp;
-				continue;
-
-			case SAP_RANGE:
-				if ((cmd == SAP_RANGE) &&
-				    (((minor >= ap->ap_minor) &&
-				    (minor <= ap->ap_lastminor)) ||
-				    ((ap->ap_minor >= minor) &&
-				    (ap->ap_minor <= last))))
-					break;
-				if ((minor >= ap->ap_minor) &&
-				    (minor <= ap->ap_lastminor))
-					break;
-				ap = ap->ap_nextp;
-				continue;
-
-			default:
-				ASSERT(0);
-				break;
-			}
-			break;
-		}
-		ap = ap->ap_nextp;
-	}
-	return (ap);
 }
 
 /*

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1989-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,30 +32,255 @@
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/stream.h>
+#include <sys/strsubr.h>
 #include <sys/sad.h>
 #include <sys/kmem.h>
+#include <sys/sysmacros.h>
 
-#ifndef	NSAD
-#define	NSAD	16
-#endif
-
-struct saddev *saddev;			/* sad device array */
-int	sadcnt = NSAD;			/* number of sad devices */
+struct saddev		*saddev;	/* sad device array */
+int			sadcnt = 16;	/* number of sad devices */
 
 /*
- * Auto-push structures.
+ * Currently we store all the sad data in a hash table keyed by major
+ * number.  This is far from ideal.  It means that if a single device
+ * starts using lots of SAP_ONE entries all its entries will hash
+ * to the same bucket and we'll get very long chains for that bucket.
+ *
+ * Unfortunately, it's not possible to hash by a different key or to easily
+ * break up our one hash into seperate hashs.  The reason is because
+ * the hash contains mixed data types.  Ie, it has three different
+ * types of autopush nodes in it:  SAP_ALL, SAP_RANGE, SAP_ONE.  Not
+ * only does the hash table contain nodes of different types, but we
+ * have to be able to search the table with a node of one type that
+ * might match another node with a different type.  (ie, we might search
+ * for a SAP_ONE node with a value that matches a SAP_ALL node in the
+ * hash, or vice versa.)
+ *
+ * An ideal solution would probably be an AVL tree sorted by major
+ * numbers.  Each node in the AVL tree would have the following optional
+ * data associated with it:
+ *	- a single SAP_ALL autopush node
+ *	- an or avl tree or hash table of SAP_RANGE and SAP_ONE autopush
+ *	  nodes indexed by minor numbers.  perhaps two separate tables,
+ *	  one for each type of autopush nodes.
+ *
+ * Note that regardless of how the data is stored there can't be any overlap
+ * stored between autopush nodes.  For example, if there is a SAP_ALL node
+ * for a given major number then there can't be any SAP_RANGE or SAP_ONE
+ * nodes for that same major number.
  */
-#ifndef NAUTOPUSH
-#define	NAUTOPUSH	32
-#endif
-struct autopush *autopush;
-int	nautopush = NAUTOPUSH;
+kmutex_t		sad_lock;		/* protects sad_hash */
+static mod_hash_t	*sad_hash;
+static size_t		sad_hash_nchains = 127;
+
+/*
+ * Private Internal Interfaces
+ */
+/*ARGSUSED*/
+static uint_t
+sad_hash_alg(void *hash_data, mod_hash_key_t key)
+{
+	struct apcommon *apc = (struct apcommon *)key;
+
+	ASSERT(sad_apc_verify(apc) == 0);
+	return (apc->apc_major);
+}
+
+/*
+ * Compare hash keys based off of major, minor, lastminor, and type.
+ */
+static int
+sad_hash_keycmp(mod_hash_key_t key1, mod_hash_key_t key2)
+{
+	struct apcommon *apc1 = (struct apcommon *)key1;
+	struct apcommon *apc2 = (struct apcommon *)key2;
+
+	ASSERT(sad_apc_verify(apc1) == 0);
+	ASSERT(sad_apc_verify(apc2) == 0);
+
+	/* Filter out cases where the major number doesn't match. */
+	if (apc1->apc_major != apc2->apc_major)
+		return (1);
+
+	/* If either type is SAP_ALL then we're done. */
+	if ((apc1->apc_cmd == SAP_ALL) || (apc2->apc_cmd == SAP_ALL))
+		return (0);
+
+	/* Deal with the case where both types are SAP_ONE. */
+	if ((apc1->apc_cmd == SAP_ONE) && (apc2->apc_cmd == SAP_ONE)) {
+		/* Check if the minor numbers match. */
+		return (apc1->apc_minor != apc2->apc_minor);
+	}
+
+	/* Deal with the case where both types are SAP_RANGE. */
+	if ((apc1->apc_cmd == SAP_RANGE) && (apc2->apc_cmd == SAP_RANGE)) {
+		/* Check for overlapping ranges. */
+		if ((apc1->apc_lastminor < apc2->apc_minor) ||
+		    (apc1->apc_minor > apc2->apc_lastminor))
+			return (1);
+		return (0);
+	}
+
+	/*
+	 * We know that one type is SAP_ONE and the other is SAP_RANGE.
+	 * So now let's do range matching.
+	 */
+	if (apc1->apc_cmd == SAP_RANGE) {
+		ASSERT(apc2->apc_cmd == SAP_ONE);
+		if ((apc1->apc_lastminor < apc2->apc_minor) ||
+		    (apc1->apc_minor > apc2->apc_minor))
+			return (1);
+	} else {
+		ASSERT(apc1->apc_cmd == SAP_ONE);
+		ASSERT(apc2->apc_cmd == SAP_RANGE);
+		if ((apc1->apc_minor < apc2->apc_minor) ||
+		    (apc1->apc_minor > apc2->apc_lastminor))
+			return (1);
+	}
+	return (0);
+}
+
+/*
+ * External Interfaces
+ */
+int
+sad_apc_verify(struct apcommon *apc)
+{
+	/* sanity check the number of modules to push */
+	if ((apc->apc_npush == 0) || (apc->apc_npush > MAXAPUSH) ||
+	    (apc->apc_npush > nstrpush))
+		return (EINVAL);
+
+	/* Check for NODEV major vaule */
+	if (apc->apc_major == -1)
+		return (EINVAL);
+
+	switch (apc->apc_cmd) {
+	case SAP_ALL:
+	case SAP_ONE:
+		/* lastminor should not have been specified */
+		if (apc->apc_lastminor != 0)
+			return (EINVAL);
+		break;
+	case SAP_RANGE:
+		if (apc->apc_lastminor <= apc->apc_minor)
+			return (ERANGE);
+		break;
+	default:
+		return (EINVAL);
+	}
+	return (0);
+}
+
+int
+sad_ap_verify(struct autopush *ap)
+{
+	int ret, i;
+
+	if ((ret = sad_apc_verify(&ap->ap_common)) != 0)
+		return (ret);
+
+	/*
+	 * Validate that the specified list of modules exist.  Note that
+	 * ap_npush has already been sanity checked by sad_apc_verify().
+	 */
+	for (i = 0; i < ap->ap_npush; i++) {
+		ap->ap_list[i][FMNAMESZ] = '\0';
+		if (fmodsw_find(ap->ap_list[i], FMODSW_LOAD) == NULL)
+			return (EINVAL);
+	}
+	return (0);
+}
+
+struct autopush *
+sad_ap_alloc(void)
+{
+	struct autopush *ap_new;
+
+	ap_new = kmem_zalloc(sizeof (struct autopush), KM_SLEEP);
+	ap_new->ap_cnt = 1;
+	return (ap_new);
+}
+
+void
+sad_ap_rele(struct autopush *ap)
+{
+	mutex_enter(&sad_lock);
+	ASSERT(ap->ap_cnt > 0);
+	if (--(ap->ap_cnt) == 0) {
+		mutex_exit(&sad_lock);
+		kmem_free(ap, sizeof (struct autopush));
+	} else {
+		mutex_exit(&sad_lock);
+	}
+}
+
+void
+sad_ap_insert(struct autopush *ap)
+{
+	ASSERT(MUTEX_HELD(&sad_lock));
+	ASSERT(sad_apc_verify(&ap->ap_common) == 0);
+	ASSERT(sad_ap_find(&ap->ap_common) == NULL);
+	(void) mod_hash_insert(sad_hash, &ap->ap_common, ap);
+}
+
+void
+sad_ap_remove(struct autopush *ap)
+{
+	struct autopush	*ap_removed = NULL;
+
+	ASSERT(MUTEX_HELD(&sad_lock));
+	(void) mod_hash_remove(sad_hash, &ap->ap_common,
+	    (mod_hash_val_t *)&ap_removed);
+	ASSERT(ap == ap_removed);
+}
+
+struct autopush *
+sad_ap_find(struct apcommon *apc)
+{
+	struct autopush	*ap_result = NULL;
+
+	ASSERT(MUTEX_HELD(&sad_lock));
+	ASSERT(sad_apc_verify(apc) == 0);
+
+	(void) mod_hash_find(sad_hash, apc, (mod_hash_val_t *)&ap_result);
+	if (ap_result != NULL)
+		ap_result->ap_cnt++;
+	return (ap_result);
+}
+
+struct autopush *
+sad_ap_find_by_dev(dev_t dev)
+{
+	struct apcommon	apc;
+	struct autopush	*ap_result;
+
+	ASSERT(MUTEX_NOT_HELD(&sad_lock));
+
+	/* prepare an apcommon structure to search with */
+	apc.apc_cmd = SAP_ONE;
+	apc.apc_major = getmajor(dev);
+	apc.apc_minor = getminor(dev);
+
+	/*
+	 * the following values must be set but initialized to have a
+	 * valid apcommon struct, but since we're only using this
+	 * structure to do a query the values are never actually used.
+	 */
+	apc.apc_npush = 1;
+	apc.apc_lastminor = 0;
+
+	mutex_enter(&sad_lock);
+	ap_result = sad_ap_find(&apc);
+	mutex_exit(&sad_lock);
+	return (ap_result);
+}
 
 void
 sad_initspace(void)
 {
 	saddev = kmem_zalloc(sadcnt * sizeof (struct saddev), KM_SLEEP);
-	autopush = kmem_zalloc(nautopush * sizeof (struct autopush), KM_SLEEP);
-	strpcache = kmem_zalloc((strpmask + 1) * sizeof (struct autopush),
-	    KM_SLEEP);
+	sad_hash = mod_hash_create_extended("sad_hash",
+	    sad_hash_nchains, mod_hash_null_keydtor, mod_hash_null_valdtor,
+	    sad_hash_alg, NULL, sad_hash_keycmp, KM_SLEEP);
 }
