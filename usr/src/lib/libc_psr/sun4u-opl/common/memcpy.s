@@ -64,7 +64,7 @@
 #define	BST_THRESHOLD			65536
 
 #define	SHORTCOPY	3
-#define	SMALL_MAX	39
+#define	SMALL_MAX	64
 #define	MEDIUM_MAX	255
 #define	MED_WMAX	256	/* max copy for medium word-aligned case */
 
@@ -469,7 +469,7 @@
 	andcc	%o1, 0x7, %g0		! test word alignment
 	prefetch [%o1 + (2 * BLOCK_SIZE)], #one_read
 	bz,pt	%ncc, .medlword		! branch to long word aligned case
-	prefetch [%o1 + (2 * BLOCK_SIZE)], #one_write
+	prefetch [%o0 + (2 * BLOCK_SIZE)], #one_write
 	cmp	%o2, ALIGNED4_FPCOPY_THRESHOLD	! limit to store buffer size
 	bgu,pt	%ncc, .mediumrejoin	! otherwise rejoin main loop
 	prefetch [%o1 + (3 * BLOCK_SIZE)], #one_read
