@@ -484,8 +484,8 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 {
 	dl_bind_req_t	*dlp = (dl_bind_req_t *)udlp;
 	int		err = 0;
-	uint8_t		addr[MAXMACADDRLEN];
-	uint_t		addr_length;
+	uint8_t		dlsap_addr[MAXMACADDRLEN + sizeof (uint16_t)];
+	uint_t		dlsap_addr_length;
 	t_uscalar_t	dl_err;
 	t_scalar_t	sap;
 	queue_t		*q = dsp->ds_wq;
@@ -551,14 +551,14 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	/*
 	 * Copy in MAC address.
 	 */
-	addr_length = dsp->ds_mip->mi_addr_length;
-	bcopy(dsp->ds_curr_addr, addr, addr_length);
+	dlsap_addr_length = dsp->ds_mip->mi_addr_length;
+	bcopy(dsp->ds_curr_addr, dlsap_addr, dlsap_addr_length);
 
 	/*
-	 * Copy in the DLSAP.
+	 * Copy in the SAP.
 	 */
-	*(uint16_t *)(addr + addr_length) = dsp->ds_sap;
-	addr_length += sizeof (uint16_t);
+	*(uint16_t *)(dlsap_addr + dlsap_addr_length) = dsp->ds_sap;
+	dlsap_addr_length += sizeof (uint16_t);
 
 	dsp->ds_dlstate = DL_IDLE;
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
@@ -566,7 +566,7 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 
 	rw_exit(&dsp->ds_lock);
 
-	dlbindack(q, mp, sap, (void *)addr, addr_length, 0, 0);
+	dlbindack(q, mp, sap, dlsap_addr, dlsap_addr_length, 0, 0);
 	return (B_TRUE);
 failed:
 	rw_exit(&dsp->ds_lock);

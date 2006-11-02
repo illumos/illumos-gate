@@ -122,9 +122,12 @@ i_dls_link_destructor(void *buf, void *arg)
  * - Parse the mac header information of the given packet.
  * - Strip the padding and skip over the header. Note that because some
  *   DLS consumers only check the db_ref count of the first mblk, we
- *   pullup the message into a single mblk. The dls_link_header_info()
- *   function ensures that the size of the pulled message is greater
- *   than the MAC header size.
+ *   pullup the message into a single mblk. Because the original message
+ *   is freed as the result of message pulling up, dls_link_header_info()
+ *   is called again to update the mhi_saddr and mhi_daddr pointers in the
+ *   mhip. Further, the dls_link_header_info() function ensures that the
+ *   size of the pulled message is greater than the MAC header size,
+ *   therefore we can directly advance b_rptr to point at the payload.
  *
  * We choose to use a macro for performance reasons.
  */
@@ -137,8 +140,11 @@ i_dls_link_destructor(void *buf, void *arg)
 			if ((newmp = msgpullup((mp), -1)) == NULL) {	\
 				(err) = EINVAL;				\
 			} else {					\
+				(mp)->b_next = NULL;			\
 				freemsg((mp));				\
 				(mp) = newmp;				\
+				VERIFY(dls_link_header_info((dlp),	\
+				    (mp), (mhip)) == 0);		\
 				(mp)->b_next = nextp;			\
 				(mp)->b_rptr += (mhip)->mhi_hdrsize;	\
 			}						\
@@ -360,6 +366,7 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 		if (err != 0) {
 			atomic_add_32(&(dlp->dl_unknowns), 1);
 			nextp = mp->b_next;
+			mp->b_next = NULL;
 			freemsg(mp);
 			continue;
 		}
@@ -554,6 +561,7 @@ i_dls_link_rx_common(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 			if (acceptfunc == dls_accept)
 				atomic_add_32(&(dlp->dl_unknowns), 1);
 			nextp = mp->b_next;
+			mp->b_next = NULL;
 			freemsg(mp);
 			continue;
 		}
