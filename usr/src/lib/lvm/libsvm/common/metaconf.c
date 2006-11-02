@@ -93,6 +93,9 @@ write_targ_nm_table(char *path)
 
 	while (fgets(buf, PATH_MAX, targfp) != NULL &&
 				(retval == RET_SUCCESS)) {
+		/* remove a new-line character for md_targ_nm_table */
+		if ((cp = strchr(buf, '\n')) != NULL)
+			*cp = 0;
 		/* cut off comments starting with '#' */
 		if ((cp = strchr(buf, '#')) != NULL)
 			*cp = 0;
@@ -103,9 +106,10 @@ write_targ_nm_table(char *path)
 			if (fprintf(mdfp, "md_targ_nm_table=\"%s\"", buf) < 0)
 				retval = RET_ERROR;
 			first_entry = 0;
+		} else {
+			if (fprintf(mdfp, ",\"%s\"", buf) < 0)
+					retval = RET_ERROR;
 		}
-		if (fprintf(mdfp, ",\"%s\"", buf) < 0)
-				retval = RET_ERROR;
 	}
 	if (!first_entry)
 		if (fprintf(mdfp, ";\n") < 0)

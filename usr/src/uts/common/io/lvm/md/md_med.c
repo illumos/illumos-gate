@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,6 +254,7 @@ struct med_client {
 #define	UAFLG_ERROR		0x00000002
 #define	UAFLG_RPCERROR		0x00000004
 #define	UAFLG_LOOPBACK		0x00000008
+#define	UAFLG_LOCKINIT		0x00000010
 
 /*
  * most of this data is static.  The mutex protects the changable items:
@@ -1535,6 +1535,7 @@ med_init(void)
 		}
 
 		mutex_init(&uap->ua_mutex, NULL, MUTEX_DEFAULT, NULL);
+		uap->ua_flags |= UAFLG_LOCKINIT;
 		bzero((caddr_t)&uap->ua_kn.knc_unused,
 		    sizeof (uap->ua_kn.knc_unused));
 	}
@@ -1555,8 +1556,10 @@ med_fini(void)
 	for (uapi = 0; uapi < med_addr_tab_nents; uapi++) {
 		struct med_addr *uap = &med_addr_tab[uapi];
 
-		if (! (uap->ua_flags & UAFLG_SKIP))
+		if (uap->ua_flags & UAFLG_LOCKINIT) {
 			mutex_destroy(&uap->ua_mutex);
+			uap->ua_flags &= ~UAFLG_LOCKINIT;
+		}
 	}
 
 	TRIVIA(("]\n"));

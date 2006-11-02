@@ -174,8 +174,8 @@ md_set_io_t	md_set_io[MD_MAXSETS];
 
 md_krwlock_t	hsp_rwlp;		/* protects hot_spare_interface */
 md_krwlock_t	ni_rwlp;		/* protects notify_interface */
-md_ops_t	**md_ops;
-ddi_modhandle_t	*md_mods;
+md_ops_t	**md_ops = NULL;
+ddi_modhandle_t	*md_mods = NULL;
 md_ops_t	*md_opslist;
 clock_t		md_hz;
 md_event_queue_t	*md_event_queue = NULL;
@@ -460,6 +460,18 @@ mdattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 	}
 
+	/*
+	 * Must initialize the internal data structures before the
+	 * any possible calls to 'goto attach_failure' as _fini
+	 * routine references them.
+	 */
+	med_init();
+
+	md_ops = (md_ops_t **)kmem_zalloc(
+	    sizeof (md_ops_t *) * MD_NOPS, KM_SLEEP);
+	md_mods = (ddi_modhandle_t *)kmem_zalloc(
+	    sizeof (ddi_modhandle_t) * MD_NOPS, KM_SLEEP);
+
 	/* try and get the md_xlate property */
 	/* Should we only do this if upgrade? */
 	len = sizeof (char) * 5;
@@ -541,12 +553,6 @@ mdattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	else
 		md_major_targ = 0;
 
-	/* alloc md_ops and md_mods struct */
-	md_ops = (md_ops_t **)kmem_zalloc(
-	    sizeof (md_ops_t *) * MD_NOPS, KM_SLEEP);
-	md_mods = (ddi_modhandle_t *)kmem_zalloc(
-	    sizeof (ddi_modhandle_t) * MD_NOPS, KM_SLEEP);
-
 	/* allocate admin device node */
 	if (ddi_create_priv_minor_node(dip, "admin", S_IFCHR,
 	    MD_ADM_MINOR, DDI_PSEUDO, 0, NULL, PRIV_SYS_CONFIG, 0640))
@@ -611,8 +617,6 @@ mdattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			goto attach_failure;
 		}
 	}
-
-	med_init();
 
 	MD_CLR_IN(IN_ATTACH);
 	return (DDI_SUCCESS);
