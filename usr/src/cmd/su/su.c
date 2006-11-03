@@ -831,7 +831,7 @@ audit_success(int pw_change, struct passwd *pwd)
 	 * but, let's not make a new process when it's not necessary.
 	 */
 	if (adt_audit_enabled()) {
-		audit_logout(ah, event_id);
+		audit_logout(ah, event_id);	/* fork to catch logout */
 	}
 	(void) adt_end_session(ah);
 }
@@ -854,62 +854,76 @@ audit_logout(adt_session_data_t *ah, au_event_t event_id)
 	pid_t			pid;
 	priv_set_t		*priv;		/* waiting process privs */
 
-	if ((pid = fork()) == 0) {
-		return;
-	} else if (pid == -1) {
-		syslog(LOG_AUTH | LOG_ALERT, "su: could not fork: %m");
-		return;
+	if (event_id == ADT_su) {
+		event_id = ADT_su_logout;
 	} else {
-		/*
-		 * When this routine is called, the current working
-		 * directory is the unknown. Change it to root for the
-		 * waiting process so that the current directory can be
-		 * unmounted if necessary.
-		 */
-		if (chdir("/") != 0) {
-			syslog(LOG_AUTH | LOG_ALERT,
-			    "su waitron: could not chdir: %m");
-			/* since we let the child finish we just bail */
-			exit(0);
-		}
-		/*
-		 * Reduce privileges to just those needed.
-		 */
-		if ((priv = priv_allocset())  == NULL) {
-			syslog(LOG_AUTH | LOG_ALERT,
-			    "su waitron: could not reduce privs: %m");
-			/* since we let the child finish we just bail */
-			exit(0);
-		}
-		priv_emptyset(priv);
-		if ((priv_addset(priv, PRIV_PROC_AUDIT) != 0) ||
-		    (setppriv(PRIV_SET, PRIV_PERMITTED, priv) != 0)) {
-			syslog(LOG_AUTH | LOG_ALERT,
-			    "su waitron: could not reduce privs: %m");
-			/* since we let the child finish we just bail */
-			priv_freeset(priv);
-			exit(0);
-		}
-		priv_freeset(priv);
-		while (pid != waitpid(pid, &status, 0))
-			continue;
-
-		if (event_id == ADT_su) {
-			event_id = ADT_su_logout;
-		} else {
-			event_id = ADT_role_logout;
-		}
-		if ((event = adt_alloc_event(ah, event_id)) == NULL) {
-			syslog(LOG_AUTH | LOG_ALERT,
-			    "adt_alloc_event(ADT_su_logout): %m");
-			exit(0);
-		}
-
-		(void) adt_put_event(event, ADT_SUCCESS, ADT_SUCCESS);
-		adt_free_event(event);
-		(void) adt_end_session(ah);
-		exit(0);
+		event_id = ADT_role_logout;
 	}
+	if ((event = adt_alloc_event(ah, event_id)) == NULL) {
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "adt_alloc_event(ADT_su_logout): %m");
+		return;
+	}
+	if ((priv = priv_allocset())  == NULL) {
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "su audit_logout: could not alloc privs: %m");
+		adt_free_event(event);
+		return;
+	}
+
+	/*
+	 * The child returns and continues su processing.
+	 * The parent's sole job is to wait for child exit, write the
+	 * logout audit record, and replay the child's exit code.
+	 */
+	if ((pid = fork()) == 0) {
+		/* child */
+
+		adt_free_event(event);
+		priv_freeset(priv);
+		return;
+	}
+	if (pid == -1) {
+		/* failure */
+
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "su audit_logout: could not fork: %m");
+		adt_free_event(event);
+		priv_freeset(priv);
+		return;
+	}
+
+	/* parent process */
+
+	/*
+	 * When this routine is called, the current working
+	 * directory is the unknown and there are unknown open
+	 * files. For the waiting process, change the current
+	 * directory to root and close open files so that
+	 * directories can be unmounted if necessary.
+	 */
+	if (chdir("/") != 0) {
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "su audit_logout: could not chdir /: %m");
+	}
+	/*
+	 * Reduce privileges to just those needed.
+	 */
+	priv_emptyset(priv);
+	if ((priv_addset(priv, PRIV_PROC_AUDIT) != 0) ||
+	    (setppriv(PRIV_SET, PRIV_PERMITTED, priv) != 0)) {
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "su audit_logout: could not reduce privs: %m");
+	}
+	closefrom(0);
+	priv_freeset(priv);
+	while (pid != waitpid(pid, &status, 0))
+		continue;
+
+	(void) adt_put_event(event, ADT_SUCCESS, ADT_SUCCESS);
+	adt_free_event(event);
+	(void) adt_end_session(ah);
+	exit(WEXITSTATUS(status));
 }
 
 
@@ -985,11 +999,11 @@ audit_failure(int pw_change, struct passwd *pwd, char *user, int pamerr)
 		adt_free_event(event);
 		if ((event = adt_alloc_event(ah, ADT_passwd)) == NULL) {
 			syslog(LOG_AUTH | LOG_ALERT,
-			    "adt_alloc_event(ADT_passwd): %m");
+			    "su: adt_alloc_event(ADT_passwd): %m");
 		} else if (adt_put_event(event, ADT_FAILURE,
 		    ADT_FAIL_PAM + pamerr) != 0) {
 			syslog(LOG_AUTH | LOG_ALERT,
-			    "adt_put_event(ADT_passwd, ADT_FAILURE): %m");
+			    "su: adt_put_event(ADT_passwd, ADT_FAILURE): %m");
 		}
 	}
 	adt_free_event(event);
