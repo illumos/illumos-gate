@@ -13871,17 +13871,19 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 			    IRE_INTERFACE, NULL, NULL, ALL_ZONES,
 			    0, NULL, MATCH_IRE_TYPE);
 
-			if (nhop_ire != NULL &&
-			    (src & nhop_ire->ire_mask) ==
-			    (nhop & nhop_ire->ire_mask)) {
-				/*
-				 * The source is directly connected.
-				 * Just copy the ip header (which is
-				 * in the first mblk)
-				 */
-				mp1 = copyb(mp);
-				if (mp1 != NULL) {
-					icmp_send_redirect(WR(q), mp1, nhop);
+			if (nhop_ire != NULL) {
+				if ((src & nhop_ire->ire_mask) ==
+				    (nhop & nhop_ire->ire_mask)) {
+					/*
+					 * The source is directly connected.
+					 * Just copy the ip header (which is
+					 * in the first mblk)
+					 */
+					mp1 = copyb(mp);
+					if (mp1 != NULL) {
+						icmp_send_redirect(WR(q), mp1,
+						    nhop);
+					}
 				}
 				ire_refrele(nhop_ire);
 			}
