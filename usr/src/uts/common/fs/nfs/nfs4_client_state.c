@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2042,6 +2041,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 	hrtime_t		t;
 	char 			*failed_msg = "";
 	int			fh_different;
+	int			reopen = 0;
 
 	nfs4_error_zinit(ep);
 
@@ -2075,7 +2075,8 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 			return;
 		}
 		mutex_exit(&drp->r_statelock);
-	}
+	} else
+		reopen = 1;	/* NULL dvp means this is a reopen */
 
 	claim = resend_rqstp->lr_oclaim;
 	ASSERT(claim == CLAIM_NULL || claim == CLAIM_DELEGATE_CUR);
@@ -2085,7 +2086,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 	args.array = argop;
 
 	argop[0].argop = OP_CPUTFH;
-	if (claim == CLAIM_DELEGATE_CUR) {
+	if (reopen) {
 		ASSERT(vp != NULL);
 
 		mi = VTOMI4(vp);
@@ -2223,7 +2224,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 		rp = VTOR4(vp);
 	}
 
-	if (claim == CLAIM_DELEGATE_CUR) {
+	if (reopen) {
 		/*
 		 * Check if the path we reopened really is the same
 		 * file. We could end up in a situation were the file
@@ -2325,7 +2326,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 		return;
 	}
 
-	if (claim == CLAIM_DELEGATE_CUR) {
+	if (reopen) {
 		/*
 		 * Doing a reopen here so the osp should already exist.
 		 * If not, something changed or went very wrong.
@@ -2366,7 +2367,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 	osp->os_final_close = 0;
 	osp->os_force_close = 0;
 
-	if (claim != CLAIM_DELEGATE_CUR) {
+	if (!reopen) {
 		if (open_args->share_access & OPEN4_SHARE_ACCESS_READ)
 			osp->os_share_acc_read++;
 		if (open_args->share_access & OPEN4_SHARE_ACCESS_WRITE)
