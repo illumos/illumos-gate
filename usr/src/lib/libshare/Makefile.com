@@ -50,7 +50,8 @@ ROOTHDRS= $(HDRS:%=$(ROOTDIRS)/%)
 CHECKHDRS= $(HDRS:%.h=%.check)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lnsl -lscf -lxml2 -lzfs -luuid -lfsmgt
+LDLIBS +=	-lc -lnsl -lscf -lzfs -luuid -lfsmgt
+all install := LDLIBS += -lxml2
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 SRCDIR =	../common

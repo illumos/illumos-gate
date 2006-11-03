@@ -64,7 +64,8 @@ MYCPPFLAGS = -I$(SRC)/lib/libshare/common -I$(SRC)/lib/libfsmgt/common \
 		-I/usr/include/libxml2 -I.. -I../.. \
 		-I../../../../fs.d/nfs/lib
 CPPFLAGS += $(MYCPPFLAGS)
-LDLIBS += -lshare -lxml2 -lnsl -lscf -lumem -lc
+LDLIBS += -lshare -lnsl -lscf -lumem -lc
+all install := LDLIBS += -lxml2
 LDFLAGS += -zdefs -zcombreloc
 CFLAGS += -Kpic
 

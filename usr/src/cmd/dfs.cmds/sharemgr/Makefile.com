@@ -48,7 +48,8 @@ ROOTLINKS = $(ROOTUSRSBIN)/share $(ROOTUSRSBIN)/unshare
 MYCPPFLAGS = -I../../../../lib/libfsmgt/common -I/usr/include/libxml2 \
 		-I../..
 CPPFLAGS += $(MYCPPFLAGS)
-LDLIBS += -lshare -lxml2 -lscf -lsecdb -lumem
+LDLIBS += -lshare -lscf -lsecdb -lumem
+all install := LDLIBS += -lxml2
 LINTFLAGS	+= -u
 
 SRCS = $(SHAREMGR_SRC)
