@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +41,6 @@
 #include <sys/debug.h>
 #include <sys/kmem.h>
 #include <sys/cmn_err.h>
-#include <sys/proc.h>
 #include <sys/suntpi.h>
 #include <sys/policy.h>
 
@@ -57,6 +55,8 @@
 #include <inet/ip6.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
+#include <inet/ip_if.h>
+#include <inet/tun.h>
 #include <inet/optcom.h>
 #include <inet/ipsec_info.h>
 #include <inet/ipsec_impl.h>
@@ -158,6 +158,8 @@ static void spdsock_wsrv(queue_t *);
 static void spdsock_rsrv(queue_t *);
 static void spdsock_loadcheck(void *);
 static void spdsock_merge_algs(void);
+static void spdsock_flush_one(ipsec_policy_head_t *);
+static mblk_t *spdsock_dump_next_record(spdsock_t *);
 
 static struct module_info info = {
 	5138, "spdsock", 1, INFPSZ, 512, 128
@@ -191,6 +193,9 @@ static const uint_t execmodes[] = {
 };
 
 #define	NEXECMODES	(sizeof (execmodes) / sizeof (execmodes[0]))
+
+#define	ALL_ACTIVE_POLHEADS ((ipsec_policy_head_t *)-1)
+#define	ALL_INACTIVE_POLHEADS ((ipsec_policy_head_t *)-2)
 
 /* ARGSUSED */
 static int
@@ -301,7 +306,33 @@ spdsock_ddi_destroy(void)
 static boolean_t
 ext_check(spd_ext_t *ext)
 {
+	spd_if_t *tunname = (spd_if_t *)ext;
+	int i;
+	char *idstr;
 
+	if (ext->spd_ext_type == SPD_EXT_TUN_NAME) {
+		/* (NOTE:  Modified from SADB_EXT_IDENTITY..) */
+
+		/*
+		 * Make sure the strings in these identities are
+		 * null-terminated.  Let's "proactively" null-terminate the
+		 * string at the last byte if it's not terminated sooner.
+		 */
+		i = SPD_64TO8(tunname->spd_if_len) - sizeof (spd_if_t);
+		idstr = (char *)(tunname + 1);
+		while (*idstr != '\0' && i > 0) {
+			i--;
+			idstr++;
+		}
+		if (i == 0) {
+			/*
+			 * I.e., if the bozo user didn't NULL-terminate the
+			 * string...
+			 */
+			idstr--;
+			*idstr = '\0';
+		}
+	}
 	return (B_TRUE);	/* For now... */
 }
 
@@ -454,14 +485,55 @@ spd_echo(queue_t *q, mblk_t *mp)
 	qreply(q, mp);
 }
 
-/* ARGSUSED */
+/*
+ * Do NOT consume a reference to itp.
+ */
 static void
-spdsock_flush(queue_t *q, ipsec_policy_head_t *iph,
-    mblk_t *mp, spd_ext_t **extv)
+spdsock_flush_node(ipsec_tun_pol_t *itp, void *cookie)
+{
+	boolean_t active = (boolean_t)cookie;
+	ipsec_policy_head_t *iph;
+
+	iph = active ? itp->itp_policy : itp->itp_inactive;
+	IPPH_REFHOLD(iph);
+	mutex_enter(&itp->itp_lock);
+	spdsock_flush_one(iph);
+	if (active)
+		itp->itp_flags &= ~ITPF_PFLAGS;
+	else
+		itp->itp_flags &= ~ITPF_IFLAGS;
+	mutex_exit(&itp->itp_lock);
+}
+
+/*
+ * Clear out one polhead.
+ */
+static void
+spdsock_flush_one(ipsec_policy_head_t *iph)
 {
 	rw_enter(&iph->iph_lock, RW_WRITER);
 	ipsec_polhead_flush(iph);
 	rw_exit(&iph->iph_lock);
+	IPPH_REFRELE(iph);
+}
+
+static void
+spdsock_flush(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp)
+{
+	boolean_t active;
+
+	if (iph != ALL_ACTIVE_POLHEADS && iph != ALL_INACTIVE_POLHEADS) {
+		spdsock_flush_one(iph);
+	} else {
+		active = (iph == ALL_ACTIVE_POLHEADS);
+
+		/* First flush the global policy. */
+		spdsock_flush_one(active ? ipsec_system_policy() :
+		    ipsec_inactive_policy());
+
+		/* Then flush every tunnel's appropriate one. */
+		itp_walk(spdsock_flush_node, (void *)active);
+	}
 
 	spd_echo(q, mp);
 }
@@ -592,8 +664,12 @@ spdsock_reset_act(ipsec_act_t *act)
  * Sanity check action against reality, and shrink-wrap key sizes..
  */
 static boolean_t
-spdsock_check_action(ipsec_act_t *act, int *diag)
+spdsock_check_action(ipsec_act_t *act, boolean_t tunnel_polhead, int *diag)
 {
+	if (tunnel_polhead && act->ipa_apply.ipp_use_unique) {
+		*diag = SPD_DIAGNOSTIC_ADD_INCON_FLAGS;
+		return (B_FALSE);
+	}
 	if ((act->ipa_type != IPSEC_ACT_APPLY) &&
 	    (act->ipa_apply.ipp_use_ah ||
 		act->ipa_apply.ipp_use_esp ||
@@ -625,6 +701,11 @@ spdsock_ext_to_actvec(spd_ext_t **extv, ipsec_act_t **actpp, uint_t *nactp,
 	struct spd_attribute *attrp, *endattrp;
 	uint64_t *endp;
 	int nact;
+	boolean_t tunnel_polhead;
+
+	tunnel_polhead = (extv[SPD_EXT_TUN_NAME] != NULL &&
+	    (((struct spd_rule *)extv[SPD_EXT_RULE])->spd_rule_flags &
+		SPD_RULE_FLAG_TUNNEL));
 
 	*actpp = NULL;
 	*nactp = 0;
@@ -673,9 +754,10 @@ spdsock_ext_to_actvec(spd_ext_t **extv, ipsec_act_t **actpp, uint_t *nactp,
 				*diag = SPD_DIAGNOSTIC_ADD_WRONG_ACT_COUNT;
 				goto fail;
 			}
-			if (!spdsock_check_action(&act, diag))
+			if (!spdsock_check_action(&act, tunnel_polhead, diag))
 				goto fail;
 			*actp++ = act;
+			spdsock_reset_act(&act);
 			break;
 
 		case SPD_ATTR_TYPE:
@@ -686,6 +768,13 @@ spdsock_ext_to_actvec(spd_ext_t **extv, ipsec_act_t **actpp, uint_t *nactp,
 			break;
 
 		case SPD_ATTR_FLAGS:
+			if (!tunnel_polhead && extv[SPD_EXT_TUN_NAME] != NULL) {
+				/*
+				 * Set "sa unique" for transport-mode
+				 * tunnels whether we want to or not.
+				 */
+				attrp->spd_attr_value |= SPD_APPLY_UNIQUE;
+			}
 			if (!spd_convert_flags(attrp->spd_attr_value, &act)) {
 				*diag = SPD_DIAGNOSTIC_ADD_BAD_FLAGS;
 				goto fail;
@@ -693,14 +782,26 @@ spdsock_ext_to_actvec(spd_ext_t **extv, ipsec_act_t **actpp, uint_t *nactp,
 			break;
 
 		case SPD_ATTR_AH_AUTH:
+			if (attrp->spd_attr_value == 0) {
+				*diag = SPD_DIAGNOSTIC_UNSUPP_AH_ALG;
+				goto fail;
+			}
 			act.ipa_apply.ipp_auth_alg = attrp->spd_attr_value;
 			break;
 
 		case SPD_ATTR_ESP_ENCR:
+			if (attrp->spd_attr_value == 0) {
+				*diag = SPD_DIAGNOSTIC_UNSUPP_ESP_ENCR_ALG;
+				goto fail;
+			}
 			act.ipa_apply.ipp_encr_alg = attrp->spd_attr_value;
 			break;
 
 		case SPD_ATTR_ESP_AUTH:
+			if (attrp->spd_attr_value == 0) {
+				*diag = SPD_DIAGNOSTIC_UNSUPP_ESP_AUTH_ALG;
+				goto fail;
+			}
 			act.ipa_apply.ipp_esp_auth_alg = attrp->spd_attr_value;
 			break;
 
@@ -768,14 +869,15 @@ typedef struct
 static int
 mkrule(ipsec_policy_head_t *iph, struct spd_rule *rule,
     ipsec_selkey_t *sel, ipsec_act_t *actp, int nact, uint_t dir, uint_t af,
-    tmprule_t **rp)
+    tmprule_t **rp, uint64_t *index)
 {
 	ipsec_policy_t *pol;
 
 	sel->ipsl_valid &= ~(IPSL_IPV6|IPSL_IPV4);
 	sel->ipsl_valid |= af;
 
-	pol = ipsec_policy_create(sel, actp, nact, rule->spd_rule_priority);
+	pol = ipsec_policy_create(sel, actp, nact, rule->spd_rule_priority,
+	    index);
 	if (pol == NULL)
 		return (ENOMEM);
 
@@ -793,17 +895,19 @@ mkrule(ipsec_policy_head_t *iph, struct spd_rule *rule,
 static int
 mkrulepair(ipsec_policy_head_t *iph, struct spd_rule *rule,
     ipsec_selkey_t *sel, ipsec_act_t *actp, int nact, uint_t dir, uint_t afs,
-    tmprule_t **rp)
+    tmprule_t **rp, uint64_t *index)
 {
 	int error;
 
 	if (afs & IPSL_IPV4) {
-		error = mkrule(iph, rule, sel, actp, nact, dir, IPSL_IPV4, rp);
+		error = mkrule(iph, rule, sel, actp, nact, dir, IPSL_IPV4, rp,
+		    index);
 		if (error != 0)
 			return (error);
 	}
 	if (afs & IPSL_IPV6) {
-		error = mkrule(iph, rule, sel, actp, nact, dir, IPSL_IPV6, rp);
+		error = mkrule(iph, rule, sel, actp, nact, dir, IPSL_IPV6, rp,
+		    index);
 		if (error != 0)
 			return (error);
 	}
@@ -812,34 +916,85 @@ mkrulepair(ipsec_policy_head_t *iph, struct spd_rule *rule,
 
 
 static void
-spdsock_addrule(queue_t *q, ipsec_policy_head_t *iph,
-    mblk_t *mp, spd_ext_t **extv)
+spdsock_addrule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
+    spd_ext_t **extv, ipsec_tun_pol_t *itp)
 {
 	ipsec_selkey_t sel;
 	ipsec_act_t *actp;
 	uint_t nact;
-	int diag, error, afs;
+	int diag = 0, error, afs;
 	struct spd_rule *rule = (struct spd_rule *)extv[SPD_EXT_RULE];
 	tmprule_t rules[4], *rulep = &rules[0];
+	boolean_t tunnel_mode, empty_itp, active;
+	uint64_t *index = (itp == NULL) ? NULL : &itp->itp_next_policy_index;
 
 	if (rule == NULL) {
 		spdsock_diag(q, mp, SPD_DIAGNOSTIC_NO_RULE_EXT);
 		return;
 	}
 
+	tunnel_mode = (rule->spd_rule_flags & SPD_RULE_FLAG_TUNNEL);
+
+	if (itp != NULL) {
+		mutex_enter(&itp->itp_lock);
+		ASSERT(itp->itp_policy == iph || itp->itp_inactive == iph);
+		active = (itp->itp_policy == iph);
+		if (ITP_P_ISACTIVE(itp, iph)) {
+			/* Check for mix-and-match of tunnel/transport. */
+			if ((tunnel_mode && !ITP_P_ISTUNNEL(itp, iph)) ||
+			    (!tunnel_mode && ITP_P_ISTUNNEL(itp, iph))) {
+				mutex_exit(&itp->itp_lock);
+				spdsock_error(q, mp, EBUSY, 0);
+				return;
+			}
+			empty_itp = B_FALSE;
+		} else {
+			empty_itp = B_TRUE;
+			itp->itp_flags = active ? ITPF_P_ACTIVE : ITPF_I_ACTIVE;
+			if (tunnel_mode)
+				itp->itp_flags |= active ? ITPF_P_TUNNEL :
+				    ITPF_I_TUNNEL;
+		}
+	} else {
+		empty_itp = B_FALSE;
+	}
+
 	if (rule->spd_rule_index != 0) {
-		spdsock_diag(q, mp, SPD_DIAGNOSTIC_INVALID_RULE_INDEX);
-		return;
+		diag = SPD_DIAGNOSTIC_INVALID_RULE_INDEX;
+		error = EINVAL;
+		goto fail2;
 	}
 
 	if (!spdsock_ext_to_sel(extv, &sel, &diag)) {
-		spdsock_diag(q, mp, diag);
-		return;
+		error = EINVAL;
+		goto fail2;
+	}
+
+	if (itp != NULL) {
+		if (tunnel_mode) {
+			if (sel.ipsl_valid &
+			    (IPSL_REMOTE_PORT | IPSL_LOCAL_PORT)) {
+				itp->itp_flags |= active ?
+				    ITPF_P_PER_PORT_SECURITY :
+				    ITPF_I_PER_PORT_SECURITY;
+			}
+		} else {
+			/*
+			 * For now, we don't allow transport-mode on a tunnel
+			 * with ANY specific selectors.  Bail if we have such
+			 * a request.
+			 */
+			if (sel.ipsl_valid & IPSL_WILDCARD) {
+				diag = SPD_DIAGNOSTIC_NO_TUNNEL_SELECTORS;
+				error = EINVAL;
+				goto fail2;
+			}
+		}
 	}
 
 	if (!spdsock_ext_to_actvec(extv, &actp, &nact, &diag)) {
-		spdsock_diag(q, mp, diag);
-		return;
+		error = EINVAL;
+		goto fail2;
 	}
 	/*
 	 * If no addresses were specified, add both.
@@ -852,14 +1007,14 @@ spdsock_addrule(queue_t *q, ipsec_policy_head_t *iph,
 
 	if (rule->spd_rule_flags & SPD_RULE_FLAG_OUTBOUND) {
 		error = mkrulepair(iph, rule, &sel, actp, nact,
-		    IPSEC_TYPE_OUTBOUND, afs, &rulep);
+		    IPSEC_TYPE_OUTBOUND, afs, &rulep, index);
 		if (error != 0)
 			goto fail;
 	}
 
 	if (rule->spd_rule_flags & SPD_RULE_FLAG_INBOUND) {
 		error = mkrulepair(iph, rule, &sel, actp, nact,
-		    IPSEC_TYPE_INBOUND, afs, &rulep);
+		    IPSEC_TYPE_INBOUND, afs, &rulep, index);
 		if (error != 0)
 			goto fail;
 	}
@@ -868,6 +1023,8 @@ spdsock_addrule(queue_t *q, ipsec_policy_head_t *iph,
 		ipsec_enter_policy(iph, rulep->pol, rulep->dir);
 
 	rw_exit(&iph->iph_lock);
+	if (itp != NULL)
+		mutex_exit(&itp->itp_lock);
 
 	ipsec_actvec_free(actp, nact);
 	spd_echo(q, mp);
@@ -879,55 +1036,115 @@ fail:
 		IPPOL_REFRELE(rulep->pol);
 	}
 	ipsec_actvec_free(actp, nact);
-	spdsock_error(q, mp, error, 0);
+fail2:
+	if (itp != NULL) {
+		if (empty_itp)
+			itp->itp_flags = 0;
+		mutex_exit(&itp->itp_lock);
+	}
+	spdsock_error(q, mp, error, diag);
 }
 
 void
-spdsock_deleterule(queue_t *q, ipsec_policy_head_t *iph,
-    mblk_t *mp, spd_ext_t **extv)
+spdsock_deleterule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
+    spd_ext_t **extv, ipsec_tun_pol_t *itp)
 {
 	ipsec_selkey_t sel;
 	struct spd_rule *rule = (struct spd_rule *)extv[SPD_EXT_RULE];
-	int diag;
+	int err, diag = 0;
 
 	if (rule == NULL) {
 		spdsock_diag(q, mp, SPD_DIAGNOSTIC_NO_RULE_EXT);
 		return;
 	}
 
+	/*
+	 * Must enter itp_lock first to avoid deadlock.  See tun.c's
+	 * set_sec_simple() for the other case of itp_lock and iph_lock.
+	 */
+	if (itp != NULL)
+		mutex_enter(&itp->itp_lock);
+
 	if (rule->spd_rule_index != 0) {
 		if (ipsec_policy_delete_index(iph, rule->spd_rule_index) != 0) {
-			spdsock_error(q, mp, ESRCH, 0);
-			return;
+			err = ESRCH;
+			goto fail;
 		}
 	} else {
 		if (!spdsock_ext_to_sel(extv, &sel, &diag)) {
-			spdsock_diag(q, mp, diag);
-			return;
+			err = EINVAL;	/* diag already set... */
+			goto fail;
 		}
 
-		if (rule->spd_rule_flags & SPD_RULE_FLAG_INBOUND) {
-			if (!ipsec_policy_delete(iph, &sel,
-			    IPSEC_TYPE_INBOUND))
-				goto fail;
+		if ((rule->spd_rule_flags & SPD_RULE_FLAG_INBOUND) &&
+		    !ipsec_policy_delete(iph, &sel, IPSEC_TYPE_INBOUND)) {
+			err = ESRCH;
+			goto fail;
 		}
 
-		if (rule->spd_rule_flags & SPD_RULE_FLAG_OUTBOUND) {
-			if (!ipsec_policy_delete(iph, &sel,
-			    IPSEC_TYPE_OUTBOUND))
-				goto fail;
+		if ((rule->spd_rule_flags & SPD_RULE_FLAG_OUTBOUND) &&
+		    !ipsec_policy_delete(iph, &sel, IPSEC_TYPE_OUTBOUND)) {
+			err = ESRCH;
+			goto fail;
 		}
+	}
+
+	if (itp != NULL) {
+		ASSERT(iph == itp->itp_policy || iph == itp->itp_inactive);
+		rw_enter(&iph->iph_lock, RW_READER);
+		if (avl_numnodes(&iph->iph_rulebyid) == 0) {
+			if (iph == itp->itp_policy)
+				itp->itp_flags &= ~ITPF_PFLAGS;
+			else
+				itp->itp_flags &= ~ITPF_IFLAGS;
+		}
+		/* Can exit locks in any order. */
+		rw_exit(&iph->iph_lock);
+		mutex_exit(&itp->itp_lock);
 	}
 	spd_echo(q, mp);
 	return;
 fail:
-	spdsock_error(q, mp, ESRCH, 0);
+	if (itp != NULL)
+		mutex_exit(&itp->itp_lock);
+	spdsock_error(q, mp, err, diag);
+}
+
+/* Do NOT consume a reference to itp. */
+/* ARGSUSED */
+static void
+spdsock_flip_node(ipsec_tun_pol_t *itp, void *ignoreme)
+{
+	mutex_enter(&itp->itp_lock);
+	ITPF_SWAP(itp->itp_flags);
+	ipsec_swap_policy(itp->itp_policy, itp->itp_inactive);
+	mutex_exit(&itp->itp_lock);
 }
 
 void
-spdsock_flip(queue_t *q, mblk_t *mp)
+spdsock_flip(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 {
-	ipsec_swap_policy();	/* can't fail */
+	char *tname;
+	ipsec_tun_pol_t *itp;
+
+	if (tunname != NULL) {
+		tname = (char *)tunname->spd_if_name;
+		if (*tname == '\0') {
+			ipsec_swap_global_policy();	/* can't fail */
+			itp_walk(spdsock_flip_node, NULL);
+		} else {
+			itp = get_tunnel_policy(tname);
+			if (itp == NULL) {
+				/* Better idea for "tunnel not found"? */
+				spdsock_error(q, mp, ESRCH, 0);
+				return;
+			}
+			spdsock_flip_node(itp, NULL);
+			ITP_REFRELE(itp);
+		}
+	} else {
+		ipsec_swap_global_policy();	/* can't fail */
+	}
 	spd_echo(q, mp);
 }
 
@@ -936,8 +1153,8 @@ spdsock_flip(queue_t *q, mblk_t *mp)
  */
 /* ARGSUSED */
 static void
-spdsock_lookup(queue_t *q, ipsec_policy_head_t *iph,
-    mblk_t *mp, spd_ext_t **extv)
+spdsock_lookup(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
+    spd_ext_t **extv, ipsec_tun_pol_t *itp)
 {
 	spdsock_error(q, mp, EINVAL, 0);
 }
@@ -979,11 +1196,69 @@ spdsock_dump_finish(spdsock_t *ss, int error)
 	mblk_t *m;
 	ipsec_policy_head_t *iph = ss->spdsock_dump_head;
 	mblk_t *req = ss->spdsock_dump_req;
+	ipsec_tun_pol_t *itp, dummy;
+
+	ss->spdsock_dump_remaining_polheads--;
+	if (error == 0 && ss->spdsock_dump_remaining_polheads != 0) {
+		/* Attempt a respin with a new policy head. */
+		rw_enter(&tunnel_policy_lock, RW_READER);
+		/* NOTE:  No need for ITP_REF*() macros here. */
+		if (tunnel_policy_gen > ss->spdsock_dump_tun_gen) {
+			/* Bail with EAGAIN. */
+			error = EAGAIN;
+		} else if (ss->spdsock_dump_name[0] == '\0') {
+			/* Just finished global, find first node. */
+			itp = (ipsec_tun_pol_t *)avl_first(&tunnel_policies);
+		} else {
+			/*
+			 * We just finished current-named polhead, find
+			 * the next one.
+			 */
+			(void) strncpy(dummy.itp_name, ss->spdsock_dump_name,
+			    LIFNAMSIZ);
+			itp = (ipsec_tun_pol_t *)avl_find(&tunnel_policies,
+			    &dummy, NULL);
+			ASSERT(itp != NULL);
+			itp = (ipsec_tun_pol_t *)AVL_NEXT(&tunnel_policies,
+			    itp);
+			/* remaining_polheads should maintain this assertion. */
+			ASSERT(itp != NULL);
+		}
+		if (error == 0) {
+			(void) strncpy(ss->spdsock_dump_name, itp->itp_name,
+			    LIFNAMSIZ);
+			/* Reset other spdsock_dump thingies. */
+			IPPH_REFRELE(ss->spdsock_dump_head);
+			if (ss->spdsock_dump_active) {
+				ss->spdsock_dump_tunnel =
+				    itp->itp_flags & ITPF_P_TUNNEL;
+				iph = itp->itp_policy;
+			} else {
+				ss->spdsock_dump_tunnel =
+				    itp->itp_flags & ITPF_I_TUNNEL;
+				iph = itp->itp_inactive;
+			}
+			IPPH_REFHOLD(iph);
+			rw_enter(&iph->iph_lock, RW_READER);
+			ss->spdsock_dump_head = iph;
+			ss->spdsock_dump_gen = iph->iph_gen;
+			ss->spdsock_dump_cur_type = 0;
+			ss->spdsock_dump_cur_af = IPSEC_AF_V4;
+			ss->spdsock_dump_cur_rule = NULL;
+			ss->spdsock_dump_count = 0;
+			ss->spdsock_dump_cur_chain = 0;
+			rw_exit(&iph->iph_lock);
+			rw_exit(&tunnel_policy_lock);
+			/* And start again. */
+			return (spdsock_dump_next_record(ss));
+		}
+		rw_exit(&tunnel_policy_lock);
+	}
 
 	rw_enter(&iph->iph_lock, RW_READER);
 	m = spdsock_dump_ruleset(req, iph, ss->spdsock_dump_count, error);
 	rw_exit(&iph->iph_lock);
-
+	IPPH_REFRELE(iph);
 	ss->spdsock_dump_req = NULL;
 	freemsg(req);
 
@@ -1284,11 +1559,13 @@ spdsock_rule_flags(uint_t dir, uint_t af)
 
 
 static uint_t
-spdsock_encode_rule_head(uint8_t *base, uint_t offset,
-    spd_msg_t *req, const ipsec_policy_t *rule, uint_t dir, uint_t af)
+spdsock_encode_rule_head(uint8_t *base, uint_t offset, spd_msg_t *req,
+    const ipsec_policy_t *rule, uint_t dir, uint_t af, char *name,
+    boolean_t tunnel)
 {
 	struct spd_msg *spmsg;
 	struct spd_rule *spr;
+	spd_if_t *sid;
 
 	uint_t start = offset;
 
@@ -1311,11 +1588,34 @@ spdsock_encode_rule_head(uint8_t *base, uint_t offset,
 		spr->spd_rule_type = SPD_EXT_RULE;
 		spr->spd_rule_priority = rule->ipsp_prio;
 		spr->spd_rule_flags = spdsock_rule_flags(dir, af);
+		if (tunnel)
+			spr->spd_rule_flags |= SPD_RULE_FLAG_TUNNEL;
 		spr->spd_rule_unused = 0;
 		spr->spd_rule_len = SPD_8TO64(sizeof (*spr));
 		spr->spd_rule_index = rule->ipsp_index;
 	}
 	offset += sizeof (struct spd_rule);
+
+	/*
+	 * If we have an interface name (i.e. if this policy head came from
+	 * a tunnel), add the SPD_EXT_TUN_NAME extension.
+	 */
+	if (name[0] != '\0') {
+
+		ASSERT(ALIGNED64(offset));
+
+		if (base != NULL) {
+			sid = (spd_if_t *)(base + offset);
+			sid->spd_if_exttype = SPD_EXT_TUN_NAME;
+			sid->spd_if_len = SPD_8TO64(sizeof (spd_if_t) +
+			    roundup((strlen(name) - 4), 8));
+			(void) strlcpy((char *)sid->spd_if_name, name,
+			    LIFNAMSIZ);
+		}
+
+		offset += sizeof (spd_if_t) + roundup((strlen(name) - 4), 8);
+	}
+
 	offset = spdsock_encode_sel(base, offset, rule->ipsp_sel);
 	offset = spdsock_encode_action_list(base, offset, rule->ipsp_act);
 
@@ -1330,7 +1630,7 @@ spdsock_encode_rule_head(uint8_t *base, uint_t offset,
 /* ARGSUSED */
 static mblk_t *
 spdsock_encode_rule(mblk_t *req, const ipsec_policy_t *rule,
-    uint_t dir, uint_t af)
+    uint_t dir, uint_t af, char *name, boolean_t tunnel)
 {
 	mblk_t *m;
 	uint_t len;
@@ -1339,7 +1639,8 @@ spdsock_encode_rule(mblk_t *req, const ipsec_policy_t *rule,
 	/*
 	 * Figure out how much space we'll need.
 	 */
-	len = spdsock_encode_rule_head(NULL, 0, mreq, rule, dir, af);
+	len = spdsock_encode_rule_head(NULL, 0, mreq, rule, dir, af, name,
+	    tunnel);
 
 	/*
 	 * Allocate mblk.
@@ -1353,7 +1654,8 @@ spdsock_encode_rule(mblk_t *req, const ipsec_policy_t *rule,
 	 */
 	m->b_wptr = m->b_rptr + len;
 	bzero(m->b_rptr, len);
-	(void) spdsock_encode_rule_head(m->b_rptr, 0, mreq, rule, dir, af);
+	(void) spdsock_encode_rule_head(m->b_rptr, 0, mreq, rule, dir, af,
+	    name, tunnel);
 	return (m);
 }
 
@@ -1447,7 +1749,8 @@ spdsock_dump_next_record(spdsock_t *ss)
 	}
 
 	m = spdsock_encode_rule(req, rule, ss->spdsock_dump_cur_type,
-	    ss->spdsock_dump_cur_af);
+	    ss->spdsock_dump_cur_af, ss->spdsock_dump_name,
+	    ss->spdsock_dump_tunnel);
 	rw_exit(&iph->iph_lock);
 
 	if (m == NULL)
@@ -1488,11 +1791,29 @@ spdsock_dump_some(queue_t *q, spdsock_t *ss)
  */
 /* ARGSUSED */
 static void
-spdsock_dump(queue_t *q, ipsec_policy_head_t *iph,
-    mblk_t *mp, spd_ext_t **extv)
+spdsock_dump(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp)
 {
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
 	mblk_t *mr;
+
+	/* spdsock_parse() already NULL-terminated spdsock_dump_name. */
+	if (iph == ALL_ACTIVE_POLHEADS || iph == ALL_INACTIVE_POLHEADS) {
+		rw_enter(&tunnel_policy_lock, RW_READER);
+		ss->spdsock_dump_remaining_polheads = 1 +
+		    avl_numnodes(&tunnel_policies);
+		ss->spdsock_dump_tun_gen = tunnel_policy_gen;
+		rw_exit(&tunnel_policy_lock);
+		if (iph == ALL_ACTIVE_POLHEADS) {
+			iph = ipsec_system_policy();
+			ss->spdsock_dump_active = B_TRUE;
+		} else {
+			iph = ipsec_inactive_policy();
+			ss->spdsock_dump_active = B_FALSE;
+		}
+		ASSERT(ss->spdsock_dump_name[0] == '\0');
+	} else {
+		ss->spdsock_dump_remaining_polheads = 1;
+	}
 
 	rw_enter(&iph->iph_lock, RW_READER);
 
@@ -1518,10 +1839,46 @@ spdsock_dump(queue_t *q, ipsec_policy_head_t *iph,
 	qenable(OTHERQ(q));
 }
 
+/* Do NOT consume a reference to ITP. */
 void
-spdsock_clone(queue_t *q, mblk_t *mp)
+spdsock_clone_node(ipsec_tun_pol_t *itp, void *ep)
 {
-	int error = ipsec_clone_system_policy();
+	int *errptr = (int *)ep;
+
+	if (*errptr != 0)
+		return;	/* We've failed already for some reason. */
+	mutex_enter(&itp->itp_lock);
+	ITPF_CLONE(itp->itp_flags);
+	*errptr = ipsec_copy_polhead(itp->itp_policy, itp->itp_inactive);
+	mutex_exit(&itp->itp_lock);
+}
+
+void
+spdsock_clone(queue_t *q, mblk_t *mp, spd_if_t *tunname)
+{
+	int error;
+	char *tname;
+	ipsec_tun_pol_t *itp;
+
+	if (tunname != NULL) {
+		tname = (char *)tunname->spd_if_name;
+		if (*tname == '\0') {
+			error = ipsec_clone_system_policy();
+			if (error == 0)
+				itp_walk(spdsock_clone_node, &error);
+		} else {
+			itp = get_tunnel_policy(tname);
+			if (itp == NULL) {
+				spdsock_error(q, mp, ENOENT, 0);
+				return;
+			}
+			spdsock_clone_node(itp, &error);
+			ITP_REFRELE(itp);
+		}
+	} else {
+		error = ipsec_clone_system_policy();
+	}
+
 	if (error != 0)
 		spdsock_error(q, mp, error, 0);
 	else
@@ -2068,6 +2425,160 @@ spdsock_updatealg(queue_t *q, mblk_t *mp, spd_ext_t *extv[])
 	}
 }
 
+/*
+ * With a reference-held ill, dig down and find an instance of "tun", and
+ * assign its tunnel policy pointer, while reference-holding it.  Also,
+ * release ill's refrence when finished.
+ *
+ * We'll be messing with q_next, so be VERY careful.
+ */
+static void
+find_tun_and_set_itp(ill_t *ill, ipsec_tun_pol_t *itp)
+{
+	queue_t *q;
+	tun_t *tun;
+
+	/* Don't bother if this ill is going away. */
+	if (ill->ill_flags & ILL_CONDEMNED) {
+		ill_refrele(ill);
+		return;
+	}
+
+
+	q = ill->ill_wq;
+	claimstr(q);	/* Lighter-weight than freezestr(). */
+
+	do {
+		/* Use strcmp() because "tun" is bounded. */
+		if (strcmp(q->q_qinfo->qi_minfo->mi_idname, "tun") == 0) {
+			/* Aha!  Got it. */
+			tun = (tun_t *)q->q_ptr;
+			if (tun != NULL) {
+				mutex_enter(&tun->tun_lock);
+				if (tun->tun_itp != itp) {
+					ASSERT(tun->tun_itp == NULL);
+					ITP_REFHOLD(itp);
+					tun->tun_itp = itp;
+				}
+				mutex_exit(&tun->tun_lock);
+				goto release_and_return;
+			}
+			/*
+			 * Else assume this is some other module named "tun"
+			 * and move on, hoping we find one that actually has
+			 * something in q_ptr.
+			 */
+		}
+		q = q->q_next;
+	} while (q != NULL);
+
+release_and_return:
+	releasestr(ill->ill_wq);
+	ill_refrele(ill);
+}
+
+/*
+ * Sort through the mess of polhead options to retrieve an appropriate one.
+ * Returns NULL if we send an spdsock error.  Returns a valid pointer if we
+ * found a valid polhead.  Returns ALL_ACTIVE_POLHEADS (aka. -1) or
+ * ALL_INACTIVE_POLHEADS (aka. -2) if the operation calls for the operation to
+ * act on ALL policy heads.
+ */
+static ipsec_policy_head_t *
+get_appropriate_polhead(queue_t *q, mblk_t *mp, spd_if_t *tunname, int spdid,
+    int msgtype, ipsec_tun_pol_t **itpp)
+{
+	ipsec_tun_pol_t *itp;
+	ipsec_policy_head_t *iph;
+	int errno;
+	char *tname;
+	boolean_t active;
+	spdsock_t *ss = (spdsock_t *)q->q_ptr;
+	uint64_t gen;	/* Placeholder */
+	ill_t *v4, *v6;
+
+	active = (spdid == SPD_ACTIVE);
+	*itpp = NULL;
+	if (!active && spdid != SPD_STANDBY) {
+		spdsock_diag(q, mp, SPD_DIAGNOSTIC_BAD_SPDID);
+		return (NULL);
+	}
+
+	if (tunname != NULL) {
+		/* Acting on a tunnel's SPD. */
+		tname = (char *)tunname->spd_if_name;
+		if (*tname == '\0') {
+			/* Handle all-polhead cases here. */
+			if (msgtype != SPD_FLUSH && msgtype != SPD_DUMP) {
+				spdsock_diag(q, mp,
+				    SPD_DIAGNOSTIC_NOT_GLOBAL_OP);
+				return (NULL);
+			}
+			return (active ? ALL_ACTIVE_POLHEADS :
+			    ALL_INACTIVE_POLHEADS);
+		}
+
+		itp = get_tunnel_policy(tname);
+		if (itp == NULL) {
+			if (msgtype != SPD_ADDRULE) {
+				/* "Tunnel not found" */
+				spdsock_error(q, mp, ENOENT, 0);
+				return (NULL);
+			}
+
+			errno = 0;
+			itp = create_tunnel_policy(tname, &errno, &gen);
+			if (itp == NULL) {
+				/*
+				 * Something very bad happened, most likely
+				 * ENOMEM.  Return an indicator.
+				 */
+				spdsock_error(q, mp, errno, 0);
+				return (NULL);
+			}
+		}
+		/*
+		 * Troll the plumbed tunnels and see if we have a
+		 * match.  We need to do this always in case we add
+		 * policy AFTER plumbing a tunnel.
+		 */
+		v4 = ill_lookup_on_name(tname, B_FALSE, B_FALSE, NULL,
+		    NULL, NULL, &errno, NULL);
+		if (v4 != NULL)
+			find_tun_and_set_itp(v4, itp);
+		v6 = ill_lookup_on_name(tname, B_FALSE, B_TRUE, NULL,
+		    NULL, NULL, &errno, NULL);
+		if (v6 != NULL)
+			find_tun_and_set_itp(v6, itp);
+		ASSERT(itp != NULL);
+		*itpp = itp;
+		/* For spdsock dump state, set the polhead's name. */
+		if (msgtype == SPD_DUMP) {
+			(void) strncpy(ss->spdsock_dump_name, tname, LIFNAMSIZ);
+			ss->spdsock_dump_tunnel = itp->itp_flags &
+			    (active ? ITPF_P_TUNNEL : ITPF_I_TUNNEL);
+		}
+	} else {
+		itp = NULL;
+		/* For spdsock dump state, indicate it's global policy. */
+		if (msgtype == SPD_DUMP)
+			ss->spdsock_dump_name[0] = '\0';
+	}
+
+	if (active)
+		iph = (itp == NULL) ? ipsec_system_policy() : itp->itp_policy;
+	else
+		iph = (itp == NULL) ? ipsec_inactive_policy() :
+		    itp->itp_inactive;
+
+	ASSERT(iph != NULL);
+	if (itp != NULL) {
+		IPPH_REFHOLD(iph);
+	}
+
+	return (iph);
+}
+
 static void
 spdsock_parse(queue_t *q, mblk_t *mp)
 {
@@ -2075,6 +2586,8 @@ spdsock_parse(queue_t *q, mblk_t *mp)
 	spd_ext_t *extv[SPD_EXT_MAX + 1];
 	uint_t msgsize;
 	ipsec_policy_head_t *iph;
+	ipsec_tun_pol_t *itp;
+	spd_if_t *tunname;
 
 	/* Make sure nothing's below me. */
 	ASSERT(WR(q)->q_next == NULL);
@@ -2099,7 +2612,6 @@ spdsock_parse(queue_t *q, mblk_t *mp)
 	}
 
 	if (msgsize > (uint_t)(mp->b_wptr - mp->b_rptr)) {
-
 		/* Get all message into one mblk. */
 		if (pullupmsg(mp, -1) == 0) {
 			/*
@@ -2143,24 +2655,6 @@ spdsock_parse(queue_t *q, mblk_t *mp)
 	}
 
 	/*
-	 * Which rule set are we operating on today?
-	 */
-
-	switch (spmsg->spd_msg_spdid) {
-	case SPD_ACTIVE:
-		iph = ipsec_system_policy();
-		break;
-
-	case SPD_STANDBY:
-		iph = ipsec_inactive_policy();
-		break;
-
-	default:
-		spdsock_diag(q, mp, SPD_DIAGNOSTIC_BAD_SPDID);
-		return;
-	}
-
-	/*
 	 * Special-case SPD_UPDATEALGS so as not to load IPsec.
 	 */
 	if (!ipsec_loaded() && spmsg->spd_msg_type != SPD_UPDATEALGS) {
@@ -2174,50 +2668,87 @@ spdsock_parse(queue_t *q, mblk_t *mp)
 		return;
 	}
 
+	/* First check for messages that need no polheads at all. */
 	switch (spmsg->spd_msg_type) {
 	case SPD_UPDATEALGS:
 		spdsock_updatealg(q, mp, extv);
 		return;
-	case SPD_FLUSH:
-		spdsock_flush(q, iph, mp, extv);
-		return;
-
-	case SPD_ADDRULE:
-		spdsock_addrule(q, iph, mp, extv);
-		return;
-
-	case SPD_DELETERULE:
-		spdsock_deleterule(q, iph, mp, extv);
-		return;
-
-	case SPD_FLIP:
-		spdsock_flip(q, mp);
-		return;
-
-	case SPD_LOOKUP:
-		spdsock_lookup(q, iph, mp, extv);
-		return;
-
-	case SPD_DUMP:
-		spdsock_dump(q, iph, mp, extv);
-		return;
-
-	case SPD_CLONE:
-		spdsock_clone(q, mp);
-		return;
-
 	case SPD_ALGLIST:
 		spdsock_alglist(q, mp);
 		return;
-
 	case SPD_DUMPALGS:
 		spdsock_dumpalgs(q, mp);
 		return;
+	}
 
-	default:
-		spdsock_diag(q, mp, SPD_DIAGNOSTIC_BAD_MSG_TYPE);
+	/*
+	 * Then check for ones that need both primary/secondary polheads,
+	 * finding the appropriate tunnel policy if need be.
+	 */
+	tunname = (spd_if_t *)extv[SPD_EXT_TUN_NAME];
+	switch (spmsg->spd_msg_type) {
+	case SPD_FLIP:
+		spdsock_flip(q, mp, tunname);
+		return;
+	case SPD_CLONE:
+		spdsock_clone(q, mp, tunname);
 		return;
 	}
+
+	/*
+	 * Finally, find ones that operate on exactly one polhead, or
+	 * "all polheads" of a given type (active/inactive).
+	 */
+	iph = get_appropriate_polhead(q, mp, tunname, spmsg->spd_msg_spdid,
+	    spmsg->spd_msg_type, &itp);
+	if (iph == NULL)
+		return;
+
+	/* All-polheads-ready operations. */
+	switch (spmsg->spd_msg_type) {
+	case SPD_FLUSH:
+		if (itp != NULL) {
+			mutex_enter(&itp->itp_lock);
+			if (spmsg->spd_msg_spdid == SPD_ACTIVE)
+				itp->itp_flags &= ~ITPF_PFLAGS;
+			else
+				itp->itp_flags &= ~ITPF_IFLAGS;
+			mutex_exit(&itp->itp_lock);
+			ITP_REFRELE(itp);
+		}
+		spdsock_flush(q, iph, mp);
+		return;
+	case SPD_DUMP:
+		if (itp != NULL)
+			ITP_REFRELE(itp);
+		spdsock_dump(q, iph, mp);
+		return;
+	}
+
+	if (iph == ALL_ACTIVE_POLHEADS || iph == ALL_INACTIVE_POLHEADS) {
+		spdsock_diag(q, mp, SPD_DIAGNOSTIC_NOT_GLOBAL_OP);
+		return;
+	}
+
+	/* Single-polhead-only operations. */
+	switch (spmsg->spd_msg_type) {
+	case SPD_ADDRULE:
+		spdsock_addrule(q, iph, mp, extv, itp);
+		break;
+	case SPD_DELETERULE:
+		spdsock_deleterule(q, iph, mp, extv, itp);
+		break;
+	case SPD_LOOKUP:
+		spdsock_lookup(q, iph, mp, extv, itp);
+		break;
+	default:
+		spdsock_diag(q, mp, SPD_DIAGNOSTIC_BAD_MSG_TYPE);
+		break;
+	}
+
+	IPPH_REFRELE(iph);
+	if (itp != NULL)
+		ITP_REFRELE(itp);
 }
 
 /*

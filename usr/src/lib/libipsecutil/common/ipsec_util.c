@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,13 +117,15 @@ bail_msg(char *fmt, ...)
  */
 
 int
-dump_sockaddr(struct sockaddr *sa, boolean_t addr_only, FILE *where)
+dump_sockaddr(struct sockaddr *sa, uint8_t prefixlen, boolean_t addr_only,
+    FILE *where)
 {
 	struct sockaddr_in	*sin;
 	struct sockaddr_in6	*sin6;
 	char			*printable_addr, *protocol;
 	uint8_t			*addrptr;
-	char			storage[INET6_ADDRSTRLEN];
+	/* Add 4 chars to hold '/nnn' for prefixes. */
+	char			storage[INET6_ADDRSTRLEN + 4];
 	uint16_t		port;
 	boolean_t		unspec;
 	struct hostent		*hp;
@@ -157,7 +158,14 @@ dump_sockaddr(struct sockaddr *sa, boolean_t addr_only, FILE *where)
 	    NULL) {
 		printable_addr = gettext("<inet_ntop() failed>");
 	} else {
+		char prefix[5];	/* "/nnn" with terminator. */
+
+		(void) snprintf(prefix, sizeof (prefix), "/%d", prefixlen);
 		printable_addr = storage;
+		if (prefixlen != 0) {
+			(void) strlcat(printable_addr, prefix,
+			    sizeof (storage));
+		}
 	}
 	if (addr_only) {
 		if (fprintf(where, "%s", printable_addr) < 0)
@@ -983,6 +991,10 @@ spdsock_diag(int diagnostic)
 		return (gettext("number of block sizes inconsistent"));
 	case SPD_DIAGNOSTIC_ALG_MECH_NAME_LEN:
 		return (gettext("invalid mechanism name length"));
+	case SPD_DIAGNOSTIC_NOT_GLOBAL_OP:
+		return (gettext("operation not applicable to all policies"));
+	case SPD_DIAGNOSTIC_NO_TUNNEL_SELECTORS:
+		return (gettext("using selectors on a transport-mode tunnel"));
 	default:
 		return (gettext("unknown diagnostic"));
 	}
@@ -999,7 +1011,7 @@ const char *
 keysock_diag(int diagnostic)
 {
 	switch (diagnostic) {
-	case  SADB_X_DIAGNOSTIC_NONE:
+	case SADB_X_DIAGNOSTIC_NONE:
 		return (gettext("No diagnostic"));
 	case SADB_X_DIAGNOSTIC_UNKNOWN_MSG:
 		return (gettext("Unknown message type"));
@@ -1020,7 +1032,7 @@ keysock_diag(int diagnostic)
 	case SADB_X_DIAGNOSTIC_BAD_DST_AF:
 		return (gettext("Bad destination address family"));
 	case SADB_X_DIAGNOSTIC_BAD_PROXY_AF:
-		return (gettext("Bad proxy address family"));
+		return (gettext("Bad inner-source address family"));
 	case SADB_X_DIAGNOSTIC_AF_MISMATCH:
 		return (gettext("Source/destination address family mismatch"));
 	case SADB_X_DIAGNOSTIC_BAD_SRC:
@@ -1104,20 +1116,1396 @@ keysock_diag(int diagnostic)
 	case SADB_X_DIAGNOSTIC_DUPLICATE_KMC:
 		return (gettext("Duplicate key management cookie"));
 	case SADB_X_DIAGNOSTIC_MISSING_NATT_LOC:
-		return (gettext("Missing NATT local address"));
+		return (gettext("Missing NAT-T local address"));
 	case SADB_X_DIAGNOSTIC_MISSING_NATT_REM:
-		return (gettext("Missing NATT remote address"));
+		return (gettext("Missing NAT-T remote address"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_NATT_LOC:
-		return (gettext("Duplicate NATT local address"));
+		return (gettext("Duplicate NAT-T local address"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_NATT_REM:
-		return (gettext("Duplicate NATT remote address"));
+		return (gettext("Duplicate NAT-T remote address"));
 	case SADB_X_DIAGNOSTIC_MALFORMED_NATT_LOC:
-		return (gettext("Malformed NATT local address"));
+		return (gettext("Malformed NAT-T local address"));
 	case SADB_X_DIAGNOSTIC_MALFORMED_NATT_REM:
-		return (gettext("Malformed NATT remote address"));
+		return (gettext("Malformed NAT-T remote address"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_NATT_PORTS:
-		return (gettext("Duplicate NATT ports"));
+		return (gettext("Duplicate NAT-T ports"));
+	case SADB_X_DIAGNOSTIC_MISSING_INNER_SRC:
+		return (gettext("Missing inner source address"));
+	case SADB_X_DIAGNOSTIC_MISSING_INNER_DST:
+		return (gettext("Missing inner destination address"));
+	case SADB_X_DIAGNOSTIC_DUPLICATE_INNER_SRC:
+		return (gettext("Duplicate inner source address"));
+	case SADB_X_DIAGNOSTIC_DUPLICATE_INNER_DST:
+		return (gettext("Duplicate inner destination address"));
+	case SADB_X_DIAGNOSTIC_MALFORMED_INNER_SRC:
+		return (gettext("Malformed inner source address"));
+	case SADB_X_DIAGNOSTIC_MALFORMED_INNER_DST:
+		return (gettext("Malformed inner destination address"));
+	case SADB_X_DIAGNOSTIC_PREFIX_INNER_SRC:
+		return (gettext("Invalid inner-source prefix length "));
+	case SADB_X_DIAGNOSTIC_PREFIX_INNER_DST:
+		return (gettext("Invalid inner-destination prefix length"));
+	case SADB_X_DIAGNOSTIC_BAD_INNER_DST_AF:
+		return (gettext("Bad inner-destination address family"));
+	case SADB_X_DIAGNOSTIC_INNER_AF_MISMATCH:
+		return (gettext(
+		    "Inner source/destination address family mismatch"));
+	case SADB_X_DIAGNOSTIC_BAD_NATT_REM_AF:
+		return (gettext("Bad NAT-T remote address family"));
+	case SADB_X_DIAGNOSTIC_BAD_NATT_LOC_AF:
+		return (gettext("Bad NAT-T local address family"));
+	case SADB_X_DIAGNOSTIC_PROTO_MISMATCH:
+		return (gettext("Source/desination protocol mismatch"));
+	case SADB_X_DIAGNOSTIC_INNER_PROTO_MISMATCH:
+		return (gettext("Inner source/desination protocol mismatch"));
+	case SADB_X_DIAGNOSTIC_DUAL_PORT_SETS:
+		return (gettext("Both inner ports and outer ports are set"));
 	default:
 		return (gettext("Unknown diagnostic code"));
 	}
+}
+
+/*
+ * Convert an IPv6 mask to a prefix len.  I assume all IPv6 masks are
+ * contiguous, so I stop at the first zero bit!
+ */
+int
+in_masktoprefix(uint8_t *mask, boolean_t is_v4mapped)
+{
+	int rc = 0;
+	uint8_t last;
+	int limit = IPV6_ABITS;
+
+	if (is_v4mapped) {
+		mask += ((IPV6_ABITS - IP_ABITS)/8);
+		limit = IP_ABITS;
+	}
+
+	while (*mask == 0xff) {
+		rc += 8;
+		if (rc == limit)
+			return (limit);
+		mask++;
+	}
+
+	last = *mask;
+	while (last != 0) {
+		rc++;
+		last = (last << 1) & 0xff;
+	}
+
+	return (rc);
+}
+
+/*
+ * Expand the diagnostic code into a message.
+ */
+void
+print_diagnostic(FILE *file, uint16_t diagnostic)
+{
+	/* Use two spaces so above strings can fit on the line. */
+	(void) fprintf(file, gettext("  Diagnostic code %u:  %s.\n"),
+	    diagnostic, keysock_diag(diagnostic));
+}
+
+/*
+ * Prints the base PF_KEY message.
+ */
+void
+print_sadb_msg(struct sadb_msg *samsg, time_t wallclock, boolean_t vflag)
+{
+	if (wallclock != 0)
+		printsatime(wallclock, gettext("%sTimestamp: %s\n"), "", NULL,
+		    vflag);
+
+	(void) printf(gettext("Base message (version %u) type "),
+	    samsg->sadb_msg_version);
+	switch (samsg->sadb_msg_type) {
+	case SADB_RESERVED:
+		(void) printf(gettext("RESERVED (warning: set to 0)"));
+		break;
+	case SADB_GETSPI:
+		(void) printf("GETSPI");
+		break;
+	case SADB_UPDATE:
+		(void) printf("UPDATE");
+		break;
+	case SADB_ADD:
+		(void) printf("ADD");
+		break;
+	case SADB_DELETE:
+		(void) printf("DELETE");
+		break;
+	case SADB_GET:
+		(void) printf("GET");
+		break;
+	case SADB_ACQUIRE:
+		(void) printf("ACQUIRE");
+		break;
+	case SADB_REGISTER:
+		(void) printf("REGISTER");
+		break;
+	case SADB_EXPIRE:
+		(void) printf("EXPIRE");
+		break;
+	case SADB_FLUSH:
+		(void) printf("FLUSH");
+		break;
+	case SADB_DUMP:
+		(void) printf("DUMP");
+		break;
+	case SADB_X_PROMISC:
+		(void) printf("X_PROMISC");
+		break;
+	case SADB_X_INVERSE_ACQUIRE:
+		(void) printf("X_INVERSE_ACQUIRE");
+		break;
+	default:
+		(void) printf(gettext("Unknown (%u)"), samsg->sadb_msg_type);
+		break;
+	}
+	(void) printf(gettext(", SA type "));
+
+	switch (samsg->sadb_msg_satype) {
+	case SADB_SATYPE_UNSPEC:
+		(void) printf(gettext("<unspecified/all>"));
+		break;
+	case SADB_SATYPE_AH:
+		(void) printf("AH");
+		break;
+	case SADB_SATYPE_ESP:
+		(void) printf("ESP");
+		break;
+	case SADB_SATYPE_RSVP:
+		(void) printf("RSVP");
+		break;
+	case SADB_SATYPE_OSPFV2:
+		(void) printf("OSPFv2");
+		break;
+	case SADB_SATYPE_RIPV2:
+		(void) printf("RIPv2");
+		break;
+	case SADB_SATYPE_MIP:
+		(void) printf(gettext("Mobile IP"));
+		break;
+	default:
+		(void) printf(gettext("<unknown %u>"), samsg->sadb_msg_satype);
+		break;
+	}
+
+	(void) printf(".\n");
+
+	if (samsg->sadb_msg_errno != 0) {
+		(void) printf(gettext("Error %s from PF_KEY.\n"),
+		    strerror(samsg->sadb_msg_errno));
+		print_diagnostic(stdout, samsg->sadb_x_msg_diagnostic);
+	}
+
+	(void) printf(gettext("Message length %u bytes, seq=%u, pid=%u.\n"),
+	    SADB_64TO8(samsg->sadb_msg_len), samsg->sadb_msg_seq,
+	    samsg->sadb_msg_pid);
+}
+
+/*
+ * Print the SA extension for PF_KEY.
+ */
+void
+print_sa(char *prefix, struct sadb_sa *assoc)
+{
+	if (assoc->sadb_sa_len != SADB_8TO64(sizeof (*assoc))) {
+		warnx(gettext("WARNING: SA info extension length (%u) is bad."),
+		    SADB_64TO8(assoc->sadb_sa_len));
+	}
+
+	(void) printf(gettext("%sSADB_ASSOC spi=0x%x, replay=%u, state="),
+	    prefix, ntohl(assoc->sadb_sa_spi), assoc->sadb_sa_replay);
+	switch (assoc->sadb_sa_state) {
+	case SADB_SASTATE_LARVAL:
+		(void) printf(gettext("LARVAL"));
+		break;
+	case SADB_SASTATE_MATURE:
+		(void) printf(gettext("MATURE"));
+		break;
+	case SADB_SASTATE_DYING:
+		(void) printf(gettext("DYING"));
+		break;
+	case SADB_SASTATE_DEAD:
+		(void) printf(gettext("DEAD"));
+		break;
+	default:
+		(void) printf(gettext("<unknown %u>"), assoc->sadb_sa_state);
+	}
+
+	if (assoc->sadb_sa_auth != SADB_AALG_NONE) {
+		(void) printf(gettext("\n%sAuthentication algorithm = "),
+		    prefix);
+		(void) dump_aalg(assoc->sadb_sa_auth, stdout);
+	}
+
+	if (assoc->sadb_sa_encrypt != SADB_EALG_NONE) {
+		(void) printf(gettext("\n%sEncryption algorithm = "), prefix);
+		(void) dump_ealg(assoc->sadb_sa_encrypt, stdout);
+	}
+
+	(void) printf(gettext("\n%sflags=0x%x < "), prefix,
+	    assoc->sadb_sa_flags);
+	if (assoc->sadb_sa_flags & SADB_SAFLAGS_PFS)
+		(void) printf("PFS ");
+	if (assoc->sadb_sa_flags & SADB_SAFLAGS_NOREPLAY)
+		(void) printf("NOREPLAY ");
+
+	/* BEGIN Solaris-specific flags. */
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_USED)
+		(void) printf("X_USED ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_UNIQUE)
+		(void) printf("X_UNIQUE ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_AALG1)
+		(void) printf("X_AALG1 ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_AALG2)
+		(void) printf("X_AALG2 ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_EALG1)
+		(void) printf("X_EALG1 ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_EALG2)
+		(void) printf("X_EALG2 ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_NATT_LOC)
+		(void) printf("X_NATT_LOC ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_NATT_REM)
+		(void) printf("X_NATT_REM ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_TUNNEL)
+		(void) printf("X_TUNNEL ");
+	/* END Solaris-specific flags. */
+
+	(void) printf(">\n");
+}
+
+void
+printsatime(int64_t lt, const char *msg, const char *pfx, const char *pfx2,
+    boolean_t vflag)
+{
+	char tbuf[TBUF_SIZE]; /* For strftime() call. */
+	const char *tp = tbuf;
+	time_t t = lt;
+	struct tm res;
+
+	if (t != lt) {
+		if (lt > 0)
+			t = LONG_MAX;
+		else
+			t = LONG_MIN;
+	}
+
+	if (strftime(tbuf, TBUF_SIZE, NULL, localtime_r(&t, &res)) == 0)
+		tp = gettext("<time conversion failed>");
+	(void) printf(msg, pfx, tp);
+	if (vflag && (pfx2 != NULL))
+		(void) printf(gettext("%s\t(raw time value %llu)\n"), pfx2, lt);
+}
+
+/*
+ * Print the SA lifetime information.  (An SADB_EXT_LIFETIME_* extension.)
+ */
+void
+print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
+    struct sadb_lifetime *hard, struct sadb_lifetime *soft, boolean_t vflag)
+{
+	int64_t scratch;
+	char *soft_prefix = gettext("SLT: ");
+	char *hard_prefix = gettext("HLT: ");
+	char *current_prefix = gettext("CLT: ");
+
+	if (current != NULL &&
+	    current->sadb_lifetime_len != SADB_8TO64(sizeof (*current))) {
+		warnx(gettext("WARNING: CURRENT lifetime extension length "
+			"(%u) is bad."),
+		    SADB_64TO8(current->sadb_lifetime_len));
+	}
+
+	if (hard != NULL &&
+	    hard->sadb_lifetime_len != SADB_8TO64(sizeof (*hard))) {
+		warnx(gettext("WARNING: HARD lifetime "
+			"extension length (%u) is bad."),
+		    SADB_64TO8(hard->sadb_lifetime_len));
+	}
+
+	if (soft != NULL &&
+	    soft->sadb_lifetime_len != SADB_8TO64(sizeof (*soft))) {
+		warnx(gettext("WARNING: SOFT lifetime "
+		    "extension length (%u) is bad."),
+		    SADB_64TO8(soft->sadb_lifetime_len));
+	}
+
+	(void) printf(" LT: Lifetime information\n");
+
+	if (current != NULL) {
+		/* Express values as current values. */
+		(void) printf(gettext(
+		    "%s%llu bytes protected, %u allocations used.\n"),
+		    current_prefix, current->sadb_lifetime_bytes,
+		    current->sadb_lifetime_allocations);
+		printsatime(current->sadb_lifetime_addtime,
+		    gettext("%sSA added at time %s\n"),
+		    current_prefix, current_prefix, vflag);
+		if (current->sadb_lifetime_usetime != 0) {
+			printsatime(current->sadb_lifetime_usetime,
+			    gettext("%sSA first used at time %s\n"),
+			    current_prefix, current_prefix, vflag);
+		}
+		printsatime(wallclock, gettext("%sTime now is %s\n"),
+		    current_prefix, current_prefix, vflag);
+	}
+
+	if (soft != NULL) {
+		(void) printf(gettext("%sSoft lifetime information:  "),
+		    soft_prefix);
+		(void) printf(gettext("%llu bytes of lifetime, %u "
+		    "allocations.\n"), soft->sadb_lifetime_bytes,
+		    soft->sadb_lifetime_allocations);
+		(void) printf(gettext("%s%llu seconds of post-add lifetime.\n"),
+		    soft_prefix, soft->sadb_lifetime_addtime);
+		(void) printf(gettext("%s%llu seconds of post-use lifetime.\n"),
+		    soft_prefix, soft->sadb_lifetime_usetime);
+		/* If possible, express values as time remaining. */
+		if (current != NULL) {
+			if (soft->sadb_lifetime_bytes != 0)
+				(void) printf(gettext(
+				    "%s%llu more bytes can be protected.\n"),
+				    soft_prefix,
+				    (soft->sadb_lifetime_bytes >
+					current->sadb_lifetime_bytes) ?
+				    (soft->sadb_lifetime_bytes -
+					current->sadb_lifetime_bytes) : (0));
+			if (soft->sadb_lifetime_addtime != 0 ||
+			    (soft->sadb_lifetime_usetime != 0 &&
+				current->sadb_lifetime_usetime != 0)) {
+				int64_t adddelta, usedelta;
+
+				if (soft->sadb_lifetime_addtime != 0) {
+					adddelta =
+					    current->sadb_lifetime_addtime +
+					    soft->sadb_lifetime_addtime -
+					    wallclock;
+				} else {
+					adddelta = TIME_MAX;
+				}
+
+				if (soft->sadb_lifetime_usetime != 0 &&
+				    current->sadb_lifetime_usetime != 0) {
+					usedelta =
+					    current->sadb_lifetime_usetime +
+					    soft->sadb_lifetime_usetime -
+					    wallclock;
+				} else {
+					usedelta = TIME_MAX;
+				}
+				(void) printf("%s", soft_prefix);
+				scratch = MIN(adddelta, usedelta);
+				if (scratch >= 0) {
+					(void) printf(gettext("Soft expiration "
+					    "occurs in %lld seconds, "),
+					    scratch);
+				} else {
+					(void) printf(gettext(
+					    "Soft expiration occurred "));
+				}
+				scratch += wallclock;
+				printsatime(scratch, gettext("%sat %s.\n"), "",
+				    soft_prefix, vflag);
+			}
+		}
+	}
+
+	if (hard != NULL) {
+		(void) printf(gettext("%sHard lifetime information:  "),
+		    hard_prefix);
+		(void) printf(gettext("%llu bytes of lifetime, "
+		    "%u allocations.\n"), hard->sadb_lifetime_bytes,
+		    hard->sadb_lifetime_allocations);
+		(void) printf(gettext("%s%llu seconds of post-add lifetime.\n"),
+		    hard_prefix, hard->sadb_lifetime_addtime);
+		(void) printf(gettext("%s%llu seconds of post-use lifetime.\n"),
+		    hard_prefix, hard->sadb_lifetime_usetime);
+		/* If possible, express values as time remaining. */
+		if (current != NULL) {
+			if (hard->sadb_lifetime_bytes != 0)
+				(void) printf(gettext(
+				    "%s%llu more bytes can be protected.\n"),
+				    hard_prefix,
+				    (hard->sadb_lifetime_bytes >
+					current->sadb_lifetime_bytes) ?
+				    (hard->sadb_lifetime_bytes -
+					current->sadb_lifetime_bytes) : (0));
+			if (hard->sadb_lifetime_addtime != 0 ||
+			    (hard->sadb_lifetime_usetime != 0 &&
+				current->sadb_lifetime_usetime != 0)) {
+				int64_t adddelta, usedelta;
+
+				if (hard->sadb_lifetime_addtime != 0) {
+					adddelta =
+					    current->sadb_lifetime_addtime +
+					    hard->sadb_lifetime_addtime -
+					    wallclock;
+				} else {
+					adddelta = TIME_MAX;
+				}
+
+				if (hard->sadb_lifetime_usetime != 0 &&
+				    current->sadb_lifetime_usetime != 0) {
+					usedelta =
+					    current->sadb_lifetime_usetime +
+					    hard->sadb_lifetime_usetime -
+					    wallclock;
+				} else {
+					usedelta = TIME_MAX;
+				}
+				(void) printf("%s", hard_prefix);
+				scratch = MIN(adddelta, usedelta);
+				if (scratch >= 0) {
+					(void) printf(gettext("Hard expiration "
+					    "occurs in %lld seconds, "),
+					    scratch);
+				} else {
+					(void) printf(gettext(
+					    "Hard expiration occured "));
+				}
+				scratch += wallclock;
+				printsatime(scratch, gettext("%sat %s.\n"), "",
+				    hard_prefix, vflag);
+			}
+		}
+	}
+}
+
+/*
+ * Print an SADB_EXT_ADDRESS_* extension.
+ */
+void
+print_address(char *prefix, struct sadb_address *addr)
+{
+	struct protoent *pe;
+
+	(void) printf("%s", prefix);
+	switch (addr->sadb_address_exttype) {
+	case SADB_EXT_ADDRESS_SRC:
+		(void) printf(gettext("Source address "));
+		break;
+	case SADB_X_EXT_ADDRESS_INNER_SRC:
+		(void) printf(gettext("Inner source address "));
+		break;
+	case SADB_EXT_ADDRESS_DST:
+		(void) printf(gettext("Destination address "));
+		break;
+	case SADB_X_EXT_ADDRESS_INNER_DST:
+		(void) printf(gettext("Inner destination address "));
+		break;
+	case SADB_X_EXT_ADDRESS_NATT_LOC:
+		(void) printf(gettext("NATT local address "));
+		break;
+	case SADB_X_EXT_ADDRESS_NATT_REM:
+		(void) printf(gettext("NATT remote address "));
+		break;
+	}
+
+	(void) printf(gettext("(proto=%d"), addr->sadb_address_proto);
+	if (!nflag) {
+		if (addr->sadb_address_proto == 0) {
+			(void) printf(gettext("/<unspecified>"));
+		} else if ((pe = getprotobynumber(addr->sadb_address_proto))
+		    != NULL) {
+			(void) printf("/%s", pe->p_name);
+		} else {
+			(void) printf(gettext("/<unknown>"));
+		}
+	}
+	(void) printf(gettext(")\n%s"), prefix);
+	(void) dump_sockaddr((struct sockaddr *)(addr + 1),
+	    addr->sadb_address_prefixlen, B_FALSE, stdout);
+}
+
+/*
+ * Print an SADB_EXT_KEY extension.
+ */
+void
+print_key(char *prefix, struct sadb_key *key)
+{
+	(void) printf("%s", prefix);
+
+	switch (key->sadb_key_exttype) {
+	case SADB_EXT_KEY_AUTH:
+		(void) printf(gettext("Authentication"));
+		break;
+	case SADB_EXT_KEY_ENCRYPT:
+		(void) printf(gettext("Encryption"));
+		break;
+	}
+
+	(void) printf(gettext(" key.\n%s"), prefix);
+	(void) dump_key((uint8_t *)(key + 1), key->sadb_key_bits, stdout);
+	(void) putchar('\n');
+}
+
+/*
+ * Print an SADB_EXT_IDENTITY_* extension.
+ */
+void
+print_ident(char *prefix, struct sadb_ident *id)
+{
+	boolean_t canprint = B_TRUE;
+
+	(void) printf("%s", prefix);
+	switch (id->sadb_ident_exttype) {
+	case SADB_EXT_IDENTITY_SRC:
+		(void) printf(gettext("Source"));
+		break;
+	case SADB_EXT_IDENTITY_DST:
+		(void) printf(gettext("Destination"));
+		break;
+	}
+
+	(void) printf(gettext(" identity, uid=%d, type "), id->sadb_ident_id);
+	canprint = dump_sadb_idtype(id->sadb_ident_type, stdout, NULL);
+	(void) printf("\n%s", prefix);
+	if (canprint)
+		(void) printf("%s\n", (char *)(id + 1));
+	else
+		(void) printf(gettext("<cannot print>\n"));
+}
+
+/*
+ * Print an SADB_SENSITIVITY extension.
+ */
+void
+print_sens(char *prefix, struct sadb_sens *sens)
+{
+	uint64_t *bitmap = (uint64_t *)(sens + 1);
+	int i;
+
+	(void) printf(
+	    gettext("%sSensitivity DPD %d, sens level=%d, integ level=%d\n"),
+	    prefix, sens->sadb_sens_dpd, sens->sadb_sens_sens_level,
+	    sens->sadb_sens_integ_level);
+	for (i = 0; sens->sadb_sens_sens_len-- > 0; i++, bitmap++)
+		(void) printf(
+		    gettext("%s Sensitivity BM extended word %d 0x%llx\n"),
+		    i, *bitmap);
+	for (i = 0; sens->sadb_sens_integ_len-- > 0; i++, bitmap++)
+		(void) printf(
+		    gettext("%s Integrity BM extended word %d 0x%llx\n"),
+		    i, *bitmap);
+}
+
+/*
+ * Print an SADB_EXT_PROPOSAL extension.
+ */
+void
+print_prop(char *prefix, struct sadb_prop *prop)
+{
+	struct sadb_comb *combs;
+	int i, numcombs;
+
+	(void) printf(gettext("%sProposal, replay counter = %u.\n"), prefix,
+	    prop->sadb_prop_replay);
+
+	numcombs = prop->sadb_prop_len - SADB_8TO64(sizeof (*prop));
+	numcombs /= SADB_8TO64(sizeof (*combs));
+
+	combs = (struct sadb_comb *)(prop + 1);
+
+	for (i = 0; i < numcombs; i++) {
+		(void) printf(gettext("%s Combination #%u "), prefix, i + 1);
+		if (combs[i].sadb_comb_auth != SADB_AALG_NONE) {
+			(void) printf(gettext("Authentication = "));
+			(void) dump_aalg(combs[i].sadb_comb_auth, stdout);
+			(void) printf(gettext("  minbits=%u, maxbits=%u.\n%s "),
+			    combs[i].sadb_comb_auth_minbits,
+			    combs[i].sadb_comb_auth_maxbits, prefix);
+		}
+
+		if (combs[i].sadb_comb_encrypt != SADB_EALG_NONE) {
+			(void) printf(gettext("Encryption = "));
+			(void) dump_ealg(combs[i].sadb_comb_encrypt, stdout);
+			(void) printf(gettext("  minbits=%u, maxbits=%u.\n%s "),
+			    combs[i].sadb_comb_encrypt_minbits,
+			    combs[i].sadb_comb_encrypt_maxbits, prefix);
+		}
+
+		(void) printf(gettext("HARD: "));
+		if (combs[i].sadb_comb_hard_allocations)
+			(void) printf(gettext("alloc=%u "),
+			    combs[i].sadb_comb_hard_allocations);
+		if (combs[i].sadb_comb_hard_bytes)
+			(void) printf(gettext("bytes=%llu "),
+			    combs[i].sadb_comb_hard_bytes);
+		if (combs[i].sadb_comb_hard_addtime)
+			(void) printf(gettext("post-add secs=%llu "),
+			    combs[i].sadb_comb_hard_addtime);
+		if (combs[i].sadb_comb_hard_usetime)
+			(void) printf(gettext("post-use secs=%llu"),
+			    combs[i].sadb_comb_hard_usetime);
+
+		(void) printf(gettext("\n%s SOFT: "), prefix);
+		if (combs[i].sadb_comb_soft_allocations)
+			(void) printf(gettext("alloc=%u "),
+			    combs[i].sadb_comb_soft_allocations);
+		if (combs[i].sadb_comb_soft_bytes)
+			(void) printf(gettext("bytes=%llu "),
+			    combs[i].sadb_comb_soft_bytes);
+		if (combs[i].sadb_comb_soft_addtime)
+			(void) printf(gettext("post-add secs=%llu "),
+			    combs[i].sadb_comb_soft_addtime);
+		if (combs[i].sadb_comb_soft_usetime)
+			(void) printf(gettext("post-use secs=%llu"),
+			    combs[i].sadb_comb_soft_usetime);
+		(void) putchar('\n');
+	}
+}
+
+/*
+ * Print an extended proposal (SADB_X_EXT_EPROP).
+ */
+void
+print_eprop(char *prefix, struct sadb_prop *eprop)
+{
+	uint64_t *sofar;
+	struct sadb_x_ecomb *ecomb;
+	struct sadb_x_algdesc *algdesc;
+	int i, j;
+
+	(void) printf(gettext("%sExtended Proposal, replay counter = %u, "),
+	    prefix, eprop->sadb_prop_replay);
+	(void) printf(gettext("number of combinations = %u.\n"),
+	    eprop->sadb_x_prop_numecombs);
+
+	sofar = (uint64_t *)(eprop + 1);
+	ecomb = (struct sadb_x_ecomb *)sofar;
+
+	for (i = 0; i < eprop->sadb_x_prop_numecombs; ) {
+		(void) printf(gettext("%s Extended combination #%u:\n"),
+		    prefix, ++i);
+
+		(void) printf(gettext("%s HARD: "), prefix);
+		(void) printf(gettext("alloc=%u, "),
+		    ecomb->sadb_x_ecomb_hard_allocations);
+		(void) printf(gettext("bytes=%llu, "),
+		    ecomb->sadb_x_ecomb_hard_bytes);
+		(void) printf(gettext("post-add secs=%llu, "),
+		    ecomb->sadb_x_ecomb_hard_addtime);
+		(void) printf(gettext("post-use secs=%llu\n"),
+		    ecomb->sadb_x_ecomb_hard_usetime);
+
+		(void) printf(gettext("%s SOFT: "), prefix);
+		(void) printf(gettext("alloc=%u, "),
+		    ecomb->sadb_x_ecomb_soft_allocations);
+		(void) printf(gettext("bytes=%llu, "),
+		    ecomb->sadb_x_ecomb_soft_bytes);
+		(void) printf(gettext("post-add secs=%llu, "),
+		    ecomb->sadb_x_ecomb_soft_addtime);
+		(void) printf(gettext("post-use secs=%llu\n"),
+		    ecomb->sadb_x_ecomb_soft_usetime);
+
+		sofar = (uint64_t *)(ecomb + 1);
+		algdesc = (struct sadb_x_algdesc *)sofar;
+
+		for (j = 0; j < ecomb->sadb_x_ecomb_numalgs; ) {
+			(void) printf(gettext("%s Alg #%u "), prefix, ++j);
+			switch (algdesc->sadb_x_algdesc_satype) {
+			case SADB_SATYPE_ESP:
+				(void) printf(gettext("for ESP "));
+				break;
+			case SADB_SATYPE_AH:
+				(void) printf(gettext("for AH "));
+				break;
+			default:
+				(void) printf(gettext("for satype=%d "),
+				    algdesc->sadb_x_algdesc_satype);
+			}
+			switch (algdesc->sadb_x_algdesc_algtype) {
+			case SADB_X_ALGTYPE_CRYPT:
+				(void) printf(gettext("Encryption = "));
+				(void) dump_ealg(algdesc->sadb_x_algdesc_alg,
+				    stdout);
+				break;
+			case SADB_X_ALGTYPE_AUTH:
+				(void) printf(gettext("Authentication = "));
+				(void) dump_aalg(algdesc->sadb_x_algdesc_alg,
+				    stdout);
+				break;
+			default:
+				(void) printf(gettext("algtype(%d) = alg(%d)"),
+				    algdesc->sadb_x_algdesc_algtype,
+				    algdesc->sadb_x_algdesc_alg);
+				break;
+			}
+
+			(void) printf(gettext("  minbits=%u, maxbits=%u.\n"),
+			    algdesc->sadb_x_algdesc_minbits,
+			    algdesc->sadb_x_algdesc_maxbits);
+
+			sofar = (uint64_t *)(++algdesc);
+		}
+		ecomb = (struct sadb_x_ecomb *)sofar;
+	}
+}
+
+/*
+ * Print an SADB_EXT_SUPPORTED extension.
+ */
+void
+print_supp(char *prefix, struct sadb_supported *supp)
+{
+	struct sadb_alg *algs;
+	int i, numalgs;
+
+	(void) printf(gettext("%sSupported "), prefix);
+	switch (supp->sadb_supported_exttype) {
+	case SADB_EXT_SUPPORTED_AUTH:
+		(void) printf(gettext("authentication"));
+		break;
+	case SADB_EXT_SUPPORTED_ENCRYPT:
+		(void) printf(gettext("encryption"));
+		break;
+	}
+	(void) printf(gettext(" algorithms.\n"));
+
+	algs = (struct sadb_alg *)(supp + 1);
+	numalgs = supp->sadb_supported_len - SADB_8TO64(sizeof (*supp));
+	numalgs /= SADB_8TO64(sizeof (*algs));
+	for (i = 0; i < numalgs; i++) {
+		(void) printf("%s", prefix);
+		switch (supp->sadb_supported_exttype) {
+		case SADB_EXT_SUPPORTED_AUTH:
+			(void) dump_aalg(algs[i].sadb_alg_id, stdout);
+			break;
+		case SADB_EXT_SUPPORTED_ENCRYPT:
+			(void) dump_ealg(algs[i].sadb_alg_id, stdout);
+			break;
+		}
+		(void) printf(gettext(" minbits=%u, maxbits=%u, ivlen=%u.\n"),
+		    algs[i].sadb_alg_minbits, algs[i].sadb_alg_maxbits,
+		    algs[i].sadb_alg_ivlen);
+	}
+}
+
+/*
+ * Print an SADB_EXT_SPIRANGE extension.
+ */
+void
+print_spirange(char *prefix, struct sadb_spirange *range)
+{
+	(void) printf(gettext("%sSPI Range, min=0x%x, max=0x%x\n"), prefix,
+	    htonl(range->sadb_spirange_min),
+	    htonl(range->sadb_spirange_max));
+}
+
+/*
+ * Print an SADB_X_EXT_KM_COOKIE extension.
+ */
+
+void
+print_kmc(char *prefix, struct sadb_x_kmc *kmc)
+{
+	char *cookie_label;
+
+	if ((cookie_label = kmc_lookup_by_cookie(kmc->sadb_x_kmc_cookie)) ==
+	    NULL)
+		cookie_label = gettext("<Label not found.>");
+
+	(void) printf(gettext("%sProtocol %u, cookie=\"%s\" (%u)\n"), prefix,
+	    kmc->sadb_x_kmc_proto, cookie_label, kmc->sadb_x_kmc_cookie);
+}
+
+/*
+ * Take a PF_KEY message pointed to buffer and print it.  Useful for DUMP
+ * and GET.
+ */
+void
+print_samsg(uint64_t *buffer, boolean_t want_timestamp, boolean_t vflag)
+{
+	uint64_t *current;
+	struct sadb_msg *samsg = (struct sadb_msg *)buffer;
+	struct sadb_ext *ext;
+	struct sadb_lifetime *currentlt = NULL, *hardlt = NULL, *softlt = NULL;
+	int i;
+	time_t wallclock;
+
+	(void) time(&wallclock);
+
+	print_sadb_msg(samsg, want_timestamp ? wallclock : 0, vflag);
+	current = (uint64_t *)(samsg + 1);
+	while (current - buffer < samsg->sadb_msg_len) {
+		int lenbytes;
+
+		ext = (struct sadb_ext *)current;
+		lenbytes = SADB_64TO8(ext->sadb_ext_len);
+		switch (ext->sadb_ext_type) {
+		case SADB_EXT_SA:
+			print_sa(gettext("SA: "), (struct sadb_sa *)current);
+			break;
+		/*
+		 * Pluck out lifetimes and print them at the end.  This is
+		 * to show relative lifetimes.
+		 */
+		case SADB_EXT_LIFETIME_CURRENT:
+			currentlt = (struct sadb_lifetime *)current;
+			break;
+		case SADB_EXT_LIFETIME_HARD:
+			hardlt = (struct sadb_lifetime *)current;
+			break;
+		case SADB_EXT_LIFETIME_SOFT:
+			softlt = (struct sadb_lifetime *)current;
+			break;
+
+		case SADB_EXT_ADDRESS_SRC:
+			print_address(gettext("SRC: "),
+			    (struct sadb_address *)current);
+			break;
+		case SADB_X_EXT_ADDRESS_INNER_SRC:
+			print_address(gettext("INS: "),
+			    (struct sadb_address *)current);
+			break;
+		case SADB_EXT_ADDRESS_DST:
+			print_address(gettext("DST: "),
+			    (struct sadb_address *)current);
+			break;
+		case SADB_X_EXT_ADDRESS_INNER_DST:
+			print_address(gettext("IND: "),
+			    (struct sadb_address *)current);
+			break;
+		case SADB_EXT_KEY_AUTH:
+			print_key(gettext("AKY: "), (struct sadb_key *)current);
+			break;
+		case SADB_EXT_KEY_ENCRYPT:
+			print_key(gettext("EKY: "), (struct sadb_key *)current);
+			break;
+		case SADB_EXT_IDENTITY_SRC:
+			print_ident(gettext("SID: "),
+			    (struct sadb_ident *)current);
+			break;
+		case SADB_EXT_IDENTITY_DST:
+			print_ident(gettext("DID: "),
+			    (struct sadb_ident *)current);
+			break;
+		case SADB_EXT_SENSITIVITY:
+			print_sens(gettext("SNS: "),
+			    (struct sadb_sens *)current);
+			break;
+		case SADB_EXT_PROPOSAL:
+			print_prop(gettext("PRP: "),
+			    (struct sadb_prop *)current);
+			break;
+		case SADB_EXT_SUPPORTED_AUTH:
+			print_supp(gettext("SUA: "),
+			    (struct sadb_supported *)current);
+			break;
+		case SADB_EXT_SUPPORTED_ENCRYPT:
+			print_supp(gettext("SUE: "),
+			    (struct sadb_supported *)current);
+			break;
+		case SADB_EXT_SPIRANGE:
+			print_spirange(gettext("SPR: "),
+			    (struct sadb_spirange *)current);
+			break;
+		case SADB_X_EXT_EPROP:
+			print_eprop(gettext("EPR: "),
+			    (struct sadb_prop *)current);
+			break;
+		case SADB_X_EXT_KM_COOKIE:
+			print_kmc(gettext("KMC: "),
+			    (struct sadb_x_kmc *)current);
+			break;
+		case SADB_X_EXT_ADDRESS_NATT_REM:
+			print_address(gettext("NRM: "),
+			    (struct sadb_address *)current);
+			break;
+		case SADB_X_EXT_ADDRESS_NATT_LOC:
+			print_address(gettext("NLC: "),
+			    (struct sadb_address *)current);
+			break;
+		default:
+			(void) printf(gettext(
+			    "UNK: Unknown ext. %d, len %d.\n"),
+			    ext->sadb_ext_type, lenbytes);
+			for (i = 0; i < ext->sadb_ext_len; i++)
+				(void) printf(gettext("UNK: 0x%llx\n"),
+				    ((uint64_t *)ext)[i]);
+			break;
+		}
+		current += (lenbytes == 0) ?
+		    SADB_8TO64(sizeof (struct sadb_ext)) : ext->sadb_ext_len;
+	}
+	/*
+	 * Print lifetimes NOW.
+	 */
+	if (currentlt != NULL || hardlt != NULL || softlt != NULL)
+		print_lifetimes(wallclock, currentlt, hardlt, softlt, vflag);
+
+	if (current - buffer != samsg->sadb_msg_len) {
+		warnx(gettext("WARNING: insufficient buffer "
+			"space or corrupt message."));
+	}
+
+	(void) fflush(stdout);	/* Make sure our message is out there. */
+}
+
+/*
+ * save_XXX functions are used when "saving" the SA tables to either a
+ * file or standard output.  They use the dump_XXX functions where needed,
+ * but mostly they use the rparseXXX functions.
+ */
+
+/*
+ * Print save information for a lifetime extension.
+ *
+ * NOTE : It saves the lifetime in absolute terms.  For example, if you
+ * had a hard_usetime of 60 seconds, you'll save it as 60 seconds, even though
+ * there may have been 59 seconds burned off the clock.
+ */
+boolean_t
+save_lifetime(struct sadb_lifetime *lifetime, FILE *ofile)
+{
+	char *prefix;
+
+	prefix = (lifetime->sadb_lifetime_exttype == SADB_EXT_LIFETIME_SOFT) ?
+	    "soft" : "hard";
+
+	if (putc('\t', ofile) == EOF)
+		return (B_FALSE);
+
+	if (lifetime->sadb_lifetime_allocations != 0 && fprintf(ofile,
+	    "%s_alloc %u ", prefix, lifetime->sadb_lifetime_allocations) < 0)
+		return (B_FALSE);
+
+	if (lifetime->sadb_lifetime_bytes != 0 && fprintf(ofile,
+	    "%s_bytes %llu ", prefix, lifetime->sadb_lifetime_bytes) < 0)
+		return (B_FALSE);
+
+	if (lifetime->sadb_lifetime_addtime != 0 && fprintf(ofile,
+	    "%s_addtime %llu ", prefix, lifetime->sadb_lifetime_addtime) < 0)
+		return (B_FALSE);
+
+	if (lifetime->sadb_lifetime_usetime != 0 && fprintf(ofile,
+	    "%s_usetime %llu ", prefix, lifetime->sadb_lifetime_usetime) < 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * Print save information for an address extension.
+ */
+boolean_t
+save_address(struct sadb_address *addr, FILE *ofile)
+{
+	char *printable_addr, buf[INET6_ADDRSTRLEN];
+	const char *prefix, *pprefix;
+	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)(addr + 1);
+	struct sockaddr_in *sin = (struct sockaddr_in *)sin6;
+	int af = sin->sin_family;
+
+	/*
+	 * Address-family reality check.
+	 */
+	if (af != AF_INET6 && af != AF_INET)
+		return (B_FALSE);
+
+	switch (addr->sadb_address_exttype) {
+	case SADB_EXT_ADDRESS_SRC:
+		prefix = "src";
+		pprefix = "sport";
+		break;
+	case SADB_X_EXT_ADDRESS_INNER_SRC:
+		prefix = "isrc";
+		pprefix = "isport";
+		break;
+	case SADB_EXT_ADDRESS_DST:
+		prefix = "dst";
+		pprefix = "dport";
+		break;
+	case SADB_X_EXT_ADDRESS_INNER_DST:
+		prefix = "idst";
+		pprefix = "idport";
+		break;
+	case SADB_X_EXT_ADDRESS_NATT_LOC:
+		prefix = "nat_loc ";
+		pprefix = "nat_lport";
+		break;
+	case SADB_X_EXT_ADDRESS_NATT_REM:
+		prefix = "nat_rem ";
+		pprefix = "nat_rport";
+		break;
+	}
+
+	if (fprintf(ofile, "    %s ", prefix) < 0)
+		return (B_FALSE);
+
+	/*
+	 * Do not do address-to-name translation, given that we live in
+	 * an age of names that explode into many addresses.
+	 */
+	printable_addr = (char *)inet_ntop(af,
+	    (af == AF_INET) ? (char *)&sin->sin_addr : (char *)&sin6->sin6_addr,
+	    buf, sizeof (buf));
+	if (printable_addr == NULL)
+		printable_addr = "<inet_ntop() failed>";
+	if (fprintf(ofile, "%s", printable_addr) < 0)
+		return (B_FALSE);
+	if (addr->sadb_address_prefixlen != 0 &&
+	    !((addr->sadb_address_prefixlen == 32 && af == AF_INET) ||
+		(addr->sadb_address_prefixlen == 128 && af == AF_INET6))) {
+		if (fprintf(ofile, "/%d", addr->sadb_address_prefixlen) < 0)
+			return (B_FALSE);
+	}
+
+	/*
+	 * The port is in the same position for struct sockaddr_in and
+	 * struct sockaddr_in6.  We exploit that property here.
+	 */
+	if ((pprefix != NULL) && (sin->sin_port != 0))
+		(void) fprintf(ofile, " %s %d", pprefix, ntohs(sin->sin_port));
+
+	return (B_TRUE);
+}
+
+/*
+ * Print save information for a key extension. Returns whether writing
+ * to the specified output file was successful or not.
+ */
+boolean_t
+save_key(struct sadb_key *key, FILE *ofile)
+{
+	char *prefix;
+
+	if (putc('\t', ofile) == EOF)
+		return (B_FALSE);
+
+	prefix = (key->sadb_key_exttype == SADB_EXT_KEY_AUTH) ? "auth" : "encr";
+
+	if (fprintf(ofile, "%skey ", prefix) < 0)
+		return (B_FALSE);
+
+	if (dump_key((uint8_t *)(key + 1), key->sadb_key_bits, ofile) == -1)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * Print save information for an identity extension.
+ */
+boolean_t
+save_ident(struct sadb_ident *ident, FILE *ofile)
+{
+	char *prefix;
+
+	if (putc('\t', ofile) == EOF)
+		return (B_FALSE);
+
+	prefix = (ident->sadb_ident_exttype == SADB_EXT_IDENTITY_SRC) ? "src" :
+	    "dst";
+
+	if (fprintf(ofile, "%sidtype %s ", prefix,
+	    rparseidtype(ident->sadb_ident_type)) < 0)
+		return (B_FALSE);
+
+	if (ident->sadb_ident_type == SADB_X_IDENTTYPE_DN ||
+	    ident->sadb_ident_type == SADB_X_IDENTTYPE_GN) {
+		if (fprintf(ofile, gettext("<can-not-print>")) < 0)
+			return (B_FALSE);
+	} else {
+		if (fprintf(ofile, "%s", (char *)(ident + 1)) < 0)
+			return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * "Save" a security association to an output file.
+ *
+ * NOTE the lack of calls to gettext() because I'm outputting parseable stuff.
+ * ALSO NOTE that if you change keywords (see parsecmd()), you'll have to
+ * change them here as well.
+ */
+void
+save_assoc(uint64_t *buffer, FILE *ofile)
+{
+	int seen_proto = 0;
+	uint64_t *current;
+	struct sadb_address *addr;
+	struct sadb_msg *samsg = (struct sadb_msg *)buffer;
+	struct sadb_ext *ext;
+#define	bail2(s)	do { \
+				int t = errno; \
+				(void) fclose(ofile); \
+				errno = t; \
+				interactive = B_FALSE;	/* Guarantees exit. */ \
+				Bail(s); \
+			} while (B_FALSE)	/* How do I lint-clean this? */
+
+#define	savenl() if (fputs(" \\\n", ofile) == EOF) { bail2("savenl"); }
+
+	if (fputs("# begin assoc\n", ofile) == EOF)
+		Bail("save_assoc: Opening comment of SA");
+	if (fprintf(ofile, "add %s ", rparsesatype(samsg->sadb_msg_satype)) < 0)
+		Bail("save_assoc: First line of SA");
+	/* LINTED E_CONST_COND */
+	savenl();
+
+	current = (uint64_t *)(samsg + 1);
+	while (current - buffer < samsg->sadb_msg_len) {
+		struct sadb_sa *assoc;
+
+		ext = (struct sadb_ext *)current;
+		switch (ext->sadb_ext_type) {
+		case SADB_EXT_SA:
+			assoc = (struct sadb_sa *)ext;
+			if (assoc->sadb_sa_state != SADB_SASTATE_MATURE) {
+				if (fprintf(ofile, "# WARNING: SA was dying "
+				    "or dead.\n") < 0) {
+					/* LINTED E_CONST_COND */
+					bail2("save_assoc: fprintf not mature");
+				}
+			}
+			if (fprintf(ofile, "    spi 0x%x ",
+			    ntohl(assoc->sadb_sa_spi)) < 0)
+				/* LINTED E_CONST_COND */
+				bail2("save_assoc: fprintf spi");
+			if (assoc->sadb_sa_encrypt != SADB_EALG_NONE) {
+				if (fprintf(ofile, "encr_alg %s ",
+				    rparsealg(assoc->sadb_sa_encrypt,
+					IPSEC_PROTO_ESP)) < 0)
+					/* LINTED E_CONST_COND */
+					bail2("save_assoc: fprintf encrypt");
+			}
+			if (assoc->sadb_sa_auth != SADB_AALG_NONE) {
+				if (fprintf(ofile, "auth_alg %s ",
+				    rparsealg(assoc->sadb_sa_auth,
+					IPSEC_PROTO_AH)) < 0)
+					/* LINTED E_CONST_COND */
+					bail2("save_assoc: fprintf auth");
+			}
+			if (fprintf(ofile, "replay %d ",
+			    assoc->sadb_sa_replay) < 0)
+				/* LINTED E_CONST_COND */
+				bail2("save_assoc: fprintf replay");
+			if (assoc->sadb_sa_flags & (SADB_X_SAFLAGS_NATT_LOC |
+			    SADB_X_SAFLAGS_NATT_REM)) {
+				if (fprintf(ofile, "encap udp") < 0)
+					/* LINTED E_CONST_COND */
+					bail2("save_assoc: fprintf encap");
+			}
+			/* LINTED E_CONST_COND */
+			savenl();
+			break;
+		case SADB_EXT_LIFETIME_HARD:
+		case SADB_EXT_LIFETIME_SOFT:
+			if (!save_lifetime((struct sadb_lifetime *)ext, ofile))
+				/* LINTED E_CONST_COND */
+				bail2("save_lifetime");
+			/* LINTED E_CONST_COND */
+			savenl();
+			break;
+		case SADB_EXT_ADDRESS_SRC:
+		case SADB_EXT_ADDRESS_DST:
+		case SADB_X_EXT_ADDRESS_INNER_SRC:
+		case SADB_X_EXT_ADDRESS_INNER_DST:
+		case SADB_X_EXT_ADDRESS_NATT_REM:
+		case SADB_X_EXT_ADDRESS_NATT_LOC:
+			addr = (struct sadb_address *)ext;
+			if (!seen_proto && addr->sadb_address_proto) {
+				(void) fprintf(ofile, "    proto %d",
+				    addr->sadb_address_proto);
+				/* LINTED E_CONST_COND */
+				savenl();
+				seen_proto = 1;
+			}
+			if (!save_address(addr, ofile))
+				/* LINTED E_CONST_COND */
+				bail2("save_address");
+			/* LINTED E_CONST_COND */
+			savenl();
+			break;
+		case SADB_EXT_KEY_AUTH:
+		case SADB_EXT_KEY_ENCRYPT:
+			if (!save_key((struct sadb_key *)ext, ofile))
+				/* LINTED E_CONST_COND */
+				bail2("save_address");
+			/* LINTED E_CONST_COND */
+			savenl();
+			break;
+		case SADB_EXT_IDENTITY_SRC:
+		case SADB_EXT_IDENTITY_DST:
+			if (!save_ident((struct sadb_ident *)ext, ofile))
+				/* LINTED E_CONST_COND */
+				bail2("save_address");
+			/* LINTED E_CONST_COND */
+			savenl();
+			break;
+		case SADB_EXT_SENSITIVITY:
+		default:
+			/* Skip over irrelevant extensions. */
+			break;
+		}
+		current += ext->sadb_ext_len;
+	}
+
+	if (fputs(gettext("\n# end assoc\n\n"), ofile) == EOF)
+		/* LINTED E_CONST_COND */
+		bail2("save_assoc: last fputs");
+}
+
+/*
+ * Open the output file for the "save" command.
+ */
+FILE *
+opensavefile(char *filename)
+{
+	int fd;
+	FILE *retval;
+	struct stat buf;
+
+	/*
+	 * If the user specifies "-" or doesn't give a filename, then
+	 * dump to stdout.  Make sure to document the dangers of files
+	 * that are NFS, directing your output to strange places, etc.
+	 */
+	if (filename == NULL || strcmp("-", filename) == 0)
+		return (stdout);
+
+	/*
+	 * open the file with the create bits set.  Since I check for
+	 * real UID == root in main(), I won't worry about the ownership
+	 * problem.
+	 */
+	fd = open(filename, O_WRONLY | O_EXCL | O_CREAT | O_TRUNC, S_IRUSR);
+	if (fd == -1) {
+		if (errno != EEXIST)
+			bail_msg("%s %s: %s", filename, gettext("open error"),
+			    strerror(errno));
+		fd = open(filename, O_WRONLY | O_TRUNC, 0);
+		if (fd == -1)
+			bail_msg("%s %s: %s", filename, gettext("open error"),
+			    strerror(errno));
+		if (fstat(fd, &buf) == -1) {
+			(void) close(fd);
+			bail_msg("%s fstat: %s", filename, strerror(errno));
+		}
+		if (S_ISREG(buf.st_mode) &&
+		    ((buf.st_mode & S_IAMB) != S_IRUSR)) {
+			warnx(gettext("WARNING: Save file already exists with "
+				"permission %o."), buf.st_mode & S_IAMB);
+			warnx(gettext("Normal users may be able to read IPsec "
+				"keying material."));
+		}
+	}
+
+	/* Okay, we have an FD.  Assign it to a stdio FILE pointer. */
+	retval = fdopen(fd, "w");
+	if (retval == NULL) {
+		(void) close(fd);
+		bail_msg("%s %s: %s", filename, gettext("fdopen error"),
+		    strerror(errno));
+	}
+	return (retval);
+}
+
+const char *
+do_inet_ntop(const void *addr, char *cp, size_t size)
+{
+	boolean_t isv4;
+	struct in6_addr *inaddr6 = (struct in6_addr *)addr;
+	struct in_addr inaddr;
+
+	if ((isv4 = IN6_IS_ADDR_V4MAPPED(inaddr6)) == B_TRUE) {
+		IN6_V4MAPPED_TO_INADDR(inaddr6, &inaddr);
+	}
+
+	return (inet_ntop(isv4 ? AF_INET : AF_INET6,
+	    isv4 ? (void *)&inaddr : inaddr6, cp, size));
+}
+
+char numprint[NBUF_SIZE];
+
+/*
+ * Parse and reverse parse a specific SA type (AH, ESP, etc.).
+ */
+static struct typetable {
+	char *type;
+	int token;
+} type_table[] = {
+	{"all", SADB_SATYPE_UNSPEC},
+	{"ah",  SADB_SATYPE_AH},
+	{"esp", SADB_SATYPE_ESP},
+	/* PF_KEY NOTE:  More to come if net/pfkeyv2.h gets updated. */
+	{NULL, 0}	/* Token value is irrelevant for this entry. */
+};
+
+char *
+rparsesatype(int type)
+{
+	struct typetable *tt = type_table;
+
+	while (tt->type != NULL && type != tt->token)
+		tt++;
+
+	if (tt->type == NULL) {
+		(void) snprintf(numprint, NBUF_SIZE, "%d", type);
+	} else {
+		return (tt->type);
+	}
+
+	return (numprint);
+}
+
+
+/*
+ * Return a string containing the name of the specified numerical algorithm
+ * identifier.
+ */
+char *
+rparsealg(uint8_t alg, int proto_num)
+{
+	static struct ipsecalgent *holder = NULL; /* we're single-threaded */
+
+	if (holder != NULL)
+		freeipsecalgent(holder);
+
+	holder = getipsecalgbynum(alg, proto_num, NULL);
+	if (holder == NULL) {
+		(void) snprintf(numprint, NBUF_SIZE, "%d", alg);
+		return (numprint);
+	}
+
+	return (*(holder->a_names));
+}
+
+/*
+ * Parse and reverse parse out a source/destination ID type.
+ */
+static struct idtypes {
+	char *idtype;
+	uint8_t retval;
+} idtypes[] = {
+	{"prefix",	SADB_IDENTTYPE_PREFIX},
+	{"fqdn",	SADB_IDENTTYPE_FQDN},
+	{"domain",	SADB_IDENTTYPE_FQDN},
+	{"domainname",	SADB_IDENTTYPE_FQDN},
+	{"user_fqdn",	SADB_IDENTTYPE_USER_FQDN},
+	{"mailbox",	SADB_IDENTTYPE_USER_FQDN},
+	{"der_dn",	SADB_X_IDENTTYPE_DN},
+	{"der_gn",	SADB_X_IDENTTYPE_GN},
+	{NULL,		0}
+};
+
+char *
+rparseidtype(uint16_t type)
+{
+	struct idtypes *idp;
+
+	for (idp = idtypes; idp->idtype != NULL; idp++) {
+		if (type == idp->retval)
+			return (idp->idtype);
+	}
+
+	(void) snprintf(numprint, NBUF_SIZE, "%d", type);
+	return (numprint);
 }

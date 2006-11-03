@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,6 +113,18 @@ ip_drop_init(void)
 	    "spd_ah_innermismatch", KSTAT_DATA_UINT64);
 	kstat_named_init(&ipdrops_spd_esp_innermismatch,
 	    "spd_esp_innermismatch", KSTAT_DATA_UINT64);
+	kstat_named_init(&ipdrops_spd_no_policy, "spd_no_policy",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ipdrops_spd_malformed_packet, "spd_malformed_packet",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ipdrops_spd_malformed_frag, "spd_malformed_frag",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ipdrops_spd_overlap_frag, "spd_overlap_frag",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ipdrops_spd_evil_frag, "spd_evil_frag",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ipdrops_spd_max_frags, "spd_max_frags",
+	    KSTAT_DATA_UINT64);
 
 	/* ESP-specific drop statistics. */
 
@@ -281,5 +292,10 @@ ip_drop_packet(mblk_t *mp, boolean_t inbound, ill_t *arriving,
 	/* If I haven't queued the packet or some such nonsense, free it. */
 	if (ipsec_mp != NULL)
 		freeb(ipsec_mp);
+	/*
+	 * ASSERT this isn't a b_next linked mblk chain where a
+	 * chained dropper should be used instead
+	 */
+	ASSERT(mp->b_prev == NULL && mp->b_next == NULL);
 	freemsg(mp);
 }

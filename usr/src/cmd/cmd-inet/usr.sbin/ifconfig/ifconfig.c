@@ -3026,16 +3026,21 @@ print_tsec(struct iftun_req *tparams)
 	 */
 	assert(tparams->ifta_vers == IFTUN_VERSION);
 
-	ipsr = (ipsec_req_t *)(&tparams->ifta_secinfo);
-	if (ipsr->ipsr_ah_req & IPSEC_PREF_REQUIRED) {
-		(void) printf("ah (%s)  ",
-		    rparsealg(ipsr->ipsr_auth_alg, IPSEC_PROTO_AH));
-	}
-	if (ipsr->ipsr_esp_req & IPSEC_PREF_REQUIRED) {
-		(void) printf("esp (%s",
-		    rparsealg(ipsr->ipsr_esp_alg, IPSEC_PROTO_ESP));
-		(void) printf("/%s)",
-		    rparsealg(ipsr->ipsr_esp_auth_alg, IPSEC_PROTO_AH));
+	if (tparams->ifta_flags & IFTUN_COMPLEX_SECURITY) {
+		(void) printf("-->  use 'ipsecconf -ln -i %s'",
+		    tparams->ifta_lifr_name);
+	} else {
+		ipsr = (ipsec_req_t *)(&tparams->ifta_secinfo);
+		if (ipsr->ipsr_ah_req & IPSEC_PREF_REQUIRED) {
+			(void) printf("ah (%s)  ",
+			    rparsealg(ipsr->ipsr_auth_alg, IPSEC_PROTO_AH));
+		}
+		if (ipsr->ipsr_esp_req & IPSEC_PREF_REQUIRED) {
+			(void) printf("esp (%s",
+			    rparsealg(ipsr->ipsr_esp_alg, IPSEC_PROTO_ESP));
+			(void) printf("/%s)",
+			    rparsealg(ipsr->ipsr_esp_auth_alg, IPSEC_PROTO_AH));
+		}
 	}
 	(void) printf("\n");
 }

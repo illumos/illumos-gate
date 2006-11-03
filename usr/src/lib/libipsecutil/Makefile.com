@@ -37,7 +37,7 @@ SRCDIR =	../common
 SRCS = 		$(SRCDIR)/ipsec_util.c $(SRCDIR)/algs.c $(SRCDIR)/err.c
 
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
-LDLIBS +=	-lnsl -lc
+LDLIBS +=	-lsocket -lnsl -lc
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)

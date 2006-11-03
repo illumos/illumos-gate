@@ -83,7 +83,6 @@ typedef struct ipsa_s {
 
 	struct ipsid_s *ipsa_src_cid;	/* Source certificate identity */
 	struct ipsid_s *ipsa_dst_cid;	/* Destination certificate identity */
-	struct ipsid_s *ipsa_proxy_cid;	/* (src) Proxy agent's cert. id. */
 	uint64_t *ipsa_integ;	/* Integrity bitmap */
 	uint64_t *ipsa_sens;	/* Sensitivity bitmap */
 	mblk_t	*ipsa_lpkt;	/* Packet received while larval (CAS me) */
@@ -175,7 +174,7 @@ typedef struct ipsa_s {
 	uint32_t ipsa_kmp;	/* key management proto */
 	uint32_t ipsa_kmc;	/* key management cookie */
 
-	boolean_t ipsa_haspeer;	/* Has peer in another table. */
+	boolean_t ipsa_haspeer;		/* Has peer in another table. */
 
 	/*
 	 * Address storage.
@@ -185,12 +184,15 @@ typedef struct ipsa_s {
 	 * used sockaddr_storage
 	 */
 	sa_family_t ipsa_addrfam;
-	sa_family_t ipsa_proxyfam;	/* Proxy AF can be != src/dst AF. */
+	sa_family_t ipsa_innerfam;	/* Inner AF can be != src/dst AF. */
 
 	uint32_t ipsa_srcaddr[IPSA_MAX_ADDRLEN];
 	uint32_t ipsa_dstaddr[IPSA_MAX_ADDRLEN];
-	uint32_t ipsa_proxysrc[IPSA_MAX_ADDRLEN];
-	uint32_t ipsa_proxydst[IPSA_MAX_ADDRLEN];
+	uint32_t ipsa_innersrc[IPSA_MAX_ADDRLEN];
+	uint32_t ipsa_innerdst[IPSA_MAX_ADDRLEN];
+
+	uint8_t ipsa_innersrcpfx;
+	uint8_t ipsa_innerdstpfx;
 
 	/* these can only be v4 */
 	uint32_t ipsa_natt_addr_loc[IPSA_MAX_ADDRLEN];
@@ -323,6 +325,7 @@ typedef struct ipsa_s {
 #define	IPSA_F_NATT_REM	SADB_X_SAFLAGS_NATT_REM
 #define	IPSA_F_NATT	(SADB_X_SAFLAGS_NATT_LOC | SADB_X_SAFLAGS_NATT_REM)
 #define	IPSA_F_CINVALID	0x40000		/* SA shouldn't be cached */
+#define	IPSA_F_TUNNEL	SADB_X_SAFLAGS_TUNNEL
 
 /* SA states are important for handling UPDATE PF_KEY messages. */
 #define	IPSA_STATE_LARVAL	SADB_SASTATE_LARVAL
@@ -374,6 +377,7 @@ typedef struct ipsacq_s {
 	struct ipsec_action_s  *ipsacq_act;
 
 	sa_family_t ipsacq_addrfam;	/* Address family. */
+	sa_family_t ipsacq_inneraddrfam; /* Inner-packet address family. */
 	int ipsacq_numpackets;		/* How many packets queued up so far. */
 	uint32_t ipsacq_seq;		/* PF_KEY sequence number. */
 	uint64_t ipsacq_unique_id;	/* Unique ID for SAs that need it. */
@@ -386,13 +390,18 @@ typedef struct ipsacq_s {
 	uint32_t *ipsacq_srcaddr;
 	uint32_t *ipsacq_dstaddr;
 
-	/* uint32_t ipsacq_proxysrc[IPSA_MAX_ADDRLEN]; */	/* For later */
-	/* uint32_t ipsacq_proxydst[IPSA_MAX_ADDRLEN]; */	/* For later */
+	/* Cache these instead of point so we can mask off accordingly */
+	uint32_t ipsacq_innersrc[IPSA_MAX_ADDRLEN];
+	uint32_t ipsacq_innerdst[IPSA_MAX_ADDRLEN];
 
 	/* These may change per-acquire. */
 	uint16_t ipsacq_srcport;
 	uint16_t ipsacq_dstport;
 	uint8_t ipsacq_proto;
+	uint8_t ipsacq_inner_proto;
+	uint8_t ipsacq_innersrcpfx;
+	uint8_t ipsacq_innerdstpfx;
+
 	/* icmp type and code of triggering packet (if applicable) */
 	uint8_t	ipsacq_icmp_type;
 	uint8_t ipsacq_icmp_code;
@@ -462,31 +471,49 @@ extern sadbp_t ah_sadb, esp_sadb;
 
 #define	SA_FORM_UNIQUE_ID(io)				\
 	SA_UNIQUE_ID((io)->ipsec_out_src_port, (io)->ipsec_out_dst_port, \
-		(io)->ipsec_out_proto)
+		((io)->ipsec_out_tunnel ? ((io)->ipsec_out_inaf == AF_INET6 ? \
+		    IPPROTO_IPV6 : IPPROTO_ENCAP) : (io)->ipsec_out_proto), \
+		((io)->ipsec_out_tunnel ? (io)->ipsec_out_proto : 0))
 
 /*
- * This macro is used to generate unique ids (along with the addresses) for
- * outbound datagrams that require unique SAs.
+ * This macro is used to generate unique ids (along with the addresses, both
+ * inner and outer) for outbound datagrams that require unique SAs.
  *
  * N.B. casts and unsigned shift amounts discourage unwarranted
- * sign extension of dstport and proto.
+ * sign extension of dstport, proto, and iproto.
+ *
+ * Unique ID is 64-bits allocated as follows (pardon my big-endian bias):
+ *
+ *   6               4      43      33              11
+ *   3               7      09      21              65              0
+ *   +---------------*-------+-------+--------------+---------------+
+ *   |  MUST-BE-ZERO |<iprot>|<proto>| <src port>   |  <dest port>  |
+ *   +---------------*-------+-------+--------------+---------------+
+ *
+ * If there are inner addresses (tunnel mode) the ports come from the
+ * inner addresses.  If there are no inner addresses, the ports come from
+ * the outer addresses (transport mode).  Tunnel mode MUST have <proto>
+ * set to either IPPROTO_ENCAP or IPPPROTO_IPV6.
  */
-#define	SA_UNIQUE_ID(srcport, dstport, proto) 		\
-	((srcport) | ((uint64_t)(dstport) << 16U) | ((uint64_t)(proto) << 32U))
+#define	SA_UNIQUE_ID(srcport, dstport, proto, iproto) 	\
+	((srcport) | ((uint64_t)(dstport) << 16U) | \
+	((uint64_t)(proto) << 32U) | ((uint64_t)(iproto) << 40U))
 
 /*
  * SA_UNIQUE_MASK generates a mask value to use when comparing the unique value
  * from a packet to an SA.
  */
 
-#define	SA_UNIQUE_MASK(srcport, dstport, proto) 		\
-	SA_UNIQUE_ID((srcport != 0)? 0xffff : 0,		\
-		    (dstport != 0)? 0xffff : 0,			\
-		    (proto != 0)? 0xff : 0)
+#define	SA_UNIQUE_MASK(srcport, dstport, proto, iproto) 	\
+	SA_UNIQUE_ID((srcport != 0) ? 0xffff : 0,		\
+		    (dstport != 0) ? 0xffff : 0,		\
+		    (proto != 0) ? 0xff : 0,			\
+		    (iproto != 0) ? 0xff : 0)
 
 /*
  * Decompose unique id back into its original fields.
  */
+#define	SA_IPROTO(ipsa) ((ipsa)->ipsa_unique_id>>40)&0xff
 #define	SA_PROTO(ipsa) ((ipsa)->ipsa_unique_id>>32)&0xff
 #define	SA_SRCPORT(ipsa) ((ipsa)->ipsa_unique_id & 0xffff)
 #define	SA_DSTPORT(ipsa) (((ipsa)->ipsa_unique_id >> 16) & 0xffff)
@@ -522,18 +549,17 @@ void sadb_pfkey_echo(queue_t *, mblk_t *, sadb_msg_t *, struct keysock_in_s *,
 void sadb_pfkey_error(queue_t *, mblk_t *, int, int, uint_t);
 void sadb_keysock_hello(queue_t **, queue_t *, mblk_t *, void (*)(void *),
     timeout_id_t *, int);
-int sadb_addrcheck(queue_t *, queue_t *, mblk_t *, sadb_ext_t *, uint_t);
-void sadb_srcaddrfix(keysock_in_t *);
+int sadb_addrcheck(queue_t *, mblk_t *, sadb_ext_t *, uint_t);
+boolean_t sadb_addrfix(keysock_in_t *, queue_t *, mblk_t *);
 int sadb_addrset(ire_t *);
 int sadb_delget_sa(mblk_t *, keysock_in_t *, sadbp_t *, int *, queue_t *,
     boolean_t);
 #define	sadb_get_sa(m, k, s, i, q)	sadb_delget_sa(m, k, s, i, q, B_FALSE)
 #define	sadb_del_sa(m, k, s, i, q)	sadb_delget_sa(m, k, s, i, q, B_TRUE)
 
-int sadb_purge_sa(mblk_t *, keysock_in_t *, sadb_t *, int *,
-    queue_t *, queue_t *);
+int sadb_purge_sa(mblk_t *, keysock_in_t *, sadb_t *, queue_t *, queue_t *);
 int sadb_common_add(queue_t *, queue_t *, mblk_t *, sadb_msg_t *,
-    keysock_in_t *, isaf_t *, isaf_t *, ipsa_t *, boolean_t, boolean_t);
+    keysock_in_t *, isaf_t *, isaf_t *, ipsa_t *, boolean_t, boolean_t, int *);
 void sadb_set_usetime(ipsa_t *);
 boolean_t sadb_age_bytes(queue_t *, ipsa_t *, uint64_t, boolean_t);
 int sadb_update_sa(mblk_t *, keysock_in_t *, sadb_t *,
@@ -541,12 +567,11 @@ int sadb_update_sa(mblk_t *, keysock_in_t *, sadb_t *,
 void sadb_acquire(mblk_t *, ipsec_out_t *, boolean_t, boolean_t);
 
 void sadb_destroy_acquire(ipsacq_t *);
-uint8_t *sadb_setup_acquire(uint8_t *, uint8_t *, ipsacq_t *);
+mblk_t *sadb_setup_acquire(ipsacq_t *, uint8_t);
 ipsa_t *sadb_getspi(keysock_in_t *, uint32_t, int *);
 void sadb_in_acquire(sadb_msg_t *, sadbp_t *, queue_t *);
 boolean_t sadb_replay_check(ipsa_t *, uint32_t);
 boolean_t sadb_replay_peek(ipsa_t *, uint32_t);
-mblk_t *sadb_sa2msg(ipsa_t *, sadb_msg_t *);
 int sadb_dump(queue_t *, mblk_t *, minor_t, sadb_t *);
 void sadb_replay_delete(ipsa_t *);
 void sadb_ager(sadb_t *, queue_t *, queue_t *, int);

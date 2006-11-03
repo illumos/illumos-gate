@@ -712,6 +712,7 @@ struct iftun_req {
 #define	IFTUN_SECURITY			0x04	/* Pay attention to secinfo */
 #define	IFTUN_ENCAP			0x08	/* Pay attention to encap */
 #define	IFTUN_HOPLIMIT			0x10	/* Pay attention to hoplimit */
+#define	IFTUN_COMPLEX_SECURITY		0x20	/* Policy too big for ioctl */
 
 #endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
 

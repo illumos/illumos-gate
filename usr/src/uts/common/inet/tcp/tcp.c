@@ -11926,7 +11926,7 @@ tcp_check_policy(tcp_t *tcp, mblk_t *first_mp, ipha_t *ipha, ip6_t *ip6h,
 	ii = (ipsec_in_t *)first_mp->b_rptr;
 
 	if (ipsec_check_ipsecin_latch(ii, data_mp, ipl, ipha, ip6h, &reason,
-	    &counter)) {
+	    &counter, tcp->tcp_connp)) {
 		BUMP_MIB(&ip_mib, ipsecInSucceeded);
 		return (B_TRUE);
 	}

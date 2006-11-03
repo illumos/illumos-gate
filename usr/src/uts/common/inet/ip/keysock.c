@@ -970,9 +970,6 @@ keysock_passdown(keysock_t *ks, mblk_t *mp, uint8_t satype, sadb_ext_t *extv[],
 	if (extv[SADB_EXT_ADDRESS_DST] != NULL)
 		ksi->ks_in_dsttype = KS_IN_ADDR_UNKNOWN;
 	else ksi->ks_in_dsttype = KS_IN_ADDR_NOTTHERE;
-	if (extv[SADB_EXT_ADDRESS_PROXY] != NULL)
-		ksi->ks_in_proxytype = KS_IN_ADDR_UNKNOWN;
-	else ksi->ks_in_proxytype = KS_IN_ADDR_NOTTHERE;
 	for (i = 0; i <= SADB_EXT_MAX; i++)
 		ksi->ks_in_extv[i] = extv[i];
 	ksi->ks_in_serial = ks->keysock_serial;
@@ -1024,7 +1021,8 @@ ext_check(sadb_ext_t *ext)
 	switch (ext->sadb_ext_type) {
 	case SADB_EXT_ADDRESS_SRC:
 	case SADB_EXT_ADDRESS_DST:
-	case SADB_EXT_ADDRESS_PROXY:
+	case SADB_X_EXT_ADDRESS_INNER_SRC:
+	case SADB_X_EXT_ADDRESS_INNER_DST:
 		/* Check for at least enough addtl length for a sockaddr. */
 		if (ext->sadb_ext_len <= SADB_8TO64(sizeof (sadb_address_t)))
 			return (B_FALSE);
@@ -1313,6 +1311,12 @@ keysock_duplicate(int ext_type)
 	case SADB_EXT_ADDRESS_DST:
 		rc = SADB_X_DIAGNOSTIC_DUPLICATE_DST;
 		break;
+	case SADB_X_EXT_ADDRESS_INNER_SRC:
+		rc = SADB_X_DIAGNOSTIC_DUPLICATE_INNER_SRC;
+		break;
+	case SADB_X_EXT_ADDRESS_INNER_DST:
+		rc = SADB_X_DIAGNOSTIC_DUPLICATE_INNER_DST;
+		break;
 	case SADB_EXT_SA:
 		rc = SADB_X_DIAGNOSTIC_DUPLICATE_SA;
 		break;
@@ -1344,6 +1348,12 @@ keysock_malformed(int ext_type)
 		break;
 	case SADB_EXT_ADDRESS_DST:
 		rc = SADB_X_DIAGNOSTIC_MALFORMED_DST;
+		break;
+	case SADB_X_EXT_ADDRESS_INNER_SRC:
+		rc = SADB_X_DIAGNOSTIC_MALFORMED_INNER_SRC;
+		break;
+	case SADB_X_EXT_ADDRESS_INNER_DST:
+		rc = SADB_X_DIAGNOSTIC_MALFORMED_INNER_DST;
 		break;
 	case SADB_EXT_SA:
 		rc = SADB_X_DIAGNOSTIC_MALFORMED_SA;
@@ -1380,6 +1390,21 @@ keysock_inverse_acquire(mblk_t *mp, sadb_msg_t *samsg, sadb_ext_t *extv[],
 	}
 	if (extv[SADB_EXT_ADDRESS_DST] == NULL) {
 		keysock_error(ks, mp, EINVAL, SADB_X_DIAGNOSTIC_MISSING_DST);
+		return;
+	}
+
+	if (extv[SADB_X_EXT_ADDRESS_INNER_SRC] != NULL &&
+	    extv[SADB_X_EXT_ADDRESS_INNER_DST] == NULL) {
+		keysock_error(ks, mp, EINVAL,
+		    SADB_X_DIAGNOSTIC_MISSING_INNER_DST);
+		return;
+	}
+
+	if (extv[SADB_X_EXT_ADDRESS_INNER_SRC] == NULL &&
+	    extv[SADB_X_EXT_ADDRESS_INNER_DST] != NULL) {
+		keysock_error(ks, mp, EINVAL,
+		    SADB_X_DIAGNOSTIC_MISSING_INNER_SRC);
+		return;
 	}
 
 	reply_mp = ipsec_construct_inverse_acquire(samsg, extv);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,20 +125,9 @@ typedef struct ipsec_in_s {
 	crypto_data_t ipsec_in_crypto_mac;	/* to store the MAC */
 
 	zoneid_t ipsec_in_zoneid;	/* target zone for the datagram */
-
-#ifdef DEBUG
-	/*
-	 * To aid in IPSEC_IN leak detection, save a copy of the inbound IPsec
-	 * header in DEBUG kernels.  It takes no more space overall because
-	 * ipsec_info_t is more than sizeof (IPv4 or IPv6) bytes larger than
-	 * ipsec_in_t.  (60 bytes was chosen as a nice safe number.  Using
-	 * an IP or IPv6 constant increases the header file count for
-	 * consumers of this header file.)
-	 */
-	uint8_t ipsec_in_saved_hdr[60];
-#endif
 } ipsec_in_t;
 
+#define	IPSECOUT_MAX_ADDRLEN 4	/* Max addr len. (in 32-bit words) */
 /*
  * This is used for communication between IP and IPSEC (AH/ESP)
  * for Outbound datagrams. IPSEC_OUT is allocated by IP before IPSEC
@@ -170,10 +158,17 @@ typedef struct ipsec_out_s {
 	uint16_t ipsec_out_dst_port;	/* Destination port number of d-gram. */
 	uint8_t  ipsec_out_icmp_type;	/* ICMP type of d-gram */
 	uint8_t  ipsec_out_icmp_code;	/* ICMP code of d-gram */
+
+	sa_family_t ipsec_out_inaf;	/* Inner address family */
+	uint32_t ipsec_out_insrc[IPSECOUT_MAX_ADDRLEN];	/* Inner src address */
+	uint32_t ipsec_out_indst[IPSECOUT_MAX_ADDRLEN];	/* Inner dest address */
+	uint8_t  ipsec_out_insrcpfx;	/* Inner source prefix */
+	uint8_t  ipsec_out_indstpfx;	/* Inner destination prefix */
+
 	uint_t ipsec_out_ill_index;	/* ill index used for multicast etc. */
 	uint8_t ipsec_out_proto;	/* IP protocol number for d-gram. */
 	unsigned int
-		ipsec_out_encaps : 1,	/* Encapsualtion done ? */
+		ipsec_out_tunnel : 1,	/* Tunnel mode? */
 		ipsec_out_use_global_policy : 1, /* Inherit global policy ? */
 		ipsec_out_secure : 1,	/* Is this secure ? */
 		ipsec_out_proc_begin : 1, /* IPSEC processing begun */
@@ -273,6 +268,9 @@ typedef struct ipsec_out_s {
  * NOTE: Keysock_hello is simply an ipsec_info_t
  */
 
+/* TUN_HELLO is just like KEYSOCK_HELLO, except for tunnels to talk with IP. */
+#define	TUN_HELLO		KEYSOCK_HELLO
+
 /*
  * KEYSOCK_HELLO_ACK is sent by a consumer to acknowledge a KEYSOCK_HELLO.
  * It contains the PF_KEYv2 sa_type, so keysock can redirect PF_KEY messages
@@ -290,6 +288,7 @@ typedef struct keysock_hello_ack_s {
 #define	KS_IN_ADDR_ME 3
 #define	KS_IN_ADDR_NOTME 4
 #define	KS_IN_ADDR_MBCAST 5
+#define	KS_IN_ADDR_DONTCARE 6
 
 /*
  * KEYSOCK_IN is a PF_KEY message from a PF_KEY socket destined for a consumer.
@@ -305,7 +304,6 @@ typedef struct keysock_in_s {
 	struct sadb_ext *ks_in_extv[SADB_EXT_MAX + 1];
 	int ks_in_srctype;	/* Source address type. */
 	int ks_in_dsttype;	/* Dest address type. */
-	int ks_in_proxytype;	/* Proxy address type. */
 	minor_t ks_in_serial;	/* Serial # of sending socket. */
 } keysock_in_t;
 

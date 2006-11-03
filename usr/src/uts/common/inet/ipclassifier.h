@@ -76,6 +76,7 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
 #define	IPCL_SCTPCONN		0x00000002
 #define	IPCL_IPCCONN		0x00000004
 #define	IPCL_ISV6		0x00000008	/* Is a V6 connection */
+#define	IPCL_IPTUN		0x00000010	/* Has "tun" plumbed above it */
 
 /* Conn Masks */
 #define	IPCL_TCP		(IPCL_TCP4|IPCL_TCP6)
@@ -115,8 +116,9 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
 	((connp)->conn_flags & IPCL_UDP)
 
 #define	IPCL_IS_IPTUN(connp)						\
-	((connp)->conn_ulp == IPPROTO_ENCAP || \
-	(connp)->conn_ulp == IPPROTO_IPV6)
+	(((connp)->conn_ulp == IPPROTO_ENCAP ||				\
+	(connp)->conn_ulp == IPPROTO_IPV6) &&				\
+	((connp)->conn_flags & IPCL_IPTUN))
 
 typedef struct connf_s connf_t;
 typedef struct

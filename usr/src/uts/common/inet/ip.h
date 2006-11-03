@@ -2638,10 +2638,12 @@ struct ip6_pkt_s {
 	uint_t		ipp_rthdrlen;
 	uint_t		ipp_dstoptslen;
 	uint_t		ipp_pathmtulen;
+	uint_t		ipp_fraghdrlen;
 	ip6_hbh_t	*ipp_hopopts;
 	ip6_dest_t	*ipp_rtdstopts;
 	ip6_rthdr_t	*ipp_rthdr;
 	ip6_dest_t	*ipp_dstopts;
+	ip6_frag_t	*ipp_fraghdr;
 	struct ip6_mtuinfo *ipp_pathmtu;
 	in6_addr_t	ipp_nexthop;		/* Transmit only */
 	uint8_t		ipp_tclass;
@@ -2690,7 +2692,9 @@ typedef struct in_pktinfo {
 #define	IPPF_DONTFRAG	0x2000
 #define	IPPF_USE_MIN_MTU	0x04000
 #define	IPPF_MULTICAST_HOPS	0x08000
+
 #define	IPPF_UNICAST_HOPS	0x10000
+#define	IPPF_FRAGHDR		0x20000
 
 #define	IPPF_HAS_IP6I \
 	(IPPF_IFINDEX|IPPF_ADDR|IPPF_NEXTHOP|IPPF_SCOPE_ID| \

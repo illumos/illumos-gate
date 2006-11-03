@@ -64,6 +64,9 @@
  */
 #define	MAXLEN			1024
 
+/* Max length of tunnel interface string identifier */
+#define	TUNNAMEMAXLEN		LIFNAMSIZ
+
 /*
  * Used by parse_one and parse/parse_action to communicate
  * the errors. -1 is failure, which is not defined here.
@@ -110,9 +113,22 @@ static const char index_tag[] = "#INDEX";
 /* Types of Error messages */
 typedef enum error_type {BAD_ERROR, DUP_ERROR, REQ_ERROR} error_type_t;
 
+/* Error message human readable conversions */
+static char *sys_error_message(int);
+static void error_message(error_type_t, int, int);
+
 static int cmd;
 static char *filename;
 static char lo_buf[MAXLEN];			/* Leftover buffer */
+
+/*
+ * The new SPD_EXT_TUN_NAME extension has a tunnel name in it.  Use the empty
+ * string ("", stored in the char value "all_polheads") for all policy heads
+ * (global and all tunnels).  Set interface_name to NULL for global-only, or
+ * specify a name of an IP-in-IP tunnel.
+ */
+static char *interface_name;
+static char all_polheads;	/* So we can easily get "". */
 
 /* Error reporting stuff */
 #define	CBUF_LEN		4096		/* Maximum size of the cmd */
@@ -167,6 +183,7 @@ static d_list_t *d_tail = NULL;
  */
 static struct hostent *shp, *dhp;
 static unsigned int splen, dplen;
+static char tunif[TUNNAMEMAXLEN];
 static boolean_t has_saprefix, has_daprefix;
 static uint32_t seq_cnt = 0;
 
@@ -239,6 +256,8 @@ typedef struct ips_conf_s {
 	uint8_t has_dmask;
 	uint8_t has_type;
 	uint8_t has_code;
+	uint8_t has_negotiate;
+	uint8_t has_tunnel;
 	uint16_t swap;
 
 	struct in6_addr	ips_src_addr_v6;
@@ -263,6 +282,11 @@ typedef struct ips_conf_s {
 	 * SPD_RULE_FLAG_OUTBOUND		0x0002
 	 */
 	uint8_t			ips_dir;
+	/*
+	 * Keep track of tunnel separately due to explosion of ways to set
+	 * inbound/outbound.
+	 */
+	boolean_t		ips_tunnel;
 	uint64_t		ips_policy_index;
 	uint32_t		ips_act_cnt;
 	ips_act_props_t	*ips_acts;
@@ -286,6 +310,8 @@ typedef struct str_tval {
 } str_tval_t;
 
 static int	parse_int(const char *);
+static int	parse_index(const char *, char *);
+static int	attach_tunname(spd_if_t *);
 static void	usage(void);
 static int	ipsec_conf_del(int, boolean_t);
 static int	ipsec_conf_add(void);
@@ -298,8 +324,7 @@ static int	unlock(int);
 static int	parse_one(FILE *, act_prop_t *);
 static void	reconfigure();
 static void	in_prefixlentomask(unsigned int, uchar_t *);
-static unsigned int in_getprefixlen(char *);
-static int	in_masktoprefix(uint8_t *, boolean_t);
+static int	in_getprefixlen(char *);
 static int	parse_address(int, char *);
 #ifdef DEBUG_HEAVY
 static void	pfpol_msg_dump(spd_msg_t *msg, char *);
@@ -348,9 +373,12 @@ static alginfo_t known_algs[3][256];
 #define	TOK_dir 	12
 #define	TOK_type	13
 #define	TOK_code	14
+#define	TOK_negotiate	15
+#define	TOK_tunnel	16
 
 #define	IPS_SA SPD_ATTR_END
 #define	IPS_DIR SPD_ATTR_EMPTY
+#define	IPS_NEG SPD_ATTR_NOP
 
 
 static str_tval_t pattern_table[] = {
@@ -375,6 +403,8 @@ static str_tval_t pattern_table[] = {
 	{"dir",			TOK_dir,		IPS_DIR},
 	{"type",		TOK_type,		SPD_EXT_ICMP_TYPECODE},
 	{"code",		TOK_code,		SPD_EXT_ICMP_TYPECODE},
+	{"negotiate",		TOK_negotiate,		IPS_NEG},
+	{"tunnel",		TOK_tunnel,		SPD_EXT_TUN_NAME},
 	{NULL, 			0,				0},
 };
 
@@ -580,7 +610,7 @@ fetch_algorithms()
 		if (cnt < 0) {
 			err(-1, gettext("alglist failed: write"));
 		} else {
-			errx(-1, gettext("admin failed: short write"));
+			errx(-1, gettext("alglist failed: short write"));
 		}
 	}
 
@@ -934,6 +964,7 @@ ips_conf_to_pfpol_msg(int ipsec_cmd, ips_conf_t *inConf, int num_ips,
 		struct spd_ext_actions *spd_ext_actions;
 		struct spd_attribute *ap;
 		struct spd_typecode *spd_typecode;
+		spd_if_t *spd_if;
 		ips_act_props_t *act_ptr;
 		uint32_t rule_priority = 0;
 
@@ -977,6 +1008,8 @@ ips_conf_to_pfpol_msg(int ipsec_cmd, ips_conf_t *inConf, int num_ips,
 		spd_rule->spd_rule_len = SPD_8TO64(sizeof (struct spd_rule));
 		spd_rule->spd_rule_type = SPD_EXT_RULE;
 		spd_rule->spd_rule_flags = conf->ips_dir;
+		if (conf->ips_tunnel)
+			spd_rule->spd_rule_flags |= SPD_RULE_FLAG_TUNNEL;
 
 		next = (uint64_t *)&(spd_rule[1]);
 
@@ -988,6 +1021,18 @@ ips_conf_to_pfpol_msg(int ipsec_cmd, ips_conf_t *inConf, int num_ips,
 			spd_proto->spd_proto_exttype = SPD_EXT_PROTO;
 			spd_proto->spd_proto_number = conf->ips_ulp_prot;
 			next = (uint64_t *)&(spd_proto[1]);
+		}
+
+		/* tunnel */
+		if (conf->has_tunnel != 0) {
+			spd_if = (spd_if_t *)next;
+			spd_if->spd_if_len =
+			    SPD_8TO64(P2ROUNDUP(strlen(tunif) + 1, 8) +
+			    sizeof (spd_if_t));
+			spd_if->spd_if_exttype = SPD_EXT_TUN_NAME;
+			(void) strlcpy((char *)spd_if->spd_if_name, tunif,
+				TUNNAMEMAXLEN);
+			next = (uint64_t *)(spd_if) + spd_if->spd_if_len;
 		}
 
 		/* icmp type/code */
@@ -1159,7 +1204,7 @@ get_pf_pol_socket(void)
 
 
 static int
-send_pf_pol_message(int ipsec_cmd, ips_conf_t *conf)
+send_pf_pol_message(int ipsec_cmd, ips_conf_t *conf, int *diag)
 {
 	int retval;
 	int cnt;
@@ -1168,6 +1213,8 @@ send_pf_pol_message(int ipsec_cmd, ips_conf_t *conf)
 	spd_msg_t *return_buf;
 	spd_ext_t *exts[SPD_EXT_MAX+1];
 	int fd = get_pf_pol_socket();
+
+	*diag = 0;
 
 	if (fd < 0)
 		return (EBADF);
@@ -1201,16 +1248,17 @@ send_pf_pol_message(int ipsec_cmd, ips_conf_t *conf)
 #endif
 
 			if (cnt > 8 && return_buf->spd_msg_errno) {
-				int diag = return_buf->spd_msg_diagnostic;
+				*diag = return_buf->spd_msg_diagnostic;
 				if (!ipsecconf_qflag) {
 					warnx("%s: %s",
-					    gettext("spd_msg return"),
-					    strerror(
+					    gettext("Kernel returned"),
+					    sys_error_message(
 					    return_buf->spd_msg_errno));
 				}
-				if (diag != 0)
-					(void) printf("%s\n",
-					    spdsock_diag(diag));
+				if (*diag != 0)
+					(void) printf(gettext(
+					    "\t(spdsock diagnostic: %s)\n"),
+					    spdsock_diag(*diag));
 #ifdef DEBUG_HEAVY
 				pfpol_msg_dump((spd_msg_t *)polmsg.iov_base,
 				    "message in");
@@ -1277,8 +1325,16 @@ main(int argc, char *argv[])
 		cmd = IPSEC_CONF_VIEW;
 		goto done;
 	}
-	while ((c = getopt(argc, argv, "nlfa:qd:r:")) != EOF) {
+	while ((c = getopt(argc, argv, "nlfLFa:qd:r:i:")) != EOF) {
 		switch (c) {
+		case 'F':
+			if (interface_name != NULL) {
+				usage();
+				exit(1);
+			}
+			/* Apply to all policy heads - global and tunnels. */
+			interface_name = &all_polheads;
+			/* FALLTHRU */
 		case 'f':
 			/* Only one command at a time */
 			if (cmd != 0) {
@@ -1287,6 +1343,14 @@ main(int argc, char *argv[])
 			}
 			cmd = IPSEC_CONF_FLUSH;
 			break;
+		case 'L':
+			if (interface_name != NULL) {
+				usage();
+				exit(1);
+			}
+			/* Apply to all policy heads - global and tunnels. */
+			interface_name = &all_polheads;
+			/* FALLTHRU */
 		case 'l':
 			/* Only one command at a time */
 			if (cmd != 0) {
@@ -1296,8 +1360,8 @@ main(int argc, char *argv[])
 			cmd = IPSEC_CONF_LIST;
 			break;
 		case 'a':
-			/* Only one command at a time */
-			if (cmd != 0) {
+			/* Only one command at a time, and no interface name */
+			if (cmd != 0 || interface_name != NULL) {
 				usage();
 				exit(1);
 			}
@@ -1305,13 +1369,16 @@ main(int argc, char *argv[])
 			filename = optarg;
 			break;
 		case 'd':
-			/* Only one command at a time */
+			/*
+			 * Only one command at a time.  Interface name is
+			 * optional.
+			 */
 			if (cmd != 0) {
 				usage();
 				exit(1);
 			}
 			cmd = IPSEC_CONF_DEL;
-			index = parse_int(optarg);
+			index = parse_index(optarg, NULL);
 			break;
 		case 'n' :
 			ipsecconf_nflag++;
@@ -1320,13 +1387,26 @@ main(int argc, char *argv[])
 			ipsecconf_qflag++;
 			break;
 		case 'r' :
-			/* only one command at a time */
-			if (cmd != 0) {
+			/* Only one command at a time, and no interface name */
+			if (cmd != 0 || interface_name != NULL) {
 				usage();
 				exit(1);
 			}
 			cmd = IPSEC_CONF_SUB;
 			filename = optarg;
+			break;
+		case 'i':
+			if (interface_name != NULL) {
+				warnx(
+				    gettext("Interface name already selected"));
+				exit(1);
+			}
+			interface_name = optarg;
+			/* Check for some cretin using the all-polheads name. */
+			if (strlen(optarg) == 0) {
+				usage();
+				exit(1);
+			}
 			break;
 		default :
 			usage();
@@ -1366,6 +1446,10 @@ done:
 		(void) restore_all_signals();
 		break;
 	case IPSEC_CONF_VIEW:
+		if (interface_name != NULL) {
+			warnx(gettext("Cannot view for one interface only.\n"));
+			exit(1);
+		}
 		ret = ipsec_conf_view();
 		break;
 	case IPSEC_CONF_DEL:
@@ -1629,135 +1713,11 @@ print_port(uint16_t in_port, int type)
 		(void) printf("%d ", port);
 }
 
-#if 0
 /*
- * Print the mask (source or destination depending on the specified type)
- * defined in the policy pointed to by cptr.
- * We follow ifconfig's lead, i.e. we use the decimal dot notation for IPv4
- * masks and the /N prefix length form for IPv6.
+ * Print the address, given as "raw" input via the void pointer.
  */
 static void
-print_mask(ips_conf_t *cptr, int type)
-{
-	struct in_addr addr;
-	struct in6_addr addr6;
-	struct in_addr mask;
-	char buf[INET6_ADDRSTRLEN];
-	boolean_t isv4;
-	struct in6_addr *in_addr_ptr;
-	struct in6_addr *in_mask_ptr;
-
-	if (type == IPS_SRC_MASK) {
-		in_addr_ptr = &cptr->ips_src_addr_v6;
-		in_mask_ptr = &cptr->ips_src_mask_v6;
-	} else {
-		in_addr_ptr = &cptr->ips_dst_addr_v6;
-		in_mask_ptr = &cptr->ips_dst_mask_v6;
-	}
-
-	isv4 = cptr->ips_isv4;
-
-	/*
-	 * If the address is INADDR_ANY, don't print the mask.
-	 */
-	if (isv4) {
-		IN6_V4MAPPED_TO_INADDR(in_addr_ptr, &addr);
-		if (addr.s_addr == INADDR_ANY)
-			return;
-	} else {
-		addr6 = *in_addr_ptr;
-		if (IN6_IS_ADDR_UNSPECIFIED(&addr6))
-			return;
-	}
-
-	if (isv4) {
-		(void) printf(" ");
-		print_pattern_string(type);
-		IN6_V4MAPPED_TO_INADDR(in_mask_ptr, &mask);
-		(void) printf("%s ",
-		    inet_ntop(AF_INET, (uchar_t *)&mask.s_addr, buf,
-		    INET6_ADDRSTRLEN));
-	} else {
-		(void) printf("/%d ",
-		    in_masktoprefix((uint8_t *)&in_mask_ptr->s6_addr, B_FALSE));
-	}
-}
-
-/*
- * Print the address and mask.
- */
-static void
-print_address(ips_conf_t *cptr, int type)
-{
-	char  *cp;
-	struct hostent *hp;
-	char	domain[MAXHOSTNAMELEN + 1];
-	struct in_addr addr;
-	struct in6_addr addr6;
-	char abuf[INET6_ADDRSTRLEN];
-	int error_num;
-	struct in6_addr *in_addr_ptr;
-	uchar_t *addr_ptr;
-	sa_family_t af;
-	int addr_len;
-
-	if (type == SPD_EXT_LCLADDR)
-		in_addr_ptr = &cptr->ips_src_addr_v6;
-	else
-		in_addr_ptr = &cptr->ips_dst_addr_v6;
-
-	if (cptr->ips_isv4) {
-		af = AF_INET;
-		/* we don't print unspecified addresses */
-		IN6_V4MAPPED_TO_INADDR(in_addr_ptr, &addr);
-		if (addr.s_addr == INADDR_ANY)
-			return;
-		addr_ptr = (uchar_t *)&addr.s_addr;
-		addr_len = IPV4_ADDR_LEN;
-	} else {
-		af = AF_INET6;
-		addr6 = *in_addr_ptr;
-		/* we don't print unspecified addresses */
-		if (IN6_IS_ADDR_UNSPECIFIED(&addr6))
-			return;
-		addr_ptr = (uchar_t *)&addr6.s6_addr;
-		addr_len = sizeof (struct in6_addr);
-	}
-
-	print_pattern_string(type);
-
-	if (!ipsecconf_nflag) {
-		if (sysinfo(SI_HOSTNAME, domain, MAXHOSTNAMELEN) != -1 &&
-			(cp = strchr(domain, '.')) != NULL) {
-			(void) strcpy(domain, cp + 1);
-		} else {
-			domain[0] = 0;
-		}
-		hp = getipnodebyaddr(addr_ptr, addr_len, af, &error_num);
-		if (hp == NULL)
-			cp = NULL;
-		else {
-			if ((cp = strchr(hp->h_name, '.')) != 0 &&
-					strcasecmp(cp + 1, domain) == 0)
-				*cp = 0;
-			cp = hp->h_name;
-		}
-	}
-
-	if (cp) {
-		(void) printf("%s", cp);
-	} else {
-		(void) printf("%s", inet_ntop(af, addr_ptr, abuf,
-		    INET6_ADDRSTRLEN));
-	}
-}
-#endif
-
-/*
- * Print the address and mask.
- */
-static void
-print_address2(void *input, int isv4)
+print_raw_address(void *input, boolean_t isv4)
 {
 	char  *cp;
 	struct hostent *hp;
@@ -1869,10 +1829,16 @@ ipsec_conf_list(void)
 {
 	int ret;
 	int pfd;
-	struct spd_msg msg;
+	struct spd_msg *msg;
 	int cnt;
 	spd_msg_t *rmsg;
 	spd_ext_t *exts[SPD_EXT_MAX+1];
+	/*
+	 * Add an extra 8 bytes of space (+1 uint64_t) to avoid truncation
+	 * issues.
+	 */
+	uint64_t buffer[
+	    SPD_8TO64(sizeof (*msg) + sizeof (spd_if_t) + LIFNAMSIZ) + 1];
 
 	pfd = get_pf_pol_socket();
 
@@ -1881,12 +1847,15 @@ ipsec_conf_list(void)
 		return (-1);
 	}
 
-	(void) memset(&msg, 0, sizeof (msg));
-	msg.spd_msg_version = PF_POLICY_V1;
-	msg.spd_msg_type = SPD_DUMP;
-	msg.spd_msg_len = SPD_8TO64(sizeof (msg));
+	(void) memset(buffer, 0, sizeof (buffer));
+	msg = (struct spd_msg *)buffer;
+	msg->spd_msg_version = PF_POLICY_V1;
+	msg->spd_msg_type = SPD_DUMP;
+	msg->spd_msg_len = SPD_8TO64(sizeof (*msg));
 
-	cnt = write(pfd, &msg, sizeof (msg));
+	msg->spd_msg_len += attach_tunname((spd_if_t *)(msg + 1));
+
+	cnt = write(pfd, msg, SPD_64TO8(msg->spd_msg_len));
 
 	if (cnt < 0) {
 		warn(gettext("dump: invalid write() return"));
@@ -1899,7 +1868,8 @@ ipsec_conf_list(void)
 	if (rmsg == NULL || rmsg->spd_msg_errno != 0) {
 		warnx("%s: %s", gettext("ruleset dump failed"),
 		    (rmsg == NULL ?
-			gettext("read error") : strerror(rmsg->spd_msg_errno)));
+			gettext("read error") :
+			sys_error_message(rmsg->spd_msg_errno)));
 		(void) close(pfd);
 		return (-1);
 	}
@@ -1916,7 +1886,7 @@ ipsec_conf_list(void)
 
 		if (rmsg->spd_msg_errno != 0) {
 			warnx("%s: %s", gettext("dump read: bad message"),
-			    strerror(rmsg->spd_msg_errno));
+			    sys_error_message(rmsg->spd_msg_errno));
 			(void) close(pfd);
 			return (-1);
 		}
@@ -1927,7 +1897,7 @@ ipsec_conf_list(void)
 			if (strlen(spdsock_diag_buf) != 0)
 				warnx(spdsock_diag_buf);
 			warnx("%s: %s", gettext("dump read: bad message"),
-			    strerror(rmsg->spd_msg_errno));
+			    sys_error_message(rmsg->spd_msg_errno));
 			(void) close(pfd);
 			return (ret);
 		}
@@ -1997,6 +1967,7 @@ print_pfpol_msg(spd_msg_t *msg)
 	struct spd_ext_actions *spd_ext_actions;
 	struct spd_typecode *spd_typecode;
 	struct spd_attribute *app;
+	spd_if_t *spd_if;
 	uint32_t rv;
 	uint16_t act_count;
 
@@ -2004,8 +1975,16 @@ print_pfpol_msg(spd_msg_t *msg)
 	    SPDSOCK_DIAG_BUF_LEN);
 
 	if (rv == KGE_OK && exts[SPD_EXT_RULE] != NULL) {
+		spd_if = (spd_if_t *)exts[SPD_EXT_TUN_NAME];
 		spd_rule = (struct spd_rule *)exts[SPD_EXT_RULE];
-		(void) printf("%s %lld\n", INDEX_TAG, spd_rule->spd_rule_index);
+		if (spd_if == NULL) {
+			(void) printf("%s %lld\n", INDEX_TAG,
+			    spd_rule->spd_rule_index);
+		} else {
+			(void) printf("%s %s,%lld\n", INDEX_TAG,
+			    (char *)spd_if->spd_if_name,
+			    spd_rule->spd_rule_index);
+		}
 	} else {
 		if (strlen(spdsock_diag_buf) != 0)
 			warnx(spdsock_diag_buf);
@@ -2014,6 +1993,13 @@ print_pfpol_msg(spd_msg_t *msg)
 	}
 
 	(void) printf("%c ", CURL_BEGIN);
+
+	if (spd_if != NULL) {
+		(void) printf("tunnel %s negotiate %s ",
+		    (char *)spd_if->spd_if_name,
+		    (spd_rule->spd_rule_flags & SPD_RULE_FLAG_TUNNEL) ?
+		    "tunnel" : "transport");
+	}
 
 	if (exts[SPD_EXT_PROTO] != NULL) {
 		spd_proto = (struct spd_proto *)exts[SPD_EXT_PROTO];
@@ -2024,11 +2010,8 @@ print_pfpol_msg(spd_msg_t *msg)
 		spd_address = (spd_address_t *)exts[SPD_EXT_LCLADDR];
 
 		(void) printf("laddr ");
-		if (spd_address->spd_address_len == 2)
-			print_address2((spd_address+1), 1);
-		else
-			print_address2((spd_address+1), 0);
-
+		print_raw_address((spd_address + 1),
+		    (spd_address->spd_address_len == 2));
 		(void) printf("/%d ", spd_address->spd_address_prefixlen);
 	}
 
@@ -2045,11 +2028,8 @@ print_pfpol_msg(spd_msg_t *msg)
 		spd_address = (spd_address_t *)exts[SPD_EXT_REMADDR];
 
 		(void) printf("raddr ");
-		if (spd_address->spd_address_len == 2)
-			print_address2((spd_address+1), 1);
-		else
-			print_address2((spd_address+1), 0);
-
+		print_raw_address((spd_address + 1),
+		    (spd_address->spd_address_len == 2));
 		(void) printf("/%d ", spd_address->spd_address_prefixlen);
 	}
 
@@ -2199,6 +2179,7 @@ pfpol_msg_dump(spd_msg_t *msg, char *tag)
 	struct spd_typecode *spd_typecode;
 	struct spd_ext_actions *spd_ext_actions;
 	struct spd_attribute *app;
+	spd_if_t *spd_if;
 	char abuf[INET6_ADDRSTRLEN];
 	uint32_t rv;
 	uint16_t act_count;
@@ -2226,6 +2207,11 @@ pfpol_msg_dump(spd_msg_t *msg, char *tag)
 		}
 
 		switch (i) {
+		case SPD_EXT_TUN_NAME:
+			spd_if = (spd_if_t *)exts[i];
+			(void) printf("spd_if = %s\n", spd_if->spd_if_name);
+			break;
+
 		case SPD_EXT_ICMP_TYPECODE:
 			spd_typecode = (struct spd_typecode *)exts[i];
 			(void) printf("icmp type %d-%d code %d-%d\n",
@@ -2447,6 +2433,7 @@ ipsec_conf_del(int policy_index, boolean_t ignore_spd)
 	int ret = 0;
 	int offset, prev_offset;
 	int nlines;
+	char lifname[LIFNAMSIZ];
 
 	if (act_props == NULL) {
 		warn(gettext("memory"));
@@ -2476,13 +2463,15 @@ ipsec_conf_del(int policy_index, boolean_t ignore_spd)
 		 */
 		buf = ibuf + index_len;
 		buf++;			/* Skip the space */
-		index = parse_int(buf);
+		index = parse_index(buf, lifname);
 		if (index == -1) {
 			warnx(gettext("Invalid index in the file"));
 			free(act_props);
 			return (-1);
 		}
-		if (index == policy_index) {
+		if (index == policy_index &&
+		    (interface_name == NULL ||
+			strncmp(interface_name, lifname, LIFNAMSIZ) == 0)) {
 			if (!ignore_spd) {
 				ret = parse_one(fp, act_props);
 				if (ret == -1) {
@@ -2554,15 +2543,20 @@ pfp_delete_rule(uint64_t index)
 	struct spd_msg *msg;
 	struct spd_rule *rule;
 	int sfd = socket(PF_POLICY, SOCK_RAW, PF_POLICY_V1);
-	int cnt;
+	int cnt, len, alloclen;
 
 	if (sfd < 0) {
 		warn(gettext("unable to open policy socket"));
 		return (-1);
 	}
 
-	msg = (spd_msg_t *)malloc(sizeof (spd_msg_t)
-	    + sizeof (struct spd_rule));
+	/*
+	 * Add an extra 8 bytes of space (+1 uint64_t) to avoid truncation
+	 * issues.
+	 */
+	alloclen = sizeof (spd_msg_t) + sizeof (struct spd_rule) +
+	    sizeof (spd_if_t) + LIFNAMSIZ + 8;
+	msg = (spd_msg_t *)malloc(alloclen);
 
 	if (msg == NULL) {
 		warn("malloc");
@@ -2571,7 +2565,7 @@ pfp_delete_rule(uint64_t index)
 
 	rule = (struct spd_rule *)(msg + 1);
 
-	(void) memset(msg, 0, sizeof (spd_msg_t) + sizeof (struct spd_rule));
+	(void) memset(msg, 0, alloclen);
 	msg->spd_msg_version = PF_POLICY_V1;
 	msg->spd_msg_type = SPD_DELETERULE;
 	msg->spd_msg_len = SPD_8TO64(sizeof (spd_msg_t)
@@ -2581,10 +2575,12 @@ pfp_delete_rule(uint64_t index)
 	rule->spd_rule_len = SPD_8TO64(sizeof (struct spd_rule));
 	rule->spd_rule_index = index;
 
-	cnt = write(sfd, msg,
-	    sizeof (spd_msg_t) + sizeof (struct spd_rule));
+	msg->spd_msg_len += attach_tunname((spd_if_t *)(rule + 1));
 
-	if (cnt != sizeof (spd_msg_t) + sizeof (struct spd_rule)) {
+	len = SPD_64TO8(msg->spd_msg_len);
+	cnt = write(sfd, msg, len);
+
+	if (cnt != len) {
 		if (cnt < 0) {
 			(void) close(sfd);
 			free(msg);
@@ -2598,9 +2594,8 @@ pfp_delete_rule(uint64_t index)
 		}
 	}
 
-	cnt = read(sfd, msg,
-	    sizeof (spd_msg_t) + sizeof (struct spd_rule));
-	if (cnt != sizeof (spd_msg_t) + sizeof (struct spd_rule)) {
+	cnt = read(sfd, msg, len);
+	if (cnt != len) {
 		if (cnt < 0) {
 			(void) close(sfd);
 			free(msg);
@@ -2628,23 +2623,33 @@ pfp_delete_rule(uint64_t index)
 static int
 ipsec_conf_flush(int db)
 {
-	int pfd, cnt;
+	int pfd, cnt, len;
 	int sfd = socket(PF_POLICY, SOCK_RAW, PF_POLICY_V1);
-	struct spd_msg msg;
+	struct spd_msg *msg;
+	/*
+	 * Add an extra 8 bytes of space (+1 uint64_t) to avoid truncation
+	 * issues.
+	 */
+	uint64_t buffer[
+	    SPD_8TO64(sizeof (*msg) + sizeof (spd_if_t) + LIFNAMSIZ) + 1];
 
 	if (sfd < 0) {
 		warn(gettext("unable to open policy socket"));
 		return (-1);
 	}
 
-	(void) memset(&msg, 0, sizeof (msg));
-	msg.spd_msg_version = PF_POLICY_V1;
-	msg.spd_msg_type = SPD_FLUSH;
-	msg.spd_msg_len = SPD_8TO64(sizeof (msg));
-	msg.spd_msg_spdid = db;
+	(void) memset(buffer, 0, sizeof (buffer));
+	msg = (struct spd_msg *)buffer;
+	msg->spd_msg_version = PF_POLICY_V1;
+	msg->spd_msg_type = SPD_FLUSH;
+	msg->spd_msg_len = SPD_8TO64(sizeof (*msg));
+	msg->spd_msg_spdid = db;
 
-	cnt = write(sfd, &msg, sizeof (msg));
-	if (cnt != sizeof (msg)) {
+	msg->spd_msg_len += attach_tunname((spd_if_t *)(msg + 1));
+
+	len = SPD_64TO8(msg->spd_msg_len);
+	cnt = write(sfd, msg, len);
+	if (cnt != len) {
 		if (cnt < 0) {
 			warn(gettext("Flush failed: write"));
 			return (-1);
@@ -2654,8 +2659,8 @@ ipsec_conf_flush(int db)
 		}
 	}
 
-	cnt = read(sfd, &msg, sizeof (msg));
-	if (cnt != sizeof (msg)) {
+	cnt = read(sfd, msg, len);
+	if (cnt != len) {
 		if (cnt < 0) {
 			warn(gettext("Flush failed: read"));
 			return (-1);
@@ -2665,9 +2670,9 @@ ipsec_conf_flush(int db)
 		}
 	}
 	(void) close(sfd);
-	if (msg.spd_msg_errno != 0) {
+	if (msg->spd_msg_errno != 0) {
 		warnx("%s: %s", gettext("Flush failed: SPD_FLUSH"),
-		    strerror(msg.spd_msg_errno));
+		    sys_error_message(msg->spd_msg_errno));
 		return (-1);
 	}
 
@@ -2693,25 +2698,38 @@ ipsec_conf_flush(int db)
 	return (0);
 }
 
-/* function to send SPD_FLIP and SPD_CLONE messages */
+/*
+ * function to send SPD_FLIP and SPD_CLONE messages
+ * Do it for ALL polheads for simplicity's sake.
+ */
 static void
 ipsec_conf_admin(uint8_t type)
 {
 	int cnt;
 	int sfd = socket(PF_POLICY, SOCK_RAW, PF_POLICY_V1);
-	struct spd_msg msg;
+	struct spd_msg *msg;
+	uint64_t buffer[
+	    SPD_8TO64(sizeof (struct spd_msg) + sizeof (spd_if_t))];
+	char *save_ifname;
 
 	if (sfd < 0) {
 		err(-1, gettext("unable to open policy socket"));
 	}
 
-	(void) memset(&msg, 0, sizeof (msg));
-	msg.spd_msg_version = PF_POLICY_V1;
-	msg.spd_msg_type = type;
-	msg.spd_msg_len = SPD_8TO64(sizeof (msg));
+	(void) memset(buffer, 0, sizeof (buffer));
+	msg = (struct spd_msg *)buffer;
+	msg->spd_msg_version = PF_POLICY_V1;
+	msg->spd_msg_type = type;
+	msg->spd_msg_len = SPD_8TO64(sizeof (buffer));
 
-	cnt = write(sfd, &msg, sizeof (msg));
-	if (cnt != sizeof (msg)) {
+	save_ifname = interface_name;
+	/* Apply to all policy heads - global and tunnels. */
+	interface_name = &all_polheads;
+	(void) attach_tunname((spd_if_t *)(msg + 1));
+	interface_name = save_ifname;
+
+	cnt = write(sfd, msg, sizeof (buffer));
+	if (cnt != sizeof (buffer)) {
 		if (cnt < 0) {
 			err(-1, gettext("admin failed: write"));
 		} else {
@@ -2719,8 +2737,8 @@ ipsec_conf_admin(uint8_t type)
 		}
 	}
 
-	cnt = read(sfd, &msg, sizeof (msg));
-	if (cnt != sizeof (msg)) {
+	cnt = read(sfd, msg, sizeof (buffer));
+	if (cnt != sizeof (buffer)) {
 		if (cnt < 0) {
 			err(-1, gettext("admin failed: read"));
 		} else {
@@ -2728,8 +2746,8 @@ ipsec_conf_admin(uint8_t type)
 		}
 	}
 	(void) close(sfd);
-	if (msg.spd_msg_errno != 0) {
-		errno = msg.spd_msg_errno;
+	if (msg->spd_msg_errno != 0) {
+		errno = msg->spd_msg_errno;
 		err(-1, gettext("admin failed"));
 	}
 }
@@ -2746,12 +2764,15 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr, gettext(
-		"Usage:	ipsecconf\n"
-		"\tipsecconf -a ([-]|<filename>) [-q]\n"
-		"\tipsecconf -r ([-]|<filename>) [-q]\n"
-		"\tipsecconf -d <index>\n"
-		"\tipsecconf -l [-n]\n"
-		"\tipsecconf -f\n"));
+	"Usage:	ipsecconf\n"
+	"\tipsecconf -a ([-]|<filename>) [-q]\n"
+	"\tipsecconf -r ([-]|<filename>) [-q]\n"
+	"\tipsecconf -d [-i tunnel-interface] <index>\n"
+	"\tipsecconf -d <tunnel-interface,index>\n"
+	"\tipsecconf -l [-n] [-i tunnel-interface]\n"
+	"\tipsecconf -f [-i tunnel-interface]\n"
+	"\tipsecconf -L [-n]\n"
+	"\tipsecconf -F\n"));
 }
 
 /*
@@ -2831,58 +2852,72 @@ parse_int(const char *str)
 }
 
 /*
- * Convert a mask to a prefix length.
- * Returns prefix length on success, 0 otherwise.
+ * Parses <interface>,<index>.  Sets iname or the global interface_name (if
+ * iname == NULL) to <interface> and returns <index>.  Calls exit() if we have
+ * an interface_name already set.
  */
-static unsigned int
-in_getprefixlen(char *mask)
+static int
+parse_index(const char *str, char *iname)
 {
-	long prefixlen;
-	char *end;
+	char *intf, *num, *copy;
+	int rc;
 
-	prefixlen = strtol(mask, &end, 10);
-	if (prefixlen < 0) {
-		return (0);
+	copy = strdup(str);
+	if (copy == NULL) {
+		warnx(gettext("Out of memory"));
+		exit(1);
 	}
-	if (mask == end) {
-		return (0);
+
+	intf = strtok(copy, ",");
+	/* Just want the rest of the string unmolested, so use "" for arg2. */
+	num = strtok(NULL, "");
+	if (num == NULL) {
+		/* No comma found, just parse it like an int. */
+		free(copy);
+		return (parse_int(str));
 	}
-	if (*end != '\0') {
-		return (0);
+
+	if (iname != NULL) {
+		(void) strlcpy(iname, intf, LIFNAMSIZ);
+	} else {
+		if (interface_name != NULL) {
+			warnx(gettext("Interface name already selected"));
+			exit(1);
+		}
+
+		interface_name = strdup(intf);
+		if (interface_name == NULL) {
+			warnx(gettext("Out of memory"));
+			exit(1);
+		}
 	}
-	return ((unsigned int)prefixlen);
+
+	rc = parse_int(num);
+	free(copy);
+	return (rc);
 }
 
 /*
- * Convert an IPv6 mask to a prefix len.  I assume all IPv6 masks are
- * contiguous, so I stop at the first bit!
+ * Convert a mask to a prefix length.
+ * Returns prefix length on success, -1 otherwise.
  */
 static int
-in_masktoprefix(uint8_t *mask, boolean_t is_v4mapped)
+in_getprefixlen(char *mask)
 {
-	int rc = 0;
-	uint8_t last;
-	int limit = IPV6_ABITS;
+	int prefixlen;
+	char *end;
 
-	if (is_v4mapped) {
-		mask += ((IPV6_ABITS - IP_ABITS)/8);
-		limit = IP_ABITS;
+	prefixlen = (int)strtol(mask, &end, 10);
+	if (prefixlen < 0) {
+		return (-1);
 	}
-
-	while (*mask == 0xff) {
-		rc += 8;
-		if (rc == limit)
-			return (limit);
-		mask++;
+	if (mask == end) {
+		return (-1);
 	}
-
-	last = *mask;
-	while (last != 0) {
-		rc++;
-		last = (last << 1) & 0xff;
+	if (*end != '\0') {
+		return (-1);
 	}
-
-	return (rc);
+	return (prefixlen);
 }
 
 /*
@@ -2908,7 +2943,7 @@ static int
 parse_address(int type, char *addr_str)
 {
 	char *ptr;
-	unsigned int prefix_len = 0;
+	int prefix_len = 0;
 	struct netent *ne = NULL;
 	struct hostent *hp = NULL;
 	int h_errno;
@@ -2923,7 +2958,7 @@ parse_address(int type, char *addr_str)
 		*ptr++ = NULL;
 
 		prefix_len = in_getprefixlen(ptr);
-		if (prefix_len == 0)
+		if (prefix_len < 0)
 			return (-1);
 	}
 
@@ -3002,7 +3037,7 @@ parse_address(int type, char *addr_str)
 static int
 do_port_adds(ips_conf_t *cptr)
 {
-	int ret;
+	int ret, diag;
 
 	assert(IN6_IS_ADDR_UNSPECIFIED(&cptr->ips_src_addr_v6));
 	assert(IN6_IS_ADDR_UNSPECIFIED(&cptr->ips_dst_addr_v6));
@@ -3011,13 +3046,13 @@ do_port_adds(ips_conf_t *cptr)
 	(void) dump_conf(cptr);
 #endif
 
-	ret = send_pf_pol_message(SPD_ADDRULE, cptr);
+	ret = send_pf_pol_message(SPD_ADDRULE, cptr, &diag);
 	if (ret != 0 && !ipsecconf_qflag) {
 		warnx(
-		    gettext("Could not add IPv4 policy for sport %d, dport %d"),
+		    gettext("Could not add IPv4 policy for sport %d, dport %d "
+			"- diagnostic %d - %s"),
 		    ntohs(cptr->ips_src_port_min),
-		    ntohs(cptr->ips_dst_port_min));
-
+		    ntohs(cptr->ips_dst_port_min), diag, spdsock_diag(diag));
 	}
 
 	return (ret);
@@ -3058,7 +3093,7 @@ set_mask_info(struct hostent *hp, unsigned int plen, struct in6_addr *mask_v6)
 	struct in_addr mask_v4;
 
 	if (hp->h_addr_list[1] != NULL) {
-		return (EINVAL);
+		return (EOPNOTSUPP);
 	}
 
 	if (!IN6_IS_ADDR_UNSPECIFIED(mask_v6)) {
@@ -3102,7 +3137,7 @@ init_addr_wildcard(struct in6_addr *addr_v6, boolean_t isv4)
  * cases.
  */
 static int
-do_address_adds(ips_conf_t *cptr)
+do_address_adds(ips_conf_t *cptr, int *diag)
 {
 	int i, j;
 	int ret = 0;	/* For ioctl() call. */
@@ -3184,7 +3219,7 @@ do_address_adds(ips_conf_t *cptr)
 				    isv4);
 			}
 
-			ret = send_pf_pol_message(SPD_ADDRULE, cptr);
+			ret = send_pf_pol_message(SPD_ADDRULE, cptr, diag);
 
 			if (ret == 0) {
 				add_count++;
@@ -3383,8 +3418,7 @@ parse_ipsec_alg(char *str, ips_act_props_t *iap, int alg_type)
 	 * Make sure that we get a null terminated string.
 	 * For a bad input, we truncate at VALID_ALG_LEN.
 	 */
-	(void) strncpy(tstr, str, VALID_ALG_LEN - 1);
-	tstr[VALID_ALG_LEN - 1] = '\0';
+	(void) strlcpy(tstr, str, VALID_ALG_LEN);
 	lens = strtok(tstr, "()");
 	lens = strtok(NULL, "()");
 
@@ -3456,6 +3490,27 @@ parse_ipsec_alg(char *str, ips_act_props_t *iap, int alg_type)
 	return (0);
 }
 
+static char *
+sys_error_message(int syserr)
+{
+	char *mesg;
+
+	switch (syserr) {
+	case EEXIST:
+		mesg = gettext("Entry already exists");
+		break;
+	case ENOENT:
+		mesg = gettext("Tunnel not found");
+		break;
+	case EINVAL:
+		mesg = gettext("Invalid entry");
+		break;
+	default :
+		mesg = strerror(syserr);
+	}
+	return (mesg);
+}
+
 static void
 error_message(error_type_t error, int type, int line)
 {
@@ -3504,6 +3559,12 @@ error_message(error_type_t error, int type, int line)
 	case IPSEC_CONF_ICMP_CODE:
 		mesg = gettext("ICMP code");
 		break;
+	case IPSEC_CONF_NEGOTIATE:
+		mesg = gettext("Negotiate");
+		break;
+	case IPSEC_CONF_TUNNEL:
+		mesg = gettext("Tunnel");
+		break;
 	default :
 		return;
 	}
@@ -3536,7 +3597,7 @@ validate_properties(ips_act_props_t *cptr, boolean_t dir, boolean_t is_alg)
 		return (0);
 	}
 	if (!is_alg) {
-		warnx(gettext("No IPSEC algorithms given"));
+		warnx(gettext("No IPsec algorithms given"));
 		return (-1);
 	}
 	if (cptr->iap_attr == 0) {
@@ -3734,8 +3795,9 @@ scan:
 				 * If we never read a newline character,
 				 * we don't want to print 0.
 				 */
-				warnx(gettext("Bad start on line %d :"),
-				(linecount == 0) ? 1 : linecount);
+				warnx(gettext("line %d : line must start "
+				    "with \"{\" character"),
+				    (linecount == 0) ? 1 : linecount);
 				return (-1);
 			}
 			buf++;
@@ -3933,7 +3995,7 @@ parse_one(FILE *fp, act_prop_t *act_props)
 				 * character, we don't want
 				 * to print 0.
 				 */
-				warnx(gettext("(parse one)"
+				warnx(gettext("(parsing one command)"
 				    "Invalid action on line %d: %s"),
 				    (linecount == 0) ? 1 : linecount,
 				    act_props->ap[ap_num].act);
@@ -4519,7 +4581,64 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 			cptr->ips_icmp_code = (uint8_t)code;
 			cptr->ips_icmp_code_end = (uint8_t)code_end;
 			break;
+		case TOK_tunnel:
+			if (cptr->has_tunnel == 1) {
+				error_message(BAD_ERROR,
+				    IPSEC_CONF_TUNNEL, line_no);
+				return (-1);
+			}
+			i++, line_no++;
+			if (act_props->pattern[i] == NULL) {
+				error_message(BAD_ERROR,
+				    IPSEC_CONF_TUNNEL, line_no);
+				return (-1);
+			}
+
+			if (strlcpy(tunif, act_props->pattern[i],
+			    TUNNAMEMAXLEN) >= TUNNAMEMAXLEN) {
+				error_message(BAD_ERROR,
+				    IPSEC_CONF_TUNNEL, line_no);
+				return (-1);
+			}
+			cptr->has_tunnel = 1;
+			break;
+		case TOK_negotiate:
+			if (cptr->has_negotiate == 1) {
+				error_message(BAD_ERROR,
+				    IPSEC_CONF_NEGOTIATE, line_no);
+				return (-1);
+			}
+			i++, line_no++;
+			if (act_props->pattern[i] == NULL) {
+				error_message(BAD_ERROR,
+				    IPSEC_CONF_NEGOTIATE, line_no);
+				return (-1);
+			}
+
+			if (strncmp(act_props->pattern[i], "tunnel", 6) == 0) {
+				cptr->ips_tunnel = B_TRUE;
+			} else if (strncmp(
+			    act_props->pattern[i], "transport", 9) != 0) {
+				error_message(BAD_ERROR,
+				    IPSEC_CONF_NEGOTIATE, line_no);
+				return (-1);
+			}
+			cptr->has_negotiate = 1;
+			break;
 		}
+
+	}
+
+	/* Sanity check that certain tokens occur together */
+	if (cptr->has_tunnel + cptr->has_negotiate == 1) {
+		if (cptr->has_negotiate == 0) {
+			error_message(REQ_ERROR, IPSEC_CONF_NEGOTIATE, line_no);
+		} else {
+			error_message(REQ_ERROR, IPSEC_CONF_TUNNEL, line_no);
+		}
+		errx(1, gettext(
+		    "tunnel and negotiate tokens must occur together"));
+		return (-1);
 	}
 
 	/*
@@ -4943,7 +5062,7 @@ ipsec_conf_add(void)
 	act_prop_t *act_props = malloc(sizeof (act_prop_t));
 	ips_conf_t conf;
 	FILE *fp, *policy_fp;
-	int ret, i, j;
+	int ret, i, j, diag;
 	char *warning = gettext(
 		"\tWARNING : New policy entries that are being added may\n "
 		"\taffect the existing connections. Existing connections\n"
@@ -5026,7 +5145,7 @@ ipsec_conf_add(void)
 				goto bail;
 			}
 		} else {
-			ret = do_address_adds(&conf);
+			ret = do_address_adds(&conf, &diag);
 			switch (ret) {
 			case 0:
 				/* no error. */
@@ -5039,7 +5158,21 @@ ipsec_conf_add(void)
 					"Can't set mask and /NN prefix."));
 				ret = -1;
 				break;
+			case ENOENT:
+				warnx(gettext("Cannot find tunnel "
+				    "interface %s."), interface_name);
+				ret = -1;
+				break;
 			case EINVAL:
+				/*
+				 * PF_POLICY didn't like what we sent.  We
+				 * can't check all input up here, but we
+				 * do in-kernel.
+				 */
+				warnx(gettext("PF_POLICY invalid input:\n\t%s"),
+				    spdsock_diag(diag));
+				break;
+			case EOPNOTSUPP:
 				warnx(gettext("Can't set /NN"
 					" prefix on multi-host name."));
 				ret = -1;
@@ -5248,7 +5381,7 @@ ipsec_conf_sub()
 			if (strncasecmp(pbuf, INDEX_TAG, index_len) == 0) {
 				buf = pbuf + index_len;
 				buf++;
-				if ((pindex = parse_int(buf)) == -1) {
+				if ((pindex = parse_index(buf, NULL)) == -1) {
 					/* bad index, we can't continue */
 					warnx(gettext(
 						"Invalid index in the file"));
@@ -5333,6 +5466,9 @@ delete:
 		/* reset the globals */
 		linecount = 0;
 		pindex = 0;
+		/* free(NULL) also works. */
+		free(interface_name);
+		interface_name = NULL;
 
 		/* reopen for next pass, automagically starting over. */
 		policy_fp = fopen(POLICY_CONF_FILE, "r");
@@ -5359,4 +5495,25 @@ delete:
 	free(act_props);
 
 	return (0);
+}
+
+/*
+ * Constructs a tunnel interface ID extension.  Returns the length
+ * of the extension in 64-bit-words.
+ */
+static int
+attach_tunname(spd_if_t *tunname)
+{
+	if (tunname == NULL || interface_name == NULL)
+		return (0);
+
+	tunname->spd_if_exttype = SPD_EXT_TUN_NAME;
+	/*
+	 * Use "-3" because there's 4 bytes in the message itself, and
+	 * we lose one because of the '\0' terminator.
+	 */
+	tunname->spd_if_len = SPD_8TO64(
+	    P2ROUNDUP(sizeof (*tunname) + strlen(interface_name) - 3, 8));
+	(void) strlcpy((char *)tunname->spd_if_name, interface_name, LIFNAMSIZ);
+	return (tunname->spd_if_len);
 }

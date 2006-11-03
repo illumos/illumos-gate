@@ -1563,10 +1563,10 @@ print_addr_range(char *prefix, ike_addr_pr_t *pr)
 	}
 
 	(void) printf("%s ", prefix);
-	(void) dump_sockaddr((struct sockaddr *)beg, B_TRUE, stdout);
+	(void) dump_sockaddr((struct sockaddr *)beg, 0, B_TRUE, stdout);
 	if (range) {
 		(void) printf(" - ");
-		(void) dump_sockaddr((struct sockaddr *)end, B_TRUE, stdout);
+		(void) dump_sockaddr((struct sockaddr *)end, 0, B_TRUE, stdout);
 	}
 	(void) printf("\n");
 
@@ -1592,7 +1592,7 @@ print_addr(char *prefix, struct sockaddr_storage *sa, int init_instr)
 		(void) printf(":\n");
 
 	(void) printf("%s ", prefix);
-	(void) dump_sockaddr((struct sockaddr *)sa, B_FALSE, stdout);
+	(void) dump_sockaddr((struct sockaddr *)sa, 0, B_FALSE, stdout);
 }
 
 static void

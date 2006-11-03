@@ -545,11 +545,24 @@ natty_rput_pkt(queue_t *q, mblk_t *mp)
 		    AF_INET);
 		mutex_exit(&bucket->isaf_lock);
 
-		if (ipsa == NULL || ipsa->ipsa_state == IPSA_STATE_DEAD) {
+		if (ipsa == NULL || ipsa->ipsa_state == IPSA_STATE_DEAD ||
+		    (!(ipsa->ipsa_flags & IPSA_F_NATT) &&
+			ipsa->ipsa_state != IPSA_STATE_LARVAL)) {
 			/* no associated sa error */
 
-			if (ipsa != NULL)
+			if (ipsa != NULL) {
+				/*
+				 * While we give LARVALs the benefit of the
+				 * doubt, full SAs that aren't NAT-T shouldn't
+				 * be dealing with inbound NAT-T traffic.
+				 */
+				if (!(ipsa->ipsa_flags & IPSA_F_NATT)) {
+					cmn_err(CE_WARN, "UDP-ESP arrived for "
+					    "non-NAT SA, spi 0x%x",
+					    htonl(ipsa->ipsa_spi));
+				}
 				IPSA_REFRELE(ipsa);
+			}
 
 			ip_drop_packet(iph_mp, B_TRUE, NULL, NULL,
 			    &ipdrops_esp_no_sa, &ip_dropper);

@@ -6235,21 +6235,21 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 		 */
 		if (protocol == IPPROTO_ENCAP && ip_g_mrouter) {
 			/*
-			 * XXX If an IPsec mblk is here on a multicast
-			 * tunnel (using ip_mroute stuff), what should
-			 * I do?
-			 *
-			 * For now, just free the IPsec mblk before
-			 * passing it up to the multicast routing
-			 * stuff.
+			 * If an IPsec mblk is here on a multicast
+			 * tunnel (using ip_mroute stuff), check policy here,
+			 * THEN ship off to ip_mroute_decap().
 			 *
 			 * BTW,  If I match a configured IP-in-IP
-			 * tunnel, ip_mroute_decap will never be
-			 * called.
+			 * tunnel, this path will not be reached, and
+			 * ip_mroute_decap will never be called.
 			 */
-			if (mp != first_mp)
-				freeb(first_mp);
-			ip_mroute_decap(q, mp);
+			first_mp = ipsec_check_global_policy(first_mp, connp,
+			    ipha, NULL, mctl_present);
+			if (first_mp != NULL) {
+				if (mctl_present)
+					freeb(first_mp);
+				ip_mroute_decap(q, mp);
+			} /* Else we already freed everything! */
 		} else {
 			/*
 			 * Otherwise send an ICMP protocol unreachable.
@@ -6308,7 +6308,12 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 
 			freemsg(first_mp1);
 		} else {
-			if (CONN_INBOUND_POLICY_PRESENT(connp) || secure) {
+			/*
+			 * Don't enforce here if we're an actual tunnel -
+			 * let "tun" do it instead.
+			 */
+			if (!IPCL_IS_IPTUN(connp) &&
+			    (CONN_INBOUND_POLICY_PRESENT(connp) || secure)) {
 				first_mp1 = ipsec_check_inbound_policy
 				    (first_mp1, connp, ipha, NULL,
 				    mctl_present);
@@ -6378,10 +6383,24 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 
 		freemsg(first_mp);
 	} else {
-		if (CONN_INBOUND_POLICY_PRESENT(connp) || secure) {
+		if (IPCL_IS_IPTUN(connp)) {
+			/*
+			 * Tunneled packet.  We enforce policy in the tunnel
+			 * module itself.
+			 *
+			 * Send the WHOLE packet up (incl. IPSEC_IN) without
+			 * a policy check.
+			 */
+			putnext(rq, first_mp);
+			CONN_DEC_REF(connp);
+			return;
+		}
+
+		if ((CONN_INBOUND_POLICY_PRESENT(connp) || secure)) {
 			first_mp = ipsec_check_inbound_policy(first_mp, connp,
 			    ipha, NULL, mctl_present);
 		}
+
 		if (first_mp != NULL) {
 			/*
 			 * ip_fanout_proto also gets called
@@ -9999,11 +10018,9 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 	/*
 	 * If we have already cached policies in ip_bind_connected*(), don't
 	 * let them change now. We cache policies for connections
-	 * whose src,dst [addr, port] is known.  The exception to this is
-	 * tunnels.  Tunnels are allowed to change policies after having
-	 * become fully bound.
+	 * whose src,dst [addr, port] is known.
 	 */
-	if (connp->conn_policy_cached && !IPCL_IS_IPTUN(connp)) {
+	if (connp->conn_policy_cached) {
 		mutex_exit(&connp->conn_lock);
 		return (EINVAL);
 	}
@@ -10040,11 +10057,11 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 	bzero(&sel, sizeof (sel));
 	sel.ipsl_valid = IPSL_IPV4;
 
-	pin4 = ipsec_policy_create(&sel, actp, nact, IPSEC_PRIO_SOCKET);
+	pin4 = ipsec_policy_create(&sel, actp, nact, IPSEC_PRIO_SOCKET, NULL);
 	if (pin4 == NULL)
 		goto enomem;
 
-	pout4 = ipsec_policy_create(&sel, actp, nact, IPSEC_PRIO_SOCKET);
+	pout4 = ipsec_policy_create(&sel, actp, nact, IPSEC_PRIO_SOCKET, NULL);
 	if (pout4 == NULL)
 		goto enomem;
 
@@ -10055,12 +10072,12 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 		 */
 		sel.ipsl_valid = IPSL_IPV6;
 		pin6 = ipsec_policy_create(&sel, actp, nact,
-		    IPSEC_PRIO_SOCKET);
+		    IPSEC_PRIO_SOCKET, NULL);
 		if (pin6 == NULL)
 			goto enomem;
 
 		pout6 = ipsec_policy_create(&sel, actp, nact,
-		    IPSEC_PRIO_SOCKET);
+		    IPSEC_PRIO_SOCKET, NULL);
 		if (pout6 == NULL)
 			goto enomem;
 
@@ -10108,13 +10125,6 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 		connp->conn_out_enforce_policy = B_TRUE;
 		connp->conn_flags |= IPCL_CHECK_POLICY;
 	}
-
-	/*
-	 * Tunnels are allowed to set policy after having been fully bound.
-	 * If that's the case, cache policy here.
-	 */
-	if (IPCL_IS_IPTUN(connp) && connp->conn_fully_bound)
-		error = ipsec_conn_cache_policy(connp, !connp->conn_af_isv6);
 
 	mutex_exit(&connp->conn_lock);
 	return (error);
@@ -17241,7 +17251,8 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 				return;
 			}
 			ii->ipsec_in_decaps = B_TRUE;
-			ip_proto_input(q, first_mp, ipha, ire, recv_ill);
+			ip_fanout_proto_again(first_mp, recv_ill, recv_ill,
+			    ire);
 			return;
 		}
 		break;
@@ -21228,7 +21239,7 @@ ip_wput_ire_parse_ipsec_out(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 		 * ip_wput[_v6] attaches an IPSEC_OUT in two cases.
 		 *
 		 * 1) There is per-socket policy (including cached global
-		 *    policy).
+		 *    policy) or a policy on the IP-in-IP tunnel.
 		 * 2) There is no per-socket policy, but it is
 		 *    a multicast packet that needs to go out
 		 *    on a specific interface. This is the case
@@ -24194,6 +24205,10 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 			first_mp = mp;
 			mctl_present = B_FALSE;
 		} else {
+			/*
+			 * Convert IPSEC_OUT to IPSEC_IN, preserving all
+			 * security properties for the looped-back packet.
+			 */
 			mctl_present = B_TRUE;
 			mp = first_mp->b_cont;
 			ASSERT(mp != NULL);
@@ -25914,7 +25929,7 @@ ipsec_out_process(queue_t *q, mblk_t *ipsec_mp, ire_t *ire, uint_t ill_index)
 		ipsec_mp->b_cont = outer_mp;
 
 		io->ipsec_out_se_done = B_TRUE;
-		io->ipsec_out_encaps = B_TRUE;
+		io->ipsec_out_tunnel = B_TRUE;
 	}
 
 	if (((ap->ipa_want_ah && (io->ipsec_out_ah_sa == NULL)) ||
@@ -26575,6 +26590,14 @@ nak:
 	case M_CTL:
 		if (mp->b_wptr - mp->b_rptr < sizeof (uint32_t))
 			break;
+
+		if (((ipsec_info_t *)mp->b_rptr)->ipsec_info_type ==
+		    TUN_HELLO) {
+			ASSERT(connp != NULL);
+			connp->conn_flags |= IPCL_IPTUN;
+			freeb(mp);
+			return;
+		}
 
 		if (connp != NULL && *(uint32_t *)mp->b_rptr ==
 		    IP_ULP_OUT_LABELED) {

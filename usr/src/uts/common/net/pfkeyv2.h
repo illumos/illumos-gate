@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -521,9 +520,15 @@ typedef struct sadb_x_kmc {
 #define	SADB_X_SAFLAGS_KM2	 0x1000000	/* Key mgmt. specific flag 2 */
 #define	SADB_X_SAFLAGS_KM3	  0x800000	/* Key mgmt. specific flag 3 */
 #define	SADB_X_SAFLAGS_KM4	  0x400000	/* Key mgmt. specific flag 4 */
-	/* skip x200000 because it's used in the kernel */
+#define	SADB_X_SAFLAGS_KRES1	  0x200000	/* Reserved by the kernel */
 #define	SADB_X_SAFLAGS_NATT_LOC	  0x100000	/* this has a natted src SA */
 #define	SADB_X_SAFLAGS_NATT_REM	   0x80000	/* this has a natted dst SA */
+#define	SADB_X_SAFLAGS_KRES2	   0x40000	/* Reserved by the kernel */
+#define	SADB_X_SAFLAGS_TUNNEL	   0x20000	/* tunnel mode */
+
+#define	SADB_X_SAFLAGS_KRES	\
+	SADB_X_SAFLAGS_KRES1 | SADB_X_SAFLAGS_KRES2
+
 /*
  * SA state.
  */
@@ -586,7 +591,9 @@ typedef struct sadb_x_kmc {
 #define	SADB_EXT_LIFETIME_SOFT		4
 #define	SADB_EXT_ADDRESS_SRC		5
 #define	SADB_EXT_ADDRESS_DST		6
+/* These two are synonyms. */
 #define	SADB_EXT_ADDRESS_PROXY		7
+#define	SADB_X_EXT_ADDRESS_INNER_SRC	SADB_EXT_ADDRESS_PROXY
 #define	SADB_EXT_KEY_AUTH		8
 #define	SADB_EXT_KEY_ENCRYPT		9
 #define	SADB_EXT_IDENTITY_SRC		10
@@ -601,8 +608,9 @@ typedef struct sadb_x_kmc {
 #define	SADB_X_EXT_KM_COOKIE		19
 #define	SADB_X_EXT_ADDRESS_NATT_LOC	20
 #define	SADB_X_EXT_ADDRESS_NATT_REM	21
+#define	SADB_X_EXT_ADDRESS_INNER_DST	22
 
-#define	SADB_EXT_MAX			21
+#define	SADB_EXT_MAX			22
 
 /*
  * Identity types.
@@ -653,7 +661,10 @@ typedef struct sadb_x_kmc {
 #define	SADB_X_DIAGNOSTIC_BAD_SRC_AF		8
 /* in sockaddr->sa_family. */
 #define	SADB_X_DIAGNOSTIC_BAD_DST_AF		9
+/* These two are synonyms. */
 #define	SADB_X_DIAGNOSTIC_BAD_PROXY_AF		10
+#define	SADB_X_DIAGNOSTIC_BAD_INNER_SRC_AF	10
+
 #define	SADB_X_DIAGNOSTIC_AF_MISMATCH		11
 
 #define	SADB_X_DIAGNOSTIC_BAD_SRC		12
@@ -713,7 +724,28 @@ typedef struct sadb_x_kmc {
 #define	SADB_X_DIAGNOSTIC_MALFORMED_NATT_LOC	55
 #define	SADB_X_DIAGNOSTIC_MALFORMED_NATT_REM	56
 #define	SADB_X_DIAGNOSTIC_DUPLICATE_NATT_PORTS	57
-#define	SADB_X_DIAGNOSTIC_MAX			57
+
+#define	SADB_X_DIAGNOSTIC_MISSING_INNER_SRC	58
+#define	SADB_X_DIAGNOSTIC_MISSING_INNER_DST	59
+#define	SADB_X_DIAGNOSTIC_DUPLICATE_INNER_SRC	60
+#define	SADB_X_DIAGNOSTIC_DUPLICATE_INNER_DST	61
+#define	SADB_X_DIAGNOSTIC_MALFORMED_INNER_SRC	62
+#define	SADB_X_DIAGNOSTIC_MALFORMED_INNER_DST	63
+
+#define	SADB_X_DIAGNOSTIC_PREFIX_INNER_SRC	64
+#define	SADB_X_DIAGNOSTIC_PREFIX_INNER_DST	65
+#define	SADB_X_DIAGNOSTIC_BAD_INNER_DST_AF	66
+#define	SADB_X_DIAGNOSTIC_INNER_AF_MISMATCH	67
+
+#define	SADB_X_DIAGNOSTIC_BAD_NATT_REM_AF	68
+#define	SADB_X_DIAGNOSTIC_BAD_NATT_LOC_AF	69
+
+#define	SADB_X_DIAGNOSTIC_PROTO_MISMATCH	70
+#define	SADB_X_DIAGNOSTIC_INNER_PROTO_MISMATCH	71
+
+#define	SADB_X_DIAGNOSTIC_DUAL_PORT_SETS	72
+
+#define	SADB_X_DIAGNOSTIC_MAX			72
 
 /* Algorithm type for sadb_x_algdesc above... */
 

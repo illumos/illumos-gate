@@ -44,6 +44,7 @@
 #include <sys/systm.h>
 #include <sys/param.h>
 #include <sys/kmem.h>
+#include <sys/ddi.h>
 
 #include <sys/crypto/api.h>
 
@@ -66,31 +67,47 @@
 #include <inet/ipsecesp.h>
 #include <inet/ipdrop.h>
 #include <inet/ipclassifier.h>
+#include <inet/tun.h>
 
 static void ipsec_update_present_flags();
 static ipsec_act_t *ipsec_act_wildcard_expand(ipsec_act_t *, uint_t *);
 static void ipsec_out_free(void *);
 static void ipsec_in_free(void *);
-static boolean_t ipsec_init_inbound_sel(ipsec_selector_t *, mblk_t *,
-    ipha_t *, ip6_t *);
 static mblk_t *ipsec_attach_global_policy(mblk_t *, conn_t *,
     ipsec_selector_t *);
 static mblk_t *ipsec_apply_global_policy(mblk_t *, conn_t *,
     ipsec_selector_t *);
 static mblk_t *ipsec_check_ipsecin_policy(queue_t *, mblk_t *,
-    ipsec_policy_t *, ipha_t *, ip6_t *);
+    ipsec_policy_t *, ipha_t *, ip6_t *, uint64_t);
 static void ipsec_in_release_refs(ipsec_in_t *);
 static void ipsec_out_release_refs(ipsec_out_t *);
 static void ipsec_action_reclaim(void *);
 static void ipsid_init(void);
 static void ipsid_fini(void);
+
+/* sel_flags values for ipsec_init_inbound_sel(). */
+#define	SEL_NONE	0x0000
+#define	SEL_PORT_POLICY	0x0001
+#define	SEL_IS_ICMP	0x0002
+#define	SEL_TUNNEL_MODE	0x0004
+
+/* Return values for ipsec_init_inbound_sel(). */
+typedef enum { SELRET_NOMEM, SELRET_BADPKT, SELRET_SUCCESS, SELRET_TUNFRAG}
+    selret_t;
+
+static selret_t ipsec_init_inbound_sel(ipsec_selector_t *, mblk_t *,
+    ipha_t *, ip6_t *, uint8_t);
+
 static boolean_t ipsec_check_ipsecin_action(struct ipsec_in_s *, mblk_t *,
     struct ipsec_action_s *, ipha_t *ipha, ip6_t *ip6h, const char **,
     kstat_named_t **);
-static int32_t ipsec_act_ovhd(const ipsec_act_t *act);
 static void ipsec_unregister_prov_update(void);
 static boolean_t ipsec_compare_action(ipsec_policy_t *, ipsec_policy_t *);
-static uint32_t selector_hash(ipsec_selector_t *);
+static uint32_t selector_hash(ipsec_selector_t *, ipsec_policy_root_t *);
+static int tunnel_compare(const void *, const void *);
+static void ipsec_freemsg_chain(mblk_t *);
+static void ip_drop_packet_chain(mblk_t *, boolean_t, ill_t *, ire_t *,
+    struct kstat_named *, ipdropper_t *);
 
 /*
  * Policy rule index generator.  We assume this won't wrap in the
@@ -108,8 +125,15 @@ uint64_t	ipsec_next_policy_index = 1;
 static ipsec_policy_head_t system_policy;
 static ipsec_policy_head_t inactive_policy;
 
+/*
+ * Tunnel policies - AVL tree indexed by tunnel name.
+ */
+krwlock_t tunnel_policy_lock;
+uint64_t tunnel_policy_gen;	/* To keep track of updates w/o searches. */
+avl_tree_t tunnel_policies;
+
 /* Packet dropper for generic SPD drops. */
-static ipdropper_t spd_dropper;
+ipdropper_t spd_dropper;
 
 /*
  * For now, use a trivially sized hash table for actions.
@@ -126,6 +150,11 @@ static ipdropper_t spd_dropper;
 #define	IPSEC_SPDHASH_DEFAULT 251
 uint32_t ipsec_spd_hashsize = 0;
 
+/* SPD hash-size tunable per tunnel. */
+#define	TUN_SPDHASH_DEFAULT 5
+uint32_t tun_spd_hashsize;
+
+
 #define	IPSEC_SEL_NOHASH ((uint32_t)(~0))
 
 static HASH_HEAD(ipsec_action_s) ipsec_action_hash[IPSEC_ACTION_HASH_SIZE];
@@ -141,12 +170,22 @@ boolean_t ipsec_outbound_v4_policy_present = B_FALSE;
 boolean_t ipsec_inbound_v6_policy_present = B_FALSE;
 boolean_t ipsec_outbound_v6_policy_present = B_FALSE;
 
+/* Frag cache prototypes */
+static void ipsec_fragcache_clean(ipsec_fragcache_t *);
+static ipsec_fragcache_entry_t *fragcache_delentry(int,
+    ipsec_fragcache_entry_t *, ipsec_fragcache_t *);
+boolean_t ipsec_fragcache_init(ipsec_fragcache_t *);
+void ipsec_fragcache_uninit(ipsec_fragcache_t *);
+mblk_t *ipsec_fragcache_add(ipsec_fragcache_t *, mblk_t *, mblk_t *, int);
+
 /*
  * Because policy needs to know what algorithms are supported, keep the
  * lists of algorithms here.
  */
 
 kmutex_t alg_lock;
+krwlock_t itp_get_byaddr_rw_lock;
+ipsec_tun_pol_t *(*itp_get_byaddr)(uint32_t *, uint32_t *, int);
 uint8_t ipsec_nalgs[IPSEC_NALGTYPES];
 ipsec_alginfo_t *ipsec_alglists[IPSEC_NALGTYPES][IPSEC_MAX_ALGS];
 uint8_t ipsec_sortlist[IPSEC_NALGTYPES][IPSEC_MAX_ALGS];
@@ -168,10 +207,17 @@ int ipsec_weird_null_inbound_policy = 0;
 	(((sa1)->ipsa_src_cid == (sa2)->ipsa_src_cid) &&		\
 	    (((sa1)->ipsa_dst_cid == (sa2)->ipsa_dst_cid))))
 
-#define	IPPOL_UNCHAIN(php, ip) 						\
-	HASHLIST_UNCHAIN((ip), ipsp_hash);				\
-	avl_remove(&(php)->iph_rulebyid, (ip));				\
-	IPPOL_REFRELE(ip);
+/*
+ * IPv4 Fragments
+ */
+#define	IS_V4_FRAGMENT(ipha_fragment_offset_and_flags)			\
+	(((ntohs(ipha_fragment_offset_and_flags) & IPH_OFFSET) != 0) ||	\
+	((ntohs(ipha_fragment_offset_and_flags) & IPH_MF) != 0))
+
+/*
+ * IPv6 Fragments
+ */
+#define	IS_V6_FRAGMENT(ipp)	(ipp.ipp_fields & IPPF_FRAGHDR)
 
 /*
  * Policy failure messages.
@@ -227,6 +273,37 @@ hrtime_t ipsec_policy_failure_last = 0;
  *	entries..
  */
 
+/* Convenient functions for freeing or dropping a b_next linked mblk chain */
+
+/* Free all messages in an mblk chain */
+static void
+ipsec_freemsg_chain(mblk_t *mp)
+{
+	mblk_t *mpnext;
+	while (mp != NULL) {
+		ASSERT(mp->b_prev == NULL);
+		mpnext = mp->b_next;
+		mp->b_next = NULL;
+		freemsg(mp);	/* Always works, even if NULL */
+		mp = mpnext;
+	}
+}
+
+/* ip_drop all messages in an mblk chain */
+static void
+ip_drop_packet_chain(mblk_t *mp, boolean_t inbound, ill_t *arriving,
+    ire_t *outbound_ire, struct kstat_named *counter, ipdropper_t *who_called)
+{
+	mblk_t *mpnext;
+	while (mp != NULL) {
+		ASSERT(mp->b_prev == NULL);
+		mpnext = mp->b_next;
+		mp->b_next = NULL;
+		ip_drop_packet(mp, inbound, arriving, outbound_ire, counter,
+		    who_called);
+		mp = mpnext;
+	}
+}
 
 /*
  * AVL tree comparison function.
@@ -281,12 +358,10 @@ ipsec_policy_cmpbyid(const void *a, const void *b)
 	return (0);
 }
 
-static void
+void
 ipsec_polhead_free_table(ipsec_policy_head_t *iph)
 {
-	int dir, nchains;
-
-	nchains = ipsec_spd_hashsize;
+	int dir;
 
 	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
 		ipsec_policy_root_t *ipr = &iph->iph_root[dir];
@@ -294,12 +369,12 @@ ipsec_polhead_free_table(ipsec_policy_head_t *iph)
 		if (ipr->ipr_hash == NULL)
 			continue;
 
-		kmem_free(ipr->ipr_hash, nchains *
+		kmem_free(ipr->ipr_hash, ipr->ipr_nchains *
 		    sizeof (ipsec_policy_hash_t));
 	}
 }
 
-static void
+void
 ipsec_polhead_destroy(ipsec_policy_head_t *iph)
 {
 	int dir;
@@ -309,10 +384,9 @@ ipsec_polhead_destroy(ipsec_policy_head_t *iph)
 
 	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
 		ipsec_policy_root_t *ipr = &iph->iph_root[dir];
-		int nchains = ipr->ipr_nchains;
 		int chain;
 
-		for (chain = 0; chain < nchains; chain++)
+		for (chain = 0; chain < ipr->ipr_nchains; chain++)
 			mutex_destroy(&(ipr->ipr_hash[chain].hash_lock));
 
 	}
@@ -326,10 +400,27 @@ void
 ipsec_policy_destroy(void)
 {
 	int i;
+	void *cookie;
+	ipsec_tun_pol_t *node;
 
 	ip_drop_unregister(&spd_dropper);
 	ip_drop_destroy();
 
+	rw_enter(&tunnel_policy_lock, RW_WRITER);
+	/*
+	 * It's possible we can just ASSERT() the tree is empty.  After all,
+	 * we aren't called until IP is ready to unload (and presumably all
+	 * tunnels have been unplumbed).  But we'll play it safe for now, the
+	 * loop will just exit immediately if it's empty.
+	 */
+	cookie = NULL;
+	while ((node = (ipsec_tun_pol_t *)
+		    avl_destroy_nodes(&tunnel_policies, &cookie)) != NULL) {
+		ITP_REFRELE(node);
+	}
+	avl_destroy(&tunnel_policies);
+	rw_exit(&tunnel_policy_lock);
+	rw_destroy(&tunnel_policy_lock);
 	ipsec_polhead_destroy(&system_policy);
 	ipsec_polhead_destroy(&inactive_policy);
 
@@ -373,20 +464,21 @@ ipsec_alloc_tables_failed()
  * Attempt to allocate the tables in a single policy head.
  * Return nonzero on failure after cleaning up any work in progress.
  */
-static int
-ipsec_alloc_table(ipsec_policy_head_t *iph, int kmflag)
+int
+ipsec_alloc_table(ipsec_policy_head_t *iph, int nchains, int kmflag,
+    boolean_t global_cleanup)
 {
-	int dir, nchains;
-
-	nchains = ipsec_spd_hashsize;
+	int dir;
 
 	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
 		ipsec_policy_root_t *ipr = &iph->iph_root[dir];
 
+		ipr->ipr_nchains = nchains;
 		ipr->ipr_hash = kmem_zalloc(nchains *
 		    sizeof (ipsec_policy_hash_t), kmflag);
 		if (ipr->ipr_hash == NULL)
-			return (ipsec_alloc_tables_failed());
+			return (global_cleanup ? ipsec_alloc_tables_failed() :
+			    ENOMEM);
 	}
 	return (0);
 }
@@ -400,11 +492,13 @@ ipsec_alloc_tables(int kmflag)
 {
 	int error;
 
-	error = ipsec_alloc_table(&system_policy, kmflag);
+	error = ipsec_alloc_table(&system_policy, ipsec_spd_hashsize, kmflag,
+	    B_TRUE);
 	if (error != 0)
 		return (error);
 
-	error = ipsec_alloc_table(&inactive_policy, kmflag);
+	error = ipsec_alloc_table(&inactive_policy, ipsec_spd_hashsize, kmflag,
+	    B_TRUE);
 	if (error != 0)
 		return (error);
 
@@ -420,12 +514,10 @@ ipsec_alloc_tables(int kmflag)
 /*
  * After table allocation, initialize a policy head.
  */
-static void
-ipsec_polhead_init(ipsec_policy_head_t *iph)
+void
+ipsec_polhead_init(ipsec_policy_head_t *iph, int nchains)
 {
-	int dir, chain, nchains;
-
-	nchains = ipsec_spd_hashsize;
+	int dir, chain;
 
 	rw_init(&iph->iph_lock, NULL, RW_DEFAULT, NULL);
 	avl_create(&iph->iph_rulebyid, ipsec_policy_cmpbyid,
@@ -468,9 +560,22 @@ ipsec_policy_init()
 		(void) ipsec_alloc_tables(KM_SLEEP);
 	}
 
+	/* Just set a default for tunnels. */
+	if (tun_spd_hashsize == 0)
+		tun_spd_hashsize = TUN_SPDHASH_DEFAULT;
+
 	ipsid_init();
-	ipsec_polhead_init(&system_policy);
-	ipsec_polhead_init(&inactive_policy);
+	/*
+	 * Globals need ref == 1 to prevent IPPH_REFRELE() from attempting
+	 * to free them.
+	 */
+	system_policy.iph_refs = 1;
+	inactive_policy.iph_refs = 1;
+	ipsec_polhead_init(&system_policy, ipsec_spd_hashsize);
+	ipsec_polhead_init(&inactive_policy, ipsec_spd_hashsize);
+	rw_init(&tunnel_policy_lock, NULL, RW_DEFAULT, NULL);
+	avl_create(&tunnel_policies, tunnel_compare, sizeof (ipsec_tun_pol_t),
+	    0);
 
 	for (i = 0; i < IPSEC_ACTION_HASH_SIZE; i++)
 		mutex_init(&(ipsec_action_hash[i].hash_lock),
@@ -500,6 +605,12 @@ ipsec_policy_init()
 
 	ip_drop_init();
 	ip_drop_register(&spd_dropper, "IPsec SPD");
+
+	/* Set function to dummy until tun is loaded */
+	rw_init(&itp_get_byaddr_rw_lock, NULL, RW_DEFAULT, NULL);
+	rw_enter(&itp_get_byaddr_rw_lock, RW_WRITER);
+	itp_get_byaddr = itp_get_byaddr_dummy;
+	rw_exit(&itp_get_byaddr_rw_lock);
 }
 
 /*
@@ -628,52 +739,59 @@ ipsec_inactive_policy(void)
  * pointers.
  */
 void
-ipsec_swap_policy(void)
+ipsec_swap_policy(ipsec_policy_head_t *active, ipsec_policy_head_t *inactive)
 {
 	int af, dir;
 	avl_tree_t r1, r2;
 
-	rw_enter(&inactive_policy.iph_lock, RW_WRITER);
-	rw_enter(&system_policy.iph_lock, RW_WRITER);
+	rw_enter(&inactive->iph_lock, RW_WRITER);
+	rw_enter(&active->iph_lock, RW_WRITER);
 
-	r1 = system_policy.iph_rulebyid;
-	r2 = inactive_policy.iph_rulebyid;
-	system_policy.iph_rulebyid = r2;
-	inactive_policy.iph_rulebyid = r1;
+	r1 = active->iph_rulebyid;
+	r2 = inactive->iph_rulebyid;
+	active->iph_rulebyid = r2;
+	inactive->iph_rulebyid = r1;
 
 	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
 		ipsec_policy_hash_t *h1, *h2;
 
-		h1 = system_policy.iph_root[dir].ipr_hash;
-		h2 = inactive_policy.iph_root[dir].ipr_hash;
-		system_policy.iph_root[dir].ipr_hash = h2;
-		inactive_policy.iph_root[dir].ipr_hash = h1;
+		h1 = active->iph_root[dir].ipr_hash;
+		h2 = inactive->iph_root[dir].ipr_hash;
+		active->iph_root[dir].ipr_hash = h2;
+		inactive->iph_root[dir].ipr_hash = h1;
 
 		for (af = 0; af < IPSEC_NAF; af++) {
 			ipsec_policy_t *t1, *t2;
 
-			t1 = system_policy.iph_root[dir].ipr_nonhash[af];
-			t2 = inactive_policy.iph_root[dir].ipr_nonhash[af];
-			system_policy.iph_root[dir].ipr_nonhash[af] = t2;
-			inactive_policy.iph_root[dir].ipr_nonhash[af] = t1;
+			t1 = active->iph_root[dir].ipr_nonhash[af];
+			t2 = inactive->iph_root[dir].ipr_nonhash[af];
+			active->iph_root[dir].ipr_nonhash[af] = t2;
+			inactive->iph_root[dir].ipr_nonhash[af] = t1;
 			if (t1 != NULL) {
 				t1->ipsp_hash.hash_pp =
-				    &(inactive_policy.iph_root[dir].
-				    ipr_nonhash[af]);
+				    &(inactive->iph_root[dir].ipr_nonhash[af]);
 			}
 			if (t2 != NULL) {
 				t2->ipsp_hash.hash_pp =
-				    &(system_policy.iph_root[dir].
-				    ipr_nonhash[af]);
+				    &(active->iph_root[dir].ipr_nonhash[af]);
 			}
 
 		}
 	}
-	system_policy.iph_gen++;
-	inactive_policy.iph_gen++;
+	active->iph_gen++;
+	inactive->iph_gen++;
 	ipsec_update_present_flags();
-	rw_exit(&system_policy.iph_lock);
-	rw_exit(&inactive_policy.iph_lock);
+	rw_exit(&active->iph_lock);
+	rw_exit(&inactive->iph_lock);
+}
+
+/*
+ * Swap global policy primary/secondary.
+ */
+void
+ipsec_swap_global_policy(void)
+{
+	ipsec_swap_policy(&system_policy, &inactive_policy);
 }
 
 /*
@@ -739,7 +857,7 @@ ipsec_copy_chain(ipsec_policy_head_t *dph, ipsec_policy_t *src,
  * the source policy head. Note that we only need to read-lock the source
  * policy head as we are not changing it.
  */
-static int
+int
 ipsec_copy_polhead(ipsec_policy_head_t *sph, ipsec_policy_head_t *dph)
 {
 	int af, dir, chain, nchains;
@@ -793,6 +911,40 @@ ipsec_clone_system_policy(void)
 	return (ipsec_copy_polhead(&system_policy, &inactive_policy));
 }
 
+/*
+ * Generic "do we have IPvN policy" answer.
+ */
+boolean_t
+iph_ipvN(ipsec_policy_head_t *iph, boolean_t v6)
+{
+	int i, hval;
+	uint32_t valbit;
+	ipsec_policy_root_t *ipr;
+	ipsec_policy_t *ipp;
+
+	if (v6) {
+		valbit = IPSL_IPV6;
+		hval = IPSEC_AF_V6;
+	} else {
+		valbit = IPSL_IPV4;
+		hval = IPSEC_AF_V4;
+	}
+
+	ASSERT(RW_LOCK_HELD(&iph->iph_lock));
+	for (ipr = iph->iph_root; ipr < &(iph->iph_root[IPSEC_NTYPES]); ipr++) {
+		if (ipr->ipr_nonhash[hval] != NULL)
+			return (B_TRUE);
+		for (i = 0; i < ipr->ipr_nchains; i++) {
+			for (ipp = ipr->ipr_hash[i].hash_head; ipp != NULL;
+			    ipp = ipp->ipsp_hash.hash_next) {
+				if (ipp->ipsp_sel->ipsl_key.ipsl_valid & valbit)
+					return (B_TRUE);
+			}
+		}
+	}
+
+	return (B_FALSE);
+}
 
 /*
  * Extract the string from ipsec_policy_failure_msgs[type] and
@@ -893,12 +1045,14 @@ act_alg_adjust(uint_t algtype, uint_t algid,
 			*minbits = algp->alg_default_bits;
 			ASSERT(*minbits >= algp->alg_minbits);
 		} else {
-			*minbits = MAX(*minbits, algp->alg_minbits);
+			*minbits = MAX(MIN(*minbits, algp->alg_maxbits),
+			    algp->alg_minbits);
 		}
 		if (*maxbits == 0)
 			*maxbits = algp->alg_maxbits;
 		else
-			*maxbits = MIN(*maxbits, algp->alg_maxbits);
+			*maxbits = MIN(MAX(*maxbits, algp->alg_minbits),
+			    algp->alg_maxbits);
 		ASSERT(*minbits <= *maxbits);
 	} else {
 		*minbits = 0;
@@ -1190,7 +1344,7 @@ ipsec_req_from_act(ipsec_action_t *ap, ipsec_req_t *req)
  * Convert a new-style action back to an ipsec_req_t (more backwards compat).
  * We assume caller has already zero'ed *req for us.
  */
-static int
+int
 ipsec_req_from_head(ipsec_policy_head_t *ph, ipsec_req_t *req, int af)
 {
 	ipsec_policy_t *p;
@@ -1201,7 +1355,7 @@ ipsec_req_from_head(ipsec_policy_head_t *ph, ipsec_req_t *req, int af)
 	for (p = ph->iph_root[IPSEC_INBOUND].ipr_nonhash[af];
 	    p != NULL;
 	    p = p->ipsp_hash.hash_next) {
-		if ((p->ipsp_sel->ipsl_key.ipsl_valid&IPSL_WILDCARD) == 0)
+		if ((p->ipsp_sel->ipsl_key.ipsl_valid & IPSL_WILDCARD) == 0)
 			return (ipsec_req_from_act(p->ipsp_act, req));
 	}
 	return (sizeof (*req));
@@ -1325,14 +1479,12 @@ ipsec_check_loopback_policy(queue_t *q, mblk_t *first_mp,
  * expected by the SAs it traversed on the way in.
  */
 static boolean_t
-ipsec_check_ipsecin_unique(ipsec_in_t *ii, mblk_t *mp,
-    ipha_t *ipha, ip6_t *ip6h,
-    const char **reason, kstat_named_t **counter)
+ipsec_check_ipsecin_unique(ipsec_in_t *ii, const char **reason,
+    kstat_named_t **counter, uint64_t pkt_unique)
 {
-	uint64_t pkt_unique, ah_mask, esp_mask;
+	uint64_t ah_mask, esp_mask;
 	ipsa_t *ah_assoc;
 	ipsa_t *esp_assoc;
-	ipsec_selector_t sel;
 
 	ASSERT(ii->ipsec_in_secure);
 	ASSERT(!ii->ipsec_in_loopback);
@@ -1347,32 +1499,23 @@ ipsec_check_ipsecin_unique(ipsec_in_t *ii, mblk_t *mp,
 	if ((ah_mask == 0) && (esp_mask == 0))
 		return (B_TRUE);
 
-	if (!ipsec_init_inbound_sel(&sel, mp, ipha, ip6h)) {
-		/*
-		 * Technically not a policy mismatch, but it is
-		 * an internal failure.
-		 */
-		*reason = "ipsec_init_inbound_sel";
-		*counter = &ipdrops_spd_nomem;
+	/*
+	 * The pkt_unique check will also check for tunnel mode on the SA
+	 * vs. the tunneled_packet boolean.  "Be liberal in what you receive"
+	 * should not apply in this case.  ;)
+	 */
+
+	if (ah_mask != 0 &&
+	    ah_assoc->ipsa_unique_id != (pkt_unique & ah_mask)) {
+		*reason = "AH inner header mismatch";
+		*counter = &ipdrops_spd_ah_innermismatch;
 		return (B_FALSE);
 	}
-
-	pkt_unique = SA_UNIQUE_ID(sel.ips_remote_port, sel.ips_local_port,
-	    sel.ips_protocol);
-
-	if (ah_mask != 0) {
-		if (ah_assoc->ipsa_unique_id != (pkt_unique & ah_mask)) {
-			*reason = "AH inner header mismatch";
-			*counter = &ipdrops_spd_ah_innermismatch;
-			return (B_FALSE);
-		}
-	}
-	if (esp_mask != 0) {
-		if (esp_assoc->ipsa_unique_id != (pkt_unique & esp_mask)) {
-			*reason = "ESP inner header mismatch";
-			*counter = &ipdrops_spd_esp_innermismatch;
-			return (B_FALSE);
-		}
+	if (esp_mask != 0 &&
+	    esp_assoc->ipsa_unique_id != (pkt_unique & esp_mask)) {
+		*reason = "ESP inner header mismatch";
+		*counter = &ipdrops_spd_esp_innermismatch;
+		return (B_FALSE);
 	}
 	return (B_TRUE);
 }
@@ -1555,12 +1698,59 @@ spd_match_inbound_ids(ipsec_latch_t *ipl, ipsa_t *sa)
 }
 
 /*
+ * Takes a latched conn and an inbound packet and returns a unique_id suitable
+ * for SA comparisons.  Most of the time we will copy from the conn_t, but
+ * there are cases when the conn_t is latched but it has wildcard selectors,
+ * and then we need to fallback to scooping them out of the packet.
+ *
+ * Assume we'll never have 0 with a conn_t present, so use 0 as a failure.  We
+ * can get away with this because we only have non-zero ports/proto for
+ * latched conn_ts.
+ *
+ * Ideal candidate for an "inline" keyword, as we're JUST convoluted enough
+ * to not be a nice macro.
+ */
+static uint64_t
+conn_to_unique(conn_t *connp, mblk_t *data_mp, ipha_t *ipha, ip6_t *ip6h)
+{
+	ipsec_selector_t sel;
+	uint8_t ulp = connp->conn_ulp;
+
+	ASSERT(connp->conn_latch->ipl_in_policy != NULL);
+
+	if ((ulp == IPPROTO_TCP || ulp == IPPROTO_UDP || ulp == IPPROTO_SCTP) &&
+	    (connp->conn_fport == 0 || connp->conn_lport == 0)) {
+		/* Slow path - we gotta grab from the packet. */
+		if (ipsec_init_inbound_sel(&sel, data_mp, ipha, ip6h,
+			SEL_NONE) != SELRET_SUCCESS) {
+			/* Failure -> have caller free packet with ENOMEM. */
+			return (0);
+		}
+		return (SA_UNIQUE_ID(sel.ips_remote_port, sel.ips_local_port,
+			    sel.ips_protocol, 0));
+	}
+
+#ifdef DEBUG_NOT_UNTIL_6478464
+	if (ipsec_init_inbound_sel(&sel, data_mp, ipha, ip6h, SEL_NONE) ==
+	    SELRET_SUCCESS) {
+		ASSERT(sel.ips_local_port == connp->conn_lport);
+		ASSERT(sel.ips_remote_port == connp->conn_fport);
+		ASSERT(sel.ips_protocol == connp->conn_ulp);
+	}
+	ASSERT(connp->conn_ulp != 0);
+#endif
+
+	return (SA_UNIQUE_ID(connp->conn_fport, connp->conn_lport, ulp, 0));
+}
+
+/*
  * Called to check policy on a latched connection, both from this file
  * and from tcp.c
  */
 boolean_t
 ipsec_check_ipsecin_latch(ipsec_in_t *ii, mblk_t *mp, ipsec_latch_t *ipl,
-    ipha_t *ipha, ip6_t *ip6h, const char **reason, kstat_named_t **counter)
+    ipha_t *ipha, ip6_t *ip6h, const char **reason, kstat_named_t **counter,
+    conn_t *connp)
 {
 	ASSERT(ipl->ipl_ids_latched == B_TRUE);
 
@@ -1584,8 +1774,13 @@ ipsec_check_ipsecin_latch(ipsec_in_t *ii, mblk_t *mp, ipsec_latch_t *ipl,
 			return (B_FALSE);
 		}
 
-		if (!ipsec_check_ipsecin_unique(ii, mp, ipha, ip6h, reason,
-		    counter)) {
+		/*
+		 * Can fudge pkt_unique from connp because we're latched.
+		 * In DEBUG kernels (see conn_to_unique()'s implementation),
+		 * verify this even if it REALLY slows things down.
+		 */
+		if (!ipsec_check_ipsecin_unique(ii, reason, counter,
+			conn_to_unique(connp, mp, ipha, ip6h))) {
 			return (B_FALSE);
 		}
 	}
@@ -1604,7 +1799,7 @@ ipsec_check_ipsecin_latch(ipsec_in_t *ii, mblk_t *mp, ipsec_latch_t *ipl,
  */
 static mblk_t *
 ipsec_check_ipsecin_policy(queue_t *q, mblk_t *first_mp, ipsec_policy_t *ipsp,
-    ipha_t *ipha, ip6_t *ip6h)
+    ipha_t *ipha, ip6_t *ip6h, uint64_t pkt_unique)
 {
 	ipsec_in_t *ii;
 	ipsec_action_t *ap;
@@ -1643,8 +1838,7 @@ ipsec_check_ipsecin_policy(queue_t *q, mblk_t *first_mp, ipsec_policy_t *ipsp,
 		goto drop;
 	}
 
-	if (!ipsec_check_ipsecin_unique(ii, data_mp, ipha, ip6h,
-	    &reason, &counter))
+	if (!ipsec_check_ipsecin_unique(ii, &reason, &counter, pkt_unique))
 		goto drop;
 
 	/*
@@ -1678,7 +1872,7 @@ drop:
  * sleazy prefix-length-based compare.
  * another inlining candidate..
  */
-static boolean_t
+boolean_t
 ip_addr_match(uint8_t *addr1, int pfxlen, in6_addr_t *addr2p)
 {
 	int offset = pfxlen>>3;
@@ -1774,10 +1968,9 @@ ipsec_find_policy_chain(ipsec_policy_t *best, ipsec_policy_t *chain,
  * is not the original "best", we need to release that reference
  * before returning.
  */
-static ipsec_policy_t *
-ipsec_find_policy_head(ipsec_policy_t *best,
-    ipsec_policy_head_t *head, int direction, ipsec_selector_t *sel,
-    int selhash)
+ipsec_policy_t *
+ipsec_find_policy_head(ipsec_policy_t *best, ipsec_policy_head_t *head,
+    int direction, ipsec_selector_t *sel)
 {
 	ipsec_policy_t *curbest;
 	ipsec_policy_root_t *root;
@@ -1807,7 +2000,8 @@ ipsec_find_policy_head(ipsec_policy_t *best,
 
 	if (root->ipr_nchains > 0) {
 		curbest = ipsec_find_policy_chain(curbest,
-		    root->ipr_hash[selhash].hash_head, sel, is_icmp_inv_acq);
+		    root->ipr_hash[selector_hash(sel, root)].hash_head, sel,
+		    is_icmp_inv_acq);
 	}
 	curbest = ipsec_find_policy_chain(curbest, root->ipr_nonhash[af], sel,
 	    is_icmp_inv_acq);
@@ -1842,16 +2036,14 @@ ipsec_find_policy(int direction, conn_t *connp, ipsec_out_t *io,
     ipsec_selector_t *sel)
 {
 	ipsec_policy_t *p;
-	int selhash = selector_hash(sel);
 
-	p = ipsec_find_policy_head(NULL, &system_policy, direction, sel,
-	    selhash);
+	p = ipsec_find_policy_head(NULL, &system_policy, direction, sel);
 	if ((connp != NULL) && (connp->conn_policy != NULL)) {
 		p = ipsec_find_policy_head(p, connp->conn_policy,
-		    direction, sel, selhash);
+		    direction, sel);
 	} else if ((io != NULL) && (io->ipsec_out_polhead != NULL)) {
 		p = ipsec_find_policy_head(p, io->ipsec_out_polhead,
-		    direction, sel, selhash);
+		    direction, sel);
 	}
 
 	return (p);
@@ -1881,6 +2073,7 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 	boolean_t policy_present;
 	kstat_named_t *counter;
 	ipsec_in_t *ii = NULL;
+	uint64_t pkt_unique;
 
 	data_mp = mctl_present ? first_mp->b_cont : first_mp;
 	ipsec_mp = mctl_present ? first_mp : NULL;
@@ -1921,9 +2114,14 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 		if (p != NULL) {
 			IPPOL_REFHOLD(p);
 		}
+		/*
+		 * Fudge sel for UNIQUE_ID setting below.
+		 */
+		pkt_unique = conn_to_unique(connp, data_mp, ipha, ip6h);
 	} else {
 		/* Initialize the ports in the selector */
-		if (!ipsec_init_inbound_sel(&sel, data_mp, ipha, ip6h)) {
+		if (ipsec_init_inbound_sel(&sel, data_mp, ipha, ip6h,
+			SEL_NONE) == SELRET_NOMEM) {
 			/*
 			 * Technically not a policy mismatch, but it is
 			 * an internal failure.
@@ -1946,6 +2144,8 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 		 */
 
 		p = ipsec_find_policy(IPSEC_TYPE_INBOUND, connp, NULL, &sel);
+		pkt_unique = SA_UNIQUE_ID(sel.ips_remote_port,
+		    sel.ips_local_port, sel.ips_protocol, 0);
 	}
 
 	if (p == NULL) {
@@ -1964,7 +2164,8 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 		}
 	}
 	if ((ii != NULL) && (ii->ipsec_in_secure))
-		return (ipsec_check_ipsecin_policy(q, ipsec_mp, p, ipha, ip6h));
+		return (ipsec_check_ipsecin_policy(q, ipsec_mp, p, ipha, ip6h,
+			    pkt_unique));
 	if (p->ipsp_act->ipa_allow_clear) {
 		BUMP_MIB(&ip_mib, ipsecInSucceeded);
 		IPPOL_REFRELE(p);
@@ -2054,8 +2255,13 @@ ipsec_inbound_accept_clear(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h)
 		/*
 		 * If it is not ICMP, fail this request.
 		 */
-		if (ipha->ipha_protocol != IPPROTO_ICMP)
+		if (ipha->ipha_protocol != IPPROTO_ICMP) {
+#ifdef FRAGCACHE_DEBUG
+			cmn_err(CE_WARN, "Dropping - ipha_proto = %d\n",
+			    ipha->ipha_protocol);
+#endif
 			return (B_FALSE);
+		}
 		iph_hdr_length = IPH_HDR_LENGTH(ipha);
 		icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
 		/*
@@ -2099,6 +2305,9 @@ ipsec_inbound_accept_clear(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h)
 				 * Be in sync with icmp_inbound, where we have
 				 * already set ire_max_frag.
 				 */
+#ifdef FRAGCACHE_DEBUG
+			cmn_err(CE_WARN, "ICMP frag needed\n");
+#endif
 				return (B_TRUE);
 			case ICMP_HOST_UNREACHABLE:
 			case ICMP_NET_UNREACHABLE:
@@ -2196,6 +2405,7 @@ ipsec_check_inbound_policy(mblk_t *first_mp, conn_t *connp,
 	mblk_t *mp = mctl_present ? first_mp->b_cont : first_mp;
 	mblk_t *ipsec_mp = mctl_present ? first_mp : NULL;
 	ipsec_latch_t *ipl;
+	uint64_t unique_id;
 
 	ASSERT(connp != NULL);
 	ipl = connp->conn_latch;
@@ -2273,8 +2483,7 @@ clear:
 	 * mp->b_cont could be either a M_CTL message
 	 * for icmp errors being sent up or a M_DATA message.
 	 */
-	ASSERT(mp->b_datap->db_type == M_CTL ||
-	    mp->b_datap->db_type == M_DATA);
+	ASSERT(mp->b_datap->db_type == M_CTL || mp->b_datap->db_type == M_DATA);
 
 	ASSERT(ii->ipsec_in_type == IPSEC_IN);
 
@@ -2294,7 +2503,7 @@ clear:
 		const char *reason;
 		kstat_named_t *counter;
 		if (ipsec_check_ipsecin_latch(ii, mp, ipl,
-		    ipha, ip6h, &reason, &counter)) {
+		    ipha, ip6h, &reason, &counter, connp)) {
 			BUMP_MIB(&ip_mib, ipsecInSucceeded);
 			return (first_mp);
 		}
@@ -2314,9 +2523,10 @@ clear:
 		return (first_mp);
 	}
 
+	unique_id = conn_to_unique(connp, mp, ipha, ip6h);
 	IPPOL_REFHOLD(ipl->ipl_in_policy);
 	first_mp = ipsec_check_ipsecin_policy(CONNP_TO_WQ(connp), first_mp,
-	    ipl->ipl_in_policy, ipha, ip6h);
+	    ipl->ipl_in_policy, ipha, ip6h, unique_id);
 	/*
 	 * NOTE: ipsecIn{Failed,Succeeeded} bumped by
 	 * ipsec_check_ipsecin_policy().
@@ -2326,43 +2536,70 @@ clear:
 	return (first_mp);
 }
 
-boolean_t
-ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp,
-    ipha_t *ipha, ip6_t *ip6h)
+/*
+ * Returns:
+ *
+ * SELRET_NOMEM --> msgpullup() needed to gather things failed.
+ * SELRET_BADPKT --> If we're being called after tunnel-mode fragment
+ *		     gathering, the initial fragment is too short for
+ *		     useful data.  Only returned if SEL_TUNNEL_FIRSTFRAG is
+ *		     set.
+ * SELRET_SUCCESS --> "sel" now has initialized IPsec selector data.
+ * SELRET_TUNFRAG --> This is a fragment in a tunnel-mode packet.  Caller
+ *		      should put this packet in a fragment-gathering queue.
+ *		      Only returned if SEL_TUNNEL_MODE and SEL_PORT_POLICY
+ *		      is set.
+ */
+static selret_t
+ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
+    ip6_t *ip6h, uint8_t sel_flags)
 {
 	uint16_t *ports;
 	ushort_t hdr_len;
+	int outer_hdr_len = 0;	/* For ICMP tunnel-mode cases... */
 	mblk_t *spare_mp = NULL;
 	uint8_t *nexthdrp;
 	uint8_t nexthdr;
 	uint8_t *typecode;
 	uint8_t check_proto;
+	ip6_pkt_t ipp;
+	boolean_t port_policy_present = (sel_flags & SEL_PORT_POLICY);
+	boolean_t is_icmp = (sel_flags & SEL_IS_ICMP);
+	boolean_t tunnel_mode = (sel_flags & SEL_TUNNEL_MODE);
 
 	ASSERT((ipha == NULL && ip6h != NULL) ||
 	    (ipha != NULL && ip6h == NULL));
 
 	if (ip6h != NULL) {
+		if (is_icmp)
+			outer_hdr_len = ((uint8_t *)ip6h) - mp->b_rptr;
+
 		check_proto = IPPROTO_ICMPV6;
 		sel->ips_isv4 = B_FALSE;
 		sel->ips_local_addr_v6 = ip6h->ip6_dst;
 		sel->ips_remote_addr_v6 = ip6h->ip6_src;
+
+		bzero(&ipp, sizeof (ipp));
+		(void) ip_find_hdr_v6(mp, ip6h, &ipp, NULL);
 
 		nexthdr = ip6h->ip6_nxt;
 		switch (nexthdr) {
 		case IPPROTO_HOPOPTS:
 		case IPPROTO_ROUTING:
 		case IPPROTO_DSTOPTS:
+		case IPPROTO_FRAGMENT:
 			/*
 			 * Use ip_hdr_length_nexthdr_v6().  And have a spare
 			 * mblk that's contiguous to feed it
 			 */
 			if ((spare_mp = msgpullup(mp, -1)) == NULL)
-				return (B_FALSE);
+				return (SELRET_NOMEM);
 			if (!ip_hdr_length_nexthdr_v6(spare_mp,
-			    (ip6_t *)spare_mp->b_rptr, &hdr_len, &nexthdrp)) {
-				/* Malformed packet - XXX ip_drop_packet()? */
-				freemsg(spare_mp);
-				return (B_FALSE);
+			    (ip6_t *)(spare_mp->b_rptr + outer_hdr_len),
+				&hdr_len, &nexthdrp)) {
+				/* Malformed packet - caller frees. */
+				ipsec_freemsg_chain(spare_mp);
+				return (SELRET_BADPKT);
 			}
 			nexthdr = *nexthdrp;
 			/* We can just extract based on hdr_len now. */
@@ -2371,21 +2608,39 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp,
 			hdr_len = IPV6_HDR_LEN;
 			break;
 		}
+
+		if (port_policy_present && IS_V6_FRAGMENT(ipp) && !is_icmp) {
+			/* IPv6 Fragment */
+			ipsec_freemsg_chain(spare_mp);
+			return (SELRET_TUNFRAG);
+		}
 	} else {
+		if (is_icmp)
+			outer_hdr_len = ((uint8_t *)ipha) - mp->b_rptr;
 		check_proto = IPPROTO_ICMP;
 		sel->ips_isv4 = B_TRUE;
 		sel->ips_local_addr_v4 = ipha->ipha_dst;
 		sel->ips_remote_addr_v4 = ipha->ipha_src;
 		nexthdr = ipha->ipha_protocol;
 		hdr_len = IPH_HDR_LENGTH(ipha);
+
+		if (port_policy_present &&
+		    IS_V4_FRAGMENT(ipha->ipha_fragment_offset_and_flags) &&
+		    !is_icmp) {
+			/* IPv4 Fragment */
+			ipsec_freemsg_chain(spare_mp);
+			return (SELRET_TUNFRAG);
+		}
+
 	}
 	sel->ips_protocol = nexthdr;
 
-	if (nexthdr != IPPROTO_TCP && nexthdr != IPPROTO_UDP &&
-	    nexthdr != IPPROTO_SCTP && nexthdr != check_proto) {
+	if ((nexthdr != IPPROTO_TCP && nexthdr != IPPROTO_UDP &&
+		nexthdr != IPPROTO_SCTP && nexthdr != check_proto) ||
+	    (!port_policy_present && tunnel_mode)) {
 		sel->ips_remote_port = sel->ips_local_port = 0;
-		freemsg(spare_mp);	/* Always works, even if NULL. */
-		return (B_TRUE);
+		ipsec_freemsg_chain(spare_mp);
+		return (SELRET_SUCCESS);
 	}
 
 	if (&mp->b_rptr[hdr_len] + 4 > mp->b_wptr) {
@@ -2398,11 +2653,11 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp,
 		ipsec_hdr_pullup_needed++;
 		if (spare_mp == NULL &&
 		    (spare_mp = msgpullup(mp, -1)) == NULL) {
-			return (B_FALSE);
+			return (SELRET_NOMEM);
 		}
-		ports = (uint16_t *)&spare_mp->b_rptr[hdr_len];
+		ports = (uint16_t *)&spare_mp->b_rptr[hdr_len + outer_hdr_len];
 	} else {
-		ports = (uint16_t *)&mp->b_rptr[hdr_len];
+		ports = (uint16_t *)&mp->b_rptr[hdr_len + outer_hdr_len];
 	}
 
 	if (nexthdr == check_proto) {
@@ -2410,19 +2665,17 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp,
 		sel->ips_icmp_type = *typecode++;
 		sel->ips_icmp_code = *typecode;
 		sel->ips_remote_port = sel->ips_local_port = 0;
-		freemsg(spare_mp);	/* Always works, even if NULL */
-		return (B_TRUE);
+	} else {
+		sel->ips_remote_port = *ports++;
+		sel->ips_local_port = *ports;
 	}
-
-	sel->ips_remote_port = *ports++;
-	sel->ips_local_port = *ports;
-	freemsg(spare_mp);	/* Always works, even if NULL */
-	return (B_TRUE);
+	ipsec_freemsg_chain(spare_mp);
+	return (SELRET_SUCCESS);
 }
 
 static boolean_t
 ipsec_init_outbound_ports(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
-    ip6_t *ip6h)
+    ip6_t *ip6h, int outer_hdr_len)
 {
 	/*
 	 * XXX cut&paste shared with ipsec_init_inbound_sel
@@ -2445,6 +2698,7 @@ ipsec_init_outbound_ports(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 		case IPPROTO_HOPOPTS:
 		case IPPROTO_ROUTING:
 		case IPPROTO_DSTOPTS:
+		case IPPROTO_FRAGMENT:
 			/*
 			 * Use ip_hdr_length_nexthdr_v6().  And have a spare
 			 * mblk that's contiguous to feed it
@@ -2452,11 +2706,12 @@ ipsec_init_outbound_ports(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 			spare_mp = msgpullup(mp, -1);
 			if (spare_mp == NULL ||
 			    !ip_hdr_length_nexthdr_v6(spare_mp,
-				(ip6_t *)spare_mp->b_rptr, &hdr_len,
-				&nexthdrp)) {
+				(ip6_t *)(spare_mp->b_rptr + outer_hdr_len),
+				&hdr_len, &nexthdrp)) {
 				/* Always works, even if NULL. */
-				freemsg(spare_mp);
-				freemsg(mp);
+				ipsec_freemsg_chain(spare_mp);
+				ip_drop_packet_chain(mp, B_FALSE, NULL, NULL,
+				    &ipdrops_spd_nomem, &spd_dropper);
 				return (B_FALSE);
 			} else {
 				nexthdr = *nexthdrp;
@@ -2477,11 +2732,11 @@ ipsec_init_outbound_ports(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 	if (nexthdr != IPPROTO_TCP && nexthdr != IPPROTO_UDP &&
 	    nexthdr != IPPROTO_SCTP && nexthdr != check_proto) {
 		sel->ips_local_port = sel->ips_remote_port = 0;
-		freemsg(spare_mp);  /* Always works, even if NULL. */
+		ipsec_freemsg_chain(spare_mp); /* Always works, even if NULL */
 		return (B_TRUE);
 	}
 
-	if (&mp->b_rptr[hdr_len] + 4 > mp->b_wptr) {
+	if (&mp->b_rptr[hdr_len] + 4 + outer_hdr_len > mp->b_wptr) {
 		/* If we didn't pullup a copy already, do so now. */
 		/*
 		 * XXX performance, will upper-layers frequently split TCP/UDP
@@ -2492,12 +2747,13 @@ ipsec_init_outbound_ports(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 		 */
 		if (spare_mp == NULL &&
 		    (spare_mp = msgpullup(mp, -1)) == NULL) {
-			freemsg(mp);
+			ip_drop_packet_chain(mp, B_FALSE, NULL, NULL,
+			    &ipdrops_spd_nomem, &spd_dropper);
 			return (B_FALSE);
 		}
-		ports = (uint16_t *)&spare_mp->b_rptr[hdr_len];
+		ports = (uint16_t *)&spare_mp->b_rptr[hdr_len + outer_hdr_len];
 	} else {
-		ports = (uint16_t *)&mp->b_rptr[hdr_len];
+		ports = (uint16_t *)&mp->b_rptr[hdr_len + outer_hdr_len];
 	}
 
 	if (nexthdr == check_proto) {
@@ -2505,13 +2761,11 @@ ipsec_init_outbound_ports(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 		sel->ips_icmp_type = *typecode++;
 		sel->ips_icmp_code = *typecode;
 		sel->ips_remote_port = sel->ips_local_port = 0;
-		freemsg(spare_mp);	/* Always works, even if NULL */
-		return (B_TRUE);
+	} else {
+		sel->ips_local_port = *ports++;
+		sel->ips_remote_port = *ports;
 	}
-
-	sel->ips_local_port = *ports++;
-	sel->ips_remote_port = *ports;
-	freemsg(spare_mp);	/* Always works, even if NULL */
+	ipsec_freemsg_chain(spare_mp);	/* Always works, even if NULL */
 	return (B_TRUE);
 }
 
@@ -2618,7 +2872,7 @@ ipsec_in_to_out_action(ipsec_in_t *ii)
  * effective MTU, yielding the inner payload size which reflects a
  * packet with *minimum* ESP padding..
  */
-static int32_t
+int32_t
 ipsec_act_ovhd(const ipsec_act_t *act)
 {
 	int32_t overhead = 0;
@@ -2662,8 +2916,8 @@ policy_hash(int size, const void *start, const void *end)
  * into trouble from lots of collisions on ::1 addresses and the like
  * (seems unlikely).
  */
-#define	IPSEC_IPV4_HASH(a) ((a) % ipsec_spd_hashsize)
-#define	IPSEC_IPV6_HASH(a) ((a.s6_addr32[3]) % ipsec_spd_hashsize)
+#define	IPSEC_IPV4_HASH(a, n) ((a) % (n))
+#define	IPSEC_IPV6_HASH(a, n) (((a).s6_addr32[3]) % (n))
 
 /*
  * These two hash functions should produce coordinated values
@@ -2679,22 +2933,25 @@ selkey_hash(const ipsec_selkey_t *selkey)
 
 	if (valid & IPSL_IPV4) {
 		if (selkey->ipsl_remote_pfxlen == 32)
-			return (IPSEC_IPV4_HASH(selkey->ipsl_remote.ipsad_v4));
+			return (IPSEC_IPV4_HASH(selkey->ipsl_remote.ipsad_v4,
+				    ipsec_spd_hashsize));
 	}
 	if (valid & IPSL_IPV6) {
 		if (selkey->ipsl_remote_pfxlen == 128)
-			return (IPSEC_IPV6_HASH(selkey->ipsl_remote.ipsad_v6));
+			return (IPSEC_IPV6_HASH(selkey->ipsl_remote.ipsad_v6,
+				    ipsec_spd_hashsize));
 	}
 	return (IPSEC_SEL_NOHASH);
 }
 
 static uint32_t
-selector_hash(ipsec_selector_t *sel)
+selector_hash(ipsec_selector_t *sel, ipsec_policy_root_t *root)
 {
 	if (sel->ips_isv4) {
-		return (IPSEC_IPV4_HASH(sel->ips_remote_addr_v4));
+		return (IPSEC_IPV4_HASH(sel->ips_remote_addr_v4,
+			    root->ipr_nchains));
 	}
-	return (IPSEC_IPV6_HASH(sel->ips_remote_addr_v6));
+	return (IPSEC_IPV6_HASH(sel->ips_remote_addr_v6, root->ipr_nchains));
 }
 
 /*
@@ -2864,7 +3121,8 @@ ipsec_find_sel(ipsec_selkey_t *selkey)
 	    !(selkey->ipsl_valid & IPSL_IPV6));
 
 	hval = selkey_hash(selkey);
-	selkey->ipsl_hval = hval;
+	/* Set pol_hval to uninitialized until we put it in a polhead. */
+	selkey->ipsl_sel_hval = hval;
 
 	bucket = (hval == IPSEC_SEL_NOHASH) ? 0 : hval;
 
@@ -2872,7 +3130,8 @@ ipsec_find_sel(ipsec_selkey_t *selkey)
 	HASH_LOCK(ipsec_sel_hash, bucket);
 
 	for (HASH_ITERATE(sp, ipsl_hash, ipsec_sel_hash, bucket)) {
-		if (bcmp(&sp->ipsl_key, selkey, sizeof (*selkey)) == 0)
+		if (bcmp(&sp->ipsl_key, selkey,
+		    offsetof(ipsec_selkey_t, ipsl_pol_hval)) == 0)
 			break;
 	}
 	if (sp != NULL) {
@@ -2891,6 +3150,11 @@ ipsec_find_sel(ipsec_selkey_t *selkey)
 	HASH_INSERT(sp, ipsl_hash, ipsec_sel_hash, bucket);
 	sp->ipsl_refs = 2;	/* one for hash table, one for caller */
 	sp->ipsl_key = *selkey;
+	/* Set to uninitalized and have insertion into polhead fix things. */
+	if (selkey->ipsl_sel_hval != IPSEC_SEL_NOHASH)
+		sp->ipsl_key.ipsl_pol_hval = 0;
+	else
+		sp->ipsl_key.ipsl_pol_hval = IPSEC_SEL_NOHASH;
 
 	HASH_UNLOCK(ipsec_sel_hash, bucket);
 
@@ -2901,7 +3165,7 @@ static void
 ipsec_sel_rel(ipsec_sel_t **spp)
 {
 	ipsec_sel_t *sp = *spp;
-	int hval = sp->ipsl_key.ipsl_hval;
+	int hval = sp->ipsl_key.ipsl_sel_hval;
 	*spp = NULL;
 
 	if (hval == IPSEC_SEL_NOHASH)
@@ -2942,11 +3206,14 @@ ipsec_policy_free(ipsec_policy_t *ipp)
  */
 ipsec_policy_t *
 ipsec_policy_create(ipsec_selkey_t *keys, const ipsec_act_t *a,
-    int nacts, int prio)
+    int nacts, int prio, uint64_t *index_ptr)
 {
 	ipsec_action_t *ap;
 	ipsec_sel_t *sp;
 	ipsec_policy_t *ipp;
+
+	if (index_ptr == NULL)
+		index_ptr = &ipsec_next_policy_index;
 
 	ipp = kmem_cache_alloc(ipsec_pol_cache, KM_NOSLEEP);
 	ap = ipsec_act_find(a, nacts);
@@ -2969,7 +3236,8 @@ ipsec_policy_create(ipsec_selkey_t *keys, const ipsec_act_t *a,
 	ipp->ipsp_sel = sp;
 	ipp->ipsp_act = ap;
 	ipp->ipsp_prio = prio;	/* rule priority */
-	ipp->ipsp_index = ipsec_next_policy_index++;
+	ipp->ipsp_index = *index_ptr;
+	(*index_ptr)++;
 
 	return (ipp);
 }
@@ -3018,10 +3286,10 @@ ipsec_policy_delete(ipsec_policy_head_t *php, ipsec_selkey_t *keys, int dir)
 
 	rw_enter(&php->iph_lock, RW_WRITER);
 
-	if (keys->ipsl_hval == IPSEC_SEL_NOHASH) {
+	if (sp->ipsl_key.ipsl_pol_hval == IPSEC_SEL_NOHASH) {
 		head = pr->ipr_nonhash[af];
 	} else {
-		head = pr->ipr_hash[keys->ipsl_hval].hash_head;
+		head = pr->ipr_hash[sp->ipsl_key.ipsl_pol_hval].hash_head;
 	}
 
 	for (ip = head; ip != NULL; ip = nip) {
@@ -3096,7 +3364,8 @@ ipsec_policy_delete_index(ipsec_policy_head_t *php, uint64_t policy_index)
 
 /*
  * Given a constructed ipsec_policy_t policy rule, see if it can be entered
- * into the correct policy ruleset.
+ * into the correct policy ruleset.  As a side-effect, it sets the hash
+ * entries on "ipp"'s ipsp_pol_hval.
  *
  * Returns B_TRUE if it can be entered, B_FALSE if it can't be (because a
  * duplicate policy exists with exactly the same selectors), or an icmp
@@ -3129,10 +3398,17 @@ ipsec_check_policy(ipsec_policy_head_t *php, ipsec_policy_t *ipp, int direction)
 	 * Because selectors are interned below, we need only compare pointers
 	 * for equality.
 	 */
-	if (selkey->ipsl_hval == IPSEC_SEL_NOHASH) {
+	if (selkey->ipsl_sel_hval == IPSEC_SEL_NOHASH) {
 		head = pr->ipr_nonhash[af];
 	} else {
-		head = pr->ipr_hash[selkey->ipsl_hval].hash_head;
+		selkey->ipsl_pol_hval =
+		    (selkey->ipsl_valid & IPSL_IPV4) ?
+		    IPSEC_IPV4_HASH(selkey->ipsl_remote.ipsad_v4,
+			pr->ipr_nchains) :
+		    IPSEC_IPV6_HASH(selkey->ipsl_remote.ipsad_v6,
+			pr->ipr_nchains);
+
+		head = pr->ipr_hash[selkey->ipsl_pol_hval].hash_head;
 	}
 
 	for (p2 = head; p2 != NULL; p2 = p2->ipsp_hash.hash_next) {
@@ -3275,7 +3551,7 @@ ipsec_enter_policy(ipsec_policy_head_t *php, ipsec_policy_t *ipp, int direction)
 	ipsec_policy_root_t *pr = &php->iph_root[direction];
 	ipsec_selkey_t *selkey = &ipp->ipsp_sel->ipsl_key;
 	uint32_t valid = selkey->ipsl_valid;
-	uint32_t hval = selkey->ipsl_hval;
+	uint32_t hval = selkey->ipsl_pol_hval;
 	int af = -1;
 
 	ASSERT(RW_WRITE_HELD(&php->iph_lock));
@@ -3329,7 +3605,6 @@ ipsec_ipr_flush(ipsec_policy_head_t *php, ipsec_policy_root_t *ipr)
 	}
 }
 
-
 void
 ipsec_polhead_flush(ipsec_policy_head_t *php)
 {
@@ -3346,11 +3621,22 @@ ipsec_polhead_flush(ipsec_policy_head_t *php)
 void
 ipsec_polhead_free(ipsec_policy_head_t *php)
 {
+	int dir;
+
 	ASSERT(php->iph_refs == 0);
 	rw_enter(&php->iph_lock, RW_WRITER);
 	ipsec_polhead_flush(php);
 	rw_exit(&php->iph_lock);
 	rw_destroy(&php->iph_lock);
+	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
+		ipsec_policy_root_t *ipr = &php->iph_root[dir];
+		int chain;
+
+		for (chain = 0; chain < ipr->ipr_nchains; chain++)
+			mutex_destroy(&(ipr->ipr_hash[chain].hash_lock));
+
+	}
+	ipsec_polhead_free_table(php);
 	kmem_free(php, sizeof (*php));
 }
 
@@ -3367,7 +3653,7 @@ ipsec_ipr_init(ipsec_policy_root_t *ipr)
 	}
 }
 
-extern ipsec_policy_head_t *
+ipsec_policy_head_t *
 ipsec_polhead_create(void)
 {
 	ipsec_policy_head_t *php;
@@ -3394,7 +3680,7 @@ ipsec_polhead_create(void)
  * old one and return the only reference to the new one.
  * If the old one had a refcount of 1, just return it.
  */
-extern ipsec_policy_head_t *
+ipsec_policy_head_t *
 ipsec_polhead_split(ipsec_policy_head_t *php)
 {
 	ipsec_policy_head_t *nphp;
@@ -3494,7 +3780,7 @@ ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h)
 	io->ipsec_out_frtn.free_arg = (char *)io;
 	io->ipsec_out_act = reflect_action;
 
-	if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h))
+	if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h, 0))
 		return (B_FALSE);
 
 	io->ipsec_out_src_port = sel.ips_local_port;
@@ -3570,7 +3856,8 @@ ipsec_out_tag(mblk_t *mp, mblk_t *cont)
 
 	nmp = ipsec_alloc_ipsec_out();
 	if (nmp == NULL) {
-		freemsg(cont);	/* XXX ip_drop_packet() ? */
+		ip_drop_packet_chain(cont, B_FALSE, NULL, NULL,
+		    &ipdrops_spd_nomem, &spd_dropper);
 		return (NULL);
 	}
 	ASSERT(nmp->b_datap->db_type == M_CTL);
@@ -3829,8 +4116,8 @@ ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
 		 * it from the packet.
 		 */
 
-		if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h)) {
-			/* XXX any cleanup required here?? */
+		if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h, 0)) {
+			/* Callee did ip_drop_packet(). */
 			return (NULL);
 		}
 		io->ipsec_out_src_port = sel.ips_local_port;
@@ -3854,7 +4141,16 @@ ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
 			IPPH_REFHOLD(connp->conn_policy);
 			io->ipsec_out_polhead = connp->conn_policy;
 		}
+	} else {
+		/* Handle explicit drop action. */
+		if (p->ipsp_act->ipa_act.ipa_type == IPSEC_ACT_DISCARD ||
+		    p->ipsp_act->ipa_act.ipa_type == IPSEC_ACT_REJECT) {
+			ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
+			    &ipdrops_spd_explicit, &spd_dropper);
+			ipsec_mp = NULL;
+		}
 	}
+
 	return (ipsec_mp);
 }
 
@@ -4013,6 +4309,7 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 				ipsec_mp = mp;
 				io = NULL;
 			}
+			ASSERT(io == NULL || !io->ipsec_out_tunnel);
 		}
 		if (((io == NULL) || (io->ipsec_out_polhead == NULL)) &&
 		    ((connp == NULL) || (connp->conn_policy == NULL)))
@@ -4045,6 +4342,7 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 			ipsec_mp = mp;
 			io = NULL;
 		}
+		ASSERT(io == NULL || !io->ipsec_out_tunnel);
 	}
 
 	if (ipha != NULL) {
@@ -4104,15 +4402,14 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 		}
 	}
 
-	if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h)) {
+	if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h, 0)) {
 		if (ipha != NULL) {
 			BUMP_MIB(&ip_mib, ipOutDiscards);
 		} else {
 			BUMP_MIB(&ip6_mib, ipv6OutDiscards);
 		}
 
-		ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
-		    &ipdrops_spd_nomem, &spd_dropper);
+		/* Callee dropped the packet. */
 		return (NULL);
 	}
 
@@ -4831,4 +5128,1542 @@ ipsec_unregister_prov_update(void)
 {
 	if (prov_update_handle != NULL)
 		crypto_unnotify_events(prov_update_handle);
+}
+
+/*
+ * Tunnel-mode support routines.
+ */
+
+/*
+ * Returns an mblk chain suitable for putnext() if policies match and IPsec
+ * SAs are available.  If there's no per-tunnel policy, or a match comes back
+ * with no match, then still return the packet and have global policy take
+ * a crack at it in IP.
+ *
+ * Remember -> we can be forwarding packets.  Keep that in mind w.r.t.
+ * inner-packet contents.
+ */
+mblk_t *
+ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
+    ip6_t *inner_ipv6, ipha_t *outer_ipv4, ip6_t *outer_ipv6, int outer_hdr_len)
+{
+	ipsec_tun_pol_t *itp = atp->tun_itp;
+	ipsec_policy_head_t *polhead;
+	ipsec_selector_t sel;
+	mblk_t *ipsec_mp, *ipsec_mp_head, *nmp;
+	mblk_t *spare_mp = NULL;
+	ipsec_out_t *io;
+	boolean_t is_fragment;
+	ipsec_policy_t *pol;
+
+	ASSERT(outer_ipv6 != NULL && outer_ipv4 == NULL ||
+	    outer_ipv4 != NULL && outer_ipv6 == NULL);
+	/* We take care of inners in a bit. */
+
+	/* No policy on this tunnel - let global policy have at it. */
+	if (itp == NULL || !(itp->itp_flags & ITPF_P_ACTIVE))
+		return (mp);
+	polhead = itp->itp_policy;
+
+	bzero(&sel, sizeof (sel));
+	if (inner_ipv4 != NULL) {
+		ASSERT(inner_ipv6 == NULL);
+		sel.ips_isv4 = B_TRUE;
+		sel.ips_local_addr_v4 = inner_ipv4->ipha_src;
+		sel.ips_remote_addr_v4 = inner_ipv4->ipha_dst;
+		sel.ips_protocol = (uint8_t)inner_ipv4->ipha_protocol;
+		is_fragment =
+		    IS_V4_FRAGMENT(inner_ipv4->ipha_fragment_offset_and_flags);
+	} else {
+		ASSERT(inner_ipv6 != NULL);
+		sel.ips_isv4 = B_FALSE;
+		sel.ips_local_addr_v6 = inner_ipv6->ip6_src;
+		/* Use ip_get_dst_v6() just for the fragment bit. */
+		sel.ips_remote_addr_v6 = ip_get_dst_v6(inner_ipv6,
+		    &is_fragment);
+		/*
+		 * Reset, because we don't care about routing-header dests
+		 * in the forwarding/tunnel path.
+		 */
+		sel.ips_remote_addr_v6 = inner_ipv6->ip6_dst;
+	}
+
+	if (itp->itp_flags & ITPF_P_PER_PORT_SECURITY) {
+		if (is_fragment) {
+			ipha_t *oiph;
+			ipha_t *iph = NULL;
+			ip6_t *ip6h = NULL;
+			int hdr_len;
+			uint16_t ip6_hdr_length;
+			uint8_t v6_proto;
+			uint8_t *v6_proto_p;
+
+			/*
+			 * We have a fragment we need to track!
+			 */
+			mp = ipsec_fragcache_add(&itp->itp_fragcache, NULL, mp,
+			    outer_hdr_len);
+			if (mp == NULL)
+				return (NULL);
+
+			/*
+			 * If we get here, we have a full
+			 * fragment chain
+			 */
+
+			oiph = (ipha_t *)mp->b_rptr;
+			if (IPH_HDR_VERSION(oiph) == IPV4_VERSION) {
+				hdr_len = ((outer_hdr_len != 0) ?
+				    IPH_HDR_LENGTH(oiph) : 0);
+				iph = (ipha_t *)(mp->b_rptr + hdr_len);
+			} else {
+				ASSERT(IPH_HDR_VERSION(oiph) == IPV6_VERSION);
+				if ((spare_mp = msgpullup(mp, -1)) == NULL) {
+					ip_drop_packet_chain(mp, B_FALSE,
+					    NULL, NULL, &ipdrops_spd_nomem,
+					    &spd_dropper);
+				}
+				ip6h = (ip6_t *)spare_mp->b_rptr;
+				(void) ip_hdr_length_nexthdr_v6(spare_mp, ip6h,
+				    &ip6_hdr_length, &v6_proto_p);
+				hdr_len = ip6_hdr_length;
+			}
+			outer_hdr_len = hdr_len;
+
+			if (sel.ips_isv4) {
+				if (iph == NULL) {
+					/* Was v6 outer */
+					iph = (ipha_t *)(mp->b_rptr + hdr_len);
+				}
+				inner_ipv4 = iph;
+				sel.ips_local_addr_v4 = inner_ipv4->ipha_src;
+				sel.ips_remote_addr_v4 = inner_ipv4->ipha_dst;
+				sel.ips_protocol =
+				    (uint8_t)inner_ipv4->ipha_protocol;
+			} else {
+				if ((spare_mp == NULL) &&
+				    ((spare_mp = msgpullup(mp, -1)) == NULL)) {
+					ip_drop_packet_chain(mp, B_FALSE,
+					    NULL, NULL, &ipdrops_spd_nomem,
+					    &spd_dropper);
+				}
+				inner_ipv6 = (ip6_t *)(spare_mp->b_rptr +
+				    hdr_len);
+				sel.ips_local_addr_v6 = inner_ipv6->ip6_src;
+				sel.ips_remote_addr_v6 = inner_ipv6->ip6_dst;
+				(void) ip_hdr_length_nexthdr_v6(spare_mp,
+				    inner_ipv6, &ip6_hdr_length,
+				    &v6_proto_p);
+				v6_proto = *v6_proto_p;
+				sel.ips_protocol = v6_proto;
+#ifdef FRAGCACHE_DEBUG
+				cmn_err(CE_WARN, "v6_sel.ips_protocol = %d\n",
+				    sel.ips_protocol);
+#endif
+			}
+			/* Ports are extracted below */
+		}
+
+		/* Get ports... */
+		if (spare_mp != NULL) {
+			if (!ipsec_init_outbound_ports(&sel, spare_mp,
+			    inner_ipv4, inner_ipv6, outer_hdr_len)) {
+				/*
+				 * callee did ip_drop_packet_chain() on
+				 * spare_mp
+				 */
+				ipsec_freemsg_chain(mp);
+				return (NULL);
+			}
+		} else {
+			if (!ipsec_init_outbound_ports(&sel, mp,
+			    inner_ipv4, inner_ipv6, outer_hdr_len)) {
+				/* callee did ip_drop_packet_chain() on mp. */
+				return (NULL);
+			}
+		}
+#ifdef FRAGCACHE_DEBUG
+		if (inner_ipv4 != NULL)
+			cmn_err(CE_WARN,
+			    "(v4) sel.ips_protocol = %d, "
+			    "sel.ips_local_port = %d, "
+			    "sel.ips_remote_port = %d\n",
+			    sel.ips_protocol, ntohs(sel.ips_local_port),
+			    ntohs(sel.ips_remote_port));
+		if (inner_ipv6 != NULL)
+			cmn_err(CE_WARN,
+			    "(v6) sel.ips_protocol = %d, "
+			    "sel.ips_local_port = %d, "
+			    "sel.ips_remote_port = %d\n",
+			    sel.ips_protocol, ntohs(sel.ips_local_port),
+			    ntohs(sel.ips_remote_port));
+#endif
+		/* Success so far - done with spare_mp */
+		ipsec_freemsg_chain(spare_mp);
+	}
+	rw_enter(&polhead->iph_lock, RW_READER);
+	pol = ipsec_find_policy_head(NULL, polhead, IPSEC_TYPE_OUTBOUND, &sel);
+	rw_exit(&polhead->iph_lock);
+	if (pol == NULL) {
+		/*
+		 * No matching policy on this tunnel, drop the packet.
+		 *
+		 * NOTE:  Tunnel-mode tunnels are different from the
+		 * IP global transport mode policy head.  For a tunnel-mode
+		 * tunnel, we drop the packet in lieu of passing it
+		 * along accepted the way a global-policy miss would.
+		 *
+		 * NOTE2:  "negotiate transport" tunnels should match ALL
+		 * inbound packets, but we do not uncomment the ASSERT()
+		 * below because if/when we open PF_POLICY, a user can
+		 * shoot him/her-self in the foot with a 0 priority.
+		 */
+
+		/* ASSERT(itp->itp_flags & ITPF_P_TUNNEL); */
+#ifdef FRAGCACHE_DEBUG
+		cmn_err(CE_WARN, "ipsec_tun_outbound(): No matching tunnel "
+		    "per-port policy\n");
+#endif
+		ip_drop_packet_chain(mp, B_FALSE, NULL, NULL,
+		    &ipdrops_spd_explicit, &spd_dropper);
+		return (NULL);
+	}
+
+#ifdef FRAGCACHE_DEBUG
+	cmn_err(CE_WARN, "Having matching tunnel per-port policy\n");
+#endif
+
+	/* Construct an IPSEC_OUT message. */
+	ipsec_mp = ipsec_mp_head = ipsec_alloc_ipsec_out();
+	if (ipsec_mp == NULL) {
+		IPPOL_REFRELE(pol);
+		ip_drop_packet(mp, B_FALSE, NULL, NULL, &ipdrops_spd_nomem,
+		    &spd_dropper);
+		return (NULL);
+	}
+	ipsec_mp->b_cont = mp;
+	io = (ipsec_out_t *)ipsec_mp->b_rptr;
+	IPPH_REFHOLD(polhead);
+	/*
+	 * NOTE: free() function of ipsec_out mblk will release polhead and
+	 * pol references.
+	 */
+	io->ipsec_out_polhead = polhead;
+	io->ipsec_out_policy = pol;
+	io->ipsec_out_zoneid = atp->tun_zoneid;
+	io->ipsec_out_v4 = (outer_ipv4 != NULL);
+	io->ipsec_out_secure = B_TRUE;
+
+	if (!(itp->itp_flags & ITPF_P_TUNNEL)) {
+		/* Set up transport mode for tunnelled packets. */
+		io->ipsec_out_proto = (inner_ipv4 != NULL) ? IPPROTO_ENCAP :
+		    IPPROTO_IPV6;
+		return (ipsec_mp);
+	}
+
+	/* Fill in tunnel-mode goodies here. */
+	io->ipsec_out_tunnel = B_TRUE;
+	/* XXX Do I need to fill in all of the goodies here? */
+	if (inner_ipv4) {
+		io->ipsec_out_inaf = AF_INET;
+		io->ipsec_out_insrc[0] =
+		    pol->ipsp_sel->ipsl_key.ipsl_local.ipsad_v4;
+		io->ipsec_out_indst[0] =
+		    pol->ipsp_sel->ipsl_key.ipsl_remote.ipsad_v4;
+	} else {
+		io->ipsec_out_inaf = AF_INET6;
+		io->ipsec_out_insrc[0] =
+		    pol->ipsp_sel->ipsl_key.ipsl_local.ipsad_v6.s6_addr32[0];
+		io->ipsec_out_insrc[1] =
+		    pol->ipsp_sel->ipsl_key.ipsl_local.ipsad_v6.s6_addr32[1];
+		io->ipsec_out_insrc[2] =
+		    pol->ipsp_sel->ipsl_key.ipsl_local.ipsad_v6.s6_addr32[2];
+		io->ipsec_out_insrc[3] =
+		    pol->ipsp_sel->ipsl_key.ipsl_local.ipsad_v6.s6_addr32[3];
+		io->ipsec_out_indst[0] =
+		    pol->ipsp_sel->ipsl_key.ipsl_remote.ipsad_v6.s6_addr32[0];
+		io->ipsec_out_indst[1] =
+		    pol->ipsp_sel->ipsl_key.ipsl_remote.ipsad_v6.s6_addr32[1];
+		io->ipsec_out_indst[2] =
+		    pol->ipsp_sel->ipsl_key.ipsl_remote.ipsad_v6.s6_addr32[2];
+		io->ipsec_out_indst[3] =
+		    pol->ipsp_sel->ipsl_key.ipsl_remote.ipsad_v6.s6_addr32[3];
+	}
+	io->ipsec_out_insrcpfx = pol->ipsp_sel->ipsl_key.ipsl_local_pfxlen;
+	io->ipsec_out_indstpfx = pol->ipsp_sel->ipsl_key.ipsl_remote_pfxlen;
+	/* NOTE:  These are used for transport mode too. */
+	io->ipsec_out_src_port = pol->ipsp_sel->ipsl_key.ipsl_lport;
+	io->ipsec_out_dst_port = pol->ipsp_sel->ipsl_key.ipsl_rport;
+	io->ipsec_out_proto = pol->ipsp_sel->ipsl_key.ipsl_proto;
+
+	/*
+	 * The mp pointer still valid
+	 * Add ipsec_out to each fragment.
+	 * The fragment head already has one
+	 */
+	nmp = mp->b_next;
+	mp->b_next = NULL;
+	mp = nmp;
+	ASSERT(ipsec_mp != NULL);
+	while (mp != NULL) {
+		nmp = mp->b_next;
+		ipsec_mp->b_next = ipsec_out_tag(ipsec_mp_head, mp);
+		if (ipsec_mp->b_next == NULL) {
+			ip_drop_packet_chain(ipsec_mp_head, B_FALSE, NULL, NULL,
+			    &ipdrops_spd_nomem, &spd_dropper);
+			ip_drop_packet_chain(mp, B_FALSE, NULL, NULL,
+			    &ipdrops_spd_nomem, &spd_dropper);
+			return (NULL);
+		}
+		ipsec_mp = ipsec_mp->b_next;
+		mp->b_next = NULL;
+		mp = nmp;
+	}
+	return (ipsec_mp_head);
+}
+
+/*
+ * NOTE: The following releases pol's reference and
+ * calls ip_drop_packet() for me on NULL returns.
+ */
+mblk_t *
+ipsec_check_ipsecin_policy_reasm(mblk_t *ipsec_mp, ipsec_policy_t *pol,
+    ipha_t *inner_ipv4, ip6_t *inner_ipv6, uint64_t pkt_unique)
+{
+	/* Assume ipsec_mp is a chain of b_next-linked IPSEC_IN M_CTLs. */
+	mblk_t *data_chain = NULL, *data_tail = NULL;
+	mblk_t *ii_next;
+
+	while (ipsec_mp != NULL) {
+		ii_next = ipsec_mp->b_next;
+		ipsec_mp->b_next = NULL;  /* No tripping asserts. */
+
+		/*
+		 * Need IPPOL_REFHOLD(pol) for extras because
+		 * ipsecin_policy does the refrele.
+		 */
+		IPPOL_REFHOLD(pol);
+
+		if (ipsec_check_ipsecin_policy(NULL, ipsec_mp, pol,
+		    inner_ipv4, inner_ipv6, pkt_unique) != NULL) {
+			if (data_tail == NULL) {
+				/* First one */
+				data_chain = data_tail = ipsec_mp->b_cont;
+			} else {
+				data_tail->b_next = ipsec_mp->b_cont;
+				data_tail = data_tail->b_next;
+			}
+			freeb(ipsec_mp);
+		} else {
+			/*
+			 * ipsec_check_ipsecin_policy() freed ipsec_mp
+			 * already.   Need to get rid of any extra pol
+			 * references, and any remaining bits as well.
+			 */
+			IPPOL_REFRELE(pol);
+			ipsec_freemsg_chain(data_chain);
+			ipsec_freemsg_chain(ii_next);	/* ipdrop stats? */
+			return (NULL);
+		}
+		ipsec_mp = ii_next;
+	}
+	/*
+	 * One last release because either the loop bumped it up, or we never
+	 * called ipsec_check_ipsecin_policy().
+	 */
+	IPPOL_REFRELE(pol);
+
+	/* data_chain is ready for return to tun module. */
+	return (data_chain);
+}
+
+
+/*
+ * Returns B_TRUE if the inbound packet passed an IPsec policy check.  Returns
+ * B_FALSE if it failed or if it is a fragment needing its friends before a
+ * policy check can be performed.
+ *
+ * Expects a non-NULL *data_mp, an optional ipsec_mp, and a non-NULL polhead.
+ * data_mp may be reassigned with a b_next chain of packets if fragments
+ * neeeded to be collected for a proper policy check.
+ *
+ * Always frees ipsec_mp, but only frees data_mp if returns B_FALSE.  This
+ * function calls ip_drop_packet() on data_mp if need be.
+ *
+ * NOTE:  outer_hdr_len is signed.  If it's a negative value, the caller
+ * is inspecting an ICMP packet.
+ */
+boolean_t
+ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
+    ipha_t *inner_ipv4, ip6_t *inner_ipv6, ipha_t *outer_ipv4,
+    ip6_t *outer_ipv6, int outer_hdr_len)
+{
+	ipsec_policy_head_t *polhead;
+	ipsec_selector_t sel;
+	mblk_t *message = (ipsec_mp == NULL) ? *data_mp : ipsec_mp;
+	ipsec_policy_t *pol;
+	uint16_t tmpport;
+	selret_t rc;
+	boolean_t retval, port_policy_present, is_icmp;
+	in6_addr_t tmpaddr;
+	uint8_t flags;
+
+	sel.ips_is_icmp_inv_acq = 0;
+
+	ASSERT(outer_ipv4 != NULL && outer_ipv6 == NULL ||
+	    outer_ipv4 == NULL && outer_ipv6 != NULL);
+	ASSERT(inner_ipv4 != NULL && inner_ipv6 == NULL ||
+	    inner_ipv4 == NULL && inner_ipv6 != NULL);
+	ASSERT(message == *data_mp || message->b_cont == *data_mp);
+
+	if (outer_hdr_len < 0) {
+		outer_hdr_len = (-outer_hdr_len);
+		is_icmp = B_TRUE;
+	} else {
+		is_icmp = B_FALSE;
+	}
+
+	if (itp != NULL && (itp->itp_flags & ITPF_P_ACTIVE)) {
+		polhead = itp->itp_policy;
+		/*
+		 * We need to perform full Tunnel-Mode enforcement,
+		 * and we need to have inner-header data for such enforcement.
+		 *
+		 * See ipsec_init_inbound_sel() for the 0x80000000 on inbound
+		 * and on return.
+		 */
+
+		port_policy_present = ((itp->itp_flags &
+		    ITPF_P_PER_PORT_SECURITY) ? B_TRUE : B_FALSE);
+		flags = ((port_policy_present ? SEL_PORT_POLICY : SEL_NONE) |
+		    (is_icmp ? SEL_IS_ICMP : SEL_NONE) | SEL_TUNNEL_MODE);
+
+		rc = ipsec_init_inbound_sel(&sel, *data_mp, inner_ipv4,
+		    inner_ipv6, flags);
+
+		switch (rc) {
+		case SELRET_NOMEM:
+			ip_drop_packet(message, B_TRUE, NULL, NULL,
+			    &ipdrops_spd_nomem, &spd_dropper);
+			return (B_FALSE);
+		case SELRET_TUNFRAG:
+			/*
+			 * At this point, if we're cleartext, we don't want
+			 * to go there.
+			 */
+			if (ipsec_mp == NULL) {
+				ip_drop_packet(*data_mp, B_TRUE, NULL, NULL,
+				    &ipdrops_spd_got_clear, &spd_dropper);
+				*data_mp = NULL;
+				return (B_FALSE);
+			}
+			ASSERT(((ipsec_in_t *)ipsec_mp->b_rptr)->
+			    ipsec_in_secure);
+			message = ipsec_fragcache_add(&itp->itp_fragcache,
+			    ipsec_mp, *data_mp, outer_hdr_len);
+
+			if (message == NULL) {
+				/*
+				 * Data is cached, fragment chain is not
+				 * complete.  I consume ipsec_mp and data_mp
+				 */
+				return (B_FALSE);
+			}
+
+			/*
+			 * If we get here, we have a full fragment chain.
+			 * Reacquire headers and selectors from first fragment.
+			 */
+			if (inner_ipv4 != NULL) {
+				inner_ipv4 = (ipha_t *)message->b_cont->b_rptr;
+				ASSERT(message->b_cont->b_wptr -
+				    message->b_cont->b_rptr > sizeof (ipha_t));
+			} else {
+				inner_ipv6 = (ip6_t *)message->b_cont->b_rptr;
+				ASSERT(message->b_cont->b_wptr -
+				    message->b_cont->b_rptr > sizeof (ip6_t));
+			}
+			/* Use SEL_NONE so we always get ports! */
+			rc = ipsec_init_inbound_sel(&sel, message->b_cont,
+			    inner_ipv4, inner_ipv6, SEL_NONE);
+			switch (rc) {
+			case SELRET_SUCCESS:
+				/*
+				 * Get to same place as first caller's
+				 * SELRET_SUCCESS case.
+				 */
+				break;
+			case SELRET_NOMEM:
+				ip_drop_packet_chain(message, B_TRUE, NULL,
+				    NULL, &ipdrops_spd_nomem, &spd_dropper);
+				return (B_FALSE);
+			case SELRET_BADPKT:
+				ip_drop_packet_chain(message, B_TRUE, NULL,
+				    NULL, &ipdrops_spd_malformed_frag,
+				    &spd_dropper);
+				return (B_FALSE);
+			case SELRET_TUNFRAG:
+				cmn_err(CE_WARN, "(TUNFRAG on 2nd call...)");
+				/* FALLTHRU */
+			default:
+				cmn_err(CE_WARN, "ipsec_init_inbound_sel(mark2)"
+				    " returns bizarro 0x%x", rc);
+				/* Guaranteed panic! */
+				ASSERT(rc == SELRET_NOMEM);
+				return (B_FALSE);
+			}
+			/* FALLTHRU */
+		case SELRET_SUCCESS:
+			/*
+			 * Common case:
+			 * No per-port policy or a non-fragment.  Keep going.
+			 */
+			break;
+		case SELRET_BADPKT:
+			/*
+			 * We may receive ICMP (with IPv6 inner) packets that
+			 * trigger this return value.  Send 'em in for
+			 * enforcement checking.
+			 */
+			cmn_err(CE_NOTE, "ipsec_tun_inbound(): "
+			    "sending 'bad packet' in for enforcement");
+			break;
+		default:
+			cmn_err(CE_WARN,
+			    "ipsec_init_inbound_sel() returns bizarro 0x%x",
+			    rc);
+			ASSERT(rc == SELRET_NOMEM);	/* Guaranteed panic! */
+			return (B_FALSE);
+		}
+
+		if (is_icmp) {
+			/*
+			 * Swap local/remote because this is an ICMP packet.
+			 */
+			tmpaddr = sel.ips_local_addr_v6;
+			sel.ips_local_addr_v6 = sel.ips_remote_addr_v6;
+			sel.ips_remote_addr_v6 = tmpaddr;
+			tmpport = sel.ips_local_port;
+			sel.ips_local_port = sel.ips_remote_port;
+			sel.ips_remote_port = tmpport;
+		}
+
+		/* find_policy_head() */
+		rw_enter(&polhead->iph_lock, RW_READER);
+		pol = ipsec_find_policy_head(NULL, polhead, IPSEC_TYPE_INBOUND,
+		    &sel);
+		rw_exit(&polhead->iph_lock);
+		if (pol != NULL) {
+			if (ipsec_mp == NULL ||
+			    !((ipsec_in_t *)ipsec_mp->b_rptr)->
+				ipsec_in_secure) {
+				retval = pol->ipsp_act->ipa_allow_clear;
+				if (!retval) {
+					/*
+					 * XXX should never get here with
+					 * tunnel reassembled fragments?
+					 */
+					ASSERT(message->b_next == NULL);
+					ip_drop_packet(message, B_TRUE, NULL,
+					    NULL, &ipdrops_spd_got_clear,
+					    &spd_dropper);
+				} else if (ipsec_mp != NULL) {
+					freeb(ipsec_mp);
+				}
+
+				IPPOL_REFRELE(pol);
+				return (retval);
+			}
+			/*
+			 * NOTE: The following releases pol's reference and
+			 * calls ip_drop_packet() for me on NULL returns.
+			 *
+			 * "sel" is still good here, so let's use it!
+			 */
+			*data_mp = ipsec_check_ipsecin_policy_reasm(message,
+			    pol, inner_ipv4, inner_ipv6, SA_UNIQUE_ID(
+				sel.ips_remote_port, sel.ips_local_port,
+				(inner_ipv4 == NULL) ? IPPROTO_IPV6 :
+				IPPROTO_ENCAP, sel.ips_protocol));
+			return (*data_mp != NULL);
+		}
+
+		/*
+		 * Else fallthru and check the global policy on the outer
+		 * header(s) if this tunnel is an old-style transport-mode
+		 * one.  Drop the packet explicitly (no policy entry) for
+		 * a new-style tunnel-mode tunnel.
+		 */
+		if ((itp->itp_flags & ITPF_P_TUNNEL) && !is_icmp) {
+			ip_drop_packet_chain(message, B_TRUE, NULL,
+			    NULL, &ipdrops_spd_explicit, &spd_dropper);
+			return (B_FALSE);
+		}
+	}
+
+	/*
+	 * NOTE:  If we reach here, we will not have packet chains from
+	 * fragcache_add(), because the only way I get chains is on a
+	 * tunnel-mode tunnel, which either returns with a pass, or gets
+	 * hit by the ip_drop_packet_chain() call right above here.
+	 */
+
+	/* If no per-tunnel security, check global policy now. */
+	if (ipsec_mp != NULL &&
+	    (((outer_ipv4 != NULL) && !ipsec_inbound_v4_policy_present) ||
+		((outer_ipv6 != NULL) && !ipsec_inbound_v6_policy_present))) {
+		if (((ipsec_in_t *)(ipsec_mp->b_rptr))->
+		    ipsec_in_icmp_loopback) {
+			/*
+			 * This is an ICMP message with an ipsec_mp
+			 * attached.  We should accept it.
+			 */
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
+			return (B_TRUE);
+		}
+
+		ip_drop_packet(ipsec_mp, B_TRUE, NULL, NULL,
+		    &ipdrops_spd_got_secure, &spd_dropper);
+		return (B_FALSE);
+	}
+
+	/* NOTE:  Frees message if it returns NULL. */
+	if (ipsec_check_global_policy(message, NULL, outer_ipv4, outer_ipv6,
+		(ipsec_mp != NULL)) == NULL) {
+		return (B_FALSE);
+	}
+
+	if (ipsec_mp != NULL)
+		freeb(ipsec_mp);
+
+	/*
+	 * At this point, we pretend it's a cleartext accepted
+	 * packet.
+	 */
+	return (B_TRUE);
+}
+
+/*
+ * AVL comparison routine for our list of tunnel polheads.
+ */
+static int
+tunnel_compare(const void *arg1, const void *arg2)
+{
+	ipsec_tun_pol_t *left, *right;
+	int rc;
+
+	left = (ipsec_tun_pol_t *)arg1;
+	right = (ipsec_tun_pol_t *)arg2;
+
+	rc = strncmp(left->itp_name, right->itp_name, LIFNAMSIZ);
+	return (rc == 0 ? rc : (rc > 0 ? 1 : -1));
+}
+
+/*
+ * Free a tunnel policy node.
+ */
+void
+itp_free(ipsec_tun_pol_t *node)
+{
+	IPPH_REFRELE(node->itp_policy);
+	IPPH_REFRELE(node->itp_inactive);
+	mutex_destroy(&node->itp_lock);
+	kmem_free(node, sizeof (*node));
+}
+
+void
+itp_unlink(ipsec_tun_pol_t *node)
+{
+	rw_enter(&tunnel_policy_lock, RW_WRITER);
+	tunnel_policy_gen++;
+	ipsec_fragcache_uninit(&node->itp_fragcache);
+	avl_remove(&tunnel_policies, node);
+	rw_exit(&tunnel_policy_lock);
+	ITP_REFRELE(node);
+}
+
+/*
+ * Public interface to look up a tunnel security policy by name.  Used by
+ * spdsock mostly.  Returns "node" with a bumped refcnt.
+ */
+ipsec_tun_pol_t *
+get_tunnel_policy(char *name)
+{
+	ipsec_tun_pol_t *node, lookup;
+
+	(void) strncpy(lookup.itp_name, name, LIFNAMSIZ);
+
+	rw_enter(&tunnel_policy_lock, RW_READER);
+	node = (ipsec_tun_pol_t *)avl_find(&tunnel_policies, &lookup, NULL);
+	if (node != NULL) {
+		ITP_REFHOLD(node);
+	}
+	rw_exit(&tunnel_policy_lock);
+
+	return (node);
+}
+
+/*
+ * Public interface to walk all tunnel security polcies.  Useful for spdsock
+ * DUMP operations.  iterator() will not consume a reference.
+ */
+void
+itp_walk(void (*iterator)(ipsec_tun_pol_t *, void *), void *arg)
+{
+	ipsec_tun_pol_t *node;
+
+	rw_enter(&tunnel_policy_lock, RW_READER);
+	for (node = avl_first(&tunnel_policies); node != NULL;
+	    node = AVL_NEXT(&tunnel_policies, node)) {
+		iterator(node, arg);
+	}
+	rw_exit(&tunnel_policy_lock);
+}
+
+/*
+ * Initialize policy head.  This can only fail if there's a memory problem.
+ */
+static boolean_t
+tunnel_polhead_init(ipsec_policy_head_t *iph)
+{
+	rw_init(&iph->iph_lock, NULL, RW_DEFAULT, NULL);
+	iph->iph_refs = 1;
+	iph->iph_gen = 0;
+	if (ipsec_alloc_table(iph, tun_spd_hashsize, KM_SLEEP, B_FALSE) != 0) {
+		ipsec_polhead_free_table(iph);
+		return (B_FALSE);
+	}
+	ipsec_polhead_init(iph, tun_spd_hashsize);
+	return (B_TRUE);
+}
+
+/*
+ * Create a tunnel policy node with "name".  Set errno with
+ * ENOMEM if there's a memory problem, and EEXIST if there's an existing
+ * node.
+ */
+ipsec_tun_pol_t *
+create_tunnel_policy(char *name, int *errno, uint64_t *gen)
+{
+	ipsec_tun_pol_t *newbie, *existing;
+	avl_index_t where;
+
+	newbie = kmem_zalloc(sizeof (*newbie), KM_NOSLEEP);
+	if (newbie == NULL) {
+		*errno = ENOMEM;
+		return (NULL);
+	}
+	if (!ipsec_fragcache_init(&newbie->itp_fragcache)) {
+		kmem_free(newbie, sizeof (*newbie));
+		*errno = ENOMEM;
+		return (NULL);
+	}
+
+	(void) strncpy(newbie->itp_name, name, LIFNAMSIZ);
+
+	rw_enter(&tunnel_policy_lock, RW_WRITER);
+	existing = (ipsec_tun_pol_t *)avl_find(&tunnel_policies, newbie,
+	    &where);
+	if (existing != NULL) {
+		itp_free(newbie);
+		*errno = EEXIST;
+		rw_exit(&tunnel_policy_lock);
+		return (NULL);
+	}
+	tunnel_policy_gen++;
+	*gen = tunnel_policy_gen;
+	newbie->itp_refcnt = 2;	/* One for the caller, one for the tree. */
+	newbie->itp_next_policy_index = 1;
+	avl_insert(&tunnel_policies, newbie, where);
+	mutex_init(&newbie->itp_lock, NULL, MUTEX_DEFAULT, NULL);
+	newbie->itp_policy = kmem_zalloc(sizeof (ipsec_policy_head_t),
+	    KM_NOSLEEP);
+	if (newbie->itp_policy == NULL)
+		goto nomem;
+	newbie->itp_inactive = kmem_zalloc(sizeof (ipsec_policy_head_t),
+	    KM_NOSLEEP);
+	if (newbie->itp_inactive == NULL) {
+		kmem_free(newbie->itp_inactive, sizeof (ipsec_policy_head_t));
+		goto nomem;
+	}
+
+	if (!tunnel_polhead_init(newbie->itp_policy)) {
+		kmem_free(newbie->itp_policy, sizeof (ipsec_policy_head_t));
+		kmem_free(newbie->itp_inactive, sizeof (ipsec_policy_head_t));
+		goto nomem;
+	} else if (!tunnel_polhead_init(newbie->itp_inactive)) {
+		IPPH_REFRELE(newbie->itp_policy);
+		kmem_free(newbie->itp_inactive, sizeof (ipsec_policy_head_t));
+		goto nomem;
+	}
+	rw_exit(&tunnel_policy_lock);
+
+	return (newbie);
+nomem:
+	*errno = ENOMEM;
+	kmem_free(newbie, sizeof (*newbie));
+	return (NULL);
+}
+
+/*
+ * We can't call the tun_t lookup function until tun is
+ * loaded, so create a dummy function to avoid symbol
+ * lookup errors on boot.
+ */
+/* ARGSUSED */
+ipsec_tun_pol_t *
+itp_get_byaddr_dummy(uint32_t *laddr, uint32_t *faddr, int af)
+{
+	return (NULL);  /* Always return NULL. */
+}
+
+/*
+ * Frag cache code, based on SunScreen 3.2 source
+ *	screen/kernel/common/screen_fragcache.c
+ */
+
+#define	IPSEC_FRAG_TTL_MAX	5
+/*
+ * Note that the following parameters create 256 hash buckets
+ * with 1024 free entries to be distributed.  Things are cleaned
+ * periodically and are attempted to be cleaned when there is no
+ * free space, but this system errs on the side of dropping packets
+ * over creating memory exhaustion.  We may decide to make hash
+ * factor a tunable if this proves to be a bad decision.
+ */
+#define	IPSEC_FRAG_HASH_SLOTS	(1<<8)
+#define	IPSEC_FRAG_HASH_FACTOR	4
+#define	IPSEC_FRAG_HASH_SIZE	(IPSEC_FRAG_HASH_SLOTS * IPSEC_FRAG_HASH_FACTOR)
+
+#define	IPSEC_FRAG_HASH_MASK		(IPSEC_FRAG_HASH_SLOTS - 1)
+#define	IPSEC_FRAG_HASH_FUNC(id)	(((id) & IPSEC_FRAG_HASH_MASK) ^ \
+					    (((id) / \
+					    (ushort_t)IPSEC_FRAG_HASH_SLOTS) & \
+					    IPSEC_FRAG_HASH_MASK))
+
+/* Maximum fragments per packet.  48 bytes payload x 1366 packets > 64KB */
+#define	IPSEC_MAX_FRAGS		1366
+
+#define	V4_FRAG_OFFSET(ipha) ((ntohs(ipha->ipha_fragment_offset_and_flags) & \
+				    IPH_OFFSET) << 3)
+#define	V4_MORE_FRAGS(ipha) (ntohs(ipha->ipha_fragment_offset_and_flags) & \
+		IPH_MF)
+
+/*
+ * Initialize an ipsec fragcache instance.
+ * Returns B_FALSE if memory allocation fails.
+ */
+boolean_t
+ipsec_fragcache_init(ipsec_fragcache_t *frag)
+{
+	ipsec_fragcache_entry_t *ftemp;
+	int i;
+
+	mutex_init(&frag->itpf_lock, NULL, MUTEX_DEFAULT, NULL);
+	frag->itpf_ptr = (ipsec_fragcache_entry_t **)
+		kmem_zalloc(
+		    sizeof (ipsec_fragcache_entry_t *) *
+		    IPSEC_FRAG_HASH_SLOTS, KM_NOSLEEP);
+	if (frag->itpf_ptr == NULL)
+		return (B_FALSE);
+
+	ftemp = (ipsec_fragcache_entry_t *)
+		kmem_zalloc(sizeof (ipsec_fragcache_entry_t) *
+		    IPSEC_FRAG_HASH_SIZE, KM_NOSLEEP);
+	if (ftemp == NULL) {
+		kmem_free(frag->itpf_ptr,
+		    sizeof (ipsec_fragcache_entry_t *) *
+		    IPSEC_FRAG_HASH_SLOTS);
+		return (B_FALSE);
+	}
+
+	frag->itpf_freelist = NULL;
+
+	for (i = 0; i < IPSEC_FRAG_HASH_SIZE; i++) {
+	    ftemp->itpfe_next = frag->itpf_freelist;
+	    frag->itpf_freelist = ftemp;
+	    ftemp++;
+	}
+
+	frag->itpf_expire_hint = 0;
+
+	return (B_TRUE);
+}
+
+void
+ipsec_fragcache_uninit(ipsec_fragcache_t *frag)
+{
+	ipsec_fragcache_entry_t *fep;
+	int i;
+
+	mutex_enter(&frag->itpf_lock);
+	if (frag->itpf_ptr) {
+		/* Delete any existing fragcache entry chains */
+		for (i = 0; i < IPSEC_FRAG_HASH_SLOTS; i++) {
+			fep = (frag->itpf_ptr)[i];
+			while (fep != NULL) {
+				/* Returned fep is next in chain or NULL */
+				fep = fragcache_delentry(i, fep, frag);
+			}
+		}
+		/*
+		 * Chase the pointers back to the beginning
+		 * of the memory allocation and then
+		 * get rid of the allocated freelist
+		 */
+		while (frag->itpf_freelist->itpfe_next != NULL)
+			frag->itpf_freelist = frag->itpf_freelist->itpfe_next;
+		/*
+		 * XXX - If we ever dynamically grow the freelist
+		 * then we'll have to free entries individually
+		 * or determine how many entries or chunks we have
+		 * grown since the initial allocation.
+		 */
+		kmem_free(frag->itpf_freelist,
+		    sizeof (ipsec_fragcache_entry_t) *
+		    IPSEC_FRAG_HASH_SIZE);
+		/* Free the fragcache structure */
+		kmem_free(frag->itpf_ptr,
+		    sizeof (ipsec_fragcache_entry_t *) *
+		    IPSEC_FRAG_HASH_SLOTS);
+	}
+	mutex_exit(&frag->itpf_lock);
+	mutex_destroy(&frag->itpf_lock);
+}
+
+/*
+ * Add a fragment to the fragment cache.   Consumes mp if NULL is returned.
+ * Returns mp if a whole fragment has been assembled, NULL otherwise
+ */
+
+mblk_t *
+ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *ipsec_mp, mblk_t *mp,
+    int outer_hdr_len)
+{
+	boolean_t is_v4;
+	time_t itpf_time;
+	ipha_t *iph;
+	ipha_t *oiph;
+	ip6_t *ip6h = NULL;
+	uint8_t v6_proto;
+	uint8_t *v6_proto_p;
+	uint16_t ip6_hdr_length;
+	ip6_pkt_t ipp;
+	ip6_frag_t *fraghdr;
+	ipsec_fragcache_entry_t *fep;
+	int i;
+	mblk_t *nmp, *prevmp, *spare_mp = NULL;
+	int firstbyte, lastbyte;
+	int offset;
+	int last;
+	boolean_t inbound = (ipsec_mp != NULL);
+	mblk_t *first_mp = inbound ? ipsec_mp : mp;
+
+	mutex_enter(&frag->itpf_lock);
+
+	oiph  = (ipha_t *)mp->b_rptr;
+	iph  = (ipha_t *)(mp->b_rptr + outer_hdr_len);
+	if (IPH_HDR_VERSION(iph) == IPV4_VERSION) {
+		is_v4 = B_TRUE;
+	} else {
+		ASSERT(IPH_HDR_VERSION(iph) == IPV6_VERSION);
+		if ((spare_mp = msgpullup(mp, -1)) == NULL) {
+			mutex_exit(&frag->itpf_lock);
+			ip_drop_packet(first_mp, inbound, NULL, NULL,
+			    &ipdrops_spd_nomem, &spd_dropper);
+			return (NULL);
+		}
+		ip6h = (ip6_t *)(spare_mp->b_rptr + outer_hdr_len);
+
+		if (!ip_hdr_length_nexthdr_v6(spare_mp, ip6h, &ip6_hdr_length,
+		    &v6_proto_p)) {
+			/*
+			 * Find upper layer protocol.
+			 * If it fails we have a malformed packet
+			 */
+			mutex_exit(&frag->itpf_lock);
+			ip_drop_packet(first_mp, inbound, NULL, NULL,
+			    &ipdrops_spd_malformed_packet, &spd_dropper);
+			freemsg(spare_mp);
+			return (NULL);
+		} else {
+			v6_proto = *v6_proto_p;
+		}
+
+
+		bzero(&ipp, sizeof (ipp));
+		(void) ip_find_hdr_v6(spare_mp, ip6h, &ipp, NULL);
+		if (!(ipp.ipp_fields & IPPF_FRAGHDR)) {
+			/*
+			 * We think this is a fragment, but didn't find
+			 * a fragment header.  Something is wrong.
+			 */
+			mutex_exit(&frag->itpf_lock);
+			ip_drop_packet(first_mp, inbound, NULL, NULL,
+			    &ipdrops_spd_malformed_frag, &spd_dropper);
+			freemsg(spare_mp);
+			return (NULL);
+		}
+		fraghdr = ipp.ipp_fraghdr;
+		is_v4 = B_FALSE;
+	}
+
+	/* Anything to cleanup? */
+
+	/*
+	 * This cleanup call could be put in a timer loop
+	 * but it may actually be just as reasonable a decision to
+	 * leave it here.  The disadvantage is this only gets called when
+	 * frags are added.  The advantage is that it is not
+	 * susceptible to race conditions like a time-based cleanup
+	 * may be.
+	 */
+	itpf_time = gethrestime_sec();
+	if (itpf_time >= frag->itpf_expire_hint)
+		ipsec_fragcache_clean(frag);
+
+	/* Lookup to see if there is an existing entry */
+
+	if (is_v4)
+		i = IPSEC_FRAG_HASH_FUNC(iph->ipha_ident);
+	else
+		i = IPSEC_FRAG_HASH_FUNC(fraghdr->ip6f_ident);
+
+	for (fep = (frag->itpf_ptr)[i]; fep; fep = fep->itpfe_next) {
+		if (is_v4) {
+			ASSERT(iph != NULL);
+			if ((fep->itpfe_id == iph->ipha_ident) &&
+			    (fep->itpfe_src == iph->ipha_src) &&
+			    (fep->itpfe_dst == iph->ipha_dst) &&
+			    (fep->itpfe_proto == iph->ipha_protocol))
+				break;
+		} else {
+			ASSERT(fraghdr != NULL);
+			ASSERT(fep != NULL);
+			if ((fep->itpfe_id == fraghdr->ip6f_ident) &&
+			    IN6_ARE_ADDR_EQUAL(&fep->itpfe_src6,
+			    &ip6h->ip6_src) &&
+			    IN6_ARE_ADDR_EQUAL(&fep->itpfe_dst6,
+			    &ip6h->ip6_dst) && (fep->itpfe_proto == v6_proto))
+				break;
+		}
+	}
+
+	if (is_v4) {
+		firstbyte = V4_FRAG_OFFSET(iph);
+		lastbyte  = firstbyte + ntohs(iph->ipha_length) -
+		    IPH_HDR_LENGTH(iph);
+		last = (V4_MORE_FRAGS(iph) == 0);
+#ifdef FRAGCACHE_DEBUG
+		cmn_err(CE_WARN, "V4 fragcache: firstbyte = %d, lastbyte = %d, "
+		    "last = %d, id = %d\n", firstbyte, lastbyte, last,
+		    iph->ipha_ident);
+#endif
+	} else {
+		firstbyte = ntohs(fraghdr->ip6f_offlg & IP6F_OFF_MASK);
+		lastbyte  = firstbyte + ntohs(ip6h->ip6_plen) +
+		    sizeof (ip6_t) - ip6_hdr_length;
+		last = (fraghdr->ip6f_offlg & IP6F_MORE_FRAG) == 0;
+#ifdef FRAGCACHE_DEBUG
+		cmn_err(CE_WARN, "V6 fragcache: firstbyte = %d, lastbyte = %d, "
+		    "last = %d, id = %d, fraghdr = %p, spare_mp = %p\n",
+		    firstbyte, lastbyte, last, fraghdr->ip6f_ident,
+		    fraghdr, spare_mp);
+#endif
+	}
+
+	/* check for bogus fragments and delete the entry */
+	if (firstbyte > 0 && firstbyte <= 8) {
+		if (fep != NULL)
+			(void) fragcache_delentry(i, fep, frag);
+		mutex_exit(&frag->itpf_lock);
+		ip_drop_packet(first_mp, inbound, NULL, NULL,
+		    &ipdrops_spd_malformed_frag, &spd_dropper);
+		freemsg(spare_mp);
+		return (NULL);
+	}
+
+	/* Not found, allocate a new entry */
+	if (fep == NULL) {
+		if (frag->itpf_freelist == NULL) {
+			/* see if there is some space */
+			ipsec_fragcache_clean(frag);
+			if (frag->itpf_freelist == NULL) {
+				mutex_exit(&frag->itpf_lock);
+				ip_drop_packet(first_mp, inbound, NULL, NULL,
+				    &ipdrops_spd_nomem, &spd_dropper);
+				freemsg(spare_mp);
+				return (NULL);
+			}
+		}
+
+		fep = frag->itpf_freelist;
+		frag->itpf_freelist = fep->itpfe_next;
+
+		if (is_v4) {
+			bcopy((caddr_t)&iph->ipha_src, (caddr_t)&fep->itpfe_src,
+			    sizeof (struct in_addr));
+			bcopy((caddr_t)&iph->ipha_dst, (caddr_t)&fep->itpfe_dst,
+			    sizeof (struct in_addr));
+			fep->itpfe_id = iph->ipha_ident;
+			fep->itpfe_proto = iph->ipha_protocol;
+			i = IPSEC_FRAG_HASH_FUNC(fep->itpfe_id);
+		} else {
+			bcopy((in6_addr_t *)&ip6h->ip6_src,
+			    (in6_addr_t *)&fep->itpfe_src6,
+			    sizeof (struct in6_addr));
+			bcopy((in6_addr_t *)&ip6h->ip6_dst,
+			    (in6_addr_t *)&fep->itpfe_dst6,
+			    sizeof (struct in6_addr));
+			fep->itpfe_id = fraghdr->ip6f_ident;
+			fep->itpfe_proto = v6_proto;
+			i = IPSEC_FRAG_HASH_FUNC(fep->itpfe_id);
+		}
+		itpf_time = gethrestime_sec();
+		fep->itpfe_exp = itpf_time + IPSEC_FRAG_TTL_MAX + 1;
+		fep->itpfe_last = 0;
+		fep->itpfe_fraglist = NULL;
+		fep->itpfe_depth = 0;
+		fep->itpfe_next = (frag->itpf_ptr)[i];
+		(frag->itpf_ptr)[i] = fep;
+
+		if (frag->itpf_expire_hint > fep->itpfe_exp)
+			frag->itpf_expire_hint = fep->itpfe_exp;
+
+	}
+	freemsg(spare_mp);
+
+	/* Insert it in the frag list */
+	/* List is in order by starting offset of fragments */
+
+	prevmp = NULL;
+	for (nmp = fep->itpfe_fraglist; nmp; nmp = nmp->b_next) {
+		ipha_t *niph;
+		ipha_t *oniph;
+		ip6_t *nip6h;
+		ip6_pkt_t nipp;
+		ip6_frag_t *nfraghdr;
+		uint16_t nip6_hdr_length;
+		uint8_t *nv6_proto_p;
+		int nfirstbyte, nlastbyte;
+		char *data, *ndata;
+		mblk_t *nspare_mp = NULL;
+		mblk_t *ndata_mp = (inbound ? nmp->b_cont : nmp);
+		int hdr_len;
+
+		oniph  = (ipha_t *)mp->b_rptr;
+		nip6h = NULL;
+		niph = NULL;
+
+		/*
+		 * Determine outer header type and length and set
+		 * pointers appropriately
+		 */
+
+		if (IPH_HDR_VERSION(oniph) == IPV4_VERSION) {
+			hdr_len = ((outer_hdr_len != 0) ?
+			    IPH_HDR_LENGTH(oiph) : 0);
+			niph = (ipha_t *)(ndata_mp->b_rptr + hdr_len);
+		} else {
+			ASSERT(IPH_HDR_VERSION(oniph) == IPV6_VERSION);
+			if ((nspare_mp = msgpullup(ndata_mp, -1)) == NULL) {
+				mutex_exit(&frag->itpf_lock);
+				ip_drop_packet_chain(nmp, inbound, NULL, NULL,
+				    &ipdrops_spd_nomem, &spd_dropper);
+				return (NULL);
+			}
+			nip6h = (ip6_t *)nspare_mp->b_rptr;
+			(void) ip_hdr_length_nexthdr_v6(nspare_mp, nip6h,
+			    &nip6_hdr_length, &v6_proto_p);
+			hdr_len = ((outer_hdr_len != 0) ? nip6_hdr_length : 0);
+		}
+
+		/*
+		 * Determine inner header type and length and set
+		 * pointers appropriately
+		 */
+
+		if (is_v4) {
+			if (niph == NULL) {
+				/* Was v6 outer */
+				niph = (ipha_t *)(ndata_mp->b_rptr + hdr_len);
+			}
+			nfirstbyte = V4_FRAG_OFFSET(niph);
+			nlastbyte = nfirstbyte + ntohs(niph->ipha_length) -
+			    IPH_HDR_LENGTH(niph);
+		} else {
+			if ((nspare_mp == NULL) &&
+			    ((nspare_mp = msgpullup(ndata_mp, -1)) == NULL)) {
+				mutex_exit(&frag->itpf_lock);
+				ip_drop_packet_chain(nmp, inbound, NULL, NULL,
+				    &ipdrops_spd_nomem, &spd_dropper);
+				return (NULL);
+			}
+			nip6h = (ip6_t *)(nspare_mp->b_rptr + hdr_len);
+			if (!ip_hdr_length_nexthdr_v6(nspare_mp, nip6h,
+			    &nip6_hdr_length, &nv6_proto_p)) {
+				mutex_exit(&frag->itpf_lock);
+			    ip_drop_packet_chain(nmp, inbound, NULL, NULL,
+				&ipdrops_spd_malformed_frag, &spd_dropper);
+			    ipsec_freemsg_chain(nspare_mp);
+			    return (NULL);
+			}
+			bzero(&nipp, sizeof (nipp));
+			(void) ip_find_hdr_v6(nspare_mp, nip6h, &nipp, NULL);
+			nfraghdr = nipp.ipp_fraghdr;
+			nfirstbyte = ntohs(nfraghdr->ip6f_offlg &
+			    IP6F_OFF_MASK);
+			nlastbyte  = nfirstbyte + ntohs(nip6h->ip6_plen) +
+			    sizeof (ip6_t) - nip6_hdr_length;
+		}
+		ipsec_freemsg_chain(nspare_mp);
+
+		/* Check for overlapping fragments */
+		if (firstbyte >= nfirstbyte && firstbyte < nlastbyte) {
+			/*
+			 * Overlap Check:
+			 *  ~~~~---------		# Check if the newly
+			 * ~	ndata_mp|		# received fragment
+			 *  ~~~~---------		# overlaps with the
+			 *	 ---------~~~~~~	# current fragment.
+			 *	|    mp		~
+			 *	 ---------~~~~~~
+			 */
+			if (is_v4) {
+				data  = (char *)iph  + IPH_HDR_LENGTH(iph) +
+				    firstbyte - nfirstbyte;
+				ndata = (char *)niph + IPH_HDR_LENGTH(niph);
+			} else {
+				data  = (char *)ip6h  +
+				    nip6_hdr_length + firstbyte -
+				    nfirstbyte;
+				ndata = (char *)nip6h + nip6_hdr_length;
+			}
+			if (bcmp(data, ndata, MIN(lastbyte, nlastbyte)
+			    - firstbyte)) {
+				/* Overlapping data does not match */
+				(void) fragcache_delentry(i, fep, frag);
+				mutex_exit(&frag->itpf_lock);
+				ip_drop_packet(first_mp, inbound, NULL, NULL,
+				    &ipdrops_spd_overlap_frag, &spd_dropper);
+				return (NULL);
+			}
+			/* Part of defense for jolt2.c fragmentation attack */
+			if (firstbyte >= nfirstbyte && lastbyte <= nlastbyte) {
+				/*
+				 * Check for identical or subset fragments:
+				 *  ----------	    ~~~~--------~~~~~
+				 * |    nmp   | or  ~	   nmp	    ~
+				 *  ----------	    ~~~~--------~~~~~
+				 *  ----------		  ------
+				 * |	mp    |		 |  mp  |
+				 *  ----------		  ------
+				 */
+				mutex_exit(&frag->itpf_lock);
+				ip_drop_packet(first_mp, inbound, NULL, NULL,
+				    &ipdrops_spd_evil_frag, &spd_dropper);
+				return (NULL);
+			}
+
+		}
+
+		/* Correct location for this fragment? */
+		if (firstbyte <= nfirstbyte) {
+			/*
+			 * Check if the tail end of the new fragment overlaps
+			 * with the head of the current fragment.
+			 *	  --------~~~~~~~
+			 *	 |    nmp	~
+			 *	  --------~~~~~~~
+			 *  ~~~~~--------
+			 *  ~	mp	 |
+			 *  ~~~~~--------
+			 */
+			if (lastbyte > nfirstbyte) {
+				/* Fragments overlap */
+				data  = (char *)iph  + IPH_HDR_LENGTH(iph) +
+				    firstbyte - nfirstbyte;
+				ndata = (char *)niph + IPH_HDR_LENGTH(niph);
+				if (is_v4) {
+					data  = (char *)iph +
+					    IPH_HDR_LENGTH(iph) + firstbyte -
+					    nfirstbyte;
+					ndata = (char *)niph +
+					    IPH_HDR_LENGTH(niph);
+				} else {
+					data  = (char *)ip6h  +
+					    nip6_hdr_length + firstbyte -
+					    nfirstbyte;
+					ndata = (char *)nip6h + nip6_hdr_length;
+				}
+				if (bcmp(data, ndata, MIN(lastbyte, nlastbyte)
+				    - nfirstbyte)) {
+					/* Overlap mismatch */
+					(void) fragcache_delentry(i, fep, frag);
+					mutex_exit(&frag->itpf_lock);
+					ip_drop_packet(first_mp, inbound, NULL,
+					    NULL, &ipdrops_spd_overlap_frag,
+					    &spd_dropper);
+					return (NULL);
+				}
+			}
+
+			/*
+			 * Fragment does not illegally overlap and can now
+			 * be inserted into the chain
+			 */
+			break;
+		}
+
+		prevmp = nmp;
+	}
+	first_mp->b_next = nmp;
+
+	if (prevmp == NULL) {
+		fep->itpfe_fraglist = first_mp;
+	} else {
+		prevmp->b_next = first_mp;
+	}
+	if (last)
+		fep->itpfe_last = 1;
+
+	/* Part of defense for jolt2.c fragmentation attack */
+	if (++(fep->itpfe_depth) > IPSEC_MAX_FRAGS) {
+		(void) fragcache_delentry(i, fep, frag);
+		mutex_exit(&frag->itpf_lock);
+		ip_drop_packet(first_mp, inbound, NULL, NULL,
+		    &ipdrops_spd_max_frags, &spd_dropper);
+		return (NULL);
+	}
+
+	/* Check for complete packet */
+
+	if (!fep->itpfe_last) {
+		mutex_exit(&frag->itpf_lock);
+#ifdef FRAGCACHE_DEBUG
+		cmn_err(CE_WARN, "Fragment cached, not last.\n");
+#endif
+		return (NULL);
+	}
+
+#ifdef FRAGCACHE_DEBUG
+	cmn_err(CE_WARN, "Last fragment cached.\n");
+	cmn_err(CE_WARN, "mp = %p, first_mp = %p.\n", mp, first_mp);
+#endif
+
+	offset = 0;
+	for (mp = fep->itpfe_fraglist; mp; mp = mp->b_next) {
+		mblk_t *data_mp = (inbound ? mp->b_cont : mp);
+		int hdr_len;
+
+		oiph  = (ipha_t *)data_mp->b_rptr;
+		ip6h = NULL;
+		iph = NULL;
+
+		spare_mp = NULL;
+		if (IPH_HDR_VERSION(oiph) == IPV4_VERSION) {
+			hdr_len = ((outer_hdr_len != 0) ?
+			    IPH_HDR_LENGTH(oiph) : 0);
+			iph = (ipha_t *)(data_mp->b_rptr + hdr_len);
+		} else {
+			ASSERT(IPH_HDR_VERSION(oiph) == IPV6_VERSION);
+			if ((spare_mp = msgpullup(data_mp, -1)) == NULL) {
+				mutex_exit(&frag->itpf_lock);
+				ip_drop_packet_chain(mp, inbound, NULL, NULL,
+				    &ipdrops_spd_nomem, &spd_dropper);
+				return (NULL);
+			}
+			ip6h = (ip6_t *)spare_mp->b_rptr;
+			(void) ip_hdr_length_nexthdr_v6(spare_mp, ip6h,
+			    &ip6_hdr_length, &v6_proto_p);
+			hdr_len = ((outer_hdr_len != 0) ? ip6_hdr_length : 0);
+		}
+
+		/* Calculate current fragment start/end */
+		if (is_v4) {
+			if (iph == NULL) {
+				/* Was v6 outer */
+				iph = (ipha_t *)(data_mp->b_rptr + hdr_len);
+			}
+			firstbyte = V4_FRAG_OFFSET(iph);
+			lastbyte = firstbyte + ntohs(iph->ipha_length) -
+			    IPH_HDR_LENGTH(iph);
+		} else {
+			if ((spare_mp == NULL) &&
+				((spare_mp = msgpullup(data_mp, -1)) == NULL)) {
+				mutex_exit(&frag->itpf_lock);
+				ip_drop_packet_chain(mp, inbound, NULL, NULL,
+				    &ipdrops_spd_nomem, &spd_dropper);
+				return (NULL);
+			}
+			ip6h = (ip6_t *)(spare_mp->b_rptr + hdr_len);
+			if (!ip_hdr_length_nexthdr_v6(spare_mp, ip6h,
+			    &ip6_hdr_length, &v6_proto_p)) {
+				mutex_exit(&frag->itpf_lock);
+				ip_drop_packet_chain(mp, inbound, NULL, NULL,
+				    &ipdrops_spd_malformed_frag, &spd_dropper);
+				ipsec_freemsg_chain(spare_mp);
+				return (NULL);
+			}
+			v6_proto = *v6_proto_p;
+			bzero(&ipp, sizeof (ipp));
+			(void) ip_find_hdr_v6(spare_mp, ip6h, &ipp, NULL);
+			fraghdr = ipp.ipp_fraghdr;
+			firstbyte = ntohs(fraghdr->ip6f_offlg &
+			    IP6F_OFF_MASK);
+			lastbyte  = firstbyte + ntohs(ip6h->ip6_plen) +
+			    sizeof (ip6_t) - ip6_hdr_length;
+		}
+
+		/*
+		 * If this fragment is greater than current offset,
+		 * we have a missing fragment so return NULL
+		 */
+		if (firstbyte > offset) {
+			mutex_exit(&frag->itpf_lock);
+#ifdef FRAGCACHE_DEBUG
+			/*
+			 * Note, this can happen when the last frag
+			 * gets sent through because it is smaller
+			 * than the MTU.  It is not necessarily an
+			 * error condition.
+			 */
+			cmn_err(CE_WARN, "Frag greater than offset! : "
+			    "missing fragment: firstbyte = %d, offset = %d, "
+			    "mp = %p\n", firstbyte, offset, mp);
+#endif
+			ipsec_freemsg_chain(spare_mp);
+			return (NULL);
+		}
+
+		/*
+		 * If we are at the last fragment, we have the complete
+		 * packet, so rechain things and return it to caller
+		 * for processing
+		 */
+
+		if ((is_v4 && !V4_MORE_FRAGS(iph)) ||
+		    (!is_v4 && !(fraghdr->ip6f_offlg & IP6F_MORE_FRAG))) {
+			mp = fep->itpfe_fraglist;
+			fep->itpfe_fraglist = NULL;
+			(void) fragcache_delentry(i, fep, frag);
+			mutex_exit(&frag->itpf_lock);
+
+			if ((is_v4 && (firstbyte + ntohs(iph->ipha_length) >
+			    65535)) || (!is_v4 && (firstbyte +
+			    ntohs(ip6h->ip6_plen) > 65535))) {
+				/* It is an invalid "ping-o-death" packet */
+				/* Discard it */
+				ip_drop_packet_chain(mp, inbound, NULL, NULL,
+				    &ipdrops_spd_evil_frag, &spd_dropper);
+				ipsec_freemsg_chain(spare_mp);
+				return (NULL);
+			}
+#ifdef FRAGCACHE_DEBUG
+			cmn_err(CE_WARN, "Fragcache returning mp = %p, "
+				"mp->b_next = %p", mp, mp->b_next);
+#endif
+			ipsec_freemsg_chain(spare_mp);
+			/*
+			 * For inbound case, mp has ipsec_in b_next'd chain
+			 * For outbound case, it is just data mp chain
+			 */
+			return (mp);
+		}
+		ipsec_freemsg_chain(spare_mp);
+
+		/*
+		 * Update new ending offset if this
+		 * fragment extends the packet
+		 */
+		if (offset < lastbyte)
+			offset = lastbyte;
+	}
+
+	mutex_exit(&frag->itpf_lock);
+
+	/* Didn't find last fragment, so return NULL */
+	return (NULL);
+}
+
+static void
+ipsec_fragcache_clean(ipsec_fragcache_t *frag)
+{
+	ipsec_fragcache_entry_t *fep;
+	int i;
+	ipsec_fragcache_entry_t *earlyfep = NULL;
+	time_t itpf_time;
+	int earlyexp;
+	int earlyi = 0;
+
+	ASSERT(MUTEX_HELD(&frag->itpf_lock));
+
+	itpf_time = gethrestime_sec();
+	earlyexp = itpf_time + 10000;
+
+	for (i = 0; i < IPSEC_FRAG_HASH_SLOTS; i++) {
+	    fep = (frag->itpf_ptr)[i];
+	    while (fep) {
+		if (fep->itpfe_exp < itpf_time) {
+			/* found */
+			fep = fragcache_delentry(i, fep, frag);
+		} else {
+			if (fep->itpfe_exp < earlyexp) {
+				earlyfep = fep;
+				earlyexp = fep->itpfe_exp;
+				earlyi = i;
+			}
+			fep = fep->itpfe_next;
+		}
+	    }
+	}
+
+	frag->itpf_expire_hint = earlyexp;
+
+	/* if (!found) */
+	if (frag->itpf_freelist == NULL)
+		(void) fragcache_delentry(earlyi, earlyfep, frag);
+}
+
+static ipsec_fragcache_entry_t *
+fragcache_delentry(int slot, ipsec_fragcache_entry_t *fep,
+    ipsec_fragcache_t *frag)
+{
+	ipsec_fragcache_entry_t *targp;
+	ipsec_fragcache_entry_t *nextp = fep->itpfe_next;
+
+	ASSERT(MUTEX_HELD(&frag->itpf_lock));
+
+	/* Free up any fragment list still in cache entry */
+	ipsec_freemsg_chain(fep->itpfe_fraglist);
+
+	targp = (frag->itpf_ptr)[slot];
+	ASSERT(targp != 0);
+
+	if (targp == fep) {
+		/* unlink from head of hash chain */
+		(frag->itpf_ptr)[slot] = nextp;
+		/* link into free list */
+		fep->itpfe_next = frag->itpf_freelist;
+		frag->itpf_freelist = fep;
+		return (nextp);
+	}
+
+	/* maybe should use double linked list to make update faster */
+	/* must be past front of chain */
+	while (targp) {
+	    if (targp->itpfe_next == fep) {
+		    /* unlink from hash chain */
+		    targp->itpfe_next = nextp;
+		    /* link into free list */
+		    fep->itpfe_next = frag->itpf_freelist;
+		    frag->itpf_freelist = fep;
+		    return (nextp);
+	    }
+	    targp = targp->itpfe_next;
+	    ASSERT(targp != 0);
+	}
+	/* NOTREACHED */
+	return (NULL);
 }

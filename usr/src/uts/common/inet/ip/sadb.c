@@ -48,6 +48,7 @@
 #include <inet/common.h>
 #include <netinet/ip6.h>
 #include <inet/ip.h>
+#include <inet/ip_ire.h>
 #include <inet/ip6.h>
 #include <inet/ipsec_info.h>
 #include <inet/ipsec_impl.h>
@@ -62,6 +63,7 @@
 #include <inet/ipdrop.h>
 #include <inet/ipclassifier.h>
 #include <inet/sctp_ip.h>
+#include <inet/tun.h>
 
 /*
  * This source file contains Security Association Database (SADB) common
@@ -73,14 +75,15 @@
 static ipdropper_t sadb_dropper;
 
 static mblk_t *sadb_extended_acquire(ipsec_selector_t *, ipsec_policy_t *,
-    ipsec_action_t *, uint32_t, uint32_t);
+    ipsec_action_t *, boolean_t, uint32_t, uint32_t);
 static void sadb_ill_df(ill_t *, mblk_t *, isaf_t *, int, boolean_t);
 static ipsa_t *sadb_torch_assoc(isaf_t *, ipsa_t *, boolean_t, mblk_t **);
-static void sadb_drain_torchq(queue_t *q, mblk_t *);
+static void sadb_drain_torchq(queue_t *, mblk_t *);
 static void sadb_destroy_acqlist(iacqf_t **, uint_t, boolean_t);
-static void sadb_destroy(sadb_t *sp);
+static void sadb_destroy(sadb_t *);
+static mblk_t *sadb_sa2msg(ipsa_t *, sadb_msg_t *);
 
-static time_t sadb_add_time(time_t base, uint64_t delta);
+static time_t sadb_add_time(time_t, uint64_t);
 
 /*
  * ipsacq_maxpackets is defined here to make it tunable
@@ -277,9 +280,6 @@ sadb_freeassoc(ipsa_t *ipsa)
 	}
 	if (ipsa->ipsa_dst_cid != NULL) {
 		IPSID_REFRELE(ipsa->ipsa_dst_cid);
-	}
-	if (ipsa->ipsa_proxy_cid != NULL) {
-		IPSID_REFRELE(ipsa->ipsa_proxy_cid);
 	}
 	if (ipsa->ipsa_integ != NULL)
 		kmem_free(ipsa->ipsa_integ, ipsa->ipsa_integlen);
@@ -1192,13 +1192,6 @@ sadb_cloneassoc(ipsa_t *ipsa)
 		IPSID_REFHOLD(ipsa->ipsa_dst_cid);
 	}
 
-#if 0 /* XXX PROXY  - Proxy identities not supported yet. */
-	if (ipsa->ipsa_proxy_cid != NULL) {
-		newbie->ipsa_proxy_cid = ipsa->ipsa_proxy_cid;
-		IPSID_REFHOLD(ipsa->ipsa_proxy_cid);
-	}
-#endif /* XXX PROXY */
-
 	if (error) {
 		sadb_freeassoc(newbie);
 		return (NULL);
@@ -1213,7 +1206,7 @@ sadb_cloneassoc(ipsa_t *ipsa)
  */
 static uint8_t *
 sadb_make_addr_ext(uint8_t *start, uint8_t *end, uint16_t exttype,
-    sa_family_t af, uint32_t *addr, uint16_t port, uint8_t proto)
+    sa_family_t af, uint32_t *addr, uint16_t port, uint8_t proto, int prefix)
 {
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
@@ -1230,7 +1223,7 @@ sadb_make_addr_ext(uint8_t *start, uint8_t *end, uint16_t exttype,
 		return (NULL);
 
 	addrext->sadb_address_proto = proto;
-	addrext->sadb_address_prefixlen = 0;
+	addrext->sadb_address_prefixlen = prefix;
 	addrext->sadb_address_reserved = 0;
 	addrext->sadb_address_exttype = exttype;
 
@@ -1302,7 +1295,7 @@ sadb_make_kmc_ext(uint8_t *cur, uint8_t *end, uint32_t kmp, uint32_t kmc)
  * SA, construct a full PF_KEY message with all of the relevant extensions.
  * This is mostly used for SADB_GET, and SADB_DUMP.
  */
-mblk_t *
+static mblk_t *
 sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 {
 	int alloclen, addrsize, paddrsize, authsize, encrsize;
@@ -1324,11 +1317,7 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 	uint64_t *bitmap;
 	uint8_t *cur, *end;
 	/* These indicate the presence of the above extension fields. */
-	boolean_t soft, hard, proxy, auth, encr, sensinteg, srcid, dstid;
-#if 0 /* XXX PROXY see below... */
-	boolean_t proxyid, iv;
-	int proxyidsize, ivsize;
-#endif /* XXX PROXY */
+	boolean_t soft, hard, isrc, idst, auth, encr, sensinteg, srcid, dstid;
 
 	/* First off, figure out the allocation length for this message. */
 
@@ -1380,9 +1369,12 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 		hard = B_FALSE;
 	}
 
-	/* Proxy address? */
-	if (!IPSA_IS_ADDR_UNSPEC(ipsa->ipsa_proxysrc, ipsa->ipsa_proxyfam)) {
-		pfam = ipsa->ipsa_proxyfam;
+	/* Inner addresses. */
+	if (ipsa->ipsa_innerfam == 0) {
+		isrc = B_FALSE;
+		idst = B_FALSE;
+	} else {
+		pfam = ipsa->ipsa_innerfam;
 		switch (pfam) {
 		case AF_INET6:
 			paddrsize = roundup(sizeof (struct sockaddr_in6) +
@@ -1397,10 +1389,9 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 			    "IPsec SADB: Proxy length failure.\n");
 			break;
 		}
-		proxy = B_TRUE;
-		alloclen += paddrsize;
-	} else {
-		proxy = B_FALSE;
+		isrc = B_TRUE;
+		idst = B_TRUE;
+		alloclen += 2 * paddrsize;
 	}
 
 	/* For the following fields, assume that length != 0 ==> stuff */
@@ -1455,17 +1446,6 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 		dstid = B_FALSE;
 	}
 
-#if 0 /* XXX PROXY not yet. */
-	if (ipsa->ipsa_proxy_cid != NULL) {
-		proxyidsize = roundup(sizeof (sadb_ident_t) +
-		    strlen(ipsa->ipsa_proxy_cid->ipsid_cid) + 1,
-		    sizeof (uint64_t));
-		alloclen += proxyidsize;
-		proxyid = B_TRUE;
-	} else {
-		proxyid = B_FALSE;
-	}
-#endif /* XXX PROXY */
 	if ((ipsa->ipsa_kmp != 0) || (ipsa->ipsa_kmc != 0))
 		alloclen += sizeof (sadb_x_kmc_t);
 
@@ -1527,8 +1507,10 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 
 	cur = (uint8_t *)(lt + 1);
 
+	/* NOTE:  Don't fill in ports here if we are a tunnel-mode SA. */
 	cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_SRC, fam,
-	    ipsa->ipsa_srcaddr, SA_SRCPORT(ipsa), SA_PROTO(ipsa));
+	    ipsa->ipsa_srcaddr, (!isrc && !idst) ? SA_SRCPORT(ipsa) : 0,
+	    SA_PROTO(ipsa), 0);
 	if (cur == NULL) {
 		freemsg(mp);
 		mp = NULL;
@@ -1536,7 +1518,8 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 	}
 
 	cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_DST, fam,
-	    ipsa->ipsa_dstaddr, SA_DSTPORT(ipsa), SA_PROTO(ipsa));
+	    ipsa->ipsa_dstaddr, (!isrc && !idst) ? SA_DSTPORT(ipsa) : 0,
+	    SA_PROTO(ipsa), 0);
 	if (cur == NULL) {
 		freemsg(mp);
 		mp = NULL;
@@ -1545,7 +1528,7 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 
 	if (ipsa->ipsa_flags & IPSA_F_NATT_LOC) {
 		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_NATT_LOC,
-		    fam, ipsa->ipsa_natt_addr_loc, 0, 0);
+		    fam, ipsa->ipsa_natt_addr_loc, 0, 0, 0);
 		if (cur == NULL) {
 			freemsg(mp);
 			mp = NULL;
@@ -1556,7 +1539,7 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 	if (ipsa->ipsa_flags & IPSA_F_NATT_REM) {
 		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_NATT_REM,
 		    fam, ipsa->ipsa_natt_addr_rem, ipsa->ipsa_remote_port,
-		    IPPROTO_UDP);
+		    IPPROTO_UDP, 0);
 		if (cur == NULL) {
 			freemsg(mp);
 			mp = NULL;
@@ -1564,14 +1547,22 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 		}
 	}
 
-	if (proxy) {
-		/*
-		 * XXX PROXY When we expand the definition of proxy to include
-		 * both inner and outer IP addresses, this will have to
-		 * be expanded.
-		 */
-		cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_PROXY,
-		    pfam, ipsa->ipsa_proxysrc, 0, 0);
+	/* If we are a tunnel-mode SA, fill in the inner-selectors. */
+	if (isrc) {
+		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_INNER_SRC,
+		    pfam, ipsa->ipsa_innersrc, SA_SRCPORT(ipsa),
+		    SA_IPROTO(ipsa), ipsa->ipsa_innersrcpfx);
+		if (cur == NULL) {
+			freemsg(mp);
+			mp = NULL;
+			goto bail;
+		}
+	}
+
+	if (idst) {
+		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_INNER_DST,
+		    pfam, ipsa->ipsa_innerdst, SA_DSTPORT(ipsa),
+		    SA_IPROTO(ipsa), ipsa->ipsa_innerdstpfx);
 		if (cur == NULL) {
 			freemsg(mp);
 			mp = NULL;
@@ -1637,20 +1628,6 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 		walker = (sadb_ext_t *)((uint64_t *)walker +
 		    walker->sadb_ext_len);
 	}
-
-#if 0 /* XXX PROXY not yet */
-	if (proxyid) {
-		ident = (sadb_ident_t *)walker;
-		ident->sadb_ident_len = SADB_8TO64(proxyidsize);
-		ident->sadb_ident_exttype = SADB_EXT_IDENTITY_PROXY;
-		ident->sadb_ident_type = ipsa->ipsa_pcid_type;
-		ident->sadb_ident_id = 0;
-		ident->sadb_ident_reserved = 0;
-		(void) strcpy((char *)(ident + 1), ipsa->ipsa_proxy_cid);
-		walker = (sadb_ext_t *)((uint64_t *)walker +
-		    walker->sadb_ext_len);
-	}
-#endif /* XXX PROXY */
 
 	if (sensinteg) {
 		sens = (sadb_sens_t *)walker;
@@ -1856,8 +1833,8 @@ sadb_pfkey_echo(queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	case SADB_GET:
 		/*
 		 * Do a lot of work here, because of the ipsa I just found.
-		 * First abandon the PF_KEY message, then construct
-		 * the new one.
+		 * First construct the new PF_KEY message, then abandon
+		 * the old one.
 		 */
 		mp1 = sadb_sa2msg(ipsa, samsg);
 		if (mp1 == NULL) {
@@ -1950,96 +1927,52 @@ sadb_keysock_hello(queue_t **pfkey_qp, queue_t *q, mblk_t *mp,
 }
 
 /*
- * Send IRE_DB_REQ down to IP to get properties of address.
- * If I can determine the address, return the proper type.  If an error
- * occurs, or if I have to send down an IRE_DB_REQ, return UNKNOWN, and
- * the caller will just let go of mp w/o freeing it.
+ * Normalize IPv4-mapped IPv6 addresses (and prefixes) as appropriate.
  *
- * To handle the compatible IPv6 addresses (i.e. ::FFFF:<v4-address>),
- * this function will also convert such AF_INET6 addresses into AF_INET
- * addresses.
- *
- * Whomever called the function will handle the return message that IP sends
- * in response to the message this function generates.
+ * Check addresses themselves for wildcard or multicast.
+ * Check ire table for local/non-local/broadcast.
  */
 int
-sadb_addrcheck(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_ext_t *ext,
-    uint_t serial)
+sadb_addrcheck(queue_t *pfkey_q, mblk_t *mp, sadb_ext_t *ext, uint_t serial)
 {
 	sadb_address_t *addr = (sadb_address_t *)ext;
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
-	mblk_t *ire_db_req_mp;
 	ire_t *ire;
-	int diagnostic;
+	int diagnostic, type;
+	boolean_t normalized = B_FALSE;
 
 	ASSERT(ext != NULL);
 	ASSERT((ext->sadb_ext_type == SADB_EXT_ADDRESS_SRC) ||
 	    (ext->sadb_ext_type == SADB_EXT_ADDRESS_DST) ||
-	    (ext->sadb_ext_type == SADB_EXT_ADDRESS_PROXY));
-
-	ire_db_req_mp = allocb(sizeof (ire_t), BPRI_HI);
-	if (ire_db_req_mp == NULL) {
-		/* cmn_err(CE_WARN, "sadb_addrcheck: allocb() failed.\n"); */
-		sadb_pfkey_error(pfkey_q, mp, ENOMEM, SADB_X_DIAGNOSTIC_NONE,
-		    serial);
-		return (KS_IN_ADDR_UNKNOWN);
-	}
-
-	ire_db_req_mp->b_datap->db_type = IRE_DB_REQ_TYPE;
-	ire_db_req_mp->b_wptr += sizeof (ire_t);
-	ire = (ire_t *)ire_db_req_mp->b_rptr;
+	    (ext->sadb_ext_type == SADB_X_EXT_ADDRESS_INNER_SRC) ||
+	    (ext->sadb_ext_type == SADB_X_EXT_ADDRESS_INNER_DST) ||
+	    (ext->sadb_ext_type == SADB_X_EXT_ADDRESS_NATT_LOC) ||
+	    (ext->sadb_ext_type == SADB_X_EXT_ADDRESS_NATT_REM));
 
 	/* Assign both sockaddrs, the compiler will do the right thing. */
 	sin = (struct sockaddr_in *)(addr + 1);
 	sin6 = (struct sockaddr_in6 *)(addr + 1);
 
-	switch (sin->sin_family) {
-	case AF_INET6:
-		/* Because of the longer IPv6 addrs, do check first. */
-		if (!IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-			if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
-				freemsg(ire_db_req_mp);
-				return (KS_IN_ADDR_MBCAST);
-			}
-			if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
-				freemsg(ire_db_req_mp);
-				return (KS_IN_ADDR_UNSPEC);
-			}
-			ire->ire_ipversion = IPV6_VERSION;
-			ire->ire_addr_v6 = sin6->sin6_addr;
-			break;	/* Out of switch. */
+	if (sin6->sin6_family == AF_INET6) {
+		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+			/*
+			 * Convert to an AF_INET sockaddr.  This means the
+			 * return messages will have the extra space, but have
+			 * AF_INET sockaddrs instead of AF_INET6.
+			 *
+			 * Yes, RFC 2367 isn't clear on what to do here w.r.t.
+			 * mapped addresses, but since AF_INET6 ::ffff:<v4> is
+			 * equal to AF_INET <v4>, it shouldnt be a huge
+			 * problem.
+			 */
+			sin->sin_family = AF_INET;
+			IN6_V4MAPPED_TO_INADDR(&sin6->sin6_addr,
+			    &sin->sin_addr);
+			bzero(&sin->sin_zero, sizeof (sin->sin_zero));
+			normalized = B_TRUE;
 		}
-		/*
-		 * Convert to an AF_INET sockaddr.  This means
-		 * the return messages will have the extra space, but
-		 * have AF_INET sockaddrs instead of AF_INET6.
-		 *
-		 * Yes, RFC 2367 isn't clear on what to do here w.r.t.
-		 * mapped addresses, but since AF_INET6 ::ffff:<v4> is
-		 * equal to AF_INET <v4>, it shouldnt be a huge
-		 * problem.
-		 */
-		ASSERT(&sin->sin_port == &sin6->sin6_port);
-		sin->sin_family = AF_INET;
-		IN6_V4MAPPED_TO_INADDR(&sin6->sin6_addr, &sin->sin_addr);
-		bzero(&sin->sin_zero, sizeof (sin->sin_zero));
-		/* FALLTHRU */
-	case AF_INET:
-		ire->ire_ipversion = IPV4_VERSION;
-		ire->ire_addr = sin->sin_addr.s_addr;
-		if (ire->ire_addr == INADDR_ANY) {
-			freemsg(ire_db_req_mp);
-			return (KS_IN_ADDR_UNSPEC);
-		}
-		if (CLASSD(ire->ire_addr)) {
-			freemsg(ire_db_req_mp);
-			return (KS_IN_ADDR_MBCAST);
-		}
-		break;
-	default:
-		freemsg(ire_db_req_mp);
-
+	} else if (sin->sin_family != AF_INET) {
 		switch (ext->sadb_ext_type) {
 		case SADB_EXT_ADDRESS_SRC:
 			diagnostic = SADB_X_DIAGNOSTIC_BAD_SRC_AF;
@@ -2047,50 +1980,319 @@ sadb_addrcheck(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_ext_t *ext,
 		case SADB_EXT_ADDRESS_DST:
 			diagnostic = SADB_X_DIAGNOSTIC_BAD_DST_AF;
 			break;
-		case SADB_EXT_ADDRESS_PROXY:
+		case SADB_X_EXT_ADDRESS_INNER_SRC:
 			diagnostic = SADB_X_DIAGNOSTIC_BAD_PROXY_AF;
+			break;
+		case SADB_X_EXT_ADDRESS_INNER_DST:
+			diagnostic = SADB_X_DIAGNOSTIC_BAD_INNER_DST_AF;
+			break;
+		case SADB_X_EXT_ADDRESS_NATT_LOC:
+			diagnostic = SADB_X_DIAGNOSTIC_BAD_NATT_LOC_AF;
+			break;
+		case SADB_X_EXT_ADDRESS_NATT_REM:
+			diagnostic = SADB_X_DIAGNOSTIC_BAD_NATT_REM_AF;
 			break;
 			/* There is no default, see above ASSERT. */
 		}
+bail:
+		if (pfkey_q != NULL) {
+			sadb_pfkey_error(pfkey_q, mp, EINVAL, diagnostic,
+			    serial);
+		} else {
+			/*
+			 * Scribble in sadb_msg that we got passed in.
+			 * Overload "mp" to be an sadb_msg pointer.
+			 */
+			sadb_msg_t *samsg = (sadb_msg_t *)mp;
 
-		sadb_pfkey_error(pfkey_q, mp, EINVAL, diagnostic, serial);
+			samsg->sadb_msg_errno = EINVAL;
+			samsg->sadb_x_msg_diagnostic = diagnostic;
+		}
 		return (KS_IN_ADDR_UNKNOWN);
 	}
-	ire_db_req_mp->b_cont = mp;
 
-	ASSERT(ip_q != NULL);
-	putnext(ip_q, ire_db_req_mp);
-	return (KS_IN_ADDR_UNKNOWN);
+	if (ext->sadb_ext_type == SADB_X_EXT_ADDRESS_INNER_SRC ||
+	    ext->sadb_ext_type == SADB_X_EXT_ADDRESS_INNER_DST) {
+		/*
+		 * We need only check for prefix issues.
+		 */
+
+		/* Set diagnostic now, in case we need it later. */
+		diagnostic =
+		    (ext->sadb_ext_type == SADB_X_EXT_ADDRESS_INNER_SRC) ?
+		    SADB_X_DIAGNOSTIC_PREFIX_INNER_SRC :
+		    SADB_X_DIAGNOSTIC_PREFIX_INNER_DST;
+
+		if (normalized)
+			addr->sadb_address_prefixlen -= 96;
+
+		/*
+		 * Verify and mask out inner-addresses based on prefix length.
+		 */
+		if (sin->sin_family == AF_INET) {
+			if (addr->sadb_address_prefixlen > 32)
+				goto bail;
+			sin->sin_addr.s_addr &=
+			    ip_plen_to_mask(addr->sadb_address_prefixlen);
+		} else {
+			in6_addr_t mask;
+
+			ASSERT(sin->sin_family == AF_INET6);
+			/*
+			 * ip_plen_to_mask_v6() returns NULL if the value in
+			 * question is out of range.
+			 */
+			if (ip_plen_to_mask_v6(addr->sadb_address_prefixlen,
+				&mask) == NULL)
+				goto bail;
+			sin6->sin6_addr.s6_addr32[0] &= mask.s6_addr32[0];
+			sin6->sin6_addr.s6_addr32[1] &= mask.s6_addr32[1];
+			sin6->sin6_addr.s6_addr32[2] &= mask.s6_addr32[2];
+			sin6->sin6_addr.s6_addr32[3] &= mask.s6_addr32[3];
+		}
+
+		/* We don't care in these cases. */
+		return (KS_IN_ADDR_DONTCARE);
+	}
+
+	if (sin->sin_family == AF_INET6) {
+		/* Check the easy ones now. */
+		if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))
+			return (KS_IN_ADDR_MBCAST);
+		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
+			return (KS_IN_ADDR_UNSPEC);
+		/*
+		 * At this point, we're a unicast IPv6 address.
+		 *
+		 * A ctable lookup for local is sufficient here.  If we're
+		 * local, return KS_IN_ADDR_ME, otherwise KS_IN_ADDR_NOTME.
+		 *
+		 * XXX Zones alert -> me/notme decision needs to be tempered
+		 * by what zone we're in when we go to zone-aware IPsec.
+		 */
+		ire = ire_ctable_lookup_v6(&sin6->sin6_addr, NULL,
+		    IRE_LOCAL, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE);
+		if (ire != NULL) {
+			/* Hey hey, it's local. */
+			IRE_REFRELE(ire);
+			return (KS_IN_ADDR_ME);
+		}
+	} else {
+		ASSERT(sin->sin_family == AF_INET);
+		if (sin->sin_addr.s_addr == INADDR_ANY)
+			return (KS_IN_ADDR_UNSPEC);
+		if (CLASSD(sin->sin_addr.s_addr))
+			return (KS_IN_ADDR_MBCAST);
+		/*
+		 * At this point we're a unicast or broadcast IPv4 address.
+		 *
+		 * Lookup on the ctable for IRE_BROADCAST or IRE_LOCAL.
+		 * A NULL return value is NOTME, otherwise, look at the
+		 * returned ire for broadcast or not and return accordingly.
+		 *
+		 * XXX Zones alert -> me/notme decision needs to be tempered
+		 * by what zone we're in when we go to zone-aware IPsec.
+		 */
+		ire = ire_ctable_lookup(sin->sin_addr.s_addr, 0,
+		    IRE_LOCAL | IRE_BROADCAST, NULL, ALL_ZONES, NULL,
+		    MATCH_IRE_TYPE);
+		if (ire != NULL) {
+			/* Check for local or broadcast */
+			type = ire->ire_type;
+			IRE_REFRELE(ire);
+			ASSERT(type == IRE_LOCAL || type == IRE_BROADCAST);
+			return ((type == IRE_LOCAL) ? KS_IN_ADDR_ME :
+			    KS_IN_ADDR_MBCAST);
+		}
+	}
+
+	return (KS_IN_ADDR_NOTME);
 }
 
 /*
+ * Address normalizations and reality checks for inbound PF_KEY messages.
+ *
  * For the case of src == unspecified AF_INET6, and dst == AF_INET, convert
- * the source to AF_INET.
+ * the source to AF_INET.  Do the same for the inner sources.
  */
-void
-sadb_srcaddrfix(keysock_in_t *ksi)
+boolean_t
+sadb_addrfix(keysock_in_t *ksi, queue_t *pfkey_q, mblk_t *mp)
 {
-	struct sockaddr_in *src;
-	struct sockaddr_in6 *dst;
+	struct sockaddr_in *src, *isrc;
+	struct sockaddr_in6 *dst, *idst;
 	sadb_address_t *srcext, *dstext;
 	uint16_t sport;
+	sadb_ext_t **extv = ksi->ks_in_extv;
+	int rc;
 
-	if (ksi->ks_in_srctype != KS_IN_ADDR_UNSPEC ||
-	    ksi->ks_in_dsttype == KS_IN_ADDR_NOTTHERE)
-		return;
+	if (extv[SADB_EXT_ADDRESS_SRC] != NULL) {
+		rc = sadb_addrcheck(pfkey_q, mp, extv[SADB_EXT_ADDRESS_SRC],
+		    ksi->ks_in_serial);
+		if (rc == KS_IN_ADDR_UNKNOWN)
+			return (B_FALSE);
+		if (rc == KS_IN_ADDR_MBCAST) {
+			sadb_pfkey_error(pfkey_q, mp, EINVAL,
+			    SADB_X_DIAGNOSTIC_BAD_SRC, ksi->ks_in_serial);
+			return (B_FALSE);
+		}
+		ksi->ks_in_srctype = rc;
+	}
 
-	dstext = (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_DST];
-	dst = (struct sockaddr_in6 *)(dstext + 1);
-	srcext = (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_SRC];
-	src = (struct sockaddr_in *)(srcext + 1);
+	if (extv[SADB_EXT_ADDRESS_DST] != NULL) {
+		rc = sadb_addrcheck(pfkey_q, mp, extv[SADB_EXT_ADDRESS_DST],
+		    ksi->ks_in_serial);
+		if (rc == KS_IN_ADDR_UNKNOWN)
+			return (B_FALSE);
+		if (rc == KS_IN_ADDR_UNSPEC) {
+			sadb_pfkey_error(pfkey_q, mp, EINVAL,
+			    SADB_X_DIAGNOSTIC_BAD_DST, ksi->ks_in_serial);
+			return (B_FALSE);
+		}
+		ksi->ks_in_dsttype = rc;
+	}
 
 	/*
-	 * If unspecified IPv4 source, but an IPv6 dest, don't bother
-	 * fixing, as it should be an error.
+	 * NAT-Traversal addrs are simple enough to not require all of
+	 * the checks in sadb_addrcheck().  Just normalize or reject if not
+	 * AF_INET.
 	 */
-	if (dst->sin6_family == src->sin_family ||
-	    src->sin_family == AF_INET)
-		return;
+	if (extv[SADB_X_EXT_ADDRESS_NATT_LOC] != NULL) {
+		rc = sadb_addrcheck(pfkey_q, mp,
+		    extv[SADB_X_EXT_ADDRESS_NATT_LOC], ksi->ks_in_serial);
+
+		/*
+		 * NATT addresses never use an IRE_LOCAL, so it should
+		 * always be NOTME, or UNSPEC if it's a tunnel-mode SA.
+		 */
+		if (rc != KS_IN_ADDR_NOTME &&
+		    !(extv[SADB_X_EXT_ADDRESS_INNER_SRC] != NULL &&
+			rc == KS_IN_ADDR_UNSPEC)) {
+			if (rc != KS_IN_ADDR_UNKNOWN)
+				sadb_pfkey_error(pfkey_q, mp, EINVAL,
+				    SADB_X_DIAGNOSTIC_MALFORMED_NATT_LOC,
+				    ksi->ks_in_serial);
+			return (B_FALSE);
+		}
+		src = (struct sockaddr_in *)
+		    (((sadb_address_t *)extv[SADB_X_EXT_ADDRESS_NATT_LOC]) + 1);
+		if (src->sin_family != AF_INET) {
+			sadb_pfkey_error(pfkey_q, mp, EINVAL,
+			    SADB_X_DIAGNOSTIC_BAD_NATT_LOC_AF,
+			    ksi->ks_in_serial);
+			return (B_FALSE);
+		}
+	}
+
+	if (extv[SADB_X_EXT_ADDRESS_NATT_REM] != NULL) {
+		rc = sadb_addrcheck(pfkey_q, mp,
+		    extv[SADB_X_EXT_ADDRESS_NATT_REM], ksi->ks_in_serial);
+
+		/*
+		 * NATT addresses never use an IRE_LOCAL, so it should
+		 * always be NOTME, or UNSPEC if it's a tunnel-mode SA.
+		 */
+		if (rc != KS_IN_ADDR_NOTME &&
+		    !(extv[SADB_X_EXT_ADDRESS_INNER_SRC] != NULL &&
+			rc == KS_IN_ADDR_UNSPEC)) {
+			if (rc != KS_IN_ADDR_UNKNOWN)
+				sadb_pfkey_error(pfkey_q, mp, EINVAL,
+				    SADB_X_DIAGNOSTIC_MALFORMED_NATT_REM,
+				    ksi->ks_in_serial);
+			return (B_FALSE);
+		}
+		src = (struct sockaddr_in *)
+		    (((sadb_address_t *)extv[SADB_X_EXT_ADDRESS_NATT_REM]) + 1);
+		if (src->sin_family != AF_INET) {
+			sadb_pfkey_error(pfkey_q, mp, EINVAL,
+			    SADB_X_DIAGNOSTIC_BAD_NATT_REM_AF,
+			    ksi->ks_in_serial);
+			return (B_FALSE);
+		}
+	}
+
+	if (extv[SADB_X_EXT_ADDRESS_INNER_SRC] != NULL) {
+		if (extv[SADB_X_EXT_ADDRESS_INNER_DST] == NULL) {
+			sadb_pfkey_error(pfkey_q, mp, EINVAL,
+			    SADB_X_DIAGNOSTIC_MISSING_INNER_DST,
+			    ksi->ks_in_serial);
+			return (B_FALSE);
+		}
+
+		if (sadb_addrcheck(pfkey_q, mp,
+			extv[SADB_X_EXT_ADDRESS_INNER_DST], ksi->ks_in_serial)
+		    == KS_IN_ADDR_UNKNOWN ||
+		    sadb_addrcheck(pfkey_q, mp,
+			extv[SADB_X_EXT_ADDRESS_INNER_SRC], ksi->ks_in_serial)
+		    == KS_IN_ADDR_UNKNOWN)
+			return (B_FALSE);
+
+		isrc = (struct sockaddr_in *)
+		    (((sadb_address_t *)extv[SADB_X_EXT_ADDRESS_INNER_SRC]) +
+			1);
+		idst = (struct sockaddr_in6 *)
+		    (((sadb_address_t *)extv[SADB_X_EXT_ADDRESS_INNER_DST]) +
+			1);
+		if (isrc->sin_family != idst->sin6_family) {
+			sadb_pfkey_error(pfkey_q, mp, EINVAL,
+			    SADB_X_DIAGNOSTIC_INNER_AF_MISMATCH,
+			    ksi->ks_in_serial);
+			return (B_FALSE);
+		}
+	} else if (extv[SADB_X_EXT_ADDRESS_INNER_DST] != NULL) {
+			sadb_pfkey_error(pfkey_q, mp, EINVAL,
+			    SADB_X_DIAGNOSTIC_MISSING_INNER_SRC,
+			    ksi->ks_in_serial);
+			return (B_FALSE);
+	} else {
+		isrc = NULL;	/* For inner/outer port check below. */
+	}
+
+	dstext = (sadb_address_t *)extv[SADB_EXT_ADDRESS_DST];
+	srcext = (sadb_address_t *)extv[SADB_EXT_ADDRESS_SRC];
+
+	if (dstext == NULL || srcext == NULL)
+		return (B_TRUE);
+
+	dst = (struct sockaddr_in6 *)(dstext + 1);
+	src = (struct sockaddr_in *)(srcext + 1);
+
+	if (isrc != NULL &&
+	    (isrc->sin_port != 0 || idst->sin6_port != 0) &&
+	    (src->sin_port != 0 || dst->sin6_port != 0)) {
+		/* Can't set inner and outer ports in one SA. */
+		sadb_pfkey_error(pfkey_q, mp, EINVAL,
+		    SADB_X_DIAGNOSTIC_DUAL_PORT_SETS,
+		    ksi->ks_in_serial);
+		return (B_FALSE);
+	}
+
+	if (dst->sin6_family == src->sin_family)
+		return (B_TRUE);
+
+	if (srcext->sadb_address_proto != dstext->sadb_address_proto) {
+		if (srcext->sadb_address_proto == 0) {
+			srcext->sadb_address_proto = dstext->sadb_address_proto;
+		} else if (dstext->sadb_address_proto == 0) {
+			dstext->sadb_address_proto = srcext->sadb_address_proto;
+		} else {
+			/* Inequal protocols, neither were 0.  Report error. */
+			sadb_pfkey_error(pfkey_q, mp, EINVAL,
+			    SADB_X_DIAGNOSTIC_PROTO_MISMATCH,
+			    ksi->ks_in_serial);
+			return (B_FALSE);
+		}
+	}
+
+	/*
+	 * With the exception of an unspec IPv6 source and an IPv4
+	 * destination, address families MUST me matched.
+	 */
+	if (src->sin_family == AF_INET ||
+	    ksi->ks_in_srctype != KS_IN_ADDR_UNSPEC) {
+		sadb_pfkey_error(pfkey_q, mp, EINVAL,
+		    SADB_X_DIAGNOSTIC_AF_MISMATCH, ksi->ks_in_serial);
+		return (B_FALSE);
+	}
 
 	/*
 	 * Convert "src" to AF_INET INADDR_ANY.  We rely on sin_port being
@@ -2100,6 +2302,8 @@ sadb_srcaddrfix(keysock_in_t *ksi)
 	bzero(src, sizeof (*src));
 	src->sin_family = AF_INET;
 	src->sin_port = sport;
+
+	return (B_TRUE);
 }
 
 /*
@@ -2177,8 +2381,8 @@ sadb_purge_cb(isaf_t *head, ipsa_t *entry, void *cookie)
  * Don't kill larval SA's in such a purge.
  */
 int
-sadb_purge_sa(mblk_t *mp, keysock_in_t *ksi, sadb_t *sp,
-    int *diagnostic, queue_t *pfkey_q, queue_t *ip_q)
+sadb_purge_sa(mblk_t *mp, keysock_in_t *ksi, sadb_t *sp, queue_t *pfkey_q,
+    queue_t *ip_q)
 {
 	sadb_address_t *dstext =
 	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_DST];
@@ -2232,14 +2436,9 @@ sadb_purge_sa(mblk_t *mp, keysock_in_t *ksi, sadb_t *sp,
 		} else {
 			ps.src = (uint32_t *)&src->sin_addr;
 		}
-
-		if (dstext != NULL) {
-			if (src->sin_family != dst->sin_family) {
-				*diagnostic = SADB_X_DIAGNOSTIC_AF_MISMATCH;
-				return (EINVAL);
-			}
-		}
+		ASSERT(dstext == NULL || src->sin_family == dst->sin_family);
 	}
+
 	ASSERT(ps.af != (sa_family_t)-1);
 
 	if (dstid != NULL) {
@@ -2331,10 +2530,7 @@ sadb_delget_sa(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 		if (srcext != NULL) {
 			src6 = (struct sockaddr_in6 *)(srcext + 1);
 			srcaddr = (uint32_t *)&src6->sin6_addr;
-			if (src6->sin6_family != AF_INET6) {
-				*diagnostic = SADB_X_DIAGNOSTIC_AF_MISMATCH;
-				return (EINVAL);
-			}
+			ASSERT(src6->sin6_family == AF_INET6);
 		} else {
 			srcaddr = ALL_ZEROES_PTR;
 		}
@@ -2346,10 +2542,7 @@ sadb_delget_sa(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 		if (srcext != NULL) {
 			src = (struct sockaddr_in *)(srcext + 1);
 			srcaddr = (uint32_t *)&src->sin_addr;
-			if (src->sin_family != AF_INET) {
-				*diagnostic = SADB_X_DIAGNOSTIC_AF_MISMATCH;
-				return (EINVAL);
-			}
+			ASSERT(src->sin_family == AF_INET);
 		} else {
 			srcaddr = ALL_ZEROES_PTR;
 		}
@@ -2458,110 +2651,17 @@ sadb_init_alginfo(ipsa_t *sa)
 	mutex_exit(&alg_lock);
 }
 
-
 /*
- * This function is called from consumers that need to insert a fully-grown
- * security association into its tables.  This function takes into account that
- * SAs can be "inbound", "outbound", or "both".	 The "primary" and "secondary"
- * hash bucket parameters are set in order of what the SA will be most of the
- * time.  (For example, an SA with an unspecified source, and a multicast
- * destination will primarily be an outbound SA.  OTOH, if that destination
- * is unicast for this node, then the SA will primarily be inbound.)
- *
- * It takes a lot of parameters because even if clone is B_FALSE, this needs
- * to check both buckets for purposes of collision.
- *
- * Return 0 upon success.  Return various errnos (ENOMEM, EEXIST) for
- * various error conditions.  No need to set samsg->sadb_x_msg_diagnostic with
- * additional diagnostic information because ENOMEM and EEXIST are self-
- * explanitory.
+ * Perform NAT-traversal cached checksum offset calculations here.
  */
-int
-sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
-    keysock_in_t *ksi, isaf_t *primary, isaf_t *secondary,
-    ipsa_t *newbie, boolean_t clone, boolean_t is_inbound)
+static void
+sadb_nat_calculations(ipsa_t *newbie, sadb_address_t *natt_loc_ext,
+    sadb_address_t *natt_rem_ext, uint32_t *src_addr_ptr,
+    uint32_t *dst_addr_ptr)
 {
-	ipsa_t *newbie_clone = NULL, *scratch;
-	sadb_sa_t *assoc = (sadb_sa_t *)ksi->ks_in_extv[SADB_EXT_SA];
-	sadb_address_t *srcext =
-	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_SRC];
-	sadb_address_t *dstext =
-	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_DST];
-	sadb_address_t *proxyext =
-	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_PROXY];
-	sadb_address_t *natt_loc_ext =
-	    (sadb_address_t *)ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_LOC];
-	sadb_address_t *natt_rem_ext =
-	    (sadb_address_t *)ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_REM];
-	sadb_x_kmc_t *kmcext =
-	    (sadb_x_kmc_t *)ksi->ks_in_extv[SADB_X_EXT_KM_COOKIE];
-	sadb_key_t *akey = (sadb_key_t *)ksi->ks_in_extv[SADB_EXT_KEY_AUTH];
-	sadb_key_t *ekey = (sadb_key_t *)ksi->ks_in_extv[SADB_EXT_KEY_ENCRYPT];
-#if 0
-	/*
-	 * XXXMLS - When Trusted Solaris or Multi-Level Secure functionality
-	 * comes to ON, examine these if 0'ed fragments.  Look for XXXMLS.
-	 */
-	sadb_sens_t *sens = (sadb_sens_t *);
-#endif
-	struct sockaddr_in *src, *dst, *proxy, *natt_loc, *natt_rem;
-	struct sockaddr_in6 *src6, *dst6, *proxy6, *natt_loc6, *natt_rem6;
-	sadb_lifetime_t *soft =
-	    (sadb_lifetime_t *)ksi->ks_in_extv[SADB_EXT_LIFETIME_SOFT];
-	sadb_lifetime_t *hard =
-	    (sadb_lifetime_t *)ksi->ks_in_extv[SADB_EXT_LIFETIME_HARD];
-	sa_family_t af;
-	int error = 0;
-	boolean_t isupdate = (newbie != NULL);
-	uint32_t *src_addr_ptr, *dst_addr_ptr, *proxy_addr_ptr;
+	struct sockaddr_in *natt_loc, *natt_rem;
 	uint32_t *natt_loc_ptr = NULL, *natt_rem_ptr = NULL;
 	uint32_t running_sum = 0;
-	mblk_t *ctl_mp = NULL;
-
-	src = (struct sockaddr_in *)(srcext + 1);
-	src6 = (struct sockaddr_in6 *)(srcext + 1);
-	dst = (struct sockaddr_in *)(dstext + 1);
-	dst6 = (struct sockaddr_in6 *)(dstext + 1);
-	if (proxyext != NULL) {
-		proxy = (struct sockaddr_in *)(proxyext + 1);
-		proxy6 = (struct sockaddr_in6 *)(proxyext + 1);
-	} else {
-		proxy = NULL;
-		proxy6 = NULL;
-	}
-
-	af = src->sin_family;
-
-	if (af == AF_INET) {
-		src_addr_ptr = (uint32_t *)&src->sin_addr;
-		dst_addr_ptr = (uint32_t *)&dst->sin_addr;
-	} else {
-		ASSERT(af == AF_INET6);
-		src_addr_ptr = (uint32_t *)&src6->sin6_addr;
-		dst_addr_ptr = (uint32_t *)&dst6->sin6_addr;
-	}
-
-	if (!isupdate) {
-		newbie = sadb_makelarvalassoc(assoc->sadb_sa_spi,
-		    src_addr_ptr, dst_addr_ptr, af);
-		if (newbie == NULL)
-			return (ENOMEM);
-	}
-
-	mutex_enter(&newbie->ipsa_lock);
-
-	if (proxy != NULL) {
-		if (proxy->sin_family == AF_INET) {
-			proxy_addr_ptr = (uint32_t *)&proxy->sin_addr;
-		} else {
-			ASSERT(proxy->sin_family == AF_INET6);
-			proxy_addr_ptr = (uint32_t *)&proxy6->sin6_addr;
-		}
-		newbie->ipsa_proxyfam = proxy->sin_family;
-
-		IPSA_COPY_ADDR(newbie->ipsa_proxysrc, proxy_addr_ptr,
-		    newbie->ipsa_proxyfam);
-	}
 
 #define	DOWN_SUM(x) (x) = ((x) & 0xFFFF) +	 ((x) >> 16)
 
@@ -2571,26 +2671,17 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		uint32_t l_rem;
 
 		natt_rem = (struct sockaddr_in *)(natt_rem_ext + 1);
-		natt_rem6 = (struct sockaddr_in6 *)(natt_rem_ext + 1);
 
-		if (natt_rem->sin_family == AF_INET) {
-			natt_rem_ptr = (uint32_t *)(&natt_rem->sin_addr);
-			newbie->ipsa_remote_port = natt_rem->sin_port;
-			l_src = *src_addr_ptr;
-			l_rem = *natt_rem_ptr;
-		} else {
-			if (!IN6_IS_ADDR_V4MAPPED(&natt_rem6->sin6_addr)) {
-				goto error;
-			}
-			ASSERT(natt_rem->sin_family == AF_INET6);
+		/* Ensured by sadb_addrfix(). */
+		ASSERT(natt_rem->sin_family == AF_INET);
 
-			natt_rem_ptr = ((uint32_t *)
-			    (&natt_rem6->sin6_addr)) + 3;
-			newbie->ipsa_remote_port = natt_rem6->sin6_port;
-			l_src = *src_addr_ptr;
-			l_rem = *natt_rem_ptr;
-		}
-		IPSA_COPY_ADDR(newbie->ipsa_natt_addr_rem, natt_rem_ptr, af);
+		natt_rem_ptr = (uint32_t *)(&natt_rem->sin_addr);
+		newbie->ipsa_remote_port = natt_rem->sin_port;
+		l_src = *src_addr_ptr;
+		l_rem = *natt_rem_ptr;
+
+		/* Instead of IPSA_COPY_ADDR(), just copy first 32 bits. */
+		newbie->ipsa_natt_addr_rem[0] = *natt_rem_ptr;
 
 		l_src = ntohl(l_src);
 		DOWN_SUM(l_src);
@@ -2617,24 +2708,17 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		uint32_t l_loc;
 
 		natt_loc = (struct sockaddr_in *)(natt_loc_ext + 1);
-		natt_loc6 = (struct sockaddr_in6 *)(natt_loc_ext + 1);
 
-		if (natt_loc->sin_family == AF_INET) {
-			natt_loc_ptr = (uint32_t *)&natt_loc->sin_addr;
-			l_dst = *dst_addr_ptr;
-			l_loc = *natt_loc_ptr;
+		/* Ensured by sadb_addrfix(). */
+		ASSERT(natt_loc->sin_family == AF_INET);
 
-		} else {
-			if (!IN6_IS_ADDR_V4MAPPED(&natt_loc6->sin6_addr)) {
-				goto error;
-			}
-			ASSERT(natt_loc->sin_family == AF_INET6);
-			natt_loc_ptr = ((uint32_t *)&natt_loc6->sin6_addr) + 3;
-			l_dst = *dst_addr_ptr;
-			l_loc = *natt_loc_ptr;
+		natt_loc_ptr = (uint32_t *)&natt_loc->sin_addr;
+		/* TODO - future port flexibility beyond 4500. */
+		l_dst = *dst_addr_ptr;
+		l_loc = *natt_loc_ptr;
 
-		}
-		IPSA_COPY_ADDR(newbie->ipsa_natt_addr_loc, natt_loc_ptr, af);
+		/* Instead of IPSA_COPY_ADDR(), just copy first 32 bits. */
+		newbie->ipsa_natt_addr_loc[0] = *natt_loc_ptr;
 
 		l_loc = ntohl(l_loc);
 		DOWN_SUM(l_loc);
@@ -2657,12 +2741,195 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 
 	newbie->ipsa_inbound_cksum = running_sum;
 #undef DOWN_SUM
+}
+
+/*
+ * This function is called from consumers that need to insert a fully-grown
+ * security association into its tables.  This function takes into account that
+ * SAs can be "inbound", "outbound", or "both".	 The "primary" and "secondary"
+ * hash bucket parameters are set in order of what the SA will be most of the
+ * time.  (For example, an SA with an unspecified source, and a multicast
+ * destination will primarily be an outbound SA.  OTOH, if that destination
+ * is unicast for this node, then the SA will primarily be inbound.)
+ *
+ * It takes a lot of parameters because even if clone is B_FALSE, this needs
+ * to check both buckets for purposes of collision.
+ *
+ * Return 0 upon success.  Return various errnos (ENOMEM, EEXIST) for
+ * various error conditions.  We may need to set samsg->sadb_x_msg_diagnostic
+ * with additional diagnostic information because there is at least one EINVAL
+ * case here.
+ */
+int
+sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
+    keysock_in_t *ksi, isaf_t *primary, isaf_t *secondary,
+    ipsa_t *newbie, boolean_t clone, boolean_t is_inbound, int *diagnostic)
+{
+	ipsa_t *newbie_clone = NULL, *scratch;
+	sadb_sa_t *assoc = (sadb_sa_t *)ksi->ks_in_extv[SADB_EXT_SA];
+	sadb_address_t *srcext =
+	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_SRC];
+	sadb_address_t *dstext =
+	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_DST];
+	sadb_address_t *isrcext =
+	    (sadb_address_t *)ksi->ks_in_extv[SADB_X_EXT_ADDRESS_INNER_SRC];
+	sadb_address_t *idstext =
+	    (sadb_address_t *)ksi->ks_in_extv[SADB_X_EXT_ADDRESS_INNER_DST];
+	sadb_x_kmc_t *kmcext =
+	    (sadb_x_kmc_t *)ksi->ks_in_extv[SADB_X_EXT_KM_COOKIE];
+	sadb_key_t *akey = (sadb_key_t *)ksi->ks_in_extv[SADB_EXT_KEY_AUTH];
+	sadb_key_t *ekey = (sadb_key_t *)ksi->ks_in_extv[SADB_EXT_KEY_ENCRYPT];
+#if 0
+	/*
+	 * XXXMLS - When Trusted Solaris or Multi-Level Secure functionality
+	 * comes to ON, examine these if 0'ed fragments.  Look for XXXMLS.
+	 */
+	sadb_sens_t *sens = (sadb_sens_t *);
+#endif
+	struct sockaddr_in *src, *dst, *isrc, *idst;
+	struct sockaddr_in6 *src6, *dst6, *isrc6, *idst6;
+	sadb_lifetime_t *soft =
+	    (sadb_lifetime_t *)ksi->ks_in_extv[SADB_EXT_LIFETIME_SOFT];
+	sadb_lifetime_t *hard =
+	    (sadb_lifetime_t *)ksi->ks_in_extv[SADB_EXT_LIFETIME_HARD];
+	sa_family_t af;
+	int error = 0;
+	boolean_t isupdate = (newbie != NULL);
+	uint32_t *src_addr_ptr, *dst_addr_ptr, *isrc_addr_ptr, *idst_addr_ptr;
+	mblk_t *ctl_mp = NULL;
+
+	src = (struct sockaddr_in *)(srcext + 1);
+	src6 = (struct sockaddr_in6 *)(srcext + 1);
+	dst = (struct sockaddr_in *)(dstext + 1);
+	dst6 = (struct sockaddr_in6 *)(dstext + 1);
+	if (isrcext != NULL) {
+		isrc = (struct sockaddr_in *)(isrcext + 1);
+		isrc6 = (struct sockaddr_in6 *)(isrcext + 1);
+		ASSERT(idstext != NULL);
+		idst = (struct sockaddr_in *)(idstext + 1);
+		idst6 = (struct sockaddr_in6 *)(idstext + 1);
+	} else {
+		isrc = NULL;
+		isrc6 = NULL;
+	}
+
+	af = src->sin_family;
+
+	if (af == AF_INET) {
+		src_addr_ptr = (uint32_t *)&src->sin_addr;
+		dst_addr_ptr = (uint32_t *)&dst->sin_addr;
+	} else {
+		ASSERT(af == AF_INET6);
+		src_addr_ptr = (uint32_t *)&src6->sin6_addr;
+		dst_addr_ptr = (uint32_t *)&dst6->sin6_addr;
+	}
+
+	if (!isupdate) {
+		newbie = sadb_makelarvalassoc(assoc->sadb_sa_spi,
+		    src_addr_ptr, dst_addr_ptr, af);
+		if (newbie == NULL)
+			return (ENOMEM);
+	}
+
+	mutex_enter(&newbie->ipsa_lock);
+
+	if (isrc != NULL) {
+		if (isrc->sin_family == AF_INET) {
+			if (srcext->sadb_address_proto != IPPROTO_ENCAP) {
+				if (srcext->sadb_address_proto != 0) {
+					/*
+					 * Mismatched outer-packet protocol
+					 * and inner-packet address family.
+					 */
+					mutex_exit(&newbie->ipsa_lock);
+					error = EPROTOTYPE;
+					goto error;
+				} else {
+					/* Fill in with explicit protocol. */
+					srcext->sadb_address_proto =
+					    IPPROTO_ENCAP;
+					dstext->sadb_address_proto =
+					    IPPROTO_ENCAP;
+				}
+			}
+			isrc_addr_ptr = (uint32_t *)&isrc->sin_addr;
+			idst_addr_ptr = (uint32_t *)&idst->sin_addr;
+		} else {
+			ASSERT(isrc->sin_family == AF_INET6);
+			if (srcext->sadb_address_proto != IPPROTO_IPV6) {
+				if (srcext->sadb_address_proto != 0) {
+					/*
+					 * Mismatched outer-packet protocol
+					 * and inner-packet address family.
+					 */
+					mutex_exit(&newbie->ipsa_lock);
+					error = EPROTOTYPE;
+					goto error;
+				} else {
+					/* Fill in with explicit protocol. */
+					srcext->sadb_address_proto =
+					    IPPROTO_IPV6;
+					dstext->sadb_address_proto =
+					    IPPROTO_IPV6;
+				}
+			}
+			isrc_addr_ptr = (uint32_t *)&isrc6->sin6_addr;
+			idst_addr_ptr = (uint32_t *)&idst6->sin6_addr;
+		}
+		newbie->ipsa_innerfam = isrc->sin_family;
+
+		IPSA_COPY_ADDR(newbie->ipsa_innersrc, isrc_addr_ptr,
+		    newbie->ipsa_innerfam);
+		IPSA_COPY_ADDR(newbie->ipsa_innerdst, idst_addr_ptr,
+		    newbie->ipsa_innerfam);
+		newbie->ipsa_innersrcpfx = isrcext->sadb_address_prefixlen;
+		newbie->ipsa_innerdstpfx = idstext->sadb_address_prefixlen;
+
+		/* Unique value uses inner-ports for Tunnel Mode... */
+		newbie->ipsa_unique_id = SA_UNIQUE_ID(isrc->sin_port,
+		    idst->sin_port, dstext->sadb_address_proto,
+		    idstext->sadb_address_proto);
+		newbie->ipsa_unique_mask = SA_UNIQUE_MASK(isrc->sin_port,
+		    idst->sin_port, dstext->sadb_address_proto,
+		    idstext->sadb_address_proto);
+	} else {
+		/* ... and outer-ports for Transport Mode. */
+		newbie->ipsa_unique_id = SA_UNIQUE_ID(src->sin_port,
+		    dst->sin_port, dstext->sadb_address_proto, 0);
+		newbie->ipsa_unique_mask = SA_UNIQUE_MASK(src->sin_port,
+		    dst->sin_port, dstext->sadb_address_proto, 0);
+	}
+	if (newbie->ipsa_unique_mask != (uint64_t)0)
+		newbie->ipsa_flags |= IPSA_F_UNIQUE;
+
+
+	sadb_nat_calculations(newbie,
+	    (sadb_address_t *)ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_LOC],
+	    (sadb_address_t *)ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_REM],
+	    src_addr_ptr, dst_addr_ptr);
 
 	newbie->ipsa_type = samsg->sadb_msg_satype;
 	ASSERT(assoc->sadb_sa_state == SADB_SASTATE_MATURE);
 	newbie->ipsa_auth_alg = assoc->sadb_sa_auth;
 	newbie->ipsa_encr_alg = assoc->sadb_sa_encrypt;
-	newbie->ipsa_flags = assoc->sadb_sa_flags;
+	/*
+	 * Use |= because we set unique fields above.  UNIQUE is filtered
+	 * out before we reach here so it's not like we're sabotaging anything.
+	 * ASSERT we're either 0 or UNIQUE for good measure, though.
+	 */
+	ASSERT((newbie->ipsa_flags & IPSA_F_UNIQUE) == newbie->ipsa_flags);
+	newbie->ipsa_flags |= assoc->sadb_sa_flags;
+	if ((newbie->ipsa_flags & SADB_X_SAFLAGS_NATT_LOC &&
+		ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_LOC] == NULL) ||
+	    (newbie->ipsa_flags & SADB_X_SAFLAGS_NATT_REM &&
+		ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_REM] == NULL) ||
+	    (newbie->ipsa_flags & SADB_X_SAFLAGS_TUNNEL &&
+		ksi->ks_in_extv[SADB_X_EXT_ADDRESS_INNER_SRC] == NULL)) {
+		mutex_exit(&newbie->ipsa_lock);
+		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
+		error = EINVAL;
+		goto error;
+	}
 	/*
 	 * If unspecified source address, force replay_wsize to 0.
 	 * This is because an SA that has multiple sources of secure
@@ -2675,15 +2942,6 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		newbie->ipsa_replay_wsize = 0;
 
 	(void) drv_getparm(TIME, &newbie->ipsa_addtime);
-
-	/* Set unique value */
-	newbie->ipsa_unique_id = SA_UNIQUE_ID((uint16_t)src->sin_port,
-	    (uint16_t)dst->sin_port, dstext->sadb_address_proto);
-	newbie->ipsa_unique_mask = SA_UNIQUE_MASK((uint16_t)src->sin_port,
-	    (uint16_t)dst->sin_port, dstext->sadb_address_proto);
-
-	if (newbie->ipsa_unique_mask != 0)
-		newbie->ipsa_flags |= IPSA_F_UNIQUE;
 
 	if (kmcext != NULL) {
 		newbie->ipsa_kmp = kmcext->sadb_x_kmc_proto;
@@ -3053,6 +3311,7 @@ sadb_expire_assoc(queue_t *pfkey_q, ipsa_t *assoc)
 	sadb_lifetime_t *current, *expire;
 	sadb_sa_t *saext;
 	uint8_t *end;
+	boolean_t tunnel_mode;
 
 	ASSERT(MUTEX_HELD(&assoc->ipsa_lock));
 
@@ -3068,7 +3327,7 @@ sadb_expire_assoc(queue_t *pfkey_q, ipsa_t *assoc)
 	}
 
 	alloclen = sizeof (*samsg) + sizeof (*current) + sizeof (*expire) +
-	    2*sizeof (sadb_address_t) + sizeof (*saext);
+	    2 * sizeof (sadb_address_t) + sizeof (*saext);
 
 	af = assoc->ipsa_addrfam;
 	switch (af) {
@@ -3084,6 +3343,25 @@ sadb_expire_assoc(queue_t *pfkey_q, ipsa_t *assoc)
 		cmn_err(CE_WARN,
 		    "sadb_expire_assoc: Unknown address length.\n");
 		return;
+	}
+
+	tunnel_mode = (assoc->ipsa_flags & IPSA_F_TUNNEL);
+	if (tunnel_mode) {
+		alloclen += 2 * sizeof (sadb_address_t);
+		switch (assoc->ipsa_innerfam) {
+		case AF_INET:
+			alloclen += 2 * sizeof (struct sockaddr_in);
+			break;
+		case AF_INET6:
+			alloclen += 2 * sizeof (struct sockaddr_in6);
+			break;
+		default:
+			/* Won't happen unless there's a kernel bug. */
+			freeb(mp);
+			cmn_err(CE_WARN, "sadb_expire_assoc: "
+			    "Unknown inner address length.\n");
+			return;
+		}
 	}
 
 	mp->b_cont = allocb(alloclen, BPRI_HI);
@@ -3149,12 +3427,27 @@ sadb_expire_assoc(queue_t *pfkey_q, ipsa_t *assoc)
 	}
 
 	mp->b_wptr = sadb_make_addr_ext(mp->b_wptr, end, SADB_EXT_ADDRESS_SRC,
-	    af, assoc->ipsa_srcaddr, SA_SRCPORT(assoc), SA_PROTO(assoc));
+	    af, assoc->ipsa_srcaddr, tunnel_mode ? 0 : SA_SRCPORT(assoc),
+	    SA_PROTO(assoc), 0);
 	ASSERT(mp->b_wptr != NULL);
 
 	mp->b_wptr = sadb_make_addr_ext(mp->b_wptr, end, SADB_EXT_ADDRESS_DST,
-	    af, assoc->ipsa_dstaddr, SA_DSTPORT(assoc), SA_PROTO(assoc));
+	    af, assoc->ipsa_dstaddr, tunnel_mode ? 0 : SA_DSTPORT(assoc),
+	    SA_PROTO(assoc), 0);
 	ASSERT(mp->b_wptr != NULL);
+
+	if (tunnel_mode) {
+		mp->b_wptr = sadb_make_addr_ext(mp->b_wptr, end,
+		    SADB_X_EXT_ADDRESS_INNER_SRC, assoc->ipsa_innerfam,
+		    assoc->ipsa_innersrc, SA_SRCPORT(assoc), SA_IPROTO(assoc),
+		    assoc->ipsa_innersrcpfx);
+		ASSERT(mp->b_wptr != NULL);
+		mp->b_wptr = sadb_make_addr_ext(mp->b_wptr, end,
+		    SADB_X_EXT_ADDRESS_INNER_DST, assoc->ipsa_innerfam,
+		    assoc->ipsa_innerdst, SA_DSTPORT(assoc), SA_IPROTO(assoc),
+		    assoc->ipsa_innerdstpfx);
+		ASSERT(mp->b_wptr != NULL);
+	}
 
 	/* Can just putnext, we're ready to go! */
 	putnext(pfkey_q, mp1);
@@ -3708,11 +4001,6 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi,
 		srcaddr = (uint32_t *)&src6->sin6_addr;
 		dstaddr = (uint32_t *)&dst6->sin6_addr;
 		outbound = OUTBOUND_BUCKET_V6(sp, *(uint32_t *)dstaddr);
-#if 0
-		/* Not used for now... */
-		if (proxyext != NULL)
-			proxy6 = (struct sockaddr_in6 *)(proxyext + 1);
-#endif
 	} else {
 		srcaddr = (uint32_t *)&src->sin_addr;
 		dstaddr = (uint32_t *)&dst->sin_addr;
@@ -3772,11 +4060,7 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi,
 		error = EINVAL;
 		goto bail;
 	}
-	if (src->sin_family != dst->sin_family) {
-		*diagnostic = SADB_X_DIAGNOSTIC_AF_MISMATCH;
-		error = EINVAL;
-		goto bail;
-	}
+	ASSERT(src->sin_family == dst->sin_family);
 	if (akey != NULL) {
 		*diagnostic = SADB_X_DIAGNOSTIC_AKEY_PRESENT;
 		error = EINVAL;
@@ -3880,10 +4164,17 @@ bail:
  */
 static ipsacq_t *
 sadb_checkacquire(iacqf_t *bucket, ipsec_action_t *ap, ipsec_policy_t *pp,
-    uint32_t *src, uint32_t *dst, uint64_t unique_id)
+    uint32_t *src, uint32_t *dst, uint32_t *isrc, uint32_t *idst,
+    uint64_t unique_id)
 {
 	ipsacq_t *walker;
 	sa_family_t fam;
+	uint32_t blank_address[4] = {0, 0, 0, 0};
+
+	if (isrc == NULL) {
+		ASSERT(idst == NULL);
+		isrc = idst = blank_address;
+	}
 
 	/*
 	 * Scan list for duplicates.  Check for UNIQUE, src/dest, policy.
@@ -3896,7 +4187,10 @@ sadb_checkacquire(iacqf_t *bucket, ipsec_action_t *ap, ipsec_policy_t *pp,
 		fam = walker->ipsacq_addrfam;
 		if (IPSA_ARE_ADDR_EQUAL(dst, walker->ipsacq_dstaddr, fam) &&
 		    IPSA_ARE_ADDR_EQUAL(src, walker->ipsacq_srcaddr, fam) &&
-		    /* XXX PROXY should check for proxy addr here */
+		    ip_addr_match((uint8_t *)isrc, walker->ipsacq_innersrcpfx,
+			(in6_addr_t *)walker->ipsacq_innersrc) &&
+		    ip_addr_match((uint8_t *)idst, walker->ipsacq_innerdstpfx,
+			(in6_addr_t *)walker->ipsacq_innerdst) &&
 		    (ap == walker->ipsacq_act) &&
 		    (pp == walker->ipsacq_policy) &&
 		    /* XXX do deep compares of ap/pp? */
@@ -3929,7 +4223,7 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 	mblk_t *extended;
 	ipha_t *ipha = (ipha_t *)datamp->b_rptr;
 	ip6_t *ip6h = (ip6_t *)datamp->b_rptr;
-	uint32_t *src, *dst;
+	uint32_t *src, *dst, *isrc, *idst;
 	ipsec_policy_t *pp = io->ipsec_out_policy;
 	ipsec_action_t *ap = io->ipsec_out_act;
 	sa_family_t af;
@@ -3937,6 +4231,7 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 	uint32_t seq;
 	uint64_t unique_id = 0;
 	ipsec_selector_t sel;
+	boolean_t tunnel_mode = io->ipsec_out_tunnel;
 
 	ASSERT((pp != NULL) || (ap != NULL));
 
@@ -3950,17 +4245,11 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 
 	ASSERT(ap != NULL);
 
-	if (ap->ipa_act.ipa_apply.ipp_use_unique)
+	if (ap->ipa_act.ipa_apply.ipp_use_unique || tunnel_mode)
 		unique_id = SA_FORM_UNIQUE_ID(io);
 
 	/*
 	 * Set up an ACQUIRE record.
-	 *
-	 * Will eventually want to pull the PROXY source address from
-	 * either the inner IP header, or from a future extension to the
-	 * IPSEC_OUT message.
-	 *
-	 * Actually, we'll also want to check for duplicates.
 	 *
 	 * Immediately, make sure the ACQUIRE sequence number doesn't slip
 	 * below the lowest point allowed in the kernel.  (In other words,
@@ -3969,19 +4258,9 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 
 	seq = keysock_next_seq() | IACQF_LOWEST_SEQ;
 
-	sel.ips_isv4 = io->ipsec_out_v4;
-	sel.ips_protocol = io->ipsec_out_proto;
-	sel.ips_local_port = io->ipsec_out_src_port;
-	sel.ips_remote_port = io->ipsec_out_dst_port;
-	sel.ips_icmp_type = io->ipsec_out_icmp_type;
-	sel.ips_icmp_code = io->ipsec_out_icmp_code;
-	sel.ips_is_icmp_inv_acq = 0;
 	if (IPH_HDR_VERSION(ipha) == IP_VERSION) {
 		src = (uint32_t *)&ipha->ipha_src;
 		dst = (uint32_t *)&ipha->ipha_dst;
-		/* No compiler dain-bramage (4438087) for IPv4 addresses. */
-		sel.ips_local_addr_v4 = ipha->ipha_src;
-		sel.ips_remote_addr_v4 = ipha->ipha_dst;
 		af = AF_INET;
 		hashoffset = OUTBOUND_HASH_V4(sp, ipha->ipha_dst);
 		ASSERT(io->ipsec_out_v4 == B_TRUE);
@@ -3989,11 +4268,17 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 		ASSERT(IPH_HDR_VERSION(ipha) == IPV6_VERSION);
 		src = (uint32_t *)&ip6h->ip6_src;
 		dst = (uint32_t *)&ip6h->ip6_dst;
-		sel.ips_local_addr_v6 = ip6h->ip6_src;
-		sel.ips_remote_addr_v6 = ip6h->ip6_dst;
 		af = AF_INET6;
 		hashoffset = OUTBOUND_HASH_V6(sp, ip6h->ip6_dst);
 		ASSERT(io->ipsec_out_v4 == B_FALSE);
+	}
+
+	if (tunnel_mode) {
+		/* Snag inner addresses. */
+		isrc = io->ipsec_out_insrc;
+		idst = io->ipsec_out_indst;
+	} else {
+		isrc = idst = NULL;
 	}
 
 	/*
@@ -4002,7 +4287,8 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 	 */
 	bucket = &(sp->sdb_acq[hashoffset]);
 	mutex_enter(&bucket->iacqf_lock);
-	newbie = sadb_checkacquire(bucket, ap, pp, src, dst, unique_id);
+	newbie = sadb_checkacquire(bucket, ap, pp, src, dst, isrc, idst,
+	    unique_id);
 
 	if (newbie == NULL) {
 		/*
@@ -4058,7 +4344,19 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 		newbie->ipsacq_dstport = io->ipsec_out_dst_port;
 		newbie->ipsacq_icmp_type = io->ipsec_out_icmp_type;
 		newbie->ipsacq_icmp_code = io->ipsec_out_icmp_code;
-		newbie->ipsacq_proto = io->ipsec_out_proto;
+		if (tunnel_mode) {
+			newbie->ipsacq_inneraddrfam = io->ipsec_out_inaf;
+			newbie->ipsacq_proto = io->ipsec_out_inaf == AF_INET6 ?
+			    IPPROTO_IPV6 : IPPROTO_ENCAP;
+			newbie->ipsacq_innersrcpfx = io->ipsec_out_insrcpfx;
+			newbie->ipsacq_innerdstpfx = io->ipsec_out_indstpfx;
+			IPSA_COPY_ADDR(newbie->ipsacq_innersrc,
+			    io->ipsec_out_insrc, io->ipsec_out_inaf);
+			IPSA_COPY_ADDR(newbie->ipsacq_innerdst,
+			    io->ipsec_out_indst, io->ipsec_out_inaf);
+		} else {
+			newbie->ipsacq_proto = io->ipsec_out_proto;
+		}
 		newbie->ipsacq_unique_id = unique_id;
 	} else {
 		/* Scan to the end of the list & insert. */
@@ -4104,10 +4402,31 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 		 * opportunities here in failure cases.
 		 */
 
+		(void) memset(&sel, 0, sizeof (sel));
+		sel.ips_isv4 = io->ipsec_out_v4;
+		if (tunnel_mode) {
+			sel.ips_protocol = (io->ipsec_out_inaf == AF_INET) ?
+			    IPPROTO_ENCAP : IPPROTO_IPV6;
+		} else {
+			sel.ips_protocol = io->ipsec_out_proto;
+			sel.ips_local_port = io->ipsec_out_src_port;
+			sel.ips_remote_port = io->ipsec_out_dst_port;
+		}
+		sel.ips_icmp_type = io->ipsec_out_icmp_type;
+		sel.ips_icmp_code = io->ipsec_out_icmp_code;
+		sel.ips_is_icmp_inv_acq = 0;
+		if (af == AF_INET) {
+			sel.ips_local_addr_v4 = ipha->ipha_src;
+			sel.ips_remote_addr_v4 = ipha->ipha_dst;
+		} else {
+			sel.ips_local_addr_v6 = ip6h->ip6_src;
+			sel.ips_remote_addr_v6 = ip6h->ip6_dst;
+		}
+
 		extended = sadb_keysock_out(0);
 		if (extended != NULL) {
 			extended->b_cont = sadb_extended_acquire(&sel, pp, ap,
-			    seq, 0);
+			    tunnel_mode, seq, 0);
 			if (extended->b_cont == NULL) {
 				freeb(extended);
 				extended = NULL;
@@ -4324,7 +4643,7 @@ sadb_action_to_ecomb(uint8_t *start, uint8_t *limit, ipsec_action_t *act)
  */
 static mblk_t *
 sadb_extended_acquire(ipsec_selector_t *sel, ipsec_policy_t *pol,
-    ipsec_action_t *act, uint32_t seq, uint32_t pid)
+    ipsec_action_t *act, boolean_t tunnel_mode, uint32_t seq, uint32_t pid)
 {
 	mblk_t *mp;
 	sadb_msg_t *samsg;
@@ -4333,7 +4652,8 @@ sadb_extended_acquire(ipsec_selector_t *sel, ipsec_policy_t *pol,
 	sa_family_t af;
 	sadb_prop_t *eprop;
 	ipsec_action_t *ap, *an;
-	uint8_t proto;
+	ipsec_selkey_t *ipsl;
+	uint8_t proto, pfxlen;
 	uint16_t lport, rport;
 	uint32_t kmp, kmc;
 
@@ -4358,15 +4678,6 @@ sadb_extended_acquire(ipsec_selector_t *sel, ipsec_policy_t *pol,
 	mp = allocb(SADB_EXTENDED_ACQUIRE_SIZE, BPRI_HI);
 	if (mp == NULL)
 		return (NULL);
-	if (sel->ips_isv4) {
-		af = AF_INET;
-		saddrptr = (uint32_t *)(&sel->ips_local_addr_v4);
-		daddrptr = (uint32_t *)(&sel->ips_remote_addr_v4);
-	} else {
-		af = AF_INET6;
-		saddrptr = (uint32_t *)(&sel->ips_local_addr_v6);
-		daddrptr = (uint32_t *)(&sel->ips_remote_addr_v6);
-	}
 
 	start = mp->b_rptr;
 	end = start + SADB_EXTENDED_ACQUIRE_SIZE;
@@ -4384,32 +4695,103 @@ sadb_extended_acquire(ipsec_selector_t *sel, ipsec_policy_t *pol,
 	samsg->sadb_msg_seq = seq;
 	samsg->sadb_msg_pid = pid;
 
-	proto = sel->ips_protocol;
-	lport = sel->ips_local_port;
-	rport = sel->ips_remote_port;
+	if (tunnel_mode) {
+		/*
+		 * Form inner address extensions based NOT on the inner
+		 * selectors (i.e. the packet data), but on the policy's
+		 * selector key (i.e. the policy's selector information).
+		 *
+		 * NOTE:  The position of IPv4 and IPv6 addresses is the
+		 * same in ipsec_selkey_t (unless the compiler does very
+		 * strange things with unions, consult your local C language
+		 * lawyer for details).
+		 */
+		ipsl = &(pol->ipsp_sel->ipsl_key);
+		if (ipsl->ipsl_valid & IPSL_IPV4) {
+			af = AF_INET;
+			ASSERT(sel->ips_protocol == IPPROTO_ENCAP);
+			ASSERT(!(ipsl->ipsl_valid & IPSL_IPV6));
+		} else {
+			af = AF_INET6;
+			ASSERT(sel->ips_protocol == IPPROTO_IPV6);
+			ASSERT(ipsl->ipsl_valid & IPSL_IPV6);
+		}
 
-	/*
-	 * Unless our policy says "sa unique", drop port/proto
-	 * selectors, then add them back if policy rule includes them..
-	 */
+		if (ipsl->ipsl_valid & IPSL_LOCAL_ADDR) {
+			saddrptr = (uint32_t *)(&ipsl->ipsl_local);
+			pfxlen = ipsl->ipsl_local_pfxlen;
+		} else {
+			saddrptr = (uint32_t *)(&ipv6_all_zeros);
+			pfxlen = 0;
+		}
+		/* XXX What about ICMP type/code? */
+		lport = (ipsl->ipsl_valid & IPSL_LOCAL_PORT) ?
+		    ipsl->ipsl_lport : 0;
+		proto = (ipsl->ipsl_valid & IPSL_PROTOCOL) ?
+		    ipsl->ipsl_proto : 0;
 
-	if ((ap != NULL) && (!ap->ipa_want_unique)) {
+		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_INNER_SRC,
+		    af, saddrptr, lport, proto, pfxlen);
+		if (cur == NULL) {
+			freeb(mp);
+			return (NULL);
+		}
+
+		if (ipsl->ipsl_valid & IPSL_REMOTE_ADDR) {
+			daddrptr = (uint32_t *)(&ipsl->ipsl_remote);
+			pfxlen = ipsl->ipsl_remote_pfxlen;
+		} else {
+			daddrptr = (uint32_t *)(&ipv6_all_zeros);
+			pfxlen = 0;
+		}
+		/* XXX What about ICMP type/code? */
+		rport = (ipsl->ipsl_valid & IPSL_REMOTE_PORT) ?
+		    ipsl->ipsl_rport : 0;
+
+		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_INNER_DST,
+		    af, daddrptr, rport, proto, pfxlen);
+		if (cur == NULL) {
+			freeb(mp);
+			return (NULL);
+		}
+		/*
+		 * TODO  - if we go to 3408's dream of transport mode IP-in-IP
+		 * _with_ inner-packet address selectors, we'll need to further
+		 * distinguish tunnel mode here.  For now, having inner
+		 * addresses and/or ports is sufficient.
+		 *
+		 * Meanwhile, whack proto/ports to reflect IP-in-IP for the
+		 * outer addresses.
+		 */
+		proto = sel->ips_protocol;	/* Either _ENCAP or _IPV6 */
+		lport = rport = 0;
+	} else if ((ap != NULL) && (!ap->ipa_want_unique)) {
 		proto = 0;
 		lport = 0;
 		rport = 0;
 		if (pol != NULL) {
-			ipsec_selkey_t *psel = &pol->ipsp_sel->ipsl_key;
-			if (psel->ipsl_valid & IPSL_PROTOCOL)
-				proto = psel->ipsl_proto;
-			if (psel->ipsl_valid & IPSL_REMOTE_PORT)
-				rport = psel->ipsl_rport;
-			if (psel->ipsl_valid & IPSL_LOCAL_PORT)
-				lport = psel->ipsl_lport;
+			ipsl = &(pol->ipsp_sel->ipsl_key);
+			if (ipsl->ipsl_valid & IPSL_PROTOCOL)
+				proto = ipsl->ipsl_proto;
+			if (ipsl->ipsl_valid & IPSL_REMOTE_PORT)
+				rport = ipsl->ipsl_rport;
+			if (ipsl->ipsl_valid & IPSL_LOCAL_PORT)
+				lport = ipsl->ipsl_lport;
 		}
+	} else {
+		proto = sel->ips_protocol;
+		lport = sel->ips_local_port;
+		rport = sel->ips_remote_port;
 	}
 
+	af = sel->ips_isv4 ? AF_INET : AF_INET6;
+
+	/*
+	 * NOTE:  The position of IPv4 and IPv6 addresses is the same in
+	 * ipsec_selector_t.
+	 */
 	cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_SRC, af,
-	    saddrptr, lport, proto);
+	    (uint32_t *)(&sel->ips_local_addr_v6), lport, proto, 0);
 
 	if (cur == NULL) {
 		freeb(mp);
@@ -4417,7 +4799,7 @@ sadb_extended_acquire(ipsec_selector_t *sel, ipsec_policy_t *pol,
 	}
 
 	cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_DST, af,
-	    daddrptr, rport, proto);
+	    (uint32_t *)(&sel->ips_remote_addr_v6), rport, proto, 0);
 
 	if (cur == NULL) {
 		freeb(mp);
@@ -4490,30 +4872,73 @@ sadb_extended_acquire(ipsec_selector_t *sel, ipsec_policy_t *pol,
 	}
 
 	eprop->sadb_prop_len = SADB_8TO64(cur - (uint8_t *)eprop);
-	samsg->sadb_msg_len = SADB_8TO64(cur-start);
+	samsg->sadb_msg_len = SADB_8TO64(cur - start);
 	mp->b_wptr = cur;
 
 	return (mp);
 }
 
 /*
- * Generic setup of an ACQUIRE message.	 Caller sets satype.
+ * Generic setup of an RFC 2367 ACQUIRE message.  Caller sets satype.
+ *
+ * NOTE: This function acquires alg_lock as a side-effect if-and-only-if we
+ * succeed (i.e. return non-NULL).  Caller MUST release it.  This is to
+ * maximize code consolidation while preventing algorithm changes from messing
+ * with the callers finishing touches on the ACQUIRE itself.
  */
-uint8_t *
-sadb_setup_acquire(uint8_t *start, uint8_t *end, ipsacq_t *acqrec)
+mblk_t *
+sadb_setup_acquire(ipsacq_t *acqrec, uint8_t satype)
 {
+	uint_t allocsize;
+	mblk_t *pfkeymp, *msgmp;
 	sa_family_t af;
-	uint8_t *cur = start;
-	sadb_msg_t *samsg = (sadb_msg_t *)cur;
+	uint8_t *cur, *end;
+	sadb_msg_t *samsg;
 	uint16_t sport_typecode;
 	uint16_t dport_typecode;
 	uint8_t check_proto;
+	boolean_t tunnel_mode = (acqrec->ipsacq_inneraddrfam != 0);
 
-	cur += sizeof (sadb_msg_t);
-	if (cur > end)
+	ASSERT(MUTEX_HELD(&acqrec->ipsacq_lock));
+
+	pfkeymp = sadb_keysock_out(0);
+	if (pfkeymp == NULL)
 		return (NULL);
 
-	/* use the address length to find the address family */
+	/*
+	 * First, allocate a basic ACQUIRE message
+	 */
+	allocsize = sizeof (sadb_msg_t) + sizeof (sadb_address_t) +
+	    sizeof (sadb_address_t) + sizeof (sadb_prop_t);
+
+	/* Make sure there's enough to cover both AF_INET and AF_INET6. */
+	allocsize += 2 * sizeof (struct sockaddr_in6);
+
+	mutex_enter(&alg_lock);
+	/* NOTE:  The lock is now held through to this function's return. */
+	allocsize += ipsec_nalgs[IPSEC_ALG_AUTH] *
+	    ipsec_nalgs[IPSEC_ALG_ENCR] * sizeof (sadb_comb_t);
+
+	if (tunnel_mode) {
+		/* Tunnel mode! */
+		allocsize += 2 * sizeof (sadb_address_t);
+		/* Enough to cover both AF_INET and AF_INET6. */
+		allocsize += 2 * sizeof (struct sockaddr_in6);
+	}
+
+	msgmp = allocb(allocsize, BPRI_HI);
+	if (msgmp == NULL) {
+		freeb(pfkeymp);
+		mutex_exit(&alg_lock);
+		return (NULL);
+	}
+
+	pfkeymp->b_cont = msgmp;
+	cur = msgmp->b_rptr;
+	end = cur + allocsize;
+	samsg = (sadb_msg_t *)cur;
+	cur += sizeof (sadb_msg_t);
+
 	af = acqrec->ipsacq_addrfam;
 	switch (af) {
 	case AF_INET:
@@ -4527,11 +4952,13 @@ sadb_setup_acquire(uint8_t *start, uint8_t *end, ipsacq_t *acqrec)
 		cmn_err(CE_WARN,
 		    "sadb_setup_acquire:  corrupt ACQUIRE record.\n");
 		ASSERT(0);
+		mutex_exit(&alg_lock);
 		return (NULL);
 	}
 
 	samsg->sadb_msg_version = PF_KEY_V2;
 	samsg->sadb_msg_type = SADB_ACQUIRE;
+	samsg->sadb_msg_satype = satype;
 	samsg->sadb_msg_errno = 0;
 	samsg->sadb_msg_pid = 0;
 	samsg->sadb_msg_reserved = 0;
@@ -4539,7 +4966,7 @@ sadb_setup_acquire(uint8_t *start, uint8_t *end, ipsacq_t *acqrec)
 
 	ASSERT(MUTEX_HELD(&acqrec->ipsacq_lock));
 
-	if (acqrec->ipsacq_proto == check_proto) {
+	if ((acqrec->ipsacq_proto == check_proto) || tunnel_mode) {
 		sport_typecode = dport_typecode = 0;
 	} else {
 		sport_typecode = acqrec->ipsacq_srcport;
@@ -4547,15 +4974,34 @@ sadb_setup_acquire(uint8_t *start, uint8_t *end, ipsacq_t *acqrec)
 	}
 
 	cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_SRC, af,
-	    acqrec->ipsacq_srcaddr, sport_typecode, acqrec->ipsacq_proto);
+	    acqrec->ipsacq_srcaddr, sport_typecode, acqrec->ipsacq_proto, 0);
 
 	cur = sadb_make_addr_ext(cur, end, SADB_EXT_ADDRESS_DST, af,
-	    acqrec->ipsacq_dstaddr, dport_typecode, acqrec->ipsacq_proto);
+	    acqrec->ipsacq_dstaddr, dport_typecode, acqrec->ipsacq_proto, 0);
+
+	if (tunnel_mode) {
+		sport_typecode = acqrec->ipsacq_srcport;
+		dport_typecode = acqrec->ipsacq_dstport;
+		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_INNER_SRC,
+		    acqrec->ipsacq_inneraddrfam, acqrec->ipsacq_innersrc,
+		    sport_typecode, acqrec->ipsacq_inner_proto,
+		    acqrec->ipsacq_innersrcpfx);
+		cur = sadb_make_addr_ext(cur, end, SADB_X_EXT_ADDRESS_INNER_DST,
+		    acqrec->ipsacq_inneraddrfam, acqrec->ipsacq_innerdst,
+		    dport_typecode, acqrec->ipsacq_inner_proto,
+		    acqrec->ipsacq_innerdstpfx);
+	}
+
+	/* XXX Insert identity information here. */
+
+	/* XXXMLS Insert sensitivity information here. */
 
 	if (cur != NULL)
-		samsg->sadb_msg_len = SADB_8TO64(cur - start);
+		samsg->sadb_msg_len = SADB_8TO64(cur - msgmp->b_rptr);
+	else
+		mutex_exit(&alg_lock);
 
-	return (cur);
+	return (pfkeymp);
 }
 
 /*
@@ -4600,10 +5046,7 @@ sadb_getspi(keysock_in_t *ksi, uint32_t master_spi, int *diagnostic)
 
 	ssa = (struct sockaddr_in *)(src + 1);
 	ssa6 = (struct sockaddr_in6 *)ssa;
-	if (dsa->sin_family != ssa->sin_family) {
-		*diagnostic = SADB_X_DIAGNOSTIC_AF_MISMATCH;
-		return ((ipsa_t *)-1);
-	}
+	ASSERT(dsa->sin_family == ssa->sin_family);
 
 	srcaddr = ALL_ZEROES_PTR;
 	af = dsa->sin_family;
@@ -4836,7 +5279,7 @@ done:
  * running an authentication check on the sequence number passed in.
  * this takes into account packets that are below the replay window,
  * and collisions with already replayed packets.  Return B_TRUE if it
- * is okay to proceed, B_FALSE if this packet should be dropped immeidately.
+ * is okay to proceed, B_FALSE if this packet should be dropped immediately.
  * Assume same byte-ordering as sadb_replay_check.
  */
 boolean_t
@@ -4964,11 +5407,8 @@ ipsec_assocfailure(short mid, short sid, char level, ushort_t sl, char *fmt,
  * Fills in a reference to the policy, if any, from the conn, in *ppp
  * Releases a reference to the passed conn_t.
  */
-
-/* ARGSUSED */
 static void
-ipsec_conn_pol(ipsec_selector_t *sel, conn_t *connp, ipsec_policy_t **ppp,
-    ipsec_action_t **app)
+ipsec_conn_pol(ipsec_selector_t *sel, conn_t *connp, ipsec_policy_t **ppp)
 {
 	ipsec_policy_t	*pp;
 	ipsec_latch_t	*ipl = connp->conn_latch;
@@ -4989,7 +5429,7 @@ ipsec_conn_pol(ipsec_selector_t *sel, conn_t *connp, ipsec_policy_t **ppp,
  * Caller must release the reference.
  */
 static void
-ipsec_udp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp, ipsec_action_t **app)
+ipsec_udp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp)
 {
 	connf_t *connfp;
 	conn_t *connp = NULL;
@@ -5039,7 +5479,7 @@ ipsec_udp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp, ipsec_action_t **app)
 	CONN_INC_REF(connp);
 	mutex_exit(&connfp->connf_lock);
 
-	ipsec_conn_pol(sel, connp, ppp, app);
+	ipsec_conn_pol(sel, connp, ppp);
 }
 
 static conn_t *
@@ -5091,7 +5531,7 @@ ipsec_find_listen_conn(uint16_t *pptr, ipsec_selector_t *sel)
 }
 
 static void
-ipsec_tcp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp, ipsec_action_t **app)
+ipsec_tcp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp)
 {
 	connf_t 	*connfp;
 	conn_t		*connp;
@@ -5151,12 +5591,11 @@ ipsec_tcp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp, ipsec_action_t **app)
 			return;
 	}
 
-	ipsec_conn_pol(sel, connp, ppp, app);
+	ipsec_conn_pol(sel, connp, ppp);
 }
 
 static void
-ipsec_sctp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
-    ipsec_action_t **app)
+ipsec_sctp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp)
 {
 	conn_t		*connp;
 	uint32_t	ports;
@@ -5193,12 +5632,163 @@ ipsec_sctp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 	}
 	if (connp == NULL)
 		return;
-	ipsec_conn_pol(sel, connp, ppp, app);
+	ipsec_conn_pol(sel, connp, ppp);
+}
+
+/*
+ * Fill in a query for the SPD (in "sel") using two PF_KEY address extensions.
+ * Returns 0 or errno, and always sets *diagnostic to something appropriate
+ * to PF_KEY.
+ *
+ * NOTE:  For right now, this function (and ipsec_selector_t for that matter),
+ * ignore prefix lengths in the address extension.  Since we match on first-
+ * entered policies, this shouldn't matter.  Also, since we normalize prefix-
+ * set addresses to mask out the lower bits, we should get a suitable search
+ * key for the SPD anyway.  This is the function to change if the assumption
+ * about suitable search keys is wrong.
+ */
+static int
+ipsec_get_inverse_acquire_sel(ipsec_selector_t *sel, sadb_address_t *srcext,
+    sadb_address_t *dstext, int *diagnostic)
+{
+	struct sockaddr_in *src, *dst;
+	struct sockaddr_in6 *src6, *dst6;
+
+	*diagnostic = 0;
+
+	bzero(sel, sizeof (*sel));
+	sel->ips_protocol = srcext->sadb_address_proto;
+	dst = (struct sockaddr_in *)(dstext + 1);
+	if (dst->sin_family == AF_INET6) {
+		dst6 = (struct sockaddr_in6 *)dst;
+		src6 = (struct sockaddr_in6 *)(srcext + 1);
+		if (src6->sin6_family != AF_INET6) {
+			*diagnostic = SADB_X_DIAGNOSTIC_AF_MISMATCH;
+			return (EINVAL);
+		}
+		sel->ips_remote_addr_v6 = dst6->sin6_addr;
+		sel->ips_local_addr_v6 = src6->sin6_addr;
+		if (sel->ips_protocol == IPPROTO_ICMPV6) {
+			sel->ips_is_icmp_inv_acq = 1;
+		} else {
+			sel->ips_remote_port = dst6->sin6_port;
+			sel->ips_local_port = src6->sin6_port;
+		}
+		sel->ips_isv4 = B_FALSE;
+	} else {
+		src = (struct sockaddr_in *)(srcext + 1);
+		if (src->sin_family != AF_INET) {
+			*diagnostic = SADB_X_DIAGNOSTIC_AF_MISMATCH;
+			return (EINVAL);
+		}
+		sel->ips_remote_addr_v4 = dst->sin_addr.s_addr;
+		sel->ips_local_addr_v4 = src->sin_addr.s_addr;
+		if (sel->ips_protocol == IPPROTO_ICMP) {
+			sel->ips_is_icmp_inv_acq = 1;
+		} else {
+			sel->ips_remote_port = dst->sin_port;
+			sel->ips_local_port = src->sin_port;
+		}
+		sel->ips_isv4 = B_TRUE;
+	}
+	return (0);
+}
+
+/*
+ * We have encapsulation.
+ * - Lookup tun_t by address and look for an associated
+ *   tunnel policy
+ * - If there are inner selectors
+ *   - check ITPF_P_TUNNEL and ITPF_P_ACTIVE
+ *   - Look up tunnel policy based on selectors
+ * - Else
+ *   - Sanity check the negotation
+ *   - If appropriate, fall through to global policy
+ */
+static int
+ipsec_tun_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
+    sadb_address_t *innsrcext, sadb_address_t *inndstext, ipsec_tun_pol_t *itp,
+    int *diagnostic)
+{
+	int err;
+	ipsec_policy_head_t *polhead;
+
+	/* Check for inner selectors and act appropriately */
+
+	if (innsrcext != NULL) {
+		/* Inner selectors present */
+		ASSERT(inndstext != NULL);
+		if ((itp == NULL) ||
+		    (itp->itp_flags & (ITPF_P_ACTIVE | ITPF_P_TUNNEL)) !=
+		    (ITPF_P_ACTIVE | ITPF_P_TUNNEL)) {
+			/*
+			 * If inner packet selectors, we must have negotiate
+			 * tunnel and active policy.  If the tunnel has
+			 * transport-mode policy set on it, or has no policy,
+			 * fail.
+			 */
+			return (ENOENT);
+		} else {
+			/*
+			 * Reset "sel" to indicate inner selectors.  Pass
+			 * inner PF_KEY address extensions for this to happen.
+			 */
+			err = ipsec_get_inverse_acquire_sel(sel,
+			    innsrcext, inndstext, diagnostic);
+			if (err != 0) {
+				ITP_REFRELE(itp);
+				return (err);
+			}
+			/*
+			 * Now look for a tunnel policy based on those inner
+			 * selectors.  (Common code is below.)
+			 */
+		}
+	} else {
+		/* No inner selectors present */
+		if ((itp == NULL) || !(itp->itp_flags & ITPF_P_ACTIVE)) {
+			/*
+			 * Transport mode negotiation with no tunnel policy
+			 * configured - return to indicate a global policy
+			 * check is needed.
+			 */
+			if (itp != NULL) {
+				ITP_REFRELE(itp);
+			}
+			return (0);
+		} else if (itp->itp_flags & ITPF_P_TUNNEL) {
+			/* Tunnel mode set with no inner selectors. */
+			ITP_REFRELE(itp);
+			return (ENOENT);
+		}
+		/*
+		 * Else, this is a tunnel policy configured with ifconfig(1m)
+		 * or "negotiate transport" with ipsecconf(1m).  We have an
+		 * itp with policy set based on any match, so don't bother
+		 * changing fields in "sel".
+		 */
+	}
+
+	ASSERT(itp != NULL);
+	polhead = itp->itp_policy;
+	ASSERT(polhead != NULL);
+	rw_enter(&polhead->iph_lock, RW_READER);
+	*ppp = ipsec_find_policy_head(NULL, polhead, IPSEC_TYPE_INBOUND, sel);
+	rw_exit(&polhead->iph_lock);
+	ITP_REFRELE(itp);
+
+	/*
+	 * Don't default to global if we didn't find a matching policy entry.
+	 * Instead, send ENOENT, just like if we hit a transport-mode tunnel.
+	 */
+	if (*ppp == NULL)
+		return (ENOENT);
+
+	return (0);
 }
 
 static void
-ipsec_oth_pol(ipsec_selector_t *sel,
-    ipsec_policy_t **ppp, ipsec_action_t **app)
+ipsec_oth_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp)
 {
 	boolean_t	isv4 = sel->ips_isv4;
 	connf_t		*connfp;
@@ -5234,7 +5824,7 @@ ipsec_oth_pol(ipsec_selector_t *sel,
 	CONN_INC_REF(connp);
 	mutex_exit(&connfp->connf_lock);
 
-	ipsec_conn_pol(sel, connp, ppp, app);
+	ipsec_conn_pol(sel, connp, ppp);
 }
 
 /*
@@ -5242,6 +5832,7 @@ ipsec_oth_pol(ipsec_selector_t *sel,
  *
  * 1.) Current global policy.
  * 2.) An conn_t match depending on what all was passed in the extv[].
+ * 3.) A tunnel's policy head.
  * ...
  * N.) Other stuff TBD (e.g. identities)
  *
@@ -5256,77 +5847,143 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[])
 	int err;
 	int diagnostic;
 	sadb_address_t *srcext = (sadb_address_t *)extv[SADB_EXT_ADDRESS_SRC],
-	    *dstext = (sadb_address_t *)extv[SADB_EXT_ADDRESS_DST];
-	struct sockaddr_in *src, *dst;
-	struct sockaddr_in6 *src6, *dst6;
-	ipsec_policy_t *pp;
-	ipsec_action_t *ap;
-	ipsec_selector_t sel;
+	    *dstext = (sadb_address_t *)extv[SADB_EXT_ADDRESS_DST],
+	    *innsrcext = (sadb_address_t *)extv[SADB_X_EXT_ADDRESS_INNER_SRC],
+	    *inndstext = (sadb_address_t *)extv[SADB_X_EXT_ADDRESS_INNER_DST];
+	struct sockaddr_in6 *src, *dst;
+	struct sockaddr_in6 *isrc, *idst;
+	ipsec_tun_pol_t *itp = NULL;
+	ipsec_policy_t *pp = NULL;
+	ipsec_selector_t sel, isel;
 	mblk_t *retmp;
 
-	bzero(&sel, sizeof (sel));
-	sel.ips_protocol = srcext->sadb_address_proto;
-	dst = (struct sockaddr_in *)(dstext + 1);
-	if (dst->sin_family == AF_INET6) {
-		dst6 = (struct sockaddr_in6 *)dst;
-		src6 = (struct sockaddr_in6 *)(srcext + 1);
-		if (src6->sin6_family != AF_INET6) {
-			diagnostic = SADB_X_DIAGNOSTIC_AF_MISMATCH;
+	/* Normalize addresses */
+	if (sadb_addrcheck(NULL, (mblk_t *)samsg, (sadb_ext_t *)srcext, 0) ==
+	    KS_IN_ADDR_UNKNOWN) {
+		err = EINVAL;
+		diagnostic = SADB_X_DIAGNOSTIC_BAD_SRC;
+		goto bail;
+	}
+	src = (struct sockaddr_in6 *)(srcext + 1);
+	if (sadb_addrcheck(NULL, (mblk_t *)samsg, (sadb_ext_t *)dstext, 0) ==
+	    KS_IN_ADDR_UNKNOWN) {
+		err = EINVAL;
+		diagnostic = SADB_X_DIAGNOSTIC_BAD_DST;
+		goto bail;
+	}
+	dst = (struct sockaddr_in6 *)(dstext + 1);
+	if (src->sin6_family != dst->sin6_family) {
+		err = EINVAL;
+		diagnostic = SADB_X_DIAGNOSTIC_AF_MISMATCH;
+		goto bail;
+	}
+
+	/* Check for tunnel mode and act appropriately */
+	if (innsrcext != NULL) {
+		if (inndstext == NULL) {
 			err = EINVAL;
+			diagnostic = SADB_X_DIAGNOSTIC_MISSING_INNER_DST;
 			goto bail;
 		}
-		sel.ips_remote_addr_v6 = dst6->sin6_addr;
-		sel.ips_local_addr_v6 = src6->sin6_addr;
-		if (sel.ips_protocol == IPPROTO_ICMPV6) {
-			sel.ips_is_icmp_inv_acq = 1;
-		} else {
-			sel.ips_remote_port = dst6->sin6_port;
-			sel.ips_local_port = src6->sin6_port;
-		}
-		sel.ips_isv4 = B_FALSE;
-	} else {
-		src = (struct sockaddr_in *)(srcext + 1);
-		if (src->sin_family != AF_INET) {
-			diagnostic = SADB_X_DIAGNOSTIC_AF_MISMATCH;
+		if (sadb_addrcheck(NULL, (mblk_t *)samsg,
+			(sadb_ext_t *)innsrcext, 0) == KS_IN_ADDR_UNKNOWN) {
 			err = EINVAL;
+			diagnostic = SADB_X_DIAGNOSTIC_MALFORMED_INNER_SRC;
 			goto bail;
 		}
-		sel.ips_remote_addr_v4 = dst->sin_addr.s_addr;
-		sel.ips_local_addr_v4 = src->sin_addr.s_addr;
-		if (sel.ips_protocol == IPPROTO_ICMP) {
-			sel.ips_is_icmp_inv_acq = 1;
-		} else {
-			sel.ips_remote_port = dst->sin_port;
-			sel.ips_local_port = src->sin_port;
+		isrc = (struct sockaddr_in6 *)(innsrcext + 1);
+		if (sadb_addrcheck(NULL, (mblk_t *)samsg,
+			(sadb_ext_t *)inndstext, 0) == KS_IN_ADDR_UNKNOWN) {
+			err = EINVAL;
+			diagnostic = SADB_X_DIAGNOSTIC_MALFORMED_INNER_DST;
+			goto bail;
 		}
-		sel.ips_isv4 = B_TRUE;
+		idst = (struct sockaddr_in6 *)(inndstext + 1);
+		if (isrc->sin6_family != idst->sin6_family) {
+			err = EINVAL;
+			diagnostic = SADB_X_DIAGNOSTIC_INNER_AF_MISMATCH;
+			goto bail;
+		}
+		if (isrc->sin6_family != AF_INET &&
+		    isrc->sin6_family != AF_INET6) {
+			err = EINVAL;
+			diagnostic = SADB_X_DIAGNOSTIC_BAD_INNER_SRC_AF;
+			goto bail;
+		}
+	} else if (inndstext != NULL) {
+			err = EINVAL;
+			diagnostic = SADB_X_DIAGNOSTIC_MISSING_INNER_SRC;
+			goto bail;
+	}
+
+	/* Get selectors first, based on outer addresses */
+	err = ipsec_get_inverse_acquire_sel(&sel, srcext, dstext, &diagnostic);
+	if (err != 0)
+		goto bail;
+
+	/* Check for tunnel mode mismatches. */
+	if (innsrcext != NULL &&
+	    ((isrc->sin6_family == AF_INET &&
+		sel.ips_protocol != IPPROTO_ENCAP && sel.ips_protocol != 0) ||
+		(isrc->sin6_family == AF_INET6 &&
+		    sel.ips_protocol != IPPROTO_IPV6 &&
+		    sel.ips_protocol != 0))) {
+		err = EPROTOTYPE;
+		goto bail;
 	}
 
 	/*
 	 * Okay, we have the addresses and other selector information.
 	 * Let's first find a conn...
 	 */
-	pp = NULL; ap = NULL;
+	pp = NULL;
 	switch (sel.ips_protocol) {
 	case IPPROTO_TCP:
-		ipsec_tcp_pol(&sel, &pp, &ap);
+		ipsec_tcp_pol(&sel, &pp);
 		break;
 	case IPPROTO_UDP:
-		ipsec_udp_pol(&sel, &pp, &ap);
+		ipsec_udp_pol(&sel, &pp);
 		break;
 	case IPPROTO_SCTP:
-		ipsec_sctp_pol(&sel, &pp, &ap);
+		ipsec_sctp_pol(&sel, &pp);
+		break;
+	case IPPROTO_ENCAP:
+	case IPPROTO_IPV6:
+		rw_enter(&itp_get_byaddr_rw_lock, RW_READER);
+		/*
+		 * Assume sel.ips_remote_addr_* has the right address at
+		 * that exact position.
+		 */
+		itp = itp_get_byaddr((uint32_t *)(&sel.ips_local_addr_v6),
+		    (uint32_t *)(&sel.ips_remote_addr_v6), src->sin6_family);
+		rw_exit(&itp_get_byaddr_rw_lock);
+		if (innsrcext == NULL) {
+			/*
+			 * Transport-mode tunnel, make sure we fake out isel
+			 * to contain something based on the outer protocol.
+			 */
+			bzero(&isel, sizeof (isel));
+			isel.ips_isv4 = (sel.ips_protocol == IPPROTO_ENCAP);
+		} /* Else isel is initialized by ipsec_tun_pol(). */
+		err = ipsec_tun_pol(&isel, &pp, innsrcext, inndstext, itp,
+		    &diagnostic);
+		/*
+		 * NOTE:  isel isn't used for now, but in RFC 430x IPsec, it
+		 * may be.
+		 */
+		if (err != 0)
+			goto bail;
 		break;
 	default:
-		ipsec_oth_pol(&sel, &pp, &ap);
+		ipsec_oth_pol(&sel, &pp);
 		break;
 	}
 
 	/*
-	 * If we didn't find a matching conn_t, take a look in the global
-	 * policy.
+	 * If we didn't find a matching conn_t or other policy head, take a
+	 * look in the global policy.
 	 */
-	if ((pp == NULL) && (ap == NULL)) {
+	if (pp == NULL) {
 		pp = ipsec_find_policy(IPSEC_TYPE_OUTBOUND, NULL, NULL, &sel);
 		if (pp == NULL) {
 			/* There's no global policy. */
@@ -5341,24 +5998,22 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[])
 	 * message based on that, fix fields where appropriate,
 	 * and return the message.
 	 */
-	retmp = sadb_extended_acquire(&sel, pp, ap, samsg->sadb_msg_seq,
-	    samsg->sadb_msg_pid);
+	retmp = sadb_extended_acquire(&sel, pp, NULL,
+	    (itp != NULL && (itp->itp_flags & ITPF_P_TUNNEL)),
+	    samsg->sadb_msg_seq, samsg->sadb_msg_pid);
 	if (pp != NULL) {
 		IPPOL_REFRELE(pp);
-	}
-	if (ap != NULL) {
-		IPACT_REFRELE(ap);
 	}
 	if (retmp != NULL) {
 		return (retmp);
 	} else {
 		err = ENOMEM;
 		diagnostic = 0;
-	bail:
-		samsg->sadb_msg_errno = (uint8_t)err;
-		samsg->sadb_x_msg_diagnostic = (uint16_t)diagnostic;
-		return (NULL);
 	}
+bail:
+	samsg->sadb_msg_errno = (uint8_t)err;
+	samsg->sadb_x_msg_diagnostic = (uint16_t)diagnostic;
+	return (NULL);
 }
 
 /*

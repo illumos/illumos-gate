@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,7 +74,9 @@
 #include <net/if_dl.h>
 #include <inet/ip_if.h>
 #include <sys/strsun.h>
+#include <inet/ipdrop.h>
 #include <inet/tun.h>
+#include <inet/ipsec_impl.h>
 
 
 #include <sys/conf.h>
@@ -103,21 +104,23 @@ static void	tun_timeout_handler(void *);
 static int	tun_rproc(queue_t *, mblk_t *);
 static int	tun_wproc_mdata(queue_t *, mblk_t *);
 static int	tun_wproc(queue_t *, mblk_t  *);
-static int	tun_rdata_v4(queue_t *, mblk_t *);
-static int	tun_rdata_v6(queue_t *, mblk_t *);
-static int	tun_send_sec_req(queue_t *);
+static int	tun_rdata(queue_t *, mblk_t *, mblk_t *, tun_t *, uint_t);
+static int	tun_rdata_v4(queue_t *, mblk_t *, mblk_t *, tun_t *);
+static int	tun_rdata_v6(queue_t *, mblk_t *, mblk_t *, tun_t *);
+static int	tun_set_sec_simple(tun_t *, ipsec_req_t *);
 static void	tun_send_ire_req(queue_t *);
 static uint32_t	tun_update_link_mtu(queue_t *, uint32_t, boolean_t);
 static mblk_t	*tun_realloc_mblk(queue_t *, mblk_t *, size_t, mblk_t *,
     boolean_t);
 static void	tun_recover(queue_t *, mblk_t *, size_t);
-static void	tun_rem_list(tun_t *);
-static void	tun_rput_icmp_err_v4(queue_t *, mblk_t *);
-static void	icmp_ricmp_err_v4_v4(queue_t *, mblk_t *);
-static void	icmp_ricmp_err_v6_v4(queue_t *, mblk_t *);
-static void	icmp_ricmp_err_v4_v6(queue_t *, mblk_t *, icmp6_t *);
-static void	icmp_ricmp_err_v6_v6(queue_t *, mblk_t *, icmp6_t *);
-static void	tun_rput_icmp_err_v6(queue_t *, mblk_t *);
+static void	tun_rem_ppa_list(tun_t *);
+static void	tun_rem_tun_byaddr_list(tun_t *);
+static void	tun_rput_icmp_err_v4(queue_t *, mblk_t *, mblk_t *);
+static void	icmp_ricmp_err_v4_v4(queue_t *, mblk_t *, mblk_t *);
+static void	icmp_ricmp_err_v6_v4(queue_t *, mblk_t *, mblk_t *);
+static void	icmp_ricmp_err_v4_v6(queue_t *, mblk_t *, mblk_t *, icmp6_t *);
+static void	icmp_ricmp_err_v6_v6(queue_t *, mblk_t *, mblk_t *, icmp6_t *);
+static void	tun_rput_icmp_err_v6(queue_t *, mblk_t *, mblk_t *);
 static int	tun_rput_tpi(queue_t *, mblk_t *);
 static int	tun_send_bind_req(queue_t *);
 static void	tun_statinit(tun_stats_t *, char *);
@@ -129,6 +132,7 @@ static int	tun_wput_dlpi(queue_t *, mblk_t *);
 static int	tun_wputnext_v6(queue_t *, mblk_t *);
 static int	tun_wputnext_v4(queue_t *, mblk_t *);
 static boolean_t tun_limit_value_v6(queue_t *, mblk_t *, ip6_t *, int *);
+static void	tun_freemsg_chain(mblk_t *, uint64_t *);
 
 /* module's defined constants, globals and data structures */
 
@@ -174,7 +178,6 @@ int8_t tun_debug = TUN0DBG;
 #endif /* TUN_DEBUG */
 
 #define	TUN_RECOVER_WAIT		(1*hz)
-
 
 /* canned DL_INFO_ACK  - adjusted based on tunnel type */
 dl_info_ack_t infoack = {
@@ -250,6 +253,14 @@ static struct tun_encap_limit tun_limit_init_upper_v6 = {
 static kmutex_t		tun_global_lock;
 static tun_stats_t	*tun_ppa_list[TUN_PPA_SZ];
 static tun_stats_t	*tun_add_stat(queue_t *);
+
+#define	TUN_T_SZ	251
+#define	TUN_BYADDR_LIST_HASH(a) (((a).s6_addr32[3]) % (TUN_T_SZ))
+
+tun_t *tun_byaddr_list[TUN_T_SZ];
+static void tun_add_byaddr(tun_t *);
+static ipsec_tun_pol_t *itp_get_byaddr_fn(uint32_t *, uint32_t *, int);
+
 static boolean_t 	tun_do_fastpath = B_TRUE;
 static ipaddr_t		relay_rtr_addr_v4 = INADDR_ANY;
 
@@ -319,6 +330,9 @@ _init(void)
 	if (rc == 0) {
 		mutex_init(&tun_global_lock, NULL, MUTEX_DEFAULT, NULL);
 	}
+	rw_enter(&itp_get_byaddr_rw_lock, RW_WRITER);
+	itp_get_byaddr = itp_get_byaddr_fn;
+	rw_exit(&itp_get_byaddr_rw_lock);
 	return (rc);
 }
 
@@ -330,6 +344,9 @@ _fini(void)
 	rc = mod_remove(&modlinkage);
 	if (rc == 0) {
 		mutex_destroy(&tun_global_lock);
+		rw_enter(&itp_get_byaddr_rw_lock, RW_WRITER);
+		itp_get_byaddr = itp_get_byaddr_dummy;
+		rw_exit(&itp_get_byaddr_rw_lock);
 	}
 	return (rc);
 }
@@ -350,6 +367,8 @@ int
 tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 {
 	tun_t	*atp;
+	mblk_t *hello;
+	ipsec_info_t *ii;
 
 	if (q->q_ptr != NULL) {
 		/* re-open of an already open instance */
@@ -362,11 +381,16 @@ tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	tun1dbg(("tun_open\n"));
 
+	hello = allocb(sizeof (ipsec_info_t), BPRI_HI);
+	if (hello == NULL)
+		return (ENOMEM);
+
 	/* allocate per-instance structure */
 	atp = kmem_zalloc(sizeof (tun_t), KM_SLEEP);
 
 	atp->tun_state = DL_UNATTACHED;
 	atp->tun_dev = *devp;
+	atp->tun_zoneid = crgetzoneid(credp);
 
 	/*
 	 * Based on the lower version of IP, initialize stuff that
@@ -437,7 +461,15 @@ tun_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	}
 
 	q->q_ptr = WR(q)->q_ptr = atp;
+	atp->tun_wq = WR(q);
+	tun_add_byaddr(atp);
+	ii = (ipsec_info_t *)hello->b_rptr;
+	hello->b_wptr = hello->b_rptr + sizeof (*ii);
+	hello->b_datap->db_type = M_CTL;
+	ii->ipsec_info_type = TUN_HELLO;
+	ii->ipsec_info_len = sizeof (*ii);
 	qprocson(q);
+	putnext(WR(q), hello);
 	return (0);
 }
 
@@ -454,10 +486,19 @@ tun_close(queue_t *q, int flag, cred_t *cred_p)
 
 	qprocsoff(q);
 
+	/* NOTE:  tun_rem_ppa_list() may unlink tun_itp from its AVL tree. */
 	if (atp->tun_stats != NULL)
-		tun_rem_list(atp);
+		tun_rem_ppa_list(atp);
+
+	if (atp->tun_itp != NULL) {
+		/* In brackets because of ITP_REFRELE's brackets. */
+		ITP_REFRELE(atp->tun_itp);
+	}
 
 	mutex_destroy(&atp->tun_lock);
+
+	/* remove tun_t from global list */
+	tun_rem_tun_byaddr_list(atp);
 
 	/* free per-instance struct  */
 	kmem_free(atp, sizeof (tun_t));
@@ -756,6 +797,200 @@ tun_senderrack(queue_t *q, mblk_t *mp, t_uscalar_t prim, t_uscalar_t dl_err,
 }
 
 /*
+ * Free all messages in an mblk chain and optionally collect
+ * byte-counter stats.  Caller responsible for per-packet stats
+ */
+static void
+tun_freemsg_chain(mblk_t *mp, uint64_t *bytecount)
+{
+	mblk_t *mpnext;
+	while (mp != NULL) {
+		ASSERT(mp->b_prev == NULL);
+		mpnext = mp->b_next;
+		mp->b_next = NULL;
+		if (bytecount != NULL)
+			atomic_add_64(bytecount, (int64_t)msgdsize(mp));
+		freemsg(mp);
+		mp = mpnext;
+	}
+}
+
+/*
+ * Send all messages in a chain of mblk chains and optionally collect
+ * byte-counter stats.  Caller responsible for per-packet stats, and insuring
+ * mp is always non-NULL.
+ *
+ * This is a macro so we can save stack.  Assume the caller function
+ * has local-variable "nmp" as a placeholder.  Define two versions, one with
+ * byte-counting stats and one without.
+ */
+#define	TUN_PUTMSG_CHAIN_STATS(q, mp, nmp, bytecount) \
+	(nmp) = NULL; \
+	ASSERT((mp) != NULL); \
+	do { \
+		if ((nmp) != NULL) \
+			putnext(q, (nmp)); \
+		ASSERT((mp)->b_prev == NULL); \
+		(nmp) = (mp); \
+		(mp) = (mp)->b_next; \
+		(nmp)->b_next = NULL; \
+		atomic_add_64(bytecount, (int64_t)msgdsize(nmp)); \
+	} while ((mp) != NULL); \
+\
+	putnext((q), (nmp))  /* trailing semicolon provided by instantiator. */
+
+#define	TUN_PUTMSG_CHAIN(q, mp, nmp) \
+	(nmp) = NULL; \
+	ASSERT((mp) != NULL); \
+	do { \
+		if ((nmp) != NULL) \
+			putnext(q, (nmp)); \
+		ASSERT((mp)->b_prev == NULL); \
+		(nmp) = (mp); \
+		(mp) = (mp)->b_next; \
+		(nmp)->b_next = NULL; \
+	} while ((mp) != NULL); \
+\
+	putnext((q), (nmp))  /* trailing semicolon provided by instantiator. */
+
+/*
+ * Macro that not only checks tun_itp, but also sees if one got loaded
+ * via ipsecconf(1m)/PF_POLICY behind our backs.  Note the sleazy update of
+ * (tun)->tun_itp_gen so we don't lose races with other possible updates via
+ * PF_POLICY.
+ */
+#define	tun_policy_present(tun)	(((tun)->tun_itp != NULL) || \
+	(((tun)->tun_itp_gen < tunnel_policy_gen) && \
+	    ((tun)->tun_itp_gen = tunnel_policy_gen) && \
+	    (((tun)->tun_itp = get_tunnel_policy((tun)->tun_lifname)) != NULL)))
+
+/*
+ * Search tun_byaddr_list for occurrence of tun_t with matching
+ * inner addresses.  This function does not take into account
+ * prefixes.  Possibly we could generalize this function in the
+ * future with V6_MASK_EQ() and pass in an all 1's prefix for IP
+ * address matches.
+ * Returns NULL on no match.
+ * This function is not directly called - it's assigned into itp_get_byaddr().
+ */
+static ipsec_tun_pol_t *
+itp_get_byaddr_fn(uint32_t *lin, uint32_t *fin, int af)
+{
+	tun_t	*tun_list;
+	uint_t index;
+	in6_addr_t lmapped, fmapped, *laddr, *faddr;
+
+	if (af == AF_INET) {
+		laddr = &lmapped;
+		faddr = &fmapped;
+		IN6_INADDR_TO_V4MAPPED((struct in_addr *)lin, laddr);
+		IN6_INADDR_TO_V4MAPPED((struct in_addr *)fin, faddr);
+	} else {
+		laddr = (in6_addr_t *)lin;
+		faddr = (in6_addr_t *)fin;
+	}
+
+	index = TUN_BYADDR_LIST_HASH(*faddr);
+
+	/*
+	 * it's ok to grab global lock while holding tun_lock/perimeter
+	 */
+	mutex_enter(&tun_global_lock);
+
+	/*
+	 * walk through list of tun_t looking for a match of
+	 * inner addresses.  Addresses are inserted with
+	 * IN6_IPADDR_TO_V4MAPPED(), so v6 matching works for
+	 * all cases.
+	 */
+	for (tun_list = tun_byaddr_list[index]; tun_list;
+	    tun_list = tun_list->tun_next) {
+		if (IN6_ARE_ADDR_EQUAL(&tun_list->tun_laddr, laddr) &&
+		    IN6_ARE_ADDR_EQUAL(&tun_list->tun_faddr, faddr)) {
+			ipsec_tun_pol_t *itp;
+
+			if (!tun_policy_present(tun_list)) {
+				tun1dbg(("itp_get_byaddr: No IPsec policy on "
+				    "matching tun_t instance %p/%s\n",
+				    (void *)tun_list, tun_list->tun_lifname));
+				continue;
+			}
+			tun1dbg(("itp_get_byaddr: Found matching tun_t %p with "
+			    "IPsec policy\n", (void *)tun_list));
+			mutex_enter(&tun_list->tun_itp->itp_lock);
+			itp = tun_list->tun_itp;
+			mutex_exit(&tun_global_lock);
+			ITP_REFHOLD(itp);
+			mutex_exit(&itp->itp_lock);
+			tun1dbg(("itp_get_byaddr: Found itp %p \n",
+			    (void *)itp));
+			return (itp);
+		}
+	}
+
+	/* didn't find one, return zilch */
+
+	tun1dbg(("itp_get_byaddr: No matching tunnel instances with policy\n"));
+	mutex_exit(&tun_global_lock);
+	return (NULL);
+}
+
+/*
+ * Search tun_byaddr_list for occurrence of tun_t, same upper and lower stream,
+ * and same type (6to4 vs automatic vs configured)
+ * If none is found, insert this tun entry.
+ */
+static void
+tun_add_byaddr(tun_t *atp)
+{
+	tun_t	*tun_list;
+	t_uscalar_t	ppa = atp->tun_ppa;
+	uint_t	mask = atp->tun_flags & (TUN_LOWER_MASK | TUN_UPPER_MASK);
+	uint_t	tun_type = (atp->tun_flags & (TUN_AUTOMATIC | TUN_6TO4));
+	uint_t index = TUN_BYADDR_LIST_HASH(atp->tun_faddr);
+
+	tun1dbg(("tun_add_byaddr: index = %d\n", index));
+
+	ASSERT(atp->tun_next == NULL);
+	/*
+	 * it's ok to grab global lock while holding tun_lock/perimeter
+	 */
+	mutex_enter(&tun_global_lock);
+
+	/*
+	 * walk through list of tun_t looking for a match of
+	 * ppa, same upper and lower stream and same tunnel type
+	 * (automatic or configured).
+	 * There shouldn't be all that many tunnels, so a sequential
+	 * search of the bucket should be fine.
+	 */
+	for (tun_list = tun_byaddr_list[index]; tun_list;
+	    tun_list = tun_list->tun_next) {
+		if (tun_list->tun_ppa == ppa &&
+		    ((tun_list->tun_flags & (TUN_LOWER_MASK |
+		    TUN_UPPER_MASK)) == mask) &&
+		    ((tun_list->tun_flags & (TUN_AUTOMATIC | TUN_6TO4)) ==
+		    tun_type)) {
+			tun1dbg(("tun_add_byaddr: tun 0x%p Found ppa %d " \
+			    "tun_stats 0x%p\n", (void *)atp, ppa,
+			    (void *)tun_list));
+			tun1dbg(("tun_add_byaddr: Nothing to do."));
+			mutex_exit(&tun_global_lock);
+			return;
+		}
+	}
+
+	/* didn't find one, throw it in the global list */
+
+	atp->tun_next = tun_byaddr_list[index];
+	atp->tun_ptpn = &(tun_byaddr_list[index]);
+	if (tun_byaddr_list[index] != NULL)
+		tun_byaddr_list[index]->tun_ptpn = &(atp->tun_next);
+	tun_byaddr_list[index] = atp;
+	mutex_exit(&tun_global_lock);
+}
+
+/*
  * Search tun_ppa_list for occurrence of tun_ppa, same lower stream,
  * and same type (6to4 vs automatic vs configured)
  * If none is found, insert this tun entry and create a new kstat for
@@ -778,7 +1013,7 @@ tun_add_stat(queue_t *q)
 
 	ASSERT(atp->tun_stats == NULL);
 
-	ASSERT(atp->tun_next == NULL);
+	ASSERT(atp->tun_kstat_next == NULL);
 	/*
 	 * it's ok to grab global lock while holding tun_lock/perimeter
 	 */
@@ -804,16 +1039,27 @@ tun_add_stat(queue_t *q)
 			mutex_exit(&tun_global_lock);
 			ASSERT(tun_list->ts_refcnt > 0);
 			tun_list->ts_refcnt++;
-			ASSERT(atp->tun_next == NULL);
+			ASSERT(atp->tun_kstat_next == NULL);
 			ASSERT(atp != tun_list->ts_atp);
 			/*
 			 * add this tunnel instance to head of list
 			 * of tunnels referencing this kstat structure
 			 */
-			atp->tun_next = tun_list->ts_atp;
+			atp->tun_kstat_next = tun_list->ts_atp;
 			tun_list->ts_atp = atp;
 			atp->tun_stats = tun_list;
 			mutex_exit(&tun_list->ts_lock);
+
+			/*
+			 * Check for IPsec tunnel policy pointer, if it hasn't
+			 * been set already.  If we call get_tunnel_policy()
+			 * and return NULL, there's none configured.
+			 */
+			if (atp->tun_lifname[0] != '\0' &&
+			    atp->tun_itp == NULL) {
+				atp->tun_itp =
+				    get_tunnel_policy(atp->tun_lifname);
+			}
 			return (tun_list);
 		}
 	}
@@ -833,7 +1079,7 @@ tun_add_stat(queue_t *q)
 		tun_stat->ts_next = tun_ppa_list[index];
 		tun_ppa_list[index] = tun_stat;
 		tun_stat->ts_atp = atp;
-		atp->tun_next = NULL;
+		atp->tun_kstat_next = NULL;
 		atp->tun_stats = tun_stat;
 		mutex_exit(&tun_global_lock);
 		tun_statinit(tun_stat, q->q_qinfo->qi_minfo->mi_idname);
@@ -844,11 +1090,34 @@ tun_add_stat(queue_t *q)
 }
 
 /*
+ * remove tun from tun_byaddr_list
+ * called either holding tun_lock or in perimeter
+ */
+static void
+tun_rem_tun_byaddr_list(tun_t *atp)
+{
+	mutex_enter(&tun_global_lock);
+
+	/*
+	 * remove tunnel instance from list of tun_t
+	 */
+	*(atp->tun_ptpn) = atp->tun_next;
+	if (atp->tun_next != NULL) {
+		atp->tun_next->tun_ptpn = atp->tun_ptpn;
+		atp->tun_next = NULL;
+	}
+	atp->tun_ptpn = NULL;
+
+	ASSERT(atp->tun_next == NULL);
+	mutex_exit(&tun_global_lock);
+}
+
+/*
  * remove tun from tun_ppa_list
  * called either holding tun_lock or in perimeter
  */
 static void
-tun_rem_list(tun_t *atp)
+tun_rem_ppa_list(tun_t *atp)
 {
 	uint_t index = TUN_LIST_HASH(atp->tun_ppa);
 	tun_stats_t	*tun_stat = atp->tun_stats;
@@ -865,16 +1134,20 @@ tun_rem_list(tun_t *atp)
 	tun_stat->ts_refcnt--;
 
 	/*
-	 * If this is the last instance, delete the tun_stat
+	 * If this is the last instance, delete the tun_stat AND unlink the
+	 * ipsec_tun_pol_t from the AVL tree.
 	 */
 	if (tun_stat->ts_refcnt == 0) {
 		kstat_t		*tksp;
 
-		tun1dbg(("tun_rem_list: tun 0x%p Last ref ppa %d tun_stat " \
-		    "0x%p\n", (void *)atp, tun_stat->ts_ppa,
+		tun1dbg(("tun_rem_ppa_list: tun 0x%p Last ref ppa %d tun_stat" \
+		    " 0x%p\n", (void *)atp, tun_stat->ts_ppa,
 		    (void *)tun_stat));
 
-		ASSERT(atp->tun_next == NULL);
+		if (atp->tun_itp != NULL)
+			itp_unlink(atp->tun_itp);
+
+		ASSERT(atp->tun_kstat_next == NULL);
 		for (tun_list = &tun_ppa_list[index]; *tun_list;
 		    tun_list = &(*tun_list)->ts_next) {
 			if (tun_stat == *tun_list) {
@@ -894,10 +1167,10 @@ tun_rem_list(tun_t *atp)
 	}
 	mutex_exit(&tun_global_lock);
 
-	tun1dbg(("tun_rem_list: tun 0x%p Removing ref ppa %d tun_stat 0x%p\n",
-	    (void *)atp, tun_stat->ts_ppa, (void *)tun_stat));
+	tun1dbg(("tun_rem_ppa_list: tun 0x%p Removing ref ppa %d tun_stat " \
+	    "0x%p\n", (void *)atp, tun_stat->ts_ppa, (void *)tun_stat));
 
-	ASSERT(tun_stat->ts_atp->tun_next != NULL);
+	ASSERT(tun_stat->ts_atp->tun_kstat_next != NULL);
 
 	/*
 	 * remove tunnel instance from list of tunnels referencing
@@ -905,15 +1178,15 @@ tun_rem_list(tun_t *atp)
 	 * sequentially
 	 */
 	for (at_list = &tun_stat->ts_atp; *at_list;
-	    at_list = &(*at_list)->tun_next) {
+	    at_list = &(*at_list)->tun_kstat_next) {
 		if (atp == *at_list) {
-			*at_list = atp->tun_next;
-			atp->tun_next = NULL;
+			*at_list = atp->tun_kstat_next;
+			atp->tun_kstat_next = NULL;
 			break;
 		}
 	}
 	ASSERT(tun_stat->ts_atp != NULL);
-	ASSERT(atp->tun_next == NULL);
+	ASSERT(atp->tun_kstat_next == NULL);
 	mutex_exit(&tun_stat->ts_lock);
 }
 
@@ -1035,7 +1308,7 @@ tun_wput_dlpi_other(queue_t *q, mblk_t *mp)
 		 * for this instance
 		 */
 		if (atp->tun_stats) {
-			tun_rem_list(atp);
+			tun_rem_ppa_list(atp);
 			tun1dbg(("tun_wput_dlpi_other: deleting kstat"));
 		}
 		tun_sendokack(q, mp, prim);
@@ -1465,6 +1738,7 @@ tun_sparam(queue_t *q, mblk_t *mp)
 				goto nak;
 			}
 			atp->tun_ipha.ipha_dst = sin->sin_addr.s_addr;
+			/* Remove from previous hash bucket */
 			IN6_IPADDR_TO_V4MAPPED(sin->sin_addr.s_addr,
 			    &atp->tun_faddr);
 		} else if (ta->ifta_saddr.ss_family == AF_INET6) {
@@ -1481,6 +1755,7 @@ tun_sparam(queue_t *q, mblk_t *mp)
 				goto nak;
 			}
 
+			/* Remove from previous hash bucket */
 			atp->tun_ip6h.ip6_dst = atp->tun_faddr =
 			    sin6->sin6_addr;
 		} else {
@@ -1493,6 +1768,9 @@ tun_sparam(queue_t *q, mblk_t *mp)
 		 * was good.
 		 */
 		atp->tun_flags |= TUN_DST;
+		/* tun_faddr changed, move to proper hash bucket */
+		tun_rem_tun_byaddr_list(atp);
+		tun_add_byaddr(atp);
 	}
 
 	if (new && (ta->ifta_flags & IFTUN_HOPLIMIT)) {
@@ -1541,9 +1819,13 @@ tun_sparam(queue_t *q, mblk_t *mp)
 		}
 	}
 
-	if (ta->ifta_flags & IFTUN_SECURITY) {
-		ipsec_req_t *ipsr;
-
+	/*
+	 * If we passed in IFTUN_COMPLEX_SECURITY, do not do anything.  This
+	 * allows us to let dumb ifconfig(1m)-like apps reflect what they see
+	 * without a penalty.
+	 */
+	if ((ta->ifta_flags & (IFTUN_SECURITY | IFTUN_COMPLEX_SECURITY)) ==
+	    IFTUN_SECURITY) {
 		/* Can't set security properties for automatic tunnels. */
 		if (atp->tun_flags & (TUN_AUTOMATIC | TUN_6TO4)) {
 			uerr = EINVAL;
@@ -1552,19 +1834,23 @@ tun_sparam(queue_t *q, mblk_t *mp)
 
 		/*
 		 * The version number checked out, so just cast
-		 * iftr_secinfo to an ipsr.
-		 *
-		 * Also pay attention to the iftr_secinfo.
+		 * ifta_secinfo to an ipsr.
 		 */
-
-		ipsr = (ipsec_req_t *)(&ta->ifta_secinfo);
-		atp->tun_secinfo = *ipsr;
-		atp->tun_flags |= TUN_SECURITY;
-		/*
-		 * Do setting of security options after T_BIND_ACK
-		 * happens.  If there is no T_BIND_ACK, however,
-		 * see below.
-		 */
+		if (ipsec_loaded()) {
+			uerr = tun_set_sec_simple(atp,
+			    (ipsec_req_t *)&ta->ifta_secinfo);
+		} else {
+			if (ipsec_failed()) {
+				uerr = EPROTONOSUPPORT;
+				goto nak;
+			}
+			/* Otherwise, try again later and load IPsec. */
+			(void) putq(q, mp);
+			ipsec_loader_loadnow();
+			return;
+		}
+		if (uerr != 0)
+			goto nak;
 	}
 
 	mp->b_datap->db_type = M_IOCACK;
@@ -1587,22 +1873,6 @@ tun_sparam(queue_t *q, mblk_t *mp)
 			atp->tun_iocmp = NULL;
 			goto nak;
 		}
-	} else if (ta->ifta_flags & IFTUN_SECURITY) {
-		/*
-		 * If just a change of security settings, do it now!
-		 * Either ifta_flags or tun_flags will do, but ASSERT
-		 * that both are turned on.
-		 */
-		ASSERT(atp->tun_flags & TUN_SECURITY);
-		atp->tun_iocmp = mp;
-		uerr = tun_send_sec_req(q);
-		if (uerr == 0) {
-			/* qreply() done by T_OPTMGMT_REQ processing */
-			return;
-		} else {
-			atp->tun_iocmp = NULL;
-			goto nak;
-		}
 	}
 	qreply(q, mp);
 	return;
@@ -1610,6 +1880,24 @@ nak:
 	iocp->ioc_error = uerr;
 	mp->b_datap->db_type = M_IOCNAK;
 	qreply(q, mp);
+}
+
+static boolean_t
+tun_thisvers_policy(tun_t *atp)
+{
+	boolean_t rc;
+	ipsec_policy_head_t *iph;
+	int uvec = atp->tun_flags & TUN_UPPER_MASK;
+
+	if (atp->tun_itp == NULL)
+		return (B_FALSE);
+	iph = atp->tun_itp->itp_policy;
+
+	rw_enter(&iph->iph_lock, RW_READER);
+	rc = iph_ipvN(iph, (uvec & TUN_U_V6));
+	rw_exit(&iph->iph_lock);
+
+	return (rc);
 }
 
 /*
@@ -1632,6 +1920,7 @@ tun_ioctl(queue_t *q, mblk_t *mp)
 	boolean_t new;
 	ipaddr_t *rr_addr;
 	char buf[INET6_ADDRSTRLEN];
+	struct lifreq *lifr;
 
 	lvers = atp->tun_flags & TUN_LOWER_MASK;
 
@@ -1690,12 +1979,29 @@ tun_ioctl(queue_t *q, mblk_t *mp)
 		 * If we revise IFTUN_VERSION, this will become revision-
 		 * dependent.
 		 */
-		if (atp->tun_flags & TUN_SECURITY) {
-			ipsec_req_t *ipsr;
 
-			ta->ifta_flags |= IFTUN_SECURITY;
-			ipsr = (ipsec_req_t *)(&ta->ifta_secinfo);
-			*ipsr = atp->tun_secinfo;
+		if (tun_policy_present(atp) && tun_thisvers_policy(atp)) {
+			mutex_enter(&atp->tun_itp->itp_lock);
+			if (!(atp->tun_itp->itp_flags & ITPF_P_TUNNEL) &&
+			    (atp->tun_policy_index >=
+				atp->tun_itp->itp_next_policy_index)) {
+				ipsec_req_t *ipsr;
+
+				/*
+				 * Convert 0.0.0.0/0, 0::0/0 tree entry to
+				 * ipsec_req_t.
+				 */
+				ipsr = (ipsec_req_t *)ta->ifta_secinfo;
+				*ipsr = atp->tun_secinfo;
+				/* Reality check for empty polhead. */
+				if (ipsr->ipsr_ah_req != 0 ||
+				    ipsr->ipsr_esp_req != 0)
+					ta->ifta_flags |= IFTUN_SECURITY;
+			} else {
+				ta->ifta_flags |=
+				    (IFTUN_COMPLEX_SECURITY | IFTUN_SECURITY);
+			}
+			mutex_exit(&atp->tun_itp->itp_lock);
 		}
 
 		if (new && (iocp->ioc_cmd == SIOCGTUNPARAM)) {
@@ -1837,11 +2143,45 @@ tun_ioctl(queue_t *q, mblk_t *mp)
 		if (uerr != 0)
 			goto nak;
 		break;
-	/*
-	 * We are module that thinks it's a driver so nak anything
-	 * we don't understand
-	 */
+	case SIOCSLIFNAME:
+		/*
+		 * Intercept SIOCSLIFNAME and attach the name to my
+		 * tunnel_instance.  For extra paranoia, if my name is not ""
+		 * (as it would be at tun_t initialization), don't change
+		 * anything.
+		 *
+		 * For now, this is the only way to tie tunnel names (as
+		 * used in IPsec Tunnel Policy (ITP) instances) to actual
+		 * tunnel instances.  In practice, SIOCSLIFNAME is only
+		 * used by ifconfig(1m) to change the ill name to something
+		 * ifconfig can handle.
+		 */
+		mp1 = mp->b_cont;
+		if (mp1 != NULL) {
+			lifr = (struct lifreq *)mp1->b_rptr;
+			if (atp->tun_lifname[0] == '\0') {
+				(void) strncpy(atp->tun_lifname,
+				    lifr->lifr_name, LIFNAMSIZ);
+				ASSERT(atp->tun_itp == NULL);
+				atp->tun_itp =
+				    get_tunnel_policy(atp->tun_lifname);
+				/*
+				 * It really doesn't matter if we return
+				 * NULL or not.  If we get the itp pointer,
+				 * we're in good shape.
+				 */
+			} else {
+				tun0dbg(("SIOCSLIFNAME:  new is %s, old is %s"
+				    " -  not changing\n",
+				    lifr->lifr_name, atp->tun_lifname));
+			}
+		}
+		break;
 	default:
+		/*
+		 * We are module that thinks it's a driver so nak anything we
+		 * don't understand
+		 */
 		uerr = EINVAL;
 		goto nak;
 	}
@@ -2079,50 +2419,253 @@ tun_wproc_mdata(queue_t *q, mblk_t *mp)
 	return (error);
 }
 
-static int
-tun_send_sec_req(queue_t *q)
+/*
+ * Because a TUNSPARAM ioctl()'s requirement to only set IPsec policy for a
+ * given upper instance (IPv4-over-IP* or IPv6-over-IP*), have a special
+ * AF-specific flusher.  This way, setting one upper instance doesn't sabotage
+ * the other.  Don't bother with the hash-chained policy heads - they won't be
+ * filled in in TUNSPARAM cases.
+ */
+static void
+flush_af(ipsec_policy_head_t *polhead, int ulp_vector)
 {
-	tun_t *atp = (tun_t *)q->q_ptr;
-	mblk_t *optmp;
-	struct T_optmgmt_req *omr;
-	struct opthdr *oh;
+	int dir;
+	int af = (ulp_vector == TUN_U_V4) ? IPSEC_AF_V4 : IPSEC_AF_V6;
+	ipsec_policy_t *ip, *nip;
+
+	ASSERT(RW_WRITE_HELD(&polhead->iph_lock));
+
+	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
+		for (ip = polhead->iph_root[dir].ipr_nonhash[af]; ip != NULL;
+		    ip = nip) {
+			nip = ip->ipsp_hash.hash_next;
+			IPPOL_UNCHAIN(polhead, ip);
+		}
+	}
+}
+
+/*
+ * Set and insert the actual simple policies.
+ */
+static boolean_t
+insert_actual_policies(ipsec_tun_pol_t *itp, ipsec_act_t *actp, uint_t nact,
+    int ulp_vector)
+{
+	ipsec_selkey_t selkey;
+	ipsec_policy_t *pol;
+	ipsec_policy_root_t *pr;
+	ipsec_policy_head_t *polhead = itp->itp_policy;
+
+	bzero(&selkey, sizeof (selkey));
+
+	if (ulp_vector & TUN_U_V4) {
+		selkey.ipsl_valid = IPSL_IPV4;
+
+		/* v4 inbound */
+		pol = ipsec_policy_create(&selkey, actp, nact,
+		    IPSEC_PRIO_SOCKET, &itp->itp_next_policy_index);
+		if (pol == NULL)
+			return (B_FALSE);
+		pr = &polhead->iph_root[IPSEC_TYPE_INBOUND];
+		HASHLIST_INSERT(pol, ipsp_hash, pr->ipr_nonhash[IPSEC_AF_V4]);
+		ipsec_insert_always(&polhead->iph_rulebyid, pol);
+
+		/* v4 outbound */
+		pol = ipsec_policy_create(&selkey, actp, nact,
+		    IPSEC_PRIO_SOCKET, &itp->itp_next_policy_index);
+		if (pol == NULL)
+			return (B_FALSE);
+		pr = &polhead->iph_root[IPSEC_TYPE_OUTBOUND];
+		HASHLIST_INSERT(pol, ipsp_hash, pr->ipr_nonhash[IPSEC_AF_V4]);
+		ipsec_insert_always(&polhead->iph_rulebyid, pol);
+	}
+
+	if (ulp_vector & TUN_U_V6) {
+		selkey.ipsl_valid = IPSL_IPV6;
+
+		/* v6 inbound */
+		pol = ipsec_policy_create(&selkey, actp, nact,
+		    IPSEC_PRIO_SOCKET, &itp->itp_next_policy_index);
+		if (pol == NULL)
+			return (B_FALSE);
+		pr = &polhead->iph_root[IPSEC_TYPE_INBOUND];
+		HASHLIST_INSERT(pol, ipsp_hash, pr->ipr_nonhash[IPSEC_AF_V6]);
+		ipsec_insert_always(&polhead->iph_rulebyid, pol);
+
+		/* v6 outbound */
+		pol = ipsec_policy_create(&selkey, actp, nact,
+		    IPSEC_PRIO_SOCKET, &itp->itp_next_policy_index);
+		if (pol == NULL)
+			return (B_FALSE);
+		pr = &polhead->iph_root[IPSEC_TYPE_OUTBOUND];
+		HASHLIST_INSERT(pol, ipsp_hash, pr->ipr_nonhash[IPSEC_AF_V6]);
+		ipsec_insert_always(&polhead->iph_rulebyid, pol);
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * For the old-fashioned tunnel-ioctl method of setting tunnel security
+ * properties.  In the new world, set this to be a low-priority 0.0.0.0/0
+ * match.
+ */
+static int
+tun_set_sec_simple(tun_t *atp, ipsec_req_t *ipsr)
+{
+	int rc = 0;
+	uint_t nact;
+	ipsec_act_t *actp = NULL;
+	boolean_t clear_all, old_policy = B_FALSE;
+	ipsec_tun_pol_t *itp;
+	tun_t *other_tun;
+
+	tun1dbg(
+	    ("tun_set_sec_simple: adjusting tunnel security the old way."));
+
+#define	REQ_MASK (IPSEC_PREF_REQUIRED | IPSEC_PREF_NEVER)
+	/* Can't specify self-encap on a tunnel!!! */
+	if ((ipsr->ipsr_self_encap_req && REQ_MASK) != 0)
+		return (EINVAL);
 
 	/*
-	 * Since we're adjusting security, adjust tun_extra_offset!
+	 * If it's a "clear-all" entry, unset the security flags and
+	 * resume normal cleartext (or inherit-from-global) policy.
 	 */
-	atp->tun_extra_offset = TUN_LINK_EXTRA_OFF;
-
-	optmp = tun_realloc_mblk(q, NULL, sizeof (*omr) + sizeof (*oh) +
-	    sizeof (atp->tun_secinfo), NULL, B_FALSE);
-	if (optmp == NULL)
-		return (ENOMEM);
-
-	optmp->b_wptr += sizeof (*omr) + sizeof (*oh) +
-	    sizeof (atp->tun_secinfo);
-	optmp->b_datap->db_type = M_PROTO;
-	omr = (struct T_optmgmt_req *)optmp->b_rptr;
-	oh = (struct opthdr *)(omr + 1);
-	/*
-	 * XXX Which TPI version am I?  Make sure we stay on top of things
-	 * w.r.t. option management.
-	 */
-	omr->PRIM_type = T_SVR4_OPTMGMT_REQ;
-	omr->MGMT_flags = T_NEGOTIATE;
-	omr->OPT_offset = sizeof (*omr);
-	omr->OPT_length = sizeof (*oh) + sizeof (atp->tun_secinfo);
-
-	oh->level = IPPROTO_IP;
-	oh->name = IP_SEC_OPT;
-	oh->len = sizeof (atp->tun_secinfo);
+	clear_all = ((ipsr->ipsr_ah_req & REQ_MASK) == 0 &&
+	    (ipsr->ipsr_esp_req & REQ_MASK) == 0);
+#undef REQ_MASK
 
 	mutex_enter(&atp->tun_lock);
-	*((ipsec_req_t *)(oh + 1)) = atp->tun_secinfo;
+	if (!tun_policy_present(atp)) {
+		if (clear_all) {
+			bzero(&atp->tun_secinfo, sizeof (ipsec_req_t));
+			atp->tun_policy_index = 0;
+			goto bail;	/* No need to allocate! */
+		}
+
+		ASSERT(atp->tun_lifname[0] != '\0');
+		atp->tun_itp = create_tunnel_policy(atp->tun_lifname,
+		    &rc, &atp->tun_itp_gen);
+		/* NOTE:  "rc" set by create_tunnel_policy(). */
+		if (atp->tun_itp == NULL)
+			goto bail;
+	}
+	itp = atp->tun_itp;
+
+	/* Allocate the actvec now, before holding itp or polhead locks. */
+	ipsec_actvec_from_req(ipsr, &actp, &nact);
+	if (actp == NULL) {
+		rc = ENOMEM;
+		goto bail;
+	}
+
+	/*
+	 * Just write on the active polhead.  Save the primary/secondary
+	 * stuff for spdsock operations.
+	 *
+	 * Mutex because we need to write to the polhead AND flags atomically.
+	 * Other threads will acquire the polhead lock as a reader if the
+	 * (unprotected) flag is set.
+	 */
+	mutex_enter(&itp->itp_lock);
+	if (itp->itp_flags & ITPF_P_TUNNEL) {
+		/*
+		 * Oops, we lost a race.  Let's get out of here.
+		 */
+		rc = EBUSY;
+		goto mutex_bail;
+	}
+	old_policy = ((itp->itp_flags & ITPF_P_ACTIVE) != 0);
+
+	if (old_policy) {
+		/*
+		 * We have to be more subtle here than we would
+		 * in the spdosock code-paths, due to backward compatibility.
+		 */
+		ITPF_CLONE(itp->itp_flags);
+		rc = ipsec_copy_polhead(itp->itp_policy, itp->itp_inactive);
+		if (rc != 0) {
+			/* inactive has already been cleared. */
+			itp->itp_flags &= ~ITPF_IFLAGS;
+			goto mutex_bail;
+		}
+		rw_enter(&itp->itp_policy->iph_lock, RW_WRITER);
+		flush_af(itp->itp_policy, atp->tun_flags & TUN_UPPER_MASK);
+	} else {
+		/* Else assume itp->itp_policy is already flushed. */
+		rw_enter(&itp->itp_policy->iph_lock, RW_WRITER);
+	}
+
+	if (clear_all) {
+		/* We've already cleared out the polhead.  We are now done. */
+		if (avl_numnodes(&itp->itp_policy->iph_rulebyid) == 0)
+			itp->itp_flags &= ~ITPF_PFLAGS;
+		rw_exit(&itp->itp_policy->iph_lock);
+		bzero(&atp->tun_secinfo, sizeof (ipsec_req_t));
+		old_policy = B_FALSE;	/* Clear out the inactive one too. */
+		goto recover_bail;
+	}
+	if (insert_actual_policies(itp, actp, nact,
+		atp->tun_flags & TUN_UPPER_MASK)) {
+		rw_exit(&itp->itp_policy->iph_lock);
+		/*
+		 * Adjust MTU and make sure the DL side knows what's up.
+		 */
+		atp->tun_ipsec_overhead = ipsec_act_ovhd(actp);
+		itp->itp_flags = ITPF_P_ACTIVE;
+		/*
+		 * <sigh> There has to be a better way, but for now, send an
+		 * IRE_DB_REQ again.  We will resynch from scratch, but have
+		 * the tun_ipsec_overhead taken into account.
+		 */
+		tun_send_ire_req(atp->tun_wq);
+		old_policy = B_FALSE;	/* Blank out inactive - we succeeded */
+		/* Copy ipsec_req_t for subsequent SIOGTUNPARAM ops. */
+		atp->tun_secinfo = *ipsr;
+	} else {
+		rw_exit(&itp->itp_policy->iph_lock);
+		rc = ENOMEM;
+	}
+
+recover_bail:
+	atp->tun_policy_index = itp->itp_next_policy_index;
+	/* Find the "other guy" (v4/v6) and update his tun_policy_index too. */
+	if (atp->tun_stats != NULL) {
+		if (atp->tun_stats->ts_atp == atp) {
+			other_tun = atp->tun_kstat_next;
+			ASSERT(other_tun == NULL ||
+			    other_tun->tun_kstat_next == NULL);
+		} else {
+			other_tun = atp->tun_stats->ts_atp;
+			ASSERT(other_tun != NULL);
+			ASSERT(other_tun->tun_kstat_next == atp);
+		}
+		if (other_tun != NULL)
+			other_tun->tun_policy_index = atp->tun_policy_index;
+	}
+
+	if (old_policy) {
+		/* Recover policy in in active polhead. */
+		ipsec_swap_policy(itp->itp_policy, itp->itp_inactive);
+		ITPF_SWAP(itp->itp_flags);
+		atp->tun_extra_offset = TUN_LINK_EXTRA_OFF;
+	}
+
+	/* Clear policy in inactive polhead. */
+	itp->itp_flags &= ~ITPF_IFLAGS;
+	rw_enter(&itp->itp_inactive->iph_lock, RW_WRITER);
+	ipsec_polhead_flush(itp->itp_inactive);
+	rw_exit(&itp->itp_inactive->iph_lock);
+
+mutex_bail:
+	mutex_exit(&itp->itp_lock);
+
+bail:
+	if (actp != NULL)
+		ipsec_actvec_free(actp, nact);
 	mutex_exit(&atp->tun_lock);
-
-	tun1dbg(("tun_send_sec_req: adjusting tunnel security."));
-
-	putnext(WR(q), optmp);
-	return (0);
+	return (rc);
 }
 
 /*
@@ -2192,7 +2735,8 @@ tun_update_link_mtu(queue_t *q, uint32_t pmtu, boolean_t icmp)
 	 * from below, then the pmtu argument has already been adjusted
 	 * by the IPsec overhead.
 	 */
-	if (!icmp && (atp->tun_flags & TUN_SECURITY))
+	if (!icmp && atp->tun_itp != NULL &&
+	    (atp->tun_itp->itp_flags & ITPF_P_ACTIVE))
 		newmtu -= atp->tun_ipsec_overhead;
 
 	if (atp->tun_flags & TUN_L_V4) {
@@ -2232,29 +2776,6 @@ tun_rput_tpi(queue_t *q, mblk_t *mp)
 	mblk_t *iocmp;
 
 	switch (prim) {
-	case T_OPTMGMT_ACK:
-		mutex_enter(&atp->tun_lock);
-		iocmp = atp->tun_iocmp;
-		atp->tun_iocmp = NULL;
-		if (atp->tun_secinfo.ipsr_esp_req == 0 &&
-		    atp->tun_secinfo.ipsr_ah_req == 0) {
-			atp->tun_flags &= ~TUN_SECURITY;
-			mutex_exit(&atp->tun_lock);
-		} else {
-			/*
-			 * Since the security properties of the tunnel have
-			 * changed, request new ire information to
-			 * re-calculate the tunnel's link MTU.
-			 */
-			mutex_exit(&atp->tun_lock);
-			tun1dbg(("tun_rput_tpi: tunnel security attributes have"
-			    "been set.  Requesting ire"));
-			tun_send_ire_req(q);
-		}
-		ASSERT(iocmp != NULL);
-		putnext(q, iocmp);
-		freemsg(mp);
-		break;
 	case T_BIND_ACK:
 		tun1dbg(("tun_rput_tpi: got a T_BIND_ACK\n"));
 		mutex_enter(&atp->tun_lock);
@@ -2274,7 +2795,14 @@ tun_rput_tpi(queue_t *q, mblk_t *mp)
 			ire_t *ire;
 
 			ire = (ire_t *)mp->b_cont->b_rptr;
-			atp->tun_ipsec_overhead = ire->ire_ipsec_overhead;
+			/*
+			 * Take advice from lower-layer if it is bigger than
+			 * what we have cached now.  We do manage per-tunnel
+			 * policy, but there may be global overhead to account
+			 * for.
+			 */
+			atp->tun_ipsec_overhead = max(ire->ire_ipsec_overhead,
+			    atp->tun_ipsec_overhead);
 			if (atp->tun_flags & TUN_DST) {
 				atp->tun_extra_offset =
 				    MAX(ire->ire_ll_hdr_length,
@@ -2296,34 +2824,6 @@ tun_rput_tpi(queue_t *q, mblk_t *mp)
 		atp->tun_flags &= ~TUN_BIND_SENT;
 
 		iocmp = atp->tun_iocmp;
-		/*
-		 * If we have security information to send, do it after
-		 * the T_BIND_ACK has been received.  Don't bother ACK-ing
-		 * the ioctl until after this has been done.
-		 *
-		 * XXX One small nit about here is that if the user didn't set
-		 * IFTUN_SECURITY, then this handler will reset the security
-		 * levels anyway.
-		 */
-
-		if (atp->tun_flags & TUN_SECURITY) {
-			int err;
-			struct iocblk *iocp;
-
-			/* Exit the mutex for tun_send_sec_req(). */
-			mutex_exit(&atp->tun_lock);
-			err = tun_send_sec_req(q);
-			if (err != 0) {
-				/* Re-enter the mutex. */
-				mutex_enter(&atp->tun_lock);
-				atp->tun_flags &= ~TUN_SECURITY;
-				iocp = (struct iocblk *)iocmp->b_rptr;
-				iocp->ioc_error = err;
-			} else {
-				/* Let the OPTMGMT_ACK handler deal with it. */
-				break;	/* Out of this case. */
-			}
-		}
 
 		/*
 		 * Ack the ioctl
@@ -2336,24 +2836,6 @@ tun_rput_tpi(queue_t *q, mblk_t *mp)
 	case T_ERROR_ACK: {
 		struct T_error_ack *terr = (struct T_error_ack *)mp->b_rptr;
 		switch (terr->ERROR_prim) {
-		case T_SVR4_OPTMGMT_REQ: {
-			struct iocblk *iocp;
-
-			mutex_enter(&atp->tun_lock);
-			/* XXX Should we should unbind too? */
-			atp->tun_flags &= ~TUN_SECURITY;
-			iocmp = atp->tun_iocmp;
-			atp->tun_iocmp = NULL;
-			mutex_exit(&atp->tun_lock);
-			iocp = (struct iocblk *)(iocmp->b_rptr);
-			/* XXX Does OPTMGMT generate TLI_errors? */
-			if (terr->UNIX_error == 0)
-				iocp->ioc_error = EINVAL;
-			else iocp->ioc_error = terr->UNIX_error;
-			putnext(q, iocmp);
-			freemsg(mp);
-			return (0);
-		}
 		case T_BIND_REQ: {
 			struct iftun_req	*ta;
 			mblk_t *mp1;
@@ -2426,16 +2908,14 @@ tun_rput_tpi(queue_t *q, mblk_t *mp)
 /*
  * handle tunnel over IPv6
  */
-/* ARGSUSED */
 static int
-tun_rdata_v6(queue_t *q, mblk_t *mp)
+tun_rdata_v6(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 {
-	tun_t *atp = (tun_t *)q->q_ptr;
 	ip6_t *outer_ip6h, *ip6h;
 	ipha_t *inner_iph;
 	uint8_t *rptr;
 	size_t		hdrlen;
-	mblk_t		*mp1;
+	mblk_t		*mp1, *nmp, *orig_mp = data_mp;
 	uint8_t		nexthdr;
 	boolean_t	inner_v4;
 	in6_addr_t	v6src;
@@ -2443,25 +2923,12 @@ tun_rdata_v6(queue_t *q, mblk_t *mp)
 	char		buf[TUN_WHO_BUF];
 	char		buf1[INET6_ADDRSTRLEN];
 	char		buf2[INET6_ADDRSTRLEN];
+	int		pullup_len;
 
 	/* need at least an IPv6 header. */
-	ASSERT((mp->b_wptr - mp->b_rptr) >= sizeof (ip6_t));
+	ASSERT((data_mp->b_wptr - data_mp->b_rptr) >= sizeof (ip6_t));
 
-	if (atp->tun_state != DL_IDLE) {
-		atomic_add_32(&atp->tun_InErrors, 1);
-		atomic_add_64(&atp->tun_HCInUcastPkts, 1);
-		goto drop;
-	}
-
-	if (!canputnext(q)) {
-		tun1dbg(("tun_rdata_v6: flow controlled\n"));
-		ASSERT(mp->b_datap->db_type < QPCTL);
-		atomic_add_32(&atp->tun_nocanput, 1);
-		(void) putbq(q, mp);
-		return (ENOMEM);	/* to stop service procedure */
-	}
-
-	outer_ip6h = (ip6_t *)mp->b_rptr;
+	outer_ip6h = (ip6_t *)data_mp->b_rptr;
 
 	/* Handle ip6i_t case. */
 	if (outer_ip6h->ip6_nxt == IPPROTO_RAW) {
@@ -2470,22 +2937,24 @@ tun_rdata_v6(queue_t *q, mblk_t *mp)
 		 * use ASSERT because of lint warnings.
 		 */
 		rptr = (uint8_t *)(outer_ip6h + 1);
-		mp->b_rptr = rptr;
-		if (rptr == mp->b_wptr) {
-			mp1 = mp->b_cont;
-			freeb(mp);
-			mp = mp1;
-			rptr = mp->b_rptr;
+		data_mp->b_rptr = rptr;
+		if (rptr == data_mp->b_wptr) {
+			mp1 = data_mp->b_cont;
+			freeb(data_mp);
+			orig_mp = data_mp = mp1;
+			rptr = data_mp->b_rptr;
+			if (ipsec_mp != NULL)
+				ipsec_mp->b_cont = data_mp;
 		}
-		ASSERT(mp->b_wptr - rptr >= sizeof (ip6_t));
+		ASSERT(data_mp->b_wptr - rptr >= sizeof (ip6_t));
 		outer_ip6h = (ip6_t *)rptr;
 	}
 
 
-	hdrlen = ip_hdr_length_v6(mp, outer_ip6h);
+	hdrlen = ip_hdr_length_v6(data_mp, outer_ip6h);
 	ASSERT(IPH_HDR_VERSION(outer_ip6h) == IPV6_VERSION);
 	ASSERT(hdrlen >= sizeof (ip6_t));
-	ASSERT(hdrlen <= (mp->b_wptr - mp->b_rptr));
+	ASSERT(hdrlen <= (data_mp->b_wptr - data_mp->b_rptr));
 
 	v6src = outer_ip6h->ip6_src;
 	v6dst = outer_ip6h->ip6_dst;
@@ -2501,7 +2970,7 @@ tun_rdata_v6(queue_t *q, mblk_t *mp)
 		ip6_pkt_t ipp;
 
 		ipp.ipp_fields = 0; /* must be initialized */
-		(void) ip_find_hdr_v6(mp, outer_ip6h, &ipp, NULL);
+		(void) ip_find_hdr_v6(data_mp, outer_ip6h, &ipp, NULL);
 		if (ipp.ipp_dstopts != NULL) {
 			nexthdr = ipp.ipp_dstopts->ip6d_nxt;
 		} else if (ipp.ipp_rthdr != NULL) {
@@ -2519,52 +2988,87 @@ tun_rdata_v6(queue_t *q, mblk_t *mp)
 	}
 	inner_v4 = (nexthdr == IPPROTO_ENCAP);
 
-	/* Shave off the outer header(s). */
-	if ((mp->b_wptr - mp->b_rptr) == hdrlen) {
-		tun1dbg(("tun_rdata_v6: new path hdrlen= %lu\n", hdrlen));
-		mp1 = mp->b_cont;
-		freeb(mp);
-		mp = mp1;
-		if (mp == NULL) {
-			tun0dbg(("tun_rdata_v6: b_cont null, no data\n"));
-			atomic_add_32(&atp->tun_InErrors, 1);
-			return (0);
-		}
-	} else {
-		mp->b_rptr += hdrlen;
-	}
-
-	if ((mp->b_wptr - mp->b_rptr) <
-	    (inner_v4 ? sizeof (ipha_t) : sizeof (ip6_t))) {
-		if (!pullupmsg(mp,
-		    (inner_v4 ? sizeof (ipha_t) : sizeof (ip6_t)))) {
+	/*
+	 * NOTE:  The "+ 4" is for the upper-layer protocol information
+	 * (ports) so we can enforce policy.
+	 */
+	pullup_len = hdrlen + (inner_v4 ? sizeof (ipha_t) : sizeof (ip6_t)) + 4;
+	if ((data_mp->b_wptr - data_mp->b_rptr) < pullup_len) {
+		if (!pullupmsg(data_mp, pullup_len)) {
 			atomic_add_32(&atp->tun_InErrors, 1);
 			atomic_add_32(&atp->tun_InDiscard, 1);
 			goto drop;
 		}
+		outer_ip6h = (ip6_t *)data_mp->b_rptr;
 	}
+
+	/* Shave off the outer header(s). */
+	data_mp->b_rptr += hdrlen;
 
 	if (inner_v4) {
 		/* IPv4 in IPv6 */
-		inner_iph = (ipha_t *)mp->b_rptr;
+		inner_iph = (ipha_t *)data_mp->b_rptr;
 		ASSERT(IPH_HDR_VERSION(inner_iph) == IPV4_VERSION);
 		ASSERT(IN6_ARE_ADDR_EQUAL(&v6dst, &atp->tun_laddr) &&
 		    IN6_ARE_ADDR_EQUAL(&v6src, &atp->tun_faddr));
+		if (!ipsec_tun_inbound(ipsec_mp, &data_mp, atp->tun_itp,
+			inner_iph, NULL, NULL, outer_ip6h, 0)) {
+			data_mp = NULL;
+			ipsec_mp = NULL;
+			atomic_add_32(&atp->tun_InErrors, 1);
+			goto drop;
+		}
+		if (data_mp != orig_mp) {
+			/* mp has changed, reset appropriate pointers */
+
+			/* Outer hdrlen is already shaved off */
+			ASSERT(data_mp != NULL);
+			inner_iph = (ipha_t *)data_mp->b_rptr;
+		}
+
+		/*
+		 * Remember - ipsec_tun_inbound() may return a whole chain
+		 * of packets if there was per-port policy on the ITP and
+		 * we got a fragmented packet.
+		 */
 		if (CLASSD(inner_iph->ipha_dst)) {
-			atomic_add_64(&atp->tun_HCInMulticastPkts, 1);
+			for (nmp = data_mp; nmp != NULL; nmp = nmp->b_next)
+				atomic_add_64(&atp->tun_HCInMulticastPkts, 1);
 		} else {
-			atomic_add_64(&atp->tun_HCInUcastPkts, 1);
+			for (nmp = data_mp; nmp != NULL; nmp = nmp->b_next)
+				atomic_add_64(&atp->tun_HCInUcastPkts, 1);
 		}
 	} else {
 		/* IPv6 in IPv6 */
-		ip6h = (ip6_t *)mp->b_rptr;
+		ip6h = (ip6_t *)data_mp->b_rptr;
 		ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
-
 		ASSERT(IN6_ARE_ADDR_EQUAL(&v6dst, &atp->tun_laddr));
+
+		if (!ipsec_tun_inbound(ipsec_mp, &data_mp, atp->tun_itp, NULL,
+			ip6h, NULL, outer_ip6h, 0)) {
+			data_mp = NULL;
+			ipsec_mp = NULL;
+			atomic_add_32(&atp->tun_InErrors, 1);
+			goto drop;
+		}
+		if (data_mp != orig_mp) {
+			/* mp has changed, reset appropriate pointers */
+			/* v6src should still be a valid and relevant ptr */
+			ASSERT(data_mp != NULL);
+			ip6h = (ip6_t *)data_mp->b_rptr;
+		}
+
+		/*
+		 * Remember - ipsec_tun_inbound() may return a whole chain
+		 * of packets if there was per-port policy on the ITP and
+		 * we got a fragmented packet.
+		 */
 		if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
-			atomic_add_64(&atp->tun_HCInMulticastPkts, 1);
+			for (nmp = data_mp; nmp != NULL; nmp = nmp->b_next)
+				atomic_add_64(&atp->tun_HCInMulticastPkts, 1);
 		} else {
-			atomic_add_64(&atp->tun_HCInUcastPkts, 1);
+			for (nmp = data_mp; nmp != NULL; nmp = nmp->b_next)
+				atomic_add_64(&atp->tun_HCInUcastPkts, 1);
 		}
 
 		if (!IN6_ARE_ADDR_EQUAL(&v6src, &atp->tun_faddr)) {
@@ -2579,18 +3083,17 @@ tun_rdata_v6(queue_t *q, mblk_t *mp)
 				sizeof (buf1)),
 			    inet_ntop(AF_INET6, &atp->tun_faddr, buf2,
 				sizeof (buf2))));
-			atomic_add_32(&atp->tun_InErrors, 1);
+			for (nmp = data_mp; nmp != NULL; nmp = nmp->b_next)
+				atomic_add_32(&atp->tun_InErrors, 1);
 			goto drop;
 		}
 	}
-
-	mutex_enter(&atp->tun_lock);
-	atp->tun_HCInOctets += msgdsize(mp);
-	mutex_exit(&atp->tun_lock);
-	putnext(q, mp);
+	TUN_PUTMSG_CHAIN_STATS(q, data_mp, nmp, &atp->tun_HCInOctets);
 	return (0);
 drop:
-	freemsg(mp);
+	if (ipsec_mp != NULL)
+		freeb(ipsec_mp);
+	tun_freemsg_chain(data_mp, NULL);
 	return (0);
 }
 
@@ -2601,13 +3104,12 @@ drop:
  * what's the worst that can happen if the header stuff changes?
  */
 static int
-tun_rdata_v4(queue_t *q, mblk_t *mp)
+tun_rdata_v4(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 {
-	tun_t		*atp = (tun_t *)q->q_ptr;
 	ipha_t		*iph, *inner_iph;
 	ip6_t		*ip6h;
 	size_t		hdrlen;
-	mblk_t		*mp1;
+	mblk_t		*mp1, *nmp, *orig_mp = data_mp;
 	boolean_t	inner_v4;
 	ipaddr_t	v4src;
 	ipaddr_t	v4dst;
@@ -2616,33 +3118,19 @@ tun_rdata_v4(queue_t *q, mblk_t *mp)
 	char		buf1[INET6_ADDRSTRLEN];
 	char		buf2[INET6_ADDRSTRLEN];
 	char		buf[TUN_WHO_BUF];
+	int		pullup_len;
 
 	/* need at least an IP header */
-	ASSERT((mp->b_wptr - mp->b_rptr) >= sizeof (ipha_t));
+	ASSERT((data_mp->b_wptr - data_mp->b_rptr) >= sizeof (ipha_t));
 
-	if (atp->tun_state != DL_IDLE) {
-		atomic_add_32(&atp->tun_InErrors, 1);
-		/* need to count packet */
-		atomic_add_64(&atp->tun_HCInUcastPkts, 1);
-		goto drop;
-	}
-
-	if (!canputnext(q)) {
-		tun1dbg(("tun_rdata_v4: flow controlled\n"));
-		ASSERT(mp->b_datap->db_type < QPCTL);
-		atomic_add_32(&atp->tun_nocanput, 1);
-		(void) putbq(q, mp);
-		return (ENOMEM);	/* to stop service procedure */
-	}
-
-	iph = (ipha_t *)mp->b_rptr;
+	iph = (ipha_t *)data_mp->b_rptr;
 
 	hdrlen = IPH_HDR_LENGTH(iph);
 	/* check IP version number */
 	ASSERT(IPH_HDR_VERSION(iph) == IPV4_VERSION);
 
 	ASSERT(hdrlen >= sizeof (ipha_t));
-	ASSERT(hdrlen <= (mp->b_wptr - mp->b_rptr));
+	ASSERT(hdrlen <= (data_mp->b_wptr - data_mp->b_rptr));
 
 	v4src = iph->ipha_src;
 	v4dst = iph->ipha_dst;
@@ -2650,52 +3138,93 @@ tun_rdata_v4(queue_t *q, mblk_t *mp)
 	IN6_IPADDR_TO_V4MAPPED(v4dst, &v4mapped_dst);
 	inner_v4 = (iph->ipha_protocol == IPPROTO_ENCAP);
 
-	/* shave off the IPv4 header */
-	if ((mp->b_wptr - mp->b_rptr) == hdrlen) {
-		tun1dbg(("tun_rdata_v4: new path hdrlen= %lu\n", hdrlen));
-		mp1 = mp->b_cont;
-		freeb(mp);
-		mp = mp1;
-		if (mp == NULL) {
-			tun0dbg(("tun_rdata_v4: b_cont null, no data\n"));
-			atomic_add_32(&atp->tun_InErrors, 1);
-			return (0);
-		}
-	} else {
-		mp->b_rptr += hdrlen;
-	}
-
-	if ((mp->b_wptr - mp->b_rptr) <
-	    (inner_v4 ? sizeof (ipha_t) : sizeof (ip6_t))) {
-		if (!pullupmsg(mp,
-		    (inner_v4 ? sizeof (ipha_t) : sizeof (ip6_t)))) {
+	/*
+	 * NOTE:  The "+ 4" is for the upper-layer protocol headers
+	 * so we can enforce policy.
+	 */
+	pullup_len = hdrlen + (inner_v4 ? sizeof (ipha_t) : sizeof (ip6_t)) + 4;
+	if ((data_mp->b_wptr - data_mp->b_rptr) < pullup_len) {
+		if (!pullupmsg(data_mp, hdrlen + pullup_len)) {
 			atomic_add_32(&atp->tun_InErrors, 1);
 			atomic_add_32(&atp->tun_InDiscard, 1);
 			goto drop;
 		}
+		iph = (ipha_t *)data_mp->b_rptr;
 	}
+
+	/* Shave off the IPv4 header. */
+	data_mp->b_rptr += hdrlen;
 
 	if (inner_v4) {
 		/* IPv4 in IPv4 */
-		inner_iph = (ipha_t *)mp->b_rptr;
+		inner_iph = (ipha_t *)data_mp->b_rptr;
 		ASSERT(IPH_HDR_VERSION(inner_iph) == IPV4_VERSION);
 		ASSERT(IN6_ARE_ADDR_EQUAL(&v4mapped_dst, &atp->tun_laddr) &&
 		    IN6_ARE_ADDR_EQUAL(&v4mapped_src, &atp->tun_faddr));
-		if (CLASSD(inner_iph->ipha_dst)) {
-			atomic_add_64(&atp->tun_HCInMulticastPkts, 1);
-		} else {
-			atomic_add_64(&atp->tun_HCInUcastPkts, 1);
+
+		if (!ipsec_tun_inbound(ipsec_mp, &data_mp, atp->tun_itp,
+			inner_iph, NULL, iph, NULL, 0)) {
+			data_mp = NULL;
+			ipsec_mp = NULL;
+			atomic_add_32(&atp->tun_InErrors, 1);
+			goto drop;
 		}
+		if (data_mp != orig_mp) {
+			/* mp has changed, reset appropriate pointers */
+
+			/* Outer hdrlen is already shaved off */
+			ASSERT(data_mp != NULL);
+			inner_iph = (ipha_t *)data_mp->b_rptr;
+		}
+
+		/*
+		 * Remember - ipsec_tun_inbound() may return a whole chain
+		 * of packets if there was per-port policy on the ITP and
+		 * we got a fragmented packet.
+		 */
+		if (CLASSD(inner_iph->ipha_dst)) {
+			for (nmp = data_mp; nmp != NULL; nmp = nmp->b_next)
+				atomic_add_64(&atp->tun_HCInMulticastPkts, 1);
+		} else {
+			for (nmp = data_mp; nmp != NULL; nmp = nmp->b_next)
+				atomic_add_64(&atp->tun_HCInUcastPkts, 1);
+		}
+
 	} else {
 		/* IPv6 in IPv4 */
-		ip6h = (ip6_t *)mp->b_rptr;
+		ip6h = (ip6_t *)data_mp->b_rptr;
 		ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
 
+		if (!ipsec_tun_inbound(ipsec_mp, &data_mp, atp->tun_itp, NULL,
+			ip6h, iph, NULL, 0)) {
+			data_mp = NULL;
+			ipsec_mp = NULL;
+			atomic_add_32(&atp->tun_InErrors, 1);
+			goto drop;
+		}
+		if (data_mp != orig_mp) {
+			/* mp has changed, reset appropriate pointers */
+
+			/*
+			 * v6src and v4dst should still be
+			 * valid and relevant pointers
+			 */
+			ASSERT(data_mp != NULL);
+			ip6h = (ip6_t *)data_mp->b_rptr;
+		}
+
+		/*
+		 * Remember - ipsec_tun_inbound() may return a whole chain
+		 * of packets if there was per-port policy on the ITP and
+		 * we got a fragmented packet.
+		 */
 		ASSERT(IN6_ARE_ADDR_EQUAL(&v4mapped_dst, &atp->tun_laddr));
 		if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
-			atomic_add_64(&atp->tun_HCInMulticastPkts, 1);
+			for (nmp = data_mp; nmp != NULL; nmp = nmp->b_next)
+				atomic_add_64(&atp->tun_HCInMulticastPkts, 1);
 		} else {
-			atomic_add_64(&atp->tun_HCInUcastPkts, 1);
+			for (nmp = data_mp; nmp != NULL; nmp = nmp->b_next)
+				atomic_add_64(&atp->tun_HCInUcastPkts, 1);
 		}
 
 		/* Is this an automatic tunnel ? */
@@ -2711,7 +3240,10 @@ tun_rdata_v4(queue_t *q, mblk_t *mp)
 				    tun_who(q, buf),
 				    inet_ntop(AF_INET, &v4dst,
 					buf1, sizeof (buf1))));
-				atomic_add_32(&atp->tun_InErrors, 1);
+				for (nmp = data_mp; nmp != NULL;
+				    nmp = nmp->b_next) {
+					atomic_add_32(&atp->tun_InErrors, 1);
+				}
 				goto drop;
 			}
 
@@ -2727,15 +3259,16 @@ tun_rdata_v4(queue_t *q, mblk_t *mp)
 				atomic_add_32(&atp->tun_allocbfail, 1);
 				goto drop;
 			}
-			mp1->b_cont = mp;
-			mp = mp1;
+			mp1->b_cont = data_mp;
+			data_mp = mp1;
 			/*
 			 * create dl_unitdata_ind with group address set so
 			 * we don't forward
 			 */
-			mp->b_wptr = mp->b_rptr + sizeof (dl_unitdata_ind_t);
-			mp->b_datap->db_type = M_PROTO;
-			dludindp = (dl_unitdata_ind_t *)mp->b_rptr;
+			data_mp->b_wptr = data_mp->b_rptr +
+			    sizeof (dl_unitdata_ind_t);
+			data_mp->b_datap->db_type = M_PROTO;
+			dludindp = (dl_unitdata_ind_t *)data_mp->b_rptr;
 			dludindp->dl_primitive = DL_UNITDATA_IND;
 			dludindp->dl_dest_addr_length = 0;
 			dludindp->dl_dest_addr_offset = 0;
@@ -2771,7 +3304,10 @@ tun_rdata_v4(queue_t *q, mblk_t *mp)
 				    "IPv4 dest (%s)\n", tun_who(q, buf),
 				    inet_ntop(AF_INET, &v4dst, buf1,
 					sizeof (buf1))));
-				atomic_add_32(&atp->tun_InErrors, 1);
+				for (nmp = data_mp; nmp != NULL;
+				    nmp = nmp->b_next) {
+					atomic_add_32(&atp->tun_InErrors, 1);
+				}
 				goto drop;
 			}
 
@@ -2789,7 +3325,10 @@ tun_rdata_v4(queue_t *q, mblk_t *mp)
 					buf1, sizeof (buf1)),
 				    inet_ntop(AF_INET, &v4dst,
 					buf2, sizeof (buf2))));
-				atomic_add_32(&atp->tun_InDiscard, 1);
+				for (nmp = data_mp; nmp != NULL;
+				    nmp = nmp->b_next) {
+					atomic_add_32(&atp->tun_InErrors, 1);
+				}
 				goto drop;
 			}
 
@@ -2814,7 +3353,11 @@ tun_rdata_v4(queue_t *q, mblk_t *mp)
 						buf1, sizeof (buf1)),
 					    inet_ntop(AF_INET, &v4src,
 						buf2, sizeof (buf2))));
-					atomic_add_32(&atp->tun_InDiscard, 1);
+					for (nmp = data_mp; nmp != NULL;
+					    nmp = nmp->b_next) {
+						atomic_add_32(
+						    &atp->tun_InErrors, 1);
+					}
 					goto drop;
 				}
 
@@ -2847,7 +3390,11 @@ tun_rdata_v4(queue_t *q, mblk_t *mp)
 						sizeof (buf1)),
 					    inet_ntop(AF_INET, &v4src, buf2,
 						sizeof (buf2))));
-					atomic_add_32(&atp->tun_InDiscard, 1);
+					for (nmp = data_mp; nmp != NULL;
+					    nmp = nmp->b_next) {
+						atomic_add_32(
+						    &atp->tun_InErrors, 1);
+					}
 					goto drop;
 				}
 			}
@@ -2870,33 +3417,28 @@ tun_rdata_v4(queue_t *q, mblk_t *mp)
 				buf1, sizeof (buf1)),
 			    inet_ntop(AF_INET6, &atp->tun_faddr,
 				buf2, sizeof (buf2))));
-			atomic_add_32(&atp->tun_InErrors, 1);
+			/* XXX - should this be per-frag? */
+			for (nmp = data_mp; nmp != NULL; nmp = nmp->b_next)
+				atomic_add_32(&atp->tun_InErrors, 1);
 			goto drop;
 		}
 	}
-	atomic_add_64(&atp->tun_HCInOctets, (int64_t)msgdsize(mp));
-	putnext(q, mp);
+	TUN_PUTMSG_CHAIN_STATS(q, data_mp, nmp, &atp->tun_HCInOctets);
 	return (0);
 drop:
-	freemsg(mp);
+	if (ipsec_mp != NULL)
+		freeb(ipsec_mp);
+	tun_freemsg_chain(data_mp, NULL);
 	return (0);
 }
 
-/* ARGSUSED */
 static void
-tun_rput_icmp_err_v6(queue_t *q, mblk_t *mp)
+tun_rput_icmp_err_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 {
 	tun_t		*atp = (tun_t *)q->q_ptr;
 	ip6_t		*ip6;
 	icmp6_t		*icmph;
 	int		hdr_length;
-
-	if (!canputnext(q)) {
-		atomic_add_32(&atp->tun_nocanput, 1);
-		atomic_add_32(&atp->tun_InDiscard, 1);
-		freemsg(mp);
-		return;
-	}
 
 	ip6 = (ip6_t *)mp->b_rptr;
 	hdr_length = ip_hdr_length_v6(mp, ip6);
@@ -2904,14 +3446,16 @@ tun_rput_icmp_err_v6(queue_t *q, mblk_t *mp)
 
 	switch (atp->tun_flags & TUN_UPPER_MASK) {
 	case TUN_U_V6:
-		icmp_ricmp_err_v6_v6(q, mp, icmph);
+		icmp_ricmp_err_v6_v6(q, mp, ipsec_mp, icmph);
 		break;
 	case TUN_U_V4:
-		icmp_ricmp_err_v4_v6(q, mp, icmph);
+		icmp_ricmp_err_v4_v6(q, mp, ipsec_mp, icmph);
 		break;
 	default:
 		atomic_add_32(&atp->tun_InErrors, 1);
 		ASSERT(0);
+		if (ipsec_mp != NULL)
+			freeb(ipsec_mp);
 		freemsg(mp);
 	}
 }
@@ -2922,28 +3466,22 @@ tun_rput_icmp_err_v6(queue_t *q, mblk_t *mp)
  * lower processing function.
  */
 static void
-tun_rput_icmp_err_v4(queue_t *q, mblk_t *mp)
+tun_rput_icmp_err_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 {
 	tun_t		*atp = (tun_t *)q->q_ptr;
 
-	/* XXX - should we trust this or do the same logic as IP */
-	if (!canputnext(q)) {
-		atomic_add_32(&atp->tun_nocanput, 1);
-		atomic_add_32(&atp->tun_InDiscard, 1);
-		freemsg(mp);
-		return;
-	}
-
 	switch (atp->tun_flags & TUN_UPPER_MASK) {
 	case TUN_U_V6:
-		icmp_ricmp_err_v6_v4(q, mp);
+		icmp_ricmp_err_v6_v4(q, mp, ipsec_mp);
 		break;
 	case TUN_U_V4:
-		icmp_ricmp_err_v4_v4(q, mp);
+		icmp_ricmp_err_v4_v4(q, mp, ipsec_mp);
 		break;
 	default:
 		atomic_add_32(&atp->tun_InErrors, 1);
 		ASSERT(0);
+		if (ipsec_mp != NULL)
+			freeb(ipsec_mp);
 		freemsg(mp);
 	}
 }
@@ -2956,7 +3494,7 @@ tun_rput_icmp_err_v4(queue_t *q, mblk_t *mp)
  * the upper layer IP)
  */
 static void
-icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp)
+icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 {
 	tun_t		*atp = (tun_t *)q->q_ptr;
 	ipha_t		*outer_ipha, *inner_ipha;
@@ -2969,38 +3507,25 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp)
 	char		buf1[INET_ADDRSTRLEN];
 	char		buf2[INET_ADDRSTRLEN];
 	icmph_t		*icmph;
+	mblk_t		*orig_mp = mp;
 
 	/*
 	 * The packet looks like this :
 	 *
-	 *		[IPv4][ICMPv4][IPv4][IPv4][ULP]
+	 *		[IPv4(0)][ICMPv4][IPv4(1)][IPv4(2)][ULP]
 	 *
 	 * We want most of this in one piece. But if the ULP is ICMP, we
 	 * need to see whether it is an ICMP error or not. We should not
-	 * send icmp errors in response to icmp errors. To see whether
-	 * ULP is ICMP or not, we need to do the following :
+	 * send icmp errors in response to icmp errors.  "outer_ipha" points
+	 * to IP header (1), "inner_ipha" points to IP header (2).  Inbound
+	 * policy lookups for ICMP need to reverse the src/dst of things.
+	 * Fortunately, ipsec_tun_inbound() can determine if this is an ICMP
+	 * message or not.
 	 *
-	 *	- First pullup the outer IP header (i.e outer_ipha)
-	 *	  and the inner IP header without IP options.
-	 *	- Then obtain the length of the inner IP header,
-	 *	  pullup the inner IP header including the options and
-	 *	  the ICMP header following that.
-	 *
-	 * To keep it simple, we pullup the whole message.
+	 * The caller already pulled up the entire message, or should have!
 	 */
-	if (mp->b_cont != NULL) {
-		mp->b_datap->db_type = M_DATA;
-		if (!pullupmsg(mp, -1)) {
-			atomic_add_32(&atp->tun_InDiscard, 1);
-			freemsg(mp);
-			return;
-		}
-		mp->b_datap->db_type = M_CTL;
-	}
-	/*
-	 * icmp_inbound has pulled up the message until the
-	 * outer IP header excluding any IP options.
-	 */
+	ASSERT(mp->b_cont == NULL);
+
 	hlen = IPH_HDR_LENGTH((ipha_t *)mp->b_rptr);
 	icmph = (icmph_t *)(&mp->b_rptr[hlen]);
 	outer_ipha = (ipha_t *)&icmph[1];
@@ -3009,6 +3534,8 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp)
 
 	if (((uchar_t *)inner_ipha + sizeof (ipha_t)) > mp->b_wptr) {
 		atomic_add_32(&atp->tun_InDiscard, 1);
+		if (ipsec_mp != NULL)
+			freeb(ipsec_mp);
 		freemsg(mp);
 		return;
 	}
@@ -3020,6 +3547,8 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp)
 
 		if (((uchar_t *)inner_icmph + sizeof (icmph_t)) > mp->b_wptr) {
 			atomic_add_32(&atp->tun_InDiscard, 1);
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
 			freemsg(mp);
 			return;
 		}
@@ -3032,6 +3561,8 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp)
 		case ICMP_REDIRECT:
 			atomic_add_32(&atp->tun_InDiscard, 1);
 			freemsg(mp);
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
 			return;
 		default :
 			break;
@@ -3040,6 +3571,21 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp)
 
 	type = icmph->icmph_type;
 	code = icmph->icmph_code;
+
+	/*
+	 * NOTE:  icmp_inbound() in IP already checked global policy on the
+	 * outermost header.  If we got here, IP thought it was okay for
+	 * us to receive it.  We now have to use inner policy to see if
+	 * we want to percolate it up (like conn_t's are checked).
+	 *
+	 * Use -outer_hlen to indicate this is an ICMP packet.
+	 */
+	if (!ipsec_tun_inbound(ipsec_mp, &mp, atp->tun_itp, inner_ipha, NULL,
+		outer_ipha, NULL, -outer_hlen)) {
+		/* Callee did all of the freeing */
+		return;
+	}
+	ASSERT(mp == orig_mp);
 
 	/* New packet will contain all of old packet */
 
@@ -3056,6 +3602,8 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp)
 				tun0dbg(("icmp_ricmp_err_v4_v4: invalid " \
 				    "icmp mtu\n"));
 				atomic_add_32(&atp->tun_InErrors, 1);
+				if (ipsec_mp != NULL)
+					freeb(ipsec_mp);
 				freemsg(mp);
 				return;
 			}
@@ -3109,6 +3657,8 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp)
 			break;
 		default:
 			atomic_add_32(&atp->tun_InErrors, 1);
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
 			freemsg(mp);
 			return;
 		}
@@ -3124,6 +3674,8 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp)
 			tun0dbg(("icmp_ricmp_err_v4_v4: ICMP_PARAM_PROBLEM " \
 			    "too short\n"));
 			atomic_add_32(&atp->tun_InErrors, 1);
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
 			freemsg(mp);
 			return;
 		}
@@ -3133,6 +3685,8 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp)
 		break;
 	default:
 		atomic_add_32(&atp->tun_InErrors, 1);
+		if (ipsec_mp != NULL)
+			freeb(ipsec_mp);
 		freemsg(mp);
 		return;
 	}
@@ -3150,7 +3704,7 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp)
  * the upper layer IP)
  */
 static void
-icmp_ricmp_err_v4_v6(queue_t *q, mblk_t *mp, icmp6_t *icmph)
+icmp_ricmp_err_v4_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp, icmp6_t *icmph)
 {
 	tun_t		*atp = (tun_t *)q->q_ptr;
 	ip6_t		*ip6;
@@ -3165,12 +3719,34 @@ icmp_ricmp_err_v4_v6(queue_t *q, mblk_t *mp, icmp6_t *icmph)
 	struct ip6_opt	*optp;
 	boolean_t	found = B_FALSE;
 	ip6_pkt_t	pkt;
+	mblk_t		*orig_mp = mp;
 
 	ip6 = (ip6_t *)&(icmph[1]);
 
+	/*
+	 * The packet looks like this:
+	 *
+	 *		[IPv6(0)][ICMPv6][IPv6(1)][IPv4][ULP]
+	 *
+	 * "ip6" points to the IPv6 header labelled (1).
+	 */
 	outer_hlen = ip_hdr_length_v6(mp, ip6);
 	ipha = (ipha_t *)((uint8_t *)ip6 + outer_hlen);
 	type = icmph->icmp6_type;
+
+	/*
+	 * NOTE:  icmp_inbound() in IP already checked global policy on the
+	 * outermost header.  If we got here, IP thought it was okay for
+	 * us to receive it.  We now have to use inner policy to see if
+	 * we want to percolate it up (like conn_t's are checked).
+	 *
+	 * Use -outer_hlen to indicate this is an ICMP packet.
+	 */
+	if (!ipsec_tun_inbound(ipsec_mp, &mp, atp->tun_itp, ipha, NULL, NULL,
+		ip6, -outer_hlen))
+		/* Callee did all of the freeing */
+		return;
+	ASSERT(mp == orig_mp);
 
 	/* new packet will contain all of old packet */
 
@@ -3231,6 +3807,8 @@ icmp_ricmp_err_v4_v6(queue_t *q, mblk_t *mp, icmp6_t *icmph)
 		}
 
 		if (found != B_TRUE) {
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
 			freemsg(mp);
 			return;
 		}
@@ -3259,6 +3837,8 @@ icmp_ricmp_err_v4_v6(queue_t *q, mblk_t *mp, icmp6_t *icmph)
 		break;
 	}
 	default:
+		if (ipsec_mp != NULL)
+			freeb(ipsec_mp);
 		freemsg(mp);
 		return;
 	}
@@ -3277,7 +3857,7 @@ icmp_ricmp_err_v4_v6(queue_t *q, mblk_t *mp, icmp6_t *icmph)
  * the upper layer IP).  Otherwise, drop the message.
  */
 static void
-icmp_ricmp_err_v6_v6(queue_t *q, mblk_t *mp, icmp6_t *icmph)
+icmp_ricmp_err_v6_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp, icmp6_t *icmph)
 {
 	ip6_t		*ip6;
 	ip6_t		*inner_ip6;
@@ -3292,11 +3872,34 @@ icmp_ricmp_err_v6_v6(queue_t *q, mblk_t *mp, icmp6_t *icmph)
 	struct ip6_opt	*optp;
 	boolean_t	found = B_FALSE;
 	ip6_pkt_t	pkt;
+	mblk_t		*orig_mp = mp;
 
+	/*
+	 * The packet looks like this :
+	 *
+	 *		[IPv6(0)][ICMPv4][IPv6(1)][IPv6(2)][ULP]
+	 *
+	 * "ip6" points to the IPv6 header labelled (1), and inner_ip6 points
+	 * to IPv6 header (2).
+	 */
 	ip6 = (ip6_t *)&icmph[1];
 	outer_hlen = ip_hdr_length_v6(mp, ip6);
 	inner_ip6 = (ip6_t *)((uint8_t *)ip6 + outer_hlen);
 	type = icmph->icmp6_type;
+
+	/*
+	 * NOTE:  icmp_inbound() in IP already checked global policy on the
+	 * outermost header.  If we got here, IP thought it was okay for
+	 * us to receive it.  We now have to use inner policy to see if
+	 * we want to percolate it up (like conn_t's are checked).
+	 *
+	 * Use -outer_hlen to indicate this is an ICMP packet.
+	 */
+	if (!ipsec_tun_inbound(ipsec_mp, &mp, atp->tun_itp, NULL, inner_ip6,
+		NULL, ip6, -outer_hlen))
+		/* Callee did all of the freeing */
+		return;
+	ASSERT(mp == orig_mp);
 
 	/* new packet will contain all of old packet */
 
@@ -3357,6 +3960,8 @@ icmp_ricmp_err_v6_v6(queue_t *q, mblk_t *mp, icmp6_t *icmph)
 		}
 
 		if (found != B_TRUE) {
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
 			freemsg(mp);
 			return;	/* case */
 		}
@@ -3386,6 +3991,8 @@ icmp_ricmp_err_v6_v6(queue_t *q, mblk_t *mp, icmp6_t *icmph)
 		break;
 	}
 	default:
+		if (ipsec_mp != NULL)
+			freeb(ipsec_mp);
 		freemsg(mp);
 		return;
 	}
@@ -3405,7 +4012,7 @@ icmp_ricmp_err_v6_v6(queue_t *q, mblk_t *mp, icmp6_t *icmph)
  * the upper layer IP)
  */
 static void
-icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp)
+icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 {
 	tun_t		*atp = (tun_t *)q->q_ptr;
 	ip6_t		*ip6h;
@@ -3421,6 +4028,7 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp)
 	icmph_t		*icmph;
 	uint16_t	ip6_hdr_length;
 	uint8_t		*nexthdrp;
+	mblk_t		*orig_mp = mp;
 
 	/*
 	 * The case here is pretty easy when compared to IPv4 in IPv4
@@ -3428,25 +4036,18 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp)
 	 *
 	 * The packet looks like this :
 	 *
-	 *		[IPv4][ICMPv4][IPv4][IPv6][ULP]
+	 *		[IPv4(0)][ICMPv4][IPv4(1)][IPv6][ULP]
 	 *
 	 * We want most of this in one piece. But if the ULP is ICMPv6, we
 	 * need to see whether it is an ICMPv6 error or not. We should not
-	 * send icmp errors in response to icmp errors. To see whether
-	 * ULP is ICMPv6 or not, we need to call ip_hdr_length_nexthdr_v6
-	 * function which expects everything to be pulled up. So, we
-	 * pullup the whole message and see whether it is an ICMPv6 error
-	 * and discard if it is. Otherwise, we do the normal processing.
+	 * send icmp errors in response to icmp errors. "outer_ipha" points to
+	 * IP header (1).  "ip6h" is obvious.  To see whether ULP is ICMPv6 or
+	 * not, we need to call ip_hdr_length_nexthdr_v6 function which
+	 * expects everything to be pulled up.  Fortunately, the caller
+	 * should've done all of the pulling up.
 	 */
-	if (mp->b_cont != NULL) {
-		mp->b_datap->db_type = M_DATA;
-		if (!pullupmsg(mp, -1)) {
-			atomic_add_32(&atp->tun_InErrors, 1);
-			freemsg(mp);
-			return;
-		}
-		mp->b_datap->db_type = M_CTL;
-	}
+	ASSERT(mp->b_cont == NULL);
+
 	/*
 	 * icmp_inbound has pulled up the message until the
 	 * outer IP header excluding any IP options.
@@ -3459,6 +4060,8 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp)
 
 	if (((uchar_t *)ip6h + sizeof (ip6_t)) > mp->b_wptr) {
 		atomic_add_32(&atp->tun_InDiscard, 1);
+		if (ipsec_mp != NULL)
+			freeb(ipsec_mp);
 		freemsg(mp);
 		return;
 	}
@@ -3468,6 +4071,8 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp)
 	 */
 	if (!ip_hdr_length_nexthdr_v6(mp, ip6h, &ip6_hdr_length, &nexthdrp)) {
 		atomic_add_32(&atp->tun_InErrors, 1);
+		if (ipsec_mp != NULL)
+			freeb(ipsec_mp);
 		freemsg(mp);
 		return;
 	}
@@ -3481,6 +4086,8 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp)
 		    (ICMP6_IS_ERROR(inner_icmp6->icmp6_type)) ||
 		    inner_icmp6->icmp6_type == ND_REDIRECT) {
 			atomic_add_32(&atp->tun_InErrors, 1);
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
 			freemsg(mp);
 			return;
 		}
@@ -3489,6 +4096,20 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp)
 	type = icmph->icmph_type;
 	code = icmph->icmph_code;
 	hoplim = outer_ipha->ipha_ttl;
+
+	/*
+	 * NOTE:  icmp_inbound() in IP already checked global policy on the
+	 * outermost header.  If we got here, IP thought it was okay for
+	 * us to receive it.  We now have to use inner policy to see if
+	 * we want to percolate it up (like conn_t's are checked).
+	 *
+	 * Use -outer_hlen to indicate this is an ICMP packet.
+	 */
+	if (!ipsec_tun_inbound(ipsec_mp, &mp, atp->tun_itp, NULL, ip6h,
+		outer_ipha, NULL, -outer_hlen))
+		/* Callee did all of the freeing */
+		return;
+	ASSERT(mp == orig_mp);
 
 	/* New packet will contain all of old packet */
 
@@ -3505,6 +4126,8 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp)
 				tun0dbg(("icmp_ricmp_err_v6_v4: invalid " \
 				    "icmp mtu\n"));
 				atomic_add_32(&atp->tun_InErrors, 1);
+				if (ipsec_mp != NULL)
+					freeb(ipsec_mp);
 				freemsg(mp);
 				return;
 			}
@@ -3572,6 +4195,8 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp)
 			break;
 		default:
 			atomic_add_32(&atp->tun_InErrors, 1);
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
 			freemsg(mp);
 			return;
 		}
@@ -3587,6 +4212,8 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp)
 			tun0dbg(("icmp_ricmp_err_v6_v4: ICMP_PARAM_PROBLEM " \
 			    "too short\n"));
 			atomic_add_32(&atp->tun_InErrors, 1);
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
 			freemsg(mp);
 			return;
 		}
@@ -3597,6 +4224,8 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp)
 
 	default:
 		atomic_add_32(&atp->tun_InErrors, 1);
+		if (ipsec_mp != NULL)
+			freeb(ipsec_mp);
 		freemsg(mp);
 		return;
 	}
@@ -3809,6 +4438,68 @@ tun_rput(queue_t *q, mblk_t *mp)
 	}
 }
 
+static int
+tun_rdata(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp,
+    uint_t lvers)
+{
+	char buf[TUN_WHO_BUF];
+	int error = 0;
+
+	ASSERT(ipsec_mp == NULL || ipsec_mp->b_cont == data_mp);
+
+#define	MESSAGE ((ipsec_mp == NULL) ? data_mp : ipsec_mp)
+
+	/*
+	 * If it's an IPSEC_IN w/o any security properties, start treating
+	 * it like a cleartext packet.
+	 */
+	if (ipsec_mp != NULL && !ipsec_in_is_secure(ipsec_mp)) {
+		freeb(ipsec_mp);
+		ipsec_mp = NULL;
+	}
+
+	if (atp->tun_state != DL_IDLE) {
+		atomic_add_32(&atp->tun_InErrors, 1);
+		atomic_add_64(&atp->tun_HCInUcastPkts, 1);
+		freemsg(MESSAGE);
+		return (error);	/* pre-set to 0 */
+	}
+
+	if (!canputnext(q)) {
+		tun1dbg(("tun_rdata: flow controlled\n"));
+		ASSERT(data_mp->b_datap->db_type < QPCTL);
+		atomic_add_32(&atp->tun_nocanput, 1);
+		(void) putbq(q, MESSAGE);
+		error = ENOMEM;
+		goto bail;
+	}
+
+	if (lvers != TUN_L_V4 && lvers != TUN_L_V6) {
+		tun0dbg(("tun_rproc: %s no lower version\n",
+			    tun_who(q, buf)));
+		atomic_add_32(&atp->tun_InErrors, 1);
+		freemsg(MESSAGE);
+		error = EIO;
+		goto bail;
+	}
+
+#undef MESSAGE
+
+	error = (lvers == TUN_L_V4) ? tun_rdata_v4(q, ipsec_mp, data_mp, atp) :
+	    tun_rdata_v6(q, ipsec_mp, data_mp, atp);
+
+bail:
+	if (error) {
+		/* only record non flow control problems */
+		if (error != EBUSY) {
+			tun0dbg(("tun_rproc: %s error encounterd %d\n",
+				    tun_who(q, buf), error));
+		}
+	}
+
+	return (error);
+}
+
 /*
  * Process read side messages
  */
@@ -3819,30 +4510,15 @@ tun_rproc(queue_t *q, mblk_t *mp)
 	uint_t	lvers;
 	int	error = 0;
 	char	buf[TUN_WHO_BUF];
+	ipsec_in_t *ii;
+	mblk_t *ipsec_mp;
 
 	/* no lock needed, won't ever change */
 	lvers = atp->tun_flags & TUN_LOWER_MASK;
 
 	switch (mp->b_datap->db_type) {
 	case M_DATA:
-
-		if (lvers == TUN_L_V4) {
-			error = tun_rdata_v4(q, mp);
-		} else if (lvers == TUN_L_V6) {
-			error = tun_rdata_v6(q, mp);
-		} else {
-			tun0dbg(("tun_rproc: %s no lower version\n",
-			    tun_who(q, buf)));
-			atomic_add_32(&atp->tun_InErrors, 1);
-			freemsg(mp);
-		}
-		if (error) {
-			/* only record non flow control problems */
-			if (error != EBUSY) {
-				tun0dbg(("tun_rproc: %s error encounterd %d\n",
-				    tun_who(q, buf), error));
-			}
-		}
+		error = tun_rdata(q, NULL, mp, atp, lvers);
 		break;
 
 	case M_PROTO:
@@ -3852,24 +4528,56 @@ tun_rproc(queue_t *q, mblk_t *mp)
 		break;
 
 	case M_CTL:
-		/* its an ICMP error message from IP */
+		/* its either an IPsec-protect packet... */
+		ii = (ipsec_in_t *)mp->b_rptr;
+		if (ii->ipsec_in_type == IPSEC_IN) {
+			if (mp->b_cont->b_datap->db_type == M_DATA) {
+				error = tun_rdata(q, mp, mp->b_cont, atp,
+				    lvers);
+				break;	/* Out of switch. */
+			} else {
+				ASSERT(mp->b_cont->b_datap->db_type == M_CTL);
+				/*
+				 * ICMP message protected by IPsec.
+				 * Split out IPSEC_IN and pass it up separately.
+				 */
+				ipsec_mp = mp;
+				mp = mp->b_cont;
+			}
+		} else {
+			ipsec_mp = NULL;
+		}
 
+		/* ... or an ICMP error message from IP */
 		atomic_add_64(&atp->tun_HCInUcastPkts, 1);
+
+		if (!canputnext(q)) {
+			atomic_add_32(&atp->tun_nocanput, 1);
+			atomic_add_32(&atp->tun_InDiscard, 1);
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
+			freemsg(mp);
+			break;
+		}
 
 		/* Pull everything up into mp. */
 		mp->b_datap->db_type = M_DATA;
 		if (!pullupmsg(mp, -1)) {
 			atomic_add_32(&atp->tun_InErrors, 1);
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
 			freemsg(mp);
 			break;
 		}
 		mp->b_datap->db_type = M_CTL;
 
 		if (lvers == TUN_L_V4) {
-			tun_rput_icmp_err_v4(q, mp);
+			tun_rput_icmp_err_v4(q, mp, ipsec_mp);
 		} else if (lvers == TUN_L_V6) {
-			tun_rput_icmp_err_v6(q, mp);
+			tun_rput_icmp_err_v6(q, mp, ipsec_mp);
 		} else {
+			if (ipsec_mp != NULL)
+				freeb(ipsec_mp);
 			freemsg(mp);
 		}
 		break;
@@ -3894,7 +4602,13 @@ tun_rproc(queue_t *q, mblk_t *mp)
 		tun1dbg(("tun_rproc: received IRE_DB_TYPE, "
 		    "ipsec_overhead is %d bytes", ire->ire_ipsec_overhead));
 		mutex_enter(&atp->tun_lock);
-		atp->tun_ipsec_overhead = ire->ire_ipsec_overhead;
+		/*
+		 * Take advice from lower-layer if it is bigger than what we
+		 * have cached now.  We do manage per-tunnel policy, but
+		 * there may be global overhead to account for.
+		 */
+		atp->tun_ipsec_overhead = max(ire->ire_ipsec_overhead,
+		    atp->tun_ipsec_overhead);
 		if (atp->tun_flags & TUN_DST) {
 			(void) tun_update_link_mtu(q, ire->ire_max_frag,
 			    B_FALSE);
@@ -3919,10 +4633,10 @@ tun_rproc(queue_t *q, mblk_t *mp)
 static void
 tun_wdata_v4(queue_t *q, mblk_t *mp)
 {
-	ipha_t *outer_ipha, *inner_ipha;
-	ip6_t *ip6;
+	ipha_t *outer_ipha = NULL, *inner_ipha;
+	ip6_t *ip6 = NULL;
 	tun_t *atp = (tun_t *)q->q_ptr;
-	mblk_t *newmp;
+	mblk_t *nmp;
 	size_t hdrlen;
 	int16_t encap_limit;
 
@@ -3971,16 +4685,16 @@ tun_wdata_v4(queue_t *q, mblk_t *mp)
 		if ((mp->b_rptr - mp->b_datap->db_base) < sizeof (ipha_t)) {
 			/* no */
 
-			newmp = allocb(sizeof (ipha_t) + atp->tun_extra_offset,
+			nmp = allocb(sizeof (ipha_t) + atp->tun_extra_offset,
 			    BPRI_HI);
-			if (newmp == NULL) {
+			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);
 				freemsg(mp);
 				return;
 			}
-			newmp->b_cont = mp;
-			mp = newmp;
+			nmp->b_cont = mp;
+			mp = nmp;
 			mp->b_wptr = mp->b_datap->db_lim;
 			mp->b_rptr = mp->b_wptr - sizeof (ipha_t);
 		} else {
@@ -4016,16 +4730,16 @@ tun_wdata_v4(queue_t *q, mblk_t *mp)
 
 		if ((mp->b_rptr - mp->b_datap->db_base) < hdrlen) {
 			/* no */
-			newmp = allocb(hdrlen + atp->tun_extra_offset,
+			nmp = allocb(hdrlen + atp->tun_extra_offset,
 			    BPRI_HI);
-			if (newmp == NULL) {
+			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);
 				freemsg(mp);
 				return;
 			}
-			newmp->b_cont = mp;
-			mp = newmp;
+			nmp->b_cont = mp;
+			mp = nmp;
 			mp->b_wptr = mp->b_datap->db_lim;
 			mp->b_rptr = mp->b_wptr - hdrlen;
 		} else {
@@ -4058,7 +4772,14 @@ tun_wdata_v4(queue_t *q, mblk_t *mp)
 		tun_send_ire_req(q);
 
 	atomic_add_64(&atp->tun_HCOutOctets, (int64_t)msgdsize(mp));
-	putnext(q, mp);
+
+	mp = ipsec_tun_outbound(mp, atp, inner_ipha, NULL, outer_ipha, ip6,
+	    hdrlen);
+	if (mp == NULL)
+		return;
+
+	/* send the packet chain down the transport stream to IPv4/IPv6 */
+	TUN_PUTMSG_CHAIN(q, mp, nmp);
 }
 
 /*
@@ -4069,9 +4790,10 @@ static int
 tun_wputnext_v4(queue_t *q, mblk_t *mp)
 {
 	tun_t *atp = (tun_t *)q->q_ptr;
-	ipha_t *inner_ipha, *outer_ipha;
-	ip6_t *ip6;
+	ipha_t *inner_ipha, *outer_ipha = NULL;
+	ip6_t *ip6 = NULL;
 	uint_t	hdrlen;
+	mblk_t *nmp;
 
 	mp->b_rptr += atp->tun_extra_offset;
 	if ((atp->tun_flags & TUN_L_V4) != 0) {
@@ -4178,6 +4900,11 @@ tun_wputnext_v4(queue_t *q, mblk_t *mp)
 
 	atomic_add_64(&atp->tun_HCOutOctets, (int64_t)msgsize(mp));
 
+	mp = ipsec_tun_outbound(mp, atp, inner_ipha, NULL, outer_ipha, ip6,
+	    hdrlen);
+	if (mp == NULL)
+		return (0);
+
 	/*
 	 * Request the destination ire regularly in case Path MTU has
 	 * increased.
@@ -4185,8 +4912,8 @@ tun_wputnext_v4(queue_t *q, mblk_t *mp)
 	if (TUN_IRE_TOO_OLD(atp))
 		tun_send_ire_req(q);
 
-	/* send the packet down the transport stream to IPv4/IPv6 */
-	putnext(q, mp);
+	/* send the packet chain down the transport stream to IPv4/IPv6 */
+	TUN_PUTMSG_CHAIN(q, mp, nmp);
 	return (0);
 }
 
@@ -4199,9 +4926,12 @@ tun_wputnext_v6(queue_t *q, mblk_t *mp)
 {
 	tun_t	*atp = (tun_t *)q->q_ptr;
 	ip6_t	*ip6h;
+	ip6_t *outer_ip6 = NULL;
 	uint_t	hdrlen;
 	struct ip6_opt_tunnel *encap_opt;
 	int	encap_limit = 0;
+	ipha_t	*ipha = NULL;
+	mblk_t	*nmp;
 
 	/*
 	 * fastpath reserves a bit more then we can use.
@@ -4209,8 +4939,6 @@ tun_wputnext_v6(queue_t *q, mblk_t *mp)
 	 */
 	mp->b_rptr += atp->tun_extra_offset;
 	if ((atp->tun_flags & TUN_L_V4) != 0) {
-		ipha_t	*ipha;
-
 		ipha = (ipha_t *)mp->b_rptr;
 		hdrlen = IPH_HDR_LENGTH(ipha);
 
@@ -4237,8 +4965,6 @@ tun_wputnext_v6(queue_t *q, mblk_t *mp)
 		    (uint16_t)sizeof (ip6_t) + (uint16_t)sizeof (ipha_t));
 
 	} else if ((atp->tun_flags & TUN_L_V6) != 0) {
-		ip6_t *outer_ip6;
-
 		outer_ip6 = (ip6_t *)mp->b_rptr;
 		ASSERT(outer_ip6->ip6_nxt == IPPROTO_IPV6 ||
 		    outer_ip6->ip6_nxt == IPPROTO_DSTOPTS);
@@ -4331,7 +5057,12 @@ tun_wputnext_v6(queue_t *q, mblk_t *mp)
 		tun_send_ire_req(q);
 
 	/* send the packet down the transport stream to IPv4/IPv6 */
-	putnext(q, mp);
+	mp = ipsec_tun_outbound(mp, atp, NULL, ip6h, ipha, outer_ip6, hdrlen);
+	if (mp == NULL)
+		return (0);
+
+	/* send the packet chain down the transport stream to IPv4/IPv6 */
+	TUN_PUTMSG_CHAIN(q, mp, nmp);
 	return (0);
 }
 
@@ -4432,9 +5163,9 @@ static void
 tun_wdata_v6(queue_t *q, mblk_t *mp)
 {
 	tun_t		*atp = (tun_t *)q->q_ptr;
-	ipha_t		*ipha;
-	ip6_t		*ip6h, *outer_ip6;
-	mblk_t		*newmp;
+	ipha_t		*ipha = NULL;
+	ip6_t		*ip6h, *outer_ip6 = NULL;
+	mblk_t		*nmp;
 	ipaddr_t	v4addr;
 	char		buf1[INET6_ADDRSTRLEN];
 	char		buf2[INET6_ADDRSTRLEN];
@@ -4471,18 +5202,19 @@ tun_wdata_v6(queue_t *q, mblk_t *mp)
 	switch (atp->tun_flags & TUN_LOWER_MASK) {
 	case TUN_L_V4:
 		/* room for IPv4 header? */
+		hdrlen = sizeof (ipha_t);
 		if ((mp->b_rptr - mp->b_datap->db_base) < sizeof (ipha_t)) {
 			/* no */
 
-			newmp = allocb(sizeof (ipha_t) + atp->tun_extra_offset,
+			nmp = allocb(sizeof (ipha_t) + atp->tun_extra_offset,
 			    BPRI_HI);
-			if (newmp == NULL) {
+			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);
 				goto drop;
 			}
-			newmp->b_cont = mp;
-			mp = newmp;
+			nmp->b_cont = mp;
+			mp = nmp;
 			mp->b_wptr = mp->b_datap->db_lim;
 			mp->b_rptr = mp->b_wptr - sizeof (ipha_t);
 		} else {
@@ -4659,16 +5391,16 @@ tun_wdata_v6(queue_t *q, mblk_t *mp)
 
 		if ((mp->b_rptr - mp->b_datap->db_base) < hdrlen) {
 			/* no */
-			newmp = allocb(hdrlen + atp->tun_extra_offset,
+			nmp = allocb(hdrlen + atp->tun_extra_offset,
 			    BPRI_HI);
-			if (newmp == NULL) {
+			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);
 				freemsg(mp);
 				return;
 			}
-			newmp->b_cont = mp;
-			mp = newmp;
+			nmp->b_cont = mp;
+			mp = nmp;
 			mp->b_wptr = mp->b_datap->db_lim;
 			mp->b_rptr = mp->b_wptr - hdrlen;
 		} else {
@@ -4711,7 +5443,12 @@ tun_wdata_v6(queue_t *q, mblk_t *mp)
 		tun_send_ire_req(q);
 
 	/* send the packet down the transport stream to IP */
-	putnext(q, mp);
+	mp = ipsec_tun_outbound(mp, atp, NULL, ip6h, ipha, outer_ip6, hdrlen);
+	if (mp == NULL)
+		return;
+
+	/* send the packet chain down the transport stream to IPv4/IPv6 */
+	TUN_PUTMSG_CHAIN(q, mp, nmp);
 	return;
 drop:
 	freemsg(mp);
@@ -4943,7 +5680,7 @@ tun_stat_kstat_update(kstat_t *ksp, int rw)
 	tunsp->tuns_HCOutUcastPkts.value.ui64 = 0;
 	tunsp->tuns_HCOutMulticastPkts.value.ui64 = 0;
 
-	for (tunp = tstats->ts_atp; tunp; tunp = tunp->tun_next) {
+	for (tunp = tstats->ts_atp; tunp; tunp = tunp->tun_kstat_next) {
 		tunsp->tuns_nocanput.value.ui32 += tunp->tun_nocanput;
 		tunsp->tuns_xmtretry.value.ui32 += tunp->tun_xmtretry;
 		tunsp->tuns_allocbfail.value.ui32 += tunp->tun_allocbfail;

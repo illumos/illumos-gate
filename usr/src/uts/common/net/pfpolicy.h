@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,9 +127,11 @@ typedef struct spd_ext
 #define	SPD_EXT_ACTION				6
 #define	SPD_EXT_RULE				7
 #define	SPD_EXT_RULESET				8
-#define	SPD_EXT_ICMP_TYPECODE  	9
+#define	SPD_EXT_ICMP_TYPECODE  			9
 
-#define	SPD_EXT_MAX				9
+#define	SPD_EXT_TUN_NAME			10
+
+#define	SPD_EXT_MAX				10
 
 /*
  * base policy rule (attributes which every rule has)
@@ -154,6 +155,8 @@ struct spd_rule
  */
 #define	SPD_RULE_FLAG_INBOUND		0x0001
 #define	SPD_RULE_FLAG_OUTBOUND		0x0002
+/* Only applies to tunnel policy heads. */
+#define	SPD_RULE_FLAG_TUNNEL		0x0004
 
 /*
  * Address selectors.   Different from PF_KEY because we want a
@@ -365,6 +368,29 @@ struct spd_attribute
 #define	SPD_ATTR_PROTO_EXEC_MODE	0x00000121
 
 /*
+ * An interface extension identifies a network interface.
+ * It is used for configuring Tunnel Mode policies on a tunnelling
+ * interface for now.
+ */
+typedef struct spd_if_s {
+	union {
+		struct {
+			uint16_t spd_if_ulen;
+			uint16_t spd_if_uexttype;
+			union {
+				uint8_t spd_if_iuname[4];
+				uint32_t spd_if_iuindex;
+			} spd_if_iu;
+		} spd_if_actual;
+		uint64_t spd_if_alignment;
+	} spd_if_u;
+#define	spd_if_len spd_if_u.spd_if_actual.spd_if_ulen
+#define	spd_if_exttype spd_if_u.spd_if_actual.spd_if_uexttype
+#define	spd_if_name spd_if_u.spd_if_actual.spd_if_iu.spd_if_iuname
+#define	spd_if_index spd_if_u.spd_if_actual.spd_if_iu.spd_if_iuindex
+} spd_if_t;
+
+/*
  * Minimum, maximum key lengths in bits.
  */
 #define	SPD_MIN_MINBITS		0x0000
@@ -483,6 +509,8 @@ typedef struct spd_ruleset_ext
 #define	SPD_DIAGNOSTIC_ALG_IPSEC_NOT_LOADED	41
 #define	SPD_DIAGNOSTIC_MALFORMED_ICMP_TYPECODE	42
 #define	SPD_DIAGNOSTIC_DUPLICATE_ICMP_TYPECODE	43
+#define	SPD_DIAGNOSTIC_NOT_GLOBAL_OP		44
+#define	SPD_DIAGNOSTIC_NO_TUNNEL_SELECTORS	45
 
 /*
  * Helper macros.

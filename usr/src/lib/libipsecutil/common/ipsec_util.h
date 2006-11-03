@@ -39,6 +39,9 @@ extern "C" {
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <net/pfkeyv2.h>
+#include <netinet/in.h>
+#include <inet/ip.h>
 #include <setjmp.h>
 #include <stdio.h>
 #include <err.h>
@@ -109,7 +112,7 @@ extern void bail_msg(char *, ...);
  * take a FILE pointer.
  */
 
-extern int dump_sockaddr(struct sockaddr *, boolean_t, FILE *);
+extern int dump_sockaddr(struct sockaddr *, uint8_t, boolean_t, FILE *);
 
 extern int dump_key(uint8_t *, uint_t, FILE *);
 
@@ -172,6 +175,7 @@ extern boolean_t pflag;	/* Paranoid w.r.t. printing keying material? */
 extern boolean_t interactive;
 extern boolean_t readfile;
 extern uint_t lineno;
+extern char numprint[NBUF_SIZE];
 
 /* For error recovery in interactive or read-file mode. */
 extern jmp_buf env;
@@ -283,6 +287,37 @@ extern const char *spdsock_diag(int);
 
 /* PF_KEY (keysock) support functions */
 extern const char *keysock_diag(int);
+extern int in_masktoprefix(uint8_t *, boolean_t);
+
+/* SA support functions */
+
+extern void print_diagnostic(FILE *, uint16_t);
+extern void print_sadb_msg(struct sadb_msg *, time_t, boolean_t);
+extern void print_sa(char *, struct sadb_sa *);
+extern void printsatime(int64_t, const char *, const char *, const char *,
+    boolean_t);
+extern void print_lifetimes(time_t, struct sadb_lifetime *,
+    struct sadb_lifetime *, struct sadb_lifetime *, boolean_t vflag);
+extern void print_address(char *, struct sadb_address *);
+extern void print_key(char *, struct sadb_key *);
+extern void print_ident(char *, struct sadb_ident *);
+extern void print_sens(char *, struct sadb_sens *);
+extern void print_prop(char *, struct sadb_prop *);
+extern void print_eprop(char *, struct sadb_prop *);
+extern void print_supp(char *, struct sadb_supported *);
+extern void print_spirange(char *, struct sadb_spirange *);
+extern void print_kmc(char *, struct sadb_x_kmc *);
+extern void print_samsg(uint64_t *, boolean_t, boolean_t);
+extern char *rparsesatype(int);
+extern char *rparsealg(uint8_t, int);
+extern char *rparseidtype(uint16_t);
+extern boolean_t save_lifetime(struct sadb_lifetime *, FILE *);
+extern boolean_t save_address(struct sadb_address *, FILE *);
+extern boolean_t save_key(struct sadb_key *, FILE *);
+extern boolean_t save_ident(struct sadb_ident *, FILE *);
+extern void save_assoc(uint64_t *, FILE *);
+extern FILE *opensavefile(char *);
+extern const char *do_inet_ntop(const void *, char *, size_t);
 
 #ifdef __cplusplus
 }

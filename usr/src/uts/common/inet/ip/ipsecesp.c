@@ -1257,83 +1257,26 @@ esp_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs)
 static void
 esp_send_acquire(ipsacq_t *acqrec, mblk_t *extended)
 {
-	mblk_t *pfkeymp, *msgmp;
-	uint_t allocsize, combs;
+	uint_t combs;
 	sadb_msg_t *samsg;
 	sadb_prop_t *prop;
-	uint8_t *cur, *end;
+	mblk_t *pfkeymp, *msgmp;
 
 	ESP_BUMP_STAT(acquire_requests);
 
-	ASSERT(MUTEX_HELD(&acqrec->ipsacq_lock));
-
-	pfkeymp = sadb_keysock_out(0);
-	if (pfkeymp == NULL) {
-		esp0dbg(("esp_send_acquire: 1st allocb() failed.\n"));
-		/* Just bail. */
-		goto done;
-	}
-
-	/*
-	 * First, allocate a basic ACQUIRE message.  Beyond that,
-	 * you need to extract certificate info from
-	 */
-	allocsize = sizeof (sadb_msg_t) + sizeof (sadb_address_t) +
-	    sizeof (sadb_address_t) + sizeof (sadb_prop_t);
-
-	switch (acqrec->ipsacq_addrfam) {
-	case AF_INET:
-		allocsize += 2 * sizeof (struct sockaddr_in);
-		break;
-	case AF_INET6:
-		allocsize += 2 * sizeof (struct sockaddr_in6);
-		break;
-	}
-
-	mutex_enter(&alg_lock);
-
-	combs = ipsec_nalgs[IPSEC_ALG_AUTH] * ipsec_nalgs[IPSEC_ALG_ENCR];
-
-	allocsize += combs * sizeof (sadb_comb_t);
-
-	/*
-	 * XXX If there are:
-	 *	certificate IDs
-	 *	proxy address
-	 *	<Others>
-	 * add additional allocation size.
-	 */
-
-	msgmp = allocb(allocsize, BPRI_HI);
-	if (msgmp == NULL) {
-		esp0dbg(("esp_send_acquire: 2nd allocb() failed.\n"));
-		/* Just bail. */
-		freemsg(pfkeymp);
-		pfkeymp = NULL;
-		goto done;
-	}
-
-	cur = msgmp->b_rptr;
-	end = cur + allocsize;
-	samsg = (sadb_msg_t *)cur;
-	pfkeymp->b_cont = msgmp;
+	if (esp_pfkey_q == NULL)
+		return;
 
 	/* Set up ACQUIRE. */
-	cur = sadb_setup_acquire(cur, end, acqrec);
-	if (cur == NULL) {
+	pfkeymp = sadb_setup_acquire(acqrec, SADB_SATYPE_ESP);
+	if (pfkeymp == NULL) {
 		esp0dbg(("sadb_setup_acquire failed.\n"));
-		/* Just bail. */
-		freemsg(pfkeymp);
-		pfkeymp = NULL;
-		goto done;
+		return;
 	}
-	samsg->sadb_msg_satype = SADB_SATYPE_ESP;
-
-	/* XXX Insert proxy address information here. */
-
-	/* XXX Insert identity information here. */
-
-	/* XXXMLS Insert sensitivity information here. */
+	ASSERT(MUTEX_HELD(&alg_lock));
+	combs = ipsec_nalgs[IPSEC_ALG_AUTH] * ipsec_nalgs[IPSEC_ALG_ENCR];
+	msgmp = pfkeymp->b_cont;
+	samsg = (sadb_msg_t *)(msgmp->b_rptr);
 
 	/* Insert proposal here. */
 
@@ -1342,7 +1285,6 @@ esp_send_acquire(ipsacq_t *acqrec, mblk_t *extended)
 	samsg->sadb_msg_len += prop->sadb_prop_len;
 	msgmp->b_wptr += SADB_64TO8(samsg->sadb_msg_len);
 
-done:
 	mutex_exit(&alg_lock);
 
 	/*
@@ -1353,16 +1295,10 @@ done:
 	 * Once I've sent the message, I'm cool anyway.
 	 */
 	mutex_exit(&acqrec->ipsacq_lock);
-	if (esp_pfkey_q != NULL && pfkeymp != NULL) {
-		if (extended != NULL) {
-			putnext(esp_pfkey_q, extended);
-		}
-		putnext(esp_pfkey_q, pfkeymp);
-		return;
+	if (extended != NULL) {
+		putnext(esp_pfkey_q, extended);
 	}
-	/* XXX freemsg() works for extended == NULL. */
-	freemsg(extended);
-	freemsg(pfkeymp);
+	putnext(esp_pfkey_q, pfkeymp);
 }
 
 /*
@@ -2468,69 +2404,8 @@ ipsecesp_icmp_error(mblk_t *ipsec_mp)
 static void
 ipsecesp_rput(queue_t *q, mblk_t *mp)
 {
-	keysock_in_t *ksi;
-	int *addrtype;
-	ire_t *ire;
-	mblk_t *ire_mp, *last_mp;
-
+	ASSERT(mp->b_datap->db_type != M_CTL);	/* No more IRE_DB_REQ. */
 	switch (mp->b_datap->db_type) {
-	case M_CTL:
-		/*
-		 * IPsec request of some variety from IP.  IPSEC_{IN,OUT}
-		 * are the common cases, but even ICMP error messages from IP
-		 * may rise up here.
-		 *
-		 * Ummmm, actually, this can also be the reflected KEYSOCK_IN
-		 * message, with an IRE_DB_TYPE hung off at the end.
-		 */
-		switch (((ipsec_info_t *)(mp->b_rptr))->ipsec_info_type) {
-		case KEYSOCK_IN:
-			last_mp = mp;
-			while (last_mp->b_cont != NULL &&
-			    last_mp->b_cont->b_datap->db_type != IRE_DB_TYPE)
-				last_mp = last_mp->b_cont;
-
-			if (last_mp->b_cont == NULL) {
-				freemsg(mp);
-				break;	/* Out of switch. */
-			}
-
-			ire_mp = last_mp->b_cont;
-			last_mp->b_cont = NULL;
-
-			ksi = (keysock_in_t *)mp->b_rptr;
-
-			if (ksi->ks_in_srctype == KS_IN_ADDR_UNKNOWN)
-				addrtype = &ksi->ks_in_srctype;
-			else if (ksi->ks_in_dsttype == KS_IN_ADDR_UNKNOWN)
-				addrtype = &ksi->ks_in_dsttype;
-			else if (ksi->ks_in_proxytype == KS_IN_ADDR_UNKNOWN)
-				addrtype = &ksi->ks_in_proxytype;
-
-			ire = (ire_t *)ire_mp->b_rptr;
-
-			*addrtype = sadb_addrset(ire);
-
-			freemsg(ire_mp);
-			if (esp_pfkey_q != NULL) {
-				/*
-				 * Decrement counter to make up for
-				 * auto-increment in ipsecesp_wput().
-				 * I'm running all MT-hot through here, so
-				 * don't worry about perimeters and lateral
-				 * puts.
-				 */
-				ESP_DEBUMP_STAT(keysock_in);
-				ipsecesp_wput(WR(esp_pfkey_q), mp);
-			} else {
-				freemsg(mp);
-			}
-			break;
-		default:
-			freemsg(mp);
-			break;
-		}
-		break;
 	case M_PROTO:
 	case M_PCPROTO:
 		/* TPI message of some sort. */
@@ -2796,7 +2671,8 @@ inbound_task(void *arg)
  * send back a reply ADD message.
  */
 static int
-esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi)
+esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
+    int *diagnostic)
 {
 	isaf_t *primary, *secondary, *inbound, *outbound;
 	sadb_sa_t *assoc = (sadb_sa_t *)ksi->ks_in_extv[SADB_EXT_SA];
@@ -2868,7 +2744,7 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi)
 			clone = B_TRUE;
 		break;
 	default:
-		samsg->sadb_x_msg_diagnostic = SADB_X_DIAGNOSTIC_BAD_DST;
+		*diagnostic = SADB_X_DIAGNOSTIC_BAD_DST;
 		return (EINVAL);
 	}
 
@@ -2934,7 +2810,7 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi)
 		lpkt = sadb_clear_lpkt(larval);
 
 	rc = sadb_common_add(esp_sadb.s_ip_q, esp_pfkey_q, mp, samsg, ksi,
-	    primary, secondary, larval, clone, is_inbound);
+	    primary, secondary, larval, clone, is_inbound, diagnostic);
 
 	if (rc == 0 && lpkt != NULL) {
 		rc = !taskq_dispatch(esp_taskq, inbound_task,
@@ -2961,12 +2837,13 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi)
 				((ipsec_out_t *)(mp->b_rptr))->
 				    ipsec_out_esp_done = B_TRUE;
 				if (esp_outbound(mp) == IPSEC_STATUS_SUCCESS) {
-					ipha_t *ipha = (ipha_t *)
-					    mp->b_cont->b_rptr;
+					ipha_t *ipha;
 
 					/* do AH processing if needed */
 					if (!esp_do_outbound_ah(mp))
 						continue;
+
+					ipha = (ipha_t *)mp->b_cont->b_rptr;
 
 					/* finish IPsec processing */
 					if (is_ipv4) {
@@ -3001,6 +2878,10 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic)
 	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_SRC];
 	sadb_address_t *dstext =
 	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_DST];
+	sadb_address_t *isrcext =
+	    (sadb_address_t *)ksi->ks_in_extv[SADB_X_EXT_ADDRESS_INNER_SRC];
+	sadb_address_t *idstext =
+	    (sadb_address_t *)ksi->ks_in_extv[SADB_X_EXT_ADDRESS_INNER_DST];
 	sadb_address_t *nttext_loc =
 	    (sadb_address_t *)ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_LOC];
 	sadb_address_t *nttext_rem =
@@ -3023,6 +2904,14 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic)
 	}
 	if (dstext == NULL) {
 		*diagnostic = SADB_X_DIAGNOSTIC_MISSING_DST;
+		return (EINVAL);
+	}
+	if (isrcext == NULL && idstext != NULL) {
+		*diagnostic = SADB_X_DIAGNOSTIC_MISSING_INNER_SRC;
+		return (EINVAL);
+	}
+	if (isrcext != NULL && idstext == NULL) {
+		*diagnostic = SADB_X_DIAGNOSTIC_MISSING_INNER_DST;
 		return (EINVAL);
 	}
 	if (assoc == NULL) {
@@ -3059,7 +2948,8 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic)
 	}
 
 	if (assoc->sadb_sa_flags & ~(SADB_SAFLAGS_NOREPLAY |
-	    SADB_X_SAFLAGS_NATT_LOC | SADB_X_SAFLAGS_NATT_REM)) {
+	    SADB_X_SAFLAGS_NATT_LOC | SADB_X_SAFLAGS_NATT_REM |
+		SADB_X_SAFLAGS_TUNNEL)) {
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
 		return (EINVAL);
 	}
@@ -3067,11 +2957,7 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic)
 	if ((*diagnostic = sadb_hardsoftchk(hard, soft)) != 0) {
 		return (EINVAL);
 	}
-	if (src->sin_family != dst->sin_family) {
-		*diagnostic = SADB_X_DIAGNOSTIC_AF_MISMATCH;
-		return (EINVAL);
-	}
-
+	ASSERT(src->sin_family == dst->sin_family);
 
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_NATT_LOC) {
 		if (nttext_loc == NULL) {
@@ -3186,7 +3072,8 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic)
 	}
 	mutex_exit(&alg_lock);
 
-	return (esp_add_sa_finish(mp, (sadb_msg_t *)mp->b_cont->b_rptr, ksi));
+	return (esp_add_sa_finish(mp, (sadb_msg_t *)mp->b_cont->b_rptr, ksi,
+		    diagnostic));
 }
 
 /*
@@ -3235,10 +3122,9 @@ esp_del_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic)
 			*diagnostic = SADB_X_DIAGNOSTIC_MISSING_SA;
 			return (EINVAL);
 		}
-		return sadb_purge_sa(mp, ksi,
-		    (sin->sin_family == AF_INET6) ? &esp_sadb.s_v6 :
-		    &esp_sadb.s_v4,
-		    diagnostic, esp_pfkey_q, esp_sadb.s_ip_q);
+		return (sadb_purge_sa(mp, ksi,
+			    (sin->sin_family == AF_INET6) ? &esp_sadb.s_v6 :
+			    &esp_sadb.s_v4, esp_pfkey_q, esp_sadb.s_ip_q));
 	}
 
 	return (sadb_del_sa(mp, ksi, &esp_sadb, diagnostic, esp_pfkey_q));
@@ -3272,6 +3158,31 @@ bail:
 }
 
 /*
+ * First-cut reality check for an inbound PF_KEY message.
+ */
+static boolean_t
+esp_pfkey_reality_failures(mblk_t *mp, keysock_in_t *ksi)
+{
+	int diagnostic;
+
+	if (ksi->ks_in_extv[SADB_EXT_PROPOSAL] != NULL) {
+		diagnostic = SADB_X_DIAGNOSTIC_PROP_PRESENT;
+		goto badmsg;
+	}
+	if (ksi->ks_in_extv[SADB_EXT_SUPPORTED_AUTH] != NULL ||
+	    ksi->ks_in_extv[SADB_EXT_SUPPORTED_ENCRYPT] != NULL) {
+		diagnostic = SADB_X_DIAGNOSTIC_SUPP_PRESENT;
+		goto badmsg;
+	}
+	return (B_FALSE);	/* False ==> no failures */
+
+badmsg:
+	sadb_pfkey_error(esp_pfkey_q, mp, EINVAL, diagnostic,
+	    ksi->ks_in_serial);
+	return (B_TRUE);	/* True ==> failures */
+}
+
+/*
  * ESP parsing of PF_KEY messages.  Keysock did most of the really silly
  * error cases.  What I receive is a fully-formed, syntactically legal
  * PF_KEY message.  I then need to check semantics...
@@ -3297,9 +3208,12 @@ esp_parse_pfkey(mblk_t *mp)
 
 	/*
 	 * If applicable, convert unspecified AF_INET6 to unspecified
-	 * AF_INET.
+	 * AF_INET.  And do other address reality checks.
 	 */
-	sadb_srcaddrfix(ksi);
+	if (!sadb_addrfix(ksi, esp_pfkey_q, mp) ||
+	    esp_pfkey_reality_failures(mp, ksi)) {
+		return;
+	}
 
 	switch (samsg->sadb_msg_type) {
 	case SADB_ADD:
@@ -3432,48 +3346,12 @@ esp_keysock_no_socket(mblk_t *mp)
 }
 
 /*
- * First-cut reality check for an inbound PF_KEY message.
- */
-static boolean_t
-esp_pfkey_reality_failures(mblk_t *mp, keysock_in_t *ksi)
-{
-	int diagnostic;
-
-	if (ksi->ks_in_extv[SADB_EXT_PROPOSAL] != NULL) {
-		diagnostic = SADB_X_DIAGNOSTIC_PROP_PRESENT;
-		goto badmsg;
-	}
-	if (ksi->ks_in_extv[SADB_EXT_SUPPORTED_AUTH] != NULL ||
-	    ksi->ks_in_extv[SADB_EXT_SUPPORTED_ENCRYPT] != NULL) {
-		diagnostic = SADB_X_DIAGNOSTIC_SUPP_PRESENT;
-		goto badmsg;
-	}
-	if (ksi->ks_in_srctype == KS_IN_ADDR_MBCAST) {
-		diagnostic = SADB_X_DIAGNOSTIC_BAD_SRC;
-		goto badmsg;
-	}
-	if (ksi->ks_in_dsttype == KS_IN_ADDR_UNSPEC) {
-		diagnostic = SADB_X_DIAGNOSTIC_BAD_DST;
-		goto badmsg;
-	}
-
-	return (B_FALSE);	/* False ==> no failures */
-
-badmsg:
-	sadb_pfkey_error(esp_pfkey_q, mp, EINVAL, diagnostic,
-	    ksi->ks_in_serial);
-	return (B_TRUE);	/* True ==> failures */
-}
-
-/*
  * ESP module write put routine.
  */
 static void
 ipsecesp_wput(queue_t *q, mblk_t *mp)
 {
 	ipsec_info_t *ii;
-	keysock_in_t *ksi;
-	int rc;
 	struct iocblk *iocp;
 
 	esp3dbg(("In esp_wput().\n"));
@@ -3496,51 +3374,8 @@ ipsecesp_wput(queue_t *q, mblk_t *mp)
 		case KEYSOCK_IN:
 			ESP_BUMP_STAT(keysock_in);
 			esp3dbg(("Got KEYSOCK_IN message.\n"));
-			ksi = (keysock_in_t *)ii;
-			/*
-			 * Some common reality checks.
-			 */
 
-			if (esp_pfkey_reality_failures(mp, ksi))
-				return;
-
-			/*
-			 * Use 'q' instead of esp_sadb.s_ip_q, since
-			 * it's the write side already, and it'll go
-			 * down to IP.  Use esp_pfkey_q because we
-			 * wouldn't get here if that weren't set, and
-			 * the RD(q) has been done already.
-			 */
-			if (ksi->ks_in_srctype == KS_IN_ADDR_UNKNOWN) {
-				rc = sadb_addrcheck(q, esp_pfkey_q, mp,
-				    ksi->ks_in_extv[SADB_EXT_ADDRESS_SRC],
-				    ksi->ks_in_serial);
-				if (rc == KS_IN_ADDR_UNKNOWN)
-					return;
-				else
-					ksi->ks_in_srctype = rc;
-			}
-			if (ksi->ks_in_dsttype == KS_IN_ADDR_UNKNOWN) {
-				rc = sadb_addrcheck(q, esp_pfkey_q, mp,
-				    ksi->ks_in_extv[SADB_EXT_ADDRESS_DST],
-				    ksi->ks_in_serial);
-				if (rc == KS_IN_ADDR_UNKNOWN)
-					return;
-				else
-					ksi->ks_in_dsttype = rc;
-			}
-			/*
-			 * XXX Proxy may be a different address family.
-			 */
-			if (ksi->ks_in_proxytype == KS_IN_ADDR_UNKNOWN) {
-				rc = sadb_addrcheck(q, esp_pfkey_q, mp,
-				    ksi->ks_in_extv[SADB_EXT_ADDRESS_PROXY],
-				    ksi->ks_in_serial);
-				if (rc == KS_IN_ADDR_UNKNOWN)
-					return;
-				else
-					ksi->ks_in_proxytype = rc;
-			}
+			/* Parse the message. */
 			esp_parse_pfkey(mp);
 			break;
 		case KEYSOCK_HELLO:

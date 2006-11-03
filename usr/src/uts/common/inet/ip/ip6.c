@@ -3337,7 +3337,12 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 
 			freemsg(mp1);
 		} else {
-			if (CONN_INBOUND_POLICY_PRESENT_V6(connp) || secure) {
+			/*
+			 * Don't enforce here if we're a tunnel - let "tun" do
+			 * it instead.
+			 */
+			if (!IPCL_IS_IPTUN(connp) &&
+			    (CONN_INBOUND_POLICY_PRESENT_V6(connp) || secure)) {
 				first_mp1 = ipsec_check_inbound_policy
 				    (first_mp1, connp, NULL, ip6h,
 				    mctl_present);
@@ -3406,7 +3411,24 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 
 		freemsg(first_mp);
 	} else {
-		if (CONN_INBOUND_POLICY_PRESENT_V6(connp) || secure) {
+		if (IPCL_IS_IPTUN(connp)) {
+			/*
+			 * Tunneled packet.  We enforce policy in the tunnel
+			 * module itself.
+			 *
+			 * Send the WHOLE packet up (incl. IPSEC_IN) without
+			 * a policy check.
+			 */
+			putnext(rq, first_mp);
+			CONN_DEC_REF(connp);
+			return;
+		}
+		/*
+		 * Don't enforce here if we're a tunnel - let "tun" do
+		 * it instead.
+		 */
+		if (nexthdr != IPPROTO_ENCAP && nexthdr != IPPROTO_IPV6 &&
+		    (CONN_INBOUND_POLICY_PRESENT(connp) || secure)) {
 			first_mp = ipsec_check_inbound_policy(first_mp, connp,
 			    NULL, ip6h, mctl_present);
 			if (first_mp == NULL) {
@@ -4127,18 +4149,16 @@ ip_find_hdr_v6(mblk_t *mp, ip6_t *ip6h, ip6_pkt_t *ipp, uint8_t *nexthdrp)
 			}
 			break;
 		case IPPROTO_FRAGMENT:
-			/*
-			 * Fragment headers are skipped.  Currently, only
-			 * IP cares for their existence.  If anyone other
-			 * than IP ever has the need to know about the
-			 * location of fragment headers, support can be
-			 * added to the ip6_pkt_t at that time.
-			 */
 			tmpfraghdr = (ip6_frag_t *)whereptr;
 			ehdrlen = sizeof (ip6_frag_t);
 			if ((uchar_t *)tmpfraghdr + ehdrlen > endptr)
 				goto done;
 			nexthdr = tmpfraghdr->ip6f_nxt;
+			if (!(ipp->ipp_fields & IPPF_FRAGHDR)) {
+				ipp->ipp_fields |= IPPF_FRAGHDR;
+				ipp->ipp_fraghdr = tmpfraghdr;
+				ipp->ipp_fraghdrlen = ehdrlen;
+			}
 			break;
 		case IPPROTO_NONE:
 		default:
@@ -4194,6 +4214,7 @@ ip_hdr_length_nexthdr_v6(mblk_t *mp, ip6_t *ip6h, uint16_t *hdr_length_ptr,
 	ip6_rthdr_t *rthdr;
 	ip6_frag_t *fraghdr;
 
+	ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
 	length = IPV6_HDR_LEN;
 	whereptr = ((uint8_t *)&ip6h[1]); /* point to next hdr */
 	endptr = mp->b_wptr;
@@ -9264,7 +9285,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 #endif
 
 	/*
-	 * M_CTL comes from 5 places
+	 * M_CTL comes from 6 places
 	 *
 	 * 1) TCP sends down IPSEC_OUT(M_CTL) for detached connections
 	 *    both V4 and V6 datagrams.
@@ -9279,6 +9300,8 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 	 *
 	 * 5) AH/ESP send down IPSEC_CTL(M_CTL) to be relayed to hardware for
 	 *    IPsec hardware acceleration support.
+	 *
+	 * 6) TUN_HELLO.
 	 *
 	 * We need to handle (1)'s IPv6 case and (3) here.  For the
 	 * IPv4 case in (1), and (2), IPSEC processing has already

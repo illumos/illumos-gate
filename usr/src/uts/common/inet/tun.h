@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,7 +105,7 @@ struct	tunstat {
 };
 
 typedef struct tun_stats_s {
-	/* protected by t_global_lock */
+	/* Protected by tun_global_lock. */
 	struct tun_stats_s *ts_next;
 	kmutex_t	ts_lock;		/* protects from here down */
 	struct tun_s	*ts_atp;
@@ -136,17 +135,32 @@ struct tun_encap_limit {
 /* per-instance data structure */
 /* Note: if t_recnt > 1, then t_indirect must be null */
 typedef struct tun_s {
-	struct tun_s	*tun_next;
+	struct tun_s	*tun_next;	/* For linked-list of tunnels by */
+	struct tun_s	**tun_ptpn;	/* ip address. */
+
+	/* Links v4-upper and v6-upper instances so they can share kstats. */
+	struct tun_s	*tun_kstat_next;
+
+	queue_t		*tun_wq;
 	kmutex_t	tun_lock;		/* protects from here down */
 	eventid_t	tun_events;
 	t_uscalar_t	tun_state;		/* protected by qwriter */
 	t_uscalar_t	tun_ppa;
 	mblk_t		*tun_iocmp;
-	ipsec_req_t	tun_secinfo;		/* Security preferences. */
+	ipsec_req_t	tun_secinfo;
+	/*
+	 * tun_polcy_index is used to keep track if a tunnel's policy
+	 * was altered by ipsecconf(1m)/PF_POLICY instead of ioctl()s.
+	 * (Only ioctl()s can update this field.)
+	 */
+	uint64_t	tun_policy_index;
+	struct ipsec_tun_pol_s *tun_itp;
+	uint64_t	tun_itp_gen;
 	uint_t		tun_ipsec_overhead;	/* Length of IPsec headers. */
 	uint_t		tun_flags;
 	in6_addr_t	tun_laddr;
 	in6_addr_t	tun_faddr;
+	zoneid_t	tun_zoneid;
 	uint32_t	tun_mtu;
 	uint32_t	tun_notifications;	/* For DL_NOTIFY_IND */
 	int16_t		tun_encap_lim;
@@ -166,6 +180,7 @@ typedef struct tun_s {
 #define	tun_ip6h		tun_u.tun_u_ip6hdrs.tun_u_ip6h
 #define	tun_telopt		tun_u.tun_u_ip6hdrs.tun_u_telopt
 	tun_stats_t	*tun_stats;
+	char tun_lifname[LIFNAMSIZ];
 	uint32_t tun_nocanput;		/* # input canput() returned false */
 	uint32_t tun_xmtretry;		/* # output canput() returned false */
 	uint32_t tun_allocbfail;	/* # esballoc/allocb failed */
@@ -213,6 +228,7 @@ typedef struct tun_s {
 #define	TUN_HOP_LIM		0x800	/* Hop limit non-default */
 #define	TUN_ENCAP_LIM		0x1000	/* Encapsulation limit non-default */
 #define	TUN_6TO4		0x2000	/* tunnel is 6to4 tunnel */
+#define	TUN_COMPLEX_SECURITY	0x4000	/* tunnel has full tunnel-mode policy */
 
 struct old_iftun_req {
 	char		ifta_lifr_name[LIFNAMSIZ]; /* if name */
@@ -241,6 +257,8 @@ void	tun_rput(queue_t *q, mblk_t  *mp);
 void	tun_rsrv(queue_t *q);
 void	tun_wput(queue_t *q, mblk_t  *mp);
 void	tun_wsrv(queue_t *q);
+
+extern void tun_ipsec_load_complete(void);
 
 #endif	/* _KERNEL */
 

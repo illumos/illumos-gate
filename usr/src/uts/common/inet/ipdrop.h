@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,6 +91,12 @@ struct ip_dropstats {
 	kstat_named_t ipds_spd_esp_badid;
 	kstat_named_t ipds_spd_ah_innermismatch;
 	kstat_named_t ipds_spd_esp_innermismatch;
+	kstat_named_t ipds_spd_no_policy;
+	kstat_named_t ipds_spd_malformed_packet;
+	kstat_named_t ipds_spd_malformed_frag;
+	kstat_named_t ipds_spd_overlap_frag;
+	kstat_named_t ipds_spd_evil_frag;
+	kstat_named_t ipds_spd_max_frags;
 
 	/* ESP-specific drop statistics. */
 	kstat_named_t ipds_esp_nomem;
@@ -158,6 +163,12 @@ struct ip_dropstats {
 				ip_drop_types->ipds_spd_ah_innermismatch
 #define	ipdrops_spd_esp_innermismatch	\
 				ip_drop_types->ipds_spd_esp_innermismatch
+#define	ipdrops_spd_no_policy		ip_drop_types->ipds_spd_no_policy
+#define	ipdrops_spd_malformed_packet	ip_drop_types->ipds_spd_malformed_packet
+#define	ipdrops_spd_malformed_frag	ip_drop_types->ipds_spd_malformed_frag
+#define	ipdrops_spd_overlap_frag	ip_drop_types->ipds_spd_overlap_frag
+#define	ipdrops_spd_evil_frag		ip_drop_types->ipds_spd_evil_frag
+#define	ipdrops_spd_max_frags		ip_drop_types->ipds_spd_max_frags
 
 /* ESP-specific drop statistics. */
 #define	ipdrops_esp_nomem		ip_drop_types->ipds_esp_nomem
