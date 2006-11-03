@@ -231,7 +231,7 @@ zap_leaf_array_create(zap_leaf_t *l, const char *buf,
 		for (i = 0; i < ZAP_LEAF_ARRAY_BYTES; i++) {
 			if (byten == 0)
 				value = ldv(integer_size, buf);
-			la->la_array[i] = (value & (0xff << shift)) >> shift;
+			la->la_array[i] = value >> shift;
 			value <<= 8;
 			if (++byten == integer_size) {
 				byten = 0;
