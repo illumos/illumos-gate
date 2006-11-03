@@ -2056,6 +2056,8 @@ out:
 int
 main(int argc, char **argv)
 {
+	extern int zfs_vdev_cache_size;
+
 	int i, c;
 	struct rlimit rl = { 1024, 1024 };
 	spa_t *spa;
@@ -2065,7 +2067,6 @@ main(int argc, char **argv)
 	int verbose = 0;
 	int error;
 	int flag, set;
-	vdev_knob_t *vk;
 
 	(void) setrlimit(RLIMIT_NOFILE, &rl);
 	(void) enable_extended_FILE_stdio(-1, -1);
@@ -2147,10 +2148,7 @@ main(int argc, char **argv)
 	 * Disable vdev caching.  If we don't do this, live pool traversal
 	 * won't make progress because it will never see disk updates.
 	 */
-	for (vk = vdev_knob_next(NULL); vk != NULL; vk = vdev_knob_next(vk)) {
-		if (strcmp(vk->vk_name, "cache_size") == 0)
-			vk->vk_default = 0;
-	}
+	zfs_vdev_cache_size = 0;
 
 	for (c = 0; c < 256; c++) {
 		if (dump_all && c != 'L' && c != 'l' && c != 'R')

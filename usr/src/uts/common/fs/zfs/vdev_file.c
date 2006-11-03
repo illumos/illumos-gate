@@ -54,14 +54,6 @@ vdev_file_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 
 	vf = vd->vdev_tsd = kmem_zalloc(sizeof (vdev_file_t), KM_SLEEP);
 
-#ifdef _KERNEL
-	/*
-	 * When using a file vdev in kernel context, the underlying filesystem
-	 * will already be caching the data.  Don't cache it again here.
-	 */
-	vd->vdev_cache.vc_size = 0;
-#endif
-
 	/*
 	 * We always open the files from the root of the global zone, even if
 	 * we're in a local zone.  If the user has gotten to this point, the
@@ -156,8 +148,14 @@ vdev_file_io_start(zio_t *zio)
 		return;
 	}
 
+	/*
+	 * In the kernel, don't bother double-caching, but in userland,
+	 * we want to test the vdev_cache code.
+	 */
+#ifndef _KERNEL
 	if (zio->io_type == ZIO_TYPE_READ && vdev_cache_read(zio) == 0)
 		return;
+#endif
 
 	if ((zio = vdev_queue_io(zio)) == NULL)
 		return;
@@ -186,8 +184,10 @@ vdev_file_io_done(zio_t *zio)
 {
 	vdev_queue_io_done(zio);
 
+#ifndef _KERNEL
 	if (zio->io_type == ZIO_TYPE_WRITE)
 		vdev_cache_write(zio);
+#endif
 
 	if (zio_injection_enabled && zio->io_error == 0)
 		zio->io_error = zio_handle_device_injection(zio->io_vd, EIO);

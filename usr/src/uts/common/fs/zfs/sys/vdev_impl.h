@@ -91,22 +91,12 @@ struct vdev_cache_entry {
 };
 
 struct vdev_cache {
-	uint64_t	vc_size;
-	uint64_t	vc_bshift;
-	uint64_t	vc_blocksize;
-	uint64_t	vc_max;
 	avl_tree_t	vc_offset_tree;
 	avl_tree_t	vc_lastused_tree;
 	kmutex_t	vc_lock;
 };
 
 struct vdev_queue {
-	uint64_t	vq_min_pending;
-	uint64_t	vq_max_pending;
-	uint64_t	vq_scrub_limit;
-	uint64_t	vq_agg_limit;
-	uint64_t	vq_time_shift;
-	uint64_t	vq_ramp_rate;
 	uint64_t	vq_scrub_count;
 	avl_tree_t	vq_deadline_tree;
 	avl_tree_t	vq_read_tree;

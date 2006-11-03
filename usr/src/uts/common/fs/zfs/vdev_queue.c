@@ -32,6 +32,33 @@
 #include <sys/avl.h>
 
 /*
+ * These tunables are for performance analysis.
+ */
+/*
+ * zfs_vdev_max_pending is the maximum number of i/os concurrently
+ * pending to each device.  zfs_vdev_min_pending is the initial number
+ * of i/os pending to each device (before it starts ramping up to
+ * max_pending).
+ */
+int zfs_vdev_max_pending = 35;
+int zfs_vdev_min_pending = 4;
+
+/* maximum scrub/resilver I/O queue */
+int zfs_scrub_limit = 70;
+
+/* deadline = pri + (lbolt >> time_shift) */
+int zfs_vdev_time_shift = 6;
+
+/* exponential I/O issue ramp-up rate */
+int zfs_vdev_ramp_rate = 2;
+
+/*
+ * i/os will be aggregated into a single large i/o up to
+ * zfs_vdev_aggregation_limit bytes long.
+ */
+int zfs_vdev_aggregation_limit = SPA_MAXBLOCKSIZE;
+
+/*
  * Virtual device vector for disk I/O scheduling.
  */
 int
@@ -119,7 +146,7 @@ vdev_queue_io_add(vdev_queue_t *vq, zio_t *zio)
 	avl_add(zio->io_vdev_tree, zio);
 
 	if ((zio->io_flags & ZIO_FLAG_SCRUB_THREAD) &&
-	    ++vq->vq_scrub_count >= vq->vq_scrub_limit)
+	    ++vq->vq_scrub_count >= zfs_scrub_limit)
 		spa_scrub_throttle(zio->io_spa, 1);
 }
 
@@ -127,7 +154,7 @@ static void
 vdev_queue_io_remove(vdev_queue_t *vq, zio_t *zio)
 {
 	if ((zio->io_flags & ZIO_FLAG_SCRUB_THREAD) &&
-	    vq->vq_scrub_count-- >= vq->vq_scrub_limit)
+	    vq->vq_scrub_count-- >= zfs_scrub_limit)
 		spa_scrub_throttle(zio->io_spa, -1);
 
 	avl_remove(&vq->vq_deadline_tree, zio);
@@ -182,14 +209,14 @@ vdev_queue_io_to_issue(vdev_queue_t *vq, uint64_t pending_limit,
 	size = fio->io_size;
 
 	while ((dio = AVL_PREV(tree, fio)) != NULL && IS_ADJACENT(dio, fio) &&
-	    size + dio->io_size <= vq->vq_agg_limit) {
+	    size + dio->io_size <= zfs_vdev_aggregation_limit) {
 		dio->io_delegate_next = fio;
 		fio = dio;
 		size += dio->io_size;
 	}
 
 	while ((dio = AVL_NEXT(tree, lio)) != NULL && IS_ADJACENT(lio, dio) &&
-	    size + dio->io_size <= vq->vq_agg_limit) {
+	    size + dio->io_size <= zfs_vdev_aggregation_limit) {
 		lio->io_delegate_next = dio;
 		lio = dio;
 		size += dio->io_size;
@@ -200,7 +227,7 @@ vdev_queue_io_to_issue(vdev_queue_t *vq, uint64_t pending_limit,
 		uint64_t offset = 0;
 		int nagg = 0;
 
-		ASSERT(size <= vq->vq_agg_limit);
+		ASSERT(size <= zfs_vdev_aggregation_limit);
 
 		aio = zio_vdev_child_io(fio, NULL, fio->io_vd,
 		    fio->io_offset, buf, size, fio->io_type,
@@ -266,12 +293,12 @@ vdev_queue_io(zio_t *zio)
 
 	mutex_enter(&vq->vq_lock);
 
-	zio->io_deadline = (zio->io_timestamp >> vq->vq_time_shift) +
+	zio->io_deadline = (zio->io_timestamp >> zfs_vdev_time_shift) +
 	    zio->io_priority;
 
 	vdev_queue_io_add(vq, zio);
 
-	nio = vdev_queue_io_to_issue(vq, vq->vq_min_pending, &func);
+	nio = vdev_queue_io_to_issue(vq, zfs_vdev_min_pending, &func);
 
 	mutex_exit(&vq->vq_lock);
 
@@ -294,8 +321,8 @@ vdev_queue_io_done(zio_t *zio)
 
 	avl_remove(&vq->vq_pending_tree, zio);
 
-	for (i = 0; i < vq->vq_ramp_rate; i++) {
-		nio = vdev_queue_io_to_issue(vq, vq->vq_max_pending, &func);
+	for (i = 0; i < zfs_vdev_ramp_rate; i++) {
+		nio = vdev_queue_io_to_issue(vq, zfs_vdev_max_pending, &func);
 		if (nio == NULL)
 			break;
 		mutex_exit(&vq->vq_lock);

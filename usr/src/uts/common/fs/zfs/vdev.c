@@ -45,15 +45,6 @@
  * Virtual device management.
  */
 
-/*
- * These tunables are for performance analysis, and override the
- * (not-easily-turnable) vdev "knobs".
- */
-int zfs_vdev_cache_max;
-int zfs_vdev_max_pending;
-int zfs_vdev_min_pending;
-int zfs_vdev_time_shift;
-
 static vdev_ops_t *vdev_ops_table[] = {
 	&vdev_root_ops,
 	&vdev_raidz_ops,
@@ -774,7 +765,6 @@ int
 vdev_open(vdev_t *vd)
 {
 	int error;
-	vdev_knob_t *vk;
 	int c;
 	uint64_t osize = 0;
 	uint64_t asize, psize;
@@ -790,23 +780,6 @@ vdev_open(vdev_t *vd)
 		vd->vdev_fault_mode = VDEV_FAULT_NONE;
 
 	vd->vdev_stat.vs_aux = VDEV_AUX_NONE;
-
-	for (vk = vdev_knob_next(NULL); vk != NULL; vk = vdev_knob_next(vk)) {
-		uint64_t *valp = (uint64_t *)((char *)vd + vk->vk_offset);
-
-		*valp = vk->vk_default;
-		*valp = MAX(*valp, vk->vk_min);
-		*valp = MIN(*valp, vk->vk_max);
-	}
-
-	if (zfs_vdev_cache_max)
-		vd->vdev_cache.vc_max = zfs_vdev_cache_max;
-	if (zfs_vdev_max_pending)
-		vd->vdev_queue.vq_max_pending = zfs_vdev_max_pending;
-	if (zfs_vdev_min_pending)
-		vd->vdev_queue.vq_min_pending = zfs_vdev_min_pending;
-	if (zfs_vdev_time_shift)
-		vd->vdev_queue.vq_time_shift = zfs_vdev_time_shift;
 
 	if (vd->vdev_ops->vdev_op_leaf) {
 		vdev_cache_init(vd);
@@ -1745,96 +1718,6 @@ vdev_space_update(vdev_t *vd, int64_t space_delta, int64_t alloc_delta)
 		vd->vdev_stat.vs_dspace += dspace_delta;
 		mutex_exit(&vd->vdev_stat_lock);
 	} while ((vd = vd->vdev_parent) != NULL);
-}
-
-/*
- * Various knobs to tune a vdev.
- */
-static vdev_knob_t vdev_knob[] = {
-	{
-		"cache_size",
-		"size of the read-ahead cache",
-		0,
-		1ULL << 30,
-		10ULL << 20,
-		offsetof(struct vdev, vdev_cache.vc_size)
-	},
-	{
-		"cache_bshift",
-		"log2 of cache blocksize",
-		SPA_MINBLOCKSHIFT,
-		SPA_MAXBLOCKSHIFT,
-		16,
-		offsetof(struct vdev, vdev_cache.vc_bshift)
-	},
-	{
-		"cache_max",
-		"largest block size to cache",
-		0,
-		SPA_MAXBLOCKSIZE,
-		1ULL << 14,
-		offsetof(struct vdev, vdev_cache.vc_max)
-	},
-	{
-		"min_pending",
-		"minimum pending I/Os to the disk",
-		1,
-		10000,
-		4,
-		offsetof(struct vdev, vdev_queue.vq_min_pending)
-	},
-	{
-		"max_pending",
-		"maximum pending I/Os to the disk",
-		1,
-		10000,
-		35,
-		offsetof(struct vdev, vdev_queue.vq_max_pending)
-	},
-	{
-		"scrub_limit",
-		"maximum scrub/resilver I/O queue",
-		0,
-		10000,
-		70,
-		offsetof(struct vdev, vdev_queue.vq_scrub_limit)
-	},
-	{
-		"agg_limit",
-		"maximum size of aggregated I/Os",
-		0,
-		SPA_MAXBLOCKSIZE,
-		SPA_MAXBLOCKSIZE,
-		offsetof(struct vdev, vdev_queue.vq_agg_limit)
-	},
-	{
-		"time_shift",
-		"deadline = pri + (lbolt >> time_shift)",
-		0,
-		63,
-		6,
-		offsetof(struct vdev, vdev_queue.vq_time_shift)
-	},
-	{
-		"ramp_rate",
-		"exponential I/O issue ramp-up rate",
-		1,
-		10000,
-		2,
-		offsetof(struct vdev, vdev_queue.vq_ramp_rate)
-	},
-};
-
-vdev_knob_t *
-vdev_knob_next(vdev_knob_t *vk)
-{
-	if (vk == NULL)
-		return (vdev_knob);
-
-	if (++vk == vdev_knob + sizeof (vdev_knob) / sizeof (vdev_knob_t))
-		return (NULL);
-
-	return (vk);
 }
 
 /*

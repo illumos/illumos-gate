@@ -60,8 +60,23 @@
  * (4) Write.  Update cache contents after write completion.
  *
  * (5) Evict.  When allocating a new entry, we evict the oldest (LRU) entry
- *     if the total cache size exceeds vc_size.
+ *     if the total cache size exceeds zfs_vdev_cache_size.
  */
+
+/*
+ * These tunables are for performance analysis.
+ */
+/*
+ * All i/os smaller than zfs_vdev_cache_max will be turned into
+ * 1<<zfs_vdev_cache_bshift byte reads by the vdev_cache (aka software
+ * track buffer.  At most zfs_vdev_cache_size bytes will be kept in each
+ * vdev's vdev_cache.
+ */
+int zfs_vdev_cache_max = 1<<14;
+int zfs_vdev_cache_size = 10ULL << 20;
+int zfs_vdev_cache_bshift = 16;
+
+#define	VCBS (1 << zfs_vdev_cache_bshift)
 
 static int
 vdev_cache_offset_compare(const void *a1, const void *a2)
@@ -109,7 +124,7 @@ vdev_cache_evict(vdev_cache_t *vc, vdev_cache_entry_t *ve)
 
 	avl_remove(&vc->vc_lastused_tree, ve);
 	avl_remove(&vc->vc_offset_tree, ve);
-	zio_buf_free(ve->ve_data, vc->vc_blocksize);
+	zio_buf_free(ve->ve_data, VCBS);
 	kmem_free(ve, sizeof (vdev_cache_entry_t));
 }
 
@@ -122,20 +137,20 @@ static vdev_cache_entry_t *
 vdev_cache_allocate(zio_t *zio)
 {
 	vdev_cache_t *vc = &zio->io_vd->vdev_cache;
-	uint64_t offset = P2ALIGN(zio->io_offset, vc->vc_blocksize);
+	uint64_t offset = P2ALIGN(zio->io_offset, VCBS);
 	vdev_cache_entry_t *ve;
 
 	ASSERT(MUTEX_HELD(&vc->vc_lock));
 
-	if (vc->vc_size == 0)
+	if (zfs_vdev_cache_size == 0)
 		return (NULL);
 
 	/*
 	 * If adding a new entry would exceed the cache size,
 	 * evict the oldest entry (LRU).
 	 */
-	if ((avl_numnodes(&vc->vc_lastused_tree) << vc->vc_bshift) >
-	    vc->vc_size) {
+	if ((avl_numnodes(&vc->vc_lastused_tree) << zfs_vdev_cache_bshift) >
+	    zfs_vdev_cache_size) {
 		ve = avl_first(&vc->vc_lastused_tree);
 		if (ve->ve_fill_io != NULL) {
 			dprintf("can't evict in %p, still filling\n", vc);
@@ -148,7 +163,7 @@ vdev_cache_allocate(zio_t *zio)
 	ve = kmem_zalloc(sizeof (vdev_cache_entry_t), KM_SLEEP);
 	ve->ve_offset = offset;
 	ve->ve_lastused = lbolt;
-	ve->ve_data = zio_buf_alloc(vc->vc_blocksize);
+	ve->ve_data = zio_buf_alloc(VCBS);
 
 	avl_add(&vc->vc_offset_tree, ve);
 	avl_add(&vc->vc_lastused_tree, ve);
@@ -159,7 +174,7 @@ vdev_cache_allocate(zio_t *zio)
 static void
 vdev_cache_hit(vdev_cache_t *vc, vdev_cache_entry_t *ve, zio_t *zio)
 {
-	uint64_t cache_phase = P2PHASE(zio->io_offset, vc->vc_blocksize);
+	uint64_t cache_phase = P2PHASE(zio->io_offset, VCBS);
 
 	ASSERT(MUTEX_HELD(&vc->vc_lock));
 	ASSERT(ve->ve_fill_io == NULL);
@@ -185,7 +200,7 @@ vdev_cache_fill(zio_t *zio)
 	vdev_cache_entry_t *ve = zio->io_private;
 	zio_t *dio;
 
-	ASSERT(zio->io_size == vc->vc_blocksize);
+	ASSERT(zio->io_size == VCBS);
 
 	/*
 	 * Add data to the cache.
@@ -227,8 +242,8 @@ vdev_cache_read(zio_t *zio)
 {
 	vdev_cache_t *vc = &zio->io_vd->vdev_cache;
 	vdev_cache_entry_t *ve, ve_search;
-	uint64_t cache_offset = P2ALIGN(zio->io_offset, vc->vc_blocksize);
-	uint64_t cache_phase = P2PHASE(zio->io_offset, vc->vc_blocksize);
+	uint64_t cache_offset = P2ALIGN(zio->io_offset, VCBS);
+	uint64_t cache_phase = P2PHASE(zio->io_offset, VCBS);
 	zio_t *fio;
 
 	ASSERT(zio->io_type == ZIO_TYPE_READ);
@@ -236,17 +251,16 @@ vdev_cache_read(zio_t *zio)
 	if (zio->io_flags & ZIO_FLAG_DONT_CACHE)
 		return (EINVAL);
 
-	if (zio->io_size > vc->vc_max)
+	if (zio->io_size > zfs_vdev_cache_max)
 		return (EOVERFLOW);
 
 	/*
 	 * If the I/O straddles two or more cache blocks, don't cache it.
 	 */
-	if (P2CROSS(zio->io_offset, zio->io_offset + zio->io_size - 1,
-	    vc->vc_blocksize))
+	if (P2CROSS(zio->io_offset, zio->io_offset + zio->io_size - 1, VCBS))
 		return (EXDEV);
 
-	ASSERT(cache_phase + zio->io_size <= vc->vc_blocksize);
+	ASSERT(cache_phase + zio->io_size <= VCBS);
 
 	mutex_enter(&vc->vc_lock);
 
@@ -283,8 +297,7 @@ vdev_cache_read(zio_t *zio)
 	}
 
 	fio = zio_vdev_child_io(zio, NULL, zio->io_vd, cache_offset,
-	    ve->ve_data, vc->vc_blocksize, ZIO_TYPE_READ,
-	    ZIO_PRIORITY_CACHE_FILL,
+	    ve->ve_data, VCBS, ZIO_TYPE_READ, ZIO_PRIORITY_CACHE_FILL,
 	    ZIO_FLAG_DONT_CACHE | ZIO_FLAG_DONT_PROPAGATE |
 	    ZIO_FLAG_DONT_RETRY | ZIO_FLAG_NOBOOKMARK,
 	    vdev_cache_fill, ve);
@@ -309,8 +322,8 @@ vdev_cache_write(zio_t *zio)
 	vdev_cache_entry_t *ve, ve_search;
 	uint64_t io_start = zio->io_offset;
 	uint64_t io_end = io_start + zio->io_size;
-	uint64_t min_offset = P2ALIGN(io_start, vc->vc_blocksize);
-	uint64_t max_offset = P2ROUNDUP(io_end, vc->vc_blocksize);
+	uint64_t min_offset = P2ALIGN(io_start, VCBS);
+	uint64_t max_offset = P2ROUNDUP(io_end, VCBS);
 	avl_index_t where;
 
 	ASSERT(zio->io_type == ZIO_TYPE_WRITE);
@@ -325,7 +338,7 @@ vdev_cache_write(zio_t *zio)
 
 	while (ve != NULL && ve->ve_offset < max_offset) {
 		uint64_t start = MAX(ve->ve_offset, io_start);
-		uint64_t end = MIN(ve->ve_offset + vc->vc_blocksize, io_end);
+		uint64_t end = MIN(ve->ve_offset + VCBS, io_end);
 
 		if (ve->ve_fill_io != NULL) {
 			ve->ve_missed_update = 1;
@@ -352,8 +365,6 @@ vdev_cache_init(vdev_t *vd)
 	avl_create(&vc->vc_lastused_tree, vdev_cache_lastused_compare,
 	    sizeof (vdev_cache_entry_t),
 	    offsetof(struct vdev_cache_entry, ve_lastused_node));
-
-	vc->vc_blocksize = 1ULL << vc->vc_bshift;
 }
 
 void

@@ -41,18 +41,6 @@ extern "C" {
 extern boolean_t zfs_nocacheflush;
 
 /*
- * Vdev knobs.
- */
-typedef struct vdev_knob {
-	char		*vk_name;		/* knob name		*/
-	char		*vk_desc;		/* knob description	*/
-	uint64_t	vk_min;			/* minimum legal value	*/
-	uint64_t	vk_max;			/* maximum legal value	*/
-	uint64_t	vk_default;		/* default value	*/
-	size_t		vk_offset;		/* offset into vdev_t	*/
-} vdev_knob_t;
-
-/*
  * Fault injection modes.
  */
 #define	VDEV_FAULT_NONE		0
@@ -112,8 +100,6 @@ extern void vdev_queue_init(vdev_t *vd);
 extern void vdev_queue_fini(vdev_t *vd);
 extern zio_t *vdev_queue_io(zio_t *zio);
 extern void vdev_queue_io_done(zio_t *zio);
-
-extern vdev_knob_t *vdev_knob_next(vdev_knob_t *vk);
 
 extern void vdev_config_dirty(vdev_t *vd);
 extern void vdev_config_clean(vdev_t *vd);
