@@ -151,6 +151,7 @@ typedef struct znode {
 	uint_t		z_seq;		/* modification sequence number */
 	uint64_t	z_mapcnt;	/* number of pages mapped to file */
 	uint64_t	z_last_itx;	/* last ZIL itx on this znode */
+	uint32_t	z_sync_cnt;	/* synchronous open count */
 	kmutex_t	z_acl_lock;	/* acl data lock */
 	list_node_t	z_link_node;	/* all znodes in fs link */
 	/*

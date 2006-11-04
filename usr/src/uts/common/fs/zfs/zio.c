@@ -1147,7 +1147,7 @@ zio_write_allocate_gang_members(zio_t *zio)
 	gsize = SPA_GANGBLOCKSIZE;
 	gbps_left = SPA_GBH_NBLKPTRS;
 
-	error = metaslab_alloc(spa, gsize, bp, gbh_ndvas, txg, NULL);
+	error = metaslab_alloc(spa, gsize, bp, gbh_ndvas, txg, NULL, B_FALSE);
 	if (error == ENOSPC)
 		panic("can't allocate gang block header");
 	ASSERT(error == 0);
@@ -1174,7 +1174,7 @@ zio_write_allocate_gang_members(zio_t *zio)
 
 		while (resid <= maxalloc * gbps_left) {
 			error = metaslab_alloc(spa, maxalloc, gbp, ndvas,
-			    txg, bp);
+			    txg, bp, B_FALSE);
 			if (error == 0)
 				break;
 			ASSERT3U(error, ==, ENOSPC);
@@ -1245,7 +1245,7 @@ zio_dva_allocate(zio_t *zio)
 	ASSERT3U(zio->io_size, ==, BP_GET_PSIZE(bp));
 
 	error = metaslab_alloc(zio->io_spa, zio->io_size, bp, zio->io_ndvas,
-	    zio->io_txg, NULL);
+	    zio->io_txg, NULL, B_FALSE);
 
 	if (error == 0) {
 		bp->blk_birth = zio->io_txg;
@@ -1653,25 +1653,27 @@ zio_next_stage_async(zio_t *zio)
  * Try to allocate an intent log block.  Return 0 on success, errno on failure.
  */
 int
-zio_alloc_blk(spa_t *spa, uint64_t size, blkptr_t *bp, uint64_t txg)
+zio_alloc_blk(spa_t *spa, uint64_t size, blkptr_t *new_bp, blkptr_t *old_bp,
+    uint64_t txg)
 {
 	int error;
 
 	spa_config_enter(spa, RW_READER, FTAG);
 
-	BP_ZERO(bp);
-
-	error = metaslab_alloc(spa, size, bp, 1, txg, NULL);
+	/*
+	 * We were passed the previous log blocks dva_t in bp->blk_dva[0].
+	 */
+	error = metaslab_alloc(spa, size, new_bp, 1, txg, old_bp, B_TRUE);
 
 	if (error == 0) {
-		BP_SET_LSIZE(bp, size);
-		BP_SET_PSIZE(bp, size);
-		BP_SET_COMPRESS(bp, ZIO_COMPRESS_OFF);
-		BP_SET_CHECKSUM(bp, ZIO_CHECKSUM_ZILOG);
-		BP_SET_TYPE(bp, DMU_OT_INTENT_LOG);
-		BP_SET_LEVEL(bp, 0);
-		BP_SET_BYTEORDER(bp, ZFS_HOST_BYTEORDER);
-		bp->blk_birth = txg;
+		BP_SET_LSIZE(new_bp, size);
+		BP_SET_PSIZE(new_bp, size);
+		BP_SET_COMPRESS(new_bp, ZIO_COMPRESS_OFF);
+		BP_SET_CHECKSUM(new_bp, ZIO_CHECKSUM_ZILOG);
+		BP_SET_TYPE(new_bp, DMU_OT_INTENT_LOG);
+		BP_SET_LEVEL(new_bp, 0);
+		BP_SET_BYTEORDER(new_bp, ZFS_HOST_BYTEORDER);
+		new_bp->blk_birth = txg;
 	}
 
 	spa_config_exit(spa, FTAG);

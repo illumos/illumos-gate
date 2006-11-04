@@ -35,13 +35,6 @@
 extern "C" {
 #endif
 
-typedef enum lwb_state_type {
-	UNWRITTEN,	/* buffer yet to be written */
-	SEQ_INCOMPLETE,	/* buffer written, but there's an unwritten buffer in */
-			/* the sequence before this */
-	SEQ_COMPLETE,	/* no unwritten buffers before this */
-} lwb_state_t;
-
 /*
  * Log write buffer.
  */
@@ -58,8 +51,11 @@ typedef struct lwb {
 } lwb_t;
 
 /*
- * vdev element for use in flushing device write caches
+ * Vdev flushing: We use a bit map of size ZIL_VDEV_BMAP bytes.
+ * Any vdev numbers beyond that use a linked list of zil_vdev_t structures.
  */
+
+#define	ZIL_VDEV_BMSZ 16 /* 16 * 8 = 128 vdevs */
 typedef struct zil_vdev {
 	uint64_t	vdev;		/* device written */
 	list_node_t	vdev_seq_node;	/* zilog->zl_vdev_list linkage */
@@ -76,8 +72,8 @@ struct zilog {
 	objset_t	*zl_os;		/* object set we're logging */
 	zil_get_data_t	*zl_get_data;	/* callback to get object content */
 	zio_t		*zl_root_zio;	/* log writer root zio */
-	uint64_t	zl_itx_seq;	/* itx sequence number */
-	uint64_t	zl_ss_seq;	/* last tx on stable storage */
+	uint64_t	zl_itx_seq;	/* next itx sequence number */
+	uint64_t	zl_commit_seq;	/* committed upto this number */
 	uint64_t	zl_lr_seq;	/* log record sequence number */
 	uint64_t	zl_destroy_txg;	/* txg of last zil_destroy() */
 	uint64_t	zl_replay_seq[TXG_SIZE]; /* seq of last replayed rec */
@@ -96,8 +92,11 @@ struct zilog {
 	uint64_t	zl_prev_used;	/* previous commit log size used */
 	list_t		zl_lwb_list;	/* in-flight log write list */
 	list_t		zl_vdev_list;	/* list of [vdev, seq] pairs */
+	uint8_t		zl_vdev_bmap[ZIL_VDEV_BMSZ]; /* bitmap of vdevs */
 	taskq_t		*zl_clean_taskq; /* runs lwb and itx clean tasks */
 	avl_tree_t	zl_dva_tree;	/* track DVAs during log parse */
+	clock_t		zl_replay_time;	/* lbolt of when replay started */
+	uint64_t	zl_replay_blks;	/* number of log blocks replayed */
 };
 
 typedef struct zil_dva_node {

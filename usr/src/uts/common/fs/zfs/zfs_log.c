@@ -273,6 +273,7 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 
 	itx->itx_private = zp->z_zfsvfs;
 
+	itx->itx_sync = (zp->z_sync_cnt != 0);
 	seq = zil_itx_assign(zilog, itx, tx);
 	zp->z_last_itx = seq;
 }
@@ -297,6 +298,7 @@ zfs_log_truncate(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	lr->lr_offset = off;
 	lr->lr_length = len;
 
+	itx->itx_sync = (zp->z_sync_cnt != 0);
 	seq = zil_itx_assign(zilog, itx, tx);
 	zp->z_last_itx = seq;
 }
@@ -326,6 +328,7 @@ zfs_log_setattr(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	ZFS_TIME_ENCODE(&vap->va_atime, lr->lr_atime);
 	ZFS_TIME_ENCODE(&vap->va_mtime, lr->lr_mtime);
 
+	itx->itx_sync = (zp->z_sync_cnt != 0);
 	seq = zil_itx_assign(zilog, itx, tx);
 	zp->z_last_itx = seq;
 }
@@ -350,6 +353,7 @@ zfs_log_acl(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	lr->lr_aclcnt = (uint64_t)aclcnt;
 	bcopy(z_ace, (ace_t *)(lr + 1), aclcnt * sizeof (ace_t));
 
+	itx->itx_sync = (zp->z_sync_cnt != 0);
 	seq = zil_itx_assign(zilog, itx, tx);
 	zp->z_last_itx = seq;
 }

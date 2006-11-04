@@ -212,9 +212,22 @@ typedef struct itx {
 	list_node_t	itx_node;	/* linkage on zl_itx_list */
 	void		*itx_private;	/* type-specific opaque data */
 	itx_wr_state_t	itx_wr_state;	/* write state */
+	uint8_t		itx_sync;	/* synchronous transaction */
 	lr_t		itx_lr;		/* common part of log record */
 	/* followed by type-specific part of lr_xx_t and its immediate data */
 } itx_t;
+
+
+/*
+ * zgd_t is passed through dmu_sync() to the callback routine zfs_get_done()
+ * to handle the cleanup of the dmu_sync() buffer write
+ */
+typedef struct {
+	zilog_t		*zgd_zilog;	/* zilog */
+	blkptr_t	*zgd_bp;	/* block pointer */
+	struct rl	*zgd_rl;	/* range lock */
+} zgd_t;
+
 
 typedef void zil_parse_blk_func_t(zilog_t *zilog, blkptr_t *bp, void *arg,
     uint64_t txg);
@@ -251,6 +264,8 @@ extern int	zil_is_committed(zilog_t *zilog);
 
 extern int	zil_suspend(zilog_t *zilog);
 extern void	zil_resume(zilog_t *zilog);
+
+extern void	zil_add_vdev(zilog_t *zilog, uint64_t vdev);
 
 extern int zil_disable;
 

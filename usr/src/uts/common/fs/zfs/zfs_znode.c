@@ -411,6 +411,7 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, uint64_t obj_num, int blksz)
 	zp->z_id = obj_num;
 	zp->z_blksz = blksz;
 	zp->z_seq = 0x7A4653;
+	zp->z_sync_cnt = 0;
 
 	mutex_enter(&zfsvfs->z_znodes_lock);
 	list_insert_tail(&zfsvfs->z_all_znodes, zp);
