@@ -588,7 +588,7 @@ is_fs_snapshot(zfs_handle_t *zhp)
 static int
 is_pool_name(const char *name)
 {
-	return (strchr(name, '/') == NULL);
+	return (strchr(name, '/') == NULL && strchr(name, '@') == NULL);
 }
 
 /*
