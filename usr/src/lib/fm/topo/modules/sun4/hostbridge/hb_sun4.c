@@ -32,15 +32,14 @@
 #include <sys/param.h>
 #include <sys/systeminfo.h>
 
-#include "hb_sun4.h"
-#include "util.h"
-#include "topo_error.h"
-#include "hostbridge.h"
-#include "pcibus.h"
-#include "did.h"
+#include <hb_sun4.h>
+#include <util.h>
+#include <hostbridge.h>
+#include <pcibus.h>
+#include <did.h>
 
 busorrc_t *
-busorrc_new(const char *bus_addr, di_node_t di, topo_mod_t *mod)
+busorrc_new(topo_mod_t *mod, const char *bus_addr, di_node_t di)
 {
 	busorrc_t *pp;
 	char *comma;
@@ -83,7 +82,7 @@ busorrc_new(const char *bus_addr, di_node_t di, topo_mod_t *mod)
 }
 
 void
-busorrc_insert(busorrc_t **head, busorrc_t *new, topo_mod_t *mod)
+busorrc_insert(topo_mod_t *mod, busorrc_t **head, busorrc_t *new)
 {
 	busorrc_t *ppci, *pci;
 
@@ -122,7 +121,7 @@ busorrc_insert(busorrc_t **head, busorrc_t *new, topo_mod_t *mod)
 }
 
 int
-busorrc_add(busorrc_t **list, di_node_t n, topo_mod_t *mod)
+busorrc_add(topo_mod_t *mod, busorrc_t **list, di_node_t n)
 {
 	busorrc_t *nb;
 	char *ba;
@@ -130,49 +129,45 @@ busorrc_add(busorrc_t **list, di_node_t n, topo_mod_t *mod)
 	topo_mod_dprintf(mod, "busorrc_add\n");
 	ba = di_bus_addr(n);
 	if (ba == NULL ||
-	    (nb = busorrc_new(ba, n, mod)) == NULL) {
+	    (nb = busorrc_new(mod, ba, n)) == NULL) {
 		topo_mod_dprintf(mod, "busorrc_new() failed.\n");
 		return (-1);
 	}
-	busorrc_insert(list, nb, mod);
+	busorrc_insert(mod, list, nb);
 	return (0);
 }
 
 void
-busorrc_free(busorrc_t *pb, topo_mod_t *mod)
+busorrc_free(topo_mod_t *mod, busorrc_t *pb)
 {
 	if (pb == NULL)
 		return;
-	busorrc_free(pb->br_nextbus, mod);
+	busorrc_free(mod, pb->br_nextbus);
 	topo_mod_free(mod, pb, sizeof (busorrc_t));
 }
 
 tnode_t *
-hb_process(tnode_t *ptn, topo_instance_t hbi, topo_instance_t bi,
-    di_node_t bn, did_hash_t *didhash, di_prom_handle_t promtree,
-    topo_mod_t *mod)
+hb_process(topo_mod_t *mod, tnode_t *ptn, topo_instance_t hbi,
+    topo_instance_t bi, di_node_t bn, did_t *hbdid)
 {
 	tnode_t *hb;
 
-	if ((hb = pcihostbridge_declare(ptn, bn, hbi, didhash,
-	    promtree, mod)) == NULL)
+	if ((hb = pcihostbridge_declare(mod, ptn, bn, hbi)) == NULL)
 		return (NULL);
-	if (topo_mod_enumerate(mod, hb, PCI_BUS, PCI_BUS, bi, bi) == 0)
+	if (topo_mod_enumerate(mod, hb, PCI_BUS, PCI_BUS, bi, bi, hbdid) == 0)
 		return (hb);
 	return (NULL);
 }
 
 tnode_t *
-rc_process(tnode_t *ptn, topo_instance_t rci, di_node_t bn,
-    did_hash_t *didhash, di_prom_handle_t promtree, topo_mod_t *mod)
+rc_process(topo_mod_t *mod, tnode_t *ptn, topo_instance_t rci, di_node_t bn)
 {
 	tnode_t *rc;
 
-	if ((rc = pciexrc_declare(ptn, bn, rci, didhash, promtree, mod))
-	    == NULL)
+	if ((rc = pciexrc_declare(mod, ptn, bn, rci)) == NULL)
 		return (NULL);
 	if (topo_mod_enumerate(mod,
-	    rc, PCI_BUS, PCIEX_BUS, 0, MAX_HB_BUSES) == 0)
+	    rc, PCI_BUS, PCIEX_BUS, 0, MAX_HB_BUSES, NULL) == 0)
 		return (rc);
 	return (NULL);
 }
@@ -199,8 +194,8 @@ rc_process(tnode_t *ptn, topo_instance_t rci, di_node_t bn,
  *	(Hostbridge #nhb, Root Complex #(rcs/hostbridge), ExBus #(buses/rc))
  */
 int
-declare_exbuses(busorrc_t *list, tnode_t *ptn, int nhb, int nrc,
-    did_hash_t *didhash, di_prom_handle_t promtree, topo_mod_t *mod)
+declare_exbuses(topo_mod_t *mod, busorrc_t *list, tnode_t *ptn, int nhb,
+    int nrc)
 {
 	tnode_t **rcs;
 	tnode_t **hb;
@@ -211,37 +206,36 @@ declare_exbuses(busorrc_t *list, tnode_t *ptn, int nhb, int nrc,
 	 * Allocate an array to point at the hostbridge tnode_t pointers.
 	 */
 	if ((hb = topo_mod_zalloc(mod, nhb * sizeof (tnode_t *))) == NULL)
-		return (topo_mod_seterrno(mod, ETOPO_NOMEM));
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
 
 	/*
 	 * Allocate an array to point at the root complex tnode_t pointers.
 	 */
 	if ((rcs = topo_mod_zalloc(mod, nrc * sizeof (tnode_t *))) == NULL)
-		return (topo_mod_seterrno(mod, ETOPO_NOMEM));
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
 
 	br = rc = 0;
 	for (p = list; p != NULL; p = p->br_nextbus) {
 		topo_mod_dprintf(mod,
 		    "declaring (%x,%x)\n", p->br_ba_bc, p->br_ba_ac);
 
-		if (did_create(didhash, p->br_din, 0, br, rc, rc,
-		    promtree) == NULL)
+		if (did_create(mod, p->br_din, 0, br, rc, rc) == NULL)
 			return (-1);
 
 		if (hb[br] == NULL) {
-			hb[br] = pciexhostbridge_declare(ptn, p->br_din, br,
-			    didhash, promtree, mod);
+			hb[br] = pciexhostbridge_declare(mod, ptn, p->br_din,
+			    br);
 			if (hb[br] == NULL)
 				return (-1);
 		}
 		if (rcs[rc] == NULL) {
-			rcs[rc] = rc_process(hb[br], rc, p->br_din, didhash,
-			    promtree, mod);
+			rcs[rc] = rc_process(mod, hb[br], rc, p->br_din);
 			if (rcs[rc] == NULL)
 				return (-1);
 		} else {
 			if (topo_mod_enumerate(mod,
-			    rcs[rc], PCI_BUS, PCIEX_BUS, 0, MAX_HB_BUSES) < 0)
+			    rcs[rc], PCI_BUS, PCIEX_BUS, 0, MAX_HB_BUSES,
+			    NULL) < 0)
 				return (-1);
 		}
 		rc++;
@@ -271,8 +265,7 @@ declare_exbuses(busorrc_t *list, tnode_t *ptn, int nhb, int nrc,
  *	(Hostbridge #nhb, Bus #(buses/hostbridge))
  */
 int
-declare_buses(busorrc_t *list, tnode_t *ptn, int nhb, did_hash_t *didhash,
-    di_prom_handle_t promtree, topo_mod_t *mod)
+declare_buses(topo_mod_t *mod, busorrc_t *list, tnode_t *ptn, int nhb)
 {
 	busorrc_t *p;
 	tnode_t **hb;
@@ -290,19 +283,18 @@ declare_buses(busorrc_t *list, tnode_t *ptn, int nhb, did_hash_t *didhash,
 		topo_mod_dprintf(mod,
 		    "declaring (%x,%x)\n", p->br_ba_bc, p->br_ba_ac);
 
-		if ((link = did_create(didhash, p->br_din, 0, br, NO_RC, bus,
-		    promtree)) == NULL)
+		if ((link =
+		    did_create(mod, p->br_din, 0, br, NO_RC, bus)) == NULL)
 			return (-1);
 
 		if (hb[br] == NULL) {
-			hb[br] = hb_process(ptn, br, bus, p->br_din, didhash,
-			    promtree, mod);
+			hb[br] = hb_process(mod, ptn, br, bus, p->br_din, link);
 			if (hb[br] == NULL)
 				return (-1);
 		} else {
-			did_link_set(hb[br], link);
+			did_link_set(mod, hb[br], link);
 			if (topo_mod_enumerate(mod,
-			    hb[br], PCI_BUS, PCI_BUS, bus, bus) < 0) {
+			    hb[br], PCI_BUS, PCI_BUS, bus, bus, link) < 0) {
 				return (-1);
 			}
 		}

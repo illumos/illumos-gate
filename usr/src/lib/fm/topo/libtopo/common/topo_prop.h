@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -37,28 +36,27 @@
 extern "C" {
 #endif
 
+typedef struct topo_ipgroup_info {
+	char *tpi_name;			/* property group name */
+	topo_stability_t tpi_namestab;	/* stability of group name */
+	topo_stability_t tpi_datastab;	/* stability of all property values */
+	topo_version_t  tpi_version;	/* version of pgroup definition */
+} topo_ipgroup_info_t;
+
 typedef struct topo_pgroup {
 	topo_list_t tpg_list;		/* next/prev pointers */
-	char *tpg_name;			/* Group name */
-	topo_stability_t tpg_stability;	/* SMI Stability level */
-	topo_list_t tpg_pvals;		/* Property values */
+	topo_ipgroup_info_t *tpg_info;	/* name, version, stability */
+	topo_list_t tpg_pvals;		/* property values */
 } topo_pgroup_t;
 
 typedef struct topo_propval {
-	char *tp_name;			/* Prop name */
-	topo_type_t tp_type;		/* Prop type */
-	int tp_flag;			/* Dynamic property */
+	char *tp_name;			/* prop name */
+	topo_type_t tp_type;		/* prop type */
+	int tp_flag;			/* dynamic property */
 	int tp_refs;			/* ref count for this prop val */
 	topo_hdl_t *tp_hdl;		/* handle pointer for allocations */
-	void (*tp_free)(struct topo_propval *); /* Prop value destructor */
-	union {
-		int32_t tp_int32;
-		int32_t tp_uint32;
-		int64_t tp_int64;
-		int64_t tp_uint64;
-		char *tp_string;
-		nvlist_t *tp_fmri;
-	} tp_u;
+	void (*tp_free)(struct topo_propval *); /* prop value destructor */
+	nvlist_t *tp_val;
 } topo_propval_t;
 
 typedef struct topo_proplist {
@@ -66,7 +64,6 @@ typedef struct topo_proplist {
 	topo_propval_t *tp_pval;	/* actual value */
 } topo_proplist_t;
 
-extern int topo_prop_inherit(tnode_t *, const char *, const char *, int *);
 extern void topo_prop_hold(topo_propval_t *);
 extern void topo_prop_rele(topo_propval_t *);
 extern void topo_pgroup_destroy_all(tnode_t *);

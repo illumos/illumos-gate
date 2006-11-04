@@ -64,7 +64,7 @@ MAPFILES =		# use APIMAP instead
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
 CFLAGS += -G $(XREGSFLAG)
 
-CPPFLAGS += -I. -I../../common -I../../../libtopo/common
+CPPFLAGS += -I.
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
 LDFLAGS += $(ZIGNORE) -M$(APIMAP)
 LDLIBS += -L$(ROOTLIBDIR)/fm -R/usr/lib/fm -ltopo -lnvpair -lc
@@ -79,7 +79,7 @@ $(PROG): $(OBJS) $(APIMAP)
 	$(CTFMERGE) -L VERSION -o $@ $(OBJS)
 	$(POST_PROCESS_SO)
 
-%.o: ../../common/%.c
+%.o: ../../common/$(MODULE)/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
@@ -93,7 +93,7 @@ clean:
 clobber: clean
 	$(RM) $(PROG)
 
-%.ln: ../../common/%.c
+%.ln: ../../common/$(MODULE)/%.c
 	$(LINT.c) -c $<
 
 %.ln: %.c

@@ -47,24 +47,12 @@ extern "C" {
 
 typedef struct topo_builtin {
 	const char *bltin_name;
-	void (*bltin_init)(topo_mod_t *);
+	topo_version_t bltin_version;
+	int (*bltin_init)(topo_mod_t *, topo_version_t version);
 	void (*bltin_fini)(topo_mod_t *);
 } topo_builtin_t;
 
 extern int topo_builtin_create(topo_hdl_t *, const char *);
-
-extern void hc_init(topo_mod_t *);	/* see hc.c */
-extern void hc_fini(topo_mod_t *);	/* see hc.c */
-extern void cpu_init(topo_mod_t *);	/* see cpu.c */
-extern void cpu_fini(topo_mod_t *);	/* see cpu.c */
-extern void dev_init(topo_mod_t *);	/* see dev.c */
-extern void dev_fini(topo_mod_t *);	/* see dev.c */
-extern void mem_init(topo_mod_t *);	/* see mem.c */
-extern void mem_fini(topo_mod_t *);	/* see mem.c */
-extern void mod_init(topo_mod_t *);	/* see mod.c */
-extern void mod_fini(topo_mod_t *);	/* see mod.c */
-extern void pkg_init(topo_mod_t *);	/* see pkg.c */
-extern void pkg_fini(topo_mod_t *);	/* see pkg.c */
 
 #ifdef	__cplusplus
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -69,12 +68,18 @@
  * and release nodes that may be still held.
  */
 
+#include <alloca.h>
+#include <ctype.h>
 #include <pthread.h>
 #include <limits.h>
 #include <assert.h>
 #include <fcntl.h>
+#include <smbios.h>
+#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/systeminfo.h>
+#include <sys/utsname.h>
 #include <uuid/uuid.h>
 
 #include <fm/libtopo.h>
@@ -98,18 +103,57 @@ set_open_errno(topo_hdl_t *thp, int *errp, int err)
 	return (NULL);
 }
 
+static char *
+smbios_fix(topo_hdl_t *thp, char *begin)
+{
+	char buf[MAXNAMELEN];
+	size_t count;
+	char *str, *end, *pp;
+
+	end = begin + strlen(begin);
+
+	while (begin < end && isspace(*begin))
+		begin++;
+	while (begin < end && isspace(*(end - 1)))
+		end--;
+
+	if (begin >= end)
+		return (NULL);
+
+	count = end - begin;
+	count += 1;
+
+	if (count > sizeof (buf))
+		return (NULL);
+
+	(void) snprintf(buf, count, "%s", begin);
+	while ((str = strchr(buf, ' ')) != NULL)
+		*str = '-';
+
+	pp = topo_hdl_strdup(thp, buf);
+	return (pp);
+}
+
 topo_hdl_t *
 topo_open(int version, const char *rootdir, int *errp)
 {
 	topo_hdl_t *thp = NULL;
 	topo_alloc_t *tap;
+
+	char platform[MAXNAMELEN];
+	char isa[MAXNAMELEN];
+	struct utsname uts;
 	struct stat st;
 
-	if (version < TOPO_VERSION)
-		return (set_open_errno(thp, errp, ETOPO_HDL_VER));
+	smbios_hdl_t *shp;
+	smbios_system_t s1;
+	smbios_info_t s2;
+	id_t id;
 
-	if (version > TOPO_VERSION)
-		return (set_open_errno(thp, errp, ETOPO_HDL_VER));
+	char *dbflags, *dbout;
+
+	if (version != TOPO_VERSION)
+		return (set_open_errno(thp, errp, ETOPO_HDL_ABIVER));
 
 	if (rootdir != NULL && stat(rootdir, &st) < 0)
 		return (set_open_errno(thp, errp, ETOPO_HDL_INVAL));
@@ -117,8 +161,12 @@ topo_open(int version, const char *rootdir, int *errp)
 	if ((thp = topo_zalloc(sizeof (topo_hdl_t), 0)) == NULL)
 		return (set_open_errno(thp, errp, ETOPO_NOMEM));
 
-	if ((tap = topo_zalloc(sizeof (topo_alloc_t), 0)) == NULL)
+	(void) pthread_mutex_init(&thp->th_lock, NULL);
+
+	if ((tap = topo_zalloc(sizeof (topo_alloc_t), 0)) == NULL) {
+		topo_close(thp);
 		return (set_open_errno(thp, errp, ETOPO_NOMEM));
+	}
 
 	/*
 	 * Install default allocators
@@ -135,22 +183,68 @@ topo_open(int version, const char *rootdir, int *errp)
 	if ((thp->th_modhash = topo_modhash_create(thp)) == NULL)
 		return (set_open_errno(thp, errp, ETOPO_NOMEM));
 
+	/*
+	 * Set-up system information and search paths for modules
+	 * and topology map files
+	 */
 	if (rootdir == NULL) {
 		rootdir = topo_hdl_strdup(thp, "/");
 		thp->th_rootdir = (char *)rootdir;
 	} else {
-		if (strlen(rootdir) > PATH_MAX)
+		int len;
+		char *rpath;
+
+		len = strlen(rootdir);
+		if (len >= PATH_MAX)
 			return (set_open_errno(thp, errp, EINVAL));
 
-		thp->th_rootdir = topo_hdl_strdup(thp, rootdir);
+		if (rootdir[len] != '/') {
+			rpath = alloca(len + 1);
+			(void) snprintf(rpath, len + 1, "%s/", rootdir);
+		} else {
+			rpath = (char *)rootdir;
+		}
+		thp->th_rootdir = topo_hdl_strdup(thp, rpath);
 	}
 
-	if (thp->th_rootdir == NULL)
+	platform[0] = '\0';
+	isa[0] = '\0';
+	(void) sysinfo(SI_PLATFORM, platform, sizeof (platform));
+	(void) sysinfo(SI_ARCHITECTURE, isa, sizeof (isa));
+	(void) uname(&uts);
+	thp->th_platform = topo_hdl_strdup(thp, platform);
+	thp->th_isa = topo_hdl_strdup(thp, isa);
+	thp->th_machine = topo_hdl_strdup(thp, uts.machine);
+	if ((shp = smbios_open(NULL, SMB_VERSION, 0, NULL)) != NULL) {
+		if ((id = smbios_info_system(shp, &s1)) != SMB_ERR &&
+		    smbios_info_common(shp, id, &s2) != SMB_ERR) {
+
+			if (strcmp(s2.smbi_product, SMB_DEFAULT1) != 0 &&
+			    strcmp(s2.smbi_product, SMB_DEFAULT2) != 0) {
+				thp->th_product = smbios_fix(thp,
+				    (char *)s2.smbi_product);
+			}
+		}
+		smbios_close(shp);
+	} else {
+		thp->th_product = topo_hdl_strdup(thp, thp->th_platform);
+	}
+
+	if (thp->th_rootdir == NULL) {
+		topo_close(thp);
 		return (set_open_errno(thp, errp, ETOPO_NOMEM));
+	}
+
+	dbflags	 = getenv("TOPO_DEBUG");
+	dbout = getenv("TOPO_DEBUG_OUT");
+	if (dbflags != NULL)
+		topo_debug_set(thp, dbflags, dbout);
 
 	if (topo_builtin_create(thp, thp->th_rootdir) != 0) {
-		topo_dprintf(TOPO_DBG_ERR, "failed to load builtin modules: "
-		    "%s\n", topo_hdl_errmsg(thp));
+		topo_dprintf(thp, TOPO_DBG_ERR,
+		    "failed to load builtin modules: %s\n",
+		    topo_hdl_errmsg(thp));
+		topo_close(thp);
 		return (NULL);
 	}
 
@@ -163,6 +257,14 @@ topo_close(topo_hdl_t *thp)
 	ttree_t *tp;
 
 	topo_hdl_lock(thp);
+	if (thp->th_platform != NULL)
+		topo_hdl_strfree(thp, thp->th_platform);
+	if (thp->th_isa != NULL)
+		topo_hdl_strfree(thp, thp->th_isa);
+	if (thp->th_machine != NULL)
+		topo_hdl_strfree(thp, thp->th_machine);
+	if (thp->th_product != NULL)
+		topo_hdl_strfree(thp, thp->th_product);
 	if (thp->th_rootdir != NULL)
 		topo_hdl_strfree(thp, thp->th_rootdir);
 
@@ -176,7 +278,7 @@ topo_close(topo_hdl_t *thp)
 	 */
 	while ((tp = topo_list_next(&thp->th_trees)) != NULL) {
 		topo_list_delete(&thp->th_trees, tp);
-		topo_tree_destroy(thp, tp);
+		topo_tree_destroy(tp);
 	}
 
 	/*
@@ -209,7 +311,7 @@ topo_snap_create(topo_hdl_t *thp, int *errp)
 
 	if ((thp->th_uuid = topo_hdl_zalloc(thp, TOPO_UUID_SIZE)) == NULL) {
 		*errp = ETOPO_NOMEM;
-		topo_dprintf(TOPO_DBG_ERR, "unable to allocate uuid: %s\n",
+		topo_dprintf(thp, TOPO_DBG_ERR, "unable to allocate uuid: %s\n",
 		    topo_strerror(*errp));
 		topo_hdl_unlock(thp);
 		return (NULL);
@@ -219,9 +321,9 @@ topo_snap_create(topo_hdl_t *thp, int *errp)
 	uuid_unparse(uuid, thp->th_uuid);
 
 	if (topo_tree_enum_all(thp) < 0) {
-		topo_dprintf(TOPO_DBG_ERR, "enumeration failure: %s\n",
+		topo_dprintf(thp, TOPO_DBG_ERR, "enumeration failure: %s\n",
 		    topo_hdl_errmsg(thp));
-		if (topo_hdl_errno(thp) != ETOPO_ENUM_PARTIAL) {
+		if (topo_hdl_errno(thp) == ETOPO_ENUM_FATAL) {
 			*errp = thp->th_errno;
 			topo_hdl_unlock(thp);
 			return (NULL);
@@ -230,6 +332,9 @@ topo_snap_create(topo_hdl_t *thp, int *errp)
 
 	if ((ustr = topo_hdl_strdup(thp, thp->th_uuid)) == NULL)
 		*errp = ETOPO_NOMEM;
+
+	thp->th_di = DI_NODE_NIL;
+	thp->th_pi = DI_PROM_HANDLE_NIL;
 
 	topo_hdl_unlock(thp);
 
@@ -316,14 +421,12 @@ topo_snap_destroy(topo_hdl_t *thp)
 			topo_mod_rele(mod);
 		}
 
-		/*
-		 * Release the file handle
-		 */
-		if (tp->tt_file != NULL)
-			topo_file_unload(thp, tp);
-
 	}
 
+	if (thp->th_uuid != NULL) {
+		topo_hdl_free(thp, thp->th_uuid, TOPO_UUID_SIZE);
+		thp->th_uuid = NULL;
+	}
 }
 
 void
@@ -333,11 +436,7 @@ topo_snap_release(topo_hdl_t *thp)
 		return;
 
 	topo_hdl_lock(thp);
-	if (thp->th_uuid != NULL) {
-		topo_hdl_free(thp, thp->th_uuid, TOPO_UUID_SIZE);
-		topo_snap_destroy(thp);
-		thp->th_uuid = NULL;
-	}
+	topo_snap_destroy(thp);
 	topo_hdl_unlock(thp);
 
 }
@@ -405,7 +504,8 @@ step_child(tnode_t *cnp, topo_walk_t *wp, int bottomup)
 	if (nnp == NULL)
 		return (TOPO_WALK_TERMINATE);
 
-	topo_dprintf(TOPO_DBG_WALK, "walk through child node %s=%d\n",
+	topo_dprintf(wp->tw_thp, TOPO_DBG_WALK,
+	    "walk through child node %s=%d\n",
 	    nnp->tn_name, nnp->tn_instance);
 
 	topo_node_hold(nnp); /* released on return from walk_step */
@@ -429,7 +529,8 @@ step_sibling(tnode_t *cnp, topo_walk_t *wp, int bottomup)
 	if (nnp == NULL)
 		return (TOPO_WALK_TERMINATE);
 
-	topo_dprintf(TOPO_DBG_WALK, "walk through sibling node %s=%d\n",
+	topo_dprintf(wp->tw_thp, TOPO_DBG_WALK,
+	    "walk through sibling node %s=%d\n",
 	    nnp->tn_name, nnp->tn_instance);
 
 	topo_node_hold(nnp); /* released on return from walk_step */
@@ -457,12 +558,14 @@ topo_walk_step(topo_walk_t *wp, int flag)
 	 * End of the line
 	 */
 	if (cnp == NULL) {
-		topo_dprintf(TOPO_DBG_WALK, "walk_step terminated\n");
+		topo_dprintf(wp->tw_thp, TOPO_DBG_WALK,
+		    "walk_step terminated\n");
 		topo_node_rele(cnp);
 		return (TOPO_WALK_TERMINATE);
 	}
 
-	topo_dprintf(TOPO_DBG_WALK, "%s walk_step through node %s=%d\n",
+	topo_dprintf(wp->tw_thp, TOPO_DBG_WALK,
+	    "%s walk_step through node %s=%d\n",
 	    (flag == TOPO_WALK_CHILD ? "TOPO_WALK_CHILD" : "TOPO_WALK_SIBLING"),
 	    cnp->tn_name, cnp->tn_instance);
 
@@ -522,12 +625,14 @@ topo_walk_bottomup(topo_walk_t *wp, int flag)
 	 * End of the line
 	 */
 	if (cnp == NULL) {
-		topo_dprintf(TOPO_DBG_WALK, "walk_bottomup terminated\n");
+		topo_dprintf(wp->tw_thp, TOPO_DBG_WALK,
+		    "walk_bottomup terminated\n");
 		topo_node_rele(cnp);
 		return (TOPO_WALK_TERMINATE);
 	}
 
-	topo_dprintf(TOPO_DBG_WALK, "%s walk_bottomup through node %s=%d\n",
+	topo_dprintf(wp->tw_thp, TOPO_DBG_WALK,
+	    "%s walk_bottomup through node %s=%d\n",
 	    (flag == TOPO_WALK_CHILD ? "TOPO_WALK_CHILD" : "TOPO_WALK_SIBLING"),
 	    cnp->tn_name, cnp->tn_instance);
 

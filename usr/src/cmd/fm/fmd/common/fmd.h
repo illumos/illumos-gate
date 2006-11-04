@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -60,6 +59,8 @@ typedef struct fmd_statistics {
 	fmd_stat_t ds_flt_enospc;	/* number of events w/ ENOSPC fltlog */
 	fmd_stat_t ds_oth_enospc;	/* number of events w/ ENOSPC others */
 	fmd_stat_t ds_dr_gen;		/* dynamic reconfiguration generation */
+	fmd_stat_t ds_topo_gen;		/* topology snapshot generation */
+	fmd_stat_t ds_topo_drgen;	/* topology DR generation */
 } fmd_statistics_t;
 
 typedef struct fmd {
@@ -110,7 +111,8 @@ typedef struct fmd {
 	void *d_dr_hdl;			/* DR event handle (see fmd_dr.c) */
 	nv_alloc_t d_nva;		/* libnvpair allocator handle */
 	nvlist_t *d_auth;		/* FMRI authority nvlist */
-	struct topo_hdl *d_topo;	/* libtopo handle */
+	pthread_mutex_t d_topo_lock;	/* lock for topo hdl */
+	fmd_list_t d_topo_list;		/* list of all topology snapshots */
 
 	struct fmd_conf *d_conf;	/* global configuration properties */
 	uint_t d_fg;			/* cached value of "fg" property */

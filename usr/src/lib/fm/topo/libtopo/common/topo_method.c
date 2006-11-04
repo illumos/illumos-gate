@@ -99,7 +99,8 @@ set_methregister_error(topo_mod_t *mod, tnode_t *node, topo_imethod_t *mp,
 		topo_mod_free(mod, mp, sizeof (topo_imethod_t));
 	}
 
-	topo_dprintf(TOPO_DBG_ERR, "method registration failed for %s: %s\n",
+	topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR,
+	    "method registration failed for %s: %s\n",
 	    mod->tm_name, topo_strerror(err));
 
 	return (topo_mod_seterrno(mod, err));
@@ -150,7 +151,8 @@ topo_method_register(topo_mod_t *mod, tnode_t *node, const topo_method_t *mp)
 		topo_list_append(&node->tn_methods, imp);
 		topo_node_unlock(node);
 
-		topo_dprintf(TOPO_DBG_MOD, "registered module %s method "
+		topo_dprintf(mod->tm_hdl, TOPO_DBG_MODSVC,
+		    "registered module %s method "
 		    "%s for %s=%d\n", mod->tm_name, imp->tim_name,
 		    topo_node_name(node), topo_node_instance(node));
 

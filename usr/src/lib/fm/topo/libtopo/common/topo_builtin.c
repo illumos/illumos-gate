@@ -33,18 +33,25 @@
 #include <topo_error.h>
 #include <topo_subr.h>
 
+#include <cpu.h>
+#include <hc.h>
+#include <dev.h>
+#include <mem.h>
+#include <mod.h>
+#include <pkg.h>
+
 static const struct topo_builtin _topo_builtins[] = {
-	{ "cpu", cpu_init, cpu_fini },
-	{ "dev", dev_init, dev_fini },
-	{ "mem", mem_init, mem_fini },
-	{ "pkg", pkg_init, pkg_fini },
-	{ "mod", mod_init, mod_fini },
-	{ "hc", hc_init, hc_fini },
+	{ "cpu", CPU_VERSION, cpu_init, cpu_fini },
+	{ "dev", DEV_VERSION, dev_init, dev_fini },
+	{ "mem", MEM_VERSION, mem_init, mem_fini },
+	{ "pkg", PKG_VERSION, pkg_init, pkg_fini },
+	{ "mod", MOD_VERSION, mod_init, mod_fini },
+	{ "hc", HC_VERSION, hc_init, hc_fini },		/* hc must go last */
 	{ NULL, NULL, NULL }
 };
 
 static int
-bltin_init(topo_mod_t *mp)
+bltin_init(topo_mod_t *mp, topo_version_t version)
 {
 	const topo_builtin_t *bp;
 
@@ -55,12 +62,13 @@ bltin_init(topo_mod_t *mp)
 
 	mp->tm_data = (void *)bp;
 
-	(*bp->bltin_init)(mp);
-
-	if (mp->tm_info == NULL) {
-		topo_dprintf(TOPO_DBG_ERR,
-		    "unable initialize builtin module: %s\n", bp->bltin_name);
-		return (topo_mod_seterrno(mp, ETOPO_MOD_INIT));
+	if ((*bp->bltin_init)(mp, version) != 0 || mp->tm_info == NULL) {
+		if (mp->tm_errno == 0)
+			(void) topo_mod_seterrno(mp, ETOPO_MOD_INIT);
+		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
+		    "unable initialize builtin module: %s: %s\n",
+		    bp->bltin_name, topo_mod_errmsg(mp));
+		return (-1);
 	}
 
 	return (0);
@@ -79,7 +87,7 @@ bltin_fini(topo_mod_t *mp)
 	return (0);
 }
 
-const topo_modops_t topo_bltin_ops = {
+const topo_imodops_t topo_bltin_ops = {
 	bltin_init,
 	bltin_fini,
 };
@@ -101,16 +109,18 @@ topo_builtin_create(topo_hdl_t *thp, const char *rootdir)
 		/*
 		 * Load scheme-specific module
 		 */
-		if ((mod = topo_modhash_load(thp, bp->bltin_name,
-		    &topo_bltin_ops)) == NULL) {
-			topo_dprintf(TOPO_DBG_ERR, "unable to create scheme "
+		if ((mod = topo_modhash_load(thp, bp->bltin_name, NULL,
+		    &topo_bltin_ops, bp->bltin_version)) == NULL) {
+			topo_dprintf(thp, TOPO_DBG_ERR,
+			    "unable to create scheme "
 			    "tree for %s:%s\n", bp->bltin_name,
 			    topo_hdl_errmsg(thp));
 			return (-1);
 		}
 		if ((tp = topo_tree_create(thp, mod, bp->bltin_name))
 		    == NULL) {
-			topo_dprintf(TOPO_DBG_ERR, "unable to create scheme "
+			topo_dprintf(thp, TOPO_DBG_ERR,
+			    "unable to create scheme "
 			    "tree for %s:%s\n", bp->bltin_name,
 			    topo_hdl_errmsg(thp));
 			return (-1);
@@ -124,7 +134,7 @@ topo_builtin_create(topo_hdl_t *thp, const char *rootdir)
 		 */
 		rnode = tp->tt_root;
 		if (topo_mod_enumerate(mod, rnode, mod->tm_name, rnode->tn_name,
-		    rnode->tn_instance, rnode->tn_instance) < 0) {
+		    rnode->tn_instance, rnode->tn_instance, NULL) < 0) {
 			/*
 			 * If we see a failure, note it in the handle and
 			 * drive on

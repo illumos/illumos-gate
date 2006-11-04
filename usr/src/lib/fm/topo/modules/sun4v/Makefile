@@ -25,6 +25,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = chip hostbridge ioboard pcibus
+SUBDIRS = chip hostbridge pcibus
 
 include ../../../Makefile.subdirs

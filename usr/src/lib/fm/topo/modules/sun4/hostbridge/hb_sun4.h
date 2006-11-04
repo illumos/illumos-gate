@@ -47,20 +47,14 @@ typedef struct busorrc {
 
 struct did_hash;
 
-extern busorrc_t *busorrc_new(const char *, di_node_t, topo_mod_t *);
-extern void busorrc_insert(busorrc_t **, busorrc_t *, topo_mod_t *);
-extern int busorrc_add(busorrc_t **, di_node_t, topo_mod_t *);
-extern void busorrc_free(busorrc_t *, topo_mod_t *);
+extern busorrc_t *busorrc_new(topo_mod_t *, const char *, di_node_t);
+extern void busorrc_insert(topo_mod_t *, busorrc_t **, busorrc_t *);
+extern int busorrc_add(topo_mod_t *, busorrc_t **, di_node_t);
+extern void busorrc_free(topo_mod_t *, busorrc_t *);
 
-extern tnode_t *hb_process(tnode_t *,
-    topo_instance_t, topo_instance_t, di_node_t, struct did_hash *,
-    di_prom_handle_t, topo_mod_t *);
-extern tnode_t *rc_process(tnode_t *, topo_instance_t, di_node_t,
-    struct did_hash *, di_prom_handle_t, topo_mod_t *);
-extern int declare_buses(busorrc_t *, tnode_t *, int,
-    struct did_hash *, di_prom_handle_t, topo_mod_t *);
-extern int declare_exbuses(busorrc_t *, tnode_t *, int, int,
-    struct did_hash *, di_prom_handle_t, topo_mod_t *);
+extern tnode_t *rc_process(topo_mod_t *, tnode_t *, topo_instance_t, di_node_t);
+extern int declare_buses(topo_mod_t *, busorrc_t *, tnode_t *, int);
+extern int declare_exbuses(topo_mod_t *, busorrc_t *, tnode_t *, int, int);
 
 #ifdef __cplusplus
 }

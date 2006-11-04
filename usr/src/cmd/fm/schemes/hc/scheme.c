@@ -25,67 +25,56 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <fm/topo_mod.h>
+#include <strings.h>
 #include <fm/fmd_fmri.h>
 #include <fm/libtopo.h>
-
-typedef struct hc_walk_arg {
-	void	*p;
-	int	*resultp;
-} hc_walk_arg_t;
-
-static topo_hdl_t	*HC_thp = NULL;
-static char		*HC_uuid = NULL;
+#include <fm/topo_mod.h>
 
 int
 fmd_fmri_init(void)
 {
-	int err;
-
-	if ((HC_thp = topo_open(TOPO_VERSION, NULL, &err)) == NULL)
-		return (-1);
-
 	return (0);
 }
 
 void
 fmd_fmri_fini(void)
 {
-	if (HC_uuid) {
-		topo_snap_release(HC_thp);
-		topo_hdl_strfree(HC_thp, HC_uuid);
-		HC_uuid = NULL;
-	}
-	topo_close(HC_thp);
 }
 
-static int
-hc_update_topology(void)
+ssize_t
+fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 {
-	static uint64_t lastgen = 0;
 	int err;
-	uint64_t curgen;
+	uint8_t version;
+	ssize_t len;
+	topo_hdl_t *thp;
+	char *str;
 
-	if (HC_uuid == NULL ||
-	    (curgen = fmd_fmri_get_drgen()) > lastgen) {
+	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
+	    version > FM_HC_SCHEME_VERSION)
+		return (fmd_fmri_set_errno(EINVAL));
 
-		lastgen = curgen;
+	thp = fmd_fmri_topology(TOPO_VERSION);
+	if (topo_fmri_nvl2str(thp, nvl, &str, &err) != 0)
+		return (fmd_fmri_set_errno(EINVAL));
 
-		if (HC_uuid) {
-			topo_snap_release(HC_thp);
-			topo_hdl_strfree(HC_thp, HC_uuid);
-			HC_uuid = NULL;
-		}
+	if (buf != NULL)
+		len = snprintf(buf, buflen, "%s", str);
+	else
+		len = strlen(str);
 
-		if ((HC_uuid = topo_snap_hold(HC_thp, NULL, &err)) == NULL) {
-			return (-1);
-		}
-	}
-	return (0);
+	topo_hdl_strfree(thp, str);
+
+	return (len);
 }
 
+typedef struct hc_walk_arg {
+	void	*p;
+	int	*resultp;
+} hc_walk_arg_t;
+
 static int
-hc_topo_walk(topo_walk_cb_t fn, void *arg, int *resultp)
+hc_topo_walk(topo_hdl_t *thp, topo_walk_cb_t fn, void *arg, int *resultp)
 {
 	int err, rv;
 	topo_walk_t *twp;
@@ -94,7 +83,7 @@ hc_topo_walk(topo_walk_cb_t fn, void *arg, int *resultp)
 	hcarg.p = arg;
 	hcarg.resultp = resultp;
 
-	if ((twp = topo_walk_init(HC_thp, FM_FMRI_SCHEME_HC, fn,
+	if ((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC, fn,
 	    &hcarg, &err)) == NULL)
 		return (-1);
 
@@ -105,162 +94,20 @@ hc_topo_walk(topo_walk_cb_t fn, void *arg, int *resultp)
 	return (rv);
 }
 
-/*
- * buf_append -- Append str to buf (if it's non-NULL).  Place prepend
- * in buf in front of str and append behind it (if they're non-NULL).
- * Continue to update size even if we run out of space to actually
- * stuff characters in the buffer.
- */
-static void
-buf_append(ssize_t *sz, char *buf, size_t buflen, char *str,
-    char *prepend, char *append)
-{
-	ssize_t left;
-
-	if (str == NULL)
-		return;
-
-	if (buflen == 0 || (left = buflen - *sz) < 0)
-		left = 0;
-
-	if (buf != NULL && left != 0)
-		buf += *sz;
-
-	if (prepend == NULL && append == NULL)
-		*sz += snprintf(buf, left, "%s", str);
-	else if (append == NULL)
-		*sz += snprintf(buf, left, "%s%s", prepend, str);
-	else if (prepend == NULL)
-		*sz += snprintf(buf, left, "%s%s", str, append);
-	else
-		*sz += snprintf(buf, left, "%s%s%s", prepend, str, append);
-}
-
-ssize_t
-fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
-{
-	nvlist_t **hcprs = NULL;
-	nvlist_t *anvl = NULL;
-	uint8_t version;
-	ssize_t size = 0;
-	uint_t hcnprs;
-	char *achas = NULL;
-	char *adom = NULL;
-	char *aprod = NULL;
-	char *asrvr = NULL;
-	char *ahost = NULL;
-	char *serial = NULL;
-	char *part = NULL;
-	char *root = NULL;
-	char *rev = NULL;
-	int more_auth = 0;
-	int err, i;
-
-	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
-	    version > FM_HC_SCHEME_VERSION)
-		return (fmd_fmri_set_errno(EINVAL));
-
-	/* Get authority, if present */
-	err = nvlist_lookup_nvlist(nvl, FM_FMRI_AUTHORITY, &anvl);
-	if (err != 0 && err != ENOENT)
-		return (fmd_fmri_set_errno(err));
-
-	if ((err = nvlist_lookup_string(nvl, FM_FMRI_HC_ROOT, &root)) != 0)
-		return (fmd_fmri_set_errno(EINVAL));
-
-	err = nvlist_lookup_nvlist_array(nvl, FM_FMRI_HC_LIST, &hcprs, &hcnprs);
-	if (err != 0 || hcprs == NULL)
-		return (fmd_fmri_set_errno(EINVAL));
-
-	if (anvl != NULL) {
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_PRODUCT, &aprod);
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_CHASSIS, &achas);
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_DOMAIN, &adom);
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_SERVER, &asrvr);
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_HOST, &ahost);
-		if (aprod != NULL)
-			more_auth++;
-		if (achas != NULL)
-			more_auth++;
-		if (adom != NULL)
-			more_auth++;
-		if (asrvr != NULL)
-			more_auth++;
-		if (ahost != NULL)
-			more_auth++;
-	}
-
-	(void) nvlist_lookup_string(nvl, FM_FMRI_HC_SERIAL_ID, &serial);
-	(void) nvlist_lookup_string(nvl, FM_FMRI_HC_PART, &part);
-	(void) nvlist_lookup_string(nvl, FM_FMRI_HC_REVISION, &rev);
-
-	/* hc:// */
-	buf_append(&size, buf, buflen, FM_FMRI_SCHEME_HC, NULL, "://");
-
-	/* authority, if any */
-	if (aprod != NULL)
-		buf_append(&size, buf, buflen, aprod, FM_FMRI_AUTH_PRODUCT "=",
-		    --more_auth > 0 ? "," : NULL);
-	if (achas != NULL)
-		buf_append(&size, buf, buflen, achas, FM_FMRI_AUTH_CHASSIS "=",
-		    --more_auth > 0 ? "," : NULL);
-	if (adom != NULL)
-		buf_append(&size, buf, buflen, adom, FM_FMRI_AUTH_DOMAIN "=",
-		    --more_auth > 0 ? "," : NULL);
-	if (asrvr != NULL)
-		buf_append(&size, buf, buflen, asrvr, FM_FMRI_AUTH_SERVER "=",
-		    --more_auth > 0 ? "," : NULL);
-	if (ahost != NULL)
-		buf_append(&size, buf, buflen, ahost, FM_FMRI_AUTH_HOST "=",
-		    NULL);
-
-	/* separating slash */
-	if (serial != NULL || part != NULL || rev != NULL)
-		buf_append(&size, buf, buflen, "/", NULL, NULL);
-
-	/* hardware-id part */
-	buf_append(&size, buf, buflen, serial, ":" FM_FMRI_HC_SERIAL_ID "=",
-	    NULL);
-	buf_append(&size, buf, buflen, part, ":" FM_FMRI_HC_PART "=", NULL);
-	buf_append(&size, buf, buflen, rev, ":" FM_FMRI_HC_REVISION "=", NULL);
-
-	/* separating slash */
-	buf_append(&size, buf, buflen, "/", NULL, NULL);
-
-	/* hc-root */
-	buf_append(&size, buf, buflen, root, NULL, NULL);
-
-	/* all the pairs */
-	for (i = 0; i < hcnprs; i++) {
-		char *nm = NULL;
-		char *id = NULL;
-
-		if (i > 0)
-			buf_append(&size, buf, buflen, "/", NULL, NULL);
-		(void) nvlist_lookup_string(hcprs[i], FM_FMRI_HC_NAME, &nm);
-		(void) nvlist_lookup_string(hcprs[i], FM_FMRI_HC_ID, &id);
-		if (nm == NULL || id == NULL)
-			return (fmd_fmri_set_errno(EINVAL));
-		buf_append(&size, buf, buflen, nm, NULL, "=");
-		buf_append(&size, buf, buflen, id, NULL, NULL);
-	}
-
-	return (size);
-}
-
 /*ARGSUSED*/
 static int
 hc_topo_present(topo_hdl_t *thp, tnode_t *node, void *arg)
 {
 	int cmp, err;
-	nvlist_t *out = NULL;
-	nvlist_t *asru;
+	nvlist_t *out, *asru;
 	hc_walk_arg_t *hcargp = (hc_walk_arg_t *)arg;
+
+	/*
+	 * Only care about sata-ports and disks
+	 */
+	if (strcmp(topo_node_name(node), SATA_PORT) != 0 &&
+	    strcmp(topo_node_name(node), DISK) != 0)
+		return (TOPO_WALK_NEXT);
 
 	if (topo_node_asru(node, &asru, NULL, &err) != 0 ||
 	    asru == NULL) {
@@ -280,47 +127,78 @@ hc_topo_present(topo_hdl_t *thp, tnode_t *node, void *arg)
 	/*
 	 * Yes, so try to execute the topo-present method.
 	 */
-	cmp = topo_method_invoke(node, TOPO_METH_PRESENT,
-	    TOPO_METH_PRESENT_VERSION, (nvlist_t *)hcargp->p, &out, &err);
-
-	if (out)
+	if (topo_method_invoke(node, TOPO_METH_PRESENT,
+	    TOPO_METH_PRESENT_VERSION, (nvlist_t *)hcargp->p, &out, &err)
+	    == 0) {
+		(void) nvlist_lookup_uint32(out, TOPO_METH_PRESENT_RET,
+		    (uint32_t *)hcargp->resultp);
 		nvlist_free(out);
-
-	if (cmp == 1) {
-		*(hcargp->resultp) = 1;
 		return (TOPO_WALK_TERMINATE);
-	} else if (cmp == 0) {
-		*(hcargp->resultp) = 0;
-		return (TOPO_WALK_TERMINATE);
+	} else {
+		return (TOPO_WALK_ERR);
 	}
 
-	return (TOPO_WALK_NEXT);
 }
 
-
 /*
- * fmd_fmri_present() is called by fmadm to determine if a faulty ASRU
- * is still present in the system.  In general we don't expect to get
- * ASRUs in this scheme, so it's unlikely this routine will get called.
- * In case it does, though, we just traverse our libtopo snapshot,
- * looking for a matching ASRU (minus the serial number information),
- * then invoke the "topo_present" method to determine presence.
+ * The SATA disk topology permits an ASRU to be declared as a pseudo-hc
+ * FMRI, something like this:
+ *
+ *	hc:///motherboard=0/hostbridge=0/pcibus=0/pcidev=1/pcifn=0/sata-port=1
+ *		ASRU: hc:///component=sata0/1
+ *		FRU: hc:///component=MB
+ *		Label: sata0/1
+ *
+ * This is a hack to support cfgadm attachment point ASRUs without defining
+ * a new scheme.  As a result, we need to support an is_present function for
+ * something * that begins with hc:///component=.  To do this, we compare the
+ * nvlist provided by the caller against the ASRU property for all possible
+ * topology nodes.
+ *
+ * The SATA phase 2 project will address the lack of a proper FMRI scheme
+ * for cfgadm attachment points.  This code may be removed when the SATA
+ * phase 2 FMA work is completed.
  */
-int
-fmd_fmri_present(nvlist_t *nvl)
+static int
+hc_sata_hack(nvlist_t *nvl)
 {
 	int ispresent = 1;
+	topo_hdl_t *thp;
 
 	/*
 	 * If there's an error during the topology update, punt by
 	 * indicating presence.
 	 */
-	if (hc_update_topology() < 0)
-		return (1);
-
-	(void) hc_topo_walk(hc_topo_present, nvl, &ispresent);
+	thp = fmd_fmri_topology(TOPO_VERSION);
+	(void) hc_topo_walk(thp, hc_topo_present, nvl, &ispresent);
 
 	return (ispresent);
+}
+
+int
+fmd_fmri_present(nvlist_t *nvl)
+{
+	int err, present;
+	topo_hdl_t *thp;
+	nvlist_t **hcprs;
+	char *nm;
+	uint_t hcnprs;
+
+	err = nvlist_lookup_nvlist_array(nvl, FM_FMRI_HC_LIST, &hcprs, &hcnprs);
+	err |= nvlist_lookup_string(hcprs[0], FM_FMRI_HC_NAME, &nm);
+	if (err != 0)
+		return (0);
+
+	if (strcmp(nm, "component") == 0)
+		return (hc_sata_hack(nvl));
+
+	thp = fmd_fmri_topology(TOPO_VERSION);
+	present = topo_fmri_present(thp, nvl, &err);
+
+	if (err != 0)
+		return (present);
+	else
+		return (1);
 }
 
 /*

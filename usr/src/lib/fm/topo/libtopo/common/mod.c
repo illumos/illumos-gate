@@ -41,15 +41,14 @@
 #include <libelf.h>
 #include <gelf.h>
 
-#include <topo_error.h>
+#include <topo_method.h>
+#include <mod.h>
 
 static int mod_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
-    topo_instance_t, void *);
+    topo_instance_t, void *, void *);
 static void mod_release(topo_mod_t *, tnode_t *);
 static int mod_fmri_create_meth(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
-
-#define	MOD_VERSION	TOPO_VERSION
 
 static const topo_method_t mod_methods[] = {
 	{ TOPO_METH_FMRI, TOPO_METH_FMRI_DESC, TOPO_METH_FMRI_VERSION,
@@ -57,20 +56,28 @@ static const topo_method_t mod_methods[] = {
 	{ NULL }
 };
 
+static const topo_modops_t mod_modops =
+	{ mod_enum, mod_release };
 static const topo_modinfo_t mod_info =
-	{ "mod", MOD_VERSION, mod_enum, mod_release };
+	{ "mod", FM_FMRI_SCHEME_MOD, MOD_VERSION, &mod_modops };
 
-void
-mod_init(topo_mod_t *mod)
+int
+mod_init(topo_mod_t *mod, topo_version_t version)
 {
-	topo_mod_setdebug(mod, TOPO_DBG_ALL);
+	if (getenv("TOPOMODDEBUG"))
+		topo_mod_setdebug(mod);
 	topo_mod_dprintf(mod, "initializing mod builtin\n");
 
-	if (topo_mod_register(mod, &mod_info, NULL) != 0) {
+	if (version != MOD_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (topo_mod_register(mod, &mod_info, TOPO_VERSION) != 0) {
 		topo_mod_dprintf(mod, "failed to register mod_info: "
 		    "%s\n", topo_mod_errmsg(mod));
-		return;
+		return (-1); /* mod errno already set */
 	}
+
+	return (0);
 }
 
 void
@@ -82,7 +89,7 @@ mod_fini(topo_mod_t *mod)
 /*ARGSUSED*/
 static int
 mod_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    topo_instance_t min, topo_instance_t max, void *arg)
+    topo_instance_t min, topo_instance_t max, void *notused1, void *notused2)
 {
 	(void) topo_method_register(mod, pnode, mod_methods);
 	return (0);
@@ -191,16 +198,12 @@ mod_nvl_data(topo_mod_t *mp, nvlist_t *out, const char *path)
 static nvlist_t *
 mod_fmri_create(topo_mod_t *mp, const char *driver)
 {
-	topo_hdl_t *thp;
-	nvlist_t *arg = NULL;
 	nvlist_t *out = NULL;
 	nvlist_t *pkg = NULL;
 	char objpath[PATH_MAX];
 	char *path = NULL;
-	int err;
 
-	if (topo_mod_nvalloc(mp, &arg, NV_UNIQUE_NAME) != 0 ||
-	    topo_mod_nvalloc(mp, &out, NV_UNIQUE_NAME) != 0) {
+	if (topo_mod_nvalloc(mp, &out, NV_UNIQUE_NAME) != 0) {
 		(void) topo_mod_seterrno(mp, EMOD_FMRI_NVL);
 		goto mfc_bail;
 	}
@@ -209,23 +212,14 @@ mod_fmri_create(topo_mod_t *mp, const char *driver)
 
 	if ((path = mod_binary_path_get(mp, objpath)) == NULL)
 		goto mfc_bail;
-	if (nvlist_add_string(arg, "path", path) != 0) {
-		(void) topo_mod_seterrno(mp, EMOD_FMRI_NVL);
-		goto mfc_bail;
-	}
 
 	if (mod_nvl_data(mp, out, objpath) < 0)
 		goto mfc_bail;
 
-	thp = topo_mod_handle(mp);
-	pkg = topo_fmri_create(thp,
-	    FM_FMRI_SCHEME_PKG, FM_FMRI_SCHEME_PKG, 0, arg, &err);
+	pkg = topo_mod_pkgfmri(mp, FM_PKG_SCHEME_VERSION, path);
 	if (pkg == NULL) {
-		(void) topo_mod_seterrno(mp, err);
 		goto mfc_bail;
 	}
-	nvlist_free(arg);
-	arg = NULL;
 
 	if (nvlist_add_nvlist(out, FM_FMRI_MOD_PKG, pkg) != 0) {
 		(void) topo_mod_seterrno(mp, EMOD_FMRI_NVL);
@@ -238,7 +232,6 @@ mod_fmri_create(topo_mod_t *mp, const char *driver)
 mfc_bail:
 	nvlist_free(pkg);
 	nvlist_free(out);
-	nvlist_free(arg);
 	return (NULL);
 }
 

@@ -27,80 +27,65 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
-#include <kstat.h>
 #include <limits.h>
 #include <strings.h>
 #include <unistd.h>
 #include <fm/topo_mod.h>
 #include <sys/fm/protocol.h>
 
-#include <topo_error.h>
-
-typedef struct cpu_node {
-	kstat_ctl_t *cn_kc;
-	kstat_t **cn_cpustats;
-	uint_t cn_ncpustats;
-} cpu_node_t;
+#include <topo_method.h>
+#include <cpu.h>
 
 static int cpu_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
-    topo_instance_t, void *);
+    topo_instance_t, void *, void *);
 static void cpu_release(topo_mod_t *, tnode_t *);
 static int cpu_nvl2str(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 static int cpu_str2nvl(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
-static int cpu_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
-static int cpu_unusable(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
-static int cpu_contains(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
-static int cpu_expand(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
 static int cpu_fmri_asru(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 static nvlist_t *fmri_create(topo_mod_t *, uint32_t, uint8_t, char *);
-
-#define	CPU_VERSION	TOPO_VERSION
 
 static const topo_method_t cpu_methods[] = {
 	{ TOPO_METH_NVL2STR, TOPO_METH_NVL2STR_DESC, TOPO_METH_NVL2STR_VERSION,
 	    TOPO_STABILITY_INTERNAL, cpu_nvl2str },
 	{ TOPO_METH_STR2NVL, TOPO_METH_STR2NVL_DESC, TOPO_METH_STR2NVL_VERSION,
 	    TOPO_STABILITY_INTERNAL, cpu_str2nvl },
-	{ TOPO_METH_PRESENT, TOPO_METH_PRESENT_DESC, TOPO_METH_PRESENT_VERSION,
-	    TOPO_STABILITY_INTERNAL, cpu_present },
-	{ TOPO_METH_CONTAINS, TOPO_METH_CONTAINS_DESC,
-	    TOPO_METH_CONTAINS_VERSION, TOPO_STABILITY_INTERNAL, cpu_contains },
-	{ TOPO_METH_UNUSABLE, TOPO_METH_UNUSABLE_DESC,
-	    TOPO_METH_UNUSABLE_VERSION, TOPO_STABILITY_INTERNAL, cpu_unusable },
-	{ TOPO_METH_EXPAND, TOPO_METH_EXPAND_DESC,
-	    TOPO_METH_EXPAND_VERSION, TOPO_STABILITY_INTERNAL, cpu_expand },
 	{ TOPO_METH_ASRU_COMPUTE, TOPO_METH_ASRU_COMPUTE_DESC,
 	    TOPO_METH_ASRU_COMPUTE_VERSION, TOPO_STABILITY_INTERNAL,
 	    cpu_fmri_asru },
+	{ TOPO_METH_FMRI, TOPO_METH_FMRI_DESC, TOPO_METH_FMRI_VERSION,
+	    TOPO_STABILITY_INTERNAL, cpu_fmri_asru },
 	{ NULL }
 };
 
-static const topo_modinfo_t cpu_info =
-	{ "cpu", CPU_VERSION, cpu_enum, cpu_release };
+static const topo_modops_t cpu_ops =
+	{ cpu_enum, cpu_release };
 
-void
-cpu_init(topo_mod_t *mod)
+static const topo_modinfo_t cpu_info =
+	{ "cpu", FM_FMRI_SCHEME_CPU, CPU_VERSION, &cpu_ops };
+
+int
+cpu_init(topo_mod_t *mod, topo_version_t version)
 {
 	cpu_node_t *cpuip;
 
-	topo_mod_setdebug(mod, TOPO_DBG_ALL);
+	if (getenv("TOPOCPUDEBUG"))
+		topo_mod_setdebug(mod);
 	topo_mod_dprintf(mod, "initializing cpu builtin\n");
 
+	if (version != CPU_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
 	if ((cpuip = topo_mod_zalloc(mod, sizeof (cpu_node_t))) == NULL)
-		return;
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
 
 	if ((cpuip->cn_kc = kstat_open()) == NULL) {
 		topo_mod_dprintf(mod, "kstat_open failed: %s\n",
 		    strerror(errno));
 		topo_mod_free(mod, cpuip, sizeof (cpu_node_t));
-		return;
+		return (-1);
 	}
 
 	cpuip->cn_ncpustats = sysconf(_SC_CPUID_MAX);
@@ -108,18 +93,22 @@ cpu_init(topo_mod_t *mod)
 	    cpuip->cn_ncpustats + 1) * sizeof (kstat_t *))) == NULL) {
 		(void) kstat_close(cpuip->cn_kc);
 		topo_mod_free(mod, cpuip, sizeof (cpu_node_t));
-		return;
+		return (-1);
 	}
 
-	if (topo_mod_register(mod, &cpu_info, (void *)cpuip) != 0) {
+	if (topo_mod_register(mod, &cpu_info, TOPO_VERSION) != 0) {
 		topo_mod_dprintf(mod, "failed to register cpu_info: "
 		    "%s\n", topo_mod_errmsg(mod));
 		topo_mod_free(mod, cpuip->cn_cpustats,
 		    (cpuip->cn_ncpustats + 1) * sizeof (kstat_t *));
 		(void) kstat_close(cpuip->cn_kc);
 		topo_mod_free(mod, cpuip, sizeof (cpu_node_t));
-		return;
+		return (-1);
 	}
+
+	topo_mod_setspecific(mod, (void *)cpuip);
+
+	return (0);
 }
 
 void
@@ -127,7 +116,7 @@ cpu_fini(topo_mod_t *mod)
 {
 	cpu_node_t *cpuip;
 
-	cpuip = topo_mod_private(mod);
+	cpuip = topo_mod_getspecific(mod);
 
 	if (cpuip->cn_cpustats != NULL)
 		topo_mod_free(mod, cpuip->cn_cpustats,
@@ -183,7 +172,7 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 
 		if ((fmri = fmri_create(mod, cpu_id, 0, s)) == NULL)
 			continue;
-		(void) topo_node_bind(mod, rnode, name, cpu_id, fmri, NULL);
+		(void) topo_node_bind(mod, rnode, name, cpu_id, fmri);
 		nvlist_free(fmri);
 	}
 
@@ -194,7 +183,7 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 /*ARGSUSED*/
 static int
 cpu_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    topo_instance_t min, topo_instance_t max, void *arg)
+    topo_instance_t min, topo_instance_t max, void *arg, void *notused2)
 {
 	cpu_node_t *cpuip = (cpu_node_t *)arg;
 
@@ -347,38 +336,6 @@ cpu_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	*out = fmri;
 
 	return (0);
-}
-
-/*ARGSUSED*/
-static int
-cpu_present(topo_mod_t *mod, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	return (topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP));
-}
-
-/*ARGSUSED*/
-static int
-cpu_contains(topo_mod_t *mod, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	return (topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP));
-}
-
-/*ARGSUSED*/
-static int
-cpu_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	return (topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP));
-}
-
-/*ARGSUSED*/
-static int
-cpu_expand(topo_mod_t *mod, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	return (topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP));
 }
 
 static nvlist_t *

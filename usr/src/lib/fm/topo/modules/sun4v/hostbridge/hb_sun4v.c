@@ -26,15 +26,15 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "hb_sun4.h"
-#include "hostbridge.h"
-#include "pcibus.h"
-#include "util.h"
-#include "did.h"
+#include <fm/topo_hc.h>
+
+#include <hb_sun4.h>
+#include <hostbridge.h>
+#include <pcibus.h>
+#include <util.h>
 
 static int
-rcs_process(busorrc_t *list, tnode_t *ptn, did_hash_t *didhash,
-    di_prom_handle_t promtree, topo_mod_t *mod)
+rcs_process(topo_mod_t *mod, busorrc_t *list, tnode_t *ptn)
 {
 	busorrc_t *p;
 	int nrc = 0;
@@ -53,19 +53,18 @@ rcs_process(busorrc_t *list, tnode_t *ptn, did_hash_t *didhash,
 		nrc++;
 
 	topo_mod_dprintf(mod, "root complex count: %d\n", nrc);
-	return (declare_exbuses(list, ptn, 1, nrc, didhash, promtree, mod));
+	return (declare_exbuses(mod, list, ptn, 1, nrc));
 }
 
 static int
-pci_hostbridges_find(tnode_t *ptn, did_hash_t *didhash,
-    di_prom_handle_t promtree, topo_mod_t *mod)
+pci_hostbridges_find(topo_mod_t *mod, tnode_t *ptn)
 {
 	busorrc_t *rcs = NULL;
 	di_node_t devtree;
 	di_node_t pnode;
 
 	/* Scan for buses, top-level devinfo nodes with the right driver */
-	devtree = di_init("/", DINFOCPYALL);
+	devtree = topo_mod_devinfo(mod);
 	if (devtree == DI_NODE_NIL) {
 		topo_mod_dprintf(mod, "devinfo init failed.");
 		topo_node_range_destroy(ptn, HOSTBRIDGE);
@@ -73,30 +72,27 @@ pci_hostbridges_find(tnode_t *ptn, did_hash_t *didhash,
 	}
 	pnode = di_drv_first_node(PX, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (busorrc_add(&rcs, pnode, mod) < 0) {
-			di_fini(devtree);
+		if (busorrc_add(mod, &rcs, pnode) < 0) {
 			return (-1);
 		}
 		pnode = di_drv_next_node(pnode);
 	}
-	rcs_process(rcs, ptn, didhash, promtree, mod);
-	busorrc_free(rcs, mod);
-	di_fini(devtree);
+	rcs_process(mod, rcs, ptn);
+	busorrc_free(mod, rcs);
 	return (0);
 }
 
 /*ARGSUSED*/
 int
-platform_hb_enum(tnode_t *parent, const char *name,
-    topo_instance_t imin, topo_instance_t imax, did_hash_t *didhash,
-    di_prom_handle_t promtree, topo_mod_t *mod)
+platform_hb_enum(topo_mod_t *mod, tnode_t *parent, const char *name,
+    topo_instance_t imin, topo_instance_t imax)
 {
-	return (pci_hostbridges_find(parent, didhash, promtree, mod));
+	return (pci_hostbridges_find(mod, parent));
 }
 
 /*ARGSUSED*/
 int
-platform_hb_label(tnode_t *node, nvlist_t *in, nvlist_t **out, topo_mod_t *mod)
+platform_hb_label(topo_mod_t *mod, tnode_t *node, nvlist_t *in, nvlist_t **out)
 {
 	return (labelmethod_inherit(mod, node, in, out));
 }

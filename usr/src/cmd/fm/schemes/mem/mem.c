@@ -348,7 +348,7 @@ fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	 * If we have a well-formed unum (hc-FMRI), use the string verbatim
 	 * to form the initial mem:/// components.  Otherwise use unum=%s.
 	 */
-	if (strncmp(rawunum, "hc:///", 6) != 0)
+	if (strncmp(rawunum, "hc://", 5) != 0)
 		prefix = FM_FMRI_MEM_UNUM "=";
 	else
 		prefix = "";
@@ -371,14 +371,18 @@ fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	}
 
 	/*
-	 * If we have a well-formed unum (hc-FMRI), leave it as is.
+	 * If we have a well-formed unum (hc-FMRI), we skip over the
+	 * the scheme and authority prefix.
 	 * Otherwise, the spaces and colons will be escaped,
 	 * rendering the resulting FMRI pretty much unreadable.
 	 * We're therefore going to do some escaping of our own first.
 	 */
-	if (strncmp(rawunum, "hc:///", 6) == 0) {
+	if (strncmp(rawunum, "hc://", 5) == 0) {
+		rawunum += 5;
+		rawunum = strchr(rawunum, '/');
+		++rawunum;
 		/* LINTED: variable format specifier */
-		size = snprintf(buf, buflen, format, rawunum + 6, val);
+		size = snprintf(buf, buflen, format, rawunum, val);
 	} else {
 		preunum = fmd_fmri_strdup(rawunum);
 		presz = strlen(preunum) + 1;

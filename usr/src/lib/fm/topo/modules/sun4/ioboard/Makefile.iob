@@ -27,17 +27,27 @@
 
 MODULE = ioboard
 SUN4DIR = ../../sun4/$(MODULE)
-IOBSRCS = ioboard.c did.c did_hash.c did_props.c util.c
-MODULESRCS = $(IOBSRCS) iob_platform.c
+UTILDIR = ../../common/pcibus
+UTILSRCS = did.c did_hash.c did_props.c util.c
+HBDIR = ../../common/hostbridge
+IOBSRCS = ioboard.c
+MODULESRCS = $(UTILSRCS) $(IOBSRCS) iob_platform.c
 
 include ../../Makefile.plugin
 
 LDLIBS += -ldevinfo
-CPPFLAGS += -I$(SUN4DIR)
+CPPFLAGS += -I$(UTILDIR) -I$(HBDIR) -I$(SUN4DIR)
+
+%.o: $(UTILDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
 
 %.o: $(SUN4DIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
+
+%.ln: $(UTILDIR)/%.c
+	$(LINT.c) -c $<
 
 %.ln: $(SUN4DIR)/%.c
 	$(LINT.c) -c $<

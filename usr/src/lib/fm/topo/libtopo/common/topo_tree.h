@@ -91,9 +91,9 @@ struct topo_node {
 
 typedef struct topo_tree {
 	topo_list_t tt_list;		/* next/prev pointers */
-	char *tt_scheme;		/* Scheme name */
-	void *tt_file;			/* Topology file info */
-	struct topo_node *tt_root;	/* Root node */
+	char *tt_scheme;		/* scheme name */
+	topo_mod_t *tt_mod;		/* builtin enumerator mod */
+	struct topo_node *tt_root;	/* root node */
 	topo_walk_t *tt_walk;		/* private walker */
 } ttree_t;
 
@@ -118,6 +118,12 @@ struct topo_hdl {
 	pthread_mutex_t	th_lock;	/* lock protecting hdl */
 	char *th_uuid;			/* uuid of snapshot */
 	char *th_rootdir;		/* Root directory of plugin paths */
+	char *th_platform;		/* platform name */
+	char *th_isa;			/* isa name */
+	char *th_machine;		/* machine name */
+	char *th_product;		/* product name */
+	di_node_t th_di;		/* handle  to root of devinfo tree */
+	di_prom_handle_t th_pi;		/* handle to root of prom tree */
 	topo_modhash_t *th_modhash;	/* Module hash */
 	topo_list_t th_trees;		/* Scheme-specific topo tree list */
 	topo_alloc_t *th_alloc;		/* allocators */
@@ -127,13 +133,12 @@ struct topo_hdl {
 };
 
 #define	TOPO_UUID_SIZE	37	/* libuuid limit + 1 */
+#define	SMB_DEFAULT1	"To Be Filled By O.E.M."
+#define	SMB_DEFAULT2	"Not Available At This Time"
 
 extern ttree_t *topo_tree_create(topo_hdl_t *, topo_mod_t *, const char *);
-extern void topo_tree_destroy(topo_hdl_t *, ttree_t *);
+extern void topo_tree_destroy(ttree_t *);
 extern int topo_tree_enum_all(topo_hdl_t *);
-
-extern int topo_file_load(topo_hdl_t *, topo_mod_t *, ttree_t *);
-extern void topo_file_unload(topo_hdl_t *, ttree_t *);
 
 extern void topo_node_lock(tnode_t *);
 extern void topo_node_unlock(tnode_t *);

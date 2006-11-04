@@ -29,19 +29,14 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <fm/topo_hc.h>
+#include <fm/topo_mod.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/*
- * OPL-specific enumerators.
- */
-#define	IOBOARD		"ioboard"
-#define	HOSTBRIDGE	"hostbridge"
-#define	PCIEXRC		"pciexrc"
-#define	PCI_BUS		"pcibus"
-#define	PCIEX_BUS	"pciexbus"
-#define	PCI_MOD_PATH	"/usr/platform/sun4u/lib/fm/topo/plugins/pcibus.so"
+#define	PCI_BUS_VERS	1
 
 /*
  * OPL uses the Jupiter Bus Bindings (see FWARC/2005/076) which specifies
@@ -88,7 +83,7 @@ typedef struct {
 
 /* Shared device tree root node */
 int opl_hb_enum(topo_mod_t *mp, const ioboard_contents_t *iob,
-    tnode_t *parent, int brd, di_prom_handle_t opl_promtree);
+    tnode_t *parent, int brd);
 
 #ifdef __cplusplus
 }

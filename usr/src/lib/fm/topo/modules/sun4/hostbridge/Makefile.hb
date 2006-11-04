@@ -28,17 +28,26 @@
 MODULE = hostbridge
 CLASS = arch
 SUN4DIR = ../../sun4/$(MODULE)
+UTILDIR = ../../common/pcibus
+HBDIR = ../../common/hostbridge
 HBSRCS = hostbridge.c hb_sun4.c did.c did_hash.c did_props.c util.c
 MODULESRCS = $(HBSRCS) hb_$(ARCH).c
 
 include ../../Makefile.plugin
 
 LDLIBS += -ldevinfo
-CPPFLAGS += -I$(SUN4DIR)
+CPPFLAGS += -I$(SUN4DIR) -I$(UTILDIR) -I$(HBDIR)
 
 %.o: $(SUN4DIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+%.o: $(UTILDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 %.ln: $(SUN4DIR)/%.c
+	$(LINT.c) -c $<
+
+%.ln: $(UTILDIR)/%.c
 	$(LINT.c) -c $<

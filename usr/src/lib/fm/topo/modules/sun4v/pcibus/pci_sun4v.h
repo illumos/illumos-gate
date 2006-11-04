@@ -43,7 +43,7 @@ physnm_t t200_pnms[] = {
 };
 
 pphysnm_t plat_pnames[] = {
-	{ "SUNW,Sun-Fire-T200",
+	{ "Sun-Fire-T200",
 	    sizeof (t200_pnms) / sizeof (physnm_t),
 	    t200_pnms }
 };
@@ -60,7 +60,7 @@ devlab_t t200_missing[] = {
 };
 
 pdevlabs_t plats_missing[] = {
-	{ "SUNW,Sun-Fire-T200",
+	{ "Sun-Fire-T200",
 	    sizeof (t200_missing) / sizeof (devlab_t),
 	    t200_missing }
 };

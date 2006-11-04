@@ -50,8 +50,8 @@ topo_mod_release(topo_mod_t *mod, tnode_t *node)
 {
 	topo_mod_enter(mod);
 
-	if (mod->tm_info->tmi_release != NULL)
-		mod->tm_info->tmi_release(mod, node);
+	if (mod->tm_info->tmi_ops->tmo_release != NULL)
+		mod->tm_info->tmi_ops->tmo_release(mod, node);
 
 	topo_mod_exit(mod);
 }
@@ -129,17 +129,20 @@ topo_mod_stop(topo_mod_t *mod)
 
 	mod->tm_flags = TOPO_MOD_FINI;
 
-	topo_dprintf(TOPO_DBG_MOD, "module %s stopped\n", mod->tm_name);
+	topo_dprintf(mod->tm_hdl, TOPO_DBG_MODSVC,
+	    "module %s stopped\n", mod->tm_name);
 }
 
 static int
-topo_mod_start(topo_mod_t *mod)
+topo_mod_start(topo_mod_t *mod, topo_version_t version)
 {
-	topo_dprintf(TOPO_DBG_MOD, "starting module %s\n", mod->tm_name);
+	topo_dprintf(mod->tm_hdl, TOPO_DBG_MODSVC,
+	    "starting module %s\n", mod->tm_name);
 
-	if (mod->tm_mops->mop_init(mod) != 0) {
-		mod->tm_errno = errno ? errno : ETOPO_MOD_INIT;
-		topo_dprintf(TOPO_DBG_ERR,
+	if (mod->tm_mops->mop_init(mod, version) != 0) {
+		if (mod->tm_errno == 0)
+			mod->tm_errno = ETOPO_MOD_INIT;
+		topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR,
 		    "module %s failed to initialize: %s\n", mod->tm_name,
 		    topo_strerror(mod->tm_errno));
 		return (-1);
@@ -148,32 +151,26 @@ topo_mod_start(topo_mod_t *mod)
 	mod->tm_flags |= TOPO_MOD_INIT;
 
 	if (!(mod->tm_flags & TOPO_MOD_REG)) {
-		topo_dprintf(TOPO_DBG_ERR,
+		topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR,
 		    "module %s failed to register\n", mod->tm_name);
 		mod->tm_errno = ETOPO_MOD_NOREG;
 		topo_mod_stop(mod);
 		return (-1);
 	}
 
-	topo_dprintf(TOPO_DBG_MOD, "module %s started\n", mod->tm_name);
-
 	return (0);
 }
 
 topo_mod_t *
-topo_mod_lookup(topo_hdl_t *thp, const char *path)
+topo_mod_lookup(topo_hdl_t *thp, const char *name, int bump)
 {
-	char *p;
-	char name[PATH_MAX];
 	topo_mod_t *mod;
 	topo_modhash_t *mhp = thp->th_modhash;
 
-	(void) strlcpy(name, topo_strbasename(path), sizeof (name));
-	if ((p = strrchr(name, '.')) != NULL && strcmp(p, ".so") == 0)
-	*p = '\0'; /* strip trailing .so from any module name */
-
 	topo_modhash_lock(mhp);
 	mod = topo_modhash_lookup(mhp, name);
+	if (mod != NULL && bump != 0)
+		topo_mod_hold(mod);
 	topo_modhash_unlock(mhp);
 
 	return (mod);
@@ -203,7 +200,7 @@ topo_mod_destroy(topo_mod_t *mod)
 static topo_mod_t *
 set_create_error(topo_hdl_t *thp, topo_mod_t *mod, const char *path, int err)
 {
-	topo_dprintf(TOPO_DBG_ERR, "unable to load module %s: %s\n",
+	topo_dprintf(thp, TOPO_DBG_ERR, "unable to load module %s: %s\n",
 	    path, topo_strerror(err));
 
 	if (mod != NULL)
@@ -216,7 +213,7 @@ set_create_error(topo_hdl_t *thp, topo_mod_t *mod, const char *path, int err)
 
 static topo_mod_t *
 topo_mod_create(topo_hdl_t *thp, const char *name, const char *path,
-    const topo_modops_t *ops)
+    const topo_imodops_t *ops, topo_version_t version)
 {
 	topo_mod_t *mod;
 
@@ -229,24 +226,23 @@ topo_mod_create(topo_hdl_t *thp, const char *name, const char *path,
 	(void) pthread_mutex_init(&mod->tm_lock, NULL);
 
 	mod->tm_name = topo_hdl_strdup(thp, name);
-	mod->tm_path = topo_hdl_strdup(thp, path);
+	if (path != NULL)
+		mod->tm_path = topo_hdl_strdup(thp, path);
 	mod->tm_rootdir = topo_hdl_strdup(thp, thp->th_rootdir);
-	if (mod->tm_name == NULL || mod->tm_path == NULL ||
-	    mod->tm_rootdir == NULL)
+	if (mod->tm_name == NULL || mod->tm_rootdir == NULL)
 		return (set_create_error(thp, mod, path, ETOPO_NOMEM));
 
-	mod->tm_mops = (topo_modops_t *)ops;
+	mod->tm_mops = (topo_imodops_t *)ops;
 	mod->tm_hdl = thp;
 	mod->tm_alloc = thp->th_alloc;
-	mod->tm_version = TOPO_VERSION;
 
 	/*
 	 * Module will be held upon a successful return from topo_mod_start()
 	 */
-	if ((topo_mod_start(mod)) < 0)
+	if ((topo_mod_start(mod, version)) < 0)
 		return (set_create_error(thp, mod, path, mod->tm_errno));
 
-	topo_dprintf(TOPO_DBG_MOD, "loaded module %s\n", mod->tm_name);
+	topo_dprintf(thp, TOPO_DBG_MODSVC, "loaded module %s\n", mod->tm_name);
 
 	return (mod);
 }
@@ -305,20 +301,16 @@ topo_modhash_lookup(topo_modhash_t *mhp, const char *name)
 }
 
 topo_mod_t *
-topo_modhash_load(topo_hdl_t *thp, const char *path, const topo_modops_t *ops)
+topo_modhash_load(topo_hdl_t *thp, const char *name, const char *path,
+    const topo_imodops_t *ops, topo_version_t version)
 {
-	char name[PATH_MAX], *p;
 	topo_modhash_t *mhp = thp->th_modhash;
 	topo_mod_t *mod;
 	uint_t h;
 
 	topo_modhash_lock(mhp);
 
-	(void) strlcpy(name, topo_strbasename(path), sizeof (name));
-	if ((p = strrchr(name, '.')) != NULL && strcmp(p, ".so") == 0)
-		*p = '\0'; /* strip trailing .so from any module name */
-
-	if ((mod = topo_mod_create(thp, name, path, ops)) == NULL) {
+	if ((mod = topo_mod_create(thp, name, path, ops, version)) == NULL) {
 		topo_modhash_unlock(mhp);
 		return (NULL); /* th_errno set */
 	}
@@ -391,9 +383,12 @@ topo_modhash_unload_all(topo_hdl_t *thp)
 		while (mp != NULL) {
 			topo_mod_stop(mp);
 
-			assert(mp->tm_refs == 1);
+			/*
+			 * At this point we are forcing all modules to
+			 * stop, ignore any remaining module reference counts.
+			 */
+			mp->tm_refs = 0;
 
-			--mp->tm_refs;
 			*pp = mp->tm_next;
 			topo_mod_destroy(mp);
 			mp = *pp;

@@ -28,7 +28,7 @@
 include ../../../Makefile.lib
 include ../../Makefile.lib
 
-FMHDRS = libtopo.h topo_mod.h
+FMHDRS = libtopo.h topo_mod.h topo_hc.h
 HDRDIR = common
 
 SUBDIRS = $(MACH)

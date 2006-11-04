@@ -65,17 +65,20 @@ typedef struct chip {
 } chip_t;
 
 static int chip_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
-    topo_instance_t, void *);
+    topo_instance_t, void *, void *);
 
-const topo_modinfo_t chip_info =
-	{ "chip", CHIP_VERSION, chip_enum, NULL};
+static const topo_modops_t chip_ops =
+	{ chip_enum, NULL};
+static const topo_modinfo_t chip_info =
+	{ "chip", FM_FMRI_SCHEME_HC, CHIP_VERSION, &chip_ops };
 
 int
 _topo_init(topo_mod_t *mod)
 {
 	chip_t *chip;
 
-	topo_mod_setdebug(mod, TOPO_DBG_ALL);
+	if (getenv("TOPOCHIPDBG"))
+		topo_mod_setdebug(mod);
 	topo_mod_dprintf(mod, "initializing chip enumerator\n");
 
 	if ((chip = topo_mod_zalloc(mod, sizeof (chip_t))) == NULL)
@@ -96,7 +99,7 @@ _topo_init(topo_mod_t *mod)
 		return (-1);
 	}
 
-	if (topo_mod_register(mod, &chip_info, (void *)chip) != 0) {
+	if (topo_mod_register(mod, &chip_info, TOPO_VERSION) != 0) {
 		topo_mod_dprintf(mod, "failed to register hc: "
 		    "%s\n", topo_mod_errmsg(mod));
 		topo_mod_free(mod, chip->chip_cpustats,
@@ -105,6 +108,7 @@ _topo_init(topo_mod_t *mod)
 		topo_mod_free(mod, chip, sizeof (chip_t));
 		return (-1);
 	}
+	topo_mod_setspecific(mod, (void *)chip);
 
 	return (0);
 }
@@ -114,7 +118,7 @@ _topo_fini(topo_mod_t *mod)
 {
 	chip_t *chip;
 
-	chip = topo_mod_private(mod);
+	chip = topo_mod_getspecific(mod);
 
 	if (chip->chip_cpustats != NULL)
 		topo_mod_free(mod, chip->chip_cpustats,
@@ -177,9 +181,8 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 	char *s, sbuf[21];
 	tnode_t *cnode;
 	kstat_named_t *ks, *kf;
-	nvlist_t *pfmri, *fmri, *asru;
-	nvlist_t *args = NULL;
-	topo_hdl_t *thp;
+	nvlist_t *fmri, *asru;
+	nvlist_t *auth = topo_mod_auth(mod, rnode);
 
 	/*
 	 * Override what was created for us
@@ -189,7 +192,6 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 	    < 0)
 		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 
-	thp = topo_mod_handle(mod);
 	for (i = 0; i <= chip->chip_ncpustats; i++) {
 
 		if ((chip_id = cpu_kstat_init(chip, i)) < 0)
@@ -203,29 +205,10 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 			s = NULL;
 		}
 
-		pfmri = NULL;
-		if (topo_node_resource(rnode, &pfmri, &err) < 0 ||
-		    topo_mod_nvalloc(mod, &args, NV_UNIQUE_NAME) != 0) {
-			nvlist_free(pfmri);
-			++nerr;
-			continue;
-		}
-		err = nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_PARENT, pfmri);
-		if (err != 0 ||
-		    (s != NULL &&
-		    nvlist_add_string(args, TOPO_METH_FMRI_ARG_SER, s) != 0)) {
-			nvlist_free(pfmri);
-			nvlist_free(args);
-			++nerr;
-			continue;
-		}
-		nvlist_free(pfmri);
-
-		fmri = topo_fmri_create(thp, FM_FMRI_SCHEME_HC,
-		    name, (topo_instance_t)chip_id, args, &err);
-		nvlist_free(args);
+		fmri = topo_mod_hcfmri(mod, rnode, FM_HC_SCHEME_VERSION, name,
+		    (topo_instance_t)chip_id, NULL, auth, NULL, NULL, s);
 		if (fmri == NULL || (cnode = topo_node_bind(mod,
-		    rnode, name, i, fmri, NULL)) == NULL) {
+		    rnode, name, i, fmri)) == NULL) {
 			++nerr;
 			nvlist_free(fmri);
 			continue;
@@ -252,19 +235,27 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 		    != NULL && strcmp(KSTAT_NAMED_STR_PTR(kf),
 		    "hc:///component=") != 0) {
 			nvlist_t *fru;
+			char *lp;
 
-			if (topo_fmri_str2nvl(thp, KSTAT_NAMED_STR_PTR(kf),
-			    &fru, &err) == 0) {
+			if (topo_mod_str2nvl(mod, KSTAT_NAMED_STR_PTR(kf),
+			    &fru) == 0) {
 				(void) topo_node_fru_set(cnode, fru, 0, &err);
 				nvlist_free(fru);
 			}
 
-			(void) topo_node_label_set(cnode,
-			    KSTAT_NAMED_STR_PTR(kf), &err);
+			if ((lp = strchr(KSTAT_NAMED_STR_PTR(kf), '='))
+			    == NULL) {
+				(void) topo_node_label_set(cnode, NULL, &err);
+			} else {
+				++lp;
+				(void) topo_node_label_set(cnode, lp, &err);
+			}
 		} else {
 			(void) topo_node_label_set(cnode, NULL, &err);
 		}
 	}
+
+	nvlist_free(auth);
 
 	if (nerr != 0)
 		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
@@ -272,9 +263,10 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 		return (0);
 }
 
+/*ARGSUSED*/
 static int
 chip_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
-    topo_instance_t min, topo_instance_t max, void *arg)
+    topo_instance_t min, topo_instance_t max, void *arg, void *notused)
 {
 	chip_t *chip = (chip_t *)arg;
 

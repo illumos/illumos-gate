@@ -33,12 +33,13 @@
 extern "C" {
 #endif
 
+#include <fm/libtopo.h>
+
 /* Topo plugin version */
 #define	SATA_VERSION			1
 
 /* The names of the two nodes the plugin creates: */
-#define	SATA_DISK			"disk"
-#define	SATA_PORT			"sata-port"
+#define	SATA_DISK			DISK /* from topo_hc.h */
 
 #define	TOPO_STORAGE_PGROUP		"storage"
 
@@ -49,10 +50,6 @@ extern "C" {
 #define	TOPO_STORAGE_SERIAL_NUM		"disk-serial-number"
 #define	TOPO_STORAGE_FIRMWARE_REV	"disk-firmware-revision"
 #define	TOPO_STORAGE_CAPACITY		"disk-capacity-in-bytes"
-
-/* Properties added to the "io" pgroup: */
-#define	TOPO_IO_DEV_PATH		"dev-path"
-#define	TOPO_IO_AP_PATH			"ap-path"
 
 /* Properties added to the machine-specific properties pgroup */
 #define	SATA_IND_NAME			"indicator-name"

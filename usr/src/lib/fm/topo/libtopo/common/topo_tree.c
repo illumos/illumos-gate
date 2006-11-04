@@ -62,6 +62,7 @@
 
 #include <topo_alloc.h>
 #include <topo_error.h>
+#include <topo_file.h>
 #include <topo_module.h>
 #include <topo_string.h>
 #include <topo_subr.h>
@@ -71,36 +72,12 @@ static ttree_t *
 set_create_error(topo_hdl_t *thp, ttree_t *tp, int err)
 {
 	if (tp != NULL)
-		topo_tree_destroy(thp, tp);
+		topo_tree_destroy(tp);
 
 	if (err != 0)
 		(void) topo_hdl_seterrno(thp, err);
 
 	return (NULL);
-}
-
-static void
-set_system_props(tnode_t *node)
-{
-	int err;
-	char platform[MAXNAMELEN];
-	char isa[MAXNAMELEN];
-	struct utsname uts;
-
-	platform[0] = '\0';
-	isa[0] = '\0';
-	(void) sysinfo(SI_PLATFORM, platform, sizeof (platform));
-	(void) sysinfo(SI_ARCHITECTURE, isa, sizeof (isa));
-	(void) uname(&uts);
-
-	(void) topo_pgroup_create(node, TOPO_PGROUP_SYSTEM,
-	    TOPO_STABILITY_PRIVATE, &err);
-	(void) topo_prop_set_string(node, TOPO_PGROUP_SYSTEM,
-	    TOPO_PROP_PLATFORM, TOPO_PROP_SET_ONCE, platform, &err);
-	(void) topo_prop_set_string(node, TOPO_PGROUP_SYSTEM,
-	    TOPO_PROP_ISA, TOPO_PROP_SET_ONCE, isa, &err);
-	(void) topo_prop_set_string(node, TOPO_PGROUP_SYSTEM,
-	    TOPO_PROP_MACHINE, TOPO_PROP_SET_ONCE, uts.machine, &err);
 }
 
 ttree_t *
@@ -109,16 +86,18 @@ topo_tree_create(topo_hdl_t *thp, topo_mod_t *mod, const char *scheme)
 	ttree_t *tp;
 	tnode_t *rp;
 
-	if ((tp = topo_hdl_zalloc(thp, sizeof (ttree_t))) == NULL)
+	if ((tp = topo_mod_zalloc(mod, sizeof (ttree_t))) == NULL)
 		return (set_create_error(thp, NULL, ETOPO_NOMEM));
 
-	if ((tp->tt_scheme = topo_hdl_strdup(thp, scheme)) == NULL)
+	tp->tt_mod = mod;
+
+	if ((tp->tt_scheme = topo_mod_strdup(mod, scheme)) == NULL)
 		return (set_create_error(thp, tp, ETOPO_NOMEM));
 
 	/*
 	 * Initialize a private walker for internal use
 	 */
-	if ((tp->tt_walk = topo_hdl_zalloc(thp, sizeof (topo_walk_t))) == NULL)
+	if ((tp->tt_walk = topo_mod_zalloc(mod, sizeof (topo_walk_t))) == NULL)
 		return (set_create_error(thp, tp, ETOPO_NOMEM));
 
 	/*
@@ -133,7 +112,6 @@ topo_tree_create(topo_hdl_t *thp, topo_mod_t *mod, const char *scheme)
 	rp->tn_enum = mod;
 	rp->tn_hdl = thp;
 
-	set_system_props(rp);
 	topo_node_hold(rp);
 
 	tp->tt_walk->tw_root = rp;
@@ -147,16 +125,16 @@ topo_tree_create(topo_hdl_t *thp, topo_mod_t *mod, const char *scheme)
 }
 
 void
-topo_tree_destroy(topo_hdl_t *thp, ttree_t *tp)
+topo_tree_destroy(ttree_t *tp)
 {
+	topo_mod_t *mod;
+
 	if (tp == NULL)
 		return;
 
+	mod = tp->tt_mod;
 	if (tp->tt_walk != NULL)
-		topo_hdl_free(thp, tp->tt_walk, sizeof (topo_walk_t));
-
-	if (tp->tt_file != NULL)
-		topo_file_unload(thp, tp);
+		topo_mod_free(mod, tp->tt_walk, sizeof (topo_walk_t));
 
 	if (tp->tt_root != NULL) {
 		assert(tp->tt_root->tn_refs == 1);
@@ -168,28 +146,71 @@ topo_tree_destroy(topo_hdl_t *thp, ttree_t *tp)
 	 * topo_node_rele().
 	 */
 	if (tp->tt_scheme != NULL)
-		topo_hdl_strfree(thp, tp->tt_scheme);
+		topo_mod_strfree(mod, tp->tt_scheme);
 
-	topo_hdl_free(thp, tp, sizeof (ttree_t));
+	topo_mod_free(mod, tp, sizeof (ttree_t));
 }
 
 static int
 topo_tree_enum(topo_hdl_t *thp, ttree_t *tp)
 {
-	tnode_t *rnode;
+	char *pp;
 
-	rnode = tp->tt_root;
 	/*
-	 * Attempt to populate the tree from a topology file
+	 * Attempt to enumerate the tree from a topology map in the
+	 * following order:
+	 *	<product-name>-<scheme>-topology
+	 *	<platform-name>-<scheme>-topology (uname -i)
+	 *	<machine-name>-<scheme>-topology (uname -m)
+	 *	<scheme>-topology
+	 *
+	 * Trim any SUNW, from the product or platform name
+	 * before loading file
 	 */
-	if (topo_file_load(thp, rnode->tn_enum, tp) < 0) {
-		/*
-		 * If this tree does not have a matching static topology file,
-		 * continue on.
-		 */
-		if (topo_hdl_errno(thp) != ETOPO_FILE_NOENT)
-			return (topo_hdl_seterrno(thp, ETOPO_ENUM_PARTIAL));
+	if (thp->th_product == NULL ||
+	    (pp = strchr(thp->th_product, ',')) == NULL)
+		pp = thp->th_product;
+	else
+		pp++;
+	if (topo_file_load(tp->tt_root->tn_enum, tp->tt_root,
+	    pp, tp->tt_scheme) < 0) {
+		if ((pp = strchr(thp->th_platform, ',')) == NULL)
+			pp = thp->th_platform;
+		else
+			pp++;
+
+		if (topo_file_load(tp->tt_root->tn_enum, tp->tt_root,
+		    pp, tp->tt_scheme) < 0) {
+			if (topo_file_load(tp->tt_root->tn_enum, tp->tt_root,
+			    thp->th_machine, tp->tt_scheme) < 0) {
+
+				if (topo_file_load(tp->tt_root->tn_enum,
+				    tp->tt_root, NULL, tp->tt_scheme) < 0) {
+					topo_dprintf(thp, TOPO_DBG_ERR, "no "
+					    "topology map found for the %s "
+					    "FMRI set\n", tp->tt_scheme);
+					return (topo_hdl_seterrno(thp,
+					    ETOPO_ENUM_NOMAP));
+				}
+			}
+		}
 	}
+
+	/*
+	 * It would be nice to leave the devinfo and prominfo trees
+	 * active but the interfaces consume copious amounts of memory
+	 * while searching for property information
+	 */
+	if (thp->th_di != DI_NODE_NIL) {
+		di_fini(thp->th_di);
+		thp->th_di = DI_NODE_NIL;
+	}
+	if (thp->th_pi != DI_PROM_HANDLE_NIL) {
+		di_prom_fini(thp->th_pi);
+		thp->th_pi = DI_PROM_HANDLE_NIL;
+	}
+
+
 	return (0);
 }
 

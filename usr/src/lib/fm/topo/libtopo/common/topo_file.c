@@ -28,6 +28,7 @@
 
 #include <limits.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/param.h>
 #include <topo_error.h>
 #include <topo_tree.h>
@@ -38,132 +39,70 @@
  * topo_file.c
  *
  *	This file hides the details of any file manipulation to
- *	establish topology for a given scheme.  It has two outward
- *	facing interfaces topo_file_load() and topo_file_unload().
+ *	establish topology for a given enumerator.
  */
 
-#define	TOPO_DEFAULT_FILE	"%s-topology.xml"
-#define	PLATFORM_TOPO_PATH	"%susr/platform/%s/lib/fm/topo/%s"
-#define	COMMON_TOPO_PATH	"%susr/lib/fm/topo/%s"
+#define	TOPO_DEFAULT_FILE	"maps/%s-%s-topology.xml"
+#define	TOPO_COMMON_FILE	"maps/%s-topology.xml"
 
-static int
-xml_read(topo_hdl_t *hp, ttree_t *tp)
+static void
+topo_file_unload(topo_file_t *tfp)
 {
-	topo_file_t *tfp;
-	char *pplat, *pmach;
-	int err, e;
-	char _topo_file[MAXNAMELEN * 2];
-	char _topo_path[PATH_MAX];
-
-
-	tfp = (topo_file_t *)tp->tt_file;
-
-	(void) snprintf(_topo_file,
-	    2 * MAXNAMELEN, TOPO_DEFAULT_FILE, tp->tt_scheme);
-
-	/*
-	 * Look for a platform-specific topology file first
-	 */
-	e = topo_prop_get_string(tp->tt_root, TOPO_PGROUP_SYSTEM,
-	    TOPO_PROP_PLATFORM, &pplat, &err);
-	if (e < 0)
-		return (topo_hdl_seterrno(hp, err));
-	(void) snprintf(_topo_path, PATH_MAX, PLATFORM_TOPO_PATH,
-	    hp->th_rootdir, pplat, _topo_file);
-
-	tfp->tf_fileinfo =
-	    topo_xml_read(tfp->tf_mod, _topo_path, tp->tt_scheme);
-	if (tfp->tf_fileinfo != NULL) {
-		topo_hdl_strfree(hp, pplat);
-		return (0);
-	}
-
-	topo_dprintf(TOPO_DBG_MOD, "failed to load topology file %s: %s\n",
-	    _topo_path, topo_strerror(topo_hdl_errno(hp)));
-
-	/*
-	 * No luck with the platform-specific file, how about a
-	 * machine-specific one?
-	 */
-	e = topo_prop_get_string(tp->tt_root, TOPO_PGROUP_SYSTEM,
-	    TOPO_PROP_MACHINE, &pmach, &err);
-	if (e < 0) {
-		topo_hdl_strfree(hp, pplat);
-		return (topo_hdl_seterrno(hp, err));
-	}
-	/*
-	 * Don't waste time trying to open the same file twice in the
-	 * cases where the platform name is identical to the machine
-	 * name
-	 */
-	if (strcmp(pplat, pmach) != 0) {
-		(void) snprintf(_topo_path, PATH_MAX, PLATFORM_TOPO_PATH,
-		    hp->th_rootdir, pmach, _topo_file);
-		tfp->tf_fileinfo =
-		    topo_xml_read(tfp->tf_mod, _topo_path, tp->tt_scheme);
-	}
-	if (tfp->tf_fileinfo != NULL) {
-		topo_hdl_strfree(hp, pplat);
-		topo_hdl_strfree(hp, pmach);
-		return (0);
-	} else {
-		topo_dprintf(TOPO_DBG_MOD,
-		    "failed to load topology file %s: %s\n",
-		    _topo_path, topo_strerror(topo_hdl_errno(hp)));
-	}
-	topo_hdl_strfree(hp, pplat);
-	topo_hdl_strfree(hp, pmach);
-	(void) snprintf(_topo_path, PATH_MAX, COMMON_TOPO_PATH,
-	    hp->th_rootdir, _topo_file);
-	tfp->tf_fileinfo =
-	    topo_xml_read(tfp->tf_mod, _topo_path, tp->tt_scheme);
-	if (tfp->tf_fileinfo == NULL) {
-		topo_dprintf(TOPO_DBG_MOD,
-		    "failed to load topology file %s: %s\n",
-		    _topo_path, topo_strerror(topo_hdl_errno(hp)));
-		return (topo_hdl_seterrno(hp, ETOPO_FILE_NOENT));
-	}
-	return (0);
-}
-
-int
-topo_file_load(topo_hdl_t *thp, topo_mod_t *mod, ttree_t *tp)
-{
-	topo_file_t *tfp;
-
-	if ((tfp = topo_hdl_zalloc(thp, sizeof (topo_file_t))) == NULL)
-		return (topo_hdl_seterrno(thp, ETOPO_NOMEM));
-
-	tp->tt_file = tfp;
-
-	tfp->tf_mod = mod;
-
-	if (xml_read(thp, tp) < 0) {
-		topo_file_unload(thp, tp);
-		return (-1);
-	}
-
-	if (topo_xml_enum(tfp->tf_mod, tfp->tf_fileinfo, tp->tt_root) < 0) {
-		topo_dprintf(TOPO_DBG_ERR,
-		    "Failed to enumerate topology: %s\n",
-		    topo_strerror(topo_hdl_errno(thp)));
-		topo_file_unload(thp, tp);
-		return (-1);
-	}
-	return (0);
-}
-
-void
-topo_file_unload(topo_hdl_t *thp, ttree_t *tp)
-{
-	topo_file_t *tfp = tp->tt_file;
 
 	if (tfp == NULL)
 		return;
 
-	if (tfp->tf_fileinfo != NULL)
-		tf_info_free(tfp->tf_mod, tfp->tf_fileinfo);
+	if (tfp->tf_filenm != NULL)
+		topo_mod_strfree(tfp->tf_mod, tfp->tf_filenm);
 
-	topo_hdl_free(thp, tfp, sizeof (topo_file_t));
-	tp->tt_file = NULL;
+	if (tfp->tf_tmap != NULL)
+		tf_info_free(tfp->tf_mod, tfp->tf_tmap);
+
+	topo_mod_free(tfp->tf_mod, tfp, sizeof (topo_file_t));
+}
+
+int
+topo_file_load(topo_mod_t *mod, tnode_t *node, const char *name,
+    const char *scheme)
+{
+	topo_file_t *tfp;
+	char fp[MAXNAMELEN];
+
+	if ((tfp = topo_mod_zalloc(mod, sizeof (topo_file_t))) == NULL)
+		return (topo_mod_seterrno(mod, ETOPO_NOMEM));
+
+	tfp->tf_mod = mod;
+
+	if (name != NULL)
+		(void) snprintf(fp, MAXNAMELEN, TOPO_DEFAULT_FILE, name,
+		    scheme);
+	else
+		(void) snprintf(fp, MAXNAMELEN, TOPO_COMMON_FILE, scheme);
+
+	if ((tfp->tf_filenm = topo_search_path(mod, mod->tm_rootdir, fp))
+	    == NULL) {
+		topo_file_unload(tfp);
+		return (topo_mod_seterrno(mod, ETOPO_MOD_NOENT));
+	}
+
+	if ((tfp->tf_tmap = topo_xml_read(mod, tfp->tf_filenm, scheme))
+	    == NULL) {
+		topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR,
+		    "failed to load topology file %s: "
+		    "%s\n", tfp->tf_filenm, topo_strerror(ETOPO_MOD_XRD));
+		topo_file_unload(tfp);
+		return (topo_mod_seterrno(mod, ETOPO_MOD_XRD));
+	}
+
+	if (topo_xml_enum(mod, tfp->tf_tmap, node) < 0) {
+		topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR,
+		    "Failed to enumerate topology: %s\n",
+		    topo_strerror(ETOPO_MOD_XENUM));
+		topo_file_unload(tfp);
+		return (topo_mod_seterrno(mod, ETOPO_MOD_XENUM));
+	}
+
+	topo_file_unload(tfp);
+
+	return (0);
 }

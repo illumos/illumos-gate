@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -76,10 +75,19 @@ function cp_so
 		case $name in
 		_fmd_init)        cp $1 $2/usr/lib/fm/fmd/plugins; return ;;
 		fmd_fmri_nvl2str) cp $1 $2/usr/lib/fm/fmd/schemes; return ;;
-		topo_load)        cp $1 $2/usr/lib/fm/topo; return ;;
+		topo_load)        cp $1 $2/usr/lib/fm/topo/plugins; return ;;
 		esac
 	done
 	die "\nunknown .so type -- $1"
+}
+
+function cp_topo
+{
+	mkdir -p $2/usr/lib/fm/topo/maps
+	cp $1 $2/usr/lib/fm/topo/maps; 
+	for platdir in $2/usr/platform/*/lib/fm/topo/maps; do
+		rm -f $platdir/* 2>/dev/null
+	done
 }
 
 function list_cmds
@@ -220,14 +228,15 @@ for file in $files; do
 	fmd.conf) cp $file $simroot/etc/fm/fmd ;;
 	*.conf)	cp $file $simroot/usr/lib/fm/fmd/plugins ;;
 	*.dict)	cp $file $simroot/usr/lib/fm/dict ;;
-	*.eft)	die "\neversholt fault tree file not yet supported -- $file" ;;
+	*.eft) cp $file $simroot/usr/lib/fm/eft ;;
 	*.esc)	die "\neversholt source file not yet supported -- $file" ;;
 	*.inj)	inj_args="$inj_args $file" ;;
 	*.log)	inj_args="$inj_args $file" ;;
 	*log)	inj_args="$inj_args $file" ;;
 	*.mo)	cp $file $simroot/usr/lib/locale/$LANG/LC_MESSAGES ;;
 	*.so)	cp_so $file $simroot ;;
-	*.topo) cp $file $simroot/usr/lib/fm/topo ;;
+	*.topo) die "\n .topo files not supported -- $file" ;;
+	*.xml) cp_topo $file $simroot ;;
 	*)	die "\nunknown file type or suffix -- $file" ;;
 	esac
 	echo " $base\c"
@@ -243,7 +252,7 @@ cat >$simscript <<EOS
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"@(#)fmsim.ksh	1.5	06/10/11 SMI"
 
 #
 # fmsim(1M) script generated for $simroot $(date)

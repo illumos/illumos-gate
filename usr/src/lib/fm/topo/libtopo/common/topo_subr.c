@@ -27,17 +27,17 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <alloca.h>
+#include <ctype.h>
+#include <limits.h>
 #include <syslog.h>
 #include <strings.h>
+#include <unistd.h>
 
 #include <topo_error.h>
 #include <topo_subr.h>
 
 struct _rwlock;
 struct _lwp_mutex;
-
-int _topo_debug = 0;	/* debug messages enabled (off) */
-int _topo_dbout = 0;	/* debug messages output mode */
 
 int
 topo_rw_read_held(pthread_rwlock_t *lock)
@@ -73,19 +73,42 @@ topo_hdl_unlock(topo_hdl_t *thp)
 }
 
 const char *
-topo_stability_name(topo_stability_t s)
+topo_stability2name(topo_stability_t s)
 {
 	switch (s) {
-	case TOPO_STABILITY_INTERNAL:	return ("Internal");
-	case TOPO_STABILITY_PRIVATE:	return ("Private");
-	case TOPO_STABILITY_OBSOLETE:	return ("Obsolete");
-	case TOPO_STABILITY_EXTERNAL:	return ("External");
-	case TOPO_STABILITY_UNSTABLE:	return ("Unstable");
-	case TOPO_STABILITY_EVOLVING:	return ("Evolving");
-	case TOPO_STABILITY_STABLE:	return ("Stable");
-	case TOPO_STABILITY_STANDARD:	return ("Standard");
-	default:			return (NULL);
+	case TOPO_STABILITY_INTERNAL:	return (TOPO_STABSTR_INTERNAL);
+	case TOPO_STABILITY_PRIVATE:	return (TOPO_STABSTR_PRIVATE);
+	case TOPO_STABILITY_OBSOLETE:	return (TOPO_STABSTR_OBSOLETE);
+	case TOPO_STABILITY_EXTERNAL:	return (TOPO_STABSTR_EXTERNAL);
+	case TOPO_STABILITY_UNSTABLE:	return (TOPO_STABSTR_UNSTABLE);
+	case TOPO_STABILITY_EVOLVING:	return (TOPO_STABSTR_EVOLVING);
+	case TOPO_STABILITY_STABLE:	return (TOPO_STABSTR_STABLE);
+	case TOPO_STABILITY_STANDARD:	return (TOPO_STABSTR_STANDARD);
+	default:			return (TOPO_STABSTR_UNKNOWN);
 	}
+}
+
+topo_stability_t
+topo_name2stability(const char *name)
+{
+	if (strcmp(name, TOPO_STABSTR_INTERNAL) == 0)
+		return (TOPO_STABILITY_INTERNAL);
+	else if (strcmp(name, TOPO_STABSTR_PRIVATE) == 0)
+		return (TOPO_STABILITY_PRIVATE);
+	else if (strcmp(name, TOPO_STABSTR_OBSOLETE) == 0)
+		return (TOPO_STABILITY_OBSOLETE);
+	else if (strcmp(name, TOPO_STABSTR_EXTERNAL) == 0)
+		return (TOPO_STABILITY_EXTERNAL);
+	else if (strcmp(name, TOPO_STABSTR_UNSTABLE) == 0)
+		return (TOPO_STABILITY_UNSTABLE);
+	else if (strcmp(name, TOPO_STABSTR_EVOLVING) == 0)
+		return (TOPO_STABILITY_EVOLVING);
+	else if (strcmp(name, TOPO_STABSTR_STABLE) == 0)
+		return (TOPO_STABILITY_STABLE);
+	else if (strcmp(name, TOPO_STABSTR_STANDARD) == 0)
+		return (TOPO_STABILITY_STANDARD);
+
+	return (TOPO_STABILITY_UNKNOWN);
 }
 
 static const topo_debug_mode_t _topo_dbout_modes[] = {
@@ -94,29 +117,89 @@ static const topo_debug_mode_t _topo_dbout_modes[] = {
 	{ NULL, NULL, 0 }
 };
 
-void
-topo_debug_set(topo_hdl_t *thp, int mask, char *dout)
-{
-	int i;
+static const topo_debug_mode_t _topo_dbflag_modes[] = {
+	{ "error", "error handling debug messages enabled", TOPO_DBG_ERR },
+	{ "module", "module debug messages enabled", TOPO_DBG_MOD },
+	{ "modulesvc", "module services debug messages enabled",
+	    TOPO_DBG_MODSVC },
+	{ "walk", "walker subsystem debug messages enabled", TOPO_DBG_WALK },
+	{ "xml", "xml file parsing messages enabled", TOPO_DBG_XML },
+	{ "all", "all debug modes enabled", TOPO_DBG_ALL},
+	{ NULL, NULL, 0 }
+};
 
-	for (i = 0; i < 2; ++i) {
-		if (strcmp(_topo_dbout_modes[i].tdm_name, dout) == 0) {
-			thp->th_dbout = _topo_dbout =
-			    _topo_dbout_modes[i].tdm_mode;
-			thp->th_debug = _topo_debug = mask;
-			topo_dprintf(mask, _topo_dbout_modes[i].tdm_desc);
-		}
+void
+env_process_value(topo_hdl_t *thp, const char *begin, const char *end)
+{
+	char buf[MAXNAMELEN];
+	size_t count;
+	topo_debug_mode_t *dbp;
+
+	while (begin < end && isspace(*begin))
+		begin++;
+
+	while (begin < end && isspace(*(end - 1)))
+		end--;
+
+	if (begin >= end)
+		return;
+
+	count = end - begin;
+	count += 1;
+
+	if (count > sizeof (buf))
+		return;
+
+	(void) snprintf(buf, count, "%s", begin);
+
+	for (dbp = (topo_debug_mode_t *)_topo_dbflag_modes;
+	    dbp->tdm_name != NULL; ++dbp) {
+		if (strcmp(buf, dbp->tdm_name) == 0)
+			thp->th_debug |= dbp->tdm_mode;
 	}
 }
 
 void
-topo_vdprintf(int mask, const char *format, va_list ap)
+topo_debug_set(topo_hdl_t *thp, const char *dbmode, const char *dout)
+{
+	char *end, *value, *next;
+	topo_debug_mode_t *dbp;
+
+	topo_hdl_lock(thp);
+	value = (char *)dbmode;
+
+	for (end = (char *)dbmode; *end != '\0'; value = next) {
+		end = strchr(value, ',');
+		if (end != NULL)
+			next = end + 1;	/* skip the comma */
+		else
+			next = end = value + strlen(value);
+
+		env_process_value(thp, value, end);
+	}
+
+	if (dout == NULL) {
+		topo_hdl_unlock(thp);
+		return;
+	}
+
+	for (dbp = (topo_debug_mode_t *)_topo_dbout_modes;
+	    dbp->tdm_name != NULL; ++dbp) {
+		if (strcmp(dout, dbp->tdm_name) == 0)
+		thp->th_dbout = dbp->tdm_mode;
+	}
+	topo_hdl_unlock(thp);
+}
+
+void
+topo_vdprintf(topo_hdl_t *thp, int mask, const char *mod, const char *format,
+    va_list ap)
 {
 	char *msg;
 	size_t len;
 	char c;
 
-	if (!(_topo_debug & mask))
+	if (!(thp->th_debug & mask))
 		return;
 
 	len = vsnprintf(&c, 1, format, ap);
@@ -126,24 +209,31 @@ topo_vdprintf(int mask, const char *format, va_list ap)
 	if (msg[len - 1] != '\n')
 		(void) strcpy(&msg[len], "\n");
 
-	if (_topo_dbout == TOPO_DBOUT_STDERR)
-		(void) fprintf(stderr, "libtopo DEBUG: %s", msg);
-
-	if (_topo_dbout == TOPO_DBOUT_SYSLOG)
-		syslog(LOG_DEBUG | LOG_USER, "libtopo DEBUG: %s", msg);
+	if (thp->th_dbout == TOPO_DBOUT_SYSLOG) {
+		if (mod == NULL) {
+			syslog(LOG_DEBUG | LOG_USER, "libtopo DEBUG: %s", msg);
+		} else {
+			syslog(LOG_DEBUG | LOG_USER, "libtopo DEBUG: %s: %s",
+			    mod, msg);
+		}
+	} else {
+		if (mod == NULL) {
+			(void) fprintf(stderr, "libtopo DEBUG: %s", msg);
+		} else {
+			(void) fprintf(stderr, "libtopo DEBUG: %s: %s", mod,
+			    msg);
+		}
+	}
 }
 
-/*PRINTFLIKE2*/
+/*PRINTFLIKE3*/
 void
-topo_dprintf(int mask, const char *format, ...)
+topo_dprintf(topo_hdl_t *thp, int mask, const char *format, ...)
 {
 	va_list ap;
 
-	if (!(_topo_debug & mask))
-		return;
-
 	va_start(ap, format);
-	topo_vdprintf(mask, format, ap);
+	topo_vdprintf(thp, mask, NULL, format, ap);
 	va_end(ap);
 }
 
@@ -190,4 +280,36 @@ topo_fmristr_build(ssize_t *sz, char *buf, size_t buflen, char *str,
 		*sz += snprintf(buf, left, "%s%s", str, append);
 	else
 		*sz += snprintf(buf, left, "%s%s%s", prepend, str, append);
+}
+
+#define	TOPO_PLATFORM_PATH	"%s/usr/platform/%s/lib/fm/topo/%s"
+#define	TOPO_COMMON_PATH	"%s/usr/lib/fm/topo/%s"
+
+char *
+topo_search_path(topo_mod_t *mod, const char *rootdir, const char *file)
+{
+	char *pp, sp[PATH_MAX];
+	topo_hdl_t *thp = mod->tm_hdl;
+
+	/*
+	 * Search for file name in order of platform, machine and common
+	 * topo directories
+	 */
+	(void) snprintf(sp, PATH_MAX, TOPO_PLATFORM_PATH, rootdir,
+	    thp->th_platform, file);
+	if (access(sp, F_OK) != 0) {
+		(void) snprintf(sp, PATH_MAX, TOPO_PLATFORM_PATH,
+		    thp->th_rootdir, thp->th_machine, file);
+		if (access(sp, F_OK) != 0) {
+			(void) snprintf(sp, PATH_MAX, TOPO_COMMON_PATH,
+			    thp->th_rootdir, file);
+			if (access(sp, F_OK) != 0) {
+				return (NULL);
+			}
+		}
+	}
+
+	pp = topo_mod_strdup(mod, sp);
+
+	return (pp);
 }

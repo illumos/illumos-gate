@@ -29,42 +29,42 @@
 #include <string.h>
 #include <sys/fm/protocol.h>
 #include <fm/topo_mod.h>
+#include <fm/topo_hc.h>
 #include <libdevinfo.h>
 #include <limits.h>
 #include <sys/param.h>
 #include <sys/systeminfo.h>
 
-#include "hostbridge.h"
-#include "ioboard.h"
-#include "did.h"
-#include "did_props.h"
-#include "util.h"
+#include <hostbridge.h>
+#include <ioboard.h>
+#include <did.h>
+#include <did_props.h>
+#include <util.h>
 
 /*
  * ioboard.c
  *	Generic code shared by all the ioboard enumerators
  */
+
 static void iob_release(topo_mod_t *, tnode_t *);
-static int iob_contains(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
-static int iob_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
 static int iob_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
-    topo_instance_t, void *);
+    topo_instance_t, void *, void *);
 static int iob_label(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
+
+extern int platform_iob_enum(topo_mod_t *, tnode_t *, topo_instance_t,
+    topo_instance_t);
+extern int platform_iob_label(topo_mod_t *, tnode_t *, nvlist_t *, nvlist_t **);
 
 extern txprop_t IOB_common_props[];
 extern int IOB_propcnt;
 
-const topo_modinfo_t Iob_info =
-	{ IOBOARD, IOB_ENUMR_VERS, iob_enum, iob_release };
+static const topo_modops_t Iob_ops =
+	{ iob_enum, iob_release };
+static const topo_modinfo_t Iob_info =
+	{ IOBOARD, FM_FMRI_SCHEME_HC, IOB_ENUMR_VERS, &Iob_ops };
 
-const topo_method_t Iob_methods[] = {
-	{ "iob_contains", "ioboard element contains other element",
-	    IOB_ENUMR_VERS, TOPO_STABILITY_INTERNAL, iob_contains },
-	{ "iob_present", "ioboard element currently present",
-	    IOB_ENUMR_VERS, TOPO_STABILITY_INTERNAL, iob_present },
+static const topo_method_t Iob_methods[] = {
 	{ TOPO_METH_LABEL, TOPO_METH_LABEL_DESC,
 	    TOPO_METH_LABEL_VERSION, TOPO_STABILITY_INTERNAL, iob_label },
 	{ NULL }
@@ -77,33 +77,20 @@ _topo_init(topo_mod_t *modhdl)
 	 * Turn on module debugging output
 	 */
 	if (getenv("TOPOIOBDBG") != NULL)
-		topo_mod_setdebug(modhdl, TOPO_DBG_ALL);
+		topo_mod_setdebug(modhdl);
 	topo_mod_dprintf(modhdl, "initializing ioboard enumerator\n");
 
-	topo_mod_register(modhdl, &Iob_info, NULL);
+	topo_mod_register(modhdl, &Iob_info, TOPO_VERSION);
+
+	did_hash_init(modhdl);
 	topo_mod_dprintf(modhdl, "Ioboard enumr initd\n");
 }
 
 void
 _topo_fini(topo_mod_t *modhdl)
 {
+	did_hash_fini(modhdl);
 	topo_mod_unregister(modhdl);
-}
-
-/*ARGSUSED*/
-static int
-iob_contains(topo_mod_t *mp, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	return (0);
-}
-
-/*ARGSUSED*/
-static int
-iob_present(topo_mod_t *mp, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	return (0);
 }
 
 static int
@@ -112,61 +99,28 @@ iob_label(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 {
 	if (version > TOPO_METH_LABEL_VERSION)
 		return (topo_mod_seterrno(mp, EMOD_VER_NEW));
-	return (platform_iob_label(node, in, out, mp));
+	return (platform_iob_label(mp, node, in, out));
 }
 
 static topo_mod_t *
-hb_enumr_load(topo_mod_t *mp, tnode_t *parent)
+hb_enumr_load(topo_mod_t *mp)
 {
 	topo_mod_t *rp = NULL;
-	char *plat, *mach;
-	char *hbpath;
-	char *rootdir;
-	int err;
 
-	plat = mach = NULL;
-
-	if (topo_prop_get_string(parent,
-	    TOPO_PGROUP_SYSTEM, TOPO_PROP_PLATFORM, &plat, &err) < 0) {
-		(void) topo_mod_seterrno(mp, err);
-		return (NULL);
-	}
-	if (topo_prop_get_string(parent,
-	    TOPO_PGROUP_SYSTEM, TOPO_PROP_MACHINE, &mach, &err) < 0) {
-		(void) topo_mod_seterrno(mp, err);
-		return (NULL);
-	}
-	hbpath = topo_mod_alloc(mp, PATH_MAX);
-	rootdir = topo_mod_rootdir(mp);
-	(void) snprintf(hbpath,
-	    PATH_MAX, PATH_TO_HB_ENUM, rootdir ? rootdir : "", plat);
-
-	if ((rp = topo_mod_load(mp, hbpath)) == NULL) {
+	if ((rp = topo_mod_load(mp, HOSTBRIDGE, HB_ENUMR_VERS)) == NULL) {
 		topo_mod_dprintf(mp,
-		    "%s enumerator could not load %s.\n", IOBOARD, hbpath);
-		(void) snprintf(hbpath,
-		    PATH_MAX, PATH_TO_HB_ENUM, rootdir ? rootdir : "", mach);
-		if ((rp = topo_mod_load(mp, hbpath)) == NULL) {
-			topo_mod_dprintf(mp,
-			    "%s enumerator could not load %s.\n",
-			    IOBOARD, hbpath);
-		}
+		    "%s enumerator could not load %s.\n", IOBOARD, HOSTBRIDGE);
 	}
-	topo_mod_strfree(mp, plat);
-	topo_mod_strfree(mp, mach);
-	topo_mod_free(mp, hbpath, PATH_MAX);
 	return (rp);
 }
 
 /*ARGSUSED*/
 static int
 iob_enum(topo_mod_t *mp, tnode_t *pn, const char *name, topo_instance_t imin,
-    topo_instance_t imax, void *notused)
+    topo_instance_t imax, void *notused1, void *notused2)
 {
 	topo_mod_t *hbmod;
 	int rv;
-	did_hash_t *didhash;
-	di_prom_handle_t promtree;
 
 	if (strcmp(name, IOBOARD) != 0) {
 		topo_mod_dprintf(mp,
@@ -174,33 +128,18 @@ iob_enum(topo_mod_t *mp, tnode_t *pn, const char *name, topo_instance_t imin,
 		    IOBOARD);
 		return (0);
 	}
-
-	if ((promtree = di_prom_init()) == DI_PROM_HANDLE_NIL) {
-		topo_mod_dprintf(mp,
-		    "Ioboard enumerator: di_prom_handle_init failed.\n");
-		return (-1);
-	}
-
 	/*
 	 * Load the hostbridge enumerator, we'll soon need it!
 	 */
-	if ((hbmod = hb_enumr_load(mp, pn)) == NULL) {
-		di_prom_fini(promtree);
+	if ((hbmod = hb_enumr_load(mp)) == NULL) {
 		return (-1);
 	}
 
-	if ((didhash = did_hash_init(mp)) == NULL) {
-		topo_mod_dprintf(mp,
-		    "Hash initialization for ioboard enumerator failed.\n");
-		di_prom_fini(promtree);
-		topo_mod_unload(hbmod);
-		return (-1);
-	}
+	did_hash_init(mp);
 
-	rv = platform_iob_enum(pn, imin, imax, didhash, promtree, mp);
+	rv = platform_iob_enum(mp, pn, imin, imax);
 
-	did_hash_fini(didhash);
-	di_prom_fini(promtree);
+	did_hash_fini(mp);
 	topo_mod_unload(hbmod);
 
 	if (rv < 0)
@@ -223,41 +162,22 @@ iob_release(topo_mod_t *mp, tnode_t *node)
 }
 
 static tnode_t *
-iob_tnode_create(tnode_t *parent,
-    const char *name, topo_instance_t i, void *priv, topo_mod_t *mod)
+iob_tnode_create(topo_mod_t *mod, tnode_t *parent,
+    const char *name, topo_instance_t i, void *priv)
 {
-	topo_hdl_t *thp;
-	nvlist_t *args, *fmri, *pfmri;
+	nvlist_t *fmri;
 	tnode_t *ntn;
-	int err;
+	nvlist_t *auth = topo_mod_auth(mod, parent);
 
-	thp = topo_mod_handle(mod);
-
-	if (topo_node_resource(parent, &pfmri, &err) < 0) {
-		topo_mod_seterrno(mod, err);
-		topo_mod_dprintf(mod,
-		    "Unable to retrieve parent resource.\n");
-		return (NULL);
-	}
-	if (topo_mod_nvalloc(mod, &args, NV_UNIQUE_NAME) != 0) {
-		(void) topo_mod_seterrno(mod, EMOD_FMRI_NVL);
-		nvlist_free(pfmri);
-		return (NULL);
-	}
-	err = nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_PARENT, pfmri);
-	if (err != 0) {
-		nvlist_free(pfmri);
-		nvlist_free(args);
-		(void) topo_mod_seterrno(mod, EMOD_FMRI_NVL);
-		return (NULL);
-	}
-	fmri = topo_fmri_create(thp, FM_FMRI_SCHEME_HC, name, i, args, &err);
+	fmri = topo_mod_hcfmri(mod, parent, FM_HC_SCHEME_VERSION, name, i,
+	    NULL, auth, NULL, NULL, NULL);
+	nvlist_free(auth);
 	if (fmri == NULL) {
 		topo_mod_dprintf(mod,
 		    "Unable to make nvlist for %s bind.\n", name);
 		return (NULL);
 	}
-	ntn = topo_node_bind(mod, parent, name, i, fmri, priv);
+	ntn = topo_node_bind(mod, parent, name, i, fmri);
 	if (ntn == NULL) {
 		topo_mod_dprintf(mod,
 		    "topo_node_bind (%s%d/%s%d) failed: %s\n",
@@ -268,6 +188,8 @@ iob_tnode_create(tnode_t *parent,
 		return (NULL);
 	}
 	nvlist_free(fmri);
+	topo_node_setspecific(ntn, priv);
+
 	if (topo_method_register(mod, ntn, Iob_methods) < 0) {
 		topo_mod_dprintf(mod, "topo_method_register failed: %s\n",
 		    topo_strerror(topo_mod_errno(mod)));
@@ -278,15 +200,13 @@ iob_tnode_create(tnode_t *parent,
 }
 
 tnode_t *
-ioboard_declare(tnode_t *parent, topo_instance_t i, void *priv,
-    di_prom_handle_t promtree, topo_mod_t *mod)
+ioboard_declare(topo_mod_t *mod, tnode_t *parent, topo_instance_t i, void *priv)
 {
 	tnode_t *ntn;
 
-	if ((ntn = iob_tnode_create(parent, IOBOARD, i, priv, mod)) == NULL)
+	if ((ntn = iob_tnode_create(mod, parent, IOBOARD, i, priv)) == NULL)
 		return (NULL);
-	if (did_props_set(ntn, priv, IOB_common_props, IOB_propcnt,
-	    promtree) < 0) {
+	if (did_props_set(ntn, priv, IOB_common_props, IOB_propcnt) < 0) {
 		topo_node_unbind(ntn);
 		return (NULL);
 	}
@@ -301,9 +221,8 @@ ioboard_declare(tnode_t *parent, topo_instance_t i, void *priv,
 }
 
 did_t *
-split_bus_address(did_hash_t *dhash, di_node_t dp, uint_t baseaddr,
-    uint_t bussep, int minbrd, int maxbrd, int *brd, int *br, int *bus,
-    di_prom_handle_t promtree, topo_mod_t *mod)
+split_bus_address(topo_mod_t *mod, di_node_t dp, uint_t baseaddr,
+    uint_t bussep, int minbrd, int maxbrd, int *brd, int *br, int *bus)
 {
 	uint_t bc, ac;
 	char *comma;
@@ -350,5 +269,5 @@ split_bus_address(did_hash_t *dhash, di_node_t dp, uint_t baseaddr,
 		    *brd, *br, *bus, bc, ac);
 		return (NULL);
 	}
-	return (did_create(dhash, dp, *brd, *br, NO_RC, *bus, promtree));
+	return (did_create(mod, dp, *brd, *br, NO_RC, *bus));
 }

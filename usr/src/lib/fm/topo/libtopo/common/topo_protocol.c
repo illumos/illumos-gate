@@ -32,6 +32,7 @@
 
 #include <topo_alloc.h>
 #include <topo_error.h>
+#include <topo_method.h>
 #include <topo_protocol.h>
 #include <topo_subr.h>
 
@@ -157,7 +158,7 @@ topo_node_asru_set(tnode_t *node, nvlist_t *asru, int flag, int *err)
 			node->tn_fflags |= TOPO_ASRU_COMPUTE;
 
 		if (topo_prop_set_fmri(node, TOPO_PGROUP_PROTOCOL,
-		    TOPO_PROP_ASRU, TOPO_PROP_SET_ONCE, asru, err) < 0)
+		    TOPO_PROP_ASRU, TOPO_PROP_IMMUTABLE, asru, err) < 0)
 			return (-1);
 	}
 
@@ -184,7 +185,7 @@ topo_node_fru_set(tnode_t *node, nvlist_t *fru, int flag, int *err)
 			node->tn_fflags |= TOPO_FRU_COMPUTE;
 
 		if (topo_prop_set_fmri(node, TOPO_PGROUP_PROTOCOL,
-		    TOPO_PROP_FRU, TOPO_PROP_SET_ONCE, fru, err) < 0)
+		    TOPO_PROP_FRU, TOPO_PROP_IMMUTABLE, fru, err) < 0)
 			return (-1);
 	}
 
@@ -194,6 +195,7 @@ topo_node_fru_set(tnode_t *node, nvlist_t *fru, int flag, int *err)
 int
 topo_node_label_set(tnode_t *node, char *label, int *err)
 {
+
 	/*
 	 * Inherit FRU property from our parent if * not specified
 	 */
@@ -204,7 +206,7 @@ topo_node_label_set(tnode_t *node, char *label, int *err)
 		}
 	} else {
 		if (topo_prop_set_string(node, TOPO_PGROUP_PROTOCOL,
-		    TOPO_PROP_LABEL, TOPO_PROP_SET_ONCE, label, err) < 0)
+		    TOPO_PROP_LABEL, TOPO_PROP_IMMUTABLE, label, err) < 0)
 			return (-1);
 	}
 

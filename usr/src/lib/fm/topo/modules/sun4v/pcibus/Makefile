@@ -29,16 +29,15 @@
 MODULE = pcibus
 ARCH = sun4v
 CLASS = arch
-PCISRCS = did.c			\
-	  did_hash.c		\
-	  did_props.c		\
-	  pcibus.c		\
-	  pcibus_labels.c	\
-	  pcifn_enum.c		\
-	  util.c
+UTILDIR = ../../common/pcibus
+HBDIR = ../../common/hostbridge
+UTILSRCS = did.c did_hash.c did_props.c util.c
+PCISRCS = pcibus.c pcibus_labels.c
 
-MODULESRCS = $(PCISRCS) pci_sun4v.c
+MODULESRCS = $(UTILSRCS) $(PCISRCS) pci_sun4v.c
 
 include ../../Makefile.plugin
 
 LDLIBS += -ldevinfo
+
+CPPFLAGS += -I$(UTILDIR) -I$(HBDIR)

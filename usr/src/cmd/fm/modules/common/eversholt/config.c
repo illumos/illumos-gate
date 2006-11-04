@@ -41,6 +41,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <strings.h>
+#include <fm/topo_hc.h>
 #include "alloc.h"
 #include "out.h"
 #include "literals.h"
@@ -341,7 +342,7 @@ config_cook(struct cfgdata *cdata)
 		/*
 		 * If this property is a device path, cache it for quick lookup
 		 */
-		if (pn == stable("DEV")) {
+		if (pn == stable(TOPO_IO_DEV)) {
 			sv = stable(pv);
 			out(O_ALTFP|O_VERB3, "caching %s\n", sv);
 			cdata->devcache = lut_add(cdata->devcache,

@@ -31,7 +31,6 @@
 #include <sys/param.h>
 #include <sys/systeminfo.h>
 #include <sys/fm/util.h>
-#include <fm/libtopo.h>
 
 #include <smbios.h>
 #include <limits.h>
@@ -60,6 +59,7 @@
 #include <fmd_idspace.h>
 #include <fmd_rpc.h>
 #include <fmd_dr.h>
+#include <fmd_topo.h>
 #include <fmd_xprt.h>
 #include <fmd_ctl.h>
 #include <sys/openpromio.h>
@@ -313,6 +313,8 @@ static fmd_statistics_t _fmd_stats = {
 { "fltlog.enospc", FMD_TYPE_UINT64, "events not appended to fltlog (ENOSPC)" },
 { "log.enospc", FMD_TYPE_UINT64, "events not appended to other logs (ENOSPC)" },
 { "dr.gen", FMD_TYPE_UINT64, "dynamic reconfiguration generation" },
+{ "topo.gen", FMD_TYPE_UINT64, "topology snapshot generation" },
+{ "topo.drgen", FMD_TYPE_UINT64, "current topology DR generation number" },
 };
 
 void
@@ -371,6 +373,7 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 	(void) pthread_mutex_init(&dp->d_thr_lock, NULL);
 	(void) pthread_mutex_init(&dp->d_mod_lock, NULL);
 	(void) pthread_mutex_init(&dp->d_stats_lock, NULL);
+	(void) pthread_mutex_init(&dp->d_topo_lock, NULL);
 	(void) pthread_rwlock_init(&dp->d_log_lock, NULL);
 
 	/*
@@ -614,8 +617,7 @@ fmd_destroy(fmd_t *dp)
 	if (dp->d_conf != NULL)
 		fmd_conf_close(dp->d_conf);
 
-	if (dp->d_topo != NULL)
-		topo_close(dp->d_topo);
+	fmd_topo_fini();
 
 	nvlist_free(dp->d_auth);
 	(void) nv_alloc_fini(&dp->d_nva);
@@ -736,7 +738,7 @@ fmd_run(fmd_t *dp, int pfd)
 	const char *name;
 	fmd_conf_path_t *pap;
 	fmd_event_t *e;
-	int dbout, err;
+	int dbout;
 
 	/*
 	 * Cache all the current debug property settings in d_fmd_debug,
@@ -768,10 +770,7 @@ fmd_run(fmd_t *dp, int pfd)
 	name = dp->d_rootdir != NULL &&
 	    *dp->d_rootdir != '\0' ? dp->d_rootdir : NULL;
 
-	if ((dp->d_topo = topo_open(TOPO_VERSION, name, &err)) == NULL) {
-		fmd_error(EFMD_EXIT, "failed to initialize "
-		    "topology library: %s\n", topo_strerror(err));
-	}
+	fmd_topo_init();
 
 	dp->d_clockptr = dp->d_clockops->fto_init();
 	dp->d_xprt_ids = fmd_idspace_create("xprt_ids", 1, INT_MAX);

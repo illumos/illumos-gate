@@ -36,11 +36,12 @@
 #include <fm/topo_mod.h>
 #include <sys/fm/protocol.h>
 
+#include <topo_method.h>
 #include <topo_subr.h>
-#include <topo_error.h>
+#include <dev.h>
 
 static int dev_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
-    topo_instance_t, void *);
+    topo_instance_t, void *, void *);
 static void dev_release(topo_mod_t *, tnode_t *);
 static int dev_fmri_nvl2str(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
@@ -48,8 +49,6 @@ static int dev_fmri_str2nvl(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 static int dev_fmri_create_meth(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
-
-#define	DEV_VERSION	TOPO_VERSION
 
 static const topo_method_t dev_methods[] = {
 	{ TOPO_METH_NVL2STR, TOPO_METH_NVL2STR_DESC, TOPO_METH_NVL2STR_VERSION,
@@ -61,20 +60,28 @@ static const topo_method_t dev_methods[] = {
 	{ NULL }
 };
 
+static const topo_modops_t dev_ops =
+	{ dev_enum, dev_release };
 static const topo_modinfo_t dev_info =
-	{ "dev", DEV_VERSION, dev_enum, dev_release };
+	{ "dev", FM_FMRI_SCHEME_DEV, DEV_VERSION, &dev_ops };
 
-void
-dev_init(topo_mod_t *mod)
+int
+dev_init(topo_mod_t *mod, topo_version_t version)
 {
-	topo_mod_setdebug(mod, TOPO_DBG_ALL);
+	if (getenv("TOPOHCDEBUG"))
+		topo_mod_setdebug(mod);
 	topo_mod_dprintf(mod, "initializing dev builtin\n");
 
-	if (topo_mod_register(mod, &dev_info, NULL) != 0) {
+	if (version != DEV_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (topo_mod_register(mod, &dev_info, TOPO_VERSION) != 0) {
 		topo_mod_dprintf(mod, "failed to register dev_info: "
 		    "%s\n", topo_mod_errmsg(mod));
-		return;
+		return (-1);
 	}
+
+	return (0);
 }
 
 void
@@ -86,7 +93,7 @@ dev_fini(topo_mod_t *mod)
 /*ARGSUSED*/
 static int
 dev_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    topo_instance_t min, topo_instance_t max, void *arg)
+    topo_instance_t min, topo_instance_t max, void *notused1, void *notused2)
 {
 	(void) topo_method_register(mod, pnode, dev_methods);
 	return (0);

@@ -26,14 +26,15 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "hb_sun4.h"
-#include "hostbridge.h"
-#include "pcibus.h"
-#include "util.h"
-#include "did.h"
+#include <fm/topo_hc.h>
+
+#include <hb_sun4.h>
+#include <hostbridge.h>
+#include <pcibus.h>
+#include <util.h>
 
 int
-count_busorrc(busorrc_t *list, int *hbc, int *bph, topo_mod_t *mod)
+count_busorrc(topo_mod_t *mod, busorrc_t *list, int *hbc, int *bph)
 {
 	ulong_t start;
 	busorrc_t *p;
@@ -68,8 +69,7 @@ count_busorrc(busorrc_t *list, int *hbc, int *bph, topo_mod_t *mod)
 }
 
 static int
-busorrc_process(busorrc_t *list, int isrc, tnode_t *ptn,
-    did_hash_t *didhash, di_prom_handle_t promtree, topo_mod_t *mod)
+busorrc_process(topo_mod_t *mod, busorrc_t *list, int isrc, tnode_t *ptn)
 {
 	int hbc, busper;
 
@@ -104,18 +104,16 @@ busorrc_process(busorrc_t *list, int isrc, tnode_t *ptn,
 	 * values of X2 maintains the correct associations of
 	 * buses/root complexes and bridges.
 	 */
-	if (count_busorrc(list, &hbc, &busper, mod) < 0)
+	if (count_busorrc(mod, list, &hbc, &busper) < 0)
 		return (-1);
 	if (isrc == 1)
-		return (declare_exbuses(list, ptn, hbc, busper, didhash,
-		    promtree, mod));
+		return (declare_exbuses(mod, list, ptn, hbc, busper));
 	else
-		return (declare_buses(list, ptn, hbc, didhash, promtree, mod));
+		return (declare_buses(mod, list, ptn, hbc));
 }
 
 static int
-pci_hostbridges_find(tnode_t *ptn, did_hash_t *didhash,
-    di_prom_handle_t promtree, topo_mod_t *mod)
+pci_hostbridges_find(topo_mod_t *mod, tnode_t *ptn)
 {
 	busorrc_t *buses = NULL;
 	busorrc_t *rcs = NULL;
@@ -123,7 +121,7 @@ pci_hostbridges_find(tnode_t *ptn, did_hash_t *didhash,
 	di_node_t pnode;
 
 	/* Scan for buses, top-level devinfo nodes with the right driver */
-	devtree = di_init("/", DINFOCPYALL);
+	devtree = topo_mod_devinfo(mod);
 	if (devtree == DI_NODE_NIL) {
 		topo_mod_dprintf(mod, "devinfo init failed.");
 		topo_node_range_destroy(ptn, HOSTBRIDGE);
@@ -132,60 +130,54 @@ pci_hostbridges_find(tnode_t *ptn, did_hash_t *didhash,
 
 	pnode = di_drv_first_node(PCI, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (busorrc_add(&buses, pnode, mod) < 0) {
-			di_fini(devtree);
+		if (busorrc_add(mod, &buses, pnode) < 0) {
 			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 		}
 		pnode = di_drv_next_node(pnode);
 	}
 	pnode = di_drv_first_node(PSYCHO, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (busorrc_add(&buses, pnode, mod) < 0) {
-			di_fini(devtree);
+		if (busorrc_add(mod, &buses, pnode) < 0) {
 			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 		}
 		pnode = di_drv_next_node(pnode);
 	}
 	pnode = di_drv_first_node(SCHIZO, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (busorrc_add(&buses, pnode, mod) < 0) {
-			di_fini(devtree);
+		if (busorrc_add(mod, &buses, pnode) < 0) {
 			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 		}
 		pnode = di_drv_next_node(pnode);
 	}
 	pnode = di_drv_first_node(PX, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (busorrc_add(&rcs, pnode, mod) < 0) {
-			di_fini(devtree);
+		if (busorrc_add(mod, &rcs, pnode) < 0) {
 			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 		}
 		pnode = di_drv_next_node(pnode);
 	}
-	if (busorrc_process(buses, 0, ptn, didhash, promtree, mod) < 0)
+	if (busorrc_process(mod, buses, 0, ptn) < 0)
 		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 
-	if (busorrc_process(rcs, 1, ptn, didhash, promtree, mod) < 0)
+	if (busorrc_process(mod, rcs, 1, ptn) < 0)
 		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 
-	busorrc_free(buses, mod);
-	busorrc_free(rcs, mod);
-	di_fini(devtree);
+	busorrc_free(mod, buses);
+	busorrc_free(mod, rcs);
 	return (0);
 }
 
 /*ARGSUSED*/
 int
-platform_hb_enum(tnode_t *parent, const char *name,
-    topo_instance_t imin, topo_instance_t imax, did_hash_t *didhash,
-    di_prom_handle_t promtree, topo_mod_t *mod)
+platform_hb_enum(topo_mod_t *mod, tnode_t *parent, const char *name,
+    topo_instance_t imin, topo_instance_t imax)
 {
-	return (pci_hostbridges_find(parent, didhash, promtree, mod));
+	return (pci_hostbridges_find(mod, parent));
 }
 
 /*ARGSUSED*/
 int
-platform_hb_label(tnode_t *node, nvlist_t *in, nvlist_t **out, topo_mod_t *mod)
+platform_hb_label(topo_mod_t *mod, tnode_t *node, nvlist_t *in, nvlist_t **out)
 {
 	return (labelmethod_inherit(mod, node, in, out));
 }

@@ -33,16 +33,17 @@
 #include <string.h>
 #include <libdevinfo.h>
 #include <fm/topo_mod.h>
+#include <fm/topo_hc.h>
 
-#include "did.h"
-#include "hostbridge.h"
-#include "ioboard.h"
-#include "util.h"
+#include <did.h>
+#include <hostbridge.h>
+#include <ioboard.h>
+#include <util.h>
 
 /*ARGSUSED*/
 int
-platform_iob_label(tnode_t *node, nvlist_t *ignored, nvlist_t **out,
-    topo_mod_t *mod)
+platform_iob_label(topo_mod_t *mod, tnode_t *node, nvlist_t *ignored,
+    nvlist_t **out)
 {
 	/*
 	 * For E15K, the label is simply IOXX where XX is the
@@ -65,8 +66,8 @@ platform_iob_label(tnode_t *node, nvlist_t *ignored, nvlist_t **out,
 
 /*ARGSUSED*/
 int
-platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax,
-    did_hash_t *didhash, di_prom_handle_t promtree, topo_mod_t *mod)
+platform_iob_enum(topo_mod_t *mod, tnode_t *parent, topo_instance_t imin,
+    topo_instance_t imax)
 {
 	/*
 	 * An E15K and its successors may have up to 18 I/O boards,
@@ -83,7 +84,7 @@ platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax,
 	did_t *iobs[18][2][2];
 	int brd, br, bus, i;
 
-	devtree = di_init("/", DINFOCPYALL);
+	devtree = topo_mod_devinfo(mod);
 	if (devtree == DI_NODE_NIL) {
 		topo_mod_dprintf(mod, "devinfo init failed.");
 		return (-1);
@@ -98,9 +99,8 @@ platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax,
 	while (pnode != DI_NODE_NIL) {
 		did_t *d;
 
-		d = split_bus_address(didhash,
-		    pnode, IOB_BASEADDR, BUS_ADDRDIST, 0, 17, &brd, &br, &bus,
-		    promtree, mod);
+		d = split_bus_address(mod,
+		    pnode, IOB_BASEADDR, BUS_ADDRDIST, 0, 17, &brd, &br, &bus);
 		if (d == NULL) {
 			pnode = di_drv_next_node(pnode);
 			continue;
@@ -120,27 +120,26 @@ platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax,
 		did_did_link_set(iobs[i][0][0], iobs[i][0][1]);
 		did_did_link_set(iobs[i][1][0], iobs[i][1][1]);
 		did_did_chain_set(iobs[i][0][0], iobs[i][1][0]);
-		if ((ion = ioboard_declare(parent, i, iobs[i][0][0],
-		    promtree, mod)) == NULL) {
+		if ((ion = ioboard_declare(mod, parent, i, iobs[i][0][0]))
+		    == NULL) {
 			topo_mod_dprintf(mod,
 			    "Creation of tnode for %s%d failed.\n", IOBOARD, i);
 			continue;
 		}
-		if (topo_mod_enumerate(mod,
-		    ion, HOSTBRIDGE, HOSTBRIDGE, 0, 0) < 0) {
+		if (topo_mod_enumerate(mod, ion, HOSTBRIDGE, HOSTBRIDGE, 0, 0,
+		    iobs[i][0][0]) < 0) {
 			topo_mod_dprintf(mod,
 			    "Enumeration of %s%d/%s%d failed.\n",
 			    IOBOARD, i, HOSTBRIDGE, 0);
 			continue;
 		}
-		if (topo_mod_enumerate(mod,
-		    ion, HOSTBRIDGE, HOSTBRIDGE, 1, 1) < 0) {
+		if (topo_mod_enumerate(mod, ion, HOSTBRIDGE, HOSTBRIDGE, 1, 1,
+		    iobs[i][0][0]) < 0) {
 			topo_mod_dprintf(mod,
 			    "Enumeration of %s%d/%s%d failed.\n",
 			    IOBOARD, i, HOSTBRIDGE, 1);
 			continue;
 		}
 	}
-	di_fini(devtree);
 	return (0);
 }

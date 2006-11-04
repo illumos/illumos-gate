@@ -43,6 +43,7 @@
 #include <config_admin.h>
 #include <sys/fm/protocol.h>
 #include <fm/libtopo.h>
+#include <fm/topo_hc.h>
 
 #include "sata.h"
 #include "sfx4500_props.h"
@@ -114,7 +115,7 @@ dm_fmri_to_diskmon(fmd_hdl_t *hdl, nvlist_t *fmri)
 	(void) nvlist_remove(dupfmri, FM_FMRI_HC_PART, DATA_TYPE_STRING);
 
 	thdl = fmd_hdl_topology(hdl, TOPO_VERSION);
-	if (thdl == NULL || topo_fmri_nvl2str(thdl, dupfmri, &buf, &err) != 0) {
+	if (topo_fmri_nvl2str(thdl, dupfmri, &buf, &err) != 0) {
 		nvlist_free(dupfmri);
 		return (NULL);
 	}
@@ -128,8 +129,9 @@ dm_fmri_to_diskmon(fmd_hdl_t *hdl, nvlist_t *fmri)
 }
 
 static nvlist_t *
-find_sfx4500_private_pgroup(topo_hdl_t *thp, tnode_t *node)
+find_sfx4500_private_pgroup(tnode_t *node)
 {
+	int err;
 	nvlist_t *list_of_lists, *nvlp, *dupnvlp;
 	nvlist_t *sfx4500_pgrp = NULL;
 	nvpair_t *nvp = NULL;
@@ -144,7 +146,7 @@ find_sfx4500_private_pgroup(topo_hdl_t *thp, tnode_t *node)
 	 * check inside each embedded nvlist to see if it's the pgroup we're
 	 * looking for.
 	 */
-	if ((list_of_lists = topo_prop_get_all(thp, node)) != NULL) {
+	if ((list_of_lists = topo_prop_getprops(node, &err)) != NULL) {
 		/*
 		 * Go through the list of nvlists, looking for the
 		 * property group we need.
@@ -257,9 +259,15 @@ transform_model_string(char *manuf, char *model, char **finalstring,
 	*finalstringbuflen = buflen;
 }
 
+typedef struct walk_diskmon {
+	diskmon_t *target;
+	char *pfmri;
+} walk_diskmon_t;
+
 static int
-topo_add_disk(topo_hdl_t *thp, tnode_t *node, diskmon_t *target_diskp)
+topo_add_disk(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 {
+	diskmon_t *target_diskp = wdp->target;
 	nvlist_t	*fmri = NULL;
 	nvlist_t	*asru_fmri;
 	nvlist_t	*fru_fmri;
@@ -269,53 +277,25 @@ topo_add_disk(topo_hdl_t *thp, tnode_t *node, diskmon_t *target_diskp)
 	char		*serial = NULL;
 	char		*manuf = NULL;
 	char		*model = NULL;
-	char		*cstr = NULL;
 	char		*buf;
 	char		*label;
-	char		*p;
 	uint64_t	ptr = 0;
 	int		buflen;
 	int		err;
-	int		orig_cstr_len;
 	dm_fru_t	*frup;
 	diskmon_t	*diskp;
 
-	/*
-	 * Match this node to a disk in the configuration by looking at
-	 * our parent's fmri (and do that by getting our FMRI and chopping
-	 * off the last part).
-	 */
-	if (topo_node_resource(node, &fmri, &err) != 0) {
-		log_msg(MM_TOPO, "topo_add_disk: Could not generate FMRI for "
-		    "node %p!\n", (void *)node);
-		return (-1);
-	}
-
-	if (topo_fmri_nvl2str(thp, fmri, &cstr, &err) != 0) {
-		log_msg(MM_TOPO, "topo_add_disk: Could not create string for "
-		    "node %p's FMRI!\n", (void *)node);
-		nvlist_free(fmri);
-		return (-1);
-	}
-
-	nvlist_free(fmri);
-
-	/*
-	 * Chop off all but last path (since there's no way to get
-	 * the node's parent in the libtopo API).
-	 */
-	orig_cstr_len = strlen(cstr) + 1;
-	p = strrchr(cstr, '/');
-	dm_assert(p != NULL);
-	*p = 0;
-	if (nvlist_lookup_uint64(g_topo2diskmon, cstr, &ptr) != 0) {
-		log_msg(MM_TOPO, "No diskmon for parent of node %p.\n", node);
-		topo_hdl_free(thp, cstr, orig_cstr_len);
+	dm_assert(wdp->pfmri != NULL);
+	if (nvlist_lookup_uint64(g_topo2diskmon, wdp->pfmri, &ptr) != 0) {
+		log_msg(MM_TOPO, "No diskmon for %s: parent of node %p.\n",
+		    wdp->pfmri, node);
+		dstrfree(wdp->pfmri);
 		/* Skip this disk: */
 		return (0);
 	}
 
-	topo_hdl_free(thp, cstr, orig_cstr_len);
+	dstrfree(wdp->pfmri);
+	wdp->pfmri = NULL;
 
 	diskp = (diskmon_t *)(uintptr_t)ptr;
 
@@ -584,9 +564,10 @@ topoprop_indrule_add(indrule_t **indrp, char *sts, char *acts)
 
 
 static int
-topo_add_sata_port(topo_hdl_t *thp, tnode_t *node, diskmon_t *target_diskp)
+topo_add_sata_port(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 {
-	nvlist_t	*nvlp = find_sfx4500_private_pgroup(thp, node);
+	diskmon_t *target_diskp = wdp->target;
+	nvlist_t	*nvlp = find_sfx4500_private_pgroup(node);
 	nvlist_t	*prop_nvlp;
 	nvpair_t	*nvp = NULL;
 	char		*prop_name, *prop_value;
@@ -636,7 +617,7 @@ topo_add_sata_port(topo_hdl_t *thp, tnode_t *node, diskmon_t *target_diskp)
 			dm_assert(pthread_mutex_unlock(&diskp->fru_mutex) == 0);
 		}
 
-		dstrfree(cstr);
+		wdp->pfmri = cstr;
 		nvlist_free(nvlp);
 		return (0);
 	}
@@ -833,7 +814,7 @@ topo_add_sata_port(topo_hdl_t *thp, tnode_t *node, diskmon_t *target_diskp)
 				nvlist_free(diskprops);
 		}
 
-		dstrfree(cstr);
+		wdp->pfmri = cstr;
 	}
 
 
@@ -847,60 +828,59 @@ gather_topo_cfg(topo_hdl_t *thp, tnode_t *node, void *arg)
 {
 	char *nodename = topo_node_name(node);
 	if (strcmp(SATA_DISK, nodename) == 0)
-		return (topo_add_disk(thp, node, (diskmon_t *)arg)
+		return (topo_add_disk(thp, node, (walk_diskmon_t *)arg)
 		    ? TOPO_WALK_ERR : TOPO_WALK_NEXT);
 	else if (strcmp(SATA_PORT, nodename) == 0)
-		return (topo_add_sata_port(thp, node, (diskmon_t *)arg)
+		return (topo_add_sata_port(thp, node, (walk_diskmon_t *)arg)
 		    ? TOPO_WALK_ERR : TOPO_WALK_NEXT);
 
 	return (TOPO_WALK_NEXT);
 }
 
 
+/*ARGSUSED*/
 int
-update_configuration_from_topo(diskmon_t *diskp)
+update_configuration_from_topo(fmd_hdl_t *hdl, diskmon_t *diskp)
 {
 	int err;
 	topo_hdl_t *thp;
 	topo_walk_t *twp;
+	walk_diskmon_t wd;
 	char *uuid;
 
 	if ((thp = topo_open(TOPO_VERSION, NULL, &err)) == NULL) {
-
 		return (TOPO_OPEN_ERROR);
 	}
 
 	if ((uuid = topo_snap_hold(thp, NULL, &err)) == NULL) {
-
 		topo_close(thp);
 		return (TOPO_SNAP_ERROR);
 	}
 
+	topo_hdl_strfree(thp, uuid);
 
+	wd.target = diskp;
+	wd.pfmri = NULL;
 	if ((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC, gather_topo_cfg,
-	    diskp, &err)) == NULL) {
-
-		topo_snap_release(thp);
-		topo_hdl_strfree(thp, uuid);
-		topo_close(thp);
-
+	    &wd, &err)) == NULL) {
+		topo_close(thp); /* topo_close() will release the snapshot */
 		return (err ? TOPO_WALK_INIT_ERROR : TOPO_SUCCESS);
 	}
-
-	topo_hdl_strfree(thp, uuid);
 
 	if (topo_walk_step(twp, TOPO_WALK_CHILD) == TOPO_WALK_ERR) {
 
 		topo_walk_fini(twp);
-		topo_snap_release(thp);
-		topo_close(thp);
+		if (wd.pfmri != NULL)
+			dstrfree(wd.pfmri);
 
+		topo_close(thp);
 		return (TOPO_WALK_ERROR);
 	}
 
 	topo_walk_fini(twp);
-	topo_snap_release(thp);
 	topo_close(thp);
+	if (wd.pfmri != NULL)
+		dstrfree(wd.pfmri);
 
 	return (TOPO_SUCCESS);
 }

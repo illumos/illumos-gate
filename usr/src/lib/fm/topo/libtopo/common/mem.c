@@ -34,57 +34,47 @@
 #include <fm/topo_mod.h>
 #include <sys/fm/protocol.h>
 
-#include <topo_error.h>
+#include <topo_method.h>
+#include <mem.h>
 
 static int mem_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
-    topo_instance_t, void *);
+    topo_instance_t, void *, void *);
 static void mem_release(topo_mod_t *, tnode_t *);
 static int mem_nvl2str(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
-static int mem_str2nvl(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
-static int mem_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
-static int mem_contains(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
-static int mem_unusable(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
-static int mem_expand(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
-
-#define	MEM_VERSION	TOPO_VERSION
+static int mem_fmri_create(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
 
 static const topo_method_t mem_methods[] = {
 	{ TOPO_METH_NVL2STR, TOPO_METH_NVL2STR_DESC, TOPO_METH_NVL2STR_VERSION,
 	    TOPO_STABILITY_INTERNAL, mem_nvl2str },
-	{ TOPO_METH_STR2NVL, TOPO_METH_STR2NVL_DESC, TOPO_METH_STR2NVL_VERSION,
-	    TOPO_STABILITY_INTERNAL, mem_str2nvl },
-	{ TOPO_METH_PRESENT, TOPO_METH_PRESENT_DESC, TOPO_METH_PRESENT_VERSION,
-	    TOPO_STABILITY_INTERNAL, mem_present },
-	{ TOPO_METH_CONTAINS, TOPO_METH_CONTAINS_DESC,
-	    TOPO_METH_CONTAINS_VERSION, TOPO_STABILITY_INTERNAL, mem_contains },
-	{ TOPO_METH_UNUSABLE, TOPO_METH_UNUSABLE_DESC,
-	    TOPO_METH_UNUSABLE_VERSION, TOPO_STABILITY_INTERNAL, mem_unusable },
-	{ TOPO_METH_EXPAND, TOPO_METH_UNUSABLE_DESC,
-	    TOPO_METH_EXPAND_VERSION, TOPO_STABILITY_INTERNAL, mem_expand },
+	{ TOPO_METH_FMRI, TOPO_METH_FMRI_DESC, TOPO_METH_FMRI_VERSION,
+	    TOPO_STABILITY_INTERNAL, mem_fmri_create },
 	{ NULL }
 };
 
+static const topo_modops_t mem_ops =
+	{ mem_enum, mem_release };
 static const topo_modinfo_t mem_info =
-	{ "mem", MEM_VERSION, mem_enum, mem_release };
+	{ "mem", FM_FMRI_SCHEME_MEM, MEM_VERSION, &mem_ops };
 
-void
-mem_init(topo_mod_t *mod)
+int
+mem_init(topo_mod_t *mod, topo_version_t version)
 {
 
-	topo_mod_setdebug(mod, TOPO_DBG_ALL);
+	topo_mod_setdebug(mod);
 	topo_mod_dprintf(mod, "initializing mem builtin\n");
 
-	if (topo_mod_register(mod, &mem_info, NULL) != 0) {
+	if (version != MEM_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (topo_mod_register(mod, &mem_info, TOPO_VERSION) != 0) {
 		topo_mod_dprintf(mod, "failed to register mem_info: "
 		    "%s\n", topo_mod_errmsg(mod));
-		return;
+		return (-1); /* mod errno already set */
 	}
+
+	return (0);
 }
 
 void
@@ -96,7 +86,7 @@ mem_fini(topo_mod_t *mod)
 /*ARGSUSED*/
 static int
 mem_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    topo_instance_t min, topo_instance_t max, void *arg)
+    topo_instance_t min, topo_instance_t max, void *notused1, void *notused2)
 {
 	(void) topo_method_register(mod, pnode, mem_methods);
 
@@ -143,10 +133,14 @@ mem_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		format = FM_FMRI_SCHEME_MEM ":///" "%1$s";
 
 	/*
-	 * If we have a well-formed unum we step over the hc:/// prefix
+	 * If we have a well-formed unum we step over the hc:// and
+	 * authority prefix
 	 */
-	if (strncmp(unum, "hc:///", 6) == 0)
-		unum += 6;
+	if (strncmp(unum, "hc://", 5) == 0) {
+		unum += 5;
+		unum = strchr(unum, '/');
+		++unum;
+	}
 
 	len = snprintf(NULL, 0, format, unum, val) + 1;
 	buf = topo_mod_zalloc(mod, len);
@@ -169,42 +163,65 @@ mem_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	return (0);
 }
 
-/*ARGSUSED*/
-static int
-mem_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
+static nvlist_t *
+mem_fmri(topo_mod_t *mod, uint64_t pa, uint64_t offset, char *unum, int flags)
 {
-	return (-1);
+	int err;
+	nvlist_t *asru;
+
+	if (topo_mod_nvalloc(mod, &asru, NV_UNIQUE_NAME) != 0)
+		return (NULL);
+
+	/*
+	 * If we have a well-formed unum we step over the hc:/// and
+	 * authority prefix
+	 */
+	if (strncmp(unum, "hc://", 5) == 0) {
+		char *tstr;
+
+		tstr = strchr(unum, '/');
+		unum = ++tstr;
+	}
+
+	err = nvlist_add_uint8(asru, FM_VERSION, FM_MEM_SCHEME_VERSION);
+	err |= nvlist_add_string(asru, FM_FMRI_SCHEME, FM_FMRI_SCHEME_MEM);
+	err |= nvlist_add_string(asru, FM_FMRI_MEM_UNUM, unum);
+	if (flags & TOPO_MEMFMRI_PA)
+		err |= nvlist_add_uint64(asru, FM_FMRI_MEM_PHYSADDR, pa);
+	if (flags & TOPO_MEMFMRI_OFFSET)
+		err |= nvlist_add_uint64(asru, FM_FMRI_MEM_OFFSET, offset);
+
+	if (err != 0) {
+		nvlist_free(asru);
+		return (NULL);
+	}
+
+	return (asru);
 }
 
 /*ARGSUSED*/
 static int
-mem_present(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+mem_fmri_create(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
 {
-	return (-1);
-}
+	uint64_t pa = 0, offset = 0;
+	int flags = 0;
+	nvlist_t *asru;
+	char *unum;
 
-/*ARGSUSED*/
-static int
-mem_contains(topo_mod_t *mod, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	return (-1);
-}
+	if (nvlist_lookup_uint64(in, FM_FMRI_MEM_PHYSADDR, &pa) == 0)
+		flags |= TOPO_MEMFMRI_PA;
+	if (nvlist_lookup_uint64(in, FM_FMRI_MEM_OFFSET, &offset) == 0)
+		flags |= TOPO_MEMFMRI_OFFSET;
+	if (nvlist_lookup_string(in, FM_FMRI_MEM_UNUM, &unum) != 0)
+		return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
 
-/*ARGSUSED*/
-static int
-mem_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	return (-1);
-}
+	asru = mem_fmri(mod, pa, offset, unum, flags);
 
-/*ARGSUSED*/
-static int
-mem_expand(topo_mod_t *mod, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	return (-1);
+	if (asru == NULL)
+		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
+
+	*out = asru;
+
+	return (0);
 }

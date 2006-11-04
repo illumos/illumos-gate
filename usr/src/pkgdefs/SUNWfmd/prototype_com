@@ -41,6 +41,7 @@ f none usr/include/fm/fmd_log.h 644 root bin
 f none usr/include/fm/fmd_snmp.h 644 root bin
 f none usr/include/fm/libtopo.h 644 root bin
 f none usr/include/fm/topo_mod.h 644 root bin
+f none usr/include/fm/topo_hc.h 644 root bin
 d none usr/lib 755 root bin
 d none usr/lib/fm 755 root bin
 d none usr/lib/fm/dict 755 root bin

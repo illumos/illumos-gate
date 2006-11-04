@@ -66,6 +66,7 @@ SRCS += fmd.c \
 	fmd_thread.c \
 	fmd_time.c \
 	fmd_timerq.c \
+	fmd_topo.c \
 	fmd_trace.c \
 	fmd_ustat.c \
 	fmd_xdr_adm.c \

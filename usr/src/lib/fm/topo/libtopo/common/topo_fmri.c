@@ -32,6 +32,7 @@
 #include <sys/fm/protocol.h>
 #include <topo_alloc.h>
 #include <topo_error.h>
+#include <topo_method.h>
 #include <topo_subr.h>
 #include <topo_string.h>
 
@@ -42,7 +43,7 @@ set_error(topo_hdl_t *thp, int err, int *errp, char *method, nvlist_t *nvlp)
 	if (nvlp != NULL)
 		nvlist_free(nvlp);
 
-	topo_dprintf(TOPO_DBG_ERR, "%s failed: %s\n", method,
+	topo_dprintf(thp, TOPO_DBG_ERR, "%s failed: %s\n", method,
 	    topo_strerror(err));
 
 	*errp = err;
@@ -56,7 +57,7 @@ set_nverror(topo_hdl_t *thp, int err, int *errp, char *method, nvlist_t *nvlp)
 	if (nvlp != NULL)
 		nvlist_free(nvlp);
 
-	topo_dprintf(TOPO_DBG_ERR, "%s failed: %s\n", method,
+	topo_dprintf(thp, TOPO_DBG_ERR, "%s failed: %s\n", method,
 	    topo_strerror(err));
 
 	*errp = err;
@@ -99,18 +100,18 @@ int
 topo_fmri_str2nvl(topo_hdl_t *thp, const char *fmristr, nvlist_t **fmri,
     int *err)
 {
-	char *f, scheme[PATH_MAX];
+	char *f, buf[PATH_MAX];
 	nvlist_t *out = NULL, *in = NULL;
 	tnode_t *rnode;
 
-	(void) strlcpy(scheme, fmristr, sizeof (scheme));
-	if ((f = strrchr(scheme, ':')) == NULL)
+	(void) strlcpy(buf, fmristr, sizeof (buf));
+	if ((f = strchr(buf, ':')) == NULL)
 		return (set_error(thp, ETOPO_FMRI_MALFORM, err,
 		    TOPO_METH_STR2NVL, in));
 
 	*f = '\0'; /* strip trailing FMRI path */
 
-	if ((rnode = topo_hdl_root(thp, scheme)) == NULL)
+	if ((rnode = topo_hdl_root(thp, buf)) == NULL)
 		return (set_error(thp, ETOPO_METHOD_NOTSUP, err,
 		    TOPO_METH_STR2NVL, in));
 
@@ -137,13 +138,40 @@ topo_fmri_str2nvl(topo_hdl_t *thp, const char *fmristr, nvlist_t **fmri,
 	return (0);
 }
 
+/* ARGSUSED */
+static int
+is_present(topo_hdl_t *thp, tnode_t *node, void *data)
+{
+	int err;
+	uint32_t present = 0;
+	nvlist_t *out = NULL;
+	nvlist_t *fmri = (nvlist_t *)data;
+
+	if (topo_method_invoke(node, TOPO_METH_PRESENT,
+	    TOPO_METH_PRESENT_VERSION, fmri, &out, &err) < 0) {
+		if (out != NULL)
+			nvlist_free(out);
+		return (present);
+	}
+
+	(void) nvlist_lookup_uint32(out, TOPO_METH_PRESENT_RET, &present);
+
+	nvlist_free(out);
+
+	return (present);
+}
+
 int
 topo_fmri_present(topo_hdl_t *thp, nvlist_t *fmri, int *err)
 {
-	int rc;
+	int ret = 0;
+	uint32_t present = 0;
 	char *scheme;
 	nvlist_t *out = NULL;
 	tnode_t *rnode;
+
+	if (topo_fmri_invoke(thp, fmri, is_present, fmri, &ret) == 0)
+		return (ret);
 
 	if (nvlist_lookup_string(fmri, FM_FMRI_SCHEME, &scheme) != 0)
 		return (set_error(thp, ETOPO_FMRI_MALFORM, err,
@@ -153,11 +181,16 @@ topo_fmri_present(topo_hdl_t *thp, nvlist_t *fmri, int *err)
 		return (set_error(thp, ETOPO_METHOD_NOTSUP, err,
 		    TOPO_METH_PRESENT, out));
 
-	if ((rc = topo_method_invoke(rnode, TOPO_METH_PRESENT,
-	    TOPO_METH_PRESENT_VERSION, fmri, &out, err)) < 0)
-		return (set_error(thp, *err, err, TOPO_METH_PRESENT, out));
+	if (topo_method_invoke(rnode, TOPO_METH_PRESENT,
+	    TOPO_METH_PRESENT_VERSION, fmri, &out, err) < 0) {
+		(void) set_error(thp, *err, err, TOPO_METH_PRESENT, out);
+		return (present);
+	}
 
-	return (rc);
+	(void) nvlist_lookup_uint32(out, TOPO_METH_PRESENT_RET, &present);
+	nvlist_free(out);
+
+	return (present);
 }
 
 int
@@ -272,31 +305,15 @@ get_prop(topo_hdl_t *thp, tnode_t *node, void *pdata)
 int
 topo_fmri_asru(topo_hdl_t *thp, nvlist_t *nvl, nvlist_t **asru, int *err)
 {
-	char *uuid = NULL;
 	struct rsrc r;
-
-	if (thp->th_uuid == NULL) {
-		if ((uuid = topo_snap_hold(thp, NULL, err)) == NULL)
-			return (set_error(thp, *err, err, "topo_fmri_asru",
-			    NULL));
-	}
 
 	r.rs_flag = 0;
 	r.rs_err = 0;
 	r.rs_priv = nvl;
 	r.rs_fprop = asru;
 	if (topo_fmri_invoke(thp, nvl, get_prop, &r, err) < 0) {
-		if (uuid != NULL) {
-			topo_hdl_strfree(thp, uuid);
-			topo_snap_release(thp);
-		}
 
 		return (set_error(thp, *err, err, "topo_fmri_asru", NULL));
-	}
-
-	if (uuid != NULL) {
-		topo_hdl_strfree(thp, uuid);
-		topo_snap_release(thp);
 	}
 
 	return (0);
@@ -306,31 +323,15 @@ int
 topo_fmri_fru(topo_hdl_t *thp, nvlist_t *nvl, nvlist_t **fru,
     int *err)
 {
-	char *uuid = NULL;
 	struct rsrc r;
-
-	if (thp->th_uuid == NULL) {
-		if ((uuid = topo_snap_hold(thp, NULL, err)) == NULL)
-			return (set_error(thp, *err, err, "topo_fmri_fru",
-			    NULL));
-	}
 
 	r.rs_flag = 1;
 	r.rs_err = 0;
 	r.rs_priv = nvl;
 	r.rs_fprop = fru;
 	if (topo_fmri_invoke(thp, nvl, get_prop, &r, err) < 0) {
-		if (uuid != NULL) {
-			topo_hdl_strfree(thp, uuid);
-			topo_snap_release(thp);
-		}
 
 		return (set_error(thp, *err, err, "topo_fmri_fru", NULL));
-	}
-
-	if (uuid != NULL) {
-		topo_hdl_strfree(thp, uuid);
-		topo_snap_release(thp);
 	}
 
 	return (0);
@@ -380,7 +381,7 @@ topo_fmri_compare(topo_hdl_t *thp, nvlist_t *f1, nvlist_t *f2, int *err)
 struct topo_lookup {
 	nvlist_t *tl_resource;
 	topo_walk_cb_t tl_func;
-	int tl_err;
+	int tl_ret;
 	void *tl_pdata;
 };
 
@@ -391,47 +392,50 @@ walk_lookup(topo_hdl_t *thp, tnode_t *node, void *pdata)
 	struct topo_lookup *tlp = (struct topo_lookup *)pdata;
 	nvlist_t *r1, *r2 = tlp->tl_resource;
 
-	if (topo_node_resource(node, &r1, &tlp->tl_err) != 0)
+	if (topo_node_resource(node, &r1, &tlp->tl_ret) != 0)
 		return (TOPO_WALK_ERR);
 
-	rc = topo_fmri_compare(thp, r1, r2, &tlp->tl_err);
+	rc = topo_fmri_compare(thp, r1, r2, &tlp->tl_ret);
 	nvlist_free(r1);
 	if (rc == 0)
 		return (TOPO_WALK_NEXT);
 	else if (rc == -1)
 		return (TOPO_WALK_ERR);
 
-	tlp->tl_err = tlp->tl_func(thp, node, tlp->tl_pdata);
+	tlp->tl_ret = tlp->tl_func(thp, node, tlp->tl_pdata);
 
 	return (TOPO_WALK_TERMINATE);
 }
 
 int
 topo_fmri_invoke(topo_hdl_t *thp, nvlist_t *nvl, topo_walk_cb_t cb_f,
-    void *pdata, int *err)
+    void *pdata, int *ret)
 {
+	int err;
 	topo_walk_t *wp;
 	char *scheme;
 	struct topo_lookup tl;
 
-	if (nvlist_lookup_string(nvl, FM_FMRI_SCHEME, &scheme)	 != 0)
-		return (set_error(thp, ETOPO_METHOD_INVAL, err,
+	if (nvlist_lookup_string(nvl, FM_FMRI_SCHEME, &scheme)   != 0)
+		return (set_error(thp, ETOPO_METHOD_INVAL, ret,
 		    "topo_fmri_invoke", NULL));
 
 	tl.tl_resource = nvl;
 	tl.tl_func = cb_f;
 	tl.tl_pdata = pdata;
-	tl.tl_err = 0;
-	if ((wp = topo_walk_init(thp, scheme, walk_lookup, &tl, err)) == NULL)
-		return (set_error(thp, *err, err, "topo_fmri_invoke", NULL));
+	tl.tl_ret = 0;
+	if ((wp = topo_walk_init(thp, scheme, walk_lookup, &tl, &err)) == NULL)
+		return (set_error(thp, err, ret, "topo_fmri_invoke", NULL));
 
-	(void) topo_walk_step(wp, TOPO_WALK_CHILD);
+	err = topo_walk_step(wp, TOPO_WALK_CHILD);
 	topo_walk_fini(wp);
 
-	if (tl.tl_err != 0) {
-		*err = tl.tl_err;
+	if (err == TOPO_WALK_ERR) {
+		*ret = err;
 		return (-1);
 	}
+
+	*ret = tl.tl_ret;
 
 	return (0);
 }

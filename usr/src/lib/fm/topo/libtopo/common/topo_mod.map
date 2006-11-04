@@ -5,9 +5,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -30,7 +29,8 @@
 	topo_node_bind = FUNCTION extern;
 	topo_node_unbind = FUNCTION extern;
 	topo_node_name = FUNCTION extern;
-	topo_node_private = FUNCTION extern;
+	topo_node_setspecific = FUNCTION extern;
+	topo_node_getspecific = FUNCTION extern;
 	topo_node_instance = FUNCTION extern;
 
 	topo_mod_alloc = FUNCTION extern;
@@ -40,8 +40,6 @@
 	topo_mod_nvdup = FUNCTION extern;
 	topo_mod_strfree = FUNCTION extern;
 	topo_mod_strdup = FUNCTION extern;
-
-	topo_fmri_create = FUNCTION extern;
 
 	topo_mod_clrdebug = FUNCTION extern;
 	topo_mod_setdebug = FUNCTION extern;
@@ -54,10 +52,18 @@
 	topo_mod_register = FUNCTION extern;
 	topo_mod_unregister = FUNCTION extern;
 	topo_mod_enumerate = FUNCTION extern;
+	topo_mod_enummap = FUNCTION extern;
 	topo_mod_release = FUNCTION extern;
-	topo_mod_rootdir = FUNCTION extern;
-	topo_mod_handle = FUNCTION extern;
-	topo_mod_private = FUNCTION extern;
+	topo_mod_getspecific = FUNCTION extern;
+	topo_mod_setspecific = FUNCTION extern;
+	topo_mod_hcfmri = FUNCTION extern;
+	topo_mod_devfmri = FUNCTION extern;
+	topo_mod_cpufmri = FUNCTION extern;
+	topo_mod_pkgfmri = FUNCTION extern;
+	topo_mod_modfmri = FUNCTION extern;
+	topo_mod_nvl2str = FUNCTION extern;
+	topo_mod_str2nvl = FUNCTION extern;
+	topo_mod_auth = FUNCTION extern;
 
 	topo_method_register = FUNCTION extern;
 	topo_method_unregister = FUNCTION extern;

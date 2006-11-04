@@ -30,6 +30,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/nvpair.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,18 +52,18 @@ typedef uint32_t topo_version_t;
  */
 
 typedef enum topo_stability {
-	TOPO_STABILITY_INTERNAL = 0,	/* private to libtopo */
+	TOPO_STABILITY_UNKNOWN = 0,	/* private to libtopo */
+	TOPO_STABILITY_INTERNAL,	/* private to libtopo */
 	TOPO_STABILITY_PRIVATE,		/* private to Sun */
 	TOPO_STABILITY_OBSOLETE,	/* scheduled for removal */
 	TOPO_STABILITY_EXTERNAL,	/* not controlled by Sun */
 	TOPO_STABILITY_UNSTABLE,	/* new or rapidly changing */
 	TOPO_STABILITY_EVOLVING,	/* less rapidly changing */
 	TOPO_STABILITY_STABLE,		/* mature interface from Sun */
-	TOPO_STABILITY_STANDARD,	/* industry standard */
-	TOPO_STABILITY_MAX		/* end */
+	TOPO_STABILITY_STANDARD		/* industry standard */
 } topo_stability_t;
 
-#define	TOPO_STABILITY_MAX   TOPO_STABILITY_STANDARD /* max valid stability */
+#define	TOPO_STABILITY_MAX	TOPO_STABILITY_STANDARD	/* max valid stab */
 
 typedef enum {
 	TOPO_TYPE_INVALID = 0,
@@ -74,15 +75,36 @@ typedef enum {
 	TOPO_TYPE_STRING,	/* const char* */
 	TOPO_TYPE_TIME,		/* uint64_t */
 	TOPO_TYPE_SIZE,		/* uint64_t */
-	TOPO_TYPE_FMRI		/* nvlist_t */
+	TOPO_TYPE_FMRI,		/* nvlist_t */
+	TOPO_TYPE_INT32_ARRAY,	/* array of int32_t */
+	TOPO_TYPE_UINT32_ARRAY,	/* array of uint32_t */
+	TOPO_TYPE_INT64_ARRAY,	/* array of int64_t */
+	TOPO_TYPE_UINT64_ARRAY,	/* array of uint64_t */
+	TOPO_TYPE_STRING_ARRAY,	/* array of const char* */
+	TOPO_TYPE_FMRI_ARRAY	/* array of nvlist_t */
 } topo_type_t;
 
-typedef int (*topo_walk_cb_t)(topo_hdl_t *, tnode_t *, void *);
+typedef struct topo_pgroup_info {
+	const char *tpi_name;		/* property group name */
+	topo_stability_t tpi_namestab;	/* stability of group name */
+	topo_stability_t tpi_datastab;	/* stability of all property values */
+	topo_version_t tpi_version;	/* version of pgroup definition */
+} topo_pgroup_info_t;
+
+extern topo_stability_t topo_name2stability(const char *);
+extern const char *topo_stability2name(topo_stability_t);
 
 extern topo_hdl_t *topo_open(int, const char *, int *);
 extern void topo_close(topo_hdl_t *);
 extern char *topo_snap_hold(topo_hdl_t *, const char *, int *);
 extern void topo_snap_release(topo_hdl_t *);
+extern int topo_xml_print(topo_hdl_t *, FILE *, const char *scheme, int *);
+
+/*
+ * Snapshot walker support
+ */
+typedef int (*topo_walk_cb_t)(topo_hdl_t *, tnode_t *, void *);
+
 extern topo_walk_t *topo_walk_init(topo_hdl_t *, const char *, topo_walk_cb_t,
     void *, int *);
 extern int topo_walk_step(topo_walk_t *, int);
@@ -95,6 +117,9 @@ extern void topo_walk_fini(topo_walk_t *);
 #define	TOPO_WALK_CHILD		0x0001
 #define	TOPO_WALK_SIBLING	0x0002
 
+/*
+ * FMRI helper routines
+ */
 extern int topo_fmri_present(topo_hdl_t *, nvlist_t *, int *);
 extern int topo_fmri_contains(topo_hdl_t *, nvlist_t *, nvlist_t *, int *);
 extern int topo_fmri_unusable(topo_hdl_t *, nvlist_t *, int *);
@@ -120,14 +145,12 @@ extern int topo_node_asru(tnode_t *, nvlist_t **, nvlist_t *, int *);
 extern int topo_node_fru(tnode_t *, nvlist_t **, nvlist_t *, int *);
 extern int topo_node_resource(tnode_t *, nvlist_t **, int *);
 extern int topo_node_label(tnode_t *, char **, int *);
-extern int topo_node_asru_set(tnode_t *node, nvlist_t *, int, int *);
-extern int topo_node_fru_set(tnode_t *node, nvlist_t *, int, int *);
-extern int topo_node_label_set(tnode_t *node, char *, int *);
 extern int topo_method_invoke(tnode_t *node, const char *, topo_version_t,
     nvlist_t *, nvlist_t **, int *);
 
-extern int topo_pgroup_create(tnode_t *, const char *, topo_stability_t, int *);
+extern int topo_pgroup_create(tnode_t *, const topo_pgroup_info_t *, int *);
 extern void topo_pgroup_destroy(tnode_t *, const char *);
+extern topo_pgroup_info_t *topo_pgroup_info(tnode_t *, const char *, int *);
 extern int topo_prop_get_int32(tnode_t *, const char *, const char *,
     int32_t *, int *);
 extern int topo_prop_get_uint32(tnode_t *, const char *, const char *,
@@ -140,6 +163,18 @@ extern int topo_prop_get_string(tnode_t *, const char *, const char *,
     char **, int *);
 extern int topo_prop_get_fmri(tnode_t *, const char *, const char *,
     nvlist_t **, int *);
+extern int topo_prop_get_int32_array(tnode_t *, const char *, const char *,
+    int32_t **, uint_t *, int *);
+extern int topo_prop_get_uint32_array(tnode_t *, const char *, const char *,
+    uint32_t **, uint_t *, int *);
+extern int topo_prop_get_int64_array(tnode_t *, const char *, const char *,
+    int64_t **, uint_t *, int *);
+extern int topo_prop_get_uint64_array(tnode_t *, const char *, const char *,
+    uint64_t **, uint_t *, int *);
+extern int topo_prop_get_string_array(tnode_t *, const char *, const char *,
+    char ***, uint_t *, int *);
+extern int topo_prop_get_fmri_array(tnode_t *, const char *, const char *,
+    nvlist_t ***, uint_t *, int *);
 extern int topo_prop_set_int32(tnode_t *, const char *, const char *, int,
     int32_t, int *);
 extern int topo_prop_set_uint32(tnode_t *, const char *, const char *, int,
@@ -152,15 +187,23 @@ extern int topo_prop_set_string(tnode_t *, const char *, const char *,
     int, const char *, int *);
 extern int topo_prop_set_fmri(tnode_t *, const char *, const char *,
     int, const nvlist_t *, int *);
-extern int topo_prop_stability(tnode_t *, const char *, topo_stability_t *);
-extern nvlist_t *topo_prop_get_all(topo_hdl_t *, tnode_t *);
+extern int topo_prop_set_int32_array(tnode_t *, const char *, const char *, int,
+    int32_t *, uint_t, int *);
+extern int topo_prop_set_uint32_array(tnode_t *, const char *, const char *,
+    int, uint32_t *, uint_t, int *);
+extern int topo_prop_set_int64_array(tnode_t *, const char *, const char *,
+    int, int64_t *, uint_t, int *);
+extern int topo_prop_set_uint64_array(tnode_t *, const char *, const char *,
+    int, uint64_t *, uint_t, int *);
+extern int topo_prop_set_string_array(tnode_t *, const char *, const char *,
+    int, const char **, uint_t, int *);
+extern int topo_prop_set_fmri_array(tnode_t *, const char *, const char *,
+    int, const nvlist_t **, uint_t, int *);
+extern nvlist_t *topo_prop_getprops(tnode_t *, int *err);
 extern int topo_prop_inherit(tnode_t *, const char *, const char *, int *);
 
-#define	TOPO_PROP_SET_ONCE	0
-#define	TOPO_PROP_SET_MULTIPLE	1
-
-#define	TOPO_ASRU_COMPUTE	0x0001  /* Compute ASRU dynamically */
-#define	TOPO_FRU_COMPUTE	0x0002  /* Compute FRU dynamically */
+#define	TOPO_PROP_IMMUTABLE	0
+#define	TOPO_PROP_MUTABLE	1
 
 /* Protocol property group and property names */
 #define	TOPO_PGROUP_PROTOCOL	"protocol"	/* Required property group */
@@ -172,30 +215,44 @@ extern int topo_prop_inherit(tnode_t *, const char *, const char *, int *);
 #define	TOPO_PROP_LABEL		"label"		/*  property LABEL */
 
 /*
- * Legacy TOPO property group: this group supports legacy platform.topo
- * property names
- */
-#define	TOPO_PGROUP_LEGACY	"legacy"	/* Legacy property group */
-#define	TOPO_PROP_PLATASRU	"PLAT-ASRU"
-#define	TOPO_PROP_PLATFRU	"PLAT-FRU"
-
-/*
  * System property group
  */
 #define	TOPO_PGROUP_SYSTEM	"system"
-#define	TOPO_PROP_PLATFORM	"platform"
 #define	TOPO_PROP_ISA		"isa"
 #define	TOPO_PROP_MACHINE	"machine"
 
-/* Property node NVL names */
+/* Property node NVL names used in topo_prop_getprops */
 #define	TOPO_PROP_GROUP		"property-group"
 #define	TOPO_PROP_GROUP_NAME	"property-group-name"
+#define	TOPO_PROP_GROUP_DSTAB	"property-group-data-stability"
+#define	TOPO_PROP_GROUP_NSTAB	"property-group-name-stability"
+#define	TOPO_PROP_GROUP_VERSION	"property-group-version"
 #define	TOPO_PROP_VAL		"property"
 #define	TOPO_PROP_VAL_NAME	"property-name"
 #define	TOPO_PROP_VAL_VAL	"property-value"
+#define	TOPO_PROP_VAL_TYPE	"property-type"
+
+/*
+ * This enum definition is used to define a set of error tags associated with
+ * the libtopo various error conditions occuring during the adminstration of
+ * properties.  The shell script mkerror.sh is
+ * used to parse this file and create a corresponding topo_error.c source file.
+ * If you do something other than add a new error tag here, you may need to
+ * update the mkerror shell script as it is based upon simple regexps.
+ */
+typedef enum topo_prop_errno {
+    ETOPO_PROP_UNKNOWN = 3000, /* unknown topo prop error */
+    ETOPO_PROP_NOENT,   /* undefined property or property group */
+    ETOPO_PROP_DEFD,    /* static property already defined */
+    ETOPO_PROP_NOMEM,   /* memory limit exceeded during property allocation */
+    ETOPO_PROP_TYPE,    /* invalid property type */
+    ETOPO_PROP_NOINHERIT, /* can not inherit property */
+    ETOPO_PROP_NVL,	/* malformed property nvlist */
+    ETOPO_PROP_END	/* end of prop errno list (to ease auto-merge) */
+} topo_prop_errno_t;
 
 extern const char *topo_strerror(int);
-extern void topo_debug_set(topo_hdl_t *, int, char *);
+extern void topo_debug_set(topo_hdl_t *, const char *, const char *);
 extern void *topo_hdl_alloc(topo_hdl_t *, size_t);
 extern void *topo_hdl_zalloc(topo_hdl_t *, size_t);
 extern void topo_hdl_free(topo_hdl_t *, void *, size_t);
@@ -203,13 +260,6 @@ extern int topo_hdl_nvalloc(topo_hdl_t *, nvlist_t **, uint_t);
 extern int topo_hdl_nvdup(topo_hdl_t *, nvlist_t *, nvlist_t **);
 extern char *topo_hdl_strdup(topo_hdl_t *, const char *);
 extern void topo_hdl_strfree(topo_hdl_t *, char *);
-
-#define	TOPO_DBG_ERR	0x0001	/* enable error handling debug messages */
-#define	TOPO_DBG_MOD	0x0002	/* enable module subsystem debug messages */
-#define	TOPO_DBG_LOG	0x0004	/* enable log subsystem debug messages */
-#define	TOPO_DBG_WALK	0x0008	/* enable walker subsystem debug messages */
-#define	TOPO_DBG_TREE	0x0010	/* enable tree subsystem debug messages */
-#define	TOPO_DBG_ALL	0xffff	/* enable all debug modes */
 
 #ifdef __cplusplus
 }

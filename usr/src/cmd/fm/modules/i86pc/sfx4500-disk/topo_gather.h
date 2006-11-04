@@ -44,7 +44,7 @@ extern "C" {
 #define	TOPO_SNAP_ERROR		3
 #define	TOPO_OPEN_ERROR		4
 
-int		update_configuration_from_topo(diskmon_t *diskp);
+int		update_configuration_from_topo(fmd_hdl_t *, diskmon_t *diskp);
 int		init_configuration_from_topo(void);
 void		fini_configuration_from_topo(void);
 diskmon_t	*dm_fmri_to_diskmon(fmd_hdl_t *hdl, nvlist_t *fmri);

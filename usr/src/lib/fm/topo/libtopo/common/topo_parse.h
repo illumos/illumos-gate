@@ -33,15 +33,13 @@
 #include <libxml/parser.h>
 #include <libnvpair.h>
 #include <fm/libtopo.h>
+#include <fm/topo_mod.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#define	TOPO_DTD_PATH	"topology.dtd.1"
-#define	TOPO_FILE	"topology.xml"
-#define	TOPO_PLATFORM_PATH	"%susr/platform/%s/lib/fm/topo/%s"
-#define	TOPO_COMMON_PATH	"%susr/lib/fm/topo/%s"
+#define	TOPO_DTD_PATH	"/usr/share/lib/xml/dtd/topology.dtd.1"
 
 /*
  * Plenty of room to hold string representation of an instance
@@ -61,11 +59,8 @@ struct tf_info;
  */
 typedef struct tf_edata {
 	char *te_name;		/* name of the enumerator, if any */
-	char *te_path;		/* path to the enumerator, if any */
 	topo_stability_t te_stab; /* stability of the enumerator, if any */
-	int te_vers;		/* version of the enumerator, if any */
-	int te_amcnt;		/* number of apply-methods */
-	nvlist_t **te_ams;	/* apply-methods */
+	topo_version_t te_vers;		/* version of the enumerator, if any */
 } tf_edata_t;
 
 /* properties and dependents off of an instance or a range */
@@ -108,7 +103,6 @@ typedef struct tf_rdata {
  * affected, etc.
  */
 typedef struct tf_info {
-	char *tf_fn;		/* name of file read */
 	char *tf_scheme;	/* scheme of topology in file */
 	/* UUID ? */
 	uint_t tf_flags;	/* behavior modifiers (see values below) */
@@ -127,18 +121,69 @@ typedef struct tf_info {
 #define	INV_PGRP_ALLPROPS "propgrp-props"
 #define	INV_PGRP_NAME	"propgrp-name"
 #define	INV_PGRP_NPROP	"propgrp-numprops"
-#define	INV_PGRP_STAB	"propgrp-name-stability"
+#define	INV_PGRP_NMSTAB	"propgrp-name-stability"
+#define	INV_PGRP_DSTAB	"propgrp-data-stability"
+#define	INV_PGRP_VER	"propgrp-version"
 #define	INV_PNAME	"prop-name"
 #define	INV_PVAL	"prop-val"
 #define	INV_PVALTYPE	"prop-valtype"
 
-extern tf_idata_t *tf_idata_lookup(topo_mod_t *, tf_idata_t *, topo_instance_t);
+/*
+ * Valid .xml element and attribute names
+ */
+#define	Children "children"
+#define	Dependents "dependents"
+#define	FMRI "fmri"
+#define	Grouping "grouping"
+#define	Immutable "immutable"
+#define	Instance "instance"
+#define	Int32 "int32"
+#define	Int64 "int64"
+#define	Name "name"
+#define	Path "path"
+#define	Range "range"
+#define	Scheme "scheme"
+#define	Siblings "siblings"
+#define	Static "static"
+#define	String "string"
+#define	Topology "topology"
+#define	Type "type"
+#define	UInt32 "uint32"
+#define	UInt64 "uint64"
+#define	Value "value"
+#define	Verify "verify"
+#define	Version "version"
+#define	Min "min"
+#define	Max "max"
+
+#define	Enum_meth "enum-method"
+#define	Propgrp "propgroup"
+#define	Propval "propval"
+
+#define	Node "node"
+#define	Hc "hc"
+
+#define	True "true"
+#define	False "false"
+
+#define	Namestab "name-stability"
+#define	Datastab "data-stability"
+
+#define	Evolving "Evolving"
+#define	External "External"
+#define	Internal "Internal"
+#define	Obsolete "Obsolete"
+#define	Private "Private"
+#define	Stable "Stable"
+#define	Standard "Standard"
+#define	Unstable "Unstable"
+
+extern tf_idata_t *tf_idata_lookup(tf_idata_t *, topo_instance_t);
 extern tf_rdata_t *tf_rdata_new(topo_mod_t *,
     tf_info_t *, xmlNodePtr, tnode_t *);
 extern tf_idata_t *tf_idata_new(topo_mod_t *, topo_instance_t, tnode_t *);
 extern tf_info_t *topo_xml_read(topo_mod_t *, const char *, const char *);
-extern tf_info_t *tf_info_new(topo_mod_t *,
-    const char *, xmlDocPtr, xmlChar *);
+extern tf_info_t *tf_info_new(topo_mod_t *, xmlDocPtr, xmlChar *);
 extern tf_pad_t *tf_pad_new(topo_mod_t *, int, int);
 extern void topo_xml_cleanup(topo_mod_t *, tf_info_t *);
 extern void tf_rdata_free(topo_mod_t *, tf_rdata_t *);
@@ -148,9 +193,10 @@ extern void tf_info_free(topo_mod_t *, tf_info_t *);
 extern void tf_pad_free(topo_mod_t *, tf_pad_t *);
 extern int topo_xml_range_process(topo_mod_t *, xmlNodePtr, tf_rdata_t *);
 extern int topo_xml_enum(topo_mod_t *, tf_info_t *, tnode_t *);
-extern int tf_idata_insert(topo_mod_t *, tf_idata_t **, tf_idata_t *);
+extern int tf_idata_insert(tf_idata_t **, tf_idata_t *);
 extern int xmlattr_to_int(topo_mod_t *, xmlNodePtr, const char *, uint64_t *);
-extern int xmlattr_to_stab(topo_mod_t *, xmlNodePtr, topo_stability_t *);
+extern int xmlattr_to_stab(topo_mod_t *, xmlNodePtr, const char *,
+    topo_stability_t *);
 
 #ifdef	__cplusplus
 }

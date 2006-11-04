@@ -48,7 +48,9 @@
 #include <sys/param.h>
 #include <sys/fm/protocol.h>
 #include <fm/fmd_api.h>
+#include <fm/fmd_fmri.h>
 #include <fm/libtopo.h>
+#include <fm/topo_hc.h>
 #include "alloc.h"
 #include "out.h"
 #include "tree.h"
@@ -395,6 +397,12 @@ add_prop_val(topo_hdl_t *thp, struct cfgdata *rawdata, char *propn,
 	char buf[32];	/* big enough for any 64-bit int */
 
 	/*
+	 * malformed prop nvpair
+	 */
+	if (propn == NULL)
+		return;
+
+	/*
 	 * We can only handle properties of string type
 	 */
 	switch (nvpair_type(pv_nvp)) {
@@ -427,6 +435,8 @@ add_prop_val(topo_hdl_t *thp, struct cfgdata *rawdata, char *propn,
 		break;
 
 	default:
+		out(O_ALTFP, "cfgcollect: failed to get property value for "
+		    "%s", propn);
 		return;
 	}
 
@@ -436,6 +446,9 @@ add_prop_val(topo_hdl_t *thp, struct cfgdata *rawdata, char *propn,
 	(void) snprintf(rawdata->nextfree,
 	    rawdata->end - rawdata->nextfree, "%s=%s",
 	    propn, propv);
+	if (strcmp(propn, TOPO_PROP_RESOURCE) == 0)
+		out(O_ALTFP, "cfgcollect: %s", propv);
+
 	rawdata->nextfree += addlen;
 
 	if (fmristr != NULL)
@@ -450,7 +463,7 @@ static int
 cfgcollect(topo_hdl_t *thp, tnode_t *node, void *arg)
 {
 	struct cfgdata *rawdata = (struct cfgdata *)arg;
-	int addlen;
+	int err, addlen;
 	char *propn, *path = NULL;
 	nvlist_t *p_nv, *pg_nv, *pv_nv;
 	nvpair_t *nvp, *pg_nvp, *pv_nvp;
@@ -472,7 +485,7 @@ cfgcollect(topo_hdl_t *thp, tnode_t *node, void *arg)
 	 * Better yet, topo properties could be represented as
 	 * a packed nvlist
 	 */
-	p_nv = topo_prop_get_all(thp, node);
+	p_nv = topo_prop_getprops(node, &err);
 	for (nvp = nvlist_next_nvpair(p_nv, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(p_nv, nvp)) {
 		if (strcmp(TOPO_PROP_GROUP, nvpair_name(nvp)) != 0 ||
@@ -490,22 +503,24 @@ cfgcollect(topo_hdl_t *thp, tnode_t *node, void *arg)
 
 			(void) nvpair_value_nvlist(pg_nvp, &pv_nv);
 
+			propn = NULL;
 			for (pv_nvp = nvlist_next_nvpair(pv_nv, NULL);
 			    pv_nvp != NULL;
 			    pv_nvp = nvlist_next_nvpair(pv_nv, pv_nvp)) {
 
 				/* Get property name */
-				propn = nvpair_name(pv_nvp);
-				if (strcmp(TOPO_PROP_VAL_NAME, propn) != 0)
-					continue;
-				if (nvpair_value_string(pv_nvp, &propn) != 0)
-					continue;
+				if (strcmp(TOPO_PROP_VAL_NAME,
+				    nvpair_name(pv_nvp)) == 0)
+					(void) nvpair_value_string(pv_nvp,
+					    &propn);
 
 				/*
 				 * Get property value
 				 */
-				pv_nvp = nvlist_next_nvpair(pv_nv, pv_nvp);
-				add_prop_val(thp, rawdata, propn, pv_nvp);
+				if (strcmp(TOPO_PROP_VAL_VAL,
+				    nvpair_name(pv_nvp)) == 0)
+					add_prop_val(thp, rawdata, propn,
+					    pv_nvp);
 			}
 
 		}
@@ -523,22 +538,21 @@ struct cfgdata *
 platform_config_snapshot(void)
 {
 	int err;
-	char *uuid;
 	topo_walk_t *twp;
+	static uint64_t lastgen;
+	uint64_t curgen;
 
 	/*
-	 *
 	 * If the DR generation number has changed,
 	 * we need to grab a new snapshot, otherwise we
 	 * can simply point them at the last config.
-	 *
-	 *	svgen = DRgen;
-	 *	if (svgen == (Drgen = fmd_drgen_get()) && Lastcfg != NULL) {
-	 *		Lastcfg->refcnt++;
-	 *		return (Lastcfg);
-	 *	}
 	 */
+	if ((curgen = fmd_fmri_get_drgen()) <= lastgen && Lastcfg != NULL) {
+		Lastcfg->refcnt++;
+		return (Lastcfg);
+	}
 
+	lastgen = curgen;
 	/* we're getting a new config, so clean up the last one */
 	if (Lastcfg != NULL)
 		config_free(Lastcfg);
@@ -551,19 +565,16 @@ platform_config_snapshot(void)
 	Lastcfg->cpucache = NULL;
 
 	out(O_ALTFP, "platform_config_snapshot(): topo snapshot");
-	if ((uuid = topo_snap_hold(Eft_topo_hdl, NULL, &err)) == NULL)
-		out(O_DIE, "platform_config_snapshot: topo snapshot failed: %s",
-		    topo_strerror(err));
+
+	Eft_topo_hdl = fmd_hdl_topology(Hdl, TOPO_VERSION);
 
 	if ((twp = topo_walk_init(Eft_topo_hdl, FM_FMRI_SCHEME_HC, cfgcollect,
 	    Lastcfg, &err)) == NULL) {
-		topo_hdl_strfree(Eft_topo_hdl, uuid);
 		out(O_DIE, "platform_config_snapshot: NULL topology tree: %s",
 		    topo_strerror(err));
 	}
 
 	if (topo_walk_step(twp, TOPO_WALK_CHILD) == TOPO_WALK_ERR) {
-		topo_hdl_strfree(Eft_topo_hdl, uuid);
 		topo_walk_fini(twp);
 		out(O_DIE, "platform_config_snapshot: error walking topology "
 		    "tree");
@@ -571,8 +582,6 @@ platform_config_snapshot(void)
 
 	topo_walk_fini(twp);
 
-	topo_hdl_strfree(Eft_topo_hdl, uuid);
-	topo_snap_release(Eft_topo_hdl);
 
 	return (Lastcfg);
 }
@@ -641,14 +650,15 @@ defect_units(nvlist_t **ap, nvlist_t **fp, struct config *croot, char *path)
 	 * Find the driver for this resource and use that to get
 	 * mod and pkg fmris for ASRU and FRU respectively.
 	 */
-	if ((driverstr = cfgstrprop_lookup(croot, path, "DRIVER")) == NULL)
+	if ((driverstr = cfgstrprop_lookup(croot, path, TOPO_IO_DRIVER))
+	    == NULL)
 		return;
 
 	if (topo_hdl_nvalloc(Eft_topo_hdl, &arg, NV_UNIQUE_NAME) != 0) {
 		out(O_ALTFP, "Can not allocate nvlist for MOD fmri lookup");
 		return;
 	}
-	if (nvlist_add_string(arg, "DRIVER", driverstr) != 0) {
+	if (nvlist_add_string(arg, TOPO_IO_DRIVER, driverstr) != 0) {
 		out(O_ALTFP, "Failed to add DRIVER string to arg nvlist");
 		nvlist_free(arg);
 		return;

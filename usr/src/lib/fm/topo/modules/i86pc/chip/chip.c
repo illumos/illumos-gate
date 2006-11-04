@@ -64,31 +64,34 @@
  */
 
 static int chip_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
-    topo_instance_t, void *);
+    topo_instance_t, void *, void *);
 
 static int mem_asru_compute(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 
-const topo_modinfo_t chip_info =
-	{ "chip", CHIP_VERSION, chip_enum, NULL};
+static const topo_modops_t chip_ops =
+	{ chip_enum, NULL};
+static const topo_modinfo_t chip_info =
+	{ "chip", FM_FMRI_SCHEME_HC, CHIP_VERSION, &chip_ops };
+
+static const topo_pgroup_info_t cs_pgroup =
+	{ CS_PGROUP, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+static const topo_pgroup_info_t dimm_pgroup =
+	{ DIMM_PGROUP, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+static const topo_pgroup_info_t mc_pgroup =
+	{ MCT_PGROUP, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+static const topo_pgroup_info_t chip_pgroup =
+	{ CHIP_PGROUP, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+static const topo_pgroup_info_t rank_pgroup =
+	{ RANK_PGROUP, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+static const topo_pgroup_info_t chan_pgroup =
+	{ CHAN_PGROUP, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
 
 const topo_method_t rank_methods[] = {
 	{ TOPO_METH_ASRU_COMPUTE, TOPO_METH_ASRU_COMPUTE_DESC,
 	    TOPO_METH_ASRU_COMPUTE_VERSION, TOPO_STABILITY_INTERNAL,
 	    mem_asru_compute },
 	{ NULL }
-};
-
-static const struct debugopt {
-	const char *optname;
-	int optval;
-} debugopts[] = {
-	{ "err", TOPO_DBG_ERR },
-	{ "mod", TOPO_DBG_MOD },
-	{ "log", TOPO_DBG_LOG },
-	{ "walk", TOPO_DBG_WALK },
-	{ "tree", TOPO_DBG_TREE },
-	{ "all", TOPO_DBG_ALL }
 };
 
 static nvlist_t *cs_fmri[MC_CHIP_NCS];
@@ -112,21 +115,10 @@ whinge(topo_mod_t *mod, int *nerr, const char *fmt, ...)
 int
 _topo_init(topo_mod_t *mod)
 {
-	const char *debugstr = getenv("TOPOCHPDBG");
 	chip_t *chip;
-	int i;
 
-	if (debugstr != NULL) {
-		for (i = 0; i < sizeof (debugopts) / sizeof (struct debugopt);
-		    i++) {
-			if (strncmp(debugstr, debugopts[i].optname, 4) == 0) {
-				topo_mod_clrdebug(mod);
-				topo_mod_setdebug(mod, debugopts[i].optval);
-				break;	/* handle a single option only */
-			}
-		}
-	}
-
+	if (getenv("TOPOCHIPDBG"))
+		topo_mod_setdebug(mod);
 	topo_mod_dprintf(mod, "initializing chip enumerator\n");
 
 	if ((chip = topo_mod_zalloc(mod, sizeof (chip_t))) == NULL)
@@ -147,7 +139,7 @@ _topo_init(topo_mod_t *mod)
 		return (topo_mod_seterrno(mod, EMOD_NOMEM));
 	}
 
-	if (topo_mod_register(mod, &chip_info, (void *)chip) != 0) {
+	if (topo_mod_register(mod, &chip_info, TOPO_VERSION) != 0) {
 		whinge(mod, NULL, "failed to register hc: "
 		    "%s\n", topo_mod_errmsg(mod));
 		topo_mod_free(mod, chip->chip_cpustats,
@@ -156,6 +148,7 @@ _topo_init(topo_mod_t *mod)
 		topo_mod_free(mod, chip, sizeof (chip_t));
 		return (-1); /* mod errno set */
 	}
+	topo_mod_setspecific(mod, (void *)chip);
 
 	return (0);
 }
@@ -163,7 +156,7 @@ _topo_init(topo_mod_t *mod)
 void
 _topo_fini(topo_mod_t *mod)
 {
-	chip_t *chip = topo_mod_private(mod);
+	chip_t *chip = topo_mod_getspecific(mod);
 
 	if (chip->chip_cpustats != NULL)
 		topo_mod_free(mod, chip->chip_cpustats,
@@ -185,7 +178,7 @@ chip_strprop(tnode_t *cnode, kstat_t *ksp, const char *name)
 		return (0);
 
 	(void) topo_prop_set_string(cnode, CHIP_PGROUP, name,
-	    TOPO_PROP_SET_ONCE, k->value.str.addr.ptr, &err);
+	    TOPO_PROP_IMMUTABLE, k->value.str.addr.ptr, &err);
 
 	return (-1);
 }
@@ -199,32 +192,18 @@ chip_longprop(tnode_t *cnode, kstat_t *ksp, const char *name)
 	if ((k = kstat_data_lookup(ksp, (char *)name)) == NULL)
 		return (0);
 
-	(void) topo_prop_set_int32(cnode, CHIP_PGROUP, name, TOPO_PROP_SET_ONCE,
-	    k->value.l, &err);
+	(void) topo_prop_set_int32(cnode, CHIP_PGROUP, name,
+	    TOPO_PROP_IMMUTABLE, k->value.l, &err);
 
 	return (-1);
 }
 
 static int
 mkrsrc(topo_mod_t *mod, tnode_t *pnode, const char *name, int inst,
-    nvlist_t **nvl)
+    nvlist_t *auth, nvlist_t **nvl)
 {
-	nvlist_t *args = NULL, *pfmri = NULL;
-	topo_hdl_t *thp = topo_mod_handle(mod);
-	int err;
-
-	if (topo_node_resource(pnode, &pfmri, &err) < 0 ||
-	    topo_mod_nvalloc(mod, &args, NV_UNIQUE_NAME) != 0 ||
-	    nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_PARENT, pfmri) != 0) {
-		nvlist_free(pfmri);
-		nvlist_free(args);
-		return (-1);
-	}
-
-	*nvl = topo_fmri_create(thp, FM_FMRI_SCHEME_HC, name, inst, args, &err);
-	nvlist_free(pfmri);
-	nvlist_free(args);
-
+	*nvl = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION, name,
+	    inst, NULL, auth, NULL, NULL, NULL);
 	return (nvl != NULL ? 0 : -1);	/* caller must free nvlist */
 }
 
@@ -271,7 +250,7 @@ mem_fmri_create(topo_mod_t *mod)
 
 static int
 cpu_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int chipid,
-    chip_t *chip)
+    chip_t *chip, nvlist_t *auth)
 {
 	kstat_named_t *k;
 	nvlist_t *fmri, *asru;
@@ -320,13 +299,13 @@ cpu_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int chipid,
 		}
 		clogid = k->value.l;
 
-		if (mkrsrc(mod, pnode, name, clogid, &fmri) != 0) {
+		if (mkrsrc(mod, pnode, name, clogid, auth, &fmri) != 0) {
 			whinge(mod, &nerr, "cpu_create: mkrsrc failed\n");
 			continue;
 		}
 
-		if ((cnode = topo_node_bind(mod, pnode, name, clogid, fmri,
-		    NULL)) == NULL) {
+		if ((cnode = topo_node_bind(mod, pnode, name, clogid, fmri))
+		    == NULL) {
 			whinge(mod, &nerr, "cpu_create: node bind failed\n");
 			nvlist_free(fmri);
 			continue;
@@ -358,7 +337,7 @@ nvprop_add(topo_mod_t *mod, nvpair_t *nvp, const char *pgname, tnode_t *node)
 
 		if (nvpair_value_boolean_value(nvp, &val) == 0) {
 			(void) topo_prop_set_string(node, pgname, pname,
-			    TOPO_PROP_SET_ONCE, (val ? "true" : "false"), &err);
+			    TOPO_PROP_IMMUTABLE, val ? "true" : "false", &err);
 		}
 		return (0);
 	}
@@ -368,7 +347,7 @@ nvprop_add(topo_mod_t *mod, nvpair_t *nvp, const char *pgname, tnode_t *node)
 
 		if (nvpair_value_uint64(nvp, &val) == 0) {
 			(void) topo_prop_set_uint64(node, pgname, pname,
-			    TOPO_PROP_SET_ONCE, val, &err);
+			    TOPO_PROP_IMMUTABLE, val, &err);
 		}
 		return (0);
 	}
@@ -378,7 +357,7 @@ nvprop_add(topo_mod_t *mod, nvpair_t *nvp, const char *pgname, tnode_t *node)
 
 		if (nvpair_value_string(nvp, &str) == 0)
 			(void) topo_prop_set_string(node, pgname, pname,
-			    TOPO_PROP_SET_ONCE, str, &err);
+			    TOPO_PROP_IMMUTABLE, str, &err);
 		return (0);
 	}
 
@@ -391,7 +370,8 @@ nvprop_add(topo_mod_t *mod, nvpair_t *nvp, const char *pgname, tnode_t *node)
 }
 
 static int
-dramchan_create(topo_mod_t *mod, tnode_t *pnode, const char *name)
+dramchan_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
+    nvlist_t *auth)
 {
 	tnode_t *chnode;
 	nvlist_t *fmri;
@@ -419,14 +399,14 @@ dramchan_create(topo_mod_t *mod, tnode_t *pnode, const char *name)
 		return (-1);
 
 	for (i = 0; i < nchan; i++) {
-		if (mkrsrc(mod, pnode, name, i, &fmri) != 0) {
+		if (mkrsrc(mod, pnode, name, i, auth, &fmri) != 0) {
 			whinge(mod, &nerr, "dramchan_create: mkrsrc "
 			    "failed\n");
 			continue;
 		}
 
-		if ((chnode = topo_node_bind(mod, pnode, name, i, fmri,
-		    NULL)) == NULL) {
+		if ((chnode = topo_node_bind(mod, pnode, name, i, fmri))
+		    == NULL) {
 			nvlist_free(fmri);
 			whinge(mod, &nerr, "dramchan_create: node bind "
 			    "failed\n");
@@ -435,18 +415,18 @@ dramchan_create(topo_mod_t *mod, tnode_t *pnode, const char *name)
 
 		nvlist_free(fmri);
 
-		(void) topo_pgroup_create(chnode, CHAN_PGROUP,
-		    TOPO_STABILITY_PRIVATE, &err);
+		(void) topo_pgroup_create(chnode, &chan_pgroup, &err);
 
 		(void) topo_prop_set_string(chnode, CHAN_PGROUP, "channel",
-		    TOPO_PROP_SET_ONCE, i == 0 ? "A" : "B", &err);
+		    TOPO_PROP_IMMUTABLE, i == 0 ? "A" : "B", &err);
 	}
 
 	return (nerr == 0 ? 0 : -1);
 }
 
 static int
-cs_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc)
+cs_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc,
+    nvlist_t *auth)
 {
 	int i, err, nerr = 0;
 	nvpair_t *nvp;
@@ -471,13 +451,13 @@ cs_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc)
 			continue;
 		}
 
-		if (mkrsrc(mod, pnode, name, csnum, &fmri) != 0) {
+		if (mkrsrc(mod, pnode, name, csnum, auth, &fmri) != 0) {
 			whinge(mod, &nerr, "cs_create: mkrsrc failed\n");
 			continue;
 		}
 
-		if ((csnode = topo_node_bind(mod, pnode, name, csnum, fmri,
-		    NULL)) == NULL) {
+		if ((csnode = topo_node_bind(mod, pnode, name, csnum, fmri))
+		    == NULL) {
 			nvlist_free(fmri);
 			whinge(mod, &nerr, "cs_create: node bind failed\n");
 			continue;
@@ -487,8 +467,7 @@ cs_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc)
 
 		(void) topo_node_asru_set(csnode, fmri, 0, &err);
 
-		(void) topo_pgroup_create(csnode, CS_PGROUP,
-		    TOPO_STABILITY_PRIVATE, &err);
+		(void) topo_pgroup_create(csnode, &cs_pgroup, &err);
 
 		for (nvp = nvlist_next_nvpair(csarr[i], NULL); nvp != NULL;
 		    nvp = nvlist_next_nvpair(csarr[i], nvp)) {
@@ -552,7 +531,7 @@ mem_asru_compute(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	}
 
 	/* use 'in' to obtain resource path;  could use node resource */
-	if (topo_fmri_nvl2str(topo_mod_handle(mod), in, &unum, &err) < 0)
+	if (topo_mod_nvl2str(mod, in, &unum) < 0)
 		return (topo_mod_seterrno(mod, err));
 
 	if ((asru = mem_fmri_create(mod)) == NULL) {
@@ -577,7 +556,7 @@ mem_asru_compute(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 }
 
 static int
-rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl)
+rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl, nvlist_t *auth)
 {
 	uint64_t *csnumarr;
 	char **csnamearr;
@@ -617,13 +596,13 @@ rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl)
 	}
 
 	for (i = 0; i < ncs; i++) {
-		if (mkrsrc(mod, pnode, RANK_NODE_NAME, i, &fmri) < 0) {
+		if (mkrsrc(mod, pnode, RANK_NODE_NAME, i, auth, &fmri) < 0) {
 			whinge(mod, &nerr, "rank_create: mkrsrc failed\n");
 			continue;
 		}
 
 		if ((ranknode = topo_node_bind(mod, pnode, RANK_NODE_NAME, i,
-		    fmri, NULL)) == NULL) {
+		    fmri)) == NULL) {
 			nvlist_free(fmri);
 			whinge(mod, &nerr, "rank_create: node bind "
 			    "failed\n");
@@ -647,17 +626,16 @@ rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl)
 			whinge(mod, &nerr, "rank_create: "
 			    "topo_method_register failed");
 
-		(void) topo_pgroup_create(ranknode, RANK_PGROUP,
-		    TOPO_STABILITY_PRIVATE, &err);
+		(void) topo_pgroup_create(ranknode, &rank_pgroup, &err);
 
 		(void) topo_prop_set_uint64(ranknode, RANK_PGROUP, "size",
-		    TOPO_PROP_SET_ONCE, rsz, &err);
+		    TOPO_PROP_IMMUTABLE, rsz, &err);
 
 		(void) topo_prop_set_string(ranknode, RANK_PGROUP, "csname",
-		    TOPO_PROP_SET_ONCE, csnamearr[i], &err);
+		    TOPO_PROP_IMMUTABLE, csnamearr[i], &err);
 
 		(void) topo_prop_set_uint64(ranknode, RANK_PGROUP, "csnum",
-		    TOPO_PROP_SET_ONCE, csnumarr[i], &err);
+		    TOPO_PROP_IMMUTABLE, csnumarr[i], &err);
 	}
 
 	nvlist_free(pfmri);
@@ -666,7 +644,8 @@ rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl)
 }
 
 static int
-dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc)
+dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc,
+    nvlist_t *auth)
 {
 	int i, err, nerr = 0;
 	nvpair_t *nvp;
@@ -695,13 +674,13 @@ dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc)
 			continue;
 		}
 
-		if (mkrsrc(mod, pnode, name, num, &fmri) < 0) {
+		if (mkrsrc(mod, pnode, name, num, auth, &fmri) < 0) {
 			whinge(mod, &nerr, "dimm_create: mkrsrc failed\n");
 			continue;
 		}
 
-		if ((dimmnode = topo_node_bind(mod, pnode, name, num, fmri,
-		    NULL)) == NULL) {
+		if ((dimmnode = topo_node_bind(mod, pnode, name, num, fmri))
+		    == NULL) {
 			nvlist_free(fmri);
 			whinge(mod, &nerr, "dimm_create: node bind "
 			    "failed\n");
@@ -729,8 +708,7 @@ dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc)
 
 		nvlist_free(fmri);
 
-		(void) topo_pgroup_create(dimmnode, DIMM_PGROUP,
-		    TOPO_STABILITY_PRIVATE, &err);
+		(void) topo_pgroup_create(dimmnode, &dimm_pgroup, &err);
 
 		for (nvp = nvlist_next_nvpair(dimmarr[i], NULL); nvp != NULL;
 		    nvp = nvlist_next_nvpair(dimmarr[i], nvp)) {
@@ -743,7 +721,7 @@ dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc)
 			nerr += nvprop_add(mod, nvp, DIMM_PGROUP, dimmnode);
 		}
 
-		nerr += rank_create(mod, dimmnode, dimmarr[i]);
+		nerr += rank_create(mod, dimmnode, dimmarr[i], auth);
 	}
 
 	return (nerr == 0 ? 0 : -1);
@@ -811,7 +789,7 @@ mc_lookup_by_mcid(topo_mod_t *mod, topo_instance_t id)
 }
 
 static int
-mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name)
+mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth)
 {
 	int err, rc = 0;
 	tnode_t *mcnode;
@@ -820,7 +798,7 @@ mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name)
 	nvlist_t *mc = NULL;
 	int i;
 
-	if (mkrsrc(mod, pnode, name, 0, &fmri) != 0) {
+	if (mkrsrc(mod, pnode, name, 0, auth, &fmri) != 0) {
 		whinge(mod, NULL, "mc_create: mkrsrc failed\n");
 		return (-1);
 	}
@@ -836,7 +814,7 @@ mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name)
 	 */
 	if ((mc = mc_lookup_by_mcid(mod, topo_node_instance(pnode))) == NULL ||
 	    (mcnode = topo_node_bind(mod, pnode,
-	    name, 0, fmri, NULL)) == NULL) {
+	    name, 0, fmri)) == NULL) {
 		if (mc != NULL)
 			nvlist_free(mc);
 		topo_node_range_destroy(pnode, name);
@@ -851,8 +829,7 @@ mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name)
 	/*
 	 * Add memory controller properties
 	 */
-	(void) topo_pgroup_create(mcnode, MCT_PGROUP,
-	    TOPO_STABILITY_PRIVATE, &err);
+	(void) topo_pgroup_create(mcnode, &mc_pgroup, &err);
 
 	for (nvp = nvlist_next_nvpair(mc, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(mc, nvp)) {
@@ -869,9 +846,9 @@ mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name)
 		}
 	}
 
-	if (dramchan_create(mod, mcnode, CHAN_NODE_NAME) != 0 ||
-	    cs_create(mod, mcnode, CS_NODE_NAME, mc) != 0 ||
-	    dimm_create(mod, mcnode, DIMM_NODE_NAME, mc) != 0)
+	if (dramchan_create(mod, mcnode, CHAN_NODE_NAME, auth) != 0 ||
+	    cs_create(mod, mcnode, CS_NODE_NAME, mc, auth) != 0 ||
+	    dimm_create(mod, mcnode, DIMM_NODE_NAME, mc, auth) != 0)
 		rc = -1;
 
 	/*
@@ -890,7 +867,7 @@ mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name)
 
 static int
 chip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    topo_instance_t min, topo_instance_t max, chip_t *chip)
+    topo_instance_t min, topo_instance_t max, chip_t *chip, nvlist_t *auth)
 {
 	int i, nerr = 0;
 	kstat_t *ksp;
@@ -935,13 +912,13 @@ chip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		if (chipid < min || chipid > max)
 			continue;
 
-		if (mkrsrc(mod, pnode, name, chipid, &fmri) != 0) {
+		if (mkrsrc(mod, pnode, name, chipid, auth, &fmri) != 0) {
 			whinge(mod, &nerr, "chip_create: mkrsrc failed\n");
 			continue;
 		}
 
-		if ((cnode = topo_node_bind(mod, pnode, name, chipid, fmri,
-		    NULL)) == NULL) {
+		if ((cnode = topo_node_bind(mod, pnode, name, chipid, fmri))
+		    == NULL) {
 			nvlist_free(fmri);
 			whinge(mod, &nerr, "chip_create: node bind "
 			    "failed for chipid %d\n", chipid);
@@ -953,15 +930,14 @@ chip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 
 		nvlist_free(fmri);
 
-		(void) topo_pgroup_create(cnode, CHIP_PGROUP,
-		    TOPO_STABILITY_PRIVATE, &err);
+		(void) topo_pgroup_create(cnode, &chip_pgroup, &err);
 		(void) chip_strprop(cnode, ksp, CHIP_VENDOR_ID);
 		(void) chip_longprop(cnode, ksp, CHIP_FAMILY);
 		(void) chip_longprop(cnode, ksp, CHIP_MODEL);
 		(void) chip_longprop(cnode, ksp, CHIP_STEPPING);
 
-		if (cpu_create(mod, cnode, CPU_NODE_NAME, chipid, chip) != 0 ||
-		    mc_create(mod, cnode, MCT_NODE_NAME) != 0)
+		if (cpu_create(mod, cnode, CPU_NODE_NAME, chipid, chip, auth)
+		    != 0 || mc_create(mod, cnode, MCT_NODE_NAME, auth) != 0)
 			nerr++;		/* have whinged elsewhere */
 	}
 
@@ -975,14 +951,21 @@ chip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	}
 }
 
+/*ARGSUSED*/
 static int
 chip_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    topo_instance_t min, topo_instance_t max, void *arg)
+    topo_instance_t min, topo_instance_t max, void *arg, void *notused)
 {
+	int rv = 0;
 	chip_t *chip = (chip_t *)arg;
+	nvlist_t *auth = NULL;
+
+	auth = topo_mod_auth(mod, pnode);
 
 	if (strcmp(name, "chip") == 0)
-		return (chip_create(mod, pnode, name, min, max, chip));
+		rv = chip_create(mod, pnode, name, min, max, chip, auth);
 
-	return (0);
+	nvlist_free(auth);
+
+	return (rv);
 }

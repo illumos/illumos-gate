@@ -27,58 +27,55 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/topo_mod.h>
+#include <fm/topo_hc.h>
 #include <libdevinfo.h>
 #include <strings.h>
-#include "pcibus.h"
-#include "hostbridge.h"
-#include "did.h"
-#include "util.h"
+#include <pcibus.h>
+#include <hostbridge.h>
+#include <did.h>
+#include <util.h>
 
 static int
-hb_process(tnode_t *ptn, topo_instance_t hbi, di_node_t bn, did_hash_t *didhash,
-    di_prom_handle_t promtree, topo_mod_t *mod)
+hb_process(topo_mod_t *mod, tnode_t *ptn, topo_instance_t hbi, di_node_t bn)
 {
 	tnode_t *hb;
+	did_t *hbdid;
 
-	if (did_create(didhash, bn, 0, hbi, NO_RC, TRUST_BDF, promtree) == NULL)
+	if ((hbdid = did_create(mod, bn, 0, hbi, NO_RC, TRUST_BDF)) == NULL)
 		return (-1);
-	if ((hb = pcihostbridge_declare(ptn, bn, hbi, didhash,
-	    promtree, mod)) == NULL)
+	if ((hb = pcihostbridge_declare(mod, ptn, bn, hbi)) == NULL)
 		return (-1);
-	return (topo_mod_enumerate(mod, hb, PCI_BUS, PCI_BUS, 0,
-	    MAX_HB_BUSES));
+	return (topo_mod_enumerate(mod,
+	    hb, PCI_BUS, PCI_BUS, 0, MAX_HB_BUSES, (void *)hbdid));
 }
 
 static int
-rc_process(tnode_t *ptn, topo_instance_t hbi, di_node_t bn, did_hash_t *didhash,
-    di_prom_handle_t promtree, topo_mod_t *mod)
+rc_process(topo_mod_t *mod, tnode_t *ptn, topo_instance_t hbi, di_node_t bn)
 {
 	tnode_t *hb;
 	tnode_t *rc;
+	did_t *hbdid;
 
-	if (did_create(didhash, bn, 0, hbi, hbi, TRUST_BDF, promtree) == NULL)
+	if ((hbdid = did_create(mod, bn, 0, hbi, hbi, TRUST_BDF)) == NULL)
 		return (-1);
-	if ((hb = pciexhostbridge_declare(ptn, bn, hbi, didhash, promtree, mod))
-	    == NULL)
+	if ((hb = pciexhostbridge_declare(mod, ptn, bn, hbi)) == NULL)
 		return (-1);
-	if ((rc = pciexrc_declare(hb, bn, hbi, didhash, promtree, mod)) == NULL)
+	if ((rc = pciexrc_declare(mod, hb, bn, hbi)) == NULL)
 		return (-1);
 	return (topo_mod_enumerate(mod,
-	    rc, PCI_BUS, PCIEX_BUS, 0, MAX_HB_BUSES));
+	    rc, PCI_BUS, PCIEX_BUS, 0, MAX_HB_BUSES, (void *)hbdid));
 }
 
 
 int
-pci_hostbridges_find(tnode_t *ptn, did_hash_t *didhash,
-    di_prom_handle_t promtree, topo_mod_t *mod)
+pci_hostbridges_find(topo_mod_t *mod, tnode_t *ptn)
 {
 	di_node_t devtree;
-	di_node_t pnode;
-	di_node_t cnode;
+	di_node_t pnode, cnode;
 	int hbcnt = 0;
 
 	/* Scan for buses, top-level devinfo nodes with the right driver */
-	devtree = di_init("/", DINFOCPYALL);
+	devtree = topo_mod_devinfo(mod);
 	if (devtree == DI_NODE_NIL) {
 		topo_mod_dprintf(mod, "devinfo init failed.");
 		topo_node_range_destroy(ptn, HOSTBRIDGE);
@@ -87,9 +84,8 @@ pci_hostbridges_find(tnode_t *ptn, did_hash_t *didhash,
 
 	pnode = di_drv_first_node(PCI, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (hb_process(ptn, hbcnt++, pnode, didhash, promtree, mod)
+		if (hb_process(mod, ptn, hbcnt++, pnode)
 		    < 0) {
-			di_fini(devtree);
 			topo_node_range_destroy(ptn, HOSTBRIDGE);
 			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 		}
@@ -103,9 +99,7 @@ pci_hostbridges_find(tnode_t *ptn, did_hash_t *didhash,
 			if (di_driver_name(cnode) == NULL)
 				continue;
 			if (strcmp(di_driver_name(cnode), PCI_PCI) == 0) {
-				if (hb_process(ptn, hbcnt++, cnode, didhash,
-				    promtree, mod) < 0) {
-					di_fini(devtree);
+				if (hb_process(mod, ptn, hbcnt++, cnode) < 0) {
 					topo_node_range_destroy(ptn,
 					    HOSTBRIDGE);
 					return (topo_mod_seterrno(mod,
@@ -113,9 +107,7 @@ pci_hostbridges_find(tnode_t *ptn, did_hash_t *didhash,
 				}
 			}
 			if (strcmp(di_driver_name(cnode), PCIE_PCI) == 0) {
-				if (rc_process(ptn, hbcnt++, cnode, didhash,
-				    promtree, mod) < 0) {
-					di_fini(devtree);
+				if (rc_process(mod, ptn, hbcnt++, cnode) < 0) {
 					topo_node_range_destroy(ptn,
 					    HOSTBRIDGE);
 					return (topo_mod_seterrno(mod,
@@ -125,22 +117,20 @@ pci_hostbridges_find(tnode_t *ptn, did_hash_t *didhash,
 		}
 		pnode = di_drv_next_node(pnode);
 	}
-	di_fini(devtree);
 	return (0);
 }
 
 /*ARGSUSED*/
 int
-platform_hb_enum(tnode_t *parent, const char *name,
-    topo_instance_t imin, topo_instance_t imax, did_hash_t *didhash,
-    di_prom_handle_t promtree, topo_mod_t *mod)
+platform_hb_enum(topo_mod_t *mod, tnode_t *parent, const char *name,
+    topo_instance_t imin, topo_instance_t imax)
 {
-	return (pci_hostbridges_find(parent, didhash, promtree, mod));
+	return (pci_hostbridges_find(mod, parent));
 }
 
 /*ARGSUSED*/
 int
-platform_hb_label(tnode_t *node, nvlist_t *in, nvlist_t **out, topo_mod_t *mod)
+platform_hb_label(topo_mod_t *mod, tnode_t *node, nvlist_t *in, nvlist_t **out)
 {
 	return (labelmethod_inherit(mod, node, in, out));
 }

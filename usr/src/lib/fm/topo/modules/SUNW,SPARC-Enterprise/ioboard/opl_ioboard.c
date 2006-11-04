@@ -33,6 +33,7 @@
 #include <strings.h>
 #include <libdevinfo.h>
 #include <fm/topo_mod.h>
+#include <fm/topo_hc.h>
 #include <sys/fm/protocol.h>
 #include "opl_topo.h"
 
@@ -42,13 +43,16 @@
 #define	IOBDFRU		"hc:///component=" LABEL
 
 static int opl_iob_enum(topo_mod_t *hdl, tnode_t *parent, const char *name,
-    topo_instance_t imin, topo_instance_t imax, void *notused);
+    topo_instance_t imin, topo_instance_t imax, void *notused1, void *notused2);
 
-const topo_modinfo_t IobInfo = {
+static const topo_modops_t Iobops =
+	{ opl_iob_enum, NULL };
+
+static const topo_modinfo_t IobInfo = {
 	IOBOARD,
+	FM_FMRI_SCHEME_HC,
 	IOB_ENUMR_VERS,
-	opl_iob_enum,
-	NULL};
+	&Iobops};
 
 void
 _topo_init(topo_mod_t *modhdl)
@@ -57,10 +61,10 @@ _topo_init(topo_mod_t *modhdl)
 	 * Turn on module debugging output
 	 */
 	if (getenv("TOPOIOBDBG") != NULL)
-		topo_mod_setdebug(modhdl, TOPO_DBG_ALL);
+		topo_mod_setdebug(modhdl);
 	topo_mod_dprintf(modhdl, "initializing ioboard enumerator\n");
 
-	topo_mod_register(modhdl, &IobInfo, NULL);
+	topo_mod_register(modhdl, &IobInfo, TOPO_VERSION);
 }
 
 void
@@ -74,16 +78,19 @@ _topo_fini(topo_mod_t *modhdl)
  * device node.
  */
 static int
-opl_get_physical_board(di_node_t n, di_prom_handle_t opl_promtree)
+opl_get_physical_board(topo_mod_t *mod, di_node_t n)
 {
+	di_prom_handle_t ptp = DI_PROM_HANDLE_NIL;
 	di_prom_prop_t pp = DI_PROM_PROP_NIL;
 	uchar_t *buf;
 	int val;
 
+	if ((ptp = topo_mod_prominfo(mod)) == DI_PROM_HANDLE_NIL)
+		return (-1);
 
-	for (pp = di_prom_prop_next(opl_promtree, n, pp);
+	for (pp = di_prom_prop_next(ptp, n, pp);
 	    pp != DI_PROM_PROP_NIL;
-	    pp = di_prom_prop_next(opl_promtree, n, pp)) {
+	    pp = di_prom_prop_next(ptp, n, pp)) {
 		if (strcmp(di_prom_prop_name(pp), OPL_PHYSICAL_BD) == 0) {
 			if (di_prom_prop_data(pp, &buf) < sizeof (val))
 				continue;
@@ -98,8 +105,8 @@ opl_get_physical_board(di_node_t n, di_prom_handle_t opl_promtree)
  * Creates a map of logical boards to physical location.
  */
 static void
-opl_map_boards(int lsb_to_psb[OPL_IOB_MAX], di_node_t opl_devtree,
-    di_prom_handle_t opl_promtree)
+opl_map_boards(topo_mod_t *mod, di_node_t opl_devtree,
+    int lsb_to_psb[OPL_IOB_MAX])
 {
 	di_node_t n;
 	int i;
@@ -129,7 +136,7 @@ opl_map_boards(int lsb_to_psb[OPL_IOB_MAX], di_node_t opl_devtree,
 		a = OPL_MC_STR2BA(ba);
 		lsb = OPL_MC_LSB(a);
 
-		psb = opl_get_physical_board(n, opl_promtree);
+		psb = opl_get_physical_board(mod, n);
 		if (psb < 0 || psb >= OPL_IOB_MAX) {
 			/* psb mapping is out of range, skip */
 			continue;
@@ -148,41 +155,25 @@ opl_iob_node_create(topo_mod_t *mp, tnode_t *parent, int inst)
 	int err;
 	tnode_t *ion;
 	nvlist_t *fmri;
-	nvlist_t *args = NULL;
-	nvlist_t *pfmri = NULL;
-	topo_hdl_t *thp = topo_mod_handle(mp);
 	char label[8];
 	char fmri_str[32];
+	nvlist_t *auth = topo_mod_auth(mp, parent);
 
 	if (parent == NULL || inst < 0) {
 		return (NULL);
 	}
 
-	/* Get parent FMRI */
-	(void) topo_node_resource(parent, &pfmri, &err);
-	if (pfmri != NULL) {
-		if (topo_mod_nvalloc(mp, &args, NV_UNIQUE_NAME) != 0 ||
-		    nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_PARENT, pfmri)
-		    != 0) {
-			nvlist_free(pfmri);
-			nvlist_free(args);
-			(void) topo_mod_seterrno(mp, EMOD_FMRI_NVL);
-			return (NULL);
-		}
-		nvlist_free(pfmri);
-	}
 	/* Create ioboard FMRI */
-	if ((fmri = topo_fmri_create(thp, FM_FMRI_SCHEME_HC, IOBOARD, inst,
-	    args, &err)) == NULL) {
+	if ((fmri = topo_mod_hcfmri(mp, parent, FM_HC_SCHEME_VERSION, IOBOARD,
+	    inst, NULL, auth, NULL, NULL, NULL)) == NULL) {
+		nvlist_free(auth);
 		topo_mod_dprintf(mp, "create of tnode for ioboard failed: %s\n",
 		    topo_strerror(topo_mod_errno(mp)));
-		(void) topo_mod_seterrno(mp, err);
-		nvlist_free(args);
 		return (NULL);
 	}
-	nvlist_free(args);
+	nvlist_free(auth);
 	/* Create node for this ioboard */
-	ion = topo_node_bind(mp, parent, IOBOARD, inst, fmri, NULL);
+	ion = topo_node_bind(mp, parent, IOBOARD, inst, fmri);
 	if (ion == NULL) {
 		nvlist_free(fmri);
 		topo_mod_dprintf(mp, "unable to bind ioboard: %s\n",
@@ -192,7 +183,7 @@ opl_iob_node_create(topo_mod_t *mp, tnode_t *parent, int inst)
 	nvlist_free(fmri);
 	/* Create and add FRU fmri for this ioboard */
 	snprintf(fmri_str, sizeof (fmri_str), IOBDFRU, inst);
-	if (topo_fmri_str2nvl(thp, fmri_str, &fmri, &err) == 0) {
+	if (topo_mod_str2nvl(mp, fmri_str, &fmri) == 0) {
 		(void) topo_node_fru_set(ion, fmri, 0, &err);
 		nvlist_free(fmri);
 	}
@@ -213,26 +204,18 @@ opl_iob_node_create(topo_mod_t *mp, tnode_t *parent, int inst)
 /*ARGSUSED*/
 static int
 opl_iob_enum(topo_mod_t *mp, tnode_t *parent, const char *name,
-    topo_instance_t imin, topo_instance_t imax, void *notused)
+    topo_instance_t imin, topo_instance_t imax, void *notused1, void *notused2)
 {
+	di_node_t opl_devtree;
 	di_node_t pnode;
 	tnode_t *ion;
 	topo_instance_t inst;
 	int lsb_to_psb[OPL_IOB_MAX];
 	ioboard_contents_t ioboard_list[OPL_IOB_MAX];
 	int retval = 0;
-	di_prom_handle_t opl_promtree = DI_PROM_HANDLE_NIL;
-	di_node_t opl_devtree;
 
 	/* Validate the name is correct */
 	if (strcmp(name, "ioboard") != 0) {
-		return (-1);
-	}
-	/* Initialize devinfo once for the module */
-	if ((opl_promtree = di_prom_init()) == DI_PROM_HANDLE_NIL) {
-		(void) topo_mod_seterrno(mp, errno);
-		topo_mod_dprintf(mp,
-		    "Ioboard enumerator: di_prom_handle_init failed.\n");
 		return (-1);
 	}
 	/* Make sure we don't exceed OPL_IOB_MAX */
@@ -242,7 +225,7 @@ opl_iob_enum(topo_mod_t *mp, tnode_t *parent, const char *name,
 
 	bzero(ioboard_list, sizeof (ioboard_list));
 
-	opl_devtree = di_init("/", DINFOCPYALL);
+	opl_devtree = topo_mod_devinfo(mp);
 	if (opl_devtree == DI_NODE_NIL) {
 		(void) topo_mod_seterrno(mp, errno);
 		topo_mod_dprintf(mp, "devinfo init failed.\n");
@@ -254,7 +237,7 @@ opl_iob_enum(topo_mod_t *mp, tnode_t *parent, const char *name,
 	 * the device node bus address) to physical board numbers, so we
 	 * can create meaningful fru labels.
 	 */
-	opl_map_boards(lsb_to_psb, opl_devtree, opl_promtree);
+	opl_map_boards(mp, opl_devtree, lsb_to_psb);
 
 	/*
 	 * Figure out which boards are installed by finding hostbridges
@@ -299,10 +282,7 @@ opl_iob_enum(topo_mod_t *mp, tnode_t *parent, const char *name,
 			break;
 		}
 		/* Enumerate hostbridges on this ioboard, sets errno */
-		retval = opl_hb_enum(mp, &ioboard_list[inst], ion, inst,
-		    opl_promtree);
+		retval = opl_hb_enum(mp, &ioboard_list[inst], ion, inst);
 	}
-	di_fini(opl_devtree);
-	di_prom_fini(opl_promtree);
 	return (retval);
 }

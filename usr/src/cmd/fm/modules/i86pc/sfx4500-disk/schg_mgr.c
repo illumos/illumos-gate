@@ -234,7 +234,7 @@ static void
 schg_update_fru_info(diskmon_t *diskp)
 {
 	if (diskp->initial_configuration ||
-	    update_configuration_from_topo(diskp) == TOPO_SUCCESS) {
+	    update_configuration_from_topo(g_fm_hdl, diskp) == TOPO_SUCCESS) {
 		diskp->initial_configuration = B_FALSE;
 		dm_assert(pthread_mutex_lock(&diskp->fru_mutex) == 0);
 		if (diskp->frup != NULL)

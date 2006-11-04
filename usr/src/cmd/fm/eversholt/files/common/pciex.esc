@@ -27,6 +27,8 @@
 
 #pragma dictionary "PCIEX"
 
+#include <fm/topo_hc.h>
+
 /*
  * FIT rates - assume leaf devices are somewhat less reliable than
  * root complexes, switches and bridges
@@ -87,7 +89,7 @@
 
 #define SOURCE_ID_MATCHES_OWN_BDF \
 	(payloadprop("source-valid") == 1 && \
-	payloadprop("source-id") == (confprop(asru(pciexrc), "BDF") + 0))
+	payloadprop("source-id") == (confprop(asru(pciexrc), TOPO_PCI_BDF) + 0))
 
 /*
  * Other useful macros. These use the EXCAP property (PCI Express Capabilities
@@ -109,35 +111,39 @@
 	is_under(pciexbus/pciexdev/pciexfn, pcibus[b]/pcidev[d]/pcifn[f])
 
 #define IS_SWD \
-	(confprop(asru(pciexbus/pciexdev/pciexfn), "EXCAP") == "pciexswd")
+	(confprop(asru(pciexbus/pciexdev/pciexfn), TOPO_PCI_EXCAP) == \
+	"pciexswd")
 
 #define IS_SWU \
-	(confprop(asru(pciexbus/pciexdev/pciexfn), "EXCAP") == "pciexswu")
+	(confprop(asru(pciexbus/pciexdev/pciexfn), TOPO_PCI_EXCAP) == \
+	"pciexswu")
 
 #define IS_LEAF \
-	(confprop(asru(pciexbus/pciexdev/pciexfn), "EXCAP") == "pciexdev")
+	(confprop(asru(pciexbus/pciexdev/pciexfn), TOPO_PCI_EXCAP) == \
+	"pciexdev")
 
 #define	IS_PCI_LEAF \
-	(confprop(asru(pcibus/pcidev/pcifn), "CLASS-CODE") != "60400" && \
-	confprop(asru(pcibus/pcidev/pcifn), "CLASS-CODE") != "60401")
+	(confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) != "60400" && \
+	confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) != "60401")
 
 #define	BDF_IS_PCI_LEAF \
-	(confprop(asru(pcibus[b]/pcidev[d]/pcifn[f]),"CLASS-CODE") != \
+	(confprop(asru(pcibus[b]/pcidev[d]/pcifn[f]),TOPO_PCI_CLASS) != \
 	"60400" && \
-	confprop(asru(pcibus[b]/pcidev[d]/pcifn[f]), "CLASS-CODE") != "60401")
+	confprop(asru(pcibus[b]/pcidev[d]/pcifn[f]), TOPO_PCI_CLASS) != "60401")
 
 #define	BDF_IS_PCI_IMM_LEAF \
-	(confprop(asru(pciexfn/pcibus[b]/pcidev[d]/pcifn[f]),"CLASS-CODE") != \
-	"60400" && \
-	confprop(asru(pciexfn/pcibus[b]/pcidev[d]/pcifn[f]), "CLASS-CODE") != \
-	"60401")
+	(confprop(asru(pciexfn/pcibus[b]/pcidev[d]/pcifn[f]),TOPO_PCI_CLASS) \
+	!= "60400" && \
+	confprop(asru(pciexfn/pcibus[b]/pcidev[d]/pcifn[f]), TOPO_PCI_CLASS) \
+	!= "60401")
 
 #define IS_BDG \
-	(confprop(asru(pciexbus/pciexdev/pciexfn), "EXCAP") == "pcibus")
+	(confprop(asru(pciexbus/pciexdev/pciexfn), TOPO_PCI_EXCAP) == \
+	"pcibus")
 
 #define BDF_IS_LEAF \
-	(confprop(asru(pciexbus[b]/pciexdev[d]/pciexfn[f]), "EXCAP") == \
-	"pciexdev")
+	(confprop(asru(pciexbus[b]/pciexdev[d]/pciexfn[f]), \
+	TOPO_PCI_EXCAP) == "pciexdev")
 
 /*
  * define faults
@@ -1837,11 +1843,11 @@ prop error.io.pciex.badreq-u@pciexbus/pciexdev/pciexfn (0)->
 
 prop error.io.pciex.badreq-u@pciexbus[b]/pciexdev[d] (0)->
     ereport.io.pciex.tl.ur@pciexfn {
-	(confprop(asru(pciexfn), "EXCAP") == "pciexswd") &&
+	(confprop(asru(pciexfn), TOPO_PCI_EXCAP) == "pciexswd") &&
 	(payloadprop("source-valid") == 0 ||
 	(payloadprop("source-id") & 0xfff8) == ((b << 8) | (d << 3))) },
     ereport.io.pciex.tl.ca@pciexfn {
-	(confprop(asru(pciexfn), "EXCAP") == "pciexswd") &&
+	(confprop(asru(pciexfn), TOPO_PCI_EXCAP) == "pciexswd") &&
 	(payloadprop("source-valid") == 0 ||
 	(payloadprop("source-id") & 0xfff8) == ((b << 8) | (d << 3))) };
 

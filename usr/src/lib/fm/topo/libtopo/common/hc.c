@@ -35,26 +35,21 @@
 #include <alloca.h>
 #include <limits.h>
 #include <fm/topo_mod.h>
+#include <fm/topo_hc.h>
 #include <sys/param.h>
 #include <sys/systeminfo.h>
 #include <sys/fm/protocol.h>
-#include <topo_parse.h>
+#include <sys/stat.h>
+#include <sys/systeminfo.h>
+#include <sys/utsname.h>
+
+#include <topo_method.h>
 #include <topo_subr.h>
-
-#include <hc_canon.h>
-
-#define	HC			"hc"
-#define	HC_VERSION		TOPO_VERSION
+#include <hc.h>
 
 static int hc_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
-    topo_instance_t, void *);
+    topo_instance_t, void *, void *);
 static void hc_release(topo_mod_t *, tnode_t *);
-static int hc_contains(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
-static int hc_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
-static int hc_unusable(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
-    nvlist_t **);
 static int hc_fmri_nvl2str(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 static int hc_fmri_str2nvl(topo_mod_t *, tnode_t *, topo_version_t,
@@ -69,12 +64,6 @@ static nvlist_t *hc_fmri_create(topo_mod_t *, nvlist_t *, int, const char *,
     const char *);
 
 const topo_method_t hc_methods[] = {
-	{ "hc_contains", "Hardware Component Contains", HC_VERSION,
-	    TOPO_STABILITY_INTERNAL, hc_contains },
-	{ "hc_present", "Hardware Component Present", HC_VERSION,
-	    TOPO_STABILITY_INTERNAL, hc_present },
-	{ "hc_unusable", "Hardware Component Unusable", HC_VERSION,
-	    TOPO_STABILITY_INTERNAL, hc_unusable },
 	{ TOPO_METH_NVL2STR, TOPO_METH_NVL2STR_DESC, TOPO_METH_NVL2STR_VERSION,
 	    TOPO_STABILITY_INTERNAL, hc_fmri_nvl2str },
 	{ TOPO_METH_STR2NVL, TOPO_METH_STR2NVL_DESC, TOPO_METH_STR2NVL_VERSION,
@@ -86,67 +75,187 @@ const topo_method_t hc_methods[] = {
 	{ NULL }
 };
 
-const topo_modinfo_t hc_info =
-	{ HC, HC_VERSION, hc_enum, hc_release };
+static const topo_modops_t hc_ops =
+	{ hc_enum, hc_release };
+static const topo_modinfo_t hc_info =
+	{ HC, FM_FMRI_SCHEME_HC, HC_VERSION, &hc_ops };
 
-void
-hc_init(topo_mod_t *mp)
+static const hcc_t hc_canon[] = {
+	{ CMP, TOPO_STABILITY_PRIVATE },
+	{ CENTERPLANE, TOPO_STABILITY_PRIVATE },
+	{ CHASSIS, TOPO_STABILITY_PRIVATE },
+	{ CHIP, TOPO_STABILITY_PRIVATE },
+	{ CHIP_SELECT, TOPO_STABILITY_PRIVATE },
+	{ CPU, TOPO_STABILITY_PRIVATE },
+	{ DIMM, TOPO_STABILITY_PRIVATE },
+	{ DISK, TOPO_STABILITY_PRIVATE },
+	{ DRAMCHANNEL, TOPO_STABILITY_PRIVATE },
+	{ HOSTBRIDGE, TOPO_STABILITY_PRIVATE },
+	{ INTERCONNECT, TOPO_STABILITY_PRIVATE },
+	{ IOBOARD, TOPO_STABILITY_PRIVATE },
+	{ MEMORYCONTROL, TOPO_STABILITY_PRIVATE },
+	{ MOTHERBOARD, TOPO_STABILITY_PRIVATE },
+	{ PCI_BUS, TOPO_STABILITY_PRIVATE },
+	{ PCI_DEVICE, TOPO_STABILITY_PRIVATE },
+	{ PCI_FUNCTION, TOPO_STABILITY_PRIVATE },
+	{ PCIEX_BUS, TOPO_STABILITY_PRIVATE },
+	{ PCIEX_DEVICE, TOPO_STABILITY_PRIVATE },
+	{ PCIEX_FUNCTION, TOPO_STABILITY_PRIVATE },
+	{ PCIEX_ROOT, TOPO_STABILITY_PRIVATE },
+	{ PCIEX_SWUP, TOPO_STABILITY_PRIVATE },
+	{ PCIEX_SWDWN, TOPO_STABILITY_PRIVATE },
+	{ RANK, TOPO_STABILITY_PRIVATE },
+	{ SATA_PORT, TOPO_STABILITY_PRIVATE },
+	{ SYSTEMBOARD, TOPO_STABILITY_PRIVATE }
+};
+
+static int hc_ncanon = sizeof (hc_canon) / sizeof (hcc_t);
+
+int
+hc_init(topo_mod_t *mod, topo_version_t version)
 {
 	/*
 	 * Turn on module debugging output
 	 */
-	topo_mod_setdebug(mp, TOPO_DBG_ALL);
-	topo_mod_dprintf(mp, "initializing hc builtin\n");
+	if (getenv("TOPOHCDEBUG"))
+		topo_mod_setdebug(mod);
 
-	if (topo_mod_register(mp, &hc_info, NULL) != 0) {
-		topo_mod_dprintf(mp, "failed to register hc: "
-		    "%s\n", topo_mod_errmsg(mp));
+	topo_mod_dprintf(mod, "initializing hc builtin\n");
+
+	if (version != HC_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (topo_mod_register(mod, &hc_info, TOPO_VERSION) != 0) {
+		topo_mod_dprintf(mod, "failed to register hc: "
+		    "%s\n", topo_mod_errmsg(mod));
+		return (-1); /* mod errno already set */
 	}
+
+	return (0);
 }
 
 void
-hc_fini(topo_mod_t *mp)
+hc_fini(topo_mod_t *mod)
 {
-	topo_mod_unregister(mp);
+	topo_mod_unregister(mod);
+}
+
+
+static const topo_pgroup_info_t sys_pgroup = {
+	TOPO_PGROUP_SYSTEM,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
+
+static const topo_pgroup_info_t auth_pgroup = {
+	FM_FMRI_AUTHORITY,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
+
+static void
+hc_prop_set(tnode_t *node, nvlist_t *auth)
+{
+	int err;
+	char isa[MAXNAMELEN];
+	struct utsname uts;
+	char *prod, *csn, *server;
+
+	if (topo_pgroup_create(node, &auth_pgroup, &err) != 0) {
+		if (err != ETOPO_PROP_DEFD)
+			return;
+	}
+
+	/*
+	 * Inherit if we can, it saves memory
+	 */
+	if (topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_PRODUCT,
+	    &err) != 0) {
+		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT, &prod)
+		    == 0)
+			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
+			    FM_FMRI_AUTH_PRODUCT, TOPO_PROP_IMMUTABLE, prod,
+			    &err);
+	}
+	if (topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_CHASSIS,
+	    &err) != 0) {
+		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS, &csn) == 0)
+			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
+			    FM_FMRI_AUTH_CHASSIS, TOPO_PROP_IMMUTABLE, csn,
+			    &err);
+	}
+	if (topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_SERVER,
+	    &err) != 0) {
+		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_SERVER, &server)
+		    == 0)
+			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
+			    FM_FMRI_AUTH_SERVER, TOPO_PROP_IMMUTABLE, server,
+			    &err);
+	}
+
+	if (topo_pgroup_create(node, &sys_pgroup, &err) != 0)
+		return;
+
+	isa[0] = '\0';
+	(void) sysinfo(SI_ARCHITECTURE, isa, sizeof (isa));
+	(void) uname(&uts);
+	(void) topo_prop_set_string(node, TOPO_PGROUP_SYSTEM, TOPO_PROP_ISA,
+	    TOPO_PROP_IMMUTABLE, isa, &err);
+	(void) topo_prop_set_string(node, TOPO_PGROUP_SYSTEM, TOPO_PROP_MACHINE,
+	    TOPO_PROP_IMMUTABLE, uts.machine, &err);
 }
 
 /*ARGSUSED*/
 int
-hc_enum(topo_mod_t *mp, tnode_t *pnode, const char *name, topo_instance_t min,
-    topo_instance_t max, void *notused)
+hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
+    topo_instance_t max, void *notused1, void *arg)
 {
 	nvlist_t *pfmri = NULL;
 	nvlist_t *nvl;
+	nvlist_t *auth;
+	tnode_t *node;
 	int err;
 	/*
 	 * Register root node methods
 	 */
 	if (strcmp(name, HC) == 0) {
-		(void) topo_method_register(mp, pnode, hc_methods);
+		(void) topo_method_register(mod, pnode, hc_methods);
 		return (0);
 	}
 	if (min != max) {
-		topo_mod_dprintf(mp,
+		topo_mod_dprintf(mod,
 		    "Request to enumerate %s component with an "
 		    "ambiguous instance number, min (%d) != max (%d).\n",
 		    HC, min, max);
-		return (topo_mod_seterrno(mp, EINVAL));
+		return (topo_mod_seterrno(mod, EINVAL));
 	}
 
 	(void) topo_node_resource(pnode, &pfmri, &err);
-	nvl = hc_fmri_create(mp, pfmri, FM_HC_SCHEME_VERSION, name, min,
-	    NULL, NULL, NULL, NULL);
+	if (arg == NULL)
+		auth = topo_mod_auth(mod, pnode);
+	nvl = hc_fmri_create(mod, pfmri, FM_HC_SCHEME_VERSION, name, min,
+	    auth, NULL, NULL, NULL);
 	nvlist_free(pfmri);	/* callee ignores NULLs */
-	if (nvl == NULL)
+	if (nvl == NULL) {
+		nvlist_free(auth);
 		return (-1);
+	}
 
-	if (topo_node_bind(mp, pnode, name, min, nvl, NULL) == NULL) {
-		topo_mod_dprintf(mp, "topo_node_bind failed: %s\n",
-		    topo_strerror(topo_mod_errno(mp)));
+	if ((node = topo_node_bind(mod, pnode, name, min, nvl)) == NULL) {
+		topo_mod_dprintf(mod, "topo_node_bind failed: %s\n",
+		    topo_strerror(topo_mod_errno(mod)));
+		nvlist_free(auth);
 		nvlist_free(nvl);
 		return (-1);
 	}
+
+	if (arg == NULL)
+		hc_prop_set(node, auth);
 	nvlist_free(nvl);
+	nvlist_free(auth);
+
 	return (0);
 }
 
@@ -159,31 +268,7 @@ hc_release(topo_mod_t *mp, tnode_t *node)
 
 /*ARGSUSED*/
 static int
-hc_contains(topo_mod_t *mp, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	return (topo_mod_seterrno(mp, EMOD_METHOD_NOTSUP));
-}
-
-/*ARGSUSED*/
-static int
-hc_present(topo_mod_t *mp, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	return (topo_mod_seterrno(mp, EMOD_METHOD_NOTSUP));
-}
-
-/*ARGSUSED*/
-static int
-hc_unusable(topo_mod_t *mp, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
-{
-	return (topo_mod_seterrno(mp, EMOD_METHOD_NOTSUP));
-}
-
-/*ARGSUSED*/
-static int
-hc_compare(topo_mod_t *mp, tnode_t *node, topo_version_t version,
+hc_compare(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
 {
 	uint8_t v1, v2;
@@ -193,21 +278,21 @@ hc_compare(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 	uint_t nhcp1, nhcp2;
 
 	if (version > TOPO_METH_COMPARE_VERSION)
-		return (topo_mod_seterrno(mp, EMOD_VER_NEW));
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
 
 	if (nvlist_lookup_nvlist(in, "nv1", &nv1) != 0 ||
 	    nvlist_lookup_nvlist(in, "nv2", &nv2) != 0)
-		return (topo_mod_seterrno(mp, EMOD_METHOD_INVAL));
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
 
 	if (nvlist_lookup_uint8(nv1, FM_VERSION, &v1) != 0 ||
 	    nvlist_lookup_uint8(nv2, FM_VERSION, &v2) != 0 ||
 	    v1 > FM_HC_SCHEME_VERSION || v2 > FM_HC_SCHEME_VERSION)
-		return (topo_mod_seterrno(mp, EMOD_FMRI_VERSION));
+		return (topo_mod_seterrno(mod, EMOD_FMRI_VERSION));
 
 	err = nvlist_lookup_nvlist_array(nv1, FM_FMRI_HC_LIST, &hcp1, &nhcp1);
 	err |= nvlist_lookup_nvlist_array(nv2, FM_FMRI_HC_LIST, &hcp2, &nhcp2);
 	if (err != 0)
-		return (topo_mod_seterrno(mp, EMOD_FMRI_NVL));
+		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 
 	if (nhcp1 != nhcp2)
 		return (0);
@@ -223,7 +308,7 @@ hc_compare(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 		(void) nvlist_lookup_string(hcp1[i], FM_FMRI_HC_ID, &id1);
 		(void) nvlist_lookup_string(hcp2[i], FM_FMRI_HC_ID, &id2);
 		if (nm1 == NULL || nm2 == NULL || id1 == NULL || id2 == NULL)
-			return (topo_mod_seterrno(mp, EMOD_FMRI_NVL));
+			return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 
 		if (strcmp(nm1, nm2) == 0 && strcmp(id1, id2) == 0)
 			continue;
@@ -303,28 +388,19 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	/* authority, if any */
 	if (aprod != NULL)
 		topo_fmristr_build(&size,
-		    buf, buflen, aprod, FM_FMRI_AUTH_PRODUCT "=",
-		    --more_auth > 0 ? "," : NULL);
+		    buf, buflen, aprod, ":" FM_FMRI_AUTH_PRODUCT "=", NULL);
 	if (achas != NULL)
 		topo_fmristr_build(&size,
-		    buf, buflen, achas, FM_FMRI_AUTH_CHASSIS "=",
-		    --more_auth > 0 ? "," : NULL);
+		    buf, buflen, achas, ":" FM_FMRI_AUTH_CHASSIS "=", NULL);
 	if (adom != NULL)
 		topo_fmristr_build(&size,
-		    buf, buflen, adom, FM_FMRI_AUTH_DOMAIN "=",
-		    --more_auth > 0 ? "," : NULL);
+		    buf, buflen, adom, ":" FM_FMRI_AUTH_DOMAIN "=", NULL);
 	if (asrvr != NULL)
 		topo_fmristr_build(&size,
-		    buf, buflen, asrvr, FM_FMRI_AUTH_SERVER "=",
-		    --more_auth > 0 ? "," : NULL);
+		    buf, buflen, asrvr, ":" FM_FMRI_AUTH_SERVER "=", NULL);
 	if (ahost != NULL)
 		topo_fmristr_build(&size,
-		    buf, buflen, ahost, FM_FMRI_AUTH_HOST "=",
-		    NULL);
-
-	/* separating slash */
-	if (serial != NULL || part != NULL || rev != NULL)
-		topo_fmristr_build(&size, buf, buflen, "/", NULL, NULL);
+		    buf, buflen, ahost, ":" FM_FMRI_AUTH_HOST "=", NULL);
 
 	/* hardware-id part */
 	topo_fmristr_build(&size,
@@ -430,9 +506,10 @@ hc_base_fmri_create(topo_mod_t *mod, const nvlist_t *auth, const char *part,
 }
 
 static nvlist_t **
-make_hc_pairs(topo_mod_t *mod, char *fromstr, int *num)
+make_hc_pairs(topo_mod_t *mod, char *fmri, int *num)
 {
 	nvlist_t **pa;
+	char *hc, *fromstr;
 	char *starti, *startn, *endi, *endi2;
 	char *ne, *ns;
 	char *cname;
@@ -442,12 +519,18 @@ make_hc_pairs(topo_mod_t *mod, char *fromstr, int *num)
 	int npairs = 0;
 	int i, e;
 
+	if ((hc = topo_mod_strdup(mod, fmri + 5)) == NULL)
+		return (NULL);
+
 	/*
 	 * Count equal signs and slashes to determine how many
 	 * hc-pairs will be present in the final FMRI.  There should
 	 * be at least as many slashes as equal signs.  There can be
 	 * more, though if the string after an = includes them.
 	 */
+	if ((fromstr = strchr(hc, '/')) == NULL)
+		return (NULL);
+
 	find = fromstr;
 	while ((ne = strchr(find, '=')) != NULL) {
 		find = ne + 1;
@@ -463,8 +546,10 @@ make_hc_pairs(topo_mod_t *mod, char *fromstr, int *num)
 	/*
 	 * Do we appear to have a well-formed string version of the FMRI?
 	 */
-	if (nslashes < npairs || npairs == 0)
+	if (nslashes < npairs || npairs == 0) {
+		topo_mod_strfree(mod, hc);
 		return (NULL);
+	}
 
 	*num = npairs;
 
@@ -528,10 +613,99 @@ make_hc_pairs(topo_mod_t *mod, char *fromstr, int *num)
 			if (pa[i--] != NULL)
 				nvlist_free(pa[i + 1]);
 		topo_mod_free(mod, pa, npairs * sizeof (nvlist_t *));
+		topo_mod_strfree(mod, hc);
 		return (NULL);
 	}
 
+	topo_mod_strfree(mod, hc);
+
 	return (pa);
+}
+
+void
+make_hc_auth(topo_mod_t *mod, char *fmri, char **serial, char **part,
+char **rev, nvlist_t **auth)
+{
+	char *starti, *startn, *endi, *copy;
+	char *aname, *aid, *fs;
+	nvlist_t *na = NULL;
+	size_t len;
+
+	if ((copy = topo_mod_strdup(mod, fmri + 5)) == NULL)
+		return;
+
+	len = strlen(copy);
+
+	/*
+	 * Make sure there are a valid authority members
+	 */
+	startn = strchr(copy, ':');
+	fs = strchr(copy, '/');
+
+	if (startn == NULL || fs == NULL) {
+		topo_mod_strfree(mod, copy);
+		return;
+	}
+
+	/*
+	 * The first colon we encounter must occur before the
+	 * first slash
+	 */
+	if (startn > fs)
+		return;
+
+	do {
+		if (++startn >= copy + len)
+			break;
+
+		if ((starti = strchr(startn, '=')) == NULL)
+			break;
+
+		*starti = '\0';
+		if (++starti > copy + len)
+			break;
+
+		if ((aname = topo_mod_strdup(mod, startn)) == NULL)
+			break;
+
+		startn = endi = strchr(starti, ':');
+		if (endi == NULL)
+			if ((endi = strchr(starti, '/')) == NULL)
+				break;
+
+		*endi = '\0';
+		if ((aid = topo_mod_strdup(mod, starti)) == NULL) {
+			topo_mod_strfree(mod, aname);
+			break;
+		}
+
+		/*
+		 * Return possible serial, part and revision
+		 */
+		if (strcmp(aname, FM_FMRI_HC_SERIAL_ID) == 0) {
+			*serial = aid;
+		} else if (strcmp(aname, FM_FMRI_HC_PART) == 0) {
+			*part = aid;
+		} else if (strcmp(aname, FM_FMRI_HC_REVISION) == 0) {
+			*rev = aid;
+		} else {
+			if (na == NULL) {
+				if (topo_mod_nvalloc(mod, &na,
+				    NV_UNIQUE_NAME) == 0) {
+					nvlist_add_string(na, aname, aid);
+				}
+			} else {
+				(void) nvlist_add_string(na, aname, aid);
+			}
+		}
+		topo_mod_strfree(mod, aname);
+		topo_mod_strfree(mod, aid);
+
+	} while (startn != NULL);
+
+	*auth = na;
+
+	topo_mod_free(mod, copy, len + 1);
 }
 
 /*ARGSUSED*/
@@ -541,7 +715,9 @@ hc_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 {
 	nvlist_t **pa = NULL;
 	nvlist_t *nf = NULL;
-	char *str, *copy;
+	nvlist_t *auth = NULL;
+	char *str;
+	char *serial = NULL, *part = NULL, *rev = NULL;
 	int npairs;
 	int i, e;
 
@@ -552,17 +728,14 @@ hc_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
 
 	/* We're expecting a string version of an hc scheme FMRI */
-	if (strncmp(str, "hc:///", 6) != 0)
+	if (strncmp(str, "hc://", 5) != 0)
 		return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
 
-	copy = topo_mod_strdup(mod, str + 5);
-	if ((pa = make_hc_pairs(mod, copy, &npairs)) == NULL) {
-		topo_mod_strfree(mod, copy);
+	if ((pa = make_hc_pairs(mod, str, &npairs)) == NULL)
 		return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
-	}
-	topo_mod_strfree(mod, copy);
 
-	if ((nf = hc_base_fmri_create(mod, NULL, NULL, NULL, NULL)) == NULL)
+	make_hc_auth(mod, str, &serial, &part, &rev, &auth);
+	if ((nf = hc_base_fmri_create(mod, auth, part, rev, serial)) == NULL)
 		goto hcfmbail;
 	if ((e = nvlist_add_uint32(nf, FM_FMRI_HC_LIST_SZ, npairs)) == 0)
 		e = nvlist_add_nvlist_array(nf, FM_FMRI_HC_LIST, pa, npairs);
@@ -573,6 +746,14 @@ hc_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	for (i = 0; i < npairs; i++)
 		nvlist_free(pa[i]);
 	topo_mod_free(mod, pa, npairs * sizeof (nvlist_t *));
+	if (serial != NULL)
+		topo_mod_strfree(mod, serial);
+	if (part != NULL)
+		topo_mod_strfree(mod, part);
+	if (rev != NULL)
+		topo_mod_strfree(mod, rev);
+	nvlist_free(auth);
+
 	*out = nf;
 
 	return (0);
@@ -583,6 +764,13 @@ hcfmbail:
 	for (i = 0; i < npairs; i++)
 		nvlist_free(pa[i]);
 	topo_mod_free(mod, pa, npairs * sizeof (nvlist_t *));
+	if (serial != NULL)
+		topo_mod_strfree(mod, serial);
+	if (part != NULL)
+		topo_mod_strfree(mod, part);
+	if (rev != NULL)
+		topo_mod_strfree(mod, rev);
+	nvlist_free(auth);
 	return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
 }
 
@@ -629,20 +817,27 @@ hc_create_seterror(topo_mod_t *mod, nvlist_t **hcl, int n, nvlist_t *fmri,
 }
 
 static int
-hc_name_canonical(const char *name)
+hc_name_canonical(topo_mod_t *mod, const char *name)
 {
 	int i;
+
+	if (getenv("NOHCCHECK") != NULL)
+		return (1);
+
 	/*
 	 * Only enumerate elements with correct canonical names
 	 */
-	for (i = 0; i < Hc_ncanon; i++) {
-		if (strcmp(name, Hc_canon[i]) == 0)
+	for (i = 0; i < hc_ncanon; i++) {
+		if (strcmp(name, hc_canon[i].hcc_name) == 0)
 			break;
 	}
-	if (i >= Hc_ncanon)
+	if (i >= hc_ncanon) {
+		topo_mod_dprintf(mod, "non-canonical name %s\n",
+		    name);
 		return (0);
-	else
+	} else {
 		return (1);
+	}
 }
 
 static nvlist_t *
@@ -667,7 +862,7 @@ hc_fmri_create(topo_mod_t *mod, nvlist_t *pfmri, int version, const char *name,
 	/*
 	 * Check that the requested name is in our canonical list
 	 */
-	if (hc_name_canonical(name) == 0)
+	if (hc_name_canonical(mod, name) == 0)
 		return (hc_create_seterror(mod,
 		    hcl, pelems, fmri, EMOD_NONCANON));
 	/*
@@ -717,7 +912,7 @@ hc_fmri_create(topo_mod_t *mod, nvlist_t *pfmri, int version, const char *name,
 
 /*ARGSUSED*/
 static int
-hc_fmri_create_meth(topo_mod_t *mp, tnode_t *node, topo_version_t version,
+hc_fmri_create_meth(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
 {
 	int ret;
@@ -727,13 +922,13 @@ hc_fmri_create_meth(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 	char *name, *serial, *rev, *part;
 
 	if (version > TOPO_METH_FMRI_VERSION)
-		return (topo_mod_seterrno(mp, EMOD_VER_NEW));
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
 
 	/* First the must-have fields */
 	if (nvlist_lookup_string(in, TOPO_METH_FMRI_ARG_NAME, &name) != 0)
-		return (topo_mod_seterrno(mp, EMOD_METHOD_INVAL));
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
 	if (nvlist_lookup_uint32(in, TOPO_METH_FMRI_ARG_INST, &inst) != 0)
-		return (topo_mod_seterrno(mp, EMOD_METHOD_INVAL));
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
 
 	/*
 	 * args is optional
@@ -744,7 +939,7 @@ hc_fmri_create_meth(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 	if ((ret = nvlist_lookup_nvlist(in, TOPO_METH_FMRI_ARG_NVL, &args))
 	    != 0) {
 		if (ret != ENOENT)
-			return (topo_mod_seterrno(mp, EMOD_METHOD_INVAL));
+			return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
 	} else {
 
 		/* And then optional arguments */
@@ -759,8 +954,8 @@ hc_fmri_create_meth(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 		    &serial);
 	}
 
-	*out = hc_fmri_create(mp,
-	    pfmri, version, name, inst, auth, part, rev, serial);
+	*out = hc_fmri_create(mod, pfmri, version, name, inst, auth, part,
+	    rev, serial);
 	if (*out == NULL)
 		return (-1);
 	return (0);

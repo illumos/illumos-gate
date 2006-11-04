@@ -857,7 +857,7 @@ config_get(fmd_hdl_t *hdl, const fmd_prop_t *fmd_props)
 	u64 = fmd_prop_get_int32(hdl, GLOBAL_PROP_LOG_LEVEL);
 	g_verbose = (int)u64;
 
-	err = update_configuration_from_topo(NULL);
+	err = update_configuration_from_topo(hdl, NULL);
 
 	/* Pull in the properties from the DE configuration file */
 	while (fmd_props[i].fmdp_name != NULL) {

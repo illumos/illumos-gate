@@ -27,6 +27,8 @@
 
 #pragma dictionary "PCI"
 
+#include <fm/topo_hc.h>
+
 #define PCI_DEV_FIT 1000
 #define PCI_BUS_FIT 500
 
@@ -50,17 +52,17 @@
 #define NONFATAL_DPE_D_TIME 168h
 
 #define	IS_LEAF \
-	(confprop(asru(pcibus/pcidev/pcifn), "CLASS-CODE") != "60400" && \
-	confprop(asru(pcibus/pcidev/pcifn), "CLASS-CODE") != "60401")
+	(confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) != "60400" && \
+	confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) != "60401")
 
 #define	IS_BDG \
-	(confprop(asru(pcibus/pcidev/pcifn), "CLASS-CODE") == "60400" || \
-	confprop(asru(pcibus/pcidev/pcifn), "CLASS-CODE") == "60401")
+	(confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) == "60400" || \
+	confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) == "60401")
 
 #define	FD_IS_LEAF \
-	(confprop(asru(pcibus/pcidev[fromdev]/pcifn), "CLASS-CODE") != \
+	(confprop(asru(pcibus/pcidev[fromdev]/pcifn), TOPO_PCI_CLASS) != \
 	"60400" && \
-	confprop(asru(pcibus/pcidev[fromdev]/pcifn), "CLASS-CODE") != "60401")
+	confprop(asru(pcibus/pcidev[fromdev]/pcifn), TOPO_PCI_CLASS) != "60401")
 
 /*
  * note general rule for errors is that for upstream propagations

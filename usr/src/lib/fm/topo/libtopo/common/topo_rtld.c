@@ -38,8 +38,8 @@
 
 typedef struct topo_rtld {
 	void *rtld_dlp;		/* libdl(3DL) handle for shared library */
-	int (*rtld_init)(topo_mod_t *); /* shared library's _topo_init() */
-	void (*rtld_fini)(topo_mod_t *); /* shared library's _topo_fini() */
+	int (*rtld_init)(topo_mod_t *, topo_version_t); /* .so _topo_init() */
+	void (*rtld_fini)(topo_mod_t *); /* .so _topo_fini() */
 } topo_rtld_t;
 
 static int
@@ -64,14 +64,14 @@ rtld_fini(topo_mod_t *mod)
 }
 
 static int
-rtld_init(topo_mod_t *mod)
+rtld_init(topo_mod_t *mod, topo_version_t version)
 {
 	int err;
 	topo_rtld_t *rp;
 	void *dlp;
 
 	if ((dlp = dlopen(mod->tm_path, RTLD_LOCAL | RTLD_NOW)) == NULL) {
-		topo_dprintf(TOPO_DBG_ERR,
+		topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR,
 		    "dlopen() failed: %s\n", dlerror());
 		return (topo_mod_seterrno(mod, ETOPO_RTLD_OPEN));
 	}
@@ -93,7 +93,7 @@ rtld_init(topo_mod_t *mod)
 	/*
 	 * Call _topo_init() in the module.
 	 */
-	err = rp->rtld_init(mod);
+	err = rp->rtld_init(mod, version);
 
 	if (err < 0 || !(mod->tm_flags & TOPO_MOD_REG)) {
 		(void) rtld_fini(mod);
@@ -103,7 +103,7 @@ rtld_init(topo_mod_t *mod)
 	return (0);
 }
 
-const topo_modops_t topo_rtld_ops = {
+const topo_imodops_t topo_rtld_ops = {
 	rtld_init,
 	rtld_fini,
 };

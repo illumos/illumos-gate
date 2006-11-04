@@ -28,7 +28,6 @@
 
 #include <sys/types.h>
 #include <sys/fm/protocol.h>
-#include <fm/libtopo.h>
 
 #include <unistd.h>
 #include <signal.h>
@@ -52,6 +51,7 @@
 #include <fmd_buf.h>
 #include <fmd_asru.h>
 #include <fmd_fmri.h>
+#include <fmd_topo.h>
 #include <fmd_ckpt.h>
 #include <fmd_xprt.h>
 
@@ -701,7 +701,8 @@ fmd_hdl_topology(fmd_hdl_t *hdl, int v)
 		    "fmd version %d != client version %d\n", TOPO_VERSION, v);
 	}
 
-	thp = fmd.d_topo;
+	thp = fmd_topo_handle(v);
+
 	fmd_module_unlock(mp);
 	return (thp);
 }

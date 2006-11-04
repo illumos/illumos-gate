@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -77,10 +76,26 @@
 #include <assert.h>
 #include <pthread.h>
 #include <strings.h>
+#include <sys/fm/protocol.h>
 #include <topo_alloc.h>
-#include <topo_tree.h>
-#include <topo_subr.h>
 #include <topo_error.h>
+#include <topo_method.h>
+#include <topo_subr.h>
+#include <topo_tree.h>
+
+static topo_pgroup_info_t protocol_pgroup = {
+	TOPO_PGROUP_PROTOCOL,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
+
+static const topo_pgroup_info_t auth_pgroup = {
+	FM_FMRI_AUTHORITY,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
 
 static void
 topo_node_destroy(tnode_t *node)
@@ -95,8 +110,6 @@ topo_node_destroy(tnode_t *node)
 
 	assert(node->tn_refs == 0);
 
-	topo_dprintf(TOPO_DBG_TREE, "destroying node %s=%d\n", node->tn_name,
-	    node->tn_instance);
 	/*
 	 * If not a root node, remove this node from the parent's node hash
 	 */
@@ -126,8 +139,8 @@ topo_node_destroy(tnode_t *node)
 	 * Allow enumerator to clean-up private data and then release
 	 * ref count
 	 */
-	if (mod->tm_info->tmi_release != NULL)
-		mod->tm_info->tmi_release(mod, node);
+	if (mod->tm_info->tmi_ops->tmo_release != NULL)
+		mod->tm_info->tmi_ops->tmo_release(mod, node);
 
 	topo_method_unregister_all(mod, node);
 
@@ -203,8 +216,14 @@ topo_node_instance(tnode_t *node)
 	return (node->tn_instance);
 }
 
+void
+topo_node_setspecific(tnode_t *node, void *data)
+{
+	node->tn_priv = data;
+}
+
 void *
-topo_node_private(tnode_t *node)
+topo_node_getspecific(tnode_t *node)
 {
 	return (node->tn_priv);
 }
@@ -215,7 +234,7 @@ node_create_seterror(topo_mod_t *mod, tnode_t *pnode, topo_nodehash_t *nhp,
 {
 	topo_node_unlock(pnode);
 
-	topo_dprintf(TOPO_DBG_ERR, "unable to insert child:"
+	topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR, "unable to insert child:"
 	    "%s\n", topo_strerror(err));
 
 	if (nhp != NULL) {
@@ -276,8 +295,8 @@ topo_node_range_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	topo_list_append(&pnode->tn_children, nhp);
 	topo_node_unlock(pnode);
 
-	topo_dprintf(TOPO_DBG_MOD, "created node range %s[%d-%d]\n", name,
-	    min, max);
+	topo_dprintf(mod->tm_hdl, TOPO_DBG_MODSVC,
+	    "created node range %s[%d-%d]\n", name, min, max);
 
 	return (0);
 }
@@ -370,7 +389,7 @@ node_bind_seterror(topo_mod_t *mod, tnode_t *pnode, tnode_t *node, int err)
 	if (node == NULL)
 		return (NULL);
 
-	topo_dprintf(TOPO_DBG_ERR, "unable to bind %s=%d: "
+	topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR, "unable to bind %s=%d: "
 	    "%s\n", (node->tn_name != NULL ? node->tn_name : "unknown"),
 	    node->tn_instance, topo_strerror(err));
 
@@ -382,7 +401,7 @@ node_bind_seterror(topo_mod_t *mod, tnode_t *pnode, tnode_t *node, int err)
 
 tnode_t *
 topo_node_bind(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    topo_instance_t inst, nvlist_t *fmri, void *priv)
+    topo_instance_t inst, nvlist_t *fmri)
 {
 	int h, err;
 	tnode_t *node;
@@ -430,33 +449,30 @@ topo_node_bind(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	if (fmri == NULL)
 		return (node_bind_seterror(mod, pnode, node, ETOPO_NODE_INVAL));
 
-	if (topo_pgroup_create(node, TOPO_PGROUP_PROTOCOL,
-	    TOPO_STABILITY_PRIVATE, &err) < 0)
+	if (topo_pgroup_create(node, &protocol_pgroup, &err) < 0)
 		return (node_bind_seterror(mod, pnode, node, err));
 
 	if (topo_prop_set_fmri(node, TOPO_PGROUP_PROTOCOL, TOPO_PROP_RESOURCE,
-	    TOPO_PROP_SET_ONCE, fmri, &err) < 0)
+	    TOPO_PROP_IMMUTABLE, fmri, &err) < 0)
 		return (node_bind_seterror(mod, pnode, node, err));
 
-	topo_dprintf(TOPO_DBG_MOD, "node bound %s=%d\n", node->tn_name,
-	    node->tn_instance);
+	topo_dprintf(mod->tm_hdl, TOPO_DBG_MODSVC,
+	    "node bound %s=%d\n", node->tn_name, node->tn_instance);
 
 	node->tn_state |= TOPO_NODE_BOUND;
-	node->tn_priv = priv;
 
 	topo_node_hold(node);
 	nhp->th_nodearr[h] = node;
 	++pnode->tn_refs;
 	topo_node_unlock(pnode);
 
-	if (topo_pgroup_create(node, TOPO_PGROUP_SYSTEM,
-	    TOPO_STABILITY_PRIVATE, &err) == 0) {
-		(void) topo_prop_inherit(node, TOPO_PGROUP_SYSTEM,
-		    TOPO_PROP_PLATFORM, &err);
-		(void) topo_prop_inherit(node, TOPO_PGROUP_SYSTEM,
-		    TOPO_PROP_ISA, &err);
-		(void) topo_prop_inherit(node, TOPO_PGROUP_SYSTEM,
-		    TOPO_PROP_MACHINE, &err);
+	if (topo_pgroup_create(node, &auth_pgroup, &err) == 0) {
+		(void) topo_prop_inherit(node, FM_FMRI_AUTHORITY,
+		    FM_FMRI_AUTH_PRODUCT, &err);
+		(void) topo_prop_inherit(node, FM_FMRI_AUTHORITY,
+		    FM_FMRI_AUTH_CHASSIS, &err);
+		(void) topo_prop_inherit(node, FM_FMRI_AUTHORITY,
+		    FM_FMRI_AUTH_SERVER, &err);
 	}
 
 	return (node);

@@ -55,8 +55,6 @@
 #include <sys/dkio.h>
 #include <pthread.h>
 
-#include "did_impl.h"
-#include "did_props.h"
 #include "sata.h"
 #include "sfx4500_props.h"
 
@@ -69,17 +67,27 @@ struct sata_machine_specific_properties *machprops[] = {
 	&SFX4500_machprops, NULL
 };
 
+static const topo_pgroup_info_t io_pgroup =
+	{ TOPO_PGROUP_IO, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+
+static const topo_pgroup_info_t storage_pgroup = {
+	TOPO_STORAGE_PGROUP,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
+
 int _topo_init(topo_mod_t *mod);
 void _topo_fini(topo_mod_t *mod);
 
 static char *devpath_from_asru(topo_mod_t *mp, tnode_t *pnode, int *dpathlen);
 static tnode_t *node_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
     int instance, boolean_t add_fru, nvlist_t *fru, nvlist_t *asru,
-    char *label, int *err);
+    char *label, cfga_list_data_t *, int *err);
 static char *trimdup(const char *s, int *slen, topo_mod_t *mod);
 static boolean_t get_machine_name(char **name, int *namelen, topo_mod_t *mod);
-static int make_legacyhc_fmri(topo_hdl_t *thp, const char *str,
-    nvlist_t **fmri, int *err);
+static int make_legacyhc_fmri(topo_mod_t *mod, const char *str,
+    nvlist_t **fmri);
 static int sata_minorname_to_ap(char *minorname, char **ap, int *apbuflen,
     cfga_list_data_t **list_array, topo_mod_t *mod);
 static sata_dev_prop_t *lookup_sdp_by_minor(char *minorpath);
@@ -101,7 +109,7 @@ static int sata_disks_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *pasru,
 static int sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
     topo_instance_t min, topo_instance_t max);
 static int sata_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    topo_instance_t min, topo_instance_t max, void *arg);
+    topo_instance_t min, topo_instance_t max, void *notused1, void *notused2);
 static int sata_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 static void sata_release(topo_mod_t *mod, tnode_t *nodep);
@@ -115,7 +123,7 @@ static void sata_release(topo_mod_t *mod, tnode_t *nodep);
  * a presence method, and in those cases, the correct default is to
  * assert presence).
  */
-const topo_method_t SATA_METHODS[] = {
+static const topo_method_t SATA_METHODS[] = {
 	{ TOPO_METH_PRESENT, TOPO_METH_PRESENT_DESC, TOPO_METH_PRESENT_VERSION,
 	    TOPO_STABILITY_INTERNAL, sata_present },
 	{ NULL }
@@ -138,8 +146,11 @@ static sata_dev_prop_t *sata_dev_props = NULL;
 static const char *pgroupname = NULL;
 
 
-const topo_modinfo_t sata_info =
-	{ "sata", SATA_VERSION, sata_enum, sata_release };
+static const topo_modops_t sata_ops =
+	{ sata_enum, sata_release };
+
+static const topo_modinfo_t sata_info =
+	{ "sata", FM_FMRI_SCHEME_HC, SATA_VERSION, &sata_ops };
 
 
 static void
@@ -209,23 +220,38 @@ devpath_from_asru(topo_mod_t *mp, tnode_t *pnode, int *dpathlen)
  */
 static tnode_t *
 node_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int instance,
-    boolean_t add_fru, nvlist_t *fru, nvlist_t *asru, char *label, int *err)
+    boolean_t add_fru, nvlist_t *fru, nvlist_t *asru, char *label,
+    cfga_list_data_t *cfgap, int *err)
 {
-	nvlist_t *pfmri = NULL, *fmri = NULL, *args = NULL;
+	int len = 0;
+	nvlist_t *fmri = NULL;
+	nvlist_t *auth = NULL;
 	tnode_t *cnode = NULL;
-	topo_hdl_t *thp;
+	char *mm = NULL, *model = NULL, *manuf = NULL, *serial = NULL;
+	char *firm = NULL;
+	int manuf_len, model_len, serial_len, firm_len;
 
-	thp = topo_mod_handle(mod);
+	if (cfgap != NULL) {
+		char *s;
 
-	if (topo_node_resource(pnode, &pfmri, err) == 0 &&
-	    topo_mod_nvalloc(mod, &args, NV_UNIQUE_NAME) == 0 &&
-	    nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_PARENT, pfmri) == 0 &&
-	    (fmri = topo_fmri_create(thp, FM_FMRI_SCHEME_HC, name, instance,
-	    args, err)) != NULL &&
-	    (cnode = topo_node_bind(mod, pnode, name, instance, fmri,
-	    NULL)) != NULL) {
+		sata_info_to_fru(cfgap->ap_info, &model, &model_len, &manuf,
+		    &manuf_len, &serial, &serial_len, &firm, &firm_len, mod);
+		if ((s = strchr(model, ' ')) != NULL)
+			*s = '-';
+		len = manuf_len + model_len + 1;
+		if ((mm = topo_mod_alloc(mod, len)) != NULL)
+			(void) snprintf(mm, len, "%s-%s", manuf, model);
+		else
+			mm = model;
+	}
 
-		/* Set the FRU to the node's FMRI if called didn't specify it */
+	auth = topo_mod_auth(mod, pnode);
+	if ((fmri = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION, name,
+	    instance, NULL, auth, mm, serial, firm))
+	    != NULL && (cnode = topo_node_bind(mod, pnode, name, instance,
+	    fmri)) != NULL) {
+
+		/* Set the FRU to the node's FMRI if caller didn't specify it */
 		if (add_fru)
 			(void) topo_node_fru_set(cnode, fru ? fru : fmri, 0,
 			    err);
@@ -237,12 +263,20 @@ node_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int instance,
 			(void) topo_node_label_set(cnode, label, err);
 	}
 
-	if (pfmri)
-		nvlist_free(pfmri);
+	if (len != 0)
+		topo_mod_free(mod, mm, len);
+	if (model)
+		topo_mod_free(mod, model, model_len);
+	if (manuf)
+		topo_mod_free(mod, manuf, manuf_len);
+	if (serial)
+		topo_mod_free(mod, serial, serial_len);
+	if (firm)
+		topo_mod_free(mod, firm, firm_len);
 	if (fmri)
 		nvlist_free(fmri);
-	if (args)
-		nvlist_free(args);
+	if (auth)
+		nvlist_free(auth);
 
 	return (cnode);
 }
@@ -294,7 +328,8 @@ _topo_init(topo_mod_t *mod)
 	int mnamelen;
 	char *mname;
 
-	topo_mod_setdebug(mod, TOPO_DBG_ALL);
+	if (getenv("SATADBG"))
+		topo_mod_setdebug(mod);
 	topo_mod_dprintf(mod, "initializing sata enumerator\n");
 
 	(void) pthread_mutex_lock(&global_data_mutex);
@@ -323,7 +358,7 @@ _topo_init(topo_mod_t *mod)
 	}
 	(void) pthread_mutex_unlock(&global_data_mutex);
 
-	if (topo_mod_register(mod, &sata_info, NULL) != 0) {
+	if (topo_mod_register(mod, &sata_info, TOPO_VERSION) != 0) {
 		topo_mod_dprintf(mod, "failed to register sata module: "
 		    "%s\n", topo_mod_errmsg(mod));
 		return (-1); /* mod errno set */
@@ -338,13 +373,13 @@ _topo_fini(topo_mod_t *mod)
 }
 
 static int
-make_legacyhc_fmri(topo_hdl_t *thp, const char *str, nvlist_t **fmri, int *err)
+make_legacyhc_fmri(topo_mod_t *mod, const char *str, nvlist_t **fmri)
 {
 	char buf[PATH_MAX];
 
 	(void) snprintf(buf, PATH_MAX, "hc:///component=%s", str);
 
-	return (topo_fmri_str2nvl(thp, buf, fmri, err));
+	return (topo_mod_str2nvl(mod, buf, fmri));
 }
 
 
@@ -490,7 +525,14 @@ sata_present(topo_mod_t *mod, tnode_t *nodep, topo_version_t vers,
 		}
 	}
 
-	return (present);
+	if (topo_mod_nvalloc(mod, out_nvl, NV_UNIQUE_NAME) != 0)
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	if (nvlist_add_uint32(*out_nvl, TOPO_METH_PRESENT_RET, present) != 0) {
+		nvlist_free(*out_nvl);
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	return (0);
 }
 
 /*
@@ -627,6 +669,7 @@ sata_maximum_port(char *dpath, topo_mod_t *mod)
 	dentlen = pathconf(devpath, _PC_NAME_MAX);
 	dentlen = ((dentlen <= 0) ? MAXNAMELEN : dentlen) +
 	    sizeof (struct dirent);
+	dentlen = sizeof (struct dirent) + pathconf(devpath, _PC_NAME_MAX);
 	dent = topo_mod_alloc(mod, dentlen);
 
 	/*
@@ -663,26 +706,29 @@ sata_add_port_props(tnode_t *cnode, sata_dev_prop_t *sdp, int *err)
 	int i;
 #define	MAX_PNAME_LEN	128
 	char pname[MAX_PNAME_LEN];
+	topo_pgroup_info_t pgroup;
 
 	/*
 	 * Save the attachment point physical path
 	 */
-	(void) topo_pgroup_create(cnode, TOPO_PGROUP_IO,
-	    TOPO_STABILITY_PRIVATE, err);
+	(void) topo_pgroup_create(cnode, &io_pgroup, err);
 	(void) topo_prop_set_string(cnode, TOPO_PGROUP_IO,
-	    TOPO_IO_AP_PATH, TOPO_PROP_SET_ONCE,
+	    TOPO_IO_AP_PATH, TOPO_PROP_IMMUTABLE,
 	    sdp->ap_node, err);
 
 	/*
 	 * The private properties are the core of the configuration
 	 * mechanism for the sfx4500-disk Diagnosis Engine.
 	 */
-	(void) topo_pgroup_create(cnode, pgroupname,
-	    TOPO_STABILITY_PRIVATE, err);
+	pgroup.tpi_name = pgroupname;
+	pgroup.tpi_namestab = TOPO_STABILITY_PRIVATE;
+	pgroup.tpi_datastab = TOPO_STABILITY_PRIVATE;
+	pgroup.tpi_version = 1;
+	(void) topo_pgroup_create(cnode, &pgroup, err);
 
 	for (i = 0; sdp->properties[i].name != NULL; i++) {
 		(void) topo_prop_set_string(cnode, pgroupname,
-		    sdp->properties[i].name, TOPO_PROP_SET_ONCE,
+		    sdp->properties[i].name, TOPO_PROP_IMMUTABLE,
 		    (char *)sdp->properties[i].value, err);
 	}
 
@@ -696,13 +742,13 @@ sata_add_port_props(tnode_t *cnode, sata_dev_prop_t *sdp, int *err)
 		(void) snprintf(pname, MAX_PNAME_LEN, SATA_IND_NAME "-%d",
 		    i);
 		(void) topo_prop_set_string(cnode, pgroupname, pname,
-		    TOPO_PROP_SET_ONCE, (char *)sdp->indicators[i].indicator,
+		    TOPO_PROP_IMMUTABLE, (char *)sdp->indicators[i].indicator,
 		    err);
 
 		(void) snprintf(pname, MAX_PNAME_LEN, SATA_IND_ACTION "-%d",
 		    i);
 		(void) topo_prop_set_string(cnode, pgroupname, pname,
-		    TOPO_PROP_SET_ONCE, (char *)sdp->indicators[i].action,
+		    TOPO_PROP_IMMUTABLE, (char *)sdp->indicators[i].action,
 		    err);
 	}
 
@@ -711,13 +757,13 @@ sata_add_port_props(tnode_t *cnode, sata_dev_prop_t *sdp, int *err)
 		(void) snprintf(pname, MAX_PNAME_LEN, SATA_INDRULE_STATES "-%d",
 		    i);
 		(void) topo_prop_set_string(cnode, pgroupname, pname,
-		    TOPO_PROP_SET_ONCE, (char *)ruleset[i].states,
+		    TOPO_PROP_IMMUTABLE, (char *)ruleset[i].states,
 		    err);
 
 		(void) snprintf(pname, MAX_PNAME_LEN,
 		    SATA_INDRULE_ACTIONS "-%d", i);
 		(void) topo_prop_set_string(cnode, pgroupname, pname,
-		    TOPO_PROP_SET_ONCE, (char *)ruleset[i].actions,
+		    TOPO_PROP_IMMUTABLE, (char *)ruleset[i].actions,
 		    err);
 	}
 }
@@ -813,18 +859,16 @@ sata_add_disk_props(tnode_t *cnode, int portnum, cfga_list_data_t *cfgap,
 
 	if (find_physical_disk_node(physpath, PATH_MAX, portnum, mod)) {
 
-		(void) topo_pgroup_create(cnode, TOPO_PGROUP_IO,
-		    TOPO_STABILITY_PRIVATE, err);
+		(void) topo_pgroup_create(cnode, &io_pgroup, err);
 
 		(void) topo_prop_set_string(cnode, TOPO_PGROUP_IO,
-		    TOPO_IO_DEV_PATH, TOPO_PROP_SET_ONCE,
+		    TOPO_IO_DEV_PATH, TOPO_PROP_IMMUTABLE,
 		    physpath + 8 /* strlen("/devices") */,
 		    err);
 		physpath_found = B_TRUE;
 	}
 
-	(void) topo_pgroup_create(cnode, TOPO_STORAGE_PGROUP,
-	    TOPO_STABILITY_PRIVATE, err);
+	(void) topo_pgroup_create(cnode, &storage_pgroup, err);
 
 	if ((ldev = strstr(cfgap->ap_log_id, "::")) != NULL) {
 		ldev += 2 /* strlen("::") */;
@@ -832,7 +876,7 @@ sata_add_disk_props(tnode_t *cnode, int portnum, cfga_list_data_t *cfgap,
 			ldev = p + 1;
 		}
 		(void) topo_prop_set_string(cnode, TOPO_STORAGE_PGROUP,
-		    TOPO_STORAGE_LOGICAL_DISK_NAME, TOPO_PROP_SET_ONCE,
+		    TOPO_STORAGE_LOGICAL_DISK_NAME, TOPO_PROP_IMMUTABLE,
 		    ldev, err);
 	}
 
@@ -840,22 +884,22 @@ sata_add_disk_props(tnode_t *cnode, int portnum, cfga_list_data_t *cfgap,
 	    &serial, &serial_len, &firm, &firm_len, mod);
 	if (model) {
 		(void) topo_prop_set_string(cnode, TOPO_STORAGE_PGROUP,
-		    TOPO_STORAGE_MODEL, TOPO_PROP_SET_ONCE, model, err);
+		    TOPO_STORAGE_MODEL, TOPO_PROP_IMMUTABLE, model, err);
 		topo_mod_free(mod, model, model_len);
 	}
 	if (manuf) {
 		(void) topo_prop_set_string(cnode, TOPO_STORAGE_PGROUP,
-		    TOPO_STORAGE_MANUFACTURER, TOPO_PROP_SET_ONCE, manuf, err);
+		    TOPO_STORAGE_MANUFACTURER, TOPO_PROP_IMMUTABLE, manuf, err);
 		topo_mod_free(mod, manuf, manuf_len);
 	}
 	if (serial) {
 		(void) topo_prop_set_string(cnode, TOPO_STORAGE_PGROUP,
-		    TOPO_STORAGE_SERIAL_NUM, TOPO_PROP_SET_ONCE, serial, err);
+		    TOPO_STORAGE_SERIAL_NUM, TOPO_PROP_IMMUTABLE, serial, err);
 		topo_mod_free(mod, serial, serial_len);
 	}
 	if (firm) {
 		(void) topo_prop_set_string(cnode, TOPO_STORAGE_PGROUP,
-		    TOPO_STORAGE_FIRMWARE_REV, TOPO_PROP_SET_ONCE, firm, err);
+		    TOPO_STORAGE_FIRMWARE_REV, TOPO_PROP_IMMUTABLE, firm, err);
 		topo_mod_free(mod, firm, firm_len);
 	}
 
@@ -885,7 +929,7 @@ sata_add_disk_props(tnode_t *cnode, int portnum, cfga_list_data_t *cfgap,
 			(void) snprintf(capstr, sizeof (capstr), "%llu",
 			    capacity);
 			(void) topo_prop_set_string(cnode, TOPO_STORAGE_PGROUP,
-			    TOPO_STORAGE_CAPACITY, TOPO_PROP_SET_ONCE, capstr,
+			    TOPO_STORAGE_CAPACITY, TOPO_PROP_IMMUTABLE, capstr,
 			    err);
 		}
 	}
@@ -918,12 +962,9 @@ sata_disks_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *pasru,
     int ndisks, int *err)
 {
 	tnode_t *cnode;
-	topo_hdl_t *thp;
 	sata_dev_prop_t *sdp;
 	nvlist_t *fru = NULL;
 	int i, nerrs = 0;
-
-	thp = topo_mod_handle(mod);
 
 	if (topo_node_range_create(mod, pnode, name, 0, ndisks - 1) < 0) {
 		topo_mod_dprintf(mod, "Unable to create "
@@ -942,12 +983,12 @@ sata_disks_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *pasru,
 
 			if ((sdp = lookup_sdp_by_minor(cfglist[i].ap_phys_id))
 			    != NULL) {
-				if (make_legacyhc_fmri(thp, sdp->label, &fru,
-				    err) != 0) {
+				if (make_legacyhc_fmri(mod, sdp->label, &fru)
+				    != 0) {
 					topo_mod_dprintf(mod, "Error creating "
 					    "FRU while creating " SATA_DISK
 					    " nodes: %s\n",
-					    topo_strerror(*err));
+					    topo_mod_errmsg(mod));
 				}
 			}
 
@@ -962,7 +1003,7 @@ sata_disks_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *pasru,
 			 */
 			if ((cnode = node_create(mod, pnode, name, i,
 			    B_TRUE, fru, pasru, sdp ? (char *)sdp->label : NULL,
-			    err)) != NULL) {
+			    &cfglist[i], err)) != NULL) {
 
 				sata_add_disk_props(cnode, portnum, &cfglist[i],
 				    err, mod);
@@ -998,12 +1039,9 @@ sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	char *dpath;
 	char *ap = NULL;
 	char minorname[PATH_MAX];
-	topo_hdl_t *thp;
 	int apbuflen;
 	int dpathlen;
 	cfga_list_data_t *cfglist = NULL;
-
-	thp = topo_mod_handle(mod);
 
 	if (min < 0)
 		min = 0;
@@ -1028,16 +1066,8 @@ sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		return (-1);
 	}
 
-	if (topo_node_range_create(mod, pnode, name, 0, max) < 0) {
-		topo_mod_dprintf(mod, "Unable to create "
-		    SATA_PORT " range [%d..%d]: %s\n",
-		    min, max, topo_mod_errmsg(mod));
-		topo_mod_free(mod, dpath, dpathlen);
-		return (-1);
-	}
-
 	/* Create the FRU - a legacy component FMRI */
-	if (make_legacyhc_fmri(thp, "MB", &fru, &err) != 0) {
+	if (make_legacyhc_fmri(mod, "motherboard", &fru) != 0) {
 		topo_mod_dprintf(mod, "Unable to create legacy FRU FMRI for "
 		    "node " SATA_PORT ": %s\n",
 		    topo_strerror(err));
@@ -1059,7 +1089,7 @@ sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		}
 
 		/* Create the ASRU - a legacy component FMRI */
-		if (make_legacyhc_fmri(thp, ap, &asru, &err) != 0) {
+		if (make_legacyhc_fmri(mod, ap, &asru) != 0) {
 			free(cfglist);
 			topo_mod_free(mod, ap, apbuflen);
 			topo_mod_dprintf(mod, "failed to make ASRU FMRI: "
@@ -1075,7 +1105,7 @@ sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		 * component being "MB".
 		 */
 		if ((cnode = node_create(mod, pnode, name, i, B_TRUE, fru,
-		    asru, ap, &err)) == NULL) {
+		    asru, ap, NULL, &err)) == NULL) {
 			nvlist_free(asru);
 			free(cfglist);
 			topo_mod_free(mod, ap, apbuflen);
@@ -1127,7 +1157,7 @@ sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 /*ARGSUSED*/
 static int
 sata_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    topo_instance_t min, topo_instance_t max, void *arg)
+    topo_instance_t min, topo_instance_t max, void *notused1, void *notused2)
 {
 	if (strcmp(name, SATA_PORT) == 0)
 		return (sata_port_create(mod, pnode, name, min, max));

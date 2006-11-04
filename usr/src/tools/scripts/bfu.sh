@@ -4616,6 +4616,7 @@ mondo_loop() {
 	# Remove old topology data
 	#
 	rm -rf $usr/lib/fm/topo
+	rm -f $usr/platform/*/lib/fm/topo/hc-topology.xml
 
 	#
 	# Remove old prtopo and obsoleted include file.

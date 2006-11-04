@@ -44,17 +44,16 @@
 #include <libelf.h>
 #include <gelf.h>
 
-#include <topo_error.h>
+#include <topo_method.h>
+#include <pkg.h>
 
 #define	BUFLEN	(2 * PATH_MAX)
 
 static int pkg_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
-    topo_instance_t, void *);
+    topo_instance_t, void *, void *);
 static void pkg_release(topo_mod_t *, tnode_t *);
 static int pkg_fmri_create_meth(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
-
-#define	PKG_VERSION	TOPO_VERSION
 
 static const topo_method_t pkg_methods[] = {
 	{ TOPO_METH_FMRI, TOPO_METH_FMRI_DESC, TOPO_METH_FMRI_VERSION,
@@ -62,20 +61,28 @@ static const topo_method_t pkg_methods[] = {
 	{ NULL }
 };
 
+static const topo_modops_t pkg_ops =
+	{ pkg_enum, pkg_release };
 static const topo_modinfo_t pkg_info =
-	{ "pkg", PKG_VERSION, pkg_enum, pkg_release };
+	{ "pkg", FM_FMRI_SCHEME_PKG, PKG_VERSION, &pkg_ops };
 
-void
-pkg_init(topo_mod_t *mod)
+int
+pkg_init(topo_mod_t *mod, topo_version_t version)
 {
-	topo_mod_setdebug(mod, TOPO_DBG_ALL);
+	if (getenv("TOPOPKGDEBUG"))
+		topo_mod_setdebug(mod);
 	topo_mod_dprintf(mod, "initializing mod builtin\n");
 
-	if (topo_mod_register(mod, &pkg_info, NULL) != 0) {
+	if (version != PKG_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (topo_mod_register(mod, &pkg_info, TOPO_VERSION) != 0) {
 		topo_mod_dprintf(mod, "failed to register pkg_info: "
 		    "%s\n", topo_mod_errmsg(mod));
-		return;
+		return (-1);
 	}
+
+	return (0);
 }
 
 void
@@ -87,7 +94,7 @@ pkg_fini(topo_mod_t *mod)
 /*ARGSUSED*/
 static int
 pkg_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    topo_instance_t min, topo_instance_t max, void *arg)
+    topo_instance_t min, topo_instance_t max, void *notused1, void *notused2)
 {
 	(void) topo_method_register(mod, pnode, pkg_methods);
 	return (0);

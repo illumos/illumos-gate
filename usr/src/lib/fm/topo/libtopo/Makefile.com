@@ -37,6 +37,7 @@ BUILTINSRCS = \
 	pkg.c
 
 LIBSRCS = \
+	topo_2xml.c \
 	topo_alloc.c \
 	topo_builtin.c \
 	topo_error.c \
@@ -78,7 +79,8 @@ CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)
 
-$(DYNLIB)  := LDLIBS += -lnvpair -lelf -lumem -lxml2 -lkstat -luuid -lc
+$(DYNLIB)  := LDLIBS += \
+	-lnvpair -lelf -lumem -lxml2 -lkstat -luuid -ldevinfo -lsmbios -lc
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 $(LINTLIB) := LINTFLAGS = -nsvx
@@ -100,8 +102,9 @@ pics/%.o: ../$(MACH)/%.c
 	$(POST_PROCESS_O)
 
 ../common/topo_error.c: ../common/mkerror.sh ../common/topo_error.h
-	sh ../common/mkerror.sh internal < ../common/topo_error.h > $@
-	sh ../common/mkerror.sh external < ../common/topo_mod.h >> $@
+	sh ../common/mkerror.sh liberrors < ../common/topo_error.h > $@
+	sh ../common/mkerror.sh properrors < ../common/libtopo.h >> $@
+	sh ../common/mkerror.sh moderrors < ../common/topo_mod.h >> $@
 
 include ../../../../Makefile.targ
 include ../../../Makefile.targ

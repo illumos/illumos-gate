@@ -31,24 +31,16 @@
 #include <topo_alloc.h>
 #include <topo_error.h>
 #include <topo_parse.h>
-
-extern const char * const Name;
-const char * const Min = "min";
-const char * const Max = "max";
-
+#include <topo_subr.h>
 
 tf_info_t *
-tf_info_new(topo_mod_t *mp, const char *fn, xmlDocPtr doc, xmlChar *scheme)
+tf_info_new(topo_mod_t *mp, xmlDocPtr doc, xmlChar *scheme)
 {
 	tf_info_t *r;
 
 	if ((r = topo_mod_zalloc(mp, sizeof (tf_info_t))) == NULL)
 		return (NULL);
 	r->tf_flags = TF_LIVE;
-	if ((r->tf_fn = topo_mod_strdup(mp, fn)) == NULL) {
-		tf_info_free(mp, r);
-		return (NULL);
-	}
 	if ((r->tf_scheme = topo_mod_strdup(mp, (char *)scheme)) == NULL) {
 		tf_info_free(mp, r);
 		return (NULL);
@@ -62,8 +54,6 @@ tf_info_free(topo_mod_t *mp, tf_info_t *p)
 {
 	if (p->tf_xdoc != NULL)
 		xmlFreeDoc(p->tf_xdoc);
-	if (p->tf_fn != NULL)
-		topo_mod_strfree(mp, p->tf_fn);
 	if (p->tf_scheme != NULL)
 		topo_mod_strfree(mp, p->tf_scheme);
 	tf_rdata_free(mp, p->tf_rd);
@@ -77,7 +67,7 @@ tf_rdata_new(topo_mod_t *mp, tf_info_t *xinfo, xmlNodePtr n, tnode_t *troot)
 	uint64_t ui;
 	xmlChar *name = NULL;
 
-	topo_mod_dprintf(mp, "new rdata\n");
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "new rdata\n");
 	if ((r = topo_mod_zalloc(mp, sizeof (tf_rdata_t))) == NULL) {
 		(void) topo_mod_seterrno(mp, ETOPO_NOMEM);
 		return (NULL);
@@ -136,7 +126,7 @@ tf_idata_new(topo_mod_t *mp, topo_instance_t i, tnode_t *tn)
 {
 	tf_idata_t *r;
 
-	topo_mod_dprintf(mp, "new idata %d\n", i);
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "new idata %d\n", i);
 	if ((r = topo_mod_zalloc(mp, sizeof (tf_idata_t))) == NULL)
 		return (NULL);
 	r->ti_tn = tn;
@@ -155,11 +145,10 @@ tf_idata_free(topo_mod_t *mp, tf_idata_t *p)
 }
 
 int
-tf_idata_insert(topo_mod_t *mp, tf_idata_t **head, tf_idata_t *ni)
+tf_idata_insert(tf_idata_t **head, tf_idata_t *ni)
 {
 	tf_idata_t *l, *p;
 
-	topo_mod_dprintf(mp, "idata insert %d\n", ni->ti_i);
 	p = NULL;
 	for (l = *head; l != NULL; l = l->ti_next) {
 		if (ni->ti_i < l->ti_i)
@@ -175,10 +164,9 @@ tf_idata_insert(topo_mod_t *mp, tf_idata_t **head, tf_idata_t *ni)
 }
 
 tf_idata_t *
-tf_idata_lookup(topo_mod_t *mp, tf_idata_t *head, topo_instance_t i)
+tf_idata_lookup(tf_idata_t *head, topo_instance_t i)
 {
 	tf_idata_t *f;
-	topo_mod_dprintf(mp, "idata lookup %d\n", i);
 	for (f = head; f != NULL; f = f->ti_next)
 		if (i == f->ti_i)
 			break;
@@ -190,7 +178,8 @@ tf_pad_new(topo_mod_t *mp, int pcnt, int dcnt)
 {
 	tf_pad_t *r;
 
-	topo_mod_dprintf(mp, "new pad p=%d, d=%d\n", pcnt, dcnt);
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "new pad p=%d, d=%d\n",
+	    pcnt, dcnt);
 	if ((r = topo_mod_zalloc(mp, sizeof (tf_pad_t))) == NULL)
 		return (NULL);
 	r->tpad_pgcnt = pcnt;
@@ -223,7 +212,5 @@ tf_edata_free(topo_mod_t *mp, tf_edata_t *p)
 		return;
 	if (p->te_name != NULL)
 		xmlFree(p->te_name);
-	if (p->te_path != NULL)
-		xmlFree(p->te_path);
 	topo_mod_free(mp, p, sizeof (tf_edata_t));
 }

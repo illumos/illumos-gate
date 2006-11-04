@@ -27,9 +27,29 @@
 MODULE = hostbridge
 ARCH = i86pc
 CLASS = arch
-HBSRCS = hostbridge.c did.c did_hash.c did_props.c util.c
-MODULESRCS = $(HBSRCS) hb_i86pc.c
+UTILDIR = ../../common/pcibus
+UTILSRCS = did.c did_hash.c did_props.c util.c
+HBDIR = ../../common/hostbridge
+HBSRCS = hostbridge.c hb_$(ARCH).c
+MODULESRCS = $(HBSRCS) $(UTILSRCS)
 
 include ../../Makefile.plugin
 
 LDLIBS += -ldevinfo
+
+CPPFLAGS += -I$(UTILDIR) -I$(HBDIR)
+
+%.o: $(UTILDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.o: $(HBDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.ln: $(UTILDIR)/%.c
+	$(LINT.c) -c $<
+
+%.ln: $(HBDIR)/%.c
+	$(LINT.c) -c $<
+

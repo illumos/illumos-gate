@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"@(#)mkerror.sh	1.1	06/02/11 SMI"
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -32,7 +31,7 @@
 input="`cat`"
 [ -z "$input" ] && exit 1
 
-if [ $1 = "internal" ] ; then
+if [ $1 = "liberrors" ] ; then
 echo "\
 /*\n\
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.\n\
@@ -79,9 +78,27 @@ topo_hdl_errmsg(topo_hdl_t *thp)
 	return (topo_strerror(thp->th_errno));
 }"
 
+elif [ $1 = "properrors" ] ; then
+
+echo "\
+\n\
+static const char *const _topo_properrstrs[] = {"
+
+pattern='^[ ]*ETOPO_PROP_[A-Z0-9_]*.*\* \(.*\) \*.*'
+replace='	"\1",'
+
+echo "$input" | sed -n "s/$pattern/$replace/p" || exit 1
+
+echo "\
+};\n\
+\n\
+static const int _topo_nproperrstrs =\n\
+    sizeof (_topo_properrstrs) / sizeof (_topo_properrstrs[0]);"
+
 else
 
 echo "\
+\n\
 static const char *const _topo_moderrstrs[] = {"
 
 pattern='^[ ]*EMOD_[A-Z0-9_]*.*\* \(.*\) \*.*'
@@ -91,7 +108,6 @@ echo "$input" | sed -n "s/$pattern/$replace/p" || exit 1
 
 echo "\
 };\n\
-\n\
 static const int _topo_nmoderrstrs =\n\
     sizeof (_topo_moderrstrs) / sizeof (_topo_moderrstrs[0]);\n\
 \n\
@@ -122,8 +138,12 @@ topo_strerror(int err)
 
 	if (err >= ETOPO_UNKNOWN && (err - ETOPO_UNKNOWN) < _topo_nerrstrs)
 		s = _topo_errstrs[err - ETOPO_UNKNOWN];
-	else if (err >= EMOD_UNKNOWN && (err - EMOD_UNKNOWN) <  _topo_nmoderrstrs)
+	else if (err >= EMOD_UNKNOWN && (err - EMOD_UNKNOWN) <
+	    _topo_nmoderrstrs)
 		s = _topo_moderrstrs[err - EMOD_UNKNOWN];
+	else if (err >= ETOPO_PROP_UNKNOWN && (err - ETOPO_PROP_UNKNOWN) <
+	    _topo_nproperrstrs)
+		s = _topo_properrstrs[err - ETOPO_PROP_UNKNOWN];
 	else
 		s = _topo_errstrs[0];
 

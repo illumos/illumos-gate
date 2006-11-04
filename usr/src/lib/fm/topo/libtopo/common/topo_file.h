@@ -35,22 +35,13 @@
 extern "C" {
 #endif
 
-/*
- *  We support loading topology from a file.  The topo_tree routines
- *  don't need to know anymore than to call topo_file_load() to try to
- *  load the topology initially, and topo_file_unload() to clean up.
- */
 typedef struct topo_file {
-	/*
-	 * Currently we directly parse xml into topology nodes.  The
-	 * tf_info_t is created and used by the xml parsing routines.
-	 */
-	tf_info_t *tf_fileinfo;
-	/*
-	 * Module on whose behalf the enumeration-from-file is occuring.
-	 */
-	topo_mod_t *tf_mod;
+	tf_info_t *tf_tmap;		/* topology map file info */
+	char *tf_filenm;		/* topology file name */
+	topo_mod_t *tf_mod;		/* scheme-specific builtin mod */
 } topo_file_t;
+
+extern int topo_file_load(topo_mod_t *, tnode_t *, const char *, const char *);
 
 #ifdef	__cplusplus
 }
