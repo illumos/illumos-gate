@@ -2056,8 +2056,6 @@ out:
 int
 main(int argc, char **argv)
 {
-	extern int zfs_vdev_cache_size;
-
 	int i, c;
 	struct rlimit rl = { 1024, 1024 };
 	spa_t *spa;
