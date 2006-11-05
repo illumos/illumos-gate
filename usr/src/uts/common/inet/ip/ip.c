@@ -17749,7 +17749,7 @@ bad_src_route:
  *  - icmp fixed part (mib2_icmp_t)
  *  - ipAddrEntryTable (ip 20)		all IPv4 ipifs
  *  - ipRouteEntryTable (ip 21)		all IPv4 IREs
- *  - ipNetToMediaEntryTable (ip 22)	IPv4 IREs for on-link destinations
+ *  - ipNetToMediaEntryTable (ip 22)	[filled in by the arp module]
  *  - ipRouteAttributeTable (ip 102)	labeled routes
  *  - ip multicast membership (ip_member_t)
  *  - ip multicast source filtering (ip_grpsrc_t)
@@ -17768,8 +17768,8 @@ bad_src_route:
  *  - ipv6 multicast membership (ipv6_member_t)
  *  - ipv6 multicast source filtering (ipv6_grpsrc_t)
  *
- * IP_ROUTE and IP_MEDIA are augmented in arp to include arp cache entries not
- * already present.
+ * MIB2_IP_MEDIA is filled in by the arp module with ARP cache entries.
+ *
  * NOTE: original mpctl is copied for msg's 2..N, since its ctl part is
  * already filled in by the caller.
  * Return value of 0 indicates that no messages were sent and caller
@@ -18754,17 +18754,14 @@ ip_snmp_get_mib2_icmp6(queue_t *q, mblk_t *mpctl)
 
 /*
  * ire_walk routine to create both ipRouteEntryTable and
- * ipNetToMediaEntryTable in one IRE walk
+ * ipRouteAttributeTable in one IRE walk
  */
 static void
 ip_snmp_get2_v4(ire_t *ire, iproutedata_t *ird)
 {
 	ill_t				*ill;
 	ipif_t				*ipif;
-	mblk_t				*llmp;
-	dl_unitdata_req_t		*dlup;
 	mib2_ipRouteEntry_t		*re;
-	mib2_ipNetToMediaEntry_t	ntme;
 	mib2_ipAttributeEntry_t		*iae, *iaeptr;
 	ipaddr_t			gw_addr;
 	tsol_ire_gw_secattr_t		*attrp;
@@ -18857,11 +18854,6 @@ ip_snmp_get2_v4(ire_t *ire, iproutedata_t *ird)
 	re->ipRouteInfo.re_max_frag	= ire->ire_max_frag;
 	re->ipRouteInfo.re_frag_flag	= ire->ire_frag_flag;
 	re->ipRouteInfo.re_rtt		= ire->ire_uinfo.iulp_rtt;
-	if (ire->ire_nce &&
-	    ire->ire_nce->nce_state == ND_REACHABLE)
-		llmp = ire->ire_nce->nce_res_mp;
-	else
-		llmp = NULL;
 	re->ipRouteInfo.re_ref		= ire->ire_refcnt;
 	re->ipRouteInfo.re_src_addr	= ire->ire_src_addr;
 	re->ipRouteInfo.re_obpkt	= ire->ire_ob_pkt_count;
@@ -18903,52 +18895,6 @@ ip_snmp_get2_v4(ire_t *ire, iproutedata_t *ird)
 		    (unsigned)(sacnt * sizeof (*iae))));
 	}
 
-	if (ire->ire_type != IRE_CACHE || gw_addr != 0)
-		goto done;
-	/*
-	 * only IRE_CACHE entries that are for a directly connected subnet
-	 * get appended to net -> phys addr table
-	 * (others in arp)
-	 */
-	ntme.ipNetToMediaIfIndex.o_length = 0;
-	ill = ire_to_ill(ire);
-	ASSERT(ill != NULL);
-	ntme.ipNetToMediaIfIndex.o_length =
-	    ill->ill_name_length == 0 ? 0 :
-	    MIN(OCTET_LENGTH, ill->ill_name_length - 1);
-	bcopy(ill->ill_name, ntme.ipNetToMediaIfIndex.o_bytes,
-		    ntme.ipNetToMediaIfIndex.o_length);
-
-	ntme.ipNetToMediaPhysAddress.o_length = 0;
-	if (llmp) {
-		uchar_t *addr;
-
-		dlup = (dl_unitdata_req_t *)llmp->b_rptr;
-		/* Remove sap from  address */
-		if (ill->ill_sap_length < 0)
-			addr = llmp->b_rptr + dlup->dl_dest_addr_offset;
-		else
-			addr = llmp->b_rptr + dlup->dl_dest_addr_offset +
-			    ill->ill_sap_length;
-
-		ntme.ipNetToMediaPhysAddress.o_length =
-		    MIN(OCTET_LENGTH, ill->ill_phys_addr_length);
-		bcopy(addr, ntme.ipNetToMediaPhysAddress.o_bytes,
-		    ntme.ipNetToMediaPhysAddress.o_length);
-	}
-	ntme.ipNetToMediaNetAddress = ire->ire_addr;
-	/* assume dynamic (may be changed in arp) */
-	ntme.ipNetToMediaType = 3;
-	ntme.ipNetToMediaInfo.ntm_mask.o_length = sizeof (uint32_t);
-	bcopy(&ire->ire_mask, ntme.ipNetToMediaInfo.ntm_mask.o_bytes,
-	    ntme.ipNetToMediaInfo.ntm_mask.o_length);
-	ntme.ipNetToMediaInfo.ntm_flags = ACE_F_RESOLVED;
-	if (!snmp_append_data2(ird->ird_netmedia.lp_head,
-	    &ird->ird_netmedia.lp_tail, (char *)&ntme, sizeof (ntme))) {
-		ip1dbg(("ip_snmp_get2_v4: failed to allocate %u bytes\n",
-		    (uint_t)sizeof (ntme)));
-	}
-done:
 	/* bump route index for next pass */
 	ird->ird_idx++;
 

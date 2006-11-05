@@ -215,6 +215,7 @@ ar_describe(const ar_t *ar, char *buf, size_t nbytes, boolean_t addmac)
 		(void) mdb_snprintf(buf, nbytes, "IP %s", name);
 	} else {
 		arl_t arl;
+		arlphy_t ap;
 		ssize_t retv;
 		uint32_t alen;
 		uchar_t macaddr[ARP_MAX_ADDR_LEN];
@@ -224,11 +225,13 @@ ar_describe(const ar_t *ar, char *buf, size_t nbytes, boolean_t addmac)
 		retv = mdb_snprintf(buf, nbytes, "ARP %s ", arl.arl_name);
 		if (retv >= nbytes || !addmac)
 			return;
-		alen = arl.arl_hw_addr_length;
-		if (arl.arl_hw_addr == NULL || alen == 0 ||
+		if (mdb_vread(&ap, sizeof (ap), (uintptr_t)arl.arl_phy) == -1)
+			return;
+		alen = ap.ap_hw_addrlen;
+		if (ap.ap_hw_addr == NULL || alen == 0 ||
 		    alen > sizeof (macaddr))
 			return;
-		if (mdb_vread(macaddr, alen, (uintptr_t)arl.arl_hw_addr) == -1)
+		if (mdb_vread(macaddr, alen, (uintptr_t)ap.ap_hw_addr) == -1)
 			return;
 		mdb_mac_addr(macaddr, alen, buf + retv, nbytes - retv);
 	}
@@ -280,6 +283,7 @@ static int
 arl_cb(uintptr_t addr, const void *arlptr, void *dummy)
 {
 	const arl_t *arl = arlptr;
+	arlphy_t ap;
 	uchar_t macaddr[ARP_MAX_ADDR_LEN];
 	char macstr[ARP_MAX_ADDR_LEN*3];
 	char flags[4];
@@ -292,14 +296,15 @@ arl_cb(uintptr_t addr, const void *arlptr, void *dummy)
 		mdb_printf("%16s", primstr);
 	else
 		mdb_printf("%16x", arl->arl_dlpi_pending);
-	if (arl->arl_hw_addr_length == 0 ||
-	    arl->arl_hw_addr_length > sizeof (macaddr)) {
+
+	if (mdb_vread(&ap, sizeof (ap), (uintptr_t)arl->arl_phy) == -1 ||
+	    ap.ap_hw_addrlen == 0 || ap.ap_hw_addrlen > sizeof (macaddr)) {
 		(void) strcpy(macstr, "--");
-	} else if (mdb_vread(macaddr, arl->arl_hw_addr_length,
-	    (uintptr_t)arl->arl_hw_addr) == -1) {
+	} else if (mdb_vread(macaddr, ap.ap_hw_addrlen,
+	    (uintptr_t)ap.ap_hw_addr) == -1) {
 		(void) strcpy(macstr, "?");
 	} else {
-		mdb_mac_addr(macaddr, arl->arl_hw_addr_length, macstr,
+		mdb_mac_addr(macaddr, ap.ap_hw_addrlen, macstr,
 		    sizeof (macstr));
 	}
 
@@ -339,7 +344,7 @@ arl_cmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (DCMD_HDRSPEC(flags) && !(flags & DCMD_PIPE_OUT)) {
 		mdb_printf("%<u>%?s  %16s  %8s  %3s  %9s  %s%</u>\n",
 		    "ARL", "DLPI REQ", "DLPI CNT", "FLG", "INTERFACE",
-		    "HW ADDR");
+		    "HWADDR");
 	}
 
 	if (flags & DCMD_ADDRSPEC) {

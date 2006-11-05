@@ -47,33 +47,36 @@ typedef struct arl_s {
 	queue_t		*arl_rq;		/* Read queue pointer */
 	queue_t		*arl_wq;		/* Write queue pointer */
 	t_uscalar_t	arl_ppa;		/* DL_ATTACH parameter */
-	uchar_t		*arl_arp_addr;		/* multicast address to use */
-	uchar_t		*arl_hw_addr;		/* Our hardware address */
-	uint32_t	arl_hw_addr_length;
-	uint32_t	arl_arp_hw_type;	/* Our hardware type */
-	t_scalar_t	arl_sap_length;
 	char		arl_name[LIFNAMSIZ];	/* Lower level name */
-	mblk_t		*arl_xmit_template;	/* DL_UNITDATA_REQ template */
-	t_uscalar_t	arl_xmit_template_addr_offset;
-	t_uscalar_t	arl_xmit_template_sap_offset;
 	mblk_t		*arl_unbind_mp;
 	mblk_t		*arl_detach_mp;
 	t_uscalar_t	arl_provider_style;	/* From DL_INFO_ACK */
 	mblk_t		*arl_queue;		/* Queued commands head */
 	mblk_t		*arl_queue_tail;	/* Queued commands tail */
-	uint32_t	arl_flags;	/* Used for IFF_NOARP */
+	uint32_t	arl_flags;		/* ARL_F_* values below */
 	t_uscalar_t	arl_dlpi_pending;	/* pending DLPI request */
 	mblk_t		*arl_dlpi_deferred;	/* Deferred DLPI messages */
 	uint_t		arl_state;		/* lower interface state */
-	char		*arl_data;		/* address data pointer */
-	clock_t		arl_defend_start;	/* start of 1-hour period */
-	uint_t		arl_defend_count;	/* # of unbidden broadcasts */
-	uint_t
-			arl_closing : 1,	/* stream is closing */
-			arl_notifies : 1,	/* handles DL_NOTE_LINK */
-			arl_link_up : 1;	/* DL_NOTE status */
+	uint_t		arl_closing : 1;	/* stream is closing */
 	uint32_t	arl_index;		/* instance number */
+	struct arlphy_s	*arl_phy;		/* physical info, if any */
 } arl_t;
+
+/* ARL physical info structure for a link level device */
+typedef struct arlphy_s {
+	uint32_t	ap_arp_hw_type;		/* hardware type */
+	uchar_t		*ap_arp_addr;		/* multicast address to use */
+	uchar_t		*ap_hw_addr;		/* hardware address */
+	uint32_t	ap_hw_addrlen;		/* hardware address length */
+	mblk_t		*ap_xmit_mp;		/* DL_UNITDATA_REQ template */
+	t_uscalar_t	ap_xmit_addroff;	/* address offset in xmit_mp */
+	t_uscalar_t	ap_xmit_sapoff;		/* sap offset in xmit_mp */
+	t_scalar_t	ap_saplen;		/* sap length */
+	clock_t		ap_defend_start;	/* start of 1-hour period */
+	uint_t		ap_defend_count;	/* # of unbidden broadcasts */
+	uint_t		ap_notifies : 1,	/* handles DL_NOTE_LINK */
+			ap_link_down : 1;	/* DL_NOTE status */
+} arlphy_t;
 
 extern arl_t		*arl_g_head; 		/* ARL chain head */
 extern krwlock_t	arl_g_lock;

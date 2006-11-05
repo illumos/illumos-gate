@@ -157,15 +157,7 @@ typedef struct arpparam_s {
 	char		*arp_param_name;
 } arpparam_t;
 
-typedef struct ar_snmp_hashb {
-	struct	ar_snmp_hashb		*ar_next_entry;
-	mib2_ipNetToMediaEntry_t	*ar_snmp_entry;
-} ar_snmp_hashb_t;
-
-static int ar_snmp_hash_size = 64;
-
 typedef struct msg2_args {
-	ar_snmp_hashb_t *m2a_hashb;
 	mblk_t	*m2a_mpdata;
 	mblk_t	*m2a_mptail;
 } msg2_args_t;
@@ -183,12 +175,12 @@ static void	ar_ce_delete_per_arl(ace_t *ace, void *arg);
 static ace_t	**ar_ce_hash(uint32_t proto, const uchar_t *proto_addr,
     uint32_t proto_addr_length);
 static ace_t	*ar_ce_lookup(arl_t *arl, uint32_t proto,
-    uchar_t *proto_addr, uint32_t proto_addr_length);
+    const uchar_t *proto_addr, uint32_t proto_addr_length);
 static ace_t	*ar_ce_lookup_entry(arl_t *arl, uint32_t proto,
-    uchar_t *proto_addr, uint32_t proto_addr_length);
+    const uchar_t *proto_addr, uint32_t proto_addr_length);
 static ace_t	*ar_ce_lookup_from_area(mblk_t *mp, ace_t *matchfn());
 static ace_t	*ar_ce_lookup_mapping(arl_t *arl, uint32_t proto,
-    uchar_t *proto_addr, uint32_t proto_addr_length);
+    const uchar_t *proto_addr, uint32_t proto_addr_length);
 static boolean_t ar_ce_resolve(ace_t *ace, const uchar_t *hw_addr,
     uint32_t hw_addr_length);
 static void	ar_ce_walk(void (*pfi)(ace_t *, void *), void *arg1);
@@ -197,10 +189,10 @@ static void	ar_cleanup(void);
 static void	ar_client_notify(const arl_t *arl, mblk_t *mp, int code);
 static int	ar_close(queue_t *q);
 static int	ar_cmd_dispatch(queue_t *q, mblk_t *mp);
+static void	ar_cmd_done(arl_t *arl);
 static mblk_t	*ar_dlpi_comm(t_uscalar_t prim, size_t size);
 static void	ar_dlpi_send(arl_t *, mblk_t *);
 static void	ar_dlpi_done(arl_t *, t_uscalar_t);
-static void	ar_cmd_done(arl_t *arl);
 static int	ar_entry_add(queue_t *q, mblk_t *mp);
 static int	ar_entry_delete(queue_t *q, mblk_t *mp);
 static int	ar_entry_query(queue_t *q, mblk_t *mp);
@@ -244,7 +236,6 @@ static void	ar_wsrv(queue_t *q);
 static void	ar_xmit(arl_t *arl, uint32_t operation, uint32_t proto,
     uint32_t plen, const uchar_t *haddr1, const uchar_t *paddr1,
     const uchar_t *haddr2, const uchar_t *paddr2, const uchar_t *dstaddr);
-static uchar_t  *ar_snmp_msg_element(mblk_t **, uchar_t *, size_t);
 static void	ar_cmd_enqueue(arl_t *arl, mblk_t *mp, queue_t *q,
     ushort_t cmd, boolean_t);
 static mblk_t	*ar_cmd_dequeue(arl_t *arl);
@@ -312,8 +303,6 @@ static caddr_t	ar_g_nd;	/* AR Named Dispatch Head */
  * to access data structures in the ARP module without the code being
  * executed in the context of the IP module, thus there is no locking being
  * enforced through the use of STREAMS.
- *
- *
  */
 krwlock_t	arl_g_lock;
 arl_t		*arl_g_head;	/* ARL List Head */
@@ -405,9 +394,14 @@ ar_ce_create(arl_t *arl, uint_t proto, uchar_t *hw_addr, uint_t hw_addr_len,
 	ace_t	**acep;
 	uchar_t	*dst;
 	mblk_t	*mp;
+	arlphy_t *ap;
 
 	if ((flags & ~ACE_EXTERNAL_FLAGS_MASK) || arl == NULL)
 		return (EINVAL);
+
+	if ((ap = arl->arl_phy) == NULL)
+		return (EINVAL);
+
 	if (flags & ACE_F_MYADDR)
 		flags |= ACE_F_PUBLISH | ACE_F_AUTHORITY;
 
@@ -416,8 +410,8 @@ ar_ce_create(arl_t *arl, uint_t proto, uchar_t *hw_addr, uint_t hw_addr_len,
 			/* 224.0.0.0 to zero length address */
 			flags |= ACE_F_RESOLVED;
 		} else {	/* local address and unresolved case */
-			if ((hw_addr = arl->arl_hw_addr) != 0)
-				hw_addr_len = arl->arl_hw_addr_length;
+			hw_addr = ap->ap_hw_addr;
+			hw_addr_len = ap->ap_hw_addrlen;
 			if (flags & ACE_F_PUBLISH)
 				flags |= ACE_F_RESOLVED;
 		}
@@ -425,13 +419,13 @@ ar_ce_create(arl_t *arl, uint_t proto, uchar_t *hw_addr, uint_t hw_addr_len,
 		flags |= ACE_F_RESOLVED;
 	}
 
-	if (!proto_addr || proto_addr_len == 0 ||
+	if (proto_addr == NULL || proto_addr_len == 0 ||
 	    (proto == IP_ARP_PROTO_TYPE && proto_addr_len != IP_ADDR_LEN))
 		return (EINVAL);
 	/* Handle hw_addr_len == 0 for DL_ENABMULTI_REQ etc. */
-	if (hw_addr_len && !hw_addr)
+	if (hw_addr_len != 0 && hw_addr == NULL)
 		return (EINVAL);
-	if (hw_addr_len < arl->arl_hw_addr_length && hw_addr_len != 0)
+	if (hw_addr_len < ap->ap_hw_addrlen && hw_addr_len != 0)
 		return (EINVAL);
 	if (!proto_extract_mask && (flags & ACE_F_MAPPING))
 		return (EINVAL);
@@ -441,7 +435,7 @@ ar_ce_create(arl_t *arl, uint_t proto, uchar_t *hw_addr, uint_t hw_addr_len,
 	 * if we're working with the IPv4 169.254.0.0/16 Link Local Address
 	 * space, then don't use the fast timers.  Otherwise, use them.
 	 */
-	if (arl->arl_notifies &&
+	if (ap->ap_notifies &&
 	    !(proto == IP_ARP_PROTO_TYPE && IS_IPV4_LL_SPACE(proto_addr))) {
 		flags |= ACE_F_FAST;
 	}
@@ -496,7 +490,6 @@ ar_ce_create(arl_t *arl, uint_t proto, uchar_t *hw_addr, uint_t hw_addr_len,
 		dst += hw_addr_len;
 	}
 
-	ace->ace_arl = arl;
 	ace->ace_flags = flags;
 
 	if (ar_mask_all_ones(ace->ace_proto_mask,
@@ -561,7 +554,7 @@ ar_ce_hash(uint32_t proto, const uchar_t *proto_addr,
 
 /* Cache entry lookup.	Try to find an ace matching the parameters passed. */
 ace_t *
-ar_ce_lookup(arl_t *arl, uint32_t proto, uchar_t *proto_addr,
+ar_ce_lookup(arl_t *arl, uint32_t proto, const uchar_t *proto_addr,
     uint32_t proto_addr_length)
 {
 	ace_t	*ace;
@@ -578,7 +571,7 @@ ar_ce_lookup(arl_t *arl, uint32_t proto, uchar_t *proto_addr,
  * Look only for exact entries (no mappings)
  */
 static ace_t *
-ar_ce_lookup_entry(arl_t *arl, uint32_t proto, uchar_t *proto_addr,
+ar_ce_lookup_entry(arl_t *arl, uint32_t proto, const uchar_t *proto_addr,
     uint32_t proto_addr_length)
 {
 	ace_t	*ace;
@@ -629,7 +622,7 @@ ar_ce_lookup_from_area(mblk_t *mp, ace_t *matchfn())
  * Look only for mappings.
  */
 static ace_t *
-ar_ce_lookup_mapping(arl_t *arl, uint32_t proto, uchar_t *proto_addr,
+ar_ce_lookup_mapping(arl_t *arl, uint32_t proto, const uchar_t *proto_addr,
     uint32_t proto_addr_length)
 {
 	ace_t	*ace;
@@ -942,6 +935,7 @@ static void
 ar_delete_notify(const ace_t *ace)
 {
 	const arl_t *arl = ace->ace_arl;
+	const arlphy_t *ap = arl->arl_phy;
 	mblk_t	*mp;
 	size_t	len;
 	arh_t	*arh;
@@ -952,7 +946,7 @@ ar_delete_notify(const ace_t *ace)
 		return;
 	arh = (arh_t *)mp->b_rptr;
 	mp->b_wptr = (uchar_t *)arh + len;
-	U16_TO_BE16(arl->arl_arp_hw_type, arh->arh_hardware);
+	U16_TO_BE16(ap->ap_arp_hw_type, arh->arh_hardware);
 	U16_TO_BE16(ace->ace_proto, arh->arh_proto);
 	arh->arh_hlen = 0;
 	arh->arh_plen = ace->ace_proto_addr_length;
@@ -1509,19 +1503,21 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 	}
 
 	if (aflags & ACE_F_PUBLISH) {
+		arlphy_t *ap = arl->arl_phy;
+
 		if (hw_addr == NULL || hw_addr_len == 0) {
-			hw_addr = arl->arl_hw_addr;
+			hw_addr = ap->ap_hw_addr;
 		} else if (aflags & ACE_F_MYADDR) {
 			/*
 			 * If hardware address changes, then make sure
 			 * that the hardware address and hardware
-			 * address length fields in arl_t get updated
+			 * address length fields in arlphy_t get updated
 			 * too. Otherwise, they will continue carrying
 			 * the old hardware address information.
 			 */
 			ASSERT((hw_addr != NULL) && (hw_addr_len != 0));
-			bcopy(hw_addr, arl->arl_hw_addr, hw_addr_len);
-			arl->arl_hw_addr_length = hw_addr_len;
+			bcopy(hw_addr, ap->ap_hw_addr, hw_addr_len);
+			ap->ap_hw_addrlen = hw_addr_len;
 		}
 
 		ace = ar_ce_lookup(arl, area->area_proto, proto_addr,
@@ -1580,7 +1576,7 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 			    area_t *, area);
 			ar_xmit(arl, ARP_REQUEST, area->area_proto,
 			    proto_addr_len, hw_addr, proto_addr,
-			    arl->arl_arp_addr, proto_addr, NULL);
+			    ap->ap_arp_addr, proto_addr, NULL);
 			ace->ace_last_bcast = ddi_get_lbolt();
 
 			/*
@@ -1775,9 +1771,9 @@ ar_entry_query(queue_t *q, mblk_t *mp_orig)
 			err = ENXIO;
 			goto err_ret;
 		}
-		if (arl->arl_xmit_template == NULL) {
+		if (arl->arl_phy == NULL) {
 			/* Can't get help if we don't know how. */
-			DTRACE_PROBE2(query_no_template, ace_t *, ace,
+			DTRACE_PROBE2(query_no_phy, ace_t *, ace,
 			    areq_t *, areq);
 			mpp[0] = NULL;
 			mp->b_prev = NULL;
@@ -1787,10 +1783,8 @@ ar_entry_query(queue_t *q, mblk_t *mp_orig)
 		DTRACE_PROBE2(query_unresolved, ace_t, ace, areq_t *, areq);
 	} else {
 		/* No ace yet.	Make one now.  (This is the common case.) */
-		if (areq->areq_xmit_count == 0 ||
-		    arl->arl_xmit_template == NULL) {
-			DTRACE_PROBE2(query_template, arl_t *, arl,
-			    areq_t *, areq);
+		if (areq->areq_xmit_count == 0 || arl->arl_phy == NULL) {
+			DTRACE_PROBE2(query_phy, arl_t *, arl, areq_t *, areq);
 			mp->b_prev = NULL;
 			err = ENXIO;
 			goto err_ret;
@@ -2062,8 +2056,7 @@ done:
 }
 
 /*
- * Enable an interface to
- * process of ARP_REQUEST and ARP_RESPONSE messages
+ * Enable an interface to process ARP_REQUEST and ARP_RESPONSE messages.
  */
 /* ARGSUSED */
 static int
@@ -2076,9 +2069,9 @@ ar_interface_on(queue_t *q, mblk_t *mp)
 		DTRACE_PROBE2(on_no_arl, queue_t *, q, mblk_t *, mp);
 		return (EINVAL);
 	}
-	/* Turn off the IFF_NOARP flag  and activate ARP */
+
 	DTRACE_PROBE3(on_intf, queue_t *, q, mblk_t *, mp, arl_t *, arl);
-	arl->arl_flags = 0;
+	arl->arl_flags &= ~ARL_F_NOARP;
 	return (0);
 }
 
@@ -2097,9 +2090,9 @@ ar_interface_off(queue_t *q, mblk_t *mp)
 		DTRACE_PROBE2(off_no_arl, queue_t *, q, mblk_t *, mp);
 		return (EINVAL);
 	}
-	/* Turn on the IFF_NOARP flag and deactivate ARP */
+
 	DTRACE_PROBE3(off_intf, queue_t *, q, mblk_t *, mp, arl_t *, arl);
-	arl->arl_flags = ARL_F_NOARP;
+	arl->arl_flags |= ARL_F_NOARP;
 	return (0);
 }
 
@@ -2190,7 +2183,6 @@ ar_ll_init(ar_t *ar, mblk_t *mp)
 	arl->arl_wq = ar->ar_wq;
 
 	arl->arl_dlpi_pending = DL_PRIM_INVAL;
-	arl->arl_link_up = B_TRUE;
 
 	ar->ar_arl = arl;
 
@@ -2237,7 +2229,7 @@ ar_ll_init(ar_t *ar, mblk_t *mp)
  * comes back from the device.	We set up defaults for all the device dependent
  * doo-dads we are going to need.  This will leave us ready to roll if we are
  * attempting auto-configuration.  Alternatively, these defaults can be
- * overidden by initialization procedures possessing higher intelligence.
+ * overridden by initialization procedures possessing higher intelligence.
  */
 static void
 ar_ll_set_defaults(arl_t *arl, mblk_t *mp)
@@ -2245,20 +2237,20 @@ ar_ll_set_defaults(arl_t *arl, mblk_t *mp)
 	ar_m_t		*arm;
 	dl_info_ack_t	*dlia = (dl_info_ack_t *)mp->b_rptr;
 	dl_unitdata_req_t *dlur;
-	int		hw_addr_length;
-	int		i1;
 	uchar_t		*up;
-	t_scalar_t	sap_length;
+	arlphy_t	*ap;
 
-	/* Sanity check... */
-	if (arl == NULL)
-		return;
+	ASSERT(arl != NULL);
+
 	/*
-	 * If we receive multiple DL_INFO_ACkS make sure there are no
-	 * leaks by clearing the defaults now
+	 * Clear any stale defaults that might exist.
 	 */
-	if (arl->arl_data != NULL ||arl->arl_xmit_template != NULL)
-		ar_ll_clear_defaults(arl);
+	ar_ll_clear_defaults(arl);
+
+	ap = kmem_zalloc(sizeof (arlphy_t), KM_NOSLEEP);
+	if (ap == NULL)
+		goto bad;
+	arl->arl_phy = ap;
 
 	if ((arm = ar_m_lookup(dlia->dl_mac_type)) == NULL)
 		arm = ar_m_lookup(DL_OTHER);
@@ -2269,86 +2261,62 @@ ar_ll_set_defaults(arl_t *arl, mblk_t *mp)
 	 * exhaustive ar_m_tbl.
 	 */
 	if (dlia->dl_version == DL_VERSION_2) {
-		hw_addr_length = dlia->dl_brdcst_addr_length;
+		/* XXX DLPI spec allows dl_sap_length of 0 before binding. */
+		ap->ap_saplen = dlia->dl_sap_length;
+		ap->ap_hw_addrlen = dlia->dl_brdcst_addr_length;
 	} else {
-		hw_addr_length = arm->ar_mac_hw_addr_length;
+		ap->ap_saplen = arm->ar_mac_sap_length;
+		ap->ap_hw_addrlen = arm->ar_mac_hw_addr_length;
 	}
+	ap->ap_arp_hw_type = arm->ar_mac_arp_hw_type;
 
-	if ((arl->arl_data = mi_zalloc(2 * hw_addr_length)) == NULL)
+	/*
+	 * Allocate the hardware and ARP addresses; note that the hardware
+	 * address cannot be filled in until we see the DL_BIND_ACK.
+	 */
+	ap->ap_hw_addr = kmem_zalloc(ap->ap_hw_addrlen, KM_NOSLEEP);
+	ap->ap_arp_addr = kmem_alloc(ap->ap_hw_addrlen, KM_NOSLEEP);
+	if (ap->ap_hw_addr == NULL || ap->ap_arp_addr == NULL)
 		goto bad;
 
-	arl->arl_arp_hw_type = arm->ar_mac_arp_hw_type;
-
-	/*
-	 * Someday DLPI will provide the multicast address?  Meanwhile we
-	 * assume an address of all ones, known to work on some popular
-	 * networks.
-	 */
-	up = (uchar_t *)arl->arl_data;
-	arl->arl_arp_addr = up;
 	if (dlia->dl_version == DL_VERSION_2) {
-		uchar_t *up2;
-
-		up2 = mi_offset_param(mp, dlia->dl_brdcst_addr_offset,
-		    hw_addr_length);
-		if (up2 == NULL)
+		if ((up = mi_offset_param(mp, dlia->dl_brdcst_addr_offset,
+		    ap->ap_hw_addrlen)) == NULL)
 			goto bad;
-
-		bcopy(up2, up, hw_addr_length);
-		up += hw_addr_length;
-		/*
-		 * TODO Note that sap_length can be 0 before binding according
-		 * to the DLPI spec.
-		 */
-		sap_length = dlia->dl_sap_length;
+		bcopy(up, ap->ap_arp_addr, ap->ap_hw_addrlen);
 	} else {
-		for (i1 = 0; i1 < hw_addr_length; i1++)
-			*up++ = (char)~0;
-		sap_length = arm->ar_mac_sap_length;
+		/*
+		 * No choice but to assume a broadcast address of all ones,
+		 * known to work on some popular networks.
+		 */
+		(void) memset(ap->ap_arp_addr, ~0, ap->ap_hw_addrlen);
 	}
-
-	arl->arl_sap_length = sap_length;
-
-	/*
-	 * The hardware address will be filled in when we see the DL_BIND_ACK.
-	 * We reserve space for it here, and make arl_hw_addr point to it.
-	 */
-	arl->arl_hw_addr = up;
-	arl->arl_hw_addr_length = hw_addr_length;
-	up += arl->arl_hw_addr_length;
 
 	/*
 	 * Make us a template DL_UNITDATA_REQ message which we will use for
 	 * broadcasting resolution requests, and which we will clone to hand
 	 * back as responses to the protocols.
 	 */
-	arl->arl_xmit_template = ar_dlpi_comm(DL_UNITDATA_REQ,
-	    sizeof (dl_unitdata_req_t) + arl->arl_hw_addr_length +
-	    ABS(arl->arl_sap_length));
-	if (arl->arl_xmit_template == NULL)
+	ap->ap_xmit_mp = ar_dlpi_comm(DL_UNITDATA_REQ, ap->ap_hw_addrlen +
+	    ABS(ap->ap_saplen) + sizeof (dl_unitdata_req_t));
+	if (ap->ap_xmit_mp == NULL)
 		goto bad;
 
-	dlur = (dl_unitdata_req_t *)arl->arl_xmit_template->b_rptr;
+	dlur = (dl_unitdata_req_t *)ap->ap_xmit_mp->b_rptr;
 	dlur->dl_priority.dl_min = 0;
 	dlur->dl_priority.dl_max = 0;
-	dlur->dl_dest_addr_length = hw_addr_length + ABS(arl->arl_sap_length);
+	dlur->dl_dest_addr_length = ap->ap_hw_addrlen + ABS(ap->ap_saplen);
 	dlur->dl_dest_addr_offset = sizeof (dl_unitdata_req_t);
 
-	/* Note the destination address offset permanently in the arl. */
-	if (arl->arl_sap_length < 0) {
-		arl->arl_xmit_template_addr_offset = dlur->dl_dest_addr_offset;
-		arl->arl_xmit_template_sap_offset = dlur->dl_dest_addr_offset +
-		    dlur->dl_dest_addr_length + arl->arl_sap_length;
-	} else {
-		/* The sap is first in the address */
-		arl->arl_xmit_template_addr_offset = dlur->dl_dest_addr_offset
-		    + arl->arl_sap_length;
-		arl->arl_xmit_template_sap_offset = dlur->dl_dest_addr_offset;
-	}
+	/* NOTE: the destination address and sap offsets are permanently set */
+	ap->ap_xmit_sapoff = dlur->dl_dest_addr_offset;
+	ap->ap_xmit_addroff = dlur->dl_dest_addr_offset;
+	if (ap->ap_saplen < 0)
+		ap->ap_xmit_sapoff += ap->ap_hw_addrlen;	/* sap last */
+	else
+		ap->ap_xmit_addroff += ap->ap_saplen;		/* addr last */
 
-	*(uint16_t *)(arl->arl_xmit_template->b_rptr +
-	    arl->arl_xmit_template_sap_offset) = ETHERTYPE_ARP;
-
+	*(uint16_t *)((caddr_t)dlur + ap->ap_xmit_sapoff) = ETHERTYPE_ARP;
 	return;
 bad:
 	ar_ll_clear_defaults(arl);
@@ -2357,17 +2325,16 @@ bad:
 static void
 ar_ll_clear_defaults(arl_t *arl)
 {
-	if (arl->arl_data) {
-		mi_free(arl->arl_data);
-		arl->arl_data = NULL;
-		arl->arl_arp_addr = NULL;
-		arl->arl_sap_length = 0;
-		arl->arl_hw_addr = NULL;
-		arl->arl_hw_addr_length = NULL;
-	}
-	if (arl->arl_xmit_template) {
-		freemsg(arl->arl_xmit_template);
-		arl->arl_xmit_template = NULL;
+	arlphy_t *ap = arl->arl_phy;
+
+	if (ap != NULL) {
+		arl->arl_phy = NULL;
+		if (ap->ap_hw_addr != NULL)
+			kmem_free(ap->ap_hw_addr, ap->ap_hw_addrlen);
+		if (ap->ap_arp_addr != NULL)
+			kmem_free(ap->ap_arp_addr, ap->ap_hw_addrlen);
+		freemsg(ap->ap_xmit_mp);
+		kmem_free(ap, sizeof (arlphy_t));
 	}
 }
 
@@ -2854,13 +2821,14 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
 	mblk_t	*areq_mp;
 	arl_t	*arl = ace->ace_arl;
 	mblk_t	*mp;
-	mblk_t	*template;
+	mblk_t	*xmit_mp;
+	arlphy_t *ap = arl->arl_phy;
 
 	/* Cancel any outstanding timer. */
 	mi_timer(arl->arl_wq, ace->ace_mp, -1L);
 	/* Establish the return value appropriate. */
 	if (ret_val == 0) {
-		if (!ACE_RESOLVED(ace) || arl->arl_xmit_template == NULL)
+		if (!ACE_RESOLVED(ace) || ap == NULL)
 			ret_val = ENXIO;
 	}
 	/* Terminate all outstanding queries. */
@@ -2875,7 +2843,7 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
 		 * template to prepare for the client.
 		 */
 		if (ret_val == 0 &&
-		    !(template = copyb(arl->arl_xmit_template))) {
+		    (xmit_mp = copyb(ap->ap_xmit_mp)) == NULL) {
 			/* Too bad, buy more memory. */
 			ret_val = ENOMEM;
 		}
@@ -2891,11 +2859,10 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
 				continue;
 			}
 			/*
-			 * Return the xmit template out with the successful
-			 * IOCTL.
+			 * Return the xmit mp out with the successful IOCTL.
 			 */
 			DB_TYPE(mp) = M_IOCACK;
-			ioc->ioc_count = template->b_wptr - template->b_rptr;
+			ioc->ioc_count = MBLKL(xmit_mp);
 			/* Remove the areq mblk from the IOCTL. */
 			areq_mp = mp->b_cont;
 			mp->b_cont = areq_mp->b_cont;
@@ -2918,34 +2885,32 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
 			areq_mp = mp;
 			mp = mp->b_cont;
 		}
-		if (ABS(arl->arl_sap_length) != 0) {
+		ASSERT(ret_val == 0 && ap != NULL);
+		if (ap->ap_saplen != 0) {
 			/*
 			 * Copy the SAP type specified in the request into
-			 * the xmit template.
+			 * the xmit mp.
 			 */
 			areq_t	*areq = (areq_t *)areq_mp->b_rptr;
-			bcopy(&areq->areq_sap[0],
-			    (char *)template->b_rptr +
-			    arl->arl_xmit_template_sap_offset,
-			    ABS(arl->arl_sap_length));
+			bcopy(areq->areq_sap, xmit_mp->b_rptr +
+			    ap->ap_xmit_sapoff, ABS(ap->ap_saplen));
 		}
 		/* Done with the areq message. */
 		freeb(areq_mp);
 		/*
-		 * Copy the resolved hardware address into the xmit template
+		 * Copy the resolved hardware address into the xmit mp
 		 * or perform the mapping operation.
 		 */
-		ar_set_address(ace, (uchar_t *)template->b_rptr
-		    + arl->arl_xmit_template_addr_offset,
+		ar_set_address(ace, xmit_mp->b_rptr + ap->ap_xmit_addroff,
 		    proto_addr, proto_addr_len);
 		/*
-		 * Now insert the xmit template after the response message.  In
+		 * Now insert the xmit mp after the response message.  In
 		 * the M_IOCTL case, it will be the returned data block.  In
 		 * the M_PROTO case, (again using IP as an example) it will
 		 * appear after the IRE and before the outbound packet.
 		 */
-		template->b_cont = mp->b_cont;
-		mp->b_cont = template;
+		xmit_mp->b_cont = mp->b_cont;
+		mp->b_cont = xmit_mp;
 		putnext(q, mp);
 	}
 
@@ -2954,7 +2919,7 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
 	 * cleanup timer or (on error) delete the entry.
 	 */
 	if (!(ace->ace_flags & (ACE_F_PERMANENT | ACE_F_DYING))) {
-		if (!ACE_RESOLVED(ace) || arl->arl_xmit_template == NULL) {
+		if (!ACE_RESOLVED(ace) || ap == NULL) {
 			/*
 			 * No need to notify IP here, because the entry was
 			 * never resolved, so IP can't have any cached copies
@@ -3035,8 +3000,8 @@ ar_query_xmit(ace_t *ace, ace_t *src_ace)
 	DTRACE_PROBE3(xmit_send, ace_t *, ace, ace_t *, src_ace,
 	    areq_t *, areq);
 	ar_xmit(src_arl, ARP_REQUEST, areq->areq_proto,
-	    areq->areq_sender_addr_length, src_arl->arl_hw_addr, sender_addr,
-	    src_arl->arl_arp_addr, proto_addr, NULL);
+	    areq->areq_sender_addr_length, src_arl->arl_phy->ap_hw_addr,
+	    sender_addr, src_arl->arl_phy->ap_arp_addr, proto_addr, NULL);
 	src_ace->ace_last_bcast = ddi_get_lbolt();
 	return (areq->areq_xmit_interval);
 }
@@ -3118,7 +3083,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 		    ((dl_unitdata_ind_t *)mp->b_rptr)->dl_primitive ==
 		    DL_UNITDATA_IND) {
 			arl = ((ar_t *)q->q_ptr)->ar_arl;
-			if (arl != NULL) {
+			if (arl != NULL && arl->arl_phy != NULL) {
 				/* Real messages from the wire! */
 				break;
 			}
@@ -3198,7 +3163,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 	 * for this hardware address type, so might as well discard packets
 	 * here that don't match.
 	 */
-	if ((hlen > 0 && hlen != arl->arl_hw_addr_length) || plen == 0) {
+	if ((hlen > 0 && hlen != arl->arl_phy->ap_hw_addrlen) || plen == 0) {
 		DTRACE_PROBE2(rput_bogus, arl_t *, arl, mblk_t *, mp1);
 		freemsg(mp);
 		TRACE_2(TR_FAC_ARP, TR_ARP_RPUT_END,
@@ -3357,7 +3322,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 			DTRACE_PROBE3(rput_bcast_reply, arl_t *, arl,
 			    arh_t *, arh, ace_t *, dst_ace);
 			dst_ace->ace_last_bcast = now;
-			dstaddr = arl->arl_arp_addr;
+			dstaddr = arl->arl_phy->ap_arp_addr;
 			/*
 			 * If this is one of the long-suffering entries, then
 			 * pull it out now.  It no longer needs separate
@@ -3421,8 +3386,12 @@ ar_rput_dlpi(queue_t *q, mblk_t *mp)
 {
 	ar_t		*ar = q->q_ptr;
 	arl_t		*arl = ar->ar_arl;
+	arlphy_t	*ap = NULL;
 	union DL_primitives *dlp;
 	const char	*err_str;
+
+	if (arl != NULL)
+		ap = arl->arl_phy;
 
 	if (MBLKL(mp) < sizeof (dlp->dl_primitive)) {
 		putnext(q, mp);
@@ -3472,16 +3441,16 @@ ar_rput_dlpi(queue_t *q, mblk_t *mp)
 		    dlp->error_ack.dl_unix_errno);
 		break;
 	case DL_INFO_ACK:
-		/*
-		 * We have a response back from the driver.  Go set up transmit
-		 * defaults.
-		 */
 		DTRACE_PROBE2(rput_dl_info, arl_t *, arl,
 		    dl_info_ack_t *, &dlp->info_ack);
-		if (arl != NULL) {
+		if (arl != NULL && arl->arl_dlpi_pending == DL_INFO_REQ) {
+			/*
+			 * We have a response back from the driver.  Go set up
+			 * transmit defaults.
+			 */
 			ar_ll_set_defaults(arl, mp);
 			ar_dlpi_done(arl, DL_INFO_REQ);
-		} else {
+		} else if (arl == NULL) {
 			ar_ll_init(ar, mp);
 		}
 		/* Kick off any awaiting messages */
@@ -3513,35 +3482,39 @@ ar_rput_dlpi(queue_t *q, mblk_t *mp)
 		 * We mostly care about interface-up transitions, as this is
 		 * when we need to redo duplicate address detection.
 		 */
-		arl->arl_notifies =
-		    (dlp->notify_ack.dl_notifications & DL_NOTE_LINK_UP) != 0;
+		if (ap != NULL) {
+			ap->ap_notifies = (dlp->notify_ack.dl_notifications &
+				DL_NOTE_LINK_UP) != 0;
+		}
 		ar_dlpi_done(arl, DL_NOTIFY_REQ);
 		break;
 	case DL_BIND_ACK:
 		DTRACE_PROBE2(rput_dl_bind, arl_t *, arl,
 		    dl_bind_ack_t *, &dlp->bind_ack);
-		if (arl->arl_sap_length < 0)
-			bcopy((char *)dlp + dlp->bind_ack.dl_addr_offset,
-			    arl->arl_hw_addr, arl->arl_hw_addr_length);
-		else
-			bcopy((char *)dlp + dlp->bind_ack.dl_addr_offset +
-			    arl->arl_sap_length, arl->arl_hw_addr,
-			    arl->arl_hw_addr_length);
+		if (ap != NULL) {
+			caddr_t hw_addr;
 
+			hw_addr = (caddr_t)dlp + dlp->bind_ack.dl_addr_offset;
+			if (ap->ap_saplen > 0)
+				hw_addr += ap->ap_saplen;
+			bcopy(hw_addr, ap->ap_hw_addr, ap->ap_hw_addrlen);
+		}
 		arl->arl_state = ARL_S_UP;
 		ar_dlpi_done(arl, DL_BIND_REQ);
 		break;
 	case DL_NOTIFY_IND:
 		DTRACE_PROBE2(rput_dl_notify_ind, arl_t *, arl,
 		    dl_notify_ind_t *, &dlp->notify_ind);
-		switch (dlp->notify_ind.dl_notification) {
-		case DL_NOTE_LINK_UP:
-			arl->arl_link_up = B_TRUE;
-			ar_ce_walk(ar_ce_restart_dad, arl);
-			break;
-		case DL_NOTE_LINK_DOWN:
-			arl->arl_link_up = B_FALSE;
-			break;
+		if (ap != NULL) {
+			switch (dlp->notify_ind.dl_notification) {
+			case DL_NOTE_LINK_UP:
+				ap->ap_link_down = B_FALSE;
+				ar_ce_walk(ar_ce_restart_dad, arl);
+				break;
+			case DL_NOTE_LINK_DOWN:
+				ap->ap_link_down = B_TRUE;
+				break;
+			}
 		}
 		break;
 	case DL_UDERROR_IND:
@@ -3760,57 +3733,14 @@ ar_set_ppa(queue_t *q, mblk_t *mp_orig)
 	return (0);
 }
 
-/*
- * create hash table for comparison.
- * The data recvd from IP is hashed on IP address for fast matching.
- */
-static ar_snmp_hashb_t *
-ar_create_snmp_hash(mblk_t *mpdata)
-{
-	int entries;
-	mib2_ipNetToMediaEntry_t	*np;
-	mblk_t		*mp1;
-	ar_snmp_hashb_t  *hashb;
-	ar_snmp_hashb_t  *start_entry;
-	ar_snmp_hashb_t  *next_entry;
-	ar_snmp_hashb_t  *ar_snmp_hash_tbl;
-
-	entries = msgdsize(mpdata) / sizeof (mib2_ipNetToMediaEntry_t);
-
-	ar_snmp_hash_tbl = (ar_snmp_hashb_t *)mi_zalloc(
-	    (sizeof (ar_snmp_hashb_t) * (entries + ar_snmp_hash_size)));
-	if (ar_snmp_hash_tbl == NULL)
-		return (NULL);
-
-	start_entry = ar_snmp_hash_tbl + ar_snmp_hash_size;
-
-	np = NULL;
-	mp1 = mpdata;
-	next_entry = start_entry;
-	while ((np = (mib2_ipNetToMediaEntry_t *)ar_snmp_msg_element(&mp1,
-	    (uchar_t *)np, sizeof (mib2_ipNetToMediaEntry_t))) != NULL) {
-
-		hashb = &ar_snmp_hash_tbl[IRE_ADDR_HASH
-		    (np->ipNetToMediaNetAddress, ar_snmp_hash_size)];
-		ASSERT(next_entry <= start_entry + entries);
-		next_entry->ar_snmp_entry = np;
-		next_entry->ar_next_entry = hashb->ar_next_entry;
-		hashb->ar_next_entry = next_entry;
-
-		next_entry++;
-	}
-	return (ar_snmp_hash_tbl);
-}
-
 static int
 ar_snmp_msg(queue_t *q, mblk_t *mp_orig)
 {
-	mblk_t			*mpdata, *mp = mp_orig;
-	struct opthdr		*optp;
-	ar_snmp_hashb_t		*ar_snmp_hash_tbl;
-	msg2_args_t		args;
+	mblk_t		*mpdata, *mp = mp_orig;
+	struct opthdr	*optp;
+	msg2_args_t	args;
 
-	if (!mp)
+	if (mp == NULL)
 		return (0);
 	/*
 	 * ar_cmd_dispatch() already checked for us that "mp->b_cont" is valid
@@ -3820,61 +3750,22 @@ ar_snmp_msg(queue_t *q, mblk_t *mp_orig)
 		mp = mp->b_cont;
 
 	optp = (struct opthdr *)(&mp->b_rptr[sizeof (struct T_optmgmt_ack)]);
-	if (optp->level != MIB2_IP || optp->name != MIB2_IP_MEDIA) {
-		putnext(q, mp_orig);
-		return (EINPROGRESS);
-	}
-	/*
-	 * this is an ipNetToMediaTable msg from IP that needs (unique)
-	 * arp cache entries appended...
-	 */
-	if ((mpdata = mp->b_cont) == NULL)
-		return (EINVAL);
+	if (optp->level == MIB2_IP && optp->name == MIB2_IP_MEDIA) {
+		/*
+		 * Put our ARP cache entries in the ipNetToMediaTable mp from
+		 * IP.  Due to a historical side effect of IP's MIB code, it
+		 * always passes us a b_cont, but the b_cont should be empty.
+		 */
+		if ((mpdata = mp->b_cont) == NULL || MBLKL(mpdata) != 0)
+			return (EINVAL);
 
-	ar_snmp_hash_tbl = ar_create_snmp_hash(mpdata);
-
-	if (ar_snmp_hash_tbl != NULL) {
-		args.m2a_hashb = ar_snmp_hash_tbl;
-		args.m2a_mpdata = NULL;
+		args.m2a_mpdata = mpdata;
 		args.m2a_mptail = NULL;
 		ar_ce_walk(ar_snmp_msg2, &args);
-
-		mi_free(ar_snmp_hash_tbl);
-		/*
-		 * if a new entry was added link it with the list passed in.
-		 */
-		if (args.m2a_mpdata != NULL)
-			linkb(mpdata, args.m2a_mpdata);
 		optp->len = msgdsize(mpdata);
 	}
-
 	putnext(q, mp_orig);
 	return (EINPROGRESS);	/* so that rput() exits doing nothing... */
-}
-
-static uchar_t *
-ar_snmp_msg_element(mblk_t **mpp, uchar_t *oldptr, size_t len)
-{
-	mblk_t	*mp;
-
-	mp = *mpp;
-	if (!mp)
-		return (NULL);
-	if (oldptr)
-		oldptr += len;
-	else
-		oldptr = mp->b_rptr;
-
-	if (oldptr + len > mp->b_wptr) {
-		mp = mp->b_cont;
-		if (!mp)
-			return (NULL);
-		oldptr = mp->b_rptr;
-		if (oldptr + len > mp->b_wptr)
-			return (NULL);
-	}
-	*mpp = mp;
-	return (oldptr);
 }
 
 static void
@@ -3882,14 +3773,16 @@ ar_snmp_msg2(ace_t *ace, void *arg)
 {
 	const char	*name = "unknown";
 	mib2_ipNetToMediaEntry_t ntme;
-	ar_snmp_hashb_t *hashb;
-	mib2_ipNetToMediaEntry_t *np;
 	msg2_args_t	*m2ap = arg;
-	ar_snmp_hashb_t	*ar_snmp_hash_tbl;
 
 	ASSERT(ace != NULL && ace->ace_arl != NULL);
 	if (ace->ace_arl != NULL)
 		name = ace->ace_arl->arl_name;
+
+	/*
+	 * Fill in ntme using the information in the ACE.
+	 */
+	ntme.ipNetToMediaType = (ace->ace_flags & ACE_F_PERMANENT) ? 4 : 3;
 	ntme.ipNetToMediaIfIndex.o_length = MIN(OCTET_LENGTH, strlen(name));
 	bcopy(name, ntme.ipNetToMediaIfIndex.o_bytes,
 	    ntme.ipNetToMediaIfIndex.o_length);
@@ -3901,68 +3794,19 @@ ar_snmp_msg2(ace_t *ace, void *arg)
 	    MIN(OCTET_LENGTH, ace->ace_proto_addr_length);
 	bcopy(ace->ace_proto_mask, ntme.ipNetToMediaInfo.ntm_mask.o_bytes,
 	    ntme.ipNetToMediaInfo.ntm_mask.o_length);
+	ntme.ipNetToMediaInfo.ntm_flags = ace->ace_flags;
 
-	ar_snmp_hash_tbl = m2ap->m2a_hashb;
-	/*
-	 * Append this arp entry only if not already there...
-	 * if found, verify/modify ipNetToMediaType to agree with arp cache
-	 * entry.
-	 * entries within arp cache are unique, so match only with entries
-	 * passed in.
-	 */
-	hashb = &ar_snmp_hash_tbl[IRE_ADDR_HASH(ntme.ipNetToMediaNetAddress,
-	    ar_snmp_hash_size)];
-	/*
-	 * get the first entry.
-	 */
-	hashb = hashb->ar_next_entry;
-	while (hashb != NULL) {
-		ASSERT(hashb->ar_snmp_entry != NULL);
-		np = hashb->ar_snmp_entry;
-		if (np->ipNetToMediaNetAddress ==
-		    ntme.ipNetToMediaNetAddress &&
-		    np->ipNetToMediaInfo.ntm_mask.o_length ==
-		    ntme.ipNetToMediaInfo.ntm_mask.o_length &&
-		    (bcmp(np->ipNetToMediaInfo.ntm_mask.o_bytes,
-		    ntme.ipNetToMediaInfo.ntm_mask.o_bytes,
-		    ntme.ipNetToMediaInfo.ntm_mask.o_length) == 0) &&
-		    (bcmp(np->ipNetToMediaIfIndex.o_bytes,
-		    ntme.ipNetToMediaIfIndex.o_bytes,
-		    ntme.ipNetToMediaIfIndex.o_length) == 0)) {
-			if (ace->ace_flags & ACE_F_PERMANENT) {
-				/* permanent arp entries are "static" */
-				np->ipNetToMediaType = 4;
-			}
-			np->ipNetToMediaInfo.ntm_flags = ace->ace_flags;
-			return;
-		}
-		hashb = hashb->ar_next_entry;
-	}
-
-	/*
-	 * Allocate the first structure, the rest will be allocated
-	 * by snmp_append_data.
-	 */
-	if (m2ap->m2a_mpdata == NULL) {
-		m2ap->m2a_mpdata = allocb(sizeof (mib2_ipNetToMediaEntry_t),
-		    BPRI_HI);
-		if (m2ap->m2a_mpdata == NULL) {
-			DTRACE_PROBE(snmp_allocb_failure);
-			return;
-		}
-	}
-	/*
-	 * ace-> is a new entry to append
-	 */
 	ntme.ipNetToMediaPhysAddress.o_length =
 	    MIN(OCTET_LENGTH, ace->ace_hw_addr_length);
 	if ((ace->ace_flags & ACE_F_RESOLVED) == 0)
 	    ntme.ipNetToMediaPhysAddress.o_length = 0;
 	bcopy(ace->ace_hw_addr, ntme.ipNetToMediaPhysAddress.o_bytes,
 	    ntme.ipNetToMediaPhysAddress.o_length);
-	ntme.ipNetToMediaType = (ace->ace_flags & ACE_F_PERMANENT) ? 4 : 3;
 
-	ntme.ipNetToMediaInfo.ntm_flags = ace->ace_flags;
+	/*
+	 * All entries within the ARP cache are unique, and there are no
+	 * preexisting entries in the ipNetToMediaTable mp, so just add 'em.
+	 */
 	(void) snmp_append_data2(m2ap->m2a_mpdata, &m2ap->m2a_mptail,
 	    (char *)&ntme, sizeof (ntme));
 }
@@ -4048,7 +3892,7 @@ ar_wput(queue_t *q, mblk_t *mp)
 			return;
 		}
 		/*
-		 * The normal behaviour of a STREAMS module should be
+		 * The normal behavior of a STREAMS module should be
 		 * to pass down M_FLUSH messages. However there is a
 		 * complex sequence of events during plumb/unplumb that
 		 * can cause DLPI messages in the driver's queue to be
@@ -4112,12 +3956,12 @@ static boolean_t
 arp_say_ready(ace_t *ace)
 {
 	mblk_t *mp;
-	arl_t *arl;
+	arl_t *arl = ace->ace_arl;
+	arlphy_t *ap = arl->arl_phy;
 	arh_t *arh;
 	uchar_t *cp;
 
-	arl = ace->ace_arl;
-	mp = allocb(sizeof (*arh) + 2 * (arl->arl_hw_addr_length +
+	mp = allocb(sizeof (*arh) + 2 * (ace->ace_hw_addr_length +
 	    ace->ace_proto_addr_length), BPRI_MED);
 	if (mp == NULL) {
 		/* skip a beat on allocation trouble */
@@ -4127,18 +3971,18 @@ arp_say_ready(ace_t *ace)
 	}
 	/* Tell IP address is now usable */
 	arh = (arh_t *)mp->b_rptr;
-	U16_TO_BE16(arl->arl_arp_hw_type, arh->arh_hardware);
+	U16_TO_BE16(ap->ap_arp_hw_type, arh->arh_hardware);
 	U16_TO_BE16(ace->ace_proto, arh->arh_proto);
-	arh->arh_hlen = arl->arl_hw_addr_length;
+	arh->arh_hlen = ace->ace_hw_addr_length;
 	arh->arh_plen = ace->ace_proto_addr_length;
 	U16_TO_BE16(ARP_REQUEST, arh->arh_operation);
 	cp = (uchar_t *)(arh + 1);
-	bcopy(ace->ace_hw_addr, cp, arl->arl_hw_addr_length);
-	cp += arl->arl_hw_addr_length;
+	bcopy(ace->ace_hw_addr, cp, ace->ace_hw_addr_length);
+	cp += ace->ace_hw_addr_length;
 	bcopy(ace->ace_proto_addr, cp, ace->ace_proto_addr_length);
 	cp += ace->ace_proto_addr_length;
-	bcopy(ace->ace_hw_addr, cp, arl->arl_hw_addr_length);
-	cp += arl->arl_hw_addr_length;
+	bcopy(ace->ace_hw_addr, cp, ace->ace_hw_addr_length);
+	cp += ace->ace_hw_addr_length;
 	bcopy(ace->ace_proto_addr, cp, ace->ace_proto_addr_length);
 	cp += ace->ace_proto_addr_length;
 	mp->b_wptr = cp;
@@ -4191,26 +4035,27 @@ ace_reschedule(ace_t *ace, void *arg)
 static void
 arl_reschedule(arl_t *arl)
 {
+	arlphy_t *ap = arl->arl_phy;
 	ace_resched_t art;
 	int i;
 	ace_t *ace;
 
-	i = arl->arl_defend_count;
-	arl->arl_defend_count = 0;
+	i = ap->ap_defend_count;
+	ap->ap_defend_count = 0;
 	/* If none could be sitting around, then don't reschedule */
 	if (i < arp_defend_rate) {
 		DTRACE_PROBE1(reschedule_none, arl_t *, arl);
 		return;
 	}
 	art.art_arl = arl;
-	while (arl->arl_defend_count < arp_defend_rate) {
+	while (ap->ap_defend_count < arp_defend_rate) {
 		art.art_naces = 0;
 		ar_ce_walk(ace_reschedule, &art);
 		for (i = 0; i < art.art_naces; i++) {
 			ace = art.art_aces[i];
 			ace->ace_flags |= ACE_F_DELAYED;
 			ace_set_timer(ace, B_FALSE);
-			if (++arl->arl_defend_count >= arp_defend_rate)
+			if (++ap->ap_defend_count >= arp_defend_rate)
 				break;
 		}
 		if (art.art_naces < ACE_RESCHED_LIST_LEN)
@@ -4229,6 +4074,7 @@ ar_wsrv(queue_t *q)
 {
 	ace_t *ace;
 	arl_t *arl;
+	arlphy_t *ap;
 	mblk_t *mp;
 	clock_t	ms;
 
@@ -4244,6 +4090,7 @@ ar_wsrv(queue_t *q)
 			if (ace->ace_flags & ACE_F_DYING)
 				continue;
 			arl = ace->ace_arl;
+			ap = arl->arl_phy;
 			if (ace->ace_flags & ACE_F_UNVERIFIED) {
 				ASSERT(ace->ace_flags & ACE_F_PUBLISH);
 				ASSERT(ace->ace_query_mp == NULL);
@@ -4252,7 +4099,7 @@ ar_wsrv(queue_t *q)
 				 * will give us the go-ahead to try again when
 				 * the link restarts.
 				 */
-				if (!arl->arl_link_up) {
+				if (ap->ap_link_down) {
 					DTRACE_PROBE1(timer_link_down,
 					    ace_t *, ace);
 					ace->ace_flags |= ACE_F_DAD_ABORTED;
@@ -4289,9 +4136,9 @@ ar_wsrv(queue_t *q)
 				 */
 				now = ddi_get_lbolt();
 				if (arp_defend_rate > 0 &&
-				    now - arl->arl_defend_start >
+				    now - ap->ap_defend_start >
 				    SEC_TO_TICK(arp_defend_period)) {
-					arl->arl_defend_start = now;
+					ap->ap_defend_start = now;
 					arl_reschedule(arl);
 				}
 				/*
@@ -4316,9 +4163,8 @@ ar_wsrv(queue_t *q)
 					    ace_t *, ace);
 					ace->ace_flags &= ~ACE_F_DELAYED;
 				} else if (arp_defend_rate > 0 &&
-				    (arl->arl_defend_count >= arp_defend_rate ||
-				    ++arl->arl_defend_count >=
-				    arp_defend_rate)) {
+				    (ap->ap_defend_count >= arp_defend_rate ||
+				    ++ap->ap_defend_count >= arp_defend_rate)) {
 					/*
 					 * If we're no longer allowed to send
 					 * unbidden defense messages, then just
@@ -4337,7 +4183,7 @@ ar_wsrv(queue_t *q)
 				    ace->ace_proto_addr_length,
 				    ace->ace_hw_addr,
 				    ace->ace_proto_addr,
-				    arl->arl_arp_addr,
+				    ap->ap_arp_addr,
 				    ace->ace_proto_addr, NULL);
 				ace->ace_last_bcast = now;
 				if (ace->ace_xmit_count == 0)
@@ -4403,15 +4249,21 @@ ar_xmit(arl_t *arl, uint32_t operation, uint32_t proto, uint32_t plen,
 	uint8_t	*cp;
 	uint_t	hlen;
 	mblk_t	*mp;
+	arlphy_t *ap = arl->arl_phy;
 
-	/* IFF_NOARP flag is set or interface down: do not send arp messages */
-	if ((arl->arl_flags & ARL_F_NOARP) || !arl->arl_link_up)
+	if (ap == NULL) {
+		DTRACE_PROBE1(xmit_no_arl_phy, arl_t *, arl);
+		return;
+	}
+
+	/* IFF_NOARP flag is set or link down: do not send arp messages */
+	if ((arl->arl_flags & ARL_F_NOARP) || ap->ap_link_down)
 		return;
 
-	mp = arl->arl_xmit_template;
-	if (mp == NULL || (mp = copyb(mp)) == NULL)
+	hlen = ap->ap_hw_addrlen;
+	if ((mp = copyb(ap->ap_xmit_mp)) == NULL)
 		return;
-	hlen = arl->arl_hw_addr_length;
+
 	mp->b_cont = allocb(AR_LL_HDR_SLACK + ARH_FIXED_LEN + (hlen * 4) +
 	    plen + plen, BPRI_MED);
 	if (mp->b_cont == NULL) {
@@ -4421,7 +4273,7 @@ ar_xmit(arl_t *arl, uint32_t operation, uint32_t proto, uint32_t plen,
 
 	/* Get the L2 destination address for the message */
 	if (haddr2 == NULL)
-		dstaddr = arl->arl_arp_addr;
+		dstaddr = ap->ap_arp_addr;
 	else if (dstaddr == NULL)
 		dstaddr = haddr2;
 
@@ -4429,7 +4281,7 @@ ar_xmit(arl_t *arl, uint32_t operation, uint32_t proto, uint32_t plen,
 	 * Figure out where the target hardware address goes in the
 	 * DL_UNITDATA_REQ header, and copy it in.
 	 */
-	cp = mi_offset_param(mp, arl->arl_xmit_template_addr_offset, hlen);
+	cp = mi_offset_param(mp, ap->ap_xmit_addroff, hlen);
 	ASSERT(cp != NULL);
 	if (cp == NULL) {
 		freemsg(mp);
@@ -4441,7 +4293,7 @@ ar_xmit(arl_t *arl, uint32_t operation, uint32_t proto, uint32_t plen,
 	cp = mp->b_cont->b_rptr + (AR_LL_HDR_SLACK + hlen + hlen);
 	mp->b_cont->b_rptr = cp;
 	arh = (arh_t *)cp;
-	U16_TO_BE16(arl->arl_arp_hw_type, arh->arh_hardware);
+	U16_TO_BE16(ap->ap_arp_hw_type, arh->arh_hardware);
 	U16_TO_BE16(proto, arh->arh_proto);
 	arh->arh_hlen = (uint8_t)hlen;
 	arh->arh_plen = (uint8_t)plen;
