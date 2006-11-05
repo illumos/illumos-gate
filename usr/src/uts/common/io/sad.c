@@ -377,7 +377,7 @@ apush_iocdata(
 {
 	int i, ret;
 	struct copyresp *csp;
-	struct strapush *sap;
+	struct strapush *sap = NULL;
 	struct autopush *ap, *ap_tmp;
 	struct saddev *sadp;
 	uint_t size;
@@ -390,15 +390,16 @@ apush_iocdata(
 	}
 	if (mp->b_cont) {
 		/*
-		 * sap needed only if mp->b_cont is set.  first figure out
-		 * the size of the sap structure and then prepare caller
-		 * supplied data for access with miocpullup().
+		 * sap needed only if mp->b_cont is set.  figure out the
+		 * size of the expected sap structure and make sure
+		 * enough data was supplied.
 		 */
-		size = sizeof (struct strapush);
-		if (SAD_VER(csp->cp_cmd) == 0)
-			size -= sizeof (struct apdata);
-		if ((ret = miocpullup(mp, size)) != 0) {
-			miocnak(qp, mp, 0, ret);
+		if (SAD_VER(csp->cp_cmd) == 1)
+			size = STRAPUSH_V1_LEN;
+		else
+			size = STRAPUSH_V0_LEN;
+		if (MBLKL(mp->b_cont) < size) {
+			miocnak(qp, mp, 0, EINVAL);
 			return;
 		}
 		sap = (struct strapush *)mp->b_cont->b_rptr;
