@@ -1207,12 +1207,12 @@ recalc_xc_timeouts(void)
 	ASSERT(nrnode == 1);
 	if (nrnode < 1) {
 		cmn_err(CE_WARN, "recalc_xc_timeouts: platform node missing");
-		return;
+		goto done;
 	}
 
 	if (md_get_prop_val(mdp, platlist[0],
 	    "inter-cpu-latency", &latency) == -1)
-		return;
+		goto done;
 
 	/*
 	 * clock.h defines an assembly-language macro
@@ -1297,4 +1297,9 @@ recalc_xc_timeouts(void)
 			xt_sync(cpuset);
 		}
 	}
+
+done:
+	if (nrnode > 0)
+		md_free_scan_dag(mdp, &platlist);
+	(void) md_fini_handle(mdp);
 }

@@ -243,6 +243,7 @@ cif_check_cpus(void)
 
 done:
 	kmem_free(listp, listsz);
+	(void) md_fini_handle(mdp);
 }
 
 void
