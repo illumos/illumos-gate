@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/usb_as/Makefile
@@ -28,7 +28,7 @@
 #	kernel module. sparc architecture dependent
 #
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -66,6 +66,14 @@ LDFLAGS		+= -dy -Nmisc/usba -Nmisc/audiosup -Nmisc/mixer -Nmisc/amsrc2
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 .KEEP_STATE:
 

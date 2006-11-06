@@ -24,7 +24,7 @@
 #
 # uts/sparc/cardbus/Makefile
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the cardbus kernel module.
 #
@@ -77,6 +77,17 @@ CPPFLAGS        +=      -DHOTPLUG
 
 #	dependency
 LDFLAGS	+=	-dy -Nmisc/busra -Nmisc/pcmcia -Nmisc/hpcsvc
+
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 
 #
 #	Default build targets.

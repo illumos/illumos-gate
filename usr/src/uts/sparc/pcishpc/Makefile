@@ -60,6 +60,14 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 LDFLAGS		+= -dy -Nmisc/hpcsvc
 
 #
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+
+#
 #	Default build targets.
 #
 .KEEP_STATE:

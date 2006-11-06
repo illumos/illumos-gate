@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This file makes the PCMCIA Event Manager driver for a intel system
 #
@@ -63,6 +63,13 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DPEM_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
+
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 #
 #	Default build targets.

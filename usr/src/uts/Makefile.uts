@@ -164,12 +164,6 @@ LINT.c =	$(LINT) -c -dirout=$(LINTS_DIR) $(LINTFLAGS) $(LINT_DEFS) $(CPPFLAGS)
 # reasonable manner, please augment LINTTAGS in your module Makefile
 # instead.
 LINTTAGS	=
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 LINTFLAGS_sparc_32	= $(LINTCCMODE) -nsxmuF -errtags=yes
 LINTFLAGS_sparc_64	= $(LINTFLAGS_sparc_32) -Xarch=v9

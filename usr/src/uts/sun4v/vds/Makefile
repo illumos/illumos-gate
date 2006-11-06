@@ -25,7 +25,7 @@
 #
 # uts/sun4v/vds/Makefile
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the vds driver module.
 #
@@ -79,6 +79,14 @@ LDFLAGS += -dy -Nmisc/ldc -Nmisc/platsvc
 # Manually turn on C99 compilation until the sync with snv_38 re-enables it
 #
 C99MODE = $(C99_ENABLE)
+
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 #
 #	Default build targets.

@@ -83,6 +83,15 @@ CPPFLAGS += -DBCM_SW_WORKAROUNDS -DPX_MOD_NAME=pxb_bcm
 LDFLAGS += -dy -Nmisc/pcie -Nmisc/pcishpc -Nmisc/pcihp -Nmisc/pciehpc
 
 #
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+
+#
 #	Default build targets.
 #
 .KEEP_STATE:

@@ -75,6 +75,14 @@ CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -Nfs/procfs -Nbrand/lx_brand
 
 #
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+#
 #	Default build targets.
 #
 .KEEP_STATE:

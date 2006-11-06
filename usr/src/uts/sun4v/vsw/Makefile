@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # uts/sun4v/vsw/Makefile
 #
@@ -84,6 +84,17 @@ LDFLAGS += -dy -Nmisc/ldc -Nmisc/mac -Nmisc/platsvc
 # C99 mode also gives us macros such as __func__
 #
 C99MODE = $(99_ENABLE)
+
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 
 #
 #	Default build targets.

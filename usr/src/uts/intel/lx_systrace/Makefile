@@ -43,6 +43,13 @@ CPPFLAGS += -I$(UTSBASE)/common/brand/lx
 
 LDFLAGS         += -dy -Ndrv/dtrace -Nbrand/lx_brand
 
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_STATIC_UNUSED
+
 .KEEP_STATE:
 
 def:		$(DEF_DEPS)

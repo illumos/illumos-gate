@@ -25,7 +25,7 @@
 # uts/i86pc/audioixp/Makefile
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of high definition audio
 #	driver (audioixp) kernel module.
@@ -67,6 +67,13 @@ LDFLAGS		+= -dy -Nmisc/amsrc2 -Nmisc/audiosup -Nmisc/mixer
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 #
 #	Default build targets.

@@ -54,7 +54,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # lint pass one enforcement
 #
-CFLAGS		+= -v
+CFLAGS		+= $(CCVERBOSE)
 
 #
 # Turn on doubleword alignment for 64 bit registers
@@ -65,6 +65,14 @@ CFLAGS		+= -dalign
 # Module Dependencies
 #
 LDFLAGS		+= -dy -Nmisc/ds -Ndrv/drctl
+
+#
+# For now, disable these lint checks; maintainers should endeavor
+# to investigate and remove these for maximum lint coverage.
+# Please do not carry these forward to new Makefiles.
+#
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 #
 # Default build targets.
