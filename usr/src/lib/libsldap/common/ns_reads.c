@@ -1988,7 +1988,7 @@ multi_result(ns_ldap_cookie_t *cookie)
 			if (rc == LDAP_SUCCESS) {
 				if ((cookie->ctrlCookie == NULL) ||
 					(cookie->ctrlCookie->bv_val == NULL) ||
-					(*cookie->ctrlCookie->bv_val == NULL))
+					(cookie->ctrlCookie->bv_len == 0))
 					finished = 1;
 			}
 			ldap_controls_free(retCtrls);
