@@ -36,9 +36,7 @@
 #include <sys/modctl.h>
 #include <sys/pci.h>
 #include <sys/pci_impl.h>
-#include <sys/sunddi.h>
 #include <sys/sunndi.h>
-#include <sys/sysmacros.h>
 #include <sys/pcie.h>
 #include <sys/pcie_impl.h>
 #include <sys/promif.h>
@@ -150,38 +148,39 @@ static void	pcie_nvidia_error_init(dev_info_t *, ddi_acc_handle_t,
 static void	pcie_nvidia_error_fini(ddi_acc_handle_t, uint16_t, uint16_t);
 
 /*
- * PCI-Express error initialization.
+ * modload support
  */
+
+struct modlmisc modlmisc	= {
+	&mod_miscops,	/* Type	of module */
+	"PCI Express Error Support %I%"
+};
+
+struct modlinkage modlinkage = {
+	MODREV_1, (void	*)&modlmisc, NULL
+};
+
 int
-pcie_error_init(dev_info_t *cdip)
+_init(void)
 {
-	ddi_acc_handle_t	cfg_hdl;
-	int status;
+	return (mod_install(&modlinkage));
+}
 
-	if (pci_config_setup(cdip, &cfg_hdl) != DDI_SUCCESS)
-		return (DDI_FAILURE);
+int
+_fini()
+{
+	return (mod_remove(&modlinkage));
+}
 
-	status = pcie_error_enable(cdip, cfg_hdl);
-
-	pci_config_teardown(&cfg_hdl);
-	return (status);
+int
+_info(struct modinfo *modinfop)
+{
+	return (mod_info(&modlinkage, modinfop));
 }
 
 /*
- * PCI-Express CK8-04 child device de-initialization.
+ * PCI-Express error initialization.
  */
-void
-pcie_error_fini(dev_info_t *cdip)
-{
-	ddi_acc_handle_t	cfg_hdl;
-
-	if (pci_config_setup(cdip, &cfg_hdl) != DDI_SUCCESS)
-		return;
-
-	pcie_error_disable(cdip, cfg_hdl);
-
-	pci_config_teardown(&cfg_hdl);
-}
 
 /*
  * Enable generic pci-express interrupts and error handling.

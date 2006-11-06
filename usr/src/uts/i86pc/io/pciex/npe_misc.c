@@ -42,7 +42,7 @@
  * Prototype declaration
  */
 void	npe_query_acpi_mcfg(dev_info_t *dip);
-void	npe_ck804_fix_aer_ptr(dev_info_t *child);
+void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 
 /*
@@ -101,28 +101,19 @@ npe_query_acpi_mcfg(dev_info_t *dip)
  * NOTE: BIOS is disabling this, it needs to be enabled temporarily
  */
 void
-npe_ck804_fix_aer_ptr(dev_info_t *child)
+npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl)
 {
-	ushort_t		cya1;
-	ddi_acc_handle_t	config_handle;
+	ushort_t cya1;
 
-	if (pci_config_setup(child, &config_handle) != DDI_SUCCESS)
+	if ((pci_config_get16(cfg_hdl, PCI_CONF_VENID) != NVIDIA_VENDOR_ID) &&
+	    (pci_config_get16(cfg_hdl, PCI_CONF_DEVID) !=
+	    NVIDIA_CK804_DEVICE_ID))
 		return;
 
-	if ((pci_config_get16(config_handle, PCI_CONF_VENID) !=
-	    NVIDIA_VENDOR_ID) && (pci_config_get16(config_handle,
-	    PCI_CONF_DEVID) != NVIDIA_CK804_DEVICE_ID)) {
-		pci_config_teardown(&config_handle);
-		return;
-	}
-
-	cya1 =  pci_config_get16(config_handle, NVIDIA_CK804_VEND_CYA1_OFF);
+	cya1 =  pci_config_get16(cfg_hdl, NVIDIA_CK804_VEND_CYA1_OFF);
 	if (!(cya1 & ~NVIDIA_CK804_VEND_CYA1_ERPT_MASK))
-		(void) pci_config_put16(config_handle,
-		    NVIDIA_CK804_VEND_CYA1_OFF,
+		(void) pci_config_put16(cfg_hdl, NVIDIA_CK804_VEND_CYA1_OFF,
 		    cya1 | NVIDIA_CK804_VEND_CYA1_ERPT_VAL);
-
-	pci_config_teardown(&config_handle);
 }
 
 

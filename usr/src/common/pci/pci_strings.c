@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +42,10 @@ const pci_class_strings_t class_pci[] = {
 	1, 5, 0x20,	"ATA controller with single DMA",	"ata",
 	1, 5, 0x30,	"ATA controller with chained DMA",	"ata",
 	1, 6, 0,	"Serial ATA Direct Port Access (DPA)",	"sata",
+	1, 6, 1,	"SATA AHCI 1.0 Interface",		"sata",
+	1, 6, 2,	"Serial Storage Bus Interface",		"sata",
+	1, 7, 0,	"Serial Attached SCSI Controller",	"sas",
+	1, 7, 1,	"Serial Storage Bus Interface",		"sas",
 	1, 0x80, 0,	"Mass storage controller",		"unknown",
 
 	2, 0, 0,	"Ethernet controller",			"etherne",
@@ -63,6 +66,7 @@ const pci_class_strings_t class_pci[] = {
 	4, 0, 0,	"Video device",				"video",
 	4, 1, 0,	"Audio device",				"audio",
 	4, 2, 0,	"Computer Telephony device",		"teleph",
+	4, 3, 0,	"Mixed Mode device",			"mixed",
 	4, 0x80, 0,	"Multimedia device",			"unknown",
 
 	5, 0, 0,	"Ram",					"ram",
@@ -83,6 +87,8 @@ const pci_class_strings_t class_pci[] = {
 	6, 9, 0x40,	"Semi-transparent PCI-PCI primary bridge",   "stpci",
 	6, 9, 0x80,	"Semi-transparent PCI-PCI secondary bridge", "stpci",
 	6, 0xA, 0,	"Infiniband-PCI bridge",		"ib-pci",
+	6, 0xB, 0,	"AS Custom Interface bridge",		"as-pci",
+	6, 0xB, 1,	"ASI-SIG Defined Portal Interface",	"as-pci",
 	6, 0x80, 0,	"Bridge device",			"unknown",
 
 	7, 0, 0,	"Serial controller",			"serial",
@@ -118,9 +124,12 @@ const pci_class_strings_t class_pci[] = {
 	8, 2, 0,	"8254 system timer",			"timer",
 	8, 2, 1,	"ISA system timer",			"timer",
 	8, 2, 2,	"EISA system timers",			"timer",
+	8, 2, 3,	"High Performance Event timer",		"timer",
 	8, 3, 0,	"Real time clock",			"rtc",
 	8, 3, 1,	"ISA real time clock",			"rtc",
 	8, 4, 0,	"PCI Hot-Plug controller",		"pcihp",
+	8, 5, 0,	"SD Host controller",			"sd-hc",
+	8, 6, 0,	"IOMMU controller",			"iommu",
 	8, 0x80, 0,	"System peripheral",			"unknown",
 
 	9, 0, 0,	"Keyboard controller",			"keyboar",
@@ -128,7 +137,7 @@ const pci_class_strings_t class_pci[] = {
 	9, 2, 0,	"Mouse controller",			"mouse",
 	9, 3, 0,	"Scanner controller",			"scanner",
 	9, 4, 0,	"Gameport controller",			"gamepor",
-	9, 4, 1,	"Gameport Legacy controller",		"gamepor",
+	9, 4, 0x10,	"Gameport Legacy controller",		"gamepor",
 	9, 0x80, 0,	"Input controller",			"unknown",
 
 	10, 0, 0,	"Generic Docking station",		"docking",
@@ -141,6 +150,7 @@ const pci_class_strings_t class_pci[] = {
 	11, 0x20, 0,	"Power-PC",				"powerpc",
 	11, 0x30, 0,	"MIPS",					"mips",
 	11, 0x40, 0,	"Co-processor",				"coproc",
+	11, 0x80, 0,	"Processor",				"unknown",
 
 	12, 0, 0,	"FireWire (IEEE 1394)",			"1394",
 	12, 0, 0x10,	"FireWire (IEEE 1394) OpenHCI compliant", "1394",
@@ -159,9 +169,11 @@ const pci_class_strings_t class_pci[] = {
 	12, 7, 2,	"IPMI Block Transfer Interface",	"ipmi",
 	12, 8, 0,	"SERCOS Interface Standard",		"sercos",
 	12, 9, 0,	"CANbus",				"canbus",
+	12, 0x80, 0,	"Serial Bus Controller",		"unknown",
 
 	13, 0, 0,	"IRDA Wireless controller",		"irda",
 	13, 1, 0,	"Consumer IR Wireless controller",	"ir",
+	13, 1, 0x10,	"UWB Radio  controller",		"ir-uwb",
 	13, 0x10, 0,	"RF Wireless controller",		"rf",
 	13, 0x11, 0,	"Bluetooth Wireless controller",	"btooth",
 	13, 0x12, 0,	"Broadband Wireless controller",	"brdband",
@@ -170,11 +182,13 @@ const pci_class_strings_t class_pci[] = {
 	13, 0x80, 0,	"Wireless controller",			"unknown",
 
 	14, 0, 0,	"I20 controller",			"i2o",
+	14, 0, 1,	"I20 Arch Specification 1.0",		"i2o",
 
 	15, 1, 0,	"TV Satellite controller",		"tv",
 	15, 2, 0,	"Audio Satellite controller",		"audio",
 	15, 3, 0,	"Voice Satellite controller",		"voice",
 	15, 4, 0,	"Data Satellite controller",		"data",
+	15, 0x80, 0,	"Satellite Comm controller",		"unknown",
 
 	16, 0, 0,	"Network and computing en/decryption",	"netcryp",
 	16, 1, 0,	"Entertainment en/decryption",		"entcryp",

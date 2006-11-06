@@ -20,6 +20,7 @@
 #
 #
 # uts/i86pc/npe/Makefile
+#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -56,14 +57,16 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# depends on misc/pcihp misc/acpica
+# depends on misc/pcihp, misc/acpica and misc/pcie
 #
 # For PCI Hotplug support, the misc/pcihp module provides devctl control
 # device and cb_ops functions to support hotplug operations.
 #
 # acpica supplies ACPI access routines
 #
-LDFLAGS	+= -dy -Nmisc/pcihp -Nmisc/acpica
+# pcie supplies PCI Express fabric error support
+#
+LDFLAGS	+= -dy -Nmisc/pcihp -Nmisc/acpica -Nmisc/pcie
 
 #
 # Name of the module is needed by the source, to distinguish from other

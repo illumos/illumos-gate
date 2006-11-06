@@ -119,6 +119,8 @@ extern "C" {
 #define	PCIE_DEVCAP_ATTN_INDICATOR	0x2000	/* Attn Indicator Present */
 #define	PCIE_DEVCAP_PWR_INDICATOR	0x4000	/* Power Indicator Present */
 
+#define	PCIE_DEVCAP_ROLE_BASED_ERR_REP	0x8000	/* Role Based Error Reporting */
+
 #define	PCIE_DEVCAP_PLMT_VAL_SHIFT	18	/* Power Limit Value Shift */
 #define	PCIE_DEVCAP_PLMT_VAL_MASK	0xFF	/* Power Limit Value Mask */
 
@@ -363,9 +365,21 @@ extern "C" {
  * PCI-Express Enhanced Capability Identifier Values
  */
 #define	PCIE_EXT_CAP_ID_AER		0x1	/* Advanced Error Handling */
-#define	PCIE_EXT_CAP_ID_VC		0x2	/* Virtual Channel */
+#define	PCIE_EXT_CAP_ID_VC		0x2	/* Virtual Channel, no MFVC */
 #define	PCIE_EXT_CAP_ID_SER		0x3	/* Serial Number */
 #define	PCIE_EXT_CAP_ID_PWR_BUDGET	0x4	/* Power Budgeting */
+#define	PCIE_EXT_CAP_ID_RC_LINK_DECL	0x5	/* RC Link Declaration */
+#define	PCIE_EXT_CAP_ID_RC_INT_LINKCTRL	0x6	/* RC Internal Link Control */
+#define	PCIE_EXT_CAP_ID_RC_EVNT_CEA	0x7	/* RC Event Collector */
+						/* Endpoint Association */
+#define	PCIE_EXT_CAP_ID_MFVC		0x8	/* Multi-func Virtual Channel */
+#define	PCIE_EXT_CAP_ID_VC_WITH_MFVC	0x9	/* Virtual Channel w/ MFVC */
+#define	PCIE_EXT_CAP_ID_RCRB		0xA	/* Root Complex Register Blck */
+#define	PCIE_EXT_CAP_ID_VS		0xB	/* Vendor Spec Extended Cap */
+#define	PCIE_EXT_CAP_ID_CAC		0xC	/* Config Access Correlation */
+#define	PCIE_EXT_CAP_ID_ACS		0xD	/* Access Control Services */
+#define	PCIE_EXT_CAP_ID_ARI		0xE	/* Alternative Routing ID */
+#define	PCIE_EXT_CAP_ID_ATS		0xF	/* Address Translation Svcs */
 
 /*
  * PCI-Express Advanced Error Reporting Extended Capability Offsets

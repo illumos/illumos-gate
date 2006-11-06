@@ -56,9 +56,18 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-#	Dependency
+# depends on misc/hpcsvc, misc/acpica and misc/pcie
 #
-LDFLAGS		+= -dy -Nmisc/hpcsvc -Nmisc/acpica
+# For Hotplug support, the misc/hpcsvc module provides various hooks
+# to support hotplug operations.
+#
+# acpica supplies ACPI access routines
+#
+# pcie supplies PCI Express fabric error support
+#
+
+#
+LDFLAGS		+= -dy -Nmisc/hpcsvc -Nmisc/acpica -Nmisc/pcie
 
 #
 # For now, disable these lint checks; maintainers should endeavor

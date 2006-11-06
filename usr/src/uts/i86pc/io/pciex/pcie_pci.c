@@ -621,6 +621,7 @@ static int
 pepb_initchild(dev_info_t *child)
 {
 	struct ddi_parent_private_data *pdptr;
+	ddi_acc_handle_t cfg_hdl;
 	char name[MAXNAMELEN];
 
 	if (pepb_name_child(child, name, MAXNAMELEN) != DDI_SUCCESS)
@@ -676,8 +677,10 @@ pepb_initchild(dev_info_t *child)
 	} else
 		ddi_set_parent_data(child, NULL);
 
-	if (pcie_error_init(child) != DDI_SUCCESS)
-		return (DDI_FAILURE);
+	if (pci_config_setup(child, &cfg_hdl) == DDI_SUCCESS) {
+		(void) pcie_error_enable(child, cfg_hdl);
+		pci_config_teardown(&cfg_hdl);
+	}
 
 	return (DDI_SUCCESS);
 }
@@ -685,13 +688,17 @@ pepb_initchild(dev_info_t *child)
 static void
 pepb_uninitchild(dev_info_t *dip)
 {
-	struct ddi_parent_private_data *pdptr;
+	ddi_acc_handle_t		cfg_hdl;
+	struct ddi_parent_private_data	*pdptr;
 
 	/*
 	 * Do it way early.
 	 * Otherwise ddi_map() call form pcie_error_fini crashes
 	 */
-	pcie_error_fini(dip);
+	if (pci_config_setup(dip, &cfg_hdl) == DDI_SUCCESS) {
+		pcie_error_disable(dip, cfg_hdl);
+		pci_config_teardown(&cfg_hdl);
+	}
 
 	if ((pdptr = ddi_get_parent_data(dip)) != NULL) {
 		kmem_free(pdptr, (sizeof (*pdptr) + sizeof (struct intrspec)));

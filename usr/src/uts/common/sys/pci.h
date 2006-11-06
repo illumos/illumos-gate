@@ -221,11 +221,12 @@ extern "C" {
  */
 #define	PCI_MASS_SCSI		0x0	/* SCSI bus Controller */
 #define	PCI_MASS_IDE		0x1	/* IDE Controller */
-#define	PCI_MASS_FD		0x2	/* floppy disk Controller */
+#define	PCI_MASS_FD		0x2	/* Floppy disk Controller */
 #define	PCI_MASS_IPI		0x3	/* IPI bus Controller */
 #define	PCI_MASS_RAID		0x4	/* RAID Controller */
 #define	PCI_MASS_ATA		0x5	/* ATA Controller */
 #define	PCI_MASS_SATA		0x6	/* Serial ATA */
+#define	PCI_MASS_SAS		0x7	/* Serial Attached SCSI (SAS) Cntrlr */
 #define	PCI_MASS_OTHER		0x80	/* Other Mass Storage Controller */
 
 /*
@@ -243,6 +244,19 @@ extern "C" {
  */
 #define	PCI_ATA_IF_SINGLE_DMA	0x20	/* ATA controller with single DMA */
 #define	PCI_ATA_IF_CHAINED_DMA	0x30	/* ATA controller with chained DMA */
+
+/*
+ * programming interface for ATA (subclass 6) for SATA
+ */
+#define	PCI_SATA_VS_INTERFACE	0x0	/* SATA Ctlr Vendor Specific Intfc */
+#define	PCI_SATA_AHCI_INTERFACE	0x1	/* SATA Ctlr AHCI 1.0 Interface */
+#define	PCI_SATA_SSB_INTERFACE	0x2	/* Serial Storage Bus Interface */
+
+/*
+ * programming interface for ATA (subclass 7) for SAS
+ */
+#define	PCI_SAS_CONTROLLER	0x0	/* SAS Controller */
+#define	PCI_SAS_BUS_INTERFACE	0x1	/* Serial Storage Bus Interface */
 
 /*
  * PCI Sub-class codes - base class 0x2 (Network controllers)
@@ -276,6 +290,7 @@ extern "C" {
 #define	PCI_MM_VIDEO		0x0	/* Video device */
 #define	PCI_MM_AUDIO		0x1	/* Audio device */
 #define	PCI_MM_TELEPHONY	0x2	/* Computer Telephony device */
+#define	PCI_MM_MIXED_MODE	0x3	/* Mixed Mode device */
 #define	PCI_MM_OTHER		0x80	/* Other Multimedia Device */
 
 /*
@@ -299,6 +314,7 @@ extern "C" {
 #define	PCI_BRIDGE_RACE		0x8	/* RACE-way Bridge */
 #define	PCI_BRIDGE_STPCI	0x9	/* Semi-transparent PCI/PCI Bridge */
 #define	PCI_BRIDGE_IB		0xA	/* InfiniBand/PCI host Bridge */
+#define	PCI_BRIDGE_AS		0xB	/* AS/PCI host Bridge */
 #define	PCI_BRIDGE_OTHER	0x80	/* PCI/Other Bridge Device */
 
 /*
@@ -322,6 +338,12 @@ extern "C" {
 						/* facing system processor */
 #define	PCI_BRIDGE_STPCI_IF_SECONDARY	0x80	/* secondary PCI side bus */
 						/* facing system processor */
+
+/*
+ * programming interface for Bridges class 0x6 (subclass 0B) AS bridge
+ */
+#define	PCI_BRIDGE_AS_CUSTOM_INTFC	0x0	/* Custom interface */
+#define	PCI_BRIDGE_AS_PORTAL_INTFC	0x1	/* ASI-SIG Portal Interface */
 
 /*
  * PCI Sub-class codes - base class 0x7 (communication devices)
@@ -370,7 +392,9 @@ extern "C" {
 #define	PCI_PERIPH_DMA		0x1	/* Generic DMA Controller */
 #define	PCI_PERIPH_TIMER	0x2	/* Generic System Timer Controller */
 #define	PCI_PERIPH_RTC		0x3	/* Generic RTC Controller */
-#define	PCI_PERIPH_HPC		0x3	/* Generic PCI Hot-Plug Controller */
+#define	PCI_PERIPH_HPC		0x4	/* Generic PCI Hot-Plug Controller */
+#define	PCI_PERIPH_SD_HC	0x5	/* SD Host Controller */
+#define	PCI_PERIPH_IOMMU	0x6	/* IOMMU */
 #define	PCI_PERIPH_OTHER	0x80	/* Other System Peripheral */
 
 /*
@@ -395,6 +419,7 @@ extern "C" {
 #define	PCI_PERIPH_TIMER_IF_GENERIC	0x0	/* Generic 8254 system timer */
 #define	PCI_PERIPH_TIMER_IF_ISA		0x1	/* ISA system timers */
 #define	PCI_PERIPH_TIMER_IF_EISA	0x2	/* EISA system timers (two) */
+#define	PCI_PERIPH_TIMER_IF_HPET	0x3	/* High Perf Event timer */
 
 /*
  * Programming interfaces for class 0x8 / subclass 0x3 (realtime clock)
@@ -419,13 +444,13 @@ extern "C" {
 #define	PCI_INPUT_GAMEPORT_IF_LEGACY	0x10	/* Legacy controller */
 
 /*
- * PCI Sub-class codes - base class 0xa
+ * PCI Sub-class codes - base class 0xA
  */
 #define	PCI_DOCK_GENERIC	0x00	/* Generic Docking Station */
 #define	PCI_DOCK_OTHER		0x80	/* Other Type of Docking Station */
 
 /*
- * PCI Sub-class codes - base class 0xb
+ * PCI Sub-class codes - base class 0xB
  */
 #define	PCI_PROCESSOR_386	0x0	/* 386 */
 #define	PCI_PROCESSOR_486	0x1	/* 486 */
@@ -434,9 +459,10 @@ extern "C" {
 #define	PCI_PROCESSOR_POWERPC	0x20	/* PowerPC */
 #define	PCI_PROCESSOR_MIPS	0x30	/* MIPS */
 #define	PCI_PROCESSOR_COPROC	0x40	/* Co-processor */
+#define	PCI_PROCESSOR_OTHER	0x80	/* Other processors */
 
 /*
- * PCI Sub-class codes - base class 0xc (Serial Controllers)
+ * PCI Sub-class codes - base class 0xC (Serial Controllers)
  */
 #define	PCI_SERIAL_FIRE		0x0	/* FireWire (IEEE 1394) */
 #define	PCI_SERIAL_ACCESS	0x1	/* ACCESS.bus */
@@ -448,6 +474,13 @@ extern "C" {
 #define	PCI_SERIAL_IPMI		0x7	/* IPMI */
 #define	PCI_SERIAL_SERCOS	0x8	/* SERCOS Interface Std (IEC 61491) */
 #define	PCI_SERIAL_CANBUS	0x9	/* CANbus */
+#define	PCI_SERIAL_OTHER	0x80	/* Other Serial Bus Controllers */
+
+/*
+ * Programming interfaces for class 0xC / subclass 0x0 (Firewire)
+ */
+#define	PCI_SERIAL_FIRE_WIRE  		0x00	/* IEEE 1394 (Firewire) */
+#define	PCI_SERIAL_FIRE_1394_HCI 	0x10	/* 1394 OpenHCI Host Cntrlr */
 
 /*
  * Programming interfaces for class 0xC / subclass 0x3 (USB controller)
@@ -466,7 +499,7 @@ extern "C" {
 #define	PCI_SERIAL_IPMI_IF_BTI		0x2	/* Block Transfer Interface */
 
 /*
- * PCI Sub-class codes - base class 0xd (Wireless controllers)
+ * PCI Sub-class codes - base class 0xD (Wireless controllers)
  */
 #define	PCI_WIRELESS_IRDA		0x0	/* iRDA Compatible Controller */
 #define	PCI_WIRELESS_IR			0x1	/* Consumer IR Controller */
@@ -478,17 +511,25 @@ extern "C" {
 #define	PCI_WIRELESS_OTHER		0x80	/* Other Wireless Controllers */
 
 /*
- * PCI Sub-class codes - base class 0xe (Intelligent I/O controllers)
+ * Programming interfaces for class 0xD / subclass 0x1 (Consumer IR controller)
  */
+#define	PCI_WIRELESS_IR_CONSUMER 	0x00	/* Consumer IR Controller */
+#define	PCI_WIRELESS_IR_UWB_RC 		0x10	/* UWB Radio Controller */
+
+/*
+ * PCI Sub-class codes - base class 0xE (Intelligent I/O controllers)
+ */
+#define	PCI_INTIO_MSG_FIFO		0x0	/* Message FIFO at off 40h */
 #define	PCI_INTIO_I20			0x1	/* I20 Arch Spec 1.0 */
 
 /*
- * PCI Sub-class codes - base class 0xf (Satellite Communication controllers)
+ * PCI Sub-class codes - base class 0xF (Satellite Communication controllers)
  */
 #define	PCI_SATELLITE_COMM_TV		0x01	/* TV */
 #define	PCI_SATELLITE_COMM_AUDIO	0x02	/* Audio */
 #define	PCI_SATELLITE_COMM_VOICE	0x03	/* Voice */
 #define	PCI_SATELLITE_COMM_DATA		0x04	/* DATA */
+#define	PCI_SATELLITE_COMM_OTHER	0x80	/* Other Satelite Comm Cntrlr */
 
 /*
  * PCI Sub-class codes - base class 0x10 (Encryption/Decryption controllers)
@@ -562,10 +603,13 @@ extern "C" {
 #define	PCI_CAP_ID_DEBUG_PORT	0xA	/* Debug Port supported */
 #define	PCI_CAP_ID_cPCI_CRC	0xB	/* CompactPCI central resource ctrl */
 #define	PCI_CAP_ID_PCI_HOTPLUG	0xC	/* PCI Hot Plug supported */
+#define	PCI_CAP_ID_P2P_SUBSYS	0xD	/* PCI bridge Sub-system ID */
 #define	PCI_CAP_ID_AGP_8X	0xE	/* AGP 8X supported */
 #define	PCI_CAP_ID_SECURE_DEV	0xF	/* Secure Device supported */
 #define	PCI_CAP_ID_PCI_E	0x10	/* PCI Express supported */
 #define	PCI_CAP_ID_MSI_X	0x11	/* MSI-X supported */
+#define	PCI_CAP_ID_SATA		0x12	/* SATA Data/Index Config supported */
+#define	PCI_CAP_ID_FLR		0x13	/* Function Level Reset supported */
 
 /*
  * Capability next entry pointer values

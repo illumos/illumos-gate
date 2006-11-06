@@ -156,7 +156,7 @@ static int npe_initchild(dev_info_t *child);
  * External support routine
  */
 extern void	npe_query_acpi_mcfg(dev_info_t *dip);
-extern void	npe_ck804_fix_aer_ptr(dev_info_t *child);
+extern void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 extern int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 
 /*
@@ -685,7 +685,8 @@ npe_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 static int
 npe_initchild(dev_info_t *child)
 {
-	char	name[80];
+	char			name[80];
+	ddi_acc_handle_t	cfg_hdl;
 
 	/*
 	 * Do not bind drivers to empty bridges.
@@ -760,11 +761,13 @@ npe_initchild(dev_info_t *child)
 		ddi_set_parent_data(child, NULL);
 
 	/*
-	 * Enable AER next pointer being displayed
+	 * Enable AER next pointer being displayed and PCIe Error initilization
 	 */
-	npe_ck804_fix_aer_ptr(child);
-
-	(void) pcie_error_init(child);
+	if (pci_config_setup(child, &cfg_hdl) == DDI_SUCCESS) {
+		npe_ck804_fix_aer_ptr(cfg_hdl);
+		(void) pcie_error_enable(child, cfg_hdl);
+		pci_config_teardown(&cfg_hdl);
+	}
 
 	return (DDI_SUCCESS);
 }
@@ -773,13 +776,17 @@ npe_initchild(dev_info_t *child)
 static int
 npe_removechild(dev_info_t *dip)
 {
-	struct ddi_parent_private_data *pdptr;
+	ddi_acc_handle_t		cfg_hdl;
+	struct ddi_parent_private_data	*pdptr;
 
 	/*
 	 * Do it way early.
 	 * Otherwise ddi_map() call form pcie_error_fini crashes
 	 */
-	pcie_error_fini(dip);
+	if (pci_config_setup(dip, &cfg_hdl) == DDI_SUCCESS) {
+		pcie_error_disable(dip, cfg_hdl);
+		pci_config_teardown(&cfg_hdl);
+	}
 
 	if ((pdptr = ddi_get_parent_data(dip)) != NULL) {
 		kmem_free(pdptr, (sizeof (*pdptr) + sizeof (struct intrspec)));

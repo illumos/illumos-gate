@@ -322,7 +322,7 @@ SYS_KMODS	+=
 #
 #	'Misc' Modules (/kernel/misc):
 #
-MISC_KMODS	+= pci_autoconfig bootdev acpica pciehpc gfx_private \
+MISC_KMODS	+= pci_autoconfig bootdev acpica pcie pciehpc gfx_private \
 		agpmaster drm
 
 #

@@ -19,15 +19,17 @@
 # CDDL HEADER END
 #
 #
-# uts/i86pc/pcie_pci/Makefile
+# uts/i86pc/pcie/Makefile
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the pcie_pci driver kernel
-#	module.
+#	This makefile drives the production of the kernel/misc/pcie module
+#	for PCI-E Error handling support in PCI-E nexus drivers.
+#
+#	i86pc implementation architecture dependent
 #
 
 #
@@ -38,11 +40,10 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= pcie_pci
-OBJECTS		= $(PCI_E_PCINEXUS_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PCI_E_PCINEXUS_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/i86pc/io/pciex
+MODULE		= pcie
+OBJECTS		= $(PCI_E_MISC_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCI_E_MISC_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
@@ -52,35 +53,9 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
-
-#
-# depends on misc/pcihp and misc/pcie
-#
-# For PCI Hotplug support, the misc/pcihp module provides devctl control
-# device and cb_ops functions to support hotplug operations.
-#
-# pcie supplies PCI Express fabric error support
-#
-LDFLAGS		+= -dy -Nmisc/pcihp -Nmisc/pcie
-
-#
-#	Override defaults to build a unique, local modstubs.o.
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-CLEANFILES	+= $(MODSTUBS_O)
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Default build targets.
@@ -107,4 +82,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/i86pc/Makefile.targ
-
