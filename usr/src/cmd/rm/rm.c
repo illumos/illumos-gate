@@ -64,8 +64,8 @@
 static	int	errcode;
 static	int interactive, recursive, silent; /* flags for command line options */
 
-static	void	rm(char *, int);
-static	void	undir(char *, int, dev_t, ino_t);
+static	int	rm(char *, int);
+static	int	undir(char *, int, dev_t, ino_t);
 static	int	yes(void);
 static	int	mypath(dev_t, ino_t);
 
@@ -76,7 +76,7 @@ static char *fullpath;
 static int initdirfd;
 
 static void push_name(char *name, int first);
-static void pop_name(int first);
+static int pop_name(int first);
 static void force_chdir(char *);
 static void ch_dir(char *);
 static char *get_filename(char *name);
@@ -90,11 +90,6 @@ static int	first_dir = 1;	/* flag set when first trying to remove a dir */
 	/* flag set when can't get dev/inode of a parent dir */
 static int	parent_err = 0;
 static avl_tree_t *tree;	/* tree to keep track of nodes visited */
-	/*
-	 * flag set when an attempt to move subdirectories during execution
-	 * of rm is discovered
-	 */
-static int	bad_chdir = 0;
 
 struct dir_id {
 	dev_t	dev;
@@ -179,16 +174,9 @@ main(int argc, char *argv[])
 
 	while (argc-- > 0) {
 		tree = NULL;
-		rm(*argv, 1);
-		while (bad_chdir) {
-			/*
-			 * If bad_chdir is set, the argument directory is not
-			 * deleted since rm does not continue with the recursion
-			 * Call rm() again on the same argument to remove it.
-			 */
-			bad_chdir = 0;
-			rm(*argv, 1);
-		}
+		/* Retry if rm() fails due to bad chdir */
+		while (rm(*argv, 1) < 0)
+			;
 		argv++;
 		destroy_tree(tree);
 	}
@@ -198,7 +186,7 @@ main(int argc, char *argv[])
 	/* NOTREACHED */
 }
 
-static void
+static int
 rm(char *path, int first)
 {
 	struct stat buffer;
@@ -214,7 +202,7 @@ rm(char *path, int first)
 			perror(path);
 			++errcode;
 		}
-		return;
+		return (0);
 	}
 
 	/* prevent removal of / but allow removal of sym-links */
@@ -223,7 +211,7 @@ rm(char *path, int first)
 		(void) fprintf(stderr,
 		    gettext("rm of %s is not allowed\n"), resolved_path);
 		errcode++;
-		return;
+		return (0);
 	}
 
 	/* prevent removal of . or .. (directly) */
@@ -235,7 +223,7 @@ rm(char *path, int first)
 		(void) fprintf(stderr,
 			gettext("rm of %s is not allowed\n"), path);
 		errcode++;
-		return;
+		return (0);
 	}
 	/*
 	 * If it's a directory, remove its contents.
@@ -249,7 +237,7 @@ rm(char *path, int first)
 			(void) fprintf(stderr,
 			    gettext("rm: %s is a directory\n"), path);
 			++errcode;
-			return;
+			return (0);
 		}
 
 		if (first_dir) {
@@ -258,16 +246,8 @@ rm(char *path, int first)
 			first_dir = 0;
 		}
 
-		undir(path, first, buffer.st_dev, buffer.st_ino);
-		return;
+		return (undir(path, first, buffer.st_dev, buffer.st_ino));
 	}
-	/*
-	 * If 'bad_chdir' is set, rm is in an unintended directory and tries
-	 * to unlink a file whose name is contained in 'path'. Return to
-	 * the calling function without proceeding with the argument.
-	 */
-	if (bad_chdir)
-		return;
 
 	filepath = get_filename(path);
 
@@ -291,7 +271,7 @@ rm(char *path, int first)
 			filepath, yeschr, nochr);
 		if (!yes()) {
 			free(filepath);
-			return;
+			return (0);
 		}
 	} else if (!silent) {
 		/*
@@ -318,7 +298,7 @@ rm(char *path, int first)
 			 */
 			if (!yes()) {
 				free(filepath);
-				return;
+				return (0);
 			}
 		}
 	}
@@ -334,7 +314,7 @@ rm(char *path, int first)
 	if (unlink(path) == FAIL) {
 		if (errno == ENOENT) {
 			free(filepath);
-			return;
+			return (0);
 		}
 #ifndef XPG4
 		if (!silent || interactive) {
@@ -349,9 +329,10 @@ rm(char *path, int first)
 	}
 
 	free(filepath);
+	return (0);
 }
 
-static void
+static int
 undir(char *path, int first, dev_t dev, ino_t ino)
 {
 	char	*newpath;
@@ -360,6 +341,7 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 	int	ismypath;
 	int	ret;
 	int	chdir_failed = 0;
+	int	bad_chdir = 0;
 	size_t	len;
 
 	push_name(path, first);
@@ -384,10 +366,8 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 		/*
 		 * If the answer is no, skip the directory.
 		 */
-		if (!yes()) {
-			pop_name(first);
-			return;
-		}
+		if (!yes())
+			return (pop_name(first));
 	}
 
 #ifdef XPG4
@@ -407,10 +387,8 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 			/*
 			 * If the answer is no, skip the directory.
 			 */
-			if (!yes()) {
-				pop_name(first);
-				return;
-			}
+			if (!yes())
+				return (pop_name(first));
 		}
 	}
 #endif
@@ -430,8 +408,7 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 			perror("rm");
 		}
 		errcode++;
-		pop_name(first);
-		return;
+		return (pop_name(first));
 	}
 
 	/*
@@ -464,8 +441,7 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 			    fullpath, yeschr, nochr);
 			if (!yes()) {
 				++errcode;
-				pop_name(first);
-				return;
+				return (pop_name(first));
 			}
 		}
 
@@ -492,8 +468,7 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 		}
 
 		/* Continue to next file/directory rather than exit */
-		pop_name(first);
-		return;
+		return (pop_name(first));
 	}
 
 	/*
@@ -552,7 +527,8 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 		 */
 		if (name->dd_fd >= maxfiles) {
 			(void) closedir(name);
-			rm(newpath, 0);
+			if (rm(newpath, 0) < 0)
+				bad_chdir = -1;
 			if (!chdir_failed)
 				name = opendir(".");
 			else
@@ -565,28 +541,20 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 				cleanup();
 				exit(2);
 			}
-		} else
-			rm(newpath, 0);
+		} else if (rm(newpath, 0) < 0)
+			bad_chdir = -1;
 
 		free(newpath);
-
-		/*
-		 * If an attempt to move files/directories during the execution
-		 * of rm is detected DO NOT proceed with the argument directory.
-		 * rm, in such a case, may have chdir() into a directory outside
-		 * the hierarchy of argument directory.
-		 */
-		if (bad_chdir) {
-			pop_name(first);
-			(void) closedir(name);
-			return;
-		}
+		if (bad_chdir)
+			break;
 	}
 
 	/*
 	 * Close the directory we just finished reading.
 	 */
 	(void) closedir(name);
+	if (bad_chdir)
+		return (-1);
 
 	/*
 	 * The contents of the directory have been removed.  If the
@@ -616,19 +584,16 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 
 	switch (ismypath) {
 	case 3:
-		pop_name(first);
-		return;
+		return (pop_name(first));
 	case 2:
 		(void) fprintf(stderr,
 		    gettext("rm: Cannot remove any directory in the path "
 			"of the current working directory\n%s\n"), fullpath);
 		++errcode;
-		pop_name(first);
-		return;
+		return (pop_name(first));
 	case 1:
 		++errcode;
-		pop_name(first);
-		return;
+		return (pop_name(first));
 	case 0:
 		break;
 	}
@@ -639,10 +604,8 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 	if (interactive) {
 		(void) fprintf(stderr, gettext("rm: remove %s: (%s/%s)? "),
 			fullpath, yeschr, nochr);
-		if (!yes()) {
-			pop_name(first);
-			return;
-		}
+		if (!yes())
+			return (pop_name(first));
 	}
 	if (rmdir(path) == FAIL) {
 		(void) fprintf(stderr,
@@ -651,7 +614,7 @@ undir(char *path, int first, dev_t dev, ino_t ino)
 		perror("");
 		++errcode;
 	}
-	pop_name(first);
+	return (pop_name(first));
 }
 
 
@@ -795,16 +758,17 @@ push_name(char *name, int first)
 	current_dir = newdir;
 }
 
-static void
+static int
 pop_name(int first)
 {
+	int	retval = 0;
 	char *slash;
 	struct	stat buffer;
 	struct	dir_id *remove_dir;
 
 	if (first) {
 		*fullpath = '\0';
-		return;
+		return (0);
 	}
 	slash = strrchr(fullpath, '/');
 	if (slash)
@@ -829,17 +793,16 @@ pop_name(int first)
 	 */
 	if ((current_dir->inode != buffer.st_ino) || (current_dir->dev !=
 	    buffer.st_dev)) {
-		if (!bad_chdir) {
-			(void) fprintf(stderr, gettext("rm: WARNING: "
-			    "A subdirectory of %s was moved or linked to "
-			    "another directory during the execution of rm\n"),
-			    fullpath);
-		}
-		bad_chdir = 1;
+		(void) fprintf(stderr, gettext("rm: WARNING: "
+		    "A subdirectory of %s was moved or linked to "
+		    "another directory during the execution of rm\n"),
+		    fullpath);
+		retval = -1;
 	}
 	remove_dir = current_dir;
 	current_dir = current_dir->next;
 	free(remove_dir);
+	return (retval);
 }
 
 static void
