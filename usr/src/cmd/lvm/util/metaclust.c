@@ -795,7 +795,7 @@ main(int argc, char **argv)
 	/* set timeout alarm signal, a value of 0 will disable timeout */
 	if (timeout > 0) {
 		int	stat_loc = 0;
-		commd_timeout = timeout * .75;
+		commd_timeout = (long)(timeout * .75);
 
 		c_pid = fork();
 
