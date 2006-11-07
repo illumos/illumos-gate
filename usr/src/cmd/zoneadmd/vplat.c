@@ -1211,10 +1211,9 @@ free_fs_data(struct zone_fstab *fsarray, uint_t nelem)
  */
 static boolean_t
 build_mounted_pre_var(zlog_t *zlogp, char *rootpath,
-    size_t rootlen, const char *zonepath)
+    size_t rootlen, const char *zonepath, char *luroot, size_t lurootlen)
 {
 	char tmp[MAXPATHLEN], fromdir[MAXPATHLEN];
-	char luroot[MAXPATHLEN];
 	const char **cpp;
 	static const char *mkdirs[] = {
 		"/system", "/system/contract", "/system/object", "/proc",
@@ -1227,8 +1226,8 @@ build_mounted_pre_var(zlog_t *zlogp, char *rootpath,
 	assert(zone_isnative);
 
 	resolve_lofs(zlogp, rootpath, rootlen);
-	(void) snprintf(luroot, sizeof (luroot), "%s/lu", zonepath);
-	resolve_lofs(zlogp, luroot, sizeof (luroot));
+	(void) snprintf(luroot, lurootlen, "%s/lu", zonepath);
+	resolve_lofs(zlogp, luroot, lurootlen);
 	(void) snprintf(tmp, sizeof (tmp), "%s/bin", luroot);
 	(void) symlink("./usr/bin", tmp);
 
@@ -1292,10 +1291,9 @@ build_mounted_pre_var(zlog_t *zlogp, char *rootpath,
 
 
 static boolean_t
-build_mounted_post_var(zlog_t *zlogp, char *rootpath, const char *zonepath)
+build_mounted_post_var(zlog_t *zlogp, char *rootpath, const char *luroot)
 {
 	char tmp[MAXPATHLEN], fromdir[MAXPATHLEN];
-	char luroot[MAXPATHLEN];
 	const char **cpp;
 	static const char *localdirs[] = {
 		"/etc", "/var", NULL
@@ -1308,8 +1306,6 @@ build_mounted_post_var(zlog_t *zlogp, char *rootpath, const char *zonepath)
 		"/tmp", "/var/run", NULL
 	};
 	struct stat st;
-
-	(void) snprintf(luroot, sizeof (luroot), "%s/lu", zonepath);
 
 	/*
 	 * These are mounted read-write from the zone undergoing upgrade.  We
@@ -1527,6 +1523,7 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 	char rootpath[MAXPATHLEN];
 	char zonepath[MAXPATHLEN];
 	char brand[MAXNAMELEN];
+	char luroot[MAXPATHLEN];
 	int i, num_fs = 0;
 	struct zone_fstab *fs_ptr = NULL;
 	zone_dochandle_t handle = NULL;
@@ -1635,7 +1632,7 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 	 */
 	if (mount_cmd &&
 	    !build_mounted_pre_var(zlogp,
-	    rootpath, sizeof (rootpath), zonepath))
+	    rootpath, sizeof (rootpath), zonepath, luroot, sizeof (luroot)))
 		goto bad;
 
 	qsort(fs_ptr, num_fs, sizeof (*fs_ptr), fs_compare);
@@ -1662,7 +1659,7 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 			goto bad;
 	}
 	if (mount_cmd &&
-	    !build_mounted_post_var(zlogp, rootpath, zonepath))
+	    !build_mounted_post_var(zlogp, rootpath, luroot))
 		goto bad;
 
 	/*
@@ -3787,6 +3784,8 @@ vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd, zoneid_t zoneid)
 		lofs_discard_mnttab();
 		return (-1);
 	}
+
+	resolve_lofs(zlogp, zonepath, sizeof (zonepath));
 	if (make_one_dir(zlogp, zonepath, "/dev", DEFAULT_DIR_MODE) != 0) {
 		lofs_discard_mnttab();
 		return (-1);
