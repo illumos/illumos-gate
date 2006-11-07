@@ -3964,6 +3964,7 @@ mdmn_send_capability_message(minor_t mnum, volcap_t vc, IOLOCK *lockp)
 	md_mn_kresult_t		*kres;
 	mdi_unit_t		*ui = MDI_UNIT(mnum);
 	int			ret;
+	k_sigset_t		oldmask, newmask;
 
 	(void) strncpy((char *)&msg.msg_setcap_driver,
 	    md_ops[ui->ui_opsindex]->md_driver.md_drivername, MD_DRIVERNAMELEN);
@@ -3973,9 +3974,19 @@ mdmn_send_capability_message(minor_t mnum, volcap_t vc, IOLOCK *lockp)
 	if (lockp)
 		IOLOCK_RETURN_RELEASE(0, lockp);
 	kres = kmem_zalloc(sizeof (md_mn_kresult_t), KM_SLEEP);
+
+	/*
+	 * Mask signals for the mdmd_ksend_message call.  This keeps the door
+	 * interface from failing if the user process receives a signal while
+	 * in mdmn_ksend_message.
+	 */
+	sigfillset(&newmask);
+	sigreplace(&newmask, &oldmask);
 	ret = (mdmn_ksend_message(MD_MIN2SET(mnum), MD_MN_MSG_SET_CAP,
 	    MD_MSGF_NO_LOG, (char *)&msg, sizeof (md_mn_msg_setcap_t),
 	    kres));
+	sigreplace(&oldmask, (k_sigset_t *)NULL);
+
 	if (!MDMN_KSEND_MSG_OK(ret, kres)) {
 		mdmn_ksend_show_error(ret, kres, "MD_MN_MSG_SET_CAP");
 		ret = EIO;
@@ -4001,6 +4012,7 @@ mdmn_clear_all_capabilities(minor_t mnum)
 	int		ret;
 	md_mn_kresult_t	*kresult;
 	volcap_t	vc;
+	k_sigset_t	oldmask, newmask;
 
 	clumsg.dev = md_makedevice(md_major, mnum);
 	clumsg.mde = mdnullerror;
@@ -4009,10 +4021,20 @@ mdmn_clear_all_capabilities(minor_t mnum)
 	 * result be stored in the MCT. We want an up-to-date state.
 	 */
 	kresult = kmem_zalloc(sizeof (md_mn_kresult_t), KM_SLEEP);
+
+	/*
+	 * Mask signals for the mdmd_ksend_message call.  This keeps the door
+	 * interface from failing if the user process receives a signal while
+	 * in mdmn_ksend_message.
+	 */
+	sigfillset(&newmask);
+	sigreplace(&newmask, &oldmask);
 	ret = mdmn_ksend_message(MD_MIN2SET(mnum),
 	    MD_MN_MSG_CLU_CHECK,
 	    MD_MSGF_STOP_ON_ERROR | MD_MSGF_NO_LOG | MD_MSGF_NO_MCT,
 	    (char *)&clumsg, sizeof (clumsg), kresult);
+	sigreplace(&oldmask, (k_sigset_t *)NULL);
+
 	if ((ret == 0) && (kresult->kmmr_exitval == 0)) {
 		/*
 		 * Not open on any node, clear all capabilities, eg ABR and

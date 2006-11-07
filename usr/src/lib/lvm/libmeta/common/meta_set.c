@@ -1928,6 +1928,10 @@ metadrivename_withdrkey(
 		 * devid code path can set and propagate the error and
 		 * eventually prevent did disks from being added to the
 		 * diskset under SunCluster systems
+		 *
+		 * Note that this code can be called through rpc.mdcommd.
+		 * sdssc_version cannot be used because the library won't
+		 * be bound.
 		 */
 		if ((strncmp(dnp->rname, "/dev/did/", strlen("/dev/did/"))
 		    == 0) || (MD_MNSET_DESC(sd)))
@@ -1950,8 +1954,7 @@ metadrivename_withdrkey(
 		 * that's OK. dnp->devid will be null as it is in any
 		 * configuration with no devids.
 		 */
-		if (meta_setdid(MD_LOCAL_SET, sideno + SKEW, key,
-		    ep) < 0)
+		if (meta_setdid(MD_LOCAL_SET, sideno + SKEW, key, ep) < 0)
 			return (NULL);
 		if ((devidp = (ddi_devid_t)meta_getdidbykey(MD_LOCAL_SET,
 		    sideno+SKEW, key, ep)) != NULL) {
@@ -4224,6 +4227,7 @@ out:
  */
 int
 meta_reconfig_choose_master(
+	long		timeout,
 	md_error_t	*ep
 )
 {
@@ -4356,8 +4360,13 @@ meta_reconfig_choose_master(
 			return (205);
 		}
 
-		/* Send new nodelist to rpc.mdcommd */
-		(void) mdmn_reinit_set(sp->setno);
+		/* reinit rpc.mdcommd with new nodelist */
+		if (mdmn_reinit_set(sp->setno, timeout)) {
+			md_eprintf(dgettext(TEXT_DOMAIN,
+			    "Could not re-initialise rpc.mdcommd for "
+			    "set %s\n"), sp->setname);
+			return (1);
+		}
 
 		meta_mc_log(MC_LOG5, dgettext(TEXT_DOMAIN,
 		    "Choose master for set %s completed: %s"),

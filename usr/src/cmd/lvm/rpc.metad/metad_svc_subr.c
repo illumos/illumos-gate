@@ -4913,7 +4913,7 @@ mdrpc_mdcommdctl_2_svc(
 		switch (args_cc->flag_action) {
 			case COMMDCTL_SUSPEND:
 				suspend_ret = mdmn_suspend(args_cc->setno,
-				    args_cc->class);
+				    args_cc->class, 0);
 				if (suspend_ret != 0) {
 					(void) mddserror(ep, suspend_ret,
 					    args_cc->setno, mynode(),
@@ -4922,7 +4922,7 @@ mdrpc_mdcommdctl_2_svc(
 				break;
 			case COMMDCTL_RESUME:
 				if (mdmn_resume(args_cc->setno,
-				    args_cc->class, args_cc->flags)) {
+				    args_cc->class, args_cc->flags, 0)) {
 					(void) mddserror(ep,
 					    MDE_DS_COMMDCTL_RESUME_FAIL,
 					    args_cc->setno, mynode(),
@@ -4930,7 +4930,7 @@ mdrpc_mdcommdctl_2_svc(
 				}
 				break;
 			case COMMDCTL_REINIT:
-				if (mdmn_reinit_set(args_cc->setno)) {
+				if (mdmn_reinit_set(args_cc->setno, 0)) {
 					(void) mddserror(ep,
 					    MDE_DS_COMMDCTL_REINIT_FAIL,
 					    args_cc->setno, mynode(),

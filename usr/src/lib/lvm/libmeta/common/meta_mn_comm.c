@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -791,11 +790,12 @@ out:
  *	MDE_DS_COMMDCTL_SUSPEND_FAIL if any failure occurred
  */
 int
-mdmn_suspend(set_t setno, md_mn_msgclass_t class)
+mdmn_suspend(set_t setno, md_mn_msgclass_t class, long timeout)
 {
-	int	*resp;
-	CLIENT	*local_daemon;
-	md_mn_set_and_class_t msc;
+	int			*resp;
+	CLIENT			*local_daemon;
+	md_mn_set_and_class_t	msc;
+	md_error_t		xep = mdnullerror;
 
 	if ((setno >= MD_MAXSETS) || (class >= MD_MN_NCLASSES)) {
 		return (MDE_DS_COMMDCTL_SUSPEND_FAIL);
@@ -806,6 +806,14 @@ mdmn_suspend(set_t setno, md_mn_msgclass_t class)
 		clnt_pcreateerror("local_daemon");
 		return (MDE_DS_COMMDCTL_SUSPEND_FAIL);
 	}
+
+	if (timeout != 0) {
+		if (cl_sto(local_daemon, LOCALHOST_IPv4, timeout, &xep) != 0) {
+			clnt_destroy(local_daemon);
+			return (1);
+		}
+	}
+
 	msc.msc_set = setno;
 	msc.msc_class = class;
 	msc.msc_flags = 0;
@@ -842,12 +850,13 @@ mdmn_suspend(set_t setno, md_mn_msgclass_t class)
  *	MDE_DS_COMMDCTL_RESUME_FAIL on failure
  */
 int
-mdmn_resume(set_t setno, md_mn_msgclass_t class, uint_t flags)
+mdmn_resume(set_t setno, md_mn_msgclass_t class, uint_t flags, long timeout)
 {
-	md_mn_set_and_class_t msc;
-	int	ret = MDE_DS_COMMDCTL_RESUME_FAIL;
-	int	*resp;
-	CLIENT	*local_daemon;
+	md_mn_set_and_class_t	msc;
+	int			ret = MDE_DS_COMMDCTL_RESUME_FAIL;
+	int			*resp;
+	CLIENT			*local_daemon;
+	md_error_t		xep = mdnullerror;
 
 	if ((setno >= MD_MAXSETS) || (class >= MD_MN_NCLASSES)) {
 		return (MDE_DS_COMMDCTL_RESUME_FAIL);
@@ -857,6 +866,13 @@ mdmn_resume(set_t setno, md_mn_msgclass_t class, uint_t flags)
 	if (local_daemon == (CLIENT *)NULL) {
 		clnt_pcreateerror("local_daemon");
 		return (MDE_DS_COMMDCTL_RESUME_FAIL);
+	}
+
+	if (timeout != 0) {
+		if (cl_sto(local_daemon, LOCALHOST_IPv4, timeout, &xep) != 0) {
+			clnt_destroy(local_daemon);
+			return (1);
+		}
 	}
 
 	msc.msc_set = setno;
@@ -909,12 +925,12 @@ mdmn_abort(void)
  *	1 on failure
  */
 int
-mdmn_reinit_set(set_t setno)
+mdmn_reinit_set(set_t setno, long timeout)
 {
-	int	ret = 1;
-	int	*resp;
-	CLIENT  *local_daemon;
-
+	int		ret = 1;
+	int		*resp;
+	CLIENT 		*local_daemon;
+	md_error_t	xep = mdnullerror;
 
 	if ((setno == 0) || (setno >= MD_MAXSETS)) {
 		return (1);
@@ -924,6 +940,13 @@ mdmn_reinit_set(set_t setno)
 	if (local_daemon == (CLIENT *)NULL) {
 		clnt_pcreateerror("local_daemon");
 		return (1);
+	}
+
+	if (timeout != 0) {
+		if (cl_sto(local_daemon, LOCALHOST_IPv4, timeout, &xep) != 0) {
+			clnt_destroy(local_daemon);
+			return (1);
+		}
 	}
 
 	resp = mdmn_comm_reinit_set_1(&setno, local_daemon);

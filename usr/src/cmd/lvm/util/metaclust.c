@@ -663,6 +663,7 @@ main(int argc, char **argv)
 	int			ret_val;
 	mddb_config_t		cfg;
 	int			set_info[MD_MAXSETS];
+	long			commd_timeout = 0;
 
 	/*
 	 * Get the locale set up before calling any other routines
@@ -794,6 +795,7 @@ main(int argc, char **argv)
 	/* set timeout alarm signal, a value of 0 will disable timeout */
 	if (timeout > 0) {
 		int	stat_loc = 0;
+		commd_timeout = timeout * .75;
 
 		c_pid = fork();
 
@@ -920,7 +922,7 @@ main(int argc, char **argv)
 
 			/* suspend commd and spin waiting for drain */
 			while ((ret_val = mdmn_suspend(setno,
-			    MD_COMM_ALL_CLASSES)) ==
+			    MD_COMM_ALL_CLASSES, commd_timeout)) ==
 			    MDE_DS_COMMDCTL_SUSPEND_NYD) {
 				sleep(1);
 			}
@@ -1126,7 +1128,7 @@ main(int argc, char **argv)
 
 			/* suspend commd and spin waiting for drain */
 			while ((ret_val = mdmn_suspend(setno,
-			    MD_COMM_ALL_CLASSES)) ==
+			    MD_COMM_ALL_CLASSES, commd_timeout)) ==
 			    MDE_DS_COMMDCTL_SUSPEND_NYD) {
 				sleep(1);
 			}
@@ -1225,7 +1227,7 @@ main(int argc, char **argv)
 		 * given the member information and send a reinit message
 		 * to rpc.mdcommd to reload the nodelist.
 		 */
-		rval = meta_reconfig_choose_master(ep);
+		rval = meta_reconfig_choose_master(commd_timeout, ep);
 		if (rval == 205) {
 			/*
 			 * NOTE: Should issue call to reboot remote host that
@@ -1566,7 +1568,7 @@ main(int argc, char **argv)
 			    meta_print_hrtime(gethrtime() - start_time));
 
 			/* reinitialzse rpc.mdcommd with new nodelist */
-			if (mdmn_reinit_set(setno)) {
+			if (mdmn_reinit_set(setno, commd_timeout)) {
 				md_eprintf(gettext(
 				    "Could not re-initialise rpc.mdcommd for "
 				    "set %s\n"), sp->setname);
@@ -1754,7 +1756,8 @@ main(int argc, char **argv)
 			}
 
 			/* resume rpc.mdcommd */
-			if (mdmn_resume(setno, MD_COMM_ALL_CLASSES, 0)) {
+			if (mdmn_resume(setno, MD_COMM_ALL_CLASSES, 0,
+			    commd_timeout)) {
 				md_eprintf(gettext("Unable to resume "
 				    "rpc.mdcommd for set %s\n"), sp->setname);
 				md_exit(local_sp, 1);

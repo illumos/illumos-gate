@@ -480,6 +480,26 @@ meta_set_adddrives(
 			goto rollback;
 	}
 
+	/*
+	 * If this is not a MN set and the state flags do not indicate the
+	 * presence of devids, update the set records on all nodes.
+	 */
+	if (!(sd->sd_flags & MD_SR_MB_DEVID) && !(MD_MNSET_DESC(sd))) {
+		if (meta_update_mb(sp, dd, ep) == 0) {
+			mdclrerror(ep);
+
+			/* update the sr_flags on all hosts */
+			for (i = 0; i < MD_MAXSIDES; i++) {
+				if (sd->sd_nodes[i][0] == '\0')
+					continue;
+
+				if (clnt_upd_sr_flags(sd->sd_nodes[i],
+				    sp, (sd->sd_flags | MD_SR_MB_DEVID), ep))
+					goto rollback;
+			}
+		}
+	}
+
 	RB_TEST(6, "adddrives", ep)
 
 	RB_PREEMPT;

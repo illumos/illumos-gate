@@ -1755,6 +1755,8 @@ extern	CLIENT		*metarpcopen(char *hostname, long time_out,
 			    md_error_t *ep);
 extern	void		metarpcclose(CLIENT *clntp);
 extern	void		metarpccloseall(void);
+extern	int		cl_sto(CLIENT *clntp, char *hostname, long time_out,
+			    md_error_t *ep);
 
 /* metasplitname.c */
 extern	int		splitname(char *devname, md_splitname *splitname);
@@ -1815,10 +1817,11 @@ extern int		mdmn_send_message_with_msgid(set_t setno,
 			    int size, md_mn_result_t **resp,
 			    md_mn_msgid_t *msgid, md_error_t *ep);
 extern int		mdmn_create_msgid(md_mn_msgid_t *id);
-extern int		mdmn_reinit_set(set_t setno);
+extern int		mdmn_reinit_set(set_t setno, long timeout);
 extern int		mdmn_resume(set_t setno, md_mn_msgclass_t class,
-			    uint_t flags);
-extern int		mdmn_suspend(set_t setno, md_mn_msgclass_t class);
+			    uint_t flags, long timeout);
+extern int		mdmn_suspend(set_t setno, md_mn_msgclass_t class,
+			    long timeout);
 extern int		mdmn_msgtype_lock(md_mn_msgtype_t msgtype,
 			    uint_t locktype);
 extern void		mdmn_abort(void);
