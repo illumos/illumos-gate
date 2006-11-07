@@ -1602,9 +1602,6 @@ remove_target_common(char *name, int lun_num, char **msg)
 	 * along with the directory.
 	 */
 	if (lun_num == 0) {
-		c = xml_alloc_node(XML_ELEMENT_TARG, String, tname);
-		(void) xml_remove_child(targets_config, c, MatchBoth);
-		xml_free_node(c);
 		(void) snprintf(path, sizeof (path), "%s/%s", target_basedir,
 		    iname);
 		(void) rmdir(path);
@@ -1616,6 +1613,15 @@ remove_target_common(char *name, int lun_num, char **msg)
 		(void) snprintf(path, sizeof (path), "%s/%s", target_basedir,
 		    tname);
 		(void) unlink(path);
+
+		/*
+		 * 'tname' is just a reference to the memory within
+		 * the targets_config structure. So once the xml_remove_child
+		 * is called 'tname' is no longer valid.
+		 */
+		c = xml_alloc_node(XML_ELEMENT_TARG, String, tname);
+		(void) xml_remove_child(targets_config, c, MatchBoth);
+		xml_free_node(c);
 	}
 
 	/*
