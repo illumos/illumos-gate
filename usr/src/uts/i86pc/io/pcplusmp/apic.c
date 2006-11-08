@@ -3100,8 +3100,8 @@ apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
 	APIC_HEADER	*hp;
 	MADT_INTERRUPT_OVERRIDE	*isop;
 	apic_irq_t *airqp;
-	int is_pciex = 0;
-	int is_pci = 0;
+	int parent_is_pci_or_pciex = 0;
+	int child_is_pciex = 0;
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_introp_xlate: dip=0x%p name=%s "
 	    "type=%d irqno=0x%x\n", (void *)dip, ddi_get_name(dip), type,
@@ -3111,14 +3111,21 @@ apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, ddi_get_parent(dip),
 	    DDI_PROP_DONTPASS, "device_type", (caddr_t)dev_type,
 	    &dev_len) == DDI_PROP_SUCCESS) {
-		is_pci = (strcmp(dev_type, "pci") == 0);
-		is_pciex = (strcmp(dev_type, "pciex") == 0);
+		if ((strcmp(dev_type, "pci") == 0) ||
+		    (strcmp(dev_type, "pciex") == 0))
+			parent_is_pci_or_pciex = 1;
+	}
+
+	if (parent_is_pci_or_pciex && ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "pcie-capid-pointer", PCI_CAP_NEXT_PTR_NULL) !=
+	    PCI_CAP_NEXT_PTR_NULL) {
+		child_is_pciex = 1;
 	}
 
 	if (DDI_INTR_IS_MSI_OR_MSIX(type)) {
 		if ((airqp = apic_find_irq(dip, ispec, type)) != NULL) {
 			airqp->airq_iflag.bustype =
-			    is_pciex ? BUS_PCIE : BUS_PCI;
+			    child_is_pciex ? BUS_PCIE : BUS_PCI;
 			return (apic_vector_to_irq[airqp->airq_vector]);
 		}
 		return (apic_setup_irq_table(dip, irqno, NULL, ispec,
@@ -3151,7 +3158,7 @@ apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
 	if ((dip == NULL) || (!apic_irq_translate && !apic_enable_acpi))
 		goto nonpci;
 
-	if (is_pci || is_pciex) {
+	if (parent_is_pci_or_pciex) {
 		/* pci device */
 		if (acpica_get_bdf(dip, &busid, &devid, NULL) != 0)
 			goto nonpci;
@@ -3167,7 +3174,7 @@ apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
 			    ipin, &pci_irq, &intr_flag) != ACPI_PSM_SUCCESS)
 				goto nonpci;
 
-			intr_flag.bustype = is_pciex ? BUS_PCIE : BUS_PCI;
+			intr_flag.bustype = child_is_pciex ? BUS_PCIE : BUS_PCI;
 			if ((newirq = apic_setup_irq_table(dip, pci_irq, NULL,
 			    ispec, &intr_flag, type)) == -1)
 				goto nonpci;
