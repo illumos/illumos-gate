@@ -132,6 +132,7 @@ iscsi_cmd_free(iscsi_conn_t *c, iscsi_cmd_t *cmd)
 {
 	hrtime_t	h	= gethrtime();
 
+	assert(cmd->c_state != CmdFree);
 	cmd->c_state		= CmdFree;
 	cmd->c_t_completion	= h - cmd->c_t_start;
 	c->c_cmds_avg_sum	+= cmd->c_t_completion;
@@ -156,7 +157,7 @@ iscsi_cmd_cancel(iscsi_conn_t *c, iscsi_cmd_t *cmd)
 	if (cmd->c_state == CmdAlloc) {
 		cmd->c_state = CmdCanceled;
 		if (cmd->c_t10_cmd != NULL)
-			t10_cmd_state(cmd->c_t10_cmd, T10_Cmd_Event_Canceled);
+			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T6);
 	}
 	(void) pthread_mutex_unlock(&c->c_mutex);
 }
@@ -289,7 +290,7 @@ iscsi_cmd_delayed_store(iscsi_cmd_t *cmd, t10_cmd_t *t)
 		queue_prt(cmd->c_allegiance->c_mgmtq, Q_CONN_ERRS,
 		    "CON%x  Failed calloc for delayed I/O",
 		    cmd->c_allegiance->c_num);
-		t10_cmd_state(t, T10_Cmd_Event_Release);
+		t10_cmd_shoot_event(t, T10_Cmd_T5);
 		return;
 	}
 

@@ -233,6 +233,7 @@ raw_read_tape(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	off_t		offset		= 0;
 	raw_io_t	*io;
 	Boolean_t	last;
+	t10_cmd_t	*c;
 
 	req_len = (cdb[2] << 16) | (cdb[3] << 8) | cdb[4];
 	if (cdb[1] & 0x1)
@@ -249,12 +250,16 @@ raw_read_tape(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	while (offset < io->r_data_len) {
 		xfer = min(T10_MAX_OUT(cmd), io->r_data_len - offset);
 		last = ((offset + xfer) >= io->r_data_len) ? True : False;
+		if (last == True)
+			c = cmd;
+		else
+			c = trans_cmd_dup(cmd);
 
-		if (trans_send_datain(cmd, io->r_data + offset,
+		if (trans_send_datain(c, io->r_data + offset,
 		    xfer, offset, raw_free_io, last, io) == False) {
 			raw_free_io(io);
-			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
-			trans_send_complete(cmd, STATUS_CHECK);
+			spc_sense_create(c, KEY_HARDWARE_ERROR, 0);
+			trans_send_complete(c, STATUS_CHECK);
 			return;
 		}
 		offset += xfer;
@@ -282,6 +287,7 @@ raw_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	char		debug[80];
 	raw_params_t	*r;
 	uchar_t		addl_sense_len;
+	t10_cmd_t	*c;
 
 	if ((r = (raw_params_t *)T10_PARAMS_AREA(cmd)) == NULL)
 		return;
@@ -395,6 +401,11 @@ raw_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	}
 
 	do {
+		min = MIN((cnt * 512) - offset, T10_MAX_OUT(cmd));
+		if ((offset * min) < (cnt * 512LL))
+			c = trans_cmd_dup(cmd);
+		else
+			c = cmd;
 		if ((io = (raw_io_t *)calloc(1, sizeof (*io))) == NULL) {
 
 			/*
@@ -403,13 +414,12 @@ raw_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			 * allocate a sense buffer or queue the command
 			 * up to be sent back to the transport for delivery.
 			 */
-			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
-			trans_send_complete(cmd, STATUS_CHECK);
+			spc_sense_create(c, KEY_HARDWARE_ERROR, 0);
+			trans_send_complete(c, STATUS_CHECK);
 			return;
 		}
-		min = MIN((cnt * 512) - offset, T10_MAX_OUT(cmd));
 
-		io->r_cmd		= cmd;
+		io->r_cmd		= c;
 		io->r_lba		= addr;
 		io->r_lba_cnt		= cnt;
 		io->r_offset		= offset;
@@ -420,7 +430,7 @@ raw_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 #ifdef FULL_DEBUG
 		(void) snprintf(debug, sizeof (debug),
 		    "RAW%d  blk 0x%llx, cnt %d, offset 0x%llx, size %d",
-		    cmd->c_lu->l_common->l_num, addr, cnt, io->r_offset, min);
+		    c->c_lu->l_common->l_num, addr, cnt, io->r_offset, min);
 		queue_str(mgmtq, Q_STE_IO, msg_log, debug);
 #endif
 		if ((io->r_data = (char *)malloc(min)) == NULL) {
@@ -429,14 +439,14 @@ raw_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 				sense_len = INFORMATION_SENSE_DESCR;
 			else
 				sense_len = 0;
-			spc_sense_create(cmd, KEY_HARDWARE_ERROR,
+			spc_sense_create(c, KEY_HARDWARE_ERROR,
 			    sense_len);
-			spc_sense_info(cmd, err_blkno);
-			trans_send_complete(cmd, STATUS_CHECK);
+			spc_sense_info(c, err_blkno);
+			trans_send_complete(c, STATUS_CHECK);
 			return;
 		}
-		trans_aioread(cmd, io->r_data, min, (addr * 512LL) +
-		    (off_t)io->r_offset, (aio_result_t *)io);
+		trans_aioread(c, io->r_data, min, (addr * 512LL) +
+		    (off_t)io->r_offset, &io->r_aio);
 		offset += min;
 	} while (offset < (off_t)(cnt * 512));
 }
@@ -749,7 +759,7 @@ raw_write_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 	}
 
 	trans_aiowrite(cmd, data, data_len, (io->r_lba * 512) +
-	    (off_t)io->r_offset, (aio_result_t *)io);
+	    (off_t)io->r_offset, &io->r_aio);
 }
 
 /*

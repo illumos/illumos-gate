@@ -151,7 +151,7 @@ session_free(iscsi_sess_t *s)
 		}
 		if (n == NULL) {
 			queue_prt(s->s_mgmtq, Q_SESS_ERRS,
-			    "SES%x  NOT IN SESSION LIST!", s->s_num);
+			    "SES%x  NOT IN SESSION LIST!\n", s->s_num);
 		}
 	}
 	(void) pthread_mutex_unlock(&sess_mutex);
@@ -265,7 +265,7 @@ sess_from_t10(void *v)
 
 			default:
 				queue_prt(s->s_mgmtq, Q_SESS_ERRS,
-				    "SES%x  Unknown msg type (%d) from T10 ",
+				    "SES%x  Unknown msg type (%d) from T10\n",
 				    s->s_num, m->msg_type);
 				queue_message_set(s->s_conn_head->c_dataq, 0,
 				    m->msg_type, m->msg_data);
@@ -343,7 +343,7 @@ sess_process(void *v)
 					    0, msg_cmd_cmplt, t10_cmd);
 				} else {
 					queue_prt(s->s_mgmtq, Q_SESS_ERRS,
-					    "SES%x  FAILED to create cmd",
+					    "SES%x  FAILED to create cmd\n",
 					    s->s_num);
 					conn_state(cmd->c_allegiance, T11);
 				}
@@ -356,8 +356,8 @@ sess_process(void *v)
 					    cmd->c_t10_cmd, cmd->c_data,
 					    cmd->c_data_len);
 				} else {
-					t10_cmd_state(t10_cmd,
-					    T10_Cmd_Event_Canceled);
+					t10_cmd_shoot_event(t10_cmd,
+					    T10_Cmd_T6);
 				}
 				(void) pthread_mutex_unlock(
 				    &cmd->c_allegiance->c_mutex);
@@ -410,7 +410,7 @@ sess_process(void *v)
 			c = (iscsi_conn_t *)m->msg_data;
 			if (session_remove_connection(s, c) == True) {
 				queue_prt(s->s_mgmtq, Q_SESS_NONIO,
-				    "SES%x  Starting shutdown", s->s_num);
+				    "SES%x  Starting shutdown\n", s->s_num);
 
 				/*
 				 * If this is the last connection for this
@@ -518,13 +518,15 @@ sess_process(void *v)
 
 		default:
 			queue_prt(s->s_mgmtq, Q_SESS_ERRS,
-			    "SES%x  Unknown msg type (%d) from Connection",
+			    "SES%x  Unknown msg type (%d) from Connection\n",
 			    s->s_num, m->msg_type);
 			break;
 		}
 		queue_message_free(m);
 	} while (process == True);
 
+	queue_message_set(mgmtq, 0, msg_pthread_join,
+	    (void *)(uintptr_t)pthread_self());
 	return (NULL);
 }
 
@@ -548,7 +550,7 @@ session_validate(iscsi_sess_t *s)
 	iscsi_sess_t	*check;
 
 	queue_prt(s->s_mgmtq, Q_SESS_NONIO,
-	    "SES%x  %s ISID[%02x%02x%02x%02x%02x%02x]",
+	    "SES%x  %s ISID[%02x%02x%02x%02x%02x%02x]\n",
 	    s->s_num, s->s_i_alias == NULL ? s->s_i_name : s->s_i_alias,
 	    s->s_isid[0], s->s_isid[1], s->s_isid[2],
 	    s->s_isid[3], s->s_isid[4], s->s_isid[5]);
@@ -586,7 +588,7 @@ session_validate(iscsi_sess_t *s)
 		 */
 		if (bcmp(check->s_isid, s->s_isid, 6) == 0) {
 			queue_prt(s->s_mgmtq, Q_SESS_NONIO,
-			    "SES%x  Implicit shutdown", check->s_num);
+			    "SES%x  Implicit shutdown\n", check->s_num);
 			if (check->s_conn_head->c_state == S5_LOGGED_IN)
 				conn_state(check->s_conn_head, T8);
 			else

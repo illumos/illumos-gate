@@ -225,7 +225,7 @@ handle_task_mgt(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	(void) pthread_mutex_unlock(&c->c_sess->s_mutex);
 
 	queue_prt(c->c_mgmtq, Q_CONN_NONIO,
-	    "CON%x  PDU(Task Mgt): %s, cmdsn 0x%x",
+	    "CON%x  PDU(Task Mgt): %s, cmdsn 0x%x\n",
 	    c->c_num,
 	    task_to_str(hp->function & ISCSI_FLAG_TASK_MGMT_FUNCTION_MASK),
 	    ntohl(hp->cmdsn));
@@ -233,7 +233,7 @@ handle_task_mgt(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	switch (hp->function & ISCSI_FLAG_TASK_MGMT_FUNCTION_MASK) {
 	case ISCSI_TM_FUNC_ABORT_TASK:
 		queue_prt(c->c_mgmtq, Q_CONN_NONIO,
-		    "CON%x  Abort ITT 0x%x", c->c_num, hp->rtt);
+		    "CON%x  Abort ITT 0x%x\n", c->c_num, hp->rtt);
 		if ((cmd = iscsi_cmd_find(c, hp->rtt, FindITT)) == NULL) {
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 			    "CON%x  Invalid AbortTask rtt 0x%x\n",
@@ -285,8 +285,9 @@ handle_task_mgt(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 					 * yet and get a T10 command structure.
 					 */
 					if (cmd->c_t10_cmd != NULL) {
-						t10_cmd_state(cmd->c_t10_cmd,
-						    T10_Cmd_Event_Canceled);
+						t10_cmd_shoot_event(
+						    cmd->c_t10_cmd,
+						    T10_Cmd_T6);
 					}
 				}
 
@@ -338,7 +339,7 @@ handle_noop_cmd(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	in = (iscsi_nop_in_hdr_t *)calloc(sizeof (*in), 1);
 	if (in == NULL) {
 		queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-		    "CON%x  NopIn -- failed to malloc space for header",
+		    "CON%x  NopIn -- failed to malloc space for header\n",
 		    c->c_num);
 		return (False);
 	}
@@ -348,7 +349,7 @@ handle_noop_cmd(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	 */
 	if (hp->ttt != ISCSI_RSVD_TASK_TAG) {
 		queue_prt(c->c_mgmtq, Q_CONN_NONIO,
-		    "CON%x  NopIn -- answer to our call", c->c_num);
+		    "CON%x  NopIn -- answer to our call\n", c->c_num);
 		return (True);
 	}
 
@@ -384,7 +385,7 @@ handle_scsi_data(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 
 	if ((cmd = iscsi_cmd_find(c, hp->ttt, FindTTT)) == NULL) {
 		queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-		    "CON%x  failed to find ttt 0x%x", c->c_num, hp->ttt);
+		    "CON%x  failed to find ttt 0x%x\n", c->c_num, hp->ttt);
 		/*
 		 * Need to handle error case.
 		 */
@@ -413,17 +414,15 @@ handle_scsi_data(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	(void) pthread_mutex_lock(&c->c_mutex);
 	(void) pthread_mutex_lock(&c->c_state_mutex);
 	if (c->c_state == S5_LOGGED_IN) {
-		if (cmd->c_state != CmdCanceled) {
-			t10_cmd_state(cmd->c_t10_cmd,
-			    T10_Cmd_Event_DataIn_Recv);
-		}
+		if (cmd->c_state != CmdCanceled)
+			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T4);
 	}
 	(void) pthread_mutex_unlock(&c->c_state_mutex);
 	(void) pthread_mutex_unlock(&c->c_mutex);
 
 #ifdef FULL_DEBUG
 	queue_prt(c->c_mgmtq, Q_CONN_IO,
-	    "CON%x  PDU(DataOut) TTT 0x%x, offset=0x%x, len=0x%x",
+	    "CON%x  PDU(DataOut) TTT 0x%x, offset=0x%x, len=0x%x\n",
 	    c->c_num, cmd->c_ttt, cmd->c_t10_cmd->c_offset, dlen);
 #endif
 
@@ -537,7 +536,7 @@ handle_scsi_cmd(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 #ifdef FULL_DEBUG
 	queue_prt(c->c_mgmtq, Q_CONN_IO,
 	    "CON%x  PDU(SCSI Cmd) CmdSN 0x%x ITT 0x%x TTT 0x%x LUN[%02x] "
-	    "SCSI Op", c->c_num, cmd->c_cmdsn, cmd->c_itt, cmd->c_ttt,
+	    "SCSI Op\n", c->c_num, cmd->c_cmdsn, cmd->c_itt, cmd->c_ttt,
 	    cmd->c_lun);
 #endif
 	if (dlen && (hp->flags & ISCSI_FLAG_CMD_WRITE)) {
@@ -580,7 +579,7 @@ handle_text_msg(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	rsp.opcode	= ISCSI_OP_TEXT_RSP;
 	rsp.itt		= hp->itt;
 
-	queue_prt(c->c_mgmtq, Q_CONN_NONIO, "CON%x  PDU(Text Message)",
+	queue_prt(c->c_mgmtq, Q_CONN_NONIO, "CON%x  PDU(Text Message)\n",
 			c->c_num);
 
 	/*
@@ -593,7 +592,7 @@ handle_text_msg(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 		if (parse_text(c, ntoh24(hp->dlength), &text, &text_length,
 		    NULL) == False) {
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-			    "Failed to parse Text");
+			    "Failed to parse Text\n");
 			if (text) {
 				/*
 				 * It's possible that we started to create
@@ -630,7 +629,7 @@ handle_text_msg(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 			c->c_text_sent	= text_length;
 
 			queue_prt(c->c_mgmtq, Q_CONN_NONIO,
-			    "CON%x  Text PDU: %d PDUs required (len=%d)",
+			    "CON%x  Text PDU: %d PDUs required (len=%d)\n",
 			    c->c_num,
 			    (c->c_text_len + c->c_max_recv_data - 1) /
 			    c->c_max_recv_data, c->c_text_len);
@@ -658,7 +657,7 @@ handle_text_msg(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	}
 
 	queue_prt(c->c_mgmtq, Q_CONN_NONIO,
-	    "CON%x  Text PDU: flags=0x%02x, ttt=0x%08x, len=%d",
+	    "CON%x  Text PDU: flags=0x%02x, ttt=0x%08x, len=%d\n",
 	    c->c_num, rsp.flags, rsp.ttt, text_length);
 
 	hton24(rsp.dlength, text_length);
@@ -734,7 +733,7 @@ handle_logout_msg(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 }
 
 /*
- * dataou_delayed -- possibly copy data from initiator
+ * dataout_delayed -- possibly copy data from initiator
  *
  * If DataDigests are enabled copy the data from the socket into a buffer
  * and perform the CRC check now.
@@ -772,6 +771,11 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 		if ((cmd->c_data = (char *)malloc(dlen)) == NULL) {
 			(void) pthread_mutex_lock(&c->c_mutex);
 			iscsi_cmd_free(c, cmd);
+			if (cmd->c_t10_cmd) {
+				t10_cmd_shoot_event(cmd->c_t10_cmd,
+				    T10_Cmd_T5);
+				cmd->c_t10_cmd = NULL;
+			}
 			(void) pthread_mutex_unlock(&c->c_mutex);
 			return (False);
 		}
@@ -782,15 +786,19 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 		if (errno == ECONNRESET) {
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 			    "CON%x  dataout_delayed -- "
-			    "initiator reset socket", c->c_num);
+			    "initiator reset socket\n", c->c_num);
 		} else {
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-			    "CON%x  recv(got-%d, expect-%d), errno=%d",
+			    "CON%x  recv(got-%d, expect-%d), errno=%d\n",
 			    c->c_num, cc, dlen, errno);
 		}
 
 		(void) pthread_mutex_lock(&c->c_mutex);
 		iscsi_cmd_free(c, cmd);
+		if (cmd->c_t10_cmd) {
+			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T5);
+			cmd->c_t10_cmd = NULL;
+		}
 		(void) pthread_mutex_unlock(&c->c_mutex);
 		conn_state(c, T8);
 		return (True);
@@ -804,15 +812,20 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 			if (errno == ECONNRESET) {
 				queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 				    "CON%x  dataout_delayed -- "
-				    "initiator reset socket", c->c_num);
+				    "initiator reset socket\n", c->c_num);
 			} else {
 				queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-				    "CON%x Pad Word read errno=%d", c->c_num,
+				    "CON%x Pad Word read errno=%d\n", c->c_num,
 				    errno);
 			}
 
 			(void) pthread_mutex_lock(&c->c_mutex);
 			iscsi_cmd_free(c, cmd);
+			if (cmd->c_t10_cmd) {
+				t10_cmd_shoot_event(cmd->c_t10_cmd,
+				    T10_Cmd_T5);
+				cmd->c_t10_cmd = NULL;
+			}
 			(void) pthread_mutex_unlock(&c->c_mutex);
 			conn_state(c, T8);
 			return (True);
@@ -825,15 +838,20 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 			if (errno == ECONNRESET) {
 				queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 				    "CON%x  dataout_delayed -- "
-				    "initiator reset socket", c->c_num);
+				    "initiator reset socket\n", c->c_num);
 			} else {
 				queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-				    "CON%x  CRC32 read errno=%d", c->c_num,
+				    "CON%x  CRC32 read errno=%d\n", c->c_num,
 				    errno);
 			}
 
 			(void) pthread_mutex_lock(&c->c_mutex);
 			iscsi_cmd_free(c, cmd);
+			if (cmd->c_t10_cmd) {
+				t10_cmd_shoot_event(cmd->c_t10_cmd,
+				    T10_Cmd_T5);
+				cmd->c_t10_cmd = NULL;
+			}
 			(void) pthread_mutex_unlock(&c->c_mutex);
 			conn_state(c, T8);
 			return (True);
@@ -854,6 +872,11 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 			 */
 			(void) pthread_mutex_lock(&c->c_mutex);
 			iscsi_cmd_free(c, cmd);
+			if (cmd->c_t10_cmd) {
+				t10_cmd_shoot_event(cmd->c_t10_cmd,
+				    T10_Cmd_T5);
+				cmd->c_t10_cmd = NULL;
+			}
 			(void) pthread_mutex_unlock(&c->c_mutex);
 			conn_state(c, T8);
 			return (True);
@@ -865,12 +888,12 @@ dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 	if (c->c_state == S5_LOGGED_IN) {
 		if ((cmd->c_state == CmdCanceled) &&
 		    (type == msg_cmd_data_out)) {
-			t10_cmd_state(cmd->c_t10_cmd, T10_Cmd_Event_Release);
+			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T5);
 			cmd->c_t10_cmd = NULL;
 		} else
 			queue_message_set(c->c_sessq, 0, type, (void *)cmd);
 	} else if (cmd->c_state == CmdCanceled) {
-		t10_cmd_state(cmd->c_t10_cmd, T10_Cmd_Event_Release);
+		t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T5);
 		cmd->c_t10_cmd = NULL;
 	}
 	(void) pthread_mutex_unlock(&c->c_state_mutex);
@@ -917,7 +940,7 @@ dataout_callback(t10_cmd_t *t, char *data, size_t *xfer)
 	if ((cc = recv(c->c_fd, data, dlen, MSG_WAITALL)) != dlen) {
 		if (errno == ECONNRESET) {
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-			    "CON%x  data_callback -- initiator reset socket",
+			    "CON%x  data_callback -- initiator reset socket\n",
 			    c->c_num);
 		} else {
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
@@ -934,11 +957,11 @@ dataout_callback(t10_cmd_t *t, char *data, size_t *xfer)
 			if (errno == ECONNRESET) {
 				queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 				    "CON%x  data_callback -- "
-				    "initiator reset socket", c->c_num);
+				    "initiator reset socket\n", c->c_num);
 			} else {
 				queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 				    "CON%x data_callback -- "
-				    "pad read errno=%d", c->c_num, errno);
+				    "pad read errno=%d\n", c->c_num, errno);
 			}
 			conn_state(c, T8);
 			goto finish;

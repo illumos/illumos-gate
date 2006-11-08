@@ -87,6 +87,7 @@ typedef enum {
 	msg_lu_add,
 	msg_lu_remove,
 	msg_lu_online,
+	msg_lu_aio_done,
 
 	/*
 	 * | End of SAM-3 messages

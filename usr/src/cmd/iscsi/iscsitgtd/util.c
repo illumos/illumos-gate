@@ -279,7 +279,7 @@ add_targets(iscsi_conn_t *c, char **text, int *text_length)
 				break;
 			}
 			queue_prt(c->c_mgmtq, Q_CONN_LOGIN,
-			    "CON%x    %24s = %s", c->c_num, "TargetName",
+			    "CON%x    %24s = %s\n", c->c_num, "TargetName",
 			    targ_name);
 
 			(void) add_text(text, text_length, "TargetName",
@@ -405,7 +405,7 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 		return (False);
 	}
 
-	queue_prt(c->c_mgmtq, Q_CONN_NONIO, "CON%x  Available text size %d",
+	queue_prt(c->c_mgmtq, Q_CONN_NONIO, "CON%x  Available text size %d\n",
 	    c->c_num, dlen);
 
 	/*
@@ -468,7 +468,7 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 		} else
 			*n++ = '\0';
 
-		queue_prt(c->c_mgmtq, Q_CONN_LOGIN, "CON%x    %-24s = %s",
+		queue_prt(c->c_mgmtq, Q_CONN_LOGIN, "CON%x    %-24s = %s\n",
 		    c->c_num, cur_pair, n);
 
 		/*
@@ -775,7 +775,7 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 			 * something unexpected.
 			 */
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-			    "CON%x  Unknown parameter %s=%s",
+			    "CON%x  Unknown parameter %s=%s\n",
 			    c->c_num, cur_pair, n);
 		}
 
@@ -1239,7 +1239,7 @@ util_title(target_queue_t *q, int type, int num, char *title)
 		break;
 	}
 
-	queue_prt(q, type, "%s%x  ---- %*s%s%*s ----", type_str, num,
+	queue_prt(q, type, "%s%x  ---- %*s%s%*s ----\n", type_str, num,
 	    ((60 - len) / 2), "", title, ((60 - len) / 2) + pad, "");
 }
 
@@ -1356,7 +1356,7 @@ thick_provo_start(void *v)
 	if (rval == True)
 		iscsi_inventory_change(tp->targ_name);
 	else {
-		queue_prt(mgmtq, Q_GEN_ERRS, "Failed to initialize %s/%d",
+		queue_prt(mgmtq, Q_GEN_ERRS, "Failed to initialize %s/%d\n",
 		    tp->targ_name, tp->lun);
 		syslog(LOG_ERR, "Failed to initialize %s, LU%d", tp->targ_name,
 		    tp->lun);
@@ -1369,7 +1369,8 @@ thick_provo_start(void *v)
 			 * that it's LU 0 and there is currently another
 			 * LU allocated.
 			 */
-			queue_prt(mgmtq, Q_GEN_ERRS, "Failed to remove target");
+			queue_prt(mgmtq, Q_GEN_ERRS,
+			    "Failed to remove target\n");
 			syslog(LOG_ERR, "Failed to remove target/lun after "
 			    "initialization failure");
 		}
@@ -1379,6 +1380,8 @@ thick_provo_start(void *v)
 	queue_free(tp->q, NULL);
 	free(tp);
 
+	queue_message_set(mgmtq, 0, msg_pthread_join,
+	    (void *)(uintptr_t)pthread_self());
 	return (NULL);
 }
 

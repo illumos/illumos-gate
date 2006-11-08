@@ -158,7 +158,7 @@ conn_poller(void *v)
 
 			} else if (c->c_sess->s_type == SessionNormal) {
 				queue_prt(c->c_mgmtq, Q_CONN_NONIO,
-				    "CON%x  Send a NOP request", c->c_num);
+				    "CON%x  Send a NOP request\n", c->c_num);
 				queue_noop_in(c);
 			}
 			break;
@@ -168,7 +168,7 @@ conn_poller(void *v)
 
 		case S8_CLEANUP_WAIT:
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-			    "Haven't handled state S8");
+			    "Haven't handled state S8\n");
 			queue_message_set(c->c_dataq, 0,
 			    msg_shutdown_rsp, 0);
 			goto error;
@@ -282,7 +282,7 @@ conn_process(void *v)
 
 		case msg_conn_lost:
 			queue_prt(c->c_mgmtq, Q_CONN_LOGIN,
-			    "CON%x  Shutdown: connection", c->c_num);
+			    "CON%x  Shutdown: connection\n", c->c_num);
 
 			if (c->c_state == S5_LOGGED_IN)
 				conn_state(c, T8);
@@ -344,7 +344,7 @@ conn_process(void *v)
 
 		default:
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-			    "CON%x  Didn't handle msg_type %d", c->c_num,
+			    "CON%x  Didn't handle msg_type %d\n", c->c_num,
 			    m->msg_type);
 			break;
 		}
@@ -406,7 +406,7 @@ conn_process(void *v)
 
 	if (c->c_cmds_avg_cnt != 0)
 		queue_prt(c->c_mgmtq, Q_CONN_LOGIN,
-		    "CON%x  Average completion %lldms",  c->c_num,
+		    "CON%x  Average completion %lldms\n",  c->c_num,
 		    (c->c_cmds_avg_sum / c->c_cmds_avg_cnt) / (1000 * 1000));
 
 	(void) sema_destroy(&c->c_datain);
@@ -483,7 +483,7 @@ iscsi_conn_data_rqst(t10_cmd_t *t)
 	(void) pthread_mutex_lock(&c->c_state_mutex);
 	if ((c->c_state != S5_LOGGED_IN) ||
 	    (cmd->c_state == CmdCanceled)) {
-		t10_cmd_state(t, T10_Cmd_Event_Release);
+		t10_cmd_shoot_event(t, T10_Cmd_T5);
 		(void) pthread_mutex_unlock(&c->c_state_mutex);
 		(void) pthread_mutex_unlock(&c->c_mutex);
 		return;
@@ -519,11 +519,11 @@ iscsi_conn_data_rqst(t10_cmd_t *t)
 
 #ifdef FULL_DEBUG
 	queue_prt(c->c_mgmtq, Q_CONN_IO,
-	    "CON%x  TTT 0x%x R2T offset 0x%x, len 0x%x",
+	    "CON%x  TTT 0x%x R2T offset 0x%x, len 0x%x\n",
 	    c->c_num, cmd->c_ttt, T10_DATA_OFFSET(t), T10_DATA_LEN(t));
 #endif
 
-	t10_cmd_state(t, T10_Cmd_Event_DataOut_Sent);
+	t10_cmd_shoot_event(t, T10_Cmd_T7);
 	(void) pthread_mutex_unlock(&c->c_mutex);
 	send_iscsi_pkt(c, (iscsi_hdr_t *)&rtt, 0);
 }
@@ -545,10 +545,10 @@ iscsi_conn_data_in(t10_cmd_t *t)
 	if ((c->c_state != S5_LOGGED_IN) ||
 	    (cmd->c_state == CmdCanceled)) {
 
-		t10_cmd_state(t, T10_Cmd_Event_Release);
+		t10_cmd_shoot_event(t, T10_Cmd_T5);
 		while (cmd->c_t10_delayed) {
-			t10_cmd_state(cmd->c_t10_delayed->id_t10_cmd,
-			    T10_Cmd_Event_Release);
+			t10_cmd_shoot_event(cmd->c_t10_delayed->id_t10_cmd,
+			    T10_Cmd_T5);
 			iscsi_cmd_delayed_remove(cmd, cmd->c_t10_delayed);
 		}
 		(void) pthread_mutex_unlock(&c->c_state_mutex);
@@ -578,7 +578,7 @@ iscsi_conn_data_in(t10_cmd_t *t)
 		} else {
 			send_datain_pdu(c, t, 0);
 		}
-		t10_cmd_state(t, T10_Cmd_Event_Release);
+		t10_cmd_shoot_event(t, T10_Cmd_T5);
 		cmd->c_t10_cmd = NULL;
 
 		if (cmd->c_t10_delayed &&
@@ -609,7 +609,7 @@ iscsi_conn_cmdcmplt(t10_cmd_t *t)
 	if ((c->c_state != S5_LOGGED_IN) ||
 	    (cmd->c_state == CmdCanceled)) {
 
-		t10_cmd_state(t, T10_Cmd_Event_Release);
+		t10_cmd_shoot_event(t, T10_Cmd_T5);
 		(void) pthread_mutex_unlock(&c->c_state_mutex);
 		(void) pthread_mutex_unlock(&c->c_mutex);
 		return;
@@ -638,7 +638,7 @@ iscsi_conn_cmdcmplt(t10_cmd_t *t)
 
 	}
 
-	t10_cmd_state(t, T10_Cmd_Event_Release);
+	t10_cmd_shoot_event(t, T10_Cmd_T5);
 	cmd->c_t10_cmd = NULL;
 
 	if (cmd->c_scb_extended != NULL)
@@ -739,7 +739,7 @@ send_scsi_rsp(iscsi_conn_t *c, t10_cmd_t *t)
 			hton24(rsp.dlength, T10_SENSE_LEN(t));
 		}
 		queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-		    "CON%x  LUN%d SCSI Error Status: %d",
+		    "CON%x  LUN%d SCSI Error Status: %d\n",
 		    c->c_num, t->c_lu->l_common->l_num, rsp.cmd_status);
 	} else {
 		rsp.response	= ISCSI_STATUS_CMD_COMPLETED;
@@ -786,7 +786,7 @@ send_async_scsi(iscsi_conn_t *c, int key, int asc, int ascq)
 	(void) pthread_mutex_unlock(&c->c_mutex);
 
 	queue_prt(c->c_mgmtq, Q_CONN_NONIO,
-	    "CON%x  Sending async scsi sense", c->c_num);
+	    "CON%x  Sending async scsi sense\n", c->c_num);
 
 	send_iscsi_pkt(c, (iscsi_hdr_t *)&a, buf);
 }
@@ -820,7 +820,7 @@ send_async_logout(iscsi_conn_t *c)
 	(void) pthread_mutex_unlock(&c->c_mutex);
 
 	queue_prt(c->c_mgmtq, Q_CONN_NONIO,
-	    "CON%x  Sending async logout request", c->c_num);
+	    "CON%x  Sending async logout request\n", c->c_num);
 
 	send_iscsi_pkt(c, (iscsi_hdr_t *)&a, 0);
 }
@@ -848,7 +848,9 @@ queue_noop_in(iscsi_conn_t *c)
 	in->ttt = cmd->c_ttt;
 	in->itt = ISCSI_RSVD_TASK_TAG;
 
+	(void) pthread_mutex_lock(&c->c_mutex);
 	iscsi_cmd_free(c, cmd);
+	(void) pthread_mutex_unlock(&c->c_mutex);
 	queue_message_set(c->c_dataq, 0, msg_send_pkt, (void *)in);
 }
 
@@ -909,7 +911,7 @@ iscsi_inventory_change(char *targ_name)
 		    (strcmp(c->c_sess->s_t_name, targ_name) == 0)) {
 
 			queue_prt(c->c_mgmtq, Q_CONN_NONIO,
-			    "CON%x  Sending Inventory change out", c->c_num);
+			    "CON%x  Sending Inventory change out\n", c->c_num);
 			/*
 			 * Send a message indicating that the logical unit
 			 * inventory has changed. 1) This message is sent
@@ -1108,7 +1110,7 @@ conn_state(iscsi_conn_t *c, iscsi_transition_t t)
 	default:
 		break;
 	}
-	queue_prt(c->c_mgmtq, Q_CONN_NONIO, "CON%x  ---- %s(%s) -> %s",
+	queue_prt(c->c_mgmtq, Q_CONN_NONIO, "CON%x  ---- %s(%s) -> %s\n",
 	    c->c_num, state_to_str(old_state), event_to_str(t),
 	    state_to_str(c->c_state));
 	(void) pthread_mutex_unlock(&c->c_state_mutex);
@@ -1151,7 +1153,7 @@ send_iscsi_pkt(iscsi_conn_t *c, iscsi_hdr_t *h, char *opt_text)
 			 * wait for a reconnect from the initiator.
 			 */
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-			    "CON%x  iscsi_pkt -- initiator closed socket",
+			    "CON%x  iscsi_pkt -- initiator closed socket\n",
 			    c->c_num);
 		} else {
 
@@ -1159,7 +1161,7 @@ send_iscsi_pkt(iscsi_conn_t *c, iscsi_hdr_t *h, char *opt_text)
 			 * This is not good.
 			 */
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-			    "CON%x  iscsi_pkt write failed, errno %d",
+			    "CON%x  iscsi_pkt write failed, errno %d\n",
 			    c->c_num, errno);
 		}
 		conn_state(c, T8);
@@ -1223,7 +1225,7 @@ send_iscsi_pkt(iscsi_conn_t *c, iscsi_hdr_t *h, char *opt_text)
 #ifdef FULL_DEBUG
 	if (dlen != 0) {
 		queue_prt(c->c_mgmtq, Q_CONN_IO,
-		    "CON%x  Response(0x%x), Data: len=%d addr=0x%llx",
+		    "CON%x  Response(0x%x), Data: len=%d addr=0x%llx\n",
 		    c->c_num, h->opcode, dlen, opt_text);
 	}
 #endif

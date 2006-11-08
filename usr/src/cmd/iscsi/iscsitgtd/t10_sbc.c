@@ -299,6 +299,7 @@ sbc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	uint64_t	err_blkno;
 	disk_params_t	*d;
 	uchar_t		addl_sense_len;
+	t10_cmd_t	*c;
 
 	if ((d = (disk_params_t *)T10_PARAMS_AREA(cmd)) == NULL) {
 		trans_send_complete(cmd, STATUS_BUSY);
@@ -390,8 +391,9 @@ sbc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 		queue_prt(mgmtq, Q_STE_ERRS,
 		    "SBC%x  LUN%d READ Illegal sector "
-		    "(0x%llx + 0x%x) > 0x%ullx", cmd->c_lu->l_targ->s_targ_num,
-		    cmd->c_lu->l_common->l_num, addr, cnt, d->d_size);
+		    "(0x%llx + 0x%x) > 0x%ullx\n",
+		    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
+		    addr, cnt, d->d_size);
 		return;
 	}
 
@@ -404,8 +406,12 @@ sbc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	}
 
 	do {
-		io = sbc_io_alloc(cmd);
 		min = MIN((cnt * 512) - offset, T10_MAX_OUT(cmd));
+		if ((offset + min) < (cnt * 512LL))
+			c = trans_cmd_dup(cmd);
+		else
+			c = cmd;
+		io = sbc_io_alloc(c);
 
 		io->da_lba	= addr;
 		io->da_lba_cnt	= cnt;
@@ -414,8 +420,8 @@ sbc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 #ifdef FULL_DEBUG
 		queue_prt(mgmtq, Q_STE_IO,
-		    "SBC%x  LUN%d blk 0x%llx, cnt %d, offset 0x%llx, size %d",
-		    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
+		    "SBC%x  LUN%d blk 0x%llx, cnt %d, offset 0x%llx, size %d\n",
+		    c->c_lu->l_targ->s_targ_num, c->c_lu->l_common->l_num,
 		    addr, cnt, io->da_offset, min);
 #endif
 		if (mmap_data != MAP_FAILED) {
@@ -430,15 +436,15 @@ sbc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 		} else {
 			if ((io->da_data = (char *)malloc(min)) == NULL) {
-				trans_send_complete(cmd, STATUS_BUSY);
+				trans_send_complete(c, STATUS_BUSY);
 				return;
 			}
 			io->da_clear_overlap	= False;
 			io->da_data_alloc	= True;
 			io->da_aio.a_aio_cmplt	= sbc_read_cmplt;
 			io->da_aio.a_id		= io;
-			trans_aioread(cmd, io->da_data, min, (addr * 512LL) +
-			    (off_t)io->da_offset, (aio_result_t *)io);
+			trans_aioread(c, io->da_data, min, (addr * 512LL) +
+			    (off_t)io->da_offset, &io->da_aio);
 		}
 		offset += min;
 	} while (offset < (off_t)(cnt * 512));
@@ -563,7 +569,7 @@ sbc_write(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		break;
 
 	default:
-		queue_prt(mgmtq, Q_STE_ERRS, "Unprocessed WRITE type");
+		queue_prt(mgmtq, Q_STE_ERRS, "Unprocessed WRITE type\n");
 		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
 		spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
 		trans_send_complete(cmd, STATUS_CHECK);
@@ -590,14 +596,15 @@ sbc_write(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 		queue_prt(mgmtq, Q_STE_ERRS,
 		    "SBC%x  LUN%d WRITE Illegal sector "
-		    "(0x%llx + 0x%x) > 0x%ullx", cmd->c_lu->l_targ->s_targ_num,
-		    cmd->c_lu->l_common->l_num, addr, cnt, d->d_size);
+		    "(0x%llx + 0x%x) > 0x%ullx\n",
+		    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
+		    addr, cnt, d->d_size);
 		return;
 	}
 
 	if (cnt == 0) {
 		queue_prt(mgmtq, Q_STE_NONIO,
-		    "SBC%x  LUN%d WRITE zero block count for addr 0x%x",
+		    "SBC%x  LUN%d WRITE zero block count for addr 0x%x\n",
 		    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
 		    addr);
 		trans_send_complete(cmd, STATUS_GOOD);
@@ -625,7 +632,7 @@ sbc_write(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 #ifdef FULL_DEBUG
 	queue_prt(mgmtq, Q_STE_IO,
-	    "SBC%x  LUN%d blk 0x%llx, cnt %d, offset 0x%llx, size %d",
+	    "SBC%x  LUN%d blk 0x%llx, cnt %d, offset 0x%llx, size %d\n",
 	    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num, addr,
 	    cnt, io->da_offset, io->da_data_len);
 #endif
@@ -677,7 +684,7 @@ sbc_write_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 
 	if (cmd->c_lu->l_common->l_mmap == MAP_FAILED) {
 		trans_aiowrite(cmd, data, data_len, (io->da_lba * 512) +
-		    (off_t)io->da_offset, (aio_result_t *)io);
+		    (off_t)io->da_offset, &io->da_aio);
 	} else {
 		if ((d = (disk_params_t *)T10_PARAMS_AREA(cmd)) == NULL)
 			return;
@@ -1041,7 +1048,7 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 	default:
 		queue_prt(mgmtq, Q_STE_ERRS,
-		    "SBC%x  LUN%d Unsupported mode_sense request 0x%x",
+		    "SBC%x  LUN%d Unsupported mode_sense request 0x%x\n",
 		    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
 		    cdb[2]);
 		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
@@ -1395,8 +1402,9 @@ sbc_verify(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 		queue_prt(mgmtq, Q_STE_ERRS,
 		    "SBC%x  LUN%d WRITE Illegal sector "
-		    "(0x%llx + 0x%x) > 0x%ullx", cmd->c_lu->l_targ->s_targ_num,
-		    cmd->c_lu->l_common->l_num, addr, cnt, d->d_size);
+		    "(0x%llx + 0x%x) > 0x%ullx\n",
+		    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
+		    addr, cnt, d->d_size);
 		return;
 	}
 

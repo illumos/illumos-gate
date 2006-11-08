@@ -221,6 +221,7 @@ ssc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	size_t		xfer,
 			req_len;
 	void		*mmap		= cmd->c_lu->l_common->l_mmap;
+	t10_cmd_t	*c;
 
 	fixed	= cdb[1] & 0x01;
 	sili	= cdb[1] & 0x02;
@@ -290,13 +291,17 @@ ssc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	}
 
 	do {
+		xfer = MIN((req_len - offset), T10_MAX_OUT(cmd));
+		if ((offset + xfer) < req_len)
+			c = trans_cmd_dup(cmd);
+		else
+			c = cmd;
 		if ((io = (ssc_io_t *)calloc(1, sizeof (*io))) == NULL) {
-			trans_send_complete(cmd, STATUS_BUSY);
+			trans_send_complete(c, STATUS_BUSY);
 			return;
 		}
 
-		xfer = MIN((req_len - offset), T10_MAX_OUT(cmd));
-		io->sio_cmd		= cmd;
+		io->sio_cmd		= c;
 		io->sio_offset		= offset;
 		io->sio_total		= req_len;
 		io->sio_data_len	= xfer;

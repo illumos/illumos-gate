@@ -76,22 +76,27 @@ typedef	enum {
 	DeviceOffline
 } TaskOp_t;
 
+/*
+ * For an explanation of the t10_cmd_state_t and t10_cmd_event_t
+ * see t10_sam.c:t10_cmd_state_machine()
+ */
 typedef enum {
-	T10_Cmd_Free = 1,
-	T10_Cmd_Alloc,
-	T10_Cmd_DataIn,
-	T10_Cmd_DataOut,
-	T10_Cmd_DataOut_Sent,
-	T10_Cmd_Complete,
-	T10_Cmd_Canceled,
-	T10_Cmd_Errored
+	T10_Cmd_S1_Free		= 1,
+	T10_Cmd_S2_In,
+	T10_Cmd_S3_Trans,
+	T10_Cmd_S4_AIO,
+	T10_Cmd_S5_Wait,
+	T10_Cmd_S6_Freeing
 } t10_cmd_state_t;
 
 typedef enum {
-	T10_Cmd_Event_DataOut_Sent,
-	T10_Cmd_Event_DataIn_Recv,
-	T10_Cmd_Event_Release,
-	T10_Cmd_Event_Canceled
+	T10_Cmd_T1		= 1,
+	T10_Cmd_T2,
+	T10_Cmd_T3,
+	T10_Cmd_T4,
+	T10_Cmd_T5,
+	T10_Cmd_T6,
+	T10_Cmd_T7
 } t10_cmd_event_t;
 
 typedef enum {
@@ -159,6 +164,7 @@ typedef struct t10_aio {
 
 	void		(*a_aio_cmplt)(emul_cmd_t id);
 	emul_cmd_t	a_id;
+	struct t10_cmd	*a_cmd;
 } t10_aio_t;
 
 /*
@@ -228,6 +234,13 @@ typedef struct t10_cmd {
 	 * memory it allocated.
 	 */
 	void			(*c_emul_complete)(emul_handle_t id);
+
+	/*
+	 * During transitions from T10 layer to transport one of three
+	 * messages are sent. The state machine needs access to these
+	 * values to pass things along so we keep it here.
+	 */
+	msg_type_t		c_msg;
 
 	/*
 	 * SCSI sense information.
@@ -539,9 +552,9 @@ Boolean_t
 t10_task_mgmt(t10_targ_handle_t t, TaskOp_t op, int opt_lun, void *tag);
 
 /*
- * t10_cmd_state -- issue an event to change the state of a T10 layer command
+ * t10_cmd_shoot_event -- perform transition to the  state of a T10 command
  */
-void t10_cmd_state(t10_cmd_t *c, t10_cmd_event_t e);
+void t10_cmd_shoot_event(t10_cmd_t *c, t10_cmd_event_t e);
 
 void t10_targ_stat(t10_targ_handle_t t, char **buf);
 
@@ -555,37 +568,38 @@ Boolean_t t10_thick_provision(char *target, int lun, target_queue_t *q);
  * | Methods called by the emulation routines				|
  * []------------------------------------------------------------------[]
  */
+
+t10_cmd_t *trans_cmd_dup(t10_cmd_t *cmd);
+
 /*
  * trans_send_datain -- Emulation layer sending data to initiator
  */
-Boolean_t
-trans_send_datain(t10_cmd_t *cmd, char *data, size_t data_len, size_t offset,
-    void (*callback)(emul_handle_t t), Boolean_t last, emul_handle_t id);
+Boolean_t trans_send_datain(t10_cmd_t *cmd, char *data, size_t data_len,
+    size_t offset, void (*callback)(emul_handle_t t), Boolean_t last,
+    emul_handle_t id);
 
 /*
  * trans_rqst_dataout -- Emulation needs more data to complete request
  */
-Boolean_t
-trans_rqst_dataout(t10_cmd_t *cmd, char *data, size_t data_len, size_t offset,
-    emul_cmd_t emul_id);
+Boolean_t trans_rqst_dataout(t10_cmd_t *cmd, char *data, size_t data_len,
+    size_t offset, emul_cmd_t emul_id);
 
 /*
  * trans_send_complete -- Emulation has completed request w/ opt. sense data
  */
-void
-trans_send_complete(t10_cmd_t *cmd, int t10_status);
+void trans_send_complete(t10_cmd_t *cmd, int t10_status);
 
 /*
  * trans_aiowrite -- asynchronous write and kicks the aio wait thread
  */
 void trans_aiowrite(t10_cmd_t *cmd, char *data, size_t data_len, off_t offset,
-    aio_result_t *aiop);
+    t10_aio_t *taio);
 
 /*
  * trans_aioread -- asynchronous read and kicks the aio wait thread
  */
 void trans_aioread(t10_cmd_t *cmd, char *data, size_t data_len, off_t offset,
-    aio_result_t *aiop);
+    t10_aio_t *taio);
 
 /*
  * trans_params_area -- given a t10_cmd return the dtype params

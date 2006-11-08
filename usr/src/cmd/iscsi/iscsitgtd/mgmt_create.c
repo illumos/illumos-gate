@@ -648,6 +648,7 @@ create_lun_common(char *targ_name, int lun, uint64_t size, err_code_t *code)
 		goto error;
 
 	(void) lseek(fd, size - 512LL, 0);
+	bzero(buf, sizeof (buf));
 	if (write(fd, buf, sizeof (buf)) != sizeof (buf)) {
 		unlink(path);
 		if (errno == EFBIG)
@@ -826,6 +827,7 @@ setup_disk_backing(err_code_t *code, char *path, char *backing, FILE *fp,
 				return (False);
 			}
 			lseek(fd, *size - 512LL, 0);
+			bzero(buf, sizeof (buf));
 			(void) write(fd, buf, sizeof (buf));
 			close(fd);
 		}

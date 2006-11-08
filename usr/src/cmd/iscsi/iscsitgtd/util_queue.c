@@ -342,7 +342,7 @@ queue_str(target_queue_t *q, uint32_t lvl, msg_type_t type, char *fmt)
 
 	(void) pthread_mutex_lock(&q_mutex);
 	if ((qlog) && (qlog_lvl & lvl)) {
-		(void) fprintf(qlog, "%s\n", fmt);
+		(void) fprintf(qlog, "%s", fmt);
 		(void) fflush(qlog);
 	}
 	(void) pthread_mutex_unlock(&q_mutex);
