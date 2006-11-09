@@ -1028,7 +1028,7 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 			gpt.efi_gpt_LastUsableLBA =
 			    LE_64((zv->zv_volsize >> zv->zv_min_bs) - 1);
 			gpt.efi_gpt_NumberOfPartitionEntries = LE_32(1);
-			gpt.efi_gpt_PartitionEntryLBA = LE_32(2);
+			gpt.efi_gpt_PartitionEntryLBA = LE_64(2ULL);
 			gpt.efi_gpt_SizeOfPartitionEntry = LE_32(sizeof (gpe));
 
 			UUID_LE_CONVERT(gpe.efi_gpe_PartitionTypeGUID, uuid);
