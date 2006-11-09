@@ -72,7 +72,7 @@ static struct cnex_pil_map cnex_class_to_pil[] = {
 #define	SUN4V_REG_SPEC2CFG_HDL(x)	((x >> 32) & ~(0xfull << 28))
 
 static clock_t cnex_wait_usecs = 1000; /* wait time in usecs */
-static hrtime_t cnex_pending_tmout = 2ull * NANOSEC; /* 2 secs in nsecs */
+static int cnex_wait_retries = 3;
 static void *cnex_state;
 
 static void cnex_intr_redist(void *arg);
@@ -265,9 +265,8 @@ cnex_intr_redist(void *arg)
 	cnex_ldc_t		*cldcp;
 	cnex_soft_state_t	*cnex_ssp = arg;
 	int			intr_state;
-	hrtime_t 		start;
 	uint64_t		cpuid;
-	int 			rv;
+	int 			rv, retries = 0;
 
 	ASSERT(cnex_ssp != NULL);
 	mutex_enter(&cnex_ssp->clist_lock);
@@ -313,7 +312,7 @@ cnex_intr_redist(void *arg)
 			 * Make a best effort to wait for pending interrupts
 			 * to finish. There is not much we can do if we timeout.
 			 */
-			start = gethrtime();
+			retries = 0;
 
 			do {
 				rv = hvldc_intr_getstate(cnex_ssp->cfghdl,
@@ -326,13 +325,12 @@ cnex_intr_redist(void *arg)
 					return;
 				}
 
-				if ((gethrtime() - start) > cnex_pending_tmout)
+				if (intr_state != HV_INTR_DELIVERED_STATE)
 					break;
-				else
-					drv_usecwait(cnex_wait_usecs);
 
-			} while (!panicstr &&
-			    intr_state == HV_INTR_DELIVERED_STATE);
+				drv_usecwait(cnex_wait_usecs);
+
+			} while (!panicstr && ++retries <= cnex_wait_retries);
 
 			(void) hvldc_intr_settarget(cnex_ssp->cfghdl,
 			    cldcp->tx.ino, cpuid);
@@ -376,26 +374,25 @@ cnex_intr_redist(void *arg)
 			 * Make a best effort to wait for pending interrupts
 			 * to finish. There is not much we can do if we timeout.
 			 */
-			start = gethrtime();
+			retries = 0;
 
 			do {
 				rv = hvldc_intr_getstate(cnex_ssp->cfghdl,
 				    cldcp->rx.ino, &intr_state);
 				if (rv) {
 					DWARN("cnex_intr_redist: rx ino=0x%llx,"
-					    "can't set state\n", cldcp->rx.ino);
+					    "can't get state\n", cldcp->rx.ino);
 					mutex_exit(&cldcp->lock);
 					mutex_exit(&cnex_ssp->clist_lock);
 					return;
 				}
 
-				if ((gethrtime() - start) > cnex_pending_tmout)
+				if (intr_state != HV_INTR_DELIVERED_STATE)
 					break;
-				else
-					drv_usecwait(cnex_wait_usecs);
 
-			} while (!panicstr &&
-			    intr_state == HV_INTR_DELIVERED_STATE);
+				drv_usecwait(cnex_wait_usecs);
+
+			} while (!panicstr && ++retries <= cnex_wait_retries);
 
 			(void) hvldc_intr_settarget(cnex_ssp->cfghdl,
 			    cldcp->rx.ino, cpuid);

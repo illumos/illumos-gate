@@ -95,10 +95,19 @@ extern "C" {
 #define	VDC_SEQ_NUM_TODO		1	/* Request needs processing */
 
 /*
- * Scheme to store the instance number and the slice number in the minor number.
- * (Uses the same format and definitions as the sd(7D) driver)
+ * Macros to get UNIT and PART number
  */
-#define	VD_MAKE_DEV(instance, minor)	((instance << SDUNIT_SHIFT) | minor)
+#define	VDCUNIT_SHIFT	3
+#define	VDCPART_MASK	7
+
+#define	VDCUNIT(dev)	(getminor((dev)) >> VDCUNIT_SHIFT)
+#define	VDCPART(dev)	(getminor((dev)) &  VDCPART_MASK)
+
+/*
+ * Scheme to store the instance number and the slice number in the minor number.
+ * (NOTE: Uses the same format and definitions as the sd(7D) driver)
+ */
+#define	VD_MAKE_DEV(instance, minor)	((instance << VDCUNIT_SHIFT) | minor)
 
 /*
  * variables controlling how long to wait before timing out and how many

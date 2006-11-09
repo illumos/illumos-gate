@@ -84,7 +84,6 @@
 #include <sys/dktp/fdisk.h>
 #include <sys/scsi/generic/sense.h>
 #include <sys/scsi/impl/uscsi.h>	/* Needed for defn of USCSICMD ioctl */
-#include <sys/scsi/targets/sddef.h>
 
 #include <sys/ldoms.h>
 #include <sys/ldc.h>
@@ -117,6 +116,7 @@ static int	vdc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int	vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 
 /* setup */
+static void	vdc_min(struct buf *bufp);
 static int	vdc_send(vdc_t *vdc, caddr_t pkt, size_t *msglen);
 static int	vdc_do_ldc_init(vdc_t *vdc);
 static int	vdc_start_ldc_connection(vdc_t *vdc);
@@ -333,7 +333,7 @@ vdc_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd,  void *arg, void **resultp)
 {
 	_NOTE(ARGUNUSED(dip))
 
-	int	instance = SDUNIT((dev_t)arg);
+	int	instance = VDCUNIT((dev_t)arg);
 	vdc_t	*vdc = NULL;
 
 	switch (cmd) {
@@ -967,7 +967,7 @@ vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 	vdc_t		*vdc;
 
 	ASSERT(dev != NULL);
-	instance = SDUNIT(*dev);
+	instance = VDCUNIT(*dev);
 
 	if ((otyp != OTYP_CHR) && (otyp != OTYP_BLK))
 		return (EINVAL);
@@ -995,7 +995,7 @@ vdc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 	int	instance;
 	vdc_t	*vdc;
 
-	instance = SDUNIT(dev);
+	instance = VDCUNIT(dev);
 
 	if ((otyp != OTYP_CHR) && (otyp != OTYP_BLK))
 		return (EINVAL);
@@ -1036,7 +1036,7 @@ vdc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 static int
 vdc_print(dev_t dev, char *str)
 {
-	cmn_err(CE_NOTE, "vdc%d:  %s", SDUNIT(dev), str);
+	cmn_err(CE_NOTE, "vdc%d:  %s", VDCUNIT(dev), str);
 	return (0);
 }
 
@@ -1045,7 +1045,7 @@ vdc_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 {
 	int	rv;
 	size_t	nbytes = nblk * DEV_BSIZE;
-	int	instance = SDUNIT(dev);
+	int	instance = VDCUNIT(dev);
 	vdc_t	*vdc = NULL;
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
@@ -1056,7 +1056,7 @@ vdc_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	DMSG(vdc, 2, "[%d] dump %ld bytes at block 0x%lx : addr=0x%p\n",
 	    instance, nbytes, blkno, (void *)addr);
 	rv = vdc_send_request(vdc, VD_OP_BWRITE, addr, nbytes,
-	    SDPART(dev), blkno, CB_STRATEGY, 0, VIO_write_dir);
+	    VDCPART(dev), blkno, CB_STRATEGY, 0, VIO_write_dir);
 	if (rv) {
 		DMSG(vdc, 0, "Failed to do a disk dump (err=%d)\n", rv);
 		return (rv);
@@ -1089,7 +1089,7 @@ vdc_strategy(struct buf *buf)
 {
 	int	rv = -1;
 	vdc_t	*vdc = NULL;
-	int	instance = SDUNIT(buf->b_edev);
+	int	instance = VDCUNIT(buf->b_edev);
 	int	op = (buf->b_flags & B_READ) ? VD_OP_BREAD : VD_OP_BWRITE;
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
@@ -1107,7 +1107,7 @@ vdc_strategy(struct buf *buf)
 	bp_mapin(buf);
 
 	rv = vdc_send_request(vdc, op, (caddr_t)buf->b_un.b_addr,
-	    buf->b_bcount, SDPART(buf->b_edev), buf->b_lblkno,
+	    buf->b_bcount, VDCPART(buf->b_edev), buf->b_lblkno,
 	    CB_STRATEGY, buf, (op == VD_OP_BREAD) ? VIO_read_dir :
 	    VIO_write_dir);
 
@@ -1127,14 +1127,39 @@ vdc_strategy(struct buf *buf)
 	return (0);
 }
 
+/*
+ * Function:
+ *	vdc_min
+ *
+ * Description:
+ *	Routine to limit the size of a data transfer. Used in
+ *	conjunction with physio(9F).
+ *
+ * Arguments:
+ *	bp - pointer to the indicated buf(9S) struct.
+ *
+ */
+static void
+vdc_min(struct buf *bufp)
+{
+	vdc_t	*vdc = NULL;
+	int	instance = VDCUNIT(bufp->b_edev);
+
+	vdc = ddi_get_soft_state(vdc_state, instance);
+	VERIFY(vdc != NULL);
+
+	if (bufp->b_bcount > (vdc->max_xfer_sz * vdc->block_size)) {
+		bufp->b_bcount = vdc->max_xfer_sz * vdc->block_size;
+	}
+}
 
 static int
 vdc_read(dev_t dev, struct uio *uio, cred_t *cred)
 {
 	_NOTE(ARGUNUSED(cred))
 
-	DMSGX(1, "[%d] Entered", SDUNIT(dev));
-	return (physio(vdc_strategy, NULL, dev, B_READ, minphys, uio));
+	DMSGX(1, "[%d] Entered", VDCUNIT(dev));
+	return (physio(vdc_strategy, NULL, dev, B_READ, vdc_min, uio));
 }
 
 static int
@@ -1142,8 +1167,8 @@ vdc_write(dev_t dev, struct uio *uio, cred_t *cred)
 {
 	_NOTE(ARGUNUSED(cred))
 
-	DMSGX(1, "[%d] Entered", SDUNIT(dev));
-	return (physio(vdc_strategy, NULL, dev, B_WRITE, minphys, uio));
+	DMSGX(1, "[%d] Entered", VDCUNIT(dev));
+	return (physio(vdc_strategy, NULL, dev, B_WRITE, vdc_min, uio));
 }
 
 static int
@@ -1151,8 +1176,8 @@ vdc_aread(dev_t dev, struct aio_req *aio, cred_t *cred)
 {
 	_NOTE(ARGUNUSED(cred))
 
-	DMSGX(1, "[%d] Entered", SDUNIT(dev));
-	return (aphysio(vdc_strategy, anocancel, dev, B_READ, minphys, aio));
+	DMSGX(1, "[%d] Entered", VDCUNIT(dev));
+	return (aphysio(vdc_strategy, anocancel, dev, B_READ, vdc_min, aio));
 }
 
 static int
@@ -1160,8 +1185,8 @@ vdc_awrite(dev_t dev, struct aio_req *aio, cred_t *cred)
 {
 	_NOTE(ARGUNUSED(cred))
 
-	DMSGX(1, "[%d] Entered", SDUNIT(dev));
-	return (aphysio(vdc_strategy, anocancel, dev, B_WRITE, minphys, aio));
+	DMSGX(1, "[%d] Entered", VDCUNIT(dev));
+	return (aphysio(vdc_strategy, anocancel, dev, B_WRITE, vdc_min, aio));
 }
 
 
@@ -4005,7 +4030,7 @@ vdc_dkio_flush_cb(void *arg)
 	ASSERT(vdc != NULL);
 
 	rv = vdc_do_sync_op(vdc, VD_OP_FLUSH, NULL, 0,
-	    SDPART(dk_arg->dev), 0, CB_SYNC, 0, VIO_both_dir);
+	    VDCPART(dk_arg->dev), 0, CB_SYNC, 0, VIO_both_dir);
 	if (rv != 0) {
 		DMSG(vdc, 0, "[%d] DKIOCFLUSHWRITECACHE failed %d : model %x\n",
 			vdc->instance, rv,
@@ -4108,7 +4133,7 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 static int
 vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 {
-	int		instance = SDUNIT(dev);
+	int		instance = VDCUNIT(dev);
 	vdc_t		*vdc = NULL;
 	int		rv = -1;
 	int		idx = 0;		/* index into dk_ioctl[] */
@@ -4178,7 +4203,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 				return (ENXIO);
 
 			bcopy(vdc->cinfo, &cinfo, sizeof (struct dk_cinfo));
-			cinfo.dki_partition = SDPART(dev);
+			cinfo.dki_partition = VDCPART(dev);
 
 			rv = ddi_copyout(&cinfo, (void *)arg,
 					sizeof (struct dk_cinfo), mode);
@@ -4297,7 +4322,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	 * send request to vds to service the ioctl.
 	 */
 	rv = vdc_do_sync_op(vdc, iop->op, mem_p, alloc_len,
-	    SDPART(dev), 0, CB_SYNC, (void*)(uint64_t)mode,
+	    VDCPART(dev), 0, CB_SYNC, (void *)(uint64_t)mode,
 	    VIO_both_dir);
 
 	if (rv != 0) {
@@ -4764,9 +4789,13 @@ vdc_set_efi_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 static int
 vdc_create_fake_geometry(vdc_t *vdc)
 {
-	int	rv = 0;
-
 	ASSERT(vdc != NULL);
+
+	/*
+	 * Check if max_xfer_sz and vdisk_size are valid
+	 */
+	if (vdc->vdisk_size == 0 || vdc->max_xfer_sz == 0)
+		return (EIO);
 
 	/*
 	 * DKIOCINFO support
@@ -4801,7 +4830,7 @@ vdc_create_fake_geometry(vdc_t *vdc)
 	vdc->minfo->dki_capacity = vdc->vdisk_size;
 	vdc->minfo->dki_lbsize = DEV_BSIZE;
 
-	return (rv);
+	return (0);
 }
 
 /*
@@ -4825,15 +4854,9 @@ vdc_setup_disk_layout(vdc_t *vdc)
 	buf_t	*buf;	/* BREAD requests need to be in a buf_t structure */
 	dev_t	dev;
 	int	slice = 0;
-	int	rv;
+	int	rv, error;
 
 	ASSERT(vdc != NULL);
-
-	rv = vdc_create_fake_geometry(vdc);
-	if (rv != 0) {
-		DMSG(vdc, 0, "[%d] Failed to create disk geometry (err%d)",
-				vdc->instance, rv);
-	}
 
 	if (vdc->vtoc == NULL)
 		vdc->vtoc = kmem_zalloc(sizeof (struct vtoc), KM_SLEEP);
@@ -4846,6 +4869,18 @@ vdc_setup_disk_layout(vdc_t *vdc)
 		DMSG(vdc, 0, "[%d] Failed to get VTOC (err=%d)",
 				vdc->instance, rv);
 		return (rv);
+	}
+
+	/*
+	 * The process of attempting to read VTOC will initiate
+	 * the handshake and establish a connection. Following
+	 * handshake, go ahead and create geometry.
+	 */
+	error = vdc_create_fake_geometry(vdc);
+	if (error != 0) {
+		DMSG(vdc, 0, "[%d] Failed to create disk geometry (err%d)",
+		    vdc->instance, error);
+		return (error);
 	}
 
 	if (rv == ENOTSUP) {
