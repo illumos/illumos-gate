@@ -304,19 +304,22 @@ resolve_lofs(zlog_t *zlogp, char *path, size_t pathlen)
 	for (;;) {
 		struct mnttab *mnp;
 
-		for (mnp = resolve_lofs_mnts; mnp < resolve_lofs_mnt_max;
-		    mnp++) {
+		/* Search in reverse order to find longest match */
+		for (mnp = resolve_lofs_mnt_max - 1; mnp >= resolve_lofs_mnts;
+		    mnp--) {
 			if (mnp->mnt_fstype == NULL ||
 			    mnp->mnt_mountp == NULL ||
-			    mnp->mnt_special == NULL ||
-			    strcmp(mnp->mnt_fstype, MNTTYPE_LOFS) != 0)
+			    mnp->mnt_special == NULL)
 				continue;
 			len = strlen(mnp->mnt_mountp);
 			if (strncmp(mnp->mnt_mountp, path, len) == 0 &&
 			    (path[len] == '/' || path[len] == '\0'))
 				break;
 		}
-		if (mnp >= resolve_lofs_mnt_max)
+		if (mnp < resolve_lofs_mnts)
+			break;
+		/* If it's not a lofs then we're done */
+		if (strcmp(mnp->mnt_fstype, MNTTYPE_LOFS) != 0)
 			break;
 		if (outside_altroot) {
 			char *cp;
