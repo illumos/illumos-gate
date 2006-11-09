@@ -227,22 +227,44 @@ check_authorizations(char *instname, int flags)
 }
 
 /*
- * enable_all_groups(list, setstate, online, update)
- *	Given a list of groups, enable each one found.  If update is
- *	not NULL, then update all the shares for the protocol that was
- *	passed in.
+ * enable_group(group, updateproto)
+ *
+ * enable all the shares in the specified group. This is a helper for
+ * enable_all_groups in order to simplify regular and subgroup (zfs)
+ * disabling. Group has already been checked for non-NULL.
  */
-static int
-enable_all_groups(struct list *work, int setstate, int online, char *update)
+
+static void
+enable_group(sa_group_t group, char *updateproto)
 {
 	sa_share_t share;
+
+	for (share = sa_get_share(group, NULL);
+	    share != NULL;
+	    share = sa_get_next_share(share)) {
+	    if (updateproto != NULL)
+		(void) sa_update_legacy(share, updateproto);
+	    (void) sa_enable_share(share, NULL);
+	}
+}
+
+/*
+ * enable_all_groups(list, setstate, online, updateproto)
+ *	Given a list of groups, enable each one found.  If updateproto
+ *	is not NULL, then update all the shares for the protocol that
+ *	was passed in.
+ */
+static int
+enable_all_groups(struct list *work, int setstate, int online,
+	char *updateproto)
+{
 	int ret = SA_OK;
 	char instance[SA_MAX_NAME_LEN + sizeof (SA_SVC_FMRI_BASE) + 1];
 	char *state;
 	char *name;
 	char *zfs = NULL;
-	int dozfs = 0;
 	sa_group_t group;
+	sa_group_t subgroup;
 
 	while (work != NULL && ret == SA_OK) {
 	    group = (sa_group_t)work->item;
@@ -256,16 +278,24 @@ enable_all_groups(struct list *work, int setstate, int online, char *update)
 	    if (ret == SA_OK) {
 		/* if itemdata == NULL then the whole group */
 		if (work->itemdata == NULL) {
-		    for (share = sa_get_share(group, NULL);
-			share != NULL; share = sa_get_next_share(share)) {
-			if (update != NULL)
-			    (void) sa_update_legacy(share, update);
-			ret = sa_enable_share(share, NULL);
+		    zfs = sa_get_group_attr(group, "zfs");
+			/*
+			 * if the share is managed by ZFS, don't
+			 * update any of the protocols since ZFS is
+			 * handling this.  updateproto will contain
+			 * the name of the protocol that we want to
+			 * update legacy files for.
+			 */
+		    enable_group(group, zfs == NULL ? updateproto : NULL);
+		    for (subgroup = sa_get_sub_group(group); subgroup != NULL;
+			subgroup = sa_get_next_group(subgroup)) {
+			/* never update legacy for ZFS subgroups */
+			enable_group(subgroup, NULL);
 		    }
 		}
 		if (online) {
-		    name = sa_get_group_attr(group, "name");
 		    zfs = sa_get_group_attr(group, "zfs");
+		    name = sa_get_group_attr(group, "name");
 		    if (name != NULL) {
 			if (zfs == NULL) {
 			    (void) snprintf(instance, sizeof (instance),
@@ -278,19 +308,11 @@ enable_all_groups(struct list *work, int setstate, int online, char *update)
 				free(state);
 			    }
 			} else {
-			    dozfs++;
 			    sa_free_attr_string(zfs);
 			    zfs = NULL;
 			}
 			if (name != NULL)
 			    sa_free_attr_string(name);
-		    }
-		} else {
-		    zfs = sa_get_group_attr(group, "zfs");
-		    if (zfs != NULL) {
-			dozfs++;
-			sa_free_attr_string(zfs);
-			zfs = NULL;
 		    }
 		}
 		work = work->next;
@@ -298,19 +320,6 @@ enable_all_groups(struct list *work, int setstate, int online, char *update)
 	}
 	if (ret == SA_OK) {
 	    ret = sa_update_config();
-	}
-	/* do ZFS last to allow everything to get updated */
-	if (ret == SA_OK && dozfs) {
-	    FILE *sys;
-	    int err;
-	    sys = popen(ZFS_SHAREALL, "r");
-	    if (sys != NULL) {
-		err = pclose(sys);
-		if (err != 0)
-		    ret = SA_SYSTEM_ERR;
-	    } else {
-		ret = SA_SYSTEM_ERR;
-	    }
 	}
 	return (ret);
 }

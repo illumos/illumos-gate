@@ -126,6 +126,13 @@ fix_notice(xfs_sharelist_t *list)
 	xfs_sharelist_t *item, *prev;
 	int i;
 
+	if (list == NULL) {
+	    /* zero length dfstab */
+	    list = alloc_sharelist();
+	    if (list == NULL)
+		return (NULL);
+	    list->description = strdup("#\n");
+	}
 	if (list->path == NULL && list->description != NULL &&
 	    strcmp(list->description, notice[0]) != 0) {
 	    for (prev = NULL, i = 0; i < DFSTAB_NOTICE_LINES; i++) {
@@ -166,7 +173,7 @@ getdfstab(FILE *dfs)
 	int argc;
 	int c;
 	static int line = 0;
-	xfs_sharelist_t *item, *first, *last;
+	xfs_sharelist_t *item = NULL, *first = NULL, *last;
 
 	if (dfs != NULL) {
 	    first = NULL;
@@ -254,7 +261,7 @@ getdfstab(FILE *dfs)
 		    }
 		}
 	    }
-	    if (item->fstype == NULL)
+	    if (item != NULL && item->fstype == NULL)
 		item->fstype = strdup("nfs"); /* this is the default */
 	}
 	first = fix_notice(first);
@@ -264,7 +271,7 @@ getdfstab(FILE *dfs)
 /*
  * finddfsentry(list, path)
  *
- * Look for path in the zfs_sharelist_t list and return the tnry if it
+ * Look for path in the zfs_sharelist_t list and return the entry if it
  * exists.
  */
 
@@ -558,7 +565,7 @@ sa_delete_legacy(sa_share_t share)
 			optionset = sa_get_next_optionset(optionset)) {
 			char *proto = sa_get_optionset_attr(optionset, "type");
 			if (list != NULL && proto != NULL)
-			    (void) remdfsentry(list, path, proto);
+			    list = remdfsentry(list, path, proto);
 			if (proto == NULL)
 			    ret = SA_NO_MEMORY;
 			/*

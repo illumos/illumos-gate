@@ -67,15 +67,6 @@ main(int argc, char *argv[])
 	(void) textdomain(TEXT_DOMAIN);
 
 	/*
-	 * initialize the plugin architecture.
-	 * Plugins are needed in the event of a global help
-	 * request.
-	 */
-
-	sa_init(SA_INIT_SHARE_API);
-	optind = 1;	/* reset to beginning */
-
-	/*
 	 * parse enough of command line to get protocol, if any.
 	 * Note that options need to come "after" the subcommand.
 	 */
@@ -108,7 +99,23 @@ main(int argc, char *argv[])
 
 	/*
 	 * now have enough to parse rest of command line
+	 *
+	 * First, initialize the plugin architecture.
+	 * Plugins are needed in the event of a global help
+	 * request.
+	 *
+	 * reset optind to 1 so the parsing that takes place in
+	 * sa_init() will work correctly.
 	 */
+
+	optind = 1;
+	sa_init(SA_INIT_SHARE_API);
+
+	/*
+	 * reset optind again since we will start parsing all over in
+	 * the sub-commands.
+	 */
+	optind = 1;
 	rval = run_command(command, argc, argv, protocol);
 
 	sa_fini();
