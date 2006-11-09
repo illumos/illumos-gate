@@ -81,12 +81,14 @@ cmd_cpuerr_common(fmd_hdl_t *hdl, fmd_event_t *ep, cmd_cpu_t *cpu,
 
 		fmd_case_add_serd(hdl, cc->cc_cp, cc->cc_serdnm);
 	} else {
-		fmd_hdl_debug(hdl,
-		    "destroying existing %s state for class %x\n",
-		    cc->cc_serdnm, clcode);
-		fmd_serd_destroy(hdl, cc->cc_serdnm);
-		fmd_hdl_strfree(hdl, cc->cc_serdnm);
-		cc->cc_serdnm = NULL;
+		if (cc->cc_serdnm != NULL) {
+			fmd_hdl_debug(hdl,
+			    "destroying existing %s state for class %x\n",
+			    cc->cc_serdnm, clcode);
+			fmd_serd_destroy(hdl, cc->cc_serdnm);
+			fmd_hdl_strfree(hdl, cc->cc_serdnm);
+			cc->cc_serdnm = NULL;
+		}
 		fmd_case_reset(hdl, cc->cc_cp);
 		fmd_case_add_ereport(hdl, cc->cc_cp, ep);
 	}
