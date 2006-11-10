@@ -34,11 +34,15 @@ SUNWprivate_1.1 {
 	free_uentry;
 	free_uentrylist;
 	free_umechlist;
+	getent_uef;
+	get_fullpath;
+	get_metaslot_info;
 	get_pkcs11conf_info;
 	pkcs11_mech2keytype;
 	pkcs11_mech2str;
 	pkcs11_str2mech;
 	pkcs11_strerror;
+	str2lifetime;
 	tohexstr;
     local:
 	*;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,754 +36,354 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <cryptoutil.h>
-#include <security/cryptoki.h>
 #include "common.h"
-#include "biginteger.h"
-#include "osslcommon.h"
-#include "p12common.h"
-#include <openssl/pkcs12.h>
-#include <openssl/err.h>
 
-/*
- * Helper function decrypt and parse PKCS#12 import file.
- */
-static CK_RV
-extract_pkcs12(BIO *fbio, CK_UTF8CHAR *pin, CK_ULONG pinlen,
-	EVP_PKEY **priv_key, X509 **cert, STACK_OF(X509) **ca)
-/* ARGSUSED */
+#include <kmfapi.h>
+
+static KMF_RETURN
+pk_import_pk12_files(KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *cred,
+	char *outfile, char *certfile, char *keyfile,
+	char *dir, char *keydir, KMF_ENCODE_FORMAT outformat)
 {
-	PKCS12		*pk12, *pk12_tmp;
-	EVP_PKEY	*temp_pkey = NULL;
-	X509		*temp_cert = NULL;
-	STACK_OF(X509)	*temp_ca = NULL;
+	KMF_RETURN rv = KMF_OK;
+	KMF_DATA *certs = NULL;
+	KMF_RAW_KEY_DATA *keys = NULL;
+	int ncerts = 0;
+	int nkeys = 0;
+	int i;
 
-	cryptodebug("inside extract_pkcs12");
+	rv = KMF_ImportPK12(kmfhandle, outfile, cred,
+		&certs, &ncerts, &keys, &nkeys);
 
-	cryptodebug("calling PKCS12_new");
-	if ((pk12 = PKCS12_new()) == NULL) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to create PKCS#12 context."));
-		return (CKR_GENERAL_ERROR);
+	if (rv == KMF_OK) {
+		(void) printf(gettext("Found %d certificate(s) and %d "
+			"key(s) in %s\n"), ncerts, nkeys, outfile);
 	}
 
-	cryptodebug("calling d2i_PKCS12_bio");
-	if ((pk12_tmp = d2i_PKCS12_bio(fbio, &pk12)) == NULL) {
-		/* This is ok; it seems to mean there is no more to read. */
-		if (ERR_GET_LIB(ERR_peek_error()) == ERR_LIB_ASN1 &&
-		    ERR_GET_REASON(ERR_peek_error()) == ASN1_R_HEADER_TOO_LONG)
-			goto end_extract_pkcs12;
+	if (rv == KMF_OK && ncerts > 0) {
+		KMF_STORECERT_PARAMS params;
+		char newcertfile[MAXPATHLEN];
 
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to populate PKCS#12 context."));
-		PKCS12_free(pk12);
-		return (CKR_GENERAL_ERROR);
+		(void) memset(&params, 0, sizeof (KMF_STORECERT_PARAMS));
+		params.kstype = KMF_KEYSTORE_OPENSSL;
+		params.sslparms.dirpath = dir;
+		params.sslparms.format = outformat;
+
+		for (i = 0; rv == KMF_OK && i < ncerts; i++) {
+			/*
+			 * If storing more than 1 cert, gotta change
+			 * the name so we don't overwrite the previous one.
+			 * Just append a _# to the name.
+			 */
+			if (i > 0) {
+				(void) snprintf(newcertfile,
+					sizeof (newcertfile),
+					"%s_%d", certfile, i);
+				params.sslparms.certfile = newcertfile;
+			} else {
+				params.sslparms.certfile = certfile;
+			}
+			rv = KMF_StoreCert(kmfhandle, &params, &certs[i]);
+		}
 	}
-	pk12 = pk12_tmp;
+	if (rv == KMF_OK && nkeys > 0) {
+		KMF_STOREKEY_PARAMS skparms;
+		char newkeyfile[MAXPATHLEN];
 
-	cryptodebug("calling PKCS12_parse");
-	if (PKCS12_parse(pk12, (char *)pin, &temp_pkey, &temp_cert,
-	    &temp_ca) <= 0) {
-		cryptoerror(LOG_STDERR,
-		    gettext("Unable to parse import file."));
-		PKCS12_free(pk12);
-		return (CKR_GENERAL_ERROR);
+		(void) memset(&skparms, 0, sizeof (skparms));
+
+		/* The order of certificates and keys should match */
+		for (i = 0; rv == KMF_OK && i < nkeys; i++) {
+			skparms.kstype = KMF_KEYSTORE_OPENSSL;
+			skparms.sslparms.dirpath = keydir;
+			skparms.sslparms.format = outformat;
+			skparms.cred = *cred;
+			skparms.certificate = &certs[i];
+
+			if (i > 0) {
+				(void) snprintf(newkeyfile,
+					sizeof (newkeyfile),
+					"%s_%d", keyfile, i);
+				skparms.sslparms.keyfile = newkeyfile;
+			} else {
+				skparms.sslparms.keyfile = keyfile;
+			}
+
+			rv = KMF_StorePrivateKey(kmfhandle, &skparms,
+				&keys[i]);
+		}
+	}
+	/*
+	 * Cleanup memory.
+	 */
+	if (certs) {
+		for (i = 0; i < ncerts; i++)
+			KMF_FreeData(&certs[i]);
+		free(certs);
+	}
+	if (keys) {
+		for (i = 0; i < nkeys; i++)
+			KMF_FreeRawKey(&keys[i]);
+		free(keys);
 	}
 
-end_extract_pkcs12:
 
-	*priv_key = temp_pkey;
-	*cert = temp_cert;
-	*ca = temp_ca;
-
-	PKCS12_free(pk12);
-	return (CKR_OK);
+	return (rv);
 }
 
-/*
- * Converts OpenSSL BIGNUM into PKCS#11 biginteger_t format.
- */
-static CK_RV
-cvt_bn2bigint(BIGNUM *from, biginteger_t *to)
+
+static KMF_RETURN
+pk_import_pk12_nss(
+	KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *kmfcred,
+	KMF_CREDENTIAL *tokencred,
+	char *token_spec, char *dir, char *prefix,
+	char *nickname, char *trustflags, char *filename)
 {
-	CK_BYTE		*temp;
-	CK_ULONG	temp_alloc_sz, temp_cvt_sz;
+	KMF_RETURN rv = KMF_OK;
+	KMF_DATA *certs = NULL;
+	KMF_RAW_KEY_DATA *keys = NULL;
+	int ncerts = 0;
+	int nkeys = 0;
+	int i;
 
-	cryptodebug("inside cvt_bn2bigint");
-
-	if (from == NULL || to == NULL)
-		return (CKR_ARGUMENTS_BAD);
-
-	cryptodebug("calling BN_num_bytes");
-	temp_alloc_sz = BN_num_bytes(from);
-	if ((temp = malloc(temp_alloc_sz)) == NULL)
-		return (CKR_HOST_MEMORY);
-
-	cryptodebug("calling BN_bn2bin");
-	temp_cvt_sz = BN_bn2bin(from, (unsigned char *)temp);
-	if (temp_cvt_sz != temp_alloc_sz)
-		return (CKR_GENERAL_ERROR);
-
-	to->big_value = temp;
-	to->big_value_len = temp_cvt_sz;
-	return (CKR_OK);
-}
-
-/*
- * Write RSA private key to token.
- */
-static CK_RV
-write_rsa_private(CK_SESSION_HANDLE sess, RSA *rsa, X509 *cert)
-{
-	CK_RV		rv = CKR_OK;
-	int		i = 0;
-	static CK_OBJECT_CLASS	objclass = CKO_PRIVATE_KEY;
-	static CK_KEY_TYPE	keytype = CKK_RSA;
-	CK_BYTE		*label = NULL;
-	CK_ULONG	label_len = 0;
-	CK_BYTE		*id = NULL;
-	CK_ULONG	id_len = 0;
-	CK_DATE		startdate = { "", "", "" };
-	CK_DATE		enddate = { "", "", "" };
-	char		tmpdate[8];
-	biginteger_t	mod = { NULL, 0 };	/* required */
-	biginteger_t	pubexp = { NULL, 0 };	/* required */
-	biginteger_t	priexp = { NULL, 0 };	/* optional */
-	biginteger_t	prime1 = { NULL, 0 };	/* optional */
-	biginteger_t	prime2 = { NULL, 0 };	/* optional */
-	biginteger_t	exp1 = { NULL, 0 };	/* optional */
-	biginteger_t	exp2 = { NULL, 0 };	/* optional */
-	biginteger_t	coef = { NULL, 0 };	/* optional */
-	CK_ATTRIBUTE	rsa_pri_attrs[16] = {
-		{ CKA_CLASS, &objclass, sizeof (objclass) },
-		{ CKA_KEY_TYPE, &keytype, sizeof (keytype) },
-		{ CKA_PRIVATE, &pk_true, sizeof (pk_true) },
-		{ CKA_TOKEN, &pk_true, sizeof (pk_true) },
-		{ CKA_LABEL, NULL, 0 },
-		{ CKA_ID, NULL, 0 },
-		{ CKA_START_DATE, NULL, 0 },
-		{ CKA_END_DATE, NULL, 0 },
-		{ CKA_MODULUS, NULL, 0 },
-		{ CKA_PUBLIC_EXPONENT, NULL, 0 },
-		{ 0 /* CKA_PRIVATE_EXPONENT */, NULL, 0 },	/* optional */
-		{ 0 /* CKA_PRIME_1 */, NULL, 0 },		/*  |  */
-		{ 0 /* CKA_PRIME_2 */, NULL, 0 },		/*  |  */
-		{ 0 /* CKA_EXPONENT_1 */, NULL, 0 },		/*  |  */
-		{ 0 /* CKA_EXPONENT_2 */, NULL, 0 },		/*  |  */
-		{ 0 /* CKA_COEFFICIENT */, NULL, 0 }		/*  V  */
-	    };
-	CK_ULONG	count = sizeof (rsa_pri_attrs) / sizeof (CK_ATTRIBUTE);
-	CK_OBJECT_HANDLE	obj;
-
-	cryptodebug("inside write_rsa_private");
-
-	/* Attributes start at array index 4. */
-	i = 4;
-
-	/* Recycle the certificate label for the private key label. */
-	cryptodebug("calling X509_alias_get0");
-	if ((label = X509_alias_get0(cert, (int *)&label_len)) == NULL) {
-		label = (CK_BYTE *)gettext("no label");
-		label_len = strlen((char *)label);
-	}
-	copy_string_to_attr(label, label_len, &(rsa_pri_attrs[i++]));
-
-	/* Recycle the certificate id for the private key id. */
-	cryptodebug("calling PKTOOL_X509_keyid_get0");
-	if ((id = PKTOOL_X509_keyid_get0(cert, (int *)&id_len)) == NULL) {
-		id = (CK_BYTE *)gettext("no id");
-		id_len = strlen((char *)id);
-	}
-	copy_string_to_attr(id, id_len, &(rsa_pri_attrs[i++]));
-
-	/* Recycle the certificate start and end dates for private key.  */
-	cryptodebug("calling X509_get_notBefore");
-	if (PKTOOL_cvt_ossltime(X509_get_notBefore(cert), tmpdate)) {
-		(void) memcpy(&startdate, tmpdate, sizeof (startdate));
-		copy_string_to_attr((CK_BYTE *)&startdate, sizeof (startdate),
-		    &(rsa_pri_attrs[i++]));
-	}
-
-	cryptodebug("calling X509_get_notAfter");
-	if (PKTOOL_cvt_ossltime(X509_get_notAfter(cert), tmpdate)) {
-		(void) memcpy(&enddate, tmpdate, sizeof (enddate));
-		copy_string_to_attr((CK_BYTE *)&enddate, sizeof (enddate),
-		    &(rsa_pri_attrs[i++]));
-	}
-
-	/* Modulus n */
-	cryptodebug("converting RSA private key modulus");
-	if ((rv = cvt_bn2bigint(rsa->n, &mod)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to convert RSA private key modulus."));
+	rv = configure_nss(kmfhandle, dir, prefix);
+	if (rv != KMF_OK)
 		return (rv);
-	}
-	copy_bigint_to_attr(mod, &(rsa_pri_attrs[i++]));
 
-	/* Public exponent e */
-	cryptodebug("converting RSA private key public exponent");
-	if ((rv = cvt_bn2bigint(rsa->e, &pubexp)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to convert RSA private key public exponent."));
-		return (rv);
-	}
-	copy_bigint_to_attr(pubexp, &(rsa_pri_attrs[i++]));
+	rv = KMF_ImportPK12(kmfhandle, filename, kmfcred,
+		&certs, &ncerts, &keys, &nkeys);
 
-	/* Private exponent d */
-	if (rsa->d != NULL) {
-		cryptodebug("converting RSA private key private exponent");
-		if ((rv = cvt_bn2bigint(rsa->d, &priexp)) != CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext("Unable to convert "
-			    "RSA private key private exponent."));
-			return (rv);
+	if (rv == KMF_OK)
+		(void) printf(gettext("Found %d certificate(s) and %d "
+			"key(s) in %s\n"), ncerts, nkeys, filename);
+
+	if (rv == KMF_OK) {
+		KMF_STORECERT_PARAMS params;
+
+		(void) memset(&params, 0, sizeof (KMF_STORECERT_PARAMS));
+		params.kstype = KMF_KEYSTORE_NSS;
+		params.nssparms.slotlabel = token_spec;
+		params.nssparms.trustflag = trustflags;
+
+		for (i = 0; rv == KMF_OK && i < ncerts; i++) {
+			if (i == 0)
+				params.certLabel = nickname;
+			else
+				params.certLabel = NULL;
+
+			rv = KMF_StoreCert(kmfhandle, &params, &certs[i]);
 		}
-		rsa_pri_attrs[i].type = CKA_PRIVATE_EXPONENT;
-		copy_bigint_to_attr(priexp, &(rsa_pri_attrs[i++]));
-	} else
-		cryptodebug("no RSA private key private exponent");
-
-	/* Prime p */
-	if (rsa->p != NULL) {
-		cryptodebug("converting RSA private key prime 1");
-		if ((rv = cvt_bn2bigint(rsa->p, &prime1)) != CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to convert RSA private key prime 1."));
-			return (rv);
+		if (rv != KMF_OK) {
+			display_error(kmfhandle, rv,
+				gettext("Error storing certificate "
+					"in PKCS11 token"));
 		}
-		rsa_pri_attrs[i].type = CKA_PRIME_1;
-		copy_bigint_to_attr(prime1, &(rsa_pri_attrs[i++]));
-	} else
-		cryptodebug("no RSA private key prime 1");
+	}
 
-	/* Prime q */
-	if (rsa->q != NULL) {
-		cryptodebug("converting RSA private key prime 2");
-		if ((rv = cvt_bn2bigint(rsa->q, &prime2)) != CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to convert RSA private key prime 2."));
-			return (rv);
+	if (rv == KMF_OK) {
+		KMF_STOREKEY_PARAMS skparms;
+
+		/* The order of certificates and keys should match */
+		for (i = 0; i < nkeys; i++) {
+			(void) memset(&skparms, 0,
+				sizeof (KMF_STOREKEY_PARAMS));
+			skparms.kstype = KMF_KEYSTORE_NSS;
+			skparms.cred = *tokencred;
+			skparms.label = nickname;
+			skparms.certificate = &certs[i];
+			skparms.nssparms.slotlabel = token_spec;
+
+			rv = KMF_StorePrivateKey(kmfhandle, &skparms, &keys[i]);
 		}
-		rsa_pri_attrs[i].type = CKA_PRIME_2;
-		copy_bigint_to_attr(prime2, &(rsa_pri_attrs[i++]));
-	} else
-		cryptodebug("no RSA private key prime 2");
-
-	/* Private exponent d modulo p-1 */
-	if (rsa->dmp1 != NULL) {
-		cryptodebug("converting RSA private key exponent 1");
-		if ((rv = cvt_bn2bigint(rsa->dmp1, &exp1)) != CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to convert RSA private key exponent 1."));
-			return (rv);
-		}
-		rsa_pri_attrs[i].type = CKA_EXPONENT_1;
-		copy_bigint_to_attr(exp1, &(rsa_pri_attrs[i++]));
-	} else
-		cryptodebug("no RSA private key exponent 1");
-
-	/* Private exponent d modulo q-1 */
-	if (rsa->dmq1 != NULL) {
-		cryptodebug("converting RSA private key exponent 2");
-		if ((rv = cvt_bn2bigint(rsa->dmq1, &exp2)) != CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to convert RSA private key exponent 2."));
-			return (rv);
-		}
-		rsa_pri_attrs[i].type = CKA_EXPONENT_2;
-		copy_bigint_to_attr(exp2, &(rsa_pri_attrs[i++]));
-	} else
-		cryptodebug("no RSA private key exponent 2");
-
-	/* CRT coefficient q-inverse mod p */
-	if (rsa->iqmp != NULL) {
-		cryptodebug("converting RSA private key coefficient");
-		if ((rv = cvt_bn2bigint(rsa->iqmp, &coef)) != CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to convert RSA private key coefficient."));
-			return (rv);
-		}
-		rsa_pri_attrs[i].type = CKA_COEFFICIENT;
-		copy_bigint_to_attr(coef, &(rsa_pri_attrs[i++]));
-	} else
-		cryptodebug("no RSA private key coefficient");
-
-	/* Indicates programming error:  attributes overran the template */
-	if (i > count) {
-		cryptodebug("error: more attributes found than accounted for");
-		i = count;
 	}
-
-	cryptodebug("calling C_CreateObject");
-	if ((rv = C_CreateObject(sess, rsa_pri_attrs, i, &obj)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to create RSA private key object."));
-		return (rv);
-	}
-
-	return (CKR_OK);
-}
-
-/*
- * Write DSA private key to token.
- */
-static CK_RV
-write_dsa_private(CK_SESSION_HANDLE sess, DSA *dsa, X509 *cert)
-{
-	CK_RV		rv = CKR_OK;
-	int		i = 0;
-	static CK_OBJECT_CLASS	objclass = CKO_PRIVATE_KEY;
-	static CK_KEY_TYPE	keytype = CKK_DSA;
-	CK_BYTE		*label = NULL;
-	CK_ULONG	label_len = 0;
-	CK_BYTE		*id = NULL;
-	CK_ULONG	id_len = 0;
-	CK_DATE		startdate = { "", "", "" };
-	CK_DATE		enddate = { "", "", "" };
-	char		tmpdate[8];
-	biginteger_t	prime = { NULL, 0 };	/* required */
-	biginteger_t	subprime = { NULL, 0 };	/* required */
-	biginteger_t	base = { NULL, 0 };	/* required */
-	biginteger_t	value = { NULL, 0 };	/* required */
-	CK_ATTRIBUTE	dsa_pri_attrs[12] = {
-		{ CKA_CLASS, &objclass, sizeof (objclass) },
-		{ CKA_KEY_TYPE, &keytype, sizeof (keytype) },
-		{ CKA_PRIVATE, &pk_true, sizeof (pk_true) },
-		{ CKA_TOKEN, &pk_true, sizeof (pk_true) },
-		{ CKA_LABEL, NULL, 0 },
-		{ CKA_ID, NULL, 0 },
-		{ CKA_START_DATE, NULL, 0 },
-		{ CKA_END_DATE, NULL, 0 },
-		{ CKA_PRIME, NULL, 0 },
-		{ CKA_SUBPRIME, NULL, 0 },
-		{ CKA_BASE, NULL, 0 },
-		{ CKA_VALUE, NULL, 0 }
-	    };
-	CK_ULONG	count = sizeof (dsa_pri_attrs) / sizeof (CK_ATTRIBUTE);
-	CK_OBJECT_HANDLE	obj;
-
-	cryptodebug("inside write_dsa_private");
-
-	/* Attributes start at array index 4. */
-	i = 4;
-
-	/* Recycle the certificate label for the private key label. */
-	cryptodebug("calling X509_alias_get0");
-	if ((label = X509_alias_get0(cert, (int *)&label_len)) == NULL) {
-		label = (CK_BYTE *)gettext("no label");
-		label_len = strlen((char *)label);
-	}
-	copy_string_to_attr(label, label_len, &(dsa_pri_attrs[i++]));
-
-	/* Recycle the certificate id for the private key id. */
-	cryptodebug("calling PKTOOL_X509_keyid_get0");
-	if ((id = PKTOOL_X509_keyid_get0(cert, (int *)&id_len)) == NULL) {
-		id = (CK_BYTE *)gettext("no id");
-		id_len = strlen((char *)id);
-	}
-	copy_string_to_attr(id, id_len, &(dsa_pri_attrs[i++]));
-
-	/* Recycle the certificate start and end dates for private key.  */
-	cryptodebug("calling X509_get_notBefore");
-	if (PKTOOL_cvt_ossltime(X509_get_notBefore(cert), tmpdate)) {
-		(void) memcpy(&startdate, tmpdate, sizeof (startdate));
-		copy_string_to_attr((CK_BYTE *)&startdate, sizeof (startdate),
-		    &(dsa_pri_attrs[i++]));
-	}
-
-	cryptodebug("calling X509_get_notAfter");
-	if (PKTOOL_cvt_ossltime(X509_get_notAfter(cert), tmpdate)) {
-		(void) memcpy(&enddate, tmpdate, sizeof (enddate));
-		copy_string_to_attr((CK_BYTE *)&enddate, sizeof (enddate),
-		    &(dsa_pri_attrs[i++]));
-	}
-
-	/* Prime p */
-	cryptodebug("converting DSA private key prime");
-	if ((rv = cvt_bn2bigint(dsa->p, &prime)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to convert DSA private key prime."));
-		return (rv);
-	}
-	copy_bigint_to_attr(prime, &(dsa_pri_attrs[i++]));
-
-	/* Subprime q */
-	cryptodebug("converting DSA private key subprime");
-	if ((rv = cvt_bn2bigint(dsa->q, &subprime)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to convert DSA private key subprime."));
-		return (rv);
-	}
-	copy_bigint_to_attr(subprime, &(dsa_pri_attrs[i++]));
-
-	/* Base g */
-	cryptodebug("converting DSA private key base");
-	if ((rv = cvt_bn2bigint(dsa->g, &base)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to convert DSA private key base."));
-		return (rv);
-	}
-	copy_bigint_to_attr(base, &(dsa_pri_attrs[i++]));
-
-	/* Private key x */
-	cryptodebug("converting DSA private key value");
-	if ((rv = cvt_bn2bigint(dsa->priv_key, &value)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to convert DSA private key value."));
-		return (rv);
-	}
-	copy_bigint_to_attr(value, &(dsa_pri_attrs[i++]));
-
-	/* Indicates programming error:  attributes overran the template */
-	if (i > count) {
-		cryptodebug("error: more attributes found than accounted for");
-		i = count;
-	}
-
-	cryptodebug("calling C_CreateObject");
-	if ((rv = C_CreateObject(sess, dsa_pri_attrs, i, &obj)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to create DSA private key object."));
-		return (rv);
-	}
-
-	return (CKR_OK);
-}
-
-/*
- * Write DH private key to token.
- */
-static CK_RV
-write_dh_private(CK_SESSION_HANDLE sess, DH *dh, X509 *cert)
-{
-	CK_RV		rv = CKR_OK;
-	int		i = 0;
-	static CK_OBJECT_CLASS	objclass = CKO_PRIVATE_KEY;
-	static CK_KEY_TYPE	keytype = CKK_DH;
-	CK_BYTE		*label = NULL;
-	CK_ULONG	label_len = 0;
-	CK_BYTE		*id = NULL;
-	CK_ULONG	id_len = 0;
-	CK_DATE		startdate = { "", "", "" };
-	CK_DATE		enddate = { "", "", "" };
-	char		tmpdate[8];
-	biginteger_t	prime = { NULL, 0 };	/* required */
-	biginteger_t	base = { NULL, 0 };	/* required */
-	biginteger_t	value = { NULL, 0 };	/* required */
-	CK_ATTRIBUTE	dh_pri_attrs[11] = {
-		{ CKA_CLASS, &objclass, sizeof (objclass) },
-		{ CKA_KEY_TYPE, &keytype, sizeof (keytype) },
-		{ CKA_PRIVATE, &pk_true, sizeof (pk_true) },
-		{ CKA_TOKEN, &pk_true, sizeof (pk_true) },
-		{ CKA_LABEL, NULL, 0 },
-		{ CKA_ID, NULL, 0 },
-		{ CKA_START_DATE, NULL, 0 },
-		{ CKA_END_DATE, NULL, 0 },
-		{ CKA_PRIME, NULL, 0 },
-		{ CKA_BASE, NULL, 0 },
-		{ CKA_VALUE, NULL, 0 }
-	    };
-	CK_ULONG	count = sizeof (dh_pri_attrs) / sizeof (CK_ATTRIBUTE);
-	CK_OBJECT_HANDLE	obj;
-
-	cryptodebug("inside write_dh_private");
-
-	/* Attributes start at array index 4. */
-	i = 4;
-
-	/* Recycle the certificate label for the private key label. */
-	cryptodebug("calling X509_alias_get0");
-	if ((label = X509_alias_get0(cert, (int *)&label_len)) == NULL) {
-		label = (CK_BYTE *)gettext("no label");
-		label_len = strlen((char *)label);
-	}
-	copy_string_to_attr(label, label_len, &(dh_pri_attrs[i++]));
-
-	/* Recycle the certificate id for the private key id. */
-	cryptodebug("PKTOOL_X509_keyid_get0");
-	if ((id = PKTOOL_X509_keyid_get0(cert, (int *)&id_len)) == NULL) {
-		id = (CK_BYTE *)gettext("no id");
-		id_len = strlen((char *)id);
-	}
-	copy_string_to_attr(id, id_len, &(dh_pri_attrs[i++]));
-
-	/* Recycle the certificate start and end dates for private key.  */
-	cryptodebug("calling X509_get_notBefore");
-	if (PKTOOL_cvt_ossltime(X509_get_notBefore(cert), tmpdate)) {
-		(void) memcpy(&startdate, tmpdate, sizeof (startdate));
-		copy_string_to_attr((CK_BYTE *)&startdate, sizeof (startdate),
-		    &(dh_pri_attrs[i++]));
-	}
-
-	cryptodebug("calling X509_get_notAfter");
-	if (PKTOOL_cvt_ossltime(X509_get_notAfter(cert), tmpdate)) {
-		(void) memcpy(&enddate, tmpdate, sizeof (enddate));
-		copy_string_to_attr((CK_BYTE *)&enddate, sizeof (enddate),
-		    &(dh_pri_attrs[i++]));
-	}
-
-	/* Prime p */
-	cryptodebug("converting DH private key prime");
-	if ((rv = cvt_bn2bigint(dh->p, &prime)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to convert DH private key prime."));
-		return (rv);
-	}
-	copy_bigint_to_attr(prime, &(dh_pri_attrs[i++]));
-
-	/* Base g */
-	cryptodebug("converting DH private key base");
-	if ((rv = cvt_bn2bigint(dh->g, &base)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to convert DH private key base."));
-		return (rv);
-	}
-	copy_bigint_to_attr(base, &(dh_pri_attrs[i++]));
-
-	/* Private value x */
-	cryptodebug("converting DH private key value");
-	if ((rv = cvt_bn2bigint(dh->priv_key, &value)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to convert DH private key value."));
-		return (rv);
-	}
-	copy_bigint_to_attr(value, &(dh_pri_attrs[i++]));
-
-	/* Indicates programming error:  attributes overran the template */
-	if (i > count) {
-		cryptodebug("error: more attributes found than accounted for");
-		i = count;
-	}
-
-	cryptodebug("calling C_CreateObject");
-	if ((rv = C_CreateObject(sess, dh_pri_attrs, i, &obj)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to create DH private key object."));
-		return (rv);
-	}
-
-	return (CKR_OK);
-}
-
-/*
- * Write certificate to token.
- */
-static CK_RV
-write_cert(CK_SESSION_HANDLE sess, X509 *cert)
-{
-	CK_RV		rv = CKR_OK;
-	int		i = 0;
-	static CK_OBJECT_CLASS	objclass = CKO_CERTIFICATE;
-	static CK_CERTIFICATE_TYPE	certtype = CKC_X_509;
-	CK_BYTE		*subject = NULL;
-	CK_ULONG	subject_len = 0;
-	CK_BYTE		*value = NULL;
-	CK_ULONG	value_len = 0;
-	CK_BYTE		*label = NULL;
-	CK_ULONG	label_len = 0;
-	CK_BYTE		*id = NULL;
-	CK_ULONG	id_len = 0;
-	CK_BYTE		*issuer = NULL;
-	CK_ULONG	issuer_len = 0;
-	CK_BYTE		*serial = NULL;
-	CK_ULONG	serial_len = 0;
-	CK_ATTRIBUTE	cert_attrs[9] = {
-		{ CKA_CLASS, &objclass, sizeof (objclass) },
-		{ CKA_CERTIFICATE_TYPE, &certtype, sizeof (certtype) },
-		{ CKA_TOKEN, &pk_true, sizeof (pk_true) },
-		{ CKA_SUBJECT, NULL, 0 },		/* required */
-		{ CKA_VALUE, NULL, 0 },			/* required */
-		{ 0 /* CKA_LABEL */, NULL, 0 },		/* optional */
-		{ 0 /* CKA_ID */, NULL, 0 },		/* optional */
-		{ 0 /* CKA_ISSUER */, NULL, 0 },	/* optional */
-		{ 0 /* CKA_SERIAL_NUMBER */, NULL, 0 }	/* optional */
-	    };
-	CK_ULONG	count = sizeof (cert_attrs) / sizeof (CK_ATTRIBUTE);
-	CK_OBJECT_HANDLE	obj;
-
-	cryptodebug("inside write_cert");
-
-	/* Attributes start at array index 3. */
-	i = 3;
 
 	/*
-	 * OpenSSL subject name and issuer (a little further below) are
-	 * actually stack structures that contain individual ASN.1
-	 * components.  This stack of entries is packed into one DER string.
+	 * Cleanup memory.
 	 */
-	cryptodebug("calling PKTOOL_X509_subject_name");
-	if ((subject = PKTOOL_X509_subject_name(cert, (int *)&subject_len)) ==
-	    NULL) {
-		subject = (CK_BYTE *)gettext("no subject name");
-		subject_len = strlen((char *)subject);
+	if (certs) {
+		for (i = 0; i < ncerts; i++)
+			KMF_FreeData(&certs[i]);
+		free(certs);
 	}
-	copy_string_to_attr(subject, subject_len, &(cert_attrs[i++]));
-
-	/* Get cert value, but it has to be reconstructed from cert.  */
-	cryptodebug("calling PKTOOL_X509_cert_value");
-	if ((value = PKTOOL_X509_cert_value(cert, (int *)&value_len)) == NULL) {
-		value = (CK_BYTE *)gettext("no value");
-		value_len = strlen((char *)value);
-	}
-	copy_string_to_attr(value, value_len, &(cert_attrs[i++]));
-
-	/*
-	 * Get certificate label which is "friendlyName" Netscape,
-	 * "alias" in OpenSSL.
-	 */
-	if ((label = X509_alias_get0(cert, (int *)&label_len)) == NULL) {
-		cryptodebug("no certificate label");
-	} else {
-		cert_attrs[i].type = CKA_LABEL;
-		copy_string_to_attr(label, label_len, &(cert_attrs[i++]));
+	if (keys) {
+		for (i = 0; i < nkeys; i++)
+			KMF_FreeRawKey(&keys[i]);
+		free(keys);
 	}
 
-	/* Get the keyid for the cert. */
-	if ((id = PKTOOL_X509_keyid_get0(cert, (int *)&id_len)) == NULL) {
-		cryptodebug("no certificate id");
-	} else {
-		cert_attrs[i].type = CKA_ID;
-		copy_string_to_attr(id, id_len, &(cert_attrs[i++]));
+	return (rv);
+}
+
+static KMF_RETURN
+pk_import_cert(
+	KMF_HANDLE_T kmfhandle,
+	KMF_KEYSTORE_TYPE kstype,
+	char *label, char *token_spec, char *filename,
+	char *dir, char *prefix, char *trustflags)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_IMPORTCERT_PARAMS params;
+
+	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
+		rv = select_token(kmfhandle, token_spec, FALSE);
+
+		if (rv != KMF_OK) {
+			return (rv);
+		}
 	}
 
-	/* Get the issuer name for the cert. */
-	if ((issuer = PKTOOL_X509_issuer_name(cert, (int *)&issuer_len)) ==
-	    NULL) {
-		cryptodebug("no certificate issuer name");
-	} else {
-		cert_attrs[i].type = CKA_ISSUER;
-		copy_string_to_attr(issuer, issuer_len, &(cert_attrs[i++]));
+	(void) memset(&params, 0, sizeof (params));
+	params.kstype = kstype;
+	params.certfile = filename;
+	params.certLabel = label;
+
+	if (kstype == KMF_KEYSTORE_NSS) {
+		rv = configure_nss(kmfhandle, dir, prefix);
+		if (rv != KMF_OK)
+			return (rv);
+		params.nssparms.trustflag = trustflags;
+		params.nssparms.slotlabel = token_spec;
 	}
 
-	/* Get the cert serial number. */
-	if ((serial  = PKTOOL_X509_serial_number(cert, (int *)&serial_len)) ==
-	    NULL) {
-		cryptodebug("no certificate serial number");
-	} else {
-		cert_attrs[i].type = CKA_SERIAL_NUMBER;
-		copy_string_to_attr(serial, serial_len, &(cert_attrs[i++]));
-	}
+	rv = KMF_ImportCert(kmfhandle, &params);
 
-	/* Indicates programming error:  attributes overran the template */
-	if (i > count) {
-		cryptodebug("error: more attributes found than accounted for");
-		i = count;
-	}
+	return (rv);
+}
 
-	cryptodebug("calling C_CreateObject");
-	if ((rv = C_CreateObject(sess, cert_attrs, i, &obj)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to create X.509 certificate object."));
+static KMF_RETURN
+pk_import_file_crl(void *kmfhandle,
+	char *infile,
+	char *outfile,
+	char *outdir,
+	KMF_ENCODE_FORMAT outfmt)
+{
+	KMF_IMPORTCRL_PARAMS 	icrl_params;
+	KMF_OPENSSL_PARAMS sslparams;
+
+	sslparams.crlfile = infile;
+	sslparams.dirpath = outdir;
+	sslparams.outcrlfile = outfile;
+	sslparams.format = outfmt;
+	sslparams.crl_check = B_FALSE;
+
+	icrl_params.kstype = KMF_KEYSTORE_OPENSSL;
+	icrl_params.sslparms = sslparams;
+
+	return (KMF_ImportCRL(kmfhandle, &icrl_params));
+
+}
+
+static KMF_RETURN
+pk_import_nss_crl(void *kmfhandle,
+	boolean_t verify_crl_flag,
+	char *infile,
+	char *outdir,
+	char *prefix)
+{
+	KMF_IMPORTCRL_PARAMS 	icrl_params;
+	KMF_RETURN rv;
+
+	rv = configure_nss(kmfhandle, outdir, prefix);
+	if (rv != KMF_OK)
+		return (rv);
+
+	icrl_params.kstype = KMF_KEYSTORE_NSS;
+	icrl_params.nssparms.slotlabel = NULL;
+	icrl_params.nssparms.crlfile = infile;
+	icrl_params.nssparms.crl_check = verify_crl_flag;
+
+	return (KMF_ImportCRL(kmfhandle, &icrl_params));
+
+}
+
+static KMF_RETURN
+pk_import_pk12_pk11(
+	KMF_HANDLE_T kmfhandle,
+	KMF_CREDENTIAL *p12cred,
+	KMF_CREDENTIAL *tokencred,
+	char *label, char *token_spec,
+	char *filename)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_DATA *certs = NULL;
+	KMF_RAW_KEY_DATA *keys = NULL;
+	int ncerts = 0;
+	int nkeys = 0;
+	int i;
+
+	rv = select_token(kmfhandle, token_spec, FALSE);
+
+	if (rv != KMF_OK) {
 		return (rv);
 	}
 
-	return (CKR_OK);
+	rv = KMF_ImportPK12(kmfhandle, filename, p12cred,
+		&certs, &ncerts, &keys, &nkeys);
+
+	if (rv == KMF_OK) {
+		KMF_STOREKEY_PARAMS skparms;
+
+		/* The order of certificates and keys should match */
+		for (i = 0; i < nkeys; i++) {
+			(void) memset(&skparms, 0,
+				sizeof (KMF_STOREKEY_PARAMS));
+			skparms.kstype = KMF_KEYSTORE_PK11TOKEN;
+			skparms.certificate = &certs[i];
+			if (tokencred != NULL)
+				skparms.cred = *tokencred;
+			if (i == 0)
+				skparms.label = label;
+			else
+				skparms.label = NULL;
+
+			rv = KMF_StorePrivateKey(kmfhandle, &skparms,
+				&keys[i]);
+		}
+	}
+
+	if (rv == KMF_OK) {
+		KMF_STORECERT_PARAMS params;
+
+		(void) printf(gettext("Found %d certificate(s) and %d "
+			"key(s) in %s\n"), ncerts, nkeys, filename);
+		(void) memset(&params, 0, sizeof (KMF_STORECERT_PARAMS));
+
+		params.kstype = KMF_KEYSTORE_PK11TOKEN;
+
+		for (i = 0; rv == KMF_OK && i < ncerts; i++) {
+			if (i == 0)
+				params.certLabel = label;
+			else
+				params.certLabel = NULL;
+
+			rv = KMF_StoreCert(kmfhandle, &params, &certs[i]);
+		}
+	}
+
+	/*
+	 * Cleanup memory.
+	 */
+	if (certs) {
+		for (i = 0; i < ncerts; i++)
+			KMF_FreeData(&certs[i]);
+		free(certs);
+	}
+	if (keys) {
+		for (i = 0; i < nkeys; i++)
+			KMF_FreeRawKey(&keys[i]);
+		free(keys);
+	}
+
+	return (rv);
 }
 
 /*
- * Helper function to write PKCS#12 items to token.  Returns CKR_OK
- * or CKR_GENERAL_ERROR
- */
-static CK_RV
-write_token_objs(CK_SESSION_HANDLE sess, EVP_PKEY *priv_key, X509 *cert,
-	    STACK_OF(X509) *ca, int *successes, int *failures)
-{
-	int		i;
-	X509		*c;
-	CK_RV		rv = CKR_OK;
-
-	cryptodebug("inside write_token_objs");
-
-	/* Do not reset *successes or *failures -- keep running totals. */
-
-	/* Import user key. */
-	switch (priv_key->type) {
-	case EVP_PKEY_RSA:
-		(void) fprintf(stdout, gettext("Writing RSA private key...\n"));
-		if ((rv = write_rsa_private(sess,
-		    EVP_PKEY_get1_RSA(priv_key), cert)) != CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to write RSA private key (%s)."),
-			    pkcs11_strerror(rv));
-			(*failures)++;
-		} else
-			(*successes)++;
-		break;
-	case EVP_PKEY_DSA:
-		(void) fprintf(stdout, gettext("Writing DSA private key...\n"));
-		if ((rv = write_dsa_private(sess,
-		    EVP_PKEY_get1_DSA(priv_key), cert)) != CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to write DSA private key (%s)."),
-			    pkcs11_strerror(rv));
-			(*failures)++;
-		} else
-			(*successes)++;
-		break;
-	case EVP_PKEY_DH:
-		(void) fprintf(stdout, gettext("Writing DH private key...\n"));
-		if ((rv = write_dh_private(sess,
-		    EVP_PKEY_get1_DH(priv_key), cert)) != CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to write DH private key (%s)."),
-			    pkcs11_strerror(rv));
-			(*failures)++;
-		} else
-			(*successes)++;
-		break;
-
-	default:
-		/*
-		 * Note that EVP_PKEY_DH for X9.42 is not implemented
-		 * in the OpenSSL library.
-		 */
-		cryptoerror(LOG_STDERR, gettext(
-		    "Private key type 0x%02x import not supported."),
-		    priv_key->type);
-		(*failures)++;
-		break;
-	}
-
-	/* Import user certificate. */
-	(void) fprintf(stdout, gettext("Writing user certificate...\n"));
-	if ((rv = write_cert(sess, cert)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to write user certificate (%s)."),
-		    pkcs11_strerror(rv));
-		(*failures)++;
-	} else
-		(*successes)++;
-
-	/* Import as many stacks of authority certificates as possible. */
-	for (i = 0; i != sk_X509_num(ca); i++) {
-		/*
-		 * sk_X509_value() is macro that embeds a cast to (X509 *).
-		 * Here it translates into ((X509 *)sk_value((ca), (i))).
-		 * Lint is complaining about the embedded casting, and
-		 * to fix it, you need to fix openssl header files.
-		 */
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
-		c = sk_X509_value(ca, i);
-		(void) fprintf(stdout, gettext(
-		    "Writing authority certificate...\n"));
-		if ((rv = write_cert(sess, c)) != CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to write authority certificate (%s)."),
-			    pkcs11_strerror(rv));
-			(*failures)++;
-		} else
-			(*successes)++;
-	}
-
-	(void) fprintf(stdout, gettext("PKCS#12 element scan completed.\n"));
-	return (*failures != 0 ? CKR_GENERAL_ERROR : CKR_OK);
-}
-
-/*
- * Import objects from PKCS#12 file into token.
+ * Import objects from into KMF repositories.
  */
 int
 pk_import(int argc, char *argv[])
@@ -793,41 +392,108 @@ pk_import(int argc, char *argv[])
 	extern int	optind_av;
 	extern char	*optarg_av;
 	char		*token_spec = NULL;
-	char		*token_name = NULL;
-	char		*manuf_id = NULL;
-	char		*serial_no = NULL;
-	char		full_name[FULL_NAME_LEN];
 	char		*filename = NULL;
-	struct stat	statbuf;
-	CK_SLOT_ID	slot_id;
-	CK_FLAGS	pin_state;
-	CK_UTF8CHAR_PTR	pin = NULL;
-	CK_ULONG	pinlen = 0;
-	CK_UTF8CHAR_PTR	pk12pin = NULL;
-	CK_ULONG	pk12pinlen = 0;
-	CK_SESSION_HANDLE	sess;
-	BIO		*fbio = NULL;
-	EVP_PKEY	*priv_key = NULL;
-	X509		*cert = NULL;
-	STACK_OF(X509)	*ca = NULL;
-	CK_RV		rv = CKR_OK;
-	int		i;
-	int		good_count = 0, bad_count = 0;	/* running totals */
-
-	cryptodebug("inside pk_import");
+	char		*keyfile = NULL;
+	char		*certfile = NULL;
+	char		*crlfile = NULL;
+	char		*certlabel = NULL;
+	char		*dir = NULL;
+	char		*keydir = NULL;
+	char		*prefix = NULL;
+	char		*trustflags = NULL;
+	char		*verify_crl = NULL;
+	boolean_t	verify_crl_flag = B_FALSE;
+	int		oclass = 0;
+	KMF_KEYSTORE_TYPE	kstype = 0;
+	KMF_ENCODE_FORMAT	kfmt = 0;
+	KMF_ENCODE_FORMAT	okfmt = KMF_FORMAT_ASN1;
+	KMF_RETURN		rv = KMF_OK;
+	KMF_CREDENTIAL	pk12cred = { NULL, 0 };
+	KMF_CREDENTIAL	tokencred = { NULL, 0 };
+	KMF_HANDLE_T	kmfhandle = NULL;
 
 	/* Parse command line options.  Do NOT i18n/l10n. */
-	while ((opt = getopt_av(argc, argv, "T:(token)i:(infile)")) != EOF) {
+	while ((opt = getopt_av(argc, argv,
+		"T:(token)i:(infile)"
+		"k:(keystore)y:(objtype)"
+		"d:(dir)p:(prefix)"
+		"n:(certlabel)N:(label)"
+		"K:(outkey)c:(outcert)"
+		"v:(verifycrl)l:(outcrl)"
+		"t:(trust)D:(keydir)F:(outformat)")) != EOF) {
+		if (EMPTYSTRING(optarg_av))
+			return (PK_ERR_USAGE);
 		switch (opt) {
 		case 'T':	/* token specifier */
 			if (token_spec)
 				return (PK_ERR_USAGE);
 			token_spec = optarg_av;
 			break;
+		case 'c':	/* output cert file name */
+			if (certfile)
+				return (PK_ERR_USAGE);
+			certfile = optarg_av;
+			break;
+		case 'l':	/* output CRL file name */
+			if (crlfile)
+				return (PK_ERR_USAGE);
+			crlfile = optarg_av;
+			break;
+		case 'K':	/* output key file name */
+			if (keyfile)
+				return (PK_ERR_USAGE);
+			keyfile = optarg_av;
+			break;
 		case 'i':	/* input file name */
 			if (filename)
 				return (PK_ERR_USAGE);
 			filename = optarg_av;
+			break;
+		case 'k':
+			kstype = KS2Int(optarg_av);
+			if (kstype == 0)
+				return (PK_ERR_USAGE);
+			break;
+		case 'y':
+			oclass = OT2Int(optarg_av);
+			if (oclass == -1)
+				return (PK_ERR_USAGE);
+			break;
+		case 'd':
+			dir = optarg_av;
+			break;
+		case 'D':
+			keydir = optarg_av;
+			break;
+		case 'p':
+			if (prefix)
+				return (PK_ERR_USAGE);
+			prefix = optarg_av;
+			break;
+		case 'n':
+		case 'N':
+			if (certlabel)
+				return (PK_ERR_USAGE);
+			certlabel = optarg_av;
+			break;
+		case 'F':
+			okfmt = Str2Format(optarg_av);
+			if (okfmt == KMF_FORMAT_UNDEF)
+				return (PK_ERR_USAGE);
+			break;
+		case 't':
+			if (trustflags)
+				return (PK_ERR_USAGE);
+			trustflags = optarg_av;
+			break;
+		case 'v':
+			verify_crl = optarg_av;
+			if (tolower(verify_crl[0]) == 'y')
+				verify_crl_flag = B_TRUE;
+			else if (tolower(verify_crl[0]) == 'n')
+				verify_crl_flag = B_FALSE;
+			else
+				return (PK_ERR_USAGE);
 			break;
 		default:
 			return (PK_ERR_USAGE);
@@ -835,142 +501,211 @@ pk_import(int argc, char *argv[])
 		}
 	}
 
-	/* If nothing is specified, default is to use softtoken. */
-	if (token_spec == NULL) {
-		token_name = SOFT_TOKEN_LABEL;
-		manuf_id = SOFT_MANUFACTURER_ID;
-		serial_no = SOFT_TOKEN_SERIAL;
-	} else {
-		/*
-		 * Parse token specifier into token_name, manuf_id, serial_no.
-		 * Token_name is required; manuf_id and serial_no are optional.
-		 */
-		if (parse_token_spec(token_spec, &token_name, &manuf_id,
-		    &serial_no) < 0)
-			return (PK_ERR_USAGE);
-	}
+	/* Assume keystore = PKCS#11 if not specified */
+	if (kstype == 0)
+		kstype = KMF_KEYSTORE_PK11TOKEN;
 
 	/* Filename arg is required. */
-	if (filename == NULL)
+	if (EMPTYSTRING(filename)) {
+		cryptoerror(LOG_STDERR, gettext("The 'infile' parameter"
+			"is required for the import operation.\n"));
 		return (PK_ERR_USAGE);
+	}
 
 	/* No additional args allowed. */
 	argc -= optind_av;
 	argv += optind_av;
 	if (argc)
 		return (PK_ERR_USAGE);
-	/* Done parsing command line options. */
 
-	/* Check that the file exists and is non-empty. */
-	if (access(filename, R_OK) < 0) {
-		cryptoerror(LOG_STDERR, gettext("File \"%s\" is unreadable "
-		    "(%s)."), filename, strerror(errno));
-		return (CKR_OK);
-	}
-	if (stat(filename, &statbuf) < 0) {
-		cryptoerror(LOG_STDERR, gettext("Unable to get size of "
-		    "file \"%s\" (%s)."), filename, strerror(errno));
-		return (CKR_OK);
-	}
-	if (statbuf.st_size == 0) {
-		cryptoerror(LOG_STDERR, gettext("File \"%s\" is empty."),
-		    filename);
-		return (CKR_OK);
+	/* if PUBLIC or PRIVATE obj was given, the old syntax was used. */
+	if ((oclass & (PK_PUBLIC_OBJ | PK_PRIVATE_OBJ)) &&
+		kstype != KMF_KEYSTORE_PK11TOKEN) {
+
+		(void) fprintf(stderr, gettext("The objtype parameter "
+			"is only relevant if keystore=pkcs11\n"));
+		return (PK_ERR_USAGE);
 	}
 
-	full_token_name(token_name, manuf_id, serial_no, full_name);
-
-	/* Find the slot with token. */
-	if ((rv = find_token_slot(token_name, manuf_id, serial_no, &slot_id,
-	    &pin_state)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to find token %s (%s)."), full_name,
-		    pkcs11_strerror(rv));
-		return (PK_ERR_PK11);
+	/*
+	 * You must specify a certlabel (cert label) when importing
+	 * into NSS or PKCS#11.
+	 */
+	if (kstype == KMF_KEYSTORE_NSS &&
+		(oclass != PK_CRL_OBJ) && EMPTYSTRING(certlabel)) {
+		cryptoerror(LOG_STDERR, gettext("The 'label' argument "
+			"is required for this operation\n"));
+		return (PK_ERR_USAGE);
 	}
 
-	/* Get the user's PIN. */
-	if ((rv = get_pin(gettext("Enter token passphrase:"), NULL, &pin,
-	    &pinlen)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to get token passphrase (%s)."),
-		    pkcs11_strerror(rv));
-		quick_finish(NULL);
-		return (PK_ERR_PK11);
+	/*
+	 * PKCS11 only imports PKCS#12 files or PEM/DER Cert files.
+	 */
+	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
+		/* we do not import private keys except in PKCS12 bundles */
+		if (oclass & (PK_PRIVATE_OBJ | PK_PRIKEY_OBJ)) {
+			cryptoerror(LOG_STDERR, gettext(
+				"The PKCS11 keystore only imports PKCS12 "
+				"files or raw certificate data files "
+				" or CRL file.\n"));
+			return (PK_ERR_USAGE);
+		}
 	}
 
-	/* Assume user must be logged in R/W to import objects into token. */
-	if ((rv = quick_start(slot_id, CKF_RW_SESSION, pin, pinlen, &sess)) !=
-	    CKR_OK) {
+	if ((rv = KMF_GetFileFormat(filename, &kfmt)) != KMF_OK) {
 		cryptoerror(LOG_STDERR,
-		    gettext("Unable to log into token (%s)."),
-		    pkcs11_strerror(rv));
-		quick_finish(sess);
-		return (PK_ERR_PK11);
+			gettext("File format not recognized."));
+		return (rv);
 	}
+	if (oclass == 0 && (kfmt == KMF_FORMAT_ASN1 ||
+		kfmt == KMF_FORMAT_PEM))
+		oclass = PK_CERT_OBJ;
 
-	/* Setup OpenSSL context. */
-	PKTOOL_setup_openssl();
-
-	/* Open PKCS#12 file. */
-	if ((open_pkcs12(filename, &fbio)) < 0) {
-		cryptoerror(LOG_STDERR, gettext("Unable to open import file."));
-		quick_finish(sess);
-		return (PK_ERR_SYSTEM);
-	}
-
-	/* Get the PIN for the PKCS#12 import file. */
-	if ((rv = get_pin(gettext("Enter import file passphrase:"), NULL,
-	    &pk12pin, &pk12pinlen)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to get import file passphrase (%s)."),
-		    pkcs11_strerror(rv));
-		close_pkcs12(fbio);
-		quick_finish(sess);
-		return (PK_ERR_PK11);
-	}
-
-	/* PKCS#12 import file may have multiple elements, loop until done. */
-	for (i = 0; /* */; i++) {
-		/* Extract the contents of the PKCS#12 import file. */
-		if ((rv = extract_pkcs12(fbio, pk12pin, pk12pinlen, &priv_key,
-		    &cert, &ca)) != CKR_OK) {
+	if (kstype == KMF_KEYSTORE_NSS) {
+		if (oclass == PK_CRL_OBJ &&
+			(kfmt != KMF_FORMAT_ASN1 && kfmt != KMF_FORMAT_PEM)) {
 			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to parse PKCS#12 element #%d "
-			    "in import file (%s)."), i+1, pkcs11_strerror(rv));
-			close_pkcs12(fbio);
-			quick_finish(sess);
-			return (PK_ERR_OPENSSL);
+				"CRL data can only be imported as DER or "
+				"PEM format"));
+			return (PK_ERR_USAGE);
 		}
 
-		/* Reached end of import file? */
-		if (rv == CKR_OK && priv_key == NULL && cert == NULL &&
-		    ca == NULL)
+		if (oclass == PK_CERT_OBJ &&
+			(kfmt != KMF_FORMAT_ASN1 && kfmt != KMF_FORMAT_PEM)) {
+			cryptoerror(LOG_STDERR, gettext(
+				"Certificates can only be imported as DER or "
+				"PEM format"));
+			return (PK_ERR_USAGE);
+		}
+
+		/* we do not import private keys except in PKCS12 bundles */
+		if (oclass & (PK_PRIVATE_OBJ | PK_PRIKEY_OBJ)) {
+			cryptoerror(LOG_STDERR, gettext(
+				"Private key data can only be imported as part "
+				"of a PKCS12 file.\n"));
+			return (PK_ERR_USAGE);
+		}
+	}
+
+	if (kstype == KMF_KEYSTORE_OPENSSL && oclass != PK_CRL_OBJ) {
+		if (EMPTYSTRING(keyfile) || EMPTYSTRING(certfile)) {
+			cryptoerror(LOG_STDERR, gettext(
+				"The 'outkey' and 'outcert' parameters "
+				"are required for the import operation "
+				"when the 'file' keystore is used.\n"));
+			return (PK_ERR_USAGE);
+		}
+	}
+
+	if (kstype == KMF_KEYSTORE_PK11TOKEN && EMPTYSTRING(token_spec))
+		token_spec = PK_DEFAULT_PK11TOKEN;
+	else if (kstype == KMF_KEYSTORE_NSS && EMPTYSTRING(token_spec))
+		token_spec = DEFAULT_NSS_TOKEN;
+
+	if (kfmt == KMF_FORMAT_PKCS12) {
+		(void) get_pk12_password(&pk12cred);
+
+		if (kstype == KMF_KEYSTORE_PK11TOKEN ||
+			kstype == KMF_KEYSTORE_NSS)
+			(void) get_token_password(kstype, token_spec,
+				&tokencred);
+	}
+
+	if ((rv = KMF_Initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
+		cryptoerror(LOG_STDERR, gettext("Error initializing "
+				"KMF: 0x%02x\n"), rv);
+		goto end;
+	}
+
+	switch (kstype) {
+		case KMF_KEYSTORE_PK11TOKEN:
+			if (kfmt == KMF_FORMAT_PKCS12)
+				rv = pk_import_pk12_pk11(
+					kmfhandle,
+					&pk12cred,
+					&tokencred,
+					certlabel,
+					token_spec,
+					filename);
+			else if (oclass == PK_CERT_OBJ)
+				rv = pk_import_cert(
+					kmfhandle,
+					kstype,
+					certlabel,
+					token_spec,
+					filename,
+					NULL, NULL, NULL);
+			else if (oclass == PK_CRL_OBJ)
+				rv = pk_import_file_crl(
+					kmfhandle,
+					filename,
+					crlfile,
+					dir,
+					okfmt);
 			break;
-
-		(void) fprintf(stdout, gettext(
-		    "Scanning PKCS#12 element #%d for objects...\n"), i+1);
-
-		/* Write the objects to the token. */
-		if ((rv = write_token_objs(sess, priv_key, cert, ca,
-		    &good_count, &bad_count)) != CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to write PKCS#12 element #%d to token %s."),
-			    i+1, full_name);
-			close_pkcs12(fbio);
-			quick_finish(sess);
-			return (PK_ERR_PK11);
-		}
+		case KMF_KEYSTORE_NSS:
+			if (dir == NULL)
+				dir = PK_DEFAULT_DIRECTORY;
+			if (kfmt == KMF_FORMAT_PKCS12)
+				rv = pk_import_pk12_nss(
+					kmfhandle, &pk12cred,
+					&tokencred,
+					token_spec, dir, prefix,
+					certlabel, trustflags, filename);
+			else if (oclass == PK_CERT_OBJ) {
+				rv = pk_import_cert(
+					kmfhandle, kstype,
+					certlabel, token_spec,
+					filename, dir, prefix, trustflags);
+			} else if (oclass == PK_CRL_OBJ) {
+				rv = pk_import_nss_crl(
+					kmfhandle,
+					verify_crl_flag,
+					filename,
+					dir,
+					prefix);
+			}
+			break;
+		case KMF_KEYSTORE_OPENSSL:
+			if (kfmt == KMF_FORMAT_PKCS12)
+				rv = pk_import_pk12_files(
+					kmfhandle, &pk12cred,
+					filename, certfile, keyfile,
+					dir, keydir, okfmt);
+			else if (oclass == PK_CRL_OBJ) {
+				rv = pk_import_file_crl(
+					kmfhandle,
+					filename,
+					crlfile,
+					dir,
+					okfmt);
+			} else
+				/*
+				 * It doesn't make sense to import anything
+				 * else for the files plugin.
+				 */
+				return (PK_ERR_USAGE);
+			break;
+		default:
+			rv = PK_ERR_USAGE;
+			break;
 	}
 
-	(void) fprintf(stdout, gettext("%d PKCS#12 elements scanned: "
-		"%d objects imported, %d errors occurred.\n"), i,
-		good_count, bad_count);
+end:
+	if (rv != KMF_OK)
+		display_error(kmfhandle, rv,
+			gettext("Error importing objects"));
 
-	/* Close PKCS#12 file. */
-	close_pkcs12(fbio);
+	if (tokencred.cred != NULL)
+		free(tokencred.cred);
 
-	/* Clean up. */
-	quick_finish(sess);
+	if (pk12cred.cred != NULL)
+		free(pk12cred.cred);
+
+	(void) KMF_Finalize(kmfhandle);
+
+	if (rv != KMF_OK)
+		return (PK_ERR_USAGE);
+
 	return (0);
 }

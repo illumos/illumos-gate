@@ -94,6 +94,9 @@ f none usr/lib/security/amd64/crypt_bsdbf.so.1 755 root bin
 s none usr/lib/security/amd64/crypt_bsdbf.so=./crypt_bsdbf.so.1
 f none usr/lib/security/amd64/crypt_sunmd5.so.1 755 root bin
 s none usr/lib/security/amd64/crypt_sunmd5.so=./crypt_sunmd5.so.1
+f none usr/lib/security/amd64/kmf_nss.so.1 755 root bin
+f none usr/lib/security/amd64/kmf_openssl.so.1 755 root bin
+f none usr/lib/security/amd64/kmf_pkcs11.so.1 755 root bin
 f none usr/lib/security/amd64/pam_ldap.so.1 755 root bin
 s none usr/lib/security/amd64/pam_ldap.so=./pam_ldap.so.1
 f none usr/lib/security/amd64/pam_allow.so.1 755 root bin
@@ -165,6 +168,10 @@ s none usr/lib/amd64/libgen.so=../../../lib/amd64/libgen.so.1
 s none usr/lib/amd64/libinetutil.so.1=../../../lib/amd64/libinetutil.so.1
 f none usr/lib/amd64/libipp.so.1 755 root bin
 s none usr/lib/amd64/libipp.so=libipp.so.1
+f none usr/lib/amd64/libkmf.so.1 755 root bin
+s none usr/lib/amd64/libkmf.so=libkmf.so.1
+f none usr/lib/amd64/libkmfberder.so.1 755 root bin
+s none usr/lib/amd64/libkmfberder.so=libkmfberder.so.1
 f none usr/lib/amd64/libldap.so.4 755 root bin
 f none usr/lib/amd64/libldap.so.5 755 root bin
 s none usr/lib/amd64/libldap.so=libldap.so.5

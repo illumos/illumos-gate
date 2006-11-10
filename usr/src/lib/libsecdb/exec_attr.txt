@@ -41,6 +41,7 @@ Contract Observer:solaris:cmd:::/usr/bin/ctwatch:\
 	privs=contract_event,contract_observer
 Cron Management:suser:cmd:::/usr/bin/crontab:euid=0
 Crypto Management:suser:cmd:::/usr/sbin/cryptoadm:euid=0
+Crypto Management:suser:cmd:::/usr/bin/kfmcfg:euid=0
 Crypto Management:suser:cmd:::/usr/sfw/bin/openssl:euid=0
 Crypto Management:suser:cmd:::/usr/sfw/bin/CA.pl:euid=0
 DHCP Management:suser:cmd:::/usr/lib/inet/dhcp/svcadm/dhcpconfig:uid=0

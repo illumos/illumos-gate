@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,31 +29,30 @@ PROG =	pktool
 
 OBJS =	pktool.o \
 	common.o \
-	derparse.o \
-	osslcommon.o \
-	p12common.o \
 	setpin.o \
 	list.o \
 	delete.o \
 	import.o \
 	export.o \
-	tokens.o
+	tokens.o \
+	gencert.o \
+	gencsr.o \
+	download.o \
+	genkey.o
 
 include ../../Makefile.cmd
-include $(SRC)/lib/openssl/Makefile.openssl
 
+KMFDIR	=	$(SRC)/lib/libkmf
 SRCS =	$(OBJS:%.o=%.c)
 POFILES = $(OBJS:%.o=%.po)
 POFILE = $(PROG)_msg.po
+MSGFILES=$(SRCS:%.c=%.i)
 
-CPPFLAGS += -I. $(OPENSSL_CPPFLAGS)
-CFLAGS += $(CCVERBOSE)
+CPPFLAGS += -I. -I$(KMFDIR)/include
+CFLAGS += $(CCVERBOSE) -DDEBUG
 
-DYNFLAGS += $(OPENSSL_DYNFLAGS)
-LDFLAGS += $(OPENSSL_LDFLAGS)
-LDLIBS += -lpkcs11 -lcryptoutil -lcrypto -lldap
-
-LINTFLAGS += $(OPENSSL_LDFLAGS)
+LDFLAGS += -L$(SRC)/lib/libkmf/libkmf/$(MACH)
+LDLIBS +=  -lkmf -lpkcs11 -lcryptoutil 
 
 .KEEP_STATE:
 
@@ -65,7 +63,7 @@ $(PROG) : $(OBJS)
 	$(POST_PROCESS)
 
 $(POFILE) : $(POFILES)
-	$(RM) $@; cat $(POFILES) > $@
+	$(BUILDPO.pofiles)
 
 install : all $(ROOTPROG)
 
@@ -75,4 +73,3 @@ clean :
 lint : lint_SRCS
 
 include ../../Makefile.targ
-

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,794 +38,482 @@
 #include <cryptoutil.h>
 #include <security/cryptoki.h>
 #include "common.h"
-#include "derparse.h"
 
-/*
- * Get key size based on the key type.
- */
-static CK_ULONG
-get_key_size(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE obj, CK_KEY_TYPE key_type)
+#include <kmfapi.h>
+
+static void
+pk_show_certs(KMF_HANDLE_T kmfhandle, KMF_X509_DER_CERT *certs, int num_certs)
 {
-	CK_RV		rv = CKR_OK;
-	CK_ULONG	key_size;
-	CK_ATTRIBUTE	modulus_sz =
-		{ CKA_MODULUS, NULL, 0 };	/* RSA */
-	CK_ATTRIBUTE	prime_sz =
-		{ CKA_PRIME, NULL, 0 };		/* DSA, DH X9.42 */
-	CK_ATTRIBUTE	value_sz =
-		{ CKA_VALUE, NULL_PTR, 0 };	/* DH, DES/DES3, AES, GENERIC */
+	int i;
+	char *subject, *issuer, *serial, *id, *altname;
 
-	cryptodebug("inside get_key_size");
+	for (i = 0; i < num_certs; i++) {
+		subject = NULL;
+		issuer = NULL;
+		serial = NULL;
+		id = NULL;
+		altname = NULL;
 
-	switch (key_type) {
-	case CKK_RSA:
-		if ((rv = C_GetAttributeValue(sess, obj, &modulus_sz, 1)) !=
-		    CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to get modulus attribute size (%s)."),
-			    pkcs11_strerror(rv));
-		} else
-			/* Convert key size to bits. */
-			key_size = modulus_sz.ulValueLen * 8;
-		break;
-	case CKK_DH:
-		if ((rv = C_GetAttributeValue(sess, obj, &value_sz, 1)) !=
-		    CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to get value attribute size (%s)."),
-			    pkcs11_strerror(rv));
-		} else
-			/* Convert key size to bits. */
-			key_size = value_sz.ulValueLen * 8;
-		break;
-	case CKK_X9_42_DH:
-	case CKK_DSA:
-		if ((rv = C_GetAttributeValue(sess, obj, &prime_sz, 1)) !=
-		    CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to get prime attribute size (%s)."),
-			    pkcs11_strerror(rv));
-		} else
-			/* Convert key size to bits. */
-			key_size = prime_sz.ulValueLen * 8;
-		break;
-	case CKK_DES:
-	case CKK_DES3:
-		if ((rv = C_GetAttributeValue(sess, obj, &value_sz, 1)) !=
-		    CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to get value attribute size (%s)."),
-			    pkcs11_strerror(rv));
-		} else
-			/* Convert key size to bits -- omitting parity bit. */
-			key_size = value_sz.ulValueLen * 7;
-		break;
-	case CKK_AES:
-	case CKK_GENERIC_SECRET:
-		if ((rv = C_GetAttributeValue(sess, obj, &value_sz, 1)) !=
-		    CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to get value attribute size (%s)."),
-			    pkcs11_strerror(rv));
-		} else
-			/* Convert key size to bits. */
-			key_size = value_sz.ulValueLen * 8;
-		break;
-	default:
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unknown object key type (0x%02x)."), key_type);
-		break;
+		(void) fprintf(stdout,
+			gettext("%d. (X.509 certificate)\n"), i + 1);
+		if (certs[i].kmf_private.label != NULL)
+			(void) fprintf(stdout, gettext("\t%s: %s\n"),
+				(certs[i].kmf_private.keystore_type ==
+				KMF_KEYSTORE_OPENSSL ?  "Filename" : "Label"),
+				certs[i].kmf_private.label);
+		if (KMF_GetCertIDString(&certs[i].certificate,
+				&id) == KMF_OK)
+			(void) fprintf(stdout, gettext("\tID: %s\n"), id);
+		if (KMF_GetCertSubjectNameString(kmfhandle,
+			&certs[i].certificate, &subject) == KMF_OK)
+			(void) fprintf(stdout, gettext("\tSubject: %s\n"),
+				subject);
+		if (KMF_GetCertIssuerNameString(kmfhandle,
+			&certs[i].certificate, &issuer) == KMF_OK)
+			(void) fprintf(stdout, gettext("\tIssuer: %s\n"),
+				issuer);
+		if (KMF_GetCertSerialNumberString(kmfhandle,
+			&certs[i].certificate, &serial) == KMF_OK)
+			(void) fprintf(stdout, gettext("\tSerial: %s\n"),
+				serial);
+
+		if (KMF_GetCertExtensionString(kmfhandle,
+			&certs[i].certificate, KMF_X509_EXT_SUBJ_ALTNAME,
+			&altname) == KMF_OK)  {
+			(void) fprintf(stdout, gettext("\t%s\n"),
+				altname);
+		}
+
+		KMF_FreeString(subject);
+		KMF_FreeString(issuer);
+		KMF_FreeString(serial);
+		KMF_FreeString(id);
+		KMF_FreeString(altname);
+		(void) fprintf(stdout, "\n");
+	}
+}
+
+static char *
+describeKey(KMF_KEY_HANDLE *key)
+{
+	if (key->keyclass == KMF_ASYM_PUB) {
+		if (key->keyalg == KMF_RSA)
+			return (gettext("RSA public key"));
+		if (key->keyalg == KMF_DSA)
+			return (gettext("DSA public key"));
+	}
+	if (key->keyclass == KMF_ASYM_PRI) {
+		if (key->keyalg == KMF_RSA)
+			return ("RSA private key");
+		if (key->keyalg == KMF_DSA)
+			return ("DSA private key");
+	}
+	if (key->keyclass == KMF_SYMMETRIC) {
+		switch (key->keyalg) {
+			case KMF_AES:
+				return (gettext("AES"));
+				break;
+			case KMF_RC4:
+				return (gettext("ARCFOUR"));
+				break;
+			case KMF_DES:
+				return (gettext("DES"));
+				break;
+			case KMF_DES3:
+				return (gettext("Triple-DES"));
+				break;
+			default:
+				return (gettext("symmetric"));
+				break;
+		}
 	}
 
-	return (key_size);
+	return (gettext("unrecognized key object"));
+
+}
+
+static char *
+keybitstr(KMF_KEY_HANDLE *key)
+{
+	KMF_RAW_SYM_KEY *rkey;
+	char keystr[256];
+	char *p;
+
+	if (key == NULL || (key->keyclass != KMF_SYMMETRIC))
+		return ("");
+
+	rkey = (KMF_RAW_SYM_KEY *)key->keyp;
+	(void) memset(keystr, 0, sizeof (keystr));
+	if (rkey != NULL) {
+		(void) snprintf(keystr, sizeof (keystr),
+			" (%d bits)", rkey->keydata.len * 8);
+		p = keystr;
+	} else {
+		return ("");
+	}
+
+	return (p);
+}
+
+static void
+pk_show_keys(void *handle, KMF_KEY_HANDLE *keys, int numkeys)
+{
+	int i;
+
+	for (i = 0; i < numkeys; i++) {
+		(void) fprintf(stdout, gettext("Key #%d - %s:  %s%s"),
+			i+1, describeKey(&keys[i]),
+			keys[i].keylabel ? keys[i].keylabel :
+			gettext("No label"),
+			(keys[i].keyclass == KMF_SYMMETRIC ?
+			keybitstr(&keys[i]) : ""));
+
+		if (keys[i].keyclass == KMF_SYMMETRIC) {
+			KMF_RETURN rv;
+			KMF_RAW_SYM_KEY rkey;
+			rv = KMF_GetSymKeyValue(handle, &keys[i],
+				&rkey);
+			if (rv == KMF_OK) {
+				(void) fprintf(stdout, "\t %d bits",
+					rkey.keydata.len * 8);
+				KMF_FreeRawSymKey(&rkey);
+			}
+		}
+		(void) fprintf(stdout, "\n");
+	}
 }
 
 /*
- * Display private key.
+ * Generic routine used by all "list cert" operations to find
+ * all matching certificates.
  */
-static CK_RV
-display_prikey(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE obj, int counter)
+static KMF_RETURN
+pk_find_certs(KMF_HANDLE_T kmfhandle, KMF_FINDCERT_PARAMS *params)
 {
-	CK_RV			rv = CKR_OK;
-	static CK_BBOOL		private;
-	static CK_BBOOL		modifiable;
-	static CK_KEY_TYPE	key_type;
-	CK_ULONG		key_size;
-	CK_BYTE			*label = NULL;
-	CK_ULONG		label_len = 0;
-	CK_BYTE			*id = NULL;
-	CK_ULONG		id_len = 0;
-	CK_BYTE			*subject = NULL;
-	CK_ULONG		subject_len = 0;
-	CK_DATE			*start_date = NULL;
-	CK_ULONG		start_date_len = 0;
-	CK_DATE			*end_date = NULL;
-	CK_ULONG		end_date_len = 0;
-	CK_ATTRIBUTE		attrs[18] = {
-		/* 0 to 2 */
-		{ CKA_PRIVATE, &private, sizeof (private) },
-		{ CKA_MODIFIABLE, &modifiable, sizeof (modifiable) },
-		{ CKA_KEY_TYPE, &key_type, sizeof (key_type) },
-		/* 3 to 12 */
-		{ CKA_DERIVE, NULL, 0 },
-		{ CKA_LOCAL, NULL, 0 },
-		{ CKA_DECRYPT, NULL, 0 },
-		{ CKA_SIGN, NULL, 0 },
-		{ CKA_SIGN_RECOVER, NULL, 0 },
-		{ CKA_UNWRAP, NULL, 0 },
-		{ CKA_SENSITIVE, NULL, 0 },
-		{ CKA_ALWAYS_SENSITIVE, NULL, 0 },
-		{ CKA_EXTRACTABLE, NULL, 0 },
-		{ CKA_NEVER_EXTRACTABLE, NULL, 0 },
-		/* 13 to 17 */
-		{ CKA_LABEL, NULL, 0 },			/* optional */
-		{ CKA_ID, NULL, 0 },			/* optional */
-		{ CKA_SUBJECT, NULL, 0 },		/* optional */
-		{ CKA_START_DATE, NULL, 0 },		/* optional */
-		{ CKA_END_DATE, NULL, 0 }		/* optional */
-		/* not displaying CKA_KEY_GEN_MECHANISM */
-	    };
-	CK_ULONG	n_attrs = sizeof (attrs) / sizeof (CK_ATTRIBUTE);
-	int		i;
-	char		*hex_id = NULL;
-	int		hex_id_len = 0;
-	char		*hex_subject = NULL;
-	int		hex_subject_len = 0;
+	KMF_RETURN rv = KMF_OK;
+	KMF_X509_DER_CERT *certlist = NULL;
+	uint32_t numcerts = 0;
 
-	cryptodebug("inside display_prikey");
+	numcerts = 0;
+	rv = KMF_FindCert(kmfhandle, params, NULL, &numcerts);
+	if (rv == KMF_OK && numcerts > 0) {
+		(void) printf(gettext("Found %d certificates.\n"),
+			numcerts);
+		certlist = (KMF_X509_DER_CERT *)malloc(numcerts *
+				sizeof (KMF_X509_DER_CERT));
+		if (certlist == NULL)
+			return (KMF_ERR_MEMORY);
+		(void) memset(certlist, 0, numcerts *
+			sizeof (KMF_X509_DER_CERT));
 
-	/* Get the sizes of the attributes we need. */
-	cryptodebug("calling C_GetAttributeValue for size info");
-	if ((rv = C_GetAttributeValue(sess, obj, attrs, n_attrs)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to get private key attribute sizes (%s)."),
-		    pkcs11_strerror(rv));
-		return (rv);
-	}
-
-	/* Allocate memory for each variable-length attribute. */
-	for (i = 3; i < n_attrs; i++) {
-		if (attrs[i].ulValueLen == (CK_ULONG)-1 ||
-		    attrs[i].ulValueLen == 0) {
-			cryptodebug("display_prikey: *** should not happen");
-			attrs[i].ulValueLen = 0;
-			continue;
+		rv = KMF_FindCert(kmfhandle, params, certlist, &numcerts);
+		if (rv == KMF_OK) {
+			int i;
+			(void) pk_show_certs(kmfhandle, certlist,
+				numcerts);
+			for (i = 0; i < numcerts; i++)
+				KMF_FreeKMFCert(kmfhandle, &certlist[i]);
 		}
-		if ((attrs[i].pValue = malloc(attrs[i].ulValueLen)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_prikey;
-		}
+		free(certlist);
 	}
+	if (rv == KMF_ERR_CERT_NOT_FOUND &&
+		params->kstype != KMF_KEYSTORE_OPENSSL)
+		rv = KMF_OK;
 
-	/* Now really get the attributes. */
-	cryptodebug("calling C_GetAttributeValue for attribute info");
-	if ((rv = C_GetAttributeValue(sess, obj, attrs, n_attrs)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to get private key attributes (%s)."),
-		    pkcs11_strerror(rv));
-		goto free_display_prikey;
-	}
-
-	/* Fill in all the optional temp variables. */
-	i = 13;
-	copy_attr_to_string(&(attrs[i++]), &label, &label_len);
-	copy_attr_to_string(&(attrs[i++]), &id, &id_len);
-	copy_attr_to_string(&(attrs[i++]), &subject, &subject_len);
-	copy_attr_to_date(&(attrs[i++]), &start_date, &start_date_len);
-	copy_attr_to_date(&(attrs[i++]), &end_date, &end_date_len);
-
-	/* Get the key size for the object. */
-	key_size = get_key_size(sess, obj, key_type);
-
-	/* Display the object ... */
-		/* ... the label and what it is (and key size in bits) ... */
-	(void) fprintf(stdout, gettext("%d.  \"%.*s\" (%d-bit %s %s)\n"),
-	    counter, label_len, label_len > 0 ? (char *)label :
-	    gettext("<no label>"), key_size, keytype_str(key_type),
-	    class_str(CKO_PRIVATE_KEY));
-
-		/* ... the id ... */
-	if (id_len == (CK_ULONG)-1 || id_len == 0)
-		(void) fprintf(stdout, gettext("\tId:  --\n"));
-	else {
-		hex_id_len = 3 * id_len + 1;
-		if ((hex_id = malloc(hex_id_len)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_prikey;
-		}
-		octetify(id, id_len, hex_id, hex_id_len, B_FALSE, B_FALSE, 60,
-		    "\n\t\t", "");
-		(void) fprintf(stdout, gettext("\tId:  %s\n"), hex_id);
-		free(hex_id);
-	}
-
-		/* ... the subject name ... */
-	if (subject_len == (CK_ULONG)-1 || subject_len == 0)
-		(void) fprintf(stdout, gettext("\tSubject:  --\n"));
-	else {
-		hex_subject_len = 2 * subject_len + 1;	/* best guesstimate */
-		if ((hex_subject = malloc(hex_subject_len)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_prikey;
-		}
-		rdnseq_to_str(subject, subject_len, hex_subject,
-		    hex_subject_len);
-		(void) fprintf(stdout, gettext("\tSubject:  %.*s\n"),
-		    hex_subject_len, hex_subject);
-		free(hex_subject);
-	}
-
-		/* ... the start date ... */
-	if (start_date_len == (CK_ULONG)-1 || start_date_len == 0)
-		(void) fprintf(stdout, gettext("\tStart Date:  --\n"));
-	else
-		(void) fprintf(stdout, gettext(
-		    "\tStart Date:  %02.2s/%02.2s/%04.4s\n"),
-		    start_date->month, start_date->day, start_date->year);
-
-		/* ... the end date ... */
-	if (end_date_len == (CK_ULONG)-1 || end_date_len == 0)
-		(void) fprintf(stdout, gettext("\tEnd Date:  --\n"));
-	else
-		(void) fprintf(stdout, gettext(
-		    "\tEnd Date:  %02.2s/%02.2s/%04.4s\n"),
-		    end_date->month, end_date->day, end_date->year);
-
-		/* ... and its capabilities */
-	(void) fprintf(stdout, "\t(%s, %s",
-	    private != pk_false ? gettext("private") : gettext("public"),
-	    modifiable == B_TRUE ? gettext("modifiable") :
-	    gettext("not modifiable"));
-	for (i = 3; i <= 12; i++) {
-		if (attrs[i].ulValueLen != (CK_ULONG)-1 &&
-		    attrs[i].ulValueLen != 0 &&
-		    *((CK_BBOOL *)(attrs[i].pValue)) == B_TRUE)
-			(void) fprintf(stdout, ", %s", attr_str(attrs[i].type));
-	}
-	(void) fprintf(stdout, ")\n");
-
-free_display_prikey:
-	for (i = 3; i < n_attrs; i++)
-		if (attrs[i].ulValueLen != (CK_ULONG)-1 &&
-		    attrs[i].ulValueLen != 0)
-			free(attrs[i].pValue);
 	return (rv);
 }
 
-/*
- * Display public key.
- */
-static CK_RV
-display_pubkey(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE obj, int counter)
+static KMF_RETURN
+pk_list_keys(void *handle, KMF_FINDKEY_PARAMS *parms)
 {
-	CK_RV			rv = CKR_OK;
-	static CK_BBOOL		private;
-	static CK_BBOOL		modifiable;
-	static CK_BBOOL		trusted;
-	static CK_KEY_TYPE	key_type;
-	CK_ULONG		key_size;
-	CK_BYTE			*label = NULL;
-	CK_ULONG		label_len = 0;
-	CK_BYTE			*id = NULL;
-	CK_ULONG		id_len = 0;
-	CK_BYTE			*subject = NULL;
-	CK_ULONG		subject_len = 0;
-	CK_DATE			*start_date = NULL;
-	CK_ULONG		start_date_len = 0;
-	CK_DATE			*end_date = NULL;
-	CK_ULONG		end_date_len = 0;
-	CK_ATTRIBUTE		attrs[15] = {
-		/* 0 to 3 */
-		{ CKA_PRIVATE, &private, sizeof (private) },
-		{ CKA_MODIFIABLE, &modifiable, sizeof (modifiable) },
-		{ CKA_TRUSTED, &trusted, sizeof (trusted) },
-		{ CKA_KEY_TYPE, &key_type, sizeof (key_type) },
-		/* 4 to 9 */
-		{ CKA_DERIVE, NULL, 0 },
-		{ CKA_LOCAL, NULL, 0 },
-		{ CKA_ENCRYPT, NULL, 0 },
-		{ CKA_VERIFY, NULL, 0 },
-		{ CKA_VERIFY_RECOVER, NULL, 0 },
-		{ CKA_WRAP, NULL, 0 },
-		/* 10 to 14 */
-		{ CKA_LABEL, NULL, 0 },			/* optional */
-		{ CKA_ID, NULL, 0 },			/* optional */
-		{ CKA_SUBJECT, NULL, 0 },		/* optional */
-		{ CKA_START_DATE, NULL, 0 },		/* optional */
-		{ CKA_END_DATE, NULL, 0 }		/* optional */
-		/* not displaying CKA_KEY_GEN_MECHANISM */
-	    };
-	CK_ULONG	n_attrs = sizeof (attrs) / sizeof (CK_ATTRIBUTE);
-	int		i;
-	char		*hex_id = NULL;
-	int		hex_id_len = 0;
-	char		*hex_subject = NULL;
-	int		hex_subject_len = 0;
+	KMF_RETURN rv;
+	KMF_KEY_HANDLE *keys;
+	uint32_t numkeys = 0;
 
-	cryptodebug("inside display_pubkey");
+	numkeys = 0;
+	rv = KMF_FindKey(handle, parms, NULL, &numkeys);
+	if (rv == KMF_OK && numkeys > 0) {
+		int i;
+		(void) printf(gettext("Found %d keys.\n"), numkeys);
+		keys = (KMF_KEY_HANDLE *)malloc(numkeys *
+				sizeof (KMF_KEY_HANDLE));
+		if (keys == NULL)
+			return (KMF_ERR_MEMORY);
+		(void) memset(keys, 0, numkeys *
+			sizeof (KMF_KEY_HANDLE));
 
-	/* Get the sizes of the attributes we need. */
-	cryptodebug("calling C_GetAttributeValue for size info");
-	if ((rv = C_GetAttributeValue(sess, obj, attrs, n_attrs)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to get public key attribute sizes (%s)."),
-		    pkcs11_strerror(rv));
-		return (rv);
+		rv = KMF_FindKey(handle, parms, keys, &numkeys);
+		if (rv == KMF_OK)
+			pk_show_keys(handle, keys, numkeys);
+		for (i = 0; i < numkeys; i++)
+			KMF_FreeKMFKey(handle, &keys[i]);
+		free(keys);
 	}
-
-	/* Allocate memory for each variable-length attribute. */
-	for (i = 4; i < n_attrs; i++) {
-		if (attrs[i].ulValueLen == (CK_ULONG)-1 ||
-		    attrs[i].ulValueLen == 0) {
-			cryptodebug("display_pubkey: *** should not happen");
-			attrs[i].ulValueLen = 0;
-			continue;
-		}
-		if ((attrs[i].pValue = malloc(attrs[i].ulValueLen)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_pubkey;
-		}
-	}
-
-	/* Now really get the attributes. */
-	cryptodebug("calling C_GetAttributeValue for attribute info");
-	if ((rv = C_GetAttributeValue(sess, obj, attrs, n_attrs)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to get public key attributes (%s)."),
-		    pkcs11_strerror(rv));
-		goto free_display_pubkey;
-	}
-
-	/* Fill in all the optional temp variables. */
-	i = 10;
-	copy_attr_to_string(&(attrs[i++]), &label, &label_len);
-	copy_attr_to_string(&(attrs[i++]), &id, &id_len);
-	copy_attr_to_string(&(attrs[i++]), &subject, &subject_len);
-	copy_attr_to_date(&(attrs[i++]), &start_date, &start_date_len);
-	copy_attr_to_date(&(attrs[i++]), &end_date, &end_date_len);
-
-	/* Get the key size for the object. */
-	key_size = get_key_size(sess, obj, key_type);
-
-	/* Display the object ... */
-		/* ... the label and what it is (and key size in bits) ... */
-	(void) fprintf(stdout, gettext("%d.  \"%.*s\" (%d-bit %s %s)\n"),
-	    counter, label_len, label_len > 0 ? (char *)label :
-	    gettext("<no label>"), key_size, keytype_str(key_type),
-	    class_str(CKO_PUBLIC_KEY));
-
-		/* ... the id ... */
-	if (id_len == (CK_ULONG)-1 || id_len == 0)
-		(void) fprintf(stdout, gettext("\tId:  --\n"));
-	else {
-		hex_id_len = 3 * id_len + 1;
-		if ((hex_id = malloc(hex_id_len)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_pubkey;
-		}
-		octetify(id, id_len, hex_id, hex_id_len, B_FALSE, B_FALSE, 60,
-		    "\n\t\t", "");
-		(void) fprintf(stdout, gettext("\tId:  %s\n"), hex_id);
-		free(hex_id);
-	}
-
-		/* ... the subject name ... */
-	if (subject_len == (CK_ULONG)-1 || subject_len == 0)
-		(void) fprintf(stdout, gettext("\tSubject:  --\n"));
-	else {
-		hex_subject_len = 2 * subject_len + 1;	/* best guesstimate */
-		if ((hex_subject = malloc(hex_subject_len)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_pubkey;
-		}
-		rdnseq_to_str(subject, subject_len, hex_subject,
-		    hex_subject_len);
-		(void) fprintf(stdout, gettext("\tSubject:  %.*s\n"),
-		    hex_subject_len, hex_subject);
-		free(hex_subject);
-	}
-
-		/* ... the start date ... */
-	if (start_date_len == (CK_ULONG)-1 || start_date_len == 0)
-		(void) fprintf(stdout, gettext("\tStart Date:  --\n"));
-	else
-		(void) fprintf(stdout, gettext(
-		    "\tStart Date:  %02.2s/%02.2s/%04.4s\n"),
-		    start_date->month, start_date->day, start_date->year);
-
-		/* ... the end date ... */
-	if (end_date_len == (CK_ULONG)-1 || end_date_len == 0)
-		(void) fprintf(stdout, gettext("\tEnd Date:  --\n"));
-	else
-		(void) fprintf(stdout, gettext(
-		    "\tEnd Date:  %02.2s/%02.2s/%04.4s\n"),
-		    end_date->month, end_date->day, end_date->year);
-
-		/* ... and its capabilities */
-	(void) fprintf(stdout, "\t(%s, %s, %s",
-	    private == B_TRUE ? gettext("private") : gettext("public"),
-	    modifiable == B_TRUE ? gettext("modifiable") :
-	    gettext("not modifiable"),
-	    trusted == B_TRUE ? gettext("trusted") : gettext("untrusted"));
-	for (i = 4; i <= 9; i++) {
-		if (attrs[i].ulValueLen != (CK_ULONG)-1 &&
-		    attrs[i].ulValueLen != 0 &&
-		    *((CK_BBOOL *)(attrs[i].pValue)) == B_TRUE)
-			(void) fprintf(stdout, ", %s", attr_str(attrs[i].type));
-	}
-	(void) fprintf(stdout, ")\n");
-
-free_display_pubkey:
-	for (i = 4; i < n_attrs; i++)
-		if (attrs[i].ulValueLen != (CK_ULONG)-1 &&
-		    attrs[i].ulValueLen != 0)
-			free(attrs[i].pValue);
+	if (rv == KMF_ERR_KEY_NOT_FOUND &&
+		parms->kstype != KMF_KEYSTORE_OPENSSL)
+		rv = KMF_OK;
 	return (rv);
 }
 
-/*
- * Display secret key.
- */
-static CK_RV
-display_seckey(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE obj, int counter)
+static KMF_RETURN
+list_pk11_objects(KMF_HANDLE_T kmfhandle, char *token, int oclass,
+	char *objlabel, KMF_BIGINT *serial, char *issuer, char *subject,
+	char *dir, char *filename, KMF_CREDENTIAL *tokencred,
+	KMF_CERT_VALIDITY find_criteria_flag)
 {
-	CK_RV			rv = CKR_OK;
-	static CK_BBOOL		private;
-	static CK_BBOOL		modifiable;
-	static CK_KEY_TYPE	key_type;
-	static CK_ULONG		key_size;
-	CK_BYTE			*label = NULL;
-	CK_ULONG		label_len = 0;
-	CK_BYTE			*id = NULL;
-	CK_ULONG		id_len = 0;
-	CK_DATE			*start_date = NULL;
-	CK_ULONG		start_date_len = 0;
-	CK_DATE			*end_date = NULL;
-	CK_ULONG		end_date_len = 0;
-	CK_ATTRIBUTE		attrs[19] = {
-		/* 0 to 2 */
-		{ CKA_PRIVATE, &private, sizeof (private) },
-		{ CKA_MODIFIABLE, &modifiable, sizeof (modifiable) },
-		{ CKA_KEY_TYPE, &key_type, sizeof (key_type) },
-		/* 3 to 14 */
-		{ CKA_DERIVE, NULL, 0 },
-		{ CKA_LOCAL, NULL, 0 },
-		{ CKA_ENCRYPT, NULL, 0 },
-		{ CKA_DECRYPT, NULL, 0 },
-		{ CKA_SIGN, NULL, 0 },
-		{ CKA_VERIFY, NULL, 0 },
-		{ CKA_WRAP, NULL, 0 },
-		{ CKA_UNWRAP, NULL, 0 },
-		{ CKA_SENSITIVE, NULL, 0 },
-		{ CKA_ALWAYS_SENSITIVE, NULL, 0 },
-		{ CKA_EXTRACTABLE, NULL, 0 },
-		{ CKA_NEVER_EXTRACTABLE, 0 },
-		/* 15 to 18 */
-		{ CKA_LABEL, NULL, 0 },			/* optional */
-		{ CKA_ID, NULL, 0 },			/* optional */
-		{ CKA_START_DATE, NULL, 0 },		/* optional */
-		{ CKA_END_DATE, NULL, 0 }		/* optional */
-		/* not displaying CKA_KEY_GEN_MECHANISM */
-	    };
-	CK_ULONG	n_attrs = sizeof (attrs) / sizeof (CK_ATTRIBUTE);
-	int		i;
-	char		*hex_id = NULL;
-	int		hex_id_len = 0;
-
-	cryptodebug("inside display_seckey");
-
-	/* Get the sizes of the attributes we need. */
-	cryptodebug("calling C_GetAttributeValue for size info");
-	if ((rv = C_GetAttributeValue(sess, obj, attrs, n_attrs)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to get secret key attribute sizes (%s)."),
-		    pkcs11_strerror(rv));
-		return (rv);
-	}
-
-	/* Allocate memory for each variable-length attribute. */
-	for (i = 3; i < n_attrs; i++) {
-		if (attrs[i].ulValueLen == (CK_ULONG)-1 ||
-		    attrs[i].ulValueLen == 0) {
-			cryptodebug("display_seckey: *** should not happen");
-			attrs[i].ulValueLen = 0;
-			continue;
-		}
-		if ((attrs[i].pValue = malloc(attrs[i].ulValueLen)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_seckey;
-		}
-	}
-
-	/* Now really get the attributes. */
-	cryptodebug("calling C_GetAttributeValue for attribute info");
-	if ((rv = C_GetAttributeValue(sess, obj, attrs, n_attrs)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to get secret key attributes (%s)."),
-		    pkcs11_strerror(rv));
-		goto free_display_seckey;
-	}
-
-	/* Fill in all the optional temp variables. */
-	i = 15;
-	copy_attr_to_string(&(attrs[i++]), &label, &label_len);
-	copy_attr_to_string(&(attrs[i++]), &id, &id_len);
-	copy_attr_to_date(&(attrs[i++]), &start_date, &start_date_len);
-	copy_attr_to_date(&(attrs[i++]), &end_date, &end_date_len);
-
-	/* Get the key size for the object. */
-	key_size = get_key_size(sess, obj, key_type);
-
-	/* Display the object ... */
-		/* ... the label and what it is (and key size in bytes) ... */
-	(void) fprintf(stdout, gettext("%d.  \"%.*s\" (%d-bit %s %s)\n"),
-	    counter, label_len, label_len > 0 ? (char *)label :
-	    gettext("<no label>"), key_size, keytype_str(key_type),
-	    class_str(CKO_SECRET_KEY));
-
-		/* ... the id ... */
-	if (id_len == (CK_ULONG)-1 || id_len == 0)
-		(void) fprintf(stdout, gettext("\tId:  --\n"));
-	else {
-		hex_id_len = 3 * id_len + 1;
-		if ((hex_id = malloc(hex_id_len)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_seckey;
-		}
-		octetify(id, id_len, hex_id, hex_id_len, B_FALSE, B_FALSE, 60,
-		    "\n\t\t", "");
-		(void) fprintf(stdout, gettext("\tId:  %s\n"), hex_id);
-		free(hex_id);
-	}
-
-		/* ... the start date ... */
-	if (start_date_len == (CK_ULONG)-1 || start_date_len == 0)
-		(void) fprintf(stdout, gettext("\tStart Date:  --\n"));
-	else
-		(void) fprintf(stdout, gettext(
-		    "\tStart Date:  %02.2s/%02.2s/%04.4s\n"),
-		    start_date->month, start_date->day, start_date->year);
-
-		/* ... the end date ... */
-	if (end_date_len == (CK_ULONG)-1 || end_date_len == 0)
-		(void) fprintf(stdout, gettext("\tEnd Date:  --\n"));
-	else
-		(void) fprintf(stdout, gettext(
-		    "\tEnd Date:  %02.2s/%02.2s/%04.4s\n"),
-		    end_date->month, end_date->day, end_date->year);
-
-		/* ... and its capabilities */
-	(void) fprintf(stdout, "\t(%s, %s",
-	    private == B_TRUE ? gettext("private") : gettext("public"),
-	    modifiable == B_TRUE ? gettext("modifiable") :
-	    gettext("not modifiable"));
-	for (i = 3; i <= 14; i++) {
-		if (attrs[i].ulValueLen != (CK_ULONG)-1 &&
-		    attrs[i].ulValueLen != 0 &&
-		    *((CK_BBOOL *)(attrs[i].pValue)) == B_TRUE)
-			(void) fprintf(stdout, ", %s", attr_str(attrs[i].type));
-	}
-	(void) fprintf(stdout, ")\n");
-
-free_display_seckey:
-	for (i = 3; i < n_attrs; i++)
-		if (attrs[i].ulValueLen != (CK_ULONG)-1 &&
-		    attrs[i].ulValueLen != 0)
-			free(attrs[i].pValue);
-	return (rv);
-}
-
-/*
- * Display certificate.
- */
-static CK_RV
-display_cert(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE obj, int counter)
-{
-	CK_RV			rv = CKR_OK;
-	static CK_BBOOL		private;
-	static CK_BBOOL		modifiable;
-	static CK_BBOOL		trusted;
-	CK_BYTE			*subject = NULL;
-	CK_ULONG		subject_len = 0;
-	CK_BYTE			*value = NULL;
-	CK_ULONG		value_len = 0;
-	CK_BYTE			*label = NULL;
-	CK_ULONG		label_len = 0;
-	CK_BYTE			*id = NULL;
-	CK_ULONG		id_len = 0;
-	CK_BYTE			*issuer = NULL;
-	CK_ULONG		issuer_len = 0;
-	CK_BYTE			*serial = NULL;
-	CK_ULONG		serial_len = 0;
-	CK_ATTRIBUTE		attrs[9] = {
-		{ CKA_PRIVATE, &private, sizeof (private) },
-		{ CKA_MODIFIABLE, &modifiable, sizeof (modifiable) },
-		{ CKA_TRUSTED, &trusted, sizeof (trusted) },
-		{ CKA_SUBJECT, NULL, 0 },		/* required */
-		{ CKA_VALUE, NULL, 0 },			/* required */
-		{ CKA_LABEL, NULL, 0 },			/* optional */
-		{ CKA_ID, NULL, 0 },			/* optional */
-		{ CKA_ISSUER, NULL, 0 },		/* optional */
-		{ CKA_SERIAL_NUMBER, NULL, 0 }		/* optional */
-	    };
-	CK_ULONG	n_attrs = sizeof (attrs) / sizeof (CK_ATTRIBUTE);
-	int		i;
-	char		*hex_id = NULL;
-	int		hex_id_len = 0;
-	char		*hex_subject = NULL;
-	int		hex_subject_len = 0;
-	char		*hex_issuer = NULL;
-	int		hex_issuer_len = 0;
-	char		*hex_serial = NULL;
-	int		hex_serial_len = NULL;
-	uint32_t	serial_value = 0;
-	char		*hex_value = NULL;
-	int		hex_value_len = 0;
-
-	cryptodebug("inside display_cert");
-
-	/* Get the sizes of the attributes we need. */
-	cryptodebug("calling C_GetAttributeValue for size info");
-	if ((rv = C_GetAttributeValue(sess, obj, attrs, n_attrs)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to get certificate attribute sizes (%s)."),
-		    pkcs11_strerror(rv));
-		return (rv);
-	}
-
-	/* Allocate memory for each variable-length attribute. */
-	for (i = 3; i < n_attrs; i++) {
-		if (attrs[i].ulValueLen == (CK_ULONG)-1 ||
-		    attrs[i].ulValueLen == 0) {
-			cryptodebug("display_cert: *** should not happen");
-			attrs[i].ulValueLen = 0;
-			continue;
-		}
-		if ((attrs[i].pValue = malloc(attrs[i].ulValueLen)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_cert;
-		}
-	}
-
-	/* Now really get the attributes. */
-	cryptodebug("calling C_GetAttributeValue for attribute info");
-	if ((rv = C_GetAttributeValue(sess, obj, attrs, n_attrs)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to get certificate attributes (%s)."),
-		    pkcs11_strerror(rv));
-		goto free_display_cert;
-	}
+	KMF_RETURN rv;
+	KMF_LISTCRL_PARAMS lcrlargs;
 
 	/*
-	 * Fill in all the temp variables.  Subject and value are required.
-	 * The rest are optional.
+	 * Symmetric keys and RSA/DSA private keys are always
+	 * created with the "CKA_PRIVATE" field == TRUE, so
+	 * make sure we search for them with it also set.
 	 */
-	i = 3;
-	copy_attr_to_string(&(attrs[i++]), &subject, &subject_len);
-	copy_attr_to_string(&(attrs[i++]), &value, &value_len);
-	copy_attr_to_string(&(attrs[i++]), &label, &label_len);
-	copy_attr_to_string(&(attrs[i++]), &id, &id_len);
-	copy_attr_to_string(&(attrs[i++]), &issuer, &issuer_len);
-	copy_attr_to_string(&(attrs[i++]), &serial, &serial_len);
+	if (oclass & (PK_SYMKEY_OBJ | PK_PRIKEY_OBJ))
+		oclass |= PK_PRIVATE_OBJ;
 
-	/* Display the object ... */
-		/* ... the label and what it is ... */
-	(void) fprintf(stdout, gettext("%d.  \"%.*s\" (%s %s)\n"),
-	    counter, label_len, label_len > 0 ? (char *)label :
-	    gettext("<no label>"), "X.509", class_str(CKO_CERTIFICATE));
+	rv = select_token(kmfhandle, token,
+		!(oclass & (PK_PRIVATE_OBJ | PK_PRIKEY_OBJ)));
 
-		/* ... its capabilities ... */
-	(void) fprintf(stdout, gettext("\t(%s, %s, %s)\n"),
-	    private == B_TRUE ? gettext("private") : gettext("public"),
-	    modifiable == B_TRUE ? gettext("modifiable") :
-	    gettext("not modifiable"),
-	    trusted == B_TRUE ? gettext("trusted") : gettext("untrusted"));
-
-		/* ... the id ... */
-	if (id_len == (CK_ULONG)-1 || id_len == 0)
-		(void) fprintf(stdout, gettext("\tId:  --\n"));
-	else {
-		hex_id_len = 3 * id_len + 1;
-		if ((hex_id = malloc(hex_id_len)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_cert;
-		}
-		octetify(id, id_len, hex_id, hex_id_len, B_FALSE, B_FALSE, 60,
-		    "\n\t\t", "");
-		(void) fprintf(stdout, gettext("\tId:  %s\n"), hex_id);
-		free(hex_id);
+	if (rv != KMF_OK) {
+		return (rv);
 	}
 
-		/* ... the subject name ... */
-	if (subject_len == (CK_ULONG)-1 || subject_len == 0)
-		(void) fprintf(stdout, gettext("\tSubject:  --\n"));
-	else {
-		hex_subject_len = 2 * subject_len + 1;	/* best guesstimate */
-		if ((hex_subject = malloc(hex_subject_len)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_cert;
+	if (oclass & (PK_KEY_OBJ | PK_PRIVATE_OBJ)) {
+		KMF_FINDKEY_PARAMS parms;
+
+		(void) memset(&parms, 0, sizeof (parms));
+		parms.kstype = KMF_KEYSTORE_PK11TOKEN;
+
+		if (oclass & PK_PRIKEY_OBJ) {
+			parms.keyclass = KMF_ASYM_PRI;
+			parms.findLabel = objlabel;
+			parms.cred = *tokencred;
+			parms.pkcs11parms.private =
+				((oclass & PK_PRIVATE_OBJ) > 0);
+
+			/* list asymmetric private keys */
+			rv = pk_list_keys(kmfhandle, &parms);
 		}
-		rdnseq_to_str(subject, subject_len, hex_subject,
-		    hex_subject_len);
-		(void) fprintf(stdout, gettext("\tSubject:  %.*s\n"),
-		    hex_subject_len, hex_subject);
-		free(hex_subject);
+
+		if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
+			parms.keyclass = KMF_SYMMETRIC;
+			parms.findLabel = objlabel;
+			parms.cred = *tokencred;
+			parms.format = KMF_FORMAT_RAWKEY;
+			parms.pkcs11parms.private =
+				((oclass & PK_PRIVATE_OBJ) > 0);
+
+			/* list symmetric keys */
+			rv = pk_list_keys(kmfhandle, &parms);
+		}
+
+		if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
+			parms.keyclass = KMF_ASYM_PUB;
+			parms.findLabel = objlabel;
+			parms.pkcs11parms.private =
+				((oclass & PK_PRIVATE_OBJ) > 0);
+
+			/* list asymmetric public keys (if any) */
+			rv = pk_list_keys(kmfhandle, &parms);
+		}
+
+		if (rv != KMF_OK)
+			return (rv);
 	}
 
-		/* ... the issuer name ... */
-	if (issuer_len == (CK_ULONG)-1 || issuer_len == 0)
-		(void) fprintf(stdout, gettext("\tIssuer:  --\n"));
-	else {
-		hex_issuer_len = 2 * issuer_len + 1;	/* best guesstimate */
-		if ((hex_issuer = malloc(hex_issuer_len)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_cert;
-		}
-		rdnseq_to_str(issuer, issuer_len, hex_issuer, hex_issuer_len);
-		(void) fprintf(stdout, gettext("\tIssuer:  %.*s\n"),
-		    hex_issuer_len, hex_issuer);
-		free(hex_issuer);
+	if (oclass & (PK_CERT_OBJ | PK_PUBLIC_OBJ)) {
+		KMF_FINDCERT_PARAMS parms;
+
+		(void) memset(&parms, 0, sizeof (parms));
+		parms.kstype = KMF_KEYSTORE_PK11TOKEN;
+		parms.certLabel = objlabel;
+		parms.issuer = issuer;
+		parms.subject = subject;
+		parms.serial = serial;
+		parms.pkcs11parms.private = FALSE;
+		parms.find_cert_validity = find_criteria_flag;
+
+		rv = pk_find_certs(kmfhandle, &parms);
+		if (rv != KMF_OK)
+			return (rv);
 	}
 
-		/* ... the serial number ... */
-	if (serial_len == (CK_ULONG)-1 || serial_len == 0)
-		(void) fprintf(stdout, gettext("\tSerial:  --\n"));
-	else {
-		hex_serial_len = 3 * serial_len + 1;
-		if ((hex_serial = malloc(hex_serial_len)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_cert;
+	if (oclass & PK_CRL_OBJ) {
+		char *crldata;
+
+		(void) memset(&lcrlargs, 0, sizeof (lcrlargs));
+		lcrlargs.kstype = KMF_KEYSTORE_OPENSSL;
+		lcrlargs.sslparms.dirpath = dir;
+		lcrlargs.sslparms.crlfile = filename;
+
+		rv = KMF_ListCRL(kmfhandle, &lcrlargs, &crldata);
+		if (rv == KMF_OK) {
+			(void) printf("%s\n", crldata);
+			free(crldata);
 		}
-		octetify(serial, serial_len, hex_serial, hex_serial_len,
-		    B_FALSE, B_FALSE, 60, "\n\t\t", "");
-		if (serial_len > 4)
-			(void) fprintf(stdout, gettext("\tSerial:  %s\n"),
-			    hex_serial);
-		else {
-			for (i = 0; i < serial_len; i++) {
-				serial_value <<= 8;
-				serial_value |= (serial[i] & 0xff);
+	}
+
+	return (rv);
+}
+
+static int
+list_file_objects(KMF_HANDLE_T kmfhandle, int oclass,
+	char *dir, char *filename, KMF_BIGINT *serial,
+	char *issuer, char *subject,
+	KMF_CERT_VALIDITY find_criteria_flag)
+{
+	int rv;
+	KMF_FINDCERT_PARAMS fcargs;
+	KMF_FINDKEY_PARAMS fkargs;
+	KMF_LISTCRL_PARAMS lcrlargs;
+
+	if (oclass & PK_KEY_OBJ) {
+		(void) memset(&fkargs, 0, sizeof (fkargs));
+		fkargs.kstype = KMF_KEYSTORE_OPENSSL;
+		fkargs.sslparms.dirpath = dir;
+		fkargs.sslparms.keyfile = filename;
+		if (oclass & PK_PRIKEY_OBJ) {
+			fkargs.keyclass = KMF_ASYM_PRI;
+
+			rv = pk_list_keys(kmfhandle, &fkargs);
+		}
+		if (rv == KMF_ERR_KEY_NOT_FOUND)
+			rv = KMF_OK;
+
+		if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
+			fkargs.keyclass = KMF_SYMMETRIC;
+			fkargs.format = KMF_FORMAT_RAWKEY;
+
+			rv = pk_list_keys(kmfhandle, &fkargs);
+		}
+		if (rv == KMF_ERR_KEY_NOT_FOUND)
+			rv = KMF_OK;
+		if (rv != KMF_OK)
+			return (rv);
+	}
+
+	if (oclass & PK_CERT_OBJ) {
+		(void) memset(&fcargs, 0, sizeof (fcargs));
+		fcargs.kstype = KMF_KEYSTORE_OPENSSL;
+		fcargs.certLabel = NULL;
+		fcargs.issuer = issuer;
+		fcargs.subject = subject;
+		fcargs.serial = serial;
+		fcargs.sslparms.dirpath = dir;
+		fcargs.sslparms.certfile = filename;
+		fcargs.find_cert_validity = find_criteria_flag;
+
+		rv = pk_find_certs(kmfhandle, &fcargs);
+		if (rv != KMF_OK)
+			return (rv);
+	}
+
+	if (oclass & PK_CRL_OBJ) {
+		char *crldata;
+
+		(void) memset(&lcrlargs, 0, sizeof (lcrlargs));
+		lcrlargs.kstype = KMF_KEYSTORE_OPENSSL;
+		lcrlargs.sslparms.dirpath = dir;
+		lcrlargs.sslparms.crlfile = filename;
+
+		rv = KMF_ListCRL(kmfhandle, &lcrlargs, &crldata);
+		if (rv == KMF_OK) {
+			(void) printf("%s\n", crldata);
+			free(crldata);
+		}
+	}
+
+	return (rv);
+}
+
+static int
+list_nss_objects(KMF_HANDLE_T kmfhandle,
+	int oclass, char *token_spec, char *dir, char *prefix,
+	char *nickname, KMF_BIGINT *serial, char *issuer, char *subject,
+	KMF_CREDENTIAL *tokencred,
+	KMF_CERT_VALIDITY find_criteria_flag)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_FINDKEY_PARAMS fkargs;
+
+	rv = configure_nss(kmfhandle, dir, prefix);
+	if (rv != KMF_OK)
+		return (rv);
+
+	if (oclass & PK_KEY_OBJ) {
+		(void) memset(&fkargs, 0, sizeof (fkargs));
+		fkargs.kstype = KMF_KEYSTORE_NSS;
+		fkargs.findLabel = nickname;
+		fkargs.cred = *tokencred;
+		fkargs.nssparms.slotlabel = token_spec;
+	}
+
+	if (oclass & PK_PRIKEY_OBJ) {
+		fkargs.keyclass = KMF_ASYM_PRI;
+		rv = pk_list_keys(kmfhandle, &fkargs);
+	}
+	if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
+		fkargs.keyclass = KMF_SYMMETRIC;
+		fkargs.format = KMF_FORMAT_RAWKEY;
+		rv = pk_list_keys(kmfhandle, &fkargs);
+	}
+	if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
+		fkargs.keyclass = KMF_ASYM_PUB;
+		rv = pk_list_keys(kmfhandle, &fkargs);
+	}
+
+	/* If searching for public objects or certificates, find certs now */
+	if (rv == KMF_OK && (oclass & PK_CERT_OBJ)) {
+		KMF_FINDCERT_PARAMS fcargs;
+
+		(void) memset(&fcargs, 0, sizeof (fcargs));
+		fcargs.kstype = KMF_KEYSTORE_NSS;
+		fcargs.certLabel = nickname;
+		fcargs.issuer = issuer;
+		fcargs.subject = subject;
+		fcargs.serial = serial;
+		fcargs.nssparms.slotlabel = token_spec;
+		fcargs.find_cert_validity = find_criteria_flag;
+
+		rv = pk_find_certs(kmfhandle, &fcargs);
+	}
+
+	if (rv == KMF_OK && (oclass & PK_CRL_OBJ)) {
+		int numcrls;
+		KMF_FINDCRL_PARAMS fcrlargs;
+
+		(void) memset(&fcrlargs, 0, sizeof (fcrlargs));
+		fcrlargs.kstype = KMF_KEYSTORE_NSS;
+		fcrlargs.nssparms.slotlabel = token_spec;
+
+		rv = KMF_FindCRL(kmfhandle, &fcrlargs, NULL, &numcrls);
+		if (rv == KMF_OK) {
+			char **p;
+			if (numcrls == 0) {
+				(void) printf(gettext("No CRLs found in "
+					"NSS keystore.\n"));
+
+				return (KMF_OK);
 			}
-			(void) fprintf(stdout, gettext("\tSerial:  %s (%d)\n"),
-			    hex_serial, serial_value);
+			p = malloc(numcrls * sizeof (char *));
+			if (p == NULL) {
+				return (KMF_ERR_MEMORY);
+			}
+			(void) memset(p, 0, numcrls * sizeof (char *));
+			rv = KMF_FindCRL(kmfhandle, &fcrlargs,
+				p, &numcrls);
+			if (rv == KMF_OK) {
+				int i;
+				for (i = 0; i < numcrls; i++) {
+					(void) printf("%d. Name = %s\n",
+						i + 1, p[i]);
+					free(p[i]);
+				}
+			}
+			free(p);
 		}
-		free(hex_serial);
 	}
-
-		/* ... and the value */
-	if (value_len == (CK_ULONG)-1 || value_len == 0)
-		(void) fprintf(stdout, gettext("\tValue:  --\n"));
-	else {
-		hex_value_len = 3 * value_len + 1;
-		if ((hex_value = malloc(hex_value_len)) == NULL) {
-			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			rv = CKR_HOST_MEMORY;
-			goto free_display_cert;
-		}
-		octetify(value, value_len, hex_value, hex_value_len,
-		    B_FALSE, B_FALSE, 60, "\n\t\t", "");
-		(void) fprintf(stdout, gettext("\tValue:  %s\n"), hex_value);
-		free(hex_value);
-	}
-
-free_display_cert:
-	for (i = 3; i < n_attrs; i++)
-		if (attrs[i].ulValueLen != (CK_ULONG)-1 &&
-		    attrs[i].ulValueLen != 0)
-			free(attrs[i].pValue);
 	return (rv);
 }
 
@@ -840,207 +527,189 @@ pk_list(int argc, char *argv[])
 	extern int		optind_av;
 	extern char		*optarg_av;
 	char			*token_spec = NULL;
-	char			*token_name = NULL;
-	char			*manuf_id = NULL;
-	char			*serial_no = NULL;
-	char			*type_spec = NULL;
-	char			full_name[FULL_NAME_LEN];
-	boolean_t		public_objs = B_FALSE;
-	boolean_t		private_objs = B_FALSE;
-	CK_BYTE			*list_label = NULL;
-	int			obj_type = 0x00;
-	CK_SLOT_ID		slot_id;
-	CK_FLAGS		pin_state;
-	CK_UTF8CHAR_PTR		pin = NULL;
-	CK_ULONG		pinlen = 0;
-	CK_SESSION_HANDLE	sess;
-	CK_OBJECT_HANDLE	*objs;
-	CK_ULONG		num_objs;
-	CK_RV			rv = CKR_OK;
-	int			i;
-	static CK_OBJECT_CLASS	objclass;
-	CK_ATTRIBUTE		class_attr =
-		{ CKA_CLASS, &objclass, sizeof (objclass) };
+	char			*subject = NULL;
+	char			*issuer = NULL;
+	char			*dir = NULL;
+	char			*prefix = NULL;
+	char			*filename = NULL;
+	char			*serstr = NULL;
+	KMF_BIGINT		serial = { NULL, 0 };
 
-	cryptodebug("inside pk_list");
+	char			*list_label = NULL;
+	int			oclass = 0;
+	KMF_KEYSTORE_TYPE	kstype = 0;
+	KMF_RETURN		rv = KMF_OK;
+	KMF_HANDLE_T		kmfhandle = NULL;
+	char			*find_criteria = NULL;
+	KMF_CERT_VALIDITY	find_criteria_flag = KMF_ALL_CERTS;
+	KMF_CREDENTIAL		tokencred = {NULL, 0};
 
 	/* Parse command line options.  Do NOT i18n/l10n. */
 	while ((opt = getopt_av(argc, argv,
-	    "T:(token)y:(objtype)l:(label)")) != EOF) {
-		switch (opt) {
-		case 'T':	/* token specifier */
-			if (token_spec)
-				return (PK_ERR_USAGE);
-			token_spec = optarg_av;
-			break;
-		case 'y':	/* object type:  public, private, both */
-			if (type_spec)
-				return (PK_ERR_USAGE);
-			type_spec = optarg_av;
-			break;
-		case 'l':	/* object with specific label */
-			if (list_label)
-				return (PK_ERR_USAGE);
-			list_label = (CK_BYTE *)optarg_av;
-			break;
-		default:
+		"k:(keystore)t:(objtype)T:(token)d:(dir)"
+		"p:(prefix)n:(nickname)S:(serial)s:(subject)"
+		"c:(criteria)"
+		"i:(issuer)l:(label)f:(infile)")) != EOF) {
+		if (EMPTYSTRING(optarg_av))
 			return (PK_ERR_USAGE);
-			break;
+		switch (opt) {
+			case 'k':
+				if (kstype != 0)
+					return (PK_ERR_USAGE);
+				kstype = KS2Int(optarg_av);
+				if (kstype == 0)
+					return (PK_ERR_USAGE);
+				break;
+			case 't':
+				if (oclass != 0)
+					return (PK_ERR_USAGE);
+				oclass = OT2Int(optarg_av);
+				if (oclass == -1)
+					return (PK_ERR_USAGE);
+				break;
+			case 's':
+				if (subject)
+					return (PK_ERR_USAGE);
+				subject = optarg_av;
+				break;
+			case 'i':
+				if (issuer)
+					return (PK_ERR_USAGE);
+				issuer = optarg_av;
+				break;
+			case 'd':
+				if (dir)
+					return (PK_ERR_USAGE);
+				dir = optarg_av;
+				break;
+			case 'p':
+				if (prefix)
+					return (PK_ERR_USAGE);
+				prefix = optarg_av;
+				break;
+			case 'S':
+				serstr = optarg_av;
+				break;
+			case 'f':
+				if (filename)
+					return (PK_ERR_USAGE);
+				filename = optarg_av;
+				break;
+			case 'T':	/* token specifier */
+				if (token_spec)
+					return (PK_ERR_USAGE);
+				token_spec = optarg_av;
+				break;
+			case 'n':
+			case 'l':	/* object with specific label */
+				if (list_label)
+					return (PK_ERR_USAGE);
+				list_label = optarg_av;
+				break;
+			case 'c':
+				find_criteria = optarg_av;
+				if (!strcasecmp(find_criteria, "valid"))
+					find_criteria_flag =
+					    KMF_NONEXPIRED_CERTS;
+				else if (!strcasecmp(find_criteria, "expired"))
+					find_criteria_flag = KMF_EXPIRED_CERTS;
+				else if (!strcasecmp(find_criteria, "both"))
+					find_criteria_flag = KMF_ALL_CERTS;
+				else
+					return (PK_ERR_USAGE);
+				break;
+			default:
+				return (PK_ERR_USAGE);
 		}
 	}
-
-	/* If no token is specified, default is to use softtoken. */
-	if (token_spec == NULL) {
-		token_name = SOFT_TOKEN_LABEL;
-		manuf_id = SOFT_MANUFACTURER_ID;
-		serial_no = SOFT_TOKEN_SERIAL;
-	} else {
-		/*
-		 * Parse token specifier into token_name, manuf_id, serial_no.
-		 * Token_name is required; manuf_id and serial_no are optional.
-		 */
-		if (parse_token_spec(token_spec, &token_name, &manuf_id,
-		    &serial_no) < 0)
-			return (PK_ERR_USAGE);
-	}
-
-	/* If no object type specified, default is public objects. */
-	if (!type_spec) {
-		public_objs = B_TRUE;
-	} else {
-		/*
-		 * Otherwise, the object type must be "public", "private",
-		 * or "both".
-		 */
-		if (strcmp(type_spec, "private") == 0) {
-			private_objs = B_TRUE;
-		} else if (strcmp(type_spec, "public") == 0) {
-			public_objs = B_TRUE;
-		} else if (strcmp(type_spec, "both") == 0) {
-			private_objs = B_TRUE;
-			public_objs = B_TRUE;
-		} else
-			return (PK_ERR_USAGE);
-	}
-
-	if (private_objs)
-		obj_type |= PK_PRIVATE_OBJ;
-	if (public_objs)
-		obj_type |= PK_PUBLIC_OBJ;
-
 	/* No additional args allowed. */
 	argc -= optind_av;
 	argv += optind_av;
 	if (argc)
 		return (PK_ERR_USAGE);
-	/* Done parsing command line options. */
 
-	full_token_name(token_name, manuf_id, serial_no, full_name);
-
-	/* Find the slot with token. */
-	if ((rv = find_token_slot(token_name, manuf_id, serial_no, &slot_id,
-	    &pin_state)) != CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to find token %s (%s)."), full_name,
-		    pkcs11_strerror(rv));
-		return (PK_ERR_PK11);
+	if ((rv = KMF_Initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
+		/* Error message ? */
+		return (rv);
 	}
 
-	/* If private objects are to be listed, user must be logged in. */
-	if (private_objs) {
-		/* Get the user's PIN. */
-		if ((rv = get_pin(gettext("Enter token passphrase:"), NULL,
-		    &pin, &pinlen)) != CKR_OK) {
-			cryptoerror(LOG_STDERR,
-			    gettext("Unable to get token passphrase (%s)."),
-			    pkcs11_strerror(rv));
-			quick_finish(NULL);
-			return (PK_ERR_PK11);
-		}
+	/* Assume keystore = PKCS#11 if not specified. */
+	if (kstype == 0)
+		kstype = KMF_KEYSTORE_PK11TOKEN;
 
-		/* Logging in user R/O into the token is sufficient. */
-		cryptodebug("logging in with readonly session");
-		if ((rv = quick_start(slot_id, 0, pin, pinlen, &sess)) !=
-		    CKR_OK) {
-			cryptoerror(LOG_STDERR,
-			    gettext("Unable to log into token (%s)."),
-			    pkcs11_strerror(rv));
-			quick_finish(sess);
-			return (PK_ERR_PK11);
-		}
-	/* Otherwise, just create a session. */
-	} else {
-		cryptodebug("opening a readonly session");
-		if ((rv = open_sess(slot_id, 0, &sess)) != CKR_OK) {
-			cryptoerror(LOG_STDERR,
-			    gettext("Unable to open token session (%s)."),
-			    pkcs11_strerror(rv));
-			quick_finish(sess);
-			return (PK_ERR_PK11);
-		}
+	/* if PUBLIC or PRIVATE obj was given, the old syntax was used. */
+	if ((oclass & (PK_PUBLIC_OBJ | PK_PRIVATE_OBJ)) &&
+		kstype != KMF_KEYSTORE_PK11TOKEN) {
+
+		(void) fprintf(stderr, gettext("The objtype parameter "
+			"is only relevant if keystore=pkcs11\n"));
+		return (PK_ERR_USAGE);
 	}
 
-	/* Find the object(s) with the given label and/or type. */
-	if ((rv = find_objs(sess, obj_type, list_label, &objs, &num_objs)) !=
-	    CKR_OK) {
-		cryptoerror(LOG_STDERR, gettext(
-		    "Unable to find token objects (%s)."), pkcs11_strerror(rv));
-		quick_finish(sess);
-		return (PK_ERR_PK11);
+	/* If no object class specified, list certificate objects. */
+	if (oclass == 0)
+		oclass = PK_CERT_OBJ;
+
+	if (kstype == KMF_KEYSTORE_PK11TOKEN && EMPTYSTRING(token_spec)) {
+		token_spec = PK_DEFAULT_PK11TOKEN;
+	} else if (kstype == KMF_KEYSTORE_NSS && EMPTYSTRING(token_spec)) {
+		token_spec = DEFAULT_NSS_TOKEN;
 	}
 
-	if (num_objs == 0) {
-		cryptoerror(LOG_STDERR, gettext("No objects found."));
-		quick_finish(sess);
-		return (0);
-	}
+	if (serstr != NULL) {
+		uchar_t *bytes = NULL;
+		size_t bytelen;
 
-	/* List the objects found. */
-	for (i = 0; i < num_objs; i++) {
-		/* Get object class first, then decide what is next. */
-		cryptodebug("calling C_GetAttributeValue for object class");
-		if ((rv = C_GetAttributeValue(sess, objs[i], &class_attr, 1))
-		    != CKR_OK) {
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unable to get object #%d class attribute (%s)."),
-			    i+1, pkcs11_strerror(rv));
-			continue;
+		rv = KMF_HexString2Bytes((uchar_t *)serstr, &bytes, &bytelen);
+		if (rv != KMF_OK || bytes == NULL) {
+			(void) fprintf(stderr, gettext("serial number "
+				"must be specified as a hex number "
+				"(ex: 0x0102030405ffeeddee)\n"));
+			return (PK_ERR_USAGE);
 		}
-
-		/* Display based on the type of object. */
-		switch (objclass) {
-		case CKO_CERTIFICATE:
-			if ((rv = display_cert(sess, objs[i], i+1)) != CKR_OK)
-				cryptoerror(LOG_STDERR,
-				    gettext("Unable to display certificate."));
-			break;
-		case CKO_PUBLIC_KEY:
-			if ((rv = display_pubkey(sess, objs[i], i+1)) != CKR_OK)
-				cryptoerror(LOG_STDERR,
-				    gettext("Unable to display public key."));
-			break;
-		case CKO_PRIVATE_KEY:
-			if ((rv = display_prikey(sess, objs[i], i+1)) != CKR_OK)
-				cryptoerror(LOG_STDERR,
-				    gettext("Unable to display private key."));
-			break;
-		case CKO_SECRET_KEY:
-			if ((rv = display_seckey(sess, objs[i], i+1)) != CKR_OK)
-				cryptoerror(LOG_STDERR,
-				    gettext("Unable to display secret key."));
-			break;
-		case CKO_DATA:
-			cryptoerror(LOG_STDERR,
-			    gettext("Data object display not implemented."));
-			break;
-		default:
-			cryptoerror(LOG_STDERR, gettext(
-			    "Unknown token object class (0x%02x)."), objclass);
-			break;
-		}
+		serial.val = bytes;
+		serial.len = bytelen;
 	}
 
-	/* Clean up. */
-	quick_finish(sess);
-	return (0);
+	if ((kstype == KMF_KEYSTORE_PK11TOKEN ||
+		kstype == KMF_KEYSTORE_NSS) &&
+		(oclass & (PK_PRIKEY_OBJ | PK_PRIVATE_OBJ))) {
+
+		(void) get_token_password(kstype, token_spec,
+			&tokencred);
+	}
+	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
+		rv = list_pk11_objects(kmfhandle, token_spec,
+			oclass, list_label, &serial,
+			issuer, subject, dir, filename,
+			&tokencred, find_criteria_flag);
+
+	} else if (kstype == KMF_KEYSTORE_NSS) {
+		if (dir == NULL)
+			dir = PK_DEFAULT_DIRECTORY;
+		rv = list_nss_objects(kmfhandle,
+			oclass, token_spec, dir, prefix,
+			list_label, &serial, issuer, subject,
+			&tokencred, find_criteria_flag);
+
+	} else if (kstype == KMF_KEYSTORE_OPENSSL) {
+
+		rv = list_file_objects(kmfhandle,
+			oclass, dir, filename,
+			&serial, issuer, subject, find_criteria_flag);
+	}
+
+	if (rv != KMF_OK) {
+		display_error(kmfhandle, rv,
+			gettext("Error listing objects"));
+	}
+
+	if (serial.val != NULL)
+		free(serial.val);
+
+	if (tokencred.cred != NULL)
+		free(tokencred.cred);
+
+	(void) KMF_Finalize(kmfhandle);
+	return (rv);
 }

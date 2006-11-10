@@ -174,6 +174,8 @@ f none usr/include/kerberosv5/com_err.h 644 root bin
 f none usr/include/kerberosv5/krb5.h 644 root bin
 f none usr/include/kerberosv5/mit_copyright.h 644 root bin
 f none usr/include/kerberosv5/mit-sipb-copyright.h 644 root bin
+f none usr/include/kmfapi.h 644 root bin
+f none usr/include/kmftypes.h 644 root bin
 f none usr/include/kstat.h 644 root bin
 f none usr/include/kvm.h 644 root bin
 f none usr/include/lber.h 644 root bin

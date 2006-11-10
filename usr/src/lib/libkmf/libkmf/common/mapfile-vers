@@ -1,0 +1,288 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNWprivate_1.1 {
+    global:
+	DigestData;
+	GetIDFromSPKI;
+	KMF_AddCertEKU;
+	KMF_AddPolicyToDB;
+	KMF_CheckCRLDate;
+	KMF_CheckCertDate;
+	KMF_CompareRDNs;
+	KMF_ConfigureKeystore;
+	KMF_CreateCSRFile;
+	KMF_CreateCertFile;
+	KMF_CreateKeypair;
+	KMF_CreateOCSPRequest;
+	KMF_CreateSymKey;
+	KMF_DN2Der;
+	KMF_DNParser;
+	KMF_DecryptWithCert;
+	KMF_DeleteCRL;
+	KMF_DeleteCertFromKeystore;
+	KMF_DeleteKeyFromKeystore;
+	KMF_DeletePolicyFromDB;
+	KMF_Der2Pem;
+	KMF_DownloadCRL;
+	KMF_DownloadCert;
+	KMF_EncodeCertRecord;
+	KMF_EncryptWithCert;
+	KMF_ExportPK12;
+	KMF_Finalize;
+	KMF_FindCRL;
+	KMF_FindCert;
+	KMF_FindCertInCRL;
+	KMF_FindKey;
+	KMF_FreeAlgOID;
+	KMF_FreeBigint;
+	KMF_FreeCRLDistributionPoints;
+	KMF_FreeDN;
+	KMF_FreeData;
+	KMF_FreeEKU;
+	KMF_FreeEKUPolicy;
+	KMF_FreeExtension;
+	KMF_FreeKMFCert;
+	KMF_FreeKMFKey;
+	KMF_FreePolicyRecord;
+	KMF_FreeRawKey;
+	KMF_FreeRawSymKey;
+	KMF_FreeSPKI;
+	KMF_FreeSignedCSR;
+	KMF_FreeSignedCert;
+	KMF_FreeString;
+	KMF_FreeTBSCSR;
+	KMF_FreeTBSCert;
+	KMF_GetCertAuthInfoAccessExt;
+	KMF_GetCertBasicConstraintExt;
+	KMF_GetCertCriticalExtensions;
+	KMF_GetCertCRLDistributionPointsExt;
+	KMF_GetCertEKU;
+	KMF_GetCertEmailString;
+	KMF_GetCertEndDateString;
+	KMF_GetCertExtensionData;
+	KMF_GetCertExtensionString;
+	KMF_GetCertIDData;
+	KMF_GetCertIDString;
+	KMF_GetCertIssuerNameString;
+	KMF_GetCertKeyUsageExt;
+	KMF_GetCertNonCriticalExtensions;
+	KMF_GetCertPoliciesExt;
+	KMF_GetCertPubKeyAlgString;
+	KMF_GetCertPubKeyDataString;
+	KMF_GetCertSerialNumberString;
+	KMF_GetCertSignatureAlgString;
+	KMF_GetCertStartDateString;
+	KMF_GetCertSubjectNameString;
+	KMF_GetCertValidity;
+	KMF_GetCertVersionString;
+	KMF_GetEncodedOCSPResponse;
+	KMF_GetFileFormat;
+	KMF_GetKMFErrorString;
+	KMF_GetOCSPForCert;
+	KMF_GetOCSPStatusForCert;
+	KMF_GetPluginErrorString;
+	KMF_GetPolicy;
+	KMF_GetSymKeyValue;
+	KMF_HexString2Bytes;
+	KMF_ImportCRL;
+	KMF_ImportCert;
+	KMF_ImportPK12;
+	KMF_Initialize;
+	KMF_IsCRLFile;
+	KMF_IsCertFile;
+	KMF_ListCRL;
+	KMF_OID2EKUString;
+	KMF_OID2String;
+	KMF_PK11TokenLookup;
+	KMF_Pem2Der;
+	KMF_ReadInputFile;
+	KMF_SelectToken;
+	KMF_SetCSRExtension;
+	KMF_SetCSRKeyUsage;
+	KMF_SetCSRPubKey;
+	KMF_SetCSRSignatureAlgorithm;
+	KMF_SetCSRSubjectAltName;
+	KMF_SetCSRSubjectName;
+	KMF_SetCSRVersion;
+	KMF_SetCertBasicConstraintExt;
+	KMF_SetCertExtension;
+	KMF_SetCertIssuerAltName;
+	KMF_SetCertIssuerName;
+	KMF_SetCertKeyUsage;
+	KMF_SetCertPubKey;
+	KMF_SetCertSerialNumber;
+	KMF_SetCertSignatureAlgorithm;
+	KMF_SetCertSubjectAltName;
+	KMF_SetCertSubjectName;
+	KMF_SetCertValidityTimes;
+	KMF_SetCertVersion;
+	KMF_SetPolicy;
+	KMF_SetTokenPin;
+	KMF_SignCSR;
+	KMF_SignCertRecord;
+	KMF_SignCertWithCert;
+	KMF_SignCertWithKey;
+	KMF_SignDataWithCert;
+	KMF_SignDataWithKey;
+	KMF_StoreCert;
+	KMF_StorePrivateKey;
+	KMF_String2OID;
+	KMF_StringToKeyUsage;
+	KMF_ValidateCert;
+	KMF_VerifyCRLFile;
+	KMF_VerifyCertWithCert;
+	KMF_VerifyCertWithKey;
+	KMF_VerifyDataWithCert;
+	KMF_VerifyDataWithKey;
+	KMF_VerifyPolicy;
+	KMFOID_AliasedEntryName;
+	KMFOID_AuthorityInfoAccess;
+	KMFOID_AuthorityKeyID;
+	KMFOID_AuthorityKeyIdentifier;
+	KMFOID_AuthorityRevocationList;
+	KMFOID_BasicConstraints;
+	KMFOID_BusinessCategory;
+	KMFOID_CACertificate;
+	KMFOID_CertificatePolicies;
+	KMFOID_CertificateRevocationList;
+	KMFOID_ChallengePassword;
+	KMFOID_CollectiveFacsimileTelephoneNumber;
+	KMFOID_CollectiveInternationalISDNNumber;
+	KMFOID_CollectiveOrganizationName;
+	KMFOID_CollectiveOrganizationalUnitName;
+	KMFOID_CollectivePhysicalDeliveryOfficeName;
+	KMFOID_CollectivePostOfficeBox;
+	KMFOID_CollectivePostalAddress;
+	KMFOID_CollectivePostalCode;
+	KMFOID_CollectiveStateProvinceName;
+	KMFOID_CollectiveStreetAddress;
+	KMFOID_CollectiveTelephoneNumber;
+	KMFOID_CollectiveTelexNumber;
+	KMFOID_CollectiveTelexTerminalIdentifier;
+	KMFOID_CommonName;
+	KMFOID_ContentType;
+	KMFOID_CounterSignature;
+	KMFOID_CountryName;
+	KMFOID_CrlDistributionPoints;
+	KMFOID_CrlNumber;
+	KMFOID_CrlReason;
+	KMFOID_CrossCertificatePair;
+	KMFOID_DNQualifier;
+	KMFOID_DeltaCrlIndicator;
+	KMFOID_Description;
+	KMFOID_DestinationIndicator;
+	KMFOID_DistinguishedName;
+	KMFOID_EmailAddress;
+	KMFOID_EnhancedSearchGuide;
+	KMFOID_ExtendedCertificateAttributes;
+	KMFOID_ExtendedKeyUsage;
+	KMFOID_ExtensionRequest;
+	KMFOID_FacsimileTelephoneNumber;
+	KMFOID_GenerationQualifier;
+	KMFOID_GivenName;
+	KMFOID_HoldInstructionCode;
+	KMFOID_HouseIdentifier;
+	KMFOID_Initials;
+	KMFOID_InternationalISDNNumber;
+	KMFOID_InvalidityDate;
+	KMFOID_IssuerAltName;
+	KMFOID_IssuingDistributionPoints;
+	KMFOID_KeyUsage;
+	KMFOID_KeyUsageRestriction;
+	KMFOID_KnowledgeInformation;
+	KMFOID_LocalityName;
+	KMFOID_Member;
+	KMFOID_MessageDigest;
+	KMFOID_Name;
+	KMFOID_NameConstraints;
+	KMFOID_ObjectClass;
+	KMFOID_OrganizationName;
+	KMFOID_OrganizationalUnitName;
+	KMFOID_Owner;
+	KMFOID_PKIX_KP_ClientAuth;
+	KMFOID_PKIX_KP_CodeSigning;
+	KMFOID_PKIX_KP_EmailProtection;
+	KMFOID_PKIX_KP_IPSecEndSystem;
+	KMFOID_PKIX_KP_IPSecTunnel;
+	KMFOID_PKIX_KP_IPSecUser;
+	KMFOID_PKIX_KP_OCSPSigning;
+	KMFOID_PKIX_KP_ServerAuth;
+	KMFOID_PKIX_KP_TimeStamping;
+	KMFOID_PKIX_PQ_CPSuri;
+	KMFOID_PKIX_PQ_Unotice;
+	KMFOID_PhysicalDeliveryOfficeName;
+	KMFOID_PkixAdCaIssuers;
+	KMFOID_PkixAdOcsp;
+	KMFOID_PolicyConstraints;
+	KMFOID_PolicyMappings;
+	KMFOID_PostOfficeBox;
+	KMFOID_PostalAddress;
+	KMFOID_PostalCode;
+	KMFOID_PreferredDeliveryMethod;
+	KMFOID_PresentationAddress;
+	KMFOID_PrivateKeyUsagePeriod;
+	KMFOID_ProtocolInformation;
+	KMFOID_RFC822mailbox;
+	KMFOID_RegisteredAddress;
+	KMFOID_RoleOccupant;
+	KMFOID_SearchGuide;
+	KMFOID_SeeAlso;
+	KMFOID_SerialNumber;
+	KMFOID_SigningTime;
+	KMFOID_StateProvinceName;
+	KMFOID_StreetAddress;
+	KMFOID_SubjectAltName;
+	KMFOID_SubjectDirectoryAttributes;
+	KMFOID_SubjectKeyIdentifier;
+	KMFOID_SupportedApplicationContext;
+	KMFOID_Surname;
+	KMFOID_TelephoneNumber;
+	KMFOID_TelexNumber;
+	KMFOID_TelexTerminalIdentifier;
+	KMFOID_Title;
+	KMFOID_UniqueIdentifier;
+	KMFOID_UniqueMember;
+	KMFOID_UnstructuredAddress;
+	KMFOID_UnstructuredName;
+	KMFOID_UserCertificate;
+	KMFOID_UserPassword;
+	KMFOID_VerisignCertificatePolicy;
+	KMFOID_X_121Address;
+	KMFOID_domainComponent;
+	KMFOID_userid;
+	PKCS_GetDefaultSignatureMode;
+	PKCS_GetAlgorithmMap;
+	X509_AlgIdToAlgorithmOid;
+	X509_AlgorithmOidToAlgId;
+	kmf_ekuname2oid;
+	kmf_string2oid;
+	ku2str;
+	parsePolicyElement;
+    local:
+	*;
+};

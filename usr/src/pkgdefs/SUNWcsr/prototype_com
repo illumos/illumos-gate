@@ -275,6 +275,7 @@ f none etc/security/dev/fd0 400 root bin
 f none etc/security/dev/sr0 400 root bin
 f none etc/security/dev/st0 400 root bin
 f none etc/security/dev/st1 400 root bin
+f none etc/security/kmfpolicy.xml 644 root bin
 d none etc/security/lib 755 root sys
 f none etc/security/lib/audio_clean 555 root sys
 f none etc/security/lib/fd_clean 555 root sys

@@ -1,0 +1,84 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+
+<!--
+ Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	ident	"%Z%%M%	%I%	%E% SMI"
+-->
+
+<!--Element Definitions-->
+
+<!ELEMENT kmf-policy-db (kmf-policy*)>
+<!ATTLIST kmf-policy-db allow-local-files (TRUE|FALSE) #IMPLIED>
+
+<!ELEMENT kmf-policy (validation-methods, key-usage-set?,  ext-key-usage?)>
+<!ATTLIST kmf-policy name CDATA #REQUIRED>
+<!ATTLIST kmf-policy ignore-date (TRUE|FALSE) #IMPLIED>
+<!ATTLIST kmf-policy ignore-unknown-eku (TRUE|FALSE) #IMPLIED>
+<!ATTLIST kmf-policy ignore-trust-anchor (TRUE|FALSE) #IMPLIED>
+<!ATTLIST kmf-policy validity-adjusttime CDATA #IMPLIED>
+<!ATTLIST kmf-policy ta-name CDATA #IMPLIED>
+<!ATTLIST kmf-policy ta-serial CDATA #IMPLIED>
+
+<!ELEMENT validation-methods (ocsp?, crl?)> 
+<!ELEMENT ocsp (ocsp-basic, responder-cert?)>
+
+<!ELEMENT ocsp-basic EMPTY>
+<!ATTLIST ocsp-basic
+        responder CDATA #IMPLIED
+        proxy CDATA #IMPLIED
+        uri-from-cert (TRUE|FALSE) #IMPLIED
+        response-lifetime CDATA #IMPLIED
+        ignore-response-sign (TRUE|FALSE) #IMPLIED
+>
+
+<!ELEMENT responder-cert EMPTY> 
+<!ATTLIST responder-cert
+        name CDATA #REQUIRED
+        serial CDATA #REQUIRED
+>
+
+<!ELEMENT crl EMPTY>
+<!ATTLIST crl basefilename CDATA #IMPLIED>
+<!ATTLIST crl directory CDATA #IMPLIED>
+<!ATTLIST crl get-crl-uri (TRUE|FALSE) #IMPLIED>
+<!ATTLIST crl proxy CDATA #IMPLIED>
+<!ATTLIST crl ignore-crl-sign (TRUE|FALSE) #IMPLIED>
+<!ATTLIST crl ignore-crl-date (TRUE|FALSE) #IMPLIED>
+
+<!ELEMENT key-usage-set (key-usage+)>
+
+<!ELEMENT key-usage EMPTY>
+<!ATTLIST key-usage use (digitalSignature | nonRepudiation | 
+        keyEncipherment | dataEncipherment | keyAgreement | 
+        keyCertSign | cRLSign | encipherOnly | decipherOnly) #IMPLIED>
+ 
+<!ELEMENT ext-key-usage (eku-name*, eku-oid*)>
+
+<!ELEMENT eku-name EMPTY>
+<!ATTLIST eku-name name (serverAuth | clientAuth |
+		codeSigning | emailProtection |
+		ipsecEndSystem | ipsecTunnel | ipsecUser |
+		timeStamping | OCSPSigning) #IMPLIED >
+<!ELEMENT eku-oid EMPTY>
+<!ATTLIST eku-oid oid CDATA #IMPLIED>

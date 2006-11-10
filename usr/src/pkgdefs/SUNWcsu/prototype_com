@@ -163,6 +163,7 @@ f none usr/bin/kbd 555 root bin
 f none usr/bin/keylogin 555 root bin
 f none usr/bin/keylogout 555 root bin
 l none usr/bin/kill=../../usr/bin/alias
+f none usr/bin/kmfcfg 555 root bin
 f none usr/bin/ksh 555 root bin
 f none usr/bin/line 555 root bin
 f none usr/bin/listdgrp 555 root bin
@@ -975,6 +976,7 @@ f none usr/share/lib/unittab 444 root bin
 d none usr/share/lib/xml 755 root sys
 d none usr/share/lib/xml/dtd 755 root sys
 f none usr/share/lib/xml/dtd/adt_record.dtd.1 444 root bin
+f none usr/share/lib/xml/dtd/kmfpolicy.dtd 444 root bin
 f none usr/share/lib/xml/dtd/service_bundle.dtd.1 0444 root sys
 d none usr/share/lib/xml/style 755 root sys
 f none usr/share/lib/xml/style/adt_record.xsl.1 444 root bin

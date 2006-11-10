@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,19 +37,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <tzfile.h>
 #include <cryptoutil.h>
 #include <security/cryptoki.h>
-#include "common.h"
-#include "biginteger.h"
+#include <kmfapi.h>
 
-/* True and false for attribute templates. */
-CK_BBOOL	pk_true = B_TRUE;
-CK_BBOOL	pk_false = B_FALSE;
+#include "common.h"
 
 /* Local status variables. */
 static boolean_t	initialized = B_FALSE;
 static boolean_t	session_opened = B_FALSE;
-static boolean_t	session_writable = B_FALSE;
 static boolean_t	logged_in = B_FALSE;
 
 /* Supporting structures and global variables for getopt_av(). */
@@ -67,6 +66,9 @@ static int		_save_numopts = 0;
 int			optind_av = 1;
 char			*optarg_av = NULL;
 
+static void close_sess(CK_SESSION_HANDLE);
+static void logout_token(CK_SESSION_HANDLE);
+
 /*
  * Perform PKCS#11 setup here.  Currently only C_Initialize is required,
  * along with setting/resetting state variables.
@@ -76,19 +78,15 @@ init_pk11(void)
 {
 	CK_RV		rv = CKR_OK;
 
-	cryptodebug("inside init_pk11");
-
 	/* If C_Initialize() already called, nothing to do here. */
 	if (initialized == B_TRUE)
 		return (CKR_OK);
 
 	/* Reset state variables because C_Initialize() not yet done. */
 	session_opened = B_FALSE;
-	session_writable = B_FALSE;
 	logged_in = B_FALSE;
 
 	/* Initialize PKCS#11 library. */
-	cryptodebug("calling C_Initialize()");
 	if ((rv = C_Initialize(NULL_PTR)) != CKR_OK &&
 	    rv != CKR_CRYPTOKI_ALREADY_INITIALIZED) {
 		return (rv);
@@ -105,7 +103,6 @@ init_pk11(void)
 void
 final_pk11(CK_SESSION_HANDLE sess)
 {
-	cryptodebug("inside final_pk11");
 
 	/* If the library wasn't initialized, nothing to do here. */
 	if (!initialized)
@@ -114,127 +111,41 @@ final_pk11(CK_SESSION_HANDLE sess)
 	/* Make sure the sesion is closed first. */
 	close_sess(sess);
 
-	cryptodebug("calling C_Finalize()");
 	(void) C_Finalize(NULL);
 	initialized = B_FALSE;
-}
-
-/*
- * Create a PKCS#11 session on the given slot, and set state information.
- * If session is already open, check that the read-only/read-write state
- * requested matches that of the session.  If it doesn't, make it so.
- */
-CK_RV
-open_sess(CK_SLOT_ID slot_id, CK_FLAGS sess_flags, CK_SESSION_HANDLE_PTR sess)
-{
-	CK_RV		rv = CKR_OK;
-
-	cryptodebug("inside open_sess");
-
-	/* If the session is already open, check the session flags. */
-	if (session_opened) {
-		/*
-		 * If requesting R/W session and it is currently R/O,
-		 * need to close the session and reopen it R/W.  The
-		 * other cases are considered acceptable:
-		 *	sess_flags		current state
-		 *	----------		-------------
-		 *	~CKF_RW_SESSION		!session_writable
-		 *	~CKF_RW_SESSION		session_writable
-		 *	CKF_RW_SESSION		session_writable
-		 */
-		if ((sess_flags & CKF_RW_SESSION) && !session_writable)
-			close_sess(*sess);
-		else
-			return (CKR_OK);
-	}
-
-	/* Make sure the PKCS#11 is already initialized. */
-	if (!initialized)
-		if ((rv = init_pk11()) != CKR_OK)
-			return (rv);
-
-	/* Create a session for subsequent operations. */
-	cryptodebug("calling C_OpenSession()");
-	if ((rv = C_OpenSession(slot_id, CKF_SERIAL_SESSION|sess_flags,
-	    NULL, NULL, sess)) != CKR_OK)
-		return (rv);
-	session_opened = B_TRUE;
-	session_writable = (sess_flags & CKF_RW_SESSION) ? B_TRUE : B_FALSE;
-	return (CKR_OK);
 }
 
 /*
  * Close PKCS#11 session and reset state variables.  Any logins are
  * logged out.
  */
-void
+static void
 close_sess(CK_SESSION_HANDLE sess)
 {
-	cryptodebug("inside close_sess");
 
 	if (sess == NULL) {
-		cryptodebug("session handle is null");
 		return;
 	}
 
 	/* If session is already closed, nothing to do here. */
-	session_writable = B_FALSE;
 	if (!session_opened)
 		return;
 
 	/* Make sure user is logged out of token. */
 	logout_token(sess);
 
-	cryptodebug("calling C_CloseSession()");
 	(void) C_CloseSession(sess);
 	session_opened = B_FALSE;
 }
 
 /*
- * Log user into token in given slot.  If this first login ever for this
- * token, the initial PIN is "changeme", C_Login() will succeed, but all
- * PKCS#11 calls following the C_Login() will fail with CKR_PIN_EXPIRED.
- */
-CK_RV
-login_token(CK_SLOT_ID slot_id, CK_UTF8CHAR_PTR pin, CK_ULONG pinlen,
-	    CK_SESSION_HANDLE_PTR sess)
-{
-	CK_RV		rv = CKR_OK;
-
-	cryptodebug("inside login_token");
-
-	/* If already logged in, nothing to do here. */
-	if (logged_in)
-		return (CKR_OK);
-
-	/* Make sure we have a session first, assume R/O is enough. */
-	if (!session_opened)
-		if ((rv = open_sess(slot_id, CKF_SERIAL_SESSION, sess)) !=
-		    CKR_OK)
-			return (rv);
-
-	/* Log the user into the token. */
-	cryptodebug("calling C_Login()");
-	if ((rv = C_Login(*sess, CKU_USER, pin, pinlen)) != CKR_OK) {
-		cryptodebug("C_Login returns %s", pkcs11_strerror(rv));
-		return (rv);
-	}
-
-	logged_in = B_TRUE;
-	return (CKR_OK);
-}
-
-/*
  * Log user out of token and reset status variable.
  */
-void
+static void
 logout_token(CK_SESSION_HANDLE sess)
 {
-	cryptodebug("inside logout_token");
 
 	if (sess == NULL) {
-		cryptodebug("session handle is null");
 		return;
 	}
 
@@ -242,46 +153,8 @@ logout_token(CK_SESSION_HANDLE sess)
 	if (!logged_in)
 		return;
 
-	cryptodebug("calling C_Logout()");
 	(void) C_Logout(sess);
 	logged_in = B_FALSE;
-}
-
-/*
- * Shortcut function to get from an uninitialized state to user logged in.
- * If the library is already initialized, the session is already opened,
- * or the user is already logged in, those steps are skipped and the next
- * step is checked.
- */
-CK_RV
-quick_start(CK_SLOT_ID slot_id, CK_FLAGS sess_flags, CK_UTF8CHAR_PTR pin,
-	    CK_ULONG pinlen, CK_SESSION_HANDLE_PTR sess)
-{
-	CK_RV		rv = CKR_OK;
-
-	cryptodebug("inside quick_start");
-
-	/* Call open_sess() explicitly if R/W session is needed. */
-	if (sess_flags & CKF_RW_SESSION)
-		if ((rv = open_sess(slot_id, sess_flags, sess)) != CKR_OK)
-			return (rv);
-
-	if ((rv = login_token(slot_id, pin, pinlen, sess)) != CKR_OK)
-		return (rv);
-
-	return (CKR_OK);
-}
-
-/*
- * Shortcut function to go from any state to uninitialized PKCS#11 library.
- */
-void
-quick_finish(CK_SESSION_HANDLE sess)
-{
-	cryptodebug("inside quick_finish");
-
-	/* All the needed calls are done implicitly. */
-	final_pk11(sess);
 }
 
 /*
@@ -294,15 +167,20 @@ get_pin(char *prompt1, char *prompt2, CK_UTF8CHAR_PTR *pin, CK_ULONG *pinlen)
 {
 	char		*save_phrase, *phrase1, *phrase2;
 
-	cryptodebug("inside get_pin");
+
+#ifdef DEBUG
+	if (getenv("TOKENPIN") != NULL) {
+		*pin = (CK_UTF8CHAR_PTR)strdup(getenv("TOKENPIN"));
+		*pinlen = strlen((char *)(*pin));
+		return (CKR_OK);
+	}
+#endif /* DEBUG */
 
 	/* Prompt user for a PIN. */
 	if (prompt1 == NULL) {
-		cryptodebug("no passphrase prompt given");
 		return (CKR_ARGUMENTS_BAD);
 	}
 	if ((phrase1 = getpassphrase(prompt1)) == NULL) {
-		cryptodebug("getpassphrase() failed");
 		return (CKR_FUNCTION_FAILED);
 	}
 
@@ -313,12 +191,10 @@ get_pin(char *prompt1, char *prompt2, CK_UTF8CHAR_PTR *pin, CK_ULONG *pinlen)
 	/* If second prompt given, PIN confirmation is requested. */
 	if (prompt2 != NULL) {
 		if ((phrase2 = getpassphrase(prompt2)) == NULL) {
-			cryptodebug("getpassphrase() confirmation failed");
 			free(save_phrase);
 			return (CKR_FUNCTION_FAILED);
 		}
 		if (strcmp(save_phrase, phrase2) != 0) {
-			cryptodebug("passphrases do not match");
 			free(save_phrase);
 			return (CKR_PIN_INCORRECT);
 		}
@@ -343,7 +219,13 @@ yesno(char *prompt, char *invalid, boolean_t dflt)
 	char		*yes = gettext("yes");
 	char		*no = gettext("no");
 
-	cryptodebug("inside yesno");
+
+#ifdef DEBUG
+	/* If debugging or testing, return TRUE and avoid prompting */
+	if (getenv("TOKENPIN") != NULL) {
+		return (B_TRUE);
+	}
+#endif /* DEBUG */
 
 	if (prompt == NULL)
 		prompt = gettext("Enter (y)es or (n)o? ");
@@ -388,8 +270,6 @@ get_token_slots(CK_SLOT_ID_PTR *slot_list, CK_ULONG *slot_count)
 	CK_SLOT_ID_PTR	tmp_list = NULL_PTR, tmp2_list = NULL_PTR;
 	int		rv = CKR_OK;
 
-	cryptodebug("inside get_token_slots");
-
 	if (!initialized)
 		if ((rv = init_pk11()) != CKR_OK)
 			return (rv);
@@ -402,12 +282,10 @@ get_token_slots(CK_SLOT_ID_PTR *slot_list, CK_ULONG *slot_count)
 	 * Also select only those slots that have tokens in them,
 	 * because this tool has no need to know about empty slots.
 	 */
-	cryptodebug("calling C_GetSlotList() for slot count");
 	if ((rv = C_GetSlotList(1, NULL_PTR, &tmp_count)) != CKR_OK)
 		return (rv);
 
 	if (tmp_count == 0) {
-		cryptodebug("no slots with tokens found");
 		*slot_list = NULL_PTR;
 		*slot_count = 0;
 		return (CKR_OK);
@@ -420,7 +298,6 @@ get_token_slots(CK_SLOT_ID_PTR *slot_list, CK_ULONG *slot_count)
 
 	/* Then get the slot list itself. */
 	for (;;) {
-		cryptodebug("calling C_GetSlotList()");
 		if ((rv = C_GetSlotList(1, tmp_list, &tmp_count)) == CKR_OK) {
 			*slot_list = tmp_list;
 			*slot_count = tmp_count;
@@ -433,7 +310,6 @@ get_token_slots(CK_SLOT_ID_PTR *slot_list, CK_ULONG *slot_count)
 		}
 
 		/* If the number of slots grew, try again. */
-		cryptodebug("number of tokens present increased");
 		if ((tmp2_list = (CK_SLOT_ID_PTR) realloc(tmp_list,
 		    tmp_count * sizeof (CK_SLOT_ID))) == NULL) {
 			free(tmp_list);
@@ -444,770 +320,6 @@ get_token_slots(CK_SLOT_ID_PTR *slot_list, CK_ULONG *slot_count)
 	}
 
 	return (rv);
-}
-
-/*
- * memcmp_pad_max() is a specialized version of memcmp() which
- * compares two pieces of data up to a maximum length.  If the
- * the two data match up the maximum length, they are considered
- * matching.  Trailing blanks do not cause the match to fail if
- * one of the data is shorted.
- *
- * Examples of matches:
- *	"one"           |
- *	"one      "     |
- *	                ^maximum length
- *
- *	"Number One     |  X"	(X is beyond maximum length)
- *	"Number One   " |
- *	                ^maximum length
- *
- * Examples of mismatches:
- *	" one"
- *	"one"
- *
- *	"Number One    X|"
- *	"Number One     |"
- *	                ^maximum length
- */
-static int
-memcmp_pad_max(void *d1, uint_t d1_len, void *d2, uint_t d2_len, uint_t max_sz)
-{
-	uint_t		len, extra_len;
-	char		*marker;
-
-	/* No point in comparing anything beyond max_sz */
-	if (d1_len > max_sz)
-		d1_len = max_sz;
-	if (d2_len > max_sz)
-		d2_len = max_sz;
-
-	/* Find shorter of the two data. */
-	if (d1_len <= d2_len) {
-		len = d1_len;
-		extra_len = d2_len;
-		marker = d2;
-	} else {	/* d1_len > d2_len */
-		len = d2_len;
-		extra_len = d1_len;
-		marker = d1;
-	}
-
-	/* Have a match in the shortest length of data? */
-	if (memcmp(d1, d2, len) != 0)
-		/* CONSTCOND */
-		return (!0);
-
-	/* If the rest of longer data is nulls or blanks, call it a match. */
-	while (len < extra_len)
-		if (!isspace(marker[len++]))
-			/* CONSTCOND */
-			return (!0);
-	return (0);
-}
-
-/*
- * Locate a token slot whose token matches the label, manufacturer ID, and
- * serial number given.  Token label must be specified, manufacturer ID and
- * serial number are optional.  When the token is located, the PIN state
- * is also returned to determine if it still has the default PIN.
- */
-CK_RV
-find_token_slot(char *token_name, char *manuf_id, char *serial_no,
-		CK_SLOT_ID *slot_id, CK_FLAGS *pin_state)
-{
-	CK_SLOT_ID_PTR	slot_list;
-	CK_TOKEN_INFO	token_info;
-	CK_ULONG	slot_count = 0;
-	int		rv = CKR_OK;
-	int		i;
-	uint_t		len, max_sz;
-	boolean_t	tok_match = B_FALSE,
-			man_match = B_FALSE,
-			ser_match = B_FALSE;
-
-	cryptodebug("inside find_token_slot");
-
-	if (token_name == NULL)
-		return (CKR_ARGUMENTS_BAD);
-
-	/* Get a list of all slots with tokens present. */
-	if ((rv = get_token_slots(&slot_list, &slot_count)) != CKR_OK)
-		return (rv);
-
-	/* If there are no such slots, the desired token won't be found. */
-	if (slot_count == 0)
-		return (CKR_TOKEN_NOT_PRESENT);
-
-	/* Search the slot list for the token. */
-	for (i = 0; i < slot_count; i++) {
-		cryptodebug("calling C_GetTokenInfo()");
-		if ((rv = C_GetTokenInfo(slot_list[i], &token_info)) !=
-		    CKR_OK) {
-			cryptodebug("token in slot %d returns %s", i,
-			    pkcs11_strerror(rv));
-			continue;
-		}
-
-		/* See if the token label matches. */
-		len = strlen(token_name);
-		max_sz = sizeof (token_info.label);
-		if (memcmp_pad_max(&(token_info.label), max_sz, token_name, len,
-		    max_sz) == 0)
-			tok_match = B_TRUE;
-
-		/*
-		 * If manufacturer id was given, see if it actually matches.
-		 * If no manufacturer id was given, assume match is true.
-		 */
-		if (manuf_id) {
-			len = strlen(manuf_id);
-			max_sz = sizeof ((char *)(token_info.manufacturerID));
-			if (memcmp_pad_max(&(token_info.manufacturerID), max_sz,
-			    manuf_id, len, max_sz) == 0)
-				man_match = B_TRUE;
-		} else
-			man_match = B_TRUE;
-
-		/*
-		 * If serial number was given, see if it actually matches.
-		 * If no serial number was given, assume match is true.
-		 */
-		if (serial_no) {
-			len = strlen(serial_no);
-			max_sz = sizeof ((char *)(token_info.serialNumber));
-			if (memcmp_pad_max(&(token_info.serialNumber), max_sz,
-			    serial_no, len, max_sz) == 0)
-				ser_match = B_TRUE;
-		} else
-			ser_match = B_TRUE;
-
-		cryptodebug("slot %d:", i);
-		cryptodebug("\tlabel = \"%.32s\"%s", token_info.label,
-		    tok_match ? " match" : "");
-		cryptodebug("\tmanuf = \"%.32s\"%s", token_info.manufacturerID,
-		    man_match ? " match" : "");
-		cryptodebug("\tserno = \"%.16s\"%s", token_info.serialNumber,
-		    ser_match ? " match" : "");
-		cryptodebug("\tmodel = \"%.16s\"", token_info.model);
-
-		cryptodebug("\tCKF_USER_PIN_INITIALIZED = %s",
-		    (token_info.flags & CKF_USER_PIN_INITIALIZED) ?
-		    "true" : "false");
-		cryptodebug("\tCKF_USER_PIN_TO_BE_CHANGED = %s",
-		    (token_info.flags & CKF_USER_PIN_TO_BE_CHANGED) ?
-		    "true" : "false");
-
-		if (tok_match && man_match && ser_match)
-			break;		/* found it! */
-	}
-
-	/* Scanned the whole list without finding the token. */
-	if (i == slot_count) {
-		cryptodebug("token not found");
-		free(slot_list);
-		return (CKR_TOKEN_NOT_PRESENT);
-	}
-
-	/* Return slot id where token was found and its PIN state. */
-	cryptodebug("token found at slot %d", i);
-	*slot_id = slot_list[i];
-	*pin_state = (token_info.flags & CKF_USER_PIN_TO_BE_CHANGED);
-	free(slot_list);
-	return (CKR_OK);
-}
-
-/*
- * Returns pointer to either null-terminator or next unescaped colon.  The
- * string to be extracted starts at the beginning and goes until one character
- * before this pointer.  If NULL is returned, the string itself is NULL.
- */
-static char *
-find_unescaped_colon(char *str)
-{
-	char *end;
-
-	if (str == NULL)
-		return (NULL);
-
-	while ((end = strchr(str, ':')) != NULL) {
-		if (end != str && *(end-1) != '\\')
-			return (end);
-		str = end + 1;		/* could point to null-terminator */
-	}
-	if (end == NULL)
-		end = strchr(str, '\0');
-	return (end);
-}
-
-/*
- * Compresses away any characters escaped with backslash from given string.
- * The string is altered in-place.  Example, "ab\:\\e" becomes "ab:\e".
- */
-static void
-unescape_str(char *str)
-{
-	boolean_t	escaped = B_FALSE;
-	char		*mark;
-
-	if (str == NULL)
-		return;
-
-	for (mark = str; *str != '\0'; str++) {
-		if (*str != '\\' || escaped == B_TRUE) {
-			*mark++ = *str;
-			escaped = B_FALSE;
-		} else {
-			escaped = B_TRUE;
-		}
-	}
-	*mark = '\0';
-}
-
-/*
- * Given a colon-separated token specifier, this functions splits it into
- * its label, manufacturer ID (if any), and serial number (if any).  Literal
- * colons within the label/manuf/serial can be escaped with a backslash.
- * Fields can left blank and trailing colons can be omitted, however leading
- * colons are required as placeholders.  For example, these are equivalent:
- *	(a) "lbl", "lbl:", "lbl::"	(b) "lbl:man", "lbl:man:"
- * but these are not:
- *	(c) "man", ":man"	(d) "ser", "::ser"
- * Furthermore, the token label is required always.
- *
- * The buffer containing the token specifier is altered by replacing the
- * colons to null-terminators, and pointers returned are pointers into this
- * string.  No new memory is allocated.
- */
-int
-parse_token_spec(char *token_spec, char **token_name, char **manuf_id,
-	char **serial_no)
-{
-	char	*mark;
-
-	if (token_spec == NULL || *token_spec == '\0') {
-		cryptodebug("token specifier is empty");
-		return (-1);
-	}
-
-	*token_name = NULL;
-	*manuf_id = NULL;
-	*serial_no = NULL;
-
-	/* Token label (required) */
-	mark = find_unescaped_colon(token_spec);
-	*token_name = token_spec;
-	if (*mark != '\0')
-		*mark++ = '\0';		/* mark points to next field, if any */
-	unescape_str(*token_name);
-
-	if (*(*token_name) == '\0') {	/* token label is required */
-		cryptodebug("no token label found");
-		return (-1);
-	}
-
-	if (*mark == '\0' || *(mark+1) == '\0')		/* no more fields */
-		return (0);
-	token_spec = mark;
-
-	/* Manufacturer identifier (optional) */
-	mark = find_unescaped_colon(token_spec);
-	*manuf_id = token_spec;
-	if (*mark != '\0')
-		*mark++ = '\0';		/* mark points to next field, if any */
-	unescape_str(*manuf_id);
-
-	if (*mark == '\0' || *(mark+1) == '\0')		/* no more fields */
-		return (0);
-	token_spec = mark;
-
-	/* Serial number (optional) */
-	mark = find_unescaped_colon(token_spec);
-	*serial_no = token_spec;
-	if (*mark != '\0')
-		*mark++ = '\0';		/* null-terminate, just in case */
-	unescape_str(*serial_no);
-
-	return (0);
-}
-
-/*
- * Constructs a fully qualified token name from its label, manufacturer ID
- * (if any), and its serial number (if any).  Note that the given buf must
- * be big enough.  Do NOT i18n/l10n.
- *
- * FULL_NAME_LEN is defined in common.h to be 91 because a fully qualified
- * token name adds up this way:
- * =32(label) + 32(manuf) + 16(serial) + 4("", ) + 4("", ) + 3("" and nul)
- */
-void
-full_token_name(char *token_name, char *manuf_id, char *serial_no, char *buf)
-{
-	char		*marker = buf;
-	int		n_written = 0;
-	int		space_left = FULL_NAME_LEN;
-
-	if (!token_name)
-		return;
-
-	n_written = sprintf(buf, "\"%.32s\"", token_name);
-	marker += n_written;
-	space_left -= n_written;
-
-	n_written = sprintf(marker, ", \"%.32s\"", manuf_id ? manuf_id : "");
-	marker += n_written;
-	space_left -= n_written;
-
-	n_written = sprintf(marker, ", \"%.16s\"", serial_no ? serial_no : "");
-	marker += n_written;
-	space_left -= n_written;
-
-	/* space_left should always be >= 1 */
-}
-
-/*
- * Find how many token objects with the given label.
- */
-CK_RV
-find_obj_count(CK_SESSION_HANDLE sess, int obj_type, CK_BYTE *label,
-    CK_ULONG *count)
-{
-	CK_RV			rv = CKR_OK;
-	CK_ATTRIBUTE		attrs[4] = {
-		{ CKA_TOKEN, &pk_true, sizeof (pk_true) },
-		{ 0, NULL, 0 },
-		{ 0, NULL, 0 },
-		{ 0, NULL, 0 }
-	    };
-	CK_ULONG	num_attrs = sizeof (attrs) / sizeof (CK_ATTRIBUTE);
-	CK_ULONG	cur_attr = 1;		/* CKA_TOKEN already set */
-	CK_OBJECT_CLASS		obj_class;
-	CK_OBJECT_HANDLE	tmp_obj;
-	CK_ULONG		obj_count = 0;
-
-	cryptodebug("inside find_obj_count");
-
-	if (!session_opened || sess == NULL) {
-		cryptodebug("session handle is null");
-		return (CKR_SESSION_HANDLE_INVALID);
-	}
-
-	if (label) {
-		cryptodebug("object label was specified");
-		attrs[cur_attr].type = CKA_LABEL;
-		attrs[cur_attr].pValue = label;
-		attrs[cur_attr].ulValueLen = strlen((char *)label);
-		cur_attr++;
-	}
-
-	if ((obj_type & PK_PRIVATE_OBJ) && !(obj_type & PK_PUBLIC_OBJ)) {
-		cryptodebug("only searching for private objects");
-		attrs[cur_attr].type = CKA_PRIVATE;
-		attrs[cur_attr].pValue = &pk_true;
-		attrs[cur_attr].ulValueLen = sizeof (pk_true);
-		cur_attr++;
-	}
-
-	/*
-	 * If "certs and all keys" is not specified, but at least either
-	 * "certs" or some "keys" is specified, then go into this block.
-	 * If all certs and keys were specified, there's no point in
-	 * putting that fact in the attribute template -- leave that open,
-	 * and all certs and keys will be matched automatically.
-	 * In other words, only if at least one of 0x10,0x20,0x40,0x80
-	 * bits is off, go into this code block.
-	 *
-	 * NOTE:  For now, only one of cert or key types is allowed.
-	 * This needs to change in the future.
-	 */
-	if ((obj_type & (PK_CERT_OBJ|PK_KEY_OBJ)) != (PK_CERT_OBJ|PK_KEY_OBJ) &&
-	    ((obj_type & PK_CERT_OBJ) || (obj_type & PK_KEY_OBJ))) {
-		if (obj_type & PK_CERT_OBJ) {
-			cryptodebug("only searching for certificates");
-			obj_class = CKO_CERTIFICATE;
-		} else if (obj_type & PK_PRIKEY_OBJ) {
-			cryptodebug("only searching for private keys");
-			obj_class = CKO_PRIVATE_KEY;
-		} else if (obj_type & PK_PUBKEY_OBJ) {
-			cryptodebug("only searching for public keys");
-			obj_class = CKO_PUBLIC_KEY;
-		} else if (obj_type & PK_SECKEY_OBJ) {
-			cryptodebug("only searching for secret keys");
-			obj_class = CKO_SECRET_KEY;
-		}
-
-		attrs[cur_attr].type = CKA_CLASS;
-		attrs[cur_attr].pValue = &obj_class;
-		attrs[cur_attr].ulValueLen = sizeof (CK_OBJECT_CLASS);
-		cur_attr++;
-	}
-
-	/*
-	 * This can't happen now.  When finding objects is enhanced in the
-	 * future. this could lead to buffer overruns.
-	 */
-	if (cur_attr > num_attrs)
-		cryptodebug("internal error:  attr template overrun");
-
-	cryptodebug("calling C_FindObjectsInit");
-	if ((rv = C_FindObjectsInit(sess, attrs, cur_attr)) != CKR_OK)
-		return (rv);
-
-	/* Look for the object, checking if there are more than one. */
-	cryptodebug("calling C_FindObjects");
-	for (*count = 0; /* empty */; (*count)++) {
-		if ((rv = C_FindObjects(sess, &tmp_obj, 1, &obj_count)) !=
-		    CKR_OK)
-			break;
-
-		/* No more found. */
-		if (obj_count == 0)
-			break;
-	}
-
-	cryptodebug("%d matching objects found", *count);
-
-	cryptodebug("calling C_FindObjectsFinal");
-	(void) C_FindObjectsFinal(sess);
-	return (rv);
-}
-
-/*
- * Find the token object with the given label.
- */
-CK_RV
-find_objs(CK_SESSION_HANDLE sess, int obj_type, CK_BYTE *label,
-    CK_OBJECT_HANDLE_PTR *obj, CK_ULONG *count)
-{
-	CK_RV			rv = CKR_OK;
-	CK_ATTRIBUTE		attrs[4] = {
-		{ CKA_TOKEN, &pk_true, sizeof (pk_true) },
-		{ 0, NULL, 0 },
-		{ 0, NULL, 0 },
-		{ 0, NULL, 0 }
-	    };
-	CK_ULONG	num_attrs = sizeof (attrs) / sizeof (CK_ATTRIBUTE);
-	CK_ULONG	cur_attr = 1;		/* CKA_TOKEN already set */
-	CK_OBJECT_CLASS		obj_class;
-	CK_OBJECT_HANDLE	tmp_obj;
-	CK_ULONG		obj_count = 0;
-	int			i;
-
-	cryptodebug("inside find_obj");
-
-	if ((rv = find_obj_count(sess, obj_type, label, count)) != CKR_OK)
-		return (rv);
-
-	if (*count == 0)
-		return (CKR_OK);
-
-	if ((*obj = (CK_OBJECT_HANDLE_PTR) malloc((*count) *
-	    sizeof (CK_OBJECT_HANDLE))) == NULL) {
-		cryptodebug("no memory for found object");
-		return (CKR_HOST_MEMORY);
-	}
-
-	if (label) {
-		cryptodebug("object label was specified");
-		attrs[cur_attr].type = CKA_LABEL;
-		attrs[cur_attr].pValue = label;
-		attrs[cur_attr].ulValueLen = strlen((char *)label);
-		cur_attr++;
-	}
-
-	if ((obj_type & PK_PRIVATE_OBJ) && !(obj_type & PK_PUBLIC_OBJ)) {
-		cryptodebug("only searching for private objects");
-		attrs[cur_attr].type = CKA_PRIVATE;
-		attrs[cur_attr].pValue = &pk_true;
-		attrs[cur_attr].ulValueLen = sizeof (pk_true);
-		cur_attr++;
-	}
-
-	/*
-	 * If "certs and all keys" is not specified, but at least either
-	 * "certs" or some "keys" is specified, then go into this block.
-	 * If all certs and keys were specified, there's no point in
-	 * putting that fact in the attribute template -- leave that open,
-	 * and all certs and keys will be matched automatically.
-	 * In other words, only if at least one of 0x10,0x20,0x40,0x80
-	 * bits is off, go into this code block.
-	 *
-	 * NOTE:  For now, only one of cert or key types is allowed.
-	 * This needs to change in the future.
-	 */
-	if ((obj_type & (PK_CERT_OBJ|PK_KEY_OBJ)) != (PK_CERT_OBJ|PK_KEY_OBJ) &&
-	    ((obj_type & PK_CERT_OBJ) || (obj_type & PK_KEY_OBJ))) {
-		if (obj_type & PK_CERT_OBJ) {
-			cryptodebug("only searching for certificates");
-			obj_class = CKO_CERTIFICATE;
-		} else if (obj_type & PK_PRIKEY_OBJ) {
-			cryptodebug("only searching for private keys");
-			obj_class = CKO_PRIVATE_KEY;
-		} else if (obj_type & PK_PUBKEY_OBJ) {
-			cryptodebug("only searching for public keys");
-			obj_class = CKO_PUBLIC_KEY;
-		} else if (obj_type & PK_SECKEY_OBJ) {
-			cryptodebug("only searching for secret keys");
-			obj_class = CKO_SECRET_KEY;
-		}
-
-		attrs[cur_attr].type = CKA_CLASS;
-		attrs[cur_attr].pValue = &obj_class;
-		attrs[cur_attr].ulValueLen = sizeof (CK_OBJECT_CLASS);
-		cur_attr++;
-	}
-
-	/*
-	 * This can't happen now.  When finding objects is enhanced in the
-	 * future. this could lead to buffer overruns.
-	 */
-	if (cur_attr > num_attrs)
-		cryptodebug("internal error:  attr template overrun");
-
-	cryptodebug("calling C_FindObjectsInit");
-	if ((rv = C_FindObjectsInit(sess, attrs, cur_attr)) != CKR_OK) {
-		free(*obj);
-		return (rv);
-	}
-
-	/*
-	 * Find all the matching objects.  The loop goes 1 more beyond
-	 * the number of objects found to determine if any new objects
-	 * were created since the time the object count was done.
-	 */
-	cryptodebug("calling C_FindObjects");
-	for (i = 0; i < (*count) + 1; i++) {
-		if ((rv = C_FindObjects(sess, &tmp_obj, 1, &obj_count)) !=
-		    CKR_OK)
-			break;
-
-		/* No more found. */
-		if (obj_count == 0)
-			break;
-
-		/*
-		 * Save the object in the list being created, as long as
-		 * we don't overrun the size of the list.
-		 */
-		if (i < *count)
-		    (*obj)[i] = tmp_obj;
-		else
-		    cryptodebug("number of objects changed since last count");
-	}
-
-	if (rv != CKR_OK) {
-		free(*obj);
-	} else {
-		/*
-		 * There are three cases to handle:  (1) fewer objects were
-		 * found than originally counted => change *count to the
-		 * smaller number; (2) the number of objects found matches
-		 * the number originally counted => do nothing; (3) more
-		 * objects found than originally counted => list passed
-		 * in is too small to contain the extra object(s), flag
-		 * that in the debug output but don't change number of
-		 * objects returned.  The caller can double-check by
-		 * calling find_obj_count() after this function to make
-		 * sure the numbers match, if desired.
-		 */
-		/* Case 1:  Fewer objects. */
-		if (i < *count) {
-			cryptodebug("%d objects found, expected %d", i, *count);
-			*count = i;
-		/* Case 3:  More objects. */
-		} else if (i > *count) {
-			cryptodebug("at least %d objects found, expected %d",
-			    i, *count);
-		}
-		/*
-		 * Case 2:  Same number of objects.
-		 *
-		 * else if (i == *count)
-		 *	;
-		 */
-	}
-
-	cryptodebug("calling C_FindObjectsFinal");
-	(void) C_FindObjectsFinal(sess);
-	return (rv);
-}
-
-char *
-class_str(CK_OBJECT_CLASS class)
-{
-	switch (class) {
-	case CKO_DATA:		return (gettext("data"));
-	case CKO_CERTIFICATE:	return (gettext("certificate"));
-	case CKO_PUBLIC_KEY:	return (gettext("public key"));
-	case CKO_PRIVATE_KEY:	return (gettext("private key"));
-	case CKO_SECRET_KEY:	return (gettext("secret key"));
-	case CKO_DOMAIN_PARAMETERS:	return (gettext("domain parameter"));
-	default:		return (gettext("unknown object"));
-	}
-}
-
-char *
-keytype_str(CK_KEY_TYPE keytype)
-{
-	switch (keytype) {
-	case CKK_RSA:		return (gettext("RSA"));
-	case CKK_DSA:		return (gettext("DSA"));
-	case CKK_DH:		return (gettext("Diffie-Hellman"));
-	case CKK_X9_42_DH:	return (gettext("X9.42 Diffie-Hellman"));
-	case CKK_GENERIC_SECRET:	return (gettext("generic"));
-	case CKK_RC2:		return (gettext("RC2"));
-	case CKK_RC4:		return (gettext("RC4"));
-	case CKK_DES:		return (gettext("DES"));
-	case CKK_DES2:		return (gettext("Double-DES"));
-	case CKK_DES3:		return (gettext("Triple-DES"));
-	case CKK_RC5:		return (gettext("RC5"));
-	case CKK_AES:		return (gettext("AES"));
-	default:		return (gettext("typeless"));
-	}
-}
-
-char *
-attr_str(CK_ATTRIBUTE_TYPE attrtype)
-{
-	switch (attrtype) {
-	case CKA_PRIVATE:		return (gettext("private"));
-	case CKA_LOCAL:			return (gettext("local"));
-	case CKA_SENSITIVE:		return (gettext("sensitive"));
-	case CKA_EXTRACTABLE:		return (gettext("extractable"));
-	case CKA_ENCRYPT:		return (gettext("encrypt"));
-	case CKA_DECRYPT:		return (gettext("decrypt"));
-	case CKA_WRAP:			return (gettext("wrap"));
-	case CKA_UNWRAP:		return (gettext("unwrap"));
-	case CKA_SIGN:			return (gettext("sign"));
-	case CKA_SIGN_RECOVER:		return (gettext("sign-recover"));
-	case CKA_VERIFY:		return (gettext("verify"));
-	case CKA_VERIFY_RECOVER:	return (gettext("verify-recover"));
-	case CKA_DERIVE:		return (gettext("derive"));
-	case CKA_ALWAYS_SENSITIVE:	return (gettext("always sensitive"));
-	case CKA_NEVER_EXTRACTABLE:	return (gettext("never extractable"));
-	default:		return (gettext("unknown capability"));
-	}
-}
-
-/*
- * Convert a byte string into a string of octets formatted like this:
- *	oo oo oo oo oo ... oo
- * where each "oo" is an octet is space separated and in the form:
- *	[0-f][0-f] if the octet is a non-printable character
- *	<space><char> if the octet is a printable character
- *
- * Note:  octets_sz must be 3 * str_sz + 1, or at least as long as "blank"
- */
-void
-octetify(CK_BYTE *str, CK_ULONG str_sz, char *octets, int octets_sz,
-    boolean_t stop_on_nul, boolean_t do_ascii, int limit, char *indent,
-    char *blank)
-{
-	char		*marker;
-	int		nc;
-	int		newline;
-	int		indent_len;
-	boolean_t	first = B_TRUE;
-
-	cryptodebug("inside octetify");
-
-	cryptodebug(stop_on_nul ? "stopping on first nul found" :
-	    "continuing to full length of buffer");
-	cryptodebug(do_ascii ? "using ascii chars where printable" :
-	    "using only hex octets");
-	cryptodebug("every %d characters indent with \"%s\"\n ", limit, indent);
-	cryptodebug("return \"%s\" if buffer is null or empty", blank);
-
-	/* If string is empty, write as much of the blank string and leave. */
-	if (str_sz == 0) {
-		(void) snprintf(octets, octets_sz, "%s", blank);
-		return;
-	}
-
-	/* If only limit or indent is set, pick default for the other. */
-	if (limit > 0 && indent == NULL)
-		indent = "\n";
-	if (indent != NULL && limit == 0)
-		limit = 60;
-	indent_len = strlen(indent);
-
-	for (marker = octets, newline = 0, first = B_TRUE;
-	    (stop_on_nul && *str != '\0') ||
-	    (!stop_on_nul && str_sz > 0 && octets_sz > 0);
-	    str++, str_sz--, marker += nc, octets_sz -= nc) {
-		if (!first) {
-			if (limit > 0 && ((marker - octets) / limit) >
-			    newline) {
-				nc = snprintf(marker, indent_len, "%s", indent);
-				newline++;
-				continue;
-			}
-			nc = sprintf(marker,
-			    ((do_ascii && isprint(*str) && !isspace(*str)) ?
-			    "%s%c" : "%s%02x"), (do_ascii ? " " : ":"), *str);
-		} else {
-			nc = sprintf(marker,
-			    ((do_ascii && isprint(*str) && !isspace(*str)) ?
-			    "%c" : "%02x"), *str);
-			first = B_FALSE;
-		}
-	}
-	*marker = '\0';
-}
-
-/*
- * Copies a biginteger_t to a template attribute.
- * Should be a macro instead of a function.
- */
-void
-copy_bigint_to_attr(biginteger_t big, CK_ATTRIBUTE_PTR attr)
-{
-	attr->pValue = big.big_value;
-	attr->ulValueLen = big.big_value_len;
-}
-
-/*
- * Copies a string and its length to a template attribute.
- * Should be a macro instead of a function.
- */
-void
-copy_string_to_attr(CK_BYTE *buf, CK_ULONG buflen, CK_ATTRIBUTE_PTR attr)
-{
-	attr->pValue = buf;
-	attr->ulValueLen = buflen;
-}
-
-/*
- * Copies a template attribute to a biginteger_t.
- * Should be a macro instead of a function.
- */
-void
-copy_attr_to_bigint(CK_ATTRIBUTE_PTR attr, biginteger_t *big)
-{
-	big->big_value = attr->pValue;
-	big->big_value_len = attr->ulValueLen;
-}
-
-/*
- * Copies a template attribute to a string and its length.
- * Should be a macro instead of a function.
- */
-void
-copy_attr_to_string(CK_ATTRIBUTE_PTR attr, CK_BYTE **buf, CK_ULONG *buflen)
-{
-	*buf = attr->pValue;
-	*buflen = attr->ulValueLen;
-}
-
-/*
- * Copies a template attribute to a date and its length.
- * Should be a macro instead of a function.
- */
-void
-copy_attr_to_date(CK_ATTRIBUTE_PTR attr, CK_DATE **buf, CK_ULONG *buflen)
-{
-	*buf = (CK_DATE *)attr->pValue;
-	*buflen = attr->ulValueLen;
 }
 
 /*
@@ -1233,12 +345,15 @@ populate_opts(char *optstring)
 	for (i = 0; *optstring != '\0'; i++) {
 		if ((temp = (av_opts *)((i == 0) ? malloc(sizeof (av_opts)) :
 		    realloc(opts_av, (i+1) * sizeof (av_opts)))) == NULL) {
-			free(opts_av);
+			if (opts_av != NULL)
+				free(opts_av);
 			opts_av = NULL;
 			return (0);
-		} else
+		} else {
 			opts_av = (av_opts *)temp;
+		}
 
+		(void) memset(&opts_av[i], 0, sizeof (av_opts));
 		marker = optstring;		/* may need optstring later */
 
 		opts_av[i].shortnm = *marker++;	/* set short name */
@@ -1278,6 +393,7 @@ getopt_av(int argc, char * const *argv, const char *optstring)
 {
 	int	i;
 	int	len;
+	char   *cur_option;
 
 	if (optind_av >= argc)
 		return (EOF);
@@ -1292,14 +408,21 @@ getopt_av(int argc, char * const *argv, const char *optstring)
 	}
 
 	for (i = 0; i < _save_numopts; i++) {
-		if (strcmp(argv[optind_av], "--") == 0) {
+		cur_option = argv[optind_av];
+
+		if (strcmp(cur_option, "--") == 0) {
 			optind_av++;
 			break;
 		}
 
-		len = strcspn(argv[optind_av], "=");
+		if (cur_option[0] == '-' && strlen(cur_option) == 2) {
+			len = 1;
+			cur_option++; /* remove "-" */
+		} else {
+			len = strcspn(cur_option, "=");
+		}
 
-		if (len == opts_av[i].longnm_len && strncmp(argv[optind_av],
+		if (len == opts_av[i].longnm_len && strncmp(cur_option,
 		    opts_av[i].longnm, opts_av[i].longnm_len) == 0) {
 			/* matched */
 			if (!opts_av[i].has_arg) {
@@ -1308,8 +431,8 @@ getopt_av(int argc, char * const *argv, const char *optstring)
 			}
 
 			/* needs optarg */
-			if (argv[optind_av][len] == '=') {
-				optarg_av = &(argv[optind_av][len+1]);
+			if (cur_option[len] == '=') {
+				optarg_av = &(cur_option[len+1]);
 				optind_av++;
 				return (opts_av[i].shortnm);
 			}
@@ -1321,4 +444,562 @@ getopt_av(int argc, char * const *argv, const char *optstring)
 	}
 
 	return (EOF);
+}
+
+KMF_KEYSTORE_TYPE
+KS2Int(char *keystore_str)
+{
+	if (keystore_str == NULL)
+		return (0);
+	if (!strcasecmp(keystore_str, "pkcs11"))
+		return (KMF_KEYSTORE_PK11TOKEN);
+	else if (!strcasecmp(keystore_str, "nss"))
+		return (KMF_KEYSTORE_NSS);
+	else if (!strcasecmp(keystore_str, "file"))
+		return (KMF_KEYSTORE_OPENSSL);
+	else
+		return (0);
+}
+
+
+int
+Str2KeyType(char *algm, KMF_KEY_ALG *ktype, KMF_ALGORITHM_INDEX *sigAlg)
+{
+	if (algm == NULL) {
+		*sigAlg = KMF_ALGID_MD5WithRSA;
+		*ktype = KMF_RSA;
+	} else if (strcasecmp(algm, "DSA") == 0) {
+		*sigAlg = KMF_ALGID_SHA1WithDSA;
+		*ktype = KMF_DSA;
+	} else if (strcasecmp(algm, "RSA") == 0) {
+		*sigAlg = KMF_ALGID_MD5WithRSA;
+		*ktype = KMF_RSA;
+	} else {
+		return (-1);
+	}
+	return (0);
+}
+
+int
+Str2SymKeyType(char *algm, KMF_KEY_ALG *ktype)
+{
+	if (algm == NULL)
+		*ktype = KMF_AES;
+	else if (strcasecmp(algm, "aes") == 0)
+		*ktype = KMF_AES;
+	else if (strcasecmp(algm, "arcfour") == 0)
+		*ktype = KMF_RC4;
+	else if (strcasecmp(algm, "des") == 0)
+		*ktype = KMF_DES;
+	else if (strcasecmp(algm, "3des") == 0)
+		*ktype = KMF_DES3;
+	else
+		return (-1);
+
+	return (0);
+}
+
+int
+Str2Lifetime(char *ltimestr, uint32_t *ltime)
+{
+	int num;
+	char timetok[6];
+
+	if (ltimestr == NULL || !strlen(ltimestr)) {
+		/* default to 1 year lifetime */
+		*ltime = SECSPERDAY * DAYSPERNYEAR;
+		return (0);
+	}
+
+	(void) memset(timetok, 0, sizeof (timetok));
+	if (sscanf(ltimestr, "%d-%06s", &num, timetok) != 2)
+		return (-1);
+
+	if (!strcasecmp(timetok, "day") ||
+	    !strcasecmp(timetok, "days")) {
+		*ltime = num * SECSPERDAY;
+	} else if (!strcasecmp(timetok, "hour") ||
+		!strcasecmp(timetok, "hours")) {
+		*ltime = num * SECSPERHOUR;
+	} else if (!strcasecmp(timetok, "year") ||
+		!strcasecmp(timetok, "years")) {
+		*ltime = num * SECSPERDAY * DAYSPERNYEAR;
+	} else {
+		*ltime = 0;
+		return (-1);
+	}
+
+	return (0);
+}
+
+int
+OT2Int(char *objclass)
+{
+	char *c = NULL;
+	int retval = 0;
+
+	if (objclass == NULL)
+		return (-1);
+
+	c = strchr(objclass, ':');
+	if (c != NULL) {
+		if (!strcasecmp(c, ":private"))
+			retval = PK_PRIVATE_OBJ;
+		else if (!strcasecmp(c, ":public"))
+			retval = PK_PUBLIC_OBJ;
+		else if (!strcasecmp(c, ":both"))
+			retval = PK_PRIVATE_OBJ | PK_PUBLIC_OBJ;
+		else /* unrecognized option */
+			return (-1);
+
+		*c = '\0';
+	}
+
+	if (!strcasecmp(objclass, "public")) {
+		if (retval)
+			return (-1);
+		return (retval | PK_PUBLIC_OBJ | PK_CERT_OBJ |
+			PK_PUBKEY_OBJ);
+	} else if (!strcasecmp(objclass, "private")) {
+		if (retval)
+			return (-1);
+		return (retval | PK_PRIKEY_OBJ | PK_PRIVATE_OBJ);
+	} else if (!strcasecmp(objclass, "both")) {
+		if (retval)
+			return (-1);
+		return (PK_KEY_OBJ | PK_PUBLIC_OBJ | PK_PRIVATE_OBJ);
+	} else if (!strcasecmp(objclass, "cert")) {
+		return (retval | PK_CERT_OBJ);
+	} else if (!strcasecmp(objclass, "key")) {
+		if (retval == 0) /* return all keys */
+			return (retval | PK_KEY_OBJ);
+		else if (retval == (PK_PRIVATE_OBJ | PK_PUBLIC_OBJ))
+			/* return all keys */
+			return (retval | PK_KEY_OBJ);
+		else if (retval & PK_PUBLIC_OBJ)
+			/* Only return public keys */
+			return (retval | PK_PUBKEY_OBJ);
+		else if (retval & PK_PRIVATE_OBJ)
+			/* Only return private keys */
+			return (retval | PK_PRIKEY_OBJ);
+	} else if (!strcasecmp(objclass, "crl")) {
+		if (retval)
+			return (-1);
+		return (retval | PK_CRL_OBJ);
+	}
+
+	if (retval == 0) /* No matches found */
+		retval = -1;
+	return (retval);
+}
+
+KMF_ENCODE_FORMAT
+Str2Format(char *formstr)
+{
+	if (formstr == NULL || !strcasecmp(formstr, "der"))
+		return (KMF_FORMAT_ASN1);
+	if (!strcasecmp(formstr, "pem"))
+		return (KMF_FORMAT_PEM);
+	if (!strcasecmp(formstr, "pkcs12"))
+		return (KMF_FORMAT_PKCS12);
+
+	return (KMF_FORMAT_UNDEF);
+}
+
+
+KMF_RETURN
+select_token(void *kmfhandle, char *token,
+	int readonly)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_CONFIG_PARAMS  config;
+
+	if (token == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	(void) memset(&config, 0, sizeof (config));
+	config.kstype = KMF_KEYSTORE_PK11TOKEN;
+	config.pkcs11config.label = token;
+	config.pkcs11config.readonly = readonly;
+
+	rv = KMF_ConfigureKeystore(kmfhandle, &config);
+	if (rv == KMF_ERR_TOKEN_SELECTED)
+		rv = KMF_OK;
+	return (rv);
+}
+
+
+KMF_RETURN
+configure_nss(void *kmfhandle, char *dir, char *prefix)
+{
+	KMF_RETURN rv = KMF_OK;
+	KMF_CONFIG_PARAMS  config;
+
+	(void) memset(&config, 0, sizeof (config));
+	config.kstype = KMF_KEYSTORE_NSS;
+	config.nssconfig.configdir = dir;
+	config.nssconfig.certPrefix = prefix;
+	config.nssconfig.keyPrefix = prefix;
+	config.nssconfig.secModName = NULL;
+
+	rv = KMF_ConfigureKeystore(kmfhandle, &config);
+	if (rv == KMF_KEYSTORE_ALREADY_INITIALIZED)
+		rv = KMF_OK;
+
+	return (rv);
+}
+
+
+KMF_RETURN
+get_pk12_password(KMF_CREDENTIAL *cred)
+{
+	KMF_RETURN rv = KMF_OK;
+	char prompt[1024];
+
+	/*
+	 * Get the password to use for the PK12 encryption.
+	 */
+	(void) strlcpy(prompt,
+		gettext("Enter password to use for "
+			"accessing the PKCS12 file: "),
+		sizeof (prompt));
+
+	if (get_pin(prompt, NULL, (uchar_t **)&cred->cred,
+		(ulong_t *)&cred->credlen) != CKR_OK) {
+		cred->cred = NULL;
+		cred->credlen = 0;
+	}
+
+	return (rv);
+}
+
+
+#define	COUNTRY_PROMPT	"Country Name (2 letter code) [US]:"
+#define	STATE_PROMPT	"State or Province Name (full name) [Some-State]:"
+#define	LOCALITY_PROMPT	"Locality Name (eg, city) []:"
+#define	ORG_PROMPT	"Organization Name (eg, company) []:"
+#define	UNIT_PROMPT	"Organizational Unit Name (eg, section) []:"
+#define	NAME_PROMPT	"Common Name (eg, YOUR name) []:"
+#define	EMAIL_PROMPT	"Email Address []:"
+
+#define	COUNTRY_DEFAULT "US"
+#define	STATE_DEFAULT	"Some-State"
+#define	INVALID_INPUT 	"Invalid input; please re-enter ..."
+
+#define	SUBNAMESIZ	1024
+#define	RDN_MIN		1
+#define	RDN_MAX		64
+#define	COUNTRYNAME_MIN	2
+#define	COUNTRYNAME_MAX	2
+
+static char *
+get_input_string(char *prompt, char *default_str, int min_len, int max_len)
+{
+	char buf[1024];
+	char *response = NULL;
+	char *ret = NULL;
+	int len;
+
+	for (;;) {
+		(void) printf("\t%s", prompt);
+		(void) fflush(stdout);
+
+		response = fgets(buf, sizeof (buf), stdin);
+		if (response == NULL) {
+			if (default_str != NULL) {
+				ret = strdup(default_str);
+			}
+			break;
+		}
+
+		/* Skip any leading white space. */
+		while (isspace(*response))
+			response++;
+		if (*response == '\0') {
+			if (default_str != NULL) {
+				ret = strdup(default_str);
+			}
+			break;
+		}
+
+		len = strlen(response);
+		response[len-1] = '\0'; /* get rid of "LF" */
+		len--;
+		if (len >= min_len && len <= max_len) {
+			ret = strdup(response);
+			break;
+		}
+
+		(void) printf("%s\n", INVALID_INPUT);
+
+	}
+
+	return (ret);
+}
+
+int
+get_subname(char **result)
+{
+	char *country = NULL;
+	char *state = NULL;
+	char *locality = NULL;
+	char *org = NULL;
+	char *unit = NULL;
+	char *name = NULL;
+	char *email = NULL;
+	char *subname = NULL;
+
+	(void) printf("Entering following fields for subject (a DN) ...\n");
+	country = get_input_string(COUNTRY_PROMPT, COUNTRY_DEFAULT,
+	    COUNTRYNAME_MIN, COUNTRYNAME_MAX);
+	if (country == NULL)
+		return (-1);
+
+	state = get_input_string(STATE_PROMPT, STATE_DEFAULT,
+	    RDN_MIN, RDN_MAX);
+	if (state == NULL) {
+		goto out;
+	}
+
+	locality = get_input_string(LOCALITY_PROMPT, NULL, RDN_MIN, RDN_MAX);
+	org = get_input_string(ORG_PROMPT, NULL, RDN_MIN, RDN_MAX);
+	unit = get_input_string(UNIT_PROMPT, NULL, RDN_MIN, RDN_MAX);
+	name = get_input_string(NAME_PROMPT, NULL, RDN_MIN, RDN_MAX);
+	email = get_input_string(EMAIL_PROMPT, NULL, RDN_MIN, RDN_MAX);
+
+	/* Now create a subject name from the input strings */
+	if ((subname = malloc(SUBNAMESIZ)) == NULL)
+		goto out;
+
+	(void) memset(subname, 0, SUBNAMESIZ);
+	(void) strlcpy(subname, "C=", SUBNAMESIZ);
+	(void) strlcat(subname, country, SUBNAMESIZ);
+	(void) strlcat(subname, ", ", SUBNAMESIZ);
+	(void) strlcat(subname, "ST=", SUBNAMESIZ);
+	(void) strlcat(subname, state, SUBNAMESIZ);
+
+	if (locality) {
+		(void) strlcat(subname, ", ", SUBNAMESIZ);
+		(void) strlcat(subname, "L=", SUBNAMESIZ);
+		(void) strlcat(subname, locality, SUBNAMESIZ);
+	}
+
+	if (org) {
+		(void) strlcat(subname, ", ", SUBNAMESIZ);
+		(void) strlcat(subname, "O=", SUBNAMESIZ);
+		(void) strlcat(subname, org, SUBNAMESIZ);
+	}
+
+	if (unit) {
+		(void) strlcat(subname, ", ", SUBNAMESIZ);
+		(void) strlcat(subname, "OU=", SUBNAMESIZ);
+		(void) strlcat(subname, unit, SUBNAMESIZ);
+	}
+
+	if (name) {
+		(void) strlcat(subname, ", ", SUBNAMESIZ);
+		(void) strlcat(subname, "CN=", SUBNAMESIZ);
+		(void) strlcat(subname, name, SUBNAMESIZ);
+	}
+
+	if (email) {
+		(void) strlcat(subname, ", ", SUBNAMESIZ);
+		(void) strlcat(subname, "E=", SUBNAMESIZ);
+		(void) strlcat(subname, email, SUBNAMESIZ);
+	}
+
+out:
+	if (country)
+		free(country);
+	if (state)
+		free(state);
+	if (locality)
+		free(locality);
+	if (org)
+		free(org);
+	if (unit)
+		free(unit);
+	if (name)
+		free(name);
+	if (email)
+		free(email);
+
+	if (subname == NULL)
+		return (-1);
+	else {
+		*result = subname;
+		return (0);
+	}
+}
+
+/*
+ * Parse a string of KeyUsage values and convert
+ * them to the correct KU Bits.
+ * The field may be marked "critical" by prepending
+ * "critical:" to the list.
+ * EX:  critical:digitialSignature,keyEncipherment
+ */
+KMF_RETURN
+verify_keyusage(char *kustr, uint16_t *kubits, int *critical)
+{
+	KMF_RETURN ret = KMF_OK;
+	uint16_t kuval;
+	char *k;
+
+	*kubits = 0;
+	if (kustr == NULL || !strlen(kustr))
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/* Check to see if this is critical */
+	if (!strncasecmp(kustr, "critical:", strlen("critical:"))) {
+		*critical = TRUE;
+		kustr += strlen("critical:");
+	} else {
+		*critical = FALSE;
+	}
+
+	k = strtok(kustr, ",");
+	while (k != NULL) {
+		kuval = KMF_StringToKeyUsage(k);
+		if (kuval == 0) {
+			*kubits = 0;
+			return (KMF_ERR_BAD_PARAMETER);
+		}
+		*kubits |= kuval;
+		k = strtok(NULL, ",");
+	}
+
+	return (ret);
+}
+
+/*
+ * Verify the alternate subject label is real or invalid.
+ *
+ * The field may be marked "critical" by prepending
+ * "critical:" to the list.
+ * EX:  "critical:IP=1.2.3.4"
+ */
+KMF_RETURN
+verify_altname(char *arg, KMF_GENERALNAMECHOICES *type, int *critical)
+{
+	char *p;
+	KMF_RETURN rv = KMF_OK;
+
+	/* Check to see if this is critical */
+	if (!strncasecmp(arg, "critical:", strlen("critical:"))) {
+		*critical = TRUE;
+		arg += strlen("critical:");
+	} else {
+		*critical = FALSE;
+	}
+
+	/* Make sure there is an "=" sign */
+	p = strchr(arg, '=');
+	if (p == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	p[0] = '\0';
+
+	if (strcmp(arg, "IP") == 0)
+		*type = GENNAME_IPADDRESS;
+	else if (strcmp(arg, "DNS") == 0)
+		*type = GENNAME_DNSNAME;
+	else if (strcmp(arg, "EMAIL") == 0)
+		*type = GENNAME_RFC822NAME;
+	else if (strcmp(arg, "URI") == 0)
+		*type = GENNAME_URI;
+	else if (strcmp(arg, "DN") == 0)
+		*type = GENNAME_DIRECTORYNAME;
+	else if (strcmp(arg, "RID") == 0)
+		*type = GENNAME_REGISTEREDID;
+	else
+		rv = KMF_ERR_BAD_PARAMETER;
+
+	p[0] = '=';
+
+	return (rv);
+}
+
+int
+get_token_password(KMF_KEYSTORE_TYPE kstype,
+	char *token_spec, KMF_CREDENTIAL *cred)
+{
+	char	prompt[1024];
+	char	*p = NULL;
+
+	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
+		p = strchr(token_spec, ':');
+		if (p != NULL)
+		*p = 0;
+	}
+	/*
+	 * Login to the token first.
+	 */
+	(void) snprintf(prompt, sizeof (prompt),
+		gettext(DEFAULT_TOKEN_PROMPT),
+		token_spec);
+
+	if (get_pin(prompt, NULL, (uchar_t **)&cred->cred,
+		(ulong_t *)&cred->credlen) != CKR_OK) {
+		cred->cred = NULL;
+		cred->credlen = 0;
+	}
+
+	if (kstype == KMF_KEYSTORE_PK11TOKEN && p != NULL)
+		*p = ':';
+	return (KMF_OK);
+}
+
+KMF_RETURN
+verify_file(char *filename)
+{
+	KMF_RETURN ret = KMF_OK;
+	int fd;
+
+	/*
+	 * Attempt to open with  the EXCL flag so that if
+	 * it already exists, the open will fail.  It will
+	 * also fail if the file cannot be created due to
+	 * permissions on the parent directory, or if the
+	 * parent directory itself does not exist.
+	 */
+	fd = open(filename, O_CREAT | O_EXCL, 0600);
+	if (fd == -1)
+		return (KMF_ERR_OPEN_FILE);
+
+	/* If we were able to create it, delete it. */
+	(void) close(fd);
+	(void) unlink(filename);
+
+	return (ret);
+}
+
+void
+display_error(void *handle, KMF_RETURN errcode, char *prefix)
+{
+	KMF_RETURN rv1, rv2;
+	char *plugin_errmsg = NULL;
+	char *kmf_errmsg = NULL;
+
+	rv1 = KMF_GetPluginErrorString(handle, &plugin_errmsg);
+	rv2 = KMF_GetKMFErrorString(errcode, &kmf_errmsg);
+
+	cryptoerror(LOG_STDERR, "%s:", prefix);
+	if (rv1 == KMF_OK && plugin_errmsg) {
+		cryptoerror(LOG_STDERR,
+			gettext("keystore error: %s"),
+			plugin_errmsg);
+		KMF_FreeString(plugin_errmsg);
+	}
+
+	if (rv2 == KMF_OK && kmf_errmsg) {
+		cryptoerror(LOG_STDERR,
+			gettext("libkmf error: %s"),
+			kmf_errmsg);
+		KMF_FreeString(kmf_errmsg);
+	}
+
+	if (rv1 != KMF_OK && rv2 != KMF_OK)
+		cryptoerror(LOG_STDERR, gettext("<unknown error>\n"));
+
 }

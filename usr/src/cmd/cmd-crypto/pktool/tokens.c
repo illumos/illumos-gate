@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +50,6 @@ pk_tokens(int argc, char *argv[])
 	CK_RV		rv = CKR_OK;
 	int		i;
 
-	cryptodebug("inside pk_tokens");
 
 	/* Get rid of subcommand word "tokens". */
 	argc--;
@@ -81,13 +79,10 @@ pk_tokens(int argc, char *argv[])
 	(void) fprintf(stdout, fmt, gettext("Token Label"), gettext("Manuf ID"),
 	    gettext("Serial No"), gettext("PIN State"));
 	for (i = 0; i < slot_count; i++) {
-		cryptodebug("calling C_GetTokenInfo");
 		if ((rv = C_GetTokenInfo(slots[i], &token_info)) != CKR_OK) {
 			cryptoerror(LOG_STDERR,
 			    gettext("Unable to get slot %d token info (%s)."),
 			    i, pkcs11_strerror(rv));
-			cryptodebug("token info error, slot %d (%s)", i,
-				pkcs11_strerror(rv));
 			continue;
 		}
 
@@ -99,6 +94,6 @@ pk_tokens(int argc, char *argv[])
 
 	/* Clean up. */
 	free(slots);
-	quick_finish(NULL);
+	(void) C_Finalize(NULL);
 	return (0);
 }

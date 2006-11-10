@@ -211,7 +211,7 @@ parse_policylist(char *buf, uentry_t *pent)
 		if (value = strpbrk(buf, SEP_EQUAL)) {
 			value++; /* get rid of = */
 			(void) strlcpy((char *)pent->metaslot_ks_token, value,
-			    TOKEN_LABEL_SIZE);
+			    sizeof (pent->metaslot_ks_token));
 			return (SUCCESS);
 		} else {
 			cryptoerror(LOG_ERR, "failed to parse %s.\n",
@@ -223,7 +223,7 @@ parse_policylist(char *buf, uentry_t *pent)
 		if (value = strpbrk(buf, SEP_EQUAL)) {
 			value++; /* get rid of = */
 			(void) strlcpy((char *)pent->metaslot_ks_slot, value,
-			    SLOT_DESCRIPTION_SIZE);
+			    sizeof (pent->metaslot_ks_slot));
 			return (SUCCESS);
 		} else {
 			cryptoerror(LOG_ERR, "failed to parse %s.\n",
@@ -375,4 +375,175 @@ free_uentrylist(uentrylist_t *entrylist)
 		free(entrylist);
 		entrylist = pnext;
 	}
+}
+
+
+
+/*
+ * Duplicate an UEF mechanism list.  A NULL pointer is returned if out of
+ * memory or the input argument is NULL.
+ */
+static umechlist_t *
+dup_umechlist(umechlist_t *plist)
+{
+	umechlist_t *pres = NULL;
+	umechlist_t *pcur;
+	umechlist_t *ptmp;
+	int rc = SUCCESS;
+
+	while (plist != NULL) {
+		if (!(ptmp = create_umech(plist->name))) {
+			rc = FAILURE;
+			break;
+		}
+
+		if (pres == NULL) {
+			pres = pcur = ptmp;
+		} else {
+			pcur->next = ptmp;
+			pcur = pcur->next;
+		}
+		plist = plist->next;
+	}
+
+	if (rc != SUCCESS) {
+		free_umechlist(pres);
+		return (NULL);
+	}
+
+	return (pres);
+}
+
+
+/*
+ * Duplicate an uentry.  A NULL pointer is returned if out of memory
+ * or the input argument is NULL.
+ */
+static uentry_t *
+dup_uentry(uentry_t *puent1)
+{
+	uentry_t *puent2 = NULL;
+
+	if (puent1 == NULL) {
+		return (NULL);
+	}
+
+	if ((puent2 = malloc(sizeof (uentry_t))) == NULL) {
+		cryptoerror(LOG_STDERR, gettext("out of memory."));
+		return (NULL);
+	} else {
+		(void) strlcpy(puent2->name, puent1->name,
+		    sizeof (puent2->name));
+		puent2->flag_norandom = puent1->flag_norandom;
+		puent2->flag_enabledlist = puent1->flag_enabledlist;
+		puent2->policylist = dup_umechlist(puent1->policylist);
+		puent2->flag_metaslot_enabled = puent1->flag_metaslot_enabled;
+		puent2->flag_metaslot_auto_key_migrate
+		    = puent1->flag_metaslot_auto_key_migrate;
+		(void) memcpy(puent2->metaslot_ks_slot,
+		    puent1->metaslot_ks_slot, SLOT_DESCRIPTION_SIZE);
+		(void) memcpy(puent2->metaslot_ks_token,
+		    puent1->metaslot_ks_token, TOKEN_LABEL_SIZE);
+		puent2->count = puent1->count;
+		return (puent2);
+	}
+}
+
+/*
+ * Find the entry in the "pkcs11.conf" file with "libname" as the provider
+ * name. Return the entry if found, otherwise return NULL.
+ */
+uentry_t *
+getent_uef(char *libname)
+{
+	uentrylist_t	*pliblist = NULL;
+	uentrylist_t	*plib = NULL;
+	uentry_t	*puent = NULL;
+	boolean_t	found = B_FALSE;
+
+	if (libname == NULL) {
+		return (NULL);
+	}
+
+	if ((get_pkcs11conf_info(&pliblist)) == FAILURE) {
+		return (NULL);
+	}
+
+	plib = pliblist;
+	while (plib) {
+		if (strcmp(plib->puent->name, libname) == 0) {
+			found = B_TRUE;
+			break;
+		} else {
+			plib = plib->next;
+		}
+	}
+
+	if (found) {
+		puent = dup_uentry(plib->puent);
+	}
+
+	free_uentrylist(pliblist);
+	return (puent);
+}
+
+
+
+/*
+ * Retrieve the metaslot information from the pkcs11.conf file.
+ * This function returns SUCCESS if successfully done; otherwise it returns
+ * FAILURE.   If successful, the caller is responsible to free the space
+ * allocated for objectstore_slot_info and objectstore_token_info.
+ */
+int
+get_metaslot_info(boolean_t  *status_enabled, boolean_t *migrate_enabled,
+    char **objectstore_slot_info, char **objectstore_token_info)
+{
+
+	int rc = SUCCESS;
+	uentry_t *puent;
+	char *buf1 = NULL;
+	char *buf2 = NULL;
+
+	if ((puent = getent_uef(METASLOT_KEYWORD)) == NULL) {
+		/* metaslot entry doesn't exist */
+		return (FAILURE);
+	}
+
+	*status_enabled = puent->flag_metaslot_enabled;
+	*migrate_enabled = puent->flag_metaslot_auto_key_migrate;
+
+	buf1 = malloc(SLOT_DESCRIPTION_SIZE);
+	if (buf1 == NULL) {
+		cryptoerror(LOG_ERR, "get_metaslot_info() - out of memory.\n");
+		rc = FAILURE;
+		goto out;
+	}
+	(void) strcpy(buf1, (const char *) puent->metaslot_ks_slot);
+	*objectstore_slot_info = buf1;
+
+	buf2 = malloc(TOKEN_LABEL_SIZE);
+	if (objectstore_slot_info == NULL) {
+		cryptoerror(LOG_ERR, "get_metaslot_info() - out of memory.\n");
+		rc = FAILURE;
+		goto out;
+	}
+	(void) strcpy(buf2, (const char *) puent->metaslot_ks_token);
+	*objectstore_token_info = buf2;
+
+out:
+	if (puent != NULL) {
+		free_uentry(puent);
+	}
+
+	if (rc == FAILURE) {
+		if (buf1 != NULL) {
+			free(buf1);
+		}
+		if (buf2 != NULL) {
+			free(buf2);
+		}
+	}
+
+	return (rc);
 }

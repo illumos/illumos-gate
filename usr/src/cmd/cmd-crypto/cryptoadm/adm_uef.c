@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,8 +51,6 @@
 
 static int err; /* To store errno which may be overwritten by gettext() */
 static boolean_t is_in_policylist(midstr_t, umechlist_t *);
-static umechlist_t *dup_umechlist(umechlist_t *);
-static uentry_t *dup_uentry(uentry_t *);
 static char *uent2str(uentry_t *);
 static boolean_t check_random(CK_SLOT_ID, CK_FUNCTION_LIST_PTR);
 
@@ -1113,117 +1110,6 @@ uninstall_uef_lib(char *libname)
 	return (rc);
 }
 
-
-
-/*
- * Duplicate an UEF mechanism list.  A NULL pointer is returned if out of
- * memory or the input argument is NULL.
- */
-static umechlist_t *
-dup_umechlist(umechlist_t *plist)
-{
-	umechlist_t *pres = NULL;
-	umechlist_t *pcur;
-	umechlist_t *ptmp;
-	int rc = SUCCESS;
-
-	while (plist != NULL) {
-		if (!(ptmp = create_umech(plist->name))) {
-			rc = FAILURE;
-			break;
-		}
-
-		if (pres == NULL) {
-			pres = pcur = ptmp;
-		} else {
-			pcur->next = ptmp;
-			pcur = pcur->next;
-		}
-		plist = plist->next;
-	}
-
-	if (rc != SUCCESS) {
-		free_umechlist(pres);
-		return (NULL);
-	}
-
-	return (pres);
-}
-
-
-
-/*
- * Duplicate an uentry.  A NULL pointer is returned if out of memory
- * or the input argument is NULL.
- */
-static uentry_t *
-dup_uentry(uentry_t *puent1)
-{
-	uentry_t	*puent2 = NULL;
-
-	if (puent1 == NULL) {
-		return (NULL);
-	}
-
-	if ((puent2 = malloc(sizeof (uentry_t))) == NULL) {
-		cryptoerror(LOG_STDERR, gettext("out of memory."));
-		return (NULL);
-	} else {
-		(void) strlcpy(puent2->name, puent1->name,
-		    sizeof (puent2->name));
-		puent2->flag_norandom = puent1->flag_norandom;
-		puent2->flag_enabledlist = puent1->flag_enabledlist;
-		puent2->count = puent1->count;
-		puent2->policylist = dup_umechlist(puent1->policylist);
-		puent2->flag_metaslot_enabled = puent1->flag_metaslot_enabled;
-		puent2->flag_metaslot_auto_key_migrate
-		    = puent1->flag_metaslot_auto_key_migrate;
-		(void) memcpy(puent2->metaslot_ks_slot,
-		    puent1->metaslot_ks_slot, SLOT_DESCRIPTION_SIZE);
-		(void) memcpy(puent2->metaslot_ks_token,
-		    puent1->metaslot_ks_token, TOKEN_LABEL_SIZE);
-		return (puent2);
-	}
-}
-
-
-/*
- * Find the entry in the "pkcs11.conf" file with "libname" as the provider
- * name. Return the entry if found, otherwise return NULL.
- */
-uentry_t *
-getent_uef(char *libname)
-{
-	uentrylist_t	*pliblist = NULL;
-	uentrylist_t	*plib = NULL;
-	uentry_t	*puent = NULL;
-	boolean_t	found = B_FALSE;
-
-	if (libname == NULL) {
-		return (NULL);
-	}
-
-	if ((get_pkcs11conf_info(&pliblist)) == FAILURE) {
-		return (NULL);
-	}
-
-	plib = pliblist;
-	while (plib) {
-		if (strcmp(plib->puent->name, libname) == 0) {
-			found = B_TRUE;
-			break;
-		} else {
-			plib = plib->next;
-		}
-	}
-
-	if (found) {
-		puent = dup_uentry(plib->puent);
-	}
-
-	free_uentrylist(pliblist);
-	return (puent);
-}
 
 int
 display_policy(uentry_t *puent)

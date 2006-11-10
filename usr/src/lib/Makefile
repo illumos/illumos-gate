@@ -108,6 +108,7 @@ SUBDIRS += \
 	libinetcfg	\
 	libinetutil	\
 	libipmp		\
+	libkmf		\
 	libkstat	\
 	libkvm		\
         liblaadm        \
@@ -466,6 +467,7 @@ libfstyp:	libnvpair
 $(CLOSED_BUILD)$(CLOSED)/lib/libelfsign: \
 			$(CLOSED)/lib/libike libcryptoutil pkcs11
 libinetcfg:	libnsl libsocket libdevinfo
+libkmf:		libcryptoutil pkcs11 openssl
 libnsl:		libmd5 libscf
 libmapid:	libresolv
 libmacadm:	libdevinfo

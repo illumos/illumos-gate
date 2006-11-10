@@ -34,7 +34,8 @@ OBJECTS= \
 	config_parsing.o \
 	tohexstr.o \
 	mechkeytype.o\
-	pkcserror.o
+	pkcserror.o \
+	util.o
 
 include $(SRC)/lib/Makefile.lib
 

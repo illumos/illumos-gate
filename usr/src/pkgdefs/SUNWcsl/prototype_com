@@ -146,6 +146,10 @@ f none usr/lib/libipp.so.1 755 root bin
 f none usr/lib/libipsecutil.so.1 755 root bin
 s none usr/lib/libkstat.so=../../lib/libkstat.so.1
 s none usr/lib/libkstat.so.1=../../lib/libkstat.so.1
+f none usr/lib/libkmf.so.1 755 root bin
+s none usr/lib/libkmf.so=./libkmf.so.1
+f none usr/lib/libkmfberder.so.1 755 root bin
+s none usr/lib/libkmfberder.so=./libkmfberder.so.1
 s none usr/lib/libkvm.so=./libkvm.so.1
 f none usr/lib/libkvm.so.1 755 root bin
 s none usr/lib/libl.so=./libl.so.1
@@ -294,6 +298,9 @@ f none usr/lib/security/crypt_bsdbf.so.1 755 root bin
 s none usr/lib/security/crypt_bsdbf.so=./crypt_bsdbf.so.1
 f none usr/lib/security/crypt_sunmd5.so.1 755 root bin
 s none usr/lib/security/crypt_sunmd5.so=./crypt_sunmd5.so.1
+f none usr/lib/security/kmf_nss.so.1 755 root bin
+f none usr/lib/security/kmf_openssl.so.1 755 root bin
+f none usr/lib/security/kmf_pkcs11.so.1 755 root bin
 f none usr/lib/security/pam_ldap.so.1 755 root bin
 s none usr/lib/security/pam_ldap.so=./pam_ldap.so.1
 f none usr/lib/security/pam_allow.so.1 755 root bin
