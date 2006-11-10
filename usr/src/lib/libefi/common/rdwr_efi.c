@@ -316,6 +316,7 @@ efi_read(int fd, struct dk_gpt *vtoc)
 	efi_gpe_t		*efi_parts;
 	struct dk_cinfo		dki_info;
 	uint32_t		user_length;
+	boolean_t		legacy_label = B_FALSE;
 
 	/*
 	 * get the partition number for this file descriptor.
@@ -386,51 +387,76 @@ efi_read(int fd, struct dk_gpt *vtoc)
 			}
 		}
 	} else if ((rval = check_label(fd, &dk_ioc)) == VT_EINVAL) {
-		/* no valid label here; try the alternate */
-		dk_ioc.dki_lba = disk_info.dki_capacity - 1;
+		/*
+		 * No valid label here; try the alternate. Note that here
+		 * we just read GPT header and save it into dk_ioc.data,
+		 * Later, we will read GUID partition entry array if we
+		 * can get valid GPT header.
+		 */
+
+		/*
+		 * This is a workaround for legacy systems. In the past, the
+		 * last sector of SCSI disk was invisible on x86 platform. At
+		 * that time, backup label was saved on the next to the last
+		 * sector. It is possible for users to move a disk from previous
+		 * solaris system to present system. Here, we attempt to search
+		 * legacy backup EFI label first.
+		 */
+		dk_ioc.dki_lba = disk_info.dki_capacity - 2;
 		dk_ioc.dki_length = disk_info.dki_lbsize;
 		rval = check_label(fd, &dk_ioc);
-		if (rval != 0) {
+		if (rval == VT_EINVAL) {
 			/*
-			 * This is a workaround for legacy systems.
-			 *
-			 * In the past, the last sector of SCSI disk was
-			 * invisible on x86 platform. At that time, backup
-			 * label was saved on the next to the last sector.
-			 * It is possible for users to move a disk from
-			 * previous solaris system to present system.
+			 * we didn't find legacy backup EFI label, try to
+			 * search backup EFI label in the last block.
 			 */
-			dk_ioc.dki_lba = disk_info.dki_capacity - 2;
+			dk_ioc.dki_lba = disk_info.dki_capacity - 1;
 			dk_ioc.dki_length = disk_info.dki_lbsize;
 			rval = check_label(fd, &dk_ioc);
-			if (efi_debug && (rval == 0)) {
-				(void) fprintf(stderr,
-				    "efi_read: primary label corrupt; "
-				    "using legacy EFI backup label\n");
+			if (rval == 0) {
+				legacy_label = B_TRUE;
+				if (efi_debug)
+					(void) fprintf(stderr,
+					    "efi_read: primary label corrupt; "
+					    "using EFI backup label located on"
+					    " the last block\n");
 			}
+		} else {
+			if ((efi_debug) && (rval == 0))
+				(void) fprintf(stderr, "efi_read: primary label"
+				    " corrupt; using legacy EFI backup label "
+				    " located on the next to last block\n");
 		}
 
 		if (rval == 0) {
-			if (efi_debug) {
-				(void) fprintf(stderr,
-				    "efi_read: primary label corrupt; "
-				    "using backup\n");
-			}
 			dk_ioc.dki_lba = LE_64(efi->efi_gpt_PartitionEntryLBA);
 			vtoc->efi_flags |= EFI_GPT_PRIMARY_CORRUPT;
 			vtoc->efi_nparts =
 			    LE_32(efi->efi_gpt_NumberOfPartitionEntries);
+
 			/*
-			 * partitions are between last usable LBA and
-			 * backup partition header
+			 * Partition tables are between backup GPT header
+			 * table and ParitionEntryLBA (the starting LBA of
+			 * the GUID partition entries array). Now that we
+			 * already got valid GPT header and saved it in
+			 * dk_ioc.dki_data, we try to get GUID partition
+			 * entry array here.
 			 */
 			dk_ioc.dki_data++;
-			dk_ioc.dki_length = disk_info.dki_capacity -
-						    dk_ioc.dki_lba - 1;
+			if (legacy_label)
+				dk_ioc.dki_length = disk_info.dki_capacity - 1 -
+					dk_ioc.dki_lba;
+			else
+				dk_ioc.dki_length = disk_info.dki_capacity - 2 -
+					dk_ioc.dki_lba;
 			dk_ioc.dki_length *= disk_info.dki_lbsize;
-			if (dk_ioc.dki_length > (len_t)label_len) {
+			if (dk_ioc.dki_length >
+			    ((len_t)label_len - sizeof (*dk_ioc.dki_data))) {
 				rval = VT_EINVAL;
 			} else {
+				/*
+				 * read GUID partition entry array
+				 */
 				rval = efi_ioctl(fd, DKIOCGETEFI, &dk_ioc);
 			}
 		}
@@ -679,6 +705,8 @@ efi_write(int fd, struct dk_gpt *vtoc)
 	int			i, j;
 	struct dk_cinfo		dki_info;
 	int			md_flag = 0;
+	int			nblocks;
+	diskaddr_t		lba_backup_gpt_hdr;
 
 	if (ioctl(fd, DKIOCINFO, (caddr_t)&dki_info) == -1) {
 		if (efi_debug)
@@ -718,6 +746,18 @@ efi_write(int fd, struct dk_gpt *vtoc)
 				    vtoc->efi_lbasize;
 	}
 
+	/*
+	 * the number of blocks occupied by GUID partition entry array
+	 */
+	nblocks = dk_ioc.dki_length / vtoc->efi_lbasize - 1;
+
+	/*
+	 * Backup GPT header is located on the block after GUID
+	 * partition entry array. Here, we calculate the address
+	 * for backup GPT header.
+	 */
+	lba_backup_gpt_hdr = vtoc->efi_last_u_lba + 1 + nblocks;
+
 	if ((dk_ioc.dki_data = calloc(dk_ioc.dki_length, 1)) == NULL)
 		return (VT_ERROR);
 
@@ -729,7 +769,7 @@ efi_write(int fd, struct dk_gpt *vtoc)
 	efi->efi_gpt_HeaderSize = LE_32(sizeof (struct efi_gpt));
 	efi->efi_gpt_Reserved1 = 0;
 	efi->efi_gpt_MyLBA = LE_64(1ULL);
-	efi->efi_gpt_AlternateLBA = LE_64(vtoc->efi_last_lba);
+	efi->efi_gpt_AlternateLBA = LE_64(lba_backup_gpt_hdr);
 	efi->efi_gpt_FirstUsableLBA = LE_64(vtoc->efi_first_u_lba);
 	efi->efi_gpt_LastUsableLBA = LE_64(vtoc->efi_last_u_lba);
 	efi->efi_gpt_PartitionEntryLBA = LE_64(2ULL);
@@ -826,11 +866,11 @@ efi_write(int fd, struct dk_gpt *vtoc)
 	 * now swap MyLBA and AlternateLBA fields and write backup
 	 * partition table header
 	 */
-	dk_ioc.dki_lba = vtoc->efi_last_lba;
+	dk_ioc.dki_lba = lba_backup_gpt_hdr;
 	dk_ioc.dki_length = vtoc->efi_lbasize;
 	dk_ioc.dki_data--;
 	efi->efi_gpt_AlternateLBA = LE_64(1ULL);
-	efi->efi_gpt_MyLBA = LE_64(vtoc->efi_last_lba);
+	efi->efi_gpt_MyLBA = LE_64(lba_backup_gpt_hdr);
 	efi->efi_gpt_PartitionEntryLBA = LE_64(vtoc->efi_last_u_lba + 1);
 	efi->efi_gpt_HeaderCRC32 = 0;
 	efi->efi_gpt_HeaderCRC32 =
@@ -842,7 +882,7 @@ efi_write(int fd, struct dk_gpt *vtoc)
 			(void) fprintf(stderr,
 			    "write of backup header to block %llu failed, "
 			    "errno %d\n",
-			    vtoc->efi_last_lba,
+			    lba_backup_gpt_hdr,
 			    errno);
 		}
 	}

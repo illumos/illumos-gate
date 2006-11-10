@@ -117,10 +117,13 @@ char _depends_on[]	= "misc/scsi";
  *    driver to work with disks which are labeled/partitioned
  *    via previous sd, we add workaround as follows:
  *
- *    1) Locate backup EFI label: sd searchs the next to last
- *       block for backup EFI label if it can't find it on the
- *       last block;
- *    2) Calculate geometry: refer to sd_convert_geometry(), If
+ *    1) Locate backup EFI label: sd searches the next to last
+ *       block for legacy backup EFI label. If fails, it will
+ *       turn to the last block for backup EFI label;
+ *    2) Clear backup EFI label: sd first search the last block
+ *       for backup EFI label, and will search the next to last
+ *       block only if failed for the last block.
+ *    3) Calculate geometry: refer to sd_convert_geometry(), If
  *       capacity increasing by 1 causes disks' capacity to cross
  *       over the limits in table CHS_values, geometry info will
  *       change. This will raise an issue: In case that primary
@@ -130,12 +133,13 @@ char _depends_on[]	= "misc/scsi";
  *       geometry will prevent format from finding backup VTOC
  *       labels. To eliminate this side effect for compatibility,
  *       sd uses (capacity -1) to calculate geometry;
- *    3) 1TB disks: VTOC uses 32-bit signed int, thus sd doesn't
- *       support VTOC for a disk which has more than DK_MAX_BLOCKS
- *       LBAs. However, for exactly 1TB disk, it was treated as
- *       (1T - 512)B in the past, and could have VTOC. To overcome
- *       this, if an exactly 1TB disk has solaris fdisk partition,
- *       it will be allowed to work with sd.
+ *    4) 1TB disks: some important data structures use 32-bit
+ *       signed long/int (for example, daddr_t), so that sd doesn't
+ *       support a disk with capacity larger than 1TB on 32-bit
+ *       platform. However, for exactly 1TB disk, it was treated as
+ *       (1T - 512)B in the past, and could have valid solaris
+ *       partitions. To workaround this, if an exactly 1TB disk has
+ *       solaris fdisk partition, it will be allowed to work with sd.
  */
 #if (defined(__fibre))
 #define	SD_DEFAULT_INTERCONNECT_TYPE	SD_INTERCONNECT_FIBRE
@@ -4345,6 +4349,7 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 	int	lbasize;
 	uint_t	capacity;
 	int	count;
+	int forced_under_1t = 0;
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -4431,6 +4436,7 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 "is >1TB and has a VTOC label: use format(1M) to either decrease the");
 			scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
 "size to be < 1TB or relabel the disk with an EFI label");
+			forced_under_1t = 1;
 		} else {
 			/* unlabeled disk over 1TB */
 #if defined(__i386) || defined(__amd64)
@@ -4505,7 +4511,8 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 		 * must be created by previous sd driver, we have to
 		 * treat it as (1T-512)B.
 		 */
-		if (un->un_blockcount > DK_MAX_BLOCKS) {
+		if ((un->un_blockcount > DK_MAX_BLOCKS) &&
+		    (forced_under_1t != 1)) {
 			un->un_f_capacity_adjusted = 1;
 			un->un_blockcount = DK_MAX_BLOCKS;
 			un->un_map[P0_RAW_DISK].dkl_nblk  = DK_MAX_BLOCKS;
@@ -5552,23 +5559,23 @@ sd_use_efi(struct sd_lun *un, int path_flag)
 		 * data). Depending on the per-Vendor/drive Sense data,
 		 * the failed READ can cause many (unnecessary) retries.
 		 */
+
+		/*
+		 * Refer to comments related to off-by-1 at the
+		 * header of this file. Search the next to last
+		 * block for backup EFI label.
+		 */
 		if ((rval = sd_send_scsi_READ(un, buf, lbasize,
-		    cap - 1, (ISCD(un)) ? SD_PATH_DIRECT_PRIORITY :
+		    cap - 2, (ISCD(un)) ? SD_PATH_DIRECT_PRIORITY :
 			path_flag)) != 0) {
 				goto done_err;
 		}
 
 		sd_swap_efi_gpt((efi_gpt_t *)buf);
 		if ((rval = sd_validate_efi((efi_gpt_t *)buf)) != 0) {
-
-			/*
-			 * Refer to comments related to off-by-1 at the
-			 * header of this file. Search the next to last
-			 * block for backup EFI label.
-			 */
 			if ((rval = sd_send_scsi_READ(un, buf, lbasize,
-			    cap - 2, (ISCD(un)) ? SD_PATH_DIRECT_PRIORITY :
-				path_flag)) != 0) {
+			    cap - 1, (ISCD(un)) ? SD_PATH_DIRECT_PRIORITY :
+			    path_flag)) != 0) {
 					goto done_err;
 			}
 			sd_swap_efi_gpt((efi_gpt_t *)buf);
