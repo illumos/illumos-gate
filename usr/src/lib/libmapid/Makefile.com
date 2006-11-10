@@ -38,10 +38,6 @@ LIBS	=	$(DYNLIB) $(LINTLIB)
 # binaries in /usr/lib/nfs, so define it as such.
 #
 ROOTLIBDIR   =	$(ROOT)/usr/lib/nfs
-ROOTSLINK32  =	$(ROOTLIBDIR)/32
-
-$(ROOTSLINK32):	$(ROOTLIBDIR)
-	$(SYMLINK) . $@
 
 #
 # SRCS is defined to be $(OBJECTS:%.o=$(SRCDIR)/%.c)

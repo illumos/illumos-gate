@@ -58,7 +58,6 @@ f none usr/lib/fs/nfs/showmount 555 root bin
 f none usr/lib/fs/nfs/umount 555 root bin
 f none usr/lib/fs/nfs/nfsfind 555 root sys
 d none usr/lib/nfs 755 root sys
-s none usr/lib/nfs/32=.
 f none usr/lib/nfs/lockd 555 root bin
 f none usr/lib/nfs/statd 555 root bin
 f none usr/lib/nfs/nfsmapid 555 root bin
