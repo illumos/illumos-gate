@@ -677,7 +677,14 @@ retry:
 	if (zc->zc_nvlist_dst != 0 &&
 	    (error = dsl_prop_get_all(os, &nv)) == 0) {
 		dmu_objset_stats(os, nv);
-		if (dmu_objset_type(os) == DMU_OST_ZVOL)
+		/*
+		 * NB: zvol_get_stats() will read the objset contents,
+		 * which we aren't supposed to do with a
+		 * DS_MODE_STANDARD open, because it could be
+		 * inconsistent.  So this is a bit of a workaround...
+		 */
+		if (!zc->zc_objset_stats.dds_inconsistent &&
+		    dmu_objset_type(os) == DMU_OST_ZVOL)
 			VERIFY(zvol_get_stats(os, nv) == 0);
 		error = put_nvlist(zc, nv);
 		nvlist_free(nv);

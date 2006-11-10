@@ -395,6 +395,7 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
     dmu_object_type_t bonustype, int bonuslen, dmu_tx_t *tx)
 {
 	int i;
+	dmu_buf_impl_t *db = NULL;
 
 	ASSERT3U(blocksize, >=, SPA_MINBLOCKSIZE);
 	ASSERT3U(blocksize, <=, SPA_MAXBLOCKSIZE);
@@ -425,17 +426,25 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
 
 	/* change blocksize */
 	rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
+	if (blocksize != dn->dn_datablksz &&
+	    (!BP_IS_HOLE(&dn->dn_phys->dn_blkptr[0]) ||
+	    list_head(&dn->dn_dbufs) != NULL)) {
+		db = dbuf_hold(dn, 0, FTAG);
+		dbuf_new_size(db, blocksize, tx);
+	}
 	dnode_setdblksz(dn, blocksize);
 	dnode_setdirty(dn, tx);
 	dn->dn_next_blksz[tx->tx_txg&TXG_MASK] = blocksize;
 	rw_exit(&dn->dn_struct_rwlock);
+	if (db) {
+		dbuf_rele(db, FTAG);
+		db = NULL;
+	}
 
 	/* change type */
 	dn->dn_type = ot;
 
 	if (dn->dn_bonuslen != bonuslen) {
-		dmu_buf_impl_t *db = NULL;
-
 		/* change bonus size */
 		if (bonuslen == 0)
 			bonuslen = 1; /* XXX */
@@ -453,7 +462,6 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
 		db->db.db_size = bonuslen;
 		mutex_exit(&db->db_mtx);
 		dbuf_dirty(db, tx);
-		dbuf_rele(db, FTAG);
 	}
 
 	/* change bonus size and type */
@@ -464,6 +472,13 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
 	dn->dn_checksum = ZIO_CHECKSUM_INHERIT;
 	dn->dn_compress = ZIO_COMPRESS_INHERIT;
 	ASSERT3U(dn->dn_nblkptr, <=, DN_MAX_NBLKPTR);
+
+	/*
+	 * NB: we have to do the dbuf_rele after we've changed the
+	 * dn_bonuslen, for the sake of dbuf_verify().
+	 */
+	if (db)
+		dbuf_rele(db, FTAG);
 
 	dn->dn_allocated_txg = tx->tx_txg;
 	mutex_exit(&dn->dn_mtx);

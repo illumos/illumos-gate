@@ -622,7 +622,8 @@ restore_freeobjects(struct restorearg *ra, objset_t *os,
 		return (EINVAL);
 
 	for (obj = drrfo->drr_firstobj;
-	    obj < drrfo->drr_firstobj + drrfo->drr_numobjs; obj++) {
+	    obj < drrfo->drr_firstobj + drrfo->drr_numobjs;
+	    (void) dmu_object_next(os, &obj, FALSE, 0)) {
 		dmu_tx_t *tx;
 		int err;
 
