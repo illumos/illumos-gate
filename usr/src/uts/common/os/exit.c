@@ -74,6 +74,7 @@
 #include <sys/sdt.h>
 #include <sys/corectl.h>
 #include <sys/brand.h>
+#include <sys/libc_kernel.h>
 
 /*
  * convert code/data pair into old style wait status
@@ -344,6 +345,7 @@ proc_exit(int why, int what)
 	uint_t tidhash_sz;
 	refstr_t *cwd;
 	hrtime_t hrutime, hrstime;
+	int evaporate;
 
 	/*
 	 * Stop and discard the process's lwps except for the current one,
@@ -390,8 +392,14 @@ proc_exit(int why, int what)
 	/*
 	 * Allocate a sigqueue now, before we grab locks.
 	 * It will be given to sigcld(), below.
+	 * Special case:  If we will be making the process disappear
+	 * without a trace (for the benefit of posix_spawn() in libc)
+	 * don't bother to allocate a useless sigqueue.
 	 */
-	sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
+	evaporate = ((p->p_flag & SVFORK) &&
+	    why == CLD_EXITED && what == _EVAPORATE);
+	if (!evaporate)
+		sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
 
 	/*
 	 * revoke any doors created by the process.
@@ -775,7 +783,16 @@ proc_exit(int why, int what)
 	t->t_procp = &p0;
 
 	mutex_exit(&p->p_lock);
-	sigcld(p, sqp);
+	if (!evaporate)
+		sigcld(p, sqp);
+	else {
+		/*
+		 * Do what sigcld() would do if the disposition
+		 * of the SIGCHLD signal were set to be ignored.
+		 */
+		cv_broadcast(&p->p_srwchan_cv);
+		freeproc(p);
+	}
 	mutex_exit(&pidlock);
 
 	task_rele(tk);

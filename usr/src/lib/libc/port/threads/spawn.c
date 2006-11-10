@@ -28,6 +28,7 @@
 
 #include "lint.h"
 #include "thr_uberdata.h"
+#include <sys/libc_kernel.h>
 #include <sys/procset.h>
 #include <sys/rtpriocntl.h>
 #include <sys/tspriocntl.h>
@@ -175,7 +176,7 @@ setparam(pcparms_t *pcparmp, pri_t prio)
 	    PC_SETPARMS, (caddr_t)pcparmp));
 }
 
-static void
+static int
 perform_flag_actions(spawn_attr_t *sap)
 {
 	int sig;
@@ -197,17 +198,17 @@ perform_flag_actions(spawn_attr_t *sap)
 	if (sap->sa_psflags & POSIX_SPAWN_RESETIDS) {
 		if (_private_setgid(_private_getgid()) != 0 ||
 		    _private_setuid(_private_getuid()) != 0)
-			_private_exit(127);
+			return (errno);
 	}
 
 	if (sap->sa_psflags & POSIX_SPAWN_SETPGROUP) {
 		if (_private_setpgid(0, sap->sa_pgroup) != 0)
-			_private_exit(127);
+			return (errno);
 	}
 
 	if (sap->sa_psflags & POSIX_SPAWN_SETSCHEDULER) {
 		if (setscheduler(sap->sa_schedpolicy, sap->sa_priority) != 0)
-			_private_exit(127);
+			return (errno);
 	} else if (sap->sa_psflags & POSIX_SPAWN_SETSCHEDPARAM) {
 		/*
 		 * Get the process's current scheduling parameters,
@@ -218,13 +219,15 @@ perform_flag_actions(spawn_attr_t *sap)
 		pcparm.pc_cid = PC_CLNULL;
 		if (_private_priocntl(P_PID, P_MYID,
 		    PC_GETPARMS, (caddr_t)&pcparm) == -1)
-			_private_exit(127);
+			return (errno);
 		if (setparam(&pcparm, sap->sa_priority) != 0)
-			_private_exit(127);
+			return (errno);
 	}
+
+	return (0);
 }
 
-static void
+static int
 perform_file_actions(file_attr_t *fap)
 {
 	file_attr_t *froot = fap;
@@ -235,26 +238,45 @@ perform_file_actions(file_attr_t *fap)
 		case FA_OPEN:
 			fd = __open(fap->fa_path, fap->fa_oflag, fap->fa_mode);
 			if (fd < 0)
-				_private_exit(127);
+				return (errno);
 			if (fd != fap->fa_filedes) {
 				if (_private_fcntl(fd, F_DUP2FD,
 				    fap->fa_filedes) < 0)
-					_private_exit(127);
+					return (errno);
 				(void) _private_close(fd);
 			}
 			break;
 		case FA_CLOSE:
 			if (_private_close(fap->fa_filedes) == -1)
-				_private_exit(127);
+				return (errno);
 			break;
 		case FA_DUP2:
 			fd = _private_fcntl(fap->fa_filedes, F_DUP2FD,
 				fap->fa_newfiledes);
 			if (fd < 0)
-				_private_exit(127);
+				return (errno);
 			break;
 		}
 	} while ((fap = fap->fa_next) != froot);
+
+	return (0);
+}
+
+/*
+ * set_error() / get_error() are used to guarantee that the local variable
+ * 'error' is set correctly in memory on return from vfork() in the parent.
+ */
+
+static int
+set_error(int *errp, int err)
+{
+	return (*errp = err);
+}
+
+static int
+get_error(int *errp)
+{
+	return (*errp);
 }
 
 /*
@@ -280,6 +302,7 @@ _posix_spawn(
 {
 	spawn_attr_t *sap = attrp? attrp->__spawn_attrp : NULL;
 	file_attr_t *fap = file_actions? file_actions->__file_attrp : NULL;
+	int error;		/* this will be set by the child */
 	pid_t pid;
 
 	if (attrp != NULL && sap == NULL)
@@ -291,19 +314,26 @@ _posix_spawn(
 	case -1:		/* parent, failure */
 		return (errno);
 	default:		/* parent, success */
-		if (pidp != NULL)
+		/*
+		 * We don't get here until the child exec()s or exit()s
+		 */
+		if (pidp != NULL && get_error(&error) == 0)
 			*pidp = pid;
-		return (0);
+		return (get_error(&error));
 	}
 
 	if (sap != NULL)
-		perform_flag_actions(sap);
+		if (set_error(&error, perform_flag_actions(sap)) != 0)
+			_private_exit(_EVAPORATE);
 
 	if (fap != NULL)
-		perform_file_actions(fap);
+		if (set_error(&error, perform_file_actions(fap)) != 0)
+			_private_exit(_EVAPORATE);
 
+	(void) set_error(&error, 0);
 	(void) _private_execve(path, argv, envp);
-	_private_exit(127);
+	(void) set_error(&error, errno);
+	_private_exit(_EVAPORATE);
 	return (0);	/* not reached */
 }
 
@@ -353,6 +383,7 @@ _posix_spawnp(
 	file_attr_t *fap = file_actions? file_actions->__file_attrp : NULL;
 	const char *pathstr = (strchr(file, '/') == NULL)? getenv("PATH") : "";
 	int xpg4 = __xpg4;
+	int error;		/* this will be set by the child */
 	char path[PATH_MAX+4];
 	const char *cp;
 	pid_t pid;
@@ -365,6 +396,9 @@ _posix_spawnp(
 
 	if (attrp != NULL && sap == NULL)
 		return (EINVAL);
+
+	if (*file == '\0')
+		return (EACCES);
 
 	/*
 	 * We may need to invoke the shell with a slightly modified
@@ -382,19 +416,21 @@ _posix_spawnp(
 	case -1:		/* parent, failure */
 		return (errno);
 	default:		/* parent, success */
-		if (pidp != NULL)
+		/*
+		 * We don't get here until the child exec()s or exit()s
+		 */
+		if (pidp != NULL && get_error(&error) == 0)
 			*pidp = pid;
-		return (0);
+		return (get_error(&error));
 	}
 
-	if (*file == '\0')
-		_private_exit(127);
-
 	if (sap != NULL)
-		perform_flag_actions(sap);
+		if (set_error(&error, perform_flag_actions(sap)) != 0)
+			_private_exit(_EVAPORATE);
 
 	if (fap != NULL)
-		perform_file_actions(fap);
+		if (set_error(&error, perform_file_actions(fap)) != 0)
+			_private_exit(_EVAPORATE);
 
 	if (pathstr == NULL) {
 		/*
@@ -439,18 +475,21 @@ _posix_spawnp(
 			path[0] = '.';
 			path[1] = '/';
 		}
+		(void) set_error(&error, 0);
 		(void) _private_execve(path, argv, envp);
-		if (errno == ENOEXEC) {
+		if (set_error(&error, errno) == ENOEXEC) {
 			newargs[0] = (char *)shell;
 			newargs[1] = path;
 			for (i = 1; i <= argc; i++)
 				newargs[i + 1] = argv[i];
+			(void) set_error(&error, 0);
 			(void) _private_execve(xpg4? xpg4_path : sun_path,
-				newargs, envp);
-			_private_exit(127);
+			    newargs, envp);
+			(void) set_error(&error, errno);
+			_private_exit(_EVAPORATE);
 		}
 	} while (cp);
-	_private_exit(127);
+	_private_exit(_EVAPORATE);
 	return (0);	/* not reached */
 }
 

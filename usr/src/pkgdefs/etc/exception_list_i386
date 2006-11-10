@@ -18,14 +18,12 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-
 # Exception List for protocmp
 #
 ###########################################
@@ -37,80 +35,80 @@
 # these are just funky entries - they are fixed up
 # via a post install scripts.
 #
-usr/lib/libcrypt.so		i386
-usr/lib/libcrypt.so.1		i386
-usr/lib/amd64/libcrypt.so	i386
-usr/lib/amd64/libcrypt.so.1	i386
-usr/lib/font/devpost/charlib/~=	i386
+usr/lib/libcrypt.so			i386
+usr/lib/libcrypt.so.1			i386
+usr/lib/amd64/libcrypt.so		i386
+usr/lib/amd64/libcrypt.so.1		i386
+usr/lib/font/devpost/charlib/~=		i386
 #
 # The following entries are built in the /proto area
 # but not included in any packages - this is intentional.
 #
-usr/include/auth_list.h		i386
-usr/include/getxby_door.h	i386
+usr/include/auth_list.h			i386
+usr/include/getxby_door.h		i386
 usr/include/rpcsvc/daemon_utils.h	i386
-usr/include/priv_utils.h	i386
+usr/include/priv_utils.h		i386
 usr/include/bsm/audit_door_infc.h	i386
-usr/include/bsm/audit_private.h	i386
-usr/include/bsm/devalloc.h	i386
-usr/include/sys/ieeefp.h	i386
-usr/include/sys/winlockio.h	i386
-usr/include/security/pam_impl.h	i386
-usr/include/passwdutil.h	i386
+usr/include/bsm/audit_private.h		i386
+usr/include/bsm/devalloc.h		i386
+usr/include/sys/ieeefp.h		i386
+usr/include/sys/winlockio.h		i386
+usr/include/security/pam_impl.h		i386
+usr/include/passwdutil.h		i386
 #
 # Private/Internal libraries of the Cryptographic Framework.
 #
-usr/lib/llib-lelfsign.ln	i386
-usr/lib/llib-lelfsign		i386
-usr/lib/llib-lcryptoutil.ln	i386
-usr/lib/llib-lcryptoutil	i386
+usr/lib/llib-lelfsign.ln		i386
+usr/lib/llib-lelfsign			i386
+usr/lib/llib-lcryptoutil.ln		i386
+usr/lib/llib-lcryptoutil		i386
 usr/lib/amd64/llib-lcryptoutil.ln	i386
-usr/include/cryptoutil.h	i386
+usr/include/cryptoutil.h		i386
 #
 # The following files are used by the DHCP service, the
 # standalone's DHCP implementation, and the kernel (nfs_dlboot).
 # They contain interfaces which are currently private.
 #
-usr/include/dhcp_svc_private.h	i386
-usr/include/dhcp_svc_confkey.h	i386
-usr/include/dhcp_svc_confopt.h	i386
-usr/include/dhcp_symbol.h	i386
+usr/include/dhcp_svc_private.h		i386
+usr/include/dhcp_svc_confkey.h		i386
+usr/include/dhcp_svc_confopt.h		i386
+usr/include/dhcp_symbol.h		i386
 usr/include/sys/sunos_dhcp_class.h	i386
-usr/lib/llib-ldhcpsvc		i386
-usr/lib/llib-ldhcpsvc.ln	i386
-usr/lib/libdhcpsvc.so		i386
+usr/lib/llib-ldhcpsvc			i386
+usr/lib/llib-ldhcpsvc.ln		i386
+usr/lib/libdhcpsvc.so			i386
 #
 # Private MAC driver header files
 #
-usr/include/sys/aggr.h		i386
-usr/include/sys/aggr_impl.h	i386
-usr/include/sys/dld.h		i386
+usr/include/sys/aggr.h			i386
+usr/include/sys/aggr_impl.h		i386
+usr/include/sys/dld.h			i386
 usr/include/sys/dld_impl.h		i386
-usr/include/sys/dls.h		i386
+usr/include/sys/dls.h			i386
 usr/include/sys/dls_impl.h		i386
-usr/include/sys/mac.h		i386
+usr/include/sys/mac.h			i386
 usr/include/sys/mac_impl.h		i386
-usr/include/libdladm.h		i386
-usr/include/liblaadm.h		i386
+usr/include/libdladm.h			i386
+usr/include/liblaadm.h			i386
 usr/include/libmacadm.h			i386
 #
 # These files are installed in the proto area for
 # Solaris MAC drivers and should not be shipped
 #
-lib/libdladm.so		i386
-lib/liblaadm.so		i386
-lib/libmacadm.so		i386
-lib/llib-ldladm.ln		i386
-lib/llib-ldladm		i386
-lib/llib-llaadm.ln		i386
-lib/llib-llaadm		i386
-lib/llib-lmacadm.ln		i386
-lib/llib-lmacadm		i386
+lib/libdladm.so				i386
+lib/liblaadm.so				i386
+lib/libmacadm.so			i386
+lib/llib-ldladm.ln			i386
+lib/llib-ldladm				i386
+lib/llib-llaadm.ln			i386
+lib/llib-llaadm				i386
+lib/llib-lmacadm.ln			i386
+lib/llib-lmacadm			i386
 #
 # Installed in the proto area for building utilties dependent on
 # it, but is not shipped.
 #
-usr/include/libdiskmgt.h	i386
+usr/include/libdiskmgt.h		i386
 #
 # The following files are used by the dhcpmgr.
 #
@@ -125,268 +123,264 @@ usr/share/lib/locale/com/sun/dhcpmgr/cli/pntadm/ResourceBundle.properties	i386
 # library contains exclusively private interfaces, as does
 # libipsecutil.  My apologies for the glut of header files here.
 #
-usr/include/ikedoor.h		i386
-usr/include/ipsec_util.h	i386
-usr/include/err.h		i386
-usr/include/ike			i386
-usr/include/ike/certlib.h	i386
-usr/include/ike/pkcs11-glue.h	i386
-usr/include/ike/crypto_tests.h	i386
-usr/include/ike/sshdistdefs.h	i386
-usr/include/ike/sshglobals.h	i386
-usr/include/ike/sshasmidioms.h	i386
-usr/include/ike/sshcryptoaux.h	i386
-usr/include/ike/pkcs1_pad.h	i386
-usr/include/ike/ssh1encode.h	i386
-usr/include/ike/sshpem.h	i386
-usr/include/ike/sshprvkey.h	i386
-usr/include/ike/sshpemi.h	i386
-usr/include/ike/sshkeyblob1.h	i386
-usr/include/ike/sshkeyblob2.h	i386
-usr/include/ike/sshpubkey.h	i386
-usr/include/ike/sshcipherlist.h	i386
+usr/include/ikedoor.h			i386
+usr/include/ipsec_util.h		i386
+usr/include/err.h			i386
+usr/include/ike				i386
+usr/include/ike/certlib.h		i386
+usr/include/ike/pkcs11-glue.h		i386
+usr/include/ike/crypto_tests.h		i386
+usr/include/ike/sshdistdefs.h		i386
+usr/include/ike/sshglobals.h		i386
+usr/include/ike/sshasmidioms.h		i386
+usr/include/ike/sshcryptoaux.h		i386
+usr/include/ike/pkcs1_pad.h		i386
+usr/include/ike/ssh1encode.h		i386
+usr/include/ike/sshpem.h		i386
+usr/include/ike/sshprvkey.h		i386
+usr/include/ike/sshpemi.h		i386
+usr/include/ike/sshkeyblob1.h		i386
+usr/include/ike/sshkeyblob2.h		i386
+usr/include/ike/sshpubkey.h		i386
+usr/include/ike/sshcipherlist.h		i386
 usr/include/ike/ssh2pubkeyencode.h	i386
-usr/include/ike/sshpsystem.h	i386
-usr/include/ike/sshsnlist.h	i386
-usr/include/ike/dn.h		i386
-usr/include/ike/ocsp_internal.h	i386
-usr/include/ike/oid.h		i386
-usr/include/ike/sshasn1-oid.h	i386
-usr/include/ike/sshglist.h	i386
-usr/include/ike/sshocsp.h	i386
-usr/include/ike/sshocspclient.h	i386
-usr/include/ike/sshocsphttp.h	i386
+usr/include/ike/sshpsystem.h		i386
+usr/include/ike/sshsnlist.h		i386
+usr/include/ike/dn.h			i386
+usr/include/ike/ocsp_internal.h		i386
+usr/include/ike/oid.h			i386
+usr/include/ike/sshasn1-oid.h		i386
+usr/include/ike/sshglist.h		i386
+usr/include/ike/sshocsp.h		i386
+usr/include/ike/sshocspclient.h		i386
+usr/include/ike/sshocsphttp.h		i386
 usr/include/ike/sshocspresponder.h	i386
-usr/include/ike/sshpswbmac.h	i386
-usr/include/ike/sshgafpi.h	i386
-usr/include/ike/sshgafp.h	i386
-usr/include/ike/x509.h		i386
-usr/include/ike/x509internal.h	i386
-usr/include/ike/x509spkac.h	i386
-usr/include/ike/sshhttpi.h	i386
+usr/include/ike/sshpswbmac.h		i386
+usr/include/ike/sshgafpi.h		i386
+usr/include/ike/sshgafp.h		i386
+usr/include/ike/x509.h			i386
+usr/include/ike/x509internal.h		i386
+usr/include/ike/x509spkac.h		i386
+usr/include/ike/sshhttpi.h		i386
 usr/include/ike/sshhttp_status.h	i386
-usr/include/ike/sshhttp.h	i386
-usr/include/ike/isakmp.h	i386
+usr/include/ike/sshhttp.h		i386
+usr/include/ike/isakmp.h		i386
 usr/include/ike/isakmp_defaults.h	i386
-usr/include/ike/isakmp_doi.h	i386
-usr/include/ike/isakmp_notify.h	i386
+usr/include/ike/isakmp_doi.h		i386
+usr/include/ike/isakmp_notify.h		i386
 usr/include/ike/isakmp_internal.h	i386
-usr/include/ike/isakmp_policy.h	i386
-usr/include/ike/isakmp_state.h	i386
-usr/include/ike/isakmp_util.h	i386
+usr/include/ike/isakmp_policy.h		i386
+usr/include/ike/isakmp_state.h		i386
+usr/include/ike/isakmp_util.h		i386
 usr/include/ike/isakmp_linearize.h	i386
-usr/include/ike/sshldap.h	i386
-usr/include/ike/ldap-internal.h	i386
-usr/include/ike/sshmp.h		i386
-usr/include/ike/sshmp-2adic.h	i386
-usr/include/ike/sshmp-kernel.h	i386
+usr/include/ike/sshldap.h		i386
+usr/include/ike/ldap-internal.h		i386
+usr/include/ike/sshmp.h			i386
+usr/include/ike/sshmp-2adic.h		i386
+usr/include/ike/sshmp-kernel.h		i386
 usr/include/ike/sshmp-arithmetic.h	i386
-usr/include/ike/sshmp-compat.h	i386
-usr/include/ike/sshmp-convabs.h	i386
-usr/include/ike/sshmp-intmod.h	i386
-usr/include/ike/sshmp-integer.h	i386
+usr/include/ike/sshmp-compat.h		i386
+usr/include/ike/sshmp-convabs.h		i386
+usr/include/ike/sshmp-intmod.h		i386
+usr/include/ike/sshmp-integer.h		i386
 usr/include/ike/sshmp-montgomery.h	i386
-usr/include/ike/sshmp-powm.h	i386
-usr/include/ike/sshsieve.h	i386
-usr/include/ike/sshmp-types.h	i386
-usr/include/ike/sigchld.h	i386
-usr/include/ike/sshtty.h	i386
-usr/include/ike/sshttymodes.h	i386
-usr/include/ike/pty-int.h	i386
+usr/include/ike/sshmp-powm.h		i386
+usr/include/ike/sshsieve.h		i386
+usr/include/ike/sshmp-types.h		i386
+usr/include/ike/sigchld.h		i386
+usr/include/ike/sshtty.h		i386
+usr/include/ike/sshttymodes.h		i386
+usr/include/ike/pty-int.h		i386
 usr/include/ike/sshsessionincludes.h	i386
 usr/include/ike/sshunixpipestream.h	i386
 usr/include/ike/sshunixptystream.h	i386
-usr/include/ike/sshuser.h	i386
-usr/include/ike/sshadt_i.h	i386
+usr/include/ike/sshuser.h		i386
+usr/include/ike/sshadt_i.h		i386
 usr/include/ike/sshadt_array_i.h	i386
-usr/include/ike/sshadt.h	i386
-usr/include/ike/sshadt_array.h	i386
-usr/include/ike/sshadt_map_i.h	i386
-usr/include/ike/sshadt_assoc.h	i386
+usr/include/ike/sshadt.h		i386
+usr/include/ike/sshadt_array.h		i386
+usr/include/ike/sshadt_map_i.h		i386
+usr/include/ike/sshadt_assoc.h		i386
 usr/include/ike/sshadt_avltree.h	i386
 usr/include/ike/sshadt_avltree_i.h	i386
-usr/include/ike/sshadt_bag.h	i386
-usr/include/ike/sshadt_bag_i.h	i386
-usr/include/ike/sshadt_conv.h	i386
-usr/include/ike/sshadt_impls.h	i386
-usr/include/ike/sshadt_intmap.h	i386
-usr/include/ike/sshadt_list.h	i386
-usr/include/ike/sshadt_list_i.h	i386
-usr/include/ike/sshadt_std_i.h	i386
-usr/include/ike/sshadt_map.h	i386
+usr/include/ike/sshadt_bag.h		i386
+usr/include/ike/sshadt_bag_i.h		i386
+usr/include/ike/sshadt_conv.h		i386
+usr/include/ike/sshadt_impls.h		i386
+usr/include/ike/sshadt_intmap.h		i386
+usr/include/ike/sshadt_list.h		i386
+usr/include/ike/sshadt_list_i.h		i386
+usr/include/ike/sshadt_std_i.h		i386
+usr/include/ike/sshadt_map.h		i386
 usr/include/ike/sshadt_priority_queue.h	i386
 usr/include/ike/sshadt_shortcuts.h	i386
-usr/include/ike/sshadt_strmap.h	i386
+usr/include/ike/sshadt_strmap.h		i386
 usr/include/ike/sshadt_structs.h	i386
-usr/include/ike/sshadt_xmap.h	i386
+usr/include/ike/sshadt_xmap.h		i386
 usr/include/ike/sshadt_priority_heap.h	i386
 usr/include/ike/sshadt_priority_heap_i.h	i386
-usr/include/ike/sshadt_ranges.h	i386
-usr/include/ike/sshaudit.h	i386
-usr/include/ike/sshbuffer.h	i386
-usr/include/ike/sshgetopt.h	i386
-usr/include/ike/sshenum.h	i386
-usr/include/ike/sshbprintf.h	i386
-usr/include/ike/sshdebug.h	i386
-usr/include/ike/sshdsprintf.h	i386
-usr/include/ike/sshrand.h	i386
-usr/include/ike/sshgetput.h	i386
-usr/include/ike/sshfastalloc.h	i386
-usr/include/ike/sshmatch.h	i386
-usr/include/ike/sshrefcnt.h	i386
-usr/include/ike/sshmalloc.h	i386
-usr/include/ike/sshtime.h	i386
-usr/include/ike/sshobstack.h	i386
-usr/include/ike/sshsnprintf.h	i386
+usr/include/ike/sshadt_ranges.h		i386
+usr/include/ike/sshaudit.h		i386
+usr/include/ike/sshbuffer.h		i386
+usr/include/ike/sshgetopt.h		i386
+usr/include/ike/sshenum.h		i386
+usr/include/ike/sshbprintf.h		i386
+usr/include/ike/sshdebug.h		i386
+usr/include/ike/sshdsprintf.h		i386
+usr/include/ike/sshrand.h		i386
+usr/include/ike/sshgetput.h		i386
+usr/include/ike/sshfastalloc.h		i386
+usr/include/ike/sshmatch.h		i386
+usr/include/ike/sshrefcnt.h		i386
+usr/include/ike/sshmalloc.h		i386
+usr/include/ike/sshtime.h		i386
+usr/include/ike/sshobstack.h		i386
+usr/include/ike/sshsnprintf.h		i386
 usr/include/ike/sshtimemeasure.h	i386
-usr/include/ike/sshthread.h	i386
-usr/include/ike/ssheloop.h	i386
-usr/include/ike/sshmutex.h	i386
-usr/include/ike/sshoperation.h	i386
-usr/include/ike/sshtimeouts.h	i386
-usr/include/ike/sshtimeoutsi.h	i386
-usr/include/ike/sshfsm.h	i386
+usr/include/ike/sshthread.h		i386
+usr/include/ike/ssheloop.h		i386
+usr/include/ike/sshmutex.h		i386
+usr/include/ike/sshoperation.h		i386
+usr/include/ike/sshtimeouts.h		i386
+usr/include/ike/sshtimeoutsi.h		i386
+usr/include/ike/sshfsm.h		i386
 usr/include/ike/sshfsm_internal.h	i386
-usr/include/ike/sshbufaux.h	i386
-usr/include/ike/sshdecay.h	i386
-usr/include/ike/sshcrc32.h	i386
-usr/include/ike/sshgenutils.h	i386
-usr/include/ike/sshinet.h	i386
-usr/include/ike/sshtcp.h	i386
-usr/include/ike/sshinetencode.h	i386
+usr/include/ike/sshbufaux.h		i386
+usr/include/ike/sshdecay.h		i386
+usr/include/ike/sshcrc32.h		i386
+usr/include/ike/sshgenutils.h		i386
+usr/include/ike/sshinet.h		i386
+usr/include/ike/sshtcp.h		i386
+usr/include/ike/sshinetencode.h		i386
 usr/include/ike/sshlocalstream.h	i386
-usr/include/ike/sshsocks.h	i386
-usr/include/ike/sshudp.h	i386
-usr/include/ike/sshurl.h	i386
-usr/include/ike/sshnameserver.h	i386
-usr/include/ike/sshpacketint.h	i386
+usr/include/ike/sshsocks.h		i386
+usr/include/ike/sshudp.h		i386
+usr/include/ike/sshurl.h		i386
+usr/include/ike/sshnameserver.h		i386
+usr/include/ike/sshpacketint.h		i386
 usr/include/ike/sshpacketstream.h	i386
-usr/include/ike/sshstream.h	i386
-usr/include/ike/sshdatastream.h	i386
-usr/include/ike/sshfsmstreams.h	i386
+usr/include/ike/sshstream.h		i386
+usr/include/ike/sshdatastream.h		i386
+usr/include/ike/sshfsmstreams.h		i386
 usr/include/ike/sshstreamconnect.h	i386
-usr/include/ike/sshstreampair.h	i386
-usr/include/ike/sshdlex.h	i386
-usr/include/ike/sshbase16.h	i386
-usr/include/ike/sshencode.h	i386
-usr/include/ike/sshbase64.h	i386
-usr/include/ike/sshregex.h	i386
-usr/include/ike/sshbitvector.h	i386
+usr/include/ike/sshstreampair.h		i386
+usr/include/ike/sshdlex.h		i386
+usr/include/ike/sshbase16.h		i386
+usr/include/ike/sshencode.h		i386
+usr/include/ike/sshbase64.h		i386
+usr/include/ike/sshregex.h		i386
+usr/include/ike/sshbitvector.h		i386
 usr/include/ike/sshfingerprint.h	i386
-usr/include/ike/sshmiscstring.h	i386
-usr/include/ike/sshstr.h	i386
-usr/include/ike/sshutf8.h	i386
-usr/include/ike/sshfilebuffer.h	i386
-usr/include/ike/sshdirectory.h	i386
-usr/include/ike/sshfdstream.h	i386
-usr/include/ike/sshfileio.h	i386
-usr/include/ike/sshsignals.h	i386
-usr/include/ike/sshincludes.h	i386
+usr/include/ike/sshmiscstring.h		i386
+usr/include/ike/sshstr.h		i386
+usr/include/ike/sshutf8.h		i386
+usr/include/ike/sshfilebuffer.h		i386
+usr/include/ike/sshdirectory.h		i386
+usr/include/ike/sshfdstream.h		i386
+usr/include/ike/sshfileio.h		i386
+usr/include/ike/sshsignals.h		i386
+usr/include/ike/sshincludes.h		i386
 usr/include/ike/sshincludes_unix.h	i386
-usr/include/ike/sshasn1.h	i386
-usr/include/ike/sshasn1i.h	i386
-usr/include/ike/sshber.h	i386
-usr/include/ike/ssh_berfile.h	i386
+usr/include/ike/sshasn1.h		i386
+usr/include/ike/sshasn1i.h		i386
+usr/include/ike/sshber.h		i386
+usr/include/ike/ssh_berfile.h		i386
 usr/include/ike/enroll-internal.h	i386
-usr/include/ike/enroll-pkix.h	i386
-usr/include/ike/enroll-scep.h	i386
+usr/include/ike/enroll-pkix.h		i386
+usr/include/ike/enroll-scep.h		i386
 usr/include/ike/x509cmp-internal.h	i386
-usr/include/ike/x509cmp.h	i386
-usr/include/ike/x509scep.h	i386
-usr/include/ike/sshenroll.h	i386
-usr/include/ike/sshcrmf.h	i386
-usr/include/ike/scep-internal.h	i386
+usr/include/ike/x509cmp.h		i386
+usr/include/ike/x509scep.h		i386
+usr/include/ike/sshenroll.h		i386
+usr/include/ike/sshcrmf.h		i386
+usr/include/ike/scep-internal.h		i386
 usr/include/ike/ssh_PKIDiscoverySpec.h	i386
-usr/include/ike/cert-db.h	i386
-usr/include/ike/cmi-internal.h	i386
-usr/include/ike/cmi-map.h	i386
-usr/include/ike/cmi.h		i386
-usr/include/ike/cmi-debug.h	i386
-usr/include/ike/cmi-edb.h	i386
-usr/include/ike/sshpkcs5.h	i386
-usr/include/ike/pkcs6.h		i386
-usr/include/ike/sshpkcs1.h	i386
-usr/include/ike/sshpkcs12.h	i386
-usr/include/ike/sshpkcs7.h	i386
-usr/include/ike/sshpkcs8.h	i386
+usr/include/ike/cert-db.h		i386
+usr/include/ike/cmi-internal.h		i386
+usr/include/ike/cmi-map.h		i386
+usr/include/ike/cmi.h			i386
+usr/include/ike/cmi-debug.h		i386
+usr/include/ike/cmi-edb.h		i386
+usr/include/ike/sshpkcs5.h		i386
+usr/include/ike/pkcs6.h			i386
+usr/include/ike/sshpkcs1.h		i386
+usr/include/ike/sshpkcs12.h		i386
+usr/include/ike/sshpkcs7.h		i386
+usr/include/ike/sshpkcs8.h		i386
 usr/include/ike/pkcs7-internal.h	i386
 usr/include/ike/sshpkcs12-conv.h	i386
-usr/include/ike/des.h		i386
-usr/include/ike/blowfish.h	i386
-usr/include/ike/nociph.h	i386
-usr/include/ike/rc2.h		i386
-usr/include/ike/rijndael.h	i386
-usr/include/ike/sshrotate.h	i386
-usr/include/ike/sshcipher_i.h	i386
-usr/include/ike/namelist.h	i386
-usr/include/ike/md5.h		i386
-usr/include/ike/sha.h		i386
-usr/include/ike/sha256.h	i386
-usr/include/ike/sshhash_i.h	i386
-usr/include/ike/hmac.h		i386
-usr/include/ike/macs.h		i386
-usr/include/ike/sshmac_i.h	i386
-usr/include/ike/dlfix.h		i386
-usr/include/ike/dlglue.h	i386
-usr/include/ike/libmonitor.h	i386
-usr/include/ike/rsa.h		i386
-usr/include/ike/sshgenmp.h	i386
-usr/include/ike/dl-internal.h	i386
-usr/include/ike/pkcs1.h		i386
-usr/include/ike/sshpk_i.h	i386
+usr/include/ike/des.h			i386
+usr/include/ike/blowfish.h		i386
+usr/include/ike/nociph.h		i386
+usr/include/ike/rc2.h			i386
+usr/include/ike/rijndael.h		i386
+usr/include/ike/sshrotate.h		i386
+usr/include/ike/sshcipher_i.h		i386
+usr/include/ike/namelist.h		i386
+usr/include/ike/md5.h			i386
+usr/include/ike/sha.h			i386
+usr/include/ike/sha256.h		i386
+usr/include/ike/sshhash_i.h		i386
+usr/include/ike/hmac.h			i386
+usr/include/ike/macs.h			i386
+usr/include/ike/sshmac_i.h		i386
+usr/include/ike/dlfix.h			i386
+usr/include/ike/dlglue.h		i386
+usr/include/ike/libmonitor.h		i386
+usr/include/ike/rsa.h			i386
+usr/include/ike/sshgenmp.h		i386
+usr/include/ike/dl-internal.h		i386
+usr/include/ike/pkcs1.h			i386
+usr/include/ike/sshpk_i.h		i386
 usr/include/ike/sshrgf-internal.h	i386
-usr/include/ike/sshrgf.h	i386
-usr/include/ike/sshrandom_i.h	i386
-usr/include/ike/sshcrypt.h	i386
-usr/include/ike/sshcipher.h	i386
-usr/include/ike/sshcrypt_i.h	i386
-usr/include/ike/sshproxykey.h	i386
-usr/include/ike/sshmac.h	i386
-usr/include/ike/sshpk.h		i386
-usr/include/ike/sshrandom.h	i386
-usr/include/ike/sshhash.h	i386
-usr/include/ike/sshconf.h	i386
-usr/lib/libike.so		i386
-usr/lib/llib-like.ln		i386
-usr/lib/llib-lipsecutil		i386
-usr/lib/libipsecutil.so		i386
-usr/lib/llib-lipsecutil.ln	i386
+usr/include/ike/sshrgf.h		i386
+usr/include/ike/sshrandom_i.h		i386
+usr/include/ike/sshcrypt.h		i386
+usr/include/ike/sshcipher.h		i386
+usr/include/ike/sshcrypt_i.h		i386
+usr/include/ike/sshproxykey.h		i386
+usr/include/ike/sshmac.h		i386
+usr/include/ike/sshpk.h			i386
+usr/include/ike/sshrandom.h		i386
+usr/include/ike/sshhash.h		i386
+usr/include/ike/sshconf.h		i386
+usr/lib/libike.so			i386
+usr/lib/llib-like.ln			i386
+usr/lib/llib-lipsecutil			i386
+usr/lib/libipsecutil.so			i386
+usr/lib/llib-lipsecutil.ln		i386
 #
-usr/include/inet/arp_impl.h	i386
-usr/include/inet/rawip_impl.h	i386
-usr/include/inet/udp_impl.h	i386
-usr/include/inet/tcp_impl.h	i386
-usr/include/inet/ip_impl.h	i386
-usr/include/inet/ip_ndp.h	i386
-usr/include/inet/ipdrop.h	i386
-usr/include/inet/tun.h		i386
-usr/include/protocols/ripngd.h	i386
-usr/include/libmail.h	i386
-usr/include/s_string.h	i386
+usr/include/inet/arp_impl.h		i386
+usr/include/inet/rawip_impl.h		i386
+usr/include/inet/udp_impl.h		i386
+usr/include/inet/tcp_impl.h		i386
+usr/include/inet/ip_impl.h		i386
+usr/include/inet/ip_ndp.h		i386
+usr/include/inet/ipdrop.h		i386
+usr/include/inet/tun.h			i386
+usr/include/protocols/ripngd.h		i386
+usr/include/libmail.h			i386
+usr/include/s_string.h			i386
 usr/include/sys/logindmux_impl.h	i386
-usr/include/sys/vgareg.h	i386
+usr/include/sys/vgareg.h		i386
+#
 # Some IPsec headers can't be shipped lest we hit export controls...
-usr/include/inet/ipsec_impl.h	i386
-usr/include/inet/ipsec_info.h	i386
-usr/include/inet/ipsecah.h	i386
-usr/include/inet/ipsecesp.h	i386
-usr/include/inet/keysock.h	i386
-usr/include/inet/sadb.h		i386
-usr/include/sys/sha1.h		i386
-usr/include/sys/sha1_consts.h	i386
-usr/include/sys/sha2.h          i386
-usr/include/sys/sha2_consts.h   i386
-usr/include/inet/tun.h		i386
 #
-###########################################
-#
-# ENTRIES FILTERED OUT OF THE protodirs
-#
-###########################################
+usr/include/inet/ipsec_impl.h		i386
+usr/include/inet/ipsec_info.h		i386
+usr/include/inet/ipsecah.h		i386
+usr/include/inet/ipsecesp.h		i386
+usr/include/inet/keysock.h		i386
+usr/include/inet/sadb.h			i386
+usr/include/sys/sha1.h			i386
+usr/include/sys/sha1_consts.h		i386
+usr/include/sys/sha2.h			i386
+usr/include/sys/sha2_consts.h		i386
+usr/include/inet/tun.h			i386
 #
 # Filtering out directories not shipped
 #
-usr/4lib	i386
+usr/4lib				i386
 #
 # The following dhcpmgr directories are not shipped.
 #
@@ -398,115 +392,117 @@ usr/share/lib/locale/com/sun/dhcpmgr/cli/dhtadm		i386
 usr/share/lib/locale/com/sun/dhcpmgr/cli/pntadm		i386
 usr/share/lib/locale/com/sun/dhcpmgr/cli/common		i386
 #
-# Part of the implementation of libthread, there is no reason for synch32.h 
-# to be part of a package that the customer should ever see.  The file
-# is installed to a proto area by the uts build because various libraries
-# are dependent upon its contents, and should not have their own copies.
+# These files contain definitions shared privately between the kernel
+# and libc.  There is no reason for them to be part of a package that
+# a customer should ever see.  They are installed in the proto area by
+# the uts build because libc and and other components, like truss, are
+# dependent upon their contents and should not have their own copies.
 #
-usr/include/sys/synch32.h	i386
+usr/include/sys/libc_kernel.h		i386
+usr/include/sys/synch32.h		i386
 #
 # These files are installed in the proto area by the build of libproc for
 # the benefit of the builds of cmd/truss, cmd/gcore and cmd/ptools, which
 # use libproc as their common process-control library.  These are not
 # interfaces for customer use, so the files are excluded from packaging.
 #
-usr/include/libproc.h		i386
-lib/llib-lproc			i386
-lib/llib-lproc.ln		i386
-lib/amd64/llib-lproc.ln		i386
+usr/include/libproc.h			i386
+lib/llib-lproc				i386
+lib/llib-lproc.ln			i386
+lib/amd64/llib-lproc.ln			i386
 #
 # Private interfaces for libdisasm
 #
-usr/include/libdisasm.h		i386
-usr/lib/llib-ldisasm		i386
-usr/lib/llib-ldisasm.ln		i386
-usr/lib/amd64/llib-ldisasm.ln	i386
+usr/include/libdisasm.h			i386
+usr/lib/llib-ldisasm			i386
+usr/lib/llib-ldisasm.ln			i386
+usr/lib/amd64/llib-ldisasm.ln		i386
 #
 # This file is used for private communication between mdb, drv/kmdb, and
 # misc/kmdb.  The interfaces described herein are not intended for customer
 # use, and are thus excluded from packaging.
 #
-usr/include/sys/kmdb.h		i386
+usr/include/sys/kmdb.h			i386
 #
 # These files are installed in the proto area by the build of libdhcpagent
 # and libdhcputil for the benefit of DHCP-related networking commands such
 # as dhcpagent, dhcpinfo, ifconfig, and netstat.  These are not interfaces
 # for customer use, so the files are excluded from packaging.
 #
-usr/include/dhcp_hostconf.h	i386
-usr/include/dhcp_impl.h		i386
-usr/include/dhcp_inittab.h	i386
+usr/include/dhcp_hostconf.h		i386
+usr/include/dhcp_impl.h			i386
+usr/include/dhcp_inittab.h		i386
 usr/include/dhcp_symbol_common.h	i386
-usr/include/dhcpagent_ipc.h	i386
-usr/include/dhcpagent_util.h	i386
-usr/include/dhcpmsg.h		i386
-usr/lib/llib-ldhcpagent		i386
-usr/lib/llib-ldhcpagent.ln	i386
-usr/lib/llib-ldhcputil		i386
-usr/lib/llib-ldhcputil.ln	i386
-usr/lib/libdhcpagent.so		i386
-usr/lib/libdhcputil.so		i386
-lib/llib-ldhcpagent		i386
-lib/llib-ldhcpagent.ln		i386
-lib/llib-ldhcputil		i386
-lib/llib-ldhcputil.ln		i386
-lib/libdhcpagent.so		i386
-lib/libdhcputil.so		i386
+usr/include/dhcpagent_ipc.h		i386
+usr/include/dhcpagent_util.h		i386
+usr/include/dhcpmsg.h			i386
+usr/lib/llib-ldhcpagent			i386
+usr/lib/llib-ldhcpagent.ln		i386
+usr/lib/llib-ldhcputil			i386
+usr/lib/llib-ldhcputil.ln		i386
+usr/lib/libdhcpagent.so			i386
+usr/lib/libdhcputil.so			i386
+lib/llib-ldhcpagent			i386
+lib/llib-ldhcpagent.ln			i386
+lib/llib-ldhcputil			i386
+lib/llib-ldhcputil.ln			i386
+lib/libdhcpagent.so			i386
+lib/libdhcputil.so			i386
 #
 # These files are installed in the proto area by the build of libinetcfg.
 # Only the shared object is shipped.
 #
-usr/include/inetcfg.h		i386
-usr/lib/llib-linetcfg		i386
-usr/lib/llib-linetcfg.ln	i386
-usr/lib/libinetcfg.so		i386
-lib/llib-linetcfg		i386
-lib/llib-linetcfg.ln		i386
-lib/libinetcfg.so		i386
+usr/include/inetcfg.h			i386
+usr/lib/llib-linetcfg			i386
+usr/lib/llib-linetcfg.ln		i386
+usr/lib/libinetcfg.so			i386
+lib/llib-linetcfg			i386
+lib/llib-linetcfg.ln			i386
+lib/libinetcfg.so			i386
 #
 # Don't ship header files private to libipmp and in.mpathd
 #
-usr/include/ipmp_query_impl.h	i386
+usr/include/ipmp_query_impl.h		i386
 #
 # These files are installed in the proto area by the build of libinetsvc,
 # an inetd-specific library shared by inetd, inetadm and inetconv. Only
 # the shared object is shipped.
 #
-usr/include/inetsvc.h		i386
-usr/lib/llib-linetsvc		i386
-usr/lib/llib-linetsvc.ln	i386
-usr/lib/libinetsvc.so		i386
+usr/include/inetsvc.h			i386
+usr/lib/llib-linetsvc			i386
+usr/lib/llib-linetsvc.ln		i386
+usr/lib/libinetsvc.so			i386
 #
 # These files are installed in the proto area by the build of libinetutil,
 # a general purpose library for the benefit of internet utilities. Only
 # the shared object is shipped.
 #
-usr/include/libinetutil.h	i386
-usr/include/netinet/inetutil.h	i386
-usr/lib/llib-linetutil		i386
-usr/lib/llib-linetutil.ln	i386
-usr/lib/libinetutil.so		i386
-lib/llib-linetutil		i386
-lib/llib-linetutil.ln		i386
-lib/libinetutil.so		i386
-lib/amd64/libinetutil.so	i386
-lib/amd64/llib-linetutil.ln	i386
-usr/lib/amd64/libinetutil.so	i386
-usr/lib/amd64/llib-linetutil.ln	i386
+usr/include/libinetutil.h		i386
+usr/include/netinet/inetutil.h		i386
+usr/lib/llib-linetutil			i386
+usr/lib/llib-linetutil.ln		i386
+usr/lib/libinetutil.so			i386
+lib/llib-linetutil			i386
+lib/llib-linetutil.ln			i386
+lib/libinetutil.so			i386
+lib/amd64/libinetutil.so		i386
+lib/amd64/llib-linetutil.ln		i386
+usr/lib/amd64/libinetutil.so		i386
+usr/lib/amd64/llib-linetutil.ln		i386
 #
 # Miscellaneous kernel interfaces or kernel<->user interfaces that are
 # consolidation private and we do not want to export at this time.
 #
-usr/include/sys/dumpadm.h	i386
-usr/include/sys/ontrap.h	i386
-usr/include/sys/sysmsg_impl.h	i386
-usr/include/sys/cryptmod.h	i386
-usr/include/sys/vlan.h		i386
+usr/include/sys/dumpadm.h		i386
+usr/include/sys/ontrap.h		i386
+usr/include/sys/sysmsg_impl.h		i386
+usr/include/sys/cryptmod.h		i386
+usr/include/sys/vlan.h			i386
 #
 # These files are installed in the proto area so lvm can use
-# them during the build process. 
+# them during the build process.
 #
-usr/include/sdssc.h                  	i386 
+usr/include/sdssc.h			i386
 usr/lib/llib-lmeta			i386
 usr/lib/llib-lmeta.ln			i386
 lib/llib-lmeta				i386
@@ -514,16 +510,16 @@ lib/llib-lmeta.ln			i386
 #
 # non-public pci header
 #
-usr/include/sys/pci_impl.h      i386
+usr/include/sys/pci_impl.h		i386
 #
 # Exception list for RCM project, included by librcm and rcm_daemon
 #
-usr/include/librcm_impl.h	i386
-usr/include/librcm_event.h	i386
+usr/include/librcm_impl.h		i386
+usr/include/librcm_event.h		i386
 #
 # MDB deliverables that are not yet public
 #
-usr/lib/mdb/proc/mdb_test.so	i386
+usr/lib/mdb/proc/mdb_test.so		i386
 #
 # SNCA project exception list
 #
@@ -534,13 +530,13 @@ usr/include/inet/nca/ncakmem.h		i386
 usr/include/inet/nca/ncalogd.h		i386
 usr/include/inet/nca/ncandd.h		i386
 usr/include/inet/nca/ncaio.h		i386
-#
 usr/include/inet/kssl			i386
 usr/include/inet/kssl/kssl.h		i386
 usr/include/inet/kssl/ksslimpl.h	i386
 usr/include/inet/kssl/ksslproto.h	i386
 #
 # other contents (packages removed in source product)
+#
 usr/bin/des				i386
 usr/include/des/desdata.h		i386
 usr/lib/libcrypt_d.so			i386
@@ -576,12 +572,14 @@ var/svc/manifest/network/security/krb5_prop.xml	i386
 var/svc/manifest/network/security/krb5kdc.xml	i386
 etc/sfw/openssl/certs			i386
 etc/sfw/openssl/private			i386
+#
 # these are "removed" from the source product build because the only
-# pacakges that currently deliver them are removed.
+# packages that currently deliver them are removed.
 # they really should't be in here.
+#
 etc/sfw					i386
 usr/sfw/bin				i386
-# 
+#
 # Entries for the libmech_krb5 symlink, which has been included
 # for build purposes only, not delivered to customers.
 #
@@ -596,16 +594,15 @@ usr/lib/amd64/libmech_krb5.so		i386
 lib/svc/method/sshd			i386
 var/svc/manifest/network/ssh.xml	i386
 #
-#
-usr/include/sys/1394				i386
-usr/include/sys/1394/s1394_impl.h		i386
-usr/include/sys/1394/ixl1394.h			i386
-usr/include/sys/1394/cmd1394.h			i386
-usr/include/sys/1394/ieee1394.h			i386
+usr/include/sys/1394			i386
+usr/include/sys/1394/s1394_impl.h	i386
+usr/include/sys/1394/ixl1394.h		i386
+usr/include/sys/1394/cmd1394.h		i386
+usr/include/sys/1394/ieee1394.h		i386
 usr/lib/devfsadm/linkmod/SUNW_ieee1394_link.so	i386
-usr/include/sys/1394/ieee1212.h			i386
-usr/include/sys/1394/t1394.h			i386
-usr/include/sys/1394/id1394.h			i386
+usr/include/sys/1394/ieee1212.h		i386
+usr/include/sys/1394/t1394.h		i386
+usr/include/sys/1394/id1394.h		i386
 #
 # PPPoE files not delivered to customers.
 usr/include/net/pppoe.h			i386
@@ -619,17 +616,16 @@ kernel/drv/amd64/ses			i386
 #
 # User<->kernel interface used by cfgadm/USB only
 #
-usr/include/sys/usb/hubd/hubd_impl.h			i386
+usr/include/sys/usb/hubd/hubd_impl.h	i386
 #
 #
 # User<->kernel interface used by cfgadm/SATA only
 #
 usr/include/sys/sata/sata_cfgadm.h	i386
 #
-#
 # Private ucred kernel header
 #
-usr/include/sys/ucred.h					i386
+usr/include/sys/ucred.h			i386
 #
 # Private and/or platform-specific smf(5) files
 #
@@ -645,16 +641,16 @@ usr/include/librestart_priv.h		i386
 usr/include/libcontract_priv.h		i386
 var/svc/manifest/platform/sun4u		i386
 var/svc/manifest/platform/sun4v		i386
-var/svc/profile/platform_SUNW,SPARC-Enterprise.xml	i386
-var/svc/profile/platform_SUNW,Sun-Fire.xml	i386
-var/svc/profile/platform_SUNW,Sun-Fire-880.xml	i386
-var/svc/profile/platform_SUNW,Sun-Fire-V890.xml	i386
-var/svc/profile/platform_SUNW,Sun-Fire-15000.xml	i386
+var/svc/profile/platform_SUNW,SPARC-Enterprise.xml		i386
+var/svc/profile/platform_SUNW,Sun-Fire.xml			i386
+var/svc/profile/platform_SUNW,Sun-Fire-880.xml			i386
+var/svc/profile/platform_SUNW,Sun-Fire-V890.xml			i386
+var/svc/profile/platform_SUNW,Sun-Fire-15000.xml		i386
 var/svc/profile/platform_SUNW,Ultra-Enterprise-10000.xml	i386
 var/svc/profile/platform_SUNW,UltraSPARC-IIi-Netract.xml	i386
 var/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-40.xml	i386
 var/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-60.xml	i386
-var/svc/profile/platform_sun4v.xml	i386
+var/svc/profile/platform_sun4v.xml				i386
 #
 # Private libuutil files
 #
@@ -682,21 +678,20 @@ usr/include/wanboot/wbio.h		i386
 #
 # Private KEF header files
 #
-usr/include/sys/crypto					i386
-usr/include/sys/crypto/api.h				i386
-usr/include/sys/crypto/common.h				i386
-usr/include/sys/crypto/elfsign.h			i386
-usr/include/sys/crypto/impl.h				i386
-usr/include/sys/crypto/ioctl.h				i386
-usr/include/sys/crypto/ioctladmin.h			i386
-usr/include/sys/crypto/ops_impl.h			i386
-usr/include/sys/crypto/sched_impl.h			i386
-usr/include/sys/crypto/spi.h				i386
+usr/include/sys/crypto			i386
+usr/include/sys/crypto/api.h		i386
+usr/include/sys/crypto/common.h		i386
+usr/include/sys/crypto/elfsign.h	i386
+usr/include/sys/crypto/impl.h		i386
+usr/include/sys/crypto/ioctl.h		i386
+usr/include/sys/crypto/ioctladmin.h	i386
+usr/include/sys/crypto/ops_impl.h	i386
+usr/include/sys/crypto/sched_impl.h	i386
+usr/include/sys/crypto/spi.h		i386
 #
 # The following files are installed in the proto area
 # by the build of libavl (AVL Tree Interface Library).
-# libavl contains interfaces which are all private
-# interfaces.
+# libavl contains interfaces which are all private interfaces.
 #
 lib/llib-lavl				i386
 lib/llib-lavl.ln			i386
@@ -711,8 +706,7 @@ usr/lib/amd64/llib-lavl.ln		i386
 #
 # The following files are installed in the proto area
 # by the build of libcmdutils (Command Utilities Library).
-# libcmdutils contains interfaces which are all private
-# interfaces.
+# libcmdutils contains interfaces which are all private interfaces.
 #
 usr/include/libcmdutils.h		i386
 lib/llib-lcmdutils			i386
@@ -725,12 +719,10 @@ lib/amd64/llib-lcmdutils.ln		i386
 lib/amd64/libcmdutils.so		i386
 usr/lib/amd64/libcmdutils.so		i386
 usr/lib/amd64/llib-lcmdutils.ln		i386
-
 #
 # Private interfaces in libsec
 #
 usr/include/aclutils.h			i386
-
 #
 # User<->kernel interface used by cfgadm/IB only
 #
@@ -753,7 +745,6 @@ usr/include/sys/libdevid.h		i386
 #
 lib/libc_i18n.a				i386
 lib/amd64/libc_i18n.a			i386
-
 #
 # ZFS internal tools and lint libraries
 #
@@ -774,35 +765,33 @@ usr/include/libzfs_jni_main.h		i386
 usr/include/libzfs_jni_pool.h		i386
 usr/include/libzfs_jni_property.h	i386
 usr/include/libzfs_jni_util.h		i386
-
 #
 # These files are installed in the proto area for Solaris scsi_vhci driver
 # (for MPAPI support) and should not be shipped
 #
 usr/include/sys/scsi/adapters/mpapi_impl.h	i386
 usr/include/sys/scsi/adapters/mpapi_scsi_vhci.h	i386
-
 #
 # This library is installed in the proto area by the build of libdisasm, and is
 # only used when building the KMDB disasm module.
 #
 usr/lib/libstanddisasm.so		i386
 usr/lib/amd64/libstanddisasm.so		i386
-
 #
 # TSol: tsol doesn't ship lint source, and tsnet isn't for customers at all.
+#
 lib/libtsnet.so				i386
 lib/llib-ltsnet				i386
 usr/lib/llib-ltsnet			i386
 usr/lib/llib-ltsol			i386
 lib/llib-ltsol				i386
-
 #
 # nss interfaces shared between libnsl and other ON libraries.
+#
 usr/include/nss.h			i386
-
 #
 # bmc (IPMI) interfaces shared within ON.
+#
 usr/include/sys/bmc_intf.h		i386
 #
 # These files are used by the iSCSI Target which is in this consolidation

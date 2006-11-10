@@ -290,6 +290,7 @@ CHKHDRS=			\
 	ldterm.h		\
 	lgrp.h			\
 	lgrp_user.h		\
+	libc_kernel.h		\
 	link.h			\
 	list.h			\
 	list_impl.h		\
