@@ -4349,7 +4349,9 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 	int	lbasize;
 	uint_t	capacity;
 	int	count;
+#if defined(__i386) || defined(__amd64)
 	int forced_under_1t = 0;
+#endif
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -4436,7 +4438,9 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 "is >1TB and has a VTOC label: use format(1M) to either decrease the");
 			scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
 "size to be < 1TB or relabel the disk with an EFI label");
+#if defined(__i386) || defined(__amd64)
 			forced_under_1t = 1;
+#endif
 		} else {
 			/* unlabeled disk over 1TB */
 #if defined(__i386) || defined(__amd64)
