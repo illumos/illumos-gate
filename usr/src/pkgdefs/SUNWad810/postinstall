@@ -44,6 +44,7 @@ I810_ALIASES="\
 	\"pci8086,24c5\" \
 	\"pci8086,24d5\" \
 	\"pci8086,266e\" \
+	\"pci8086,27de\" \
 	\"pci10de,6a\" \
 	\"pci10de,da\" \
 	\"pci10de,ea\" \

@@ -1259,7 +1259,7 @@ audiohd_init_pci(audiohd_state_t *statep, ddi_device_acc_attr_t *acc_attr)
 	    cmdreg | PCI_COMM_MAE | PCI_COMM_ME);
 
 	/* set TCSEL to TC1 */
-	pci_config_put8(statep->hda_pci_handle, 0x44, 1);
+	pci_config_put8(statep->hda_pci_handle, 0x44, 0);
 
 	return (AUDIO_SUCCESS);
 
@@ -1699,7 +1699,7 @@ audiohd_create_codec(audiohd_state_t *statep)
 
 		default:
 			audio_sup_log(statep->hda_ahandle, CE_WARN,
-			    "!unsupported audio codec: vid=0x%08x, rev=0x%08x",
+			    "!unsupported HD codec: vid=0x%08x, rev=0x%08x",
 			    codec->hc_vid, codec->hc_revid);
 			break;
 		}
