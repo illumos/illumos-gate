@@ -2471,12 +2471,8 @@ apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 	if (irqptr->airq_share)
 		return (PSM_SUCCESS);
 
-	ioapic = apicioadr[irqptr->airq_ioapicindex];
-	intin = irqptr->airq_intin_no;
 	iflag = intr_clear();
 	lock_set(&apic_ioapic_lock);
-	ioapic[APIC_IO_REG] = APIC_RDT_CMD + 2 * intin;
-	ioapic[APIC_IO_DATA] = AV_MASK;
 
 	/* Disable the MSI/X vector */
 	if (APIC_IS_MSI_OR_MSIX_INDEX(irqptr->airq_mps_intr_index)) {
@@ -2493,6 +2489,11 @@ apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 			(void) apic_pci_msi_disable_mode(irqptr->airq_dip,
 			    type, irqptr->airq_ioapicindex);
 		}
+	} else {
+		ioapic = apicioadr[irqptr->airq_ioapicindex];
+		intin = irqptr->airq_intin_no;
+		ioapic[APIC_IO_REG] = APIC_RDT_CMD + 2 * intin;
+		ioapic[APIC_IO_DATA] = AV_MASK;
 	}
 
 	if (max_ipl == PSM_INVALID_IPL) {
