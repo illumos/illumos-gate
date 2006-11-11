@@ -1141,9 +1141,15 @@ typedef struct kmastat_vmem {
 	int kv_fail;
 } kmastat_vmem_t;
 
+typedef struct kmastat_args {
+	kmastat_vmem_t **ka_kvpp;
+	uint_t ka_shift;
+} kmastat_args_t;
+
 static int
-kmastat_cache(uintptr_t addr, const kmem_cache_t *cp, kmastat_vmem_t **kvp)
+kmastat_cache(uintptr_t addr, const kmem_cache_t *cp, kmastat_args_t *kap)
 {
+	kmastat_vmem_t **kvp = kap->ka_kvpp;
 	kmastat_vmem_t *kv;
 	datafmt_t *dfp = kmemfmt;
 	int magsize;
@@ -1184,7 +1190,7 @@ out:
 	mdb_printf((dfp++)->fmt, cp->cache_bufsize);
 	mdb_printf((dfp++)->fmt, total - avail);
 	mdb_printf((dfp++)->fmt, total);
-	mdb_printf((dfp++)->fmt, meminuse);
+	mdb_printf((dfp++)->fmt, meminuse >> kap->ka_shift);
 	mdb_printf((dfp++)->fmt, alloc);
 	mdb_printf((dfp++)->fmt, cp->cache_alloc_fail);
 	mdb_printf("\n");
@@ -1193,8 +1199,9 @@ out:
 }
 
 static int
-kmastat_vmem_totals(uintptr_t addr, const vmem_t *v, kmastat_vmem_t *kv)
+kmastat_vmem_totals(uintptr_t addr, const vmem_t *v, kmastat_args_t *kap)
 {
+	kmastat_vmem_t *kv = *kap->ka_kvpp;
 	size_t len;
 
 	while (kv != NULL && kv->kv_addr != addr)
@@ -1207,14 +1214,14 @@ kmastat_vmem_totals(uintptr_t addr, const vmem_t *v, kmastat_vmem_t *kv)
 
 	mdb_printf("Total [%s]%*s %6s %6s %6s %9u %9u %5u\n", v->vm_name,
 	    17 - len, "", "", "", "",
-	    kv->kv_meminuse, kv->kv_alloc, kv->kv_fail);
+	    kv->kv_meminuse >> kap->ka_shift, kv->kv_alloc, kv->kv_fail);
 
 	return (WALK_NEXT);
 }
 
 /*ARGSUSED*/
 static int
-kmastat_vmem(uintptr_t addr, const vmem_t *v, void *ignored)
+kmastat_vmem(uintptr_t addr, const vmem_t *v, const uint_t *shiftp)
 {
 	datafmt_t *dfp = vmemfmt;
 	const vmem_kstat_t *vkp = &v->vm_kstat;
@@ -1235,7 +1242,7 @@ kmastat_vmem(uintptr_t addr, const vmem_t *v, void *ignored)
 	mdb_printf((dfp++)->fmt, 25 - ident, v->vm_name);
 	mdb_printf((dfp++)->fmt, vkp->vk_mem_inuse.value.ui64);
 	mdb_printf((dfp++)->fmt, vkp->vk_mem_total.value.ui64);
-	mdb_printf((dfp++)->fmt, vkp->vk_mem_import.value.ui64);
+	mdb_printf((dfp++)->fmt, vkp->vk_mem_import.value.ui64 >> *shiftp);
 	mdb_printf((dfp++)->fmt, vkp->vk_alloc.value.ui64);
 	mdb_printf((dfp++)->fmt, vkp->vk_fail.value.ui64);
 
@@ -1250,8 +1257,13 @@ kmastat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	kmastat_vmem_t *kv = NULL;
 	datafmt_t *dfp;
+	kmastat_args_t ka;
 
-	if (argc != 0)
+	ka.ka_shift = 0;
+	if (mdb_getopts(argc, argv,
+	    'k', MDB_OPT_SETBITS, 10, &ka.ka_shift,
+	    'm', MDB_OPT_SETBITS, 20, &ka.ka_shift,
+	    'g', MDB_OPT_SETBITS, 30, &ka.ka_shift, NULL) != argc)
 		return (DCMD_USAGE);
 
 	for (dfp = kmemfmt; dfp->hdr1 != NULL; dfp++)
@@ -1266,7 +1278,8 @@ kmastat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%s ", dfp->dashes);
 	mdb_printf("\n");
 
-	if (mdb_walk("kmem_cache", (mdb_walk_cb_t)kmastat_cache, &kv) == -1) {
+	ka.ka_kvpp = &kv;
+	if (mdb_walk("kmem_cache", (mdb_walk_cb_t)kmastat_cache, &ka) == -1) {
 		mdb_warn("can't walk 'kmem_cache'");
 		return (DCMD_ERR);
 	}
@@ -1275,7 +1288,7 @@ kmastat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%s ", dfp->dashes);
 	mdb_printf("\n");
 
-	if (mdb_walk("vmem", (mdb_walk_cb_t)kmastat_vmem_totals, kv) == -1) {
+	if (mdb_walk("vmem", (mdb_walk_cb_t)kmastat_vmem_totals, &ka) == -1) {
 		mdb_warn("can't walk 'vmem'");
 		return (DCMD_ERR);
 	}
@@ -1298,7 +1311,7 @@ kmastat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%s ", dfp->dashes);
 	mdb_printf("\n");
 
-	if (mdb_walk("vmem", (mdb_walk_cb_t)kmastat_vmem, NULL) == -1) {
+	if (mdb_walk("vmem", (mdb_walk_cb_t)kmastat_vmem, &ka.ka_shift) == -1) {
 		mdb_warn("can't walk 'vmem'");
 		return (DCMD_ERR);
 	}
@@ -3326,7 +3339,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "freedby", ":", "given a thread, print its freed buffers", freedby },
 	{ "kmalog", "?[ fail | slab ]",
 	    "display kmem transaction log and stack traces", kmalog },
-	{ "kmastat", NULL, "kernel memory allocator stats", kmastat },
+	{ "kmastat", "[-kmg]", "kernel memory allocator stats",
+	    kmastat },
 	{ "kmausers", "?[-ef] [cache ...]", "current medium and large users "
 		"of the kmem allocator", kmausers, kmausers_help },
 	{ "kmem_cache", "?", "print kernel memory caches", kmem_cache },
