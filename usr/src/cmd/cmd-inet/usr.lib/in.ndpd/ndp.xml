@@ -31,7 +31,7 @@
 	file.
 -->
 
-<service_bundle type='manifest' name='SUNWroute:ndp'>
+<service_bundle type='manifest' name='SUNWroutr:ndp'>
 
 <service
 	name='network/routing/ndp'
@@ -82,7 +82,16 @@ privileges='basic,proc_owner,proc_fork,proc_exec,proc_info,proc_session,file_cho
 	<!-- Properties in this group are used by routeadm (1M) -->
 	<property_group name='routeadm' type='application'>
 		<stability value='Unstable' />
-		<propval name='protocol' type='astring' value='ipv6' />
+		<!--
+			Having the protocol property here ensures that ndp
+			appears in the SMF service listing, but does not
+			participate in dictating ipv6-routing state (as it
+			would if it were set to "ipv6"). If it
+			did, ipv6-routing would always be reported as enabled,
+			since if any IPv6 interfaces are present, ndp will
+			be enabled.
+		-->
+		<propval name='protocol' type='astring' value='ndp' />
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.value.routing' />
 	</property_group>

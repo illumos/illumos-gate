@@ -38,6 +38,11 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/sockio.h>
+#include <inet/ip.h>
+#include <inet/nd.h>
+#include <net/if.h>
 #include <libscf.h>
 #include <libscf_priv.h>
 #include <libuutil.h>
@@ -210,6 +215,7 @@
 	"svc:/network/routing/legacy-routing:ipv4"
 #define	RA_INSTANCE_LEGACY_ROUTING_IPV6 \
 	"svc:/network/routing/legacy-routing:ipv6"
+#define	RA_INSTANCE_NDP			"svc:/network/routing/ndp:default"
 
 #define	RA_PG_ROUTEADM			"routeadm"
 #define	RA_PROP_CURR_ROUTING_SVC	"current-routing-svc"
@@ -380,6 +386,7 @@ static int ra_update_routing_svcs(char *);
 static int ra_report(boolean_t, const char *);
 static int ra_smf_cb(ra_smf_cb_t, const char *, void *);
 static int ra_upgrade_from_legacy_conf(void);
+static int ra_numv6intfs(void);
 static int ra_parseconf(void);
 static int ra_parseopt(char *, int, raopt_t *);
 static int ra_parsevar(char *, ravar_t *);
@@ -993,21 +1000,29 @@ ra_upgrade_cmd(char opt, int argc, char **argv)
  * Set current state to "next boot" state, i.e. if general/enabled
  * value is overlaid by a general_ovr/enabled value, set the current state
  * to the value of the latter.  Doing this applies "next boot" changes to
- * the current setup.
+ * the current setup.  If any IPv6 interfaces are present, also start in.ndpd.
  */
 static int
 ra_update(void)
 {
-	int	i, ret = 0;
+	int	i;
 
 	if (ra_check_legacy_daemons() == -1)
 		return (-1);
 	for (i = 0; ra_opts[i].opt_name != NULL; i++) {
-		if ((ret = ra_smf_cb(ra_set_current_opt_cb, ra_opts[i].opt_fmri,
-		    &ra_opts[i])) == -1)
-			break;
+		if (ra_smf_cb(ra_set_current_opt_cb, ra_opts[i].opt_fmri,
+		    &ra_opts[i]) == -1) {
+			return (-1);
+		}
 	}
-	return (ret);
+	/*
+	 * If in.ndpd isn't already running, then we start it here, regardless
+	 * of global IPv6 routing status (provided there are IPv6 interfaces
+	 * present).
+	 */
+	if (ra_numv6intfs() > 0)
+		return (smf_enable_instance(RA_INSTANCE_NDP, SMF_TEMPORARY));
+	return (0);
 }
 
 /*
@@ -1361,6 +1376,12 @@ ra_get_set_opt_common_cb(raopt_t *raopt, scf_walkinfo_t *wip,
 			ra_free_prop_values(numvalues, protolist);
 			return (0);
 		}
+		/*
+		 * If no IPv6 interfaces are configured, do not apply
+		 * the "enable" state change to this IPv6 routing service.
+		 */
+		if (raopt->opt_enabled && ra_numv6intfs() < 1)
+			return (0);
 	}
 	ra_free_prop_values(numvalues, protolist);
 
@@ -2254,6 +2275,41 @@ out:
 		scf_handle_destroy(h);
 
 	return (ret);
+}
+
+/*
+ *
+ * Return the number of IPv6 addresses configured.  This answers the
+ * generic question, "is IPv6 configured?".  We only start in.ndpd if IPv6
+ * is configured, and we also only enable IPv6 routing daemons if IPv6 is
+ * enabled.
+ */
+static int
+ra_numv6intfs(void)
+{
+	static int	num = -1;
+	int		ipsock;
+	struct lifnum	lifn;
+
+	if (num != -1)
+		return (num);
+
+	if ((ipsock = socket(PF_INET6, SOCK_DGRAM, 0)) == -1) {
+		(void) fprintf(stderr,
+		    gettext("%1$s: unable to open %2$s: %3$s\n"),
+		    myname, IP_DEV_NAME, strerror(errno));
+		return (0);
+	}
+	lifn.lifn_family = AF_INET6;
+	lifn.lifn_flags = 0;
+
+	if (ioctl(ipsock, SIOCGLIFNUM, &lifn) == -1) {
+		(void) close(ipsock);
+		return (0);
+	}
+	(void) close(ipsock);
+
+	return (num = lifn.lifn_count);
 }
 
 /*

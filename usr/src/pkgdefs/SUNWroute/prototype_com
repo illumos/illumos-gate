@@ -18,8 +18,7 @@
 i pkginfo
 i copyright
 i depend
-i i.manifest
-i r.manifest
+
 #
 # source locations relative to the prototype file
 #
@@ -34,19 +33,3 @@ d none usr/sbin 755 root bin
 f none usr/sbin/in.rdisc 555 root bin
 f none usr/sbin/in.routed 555 root bin
 f none usr/sbin/rtquery 555 root bin
-d none lib 755 root bin
-d none lib/svc 0755 root bin
-d none lib/svc/method 0755 root bin
-f none lib/svc/method/svc-route 0555 root bin
-f none lib/svc/method/svc-ripng 0555 root bin
-f none lib/svc/method/svc-rdisc 0555 root bin
-f none lib/svc/method/svc-ndp 0555 root bin
-d none var 755 root sys
-d none var/svc 755 root sys
-d none var/svc/manifest 755 root sys
-d none var/svc/manifest/network 755 root sys
-d none var/svc/manifest/network/routing 755 root sys
-f manifest var/svc/manifest/network/routing/route.xml 0444 root sys
-f manifest var/svc/manifest/network/routing/ripng.xml 0444 root sys
-f manifest var/svc/manifest/network/routing/rdisc.xml 0444 root sys
-f manifest var/svc/manifest/network/routing/ndp.xml 0444 root sys

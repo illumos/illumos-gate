@@ -31,7 +31,7 @@
 	file.
 -->
 
-<service_bundle type='manifest' name='SUNWroute:route'>
+<service_bundle type='manifest' name='SUNWroutr:route'>
 
 <service
 	name='network/routing/route'

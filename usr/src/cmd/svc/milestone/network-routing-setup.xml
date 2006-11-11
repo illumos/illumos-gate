@@ -70,6 +70,18 @@
 		<service_fmri value='svc:/milestone/devices' />
 	</dependency>
 
+	<!--
+		This dependency is required to ensure that all routing-related
+		manifests have been imported prior to running routeadm.
+	-->
+	<dependency
+		name='manifest_import'
+		grouping='optional_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/manifest-import:default' />
+	</dependency>
+
 	<exec_method
 		type='method'
 		name='start'

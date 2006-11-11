@@ -308,6 +308,7 @@ COMMON_SUBDIRS= \
 	SUNWrmwbr \
 	SUNWrmwbu \
 	SUNWroute \
+	SUNWroutr \
 	SUNWrpcib \
 	SUNWrsg \
 	SUNWrsgk \

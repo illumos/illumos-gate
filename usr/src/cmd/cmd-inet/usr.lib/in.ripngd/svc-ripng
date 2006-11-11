@@ -68,14 +68,6 @@ args="$args `get_daemon_option_from_boolean_property $SMF_FMRI \
 	verbose -v true`"
 args="$args `get_daemon_nonoption_property $SMF_FMRI log_file`"
 
-#
-# If in.ndpd isn't already running, then we start it here because
-# in.ripngd depends on having routes based on the prefixes configured by
-# in.ndpd.
-#
-/usr/sbin/svcadm enable -st ndp
-[ "$?" = "$SMF_EXIT_OK" ] || exit $SMF_EXIT_ERR_FATAL
-
 /usr/lib/inet/in.ripngd $args
 
 [ "$?" = 0 ] || exit $SMF_EXIT_ERR_FATAL

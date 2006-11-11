@@ -33,7 +33,7 @@ NETYPPROG = ypbind ypxfr yppush udpublickey mkalias \
 		ypstart ypstop
 NIS2LDAPPROG = ypxfrd ypserv ypxfr
 SVCMETHOD = yp
-PROG=	$(BINPROG) $(SBINPROG) $(NETYPPROG) $(NIS2LDAPPROG) $(METHOD)
+PROG=	$(BINPROG) $(SBINPROG) $(NETYPPROG) $(NIS2LDAPPROG) $(SVCMETHOD)
 
 MANIFEST = server.xml client.xml xfr.xml
 

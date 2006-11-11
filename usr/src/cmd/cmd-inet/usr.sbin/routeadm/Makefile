@@ -44,16 +44,18 @@ ROOTSVCMANIFESTDIR=	$(ROOTSVCNETWORK) $(ROOTSVCNETWORKROUTING)
 ROOTSVCMANIFEST=	$(ROOTSVCNETWORKROUTING)/legacy-routing.xml \
 			$(ROOTSVCNETWORK)/forwarding.xml
 
+include ../../Makefile.cmd-inet
+
 $(ROOTSVCMANIFEST)	:=	OWNER= root
 $(ROOTSVCMANIFEST)	:=	GROUP= sys
 $(ROOTSVCMANIFEST)	:=	FILEMODE= 444
 
 ROOTUSRSBINLINKS=	$(PROG:%=$(ROOTUSRSBIN)/%)
 
-CPPFLAGS +=	-I../../../../common/svc
+CPPFLAGS +=	-I../../../../common/svc -I$(CMDINETCOMMONDIR)
 $(NOT_RELEASE_BUILD)CPPFLAGS +=	-DDEBUG
 
-LDLIBS +=		-lscf -luutil
+LDLIBS +=		-lscf -luutil -lsocket
 
 ROOTSBINPROG=		$(ROOTFS_PROG:%=$(ROOTSBIN)/%)
 

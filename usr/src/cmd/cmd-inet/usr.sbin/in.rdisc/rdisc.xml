@@ -31,7 +31,7 @@
 	file.
 -->
 
-<service_bundle type='manifest' name='SUNWroute:rdisc'>
+<service_bundle type='manifest' name='SUNWroutr:rdisc'>
 
 <service
 	name='network/routing/rdisc'

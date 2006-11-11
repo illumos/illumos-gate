@@ -7,9 +7,7 @@
 
 include ../Makefile.com
 
-DATAFILES=	i.manifest \
-		r.manifest \
-		depend
+DATAFILES=	depend
 
 .KEEP_STATE:
 

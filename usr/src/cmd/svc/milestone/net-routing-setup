@@ -38,22 +38,16 @@ smf_is_globalzone || exit $SMF_EXIT_OK
 
 #
 # If routing.conf file is in place, and has not already been read in
-# by previous invokation of routeadm, we run routeadm -u here to get
-# and apply legacy configuration.  We also run "routeadm -u" when
+# by previous invokation of routeadm, legacy configuration is upgraded
+# by this call to "routeadm -u".  This call is also needed when
 # a /var/svc/profile/upgrade file is found, as it may contain routeadm commands
-# which need to be applied. It would be nice if we could do this in
+# which need to be applied.  Finally, routeadm starts in.ndpd by
+# enabling the ndp service (in.ndpd), which is required for IPv6 address
+# autoconfiguration. It would be nice if we could do this in
 # network/loopback, but since the SMF backend is read-only at that
 # point in boot, we cannot.
 #
-
-upgrade_routing_conf=""
-routing_conf_read=`/usr/bin/svcprop -p routeadm/routing-conf-read $SMF_FMRI`
-if [ -f /etc/inet/routing.conf -a "$routing_conf_read" = "false" ]; then
-        upgrade_routing_conf="true"
-fi
-if [ "$upgrade_routing_conf" = "true" -o -f /var/svc/profile/upgrade ]; then
-        /sbin/routeadm -u
-fi
+/sbin/routeadm -u
 
 #
 # Are we routing dynamically? routeadm(1M) reports this in the
@@ -68,6 +62,7 @@ fi
 
 /usr/sbin/ifconfig -a6u >/etc/svc/volatile/ifconfig.$$
 numv6ifs=`/usr/bin/grep -c inet6 /etc/svc/volatile/ifconfig.$$`
+
 if  [ $numv6ifs -gt 1 ]; then
 	#
 	# Add a static route for multicast packets out of a link-local

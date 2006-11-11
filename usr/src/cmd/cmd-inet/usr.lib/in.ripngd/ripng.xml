@@ -31,7 +31,7 @@
 	file.
 -->
 
-<service_bundle type='manifest' name='SUNWroute:ripng'>
+<service_bundle type='manifest' name='SUNWroutr:ripng'>
 
 <service
 	name='network/routing/ripng'
