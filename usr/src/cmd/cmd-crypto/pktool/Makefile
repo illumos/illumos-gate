@@ -63,7 +63,7 @@ $(PROG) : $(OBJS)
 	$(POST_PROCESS)
 
 $(POFILE) : $(POFILES)
-	$(BUILDPO.pofiles)
+	$(RM) $@; $(CAT) $(POFILES) > $@
 
 install : all $(ROOTPROG)
 
