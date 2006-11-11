@@ -448,6 +448,7 @@ dbuf_read_done(zio_t *zio, arc_buf_t *buf, void *vdb)
 		/* we were freed in flight; disregard any error */
 		arc_release(buf, db);
 		bzero(buf->b_data, db->db.db_size);
+		arc_buf_freeze(buf);
 		db->db_d.db_freed_in_flight = FALSE;
 		dbuf_set_data(db, buf);
 		db->db_state = DB_CACHED;
@@ -647,8 +648,8 @@ dbuf_fix_old_data(dmu_buf_impl_t *db, uint64_t txg)
 	ASSERT(db->db.db_data != NULL);
 	ASSERT(db->db_blkid != DB_BONUS_BLKID);
 
-	quiescing = (arc_buf_t **)&db->db_d.db_data_old[(txg-1)&TXG_MASK];
-	syncing = (arc_buf_t **)&db->db_d.db_data_old[(txg-2)&TXG_MASK];
+	quiescing = &db->db_d.db_data_old[(txg-1)&TXG_MASK];
+	syncing = &db->db_d.db_data_old[(txg-2)&TXG_MASK];
 
 	/*
 	 * If this buffer is referenced from the current quiescing
@@ -701,7 +702,7 @@ dbuf_fix_old_data(dmu_buf_impl_t *db, uint64_t txg)
 static void
 dbuf_fix_old_bonus_data(dmu_buf_impl_t *db, uint64_t txg)
 {
-	void **quiescing, **syncing;
+	arc_buf_t **quiescing, **syncing;
 
 	ASSERT(MUTEX_HELD(&db->db_mtx));
 	ASSERT(db->db.db_data != NULL);
@@ -742,7 +743,14 @@ dbuf_unoverride(dmu_buf_impl_t *db, uint64_t txg)
 		kmem_free(db->db_d.db_overridden_by[txg&TXG_MASK],
 		    sizeof (blkptr_t));
 		db->db_d.db_overridden_by[txg&TXG_MASK] = NULL;
-		/* release the already-written buffer */
+		/*
+		 * Release the already-written buffer, so we leave it in
+		 * a consistent dirty state.  Note that all callers are
+		 * modifying the buffer, so they will immediately do
+		 * another (redundant) arc_release().  Therefore, leave
+		 * the buf thawed to save the effort of freezing &
+		 * immediately re-thawing it.
+		 */
 		arc_release(db->db_d.db_data_old[txg&TXG_MASK], db);
 	}
 }
@@ -811,6 +819,7 @@ dbuf_free_range(dnode_t *dn, uint64_t blkid, uint64_t nblks, dmu_tx_t *tx)
 			ASSERT(db->db.db_data != NULL);
 			arc_release(db->db_buf, db);
 			bzero(db->db.db_data, db->db.db_size);
+			arc_buf_freeze(db->db_buf);
 		}
 
 		mutex_exit(&db->db_mtx);
@@ -959,6 +968,10 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	 * If this buffer is already dirty, we're done.
 	 */
 	if (list_link_active(&db->db_dirty_node[txgoff])) {
+		if (db->db_blkid != DB_BONUS_BLKID && db->db_level == 0 &&
+		    db->db.db_object != DMU_META_DNODE_OBJECT)
+			arc_buf_thaw(db->db_buf);
+
 		mutex_exit(&db->db_mtx);
 		return;
 	}
@@ -1647,6 +1660,9 @@ dbuf_rele(dmu_buf_impl_t *db, void *tag)
 	holds = refcount_remove(&db->db_holds, tag);
 	ASSERT(holds >= 0);
 
+	if (db->db_buf && holds == db->db_dirtycnt)
+		arc_buf_freeze(db->db_buf);
+
 	if (holds == db->db_dirtycnt &&
 	    db->db_level == 0 && db->db_d.db_immediate_evict)
 		dbuf_evict_user(db);
@@ -1662,7 +1678,7 @@ dbuf_rele(dmu_buf_impl_t *db, void *tag)
 			 */
 			ASSERT3U(db->db_state, ==, DB_UNCACHED);
 			dbuf_evict(db);
-		} else  if (arc_released(db->db_buf)) {
+		} else if (arc_released(db->db_buf)) {
 			arc_buf_t *buf = db->db_buf;
 			/*
 			 * This dbuf has anonymous data associated with it.
@@ -1777,7 +1793,7 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 	 */
 
 	if (db->db_blkid == DB_BONUS_BLKID) {
-		void **datap = &db->db_d.db_data_old[txg&TXG_MASK];
+		arc_buf_t **datap = &db->db_d.db_data_old[txg&TXG_MASK];
 		/*
 		 * Simply copy the bonus data into the dnode.  It will
 		 * be written out when the dnode is synced (and it will
@@ -1807,7 +1823,7 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 	}
 
 	if (db->db_level == 0) {
-		data = (arc_buf_t **)&db->db_d.db_data_old[txg&TXG_MASK];
+		data = &db->db_d.db_data_old[txg&TXG_MASK];
 		blksz = arc_buf_size(*data);
 
 		/*
@@ -1963,7 +1979,7 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 		 * We may have read this indirect block after we dirtied it,
 		 * so never released it from the cache.
 		 */
-		arc_release(parent->db_buf, db->db_parent);
+		arc_release(parent->db_buf, parent);
 
 		db->db_blkptr = (blkptr_t *)parent->db.db_data +
 		    (db->db_blkid & ((1ULL << epbs) - 1));
@@ -1984,8 +2000,7 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 
 	if (db->db_level == 0 &&
 	    db->db_d.db_overridden_by[txg&TXG_MASK] != NULL) {
-		arc_buf_t **old =
-		    (arc_buf_t **)&db->db_d.db_data_old[txg&TXG_MASK];
+		arc_buf_t **old = &db->db_d.db_data_old[txg&TXG_MASK];
 		blkptr_t **bpp = &db->db_d.db_overridden_by[txg&TXG_MASK];
 		int old_size = bp_get_dasize(os->os_spa, db->db_blkptr);
 		int new_size = bp_get_dasize(os->os_spa, *bpp);
@@ -2130,8 +2145,7 @@ dbuf_write_done(zio_t *zio, arc_buf_t *buf, void *vdb)
 		db->db_dirtied = 0;
 
 	if (db->db_level == 0) {
-		arc_buf_t **old =
-		    (arc_buf_t **)&db->db_d.db_data_old[txg&TXG_MASK];
+		arc_buf_t **old = &db->db_d.db_data_old[txg&TXG_MASK];
 
 		ASSERT(db->db_blkid != DB_BONUS_BLKID);
 

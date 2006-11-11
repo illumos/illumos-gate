@@ -62,6 +62,7 @@ dnode_increase_indirection(dnode_t *dn, dmu_tx_t *tx)
 		    db->db.db_size);
 		bcopy(dn->dn_phys->dn_blkptr, db->db.db_data,
 		    sizeof (blkptr_t) * dn->dn_phys->dn_nblkptr);
+		arc_buf_freeze(db->db_buf);
 	}
 
 	dn->dn_phys->dn_nlevels += 1;
@@ -164,8 +165,7 @@ free_verify(dmu_buf_impl_t *db, uint64_t start, uint64_t end, dmu_tx_t *tx)
 
 		/* db_data_old better be zeroed */
 		if (child->db_d.db_data_old[txg & TXG_MASK]) {
-			buf = ((arc_buf_t *)child->db_d.db_data_old
-			    [txg & TXG_MASK])->b_data;
+			buf = child->db_d.db_data_old[txg & TXG_MASK]->b_data;
 			for (j = 0; j < child->db.db_size >> 3; j++) {
 				if (buf[j] != 0) {
 					panic("freed data not zero: "
@@ -238,6 +238,7 @@ free_children(dmu_buf_impl_t *db, uint64_t blkid, uint64_t nblks, int trunc,
 	if (db->db_level == 1) {
 		FREE_VERIFY(db, start, end, tx);
 		free_blocks(dn, bp, end-start+1, tx);
+		arc_buf_freeze(db->db_buf);
 		ASSERT(all || list_link_active(&db->db_dirty_node[txgoff]));
 		return (all);
 	}
@@ -258,6 +259,7 @@ free_children(dmu_buf_impl_t *db, uint64_t blkid, uint64_t nblks, int trunc,
 		}
 		dbuf_rele(subdb, FTAG);
 	}
+	arc_buf_freeze(db->db_buf);
 #ifdef ZFS_DEBUG
 	bp -= (end-start)+1;
 	for (i = start; i <= end; i++, bp++) {

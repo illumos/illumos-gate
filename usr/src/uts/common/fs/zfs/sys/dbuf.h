@@ -196,7 +196,7 @@ typedef struct dmu_buf_impl {
 		 * modify (dirty or clean). db_mtx must be held
 		 * before dn_dirty_mtx.
 		 */
-		void *db_data_old[TXG_SIZE];
+		arc_buf_t *db_data_old[TXG_SIZE];
 		blkptr_t *db_overridden_by[TXG_SIZE];
 	} db_d;
 } dmu_buf_impl_t;

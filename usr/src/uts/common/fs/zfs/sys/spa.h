@@ -252,6 +252,13 @@ typedef struct blkptr {
 	((dva1)->dva_word[1] == (dva2)->dva_word[1] && \
 	(dva1)->dva_word[0] == (dva2)->dva_word[0])
 
+#define	ZIO_CHECKSUM_EQUAL(zc1, zc2) \
+	(0 == (((zc1).zc_word[0] - (zc2).zc_word[0]) | \
+	((zc1).zc_word[1] - (zc2).zc_word[1]) | \
+	((zc1).zc_word[2] - (zc2).zc_word[2]) | \
+	((zc1).zc_word[3] - (zc2).zc_word[3])))
+
+
 #define	DVA_IS_VALID(dva)	(DVA_GET_ASIZE(dva) != 0)
 
 #define	ZIO_SET_CHECKSUM(zcp, w0, w1, w2, w3)	\

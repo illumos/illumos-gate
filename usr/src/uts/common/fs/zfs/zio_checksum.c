@@ -162,10 +162,7 @@ zio_checksum_error(zio_t *zio)
 		ci->ci_func[byteswap](data, size, &actual_cksum);
 	}
 
-	if ((actual_cksum.zc_word[0] - zc.zc_word[0]) |
-	    (actual_cksum.zc_word[1] - zc.zc_word[1]) |
-	    (actual_cksum.zc_word[2] - zc.zc_word[2]) |
-	    (actual_cksum.zc_word[3] - zc.zc_word[3]))
+	if (!ZIO_CHECKSUM_EQUAL(actual_cksum, zc))
 		return (ECKSUM);
 
 	if (zio_injection_enabled && !zio->io_error)

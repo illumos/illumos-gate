@@ -113,6 +113,7 @@
 
 #include <sys/spa.h>
 #include <sys/zio.h>
+#include <sys/zio_checksum.h>
 #include <sys/zfs_context.h>
 #include <sys/arc.h>
 #include <sys/refcount.h>
@@ -238,6 +239,9 @@ struct arc_buf_hdr {
 	dva_t			b_dva;
 	uint64_t		b_birth;
 	uint64_t		b_cksum0;
+
+	kmutex_t		b_freeze_lock;
+	zio_cksum_t		*b_freeze_cksum;
 
 	arc_buf_hdr_t		*b_hash_next;
 	arc_buf_t		*b_buf;
@@ -542,6 +546,69 @@ retry:
 #define	ARC_MINTIME	(hz>>4) /* 62 ms */
 
 static void
+arc_cksum_verify(arc_buf_t *buf)
+{
+	zio_cksum_t zc;
+
+	if (!zfs_flags & ZFS_DEBUG_MODIFY)
+		return;
+
+	mutex_enter(&buf->b_hdr->b_freeze_lock);
+	if (buf->b_hdr->b_freeze_cksum == NULL) {
+		mutex_exit(&buf->b_hdr->b_freeze_lock);
+		return;
+	}
+	fletcher_2_native(buf->b_data, buf->b_hdr->b_size, &zc);
+	if (!ZIO_CHECKSUM_EQUAL(*buf->b_hdr->b_freeze_cksum, zc))
+		panic("buffer modified while frozen!");
+	mutex_exit(&buf->b_hdr->b_freeze_lock);
+}
+
+static void
+arc_cksum_compute(arc_buf_t *buf)
+{
+	if (!zfs_flags & ZFS_DEBUG_MODIFY)
+		return;
+
+	mutex_enter(&buf->b_hdr->b_freeze_lock);
+	if (buf->b_hdr->b_freeze_cksum != NULL) {
+		mutex_exit(&buf->b_hdr->b_freeze_lock);
+		return;
+	}
+	buf->b_hdr->b_freeze_cksum = kmem_alloc(sizeof (zio_cksum_t), KM_SLEEP);
+	fletcher_2_native(buf->b_data, buf->b_hdr->b_size,
+	    buf->b_hdr->b_freeze_cksum);
+	mutex_exit(&buf->b_hdr->b_freeze_lock);
+}
+
+void
+arc_buf_thaw(arc_buf_t *buf)
+{
+	if (!zfs_flags & ZFS_DEBUG_MODIFY)
+		return;
+
+	if (buf->b_hdr->b_state != arc.anon)
+		panic("modifying non-anon buffer!");
+	if (buf->b_hdr->b_flags & ARC_IO_IN_PROGRESS)
+		panic("modifying buffer while i/o in progress!");
+	arc_cksum_verify(buf);
+	mutex_enter(&buf->b_hdr->b_freeze_lock);
+	if (buf->b_hdr->b_freeze_cksum != NULL) {
+		kmem_free(buf->b_hdr->b_freeze_cksum, sizeof (zio_cksum_t));
+		buf->b_hdr->b_freeze_cksum = NULL;
+	}
+	mutex_exit(&buf->b_hdr->b_freeze_lock);
+}
+
+void
+arc_buf_freeze(arc_buf_t *buf)
+{
+	ASSERT(buf->b_hdr->b_freeze_cksum != NULL ||
+	    buf->b_hdr->b_state == arc.anon);
+	arc_cksum_compute(buf);
+}
+
+static void
 add_reference(arc_buf_hdr_t *ab, kmutex_t *hash_lock, void *tag)
 {
 	ASSERT(MUTEX_HELD(hash_lock));
@@ -772,6 +839,7 @@ arc_buf_destroy(arc_buf_t *buf, boolean_t recycle, boolean_t all)
 		arc_state_t *state = buf->b_hdr->b_state;
 		uint64_t size = buf->b_hdr->b_size;
 
+		arc_cksum_verify(buf);
 		if (!recycle) {
 			zio_buf_free(buf->b_data, size);
 			atomic_add_64(&arc.size, -size);
@@ -833,6 +901,10 @@ arc_hdr_destroy(arc_buf_hdr_t *hdr)
 		} else {
 			arc_buf_destroy(hdr->b_buf, FALSE, TRUE);
 		}
+	}
+	if (hdr->b_freeze_cksum != NULL) {
+		kmem_free(hdr->b_freeze_cksum, sizeof (zio_cksum_t));
+		hdr->b_freeze_cksum = NULL;
 	}
 
 	ASSERT(!list_link_active(&hdr->b_arc_node));
@@ -1671,7 +1743,7 @@ arc_read_done(zio_t *zio)
 	 * read.
 	 */
 	found = buf_hash_find(zio->io_spa, &hdr->b_dva, hdr->b_birth,
-		    &hash_lock);
+	    &hash_lock);
 
 	ASSERT((found == NULL && HDR_FREED_IN_READ(hdr) && hash_lock == NULL) ||
 	    (found == hdr && DVA_EQUAL(&hdr->b_dva, BP_IDENTITY(zio->io_bp))));
@@ -1681,6 +1753,8 @@ arc_read_done(zio_t *zio)
 	ASSERT(callback_list != NULL);
 	if (BP_SHOULD_BYTESWAP(zio->io_bp) && callback_list->acb_byteswap)
 		callback_list->acb_byteswap(buf->b_data, hdr->b_size);
+
+	arc_cksum_compute(buf);
 
 	/* create copies of the data buffer for the callers */
 	abuf = buf;
@@ -2106,6 +2180,7 @@ arc_release(arc_buf_t *buf, void *tag)
 		ASSERT3U(refcount_count(&hdr->b_refcnt), ==, 1);
 		ASSERT(BUF_EMPTY(hdr));
 		ASSERT(buf->b_efunc == NULL);
+		arc_buf_thaw(buf);
 		return;
 	}
 
@@ -2149,6 +2224,9 @@ arc_release(arc_buf_t *buf, void *tag)
 		nhdr->b_arc_access = 0;
 		nhdr->b_flags = 0;
 		nhdr->b_datacnt = 1;
+		nhdr->b_freeze_cksum =
+		    kmem_alloc(sizeof (zio_cksum_t), KM_SLEEP);
+		*nhdr->b_freeze_cksum = *hdr->b_freeze_cksum; /* struct copy */
 		buf->b_hdr = nhdr;
 		buf->b_next = NULL;
 		(void) refcount_add(&nhdr->b_refcnt, tag);
@@ -2168,6 +2246,7 @@ arc_release(arc_buf_t *buf, void *tag)
 	}
 	buf->b_efunc = NULL;
 	buf->b_private = NULL;
+	arc_buf_thaw(buf);
 }
 
 int
@@ -2218,6 +2297,8 @@ arc_write_done(zio_t *zio)
 	if (!BUF_EMPTY(hdr)) {
 		arc_buf_hdr_t *exists;
 		kmutex_t *hash_lock;
+
+		arc_cksum_verify(buf);
 
 		exists = buf_hash_insert(hdr, &hash_lock);
 		if (exists) {
@@ -2287,6 +2368,7 @@ arc_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
 	acb->acb_byteswap = (arc_byteswap_func_t *)-1;
 	hdr->b_acb = acb;
 	hdr->b_flags |= ARC_IO_IN_PROGRESS;
+	arc_cksum_compute(buf);
 	rzio = zio_write(pio, spa, checksum, compress, ncopies, txg, bp,
 	    buf->b_data, hdr->b_size, arc_write_done, buf, priority, flags, zb);
 

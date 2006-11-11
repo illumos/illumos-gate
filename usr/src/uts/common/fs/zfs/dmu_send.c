@@ -896,10 +896,7 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 			 * everything before the DRR_END record.
 			 */
 			if (drre.drr_checksum.zc_word[0] != 0 &&
-			    ((drre.drr_checksum.zc_word[0] - pzc.zc_word[0]) |
-			    (drre.drr_checksum.zc_word[1] - pzc.zc_word[1]) |
-			    (drre.drr_checksum.zc_word[2] - pzc.zc_word[2]) |
-			    (drre.drr_checksum.zc_word[3] - pzc.zc_word[3]))) {
+			    !ZIO_CHECKSUM_EQUAL(drre.drr_checksum, pzc)) {
 				ra.err = ECKSUM;
 				goto out;
 			}
