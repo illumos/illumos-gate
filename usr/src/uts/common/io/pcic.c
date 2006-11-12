@@ -2116,6 +2116,21 @@ pcic_setup_adapter(pcicdev_t *pcic)
 			break;
 		} /* switch */
 
+		/*
+		 * The default value in the EEPROM (loaded on reset) for
+		 * MFUNC0/MFUNC1 may be incorrect. Here we make sure that
+		 * MFUNC0 is connected to INTA, and MFUNC1 is connected to
+		 * INTB. This applies to all TI CardBus controllers.
+		 */
+		if ((pcic->pc_type >> 16) == PCIC_TI_VENDORID &&
+			pcic->pc_intr_mode == PCIC_INTR_MODE_PCI_1) {
+			value = ddi_get32(pcic->cfg_handle,
+			    (uint32_t *)(pcic->cfgaddr + PCIC_MFROUTE_REG));
+			value &= ~0xff;
+			ddi_put32(pcic->cfg_handle, (uint32_t *)(pcic->cfgaddr +
+			    PCIC_MFROUTE_REG), value|0x22);
+		}
+
 		/* setup general card status change interrupt */
 		switch (pcic->pc_type) {
 			case PCIC_TI_PCI1225:
