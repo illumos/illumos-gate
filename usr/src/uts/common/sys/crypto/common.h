@@ -56,6 +56,16 @@ typedef struct crypto_mechanism {
 	size_t			cm_param_len;	/* mech. parameter len */
 } crypto_mechanism_t;
 
+#ifdef  _SYSCALL32
+
+typedef struct crypto_mechanism32 {
+	crypto_mech_type_t	cm_type;	/* mechanism type */
+	caddr32_t		cm_param;	/* mech. parameter */
+	size32_t		cm_param_len;   /* mech. parameter len */
+} crypto_mechanism32_t;
+
+#endif  /* _SYSCALL32 */
+
 /*
  * The measurement unit flag for a mechanism's minimum or maximum key size.
  * The unit are mechanism dependant.  It can be in bits or in bytes.
@@ -196,6 +206,36 @@ typedef struct crypto_key {
 		} cku_key_attrs;
 	} cku_data;				/* Crypto Key union */
 } crypto_key_t;
+
+#ifdef  _SYSCALL32
+
+typedef struct crypto_object_attribute32 {
+	uint64_t	oa_type;	/* attribute type */
+	caddr32_t	oa_value;	/* attribute value */
+	ssize32_t	oa_value_len;	/* length of attribute value */
+} crypto_object_attribute32_t;
+
+typedef struct crypto_key32 {
+	crypto_key_format_t	ck_format;	/* format identifier */
+	union {
+		/* for CRYPTO_KEY_RAW ck_format */
+		struct {
+			uint32_t cku_v_length;	/* # of bytes in ck_data */
+			caddr32_t cku_v_data;	/* ptr to key value */
+		} cku_key_value;
+
+		/* for CRYPTO_KEY_REFERENCE ck_format */
+		crypto_object_id_t cku_key_id; /* reference to object key */
+
+		/* for CRYPTO_KEY_ATTR_LIST ck_format */
+		struct {
+			uint32_t cku_a_count;	/* number of attributes */
+			caddr32_t cku_a_oattr;
+		} cku_key_attrs;
+	} cku_data;				/* Crypto Key union */
+} crypto_key32_t;
+
+#endif  /* _SYSCALL32 */
 
 #define	ck_data		cku_data.cku_key_value.cku_v_data
 #define	ck_length	cku_data.cku_key_value.cku_v_length

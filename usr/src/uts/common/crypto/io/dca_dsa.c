@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,9 +34,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/kmem.h>
-#include <sys/crypto/common.h>
 #include <sys/crypto/spi.h>
-#include <sys/crypto/ioctl.h>
 #include <sys/crypto/dca.h>
 
 /*

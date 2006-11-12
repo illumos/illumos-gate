@@ -259,7 +259,7 @@ rnd_read(dev_t dev, struct uio *uiop, cred_t *credp)
 
 			nbytes += len;
 
-			if (nbytes >= MAXRETBYTES)
+			if (devno == DEVRANDOM && nbytes >= MAXRETBYTES)
 				break;
 
 		} else if ((error == EAGAIN) && (nbytes > 0)) {

@@ -123,6 +123,8 @@ static struct pollhead rnd_pollhead;
 static timeout_id_t kcf_rndtimeout_id;
 static crypto_mech_type_t rngmech_type = CRYPTO_MECH_INVALID;
 rnd_stats_t rnd_stats;
+static boolean_t rng_prov_found = B_TRUE;
+static boolean_t rng_ok_to_log = B_TRUE;
 
 static void rndc_addbytes(uint8_t *, size_t);
 static void rndc_getbytes(uint8_t *ptr, size_t len);
@@ -175,9 +177,18 @@ kcf_rngprov_check(void)
 	if ((pd = kcf_get_mech_provider(rngmech_type, NULL, &rv,
 	    NULL, CRYPTO_FG_RANDOM, B_FALSE, 0)) != NULL) {
 		KCF_PROV_REFRELE(pd);
+		/*
+		 * We logged a warning once about no provider being available
+		 * and now a provider became available. So, set the flag so
+		 * that we can log again if the problem recurs.
+		 */
+		rng_ok_to_log = B_TRUE;
+		rng_prov_found = B_TRUE;
 		return (B_TRUE);
-	} else
+	} else {
+		rng_prov_found = B_FALSE;
 		return (B_FALSE);
+	}
 }
 
 /*
@@ -276,7 +287,12 @@ try_next:
 		kcf_free_triedlist(list);
 
 	if (prov_cnt == 0) { /* no provider could be found. */
+		rng_prov_found = B_FALSE;
 		return (-1);
+	} else {
+		rng_prov_found = B_TRUE;
+		/* See comments in kcf_rngprov_check() */
+		rng_ok_to_log = B_TRUE;
 	}
 
 	return (total_bytes);
@@ -416,7 +432,12 @@ try_next:
 	}
 
 	if (prov_cnt == 0) { /* no provider could be found. */
+		rng_prov_found = B_FALSE;
 		return (-1);
+	} else {
+		rng_prov_found = B_TRUE;
+		/* See comments in kcf_rngprov_check() */
+		rng_ok_to_log = B_TRUE;
 	}
 
 	return (total_bytes);
@@ -429,10 +450,7 @@ rngprov_task(void *arg)
 	uchar_t tbuf[MAXEXTRACTBYTES];
 
 	ASSERT(len <= MAXEXTRACTBYTES);
-	if (rngprov_getbytes(tbuf, len, B_FALSE, B_TRUE) == -1) {
-		cmn_err(CE_WARN, "No randomness provider enabled for "
-		    "/dev/random. Use cryptoadm(1M) to enable a provider.");
-	}
+	(void) rngprov_getbytes(tbuf, len, B_FALSE, B_TRUE);
 }
 
 /*
@@ -846,6 +864,12 @@ rnd_handler(void *arg)
 {
 	int len = 0;
 
+	if (!rng_prov_found && rng_ok_to_log) {
+		cmn_err(CE_WARN, "No randomness provider enabled for "
+		    "/dev/random. Use cryptoadm(1M) to enable a provider.");
+		rng_ok_to_log = B_FALSE;
+	}
+
 	if (num_waiters > 0)
 		len = MAXEXTRACTBYTES;
 	else if (rnbyte_cnt < RNDPOOLSIZE)
@@ -854,9 +878,6 @@ rnd_handler(void *arg)
 	if (len > 0) {
 		(void) taskq_dispatch(system_taskq, rngprov_task,
 		    (void *)(uintptr_t)len, TQ_NOSLEEP);
-	} else if (!kcf_rngprov_check()) {
-		cmn_err(CE_WARN, "No randomness provider enabled for "
-		    "/dev/random. Use cryptoadm(1M) to enable a provider.");
 	}
 
 	mutex_enter(&rndpool_lock);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -578,6 +577,7 @@ kcf_resubmit_request(kcf_areq_node_t *areq)
 	return (error);
 }
 
+#define	EMPTY_TASKQ(tq)	((tq)->tq_task.tqent_next == &(tq)->tq_task)
 
 /*
  * Routine called by both ioctl and k-api. The consumer should
@@ -613,11 +613,6 @@ kcf_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 			break;
 
 		case CRYPTO_HW_PROVIDER:
-			/*
-			 * Bug# 4715197
-			 * TO DO - Add the logic for EMPTYQ() case.
-			 * For now, we always queue.
-			 */
 			sreq = kmem_cache_alloc(kcf_sreq_cache, KM_SLEEP);
 			sreq->sn_state = REQ_ALLOCATED;
 			sreq->sn_rv = CRYPTO_FAILED;
@@ -635,22 +630,33 @@ kcf_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 
 			ASSERT(taskq != NULL);
 			/*
-			 * We can not tell from taskq_dispatch() return
-			 * value if we exceeded maxalloc. Hence the check
-			 * here. Since we are allowed to wait in the
-			 * synchronous case, we wait for the taskq to
-			 * become empty.
+			 * Call the SPI directly if the taskq is empty and the
+			 * provider is not busy, else dispatch to the taskq.
+			 * Calling directly is fine as this is the synchronous
+			 * case. This is unlike the asynchronous case where we
+			 * must always dispatch to the taskq.
 			 */
-			if (taskq->tq_nalloc >= crypto_taskq_maxalloc) {
-				taskq_wait(taskq);
-			}
-			if (taskq_dispatch(taskq,
-			    process_req_hwp, sreq, TQ_SLEEP) ==
-			    (taskqid_t)0) {
-				error = CRYPTO_HOST_MEMORY;
-				KCF_PROV_REFRELE(sreq->sn_provider);
-				kmem_cache_free(kcf_sreq_cache, sreq);
-				goto done;
+			if (EMPTY_TASKQ(taskq) &&
+			    pd->pd_state == KCF_PROV_READY) {
+				process_req_hwp(sreq);
+			} else {
+				/*
+				 * We can not tell from taskq_dispatch() return
+				 * value if we exceeded maxalloc. Hence the
+				 * check here. Since we are allowed to wait in
+				 * the synchronous case, we wait for the taskq
+				 * to become empty.
+				 */
+				if (taskq->tq_nalloc >= crypto_taskq_maxalloc) {
+					taskq_wait(taskq);
+				}
+				if (taskq_dispatch(taskq, process_req_hwp,
+				    sreq, TQ_SLEEP) == (taskqid_t)0) {
+					error = CRYPTO_HOST_MEMORY;
+					KCF_PROV_REFRELE(sreq->sn_provider);
+					kmem_cache_free(kcf_sreq_cache, sreq);
+					goto done;
+				}
 			}
 
 			/*

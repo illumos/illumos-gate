@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -481,44 +480,6 @@ typedef struct crypto_decrypt_verify_update {
 
 #ifdef	_KERNEL
 #ifdef	_SYSCALL32
-
-/* crypto_mechanism_t is defined in <sys/crypto/common.h> */
-
-typedef struct crypto_mechanism32 {
-	crypto_mech_type_t	cm_type;	/* mech. type */
-	caddr32_t		cm_param;	/* mech. parameter */
-	size32_t		cm_param_len;	/* mech. parameter len */
-} crypto_mechanism32_t;
-
-/* crypto_object_attribute_t is defined in <sys/crypto/common.h> */
-
-typedef struct crypto_object_attribute32 {
-	uint64_t	oa_type;	/* attribute type */
-	caddr32_t	oa_value;	/* attribute value */
-	ssize32_t	oa_value_len;	/* length of attribute value */
-} crypto_object_attribute32_t;
-
-/* crypto_key_t is defined in <sys/crypto/common.h> */
-
-typedef struct crypto_key32 {
-	crypto_key_format_t	ck_format;	/* format identifier */
-	union {
-		/* for CRYPTO_KEY_RAW ck_format */
-		struct {
-			uint32_t cku_v_length;	/* # of bytes in ck_data */
-			caddr32_t cku_v_data;	/* ptr to key value */
-		} cku_key_value;
-
-		/* for CRYPTO_KEY_REFERENCE ck_format */
-		crypto_object_id_t cku_key_id; /* reference to object key */
-
-		/* for CRYPTO_KEY_ATTR_LIST ck_format */
-		struct {
-			uint32_t cku_a_count;	/* number of attributes */
-			caddr32_t cku_a_oattr;
-		} cku_key_attrs;
-	} cku_data;				/* Crypto Key union */
-} crypto_key32_t;
 
 typedef struct crypto_encrypt32 {
 	uint32_t		ce_return_value;
