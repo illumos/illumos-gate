@@ -31,6 +31,7 @@
 All:suser:cmd:::*:
 Audit Control:suser:cmd:::/etc/security/bsmconv:uid=0
 Audit Control:suser:cmd:::/etc/security/bsmunconv:uid=0
+Audit Control:solaris:cmd:::/usr/sbin/audit:privs=sys_audit,file_dac_read,proc_owner
 Audit Control:suser:cmd:::/usr/sbin/audit:euid=0
 Audit Control:suser:cmd:::/usr/sbin/auditconfig:euid=0
 Audit Control:suser:cmd:::/usr/sbin/auditd:uid=0

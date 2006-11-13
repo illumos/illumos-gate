@@ -99,11 +99,6 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	if (getuid() != 0) {
-		(void) fprintf(stderr, gettext("%s: not super-user\n"),
-			progname);
-		exit(2);
-	}
 	/* first option required */
 	if ((c = getopt(argc, argv, "nstTv:")) == -1) {
 		(void) fprintf(stderr, gettext("usage: %s\n"), usage);
