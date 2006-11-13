@@ -487,9 +487,10 @@ px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 {
 	ddi_dma_impl_t *mp = (ddi_dma_impl_t *)handle;
 	uint64_t sync_dir;
-	px_dvma_addr_t dvma_addr, pg_off;
-	size_t num_sync;
-	uint64_t status = H_EOK;
+	size_t bytes_synced;
+	int end, idx;
+	off_t pg_off;
+	devhandle_t hdl = DIP_TO_HANDLE(dip); /* need to cache hdl */
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_dma_sync: dip 0x%p rdip 0x%p "
 	    "handle 0x%llx off 0x%x len 0x%x flags 0x%x\n",
@@ -507,33 +508,38 @@ px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	if (!len)
 		len = mp->dmai_size;
 
-	pg_off = mp->dmai_offset;			/* start min */
-	dvma_addr = MAX(off, pg_off);			/* lo */
-	pg_off += mp->dmai_size;			/* end max */
-	pg_off = MIN(off + len, pg_off);		/* hi */
-	if (dvma_addr >= pg_off) {			/* lo >= hi ? */
-		cmn_err(CE_WARN, "%s%d: %lx + %lx out of window [%lx,%lx]",
-		    ddi_driver_name(rdip), ddi_get_instance(rdip),
-		    off, len, mp->dmai_offset,
-		    mp->dmai_offset + mp->dmai_size);
-		return (DDI_FAILURE);
-	}
-
-	len = pg_off - dvma_addr;			/* sz = hi - lo */
-	dvma_addr += mp->dmai_mapping;			/* start addr */
-
 	if (mp->dmai_rflags & DDI_DMA_READ)
 		sync_dir = HVIO_DMA_SYNC_DIR_FROM_DEV;
 	else
 		sync_dir = HVIO_DMA_SYNC_DIR_TO_DEV;
 
-	for (; ((len > 0) && (status == H_EOK)); len -= num_sync) {
-		status = hvio_dma_sync(DIP_TO_HANDLE(dip), dvma_addr, len,
-		    sync_dir, &num_sync);
-		dvma_addr += num_sync;
+	off += mp->dmai_offset;
+	pg_off = off & MMU_PAGEOFFSET;
+
+	DBG(DBG_LIB_DMA, dip, "px_lib_dma_sync: page offset %x size %x\n",
+	    pg_off, len);
+
+	/* sync on page basis */
+	end = MMU_BTOPR(off + len - 1);
+	for (idx = MMU_BTOP(off); idx < end; idx++,
+	    len -= bytes_synced, pg_off = 0) {
+		size_t bytes_to_sync = bytes_to_sync =
+		    MIN(len, MMU_PAGESIZE - pg_off);
+
+		if (hvio_dma_sync(hdl, MMU_PTOB(PX_GET_MP_PFN(mp, idx)) +
+		    pg_off, bytes_to_sync, sync_dir, &bytes_synced) != H_EOK)
+			break;
+
+		DBG(DBG_LIB_DMA, dip, "px_lib_dma_sync: Called hvio_dma_sync "
+		    "ra = %p bytes to sync = %x bytes synced %x\n",
+		    MMU_PTOB(PX_GET_MP_PFN(mp, idx)) + pg_off, bytes_to_sync,
+		    bytes_synced);
+
+		if (bytes_to_sync != bytes_synced)
+			break;
 	}
 
-	return ((status == H_EOK) ? DDI_SUCCESS : DDI_FAILURE);
+	return (len ? DDI_FAILURE : DDI_SUCCESS);
 }
 
 

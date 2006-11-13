@@ -145,16 +145,18 @@ struct px {
 
 	/* CPR callback id */
 	callb_id_t	px_cprcb_id;
+	uint32_t	px_dma_sync_opt; /* DMA syncing req. of hw */
 };
 
 /* px soft state flag */
-#define	PX_SOFT_STATE_OPEN		0x01
-#define	PX_SOFT_STATE_OPEN_EXCL		0x02
-#define	PX_SOFT_STATE_CLOSED		0x04
+#define	PX_SOFT_STATE_OPEN		1
+#define	PX_SOFT_STATE_OPEN_EXCL		2
+#define	PX_SOFT_STATE_CLOSED		4
 
 /* px_dev_caps definition */
-#define	PX_BYPASS_DMA_ALLOWED		0x00000001
-#define	PX_HOTPLUG_CAPABLE		0x00000002
+#define	PX_BYPASS_DMA_ALLOWED		1
+#define	PX_HOTPLUG_CAPABLE		2
+#define	PX_DMA_SYNC_REQUIRED		4
 
 /* px_pm_flags definitions used with interrupts and FMA code */
 #define	PX_PMETOACK_RECVD		0x01 /* With PME_To_ACK interrupt */

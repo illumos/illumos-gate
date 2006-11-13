@@ -227,6 +227,12 @@ px_dma_attach(px_t *px_p)
 		/* ignore all other errors */
 		px_p->px_dev_caps |= PX_BYPASS_DMA_ALLOWED;
 
+	px_p->px_dma_sync_opt = ddi_prop_get_int(DDI_DEV_T_ANY,
+	    px_p->px_dip, DDI_PROP_DONTPASS, "dma-sync-options", 0);
+
+	if (px_p->px_dma_sync_opt != 0)
+		px_p->px_dev_caps |= PX_DMA_SYNC_REQUIRED;
+
 	return (DDI_SUCCESS);
 }
 
@@ -374,7 +380,10 @@ px_dma_type(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	pfn_t pfn0;
 	uint_t redzone;
 
-	mp->dmai_rflags = dmareq->dmar_flags & DMP_DDIFLAGS | DMP_NOSYNC;
+	mp->dmai_rflags = dmareq->dmar_flags & DMP_DDIFLAGS;
+
+	if (!(px_p->px_dev_caps & PX_DMA_SYNC_REQUIRED))
+		mp->dmai_rflags |= DMP_NOSYNC;
 
 	switch (dobj_p->dmao_type) {
 	case DMA_OTYP_BUFVADDR:
