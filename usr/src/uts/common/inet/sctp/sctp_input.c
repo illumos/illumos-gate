@@ -804,7 +804,8 @@ sctp_data_frag(sctp_t *sctp, mblk_t *dmp, sctp_data_hdr_t **dc, int *error,
 	 */
 #define	SCTP_NEW_REASS(nmp, dmp, srp, seterror)				\
 	if ((DB_REF(dmp) == 2) && (MBLKHEAD(dmp) >= 			\
-	    (sizeof (*(srp)) + sizeof (sctp_hdr_t)))) {			\
+	    (sizeof (*(srp)) + sizeof (sctp_hdr_t))) &&			\
+	    (IS_P2ALIGNED(DB_BASE(dmp), sizeof (uintptr_t)))) {		\
 		(nmp) = (dmp);						\
 	} else {							\
 		(nmp) = allocb(sizeof (*(srp)), BPRI_MED); 		\
