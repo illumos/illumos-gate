@@ -2379,6 +2379,9 @@ nfs4_putpages(vnode_t *vp, u_offset_t off, size_t len, int flags, cred_t *cr)
 		 * is happening, then R4DIRTY will get set again.  The
 		 * R4DIRTY bit must get cleared before the flush so that
 		 * we don't lose this information.
+		 *
+		 * If there are no full file async write operations
+		 * pending and RDIRTY bit is set, clear it.
 		 */
 		if (off == (u_offset_t)0 &&
 		    !(flags & B_ASYNC) &&
@@ -2386,6 +2389,13 @@ nfs4_putpages(vnode_t *vp, u_offset_t off, size_t len, int flags, cred_t *cr)
 			mutex_enter(&rp->r_statelock);
 			rdirty = (rp->r_flags & R4DIRTY);
 			rp->r_flags &= ~R4DIRTY;
+			mutex_exit(&rp->r_statelock);
+		} else if (flags & B_ASYNC && off == (u_offset_t)0) {
+			mutex_enter(&rp->r_statelock);
+			if (rp->r_flags & R4DIRTY && rp->r_awcount == 0) {
+				rdirty = (rp->r_flags & R4DIRTY);
+				rp->r_flags &= ~R4DIRTY;
+			}
 			mutex_exit(&rp->r_statelock);
 		} else
 			rdirty = 0;
