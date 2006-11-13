@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,7 @@ struct Session {
 	char	*auth_display;
 	char	*auth_proto;
 	char	*auth_data;
+	char	*auth_file;			/* xauth(1) authority file */
 	int	single_connection;
 	/* proto 2 */
 	int	chanid;

@@ -270,6 +270,9 @@ g11n_getlocales()
 		list[n_elems++] = xstrdup(locale);
 	}
 
+	if (n_elems == 0)
+		return (NULL);
+
 	list[n_elems] = NULL;
 	(void) pclose(locale_out);
 

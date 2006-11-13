@@ -230,7 +230,7 @@ fatal_add_cleanup(void (*proc) (void *), void *context)
 	fatal_cleanups = cu;
 }
 
-/* Removes a cleanup frunction to be called at fatal(). */
+/* Removes a cleanup function to be called at fatal(). */
 
 void
 fatal_remove_cleanup(void (*proc) (void *context), void *context)

@@ -46,6 +46,10 @@ RCSID("$OpenBSD: session.c,v 1.150 2002/09/16 19:55:33 stevesk Exp $");
 #include <ulimit.h>
 #endif /* HAVE_DEFOPEN */
 
+#ifdef HAVE_LIBGEN_H
+#include <libgen.h>
+#endif
+
 #include "ssh.h"
 #include "ssh1.h"
 #include "ssh2.h"
@@ -92,6 +96,7 @@ RCSID("$OpenBSD: session.c,v 1.150 2002/09/16 19:55:33 stevesk Exp $");
 Session *session_new(void);
 void	session_set_fds(Session *, int, int, int);
 void	session_pty_cleanup(void *);
+void	session_xauthfile_cleanup(void *s);
 void	session_proctitle(Session *);
 int	session_setup_x11fwd(Session *);
 void	do_exec_pty(Session *, const char *);
@@ -1107,6 +1112,9 @@ do_setup_env(Session *s, const char *shell)
 	if (getenv("TZ"))
 		child_set_env(&env, &envsize, "TZ", getenv("TZ"));
 
+	if (s->auth_file != NULL)
+		child_set_env(&env, &envsize, "XAUTHORITY", s->auth_file);
+
 	PASS_ENV("LANG")
 	PASS_ENV("LC_ALL")
 	PASS_ENV("LC_CTYPE")
@@ -1835,10 +1843,15 @@ session_subsystem_req(Session *s)
 	return success;
 }
 
+/*
+ * Serve "x11-req" channel request for X11 forwarding for the current session
+ * channel.
+ */
 static int
 session_x11_req(Session *s)
 {
 	int success;
+	char *xauthdir = "/tmp/ssh-xauth-XXXXXX";
 
 	s->single_connection = packet_get_char();
 	s->auth_proto = packet_get_string(NULL);
@@ -1853,6 +1866,31 @@ session_x11_req(Session *s)
 		s->auth_proto = NULL;
 		s->auth_data = NULL;
 	}
+
+	/*
+	 * Create per session X authority file so that different sessions
+	 * don't contend for one common file. The reason for this is that
+	 * xauth(1) locking doesn't work too well over network filesystems.
+	 *
+	 * If mkdtemp() fails then s->auth_file remains NULL which means that
+	 * we won't set XAUTHORITY variable in child's environment and
+	 * xauth(1) will use the default location for the authority file.
+	 */
+	if (success && mkdtemp(xauthdir) != NULL) {
+		s->auth_file = xmalloc(MAXPATHLEN);
+		snprintf(s->auth_file, MAXPATHLEN, "%s/xauthfile",
+		    xauthdir);
+		/*
+		 * add a cleanup function to remove the temporary
+		 * xauth file in case we call fatal() (e.g., the
+		 * connection gets closed).
+		 */
+		fatal_add_cleanup(session_xauthfile_cleanup, (void *)s);
+	} else {
+		error("failed to create the temporary authority file, "
+		    "will use the default one");
+	}
+
 	return success;
 }
 
@@ -2128,6 +2166,37 @@ session_pty_cleanup(void *session)
 	PRIVSEP(session_pty_cleanup2(session));
 }
 
+/*
+ * We use a different temporary X authority file per every session so we
+ * should remove those files when fatal() is called.
+ */
+void
+session_xauthfile_cleanup(void *session)
+{
+	Session *s = session;
+
+	if (s == NULL) {
+		error("session_xauthfile_cleanup: no session");
+		return;
+	}
+
+	debug("session_xauthfile_cleanup: session %d removing %s", s->self,
+	    s->auth_file);
+
+	if (unlink(s->auth_file) == -1) {
+		error("session_xauthfile_cleanup: cannot remove xauth file: "
+		    "%.100s", strerror(errno));
+		return;
+	}
+
+	/* dirname() will modify s->auth_file but that's ok */
+	if (rmdir(dirname(s->auth_file)) == -1) {
+		error("session_xauthfile_cleanup: "
+		    "cannot remove xauth directory: %.100s", strerror(errno));
+		return;
+	}
+}
+
 static char *
 sig2name(int sig)
 {
@@ -2205,6 +2274,11 @@ session_close(Session *s)
 		fatal_remove_cleanup(session_pty_cleanup, (void *)s);
 		session_pty_cleanup(s);
 	}
+	if (s->auth_file != NULL) {
+		fatal_remove_cleanup(session_xauthfile_cleanup, (void *)s);
+		session_xauthfile_cleanup(s);
+		xfree(s->auth_file);
+	}
 	if (s->term)
 		xfree(s->term);
 	if (s->display)
@@ -2237,8 +2311,9 @@ session_close_by_pid(pid_t pid, int status)
 }
 
 /*
- * this is called when a channel dies before
- * the session 'child' itself dies
+ * This is called when a channel dies before the session 'child' itself dies.
+ * It can happen for example if we exit from an interactive shell before we
+ * exit from forwarded X11 applications.
  */
 void
 session_close_by_channel(int id, void *arg)
